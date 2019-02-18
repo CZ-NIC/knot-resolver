@@ -35,6 +35,7 @@ BuildRequires:  gnupg2
 
 BuildRequires:  gcc
 BuildRequires:  gcc-c++
+BuildRequires:  meson
 BuildRequires:  pkgconfig(cmocka)
 BuildRequires:  pkgconfig(gnutls)
 BuildRequires:  pkgconfig(libedit)
@@ -44,7 +45,8 @@ BuildRequires:  pkgconfig(libdnssec) >= 2.7.6
 BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
-BuildRequires:  pkgconfig(systemd)
+
+Requires:	systemd
 
 # Distro-dependent dependencies
 %if 0%{?rhel}
@@ -71,22 +73,18 @@ Requires(pre):	shadow
 %endif
 
 %if "x%{?rhel}" == "x"
-# dependencies for doc package; disable in EPEL (missing fonts)
-# https://bugzilla.redhat.com/show_bug.cgi?id=1492884
+# dependencies for doc package
+# enable once CentOS 7.6 makes it into OBS buildroot
 BuildRequires:  doxygen
 BuildRequires:  python3-breathe
 BuildRequires:  python3-sphinx_rtd_theme
 %endif
 
-Requires(post):		systemd
-Requires(preun):	systemd
-Requires(postun):	systemd
-
 %description
-The Knot Resolver is a caching full resolver implementation written in C
-and LuaJIT, including both a resolver library and a daemon. Modular
-architecture of the library keeps the core tiny and efficient, and provides
-a state-machine like API for extensions.
+The Knot Resolver is a DNSSEC-enabled caching full resolver implementation
+written in C and LuaJIT, including both a resolver library and a daemon.
+Modular architecture of the library keeps the core tiny and efficient, and
+provides a state-machine like API for extensions.
 
 The package is pre-configured as local caching resolver.
 To start using it, start a single kresd instance:
@@ -119,64 +117,54 @@ gpg2 --verify %{SOURCE1} %{SOURCE0}
 %setup -q -n %{name}-%{version}
 
 %build
-%global build_paths PREFIX=%{_prefix} BINDIR=%{_bindir} LIBDIR=%{_libdir} INCLUDEDIR=%{_includedir} ETCDIR=%{_sysconfdir}/knot-resolver
-%global build_flags V=1 CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" %{build_paths} HAS_go=no
-%make_build %{build_flags}
-
+meson build_rpm \
 %if "x%{?rhel}" == "x"
-# build documentation
-make doc
+    -Ddoc=enabled \
+    -Dsystemd_unit_files=enabled \
+%else
+    -Dsystemd_unit_files=nosocket \
 %endif
+    -Dclient=enabled \
+    -Dunit_tests=enabled \
+    -Dmanaged_ta=enabled \
+    -Dinstall_kresd_conf=enabled \
+    --buildtype=plain \
+    --prefix="%{_prefix}" \
+    --sbindir="%{_sbindir}" \
+    --libdir="%{_libdir}" \
+    --includedir="%{_includedir}" \
+    --sysconfdir="%{_sysconfdir}" \
+    -Dc_args="%{optflags}"\
+    -Dc_link_args="%{?__global_ldflags}"
+
+ninja-build -v -C build_rpm
 
 %check
-make %{?_smp_mflags} check
+meson test -C build_rpm
 
 %install
-%make_install %{build_flags}
+DESTDIR="${RPM_BUILD_ROOT}" ninja-build -v -C build_rpm install
 
-# move sample configuration files to documentation
-install -m 0755 -d %{buildroot}%{_pkgdocdir}
-mv %{buildroot}%{_sysconfdir}/knot-resolver/config.* %{buildroot}%{_pkgdocdir}
-chmod 0644 %{buildroot}%{_pkgdocdir}/config.*
-
-# install configuration files
-mkdir -p %{buildroot}%{_sysconfdir}
-install -m 0755 -d %{buildroot}%{_sysconfdir}/knot-resolver
-install -m 0644 -p %{repodir}/distro/common/kresd.conf %{buildroot}%{_sysconfdir}/knot-resolver/kresd.conf
-install -m 0664 -p %{repodir}/distro/common/root.keys %{buildroot}%{_sysconfdir}/knot-resolver/root.keys
-
-# install systemd units and doc
-mkdir -p %{buildroot}%{_unitdir}
-install -m 0644 -p %{repodir}/distro/common/systemd/kresd@.service %{buildroot}%{_unitdir}/kresd@.service
-install -m 0644 -p %{repodir}/distro/common/systemd/kresd.target %{buildroot}%{_unitdir}/kresd.target
+# add kresd.target to multi-user.target.wants to support enabling kresd services
 install -m 0755 -d %{buildroot}%{_unitdir}/multi-user.target.wants
 ln -s ../kresd.target %{buildroot}%{_unitdir}/multi-user.target.wants/kresd.target
-mkdir -p %{buildroot}%{_mandir}/man7
-install -m 0644 -p %{repodir}/distro/common/systemd/kresd.systemd.7 %{buildroot}%{_mandir}/man7/kresd.systemd.7
 
+# install .tmpfiles.d dirs
+#mkdir -p %{buildroot}%{_localstatedir}/cache
+install -m 0750 -d %{buildroot}%{_localstatedir}/cache/%{name}
+install -m 0750 -d %{buildroot}/run/%{name}
+
+
+# remove http module (missing dependencies)
+rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http
+rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http.lua
+rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http_trace.lua
+rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/prometheus.lua
+
+# rename doc directory for centos 7
 %if 0%{?rhel}
-# no socket activation for CentOS 7 (requires systemd.227)
-mkdir -p %{buildroot}%{_unitdir}/kresd@.service.d
-install -m 0644 -p %{repodir}/distro/common/systemd/drop-in/systemd-compat.conf %{buildroot}%{_unitdir}/kresd@.service.d/override.conf
+mv %{buildroot}/%{_docdir}/%{name} %{buildroot}/%{_pkgdocdir}
 %endif
-%if "x%{?rhel}" == "x"
-install -m 0644 -p %{repodir}/distro/common/systemd/kresd.socket %{buildroot}%{_unitdir}/kresd.socket
-install -m 0644 -p %{repodir}/distro/common/systemd/kresd-control@.socket %{buildroot}%{_unitdir}/kresd-control@.socket
-install -m 0644 -p %{repodir}/distro/common/systemd/kresd-tls.socket %{buildroot}%{_unitdir}/kresd-tls.socket
-%endif
-
-# install tmpfiles.d
-mkdir -p %{buildroot}%{_tmpfilesdir}
-install -m 0644 -p %{repodir}/distro/common/tmpfiles/knot-resolver.conf %{buildroot}%{_tmpfilesdir}/knot-resolver.conf
-mkdir -p %{buildroot}%{_rundir}
-install -m 0750 -d %{buildroot}%{_rundir}/knot-resolver
-
-# install cache
-mkdir -p %{buildroot}%{_localstatedir}/cache
-install -m 0750 -d %{buildroot}%{_localstatedir}/cache/knot-resolver
-
-# remove module with unsatisfied dependencies
-rm -r %{buildroot}%{_libdir}/kdns_modules/{http,http.lua}
 
 %pre
 getent group knot-resolver >/dev/null || groupadd -r knot-resolver
@@ -203,30 +191,32 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %endif
 
 %files
-%license COPYING
-%doc %{_pkgdocdir}
+%license %{_pkgdocdir}/COPYING
+%doc %{_pkgdocdir}/AUTHORS
+%doc %{_pkgdocdir}/NEWS
+%doc %{_pkgdocdir}/examples
 %attr(775,root,knot-resolver) %dir %{_sysconfdir}/knot-resolver
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/kresd.conf
 %attr(664,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/root.keys
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/root.hints
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/icann-ca.pem
-%attr(750,knot-resolver,knot-resolver) %dir %{_localstatedir}/cache/knot-resolver
 %{_unitdir}/kresd*.service
 %{_unitdir}/kresd.target
 %{_unitdir}/multi-user.target.wants/kresd.target
-%if 0%{?rhel}
-%{_unitdir}/kresd@.service.d/override.conf
-%endif
 %if "x%{?rhel}" == "x"
 %{_unitdir}/kresd*.socket
+%{_mandir}/man7/kresd.systemd.7.gz
+%else
+%{_mandir}/man7/kresd.systemd.nosocket.7.gz
 %endif
 %{_tmpfilesdir}/knot-resolver.conf
+%dir /run/%{name}/
+%attr(750,knot-resolver,knot-resolver) %dir %{_localstatedir}/cache/%{name}
 %{_sbindir}/kresd
 %{_sbindir}/kresc
 %{_libdir}/libkres.so.*
-%{_libdir}/kdns_modules
+%{_libdir}/knot-resolver
 %{_mandir}/man8/kresd.8.gz
-%{_mandir}/man7/kresd.systemd.7.gz
 
 %files devel
 %{_includedir}/libkres
@@ -235,7 +225,7 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 
 %if "x%{?rhel}" == "x"
 %files doc
-%doc doc/html
+%doc %{_pkgdocdir}/html
 %endif
 
 %changelog
