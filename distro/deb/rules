@@ -14,55 +14,31 @@ DPKG_EXPORT_BUILDFLAGS = 1
 include /usr/share/dpkg/default.mk
 
 export ARCH=$(DEB_HOST_GNU_CPU)
-export PREFIX=/usr
-export MODULEDIR=/usr/lib/knot-resolver
-export ETCDIR=/etc/knot-resolver
-
-RUN_TESTS := yes
-ifeq ($(DEB_HOST_ARCH),$(filter $(DEB_HOST_ARCH),hurd-i386 mips mipsel ppc64 ppc64el armel armhf arm64 kfreebsd-amd64 kfreebsd-i386))
-  $(warning Disabling checks on $(DEB_HOST_ARCH))
-  RUN_TESTS := no
-endif
 
 %:
 	dh $@
 
-override_dh_auto_clean-indep:
-	dh_auto_clean -- doc-clean http-clean
+override_dh_auto_build:
+	meson build_deb \
+		--buildtype=plain \
+		--prefix=/usr \
+		--libdir=lib \
+		-Ddoc=enabled \
+		-Dsystemd_unit_files=enabled \
+		-Dclient=enabled \
+		-Dkeyfile_default=/usr/share/dns/root.key \
+		-Droot_hints=/usr/share/dns/root.hints \
+		-Dinstall_kresd_conf=enabled \
+		-Dunit_tests=enabled \
+		-Dc_args="$${CFLAGS}" \
+		-Dc_link_args="$${LDFLAGS}"
+	ninja -v -C build_deb
 
-override_dh_auto_build-arch:
-	CFLAGS="$${CFLAGS} -DNDEBUG" dh_auto_build -- V=1 BUILDMODE=static lib
-	CFLAGS="$${CFLAGS} -DNDEBUG" dh_auto_build -- V=1 \
-	 ROOTHINTS=/usr/share/dns/root.hints \
-	 KEYFILE_DEFAULT=/usr/share/dns/root.key
+override_dh_auto_install:
+	DESTDIR="${PWD}/debian/tmp" ninja -v -C build_deb install
 
-override_dh_auto_build-indep:
-	dh_auto_build -- V=1 http
-	dh_auto_build -- V=1 doc-doxygen
-	cd doc && sphinx-build -b html -D html_theme=nature . html
-
-override_dh_auto_install-arch:
-	dh_auto_install --destdir=debian/tmp -- V=1 KEYFILE_DEFAULT=/usr/share/dns/root.key
-	rm -f debian/tmp/etc/knot-resolver/root.hints debian/tmp/etc/knot-resolver/icann-ca.pem
-
-override_dh_auto_install-indep:
-# install just the http/2 module
-	make http-install DESTDIR=debian/tmp V=1
-
-override_dh_installinit:
-	dh_installinit -pknot-resolver --name=kresd --no-start
-
-override_dh_installsystemd:
-	dh_installsystemd -pknot-resolver --name=kresd kresd-tls.socket kresd.socket
-
-override_dh_auto_test-indep:
-override_dh_auto_test-arch:
-ifeq ($(RUN_TESTS),yes)
-	dh_auto_test -- V=1
-endif
+override_dh_auto_test:
+	meson test -C build_deb
 
 override_dh_missing:
 	dh_missing --fail-missing
-
-override_dh_installchangelogs:
-	dh_installchangelogs NEWS
