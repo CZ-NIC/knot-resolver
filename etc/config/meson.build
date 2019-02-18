@@ -6,8 +6,8 @@ if systemd_unit_files == 'enabled'
 -- Network interface configuration: see kresd.systemd(7)'''
 else
   config_defaults = '''
--- Listen on localhost (default) and external interface
--- net = { '127.0.0.1', '::1', '192.0.2.1' }
+-- Listen on localhost
+net = { '127.0.0.1', '::1' }
 
 -- Drop root privileges
 user('@0@', '@1@')'''.format(user, group)
