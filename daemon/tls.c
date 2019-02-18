@@ -459,7 +459,7 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
 		/* don't risk overflowing the buffer if we have a mistake somewhere */
 		return kr_error(EINVAL);
 	}
-	
+
 	const char *logstring = tls_p->client_side ? client_logstring : server_logstring;
 
 	tls_p->buf = buf;
@@ -864,7 +864,7 @@ int tls_client_params_clear(map_t *tls_client_paramlist, const char *addr, uint1
 		client_paramlist_entry_clear(NULL, (void *)entry, NULL);
 		map_del(tls_client_paramlist, key);
 	}
-	
+
 	return kr_ok();
 }
 
@@ -1097,6 +1097,7 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 		kr_log_error("[tls_client] newer gnutls is required to use PIN check\n");
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
+	goto skip_pins;
 #endif
 
 skip_pins:
