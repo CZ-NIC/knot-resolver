@@ -1,38 +1,28 @@
-debian/init-d-script usr/lib/knot-resolver/
-debian/kresd.conf etc/knot-resolver/
-etc/knot-resolver/config.* /usr/share/doc/knot-resolver/examples/
-distro/common/systemd/kresd-control@.socket lib/systemd/system/
-distro/common/systemd/kresd-tls.socket lib/systemd/system/
-distro/common/systemd/kresd.socket lib/systemd/system/
-distro/common/systemd/kresd@.service lib/systemd/system/
-distro/common/systemd/kresd.target lib/systemd/system/
-distro/common/tmpfiles/knot-resolver.conf usr/lib/tmpfiles.d/
+etc/knot-resolver/kresd.conf
+usr/lib/systemd/system/* lib/systemd/system/
+usr/lib/tmpfiles.d/knot-resolver.conf
 usr/lib/knot-resolver/*.so
-usr/lib/knot-resolver/basexx.lua
-usr/lib/knot-resolver/daf.lua
-usr/lib/knot-resolver/daf/
-usr/lib/knot-resolver/detect_time_jump.lua
-usr/lib/knot-resolver/detect_time_skew.lua
-usr/lib/knot-resolver/dns64.lua
-usr/lib/knot-resolver/etcd.lua
-usr/lib/knot-resolver/experimental_dot_auth.lua
-usr/lib/knot-resolver/graphite.lua
-usr/lib/knot-resolver/http_trace.lua
-usr/lib/knot-resolver/kres-gen.lua
-usr/lib/knot-resolver/kres.lua
-usr/lib/knot-resolver/policy.lua
-usr/lib/knot-resolver/predict.lua
-usr/lib/knot-resolver/prefill.lua
-usr/lib/knot-resolver/priming.lua
-usr/lib/knot-resolver/prometheus.lua
-usr/lib/knot-resolver/rebinding.lua
-usr/lib/knot-resolver/renumber.lua
-usr/lib/knot-resolver/serve_stale.lua
-usr/lib/knot-resolver/ta_sentinel.lua
-usr/lib/knot-resolver/ta_signal_query.lua
-usr/lib/knot-resolver/trust_anchors.lua
-usr/lib/knot-resolver/view.lua
-usr/lib/knot-resolver/workarounds.lua
-usr/lib/knot-resolver/zonefile.lua
+usr/lib/knot-resolver/*.lua
+usr/lib/knot-resolver/kres_modules/*.so
+usr/lib/knot-resolver/kres_modules/basexx.lua
+usr/lib/knot-resolver/kres_modules/daf.lua
+usr/lib/knot-resolver/kres_modules/daf/*
+usr/lib/knot-resolver/kres_modules/detect_time_jump.lua
+usr/lib/knot-resolver/kres_modules/detect_time_skew.lua
+usr/lib/knot-resolver/kres_modules/dns64.lua
+usr/lib/knot-resolver/kres_modules/etcd.lua
+usr/lib/knot-resolver/kres_modules/experimental_dot_auth.lua
+usr/lib/knot-resolver/kres_modules/graphite.lua
+usr/lib/knot-resolver/kres_modules/policy.lua
+usr/lib/knot-resolver/kres_modules/predict.lua
+usr/lib/knot-resolver/kres_modules/prefill.lua
+usr/lib/knot-resolver/kres_modules/priming.lua
+usr/lib/knot-resolver/kres_modules/rebinding.lua
+usr/lib/knot-resolver/kres_modules/renumber.lua
+usr/lib/knot-resolver/kres_modules/serve_stale.lua
+usr/lib/knot-resolver/kres_modules/ta_sentinel.lua
+usr/lib/knot-resolver/kres_modules/ta_signal_query.lua
+usr/lib/knot-resolver/kres_modules/view.lua
+usr/lib/knot-resolver/kres_modules/workarounds.lua
 usr/sbin/kresc
 usr/sbin/kresd
