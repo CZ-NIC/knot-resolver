@@ -22,16 +22,17 @@ stages:
 
 .build: &build
   variables:
-    CFLAGS: -ggdb
+    MESON_ARGS:
   stage: build
   except:
     - master
   script:
-    - rm daemon/lua/kres-gen.lua
-    - make -k all
+    - daemon/lua/kres-gen.sh
+    - meson build_ci -Dwerror=true ${MESON_ARGS}
+    - ninja -C build_ci
     - STATUS="$(git status --untracked-files=normal --porcelain)"
-    - test -n "${STATUS}" && echo "${STATUS}" && echo "Build + install made working tree dirty, did you forget to update something?" && exit 2
-    - make install
+    - test -n "${STATUS}" && echo "${STATUS}" && echo "Build made working tree dirty, did you forget to update something?" && exit 2
+    - ninja -C build_ci install
   artifacts:
     untracked: true
   tags:
@@ -45,30 +46,31 @@ build:linux:amd64:
 build:asan:linux:amd64:
   <<: *build
   variables:
-    CFLAGS: -ggdb3 -O0 -fsanitize=address -fno-omit-frame-pointer
+    MESON_ARGS: -Db_sanitize=address,undefined
 
-build:turris:omnia:
-  image: $CI_REGISTRY/knot/knot-resolver/ci/turris:omnia
-  stage: build
-  except:
-    - master
-  script:
-    - ./scripts/make-archive.sh
-    - cp knot-resolver*.tar.xz /tmp/turris/dl/
-    - ./scripts/make-distrofiles.sh
-    - cp -r distro/turris /tmp/turris/package/knot-resolver
-    - pushd /tmp/turris
-    - export PATH=$PATH:$PWD/staging_dir/toolchain-*/bin
-    - USE_CCACHE=n make CC=arm-openwrt-linux-gcc CXX=arm-openwrt-linux-g++ LD=arm-openwrt-linux-ld -C $PWD V=s
-    - popd
-    - cp /tmp/turris/bin/mvebu-musl/packages/base/*.ipk ./
-  artifacts:
-    paths:
-      - "*.ipk"
-  tags:
-    - docker
-    - linux
-    - amd64
+# NOTE: build for turris when meson is available and packaging files updated
+#build:turris:omnia:
+#  image: $CI_REGISTRY/knot/knot-resolver/ci/turris:omnia
+#  stage: build
+#  except:
+#    - master
+#  script:
+#    - ./scripts/make-archive.sh
+#    - cp knot-resolver*.tar.xz /tmp/turris/dl/
+#    - ./scripts/make-distrofiles.sh
+#    - cp -r distro/turris /tmp/turris/package/knot-resolver
+#    - pushd /tmp/turris
+#    - export PATH=$PATH:$PWD/staging_dir/toolchain-*/bin
+#    - USE_CCACHE=n make CC=arm-openwrt-linux-gcc CXX=arm-openwrt-linux-g++ LD=arm-openwrt-linux-ld -C $PWD V=s
+#    - popd
+#    - cp /tmp/turris/bin/mvebu-musl/packages/base/*.ipk ./
+#  artifacts:
+#    paths:
+#      - "*.ipk"
+#  tags:
+#    - docker
+#    - linux
+#    - amd64
 
 lint:pedantic:
   stage: test  # could be in build already, but let's not block the test stage if this fails
