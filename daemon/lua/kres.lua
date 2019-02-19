@@ -269,9 +269,9 @@ local lru_metatype = {
 	-- Create a new LRU with given value type
 	-- By default the LRU will have a capacity of 65536 elements
 	-- Note: At the point the parametrized type must be finalized
-	__new = function (ct, max_slots)
+	__new = function (ct, max_slots, alignment)
 		-- {0} will make sure that the value is coercible to a number
-		local o = ffi.new(ct, {0}, C.lru_create_impl(max_slots or 65536, nil, nil))
+		local o = ffi.new(ct, {0}, C.lru_create_impl(max_slots or 65536, alignment or 1, nil, nil))
 		if o.lru == nil then
 			return
 		end
@@ -916,8 +916,9 @@ kres = {
 	rrset = knot_rrset_t,
 	packet = knot_pkt_t,
 	lru = function (max_size, value_type)
-	  local ct = ffi.typeof(typed_lru_t, value_type or ffi.typeof('uint64_t'))
-	  return ffi.metatype(ct, lru_metatype)(max_size)
+	  value_type = value_type or ffi.typeof('uint64_t')
+	  local ct = ffi.typeof(typed_lru_t, value_type)
+	  return ffi.metatype(ct, lru_metatype)(max_size, ffi.alignof(value_type))
 	end,
 
 	-- Metatypes.  Beware that any pointer will be cast silently...
