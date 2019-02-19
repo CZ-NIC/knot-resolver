@@ -142,7 +142,7 @@ static inline void mm_ctx_init(knot_mm_t *mm)
 /** Initialize mm with malloc+free with higher alignment. */
 static inline void mm_ctx_init_aligned(knot_mm_t *mm, size_t alignment)
 {
-	mm->ctx = (void *)alignment;
+	mm->ctx = (uint8_t *)NULL + alignment; /*< roundabout to satisfy linters */
 	mm->alloc = mm_malloc_aligned;
 	mm->free = free;
 }
