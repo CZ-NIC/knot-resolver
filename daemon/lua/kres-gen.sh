@@ -1,17 +1,21 @@
 #!/bin/bash
-set -o pipefail -o errexit
+set -o pipefail -o errexit -o nounset
 
 cd "$(dirname ${0})"
 CDEFS="../../scripts/gen-cdefs.sh"
+LIBKRES="${MESON_BUILD_ROOT}/lib/libkres.so"
 
-# Write to .kres-gen.lua.tmp instead of STDOUT
-exec 1<&-
-exec 1<>.kres-gen.lua.tmp
-err_handle() {
+# Write to kres-gen.lua instead of stdout
+mv kres-gen.lua{,.bak} ||:
+exec 1>&-
+exec 1<>kres-gen.lua
+
+restore() {
+    exec 1>&-
+    mv kres-gen.lua{.bak,} ||:
     (>&2 echo "Failed to re-generate kres-gen.lua! Missing debugsymbols?")
-    rm -f .kres-gen.lua.tmp
 }
-trap err_handle ERR INT TERM
+trap restore ERR INT TERM
 
 ### Dev's guide
 #
@@ -52,7 +56,7 @@ typedef void (*trace_log_f) (const struct kr_query *, const char *, const char *
 typedef void (*trace_callback_f)(struct kr_request *);
 "
 
-${CDEFS} libkres types <<-EOF
+${CDEFS} ${LIBKRES} types <<-EOF
 	knot_section_t
 	knot_rrinfo_t
 	knot_dname_t
@@ -61,13 +65,13 @@ ${CDEFS} libkres types <<-EOF
 EOF
 
 genResType() {
-	echo "$1" | ${CDEFS} libkres types
+	echo "$1" | ${CDEFS} ${LIBKRES} types
 }
 
 # No simple way to fixup this rename in ./kres.lua AFAIK.
 genResType "knot_rrset_t" | sed 's/\<owner\>/_owner/; s/\<ttl\>/_ttl/'
 
-${CDEFS} libkres types <<-EOF
+${CDEFS} ${LIBKRES} types <<-EOF
 	knot_pkt_t
 	knot_edns_options_t
 	knot_pktsection_t
@@ -140,7 +144,7 @@ ${CDEFS} libknot functions <<-EOF
 EOF
 
 ## libkres API
-${CDEFS} libkres functions <<-EOF
+${CDEFS} ${LIBKRES} functions <<-EOF
 # Resolution request
 	kr_resolve_plan
 	kr_resolve_pool
@@ -225,7 +229,7 @@ EOF
 
 printf "]]\n"
 
-mv .kres-gen-lua.tmp kres-gen.lua
-(>&2 echo "Successfully re-generated "${PWD}/kres-gen.lua")
+rm kres-gen.lua.bak ||:
+(>&2 echo "Successfully re-generated ${PWD}/kres-gen.lua")
 
 exit 0
