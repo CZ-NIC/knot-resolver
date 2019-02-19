@@ -1,4 +1,5 @@
 #!/bin/bash
+# Run with "ninja kres-gen" to re-generate kres-gen.lua
 set -o pipefail -o errexit -o nounset
 
 cd "$(dirname ${0})"

@@ -20,11 +20,9 @@ config_lua = configure_file(
   configuration: ta_config,
 )
 
-run_target = (  # run manually to re-generate kres-gen.lua
-  'kres-gen.lua',
-  command: [
-    find_program('./kres-gen.sh'),
-  ),
+run_target(  # run manually to re-generate kres-gen.lua
+  'kres-gen',
+  command: find_program('./kres-gen.sh'),
 )
 
 # install daemon lua sources
