@@ -8,6 +8,8 @@ variables:
   RESPDIFF_FORCE: 0
   RESPERF_FORCE: 0
   KNOT_VERSION: '2.7'
+  LIBKRES_ABI: 9
+  LIBKRES_NAME: libkres
 
 image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
 
@@ -24,8 +26,8 @@ stages:
     - master
   artifacts:
     paths:
-      - .local/
-      - build_ci/
+      - .local
+      - 'build_ci*'
   tags:
     - docker
     - linux
@@ -34,21 +36,18 @@ stages:
 build:linux:amd64:
   <<: *build
   script:
-    - meson build_ci --default-library=both --prefix=$CI_PROJECT_DIR/.local -Dwerror=true -Dpostinstall_tests=enabled
+    - meson build_ci --default-library=static --prefix=$CI_PROJECT_DIR/.local -Dwerror=true -Dpostinstall_tests=enabled
     - ninja -C build_ci
-    - ninja -C build_ci kres-gen
-    - STATUS="$(git status --untracked-files=normal --porcelain)"
-    - test -n "${STATUS}" && echo "${STATUS}" && echo "Build made working tree dirty, did you forget to update something?" && exit 2
     - ninja -C build_ci install >/dev/null
     - meson test -C build_ci --suite unit --suite config --print-errorlogs
 
 build:asan:linux:amd64:
   <<: *build
   script:
-    - meson build_ci --default-library=static --prefix=$CI_PROJECT_DIR/.local -Db_sanitize=address,undefined -Dpostinstall_tests=enabled
-    - ninja -C build_ci
-    - ninja -C build_ci install >/dev/null
-    - meson test -C build_ci --suite unit --suite config --print-errorlogs
+    - meson build_ci_asan --default-library=static --prefix=$CI_PROJECT_DIR/.local -Db_sanitize=address,undefined -Dpostinstall_tests=enabled
+    - ninja -C build_ci_asan
+    - ninja -C build_ci_asan install >/dev/null
+    - meson test -C build_ci_asan --suite unit --suite config --print-errorlogs
 
 # NOTE: build for turris when meson is available and packaging files updated
 #build:turris:omnia:
@@ -73,6 +72,18 @@ build:asan:linux:amd64:
 #    - docker
 #    - linux
 #    - amd64
+
+kres-gen:
+  stage: build
+  except:
+    - master
+  tags:
+    - docker
+  script:
+    - meson build_ci --prefix=$CI_PROJECT_DIR/.local
+    - ninja -C build_ci lib/libkres.so.${LIBKRES_ABI}
+    - ninja -C build_ci kres-gen
+    - git diff --quiet || (git diff; exit 1)
 
 lint:pedantic:
   stage: test  # could be in build already, but let's not block the test stage if this fails
@@ -548,9 +559,6 @@ obs:devel:
     - scripts/build-in-obs.sh knot-resolver-devel  # build against knot in knot-resolver-latest
 
 pkg:debian:symbols:libkres:
-  variables:
-    LIB_NAME: libkres
-    LIB_ABI: 9
   stage: deploy
   only:  # TODO run this pre-release only
     variables:
@@ -562,7 +570,7 @@ pkg:debian:symbols:libkres:
   script:
     - ln -s distro/deb debian
     - sed -i "s/__VERSION__/99/g" distro/deb/changelog
-    - dpkg-gensymbols -c4 -elib/$LIB_NAME.so.$LIB_ABI -P. -p$LIB_NAME$LIB_ABI
+    - dpkg-gensymbols -c4 -elib/$LIB_NAME.so.$LIBKRES_ABI -P. -p$LIBKRES_NAME$LIBKRES_ABI
   allow_failure: true
   dependencies:
     - build:linux:amd64
