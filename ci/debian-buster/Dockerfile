@@ -17,7 +17,7 @@ RUN apt-get install -y -qqq doxygen python3-sphinx python3-breathe python3-sphin
 
 # Python packags required for Deckard CI
 # Python: grab latest versions from PyPi
-# (dnspython and Augeas binding in Debian packages are slow and buggy)
+# (Augeas binding in Debian packages are slow and buggy)
 RUN apt-get install -y -qqq python3-pip wget augeas-tools
 RUN pip3 install --upgrade pip
 RUN pip3 install pylint
@@ -33,13 +33,12 @@ RUN wget https://gitlab.labs.nic.cz/knot/deckard/raw/master/requirements.txt -O 
 RUN pip3 install -r /tmp/deckard-req.txt
 
 # build and install latest version of Knot DNS
-# (kresd depends on libknot and libdnssec)
 RUN git clone --depth=1 --branch=$KNOT_BRANCH https://gitlab.labs.nic.cz/knot/knot-dns.git /tmp/knot
 WORKDIR /tmp/knot
 RUN pwd
 RUN autoreconf -if
 RUN ./configure --prefix=/usr
-RUN make
+RUN CFLAGS="-g" make
 RUN make install
 RUN ldconfig
 
@@ -82,6 +81,9 @@ RUN luarocks install luacov
 
 # LuaJIT binary for stand-alone scripting
 RUN apt-get install -y -qqq luajit
+
+# clang for kresd CI, version updated as debian updates it
+RUN apt-get install -y -qqq clang clang-tools clang-tidy
 
 # OpenBuildService CLI tool
 RUN apt-get install -y osc
