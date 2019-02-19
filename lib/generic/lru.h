@@ -88,6 +88,7 @@
  * @param ptable pointer to a pointer to the LRU
  * @param max_slots number of slots
  * @param mm_ctx_array memory context to use for the huge array, NULL for default
+ * 	If you pass your own, it needs to produce CACHE_ALIGNED allocations (ubsan).
  * @param mm_ctx memory context to use for individual key-value pairs, NULL for default
  *
  * @note The pointers to memory contexts need to remain valid

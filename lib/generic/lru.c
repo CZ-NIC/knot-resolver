@@ -16,6 +16,7 @@
 
 #include "lib/generic/lru.h"
 #include "contrib/murmurhash3/murmurhash3.h"
+#include "contrib/ucw/mempool.h"
 
 typedef struct lru_group lru_group_t;
 
@@ -107,6 +108,15 @@ KR_EXPORT struct lru * lru_create_impl(uint max_slots, knot_mm_t *mm_array, knot
 		++log_groups;
 	group_count = 1 << log_groups;
 	assert(max_slots <= group_count * LRU_ASSOC && group_count * LRU_ASSOC < 2 * max_slots);
+
+	/* Get a sufficiently aligning mm_array if NULL is passed. */
+	if (!mm_array) {
+		static knot_mm_t mm_array_default = { 0 };
+		if (!mm_array_default.ctx)
+			mm_ctx_init_aligned(&mm_array_default, __alignof(struct lru));
+		mm_array = &mm_array_default;
+	}
+	assert(mm_array->alloc != mm_malloc && mm_array->alloc != (knot_mm_alloc_t)mp_alloc);
 
 	size_t size = offsetof(struct lru, groups[group_count]);
 	struct lru *lru = mm_alloc(mm_array, size);
