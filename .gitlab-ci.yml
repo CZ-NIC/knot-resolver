@@ -33,7 +33,7 @@ build:linux:amd64:
   <<: *build
   script:
     - meson build_ci --default-library=both --prefix=$CI_PROJECT_DIR/.local -Dwerror=true
-    - ninja -v -C build_ci daemon/lua/kres-gen.lua
+    - ninja -v -C build_ci kres-gen
     - ninja -v -C build_ci
     - STATUS="$(git status --untracked-files=normal --porcelain)"
     - test -n "${STATUS}" && echo "${STATUS}" && echo "Build made working tree dirty, did you forget to update something?" && exit 2
