@@ -71,6 +71,16 @@ void *mm_malloc(void *ctx, size_t n)
 	(void)ctx;
 	return malloc(n);
 }
+void *mm_malloc_aligned(void *ctx, size_t n)
+{
+	size_t alignment = (size_t)ctx;
+	void *res;
+	if (posix_memalign(&res, alignment, n) == 0) {
+		return res;
+	} else {
+		return NULL;
+	}
+}
 
 /*
  * Macros.

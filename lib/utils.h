@@ -128,6 +128,8 @@ void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t prev_size);
 
 /** Trivial malloc() wrapper. */
 void *mm_malloc(void *ctx, size_t n);
+/** posix_memalign() wrapper. */
+void *mm_malloc_aligned(void *ctx, size_t n);
 
 /** Initialize mm with standard malloc+free. */
 static inline void mm_ctx_init(knot_mm_t *mm)
@@ -136,6 +138,15 @@ static inline void mm_ctx_init(knot_mm_t *mm)
 	mm->alloc = mm_malloc;
 	mm->free = free;
 }
+
+/** Initialize mm with malloc+free with higher alignment. */
+static inline void mm_ctx_init_aligned(knot_mm_t *mm, size_t alignment)
+{
+	mm->ctx = (void *)alignment;
+	mm->alloc = mm_malloc_aligned;
+	mm->free = free;
+}
+
 /* @endcond */
 
 /** Return time difference in miliseconds.
