@@ -2,6 +2,7 @@
  * by its author, Austin Appleby. */
 
 #include "murmurhash3.h"
+#include "string.h"
 
 static inline uint32_t fmix(uint32_t h)
 {
@@ -32,12 +33,11 @@ uint32_t hash(const char* data, size_t len_)
     //----------
     // body
 
-    const uint32_t * blocks = (const uint32_t*) (data + nblocks * 4);
-
     int i;
     for(i = -nblocks; i; i++)
     {
-        uint32_t k1 = blocks[i];
+        uint32_t k1;
+        memcpy(&k1, data + nblocks * 4 + i * sizeof(k1), sizeof(k1));
 
         k1 *= c1;
         k1 = rotl32(k1, 15);
