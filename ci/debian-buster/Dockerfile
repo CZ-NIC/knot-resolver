@@ -1,4 +1,4 @@
-FROM debian:buster-20181226
+FROM debian:buster-20190204
 MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
 ARG KNOT_BRANCH=2.7
 
@@ -11,7 +11,7 @@ RUN apt-get update -qq
 # RUN apt-get upgrade -y -qqq
 
 # Knot and Knot Resolver dependecies
-RUN apt-get install -y -qqq git make cmake pkg-config build-essential bsdmainutils libtool autoconf liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev libidn11-dev protobuf-c-compiler libfstrm-dev libuv1-dev libcmocka-dev libluajit-5.1-dev lua-sec lua-socket lua-http
+RUN apt-get install -y -qqq git make cmake pkg-config build-essential bsdmainutils libtool autoconf liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev libidn11-dev protobuf-c-compiler libfstrm-dev libuv1-dev libcmocka-dev libluajit-5.1-dev lua-sec lua-socket lua-http meson
 # documentation dependecies
 RUN apt-get install -y -qqq doxygen python3-sphinx python3-breathe python3-sphinx-rtd-theme
 
@@ -45,7 +45,7 @@ RUN ldconfig
 
 # Valgrind for kresd CI
 RUN apt-get install valgrind -y -qqq
-RUN wget https://raw.githubusercontent.com/LuaJIT/LuaJIT/v2.0.4/src/lj.supp -O /lj.supp
+RUN wget https://github.com/LuaJIT/LuaJIT/raw/v2.1.0-beta3/src/lj.supp -O /lj.supp
 # TODO: rebuild LuaJIT with Valgrind support
 
 # Lua lint for kresd CI
