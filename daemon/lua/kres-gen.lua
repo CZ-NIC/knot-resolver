@@ -318,7 +318,7 @@ void kr_zonecut_set(struct kr_zonecut *, const knot_dname_t *);
 uint64_t kr_now();
 const char *kr_strptime_diff(const char *, const char *, const char *, double *);
 void lru_free_items_impl(struct lru *);
-struct lru *lru_create_impl(unsigned int, knot_mm_t *, knot_mm_t *);
+struct lru *lru_create_impl(unsigned int, unsigned int, knot_mm_t *, knot_mm_t *);
 void *lru_get_impl(struct lru *, const char *, unsigned int, unsigned int, _Bool, _Bool *);
 void *mm_realloc(knot_mm_t *, void *, size_t, size_t);
 knot_rrset_t *kr_ta_get(map_t *, const knot_dname_t *);
