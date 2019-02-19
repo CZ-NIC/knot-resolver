@@ -97,7 +97,8 @@
 #define lru_create(ptable, max_slots, mm_ctx_array, mm_ctx) do { \
 	(void)(((__typeof__((*(ptable))->pdata_t))0) == (void *)0); /* typecheck lru_t */ \
 	*(ptable) = (__typeof__(*(ptable))) \
-		lru_create_impl((max_slots), (mm_ctx_array), (mm_ctx)); \
+		lru_create_impl((max_slots), __alignof(*( (*(ptable))->pdata_t )), \
+				(mm_ctx_array), (mm_ctx)); \
 	} while (false)
 
 /** @brief Free an LRU created by lru_create (it can be NULL). */
@@ -164,15 +165,6 @@ enum lru_apply_do {
 #define lru_capacity(table) lru_capacity_impl(&(table)->lru)
 
 
-/** @brief Round the value up to a multiple of (1 << power). */
-static inline uint round_power(uint size, uint power)
-{
-	uint res = ((size - 1) & ~((1 << power) - 1)) + (1 << power);
-	assert(__builtin_ctz(res) >= power);
-	assert(size <= res && res < size + (1 << power));
-	return res;
-}
-
 
 /* ======================== Inlined part of implementation ======================== */
 /** @cond internal */
@@ -189,7 +181,8 @@ typedef lru_apply_fun_g(lru_apply_fun, void);
 
 struct lru;
 void lru_free_items_impl(struct lru *lru);
-struct lru * lru_create_impl(uint max_slots, knot_mm_t *mm_array, knot_mm_t *mm);
+struct lru * lru_create_impl(uint max_slots, uint val_alignment,
+			     knot_mm_t *mm_array, knot_mm_t *mm);
 void * lru_get_impl(struct lru *lru, const char *key, uint key_len,
 		    uint val_len, bool do_insert, bool *is_new);
 void lru_apply_impl(struct lru *lru, lru_apply_fun f, void *baton);
@@ -220,6 +213,7 @@ struct lru {
 	struct knot_mm *mm, /**< Memory context to use for keys. */
 		*mm_array; /**< Memory context to use for this structure itself. */
 	uint log_groups; /**< Logarithm of the number of LRU groups. */
+	uint val_alignment; /**< Alignment for the values. */
 	struct lru_group groups[] CACHE_ALIGNED; /**< The groups of items. */
 };
 
