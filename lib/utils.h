@@ -135,6 +135,8 @@ void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t prev_size);
 
 /** Trivial malloc() wrapper. */
 void *mm_malloc(void *ctx, size_t n);
+/** posix_memalign() wrapper. */
+void *mm_malloc_aligned(void *ctx, size_t n);
 
 /** Initialize mm with standard malloc+free. */
 static inline void mm_ctx_init(knot_mm_t *mm)
@@ -143,6 +145,20 @@ static inline void mm_ctx_init(knot_mm_t *mm)
 	mm->alloc = mm_malloc;
 	mm->free = free;
 }
+
+/** Initialize mm with malloc+free with higher alignment (a power of two). */
+static inline void mm_ctx_init_aligned(knot_mm_t *mm, size_t alignment)
+{
+	assert(__builtin_popcount(alignment) == 1);
+	mm->ctx = (uint8_t *)NULL + alignment; /*< roundabout to satisfy linters */
+	/* posix_memalign() doesn't allow alignment < sizeof(void*),
+	 * and there's no point in using it for small values anyway,
+	 * as plain malloc() guarantees at least max_align_t.
+	 * Nitpick: we might use that type when assuming C11. */
+	mm->alloc = alignment > sizeof(void*) ? mm_malloc_aligned : mm_malloc;
+	mm->free = free;
+}
+
 /* @endcond */
 
 /** A strcmp() variant directly usable for qsort() on an array of strings. */
