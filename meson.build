@@ -92,7 +92,6 @@ add_project_arguments(
   '-Wformat-security',
   '-Wtype-limits',
   '-Wshadow',
-  '-Wall',
   '-fvisibility=hidden',
   language: 'c',
 )
