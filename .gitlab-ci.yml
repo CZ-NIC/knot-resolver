@@ -8,6 +8,8 @@ variables:
   RESPDIFF_FORCE: 0
   RESPERF_FORCE: 0
   KNOT_VERSION: '2.7'
+  LIBKRES_ABI: 9
+  LIBKRES_NAME: libkres
 
 image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
 
@@ -23,7 +25,10 @@ stages:
   except:
     - master
   artifacts:
-    untracked: true
+    when: always
+    paths:
+      - .local
+      - 'build_ci*'
   tags:
     - docker
     - linux
@@ -32,19 +37,23 @@ stages:
 build:linux:amd64:
   <<: *build
   script:
-    - meson build_ci --default-library=both --prefix=$CI_PROJECT_DIR/.local -Dwerror=true
-    - ninja -v -C build_ci
-    - ninja -v -C build_ci kres-gen
-    - STATUS="$(git status --untracked-files=normal --porcelain)"
-    - test -n "${STATUS}" && echo "${STATUS}" && echo "Build made working tree dirty, did you forget to update something?" && exit 2
-    - ninja -C build_ci install
+    - meson build_ci --default-library=static --prefix=$CI_PROJECT_DIR/.local -Dwerror=true -Dpostinstall_tests=enabled
+    - ninja -C build_ci
+    - ninja -C build_ci install >/dev/null
+    - meson test -C build_ci --suite unit --suite config --print-errorlogs
 
 build:asan:linux:amd64:
   <<: *build
   script:
-    - meson build_ci --default-library=static --prefix=$CI_PROJECT_DIR/.local -Db_sanitize=address,undefined
-    - ninja -v -C build_ci
-    - ninja -C build_ci install
+    - export LSAN_OPTIONS=verbosity=1:log_threads=1
+    - meson build_ci_asan --default-library=static --prefix=$CI_PROJECT_DIR/.local -Db_sanitize=address,undefined -Dpostinstall_tests=enabled
+    - ninja -C build_ci_asan
+    - ninja -C build_ci_asan install >/dev/null
+    - meson test -C build_ci_asan --suite unit --suite config --print-errorlogs
+  # TODO remove allow_failure and privileged
+  allow_failure: true
+  tags:
+    - privileged
 
 # NOTE: build for turris when meson is available and packaging files updated
 #build:turris:omnia:
@@ -69,6 +78,18 @@ build:asan:linux:amd64:
 #    - docker
 #    - linux
 #    - amd64
+
+kres-gen:
+  stage: build
+  except:
+    - master
+  tags:
+    - docker
+  script:
+    - meson build_ci --prefix=$CI_PROJECT_DIR/.local
+    - ninja -C build_ci lib/libkres.so.${LIBKRES_ABI}
+    - ninja -C build_ci kres-gen
+    - git diff --quiet || (git diff; exit 1)
 
 lint:pedantic:
   stage: test  # could be in build already, but let's not block the test stage if this fails
@@ -141,28 +162,6 @@ lint:clang-scan-build:
   tags:
     - docker
 
-test:linux:amd64:
-  stage: test
-  except:
-    - master
-  script:
-    # recompile everything otherwise lcov will bark because Git files will be "newer" than gcda files
-    # this is caused by interaction between Git approach to timestamps and Gitlab artifacts
-    - git clean -xdf
-    - make
-    - MAKEFLAGS="--jobs $(nproc)" make -k check
-    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c COVERAGE_STAGE=gcov-check || echo "code coverage skipped"
-  dependencies: []
-  artifacts:
-    expire_in: 1 hour
-    paths:
-      - ./*.info
-  tags:
-    - docker
-    - linux
-    - amd64
-
-
 docker:build:
   stage: test
   image: docker:latest
@@ -179,30 +178,6 @@ docker:build:
   after_script:  # remove dangling images to avoid running out of disk space
     - docker rmi ${DOCKER_IMAGE_NAME}
     - docker rmi $(docker images -f "dangling=true" -q)
-
-
-installcheck:linux:amd64:
-  # TODO use debian-buster once lua packet resize issue is resolved
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-stable:knot-$KNOT_VERSION
-  stage: test
-  except:
-    - master
-  script:
-    # recompile everything otherwise lcov will bark because Git files will be "newer" than gcda files
-    # this is caused by interaction between Git approach to timestamps and Gitlab artifacts
-    - git clean -xdf
-    - make install
-    - MAKEFLAGS="--jobs $(nproc) --keep-going" make -k installcheck
-    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-installcheck || echo "code coverage skipped"
-  dependencies: []
-  artifacts:
-    expire_in: 1 hour
-    paths:
-      - ./*.info
-  tags:
-    - docker
-    - linux
-    - amd64
 
 doc:
   stage: test
@@ -245,14 +220,14 @@ deckard:linux:amd64:
     - linux
     - amd64
 
-installcheck:valgrind:linux:amd64:
+valgrind:linux:amd64:
   stage: test
   except:
     - master
   script:
-    - DEBUGGER="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" make -k installcheck
+    - meson test -C build_ci --suite unit --suite config --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
   dependencies:
-    - build:linux:amd64
+    - build:linux:amd64  # valgrind doesn't work with ASAN
   tags:
     - docker
     - linux
@@ -287,21 +262,6 @@ osx:build:
 #    - linux
 #    - amd64
 
-
-test:linux:amd64:valgrind:
-  stage: test
-  except:
-    - master
-  variables:
-    TMPDIR: $CI_PROJECT_DIR
-  script:
-    - DEBUGGER="valgrind --error-exitcode=1 --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" make -k check
-  dependencies:
-    - build:linux:amd64
-  tags:
-    - docker
-    - linux
-    - amd64
 
 pytests:lint:
   stage: test
@@ -562,8 +522,8 @@ coverage:
   coverage: '/lines\.+:\s(\d+.\d+\%)/'
   dependencies:
     - build:linux:amd64
-    - test:linux:amd64
-    - installcheck:linux:amd64
+    #- test:linux:amd64
+    #- installcheck:linux:amd64
     - deckard:linux:amd64
     - respdiff:iter:udp:linux:amd64
   tags:
@@ -605,9 +565,6 @@ obs:devel:
     - scripts/build-in-obs.sh knot-resolver-devel  # build against knot in knot-resolver-latest
 
 pkg:debian:symbols:libkres:
-  variables:
-    LIB_NAME: libkres
-    LIB_ABI: 9
   stage: deploy
   only:  # TODO run this pre-release only
     variables:
@@ -619,7 +576,7 @@ pkg:debian:symbols:libkres:
   script:
     - ln -s distro/deb debian
     - sed -i "s/__VERSION__/99/g" distro/deb/changelog
-    - dpkg-gensymbols -c4 -elib/$LIB_NAME.so.$LIB_ABI -P. -p$LIB_NAME$LIB_ABI
+    - dpkg-gensymbols -c4 -elib/$LIB_NAME.so.$LIBKRES_ABI -P. -p$LIBKRES_NAME$LIBKRES_ABI
   allow_failure: true
   dependencies:
     - build:linux:amd64
