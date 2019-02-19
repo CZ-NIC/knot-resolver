@@ -1,6 +1,18 @@
 #!/bin/bash
 set -o pipefail -o errexit
 
+cd "$(dirname ${0})"
+CDEFS="../../scripts/gen-cdefs.sh"
+
+# Write to .kres-gen.lua.tmp instead of STDOUT
+exec 1<&-
+exec 1<>.kres-gen.lua.tmp
+err_handle() {
+    (>&2 echo "Failed to re-generate kres-gen.lua! Missing debugsymbols?")
+    rm -f .kres-gen.lua.tmp
+}
+trap err_handle ERR INT TERM
+
 ### Dev's guide
 #
 # C declarations for lua are (mostly) generated to simplify maintenance.
@@ -40,7 +52,7 @@ typedef void (*trace_log_f) (const struct kr_query *, const char *, const char *
 typedef void (*trace_callback_f)(struct kr_request *);
 "
 
-./scripts/gen-cdefs.sh libkres types <<-EOF
+${CDEFS} libkres types <<-EOF
 	knot_section_t
 	knot_rrinfo_t
 	knot_dname_t
@@ -49,13 +61,13 @@ typedef void (*trace_callback_f)(struct kr_request *);
 EOF
 
 genResType() {
-	echo "$1" | ./scripts/gen-cdefs.sh libkres types
+	echo "$1" | ${CDEFS} libkres types
 }
 
 # No simple way to fixup this rename in ./kres.lua AFAIK.
 genResType "knot_rrset_t" | sed 's/\<owner\>/_owner/; s/\<ttl\>/_ttl/'
 
-./scripts/gen-cdefs.sh libkres types <<-EOF
+${CDEFS} libkres types <<-EOF
 	knot_pkt_t
 	knot_edns_options_t
 	knot_pktsection_t
@@ -100,7 +112,7 @@ genResType "struct kr_context" | sed '/kr_nsrep_rtt_lru_t/,$ d'
 printf "\tchar _stub[];\n};\n"
 
 ## libknot API
-./scripts/gen-cdefs.sh libknot functions <<-EOF
+${CDEFS} libknot functions <<-EOF
 # Utils
 	knot_strerror
 # Domain names
@@ -129,7 +141,7 @@ printf "\tchar _stub[];\n};\n"
 EOF
 
 ## libkres API
-./scripts/gen-cdefs.sh libkres functions <<-EOF
+${CDEFS} libkres functions <<-EOF
 # Resolution request
 	kr_resolve_plan
 	kr_resolve_pool
@@ -196,7 +208,7 @@ EOF
 
 
 ## libzscanner API for ./zonefile.lua
-./scripts/gen-cdefs.sh libzscanner types <<-EOF
+${CDEFS} libzscanner types <<-EOF
 	zs_win_t
 	zs_apl_t
 	zs_loc_t
@@ -204,7 +216,7 @@ EOF
 	zs_scanner_t
 	struct zs_scanner
 EOF
-./scripts/gen-cdefs.sh libzscanner functions <<-EOF
+${CDEFS} libzscanner functions <<-EOF
 	zs_deinit
 	zs_init
 	zs_parse_record
@@ -214,5 +226,8 @@ EOF
 EOF
 
 printf "]]\n"
+
+mv .kres-gen-lua.tmp kres-gen.lua
+(>&2 echo "Successfully re-generated "${PWD}/kres-gen.lua")
 
 exit 0
