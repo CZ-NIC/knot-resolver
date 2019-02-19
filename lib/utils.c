@@ -230,8 +230,10 @@ int kr_memreserve(void *baton, char **mem, size_t elm_size, size_t want, size_t 
         size_t next_size = array_next_count(want);
         void *mem_new = mm_alloc(pool, next_size * elm_size);
         if (mem_new != NULL) {
-            memcpy(mem_new, *mem, (*have)*(elm_size));
-            mm_free(pool, *mem);
+	    if (*mem) { /* 0-length memcpy from NULL isn't technically OK */
+		memcpy(mem_new, *mem, (*have)*(elm_size));
+		mm_free(pool, *mem);
+	    }
             *mem = mem_new;
             *have = next_size;
             return 0;
