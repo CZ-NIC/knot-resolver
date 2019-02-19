@@ -503,7 +503,7 @@ coverage:
   coverage: '/lines\.+:\s(\d+.\d+\%)/'
   dependencies:
     - build:linux:amd64
-    - test:linux:amd64
+    #- test:linux:amd64
     - installcheck:linux:amd64
     - deckard:linux:amd64
     - respdiff:iter:udp:linux:amd64
