@@ -224,6 +224,7 @@ valgrind:linux:amd64:
   except:
     - master
   script:
+    - ninja -C build_ci  &>/dev/null
     - meson test -C build_ci --suite unit --suite config --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
   dependencies:
     - build:linux:amd64  # valgrind doesn't work with ASAN
