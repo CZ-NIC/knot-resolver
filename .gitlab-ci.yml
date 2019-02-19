@@ -22,14 +22,14 @@ stages:
 
 .build: &build
   variables:
-    MESON_ARGS:
+    MESON_ARGS: ""
   stage: build
   except:
     - master
   script:
     - daemon/lua/kres-gen.sh
     - meson build_ci -Dwerror=true ${MESON_ARGS}
-    - ninja -C build_ci
+    - ninja -v -C build_ci
     - STATUS="$(git status --untracked-files=normal --porcelain)"
     - test -n "${STATUS}" && echo "${STATUS}" && echo "Build made working tree dirty, did you forget to update something?" && exit 2
     - ninja -C build_ci install
