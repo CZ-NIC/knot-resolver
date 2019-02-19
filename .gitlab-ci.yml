@@ -75,7 +75,6 @@ lint:pedantic:
   dependencies: []  # do not download build artifacts
   except:
     - master
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-$KNOT_VERSION  # newer Debian for newer compilers
   variables:
     CFLAGS: -Werror -Wall -Wpedantic -ggdb -std=gnu11
   script:
@@ -120,7 +119,6 @@ lint:c:
   stage: test
   except:
     - master
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-$KNOT_VERSION  # newer Debian for newer Clang
   dependencies: []  # do not download build artifacts
   script:
     - make lint-c CLANG_TIDY="clang-tidy -quiet"
@@ -131,7 +129,6 @@ lint:clang-scan-build:
   stage: test
   except:
     - master
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-unstable:knot-$KNOT_VERSION  # newer Debian for newer Clang
   dependencies: []  # do not download build artifacts
   script:
     - MAKEFLAGS="-k -j$(nproc)" SCAN_BUILD="scan-build -o scan-results --status-bugs -no-failure-reports" ./tests/clang_scan_build.sh make || true
