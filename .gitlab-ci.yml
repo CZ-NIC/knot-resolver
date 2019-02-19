@@ -32,19 +32,21 @@ stages:
 build:linux:amd64:
   <<: *build
   script:
-    - meson build_ci --default-library=both --prefix=$CI_PROJECT_DIR/.local -Dwerror=true
+    - meson build_ci --default-library=both --prefix=$CI_PROJECT_DIR/.local -Dwerror=true -Dpostinstall_tests=enabled
     - ninja -v -C build_ci
     - ninja -v -C build_ci kres-gen
     - STATUS="$(git status --untracked-files=normal --porcelain)"
     - test -n "${STATUS}" && echo "${STATUS}" && echo "Build made working tree dirty, did you forget to update something?" && exit 2
     - ninja -C build_ci install
+    - meson test -C build_ci --suite unit --suite config
 
 build:asan:linux:amd64:
   <<: *build
   script:
-    - meson build_ci --default-library=static --prefix=$CI_PROJECT_DIR/.local -Db_sanitize=address,undefined
+    - meson build_ci --default-library=static --prefix=$CI_PROJECT_DIR/.local -Db_sanitize=address,undefined -Dpostinstall_tests=enabled
     - ninja -v -C build_ci
     - ninja -C build_ci install
+    - meson test -C build_ci --suite unit --suite config
 
 # NOTE: build for turris when meson is available and packaging files updated
 #build:turris:omnia:
@@ -141,28 +143,6 @@ lint:clang-scan-build:
   tags:
     - docker
 
-test:linux:amd64:
-  stage: test
-  except:
-    - master
-  script:
-    # recompile everything otherwise lcov will bark because Git files will be "newer" than gcda files
-    # this is caused by interaction between Git approach to timestamps and Gitlab artifacts
-    - git clean -xdf
-    - make
-    - MAKEFLAGS="--jobs $(nproc)" make -k check
-    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c COVERAGE_STAGE=gcov-check || echo "code coverage skipped"
-  dependencies: []
-  artifacts:
-    expire_in: 1 hour
-    paths:
-      - ./*.info
-  tags:
-    - docker
-    - linux
-    - amd64
-
-
 docker:build:
   stage: test
   image: docker:latest
@@ -179,30 +159,6 @@ docker:build:
   after_script:  # remove dangling images to avoid running out of disk space
     - docker rmi ${DOCKER_IMAGE_NAME}
     - docker rmi $(docker images -f "dangling=true" -q)
-
-
-installcheck:linux:amd64:
-  # TODO use debian-buster once lua packet resize issue is resolved
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-stable:knot-$KNOT_VERSION
-  stage: test
-  except:
-    - master
-  script:
-    # recompile everything otherwise lcov will bark because Git files will be "newer" than gcda files
-    # this is caused by interaction between Git approach to timestamps and Gitlab artifacts
-    - git clean -xdf
-    - make install
-    - MAKEFLAGS="--jobs $(nproc) --keep-going" make -k installcheck
-    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-installcheck || echo "code coverage skipped"
-  dependencies: []
-  artifacts:
-    expire_in: 1 hour
-    paths:
-      - ./*.info
-  tags:
-    - docker
-    - linux
-    - amd64
 
 doc:
   stage: test
@@ -245,14 +201,14 @@ deckard:linux:amd64:
     - linux
     - amd64
 
-installcheck:valgrind:linux:amd64:
+valgrind:linux:amd64:
   stage: test
   except:
     - master
   script:
-    - DEBUGGER="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" make -k installcheck
+    - meson test -C build_ci --suite unit --suite config --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
   dependencies:
-    - build:linux:amd64
+    - build:linux:amd64  # valgrind doesn't work with ASAN
   tags:
     - docker
     - linux
@@ -287,21 +243,6 @@ osx:build:
 #    - linux
 #    - amd64
 
-
-test:linux:amd64:valgrind:
-  stage: test
-  except:
-    - master
-  variables:
-    TMPDIR: $CI_PROJECT_DIR
-  script:
-    - DEBUGGER="valgrind --error-exitcode=1 --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" make -k check
-  dependencies:
-    - build:linux:amd64
-  tags:
-    - docker
-    - linux
-    - amd64
 
 pytests:lint:
   stage: test
