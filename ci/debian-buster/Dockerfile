@@ -1,4 +1,4 @@
-FROM debian:buster-20181226
+FROM debian:buster-20190204
 MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
 ARG KNOT_BRANCH=2.7
 
@@ -11,13 +11,13 @@ RUN apt-get update -qq
 # RUN apt-get upgrade -y -qqq
 
 # Knot and Knot Resolver dependecies
-RUN apt-get install -y -qqq git make cmake pkg-config build-essential bsdmainutils libtool autoconf liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev libidn11-dev protobuf-c-compiler libfstrm-dev libuv1-dev libcmocka-dev libluajit-5.1-dev lua-sec lua-socket lua-http
+RUN apt-get install -y -qqq git make cmake pkg-config build-essential bsdmainutils libtool autoconf liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev libidn11-dev protobuf-c-compiler libfstrm-dev libuv1-dev libcmocka-dev libluajit-5.1-dev lua-sec lua-socket lua-http meson
 # documentation dependecies
 RUN apt-get install -y -qqq doxygen python3-sphinx python3-breathe python3-sphinx-rtd-theme
 
 # Python packags required for Deckard CI
 # Python: grab latest versions from PyPi
-# (dnspython and Augeas binding in Debian packages are slow and buggy)
+# (Augeas binding in Debian packages are slow and buggy)
 RUN apt-get install -y -qqq python3-pip wget augeas-tools
 RUN pip3 install --upgrade pip
 RUN pip3 install pylint
@@ -33,19 +33,18 @@ RUN wget https://gitlab.labs.nic.cz/knot/deckard/raw/master/requirements.txt -O 
 RUN pip3 install -r /tmp/deckard-req.txt
 
 # build and install latest version of Knot DNS
-# (kresd depends on libknot and libdnssec)
 RUN git clone --depth=1 --branch=$KNOT_BRANCH https://gitlab.labs.nic.cz/knot/knot-dns.git /tmp/knot
 WORKDIR /tmp/knot
 RUN pwd
 RUN autoreconf -if
 RUN ./configure --prefix=/usr
-RUN make
+RUN CFLAGS="-g" make
 RUN make install
 RUN ldconfig
 
 # Valgrind for kresd CI
 RUN apt-get install valgrind -y -qqq
-RUN wget https://raw.githubusercontent.com/LuaJIT/LuaJIT/v2.0.4/src/lj.supp -O /lj.supp
+RUN wget https://github.com/LuaJIT/LuaJIT/raw/v2.1.0-beta3/src/lj.supp -O /lj.supp
 # TODO: rebuild LuaJIT with Valgrind support
 
 # Lua lint for kresd CI
@@ -82,6 +81,9 @@ RUN luarocks install luacov
 
 # LuaJIT binary for stand-alone scripting
 RUN apt-get install -y -qqq luajit
+
+# clang for kresd CI, version updated as debian updates it
+RUN apt-get install -y -qqq clang clang-tools clang-tidy
 
 # OpenBuildService CLI tool
 RUN apt-get install -y osc
