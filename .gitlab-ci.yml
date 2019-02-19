@@ -3,8 +3,6 @@ variables:
   LC_ALL: C.UTF-8
   GIT_SUBMODULE_STRATEGY: recursive
   GIT_STRATEGY: clone # sometimes unclean submodule dirs otherwise
-  PREFIX: $CI_PROJECT_DIR/.local
-  LD_LIBRARY_PATH: $CI_PROJECT_DIR/.local/lib
   RESPDIFF_PRIORITY: 5
   RESPDIFF_COUNT: 1
   RESPDIFF_FORCE: 0
@@ -21,18 +19,9 @@ stages:
   - deploy
 
 .build: &build
-  variables:
-    MESON_ARGS: ""
   stage: build
   except:
     - master
-  script:
-    - daemon/lua/kres-gen.sh
-    - meson build_ci -Dwerror=true ${MESON_ARGS}
-    - ninja -v -C build_ci
-    - STATUS="$(git status --untracked-files=normal --porcelain)"
-    - test -n "${STATUS}" && echo "${STATUS}" && echo "Build made working tree dirty, did you forget to update something?" && exit 2
-    - ninja -C build_ci install
   artifacts:
     untracked: true
   tags:
@@ -42,11 +31,20 @@ stages:
 
 build:linux:amd64:
   <<: *build
+  script:
+    - meson build_ci --default-library=both --prefix=$CI_PROJECT_DIR/.local -Dwerror=true
+    - ninja -v -C build_ci daemon/lua/kres-gen.lua
+    - ninja -v -C build_ci
+    - STATUS="$(git status --untracked-files=normal --porcelain)"
+    - test -n "${STATUS}" && echo "${STATUS}" && echo "Build made working tree dirty, did you forget to update something?" && exit 2
+    - ninja -C build_ci install
 
 build:asan:linux:amd64:
   <<: *build
-  variables:
-    MESON_ARGS: -Db_sanitize=address,undefined
+  script:
+    - meson build_ci --default-library=static --prefix=$CI_PROJECT_DIR/.local -Db_sanitize=address,undefined
+    - ninja -v -C build_ci
+    - ninja -C build_ci install
 
 # NOTE: build for turris when meson is available and packaging files updated
 #build:turris:omnia:
