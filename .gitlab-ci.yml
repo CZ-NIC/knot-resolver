@@ -23,7 +23,9 @@ stages:
   except:
     - master
   artifacts:
-    untracked: true
+    paths:
+      - .local/
+      - build_ci/
   tags:
     - docker
     - linux
@@ -33,20 +35,20 @@ build:linux:amd64:
   <<: *build
   script:
     - meson build_ci --default-library=both --prefix=$CI_PROJECT_DIR/.local -Dwerror=true -Dpostinstall_tests=enabled
-    - ninja -v -C build_ci
-    - ninja -v -C build_ci kres-gen
+    - ninja -C build_ci
+    - ninja -C build_ci kres-gen
     - STATUS="$(git status --untracked-files=normal --porcelain)"
     - test -n "${STATUS}" && echo "${STATUS}" && echo "Build made working tree dirty, did you forget to update something?" && exit 2
-    - ninja -C build_ci install
-    - meson test -C build_ci --suite unit --suite config
+    - ninja -C build_ci install >/dev/null
+    - meson test -C build_ci --suite unit --suite config --print-errorlogs
 
 build:asan:linux:amd64:
   <<: *build
   script:
     - meson build_ci --default-library=static --prefix=$CI_PROJECT_DIR/.local -Db_sanitize=address,undefined -Dpostinstall_tests=enabled
-    - ninja -v -C build_ci
-    - ninja -C build_ci install
-    - meson test -C build_ci --suite unit --suite config
+    - ninja -C build_ci
+    - ninja -C build_ci install >/dev/null
+    - meson test -C build_ci --suite unit --suite config --print-errorlogs
 
 # NOTE: build for turris when meson is available and packaging files updated
 #build:turris:omnia:
