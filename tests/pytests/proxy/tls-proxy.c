@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <gnutls/gnutls.h>
 #include <uv.h>
-#include "array.h"
+#include "lib/generic/array.h"
 #include "tls-proxy.h"
 
 #define TLS_MAX_SEND_RETRIES 100
@@ -382,7 +382,7 @@ static void accept_connection_from_client(uv_stream_t *server)
 		return;
 	}
 	memcpy(&upstream->addr, &proxy->upstream_addr, sizeof(struct sockaddr_storage));
-	
+
 	struct tls_ctx *tls = calloc(1, sizeof(struct tls_ctx));
 	tls->handshake_state = TLS_HS_NOT_STARTED;
 
@@ -474,7 +474,6 @@ static void on_client_connection(uv_stream_t *server, int status)
 static void on_connect_to_upstream(uv_connect_t *req, int status)
 {
 	struct peer *upstream = (struct peer *)req->handle->data;
-	struct tls_proxy_ctx *proxy = get_proxy(upstream);
 	free(req);
 	if (status < 0) {
 		fprintf(stdout, "[upstream] error connecting to upstream (%s): %s\n",
@@ -524,7 +523,7 @@ static void read_from_client_cb(uv_stream_t *handle, ssize_t nread, const uv_buf
 	}
 	fprintf(stdout, "[client] reading %zd bytes from '%s'\n", nread, ip_straddr(&client->addr));
 
-	int res = tls_process_from_client(client, buf->base, nread);
+	int res = tls_process_from_client(client, (const uint8_t *)buf->base, nread);
 	if (res < 0) {
 		if (client->state == STATE_CONNECTED) {
 			client->state = STATE_CLOSING_IN_PROGRESS;
@@ -553,7 +552,7 @@ static void read_from_upstream_cb(uv_stream_t *handle, ssize_t nread, const uv_b
 		}
 		return;
 	}
-	int res = tls_process_from_upstream(upstream, buf->base, nread);
+	int res = tls_process_from_upstream(upstream, (const uint8_t *)buf->base, nread);
 	if (res < 0) {
 		fprintf(stdout, "[upstream] error processing tls data to client\n");
 		if (upstream->peer->state == STATE_CONNECTED) {
@@ -588,7 +587,6 @@ static void push_to_client_pending(struct peer *client, const char *buf, size_t 
 
 static int write_to_upstream_pending(struct peer *upstream)
 {
-	struct tls_proxy_ctx *proxy = get_proxy(upstream);
 	struct buf *buf = get_first_pending_buf(upstream);
 	uv_write_t *req = (uv_write_t *) malloc(sizeof(uv_write_t));
 	uv_buf_t wrbuf = uv_buf_init(buf->buf, buf->size);
@@ -620,7 +618,6 @@ static ssize_t proxy_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len
 ssize_t proxy_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
 {
 	struct peer *client = (struct peer *)h;
-	struct tls_ctx *t = client->tls;
 	fprintf(stdout, "[gnutls_push] writing %zd bytes\n", len);
 
 	ssize_t ret = -1;
@@ -651,7 +648,6 @@ static int write_to_client_pending(struct peer *client)
 
 	struct tls_proxy_ctx *proxy = get_proxy(client);
 	struct buf *buf = get_first_pending_buf(client);
-	uv_buf_t wrbuf = uv_buf_init(buf->buf, buf->size);
 	fprintf(stdout, "[client] writing %zd bytes\n", buf->size);
 
 	gnutls_session_t tls_session = client->tls->session;
@@ -751,7 +747,6 @@ static int write_to_client_pending(struct peer *client)
 static int tls_process_from_upstream(struct peer *upstream, const uint8_t *buf, ssize_t len)
 {
 	struct peer *client = upstream->peer;
-	gnutls_session_t tls_session = client->tls->session;
 
 	fprintf(stdout, "[upstream] pushing %zd bytes to client\n", len);
 
@@ -761,7 +756,7 @@ static int tls_process_from_upstream(struct peer *upstream, const uint8_t *buf, 
 	}
 
 	bool list_was_empty = (client->pending_buf.len == 0);
-	push_to_client_pending(client, buf, len);
+	push_to_client_pending(client, (const char *)buf, len);
 	submitted = len;
 	if (client->tls->handshake_state == TLS_HS_DONE) {
 		if (list_was_empty && client->pending_buf.len > 0) {
@@ -902,7 +897,7 @@ int tls_process_from_client(struct peer *client, const uint8_t *buf, ssize_t nre
 		struct peer *upstream = client->peer;
 		if (upstream->state == STATE_CONNECTED) {
 			bool upstream_pending_is_empty = (upstream->pending_buf.len == 0);
-			push_to_upstream_pending(upstream, tls->recv_buf, count);
+			push_to_upstream_pending(upstream, (const char *)tls->recv_buf, count);
 			if (upstream_pending_is_empty) {
 				write_to_upstream_pending(upstream);
 			}
@@ -912,9 +907,9 @@ int tls_process_from_client(struct peer *client, const uint8_t *buf, ssize_t nre
 			fprintf(stdout, "[client] connecting to upstream '%s'\n", ip_straddr(&upstream->addr));
 			uv_tcp_connect(conn, &upstream->handle, (struct sockaddr *)&upstream->addr,
 				       on_connect_to_upstream);
-			push_to_upstream_pending(upstream, tls->recv_buf, count);
+			push_to_upstream_pending(upstream, (const char *)tls->recv_buf, count);
 		} else if (upstream->state == STATE_CONNECT_IN_PROGRESS) {
-			push_to_upstream_pending(upstream, tls->recv_buf, count);
+			push_to_upstream_pending(upstream, (const char *)tls->recv_buf, count);
 		}
 		submitted += count;
 	}
@@ -927,7 +922,7 @@ struct tls_proxy_ctx *tls_proxy_allocate()
 }
 
 int tls_proxy_init(struct tls_proxy_ctx *proxy, const struct args *a)
-{	
+{
 	const char *server_addr = a->local_addr;
 	int server_port = a->local_port;
 	const char *upstream_addr = a->upstream;
@@ -957,7 +952,7 @@ int tls_proxy_init(struct tls_proxy_ctx *proxy, const struct args *a)
 	proxy->conn_sequence = 0;
 
 	proxy->loop->data = proxy;
-	
+
 	int err = 0;
 	if (gnutls_references == 0) {
 		err = gnutls_global_init();
@@ -968,7 +963,7 @@ int tls_proxy_init(struct tls_proxy_ctx *proxy, const struct args *a)
 		}
 	}
 	gnutls_references += 1;
-	
+
 	err = gnutls_certificate_allocate_credentials(&proxy->tls_credentials);
 	if (err != GNUTLS_E_SUCCESS) {
 		fprintf(stdout, "[proxy] gnutls_certificate_allocate_credentials() failed: (%d) %s\n",
@@ -1021,7 +1016,7 @@ void tls_proxy_free(struct tls_proxy_ctx *proxy)
 	gnutls_certificate_free_credentials(proxy->tls_credentials);
         gnutls_priority_deinit(proxy->tls_priority_cache);
 	free(proxy);
-	
+
 	gnutls_references -= 1;
 	if (gnutls_references == 0) {
 		gnutls_global_deinit();
@@ -1029,7 +1024,7 @@ void tls_proxy_free(struct tls_proxy_ctx *proxy)
 }
 
 int tls_proxy_start_listen(struct tls_proxy_ctx *proxy)
-{	
+{
 	uv_tcp_bind(&proxy->server.handle, (const struct sockaddr*)&proxy->server.addr, 0);
 	int ret = uv_listen((uv_stream_t*)&proxy->server.handle, 128, on_client_connection);
 	return ret;

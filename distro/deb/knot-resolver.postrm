@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-if [ "$1" = "remove" ] && [ -x "/bin/systemctl" ]; then
+if [ "$1" = "remove" ]; then
     systemctl stop system-kresd.slice || true
 fi
 

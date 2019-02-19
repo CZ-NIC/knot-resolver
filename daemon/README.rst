@@ -255,14 +255,6 @@ Environment
 
    This affects ephemeral certificates for kresd serving DNS over TLS.
 
-.. function:: moduledir([dir])
-
-   :return: Modules directory.
-
-   If called with a parameter, it will change kresd's directory for
-   looking up the dynamic modules.  If called without a parameter, it
-   will return kresd's modules directory.
-
 .. function:: verbose(true | false)
 
    :return: Toggle verbose logging.
@@ -421,9 +413,9 @@ Trust anchors and DNSSEC
 
       [ ta ] key: 19036 state: Valid
 
-.. envvar:: trust_anchors.keyfile_default = KEYFILE_DEFAULT
+.. envvar:: trust_anchors.keyfile_default = keyfile_default
 
-   Set by ``KEYFILE_DEFAULT`` during compilation (by default ``nil``). This can be explicitly
+   Set by ``keyfile_default`` option during compilation (by default ``nil``). This can be explicitly
    set to ``nil`` to override the value set during compilation in order to disable DNSSEC.
 
 .. envvar:: trust_anchors.hold_down_time = 30 * day
@@ -498,6 +490,9 @@ Trust anchors and DNSSEC
 Enabling DNSSEC
 ===============
 
+TODO - change section to disabling DNSSEC
+-- trust_anchors.keyfile_default = nil
+
 The resolver supports DNSSEC including :rfc:`5011` automated DNSSEC TA updates and :rfc:`7646` negative trust anchors.
 To enable it, you need to provide trusted root keys. Bootstrapping of the keys is automated, and kresd fetches root trust anchors set `over a secure channel <http://jpmens.net/2015/01/21/opendnssec-rfc-5011-bind-and-unbound/>`_ from IANA. From there, it can perform :rfc:`5011` automatic updates for you.
 
@@ -567,8 +562,10 @@ The daemon features a CLI interface, type ``help()`` to see the list of availabl
 Verbose output
 --------------
 
-If the verbose logging is compiled in, i.e. not turned off by ``-DNOVERBOSELOG``, you can turn on verbose tracing of server operation with the ``-v`` option.
-You can also toggle it on runtime with ``verbose(true|false)`` command.
+If the verbose logging is compiled in, i.e. not turned off by
+``verbose_log=disabled``, you can turn on verbose tracing of server operation
+with the ``-v`` option.  You can also toggle it on runtime with
+``verbose(true|false)`` command.
 
 .. code-block:: bash
 

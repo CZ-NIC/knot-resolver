@@ -7,6 +7,7 @@ addons:
             - cmocka
             - luajit
             - libuv
+            - lmdb
 compiler:
     - clang
 notifications:
@@ -17,7 +18,7 @@ matrix:
     fast_finish: true
 env:
     global:
-        - KNOT_DNS_VERSION=v2.7.2
+        - KNOT_DNS_VERSION=v2.7.6
         - DYLD_LIBRARY_PATH="${HOME}/.local/lib"
         - MALLOC_CHECK_=3
         - MALLOC_PERTURB_=223
