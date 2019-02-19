@@ -520,9 +520,9 @@ static int init_resolver(struct engine *engine)
 	/* Empty init; filled via ./lua/config.lua */
 	kr_zonecut_init(&engine->resolver.root_hints, (const uint8_t *)"", engine->pool);
 	/* Open NS rtt + reputation cache */
-	lru_create(&engine->resolver.cache_rtt, LRU_RTT_SIZE, engine->pool, NULL);
-	lru_create(&engine->resolver.cache_rep, LRU_REP_SIZE, engine->pool, NULL);
-	lru_create(&engine->resolver.cache_cookie, LRU_COOKIES_SIZE, engine->pool, NULL);
+	lru_create(&engine->resolver.cache_rtt, LRU_RTT_SIZE, NULL, NULL);
+	lru_create(&engine->resolver.cache_rep, LRU_REP_SIZE, NULL, NULL);
+	lru_create(&engine->resolver.cache_cookie, LRU_COOKIES_SIZE, NULL, NULL);
 
 	/* Load basic modules */
 	engine_register(engine, "iterate", NULL, NULL);
@@ -687,7 +687,7 @@ void engine_deinit(struct engine *engine)
 	kr_zonecut_deinit(&engine->resolver.root_hints);
 	kr_cache_close(&engine->resolver.cache);
 
-	/* The lru keys are currently malloc-ated and need to be freed. */
+	/* The LRUs are currently malloc-ated and need to be freed. */
 	lru_free(engine->resolver.cache_rtt);
 	lru_free(engine->resolver.cache_rep);
 	lru_free(engine->resolver.cache_cookie);
