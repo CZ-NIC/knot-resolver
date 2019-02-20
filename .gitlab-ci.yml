@@ -115,6 +115,7 @@ srpm:
     when: always
     paths:
       - build_ci*/meson-logs/testlog.txt
+      - tmpdeckard*
 
 .test_flaky: &test_flaky
   <<: *test
@@ -211,31 +212,11 @@ doc:
     - docker
 
 deckard:
-  stage: test
-  except:
-    refs:
-      - master
-    variables:
-      # prevent unstable test from cancelling nightly OBS build
-      - $SKIP_FLAKY == "1"  # TODO use in schedules
+  <<: *test_flaky
   variables:
     TMPDIR: $CI_PROJECT_DIR
   script:
-    - DECKARDFLAGS="-n $(nproc)" PATH="$PREFIX/sbin:$PATH" make check-integration
-  # these errors are side-effect of Git way of handling file timestamps
-    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard 2>&1 | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
-  dependencies:
-    - build
-  artifacts:
-    when: always
-    paths:
-      - ./*.info
-      - tmpdeckard*
-    expire_in: 1 week
-  tags:
-    - docker
-    - linux
-    - amd64
+    - meson test -C build_ci* --suite integration
 
 test:valgrind:
   <<: *test
