@@ -98,6 +98,34 @@ srpm:
 # }}}
 
 # test {{{
+.test: &test
+  stage: test
+  except:
+    - master
+  tags:
+    - docker
+    - linux
+    - amd64
+  dependencies:
+    - build  # NOTE switch to asan if build passes (where it makes sense)
+  before_script:
+    # meson detects changes and performs useless rebuild; hide the log
+    - ninja -C build_ci* &>/dev/null
+  artifacts:
+    when: always
+    paths:
+      - build_ci*/meson-logs/testlog.txt
+
+.test_flaky: &test_flaky
+  <<: *test
+  except:
+    refs:
+      - master
+    variables:
+      # prevent flaky test from cancelling the rest of pipeline
+      - $SKIP_FLAKY == "1"  # TODO use this variable in schedules
+
+
 lint:pedantic:
   stage: test  # could be in build already, but let's not block the test stage if this fails
   dependencies: []  # do not download build artifacts
@@ -189,7 +217,7 @@ deckard:
       - master
     variables:
       # prevent unstable test from cancelling nightly OBS build
-      - $SKIP_DECKARD == "1"
+      - $SKIP_FLAKY == "1"  # TODO use in schedules
   variables:
     TMPDIR: $CI_PROJECT_DIR
   script:
@@ -210,18 +238,9 @@ deckard:
     - amd64
 
 test:valgrind:
-  stage: test
-  except:
-    - master
+  <<: *test
   script:
-    - ninja -C build_ci install &>/dev/null
     - meson test -C build_ci --suite unit --suite config --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
-  dependencies:
-    - build  # valgrind doesn't work with ASAN
-  tags:
-    - docker
-    - linux
-    - amd64
 
 build:darwin:
   stage: test
@@ -263,44 +282,15 @@ pytests:lint:
     - linux
     - amd64
 
-pytests.parallel:
-  stage: test
-  dependencies:
-    - build  # NOTE switch to asan if build passes
-  except:
-    - master
-  before_script:
-    - ninja -C build_ci* &>/dev/null
-  script:
-    - meson test -C build_ci* pytests.parallel --print-errorlogs
-  artifacts:
-    when: always
-    paths:
-      - build_ci*/meson-logs/testlog.txt
-  tags:
-    - docker
-    - linux
-    - amd64
-
-pytests.single:
-  #stage: extended  # TODO switch back
-  stage: test
-  dependencies:
-    - build  # NOTE switch to asan if build passes
-  except:
-    - master
-  before_script:
-    - ninja -C build_ci* &>/dev/null
+pytests 1/2:
+  <<: *test_flaky
   script:
     - meson test -C build_ci pytests.single --print-errorlogs
-  artifacts:
-    when: always
-    paths:
-      - build_ci*/meson-logs/testlog.txt
-  tags:
-    - docker
-    - linux
-    - amd64
+
+pytests 2/2:
+  <<: *test_flaky
+  script:
+    - meson test -C build_ci* pytests.parallel --print-errorlogs
 
 respdiff:basic:
   stage: test
