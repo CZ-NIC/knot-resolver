@@ -17,12 +17,10 @@ image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
 stages:
   - build
   - test
-  - coverage
   - extended
   - deploy
 
 # build {{{
-
 .build: &build
   stage: build
   except:
@@ -508,52 +506,7 @@ resperf:iter.udp-asan:
     RESPERF_TEST: resperf.iter.udp
 # }}}
 
-# coverage {{{
-# compute coverage for runs with COVERAGE=1
-coverage:
-  stage: coverage
-  except:
-    - master
-    - branches@knot/knot-resolver-security
-  only:
-    variables:
-      - $COVERAGE == "1"
-  script:
-    - make coverage
-  artifacts:
-    expire_in: '1 week'
-    paths:
-      - coverage
-  coverage: '/lines\.+:\s(\d+.\d+\%)/'
-  dependencies:
-    - build:linux:amd64
-    #- test:linux:amd64
-    #- installcheck:linux:amd64
-    - deckard:linux:amd64
-    - respdiff:iter:udp:linux:amd64
-  tags:
-    - docker
-    - linux
-    - amd64
-# }}}
-
 # deploy {{{
-pages:
-  stage: deploy
-  only:  # publish coverage only for master branch
-    refs:
-      - nightly@knot/knot-resolver
-    variables:
-      - $COVERAGE == "1"
-  dependencies:
-    - coverage
-  script:
-    - mv coverage/ public/
-  artifacts:
-    expire_in: '30 days'
-    paths:
-      - public
-
 pkg:obs:devel:
   stage: deploy
   only:
