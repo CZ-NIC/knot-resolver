@@ -182,9 +182,8 @@ install_data(
 s_managed_ta = managed_ta ? 'enabled' : 'disabled'
 s_systemd_socket = libsystemd.found() ? 'enabled' : 'disabled'
 s_build_client = build_client ? 'enabled' : 'disabled'
-s_build_doc = build_doc ? 'enabled' : 'disabled'
-s_build_postinstall_tests = build_postinstall_tests ? 'enabled' : 'disabled'
 s_build_unit_tests = build_unit_tests ? 'enabled' : 'disabled'
+s_build_postinstall_tests = build_postinstall_tests ? 'enabled' : 'disabled'
 s_install_kresd_conf = install_kresd_conf ? 'enabled' : 'disabled'
 message('''
 
@@ -208,7 +207,6 @@ message('''
 
   optional components
     client:             @0@'''.format(s_build_client) + '''
-    doc:                @0@'''.format(s_build_doc) + '''
     unit_tests:         @0@'''.format(s_build_unit_tests) + '''
     postinstall_tests:  @0@'''.format(s_build_postinstall_tests) + '''
 
