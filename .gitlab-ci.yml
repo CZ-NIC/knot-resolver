@@ -1,3 +1,4 @@
+# vim:foldmethod=marker
 variables:
   DEBIAN_FRONTEND: noninteractive
   LC_ALL: C.UTF-8
@@ -19,6 +20,8 @@ stages:
   - coverage
   - extended
   - deploy
+
+# build {{{
 
 .build: &build
   stage: build
@@ -90,23 +93,6 @@ kres-gen:
     - ninja -C build_ci kres-gen
     - git diff --quiet || (git diff; exit 1)
 
-lint:pedantic:
-  stage: test  # could be in build already, but let's not block the test stage if this fails
-  dependencies: []  # do not download build artifacts
-  except:
-    - master
-  variables:
-    CFLAGS: -Werror -Wall -Wpedantic -ggdb -std=gnu11
-  script:
-    - make -k all
-    - make clean
-    - make -k all CC=clang CXX=clang++ \
-        CFLAGS="$CFLAGS -Wno-newline-eof -Wno-gnu-zero-variadic-macro-arguments -Wno-gnu-folding-constant"
-  tags:
-    - docker
-    - linux
-    - amd64
-
 srpm:
   stage: build
   except:
@@ -120,6 +106,26 @@ srpm:
     expire_in: '1 week'
     paths:
       - "*.src.rpm"
+  tags:
+    - docker
+    - linux
+    - amd64
+
+# }}}
+
+# test {{{
+lint:pedantic:
+  stage: test  # could be in build already, but let's not block the test stage if this fails
+  dependencies: []  # do not download build artifacts
+  except:
+    - master
+  variables:
+    CFLAGS: -Werror -Wall -Wpedantic -ggdb -std=gnu11
+  script:
+    - make -k all
+    - make clean
+    - make -k all CC=clang CXX=clang++ \
+        CFLAGS="$CFLAGS -Wno-newline-eof -Wno-gnu-zero-variadic-macro-arguments -Wno-gnu-folding-constant"
   tags:
     - docker
     - linux
@@ -243,7 +249,6 @@ build:darwin:
   tags:
     - docker
 
-
 # temporarily disabled - we need to fix issues first
 #deckard:linux:amd64:valgrind:
 #  stage: test
@@ -261,7 +266,6 @@ build:darwin:
 #    - docker
 #    - linux
 #    - amd64
-
 
 pytests:lint:
   stage: test
@@ -310,7 +314,83 @@ pytests:extended:
     - linux
     - amd64
 
+respdiff:iter:udp:linux:amd64:
+  stage: test
+  except:
+    - master
+  script:
+    - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/udp" --export)
+    - ulimit -n "$(ulimit -Hn)" # applies only for kresd ATM
+    - ./ci/respdiff/start-resolvers.sh
+    - ./ci/respdiff/run-respdiff-tests.sh udp
+    - cat results/respdiff.txt
+    - echo 'test if mismatch rate < 1.0 %'
+    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
+    - killall --wait kresd
+    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-udp | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
+  dependencies:
+    - build:asan:linux:amd64
+  artifacts:
+    when: always
+    expire_in: '1 week'
+    paths:
+      - kresd.log.xz
+      - results/*.txt
+      - results/*.png
+      - results/respdiff.db/data.mdb.xz
+      - ./*.info
+  tags:
+    - docker
+    - linux
+    - amd64
 
+pkg:fedora-29:
+  stage: test
+  except:
+    - master
+  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
+  only:  # trigger job only in repos under our control
+    - branches@knot/knot-resolver
+    - branches@knot/knot-resolver-security
+  dependencies:
+    - srpm
+  script:
+    - mock --no-clean --old-chroot -r fedora-29-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/fedora-29-x86_64/result/build.log; false)
+  after_script:
+    - mv /var/lib/mock/fedora-29-x86_64/result fedora-29-x86_64
+  artifacts:
+    when: always
+    expire_in: '1 week'
+    paths:
+      - fedora-29-x86_64/
+  tags:
+    - privileged  # mock requires additional capabilities (e.g. mount)
+
+pkg:epel-7:
+  stage: test
+  except:
+    - master
+  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
+  only:  # trigger job only in repos under our control
+    - branches@knot/knot-resolver
+    - branches@knot/knot-resolver-security
+  dependencies:
+    - srpm
+  script:
+    - mock --no-clean --dnf --old-chroot -r epel-7-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/epel-7-x86_64/result/build.log; false)
+  after_script:
+    - mv /var/lib/mock/epel-7-x86_64/result epel-7-x86_64
+  artifacts:
+    when: always
+    expire_in: '1 week'
+    paths:
+      - epel-7-x86_64/
+  tags:
+    - privileged  # mock require additional capabilities (e.g. mount)
+
+# }}}
+
+# extended {{{
 .respdiff:  &respdiff
   stage: extended
   dependencies: []
@@ -381,38 +461,6 @@ fwd-udp6-unbound.tls6:
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6.j256
 
-
-respdiff:iter:udp:linux:amd64:
-  stage: test
-  except:
-    - master
-  script:
-    - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/udp" --export)
-    - ulimit -n "$(ulimit -Hn)" # applies only for kresd ATM
-    - ./ci/respdiff/start-resolvers.sh
-    - ./ci/respdiff/run-respdiff-tests.sh udp
-    - cat results/respdiff.txt
-    - echo 'test if mismatch rate < 1.0 %'
-    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
-    - killall --wait kresd
-    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-udp | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
-  dependencies:
-    - build:asan:linux:amd64
-  artifacts:
-    when: always
-    expire_in: '1 week'
-    paths:
-      - kresd.log.xz
-      - results/*.txt
-      - results/*.png
-      - results/respdiff.db/data.mdb.xz
-      - ./*.info
-  tags:
-    - docker
-    - linux
-    - amd64
-
-
 .resperf:  &resperf
   stage: extended
   dependencies: []
@@ -458,52 +506,9 @@ resperf:iter.udp-asan:
   <<: *resperf
   variables:
     RESPERF_TEST: resperf.iter.udp
+# }}}
 
-
-pkg:fedora-29:
-  stage: test
-  except:
-    - master
-  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
-  only:  # trigger job only in repos under our control
-    - branches@knot/knot-resolver
-    - branches@knot/knot-resolver-security
-  dependencies:
-    - srpm
-  script:
-    - mock --no-clean --old-chroot -r fedora-29-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/fedora-29-x86_64/result/build.log; false)
-  after_script:
-    - mv /var/lib/mock/fedora-29-x86_64/result fedora-29-x86_64
-  artifacts:
-    when: always
-    expire_in: '1 week'
-    paths:
-      - fedora-29-x86_64/
-  tags:
-    - privileged  # mock requires additional capabilities (e.g. mount)
-
-pkg:epel-7:
-  stage: test
-  except:
-    - master
-  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
-  only:  # trigger job only in repos under our control
-    - branches@knot/knot-resolver
-    - branches@knot/knot-resolver-security
-  dependencies:
-    - srpm
-  script:
-    - mock --no-clean --dnf --old-chroot -r epel-7-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/epel-7-x86_64/result/build.log; false)
-  after_script:
-    - mv /var/lib/mock/epel-7-x86_64/result epel-7-x86_64
-  artifacts:
-    when: always
-    expire_in: '1 week'
-    paths:
-      - epel-7-x86_64/
-  tags:
-    - privileged  # mock require additional capabilities (e.g. mount)
-
+# coverage {{{
 # compute coverage for runs with COVERAGE=1
 coverage:
   stage: coverage
@@ -530,11 +535,12 @@ coverage:
     - docker
     - linux
     - amd64
+# }}}
 
-# publish coverage only for master branch
+# deploy {{{
 pages:
   stage: deploy
-  only:
+  only:  # publish coverage only for master branch
     refs:
       - nightly@knot/knot-resolver
     variables:
@@ -548,7 +554,6 @@ pages:
     paths:
       - public
 
-# trigger obs build for master branch
 pkg:obs:devel:
   stage: deploy
   only:
@@ -592,7 +597,6 @@ root.hints:
   script:
     - scripts/update-root-hints.sh
 
-
 # copy snapshot of current master to nightly branch for further processing
 # (this is workaround for missing complex conditions for job limits in Gitlab)
 nightly:copy:
@@ -610,3 +614,4 @@ nightly:copy:
     # recreate nightly branch from current master
     - 'curl --request POST --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches?branch=nightly&ref=master"'
     - 'curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/protect"'
+# }}}
