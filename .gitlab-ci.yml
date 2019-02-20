@@ -120,13 +120,10 @@ srpm:
 
 .test_flaky: &test_flaky
   <<: *test
-  except:
-    refs:
-      - master
-    variables:
-      # prevent flaky test from cancelling the rest of pipeline
-      - $SKIP_FLAKY == "1"  # TODO use this variable in schedules
-
+  retry:
+    max: 2
+    when:
+      - script_failure
 
 lint:pedantic:
   stage: test  # could be in build already, but let's not block the test stage if this fails
@@ -273,6 +270,10 @@ pytests 2/2:
   <<: *test_flaky
   script:
     - ${MESON_TEST} pytests.parallel
+  # NOTE using start_in to delay this job is an experimental attempt to reduce chance
+  # this resource-intensive job is started on the same machine as the other pytests
+  when: delayed
+  start_in: 30
 
 respdiff:basic:
   stage: test
