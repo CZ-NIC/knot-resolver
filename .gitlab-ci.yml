@@ -86,7 +86,7 @@ kres-gen:
     - ninja -C build_ci kres-gen
     - git diff --quiet || (git diff; exit 1)
 
-srpm:
+pkg:srpm:
   <<: *build
   image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
   artifacts:
@@ -296,7 +296,7 @@ pkg:fedora-29:
     - branches@knot/knot-resolver
     - branches@knot/knot-resolver-security
   dependencies:
-    - srpm
+    - pkg:srpm
   script:
     - mock --no-clean --old-chroot -r fedora-29-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/fedora-29-x86_64/result/build.log; false)
   after_script:
@@ -318,7 +318,7 @@ pkg:epel-7:
     - branches@knot/knot-resolver
     - branches@knot/knot-resolver-security
   dependencies:
-    - srpm
+    - pkg:srpm
   script:
     - mock --no-clean --dnf --old-chroot -r epel-7-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/epel-7-x86_64/result/build.log; false)
   after_script:
