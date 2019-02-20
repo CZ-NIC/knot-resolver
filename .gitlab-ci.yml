@@ -12,6 +12,7 @@ variables:
   LIBKRES_ABI: 9
   LIBKRES_NAME: libkres
   MESON_TEST: meson test -C build_ci* -t 2 --print-errorlogs
+  PREFIX: $CI_PROJECT_DIR/.local
 
 image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
 
@@ -30,7 +31,7 @@ stages:
     when: always
     paths:
       - .local
-      - 'build_ci*'
+      - build_ci*
   tags:
     - docker
     - linux
@@ -39,7 +40,7 @@ stages:
 build:
   <<: *build
   script:
-    - meson build_ci --default-library=static --prefix=$CI_PROJECT_DIR/.local -Dwerror=true -Dpostinstall_tests=enabled
+    - meson build_ci --default-library=static --prefix=$PREFIX -Dwerror=true -Dpostinstall_tests=enabled
     - ninja -C build_ci
     - ninja -C build_ci install >/dev/null
     - ${MESON_TEST} --suite unit --suite config
@@ -47,7 +48,7 @@ build:
 build-asan:
   <<: *build
   script:
-    - meson build_ci_asan --default-library=static --prefix=$CI_PROJECT_DIR/.local -Db_sanitize=address,undefined -Dpostinstall_tests=enabled
+    - meson build_ci_asan --default-library=static --prefix=$PREFIX -Db_sanitize=address,undefined -Dpostinstall_tests=enabled
     - ninja -C build_ci_asan
     - ninja -C build_ci_asan install >/dev/null
     - ${MESON_TEST} --suite unit --suite config
@@ -80,7 +81,7 @@ kres-gen:
   tags:
     - docker
   script:
-    - meson build_ci --prefix=$CI_PROJECT_DIR/.local
+    - meson build_ci --prefix=$PREFIX
     - ninja -C build_ci lib/libkres.so.${LIBKRES_ABI}
     - ninja -C build_ci kres-gen
     - git diff --quiet || (git diff; exit 1)
@@ -262,21 +263,16 @@ pytests:lint:
     - amd64
 
 respdiff:basic:
-  stage: test
-  except:
-    - master
+  <<: *test
   script:
-    - source <(./scripts/coverage_env.sh "$(pwd)" "$(pwd)/coverage.stats/respdiff" "iter/udp" --export)
     - ulimit -n "$(ulimit -Hn)" # applies only for kresd ATM
     - ./ci/respdiff/start-resolvers.sh
     - ./ci/respdiff/run-respdiff-tests.sh udp
     - cat results/respdiff.txt
     - echo 'test if mismatch rate < 1.0 %'
     - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
+  after_script:
     - killall --wait kresd
-    - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-udp | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
-  dependencies:
-    - build  # NOTE switch to asan if build passes
   artifacts:
     when: always
     expire_in: '1 week'
