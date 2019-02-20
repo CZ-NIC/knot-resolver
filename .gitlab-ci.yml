@@ -197,7 +197,7 @@ deckard:
   # these errors are side-effect of Git way of handling file timestamps
     - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-deckard 2>&1 | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
   dependencies:
-    - build:linux:amd64
+    - build
   artifacts:
     when: always
     paths:
@@ -234,7 +234,7 @@ build:darwin:
     - docker
 
 # temporarily disabled - we need to fix issues first
-#deckard:linux:amd64:valgrind:
+#deckard:valgrind:
 #  stage: test
 #  script:
 #    # TODO: valgrind missing parameter --error-exitcode=1 to fail make on error
@@ -245,7 +245,7 @@ build:darwin:
 #    paths:
 #      - tmpdeckard*
 #  dependencies:
-#    - build:linux:amd64
+#    - build
 #  tags:
 #    - docker
 #    - linux
@@ -263,42 +263,46 @@ pytests:lint:
     - linux
     - amd64
 
-pytests:run:
+pytests.parallel:
   stage: test
   dependencies:
-    - build:asan:linux:amd64
+    - build  # NOTE switch to asan if build passes
   except:
     - master
+  before_script:
+    - ninja -C build_ci* &>/dev/null
   script:
-    - pushd tests/pytests/proxy && make all && popd
-    - PATH="$PREFIX/sbin:$PATH" ./ci/pytests/run.sh &> pytests.log.txt
-  after_script:
-    - tail -1 pytests.log.txt
-    - echo "See pytests.html or pytests.log.txt for full report."
+    - meson test -C build_ci* pytests.parallel --print-errorlogs
   artifacts:
     when: always
-    expire_in: 1 week
     paths:
-      - pytest*
+      - build_ci*/meson-logs/testlog.txt
   tags:
     - docker
     - linux
     - amd64
 
-pytests:extended:
-  stage: extended
+pytests.single:
+  #stage: extended  # TODO switch back
+  stage: test
   dependencies:
-    - build:asan:linux:amd64
+    - build  # NOTE switch to asan if build passes
   except:
     - master
+  before_script:
+    - ninja -C build_ci* &>/dev/null
   script:
-    - PATH="$PREFIX/sbin:$PATH" ./ci/pytests/run-extended.sh
+    - meson test -C build_ci pytests.single --print-errorlogs
+  artifacts:
+    when: always
+    paths:
+      - build_ci*/meson-logs/testlog.txt
   tags:
     - docker
     - linux
     - amd64
 
-respdiff:iter:udp:linux:amd64:
+respdiff:basic:
   stage: test
   except:
     - master
@@ -313,7 +317,7 @@ respdiff:iter:udp:linux:amd64:
     - killall --wait kresd
     - MAKEFLAGS="--jobs $(nproc)" test "${COVERAGE:-0}" -eq 1 && make coverage-c coverage-lua COVERAGE_STAGE=gcov-respdiff-iter-udp | grep -vE '(source file is newer than notes file)|(the message is displayed only once per source file)' || echo "code coverage skipped"
   dependencies:
-    - build:asan:linux:amd64
+    - build  # NOTE switch to asan if build passes
   artifacts:
     when: always
     expire_in: '1 week'
@@ -523,7 +527,7 @@ pkg:debian.symbols:
     - dpkg-gensymbols -c4 -elib/$LIB_NAME.so.$LIBKRES_ABI -P. -p$LIBKRES_NAME$LIBKRES_ABI
   allow_failure: true
   dependencies:
-    - build:linux:amd64
+    - build
 
 root.hints:
   stage: deploy
