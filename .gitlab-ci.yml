@@ -229,8 +229,6 @@ deckard:linux:amd64:
     variables:
       # prevent unstable test from cancelling nightly OBS build
       - $SKIP_DECKARD == "1"
-  variables:
-    TMPDIR: $CI_PROJECT_DIR
   script:
     - DECKARDFLAGS="-n $(nproc)" PATH="$PREFIX/sbin:$PATH" make check-integration
   # these errors are side-effect of Git way of handling file timestamps
