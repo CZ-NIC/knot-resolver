@@ -25,10 +25,7 @@ depends=(
 )
 makedepends=(
     'cmocka'
-    'doxygen'
     'meson'
-    'python-sphinx'
-    'python-breathe'
     'systemd-libs'
 )
 
