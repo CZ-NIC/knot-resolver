@@ -57,10 +57,8 @@ build-asan:
 
 # NOTE: build for turris when meson is available and packaging files updated
 #build:turris:
+#  <<: *build
 #  image: $CI_REGISTRY/knot/knot-resolver/ci/turris:omnia
-#  stage: build
-#  except:
-#    - master
 #  script:
 #    - ./scripts/make-archive.sh
 #    - cp knot-resolver*.tar.xz /tmp/turris/dl/
@@ -74,15 +72,10 @@ build-asan:
 #  artifacts:
 #    paths:
 #      - "*.ipk"
-#  tags:
-#    - docker
-#    - linux
-#    - amd64
 
 kres-gen:
-  stage: build
-  except:
-    - master
+  <<: *build
+  artifacts:
   tags:
     - docker
   script:
@@ -92,23 +85,16 @@ kres-gen:
     - git diff --quiet || (git diff; exit 1)
 
 srpm:
-  stage: build
-  except:
-    - master
-  allow_failure: true  # don't block testing pipeline in case of failure
+  <<: *build
   image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
-  script:
-    - scripts/make-srpm.sh
   artifacts:
     when: always
     expire_in: '1 week'
     paths:
       - "*.src.rpm"
-  tags:
-    - docker
-    - linux
-    - amd64
-
+  allow_failure: true  # don't block testing pipeline in case of failure
+  script:
+    - scripts/make-srpm.sh
 # }}}
 
 # test {{{
