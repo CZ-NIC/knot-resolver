@@ -16,8 +16,8 @@ man_kresd = configure_file(
 install_man(man_kresd)
 
 
-build_doc = get_option('doc').enabled()  # NOTE 'auto' unsupported
-if build_doc  # doxygen + html docs
+# html documentation
+if get_option('doc').enabled()
   message('--- doc dependencies ---')
   doxygen = find_program('doxygen')
   sphinx_build = find_program('sphinx-build-3', required: false)
@@ -46,38 +46,15 @@ if build_doc  # doxygen + html docs
   endif
   message('------------------------')
 
-  # create doxygen in source dir
-  doc_doxyxml = custom_target(
-    'doxyxml doc',
-    command: [
-      '../scripts/doc-doxyxml.sh',
-      meson.current_source_dir(),
-    ],
-    output: 'doxygen',
-    build_always_stale: true,
-    build_by_default: true,
-  )
-
-  # create html docs in build dir
-  doc = custom_target(
-    'html doc',
-    command: [
-      sphinx_build,
-      '-W',
-      '-b', 'html',
-      '-d', '.doctrees',
-      meson.current_source_dir(),
-      '@OUTPUT@',
-    ],
-    output: 'html',
-    build_always_stale: true,
-    build_by_default: true,
-    depends: doc_doxyxml,
-  )
-
   # install html docs
   install_subdir(
-    join_paths(meson.current_build_dir(), 'html'),
+    join_paths(meson.current_source_dir(), 'html'),
     install_dir: doc_dir,
   )
 endif
+
+make_doc = find_program('../scripts/make-doc.sh')
+run_target(
+  'doc',
+  command: make_doc,
+)
