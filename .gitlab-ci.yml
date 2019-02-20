@@ -11,6 +11,7 @@ variables:
   KNOT_VERSION: '2.7'
   LIBKRES_ABI: 9
   LIBKRES_NAME: libkres
+  MESON_TEST: meson test -C build_ci* -t 2 --print-errorlogs
 
 image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
 
@@ -41,7 +42,7 @@ build:
     - meson build_ci --default-library=static --prefix=$CI_PROJECT_DIR/.local -Dwerror=true -Dpostinstall_tests=enabled
     - ninja -C build_ci
     - ninja -C build_ci install >/dev/null
-    - meson test -C build_ci --suite unit --suite config --print-errorlogs
+    - ${MESON_TEST} --suite unit --suite config
 
 build-asan:
   <<: *build
@@ -49,7 +50,7 @@ build-asan:
     - meson build_ci_asan --default-library=static --prefix=$CI_PROJECT_DIR/.local -Db_sanitize=address,undefined -Dpostinstall_tests=enabled
     - ninja -C build_ci_asan
     - ninja -C build_ci_asan install >/dev/null
-    - meson test -C build_ci_asan --suite unit --suite config --print-errorlogs
+    - ${MESON_TEST} --suite unit --suite config
   # TODO remove allow_failure and privileged
   allow_failure: true
   tags:
@@ -216,12 +217,12 @@ deckard:
   variables:
     TMPDIR: $CI_PROJECT_DIR
   script:
-    - meson test -C build_ci* --suite integration
+    - ${MESON_TEST} --suite integration
 
 test:valgrind:
   <<: *test
   script:
-    - meson test -C build_ci --suite unit --suite config --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
+    - ${MESON_TEST} --suite unit --suite config --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
 
 build:darwin:
   stage: test
@@ -266,12 +267,12 @@ pytests:lint:
 pytests 1/2:
   <<: *test_flaky
   script:
-    - meson test -C build_ci pytests.single --print-errorlogs
+    - ${MESON_TEST} pytests.single
 
 pytests 2/2:
   <<: *test_flaky
   script:
-    - meson test -C build_ci* pytests.parallel --print-errorlogs
+    - ${MESON_TEST} pytests.parallel
 
 respdiff:basic:
   stage: test
