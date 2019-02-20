@@ -34,7 +34,7 @@ stages:
     - linux
     - amd64
 
-build:linux:amd64:
+build:
   <<: *build
   script:
     - meson build_ci --default-library=static --prefix=$CI_PROJECT_DIR/.local -Dwerror=true -Dpostinstall_tests=enabled
@@ -42,7 +42,7 @@ build:linux:amd64:
     - ninja -C build_ci install >/dev/null
     - meson test -C build_ci --suite unit --suite config --print-errorlogs
 
-build:asan:linux:amd64:
+build-asan:
   <<: *build
   script:
     - meson build_ci_asan --default-library=static --prefix=$CI_PROJECT_DIR/.local -Db_sanitize=address,undefined -Dpostinstall_tests=enabled
@@ -55,7 +55,7 @@ build:asan:linux:amd64:
     - privileged
 
 # NOTE: build for turris when meson is available and packaging files updated
-#build:turris:omnia:
+#build:turris:
 #  image: $CI_REGISTRY/knot/knot-resolver/ci/turris:omnia
 #  stage: build
 #  except:
@@ -161,7 +161,7 @@ lint:clang-scan-build:
   tags:
     - docker
 
-docker:build:
+docker:
   stage: test
   image: docker:latest
   except:
@@ -192,7 +192,7 @@ doc:
   tags:
     - docker
 
-deckard:linux:amd64:
+deckard:
   stage: test
   except:
     refs:
@@ -233,7 +233,7 @@ valgrind:linux:amd64:
     - linux
     - amd64
 
-osx:build:
+build:darwin:
   stage: test
   except:
     - master
@@ -346,37 +346,37 @@ pytests:extended:
   tags:
     - respdiff
 
-respdiff:fwd-tls6-kresd.udp6:
+fwd-tls6-kresd.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-tls6-kresd.udp6.j256
 
-respdiff:fwd-udp6-kresd.udp6:
+fwd-udp6-kresd.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-kresd.udp6.j384
 
-respdiff:iter.udp6:
+iter.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.iter.udp6.j384
 
-respdiff:iter.tls6:
+iter.tls6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.iter.tls6.j384
 
-respdiff:fwd-udp6-unbound.udp6:
+fwd-udp6-unbound.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-unbound.udp6.j256
 
-respdiff:fwd-udp6-unbound.tcp6:
+fwd-udp6-unbound.tcp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tcp6.j256
 
-respdiff:fwd-udp6-unbound.tls6:
+fwd-udp6-unbound.tls6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6.j256
@@ -460,7 +460,7 @@ resperf:iter.udp-asan:
     RESPERF_TEST: resperf.iter.udp
 
 
-distro:fedora-29:
+pkg:fedora-29:
   stage: test
   except:
     - master
@@ -482,7 +482,7 @@ distro:fedora-29:
   tags:
     - privileged  # mock requires additional capabilities (e.g. mount)
 
-distro:epel-7:
+pkg:epel-7:
   stage: test
   except:
     - master
@@ -549,7 +549,7 @@ pages:
       - public
 
 # trigger obs build for master branch
-obs:devel:
+pkg:obs:devel:
   stage: deploy
   only:
     variables:
@@ -564,7 +564,7 @@ obs:devel:
     - scripts/build-in-obs.sh knot-dns-devel  # build against latest development version of knot
     - scripts/build-in-obs.sh knot-resolver-devel  # build against knot in knot-resolver-latest
 
-pkg:debian:symbols:libkres:
+pkg:debian.symbols:
   stage: deploy
   only:  # TODO run this pre-release only
     variables:
@@ -610,24 +610,3 @@ nightly:copy:
     # recreate nightly branch from current master
     - 'curl --request POST --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches?branch=nightly&ref=master"'
     - 'curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/protect"'
-
-
-#arm_build:
-#  image: cznic/armhf-ubuntu:16.04
-#  stage: build
-#  script:
-#    - make -k all
-#  tags:
-#    - docker
-#    - linux
-#    - arm
-
-#arm_test:
-#  image: armv7/armhf-ubuntu:16.04
-#  stage: test
-#  script:
-#    - make -k check
-#  tags:
-#    - docker
-#    - linux
-#    - arm
