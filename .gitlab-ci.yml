@@ -32,6 +32,7 @@ stages:
     paths:
       - .local
       - build_ci*
+      - "*.src.rpm"
   tags:
     - docker
     - linux
@@ -89,11 +90,6 @@ kres-gen:
 pkg:srpm:
   <<: *build
   image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
-  artifacts:
-    when: always
-    expire_in: '1 week'
-    paths:
-      - "*.src.rpm"
   allow_failure: true  # don't block testing pipeline in case of failure
   script:
     - scripts/make-srpm.sh
