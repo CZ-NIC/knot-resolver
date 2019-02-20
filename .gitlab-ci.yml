@@ -32,11 +32,19 @@ stages:
     paths:
       - .local
       - build_ci*
-      - "*.src.rpm"
+      - build_dist/meson-dist/*.tar.xz
   tags:
     - docker
     - linux
     - amd64
+
+archive:
+  <<: *build
+  variables:
+    GIT_COMMITER_NAME: 'ci'
+    EMAIL: 'ci@nic'
+  script:
+    - ./scripts/make-dev-archive.sh
 
 build:
   <<: *build
@@ -86,16 +94,6 @@ kres-gen:
     - ninja -C build_ci lib/libkres.so.${LIBKRES_ABI}
     - ninja -C build_ci kres-gen
     - git diff --quiet || (git diff; exit 1)
-
-pkg:srpm:
-  <<: *build
-  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
-  allow_failure: true  # don't block testing pipeline in case of failure
-  variables:
-    GIT_COMMITER_NAME: 'ci'
-    EMAIL: 'ci@nic'
-  script:
-    - scripts/make-srpm.sh
 # }}}
 
 # test {{{
@@ -286,7 +284,7 @@ respdiff:basic:
     - linux
     - amd64
 
-pkg:fedora-29:
+.pkgbuild: &pkgbuild
   stage: test
   except:
     - master
@@ -295,41 +293,31 @@ pkg:fedora-29:
     - branches@knot/knot-resolver
     - branches@knot/knot-resolver-security
   dependencies:
-    - pkg:srpm
-  script:
-    - mock --no-clean --old-chroot -r fedora-29-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/fedora-29-x86_64/result/build.log; false)
-  after_script:
-    - mv /var/lib/mock/fedora-29-x86_64/result fedora-29-x86_64
+    - archive
   artifacts:
     when: always
-    expire_in: '1 week'
     paths:
+      - epel-7-x86_64/
       - fedora-29-x86_64/
+      - "*.src.rpm"
   tags:
     - privileged  # mock requires additional capabilities (e.g. mount)
 
 pkg:epel-7:
-  stage: test
-  except:
-    - master
-  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
-  only:  # trigger job only in repos under our control
-    - branches@knot/knot-resolver
-    - branches@knot/knot-resolver-security
-  dependencies:
-    - pkg:srpm
+  <<: *pkgbuild
   script:
+    - ./scripts/make-srpm.sh
     - mock --no-clean --dnf --old-chroot -r epel-7-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/epel-7-x86_64/result/build.log; false)
   after_script:
     - mv /var/lib/mock/epel-7-x86_64/result epel-7-x86_64
-  artifacts:
-    when: always
-    expire_in: '1 week'
-    paths:
-      - epel-7-x86_64/
-  tags:
-    - privileged  # mock require additional capabilities (e.g. mount)
 
+pkg:fedora-29:
+  <<: *pkgbuild
+  script:
+    - ./scripts/make-srpm.sh
+    - mock --no-clean --old-chroot -r fedora-29-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/fedora-29-x86_64/result/build.log; false)
+  after_script:
+    - mv /var/lib/mock/fedora-29-x86_64/result fedora-29-x86_64
 # }}}
 
 # extended {{{
