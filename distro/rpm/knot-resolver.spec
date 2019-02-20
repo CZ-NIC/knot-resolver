@@ -138,6 +138,9 @@ meson build_rpm \
     -Dc_link_args="%{?__global_ldflags}"
 
 ninja-build -v -C build_rpm
+%if "x%{?rhel}" == "x"
+ninja-build -v -C build_rpm doc
+%endif
 
 %check
 meson test -C build_rpm

@@ -123,6 +123,14 @@ kres-gen:
     when:
       - script_failure
 
+.test_nodep: &test_nodep
+  stage: test
+  except:
+    - master
+  dependencies: []  # do not download build artifacts
+  tags:
+    - docker
+
 lint:pedantic:
   stage: test  # could be in build already, but let's not block the test stage if this fails
   dependencies: []  # do not download build artifacts
@@ -194,18 +202,14 @@ docker:
     - docker rmi $(docker images -f "dangling=true" -q)
 
 doc:
-  stage: test
-  except:
-    - master
+  <<: *test_nodep
   script:
-    - SPHINXFLAGS="-W" make doc
-  dependencies: []
+    - meson build_doc -Ddoc=enabled
+    - ninja -C build_doc doc
   artifacts:
     expire_in: 1 hour
     paths:
-      - ./doc/*
-  tags:
-    - docker
+      - doc/html
 
 deckard:
   <<: *test_flaky

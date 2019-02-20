@@ -197,6 +197,20 @@ It's also possible to run only specific test suite or a test.
    $ meson test -C build_test --no-suite postinstall
    $ meson test -C build_test integration.serve_stale
 
+.. _build-html-doc:
+
+HTML Documentation
+------------------
+
+To check for documentation dependencies and allow its installation, use
+``-Ddoc=enabled``. The documentation doesn't build automatically. Instead,
+target ``doc`` must be called explicitly.
+
+.. code-block:: bash
+
+   $ meson build_doc -Ddoc=enabled
+   $ ninja -C build_doc doc
+
 Tarball
 -------
 
@@ -223,7 +237,7 @@ Recommended build options for packagers:
 * ``--prefix=/usr`` to customize
   prefix, other directories can be set in a similar fashion, see ``meson setup
   --help``
-* ``-Ddoc=enabled`` for offline html documentation
+* ``-Ddoc=enabled`` for offline html documentation (see :ref:`build-html-doc`)
 * ``-Dinstall_kresd_conf=enabled`` to install default config file
 * ``-Dclient=enabled`` to force build of kresc
 * ``-Dunit_tests=enabled`` to force build of unit tests

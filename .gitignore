@@ -46,6 +46,7 @@
 /daemon/lua/trust_anchors.lua
 /depcomp
 /distro/tests/*/.vagrant
+/doc/.doctrees
 /doc/doxyxml
 /doc/html
 /doc/kresd.8
