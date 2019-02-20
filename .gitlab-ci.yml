@@ -261,20 +261,6 @@ pytests:lint:
     - linux
     - amd64
 
-pytests 1/2:
-  <<: *test_flaky
-  script:
-    - ${MESON_TEST} pytests.single
-
-pytests 2/2:
-  <<: *test_flaky
-  script:
-    - ${MESON_TEST} pytests.parallel
-  # NOTE using start_in to delay this job is an experimental attempt to reduce chance
-  # this resource-intensive job is started on the same machine as the other pytests
-  when: delayed
-  start_in: 30
-
 respdiff:basic:
   stage: test
   except:
@@ -352,6 +338,12 @@ pkg:epel-7:
 # }}}
 
 # extended {{{
+pytests:
+  <<: *test_flaky
+  stage: extended  # use this stage to avoid clash with other resource-intensive jobs
+  script:
+    - ${MESON_TEST} --suite pytests
+
 .respdiff:  &respdiff
   stage: extended
   dependencies: []
