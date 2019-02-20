@@ -81,7 +81,7 @@ option(
   'doc',
   type: 'feature',
   value: 'disabled',
-  description: 'build html documentation',
+  description: 'html documentation dependencies and installation',
 )
 
 option(
