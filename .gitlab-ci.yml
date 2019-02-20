@@ -209,15 +209,15 @@ deckard:
     - linux
     - amd64
 
-valgrind:linux:amd64:
+test:valgrind:
   stage: test
   except:
     - master
   script:
-    - ninja -C build_ci  &>/dev/null
+    - ninja -C build_ci install &>/dev/null
     - meson test -C build_ci --suite unit --suite config --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
   dependencies:
-    - build:linux:amd64  # valgrind doesn't work with ASAN
+    - build  # valgrind doesn't work with ASAN
   tags:
     - docker
     - linux
