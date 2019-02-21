@@ -131,6 +131,12 @@ kres-gen:
   tags:
     - docker
 
+lint:tidy:
+  <<: *test_nodep
+  script:
+    - meson build_tidy -Dc_std='gnu99'  # TODO use static_assert, switch to gnu11
+    - ninja -C build_tidy tidy
+
 lint:pedantic:
   <<: *test_nodep
   tags:
@@ -152,16 +158,6 @@ lint:lua:
   dependencies: []  # do not download build artifacts
   script:
     - make lint-lua
-  tags:
-    - docker
-
-lint:c:
-  stage: test
-  except:
-    - master
-  dependencies: []  # do not download build artifacts
-  script:
-    - make lint-c CLANG_TIDY="clang-tidy -quiet"
   tags:
     - docker
 
