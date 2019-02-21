@@ -4,7 +4,7 @@ Building from sources
 .. note:: Latest up-to-date packages for various distribution can be obtained
    from `<https://knot-resolver.cz/download/>`_
 
-Knot-resolver is written for UNIX-like systems, mainly in C99.
+Knot-resolver is written for UNIX-like systems using modern C standards.
 Portable I/O is provided by libuv_.
 Some 64-bit systems with LuaJIT 2.1 may be affected by
 `a problem <https://github.com/LuaJIT/LuaJIT/blob/v2.1/doc/status.html#L100>`_
@@ -64,7 +64,7 @@ tests.
 
 .. [#] If ``meson >= 0.47`` isn't available for your distro, check backports
    repository oor use python pip to install it.
-.. [#] Requires C99, ``__attribute__((cleanup))`` and ``-MMD -MP`` for
+.. [#] Requires ``__attribute__((cleanup))`` and ``-MMD -MP`` for
    dependency file generation. GCC, Clang and ICC are supported.
 .. [#] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS``
    to configure dependencies manually (i.e. ``libknot_CFLAGS`` and

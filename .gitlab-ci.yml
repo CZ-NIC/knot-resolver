@@ -132,21 +132,18 @@ kres-gen:
     - docker
 
 lint:pedantic:
-  stage: test  # could be in build already, but let's not block the test stage if this fails
-  dependencies: []  # do not download build artifacts
-  except:
-    - master
-  variables:
-    CFLAGS: -Werror -Wall -Wpedantic -ggdb -std=gnu11
-  script:
-    - make -k all
-    - make clean
-    - make -k all CC=clang CXX=clang++ \
-        CFLAGS="$CFLAGS -Wno-newline-eof -Wno-gnu-zero-variadic-macro-arguments -Wno-gnu-folding-constant"
+  <<: *test_nodep
   tags:
     - docker
     - linux
     - amd64
+  script:
+    - meson build_pedantic_gcc -Dwerror=true -Dc_args='-Wpedantic'
+    - ninja -C build_pedantic_gcc
+    - >
+      CC=clang CXX=clang++ meson build_pedantic_clang -Dwerror=true -Dc_args='
+      -Wpedantic -Wno-newline-eof -Wno-gnu-zero-variadic-macro-arguments -Wno-gnu-folding-constant'
+    - ninja -C build_pedantic_clang
 
 lint:lua:
   stage: test

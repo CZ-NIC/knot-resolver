@@ -3,7 +3,7 @@ project(
   ['c', 'cpp'],
   license: 'GPLv3+',
   version: '3.2.1',
-  default_options: ['c_std=c99', 'b_ndebug=if-release'],
+  default_options: ['c_std=gnu11', 'b_ndebug=if-release'],
   meson_version: '>=0.47.0',
 )
 
