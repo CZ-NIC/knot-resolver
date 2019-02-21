@@ -521,7 +521,8 @@ const char * kr_straddr_split(const char *addr, char *buf, uint16_t *port)
 	const size_t addrlen = p_start - addr;
 	if (addrlen > INET6_ADDRSTRLEN)
 		return NULL;
-	memcpy(buf, addr, addrlen); buf[addrlen] = '\0';
+	memcpy(buf, addr, addrlen);
+	buf[addrlen] = '\0';
 	return buf;
 }
 
