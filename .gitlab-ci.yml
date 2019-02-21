@@ -133,9 +133,6 @@ kres-gen:
 
 lint:tidy:
   <<: *test
-  before_script: []
-  tags:
-    - docker
   script:
     - ninja -C build_ci* tidy
 
@@ -146,10 +143,10 @@ lint:pedantic:
     - linux
     - amd64
   script:
-    - meson build_pedantic_gcc -Dwerror=true -Dc_args='-Wpedantic'
+    - meson build_pedantic_gcc -Dwerror=true -Dc_args='-Wpedantic' -Dpostinstall_tests=enabled
     - ninja -C build_pedantic_gcc
     - >
-      CC=clang CXX=clang++ meson build_pedantic_clang -Dwerror=true -Dc_args='
+      CC=clang CXX=clang++ meson build_pedantic_clang -Dwerror=true -Dpostinstall_tests=enabled -Dc_args='
       -Wpedantic -Wno-newline-eof -Wno-gnu-zero-variadic-macro-arguments -Wno-gnu-folding-constant'
     - ninja -C build_pedantic_clang
 
@@ -175,7 +172,7 @@ lint:scan-build:
   script:
     - export SCANBUILD="scan-build --status-bugs -no-failure-reports $(./scripts/get-scanbuild-args.sh)"
     - ninja -C build_ci* scan-build || true
-    - test "$(ls build_ci*/meson-logs/scanbuild/*/report-*.html | wc -l)" = 14 # we have this many errors ATM :-)
+    - test "$(ls build_ci*/meson-logs/scanbuild/*/report-*.html | wc -l)" = 29 # we have this many errors ATM :-)
 
 docker:
   stage: test
