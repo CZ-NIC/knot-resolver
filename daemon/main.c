@@ -635,7 +635,7 @@ static int bind_sockets(struct network *net, addr_array_t *addr_set, bool tls) {
 		char buf[INET6_ADDRSTRLEN + 1];
 		const char *addr = kr_straddr_split(addr_set->at[i], buf, &port);
 		/* NULL will result into kr_strerror(EINVAL) -> correct. */
-		int ret = network_listen(net, addr, (uint16_t)port, flags);
+		int ret = network_listen(net, addr, port, flags);
 		if (ret != 0) {
 			kr_log_error("[system] bind to '%s@%d' %s%s\n",
 				addr, port, tls ? "(TLS) " : "", kr_strerror(ret));

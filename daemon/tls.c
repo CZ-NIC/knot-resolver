@@ -36,7 +36,7 @@
 #include "daemon/worker.h"
 #include "daemon/session.h"
 
-#define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE 60*60*24*7
+#define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE (60*60*24*7)
 #define GNUTLS_PIN_MIN_VERSION  0x030400
 
 /** @internal Debugging facility. */
@@ -548,7 +548,7 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
   DNS-over-TLS OOB key-pins: https://tools.ietf.org/html/rfc7858#appendix-A
   HPKP pin reference:        https://tools.ietf.org/html/rfc7469#appendix-A
 */
-#define PINLEN  (((32) * 8 + 4)/6) + 3 + 1
+#define PINLEN  ((((32) * 8 + 4)/6) + 3 + 1)
 
 /* out must be at least PINLEN octets long */
 static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar_len)

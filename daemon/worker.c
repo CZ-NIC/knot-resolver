@@ -97,7 +97,7 @@ struct qr_task
 #define qr_task_ref(task) \
 	do { ++(task)->refs; } while(0)
 #define qr_task_unref(task) \
-	do { if (task && --(task)->refs == 0) { qr_task_free(task); } } while (0)
+	do { if ((task) && --(task)->refs == 0) { qr_task_free((task)); } } while (0)
 
 /** @internal get key for tcp session
  *  @note kr_straddr() return pointer to static string
