@@ -9,8 +9,10 @@ ENV KNOT_RESOLVER_BUILD_DEPS build-essential pkg-config bsdmainutils liblmdb-dev
 	libluajit-5.1-dev libuv1-dev libprotobuf-dev libprotobuf-c-dev \
 	libfstrm-dev luajit lua-sec lua-socket
 ENV BUILDENV_DEPS ${KNOT_DNS_BUILD_DEPS} ${KNOT_RESOLVER_BUILD_DEPS}
+RUN echo "deb http://deb.debian.org/debian stretch-backports main" > /etc/apt/sources.list.d/backports.list
 RUN apt-get update -qq && \
-	apt-get -y -qqq install ${BUILDENV_DEPS}
+	apt-get -y -qqq install ${BUILDENV_DEPS} && \
+	apt-get -y -qqq install -t stretch-backports meson
 
 # Install Knot DNS from sources
 RUN git clone -b $KNOT_DNS_VERSION --depth=1 https://gitlab.labs.nic.cz/knot/knot-dns.git /tmp/knot-dns && \
@@ -34,7 +36,7 @@ FROM debian:stable-slim AS runtime
 # Install runtime dependencies
 ENV KNOT_DNS_RUNTIME_DEPS libgnutls30
 ENV KNOT_RESOLVER_RUNTIME_DEPS liblmdb0 luajit libluajit-5.1-2 libuv1 lua-sec lua-socket
-ENV KNOT_RESOLVER_RUNTIME_DEPS_HTTP libjs-bootstrap libjs-d3 libjs-jquery lua-http lua-mmdb
+ENV KNOT_RESOLVER_RUNTIME_DEPS_HTTP lua-http lua-mmdb
 ENV KNOT_RESOLVER_RUNTIME_DEPS_EXTRA libfstrm0 lua-cqueues
 ENV KNOT_RESOLVER_RUNTIME_DEPS_SSL ca-certificates
 ENV RUNTIME_DEPS ${KNOT_DNS_RUNTIME_DEPS} ${KNOT_RESOLVER_RUNTIME_DEPS} \
@@ -53,14 +55,10 @@ FROM knot-dns-build AS build
 COPY . /tmp/knot-resolver
 
 # Build Knot Resolver
-ARG CFLAGS="-O2 -fstack-protector -g"
-ENV LDFLAGS -Wl,--as-needed
 RUN cd /tmp/knot-resolver && \
-	make "-j$(nproc)" && \
-	make install DESTDIR=/tmp/root && \
-	mkdir -p /tmp/root/etc/knot-resolver && \
-	cp ./etc/config.docker /tmp/root/etc/knot-resolver/kresd.conf && \
-	cp ./distro/common/root.keys /tmp/root/etc/knot-resolver/
+	meson build_docker --buildtype=plain --prefix=/usr --libdir=lib -Dc_args="-O2 -fstack-protector -g" && \
+	DESTDIR=/tmp/root ninja -C build_docker install && \
+	cp /tmp/root/usr/share/doc/knot-resolver/examples/config.docker /tmp/root/etc/knot-resolver/kresd.conf
 
 
 # Final container
@@ -75,5 +73,5 @@ EXPOSE 53/UDP 53/TCP 853/TCP 8053/TCP
 COPY --from=build /tmp/root/ /
 RUN ldconfig
 
-ENTRYPOINT ["/usr/local/sbin/kresd"]
+ENTRYPOINT ["/usr/sbin/kresd"]
 CMD ["-c", "/etc/knot-resolver/kresd.conf"]
