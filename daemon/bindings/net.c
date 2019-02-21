@@ -377,6 +377,7 @@ static int net_tls_client(lua_State *L)
 	/* Various basic sanity-checking. */
 	if (lua_gettop(L) != 1 || !lua_istable(L, 1))
 		lua_error_maybe(L, EINVAL);
+	/* check that only allowed keys are present */
 	{
 		const char *bad_key = lua_table_checkindices(L, (const char *[])
 			{ "1", "hostname", "ca_file", "pin_sha256", "insecure", NULL });
