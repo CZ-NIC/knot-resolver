@@ -1,6 +1,6 @@
 # contrib
 
-contrib_src = [
+contrib_src = files([
   'ccan/asprintf/asprintf.c',
   'ccan/ilog/ilog.c',
   'ccan/json/json.c',
@@ -9,7 +9,7 @@ contrib_src = [
   'murmurhash3/murmurhash3.c',
   'base32hex.c',
   'base64.c'
-]
+])
 
 contrib_inc = include_directories('.')
 
