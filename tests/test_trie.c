@@ -60,7 +60,7 @@ static void test_insert(void **state)
 		trie_val_t *data = trie_get_ins(t, dict[i], KEY_LEN(dict[i]));
 		assert_non_null(data);
 		assert_null(*data);
-		*data = NULL + (ptrdiff_t)i; // yes, ugly
+		*data = (char *)NULL + i; // yes, ugly
 		assert_ptr_equal(trie_get_try(t, dict[i], KEY_LEN(dict[i])), data);
 	}
 	assert_int_equal(trie_weight(t), dict_size);
@@ -94,7 +94,8 @@ static void test_iter(void **state)
 		const char *key = trie_it_key(it, &len);
 		assert_int_equal(KEY_LEN(key), len);
 		assert_string_equal(key, dict_sorted[i]);
-		assert_ptr_equal(dict[*trie_it_val(it) - NULL], dict_sorted[i]);
+		assert_ptr_equal(dict[(char *)*trie_it_val(it) - (char *)NULL],
+				 dict_sorted[i]);
 	}
 	assert_true(trie_it_finished(it));
 	trie_it_free(it);
@@ -111,7 +112,7 @@ static void test_queue(void **state)
 		assert_non_null(key);
 		assert_int_equal(len, KEY_LEN(key));
 		assert_non_null(data);
-		ptrdiff_t key_i = *data - NULL;
+		ptrdiff_t key_i = (char *)*data - (char *)NULL;
 		assert_string_equal(key, dict[key_i]);
 
 		len = 30;
@@ -133,7 +134,7 @@ static void test_leq_bug(void **state)
 	char key = 'a';
 	trie_get_ins(t, &key, sizeof(key));
 
-	key = 0xff;
+	key = (char)0xff;
 	trie_val_t *val;
 	int ret = trie_get_leq(t, &key, sizeof(key), &val);
 	assert_int_equal(ret, 1);
