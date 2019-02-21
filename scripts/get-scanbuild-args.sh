@@ -14,7 +14,7 @@ set -o errexit -o nounset
 # alpha.deadcode.UnreachableCode # false positives/flags sanity checks depending on implementation details
 # alpha.security.MallocOverflow # not smart enough to infer max values from data types
 
-${SCAN_BUILD:-scan-build} \
+cat <<-EOF
 -disable-checker  unix.Malloc \
 -enable-checker   alpha.core.BoolAssignment \
 -enable-checker   alpha.core.CallAndMessageUnInitRefArg \
@@ -47,5 +47,5 @@ ${SCAN_BUILD:-scan-build} \
 -enable-checker   security.FloatLoopCounter \
 -enable-checker   valist.CopyToSelf \
 -enable-checker   valist.Uninitialized \
--enable-checker   valist.Unterminated \
-make
+-enable-checker   valist.Unterminated
+EOF
