@@ -1,5 +1,5 @@
 ---
-Checks: 'bugprone-*,cert-*,-clang-analyzer-unix.Malloc,-clang-analyzer-deadcode.DeadStores,-clang-analyzer-valist.Uninitialized,readability-*,-readability-braces-*,-readability-else-after-return,-readability-redundant-declaration,-readability-non-const-parameter,google-readability-casting,misc-*,-misc-macro-parentheses,-misc-unused-parameters'
+Checks: 'bugprone-*,cert-*,-cert-dcl03-c,-clang-analyzer-unix.Malloc,-clang-analyzer-deadcode.DeadStores,-clang-analyzer-valist.Uninitialized,readability-*,-readability-braces-*,-readability-else-after-return,-readability-redundant-declaration,-readability-non-const-parameter,google-readability-casting,misc-*,-misc-macro-parentheses,-misc-unused-parameters'
 WarningsAsErrors: 'cert-*,misc-*,readability-*,clang-analyzer-*,-readability-non-const-parameter'
 HeaderFilterRegex: 'contrib/ucw/*.h'
 CheckOptions:

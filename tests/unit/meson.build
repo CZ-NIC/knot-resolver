@@ -1,9 +1,9 @@
 # tests: unit
 
 # mock module for test_module
-mock_cmodule_src = [
+mock_cmodule_src = files([
   'mock_cmodule.c',
-]
+])
 
 mock_cmodule_lib = shared_library(
   'mock_cmodule',
