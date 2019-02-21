@@ -164,20 +164,19 @@ lint:lua:
     - docker
 
 lint:clang-scan-build:
+  <<: *test
   stage: test
-  except:
-    - master
-  dependencies: []  # do not download build artifacts
-  script:
-    - MAKEFLAGS="-k -j$(nproc)" SCAN_BUILD="scan-build -o scan-results --status-bugs -no-failure-reports" ./tests/clang_scan_build.sh make || true
-    - test "$(ls scan-results/*/report-*.html | wc -l)" = 6 # we have this many errors ATM :-)
   artifacts:
     when: on_failure
     expire_in: '1 day'
     paths:
-      - scan-results
-  tags:
-    - docker
+      - build_ci*/meson-logs/scan-results
+  before_script: []
+  script:
+    - export SCANBUILD="scan-build -o scan-results --status-bugs -no-failure-reports $(./scripts/get-scanbuild-args.sh)"
+    - ninja -C build_ci* scan-build || true
+    - mv build_ci*/meson-logs/scanbuild/* scan-results
+    - test "$(ls build_ci*/meson-logs/scan-results/*/report-*.html | wc -l)" = 6 # we have this many errors ATM :-)
 
 docker:
   stage: test
