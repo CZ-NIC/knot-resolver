@@ -154,21 +154,6 @@ if get_option('bench').enabled()
 endif
 
 
-# Lint
-message('--- lint dependencies ---')
-clangtidy = find_program('clang-tidy', required: false)
-message('-------------------------')
-if clangtidy.found()
-  run_target(
-    'tidy',
-    command: [
-      clangtidy,
-      '-quiet',
-      '-p', meson.build_root(),
-    ] + c_src_lint
-  )
-endif
-
 # Tests
 subdir('tests')
 
@@ -192,6 +177,35 @@ install_data(
   ],
   install_dir: doc_dir,
 )
+
+
+# Lint
+message('--- lint dependencies ---')
+clangtidy = find_program('clang-tidy', required: false)
+luacheck = find_program('luacheck', required: false)
+message('-------------------------')
+
+if clangtidy.found()
+  run_target(
+    'tidy',
+    command: [
+      clangtidy,
+      '-quiet',
+      '-p', meson.build_root(),
+    ] + c_src_lint
+  )
+endif
+
+if luacheck.found()
+  run_target(
+    'luacheck',
+    command: [
+      luacheck,
+      '--codes',
+      '--formatter', 'TAP',
+    ] + lua_mod_src + lua_src,
+  )
+endif
 
 
 # Summary message
