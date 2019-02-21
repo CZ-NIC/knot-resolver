@@ -150,12 +150,14 @@ lint:pedantic:
       -Wpedantic -Wno-newline-eof -Wno-gnu-zero-variadic-macro-arguments -Wno-gnu-folding-constant'
     - ninja -C build_pedantic_clang
 
-lint:luacheck:
+lint:other:
   <<: *test_nodep
   stage: test
   script:
-    - meson build_ci_luacheck
-    - ninja -C build_ci_luacheck luacheck
+    - meson build_ci_lint
+    - ninja -C build_ci* pylint
+    - ninja -C build_ci* flake8
+    - ninja -C build_ci* luacheck
 
 lint:scan-build:
   <<: *test
