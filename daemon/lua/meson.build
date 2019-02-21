@@ -25,14 +25,17 @@ run_target(  # run manually to re-generate kres-gen.lua
   command: find_program('./kres-gen.sh'),
 )
 
+lua_src = [
+  config_lua,
+  files('kres.lua'),
+  files('kres-gen.lua'),
+  files('sandbox.lua'),
+  trust_anchors,
+  files('zonefile.lua'),
+]
+
 # install daemon lua sources
-install_data([
-    config_lua,
-    files('kres.lua'),
-    files('kres-gen.lua'),
-    files('sandbox.lua'),
-    trust_anchors,
-    files('zonefile.lua'),
-  ],
+install_data(
+  lua_src,
   install_dir: lib_dir,
 )
