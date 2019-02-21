@@ -1,5 +1,7 @@
-#!/usr/bin/env bash
-set -e
+#!/bin/bash
+set -o errexit -o nounset
+
+cd "$(dirname ${0})/.."
 
 # Find Python modules and standalone Python scripts
 FILES=$(find ./tests/pytests \
