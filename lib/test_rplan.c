@@ -44,7 +44,7 @@ static void test_rplan_push(void **state)
 	test_mm_ctx_init(&mm);
 	struct kr_request request = {
 		.pool = mm,
-		.options = {},
+		.options = { 0 },
 	};
 
 	struct kr_rplan rplan;
