@@ -1,8 +1,9 @@
 # client
 
-kresc_src = [
+kresc_src = files([
   'kresc.c',
-]
+])
+c_src_lint += kresc_src
 
 build_client = false
 if not get_option('client').disabled()
