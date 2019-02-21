@@ -10,10 +10,10 @@ py3_deps += [
 ]
 
 # compile tlsproxy
-tlsproxy_src = [
+tlsproxy_src = files([
   'proxy/tlsproxy.c',
   'proxy/tls-proxy.c',
-]
+])
 tlsproxy = executable(
   'tlsproxy',
   tlsproxy_src,

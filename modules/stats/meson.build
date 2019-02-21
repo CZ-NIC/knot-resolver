@@ -1,8 +1,9 @@
 # C module: stats
 
-stats_src = [
+stats_src = files([
   'stats.c',
-]
+])
+c_src_lint += stats_src
 
 integr_tests += [
   ['stats', join_paths(meson.current_source_dir(), 'test.integr')],

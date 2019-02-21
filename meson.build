@@ -96,6 +96,9 @@ add_project_arguments(
   language: 'c',
 )
 
+# Files for clang-tidy lint
+c_src_lint = files()
+
 # Lists of tests
 # These lists are added to from subdir() and finally used in tests/*
 
@@ -150,6 +153,21 @@ if get_option('bench').enabled()
   subdir('bench')
 endif
 
+
+# Lint
+message('--- lint dependencies ---')
+clangtidy = find_program('clang-tidy', required: false)
+message('-------------------------')
+if clangtidy.found()
+  run_target(
+    'tidy',
+    command: [
+      clangtidy,
+      '-quiet',
+      '-p', meson.build_root(),
+    ] + c_src_lint
+  )
+endif
 
 # Tests
 subdir('tests')

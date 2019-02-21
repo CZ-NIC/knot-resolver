@@ -1,6 +1,6 @@
 # daemon
 
-kresd_src = [
+kresd_src = files([
   'bindings/cache.c',
   'bindings/event.c',
   'bindings/impl.c',
@@ -18,7 +18,8 @@ kresd_src = [
   'tls_session_ticket-srv.c',
   'worker.c',
   'zimport.c',
-]
+])
+c_src_lint += kresd_src
 
 config_tests += [
   ['cache.clear', files('cache.test/clear.test.lua')],

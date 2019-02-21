@@ -1,8 +1,9 @@
 # C module: hints
 
-hints_src = [
+hints_src = files([
   'hints.c',
-]
+])
+c_src_lint += hints_src
 
 hints_mod = shared_module(
   'hints',

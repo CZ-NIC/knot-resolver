@@ -1,8 +1,8 @@
 # C module: dnstap
 
-dnstap_src = [
+dnstap_src = files([
   'dnstap.c',
-]
+])
 
 ## dnstap dependencies
 message('--- dnstap module dependencies ---')
@@ -14,6 +14,8 @@ message('----------------------------------')
 
 # build dnstap if deps are found
 if libprotobuf_c.found() and libfstrm.found() and protoc_c.found()
+  c_src_lint += dnstap_src
+
   # generate protobuf-c sources using protoc-c
   dnstap_pb = custom_target(
     'dnstap_pb',

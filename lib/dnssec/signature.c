@@ -90,8 +90,8 @@ int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
 static int adjust_wire_ttl(uint8_t *wire, size_t wire_size, uint32_t new_ttl)
 {
 	assert(wire);
-	assert(sizeof(uint16_t) == 2);
-	assert(sizeof(uint32_t) == 4);
+	static_assert(sizeof(uint16_t) == 2, "uint16_t must be exactly 2 bytes");
+	static_assert(sizeof(uint32_t) == 4, "uint32_t) must be exactly 4 bytes");
 	uint16_t rdlen;
 
 	int ret;
