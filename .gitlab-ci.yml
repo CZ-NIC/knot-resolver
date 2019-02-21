@@ -131,13 +131,59 @@ kres-gen:
   tags:
     - docker
 
-lint:tidy:
-  <<: *test
+build:darwin:
+  <<: *test_nodep
   script:
-    - ninja -C build_ci* tidy
+    - ci/travis.py ${CI_COMMIT_REF_NAME}
+
+deckard:
+  <<: *test_flaky
+  variables:
+    TMPDIR: $CI_PROJECT_DIR
+  script:
+    - ${MESON_TEST} --suite integration
+
+doc:
+  <<: *test_nodep
+  when: delayed
+  start_in: '30 seconds'
+  script:
+    - meson build_doc -Ddoc=enabled
+    - ninja -C build_doc doc
+  artifacts:
+    expire_in: 1 hour
+    paths:
+      - doc/html
+
+docker:
+  <<: *test_nodep
+  image: docker:latest
+  tags:
+    - dind
+  variables:
+    DOCKER_IMAGE_NAME: knot-resolver-test:${CI_COMMIT_SHA}
+  script:
+    - docker build --no-cache -t ${DOCKER_IMAGE_NAME} .
+    - echo "quit()" | docker run -i ${DOCKER_IMAGE_NAME}
+  after_script:  # remove dangling images to avoid running out of disk space
+    - docker rmi ${DOCKER_IMAGE_NAME}
+    - docker rmi $(docker images -f "dangling=true" -q)
+
+lint:other:
+  <<: *test_nodep
+  when: delayed
+  start_in: '30 seconds'
+  stage: test
+  script:
+    - meson build_ci_lint &>/dev/null
+    - ninja -C build_ci* pylint
+    - ninja -C build_ci* flake8
+    - ninja -C build_ci* luacheck
 
 lint:pedantic:
   <<: *test_nodep
+  when: delayed
+  start_in: '30 seconds'
   tags:
     - docker
     - linux
@@ -149,15 +195,6 @@ lint:pedantic:
       CC=clang CXX=clang++ meson build_pedantic_clang -Dwerror=true -Dpostinstall_tests=enabled -Dc_args='
       -Wpedantic -Wno-newline-eof -Wno-gnu-zero-variadic-macro-arguments -Wno-gnu-folding-constant'
     - ninja -C build_pedantic_clang
-
-lint:other:
-  <<: *test_nodep
-  stage: test
-  script:
-    - meson build_ci_lint
-    - ninja -C build_ci* pylint
-    - ninja -C build_ci* flake8
-    - ninja -C build_ci* luacheck
 
 lint:scan-build:
   <<: *test
@@ -173,109 +210,10 @@ lint:scan-build:
     - ninja -C build_ci* scan-build || true
     - test "$(ls build_ci*/meson-logs/scanbuild/*/report-*.html | wc -l)" = 29 # we have this many errors ATM :-)
 
-docker:
-  stage: test
-  image: docker:latest
-  except:
-    - master
-  tags:
-    - dind
-  dependencies: []
-  variables:
-    DOCKER_IMAGE_NAME: knot-resolver-test:${CI_COMMIT_SHA}
-  script:
-    - docker build --no-cache -t ${DOCKER_IMAGE_NAME} .
-    - echo "quit()" | docker run -i ${DOCKER_IMAGE_NAME}
-  after_script:  # remove dangling images to avoid running out of disk space
-    - docker rmi ${DOCKER_IMAGE_NAME}
-    - docker rmi $(docker images -f "dangling=true" -q)
-
-doc:
-  <<: *test_nodep
-  script:
-    - meson build_doc -Ddoc=enabled
-    - ninja -C build_doc doc
-  artifacts:
-    expire_in: 1 hour
-    paths:
-      - doc/html
-
-deckard:
-  <<: *test_flaky
-  variables:
-    TMPDIR: $CI_PROJECT_DIR
-  script:
-    - ${MESON_TEST} --suite integration
-
-test:valgrind:
+lint:tidy:
   <<: *test
   script:
-    - ${MESON_TEST} --suite unit --suite config --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
-
-build:darwin:
-  stage: test
-  except:
-    - master
-  script:
-    - ci/travis.py ${CI_COMMIT_REF_NAME}
-  dependencies: []
-  tags:
-    - docker
-
-# temporarily disabled - we need to fix issues first
-#deckard:valgrind:
-#  stage: test
-#  script:
-#    # TODO: valgrind missing parameter --error-exitcode=1 to fail make on error
-#    - cd tests/deckard && DAEMON=valgrind ADDITIONAL="--leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp $PREFIX/sbin/kresd -f 1" MAKEFLAGS="-j $(nproc) --keep-going" make
-#  artifacts:
-#    when: on_failure
-#    expire_in: 1 week
-#    paths:
-#      - tmpdeckard*
-#  dependencies:
-#    - build
-#  tags:
-#    - docker
-#    - linux
-#    - amd64
-
-pytests:lint:
-  stage: test
-  dependencies: []
-  except:
-    - master
-  script:
-    - ./ci/pytests/lint.sh
-  tags:
-    - docker
-    - linux
-    - amd64
-
-respdiff:basic:
-  <<: *test
-  script:
-    - ulimit -n "$(ulimit -Hn)" # applies only for kresd ATM
-    - ./ci/respdiff/start-resolvers.sh
-    - ./ci/respdiff/run-respdiff-tests.sh udp
-    - cat results/respdiff.txt
-    - echo 'test if mismatch rate < 1.0 %'
-    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
-  after_script:
-    - killall --wait kresd
-  artifacts:
-    when: always
-    expire_in: '1 week'
-    paths:
-      - kresd.log.xz
-      - results/*.txt
-      - results/*.png
-      - results/respdiff.db/data.mdb.xz
-      - ./*.info
-  tags:
-    - docker
-    - linux
-    - amd64
+    - ninja -C build_ci* tidy
 
 .pkgbuild: &pkgbuild
   stage: test
@@ -311,6 +249,37 @@ pkg:fedora-29:
     - mock --no-clean --old-chroot -r fedora-29-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/fedora-29-x86_64/result/build.log; false)
   after_script:
     - mv /var/lib/mock/fedora-29-x86_64/result fedora-29-x86_64
+
+respdiff:basic:
+  <<: *test
+  script:
+    - ulimit -n "$(ulimit -Hn)" # applies only for kresd ATM
+    - ./ci/respdiff/start-resolvers.sh
+    - ./ci/respdiff/run-respdiff-tests.sh udp
+    - cat results/respdiff.txt
+    - echo 'test if mismatch rate < 1.0 %'
+    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
+  after_script:
+    - killall --wait kresd
+  artifacts:
+    when: always
+    paths:
+      - kresd.log.xz
+      - results/*.txt
+      - results/*.png
+      - results/respdiff.db/data.mdb.xz
+      - ./*.info
+  tags:
+    - docker
+    - linux
+    - amd64
+
+test:valgrind:
+  <<: *test
+  when: delayed
+  start_in: '30 seconds'
+  script:
+    - ${MESON_TEST} --suite unit --suite config --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
 # }}}
 
 # extended {{{
