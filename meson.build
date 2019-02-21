@@ -20,13 +20,6 @@ luajit = dependency('luajit')
 message('------------------------------')
 
 
-# TODO coverage
-#lcov = find_program('lcov', required: false)
-#luacov = find_program('luacov', required: false)
-
-# TODO lint
-
-
 # Variables
 libkres_soversion = 9
 
@@ -183,6 +176,8 @@ install_data(
 message('--- lint dependencies ---')
 clangtidy = find_program('clang-tidy', required: false)
 luacheck = find_program('luacheck', required: false)
+flake8 = find_program('flake8', required: false)
+pylint_run = find_program('scripts/run-pylint.sh')
 message('-------------------------')
 
 if clangtidy.found()
@@ -207,6 +202,22 @@ if luacheck.found()
   )
 endif
 
+if flake8.found()
+  run_target(
+    'flake8',
+    command: [
+      flake8,
+      '--max-line-length=100',
+      join_paths(meson.source_root(), 'tests', 'pytests'),
+    ],
+  )
+endif
+
+run_target(
+  'pylint',
+  command: pylint_run,
+)
+
 
 # Summary message
 # NOTE: ternary operator in format() not supported
@@ -217,6 +228,7 @@ s_build_client = build_client ? 'enabled' : 'disabled'
 s_build_unit_tests = build_unit_tests ? 'enabled' : 'disabled'
 s_build_postinstall_tests = build_postinstall_tests ? 'enabled' : 'disabled'
 s_install_kresd_conf = install_kresd_conf ? 'enabled' : 'disabled'
+# TODO mention dnstap installation?
 message('''
 
 ======================= SUMMARY =======================
