@@ -337,15 +337,16 @@ KR_EXPORT
 int kr_straddr_subnet(void *dst, const char *addr);
 
 /** Splits ip address specified as "addr@port" or "addr#port" into addr and port.
- * \param addr zero-terminated input
- * \param buf buffer in case we need to copy the address;
- * 		length > MIN(strlen(addr), INET6_ADDRSTRLEN + 1)
+ * \param addr[in] zero-terminated input, e.g. "192.0.2.1#12345\0"
+ * \param buf[out] working buffer for the port-less prefix of addr;
+ *                 length >= INET6_ADDRSTRLEN + 1.
  * \param port[out] written in case it's specified in addr
- * \return pointer to address without port (zero-terminated string)
+ * \return error code
  * \note Typically you follow this by kr_straddr_socket().
  */
 KR_EXPORT
-const char * kr_straddr_split(const char *addr, char *buf, uint16_t *port);
+int kr_straddr_split(const char *addr, char buf[static restrict (INET6_ADDRSTRLEN + 1)],
+		     uint16_t *port);
 
 /** Formats ip address and port in "addr#port" format.
   * and performs validation.

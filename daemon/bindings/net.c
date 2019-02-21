@@ -535,9 +535,10 @@ static int net_tls_client(lua_State *L)
 		lua_error_p(L, "address is not a string");
 	char buf[INET6_ADDRSTRLEN + 1];
 	uint16_t port = 853;
-	addr_str = kr_straddr_split(addr_str, buf, &port);
+	const struct sockaddr *addr = NULL;
+	if (kr_straddr_split(addr_str, buf, &port) == kr_ok())
+		addr = kr_straddr_socket(buf, port);
 	/* Add newcfg into the C map, saving the original into oldcfg. */
-	const struct sockaddr *addr = kr_straddr_socket(addr_str, port);
 	if (!addr)
 		lua_error_p(L, "address '%s' could not be converted", addr_str);
 	tls_client_param_t **oldcfgp = tls_client_param_getptr(
@@ -578,8 +579,9 @@ int net_tls_client_clear(lua_State *L)
 	const char *addr_str = lua_tostring(L, 1);
 	char buf[INET6_ADDRSTRLEN + 1];
 	uint16_t port = 853;
-	addr_str = kr_straddr_split(addr_str, buf, &port);
-	const struct sockaddr *addr = kr_straddr_socket(addr_str, port);
+	const struct sockaddr *addr = NULL;
+	if (kr_straddr_split(addr_str, buf, &port) == kr_ok())
+		addr = kr_straddr_socket(buf, port);
 	if (!addr)
 		lua_error_p(L, "invalid IP address");
 	/* Do the actual removal. */
