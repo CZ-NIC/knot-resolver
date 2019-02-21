@@ -1,6 +1,6 @@
 # libkres
 
-libkres_src = [
+libkres_src = files([
   'cache/api.c',
   'cache/cdb_lmdb.c',
   'cache/entry_list.c',
@@ -28,9 +28,10 @@ libkres_src = [
   'rplan.c',
   'utils.c',
   'zonecut.c',
-]
+])
+c_src_lint += libkres_src
 
-libkres_headers = [
+libkres_headers = files([
   'cache/api.h',
   'cache/cdb_api.h',
   'cache/cdb_lmdb.h',
@@ -55,7 +56,7 @@ libkres_headers = [
   'rplan.h',
   'utils.h',
   'zonecut.h',
-]
+])
 
 unit_tests += [
   ['array', files('generic/test_array.c')],

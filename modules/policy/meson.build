@@ -22,11 +22,11 @@ if lua_ac_submodule.returncode() != 0
 endif
 
 # compile bundled lua-aho-corasick lib
-lua_ac_src = [
+lua_ac_src = files([
   'lua-aho-corasick/ac_fast.cxx',
   'lua-aho-corasick/ac_lua.cxx',
   'lua-aho-corasick/ac_slow.cxx',
-]
+])
 
 lua_ac_lib = shared_module(
   'ahocorasick',
