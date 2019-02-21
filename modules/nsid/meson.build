@@ -1,8 +1,9 @@
 # C module: nsid
 
-nsid_src = [
+nsid_src = files([
   'nsid.c',
-]
+])
+c_src_lint += nsid_src
 
 nsid_mod = shared_module(
   'nsid',
