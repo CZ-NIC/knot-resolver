@@ -82,6 +82,7 @@ message('---------------------------')
 ## Compiler args
 add_project_arguments(
   '-D_GNU_SOURCE',
+  '-Wformat',
   '-Wformat-security',
   '-Wtype-limits',
   '-Wshadow',
