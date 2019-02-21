@@ -897,35 +897,17 @@ int tls_client_param_remove(tls_client_params_t *params, const struct sockaddr *
 	return kr_ok();
 }
 
-static int client_verify_certificate(gnutls_session_t tls_session)
+/**
+ * Verify that at least one certificate in the certificate chain matches
+ * at least one certificate pin in the non-empty params->pins array.
+ * \returns GNUTLS_E_SUCCESS if pin matches, any other value is an error
+ */
+static int client_verify_pin(const unsigned int cert_list_size,
+				const gnutls_datum_t *cert_list,
+				tls_client_param_t *params)
 {
-	struct tls_client_ctx_t *ctx = gnutls_session_get_ptr(tls_session);
-	assert(ctx->params != NULL);
-
-	if (ctx->params->insecure) {
-		return GNUTLS_E_SUCCESS;
-	}
-
-	gnutls_certificate_type_t cert_type = gnutls_certificate_type_get(tls_session);
-	if (cert_type != GNUTLS_CRT_X509) {
-		kr_log_error("[tls_client] invalid certificate type %i has been received\n",
-			     cert_type);
-		return GNUTLS_E_CERTIFICATE_ERROR;
-	}
-	unsigned int cert_list_size = 0;
-	const gnutls_datum_t *cert_list =
-		gnutls_certificate_get_peers(tls_session, &cert_list_size);
-	if (cert_list == NULL || cert_list_size == 0) {
-		kr_log_error("[tls_client] empty certificate list\n");
-		return GNUTLS_E_CERTIFICATE_ERROR;
-	}
-
+	assert(params->pins.len > 0);
 #if TLS_CAN_USE_PINS
-	if (ctx->params->pins.len == 0) {
-		DEBUG_MSG("[tls_client] configured to authenticate via CA\n");
-		goto skip_pins;
-	}
-
 	for (int i = 0; i < cert_list_size; i++) {
 		gnutls_x509_crt_t cert;
 		int ret = gnutls_x509_crt_init(&cert);
@@ -960,41 +942,44 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 		if (ret != GNUTLS_E_SUCCESS) {
 			return ret;
 		}
-		for (size_t j = 0; j < ctx->params->pins.len; ++j) {
-			const uint8_t *pin = ctx->params->pins.at[j];
+		for (size_t j = 0; j < params->pins.len; ++j) {
+			const uint8_t *pin = params->pins.at[j];
 			if (memcmp(cert_pin, pin, TLS_SHA256_RAW_LEN) != 0)
 				continue; /* mismatch */
 			DEBUG_MSG("[tls_client] matched a configured pin no. %zd\n", j);
 			return GNUTLS_E_SUCCESS;
 		}
 		DEBUG_MSG("[tls_client] none of %zd configured pin(s) matched\n",
-				ctx->params->pins.len);
+				params->pins.len);
 	}
 
-	kr_log_error("[tls_client] no pin matched: %d pins * %d certificates\n",
-			(int)ctx->params->pins.len, cert_list_size);
+	kr_log_error("[tls_client] no pin matched: %zu pins * %d certificates\n",
+			params->pins.len, cert_list_size);
 	return GNUTLS_E_CERTIFICATE_ERROR;
 
 #else /* TLS_CAN_USE_PINS */
-	if (ctx->params->pins.len != 0) {
-		kr_log_error("[tls_client] internal inconsistency: TLS_CAN_USE_PINS\n");
-		assert(false);
-		return GNUTLS_E_CERTIFICATE_ERROR;
-	}
-	goto skip_pins;
+	kr_log_error("[tls_client] internal inconsistency: TLS_CAN_USE_PINS\n");
+	assert(false);
+	return GNUTLS_E_CERTIFICATE_ERROR;
 #endif
+}
 
-skip_pins:
-
-	if (!ctx->params->hostname) {
+/**
+ * Verify that \param tls_session contains a valid X.509 certificate chain
+ * with given hostname.
+ *
+ * \returns GNUTLS_E_SUCCESS if certificate chain is valid, any other value is an error
+ */
+static int client_verify_certchain(gnutls_session_t tls_session, const char *hostname)
+{
+	if (!hostname) {
 		kr_log_error("[tls_client] internal config inconsistency: no hostname set\n");
 		assert(false);
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
 
 	unsigned int status;
-	int ret = gnutls_certificate_verify_peers3(
-			ctx->c.tls_session, ctx->params->hostname, &status);
+	int ret = gnutls_certificate_verify_peers3(tls_session, hostname, &status);
 	if ((ret == GNUTLS_E_SUCCESS) && (status == 0)) {
 		return GNUTLS_E_SUCCESS;
 	}
@@ -1002,7 +987,7 @@ skip_pins:
 	if (ret == GNUTLS_E_SUCCESS) {
 		gnutls_datum_t msg;
 		ret = gnutls_certificate_verification_status_print(
-			status, gnutls_certificate_type_get(ctx->c.tls_session), &msg, 0);
+			status, gnutls_certificate_type_get(tls_session), &msg, 0);
 		if (ret == GNUTLS_E_SUCCESS) {
 			kr_log_error("[tls_client] failed to verify peer certificate: "
 					"%s\n", msg.data);
@@ -1018,6 +1003,41 @@ skip_pins:
 			     gnutls_strerror(ret), gnutls_strerror_name(ret));
 	} /* gnutls_certificate_verify_peers3 end */
 	return GNUTLS_E_CERTIFICATE_ERROR;
+}
+
+/**
+ * Verify that actual TLS security parameters of \param tls_session
+ * match requirements provided by user in tls_session->params.
+ * \returns GNUTLS_E_SUCCESS if requirements were met, any other value is an error
+ */
+static int client_verify_certificate(gnutls_session_t tls_session)
+{
+	struct tls_client_ctx_t *ctx = gnutls_session_get_ptr(tls_session);
+	assert(ctx->params != NULL);
+
+	if (ctx->params->insecure) {
+		return GNUTLS_E_SUCCESS;
+	}
+
+	gnutls_certificate_type_t cert_type = gnutls_certificate_type_get(tls_session);
+	if (cert_type != GNUTLS_CRT_X509) {
+		kr_log_error("[tls_client] invalid certificate type %i has been received\n",
+			     cert_type);
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+	unsigned int cert_list_size = 0;
+	const gnutls_datum_t *cert_list =
+		gnutls_certificate_get_peers(tls_session, &cert_list_size);
+	if (cert_list == NULL || cert_list_size == 0) {
+		kr_log_error("[tls_client] empty certificate list\n");
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+
+	if (ctx->params->pins.len > 0)
+		/* check hash of the certificate but ignore everything else */
+		return client_verify_pin(cert_list_size, cert_list, ctx->params);
+	else
+		return client_verify_certchain(ctx->c.tls_session, ctx->params->hostname);
 }
 
 struct tls_client_ctx_t *tls_client_ctx_new(tls_client_param_t *entry,
