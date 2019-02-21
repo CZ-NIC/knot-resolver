@@ -373,7 +373,7 @@ static int set_bpf_cb(const char *key, void *val, void *ext)
 	assert(bpffd != NULL);
 
 	for (size_t i = 0; i < endpoints->len; i++) {
-		struct endpoint *endpoint = (struct endpoint *)endpoints->at[i];
+		struct endpoint *endpoint = endpoints->at[i];
 		uv_os_fd_t sockfd = -1;
 		if (endpoint->tcp != NULL) uv_fileno((const uv_handle_t *)endpoint->tcp, &sockfd);
 		if (endpoint->udp != NULL) uv_fileno((const uv_handle_t *)endpoint->udp, &sockfd);
@@ -415,7 +415,7 @@ static int clear_bpf_cb(const char *key, void *val, void *ext)
 	assert(endpoints != NULL);
 
 	for (size_t i = 0; i < endpoints->len; i++) {
-		struct endpoint *endpoint = (struct endpoint *)endpoints->at[i];
+		struct endpoint *endpoint = endpoints->at[i];
 		uv_os_fd_t sockfd = -1;
 		if (endpoint->tcp != NULL) uv_fileno((const uv_handle_t *)endpoint->tcp, &sockfd);
 		if (endpoint->udp != NULL) uv_fileno((const uv_handle_t *)endpoint->udp, &sockfd);

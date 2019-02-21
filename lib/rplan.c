@@ -24,8 +24,6 @@
 #include "lib/layer.h"
 
 #define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "plan",  __VA_ARGS__)
-#define QUERY_PROVIDES(q, name, cls, type) \
-    ((q)->sclass == (cls) && (q)->stype == type && knot_dname_is_equal((q)->sname, name))
 
 inline static unsigned char chars_or(const unsigned char a, const unsigned char b)
 {
@@ -269,7 +267,8 @@ int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry)
 bool kr_rplan_satisfies(struct kr_query *closure, const knot_dname_t *name, uint16_t cls, uint16_t type)
 {
 	while (name && closure) {
-		if (QUERY_PROVIDES(closure, name, cls, type)) {
+		if (closure->sclass == cls && closure->stype == type
+		    && knot_dname_is_equal(closure->sname, name)) {
 			return true;
 		}
 		closure = closure->parent;

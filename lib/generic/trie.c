@@ -216,8 +216,8 @@ static node_t* twig(node_t *t, uint i)
  * Having this separate might be meaningful for performance optimization.
  */
 #define TWIGOFFMAX(off, max, t, b) do {			\
-		off = twigoff(t, b);			\
-		max = bitmap_weight(t->branch.bitmap);	\
+		(off) = twigoff((t), (b));		\
+		(max) = bitmap_weight((t)->branch.bitmap);\
 	} while(0)
 
 /*! \brief Simple string comparator. */

@@ -1547,7 +1547,7 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 	}
 
 	/* Randomize query case (if secret changed) */
-	knot_dname_t *qname = (knot_dname_t *)knot_pkt_qname(packet);
+	knot_dname_t *qname = knot_pkt_qname(packet);
 	if (qry->secret != old_minimization_secret) {
 		randomized_qname_case(qname, qry->secret);
 	}

@@ -29,7 +29,7 @@
 
 #define EPHEMERAL_PRIVKEY_FILENAME "ephemeral_key.pem"
 #define INVALID_HOSTNAME "dns-over-tls.invalid"
-#define EPHEMERAL_CERT_EXPIRATION_SECONDS 60*60*24*90
+#define EPHEMERAL_CERT_EXPIRATION_SECONDS (60*60*24*90)
 
 /* This is an attempt to grab an exclusive, advisory, non-blocking
  * lock based on a filename.  At the moment it's POSIX-only, but it
