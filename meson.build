@@ -19,7 +19,7 @@ if not lmdb.found()  # darwin workaround: missing pkgconfig
   lmdb = meson.get_compiler('c').find_library('lmdb')
 endif
 gnutls = dependency('gnutls')
-luajit = dependency('luajit')
+luajit = dependency('luajit', static: host_machine.system() == 'darwin')
 message('------------------------------')
 
 
