@@ -838,6 +838,14 @@ tls_client_param_t * tls_client_param_new()
 	return e;
 }
 
+/**
+ * Convert an IP address and port number to binary key.
+ *
+ * \precond buffer \param key must have sufficient size
+ * \param addr[in]
+ * \param len[out] output length
+ * \param key[out] output buffer
+ */
 static bool construct_key(const union inaddr *addr, uint32_t *len, char *key)
 {
 	switch (addr->ip.sa_family) {
