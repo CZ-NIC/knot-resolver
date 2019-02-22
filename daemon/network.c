@@ -250,7 +250,7 @@ int network_listen_fd(struct network *net, int fd, bool use_tls)
 	/* Extract local address and socket type. */
 	int sock_type = SOCK_DGRAM;
 	socklen_t len = sizeof(sock_type);
-	int ret = getsockopt(fd, SOL_SOCKET, SO_TYPE, &sock_type, &len);	
+	int ret = getsockopt(fd, SOL_SOCKET, SO_TYPE, &sock_type, &len);
 	if (ret != 0) {
 		return kr_error(EBADF);
 	}
@@ -364,16 +364,16 @@ void network_new_hostname(struct network *net, struct engine *engine)
 	}
 }
 
+#ifdef SO_ATTACH_BPF
 static int set_bpf_cb(const char *key, void *val, void *ext)
 {
-#ifdef SO_ATTACH_BPF
 	endpoint_array_t *endpoints = (endpoint_array_t *)val;
 	assert(endpoints != NULL);
 	int *bpffd = (int *)ext;
 	assert(bpffd != NULL);
 
 	for (size_t i = 0; i < endpoints->len; i++) {
-		struct endpoint *endpoint = (struct endpoint *)endpoints->at[i];
+		struct endpoint *endpoint = endpoints->at[i];
 		uv_os_fd_t sockfd = -1;
 		if (endpoint->tcp != NULL) uv_fileno((const uv_handle_t *)endpoint->tcp, &sockfd);
 		if (endpoint->udp != NULL) uv_fileno((const uv_handle_t *)endpoint->udp, &sockfd);
@@ -383,13 +383,9 @@ static int set_bpf_cb(const char *key, void *val, void *ext)
 			return 1; /* return error (and stop iterating over net->endpoints) */
 		}
 	}
-#else
-	kr_log_error("[network] SO_ATTACH_BPF socket option doesn't supported\n");
-	(void)key; (void)val; (void)ext;
-	return 1;
-#endif
 	return 0; /* OK */
 }
+#endif
 
 int network_set_bpf(struct network *net, int bpf_fd)
 {
@@ -408,14 +404,14 @@ int network_set_bpf(struct network *net, int bpf_fd)
 	return 1;
 }
 
+#ifdef SO_DETACH_BPF
 static int clear_bpf_cb(const char *key, void *val, void *ext)
 {
-#ifdef SO_DETACH_BPF
 	endpoint_array_t *endpoints = (endpoint_array_t *)val;
 	assert(endpoints != NULL);
 
 	for (size_t i = 0; i < endpoints->len; i++) {
-		struct endpoint *endpoint = (struct endpoint *)endpoints->at[i];
+		struct endpoint *endpoint = endpoints->at[i];
 		uv_os_fd_t sockfd = -1;
 		if (endpoint->tcp != NULL) uv_fileno((const uv_handle_t *)endpoint->tcp, &sockfd);
 		if (endpoint->udp != NULL) uv_fileno((const uv_handle_t *)endpoint->udp, &sockfd);
@@ -427,13 +423,9 @@ static int clear_bpf_cb(const char *key, void *val, void *ext)
 		/* Proceed even if setsockopt() failed,
 		 * as we want to process all opened sockets. */
 	}
-#else
-	kr_log_error("[network] SO_DETACH_BPF socket option doesn't supported\n");
-	(void)key; (void)val; (void)ext;
-	return 1;
-#endif
 	return 0;
 }
+#endif
 
 void network_clear_bpf(struct network *net)
 {

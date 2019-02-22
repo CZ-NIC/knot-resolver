@@ -36,7 +36,7 @@
 #include "daemon/worker.h"
 #include "daemon/session.h"
 
-#define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE 60*60*24*7
+#define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE (60*60*24*7)
 #define GNUTLS_PIN_MIN_VERSION  0x030400
 
 /** @internal Debugging facility. */
@@ -459,7 +459,7 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
 		/* don't risk overflowing the buffer if we have a mistake somewhere */
 		return kr_error(EINVAL);
 	}
-	
+
 	const char *logstring = tls_p->client_side ? client_logstring : server_logstring;
 
 	tls_p->buf = buf;
@@ -548,7 +548,7 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
   DNS-over-TLS OOB key-pins: https://tools.ietf.org/html/rfc7858#appendix-A
   HPKP pin reference:        https://tools.ietf.org/html/rfc7469#appendix-A
 */
-#define PINLEN  (((32) * 8 + 4)/6) + 3 + 1
+#define PINLEN  ((((32) * 8 + 4)/6) + 3 + 1)
 
 /* out must be at least PINLEN octets long */
 static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar_len)
@@ -864,7 +864,7 @@ int tls_client_params_clear(map_t *tls_client_paramlist, const char *addr, uint1
 		client_paramlist_entry_clear(NULL, (void *)entry, NULL);
 		map_del(tls_client_paramlist, key);
 	}
-	
+
 	return kr_ok();
 }
 
@@ -1097,6 +1097,7 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 		kr_log_error("[tls_client] newer gnutls is required to use PIN check\n");
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
+	goto skip_pins;
 #endif
 
 skip_pins:

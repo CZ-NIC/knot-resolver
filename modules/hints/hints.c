@@ -585,7 +585,7 @@ static char* hint_ttl(void *env, struct kr_module *module, const char *args)
 	JsonNode *root_node = args ? json_decode(args) : NULL;
 	if (root_node && root_node->tag == JSON_NUMBER) {
 		double ttl_d = root_node->number_;
-		uint32_t ttl = round(ttl_d);
+		uint32_t ttl = (uint32_t)round(ttl_d);
 		if (ttl_d >= 0 && fabs(ttl_d - ttl) * 64 < 1) {
 			data->ttl = ttl;
 		}

@@ -174,7 +174,7 @@ static int cache_open(lua_State *L)
 	/* Select cache storage backend */
 	struct engine *engine = engine_luaget(L);
 
-	lua_Number csize_lua = lua_tointeger(L, 1);
+	lua_Integer csize_lua = lua_tointeger(L, 1);
 	if (!(csize_lua >= 8192 && csize_lua < SIZE_MAX)) { /* min. is basically arbitrary */
 		lua_error_p(L, "invalid cache size specified, it must be in range <8192, "
 				STR(SIZE_MAX)  ">");

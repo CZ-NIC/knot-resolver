@@ -136,12 +136,12 @@ static int l_ffi_deinit(struct kr_module *module)
 #define LAYER_FFI_CALL(ctx, slot_name) \
 	const int *cb_slot = (ctx)->api->cb_slots + SLOT_ ## slot_name; \
 	if (*cb_slot <= 0) { \
-		return ctx->state; \
+		return (ctx)->state; \
 	} \
 	struct kr_module *module = (ctx)->api->data; \
 	lua_State *L = module->lib; \
 	lua_rawgeti(L, LUA_REGISTRYINDEX, *cb_slot); \
-	lua_pushnumber(L, ctx->state)
+	lua_pushnumber(L, (ctx)->state)
 
 static int l_ffi_layer_begin(kr_layer_t *ctx)
 {

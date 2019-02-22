@@ -27,10 +27,10 @@
 #include "daemon/session.h"
 
 #define negotiate_bufsize(func, handle, bufsize_want) do { \
-    int bufsize = 0; func(handle, &bufsize); \
-	if (bufsize < bufsize_want) { \
-		bufsize = bufsize_want; \
-		func(handle, &bufsize); \
+    int bufsize = 0; (func)((handle), &bufsize); \
+	if (bufsize < (bufsize_want)) { \
+		bufsize = (bufsize_want); \
+		(func)((handle), &bufsize); \
 	} \
 } while (0)
 
