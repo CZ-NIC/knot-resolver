@@ -1508,6 +1508,7 @@ static int qr_task_step(struct qr_task *task,
 		/* TODO if there are multiple addresses (task->addrlist_count > 1)
 		 * check all of them. */
 		struct network *net = &worker->engine->net;
+		/* task->addrlist has to contain TLS port before tls_client_param_get() call */
 		kr_inaddr_set_port(task->addrlist, KR_DNS_TLS_PORT);
 		tls_client_param_t *tls_entry =
 			tls_client_param_get(net->tls_client_params, task->addrlist);
