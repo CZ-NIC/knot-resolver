@@ -5,15 +5,11 @@ mock_cmodule_src = files([
   'mock_cmodule.c',
 ])
 
-mock_cmodule_lib = shared_library(
+mock_cmodule_mod = shared_module(
   'mock_cmodule',
   mock_cmodule_src,
   name_prefix: '',
   dependencies: libkres_dep,
-)
-
-mock_cmodule_dep = declare_dependency(
-  link_with: mock_cmodule_lib,
 )
 
 # executables with tests
