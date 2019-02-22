@@ -11,9 +11,7 @@ if not get_option('client').disabled()
   libedit = dependency('libedit', required: false)
   if libedit.found()
     build_client = true
-  else
-    # fallback lib
-    # TODO why call find_library? osx workaround?
+  else  # darwin workaround: missing pkgconfig
     libedit = meson.get_compiler('c').find_library('edit', required: get_option('client'))
     if libedit.found()
       build_client = true
