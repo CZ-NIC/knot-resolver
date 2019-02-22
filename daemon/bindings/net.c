@@ -688,7 +688,6 @@ static int net_tls_handshake_timeout(lua_State *L)
 static int net_bpf_set(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
-	struct network *net = &engine->net;
 
 	if (lua_gettop(L) != 1 || !lua_isnumber(L, 1)) {
 		lua_error_p(L, "net.bpf_set(fd) takes one parameter:"
@@ -697,6 +696,7 @@ static int net_bpf_set(lua_State *L)
 
 #if __linux__
 
+	struct network *net = &engine->net;
 	int progfd = lua_tointeger(L, 1);
 	if (progfd == 0) {
 		/* conversion error despite that fact
@@ -721,13 +721,13 @@ static int net_bpf_set(lua_State *L)
 static int net_bpf_clear(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
-	struct network *net = &engine->net;
 
 	if (lua_gettop(L) != 0)
 		lua_error_p(L, "net.bpf_clear() does not take any parameters");
 
 #if __linux__
 
+	struct network *net = &engine->net;
 	network_clear_bpf(net);
 
 	lua_pushboolean(L, 1);
