@@ -281,6 +281,8 @@ test:valgrind:
 build:darwin:
   <<: *test_nodep
   stage: extended
+  when: delayed
+  start_in: 5 minutes  # give the build in Travis CI time to finish
   allow_failure: true  # https://github.com/Homebrew/homebrew-core/issues/37169
   script:
     - ci/travis.py ${CI_COMMIT_REF_NAME}
