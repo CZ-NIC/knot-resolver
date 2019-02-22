@@ -63,13 +63,6 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 /** Preliminary checks before stash_rrset().  Don't call if returns <= 0. */
 static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qry/*logs*/);
 
-/** @internal Removes all records from cache. */
-static inline int cache_clear(struct kr_cache *cache)
-{
-	cache->stats.delete += 1;
-	return cache_op(cache, clear);
-}
-
 /** @internal Open cache db transaction and check internal data version. */
 static int assert_right_version(struct kr_cache *cache)
 {
@@ -97,7 +90,7 @@ static int assert_right_version(struct kr_cache *cache)
 				memcpy(&ver, val.data, sizeof(ver));
 				kr_log_verbose("bad version: %d\n", (int)ver);
 			}
-			ret = cache_clear(cache);
+			ret = cache_op(cache, clear);
 		}
 		/* Either purged or empty. */
 		if (ret == 0) {
@@ -189,7 +182,7 @@ int kr_cache_clear(struct kr_cache *cache)
 	if (!cache_isvalid(cache)) {
 		return kr_error(EINVAL);
 	}
-	int ret = cache_clear(cache);
+	int ret = cache_op(cache, clear);
 	if (ret == 0) {
 		kr_cache_make_checkpoint(cache);
 		ret = assert_right_version(cache);
@@ -561,9 +554,6 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	}
 	#endif
 
-	/* Update metrics */
-	cache->stats.insert += 1;
-
 	/* Verbose-log some not-too-common cases. */
 	WITH_VERBOSE(qry) { if (kr_rank_test(rank, KR_RANK_AUTH)
 				|| rr->type == KNOT_RRTYPE_NS) {
@@ -659,6 +649,7 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 	knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_NS);
 	knot_db_val_t val_orig = { NULL, 0 };
 	ret = cache_op(cache, read, &key, &val_orig, 1);
+	//cache->stats.fail++;
 	if (ret && ret != -ABS(ENOENT)) {
 		VERBOSE_MSG(qry, "=> EL read failed (ret: %d)\n", ret);
 		return kr_ok();

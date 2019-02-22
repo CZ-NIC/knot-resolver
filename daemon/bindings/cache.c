@@ -88,16 +88,24 @@ static int cache_checkpoint(lua_State *L)
 /** Return cache statistics. */
 static int cache_stats(lua_State *L)
 {
+#define add_cache_stat(name)	\
+	lua_pushnumber(L, (cache->stats.name));	\
+	lua_setfield(L, -2, #name);
+
 	struct kr_cache *cache = cache_assert_open(L);
 	lua_newtable(L);
-	lua_pushnumber(L, cache->stats.hit);
-	lua_setfield(L, -2, "hit");
-	lua_pushnumber(L, cache->stats.miss);
-	lua_setfield(L, -2, "miss");
-	lua_pushnumber(L, cache->stats.insert);
-	lua_setfield(L, -2, "insert");
-	lua_pushnumber(L, cache->stats.delete);
-	lua_setfield(L, -2, "delete");
+	add_cache_stat(open_op)
+	add_cache_stat(close_op)
+	add_cache_stat(count_op)
+	add_cache_stat(clear_op)
+	add_cache_stat(sync_op)
+	add_cache_stat(read_op)
+	add_cache_stat(read_leq_op)
+	add_cache_stat(write_op)
+	add_cache_stat(remove_op)
+	add_cache_stat(match_op)
+	add_cache_stat(prune_op)
+	#undef add_cache_stat
 	return 1;
 }
 

@@ -41,10 +41,18 @@ struct kr_cache
 	knot_db_t *db;		      /**< Storage instance */
 	const struct kr_cdb_api *api; /**< Storage engine */
 	struct {
-		uint32_t hit;         /**< Number of cache hits */
-		uint32_t miss;        /**< Number of cache misses */
-		uint32_t insert;      /**< Number of insertions */
-		uint32_t delete;      /**< Number of deletions */
+		/* use cache_op() macro to maintain _op counters */
+		uint64_t open_op;
+		uint64_t close_op;
+		uint64_t count_op;
+		uint64_t clear_op;
+		uint64_t sync_op;
+		uint64_t read_op;
+		uint64_t read_leq_op;
+		uint64_t write_op;
+		uint64_t remove_op;
+		uint64_t prune_op;
+		uint64_t match_op;
 	} stats;
 
 	uint32_t ttl_min, ttl_max; /**< TTL limits */
