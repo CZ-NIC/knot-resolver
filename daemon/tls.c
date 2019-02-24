@@ -565,10 +565,10 @@ static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar
 	int err = gnutls_pubkey_init(&key);
 	if (err != GNUTLS_E_SUCCESS) return err;
 
+	gnutls_datum_t datum = { .data = NULL, .size = 0 };
 	err = gnutls_pubkey_import_x509(key, crt, 0);
 	if (err != GNUTLS_E_SUCCESS) goto leave;
 
-	gnutls_datum_t datum = { .data = NULL, .size = 0 };
 	err = gnutls_pubkey_export2(key, GNUTLS_X509_FMT_DER, &datum);
 	if (err != GNUTLS_E_SUCCESS) goto leave;
 
