@@ -907,12 +907,14 @@ int tls_client_param_remove(tls_client_params_t *params, const struct sockaddr *
 
 /**
  * Verify that at least one certificate in the certificate chain matches
- * at least one certificate pin in params->pins array.
+ * at least one certificate pin in the non-empty params->pins array.
  * \returns GNUTLS_E_SUCCESS if pin matches, any other value is an error
  */
 static int client_verify_pin(const unsigned int cert_list_size,
 				const gnutls_datum_t *cert_list,
-				tls_client_param_t *params) {
+				tls_client_param_t *params)
+{
+	assert(params->pins.len > 0);
 #if TLS_CAN_USE_PINS
 	for (int i = 0; i < cert_list_size; i++) {
 		gnutls_x509_crt_t cert;
@@ -964,12 +966,9 @@ static int client_verify_pin(const unsigned int cert_list_size,
 	return GNUTLS_E_CERTIFICATE_ERROR;
 
 #else /* TLS_CAN_USE_PINS */
-	if (params->pins.len != 0) {
-		kr_log_error("[tls_client] internal inconsistency: TLS_CAN_USE_PINS\n");
-		assert(false);
-		return GNUTLS_E_CERTIFICATE_ERROR;
-	}
-	goto skip_pins;
+	kr_log_error("[tls_client] internal inconsistency: TLS_CAN_USE_PINS\n");
+	assert(false);
+	return GNUTLS_E_CERTIFICATE_ERROR;
 #endif
 }
 
@@ -979,7 +978,8 @@ static int client_verify_pin(const unsigned int cert_list_size,
  *
  * \returns GNUTLS_E_SUCCESS if certificate chain is valid, any other value is an error
  */
-static int client_verify_certchain(gnutls_session_t tls_session, const char *hostname) {
+static int client_verify_certchain(gnutls_session_t tls_session, const char *hostname)
+{
 	if (!hostname) {
 		kr_log_error("[tls_client] internal config inconsistency: no hostname set\n");
 		assert(false);
