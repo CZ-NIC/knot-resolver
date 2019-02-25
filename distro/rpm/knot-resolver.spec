@@ -4,6 +4,7 @@
 %define GPG_CHECK 0
 %define VERSION __VERSION__
 %define repodir %{_builddir}/%{name}-%{version}
+%define NINJA ninja-build
 
 Name:           knot-resolver
 Version:        %{VERSION}
@@ -65,6 +66,7 @@ Requires:       lua-cqueues-compat
 Requires(pre):	shadow-utils
 %endif
 %if 0%{?suse_version}
+%define NINJA ninja
 BuildRequires:  lmdb-devel
 BuildRequires:  python3-Sphinx
 Requires:       lua51-luasocket
@@ -137,16 +139,16 @@ meson build_rpm \
     -Dc_args="%{optflags}"\
     -Dc_link_args="%{?__global_ldflags}"
 
-ninja-build -v -C build_rpm
+%{NINJA} -v -C build_rpm
 %if "x%{?rhel}" == "x"
-ninja-build -v -C build_rpm doc
+%{NINJA} -v -C build_rpm doc
 %endif
 
 %check
 meson test -C build_rpm
 
 %install
-DESTDIR="${RPM_BUILD_ROOT}" ninja-build -v -C build_rpm install
+DESTDIR="${RPM_BUILD_ROOT}" %{NINJA} -v -C build_rpm install
 
 # add kresd.target to multi-user.target.wants to support enabling kresd services
 install -m 0755 -d %{buildroot}%{_unitdir}/multi-user.target.wants
