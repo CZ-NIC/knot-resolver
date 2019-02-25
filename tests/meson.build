@@ -2,9 +2,9 @@
 
 ## unit tests
 build_unit_tests = false
-if not get_option('unit_tests').disabled()
+if get_option('unit_tests') != 'disabled'
   message('--- unit_tests dependencies ---')
-  cmocka = dependency('cmocka', required: get_option('unit_tests'))
+  cmocka = dependency('cmocka', required: get_option('unit_tests') == 'enabled')
   if cmocka.found()
     build_unit_tests = true
     subdir('unit')
@@ -14,8 +14,12 @@ endif
 
 
 ## postinstall tests
-build_postinstall_tests = get_option('postinstall_tests').enabled()
+build_postinstall_tests = get_option('postinstall_tests') == 'enabled'
 if build_postinstall_tests
+  if meson.version().version_compare('<0.46')
+    error('meson 0.46+ is required for postinstall_tests')
+  endif
+
   subdir('config')
 
   message('--- postinstall_tests dependencies ---')
