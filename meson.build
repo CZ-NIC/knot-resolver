@@ -4,7 +4,7 @@ project(
   license: 'GPLv3+',
   version: '3.2.1',
   default_options: ['c_std=gnu11', 'b_ndebug=if-release'],
-  meson_version: '>=0.47.0',
+  meson_version: '>=0.46',
 )
 
 
@@ -46,11 +46,11 @@ systemd_unit_dir = ''
 systemd_tmpfiles_dir = ''
 
 ## Trust anchors
-managed_ta = get_option('managed_ta').enabled()
+managed_ta = get_option('managed_ta') == 'enabled'
 keyfile_default = join_paths(etc_dir, get_option('keyfile_default'))
 if keyfile_default == join_paths(etc_dir, 'root.keys')
   install_root_keys = true
-  managed_ta = managed_ta or get_option('managed_ta').auto()
+  managed_ta = managed_ta or get_option('managed_ta') == 'auto'
 else
   install_root_keys = false
   if managed_ta
@@ -68,8 +68,7 @@ else
 endif
 
 ## Additional options
-opt_verbose_log = get_option('verbose_log')
-verbose_log = opt_verbose_log.enabled() or opt_verbose_log.auto()
+verbose_log = get_option('verbose_log') == 'enabled' or get_option('verbose_log') == 'auto'
 user = get_option('user')
 group = get_option('group')
 
@@ -146,7 +145,7 @@ subdir('lib')
 subdir('client')
 subdir('daemon')
 subdir('modules')
-if get_option('bench').enabled()
+if get_option('bench') == 'enabled'
   subdir('bench')
 endif
 
