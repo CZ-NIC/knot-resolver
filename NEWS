@@ -11,6 +11,7 @@ Bugfixes
 - trust_anchors: don't do 5011-style updates on anchors from files
   that were loaded as unmanaged trust anchors (!753)
 - trust_anchors.add(): include these TAs in .summary() (!753)
+- policy module: support '#' for separating port numbers, for consistency
 
 Improvements
 ------------
