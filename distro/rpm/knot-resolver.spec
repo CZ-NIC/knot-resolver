@@ -119,7 +119,7 @@ gpg2 --verify %{SOURCE1} %{SOURCE0}
 %setup -q -n %{name}-%{version}
 
 %build
-meson build_rpm \
+CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
 %if "x%{?rhel}" == "x"
     -Ddoc=enabled \
     -Dsystemd_unit_files=enabled \
@@ -136,8 +136,6 @@ meson build_rpm \
     --libdir="%{_libdir}" \
     --includedir="%{_includedir}" \
     --sysconfdir="%{_sysconfdir}" \
-    -Dc_args="%{optflags}"\
-    -Dc_link_args="%{?__global_ldflags}"
 
 %{NINJA} -v -C build_rpm
 %if "x%{?rhel}" == "x"
@@ -155,10 +153,8 @@ install -m 0755 -d %{buildroot}%{_unitdir}/multi-user.target.wants
 ln -s ../kresd.target %{buildroot}%{_unitdir}/multi-user.target.wants/kresd.target
 
 # install .tmpfiles.d dirs
-#mkdir -p %{buildroot}%{_localstatedir}/cache
 install -m 0750 -d %{buildroot}%{_localstatedir}/cache/%{name}
 install -m 0750 -d %{buildroot}/run/%{name}
-
 
 # remove http module (missing dependencies)
 rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http
@@ -166,9 +162,10 @@ rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http.lua
 rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http_trace.lua
 rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/prometheus.lua
 
-# rename doc directory for centos 7
-%if 0%{?rhel}
-mv %{buildroot}/%{_docdir}/%{name} %{buildroot}/%{_pkgdocdir}
+# rename doc directory for centos, opensuse
+%if "x%{?fedora}" == "x"
+install -m 755 -d %{buildroot}/%{_pkgdocdir}
+mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 %endif
 
 %pre
@@ -196,6 +193,7 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %endif
 
 %files
+%dir %{_pkgdocdir}
 %license %{_pkgdocdir}/COPYING
 %doc %{_pkgdocdir}/AUTHORS
 %doc %{_pkgdocdir}/NEWS
@@ -207,6 +205,7 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/icann-ca.pem
 %{_unitdir}/kresd*.service
 %{_unitdir}/kresd.target
+%dir %{_unitdir}/multi-user.target.wants
 %{_unitdir}/multi-user.target.wants/kresd.target
 %if "x%{?rhel}" == "x"
 %{_unitdir}/kresd*.socket
@@ -215,7 +214,7 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %{_mandir}/man7/kresd.systemd.nosocket.7.gz
 %endif
 %{_tmpfilesdir}/knot-resolver.conf
-%dir /run/%{name}/
+%ghost /run/%{name}/
 %attr(750,knot-resolver,knot-resolver) %dir %{_localstatedir}/cache/%{name}
 %{_sbindir}/kresd
 %{_sbindir}/kresc
@@ -230,6 +229,7 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 
 %if "x%{?rhel}" == "x"
 %files doc
+%dir %{_pkgdocdir}
 %doc %{_pkgdocdir}/html
 %endif
 
