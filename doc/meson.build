@@ -17,7 +17,7 @@ install_man(man_kresd)
 
 
 # html documentation
-if get_option('doc').enabled()
+if get_option('doc') == 'enabled'
   message('--- doc dependencies ---')
   doxygen = find_program('doxygen')
   sphinx_build = find_program('sphinx-build-3', required: false)
