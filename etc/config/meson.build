@@ -37,8 +37,8 @@ endforeach
 
 
 # kresd.conf
-install_kresd_conf = get_option('install_kresd_conf').enabled()
-if get_option('install_kresd_conf').auto()
+install_kresd_conf = get_option('install_kresd_conf') == 'enabled'
+if get_option('install_kresd_conf') == 'auto'
   if run_command(['test', '-r', join_paths(etc_dir, 'kresd.conf')]).returncode() == 1
     install_kresd_conf = true
   endif
