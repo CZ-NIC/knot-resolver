@@ -6,13 +6,14 @@ kresc_src = files([
 c_src_lint += kresc_src
 
 build_client = false
-if not get_option('client').disabled()
+if get_option('client') != 'disabled'
   message('--- client dependencies ---')
   libedit = dependency('libedit', required: false)
   if libedit.found()
     build_client = true
   else  # darwin workaround: missing pkgconfig
-    libedit = meson.get_compiler('c').find_library('edit', required: get_option('client'))
+    libedit = meson.get_compiler('c').find_library(
+      'edit', required: get_option('client') == 'enabled')
     if libedit.found()
       build_client = true
     endif

@@ -8,7 +8,12 @@ option(
 
 option(
   'managed_ta',
-  type: 'feature',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
   value: 'auto',
   description: 'auto-manage DNSSEC trust anchors (RFC 5011)',
 )
@@ -22,15 +27,25 @@ option(
 
 option(
   'install_kresd_conf',
-  type: 'feature',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
   value: 'auto',
   description: 'creates kresd.conf in config directory',
 )
 
 option(
   'verbose_log',
-  type: 'feature',
-  value: 'enabled',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'auto',
   description: 'support verbose logging',
 )
 
@@ -65,35 +80,60 @@ option(
 # Component options
 option(
   'bench',
-  type: 'feature',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
   value: 'disabled',
   description: 'build benchmarks',
 )
 
 option(
   'client',
-  type: 'feature',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
   value: 'auto',
   description: 'build kresc client binary',
 )
 
 option(
   'doc',
-  type: 'feature',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
   value: 'disabled',
   description: 'html documentation dependencies and installation',
 )
 
 option(
   'postinstall_tests',
-  type: 'feature',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
   value: 'disabled',
   description: 'postinstall tests with extra dependencies',
 )
 
 option(
   'unit_tests',
-  type: 'feature',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
   value: 'auto',
   description: 'cmocka unit tests',
 )
