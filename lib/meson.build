@@ -107,4 +107,5 @@ pkgconfig.generate(
   description: 'Knot Resolver library',
   url: 'https://knot-resolver.cz/',
   libraries: [libkres_lib],
+  install_dir: join_paths(prefix, get_option('libdir'), 'pkgconfig'),  # pre-0.46 compat
 )

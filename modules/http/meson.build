@@ -23,6 +23,6 @@ config_tests += [
 # install static files
 install_subdir(
   'static',
-  strip_directory: true,
+  # strip_directory: true,  # requires meson 0.45
   install_dir: join_paths(modules_dir, 'http'),
 )

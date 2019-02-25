@@ -3,8 +3,8 @@ project(
   ['c', 'cpp'],
   license: 'GPLv3+',
   version: '3.2.1',
-  default_options: ['c_std=gnu11', 'b_ndebug=if-release'],
-  meson_version: '>=0.46',
+  default_options: ['c_std=gnu11'],
+  meson_version: '>=0.40',  # 0.46+ is recommended
 )
 
 
@@ -53,7 +53,7 @@ if keyfile_default == join_paths(etc_dir, 'root.keys')
   managed_ta = managed_ta or get_option('managed_ta') == 'auto'
 else
   install_root_keys = false
-  if managed_ta
+  if managed_ta and meson.version().version_compare('>=0.44')
     warning('Using managed_ta along with non-standard keyfile_default. ' +
 	    'Ensure keyfile_default directory will be writable by kresd.')
   endif
