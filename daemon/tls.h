@@ -21,7 +21,8 @@
 #include <libknot/packet/pkt.h>
 #include "lib/defines.h"
 #include "lib/generic/array.h"
-#include "lib/generic/map.h"
+#include "lib/generic/trie.h"
+#include "lib/utils.h"
 
 #define MAX_TLS_PADDING KR_EDNS_PAYLOAD
 #define TLS_MAX_UNCORK_RETRIES 100
@@ -56,17 +57,59 @@ struct tls_credentials {
 	char *ephemeral_servicename;
 };
 
-struct tls_client_paramlist_entry {
-	array_t(const char *) ca_files;
-	array_t(const char *) hostnames;
-	array_t(const char *) pins;
-	gnutls_certificate_credentials_t credentials;
-	gnutls_datum_t session_data;
-	uint32_t refs;
-};
+
+#define TLS_SHA256_RAW_LEN 32 /* gnutls_hash_get_len(GNUTLS_DIG_SHA256) */
+/** Required buffer length for pin_sha256, including the zero terminator. */
+#define TLS_SHA256_BASE64_BUFLEN (((TLS_SHA256_RAW_LEN * 8 + 4) / 6) + 3 + 1)
+
+#if GNUTLS_VERSION_NUMBER >= 0x030400
+	#define TLS_CAN_USE_PINS 1
+#else
+	#define TLS_CAN_USE_PINS 0
+#endif
+
+
+/** TLS authentication parameters for a single address-port pair. */
+typedef struct {
+	uint32_t refs; /**< Reference count; consider TLS sessions in progress. */
+	bool insecure; /**< Use no authentication. */
+	const char *hostname; /**< Server name for SNI and certificate check, lowercased.  */
+	array_t(const char *) ca_files; /**< Paths to certificate files; not really used. */
+	array_t(const uint8_t *) pins; /**< Certificate pins as raw unterminated strings.*/
+	gnutls_certificate_credentials_t credentials; /**< CA creds. in gnutls format.  */
+	gnutls_datum_t session_data; /**< Session-resumption data gets stored here.    */
+} tls_client_param_t;
+/** Holds configuration for TLS authentication for all potential servers.
+ * Special case: NULL pointer also means empty. */
+typedef trie_t tls_client_params_t;
+
+/** Get a pointer-to-pointer to TLS auth params.
+ * If it didn't exist, it returns NULL (if !do_insert) or pointer to NULL. */
+tls_client_param_t ** tls_client_param_getptr(tls_client_params_t **params,
+				const struct sockaddr *addr, bool do_insert);
+
+/** Get a pointer to TLS auth params or NULL. */
+static inline tls_client_param_t *
+	tls_client_param_get(tls_client_params_t *params, const struct sockaddr *addr)
+{
+	tls_client_param_t **pe = tls_client_param_getptr(&params, addr, false);
+	return pe ? *pe : NULL;
+}
+
+/** Allocate and initialize the structure (with ->ref = 1). */
+tls_client_param_t * tls_client_param_new();
+/** Reference-counted free(); any inside data is freed alongside. */
+void tls_client_param_unref(tls_client_param_t *entry);
+
+int tls_client_param_remove(tls_client_params_t *params, const struct sockaddr *addr);
+/** Free TLS authentication parameters. */
+void tls_client_params_free(tls_client_params_t *params);
+
 
 struct worker_ctx;
 struct qr_task;
+struct network;
+struct engine;
 
 typedef enum tls_client_hs_state {
 	TLS_HS_NOT_STARTED = 0,
@@ -78,12 +121,6 @@ typedef enum tls_client_hs_state {
 
 typedef int (*tls_handshake_cb) (struct session *session, int status);
 
-typedef enum tls_client_param {
-	TLS_CLIENT_PARAM_NONE = 0,
-	TLS_CLIENT_PARAM_PIN,
-	TLS_CLIENT_PARAM_HOSTNAME,
-	TLS_CLIENT_PARAM_CA,
-} tls_client_param_t;
 
 struct tls_common_ctx {
 	bool client_side;
@@ -117,7 +154,7 @@ struct tls_client_ctx_t {
 	 * this field must be always at first position
 	 */
 	struct tls_common_ctx c;
-	struct tls_client_paramlist_entry *params;
+	tls_client_param_t *params; /**< It's reference-counted. */
 };
 
 /*! Create an empty TLS context in query context */
@@ -162,28 +199,9 @@ tls_hs_state_t tls_get_hs_state(const struct tls_common_ctx *ctx);
 /*! Set TLS handshake state. */
 int tls_set_hs_state(struct tls_common_ctx *ctx, tls_hs_state_t state);
 
-/*! Find TLS parameters for given address. Attempt opportunistic upgrade for port 53 to 853,
- *  if the address is configured with a working DoT on port 853.
- */
-struct tls_client_paramlist_entry *tls_client_try_upgrade(map_t *tls_client_paramlist,
-			  const struct sockaddr *addr);
-
-/*! Clear (remove) TLS parameters for given address. */
-int tls_client_params_clear(map_t *tls_client_paramlist, const char *addr, uint16_t port);
-
-/*! Set TLS authentication parameters for given address.
- * Note: hostnames must be imported before ca files,
- *       otherwise ca files will not be imported at all.
- */
-int tls_client_params_set(map_t *tls_client_paramlist,
-			  const char *addr, uint16_t port,
-			  const char *param, tls_client_param_t param_type);
-
-/*! Free TLS authentication parameters. */
-int tls_client_params_free(map_t *tls_client_paramlist);
 
 /*! Allocate new client TLS context */
-struct tls_client_ctx_t *tls_client_ctx_new(struct tls_client_paramlist_entry *entry,
+struct tls_client_ctx_t *tls_client_ctx_new(tls_client_param_t *entry,
 					    struct worker_ctx *worker);
 
 /*! Free client TLS context */

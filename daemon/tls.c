@@ -537,8 +537,7 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
 	return submitted;
 }
 
-#if GNUTLS_VERSION_NUMBER >= GNUTLS_PIN_MIN_VERSION
-
+#if TLS_CAN_USE_PINS
 /*
   DNS-over-TLS Out of band key-pinned authentication profile uses the
   same form of pins as HPKP:
@@ -550,30 +549,44 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
 */
 #define PINLEN  ((((32) * 8 + 4)/6) + 3 + 1)
 
-/* out must be at least PINLEN octets long */
-static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar_len)
+/* Compute pin_sha256 for the certificate.
+ * It may be in raw format - just TLS_SHA256_RAW_LEN bytes without termination,
+ * or it may be a base64 0-terminated string requiring up to
+ * TLS_SHA256_BASE64_BUFLEN bytes.
+ * \return error code */
+static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar_len, bool raw)
 {
-	int err;
-	gnutls_pubkey_t key;
-	gnutls_datum_t datum = { .size = 0 };
-
-	if ((err = gnutls_pubkey_init(&key)) != GNUTLS_E_SUCCESS) {
-		return err;
+	if (raw && outchar_len < TLS_SHA256_RAW_LEN) {
+		assert(false);
+		return kr_error(ENOSPC);
+		/* With !raw we have check inside base64_encode. */
 	}
+	gnutls_pubkey_t key;
+	int err = gnutls_pubkey_init(&key);
+	if (err != GNUTLS_E_SUCCESS) return err;
 
-	if ((err = gnutls_pubkey_import_x509(key, crt, 0)) != GNUTLS_E_SUCCESS) {
+	gnutls_datum_t datum = { .data = NULL, .size = 0 };
+	err = gnutls_pubkey_import_x509(key, crt, 0);
+	if (err != GNUTLS_E_SUCCESS) goto leave;
+
+	err = gnutls_pubkey_export2(key, GNUTLS_X509_FMT_DER, &datum);
+	if (err != GNUTLS_E_SUCCESS) goto leave;
+
+	char raw_pin[TLS_SHA256_RAW_LEN]; /* TMP buffer if raw == false */
+	err = gnutls_hash_fast(GNUTLS_DIG_SHA256, datum.data, datum.size,
+				(raw ? outchar : raw_pin));
+	if (err != GNUTLS_E_SUCCESS || raw/*success*/)
 		goto leave;
-	} else {
-		if ((err = gnutls_pubkey_export2(key, GNUTLS_X509_FMT_DER, &datum)) != GNUTLS_E_SUCCESS) {
-			goto leave;
-		} else {
-			uint8_t raw_pin[32];
-			if ((err = gnutls_hash_fast(GNUTLS_DIG_SHA256, datum.data, datum.size, raw_pin)) != GNUTLS_E_SUCCESS) {
-				goto leave;
-			} else {
-				base64_encode(raw_pin, sizeof(raw_pin), (uint8_t *)outchar, outchar_len);
-			}
-		}
+	/* Convert to non-raw. */
+	err = base64_encode((uint8_t *)raw_pin, sizeof(raw_pin),
+			    (uint8_t *)outchar, outchar_len);
+	if (err >= 0 && err < outchar_len) {
+		err = GNUTLS_E_SUCCESS;
+		outchar[err] = '\0'; /* base64_encode() doesn't do it */
+	} else if (err >= 0) {
+		assert(false);
+		err = kr_error(ENOSPC); /* base64 fits but '\0' doesn't */
+		outchar[outchar_len - 1] = '\0';
 	}
 leave:
 	gnutls_free(datum.data);
@@ -584,23 +597,27 @@ leave:
 void tls_credentials_log_pins(struct tls_credentials *tls_credentials)
 {
 	for (int index = 0;; index++) {
-		int err;
 		gnutls_x509_crt_t *certs = NULL;
 		unsigned int cert_count = 0;
-
-		if ((err = gnutls_certificate_get_x509_crt(tls_credentials->credentials, index, &certs, &cert_count)) != GNUTLS_E_SUCCESS) {
+		int err = gnutls_certificate_get_x509_crt(tls_credentials->credentials,
+							index, &certs, &cert_count);
+		if (err != GNUTLS_E_SUCCESS) {
 			if (err != GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE) {
-				kr_log_error("[tls] could not get X.509 certificates (%d) %s\n", err, gnutls_strerror_name(err));
+				kr_log_error("[tls] could not get X.509 certificates (%d) %s\n",
+						err, gnutls_strerror_name(err));
 			}
 			return;
 		}
 
 		for (int i = 0; i < cert_count; i++) {
-			char pin[PINLEN] = { 0 };
-			if ((err = get_oob_key_pin(certs[i], pin, sizeof(pin))) != GNUTLS_E_SUCCESS) {
-				kr_log_error("[tls] could not calculate RFC 7858 OOB key-pin from cert %d (%d) %s\n", i, err, gnutls_strerror_name(err));
+			char pin[TLS_SHA256_BASE64_BUFLEN] = { 0 };
+			err = get_oob_key_pin(certs[i], pin, sizeof(pin), false);
+			if (err != GNUTLS_E_SUCCESS) {
+				kr_log_error("[tls] could not calculate RFC 7858 OOB key-pin from cert %d (%d) %s\n",
+						i, err, gnutls_strerror_name(err));
 			} else {
-				kr_log_info("[tls] RFC 7858 OOB key-pin (%d): pin-sha256=\"%s\"\n", i, pin);
+				kr_log_info("[tls] RFC 7858 OOB key-pin (%d): pin-sha256=\"%s\"\n",
+						i, pin);
 			}
 			gnutls_x509_crt_deinit(certs[i]);
 		}
@@ -757,33 +774,25 @@ void tls_credentials_free(struct tls_credentials *tls_credentials) {
 	free(tls_credentials);
 }
 
-static int client_paramlist_entry_free(struct tls_client_paramlist_entry *entry)
+void tls_client_param_unref(tls_client_param_t *entry)
 {
+	if (!entry) return;
+	assert(entry->refs); /* Well, we'd only leak memory. */
+	--(entry->refs);
+	if (entry->refs) return;
+
 	DEBUG_MSG("freeing TLS parameters %p\n", (void *)entry);
 
-	while (entry->ca_files.len > 0) {
-		if (entry->ca_files.at[0] != NULL) {
-			free((void *)entry->ca_files.at[0]);
-		}
-		array_del(entry->ca_files, 0);
+	for (int i = 0; i < entry->ca_files.len; ++i) {
+		free_const(entry->ca_files.at[i]);
 	}
-
-	while (entry->hostnames.len > 0) {
-		if (entry->hostnames.at[0] != NULL) {
-			free((void *)entry->hostnames.at[0]);
-		}
-		array_del(entry->hostnames, 0);
-	}
-
-	while (entry->pins.len > 0) {
-		if (entry->pins.at[0] != NULL) {
-			free((void *)entry->pins.at[0]);
-		}
-		array_del(entry->pins, 0);
-	}
-
 	array_clear(entry->ca_files);
-	array_clear(entry->hostnames);
+
+	free_const(entry->hostname);
+
+	for (int i = 0; i < entry->pins.len; ++i) {
+		free_const(entry->pins.at[i]);
+	}
 	array_clear(entry->pins);
 
 	if (entry->credentials) {
@@ -795,267 +804,118 @@ static int client_paramlist_entry_free(struct tls_client_paramlist_entry *entry)
 	}
 
 	free(entry);
-
+}
+static int param_free(void **param, void *null)
+{
+	assert(param && *param);
+	tls_client_param_unref(*param);
 	return 0;
 }
-
-static void client_paramlist_entry_ref(struct tls_client_paramlist_entry *entry)
+void tls_client_params_free(tls_client_params_t *params)
 {
-	if (entry != NULL) {
-		entry->refs += 1;
-	}
+	if (!params) return;
+	trie_apply(params, param_free, NULL);
+	trie_free(params);
 }
 
-static void client_paramlist_entry_unref(struct tls_client_paramlist_entry *entry)
+tls_client_param_t * tls_client_param_new()
 {
-	if (entry != NULL) {
-		assert(entry->refs > 0);
-		entry->refs -= 1;
+	tls_client_param_t *e = calloc(1, sizeof(*e));
+	if (!e) {
+		assert(!ENOMEM);
+		return NULL;
+	}
+	/* Note: those array_t don't need further initialization. */
+	e->refs = 1;
+	int ret = gnutls_certificate_allocate_credentials(&e->credentials);
+	if (ret != GNUTLS_E_SUCCESS) {
+		kr_log_error("[tls_client] error: gnutls_certificate_allocate_credentials() fails (%s)\n",
+			     gnutls_strerror_name(ret));
+		free(e);
+		return NULL;
+	}
+	gnutls_certificate_set_verify_function(e->credentials, client_verify_certificate);
+	return e;
+}
 
-		/* Last reference frees the object */
-		if (entry->refs == 0) {
-			client_paramlist_entry_free(entry);
+/**
+ * Convert an IP address and port number to binary key.
+ *
+ * \precond buffer \param key must have sufficient size
+ * \param addr[in]
+ * \param len[out] output length
+ * \param key[out] output buffer
+ */
+static bool construct_key(const union inaddr *addr, uint32_t *len, char *key)
+{
+	switch (addr->ip.sa_family) {
+	case AF_INET:
+		memcpy(key, &addr->ip4.sin_port, sizeof(addr->ip4.sin_port));
+		memcpy(key + sizeof(addr->ip4.sin_port), &addr->ip4.sin_addr,
+			sizeof(addr->ip4.sin_addr));
+		*len = sizeof(addr->ip4.sin_port) + sizeof(addr->ip4.sin_addr);
+		return true;
+	case AF_INET6:
+		memcpy(key, &addr->ip6.sin6_port, sizeof(addr->ip6.sin6_port));
+		memcpy(key + sizeof(addr->ip6.sin6_port), &addr->ip6.sin6_addr,
+			sizeof(addr->ip6.sin6_addr));
+		*len = sizeof(addr->ip6.sin6_port) + sizeof(addr->ip6.sin6_addr);
+		return true;
+	default:
+		assert(!EINVAL);
+		return false;
+	}
+}
+tls_client_param_t ** tls_client_param_getptr(tls_client_params_t **params,
+				const struct sockaddr *addr, bool do_insert)
+{
+	assert(params && addr);
+	/* We accept NULL for empty map; ensure the map exists if needed. */
+	if (!*params) {
+		if (!do_insert) return NULL;
+		*params = trie_create(NULL);
+		if (!*params) {
+			assert(!ENOMEM);
+			return NULL;
 		}
 	}
-}
-
-static int client_paramlist_entry_clear(const char *k, void *v, void *baton)
-{
-	struct tls_client_paramlist_entry *entry = (struct tls_client_paramlist_entry *)v;
-	return client_paramlist_entry_free(entry);
-}
-
-struct tls_client_paramlist_entry *tls_client_try_upgrade(map_t *tls_client_paramlist,
-			  const struct sockaddr *addr)
-{
-	/* Opportunistic upgrade from port 53 -> 853 */
-	if (kr_inaddr_port(addr) != KR_DNS_PORT) {
+	/* Construct the key. */
+	const union inaddr *ia = (const union inaddr *)addr;
+	char key[sizeof(ia->ip6.sin6_port) + sizeof(ia->ip6.sin6_addr)];
+	uint32_t len;
+	if (!construct_key(ia, &len, key))
 		return NULL;
-	}
-
-	static char key[INET6_ADDRSTRLEN + 6];
-	size_t keylen = sizeof(key);
-	if (kr_inaddr_str(addr, key, &keylen) != 0) {
-		return NULL;
-	}
-
-	/* Rewrite 053 -> 853 */
-	memcpy(key + keylen - 4, "853", 3);
-
-	return map_get(tls_client_paramlist, key);
+	/* Get the entry. */
+	return (tls_client_param_t **)
+		(do_insert ? trie_get_ins : trie_get_try)(*params, key, len);
 }
 
-int tls_client_params_clear(map_t *tls_client_paramlist, const char *addr, uint16_t port)
+int tls_client_param_remove(tls_client_params_t *params, const struct sockaddr *addr)
 {
-	if (!tls_client_paramlist || !addr) {
+	const union inaddr *ia = (const union inaddr *)addr;
+	char key[sizeof(ia->ip6.sin6_port) + sizeof(ia->ip6.sin6_addr)];
+	uint32_t len;
+	if (!construct_key(ia, &len, key))
 		return kr_error(EINVAL);
-	}
-
-	/* Parameters are OK */
-
-	char key[INET6_ADDRSTRLEN + 6];
-	size_t keylen = sizeof(key);
-	if (kr_straddr_join(addr, port, key, &keylen) != kr_ok()) {
-		return kr_error(EINVAL);
-	}
-
-	struct tls_client_paramlist_entry *entry = map_get(tls_client_paramlist, key);
-	if (entry != NULL) {
-		client_paramlist_entry_clear(NULL, (void *)entry, NULL);
-		map_del(tls_client_paramlist, key);
-	}
-
+	trie_val_t param_ptr;
+	int ret = trie_del(params, key, len, &param_ptr);
+	if (ret)
+		return kr_error(ret);
+	tls_client_param_unref(param_ptr);
 	return kr_ok();
 }
 
-int tls_client_params_set(map_t *tls_client_paramlist,
-			  const char *addr, uint16_t port,
-			  const char *param, tls_client_param_t param_type)
+/**
+ * Verify that at least one certificate in the certificate chain matches
+ * at least one certificate pin in the non-empty params->pins array.
+ * \returns GNUTLS_E_SUCCESS if pin matches, any other value is an error
+ */
+static int client_verify_pin(const unsigned int cert_list_size,
+				const gnutls_datum_t *cert_list,
+				tls_client_param_t *params)
 {
-	if (!tls_client_paramlist || !addr) {
-		return kr_error(EINVAL);
-	}
-
-	/* TLS_CLIENT_PARAM_CA can be empty */
-	if (param_type == TLS_CLIENT_PARAM_HOSTNAME ||
-	    param_type == TLS_CLIENT_PARAM_PIN) {
-		if (param == NULL || param[0] == 0) {
-			return kr_error(EINVAL);
-		}
-	}
-
-	/* Parameters are OK */
-
-	char key[INET6_ADDRSTRLEN + 6];
-	size_t keylen = sizeof(key);
-	if (kr_straddr_join(addr, port, key, &keylen) != kr_ok()) {
-		kr_log_error("[tls_client] warning: '%s' is not a valid ip address, ignoring\n", addr);
-		return kr_ok();
-	}
-
-	bool is_first_entry = false;
-	struct tls_client_paramlist_entry *entry = map_get(tls_client_paramlist, key);
-	if (entry == NULL) {
-		entry = calloc(1, sizeof(struct tls_client_paramlist_entry));
-		if (entry == NULL) {
-			return kr_error(ENOMEM);
-		}
-		is_first_entry  = true;
-		int ret = gnutls_certificate_allocate_credentials(&entry->credentials);
-		if (ret != GNUTLS_E_SUCCESS) {
-			free(entry);
-			kr_log_error("[tls_client] error: gnutls_certificate_allocate_credentials() fails (%s)\n",
-				     gnutls_strerror_name(ret));
-			return kr_error(ENOMEM);
-		}
-		gnutls_certificate_set_verify_function(entry->credentials, client_verify_certificate);
-		client_paramlist_entry_ref(entry);
-	}
-
-	int ret = kr_ok();
-
-	if (param_type == TLS_CLIENT_PARAM_HOSTNAME) {
-		const char *hostname = param;
-		bool already_exists = false;
-		for (size_t i = 0; i < entry->hostnames.len; ++i) {
-			if (strcmp(entry->hostnames.at[i], hostname) == 0) {
-				kr_log_error("[tls_client] error: hostname '%s' for address '%s' already was set, ignoring\n", hostname, key);
-				already_exists = true;
-				break;
-			}
-		}
-		if (!already_exists) {
-			const char *value = strdup(hostname);
-			if (!value) {
-				ret = kr_error(ENOMEM);
-			} else if (array_push(entry->hostnames, value) < 0) {
-				free ((void *)value);
-				ret = kr_error(ENOMEM);
-			}
-		}
-	} else if (param_type == TLS_CLIENT_PARAM_CA) {
-		/* Import ca files only when hostname is already set */
-		if (entry->hostnames.len == 0) {
-			return kr_error(ENOENT);
-		}
-		const char *ca_file = param;
-		bool already_exists = false;
-		for (size_t i = 0; i < entry->ca_files.len; ++i) {
-			const char *imported_ca = entry->ca_files.at[i];
-			if (imported_ca[0] == 0 && (ca_file == NULL || ca_file[0] == 0)) {
-				kr_log_error("[tls_client] error: system ca for address '%s' already was set, ignoring\n", key);
-				already_exists = true;
-				break;
-			} else if (strcmp(imported_ca, ca_file) == 0) {
-				kr_log_error("[tls_client] error: ca file '%s' for address '%s' already was set, ignoring\n", ca_file, key);
-				already_exists = true;
-				break;
-			}
-		}
-		if (!already_exists) {
-			const char *value = strdup(ca_file != NULL ? ca_file : "");
-			if (!value) {
-				ret = kr_error(ENOMEM);
-			} else if (array_push(entry->ca_files, value) < 0) {
-				free ((void *)value);
-				ret = kr_error(ENOMEM);
-			} else if (value[0] == 0) {
-				int res = gnutls_certificate_set_x509_system_trust (entry->credentials);
-				if (res <= 0) {
-					kr_log_error("[tls_client] failed to import certs from system store (%s)\n",
-						     gnutls_strerror_name(res));
-					/* value will be freed at cleanup */
-					ret = kr_error(EINVAL);
-				} else {
-					kr_log_verbose("[tls_client] imported %d certs from system store\n", res);
-				}
-			} else {
-				int res = gnutls_certificate_set_x509_trust_file(entry->credentials, value,
-										 GNUTLS_X509_FMT_PEM);
-				if (res <= 0) {
-					kr_log_error("[tls_client] failed to import certificate file '%s' (%s)\n",
-						     value, gnutls_strerror_name(res));
-					/* value will be freed at cleanup */
-					ret = kr_error(EINVAL);
-				} else {
-					kr_log_verbose("[tls_client] imported %d certs from file '%s'\n",
-							res, value);
-
-				}
-			}
-		}
-	} else if (param_type == TLS_CLIENT_PARAM_PIN) {
-		const char *pin = param;
-		for (size_t i = 0; i < entry->pins.len; ++i) {
-			if (strcmp(entry->pins.at[i], pin) == 0) {
-				kr_log_error("[tls_client] warning: pin '%s' for address '%s' already was set, ignoring\n", pin, key);
-				return kr_ok();
-			}
-		}
-		const void *value = strdup(pin);
-		if (!value) {
-			ret = kr_error(ENOMEM);
-		} else if (array_push(entry->pins, value) < 0) {
-			free ((void *)value);
-			ret = kr_error(ENOMEM);
-		}
-	}
-
-	if ((ret == kr_ok()) && is_first_entry) {
-		bool fail = (map_set(tls_client_paramlist, key, entry) != 0);
-		if (fail) {
-			ret = kr_error(ENOMEM);
-		}
-	}
-
-	if ((ret != kr_ok()) && is_first_entry) {
-		client_paramlist_entry_unref(entry);
-	}
-
-	return ret;
-}
-
-int tls_client_params_free(map_t *tls_client_paramlist)
-{
-	if (!tls_client_paramlist) {
-		return kr_error(EINVAL);
-	}
-
-	map_walk(tls_client_paramlist, client_paramlist_entry_clear, NULL);
-	map_clear(tls_client_paramlist);
-
-	return kr_ok();
-}
-
-static int client_verify_certificate(gnutls_session_t tls_session)
-{
-	struct tls_client_ctx_t *ctx = gnutls_session_get_ptr(tls_session);
-	assert(ctx->params != NULL);
-
-	if (ctx->params->pins.len == 0 && ctx->params->ca_files.len == 0) {
-		return GNUTLS_E_SUCCESS;
-	}
-
-	gnutls_certificate_type_t cert_type = gnutls_certificate_type_get(tls_session);
-	if (cert_type != GNUTLS_CRT_X509) {
-		kr_log_error("[tls_client] invalid certificate type %i has been received\n",
-			     cert_type);
-		return GNUTLS_E_CERTIFICATE_ERROR;
-	}
-	unsigned int cert_list_size = 0;
-	const gnutls_datum_t *cert_list =
-		gnutls_certificate_get_peers(tls_session, &cert_list_size);
-	if (cert_list == NULL || cert_list_size == 0) {
-		kr_log_error("[tls_client] empty certificate list\n");
-		return GNUTLS_E_CERTIFICATE_ERROR;
-	}
-
-#if GNUTLS_VERSION_NUMBER >= GNUTLS_PIN_MIN_VERSION
-	if (ctx->params->pins.len == 0) {
-		DEBUG_MSG("[tls_client] skipping certificate PIN check\n");
-		goto skip_pins;
-	}
-
+	assert(params->pins.len > 0);
+#if TLS_CAN_USE_PINS
 	for (int i = 0; i < cert_list_size; i++) {
 		gnutls_x509_crt_t cert;
 		int ret = gnutls_x509_crt_init(&cert);
@@ -1069,65 +929,73 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 			return ret;
 		}
 
-		char cert_pin[PINLEN] = { 0 };
-		ret = get_oob_key_pin(cert, cert_pin, sizeof(cert_pin));
-
+	#ifdef DEBUG
+		if (VERBOSE_STATUS) {
+			char pin_base64[TLS_SHA256_BASE64_BUFLEN];
+			/* DEBUG: additionally compute and print the base64 pin.
+			 * Not very efficient, but that's OK for DEBUG. */
+			ret = get_oob_key_pin(cert, pin_base64, sizeof(pin_base64), false);
+			if (ret == GNUTLS_E_SUCCESS) {
+				DEBUG_MSG("[tls_client] received pin: %s\n", pin_base64);
+			} else {
+				DEBUG_MSG("[tls_client] failed to convert received pin\n");
+				/* Now we hope that `ret` below can't differ. */
+			}
+		}
+	#endif
+		char cert_pin[TLS_SHA256_RAW_LEN];
+		/* Get raw pin and compare. */
+		ret = get_oob_key_pin(cert, cert_pin, sizeof(cert_pin), true);
 		gnutls_x509_crt_deinit(cert);
-
 		if (ret != GNUTLS_E_SUCCESS) {
 			return ret;
 		}
-
-		DEBUG_MSG("[tls_client] received pin  : %s\n", cert_pin);
-		for (size_t j = 0; j < ctx->params->pins.len; ++j) {
-			const char *pin = ctx->params->pins.at[j];
-			bool match = (strcmp(cert_pin, pin) == 0);
-			DEBUG_MSG("[tls_client] configured pin: %s matches? %s\n",
-				  pin, match ? "yes" : "no");
-			if (match) {
-				return GNUTLS_E_SUCCESS;
-			}
-		}
-	}
-
-	/* pins were set, but no one was not matched */
-	kr_log_error("[tls_client] certificate PIN check failed\n");
-#else
-	if (ctx->params->pins.len != 0) {
-		kr_log_error("[tls_client] newer gnutls is required to use PIN check\n");
-		return GNUTLS_E_CERTIFICATE_ERROR;
-	}
-	goto skip_pins;
-#endif
-
-skip_pins:
-
-	if (ctx->params->ca_files.len == 0) {
-		DEBUG_MSG("[tls_client] empty CA files list\n");
-		return GNUTLS_E_CERTIFICATE_ERROR;
-	}
-
-	if (ctx->params->hostnames.len == 0) {
-		DEBUG_MSG("[tls_client] empty hostname list\n");
-		return GNUTLS_E_CERTIFICATE_ERROR;
-	}
-
-	int ret;
-	unsigned int status;
-	for (size_t i = 0; i < ctx->params->hostnames.len; ++i) {
-		ret = gnutls_certificate_verify_peers3(
-				ctx->c.tls_session,
-				ctx->params->hostnames.at[i],
-				&status);
-		if ((ret == GNUTLS_E_SUCCESS) && (status == 0)) {
+		for (size_t j = 0; j < params->pins.len; ++j) {
+			const uint8_t *pin = params->pins.at[j];
+			if (memcmp(cert_pin, pin, TLS_SHA256_RAW_LEN) != 0)
+				continue; /* mismatch */
+			DEBUG_MSG("[tls_client] matched a configured pin no. %zd\n", j);
 			return GNUTLS_E_SUCCESS;
 		}
+		DEBUG_MSG("[tls_client] none of %zd configured pin(s) matched\n",
+				params->pins.len);
+	}
+
+	kr_log_error("[tls_client] no pin matched: %zu pins * %d certificates\n",
+			params->pins.len, cert_list_size);
+	return GNUTLS_E_CERTIFICATE_ERROR;
+
+#else /* TLS_CAN_USE_PINS */
+	kr_log_error("[tls_client] internal inconsistency: TLS_CAN_USE_PINS\n");
+	assert(false);
+	return GNUTLS_E_CERTIFICATE_ERROR;
+#endif
+}
+
+/**
+ * Verify that \param tls_session contains a valid X.509 certificate chain
+ * with given hostname.
+ *
+ * \returns GNUTLS_E_SUCCESS if certificate chain is valid, any other value is an error
+ */
+static int client_verify_certchain(gnutls_session_t tls_session, const char *hostname)
+{
+	if (!hostname) {
+		kr_log_error("[tls_client] internal config inconsistency: no hostname set\n");
+		assert(false);
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+
+	unsigned int status;
+	int ret = gnutls_certificate_verify_peers3(tls_session, hostname, &status);
+	if ((ret == GNUTLS_E_SUCCESS) && (status == 0)) {
+		return GNUTLS_E_SUCCESS;
 	}
 
 	if (ret == GNUTLS_E_SUCCESS) {
 		gnutls_datum_t msg;
 		ret = gnutls_certificate_verification_status_print(
-			status, gnutls_certificate_type_get(ctx->c.tls_session), &msg, 0);
+			status, gnutls_certificate_type_get(tls_session), &msg, 0);
 		if (ret == GNUTLS_E_SUCCESS) {
 			kr_log_error("[tls_client] failed to verify peer certificate: "
 					"%s\n", msg.data);
@@ -1145,7 +1013,42 @@ skip_pins:
 	return GNUTLS_E_CERTIFICATE_ERROR;
 }
 
-struct tls_client_ctx_t *tls_client_ctx_new(struct tls_client_paramlist_entry *entry,
+/**
+ * Verify that actual TLS security parameters of \param tls_session
+ * match requirements provided by user in tls_session->params.
+ * \returns GNUTLS_E_SUCCESS if requirements were met, any other value is an error
+ */
+static int client_verify_certificate(gnutls_session_t tls_session)
+{
+	struct tls_client_ctx_t *ctx = gnutls_session_get_ptr(tls_session);
+	assert(ctx->params != NULL);
+
+	if (ctx->params->insecure) {
+		return GNUTLS_E_SUCCESS;
+	}
+
+	gnutls_certificate_type_t cert_type = gnutls_certificate_type_get(tls_session);
+	if (cert_type != GNUTLS_CRT_X509) {
+		kr_log_error("[tls_client] invalid certificate type %i has been received\n",
+			     cert_type);
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+	unsigned int cert_list_size = 0;
+	const gnutls_datum_t *cert_list =
+		gnutls_certificate_get_peers(tls_session, &cert_list_size);
+	if (cert_list == NULL || cert_list_size == 0) {
+		kr_log_error("[tls_client] empty certificate list\n");
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+
+	if (ctx->params->pins.len > 0)
+		/* check hash of the certificate but ignore everything else */
+		return client_verify_pin(cert_list_size, cert_list, ctx->params);
+	else
+		return client_verify_certchain(ctx->c.tls_session, ctx->params->hostname);
+}
+
+struct tls_client_ctx_t *tls_client_ctx_new(tls_client_param_t *entry,
 					    struct worker_ctx *worker)
 {
 	struct tls_client_ctx_t *ctx = calloc(1, sizeof (struct tls_client_ctx_t));
@@ -1171,11 +1074,18 @@ struct tls_client_ctx_t *tls_client_ctx_new(struct tls_client_paramlist_entry *e
 
 	/* Must take a reference on parameters as the credentials are owned by it
 	 * and must not be freed while the session is active. */
-	client_paramlist_entry_ref(entry);
+	++(entry->refs);
 	ctx->params = entry;
 
 	ret = gnutls_credentials_set(ctx->c.tls_session, GNUTLS_CRD_CERTIFICATE,
 	                             entry->credentials);
+	if (ret == GNUTLS_E_SUCCESS && entry->hostname) {
+		ret = gnutls_server_name_set(ctx->c.tls_session, GNUTLS_NAME_DNS,
+					entry->hostname, strlen(entry->hostname));
+		kr_log_verbose("[tls_client] set hostname, ret = %d\n", ret);
+	} else if (!entry->hostname) {
+		kr_log_verbose("[tls_client] no hostname\n");
+	}
 	if (ret != GNUTLS_E_SUCCESS) {
 		tls_client_ctx_free(ctx);
 		return NULL;
@@ -1202,7 +1112,7 @@ void tls_client_ctx_free(struct tls_client_ctx_t *ctx)
 	}
 
 	/* Must decrease the refcount for referenced parameters */
-	client_paramlist_entry_unref(ctx->params);
+	tls_client_param_unref(ctx->params);
 
 	free (ctx);
 }
@@ -1241,7 +1151,7 @@ int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 	ctx->handshake_state = TLS_HS_IN_PROGRESS;
 	ctx->session = session;
 
-	struct tls_client_paramlist_entry *tls_params = client_ctx->params;
+	tls_client_param_t *tls_params = client_ctx->params;
 	if (tls_params->session_data.data != NULL) {
 		gnutls_session_set_data(ctx->tls_session, tls_params->session_data.data,
 					tls_params->session_data.size);
