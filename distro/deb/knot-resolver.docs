@@ -1,1 +1,4 @@
-usr/share/doc/knot-resolver/*
+debian/tmp/usr/share/doc/knot-resolver/AUTHORS
+debian/tmp/usr/share/doc/knot-resolver/COPYING
+debian/tmp/usr/share/doc/knot-resolver/NEWS
+debian/tmp/usr/share/doc/knot-resolver/examples/*
