@@ -162,6 +162,7 @@ EOF
 	kr_bitcmp
 	kr_family_len
 	kr_straddr_socket
+	kr_straddr_split
 	kr_ranked_rrarray_add
 	kr_qflags_set
 	kr_qflags_clear
