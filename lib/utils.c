@@ -500,29 +500,30 @@ int kr_straddr_subnet(void *dst, const char *addr)
 	return bit_len;
 }
 
-const char * kr_straddr_split(const char *addr, char *buf, uint16_t *port)
+int kr_straddr_split(const char *instr, char ipaddr[static restrict (INET6_ADDRSTRLEN + 1)],
+		     uint16_t *port)
 {
-	assert(addr && buf && port);
+	assert(instr && ipaddr && port);
 	/* Find where port number starts. */
-	const char *p_start = strchr(addr, '@');
+	const char *p_start = strchr(instr, '@');
 	if (!p_start)
-		p_start = strchr(addr, '#');
-	if (!p_start) /* No port specified -> no need to copy anything. */
-		return addr;
-	if (p_start[1] == '\0') /* Don't accept empty port string. */
-		return NULL;
-	/* Check the port number. */
-	char *p_end;
-	long p = strtol(p_start + 1, &p_end, 10);
-	if (*p_end != '\0' || p <= 0 || p > UINT16_MAX)
-		return NULL;
-	*port = p;
-	/* We need to copy the address. */
-	const size_t addrlen = p_start - addr;
+		p_start = strchr(instr, '#');
+	if (p_start) { /* Get and check the port number. */
+		if (p_start[1] == '\0') /* Don't accept empty port string. */
+			return kr_error(EILSEQ);
+		char *p_end;
+		long p = strtol(p_start + 1, &p_end, 10);
+		if (*p_end != '\0' || p <= 0 || p > UINT16_MAX)
+			return kr_error(EILSEQ);
+		*port = p;
+	}
+	/* Copy the address. */
+	const size_t addrlen = p_start ? p_start - instr : strlen(instr);
 	if (addrlen > INET6_ADDRSTRLEN)
-		return NULL;
-	memcpy(buf, addr, addrlen); buf[addrlen] = '\0';
-	return buf;
+		return kr_error(EILSEQ);
+	memcpy(ipaddr, instr, addrlen);
+	ipaddr[addrlen] = '\0';
+	return kr_ok();
 }
 
 int kr_straddr_join(const char *addr, uint16_t port, char *buf, size_t *buflen)

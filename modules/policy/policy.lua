@@ -33,18 +33,16 @@ if has_socket then
 	end
 end
 
+-- Split address and port from a combined string.
 local function addr_split_port(target, default_port)
-	assert(default_port)
-	assert(type(default_port) == 'number')
-	local addr, port = target:match '([^@]*)@?(.*)'
-	local nport
-	if port ~= "" then
-		nport = tonumber(port)
-		if not nport or nport < 1 or nport > 65535 then
-			error('port "'.. port  ..'" is not valid')
-		end
+	assert(default_port and type(default_port) == 'number')
+	local port = ffi.new('uint16_t[1]', default_port)
+	local addr = ffi.new('char[47]') -- INET6_ADDRSTRLEN + 1
+	local ret = ffi.C.kr_straddr_split(target, addr, port)
+	if ret ~= 0 then
+		error('failed to parse address ' .. target)
 	end
-	return addr, nport or default_port
+	return addr, tonumber(port[0])
 end
 
 -- String address@port -> sockaddr.

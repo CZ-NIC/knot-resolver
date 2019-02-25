@@ -239,7 +239,7 @@ local timeval_t = ffi.typeof('struct timeval')
 
 -- Metatype for sockaddr
 local addr_buf = ffi.new('char[16]')
-local str_addr_buf = ffi.new('char[46 + 1 + 6 + 1]') -- IPv6 + #port + \0
+local str_addr_buf = ffi.new('char[46 + 1 + 6 + 1]') -- INET6_ADDRSTRLEN + #port + \0
 local str_addr_buf_len = ffi.sizeof(str_addr_buf)
 local sockaddr_t = ffi.typeof('struct sockaddr')
 ffi.metatype( sockaddr_t, {
