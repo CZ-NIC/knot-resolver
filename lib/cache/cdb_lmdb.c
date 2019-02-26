@@ -613,60 +613,6 @@ static int cdb_match(knot_db_t *db, knot_db_val_t *key, knot_db_val_t keyval[][2
 }
 
 
-static int cdb_prune(knot_db_t *db, int limit)
-{
-	return -1;
-#if 0
-	/* Sync in-flight transactions */
-	cdb_sync(db);
-
-	/* Prune old records */
-	struct lmdb_env *env = db;
-	MDB_txn *txn = NULL;
-	int ret = txn_get(env, &txn, false);
-	if (ret != 0) {
-		return ret;
-	}
-
-	MDB_cursor *cur = NULL;
-	ret = mdb_cursor_open(txn, env->dbi, &cur);
-	if (ret != 0) {
-		return lmdb_error(ret);
-	}
-
-	MDB_val cur_key, cur_val;
-	ret = mdb_cursor_get(cur, &cur_key, &cur_val, MDB_FIRST);
-	if (ret != 0) {
-		mdb_cursor_close(cur);
-		return lmdb_error(ret);
-	}
-
-	int results = 0;
-	struct timeval now;
-	gettimeofday(&now, NULL);
-	while (ret == 0 && results < limit) {
-		/* Ignore special namespaces. */
-		if (cur_key.mv_size < 2 || ((const char *)cur_key.mv_data)[0] == 'V') {
-			ret = mdb_cursor_get(cur, &cur_key, &cur_val, MDB_NEXT);
-			continue;
-		}
-		/* Check entry age. */
-		struct kr_cache_entry *entry = cur_val.mv_data;
-		if (entry->timestamp > now.tv_sec ||
-			(now.tv_sec - entry->timestamp) < entry->ttl) {
-			ret = mdb_cursor_get(cur, &cur_key, &cur_val, MDB_NEXT);
-			continue;
-		}
-		/* Remove entry */
-		mdb_cursor_del(cur, 0);
-		++results;
-		ret = mdb_cursor_get(cur, &cur_key, &cur_val, MDB_NEXT);
-	}
-	mdb_cursor_close(cur);
-	return ret < 0 ? ret : results;
-#endif
-}
-
 static int cdb_read_leq(knot_db_t *env, knot_db_val_t *key, knot_db_val_t *val)
 {
 	assert(env && key && key->data && val);
@@ -702,7 +648,7 @@ const struct kr_cdb_api *kr_cdb_lmdb(void)
 		"lmdb",
 		cdb_init, cdb_deinit, cdb_count, cdb_clear, cdb_sync,
 		cdb_readv, cdb_writev, cdb_remove,
-		cdb_match, cdb_prune,
+		cdb_match,
 		cdb_read_leq
 	};
 

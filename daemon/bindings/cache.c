@@ -252,26 +252,6 @@ static int cache_prefixed(struct kr_cache *cache, const char *prefix, bool exact
 }
 #endif
 
-/** Prune expired/invalid records. */
-static int cache_prune(lua_State *L)
-{
-	struct kr_cache *cache = cache_assert_open(L);
-	/* Check parameters */
-	int prune_max = UINT16_MAX;
-	int n = lua_gettop(L);
-	if (n >= 1 && lua_isnumber(L, 1))
-		prune_max = lua_tointeger(L, 1);
-
-	/* Check if API supports pruning. */
-	int ret = kr_error(ENOSYS);
-	if (cache->api->prune)
-		ret = cache->api->prune(cache->db, prune_max);
-	/* Commit and format result. */
-	lua_error_maybe(L, ret);
-	lua_pushinteger(L, ret);
-	return 1;
-}
-
 /** Clear everything. */
 static int cache_clear_everything(lua_State *L)
 {
@@ -466,7 +446,6 @@ int kr_bindings_cache(lua_State *L)
 		{ "checkpoint", cache_checkpoint },
 		{ "open",   cache_open },
 		{ "close",  cache_close },
-		{ "prune",  cache_prune },
 		{ "clear_everything", cache_clear_everything },
 		{ "get",     cache_get },
 		{ "max_ttl", cache_max_ttl },
