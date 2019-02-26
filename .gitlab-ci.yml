@@ -302,6 +302,8 @@ pytests:
   except:
     - master
   script:
+    - git log -1
+    - git log -1 origin/master
     - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPDIFF_FORCE -gt 0 || exit 0
     - export LABEL=gl$(date +%s)
     - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
@@ -372,6 +374,8 @@ fwd-udp6-unbound.tls6:
   except:
     - master
   script:
+    - git log -1
+    - git log -1 origin/master
     - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPERF_FORCE -gt 0 || exit 0
     - export LABEL=gl$(date +%s)
     - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
