@@ -31,12 +31,12 @@ Depends:
  libkres9 (= ${binary:Version}),
  lua-sec,
  lua-socket,
- lua-cqueues,
  systemd,
  ${misc:Depends},
  ${shlibs:Depends},
 Recommends:
  knot-resolver-module-http,
+ lua-cqueues,
 Description: caching, DNSSEC-validating DNS resolver
  The Knot Resolver is a caching full resolver implementation
  written in C and LuaJIT, including both a resolver library and a
