@@ -13,12 +13,7 @@ integr_tests += [
 stats_mod = shared_module(
   'stats',
   stats_src,
-  dependencies: [
-    contrib_dep,
-    libkres_dep,
-    libknot,
-    luajit,
-  ],
+  include_directories: mod_inc_dir,
   name_prefix: '',
   install: true,
   install_dir: modules_dir,
