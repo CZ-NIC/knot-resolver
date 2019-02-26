@@ -58,8 +58,6 @@ struct kr_cdb_api {
 	/** Find key-value pairs that are prefixed by the given key, limited by maxcount.
 	 * \return the number of pairs or negative error. */
 	int (*match)(knot_db_t *db, knot_db_val_t *key, knot_db_val_t keyval[][2], int maxcount);
-	/** Not implemented ATM. */
-	int (*prune)(knot_db_t *db, int maxcount);
 
 	/** Less-or-equal search (lexicographic ordering).
 	 * On successful return, key->data and val->data point to DB-owned data.
