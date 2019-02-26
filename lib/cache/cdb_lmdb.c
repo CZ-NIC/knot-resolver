@@ -148,7 +148,7 @@ static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 	assert(env && txn);
 	if (env->txn.rw) {
 		/* Reuse the *open* RW txn even if only reading is requested.
-		 * We leave the management of this to the cdb_sync command.
+		 * We leave the management of this to the cdb_commit command.
 		 * The user may e.g. want to do some reads between the writes. */
 		*txn = env->txn.rw;
 		return kr_ok();
@@ -185,7 +185,7 @@ static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 	return kr_ok();
 }
 
-static int cdb_sync(knot_db_t *db)
+static int cdb_commit(knot_db_t *db)
 {
 	struct lmdb_env *env = db;
 	int ret = kr_ok();
@@ -209,7 +209,7 @@ static int txn_curs_get(struct lmdb_env *env, MDB_cursor **curs)
 	}
 	/* Only in a read-only txn; TODO: it's a bit messy/coupled */
 	if (env->txn.rw) {
-		int ret = cdb_sync(env);
+		int ret = cdb_commit(env);
 		if (ret) return ret;
 	}
 	MDB_txn *txn = NULL;
@@ -249,7 +249,7 @@ static void cdb_close_env(struct lmdb_env *env)
 	assert(env && env->env);
 
 	/* Get rid of any transactions. */
-	cdb_sync(env);
+	cdb_commit(env);
 	free_txn_ro(env);
 
 	mdb_env_sync(env->env, 1);
@@ -394,7 +394,7 @@ static int cdb_clear(knot_db_t *db)
 		if (ret == kr_ok()) {
 			ret = lmdb_error(mdb_drop(txn, env->dbi, 0));
 			if (ret == kr_ok()) {
-				ret = cdb_sync(db);
+				ret = cdb_commit(db);
 			}
 			if (ret == kr_ok()) {
 				return ret;
@@ -404,7 +404,7 @@ static int cdb_clear(knot_db_t *db)
 	}
 
 	/* We are about to switch to a different file, so end all txns, to be sure. */
-	(void) cdb_sync(db);
+	(void) cdb_commit(db);
 	free_txn_ro(db);
 
 	/* Since there is no guarantee that there will be free
@@ -506,7 +506,7 @@ static int cdb_write(struct lmdb_env *env, MDB_txn **txn, const knot_db_val_t *k
 
 	/* Try to recover from doing too much writing in a single transaction. */
 	if (ret == MDB_TXN_FULL) {
-		ret = cdb_sync(env);
+		ret = cdb_commit(env);
 		if (ret) {
 			ret = txn_get(env, txn, false);
 		}
@@ -646,7 +646,7 @@ const struct kr_cdb_api *kr_cdb_lmdb(void)
 {
 	static const struct kr_cdb_api api = {
 		"lmdb",
-		cdb_init, cdb_deinit, cdb_count, cdb_clear, cdb_sync,
+		cdb_init, cdb_deinit, cdb_count, cdb_clear, cdb_commit,
 		cdb_readv, cdb_writev, cdb_remove,
 		cdb_match,
 		cdb_read_leq

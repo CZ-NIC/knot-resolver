@@ -107,7 +107,7 @@ static int assert_right_version(struct kr_cache *cache)
 			ret = cache_op(cache, write, &key, &val, 1);
 		}
 	}
-	kr_cache_sync(cache);
+	kr_cache_commit(cache);
 	return ret;
 }
 
@@ -157,13 +157,13 @@ void kr_cache_close(struct kr_cache *cache)
 	kr_cache_emergency_file_to_remove = NULL;
 }
 
-int kr_cache_sync(struct kr_cache *cache)
+int kr_cache_commit(struct kr_cache *cache)
 {
 	if (!cache_isvalid(cache)) {
 		return kr_error(EINVAL);
 	}
-	if (cache->api->sync) {
-		return cache_op(cache, sync);
+	if (cache->api->commit) {
+		return cache_op(cache, commit);
 	}
 	return kr_ok();
 }
@@ -336,7 +336,7 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	int ret = peek_nosync(ctx, pkt);
-	kr_cache_sync(&req->ctx->cache);
+	kr_cache_commit(&req->ctx->cache);
 	return ret;
 }
 
@@ -414,7 +414,7 @@ finally:
 	if (unauth_cnt) {
 		VERBOSE_MSG(qry, "=> stashed also %d nonauth RRsets\n", unauth_cnt);
 	};
-	kr_cache_sync(cache);
+	kr_cache_commit(cache);
 	return ctx->state; /* we ignore cache-stashing errors */
 }
 
@@ -550,7 +550,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 
 	#if 0 /* Occasionally useful when debugging some kinds of changes. */
 	{
-	kr_cache_sync(cache);
+	kr_cache_commit(cache);
 	knot_db_val_t val = { NULL, 0 };
 	ret = cache_op(cache, read, &key, &val, 1);
 	if (ret != kr_error(ENOENT)) { // ENOENT might happen in some edge case, I guess
@@ -879,7 +879,7 @@ int kr_cache_remove_subtree(struct kr_cache *cache, const knot_dname_t *name,
 	}
 	ret = cache->api->remove(cache->db, keys, count);
 cleanup:
-	kr_cache_sync(cache); /* Sync even after just kr_cache_match(). */
+	kr_cache_commit(cache); /* Sync even after just kr_cache_match(). */
 	/* Free keys */
 	while (--i >= 0) {
 		free(keys[i].data);

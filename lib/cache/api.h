@@ -81,7 +81,7 @@ void kr_cache_close(struct kr_cache *cache);
 
 /** Run after a row of operations to release transaction/lock if needed. */
 KR_EXPORT
-int kr_cache_sync(struct kr_cache *cache);
+int kr_cache_commit(struct kr_cache *cache);
 
 /**
  * Return true if cache is open and enabled.

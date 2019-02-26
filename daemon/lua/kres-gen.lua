@@ -333,7 +333,7 @@ int kr_cache_closest_apex(struct kr_cache *, const knot_dname_t *, _Bool, knot_d
 int kr_cache_insert_rr(struct kr_cache *, const knot_rrset_t *, const knot_rrset_t *, uint8_t, uint32_t);
 int kr_cache_remove(struct kr_cache *, const knot_dname_t *, uint16_t);
 int kr_cache_remove_subtree(struct kr_cache *, const knot_dname_t *, _Bool, int);
-int kr_cache_sync(struct kr_cache *);
+int kr_cache_commit(struct kr_cache *);
 typedef struct {
 	uint8_t bitmap[32];
 	uint8_t length;
