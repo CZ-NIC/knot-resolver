@@ -22,7 +22,7 @@ Example configuration is:
 
 This configuration downloads zone file from URL `https://www.internic.net/domain/root.zone` and imports it into cache every 86400 seconds (1 day). The HTTPS connection is authenticated using CA certificate from file `/etc/pki/tls/certs/ca-bundle.crt` and signed zone content is validated using DNSSEC.
 
-Root zone to import must be signed using DNSSEC and the resolver must have valid DNSSEC configuration. (For further details please see :ref:`enabling-dnssec`.)
+Root zone to import must be signed using DNSSEC and the resolver must have valid DNSSEC configuration.
 
 .. csv-table::
  :header: "Parameter", "Description"
