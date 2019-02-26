@@ -200,15 +200,26 @@ struct kr_request {
 	void *daemon_context;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
+struct kr_cdb_stats {
+	uint64_t open;
+	uint64_t close;
+	uint64_t count;
+	uint64_t clear;
+	uint64_t commit;
+	uint64_t read;
+	uint64_t read_miss;
+	uint64_t write;
+	uint64_t remove;
+	uint64_t remove_miss;
+	uint64_t match;
+	uint64_t match_miss;
+	uint64_t read_leq;
+	uint64_t read_leq_miss;
+};
 struct kr_cache {
 	knot_db_t *db;
 	const struct kr_cdb_api *api;
-	struct {
-		uint32_t hit;
-		uint32_t miss;
-		uint32_t insert;
-		uint32_t delete;
-	} stats;
+	struct kr_cdb_stats stats;
 	uint32_t ttl_min;
 	uint32_t ttl_max;
 	struct timeval checkpoint_walltime;

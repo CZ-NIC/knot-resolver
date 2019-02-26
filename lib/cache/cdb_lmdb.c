@@ -26,6 +26,7 @@
 
 #include "contrib/cleanup.h"
 #include "lib/cache/cdb_lmdb.h"
+#include "lib/cache/cdb_api.h"
 #include "lib/cache/api.h"
 #include "lib/utils.h"
 
@@ -185,11 +186,12 @@ static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 	return kr_ok();
 }
 
-static int cdb_commit(knot_db_t *db)
+static int cdb_commit(knot_db_t *db, struct kr_cdb_stats *stats)
 {
 	struct lmdb_env *env = db;
 	int ret = kr_ok();
 	if (env->txn.rw) {
+		stats->commit++;
 		ret = lmdb_error(mdb_txn_commit(env->txn.rw));
 		env->txn.rw = NULL; /* the transaction got freed even in case of errors */
 	} else if (env->txn.ro && env->txn.ro_active) {
@@ -201,7 +203,7 @@ static int cdb_commit(knot_db_t *db)
 }
 
 /** Obtain a read-only cursor (and a read-only transaction). */
-static int txn_curs_get(struct lmdb_env *env, MDB_cursor **curs)
+static int txn_curs_get(struct lmdb_env *env, MDB_cursor **curs, struct kr_cdb_stats *stats)
 {
 	assert(env && curs);
 	if (env->txn.ro_curs_active) {
@@ -209,7 +211,7 @@ static int txn_curs_get(struct lmdb_env *env, MDB_cursor **curs)
 	}
 	/* Only in a read-only txn; TODO: it's a bit messy/coupled */
 	if (env->txn.rw) {
-		int ret = cdb_commit(env);
+		int ret = cdb_commit(env, stats);
 		if (ret) return ret;
 	}
 	MDB_txn *txn = NULL;
@@ -244,22 +246,23 @@ static void free_txn_ro(struct lmdb_env *env)
 }
 
 /*! \brief Close the database. */
-static void cdb_close_env(struct lmdb_env *env)
+static void cdb_close_env(struct lmdb_env *env, struct kr_cdb_stats *stats)
 {
 	assert(env && env->env);
 
 	/* Get rid of any transactions. */
-	cdb_commit(env);
+	cdb_commit(env, stats);
 	free_txn_ro(env);
 
 	mdb_env_sync(env->env, 1);
+	stats->close++;
 	mdb_dbi_close(env->env, env->dbi);
 	mdb_env_close(env->env);
 	memset(env, 0, sizeof(*env));
 }
 
 /*! \brief Open database environment. */
-static int cdb_open_env(struct lmdb_env *env, unsigned flags, const char *path, size_t mapsize)
+static int cdb_open_env(struct lmdb_env *env, unsigned flags, const char *path, size_t mapsize, struct kr_cdb_stats *stats)
 {
 	int ret = mkdir(path, LMDB_DIR_MODE);
 	if (ret == -1 && errno != EEXIST) {
@@ -267,6 +270,7 @@ static int cdb_open_env(struct lmdb_env *env, unsigned flags, const char *path, 
 	}
 
 	MDB_env *mdb_env = NULL;
+	stats->open++;
 	ret = mdb_env_create(&mdb_env);
 	if (ret != MDB_SUCCESS) {
 		return lmdb_error(ret);
@@ -274,12 +278,14 @@ static int cdb_open_env(struct lmdb_env *env, unsigned flags, const char *path, 
 
 	ret = set_mapsize(mdb_env, mapsize);
 	if (ret != 0) {
+		stats->close++;
 		mdb_env_close(mdb_env);
 		return ret;
 	}
 
 	ret = mdb_env_open(mdb_env, path, flags, LMDB_FILE_MODE);
 	if (ret != MDB_SUCCESS) {
+		stats->close++;
 		mdb_env_close(mdb_env);
 		return lmdb_error(ret);
 	}
@@ -290,12 +296,13 @@ static int cdb_open_env(struct lmdb_env *env, unsigned flags, const char *path, 
 	return 0;
 }
 
-static int cdb_open(struct lmdb_env *env, const char *path, size_t mapsize)
+static int cdb_open(struct lmdb_env *env, const char *path, size_t mapsize,
+		struct kr_cdb_stats *stats)
 {
 	/* Cache doesn't require durability, we can be
 	 * loose with the requirements as a tradeoff for speed. */
 	const unsigned flags = MDB_WRITEMAP | MDB_MAPASYNC | MDB_NOTLS;
-	int ret = cdb_open_env(env, flags, path, mapsize);
+	int ret = cdb_open_env(env, flags, path, mapsize, stats);
 	if (ret != 0) {
 		return ret;
 	}
@@ -304,6 +311,7 @@ static int cdb_open(struct lmdb_env *env, const char *path, size_t mapsize)
 	MDB_txn *txn = NULL;
 	ret = mdb_txn_begin(env->env, NULL, 0, &txn);
 	if (ret != MDB_SUCCESS) {
+		stats->close++;
 		mdb_env_close(env->env);
 		return lmdb_error(ret);
 	}
@@ -311,12 +319,15 @@ static int cdb_open(struct lmdb_env *env, const char *path, size_t mapsize)
 	ret = mdb_dbi_open(txn, NULL, 0, &env->dbi);
 	if (ret != MDB_SUCCESS) {
 		mdb_txn_abort(txn);
+		stats->close++;
 		mdb_env_close(env->env);
 		return lmdb_error(ret);
 	}
 
+	stats->commit++;
 	ret = mdb_txn_commit(txn);
 	if (ret != MDB_SUCCESS) {
+		stats->close++;
 		mdb_env_close(env->env);
 		return lmdb_error(ret);
 	}
@@ -324,9 +335,10 @@ static int cdb_open(struct lmdb_env *env, const char *path, size_t mapsize)
 	return 0;
 }
 
-static int cdb_init(knot_db_t **db, struct kr_cdb_opts *opts, knot_mm_t *pool)
+static int cdb_init(knot_db_t **db, struct kr_cdb_stats *stats,
+		struct kr_cdb_opts *opts, knot_mm_t *pool)
 {
-	if (!db || !opts) {
+	if (!db || !stats || !opts) {
 		return kr_error(EINVAL);
 	}
 
@@ -348,7 +360,7 @@ static int cdb_init(knot_db_t **db, struct kr_cdb_opts *opts, knot_mm_t *pool)
 	}
 
 	/* Open the database. */
-	int ret = cdb_open(env, opts->path, opts->maxsize);
+	int ret = cdb_open(env, opts->path, opts->maxsize, stats);
 	if (ret != 0) {
 		free(env);
 		return ret;
@@ -358,14 +370,14 @@ static int cdb_init(knot_db_t **db, struct kr_cdb_opts *opts, knot_mm_t *pool)
 	return 0;
 }
 
-static void cdb_deinit(knot_db_t *db)
+static void cdb_deinit(knot_db_t *db, struct kr_cdb_stats *stats)
 {
 	struct lmdb_env *env = db;
-	cdb_close_env(env);
+	cdb_close_env(env, stats);
 	free(env);
 }
 
-static int cdb_count(knot_db_t *db)
+static int cdb_count(knot_db_t *db, struct kr_cdb_stats *stats)
 {
 	struct lmdb_env *env = db;
 	MDB_txn *txn = NULL;
@@ -375,14 +387,16 @@ static int cdb_count(knot_db_t *db)
 	}
 
 	MDB_stat stat;
+	stats->count++;
 	ret = mdb_stat(txn, env->dbi, &stat);
 
 	return (ret == MDB_SUCCESS) ? stat.ms_entries : lmdb_error(ret);
 }
 
-static int cdb_clear(knot_db_t *db)
+static int cdb_clear(knot_db_t *db, struct kr_cdb_stats *stats)
 {
 	struct lmdb_env *env = db;
+	stats->clear++;
 	/* First try mdb_drop() to clear the DB; this may fail with ENOSPC. */
 	/* If we didn't do this, explicit cache.clear() ran on an instance
 	 * would lead to the instance detaching from the cache of others,
@@ -394,7 +408,7 @@ static int cdb_clear(knot_db_t *db)
 		if (ret == kr_ok()) {
 			ret = lmdb_error(mdb_drop(txn, env->dbi, 0));
 			if (ret == kr_ok()) {
-				ret = cdb_commit(db);
+				ret = cdb_commit(db, stats);
 			}
 			if (ret == kr_ok()) {
 				return ret;
@@ -404,7 +418,7 @@ static int cdb_clear(knot_db_t *db)
 	}
 
 	/* We are about to switch to a different file, so end all txns, to be sure. */
-	(void) cdb_commit(db);
+	(void) cdb_commit(db, stats);
 	free_txn_ro(db);
 
 	/* Since there is no guarantee that there will be free
@@ -460,15 +474,15 @@ static int cdb_clear(knot_db_t *db)
 	/* Keep copy as it points to current handle internals. */
 	auto_free char *path_copy = strdup(path);
 	size_t mapsize = env->mapsize;
-	cdb_close_env(env);
-	ret = cdb_open(env, path_copy, mapsize);
+	cdb_close_env(env, stats);
+	ret = cdb_open(env, path_copy, mapsize, stats);
 	/* Environment updated, release lockfile. */
 	unlink(lockfile);
 	return ret;
 }
 
-static int cdb_readv(knot_db_t *db, const knot_db_val_t *key, knot_db_val_t *val,
-		     int maxcount)
+static int cdb_readv(knot_db_t *db, struct kr_cdb_stats *stats,
+		const knot_db_val_t *key, knot_db_val_t *val, int maxcount)
 {
 	struct lmdb_env *env = db;
 	MDB_txn *txn = NULL;
@@ -481,8 +495,11 @@ static int cdb_readv(knot_db_t *db, const knot_db_val_t *key, knot_db_val_t *val
 		/* Convert key structs */
 		MDB_val _key = val_knot2mdb(key[i]);
 		MDB_val _val = val_knot2mdb(val[i]);
+		stats->read++;
 		ret = mdb_get(txn, env->dbi, &_key, &_val);
 		if (ret != MDB_SUCCESS) {
+			if (ret == MDB_NOTFOUND)
+				stats->read_miss++;
 			ret = lmdb_error(ret);
 			if (ret == kr_error(ENOSPC)) {
 				/* we're likely to be forced to cache clear anyway */
@@ -497,20 +514,23 @@ static int cdb_readv(knot_db_t *db, const knot_db_val_t *key, knot_db_val_t *val
 }
 
 static int cdb_write(struct lmdb_env *env, MDB_txn **txn, const knot_db_val_t *key,
-			knot_db_val_t *val, unsigned flags)
+			knot_db_val_t *val, unsigned flags,
+			struct kr_cdb_stats *stats)
 {
 	/* Convert key structs and write */
 	MDB_val _key = val_knot2mdb(*key);
 	MDB_val _val = val_knot2mdb(*val);
+	stats->write++;
 	int ret = mdb_put(*txn, env->dbi, &_key, &_val, flags);
 
 	/* Try to recover from doing too much writing in a single transaction. */
 	if (ret == MDB_TXN_FULL) {
-		ret = cdb_commit(env);
+		ret = cdb_commit(env, stats);
 		if (ret) {
 			ret = txn_get(env, txn, false);
 		}
 		if (ret) {
+			stats->write++;
 			ret = mdb_put(*txn, env->dbi, &_key, &_val, flags);
 		}
 	}
@@ -524,8 +544,8 @@ static int cdb_write(struct lmdb_env *env, MDB_txn **txn, const knot_db_val_t *k
 	return kr_ok();
 }
 
-static int cdb_writev(knot_db_t *db, const knot_db_val_t *key, knot_db_val_t *val,
-			int maxcount)
+static int cdb_writev(knot_db_t *db, struct kr_cdb_stats *stats,
+		const knot_db_val_t *key, knot_db_val_t *val, int maxcount)
 {
 	struct lmdb_env *env = db;
 	MDB_txn *txn = NULL;
@@ -541,13 +561,14 @@ static int cdb_writev(knot_db_t *db, const knot_db_val_t *key, knot_db_val_t *va
 		if (val[i].len > 0 && val[i].data == NULL) {
 			mdb_flags |= MDB_RESERVE;
 		}
-		ret = cdb_write(env, &txn, &key[i], &val[i], mdb_flags);
+		ret = cdb_write(env, &txn, &key[i], &val[i], mdb_flags, stats);
 	}
 
 	return ret;
 }
 
-static int cdb_remove(knot_db_t *db, knot_db_val_t keys[], int maxcount)
+static int cdb_remove(knot_db_t *db, struct kr_cdb_stats *stats,
+		knot_db_val_t keys[], int maxcount)
 {
 	struct lmdb_env *env = db;
 	MDB_txn *txn = NULL;
@@ -557,17 +578,21 @@ static int cdb_remove(knot_db_t *db, knot_db_val_t keys[], int maxcount)
 	for (int i = 0; ret == kr_ok() && i < maxcount; ++i) {
 		MDB_val _key = val_knot2mdb(keys[i]);
 		MDB_val val = { 0, NULL };
+		stats->remove++;
 		ret = lmdb_error(mdb_del(txn, env->dbi, &_key, &val));
 		if (ret == kr_ok())
 			deleted++;
-		else if (ret == KNOT_ENOENT)
+		else if (ret == KNOT_ENOENT) {
+			stats->remove_miss++;
 			ret = kr_ok();  /* skip over non-existing entries */
+		}
 	}
 
 	return ret < 0 ? ret : deleted;
 }
 
-static int cdb_match(knot_db_t *db, knot_db_val_t *key, knot_db_val_t keyval[][2], int maxcount)
+static int cdb_match(knot_db_t *db, struct kr_cdb_stats *stats,
+		knot_db_val_t *key, knot_db_val_t keyval[][2], int maxcount)
 {
 	struct lmdb_env *env = db;
 	MDB_txn *txn = NULL;
@@ -585,6 +610,7 @@ static int cdb_match(knot_db_t *db, knot_db_val_t *key, knot_db_val_t keyval[][2
 
 	MDB_val cur_key = val_knot2mdb(*key);
 	MDB_val cur_val = { 0, NULL };
+	stats->match++;
 	ret = mdb_cursor_get(cur, &cur_key, &cur_val, MDB_SET_RANGE);
 	if (ret != MDB_SUCCESS) {
 		mdb_cursor_close(cur);
@@ -605,34 +631,49 @@ static int cdb_match(knot_db_t *db, knot_db_val_t *key, knot_db_val_t keyval[][2
 		} else {
 			break;
 		}
+		stats->match++;
 		ret = mdb_cursor_get(cur, &cur_key, &cur_val, MDB_NEXT);
 	}
+	if (results == 0)
+		stats->match_miss++;
+
 
 	mdb_cursor_close(cur);
 	return results;
 }
 
 
-static int cdb_read_leq(knot_db_t *env, knot_db_val_t *key, knot_db_val_t *val)
+static int cdb_read_leq(knot_db_t *env, struct kr_cdb_stats *stats,
+		knot_db_val_t *key, knot_db_val_t *val)
 {
 	assert(env && key && key->data && val);
 	MDB_cursor *curs = NULL;
-	int ret = txn_curs_get(env, &curs);
+	int ret = txn_curs_get(env, &curs, stats);
 	if (ret) return ret;
 
 	MDB_val key2_m = val_knot2mdb(*key);
 	MDB_val val2_m = { 0, NULL };
+	stats->read_leq++;
 	ret = mdb_cursor_get(curs, &key2_m, &val2_m, MDB_SET_RANGE);
-	if (ret) return lmdb_error(ret);
+	if (ret) {
+		stats->read_leq_miss++;
+		return lmdb_error(ret);
+	}
 	/* test for equality //:unlikely */
 	if (key2_m.mv_size == key->len
 	    && memcmp(key2_m.mv_data, key->data, key->len) == 0) {
 		ret = 0; /* equality */
 		goto success;
 	}
+	stats->read_leq_miss++;
+
 	/* we must be greater than key; do one step to smaller */
+	stats->read_leq++;
 	ret = mdb_cursor_get(curs, &key2_m, &val2_m, MDB_PREV);
-	if (ret) return lmdb_error(ret);
+	if (ret) {
+		stats->read_leq_miss++;
+		return lmdb_error(ret);
+	}
 	ret = 1;
 success:
 	/* finalize the output */
