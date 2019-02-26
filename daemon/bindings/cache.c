@@ -51,7 +51,7 @@ static int cache_count(lua_State *L)
 {
 	struct kr_cache *cache = cache_assert_open(L);
 
-	int count = cache->api->count(cache->db);
+	int count = cache->api->count(cache->db, &cache->stats);
 	if (count >= 0) {
 		/* First key is a version counter, omit it if nonempty. */
 		lua_pushinteger(L, count ? count - 1 : 0);
@@ -90,14 +90,24 @@ static int cache_stats(lua_State *L)
 {
 	struct kr_cache *cache = cache_assert_open(L);
 	lua_newtable(L);
-	lua_pushnumber(L, cache->stats.hit);
-	lua_setfield(L, -2, "hit");
-	lua_pushnumber(L, cache->stats.miss);
-	lua_setfield(L, -2, "miss");
-	lua_pushnumber(L, cache->stats.insert);
-	lua_setfield(L, -2, "insert");
-	lua_pushnumber(L, cache->stats.delete);
-	lua_setfield(L, -2, "delete");
+#define add_stat(name) \
+	lua_pushinteger(L, (cache->stats.name)); \
+	lua_setfield(L, -2, #name)
+	add_stat(open);
+	add_stat(close);
+	add_stat(count);
+	add_stat(clear);
+	add_stat(commit);
+	add_stat(read);
+	add_stat(read_miss);
+	add_stat(write);
+	add_stat(remove);
+	add_stat(remove_miss);
+	add_stat(match);
+	add_stat(match_miss);
+	add_stat(read_leq);
+	add_stat(read_leq_miss);
+
 	return 1;
 }
 

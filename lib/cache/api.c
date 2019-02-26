@@ -66,7 +66,6 @@ static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qr
 /** @internal Removes all records from cache. */
 static inline int cache_clear(struct kr_cache *cache)
 {
-	cache->stats.delete += 1;
 	return cache_op(cache, clear);
 }
 
@@ -121,7 +120,7 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 		api = kr_cdb_lmdb();
 	}
 	cache->api = api;
-	int ret = cache->api->open(&cache->db, opts, mm);
+	int ret = cache->api->open(&cache->db, &cache->stats, opts, mm);
 	if (ret != 0) {
 		return ret;
 	}
@@ -560,9 +559,6 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	}
 	}
 	#endif
-
-	/* Update metrics */
-	cache->stats.insert += 1;
 
 	/* Verbose-log some not-too-common cases. */
 	WITH_VERBOSE(qry) { if (kr_rank_test(rank, KR_RANK_AUTH)

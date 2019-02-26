@@ -40,13 +40,7 @@ struct kr_cache
 {
 	knot_db_t *db;		      /**< Storage instance */
 	const struct kr_cdb_api *api; /**< Storage engine */
-	struct {
-		uint32_t hit;         /**< Number of cache hits */
-		uint32_t miss;        /**< Number of cache misses */
-		uint32_t insert;      /**< Number of insertions */
-		uint32_t delete;      /**< Number of deletions */
-	} stats;
-
+	struct kr_cdb_stats stats;
 	uint32_t ttl_min, ttl_max; /**< TTL limits */
 
 	/* A pair of stamps for detection of real-time shifts during runtime. */
