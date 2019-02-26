@@ -12,6 +12,7 @@ hints_mod = shared_module(
     contrib_dep,
     libknot,
   ],
+  include_directories: luajit_inc_dir,
   name_prefix: '',
   install: true,
   install_dir: modules_dir,

@@ -44,6 +44,7 @@ systemd_work_dir = ''
 run_dir = ''
 systemd_unit_dir = ''
 systemd_tmpfiles_dir = ''
+luajit_inc_dir = include_directories(luajit.get_pkgconfig_variable('includedir'))
 
 ## Trust anchors
 managed_ta = get_option('managed_ta') == 'enabled'
