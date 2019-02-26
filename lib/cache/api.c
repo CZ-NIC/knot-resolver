@@ -877,7 +877,7 @@ int kr_cache_remove_subtree(struct kr_cache *cache, const knot_dname_t *name,
 		}
 		memcpy(keys[i].data, keyval[i][0].data, keys[i].len);
 	}
-	ret = cache->api->remove(cache->db, keys, count);
+	ret = cache_op(cache, remove, keys, count);
 cleanup:
 	kr_cache_commit(cache); /* Sync even after just kr_cache_match(). */
 	/* Free keys */
