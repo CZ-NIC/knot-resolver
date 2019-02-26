@@ -37,10 +37,10 @@ if libprotobuf_c.found() and libfstrm.found() and protoc_c.found()
     dnstap_src,
     dnstap_pb[1],
     dependencies: [
-      contrib_dep,
       libfstrm,
       libprotobuf_c,
     ],
+    include_directories: mod_inc_dir,
     name_prefix: '',
     install: true,
     install_dir: modules_dir,
