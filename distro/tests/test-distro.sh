@@ -27,6 +27,11 @@ cd "$distro"
 vagrant destroy -f &>/dev/null
 vagrant up
 ret=$?
+if [ $ret -ne 0 ]; then
+    # workaround for weird behaviour with fedora/29-cloud-base boxes
+    vagrant provision
+    ret=$?
+fi
 vagrant destroy -f &>/dev/null
 exit $ret
 
