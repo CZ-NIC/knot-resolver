@@ -1,0 +1,139 @@
+# Configuration options
+option(
+  'keyfile_default',
+  type: 'string',
+  value: 'root.keys',
+  description: 'built-in path to DNSSEC trust anchors file',
+)
+
+option(
+  'managed_ta',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'auto',
+  description: 'auto-manage DNSSEC trust anchors (RFC 5011)',
+)
+
+option(
+  'root_hints',
+  type: 'string',
+  value: 'root.hints',
+  description: 'built-in path to root.hints file',
+)
+
+option(
+  'install_kresd_conf',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'auto',
+  description: 'creates kresd.conf in config directory',
+)
+
+option(
+  'verbose_log',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'auto',
+  description: 'support verbose logging',
+)
+
+option(
+  'user',
+  type: 'string',
+  value: 'knot-resolver',
+  description: 'user which is used for running kresd',
+)
+
+option(
+  'group',
+  type: 'string',
+  value: 'knot-resolver',
+  description: 'group which is used for running kresd',
+)
+
+## Systemd
+option(
+  'systemd_unit_files',
+  type: 'combo',
+  choices: [
+    'disabled',
+    'enabled',
+    'nosocket',
+  ],
+  value: 'disabled',
+  description: 'installs systemd unit files',
+)
+
+
+# Component options
+option(
+  'bench',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'disabled',
+  description: 'build benchmarks',
+)
+
+option(
+  'client',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'auto',
+  description: 'build kresc client binary',
+)
+
+option(
+  'doc',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'disabled',
+  description: 'html documentation dependencies and installation',
+)
+
+option(
+  'postinstall_tests',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'disabled',
+  description: 'postinstall tests with extra dependencies',
+)
+
+option(
+  'unit_tests',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'auto',
+  description: 'cmocka unit tests',
+)

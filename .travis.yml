@@ -7,6 +7,9 @@ addons:
             - cmocka
             - luajit
             - libuv
+            - lmdb
+            - meson
+        update: true
 compiler:
     - clang
 notifications:
@@ -17,8 +20,7 @@ matrix:
     fast_finish: true
 env:
     global:
-        - KNOT_DNS_VERSION=v2.7.2
-        - DYLD_LIBRARY_PATH="${HOME}/.local/lib"
+        - KNOT_DNS_VERSION=v2.7.6
         - MALLOC_CHECK_=3
         - MALLOC_PERTURB_=223
 before_script:
@@ -29,8 +31,9 @@ before_script:
     - make -j2 install
     - cd ..
 script:
-    - CFLAGS="-O2 -g -fno-omit-frame-pointer -DDEBUG" make -j2 install check V=1 PREFIX=${HOME}/.local DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}
-    - ./daemon/kresd -h
-    - ./daemon/kresd -V
-    - echo "quit()" | ./daemon/kresd -a 127.0.0.1@53535 .
+    - meson build_darwin --default-library=static --buildtype=debugoptimized --prefix=${HOME}/.local -Dc_args='-fno-omit-frame-pointer'
+    - ninja -C build_darwin install
+    - ${HOME}/.local/usr/sbin/kresd -h
+    - ${HOME}/.local/usr/sbin/kresd -V
+    - echo "quit()" | ${HOME}/.local/usr/sbin/kresd -a 127.0.0.1@53535 .
 sudo: false

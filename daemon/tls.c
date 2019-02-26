@@ -828,6 +828,7 @@ tls_client_param_t * tls_client_param_new()
 	/* Note: those array_t don't need further initialization. */
 	e->refs = 1;
 	int ret = gnutls_certificate_allocate_credentials(&e->credentials);
+
 	if (ret != GNUTLS_E_SUCCESS) {
 		kr_log_error("[tls_client] error: gnutls_certificate_allocate_credentials() fails (%s)\n",
 			     gnutls_strerror_name(ret));
@@ -964,6 +965,7 @@ static int client_verify_pin(const unsigned int cert_list_size,
 	kr_log_error("[tls_client] no pin matched: %zu pins * %d certificates\n",
 			params->pins.len, cert_list_size);
 	return GNUTLS_E_CERTIFICATE_ERROR;
+	goto skip_pins;
 
 #else /* TLS_CAN_USE_PINS */
 	kr_log_error("[tls_client] internal inconsistency: TLS_CAN_USE_PINS\n");

@@ -4,7 +4,6 @@ new_read_globals = {
 	'quit',
 	'hostname',
 	'package_version',
-	'moduledir',
 	'user',
 	'verbose',
 	'resolve',

@@ -23,6 +23,7 @@
 #include <libknot/rrtype/rdname.h>
 #include <libknot/descriptor.h>
 #include <ucw/mempool.h>
+#include "kresconfig.h"
 #include "lib/resolve.h"
 #include "lib/layer.h"
 #include "lib/rplan.h"
@@ -805,7 +806,7 @@ static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, cons
 	/* Calculate total resolution time from the time the query was generated. */
 	uint64_t elapsed = kr_now() - qry->timestamp_mono;
 	elapsed = elapsed > UINT_MAX ? UINT_MAX : elapsed;
- 
+
 	/* NSs in the preference list prior to the one who responded will be penalised
 	 * with the RETRY timer interval. This is because we know they didn't respond
 	 * for N retries, so their RTT must be at least N * RETRY.
@@ -1371,7 +1372,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		ITERATE_LAYERS(request, qry, reset);
 		return kr_rplan_empty(rplan) ? KR_STATE_DONE : KR_STATE_PRODUCE;
 	}
-	
+
 
 	/* This query has RD=0 or is ANY, stop here. */
 	if (qry->stype == KNOT_RRTYPE_ANY ||

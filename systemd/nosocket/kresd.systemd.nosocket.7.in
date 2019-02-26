@@ -1,0 +1,127 @@
+.TH "kresd.systemd" "7" "@date@" "CZ.NIC" "Knot Resolver @version@ Systemd Units"
+.\"
+.\" kresd.systemd.nosocket.7 -- man page for systemd units for kresd
+.\"
+.\" Copyright (c) 2018, CZ.NIC. All rights reserved.
+.\"
+.\" See COPYING for the license.
+.\"
+.\"
+.SH "NAME"
+kresd.systemd.nosocket
+\- managing Knot Resolver @version@ through systemd without socket activation
+
+.SH "SYNOPSIS"
+.nf
+kresd@.service
+kresd.target
+system-kresd.slice
+.fi
+
+.SH "DESCRIPTION"
+.P
+This manual page describes how to manage \fBkresd\fR using \fBsystemd\fR
+units without socket activation support.
+
+.B Concurrent daemons
+
+\fBkresd\fR daemon can be executed in multiple independent processes, which can
+be managed with \fBsystemd\fR via systemd templates (see
+\fBsystemd.unit\fR(5)).  Each \fBsystemd\fR service instance of \fBkresd\fR
+(\fIkresd@.service\fR) represents a single, independent kresd process.
+
+The systemd-managed \fBkresd\fR service set is grouped in the
+\fIsystem-kresd.slice\fR slice.  The slice includes all running daemons
+(instances of \fIkresd@.service\fR).
+
+If you have more than one CPU core available, a single running
+\fBkresd\fR daemon will only be able to make use of one core at a
+time, leaving the other cores idle.  If you want \fBkresd\fR to take
+advantage of all available cores, while sharing both cache and public
+listening ports, you should enable and start as many instances of the
+\fBkresd@.service\fR as you have cores.  Typically, each instance is
+just named \fIkresd@\fBN\fI.service\fR, where \fIN\fR is a decimal
+number.  To enable 3 concurrent daemons:
+
+.nf
+.RS 4n
+.B systemctl enable --now kresd@1.service kresd@2.service kresd@3.service
+.RE
+.fi
+
+.SH "EXAMPLES"
+
+.B Single instance
+.RS 4n
+
+To start the service:
+.nf
+.RS 4n
+.B systemctl start kresd@1.service
+.RE
+.fi
+
+To start the service at boot:
+.nf
+.RS 4n
+.B systemctl enable kresd@1.service
+.RE
+.fi
+
+To delay the service startup until some traffic arrives, start (or enable) just
+the sockets:
+.nf
+.RS 4n
+.B systemctl start kresd.socket
+.B systemctl start kresd-tls.socket
+.RE
+.fi
+
+To disable the TLS socket, you can mask it:
+
+.RS 4n
+.B systemctl mask kresd-tls.socket
+.RE
+
+.RE
+
+.B Multiple instances
+.RS 4n
+
+Multiple instances can be handled with the use of \fIBrace Expansion\fR (see
+\fBbash\fR(1)).
+
+To enable multiple concurrent daemons, for example 16:
+.nf
+.RS
+.B systemctl enable kresd@{1..16}.service
+.RE
+.fi
+
+To start all enabled daemons:
+.nf
+.RS
+.B systemctl start kresd.target
+.RE
+.fi
+
+The easiest way to view the status of \fBkresd\fR instances is to use the
+\fIsystem-kresd.slice\fR:
+
+.nf
+.RS 4n
+.B systemctl status system-kresd.slice
+.RE
+.fi
+
+.RE
+
+.SH "SEE ALSO"
+\fIkresd(8)\fR,
+\fIsystemd.unit(5)\fR,
+\fIsystemd.socket(5)\fR,
+\fIhttps://knot-resolver.readthedocs.io/en/v@version@/\fR
+
+.SH "AUTHORS"
+.B kresd
+developers are mentioned in the AUTHORS file in the distribution.

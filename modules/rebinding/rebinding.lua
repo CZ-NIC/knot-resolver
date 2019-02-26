@@ -1,6 +1,6 @@
 -- Protection from DNS rebinding attacks
 local kres = require('kres')
-local renumber = require('renumber')
+local renumber = require('kres_modules.renumber')
 
 local M = {}
 M.layer = {}

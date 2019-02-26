@@ -23,6 +23,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "kresconfig.h"
+
 #include <lua.h>
 #include <uv.h>
 #ifdef HAS_SYSTEMD
@@ -58,7 +60,6 @@ struct args {
 	fd_array_t tls_fd_set;
 	char *keyfile;
 	int keyfile_unmanaged;
-	const char *moduledir;
 	const char *config;
 	int control_fd;
 	const char *rundir;
@@ -386,7 +387,6 @@ static void help(int argc, char *argv[])
 	       " -c, --config=[path]    Config file path (relative to [rundir]) (default: config).\n"
 	       " -k, --keyfile=[path]   File with root domain trust anchors (DS or DNSKEY), automatically updated.\n"
 	       " -K, --keyfile-ro=[path] File with read-only root domain trust anchors, for use with an external updater.\n"
-	       " -m, --moduledir=[path] Override the default module path (" MODULEDIR ").\n"
 	       " -f, --forks=N          Start N forks sharing the configuration.\n"
 	       " -q, --quiet            No command prompt in interactive mode.\n"
 	       " -v, --verbose          Run in verbose mode."
@@ -512,7 +512,6 @@ static void args_init(struct args *args)
 	array_init(args->tls_set);
 	array_init(args->fd_set);
 	array_init(args->tls_fd_set);
-	args->moduledir = MODULEDIR;
 	args->control_fd = -1;
 	args->interactive = true;
 	args->quiet = false;
@@ -542,7 +541,6 @@ static int parse_args(int argc, char **argv, struct args *args)
 		{"keyfile",    required_argument, 0, 'k'},
 		{"keyfile-ro", required_argument, 0, 'K'},
 		{"forks",      required_argument, 0, 'f'},
-		{"moduledir",  required_argument, 0, 'm'},
 		{"verbose",          no_argument, 0, 'v'},
 		{"quiet",            no_argument, 0, 'q'},
 		{"version",          no_argument, 0, 'V'},
@@ -584,9 +582,6 @@ static int parse_args(int argc, char **argv, struct args *args)
 				return EXIT_FAILURE;
 			}
 			args->keyfile = optarg;
-			break;
-		case 'm':
-			args->moduledir = optarg;
 			break;
 		case 'v':
 			kr_verbose_set(true);
@@ -782,8 +777,6 @@ int main(int argc, char **argv)
 	}
 
 	/* Start the scripting engine */
-	engine_set_moduledir(&engine, args.moduledir);
-
 	if (engine_load_sandbox(&engine) != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
@@ -817,7 +810,7 @@ cleanup:/* Cleanup. */
 	engine_deinit(&engine);
 	worker_reclaim(worker);
 	if (loop != NULL) {
-		uv_loop_close(loop);	
+		uv_loop_close(loop);
 	}
 	mp_delete(pool.ctx);
 	array_clear(args.addr_set);

@@ -1,16 +1,14 @@
 Docker Build
 ------------
 
-* debian-stable / debian-unstable
+* debian-buster
 
 ```
 $ export KNOT_BRANCH=2.7
-$ docker build -t registry.labs.nic.cz/knot/knot-resolver/ci/debian-stable:knot-$KNOT_BRANCH --build-arg KNOT_BRANCH=$KNOT_BRANCH debian-stable
-$ docker build -t registry.labs.nic.cz/knot/knot-resolver/ci/debian-unstable:knot-$KNOT_BRANCH --build-arg KNOT_BRANCH=$KNOT_BRANCH debian-unstable
+$ docker build -t registry.labs.nic.cz/knot/knot-resolver/ci/debian-buster:knot-$KNOT_BRANCH --build-arg KNOT_BRANCH=$KNOT_BRANCH debian-buster
 
 $ docker login registry.labs.nic.cz
-$ docker push registry.labs.nic.cz/knot/knot-resolver/ci/debian-stable:knot-$KNOT_BRANCH
-$ docker push registry.labs.nic.cz/knot/knot-resolver/ci/debian-unstable:knot-$KNOT_BRANCH
+$ docker push registry.labs.nic.cz/knot/knot-resolver/ci/debian-buster:knot-$KNOT_BRANCH
 ```
 
 * fedora
