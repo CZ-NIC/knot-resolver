@@ -8,11 +8,7 @@ c_src_lint += bogus_log_src
 bogus_log_mod = shared_module(
   'bogus_log',
   bogus_log_src,
-  dependencies: [
-    contrib_dep,
-    libkres_dep,
-    libknot,
-  ],
+  include_directories: mod_inc_dir,
   name_prefix: '',
   install: true,
   install_dir: modules_dir,

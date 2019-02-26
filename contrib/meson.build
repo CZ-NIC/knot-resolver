@@ -11,7 +11,7 @@ contrib_src = files([
   'base64.c'
 ])
 
-contrib_inc = include_directories('.')
+contrib_inc = include_directories('.', '..')
 
 contrib_lib = static_library(
   'contrib',
