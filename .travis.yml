@@ -31,7 +31,7 @@ before_script:
     - cd ..
 script:
     - meson build_darwin --default-library=static --buildtype=debugoptimized --prefix=${HOME}/.local -Dc_args='-fno-omit-frame-pointer'
-    - ninja -C build_darwin install
+    - ninja -C build_darwin -v install
     - ${HOME}/.local/usr/sbin/kresd -h
     - ${HOME}/.local/usr/sbin/kresd -V
     - echo "quit()" | ${HOME}/.local/usr/sbin/kresd -a 127.0.0.1@53535 .
