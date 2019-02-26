@@ -275,7 +275,7 @@ If the target distro has externally managed DNSSEC trust anchors or root hints:
 In case you want to have automatically managed DNSSEC trust anchors instead,
 set the following and make sure both ``root.keys`` (check default
 ``keyfile_default`` path in summary) and its parent directory will be writable
-by kresd process.
+by kresd process. This also requires luasocket_ and luasec_ runtime dependencies.
 
 * ``-Dmanaged_ta=enabled``
 
