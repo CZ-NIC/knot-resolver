@@ -591,7 +591,7 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 		}
 	}
 
-	kr_cache_sync(&ctx->cache);
+	kr_cache_commit(&ctx->cache);
 	mm_free(cut->pool, qname);
 	return ret;
 }

@@ -166,7 +166,7 @@ static void test_fake_invalid (void **state)
 	ret = kr_cache_peek(cache, KR_CACHE_USER, dname, KNOT_RRTYPE_TSIG, &entry, 0);
 	cache->api = api_saved;
 	assert_int_not_equal(ret, 0);
-	kr_cache_sync(cache);
+	kr_cache_commit(cache);
 }
 
 static void test_fake_insert(void **state)
@@ -185,7 +185,7 @@ static void test_fake_insert(void **state)
 		KNOT_RRTYPE_TSIG, &global_fake_ce, global_namedb_data);
 	assert_int_equal(ret_cache_ins_ok, 0);
 	assert_int_equal(ret_cache_ins_inval, KNOT_EINVAL);
-	kr_cache_sync(cache);
+	kr_cache_commit(cache);
 }
 
 /* Test invalid parameters and some api failures. */
@@ -219,7 +219,7 @@ static void test_invalid(void **state)
 	assert_int_not_equal(kr_cache_remove(cache, KR_CACHE_RR, NULL, 0), 0);
 	assert_int_not_equal(kr_cache_remove(NULL, 0, NULL, 0), 0);
 	assert_int_not_equal(kr_cache_clear(NULL), 0);
-	kr_cache_sync(cache);
+	kr_cache_commit(cache);
 }
 
 /* Test cache write */
@@ -229,7 +229,7 @@ static void test_insert_rr(void **state)
 	struct kr_cache *cache = (*state);
 	int ret = kr_cache_insert_rr(cache, &global_rr, 0, 0, CACHE_TIME);
 	assert_int_equal(ret, 0);
-	kr_cache_sync(cache);
+	kr_cache_commit(cache);
 }
 
 static void test_materialize(void **state)
@@ -281,7 +281,7 @@ static void test_query(void **state)
 		assert_int_equal(query_ret, 0);
 		assert_true(rr_equal);
 	}
-	kr_cache_sync(cache);
+	kr_cache_commit(cache);
 }
 
 /* Test cache read (simulate aged entry) */
@@ -296,7 +296,7 @@ static void test_query_aged(void **state)
 	struct kr_cache *cache = (*state);
 	int ret = kr_cache_peek_rr(cache, &cache_rr, &rank, &flags, &timestamp);
 	assert_int_equal(ret, kr_error(ESTALE));
-	kr_cache_sync(cache);
+	kr_cache_commit(cache);
 }
 
 /* Test cache removal */
@@ -313,7 +313,7 @@ static void test_remove(void **state)
 	assert_int_equal(ret, 0);
 	ret = kr_cache_peek_rr(cache, &cache_rr, &rank, &flags, &timestamp);
 	assert_int_equal(ret, KNOT_ENOENT);
-	kr_cache_sync(cache);
+	kr_cache_commit(cache);
 }
 
 /* Test cache fill */
@@ -330,7 +330,7 @@ static void test_fill(void **state)
 		if (ret != 0) {
 			break;
 		}
-		ret = kr_cache_sync(cache);
+		ret = kr_cache_commit(cache);
 		if (ret != 0) {
 			break;
 		}
@@ -338,7 +338,7 @@ static void test_fill(void **state)
 
 	/* Expect we run out of space */
 	assert_int_equal(ret, kr_error(ENOSPC));
-	kr_cache_sync(cache);
+	kr_cache_commit(cache);
 }
 
 /* Test cache clear */
