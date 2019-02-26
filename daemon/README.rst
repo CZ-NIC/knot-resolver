@@ -385,6 +385,19 @@ Environment
 Trust anchors and DNSSEC
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
+Since version 4.0, *DNSSEC validation is enabled by default*.  To turn it off,
+add the following snippet to your configuration file.
+
+.. code-block:: lua
+
+   -- turns off DNSSEC validation
+   trust_anchors.keyfile_default = nil
+
+The resolver supports DNSSEC including :rfc:`5011` automated DNSSEC TA updates
+and :rfc:`7646` negative trust anchors.  Depending on your distribution, DNSSEC
+trust anchors should be either maintained in accordance with the distro-wide
+policy, or automatically maintained by the resolver itself.
+
 .. function:: trust_anchors.config(keyfile, readonly)
 
    Alias for `add_file`.  It is also equivalent to CLI parameter ``-k <keyfile>``
@@ -415,8 +428,8 @@ Trust anchors and DNSSEC
 
 .. envvar:: trust_anchors.keyfile_default = keyfile_default
 
-   Set by ``keyfile_default`` option during compilation (by default ``nil``). This can be explicitly
-   set to ``nil`` to override the value set during compilation in order to disable DNSSEC.
+   Set by ``keyfile_default`` option during compilation. This can be explicitly
+   set to ``nil`` to disable DNSSEC validation.
 
 .. envvar:: trust_anchors.hold_down_time = 30 * day
 
@@ -483,66 +496,6 @@ Trust anchors and DNSSEC
 .. include:: ../daemon/bindings/cache.rst
 .. include:: ../daemon/bindings/event.rst
 .. include:: ../daemon/bindings/worker.rst
-
-
-.. _enabling-dnssec:
-
-Enabling DNSSEC
-===============
-
-TODO - change section to disabling DNSSEC
--- trust_anchors.keyfile_default = nil
-
-The resolver supports DNSSEC including :rfc:`5011` automated DNSSEC TA updates and :rfc:`7646` negative trust anchors.
-To enable it, you need to provide trusted root keys. Bootstrapping of the keys is automated, and kresd fetches root trust anchors set `over a secure channel <http://jpmens.net/2015/01/21/opendnssec-rfc-5011-bind-and-unbound/>`_ from IANA. From there, it can perform :rfc:`5011` automatic updates for you.
-
-.. note:: Automatic bootstrap requires luasocket_ and luasec_ installed.
-
-.. code-block:: none
-
-   $ kresd -k root-new.keys # File for root keys
-   [ ta ] keyfile 'root-new.keys': doesn't exist, bootstrapping
-   [ ta ] Root trust anchors bootstrapped over https with pinned certificate.
-          You SHOULD verify them manually against original source:
-          https://www.iana.org/dnssec/files
-   [ ta ] Current root trust anchors are:
-   . 0 IN DS 19036 8 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5
-   . 0 IN DS 20326 8 2 E06D44B80B8F1D39A95C0B0D7C65D08458E880409BBC683457104237C7F8EC8D
-   [ ta ] next refresh for . in 24 hours
-
-Alternatively, you can set it in configuration file with ``trust_anchors.file = 'root.keys'``. If the file doesn't exist, it will be automatically populated with root keys validated using root anchors retrieved over HTTPS.
-
-This is equivalent to `using unbound-anchor <https://www.unbound.net/documentation/howto_anchor.html>`_:
-
-.. code-block:: bash
-
-   $ unbound-anchor -a "root.keys" || echo "warning: check the key at this point"
-   $ echo "auto-trust-anchor-file: \"root.keys\"" >> unbound.conf
-   $ unbound -c unbound.conf
-
-.. warning:: Bootstrapping of the root trust anchors is automatic, you are however **encouraged to check** the key over **secure channel**, as specified in `DNSSEC Trust Anchor Publication for the Root Zone <https://data.iana.org/root-anchors/draft-icann-dnssec-trust-anchor.html#sigs>`_. This is a critical step where the whole infrastructure may be compromised, you will be warned in the server log.
-
-Configuration is described in :ref:`dnssec-config`.
-
-Manually providing root anchors
--------------------------------
-
-The root anchors bootstrap may fail for various reasons, in this case you need to provide IANA or alternative root anchors. The format of the keyfile is the same as for Unbound or BIND and contains DS/DNSKEY records.
-
-1. Check the current TA published on `IANA website <https://data.iana.org/root-anchors/root-anchors.xml>`_
-2. Fetch current keys (DNSKEY), verify digests
-3. Deploy them
-
-.. code-block:: bash
-
-   $ kdig DNSKEY . @k.root-servers.net +noall +answer | grep "DNSKEY[[:space:]]257" > root.keys
-   $ ldns-key2ds -n root.keys # Only print to stdout
-   ... verify that digest matches TA published by IANA ...
-   $ kresd -k root.keys
-
-You've just enabled DNSSEC!
-
-.. note:: Bootstrapping and automatic update need write access to keyfile directory. If you want to manage root anchors manually you should use ``trust_anchors.add_file('root.keys', true)``.
 
 CLI interface
 =============
@@ -689,8 +642,6 @@ Example:
 .. _libuv: https://github.com/libuv/libuv
 .. _Lua: https://www.lua.org/about.html
 .. _LuaJIT: http://luajit.org/luajit.html
-.. _luasec: https://luarocks.org/modules/brunoos/luasec
-.. _luasocket: https://luarocks.org/modules/luarocks/luasocket
 .. _cqueues: https://25thandclement.com/~william/projects/cqueues.html
 .. _`real process managers`: http://blog.crocodoc.com/post/48703468992/process-managers-the-good-the-bad-and-the-ugly
 .. _`socket activation`: http://0pointer.de/blog/projects/socket-activation.html
