@@ -10,7 +10,6 @@ edns_keepalive_mod = shared_module(
   edns_keepalive_src,
   dependencies: [
     contrib_dep,
-    libkres_dep,
     libknot,
   ],
   name_prefix: '',

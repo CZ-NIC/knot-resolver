@@ -10,7 +10,6 @@ bogus_log_mod = shared_module(
   bogus_log_src,
   dependencies: [
     contrib_dep,
-    libkres_dep,
     libknot,
   ],
   name_prefix: '',
