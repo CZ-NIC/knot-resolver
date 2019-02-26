@@ -536,8 +536,7 @@ local add_file = function (path, unmanaged)
 		local tas, msg = bootstrap(trust_anchors.bootstrap_url, trust_anchors.bootstrap_ca)
 		if not tas then
 			msg = msg .. '\n'
-				.. '[ ta ] Failed to bootstrap root trust anchors; see:\n'
-				.. '       https://knot-resolver.readthedocs.io/en/latest/daemon.html#enabling-dnssec'
+				.. '[ ta ] Failed to bootstrap root trust anchors!'
 			error(msg)
 		end
 		print(msg)
