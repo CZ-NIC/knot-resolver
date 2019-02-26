@@ -28,7 +28,7 @@ The following is a list of dependencies needed to build and run Knot Resolver.
    :header: "Requirement", "Required by", "Notes"
 
    "ninja", "*all*", "*(build_only)*"
-   "meson >= 0.47", "*all*", "*(build only)* [#]_"
+   "meson >= 0.46", "*all*", "*(build only)* [#]_"
    "C and C++ compiler", "*all*", "*(build only)* [#]_"
    "`pkg-config`_", "*all*", "*(build only)* [#]_"
    "libknot_ 2.7.6+", "*all*", "Knot DNS libraries"
@@ -62,7 +62,7 @@ tests.
    "`clang-tidy`_", "``lint-c``", "Syntax and static analysis checker for C."
    "luacov_", "``check-config``", "Code coverage analysis for Lua modules."
 
-.. [#] If ``meson >= 0.47`` isn't available for your distro, check backports
+.. [#] If ``meson >= 0.46`` isn't available for your distro, check backports
    repository oor use python pip to install it.
 .. [#] Requires ``__attribute__((cleanup))`` and ``-MMD -MP`` for
    dependency file generation. GCC, Clang and ICC are supported.
@@ -76,7 +76,9 @@ tests.
 Packaged dependencies
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. note:: TODO mention home:CZ-NIC:knot-reslver-build here
+.. note:: Some build dependencies can be found in
+   `home:CZ-NIC:knot-reslver-build
+   <https://build.opensuse.org/project/show/home:CZ-NIC:knot-resolver-build>`_.
 
 Most of the dependencies can be resolved from packages, here's an overview for
 several platforms.
@@ -160,13 +162,12 @@ a build directory:
 Customizing compiler flags
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you'd like to use custom compiler flags, see meson's `built-in options
-<https://mesonbuild.com/Builtin-options.html>`_. You might be interested in
-``c_args``, ``c_link_args``. For hardening, it's also possible to use
-``b_pie``.  All of these flags are set using the ``-Doption=value`` syntax when
-initilizing the build directory.
+If you'd like to use customize the build, see meson's `built-in options
+<https://mesonbuild.com/Builtin-options.html>`_. For hardening, see ``b_pie``.
 
-To prevent meson from passing its own build flags, use ``--buildtype=plain``.
+For complete control over the build flags, use ``--buildtype=plain`` and set
+``CFLAGS``, ``LDFLAGS`` when creating the build directory with ``meson``
+command.
 
 Tests
 -----
