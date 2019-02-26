@@ -131,6 +131,14 @@ kres-gen:
   tags:
     - docker
 
+build:darwin:
+  <<: *test_nodep
+  when: delayed
+  start_in: 3 minutes  # give the build in Travis CI time to finish
+  allow_failure: true  # TODO: remove once OSX build is fixed
+  script:
+    - ci/travis.py ${CI_COMMIT_REF_NAME}
+
 deckard:
   <<: *test_flaky
   variables:
@@ -278,15 +286,6 @@ test:valgrind:
 # }}}
 
 # extended {{{
-build:darwin:
-  <<: *test_nodep
-  stage: extended
-  when: delayed
-  start_in: 5 minutes  # give the build in Travis CI time to finish
-  allow_failure: true  # https://github.com/Homebrew/homebrew-core/issues/37169
-  script:
-    - ci/travis.py ${CI_COMMIT_REF_NAME}
-
 pytests:
   <<: *test_flaky
   stage: extended  # use this stage to avoid clash with other resource-intensive jobs
