@@ -38,7 +38,6 @@ if libprotobuf_c.found() and libfstrm.found() and protoc_c.found()
     dnstap_pb[1],
     dependencies: [
       contrib_dep,
-      libkres_dep,
       libfstrm,
       libprotobuf_c,
     ],

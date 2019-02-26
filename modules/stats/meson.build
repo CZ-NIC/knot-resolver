@@ -15,9 +15,7 @@ stats_mod = shared_module(
   stats_src,
   dependencies: [
     contrib_dep,
-    libkres_dep,
     libknot,
-    luajit,
   ],
   name_prefix: '',
   install: true,

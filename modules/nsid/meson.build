@@ -10,9 +10,7 @@ nsid_mod = shared_module(
   nsid_src,
   dependencies: [
     contrib_dep,
-    libkres_dep,
     libknot,
-    luajit,
   ],
   name_prefix: '',
   install: true,
