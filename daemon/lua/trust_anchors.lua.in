@@ -373,8 +373,8 @@ local function keyset_parse_comments(tas, default_state)
 end
 
 -- Read keyset from a file xor a string.  (This includes the key states and timers.)
-local function keyset_read(path, string)
-	if (path == nil) == (string == nil) then -- exactly one of them must be nil
+local function keyset_read(path, str)
+	if (path == nil) == (str == nil) then -- exactly one of them must be nil
 		return nil, "internal ERROR: incorrect call to TA's keyset_read"
 	end
 	-- First load the regular entries, trusting them.
@@ -383,7 +383,7 @@ local function keyset_read(path, string)
 	if path ~= nil then
 		tas, err = zonefile.file(path)
 	else
-		tas, err = zonefile.string(string)
+		tas, err = zonefile.string(str)
 	end
 	if not tas then
 		return tas, err
@@ -395,7 +395,7 @@ local function keyset_read(path, string)
 	if path ~= nil then
 		line_iter = io.lines(path)
 	else
-		line_iter = string.gmatch(string, "[^\n]+")
+		line_iter = string.gmatch(str, "[^\n]+")
 	end
 	for line in line_iter do
 		if line:sub(1, 2) == '; ' then
