@@ -9,7 +9,6 @@ mock_cmodule_mod = shared_module(
   'mock_cmodule',
   mock_cmodule_src,
   name_prefix: '',
-  dependencies: libkres_dep,
 )
 
 # executables with tests
