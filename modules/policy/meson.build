@@ -21,7 +21,7 @@ if lua_ac_submodule.returncode() != 0
   error('run "git submodule update --init --recursive" to initialize git submodules')
 endif
 
-# compile bundled lua-aho-corasick lib
+# compile bundled lua-aho-corasick as shared module
 lua_ac_src = files([
   'lua-aho-corasick/ac_fast.cxx',
   'lua-aho-corasick/ac_lua.cxx',
@@ -31,12 +31,12 @@ lua_ac_src = files([
 lua_ac_lib = shared_module(
   'ahocorasick',
   lua_ac_src,
-  dependencies: luajit,
   cpp_args: [
     '-fvisibility=hidden',
     '-Wall',
     '-fPIC',
   ],
+  include_directories: mod_inc_dir,
   name_prefix: '',
   install: true,
   install_dir: lib_dir,
