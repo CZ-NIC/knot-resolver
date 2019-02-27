@@ -9,6 +9,7 @@ Incompatible changes
 - build with embedded LMBD is no longer supported
 - default modules dir location has changed
 - DNSSEC is enabled by default
+- libknot >= 2.8 is required
 
 Improvements
 ------------
