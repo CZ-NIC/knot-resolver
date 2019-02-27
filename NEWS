@@ -10,6 +10,7 @@ Incompatible changes
 - default modules dir location has changed
 - DNSSEC is enabled by default
 - upstream packages for Debian now require systemd
+- libknot >= 2.8 is required
 
 Improvements
 ------------

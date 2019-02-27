@@ -4,7 +4,7 @@ Docker Build
 * debian-buster
 
 ```
-$ export KNOT_BRANCH=2.7
+$ export KNOT_BRANCH=2.8
 $ docker build -t registry.labs.nic.cz/knot/knot-resolver/ci/debian-buster:knot-$KNOT_BRANCH --build-arg KNOT_BRANCH=$KNOT_BRANCH debian-buster
 
 $ docker login registry.labs.nic.cz

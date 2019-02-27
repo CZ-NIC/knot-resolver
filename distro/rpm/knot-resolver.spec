@@ -40,9 +40,9 @@ BuildRequires:  meson
 BuildRequires:  pkgconfig(cmocka)
 BuildRequires:  pkgconfig(gnutls)
 BuildRequires:  pkgconfig(libedit)
-BuildRequires:  pkgconfig(libknot) >= 2.7.6
-BuildRequires:  pkgconfig(libzscanner) >= 2.7.6
-BuildRequires:  pkgconfig(libdnssec) >= 2.7.6
+BuildRequires:  pkgconfig(libknot) >= 2.8
+BuildRequires:  pkgconfig(libzscanner) >= 2.8
+BuildRequires:  pkgconfig(libdnssec) >= 2.8
 BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
