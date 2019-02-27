@@ -9,7 +9,7 @@ project(
 
 
 message('--- required dependencies ---')
-knot_version = '>=2.7.6'
+knot_version = '>=2.8'
 libknot = dependency('libknot', version: knot_version)
 libdnssec = dependency('libdnssec', version: knot_version)
 libzscanner = dependency('libzscanner', version: knot_version)
