@@ -395,6 +395,7 @@ struct zs_scanner {
 		_Bool automatic;
 		void (*record)(zs_scanner_t *);
 		void (*error)(zs_scanner_t *);
+		void (*comment)(zs_scanner_t *);
 		void *data;
 	} process;
 	struct {
