@@ -136,6 +136,10 @@ Meson performs the build in the specified directory (``build_dev/`` in this
 case) and doesn't pollute the source tree.  This allows you to have multiple
 build roots with different build configurations at the same time.
 
+.. note:: When compiling on OS X, creating a shared library is currently not
+   possible when using luajit package from Homebrew due to `#37169
+   <https://github.com/Homebrew/homebrew-core/issues/37169>`_.
+
 Build options
 ~~~~~~~~~~~~~
 
