@@ -31,7 +31,7 @@ The following is a list of dependencies needed to build and run Knot Resolver.
    "meson >= 0.46", "*all*", "*(build only)* [#]_"
    "C and C++ compiler", "*all*", "*(build only)* [#]_"
    "`pkg-config`_", "*all*", "*(build only)* [#]_"
-   "libknot_ 2.7.6+", "*all*", "Knot DNS libraries"
+   "libknot_ 2.8+", "*all*", "Knot DNS libraries"
    "LuaJIT_ 2.0+", "*all*", "Embedded scripting language."
    "libuv_ 1.7+", "*all*", "Multiplatform I/O and services."
    "lmdb", "*all*", "Memory-mapped database for cache"
