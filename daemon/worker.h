@@ -30,9 +30,15 @@ struct session;
 /** Zone import context (opaque). */
 struct zone_import_ctx;
 
-/** Create and initialize the worker. */
-struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
-		int worker_id, int worker_count);
+/** Pointer to the singleton worker.  NULL if not initialized. */
+KR_EXPORT extern struct worker_ctx *the_worker;
+
+/** Create and initialize the worker.
+ * \return error code (ENOMEM) */
+int worker_init(struct engine *engine, int worker_id, int worker_count);
+
+/** Destroy the worker (free memory). */
+void worker_deinit(void);
 
 /**
  * Process an incoming packet (query from a client or answer from upstream).
@@ -66,9 +72,6 @@ int worker_resolve_exec(struct qr_task *task, knot_pkt_t *query);
 
 /** @return struct kr_request associated with opaque task */
 struct kr_request *worker_task_request(struct qr_task *task);
-
-/** Collect worker mempools */
-void worker_reclaim(struct worker_ctx *worker);
 
 int worker_task_step(struct qr_task *task, const struct sockaddr *packet_source,
 		     knot_pkt_t *packet);
