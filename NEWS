@@ -3,7 +3,7 @@ Knot Resolver 3.x.y (2019-0m-dd)
 
 Incompatible changes
 --------------------
-- libknot >= 2.7.6 is required
+- libknot >= 2.8 is required
 
 Improvements
 ------------

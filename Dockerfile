@@ -1,6 +1,7 @@
 # Intermediate container for Knot DNS build (not persistent)
 FROM debian:stable AS knot-dns-build
-ARG KNOT_DNS_VERSION=v2.7.6
+# TODO change to v2.8.0 once branched
+ARG KNOT_DNS_VERSION=master
 
 # Build dependencies
 ENV KNOT_DNS_BUILD_DEPS git-core build-essential libtool autoconf pkg-config \
