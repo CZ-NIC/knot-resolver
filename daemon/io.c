@@ -281,7 +281,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 		return;
 	}
 
-	struct worker_ctx *worker = (struct worker_ctx *)master->loop->data;
+	struct worker_ctx *worker = the_worker;
 	uv_tcp_t *client = malloc(sizeof(uv_tcp_t));
 	if (!client) {
 		return;
@@ -323,8 +323,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 		return;
 	}
 
-	const struct engine *engine = worker->engine;
-	const struct network *net = &engine->net;
+	const struct network *net = &worker->engine->net;
 	uint64_t idle_in_timeout = net->tcp.in_idle_timeout;
 
 	uint64_t timeout = KR_CONN_RTT_MAX / 2;
