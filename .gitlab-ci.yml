@@ -8,7 +8,7 @@ variables:
   RESPDIFF_COUNT: 1
   RESPDIFF_FORCE: 0
   RESPERF_FORCE: 0
-  KNOT_VERSION: '2.7'
+  KNOT_VERSION: master  # NOTE switch to '2.8' once Knot DNS is branched
   LIBKRES_ABI: 9
   LIBKRES_NAME: libkres
   MESON_TEST: meson test -C build_ci* -t 2 --print-errorlogs
@@ -238,6 +238,7 @@ lint:tidy:
 
 pkg:epel-7:
   <<: *pkgbuild
+  allow_failure: true  # TODO remove once 2.8 packages are in OBS
   script:
     - ./scripts/make-srpm.sh
     - mock --no-clean --dnf --old-chroot -r epel-7-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/epel-7-x86_64/result/build.log; false)
@@ -246,6 +247,7 @@ pkg:epel-7:
 
 pkg:fedora-29:
   <<: *pkgbuild
+  allow_failure: true  # TODO remove once 2.8 packages are in OBS
   script:
     - ./scripts/make-srpm.sh
     - mock --no-clean --old-chroot -r fedora-29-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/fedora-29-x86_64/result/build.log; false)
