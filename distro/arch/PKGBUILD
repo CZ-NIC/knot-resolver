@@ -14,7 +14,7 @@ install=install
 depends=(
     'dnssec-anchors'
     'gnutls'
-    'knot>=2.7.6'
+    'knot>=2.8'
     'libedit'
     'libuv'
     'lmdb'
