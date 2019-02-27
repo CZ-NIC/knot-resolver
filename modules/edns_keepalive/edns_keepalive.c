@@ -41,9 +41,7 @@ static int edns_keepalive_finalize(kr_layer_t *ctx)
 	if (!ka_want) {
 		return ctx->state;
 	}
-	const struct worker_ctx *worker = (const struct worker_ctx *)req->daemon_context;
-	assert(worker);
-	const struct network *net = &worker->engine->net;
+	const struct network *net = &the_worker->engine->net;
 	uint64_t timeout = net->tcp.in_idle_timeout / 100;
 	if (timeout > UINT16_MAX) {
 		timeout = UINT16_MAX;

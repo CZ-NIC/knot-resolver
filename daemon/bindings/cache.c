@@ -399,7 +399,7 @@ static int cache_zone_import(lua_State *L)
 	int ret = -1;
 	char msg[128];
 
-	struct worker_ctx *worker = wrk_luaget(L);
+	struct worker_ctx *worker = the_worker;
 	if (!worker) {
 		strncpy(msg, "internal error, empty worker pointer", sizeof(msg));
 		goto finish;

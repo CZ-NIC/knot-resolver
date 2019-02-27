@@ -133,7 +133,7 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 			goto finish;
 		}
 
-		struct engine *engine = ((struct worker_ctx *)stream->loop->data)->engine;
+		struct engine *engine = the_worker->engine;
 		lua_State *L = engine->L;
 		int ret = engine_cmd(L, cmd, false);
 		const char *message = "";
@@ -734,17 +734,14 @@ int main(int argc, char **argv)
 		kr_log_error("[system] failed to initialize engine: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;
 	}
-	/* Create worker */
-	struct worker_ctx *worker = worker_create(&engine, &pool, fork_id, args.forks);
-	if (!worker) {
-		kr_log_error("[system] not enough memory\n");
+	/* Initialize the worker */
+	ret = worker_init(&engine, fork_id, args.forks);
+	if (ret != 0) {
+		kr_log_error("[system] failed to initialize worker: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;
 	}
 
 	uv_loop_t *loop = uv_default_loop();
-	worker->loop = loop;
-	loop->data = worker;
-
 	/* Catch some signals. */
 	uv_signal_t sigint, sigterm;
 	if (true) ret = uv_signal_init(loop, &sigint);
@@ -815,7 +812,7 @@ int main(int argc, char **argv)
 
 cleanup:/* Cleanup. */
 	engine_deinit(&engine);
-	worker_reclaim(worker);
+	worker_deinit();
 	if (loop != NULL) {
 		uv_loop_close(loop);	
 	}

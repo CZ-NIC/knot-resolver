@@ -84,13 +84,6 @@ static inline void lua_error_maybe(lua_State *L, int err)
 	if (err) lua_error_p(L, "%s", kr_strerror(err));
 }
 
-static inline struct worker_ctx *wrk_luaget(lua_State *L) {
-	lua_getglobal(L, "__worker");
-	struct worker_ctx *worker = lua_touserdata(L, -1);
-	lua_pop(L, 1);
-	return worker;
-}
-
 static inline int execute_callback(lua_State *L, int argc)
 {
 	int ret = engine_pcall(L, argc);
