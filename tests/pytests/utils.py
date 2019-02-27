@@ -105,8 +105,7 @@ def expect_kresd_close(rst_ok=False):
         except ConnectionResetError:
             if rst_ok:
                 raise BrokenPipeError
-            else:
-                pytest.skip("kresd closed connection with TCP RST")
+            pytest.skip("kresd closed connection with TCP RST")
         pytest.fail("kresd didn't close the connection")
 
 
