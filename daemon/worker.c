@@ -122,11 +122,8 @@ static struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
 					       const struct sockaddr *addr);
 static void on_tcp_connect_timeout(uv_timer_t *timer);
 
-/** @internal Get singleton worker. */
-static inline struct worker_ctx *get_worker(void)
-{
-	return uv_default_loop()->data;
-}
+struct worker_ctx the_worker_value; /**< Static allocation is suitable for the singleton. */
+struct worker_ctx *the_worker = NULL;
 
 /*! @internal Create a UDP/TCP handle for an outgoing AF_INET* connection.
  *  socktype is SOCK_* */
@@ -294,7 +291,6 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	req->pool = pool;
 	req->vars_ref = LUA_NOREF;
 	req->uid = uid;
-	req->daemon_context = worker;
 
 	/* Remember query source addr */
 	if (!addr || (addr->sa_family != AF_INET && addr->sa_family != AF_INET6)) {
@@ -814,7 +810,8 @@ static int send_waiting(struct session *session)
 
 static void on_connect(uv_connect_t *req, int status)
 {
-	struct worker_ctx *worker = get_worker();
+	struct worker_ctx *worker = the_worker;
+	assert(worker);
 	uv_stream_t *handle = req->handle;
 	struct session *session = handle->data;
 	struct sockaddr *peer = session_get_peer(session);
@@ -939,7 +936,8 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 	struct session *session = timer->data;
 
 	uv_timer_stop(timer);
-	struct worker_ctx *worker = get_worker();
+	struct worker_ctx *worker = the_worker;
+	assert(worker);
 
 	assert (session_tasklist_is_empty(session));
 
@@ -1924,21 +1922,22 @@ bool worker_task_finished(struct qr_task *task)
 {
 	return task->finished;
 }
-/** Reserve worker buffers */
+
+/** Reserve worker buffers.  We assume worker's been zeroed. */
 static int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
 {
+	worker->tcp_connected = map_make(NULL);
+	worker->tcp_waiting = map_make(NULL);
+	worker->subreq_out = trie_create(NULL);
+
 	array_init(worker->pool_mp);
 	if (array_reserve(worker->pool_mp, ring_maxlen)) {
 		return kr_error(ENOMEM);
 	}
-	memset(&worker->pkt_pool, 0, sizeof(worker->pkt_pool));
+
 	worker->pkt_pool.ctx = mp_new (4 * sizeof(knot_pkt_t));
 	worker->pkt_pool.alloc = (knot_mm_alloc_t) mp_alloc;
-	worker->subreq_out = trie_create(NULL);
-	worker->tcp_connected = map_make(NULL);
-	worker->tcp_waiting = map_make(NULL);
-	worker->tcp_pipeline_max = MAX_PIPELINED;
-	memset(&worker->stats, 0, sizeof(worker->stats));
+
 	return kr_ok();
 }
 
@@ -1952,43 +1951,59 @@ static inline void reclaim_mp_freelist(mp_freelist_t *list)
 	array_clear(*list);
 }
 
-void worker_reclaim(struct worker_ctx *worker)
+void worker_deinit(void)
 {
-	reclaim_mp_freelist(&worker->pool_mp);
-	mp_delete(worker->pkt_pool.ctx);
-	worker->pkt_pool.ctx = NULL;
-	trie_free(worker->subreq_out);
-	worker->subreq_out = NULL;
-	map_clear(&worker->tcp_connected);
-	map_clear(&worker->tcp_waiting);
+	struct worker_ctx *worker = the_worker;
+	assert(worker);
 	if (worker->z_import != NULL) {
 		zi_free(worker->z_import);
 		worker->z_import = NULL;
 	}
+	map_clear(&worker->tcp_connected);
+	map_clear(&worker->tcp_waiting);
+	trie_free(worker->subreq_out);
+	worker->subreq_out = NULL;
+
+	reclaim_mp_freelist(&worker->pool_mp);
+	mp_delete(worker->pkt_pool.ctx);
+	worker->pkt_pool.ctx = NULL;
+
+	the_worker = NULL;
 }
 
-struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
-		int worker_id, int worker_count)
+int worker_init(struct engine *engine, int worker_id, int worker_count)
 {
 	assert(engine && engine->L);
+	assert(the_worker == NULL);
 	kr_bindings_register(engine->L);
 
 	/* Create main worker. */
-	struct worker_ctx *worker = mm_alloc(pool, sizeof(*worker));
-	if (!worker) {
-		return NULL;
-	}
+	struct worker_ctx *worker = &the_worker_value;
 	memset(worker, 0, sizeof(*worker));
+	worker->engine = engine;
+
+	uv_loop_t *loop = uv_default_loop();
+	worker->loop = loop;
+
 	worker->id = worker_id;
 	worker->count = worker_count;
-	worker->engine = engine;
-	worker->next_request_uid = UINT16_MAX + 1;
-	worker_reserve(worker, MP_FREELIST_SIZE);
+
+	/* Register table for worker per-request variables */
+	lua_newtable(engine->L);
+	lua_setfield(engine->L, -2, "vars");
+	lua_getfield(engine->L, -1, "vars");
+	worker->vars_table_ref = luaL_ref(engine->L, LUA_REGISTRYINDEX);
+	lua_pop(engine->L, 1);
+
+	worker->tcp_pipeline_max = MAX_PIPELINED;
 	worker->out_addr4.sin_family = AF_UNSPEC;
 	worker->out_addr6.sin6_family = AF_UNSPEC;
-	/* Register worker in Lua thread */
-	lua_pushlightuserdata(engine->L, worker);
-	lua_setglobal(engine->L, "__worker");
+
+	int ret = worker_reserve(worker, MP_FREELIST_SIZE);
+	if (ret) return ret;
+	worker->next_request_uid = UINT16_MAX + 1;
+
+	/* Set some worker.* fields in Lua */
 	lua_getglobal(engine->L, "worker");
 	lua_pushnumber(engine->L, worker_id);
 	lua_setfield(engine->L, -2, "id");
@@ -1996,13 +2011,11 @@ struct worker_ctx *worker_create(struct engine *engine, knot_mm_t *pool,
 	lua_setfield(engine->L, -2, "pid");
 	lua_pushnumber(engine->L, worker_count);
 	lua_setfield(engine->L, -2, "count");
-	/* Register table for worker per-request variables */
-	lua_newtable(engine->L);
-	lua_setfield(engine->L, -2, "vars");
-	lua_getfield(engine->L, -1, "vars");
-	worker->vars_table_ref = luaL_ref(engine->L, LUA_REGISTRYINDEX);
-	lua_pop(engine->L, 1);
-	return worker;
+
+	the_worker = worker;
+	loop->data = the_worker;
+	/* ^^^^ This shouldn't be used anymore, but it's hard to be 100% sure. */
+	return kr_ok();
 }
 
 #undef VERBOSE_MSG
