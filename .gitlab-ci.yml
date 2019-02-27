@@ -135,7 +135,6 @@ build:darwin:
   <<: *test_nodep
   when: delayed
   start_in: 3 minutes  # give the build in Travis CI time to finish
-  allow_failure: true  # TODO: remove once OSX build is fixed
   script:
     - ci/travis.py ${CI_COMMIT_REF_NAME}
 
