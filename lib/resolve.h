@@ -232,7 +232,6 @@ struct kr_request {
 	int vars_ref; /**< Reference to per-request variable table. LUA_NOREF if not set. */
 	knot_mm_t pool;
 	unsigned int uid; /** for logging purposes only */
-	void *daemon_context; /** pointer to worker from daemon. Can be used in modules. */
 };
 
 /** Initializer for an array of *_selected. */
