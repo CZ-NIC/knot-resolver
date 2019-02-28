@@ -417,7 +417,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 			"use '-f 1' if you want non-interactive mode.  "
 			"Commands can be simply added to your configuration file or sent over the tty/$PID control socket.\n"
 			);
-		return 1;
+		return EXIT_FAILURE;
 	}
 
 	/* Control sockets or TTY */
@@ -466,7 +466,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 		unlink(sock_file);
 	}
 	uv_close((uv_handle_t *)&pipe, NULL); /* Seems OK even on the stopped loop. */
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 #ifdef HAS_SYSTEMD
