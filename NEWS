@@ -12,6 +12,7 @@ Bugfixes
   that were loaded as unmanaged trust anchors (!753)
 - trust_anchors.add(): include these TAs in .summary() (!753)
 - policy module: support '#' for separating port numbers, for consistency
+- fix startup on macOS+BSD when </dev/null and cqueues installed
 
 Improvements
 ------------
