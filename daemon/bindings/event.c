@@ -185,24 +185,9 @@ static int event_fdwatch(lua_State *L)
 	/* Start timer with the reference */
 	int sock = lua_tointeger(L, 1);
 	uv_loop_t *loop = uv_default_loop();
-#if defined(__APPLE__) || defined(__FreeBSD__)
-	/* libuv is buggy and fails to create poller for
-	 * kqueue sockets as it can't be fcntl'd to non-blocking mode,
-	 * so we pass it a copy of standard input and then
-	 * switch it with real socket before starting the poller
-	 */
-	int decoy_fd = dup(STDIN_FILENO);
-	int ret = uv_poll_init(loop, handle, decoy_fd);
-	if (ret == 0) {
-		handle->io_watcher.fd = sock;
-	}
-	close(decoy_fd);
-#else
 	int ret = uv_poll_init(loop, handle, sock);
-#endif
-	if (ret == 0) {
+	if (ret == 0)
 		ret = uv_poll_start(handle, UV_READABLE, event_fdcallback);
-	}
 	if (ret != 0) {
 		free(handle);
 		lua_error_p(L, "couldn't start event poller");
