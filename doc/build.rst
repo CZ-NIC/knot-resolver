@@ -1,3 +1,5 @@
+.. _build:
+
 Building from sources
 =====================
 
@@ -232,6 +234,8 @@ It's also possible to make a development snapshot tarball:
 .. code-block:: bash
 
    $ ./scripts/make-dev-archive.sh
+
+.. _packaging:
 
 Packaging
 ---------

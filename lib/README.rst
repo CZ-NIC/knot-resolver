@@ -108,7 +108,7 @@ This is only passive processing of the incoming answer. If you want to change th
 	{
 		struct kr_request *req = ctx->req;
 		struct kr_query *qry = req->current_query;
-		
+
 		/* Query can be satisfied locally. */
 		if (can_satisfy(qry)) {
 			/* This flag makes the resolver move the query
@@ -277,6 +277,8 @@ As described in the layers, you can not only retrieve information about current 
 .. _libknot:  https://gitlab.labs.nic.cz/knot/knot-dns/tree/master/src/libknot
 .. _bindings: https://gitlab.labs.nic.cz/knot/knot-resolver/blob/master/daemon/lua/kres.lua
 
+
+.. _significant-lua-changes:
 
 Significant Lua API changes
 ---------------------------
