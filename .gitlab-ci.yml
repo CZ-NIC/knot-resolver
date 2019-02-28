@@ -90,9 +90,9 @@ kres-gen:
   tags:
     - docker
   script:
-    - meson build_ci --prefix=$PREFIX
-    - ninja -C build_ci lib/libkres.so.${LIBKRES_ABI}
-    - ninja -C build_ci kres-gen
+    - meson build_ci_lib --prefix=$PREFIX
+    - ninja -C build_ci_lib lib/libkres.so.${LIBKRES_ABI}
+    - ninja -C build_ci_lib kres-gen
     - git diff --quiet || (git diff; exit 1)
 # }}}
 
@@ -236,6 +236,20 @@ lint:tidy:
   tags:
     - privileged  # mock requires additional capabilities (e.g. mount)
 
+pkg:debian.symbols:
+  <<: *test
+  dependencies:
+    - kres-gen
+  before_script: []
+  ## TODO remove after testing
+  #only:
+  #  refs:
+  #    - release*
+  script:
+    - ln -s distro/deb debian
+    - sed -i "s/__VERSION__/99/g" distro/deb/changelog
+    - dpkg-gensymbols -c4 -ebuild_ci_lib/lib/$LIBKRES_NAME.so.$LIBKRES_ABI -P. -p$LIBKRES_NAME$LIBKRES_ABI
+
 pkg:epel-7:
   <<: *pkgbuild
   script:
@@ -277,6 +291,15 @@ respdiff:basic:
     - docker
     - linux
     - amd64
+
+root.hints:
+  <<: *test_nodep
+  ## TODO remove after testing
+  #only:
+  #  refs:
+  #    - release*
+  script:
+    - scripts/update-root-hints.sh
 
 test:valgrind:
   <<: *test
@@ -431,34 +454,6 @@ pkg:obs:devel:
     - echo -e "[general]\napiurl = https://api.opensuse.org\n\n[https://api.opensuse.org]\nuser = CZ-NIC-automation\npass = $OBS_PASSWORD" > /root/.oscrc
     - scripts/build-in-obs.sh knot-dns-devel  # build against latest development version of knot
     - scripts/build-in-obs.sh knot-resolver-devel  # build against knot in knot-resolver-latest
-
-pkg:debian.symbols:
-  stage: deploy
-  only:  # TODO run this pre-release only
-    variables:
-      - $OBS_BUILD == "1"
-    refs:
-      - nightly@knot/knot-resolver
-  except:
-    - master
-  script:
-    - ln -s distro/deb debian
-    - sed -i "s/__VERSION__/99/g" distro/deb/changelog
-    - dpkg-gensymbols -c4 -elib/$LIB_NAME.so.$LIBKRES_ABI -P. -p$LIBKRES_NAME$LIBKRES_ABI
-  allow_failure: true
-  dependencies:
-    - build
-
-root.hints:
-  stage: deploy
-  only:
-    variables:
-      - $OBS_BUILD == "1"
-    refs:
-      - nightly@knot/knot-resolver
-  allow_failure: true
-  script:
-    - scripts/update-root-hints.sh
 
 # copy snapshot of current master to nightly branch for further processing
 # (this is workaround for missing complex conditions for job limits in Gitlab)
