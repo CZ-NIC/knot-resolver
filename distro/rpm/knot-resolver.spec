@@ -209,12 +209,12 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %{_unitdir}/multi-user.target.wants/kresd.target
 %if "x%{?rhel}" == "x"
 %{_unitdir}/kresd*.socket
+%ghost /run/%{name}/
 %{_mandir}/man7/kresd.systemd.7.gz
 %else
 %{_mandir}/man7/kresd.systemd.nosocket.7.gz
 %endif
 %{_tmpfilesdir}/knot-resolver.conf
-%ghost /run/%{name}/
 %attr(750,knot-resolver,knot-resolver) %dir %{_localstatedir}/cache/%{name}
 %{_sbindir}/kresd
 %{_sbindir}/kresc
