@@ -186,7 +186,7 @@ The following command runs all tests. By default, only unit tests are enabled.
    $ meson test -C build_dev
 
 More comprehensive tests require you to install kresd before running the test
-suite. To run all available tests, use ``-Dpostinstall_tests=enabled`` build
+suite. To run all available tests, use ``-Dextra_tests=enabled`` build
 option.
 
 .. code-block:: bash

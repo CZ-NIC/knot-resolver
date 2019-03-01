@@ -115,7 +115,19 @@ option(
 )
 
 option(
-  'postinstall_tests',
+  'config_tests',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'auto',
+  description: 'postinstall config tests',
+)
+
+option(
+  'extra_tests',
   type: 'combo',
   choices: [
     'auto',
