@@ -12,17 +12,20 @@ if get_option('unit_tests') != 'disabled'
   message('-------------------------------')
 endif
 
+build_extra_tests = get_option('extra_tests') == 'enabled'
+build_config_tests = get_option('config_tests') == 'enabled'
+if get_option('config_tests') == 'auto'
+  build_config_tests = build_extra_tests
+endif
 
-## postinstall tests
-build_postinstall_tests = get_option('postinstall_tests') == 'enabled'
-if build_postinstall_tests
-  if meson.version().version_compare('<0.46')
-    error('meson 0.46+ is required for postinstall_tests')
-  endif
+## config tests
+if build_config_tests
+  subidr('config')
+endif
 
-  subdir('config')
-
-  message('--- postinstall_tests dependencies ---')
+## extra tests
+if build_extra_tests
+  message('--- extra_tests dependencies ---')
   python3 = find_program('python3')
   py3_deps = []
 
