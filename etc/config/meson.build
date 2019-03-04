@@ -1,7 +1,7 @@
 # etc: config examples
 
 # Config snippets (build-dependant)
-if systemd_unit_files == 'enabled'
+if systemd_files == 'enabled'
   config_defaults = '''
 -- Network interface configuration: see kresd.systemd(7)'''
 else

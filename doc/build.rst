@@ -260,9 +260,9 @@ unit files themselves.
 
 Depending on your systemd version, choose the appropriate build option:
 
-* ``-Dsystemd_unit_files=enabled`` (recommended) installs unit files with
+* ``-Dsystemd_files=enabled`` (recommended) installs unit files with
   systemd socket activation support. Requires systemd >=227.
-* ``-Dsystemd_unit_files=nosocket`` for systemd <227. Unit files won't use
+* ``-Dsystemd_files=nosocket`` for systemd <227. Unit files won't use
   socket activation.
 
 To support enabling services after boot, you must also link ``kresd.target`` to
