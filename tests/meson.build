@@ -20,6 +20,13 @@ endif
 
 ## config tests
 if build_config_tests
+  message('--- config_tests dependencies ---')
+  cqueues = run_command('luajit', '-l', 'cqueues', '-e', 'os.exit(0)')  # luajit -l $(1) -e "os.exit(0)"
+  if cqueues.returncode() != 0
+    error('missing luajit package: cqueues')
+  endif
+  message('---------------------------------')
+
   subdir('config')
 endif
 
@@ -35,7 +42,7 @@ if build_extra_tests
   foreach py3_dep : py3_deps
     py3_import = run_command(python3, '-c', 'import @0@'.format(py3_dep[0]))
     if py3_import.returncode() != 0
-      message('missing python3 dependency: @0@'.format(py3_dep[1]))
+      error('missing python3 dependency: @0@'.format(py3_dep[1]))
     endif
   endforeach
   message('--------------------------------')
