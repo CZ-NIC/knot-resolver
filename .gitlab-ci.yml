@@ -131,21 +131,21 @@ kres-gen:
   tags:
     - docker
 
-build:darwin:
+.build:darwin:
   <<: *test_nodep
   when: delayed
   start_in: 3 minutes  # give the build in Travis CI time to finish
   script:
     - ci/travis.py ${CI_COMMIT_REF_NAME}
 
-deckard:
+.deckard:
   <<: *test_flaky
   variables:
     TMPDIR: $CI_PROJECT_DIR
   script:
     - ${MESON_TEST} --suite integration
 
-doc:
+.doc:
   <<: *test_nodep
   when: delayed
   start_in: '30 seconds'
@@ -157,7 +157,7 @@ doc:
     paths:
       - doc/html
 
-docker:
+.docker:
   <<: *test_nodep
   image: docker:latest
   tags:
@@ -236,7 +236,7 @@ lint:tidy:
   tags:
     - privileged  # mock requires additional capabilities (e.g. mount)
 
-pkg:debian.symbols:
+.pkg:debian.symbols:
   <<: *test
   dependencies:
     - kres-gen
@@ -249,7 +249,7 @@ pkg:debian.symbols:
     - sed -i "s/__VERSION__/99/g" distro/deb/changelog
     - dpkg-gensymbols -c4 -ebuild_ci_lib/lib/$LIBKRES_NAME.so.$LIBKRES_ABI -P. -p$LIBKRES_NAME$LIBKRES_ABI
 
-pkg:epel-7:
+.pkg:epel-7:
   <<: *pkgbuild
   script:
     - ./scripts/make-srpm.sh
@@ -257,7 +257,7 @@ pkg:epel-7:
   after_script:
     - mv /var/lib/mock/epel-7-x86_64/result epel-7-x86_64
 
-pkg:fedora-29:
+.pkg:fedora-29:
   <<: *pkgbuild
   script:
     - ./scripts/make-srpm.sh
@@ -265,7 +265,7 @@ pkg:fedora-29:
   after_script:
     - mv /var/lib/mock/fedora-29-x86_64/result fedora-29-x86_64
 
-respdiff:basic:
+.respdiff:basic:
   <<: *test
   dependencies:
     - build-asan
@@ -291,7 +291,7 @@ respdiff:basic:
     - linux
     - amd64
 
-root.hints:
+.root.hints:
   <<: *test_nodep
   only:
     refs:
@@ -299,7 +299,7 @@ root.hints:
   script:
     - scripts/update-root-hints.sh
 
-test:valgrind:
+.test:valgrind:
   <<: *test
   when: delayed
   start_in: '30 seconds'
@@ -308,7 +308,7 @@ test:valgrind:
 # }}}
 
 # extended {{{
-pytests:
+.pytests:
   <<: *test_flaky
   dependencies:
     - build-asan
@@ -353,37 +353,37 @@ pytests:
   tags:
     - respdiff
 
-fwd-tls6-kresd.udp6:
+.fwd-tls6-kresd.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-tls6-kresd.udp6.j256
 
-fwd-udp6-kresd.udp6:
+.fwd-udp6-kresd.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-kresd.udp6.j384
 
-iter.udp6:
+.iter.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.iter.udp6.j384
 
-iter.tls6:
+.iter.tls6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.iter.tls6.j384
 
-fwd-udp6-unbound.udp6:
+.fwd-udp6-unbound.udp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-unbound.udp6.j256
 
-fwd-udp6-unbound.tcp6:
+.fwd-udp6-unbound.tcp6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tcp6.j256
 
-fwd-udp6-unbound.tls6:
+.fwd-udp6-unbound.tls6:
   <<: *respdiff
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6.j256
@@ -421,24 +421,24 @@ fwd-udp6-unbound.tls6:
   tags:
     - respdiff
 
-resperf:fwd-tls6.udp-asan:
+.resperf:fwd-tls6.udp-asan:
   <<: *resperf
   variables:
     RESPERF_TEST: resperf.fwd-tls6.udp
 
-resperf:fwd-udp6.udp-asan:
+.resperf:fwd-udp6.udp-asan:
   <<: *resperf
   variables:
     RESPERF_TEST: resperf.fwd-udp6.udp
 
-resperf:iter.udp-asan:
+.resperf:iter.udp-asan:
   <<: *resperf
   variables:
     RESPERF_TEST: resperf.iter.udp
 # }}}
 
 # deploy {{{
-pkg:obs:devel:
+.pkg:obs:devel:
   stage: deploy
   only:
     variables:
@@ -455,7 +455,7 @@ pkg:obs:devel:
 
 # copy snapshot of current master to nightly branch for further processing
 # (this is workaround for missing complex conditions for job limits in Gitlab)
-nightly:copy:
+.nightly:copy:
   stage: deploy
   only:
     variables:
