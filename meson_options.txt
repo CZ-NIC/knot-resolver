@@ -65,7 +65,7 @@ option(
 
 ## Systemd
 option(
-  'systemd_unit_files',
+  'systemd_files',
   type: 'combo',
   choices: [
     'disabled',
@@ -73,7 +73,7 @@ option(
     'nosocket',
   ],
   value: 'disabled',
-  description: 'installs systemd unit files',
+  description: 'installs systemd-related files',
 )
 
 

@@ -7,9 +7,9 @@ man_config.set('date', run_command('../scripts/get-date.sh').stdout())
 man_config.set('keyfile_default', keyfile_default)
 
 man_config.set('man_seealso_systemd', '')
-if systemd_unit_files == 'enabled'
+if systemd_files == 'enabled'
   man_config.set('man_seealso_systemd', '\\fIkresd.systemd(7)\\fR, ')
-elif systemd_unit_files == 'nosocket'
+elif systemd_files == 'nosocket'
   man_config.set('man_seealso_systemd', '\\fIkresd.systemd.nosocket(7)\\fR, ')
 endif
 

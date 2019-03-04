@@ -77,9 +77,9 @@ group = get_option('group')
 ## Systemd
 message('--- systemd socket activation ---')
 libsystemd = dependency('libsystemd', version: '>=227', required: false)
-systemd_unit_files = get_option('systemd_unit_files')
-if systemd_unit_files == 'enabled' and not libsystemd.found()
-  error('systemd_unit_files=enabled requires libsystemd >= 227')
+systemd_files = get_option('systemd_files')
+if systemd_files == 'enabled' and not libsystemd.found()
+  error('systemd_files=enabled requires libsystemd >= 227')
 endif
 message('---------------------------')
 
@@ -162,7 +162,7 @@ subdir('etc')
 
 
 # Systemd unit files
-if systemd_unit_files != 'disabled'
+if systemd_files != 'disabled'
   subdir('systemd')
 endif
 
@@ -253,7 +253,7 @@ message('''
 
   systemd:
     socket activation:  @0@'''.format(s_systemd_socket) + '''
-    unit_files:         @0@'''.format(systemd_unit_files) + '''
+    files:              @0@'''.format(systemd_files) + '''
     work_dir:           @0@'''.format(systemd_work_dir) + '''
 
   optional components

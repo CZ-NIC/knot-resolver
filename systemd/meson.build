@@ -16,7 +16,7 @@ systemd_config.set('sbin_dir', sbin_dir)
 systemd_config.set('etc_dir', etc_dir)
 systemd_config.set('run_dir', run_dir)
 
-if systemd_unit_files == 'enabled'
+if systemd_files == 'enabled'
   ## unit files
   kresd_service = configure_file(
     input: 'kresd@.service.in',
@@ -70,6 +70,6 @@ if systemd_unit_files == 'enabled'
     ],
     install_dir: join_paths(examples_dir, 'kresd-tls.socket.d'),
   )
-elif systemd_unit_files == 'nosocket'
+elif systemd_files == 'nosocket'
   subdir('nosocket')
 endif
