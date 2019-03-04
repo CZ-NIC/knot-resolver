@@ -122,9 +122,9 @@ gpg2 --verify %{SOURCE1} %{SOURCE0}
 CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
 %if "x%{?rhel}" == "x"
     -Ddoc=enabled \
-    -Dsystemd_unit_files=enabled \
+    -Dsystemd_files=enabled \
 %else
-    -Dsystemd_unit_files=nosocket \
+    -Dsystemd_files=nosocket \
 %endif
     -Dclient=enabled \
     -Dunit_tests=enabled \

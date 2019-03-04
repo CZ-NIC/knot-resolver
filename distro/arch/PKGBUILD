@@ -40,7 +40,7 @@ build() {
         --prefix=/usr \
         --sbindir=bin \
         -Dkeyfile_default=/etc/trusted-key.key \
-        -Dsystemd_unit_files=enabled \
+        -Dsystemd_files=enabled \
         -Dclient=enabled \
         -Dinstall_kresd_conf=enabled \
         -Dunit_tests=enabled
