@@ -1,6 +1,6 @@
 config_tests += [
-  ['basic', files('basic.test.lua')],
-  ['cache', files('cache.test.lua')],
+  ['basic', files('basic.test.lua'), [], false, ['skip_asan']],
+  ['cache', files('cache.test.lua'), [], false, ['skip_asan']],
   ['keyfile.bad_args', files('keyfile/bad_args.test.lua'),
     ['--keyfile-ro', 'root.keys',
      '--keyfile', 'root.keys'],
@@ -39,6 +39,9 @@ foreach config_test : config_tests
   # kresd return code check
   conftest_should_fail = config_test.length() >= 4 ? config_test[3] : false
 
+  # additional suites
+  extra_suites = config_test.length() >= 5 ? config_test[4] : []
+
   # environment variables for test
   conftest_env = environment()
   conftest_env.prepend('PATH', sbin_dir)
@@ -55,7 +58,7 @@ foreach config_test : config_tests
     suite: [
       'postinstall',
       'config',
-    ],
+    ] + extra_suites,
     should_fail: conftest_should_fail,
   )
 endforeach
