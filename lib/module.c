@@ -16,7 +16,6 @@
 
 #include <stdlib.h>
 #include <dlfcn.h>
-#include <pthread.h>
 #include <contrib/cleanup.h>
 
 #include "kresconfig.h"
