@@ -24,7 +24,7 @@ override_dh_auto_build:
 		--prefix=/usr \
 		--libdir=lib \
 		-Ddoc=enabled \
-		-Dsystemd_unit_files=enabled \
+		-Dsystemd_files=enabled \
 		-Dclient=enabled \
 		-Dkeyfile_default=/usr/share/dns/root.key \
 		-Droot_hints=/usr/share/dns/root.hints \
