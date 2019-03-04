@@ -65,7 +65,7 @@ tests.
    "luacov_", "``check-config``", "Code coverage analysis for Lua modules."
 
 .. [#] If ``meson >= 0.46`` isn't available for your distro, check backports
-   repository oor use python pip to install it.
+   repository or use python pip to install it.
 .. [#] Requires ``__attribute__((cleanup))`` and ``-MMD -MP`` for
    dependency file generation. GCC, Clang and ICC are supported.
 .. [#] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS``
@@ -79,7 +79,7 @@ Packaged dependencies
 ~~~~~~~~~~~~~~~~~~~~~
 
 .. note:: Some build dependencies can be found in
-   `home:CZ-NIC:knot-reslver-build
+   `home:CZ-NIC:knot-resolver-build
    <https://build.opensuse.org/project/show/home:CZ-NIC:knot-resolver-build>`_.
 
 Most of the dependencies can be resolved from packages, here's an overview for
