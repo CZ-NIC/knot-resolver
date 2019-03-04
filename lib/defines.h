@@ -99,4 +99,10 @@ void __asan_unpoison_memory_region(void const volatile *addr, size_t size);
 #define kr_asan_custom_poison(fn, addr)
 #define kr_asan_custom_unpoison(fn, addr)
 #endif
+
+#if defined(__SANITIZE_ADDRESS__) && defined(_FORTIFY_SOURCE)
+	#error "You can't use address sanitizer with _FORTIFY_SOURCE"
+	// https://github.com/google/sanitizers/issues/247
+#endif
+
 /* @endcond */
