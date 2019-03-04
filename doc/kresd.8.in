@@ -130,11 +130,11 @@ and warning that you need to to check the key before trusting it will be issued.
 
 The file contains DNSKEY/DS records in presentation format,
 and is compatible with Unbound and BIND 9 root key files.
+@man_managed_keyfile_default@
 .TP
 .B \-K\fI keyfile\fR, \fB\-\-keyfile\-ro=\fI<keyfile>
 (Discouraged) Static root trust anchors file. The file is not updated by kresd. Use of this option is discouraged because it will break your installation when the trust anchor key changes!
-
-Default: "@keyfile_default@"
+@man_unmanaged_keyfile_default@
 .TP
 .B \-f\fI N\fR, \fB\-\-forks=\fI<N>
 With this option, the daemon is started in non-interactive mode and instead creates a
