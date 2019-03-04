@@ -6,8 +6,8 @@
 -- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/daemon.html#configuration
 @config_defaults@
 
---- To disable DNSSEC validation, uncomment the following line (not recommended)
---- trust_anchors.keyfile_default = nil
+-- To disable DNSSEC validation, uncomment the following line (not recommended)
+-- trust_anchors.keyfile_default = nil
 
 -- Large cache size, so we don't need to flush ever
 -- This can be larger than available RAM, least frequently accessed

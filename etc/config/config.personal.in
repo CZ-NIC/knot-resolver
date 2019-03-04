@@ -2,8 +2,8 @@
 -- Refer to manual: http://knot-resolver.readthedocs.org/en/stable/daemon.html#configuration
 @config_defaults@
 
---- To disable DNSSEC validation, uncomment the following line (not recommended)
---- trust_anchors.keyfile_default = nil
+-- To disable DNSSEC validation, uncomment the following line (not recommended)
+-- trust_anchors.keyfile_default = nil
 
 -- Load useful modules
 modules = {

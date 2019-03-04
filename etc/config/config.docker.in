@@ -5,8 +5,8 @@
 net.listen('0.0.0.0')
 net.listen('0.0.0.0', 853, {tls=true})
 
---- To disable DNSSEC validation, uncomment the following line (not recommended)
---- trust_anchors.keyfile_default = nil
+-- To disable DNSSEC validation, uncomment the following line (not recommended)
+-- trust_anchors.keyfile_default = nil
 
 -- Load Useful modules
 modules = {
