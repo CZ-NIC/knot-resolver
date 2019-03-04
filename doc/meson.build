@@ -13,6 +13,16 @@ elif systemd_files == 'nosocket'
   man_config.set('man_seealso_systemd', '\\fIkresd.systemd.nosocket(7)\\fR, ')
 endif
 
+man_config.set('man_managed_keyfile_default', '')
+man_config.set('man_unmanaged_keyfile_default', '')
+if managed_ta
+  man_config.set('man_managed_keyfile_default', '''
+Default: "@0@"'''.format(keyfile_default))
+else
+  man_config.set('man_unmanaged_keyfile_default', '''
+Default: "@0@"'''.format(keyfile_default))
+endif
+
 man_kresd = configure_file(
   input: 'kresd.8.in',
   output: 'kresd.8',
