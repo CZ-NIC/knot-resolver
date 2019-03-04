@@ -28,7 +28,6 @@ if build_client
     kresc_src,
     dependencies: [
       contrib_dep,
-      libkres_dep,
       libedit,
     ],
     install: true,
