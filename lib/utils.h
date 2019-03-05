@@ -46,7 +46,7 @@ typedef void (*trace_callback_f)(struct kr_request *request);
 /** @brief Callback for request logging handler. */
 typedef void (*trace_log_f)(const struct kr_query *query, const char *source, const char *msg);
 
-#define kr_log_info(...) do { printf(__VA_ARGS__); fflush(stdout); } while(0)
+#define kr_log_info printf
 #define kr_log_error(...) fprintf(stderr, ## __VA_ARGS__)
 
 /* Always export these, but override direct calls by macros conditionally. */

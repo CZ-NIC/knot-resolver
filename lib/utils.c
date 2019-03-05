@@ -118,12 +118,11 @@ bool kr_verbose_set(bool status)
 
 void kr_log_verbose(const char *fmt, ...)
 {
-	if (kr_verbose_status) {
+	if (unlikely(kr_verbose_status)) {
 		va_list args;
 		va_start(args, fmt);
 		vprintf(fmt, args);
 		va_end(args);
-		fflush(stdout);
 	}
 }
 
@@ -141,7 +140,6 @@ void kr_log_qverbose_impl(const struct kr_query *qry, const char *cls, const cha
 	va_start(args, fmt);
 	vprintf(fmt, args);
 	va_end(args);
-	fflush(stdout);
 }
 
 bool kr_log_trace(const struct kr_query *query, const char *source, const char *fmt, ...)
