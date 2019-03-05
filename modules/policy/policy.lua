@@ -363,7 +363,13 @@ local function rpz_parse(action, path)
 	}
 	local parser = require('zonefile').new()
 	if not parser:open(path) then error(string.format('failed to parse "%s"', path)) end
-	while parser:parse() do
+	while true do
+		local ok, errstr = parser:parse()
+		if errstr then
+			log('[poli] RPZ %s:%d: %s', path, tonumber(parser.line_counter), errstr)
+		end
+		if not ok then break end
+
 		local name = ffi.string(parser.r_owner, parser.r_owner_length)
 		local name_action = ffi.string(parser.r_data, parser.r_data_length)
 		rules[name] = action_map[name_action]

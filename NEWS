@@ -13,6 +13,7 @@ Bugfixes
 - trust_anchors.add(): include these TAs in .summary() (!753)
 - policy module: support '#' for separating port numbers, for consistency
 - fix startup on macOS+BSD when </dev/null and cqueues installed
+- policy.RPZ: log problems from zone-file level of parser as well
 
 Improvements
 ------------
