@@ -203,12 +203,7 @@ enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_
 struct kr_cache {
 	knot_db_t *db;
 	const struct kr_cdb_api *api;
-	struct {
-		uint32_t hit;
-		uint32_t miss;
-		uint32_t insert;
-		uint32_t delete;
-	} stats;
+	struct kr_cdb_stats stats;
 	uint32_t ttl_min;
 	uint32_t ttl_max;
 	struct timeval checkpoint_walltime;
