@@ -25,7 +25,8 @@ local function test_stats()
 	ok(cache.open(100 * MB), 'cache can be reopened')
 	local s = cache.stats()
 	is(type(s), 'table', 'stats returns a table')
-	same({s.hit, s.miss, s.insert, s.delete}, {0, 0, 0, 0}, 'stats returns correct fields')
+	-- Just checking the most useful fields
+	same({s.read, s.read_miss, s.write}, {0, 0, 0}, 'stats returns correct fields')
 end
 
 -- test if cache can be resized or shrunk
