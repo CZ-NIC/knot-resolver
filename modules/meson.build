@@ -5,8 +5,6 @@ lua_mod_src = [  # add lua modules without separate meson.build
   files('detect_time_skew/detect_time_skew.lua'),
   files('dns64/dns64.lua'),
   files('etcd/etcd.lua'),
-  files('experimental_dot_auth/experimental_dot_auth.lua'),
-  files('experimental_dot_auth/basexx.lua'),
   files('graphite/graphite.lua'),
   files('predict/predict.lua'),
   files('prefill/prefill.lua'),
@@ -39,6 +37,7 @@ subdir('bogus_log')
 subdir('daf')
 subdir('dnstap')
 subdir('edns_keepalive')
+subdir('experimental_dot_auth')
 subdir('hints')
 subdir('http')
 subdir('nsid')
