@@ -156,11 +156,13 @@ ln -s ../kresd.target %{buildroot}%{_unitdir}/multi-user.target.wants/kresd.targ
 install -m 0750 -d %{buildroot}%{_localstatedir}/cache/%{name}
 install -m 0750 -d %{buildroot}/run/%{name}
 
-# remove http module (missing dependencies)
+# remove modules with missing dependencies
+rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/etcd.lua
+rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/prefill.lua
 rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http
-rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http.lua
-rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http_trace.lua
-rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/prometheus.lua
+rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/http.lua
+rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/http_trace.lua
+rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/prometheus.lua
 
 # rename doc directory for centos, opensuse
 %if "x%{?fedora}" == "x"

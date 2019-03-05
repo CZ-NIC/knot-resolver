@@ -1,2 +1,4 @@
 usr/lib/knot-resolver/kres_modules/http/LICENSE
+usr/lib/knot-resolver/kres_modules/prefill.lua
+usr/lib/knot-resolver/kres_modules/etcd.lua
 debian/tmp/usr/share/doc/knot-resolver/html/.buildinfo
