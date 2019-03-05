@@ -16,6 +16,7 @@
 
 #include "lib/generic/lru.h"
 #include "contrib/murmurhash3/murmurhash3.h"
+#include "contrib/ucw/mempool.h"
 
 typedef struct lru_group lru_group_t;
 
@@ -29,27 +30,41 @@ struct lru_item {
 	 * Any type can be accessed through char-pointer,
 	 * so we can use a common struct definition
 	 * for all types being held.
+	 *
+	 * The value address is restricted by val_alignment.
+	 * Approach: require slightly larger sizes from the allocator
+	 * and shift value on the closest address with val_alignment.
 	 */
 };
 
-/** @internal Compute offset of value in struct lru_item. */
-static uint val_offset(uint key_len)
+/** @brief Round the value up to a multiple of mul (a power of two). */
+static inline size_t round_power(size_t size, size_t mult)
+{
+	assert(__builtin_popcount(mult) == 1);
+	size_t res = ((size - 1) & ~(mult - 1)) + mult;
+	assert(__builtin_ctz(res) >= __builtin_ctz(mult));
+	assert(size <= res && res < size + mult);
+	return res;
+}
+
+/** @internal Compute the allocation size for an lru_item. */
+static uint item_size(const struct lru *lru, uint key_len, uint val_len)
 {
 	uint key_end = offsetof(struct lru_item, data) + key_len;
-	// align it to the closest multiple of four
-	return round_power(key_end, 2);
+	return key_end + (lru->val_alignment - 1) + val_len;
+	/*             ^^^ worst-case padding length
+	 * Well, we might compute the bound a bit more precisely,
+	 * as we know that lru_item will get alignment at least
+	 * some sizeof(void*) and we know all the lengths,
+	 * but let's not complicate it, as the gain would be small anyway. */
 }
 
-/** @internal Return pointer to value in an item. */
-static void * item_val(struct lru_item *it)
+/** @internal Return pointer to value in an lru_item. */
+static void * item_val(const struct lru *lru, struct lru_item *it)
 {
-	return it->data + val_offset(it->key_len) - offsetof(struct lru_item, data);
-}
-
-/** @internal Compute the size of an item. ATM we don't align/pad the end of it. */
-static uint item_size(uint key_len, uint val_len)
-{
-	return val_offset(key_len) + val_len;
+	size_t key_end = it->data + it->key_len - (char *)NULL;
+	size_t val_begin = round_power(key_end, lru->val_alignment);
+	return (char *)NULL + val_begin;
 }
 
 /** @internal Free each item. */
@@ -78,7 +93,7 @@ KR_EXPORT void lru_apply_impl(struct lru *lru, lru_apply_fun f, void *baton)
 			if (!it)
 				continue;
 			enum lru_apply_do ret =
-				f(it->data, it->key_len, item_val(it), baton);
+				f(it->data, it->key_len, item_val(lru, it), baton);
 			switch(ret) {
 			case LRU_APPLY_DO_EVICT: // evict
 				mm_free(lru->mm, it);
@@ -94,9 +109,10 @@ KR_EXPORT void lru_apply_impl(struct lru *lru, lru_apply_fun f, void *baton)
 }
 
 /** @internal See lru_create. */
-KR_EXPORT struct lru * lru_create_impl(uint max_slots, knot_mm_t *mm_array, knot_mm_t *mm)
+KR_EXPORT struct lru * lru_create_impl(uint max_slots, uint val_alignment,
+					knot_mm_t *mm_array, knot_mm_t *mm)
 {
-	assert(max_slots);
+	assert(max_slots && __builtin_popcount(val_alignment) == 1);
 	if (!max_slots)
 		return NULL;
 	// let lru->log_groups = ceil(log2(max_slots / (float) assoc))
@@ -108,6 +124,15 @@ KR_EXPORT struct lru * lru_create_impl(uint max_slots, knot_mm_t *mm_array, knot
 	group_count = 1 << log_groups;
 	assert(max_slots <= group_count * LRU_ASSOC && group_count * LRU_ASSOC < 2 * max_slots);
 
+	/* Get a sufficiently aligning mm_array if NULL is passed. */
+	if (!mm_array) {
+		static knot_mm_t mm_array_default = { 0 };
+		if (!mm_array_default.ctx)
+			mm_ctx_init_aligned(&mm_array_default, __alignof(struct lru));
+		mm_array = &mm_array_default;
+	}
+	assert(mm_array->alloc != mm_malloc && mm_array->alloc != (knot_mm_alloc_t)mp_alloc);
+
 	size_t size = offsetof(struct lru, groups[group_count]);
 	struct lru *lru = mm_alloc(mm_array, size);
 	if (unlikely(lru == NULL))
@@ -116,6 +141,7 @@ KR_EXPORT struct lru * lru_create_impl(uint max_slots, knot_mm_t *mm_array, knot
 		.mm = mm,
 		.mm_array = mm_array,
 		.log_groups = log_groups,
+		.val_alignment = val_alignment,
 	};
 	// zeros are a good init
 	memset(lru->groups, 0, size - offsetof(struct lru, groups));
@@ -210,8 +236,8 @@ insert: // insert into position i (incl. key)
 	assert(i < LRU_ASSOC);
 	g->hashes[i] = khash_top;
 	it = g->items[i];
-	uint new_size = item_size(key_len, val_len);
-	if (it == NULL || new_size != item_size(it->key_len, it->val_len)) {
+	uint new_size = item_size(lru, key_len, val_len);
+	if (it == NULL || new_size != item_size(lru, it->key_len, it->val_len)) {
 		// (re)allocate
 		mm_free(lru->mm, it);
 		it = g->items[i] = mm_alloc(lru->mm, new_size);
@@ -223,7 +249,7 @@ insert: // insert into position i (incl. key)
 	if (key_len > 0) {
 		memcpy(it->data, key, key_len);
 	}
-	memset(item_val(it), 0, val_len); // clear the value
+	memset(item_val(lru, it), 0, val_len); // clear the value
 	is_new_entry = true;
 found: // key and hash OK on g->items[i]; now update stamps
 	assert(i < LRU_ASSOC);
@@ -231,6 +257,6 @@ found: // key and hash OK on g->items[i]; now update stamps
 	if (is_new) {
 		*is_new = is_new_entry;
 	}
-	return item_val(g->items[i]);
+	return item_val(lru, g->items[i]);
 }
 
