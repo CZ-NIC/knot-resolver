@@ -673,35 +673,32 @@ static int answer_finalize(struct kr_request *request, int state)
 
 static int query_finalize(struct kr_request *request, struct kr_query *qry, knot_pkt_t *pkt)
 {
-	int ret = 0;
 	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
-	if (!(qry->flags.SAFEMODE)) {
-		/* Remove any EDNS records from any previous iteration. */
-		ret = edns_erase_and_reserve(pkt);
-		if (ret == 0) {
-			ret = edns_create(pkt, request->answer, request);
+	if (qry->flags.SAFEMODE)
+		return kr_ok();
+	/* Remove any EDNS records from any previous iteration. */
+	int ret = edns_erase_and_reserve(pkt);
+	if (ret) return ret;
+	ret = edns_create(pkt, request->answer, request);
+	if (ret) return ret;
+	if (qry->flags.STUB) {
+		/* Stub resolution (ask for +rd and +do) */
+		knot_wire_set_rd(pkt->wire);
+		if (knot_pkt_has_dnssec(request->qsource.packet)) {
+			knot_edns_set_do(pkt->opt_rr);
 		}
-		if (ret == 0) {
-			/* Stub resolution (ask for +rd and +do) */
-			if (qry->flags.STUB) {
-				knot_wire_set_rd(pkt->wire);
-				if (knot_pkt_has_dnssec(request->qsource.packet)) {
-					knot_edns_set_do(pkt->opt_rr);
-				}
-				if (knot_wire_get_cd(request->qsource.packet->wire)) {
-					knot_wire_set_cd(pkt->wire);
-				}
-			/* Full resolution (ask for +cd and +do) */
-			} else {
-				knot_edns_set_do(pkt->opt_rr);
-				knot_wire_set_cd(pkt->wire);
-				if (qry->flags.FORWARD) {
-					knot_wire_set_rd(pkt->wire);
-				}
-			}
+		if (knot_wire_get_cd(request->qsource.packet->wire)) {
+			knot_wire_set_cd(pkt->wire);
+		}
+	} else {
+		/* Full resolution (ask for +cd and +do) */
+		knot_edns_set_do(pkt->opt_rr);
+		knot_wire_set_cd(pkt->wire);
+		if (qry->flags.FORWARD) {
+			knot_wire_set_rd(pkt->wire);
 		}
 	}
-	return ret;
+	return kr_ok();
 }
 
 int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pkt_t *answer)
