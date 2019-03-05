@@ -25,7 +25,8 @@ local function test_stats()
 	ok(cache.open(100 * MB), 'cache can be reopened')
 	local s = cache.stats()
 	is(type(s), 'table', 'stats returns a table')
-	same({s.hit, s.miss, s.insert, s.delete}, {0, 0, 0, 0}, 'stats returns correct fields')
+	-- Just checking the most useful fields
+	isnt(s.read and s.read_miss and s.write, nil, 'stats returns correct fields')
 end
 
 -- test if cache can be resized or shrunk
@@ -41,14 +42,15 @@ local function test_context_cache()
 	local c = kres.context().cache
 	is(type(c), 'cdata', 'context has a cache object')
 	local s = c.stats
-	same({s.hit, s.miss, s.insert, s.delete}, {0, 0, 0, 0}, 'context cache stats works')
+	isnt(s.read and s.read_miss and s.write, 'context cache stats works')
 	-- insert a record into cache
 	local rdata = '\1\2\3\4'
 	local rr = kres.rrset('\3com\0', kres.type.A, kres.class.IN, 66)
 	rr:add_rdata(rdata, #rdata)
+	local s_write = s.write
 	ok(c:insert(rr, nil, 0, 0), 'cache insertion works')
 	ok(c:sync(), 'cache sync works')
-	same(s.insert, 1, 'cache insertion increments counters')
+	isnt(s.write, s_write, 'cache insertion increments counters')
 end
 
 return {
