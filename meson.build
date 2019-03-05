@@ -231,11 +231,11 @@ run_target(
 s_managed_ta = managed_ta ? 'enabled' : 'disabled'
 s_systemd_socket = libsystemd.found() ? 'enabled' : 'disabled'
 s_build_client = build_client ? 'enabled' : 'disabled'
+s_build_dnstap = build_dnstap ? 'enabled' : 'disabled'
 s_build_unit_tests = build_unit_tests ? 'enabled' : 'disabled'
 s_build_config_tests = build_config_tests ? 'enabled' : 'disabled'
 s_build_extra_tests = build_extra_tests ? 'enabled' : 'disabled'
 s_install_kresd_conf = install_kresd_conf ? 'enabled' : 'disabled'
-# TODO mention dnstap installation?
 message('''
 
 ======================= SUMMARY =======================
@@ -258,6 +258,7 @@ message('''
 
   optional components
     client:             @0@'''.format(s_build_client) + '''
+    dnstap:             @0@'''.format(s_build_dnstap) + '''
     unit_tests:         @0@'''.format(s_build_unit_tests) + '''
     config_tests:       @0@'''.format(s_build_config_tests) + '''
     extra_tests:        @0@'''.format(s_build_extra_tests) + '''

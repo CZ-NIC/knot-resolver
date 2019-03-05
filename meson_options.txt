@@ -103,6 +103,18 @@ option(
 )
 
 option(
+  'dnstap',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'auto',
+  description: 'build dnstap module',
+)
+
+option(
   'doc',
   type: 'combo',
   choices: [
