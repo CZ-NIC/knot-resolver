@@ -173,7 +173,6 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 		lua_settop(L, 0);
 	}
 finish:
-	fflush(out);
 	free(cmd);
 	/* Close if redirected */
 	if (stream_fd != STDIN_FILENO) {
@@ -420,6 +419,12 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 		return 1;
 	}
 
+	if (setvbuf(stdout, NULL, _IONBF, 0) || setvbuf(stderr, NULL, _IONBF, 0)) {
+		kr_log_error("[system] failed to to set output buffering (ignored): %s\n",
+				strerror(errno));
+		fflush(stderr);
+	}
+
 	/* Control sockets or TTY */
 	auto_free char *sock_file = NULL;
 	uv_pipe_t pipe;
@@ -428,7 +433,6 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	if (args->interactive) {
 		if (!args->quiet)
 			printf("[system] interactive mode\n> ");
-		fflush(stdout);
 		uv_pipe_open(&pipe, 0);
 		uv_read_start((uv_stream_t*) &pipe, tty_alloc, tty_process_input);
 	} else {
