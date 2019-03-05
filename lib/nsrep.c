@@ -262,7 +262,7 @@ static int eval_nsrep(const knot_dname_t *owner, const pack_t *addr_set, struct 
 		update_nsrep_set(ns, owner, addr_choice, score);
 		ns->reputation = reputation;
 		return 1; /* Stop evaluation */
-	} else if (ns->score > KR_NS_MAX_SCORE) {
+	} else if (ns->score > KR_NS_MAX_SCORE || addr_choice[KR_NSREP_MAXADDR - 1] == NULL) {
 		/* Check if any server was already selected.
 		 * If no, pick current server and continue evaluation. */
 		update_nsrep_set(ns, owner, addr_choice, score);
