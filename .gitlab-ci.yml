@@ -27,7 +27,7 @@ stages:
   stage: build
   except:
     - master
-  artifacts:
+  artifacts: []
     when: always
     paths:
       - .local
@@ -213,6 +213,7 @@ lint:scan-build:
 
 lint:tidy:
   <<: *test
+  artifacts:
   script:
     - ninja -C build_ci* tidy
 
