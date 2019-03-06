@@ -62,4 +62,7 @@ package() {
     # add kresd.target to multi-user.target.wants to support enabling kresd services
     install -dm 0755 "${pkgdir}/usr/lib/systemd/system/multi-user.target.wants"
     ln -s ../kresd.target "${pkgdir}/usr/lib/systemd/system/multi-user.target.wants/kresd.target"
+
+    # remove modules with missing dependencies
+    rm "${pkgdir}/usr/lib/knot-resolver/kres_modules/etcd.lua"
 }
