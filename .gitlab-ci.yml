@@ -213,6 +213,7 @@ lint:scan-build:
 
 lint:tidy:
   <<: *test
+  artifacts:
   script:
     - ninja -C build_ci* tidy
 
