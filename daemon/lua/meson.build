@@ -1,6 +1,7 @@
 # daemon: lua modules
 
 config_tests += [
+  ['ta', files('trust_anchors.test/ta.test.lua')],
   ['ta_bootstrap', files('trust_anchors.test/bootstrap.test.lua')],
 ]
 
