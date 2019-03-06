@@ -23,6 +23,9 @@ depends=(
     'luajit'
     'systemd'
 )
+optdepends=(
+    'lua51-filesystem: prefill module',
+)
 makedepends=(
     'cmocka'
     'meson'
