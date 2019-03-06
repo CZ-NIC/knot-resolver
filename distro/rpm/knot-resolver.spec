@@ -55,20 +55,23 @@ BuildRequires:  lmdb-devel
 # Lua 5.1 version of the libraries have different package names
 Requires:       lua-socket
 Requires:       lua-sec
+Requires:       lua-filesystem
 Requires(pre):	shadow-utils
 %endif
 %if 0%{?fedora}
 BuildRequires:  pkgconfig(lmdb)
 BuildRequires:  python3-sphinx
+Requires:       lua-cqueues-compat
+Requires:       lua-filesystem-compat
 Requires:       lua-socket-compat
 Requires:       lua-sec-compat
-Requires:       lua-cqueues-compat
 Requires(pre):	shadow-utils
 %endif
 %if 0%{?suse_version}
 %define NINJA ninja
 BuildRequires:  lmdb-devel
 BuildRequires:  python3-Sphinx
+Requires:       lua51-luafilesystem
 Requires:       lua51-luasocket
 Requires:       lua51-luasec
 Requires(pre):	shadow
