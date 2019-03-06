@@ -9,7 +9,6 @@ usr/lib/knot-resolver/kres_modules/daf/*
 usr/lib/knot-resolver/kres_modules/detect_time_jump.lua
 usr/lib/knot-resolver/kres_modules/detect_time_skew.lua
 usr/lib/knot-resolver/kres_modules/dns64.lua
-usr/lib/knot-resolver/kres_modules/etcd.lua
 usr/lib/knot-resolver/kres_modules/experimental_dot_auth.lua
 usr/lib/knot-resolver/kres_modules/graphite.lua
 usr/lib/knot-resolver/kres_modules/policy.lua
