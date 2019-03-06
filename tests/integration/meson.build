@@ -38,6 +38,7 @@ test(
   env: deckard_env,
   args: [
     '-n', 'auto',
+    '-Wignore::DeprecationWarning',
   ],
   suite: [
     'postinstall',
@@ -57,6 +58,7 @@ foreach integr_test : integr_tests
     env: deckard_env,
     args: [
       '-n', 'auto',
+      '-Wignore::DeprecationWarning',
       '--config=@0@'.format(deckard_config_path),
       '--scenarios=@0@'.format(integr_test[1]),
     ],
