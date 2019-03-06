@@ -1,5 +1,5 @@
 -- check prerequisites
-local has_http = pcall(require, 'http') and pcall(require, 'http.request')
+local has_http = pcall(require, 'kres_modules.http') and pcall(require, 'http.request')
 if not has_http then
 	pass('skipping http module test because its not installed')
 	done()
