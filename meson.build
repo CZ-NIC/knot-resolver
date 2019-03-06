@@ -204,7 +204,8 @@ if luacheck.found()
       luacheck,
       '--codes',
       '--formatter', 'TAP',
-    ] + lua_mod_src + lua_src,
+      meson.source_root(),
+    ],
   )
 endif
 
