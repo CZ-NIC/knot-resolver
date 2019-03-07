@@ -232,6 +232,10 @@ lint:tidy:
       - "*.src.rpm"
   tags:
     - privileged  # mock requires additional capabilities (e.g. mount)
+  retry:
+    max: 1
+    when:
+      - script_failure
 
 pkg:debian.symbols:
   <<: *test
