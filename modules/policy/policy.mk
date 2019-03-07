@@ -7,7 +7,7 @@ $(call make_lua_module,policy)
 policy-clean:
 	$(MAKE) -C $(AHOCORASICK_DIR) clean
 $(AHOCORASICK_DIR)ahocorasick$(LIBEXT): $(AHOCORASICK_DIR)Makefile
-	$(MAKE) -C $(AHOCORASICK_DIR) ahocorasick$(LIBEXT) CXXFLAGS="$(lua_CFLAGS)"
+	$(MAKE) -C $(AHOCORASICK_DIR) ahocorasick$(LIBEXT) CXXFLAGS="$(lua_CFLAGS) $(CXXFLAGS)"
 
 policy-install: ahocorasick-install
 ahocorasick-install: $(AHOCORASICK_DIR)ahocorasick$(LIBEXT) $(DESTDIR)$(MODULEDIR)
