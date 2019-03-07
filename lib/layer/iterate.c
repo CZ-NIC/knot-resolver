@@ -1073,16 +1073,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 			break;
 		}
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		query->fails += 1;
-		if (query->fails >= KR_QUERY_NSRETRY_LIMIT) {
-			query->fails = 0; /* Reset per-query counter. */
-			return resolve_error(pkt, req);
-		} else {
-			if (!query->flags.FORWARD) {
-				query->flags.NO_MINIMIZE = true; /* Drop minimisation as a safe-guard. */
-			}
-			return KR_STATE_CONSUME;
-		}
+		return KR_STATE_FAIL;
 	}
 	case KNOT_RCODE_FORMERR:
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
