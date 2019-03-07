@@ -203,7 +203,7 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 		assert(target[0]);
 		target = knot_wire_next_label(target, NULL);
 	}
-	kr_cache_sync(cache);
+	kr_cache_commit(cache);
 #endif
 }
 

@@ -840,9 +840,9 @@ ffi.metatype( kr_cache_t, {
 			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
-		sync = function (self)
+		commit = function (self)
 			assert(ffi.istype(kr_cache_t, self))
-			local ret = C.kr_cache_sync(self)
+			local ret = C.kr_cache_commit(self)
 			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,

@@ -200,15 +200,26 @@ struct kr_request {
 	void *daemon_context;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
+struct kr_cdb_stats {
+	uint64_t open;
+	uint64_t close;
+	uint64_t count;
+	uint64_t clear;
+	uint64_t commit;
+	uint64_t read;
+	uint64_t read_miss;
+	uint64_t write;
+	uint64_t remove;
+	uint64_t remove_miss;
+	uint64_t match;
+	uint64_t match_miss;
+	uint64_t read_leq;
+	uint64_t read_leq_miss;
+};
 struct kr_cache {
 	knot_db_t *db;
 	const struct kr_cdb_api *api;
-	struct {
-		uint32_t hit;
-		uint32_t miss;
-		uint32_t insert;
-		uint32_t delete;
-	} stats;
+	struct kr_cdb_stats stats;
 	uint32_t ttl_min;
 	uint32_t ttl_max;
 	struct timeval checkpoint_walltime;
@@ -333,7 +344,7 @@ int kr_cache_closest_apex(struct kr_cache *, const knot_dname_t *, _Bool, knot_d
 int kr_cache_insert_rr(struct kr_cache *, const knot_rrset_t *, const knot_rrset_t *, uint8_t, uint32_t);
 int kr_cache_remove(struct kr_cache *, const knot_dname_t *, uint16_t);
 int kr_cache_remove_subtree(struct kr_cache *, const knot_dname_t *, _Bool, int);
-int kr_cache_sync(struct kr_cache *);
+int kr_cache_commit(struct kr_cache *);
 typedef struct {
 	uint8_t bitmap[32];
 	uint8_t length;

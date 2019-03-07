@@ -77,6 +77,7 @@ genResType "knot_rrset_t" | sed 's/\<owner\>/_owner/; s/\<ttl\>/_ttl/'
 	struct kr_request_qsource_flags
 	struct kr_request
 	enum kr_rank
+	struct kr_cdb_stats
 	struct kr_cache
 EOF
 
@@ -190,7 +191,7 @@ EOF
 	kr_cache_insert_rr
 	kr_cache_remove
 	kr_cache_remove_subtree
-	kr_cache_sync
+	kr_cache_commit
 EOF
 
 
