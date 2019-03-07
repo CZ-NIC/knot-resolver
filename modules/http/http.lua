@@ -53,7 +53,7 @@ local pages = {
 	'd3.js',
 	'topojson.js',
 	'datamaps.world.min.js',
-	'dygraph-combined.js',
+	'dygraph.min.js',
 	'selectize.min.js',
 	'selectize.min.css',
 	'selectize.bootstrap3.min.css',

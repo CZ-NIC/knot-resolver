@@ -9,7 +9,7 @@
 <script src="jquery.js"></script>
 <script src="bootstrap.min.js"></script>
 <script src="d3.js"></script>
-<script src="dygraph-combined.js"></script>
+<script src="dygraph.min.js"></script>
 <script src="selectize.min.js"></script>
 <script src="topojson.js"></script>
 <script src="datamaps.world.min.js"></script>
