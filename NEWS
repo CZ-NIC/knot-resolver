@@ -15,6 +15,7 @@ Bugfixes
 - fix startup on macOS+BSD when </dev/null and cqueues installed
 - policy.RPZ: log problems from zone-file level of parser as well (#453)
 - fix flushing of messages to logs in some cases (!781)
+- fix fallback when SERVFAIL or REFUSED is received from upstream (!784)
 
 Improvements
 ------------
