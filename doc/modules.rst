@@ -1,8 +1,8 @@
 .. _modules-implemented:
 
-*********************
-Knot Resolver modules
-*********************
+*******
+Modules
+*******
 
 .. contents::
    :depth: 1
