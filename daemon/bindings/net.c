@@ -27,20 +27,49 @@
 static int net_list_add(const char *key, void *val, void *ext)
 {
 	lua_State *L = (lua_State *)ext;
+	lua_Integer i = lua_tointeger(L, -1);
 	endpoint_array_t *ep_array = val;
-	lua_newtable(L);
-	for (size_t i = ep_array->len; i--;) {
-		struct endpoint *ep = ep_array->at[i];
-		lua_pushinteger(L, ep->port);
-		lua_setfield(L, -2, "port");
-		lua_pushboolean(L, ep->flags & NET_UDP);
-		lua_setfield(L, -2, "udp");
-		lua_pushboolean(L, ep->flags & NET_TCP);
-		lua_setfield(L, -2, "tcp");
-		lua_pushboolean(L, ep->flags & NET_TLS);
-		lua_setfield(L, -2, "tls");
+	for (size_t j = ep_array->len; j--;) {
+		struct endpoint *ep = ep_array->at[j];
+		lua_newtable(L);  // connection tuple
+
+		lua_pushstring(L, key);
+		lua_setfield(L, -2, "ip");
+
+		lua_newtable(L);  // "transport" table
+		if (ep->flags & NET_UDP) {
+			lua_pushstring(L, "udp");
+			lua_setfield(L, -2, "protocol");
+			lua_pushinteger(L, ep->port);
+			lua_setfield(L, -2, "port");
+			lua_pushstring(L, "none");
+			lua_setfield(L, -2, "security");
+		} else if (ep->flags & NET_TCP) {
+			lua_pushstring(L, "tcp");
+			lua_setfield(L, -2, "protocol");
+			lua_pushinteger(L, ep->port);
+			lua_setfield(L, -2, "port");
+			if (ep->flags & NET_TLS) {
+				lua_pushstring(L, "tls");
+			} else {
+				lua_pushstring(L, "none");
+			}
+			lua_setfield(L, -2, "security");
+		} else {
+			lua_pushstring(L, "unknown");
+			lua_setfield(L, -2, "protocol");
+		}
+		lua_setfield(L, -2, "transport");
+
+		lua_newtable(L);  // "application" table
+		lua_pushstring(L, "dns");
+		lua_setfield(L, -2, "protocol");
+		lua_setfield(L, -2, "application");
+
+		lua_settable(L, -3);
+		i++;
+		lua_pushinteger(L, i);
 	}
-	lua_setfield(L, -2, key);
 	return kr_ok();
 }
 
@@ -49,7 +78,9 @@ static int net_list(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
 	lua_newtable(L);
+	lua_pushinteger(L, 1);
 	map_walk(&engine->net.endpoints, net_list_add, L);
+	lua_pop(L, 1);
 	return 1;
 }
 
