@@ -162,7 +162,12 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 	if (qry->ns.addr[0].ip.sa_family != AF_UNSPEC) {
 		const char *addr = kr_inaddr(&qry->ns.addr[0].ip);
 		int addr_len = kr_inaddr_len(&qry->ns.addr[0].ip);
-		return kr_zonecut_del(&qry->zone_cut, qry->ns.name, addr, addr_len);
+		int ret = kr_zonecut_del(&qry->zone_cut, qry->ns.name, addr, addr_len);
+		/* Also remove it from the qry->ns.addr array.
+		 * That's useful at least for STUB and FORWARD modes. */
+		memmove(qry->ns.addr, qry->ns.addr + 1,
+			sizeof(qry->ns.addr[0]) * (KR_NSREP_MAXADDR - 1));
+		return ret;
 	} else {
 		return kr_zonecut_del_all(&qry->zone_cut, qry->ns.name);
 	}

@@ -4,6 +4,9 @@ Knot Resolver 3.x.y (2019-0m-dd)
 Improvements
 ------------
 - policy.TLS_FORWARD: if hostname is configured, send it on wire (!759)
+- hints module: allow configuring the TTL and change default from 0 to 5s
+- policy module: policy.rpz() will watch the file for changes by default
+- packaging: lua cqueues added to default dependencies where available
 
 Bugfixes
 --------
@@ -15,12 +18,7 @@ Bugfixes
 - fix startup on macOS+BSD when </dev/null and cqueues installed
 - policy.RPZ: log problems from zone-file level of parser as well (#453)
 - fix flushing of messages to logs in some cases (!781)
-
-Improvements
-------------
-- hints module: allow configuring the TTL and change default from 0 to 5s
-- policy module: policy.rpz() will watch the file for changes by default
-- packaging: lua cqueues added to default dependencies where available
+- fix fallback when SERVFAIL or REFUSED is received from upstream (!784)
 
 Module API changes
 ------------------
