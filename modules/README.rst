@@ -12,7 +12,6 @@ Supported languages
 ===================
 
 Currently modules written in C and LuaJIT are supported.
-There is also a support for writing modules in Go 1.5+ |---| the library has no native Go bindings, library is accessible using CGO_.
 
 The anatomy of an extension
 ===========================
@@ -34,7 +33,6 @@ A module is a shared object or script defining specific functions, here's an ove
 .. [#] Mandatory symbol.
 
 The ``X`` corresponds to the module name, if the module name is ``hints``, then the prefix for constructor would be ``hints_init()``.
-This doesn't apply for Go, as it for now always implements `main` and requires capitalized first letter in order to export its symbol.
 
 .. note::
    The resolution context :c:type:`struct kr_context` holds loaded modules for current context. A module can be registered with :c:func:`kr_context_register`, which triggers module constructor *immediately* after the load. Module destructor is automatically called when the resolution context closes.
@@ -180,83 +178,6 @@ module layer (see the :ref:`Writing layers <lib-layers>`).
 This example shows how a module can run in the background, this enables you to, for example, observe
 and publish data about query resolution.
 
-Writing a module in Go
-======================
-
-The Go modules use CGO_ to interface C resolver library, there are no native bindings yet. Second issue is that layers are declared as a structure of function pointers, which are `not present in Go`_, the workaround is to declare them in CGO_ header. Each module must be the ``main`` package, here's a minimal example:
-
-.. code-block:: go
-
-	package main
-
-	/*
-	#include "lib/module.h"
-	*/
-	import "C"
-	import "unsafe"
-
-	/* Mandatory functions */
-
-	//export mymodule_api
-	func mymodule_api() C.uint32_t {
-		return C.KR_MODULE_API
-	}
-	func main() {}
-
-.. warning:: Do not forget to prefix function declarations with ``//export symbol_name``, as only these will be exported in module.
-
-In order to integrate with query processing, you have to declare a helper function with function pointers to the
-the layer implementation. Since the code prefacing ``import "C"`` is expanded in headers, you need the `static inline` trick
-to avoid multiple declarations. Here's how the preface looks like:
-
-.. code-block:: go
-
-	/*
-	#include "lib/layer.h"
-	#include "lib/module.h"
-	// Need a forward declaration of the function signature
-	int finish(kr_layer_t *);
-	// Workaround for layers composition
-	static inline const kr_layer_api_t *_layer(void)
-	{
-		static const kr_layer_api_t api = {
-			.finish = &finish
-		};
-		return &api;
-	}
-	*/
-	import "C"
-	import "unsafe"
-
-Now we can add the implementations for the ``finish`` layer and finalize the module:
-
-.. code-block:: go
-
-	//export finish
-	func finish(ctx *C.kr_layer_t) C.int {
-		// Since the context is unsafe.Pointer, we need to cast it
-		var param *C.struct_kr_request = (*C.struct_kr_request)(ctx.data)
-		// Now we can use the C API as well
-		fmt.Printf("[go] resolved %d queries\n", C.list_size(&param.rplan.resolved))
-		return 0
-	}
-
-	//export mymodule_layer
-	func mymodule_layer(module *C.struct_kr_module) *C.kr_layer_api_t {
-		// Wrapping the inline trampoline function
-		return C._layer()
-	}
-
-See the CGO_ for more information about type conversions and interoperability between the C/Go.
-
-Gotchas
--------
-
-* ``main()`` function is mandatory in each module, otherwise it won't compile.
-* Module layer function implementation must be done in C during ``import "C"``, as Go doesn't support pointers to functions.
-* The library doesn't have a Go-ified bindings yet, so interacting with it requires CGO shims, namely structure traversal and type conversions (strings, numbers).
-* Other modules can be called through C call ``C.kr_module_call(kr_context, module_name, module_propery, input)``
-
 Configuring modules
 ===================
 
@@ -264,8 +185,8 @@ There is a callback ``X_config()`` that you can implement, see hints module.
 
 .. _mod-properties:
 
-Exposing C/Go module properties
-===============================
+Exposing C module properties
+============================
 
 A module can offer NULL-terminated list of *properties*, each property is essentially a callable with free-form JSON input/output.
 JSON was chosen as an interchangeable format that doesn't require any schema beforehand, so you can do two things - query the module properties
@@ -324,8 +245,5 @@ Special properties
 
 If the module declares properties ``get`` or ``set``, they can be used in the Lua interpreter as
 regular tables.
-
-.. _`not present in Go`: http://blog.golang.org/gos-declaration-syntax
-.. _CGO: http://golang.org/cmd/cgo/
 
 .. |---| unicode:: U+02014 .. em dash
