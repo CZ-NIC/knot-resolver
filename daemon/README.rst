@@ -1,6 +1,6 @@
-************************
-Knot Resolver daemon
-************************
+******
+Daemon
+******
 
 The server is in the `daemon` directory, it works out of the box without any configuration.
 
@@ -398,11 +398,6 @@ and :rfc:`7646` negative trust anchors.  Depending on your distribution, DNSSEC
 trust anchors should be either maintained in accordance with the distro-wide
 policy, or automatically maintained by the resolver itself.
 
-.. function:: trust_anchors.config(keyfile, readonly)
-
-   Alias for `add_file`.  It is also equivalent to CLI parameter ``-k <keyfile>``
-   and ``trust_anchors.file = keyfile``.
-
 .. function:: trust_anchors.add_file(keyfile, readonly)
 
    :param string keyfile: path to the file.
@@ -425,6 +420,11 @@ policy, or automatically maintained by the resolver itself.
       nil
 
       [ ta ] key: 19036 state: Valid
+
+.. function:: trust_anchors.config(keyfile, readonly)
+
+   Alias for `add_file`.  It is also equivalent to CLI parameter ``-k <keyfile>``
+   and ``trust_anchors.file = keyfile``.
 
 .. envvar:: trust_anchors.keyfile_default = keyfile_default
 
