@@ -1,5 +1,5 @@
 *********
-Migration
+Upgrading
 *********
 
 .. _upgrade-from-3-to-4:
@@ -57,8 +57,8 @@ Packagers & Developers
   Valid configuration must open cache using `cache.open()` or `cache.size =`
   before executing cache operations like `cache.clear()`.
 
-Modules changes
-~~~~~~~~~~~~~~~
+Module changes
+~~~~~~~~~~~~~~
 
 * New layer was added: ``answer_finalize``.
 * ``kr_request`` keeps ``::qsource.packet`` beyond the ``begin`` layer.

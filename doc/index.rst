@@ -14,7 +14,7 @@ and it provides a state-machine like API for extensions.
    build
    lib
    modules_api
-   migration
+   upgrading
    NEWS
 
 

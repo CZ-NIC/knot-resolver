@@ -4,7 +4,7 @@ Knot Resolver 4.0.0 (2019-0m-dd)
 Incompatible changes
 --------------------
 - see migration guide:
-  https://knot-resolver.readthedocs.io/en/v4.0.0/migration.html#upgrade-from-3-to-4
+  https://knot-resolver.readthedocs.io/en/v4.0.0/upgrading.html#upgrade-from-3-to-4
 - meson build system is now used for builds (!771)
 - build with embedded LMBD is no longer supported
 - default modules dir location has changed
