@@ -4,11 +4,10 @@ Building from sources
 =====================
 
 .. note:: Latest up-to-date packages for various distribution can be obtained
-   from `<https://knot-resolver.cz/download/>`_
+   from web `<https://knot-resolver.cz/download/>`_.
 
-Knot-resolver is written for UNIX-like systems using modern C standards.
-Portable I/O is provided by libuv_.
-Some 64-bit systems with LuaJIT 2.1 may be affected by
+Knot Resolver is written for UNIX-like systems using modern C standards.
+Beware that some 64-bit systems with LuaJIT 2.1 may be affected by
 `a problem <https://github.com/LuaJIT/LuaJIT/blob/v2.1/doc/status.html#L100>`_
 -- Linux on x86_64 is unaffected but `Linux on aarch64 is
 <https://gitlab.labs.nic.cz/knot/knot-resolver/issues/216>`_.
@@ -20,28 +19,26 @@ Some 64-bit systems with LuaJIT 2.1 may be affected by
 Dependencies
 ------------
 
-.. warning:: Section *Dependencies* is not up-to-date. Also, individual modules
+.. note:: This section lists basic requirements. Individual modules
    might have additional build or runtime dependencies.
 
-The following is a list of dependencies needed to build and run Knot Resolver.
-
+The following dependencies are needed to build and run Knot Resolver:
 
 .. csv-table::
-   :header: "Requirement", "Required by", "Notes"
+   :header: "Requirement", "Notes"
 
-   "ninja", "*all*", "*(build_only)*"
-   "meson >= 0.46", "*all*", "*(build only)* [#]_"
-   "C and C++ compiler", "*all*", "*(build only)* [#]_"
-   "`pkg-config`_", "*all*", "*(build only)* [#]_"
-   "libknot_ 2.8+", "*all*", "Knot DNS libraries"
-   "LuaJIT_ 2.0+", "*all*", "Embedded scripting language."
-   "libuv_ 1.7+", "*all*", "Multiplatform I/O and services."
-   "lmdb", "*all*", "Memory-mapped database for cache"
-   "GnuTLS", "*all*", "TLS"
+   "ninja", "*build only*"
+   "meson >= 0.46", "*build only* [#]_"
+   "C and C++ compiler", "*build only* [#]_"
+   "`pkg-config`_", "*build only* [#]_"
+   "libknot_ 2.8+", "Knot DNS libraries"
+   "LuaJIT_ 2.0+", "Embedded scripting language"
+   "libuv_ 1.7+", "Multiplatform I/O and services [#]_"
+   "lmdb", "Memory-mapped database for cache"
+   "GnuTLS", "TLS"
 
 There are also *optional* packages that enable specific functionality in Knot
-Resolver, they are useful mainly for developers to build documentation and
-tests.
+Resolver:
 
 .. csv-table::
    :header: "Optional", "Needed for", "Notes"
@@ -67,7 +64,7 @@ tests.
 .. [#] If ``meson >= 0.46`` isn't available for your distro, check backports
    repository or use python pip to install it.
 .. [#] Requires ``__attribute__((cleanup))`` and ``-MMD -MP`` for
-   dependency file generation. GCC, Clang and ICC are supported.
+   dependency file generation. We test GCC and Clang, and ICC is likely to work as well.
 .. [#] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS``
    to configure dependencies manually (i.e. ``libknot_CFLAGS`` and
    ``libknot_LIBS``).
@@ -82,45 +79,17 @@ Packaged dependencies
    `home:CZ-NIC:knot-resolver-build
    <https://build.opensuse.org/project/show/home:CZ-NIC:knot-resolver-build>`_.
 
-Most of the dependencies can be resolved from packages, here's an overview for
-several platforms.
+On reasonably new systems most of the dependencies can be resolved from packages,
+here's an overview for several platforms.
 
-* **Debian** (since *sid*) - current stable doesn't have libknot and libuv,
-  which must be installed from sources.
+* **Debian/Ubuntu** - Current stable doesn't have new enough Meson
+  and libknot. Use repository above or build them yourself. Fresh list of dependencies can be found in `Debian control file in our repo <https://gitlab.labs.nic.cz/knot/knot-resolver/blob/master/distro/deb/control>`_, search for "Build-Depends".
 
-.. code-block:: bash
+* **CentOS/Fedora/RHEL/openSUSE** - Fresh list of dependencies can be found in `RPM spec file in our repo <https://gitlab.labs.nic.cz/knot/knot-resolver/blob/master/distro/rpm/knot-resolver.spec>`_, search for "BuildRequires".
 
-   sudo apt-get install pkg-config libknot-dev libuv1-dev libcmocka-dev libluajit-5.1-dev
-
-* **Ubuntu** - unknown.
-* **Fedora**
-
-.. code-block:: bash
-
-   # minimal build
-   sudo dnf install @buildsys-build knot-devel libuv-devel luajit-devel
-   # unit tests
-   sudo dnf install libcmocka-devel
-   # integration tests
-   sudo dnf install cmake git python-dns python-jinja2
-   # optional features
-   sudo dnf install lua-sec-compat lua-socket-compat systemd-devel
-   # docs
-   sudo dnf install doxygen python-breathe python-sphinx
-
-* **RHEL/CentOS** - unknown.
-* **openSUSE** - there is an `experimental package
-  <https://build.opensuse.org/package/show/server:dns/knot-resolver>`_.
 * **FreeBSD** - when installing from ports, all dependencies will install
   automatically, corresponding to the selected options.
-* **NetBSD** - unknown.
-* **OpenBSD** - unknown.
-* **Mac OS X** - the dependencies can be found through `Homebrew
-  <http://brew.sh/>`_.
-
-.. code-block:: bash
-
-   brew install pkg-config libuv luajit cmocka
+* **Mac OS X** - the dependencies can be obtained from `Homebrew formula <https://formulae.brew.sh/formula/knot-resolver>`_.
 
 Compilation
 -----------
@@ -130,11 +99,11 @@ library is recommended to avoid issues with loading a shared library.
 
 .. code-block:: bash
 
-   $ meson build_dev --prefix=/tmp/kr --default-library=static
-   $ ninja -C build_dev
-   $ ninja install -C build_dev
+   $ meson build_dir --prefix=/tmp/kr --default-library=static
+   $ ninja -C build_dir
+   $ ninja install -C build_dir
 
-Meson performs the build in the specified directory (``build_dev/`` in this
+Meson performs the build in the specified directory (``build_dir/`` in this
 case) and doesn't pollute the source tree.  This allows you to have multiple
 build roots with different build configurations at the same time.
 
@@ -153,15 +122,15 @@ For complete list of build options create a build directory and run:
 
 .. code-block:: bash
 
-   $ meson build_info
-   $ meson configure build_info
+   $ meson build_dir
+   $ meson configure build_dir
 
 To customize project build option, use ``-Doption=value`` when creating
 a build directory:
 
 .. code-block:: bash
 
-   $ meson build_doc -Ddoc=enabled
+   $ meson build_dir -Ddoc=enabled
 
 .. _build-custom-flags:
 
@@ -182,8 +151,8 @@ The following command runs all tests. By default, only unit tests are enabled.
 
 .. code-block:: bash
 
-   $ ninja -C build_dev
-   $ meson test -C build_dev
+   $ ninja -C build_dir
+   $ meson test -C build_dir
 
 More comprehensive tests require you to install kresd before running the test
 suite. To run all available tests, use ``-Dextra_tests=enabled`` build
@@ -191,18 +160,18 @@ option.
 
 .. code-block:: bash
 
-   $ ninja -C build_test
-   $ ninja install -C build_test
-   $ meson test -C build_test
+   $ ninja -C build_dir
+   $ ninja install -C build_dir
+   $ meson test -C build_dir
 
 It's also possible to run only specific test suite or a test.
 
 .. code-block:: bash
 
-   $ meson test -C build_test --help
-   $ meson test -C build_test --list
-   $ meson test -C build_test --no-suite postinstall
-   $ meson test -C build_test integration.serve_stale
+   $ meson test -C build_dir --help
+   $ meson test -C build_dir --list
+   $ meson test -C build_dir --no-suite postinstall
+   $ meson test -C build_dir integration.serve_stale
 
 .. _build-html-doc:
 
@@ -215,8 +184,8 @@ target ``doc`` must be called explicitly.
 
 .. code-block:: bash
 
-   $ meson build_doc -Ddoc=enabled
-   $ ninja -C build_doc doc
+   $ meson build_dir -Ddoc=enabled
+   $ ninja -C build_dir doc
 
 Tarball
 -------
@@ -227,7 +196,7 @@ To make a release tarball from git, use the follwing command. The
 
 .. code-block:: bash
 
-   $ ninja -C build_dev dist
+   $ ninja -C build_dir dist
 
 It's also possible to make a development snapshot tarball:
 
