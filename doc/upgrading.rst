@@ -2,10 +2,13 @@
 Upgrading
 *********
 
+This section summarizes steps required for upgrade to newer Knot Resolver versions.
+We advise users to also read :ref:`release_notes` for respective versions.
+
 .. _upgrade-from-3-to-4:
 
-Upgrade from 3.x to 4.x
-=======================
+3.x to 4.x
+==========
 
 Users
 -----
@@ -37,29 +40,33 @@ Module changes
 * ``kr_straddr_split()`` API has changed.
 
 
-Upgrade from 2.x to 3.x
-=======================
+.. _upgrade-from-2-to-3:
+
+2.x to 3.x
+==========
 
 Users
 -----
 
-* ``hints.use_nodata(true)`` by default.
-* In case you wrote custom Lua modules, please consult :ref:`significant-lua-changes`.
-* Removed modules: ``cookie`` (temporarily) and ``version`` (permanently).
+* Module :ref:`mod-hints` has option :func:`hints.use_nodata` enabled by default,
+  which is what most users expect. Add ``hints.use_nodata(false)`` to your config
+  to revert to the old behavior.
+* Modules ``cookie`` and ``version`` were removed.
+  Please remove relevant configuration lines with ``modules.load()`` and ``modules =``
+  from configuration file.
+* Valid configuration must open cache using ``cache.open()`` or ``cache.size =``
+  before executing cache operations like ``cache.clear()``.
+  (Older versions were silently ignoring such cache operations.)
 
 Packagers & Developers
 ----------------------
 
 * Knot DNS >= 2.7.2 is required.
-* cache: fail lua operations if cache isn't open yet (!639)
-  By default cache is opened *after* reading the configuration,
-  and older versions were silently ignoring cache operations.
-  Valid configuration must open cache using `cache.open()` or `cache.size =`
-  before executing cache operations like `cache.clear()`.
 
 Module changes
 ~~~~~~~~~~~~~~
 
+* API for Lua modules was refactored, please see :ref:`significant-lua-changes`.
 * New layer was added: ``answer_finalize``.
 * ``kr_request`` keeps ``::qsource.packet`` beyond the ``begin`` layer.
 * ``kr_request::qsource.tcp`` renamed to ``::qsource.flags.tcp``.
