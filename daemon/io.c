@@ -114,7 +114,7 @@ static int udp_bind_finalize(uv_handle_t *handle)
 	return io_start_read(handle);
 }
 
-int udp_bind(uv_udp_t *handle, struct sockaddr *addr)
+int udp_bind(uv_udp_t *handle, const struct sockaddr *addr)
 {
 	unsigned flags = UV_UDP_REUSEADDR;
 	if (addr->sa_family == AF_INET6) {
@@ -372,7 +372,8 @@ static int tcp_bind_finalize(uv_handle_t *handle)
 	return 0;
 }
 
-static int _tcp_bind(uv_tcp_t *handle, struct sockaddr *addr, uv_connection_cb connection, int tcp_backlog)
+static int _tcp_bind(uv_tcp_t *handle, const struct sockaddr *addr,
+			uv_connection_cb connection, int tcp_backlog)
 {
 	unsigned flags = 0;
 	if (addr->sa_family == AF_INET6) {
@@ -399,12 +400,12 @@ static int _tcp_bind(uv_tcp_t *handle, struct sockaddr *addr, uv_connection_cb c
 	return tcp_bind_finalize((uv_handle_t *)handle);
 }
 
-int tcp_bind(uv_tcp_t *handle, struct sockaddr *addr, int tcp_backlog)
+int tcp_bind(uv_tcp_t *handle, const struct sockaddr *addr, int tcp_backlog)
 {
 	return _tcp_bind(handle, addr, tcp_accept, tcp_backlog);
 }
 
-int tcp_bind_tls(uv_tcp_t *handle, struct sockaddr *addr, int tcp_backlog)
+int tcp_bind_tls(uv_tcp_t *handle, const struct sockaddr *addr, int tcp_backlog)
 {
 	return _tcp_bind(handle, addr, tls_accept, tcp_backlog);
 }
