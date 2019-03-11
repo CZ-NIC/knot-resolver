@@ -221,7 +221,7 @@ static endpoint_array_t *network_get(struct network *net, const char *addr, uint
 
 /** \note pass either sa != NULL xor fd != -1 */
 static int create_endpoint(struct network *net, const char *addr_str,
-				uint16_t port, uint32_t flags,
+				uint16_t port, uint16_t flags,
 				const struct sockaddr *sa, int fd)
 {
 	/* Bind interfaces */
@@ -250,7 +250,7 @@ int network_listen_fd(struct network *net, int fd, bool use_tls)
 	if (ret != 0) {
 		return kr_error(EBADF);
 	}
-	uint32_t flags;
+	uint16_t flags;
 	if (sock_type == SOCK_DGRAM) {
 		flags = NET_UDP;
 		if (use_tls) {
@@ -290,7 +290,7 @@ int network_listen_fd(struct network *net, int fd, bool use_tls)
 	return create_endpoint(net, addr_str, port, flags, NULL, fd);
 }
 
-int network_listen(struct network *net, const char *addr, uint16_t port, uint32_t flags)
+int network_listen(struct network *net, const char *addr, uint16_t port, uint16_t flags)
 {
 	if (net == NULL || addr == 0 || port == 0) {
 		return kr_error(EINVAL);

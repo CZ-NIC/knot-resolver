@@ -69,7 +69,7 @@ void network_deinit(struct network *net);
 
 /** Start listenting on addr#port.
  * \param flags see enum endpoint_flag; (NET_UDP | NET_TCP) is allowed. */
-int network_listen(struct network *net, const char *addr, uint16_t port, uint32_t flags);
+int network_listen(struct network *net, const char *addr, uint16_t port, uint16_t flags);
 
 /** Start listenting on an open file-descriptor. */
 int network_listen_fd(struct network *net, int fd, bool use_tls);
