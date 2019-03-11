@@ -169,7 +169,8 @@ static int net_close(lua_State *L)
 
 	/* Open resolution context cache */
 	struct engine *engine = engine_luaget(L);
-	int ret = network_close(&engine->net, lua_tostring(L, 1), lua_tointeger(L, 2));
+	int ret = network_close(&engine->net, lua_tostring(L, 1), lua_tointeger(L, 2),
+				lua_tointeger(L, 3)/* 0 if not number-like */);
 	lua_pushboolean(L, ret == 0);
 	return 1;
 }

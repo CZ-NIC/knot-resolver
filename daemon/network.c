@@ -204,13 +204,14 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 }
 
 /** @internal Fetch endpoint array and offset of the address/port query. */
-static endpoint_array_t *network_get(struct network *net, const char *addr, uint16_t port, size_t *index)
+static endpoint_array_t *network_get(struct network *net, const char *addr, uint16_t port,
+					uint16_t flags, size_t *index)
 {
 	endpoint_array_t *ep_array = map_get(&net->endpoints, addr);
 	if (ep_array) {
 		for (size_t i = ep_array->len; i--;) {
 			struct endpoint *ep = ep_array->at[i];
-			if (ep->port == port) {
+			if (ep->port == port && ep->flags == flags) {
 				*index = i;
 				return ep_array;
 			}
@@ -298,7 +299,7 @@ int network_listen(struct network *net, const char *addr, uint16_t port, uint16_
 
 	/* Already listening */
 	size_t index = 0;
-	if (network_get(net, addr, port, &index)) {
+	if (network_get(net, addr, port, flags, &index)) {
 		return kr_ok();
 	}
 
@@ -327,17 +328,29 @@ int network_listen(struct network *net, const char *addr, uint16_t port, uint16_
 	return ret;
 }
 
-int network_close(struct network *net, const char *addr, uint16_t port)
+int network_close(struct network *net, const char *addr, uint16_t port, uint16_t flags)
 {
-	size_t index = 0;
-	endpoint_array_t *ep_array = network_get(net, addr, port, &index);
+	endpoint_array_t *ep_array = map_get(&net->endpoints, addr);
 	if (!ep_array) {
 		return kr_error(ENOENT);
 	}
 
-	/* Close endpoint in array. */
-	close_endpoint(ep_array->at[index], false);
-	array_del(*ep_array, index);
+	size_t i = 0;
+	bool matched = false;
+	while (i < ep_array->len) {
+		struct endpoint *ep = ep_array->at[i];
+		if (!flags || flags == ep->flags) {
+			close_endpoint(ep, false);
+			array_del(*ep_array, i);
+			matched = true;
+			/* do not advance i */
+		} else {
+			++i;
+		}
+	}
+	if (!matched) {
+		return kr_error(ENOENT);
+	}
 
 	/* Collapse key if it has no endpoint. */
 	if (ep_array->len == 0) {
