@@ -5,6 +5,10 @@ config_tests += [
   ['ta_bootstrap', files('trust_anchors.test/bootstrap.test.lua')],
 ]
 
+integr_tests += [
+  ['ta_rfc5011', join_paths(meson.current_source_dir(), 'trust_anchors.test.integr')],
+]
+
 ta_config = configuration_data()
 ta_config.set('keyfile_default', keyfile_default)
 ta_config.set('etc_dir', etc_dir)
