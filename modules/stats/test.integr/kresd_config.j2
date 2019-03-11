@@ -91,7 +91,7 @@ assert(cache.backends() ~= nil)
 assert(worker.stats() ~= nil)
 assert(net.interfaces() ~= nil)
 -- Self-checks on loaded stuff
-assert(net.list()['{{SELF_ADDR}}'])
+assert(net.list()[1].ip == '{{SELF_ADDR}}')
 assert(#modules.list() > 0)
 -- Self-check timers
 ev = event.recurrent(1 * sec, function (ev) return 1 end)
