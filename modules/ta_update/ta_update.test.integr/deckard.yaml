@@ -5,7 +5,7 @@ programs:
     - -f
     - "1"
   templates:
-    - daemon/lua/trust_anchors.test.integr/kresd_config.j2
+    - modules/ta_update/ta_update.test.integr/kresd_config.j2
     - tests/integration/hints_zone.j2
   configs:
     - config
