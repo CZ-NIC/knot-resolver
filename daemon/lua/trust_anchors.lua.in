@@ -201,12 +201,16 @@ local function ta_present(keyset, rr, hold_down_time, force_valid)
 	if rr.type == kres.type.DNSKEY and not C.kr_dnssec_key_ksk(rr.rdata) then
 		return false -- Ignore
 	end
+    -- Attempt to extract key_tag
+	local key_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
+    if key_tag < 0 or key_tag > 65535 then
+        warn(string.format('[ ta ] ignoring invalid or unsupported RR: %s: %s',
+            kres.rr2str(rr), ffi.string(C.knot_strerror(key_tag))))
+        return false
+    end
 	-- Find the key in current key set and check its status
 	local now = os.time()
 	local key_revoked = (rr.type == kres.type.DNSKEY) and C.kr_dnssec_key_revoked(rr.rdata)
-	local key_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
-	assert(key_tag >= 0 and key_tag <= 65535, string.format('invalid RR: %s: %s',
-	       kres.rr2str(rr), ffi.string(C.knot_strerror(key_tag))))
 	local ta = ta_find(keyset, rr)
 	if ta then
 		-- Key reappears (KeyPres)
