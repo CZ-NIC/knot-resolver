@@ -6,6 +6,8 @@ config_tests += [
 ]
 
 integr_tests += [
+  # NOTE: ta_rfc5011 may fail due to race condition; to ensure it passes, deckard should
+  # introduce a timeout
   ['ta_rfc5011', join_paths(meson.current_source_dir(), 'trust_anchors.test.integr')],
 ]
 
