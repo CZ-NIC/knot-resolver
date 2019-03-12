@@ -316,6 +316,7 @@ end
 
 -- Load embedded modules
 trust_anchors = require('trust_anchors')
+modules.load('ta_update')
 modules.load('ta_signal_query')
 modules.load('policy')
 modules.load('priming')
