@@ -633,13 +633,21 @@ static int bind_fds(struct network *net, fd_array_t *fd_set, bool tls) {
 }
 
 static int bind_sockets(struct network *net, addr_array_t *addr_set, bool tls) {
-	uint32_t flags = tls ? NET_TCP|NET_TLS : NET_UDP|NET_TCP;
+	endpoint_flags_t flags = { .tls = tls };
 	for (size_t i = 0; i < addr_set->len; ++i) {
 		uint16_t port = tls ? KR_DNS_TLS_PORT : KR_DNS_PORT;
 		char addr_str[INET6_ADDRSTRLEN + 1];
 		int ret = kr_straddr_split(addr_set->at[i], addr_str, &port);
-		if (ret == 0)
+
+		if (ret == 0 && !tls) {
+			flags.sock_type = SOCK_DGRAM;
 			ret = network_listen(net, addr_str, port, flags);
+		}
+		if (ret == 0) { /* common for TCP and TLS */
+			flags.sock_type = SOCK_STREAM;
+			ret = network_listen(net, addr_str, port, flags);
+		}
+
 		if (ret != 0) {
 			kr_log_error("[system] bind to '%s' %s%s\n",
 				addr_set->at[i], tls ? "(TLS) " : "", kr_strerror(ret));

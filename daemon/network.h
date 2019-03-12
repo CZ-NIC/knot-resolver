@@ -27,18 +27,23 @@
 
 struct engine;
 
-enum endpoint_flag {
-	NET_DOWN = 0,
-	NET_UDP  = 1 << 0,
-	NET_TCP  = 1 << 1,
-	NET_TLS  = 1 << 2, /**< only used together with NET_TCP */
-};
+/** Ways to listen for DNS on a port. */
+typedef struct {
+	int sock_type;	/**< SOCK_DGRAM or SOCK_STREAM */
+	bool tls;	/**< only used together with .tcp */
+} endpoint_flags_t;
+
+static inline bool endpoint_flags_eq(endpoint_flags_t f1, endpoint_flags_t f2)
+{
+	/* memcmp() would typically work, but there's no guarantee. */
+	return f1.sock_type == f2.sock_type && f1.tls == f2.tls;
+}
 
 /** Wrapper for a single socket to listen on. */
 struct endpoint {
 	uv_handle_t *handle; /** uv_udp_t or uv_tcp_t */
 	uint16_t port;
-	uint16_t flags; /**< see enum endpoint_flag; (_UDP | _TCP) *not* allowed */
+	endpoint_flags_t flags;
 };
 
 /** @cond internal Array of endpoints */
@@ -68,17 +73,20 @@ struct network {
 void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog);
 void network_deinit(struct network *net);
 
-/** Start listenting on addr#port.
- * \param flags see enum endpoint_flag; (NET_UDP | NET_TCP) is allowed.
- * \note if we did listen already, nothing is done and kr_ok() is returned. */
-int network_listen(struct network *net, const char *addr, uint16_t port, uint16_t flags);
+/** Start listenting on addr#port with flags.
+ * \note if we did listen on that combination already,
+ *       nothing is done and kr_ok() is returned.
+ * \note there's no short-hand to listen both on UDP and TCP. */
+int network_listen(struct network *net, const char *addr, uint16_t port,
+		   endpoint_flags_t flags);
 
 /** Start listenting on an open file-descriptor. */
 int network_listen_fd(struct network *net, int fd, bool use_tls);
 
-/** Stop listening on all addr#port with equal flags; flags == 0 means all of them.
+/** Stop listening on all addr#port with equal flags.
  * \return kr_error(ENOENT) if nothing matched. */
-int network_close(struct network *net, const char *addr, uint16_t port, uint16_t flags);
+int network_close(struct network *net, const char *addr, uint16_t port,
+		  endpoint_flags_t flags);
 
 int network_set_tls_cert(struct network *net, const char *cert);
 int network_set_tls_key(struct network *net, const char *key);
