@@ -3,6 +3,9 @@ net.ipv4 = false
 net.ipv6 = false
 policy.add(policy.all(policy.STUB({ '::1:2:3:4', '1.2.3.4' })))
 
+-- make sure DNSSEC is turned off for tests
+trust_anchors.keyfile_default = nil
+
 -- Disable RFC8145 signaling, scenario doesn't provide expected answers
 if ta_signal_query then
         modules.unload('ta_signal_query')

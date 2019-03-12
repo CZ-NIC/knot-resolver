@@ -31,6 +31,7 @@
 #include <libknot/version.h>
 #include <uv.h>
 
+#include "kresconfig.h"
 #include "lib/defines.h"
 #include "lib/utils.h"
 #include "lib/generic/array.h"

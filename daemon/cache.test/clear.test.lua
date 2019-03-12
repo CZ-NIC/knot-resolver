@@ -31,7 +31,7 @@ event.cancel(ev)
 ev = event.after(0, function () return 1 end)
 
 
--- Import fake root zone; avoid interference with configured KEYFILE_DEFAULT.
+-- Import fake root zone; avoid interference with configured keyfile_default.
 trust_anchors.keyfile_default = nil
 trust_anchors.add('. IN DS 48409 8 2 3D63A0C25BCE86621DE63636F11B35B908EFE8E9381E0E3E9DEFD89EA952C27D')
 

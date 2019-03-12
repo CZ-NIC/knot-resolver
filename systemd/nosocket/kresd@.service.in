@@ -1,0 +1,13 @@
+[Unit]
+Description=Knot Resolver daemon
+Documentation=man:kresd.systemd.nosocket(7)
+Documentation=man:kresd(8)
+
+[Service]
+Type=simple
+WorkingDirectory=@systemd_work_dir@
+ExecStart=@sbin_dir@/kresd --config=@etc_dir@/kresd.conf --forks=1
+Restart=on-abnormal
+
+[Install]
+WantedBy=kresd.target

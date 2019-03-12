@@ -1,0 +1,56 @@
+net = { '{{SELF_ADDR}}' }
+-- hints.root({['k.root-servers.net'] = '{{ROOT_ADDR}}'})
+_hint_root_file('hints')
+
+-- make sure DNSSEC is turned off for tests
+trust_anchors.keyfile_default = nil
+
+cache.size = 2*MB
+
+
+{% if QMIN == "false" %}
+option('NO_MINIMIZE', true)
+{% else %}
+option('NO_MINIMIZE', false)
+{% endif %}
+
+{% if DO_NOT_QUERY_LOCALHOST == "false" %}
+option('ALLOW_LOCAL', true)
+{% else %}
+option('ALLOW_LOCAL', false)
+{% endif %}
+
+{% if HARDEN_GLUE == "true" %}
+mode('normal')
+{% else %}
+mode('permissive')
+{% endif %}
+
+{% for TAF in TRUST_ANCHOR_FILES %}
+trust_anchors.add_file('{{TAF}}')
+{% endfor %}
+trust_anchors.set_insecure({
+
+{% for DI in NEGATIVE_TRUST_ANCHORS %}
+"{{DI}}",
+{% endfor %}
+})
+
+verbose(true)
+
+-- Self-checks on globals
+assert(help() ~= nil)
+assert(worker.id ~= nil)
+-- Self-checks on facilities
+assert(cache.count() == 0)
+assert(cache.stats() ~= nil)
+assert(cache.backends() ~= nil)
+assert(worker.stats() ~= nil)
+assert(net.interfaces() ~= nil)
+-- Self-checks on loaded stuff
+assert(net.list()['{{SELF_ADDR}}'])
+assert(#modules.list() > 0)
+-- Self-check timers
+ev = event.recurrent(1 * sec, function (ev) return 1 end)
+event.cancel(ev)
+ev = event.after(0, function (ev) return 1 end)

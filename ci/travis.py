@@ -36,10 +36,10 @@ while time.time() < end_time:
         except KeyError:
             pass
 
-        if state == "errored":
-            exit("Travis CI Result: ERRORED!")
-        elif state == "passed":
+        if state == "passed":
             exit("Travis CI Result: PASSED!", code=0)
+        else:
+            exit("Travis CI Result: {}!".format(state.upper()))
     else:
         exit("API Response Code: {code}".format(response.status_code), code=2)
     time.sleep(POLL_DELAY)

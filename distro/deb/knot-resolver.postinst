@@ -12,19 +12,12 @@ if [ "$1" = "triggered" ]; then
     if [ "$2" = "/usr/share/dns/root.key" ]; then
         # systemctl of the sub-services is the preferred method to restart
         systemctl try-restart 'kresd@*.service' || true
-        # but if we are running sysvinit, we can try to restart that process anyway
-        # (kresd.service is masked on systems that use systemd)
-        invoke-rc.d kresd try-restart || true
     fi
     exit 0
 fi
 
 if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ] ; then
-    if [ -d /run/systemd/system ]; then
-        systemctl try-restart 'kresd@*.service' || true
-    else
-        invoke-rc.d kresd try-restart || true
-    fi
+    systemctl try-restart 'kresd@*.service' || true
 fi
 
 #DEBHELPER#

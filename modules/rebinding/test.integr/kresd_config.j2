@@ -1,4 +1,7 @@
 {% raw %}
+-- make sure DNSSEC is turned off for tests
+trust_anchors.keyfile_default = nil
+
 -- Disable RFC8145 signaling, scenario doesn't provide expected answers
 if ta_signal_query then
         modules.unload('ta_signal_query')

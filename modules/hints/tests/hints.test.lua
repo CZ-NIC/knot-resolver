@@ -16,7 +16,7 @@ end
 -- test loading from config file
 local function test_custom()
 	-- load custom root hints file with fake ip address for a.root-server.net
-	local err_msg = hints.root_file(TEST_DIR .. 'hints_test.zone')
+	local err_msg = hints.root_file('hints_test.zone')
 	same(err_msg, '', 'load root hints from file')
 
 	-- get loaded root hints and change names to lowercase

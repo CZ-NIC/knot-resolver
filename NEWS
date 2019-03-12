@@ -1,5 +1,16 @@
-Knot Resolver 3.x.y (2019-0m-dd)
+Knot Resolver 4.0.0 (2019-0m-dd)
 ================================
+
+Incompatible changes
+--------------------
+- see upgrading guide:
+  https://knot-resolver.readthedocs.io/en/v4.0.0/upgrading.html#upgrade-from-3-to-4
+- meson build system is now used for builds (!771)
+- build with embedded LMBD is no longer supported
+- default modules dir location has changed
+- DNSSEC is enabled by default
+- upstream packages for Debian now require systemd
+- libknot >= 2.8 is required
 
 Improvements
 ------------
@@ -7,6 +18,7 @@ Improvements
 - hints module: allow configuring the TTL and change default from 0 to 5s
 - policy module: policy.rpz() will watch the file for changes by default
 - packaging: lua cqueues added to default dependencies where available
+- systemd: service is no longer auto-restarted on configuration errors
 
 Bugfixes
 --------

@@ -261,7 +261,7 @@ int ffimodule_register_lua(struct engine *engine, struct kr_module *module, cons
 	/* Register module in Lua */
 	lua_State *L = engine->L;
 	lua_getglobal(L, "require");
-	lua_pushstring(L, name);
+	lua_pushfstring(L, "kres_modules.%s", name);
 	if (lua_pcall(L, 1, LUA_MULTRET, 0) != 0) {
 		fprintf(stderr, "error: %s\n", lua_tostring(L, -1));
 		lua_pop(L, 1);

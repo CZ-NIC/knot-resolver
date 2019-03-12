@@ -31,6 +31,7 @@
 #include <libknot/rrset.h>
 #include <libknot/rrtype/rrsig.h>
 
+#include "kresconfig.h"
 #include "lib/generic/array.h"
 #include "lib/defines.h"
 
