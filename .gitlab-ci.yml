@@ -404,7 +404,7 @@ fwd-udp6-unbound.tls6:
     - >
       sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
       $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
-      "$(git rev-parse --short HEAD)" -l $LABEL --asan -t $RESPERF_TEST)
+      "$(git rev-parse --short HEAD)" -l $LABEL --asan -t $RESPERF_TEST --knot-branch=$KNOT_VERSION)
     - export EXITCODE=$(cat $TESTDIR/j*_exitcode)
     - if [[ "$EXITCODE" == "0" ]]; then cat $TESTDIR/j*_resperf.txt; else cat $TESTDIR/j*_kresd.docker.txt; fi
     - exit $EXITCODE
