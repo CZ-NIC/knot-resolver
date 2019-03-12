@@ -19,6 +19,7 @@ Improvements
 - policy module: policy.rpz() will watch the file for changes by default
 - packaging: lua cqueues added to default dependencies where available
 - systemd: service is no longer auto-restarted on configuration errors
+- always send DO+CD flags upstream, even in insecure zones
 
 Bugfixes
 --------
