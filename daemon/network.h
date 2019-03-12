@@ -47,7 +47,7 @@ struct endpoint {
 };
 
 /** @cond internal Array of endpoints */
-typedef array_t(struct endpoint*) endpoint_array_t;
+typedef array_t(struct endpoint) endpoint_array_t;
 /* @endcond */
 
 struct net_tcp_param {
