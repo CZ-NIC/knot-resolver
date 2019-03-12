@@ -74,21 +74,12 @@ static void close_handle(uv_handle_t *handle, bool force)
 	}
 }
 
-static int close_endpoint(struct endpoint *ep, bool force)
-{
-	if (ep->handle) {
-		close_handle(ep->handle, force);
-	}
-	free(ep);
-	return kr_ok();
-}
-
 /** Endpoint visitor (see @file map.h) */
 static int close_key(const char *key, void *val, void *ext)
 {
 	endpoint_array_t *ep_array = val;
-	for (size_t i = ep_array->len; i--;) {
-		close_endpoint(ep_array->at[i], true);
+	for (int i = 0; i < ep_array->len; ++i) {
+		close_handle(ep_array->at[i].handle, true);
 	}
 	return 0;
 }
@@ -116,7 +107,7 @@ void network_deinit(struct network *net)
 	}
 }
 
-/** Fetch or create endpoint array and insert endpoint. */
+/** Fetch or create endpoint array and insert endpoint (shallow memcpy). */
 static int insert_endpoint(struct network *net, const char *addr, struct endpoint *ep)
 {
 	/* Fetch or insert address into map */
@@ -133,9 +124,10 @@ static int insert_endpoint(struct network *net, const char *addr, struct endpoin
 		array_init(*ep_array);
 	}
 
-	if (array_push(*ep_array, ep) < 0) {
+	if (array_reserve(*ep_array, ep_array->len + 1)) {
 		return kr_error(ENOMEM);
 	}
+	memcpy(&ep_array->at[ep_array->len++], ep, sizeof(*ep));
 	return kr_ok();
 }
 
@@ -203,18 +195,19 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 	return kr_error(EINVAL);
 }
 
-/** @internal Fetch endpoint array and offset of the address/port query. */
-static endpoint_array_t *network_get(struct network *net, const char *addr, uint16_t port,
-					endpoint_flags_t flags, size_t *index)
+/** @internal Fetch a pointer to endpoint of given parameters (or NULL).
+ * Beware that there might be multiple matches, though that's not common. */
+static struct endpoint * endpoint_get(struct network *net, const char *addr,
+					uint16_t port, endpoint_flags_t flags)
 {
 	endpoint_array_t *ep_array = map_get(&net->endpoints, addr);
-	if (ep_array) {
-		for (size_t i = ep_array->len; i--;) {
-			struct endpoint *ep = ep_array->at[i];
-			if (ep->port == port && endpoint_flags_eq(ep->flags, flags)) {
-				*index = i;
-				return ep_array;
-			}
+	if (!ep_array) {
+		return NULL;
+	}
+	for (int i = 0; i < ep_array->len; ++i) {
+		struct endpoint *ep = &ep_array->at[i];
+		if (ep->port == port && endpoint_flags_eq(ep->flags, flags)) {
+			return ep;
 		}
 	}
 	return NULL;
@@ -226,18 +219,17 @@ static int create_endpoint(struct network *net, const char *addr_str,
 				const struct sockaddr *sa, int fd)
 {
 	/* Bind interfaces */
-	struct endpoint *ep = calloc(1, sizeof(*ep));
-	if (!ep) {
-		return kr_error(ENOMEM);
-	}
-	ep->port = port;
-	ep->flags = flags;
-	int ret = open_endpoint(net, ep, sa, fd);
+	struct endpoint ep = {
+		.handle = NULL,
+		.port = port,
+		.flags = flags,
+	};
+	int ret = open_endpoint(net, &ep, sa, fd);
 	if (ret == 0) {
-		ret = insert_endpoint(net, addr_str, ep);
+		ret = insert_endpoint(net, addr_str, &ep);
 	}
-	if (ret != 0) {
-		close_endpoint(ep, false);
+	if (ret != 0 && ep.handle) {
+		close_handle(ep.handle, false);
 	}
 	return ret;
 }
@@ -290,8 +282,7 @@ int network_listen(struct network *net, const char *addr, uint16_t port,
 		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
-	size_t index = 0;
-	if (network_get(net, addr, port, flags, &index)) {
+	if (endpoint_get(net, addr, port, flags)) {
 		return kr_ok(); /* Already listening */
 	}
 
@@ -320,9 +311,9 @@ int network_close(struct network *net, const char *addr, uint16_t port,
 	size_t i = 0;
 	bool matched = false;
 	while (i < ep_array->len) {
-		struct endpoint *ep = ep_array->at[i];
+		struct endpoint *ep = &ep_array->at[i];
 		if (endpoint_flags_eq(flags, ep->flags)) {
-			close_endpoint(ep, false);
+			close_handle(ep->handle, false);
 			array_del(*ep_array, i);
 			matched = true;
 			/* do not advance i */
@@ -368,7 +359,7 @@ static int set_bpf_cb(const char *key, void *val, void *ext)
 	assert(bpffd != NULL);
 
 	for (size_t i = 0; i < endpoints->len; i++) {
-		struct endpoint *endpoint = endpoints->at[i];
+		struct endpoint *endpoint = &endpoints->at[i];
 		uv_os_fd_t sockfd = -1;
 		if (endpoint->handle != NULL)
 			uv_fileno(endpoint->handle, &sockfd);
@@ -406,7 +397,7 @@ static int clear_bpf_cb(const char *key, void *val, void *ext)
 	assert(endpoints != NULL);
 
 	for (size_t i = 0; i < endpoints->len; i++) {
-		struct endpoint *endpoint = endpoints->at[i];
+		struct endpoint *endpoint = &endpoints->at[i];
 		uv_os_fd_t sockfd = -1;
 		if (endpoint->handle != NULL)
 			uv_fileno(endpoint->handle, &sockfd);

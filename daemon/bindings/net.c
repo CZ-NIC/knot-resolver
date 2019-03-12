@@ -29,8 +29,8 @@ static int net_list_add(const char *key, void *val, void *ext)
 	lua_State *L = (lua_State *)ext;
 	lua_Integer i = lua_tointeger(L, -1);
 	endpoint_array_t *ep_array = val;
-	for (size_t j = ep_array->len; j--;) {
-		struct endpoint *ep = ep_array->at[j];
+	for (int j = 0; j < ep_array->len; ++j) {
+		struct endpoint *ep = &ep_array->at[j];
 		lua_newtable(L);  // connection tuple
 
 		lua_pushstring(L, key);
