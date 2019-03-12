@@ -151,8 +151,8 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 		return kr_error(EEXIST);
 	}
 
-	if (ep->flags & NET_UDP) {
-		if (ep->flags & (NET_TCP | NET_TLS)) {
+	if (ep->flags.sock_type == SOCK_DGRAM) {
+		if (ep->flags.tls) {
 			assert(!EINVAL);
 			return kr_error(EINVAL);
 		}
@@ -174,7 +174,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 		}
 	} /* else */
 
-	if (ep->flags & NET_TCP) {
+	if (ep->flags.sock_type == SOCK_STREAM) {
 		uv_tcp_t *ep_handle = calloc(1, sizeof(uv_tcp_t));
 		ep->handle = (uv_handle_t *)ep_handle;
 		if (!ep->handle) {
@@ -188,7 +188,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 				return ret;
 			}
 		}
-		if (ep->flags & NET_TLS) {
+		if (ep->flags.tls) {
 			return sa
 				? tcp_bind_tls  (ep_handle, sa, net->tcp_backlog)
 				: tcp_bindfd_tls(ep_handle, fd, net->tcp_backlog);
@@ -205,13 +205,13 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 
 /** @internal Fetch endpoint array and offset of the address/port query. */
 static endpoint_array_t *network_get(struct network *net, const char *addr, uint16_t port,
-					uint16_t flags, size_t *index)
+					endpoint_flags_t flags, size_t *index)
 {
 	endpoint_array_t *ep_array = map_get(&net->endpoints, addr);
 	if (ep_array) {
 		for (size_t i = ep_array->len; i--;) {
 			struct endpoint *ep = ep_array->at[i];
-			if (ep->port == port && ep->flags == flags) {
+			if (ep->port == port && endpoint_flags_eq(ep->flags, flags)) {
 				*index = i;
 				return ep_array;
 			}
@@ -222,7 +222,7 @@ static endpoint_array_t *network_get(struct network *net, const char *addr, uint
 
 /** \note pass either sa != NULL xor fd != -1 */
 static int create_endpoint(struct network *net, const char *addr_str,
-				uint16_t port, uint16_t flags,
+				uint16_t port, endpoint_flags_t flags,
 				const struct sockaddr *sa, int fd)
 {
 	/* Bind interfaces */
@@ -230,8 +230,8 @@ static int create_endpoint(struct network *net, const char *addr_str,
 	if (!ep) {
 		return kr_error(ENOMEM);
 	}
-	ep->flags = flags;
 	ep->port = port;
+	ep->flags = flags;
 	int ret = open_endpoint(net, ep, sa, fd);
 	if (ret == 0) {
 		ret = insert_endpoint(net, addr_str, ep);
@@ -245,25 +245,17 @@ static int create_endpoint(struct network *net, const char *addr_str,
 int network_listen_fd(struct network *net, int fd, bool use_tls)
 {
 	/* Extract fd's socket type. */
-	int sock_type;
-	socklen_t len = sizeof(sock_type);
-	int ret = getsockopt(fd, SOL_SOCKET, SO_TYPE, &sock_type, &len);
+	endpoint_flags_t flags = { .tls = use_tls };
+	socklen_t len = sizeof(flags.sock_type);
+	int ret = getsockopt(fd, SOL_SOCKET, SO_TYPE, &flags.sock_type, &len);
 	if (ret != 0) {
 		return kr_error(errno);
 	}
-	uint16_t flags;
-	if (sock_type == SOCK_DGRAM) {
-		flags = NET_UDP;
-		if (use_tls) {
-			assert(!EINVAL);
-			return kr_error(EINVAL);
-		}
-	} else if (sock_type == SOCK_STREAM) {
-		flags = NET_TCP;
-		if (use_tls) {
-			flags |= NET_TLS;
-		}
-	} else {
+	if (flags.sock_type == SOCK_DGRAM && use_tls) {
+		assert(!EINVAL);
+		return kr_error(EINVAL);
+	}
+	if (flags.sock_type != SOCK_DGRAM && flags.sock_type != SOCK_STREAM) {
 		return kr_error(EBADF);
 	}
 
@@ -291,16 +283,16 @@ int network_listen_fd(struct network *net, int fd, bool use_tls)
 	return create_endpoint(net, addr_str, port, flags, NULL, fd);
 }
 
-int network_listen(struct network *net, const char *addr, uint16_t port, uint16_t flags)
+int network_listen(struct network *net, const char *addr, uint16_t port,
+		   endpoint_flags_t flags)
 {
 	if (net == NULL || addr == 0 || port == 0) {
+		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
-
-	/* Already listening */
 	size_t index = 0;
 	if (network_get(net, addr, port, flags, &index)) {
-		return kr_ok();
+		return kr_ok(); /* Already listening */
 	}
 
 	/* Parse address. */
@@ -314,21 +306,11 @@ int network_listen(struct network *net, const char *addr, uint16_t port, uint16_
 	if (ret != 0) {
 		return ret;
 	}
-
-	if ((flags & NET_UDP) && (flags & NET_TCP)) {
-		/* We accept  ^^ this shorthand at this API layer. */
-		ret = create_endpoint(net, addr, port, flags & ~NET_TCP, &sa.ip, -1);
-		if (ret == 0) {
-			ret = create_endpoint(net, addr, port, flags & ~NET_UDP, &sa.ip, -1);
-		}
-	} else {
-		ret = create_endpoint(net, addr, port, flags, &sa.ip, -1);
-	}
-
-	return ret;
+	return create_endpoint(net, addr, port, flags, &sa.ip, -1);
 }
 
-int network_close(struct network *net, const char *addr, uint16_t port, uint16_t flags)
+int network_close(struct network *net, const char *addr, uint16_t port,
+		  endpoint_flags_t flags)
 {
 	endpoint_array_t *ep_array = map_get(&net->endpoints, addr);
 	if (!ep_array) {
@@ -339,7 +321,7 @@ int network_close(struct network *net, const char *addr, uint16_t port, uint16_t
 	bool matched = false;
 	while (i < ep_array->len) {
 		struct endpoint *ep = ep_array->at[i];
-		if (!flags || flags == ep->flags) {
+		if (endpoint_flags_eq(flags, ep->flags)) {
 			close_endpoint(ep, false);
 			array_del(*ep_array, i);
 			matched = true;
