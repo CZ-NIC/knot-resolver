@@ -420,7 +420,11 @@ int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire,
 			       uint32_t qry_uid, bool check_dups,
 			       bool (*extraCheck)(const ranked_rr_array_entry_t *));
 
-KR_PURE
+/**
+ * @return Newly allocated string representation of packet.
+ * Caller has to free() returned string.
+ */
+KR_EXPORT
 char *kr_pkt_text(const knot_pkt_t *pkt);
 
 KR_PURE

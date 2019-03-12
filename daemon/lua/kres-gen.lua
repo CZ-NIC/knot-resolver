@@ -303,6 +303,7 @@ int kr_pkt_recycle(knot_pkt_t *);
 int kr_pkt_clear_payload(knot_pkt_t *);
 uint16_t kr_pkt_qclass(const knot_pkt_t *);
 uint16_t kr_pkt_qtype(const knot_pkt_t *);
+char *kr_pkt_text(const knot_pkt_t *);
 void kr_rnd_buffered(void *, unsigned int);
 uint32_t kr_rrsig_sig_inception(const knot_rdata_t *);
 uint32_t kr_rrsig_sig_expiration(const knot_rdata_t *);
