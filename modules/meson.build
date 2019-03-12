@@ -14,6 +14,7 @@ lua_mod_src = [  # add lua modules without separate meson.build
   files('serve_stale/serve_stale.lua'),
   files('ta_sentinel/ta_sentinel.lua'),
   files('ta_signal_query/ta_signal_query.lua'),
+  files('ta_update/ta_update.lua'),
   files('workarounds/workarounds.lua'),
 ]
 
@@ -28,6 +29,9 @@ integr_tests += [
   ['bogus_log', join_paths(meson.current_source_dir(), 'bogus_log', 'test.integr')],
   ['rebinding', join_paths(meson.current_source_dir(), 'rebinding', 'test.integr')],
   ['serve_stale', join_paths(meson.current_source_dir(), 'serve_stale', 'test.integr')],
+  # NOTE: ta_update may fail due to race condition; to ensure it passes, deckard should
+  # introduce a timeout
+  ['ta_update', join_paths(meson.current_source_dir(), 'ta_update', 'ta_update.test.integr')],
 ]
 
 
