@@ -579,7 +579,7 @@ local add_file = function (path, unmanaged)
 	end
 	-- TODO: if failed and for root, try to rebootstrap?
 
-	if not unmanaged then refresh_plan(keyset, 10 * sec, false) end
+	if not unmanaged then refresh_plan(keyset, 0 * sec, false) end
 end
 
 local function ta_str(owner)
