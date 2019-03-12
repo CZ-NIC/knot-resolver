@@ -14,6 +14,7 @@ new_read_globals = {
 	'cache',
 	'modules',
 	'trust_anchors',
+	'ta_update',
 	'worker',
 	'event',
 	'_hint_root_file',
