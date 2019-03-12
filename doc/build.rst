@@ -94,8 +94,20 @@ here's an overview for several platforms.
 Compilation
 -----------
 
-When installing into custom prefix during development / testing, using static
-library is recommended to avoid issues with loading a shared library.
+.. note::
+
+   Knot Resolver uses `Meson Build system <https://mesonbuild.com/>`_.
+   Shell snippets below should be sufficient for basic usage
+   but users unfamiliar with Meson Build might want to read introductory
+   article `Using Meson <https://mesonbuild.com/Quick-guide.html>`_.
+
+Following example script will:
+
+  - create new build directory named ``build_dir``
+  - configure installation path ``/tmp/kr``
+  - enable static build (to allow installation to non-standard path)
+  - build Knot Resolver
+  - install it into the previously configured path
 
 .. code-block:: bash
 
@@ -103,9 +115,7 @@ library is recommended to avoid issues with loading a shared library.
    $ ninja -C build_dir
    $ ninja install -C build_dir
 
-Meson performs the build in the specified directory (``build_dir/`` in this
-case) and doesn't pollute the source tree.  This allows you to have multiple
-build roots with different build configurations at the same time.
+At this point you can execute the newly installed binary using path ``/tmp/kr/sbin/kresd``.
 
 .. note:: When compiling on OS X, creating a shared library is currently not
    possible when using luajit package from Homebrew due to `#37169
@@ -125,12 +135,19 @@ For complete list of build options create a build directory and run:
    $ meson build_dir
    $ meson configure build_dir
 
-To customize project build option, use ``-Doption=value`` when creating
+To customize project build options, use ``-Doption=value`` when creating
 a build directory:
 
 .. code-block:: bash
 
    $ meson build_dir -Ddoc=enabled
+
+... or change options in an already existing build directory:
+
+.. code-block:: bash
+
+   $ meson configure build_dir -Ddoc=enabled
+
 
 .. _build-custom-flags:
 
@@ -147,16 +164,16 @@ command.
 Tests
 -----
 
-The following command runs all tests. By default, only unit tests are enabled.
+The following command runs all enabled tests. By default, only unit tests are enabled.
 
 .. code-block:: bash
 
    $ ninja -C build_dir
    $ meson test -C build_dir
 
-More comprehensive tests require you to install kresd before running the test
-suite. To run all available tests, use ``-Dextra_tests=enabled`` build
-option.
+More comprehensive tests require you to install ``kresd`` into the configured prefix
+before running the test suite. To run all available tests,
+use ``-Dextra_tests=enabled`` build option.
 
 .. code-block:: bash
 
@@ -244,17 +261,16 @@ To support enabling services after boot, you must also link ``kresd.target`` to
 Trust anchors
 ~~~~~~~~~~~~~
 
-If the target distro has externally managed DNSSEC trust anchors or root hints:
+If the target distro has externally managed (read-only) DNSSEC trust anchors
+or root hints use this:
 
 * ``-Dkeyfile_default=/usr/share/dns/root.key``
 * ``-Droot_hints=/usr/share/dns/root.hints``
+* ``-Dmanaged_ta=disabled``
 
 In case you want to have automatically managed DNSSEC trust anchors instead,
-set the following and make sure both ``root.keys`` (check default
-``keyfile_default`` path in summary) and its parent directory will be writable
-by kresd process. This also requires luasocket_ and luasec_ runtime dependencies.
-
-* ``-Dmanaged_ta=enabled``
+set ``-Dmanaged_ta=enabled`` and make sure both ``keyfile_default`` file and
+its parent directories are writable by kresd process (after package installation!).
 
 Docker image
 ------------
