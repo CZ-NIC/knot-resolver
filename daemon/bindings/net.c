@@ -27,20 +27,53 @@
 static int net_list_add(const char *key, void *val, void *ext)
 {
 	lua_State *L = (lua_State *)ext;
+	lua_Integer i = lua_tointeger(L, -1);
 	endpoint_array_t *ep_array = val;
-	lua_newtable(L);
-	for (size_t i = ep_array->len; i--;) {
-		struct endpoint *ep = ep_array->at[i];
-		lua_pushinteger(L, ep->port);
-		lua_setfield(L, -2, "port");
-		lua_pushboolean(L, ep->flags & NET_UDP);
-		lua_setfield(L, -2, "udp");
-		lua_pushboolean(L, ep->flags & NET_TCP);
-		lua_setfield(L, -2, "tcp");
-		lua_pushboolean(L, ep->flags & NET_TLS);
-		lua_setfield(L, -2, "tls");
+	for (int j = 0; j < ep_array->len; ++j) {
+		struct endpoint *ep = &ep_array->at[j];
+		lua_newtable(L);  // connection tuple
+
+		lua_pushstring(L, key);
+		lua_setfield(L, -2, "ip");
+
+		lua_newtable(L);  // "transport" table
+		switch (ep->flags.sock_type) {
+		case SOCK_DGRAM:
+			lua_pushliteral(L, "udp");
+			lua_setfield(L, -2, "protocol");
+			lua_pushinteger(L, ep->port);
+			lua_setfield(L, -2, "port");
+			lua_pushliteral(L, "none");
+			lua_setfield(L, -2, "security");
+			break;
+		case SOCK_STREAM:
+			lua_pushliteral(L, "tcp");
+			lua_setfield(L, -2, "protocol");
+			lua_pushinteger(L, ep->port);
+			lua_setfield(L, -2, "port");
+			if (ep->flags.tls) {
+				lua_pushliteral(L, "tls");
+			} else {
+				lua_pushliteral(L, "none");
+			}
+			lua_setfield(L, -2, "security");
+			break;
+		default:
+			assert(!EINVAL);
+			lua_pushliteral(L, "unknown");
+			lua_setfield(L, -2, "protocol");
+		}
+		lua_setfield(L, -2, "transport");
+
+		lua_newtable(L);  // "application" table
+		lua_pushliteral(L, "dns");
+		lua_setfield(L, -2, "protocol");
+		lua_setfield(L, -2, "application");
+
+		lua_settable(L, -3);
+		i++;
+		lua_pushinteger(L, i);
 	}
-	lua_setfield(L, -2, key);
 	return kr_ok();
 }
 
@@ -49,12 +82,14 @@ static int net_list(lua_State *L)
 {
 	struct engine *engine = engine_luaget(L);
 	lua_newtable(L);
+	lua_pushinteger(L, 1);
 	map_walk(&engine->net.endpoints, net_list_add, L);
+	lua_pop(L, 1);
 	return 1;
 }
 
 /** Listen on an address list represented by the top of lua stack. */
-static int net_listen_addrs(lua_State *L, int port, int flags)
+static int net_listen_addrs(lua_State *L, int port, bool tls)
 {
 	/* Case: table with 'addr' field; only follow that field directly. */
 	lua_getfield(L, -1, "addr");
@@ -68,7 +103,16 @@ static int net_listen_addrs(lua_State *L, int port, int flags)
 	const char *str = lua_tostring(L, -1);
 	if (str != NULL) {
 		struct engine *engine = engine_luaget(L);
-		int ret = network_listen(&engine->net, str, port, flags);
+		endpoint_flags_t flags = { .tls = tls };
+		int ret = 0;
+		if (!tls) {
+			flags.sock_type = SOCK_DGRAM;
+			ret = network_listen(&engine->net, str, port, flags);
+		}
+		if (ret == 0) { /* common for TCP and TLS */
+			flags.sock_type = SOCK_STREAM;
+			ret = network_listen(&engine->net, str, port, flags);
+		}
 		if (ret != 0) {
 			kr_log_info("[system] bind to '%s@%d' %s\n",
 					str, port, kr_strerror(ret));
@@ -81,7 +125,7 @@ static int net_listen_addrs(lua_State *L, int port, int flags)
 		lua_error_p(L, "bad type for address");
 	lua_pushnil(L);
 	while (lua_next(L, -2)) {
-		if (net_listen_addrs(L, port, flags) == 0)
+		if (net_listen_addrs(L, port, tls) == 0)
 			return 0;
 		lua_pop(L, 1);
 	}
@@ -119,11 +163,10 @@ static int net_listen(lua_State *L)
 	if (n > 2 && lua_istable(L, 3)) {
 		tls = table_get_flag(L, 3, "tls", tls);
 	}
-	int flags = tls ? (NET_TCP|NET_TLS) : (NET_TCP|NET_UDP);
 
 	/* Now focus on the first argument. */
 	lua_pop(L, n - 1);
-	int res = net_listen_addrs(L, port, flags);
+	int res = net_listen_addrs(L, port, tls);
 	lua_pushboolean(L, res);
 	return res;
 }
@@ -137,9 +180,27 @@ static int net_close(lua_State *L)
 		lua_error_p(L, "expected 'close(string addr, number port)'");
 
 	/* Open resolution context cache */
-	struct engine *engine = engine_luaget(L);
-	int ret = network_close(&engine->net, lua_tostring(L, 1), lua_tointeger(L, 2));
-	lua_pushboolean(L, ret == 0);
+	struct network *net = &engine_luaget(L)->net;
+	const char *addr = lua_tostring(L, 1);
+	const uint16_t port = lua_tointeger(L, 2);
+	endpoint_flags_t flags_all[] = {
+		{ .sock_type = SOCK_DGRAM,  .tls = false },
+		{ .sock_type = SOCK_STREAM, .tls = false },
+		{ .sock_type = SOCK_STREAM, .tls = true },
+	};
+	bool success = false; /*< at least one deletion succeeded */
+	int ret = 0;
+	for (int i = 0; i < sizeof(flags_all) / sizeof(flags_all[0]); ++i) {
+		ret = network_close(net, addr, port, flags_all[i]);
+		if (ret == 0) {
+			success = true;
+		} else if (ret != kr_error(ENOENT)) {
+			break;
+		}
+		ret = 0;
+	}
+	/* true: no fatal error and at least one kr_ok() */
+	lua_pushboolean(L, ret == 0 && success);
 	return 1;
 }
 
