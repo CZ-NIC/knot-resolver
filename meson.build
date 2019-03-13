@@ -20,6 +20,9 @@ if not lmdb.found()  # darwin workaround: missing pkgconfig
 endif
 gnutls = dependency('gnutls')
 luajit = dependency('luajit')
+# NOTE avoid using link_args for luajit due to a macOS issue
+# https://github.com/Homebrew/homebrew-core/issues/37169
+luajit_inc = luajit.partial_dependency(compile_args: true, includes: true)
 message('------------------------------')
 
 
@@ -44,8 +47,7 @@ systemd_work_dir = ''
 run_dir = ''
 systemd_unit_dir = ''
 systemd_tmpfiles_dir = ''
-mod_inc_dir = include_directories('.', 'contrib/',
-  luajit.get_pkgconfig_variable('includedir'))
+mod_inc_dir = include_directories('.', 'contrib/')
 
 ## Trust anchors
 managed_ta = get_option('managed_ta') == 'enabled'
