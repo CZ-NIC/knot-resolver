@@ -95,7 +95,7 @@ if ta then
 		ta.timer = nil
 	end
 	if rr.state ~= key_state.Valid or verbose() then
-		log('[ ta_update ] key: ' .. key_tag .. ' state: '..ta.state)
+		log('[ta_update] key: ' .. key_tag .. ' state: '..ta.state)
 	end
 	return true
 elseif not key_revoked then -- First time seen (NewKey)
@@ -107,7 +107,7 @@ elseif not key_revoked then -- First time seen (NewKey)
 			rr.timer = now + hold_down_time
 		end
 		if rr.state ~= key_state.Valid or verbose() then
-			log('[ ta_update ] key: ' .. key_tag .. ' state: '..rr.state)
+			log('[ta_update] key: ' .. key_tag .. ' state: '..rr.state)
 		end
 		table.insert(keyset, rr)
 		return true
@@ -132,15 +132,15 @@ local function ta_missing(ta, hold_down_time)
 	-- Remove key that is missing for too long
 	elseif ta.state == key_state.Missing and os.difftime(ta.timer, os.time()) <= 0 then
 		ta.state = key_state.Removed
-		log('[ ta_update ] key: '..key_tag..' removed because missing for too long')
+		log('[ta_update] key: '..key_tag..' removed because missing for too long')
 		keep_ta = false
 
 	-- Purge pending key
 	elseif ta.state == key_state.AddPend then
-		log('[ ta_update ] key: '..key_tag..' purging')
+		log('[ta_update] key: '..key_tag..' purging')
 		keep_ta = false
 	end
-	log('[ ta_update ] key: '..key_tag..' state: '..ta.state)
+	log('[ta_update] key: '..key_tag..' state: '..ta.state)
 	return keep_ta
 end
 
@@ -197,7 +197,7 @@ local function update(keyset, new_keys, is_initial)
 		-- TODO: try to rebootstrap if for root?
 		return false
 	elseif verbose() then
-		log('[ ta_update ] refreshed trust anchors for domain ' .. kres.dname2str(keyset.owner) .. ' are:\n'
+		log('[ta_update] refreshed trust anchors for domain ' .. kres.dname2str(keyset.owner) .. ' are:\n'
 			.. trust_anchors.summary(keyset.owner))
 	end
 
@@ -218,7 +218,7 @@ local function active_refresh(keyset, pkt, is_initial)
 		update(keyset, new_keys, is_initial)
 		retry = false
 	else
-		warn('[ ta_update ] active refresh failed for ' .. kres.dname2str(keyset.owner)
+		warn('[ta_update] active refresh failed for ' .. kres.dname2str(keyset.owner)
 			.. ' with rcode: ' .. pkt:rcode())
 	end
 	-- Calculate refresh/retry timer (RFC 5011, 2.3)
@@ -238,7 +238,7 @@ local function refresh_plan(keyset, delay, is_initial)
 			-- Schedule itself with updated timeout
 			local delay_new = active_refresh(keyset, kres.pkt_t(pkt), is_initial)
 			delay_new = keyset.refresh_time or ta_update.refresh_time or delay_new
-			log('[ ta_update ] next refresh for ' .. owner_str .. ' in '
+			log('[ta_update] next refresh for ' .. owner_str .. ' in '
 				.. delay_new/hour .. ' hours')
 			refresh_plan(keyset, delay_new)
 		end)
