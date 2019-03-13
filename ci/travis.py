@@ -38,6 +38,8 @@ while time.time() < end_time:
 
         if state == "passed":
             exit("Travis CI Result: PASSED!", code=0)
+        elif state == "started":
+            continue
         else:
             exit("Travis CI Result: {}!".format(state.upper()))
     else:
