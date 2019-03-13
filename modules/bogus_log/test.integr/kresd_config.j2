@@ -34,6 +34,11 @@ function reply_result(state, req)
 end
 policy.add(policy.pattern(reply_result, 'bogus_log.test.'))
 
+-- Disable RFC5011 TA update
+if ta_update then
+        modules.unload('ta_update')
+end
+
 -- Disable RFC8145 signaling, scenario doesn't provide expected answers
 if ta_signal_query then
         modules.unload('ta_signal_query')
