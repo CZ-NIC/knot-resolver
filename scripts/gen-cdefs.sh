@@ -26,7 +26,7 @@ fi
 case "$1" in
 	libknot) library="$(PATH="$(pkg-config libknot --variable=libdir)" command -v "$1.so")" ;;
 	libzscanner) library="$(PATH="$(pkg-config libzscanner --variable=libdir)" command -v "$1.so")" ;;
-	*) library="$(PATH="$(pwd)/lib" command -v "$1.so")"
+	*) library="$(command -v "$1")"  # use absolute path to library
 esac
 
 if [ -z "$library" ]; then
@@ -60,6 +60,8 @@ grep -v '^#\|^$' | while read -r ident; do
 	output="$(echo "$output" | sed 's/\buint\b/unsigned int/g')"
 	# GDB 8.2+ added source line prefix to output
 	output="$(echo "$output" | sed 's/^[0-9]\+:[[:space:]]*//g')"
+	# use tabs instead of spaces
+	output="$(echo "$output" | sed 's/    /\t/g')"
 
 	# abort on empty output
 	if [ -z "$(echo "$output" | tr -d "\n;")" ]; then

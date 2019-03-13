@@ -1,6 +1,9 @@
 #!/bin/bash
 set -o errexit -o nounset -o xtrace
 
+cd "$(dirname ${0})/.."
+PKGDIR="build_dist/meson-dist"
+
 # Run with -s to include *.symbols files.
 
 package=knot-resolver
@@ -18,8 +21,9 @@ done
 shift $((OPTIND-1))
 
 
-cd "$(git rev-parse --show-toplevel)"
+pushd ${PKGDIR}
 version=$(ls ${package}*.tar.xz | sed "s/${package}-\(.*\).tar.xz/\1/")
+popd
 
 # Check version for invalid characters
 if [[ $(echo "${version}" | grep '^[[:alnum:].]$') -ne 0 ]]; then
@@ -36,7 +40,7 @@ done
 # Rename archive to debian format
 pkgname="${package}-${version}"
 debname="${package}_${version}.orig"
-mv "${pkgname}.tar.xz" "${debname}.tar.xz"
+cp "${PKGDIR}/${pkgname}.tar.xz" "${debname}.tar.xz"
 
 # Prepare clean debian-specific directory
 tar -xf "${debname}.tar.xz"

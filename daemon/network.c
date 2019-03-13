@@ -25,25 +25,25 @@
 #if defined(UV_VERSION_HEX)
 #if (__linux__ && SO_REUSEPORT)
   #define handle_init(type, loop, handle, family) do { \
-	uv_ ## type ## _init_ex((loop), (handle), (family)); \
+	uv_ ## type ## _init_ex((loop), (uv_ ## type ## _t *)(handle), (family)); \
 	uv_os_fd_t hi_fd = 0; \
-	if (uv_fileno((uv_handle_t *)(handle), &hi_fd) == 0) { \
+	if (uv_fileno((handle), &hi_fd) == 0) { \
 		int hi_on = 1; \
 		int hi_ret = setsockopt(hi_fd, SOL_SOCKET, SO_REUSEPORT, &hi_on, sizeof(hi_on)); \
 		if (hi_ret) { \
-			return hi_ret; \
+			return kr_error(errno); \
 		} \
 	} \
   } while (0)
 /* libuv 1.7.0+ is able to assign fd immediately */
 #else
   #define handle_init(type, loop, handle, family) do { \
-	uv_ ## type ## _init_ex((loop), (handle), (family)); \
+	uv_ ## type ## _init_ex((loop), (uv_ ## type ## _t *)(handle), (family)); \
   } while (0)
 #endif
 #else
   #define handle_init(type, loop, handle, family) \
-	uv_ ## type ## _init((loop), (handle))
+	uv_ ## type ## _init((loop), (uv_ ## type ## _t *)(handle))
 #endif
 
 void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog)
@@ -74,25 +74,12 @@ static void close_handle(uv_handle_t *handle, bool force)
 	}
 }
 
-static int close_endpoint(struct endpoint *ep, bool force)
-{
-	if (ep->udp) {
-		close_handle((uv_handle_t *)ep->udp, force);
-	}
-	if (ep->tcp) {
-		close_handle((uv_handle_t *)ep->tcp, force);
-	}
-
-	free(ep);
-	return kr_ok();
-}
-
 /** Endpoint visitor (see @file map.h) */
 static int close_key(const char *key, void *val, void *ext)
 {
 	endpoint_array_t *ep_array = val;
-	for (size_t i = ep_array->len; i--;) {
-		close_endpoint(ep_array->at[i], true);
+	for (int i = 0; i < ep_array->len; ++i) {
+		close_handle(ep_array->at[i].handle, true);
 	}
 	return 0;
 }
@@ -120,7 +107,7 @@ void network_deinit(struct network *net)
 	}
 }
 
-/** Fetch or create endpoint array and insert endpoint. */
+/** Fetch or create endpoint array and insert endpoint (shallow memcpy). */
 static int insert_endpoint(struct network *net, const char *addr, struct endpoint *ep)
 {
 	/* Fetch or insert address into map */
@@ -137,130 +124,139 @@ static int insert_endpoint(struct network *net, const char *addr, struct endpoin
 		array_init(*ep_array);
 	}
 
-	if (array_push(*ep_array, ep) < 0) {
+	if (array_reserve(*ep_array, ep_array->len + 1)) {
 		return kr_error(ENOMEM);
 	}
+	memcpy(&ep_array->at[ep_array->len++], ep, sizeof(*ep));
 	return kr_ok();
 }
 
-/** Open endpoint protocols. */
-static int open_endpoint(struct network *net, struct endpoint *ep, struct sockaddr *sa, uint32_t flags)
+/** Open endpoint protocols.  ep->flags were pre-set. */
+static int open_endpoint(struct network *net, struct endpoint *ep,
+			 const struct sockaddr *sa, int fd)
 {
-	int ret = 0;
-	if (flags & NET_UDP) {
-		ep->udp = malloc(sizeof(*ep->udp));
-		if (!ep->udp) {
-			return kr_error(ENOMEM);
-		}
-		memset(ep->udp, 0, sizeof(*ep->udp));
-		handle_init(udp, net->loop, ep->udp, sa->sa_family); /* can return! */
-		ret = udp_bind(ep->udp, sa);
-		if (ret != 0) {
-			return ret;
-		}
-		ep->flags |= NET_UDP;
+	if ((sa != NULL) == (fd != -1)) {
+		assert(!EINVAL);
+		return kr_error(EINVAL);
 	}
-	if (flags & NET_TCP) {
-		ep->tcp = malloc(sizeof(*ep->tcp));
-		if (!ep->tcp) {
-			return kr_error(ENOMEM);
-		}
-		memset(ep->tcp, 0, sizeof(*ep->tcp));
-		handle_init(tcp, net->loop, ep->tcp, sa->sa_family); /* can return! */
-		if (flags & NET_TLS) {
-			ret = tcp_bind_tls(ep->tcp, sa, net->tcp_backlog);
-			ep->flags |= NET_TLS;
-		} else {
-			ret = tcp_bind(ep->tcp, sa, net->tcp_backlog);
-		}
-		if (ret != 0) {
-			return ret;
-		}
-		ep->flags |= NET_TCP;
+	if (ep->handle) {
+		return kr_error(EEXIST);
 	}
-	return ret;
-}
 
-/** Open fd as endpoint. */
-static int open_endpoint_fd(struct network *net, struct endpoint *ep, int fd, int sock_type, bool use_tls)
-{
-	int ret = kr_ok();
-	if (sock_type == SOCK_DGRAM) {
-		if (use_tls) {
-			/* we do not support TLS over UDP */
-			return kr_error(EBADF);
+	if (ep->flags.sock_type == SOCK_DGRAM) {
+		if (ep->flags.tls) {
+			assert(!EINVAL);
+			return kr_error(EINVAL);
 		}
-		if (ep->udp) {
-			return kr_error(EEXIST);
-		}
-		ep->udp = malloc(sizeof(*ep->udp));
-		if (!ep->udp) {
+		uv_udp_t *ep_handle = calloc(1, sizeof(uv_udp_t));
+		ep->handle = (uv_handle_t *)ep_handle;
+		if (!ep->handle) {
 			return kr_error(ENOMEM);
 		}
-		uv_udp_init(net->loop, ep->udp);
-		ret = udp_bindfd(ep->udp, fd);
-		if (ret != 0) {
-			close_handle((uv_handle_t *)ep->udp, false);
-			return ret;
-		}
-		ep->flags |= NET_UDP;
-		return kr_ok();
-	} else if (sock_type == SOCK_STREAM) {
-		if (ep->tcp) {
-			return kr_error(EEXIST);
-		}
-		ep->tcp = malloc(sizeof(*ep->tcp));
-		if (!ep->tcp) {
-			return kr_error(ENOMEM);
-		}
-		uv_tcp_init(net->loop, ep->tcp);
-		if (use_tls) {
-			ret = tcp_bindfd_tls(ep->tcp, fd, net->tcp_backlog);
-			ep->flags |= NET_TLS;
+		if (sa) {
+			handle_init(udp, net->loop, ep->handle, sa->sa_family);
+				/*^^ can return! */
+			return udp_bind(ep_handle, sa);
 		} else {
-			ret = tcp_bindfd(ep->tcp, fd, net->tcp_backlog);
-		}
-		if (ret != 0) {
-			close_handle((uv_handle_t *)ep->tcp, false);
+			int ret = uv_udp_init(net->loop, ep_handle);
+			if (ret == 0) {
+				ret = udp_bindfd(ep_handle, fd);
+			}
 			return ret;
 		}
-		ep->flags |= NET_TCP;
-		return kr_ok();
-	}
+	} /* else */
+
+	if (ep->flags.sock_type == SOCK_STREAM) {
+		uv_tcp_t *ep_handle = calloc(1, sizeof(uv_tcp_t));
+		ep->handle = (uv_handle_t *)ep_handle;
+		if (!ep->handle) {
+			return kr_error(ENOMEM);
+		}
+		if (sa) {
+			handle_init(tcp, net->loop, ep->handle, sa->sa_family); /* can return! */
+		} else {
+			int ret = uv_tcp_init(net->loop, ep_handle);
+			if (ret) {
+				return ret;
+			}
+		}
+		if (ep->flags.tls) {
+			return sa
+				? tcp_bind_tls  (ep_handle, sa, net->tcp_backlog)
+				: tcp_bindfd_tls(ep_handle, fd, net->tcp_backlog);
+		} else {
+			return sa
+				? tcp_bind  (ep_handle, sa, net->tcp_backlog)
+				: tcp_bindfd(ep_handle, fd, net->tcp_backlog);
+		}
+	} /* else */
+
+	assert(!EINVAL);
 	return kr_error(EINVAL);
 }
 
-/** @internal Fetch endpoint array and offset of the address/port query. */
-static endpoint_array_t *network_get(struct network *net, const char *addr, uint16_t port, size_t *index)
+/** @internal Fetch a pointer to endpoint of given parameters (or NULL).
+ * Beware that there might be multiple matches, though that's not common. */
+static struct endpoint * endpoint_get(struct network *net, const char *addr,
+					uint16_t port, endpoint_flags_t flags)
 {
 	endpoint_array_t *ep_array = map_get(&net->endpoints, addr);
-	if (ep_array) {
-		for (size_t i = ep_array->len; i--;) {
-			struct endpoint *ep = ep_array->at[i];
-			if (ep->port == port) {
-				*index = i;
-				return ep_array;
-			}
+	if (!ep_array) {
+		return NULL;
+	}
+	for (int i = 0; i < ep_array->len; ++i) {
+		struct endpoint *ep = &ep_array->at[i];
+		if (ep->port == port && endpoint_flags_eq(ep->flags, flags)) {
+			return ep;
 		}
 	}
 	return NULL;
 }
 
+/** \note pass either sa != NULL xor fd != -1 */
+static int create_endpoint(struct network *net, const char *addr_str,
+				uint16_t port, endpoint_flags_t flags,
+				const struct sockaddr *sa, int fd)
+{
+	/* Bind interfaces */
+	struct endpoint ep = {
+		.handle = NULL,
+		.port = port,
+		.flags = flags,
+	};
+	int ret = open_endpoint(net, &ep, sa, fd);
+	if (ret == 0) {
+		ret = insert_endpoint(net, addr_str, &ep);
+	}
+	if (ret != 0 && ep.handle) {
+		close_handle(ep.handle, false);
+	}
+	return ret;
+}
+
 int network_listen_fd(struct network *net, int fd, bool use_tls)
 {
-	/* Extract local address and socket type. */
-	int sock_type = SOCK_DGRAM;
-	socklen_t len = sizeof(sock_type);
-	int ret = getsockopt(fd, SOL_SOCKET, SO_TYPE, &sock_type, &len);
+	/* Extract fd's socket type. */
+	endpoint_flags_t flags = { .tls = use_tls };
+	socklen_t len = sizeof(flags.sock_type);
+	int ret = getsockopt(fd, SOL_SOCKET, SO_TYPE, &flags.sock_type, &len);
 	if (ret != 0) {
+		return kr_error(errno);
+	}
+	if (flags.sock_type == SOCK_DGRAM && use_tls) {
+		assert(!EINVAL);
+		return kr_error(EINVAL);
+	}
+	if (flags.sock_type != SOCK_DGRAM && flags.sock_type != SOCK_STREAM) {
 		return kr_error(EBADF);
 	}
+
 	/* Extract local address for this socket. */
 	struct sockaddr_storage ss = { .ss_family = AF_UNSPEC };
 	socklen_t addr_len = sizeof(ss);
 	ret = getsockname(fd, (struct sockaddr *)&ss, &addr_len);
 	if (ret != 0) {
-		return kr_error(EBADF);
+		return kr_error(errno);
 	}
 	int port = 0;
 	char addr_str[INET6_ADDRSTRLEN]; /* https://tools.ietf.org/html/rfc4291 */
@@ -276,69 +272,58 @@ int network_listen_fd(struct network *net, int fd, bool use_tls)
 
 	/* always create endpoint for supervisor supplied fd
 	 * even if addr+port is not unique */
-	struct endpoint *ep = malloc(sizeof(*ep));
-	memset(ep, 0, sizeof(*ep));
-	ep->flags = NET_DOWN;
-	ep->port = port;
-	ret = insert_endpoint(net, addr_str, ep);
-	if (ret != 0) {
-		return ret;
-	}
-	/* Create a libuv struct for this socket. */
-	return open_endpoint_fd(net, ep, fd, sock_type, use_tls);
+	return create_endpoint(net, addr_str, port, flags, NULL, fd);
 }
 
-int network_listen(struct network *net, const char *addr, uint16_t port, uint32_t flags)
+int network_listen(struct network *net, const char *addr, uint16_t port,
+		   endpoint_flags_t flags)
 {
 	if (net == NULL || addr == 0 || port == 0) {
+		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
-
-	/* Already listening */
-	size_t index = 0;
-	if (network_get(net, addr, port, &index)) {
-		return kr_ok();
+	if (endpoint_get(net, addr, port, flags)) {
+		return kr_ok(); /* Already listening */
 	}
 
 	/* Parse address. */
 	int ret = 0;
-	struct sockaddr_storage sa;
+	union inaddr sa;
 	if (strchr(addr, ':') != NULL) {
-		ret = uv_ip6_addr(addr, port, (struct sockaddr_in6 *)&sa);
+		ret = uv_ip6_addr(addr, port, &sa.ip6);
 	} else {
-		ret = uv_ip4_addr(addr, port, (struct sockaddr_in *)&sa);
+		ret = uv_ip4_addr(addr, port, &sa.ip4);
 	}
 	if (ret != 0) {
 		return ret;
 	}
-
-	/* Bind interfaces */
-	struct endpoint *ep = malloc(sizeof(*ep));
-	memset(ep, 0, sizeof(*ep));
-	ep->flags = NET_DOWN;
-	ep->port = port;
-	ret = open_endpoint(net, ep, (struct sockaddr *)&sa, flags);
-	if (ret == 0) {
-		ret = insert_endpoint(net, addr, ep);
-	}
-	if (ret != 0) {
-		close_endpoint(ep, false);
-	}
-
-	return ret;
+	return create_endpoint(net, addr, port, flags, &sa.ip, -1);
 }
 
-int network_close(struct network *net, const char *addr, uint16_t port)
+int network_close(struct network *net, const char *addr, uint16_t port,
+		  endpoint_flags_t flags)
 {
-	size_t index = 0;
-	endpoint_array_t *ep_array = network_get(net, addr, port, &index);
+	endpoint_array_t *ep_array = map_get(&net->endpoints, addr);
 	if (!ep_array) {
 		return kr_error(ENOENT);
 	}
 
-	/* Close endpoint in array. */
-	close_endpoint(ep_array->at[index], false);
-	array_del(*ep_array, index);
+	size_t i = 0;
+	bool matched = false;
+	while (i < ep_array->len) {
+		struct endpoint *ep = &ep_array->at[i];
+		if (endpoint_flags_eq(flags, ep->flags)) {
+			close_handle(ep->handle, false);
+			array_del(*ep_array, i);
+			matched = true;
+			/* do not advance i */
+		} else {
+			++i;
+		}
+	}
+	if (!matched) {
+		return kr_error(ENOENT);
+	}
 
 	/* Collapse key if it has no endpoint. */
 	if (ep_array->len == 0) {
@@ -374,10 +359,10 @@ static int set_bpf_cb(const char *key, void *val, void *ext)
 	assert(bpffd != NULL);
 
 	for (size_t i = 0; i < endpoints->len; i++) {
-		struct endpoint *endpoint = endpoints->at[i];
+		struct endpoint *endpoint = &endpoints->at[i];
 		uv_os_fd_t sockfd = -1;
-		if (endpoint->tcp != NULL) uv_fileno((const uv_handle_t *)endpoint->tcp, &sockfd);
-		if (endpoint->udp != NULL) uv_fileno((const uv_handle_t *)endpoint->udp, &sockfd);
+		if (endpoint->handle != NULL)
+			uv_fileno(endpoint->handle, &sockfd);
 		assert(sockfd != -1);
 
 		if (setsockopt(sockfd, SOL_SOCKET, SO_ATTACH_BPF, bpffd, sizeof(int)) != 0) {
@@ -412,10 +397,10 @@ static int clear_bpf_cb(const char *key, void *val, void *ext)
 	assert(endpoints != NULL);
 
 	for (size_t i = 0; i < endpoints->len; i++) {
-		struct endpoint *endpoint = endpoints->at[i];
+		struct endpoint *endpoint = &endpoints->at[i];
 		uv_os_fd_t sockfd = -1;
-		if (endpoint->tcp != NULL) uv_fileno((const uv_handle_t *)endpoint->tcp, &sockfd);
-		if (endpoint->udp != NULL) uv_fileno((const uv_handle_t *)endpoint->udp, &sockfd);
+		if (endpoint->handle != NULL)
+			uv_fileno(endpoint->handle, &sockfd);
 		assert(sockfd != -1);
 
 		if (setsockopt(sockfd, SOL_SOCKET, SO_DETACH_BPF, NULL, 0) != 0) {

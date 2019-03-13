@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "kresconfig.h"
 #include "lib/defines.h"
 #include "lib/utils.h"
 

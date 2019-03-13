@@ -63,13 +63,6 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 /** Preliminary checks before stash_rrset().  Don't call if returns <= 0. */
 static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qry/*logs*/);
 
-/** @internal Removes all records from cache. */
-static inline int cache_clear(struct kr_cache *cache)
-{
-	cache->stats.delete += 1;
-	return cache_op(cache, clear);
-}
-
 /** @internal Open cache db transaction and check internal data version. */
 static int assert_right_version(struct kr_cache *cache)
 {
@@ -97,7 +90,7 @@ static int assert_right_version(struct kr_cache *cache)
 				memcpy(&ver, val.data, sizeof(ver));
 				kr_log_verbose("bad version: %d\n", (int)ver);
 			}
-			ret = cache_clear(cache);
+			ret = cache_op(cache, clear);
 		}
 		/* Either purged or empty. */
 		if (ret == 0) {
@@ -107,7 +100,7 @@ static int assert_right_version(struct kr_cache *cache)
 			ret = cache_op(cache, write, &key, &val, 1);
 		}
 	}
-	kr_cache_sync(cache);
+	kr_cache_commit(cache);
 	return ret;
 }
 
@@ -121,11 +114,11 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 		api = kr_cdb_lmdb();
 	}
 	cache->api = api;
-	int ret = cache->api->open(&cache->db, opts, mm);
+	memset(&cache->stats, 0, sizeof(cache->stats));
+	int ret = cache->api->open(&cache->db, &cache->stats, opts, mm);
 	if (ret != 0) {
 		return ret;
 	}
-	memset(&cache->stats, 0, sizeof(cache->stats));
 	cache->ttl_min = KR_CACHE_DEFAULT_TTL_MIN;
 	cache->ttl_max = KR_CACHE_DEFAULT_TTL_MAX;
 	/* Check cache ABI version */
@@ -157,13 +150,13 @@ void kr_cache_close(struct kr_cache *cache)
 	kr_cache_emergency_file_to_remove = NULL;
 }
 
-int kr_cache_sync(struct kr_cache *cache)
+int kr_cache_commit(struct kr_cache *cache)
 {
 	if (!cache_isvalid(cache)) {
 		return kr_error(EINVAL);
 	}
-	if (cache->api->sync) {
-		return cache_op(cache, sync);
+	if (cache->api->commit) {
+		return cache_op(cache, commit);
 	}
 	return kr_ok();
 }
@@ -189,7 +182,7 @@ int kr_cache_clear(struct kr_cache *cache)
 	if (!cache_isvalid(cache)) {
 		return kr_error(EINVAL);
 	}
-	int ret = cache_clear(cache);
+	int ret = cache_op(cache, clear);
 	if (ret == 0) {
 		kr_cache_make_checkpoint(cache);
 		ret = assert_right_version(cache);
@@ -336,7 +329,7 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	int ret = peek_nosync(ctx, pkt);
-	kr_cache_sync(&req->ctx->cache);
+	kr_cache_commit(&req->ctx->cache);
 	return ret;
 }
 
@@ -414,7 +407,7 @@ finally:
 	if (unauth_cnt) {
 		VERBOSE_MSG(qry, "=> stashed also %d nonauth RRsets\n", unauth_cnt);
 	};
-	kr_cache_sync(cache);
+	kr_cache_commit(cache);
 	return ctx->state; /* we ignore cache-stashing errors */
 }
 
@@ -550,7 +543,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 
 	#if 0 /* Occasionally useful when debugging some kinds of changes. */
 	{
-	kr_cache_sync(cache);
+	kr_cache_commit(cache);
 	knot_db_val_t val = { NULL, 0 };
 	ret = cache_op(cache, read, &key, &val, 1);
 	if (ret != kr_error(ENOENT)) { // ENOENT might happen in some edge case, I guess
@@ -560,9 +553,6 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	}
 	}
 	#endif
-
-	/* Update metrics */
-	cache->stats.insert += 1;
 
 	/* Verbose-log some not-too-common cases. */
 	WITH_VERBOSE(qry) { if (kr_rank_test(rank, KR_RANK_AUTH)
@@ -877,9 +867,9 @@ int kr_cache_remove_subtree(struct kr_cache *cache, const knot_dname_t *name,
 		}
 		memcpy(keys[i].data, keyval[i][0].data, keys[i].len);
 	}
-	ret = cache->api->remove(cache->db, keys, count);
+	ret = cache_op(cache, remove, keys, count);
 cleanup:
-	kr_cache_sync(cache); /* Sync even after just kr_cache_match(). */
+	kr_cache_commit(cache); /* Sync even after just kr_cache_match(). */
 	/* Free keys */
 	while (--i >= 0) {
 		free(keys[i].data);

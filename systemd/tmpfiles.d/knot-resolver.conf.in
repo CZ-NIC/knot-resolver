@@ -1,0 +1,4 @@
+# tmpfiles.d(5) directories for knot-resolver (kresd)
+#Type Path                            Mode UID           GID          Age Argument
+    d @run_dir@                       0750 root          root          -   -
+    d @systemd_work_dir@              0750 @user@        @group@       -   -

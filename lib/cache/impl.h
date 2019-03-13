@@ -394,7 +394,7 @@ int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 #define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "cach",  ## __VA_ARGS__)
 
 /** Shorthand for operations on cache backend */
-#define cache_op(cache, op, ...) (cache)->api->op((cache)->db, ## __VA_ARGS__)
+#define cache_op(cache, op, ...) (cache)->api->op((cache)->db, &(cache)->stats, ## __VA_ARGS__)
 
 
 static inline uint16_t get_uint16(const void *address)

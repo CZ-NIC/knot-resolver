@@ -86,16 +86,34 @@ daemons or manipulated from other processes, making for example synchronized loa
 
 .. function:: cache.stats()
 
-  .. warning:: Cache statistics are being reworked. Do not rely on current behavior.
-
-   Return table of statistics, note that this tracks all operations over cache, not just which
-   queries were answered from cache or not.
+   Return table with low-level statistics for each internal cache operation.
+   This counts each access to cache and does not directly map to individual
+   DNS queries or resource records.
+   For query-level statistics see :ref:`stats module <mod-stats>`.
 
    Example:
 
    .. code-block:: lua
 
-	print('Insertions:', cache.stats().insert)
+       > cache.stats()
+       [read_leq_miss] => 4
+       [write] => 189
+       [read_leq] => 9
+       [read] => 4313
+       [read_miss] => 1143
+       [open] => 0
+       [close] => 0
+       [remove_miss] => 0
+       [commit] => 117
+       [match_miss] => 2
+       [match] => 21
+       [count] => 2
+       [clear] => 0
+       [remove] => 17
+
+   Cache operation `read_leq` (*read less or equal*, i.e. range search) was requested 9 times,
+   and 4 out of 9 operations were finished with *cache miss*.
+
 
 .. function:: cache.max_ttl([ttl])
 

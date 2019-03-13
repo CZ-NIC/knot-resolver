@@ -90,10 +90,10 @@ struct kr_query {
 	uint16_t stype;
 	uint16_t sclass;
 	uint16_t id;
+	uint16_t reorder; /**< Seed to reorder (cached) RRs in answer or zero. */
 	struct kr_qflags flags, forward_flags;
 	uint32_t secret;
-	uint16_t fails;
-	uint16_t reorder; /**< Seed to reorder (cached) RRs in answer or zero. */
+	uint32_t uid; /**< Query iteration number, unique within the kr_rplan. */
 	uint64_t creation_time_mono; /* The time of query's creation (milliseconds).
 				 * Or time of creation of an oldest
 				 * ancestor if it is a subquery. */
@@ -102,7 +102,6 @@ struct kr_query {
 	struct timeval timestamp; /**< Real time for TTL+DNSSEC checks (.tv_sec only). */
 	struct kr_zonecut zone_cut;
 	struct kr_layer_pickle *deferred;
-	uint32_t uid; /**< Query iteration number, unique within the kr_rplan. */
 	/** Pointer to the query that originated this one because of following a CNAME (or NULL). */
 	struct kr_query *cname_parent;
 	struct kr_request *request; /**< Parent resolution request. */

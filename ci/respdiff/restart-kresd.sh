@@ -2,10 +2,9 @@
 exec > /dev/null
 exec 2>&1
 
-PREFIX=$(pwd)/.local
 killall -w kresd
 rm -f '*.mdb'
-LD_LIBRARY_PATH=$PREFIX/lib $PREFIX/sbin/kresd -f 1 -q -c $(pwd)/ci/respdiff/kresd.config &>>kresd.log &
+$PREFIX/sbin/kresd -f 1 -q -c $(pwd)/ci/respdiff/kresd.config &>>kresd.log &
 
 # wait until socket is receiving connections
 sleep 1

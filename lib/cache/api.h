@@ -40,13 +40,7 @@ struct kr_cache
 {
 	knot_db_t *db;		      /**< Storage instance */
 	const struct kr_cdb_api *api; /**< Storage engine */
-	struct {
-		uint32_t hit;         /**< Number of cache hits */
-		uint32_t miss;        /**< Number of cache misses */
-		uint32_t insert;      /**< Number of insertions */
-		uint32_t delete;      /**< Number of deletions */
-	} stats;
-
+	struct kr_cdb_stats stats;
 	uint32_t ttl_min, ttl_max; /**< TTL limits */
 
 	/* A pair of stamps for detection of real-time shifts during runtime. */
@@ -81,7 +75,7 @@ void kr_cache_close(struct kr_cache *cache);
 
 /** Run after a row of operations to release transaction/lock if needed. */
 KR_EXPORT
-int kr_cache_sync(struct kr_cache *cache);
+int kr_cache_commit(struct kr_cache *cache);
 
 /**
  * Return true if cache is open and enabled.

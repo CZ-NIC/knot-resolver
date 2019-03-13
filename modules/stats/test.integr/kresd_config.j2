@@ -51,6 +51,9 @@ end
 policy.add(policy.pattern(reply_result, 'stats.test.'))
 policy.add(policy.all(FWD_TARGET)) -- avoid iteration
 
+-- make sure DNSSEC is turned off for tests
+trust_anchors.keyfile_default = nil
+
 -- Disable RFC8145 signaling, scenario doesn't provide expected answers
 if ta_signal_query then
         modules.unload('ta_signal_query')
@@ -91,7 +94,7 @@ assert(cache.backends() ~= nil)
 assert(worker.stats() ~= nil)
 assert(net.interfaces() ~= nil)
 -- Self-checks on loaded stuff
-assert(net.list()['{{SELF_ADDR}}'])
+assert(net.list()[1].ip == '{{SELF_ADDR}}')
 assert(#modules.list() > 0)
 -- Self-check timers
 ev = event.recurrent(1 * sec, function (ev) return 1 end)

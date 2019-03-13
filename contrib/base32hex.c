@@ -14,7 +14,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "contrib/base32hex.h"
+#include "base32hex.h"
 
 #include <stdlib.h>
 #include <stdint.h>

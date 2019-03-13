@@ -2,6 +2,9 @@
 net.ipv6 = false
 policy.add(policy.all(policy.STUB({ '::1:2:3:4', '1.2.3.4' })))
 
+-- make sure DNSSEC is turned off for tests
+trust_anchors.keyfile_default = nil
+
 -- Disable RFC8145 signaling, scenario doesn't provide expected answers
 if ta_signal_query then
         modules.unload('ta_signal_query')
@@ -42,7 +45,7 @@ assert(cache.backends() ~= nil)
 assert(worker.stats() ~= nil)
 assert(net.interfaces() ~= nil)
 -- Self-checks on loaded stuff
-assert(net.list()['{{SELF_ADDR}}'])
+assert(net.list()[1].ip == '{{SELF_ADDR}}')
 assert(#modules.list() > 0)
 -- Self-check timers
 ev = event.recurrent(1 * sec, function (ev) return 1 end)

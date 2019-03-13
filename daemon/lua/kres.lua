@@ -269,9 +269,9 @@ local lru_metatype = {
 	-- Create a new LRU with given value type
 	-- By default the LRU will have a capacity of 65536 elements
 	-- Note: At the point the parametrized type must be finalized
-	__new = function (ct, max_slots)
+	__new = function (ct, max_slots, alignment)
 		-- {0} will make sure that the value is coercible to a number
-		local o = ffi.new(ct, {0}, C.lru_create_impl(max_slots or 65536, nil, nil))
+		local o = ffi.new(ct, {0}, C.lru_create_impl(max_slots or 65536, alignment or 1, nil, nil))
 		if o.lru == nil then
 			return
 		end
@@ -492,51 +492,6 @@ local function knot_pkt_rr(section, i)
 	return ret
 end
 
--- Helpers for converting packet to text
-local function section_tostring(pkt, section_id)
-	local data = {}
-	local section = pkt.sections + section_id
-	if section.count > 0 then
-		table.insert(data, string.format('\n;; %s\n', const_section_str[section_id]))
-		for j = 0, section.count - 1 do
-			local rrset = knot_pkt_rr(section, j)
-			local rrtype = rrset.type
-			if rrtype ~= const_type.OPT and rrtype ~= const_type.TSIG then
-				table.insert(data, rrset:txt_dump())
-			end
-		end
-	end
-	return table.concat(data, '')
-end
-
-local function packet_tostring(pkt)
-	local hdr = string.format(';; ->>HEADER<<- opcode: %s; status: %s; id: %d\n',
-		const_opcode_str[pkt:opcode()], const_rcode_str[pkt:rcode()], pkt:id())
-	local flags = {}
-	for _,v in ipairs({'rd', 'tc', 'aa', 'qr', 'cd', 'ad', 'ra'}) do
-		if(pkt[v](pkt)) then table.insert(flags, v) end
-	end
-	local info = string.format(';; Flags: %s; QUERY: %d; ANSWER: %d; AUTHORITY: %d; ADDITIONAL: %d\n',
-		table.concat(flags, ' '), pkt:qdcount(), pkt:ancount(), pkt:nscount(), pkt:arcount())
-	local data = '\n'
-	if pkt.opt_rr ~= nil then
-		data = data..string.format(';; OPT PSEUDOSECTION:\n%s', pkt.opt_rr:tostring())
-	end
-	if pkt.tsig_rr ~= nil then
-		data = data..string.format(';; TSIG PSEUDOSECTION:\n%s', pkt.tsig_rr:tostring())
-	end
-	-- Zone transfer answers may omit question
-	if pkt:qdcount() > 0 then
-		data = data..string.format(';; QUESTION\n;; %s\t%s\t%s\n',
-			dname2str(pkt:qname()), const_type_str[pkt:qtype()], const_class_str[pkt:qclass()])
-	end
-	local data_sec = {}
-	for i = const_section.ANSWER, const_section.ADDITIONAL do
-		table.insert(data_sec, section_tostring(pkt, i))
-	end
-	return hdr..info..data..table.concat(data_sec, '')
-end
-
 -- Metatype for packet
 ffi.metatype( knot_pkt_t, {
 	__new = function (_, size, wire)
@@ -679,7 +634,7 @@ ffi.metatype( knot_pkt_t, {
 		end,
 		tostring = function(pkt)
 			assert(ffi.istype(knot_pkt_t, pkt))
-			return packet_tostring(pkt)
+			return ffi.string(ffi.gc(C.kr_pkt_text(pkt), C.free))
 		end,
 		-- Return number of remaining empty bytes in the packet
 		-- This is generally useful to check if there's enough space
@@ -840,9 +795,9 @@ ffi.metatype( kr_cache_t, {
 			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
-		sync = function (self)
+		commit = function (self)
 			assert(ffi.istype(kr_cache_t, self))
-			local ret = C.kr_cache_sync(self)
+			local ret = C.kr_cache_commit(self)
 			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
@@ -916,8 +871,9 @@ kres = {
 	rrset = knot_rrset_t,
 	packet = knot_pkt_t,
 	lru = function (max_size, value_type)
-	  local ct = ffi.typeof(typed_lru_t, value_type or ffi.typeof('uint64_t'))
-	  return ffi.metatype(ct, lru_metatype)(max_size)
+	  value_type = value_type or ffi.typeof('uint64_t')
+	  local ct = ffi.typeof(typed_lru_t, value_type)
+	  return ffi.metatype(ct, lru_metatype)(max_size, ffi.alignof(value_type))
 	end,
 
 	-- Metatypes.  Beware that any pointer will be cast silently...

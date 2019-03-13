@@ -1,2 +1,0 @@
-Test-Command: make installcheck
-Depends: @, @builddeps@

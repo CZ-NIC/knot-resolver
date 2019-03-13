@@ -23,6 +23,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "kresconfig.h"
+
 #include <lua.h>
 #include <uv.h>
 #ifdef HAS_SYSTEMD
@@ -58,7 +60,6 @@ struct args {
 	fd_array_t tls_fd_set;
 	char *keyfile;
 	int keyfile_unmanaged;
-	const char *moduledir;
 	const char *config;
 	int control_fd;
 	const char *rundir;
@@ -173,7 +174,6 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 		lua_settop(L, 0);
 	}
 finish:
-	fflush(out);
 	free(cmd);
 	/* Close if redirected */
 	if (stream_fd != STDIN_FILENO) {
@@ -386,7 +386,6 @@ static void help(int argc, char *argv[])
 	       " -c, --config=[path]    Config file path (relative to [rundir]) (default: config).\n"
 	       " -k, --keyfile=[path]   File with root domain trust anchors (DS or DNSKEY), automatically updated.\n"
 	       " -K, --keyfile-ro=[path] File with read-only root domain trust anchors, for use with an external updater.\n"
-	       " -m, --moduledir=[path] Override the default module path (" MODULEDIR ").\n"
 	       " -f, --forks=N          Start N forks sharing the configuration.\n"
 	       " -q, --quiet            No command prompt in interactive mode.\n"
 	       " -v, --verbose          Run in verbose mode."
@@ -417,7 +416,13 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 			"use '-f 1' if you want non-interactive mode.  "
 			"Commands can be simply added to your configuration file or sent over the tty/$PID control socket.\n"
 			);
-		return 1;
+		return EXIT_FAILURE;
+	}
+
+	if (setvbuf(stdout, NULL, _IONBF, 0) || setvbuf(stderr, NULL, _IONBF, 0)) {
+		kr_log_error("[system] failed to to set output buffering (ignored): %s\n",
+				strerror(errno));
+		fflush(stderr);
 	}
 
 	/* Control sockets or TTY */
@@ -428,7 +433,6 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	if (args->interactive) {
 		if (!args->quiet)
 			printf("[system] interactive mode\n> ");
-		fflush(stdout);
 		uv_pipe_open(&pipe, 0);
 		uv_read_start((uv_stream_t*) &pipe, tty_alloc, tty_process_input);
 	} else {
@@ -466,7 +470,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 		unlink(sock_file);
 	}
 	uv_close((uv_handle_t *)&pipe, NULL); /* Seems OK even on the stopped loop. */
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 #ifdef HAS_SYSTEMD
@@ -512,7 +516,6 @@ static void args_init(struct args *args)
 	array_init(args->tls_set);
 	array_init(args->fd_set);
 	array_init(args->tls_fd_set);
-	args->moduledir = MODULEDIR;
 	args->control_fd = -1;
 	args->interactive = true;
 	args->quiet = false;
@@ -542,7 +545,6 @@ static int parse_args(int argc, char **argv, struct args *args)
 		{"keyfile",    required_argument, 0, 'k'},
 		{"keyfile-ro", required_argument, 0, 'K'},
 		{"forks",      required_argument, 0, 'f'},
-		{"moduledir",  required_argument, 0, 'm'},
 		{"verbose",          no_argument, 0, 'v'},
 		{"quiet",            no_argument, 0, 'q'},
 		{"version",          no_argument, 0, 'V'},
@@ -585,9 +587,6 @@ static int parse_args(int argc, char **argv, struct args *args)
 			}
 			args->keyfile = optarg;
 			break;
-		case 'm':
-			args->moduledir = optarg;
-			break;
 		case 'v':
 			kr_verbose_set(true);
 #ifdef NOVERBOSELOG
@@ -629,13 +628,21 @@ static int bind_fds(struct network *net, fd_array_t *fd_set, bool tls) {
 }
 
 static int bind_sockets(struct network *net, addr_array_t *addr_set, bool tls) {
-	uint32_t flags = tls ? NET_TCP|NET_TLS : NET_UDP|NET_TCP;
+	endpoint_flags_t flags = { .tls = tls };
 	for (size_t i = 0; i < addr_set->len; ++i) {
 		uint16_t port = tls ? KR_DNS_TLS_PORT : KR_DNS_PORT;
 		char addr_str[INET6_ADDRSTRLEN + 1];
 		int ret = kr_straddr_split(addr_set->at[i], addr_str, &port);
-		if (ret == 0)
+
+		if (ret == 0 && !tls) {
+			flags.sock_type = SOCK_DGRAM;
 			ret = network_listen(net, addr_str, port, flags);
+		}
+		if (ret == 0) { /* common for TCP and TLS */
+			flags.sock_type = SOCK_STREAM;
+			ret = network_listen(net, addr_str, port, flags);
+		}
+
 		if (ret != 0) {
 			kr_log_error("[system] bind to '%s' %s%s\n",
 				addr_set->at[i], tls ? "(TLS) " : "", kr_strerror(ret));
@@ -779,8 +786,6 @@ int main(int argc, char **argv)
 	}
 
 	/* Start the scripting engine */
-	engine_set_moduledir(&engine, args.moduledir);
-
 	if (engine_load_sandbox(&engine) != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
@@ -814,7 +819,7 @@ cleanup:/* Cleanup. */
 	engine_deinit(&engine);
 	worker_deinit();
 	if (loop != NULL) {
-		uv_loop_close(loop);	
+		uv_loop_close(loop);
 	}
 	mp_delete(pool.ctx);
 	array_clear(args.addr_set);

@@ -31,6 +31,7 @@
 #include <libknot/version.h>
 #include <uv.h>
 
+#include "kresconfig.h"
 #include "lib/defines.h"
 #include "lib/utils.h"
 #include "lib/generic/array.h"
@@ -70,6 +71,18 @@ void *mm_malloc(void *ctx, size_t n)
 {
 	(void)ctx;
 	return malloc(n);
+}
+void *mm_malloc_aligned(void *ctx, size_t n)
+{
+	size_t alignment = (size_t)ctx;
+	void *res;
+	int err = posix_memalign(&res, alignment, n);
+	if (err == 0) {
+		return res;
+	} else {
+		assert(err == -1 && errno == ENOMEM);
+		return NULL;
+	}
 }
 
 /*
@@ -118,12 +131,11 @@ bool kr_verbose_set(bool status)
 
 void kr_log_verbose(const char *fmt, ...)
 {
-	if (kr_verbose_status) {
+	if (unlikely(kr_verbose_status)) {
 		va_list args;
 		va_start(args, fmt);
 		vprintf(fmt, args);
 		va_end(args);
-		fflush(stdout);
 	}
 }
 
@@ -141,7 +153,6 @@ void kr_log_qverbose_impl(const struct kr_query *qry, const char *cls, const cha
 	va_start(args, fmt);
 	vprintf(fmt, args);
 	va_end(args);
-	fflush(stdout);
 }
 
 bool kr_log_trace(const struct kr_query *query, const char *source, const char *fmt, ...)
@@ -219,8 +230,10 @@ int kr_memreserve(void *baton, char **mem, size_t elm_size, size_t want, size_t 
         size_t next_size = array_next_count(want);
         void *mem_new = mm_alloc(pool, next_size * elm_size);
         if (mem_new != NULL) {
-            memcpy(mem_new, *mem, (*have)*(elm_size));
-            mm_free(pool, *mem);
+	    if (*mem) { /* 0-length memcpy from NULL isn't technically OK */
+		memcpy(mem_new, *mem, (*have)*(elm_size));
+		mm_free(pool, *mem);
+	    }
             *mem = mem_new;
             *have = next_size;
             return 0;

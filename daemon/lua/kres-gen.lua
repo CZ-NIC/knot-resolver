@@ -199,15 +199,26 @@ struct kr_request {
 	unsigned int uid;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
+struct kr_cdb_stats {
+	uint64_t open;
+	uint64_t close;
+	uint64_t count;
+	uint64_t clear;
+	uint64_t commit;
+	uint64_t read;
+	uint64_t read_miss;
+	uint64_t write;
+	uint64_t remove;
+	uint64_t remove_miss;
+	uint64_t match;
+	uint64_t match_miss;
+	uint64_t read_leq;
+	uint64_t read_leq_miss;
+};
 struct kr_cache {
 	knot_db_t *db;
 	const struct kr_cdb_api *api;
-	struct {
-		uint32_t hit;
-		uint32_t miss;
-		uint32_t insert;
-		uint32_t delete;
-	} stats;
+	struct kr_cdb_stats stats;
 	uint32_t ttl_min;
 	uint32_t ttl_max;
 	struct timeval checkpoint_walltime;
@@ -232,17 +243,16 @@ struct kr_query {
 	uint16_t stype;
 	uint16_t sclass;
 	uint16_t id;
+	uint16_t reorder;
 	struct kr_qflags flags;
 	struct kr_qflags forward_flags;
 	uint32_t secret;
-	uint16_t fails;
-	uint16_t reorder;
+	uint32_t uid;
 	uint64_t creation_time_mono;
 	uint64_t timestamp_mono;
 	struct timeval timestamp;
 	struct kr_zonecut zone_cut;
 	struct kr_layer_pickle *deferred;
-	uint32_t uid;
 	struct kr_query *cname_parent;
 	struct kr_request *request;
 	kr_stale_cb stale_cb;
@@ -292,6 +302,7 @@ int kr_pkt_recycle(knot_pkt_t *);
 int kr_pkt_clear_payload(knot_pkt_t *);
 uint16_t kr_pkt_qclass(const knot_pkt_t *);
 uint16_t kr_pkt_qtype(const knot_pkt_t *);
+char *kr_pkt_text(const knot_pkt_t *);
 void kr_rnd_buffered(void *, unsigned int);
 uint32_t kr_rrsig_sig_inception(const knot_rdata_t *);
 uint32_t kr_rrsig_sig_expiration(const knot_rdata_t *);
@@ -317,7 +328,7 @@ void kr_zonecut_set(struct kr_zonecut *, const knot_dname_t *);
 uint64_t kr_now();
 const char *kr_strptime_diff(const char *, const char *, const char *, double *);
 void lru_free_items_impl(struct lru *);
-struct lru *lru_create_impl(unsigned int, knot_mm_t *, knot_mm_t *);
+struct lru *lru_create_impl(unsigned int, unsigned int, knot_mm_t *, knot_mm_t *);
 void *lru_get_impl(struct lru *, const char *, unsigned int, unsigned int, _Bool, _Bool *);
 void *mm_realloc(knot_mm_t *, void *, size_t, size_t);
 knot_rrset_t *kr_ta_get(map_t *, const knot_dname_t *);
@@ -332,7 +343,7 @@ int kr_cache_closest_apex(struct kr_cache *, const knot_dname_t *, _Bool, knot_d
 int kr_cache_insert_rr(struct kr_cache *, const knot_rrset_t *, const knot_rrset_t *, uint8_t, uint32_t);
 int kr_cache_remove(struct kr_cache *, const knot_dname_t *, uint16_t);
 int kr_cache_remove_subtree(struct kr_cache *, const knot_dname_t *, _Bool, int);
-int kr_cache_sync(struct kr_cache *);
+int kr_cache_commit(struct kr_cache *);
 typedef struct {
 	uint8_t bitmap[32];
 	uint8_t length;
@@ -394,6 +405,7 @@ struct zs_scanner {
 		_Bool automatic;
 		void (*record)(zs_scanner_t *);
 		void (*error)(zs_scanner_t *);
+		void (*comment)(zs_scanner_t *);
 		void *data;
 	} process;
 	struct {

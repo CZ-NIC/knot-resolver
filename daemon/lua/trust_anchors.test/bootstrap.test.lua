@@ -1,5 +1,5 @@
 -- check prerequisites
-local has_http = pcall(require, 'http') and pcall(require, 'http.request')
+local has_http = pcall(require, 'kres_modules.http') and pcall(require, 'http.request')
 if not has_http then
 	pass('skipping bootstrap tests because http module is not not installed')
 	done()
@@ -59,7 +59,7 @@ local function wait_for_webserver()
 end
 
 local host = 'https://localhost:8080/'
--- avoid interference with configured KEYFILE_DEFAULT
+-- avoid interference with configured keyfile_default
 trust_anchors.keyfile_default = nil
 
 local function test_err_cert()

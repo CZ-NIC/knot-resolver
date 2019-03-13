@@ -23,6 +23,7 @@
 #include <libknot/rrtype/rdname.h>
 #include <libknot/descriptor.h>
 #include <ucw/mempool.h>
+#include "kresconfig.h"
 #include "lib/resolve.h"
 #include "lib/layer.h"
 #include "lib/rplan.h"
@@ -162,7 +163,12 @@ static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 	if (qry->ns.addr[0].ip.sa_family != AF_UNSPEC) {
 		const char *addr = kr_inaddr(&qry->ns.addr[0].ip);
 		int addr_len = kr_inaddr_len(&qry->ns.addr[0].ip);
-		return kr_zonecut_del(&qry->zone_cut, qry->ns.name, addr, addr_len);
+		int ret = kr_zonecut_del(&qry->zone_cut, qry->ns.name, addr, addr_len);
+		/* Also remove it from the qry->ns.addr array.
+		 * That's useful at least for STUB and FORWARD modes. */
+		memmove(qry->ns.addr, qry->ns.addr + 1,
+			sizeof(qry->ns.addr[0]) * (KR_NSREP_MAXADDR - 1));
+		return ret;
 	} else {
 		return kr_zonecut_del_all(&qry->zone_cut, qry->ns.name);
 	}
@@ -203,7 +209,7 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 		assert(target[0]);
 		target = knot_wire_next_label(target, NULL);
 	}
-	kr_cache_sync(cache);
+	kr_cache_commit(cache);
 #endif
 }
 
@@ -673,36 +679,32 @@ static int answer_finalize(struct kr_request *request, int state)
 
 static int query_finalize(struct kr_request *request, struct kr_query *qry, knot_pkt_t *pkt)
 {
-	int ret = 0;
 	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
-	if (!(qry->flags.SAFEMODE)) {
-		/* Remove any EDNS records from any previous iteration. */
-		ret = edns_erase_and_reserve(pkt);
-		if (ret == 0) {
-			ret = edns_create(pkt, request->answer, request);
+	if (qry->flags.SAFEMODE)
+		return kr_ok();
+	/* Remove any EDNS records from any previous iteration. */
+	int ret = edns_erase_and_reserve(pkt);
+	if (ret) return ret;
+	ret = edns_create(pkt, request->answer, request);
+	if (ret) return ret;
+	if (qry->flags.STUB) {
+		/* Stub resolution (ask for +rd and +do) */
+		knot_wire_set_rd(pkt->wire);
+		if (knot_pkt_has_dnssec(request->qsource.packet)) {
+			knot_edns_set_do(pkt->opt_rr);
 		}
-		if (ret == 0) {
-			/* Stub resolution (ask for +rd and +do) */
-			if (qry->flags.STUB) {
-				knot_wire_set_rd(pkt->wire);
-				if (knot_pkt_has_dnssec(request->qsource.packet)) {
-					knot_edns_set_do(pkt->opt_rr);
-				}
-				if (knot_wire_get_cd(request->qsource.packet->wire)) {
-					knot_wire_set_cd(pkt->wire);
-				}
-			/* Full resolution (ask for +cd and +do) */
-			} else if (qry->flags.FORWARD) {
-				knot_wire_set_rd(pkt->wire);
-				knot_edns_set_do(pkt->opt_rr);
-				knot_wire_set_cd(pkt->wire);
-			} else if (qry->flags.DNSSEC_WANT) {
-				knot_edns_set_do(pkt->opt_rr);
-				knot_wire_set_cd(pkt->wire);
-			}
+		if (knot_wire_get_cd(request->qsource.packet->wire)) {
+			knot_wire_set_cd(pkt->wire);
+		}
+	} else {
+		/* Full resolution (ask for +cd and +do) */
+		knot_edns_set_do(pkt->opt_rr);
+		knot_wire_set_cd(pkt->wire);
+		if (qry->flags.FORWARD) {
+			knot_wire_set_rd(pkt->wire);
 		}
 	}
-	return ret;
+	return kr_ok();
 }
 
 int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pkt_t *answer)
@@ -805,7 +807,7 @@ static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, cons
 	/* Calculate total resolution time from the time the query was generated. */
 	uint64_t elapsed = kr_now() - qry->timestamp_mono;
 	elapsed = elapsed > UINT_MAX ? UINT_MAX : elapsed;
- 
+
 	/* NSs in the preference list prior to the one who responded will be penalised
 	 * with the RETRY timer interval. This is because we know they didn't respond
 	 * for N retries, so their RTT must be at least N * RETRY.
@@ -1371,7 +1373,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		ITERATE_LAYERS(request, qry, reset);
 		return kr_rplan_empty(rplan) ? KR_STATE_DONE : KR_STATE_PRODUCE;
 	}
-	
+
 
 	/* This query has RD=0 or is ANY, stop here. */
 	if (qry->stype == KNOT_RRTYPE_ANY ||

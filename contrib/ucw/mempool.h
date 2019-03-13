@@ -11,6 +11,7 @@
 #ifndef _UCW_POOLS_H
 #define _UCW_POOLS_H
 
+#include "lib/defines.h"
 #include <ucw/alloc.h>
 #include <ucw/config.h>
 #include <ucw/lib.h>
@@ -100,6 +101,7 @@ struct mempool_stats {			/** Mempool statistics. See @mp_stats(). **/
  *
  * Memory pools can be treated as <<trans:respools,resources>>, see <<trans:res_mempool()>>.
  **/
+KR_EXPORT
 void mp_init(struct mempool *pool, size_t chunk_size);
 
 /**
@@ -110,6 +112,7 @@ void mp_init(struct mempool *pool, size_t chunk_size);
  *
  * Memory pools can be treated as <<trans:respools,resources>>, see <<trans:res_mempool()>>.
  **/
+KR_EXPORT
 struct mempool *mp_new(size_t chunk_size);
 
 /**
@@ -117,6 +120,7 @@ struct mempool *mp_new(size_t chunk_size);
  * Frees all the memory allocated by this mempool and,
  * if created by @mp_new(), the @pool itself.
  **/
+KR_EXPORT
 void mp_delete(struct mempool *pool);
 
 /**
@@ -125,6 +129,7 @@ void mp_delete(struct mempool *pool);
  * further allocation requests. Leaves the @pool alive,
  * even if it was created with @mp_new().
  **/
+KR_EXPORT
 void mp_flush(struct mempool *pool);
 
 /**
@@ -166,6 +171,7 @@ void *mp_alloc_internal(struct mempool *pool, size_t size) LIKE_MALLOC;
  * `CPU_STRUCT_ALIGN` bytes and this condition remains true also
  * after future reallocations.
  **/
+KR_EXPORT
 void *mp_alloc(struct mempool *pool, size_t size);
 
 /**
@@ -531,6 +537,7 @@ char *mp_str_from_mem(struct mempool *p, const void *mem, size_t len) LIKE_MALLO
 /**
  * printf() into a in-memory string, allocated on the memory pool.
  **/
+KR_EXPORT
 char *mp_printf(struct mempool *mp, const char *fmt, ...) FORMAT_CHECK(printf,2,3) LIKE_MALLOC;
 /**
  * Like @mp_printf(), but uses `va_list` for parameters.
@@ -549,6 +556,7 @@ char *mp_vprintf(struct mempool *mp, const char *fmt, va_list args) LIKE_MALLOC;
  * not called on an opened growing buffer. The old name will be preserved for backward
  * compatibility for the time being.
  **/
+KR_EXPORT
 char *mp_printf_append(struct mempool *mp, char *ptr, const char *fmt, ...) FORMAT_CHECK(printf,3,4);
 #define mp_append_printf mp_printf_append
 /**

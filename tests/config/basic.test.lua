@@ -131,13 +131,11 @@ local function test_packet_functions()
 	same(parsed:tostring(), pkt:tostring(), 'parsed packet is equal to source packet')
 
 	-- Test adding RR sets directly
-	local copy = kres.packet(23)
+	local copy = kres.packet(512)
 	copy:question(todname('hello'), kres.class.IN, kres.type.A)
 	copy:begin(kres.section.ANSWER)
 	local rr = kres.rrset(pkt:qname(), kres.type.A, kres.class.IN, 66)
 	rr:add_rdata('\4\3\2\1', 4)
-	ok(not copy:put_rr(rr), 'adding RR sets checks for available space')
-	ok(copy:resize(512), 'resizing packet works')
 	ok(copy:put_rr(rr), 'adding RR sets directly works')
 	ok(copy:recycle(), 'recycling packet works')
 
