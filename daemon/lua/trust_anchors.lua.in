@@ -20,11 +20,11 @@ local function https_fetch(url, ca)
 	end
 	local resp = {}
 	local r, c = https.request{
-	       url = url,
-	       cafile = ca,
-	       verify = {'peer', 'fail_if_no_peer_cert' },
-	       protocol = 'tlsv1_2',
-	       sink = ltn12.sink.table(resp),
+		url = url,
+		cafile = ca,
+		verify = {'peer', 'fail_if_no_peer_cert' },
+		protocol = 'tlsv1_2',
+		sink = ltn12.sink.table(resp),
 	}
 	if r == nil then return r, c end
 	return resp[1]
@@ -49,8 +49,8 @@ local function keydigest_is_valid(valid_from, valid_until)
 	local err = ffi.C.kr_strptime_diff(
 		format, time_now, time2utc(valid_from), time_diff)
 	if (err ~= nil) then
-	       error(string.format('failed to process "validFrom" constraint: %s',
-				   ffi.string(err)))
+		error(string.format('failed to process "validFrom" constraint: %s',
+			ffi.string(err)))
 	end
 	local from_ok = time_diff[0] > 0
 
@@ -61,7 +61,7 @@ local function keydigest_is_valid(valid_from, valid_until)
 			format, time_now, time2utc(valid_until), time_diff)
 		if (err ~= nil) then
 			error(string.format('failed to process "validUntil" constraint: %s',
-					    ffi.string(err)))
+				ffi.string(err)))
 		end
 		until_ok = time_diff[0] < 0
 	end
@@ -79,19 +79,19 @@ local function parse_xml_keydigest(attrs, inside, output)
 	local valid_attrs = {id = true, validFrom = true, validUntil = true}
 	for key, _ in pairs(fields) do
 		assert(valid_attrs[key],
-		       string.format('unsupported KeyDigest attribute "%s" found in "%s"',
-				     key, attrs))
+			string.format('unsupported KeyDigest attribute "%s" found in "%s"',
+				key, attrs))
 	end
 
 	_, n = string.gsub(inside, "<([%w]+).->([^<]+)</[%w]+>", function (k, v) fields[k] = v end)
 	assert(n >= 1,
 		string.format('error parsing KeyDigest XML elements from "%s"',
-			      inside))
+			inside))
 	local mandatory_elements = {'KeyTag', 'Algorithm', 'DigestType', 'Digest'}
 	for _, key in ipairs(mandatory_elements) do
 		assert(fields[key],
 			string.format('mandatory element %s is missing in "%s"',
-				      key, inside))
+				key, inside))
 	end
 	assert(n == 4, string.format('found %d elements but expected 4 in %s', n, inside))
 	table.insert(output, fields)  -- append to list of parsed keydigests
@@ -107,7 +107,7 @@ local function generate_ds(keydigests)
 			rrset = rrset .. '\n' .. rr
 		else
 			log('[ ta ] skipping trust anchor "%s" ' ..
-			    'because it is outside of validity range', rr)
+				'because it is outside of validity range', rr)
 		end
 	end
 	return rrset
@@ -119,8 +119,8 @@ local function assert_str_match(str, pattern, expected)
 		count = count + 1
 	end
 	assert(count == expected,
-	       string.format('expected %d occurences of "%s" but got %d in "%s"',
-			     expected, pattern, count, str))
+		string.format('expected %d occurences of "%s" but got %d in "%s"',
+			expected, pattern, count, str))
 end
 
 -- Fetch root anchors in XML over HTTPS, returning a zone-file-style string
@@ -151,10 +151,10 @@ local function bootstrap(url, ca)
 		return false, string.format('[ ta ] no valid trust anchors found at "%s"', url)
 	end
 	local msg = '[ ta ] Root trust anchors bootstrapped over https with pinned certificate.\n'
-			 .. '       You SHOULD verify them manually against original source:\n'
-			 .. '       https://www.iana.org/dnssec/files\n'
-			 .. '[ ta ] Current root trust anchors are:'
-			 .. rrset
+			.. '       You SHOULD verify them manually against original source:\n'
+			.. '       https://www.iana.org/dnssec/files\n'
+			.. '[ ta ] Current root trust anchors are:'
+			.. rrset
 	return rrset, msg
 end
 
@@ -265,7 +265,7 @@ local function keyset_read(path, str)
 	for _, ta in ipairs(tas) do
 		if ta.owner ~= owner then
 			return nil, string.format("do not mix %s and %s TAs in single file/string",
-							kres.dname2str(ta.owner), kres.dname2str(owner))
+				kres.dname2str(ta.owner), kres.dname2str(owner))
 		end
 	end
 	tas.owner = owner
@@ -293,17 +293,17 @@ local function keyset_publish(keyset)
 	end
 	if count == 0 then
 		warn('[ ta ] ERROR: no anchors are trusted for ' ..
-		     kres.dname2str(keyset.owner) .. ' !')
+			kres.dname2str(keyset.owner) .. ' !')
 	end
 	return count > 0 and not has_error
 end
 
 local refresh_plan = function(keyset, delay, is_initial)
-    event.after(0, function()
-        if ta_update ~= nil then
-            ta_update.refresh_plan(keyset, delay, is_initial)
-        end
-    end)
+	event.after(0, function()
+		if ta_update ~= nil then
+			ta_update.refresh_plan(keyset, delay, is_initial)
+		end
+	end)
 end
 
 local function add_file(path, unmanaged)
@@ -356,7 +356,7 @@ local function add_file(path, unmanaged)
 	-- Replace the TA store used for validation
 	if keyset_publish(keyset) and verbose() then
 		log('[ ta ] installed trust anchors for domain ' .. owner_str .. ' are:\n'
-		    .. trust_anchors.summary(owner))
+			.. trust_anchors.summary(owner))
 	end
 	-- TODO: if failed and for root, try to rebootstrap?
 
@@ -409,8 +409,8 @@ trust_anchors = {
 	add_file = add_file,
 	config = add_file,
 
-    keyset_write = keyset_write,
-    keyset_publish = keyset_publish,
+	keyset_write = keyset_write,
+	keyset_publish = keyset_publish,
 
 	-- Add DS/DNSKEY record(s) (unmanaged)
 	add = function (keystr)

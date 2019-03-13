@@ -15,12 +15,12 @@ local key_state = {
 local function ta_find(keyset, rr)
 	local rr_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
 	assert(rr_tag >= 0 and rr_tag <= 65535, string.format('invalid RR: %s: %s',
-	       kres.rr2str(rr), ffi.string(C.knot_strerror(rr_tag))))
+		kres.rr2str(rr), ffi.string(C.knot_strerror(rr_tag))))
 	for i, ta in ipairs(keyset) do
 		-- Match key owner and content
 		local ta_tag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
 		assert(ta_tag >= 0 and ta_tag <= 65535, string.format('invalid RR: %s: %s',
-		       kres.rr2str(ta), ffi.string(C.knot_strerror(ta_tag))))
+			 kres.rr2str(ta), ffi.string(C.knot_strerror(ta_tag))))
 		if ta.owner == rr.owner then
 			if ta.type == rr.type then
 				if rr.type == kres.type.DNSKEY then
@@ -52,49 +52,49 @@ end
 -- Evaluate TA status of a RR according to RFC5011.  The time is in seconds.
 local function ta_present(keyset, rr, hold_down_time, force_valid)
 if rr.type == kres.type.DNSKEY and not C.kr_dnssec_key_ksk(rr.rdata) then
-    return false -- Ignore
+	return false -- Ignore
 end
 -- Attempt to extract key_tag
 local key_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
 if key_tag < 0 or key_tag > 65535 then
-    warn(string.format('[ ta_update ] ignoring invalid or unsupported RR: %s: %s',
-        kres.rr2str(rr), ffi.string(C.knot_strerror(key_tag))))
-    return false
+	warn(string.format('[ ta_update ] ignoring invalid or unsupported RR: %s: %s',
+		kres.rr2str(rr), ffi.string(C.knot_strerror(key_tag))))
+	return false
 end
 -- Find the key in current key set and check its status
 local now = os.time()
 local key_revoked = (rr.type == kres.type.DNSKEY) and C.kr_dnssec_key_revoked(rr.rdata)
 local ta = ta_find(keyset, rr)
 if ta then
-    -- Key reappears (KeyPres)
-    if ta.state == key_state.Missing then
-        ta.state = key_state.Valid
-        ta.timer = nil
-    end
-    -- Key is revoked (RevBit)
-    if ta.state == key_state.Valid or ta.state == key_state.Missing then
-        if key_revoked then
-            ta.state = key_state.Revoked
-            ta.timer = now + hold_down_time
-        end
-    end
-    -- Remove hold-down timer expires (RemTime)
-    if ta.state == key_state.Revoked and os.difftime(ta.timer, now) <= 0 then
-        ta.state = key_state.Removed
-        ta.timer = nil
-    end
-    -- Add hold-down timer expires (AddTime)
-    if ta.state == key_state.AddPend and os.difftime(ta.timer, now) <= 0 then
-        ta.state = key_state.Valid
-        ta.timer = nil
-    end
-    if rr.state ~= key_state.Valid or verbose() then
-        log('[ ta_update ] key: ' .. key_tag .. ' state: '..ta.state)
-    end
-    return true
+	-- Key reappears (KeyPres)
+	if ta.state == key_state.Missing then
+		ta.state = key_state.Valid
+		ta.timer = nil
+	end
+	-- Key is revoked (RevBit)
+	if ta.state == key_state.Valid or ta.state == key_state.Missing then
+		if key_revoked then
+			ta.state = key_state.Revoked
+			ta.timer = now + hold_down_time
+		end
+	end
+	-- Remove hold-down timer expires (RemTime)
+	if ta.state == key_state.Revoked and os.difftime(ta.timer, now) <= 0 then
+		ta.state = key_state.Removed
+		ta.timer = nil
+	end
+	-- Add hold-down timer expires (AddTime)
+	if ta.state == key_state.AddPend and os.difftime(ta.timer, now) <= 0 then
+		ta.state = key_state.Valid
+		ta.timer = nil
+	end
+	if rr.state ~= key_state.Valid or verbose() then
+		log('[ ta_update ] key: ' .. key_tag .. ' state: '..ta.state)
+	end
+	return true
 elseif not key_revoked then -- First time seen (NewKey)
-    rr.key_tag = key_tag
-    if force_valid then
+	rr.key_tag = key_tag
+	if force_valid then
 			rr.state = key_state.Valid
 		else
 			rr.state = key_state.AddPend
@@ -115,7 +115,7 @@ local function ta_missing(ta, hold_down_time)
 	local keep_ta = true
 	local key_tag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
 	assert(key_tag >= 0 and key_tag <= 65535, string.format('invalid RR: %s: %s',
-	       kres.rr2str(ta), ffi.string(C.knot_strerror(key_tag))))
+		 kres.rr2str(ta), ffi.string(C.knot_strerror(key_tag))))
 	if ta.state == key_state.Valid then
 		ta.state = key_state.Missing
 		ta.timer = os.time() + hold_down_time
@@ -189,7 +189,7 @@ local function update(keyset, new_keys, is_initial)
 		return false
 	elseif verbose() then
 		log('[ ta_update ] refreshed trust anchors for domain ' .. kres.dname2str(keyset.owner) .. ' are:\n'
-		    .. trust_anchors.summary(keyset.owner))
+			.. trust_anchors.summary(keyset.owner))
 	end
 
 	return true
@@ -210,7 +210,7 @@ local function active_refresh(keyset, pkt, is_initial)
 		retry = false
 	else
 		warn('[ ta_update ] active refresh failed for ' .. kres.dname2str(keyset.owner)
-				.. ' with rcode: ' .. pkt:rcode())
+			.. ' with rcode: ' .. pkt:rcode())
 	end
 	-- Calculate refresh/retry timer (RFC 5011, 2.3)
 	local min_ttl = retry and day or 15 * day
@@ -230,19 +230,19 @@ local function refresh_plan(keyset, delay, is_initial)
 			local delay_new = active_refresh(keyset, kres.pkt_t(pkt), is_initial)
 			delay_new = keyset.refresh_time or ta_update.refresh_time or delay_new
 			log('[ ta_update ] next refresh for ' .. owner_str .. ' in '
-					.. delay_new/hour .. ' hours')
+				.. delay_new/hour .. ' hours')
 			refresh_plan(keyset, delay_new)
 		end)
 	end)
 end
 
 ta_update = {
-    --   - [optional] overrides for global defaults of
-    --     hold_down_time, refresh_time, keep_removed
-    hold_down_time = 30 * day,
-    refresh_time = nil,
-    keep_removed = 0,
-    refresh_plan = refresh_plan,
+	-- [optional] overrides for global defaults of
+	-- hold_down_time, refresh_time, keep_removed
+	hold_down_time = 30 * day,
+	refresh_time = nil,
+	keep_removed = 0,
+	refresh_plan = refresh_plan,
 }
 
 return ta_update
