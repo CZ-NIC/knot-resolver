@@ -7,6 +7,11 @@ view:tsig('\8testkey1\0', policy.suffix(policy.DENY_MSG("TSIG key testkey1 match
 view:tsig('\7testkey\0', policy.suffix(policy.DENY_MSG("TSIG key testkey matched example"),{"\7example\0"}))
 policy.add(policy.all(policy.FORWARD('1.2.3.4')))
 
+-- Disable RFC5011 TA update
+if ta_update then
+        modules.unload('ta_update')
+end
+
 -- Disable RFC8145 signaling, scenario doesn't provide expected answers
 if ta_signal_query then
         modules.unload('ta_signal_query')
