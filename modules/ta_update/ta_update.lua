@@ -14,34 +14,40 @@ local key_state = {
 -- Find key in current keyset
 local function ta_find(keyset, rr)
 	local rr_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
-	assert(rr_tag >= 0 and rr_tag <= 65535, string.format('invalid RR: %s: %s',
-		kres.rr2str(rr), ffi.string(C.knot_strerror(rr_tag))))
+	if rr_tag < 0 or rr_tag > 65535 then
+		warn(string.format('[ta_update] ignoring invalid or unsupported RR: %s: %s',
+			kres.rr2str(rr), ffi.string(C.knot_strerror(rr_tag))))
+		return nil
+	end
 	for i, ta in ipairs(keyset) do
 		-- Match key owner and content
 		local ta_tag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
-		assert(ta_tag >= 0 and ta_tag <= 65535, string.format('invalid RR: %s: %s',
-			 kres.rr2str(ta), ffi.string(C.knot_strerror(ta_tag))))
-		if ta.owner == rr.owner then
-			if ta.type == rr.type then
-				if rr.type == kres.type.DNSKEY then
-					if C.kr_dnssec_key_match(ta.rdata, #ta.rdata, rr.rdata, #rr.rdata) == 0 then
+		if ta_tag < 0 or ta_tag > 65535 then
+			warn(string.format('[ta_update] ignoring invalid or unsupported RR: %s: %s',
+				kres.rr2str(ta), ffi.string(C.knot_strerror(ta_tag))))
+		else
+			if ta.owner == rr.owner then
+				if ta.type == rr.type then
+					if rr.type == kres.type.DNSKEY then
+						if C.kr_dnssec_key_match(ta.rdata, #ta.rdata, rr.rdata, #rr.rdata) == 0 then
+							return ta
+						end
+					elseif rr.type == kres.type.DS and ta.rdata == rr.rdata then
 						return ta
 					end
-				elseif rr.type == kres.type.DS and ta.rdata == rr.rdata then
-					return ta
-				end
-			-- DNSKEY superseding DS, inexact match
-			elseif rr.type == kres.type.DNSKEY and ta.type == kres.type.DS then
-				if ta.key_tag == rr_tag then
-					keyset[i] = rr -- Replace current DS
-					rr.state = ta.state
-					rr.key_tag = ta.key_tag
-					return rr
-				end
-			-- DS key matching DNSKEY, inexact match
-			elseif rr.type == kres.type.DS and ta.type == kres.type.DNSKEY then
-				if rr_tag == ta_tag then
-					return ta
+				-- DNSKEY superseding DS, inexact match
+				elseif rr.type == kres.type.DNSKEY and ta.type == kres.type.DS then
+					if ta.key_tag == rr_tag then
+						keyset[i] = rr -- Replace current DS
+						rr.state = ta.state
+						rr.key_tag = ta.key_tag
+						return rr
+					end
+				-- DS key matching DNSKEY, inexact match
+				elseif rr.type == kres.type.DS and ta.type == kres.type.DNSKEY then
+					if rr_tag == ta_tag then
+						return ta
+					end
 				end
 			end
 		end
@@ -57,7 +63,7 @@ end
 -- Attempt to extract key_tag
 local key_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
 if key_tag < 0 or key_tag > 65535 then
-	warn(string.format('[ ta_update ] ignoring invalid or unsupported RR: %s: %s',
+	warn(string.format('[ta_update] ignoring invalid or unsupported RR: %s: %s',
 		kres.rr2str(rr), ffi.string(C.knot_strerror(key_tag))))
 	return false
 end
@@ -114,8 +120,11 @@ local function ta_missing(ta, hold_down_time)
 	-- Key is removed (KeyRem)
 	local keep_ta = true
 	local key_tag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
-	assert(key_tag >= 0 and key_tag <= 65535, string.format('invalid RR: %s: %s',
-		 kres.rr2str(ta), ffi.string(C.knot_strerror(key_tag))))
+	if key_tag < 0 or key_tag > 65535 then
+		warn(string.format('[ta_update] ignoring invalid or unsupported RR: %s: %s',
+			kres.rr2str(ta), ffi.string(C.knot_strerror(key_tag))))
+		key_tag = ''
+	end
 	if ta.state == key_state.Valid then
 		ta.state = key_state.Missing
 		ta.timer = os.time() + hold_down_time
