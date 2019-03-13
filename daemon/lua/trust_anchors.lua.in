@@ -328,6 +328,7 @@ local function add_file(path, unmanaged)
 		-- Fetch DNSKEY immediately
 		local keyset = trust_anchors.keysets['\0']
 		keyset.filename = path
+		keyset_write(keyset)
 		if keyset.refresh_ev then event.cancel(keyset.refresh_ev) end
 		refresh_plan(keyset, 0, true)
 		return
