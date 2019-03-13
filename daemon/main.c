@@ -744,7 +744,9 @@ int main(int argc, char **argv)
 		.ctx = mp_new (4096),
 		.alloc = (knot_mm_alloc_t) mp_alloc
 	};
-	struct engine engine;
+	/** Static to work around lua_pushlightuserdata() limitations.
+	 * TODO: convert to a proper singleton like worker, most likely. */
+	static struct engine engine;
 	ret = engine_init(&engine, &pool);
 	if (ret != 0) {
 		kr_log_error("[system] failed to initialize engine: %s\n", kr_strerror(ret));
