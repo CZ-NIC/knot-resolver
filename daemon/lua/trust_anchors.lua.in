@@ -307,7 +307,8 @@ local refresh_plan = function(keyset, delay, is_initial)
 end
 
 local function add_file(path, unmanaged)
-	if not unmanaged then
+	local managed = not unmanaged
+	if managed then
 		if not io.open(path .. '.lock', 'w') then
 			error("[ ta ] ERROR: write access needed to keyfile dir '"..path.."'")
 		end
@@ -315,7 +316,7 @@ local function add_file(path, unmanaged)
 	end
 
 	-- Bootstrap if requested and keyfile doesn't exist
-	if not unmanaged and not io.open(path, 'r') then
+	if managed and not io.open(path, 'r') then
 		log("[ ta ] keyfile '%s': doesn't exist, bootstrapping", path);
 		local tas, msg = bootstrap(trust_anchors.bootstrap_url, trust_anchors.bootstrap_ca)
 		if not tas then
@@ -328,12 +329,13 @@ local function add_file(path, unmanaged)
 		-- Fetch DNSKEY immediately
 		local keyset = trust_anchors.keysets['\0']
 		keyset.filename = path
+		keyset.managed = true
 		keyset_write(keyset)
 		if keyset.refresh_ev then event.cancel(keyset.refresh_ev) end
 		refresh_plan(keyset, 0, true)
 		return
 	end
-	if not unmanaged and path == (trust_anchors.keysets['\0'] or {}).filename then
+	if managed and path == (trust_anchors.keysets['\0'] or {}).filename then
 		return
 	end
 
@@ -342,7 +344,7 @@ local function add_file(path, unmanaged)
 	if not keyset then
 		panic("[ ta ] ERROR: failed to read anchors from '%s' (%s)", path, err)
 	end
-	if not unmanaged then keyset.filename = path end
+	if managed then keyset.filename = path end
 
 	local owner = keyset.owner
 	local owner_str = kres.dname2str(owner)
@@ -360,7 +362,7 @@ local function add_file(path, unmanaged)
 	end
 	-- TODO: if failed and for root, try to rebootstrap?
 
-	if not unmanaged then refresh_plan(keyset, 0 * sec, false) end
+	if managed then refresh_plan(keyset, 0 * sec, false) end
 end
 
 local function ta_str(owner)
