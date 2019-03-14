@@ -64,8 +64,7 @@ end
 local function rule()
 	return function (state, req)
 		if state == kres.FAIL then return state end
-		req = kres.request_t(req)
-		local pkt = kres.pkt_t(req.answer)
+		local pkt = req.answer
 		-- Only successful answers
 		local records = pkt:section(kres.section.ANSWER)
 		local ancount = #records
