@@ -46,7 +46,6 @@ worker.resolve = function (qname, qtype, qclass, options, finish, init)
 	if finish then
 		-- Create callback for finalization
 		finish_cb = ffi.cast('trace_callback_f', function (req)
-			req = kres.request_t(req)
 			finish(req.answer, req)
 			finish_cb:free()
 		end)
