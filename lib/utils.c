@@ -766,7 +766,7 @@ static char *callprop(struct kr_module *module, const char *prop, const char *in
 	if (!module || !module->props || !prop) {
 		return NULL;
 	}
-	for (const struct kr_prop *p = module->props(); p && p->name; ++p) {
+	for (const struct kr_prop *p = module->props; p && p->name; ++p) {
 		if (p->cb != NULL && strcmp(p->name, prop) == 0) {
 			return p->cb(env, module, input);
 		}

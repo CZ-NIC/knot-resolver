@@ -23,16 +23,21 @@
 #include "lib/utils.h"
 #include "lib/module.h"
 
-/* List of embedded modules */
-const kr_layer_api_t *iterate_layer(struct kr_module *module);
-const kr_layer_api_t *validate_layer(struct kr_module *module);
-const kr_layer_api_t *cache_layer(struct kr_module *module);
-static const struct kr_module embedded_modules[] = {
-	{ "iterate",  NULL, NULL, NULL, iterate_layer,  NULL, NULL, NULL },
-	{ "validate", NULL, NULL, NULL, validate_layer, NULL, NULL, NULL },
-	{ "cache",    NULL, NULL, NULL, cache_layer,    NULL, NULL, NULL },
-};
 
+/* List of embedded modules.  These aren't (un)loaded. */
+int iterate_init(struct kr_module *self);
+int validate_init(struct kr_module *self);
+int cache_init(struct kr_module *self);
+kr_module_init_cb kr_module_get_embedded(const char *name)
+{
+	if (strcmp(name, "iterate") == 0)
+		return iterate_init;
+	if (strcmp(name, "validate") == 0)
+		return validate_init;
+	if (strcmp(name, "cache") == 0)
+		return cache_init;
+	return NULL;
+}
 
 /** Load prefixed symbol. */
 static void *load_symbol(void *lib, const char *prefix, const char *name)
@@ -60,30 +65,16 @@ static int load_library(struct kr_module *module, const char *name, const char *
 	return kr_error(ENOENT);
 }
 
-const struct kr_module * kr_module_embedded(const char *name)
-{
-	for (unsigned i = 0; i < sizeof(embedded_modules)/sizeof(embedded_modules[0]); ++i) {
-		if (strcmp(name, embedded_modules[i].name) == 0)
-			return embedded_modules + i;
-	}
-	return NULL;
-}
-
 /** Load C module symbols. */
 static int load_sym_c(struct kr_module *module, uint32_t api_required)
 {
+	module->init = kr_module_get_embedded(module->name);
+	if (module->init) {
+		return kr_ok();
+	}
 	#pragma GCC diagnostic push
 	#pragma GCC diagnostic ignored "-Wpedantic" /* casts after load_symbol() */
 	/* Check if it's embedded first */
-	const struct kr_module *embedded = kr_module_embedded(module->name);
-	if (embedded) {
-		module->init = embedded->init;
-		module->deinit = embedded->deinit;
-		module->config = embedded->config;
-		module->layer = embedded->layer;
-		module->props = embedded->props;
-		return kr_ok();
-	}
 	/* Load dynamic library module */
 	auto_free char *m_prefix = kr_strcatdup(2, module->name, "_");
 
@@ -102,9 +93,14 @@ static int load_sym_c(struct kr_module *module, uint32_t api_required)
 	ML(init);
 	ML(deinit);
 	ML(config);
-	ML(layer);
-	ML(props);
 	#undef ML
+	if (load_symbol(module->lib, m_prefix, "layer")
+	    || load_symbol(module->lib, m_prefix, "props")) {
+		/* In case someone re-compiled against new kresd
+		 * but haven't actually changed the symbols. */
+		kr_log_error("[system] module %s needs to change API.\n", module->name);
+		return kr_error(ENOTSUP);
+	}
 
 	return kr_ok();
 	#pragma GCC diagnostic pop

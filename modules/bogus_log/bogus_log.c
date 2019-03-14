@@ -105,6 +105,18 @@ static char* dump_frequent(void *env, struct kr_module *module, const char *args
 KR_EXPORT
 int bogus_log_init(struct kr_module *module)
 {
+	static kr_layer_api_t layer = {
+		.consume = &consume,
+	};
+	layer.data = module;
+	module->layer = &layer;
+
+	static const struct kr_prop props[] = {
+		{ &dump_frequent, "frequent", "List most frequent queries.", },
+		{ NULL, NULL, NULL }
+	};
+	module->props = props;
+
 	struct stat_data *data = malloc(sizeof(*data));
 	if (!data) {
 		return kr_error(ENOMEM);
@@ -124,27 +136,6 @@ int bogus_log_deinit(struct kr_module *module)
 		free(data);
 	}
 	return kr_ok();
-}
-
-
-KR_EXPORT
-const kr_layer_api_t *bogus_log_layer(struct kr_module *module)
-{
-	static kr_layer_api_t _layer = {
-		.consume = &consume,
-	};
-	_layer.data = module;
-	return &_layer;
-}
-
-KR_EXPORT
-struct kr_prop *bogus_log_props(void)
-{
-	static struct kr_prop prop_list[] = {
-		{ &dump_frequent, "frequent", "List most frequent queries.", },
-		{ NULL, NULL, NULL }
-	};
-	return prop_list;
 }
 
 KR_MODULE_EXPORT(bogus_log)
