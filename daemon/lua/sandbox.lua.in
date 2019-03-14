@@ -43,7 +43,6 @@ worker.resolve_pkt = function (pkt, options, finish, init)
 		finish_cb = ffi.cast('trace_callback_f',
 			function (req)
 				jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
-			req = kres.request_t(req)
 				finish(req.answer, req)
 				finish_cb:free()
 			end)
