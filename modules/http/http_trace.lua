@@ -60,7 +60,6 @@ local function serve_trace(h, _)
 	local cond = condition.new()
 	local waiting, done = false, false
 	local finish_cb = ffi.cast('trace_callback_f', function (req)
-		req = kres.request_t(req)
 		add_selected_records(answers, req.answ_selected)
 		add_selected_records(authority, req.auth_selected)
 		if waiting then
@@ -75,7 +74,6 @@ local function serve_trace(h, _)
 		type = qtype,
 		options = {'TRACE'},
 		init = function (req)
-			req = kres.request_t(req)
 			req.trace_log = buffer_log_cb
 			req.trace_finish = finish_cb
 		end

@@ -69,9 +69,8 @@ end
 
 -- Handle DoT signalling NS domains.
 function M.layer.consume(state, _, pkt)
-	if state == kres.FAIL then return state end
 	-- Only successful answers
-	pkt = kres.pkt_t(pkt)
+	if state == kres.FAIL then return state end
 	-- log("%s", pkt:tostring())
 	local authority = pkt:section(kres.section.AUTHORITY)
 	local additional = pkt:section(kres.section.ADDITIONAL)
