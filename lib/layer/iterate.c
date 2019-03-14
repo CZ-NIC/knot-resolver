@@ -1111,17 +1111,18 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 }
 
 /** Module implementation. */
-const kr_layer_api_t *iterate_layer(struct kr_module *module)
+int iterate_init(struct kr_module *self)
 {
-	static const kr_layer_api_t _layer = {
+	static const kr_layer_api_t layer = {
 		.begin = &begin,
 		.reset = &reset,
 		.consume = &resolve,
 		.produce = &prepare_query
 	};
-	return &_layer;
+	self->layer = &layer;
+	return kr_ok();
 }
 
-KR_MODULE_EXPORT(iterate)
+KR_MODULE_EXPORT(iterate) /* useless for builtin module, but let's be consistent */
 
 #undef VERBOSE_MSG
