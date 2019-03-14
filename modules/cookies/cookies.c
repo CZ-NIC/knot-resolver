@@ -47,6 +47,22 @@ static char *cookies_config(void *env, struct kr_module *module,
 KR_EXPORT
 int cookies_init(struct kr_module *module)
 {
+	/* The function answer_finalize() in resolver is called before any
+	 * .finish callback. Therefore this layer does not use it. */
+	static kr_layer_api_t layer = {
+		.begin = &check_request,
+		.consume = &check_response
+	};
+	/* Store module reference */
+	layer.data = module;
+	module->layer = &layer;
+
+	static const struct kr_prop props[] = {
+	    { &cookies_config, "config", "Empty value to return current configuration.", },
+	    { NULL, NULL, NULL }
+	};
+	module->props = props;
+
 	struct engine *engine = module->data;
 
 	struct kr_cookie_ctx *cookie_ctx = &engine->resolver.cookie_ctx;
@@ -70,31 +86,6 @@ int cookies_deinit(struct kr_module *module)
 	config_deinit(cookie_ctx);
 
 	return kr_ok();
-}
-
-KR_EXPORT
-const kr_layer_api_t *cookies_layer(struct kr_module *module)
-{
-	/* The function answer_finalize() in resolver is called before any
-	 * .finish callback. Therefore this layer does not use it. */
-
-	static kr_layer_api_t _layer = {
-		.begin = &check_request,
-		.consume = &check_response
-	};
-	/* Store module reference */
-	_layer.data = module;
-	return &_layer;
-}
-
-KR_EXPORT
-struct kr_prop *cookies_props(void)
-{
-	static struct kr_prop prop_list[] = {
-	    { &cookies_config, "config", "Empty value to return current configuration.", },
-	    { NULL, NULL, NULL }
-	};
-	return prop_list;
 }
 
 KR_MODULE_EXPORT(cookies)

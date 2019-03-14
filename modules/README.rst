@@ -16,6 +16,8 @@ Currently modules written in C and LuaJIT are supported.
 The anatomy of an extension
 ===========================
 
+FIXME: review and fix.
+
 A module is a shared object or script defining specific functions, here's an overview.
 
 *Note* |---| the :ref:`Modules <lib_api_modules>` header documents the module loading and API.

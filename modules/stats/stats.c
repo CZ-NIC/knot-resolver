@@ -431,25 +431,17 @@ static char* dump_upstreams(void *env, struct kr_module *module, const char *arg
 	return ret;
 }
 
-/*
- * Module implementation.
- */
-
 KR_EXPORT
-const kr_layer_api_t *stats_layer(struct kr_module *module)
+int stats_init(struct kr_module *module)
 {
-	static kr_layer_api_t _layer = {
+	static kr_layer_api_t layer = {
 		.consume = &collect_rtt,
 		.finish = &collect,
 	};
 	/* Store module reference */
-	_layer.data = module;
-	return &_layer;
-}
+	layer.data = module;
+	module->layer = &layer;
 
-KR_EXPORT
-int stats_init(struct kr_module *module)
-{
 	struct stat_data *data = malloc(sizeof(*data));
 	if (!data) {
 		return kr_error(ENOMEM);

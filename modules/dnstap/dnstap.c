@@ -211,6 +211,13 @@ static int dnstap_log(kr_layer_t *ctx) {
 
 KR_EXPORT
 int dnstap_init(struct kr_module *module) {
+	static kr_layer_api_t layer = {
+		.finish = &dnstap_log,
+	};
+	/* Store module reference */
+	layer.data = module;
+	module->layer = &layer;
+
 	/* allocated memory for internal data */
 	struct dnstap_data *data = malloc(sizeof(*data));
 	if (!data) {
@@ -366,16 +373,6 @@ int dnstap_config(struct kr_module *module, const char *conf) {
 	}
 
 	return kr_ok();
-}
-
-KR_EXPORT
-const kr_layer_api_t *dnstap_layer(struct kr_module *module) {
-	static kr_layer_api_t _layer = {
-		.finish = &dnstap_log,
-	};
-	/* Store module reference */
-	_layer.data = module;
-	return &_layer;
 }
 
 KR_MODULE_EXPORT(dnstap)

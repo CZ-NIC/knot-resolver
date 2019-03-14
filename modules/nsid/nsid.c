@@ -58,17 +58,13 @@ static int nsid_finalize(kr_layer_t *ctx) {
 }
 
 KR_EXPORT
-const kr_layer_api_t *nsid_layer(struct kr_module *module)
-{
-	static kr_layer_api_t _layer = {
+int nsid_init(struct kr_module *module) {
+	static kr_layer_api_t layer = {
 		.answer_finalize = &nsid_finalize,
 	};
-	_layer.data = module;
-	return &_layer;
-}
+	layer.data = module;
+	module->layer = &layer;
 
-KR_EXPORT
-int nsid_init(struct kr_module *module) {
 	struct nsid_config *config = calloc(1, sizeof(struct nsid_config));
 	if (config == NULL)
 		return kr_error(ENOMEM);

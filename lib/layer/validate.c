@@ -1113,21 +1113,17 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	VERBOSE_MSG(qry, "<= answer valid, OK\n");
 	return KR_STATE_DONE;
 }
+
 /** Module implementation. */
-const kr_layer_api_t *validate_layer(struct kr_module *module)
+int validate_init(struct kr_module *self)
 {
-	static const kr_layer_api_t _layer = {
+	static const kr_layer_api_t layer = {
 		.consume = &validate,
 	};
-	/* Store module reference */
-	return &_layer;
-}
-
-int validate_init(struct kr_module *module)
-{
+	self->layer = &layer;
 	return kr_ok();
 }
 
-KR_MODULE_EXPORT(validate)
+KR_MODULE_EXPORT(validate) /* useless for builtin module, but let's be consistent */
 
 #undef VERBOSE_MSG

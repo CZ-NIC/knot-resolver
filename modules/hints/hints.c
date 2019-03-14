@@ -600,26 +600,17 @@ static char* hint_ttl(void *env, struct kr_module *module, const char *args)
 	return result;
 }
 
-/*
- * Module implementation.
- */
-
-KR_EXPORT
-const kr_layer_api_t *hints_layer(struct kr_module *module)
-{
-	static kr_layer_api_t _layer = {
-		.produce = &query,
-	};
-	/* Store module reference */
-	_layer.data = module;
-	return &_layer;
-}
-
-
 /** Basic initialization: get a memory pool, etc. */
 KR_EXPORT
 int hints_init(struct kr_module *module)
 {
+	static kr_layer_api_t layer = {
+		.produce = &query,
+	};
+	/* Store module reference */
+	layer.data = module;
+	module->layer = &layer;
+
 	/* Create pool and copy itself */
 	knot_mm_t _pool = {
 		.ctx = mp_new(4096),
