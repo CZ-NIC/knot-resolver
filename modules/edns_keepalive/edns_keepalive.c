@@ -60,15 +60,13 @@ static int edns_keepalive_finalize(kr_layer_t *ctx)
 	return ctx->state;
 }
 
-KR_EXPORT
-const kr_layer_api_t *edns_keepalive_layer(struct kr_module *module)
+KR_EXPORT int edns_keeapalive_init(struct kr_module *self)
 {
-	static kr_layer_api_t _layer = {
+	static const kr_layer_api_t layer = {
 		.answer_finalize = &edns_keepalive_finalize,
 	};
-	/* Store module reference */
-	_layer.data = module;
-	return &_layer;
+	self->layer = &layer;
+	return kr_ok();
 }
 
 KR_MODULE_EXPORT(edns_keepalive)
