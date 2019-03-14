@@ -523,8 +523,6 @@ policy.layer = {
 	begin = function(state, req)
 		-- Don't act on "resolved" cases.
 		if bit.band(state, bit.bor(kres.FAIL, kres.DONE)) ~= 0 then return state end
-
-		req = kres.request_t(req)
 		return policy.evaluate(policy.rules, req, req:current(), state) or
 		       policy.evaluate(policy.special_names, req, req:current(), state) or
 		       state
@@ -532,8 +530,6 @@ policy.layer = {
 	finish = function(state, req)
 		-- Don't act on "resolved" cases.
 		if bit.band(state, bit.bor(kres.FAIL, kres.DONE)) ~= 0 then return state end
-
-		req = kres.request_t(req)
 		return policy.evaluate(policy.postrules, req, req:current(), state) or state
 	end
 }

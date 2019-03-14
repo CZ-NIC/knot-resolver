@@ -27,8 +27,6 @@ end
 M.layer = { }
 function M.layer.consume(state, req, pkt)
 	if state == kres.FAIL then return state end
-	pkt = kres.pkt_t(pkt)
-	req = kres.request_t(req)
 	local qry = req:current()
 	-- Observe only final answers in IN class where request has no CD flag.
 	if M.proxy == nil or not qry.flags.RESOLVED

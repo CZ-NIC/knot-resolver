@@ -8,7 +8,6 @@ local event_id = nil
 -- Check time validity of RRSIGs in priming query
 -- luacheck: no unused args
 local function check_time_callback(pkt, req)
-	pkt = kres.pkt_t(pkt)
 	if pkt:rcode() ~= kres.rcode.NOERROR then
 		warn("[detect_time_skew] cannot resolve '.' NS")
 		return nil
