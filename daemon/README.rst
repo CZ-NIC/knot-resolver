@@ -348,9 +348,8 @@ Environment
 
       -- Query for AAAA record
       resolve('example.com', kres.type.AAAA, kres.class.IN, 0,
-      function (answer, req)
+      function (pkt, req)
          -- Check answer RCODE
-         local pkt = kres.pkt_t(answer)
          if pkt:rcode() == kres.rcode.NOERROR then
             -- Print matching records
             local records = pkt:section(kres.section.ANSWER)
