@@ -57,22 +57,6 @@ static int nsid_finalize(kr_layer_t *ctx) {
 	return ctx->state;
 }
 
-KR_EXPORT
-int nsid_init(struct kr_module *module) {
-	static kr_layer_api_t layer = {
-		.answer_finalize = &nsid_finalize,
-	};
-	layer.data = module;
-	module->layer = &layer;
-
-	struct nsid_config *config = calloc(1, sizeof(struct nsid_config));
-	if (config == NULL)
-		return kr_error(ENOMEM);
-
-	module->data = config;
-	return kr_ok();
-}
-
 static char* nsid_name(void *env, struct kr_module *module, const char *args)
 {
 	struct engine *engine = env;
@@ -95,13 +79,25 @@ static char* nsid_name(void *env, struct kr_module *module, const char *args)
 }
 
 KR_EXPORT
-struct kr_prop *nsid_props(void)
-{
-	static struct kr_prop prop_list[] = {
+int nsid_init(struct kr_module *module) {
+	static kr_layer_api_t layer = {
+		.answer_finalize = &nsid_finalize,
+	};
+	layer.data = module;
+	module->layer = &layer;
+
+	static const struct kr_prop props[] = {
 	    { &nsid_name, "name", "Get or set local NSID value" },
 	    { NULL, NULL, NULL }
 	};
-	return prop_list;
+	module->props = props;
+
+	struct nsid_config *config = calloc(1, sizeof(struct nsid_config));
+	if (config == NULL)
+		return kr_error(ENOMEM);
+
+	module->data = config;
+	return kr_ok();
 }
 
 KR_EXPORT

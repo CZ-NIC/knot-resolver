@@ -611,6 +611,19 @@ int hints_init(struct kr_module *module)
 	layer.data = module;
 	module->layer = &layer;
 
+	static const struct kr_prop props[] = {
+	    { &hint_set,    "set", "Set {name, address} hint.", },
+	    { &hint_del,    "del", "Delete one {name, address} hint or all addresses for the name.", },
+	    { &hint_get,    "get", "Retrieve hint for given name.", },
+	    { &hint_ttl,    "ttl", "Set/get TTL used for the hints.", },
+	    { &hint_add_hosts, "add_hosts", "Load a file with hosts-like formatting and add contents into hints.", },
+	    { &hint_root,   "root", "Replace root hints set (empty value to return current list).", },
+	    { &hint_root_file, "root_file", "Replace root hints set from a zonefile.", },
+	    { &hint_use_nodata, "use_nodata", "Synthesise NODATA if name matches, but type doesn't.  True by default.", },
+	    { NULL, NULL, NULL }
+	};
+	module->props = props;
+
 	/* Create pool and copy itself */
 	knot_mm_t _pool = {
 		.ctx = mp_new(4096),
@@ -667,23 +680,6 @@ int hints_config(struct kr_module *module, const char *conf)
 		return load_file(module, conf);
 	}
 	return kr_ok();
-}
-
-KR_EXPORT
-struct kr_prop *hints_props(void)
-{
-	static struct kr_prop prop_list[] = {
-	    { &hint_set,    "set", "Set {name, address} hint.", },
-	    { &hint_del,    "del", "Delete one {name, address} hint or all addresses for the name.", },
-	    { &hint_get,    "get", "Retrieve hint for given name.", },
-	    { &hint_ttl,    "ttl", "Set/get TTL used for the hints.", },
-	    { &hint_add_hosts, "add_hosts", "Load a file with hosts-like formatting and add contents into hints.", },
-	    { &hint_root,   "root", "Replace root hints set (empty value to return current list).", },
-	    { &hint_root_file, "root_file", "Replace root hints set from a zonefile.", },
-	    { &hint_use_nodata, "use_nodata", "Synthesise NODATA if name matches, but type doesn't.  True by default.", },
-	    { NULL, NULL, NULL }
-	};
-	return prop_list;
 }
 
 KR_MODULE_EXPORT(hints)

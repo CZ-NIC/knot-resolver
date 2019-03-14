@@ -442,6 +442,17 @@ int stats_init(struct kr_module *module)
 	layer.data = module;
 	module->layer = &layer;
 
+	static const struct kr_prop props[] = {
+	    { &stats_set,     "set", "Set {key, val} metrics.", },
+	    { &stats_get,     "get", "Get metrics for given key.", },
+	    { &stats_list,    "list", "List observed metrics.", },
+	    { &dump_frequent, "frequent", "List most frequent queries.", },
+	    { &clear_frequent,"clear_frequent", "Clear frequent queries log.", },
+	    { &dump_upstreams,  "upstreams", "List recently seen authoritatives.", },
+	    { NULL, NULL, NULL }
+	};
+	module->props = props;
+
 	struct stat_data *data = malloc(sizeof(*data));
 	if (!data) {
 		return kr_error(ENOMEM);
@@ -473,21 +484,6 @@ int stats_deinit(struct kr_module *module)
 		free(data);
 	}
 	return kr_ok();
-}
-
-KR_EXPORT
-struct kr_prop *stats_props(void)
-{
-	static struct kr_prop prop_list[] = {
-	    { &stats_set,     "set", "Set {key, val} metrics.", },
-	    { &stats_get,     "get", "Get metrics for given key.", },
-	    { &stats_list,    "list", "List observed metrics.", },
-	    { &dump_frequent, "frequent", "List most frequent queries.", },
-	    { &clear_frequent,"clear_frequent", "Clear frequent queries log.", },
-	    { &dump_upstreams,  "upstreams", "List recently seen authoritatives.", },
-	    { NULL, NULL, NULL }
-	};
-	return prop_list;
 }
 
 KR_MODULE_EXPORT(stats)
