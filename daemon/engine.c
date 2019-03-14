@@ -662,13 +662,13 @@ int engine_init(struct engine *engine, knot_mm_t *pool)
 	return ret;
 }
 
+/** Unregister a (found) module */
 static void engine_unload(struct engine *engine, struct kr_module *module)
 {
-	/* Unregister module */
 	auto_free char *name = strdup(module->name);
 	kr_module_unload(module);
 	/* Clear in Lua world, but not for embedded modules ('cache' in particular). */
-	if (name && !kr_module_embedded(name)) {
+	if (name && !kr_module_get_embedded(name)) {
 		lua_pushnil(engine->L);
 		lua_setglobal(engine->L, name);
 	}
@@ -821,8 +821,7 @@ static int register_properties(struct engine *engine, struct kr_module *module)
 		REGISTER_MODULE_CALL(engine->L, module, module->config, "config");
 	}
 
-	const struct kr_prop *p = module->props == NULL ? NULL : module->props();
-	for (; p && p->name; ++p) {
+	for (const struct kr_prop *p = module->props; p && p->name; ++p) {
 		if (p->cb != NULL) {
 			REGISTER_MODULE_CALL(engine->L, module, p->cb, p->name);
 		}
