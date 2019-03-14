@@ -246,14 +246,6 @@ static kr_layer_api_t *l_ffi_layer_create(lua_State *L, struct kr_module *module
 	return api;
 }
 
-/** @internal Retrieve C layer api wrapper. */
-static const kr_layer_api_t *l_ffi_layer(struct kr_module *module)
-{
-	if (module) {
-		return (const kr_layer_api_t *)module->data;
-	}
-	return NULL;
-}
 #undef LAYER_REGISTER
 
 int ffimodule_register_lua(struct engine *engine, struct kr_module *module, const char *name)
@@ -278,8 +270,9 @@ int ffimodule_register_lua(struct engine *engine, struct kr_module *module, cons
 	/* Bake layer API if defined in module */
 	lua_getfield(L, -1, "layer");
 	if (!lua_isnil(L, -1)) {
-		module->layer = &l_ffi_layer;
-		module->data = l_ffi_layer_create(L, module);
+		module->layer = l_ffi_layer_create(L, module);
+		/* most likely not needed, but compatibility for now */
+		module->data = (void *)module->layer;
 	}
 	module->lib = L;
 	lua_pop(L, 2); /* Clear the layer + module global */

@@ -18,14 +18,15 @@
 #include "lib/cache/api.h"
 
 /** Module implementation. */
-const kr_layer_api_t *cache_layer(struct kr_module *module)
+int cache_init(struct kr_module *self)
 {
-	static const kr_layer_api_t _layer = {
+	static const kr_layer_api_t layer = {
 		.produce = &cache_peek,
 		.consume = &cache_stash,
 	};
-
-	return &_layer;
+	self->layer = &layer;
+	return kr_ok();
 }
 
-KR_MODULE_EXPORT(cache)
+KR_MODULE_EXPORT(cache) /* useless for builtin module, but let's be consistent */
+

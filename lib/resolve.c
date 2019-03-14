@@ -108,7 +108,7 @@ static int answer_finalize_yield(kr_layer_t *ctx) { return kr_ok(); }
 	for (size_t i = (from); i < (r)->ctx->modules->len; ++i) { \
 		struct kr_module *mod = (r)->ctx->modules->at[i]; \
 		if (mod->layer) { \
-			struct kr_layer layer = {.state = (r)->state, .api = mod->layer(mod), .req = (r)}; \
+			struct kr_layer layer = {.state = (r)->state, .api = mod->layer, .req = (r)}; \
 			if (layer.api && layer.api->func) { \
 				(r)->state = layer.api->func(&layer, ##__VA_ARGS__); \
 				if ((r)->state == KR_STATE_YIELD) { \
@@ -127,8 +127,7 @@ static int answer_finalize_yield(kr_layer_t *ctx) { return kr_ok(); }
 static inline size_t layer_id(struct kr_request *req, const struct kr_layer_api *api) {
 	module_array_t *modules = req->ctx->modules;
 	for (size_t i = 0; i < modules->len; ++i) {
-		struct kr_module *mod = modules->at[i];
-		if (mod->layer && mod->layer(mod) == api) {
+		if (modules->at[i]->layer == api) {
 			return i;
 		}
 	}
