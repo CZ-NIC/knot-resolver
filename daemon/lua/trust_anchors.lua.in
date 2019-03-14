@@ -317,6 +317,11 @@ local function add_file(path, unmanaged)
 
 	-- Bootstrap if requested and keyfile doesn't exist
 	if managed and not io.open(path, 'r') then
+		if trust_anchors.keysets['\0'] then
+			error(string.format(
+				"[ ta ] keyfile '%s' doesn't exist and root key is already installed, "
+				.. "cannot bootstrap; provide a path to valid file with keys", path))
+		end
 		log("[ ta ] keyfile '%s': doesn't exist, bootstrapping", path);
 		local tas, msg = bootstrap(trust_anchors.bootstrap_url, trust_anchors.bootstrap_ca)
 		if not tas then
