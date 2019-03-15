@@ -369,7 +369,8 @@ local function add_file(path, unmanaged)
 	end
 end
 
-local function distrust(owner)
+local function distrust(zname)
+	local owner = kres.str2dname(zname)
 	if not trust_anchors.keysets[owner] then
 		return false
 	end
