@@ -11,6 +11,7 @@ local key_state = {
 	Missing = 'Missing', Revoked = 'Revoked', Removed = 'Removed'
 }
 
+-- TODO: Move bootstrap to a separate module or even its own binary
 -- Fetch over HTTPS with peert cert checked
 local function https_fetch(url, ca)
 	local ssl_ok, https = pcall(require, 'ssl.https')
@@ -153,10 +154,19 @@ local function bootstrap(url, ca)
 	local msg = '[ ta ] Root trust anchors bootstrapped over https with pinned certificate.\n'
 			.. '       You SHOULD verify them manually against original source:\n'
 			.. '       https://www.iana.org/dnssec/files\n'
-			.. '[ ta ] Current root trust anchors are:'
+			.. '[ ta ] Bootstrapped root trust anchors are:'
 			.. rrset
 	return rrset, msg
 end
+
+local function bootstrap_write(rrstr, filename)
+	local fname_tmp = filename .. '.lock.' .. tostring(worker.pid);
+	local file = assert(io.open(fname_tmp, 'w'))
+	file:write(rrstr)
+	file:close()
+	assert(os.rename(fname_tmp, filename))
+end
+-- Bootstrap end
 
 -- Update ta.comment and return decorated line representing the RR
 -- This is meant to be in zone-file format.
@@ -172,7 +182,9 @@ end
 
 -- Write keyset to a file.  States and timers are stored in comments.
 local function keyset_write(keyset)
-	if not keyset.filename then return false end -- not to be persisted
+	if not keyset.managed then  -- not to be persistent, this is an error!
+		panic('internal error: keyset_write called for an unmanaged TA')
+	end
 	local fname_tmp = keyset.filename .. '.lock.' .. tostring(worker.pid);
 	local file = assert(io.open(fname_tmp, 'w'))
 	for i = 1, #keyset do
@@ -298,14 +310,6 @@ local function keyset_publish(keyset)
 	return count > 0 and not has_error
 end
 
-local refresh_plan = function(keyset, delay, is_initial)
-	event.after(0, function()
-		if ta_update ~= nil then
-			ta_update.refresh_plan(keyset, delay, is_initial)
-		end
-	end)
-end
-
 local function add_file(path, unmanaged)
 	local managed = not unmanaged
 	if managed then
@@ -315,7 +319,7 @@ local function add_file(path, unmanaged)
 		os.remove(path .. ".lock")
 	end
 
-	-- Bootstrap if requested and keyfile doesn't exist
+	-- Bootstrap TA for root zone if keyfile doesn't exist
 	if managed and not io.open(path, 'r') then
 		if trust_anchors.keysets['\0'] then
 			error(string.format(
@@ -323,25 +327,15 @@ local function add_file(path, unmanaged)
 				.. "cannot bootstrap; provide a path to valid file with keys", path))
 		end
 		log("[ ta ] keyfile '%s': doesn't exist, bootstrapping", path);
-		local tas, msg = bootstrap(trust_anchors.bootstrap_url, trust_anchors.bootstrap_ca)
-		if not tas then
+		local rrstr, msg = bootstrap(trust_anchors.bootstrap_url, trust_anchors.bootstrap_ca)
+		if not rrstr then
 			msg = msg .. '\n'
 				.. '[ ta ] Failed to bootstrap root trust anchors!'
 			error(msg)
 		end
 		print(msg)
-		trust_anchors.add(tas)
-		-- Fetch DNSKEY immediately
-		local keyset = trust_anchors.keysets['\0']
-		keyset.filename = path
-		keyset.managed = true
-		keyset_write(keyset)
-		if keyset.refresh_ev then event.cancel(keyset.refresh_ev) end
-		refresh_plan(keyset, 0, true)
-		return
-	end
-	if managed and path == (trust_anchors.keysets['\0'] or {}).filename then
-		return
+		bootstrap_write(rrstr, path)
+		-- continue as if the keyfile was there
 	end
 
 	-- Parse the file and check its sanity
@@ -349,14 +343,13 @@ local function add_file(path, unmanaged)
 	if not keyset then
 		panic("[ ta ] ERROR: failed to read anchors from '%s' (%s)", path, err)
 	end
-	if managed then keyset.filename = path end
+	keyset.filename = path
+	keyset.managed = managed
 
 	local owner = keyset.owner
 	local owner_str = kres.dname2str(owner)
 	if trust_anchors.keysets[owner] then
 		warn('[ ta ] warning: overriding previously set trust anchors for ' .. owner_str)
-		local refresh_ev = trust_anchors.keysets[owner].refresh_ev
-		if refresh_ev then event.cancel(refresh_ev) end
 	end
 	trust_anchors.keysets[owner] = keyset
 
@@ -367,7 +360,13 @@ local function add_file(path, unmanaged)
 	end
 	-- TODO: if failed and for root, try to rebootstrap?
 
-	if managed then refresh_plan(keyset, 0 * sec, false) end
+	if managed then
+		if not ta_update then
+			panic('[ ta ] automatic update for TA ' .. owner_str .. ' requested, '
+				.. 'but required plugin ta_update is not loaded')
+		end
+		ta_update.start(owner)
+	end
 end
 
 local function distrust(owner)
@@ -431,8 +430,9 @@ trust_anchors = {
 	config = add_file,
 	distrust = distrust,
 
-	keyset_write = keyset_write,
 	keyset_publish = keyset_publish,
+	keyset_write = keyset_write,
+	key_state = key_state,
 
 	-- Add DS/DNSKEY record(s) (unmanaged)
 	add = function (keystr)
@@ -443,15 +443,15 @@ trust_anchors = {
 			local keyset_orig = trust_anchors.keysets[owner]
 			-- Set up trust_anchors.keysets[owner]
 			if keyset_orig then
+				if keyset_orig.managed then
+					panic('[ ta ] it is impossible to add an unmanaged TA for zone '
+						.. owner_str .. ' which already has a managed TA')
+				end
 				warn('[ ta ] warning: extending previously set trust anchors for '
 						.. owner_str)
 				for _, ta in ipairs(keyset) do
 					table.insert(keyset_orig, ta)
 				end
-				-- we might also add more warning if it's managed, i.e. has .filename,
-				-- as the next update would overwrite this additional TA
-			else
-				trust_anchors.keysets[owner] = keyset
 			end
 			-- Replace the TA store used for validation
 			if not keyset_publish(keyset) then
@@ -459,6 +459,9 @@ trust_anchors = {
 				-- trust_anchors.keysets[owner] was already updated to the
 				-- (partially) failing state, but I'm not sure how much to improve this
 			end
+			keyset.managed = false
+			trust_anchors.keysets[owner] = keyset
+
 		end
 		if verbose() or err then log('New TA state:\n' .. trust_anchors.summary()) end
 		if err then

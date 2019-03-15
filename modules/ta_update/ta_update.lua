@@ -3,13 +3,13 @@ local ffi = require('ffi')
 local kres = require('kres')
 local C = ffi.C
 
-local ta_update = {}
+assert(trust_anchors, 'ta_update module depends on initialized trust_anchors library')
+local key_state = trust_anchors.key_state
+assert(key_state)
 
--- RFC5011 state table
-local key_state = {
-	Start = 'Start', AddPend = 'AddPend', Valid = 'Valid',
-	Missing = 'Missing', Revoked = 'Revoked', Removed = 'Removed'
-}
+local ta_update = {}
+local tracked_tas = {}  -- zone name (wire) => {event = number}
+
 
 -- Find key in current keyset
 local function ta_find(keyset, rr)
@@ -229,10 +229,19 @@ local function active_refresh(keyset, pkt, is_initial)
 	return math.max(hour, min_ttl)
 end
 
--- Plan an event for refreshing the root DNSKEYs and re-scheduling itself
+-- Plan an event for refreshing DNSKEYs and re-scheduling itself
 local function refresh_plan(keyset, delay, is_initial)
-	local owner_str = kres.dname2str(keyset.owner) -- maybe fix converting back and forth?
-	keyset.refresh_ev = event.after(delay, function ()
+	local owner = keyset.owner
+	local owner_str = kres.dname2str(keyset.owner)
+	if not tracked_tas[owner] then
+		tracked_tas[owner] = {}
+	end
+	local track_cfg = tracked_tas[owner]
+	if track_cfg.event then  -- restart timer if necessary
+		event.cancel(track_cfg.event)
+	end
+	track_cfg.event = event.after(delay, function ()
+		log('[ta_update] refreshing TA for ' .. owner_str)
 		resolve(owner_str, kres.type.DNSKEY, kres.class.IN, 'NO_CACHE',
 		function (pkt)
 			-- Schedule itself with updated timeout
@@ -251,7 +260,45 @@ ta_update = {
 	hold_down_time = 30 * day,
 	refresh_time = nil,
 	keep_removed = 0,
-	refresh_plan = refresh_plan,
+	tracked = tracked_tas, -- debug and visibility, should not be changed by hand
 }
+
+-- start tracking (already loaded) TA with given zone name in wire format
+-- do first refresh immediatelly
+function ta_update.start(zname)
+	local keyset = trust_anchors.keysets[zname]
+	if not keyset then
+		panic('[ta_update] TA must be configured first before tracking it')
+	end
+	if not keyset.managed then
+		panic('[ta_update] TA is configured as unmanaged; distrust it and '
+			.. 'add it again as managed using trust_anchors.add_file()')
+	end
+	refresh_plan(keyset, 0, false)
+end
+
+function ta_update.stop(zname)
+	if tracked_tas[zname] then
+		event.cancel(tracked_tas[zname].event)
+		tracked_tas[zname] = nil
+		trust_anchors.keysets[zname].managed = false
+	end
+end
+
+-- immediatelly schedule key refresh for all managed TAs
+function ta_update.init()
+	for zname, keyset in pairs(trust_anchors.keysets) do
+		if keyset.managed then
+			ta_update.start(zname)
+		end
+	end
+end
+
+-- stop all timers
+function ta_update.deinit()
+	for zname, _ in pairs(tracked_tas) do
+		ta_update.stop(zname)
+	end
+end
 
 return ta_update
