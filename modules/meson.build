@@ -20,7 +20,7 @@ lua_mod_src = [  # add lua modules without separate meson.build
 
 config_tests += [
   ['predict', files('predict/predict.test.lua')],
-  ['hints', files('hints/tests/hints.test.lua')],
+  ['hints', files('hints/tests/hints.test.lua'), ['skip_asan']],
   ['nsid', files('nsid/nsid.test.lua')],
   ['dns64', files('dns64/dns64.test.lua')],
   ['ta_update', files('ta_update/ta_update.test.lua'), ['snowflake']],
