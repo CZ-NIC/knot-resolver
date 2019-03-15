@@ -1,3 +1,4 @@
+trust_anchors.keyfile_default = nil
 
 local ffi = require('ffi')
 
@@ -21,8 +22,23 @@ local function test_revoked_key()
 	same(root_ta.rrs.count, 1, 'the root TA set contains one RR')
 end
 
+local function test_distrust()
+	-- uses root key from the previous test
+	assert(trust_anchors.keysets['\0'], 'root key must be there from previous test')
+	local ta_c = kres.context().trust_anchors
+	local root_ta = ffi.C.kr_ta_get(ta_c, '\0')
+	assert(root_ta ~= nil, 'we got non-NULL TA RRset')
+	assert(root_ta.rrs.count, 1, 'we have a root TA set to be deleted')
+
+	trust_anchors.distrust('\0')
+
+	same(trust_anchors.keysets['\0'], nil, 'Lua interface does not have the removed key')
+	local root_ta = ffi.C.kr_ta_get(ta_c, '\0')
+	same(root_ta == nil, true, 'C interface does not have the removed key')
+end
 
 return {
-	test_revoked_key()
+	test_revoked_key,
+	test_distrust
 }
 
