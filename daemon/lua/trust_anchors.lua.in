@@ -370,6 +370,20 @@ local function add_file(path, unmanaged)
 	if managed then refresh_plan(keyset, 0 * sec, false) end
 end
 
+local function distrust(owner)
+	if not trust_anchors.keysets[owner] then
+		return false
+	end
+
+	if ta_update then
+		ta_update.stop(owner)
+	end
+	trust_anchors.keysets[owner] = nil
+	local store = kres.context().trust_anchors
+	C.kr_ta_del(store, owner)
+	return true
+end
+
 local function ta_str(owner)
 	local owner_str = kres.dname2str(owner) .. ' '
 	local msg = ''
@@ -415,6 +429,7 @@ trust_anchors = {
 	-- If managed and the file doesn't exist, try bootstrapping the root into it.
 	add_file = add_file,
 	config = add_file,
+	distrust = distrust,
 
 	keyset_write = keyset_write,
 	keyset_publish = keyset_publish,
