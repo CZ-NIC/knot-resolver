@@ -12,6 +12,7 @@ new_read_globals = {
 	'quit',
 	'resolve',
 	'ta_update',
+	'fromjson',
 	'todname',
 	'tojson',
 	'user',
