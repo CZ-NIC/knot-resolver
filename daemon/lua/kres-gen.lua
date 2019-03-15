@@ -38,6 +38,10 @@ typedef struct {
 	knot_rdataset_t rrs;
 	void *additional;
 } knot_rrset_t;
+
+struct kr_module;
+typedef char *(kr_prop_cb)(void *, struct kr_module *, const char *);
+struct kr_layer;
 typedef struct knot_pkt knot_pkt_t;
 typedef struct {
 	uint8_t *ptr[15];
@@ -84,6 +88,7 @@ typedef struct {
 	void *root;
 	struct knot_mm *pool;
 } map_t;
+typedef struct trie trie_t;
 struct kr_qflags {
 	_Bool NO_MINIMIZE : 1;
 	_Bool NO_THROTTLE : 1;
@@ -142,7 +147,6 @@ typedef struct {
 	size_t len;
 	size_t cap;
 } ranked_rr_array_t;
-typedef struct trie trie_t;
 struct kr_zonecut {
 	knot_dname_t *name;
 	knot_rrset_t *key;
@@ -224,6 +228,34 @@ struct kr_cache {
 	uint32_t ttl_max;
 	struct timeval checkpoint_walltime;
 	uint64_t checkpoint_monotime;
+};
+typedef struct kr_layer kr_layer_t;
+struct kr_layer_api {
+	int (*begin)(kr_layer_t *);
+	int (*reset)(kr_layer_t *);
+	int (*finish)(kr_layer_t *);
+	int (*consume)(kr_layer_t *, knot_pkt_t *);
+	int (*produce)(kr_layer_t *, knot_pkt_t *);
+	int (*checkout)(kr_layer_t *, knot_pkt_t *, struct sockaddr *, int);
+	int (*answer_finalize)(kr_layer_t *);
+	void *data;
+	int cb_slots[];
+};
+typedef struct kr_layer_api kr_layer_api_t;
+struct kr_prop {
+	kr_prop_cb *cb;
+	const char *name;
+	const char *info;
+};
+struct kr_module {
+	char *name;
+	int (*init)(struct kr_module *);
+	int (*deinit)(struct kr_module *);
+	int (*config)(struct kr_module *, const char *);
+	const kr_layer_api_t *layer;
+	const struct kr_prop *props;
+	void *lib;
+	void *data;
 };
 
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
