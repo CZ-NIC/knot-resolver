@@ -423,8 +423,18 @@ policy, or automatically maintained by the resolver itself.
 
 .. function:: trust_anchors.config(keyfile, readonly)
 
-   Alias for `add_file`.  It is also equivalent to CLI parameter ``-k <keyfile>``
-   and ``trust_anchors.file = keyfile``.
+   Alias for `add_file`. Its use is discouraged and will be removed in future versions.
+
+.. function:: trust_anchors.distrust(zonename)
+
+   Remove specified trust anchor from trusted key set. Removing trust anchor for the root zone effectivelly disables DNSSEC validation (unless you configured another trust anchor).
+
+   .. code-block:: lua
+
+      > trust_anchors.distrust('.')
+      true
+
+   If you want to disable DNSSEC validation for a particular domain but keep it enabled for the rest of DNS tree, use :func:`trust_anchors.set_insecure`.
 
 .. envvar:: trust_anchors.keyfile_default = keyfile_default
 
@@ -435,7 +445,7 @@ policy, or automatically maintained by the resolver itself.
 
    :return: int (default: 30 * day)
 
-   Modify RFC5011 hold-down timer to given value. Example: ``30 * sec``
+   Modify RFC5011 hold-down timer to given value. Intended only for testing purposes. Example: ``30 * sec``
 
 .. envvar:: trust_anchors.refresh_time = nil
 
@@ -443,6 +453,7 @@ policy, or automatically maintained by the resolver itself.
 
    Modify RFC5011 refresh timer to given value (not set by default), this will force trust anchors
    to be updated every N seconds periodically instead of relying on RFC5011 logic and TTLs.
+   Intended only for testing purposes.
    Example: ``10 * sec``
 
 .. envvar:: trust_anchors.keep_removed = 0
@@ -457,16 +468,15 @@ policy, or automatically maintained by the resolver itself.
 
    :param table nta_list: List of domain names (text format) representing NTAs.
 
-   When you use a domain name as an NTA, DNSSEC validation will be turned off at/below these names.
+   When you use a domain name as an *negative trust anchor* (NTA), DNSSEC validation will be turned off at/below these names.
    Each function call replaces the previous NTA set. You can find the current active set in ``trust_anchors.insecure`` variable.
-
-   .. tip:: Use the `trust_anchors.negative = {}` alias for easier configuration.
+   If you want to disable DNSSEC validation completely use :func:`trust_anchors.distrust` function instead.
 
    Example output:
 
    .. code-block:: lua
 
-      > trust_anchors.negative = { 'bad.boy', 'example.com' }
+      > trust_anchors.set_insecure({ 'bad.boy', 'example.com' })
       > trust_anchors.insecure
       [1] => bad.boy
       [2] => example.com
@@ -480,6 +490,8 @@ policy, or automatically maintained by the resolver itself.
 
    Inserts DS/DNSKEY record(s) into current keyset. These will not be managed or updated, use it only for testing
    or if you have a specific use case for not using a keyfile.
+
+   .. note:: Static keys are very error-prone and should not be used in production. Use :func:`trust_anchors.add_file` instead.
 
    Example output:
 
