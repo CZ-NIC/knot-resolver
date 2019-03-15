@@ -30,7 +30,7 @@ local function test_distrust()
 	assert(root_ta ~= nil, 'we got non-NULL TA RRset')
 	assert(root_ta.rrs.count, 1, 'we have a root TA set to be deleted')
 
-	trust_anchors.distrust('\0')
+	trust_anchors.distrust('.')
 
 	same(trust_anchors.keysets['\0'], nil, 'Lua interface does not have the removed key')
 	local root_ta = ffi.C.kr_ta_get(ta_c, '\0')
