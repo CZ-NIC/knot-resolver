@@ -156,6 +156,77 @@ setmetatable(modules, {
 	end
 })
 
+-- Set up props and config() of a C module for calling from lua.
+function modules_register_props(kr_module_ud)
+	local kr_module = ffi.cast('struct kr_module **', kr_module_ud)[0]
+	if kr_module.config == nil and kr_module.props == nil then
+		return
+	end
+	local module = {}
+	_G[ffi.string(kr_module.name)] = module
+
+	if kr_module.props ~= nil then
+		local i = 0
+		while true do
+			local prop = kr_module.props[i]
+			local cb = prop.cb
+			if cb == nil then break; end
+			module[ffi.string(prop.name)] =
+				function (arg) -- lua wrapper around kr_prop_cb function typedef
+					local arg_conv
+					if type(arg) == 'table' or type(arg) == 'boolean' then
+						arg_conv = tojson(arg)
+					elseif arg ~= nil then
+						arg_conv = tostring(arg)
+					end
+					local ret_cstr = cb(__engine, kr_module, arg_conv)
+					if ret_cstr == nil then
+						return nil
+					end
+					-- LATER(optim.): superfluous copying
+					local ret_str = ffi.string(ret_cstr)
+					-- TODO? previously, invalid JSON was just returned as string
+					-- but that probably wasn't a good idea (now it throws an error)
+					local ret = fromjson(ret_str)
+					ffi.C.free(ret_cstr)
+					return ret
+				end
+			i = i + 1
+		end
+	end
+	if kr_module.config ~= nil then
+		module.config =
+			function (arg)
+				local arg_conv
+				if type(arg) == 'table' or type(arg) == 'boolean' then
+					arg_conv = tojson(arg)
+				elseif arg ~= nil then
+					arg_conv = tostring(arg)
+				end
+				return kr_module.config(kr_module, arg_conv)
+			end
+	end
+end
+
+-- Set up a module's meta-table.
+function modules_register_meta(module)
+	-- Syntactic sugar for get() and set() properties
+	setmetatable(module, {
+		__index = function (t, k)
+			local  v = rawget(t, k)
+			if     v     then return v
+			elseif rawget(t, 'get') then return t.get(k)
+			end
+		end,
+		__newindex = function (t, k, v)
+			local  old_v = rawget(t, k)
+			if not old_v and rawget(t, 'set') then
+				t.set(k..' '..v)
+			end
+		end
+	})
+end
+
 
 cache.clear = function (name, exact_name, rr_type, chunk_size, callback, prev_state)
 	if name == nil or (name == '.' and not exact_name) then
@@ -261,25 +332,6 @@ setmetatable(cache, {
 		elseif k == 'storage' then t.open(size, v) end
 	end
 })
-
--- Register module in Lua environment
-function modules_register(module)
-	-- Syntactic sugar for get() and set() properties
-	setmetatable(module, {
-		__index = function (t, k)
-			local  v = rawget(t, k)
-			if     v     then return v
-			elseif rawget(t, 'get') then return t.get(k)
-			end
-		end,
-		__newindex = function (t, k, v)
-			local  old_v = rawget(t, k)
-			if not old_v and rawget(t, 'set') then
-				t.set(k..' '..v)
-			end
-		end
-	})
-end
 
 -- Make sandboxed environment
 local function make_sandbox(defined)

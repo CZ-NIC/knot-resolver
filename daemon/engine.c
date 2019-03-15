@@ -78,13 +78,6 @@ const size_t CLEANUP_TIMER = 5*60*1000;
  * Global bindings.
  */
 
-/** Register module callback into Lua world. */
-#define REGISTER_MODULE_CALL(L, module, cb, name) do { \
-	lua_pushlightuserdata((L), (module)); \
-	lua_pushlightuserdata((L), (cb)); \
-	lua_pushcclosure((L), l_trampoline, 2); \
-	lua_setfield((L), -2, (name)); \
-	} while (0)
 
 /** Print help and available commands. */
 static int l_help(lua_State *L)
@@ -449,53 +442,6 @@ static int l_map(lua_State *L)
 #undef expr_checked
 
 
-/** Trampoline function for module properties. */
-static int l_trampoline(lua_State *L)
-{
-	struct kr_module *module = lua_touserdata(L, lua_upvalueindex(1));
-	void* callback = lua_touserdata(L, lua_upvalueindex(2));
-	struct engine *engine = engine_luaget(L);
-	if (!module)
-		lua_error_p(L, "module closure missing upvalue");
-
-	/* Now we only have property callback or config,
-	 * if we expand the callables, we might need a callback_type.
-	 */
-	const char *args = NULL;
-	auto_free char *cleanup_args = NULL;
-	if (lua_gettop(L) > 0) {
-		if (lua_istable(L, 1) || lua_isboolean(L, 1)) {
-			cleanup_args = l_pack_json(L, 1);
-			args = cleanup_args;
-		} else {
-			args = lua_tostring(L, 1);
-		}
-	}
-	#pragma GCC diagnostic push
-	#pragma GCC diagnostic ignored "-Wpedantic" /* void* vs. function pointer */
-	if (callback == module->config) {
-		module->config(module, args);
-	} else {
-		kr_prop_cb *prop = (kr_prop_cb *)callback;
-		auto_free char *ret = prop(engine, module, args);
-		if (!ret) { /* No results */
-			return 0;
-		}
-		JsonNode *root_node = json_decode(ret);
-		if (root_node) {
-			l_unpack_json(L, root_node);
-		} else {
-			lua_pushstring(L, ret);
-		}
-		json_delete(root_node);
-		return 1;
-	}
-	#pragma GCC diagnostic pop
-
-	/* No results */
-	return 0;
-}
-
 /*
  * Engine API.
  */
@@ -811,26 +757,14 @@ void engine_stop(struct engine *engine)
 /** Register module properties in Lua environment, if any. */
 static int register_properties(struct engine *engine, struct kr_module *module)
 {
-	#pragma GCC diagnostic push
-	#pragma GCC diagnostic ignored "-Wpedantic" /* casts in lua_pushlightuserdata() */
-	if (!module->config && !module->props) {
-		return kr_ok();
-	}
-	lua_newtable(engine->L);
-	if (module->config != NULL) {
-		REGISTER_MODULE_CALL(engine->L, module, module->config, "config");
+	lua_getglobal(engine->L, "modules_register_props");
+	lua_pushpointer(engine->L, module);
+	if (engine_pcall(engine->L, 1) != 0) {
+		lua_pop(engine->L, 1);
 	}
 
-	for (const struct kr_prop *p = module->props; p && p->name; ++p) {
-		if (p->cb != NULL) {
-			REGISTER_MODULE_CALL(engine->L, module, p->cb, p->name);
-		}
-	}
-	lua_setglobal(engine->L, module->name);
-	#pragma GCC diagnostic pop
-
-	/* Register module in Lua env */
-	lua_getglobal(engine->L, "modules_register");
+	/* Create module's metatable in lua. */
+	lua_getglobal(engine->L, "modules_register_meta");
 	lua_getglobal(engine->L, module->name);
 	if (engine_pcall(engine->L, 1) != 0) {
 		lua_pop(engine->L, 1);

@@ -95,3 +95,15 @@ static inline int execute_callback(lua_State *L, int argc)
 	return ret;
 }
 
+/** Push a pointer as heavy/full userdata.
+ *
+ * It's useful as a replacement of lua_pushlightuserdata(),
+ * but note that it behaves differently in lua (converts to pointer-to-pointer).
+ */
+static inline void lua_pushpointer(lua_State *L, void *p)
+{
+       void *addr = lua_newuserdata(L, sizeof(p));
+       assert(addr);
+       memcpy(addr, &p, sizeof(p));
+}
+
