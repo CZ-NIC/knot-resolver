@@ -40,7 +40,7 @@ local function test_ta_update_vs_trust_anchors_dependency()
 	ok(modules.unload('ta_update'), 'module can be unloaded')
 	same(ta_update, nil, 'unloaded module is nil')
 
-	ok(trust_anchors.distrust('\0'), 'managed root TA can be removed')
+	ok(trust_anchors.distrust('.'), 'managed root TA can be removed')
 	same(trust_anchors.keysets['\0'], nil, 'TA removal works')
 end
 
@@ -52,7 +52,7 @@ local function test_unloaded()
 	worker.sleep(0.3)
 	ok(counter == 0, 'TA is actually unmanaged')
 
-	ok(trust_anchors.distrust('\0'), 'unmanaged root TA can be removed')
+	ok(trust_anchors.distrust('.'), 'unmanaged root TA can be removed')
 	same(trust_anchors.keysets['\0'], nil, 'TA removal works')
 
 end
