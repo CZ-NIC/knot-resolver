@@ -56,7 +56,7 @@ local function ta_find(keyset, rr)
 end
 
 -- Evaluate TA status of a RR according to RFC5011.  The time is in seconds.
-local function ta_present(keyset, rr, hold_down_time, force_valid)
+local function ta_present(keyset, rr, hold_down_time)
 if rr.type == kres.type.DNSKEY and not C.kr_dnssec_key_ksk(rr.rdata) then
 	return false -- Ignore
 end
@@ -100,19 +100,8 @@ if ta then
 	return true
 elseif not key_revoked then -- First time seen (NewKey)
 	rr.key_tag = key_tag
-	if force_valid then
-			rr.state = key_state.Valid
-		else
-			rr.state = key_state.AddPend
-			rr.timer = now + hold_down_time
-		end
-		if rr.state ~= key_state.Valid or verbose() then
-			log('[ta_update] key: ' .. key_tag .. ' state: '..rr.state)
-		end
-		table.insert(keyset, rr)
-		return true
-	end
 	return false
+end
 end
 
 -- TA is missing in the new key set.  The time is in seconds.
@@ -145,8 +134,7 @@ local function ta_missing(ta, hold_down_time)
 end
 
 -- Update existing keyset; return true if successful.
--- Param `is_initial` (bool): force .NewKey states to .Valid, i.e. init empty keyset.
-local function update(keyset, new_keys, is_initial)
+local function update(keyset, new_keys)
 	if not new_keys then return false end
 
 	-- Filter TAs to be purged from the keyset (KeyRem), in three steps
@@ -185,7 +173,7 @@ local function update(keyset, new_keys, is_initial)
 	-- Evaluate new TAs
 	for _, rr in ipairs(new_keys) do
 		if (rr.type == kres.type.DNSKEY or rr.type == kres.type.DS) and rr.rdata ~= nil then
-			ta_present(keyset, rr, hold_down, is_initial)
+			ta_present(keyset, rr, hold_down)
 		end
 	end
 
@@ -205,7 +193,7 @@ local function update(keyset, new_keys, is_initial)
 end
 
 -- Refresh the DNSKEYs from the packet, and return time to the next check.
-local function active_refresh(keyset, pkt, is_initial)
+local function active_refresh(keyset, pkt)
 	local retry = true
 	if pkt:rcode() == kres.rcode.NOERROR then
 		local records = pkt:section(kres.section.ANSWER)
@@ -215,7 +203,7 @@ local function active_refresh(keyset, pkt, is_initial)
 				table.insert(new_keys, rr)
 			end
 		end
-		update(keyset, new_keys, is_initial)
+		update(keyset, new_keys)
 		retry = false
 	else
 		warn('[ta_update] active refresh failed for ' .. kres.dname2str(keyset.owner)
@@ -230,7 +218,7 @@ local function active_refresh(keyset, pkt, is_initial)
 end
 
 -- Plan an event for refreshing DNSKEYs and re-scheduling itself
-local function refresh_plan(keyset, delay, is_initial)
+local function refresh_plan(keyset, delay)
 	local owner = keyset.owner
 	local owner_str = kres.dname2str(keyset.owner)
 	if not tracked_tas[owner] then
@@ -245,7 +233,7 @@ local function refresh_plan(keyset, delay, is_initial)
 		resolve(owner_str, kres.type.DNSKEY, kres.class.IN, 'NO_CACHE',
 		function (pkt)
 			-- Schedule itself with updated timeout
-			local delay_new = active_refresh(keyset, kres.pkt_t(pkt), is_initial)
+			local delay_new = active_refresh(keyset, kres.pkt_t(pkt))
 			delay_new = keyset.refresh_time or ta_update.refresh_time or delay_new
 			log('[ta_update] next refresh for ' .. owner_str .. ' in '
 				.. delay_new/hour .. ' hours')
@@ -274,7 +262,7 @@ function ta_update.start(zname)
 		panic('[ta_update] TA is configured as unmanaged; distrust it and '
 			.. 'add it again as managed using trust_anchors.add_file()')
 	end
-	refresh_plan(keyset, 0, false)
+	refresh_plan(keyset, 0)
 end
 
 function ta_update.stop(zname)
