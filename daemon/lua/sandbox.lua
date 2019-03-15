@@ -185,9 +185,10 @@ function modules_register_props(kr_module_ud)
 					end
 					-- LATER(optim.): superfluous copying
 					local ret_str = ffi.string(ret_cstr)
-					-- TODO? previously, invalid JSON was just returned as string
-					-- but that probably wasn't a good idea (now it throws an error)
-					local ret = fromjson(ret_str)
+					-- This is a bit ugly, but the API is that invalid JSON
+					-- should be just returned as string :-(
+					local status, ret = pcall(fromjson, ret_str)
+					if not status then ret = ret_str end
 					ffi.C.free(ret_cstr)
 					return ret
 				end
