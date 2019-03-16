@@ -359,6 +359,20 @@ function table_print (tt, indent, done)
 	indent = indent or 0
 	local result = ""
 	-- Convert to printable string (escape unprintable)
+	local function ordered_iter(unordered_tt)
+		local keys = {}
+		for k in pairs(unordered_tt) do
+			table.insert(keys, tostring(k))
+		end
+		table.sort(keys)
+		local i = 0
+		return function()
+			i = i + 1
+			if keys[i] then
+				return keys[i], unordered_tt[keys[i]]
+			end
+		end
+	end
 	local function printable(value)
 		value = tostring(value)
 		local bytes = {}
@@ -372,7 +386,7 @@ function table_print (tt, indent, done)
 		return table.concat(bytes)
 	end
 	if type(tt) == "table" then
-		for key, value in pairs (tt) do
+		for key, value in ordered_iter(tt) do
 			result = result .. string.rep (" ", indent)
 			if type (value) == "table" and not done [value] then
 				done [value] = true
