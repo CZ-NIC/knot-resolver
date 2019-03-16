@@ -8,6 +8,7 @@ new_read_globals = {
 	'verbose',
 	'resolve',
 	'tojson',
+	'fromjson',
 	'todname',
 	'map',
 	'net',
