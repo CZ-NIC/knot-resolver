@@ -754,25 +754,6 @@ void engine_stop(struct engine *engine)
 	uv_stop(uv_default_loop());
 }
 
-/** Register module properties in Lua environment, if any. */
-static int register_properties(struct engine *engine, struct kr_module *module)
-{
-	lua_getglobal(engine->L, "modules_register_props");
-	lua_pushpointer(engine->L, module);
-	if (engine_pcall(engine->L, 1) != 0) {
-		lua_pop(engine->L, 1);
-	}
-
-	/* Create module's metatable in lua. */
-	lua_getglobal(engine->L, "modules_register_meta");
-	lua_getglobal(engine->L, module->name);
-	if (engine_pcall(engine->L, 1) != 0) {
-		lua_pop(engine->L, 1);
-	}
-
-	return kr_ok();
-}
-
 /** @internal Find matching module */
 static size_t module_find(module_array_t *mod_list, const char *name)
 {
@@ -809,7 +790,15 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 		return kr_error(ENOMEM);
 	}
 	module->data = engine;
+		/* TODO: tidy and comment this section. */
 	int ret = kr_module_load(module, name, LIBDIR "/kres_modules");
+	if (ret == kr_ok()) {
+		lua_getglobal(engine->L, "modules_register_props");
+		lua_pushpointer(engine->L, module);
+		if (engine_pcall(engine->L, 1) != 0) {
+			lua_pop(engine->L, 1);
+		}
+	}
 	/* Load Lua module if not a binary */
 	if (ret == kr_error(ENOENT)) {
 		ret = ffimodule_register_lua(engine, module, name);
@@ -821,6 +810,14 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 		free(module);
 		return ret;
 	}
+
+	/* Create module's metatable in lua. */
+	lua_getglobal(engine->L, "modules_register_meta");
+	lua_getglobal(engine->L, module->name);
+	if (engine_pcall(engine->L, 1) != 0) {
+		lua_pop(engine->L, 1);
+	}
+
 	if (array_push(engine->modules, module) < 0) {
 		engine_unload(engine, module);
 		return kr_error(ENOMEM);
@@ -843,7 +840,7 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 		}
 	}
 
-	return register_properties(engine, module);
+	return kr_ok();
 }
 
 int engine_unregister(struct engine *engine, const char *name)
