@@ -348,8 +348,12 @@ local function add_file(path, unmanaged)
 
 	local owner = keyset.owner
 	local owner_str = kres.dname2str(owner)
-	if trust_anchors.keysets[owner] then
+	local keyset_orig = trust_anchors.keysets[owner]
+	if keyset_orig then
 		warn('[ ta ] warning: overriding previously set trust anchors for ' .. owner_str)
+		if keyset_orig.managed then
+			ta_update.stop(owner)
+		end
 	end
 	trust_anchors.keysets[owner] = keyset
 
