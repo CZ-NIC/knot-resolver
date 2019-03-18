@@ -58,8 +58,6 @@ struct args {
 	addr_array_t tls_set;
 	fd_array_t fd_set;
 	fd_array_t tls_fd_set;
-	char *keyfile;
-	int keyfile_unmanaged;
 	const char *config;
 	int control_fd;
 	const char *rundir;
@@ -67,16 +65,6 @@ struct args {
 	bool quiet;
 	bool tty_binary_output;
 };
-
-/* lua_pcall helper function */
-static inline char *lua_strerror(int lua_err) {
-	switch (lua_err) {
-	case LUA_ERRRUN: return "a runtime error";
-	case LUA_ERRMEM: return "memory allocation error.";
-	case LUA_ERRERR: return "error while running the error handler function.";
-	default: return "a unknown error";
-	}
-}
 
 /**
  * TTY control: process input and free() the buffer.
@@ -384,8 +372,6 @@ static void help(int argc, char *argv[])
 	       " -S, --fd=[fd]          Listen on given fd (handed out by supervisor).\n"
 	       " -T, --tlsfd=[fd]       Listen using TLS on given fd (handed out by supervisor).\n"
 	       " -c, --config=[path]    Config file path (relative to [rundir]) (default: config).\n"
-	       " -k, --keyfile=[path]   File with root domain trust anchors (DS or DNSKEY), automatically updated.\n"
-	       " -K, --keyfile-ro=[path] File with read-only root domain trust anchors, for use with an external updater.\n"
 	       " -f, --forks=N          Start N forks sharing the configuration.\n"
 	       " -q, --quiet            No command prompt in interactive mode.\n"
 	       " -v, --verbose          Run in verbose mode."
@@ -483,31 +469,6 @@ static void free_sd_socket_names(char **socket_names, int count)
 }
 #endif
 
-static int set_keyfile(struct engine *engine, char *keyfile, bool unmanaged)
-{
-	assert(keyfile != NULL);
-	auto_free char *cmd = afmt("trust_anchors.config('%s',%s)",
-				   keyfile, unmanaged ? "true" : "nil");
-	if (!cmd) {
-		kr_log_error("[system] not enough memory\n");
-		return kr_error(ENOMEM);
-	}
-	int lua_ret = engine_cmd(engine->L, cmd, false);
-	if (lua_ret != 0) {
-		if (lua_gettop(engine->L) > 0) {
-			kr_log_error("%s\n", lua_tostring(engine->L, -1));
-		} else {
-			kr_log_error("[ ta ] keyfile '%s': failed to load (%s)\n",
-					keyfile, lua_strerror(lua_ret));
-		}
-		return lua_ret;
-	}
-
-	lua_settop(engine->L, 0);
-	return kr_ok();
-}
-
-
 static void args_init(struct args *args)
 {
 	memset(args, 0, sizeof(struct args));
@@ -542,8 +503,6 @@ static int parse_args(int argc, char **argv, struct args *args)
 		{"fd",         required_argument, 0, 'S'},
 		{"tlsfd",      required_argument, 0, 'T'},
 		{"config",     required_argument, 0, 'c'},
-		{"keyfile",    required_argument, 0, 'k'},
-		{"keyfile-ro", required_argument, 0, 'K'},
 		{"forks",      required_argument, 0, 'f'},
 		{"verbose",          no_argument, 0, 'v'},
 		{"quiet",            no_argument, 0, 'q'},
@@ -577,15 +536,6 @@ static int parse_args(int argc, char **argv, struct args *args)
 						" number, not '%s'\n", optarg);
 				return EXIT_FAILURE;
 			}
-			break;
-		case 'K':
-			args->keyfile_unmanaged = 1;
-		case 'k':
-			if (args->keyfile != NULL) {
-				kr_log_error("[system] error only one of '--keyfile' and '--keyfile-ro' allowed\n");
-				return EXIT_FAILURE;
-			}
-			args->keyfile = optarg;
 			break;
 		case 'v':
 			kr_verbose_set(true);
@@ -799,10 +749,6 @@ int main(int argc, char **argv)
 			goto cleanup;
 		}
 		lua_settop(engine.L, 0);
-	}
-	if (args.keyfile != NULL && set_keyfile(&engine, args.keyfile, args.keyfile_unmanaged) != 0) {
-		ret = EXIT_FAILURE;
-		goto cleanup;
 	}
 	if (args.config == NULL || strcmp(args.config, "-") !=0) {
 		if(engine_load_defaults(&engine) != 0) {
