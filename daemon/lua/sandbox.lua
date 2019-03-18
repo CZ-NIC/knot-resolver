@@ -229,9 +229,8 @@ function modules_create_table_for_c(kr_module_ud)
 	local set_f = rawget(module, 'set')
 	if set_f ~= nil then
 		m_newindex = function (_, key, value)
-			assert(type(key) == 'string' and type(value) == 'string',
-				'module ' .. module_name .. ': '
-				.. 'non-string parameter passed to assignment syntax sugar')
+			-- This will produce a nasty error on some non-string parameters.
+			-- Still, we already use it with integer values, e.g. in predict module :-/
 			return set_f(key .. ' ' .. value)
 		end
 	else
