@@ -84,6 +84,7 @@ end
 local function test_ok_xml(testname, testdesc)
 	return function()
 		trust_anchors.bootstrap_url = host .. testname .. '.xml'
+		trust_anchors.remove('.')
 		same(trust_anchors.add_file(testname .. '.keys'), nil, testdesc)
 	end
 end
