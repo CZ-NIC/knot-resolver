@@ -5,6 +5,8 @@ Improvements
 ------------
 - DNS-over-HTTPS: answers include `access-control-allow-origin: *` (!823)
 - support named AF_UNIX stream sockets for the http module (again)
+- lua tables for C modules are more strict by default, e.g. `nsid.foo`
+  will throw an error instead of returning `nil` (!797)
 
 Bugfixes
 --------
