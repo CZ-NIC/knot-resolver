@@ -23,7 +23,7 @@ local function test_ta_update_vs_trust_anchors_dependency()
 	ok(ta_update, 'ta_update module is loaded by default')
 
 	assert(counter == 0, 'test init must work')
-	same(trust_anchors.config('root.key'), nil, 'load managed TA for root zone')
+	same(trust_anchors.add_file('root.keys'), nil, 'load managed TA for root zone')
 	same(trust_anchors.keysets['\0'].managed, true, 'managed TA has managed flag')
 	same(type(ta_update.tracked['\0'].event), 'number', 'adding managed TA starts tracking')
 	same(counter, 0, 'TA refresh is only scheduled')
@@ -45,10 +45,10 @@ local function test_ta_update_vs_trust_anchors_dependency()
 end
 
 local function test_unloaded()
-	boom(trust_anchors.config, {'root.key', false}, 'managed TA cannot be added without ta_update module')
+	boom(trust_anchors.add_file, {'root.keys', false}, 'managed TA cannot be added without ta_update module')
 
 	counter = 0
-	same(trust_anchors.config('root.key', true), nil, 'unmanaged TA can be added without ta_update module')
+	same(trust_anchors.add_file('root.keys', true), nil, 'unmanaged TA can be added without ta_update module')
 	worker.sleep(0.3)
 	ok(counter == 0, 'TA is actually unmanaged')
 
@@ -59,7 +59,7 @@ end
 
 local function test_reload()
 	ok(modules.load('ta_update'), 'module can be re-loaded')
-	same(trust_anchors.config('root.key', false), nil, 'managed TA can be added after loading ta_update module')
+	same(trust_anchors.add_file('root.keys', false), nil, 'managed TA can be added after loading ta_update module')
 	same(counter, 0, 'TA refresh is only scheduled')
 	worker.sleep(0.3)
 	ok(counter > 0, 'TA refresh asked for TA DNSKEY after some time')
