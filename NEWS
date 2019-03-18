@@ -1,3 +1,12 @@
+Knot Resolver 4.x.y (2019-0m-dd)
+================================
+
+Improvements
+------------
+- lua tables for C modules are more strict by default, e.g. `nsid.foo`
+  will throw an error instead of returning `nil` (!797)
+
+
 Knot Resolver 4.0.0 (2019-04-18)
 ================================
 
