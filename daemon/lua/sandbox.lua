@@ -164,7 +164,8 @@ function modules_create_table_for_c(kr_module_ud)
 		return
 	end
 	local module = {}
-	_G[ffi.string(kr_module.name)] = module
+	local module_name = ffi.string(kr_module.name)
+	_G[module_name] = module
 
 	--- Construct lua functions for properties.
 	if kr_module.props ~= nil then
@@ -214,19 +215,34 @@ function modules_create_table_for_c(kr_module_ud)
 
 	--- Add syntactic sugar for get() and set() properties.
 	--- That also "catches" any commands like `moduleName.foo = bar`.
-	setmetatable(module, {
-		__index = function (t, k)
-			local  v = rawget(t, k)
-			if     v     then return v
-			elseif rawget(t, 'get') then return t.get(k)
-			end
-		end,
-		__newindex = function (t, k, v)
-			local  old_v = rawget(t, k)
-			if not old_v and rawget(t, 'set') then
-				t.set(k..' '..v)
-			end
+	local m_index, m_newindex
+	local get_f = rawget(module, 'get')
+	if get_f ~= nil then
+		m_index = function (_, key)
+			return get_f(key)
 		end
+	else
+		m_index = function ()
+			error('module ' .. module_name .. ' does not support indexing syntax sugar')
+		end
+	end
+	local set_f = rawget(module, 'set')
+	if set_f ~= nil then
+		m_newindex = function (_, key, value)
+			assert(type(key) == 'string' and type(value) == 'string',
+				'module ' .. module_name .. ': '
+				.. 'non-string parameter passed to assignment syntax sugar')
+			return set_f(key .. ' ' .. value)
+		end
+	else
+		m_newindex = function ()
+			error('module ' .. module_name .. ' does not support assignment syntax sugar')
+		end
+	end
+	setmetatable(module, {
+		-- note: the two functions only get called for *missing* indices
+		__index = m_index,
+		__newindex = m_newindex,
 	})
 end
 
