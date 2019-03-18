@@ -425,21 +425,20 @@ policy, or automatically maintained by the resolver itself.
 
    Alias for `add_file`. Its use is discouraged and will be removed in future versions.
 
-.. function:: trust_anchors.distrust(zonename)
+.. function:: trust_anchors.remove(zonename)
 
    Remove specified trust anchor from trusted key set. Removing trust anchor for the root zone effectivelly disables DNSSEC validation (unless you configured another trust anchor).
 
    .. code-block:: lua
 
-      > trust_anchors.distrust('.')
+      > trust_anchors.remove('.')
       true
 
    If you want to disable DNSSEC validation for a particular domain but keep it enabled for the rest of DNS tree, use :func:`trust_anchors.set_insecure`.
 
 .. envvar:: trust_anchors.keyfile_default = keyfile_default
 
-   Set by ``keyfile_default`` option during compilation. This can be explicitly
-   set to ``nil`` to disable DNSSEC validation.
+   Set by ``keyfile_default`` option during compilation.
 
 .. envvar:: trust_anchors.hold_down_time = 30 * day
 
@@ -470,7 +469,7 @@ policy, or automatically maintained by the resolver itself.
 
    When you use a domain name as an *negative trust anchor* (NTA), DNSSEC validation will be turned off at/below these names.
    Each function call replaces the previous NTA set. You can find the current active set in ``trust_anchors.insecure`` variable.
-   If you want to disable DNSSEC validation completely use :func:`trust_anchors.distrust` function instead.
+   If you want to disable DNSSEC validation completely use :func:`trust_anchors.remove` function instead.
 
    Example output:
 
