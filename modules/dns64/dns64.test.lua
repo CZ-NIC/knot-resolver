@@ -1,7 +1,5 @@
 local condition = require('cqueues.condition')
 
-return {} -- FIXME
---[[
 -- setup resolver
 modules = { 'hints', 'dns64' }
 hints['dns64.example'] = '192.168.1.1'
@@ -53,4 +51,3 @@ local tests = {
 }
 
 return tests
-]]
