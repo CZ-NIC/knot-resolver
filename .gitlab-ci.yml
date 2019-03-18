@@ -65,7 +65,7 @@ build-asan:
       # TODO _leaks: not sure what exactly is wrong in leak detection on config tests
       # _stack_*: config.hints test was failing with something like
       #         https://github.com/google/sanitizers/issues/1010
-    - ASAN_OPTIONS=detect_leaks=0,detect_stack_use_after_return=1 ${MESON_TEST} --suite unit --suite config --no-suite skip_asan
+    - ASAN_OPTIONS=detect_leaks=0:detect_stack_use_after_return=1 ${MESON_TEST} --suite unit --suite config --no-suite skip_asan
 
 # NOTE: build for turris when meson is available and packaging files updated
 #build:turris:
