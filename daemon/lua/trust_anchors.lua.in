@@ -369,7 +369,7 @@ local function add_file(path, unmanaged)
 	end
 end
 
-local function distrust(zname)
+local function remove(zname)
 	local owner = kres.str2dname(zname)
 	if not trust_anchors.keysets[owner] then
 		return false
@@ -429,7 +429,7 @@ trust_anchors = {
 	-- If managed and the file doesn't exist, try bootstrapping the root into it.
 	add_file = add_file,
 	config = add_file,
-	distrust = distrust,
+	remove = remove,
 
 	keyset_publish = keyset_publish,
 	keyset_write = keyset_write,
