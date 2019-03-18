@@ -156,15 +156,17 @@ setmetatable(modules, {
 	end
 })
 
--- Set up props and config() of a C module for calling from lua.
-function modules_register_props(kr_module_ud)
+-- Set up lua table for a C module. (Internal function.)
+function modules_create_table_for_c(kr_module_ud)
 	local kr_module = ffi.cast('struct kr_module **', kr_module_ud)[0]
+	--- Set up the global table named according to the module.
 	if kr_module.config == nil and kr_module.props == nil then
 		return
 	end
 	local module = {}
 	_G[ffi.string(kr_module.name)] = module
 
+	--- Construct lua functions for properties.
 	if kr_module.props ~= nil then
 		local i = 0
 		while true do
@@ -195,6 +197,8 @@ function modules_register_props(kr_module_ud)
 			i = i + 1
 		end
 	end
+
+	--- Construct lua function for config().
 	if kr_module.config ~= nil then
 		module.config =
 			function (arg)
@@ -207,11 +211,9 @@ function modules_register_props(kr_module_ud)
 				return kr_module.config(kr_module, arg_conv)
 			end
 	end
-end
 
--- Set up a module's meta-table.
-function modules_register_meta(module)
-	-- Syntactic sugar for get() and set() properties
+	--- Add syntactic sugar for get() and set() properties.
+	--- That also "catches" any commands like `moduleName.foo = bar`.
 	setmetatable(module, {
 		__index = function (t, k)
 			local  v = rawget(t, k)
@@ -227,7 +229,6 @@ function modules_register_meta(module)
 		end
 	})
 end
-
 
 cache.clear = function (name, exact_name, rr_type, chunk_size, callback, prev_state)
 	if name == nil or (name == '.' and not exact_name) then

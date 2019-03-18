@@ -793,7 +793,7 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 		/* TODO: tidy and comment this section. */
 	int ret = kr_module_load(module, name, LIBDIR "/kres_modules");
 	if (ret == kr_ok()) {
-		lua_getglobal(engine->L, "modules_register_props");
+		lua_getglobal(engine->L, "modules_create_table_for_c");
 		lua_pushpointer(engine->L, module);
 		if (engine_pcall(engine->L, 1) != 0) {
 			lua_pop(engine->L, 1);
@@ -809,13 +809,6 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 	if (ret != 0) {
 		free(module);
 		return ret;
-	}
-
-	/* Create module's metatable in lua. */
-	lua_getglobal(engine->L, "modules_register_meta");
-	lua_getglobal(engine->L, module->name);
-	if (engine_pcall(engine->L, 1) != 0) {
-		lua_pop(engine->L, 1);
 	}
 
 	if (array_push(engine->modules, module) < 0) {
