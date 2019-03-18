@@ -2,6 +2,17 @@ trust_anchors.keyfile_default = nil
 
 local ffi = require('ffi')
 
+-- count warning messages
+warn_msg = {}
+overriding_msg="[ ta ] warning: overriding previously set trust anchors for ."
+warn_msg[overriding_msg] = 0
+function warn(fmt, ...)
+	msg = string.format(fmt, ...)
+	if warn_msg[msg] ~= nil then
+		warn_msg[msg] = warn_msg[msg] + 1
+	end
+end
+
 -- Test that adding a revoked DNSKEY is refused.
 local function test_revoked_key()
 	local ta_c = kres.context().trust_anchors
@@ -37,8 +48,25 @@ local function test_remove()
 	same(root_ta == nil, true, 'C interface does not have the removed key')
 end
 
+local function test_add_file()
+	boom(trust_anchors.add_file, {'nonwriteable/root.keys', false},
+	     "Managed trust anchor in non-writeable directory")
+
+	boom(trust_anchors.add_file, {'nonexist.keys', true},
+	     "Nonexist unmanaged trust anchor file")
+
+	is(warn_msg[overriding_msg], 0, "No override warning messages at start of test")
+	trust_anchors.add_file('root.keys', true)
+	trust_anchors.add_file('root.keys', true)
+	is(warn_msg[overriding_msg], 1, "Warning message when override trust anchors")
+
+	is(trust_anchors.keysets['\0'][1].key_tag, 20326,
+	   "Loaded KeyTag from root.keys")
+end
+
 return {
 	test_revoked_key,
 	test_remove,
+	test_add_file,
 }
 
