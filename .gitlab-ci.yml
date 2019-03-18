@@ -13,6 +13,9 @@ variables:
   LIBKRES_NAME: libkres
   MESON_TEST: meson test -C build_ci* -t 2 --print-errorlogs
   PREFIX: $CI_PROJECT_DIR/.local
+  # config.hints test was failing with something like
+  # https://github.com/google/sanitizers/issues/1010
+  ASAN_OPTIONS: detect_stack_use_after_return=1
 
 image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
 
