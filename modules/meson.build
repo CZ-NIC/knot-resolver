@@ -23,6 +23,7 @@ config_tests += [
   ['hints', files('hints/tests/hints.test.lua')],
   ['nsid', files('nsid/nsid.test.lua')],
   ['dns64', files('dns64/dns64.test.lua')],
+  ['ta_update', files('ta_update/ta_update.test.lua')],
 ]
 
 integr_tests += [
