@@ -1,4 +1,4 @@
-trust_anchors.keyfile_default = nil
+trust_anchors.remove('.')
 
 local ffi = require('ffi')
 

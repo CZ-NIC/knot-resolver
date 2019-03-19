@@ -351,7 +351,7 @@ local function add_file(path, unmanaged)
 	local keyset_orig = trust_anchors.keysets[owner]
 	if keyset_orig then
 		warn('[ ta ] warning: overriding previously set trust anchors for ' .. owner_str)
-		if keyset_orig.managed then
+		if keyset_orig.managed and ta_update then
 			ta_update.stop(owner)
 		end
 	end
@@ -427,7 +427,6 @@ trust_anchors = {
 
 	bootstrap_url = 'https://data.iana.org/root-anchors/root-anchors.xml',
 	bootstrap_ca = '@etc_dir@/icann-ca.pem',
-	keyfile_default = '@keyfile_default@',
 
 	-- Load keys from a file, 5011-managed by default.
 	-- If managed and the file doesn't exist, try bootstrapping the root into it.
