@@ -15,6 +15,8 @@ Users
 
 * DNSSEC validation is now turned on by default. If you need to disable it, see
   :ref:`dnssec-config`.
+* ``-k/--keyfile`` and ``-K/--keyfile-ro`` daemon options were removed. If needed,
+  use ``trust_anchors.add_file()`` in configuration file instead.
 * In case you are using your own custom modules, move them to the new module
   location. The exact location depends on your distribution. Generally, modules previously
   in ``/usr/lib/kdns_modules`` should be moved to ``/usr/lib/knot-resolver/kres_modules``.

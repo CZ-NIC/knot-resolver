@@ -7,6 +7,7 @@ Incompatible changes
   https://knot-resolver.readthedocs.io/en/v4.0.0/upgrading.html#upgrade-from-3-to-4
 - configuration: trust_anchors aliases .file, .config() and .negative were removed (!788)
 - configuration: trust_anchors.keyfile_default is no longer accessible (!788)
+- daemon: -k/--keyfile and -K/--keyfile-ro options were removed
 - meson build system is now used for builds (!771)
 - build with embedded LMBD is no longer supported
 - default modules dir location has changed
