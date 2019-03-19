@@ -106,10 +106,11 @@ kres-gen:
   before_script:
     # meson detects changes and performs useless rebuild; hide the log
     - ninja -C build_ci* &>/dev/null
+    - rm build_ci*/meson-logs/testlog*.txt  # start with clean testlog
   artifacts:
     when: always
     paths:
-      - build_ci*/meson-logs/testlog.txt
+      - build_ci*/meson-logs/testlog*.txt
       - tmpdeckard*
 
 .test_flaky: &test_flaky
