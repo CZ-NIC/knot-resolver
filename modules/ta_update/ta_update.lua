@@ -237,6 +237,7 @@ local function refresh_plan(keyset, delay)
 			delay_new = keyset.refresh_time or ta_update.refresh_time or delay_new
 			log('[ta_update] next refresh for ' .. owner_str .. ' in '
 				.. delay_new/hour .. ' hours')
+			tracked_tas[owner].event = nil
 			refresh_plan(keyset, delay_new)
 		end)
 	end)
