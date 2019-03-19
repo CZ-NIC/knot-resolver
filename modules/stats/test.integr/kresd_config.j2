@@ -52,7 +52,7 @@ policy.add(policy.pattern(reply_result, 'stats.test.'))
 policy.add(policy.all(FWD_TARGET)) -- avoid iteration
 
 -- make sure DNSSEC is turned off for tests
-trust_anchors.keyfile_default = nil
+trust_anchors.remove('.')
 
 -- Disable RFC5011 TA update
 if ta_update then

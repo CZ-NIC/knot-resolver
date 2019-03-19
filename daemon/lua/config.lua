@@ -31,13 +31,3 @@ end
 if require('ffi').C.kr_zonecut_is_empty(kres.context().root_hints) then
 	_hint_root_file()
 end
-
-if not trust_anchors.keysets['\0'] and trust_anchors.keyfile_default then
-	if io.open(trust_anchors.keyfile_default, 'r') then
-		trust_anchors.config(trust_anchors.keyfile_default, @unmanaged@)
-	else
-		panic("cannot open default trust anchor file:'%s'",
-		      trust_anchors.keyfile_default
-		)
-	end
-end
