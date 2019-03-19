@@ -273,15 +273,6 @@ function ta_update.stop(zname)
 	end
 end
 
--- immediatelly schedule key refresh for all managed TAs
-function ta_update.init()
-	for zname, keyset in pairs(trust_anchors.keysets) do
-		if keyset.managed then
-			ta_update.start(zname)
-		end
-	end
-end
-
 -- stop all timers
 function ta_update.deinit()
 	for zname, _ in pairs(tracked_tas) do
