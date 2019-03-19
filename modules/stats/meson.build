@@ -13,6 +13,9 @@ integr_tests += [
 stats_mod = shared_module(
   'stats',
   stats_src,
+  dependencies: [
+    luajit_inc,
+  ],
   include_directories: mod_inc_dir,
   name_prefix: '',
   install: true,
