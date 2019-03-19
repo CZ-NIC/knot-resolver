@@ -1,6 +1,6 @@
--- shorten update interval to 0.1 seconds
-ta_update.refresh_time = 0.1 * sec
-ta_update.hold_down_time = 0.2 * sec
+-- shorten update interval to 0.2 seconds
+ta_update.refresh_time = 0.2 * sec
+ta_update.hold_down_time = 0.4 * sec
 
 -- prevent build-time config from interfering with the test
 trust_anchors.remove('.')
@@ -27,14 +27,14 @@ local function test_ta_update_vs_trust_anchors_dependency()
 	same(trust_anchors.keysets['\0'].managed, true, 'managed TA has managed flag')
 	same(type(ta_update.tracked['\0'].event), 'number', 'adding managed TA starts tracking')
 	same(counter, 0, 'TA refresh is only scheduled')
-	worker.sleep(0.3)
+	worker.sleep(0.6)
 	ok(counter > 0, 'TA refresh asked for TA DNSKEY after some time')
 
 	same(ta_update.stop('\0'), nil, 'key tracking can be stopped')
 	same(ta_update.tracked['\0'], nil, 'stopping removed metadata')
 	same(trust_anchors.keysets['\0'].managed, false, 'now unmanaged TA does not have managed flag')
 	counter = 0
-	worker.sleep(0.3)
+	worker.sleep(0.6)
 	same(counter, 0, 'stop() actually prevents further TA refreshes')
 
 	ok(modules.unload('ta_update'), 'module can be unloaded')
@@ -49,7 +49,7 @@ local function test_unloaded()
 
 	counter = 0
 	same(trust_anchors.add_file('root.keys', true), nil, 'unmanaged TA can be added without ta_update module')
-	worker.sleep(0.3)
+	worker.sleep(0.6)
 	ok(counter == 0, 'TA is actually unmanaged')
 
 	ok(trust_anchors.remove('.'), 'unmanaged root TA can be removed')
@@ -61,7 +61,7 @@ local function test_reload()
 	ok(modules.load('ta_update'), 'module can be re-loaded')
 	same(trust_anchors.add_file('root.keys', false), nil, 'managed TA can be added after loading ta_update module')
 	same(counter, 0, 'TA refresh is only scheduled')
-	worker.sleep(0.3)
+	worker.sleep(0.6)
 	ok(counter > 0, 'TA refresh asked for TA DNSKEY after some time')
 end
 
