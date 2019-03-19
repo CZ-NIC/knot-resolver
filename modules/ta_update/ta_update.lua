@@ -219,6 +219,7 @@ end
 
 -- Plan an event for refreshing DNSKEYs and re-scheduling itself
 local function refresh_plan(keyset, delay)
+	log('D ta_update refresh_plan "%s"', keyset.owner)
 	local owner = keyset.owner
 	local owner_str = kres.dname2str(keyset.owner)
 	if not tracked_tas[owner] then
@@ -226,9 +227,11 @@ local function refresh_plan(keyset, delay)
 	end
 	local track_cfg = tracked_tas[owner]
 	if track_cfg.event then  -- restart timer if necessary
+		log('D ta_update refresh_plan cancel event "%s"', track_cfg.event)
 		event.cancel(track_cfg.event)
 	end
 	track_cfg.event = event.after(delay, function ()
+		log('D exec event "%s"', track_cfg.event)
 		log('[ta_update] refreshing TA for ' .. owner_str)
 		resolve(owner_str, kres.type.DNSKEY, kres.class.IN, 'NO_CACHE',
 		function (pkt)
@@ -241,6 +244,7 @@ local function refresh_plan(keyset, delay)
 			refresh_plan(keyset, delay_new)
 		end)
 	end)
+	log('D ta_update refresh_plan plan event "%s"', track_cfg.event)
 end
 
 ta_update = {
@@ -255,6 +259,7 @@ ta_update = {
 -- start tracking (already loaded) TA with given zone name in wire format
 -- do first refresh immediatelly
 function ta_update.start(zname)
+	log('D ta_update start "%s"', zname)
 	local keyset = trust_anchors.keysets[zname]
 	if not keyset then
 		panic('[ta_update] TA must be configured first before tracking it')
@@ -267,7 +272,9 @@ function ta_update.start(zname)
 end
 
 function ta_update.stop(zname)
+	log('D ta_update stop "%s"', zname)
 	if tracked_tas[zname] then
+		log('D ta_update stop cancel event "%s"', tracked_tas[zname].event)
 		event.cancel(tracked_tas[zname].event)
 		tracked_tas[zname] = nil
 		trust_anchors.keysets[zname].managed = false
