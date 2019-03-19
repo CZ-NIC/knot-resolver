@@ -245,6 +245,46 @@ function modules_create_table_for_c(kr_module_ud)
 	})
 end
 
+-- Load a lua module. (Internal function.)
+-- Resource management of callbacks relies on storing modName._kr_module
+-- and using ffi.gc to register an action when that gets collected.
+function modules_load_lua(kr_module_ud)
+	local kr_module = ffi.cast('struct kr_module **', kr_module_ud)[0]
+	local module_name = ffi.string(kr_module.name)
+	-- This block can throw error on failure.
+	log("XXX loading mod %s", module_name)
+	local module = require("kres_modules." .. module_name)
+	rawset(module, '_kr_module', kr_module)
+	log("XXX calling init() %s", tostring(module.init))
+	if module.init ~= nil then module.init() end
+
+	-- Register callbacks for use from C: deinit and layer.*
+	-- See http://luajit.org/ext_ffi_semantics.html#callback
+	kr_module.deinit = module.deinit -- here the callback gets constructed (if not nil)
+	if next(module.layer or {}) then
+		local size = ffi.sizeof('struct kr_layer_api')
+		local layer_cptr = ffi.C.malloc(size)
+		ffi.fill(layer_cptr, size)
+		layer_cptr = ffi.cast('struct kr_layer_api *', layer_cptr)
+		for lname, lfun in pairs(module.layer) do
+			layer_cptr[lname] = lfun -- here the callbacks get constructed
+		end
+		kr_module.layer = layer_cptr -- this adds const qualifier
+	end
+	-- Freeing the callbacks needs to be done explicitly (see link above).
+	ffi.gc(kr_module, function (kr_mod)
+		if kr_mod.deinit ~= nil then kr_module.deinit:free() end
+		-- For simplicity we take module.layer from closure.
+		for lname in pairs(module.layer or {}) do
+			kr_mod.layer[lname]:free()
+		end
+		ffi.C.free(kr_mod.layer)
+	end)
+
+	_G[module_name] = module
+end
+
+
 cache.clear = function (name, exact_name, rr_type, chunk_size, callback, prev_state)
 	if name == nil or (name == '.' and not exact_name) then
 		-- keep same output format as for 'standard' clear
