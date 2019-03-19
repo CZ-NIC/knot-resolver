@@ -302,7 +302,7 @@ root.hints:
     - scripts/update-root-hints.sh
 
 test:valgrind:
-  <<: *test
+  <<: *test_flaky  # lost block in /bin/bash during ta_update
   when: delayed
   start_in: '30 seconds'
   script:
