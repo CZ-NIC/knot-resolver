@@ -3,7 +3,7 @@
 @config_defaults@
 
 -- To disable DNSSEC validation, uncomment the following line (not recommended)
--- trust_anchors.keyfile_default = nil
+-- trust_anchors.remove('.')
 
 -- Load useful modules
 modules = {

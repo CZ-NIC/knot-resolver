@@ -60,7 +60,7 @@ end
 
 local host = 'https://localhost:8080/'
 -- avoid interference with configured keyfile_default
-trust_anchors.keyfile_default = nil
+trust_anchors.remove('.')
 
 local function test_err_cert()
 	trust_anchors.bootstrap_ca = 'x509/wrongca.pem'
