@@ -19,6 +19,28 @@ Users
   location. The exact location depends on your distribution. Generally, modules previously
   in ``/usr/lib/kdns_modules`` should be moved to ``/usr/lib/knot-resolver/kres_modules``.
 
+Configuration
+~~~~~~~~~~~~~
+
+* ``trust_anchors.file``, ``trust_anchors.config()`` and ``trust_anchors.negative``
+  aliases were removed to avoid duplicity
+
+  .. csv-table::
+     :header: "3.x configuration", "4.x configuration"
+
+     "``trust_anchors.file = path``", "``trust_anchors.add_file(path)``"
+     "``trust_anchors.config(path, unmanaged)``", "``trust_anchors.add_file(path, unmanaged)``"
+     "``trust_anchors.negative = path``", "``trust_anchors.set_insecure(path)``"
+
+* ``trust_anchors.keyfile_default`` is no longer accessible and is only possible to set
+  at compile time. To turn off DNSSEC, use ``trust_anchors.remove('.')``.
+
+  .. csv-table::
+     :header: "3.x configuration", "4.x configuration"
+
+     "``trust_anchors.keyfile_default = nil``", "``trust_anchors.remove('.')``"
+
+
 Packagers & Developers
 ----------------------
 
