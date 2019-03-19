@@ -391,7 +391,7 @@ add the following snippet to your configuration file.
 .. code-block:: lua
 
    -- turns off DNSSEC validation
-   trust_anchors.keyfile_default = nil
+   trust_anchors.remove('.')
 
 The resolver supports DNSSEC including :rfc:`5011` automated DNSSEC TA updates
 and :rfc:`7646` negative trust anchors.  Depending on your distribution, DNSSEC
@@ -435,10 +435,6 @@ policy, or automatically maintained by the resolver itself.
       true
 
    If you want to disable DNSSEC validation for a particular domain but keep it enabled for the rest of DNS tree, use :func:`trust_anchors.set_insecure`.
-
-.. envvar:: trust_anchors.keyfile_default = keyfile_default
-
-   Set by ``keyfile_default`` option during compilation.
 
 .. envvar:: trust_anchors.hold_down_time = 30 * day
 

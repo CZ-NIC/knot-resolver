@@ -3,7 +3,7 @@ ta_update.refresh_time = 0.1 * sec
 ta_update.hold_down_time = 0.2 * sec
 
 -- prevent build-time config from interfering with the test
-trust_anchors.keyfile_default = nil
+trust_anchors.remove('.')
 
 -- count . IN DNSKEY queries
 counter = 0

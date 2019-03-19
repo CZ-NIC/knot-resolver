@@ -325,6 +325,9 @@ modules.load('detect_time_jump')
 modules.load('ta_sentinel')
 modules.load('edns_keepalive')
 
+-- Load keyfile_default
+trust_anchors.add_file('@keyfile_default@', @unmanaged@)
+
 -- Interactive command evaluation
 function eval_cmd(line, raw)
 	-- Compatibility sandbox code loading
