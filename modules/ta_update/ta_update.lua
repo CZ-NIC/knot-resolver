@@ -136,6 +136,10 @@ end
 -- Update existing keyset; return true if successful.
 local function update(keyset, new_keys)
 	if not new_keys then return false end
+	if not keyset.managed then
+		-- this may happen due to race condition during testing in CI (refesh time < query time)
+		return false
+	end
 
 	-- Filter TAs to be purged from the keyset (KeyRem), in three steps
 	-- 1: copy TAs to be kept to `keepset`
