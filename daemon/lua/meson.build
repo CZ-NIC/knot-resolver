@@ -15,9 +15,10 @@ trust_anchors = configure_file(
   output: 'trust_anchors.lua',
   configuration: ta_config,
 )
-config_lua = configure_file(
-  input: 'config.lua.in',
-  output: 'config.lua',
+
+sandbox = configure_file(
+  input: 'sandbox.lua.in',
+  output: 'sandbox.lua',
   configuration: ta_config,
 )
 
@@ -27,10 +28,10 @@ run_target(  # run manually to re-generate kres-gen.lua
 )
 
 lua_src = [
-  config_lua,
+  files('config.lua'),
   files('kres.lua'),
   files('kres-gen.lua'),
-  files('sandbox.lua'),
+  sandbox,
   trust_anchors,
   files('zonefile.lua'),
 ]
