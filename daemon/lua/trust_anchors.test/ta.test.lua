@@ -44,7 +44,7 @@ local function test_remove()
 	trust_anchors.remove('.')
 
 	same(trust_anchors.keysets['\0'], nil, 'Lua interface does not have the removed key')
-	local root_ta = ffi.C.kr_ta_get(ta_c, '\0')
+	root_ta = ffi.C.kr_ta_get(ta_c, '\0')
 	same(root_ta == nil, true, 'C interface does not have the removed key')
 end
 
