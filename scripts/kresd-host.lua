@@ -41,10 +41,10 @@ k = 1 while k <= #arg do
 		k = k + 1
 		table.insert(config, arg[k])
 	elseif v == '-D' then
-		table.insert(config, 'trust_anchors.file = "root.keys"')
+		table.insert(config, 'trust_anchors.add_file("root.keys")')
 	elseif v == '-f' then
 		k = k + 1
-		table.insert(config, string.format('trust_anchors.file = "%s"', arg[k]))
+		table.insert(config, string.format('trust_anchors.add_file("%s")', arg[k]))
 	elseif v == '-v' then
 		verbose = true
 	elseif v == '-d' then
