@@ -305,7 +305,7 @@ Environment
          net = { '127.0.0.1', '::1' }
          -- unprivileged
          cache.size = 100*MB
-         trust_anchors.file = 'root.key'
+         trust_anchors.add_file('root.key')
 
    Example output:
 
@@ -398,7 +398,7 @@ and :rfc:`7646` negative trust anchors.  Depending on your distribution, DNSSEC
 trust anchors should be either maintained in accordance with the distro-wide
 policy, or automatically maintained by the resolver itself.
 
-.. function:: trust_anchors.add_file(keyfile, readonly)
+.. function:: trust_anchors.add_file(keyfile[, readonly = false])
 
    :param string keyfile: path to the file.
    :param readonly: if true, do not attempt to update the file.
@@ -420,10 +420,6 @@ policy, or automatically maintained by the resolver itself.
       nil
 
       [ ta ] key: 19036 state: Valid
-
-.. function:: trust_anchors.config(keyfile, readonly)
-
-   Alias for `add_file`. Its use is discouraged and will be removed in future versions.
 
 .. function:: trust_anchors.remove(zonename)
 
@@ -638,7 +634,7 @@ Example:
 
 	$ kresd-query.lua www.sub.nic.cz 'assert(kres.dname2str(req:resolved().zone_cut.name) == "nic.cz.")' && echo "yes"
 	yes
-	$ kresd-query.lua -C 'trust_anchors.config("root.keys")' nic.cz 'assert(req:resolved().flags.DNSSEC_WANT)'
+	$ kresd-query.lua -C 'trust_anchors.add_file("root.keys")' nic.cz 'assert(req:resolved().flags.DNSSEC_WANT)'
 	$ echo $?
 	0
 
