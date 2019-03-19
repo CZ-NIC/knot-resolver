@@ -11,7 +11,7 @@ local key_state = {
 	Missing = 'Missing', Revoked = 'Revoked', Removed = 'Removed'
 }
 
-local function upgrade_required(field)
+local function upgrade_required()
 	panic('Configuration upgrade required! Please refer to ' ..
 		'https://knot-resolver.readthedocs.io/en/stable/upgrading.html')
 end
