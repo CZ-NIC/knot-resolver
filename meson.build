@@ -108,7 +108,7 @@ unit_tests = [
 
 config_tests = [
   # [name, files(test)]  # or
-  # [name, files(test), [arg1, arg2], should_fail]
+  # [name, files(test), [extra_suites]]
 ]
 
 integr_tests = [
