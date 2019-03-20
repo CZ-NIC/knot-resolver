@@ -7,7 +7,10 @@ if systemd_files == 'enabled'
 else
   config_defaults = '''
 -- Listen on localhost
-net = { '127.0.0.1', '::1' }
+net.listen('127.0.0.1')
+net.listen('127.0.0.1', 853)
+net.listen('::1')
+net.listen('::1', 853)
 
 -- Drop root privileges
 user('@0@', '@1@')'''.format(user, group)
