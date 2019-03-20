@@ -442,9 +442,10 @@ pkg:obs:devel:
       - $OBS_BUILD == "1"
     refs:
       - nightly@knot/knot-resolver
-  dependencies: []
+  dependencies:
+    - archive
   script:
-    - scripts/make-archive.sh
+    - mv build_*/meson-dist/*.tar.xz ./
     - scripts/make-distrofiles.sh
     - echo -e "[general]\napiurl = https://api.opensuse.org\n\n[https://api.opensuse.org]\nuser = CZ-NIC-automation\npass = $OBS_PASSWORD" > /root/.oscrc
     - scripts/build-in-obs.sh knot-dns-devel  # build against latest development version of knot
