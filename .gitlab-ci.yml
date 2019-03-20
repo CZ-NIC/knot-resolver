@@ -437,7 +437,7 @@ resperf:iter.udp-asan:
 
 # deploy {{{
 pkg:obs:devel:
-  stage: deploy
+  stage: test
   #only:
   #  variables:
   #    - $OBS_BUILD == "1"
