@@ -109,7 +109,6 @@ static int load_sym_c(struct kr_module *module, uint32_t api_required)
 int kr_module_load(struct kr_module *module, const char *name, const char *path)
 {
 	if (module == NULL || name == NULL) {
-		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
 

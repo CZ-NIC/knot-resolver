@@ -771,6 +771,7 @@ static size_t module_find(module_array_t *mod_list, const char *name)
 int engine_register(struct engine *engine, const char *name, const char *precedence, const char* ref)
 {
 	if (engine == NULL || name == NULL) {
+		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
 	/* Make sure module is unloaded */
