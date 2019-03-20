@@ -256,10 +256,16 @@ function modules_load_lua(kr_module_ud)
 	rawset(module, '_kr_module', kr_module)
 	if module.init ~= nil then module.init() end
 
-	-- Register callbacks for use from C: deinit and layer.*
-	-- See http://luajit.org/ext_ffi_semantics.html#callback
-	kr_module.deinit = module.deinit -- here the callback gets constructed (if not nil)
-	local freelist = { kr_module.deinit } -- list of FFI callbacks to be freed
+	--[[ Register callbacks for use from C: layer.* and deinit().
+
+		See http://luajit.org/ext_ffi_semantics.html#callback
+
+		The parts `return foo() or bar` are because
+		the C functions are supposed to return something
+		but lua callbacks often don't return anything (i.e. auto-return nil).
+	--]]
+	local freelist = { } -- list of resources to free; be careful about types, etc.
+
 	if next(module.layer or {}) then
 		local size = ffi.sizeof('struct kr_layer_api')
 		local layer_cptr = ffi.C.malloc(size)
@@ -272,38 +278,55 @@ function modules_load_lua(kr_module_ud)
 				but we would need the module API for lua and C to be the same.
 				Until we unify them, let's create simple lua wrapper functions
 				and let FFI construct C callbacks from those.
+
 			--]]
 			local cb
 			if cb_name == 'begin' or cb_name == 'reset'
 					or cb_name == 'finish' or cb_name == 'answer_finalize' then
 				cb = function (ctx)
-					return cb_lua(ctx.state, ctx.req)
+					return cb_lua(ctx.state, ctx.req) or ctx.state
 				end
 			elseif cb_name == 'consume' or cb_name == 'produce' then
 				cb = function (ctx, pkt)
-					return cb_lua(ctx.state, ctx.req, pkt)
+					return cb_lua(ctx.state, ctx.req, pkt) or ctx.state
 				end
 			elseif cb_name == 'checkout' then
 				cb = function (ctx, pkt, dst, socktype) -- FIXME socktype conversion
-					return cb_lua(ctx.state, ctx.req, pkt, dnst, socktype)
+					return cb_lua(ctx.state, ctx.req, pkt, dnst, socktype) or ctx.state
 				end
 			else
 				ffi.C.free(layer_cptr)
 				panic("module %s contains unsupported callback name: layer.%s",
 						module_name, cb_name)
 			end
-			layer_cptr[cb_name] = cb
-			table.insert(freelist, cb)
+			layer_cptr[cb_name] = cb -- this assignment constructs the FFI callback
+			table.insert(freelist, layer_cptr[cb_name])
 		end
 		kr_module.layer = layer_cptr -- this adds const qualifier
+		table.insert(freelist, layer_cptr)
 	end
-	-- Freeing the callbacks needs to be done explicitly (see link above).
-	ffi.gc(kr_module, function (kr_mod)
-		-- For simplicity we use freelist from closure.
-		for cb in pairs(freelist) do
-			cb:free()
+
+	if module.deinit ~= nil then
+		kr_module.deinit = function () -- this assignment constructs the FFI callback
+			return module.deinit() or 0
 		end
-		ffi.C.free(kr_mod.layer)
+		table.insert(freelist, kr_module.deinit)
+	end
+
+	-- Freeing the callbacks needs to be done explicitly (see link above).
+	ffi.gc(kr_module, function ()
+		--[[
+			We get the kr_module as parameter, but by the point GC runs,
+			the struct may have been freed from C already, so we use freelist instead.
+			LATER: something nicer? (esp. the istype() below...)
+		--]]
+		for _, tofree in pairs(freelist) do
+			if ffi.istype('struct kr_layer_api *', tofree) then -- malloc-ed pointer
+				ffi.C.free(tofree)
+			else -- it's an FFI callback
+				tofree:free()
+			end
+		end
 	end)
 
 	_G[module_name] = module
