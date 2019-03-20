@@ -437,11 +437,11 @@ resperf:iter.udp-asan:
 # deploy {{{
 pkg:obs:devel:
   stage: deploy
-  only:
-    variables:
-      - $OBS_BUILD == "1"
-    refs:
-      - nightly@knot/knot-resolver
+  #only:
+  #  variables:
+  #    - $OBS_BUILD == "1"
+  #  refs:
+  #    - nightly@knot/knot-resolver
   dependencies:
     - archive
   script:
