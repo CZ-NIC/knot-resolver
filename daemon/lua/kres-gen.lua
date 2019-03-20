@@ -41,7 +41,6 @@ typedef struct {
 
 struct kr_module;
 typedef char *(kr_prop_cb)(void *, struct kr_module *, const char *);
-struct kr_layer;
 typedef struct knot_pkt knot_pkt_t;
 typedef struct {
 	uint8_t *ptr[15];
@@ -228,6 +227,11 @@ struct kr_cache {
 	struct timeval checkpoint_walltime;
 	uint64_t checkpoint_monotime;
 };
+struct kr_layer {
+	int state;
+	struct kr_request *req;
+	const struct kr_layer_api *api;
+};
 typedef struct kr_layer kr_layer_t;
 struct kr_layer_api {
 	int (*begin)(kr_layer_t *);
@@ -238,7 +242,6 @@ struct kr_layer_api {
 	int (*checkout)(kr_layer_t *, knot_pkt_t *, struct sockaddr *, int);
 	int (*answer_finalize)(kr_layer_t *);
 	void *data;
-	int cb_slots[];
 };
 typedef struct kr_layer_api kr_layer_api_t;
 struct kr_prop {

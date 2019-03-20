@@ -83,17 +83,15 @@ struct kr_layer_api {
 	/** Finalises the outbound query packet with the knowledge of the IP addresses.
 	 * The checkout layer doesn't persist the state, so canceled subrequests
 	 * don't affect the resolution or rest of the processing. */
+	/* FIXME: lua has been using boolean for `type` param (== SOCK_STREAM). */
 	int (*checkout)(kr_layer_t *ctx, knot_pkt_t *packet, struct sockaddr *dst, int type);
 
 	/** Finalises the answer.
 	 * Last chance to affect what will get into the answer, including EDNS.*/
 	int (*answer_finalize)(kr_layer_t *ctx);
 
-	/** The module can store anything in here. */
+	/** The C module can store anything in here. */
 	void *data;
-
-	/** Internal to ./daemon/ffimodule.c. */
-	int cb_slots[];
 };
 
 typedef struct kr_layer_api kr_layer_api_t;

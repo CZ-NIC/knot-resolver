@@ -252,31 +252,56 @@ function modules_load_lua(kr_module_ud)
 	local kr_module = ffi.cast('struct kr_module **', kr_module_ud)[0]
 	local module_name = ffi.string(kr_module.name)
 	-- This block can throw error on failure.
-	log("XXX loading mod %s", module_name)
 	local module = require("kres_modules." .. module_name)
 	rawset(module, '_kr_module', kr_module)
-	log("XXX calling init() %s", tostring(module.init))
 	if module.init ~= nil then module.init() end
 
 	-- Register callbacks for use from C: deinit and layer.*
 	-- See http://luajit.org/ext_ffi_semantics.html#callback
 	kr_module.deinit = module.deinit -- here the callback gets constructed (if not nil)
+	local freelist = { kr_module.deinit } -- list of FFI callbacks to be freed
 	if next(module.layer or {}) then
 		local size = ffi.sizeof('struct kr_layer_api')
 		local layer_cptr = ffi.C.malloc(size)
 		ffi.fill(layer_cptr, size)
 		layer_cptr = ffi.cast('struct kr_layer_api *', layer_cptr)
-		for lname, lfun in pairs(module.layer) do
-			layer_cptr[lname] = lfun -- here the callbacks get constructed
+		for cb_name, cb_lua in pairs(module.layer) do
+			--[[
+				The for-loop body could be simply
+					layer_cptr[cb_name] = cb_lua
+				but we would need the module API for lua and C to be the same.
+				Until we unify them, let's create simple lua wrapper functions
+				and let FFI construct C callbacks from those.
+			--]]
+			local cb
+			if cb_name == 'begin' or cb_name == 'reset'
+					or cb_name == 'finish' or cb_name == 'answer_finalize' then
+				cb = function (ctx)
+					return cb_lua(ctx.state, ctx.req)
+				end
+			elseif cb_name == 'consume' or cb_name == 'produce' then
+				cb = function (ctx, pkt)
+					return cb_lua(ctx.state, ctx.req, pkt)
+				end
+			elseif cb_name == 'checkout' then
+				cb = function (ctx, pkt, dst, socktype) -- FIXME socktype conversion
+					return cb_lua(ctx.state, ctx.req, pkt, dnst, socktype)
+				end
+			else
+				ffi.C.free(layer_cptr)
+				panic("module %s contains unsupported callback name: layer.%s",
+						module_name, cb_name)
+			end
+			layer_cptr[cb_name] = cb
+			table.insert(freelist, cb)
 		end
 		kr_module.layer = layer_cptr -- this adds const qualifier
 	end
 	-- Freeing the callbacks needs to be done explicitly (see link above).
 	ffi.gc(kr_module, function (kr_mod)
-		if kr_mod.deinit ~= nil then kr_module.deinit:free() end
-		-- For simplicity we take module.layer from closure.
-		for lname in pairs(module.layer or {}) do
-			kr_mod.layer[lname]:free()
+		-- For simplicity we use freelist from closure.
+		for cb in pairs(freelist) do
+			cb:free()
 		end
 		ffi.C.free(kr_mod.layer)
 	end)
