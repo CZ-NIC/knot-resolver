@@ -314,7 +314,7 @@ function modules_load_lua(kr_module_ud)
 				end
 			elseif cb_name == 'checkout' then
 				cb = function (ctx, pkt, dst, socktype) -- FIXME socktype conversion
-					return cb_lua(ctx.state, ctx.req, pkt, dnst, socktype) or ctx.state
+					return cb_lua(ctx.state, ctx.req, pkt, dst, socktype) or ctx.state
 				end
 			else
 				panic("module %s contains unsupported callback name: layer.%s",
