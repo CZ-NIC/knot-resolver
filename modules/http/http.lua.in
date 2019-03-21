@@ -391,7 +391,12 @@ end
 -- @function Cleanup module
 function M.deinit()
 	for i, server in ipairs(M.servers) do
-		server:close()
+		-- We catch errors and only log them.
+		-- Even if they happen, we want to try closing all.
+		local succ, msg = pcall(server.close, server)
+		if not succ then
+			warn('error in http.deinit():\n%s', msg)
+		end
 		M.servers[i] = nil
 	end
 	prometheus.deinit()

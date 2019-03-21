@@ -265,10 +265,15 @@ function modules_load_lua(kr_module_ud)
 	local freelist = { } -- list of FFI callbacks to free
 
 	kr_module.deinit = function (kr_mod) -- this assignment constructs the FFI callback
-		-- First call the module-defined lua function.
+		-- First call the module-defined lua function; careful with errors.
 		local ret
 		if module.deinit ~= nil then
-			ret = module.deinit()
+			local succ
+			succ, ret = pcall(module.deinit)
+			if not succ then
+				warn('error: %s.deinit() throwed\n%s', ffi.string(kr_mod.name), ret)
+				ret = 1
+			end
 		end
 		-- We probably can't risk to :free() self when running, so let's defer that.
 		local deinit_self = kr_mod.deinit
