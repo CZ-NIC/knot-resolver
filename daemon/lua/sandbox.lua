@@ -297,8 +297,10 @@ function modules_load_lua(kr_module_ud)
 			--[[
 				The for-loop body could be simply
 					layer_cptr[cb_name] = cb_lua
-				but we would need the module API for lua and C to be the same.
-				Until we unify them, let's create simple lua wrapper functions
+				but
+				1. we would need the module API for lua and C to be the same.
+				2. we (probably) want to catch exceptions.
+				So, let's create simple lua wrapper functions
 				and let FFI construct C callbacks from those.
 
 			--]]
@@ -306,15 +308,33 @@ function modules_load_lua(kr_module_ud)
 			if cb_name == 'begin' or cb_name == 'reset'
 					or cb_name == 'finish' or cb_name == 'answer_finalize' then
 				cb = function (ctx)
-					return cb_lua(ctx.state, ctx.req) or ctx.state
+					local succ, ret = pcall(cb_lua, ctx.state, ctx.req)
+					if succ then
+						return ret or ctx.state
+					else
+						warn('%s', ret)
+						return kres.FAIL
+					end
 				end
 			elseif cb_name == 'consume' or cb_name == 'produce' then
 				cb = function (ctx, pkt)
-					return cb_lua(ctx.state, ctx.req, pkt) or ctx.state
+					local succ, ret = pcall(cb_lua, ctx.state, ctx.req, pkt)
+					if succ then
+						return ret or ctx.state
+					else
+						warn('%s', ret)
+						return kres.FAIL
+					end
 				end
 			elseif cb_name == 'checkout' then
 				cb = function (ctx, pkt, dst, socktype) -- FIXME socktype conversion
-					return cb_lua(ctx.state, ctx.req, pkt, dst, socktype) or ctx.state
+					local succ, ret = pcall(cb_lua, ctx.state, ctx.req, pkt, dst, socktype)
+					if succ then
+						return ret or ctx.state
+					else
+						warn('%s', ret)
+						return kres.FAIL
+					end
 				end
 			else
 				panic("module %s contains unsupported callback name: layer.%s",
