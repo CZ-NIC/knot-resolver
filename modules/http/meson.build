@@ -17,7 +17,8 @@ lua_mod_src += [
 
 config_tests += [
   ['http', files('http.test.lua')],
-  ['http.tls', files('test_tls/tls.test.lua')],
+  #FIXME
+  #['http.tls', files('test_tls/tls.test.lua')],
 ]
 
 # install static files
