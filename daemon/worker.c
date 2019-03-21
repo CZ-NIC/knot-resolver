@@ -1584,7 +1584,7 @@ static int qr_task_step(struct qr_task *task,
 	int sock_type = -1;
 	task->addrlist = NULL;
 	task->addrlist_turn = 0;
-	req->has_tls = (ctx->source.session && ctx->source.session->has_tls);
+	req->has_tls = (!ctx->source.session || ctx->source.session->has_tls);
 
 	if (worker->too_many_open) {
 		struct kr_rplan *rplan = &req->rplan;
