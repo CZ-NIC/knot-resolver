@@ -1,3 +1,4 @@
+local debug = require('debug')
 local ffi = require('ffi')
 
 -- Units
@@ -14,7 +15,9 @@ day = 24 * hour
 
 -- Logging
 function panic(fmt, ...)
-        error(string.format('error: '..fmt, ...))
+        print(debug.traceback('error occured here (config filename:lineno is '
+                .. 'at the bottom, if config is involved):', 2))
+        error(string.format('ERROR: '.. fmt, ...), 0)
 end
 function warn(fmt, ...)
         io.stderr:write(string.format(fmt..'\n', ...))
