@@ -193,9 +193,9 @@ def test_query_flood_no_recv(make_kresd_sock):
     (0, 1, 0),
     (1024, 1, 0),
 ])
-def test_query_flood_garbage(make_kresd_sock, glength, gcount, delay, query_before):
+def test_query_flood_garbage(make_kresd_silent_sock, glength, gcount, delay, query_before):
     """Flood resolver with prefixed garbage."""
-    sock1 = make_kresd_sock()
+    sock1 = make_kresd_silent_sock()
     if query_before:
         utils.ping_alive(sock1)
 
@@ -209,5 +209,5 @@ def test_query_flood_garbage(make_kresd_sock, glength, gcount, delay, query_befo
             sock1.sendall(buff)
             time.sleep(delay)
 
-    sock2 = make_kresd_sock()
+    sock2 = make_kresd_silent_sock()
     utils.ping_alive(sock2)  # resolver must stay alive

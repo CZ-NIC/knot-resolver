@@ -12,6 +12,12 @@ def kresd(tmpdir):
 
 
 @pytest.fixture
+def kresd_silent(tmpdir):
+    with make_kresd(tmpdir, verbose=False) as kresd:
+        yield kresd
+
+
+@pytest.fixture
 def kresd_tt(tmpdir):
     with make_kresd(tmpdir, 'tt') as kresd:
         yield kresd
@@ -26,6 +32,22 @@ def kresd_tt(tmpdir):
 def make_kresd_sock(request, kresd):
     """Factory function to create sockets of the same kind."""
     sock_func = getattr(kresd, request.param)
+
+    def _make_kresd_sock():
+        return sock_func()
+
+    return _make_kresd_sock
+
+
+@pytest.fixture(params=[
+    'ip_tcp_socket',
+    'ip6_tcp_socket',
+    'ip_tls_socket',
+    'ip6_tls_socket',
+])
+def make_kresd_silent_sock(request, kresd_silent):
+    """Factory function to create sockets of the same kind (no verbose)."""
+    sock_func = getattr(kresd_silent, request.param)
 
     def _make_kresd_sock():
         return sock_func()
