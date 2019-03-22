@@ -318,6 +318,10 @@ end
 local function add_file(path, unmanaged)
 	local managed = not unmanaged
 	if managed then
+		if not ta_update then
+			panic('[ ta ] automatic update for TA ' .. owner_str .. ' requested, '
+				.. 'but required module ta_update is not loaded')
+		end
 		if not io.open(path .. '.lock', 'w') then
 			error("[ ta ] ERROR: write access needed to keyfile dir '"..path.."'")
 		end
@@ -370,10 +374,6 @@ local function add_file(path, unmanaged)
 	-- TODO: if failed and for root, try to rebootstrap?
 
 	if managed then
-		if not ta_update then
-			panic('[ ta ] automatic update for TA ' .. owner_str .. ' requested, '
-				.. 'but required plugin ta_update is not loaded')
-		end
 		ta_update.start(owner)
 	end
 end
