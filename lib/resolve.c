@@ -1604,9 +1604,10 @@ int kr_resolve_finish(struct kr_request *request, int state)
 {
 	/* Finalize answer and construct wire-buffer. */
 	ITERATE_LAYERS(request, NULL, answer_finalize);
+	/*
 	if (request->state == KR_STATE_FAIL) {
-		state = KR_STATE_FAIL;
-	} else if (answer_finalize(request, state) != 0) {
+		state = KR_STATE_FAIL; // FIXME: this bypasses putting EDNS0 to wire.
+	} else */ if (answer_finalize(request, state) != 0) {
 		state = KR_STATE_FAIL;
 	}
 
