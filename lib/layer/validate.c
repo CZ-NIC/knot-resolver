@@ -264,6 +264,11 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 		if (ret != 0) {
 			if (ret != kr_error(DNSSEC_INVALID_DS_ALGORITHM) &&
 			    ret != kr_error(EAGAIN)) {
+				req->extended_error.valid = true;
+				req->extended_error.retry = false;
+				req->extended_error.response_code = KNOT_RCODE_SERVFAIL;
+				req->extended_error.info_code = KNOT_EXTENDED_ERROR_SERVFAIL_DNSSEC_BOGUS;
+				req->extended_error.extra_text = "DNSSEC bogus signatures";
 				log_bogus_rrsig(&vctx, qry, qry->zone_cut.key, "bogus key");
 			}
 			knot_rrset_free(qry->zone_cut.key, qry->zone_cut.pool);

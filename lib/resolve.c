@@ -1424,9 +1424,18 @@ ns_election:
 		}
 		kr_nsrep_elect(qry, request->ctx);
 		if (qry->ns.score > KR_NS_MAX_SCORE) {
+			request->extended_error.valid = true;
 			if (kr_zonecut_is_empty(&qry->zone_cut)) {
+				request->extended_error.retry = true;
+				request->extended_error.response_code = KNOT_RCODE_SERVFAIL;
+				request->extended_error.info_code = KNOT_EXTENDED_ERROR_SERVFAIL_NO_AUTHORITY;
+				request->extended_error.extra_text = "no NS with an address"; /* Also used when all authoritative nameservers timeout */
 				VERBOSE_MSG(qry, "=> no NS with an address\n");
 			} else {
+				request->extended_error.retry = true;
+				request->extended_error.response_code = KNOT_RCODE_SERVFAIL;
+				request->extended_error.info_code = KNOT_EXTENDED_ERROR_SERVFAIL_NO_AUTHORITY;
+				request->extended_error.extra_text = "no valid NS left";
 				VERBOSE_MSG(qry, "=> no valid NS left\n");
 			}
 			if (!qry->flags.NO_NS_FOUND) {

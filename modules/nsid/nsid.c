@@ -43,8 +43,10 @@ static int nsid_finalize(kr_layer_t *ctx) {
 		/* FIXME: actually change RCODE in answer to FORMERR? */
 
 	/* Sanity check, answer should have EDNS as well but who knows ... */
-	if (req->answer->opt_rr == NULL)
+	if (req->answer->opt_rr == NULL) {
+		kr_log_verbose("[%05u.  ][nsid] EDNS in query but not in answer???\n", req->uid);
 		return ctx->state;
+	}
 
 	if (knot_edns_add_option(req->answer->opt_rr, KNOT_EDNS_OPTION_NSID,
 				 config->local_nsid_len, config->local_nsid,

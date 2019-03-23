@@ -72,6 +72,10 @@
  * @endcode
  */
 
+/* DNS extended errors draft-ietf-dnsop-extended-error TODO: move to libknot */
+#define KNOT_EXTENDED_ERROR_SERVFAIL_DNSSEC_BOGUS 1  /* DNSSEC Bogus */
+#define KNOT_EXTENDED_ERROR_SERVFAIL_NO_AUTHORITY 7 /* No reachable authority */
+/* TODO other values from the Internet-Draft */
 
 /**
  * RRset rank - for cache and ranked_rr_*.
@@ -181,6 +185,15 @@ struct kr_request_qsource_flags {
 	bool tls:1; /**< true if the request is on TLS; only meaningful if (dst_addr). */
 };
 
+/* Extended Errors, draft-ietf-dnsop-extended-error-05 */
+struct extended_error_t {
+	bool valid; /* Do we have something to report? */
+	bool retry;
+	uint16_t response_code;
+	uint16_t info_code;
+	char *extra_text; /* Don't forget to allocate on the pool */
+};
+
 /**
  * Name resolution request.
  *
@@ -233,6 +246,8 @@ struct kr_request {
 	knot_mm_t pool;
 	unsigned int uid; /** for logging purposes only */
 	void *daemon_context; /** pointer to worker from daemon. Can be used in modules. */
+
+	struct extended_error_t extended_error;
 };
 
 /** Initializer for an array of *_selected. */
