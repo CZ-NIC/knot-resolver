@@ -37,7 +37,9 @@ static int extended_error_finalize(kr_layer_t *ctx) {
 	}
 	*/
 	
-	config->length = 4 + strlen(req->extended_error.extra_text);
+	const size_t extra_len = req->extended_error.extra_text
+		? strlen(req->extended_error.extra_text) : 0;
+	config->length = sizeof(data) + extra_len;
 	config->data = mm_alloc(&req->pool, config->length);
 	
         /* no EDNS in request, do nothing */
@@ -52,8 +54,10 @@ static int extended_error_finalize(kr_layer_t *ctx) {
 	}
 
 	data = serialize(req->extended_error);
-	memcpy(config->data, &data, config->length);
-	memcpy(config->data+4, req->extended_error.extra_text, strlen(req->extended_error.extra_text));
+	memcpy(config->data, &data, sizeof(data));
+	if (extra_len) {
+		memcpy(config->data + sizeof(data), req->extended_error.extra_text, extra_len);
+	}
 
 	if (knot_edns_add_option(req->answer->opt_rr, KNOT_EDNS_OPTION_EXTENDED_ERROR,
 				 config->length, config->data,
@@ -82,6 +86,12 @@ int extended_error_init(struct kr_module *module) {
 		return kr_error(ENOMEM);
 
 	module->data = config;
+	return kr_ok();
+}
+
+KR_EXPORT
+int extended_error_deinit(struct kr_module *module) {
+	free(module->data);
 	return kr_ok();
 }
 

@@ -191,7 +191,7 @@ struct extended_error_t {
 	bool retry;
 	uint16_t response_code;
 	uint16_t info_code;
-	char *extra_text; /* Don't forget to allocate on the pool */
+	char *extra_text; /* Don't forget to allocate on the pool; can be NULL. */
 };
 
 /**

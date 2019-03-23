@@ -457,6 +457,7 @@ function policy.DENY_MSG(msg) -- TODO: customizable extended error
 		answer:begin(kres.section.AUTHORITY)
 		mkauth_soa(answer, answer:qname())
 
+		req.extended_error.valid = true
 		req.extended_error.retry = true
 		req.extended_error.response_code = kres.rcode.NXDOMAIN
 		req.extended_error.info_code = 1 -- "Blocked" TODO
@@ -488,6 +489,7 @@ function policy.REFUSE(_, req)
 	answer:rcode(kres.rcode.REFUSED)
 	answer:ad(false)
 
+	req.extended_error.valid = true
 	req.extended_error.retry = true -- TODO: customizable
 	req.extended_error.response_code = kres.rcode.REFUSED
 	req.extended_error.info_code = 2 -- "Prohibited" TODO
