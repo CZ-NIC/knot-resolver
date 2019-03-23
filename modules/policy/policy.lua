@@ -444,7 +444,7 @@ function policy.rpz(action, path, watch)
 	end
 end
 
-function policy.DENY_MSG(msg)
+function policy.DENY_MSG(msg) -- TODO: customizable extended error
 	if msg and (type(msg) ~= 'string' or #msg >= 255) then
 		error('DENY_MSG: optional msg must be string shorter than 256 characters')
         end
@@ -456,11 +456,21 @@ function policy.DENY_MSG(msg)
 		answer:rcode(kres.rcode.NXDOMAIN)
 		answer:begin(kres.section.AUTHORITY)
 		mkauth_soa(answer, answer:qname())
+
+		req.extended_error.retry = true
+		req.extended_error.response_code = kres.rcode.NXDOMAIN
+		req.extended_error.info_code = 1 -- "Blocked" TODO
+
 		if msg then
+			local msg_len = #msg
 			answer:begin(kres.section.ADDITIONAL)
 			answer:put('\11explanation\7invalid', 10800, answer:qclass(), kres.type.TXT,
-				   string.char(#msg) .. msg)
+				   string.char(msg_len) .. msg)
 
+			req.extended_error.extra_text = ffi.C.mm_realloc(req.pool, nil, msg_len + 1, 0)
+			ffi.copy(req.extended_error.extra_text, msg)
+		else
+			req.extended_error.extra_text = nil
 		end
 		return kres.DONE
 	end
@@ -468,6 +478,8 @@ end
 policy.DENY = policy.DENY_MSG() -- compatibility with < 2.0
 
 function policy.DROP(_, _)
+	-- extended_error: no usable code in draft 5
+
 	return kres.FAIL
 end
 
@@ -475,6 +487,12 @@ function policy.REFUSE(_, req)
 	local answer = req.answer
 	answer:rcode(kres.rcode.REFUSED)
 	answer:ad(false)
+
+	req.extended_error.retry = true -- TODO: customizable
+	req.extended_error.response_code = kres.rcode.REFUSED
+	req.extended_error.info_code = 2 -- "Prohibited" TODO
+	req.extended_error.extra_text = nil
+
 	return kres.DONE
 end
 

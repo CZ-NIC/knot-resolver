@@ -167,6 +167,13 @@ struct kr_request_qsource_flags {
 	_Bool tcp : 1;
 	_Bool tls : 1;
 };
+struct extended_error_t {
+	_Bool valid;
+	_Bool retry;
+	uint16_t response_code;
+	uint16_t info_code;
+	char *extra_text;
+};
 struct kr_request {
 	struct kr_context *ctx;
 	knot_pkt_t *answer;
@@ -198,6 +205,7 @@ struct kr_request {
 	knot_mm_t pool;
 	unsigned int uid;
 	void *daemon_context;
+	struct extended_error_t extended_error;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
 struct kr_cdb_stats {

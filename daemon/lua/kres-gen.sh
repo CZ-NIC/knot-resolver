@@ -92,6 +92,7 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	kr_qarray_t
 	struct kr_rplan
 	struct kr_request_qsource_flags
+	struct extended_error_t
 	struct kr_request
 	enum kr_rank
 	struct kr_cdb_stats
