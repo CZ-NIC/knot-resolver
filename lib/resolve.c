@@ -870,18 +870,6 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 	}
 }
 
-static bool resolution_time_exceeded(struct kr_query *qry, uint64_t now)
-{
-	uint64_t resolving_time = now - qry->creation_time_mono;
-	if (resolving_time > KR_RESOLVE_TIME_LIMIT) {
-		WITH_VERBOSE(qry) {
-			VERBOSE_MSG(qry, "query resolution time limit exceeded\n");
-		}
-		return true;
-	}
-	return false;
-}
-
 int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
@@ -897,7 +885,8 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	/* Different processing for network error */
 	struct kr_query *qry = array_tail(rplan->pending);
 	/* Check overall resolution time */
-	if (resolution_time_exceeded(qry, kr_now())) {
+	if (kr_now() - qry->creation_time_mono > KR_RESOLVE_TIME_LIMIT) {
+		kr_query_inform_timeout(request, qry);
 		return KR_STATE_FAIL;
 	}
 	bool tried_tcp = (qry->flags.TCP);

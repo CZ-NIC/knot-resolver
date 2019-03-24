@@ -172,7 +172,7 @@ struct extended_error_t {
 	_Bool retry;
 	uint16_t response_code;
 	uint16_t info_code;
-	char *extra_text;
+	const char *extra_text;
 };
 struct kr_request {
 	struct kr_context *ctx;

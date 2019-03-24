@@ -57,42 +57,6 @@
 
 #define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "wrkr", __VA_ARGS__)
 
-/** Client request state. */
-struct request_ctx
-{
-	struct kr_request req;
-	struct {
-		union inaddr addr;
-		union inaddr dst_addr;
-		/* uv_handle_t *handle; */
-
-		/** NULL if the request didn't come over network. */
-		struct session *session;
-	} source;
-	struct worker_ctx *worker;
-	struct qr_task *task;
-};
-
-/** Query resolution task. */
-struct qr_task
-{
-	struct request_ctx *ctx;
-	knot_pkt_t *pktbuf;
-	qr_tasklist_t waiting;
-	struct session *pending[MAX_PENDING];
-	uint16_t pending_count;
-	uint16_t addrlist_count;
-	uint16_t addrlist_turn;
-	uint16_t timeouts;
-	uint16_t iter_count;
-	struct sockaddr *addrlist;
-	uint32_t refs;
-	bool finished : 1;
-	bool leading  : 1;
-	uint64_t creation_time;
-};
-
-
 /* Convenience macros */
 #define qr_task_ref(task) \
 	do { ++(task)->refs; } while(0)
@@ -1451,6 +1415,7 @@ static int qr_task_step(struct qr_task *task,
 	/* Close pending I/O requests */
 	subreq_finalize(task, packet_source, packet);
 	if ((kr_now() - worker_task_creation_time(task)) >= KR_RESOLVE_TIME_LIMIT) {
+		kr_query_inform_timeout(&task->ctx->req, task->ctx->req.current_query);
 		return qr_task_finalize(task, KR_STATE_FAIL);
 	}
 

@@ -212,7 +212,7 @@ struct extended_error_t {
 	bool retry;
 	uint16_t response_code;
 	uint16_t info_code;
-	char *extra_text; /* Don't forget to allocate on the pool; can be NULL. */
+	const char *extra_text; /**< Can be NULL.  Allocated on the kr_request::pool or static. */
 };
 
 /**
@@ -365,4 +365,21 @@ struct kr_rplan *kr_resolve_plan(struct kr_request *request);
  */
 KR_EXPORT KR_PURE
 knot_mm_t *kr_resolve_pool(struct kr_request *request);
+
+
+static inline void kr_query_inform_timeout(struct kr_request *req, const struct kr_query *qry)
+{
+	const char *msg = "Internal time-out for resolving the request has expired.";
+	/* TODO: perhaps investigate assert(req && qry); */
+	if (req) {
+		req->extended_error = (struct extended_error_t){
+			.valid = true,
+			.retry = true,
+			.response_code = KNOT_RCODE_SERVFAIL,
+			.info_code = KNOT_EXTENDED_ERROR_SERVFAIL_NO_AUTHORITY,
+			.extra_text = msg,
+		};
+	}
+	QRVERBOSE(qry, "work", "%s\n", msg);
+}
 

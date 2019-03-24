@@ -797,7 +797,7 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 			qry->zone_cut.name = knot_dname_copy(signer, &req->pool);
 		}
 
-		/* zone cut matches, but DS/DNSKEY doesn't => refetch. */
+		/* zone cut matches, but DS/DNSKEY doesn't => refetch. */ // FIXME: weird
 		VERBOSE_MSG(qry, ">< cut changed (unmatch DS/DNSKEY), needs revalidation\n");
 		if ((qry->flags.FORWARD) && qry->stype != KNOT_RRTYPE_DS) {
 			struct kr_rplan *rplan = &req->rplan;

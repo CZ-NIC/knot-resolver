@@ -430,6 +430,8 @@ int session_tasklist_finalize_expired(struct session *session)
 		if ((now - worker_task_creation_time(task)) >= KR_RESOLVE_TIME_LIMIT) {
 			queue_push(q, task);
 			worker_task_ref(task);
+		} else {
+			kr_query_inform_timeout(&task->ctx->req, task->ctx->req.current_query);
 		}
 	}
 	trie_it_free(it);
