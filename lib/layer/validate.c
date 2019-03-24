@@ -97,6 +97,7 @@ static void log_bogus_rrsig(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_query *qry,
 			    knot_mm_t *pool)
 {
+	struct kr_request *req = qry->request;
 	if (!vctx) {
 		return kr_error(EINVAL);
 	}
@@ -149,10 +150,20 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 			/* no RRSIGs found */
 			kr_rank_set(&entry->rank, KR_RANK_MISSING);
 			vctx->err_cnt += 1;
+			req->extended_error.valid = true;
+			req->extended_error.retry = false;
+			req->extended_error.response_code = KNOT_RCODE_SERVFAIL;
+			req->extended_error.info_code = KNOT_EXTENDED_ERROR_SERVFAIL_DNSSEC_BOGUS;
+			req->extended_error.extra_text = "no valid signatures";
 			log_bogus_rrsig(vctx, qry, rr, "no valid RRSIGs found");
 		} else {
 			kr_rank_set(&entry->rank, KR_RANK_BOGUS);
 			vctx->err_cnt += 1;
+			req->extended_error.valid = true;
+			req->extended_error.retry = false;
+			req->extended_error.response_code = KNOT_RCODE_SERVFAIL;
+			req->extended_error.info_code = KNOT_EXTENDED_ERROR_SERVFAIL_DNSSEC_BOGUS;
+			req->extended_error.extra_text = "bogus signatures";
 			log_bogus_rrsig(vctx, qry, rr, "bogus signatures");
 		}
 	}
@@ -267,14 +278,17 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 				req->extended_error.valid = true;
 				req->extended_error.retry = false;
 				req->extended_error.response_code = KNOT_RCODE_SERVFAIL;
-				req->extended_error.info_code = KNOT_EXTENDED_ERROR_SERVFAIL_DNSSEC_BOGUS;
 				if (vctx.rrs_counters.expired > 0) {
+					req->extended_error.info_code = KNOT_EXTENDED_ERROR_SERVFAIL_DNSSEC_EXPIRED;
 					req->extended_error.extra_text = "DNSSEC expired signatures";
 				} else if (vctx.rrs_counters.notyet > 0) {
+					req->extended_error.info_code = KNOT_EXTENDED_ERROR_SERVFAIL_DNSSEC_NOT_YET;
 					req->extended_error.extra_text = "DNSSEC not-yet-valid signatures";
 				} else if (vctx.rrs_counters.matching_name_type == 0) {
+					req->extended_error.info_code = KNOT_EXTENDED_ERROR_SERVFAIL_DNSSEC_SIG_MISSING;
 					req->extended_error.extra_text = "DNSSEC no signature";
 				} else {
+					req->extended_error.info_code = KNOT_EXTENDED_ERROR_SERVFAIL_DNSSEC_BOGUS;
 					req->extended_error.extra_text = "DNSSEC bogus/signatures signatures";
 				}
 				log_bogus_rrsig(&vctx, qry, qry->zone_cut.key, "bogus key");

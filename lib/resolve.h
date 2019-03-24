@@ -72,10 +72,31 @@
  * @endcode
  */
 
-/* DNS extended errors draft-ietf-dnsop-extended-error TODO: move to libknot */
+/* DNS extended errors draft-ietf-dnsop-extended-error-05 TODO: move to libknot */
+#define KNOT_EXTENDED_ERROR_NOERROR_UNSUP_KEY 1  /* Unsupported DNSKEY Algorithm */
+#define KNOT_EXTENDED_ERROR_NOERROR_UNSUP_DS 1  /* Unsupported DS Algorithm */
+#define KNOT_EXTENDED_ERROR_NOERROR_STALE 3  /* Stale answer */
+#define KNOT_EXTENDED_ERROR_NOERROR_FORGED 4  /* Forged answer */
+#define KNOT_EXTENDED_ERROR_NOERROR_INDETERMINATE 5 /* DNSSEC Indeterminate TODO SERVFAIL or NOERROR? Draft -05 seems wrong here. */
+
 #define KNOT_EXTENDED_ERROR_SERVFAIL_DNSSEC_BOGUS 1  /* DNSSEC Bogus */
+#define KNOT_EXTENDED_ERROR_SERVFAIL_DNSSEC_EXPIRED 2  /* Signature Expired */
+#define KNOT_EXTENDED_ERROR_SERVFAIL_DNSSEC_NOT_YET 3  /* Signature Not Yet Valid */
+#define KNOT_EXTENDED_ERROR_SERVFAIL_DNSSEC_KEY_MISSING 4 /* DNSKEY missing */
+#define KNOT_EXTENDED_ERROR_SERVFAIL_DNSSEC_SIG_MISSING 5 /* RRSIGs missing */
+#define KNOT_EXTENDED_ERROR_SERVFAIL_DNSSEC_NO_ZONE_KEY 6 /* No Zone Key Bit Set */
 #define KNOT_EXTENDED_ERROR_SERVFAIL_NO_AUTHORITY 7 /* No reachable authority */
-/* TODO other values from the Internet-Draft */
+#define KNOT_EXTENDED_ERROR_SERVFAIL_DNSSEC_NO_NSEC 8 /*  NSEC Missing*/
+#define KNOT_EXTENDED_ERROR_SERVFAIL_CACHED 9 /* Cached Error */
+
+#define KNOT_EXTENDED_ERROR_NOTIMP_DEPRECATED 1  /* Deprecated */
+
+#define KNOT_EXTENDED_ERROR_REFUSED_LAME 1  /* Lame */
+#define KNOT_EXTENDED_ERROR_REFUSED_PROHIBITED 1  /* Prohibited */
+
+#define KNOT_EXTENDED_ERROR_NXDOMAIN_BLOCKED 1  /* Blocked (censored, but locally) */
+#define KNOT_EXTENDED_ERROR_NXDOMAIN_CENSORED 2  /* Censored */
+#define KNOT_EXTENDED_ERROR_NXDOMAIN_STALE 3  /* Stale Answer */
 
 /**
  * RRset rank - for cache and ranked_rr_*.

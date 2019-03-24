@@ -444,7 +444,7 @@ function policy.rpz(action, path, watch)
 	end
 end
 
-function policy.DENY_MSG(msg) -- TODO: customizable extended error
+function policy.DENY_MSG(msg) -- TODO: customizable extended error info code
 	if msg and (type(msg) ~= 'string' or #msg >= 255) then
 		error('DENY_MSG: optional msg must be string shorter than 256 characters')
         end
