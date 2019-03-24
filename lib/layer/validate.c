@@ -268,7 +268,15 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 				req->extended_error.retry = false;
 				req->extended_error.response_code = KNOT_RCODE_SERVFAIL;
 				req->extended_error.info_code = KNOT_EXTENDED_ERROR_SERVFAIL_DNSSEC_BOGUS;
-				req->extended_error.extra_text = "DNSSEC bogus signatures";
+				if (vctx.rrs_counters.expired > 0) {
+					req->extended_error.extra_text = "DNSSEC expired signatures";
+				} else if (vctx.rrs_counters.notyet > 0) {
+					req->extended_error.extra_text = "DNSSEC not-yet-valid signatures";
+				} else if (vctx.rrs_counters.matching_name_type == 0) {
+					req->extended_error.extra_text = "DNSSEC no signature";
+				} else {
+					req->extended_error.extra_text = "DNSSEC bogus/signatures signatures";
+				}
 				log_bogus_rrsig(&vctx, qry, qry->zone_cut.key, "bogus key");
 			}
 			knot_rrset_free(qry->zone_cut.key, qry->zone_cut.pool);
@@ -776,7 +784,7 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 
 		/* zone cut matches, but DS/DNSKEY doesn't => refetch. */
-		VERBOSE_MSG(qry, ">< cut changed, needs revalidation\n");
+		VERBOSE_MSG(qry, ">< cut changed (unmatch DS/DNSKEY), needs revalidation\n");
 		if ((qry->flags.FORWARD) && qry->stype != KNOT_RRTYPE_DS) {
 			struct kr_rplan *rplan = &req->rplan;
 			struct kr_query *next = kr_rplan_push(rplan, qry, signer,
@@ -1046,6 +1054,11 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 					 * call update_parent_keys() to mark
 					 * parent queries as insecured */
 				} else {
+					req->extended_error.valid = true;
+					req->extended_error.retry = false;
+					req->extended_error.response_code = KNOT_RCODE_SERVFAIL;
+					req->extended_error.info_code = KNOT_EXTENDED_ERROR_SERVFAIL_DNSSEC_BOGUS;
+					req->extended_error.extra_text = "DNSSEC bad NODATA proof (no key and no sigs?)";
 					VERBOSE_MSG(qry, "<= bad NODATA proof\n");
 					qry->flags.DNSSEC_BOGUS = true;
 					return KR_STATE_FAIL;
