@@ -9,6 +9,10 @@ py3_deps += [
   ['xdist', 'pytest-xdist (for pytests)'],
 ]
 
+if gnutls.version().version_compare('<3.6.4')
+  error('pytests require GnuTLS >= 3.6.4')
+endif
+
 # compile tlsproxy
 tlsproxy_src = files([
   'proxy/tlsproxy.c',
