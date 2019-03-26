@@ -446,7 +446,7 @@ end
 
 -- Copy a lua string to c.  (to knot_mm_t or nil=malloc, zero-terminated)
 -- TODO: move to someplace, as a general lua utility.
-function string2c(str, mempool)
+local function string2c(str, mempool)
 	if str == nil then return nil end
 	local result = ffi.C.mm_realloc(mempool, nil, #str + 1, 0)
 	if result == nil then panic("not enough memory") end
