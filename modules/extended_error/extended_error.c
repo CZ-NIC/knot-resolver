@@ -4,27 +4,27 @@
 /* TODO move to libknot, in src/libknot/rrtype/opt.h */
 #define KNOT_EDNS_OPTION_EXTENDED_ERROR 65500
 
-struct extended_error_config {
-	uint8_t *data;
-	size_t length;
-};
-
-uint32_t serialize(struct extended_error_t err) {
+uint32_t serialize(const struct extended_error_t *ee) {
 	uint32_t result = 0;
-	result = (u_int32_t)err.retry << 31;
-	result = result + ((err.response_code & 0x0000000F) << 12);
-	result = result + (err.info_code & 0x00000FFF);
-	return(ntohl(result));
+	result = (uint32_t)ee->retry << 31;
+	result = result + ((ee->response_code & 0x0000000F) << 12);
+	result = result + (ee->info_code & 0x00000FFF);
+	return htonl(result);
 }
 	
 static int extended_error_finalize(kr_layer_t *ctx) {
-	const struct kr_module *module = ctx->api->data;
-	struct extended_error_config *config = module->data;
 	struct kr_request *req = ctx->req;
 	const knot_rrset_t *src_opt = req->qsource.packet->opt_rr;
-	uint32_t data;
+	const struct extended_error_t *ee = &req->extended_error;
 	
-	if (!req->extended_error.valid) {
+	if (!req->extended_error.valid || src_opt == NULL) {
+		return ctx->state;
+	}
+
+	/* Sanity check, answer should have EDNS as well but who knows ... */
+	if (req->answer->opt_rr == NULL) {
+		kr_log_verbose("[%05u.  ][exterr] no EDNS in answer, not adding Extended Error option\n", req->uid);
+		assert(false);
 		return ctx->state;
 	}
 
@@ -37,31 +37,16 @@ static int extended_error_finalize(kr_layer_t *ctx) {
 	}
 	*/
 	
-	const size_t extra_len = req->extended_error.extra_text
-		? strlen(req->extended_error.extra_text) : 0;
-	config->length = sizeof(data) + extra_len;
-	config->data = mm_alloc(&req->pool, config->length);
-	
-        /* no EDNS in request, do nothing */
-	if (src_opt == NULL)
-		return ctx->state;
-
-	/* Sanity check, answer should have EDNS as well but who knows ... */
-	if (req->answer->opt_rr == NULL) {
-		kr_log_verbose("[%05u.  ][exterr] no EDNS in answer, not adding Extended Error option\n", req->uid);
-		knot_rrset_clear(req->answer->opt_rr, &req->pool);
-		return ctx->state;
-	}
-
-	data = serialize(req->extended_error);
-	memcpy(config->data, &data, sizeof(data));
+	const uint32_t header = serialize(ee);
+	const size_t extra_len = ee->extra_text ? strlen(ee->extra_text) : 0;
+	uint8_t buf[sizeof(header) + extra_len];
+	memcpy(buf, &header, sizeof(header));
 	if (extra_len) {
-		memcpy(config->data + sizeof(data), req->extended_error.extra_text, extra_len);
+		memcpy(buf + sizeof(header), ee->extra_text, extra_len);
 	}
 
 	if (knot_edns_add_option(req->answer->opt_rr, KNOT_EDNS_OPTION_EXTENDED_ERROR,
-				 config->length, config->data,
-				 &req->pool) != KNOT_EOK) {
+				 sizeof(buf), buf, &req->pool) != KNOT_EOK) {
 		/* something went wrong and there is no way to salvage content of OPT RRset */
 		kr_log_verbose("[%05u.  ][exterr] unable to add Extended Error option\n", req->uid);
 		knot_rrset_clear(req->answer->opt_rr, &req->pool);
@@ -72,26 +57,14 @@ static int extended_error_finalize(kr_layer_t *ctx) {
 KR_EXPORT
 const kr_layer_api_t *extended_error_layer(struct kr_module *module)
 {
-	static kr_layer_api_t _layer = {
+	static const kr_layer_api_t _layer = {
 		.answer_finalize = &extended_error_finalize,
 	};
-	_layer.data = module;
 	return &_layer;
 }
 
 KR_EXPORT
 int extended_error_init(struct kr_module *module) {
-	struct extended_error_config *config = calloc(1, sizeof(struct extended_error_config));
-	if (config == NULL)
-		return kr_error(ENOMEM);
-
-	module->data = config;
-	return kr_ok();
-}
-
-KR_EXPORT
-int extended_error_deinit(struct kr_module *module) {
-	free(module->data);
 	return kr_ok();
 }
 
