@@ -444,6 +444,16 @@ function policy.rpz(action, path, watch)
 	end
 end
 
+-- Copy a lua string to c.  (to knot_mm_t or nil=malloc, zero-terminated)
+-- TODO: move to someplace, as a general lua utility.
+function string2c(str, mempool)
+	if str == nil then return nil end
+	local result = ffi.C.mm_realloc(mempool, nil, #str + 1, 0)
+	if result == nil then panic("not enough memory") end
+	ffi.copy(result, str)
+	return ffi.cast('const char *', result)
+end
+
 function policy.DENY_MSG(msg) -- TODO: customizable extended error info code
 	if msg and (type(msg) ~= 'string' or #msg >= 255) then
 		error('DENY_MSG: optional msg must be string shorter than 256 characters')
@@ -457,22 +467,17 @@ function policy.DENY_MSG(msg) -- TODO: customizable extended error info code
 		answer:begin(kres.section.AUTHORITY)
 		mkauth_soa(answer, answer:qname())
 
+		if msg then
+			answer:begin(kres.section.ADDITIONAL)
+			answer:put('\11explanation\7invalid', 10800, answer:qclass(), kres.type.TXT,
+				   string.char(#msg) .. msg)
+		end
+
 		req.extended_error.valid = true
 		req.extended_error.retry = true
 		req.extended_error.response_code = kres.rcode.NXDOMAIN
 		req.extended_error.info_code = 1 -- "Blocked" TODO
-
-		if msg then
-			local msg_len = #msg
-			answer:begin(kres.section.ADDITIONAL)
-			answer:put('\11explanation\7invalid', 10800, answer:qclass(), kres.type.TXT,
-				   string.char(msg_len) .. msg)
-
-			req.extended_error.extra_text = ffi.C.mm_realloc(req.pool, nil, msg_len + 1, 0)
-			ffi.copy(req.extended_error.extra_text, msg)
-		else
-			req.extended_error.extra_text = nil
-		end
+		req.extended_error.extra_text = string2c(msg or 'Blocked', req.pool)
 		return kres.DONE
 	end
 end
@@ -493,7 +498,7 @@ function policy.REFUSE(_, req)
 	req.extended_error.retry = true -- TODO: customizable
 	req.extended_error.response_code = kres.rcode.REFUSED
 	req.extended_error.info_code = 2 -- "Prohibited" TODO
-	req.extended_error.extra_text = nil
+	req.extended_error.extra_text = string2c('Prohibited', req.pool)
 
 	return kres.DONE
 end
