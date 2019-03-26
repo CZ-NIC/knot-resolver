@@ -4,14 +4,6 @@
 /* TODO move to libknot, in src/libknot/rrtype/opt.h */
 #define KNOT_EDNS_OPTION_EXTENDED_ERROR 65500
 
-uint32_t serialize(const struct extended_error_t *ee) {
-	uint32_t result = 0;
-	result = (uint32_t)ee->retry << 31;
-	result = result + ((ee->response_code & 0x0000000F) << 12);
-	result = result + (ee->info_code & 0x00000FFF);
-	return htonl(result);
-}
-	
 static int extended_error_finalize(kr_layer_t *ctx) {
 	struct kr_request *req = ctx->req;
 	const knot_rrset_t *src_opt = req->qsource.packet->opt_rr;
@@ -28,6 +20,10 @@ static int extended_error_finalize(kr_layer_t *ctx) {
 		return ctx->state;
 	}
 
+	if (ee->response_code & ~0xFu || ee->info_code & ~0xFFFu) {
+		assert(!EINVAL);
+		return ctx->state;
+	}
 	/* Test disabled because, at this stage, Knot does not yet set
 	 * the real return code (we get NOERROR even if there is a
 	 * SERVFAIL)
@@ -37,12 +33,15 @@ static int extended_error_finalize(kr_layer_t *ctx) {
 	}
 	*/
 	
-	const uint32_t header = serialize(ee);
+	const uint32_t header_native =
+		((uint32_t)ee->retry << 31)
+		| (ee->response_code << 12)
+		| ee->info_code;
 	const size_t extra_len = ee->extra_text ? strlen(ee->extra_text) : 0;
-	uint8_t buf[sizeof(header) + extra_len];
-	memcpy(buf, &header, sizeof(header));
+	uint8_t buf[sizeof(header_native) + extra_len];
+	knot_wire_write_u32(buf, header_native);
 	if (extra_len) {
-		memcpy(buf + sizeof(header), ee->extra_text, extra_len);
+		memcpy(buf + sizeof(header_native), ee->extra_text, extra_len);
 	}
 
 	if (knot_edns_add_option(req->answer->opt_rr, KNOT_EDNS_OPTION_EXTENDED_ERROR,
