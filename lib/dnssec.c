@@ -268,8 +268,10 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 	return vctx->result;
 }
 
-static bool kr_ds_algo_support(const knot_rrset_t *ta)
+bool kr_ds_algo_support(const knot_rrset_t *ta)
 {
+	assert(ta && ta->type == KNOT_RRTYPE_DS && ta->rclass == KNOT_CLASS_IN);
+	/* Check if at least one DS has a usable algorithm pair. */
 	knot_rdata_t *rdata_i = ta->rrs.rdata;
 	for (uint16_t i = 0; i < ta->rrs.count;
 			++i, rdata_i = knot_rdataset_next(rdata_i)) {
@@ -291,12 +293,6 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
 	if (!ok) {
 		assert(false);
 		return kr_error(EINVAL);
-	}
-
-	/* Check if at least one DS has a usable algorithm pair. */
-	if (!kr_ds_algo_support(ta)) {
-		/* See RFC6840 5.2. */
-		return vctx->result = kr_error(DNSSEC_INVALID_DS_ALGORITHM);
 	}
 
 	/* RFC4035 5.2, bullet 1
