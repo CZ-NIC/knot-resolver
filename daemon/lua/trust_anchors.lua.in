@@ -441,7 +441,7 @@ trust_anchors = {
 	-- Load keys from a file, 5011-managed by default.
 	-- If managed and the file doesn't exist, try bootstrapping the root into it.
 	add_file = add_file,
-	config = function() upgrade_required('trust_anchors.config was removed, see add_file()') end,
+	config = function() upgrade_required('trust_anchors.config was removed, use trust_anchors.add_file()') end,
 	remove = remove,
 
 	keyset_publish = keyset_publish,
@@ -527,9 +527,9 @@ trust_anchors = {
 setmetatable(trust_anchors, {
        __newindex = function (t,k,v)
        if     k == 'file' then
-	       upgrade_required('trust_anchors.file was removed, see add_file()')
+	       upgrade_required('trust_anchors.file was removed, use trust_anchors.add_file()')
        elseif k == 'negative' then
-	       upgrade_required('trust_anchors.negative was removed, see set_insecure()')
+	       upgrade_required('trust_anchors.negative was removed, use trust_anchors.set_insecure()')
        elseif k == 'keyfile_default' then
 	       upgrade_required('trust_anchors.keyfile_default is now compiled in, see trust_anchors.remove()')
        else   rawset(t, k, v) end
