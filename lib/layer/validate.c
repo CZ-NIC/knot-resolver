@@ -972,11 +972,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	if (knot_wire_get_aa(pkt->wire) && qtype == KNOT_RRTYPE_DNSKEY) {
-		ret = validate_keyset(req, pkt, has_nsec3);
-		if (ret == kr_error(EAGAIN)) {
-			VERBOSE_MSG(qry, ">< cut changed, needs revalidation\n");
-			return KR_STATE_YIELD;
-		} else if (ret == kr_error(DNSSEC_INVALID_DS_ALGORITHM)) {
+		if (!kr_ds_algo_support(qry->zone_cut.trust_anchor)) {
 			VERBOSE_MSG(qry, ">< all DS entries use unsupported algorithm pairs, going insecure\n");
 			/* ^ the message is a bit imprecise to avoid being too verbose */
 			qry->flags.DNSSEC_WANT = false;
@@ -984,6 +980,11 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			rank_records(ctx, KR_RANK_INSECURE, qry->zone_cut.name);
 			mark_insecure_parents(qry);
 			return KR_STATE_DONE;
+		}
+		ret = validate_keyset(req, pkt, has_nsec3);
+		if (ret == kr_error(EAGAIN)) {
+			VERBOSE_MSG(qry, ">< cut changed, needs revalidation\n");
+			return KR_STATE_YIELD;
 		} else if (ret != 0) {
 			VERBOSE_MSG(qry, "<= bad keys, broken trust chain\n");
 			qry->flags.DNSSEC_BOGUS = true;
