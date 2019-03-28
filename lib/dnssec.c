@@ -270,7 +270,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 
 bool kr_ds_algo_support(const knot_rrset_t *ta)
 {
-	assert(ta->type == KNOT_RRTYPE_DS && ta->rclass == KNOT_CLASS_IN);
+	assert(ta && ta->type == KNOT_RRTYPE_DS && ta->rclass == KNOT_CLASS_IN);
 	/* Check if at least one DS has a usable algorithm pair. */
 	knot_rdata_t *rdata_i = ta->rrs.rdata;
 	for (uint16_t i = 0; i < ta->rrs.count;

@@ -972,7 +972,8 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	if (knot_wire_get_aa(pkt->wire) && qtype == KNOT_RRTYPE_DNSKEY) {
-		if (!kr_ds_algo_support(qry->zone_cut.trust_anchor)) {
+		const knot_rrset_t *ds = qry->zone_cut.trust_anchor;
+		if (ds && !kr_ds_algo_support(ds)) {
 			VERBOSE_MSG(qry, ">< all DS entries use unsupported algorithm pairs, going insecure\n");
 			/* ^ the message is a bit imprecise to avoid being too verbose */
 			qry->flags.DNSSEC_WANT = false;
@@ -981,6 +982,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			mark_insecure_parents(qry);
 			return KR_STATE_DONE;
 		}
+
 		ret = validate_keyset(req, pkt, has_nsec3);
 		if (ret == kr_error(EAGAIN)) {
 			VERBOSE_MSG(qry, ">< cut changed, needs revalidation\n");
