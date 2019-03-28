@@ -82,12 +82,16 @@ int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx,
 			const knot_rrset_t *covered);
 
 /**
+ * Return true iff the RRset contains at least one usable DS.  See RFC6840 5.2.
+ */
+KR_EXPORT KR_PURE
+bool kr_ds_algo_support(const knot_rrset_t *ta);
+
+/**
  * Check whether the DNSKEY rrset matches the supplied trust anchor RRSet.
  * @param vctx  Pointer to validation context.
  * @param ta    Trust anchor RRSet against which to validate the DNSKEY RRSet.
- * @return      0 or error code, same as vctx->result.  In particular,
- * 		DNSSEC_INVALID_DS_ALGORITHM if *each* DS records is unusable
- * 		due to unimplemented DNSKEY or DS algorithm.
+ * @return      0 or error code, same as vctx->result.
  */
 int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta);
 

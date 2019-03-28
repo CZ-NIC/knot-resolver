@@ -37,6 +37,7 @@ Bugfixes
 - fix flushing of messages to logs in some cases (!781)
 - fix fallback when SERVFAIL or REFUSED is received from upstream (!784)
 - fix crash when dealing with unknown TA key algorhitm (#449)
+- go insecure due to algorithm support even if DNSKEY is NODATA (!798)
 
 Module API changes
 ------------------
