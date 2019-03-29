@@ -48,6 +48,7 @@ uint32_t packet_ttl(const knot_pkt_t *pkt, bool is_negative)
 				continue; /* Skip metatypes. */
 			}
 			ttl = MIN(ttl, rr->ttl);
+			has_ttl = true;
 		}
 	}
 	/* If no valid TTL present, go with zero (will get clamped to minimum). */
