@@ -108,6 +108,12 @@ for k, v in pairs(http_trace.endpoints) do
 end
 M.trace = http_trace
 
+local http_doh = require('kres_modules.http_doh')
+for k, v in pairs(http_doh.endpoints) do
+	M.endpoints[k] = v
+end
+M.doh = http_doh
+
 -- Export HTTP service page snippets
 M.snippets = {}
 
