@@ -11,6 +11,7 @@ lua_http = configure_file(
 
 lua_mod_src += [
   lua_http,
+  files('http_doh.lua'),
   files('http_trace.lua'),
   files('prometheus.lua'),
 ]
