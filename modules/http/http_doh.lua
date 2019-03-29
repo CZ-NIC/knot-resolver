@@ -6,7 +6,6 @@ local function get_http_ttl(pkt)
 	if true then
 		local an_records = pkt:section(kres.section.ANSWER)
 		local is_negative = #an_records <= 0
-		-- FIXME: does not work for positive answers
 		return ffi.C.packet_ttl(pkt, is_negative)
 	end
 
@@ -61,7 +60,7 @@ local function serve_doh(h, stream)
 	end
 
 	-- Resolve query
-	wire = ffi.cast("void *", input)
+	local wire = ffi.cast("void *", input)
 	local pkt = ffi.C.knot_pkt_new(wire, #input, nil);
 	if not pkt then
 		output = 'shit happened in knot_pkt_new'
