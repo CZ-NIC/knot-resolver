@@ -210,6 +210,8 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_cache_remove
 	kr_cache_remove_subtree
 	kr_cache_commit
+	# FIXME: perhaps rename this exported symbol
+	packet_ttl
 EOF
 
 
