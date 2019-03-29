@@ -18,6 +18,73 @@
 
 #include "daemon/worker.h"
 
+    static void stackDump (lua_State *L) {
+      int i;
+      int top = lua_gettop(L);
+      for (i = 1; i <= top; i++) {  /* repeat for each level */
+        int t = lua_type(L, i);
+        printf("%d  ", i);  /* put a separator */
+        switch (t) {
+    
+          case LUA_TSTRING:  /* strings */
+            printf("`%s'", lua_tostring(L, i));
+            break;
+    
+          case LUA_TBOOLEAN:  /* booleans */
+            printf(lua_toboolean(L, i) ? "true" : "false");
+            break;
+    
+          case LUA_TNUMBER:  /* numbers */
+            printf("%g", lua_tonumber(L, i));
+            break;
+    
+          default:  /* other values */
+            printf("%s", lua_typename(L, t));
+            break;
+    
+        }
+        printf("  ");  /* put a separator */
+      }
+      printf("\n");  /* end the listing */
+    }
+
+
+static int wrk_resolve_pkt(lua_State *L)
+{
+	stackDump(L);
+	struct worker_ctx *worker = wrk_luaget(L);
+	if (!worker) {
+		return 0;
+	}
+
+	// FIXME: merge with wrk_resolve
+	const struct kr_qflags options = {};
+	knot_pkt_t *pkt = *(knot_pkt_t **)lua_topointer(L, 1);
+	printf("%p\n", pkt);
+	if (!pkt)
+		lua_error_maybe(L, ENOMEM);
+
+	printf("%s\n", kr_pkt_text(pkt));
+
+	/* Create task and start with a first question */
+
+	struct qr_task *task = worker_resolve_start(worker, pkt, options);
+	if (!task) {
+		lua_error_p(L, "couldn't create a resolution request");
+	}
+
+	/* Add initialisation callback */
+	if (lua_isfunction(L, 2)) {
+		lua_pushvalue(L, 2);
+		lua_pushlightuserdata(L, worker_task_request(task));
+		(void) execute_callback(L, 1);
+	}
+
+	/* Start execution */
+	int ret = worker_resolve_exec(task, pkt);
+	lua_pushboolean(L, ret == 0);
+	return 1;
+}
 
 static int wrk_resolve(lua_State *L)
 {
@@ -148,6 +215,7 @@ int kr_bindings_worker(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
 		{ "resolve_unwrapped",  wrk_resolve },
+		{ "resolve_unwrapped_pkt",  wrk_resolve_pkt },
 		{ "stats",    wrk_stats },
 		{ NULL, NULL }
 	};

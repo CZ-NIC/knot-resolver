@@ -26,7 +26,8 @@
 
 
 /** Compute TTL for a packet.  Generally it's minimum TTL, with extra conditions. */
-static uint32_t packet_ttl(const knot_pkt_t *pkt, bool is_negative)
+KR_EXPORT
+uint32_t packet_ttl(const knot_pkt_t *pkt, bool is_negative)
 {
 	bool has_ttl = false;
 	uint32_t ttl = UINT32_MAX;

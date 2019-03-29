@@ -440,4 +440,5 @@ int zs_parse_record(zs_scanner_t *);
 int zs_set_input_file(zs_scanner_t *, const char *);
 int zs_set_input_string(zs_scanner_t *, const char *, size_t);
 const char *zs_strerror(const int);
+uint32_t packet_ttl(const knot_pkt_t *pkt, bool is_negative);
 ]]
