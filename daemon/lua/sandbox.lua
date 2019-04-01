@@ -308,7 +308,9 @@ function modules_load_lua(kr_module_ud)
 			if cb_name == 'begin' or cb_name == 'reset'
 					or cb_name == 'finish' or cb_name == 'answer_finalize' then
 				cb = function (ctx)
-					local succ, ret = pcall(cb_lua, ctx.state, ctx.req)
+					-- The last parameter was only passed for 'finish',
+					-- but other functions shouldn't be broken by that either.
+					local succ, ret = pcall(cb_lua, ctx.state, ctx.req, ctx.req.answer)
 					if succ then
 						return ret or ctx.state
 					else
