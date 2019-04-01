@@ -1,3 +1,4 @@
+local basexx = require('basexx')
 local ffi = require('ffi')
 
 function parse_pkt(input)
@@ -49,7 +50,8 @@ else
 	end
 
 	local function check_err(req, exp_status, desc)
-		local headers = req:go(5)  -- randomly chosen timeout
+		local headers, errmsg, errno = req:go(5)  -- TODO: randomly chosen timeout
+		print(errmsg, errno)
 		local got_status = headers:get(':status')
 		same(got_status, exp_status, desc)
 		print(got_status)  -- TODO
@@ -85,6 +87,13 @@ else
 		check_err(req, '413', 'too long POST finishes with 413')
 	end
 
+	local function test_get_long_input()
+		local req = assert(req_templ:clone())
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path', '/doh?dns=' .. basexx.to_url64(string.rep('s', 65536)))
+		check_err(req, '414', 'too long GET finishes with 414')
+	end
+
 	local function test_post_unparseable_input()
 		local req = assert(req_templ:clone())
 		req.headers:upsert(':method', 'POST')
@@ -115,6 +124,7 @@ else
 		-- test_doh_post,
 		test_post_short_input,
 		test_post_long_input,
+		test_get_long_input,
 		test_post_unparseable_input,
 		test_post_unsupp_type
 	}
