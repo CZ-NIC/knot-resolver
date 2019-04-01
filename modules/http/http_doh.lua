@@ -35,8 +35,26 @@ end
 
 -- Trace execution of DNS queries
 local function serve_doh(h, stream)
-	local path = h:get(':path')
-	local input = stream:get_body_as_string(10)  -- FIXME: timeout
+	local method = h:get(':method')
+	if method ~= 'POST' then
+		return 405, 'only HTTP post is supported'
+	end
+	local content_type = h:get('content-type') or 'application/dns-message'
+	if content_type ~= 'application/dns-message' then
+		return 415, 'only Content-Type: application/dns-message is supported'
+	end
+--	RFC 8484 section-4.1 allows us to ignore Accept header
+--	local accept = h:get('accept') or 'application/dns-message'
+--	if accept ~= 'application/dns-message' then
+--		return 406, 'only Accept: application/dns-message is supported'
+--	end
+
+	local input = stream:get_body_chars(65536, 10)  -- FIXME: timeout
+	if #input < 12 then
+		return 400, 'bad request: input too short'
+	elseif #input > 65535 then
+		return 413, 'bad request: input too long'
+	end
 	-- Output buffer
 	local output = ''
 
@@ -59,27 +77,22 @@ local function serve_doh(h, stream)
 		done = true
 	end
 
-	-- Resolve query
+	-- convert query to knot_pkt_t
 	local wire = ffi.cast("void *", input)
 	local pkt = ffi.C.knot_pkt_new(wire, #input, nil);
 	if not pkt then
-		output = 'shit happened in knot_pkt_new'
-	else
-		output = 'knot_pkt_new ok'
+		return 500, 'internal server error'
 	end
 
 	local result = ffi.C.knot_pkt_parse(pkt, 0)
-	if result > 0 then
-		output = output .. '\nshit in knot_pkt_parse'
-	else
-		output = output .. '\nknot_pkt_parse ok'
+	if result ~= 0 then
+		return 400, 'unparseable DNS message'
 	end
 	print(pkt)
-	print(output)
-	worker.resolve_pkt(pkt, finish_cb)
-	-- worker.resolve("www.nic.cz", 666, KNOT_CLASS_IN, NULL, finish_cb)
 
-	-- Wait for asynchronous query and free callbacks
+	-- resolve query
+	worker.resolve_pkt(pkt, finish_cb)
+	-- Wait for asynchronous query and free callbacks -- FIXME
 	if not done then
 		waiting = true
 		cond:wait()
