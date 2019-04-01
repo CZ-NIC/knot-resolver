@@ -5,7 +5,7 @@ py3_deps += [
   ['jinja2', 'jinja2 (for pytests)'],
   ['dns', 'dnspython (for pytests)'],
   ['pytest', 'pytest (for pytests)'],
-  #['pytest_html', 'pytest-html (for pytests)'],
+  ['pytest_html', 'pytest-html (for pytests)'],
   ['xdist', 'pytest-xdist (for pytests)'],
 ]
 
