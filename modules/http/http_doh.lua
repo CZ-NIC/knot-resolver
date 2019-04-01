@@ -1,3 +1,4 @@
+local basexx = require('basexx')
 local ffi = require('ffi')
 local condition = require('cqueues.condition')
 
@@ -35,10 +36,32 @@ end
 
 -- Trace execution of DNS queries
 local function serve_doh(h, stream)
+	local input
 	local method = h:get(':method')
-	if method ~= 'POST' then
-		return 405, 'only HTTP post is supported'
+	if method == 'POST' then
+		input = stream:get_body_chars(65536, 10)  -- FIXME: timeout
+	elseif method == 'GET' then
+		local input_b64 = string.match(h:get(':path'), '^/doh%?dns=([a-zA-Z0-9_-]+)$')
+		if not input_b64 then
+			return 400, 'base64url query not found'
+		end
+		if #input_b64 > 87380 then  -- base64url encode 65535
+			return 414, 'query parameter in URI too long'
+		end
+		input = basexx.from_url64(input_b64)
+		if not input then
+			return 400, 'invalid base64url'
+		end
+	else
+		return 405, 'only HTTP POST and GET are supported'
 	end
+
+	if #input < 12 then
+		return 400, 'input too short'
+	elseif #input > 65535 then
+		return 413, 'input too long'
+	end
+
 	local content_type = h:get('content-type') or 'application/dns-message'
 	if content_type ~= 'application/dns-message' then
 		return 415, 'only Content-Type: application/dns-message is supported'
@@ -49,12 +72,6 @@ local function serve_doh(h, stream)
 --		return 406, 'only Accept: application/dns-message is supported'
 --	end
 
-	local input = stream:get_body_chars(65536, 10)  -- FIXME: timeout
-	if #input < 12 then
-		return 400, 'bad request: input too short'
-	elseif #input > 65535 then
-		return 413, 'bad request: input too long'
-	end
 	-- Output buffer
 	local output = ''
 
@@ -65,7 +82,7 @@ local function serve_doh(h, stream)
 	local cond = condition.new()
 	local waiting, done = false, false
 	local finish_cb = function (answer, req)
-		print(tostring(answer))
+		print(tostring(answer))  -- FIXME
 
 		print('TTL: ', get_http_ttl(answer))
 
