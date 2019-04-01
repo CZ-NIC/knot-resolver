@@ -18,6 +18,7 @@ lua_mod_src += [
 
 config_tests += [
   ['http', files('http.test.lua')],
+  ['http.doh', files('http_doh.test.lua')],
   ['http.tls', files('test_tls/tls.test.lua')],
 ]
 
