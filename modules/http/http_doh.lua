@@ -8,6 +8,13 @@ local function get_http_ttl(pkt)
 	return ffi.C.packet_ttl(pkt, is_negative)
 end
 
+local function convert_sockaddr(family, ipaddr, port)
+	if not (family and ipaddr and port) then
+		panic('failed to obtain peer IP address')
+	end
+	return ffi.gc(ffi.C.kr_straddr_socket(ipaddr, port), ffi.C.free)
+end
+
 -- Trace execution of DNS queries
 local function serve_doh(h, stream)
 	local input
@@ -81,8 +88,14 @@ local function serve_doh(h, stream)
 	end
 	print(pkt)
 
+	-- set source address so filters can work
+	local function init_cb(req)
+		req.qsource.addr = convert_sockaddr(stream:peername())
+		req.qsource.dst_addr = convert_sockaddr(stream:localname())
+	end
+
 	-- resolve query
-	worker.resolve_pkt(pkt, finish_cb)
+	worker.resolve_pkt(pkt, finish_cb, init_cb)
 	-- Wait for asynchronous query and free callbacks -- FIXME
 	if not done then
 		waiting = true
