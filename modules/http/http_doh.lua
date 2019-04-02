@@ -3,35 +3,9 @@ local ffi = require('ffi')
 local condition = require('cqueues.condition')
 
 local function get_http_ttl(pkt)
-	-- minimum TTL from all RRs in ANSWER
-	if true then
-		local an_records = pkt:section(kres.section.ANSWER)
-		local is_negative = #an_records <= 0
-		return ffi.C.packet_ttl(pkt, is_negative)
-	end
-
-	-- garbage
-	if an_count > 0 then
-		local min_ttl = 4294967295
-		for i = 1, an_count do
-			local rr = an_records[i]
-			min_ttl = math.min(rr.ttl, min_ttl)
-		end
-		return min_ttl
-	end
-
-	-- no ANSWER records, try SOA
-	local auth_records = pkt:section(kres.section.AUTHORITY)
-	local auth_count = #auth_records
-	if auth_count > 0 then
-		for i = 1, an_count do
-			local rr = an_records[i]
-			if rr.type == kres.type.SOA then
-				knot_soa_minimum()
-			end
-		end
-		return 0  -- no SOA, uncacheable
-	end
+	local an_records = pkt:section(kres.section.ANSWER)
+	local is_negative = #an_records <= 0
+	return ffi.C.packet_ttl(pkt, is_negative)
 end
 
 -- Trace execution of DNS queries
@@ -73,7 +47,8 @@ local function serve_doh(h, stream)
 --	end
 
 	-- Output buffer
-	local output = ''
+	local output
+	local output_ttl
 
 	-- Wait for the result of the query
 	-- Note: We can't do non-blocking write to stream directly from resolve callbacks
@@ -84,8 +59,7 @@ local function serve_doh(h, stream)
 	local finish_cb = function (answer, req)
 		print(tostring(answer))  -- FIXME
 
-		print('TTL: ', get_http_ttl(answer))
-
+		output_ttl = get_http_ttl(answer)
 		-- binary output
 		output = ffi.string(answer.wire, answer.size)
 		if waiting then
@@ -119,7 +93,7 @@ local function serve_doh(h, stream)
 	if not done then
 		return 504, 'huh?'  -- FIXME
 	end
-	return output, nil, 'application/dns-message'
+	return output, nil, 'application/dns-message', output_ttl
 end
 
 -- Export endpoints
