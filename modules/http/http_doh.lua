@@ -70,7 +70,7 @@ local function serve_doh(h, stream)
 
 	-- convert query to knot_pkt_t
 	local wire = ffi.cast("void *", input)
-	local pkt = ffi.C.knot_pkt_new(wire, #input, nil);
+	local pkt = ffi.gc(ffi.C.knot_pkt_new(wire, #input, nil), ffi.C.knot_pkt_free)
 	if not pkt then
 		return 500, 'internal server error'
 	end
