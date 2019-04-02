@@ -174,6 +174,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_inaddr_family
 	kr_inaddr_len
 	kr_inaddr_str
+	kr_sockaddr_cmp
 	kr_sockaddr_len
 	kr_inaddr_port
 	kr_straddr_family

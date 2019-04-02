@@ -312,6 +312,7 @@ const char *kr_inaddr(const struct sockaddr *);
 int kr_inaddr_family(const struct sockaddr *);
 int kr_inaddr_len(const struct sockaddr *);
 int kr_inaddr_str(const struct sockaddr *, char *, size_t *);
+int kr_sockaddr_cmp(const struct sockaddr *, const struct sockaddr *);
 int kr_sockaddr_len(const struct sockaddr *);
 uint16_t kr_inaddr_port(const struct sockaddr *);
 int kr_straddr_family(const char *);
