@@ -178,6 +178,47 @@ else
 		check_err(req, '415', 'unsupported request content type finishes with 415')
 	end
 
+	local function test_dstaddr()
+		local triggered = false
+		local exp_dstaddr = ffi.gc(ffi.C.kr_straddr_socket(host, port), ffi.C.free)
+		local function check_dstaddr(state, req)
+			triggered = true
+			print(exp_dstaddr)
+			print(req.qsource.dst_addr)
+			same(ffi.C.kr_sockaddr_cmp(req.qsource.dst_addr, exp_dstaddr), 0,
+				'request has correct server address')
+			return state
+		end
+		policy.add(policy.suffix(check_dstaddr, policy.todnames({'dstaddr.test'})))
+		local desc = 'valid POST query has server address available in request'
+		local req = req_templ:clone()
+		req.headers:upsert(':method', 'POST')
+		req:set_body(basexx.from_base64(  -- dstaddr.test. A
+			'FnkBAAABAAAAAAAAB2RzdGFkZHIEdGVzdAAAAQAB'))
+		check_ok(req, desc)
+		ok(triggered, 'dstaddr policy was triggered')
+	end
+
+	local function test_srcaddr()
+		modules.load('view')
+		assert(view)
+		local policy_refuse = policy.suffix(policy.REFUSE, policy.todnames({'srcaddr.test.knot-resolver.cz'}))
+		-- these netmasks would not work if the request did not contain IP addresses
+		view:addr('0.0.0.0/0', policy_refuse)
+		view:addr('::/0', policy_refuse)
+
+		local desc = 'valid POST query has source address available in request'
+		local req = req_templ:clone()
+		req.headers:upsert(':method', 'POST')
+		req:set_body(basexx.from_base64(  -- srcaddr.test.knot-resolver.cz TXT
+			'QNQBAAABAAAAAAAAB3NyY2FkZHIEdGVzdA1rbm90LXJlc29sdmVyAmN6AAAQAAE'))
+		headers, pkt = check_ok(req, desc)
+		same(pkt:rcode(), kres.rcode.REFUSED, desc .. ': view module caught it')
+
+		modules.unload('view')
+	end
+
+
 --	not implemented
 --	local function test_post_unsupp_accept()
 --		local req = assert(req_templ:clone())
@@ -197,7 +238,9 @@ else
 		test_post_unsupp_type,
 		test_doh_servfail,
 		test_doh_nxdomain,
-		test_doh_noerror
+		test_doh_noerror,
+		test_dstaddr,
+		test_srcaddr
 	}
 
 	return tests
