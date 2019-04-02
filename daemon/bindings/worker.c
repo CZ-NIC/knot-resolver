@@ -14,6 +14,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "contrib/cleanup.h"
+
 #include "daemon/bindings/impl.h"
 
 #include "daemon/worker.h"
@@ -60,11 +62,11 @@ static int wrk_resolve_pkt(lua_State *L)
 	// FIXME: merge with wrk_resolve
 	const struct kr_qflags options = {};
 	knot_pkt_t *pkt = *(knot_pkt_t **)lua_topointer(L, 1);
-	printf("%p\n", pkt);
 	if (!pkt)
 		lua_error_maybe(L, ENOMEM);
 
-	printf("%s\n", kr_pkt_text(pkt));
+	auto_free char *debug = kr_pkt_text(pkt);
+	printf("%s\n", debug);
 
 	/* Create task and start with a first question */
 
