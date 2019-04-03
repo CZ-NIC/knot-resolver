@@ -92,6 +92,10 @@ local function serve_doh(h, stream)
 	local function init_cb(req)
 		req.qsource.addr = convert_sockaddr(stream:peername())
 		req.qsource.dst_addr = convert_sockaddr(stream:localname())
+		req.qsource.flags.tcp = true
+		req.qsource.flags.tls = (stream.connection:checktls() ~= nil)
+		print(req.qsource.flags.tls)
+		req.qsource.flags.http = true
 	end
 
 	-- resolve query
