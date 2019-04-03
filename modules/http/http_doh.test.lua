@@ -49,7 +49,7 @@ function parse_pkt(input, desc)
 end
 
 local function check_ok(req, desc)
-	local headers, stream, errno = req:go(5)  -- TODO: randomly chosen timeout
+	local headers, stream, errno = req:go(8)  -- randomly chosen timeout by tkrizek
 	if errno then
 		local errmsg = stream
 		nok(errmsg, desc .. ': ' .. errmsg)
@@ -63,7 +63,7 @@ local function check_ok(req, desc)
 end
 
 local function check_err(req, exp_status, desc)
-	local headers, errmsg, errno = req:go(5)  -- TODO: randomly chosen timeout
+	local headers, errmsg, errno = req:go(8)  -- randomly chosen timeout by tkrizek
 	if errno then
 		nok(errmsg, desc .. ': ' .. errmsg)
 		return
