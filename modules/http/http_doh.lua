@@ -64,8 +64,6 @@ local function serve_doh(h, stream)
 	local cond = condition.new()
 	local waiting, done = false, false
 	local finish_cb = function (answer, req)
-		print(tostring(answer))  -- FIXME
-
 		output_ttl = get_http_ttl(answer)
 		-- binary output
 		output = ffi.string(answer.wire, answer.size)
@@ -86,7 +84,6 @@ local function serve_doh(h, stream)
 	if result ~= 0 then
 		return 400, 'unparseable DNS message'
 	end
-	print(pkt)
 
 	-- set source address so filters can work
 	local function init_cb(req)
@@ -94,13 +91,11 @@ local function serve_doh(h, stream)
 		req.qsource.dst_addr = convert_sockaddr(stream:localname())
 		req.qsource.flags.tcp = true
 		req.qsource.flags.tls = (stream.connection:checktls() ~= nil)
-		print(req.qsource.flags.tls)
 		req.qsource.flags.http = true
 	end
 
 	-- resolve query
 	worker.resolve_pkt(pkt, finish_cb, init_cb)
-	-- Wait for asynchronous query and free callbacks -- FIXME
 	if not done then
 		waiting = true
 		cond:wait()
