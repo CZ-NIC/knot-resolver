@@ -45,7 +45,6 @@ function parse_pkt(input, desc)
 
 	local result = ffi.C.knot_pkt_parse(pkt, 0)
 	ok(result == 0, desc .. ': knot_pkt_parse works on received answer')
-	print(pkt)
 	return pkt
 end
 
@@ -199,8 +198,6 @@ else
 		local exp_dstaddr = ffi.gc(ffi.C.kr_straddr_socket(host, port), ffi.C.free)
 		local function check_dstaddr(state, req)
 			triggered = true
-			print(exp_dstaddr)
-			print(req.qsource.dst_addr)
 			same(ffi.C.kr_sockaddr_cmp(req.qsource.dst_addr, exp_dstaddr), 0,
 				'request has correct server address')
 			return state
