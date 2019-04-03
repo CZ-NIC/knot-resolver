@@ -1,6 +1,22 @@
 local basexx = require('basexx')
 local ffi = require('ffi')
 
+local function gen_huge_answer(_, req)
+	local qry = req:current()
+	local answer = req.answer
+	ffi.C.kr_pkt_make_auth_header(answer)
+
+	answer:rcode(kres.rcode.NOERROR)
+
+	-- 64k answer
+	answer:begin(kres.section.ANSWER)
+	answer:put('\4test\0', 300, answer:qclass(), kres.type.URI,
+		'\0\0\0\0' .. string.rep('0', 65000))
+	answer:put('\4test\0', 300, answer:qclass(), kres.type.URI,
+		'\0\0\0\0' .. 'done')
+	return kres.DONE
+end
+
 local function gen_varying_ttls(_, req)
 	local qry = req:current()
 	local answer = req.answer
@@ -212,12 +228,26 @@ else
 		req.headers:upsert(':method', 'POST')
 		req:set_body(basexx.from_base64(  -- srcaddr.test.knot-resolver.cz TXT
 			'QNQBAAABAAAAAAAAB3NyY2FkZHIEdGVzdA1rbm90LXJlc29sdmVyAmN6AAAQAAE'))
-		headers, pkt = check_ok(req, desc)
+		local headers, pkt = check_ok(req, desc)
 		same(pkt:rcode(), kres.rcode.REFUSED, desc .. ': view module caught it')
 
 		modules.unload('view')
 	end
 
+	-- RFC 8484 section 6 explicitly allows huge answers over HTTP
+	local function test_huge_answer()
+		local triggered = false
+		policy.add(policy.suffix(gen_huge_answer, policy.todnames({'huge.test'})))
+		local desc = 'POST query for a huge answer'
+		local req = req_templ:clone()
+		req.headers:upsert(':method', 'POST')
+		req:set_body(basexx.from_base64(  -- huge.test. URI, no EDNS
+			'HHwBAAABAAAAAAAABGh1Z2UEdGVzdAABAAAB'))
+		local headers, pkt = check_ok(req, desc)
+		same(pkt:rcode(), kres.rcode.NOERROR, desc .. ': rcode NOERROR')
+		same(pkt:tc(), false, desc .. ': no TC bit')
+		same(pkt:ancount(), 2, desc .. ': ANSWER contains both RRs')
+	end
 
 --	not implemented
 --	local function test_post_unsupp_accept()
@@ -240,7 +270,8 @@ else
 		test_doh_nxdomain,
 		test_doh_noerror,
 		test_dstaddr,
-		test_srcaddr
+		test_srcaddr,
+		test_huge_answer
 	}
 
 	return tests
