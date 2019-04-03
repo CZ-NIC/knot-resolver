@@ -14,46 +14,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "contrib/cleanup.h"
-
 #include "daemon/bindings/impl.h"
 
 #include "daemon/worker.h"
 
-    static void stackDump (lua_State *L) {
-      int i;
-      int top = lua_gettop(L);
-      for (i = 1; i <= top; i++) {  /* repeat for each level */
-        int t = lua_type(L, i);
-        printf("%d  ", i);  /* put a separator */
-        switch (t) {
-    
-          case LUA_TSTRING:  /* strings */
-            printf("`%s'", lua_tostring(L, i));
-            break;
-    
-          case LUA_TBOOLEAN:  /* booleans */
-            printf(lua_toboolean(L, i) ? "true" : "false");
-            break;
-    
-          case LUA_TNUMBER:  /* numbers */
-            printf("%g", lua_tonumber(L, i));
-            break;
-    
-          default:  /* other values */
-            printf("%s", lua_typename(L, t));
-            break;
-    
-        }
-        printf("  ");  /* put a separator */
-      }
-      printf("\n");  /* end the listing */
-    }
-
-
 static int wrk_resolve_pkt(lua_State *L)
 {
-	stackDump(L);
 	struct worker_ctx *worker = wrk_luaget(L);
 	if (!worker) {
 		return 0;
@@ -64,9 +30,6 @@ static int wrk_resolve_pkt(lua_State *L)
 	knot_pkt_t *pkt = *(knot_pkt_t **)lua_topointer(L, 1);
 	if (!pkt)
 		lua_error_maybe(L, ENOMEM);
-
-	auto_free char *debug = kr_pkt_text(pkt);
-	printf("%s\n", debug);
 
 	/* Create task and start with a first question */
 
