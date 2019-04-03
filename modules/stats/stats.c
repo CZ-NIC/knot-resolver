@@ -61,6 +61,8 @@
 	X(answer,aa) X(answer,tc) X(answer,rd) X(answer,ra) X(answer, ad) X(answer,cd) \
 	X(answer,edns0) X(answer,do) \
 	X(query,edns) X(query,dnssec) \
+	X(request,total) X(request,udp) X(request,tcp) \
+	X(request,dot) X(request,doh) X(request,internal) \
 	X(const,end)
 
 enum const_metric {
@@ -184,6 +186,33 @@ static int collect_rtt(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Advance ring buffer head */
 	data->upstreams.head = (data->upstreams.head + 1) % UPSTREAMS_COUNT;
+	return ctx->state;
+}
+
+static int collect_transport(kr_layer_t *ctx)
+{
+	struct kr_request *req = ctx->req;
+	struct kr_module *module = ctx->api->data;
+	struct stat_data *data = module->data;
+
+	stat_const_add(data, metric_request_total, 1);
+	if (req->qsource.dst_addr == NULL) {
+		stat_const_add(data, metric_request_internal, 1);
+		return ctx->state;
+	}
+
+	/**
+	 * Count each transport only once,
+	 * i.e. DoT does not count as TCP.
+	 */
+	if (req->qsource.flags.http)
+		stat_const_add(data, metric_request_doh, 1);
+	else if (req->qsource.flags.tls)
+		stat_const_add(data, metric_request_dot, 1);
+	else if (req->qsource.flags.tcp)
+		stat_const_add(data, metric_request_tcp, 1);
+	else
+		stat_const_add(data, metric_request_udp, 1);
 	return ctx->state;
 }
 
@@ -441,6 +470,7 @@ const kr_layer_api_t *stats_layer(struct kr_module *module)
 	static kr_layer_api_t _layer = {
 		.consume = &collect_rtt,
 		.finish = &collect,
+		.begin = &collect_transport,
 	};
 	/* Store module reference */
 	_layer.data = module;
