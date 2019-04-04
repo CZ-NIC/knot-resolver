@@ -466,7 +466,7 @@ int kr_bindings_cache(lua_State *L)
 		{ NULL, NULL }
 	};
 
-	register_lib(L, "cache", lib);
+	luaL_register(L, "cache", lib);
 	return 1;
 }
 

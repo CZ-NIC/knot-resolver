@@ -218,7 +218,7 @@ int kr_bindings_event(lua_State *L)
 		{ NULL, NULL }
 	};
 
-	register_lib(L, "event", lib);
+	luaL_register(L, "event", lib);
 	return 1;
 }
 

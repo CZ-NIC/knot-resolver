@@ -21,20 +21,6 @@
 #include <lua.h>
 #include <lauxlib.h>
 
-
-/** @internal Compatibility wrapper for Lua 5.0 - 5.2
-    https://www.lua.org/manual/5.2/manual.html#luaL_newlib
- */
-#if LUA_VERSION_NUM >= 502
-#define register_lib(L, name, lib) \
-	luaL_newlib((L), (lib))
-#else
-#define lua_rawlen(L, obj) \
-	lua_objlen((L), (obj))
-#define register_lib(L, name, lib) \
-	luaL_openlib((L), (name), (lib), 0)
-#endif
-
 /** Useful to stringify #defines into error strings. */
 #define STR(s) STRINGIFY_TOKEN(s)
 #define STRINGIFY_TOKEN(s) #s
