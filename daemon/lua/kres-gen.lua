@@ -233,6 +233,8 @@ struct kr_layer {
 	struct kr_request *req;
 	const struct kr_layer_api *api;
 	knot_pkt_t *pkt;
+	struct sockaddr *dst;
+	_Bool is_stream;
 };
 typedef struct kr_layer kr_layer_t;
 struct kr_layer_api {

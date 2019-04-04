@@ -200,13 +200,11 @@ static int l_ffi_layer_checkout(kr_layer_t *ctx, knot_pkt_t *pkt, struct sockadd
 	if (ctx->state & KR_STATE_FAIL) {
 		return ctx->state; /* Already failed, skip */
 	}
-	abort(); // FIXME
 	LAYER_FFI_CALL(ctx, checkout);
-	lua_pushlightuserdata(L, ctx->req);
-	lua_pushlightuserdata(L, pkt);
-	lua_pushlightuserdata(L, dst);
-	lua_pushboolean(L, type == SOCK_STREAM);
-	return l_ffi_call_layer(L, 5);
+	ctx->pkt = pkt;
+	ctx->dst = dst;
+	ctx->is_stream = (type == SOCK_STREAM);
+	return l_ffi_call_layer(L, 2);
 }
 
 static int l_ffi_layer_answer_finalize(kr_layer_t *ctx)
@@ -225,7 +223,9 @@ int ffimodule_init(lua_State *L)
 	/* for API: (int state, kr_request_t *req, knot_pkt_t *) */
 	lua_getglobal(L, "modules_ffi_layer_wrap2");
 	const int wrap2 = luaL_ref(L, LUA_REGISTRYINDEX);
-	if (wrap1 == LUA_REFNIL || wrap2 == LUA_REFNIL) {
+	lua_getglobal(L, "modules_ffi_layer_wrap_checkout");
+	const int wrap_checkout = luaL_ref(L, LUA_REGISTRYINDEX);
+	if (wrap1 == LUA_REFNIL || wrap2 == LUA_REFNIL || wrap_checkout == LUA_REFNIL) {
 		return kr_error(ENOENT);
 	}
 
@@ -235,7 +235,7 @@ int ffimodule_init(lua_State *L)
 		[SLOT_finish]  = wrap2,
 		[SLOT_consume] = wrap2,
 		[SLOT_produce] = wrap2,
-		[SLOT_checkout] = 0, // FIXME
+		[SLOT_checkout] = wrap_checkout,
 		[SLOT_answer_finalize] = wrap1,
 	};
 	memcpy(l_ffi_wrap_slots, slots, sizeof(l_ffi_wrap_slots));
