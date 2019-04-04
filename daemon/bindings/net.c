@@ -279,7 +279,7 @@ static int net_interfaces(lua_State *L)
 			buf[0] = '\0';
 		}
 		lua_pushstring(L, buf);
-		lua_rawseti(L, -2, lua_rawlen(L, -2) + 1);
+		lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
 		lua_setfield(L, -2, "addr");
 
 		/* Hardware address. */
@@ -1030,7 +1030,7 @@ int kr_bindings_net(lua_State *L)
 		{ "register_endpoint_kind", net_register_endpoint_kind },
 		{ NULL, NULL }
 	};
-	register_lib(L, "net", lib);
+	luaL_register(L, "net", lib);
 	return 1;
 }
 
