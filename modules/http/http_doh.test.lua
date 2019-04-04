@@ -2,7 +2,6 @@ local basexx = require('basexx')
 local ffi = require('ffi')
 
 local function gen_huge_answer(_, req)
-	local qry = req:current()
 	local answer = req.answer
 	ffi.C.kr_pkt_make_auth_header(answer)
 
@@ -225,7 +224,7 @@ else
 		req.headers:upsert(':method', 'POST')
 		req:set_body(basexx.from_base64(  -- srcaddr.test.knot-resolver.cz TXT
 			'QNQBAAABAAAAAAAAB3NyY2FkZHIEdGVzdA1rbm90LXJlc29sdmVyAmN6AAAQAAE'))
-		local headers, pkt = check_ok(req, desc)
+		local _, pkt = check_ok(req, desc)
 		same(pkt:rcode(), kres.rcode.REFUSED, desc .. ': view module caught it')
 
 		modules.unload('view')
@@ -233,14 +232,13 @@ else
 
 	-- RFC 8484 section 6 explicitly allows huge answers over HTTP
 	local function test_huge_answer()
-		local triggered = false
 		policy.add(policy.suffix(gen_huge_answer, policy.todnames({'huge.test'})))
 		local desc = 'POST query for a huge answer'
 		local req = req_templ:clone()
 		req.headers:upsert(':method', 'POST')
 		req:set_body(basexx.from_base64(  -- huge.test. URI, no EDNS
 			'HHwBAAABAAAAAAAABGh1Z2UEdGVzdAABAAAB'))
-		local headers, pkt = check_ok(req, desc)
+		local _, pkt = check_ok(req, desc)
 		same(pkt:rcode(), kres.rcode.NOERROR, desc .. ': rcode NOERROR')
 		same(pkt:tc(), false, desc .. ': no TC bit')
 		same(pkt:ancount(), 2, desc .. ': ANSWER contains both RRs')
