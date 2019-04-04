@@ -76,7 +76,6 @@ genResType "knot_rrset_t" | sed 's/\<owner\>/_owner/; s/\<ttl\>/_ttl/'
 printf "
 struct kr_module;
 typedef char *(kr_prop_cb)(void *, struct kr_module *, const char *);
-struct kr_layer;
 "
 
 ${CDEFS} ${LIBKRES} types <<-EOF
@@ -104,6 +103,7 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_cdb_stats
 	struct kr_cache
 	# lib/layer.h
+	struct kr_layer
 	kr_layer_t
 	struct kr_layer_api
 	kr_layer_api_t
