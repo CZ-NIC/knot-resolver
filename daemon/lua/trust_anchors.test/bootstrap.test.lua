@@ -60,7 +60,7 @@ end
 
 local host = 'https://localhost:8080/'
 -- avoid interference with configured keyfile_default
-trust_anchors.keyfile_default = nil
+trust_anchors.remove('.')
 
 local function test_err_cert()
 	trust_anchors.bootstrap_ca = 'x509/wrongca.pem'
@@ -84,6 +84,7 @@ end
 local function test_ok_xml(testname, testdesc)
 	return function()
 		trust_anchors.bootstrap_url = host .. testname .. '.xml'
+		trust_anchors.remove('.')
 		same(trust_anchors.add_file(testname .. '.keys'), nil, testdesc)
 	end
 end

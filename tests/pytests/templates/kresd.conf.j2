@@ -43,7 +43,8 @@ policy.add(policy.suffix(policy.PASS, {todname('test.')}))
 {% endif %}
 
 -- make sure DNSSEC is turned off for tests
-trust_anchors.keyfile_default = nil
+trust_anchors.remove('.')
+modules.unload("ta_update")
 modules.unload("ta_signal_query")
 modules.unload("priming")
 modules.unload("detect_time_skew")

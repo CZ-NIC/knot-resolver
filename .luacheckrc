@@ -1,22 +1,22 @@
 std = 'luajit'
 new_read_globals = {
+	'cache',
+	'event',
 	'help',
-	'quit',
+	'_hint_root_file',
 	'hostname',
+	'map',
+	'modules',
+	'net',
 	'package_version',
+	'quit',
+	'resolve',
+	'ta_update',
+	'todname',
+	'tojson',
 	'user',
 	'verbose',
-	'resolve',
-	'tojson',
-	'todname',
-	'map',
-	'net',
-	'cache',
-	'modules',
-	'trust_anchors',
 	'worker',
-	'event',
-	'_hint_root_file',
 	-- Sandbox declarations
 	'kB',
 	'MB',
@@ -31,7 +31,6 @@ new_read_globals = {
 	'warn',
 	'log',
 	'mode',
-	'trust_anchors',
 	'reorder_RR',
 	'option',
 	'env',
@@ -72,10 +71,10 @@ ignore = {
 }
 
 -- Sandbox can set global variables
-files['daemon/lua'].ignore = {'111', '121', '122'}
-files['daemon/lua/kres-gen.lua'].ignore = {'631'} -- Allow overly long lines
+files['**/daemon/lua'].ignore = {'111', '121', '122'}
+files['**/daemon/lua/kres-gen.lua'].ignore = {'631'} -- Allow overly long lines
 -- Tests and scripts can use global variables
 files['scripts'].ignore = {'111', '112', '113'}
 files['tests'].ignore = {'111', '112', '113'}
-files['modules/**/*.test.lua'].ignore = {'111', '112', '113', '121', '122'}
-files['daemon/**/*.test.lua'].ignore = {'111', '112', '113', '121', '122'}
+files['**/modules/**/*.test.lua'].ignore = {'111', '112', '113', '121', '122'}
+files['**/daemon/**/*.test.lua'].ignore = {'111', '112', '113', '121', '122'}

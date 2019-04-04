@@ -5,6 +5,23 @@ local C = ffi.C
 
 local trust_anchors -- the public pseudo-module, exported as global variable
 
+-- RFC5011 state table
+local key_state = {
+	Start = 'Start', AddPend = 'AddPend', Valid = 'Valid',
+	Missing = 'Missing', Revoked = 'Revoked', Removed = 'Removed'
+}
+
+local function upgrade_required(msg)
+	if msg then
+		msg = msg .. '\n'
+	else
+		msg = ''
+	end
+	panic('Configuration upgrade required: ' .. msg .. 'Please refer to ' ..
+		'https://knot-resolver.readthedocs.io/en/stable/upgrading.html')
+end
+
+-- TODO: Move bootstrap to a separate module or even its own binary
 -- Fetch over HTTPS with peert cert checked
 local function https_fetch(url, ca)
 	local ssl_ok, https = pcall(require, 'ssl.https')
@@ -14,11 +31,11 @@ local function https_fetch(url, ca)
 	end
 	local resp = {}
 	local r, c = https.request{
-	       url = url,
-	       cafile = ca,
-	       verify = {'peer', 'fail_if_no_peer_cert' },
-	       protocol = 'tlsv1_2',
-	       sink = ltn12.sink.table(resp),
+		url = url,
+		cafile = ca,
+		verify = {'peer', 'fail_if_no_peer_cert' },
+		protocol = 'tlsv1_2',
+		sink = ltn12.sink.table(resp),
 	}
 	if r == nil then return r, c end
 	return resp[1]
@@ -43,8 +60,8 @@ local function keydigest_is_valid(valid_from, valid_until)
 	local err = ffi.C.kr_strptime_diff(
 		format, time_now, time2utc(valid_from), time_diff)
 	if (err ~= nil) then
-	       error(string.format('failed to process "validFrom" constraint: %s',
-				   ffi.string(err)))
+		error(string.format('failed to process "validFrom" constraint: %s',
+			ffi.string(err)))
 	end
 	local from_ok = time_diff[0] > 0
 
@@ -55,7 +72,7 @@ local function keydigest_is_valid(valid_from, valid_until)
 			format, time_now, time2utc(valid_until), time_diff)
 		if (err ~= nil) then
 			error(string.format('failed to process "validUntil" constraint: %s',
-					    ffi.string(err)))
+				ffi.string(err)))
 		end
 		until_ok = time_diff[0] < 0
 	end
@@ -73,19 +90,19 @@ local function parse_xml_keydigest(attrs, inside, output)
 	local valid_attrs = {id = true, validFrom = true, validUntil = true}
 	for key, _ in pairs(fields) do
 		assert(valid_attrs[key],
-		       string.format('unsupported KeyDigest attribute "%s" found in "%s"',
-				     key, attrs))
+			string.format('unsupported KeyDigest attribute "%s" found in "%s"',
+				key, attrs))
 	end
 
 	_, n = string.gsub(inside, "<([%w]+).->([^<]+)</[%w]+>", function (k, v) fields[k] = v end)
 	assert(n >= 1,
 		string.format('error parsing KeyDigest XML elements from "%s"',
-			      inside))
+			inside))
 	local mandatory_elements = {'KeyTag', 'Algorithm', 'DigestType', 'Digest'}
 	for _, key in ipairs(mandatory_elements) do
 		assert(fields[key],
 			string.format('mandatory element %s is missing in "%s"',
-				      key, inside))
+				key, inside))
 	end
 	assert(n == 4, string.format('found %d elements but expected 4 in %s', n, inside))
 	table.insert(output, fields)  -- append to list of parsed keydigests
@@ -101,7 +118,7 @@ local function generate_ds(keydigests)
 			rrset = rrset .. '\n' .. rr
 		else
 			log('[ ta ] skipping trust anchor "%s" ' ..
-			    'because it is outside of validity range', rr)
+				'because it is outside of validity range', rr)
 		end
 	end
 	return rrset
@@ -113,8 +130,8 @@ local function assert_str_match(str, pattern, expected)
 		count = count + 1
 	end
 	assert(count == expected,
-	       string.format('expected %d occurences of "%s" but got %d in "%s"',
-			     expected, pattern, count, str))
+		string.format('expected %d occurences of "%s" but got %d in "%s"',
+			expected, pattern, count, str))
 end
 
 -- Fetch root anchors in XML over HTTPS, returning a zone-file-style string
@@ -145,181 +162,21 @@ local function bootstrap(url, ca)
 		return false, string.format('[ ta ] no valid trust anchors found at "%s"', url)
 	end
 	local msg = '[ ta ] Root trust anchors bootstrapped over https with pinned certificate.\n'
-			 .. '       You SHOULD verify them manually against original source:\n'
-			 .. '       https://www.iana.org/dnssec/files\n'
-			 .. '[ ta ] Current root trust anchors are:'
-			 .. rrset
+			.. '       You SHOULD verify them manually against original source:\n'
+			.. '       https://www.iana.org/dnssec/files\n'
+			.. '[ ta ] Bootstrapped root trust anchors are:'
+			.. rrset
 	return rrset, msg
 end
 
--- RFC5011 state table
-local key_state = {
-	Start = 'Start', AddPend = 'AddPend', Valid = 'Valid',
-	Missing = 'Missing', Revoked = 'Revoked', Removed = 'Removed'
-}
-
--- Find key in current keyset
-local function ta_find(keyset, rr)
-	local rr_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
-	assert(rr_tag >= 0 and rr_tag <= 65535, string.format('invalid RR: %s: %s',
-	       kres.rr2str(rr), ffi.string(C.knot_strerror(rr_tag))))
-	for i, ta in ipairs(keyset) do
-		-- Match key owner and content
-		local ta_tag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
-		assert(ta_tag >= 0 and ta_tag <= 65535, string.format('invalid RR: %s: %s',
-		       kres.rr2str(ta), ffi.string(C.knot_strerror(ta_tag))))
-		if ta.owner == rr.owner then
-			if ta.type == rr.type then
-				if rr.type == kres.type.DNSKEY then
-					if C.kr_dnssec_key_match(ta.rdata, #ta.rdata, rr.rdata, #rr.rdata) == 0 then
-						return ta
-					end
-				elseif rr.type == kres.type.DS and ta.rdata == rr.rdata then
-					return ta
-				end
-			-- DNSKEY superseding DS, inexact match
-			elseif rr.type == kres.type.DNSKEY and ta.type == kres.type.DS then
-				if ta.key_tag == rr_tag then
-					keyset[i] = rr -- Replace current DS
-					rr.state = ta.state
-					rr.key_tag = ta.key_tag
-					return rr
-				end
-			-- DS key matching DNSKEY, inexact match
-			elseif rr.type == kres.type.DS and ta.type == kres.type.DNSKEY then
-				if rr_tag == ta_tag then
-					return ta
-				end
-			end
-		end
-	end
-	return nil
+local function bootstrap_write(rrstr, filename)
+	local fname_tmp = filename .. '.lock.' .. tostring(worker.pid);
+	local file = assert(io.open(fname_tmp, 'w'))
+	file:write(rrstr)
+	file:close()
+	assert(os.rename(fname_tmp, filename))
 end
-
--- Evaluate TA status of a RR according to RFC5011.  The time is in seconds.
-local function ta_present(keyset, rr, hold_down_time, force_valid)
-	if rr.type == kres.type.DNSKEY and not C.kr_dnssec_key_ksk(rr.rdata) then
-		return false -- Ignore
-	end
-	-- Find the key in current key set and check its status
-	local now = os.time()
-	local key_revoked = (rr.type == kres.type.DNSKEY) and C.kr_dnssec_key_revoked(rr.rdata)
-	local key_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
-	assert(key_tag >= 0 and key_tag <= 65535, string.format('invalid RR: %s: %s',
-	       kres.rr2str(rr), ffi.string(C.knot_strerror(key_tag))))
-	local ta = ta_find(keyset, rr)
-	if ta then
-		-- Key reappears (KeyPres)
-		if ta.state == key_state.Missing then
-			ta.state = key_state.Valid
-			ta.timer = nil
-		end
-		-- Key is revoked (RevBit)
-		if ta.state == key_state.Valid or ta.state == key_state.Missing then
-			if key_revoked then
-				ta.state = key_state.Revoked
-				ta.timer = now + hold_down_time
-			end
-		end
-		-- Remove hold-down timer expires (RemTime)
-		if ta.state == key_state.Revoked and os.difftime(ta.timer, now) <= 0 then
-			ta.state = key_state.Removed
-			ta.timer = nil
-		end
-		-- Add hold-down timer expires (AddTime)
-		if ta.state == key_state.AddPend and os.difftime(ta.timer, now) <= 0 then
-			ta.state = key_state.Valid
-			ta.timer = nil
-		end
-		if rr.state ~= key_state.Valid or verbose() then
-			log('[ ta ] key: ' .. key_tag .. ' state: '..ta.state)
-		end
-		return true
-	elseif not key_revoked then -- First time seen (NewKey)
-		rr.key_tag = key_tag
-		if force_valid then
-			rr.state = key_state.Valid
-		else
-			rr.state = key_state.AddPend
-			rr.timer = now + hold_down_time
-		end
-		if rr.state ~= key_state.Valid or verbose() then
-			log('[ ta ] key: ' .. key_tag .. ' state: '..rr.state)
-		end
-		table.insert(keyset, rr)
-		return true
-	end
-	return false
-end
-
--- TA is missing in the new key set.  The time is in seconds.
-local function ta_missing(ta, hold_down_time)
-	-- Key is removed (KeyRem)
-	local keep_ta = true
-	local key_tag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
-	assert(key_tag >= 0 and key_tag <= 65535, string.format('invalid RR: %s: %s',
-	       kres.rr2str(ta), ffi.string(C.knot_strerror(key_tag))))
-	if ta.state == key_state.Valid then
-		ta.state = key_state.Missing
-		ta.timer = os.time() + hold_down_time
-
-	-- Remove key that is missing for too long
-	elseif ta.state == key_state.Missing and os.difftime(ta.timer, os.time()) <= 0 then
-		ta.state = key_state.Removed
-		log('[ ta ] key: '..key_tag..' removed because missing for too long')
-		keep_ta = false
-
-	-- Purge pending key
-	elseif ta.state == key_state.AddPend then
-		log('[ ta ] key: '..key_tag..' purging')
-		keep_ta = false
-	end
-	log('[ ta ] key: '..key_tag..' state: '..ta.state)
-	return keep_ta
-end
-
-local active_refresh, update -- forwards
-
--- Plan an event for refreshing the root DNSKEYs and re-scheduling itself
-local function refresh_plan(keyset, delay, is_initial)
-	local owner_str = kres.dname2str(keyset.owner) -- maybe fix converting back and forth?
-	keyset.refresh_ev = event.after(delay, function ()
-		resolve(owner_str, kres.type.DNSKEY, kres.class.IN, 'NO_CACHE',
-		function (pkt)
-			-- Schedule itself with updated timeout
-			local delay_new = active_refresh(keyset, kres.pkt_t(pkt), is_initial)
-			delay_new = keyset.refresh_time or trust_anchors.refresh_time or delay_new
-			log('[ ta ] next refresh for ' .. owner_str .. ' in '
-					.. delay_new/hour .. ' hours')
-			refresh_plan(keyset, delay_new)
-		end)
-	end)
-end
-
--- Refresh the DNSKEYs from the packet, and return time to the next check.
-active_refresh = function (keyset, pkt, is_initial)
-	local retry = true
-	if pkt:rcode() == kres.rcode.NOERROR then
-		local records = pkt:section(kres.section.ANSWER)
-		local new_keys = {}
-		for _, rr in ipairs(records) do
-			if rr.type == kres.type.DNSKEY then
-				table.insert(new_keys, rr)
-			end
-		end
-		update(keyset, new_keys, is_initial)
-		retry = false
-	else
-		warn('[ ta ] active refresh failed for ' .. kres.dname2str(keyset.owner)
-				.. ' with rcode: ' .. pkt:rcode())
-	end
-	-- Calculate refresh/retry timer (RFC 5011, 2.3)
-	local min_ttl = retry and day or 15 * day
-	for _, rr in ipairs(keyset) do -- 10 or 50% of the original TTL
-		min_ttl = math.min(min_ttl, (retry and 100 or 500) * rr.ttl)
-	end
-	return math.max(hour, min_ttl)
-end
+-- Bootstrap end
 
 -- Update ta.comment and return decorated line representing the RR
 -- This is meant to be in zone-file format.
@@ -335,7 +192,9 @@ end
 
 -- Write keyset to a file.  States and timers are stored in comments.
 local function keyset_write(keyset)
-	if not keyset.filename then return false end -- not to be persisted
+	if not keyset.managed then  -- not to be persistent, this is an error!
+		panic('internal error: keyset_write called for an unmanaged TA')
+	end
 	local fname_tmp = keyset.filename .. '.lock.' .. tostring(worker.pid);
 	local file = assert(io.open(fname_tmp, 'w'))
 	for i = 1, #keyset do
@@ -428,7 +287,7 @@ local function keyset_read(path, str)
 	for _, ta in ipairs(tas) do
 		if ta.owner ~= owner then
 			return nil, string.format("do not mix %s and %s TAs in single file/string",
-							kres.dname2str(ta.owner), kres.dname2str(owner))
+				kres.dname2str(ta.owner), kres.dname2str(owner))
 		end
 	end
 	tas.owner = owner
@@ -456,100 +315,41 @@ local function keyset_publish(keyset)
 	end
 	if count == 0 then
 		warn('[ ta ] ERROR: no anchors are trusted for ' ..
-		     kres.dname2str(keyset.owner) .. ' !')
+			kres.dname2str(keyset.owner) .. ' !')
 	end
 	return count > 0 and not has_error
 end
 
-
--- Update existing keyset; return true if successful.
--- Param `is_initial` (bool): force .NewKey states to .Valid, i.e. init empty keyset.
-update = function (keyset, new_keys, is_initial)
-	if not new_keys then return false end
-
-	-- Filter TAs to be purged from the keyset (KeyRem), in three steps
-	-- 1: copy TAs to be kept to `keepset`
-	local hold_down = (keyset.hold_down_time or trust_anchors.hold_down_time) / 1000
-	local keepset = {}
-	local keep_removed = keyset.keep_removed or trust_anchors.keep_removed
-	for _, ta in ipairs(keyset) do
-		local keep = true
-		if not ta_find(new_keys, ta) then
-			-- Ad-hoc: RFC 5011 doesn't mention removing a Missing key.
-			-- Let's do it after a very long period has elapsed.
-			keep = ta_missing(ta, hold_down * 4)
+local function add_file(path, unmanaged)
+	local managed = not unmanaged
+	if managed then
+		if not ta_update then
+			panic('[ ta ] automatic update for ' .. path .. ' requested, '
+				.. 'but required module ta_update is not loaded')
 		end
-		-- Purge removed keys
-		if ta.state == key_state.Removed then
-			if keep_removed > 0 then
-				keep_removed = keep_removed - 1
-			else
-				keep = false
-			end
-		end
-		if keep then
-			table.insert(keepset, ta)
-		end
-	end
-	-- 2: remove all TAs - other settings etc. will remain in the keyset
-	for i, _ in ipairs(keyset) do
-		keyset[i] = nil
-	end
-	-- 3: move TAs to be kept into the keyset (same indices)
-	for k, ta in pairs(keepset) do
-		keyset[k] = ta
-	end
-
-	-- Evaluate new TAs
-	for _, rr in ipairs(new_keys) do
-		if (rr.type == kres.type.DNSKEY or rr.type == kres.type.DS) and rr.rdata ~= nil then
-			ta_present(keyset, rr, hold_down, is_initial)
-		end
-	end
-
-	-- Store the keyset
-	keyset_write(keyset)
-
-	-- Start using the new TAs.
-	if not keyset_publish(keyset) then
-		-- TODO: try to rebootstrap if for root?
-		return false
-	elseif verbose() then
-		log('[ ta ] refreshed trust anchors for domain ' .. kres.dname2str(keyset.owner) .. ' are:\n'
-		    .. trust_anchors.summary(keyset.owner))
-	end
-
-	return true
-end
-
-local add_file = function (path, unmanaged)
-	if not unmanaged then
 		if not io.open(path .. '.lock', 'w') then
 			error("[ ta ] ERROR: write access needed to keyfile dir '"..path.."'")
 		end
 		os.remove(path .. ".lock")
 	end
 
-	-- Bootstrap if requested and keyfile doesn't exist
-	if not unmanaged and not io.open(path, 'r') then
+	-- Bootstrap TA for root zone if keyfile doesn't exist
+	if managed and not io.open(path, 'r') then
+		if trust_anchors.keysets['\0'] then
+			error(string.format(
+				"[ ta ] keyfile '%s' doesn't exist and root key is already installed, "
+				.. "cannot bootstrap; provide a path to valid file with keys", path))
+		end
 		log("[ ta ] keyfile '%s': doesn't exist, bootstrapping", path);
-		local tas, msg = bootstrap(trust_anchors.bootstrap_url, trust_anchors.bootstrap_ca)
-		if not tas then
+		local rrstr, msg = bootstrap(trust_anchors.bootstrap_url, trust_anchors.bootstrap_ca)
+		if not rrstr then
 			msg = msg .. '\n'
 				.. '[ ta ] Failed to bootstrap root trust anchors!'
 			error(msg)
 		end
 		print(msg)
-		trust_anchors.add(tas)
-		-- Fetch DNSKEY immediately
-		local keyset = trust_anchors.keysets['\0']
-		keyset.filename = path
-		if keyset.refresh_ev then event.cancel(keyset.refresh_ev) end
-		refresh_plan(keyset, 0, true)
-		return
-	end
-	if not unmanaged and path == (trust_anchors.keysets['\0'] or {}).filename then
-		return
+		bootstrap_write(rrstr, path)
+		-- continue as if the keyfile was there
 	end
 
 	-- Parse the file and check its sanity
@@ -557,25 +357,45 @@ local add_file = function (path, unmanaged)
 	if not keyset then
 		panic("[ ta ] ERROR: failed to read anchors from '%s' (%s)", path, err)
 	end
-	if not unmanaged then keyset.filename = path end
+	keyset.filename = path
+	keyset.managed = managed
 
 	local owner = keyset.owner
 	local owner_str = kres.dname2str(owner)
-	if trust_anchors.keysets[owner] then
+	local keyset_orig = trust_anchors.keysets[owner]
+	if keyset_orig then
 		warn('[ ta ] warning: overriding previously set trust anchors for ' .. owner_str)
-		local refresh_ev = trust_anchors.keysets[owner].refresh_ev
-		if refresh_ev then event.cancel(refresh_ev) end
+		if keyset_orig.managed and ta_update then
+			ta_update.stop(owner)
+		end
 	end
 	trust_anchors.keysets[owner] = keyset
 
 	-- Replace the TA store used for validation
 	if keyset_publish(keyset) and verbose() then
 		log('[ ta ] installed trust anchors for domain ' .. owner_str .. ' are:\n'
-		    .. trust_anchors.summary(owner))
+			.. trust_anchors.summary(owner))
 	end
 	-- TODO: if failed and for root, try to rebootstrap?
 
-	if not unmanaged then refresh_plan(keyset, 10 * sec, false) end
+	if managed then
+		ta_update.start(owner)
+	end
+end
+
+local function remove(zname)
+	local owner = kres.str2dname(zname)
+	if not trust_anchors.keysets[owner] then
+		return false
+	end
+
+	if ta_update then
+		ta_update.stop(owner)
+	end
+	trust_anchors.keysets[owner] = nil
+	local store = kres.context().trust_anchors
+	C.kr_ta_del(store, owner)
+	return true
 end
 
 local function ta_str(owner)
@@ -609,25 +429,24 @@ trust_anchors = {
 	--   - owner - that dname (for simplicity)
 	--   - [optional] filename in which to persist the state,
 	--     implying unmanaged TA if nil
-	--   - [optional] overrides for global defaults of
-	--     hold_down_time, refresh_time, keep_removed
 	-- The RR tables also contain some additional TA-specific fields.
 	keysets = {},
 
 	-- Documented properties:
 	insecure = {},
-	hold_down_time = 30 * day,
-	refresh_time = nil,
-	keep_removed = 0,
 
 	bootstrap_url = 'https://data.iana.org/root-anchors/root-anchors.xml',
 	bootstrap_ca = '@etc_dir@/icann-ca.pem',
-	keyfile_default = '@keyfile_default@',
 
 	-- Load keys from a file, 5011-managed by default.
 	-- If managed and the file doesn't exist, try bootstrapping the root into it.
 	add_file = add_file,
-	config = add_file,
+	config = function() upgrade_required('trust_anchors.config was removed, use trust_anchors.add_file()') end,
+	remove = remove,
+
+	keyset_publish = keyset_publish,
+	keyset_write = keyset_write,
+	key_state = key_state,
 
 	-- Add DS/DNSKEY record(s) (unmanaged)
 	add = function (keystr)
@@ -638,15 +457,15 @@ trust_anchors = {
 			local keyset_orig = trust_anchors.keysets[owner]
 			-- Set up trust_anchors.keysets[owner]
 			if keyset_orig then
+				if keyset_orig.managed then
+					panic('[ ta ] it is impossible to add an unmanaged TA for zone '
+						.. owner_str .. ' which already has a managed TA')
+				end
 				warn('[ ta ] warning: extending previously set trust anchors for '
 						.. owner_str)
 				for _, ta in ipairs(keyset) do
 					table.insert(keyset_orig, ta)
 				end
-				-- we might also add more warning if it's managed, i.e. has .filename,
-				-- as the next update would overwrite this additional TA
-			else
-				trust_anchors.keysets[owner] = keyset
 			end
 			-- Replace the TA store used for validation
 			if not keyset_publish(keyset) then
@@ -654,6 +473,9 @@ trust_anchors = {
 				-- trust_anchors.keysets[owner] was already updated to the
 				-- (partially) failing state, but I'm not sure how much to improve this
 			end
+			keyset.managed = false
+			trust_anchors.keysets[owner] = keyset
+
 		end
 		if verbose() or err then log('New TA state:\n' .. trust_anchors.summary()) end
 		if err then
@@ -703,11 +525,15 @@ trust_anchors = {
 
 -- Syntactic sugar for TA store
 setmetatable(trust_anchors, {
-	__newindex = function (t,k,v)
-	if     k == 'file' then t.config(v)
-	elseif k == 'negative' then t.set_insecure(v)
-	else   rawset(t, k, v) end
-	end,
+       __newindex = function (t,k,v)
+       if     k == 'file' then
+	       upgrade_required('trust_anchors.file was removed, use trust_anchors.add_file()')
+       elseif k == 'negative' then
+	       upgrade_required('trust_anchors.negative was removed, use trust_anchors.set_insecure()')
+       elseif k == 'keyfile_default' then
+	       upgrade_required('trust_anchors.keyfile_default is now compiled in, see trust_anchors.remove()')
+       else   rawset(t, k, v) end
+       end,
 })
 
 return trust_anchors

@@ -1,11 +1,30 @@
-net = { '{{SELF_ADDR}}' }
--- hints.root({['k.root-servers.net'] = '{{ROOT_ADDR}}'})
+{% for TAF in TRUST_ANCHOR_FILES %}
+trust_anchors.add_file('{{TAF}}')
+{% endfor %}
+
+{% raw %}
+
+-- Disable RFC8145 signaling, scenario doesn't provide expected answers
+if ta_signal_query then
+        modules.unload('ta_signal_query')
+end
+
+-- Disable RFC8109 priming, scenario doesn't provide expected answers
+if priming then
+        modules.unload('priming')
+end
+
+-- Disable this module because it make one priming query
+if detect_time_skew then
+        modules.unload('detect_time_skew')
+end
+
 _hint_root_file('hints')
-
--- make sure DNSSEC is turned off for tests
-trust_anchors.keyfile_default = nil
-
 cache.size = 2*MB
+verbose(true)
+{% endraw %}
+
+net = { '{{SELF_ADDR}}' }
 
 
 {% if QMIN == "false" %}
@@ -14,29 +33,6 @@ option('NO_MINIMIZE', true)
 option('NO_MINIMIZE', false)
 {% endif %}
 
-{% if DO_NOT_QUERY_LOCALHOST == "false" %}
-option('ALLOW_LOCAL', true)
-{% else %}
-option('ALLOW_LOCAL', false)
-{% endif %}
-
-{% if HARDEN_GLUE == "true" %}
-mode('normal')
-{% else %}
-mode('permissive')
-{% endif %}
-
-{% for TAF in TRUST_ANCHOR_FILES %}
-trust_anchors.add_file('{{TAF}}')
-{% endfor %}
-trust_anchors.set_insecure({
-
-{% for DI in NEGATIVE_TRUST_ANCHORS %}
-"{{DI}}",
-{% endfor %}
-})
-
-verbose(true)
 
 -- Self-checks on globals
 assert(help() ~= nil)

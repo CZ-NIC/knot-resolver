@@ -15,9 +15,33 @@ Users
 
 * DNSSEC validation is now turned on by default. If you need to disable it, see
   :ref:`dnssec-config`.
+* ``-k/--keyfile`` and ``-K/--keyfile-ro`` daemon options were removed. If needed,
+  use ``trust_anchors.add_file()`` in configuration file instead.
 * In case you are using your own custom modules, move them to the new module
   location. The exact location depends on your distribution. Generally, modules previously
   in ``/usr/lib/kdns_modules`` should be moved to ``/usr/lib/knot-resolver/kres_modules``.
+
+Configuration
+~~~~~~~~~~~~~
+
+* ``trust_anchors.file``, ``trust_anchors.config()`` and ``trust_anchors.negative``
+  aliases were removed to avoid duplicity
+
+  .. csv-table::
+     :header: "3.x configuration", "4.x configuration"
+
+     "``trust_anchors.file = path``", "``trust_anchors.add_file(path)``"
+     "``trust_anchors.config(path, readonly)``", "``trust_anchors.add_file(path, readonly)``"
+     "``trust_anchors.negative = nta_set``", "``trust_anchors.set_insecure(nta_set)``"
+
+* ``trust_anchors.keyfile_default`` is no longer accessible and is only possible to set
+  at compile time. To turn off DNSSEC, use ``trust_anchors.remove('.')``.
+
+  .. csv-table::
+     :header: "3.x configuration", "4.x configuration"
+
+     "``trust_anchors.keyfile_default = nil``", "``trust_anchors.remove('.')``"
+
 
 Packagers & Developers
 ----------------------

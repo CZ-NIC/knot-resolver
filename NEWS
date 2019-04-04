@@ -5,6 +5,9 @@ Incompatible changes
 --------------------
 - see upgrading guide:
   https://knot-resolver.readthedocs.io/en/v4.0.0/upgrading.html#upgrade-from-3-to-4
+- configuration: trust_anchors aliases .file, .config() and .negative were removed (!788)
+- configuration: trust_anchors.keyfile_default is no longer accessible (!788)
+- daemon: -k/--keyfile and -K/--keyfile-ro options were removed
 - meson build system is now used for builds (!771)
 - build with embedded LMBD is no longer supported
 - default modules dir location has changed
@@ -33,6 +36,7 @@ Bugfixes
 - policy.RPZ: log problems from zone-file level of parser as well (#453)
 - fix flushing of messages to logs in some cases (!781)
 - fix fallback when SERVFAIL or REFUSED is received from upstream (!784)
+- fix crash when dealing with unknown TA key algorhitm (#449)
 
 Module API changes
 ------------------
