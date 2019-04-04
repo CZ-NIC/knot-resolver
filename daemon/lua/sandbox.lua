@@ -389,12 +389,8 @@ local function make_sandbox(defined)
 end
 
 -- Compatibility sandbox
-if setfenv then -- Lua 5.1 and less
-	_G = make_sandbox(getfenv(0))
-	setfenv(0, _G)
-else -- Lua 5.2+
-	_SANDBOX = make_sandbox(_ENV)
-end
+_G = make_sandbox(getfenv(0))
+setfenv(0, _G)
 
 -- Load embedded modules
 trust_anchors = require('trust_anchors')

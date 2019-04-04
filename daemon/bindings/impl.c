@@ -49,24 +49,13 @@ int kr_bindings_modules (lua_State *L); /* ./modules.c */
 int kr_bindings_net     (lua_State *L); /* ./net.c     */
 int kr_bindings_worker  (lua_State *L); /* ./worker.c  */
 
-
-static void lualib(lua_State *L, const char *name, lua_CFunction lib_cb)
-{
-#if LUA_VERSION_NUM >= 502
-	luaL_requiref(L, name, lib_cb, 1);
-	lua_pop(L, 1);
-#else
-	lib_cb(L);
-#endif
-}
-
 void kr_bindings_register(lua_State *L)
 {
-	lualib(L, "modules", kr_bindings_modules);
-	lualib(L, "net",     kr_bindings_net);
-	lualib(L, "cache",   kr_bindings_cache);
-	lualib(L, "event",   kr_bindings_event);
-	lualib(L, "worker",  kr_bindings_worker);
+	kr_bindings_cache(L);
+	kr_bindings_event(L);
+	kr_bindings_modules(L);
+	kr_bindings_net(L);
+	kr_bindings_worker(L);
 }
 
 void lua_error_p(lua_State *L, const char *fmt, ...)

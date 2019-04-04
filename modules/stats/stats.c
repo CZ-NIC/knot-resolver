@@ -36,11 +36,6 @@
 #include "lib/layer.h"
 #include "lib/resolve.h"
 
-/** @internal Compatibility wrapper for Lua < 5.2 */
-#if LUA_VERSION_NUM < 502
-#define lua_rawlen(L, obj) lua_objlen((L), (obj))
-#endif
-
 /* Defaults */
 #define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "stat",  __VA_ARGS__)
 #define FREQUENT_PSAMPLE  10 /* Sampling rate, 1 in N */
