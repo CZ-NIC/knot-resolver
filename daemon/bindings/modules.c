@@ -85,7 +85,7 @@ int kr_bindings_modules(lua_State *L)
 		{ NULL, NULL }
 	};
 
-	register_lib(L, "modules", lib);
+	luaL_register(L, "modules", lib);
 	return 1;
 }
 
