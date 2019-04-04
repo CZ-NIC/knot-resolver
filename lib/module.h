@@ -49,19 +49,26 @@ typedef uint32_t (module_api_cb)(void);
 struct kr_module {
 	char *name;
 
-	/** Constructor.  Called after loading the module.  @return error code. */
+	/** Constructor.  Called after loading the module.  @return error code.
+	 * Lua API: not populated, called via lua directly. */
 	int (*init)(struct kr_module *self);
+
 	/** Destructor.  Called before unloading the module.  @return error code. */
 	int (*deinit)(struct kr_module *self);
-	/** Configure with encoded JSON (NULL if missing).  @return error code. */
+
+	/** Configure with encoded JSON (NULL if missing).  @return error code.
+	 * Lua API: not used and not useful (from C). */
 	int (*config)(struct kr_module *self, const char *input);
+
 	/** Packet processing API specs.  May be NULL.  See docs on that type. */
 	const kr_layer_api_t *layer;
-	/** List of properties.  May be NULL.  Terminated by { NULL, NULL, NULL }. */
+
+	/** List of properties.  May be NULL.  Terminated by { NULL, NULL, NULL }.
+	 * Lua API: not used and not useful (from C). */
 	const struct kr_prop *props;
 
-	void *lib;      /**< Shared library handle or RTLD_DEFAULT */
-	void *data;     /**< Custom data context. */
+	void *lib;  /**< Shared library handle or RTLD_DEFAULT; NULL for lua modules. */
+	void *data; /**< Custom data context. */
 };
 
 /**
@@ -99,6 +106,7 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
  * Unload module instance.
  *
  * @param module module structure
+ * @note currently used even for lua modules
  */
 KR_EXPORT
 void kr_module_unload(struct kr_module *module);

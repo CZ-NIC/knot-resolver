@@ -607,7 +607,7 @@ int engine_init(struct engine *engine, knot_mm_t *pool)
 static void engine_unload(struct engine *engine, struct kr_module *module)
 {
 	auto_free char *name = strdup(module->name);
-	kr_module_unload(module);
+	kr_module_unload(module); /* beware: lua/C mix, could be confusing */
 	/* Clear in Lua world, but not for embedded modules ('cache' in particular). */
 	if (name && !kr_module_get_embedded(name)) {
 		lua_pushnil(engine->L);
@@ -766,6 +766,7 @@ static size_t module_find(module_array_t *mod_list, const char *name)
 int engine_register(struct engine *engine, const char *name, const char *precedence, const char* ref)
 {
 	if (engine == NULL || name == NULL) {
+		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
 	/* Make sure module is unloaded */
@@ -784,33 +785,42 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 	if (!module) {
 		return kr_error(ENOMEM);
 	}
-	module->data = engine;
+	module->data = engine; /* FIXME: rewriting this, etc. */
+
 		/* TODO: tidy and comment this section. */
 	int ret = kr_module_load(module, name, LIBDIR "/kres_modules");
-	if (ret == kr_ok()) {
+	if (ret == 0) { /* We have a C module, loaded and init() was called. */
 		lua_getglobal(engine->L, "modules_create_table_for_c");
 		lua_pushpointer(engine->L, module);
 		if (engine_pcall(engine->L, 1) != 0) {
+			kr_log_error("[system] internal error: %s\n",
+					lua_tostring(engine->L, -1));
 			lua_pop(engine->L, 1);
+			ret = kr_error(1);
+			assert(false); /* probably not critical, but weird */
 		}
-	}
-	/* Load Lua module if not a binary */
-	if (ret == kr_error(ENOENT)) {
+
+	} else if (ret == kr_error(ENOENT)) {
+		/* Try to load and .init() the lua module. */
 		ret = ffimodule_register_lua(engine, module, name);
+		if (ret != 0) {
+			kr_log_error("[system] failed to load module '%s'\n", name);
+		}
+
 	} else if (ret == kr_error(ENOTSUP)) {
 		/* Print a more helpful message when module is linked against an old resolver ABI. */
-		fprintf(stderr, "[system] module '%s' links to unsupported ABI, please rebuild it\n", name);
+		kr_log_error("[system] module '%s' links to unsupported ABI, please rebuild it\n", name);
 	}
 	if (ret != 0) {
 		free(module);
 		return ret;
 	}
 
+	/* Push to the right place in engine->modules */
 	if (array_push(engine->modules, module) < 0) {
 		engine_unload(engine, module);
 		return kr_error(ENOMEM);
 	}
-	/* Evaluate precedence operator */
 	if (precedence) {
 		struct kr_module **arr = mod_list->at;
 		size_t emplacement = mod_list->len;

@@ -258,6 +258,10 @@ modules_ffi_layer_wrap_checkout = function (layer_cb, ctx_udata)
 	local ctx = ffi.cast('kr_layer_t **', ctx_udata)[0]
 	return layer_cb(ctx.state, ctx.req, ctx.pkt, ctx.dst, ctx.is_stream)
 end
+modules_ffi_wrap_modcb = function (cb, kr_module_ud) -- this one isn't for layer
+	local kr_module = ffi.cast('struct kr_module **', kr_module_ud)[0]
+	return cb(kr_module)
+end
 
 cache.clear = function (name, exact_name, rr_type, chunk_size, callback, prev_state)
 	if name == nil or (name == '.' and not exact_name) then
