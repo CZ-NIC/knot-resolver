@@ -48,6 +48,7 @@ Now you can reach the web services and APIs, done!
 	$ curl -k https://localhost:8053
 	$ curl -k https://localhost:8053/stats
 
+.. _mod-http-tls:
 
 Configuring TLS
 ^^^^^^^^^^^^^^^
@@ -97,6 +98,7 @@ The HTTP module has several built-in services to use.
  "``/stats``", "Statistics/metrics", "Exported metrics in JSON."
  "``/metrics``", "Prometheus metrics", "Exported metrics for Prometheus_"
  "``/trace/:name/:type``", "Tracking", "Trace resolution of the query and return the verbose logs."
+ "``/doh``", "DNS-over-HTTP", ":rfc:`8484` endpoint, see :ref:`mod-http-doh`."
 
 Enabling Prometheus metrics endpoint
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
