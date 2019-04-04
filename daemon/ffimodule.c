@@ -41,20 +41,6 @@ enum {
 /** Lua registry indices for functions that wrap layer callbacks (shared by all lua modules). */
 static int l_ffi_wrap_slots[SLOT_count] = { 0 };
 
-/** @internal Helper for retrieving the right function entrypoint. */
-static inline lua_State *l_ffi_preface(struct kr_module *module, const char *call) {
-	lua_State *L = module->lib;
-	lua_getglobal(L, module->name);
-	lua_getfield(L, -1, call);
-	lua_remove(L, -2);
-	if (lua_isnil(L, -1)) {
-		lua_pop(L, 1);
-		return NULL;
-	}
-	lua_pushlightuserdata(L, module);
-	return L;
-}
-
 /** @internal Continue with coroutine. */
 static void l_ffi_resume_cb(uv_idle_t *check)
 {
@@ -91,30 +77,41 @@ static int l_ffi_call_mod(lua_State *L, int argc)
 	if (lua_isnumber(L, -1)) { /* Return code */
 		status = lua_tointeger(L, -1);
 	} else if (lua_isthread(L, -1)) { /* Continuations */
+		/* TODO: unused, possibly in a bad shape.  Meant KR_STATE_YIELD? */
+		assert(!ENOTSUP);
 		status = l_ffi_defer(lua_tothread(L, -1));
 	}
 	lua_pop(L, 1);
 	return status;
 }
 
-static int l_ffi_init(struct kr_module *module)
+/** Common part of calling modname.(de)init in lua.
+ * The function to call should be on top of the stack and it gets popped. */
+static int l_ffi_modcb(lua_State *L, struct kr_module *module)
 {
-	lua_State *L = l_ffi_preface(module, "init");
-	if (!L) {
-		return 0;
+	if (lua_isnil(L, -1)) {
+		lua_pop(L, 1); /* .(de)init == nil, maybe even the module table doesn't exist */
+		return kr_ok();
 	}
-	return l_ffi_call_mod(L, 1);
+	lua_getglobal(L, "modules_ffi_wrap_modcb");
+	lua_insert(L, -2); /* swap with .(de)init */
+	lua_pushpointer(L, module);
+	if (lua_pcall(L, 2, 0, 0) == 0)
+		return kr_ok();
+	kr_log_error("error: %s\n", lua_tostring(L, -1));
+	lua_pop(L, 1);
+	return kr_error(1);
 }
 
 static int l_ffi_deinit(struct kr_module *module)
 {
-	/* Deinit the module in Lua (if possible) */
-	int ret = 0;
-	lua_State *L = module->lib;
-	if (l_ffi_preface(module, "deinit")) {
-		ret = l_ffi_call_mod(L, 1);
-	}
-	module->lib = NULL;
+	/* Call .deinit(), if it exists. */
+	lua_State *L = the_worker->engine->L;
+	lua_getglobal(L, module->name);
+	lua_getfield(L, -1, "deinit");
+	const int ret = l_ffi_modcb(L, module);
+	lua_pop(L, 1); /* the module's table */
+
 	/* Free the layer API wrapper (unconst it) */
 	kr_layer_api_t* api = module->data;
 	if (!api) {
@@ -291,7 +288,6 @@ int ffimodule_register_lua(struct engine *engine, struct kr_module *module, cons
 	/* Create FFI module with trampolined functions. */
 	memset(module, 0, sizeof(*module));
 	module->name = strdup(name);
-	module->init = &l_ffi_init;
 	module->deinit = &l_ffi_deinit;
 	/* Bake layer API if defined in module */
 	lua_getfield(L, -1, "layer");
@@ -300,10 +296,11 @@ int ffimodule_register_lua(struct engine *engine, struct kr_module *module, cons
 		/* most likely not needed, but compatibility for now */
 		module->data = (void *)module->layer;
 	}
-	module->lib = L;
-	lua_pop(L, 2); /* Clear the layer + module global */
-	if (module->init) {
-		return module->init(module);
-	}
-	return kr_ok();
+	lua_pop(L, 1); /* .layer table */
+
+	/* Now call .init(), if it exists. */
+	lua_getfield(L, -1, "init");
+	const int ret = l_ffi_modcb(L, module);
+	lua_pop(L, 1); /* the module's table */
+	return ret;
 }
