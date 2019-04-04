@@ -60,10 +60,9 @@ local function serve_doh(h, stream)
 	-- Wait for the result of the query
 	-- Note: We can't do non-blocking write to stream directly from resolve callbacks
 	-- because they don't run inside cqueue.
-	local answers, authority = {}, {}
 	local cond = condition.new()
 	local waiting, done = false, false
-	local finish_cb = function (answer, req)
+	local finish_cb = function (answer, _)
 		output_ttl = get_http_ttl(answer)
 		-- binary output
 		output = ffi.string(answer.wire, answer.size)
