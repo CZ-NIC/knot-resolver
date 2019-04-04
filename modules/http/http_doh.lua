@@ -20,13 +20,13 @@ local function serve_doh(h, stream)
 	local input
 	local method = h:get(':method')
 	if method == 'POST' then
-		input = stream:get_body_chars(65536, 2)  -- read timeout = KR_CONN_RTT_MAX
+		input = stream:get_body_chars(1025, 2)  -- read timeout = KR_CONN_RTT_MAX
 	elseif method == 'GET' then
 		local input_b64 = string.match(h:get(':path'), '^/doh%?dns=([a-zA-Z0-9_-]+)$')
 		if not input_b64 then
 			return 400, 'base64url query not found'
 		end
-		if #input_b64 > 87380 then  -- base64url encode 65535
+		if #input_b64 > 1368 then  -- base64url encode 1024
 			return 414, 'query parameter in URI too long'
 		end
 		input = basexx.from_url64(input_b64)
@@ -39,7 +39,7 @@ local function serve_doh(h, stream)
 
 	if #input < 12 then
 		return 400, 'input too short'
-	elseif #input > 65535 then
+	elseif #input > 1024 then
 		return 413, 'input too long'
 	end
 
