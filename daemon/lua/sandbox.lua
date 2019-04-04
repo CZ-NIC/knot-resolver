@@ -29,6 +29,25 @@ if rawget(kres, 'str2dname') ~= nil then
 	todname = kres.str2dname
 end
 
+local function prep_resolve_cb(finish, init)
+	local init_cb, finish_cb = init, nil
+	if finish then
+		-- Create callback for finalization
+		finish_cb = ffi.cast('trace_callback_f', function (req)
+			req = kres.request_t(req)
+			finish(req.answer, req)
+			finish_cb:free()
+		end)
+		-- Wrap initialiser to install finish callback
+		init_cb = function (req)
+			req = kres.request_t(req)
+			if init then init(req) end
+			req.trace_finish = finish_cb
+		end
+	end
+	return init_cb
+end
+
 -- Compatibility wrapper for query flags.
 worker.resolve = function (qname, qtype, qclass, options, finish, init)
 	-- Alternatively use named arguments
@@ -41,49 +60,18 @@ worker.resolve = function (qname, qtype, qclass, options, finish, init)
 		finish = t.finish
 		init = t.init
 	end
-
-	local init_cb, finish_cb = init, nil
-	if finish then
-		-- Create callback for finalization
-		finish_cb = ffi.cast('trace_callback_f', function (req)
-			req = kres.request_t(req)
-			finish(req.answer, req)
-			finish_cb:free()
-		end)
-		-- Wrap initialiser to install finish callback
-		init_cb = function (req)
-			req = kres.request_t(req)
-			if init then init(req) end
-			req.trace_finish = finish_cb
-		end
-	end
+	local init_cb = prep_resolve_cb(finish, init)
 
 	-- Translate options and resolve
 	options = kres.mk_qflags(options)
 	return worker.resolve_unwrapped(qname, qtype, qclass, options, init_cb)
 end
 
-worker.resolve_pkt = function (pkt, finish, init)
-	local init_cb, finish_cb = init, nil
-	if finish then
-		-- Create callback for finalization
-		finish_cb = ffi.cast('trace_callback_f', function (req)
-			req = kres.request_t(req)
-			finish(req.answer, req)
-			finish_cb:free()
-		end)
-		-- Wrap initialiser to install finish callback
-		init_cb = function (req)
-			req = kres.request_t(req)
-			if init then init(req) end
-			req.trace_finish = finish_cb
-		end
-	end
-
-	-- Translate options and resolve
-	return worker.resolve_unwrapped_pkt(pkt, init_cb)
+worker.resolve_pkt = function (pkt, options, finish, init)
+	local init_cb = prep_resolve_cb(finish, init)
+	options = kres.mk_qflags(options)
+	return worker.resolve_unwrapped_pkt(pkt, options, init_cb)
 end
-
 
 resolve = worker.resolve
 
