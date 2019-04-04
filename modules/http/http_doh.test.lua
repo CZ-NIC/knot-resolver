@@ -167,21 +167,21 @@ else
 	local function test_post_long_input()
 		local req = assert(req_templ:clone())
 		req.headers:upsert(':method', 'POST')
-		req:set_body(string.rep('s', 65536))  -- > DNS msg over UDP
+		req:set_body(string.rep('s', 1025))  -- > DNS msg over UDP
 		check_err(req, '413', 'too long POST finishes with 413')
 	end
 
 	local function test_get_long_input()
 		local req = assert(req_templ:clone())
 		req.headers:upsert(':method', 'GET')
-		req.headers:upsert(':path', '/doh?dns=' .. basexx.to_url64(string.rep('s', 65536)))
+		req.headers:upsert(':path', '/doh?dns=' .. basexx.to_url64(string.rep('\0', 1030)))
 		check_err(req, '414', 'too long GET finishes with 414')
 	end
 
 	local function test_post_unparseable_input()
 		local req = assert(req_templ:clone())
 		req.headers:upsert(':method', 'POST')
-		req:set_body(string.rep('\0', 65535))  -- garbage
+		req:set_body(string.rep('\0', 1024))  -- garbage
 		check_err(req, '400', 'unparseable DNS message finishes with 400')
 	end
 
