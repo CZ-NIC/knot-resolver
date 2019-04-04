@@ -18,8 +18,10 @@
 #include <lua.h>
 #include <lauxlib.h>
 
+#include "daemon/bindings/impl.h"
 #include "daemon/engine.h"
 #include "daemon/ffimodule.h"
+#include "daemon/worker.h"
 #include "lib/module.h"
 #include "lib/layer.h"
 
@@ -42,6 +44,9 @@ enum {
 	SLOT_count /* dummy, must be the last */
 };
 #define SLOT_size sizeof(int)
+
+/** Lua registry indices for functions that wrap layer callbacks (shared by all lua modules). */
+static int l_ffi_wrap_slots[SLOT_count] = { 0 };
 
 /** @internal Helper for retrieving the right function entrypoint. */
 static inline lua_State *l_ffi_preface(struct kr_module *module, const char *call) {
@@ -142,36 +147,32 @@ static int l_ffi_deinit(struct kr_module *module)
 
 /** @internal Helper for retrieving layer Lua function by name. */
 #define LAYER_FFI_CALL(ctx, slot_name) \
-	const int *cb_slot = (ctx)->api->cb_slots + SLOT_ ## slot_name; \
-	if (*cb_slot <= 0) { \
-		return (ctx)->state; \
-	} \
-	struct kr_module *module = (ctx)->api->data; \
-	lua_State *L = module->lib; \
-	lua_rawgeti(L, LUA_REGISTRYINDEX, *cb_slot); \
-	lua_pushnumber(L, (ctx)->state)
+	(ctx)->pkt = NULL; /* for debugging */ \
+	const int wrap_slot = l_ffi_wrap_slots[SLOT_ ## slot_name]; \
+	const int cb_slot = (ctx)->api->cb_slots[SLOT_ ## slot_name]; \
+	assert(wrap_slot > 0 && cb_slot > 0); \
+	lua_State *L = the_worker->engine->L; \
+	lua_rawgeti(L, LUA_REGISTRYINDEX, wrap_slot); \
+	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_slot); \
+	lua_pushpointer(L, (ctx));
 
 static int l_ffi_layer_begin(kr_layer_t *ctx)
 {
 	LAYER_FFI_CALL(ctx, begin);
-	lua_pushlightuserdata(L, ctx->req);
 	return l_ffi_call_layer(L, 2);
 }
 
 static int l_ffi_layer_reset(kr_layer_t *ctx)
 {
 	LAYER_FFI_CALL(ctx, reset);
-	lua_pushlightuserdata(L, ctx->req);
 	return l_ffi_call_layer(L, 2);
 }
 
 static int l_ffi_layer_finish(kr_layer_t *ctx)
 {
-	struct kr_request *req = ctx->req;
 	LAYER_FFI_CALL(ctx, finish);
-	lua_pushlightuserdata(L, req);
-	lua_pushlightuserdata(L, req->answer);
-	return l_ffi_call_layer(L, 3);
+	ctx->pkt = ctx->req->answer;
+	return l_ffi_call_layer(L, 2);
 }
 
 static int l_ffi_layer_consume(kr_layer_t *ctx, knot_pkt_t *pkt)
@@ -180,27 +181,26 @@ static int l_ffi_layer_consume(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state; /* Already failed, skip */
 	}
 	LAYER_FFI_CALL(ctx, consume);
-	lua_pushlightuserdata(L, ctx->req);
-	lua_pushlightuserdata(L, pkt);
-	return l_ffi_call_layer(L, 3);
+	ctx->pkt = pkt;
+	return l_ffi_call_layer(L, 2);
 }
 
 static int l_ffi_layer_produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
-	if (ctx->state & (KR_STATE_FAIL)) {
-		return ctx->state; /* Already failed or done, skip */
+	if (ctx->state & KR_STATE_FAIL) {
+		return ctx->state; /* Already failed, skip */
 	}
 	LAYER_FFI_CALL(ctx, produce);
-	lua_pushlightuserdata(L, ctx->req);
-	lua_pushlightuserdata(L, pkt);
-	return l_ffi_call_layer(L, 3);
+	ctx->pkt = pkt;
+	return l_ffi_call_layer(L, 2);
 }
 
 static int l_ffi_layer_checkout(kr_layer_t *ctx, knot_pkt_t *pkt, struct sockaddr *dst, int type)
 {
-	if (ctx->state & (KR_STATE_FAIL)) {
-		return ctx->state; /* Already failed or done, skip */
+	if (ctx->state & KR_STATE_FAIL) {
+		return ctx->state; /* Already failed, skip */
 	}
+	abort(); // FIXME
 	LAYER_FFI_CALL(ctx, checkout);
 	lua_pushlightuserdata(L, ctx->req);
 	lua_pushlightuserdata(L, pkt);
@@ -212,10 +212,42 @@ static int l_ffi_layer_checkout(kr_layer_t *ctx, knot_pkt_t *pkt, struct sockadd
 static int l_ffi_layer_answer_finalize(kr_layer_t *ctx)
 {
 	LAYER_FFI_CALL(ctx, answer_finalize);
-	lua_pushlightuserdata(L, ctx->req);
 	return l_ffi_call_layer(L, 2);
 }
 #undef LAYER_FFI_CALL
+
+int ffimodule_init(lua_State *L)
+{
+	/* Wrappers defined in ./lua/sandbox.lua */
+	/* for API: (int state, kr_request_t *req) */
+	lua_getglobal(L, "modules_ffi_layer_wrap1");
+	const int wrap1 = luaL_ref(L, LUA_REGISTRYINDEX);
+	/* for API: (int state, kr_request_t *req, knot_pkt_t *) */
+	lua_getglobal(L, "modules_ffi_layer_wrap2");
+	const int wrap2 = luaL_ref(L, LUA_REGISTRYINDEX);
+	if (wrap1 == LUA_REFNIL || wrap2 == LUA_REFNIL) {
+		return kr_error(ENOENT);
+	}
+
+	const int slots[SLOT_count] = {
+		[SLOT_begin]   = wrap1,
+		[SLOT_reset]   = wrap1,
+		[SLOT_finish]  = wrap2,
+		[SLOT_consume] = wrap2,
+		[SLOT_produce] = wrap2,
+		[SLOT_checkout] = 0, // FIXME
+		[SLOT_answer_finalize] = wrap1,
+	};
+	memcpy(l_ffi_wrap_slots, slots, sizeof(l_ffi_wrap_slots));
+	return kr_ok();
+}
+void ffimodule_deinit(lua_State *L)
+{
+	const int wrap1 = l_ffi_wrap_slots[SLOT_begin];
+	const int wrap2 = l_ffi_wrap_slots[SLOT_consume];
+	luaL_unref(L, LUA_REGISTRYINDEX, wrap1);
+	luaL_unref(L, LUA_REGISTRYINDEX, wrap2);
+}
 
 /** @internal Conditionally register layer trampoline
   * @warning Expects 'module.layer' to be on top of Lua stack. */
@@ -247,8 +279,6 @@ static kr_layer_api_t *l_ffi_layer_create(lua_State *L, struct kr_module *module
 		LAYER_REGISTER(L, api, checkout);
 		LAYER_REGISTER(L, api, answer_finalize);
 		LAYER_REGISTER(L, api, reset);
-		/* Begin is always set, as it initializes layer baton. */
-		api->begin = l_ffi_layer_begin;
 		api->data = module;
 	}
 	return api;

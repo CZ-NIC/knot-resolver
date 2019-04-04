@@ -626,6 +626,10 @@ void engine_deinit(struct engine *engine)
 	if (engine == NULL) {
 		return;
 	}
+	if (!engine->L) {
+		assert(false);
+		return;
+	}
 
 	/* Only close sockets and services,
 	 * no need to clean up mempool. */
@@ -647,9 +651,8 @@ void engine_deinit(struct engine *engine)
 	for (size_t i = 0; i < engine->modules.len; ++i) {
 		engine_unload(engine, engine->modules.at[i]);
 	}
-	if (engine->L) {
-		lua_close(engine->L);
-	}
+	ffimodule_deinit(engine->L);
+	lua_close(engine->L);
 
 	/* Free data structures */
 	array_clear(engine->modules);
@@ -703,13 +706,14 @@ int engine_ipc(struct engine *engine, const char *expr)
 int engine_load_sandbox(struct engine *engine)
 {
 	/* Init environment */
-    int ret = l_dosandboxfile(engine->L, LIBDIR "/sandbox.lua");
+	int ret = l_dosandboxfile(engine->L, LIBDIR "/sandbox.lua");
 	if (ret != 0) {
 		fprintf(stderr, "[system] error %s\n", lua_tostring(engine->L, -1));
 		lua_pop(engine->L, 1);
 		return kr_error(ENOEXEC);
 	}
-	return kr_ok();
+	ret = ffimodule_init(engine->L);
+	return ret;
 }
 
 int engine_loadconf(struct engine *engine, const char *config_path)
