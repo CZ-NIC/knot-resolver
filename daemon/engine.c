@@ -17,6 +17,7 @@
 #include <contrib/cleanup.h>
 #include <ccan/json/json.h>
 #include <ccan/asprintf/asprintf.h>
+#include <dlfcn.h>
 #include <uv.h>
 #include <unistd.h>
 #include <grp.h>
@@ -606,8 +607,8 @@ int engine_init(struct engine *engine, knot_mm_t *pool)
 /** Unregister a (found) module */
 static void engine_unload(struct engine *engine, struct kr_module *module)
 {
-	auto_free char *name = strdup(module->name);
-	kr_module_unload(module);
+	auto_free char *name = module->name ? strdup(module->name) : NULL;
+	kr_module_unload(module); /* beware: lua/C mix, could be confusing */
 	/* Clear in Lua world, but not for embedded modules ('cache' in particular). */
 	if (name && !kr_module_get_embedded(name)) {
 		lua_pushnil(engine->L);
@@ -767,6 +768,7 @@ static size_t module_find(module_array_t *mod_list, const char *name)
 int engine_register(struct engine *engine, const char *name, const char *precedence, const char* ref)
 {
 	if (engine == NULL || name == NULL) {
+		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
 	/* Make sure module is unloaded */
@@ -785,33 +787,57 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 	if (!module) {
 		return kr_error(ENOMEM);
 	}
-	module->data = engine;
-		/* TODO: tidy and comment this section. */
+	module->data = engine; /*< some outside modules may still use this value */
+
 	int ret = kr_module_load(module, name, LIBDIR "/kres_modules");
-	if (ret == kr_ok()) {
-		lua_getglobal(engine->L, "modules_create_table_for_c");
-		lua_pushpointer(engine->L, module);
-		if (engine_pcall(engine->L, 1) != 0) {
-			lua_pop(engine->L, 1);
+	if (ret == 0) {
+		/* We have a C module, loaded and init() was called.
+		 * Now we need to prepare the lua side. */
+		lua_State *L = engine->L;
+		lua_getglobal(L, "modules_create_table_for_c");
+		lua_pushpointer(L, module);
+		if (lua_isnil(L, -2)) {
+			/* When loading the three embedded modules, we don't
+			 * have the "modules_*" lua function yet, but fortunately
+			 * we don't need it there.  Let's just check they're embedded.
+			 * TODO: solve this better *without* breaking stuff. */
+			lua_pop(L, 2);
+			if (module->lib != RTLD_DEFAULT) {
+				ret = kr_error(1);
+				lua_pushliteral(L, "missing modules_create_table_for_c()");
+			}
+		} else {
+			ret = engine_pcall(L, 1);
 		}
-	}
-	/* Load Lua module if not a binary */
-	if (ret == kr_error(ENOENT)) {
+		if (ret) {
+			kr_log_error("[system] internal error when loading C module %s: %s\n",
+					module->name, lua_tostring(L, -1));
+			lua_pop(L, 1);
+			assert(false); /* probably not critical, but weird */
+		}
+
+	} else if (ret == kr_error(ENOENT)) {
+		/* No luck with C module, so try to load and .init() lua module. */
 		ret = ffimodule_register_lua(engine, module, name);
+		if (ret != 0) {
+			kr_log_error("[system] failed to load module '%s'\n", name);
+		}
+
 	} else if (ret == kr_error(ENOTSUP)) {
 		/* Print a more helpful message when module is linked against an old resolver ABI. */
-		fprintf(stderr, "[system] module '%s' links to unsupported ABI, please rebuild it\n", name);
+		kr_log_error("[system] module '%s' links to unsupported ABI, please rebuild it\n", name);
 	}
+
 	if (ret != 0) {
-		free(module);
+		engine_unload(engine, module);
 		return ret;
 	}
 
+	/* Push to the right place in engine->modules */
 	if (array_push(engine->modules, module) < 0) {
 		engine_unload(engine, module);
 		return kr_error(ENOMEM);
 	}
-	/* Evaluate precedence operator */
 	if (precedence) {
 		struct kr_module **arr = mod_list->at;
 		size_t emplacement = mod_list->len;

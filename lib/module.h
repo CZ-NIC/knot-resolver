@@ -49,19 +49,28 @@ typedef uint32_t (module_api_cb)(void);
 struct kr_module {
 	char *name;
 
-	/** Constructor.  Called after loading the module.  @return error code. */
+	/** Constructor.  Called after loading the module.  @return error code.
+	 * Lua API: not populated, called via lua directly. */
 	int (*init)(struct kr_module *self);
+
 	/** Destructor.  Called before unloading the module.  @return error code. */
 	int (*deinit)(struct kr_module *self);
-	/** Configure with encoded JSON (NULL if missing).  @return error code. */
+
+	/** Configure with encoded JSON (NULL if missing).  @return error code.
+	 * Lua API: not used and not useful (from C). */
 	int (*config)(struct kr_module *self, const char *input);
-	/** Packet processing API specs.  May be NULL.  See docs on that type. */
+
+	/** Packet processing API specs.  May be NULL.  See docs on that type.
+	 * Owned by the module code. */
 	const kr_layer_api_t *layer;
-	/** List of properties.  May be NULL.  Terminated by { NULL, NULL, NULL }. */
+
+	/** List of properties.  May be NULL.  Terminated by { NULL, NULL, NULL }.
+	 * Lua API: not used and not useful (from C). */
 	const struct kr_prop *props;
 
-	void *lib;      /**< Shared library handle or RTLD_DEFAULT */
-	void *data;     /**< Custom data context. */
+	/** dlopen() handle; RTLD_DEFAULT for embedded modules; NULL for lua modules. */
+	void *lib;
+	void *data; /**< Custom data context. */
 };
 
 /**
@@ -85,9 +94,9 @@ struct kr_prop {
 
 
 /**
- * Load a C module instance into memory.
+ * Load a C module instance into memory.  And call its init().
  *
- * @param module module structure
+ * @param module module structure.  Will be overwritten except for ->data on success.
  * @param name module name
  * @param path module search path
  * @return 0 or an error
@@ -99,6 +108,7 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
  * Unload module instance.
  *
  * @param module module structure
+ * @note currently used even for lua modules
  */
 KR_EXPORT
 void kr_module_unload(struct kr_module *module);
