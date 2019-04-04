@@ -299,6 +299,10 @@ function M.add_interface(conf)
 			-- Continue reading key file
 			if crt then
 				f = io.open(conf.key, 'r')
+				if not f then
+					panic('enable to open HTTP key file %s',
+						conf.key)
+				end
 				key = assert(pkey.new(f:read('*all')))
 				f:close()
 			end
