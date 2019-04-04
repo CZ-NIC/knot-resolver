@@ -260,6 +260,20 @@ function modules_create_table_for_c(kr_module_ud)
 	})
 end
 
+-- Utilities internal for lua layer glue; see ../ffimodule.c
+modules_ffi_layer_wrap1 = function (layer_cb, ctx_udata)
+	local ctx = ffi.cast('kr_layer_t **', ctx_udata)[0]
+	return layer_cb(ctx.state, ctx.req)
+end
+modules_ffi_layer_wrap2 = function (layer_cb, ctx_udata)
+	local ctx = ffi.cast('kr_layer_t **', ctx_udata)[0]
+	return layer_cb(ctx.state, ctx.req, ctx.pkt)
+end
+modules_ffi_layer_wrap_checkout = function (layer_cb, ctx_udata)
+	local ctx = ffi.cast('kr_layer_t **', ctx_udata)[0]
+	return layer_cb(ctx.state, ctx.req, ctx.pkt, ctx.dst, ctx.is_stream)
+end
+
 cache.clear = function (name, exact_name, rr_type, chunk_size, callback, prev_state)
 	if name == nil or (name == '.' and not exact_name) then
 		-- keep same output format as for 'standard' clear
