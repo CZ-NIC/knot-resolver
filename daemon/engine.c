@@ -53,11 +53,6 @@
 	#endif
 #endif
 
-/** @internal Compatibility wrapper for Lua < 5.2 */
-#if LUA_VERSION_NUM < 502
-#define lua_rawlen(L, obj) lua_objlen((L), (obj))
-#endif
-
 /**@internal Maximum number of incomplete TCP connections in queue.
 * Default is from Redis and Apache. */
 #ifndef TCP_BACKLOG_DEFAULT
@@ -306,7 +301,7 @@ static void l_unpack_json(lua_State *L, JsonNode *table)
 		if (node->key) {
 			lua_setfield(L, -2, node->key);
 		} else {
-			lua_rawseti(L, -2, lua_rawlen(L, -2) + 1);
+			lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
 		}
 	}
 }
@@ -390,7 +385,7 @@ static int l_fromjson(lua_State *L)
 
 /** @internal Throw Lua error if expr is false */
 #define expr_checked(expr) \
-	if (!(expr)) { lua_pushboolean(L, false); lua_rawseti(L, -2, lua_rawlen(L, -2) + 1); continue; }
+	if (!(expr)) { lua_pushboolean(L, false); lua_rawseti(L, -2, lua_objlen(L, -2) + 1); continue; }
 
 static int l_map(lua_State *L)
 {
@@ -429,12 +424,12 @@ static int l_map(lua_State *L)
 				lua_pushlstring(L, rbuf, rlen);
 			}
 			json_delete(root_node);
-			lua_rawseti(L, -2, lua_rawlen(L, -2) + 1);
+			lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
 			continue;
 		}
 		/* Didn't respond */
 		lua_pushboolean(L, false);
-		lua_rawseti(L, -2, lua_rawlen(L, -2) + 1);
+		lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
 	}
 	return 1;
 }
@@ -666,10 +661,6 @@ void engine_deinit(struct engine *engine)
 
 int engine_pcall(lua_State *L, int argc)
 {
-#if LUA_VERSION_NUM >= 502
-	lua_getglobal(L, "_SANDBOX");
-	lua_setupvalue(L, -(2 + argc), 1);
-#endif
 	return lua_pcall(L, argc, LUA_MULTRET, 0);
 }
 

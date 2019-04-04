@@ -25,12 +25,6 @@
 #include "lib/module.h"
 #include "lib/layer.h"
 
-#if LUA_VERSION_NUM >= 502
-#define l_resume(L, argc) lua_resume((L), NULL, (argc))
-#else
-#define l_resume(L, argc) lua_resume((L), (argc))
-#endif
-
 /** @internal Slots for layer callbacks.
   * Each slot ID corresponds to Lua reference in module API. */
 enum {
@@ -65,7 +59,7 @@ static inline lua_State *l_ffi_preface(struct kr_module *module, const char *cal
 static void l_ffi_resume_cb(uv_idle_t *check)
 {
 	lua_State *L = check->data;
-	int status = l_resume(L, 0);
+	int status = lua_resume(L, 0);
 	if (status != LUA_YIELD) {
 		uv_idle_stop(check); /* Stop coroutine */
 		uv_close((uv_handle_t *)check, (uv_close_cb)free);
