@@ -12,11 +12,6 @@
 #include "lib/layer.h"
 #include "lib/generic/lru.h"
 
-/** @internal Compatibility wrapper for Lua < 5.2 */
-#if LUA_VERSION_NUM < 502
-#define lua_rawlen(L, obj) lua_objlen((L), (obj))
-#endif
-
 #ifdef LRU_REP_SIZE
  #define FREQUENT_COUNT LRU_REP_SIZE /* Size of frequent tables */
 #else
