@@ -62,6 +62,7 @@ typedef struct kr_layer {
 	int state; /*!< The current state; bitmap of enum kr_layer_state. */
 	struct kr_request *req; /*!< The corresponding request. */
 	const struct kr_layer_api *api;
+	knot_pkt_t *pkt; /*!< In glue for lua kr_layer_api it's used to pass the parameter. */
 } kr_layer_t;
 
 /** Packet processing module API.  All functions return the new kr_layer_state. */
@@ -74,22 +75,26 @@ struct kr_layer_api {
 	/** Paired to begin, called both on successes and failures. */
 	int (*finish)(kr_layer_t *ctx);
 
-	/** Processing an answer from upstream or the answer to the request. */
+	/** Processing an answer from upstream or the answer to the request.
+	 * Lua API: call is omitted iff (state & KR_STATE_FAIL). */
 	int (*consume)(kr_layer_t *ctx, knot_pkt_t *pkt);
 
-	/** Produce either an answer to the request or a query for upstream (or fail). */
+	/** Produce either an answer to the request or a query for upstream (or fail).
+	 * Lua API: call is omitted iff (state & KR_STATE_FAIL). */
 	int (*produce)(kr_layer_t *ctx, knot_pkt_t *pkt);
 
 	/** Finalises the outbound query packet with the knowledge of the IP addresses.
 	 * The checkout layer doesn't persist the state, so canceled subrequests
-	 * don't affect the resolution or rest of the processing. */
+	 * don't affect the resolution or rest of the processing.
+	 * Lua API: call is omitted iff (state & KR_STATE_FAIL). */
 	int (*checkout)(kr_layer_t *ctx, knot_pkt_t *packet, struct sockaddr *dst, int type);
 
 	/** Finalises the answer.
 	 * Last chance to affect what will get into the answer, including EDNS.*/
 	int (*answer_finalize)(kr_layer_t *ctx);
 
-	/** The module can store anything in here. */
+	/** The module can store anything in here.
+	 * In lua case we store kr_module pointer. */
 	void *data;
 
 	/** Internal to ./daemon/ffimodule.c. */
