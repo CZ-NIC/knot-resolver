@@ -60,7 +60,8 @@ struct kr_module {
 	 * Lua API: not used and not useful (from C). */
 	int (*config)(struct kr_module *self, const char *input);
 
-	/** Packet processing API specs.  May be NULL.  See docs on that type. */
+	/** Packet processing API specs.  May be NULL.  See docs on that type.
+	 * Owned by the module code. */
 	const kr_layer_api_t *layer;
 
 	/** List of properties.  May be NULL.  Terminated by { NULL, NULL, NULL }.
@@ -92,9 +93,9 @@ struct kr_prop {
 
 
 /**
- * Load a C module instance into memory.
+ * Load a C module instance into memory.  And call its init().
  *
- * @param module module structure
+ * @param module module structure.  Will be overwritten except for ->data on success.
  * @param name module name
  * @param path module search path
  * @return 0 or an error

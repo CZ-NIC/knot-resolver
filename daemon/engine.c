@@ -465,11 +465,6 @@ static int init_resolver(struct engine *engine)
 	lru_create(&engine->resolver.cache_rep, LRU_REP_SIZE, NULL, NULL);
 	lru_create(&engine->resolver.cache_cookie, LRU_COOKIES_SIZE, NULL, NULL);
 
-	/* Load basic modules */
-	engine_register(engine, "iterate", NULL, NULL);
-	engine_register(engine, "validate", NULL, NULL);
-	engine_register(engine, "cache", NULL, NULL);
-
 	return array_push(engine->backends, kr_cdb_lmdb());
 }
 
@@ -606,7 +601,7 @@ int engine_init(struct engine *engine, knot_mm_t *pool)
 /** Unregister a (found) module */
 static void engine_unload(struct engine *engine, struct kr_module *module)
 {
-	auto_free char *name = strdup(module->name);
+	auto_free char *name = module->name ? strdup(module->name) : NULL;
 	kr_module_unload(module); /* beware: lua/C mix, could be confusing */
 	/* Clear in Lua world, but not for embedded modules ('cache' in particular). */
 	if (name && !kr_module_get_embedded(name)) {
@@ -703,7 +698,13 @@ int engine_load_sandbox(struct engine *engine)
 		lua_pop(engine->L, 1);
 		return kr_error(ENOEXEC);
 	}
+
 	ret = ffimodule_init(engine->L);
+	/* Load basic modules */
+	engine_register(engine, "iterate", NULL, NULL);
+	engine_register(engine, "validate", NULL, NULL);
+	engine_register(engine, "cache", NULL, NULL);
+
 	return ret;
 }
 
@@ -793,8 +794,8 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 		lua_getglobal(engine->L, "modules_create_table_for_c");
 		lua_pushpointer(engine->L, module);
 		if (engine_pcall(engine->L, 1) != 0) {
-			kr_log_error("[system] internal error: %s\n",
-					lua_tostring(engine->L, -1));
+			kr_log_error("[system] internal error when loading C module %s: %s\n",
+					module->name, lua_tostring(engine->L, -1));
 			lua_pop(engine->L, 1);
 			ret = kr_error(1);
 			assert(false); /* probably not critical, but weird */
@@ -812,7 +813,7 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 		kr_log_error("[system] module '%s' links to unsupported ABI, please rebuild it\n", name);
 	}
 	if (ret != 0) {
-		free(module);
+		engine_unload(engine, module);
 		return ret;
 	}
 
