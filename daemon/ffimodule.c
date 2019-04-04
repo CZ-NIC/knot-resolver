@@ -43,7 +43,6 @@ enum {
 	SLOT_answer_finalize,
 	SLOT_count /* dummy, must be the last */
 };
-#define SLOT_size sizeof(int)
 
 /** Lua registry indices for functions that wrap layer callbacks (shared by all lua modules). */
 static int l_ffi_wrap_slots[SLOT_count] = { 0 };
@@ -87,7 +86,7 @@ static int l_ffi_defer(lua_State *L)
 }
 
 /** @internal Helper for calling the entrypoint, for kr_module functions. */
-static inline int l_ffi_call_mod(lua_State *L, int argc)
+static int l_ffi_call_mod(lua_State *L, int argc)
 {
 	int status = lua_pcall(L, argc, 1, 0);
 	if (status != 0) {
@@ -102,14 +101,6 @@ static inline int l_ffi_call_mod(lua_State *L, int argc)
 	}
 	lua_pop(L, 1);
 	return status;
-}
-
-/** @internal Helper for calling the entrypoint, for kr_layer_api functions. */
-static inline int l_ffi_call_layer(lua_State *L, int argc)
-{
-	int ret = l_ffi_call_mod(L, argc);
-	/* The return codes are mixed at this point.  We need to return KR_STATE_* */
-	return ret < 0 ? KR_STATE_FAIL : ret;
 }
 
 static int l_ffi_init(struct kr_module *module)
@@ -145,34 +136,36 @@ static int l_ffi_deinit(struct kr_module *module)
 	return ret;
 }
 
-/** @internal Helper for retrieving layer Lua function by name. */
-#define LAYER_FFI_CALL(ctx, slot_name) \
-	(ctx)->pkt = NULL; /* for debugging */ \
-	const int wrap_slot = l_ffi_wrap_slots[SLOT_ ## slot_name]; \
-	const int cb_slot = (ctx)->api->cb_slots[SLOT_ ## slot_name]; \
-	assert(wrap_slot > 0 && cb_slot > 0); \
-	lua_State *L = the_worker->engine->L; \
-	lua_rawgeti(L, LUA_REGISTRYINDEX, wrap_slot); \
-	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_slot); \
-	lua_pushpointer(L, (ctx));
+/** @internal Helper for calling a layer Lua function by e.g. SLOT_begin. */
+static int l_ffi_call_layer(kr_layer_t *ctx, int slot_ix)
+{
+	ctx->pkt = NULL; /* for debugging */
+	const int wrap_slot = l_ffi_wrap_slots[slot_ix];
+	const int cb_slot = ctx->api->cb_slots[slot_ix];
+	assert(wrap_slot > 0 && cb_slot > 0);
+	lua_State *L = the_worker->engine->L;
+	lua_rawgeti(L, LUA_REGISTRYINDEX, wrap_slot);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_slot);
+	lua_pushpointer(L, ctx);
+	const int ret = l_ffi_call_mod(L, 2);
+	/* The return codes are mixed at this point.  We need to return KR_STATE_* */
+	return ret < 0 ? KR_STATE_FAIL : ret;
+}
 
 static int l_ffi_layer_begin(kr_layer_t *ctx)
 {
-	LAYER_FFI_CALL(ctx, begin);
-	return l_ffi_call_layer(L, 2);
+	return l_ffi_call_layer(ctx, SLOT_begin);
 }
 
 static int l_ffi_layer_reset(kr_layer_t *ctx)
 {
-	LAYER_FFI_CALL(ctx, reset);
-	return l_ffi_call_layer(L, 2);
+	return l_ffi_call_layer(ctx, SLOT_reset);
 }
 
 static int l_ffi_layer_finish(kr_layer_t *ctx)
 {
-	LAYER_FFI_CALL(ctx, finish);
 	ctx->pkt = ctx->req->answer;
-	return l_ffi_call_layer(L, 2);
+	return l_ffi_call_layer(ctx, SLOT_finish);
 }
 
 static int l_ffi_layer_consume(kr_layer_t *ctx, knot_pkt_t *pkt)
@@ -180,9 +173,8 @@ static int l_ffi_layer_consume(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (ctx->state & KR_STATE_FAIL) {
 		return ctx->state; /* Already failed, skip */
 	}
-	LAYER_FFI_CALL(ctx, consume);
 	ctx->pkt = pkt;
-	return l_ffi_call_layer(L, 2);
+	return l_ffi_call_layer(ctx, SLOT_consume);
 }
 
 static int l_ffi_layer_produce(kr_layer_t *ctx, knot_pkt_t *pkt)
@@ -190,29 +182,26 @@ static int l_ffi_layer_produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (ctx->state & KR_STATE_FAIL) {
 		return ctx->state; /* Already failed, skip */
 	}
-	LAYER_FFI_CALL(ctx, produce);
 	ctx->pkt = pkt;
-	return l_ffi_call_layer(L, 2);
+	return l_ffi_call_layer(ctx, SLOT_produce);
 }
 
-static int l_ffi_layer_checkout(kr_layer_t *ctx, knot_pkt_t *pkt, struct sockaddr *dst, int type)
+static int l_ffi_layer_checkout(kr_layer_t *ctx, knot_pkt_t *pkt,
+				struct sockaddr *dst, int type)
 {
 	if (ctx->state & KR_STATE_FAIL) {
 		return ctx->state; /* Already failed, skip */
 	}
-	LAYER_FFI_CALL(ctx, checkout);
 	ctx->pkt = pkt;
 	ctx->dst = dst;
 	ctx->is_stream = (type == SOCK_STREAM);
-	return l_ffi_call_layer(L, 2);
+	return l_ffi_call_layer(ctx, SLOT_checkout);
 }
 
 static int l_ffi_layer_answer_finalize(kr_layer_t *ctx)
 {
-	LAYER_FFI_CALL(ctx, answer_finalize);
-	return l_ffi_call_layer(L, 2);
+	return l_ffi_call_layer(ctx, SLOT_answer_finalize);
 }
-#undef LAYER_FFI_CALL
 
 int ffimodule_init(lua_State *L)
 {
@@ -268,7 +257,7 @@ static kr_layer_api_t *l_ffi_layer_create(lua_State *L, struct kr_module *module
 	/* Fabricate layer API wrapping the Lua functions
 	 * reserve slots after it for references to Lua callbacks. */
 	const size_t api_length = offsetof(kr_layer_api_t, cb_slots)
-				+ (SLOT_count * SLOT_size);
+				+ (SLOT_count * sizeof(module->layer->cb_slots[0]));
 	kr_layer_api_t *api = malloc(api_length);
 	if (api) {
 		memset(api, 0, api_length);
