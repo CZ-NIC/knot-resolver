@@ -177,7 +177,7 @@ int kr_bindings_worker(lua_State *L)
 		{ "stats",    wrk_stats },
 		{ NULL, NULL }
 	};
-	register_lib(L, "worker", lib);
+	luaL_register(L, "worker", lib);
 	return 1;
 }
 
