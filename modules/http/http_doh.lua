@@ -95,7 +95,7 @@ local function serve_doh(h, stream)
 	end
 
 	-- resolve query
-	worker.resolve_pkt(pkt, finish_cb, init_cb)
+	worker.resolve_pkt(pkt, {}, finish_cb, init_cb)
 	if not done then
 		waiting = true
 		cond:wait()
