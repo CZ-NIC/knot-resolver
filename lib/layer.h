@@ -63,6 +63,8 @@ typedef struct kr_layer {
 	struct kr_request *req; /*!< The corresponding request. */
 	const struct kr_layer_api *api;
 	knot_pkt_t *pkt; /*!< In glue for lua kr_layer_api it's used to pass the parameter. */
+	struct sockaddr *dst; /*!< In glue for checkout layer it's used to pass the parameter. */
+	bool is_stream;       /*!< In glue for checkout layer it's used to pass the parameter. */
 } kr_layer_t;
 
 /** Packet processing module API.  All functions return the new kr_layer_state. */
