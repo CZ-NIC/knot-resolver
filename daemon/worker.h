@@ -55,12 +55,18 @@ int worker_submit(struct session *session, knot_pkt_t *query);
  */
 int worker_end_tcp(struct session *session);
 
+/** FIXME docs */
+KR_EXPORT knot_pkt_t *
+worker_resolve_mk_pkt(const char *qname_str, uint16_t qtype, uint16_t qclass,
+			const struct kr_qflags *options);
+
 /**
  * Start query resolution with given query.
  *
  * @return task or NULL
  */
-struct qr_task *worker_resolve_start(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflags options);
+KR_EXPORT struct qr_task *
+worker_resolve_start(knot_pkt_t *query, struct kr_qflags options);
 
 /**
  * Execute a request with given query.
@@ -68,7 +74,7 @@ struct qr_task *worker_resolve_start(struct worker_ctx *worker, knot_pkt_t *quer
  *
  * @return 0 or an error code
  */
-int worker_resolve_exec(struct qr_task *task, knot_pkt_t *query);
+KR_EXPORT int worker_resolve_exec(struct qr_task *task, knot_pkt_t *query);
 
 /** @return struct kr_request associated with opaque task */
 struct kr_request *worker_task_request(struct qr_task *task);
