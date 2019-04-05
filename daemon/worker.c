@@ -1779,8 +1779,9 @@ int worker_end_tcp(struct session *session)
 	return kr_ok();
 }
 
-struct qr_task *worker_resolve_start(struct worker_ctx *worker, knot_pkt_t *query, struct kr_qflags options)
+struct qr_task *worker_resolve_start(knot_pkt_t *query, struct kr_qflags options)
 {
+	struct worker_ctx *worker = the_worker;
 	if (!worker || !query) {
 		assert(!EINVAL);
 		return NULL;

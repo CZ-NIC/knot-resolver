@@ -18,99 +18,33 @@
 
 #include "daemon/worker.h"
 
-/** resolve_pkt(pkt, options, init_cb) */
-static int wrk_resolve_pkt(lua_State *L)
+knot_pkt_t * worker_resolve_mk_pkt(const char *qname_str, uint16_t qtype, uint16_t qclass,
+				   const struct kr_qflags *options)
 {
-	if (!the_worker) {
-		return 0;
-	}
-
-	knot_pkt_t *pkt = *(knot_pkt_t **)lua_topointer(L, 1);
-	if (!pkt)
-		lua_error_maybe(L, ENOMEM);
-
-	/* Add query options */
-	const struct kr_qflags *options = lua_topointer(L, 2);
-	if (!options) /* but we rely on the lua wrapper when dereferencing non-NULL */
-		lua_error_p(L, "invalid options");
-
-	/* Create task and start with a first question */
-	struct qr_task *task = worker_resolve_start(the_worker, pkt, *options);
-	if (!task) {
-		lua_error_p(L, "couldn't create a resolution request");
-	}
-
-	/* Add initialisation callback */
-	if (lua_isfunction(L, 3)) {
-		lua_pushvalue(L, 3);
-		lua_pushlightuserdata(L, worker_task_request(task));
-		(void) execute_callback(L, 1);
-	}
-
-	/* Start execution */
-	int ret = worker_resolve_exec(task, pkt);
-	lua_pushboolean(L, ret == 0);
-	return 1;
-}
-
-/** resolve(qname, qtype, qclass, options, init_cb) */
-static int wrk_resolve(lua_State *L)
-{
-	struct worker_ctx *worker = the_worker;
-	if (!worker) {
-		return 0;
-	}
-
-	uint8_t dname[KNOT_DNAME_MAXLEN];
-	if (!knot_dname_from_str(dname, lua_tostring(L, 1), sizeof(dname)))
-		lua_error_p(L, "invalid qname");
-
-	/* Check class and type */
-	uint16_t rrtype = lua_tointeger(L, 2);
-	if (!lua_isnumber(L, 2))
-		lua_error_p(L, "invalid RR type");
-
-	uint16_t rrclass = lua_tointeger(L, 3);
-	if (!lua_isnumber(L, 3)) { /* Default class is IN */
-		rrclass = KNOT_CLASS_IN;
-	}
-
-	/* Add query options */
-	const struct kr_qflags *options = lua_topointer(L, 4);
-	if (!options) /* but we rely on the lua wrapper when dereferencing non-NULL */
-		lua_error_p(L, "invalid options");
-
-	/* Create query packet */
+	uint8_t qname[KNOT_DNAME_MAXLEN];
+	if (!knot_dname_from_str(qname, qname_str, sizeof(qname)))
+		return NULL;
 	knot_pkt_t *pkt = knot_pkt_new(NULL, KNOT_EDNS_MAX_UDP_PAYLOAD, NULL);
 	if (!pkt)
-		lua_error_maybe(L, ENOMEM);
-	knot_pkt_put_question(pkt, dname, rrclass, rrtype);
+		return NULL;
+	knot_pkt_put_question(pkt, qname, qclass, qtype);
 	knot_wire_set_rd(pkt->wire);
 	knot_wire_set_ad(pkt->wire);
 
 	/* Add OPT RR */
-	pkt->opt_rr = knot_rrset_copy(worker->engine->resolver.opt_rr, NULL);
+	pkt->opt_rr = knot_rrset_copy(the_worker->engine->resolver.opt_rr, NULL);
 	if (!pkt->opt_rr) {
 		knot_pkt_free(pkt);
-		lua_error_maybe(L, ENOMEM);
+		return NULL;
 	}
 	if (options->DNSSEC_WANT) {
 		knot_edns_set_do(pkt->opt_rr);
 	}
-
 	if (options->DNSSEC_CD) {
 		knot_wire_set_cd(pkt->wire);
 	}
 
-	lua_pushcfunction(L, wrk_resolve_pkt);
-	lua_pushlightuserdata(L, &pkt);
-	lua_pushvalue(L, 4);  /* options */
-	lua_pushvalue(L, 5);  /* init_cb */
-	lua_call(L, 3, 1);  /* leaves return value on stack */
-
-	knot_rrset_free(pkt->opt_rr, NULL);
-	knot_pkt_free(pkt);
-	return 1;
+	return pkt;
 }
 
 static inline double getseconds(uv_timeval_t *tv)
@@ -172,8 +106,6 @@ static int wrk_stats(lua_State *L)
 int kr_bindings_worker(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
-		{ "resolve_unwrapped",  wrk_resolve },
-		{ "resolve_unwrapped_pkt",  wrk_resolve_pkt },
 		{ "stats",    wrk_stats },
 		{ NULL, NULL }
 	};
