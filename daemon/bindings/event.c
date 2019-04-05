@@ -87,7 +87,7 @@ static int event_sched(lua_State *L, unsigned timeout, unsigned repeat)
 	lua_newtable(L);
 	lua_pushvalue(L, 2);
 	lua_rawseti(L, -2, 1);
-	lua_pushlightuserdata(L, timer);
+	lua_pushpointer(L, timer);
 	lua_rawseti(L, -2, 2);
 	int ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
@@ -132,7 +132,7 @@ static int event_cancel(lua_State *L)
 
 	/* Close the timer */
 	lua_rawgeti(L, -1, 2);
-	uv_handle_t *timer = lua_touserdata(L, -1);
+	uv_handle_t *timer = *(uv_handle_t **)lua_touserdata(L, -1);
 	if (!uv_is_closing(timer)) {
 		uv_close(timer, (uv_close_cb) event_free);
 	}
@@ -155,7 +155,7 @@ static int event_reschedule(lua_State *L)
 
 	/* Reschedule the timer */
 	lua_rawgeti(L, -1, 2);
-	uv_handle_t *timer = lua_touserdata(L, -1);
+	uv_handle_t *timer = *(uv_handle_t **)lua_touserdata(L, -1);
 	if (!uv_is_closing(timer)) {
 		if (uv_is_active(timer)) {
 			uv_timer_stop((uv_timer_t *)timer);
@@ -197,7 +197,7 @@ static int event_fdwatch(lua_State *L)
 	lua_newtable(L);
 	lua_pushvalue(L, 2);
 	lua_rawseti(L, -2, 1);
-	lua_pushlightuserdata(L, handle);
+	lua_pushpointer(L, handle);
 	lua_rawseti(L, -2, 2);
 	int ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
