@@ -338,10 +338,6 @@ static knot_pkt_t *zi_query_create(zone_import_ctx_t *z_import, knot_rrset_t *rr
  * @return -1 if failed; 0 if success */
 static int zi_rrset_import(zone_import_ctx_t *z_import, knot_rrset_t *rr)
 {
-	struct worker_ctx *worker = z_import->worker;
-
-	assert(worker);
-
 	/* Create "pseudo query" which asks for given rrset. */
 	knot_pkt_t *query = zi_query_create(z_import, rr);
 	if (!query) {
@@ -369,7 +365,7 @@ static int zi_rrset_import(zone_import_ctx_t *z_import, knot_rrset_t *rr)
 
 	/* This call creates internal structures which necessary for
 	 * resolving - qr_task & request_ctx. */
-	struct qr_task *task = worker_resolve_start(worker, query, options);
+	struct qr_task *task = worker_resolve_start(query, options);
 	if (!task) {
 		knot_pkt_free(query);
 		knot_pkt_free(answer);
