@@ -32,27 +32,30 @@ if rawget(kres, 'str2dname') ~= nil then
 	todname = kres.str2dname
 end
 
-local function prep_resolve_cb(finish, init)
-	local init_cb, finish_cb = init, nil
-	if finish then
-		-- Create callback for finalization
-		finish_cb = ffi.cast('trace_callback_f', function (req)
-			jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
+
+worker.resolve_pkt = function (pkt, options, finish, init)
+	options = kres.mk_qflags(options)
+	local task = ffi.C.worker_resolve_start(pkt, options)
+
+	-- Deal with finish and init callbacks
+	if finish ~= nil then
+		local finish_cb
+		finish_cb = ffi.cast('trace_callback_f',
+			function (req)
+				jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
 			req = kres.request_t(req)
-			finish(req.answer, req)
-			finish_cb:free()
-		end)
-		-- Wrap initialiser to install finish callback
-		init_cb = function (req)
-			req = kres.request_t(req)
-			if init then init(req) end
-			req.trace_finish = finish_cb
-		end
+				finish(req.answer, req)
+				finish_cb:free()
+			end)
+		task.ctx.req.trace_finish = finish_cb
 	end
-	return init_cb
+	if init ~= nil then
+		init(task.ctx.req)
+	end
+
+	return ffi.C.worker_resolve_exec(task, pkt) == 0
 end
 
--- Compatibility wrapper for query flags.
 worker.resolve = function (qname, qtype, qclass, options, finish, init)
 	-- Alternatively use named arguments
 	if type(qname) == 'table' then
@@ -64,19 +67,17 @@ worker.resolve = function (qname, qtype, qclass, options, finish, init)
 		finish = t.finish
 		init = t.init
 	end
-	local init_cb = prep_resolve_cb(finish, init)
-
-	-- Translate options and resolve
 	options = kres.mk_qflags(options)
-	return worker.resolve_unwrapped(qname, qtype, qclass, options, init_cb)
+	-- LATER: nicer errors for rubbish in qname, qtype, qclass?
+	local pkt = ffi.C.worker_resolve_mk_pkt(qname, qtype, qclass, options)
+	if pkt == nil then
+		panic('failure in worker.resolve(); probably invalid qname "%s"', qname)
+	end
+	local ret = worker.resolve_pkt(pkt, options, finish, init)
+	ffi.C.knot_rrset_free(pkt.opt_rr, nil);
+	ffi.C.knot_pkt_free(pkt);
+	return ret
 end
-
-worker.resolve_pkt = function (pkt, options, finish, init)
-	local init_cb = prep_resolve_cb(finish, init)
-	options = kres.mk_qflags(options)
-	return worker.resolve_unwrapped_pkt(pkt, options, init_cb)
-end
-
 resolve = worker.resolve
 
 -- Shorthand for aggregated per-worker information
