@@ -319,6 +319,7 @@ char *knot_dname_to_str(char *, const knot_dname_t *, size_t);
 knot_rdata_t *knot_rdataset_at(const knot_rdataset_t *, uint16_t);
 int knot_rdataset_merge(knot_rdataset_t *, const knot_rdataset_t *, knot_mm_t *);
 int knot_rrset_add_rdata(knot_rrset_t *, const uint8_t *, uint16_t, knot_mm_t *);
+void knot_rrset_free(knot_rrset_t *, knot_mm_t *);
 int knot_rrset_txt_dump(const knot_rrset_t *, char **, size_t *, const knot_dump_style_t *);
 int knot_rrset_txt_dump_data(const knot_rrset_t *, const size_t, char *, const size_t, const knot_dump_style_t *);
 size_t knot_rrset_size(const knot_rrset_t *);
@@ -399,6 +400,17 @@ struct endpoint {
 	_Bool engaged;
 	endpoint_flags_t flags;
 };
+struct request_ctx {
+	struct kr_request req;
+	/* beware: hidden stub, to avoid hardcoding sockaddr lengths */
+};
+struct qr_task {
+	struct request_ctx *ctx;
+	/* beware: hidden stub, to avoid qr_tasklist_t */
+};
+int worker_resolve_exec(struct qr_task *, knot_pkt_t *);
+knot_pkt_t *worker_resolve_mk_pkt(const char *, uint16_t, uint16_t, const struct kr_qflags *);
+struct qr_task *worker_resolve_start(knot_pkt_t *, struct kr_qflags);
 typedef struct {
 	uint8_t bitmap[32];
 	uint8_t length;
