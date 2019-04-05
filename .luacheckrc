@@ -42,6 +42,7 @@ new_read_globals = {
 	'table_print',
 	'__engine',
 	'_ENV',
+	'_SANDBOX',
 }
 
 new_globals = {
