@@ -17,6 +17,7 @@
 #include <contrib/cleanup.h>
 #include <ccan/json/json.h>
 #include <ccan/asprintf/asprintf.h>
+#include <dlfcn.h>
 #include <uv.h>
 #include <unistd.h>
 #include <grp.h>
@@ -465,6 +466,11 @@ static int init_resolver(struct engine *engine)
 	lru_create(&engine->resolver.cache_rep, LRU_REP_SIZE, NULL, NULL);
 	lru_create(&engine->resolver.cache_cookie, LRU_COOKIES_SIZE, NULL, NULL);
 
+	/* Load basic modules */
+	engine_register(engine, "iterate", NULL, NULL);
+	engine_register(engine, "validate", NULL, NULL);
+	engine_register(engine, "cache", NULL, NULL);
+
 	return array_push(engine->backends, kr_cdb_lmdb());
 }
 
@@ -699,13 +705,7 @@ int engine_load_sandbox(struct engine *engine)
 		lua_pop(engine->L, 1);
 		return kr_error(ENOEXEC);
 	}
-
 	ret = ffimodule_init(engine->L);
-	/* Load basic modules */
-	engine_register(engine, "iterate", NULL, NULL);
-	engine_register(engine, "validate", NULL, NULL);
-	engine_register(engine, "cache", NULL, NULL);
-
 	return ret;
 }
 
@@ -787,23 +787,37 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 	if (!module) {
 		return kr_error(ENOMEM);
 	}
-	module->data = engine; /* FIXME: rewriting this, etc. */
+	module->data = engine; /*< some outside modules may still use this value */
 
-		/* TODO: tidy and comment this section. */
 	int ret = kr_module_load(module, name, LIBDIR "/kres_modules");
-	if (ret == 0) { /* We have a C module, loaded and init() was called. */
-		lua_getglobal(engine->L, "modules_create_table_for_c");
-		lua_pushpointer(engine->L, module);
-		if (engine_pcall(engine->L, 1) != 0) {
+	if (ret == 0) {
+		/* We have a C module, loaded and init() was called.
+		 * Now we need to prepare the lua side. */
+		lua_State *L = engine->L;
+		lua_getglobal(L, "modules_create_table_for_c");
+		lua_pushpointer(L, module);
+		if (lua_isnil(L, -2)) {
+			/* When loading the three embedded modules, we don't
+			 * have the "modules_*" lua function yet, but fortunately
+			 * we don't need it there.  Let's just check they're embedded.
+			 * TODO: solve this better *without* breaking stuff. */
+			lua_pop(L, 2);
+			if (module->lib != RTLD_DEFAULT) {
+				ret = kr_error(1);
+				lua_pushliteral(L, "missing modules_create_table_for_c()");
+			}
+		} else {
+			ret = engine_pcall(L, 1);
+		}
+		if (ret) {
 			kr_log_error("[system] internal error when loading C module %s: %s\n",
-					module->name, lua_tostring(engine->L, -1));
-			lua_pop(engine->L, 1);
-			ret = kr_error(1);
+					module->name, lua_tostring(L, -1));
+			lua_pop(L, 1);
 			assert(false); /* probably not critical, but weird */
 		}
 
 	} else if (ret == kr_error(ENOENT)) {
-		/* Try to load and .init() the lua module. */
+		/* No luck with C module, so try to load and .init() lua module. */
 		ret = ffimodule_register_lua(engine, module, name);
 		if (ret != 0) {
 			kr_log_error("[system] failed to load module '%s'\n", name);
@@ -813,6 +827,7 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 		/* Print a more helpful message when module is linked against an old resolver ABI. */
 		kr_log_error("[system] module '%s' links to unsupported ABI, please rebuild it\n", name);
 	}
+
 	if (ret != 0) {
 		engine_unload(engine, module);
 		return ret;
