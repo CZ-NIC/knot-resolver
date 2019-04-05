@@ -68,7 +68,8 @@ struct kr_module {
 	 * Lua API: not used and not useful (from C). */
 	const struct kr_prop *props;
 
-	void *lib;  /**< Shared library handle or RTLD_DEFAULT; NULL for lua modules. */
+	/** dlopen() handle; RTLD_DEFAULT for embedded modules; NULL for lua modules. */
+	void *lib;
 	void *data; /**< Custom data context. */
 };
 
