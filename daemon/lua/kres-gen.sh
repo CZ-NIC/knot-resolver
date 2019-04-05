@@ -147,6 +147,7 @@ ${CDEFS} libknot functions <<-EOF
 	knot_rdataset_at
 	knot_rdataset_merge
 	knot_rrset_add_rdata
+	knot_rrset_free
 	knot_rrset_txt_dump
 	knot_rrset_txt_dump_data
 	knot_rrset_size
@@ -229,11 +230,26 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	packet_ttl
 EOF
 
-## kresd daemon stuff, too
+
+## kresd itself: worker stuff
+
 ${CDEFS} ${KRESD} types <<-EOF
 	endpoint_flags_t
 EOF
-echo "struct endpoint" | ${CDEFS} ${KRESD} types | sed 's/uv_handle_t \*/void */'
+
+echo "struct endpoint"    | ${CDEFS} ${KRESD} types | sed 's/uv_handle_t \*/void */'
+echo "struct request_ctx" | ${CDEFS} ${KRESD} types | sed '/struct {/,$ d'
+printf "\t/* beware: hidden stub, to avoid hardcoding sockaddr lengths */\n};\n"
+
+echo "struct qr_task" | ${CDEFS} ${KRESD} types | sed '/pktbuf/,$ d'
+printf "\t/* beware: hidden stub, to avoid qr_tasklist_t */\n};\n"
+
+${CDEFS} ${KRESD} functions <<-EOF
+	worker_resolve_exec
+	worker_resolve_mk_pkt
+	worker_resolve_start
+EOF
+
 
 ## libzscanner API for ./zonefile.lua
 ${CDEFS} libzscanner types <<-EOF
