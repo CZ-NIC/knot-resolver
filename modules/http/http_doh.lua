@@ -9,8 +9,11 @@ local function get_http_ttl(pkt)
 end
 
 local function convert_sockaddr(pool, family, ipaddr, port)
-	local res = ffi.C.kr_straddr_socket(ipaddr, port, pool) -- resilient to bad parameters
-	if not (family and ipaddr and port and res ~= nil) then
+	local res = nil
+	if family and ipaddr and port then
+		res = ffi.C.kr_straddr_socket(ipaddr, port, pool)
+	end
+	if not res then
 		panic('failed to obtain peer IP address')
 	end
 	return res
