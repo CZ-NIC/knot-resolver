@@ -8,11 +8,12 @@ local function get_http_ttl(pkt)
 	return ffi.C.packet_ttl(pkt, is_negative)
 end
 
-local function convert_sockaddr(family, ipaddr, port)
-	if not (family and ipaddr and port) then
+local function convert_sockaddr(pool, family, ipaddr, port)
+	local res = ffi.C.kr_straddr_socket(ipaddr, port, pool) -- resilient to bad parameters
+	if not (family and ipaddr and port and res ~= nil) then
 		panic('failed to obtain peer IP address')
 	end
-	return ffi.gc(ffi.C.kr_straddr_socket(ipaddr, port, nil), ffi.C.free)
+	return res
 end
 
 -- Trace execution of DNS queries
@@ -86,8 +87,8 @@ local function serve_doh(h, stream)
 
 	-- set source address so filters can work
 	local function init_cb(req)
-		req.qsource.addr = convert_sockaddr(stream:peername())
-		req.qsource.dst_addr = convert_sockaddr(stream:localname())
+		req.qsource.addr = convert_sockaddr(req.pool, stream:peername())
+		req.qsource.dst_addr = convert_sockaddr(req.pool, stream:localname())
 		req.qsource.flags.tcp = true
 		req.qsource.flags.tls = (stream.connection:checktls() ~= nil)
 		req.qsource.flags.http = true
