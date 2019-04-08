@@ -194,7 +194,7 @@ else
 
 	local function test_dstaddr()
 		local triggered = false
-		local exp_dstaddr = ffi.gc(ffi.C.kr_straddr_socket(host, port), ffi.C.free)
+		local exp_dstaddr = ffi.gc(ffi.C.kr_straddr_socket(host, port, nil), ffi.C.free)
 		local function check_dstaddr(state, req)
 			triggered = true
 			same(ffi.C.kr_sockaddr_cmp(req.qsource.dst_addr, exp_dstaddr), 0,
