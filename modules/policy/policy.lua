@@ -48,7 +48,7 @@ end
 -- String address@port -> sockaddr.
 local function addr2sock(target, default_port)
 	local addr, port = addr_split_port(target, default_port)
-	local sock = ffi.gc(ffi.C.kr_straddr_socket(addr, port), ffi.C.free);
+	local sock = ffi.gc(ffi.C.kr_straddr_socket(addr, port, nil), ffi.C.free);
 	if sock == nil then
 		error("target '"..target..'" is not a valid IP address')
 	end

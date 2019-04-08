@@ -12,7 +12,7 @@ local function convert_sockaddr(family, ipaddr, port)
 	if not (family and ipaddr and port) then
 		panic('failed to obtain peer IP address')
 	end
-	return ffi.gc(ffi.C.kr_straddr_socket(ipaddr, port), ffi.C.free)
+	return ffi.gc(ffi.C.kr_straddr_socket(ipaddr, port, nil), ffi.C.free)
 end
 
 -- Trace execution of DNS queries

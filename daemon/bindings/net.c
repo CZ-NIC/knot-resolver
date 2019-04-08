@@ -598,7 +598,7 @@ static int net_tls_client(lua_State *L)
 	uint16_t port = 853;
 	const struct sockaddr *addr = NULL;
 	if (kr_straddr_split(addr_str, buf, &port) == kr_ok())
-		addr = kr_straddr_socket(buf, port);
+		addr = kr_straddr_socket(buf, port, NULL);
 	/* Add newcfg into the C map, saving the original into oldcfg. */
 	if (!addr)
 		lua_error_p(L, "address '%s' could not be converted", addr_str);
@@ -642,7 +642,7 @@ int net_tls_client_clear(lua_State *L)
 	uint16_t port = 853;
 	const struct sockaddr *addr = NULL;
 	if (kr_straddr_split(addr_str, buf, &port) == kr_ok())
-		addr = kr_straddr_socket(buf, port);
+		addr = kr_straddr_socket(buf, port, NULL);
 	if (!addr)
 		lua_error_p(L, "invalid IP address");
 	/* Do the actual removal. */
