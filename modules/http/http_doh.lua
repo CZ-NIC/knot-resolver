@@ -8,13 +8,6 @@ local function get_http_ttl(pkt)
 	return ffi.C.packet_ttl(pkt, is_negative)
 end
 
-local function convert_sockaddr(family, ipaddr, port)
-	if not (family and ipaddr and port) then
-		panic('failed to obtain peer IP address')
-	end
-	return ffi.gc(ffi.C.kr_straddr_socket(ipaddr, port, nil), ffi.C.free)
-end
-
 -- Trace execution of DNS queries
 local function serve_doh(h, stream)
 	local input
@@ -53,6 +46,14 @@ local function serve_doh(h, stream)
 --		return 406, 'only Accept: application/dns-message is supported'
 --	end
 
+	-- We get these values beforehand, because it's easier to handle errors now.
+	local _, peer_addr, peer_port = stream:peername()
+	local _, dst_addr, dst_port = stream:localname()
+	if not (peer_addr and peer_port and dst_addr and dst_port) then
+		 -- The connection probably died in the meantime or something.
+		return 504, 'failed to determine your address'
+	end
+
 	-- Output buffer
 	local output
 	local output_ttl
@@ -86,8 +87,9 @@ local function serve_doh(h, stream)
 
 	-- set source address so filters can work
 	local function init_cb(req)
-		req.qsource.addr = convert_sockaddr(stream:peername())
-		req.qsource.dst_addr = convert_sockaddr(stream:localname())
+		req.qsource.addr = ffi.C.kr_straddr_socket(peer_addr, peer_port, req.pool)
+		req.qsource.dst_addr = ffi.C.kr_straddr_socket(dst_addr, dst_port, req.pool)
+		assert(req.qsource.addr ~= nil and req.qsource.dst_addr ~= nil)
 		req.qsource.flags.tcp = true
 		req.qsource.flags.tls = (stream.connection:checktls() ~= nil)
 		req.qsource.flags.http = true
