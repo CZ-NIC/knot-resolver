@@ -95,8 +95,7 @@ struct kr_layer_api {
 	 * Last chance to affect what will get into the answer, including EDNS.*/
 	int (*answer_finalize)(kr_layer_t *ctx);
 
-	/** The module can store anything in here.
-	 * In lua case we store kr_module pointer. */
+	/** The C module can store anything in here. */
 	void *data;
 
 	/** Internal to ./daemon/ffimodule.c. */
