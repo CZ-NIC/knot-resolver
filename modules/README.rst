@@ -11,35 +11,31 @@ Modules API reference
 Supported languages
 ===================
 
-Currently modules written in C and LuaJIT are supported.
+Currently modules written in C and Lua(JIT) are supported.
 
 The anatomy of an extension
 ===========================
 
-FIXME: review and fix.
-
-A module is a shared object or script defining specific functions, here's an overview.
-
-*Note* |---| the :ref:`Modules <lib_api_modules>` header documents the module loading and API.
+A module is a shared object or script defining specific functions/fields; here's an overview.
 
 .. csv-table::
-   :header: "C/Go", "Lua", "Params", "Comment"
+   :header: "C", "Lua", "Params", "Comment"
 
    "``X_api()`` [#]_", "",               "",                "API version"
    "``X_init()``",     "``X.init()``",   "``module``",      "Constructor"
-   "``X_deinit()``",   "``X.deinit()``", "``module, key``", "Destructor"
-   "``X_config()``",   "``X.config()``", "``module``",      "Configuration"
-   "``X_layer()``",    "``X.layer``",    "``module``",      ":ref:`Module layer <lib-layers>`"
-   "``X_props()``",    "",               "",                "List of properties"
+   "``X_deinit()``",   "``X.deinit()``", "``module``",      "Destructor"
+   "``X_config()``",   "``X.config()``", "``module, str``", "Configuration"
+   "``X_layer``",      "``X.layer``",    "",                ":ref:`Module layer <lib-layers>`"
+   "``X_props``",      "",               "",                "List of properties"
 
-.. [#] Mandatory symbol.
+.. [#] Mandatory symbol; defined by using :c:func:`KR_MODULE_EXPORT`.
 
-The ``X`` corresponds to the module name, if the module name is ``hints``, then the prefix for constructor would be ``hints_init()``.
+The ``X`` corresponds to the module name; if the module name is ``hints``, the prefix for constructor would be ``hints_init()``.
+More details are in docs for the :c:type:`kr_module` and :c:type:`kr_layer_api` structures.
 
 .. note::
-   The resolution context :c:type:`struct kr_context` holds loaded modules for current context. A module can be registered with :c:func:`kr_context_register`, which triggers module constructor *immediately* after the load. Module destructor is automatically called when the resolution context closes.
-   
-   If the module exports a layer implementation, it is automatically discovered by :c:func:`kr_resolver` on resolution init and plugged in. The order in which the modules are registered corresponds to the call order of layers.
+   The modules get ordered -- by default in the same as the order in which they were loaded.  The loading command can specify where in the order the module should be positioned.
+
 
 Writing a module in Lua
 =======================
@@ -47,11 +43,10 @@ Writing a module in Lua
 The probably most convenient way of writing modules is Lua since you can use already installed modules
 from system and have first-class access to the scripting engine. You can also tap to all the events, that
 the C API has access to, but keep in mind that transitioning from the C to Lua function is slower than
-the other way round.
+the other way round, especially when JIT-compilation is taken into account.
 
 .. note:: The Lua functions retrieve an additional first parameter compared to the C counterparts - a "state".
-          There is no Lua wrapper for C structures used in the resolution context, until they're implemented
-          you can inspect the structures using the `ffi <http://luajit.org/ext_ffi.html>`_ library.
+   Most useful C functions and structures have lua FFI wrappers, sometimes with extra sugar.
 
 The modules follow the `Lua way <http://lua-users.org/wiki/ModuleDefinition>`_, where the module interface is returned in a named table.
 
@@ -82,9 +77,11 @@ The modules follow the `Lua way <http://lua-users.org/wiki/ModuleDefinition>`_, 
 
 	return counter
 
-.. tip:: The API functions may return an integer value just like in other languages, but they may also return a coroutine that will be continued asynchronously. A good use case for this approach is is a deferred initialization, e.g. loading a chunks of data or waiting for I/O.
+.. vv Hmm, we do not use these coroutine returns anywhere, so it's unclear whether they still work OK.  Splitting work over time is now typically done via the ``event`` timers.
 
-.. code-block:: lua
+..  The API functions may return an integer value just like in other languages, but they may also return a coroutine that will be continued asynchronously. A good use case for this approach is is a deferred initialization, e.g. loading a chunks of data or waiting for I/O.
+
+.. .. code-block:: lua
 
 	function counter.init(module)
 		counter.total = 0
@@ -119,13 +116,13 @@ doesn't provide any layer to capture events. The Lua module can however provide 
 	}
 
 There is currently an additional "feature" in comparison to C layer functions:
-the ``consume``, ``produce`` and ``checkout`` functions do not get called at all
-if ``state == kres.FAIL``;
-note that ``answer_finalize`` and ``finish`` get called nevertheless.
+some functions do not get called at all if ``state == kres.FAIL``;
+see docs for details: :c:type:`kr_layer_api`.
 
 Since the modules are like any other Lua modules, you can interact with them through the CLI and and any interface.
 
-.. tip:: The module can be placed anywhere in the Lua search path, in the working directory or in the MODULESDIR.
+.. tip:: Module discovery: ``kres_modules.`` is prepended to the module name and lua search path is used on that.
+
 
 Writing a module in C
 =====================
@@ -135,9 +132,10 @@ As almost all the functions are optional, the minimal module looks like this:
 .. code-block:: c
 
 	#include "lib/module.h"
-	/* Convenience macro to declare module API. */
+	/* Convenience macro to declare module ABI. */
 	KR_MODULE_EXPORT(mymodule)
 
+.. TODO it's probably not a good idea to start C module tutorial by pthread_create()
 
 Let's define an observer thread for the module as well. It's going to be stub for the sake of brevity,
 but you can for example create a condition, and notify the thread from query processing by declaring
@@ -192,7 +190,7 @@ Exposing C module properties
 
 A module can offer NULL-terminated list of *properties*, each property is essentially a callable with free-form JSON input/output.
 JSON was chosen as an interchangeable format that doesn't require any schema beforehand, so you can do two things - query the module properties
-from external applications or between modules (i.e. `statistics` module can query `cache` module for memory usage).
+from external applications or between modules (e.g. `statistics` module can query `cache` module for memory usage).
 JSON was chosen not because it's the most efficient protocol, but because it's easy to read and write and interface to outside world.
 
 .. note:: The ``void *env`` is a generic module interface. Since we're implementing daemon modules, the pointer can be cast to ``struct engine*``.
@@ -207,9 +205,9 @@ Here's an example how a module can expose its property:
 	{
 		/* Get cache from engine. */
 		struct engine *engine = env;
-        struct kr_cache *cache = &engine->resolver.cache;
+		struct kr_cache *cache = &engine->resolver.cache;
 		/* Read item count */
-        int count = (cache->api)->count(cache->db);
+		int count = (cache->api)->count(cache->db);
 		char *result = NULL;
 		asprintf(&result, "{ \"result\": %d }", count);
 		
@@ -229,7 +227,7 @@ Here's an example how a module can expose its property:
 	KR_MODULE_EXPORT(cache)
 
 Once you load the module, you can call the module property from the interactive console.
-*Note* |---| the JSON output will be transparently converted to Lua tables.
+*Note:* the JSON output will be transparently converted to Lua tables.
 
 .. code-block:: bash
 
@@ -240,7 +238,8 @@ Once you load the module, you can call the module property from the interactive 
 	> cached.get_size()
 	[size] => 53
 
-*Note* |---| this relies on function pointers, so the same ``static inline`` trick as for the ``Layer()`` is required for C/Go.
+.. No idea what this talks about, but kept for now:
+.. *Note:* this relies on function pointers, so the same ``static inline`` trick as for the ``Layer()`` is required for C.
 
 Special properties
 ------------------
@@ -248,4 +247,3 @@ Special properties
 If the module declares properties ``get`` or ``set``, they can be used in the Lua interpreter as
 regular tables.
 
-.. |---| unicode:: U+02014 .. em dash
