@@ -30,7 +30,7 @@ local function serve_doh(h, stream)
 		return 405, 'only HTTP POST and GET are supported'
 	end
 
-	if #input < 12 then
+	if not input or #input < 12 then
 		return 400, 'input too short'
 	elseif #input > 1024 then
 		return 413, 'input too long'
