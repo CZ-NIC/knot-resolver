@@ -112,8 +112,7 @@ static int l_ffi_deinit(struct kr_module *module)
 	const int ret = l_ffi_modcb(L, module);
 	lua_pop(L, 1); /* the module's table */
 
-	/* Free the layer API wrapper (unconst it) */
-	kr_layer_api_t* api = module->data;
+	const kr_layer_api_t *api = module->layer;
 	if (!api) {
 		return ret;
 	}
@@ -123,7 +122,7 @@ static int l_ffi_deinit(struct kr_module *module)
 			luaL_unref(L, LUA_REGISTRYINDEX, api->cb_slots[si]);
 		}
 	}
-	free(api);
+	free_const(api);
 	return ret;
 }
 
@@ -258,7 +257,6 @@ static kr_layer_api_t *l_ffi_layer_create(lua_State *L, struct kr_module *module
 		LAYER_REGISTER(L, api, checkout);
 		LAYER_REGISTER(L, api, answer_finalize);
 		LAYER_REGISTER(L, api, reset);
-		api->data = module;
 	}
 	return api;
 }
@@ -287,8 +285,6 @@ int ffimodule_register_lua(struct engine *engine, struct kr_module *module, cons
 	lua_getfield(L, -1, "layer");
 	if (!lua_isnil(L, -1)) {
 		module->layer = l_ffi_layer_create(L, module);
-		/* most likely not needed, but compatibility for now */
-		module->data = (void *)module->layer;
 	}
 	lua_pop(L, 1); /* .layer table */
 
