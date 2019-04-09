@@ -31,7 +31,7 @@ struct kr_prop;
 /**
  * Export module API version (place this at the end of your module).
  *
- * @param module module name (f.e. hints)
+ * @param module module name (e.g. policy)
  */
 #define KR_MODULE_EXPORT(module) \
     KR_EXPORT uint32_t module ## _api() { return KR_MODULE_API; }
