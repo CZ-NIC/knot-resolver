@@ -354,10 +354,63 @@ function eval_cmd(line, raw)
 end
 
 -- Pretty printing
+
+local function funcsign(f)
+-- thanks to AnandA777 from StackOverflow! Function funcsign is adapted version of
+-- https://stackoverflow.com/questions/51095022/inspect-function-signature-in-lua-5-1
+	assert(type(f) == 'function', "bad argument #1 to 'funcsign' (function expected)")
+	local func_args = {}
+	pcall(function()
+		local oldhook
+		local delay = 2
+		local function hook()
+			delay = delay - 1
+			if delay == 0 then  -- call this only for the introspected function
+				for i = 1, math.huge do
+					-- stack depth 2 is the introspected function
+					local k = debug.getlocal(2, i)
+					if (k or '('):sub(1, 1) == '(' then
+						break  -- internal variable, skip
+					else
+						table.insert(func_args, k)
+					end
+				end
+			if debug.getlocal(2, -1) then
+				-- vararg function
+				table.insert(func_args, "...")
+			end
+			debug.sethook(oldhook)
+			error('aborting the call to introspected function')
+		end
+	end
+	oldhook = debug.sethook(hook, "c")  -- invoke hook() on function call
+	-- fake arguments, necessary to detect vararg functions
+	local fakearg = {}
+	for _ = 1, 64 do fakearg[#fakearg + 1] = true end
+	f(unpack(fakearg)) -- huh?
+	end)
+	return "(" .. table.concat(func_args, ", ") .. ")"
+end
+
 function table_print (tt, indent, done)
 	done = done or {}
 	indent = indent or 0
 	local result = ""
+	-- Ordered for-iterator for tables with tostring-able keys.
+	local function ordered_iter(unordered_tt)
+		local keys = {}
+		for k in pairs(unordered_tt) do
+			table.insert(keys, k)
+		end
+		table.sort(keys, function (a, b) return tostring(a) < tostring(b) end)
+		local i = 0
+		return function()
+			i = i + 1
+			if keys[i] then
+				return keys[i], unordered_tt[keys[i]]
+			end
+		end
+	end
 	-- Convert to printable string (escape unprintable)
 	local function printable(value)
 		value = tostring(value)
@@ -372,7 +425,7 @@ function table_print (tt, indent, done)
 		return table.concat(bytes)
 	end
 	if type(tt) == "table" then
-		for key, value in pairs (tt) do
+		for key, value in ordered_iter(tt) do
 			result = result .. string.rep (" ", indent)
 			if type (value) == "table" and not done [value] then
 				done [value] = true
@@ -380,13 +433,22 @@ function table_print (tt, indent, done)
 				result = result .. table_print (value, indent + 4, done)
 				result = result .. string.rep (" ", indent)
 				result = result .. "}\n"
+			elseif type (value) == "function" then
+				result = result .. string.format("[%s] => function %s%s\n",
+				         tostring(key), tostring(key), funcsign(value))
 			else
 				result = result .. string.format("[%s] => %s\n",
 				         tostring (key), printable(value))
 			end
 		end
-	else
-		result = result .. tostring(tt) .. "\n"
+	else  -- not a table
+		local tt_str
+		if type(tt) == "function" then
+			tt_str = string.format("function%s\n", funcsign(tt))
+		else
+			tt_str = tostring(tt)
+		end
+		result = result .. tt_str .. "\n"
 	end
 	return result
 end
