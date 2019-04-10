@@ -21,7 +21,7 @@
 
 static int wrk_resolve(lua_State *L)
 {
-	struct worker_ctx *worker = the_worker;
+	struct worker_ctx *worker = wrk_luaget(L);
 	if (!worker) {
 		return 0;
 	}
@@ -98,7 +98,7 @@ static inline double getseconds(uv_timeval_t *tv)
 /** Return worker statistics. */
 static int wrk_stats(lua_State *L)
 {
-	struct worker_ctx *worker = the_worker;
+	struct worker_ctx *worker = wrk_luaget(L);
 	if (!worker) {
 		return 0;
 	}

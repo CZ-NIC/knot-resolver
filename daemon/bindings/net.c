@@ -275,7 +275,7 @@ static int net_bufsize(lua_State *L)
 /** Set TCP pipelining size. */
 static int net_pipeline(lua_State *L)
 {
-	struct worker_ctx *worker = the_worker;
+	struct worker_ctx *worker = wrk_luaget(L);
 	if (!worker) {
 		return 0;
 	}
@@ -780,11 +780,12 @@ static int net_tls_sticket_secret_file(lua_State *L)
 
 static int net_outgoing(lua_State *L, int family)
 {
+	struct worker_ctx *worker = wrk_luaget(L);
 	union inaddr *addr;
 	if (family == AF_INET)
-		addr = (union inaddr*)&the_worker->out_addr4;
+		addr = (union inaddr*)&worker->out_addr4;
 	else
-		addr = (union inaddr*)&the_worker->out_addr6;
+		addr = (union inaddr*)&worker->out_addr6;
 
 	if (lua_gettop(L) == 0) { /* Return the current value. */
 		if (addr->ip.sa_family == AF_UNSPEC) {
