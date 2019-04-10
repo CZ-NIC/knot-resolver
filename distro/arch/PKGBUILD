@@ -24,6 +24,7 @@ depends=(
     'systemd'
 )
 optdepends=(
+    'lua51-basexx: experimental_dot_auth module',
     'lua51-http: http module',
     'lua51-filesystem: prefill module',
 )
