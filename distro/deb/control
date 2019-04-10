@@ -40,6 +40,7 @@ Breaks:
   libkres9 (<< 3.2.1-2),
 Recommends:
  knot-resolver-module-http,
+ lua-basexx,
  lua-cqueues,
 Description: caching, DNSSEC-validating DNS resolver
  The Knot Resolver is a caching full resolver implementation
