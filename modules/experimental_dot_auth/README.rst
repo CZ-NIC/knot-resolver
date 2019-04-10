@@ -80,5 +80,10 @@ if Knot Resolver uses data from its cache. You may need to delete the cache befo
 
 The module also assumes that the NS query answer will return both the NS targets in the Authority section as well as the glue records in the Additional section.
 
+Dependencies
+^^^^^^^^^^^^
+
+* `lua-basexx <https://github.com/aiq/basexx>`_ available in LuaRocks
+
 .. _dnscurve: https://dnscurve.org/
 .. _SPKI: https://en.wikipedia.org/wiki/Simple_public-key_infrastructure
