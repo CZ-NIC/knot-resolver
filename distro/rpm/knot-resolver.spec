@@ -47,12 +47,13 @@ BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
 
-Requires:	systemd
+Requires:       systemd
 
 # Distro-dependent dependencies
 %if 0%{?rhel}
 BuildRequires:  lmdb-devel
 # Lua 5.1 version of the libraries have different package names
+Requires:       lua-basexx
 Requires:       lua-socket
 Requires:       lua-sec
 Requires:       lua-filesystem
@@ -61,6 +62,7 @@ Requires(pre):  shadow-utils
 %if 0%{?fedora}
 BuildRequires:  pkgconfig(lmdb)
 BuildRequires:  python3-sphinx
+Requires:       compat-lua-basexx
 Requires:       lua-cqueues-compat
 Requires:       lua-filesystem-compat
 Requires:       lua-socket-compat
@@ -180,6 +182,7 @@ install -m 0750 -d %{buildroot}/run/%{name}
 # remove modules with missing dependencies
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/etcd.lua
 %if 0%{?suse_version}
+rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/experimental_dot_auth.lua
 rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/http*.lua
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/prometheus.lua
