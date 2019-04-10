@@ -43,7 +43,7 @@ Example configuration:
 	-- Load HTTP module with defaults
         modules.load('http')
         http.config({
-                host = 'hostname.example', -- change to your server name
+                host = '::',        -- listen on ALL IPv4 and IPv6 addresses
                 port = 443,         -- feel free to use any other port
                 tls = true,
                 -- use valid X.509 cert issued by a recognized Certificate authority
