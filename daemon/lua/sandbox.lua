@@ -356,12 +356,12 @@ local function funcsign(f)
 	pcall(function()
 		local oldhook
 		local delay = 2
-		local function hook(event, line)
+		local function hook()
 			delay = delay - 1
 			if delay == 0 then  -- call this only for the introspected function
 				for i = 1, math.huge do
 					-- stack depth 2 is the introspected function
-					local k, v = debug.getlocal(2, i)
+					local k = debug.getlocal(2, i)
 					if (k or '('):sub(1, 1) == '(' then
 						break  -- internal variable, skip
 					else
@@ -378,8 +378,8 @@ local function funcsign(f)
 	end
 	oldhook = debug.sethook(hook, "c")  -- invoke hook() on function call
 	-- fake arguments, necessary to detect vararg functions
-	fakearg = {}
-	for j = 1, 64 do fakearg[#fakearg + 1] = true end
+	local fakearg = {}
+	for _ = 1, 64 do fakearg[#fakearg + 1] = true end
 	f(unpack(fakearg)) -- huh?
 	end)
 	return "(" .. table.concat(func_args, ", ") .. ")"
@@ -435,6 +435,7 @@ function table_print (tt, indent, done)
 			end
 		end
 	else  -- not a table
+		local tt_str
 		if type(tt) == "function" then
 			tt_str = string.format("function%s\n", funcsign(tt))
 		else
