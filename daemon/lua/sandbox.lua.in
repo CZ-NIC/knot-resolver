@@ -396,13 +396,13 @@ function table_print (tt, indent, done)
 	done = done or {}
 	indent = indent or 0
 	local result = ""
-	-- Convert to printable string (escape unprintable)
+	-- Ordered for-iterator for tables with tostring-able keys.
 	local function ordered_iter(unordered_tt)
 		local keys = {}
 		for k in pairs(unordered_tt) do
-			table.insert(keys, tostring(k))
+			table.insert(keys, k)
 		end
-		table.sort(keys)
+		table.sort(keys, function (a, b) return tostring(a) < tostring(b) end)
 		local i = 0
 		return function()
 			i = i + 1
@@ -411,6 +411,7 @@ function table_print (tt, indent, done)
 			end
 		end
 	end
+	-- Convert to printable string (escape unprintable)
 	local function printable(value)
 		value = tostring(value)
 		local bytes = {}
