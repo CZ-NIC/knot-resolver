@@ -28,13 +28,16 @@ Architecture: any
 Depends:
  adduser,
  dns-root-data,
- libkres9 (= ${binary:Version}),
  lua-sec,
  lua-socket,
  lua-filesystem,
  systemd,
  ${misc:Depends},
  ${shlibs:Depends},
+Replaces:
+  libkres9 (<< 3.2.1-2),
+Breaks:
+  libkres9 (<< 3.2.1-2),
 Recommends:
  knot-resolver-module-http,
  lua-cqueues,
@@ -94,44 +97,3 @@ Description: Documentation for Knot Resolver
  validator, and many external.
  .
  This package contains Knot Resolver Documentation.
-
-Package: libkres9
-Architecture: any
-Section: libs
-Depends:
- ${misc:Depends},
- ${shlibs:Depends},
-Breaks:
- knot-resolver (<< 3.2.0-1),
-Replaces:
- knot-resolver (<< 3.2.0-1),
-Description: caching, DNSSEC-validating DNS resolver (shared library)
- The Knot Resolver is a caching full resolver implementation
- written in C and LuaJIT, including both a resolver library and a
- daemon. Modular architecture of the library keeps the core tiny and
- efficient, and provides a state-machine like API for
- extensions.
- .
- This package contains the libkres shared library used by Knot
- Resolver.
-
-Package: libkres-dev
-Architecture: any
-Section: libdevel
-Depends:
- libkres9 (= ${binary:Version}),
- ${misc:Depends},
- ${shlibs:Depends},
-Breaks:
- knot-resolver (<< 3.2.0-1),
-Replaces:
- knot-resolver (<< 3.2.0-1),
-Description: caching, DNSSEC-validating DNS resolver (shared library development files)
- The Knot Resolver is a caching full resolver implementation
- written in C and LuaJIT, including both a resolver library and a
- daemon. Modular architecture of the library keeps the core tiny and
- efficient, and provides a state-machine like API for
- extensions.
- .
- This package provides development files for use when building against
- the libkres shared library.
