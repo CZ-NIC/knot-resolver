@@ -370,6 +370,11 @@ local function funcsign(f)
 -- thanks to AnandA777 from StackOverflow! Function funcsign is adapted version of
 -- https://stackoverflow.com/questions/51095022/inspect-function-signature-in-lua-5-1
 	assert(type(f) == 'function', "bad argument #1 to 'funcsign' (function expected)")
+	local debuginfo = debug.getinfo(f)
+	if debuginfo.what == 'C' then  -- names N/A
+		return '(?)'
+	end
+
 	local func_args = {}
 	pcall(function()
 		local oldhook
@@ -378,14 +383,11 @@ local function funcsign(f)
 			delay = delay - 1
 			if delay == 0 then  -- call this only for the introspected function
 				-- stack depth 2 is the introspected function
-				local debuginfo = debug.getinfo(2)
 				for i = 1, debuginfo.nparams do
 					local k = debug.getlocal(2, i)
 					table.insert(func_args, k)
 				end
-				if debuginfo.what == 'C' then  -- names N/A
-					table.insert(func_args, '?')
-				elseif debuginfo.isvararg then
+				if debuginfo.isvararg then
 					table.insert(func_args, "...")
 				end
 				debug.sethook(oldhook)
