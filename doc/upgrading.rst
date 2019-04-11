@@ -63,6 +63,9 @@ Module changes
   ``kres_modules.*``.
 * ``kr_straddr_split()`` API has changed.
 
+* C modules defining ``*_layer`` or ``*_props`` symbols need to use a different style, but it's typically a trivial change.
+  Instead of exporting the corresponding symbols, the module should assign pointers to its static structures inside its ``*_init()`` function.  Example migration:
+  `bogus_log module <https://gitlab.labs.nic.cz/knot/knot-resolver/commit/2875a3970#9fa69cdc6ee1903dc22e3262f58996395acab364>`_.
 
 .. _upgrade-from-2-to-3:
 
