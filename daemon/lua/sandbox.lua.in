@@ -389,20 +389,15 @@ local function funcsign(f)
 				local debuginfo = debug.getinfo(2)
 				if debuginfo.what == 'C' then  -- names N/A
 					table.insert(func_args, '?')
-				end
-				if debug.getlocal(2, -1) then
-					-- vararg function
+				elseif debuginfo.isvararg then
 					table.insert(func_args, "...")
 				end
 				debug.sethook(oldhook)
 				error('aborting the call to introspected function')
 			end
 		end
-	oldhook = debug.sethook(hook, "c")  -- invoke hook() on function call
-	-- fake arguments, necessary to detect vararg functions
-	local fakearg = {}
-	for _ = 1, 64 do fakearg[#fakearg + 1] = true end
-	f(unpack(fakearg)) -- huh?
+		oldhook = debug.sethook(hook, "c")  -- invoke hook() on function call
+		f(unpack({}))  -- huh?
 	end)
 	return "(" .. table.concat(func_args, ", ") .. ")"
 end
