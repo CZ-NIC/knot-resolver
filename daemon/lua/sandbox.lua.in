@@ -377,16 +377,12 @@ local function funcsign(f)
 		local function hook()
 			delay = delay - 1
 			if delay == 0 then  -- call this only for the introspected function
-				for i = 1, math.huge do
-					-- stack depth 2 is the introspected function
-					local k = debug.getlocal(2, i)
-					if (k or '('):sub(1, 1) == '(' then
-						break  -- internal variable, skip
-					else
-						table.insert(func_args, k)
-					end
-				end
+				-- stack depth 2 is the introspected function
 				local debuginfo = debug.getinfo(2)
+				for i = 1, debuginfo.nparams do
+					local k = debug.getlocal(2, i)
+					table.insert(func_args, k)
+				end
 				if debuginfo.what == 'C' then  -- names N/A
 					table.insert(func_args, '?')
 				elseif debuginfo.isvararg then
