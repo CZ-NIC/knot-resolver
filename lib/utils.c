@@ -455,24 +455,24 @@ int kr_family_len(int family)
 	}
 }
 
-struct sockaddr * kr_straddr_socket(const char *addr, int port)
+struct sockaddr * kr_straddr_socket(const char *addr, int port, knot_mm_t *pool)
 {
 	switch (kr_straddr_family(addr)) {
 	case AF_INET: {
-		struct sockaddr_in *res = malloc(sizeof(*res));
+		struct sockaddr_in *res = mm_alloc(pool, sizeof(*res));
 		if (uv_ip4_addr(addr, port, res) >= 0) {
 			return (struct sockaddr *)res;
 		} else {
-			free(res);
+			mm_free(pool, res);
 			return NULL;
 		}
 	}
 	case AF_INET6: {
-		struct sockaddr_in6 *res = malloc(sizeof(*res));
+		struct sockaddr_in6 *res = mm_alloc(pool, sizeof(*res));
 		if (uv_ip6_addr(addr, port, res) >= 0) {
 			return (struct sockaddr *)res;
 		} else {
-			free(res);
+			mm_free(pool, res);
 			return NULL;
 		}
 	}

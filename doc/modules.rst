@@ -14,6 +14,7 @@ Modules
 .. include:: ../modules/view/README.rst
 .. include:: ../modules/predict/README.rst
 .. include:: ../modules/http/README.rst
+.. include:: ../modules/http/README.doh.rst
 .. include:: ../modules/daf/README.rst
 .. include:: ../modules/rebinding/README.rst
 .. include:: ../modules/graphite/README.rst

@@ -166,6 +166,7 @@ struct kr_rplan {
 struct kr_request_qsource_flags {
 	_Bool tcp : 1;
 	_Bool tls : 1;
+	_Bool http : 1;
 };
 struct kr_request {
 	struct kr_context *ctx;
@@ -312,13 +313,14 @@ const char *kr_inaddr(const struct sockaddr *);
 int kr_inaddr_family(const struct sockaddr *);
 int kr_inaddr_len(const struct sockaddr *);
 int kr_inaddr_str(const struct sockaddr *, char *, size_t *);
+int kr_sockaddr_cmp(const struct sockaddr *, const struct sockaddr *);
 int kr_sockaddr_len(const struct sockaddr *);
 uint16_t kr_inaddr_port(const struct sockaddr *);
 int kr_straddr_family(const char *);
 int kr_straddr_subnet(void *, const char *);
 int kr_bitcmp(const char *, const char *, int);
 int kr_family_len(int);
-struct sockaddr *kr_straddr_socket(const char *, int);
+struct sockaddr *kr_straddr_socket(const char *, int, knot_mm_t *);
 int kr_straddr_split(const char *, char * restrict, uint16_t *);
 int kr_ranked_rrarray_add(ranked_rr_array_t *, const knot_rrset_t *, uint8_t, _Bool, uint32_t, knot_mm_t *);
 void kr_qflags_set(struct kr_qflags *, struct kr_qflags);
@@ -345,6 +347,7 @@ int kr_cache_insert_rr(struct kr_cache *, const knot_rrset_t *, const knot_rrset
 int kr_cache_remove(struct kr_cache *, const knot_dname_t *, uint16_t);
 int kr_cache_remove_subtree(struct kr_cache *, const knot_dname_t *, _Bool, int);
 int kr_cache_commit(struct kr_cache *);
+uint32_t packet_ttl(const knot_pkt_t *, _Bool);
 typedef struct {
 	uint8_t bitmap[32];
 	uint8_t length;

@@ -11,12 +11,14 @@ lua_http = configure_file(
 
 lua_mod_src += [
   lua_http,
+  files('http_doh.lua'),
   files('http_trace.lua'),
   files('prometheus.lua'),
 ]
 
 config_tests += [
   ['http', files('http.test.lua')],
+  ['http.doh', files('http_doh.test.lua')],
   ['http.tls', files('test_tls/tls.test.lua')],
 ]
 

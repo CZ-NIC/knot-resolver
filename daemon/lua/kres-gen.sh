@@ -174,6 +174,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_inaddr_family
 	kr_inaddr_len
 	kr_inaddr_str
+	kr_sockaddr_cmp
 	kr_sockaddr_len
 	kr_inaddr_port
 	kr_straddr_family
@@ -210,6 +211,8 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_cache_remove
 	kr_cache_remove_subtree
 	kr_cache_commit
+	# FIXME: perhaps rename this exported symbol
+	packet_ttl
 EOF
 
 

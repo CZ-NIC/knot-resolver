@@ -18,7 +18,43 @@
 
 #include "daemon/worker.h"
 
+/** resolve_pkt(pkt, options, init_cb) */
+static int wrk_resolve_pkt(lua_State *L)
+{
+	struct worker_ctx *worker = wrk_luaget(L);
+	if (!worker) {
+		return 0;
+	}
 
+	knot_pkt_t *pkt = *(knot_pkt_t **)lua_topointer(L, 1);
+	if (!pkt)
+		lua_error_maybe(L, ENOMEM);
+
+	/* Add query options */
+	const struct kr_qflags *options = lua_topointer(L, 2);
+	if (!options) /* but we rely on the lua wrapper when dereferencing non-NULL */
+		lua_error_p(L, "invalid options");
+
+	/* Create task and start with a first question */
+	struct qr_task *task = worker_resolve_start(worker, pkt, *options);
+	if (!task) {
+		lua_error_p(L, "couldn't create a resolution request");
+	}
+
+	/* Add initialisation callback */
+	if (lua_isfunction(L, 3)) {
+		lua_pushvalue(L, 3);
+		lua_pushlightuserdata(L, worker_task_request(task));
+		(void) execute_callback(L, 1);
+	}
+
+	/* Start execution */
+	int ret = worker_resolve_exec(task, pkt);
+	lua_pushboolean(L, ret == 0);
+	return 1;
+}
+
+/** resolve(qname, qtype, qclass, options, init_cb) */
 static int wrk_resolve(lua_State *L)
 {
 	struct worker_ctx *worker = wrk_luaget(L);
@@ -67,24 +103,12 @@ static int wrk_resolve(lua_State *L)
 		knot_wire_set_cd(pkt->wire);
 	}
 
-	/* Create task and start with a first question */
-	struct qr_task *task = worker_resolve_start(worker, pkt, *options);
-	if (!task) {
-		knot_rrset_free(pkt->opt_rr, NULL);
-		knot_pkt_free(pkt);
-		lua_error_p(L, "couldn't create a resolution request");
-	}
+	lua_pushcfunction(L, wrk_resolve_pkt);
+	lua_pushlightuserdata(L, &pkt);
+	lua_pushvalue(L, 4);  /* options */
+	lua_pushvalue(L, 5);  /* init_cb */
+	lua_call(L, 3, 1);  /* leaves return value on stack */
 
-	/* Add initialisation callback */
-	if (lua_isfunction(L, 5)) {
-		lua_pushvalue(L, 5);
-		lua_pushlightuserdata(L, worker_task_request(task));
-		(void) execute_callback(L, 1);
-	}
-
-	/* Start execution */
-	int ret = worker_resolve_exec(task, pkt);
-	lua_pushboolean(L, ret == 0);
 	knot_rrset_free(pkt->opt_rr, NULL);
 	knot_pkt_free(pkt);
 	return 1;
@@ -148,6 +172,7 @@ int kr_bindings_worker(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
 		{ "resolve_unwrapped",  wrk_resolve },
+		{ "resolve_unwrapped_pkt",  wrk_resolve_pkt },
 		{ "stats",    wrk_stats },
 		{ NULL, NULL }
 	};
