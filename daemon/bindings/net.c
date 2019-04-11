@@ -88,8 +88,9 @@ static int net_list(lua_State *L)
 	return 1;
 }
 
-/** Listen on an address list represented by the top of lua stack. */
-static int net_listen_addrs(lua_State *L, int port, bool tls)
+/** Listen on an address list represented by the top of lua stack.
+ * \return success */
+static bool net_listen_addrs(lua_State *L, int port, bool tls)
 {
 	/* Case: table with 'addr' field; only follow that field directly. */
 	lua_getfield(L, -1, "addr");
@@ -125,11 +126,11 @@ static int net_listen_addrs(lua_State *L, int port, bool tls)
 		lua_error_p(L, "bad type for address");
 	lua_pushnil(L);
 	while (lua_next(L, -2)) {
-		if (net_listen_addrs(L, port, tls) == 0)
-			return 0;
+		if (!net_listen_addrs(L, port, tls))
+			return false;
 		lua_pop(L, 1);
 	}
-	return 1;
+	return true;
 }
 
 static bool table_get_flag(lua_State *L, int index, const char *key, bool def)
@@ -166,9 +167,9 @@ static int net_listen(lua_State *L)
 
 	/* Now focus on the first argument. */
 	lua_pop(L, n - 1);
-	int res = net_listen_addrs(L, port, tls);
+	const bool res = net_listen_addrs(L, port, tls);
 	lua_pushboolean(L, res);
-	return res;
+	return 1;
 }
 
 /** Close endpoint. */
