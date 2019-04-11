@@ -1,5 +1,5 @@
 [Unit]
-Description=Knot Resolver DNS-over-TLS socket
+Description=Knot Resolver DNS-over-HTTPS socket
 Documentation=man:kresd.systemd(7)
 Documentation=man:kresd(8)
 Before=sockets.target
@@ -7,9 +7,9 @@ Before=sockets.target
 [Socket]
 FreeBind=true
 BindIPv6Only=both
-FileDescriptorName=tls
-ListenStream=[::1]:853
-ListenStream=127.0.0.1:853
+FileDescriptorName=doh
+ListenStream=[::1]:44353
+ListenStream=127.0.0.1:44353
 Service=kresd@1.service
 Slice=system-kresd.slice
 

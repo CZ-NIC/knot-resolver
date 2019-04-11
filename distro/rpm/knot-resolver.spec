@@ -117,6 +117,7 @@ Documentation for Knot Resolver
 %if "x%{?suse_version}" == "x"
 %package module-http
 Summary:        HTTP/2 module for Knot Resolver
+Requires:       knot-resolver
 %if 0%{?fedora}
 Requires:       compat-lua-http
 Requires:       compat-lua-mmdb
@@ -185,6 +186,9 @@ rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/experimental_dot_auth.lua
 rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/http*.lua
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/prometheus.lua
+rm %{buildroot}%{_unitdir}/kresd@.service.d/module-http.conf
+rm %{buildroot}%{_unitdir}/kresd-doh.socket
+rm %{buildroot}%{_unitdir}/kresd-webmgmt.socket
 %endif
 
 # rename doc directory for centos, opensuse
@@ -228,12 +232,15 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %attr(664,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/root.keys
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/root.hints
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/icann-ca.pem
-%{_unitdir}/kresd*.service
+%{_unitdir}/kresd@.service
 %{_unitdir}/kresd.target
 %dir %{_unitdir}/multi-user.target.wants
 %{_unitdir}/multi-user.target.wants/kresd.target
 %if "x%{?rhel}" == "x"
-%{_unitdir}/kresd*.socket
+%dir %{_unitdir}/kresd@.service.d
+%{_unitdir}/kresd.socket
+%{_unitdir}/kresd-tls.socket
+%{_unitdir}/kresd-control@.socket
 %ghost /run/%{name}/
 %{_mandir}/man7/kresd.systemd.7.gz
 %else
@@ -285,6 +292,11 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 
 %if "x%{?suse_version}" == "x"
 %files module-http
+%if 0%{?fedora}
+%{_unitdir}/kresd@.service.d/module-http.conf
+%{_unitdir}/kresd-doh.socket
+%{_unitdir}/kresd-webmgmt.socket
+%endif
 %{_libdir}/knot-resolver/kres_modules/http
 %{_libdir}/knot-resolver/kres_modules/http*.lua
 %{_libdir}/knot-resolver/kres_modules/prometheus.lua
