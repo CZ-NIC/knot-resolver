@@ -14,7 +14,7 @@ Incompatible changes
 - DNSSEC is enabled by default
 - upstream packages for Debian now require systemd
 - libknot >= 2.8 is required
-- net.list() output format changed
+- net.list() output format changed (!786)
 
 Improvements
 ------------

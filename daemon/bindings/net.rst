@@ -136,11 +136,7 @@ configured in the config file.
 
    .. code-block:: none
 
-	[127.0.0.1] => {
-	    [port] => 53
-	    [tcp] => true
-	    [udp] => true
-	}
+      TODO
 
 .. function:: net.interfaces()
 
