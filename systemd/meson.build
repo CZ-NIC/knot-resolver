@@ -34,9 +34,17 @@ if systemd_files == 'enabled'
     sources: [
       'kresd.socket',
       'kresd-tls.socket',
+      'kresd-doh.socket',
+      'kresd-webmgmt.socket',
       'kresd.target',
     ],
     install_dir: systemd_unit_dir,
+  )
+  install_data(
+    sources: [
+      'kresd@.service.d/module-http.conf',
+    ],
+    install_dir: join_paths(systemd_unit_dir, 'kresd@.service.d'),
   )
 
   ## man page
@@ -69,6 +77,13 @@ if systemd_files == 'enabled'
       'kresd-tls.socket.d/specific-interfaces.conf',
     ],
     install_dir: join_paths(examples_dir, 'kresd-tls.socket.d'),
+  )
+  install_data(
+    sources: [
+      'kresd-doh.socket.d/all-interfaces.conf',
+      'kresd-doh.socket.d/specific-interfaces.conf',
+    ],
+    install_dir: join_paths(examples_dir, 'kresd-doh.socket.d'),
   )
 elif systemd_files == 'nosocket'
   subdir('nosocket')

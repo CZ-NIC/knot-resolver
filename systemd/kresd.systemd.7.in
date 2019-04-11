@@ -17,6 +17,8 @@ kresd@.service
 kresd.socket
 kresd-tls.socket
 kresd-control@.socket
+kresd-doh.socket
+kresd-webmgmt.socket
 kresd.target
 system-kresd.slice
 .fi
@@ -34,14 +36,16 @@ additional capabilities. The network interface sockets are created by systemd
 and then passed to the daemon.
 
 Network configuration has to take place in \fIsystemd.socket(5)\fR, which can
-be done using drop-in files.  Each instance of \fIkresd@.service\fR has three
-systemd sockets associated with it:
+be done using drop-in files.  Each instance of \fIkresd@.service\fR may have
+these systemd sockets associated with it:
 
 .nf
 .RS
 \fIkresd.socket\fR - UDP/TCP network socket (default: localhost:53)
 \fIkresd-tls.socket\fR - network socket for DNS-over-TLS (default: localhost:853)
 \fIkresd-control@.socket\fR - UNIX socket with control terminal
+\fIkresd-doh.socket\fR - DNS-over-HTTPS (with http module: localhost:44353)
+\fIkresd-webmgmt.socket\fR - web management and APIs (with http module: localhost:8453)
 .RE
 .fi
 
@@ -54,6 +58,7 @@ To configure \fBkresd\fR to listen on public interfaces, drop-in files (see
 .RS 4n
 .B systemctl edit kresd.socket
 .B systemctl edit kresd-tls.socket
+.B systemctl edit kresd-doh.socket
 .RE
 .fi
 
@@ -163,7 +168,8 @@ the sockets:
 .RE
 .fi
 
-To disable the TLS socket, you can mask it:
+To disable optional sockets, you can mask them. For example, to disable
+DNS-over-TLS socket:
 
 .RS 4n
 .B systemctl mask kresd-tls.socket
