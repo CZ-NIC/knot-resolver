@@ -386,6 +386,10 @@ local function funcsign(f)
 						table.insert(func_args, k)
 					end
 				end
+				local debuginfo = debug.getinfo(2)
+				if debuginfo.what == 'C' then  -- names N/A
+					table.insert(func_args, '?')
+				end
 				if debug.getlocal(2, -1) then
 					-- vararg function
 					table.insert(func_args, "...")
