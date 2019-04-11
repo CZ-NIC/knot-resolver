@@ -62,11 +62,13 @@ Description: caching, DNSSEC-validating DNS resolver
 Package: knot-resolver-module-http
 Architecture: all
 Depends:
+ knot-resolver,
  libjs-bootstrap,
  libjs-d3,
  libjs-jquery,
  lua-http,
  lua-mmdb,
+ systemd,
  ${misc:Depends},
  ${shlibs:Depends},
 Breaks:
