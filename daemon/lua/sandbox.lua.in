@@ -386,14 +386,14 @@ local function funcsign(f)
 						table.insert(func_args, k)
 					end
 				end
-			if debug.getlocal(2, -1) then
-				-- vararg function
-				table.insert(func_args, "...")
+				if debug.getlocal(2, -1) then
+					-- vararg function
+					table.insert(func_args, "...")
+				end
+				debug.sethook(oldhook)
+				error('aborting the call to introspected function')
 			end
-			debug.sethook(oldhook)
-			error('aborting the call to introspected function')
 		end
-	end
 	oldhook = debug.sethook(hook, "c")  -- invoke hook() on function call
 	-- fake arguments, necessary to detect vararg functions
 	local fakearg = {}
