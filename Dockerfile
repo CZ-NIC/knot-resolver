@@ -67,7 +67,7 @@ LABEL cz.knot-resolver.vendor="CZ.NIC"
 LABEL maintainer="knot-resolver-users@lists.nic.cz"
 
 # Export DNS over UDP & TCP, DNS-over-TLS, web interface
-EXPOSE 53/UDP 53/TCP 853/TCP 8053/TCP
+EXPOSE 53/UDP 53/TCP 853/TCP 8453/TCP
 
 # Fetch Knot Resolver + Knot DNS libraries from build image
 COPY --from=build /tmp/root/ /

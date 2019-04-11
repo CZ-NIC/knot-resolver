@@ -15,6 +15,7 @@ Incompatible changes
 - upstream packages for Debian now require systemd
 - libknot >= 2.8 is required
 - net.list() output format changed (!786)
+- http module: default port for web managenemt and APIs changed to 8453
 
 Improvements
 ------------

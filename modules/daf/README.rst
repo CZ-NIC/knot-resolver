@@ -107,11 +107,11 @@ for testing.
 .. code-block:: bash
 
     # Get current rule set
-    $ curl -s -X GET http://localhost:8053/daf | jq .
+    $ curl -s -X GET http://localhost:8453/daf | jq .
     {}
 
     # Create new rule
-    $ curl -s -X POST -d "src = 127.0.0.1 pass" http://localhost:8053/daf | jq .
+    $ curl -s -X POST -d "src = 127.0.0.1 pass" http://localhost:8453/daf | jq .
     {
       "count": 0,
       "active": true,
@@ -120,11 +120,11 @@ for testing.
     }
 
     # Disable rule
-    $ curl -s -X PATCH http://localhost:8053/daf/1/active/false | jq .
+    $ curl -s -X PATCH http://localhost:8453/daf/1/active/false | jq .
     true
 
     # Retrieve a rule information
-    $ curl -s -X GET http://localhost:8053/daf/1 | jq .
+    $ curl -s -X GET http://localhost:8453/daf/1 | jq .
     {
       "count": 4,
       "active": true,
@@ -133,5 +133,5 @@ for testing.
     }
 
     # Delete a rule
-    $ curl -s -X DELETE http://localhost:8053/daf/1 | jq .
+    $ curl -s -X DELETE http://localhost:8453/daf/1 | jq .
     true

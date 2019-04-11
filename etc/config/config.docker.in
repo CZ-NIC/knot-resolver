@@ -14,7 +14,7 @@ modules = {
 	-- Load HTTP module with defaults
 	http = {
 		host = '0.0.0.0',
-		port = 8053,
+		port = 8453,
 	},
 }
 
@@ -27,12 +27,12 @@ function print_help()
 	   .. 'Run this container using command:\n'
 	   .. '$ docker run -Pti cznic/knot-resolver\n'
 	   .. '\n'
-	   .. 'Docker will map ports 53, 853, and 8053 to some other numbers, see\n'
+	   .. 'Docker will map ports 53, 853, and 8453 to some other numbers, see\n'
 	   .. '$ docker ps\n'
 	   .. '(column PORTS)\n'
 	   .. '53   -> DNS protocol over UDP and TCP\n'
 	   .. '853  -> DNS-over-TLS protocol\n'
-	   .. '8053 -> web interface\n'
+	   .. '8453 -> web interface\n'
 	   .. '\n'
 	   .. 'For verbose logging enter following command to prompt below:\n'
 	   .. 'verbose(true)\n')

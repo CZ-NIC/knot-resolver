@@ -23,7 +23,7 @@ if you want to use only one of these.
 Example configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
-By default, the web interface starts HTTPS/2 on port 8053 using an ephemeral
+By default, the web interface starts HTTPS/2 on port 8453 using an ephemeral
 certificate that is valid for 90 days and is automatically renewed. It is of
 course self-signed. Why not use something like
 `Let's Encrypt <https://letsencrypt.org>`_?
@@ -34,7 +34,7 @@ course self-signed. Why not use something like
 	modules = {
 		http = {
 			host = 'localhost', -- Default: 'localhost'
-			port = 8053,        -- Default: 8053
+			port = 8453,        -- Default: 8453
 			geoip = 'GeoLite2-City.mmdb', -- Optional, see
 			-- e.g. https://dev.maxmind.com/geoip/geoip2/geolite2/
 			-- and install mmdblua library
@@ -45,8 +45,8 @@ Now you can reach the web services and APIs, done!
 
 .. code-block:: bash
 
-	$ curl -k https://localhost:8053
-	$ curl -k https://localhost:8053/stats
+	$ curl -k https://localhost:8453
+	$ curl -k https://localhost:8453/stats
 
 .. _mod-http-tls:
 
@@ -108,7 +108,7 @@ You can use it out of the box:
 
 .. code-block:: bash
 
-	$ curl -k https://localhost:8053/metrics | tail
+	$ curl -k https://localhost:8453/metrics | tail
 	# TYPE latency histogram
 	latency_bucket{le=10} 2.000000
 	latency_bucket{le=50} 2.000000
@@ -153,7 +153,7 @@ The basic mode allows you to resolve a query and trace verbose logs (and message
 
 .. code-block:: bash
 
-   $ curl https://localhost:8053/trace/e.root-servers.net
+   $ curl https://localhost:8453/trace/e.root-servers.net
    [ 8138] [iter] 'e.root-servers.net.' type 'A' created outbound query, parent id 0
    [ 8138] [ rc ] => rank: 020, lowest 020, e.root-servers.net. A
    [ 8138] [ rc ] => satisfied from cache
@@ -206,9 +206,9 @@ Then you can query the API endpoint, or tail the WebSocket using curl.
 
 .. code-block:: bash
 
-	$ curl -k https://localhost:8053/health
+	$ curl -k https://localhost:8453/health
 	{"state":"up","uptime":0}
-	$ curl -k -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Host: localhost:8053/health"  -H "Sec-Websocket-Key: nope" -H "Sec-Websocket-Version: 13" https://localhost:8053/health
+	$ curl -k -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Host: localhost:8453/health"  -H "Sec-Websocket-Key: nope" -H "Sec-Websocket-Version: 13" https://localhost:8453/health
 	HTTP/1.1 101 Switching Protocols
 	upgrade: websocket
 	sec-websocket-accept: eg18mwU7CDRGUF1Q+EJwPM335eM=

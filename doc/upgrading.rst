@@ -20,6 +20,7 @@ Users
 * In case you are using your own custom modules, move them to the new module
   location. The exact location depends on your distribution. Generally, modules previously
   in ``/usr/lib/kdns_modules`` should be moved to ``/usr/lib/knot-resolver/kres_modules``.
+* For users of HTTP module: default port was changed to 8453 (from 8053).
 
 Configuration
 ~~~~~~~~~~~~~
