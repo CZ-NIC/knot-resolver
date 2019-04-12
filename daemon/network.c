@@ -119,7 +119,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 	}
 
 	if (sa) {
-		fd = io_bind(sa, SOCK_DGRAM);
+		fd = io_bind(sa, ep->flags.sock_type);
 		if (fd < 0) return fd;
 	}
 
