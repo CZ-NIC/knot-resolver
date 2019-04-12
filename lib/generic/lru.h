@@ -64,8 +64,9 @@
 #pragma once
 
 #include <assert.h>
-#include <stdint.h>
+#include <stdalign.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "contrib/ucw/lib.h"
 #include "lib/utils.h"
@@ -97,7 +98,7 @@
 #define lru_create(ptable, max_slots, mm_ctx_array, mm_ctx) do { \
 	(void)(((__typeof__((*(ptable))->pdata_t))0) == (void *)0); /* typecheck lru_t */ \
 	*(ptable) = (__typeof__(*(ptable))) \
-		lru_create_impl((max_slots), __alignof(*( (*(ptable))->pdata_t )), \
+		lru_create_impl((max_slots), alignof(*( (*(ptable))->pdata_t )), \
 				(mm_ctx_array), (mm_ctx)); \
 	} while (false)
 
