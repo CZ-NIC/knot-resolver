@@ -1,0 +1,12 @@
+---
+- name: Add upstream package signing key
+  apt_key:
+    data: "{{ lookup('file', 'Release.pub') }}"
+    state: present
+
+- name: Add OBS repo(s)
+  apt_repository:
+    repo: >
+      deb http://download.opensuse.org/repositories/home:/CZ-NIC:/{{ item }}/{{ obs_distro_name }}/ /
+    state: present
+  with_items: "{{ repos }}"

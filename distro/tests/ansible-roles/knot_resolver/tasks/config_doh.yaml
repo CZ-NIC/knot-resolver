@@ -1,0 +1,37 @@
+---
+#- name: doh_config deploy ssl certificate
+#  copy:
+#    src: "{{ ssl_cert }}"
+#    dest: /etc/knot-resolver/ssl.crt
+#    owner: knot-resolver
+#    group: knot-resolver
+#    mode: 0644
+#
+#- name: doh_config deploy ssl key
+#  copy:
+#    src: "{{ ssl_key }}"
+#    dest: /etc/knot-resolver/ssl.key
+#    owner: knot-resolver
+#    group: knot-resolver
+#    mode: 0600
+
+- name: doh_config enable kresd-doh.socket
+  systemd:
+    name: kresd-doh.socket
+    enabled: true
+    masked: false
+
+- name: doh_config set up kresd.conf
+  blockinfile:
+    marker: -- {mark} ANSIBLE MANAGED BLOCK
+    block: |
+      -- Load HTTP module with defaults
+      modules.load('http')
+
+      -- disable all HTTP endpoints except DoH
+      for endpoint, _ in pairs(http.endpoints) do
+              if endpoint ~= '/doh' then
+                      http.endpoints[endpoint] = nil
+              end
+      end
+    path: /etc/knot-resolver/kresd.conf

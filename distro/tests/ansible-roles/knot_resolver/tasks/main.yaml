@@ -1,0 +1,43 @@
+---
+- name: Include distribution specific vars
+  include_vars: "{{ distro }}.yaml"
+
+- name: Configure upstream reporitories
+  include: "configure_repos/{{ distro }}.yaml"
+
+- name: Update all packages
+  package:
+    name: '*'
+    state: latest
+  when: update_packages
+
+- name: Install packages
+  package:
+    name: "{{ packages }}"
+    state: latest
+
+- name: Always print package version at the end
+  block:
+
+    - include: restart_kresd.yaml
+
+    - include: test_udp.yaml
+    - include: test_tcp.yaml
+    - include: test_tls.yaml
+    - include: test_dnssec.yaml
+
+    #- include: config_doh.yaml
+    #- include: restart_kresd.yaml
+    #- include: test_doh.yaml
+
+  always:
+
+    - name: Get installed package version
+      shell: "{{ show_package_version }}"
+      args:
+        warn: false
+      register: package_version
+
+    - name: Show installed version
+      debug:
+        var: package_version.stdout

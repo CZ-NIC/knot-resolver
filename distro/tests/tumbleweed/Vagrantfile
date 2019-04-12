@@ -9,7 +9,7 @@ Vagrant.configure(2) do |config|
 
     config.vm.define "tumbleweed_knot-resolver"  do |machine|
         machine.vm.provision "ansible" do |ansible|
-            ansible.playbook = "../knot-resolver-test.yaml"
+            ansible.playbook = "../knot-resolver-pkgtest.yaml"
         end
     end
 
