@@ -477,6 +477,7 @@ struct sockaddr * kr_straddr_socket(const char *addr, int port, knot_mm_t *pool)
 		}
 	}
 	default:
+		assert(!EINVAL);
 		return NULL;
 	}
 }

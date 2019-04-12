@@ -25,12 +25,13 @@
 struct tls_ctx_t;
 struct tls_client_ctx_t;
 
-int udp_bind(uv_udp_t *handle, const struct sockaddr *addr);
-int udp_bindfd(uv_udp_t *handle, int fd);
-int tcp_bind(uv_tcp_t *handle, const struct sockaddr *addr, int tcp_backlog);
-int tcp_bind_tls(uv_tcp_t *handle, const struct sockaddr *addr, int tcp_backlog);
-int tcp_bindfd(uv_tcp_t *handle, int fd, int tcp_backlog);
-int tcp_bindfd_tls(uv_tcp_t *handle, int fd, int tcp_backlog);
+/** Bind address into a file-descriptor (only, no libuv).  type is e.g. SOCK_DGRAM */
+int io_bind(const struct sockaddr *addr, int type);
+/** Initialize a UDP handle and start listening. */
+int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd);
+/** Initialize a TCP handle and start listening. */
+int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bool has_tls);
+
 void tcp_timeout_trigger(uv_timer_t *timer);
 
 /** Initialize the handle, incl. ->data = struct session * instance.

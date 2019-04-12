@@ -38,16 +38,12 @@
 #include "lib/defines.h"
 #include "lib/resolve.h"
 #include "lib/dnssec.h"
+#include "daemon/io.h"
 #include "daemon/network.h"
 #include "daemon/worker.h"
 #include "daemon/engine.h"
 #include "daemon/tls.h"
 #include "lib/dnssec/ta.h"
-
-/* We can fork early on Linux 3.9+ and do SO_REUSEPORT for better performance. */
-#if defined(UV_VERSION_HEX) && defined(SO_REUSEPORT) && defined(__linux__)
- #define CAN_FORK_EARLY 1
-#endif
 
 /* @internal Array of ip address shorthand. */
 typedef array_t(char*) addr_array_t;
@@ -564,6 +560,44 @@ static int parse_args(int argc, char **argv, struct args *args)
 	return -1;
 }
 
+/** Just convert addresses to file-descriptors.
+ * @return zero or exit code for main()
+ */
+static int bind_sockets(addr_array_t *addrs, bool tls, fd_array_t *fds)
+{
+	for (size_t i = 0; i < addrs->len; ++i) {
+		uint16_t port = tls ? KR_DNS_TLS_PORT : KR_DNS_PORT;
+		char addr_str[INET6_ADDRSTRLEN + 1];
+		int ret = kr_straddr_split(addrs->at[i], addr_str, &port);
+		struct sockaddr *sa = NULL;
+		if (ret == 0) {
+			sa = kr_straddr_socket(addr_str, port, NULL);
+			if (!sa) ret = kr_error(EINVAL); /* could be ENOMEM but unlikely */
+		}
+		if (ret == 0 && !tls) {
+			const int fd = io_bind(sa, SOCK_DGRAM);
+			if (fd < 0)
+				ret = fd;
+			else if (array_push(*fds, fd) < 0)
+				ret = kr_error(ENOMEM);
+		}
+		if (ret == 0) { /* common for TCP and TLS */
+			const int fd = io_bind(sa, SOCK_STREAM);
+			if (fd < 0)
+				ret = fd;
+			else if (array_push(*fds, fd) < 0)
+				ret = kr_error(ENOMEM);
+		}
+		free(sa);
+		if (ret != 0) {
+			kr_log_error("[system] bind to '%s' %s%s\n",
+				addrs->at[i], tls ? "(TLS) " : "", kr_strerror(ret));
+			return EXIT_FAILURE;
+		}
+	}
+	return kr_ok();
+}
+
 static int bind_fds(struct network *net, fd_array_t *fd_set, bool tls) {
 	int ret = 0;
 	for (size_t i = 0; i < fd_set->len; ++i) {
@@ -577,39 +611,17 @@ static int bind_fds(struct network *net, fd_array_t *fd_set, bool tls) {
 	return ret;
 }
 
-static int bind_sockets(struct network *net, addr_array_t *addr_set, bool tls) {
-	endpoint_flags_t flags = { .tls = tls };
-	for (size_t i = 0; i < addr_set->len; ++i) {
-		uint16_t port = tls ? KR_DNS_TLS_PORT : KR_DNS_PORT;
-		char addr_str[INET6_ADDRSTRLEN + 1];
-		int ret = kr_straddr_split(addr_set->at[i], addr_str, &port);
-
-		if (ret == 0 && !tls) {
-			flags.sock_type = SOCK_DGRAM;
-			ret = network_listen(net, addr_str, port, flags);
-		}
-		if (ret == 0) { /* common for TCP and TLS */
-			flags.sock_type = SOCK_STREAM;
-			ret = network_listen(net, addr_str, port, flags);
-		}
-
-		if (ret != 0) {
-			kr_log_error("[system] bind to '%s' %s%s\n",
-				addr_set->at[i], tls ? "(TLS) " : "", kr_strerror(ret));
-			return ret;
-		}
-	}
-	return kr_ok();
-}
-
 int main(int argc, char **argv)
 {
-	int ret = 0;
 	struct args args;
 	args_init(&args);
-	if ((ret = parse_args(argc, argv, &args)) >= 0) {
-		return ret;
-	}
+	int ret = parse_args(argc, argv, &args);
+	if (ret >= 0) goto cleanup_args;
+
+	ret = bind_sockets(&args.addr_set, false, &args.fd_set);
+	if (ret) goto cleanup_args;
+	ret = bind_sockets(&args.tls_set, true, &args.tls_fd_set);
+	if (ret) goto cleanup_args;
 
 #ifdef HAS_SYSTEMD
 	/* Accept passed sockets from systemd supervisor. */
@@ -657,17 +669,6 @@ int main(int argc, char **argv)
 	if (!args.config && access("config", R_OK) == 0) {
 		args.config = "config";
 	}
-
-#ifndef CAN_FORK_EARLY
-	/* Forking is currently broken with libuv. We need libuv to bind to
-	 * sockets etc. before forking, but at the same time can't touch it before
-	 * forking otherwise it crashes, so it's a chicken and egg problem.
-	 * Disabling until https://github.com/libuv/libuv/pull/846 is done. */
-	 if (args.forks > 1 && args.fd_set.len == 0 && args.tls_fd_set.len == 0) {
-	 	kr_log_error("[system] forking >1 workers supported only on Linux 3.9+ or with supervisor\n");
-	 	return EXIT_FAILURE;
-	 }
-#endif
 
 	/* Connect forks with local socket */
 	fd_array_t ipc_set;
@@ -730,9 +731,7 @@ int main(int argc, char **argv)
 
 	/* Bind to passed fds and sockets*/
 	if (bind_fds(&engine.net, &args.fd_set, false) != 0 ||
-	    bind_fds(&engine.net, &args.tls_fd_set, true) != 0 ||
-	    bind_sockets(&engine.net, &args.addr_set, false) != 0 ||
-	    bind_sockets(&engine.net, &args.tls_set, true) != 0
+	    bind_fds(&engine.net, &args.tls_fd_set, true) != 0
 	) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
@@ -771,8 +770,11 @@ cleanup:/* Cleanup. */
 		uv_loop_close(loop);
 	}
 	mp_delete(pool.ctx);
+cleanup_args:
 	array_clear(args.addr_set);
 	array_clear(args.tls_set);
+	array_clear(args.fd_set);
+	array_clear(args.tls_fd_set);
 	kr_crypto_cleanup();
 	return ret;
 }
