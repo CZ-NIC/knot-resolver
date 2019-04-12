@@ -1,0 +1,22 @@
+---
+- hosts: all
+
+  remote_user: root
+  become: true
+
+  vars_files:
+    - repos.yaml
+
+  # HACK: (Fedora) make sure we have the latest-greatest Py3 to avoid issues
+  gather_facts: false
+  pre_tasks:
+    - name: dnf update to latest Python 3
+      raw: |
+        dnf install -y python3 || \
+        :
+      ignore_errors: true
+    - name: gather facts
+      setup:
+
+  roles:
+    - knot_resolver

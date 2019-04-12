@@ -1,0 +1,6 @@
+---
+- name: Download repo file(s)
+  get_url:
+    url: "{{ repo_file_url }}"
+    dest: "/etc/yum.repos.d/home:CZ-NIC:{{ item }}.repo"
+  with_items: "{{ repos }}"
