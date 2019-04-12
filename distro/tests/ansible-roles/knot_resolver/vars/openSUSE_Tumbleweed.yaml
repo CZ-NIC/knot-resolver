@@ -1,0 +1,7 @@
+---
+obs_distro_name: "{{ distro }}"
+show_package_version: rpm -qi knot-resolver | grep '^Version'
+update_packages: true
+packages:
+  - knot-resolver
+  - knot-utils
