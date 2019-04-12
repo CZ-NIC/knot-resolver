@@ -1,0 +1,19 @@
+---
+- name: doh_config set up kresd.conf
+  blockinfile:
+    marker: -- {mark} ANSIBLE MANAGED BLOCK
+    block: |
+      -- Load HTTP module with defaults
+      modules.load('http')
+      http.config({
+              host = '127.0.0.1',
+              port = 443,
+      })
+
+      -- disable all HTTP endpoints except DoH
+      for endpoint, _ in pairs(http.endpoints) do
+              if endpoint ~= '/doh' then
+                      http.endpoints[endpoint] = nil
+              end
+      end
+    path: /etc/knot-resolver/kresd.conf

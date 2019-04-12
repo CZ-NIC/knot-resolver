@@ -1,0 +1,5 @@
+---
+- name: doh_test perform query
+  get_url:
+    url: http://127.0.0.1:443/doh?dns=l1sBAAABAAAAAAAAA3d3dw1rbm90LXJlc29sdmVyAmN6AAAcAAE
+    dest: doh_out

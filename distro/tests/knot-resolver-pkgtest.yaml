@@ -1,0 +1,11 @@
+---
+- hosts: all
+
+  remote_user: root
+  become: true
+
+  vars_files:
+    - repos.yaml
+
+  roles:
+    - knot_resolver

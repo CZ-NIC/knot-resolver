@@ -1,0 +1,14 @@
+---
+- name: dnssec_test dnssec-failed.org +cd returns NOERROR
+  tags:
+    - test
+  shell: dig +cd @127.0.0.1 dnssec-failed.org
+  register: res
+  failed_when: '"status: NOERROR" not in res.stdout'
+
+- name: dnssec_test dnssec-failed.org returns SERVFAIL
+  tags:
+    - test
+  shell: dig @127.0.0.1 dnssec-failed.org
+  register: res
+  failed_when: '"status: SERVFAIL" not in res.stdout'

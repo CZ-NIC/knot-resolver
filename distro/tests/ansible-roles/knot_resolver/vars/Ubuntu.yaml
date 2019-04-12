@@ -1,0 +1,10 @@
+---
+configure_obs_repo: |
+  echo 'deb http://download.opensuse.org/repositories/home:/CZ-NIC:/{{ item }}/xUbuntu_{{ ansible_distribution_version }}/ /' > /etc/apt/sources.list.d/{{ item }}.list &&
+  wget -nv https://download.opensuse.org/repositories/home:CZ-NIC:{{ item }}/xUbuntu_{{ ansible_distribution_version }}/Release.key -O Release.key &&
+  apt-key add - < Release.key &&
+  apt-get update
+show_package_version: dpkg -s knot-resolver | grep '^Version'
+packages:
+  - knot-resolver
+  - knot-dnsutils
