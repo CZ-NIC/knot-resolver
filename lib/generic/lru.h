@@ -97,13 +97,13 @@
  */
 #define lru_create(ptable, max_slots, mm_ctx_array, mm_ctx) do { \
 	(void)(((__typeof__((*(ptable))->pdata_t))0) == (void *)0); /* typecheck lru_t */ \
-	_Pragma("clang diagnostic push") \
-	_Pragma("clang diagnostic ignored \"-Wunknown-pragmas\"") \
+	_Pragma("GCC diagnostic push") \
+	_Pragma("GCC diagnostic ignored \"-Wunknown-pragmas\"") \
 	_Pragma("clang diagnostic ignored \"-Wgnu-alignof-expression\"") \
 	*(ptable) = (__typeof__(*(ptable))) \
 		lru_create_impl((max_slots), alignof(*( (*(ptable))->pdata_t )), \
 				(mm_ctx_array), (mm_ctx)); \
-	_Pragma("clang diagnostic pop") \
+	_Pragma("GCC diagnostic pop") \
 	} while (false)
 
 /** @brief Free an LRU created by lru_create (it can be NULL). */
