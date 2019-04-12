@@ -128,7 +128,7 @@ KR_EXPORT struct lru * lru_create_impl(uint max_slots, uint val_alignment,
 	if (!mm_array) {
 		static knot_mm_t mm_array_default = { 0 };
 		if (!mm_array_default.ctx)
-			mm_ctx_init_aligned(&mm_array_default, __alignof(struct lru));
+			mm_ctx_init_aligned(&mm_array_default, alignof(struct lru));
 		mm_array = &mm_array_default;
 	}
 	assert(mm_array->alloc != mm_malloc && mm_array->alloc != (knot_mm_alloc_t)mp_alloc);
