@@ -21,31 +21,6 @@
 #include "daemon/io.h"
 #include "daemon/tls.h"
 
-/* libuv 1.7.0+ is able to support SO_REUSEPORT for loadbalancing */
-#if defined(UV_VERSION_HEX)
-#if (__linux__ && SO_REUSEPORT)
-  #define handle_init(type, loop, handle, family) do { \
-	uv_ ## type ## _init_ex((loop), (uv_ ## type ## _t *)(handle), (family)); \
-	uv_os_fd_t hi_fd = 0; \
-	if (uv_fileno((handle), &hi_fd) == 0) { \
-		int hi_on = 1; \
-		int hi_ret = setsockopt(hi_fd, SOL_SOCKET, SO_REUSEPORT, &hi_on, sizeof(hi_on)); \
-		if (hi_ret) { \
-			return kr_error(errno); \
-		} \
-	} \
-  } while (0)
-/* libuv 1.7.0+ is able to assign fd immediately */
-#else
-  #define handle_init(type, loop, handle, family) do { \
-	uv_ ## type ## _init_ex((loop), (uv_ ## type ## _t *)(handle), (family)); \
-  } while (0)
-#endif
-#else
-  #define handle_init(type, loop, handle, family) \
-	uv_ ## type ## _init((loop), (uv_ ## type ## _t *)(handle))
-#endif
-
 void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog)
 {
 	if (net != NULL) {
@@ -143,52 +118,31 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 		return kr_error(EEXIST);
 	}
 
+	if (sa) {
+		fd = io_bind(sa, ep->flags.sock_type);
+		if (fd < 0) return fd;
+	}
+
 	if (ep->flags.sock_type == SOCK_DGRAM) {
 		if (ep->flags.tls) {
 			assert(!EINVAL);
 			return kr_error(EINVAL);
 		}
-		uv_udp_t *ep_handle = calloc(1, sizeof(uv_udp_t));
+		uv_udp_t *ep_handle = malloc(sizeof(uv_udp_t));
 		ep->handle = (uv_handle_t *)ep_handle;
 		if (!ep->handle) {
 			return kr_error(ENOMEM);
 		}
-		if (sa) {
-			handle_init(udp, net->loop, ep->handle, sa->sa_family);
-				/*^^ can return! */
-			return udp_bind(ep_handle, sa);
-		} else {
-			int ret = uv_udp_init(net->loop, ep_handle);
-			if (ret == 0) {
-				ret = udp_bindfd(ep_handle, fd);
-			}
-			return ret;
-		}
+		return io_listen_udp(net->loop, ep_handle, fd);
 	} /* else */
 
 	if (ep->flags.sock_type == SOCK_STREAM) {
-		uv_tcp_t *ep_handle = calloc(1, sizeof(uv_tcp_t));
+		uv_tcp_t *ep_handle = malloc(sizeof(uv_tcp_t));
 		ep->handle = (uv_handle_t *)ep_handle;
 		if (!ep->handle) {
 			return kr_error(ENOMEM);
 		}
-		if (sa) {
-			handle_init(tcp, net->loop, ep->handle, sa->sa_family); /* can return! */
-		} else {
-			int ret = uv_tcp_init(net->loop, ep_handle);
-			if (ret) {
-				return ret;
-			}
-		}
-		if (ep->flags.tls) {
-			return sa
-				? tcp_bind_tls  (ep_handle, sa, net->tcp_backlog)
-				: tcp_bindfd_tls(ep_handle, fd, net->tcp_backlog);
-		} else {
-			return sa
-				? tcp_bind  (ep_handle, sa, net->tcp_backlog)
-				: tcp_bindfd(ep_handle, fd, net->tcp_backlog);
-		}
+		return io_listen_tcp(net->loop, ep_handle, fd, net->tcp_backlog, ep->flags.tls);
 	} /* else */
 
 	assert(!EINVAL);
