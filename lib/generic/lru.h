@@ -98,6 +98,7 @@
 #define lru_create(ptable, max_slots, mm_ctx_array, mm_ctx) do { \
 	(void)(((__typeof__((*(ptable))->pdata_t))0) == (void *)0); /* typecheck lru_t */ \
 	_Pragma("GCC diagnostic push") \
+	_Pragma("GCC diagnostic ignored \"-Wpragmas\"") \
 	_Pragma("GCC diagnostic ignored \"-Wunknown-pragmas\"") \
 	_Pragma("GCC diagnostic ignored \"-Wgnu-alignof-expression\"") \
 	*(ptable) = (__typeof__(*(ptable))) \
