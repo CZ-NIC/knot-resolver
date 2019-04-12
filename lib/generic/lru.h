@@ -99,7 +99,7 @@
 	(void)(((__typeof__((*(ptable))->pdata_t))0) == (void *)0); /* typecheck lru_t */ \
 	_Pragma("GCC diagnostic push") \
 	_Pragma("GCC diagnostic ignored \"-Wunknown-pragmas\"") \
-	_Pragma("clang diagnostic ignored \"-Wgnu-alignof-expression\"") \
+	_Pragma("GCC diagnostic ignored \"-Wgnu-alignof-expression\"") \
 	*(ptable) = (__typeof__(*(ptable))) \
 		lru_create_impl((max_slots), alignof(*( (*(ptable))->pdata_t )), \
 				(mm_ctx_array), (mm_ctx)); \
