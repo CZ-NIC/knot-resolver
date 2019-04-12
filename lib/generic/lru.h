@@ -95,15 +95,16 @@
  * @note The pointers to memory contexts need to remain valid
  * 	during the whole life of the structure (or be NULL).
  */
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wgnu-alignof-expression"
 #define lru_create(ptable, max_slots, mm_ctx_array, mm_ctx) do { \
 	(void)(((__typeof__((*(ptable))->pdata_t))0) == (void *)0); /* typecheck lru_t */ \
+	_Pragma("clang diagnostic push") \
+	_Pragma("clang diagnostic ignored \"-Wunknown-pragmas\"") \
+	_Pragma("clang diagnostic ignored \"-Wgnu-alignof-expression\"") \
 	*(ptable) = (__typeof__(*(ptable))) \
 		lru_create_impl((max_slots), alignof(*( (*(ptable))->pdata_t )), \
 				(mm_ctx_array), (mm_ctx)); \
+	_Pragma("clang diagnostic pop") \
 	} while (false)
-#pragma clang diagnostic pop
 
 /** @brief Free an LRU created by lru_create (it can be NULL). */
 #define lru_free(table) \
