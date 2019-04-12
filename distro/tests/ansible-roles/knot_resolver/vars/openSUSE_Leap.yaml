@@ -1,0 +1,6 @@
+---
+obs_distro_name: "{{ distro }}_15.0"
+show_package_version: rpm -qi knot-resolver | grep '^Version'
+packages:
+  - knot-resolver
+  - knot-utils

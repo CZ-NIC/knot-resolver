@@ -1,0 +1,7 @@
+---
+- name: tls_test resolve nic.cz
+  tags:
+    - test
+  shell: kdig +tls @127.0.0.1 nic.cz
+  register: res
+  failed_when: '"status: NOERROR" not in res.stdout'
