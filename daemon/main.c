@@ -601,16 +601,16 @@ static int bind_sockets(addr_array_t *addrs, bool tls, flagged_fd_array_t *fds)
 		}
 		flagged_fd_t ffd = { .flags = { .tls = tls } };
 		if (ret == 0 && !tls) {
-			const int fd = io_bind(sa, SOCK_DGRAM);
-			if (fd < 0)
-				ret = fd;
+			ffd.fd = io_bind(sa, SOCK_DGRAM);
+			if (ffd.fd < 0)
+				ret = ffd.fd;
 			else if (array_push(*fds, ffd) < 0)
 				ret = kr_error(ENOMEM);
 		}
 		if (ret == 0) { /* common for TCP and TLS */
-			const int fd = io_bind(sa, SOCK_STREAM);
-			if (fd < 0)
-				ret = fd;
+			ffd.fd = io_bind(sa, SOCK_STREAM);
+			if (ffd.fd < 0)
+				ret = ffd.fd;
 			else if (array_push(*fds, ffd) < 0)
 				ret = kr_error(ENOMEM);
 		}

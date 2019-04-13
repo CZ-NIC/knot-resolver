@@ -35,17 +35,27 @@ void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog)
 	}
 }
 
-static void close_handle(uv_handle_t *handle, bool force)
+static void endpoint_close(struct endpoint *ep, bool force)
 {
-	if (force) { /* Force close if event loop isn't running. */
-		uv_os_fd_t fd = 0;
-		if (uv_fileno(handle, &fd) == 0) {
-			close(fd);
+	assert(!ep->handle != !ep->flags.kind);
+	if (ep->flags.kind) { /* Special endpoint. */
+		/* FIXME: some kind of callback for the lua state? */
+		if (ep->fd > 0) {
+			close(ep->fd);
 		}
-		handle->loop = NULL;
-		io_free(handle);
+		free_const(ep->flags.kind);
+	}
+
+	if (force) { /* Force close if event loop isn't running. */
+		if (ep->fd >= 0) {
+			close(ep->fd);
+		}
+		if (ep->handle) {
+			ep->handle->loop = NULL;
+			io_free(ep->handle);
+		}
 	} else { /* Asynchronous close */
-		uv_close(handle, io_free);
+		uv_close(ep->handle, io_free);
 	}
 }
 
@@ -54,7 +64,7 @@ static int close_key(const char *key, void *val, void *ext)
 {
 	endpoint_array_t *ep_array = val;
 	for (int i = 0; i < ep_array->len; ++i) {
-		close_handle(ep_array->at[i].handle, true);
+		endpoint_close(&ep_array->at[i], true);
 	}
 	return 0;
 }
@@ -126,6 +136,9 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 	if (ep->flags.kind) {
 		/* This EP isn't to be managed internally after binding. */
 		return kr_ok();
+	} else {
+		ep->engaged = true;
+		/* .engaged seems not really meaningful with .kind == NULL, but... */
 	}
 
 	if (ep->flags.sock_type == SOCK_DGRAM) {
@@ -189,7 +202,7 @@ static int create_endpoint(struct network *net, const char *addr_str,
 		ret = insert_endpoint(net, addr_str, &ep);
 	}
 	if (ret != 0 && ep.handle) {
-		close_handle(ep.handle, false);
+		endpoint_close(&ep, false);
 	}
 	return ret;
 }
@@ -272,7 +285,7 @@ int network_close(struct network *net, const char *addr, uint16_t port,
 	while (i < ep_array->len) {
 		struct endpoint *ep = &ep_array->at[i];
 		if (endpoint_flags_eq(flags, ep->flags)) {
-			close_handle(ep->handle, false);
+			endpoint_close(ep, false);
 			array_del(*ep_array, i);
 			matched = true;
 			/* do not advance i */

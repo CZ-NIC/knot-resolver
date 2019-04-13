@@ -44,9 +44,11 @@ static inline bool endpoint_flags_eq(endpoint_flags_t f1, endpoint_flags_t f2)
 		return f1.tls == f2.tls && f1.kind == f2.kind;
 }
 
-/** Wrapper for a single socket to listen on. */
+/** Wrapper for a single socket to listen on.
+ * There are two types: normal have handle, special have flags.kind (and never both).
+ */
 struct endpoint {
-	uv_handle_t *handle; /** uv_udp_t or uv_tcp_t */
+	uv_handle_t *handle; /**< uv_udp_t or uv_tcp_t */
 	int fd;
 	uint16_t port;
 	bool engaged;
@@ -84,7 +86,7 @@ void network_deinit(struct network *net);
  * \note if we did listen on that combination already,
  *       nothing is done and kr_ok() is returned.
  * \note there's no short-hand to listen both on UDP and TCP.
- * \note ownership of flags.* is taken on success.
+ * \note ownership of flags.* is taken on success.  TODO: non-success?
  */
 int network_listen(struct network *net, const char *addr, uint16_t port,
 		   endpoint_flags_t flags);
