@@ -122,6 +122,11 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 		fd = io_bind(sa, ep->flags.sock_type);
 		if (fd < 0) return fd;
 	}
+	ep->fd = fd;
+	if (ep->flags.kind) {
+		/* This EP isn't to be managed internally after binding. */
+		return kr_ok();
+	}
 
 	if (ep->flags.sock_type == SOCK_DGRAM) {
 		if (ep->flags.tls) {
@@ -167,7 +172,8 @@ static struct endpoint * endpoint_get(struct network *net, const char *addr,
 	return NULL;
 }
 
-/** \note pass either sa != NULL xor fd != -1 */
+/** \note pass either sa != NULL xor fd != -1;
+ *  \note ownership of flags.* is taken on success. */
 static int create_endpoint(struct network *net, const char *addr_str,
 				uint16_t port, endpoint_flags_t flags,
 				const struct sockaddr *sa, int fd)
@@ -188,17 +194,16 @@ static int create_endpoint(struct network *net, const char *addr_str,
 	return ret;
 }
 
-int network_listen_fd(struct network *net, int fd, bool use_tls)
+int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags)
 {
 	/* Extract fd's socket type. */
-	endpoint_flags_t flags = { .tls = use_tls };
 	socklen_t len = sizeof(flags.sock_type);
 	int ret = getsockopt(fd, SOL_SOCKET, SO_TYPE, &flags.sock_type, &len);
 	if (ret != 0) {
 		return kr_error(errno);
 	}
-	if (flags.sock_type == SOCK_DGRAM && use_tls) {
-		assert(!EINVAL);
+	if (flags.sock_type == SOCK_DGRAM && !flags.kind && flags.tls) {
+		assert(!EINVAL); /* Perhaps DTLS some day. */
 		return kr_error(EINVAL);
 	}
 	if (flags.sock_type != SOCK_DGRAM && flags.sock_type != SOCK_STREAM) {

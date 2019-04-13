@@ -27,22 +27,29 @@
 
 struct engine;
 
-/** Ways to listen for DNS on a port. */
+/** Ways to listen on a socket. */
 typedef struct {
 	int sock_type;	/**< SOCK_DGRAM or SOCK_STREAM */
-	bool tls;	/**< only used together with .tcp */
+	bool tls;	/**< only used together with .tcp; TODO: meaningful if kind != NULL? */
+	const char *kind; /**< tag for other types than the three usual */
 } endpoint_flags_t;
 
 static inline bool endpoint_flags_eq(endpoint_flags_t f1, endpoint_flags_t f2)
 {
-	/* memcmp() would typically work, but there's no guarantee. */
-	return f1.sock_type == f2.sock_type && f1.tls == f2.tls;
+	if (f1.sock_type != f2.sock_type)
+		return false;
+	if (f1.kind && f2.kind)
+		return strcasecmp(f1.kind, f2.kind);
+	else
+		return f1.tls == f2.tls && f1.kind == f2.kind;
 }
 
 /** Wrapper for a single socket to listen on. */
 struct endpoint {
 	uv_handle_t *handle; /** uv_udp_t or uv_tcp_t */
+	int fd;
 	uint16_t port;
+	bool engaged;
 	endpoint_flags_t flags;
 };
 
@@ -76,12 +83,17 @@ void network_deinit(struct network *net);
 /** Start listenting on addr#port with flags.
  * \note if we did listen on that combination already,
  *       nothing is done and kr_ok() is returned.
- * \note there's no short-hand to listen both on UDP and TCP. */
+ * \note there's no short-hand to listen both on UDP and TCP.
+ * \note ownership of flags.* is taken on success.
+ */
 int network_listen(struct network *net, const char *addr, uint16_t port,
 		   endpoint_flags_t flags);
 
-/** Start listenting on an open file-descriptor. */
-int network_listen_fd(struct network *net, int fd, bool use_tls);
+/** Start listenting on an open file-descriptor.
+ * \note flags.sock_type isn't meaningful here.
+ * \note ownership of flags.* is taken on success.
+ */
+int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags);
 
 /** Stop listening on all addr#port with equal flags.
  * \return kr_error(ENOENT) if nothing matched. */
