@@ -198,7 +198,7 @@ static int net_listen(lua_State *L)
 
 	/* Memory management of `kind` string is difficult due to longjmp etc.
 	 * Pop will unreference the lua value, so we store it on C stack instead (!) */
-	const int kind_alen = kind ? strlen(kind) + 1 : 0;
+	const int kind_alen = kind ? strlen(kind) + 1 : 1 /* 0 length isn't C standard */;
 	char kind_buf[kind_alen];
 	if (kind) {
 		memcpy(kind_buf, kind, kind_alen);
