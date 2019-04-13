@@ -66,7 +66,11 @@ static int net_list_add(const char *key, void *val, void *ext)
 		lua_setfield(L, -2, "transport");
 
 		lua_newtable(L);  // "application" table
-		lua_pushliteral(L, "dns");
+		if (ep->flags.kind) {
+			lua_pushstring(L, ep->flags.kind);
+		} else {
+			lua_pushliteral(L, "dns");
+		}
 		lua_setfield(L, -2, "protocol");
 		lua_setfield(L, -2, "application");
 
@@ -89,8 +93,9 @@ static int net_list(lua_State *L)
 }
 
 /** Listen on an address list represented by the top of lua stack.
+ * \note kind ownership is not transferred
  * \return success */
-static bool net_listen_addrs(lua_State *L, int port, bool tls)
+static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind)
 {
 	/* Case: table with 'addr' field; only follow that field directly. */
 	lua_getfield(L, -1, "addr");
@@ -104,19 +109,25 @@ static bool net_listen_addrs(lua_State *L, int port, bool tls)
 	const char *str = lua_tostring(L, -1);
 	if (str != NULL) {
 		struct engine *engine = engine_luaget(L);
-		endpoint_flags_t flags = { .tls = tls };
 		int ret = 0;
-		if (!tls) {
+		endpoint_flags_t flags = { .tls = tls };
+		if (!kind && !flags.tls) { /* normal UDP */
 			flags.sock_type = SOCK_DGRAM;
 			ret = network_listen(&engine->net, str, port, flags);
 		}
-		if (ret == 0) { /* common for TCP and TLS */
+		if (!kind && ret == 0) { /* common for normal TCP and TLS */
 			flags.sock_type = SOCK_STREAM;
 			ret = network_listen(&engine->net, str, port, flags);
 		}
+		if (kind) {
+			flags.kind = strdup(kind);
+			flags.sock_type = SOCK_STREAM; /* TODO: allow to override this? */
+			ret = network_listen(&engine->net, str, port, flags);
+		}
 		if (ret != 0) {
-			kr_log_info("[system] bind to '%s@%d' %s\n",
-					str, port, kr_strerror(ret));
+			const char *stype = flags.sock_type == SOCK_DGRAM ? "UDP" : "TCP";
+			kr_log_error("[system] bind to '%s@%d' (%s): %s\n",
+					str, port, stype, kr_strerror(ret));
 		}
 		return ret == 0;
 	}
@@ -126,7 +137,7 @@ static bool net_listen_addrs(lua_State *L, int port, bool tls)
 		lua_error_p(L, "bad type for address");
 	lua_pushnil(L);
 	while (lua_next(L, -2)) {
-		if (!net_listen_addrs(L, port, tls))
+		if (!net_listen_addrs(L, port, tls, kind))
 			return false;
 		lua_pop(L, 1);
 	}
@@ -156,18 +167,47 @@ static int net_listen(lua_State *L)
 	}
 
 	int port = KR_DNS_PORT;
-	if (n > 1 && lua_isnumber(L, 2)) {
-		port = lua_tointeger(L, 2);
+	if (n > 1) {
+		if (lua_isnumber(L, 2)) {
+			port = lua_tointeger(L, 2);
+		} else
+		if (!lua_isnil(L, 2)) {
+			lua_error_p(L, "wrong type of second parameter (port number)");
+		}
 	}
 
 	bool tls = (port == KR_DNS_TLS_PORT);
-	if (n > 2 && lua_istable(L, 3)) {
+	const char *kind = NULL;
+	if (n > 2) {
+		if (!lua_istable(L, 3))
+			lua_error_p(L, "wrong type of third parameter (table expected)");
 		tls = table_get_flag(L, 3, "tls", tls);
+
+		lua_getfield(L, 3, "kind");
+		const char *k = lua_tostring(L, -1);
+		if (k && strcasecmp(k, "dns") == 0) {
+			tls = false;
+		} else
+		if (k && strcasecmp(k, "tls") == 0) {
+			tls = true;
+		} else
+		if (k) {
+			kind = k;
+		}
+	}
+
+	/* Memory management of `kind` string is difficult due to longjmp etc.
+	 * Pop will unreference the lua value, so we store it on C stack instead (!) */
+	const int kind_alen = kind ? strlen(kind) + 1 : 1 /* 0 length isn't C standard */;
+	char kind_buf[kind_alen];
+	if (kind) {
+		memcpy(kind_buf, kind, kind_alen);
+		kind = kind_buf;
 	}
 
 	/* Now focus on the first argument. */
-	lua_pop(L, n - 1);
-	const bool res = net_listen_addrs(L, port, tls);
+	lua_settop(L, 1);
+	const bool res = net_listen_addrs(L, port, tls, kind);
 	lua_pushboolean(L, res);
 	return 1;
 }
@@ -179,6 +219,8 @@ static int net_close(lua_State *L)
 	int n = lua_gettop(L);
 	if (n < 2)
 		lua_error_p(L, "expected 'close(string addr, number port)'");
+
+	/* FIXME: support different kind values */
 
 	/* Open resolution context cache */
 	struct network *net = &engine_luaget(L)->net;
@@ -922,6 +964,47 @@ static int net_bpf_clear(lua_State *L)
 	lua_error_p(L, "BPF is not supported on this operating system");
 }
 
+static int net_register_endpoint_kind(lua_State *L)
+{
+	const int param_count = lua_gettop(L);
+	if (param_count != 1 && param_count != 2)
+		lua_error_p(L, "expected one or two parameters");
+	if (!lua_isstring(L, 1)) {
+		lua_error_p(L, "incorrect kind '%s'", lua_tostring(L, 1));
+	}
+	size_t kind_len;
+	const char *kind = lua_tolstring(L, 1, &kind_len);
+	struct network *net = &engine_luaget(L)->net;
+
+	/* Unregistering */
+	if (param_count == 1) {
+		void *val;
+		if (trie_del(net->endpoint_kinds, kind, kind_len, &val) == KNOT_EOK) {
+			const int fun_id = (char *)val - (char *)NULL;
+			luaL_unref(L, LUA_REGISTRYINDEX, fun_id);
+			return 0;
+		}
+		lua_error_p(L, "attempt to unregister unknown kind '%s'\n", kind);
+	} /* else */
+
+	/* Registering */
+	assert(param_count == 2);
+	if (!lua_isfunction(L, 2)) {
+		lua_error_p(L, "second parameter: expected function but got %s\n",
+				lua_typename(L, lua_type(L, 2)));
+	}
+	const int fun_id = luaL_ref(L, LUA_REGISTRYINDEX);
+		/* ^^ The function is on top of the stack, incidentally. */
+	void **pp = trie_get_ins(net->endpoint_kinds, kind, kind_len);
+	if (!pp) lua_error_maybe(L, kr_error(ENOMEM));
+	if (*pp != NULL || !strcasecmp(kind, "dns") || !strcasecmp(kind, "tls"))
+		lua_error_p(L, "attempt to register known kind '%s'\n", kind);
+	*pp = (char *)NULL + fun_id;
+	/* We don't attempt to engage correspoinding endpoints now.
+	 * That's the job for network_engage_endpoints() later. */
+	return 0;
+}
+
 int kr_bindings_net(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
@@ -944,6 +1027,7 @@ int kr_bindings_net(lua_State *L)
 		{ "tls_handshake_timeout",  net_tls_handshake_timeout },
 		{ "bpf_set",      net_bpf_set },
 		{ "bpf_clear",    net_bpf_clear },
+		{ "register_endpoint_kind", net_register_endpoint_kind },
 		{ NULL, NULL }
 	};
 	register_lib(L, "net", lib);

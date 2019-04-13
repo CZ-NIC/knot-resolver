@@ -349,6 +349,18 @@ int kr_cache_remove_subtree(struct kr_cache *, const knot_dname_t *, _Bool, int)
 int kr_cache_commit(struct kr_cache *);
 uint32_t packet_ttl(const knot_pkt_t *, _Bool);
 typedef struct {
+	int sock_type;
+	_Bool tls;
+	const char *kind;
+} endpoint_flags_t;
+struct endpoint {
+	void *handle;
+	int fd;
+	uint16_t port;
+	_Bool engaged;
+	endpoint_flags_t flags;
+};
+typedef struct {
 	uint8_t bitmap[32];
 	uint8_t length;
 } zs_win_t;
