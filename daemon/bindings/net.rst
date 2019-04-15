@@ -136,11 +136,39 @@ configured in the config file.
 
    .. code-block:: none
 
-	[127.0.0.1] => {
-	    [port] => 53
-	    [tcp] => true
-	    [udp] => true
-	}
+      [1] => {
+          [application] => {
+              [protocol] => dns
+          }
+          [ip] => ::1
+          [transport] => {
+              [port] => 53
+              [protocol] => udp
+              [security] => none
+          }
+      }
+      [2] => {
+          [application] => {
+              [protocol] => dns
+          }
+          [ip] => ::1
+          [transport] => {
+              [port] => 53
+              [protocol] => tcp
+              [security] => none
+          }
+      }
+      [3] => {
+          [application] => {
+              [protocol] => dns
+          }
+          [ip] => ::1
+          [transport] => {
+              [port] => 853
+              [protocol] => tcp
+              [security] => tls
+          }
+      }
 
 .. function:: net.interfaces()
 
