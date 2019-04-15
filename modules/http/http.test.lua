@@ -14,12 +14,12 @@ else
 	modules = {
 		http = {
 			port = 0, -- Select random port
-			cert = false,
+			tls = false,
 			endpoints = endpoints,
 		}
 	}
 
-	local server = http.servers[1]
+	local server = http.servers[1].server
 	ok(server ~= nil, 'creates server instance')
 	local _, host, port = server:localname()
 	ok(host and port, 'binds to an interface')
