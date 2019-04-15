@@ -636,8 +636,9 @@ static int start_listening(struct network *net, flagged_fd_array_t *fds) {
 			kr_log_error("[system] listen on fd=%d: %s\n",
 					ffd->fd, kr_strerror(ret));
 			/* Continue printing all of these before exiting. */
+		} else {
+			ffd->flags.kind = NULL; /* ownership transferred */
 		}
-		ffd->flags.kind = NULL; /* ownership transferred */
 	}
 	return some_bad_ret;
 }
@@ -685,17 +686,17 @@ int main(int argc, char **argv)
 			}
 			args.control_fd = ffd.fd;
 			free(socket_names[i]);
-			continue;
-		}
-		if (!strcasecmp("dns", socket_names[i])) {
-			free(socket_names[i]);
-		} else if (!strcasecmp("tls", socket_names[i])) {
-			ffd.flags.tls = true;
-			free(socket_names[i]);
 		} else {
-			ffd.flags.kind = socket_names[i];
+			if (!strcasecmp("dns", socket_names[i])) {
+				free(socket_names[i]);
+			} else if (!strcasecmp("tls", socket_names[i])) {
+				ffd.flags.tls = true;
+				free(socket_names[i]);
+			} else {
+				ffd.flags.kind = socket_names[i];
+			}
+			array_push(args.fds, ffd);
 		}
-		array_push(args.fds, ffd);
 		/* Either freed or passed ownership. */
 		socket_names[i] = NULL;
 	}
