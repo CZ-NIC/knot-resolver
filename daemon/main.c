@@ -625,7 +625,7 @@ static int bind_sockets(addr_array_t *addrs, bool tls, flagged_fd_array_t *fds)
 	return kr_ok();
 }
 
-static int bind_fds(struct network *net, flagged_fd_array_t *fds) {
+static int start_listening(struct network *net, flagged_fd_array_t *fds) {
 	int some_bad_ret = 0;
 	for (size_t i = 0; i < fds->len; ++i) {
 		flagged_fd_t *ffd = &fds->at[i];
@@ -677,6 +677,11 @@ int main(int argc, char **argv)
 		flagged_fd_t ffd = { .fd = SD_LISTEN_FDS_START + i };
 
 		if (!strcasecmp("control", socket_names[i])) {
+			if (args.control_fd != -1) {
+				kr_log_error("[system] multiple control sockets passed from systemd\n");
+				ret = EXIT_FAILURE;
+				break;
+			}
 			args.control_fd = ffd.fd;
 			free(socket_names[i]);
 			continue;
@@ -694,6 +699,7 @@ int main(int argc, char **argv)
 		socket_names[i] = NULL;
 	}
 	free_sd_socket_names(socket_names, sd_nsocks);
+	if (ret) goto cleanup_args;
 #endif
 
 	/* Switch to rundir. */
@@ -778,7 +784,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Start listening, in the sense of network_listen_fd(). */
-	if (bind_fds(&engine.net, &args.fds) != 0) {
+	if (start_listening(&engine.net, &args.fds) != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -802,6 +808,11 @@ int main(int argc, char **argv)
 		}
 	}
 	if (engine_start(&engine) != 0) {
+		ret = EXIT_FAILURE;
+		goto cleanup;
+	}
+
+	if (network_engage_endpoints(&engine.net)) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}

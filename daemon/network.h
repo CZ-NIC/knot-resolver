@@ -20,6 +20,7 @@
 
 #include "lib/generic/array.h"
 #include "lib/generic/map.h"
+#include "lib/generic/trie.h"
 
 #include <uv.h>
 #include <stdbool.h>
@@ -51,7 +52,7 @@ struct endpoint {
 	uv_handle_t *handle; /**< uv_udp_t or uv_tcp_t */
 	int fd;
 	uint16_t port;
-	bool engaged;
+	bool engaged; /**< to some module or internally */
 	endpoint_flags_t flags;
 };
 
@@ -71,6 +72,13 @@ struct network {
 	 * \note even same address-port-flags tuples may appear.
 	 * TODO: trie_t, keyed on *binary* address-port pair. */
 	map_t endpoints;
+
+	/** Registry of callbacks for special endpoint kinds (for opening/closing).
+	 * Map: kind (lowercased) -> lua function ID converted to void *
+	 * The ID is the usual: raw int index in the LUA_REGISTRYINDEX table. */
+	trie_t *endpoint_kinds;
+	/** See network_engage_endpoints() */
+	bool missing_kind_is_error;
 
 	struct tls_credentials *tls_credentials;
 	tls_client_params_t *tls_client_params; /**< Use tls_client_params_*() functions. */
@@ -101,6 +109,10 @@ int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags);
  * \return kr_error(ENOENT) if nothing matched. */
 int network_close(struct network *net, const char *addr, uint16_t port,
 		  endpoint_flags_t flags);
+
+/** Enforce that all endpoints are registered from now on.
+ * This only does anything with struct endpoint::flags.kind != NULL. */
+int network_engage_endpoints(struct network *net);
 
 int network_set_tls_cert(struct network *net, const char *cert);
 int network_set_tls_key(struct network *net, const char *key);

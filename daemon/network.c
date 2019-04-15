@@ -16,6 +16,7 @@
 
 #include <unistd.h>
 #include <assert.h>
+#include "daemon/bindings/impl.h"
 #include "daemon/network.h"
 #include "daemon/worker.h"
 #include "daemon/io.h"
@@ -26,6 +27,7 @@ void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog)
 	if (net != NULL) {
 		net->loop = loop;
 		net->endpoints = map_make(NULL);
+		net->endpoint_kinds = trie_create(NULL);
 		net->tls_client_params = NULL;
 		net->tls_session_ticket_ctx = /* unsync. random, by default */
 		tls_session_ticket_ctx_create(loop, NULL, 0);
@@ -35,15 +37,96 @@ void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog)
 	}
 }
 
-static void endpoint_close(struct endpoint *ep, bool force)
+/** Notify the registered function about endpoint getting open. */
+static int endpoint_open_lua_cb(struct network *net, struct endpoint *ep)
+{
+	const bool ok = ep->flags.kind && !ep->handle && !ep->engaged && ep->fd != -1;
+	if (!ok) {
+		assert(!EINVAL);
+		return kr_error(EINVAL);
+	}
+	struct worker_ctx *worker = net->loop->data; // LATER: the_worker
+	lua_State *L = worker->engine->L;
+	void **pp = trie_get_try(net->endpoint_kinds, ep->flags.kind,
+				strlen(ep->flags.kind));
+	if (!pp && net->missing_kind_is_error) {
+		kr_log_error("error: missing kind '%s' in endpoint registry\n",
+				ep->flags.kind);
+		return kr_error(ENOENT);
+	}
+	if (!pp) return kr_ok();
+
+	const int fun_id = (char *)*pp - (char *)NULL;
+	lua_rawgeti(L, LUA_REGISTRYINDEX, fun_id);
+	lua_pushboolean(L, true /* open */);
+	lua_pushpointer(L, ep);
+	lua_pushstring(L, "FIXME:endpoint-identifier");
+	if (lua_pcall(L, 3, 0, 0)) {
+		kr_log_error("failed to open FIXME:endpoint-identifier: %s\n",
+				lua_tostring(L, -1));
+		return kr_error(ENOSYS); /* TODO: better value? */
+	}
+	ep->engaged = true;
+	return kr_ok();
+}
+
+static int engage_endpoint_array(const char *key, void *endpoints, void *net)
+{
+	endpoint_array_t *eps = (endpoint_array_t *)endpoints;
+	for (int i = 0; i < eps->len; ++i) {
+		struct endpoint *ep = &eps->at[i];
+		const bool match = !ep->engaged && ep->flags.kind;
+		if (!match) continue;
+		int ret = endpoint_open_lua_cb(net, ep);
+		if (ret) return ret;
+	}
+	return 0;
+}
+int network_engage_endpoints(struct network *net)
+{
+	if (net->missing_kind_is_error)
+		return kr_ok(); /* maybe weird, but let's make it idempotent */
+	int ret = map_walk(&net->endpoints, engage_endpoint_array, net);
+	if (ret) return ret;
+	net->missing_kind_is_error = true;
+	return kr_ok();
+}
+
+
+/** Notify the registered function about endpoint about to be closed. */
+static void endpoint_close_lua_cb(struct network *net, struct endpoint *ep)
+{
+	struct worker_ctx *worker = net->loop->data; // LATER: the_worker
+	lua_State *L = worker->engine->L;
+	void **pp = trie_get_try(net->endpoint_kinds, ep->flags.kind,
+				strlen(ep->flags.kind));
+	if (!pp && net->missing_kind_is_error) {
+		kr_log_error("internal error: missing kind '%s' in endpoint registry\n",
+				ep->flags.kind);
+		return;
+	}
+
+	const int fun_id = (char *)*pp - (char *)NULL;
+	lua_rawgeti(L, LUA_REGISTRYINDEX, fun_id);
+	lua_pushboolean(L, false /* close */);
+	lua_pushpointer(L, ep);
+	lua_pushstring(L, "FIXME:endpoint-identifier");
+	if (lua_pcall(L, 3, 0, 0)) {
+		kr_log_error("failed to close FIXME:endpoint-identifier: %s\n",
+				lua_tostring(L, -1));
+	}
+}
+
+static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 {
 	assert(!ep->handle != !ep->flags.kind);
 	if (ep->flags.kind) { /* Special endpoint. */
-		/* FIXME: some kind of callback for the lua state? */
+		endpoint_close_lua_cb(net, ep);
 		if (ep->fd > 0) {
-			close(ep->fd);
+			close(ep->fd); /* nothing to do with errors */
 		}
 		free_const(ep->flags.kind);
+		return;
 	}
 
 	if (force) { /* Force close if event loop isn't running. */
@@ -60,11 +143,11 @@ static void endpoint_close(struct endpoint *ep, bool force)
 }
 
 /** Endpoint visitor (see @file map.h) */
-static int close_key(const char *key, void *val, void *ext)
+static int close_key(const char *key, void *val, void *net)
 {
 	endpoint_array_t *ep_array = val;
 	for (int i = 0; i < ep_array->len; ++i) {
-		endpoint_close(&ep_array->at[i], true);
+		endpoint_close(net, &ep_array->at[i], true);
 	}
 	return 0;
 }
@@ -77,12 +160,24 @@ static int free_key(const char *key, void *val, void *ext)
 	return kr_ok();
 }
 
+int kind_unregister(trie_val_t *tv, void *L)
+{
+	int fun_id = (char *)*tv - (char *)NULL;
+	luaL_unref(L, LUA_REGISTRYINDEX, fun_id);
+	return 0;
+}
+
 void network_deinit(struct network *net)
 {
 	if (net != NULL) {
-		map_walk(&net->endpoints, close_key, 0);
+		map_walk(&net->endpoints, close_key, net);
 		map_walk(&net->endpoints, free_key, 0);
 		map_clear(&net->endpoints);
+
+		struct worker_ctx *worker = net->loop->data; // LATER: the_worker
+		trie_apply(net->endpoint_kinds, kind_unregister, worker->engine->L);
+		trie_free(net->endpoint_kinds);
+
 		tls_credentials_free(net->tls_credentials);
 		tls_client_params_free(net->tls_client_params);
 		tls_session_ticket_ctx_destroy(net->tls_session_ticket_ctx);
@@ -135,7 +230,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 	ep->fd = fd;
 	if (ep->flags.kind) {
 		/* This EP isn't to be managed internally after binding. */
-		return kr_ok();
+		return endpoint_open_lua_cb(net, ep);
 	} else {
 		ep->engaged = true;
 		/* .engaged seems not really meaningful with .kind == NULL, but... */
@@ -202,7 +297,7 @@ static int create_endpoint(struct network *net, const char *addr_str,
 		ret = insert_endpoint(net, addr_str, &ep);
 	}
 	if (ret != 0 && ep.handle) {
-		endpoint_close(&ep, false);
+		endpoint_close(net, &ep, false);
 	}
 	return ret;
 }
@@ -285,7 +380,7 @@ int network_close(struct network *net, const char *addr, uint16_t port,
 	while (i < ep_array->len) {
 		struct endpoint *ep = &ep_array->at[i];
 		if (endpoint_flags_eq(flags, ep->flags)) {
-			endpoint_close(ep, false);
+			endpoint_close(net, ep, false);
 			array_del(*ep_array, i);
 			matched = true;
 			/* do not advance i */
