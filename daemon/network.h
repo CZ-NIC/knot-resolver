@@ -30,8 +30,8 @@ struct engine;
 
 /** Ways to listen on a socket. */
 typedef struct {
-	int sock_type;	/**< SOCK_DGRAM or SOCK_STREAM */
-	bool tls;	/**< only used together with .tcp; TODO: meaningful if kind != NULL? */
+	int sock_type;    /**< SOCK_DGRAM or SOCK_STREAM */
+	bool tls;         /**< only used together with .kind == NULL and .tcp */
 	const char *kind; /**< tag for other types than the three usual */
 } endpoint_flags_t;
 
@@ -47,12 +47,15 @@ static inline bool endpoint_flags_eq(endpoint_flags_t f1, endpoint_flags_t f2)
 
 /** Wrapper for a single socket to listen on.
  * There are two types: normal have handle, special have flags.kind (and never both).
+ *
+ * LATER: .family might be unexpected for IPv4-in-IPv6 addresses.
  */
 struct endpoint {
-	uv_handle_t *handle; /**< uv_udp_t or uv_tcp_t */
-	int fd;
-	uint16_t port;
-	bool engaged; /**< to some module or internally */
+	uv_handle_t *handle; /**< uv_udp_t or uv_tcp_t; NULL in case flags.kind != NULL */
+	int fd;              /**< POSIX file-descriptor; always used. */
+	int family;          /**< AF_INET or AF_INET6 or (in future) AF_UNIX */
+	uint16_t port;       /**< TCP/UDP port.  Meaningless with AF_UNIX. */
+	bool engaged;        /**< to some module or internally */
 	endpoint_flags_t flags;
 };
 
@@ -101,7 +104,7 @@ int network_listen(struct network *net, const char *addr, uint16_t port,
 
 /** Start listenting on an open file-descriptor.
  * \note flags.sock_type isn't meaningful here.
- * \note ownership of flags.* is taken on success.
+ * \note ownership of flags.* is taken on success.  TODO: non-success?
  */
 int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags);
 

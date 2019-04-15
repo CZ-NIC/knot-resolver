@@ -40,7 +40,7 @@ void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog)
 /** Notify the registered function about endpoint getting open.
  * If log_port < 1, don't log it. */
 static int endpoint_open_lua_cb(struct network *net, struct endpoint *ep,
-				const char *log_addr, int log_port)
+				const char *log_addr)
 {
 	const bool ok = ep->flags.kind && !ep->handle && !ep->engaged && ep->fd != -1;
 	if (!ok) {
@@ -55,8 +55,8 @@ static int endpoint_open_lua_cb(struct network *net, struct endpoint *ep,
 	if (!pp && net->missing_kind_is_error) {
 		kr_log_error("warning: network socket kind '%s' not handled when opening '%s",
 				ep->flags.kind, log_addr);
-		if (log_port >= 0)
-			kr_log_error("#%d", log_port);
+		if (ep->family != AF_UNIX)
+			kr_log_error("#%d", ep->port);
 		kr_log_error("'.  Likely causes: typo or not loading 'http' module.\n");
 		/* No hard error, for now.  LATER: perhaps differentiate between
 		 * explicit net.listen() calls and "just unused" systemd sockets.
@@ -70,10 +70,10 @@ static int endpoint_open_lua_cb(struct network *net, struct endpoint *ep,
 	lua_rawgeti(L, LUA_REGISTRYINDEX, fun_id);
 	lua_pushboolean(L, true /* open */);
 	lua_pushpointer(L, ep);
-	if (log_port < 0) {
+	if (ep->family == AF_UNIX) {
 		lua_pushstring(L, log_addr);
 	} else {
-		lua_pushfstring(L, "%s#%d", log_addr, log_port);
+		lua_pushfstring(L, "%s#%d", log_addr, ep->port);
 	}
 	if (lua_pcall(L, 3, 0, 0)) {
 		kr_log_error("error opening %s: %s\n", log_addr, lua_tostring(L, -1));
@@ -90,7 +90,7 @@ static int engage_endpoint_array(const char *key, void *endpoints, void *net)
 		struct endpoint *ep = &eps->at[i];
 		const bool match = !ep->engaged && ep->flags.kind;
 		if (!match) continue;
-		int ret = endpoint_open_lua_cb(net, ep, key, ep->port);
+		int ret = endpoint_open_lua_cb(net, ep, key);
 		if (ret) return ret;
 	}
 	return 0;
@@ -238,10 +238,9 @@ static int insert_endpoint(struct network *net, const char *addr, struct endpoin
 
 /** Open endpoint protocols.  ep->flags were pre-set. */
 static int open_endpoint(struct network *net, struct endpoint *ep,
-			 const struct sockaddr *sa, int fd,
-			 const char *log_addr, uint16_t log_port)
+			 const struct sockaddr *sa, const char *log_addr)
 {
-	if ((sa != NULL) == (fd != -1)) {
+	if ((sa != NULL) == (ep->fd != -1)) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
@@ -250,13 +249,12 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 	}
 
 	if (sa) {
-		fd = io_bind(sa, ep->flags.sock_type);
-		if (fd < 0) return fd;
+		ep->fd = io_bind(sa, ep->flags.sock_type);
+		if (ep->fd < 0) return ep->fd;
 	}
-	ep->fd = fd;
 	if (ep->flags.kind) {
 		/* This EP isn't to be managed internally after binding. */
-		return endpoint_open_lua_cb(net, ep, log_addr, log_port);
+		return endpoint_open_lua_cb(net, ep, log_addr);
 	} else {
 		ep->engaged = true;
 		/* .engaged seems not really meaningful with .kind == NULL, but... */
@@ -272,7 +270,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 		if (!ep->handle) {
 			return kr_error(ENOMEM);
 		}
-		return io_listen_udp(net->loop, ep_handle, fd);
+		return io_listen_udp(net->loop, ep_handle, ep->fd);
 	} /* else */
 
 	if (ep->flags.sock_type == SOCK_STREAM) {
@@ -281,7 +279,8 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 		if (!ep->handle) {
 			return kr_error(ENOMEM);
 		}
-		return io_listen_tcp(net->loop, ep_handle, fd, net->tcp_backlog, ep->flags.tls);
+		return io_listen_tcp(net->loop, ep_handle, ep->fd,
+					net->tcp_backlog, ep->flags.tls);
 	} /* else */
 
 	assert(!EINVAL);
@@ -306,24 +305,18 @@ static struct endpoint * endpoint_get(struct network *net, const char *addr,
 	return NULL;
 }
 
-/** \note pass either sa != NULL xor fd != -1;
- *  \note ownership of flags.* is taken on success. */
+/** \note pass either sa != NULL xor ep.fd != -1;
+ *  \note ownership of ep.flags.* is taken on success. */
 static int create_endpoint(struct network *net, const char *addr_str,
-				uint16_t port, endpoint_flags_t flags,
-				const struct sockaddr *sa, int fd)
+				struct endpoint *ep, const struct sockaddr *sa)
 {
 	/* Bind interfaces */
-	struct endpoint ep = {
-		.handle = NULL,
-		.port = port,
-		.flags = flags,
-	};
-	int ret = open_endpoint(net, &ep, sa, fd, addr_str, port);
+	int ret = open_endpoint(net, ep, sa, addr_str);
 	if (ret == 0) {
-		ret = insert_endpoint(net, addr_str, &ep);
+		ret = insert_endpoint(net, addr_str, ep);
 	}
-	if (ret != 0 && ep.handle) {
-		endpoint_close(net, &ep, false);
+	if (ret != 0 && ep->handle) {
+		endpoint_close(net, ep, false);
 	}
 	return ret;
 }
@@ -351,21 +344,27 @@ int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags)
 	if (ret != 0) {
 		return kr_error(errno);
 	}
-	int port = 0;
+
+	struct endpoint ep = {
+		.flags = flags,
+		.family = ss.ss_family,
+		.fd = fd,
+	};
+	/* Extract address string and port. */
 	char addr_str[INET6_ADDRSTRLEN]; /* https://tools.ietf.org/html/rfc4291 */
 	if (ss.ss_family == AF_INET) {
 		uv_ip4_name((const struct sockaddr_in*)&ss, addr_str, sizeof(addr_str));
-		port = ntohs(((struct sockaddr_in *)&ss)->sin_port);
+		ep.port = ntohs(((struct sockaddr_in *)&ss)->sin_port);
 	} else if (ss.ss_family == AF_INET6) {
 		uv_ip6_name((const struct sockaddr_in6*)&ss, addr_str, sizeof(addr_str));
-		port = ntohs(((struct sockaddr_in6 *)&ss)->sin6_port);
+		ep.port = ntohs(((struct sockaddr_in6 *)&ss)->sin6_port);
 	} else {
 		return kr_error(EAFNOSUPPORT);
 	}
 
 	/* always create endpoint for supervisor supplied fd
 	 * even if addr+port is not unique */
-	return create_endpoint(net, addr_str, port, flags, NULL, fd);
+	return create_endpoint(net, addr_str, &ep, NULL);
 }
 
 int network_listen(struct network *net, const char *addr, uint16_t port,
@@ -390,7 +389,13 @@ int network_listen(struct network *net, const char *addr, uint16_t port,
 	if (ret != 0) {
 		return ret;
 	}
-	return create_endpoint(net, addr, port, flags, &sa.ip, -1);
+	struct endpoint ep = {
+		.flags = flags,
+		.fd = -1,
+		.port = port,
+		.family = sa.ip.sa_family,
+	};
+	return create_endpoint(net, addr, &ep, &sa.ip);
 }
 
 int network_close(struct network *net, const char *addr, int port)
