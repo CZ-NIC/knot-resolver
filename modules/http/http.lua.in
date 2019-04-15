@@ -17,6 +17,7 @@ local has_mmdb, mmdb  = pcall(require, 'mmdb')
 -- Module declaration
 local M = {
 	servers = {},
+	templates = {}
 }
 
 -- Map extensions to MIME type
@@ -281,7 +282,7 @@ end
 
 -- @function Merge dictionaries.
 -- Values from right-hand side dictionaries take precedence.
-function M.mergeconf(...)
+function mergeconf(...)
 	local merged = {}
 	for _, intable in ipairs({...}) do
 		for key, val in pairs(intable) do
@@ -291,18 +292,38 @@ function M.mergeconf(...)
 	return merged
 end
 
+M.templates.default = {
+	cq = worker.bg_worker.cq,
+	cert = 'self.crt',
+	key = 'self.key',
+	ephemeral = true,
+	reuseport = true,
+	host = 'localhost',
+	port = 8053,
+	client_timeout = 5
+}
+M.templates.default.onerror = function(myserver, context, op, err, errno) -- luacheck: ignore 212
+	local msg = '[http] ' .. op .. ' on ' .. tostring(context) .. ' failed'
+	if err then
+		msg = msg .. ': ' .. tostring(err)
+	end
+	if verbose() then
+		log(msg)
+	end
+end
+
 -- @function Listen on given HTTP(s) host
 function M.add_interface(conf)
 	local crt, key, ephemeral
-	if conf.tls ~= false then
-		-- Check if a cert file was specified
-		if not conf.cert then
-			conf.cert = 'self.crt'
-			conf.key = 'self.key'
-			ephemeral = true
-		elseif not conf.key then
+	if conf.cert then
+		conf.ephemeral = false
+		if not conf.key then
 			error('certificate provided, but missing key')
 		end
+	end
+	local conf = mergeconf(M.templates.default, conf)
+	if conf.tls ~= false then
+		-- Check if a cert file was specified
 		-- Read or create self-signed x509 certificate
 		local f = io.open(conf.cert, 'r')
 		if f then
@@ -329,7 +350,6 @@ function M.add_interface(conf)
 	-- Compose server handler
 	local routes = route(conf.endpoints or M.endpoints)
 	-- Enable SO_REUSEPORT by default (unless explicitly turned off)
-	local reuseport = (conf.reuseport ~= nil) and conf.reuseport or true
 	if not reuseport and worker.id > 0 then
 		warn('[http] the "reuseport" option is disabled and multiple forks are used, ' ..
 			 'port binding will fail on some instances')
@@ -346,31 +366,10 @@ function M.add_interface(conf)
 		end
 		addr_str = conf.path
 	end
+	conf.ctx = crt and tlscontext(crt, key)
+	conf.onstream = routes
 	-- Create TLS context and start listening
-	local s, err = http_server.listen {
-		cq = worker.bg_worker.cq,
-		host = conf.host,
-		port = conf.port,
-		path = conf.path,
-		v6only = conf.v6only,
-		unlink = conf.unlink,
-		reuseaddr = conf.reuseaddr,
-		reuseport = reuseport,
-		client_timeout = conf.client_timeout or 5,
-		ctx = crt and tlscontext(crt, key),
-		tls = conf.tls,
-		onstream = routes,
-		-- Log errors, but do not throw
-		onerror = function(myserver, context, op, err, errno) -- luacheck: ignore 212
-			local msg = '[http] ' .. op .. ' on ' .. tostring(context) .. ' failed'
-			if err then
-				msg = msg .. ': ' .. tostring(err)
-			end
-			if verbose() then
-				log(msg)
-			end
-		end,
-	}
+	local s, err = http_server.listen(conf)
 	-- Manually call :listen() so that we are bound before calling :localname()
 	if s then
 		err = select(2, s:listen())
