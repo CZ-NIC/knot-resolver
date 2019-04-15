@@ -105,6 +105,7 @@ static void endpoint_close_lua_cb(struct network *net, struct endpoint *ep)
 				ep->flags.kind);
 		return;
 	}
+	if (!pp) return;
 
 	const int fun_id = (char *)*pp - (char *)NULL;
 	lua_rawgeti(L, LUA_REGISTRYINDEX, fun_id);
