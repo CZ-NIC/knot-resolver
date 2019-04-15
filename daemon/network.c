@@ -171,13 +171,19 @@ int kind_unregister(trie_val_t *tv, void *L)
 	return 0;
 }
 
-void network_deinit(struct network *net)
+void network_close_force(struct network *net)
 {
 	if (net != NULL) {
 		map_walk(&net->endpoints, close_key, net);
 		map_walk(&net->endpoints, free_key, 0);
 		map_clear(&net->endpoints);
+	}
+}
 
+void network_deinit(struct network *net)
+{
+	if (net != NULL) {
+		network_close_force(net);
 		struct worker_ctx *worker = net->loop->data; // LATER: the_worker
 		trie_apply(net->endpoint_kinds, kind_unregister, worker->engine->L);
 		trie_free(net->endpoint_kinds);

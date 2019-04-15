@@ -110,6 +110,9 @@ int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags);
  * \return kr_error(ENOENT) if nothing matched. */
 int network_close(struct network *net, const char *addr, int port);
 
+/** Close all endpoints immediately (no waiting for UV loop). */
+void network_close_force(struct network *net);
+
 /** Enforce that all endpoints are registered from now on.
  * This only does anything with struct endpoint::flags.kind != NULL. */
 int network_engage_endpoints(struct network *net);
