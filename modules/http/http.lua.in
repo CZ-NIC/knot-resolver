@@ -366,7 +366,7 @@ function M.add_interface(conf)
 	if err then
 		panic('failed to listen on %s: %s', addr_str, err)
 	end
-	table.insert(M.servers, s)
+	table.insert(M.servers, {server = s, config = conf})
 	-- Create certificate renewal timer if ephemeral
 	if crt and ephemeral then
 		local _, expiry = crt:getLifetime()
@@ -401,7 +401,7 @@ end
 -- @function Cleanup module
 function M.deinit()
 	for i, server in ipairs(M.servers) do
-		server:close()
+		server.server:close()
 		M.servers[i] = nil
 	end
 	prometheus.deinit()
