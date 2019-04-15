@@ -379,17 +379,6 @@ function M.add_interface(conf)
 	end
 end
 
--- @function Listen on given HTTP(s) host (backwards compatible interface)
-function M.interface(host, port, endpoints, crtfile, keyfile)
-	return M.add_interface {
-		host = host,
-		port = port,
-		endpoints = endpoints,
-		cert = crtfile,
-		key = keyfile,
-	}
-end
-
 -- @function Init module
 function M.init()
 	-- collect and merge metrics only on leader
