@@ -87,8 +87,7 @@ kres-gen:
     - docker
   script:
     - meson build_ci_lib --prefix=$PREFIX
-    - ninja -C build_ci_lib lib/libkres.so.${LIBKRES_ABI}
-    - ninja -C build_ci_lib kres-gen
+    - ninja -C build_ci_lib kres-gen kresd
     - git diff --quiet || (git diff; exit 1)
 # }}}
 
