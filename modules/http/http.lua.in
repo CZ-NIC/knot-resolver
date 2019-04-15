@@ -279,6 +279,18 @@ local function updatecert(crtfile, keyfile)
 	return crt, key
 end
 
+-- @function Merge dictionaries.
+-- Values from right-hand side dictionaries take precedence.
+function M.mergeconf(...)
+	local merged = {}
+	for _, intable in ipairs({...}) do
+		for key, val in pairs(intable) do
+			merged[key] = val
+		end
+	end
+	return merged
+end
+
 -- @function Listen on given HTTP(s) host
 function M.add_interface(conf)
 	local crt, key, ephemeral
