@@ -637,6 +637,7 @@ static int start_listening(struct network *net, flagged_fd_array_t *fds) {
 					ffd->fd, kr_strerror(ret));
 			/* Continue printing all of these before exiting. */
 		}
+		ffd->flags.kind = NULL; /* ownership transferred */
 	}
 	return some_bad_ret;
 }

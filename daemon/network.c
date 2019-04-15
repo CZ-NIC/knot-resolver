@@ -86,9 +86,12 @@ int network_engage_endpoints(struct network *net)
 {
 	if (net->missing_kind_is_error)
 		return kr_ok(); /* maybe weird, but let's make it idempotent */
-	int ret = map_walk(&net->endpoints, engage_endpoint_array, net);
-	if (ret) return ret;
 	net->missing_kind_is_error = true;
+	int ret = map_walk(&net->endpoints, engage_endpoint_array, net);
+	if (ret) {
+		net->missing_kind_is_error = false; /* avoid the same errors when closing */
+		return ret;
+	}
 	return kr_ok();
 }
 
