@@ -2,6 +2,11 @@
 if not stats then modules.load('stats') end
 if not bogus_log then modules.load('bogus_log') end
 
+ffi = require('ffi')
+cqueues = require('cqueues')
+cqueues.socket = require('cqueues.socket')
+assert(cqueues.VERSION >= 20150112)  -- fdopen changed semantics
+
 -- This is a module that does the heavy lifting to provide an HTTP/2 enabled
 -- server that supports TLS by default and provides endpoint for other modules
 -- in order to enable them to export restful APIs and websocket streams.
@@ -17,7 +22,7 @@ local has_mmdb, mmdb  = pcall(require, 'mmdb')
 -- Module declaration
 local M = {
 	servers = {},
-	templates = {}
+	templates = {}  -- configuration templates
 }
 
 -- Map extensions to MIME type
@@ -292,17 +297,16 @@ function mergeconf(...)
 	return merged
 end
 
-M.templates.default = {
+-- inherited by all configurations
+M.templates.builtin = {
 	cq = worker.bg_worker.cq,
 	cert = 'self.crt',
 	key = 'self.key',
 	ephemeral = true,
-	reuseport = true,
-	host = 'localhost',
-	port = 8053,
 	client_timeout = 5
 }
-M.templates.default.onerror = function(myserver, context, op, err, errno) -- luacheck: ignore 212
+-- log errors but do not throw
+M.templates.builtin.onerror = function(myserver, context, op, err, errno) -- luacheck: ignore 212
 	local msg = '[http] ' .. op .. ' on ' .. tostring(context) .. ' failed'
 	if err then
 		msg = msg .. ': ' .. tostring(err)
@@ -313,15 +317,11 @@ M.templates.default.onerror = function(myserver, context, op, err, errno) -- lua
 end
 
 -- @function Listen on given HTTP(s) host
-function M.add_interface(conf)
-	local crt, key, ephemeral
-	if conf.cert then
-		conf.ephemeral = false
-		if not conf.key then
-			error('certificate provided, but missing key')
-		end
-	end
-	local conf = mergeconf(M.templates.default, conf)
+function M.add_socket(socket, kind)
+	assert(M.servers[socket] == nil, 'socket is already served by an HTTP instance')
+	local conf, crt, key
+	conf = mergeconf(M.templates.builtin, M.templates.default, M.templates[kind] or {})
+	conf.socket = cqueues.socket.fdopen(socket)
 	if conf.tls ~= false then
 		-- Check if a cert file was specified
 		-- Read or create self-signed x509 certificate
@@ -339,7 +339,7 @@ function M.add_interface(conf)
 				key = assert(pkey.new(f:read('*all')))
 				f:close()
 			end
-		elseif ephemeral then
+		elseif conf.ephemeral then
 			crt, key = updatecert(conf.cert, conf.key)
 		end
 		-- Check loaded certificate
@@ -355,21 +355,11 @@ function M.add_interface(conf)
 			 'port binding will fail on some instances')
 	end
 	-- Check if UNIX socket path is used
-	local addr_str
-	if not conf.path then
-		conf.host = conf.host or 'localhost'
-		conf.port = conf.port or 8053
-		addr_str = string.format('%s@%d', conf.host, conf.port)
-	else
-		if conf.host or conf.port then
-			error('either "path", or "host" and "port" must be provided')
-		end
-		addr_str = conf.path
-	end
+	local addr_str  -- TODO
 	conf.ctx = crt and tlscontext(crt, key)
 	conf.onstream = routes
 	-- Create TLS context and start listening
-	local s, err = http_server.listen(conf)
+	local s, err = http_server.new(conf)
 	-- Manually call :listen() so that we are bound before calling :localname()
 	if s then
 		err = select(2, s:listen())
@@ -377,14 +367,15 @@ function M.add_interface(conf)
 	if err then
 		panic('failed to listen on %s: %s', addr_str, err)
 	end
-	table.insert(M.servers, {server = s, config = conf})
+	M.servers[socket] = {kind = kind, server = s, config = conf}
 	-- Create certificate renewal timer if ephemeral
-	if crt and ephemeral then
+	if crt and conf.ephemeral then
 		local _, expiry = crt:getLifetime()
 		expiry = math.max(0, expiry - (os.time() - 3 * 24 * 3600))
 		event.after(expiry, function ()
 			log('[http] refreshed ephemeral certificate')
 			crt, key = updatecert(conf.cert, conf.key)
+			-- TODO servers sharing cert?!
 			s.ctx = tlscontext(crt, key)
 		end)
 	end
@@ -396,22 +387,44 @@ function M.init()
 	if worker.id == 0 then
 		worker.coroutine(prometheus.init)
 	end
+	net.register_endpoint_kind('doh', cb_socket)
+	net.register_endpoint_kind('webmgmt', cb_socket)
 end
 
 -- @function Cleanup module
 function M.deinit()
-	for i, server in ipairs(M.servers) do
-		server.server:close()
-		M.servers[i] = nil
+	for socket, instance in pairs(M.servers) do
+		instance.server:close()
+		M.servers[socket] = nil
+		-- TODO stop refresh timer
 	end
 	prometheus.deinit()
+	net.register_endpoint_kind('doh')
+	net.register_endpoint_kind('webmgmt')
 end
 
--- @function Configure module
-function M.config(conf)
-	if conf == true then conf = {} end
-	assert(type(conf) == 'table', 'config { host = "...", port = 443, cert = "...", key = "..." }')
-	-- Configure web interface for resolver
+-- @function Listen for config changes from net.listen()/net.close()
+function cb_socket(...)
+	local added, endpoint, _ = unpack({...})
+	endpoint = ffi.cast('struct endpoint **', endpoint)[0]
+	local kind = ffi.string(endpoint.flags.kind)
+	local socket = endpoint.fd
+	M.add_socket(socket, kind)
+end
+
+-- @function Configure module, i.e. store configuration template and restart servers
+-- kind = socket type
+function M.config(conf, kind)
+	kind = kind or 'default'
+	assert(type(kind) == 'string')
+	conf = conf or {}
+	assert(type(conf) == 'table', 'config { cert = "...", key = "..." }')
+	if conf.cert then
+		conf.ephemeral = false
+		if not conf.key then
+			error('certificate provided, but missing key')
+		end
+	end
 	if conf.geoip then
 		if has_mmdb then
 			M.geoip = mmdb.open(conf.geoip)
@@ -419,7 +432,8 @@ function M.config(conf)
 			error('[http] mmdblua library not found, please remove GeoIP configuration')
 		end
 	end
-	M.add_interface(conf)
+	M.templates[kind] = conf
+	-- TODO restart configured servers of this kind
 end
 
 return M
