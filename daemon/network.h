@@ -105,10 +105,10 @@ int network_listen(struct network *net, const char *addr, uint16_t port,
  */
 int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags);
 
-/** Stop listening on all addr#port with equal flags.
+/** Stop listening on all endpoints with matching addr#port.
+ * port < 0 serves as a wild-card.
  * \return kr_error(ENOENT) if nothing matched. */
-int network_close(struct network *net, const char *addr, uint16_t port,
-		  endpoint_flags_t flags);
+int network_close(struct network *net, const char *addr, int port);
 
 /** Enforce that all endpoints are registered from now on.
  * This only does anything with struct endpoint::flags.kind != NULL. */
