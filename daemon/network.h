@@ -105,10 +105,10 @@ int network_listen(struct network *net, const char *addr, uint16_t port,
  */
 int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags);
 
-/** Stop listening on all addr#port with equal flags.
+/** Stop listening on all endpoints with matching addr#port.
+ * port < 0 serves as a wild-card.
  * \return kr_error(ENOENT) if nothing matched. */
-int network_close(struct network *net, const char *addr, uint16_t port,
-		  endpoint_flags_t flags);
+int network_close(struct network *net, const char *addr, int port);
 
 /** Close all endpoints immediately (no waiting for UV loop). */
 void network_close_force(struct network *net);

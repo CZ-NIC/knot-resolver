@@ -216,34 +216,23 @@ static int net_listen(lua_State *L)
 static int net_close(lua_State *L)
 {
 	/* Check parameters */
-	int n = lua_gettop(L);
-	if (n < 2)
-		lua_error_p(L, "expected 'close(string addr, number port)'");
-
-	/* FIXME: support different kind values */
-
-	/* Open resolution context cache */
-	struct network *net = &engine_luaget(L)->net;
+	const int n = lua_gettop(L);
+	bool ok = (n == 1 || n == 2) && lua_isstring(L, 1);
 	const char *addr = lua_tostring(L, 1);
-	const uint16_t port = lua_tointeger(L, 2);
-	endpoint_flags_t flags_all[] = {
-		{ .sock_type = SOCK_DGRAM,  .tls = false },
-		{ .sock_type = SOCK_STREAM, .tls = false },
-		{ .sock_type = SOCK_STREAM, .tls = true },
-	};
-	bool success = false; /*< at least one deletion succeeded */
-	int ret = 0;
-	for (int i = 0; i < sizeof(flags_all) / sizeof(flags_all[0]); ++i) {
-		ret = network_close(net, addr, port, flags_all[i]);
-		if (ret == 0) {
-			success = true;
-		} else if (ret != kr_error(ENOENT)) {
-			break;
-		}
-		ret = 0;
+	int port;
+	if (ok && (n < 2 || lua_isnil(L, 2))) {
+	       port = -1;
+	} else if (ok) {
+		ok = lua_isnumber(L, 2);
+		port = lua_tointeger(L, 2);
+		ok = ok && port >= 0 && port <= 65535;
 	}
-	/* true: no fatal error and at least one kr_ok() */
-	lua_pushboolean(L, ret == 0 && success);
+	if (!ok)
+		lua_error_p(L, "expected 'close(string addr, [number port])'");
+
+	struct network *net = &engine_luaget(L)->net;
+	int ret = network_close(net, addr, port);
+	lua_pushboolean(L, ret == 0);
 	return 1;
 }
 

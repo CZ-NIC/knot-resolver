@@ -122,11 +122,11 @@ configured in the config file.
 	net.listen(net.lo, 5353)
 	net.listen({net.eth0, '127.0.0.1'}, 53853, {tls = true})
 
-.. function:: net.close(address, [port = 53])
+.. function:: net.close(address, [port])
 
-   :return: boolean
+   :return: boolean (at least one endpoint closed)
 
-   Close opened address/port pair, noop if not listening.
+   Close all endpoints listening on the specified address, optionally restricted by port as well.
 
 .. function:: net.list()
 

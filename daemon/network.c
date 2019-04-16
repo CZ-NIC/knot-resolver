@@ -393,8 +393,7 @@ int network_listen(struct network *net, const char *addr, uint16_t port,
 	return create_endpoint(net, addr, port, flags, &sa.ip, -1);
 }
 
-int network_close(struct network *net, const char *addr, uint16_t port,
-		  endpoint_flags_t flags)
+int network_close(struct network *net, const char *addr, int port)
 {
 	endpoint_array_t *ep_array = map_get(&net->endpoints, addr);
 	if (!ep_array) {
@@ -402,10 +401,10 @@ int network_close(struct network *net, const char *addr, uint16_t port,
 	}
 
 	size_t i = 0;
-	bool matched = false;
+	bool matched = false; /*< at least one match */
 	while (i < ep_array->len) {
 		struct endpoint *ep = &ep_array->at[i];
-		if (endpoint_flags_eq(flags, ep->flags)) {
+		if (port < 0 || ep->port == port) {
 			endpoint_close(net, ep, false);
 			array_del(*ep_array, i);
 			matched = true;
@@ -420,6 +419,7 @@ int network_close(struct network *net, const char *addr, uint16_t port,
 
 	/* Collapse key if it has no endpoint. */
 	if (ep_array->len == 0) {
+		array_clear(*ep_array);
 		free(ep_array);
 		map_del(&net->endpoints, addr);
 	}
