@@ -119,9 +119,11 @@ Documentation for Knot Resolver
 Summary:        HTTP/2 module for Knot Resolver
 Requires:       knot-resolver
 %if 0%{?fedora}
+Requires:       compat-lua-cqueues >= 20171014
 Requires:       compat-lua-http
 Requires:       compat-lua-mmdb
 %else
+Requires:       lua-cqueues >= 20171014
 Requires:       lua-http
 Requires:       lua-mmdb
 %endif
