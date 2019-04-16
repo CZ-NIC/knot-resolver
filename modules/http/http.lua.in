@@ -25,6 +25,34 @@ local M = {
 	templates = {}  -- configuration templates
 }
 
+-- inherited by all configurations
+M.templates._builtin = {
+	cq = worker.bg_worker.cq,
+	cert = 'self.crt',
+	key = 'self.key',
+	ephemeral = true,
+	client_timeout = 5
+}
+-- log errors but do not throw
+M.templates._builtin.onerror = function(myserver, context, op, err, errno) -- luacheck: ignore 212
+	local msg = '[http] ' .. op .. ' on ' .. tostring(context) .. ' failed'
+	if err then
+		msg = msg .. ': ' .. tostring(err)
+	end
+	if verbose() then
+		log(msg)
+	end
+end
+
+-- M.config() without explicit "kind" modifies this
+M.templates._default = {}
+
+-- DoH
+M.templates.doh = {}
+
+-- management endpoint
+M.templates.webmgmt = {}
+
 -- Map extensions to MIME type
 local mime_types = {
 	js = 'application/javascript',
@@ -91,32 +119,36 @@ local function serve_root()
 end
 
 -- Export HTTP service endpoints
-M.endpoints = {
-	['/'] = {'text/html', serve_root()},
-}
+M.templates.doh.endpoints = {}
+M.templates.webmgmt.endpoints = {}
+local mgmt_endpoints = M.templates.webmgmt.endpoints
+
+mgmt_endpoints['/'] = {'text/html', serve_root()}
 
 -- Export static pages
 for _, pg in ipairs(pages) do
-	M.endpoints['/'..pg] = pgload(pg)
+	mgmt_endpoints['/'..pg] = pgload(pg)
 end
 
 -- Export built-in prometheus interface
 local prometheus = require('kres_modules.prometheus')
 for k, v in pairs(prometheus.endpoints) do
-	M.endpoints[k] = v
+	mgmt_endpoints[k] = v
 end
 M.prometheus = prometheus
 
 -- Export built-in trace interface
 local http_trace = require('kres_modules.http_trace')
 for k, v in pairs(http_trace.endpoints) do
-	M.endpoints[k] = v
+	mgmt_endpoints[k] = v
 end
 M.trace = http_trace
 
+M.templates.doh.endpoints = {}
 local http_doh = require('kres_modules.http_doh')
 for k, v in pairs(http_doh.endpoints) do
-	M.endpoints[k] = v
+	mgmt_endpoints[k] = v
+	M.templates.doh.endpoints[k] = v
 end
 M.doh = http_doh
 
@@ -171,6 +203,7 @@ end
 
 -- Web server service closure
 local function route(endpoints)
+	assert(type(endpoints) == 'table', 'endpoints are not a table, is it a botched template?')
 	return function (_, stream)
 		-- HTTP/2: We're only permitted to send in open/half-closed (remote)
 		local connection = stream.connection
@@ -290,6 +323,7 @@ end
 function mergeconf(...)
 	local merged = {}
 	for _, intable in ipairs({...}) do
+		assert(type(intable) == 'table', 'cannot merge non-tables')
 		for key, val in pairs(intable) do
 			merged[key] = val
 		end
@@ -297,31 +331,12 @@ function mergeconf(...)
 	return merged
 end
 
--- inherited by all configurations
-M.templates.builtin = {
-	cq = worker.bg_worker.cq,
-	cert = 'self.crt',
-	key = 'self.key',
-	ephemeral = true,
-	client_timeout = 5
-}
--- log errors but do not throw
-M.templates.builtin.onerror = function(myserver, context, op, err, errno) -- luacheck: ignore 212
-	local msg = '[http] ' .. op .. ' on ' .. tostring(context) .. ' failed'
-	if err then
-		msg = msg .. ': ' .. tostring(err)
-	end
-	if verbose() then
-		log(msg)
-	end
-end
-
 -- @function Listen on given socket
 -- using configuration for specific "kind" of HTTP server
 function add_socket(fd, kind)
 	assert(M.servers[fd] == nil, 'socket is already served by an HTTP instance')
 	local conf, crt, key
-	conf = mergeconf(M.templates.builtin, M.templates.default, M.templates[kind] or {})
+	conf = mergeconf(M.templates._builtin, M.templates._default, M.templates[kind] or {})
 	conf.socket = cqueues.socket.fdopen(fd)
 	if conf.tls ~= false then
 		-- Check if a cert file was specified
@@ -349,7 +364,7 @@ function add_socket(fd, kind)
 		end
 	end
 	-- Compose server handler
-	local routes = route(conf.endpoints or M.endpoints)
+	local routes = route(conf.endpoints)
 	-- Enable SO_REUSEPORT by default (unless explicitly turned off)
 	if not reuseport and worker.id > 0 then
 		warn('[http] the "reuseport" option is disabled and multiple forks are used, ' ..
@@ -425,28 +440,61 @@ function cb_socket(...)
 	end
 end
 
--- @function Configure module, i.e. store configuration template and restart servers
--- kind = socket type
+-- @function Configure module, i.e. store new configuration template
+-- kind = socket type (doh/webmgmt)
 function M.config(conf, kind)
-	kind = kind or 'default'
+	if conf == nil and kind == nil then
+		-- default module config, nothing to do
+		return
+	end
+
+	kind = kind or '_default'
 	assert(type(kind) == 'string')
-	conf = conf or {}
-	assert(type(conf) == 'table', 'config { cert = "...", key = "..." }')
-	if conf.cert then
-		conf.ephemeral = false
-		if not conf.key then
-			error('certificate provided, but missing key')
+
+	local operation
+	if M.templates[kind] then  -- config on an existing template
+		if conf then	operation = 'modify'
+		else		operation = 'delete' end
+	else  -- config for not-yet-existing template
+		if conf then	operation = 'add'
+		else		panic('endpoint kind "%s" does not exist, '
+					.. 'nothing to delete', kind) end
+	end
+
+	if operation == 'modify' or operation == 'add' then
+		assert(type(conf) == 'table', 'config { cert = "...", key = "..." }')
+
+		if conf.cert then
+			conf.ephemeral = false
+			if not conf.key then
+				error('certificate provided, but missing key')
+			end
+		end
+		if conf.geoip then
+			if has_mmdb then
+				M.geoip = mmdb.open(conf.geoip)
+			else
+				error('[http] mmdblua library not found, please remove GeoIP configuration')
+			end
 		end
 	end
-	if conf.geoip then
-		if has_mmdb then
-			M.geoip = mmdb.open(conf.geoip)
-		else
-			error('[http] mmdblua library not found, please remove GeoIP configuration')
+
+	for _, instance in pairs(M.servers) do
+		-- modification cannot be implemented as
+		-- remove_socket + add_socket because remove closes the socket
+		if instance.kind == kind then
+			panic('unable to modify configration for '
+				.. 'endpoint kind "%s" because it is in '
+				.. 'use, use net.close() first', kind)
 		end
+	end
+
+	if operation == 'add' then
+		net.register_endpoint_kind(kind, cb_socket)
+	elseif operation == 'delete' then
+		net.register_endpoint_kind(kind)
 	end
 	M.templates[kind] = conf
-	-- TODO restart configured servers of this kind
 end
 
 return M
