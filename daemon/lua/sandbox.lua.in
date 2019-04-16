@@ -442,8 +442,9 @@ function table_print (tt, indent, done)
 				result = result .. string.rep (" ", indent)
 				result = result .. "}\n"
 			elseif type (value) == "function" then
-				result = result .. string.format("[%s] => function %s%s\n",
-				         tostring(key), tostring(key), funcsign(value))
+				result = result .. string.format("[%s] => function %s%s: %s\n",
+				         tostring(key), tostring(key), funcsign(value),
+					 string.sub(tostring(value), 11))
 			else
 				result = result .. string.format("[%s] => %s\n",
 				         tostring (key), printable(value))
@@ -452,7 +453,8 @@ function table_print (tt, indent, done)
 	else  -- not a table
 		local tt_str
 		if type(tt) == "function" then
-			tt_str = string.format("function%s\n", funcsign(tt))
+			tt_str = string.format("function%s: %s\n", funcsign(tt),
+						string.sub(tostring(tt), 11))
 		else
 			tt_str = tostring(tt)
 		end
