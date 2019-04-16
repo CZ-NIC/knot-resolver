@@ -316,12 +316,13 @@ M.templates.builtin.onerror = function(myserver, context, op, err, errno) -- lua
 	end
 end
 
--- @function Listen on given HTTP(s) host
-function M.add_socket(socket, kind)
-	assert(M.servers[socket] == nil, 'socket is already served by an HTTP instance')
+-- @function Listen on given socket
+-- using configuration for specific "kind" of HTTP server
+function add_socket(fd, kind)
+	assert(M.servers[fd] == nil, 'socket is already served by an HTTP instance')
 	local conf, crt, key
 	conf = mergeconf(M.templates.builtin, M.templates.default, M.templates[kind] or {})
-	conf.socket = cqueues.socket.fdopen(socket)
+	conf.socket = cqueues.socket.fdopen(fd)
 	if conf.tls ~= false then
 		-- Check if a cert file was specified
 		-- Read or create self-signed x509 certificate
@@ -367,7 +368,7 @@ function M.add_socket(socket, kind)
 	if err then
 		panic('failed to listen on %s: %s', addr_str, err)
 	end
-	M.servers[socket] = {kind = kind, server = s, config = conf}
+	M.servers[fd] = {kind = kind, server = s, config = conf}
 	-- Create certificate renewal timer if ephemeral
 	if crt and conf.ephemeral then
 		local _, expiry = crt:getLifetime()
@@ -379,6 +380,16 @@ function M.add_socket(socket, kind)
 			s.ctx = tlscontext(crt, key)
 		end)
 	end
+end
+
+-- @function Stop listening on given socket
+function remove_socket(fd)
+	local instance = M.servers[fd]
+	assert(instance, 'HTTP module is not listening on given socket')
+
+	instance.server:close()
+	M.servers[fd] = nil
+	-- TODO stop refresh timer
 end
 
 -- @function Init module
@@ -393,10 +404,8 @@ end
 
 -- @function Cleanup module
 function M.deinit()
-	for socket, instance in pairs(M.servers) do
-		instance.server:close()
-		M.servers[socket] = nil
-		-- TODO stop refresh timer
+	for fd, _ in pairs(M.servers) do
+		remove_socket(fd)
 	end
 	prometheus.deinit()
 	net.register_endpoint_kind('doh')
@@ -409,7 +418,11 @@ function cb_socket(...)
 	endpoint = ffi.cast('struct endpoint **', endpoint)[0]
 	local kind = ffi.string(endpoint.flags.kind)
 	local socket = endpoint.fd
-	M.add_socket(socket, kind)
+	if added then
+		return add_socket(socket, kind)
+	else
+		return remove_socket(socket)
+	end
 end
 
 -- @function Configure module, i.e. store configuration template and restart servers
