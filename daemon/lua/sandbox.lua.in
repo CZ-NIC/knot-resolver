@@ -370,6 +370,11 @@ local function funcsign(f)
 -- thanks to AnandA777 from StackOverflow! Function funcsign is adapted version of
 -- https://stackoverflow.com/questions/51095022/inspect-function-signature-in-lua-5-1
 	assert(type(f) == 'function', "bad argument #1 to 'funcsign' (function expected)")
+	local debuginfo = debug.getinfo(f)
+	if debuginfo.what == 'C' then  -- names N/A
+		return '(?)'
+	end
+
 	local func_args = {}
 	pcall(function()
 		local oldhook
@@ -377,28 +382,20 @@ local function funcsign(f)
 		local function hook()
 			delay = delay - 1
 			if delay == 0 then  -- call this only for the introspected function
-				for i = 1, math.huge do
-					-- stack depth 2 is the introspected function
+				-- stack depth 2 is the introspected function
+				for i = 1, debuginfo.nparams do
 					local k = debug.getlocal(2, i)
-					if (k or '('):sub(1, 1) == '(' then
-						break  -- internal variable, skip
-					else
-						table.insert(func_args, k)
-					end
+					table.insert(func_args, k)
 				end
-			if debug.getlocal(2, -1) then
-				-- vararg function
-				table.insert(func_args, "...")
+				if debuginfo.isvararg then
+					table.insert(func_args, "...")
+				end
+				debug.sethook(oldhook)
+				error('aborting the call to introspected function')
 			end
-			debug.sethook(oldhook)
-			error('aborting the call to introspected function')
 		end
-	end
-	oldhook = debug.sethook(hook, "c")  -- invoke hook() on function call
-	-- fake arguments, necessary to detect vararg functions
-	local fakearg = {}
-	for _ = 1, 64 do fakearg[#fakearg + 1] = true end
-	f(unpack(fakearg)) -- huh?
+		oldhook = debug.sethook(hook, "c")  -- invoke hook() on function call
+		f(unpack({}))  -- huh?
 	end)
 	return "(" .. table.concat(func_args, ", ") .. ")"
 end
@@ -445,8 +442,9 @@ function table_print (tt, indent, done)
 				result = result .. string.rep (" ", indent)
 				result = result .. "}\n"
 			elseif type (value) == "function" then
-				result = result .. string.format("[%s] => function %s%s\n",
-				         tostring(key), tostring(key), funcsign(value))
+				result = result .. string.format("[%s] => function %s%s: %s\n",
+				         tostring(key), tostring(key), funcsign(value),
+					 string.sub(tostring(value), 11))
 			else
 				result = result .. string.format("[%s] => %s\n",
 				         tostring (key), printable(value))
@@ -455,7 +453,8 @@ function table_print (tt, indent, done)
 	else  -- not a table
 		local tt_str
 		if type(tt) == "function" then
-			tt_str = string.format("function%s\n", funcsign(tt))
+			tt_str = string.format("function%s: %s\n", funcsign(tt),
+						string.sub(tostring(tt), 11))
 		else
 			tt_str = tostring(tt)
 		end
