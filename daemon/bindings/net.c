@@ -34,7 +34,7 @@ static int net_list_add(const char *key, void *val, void *ext)
 		lua_newtable(L);  // connection tuple
 
 		lua_pushstring(L, key);
-		lua_setfield(L, -2, "ip");
+		lua_setfield(L, -2, "addr"); // might contain AF_UNIX path later
 
 		lua_newtable(L);  // "transport" table
 		switch (ep->flags.sock_type) {
