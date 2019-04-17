@@ -3,10 +3,21 @@
 DNS-over-HTTP (DoH)
 -------------------
 
-.. warning:: DoH support was added in version 4.0.0 and is subject to change.
-             Please note there is insufficient operational experience with
-             this module and the DoH protocol in general.
-             Knot Resolver developers do not endorse use of the DoH protocol.
+.. warning::
+
+  * DoH support was added in version 4.0.0 and is subject to change.
+  * DoH implementation in Knot Resolver is intended for experimentation
+    only as there is insufficient experience with the module
+    and the DoH protocol in general.
+  * For the time being it is recommended to run DoH endpoint
+    on a separate machine which is not handling normal DNS operations.
+  * More information about controversies around the DoH can be found
+    in blog posts
+    `DNS Privacy at IETF 104 <http://www.potaroo.net/ispcol/2019-04/angst.html>`_
+    and
+    `More DOH <http://www.potaroo.net/ispcol/2019-04/moredoh.html>`_
+    by Geoff Huston.
+  * Knot Resolver developers do not endorse use of the DoH protocol.
 
 Following section compares several options for running a DoH capable server.
 Make sure you read through this chapter before exposing the DoH service to users.
@@ -32,9 +43,6 @@ This integrated DoH server has following properties:
         - Does not offer fine grained authorization and logging at HTTP level.
         - Let's Encrypt integration is not automated.
 
-
-.. note:: For the time being it is recommended to run DoH endpoint
-          on a separate machine which is not handling normal DNS operations.
 
 Example configuration:
 
@@ -119,6 +127,12 @@ To use your own DoH server just change ``network.trr.uri`` configuration option
 to match URL of your DoH endpoint.
 
 More detailed description of configuration options in Firefox can be found
-`here <https://daniel.haxx.se/blog/2018/06/03/inside-firefoxs-doh-engine/>`_.
-(Please note that this technilogy is controversial in technical circles and that
-not everybody is as optimistic about DoH as author of the article.)
+in article
+`Inside Firefox’s DOH engine <https://daniel.haxx.se/blog/2018/06/03/inside-firefoxs-doh-engine/>`_
+by Daniel Stenberg.
+
+.. warning::
+
+  Please note that Knot Resolver developers are not as enthusiastic
+  about DoH technology as author of the article linked above,
+  make sure you read :ref:`warnings at beginning of this section <mod-http-doh>`.

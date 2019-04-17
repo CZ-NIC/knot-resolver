@@ -14,15 +14,20 @@ if you want to use only one of these.
 
 This module ships two kinds of endpoints:
 
-  * doh - :ref:`mod-http-doh`
-  * webmgmt - web management APIs (includes DoH)
++--------------+------------------------------------+
+| **Endpoint** | **Explanation**                    |
++--------------+------------------------------------+
+| doh          | :ref:`mod-http-doh`                |
++--------------+------------------------------------+
+| webmgmt      | web management APIs (includes DoH) |
++--------------+------------------------------------+
 
 Network addresses which expose each kind of endpoint are configured
 using the same mechanisms as plain DNS and DNS-over-TLS,
 see chapter :ref:`network configuration <kresd-tls-socket-override-port>`
 for more details.
 
-.. warning:: Management endpoint (`webmgmt`) must not be directly exposed
+.. warning:: Management endpoint (``webmgmt``) must not be directly exposed
              to untrusted parties. Use `reverse-proxy`_ like Apache_
              or Nginx_ if you need to authenticate API clients
              for the management API.
@@ -34,7 +39,7 @@ Example configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
 This is an example how to configure web management API on loopback interface
-on port 5380 and expose :ref:`mod-http-doh` endpoint on public IP address.
+on port 8453 and expose :ref:`mod-http-doh` endpoint on public IP addresses.
 On distributions which use systemd socket activation (all moderd distributions
 except CentOS 7) you need to configure IP addresses using systemd. On CentOS 7
 you have to configure IP addresses in Knot Resolver's configuration file.
@@ -44,12 +49,15 @@ TLS certificate that is valid for 90 days and is automatically renewed. It is of
 course self-signed. Why not use something like
 `Let's Encrypt <https://letsencrypt.org>`_?
 
+.. warning:: Make sure you read section :ref:`mod-http-doh`
+             before copy&pasting this snippet.
+
 .. code-block:: bash
 
         # IP address configuration for modern systems
         # with systemd socket activation (not CentOS 7)
 
-        # configuring DoH on public IP address and port 44353
+        # configuring DoH on public IP addresses, port 44353
         $ vim /etc/systemd/system/kresd-doh.socket.d/override.conf
         # /etc/systemd/system/kresd-doh.socket.d/override.conf
         [Socket]
@@ -57,16 +65,12 @@ course self-signed. Why not use something like
         ListenStream=192.0.2.1:44353
         ListenStream=[2001:db8::1]:44353
 
-        $ systemctl unmask kresd-doh
-
-        # configuring web management on loopback port 8053
+        # configuring web management on loopback port 8453
         $ vim /etc/systemd/system/kresd-webmgmt.socket.d/override.conf
         # /etc/systemd/system/kresd-webmgmt.socket.d/override.conf
         [Socket]
         ListenStream=
-        ListenStream=127.0.0.1:8053
-
-        $ systemctl unmask kresd-webmgmt
+        ListenStream=127.0.0.1:8453
 
 
 .. code-block:: lua
@@ -75,7 +79,7 @@ course self-signed. Why not use something like
         -- which lack proper support for systemd socket activation
 
         -- expose management interface on loopback
-        -- net.listen('127.0.0.1', '5380', { kind = 'webmgmt' })
+        -- net.listen('127.0.0.1', '8453', { kind = 'webmgmt' })
 
         -- expose DoH on public interfaces
         -- net.listen('192.0.2.1', '44353', { kind = 'doh' })
@@ -84,18 +88,18 @@ course self-signed. Why not use something like
         -- load HTTP module with defaults (self-signed TLS cert)
         modules.load('http')
         -- optionally load geoIP database for server map
-        http.config{
+        http.config({
                 geoip = 'GeoLite2-City.mmdb',
                 -- e.g. https://dev.maxmind.com/geoip/geoip2/geolite2/
                 -- and install mmdblua library
-        }
+        })
 
 Now you can reach the web services and APIs, done!
 
 .. code-block:: bash
 
-	$ curl -k https://localhost:8053
-	$ curl -k https://localhost:8053/stats
+	$ curl -k https://localhost:8453
+	$ curl -k https://localhost:8453/stats
 
 .. _mod-http-tls:
 
@@ -110,7 +114,8 @@ You can disable unecrypted HTTP and enforce HTTPS by passing
                 tls = true,
         })
 
-If you want to provide your own certificate and key, you're welcome to do so:
+It is also possible to enforce TLS and use custom certificate only for one of
+kind of endpoint, e.g.:
 
 .. code-block:: lua
 
@@ -118,7 +123,7 @@ If you want to provide your own certificate and key, you're welcome to do so:
 		tls = true,
 		cert = '/etc/knot-resolver/mycert.crt',
 		key  = '/etc/knot-resolver/mykey.key',
-	})
+	}, 'doh')
 
 The format of both certificate and key is expected to be PEM, e.g. equivalent to
 the outputs of following:
@@ -158,7 +163,7 @@ You can use it out of the box:
 
 .. code-block:: bash
 
-	$ curl -k https://localhost:8053/metrics | tail
+	$ curl -k https://localhost:8453/metrics | tail
 	# TYPE latency histogram
 	latency_bucket{le=10} 2.000000
 	latency_bucket{le=50} 2.000000
@@ -203,7 +208,7 @@ The basic mode allows you to resolve a query and trace verbose logs (and message
 
 .. code-block:: bash
 
-   $ curl https://localhost:8053/trace/e.root-servers.net
+   $ curl https://localhost:8453/trace/e.root-servers.net
    [ 8138] [iter] 'e.root-servers.net.' type 'A' created outbound query, parent id 0
    [ 8138] [ rc ] => rank: 020, lowest 020, e.root-servers.net. A
    [ 8138] [ rc ] => satisfied from cache
@@ -256,9 +261,9 @@ Then you can query the API endpoint, or tail the WebSocket using curl.
 
 .. code-block:: bash
 
-	$ curl -k https://localhost:8053/health
+	$ curl -k https://localhost:8453/health
 	{"state":"up","uptime":0}
-	$ curl -k -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Host: localhost:8053/health"  -H "Sec-Websocket-Key: nope" -H "Sec-Websocket-Version: 13" https://localhost:8053/health
+	$ curl -k -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Host: localhost:8453/health"  -H "Sec-Websocket-Key: nope" -H "Sec-Websocket-Version: 13" https://localhost:8453/health
 	HTTP/1.1 101 Switching Protocols
 	upgrade: websocket
 	sec-websocket-accept: eg18mwU7CDRGUF1Q+EJwPM335eM=
