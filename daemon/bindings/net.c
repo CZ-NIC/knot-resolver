@@ -23,7 +23,7 @@
 
 #include <stdlib.h>
 
-/** Append 'addr = {port = int, udp = bool, tcp = bool}' */
+/** Table and next index on top of stack -> append entries for given endpoint_array_t. */
 static int net_list_add(const char *key, void *val, void *ext)
 {
 	lua_State *L = (lua_State *)ext;
@@ -33,46 +33,58 @@ static int net_list_add(const char *key, void *val, void *ext)
 		struct endpoint *ep = &ep_array->at[j];
 		lua_newtable(L);  // connection tuple
 
-		lua_pushstring(L, key);
-		lua_setfield(L, -2, "addr"); // might contain AF_UNIX path later
-
-		lua_newtable(L);  // "transport" table
-		switch (ep->flags.sock_type) {
-		case SOCK_DGRAM:
-			lua_pushliteral(L, "udp");
-			lua_setfield(L, -2, "protocol");
-			lua_pushinteger(L, ep->port);
-			lua_setfield(L, -2, "port");
-			lua_pushliteral(L, "none");
-			lua_setfield(L, -2, "security");
-			break;
-		case SOCK_STREAM:
-			lua_pushliteral(L, "tcp");
-			lua_setfield(L, -2, "protocol");
-			lua_pushinteger(L, ep->port);
-			lua_setfield(L, -2, "port");
-			if (ep->flags.tls) {
-				lua_pushliteral(L, "tls");
-			} else {
-				lua_pushliteral(L, "none");
-			}
-			lua_setfield(L, -2, "security");
-			break;
-		default:
-			assert(!EINVAL);
-			lua_pushliteral(L, "unknown");
-			lua_setfield(L, -2, "protocol");
-		}
-		lua_setfield(L, -2, "transport");
-
-		lua_newtable(L);  // "application" table
 		if (ep->flags.kind) {
 			lua_pushstring(L, ep->flags.kind);
+		} else if (ep->flags.tls) {
+			lua_pushliteral(L, "tls");
 		} else {
 			lua_pushliteral(L, "dns");
 		}
+		lua_setfield(L, -2, "kind");
+
+		lua_newtable(L);  // "transport" table
+
+		switch (ep->family) {
+		case AF_INET:
+			lua_pushliteral(L, "inet4");
+			break;
+		case AF_INET6:
+			lua_pushliteral(L, "inet6");
+			break;
+		case AF_UNIX:
+			lua_pushliteral(L, "unix");
+			break;
+		default:
+			lua_pushliteral(L, "invalid");
+			assert(!EINVAL);
+		}
+		lua_setfield(L, -2, "family");
+
+		lua_pushstring(L, key);
+		if (ep->family != AF_UNIX) {
+			lua_setfield(L, -2, "ip");
+		} else {
+			lua_setfield(L, -2, "path");
+		}
+
+		if (ep->family != AF_UNIX) {
+			lua_pushinteger(L, ep->port);
+			lua_setfield(L, -2, "port");
+		}
+
+		if (ep->family == AF_UNIX) {
+			lua_pushliteral(L, "stream");
+		} else if (ep->flags.sock_type == SOCK_STREAM) {
+			lua_pushliteral(L, "tcp");
+		} else if (ep->flags.sock_type == SOCK_DGRAM) {
+			lua_pushliteral(L, "udp");
+		} else {
+			assert(!EINVAL);
+			lua_pushliteral(L, "invalid");
+		}
 		lua_setfield(L, -2, "protocol");
-		lua_setfield(L, -2, "application");
+
+		lua_setfield(L, -2, "transport");
 
 		lua_settable(L, -3);
 		i++;
@@ -178,7 +190,7 @@ static int net_listen(lua_State *L)
 
 	bool tls = (port == KR_DNS_TLS_PORT);
 	const char *kind = NULL;
-	if (n > 2) {
+	if (n > 2 && !lua_isnil(L, 3)) {
 		if (!lua_istable(L, 3))
 			lua_error_p(L, "wrong type of third parameter (table expected)");
 		tls = table_get_flag(L, 3, "tls", tls);

@@ -137,36 +137,30 @@ configured in the config file.
    .. code-block:: none
 
       [1] => {
-          [application] => {
-              [protocol] => dns
-          }
-          [ip] => ::1
+          [kind] => tls
           [transport] => {
-              [port] => 53
-              [protocol] => udp
-              [security] => none
+              [family] => inet4
+              [ip] => 127.0.0.1
+              [port] => 853
+              [protocol] => tcp
           }
       }
       [2] => {
-          [application] => {
-              [protocol] => dns
-          }
-          [ip] => ::1
+          [kind] => dns
           [transport] => {
+              [family] => inet6
+              [ip] => ::1
               [port] => 53
-              [protocol] => tcp
-              [security] => none
+              [protocol] => udp
           }
       }
       [3] => {
-          [application] => {
-              [protocol] => dns
-          }
-          [ip] => ::1
+          [kind] => dns
           [transport] => {
-              [port] => 853
+              [family] => inet6
+              [ip] => ::1
+              [port] => 53
               [protocol] => tcp
-              [security] => tls
           }
       }
 
