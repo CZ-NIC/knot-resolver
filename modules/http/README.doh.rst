@@ -119,4 +119,6 @@ To use your own DoH server just change ``network.trr.uri`` configuration option
 to match URL of your DoH endpoint.
 
 More detailed description of configuration options in Firefox can be found
-`here <https://gist.github.com/bagder/5e29101079e9ac78920ba2fc718aceec>`_.
+`here <https://daniel.haxx.se/blog/2018/06/03/inside-firefoxs-doh-engine/>`_.
+(Please note that this technilogy is controversial in technical circles and that
+not everybody is as optimistic about DoH as author of the article.)

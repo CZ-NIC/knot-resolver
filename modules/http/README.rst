@@ -9,37 +9,86 @@ in order to enable them to export restful APIs and websocket streams.
 One example is statistics module that can stream live metrics on the website,
 or publish metrics on request for Prometheus scraper.
 
-The server allows other modules to either use default endpoint that provides
-built-in webpage, restful APIs and websocket streams, or create new endpoints.
-
 By default the server provides plain HTTP and TLS on the same port. See below
 if you want to use only one of these.
 
-.. warning:: This module provides access to various API endpoints
-             and must not be directly exposed to untrusted parties.
-             Use `reverse-proxy`_ like Apache_ or Nginx_ if you need to
-             authenticate API clients.
+This module ships two kinds of endpoints:
+
+  * doh - :ref:`mod-http-doh`
+  * webmgmt - web management APIs (includes DoH)
+
+Network addresses which expose each kind of endpoint are configured
+using the same mechanisms as plain DNS and DNS-over-TLS,
+see chapter :ref:`network configuration <kresd-tls-socket-override-port>`
+for more details.
+
+.. warning:: Management endpoint (`webmgmt`) must not be directly exposed
+             to untrusted parties. Use `reverse-proxy`_ like Apache_
+             or Nginx_ if you need to authenticate API clients
+             for the management API.
+
+By default all endpoints share the same configuration for TLS certificates etc.
+and can be changed using ``http.config()`` configuration call explained below.
 
 Example configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
-By default, the web interface starts HTTPS/2 on port 8053 using an ephemeral
-certificate that is valid for 90 days and is automatically renewed. It is of
+This is an example how to configure web management API on loopback interface
+on port 5380 and expose :ref:`mod-http-doh` endpoint on public IP address.
+On distributions which use systemd socket activation (all moderd distributions
+except CentOS 7) you need to configure IP addresses using systemd. On CentOS 7
+you have to configure IP addresses in Knot Resolver's configuration file.
+
+By default, the web interface starts HTTPS/2 on specified port using an ephemeral
+TLS certificate that is valid for 90 days and is automatically renewed. It is of
 course self-signed. Why not use something like
 `Let's Encrypt <https://letsencrypt.org>`_?
 
+.. code-block:: bash
+
+        # IP address configuration for modern systems
+        # with systemd socket activation (not CentOS 7)
+
+        # configuring DoH on public IP address and port 44353
+        $ vim /etc/systemd/system/kresd-doh.socket.d/override.conf
+        # /etc/systemd/system/kresd-doh.socket.d/override.conf
+        [Socket]
+        ListenStream=
+        ListenStream=192.0.2.1:44353
+        ListenStream=[2001:db8::1]:44353
+
+        $ systemctl unmask kresd-doh
+
+        # configuring web management on loopback port 8053
+        $ vim /etc/systemd/system/kresd-webmgmt.socket.d/override.conf
+        # /etc/systemd/system/kresd-webmgmt.socket.d/override.conf
+        [Socket]
+        ListenStream=
+        ListenStream=127.0.0.1:8053
+
+        $ systemctl unmask kresd-webmgmt
+
+
 .. code-block:: lua
 
-	-- Load HTTP module with defaults
-	modules = {
-		http = {
-			host = 'localhost', -- Default: 'localhost'
-			port = 8053,        -- Default: 8053
-			geoip = 'GeoLite2-City.mmdb', -- Optional, see
-			-- e.g. https://dev.maxmind.com/geoip/geoip2/geolite2/
-			-- and install mmdblua library
-		}
-	}
+        -- use net.listen() only on old systems like CentOS 7
+        -- which lack proper support for systemd socket activation
+
+        -- expose management interface on loopback
+        -- net.listen('127.0.0.1', '5380', { kind = 'webmgmt' })
+
+        -- expose DoH on public interfaces
+        -- net.listen('192.0.2.1', '44353', { kind = 'doh' })
+        -- net.listen('2001:db8::1', '44353', { kind = 'doh' })
+
+        -- load HTTP module with defaults (self-signed TLS cert)
+        modules.load('http')
+        -- optionally load geoIP database for server map
+        http.config{
+                geoip = 'GeoLite2-City.mmdb',
+                -- e.g. https://dev.maxmind.com/geoip/geoip2/geolite2/
+                -- and install mmdblua library
+        }
 
 Now you can reach the web services and APIs, done!
 
@@ -57,18 +106,19 @@ You can disable unecrypted HTTP and enforce HTTPS by passing
 
 .. code-block:: lua
 
-	http = {
-		tls = true,
-	}
+        http.config({
+                tls = true,
+        })
 
 If you want to provide your own certificate and key, you're welcome to do so:
 
 .. code-block:: lua
 
-	http = {
-		cert = 'mycert.crt',
-		key  = 'mykey.key',
-	}
+	http.config({
+		tls = true,
+		cert = '/etc/knot-resolver/mycert.crt',
+		key  = '/etc/knot-resolver/mykey.key',
+	})
 
 The format of both certificate and key is expected to be PEM, e.g. equivalent to
 the outputs of following:
