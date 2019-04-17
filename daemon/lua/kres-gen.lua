@@ -356,6 +356,7 @@ typedef struct {
 struct endpoint {
 	void *handle;
 	int fd;
+	int family;
 	uint16_t port;
 	_Bool engaged;
 	endpoint_flags_t flags;
