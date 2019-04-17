@@ -192,12 +192,6 @@ rm %{buildroot}%{_unitdir}/kresd-doh.socket
 rm %{buildroot}%{_unitdir}/kresd-webmgmt.socket
 %endif
 
-%if 0%{?fedora}
-# mask kresd-doh.socket by default
-install -d -m 0755 %{buildroot}%{_sysconfdir}/systemd/system
-ln -s /dev/null %{buildroot}%{_sysconfdir}/systemd/system/kresd-doh.socket
-%endif
-
 # rename doc directory for centos, opensuse
 %if "x%{?fedora}" == "x"
 install -m 755 -d %{buildroot}/%{_pkgdocdir}
@@ -302,7 +296,6 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %if 0%{?fedora}
 %{_unitdir}/kresd@.service.d/module-http.conf
 %{_unitdir}/kresd-doh.socket
-%{_sysconfdir}/systemd/system/kresd-doh.socket
 %{_unitdir}/kresd-webmgmt.socket
 %endif
 %{_libdir}/knot-resolver/kres_modules/http

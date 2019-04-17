@@ -65,11 +65,6 @@ package() {
     install -d -m 0755 "${pkgdir}/usr/lib/systemd/system/multi-user.target.wants"
     ln -s ../kresd.target "${pkgdir}/usr/lib/systemd/system/multi-user.target.wants/kresd.target"
 
-    # mask kresd-doh.socket, kresd-webmgmt.socket by default (unmask if using http module)
-    install -d -m 0755 "${pkgdir}/etc/systemd/system"
-    ln -s /dev/null "${pkgdir}/etc/systemd/system/kresd-doh.socket"
-    ln -s /dev/null "${pkgdir}/etc/systemd/system/kresd-webmgmt.socket"
-
     # remove modules with missing dependencies
     rm "${pkgdir}/usr/lib/knot-resolver/kres_modules/etcd.lua"
 }
