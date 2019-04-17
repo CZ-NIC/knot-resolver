@@ -9,7 +9,7 @@ For when listening on ``localhost`` just doesn't cut it.
 
 If you're using our packages with systemd with sockets support (not supported
 on CentOS 7), network interfaces are configured using systemd drop-in files for
-``kresd.socket`` and ``kresd-tls.socket``.
+``kresd.socket``, ``kresd-tls.socket`` and ``kresd-doh.socket``.
 
 To configure kresd to listen on public interface, create a drop-in file:
 
@@ -74,6 +74,28 @@ TLS connections.
    # /etc/systemd/system/kresd-tls.socket.d/override.conf
    [Socket]
    ListenStream=192.0.2.115:853
+
+.. _kresd-doh-socket-configuration:
+
+To configure socket for DNS-over-HTTPS, make sure you have
+``kresd-doh.socket`` installed (it might be part of a separate
+``knot-resolver-module-http`` package).  Then, you can configure its network
+interfaces as above. Also, don't forget to load http module in configuration
+file, otherwise the socket won't have any function.
+
+For example, to remove the default localhost:44353 and listen on all interfaces
+on port 443, create the following drop-in file for ``kresd-doh.socket``:
+
+.. code-block:: bash
+
+   # /etc/systemd/system/kresd-doh.socket.d/override.conf
+   [Socket]
+   ListenStream=
+   ListenStream=[::]:443
+
+Make sure no other service is using port 443, as that will result in
+unpredictable behaviour. Alternately, you can use port 44353 where a collision
+is unlikely. Also, don't forget to load http module in configuration file.
 
 **Daemon network configuration**
 

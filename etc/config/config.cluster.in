@@ -6,6 +6,14 @@
 -- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/daemon.html#configuration
 @config_defaults@
 
+-- For DNS-over-HTTPS and web management when using http module
+-- modules.load('http')
+-- http.config({
+-- 	cert = '/etc/knot-resolver/mycert.crt',
+-- 	key = '/etc/knot-resolver/mykey.key',
+-- 	tls = true,
+-- })
+
 -- To disable DNSSEC validation, uncomment the following line (not recommended)
 -- trust_anchors.remove('.')
 

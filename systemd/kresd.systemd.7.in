@@ -104,6 +104,28 @@ compatible with IPv4 syntax in \fIview:addr()\fR when using the view module.
 For possible workarounds, see
 https://gitlab.labs.nic.cz/knot/knot-resolver/issues/445
 
+To configure socket for DNS-over-HTTPS, make sure you have
+\fBkresd-doh.socket\fR installed (it might be part of a separate
+knot-resolver-module-http package).  Then, you can configure its network
+interfaces as above. Also, don't forget to load http module in configuration
+file, otherwise the socket won't have any function.
+
+For example, to remove the default localhost:44353 and listen on all interfaces
+on port 443, create the following drop-in file for \fBkresd-doh.socket\fR:
+
+.nf
+.RS 4n
+# /etc/systemd/system/kresd-doh.socket.d/override.conf
+[Socket]
+ListenStream=
+ListenStream=[::]:443
+.RE
+.fi
+
+Make sure no other service is using port 443, as that will result in
+unpredictable behaviour. Alternately, you can use port 44353 where a collision
+is unlikely.
+
 For more detailed socket configuration, see \fBsystemd.socket\fR(5).
 
 .B Concurrent daemons
