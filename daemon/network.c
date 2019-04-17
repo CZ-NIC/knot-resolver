@@ -58,7 +58,10 @@ static int endpoint_open_lua_cb(struct network *net, struct endpoint *ep,
 		if (log_port >= 0)
 			kr_log_error("#%d", log_port);
 		kr_log_error("'.  Likely causes: typo or not loading 'http' module.\n");
+		/* No hard error, for now.  LATER: perhaps differentiate between
+		 * explicit net.listen() calls and "just unused" systemd sockets.
 		return kr_error(ENOENT);
+		*/
 	}
 	if (!pp) return kr_ok();
 
@@ -135,7 +138,9 @@ static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 {
 	assert(!ep->handle != !ep->flags.kind);
 	if (ep->flags.kind) { /* Special endpoint. */
-		endpoint_close_lua_cb(net, ep);
+		if (ep->engaged) {
+			endpoint_close_lua_cb(net, ep);
+		}
 		if (ep->fd > 0) {
 			close(ep->fd); /* nothing to do with errors */
 		}
