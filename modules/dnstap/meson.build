@@ -27,9 +27,8 @@ if build_dnstap
     'dnstap_pb',
     command: [
       protoc_c,
-      '--c_out=@OUTDIR@',
-      '--proto_path', meson.current_source_dir(),
-      'dnstap.proto',
+      '--c_out=' + meson.current_build_dir(),
+      '--proto_path', meson.current_source_dir(), join_paths([meson.current_source_dir(), 'dnstap.proto']),
     ],
     output: [
       'dnstap.pb-c.h',
