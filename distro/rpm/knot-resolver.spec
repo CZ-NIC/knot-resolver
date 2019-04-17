@@ -62,8 +62,8 @@ Requires(pre):  shadow-utils
 %if 0%{?fedora}
 BuildRequires:  pkgconfig(lmdb)
 BuildRequires:  python3-sphinx
-Requires:       compat-lua-basexx
-Requires:       lua-cqueues-compat
+Requires:       lua5.1-basexx
+Requires:       lua5.1-cqueues
 Requires:       lua-filesystem-compat
 Requires:       lua-socket-compat
 Requires:       lua-sec-compat
@@ -119,11 +119,9 @@ Documentation for Knot Resolver
 Summary:        HTTP/2 module for Knot Resolver
 Requires:       knot-resolver
 %if 0%{?fedora}
-Requires:       compat-lua-cqueues >= 20171014
-Requires:       compat-lua-http
-Requires:       compat-lua-mmdb
+Requires:       lua5.1-http
+Requires:       lua5.1-mmdb
 %else
-Requires:       lua-cqueues >= 20171014
 Requires:       lua-http
 Requires:       lua-mmdb
 %endif
