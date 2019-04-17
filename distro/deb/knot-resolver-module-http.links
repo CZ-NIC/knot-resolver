@@ -1,4 +1,3 @@
-dev/null etc/systemd/system/kresd-doh.socket
 usr/share/javascript/bootstrap/css/bootstrap-theme.min.css usr/lib/knot-resolver/kres_modules/http/bootstrap-theme.min.css
 usr/share/javascript/bootstrap/css/bootstrap.min.css usr/lib/knot-resolver/kres_modules/http/bootstrap.min.css
 usr/share/javascript/bootstrap/js/bootstrap.min.js usr/lib/knot-resolver/kres_modules/http/bootstrap.min.js
