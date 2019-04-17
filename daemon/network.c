@@ -53,7 +53,7 @@ static int endpoint_open_lua_cb(struct network *net, struct endpoint *ep,
 	void **pp = trie_get_try(net->endpoint_kinds, ep->flags.kind,
 				strlen(ep->flags.kind));
 	if (!pp && net->missing_kind_is_error) {
-		kr_log_error("error: network socket kind '%s' not handled when opening '%s",
+		kr_log_error("warning: network socket kind '%s' not handled when opening '%s",
 				ep->flags.kind, log_addr);
 		if (log_port >= 0)
 			kr_log_error("#%d", log_port);
