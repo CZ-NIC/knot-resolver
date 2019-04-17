@@ -40,29 +40,32 @@ static int net_list_add(const char *key, void *val, void *ext)
 		switch (ep->flags.sock_type) {
 		case SOCK_DGRAM:
 			lua_pushliteral(L, "udp");
-			lua_setfield(L, -2, "protocol");
-			lua_pushinteger(L, ep->port);
-			lua_setfield(L, -2, "port");
-			lua_pushliteral(L, "none");
-			lua_setfield(L, -2, "security");
 			break;
 		case SOCK_STREAM:
 			lua_pushliteral(L, "tcp");
-			lua_setfield(L, -2, "protocol");
-			lua_pushinteger(L, ep->port);
-			lua_setfield(L, -2, "port");
-			if (ep->flags.tls) {
-				lua_pushliteral(L, "tls");
-			} else {
-				lua_pushliteral(L, "none");
-			}
-			lua_setfield(L, -2, "security");
 			break;
 		default:
 			assert(!EINVAL);
 			lua_pushliteral(L, "unknown");
-			lua_setfield(L, -2, "protocol");
 		}
+		lua_setfield(L, -2, "protocol");
+		lua_pushinteger(L, ep->port);
+		lua_setfield(L, -2, "port");
+		switch (ep->flags.security) {
+		case NET_EFS_TLS:
+			lua_pushliteral(L, "tls");
+			break;
+		case NET_EFS_OPTIONAL:
+			lua_pushliteral(L, "optional");
+			break;
+		case NET_EFS_NONE:
+			lua_pushliteral(L, "none");
+			break;
+		default:
+			assert(ep->flags.security == NET_EFS_UNKNOWN);
+			lua_pushliteral(L, "unknown");
+		}
+		lua_setfield(L, -2, "security");
 		lua_setfield(L, -2, "transport");
 
 		lua_newtable(L);  // "application" table
@@ -110,8 +113,8 @@ static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind)
 	if (str != NULL) {
 		struct engine *engine = engine_luaget(L);
 		int ret = 0;
-		endpoint_flags_t flags = { .tls = tls };
-		if (!kind && !flags.tls) { /* normal UDP */
+		endpoint_flags_t flags = { .security = tls ? NET_EFS_TLS : NET_EFS_NONE };
+		if (!kind && !tls) { /* normal UDP */
 			flags.sock_type = SOCK_DGRAM;
 			ret = network_listen(&engine->net, str, port, flags);
 		}

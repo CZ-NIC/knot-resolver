@@ -29,8 +29,9 @@ struct tls_client_ctx_t;
 int io_bind(const struct sockaddr *addr, int type);
 /** Initialize a UDP handle and start listening. */
 int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd);
-/** Initialize a TCP handle and start listening. */
-int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bool has_tls);
+/** Initialize a TCP handle and start listening.
+ * \param security enum endpoint_flags_security */
+int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, int8_t security);
 
 void tcp_timeout_trigger(uv_timer_t *timer);
 

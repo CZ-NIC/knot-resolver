@@ -28,10 +28,17 @@
 
 struct engine;
 
+enum endpoint_flags_security {
+	NET_EFS_UNKNOWN = 0,
+	NET_EFS_NONE = 1,
+	NET_EFS_OPTIONAL = 2, /**< allows both secure and insecure */
+	NET_EFS_TLS = 3,      /**< TLS, possibly via HTTP/2. In future maybe DTLS. */
+};
+
 /** Ways to listen on a socket. */
 typedef struct {
-	int sock_type;	/**< SOCK_DGRAM or SOCK_STREAM */
-	bool tls;	/**< only used together with .tcp; TODO: meaningful if kind != NULL? */
+	int sock_type;    /**< SOCK_DGRAM or SOCK_STREAM */
+	int8_t security;  /**< values from enum endpoint_flags_security */
 	const char *kind; /**< tag for other types than the three usual */
 } endpoint_flags_t;
 
@@ -42,7 +49,7 @@ static inline bool endpoint_flags_eq(endpoint_flags_t f1, endpoint_flags_t f2)
 	if (f1.kind && f2.kind)
 		return strcasecmp(f1.kind, f2.kind);
 	else
-		return f1.tls == f2.tls && f1.kind == f2.kind;
+		return f1.security == f2.security && f1.kind == f2.kind;
 }
 
 /** Wrapper for a single socket to listen on.

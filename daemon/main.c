@@ -562,10 +562,10 @@ static int parse_args(int argc, char **argv, struct args *args)
 			ffd.fd = strtol(optarg, &endptr, 10);
 			if (endptr != optarg && endptr[0] == '\0') {
 				/* Plain DNS */
-				ffd.flags.tls = false;
+				ffd.flags.security = NET_EFS_NONE;
 			} else if (endptr[0] == ':' && strcasecmp(endptr + 1, "tls") == 0) {
 				/* DoT */
-				ffd.flags.tls = true;
+				ffd.flags.security = NET_EFS_TLS;
 				/* We know what .sock_type should be but it wouldn't help. */
 			} else if (endptr[0] == ':' && endptr[1] != '\0') {
 				/* Some other kind; no checks here. */
@@ -599,7 +599,9 @@ static int bind_sockets(addr_array_t *addrs, bool tls, flagged_fd_array_t *fds)
 			sa = kr_straddr_socket(addr_str, port, NULL);
 			if (!sa) ret = kr_error(EINVAL); /* could be ENOMEM but unlikely */
 		}
-		flagged_fd_t ffd = { .flags = { .tls = tls } };
+		flagged_fd_t ffd = {
+			.flags = { .security = tls ? NET_EFS_TLS : NET_EFS_NONE }
+		};
 		if (ret == 0 && !tls) {
 			ffd.fd = io_bind(sa, SOCK_DGRAM);
 			if (ffd.fd < 0)
@@ -691,11 +693,13 @@ int main(int argc, char **argv)
 		} else {
 			if (!strcasecmp("dns", socket_names[i])) {
 				free(socket_names[i]);
+				ffd.flags.security = NET_EFS_NONE;
 			} else if (!strcasecmp("tls", socket_names[i])) {
-				ffd.flags.tls = true;
 				free(socket_names[i]);
+				ffd.flags.security = NET_EFS_TLS;
 			} else {
 				ffd.flags.kind = socket_names[i];
+				ffd.flags.security = NET_EFS_UNKNOWN;
 			}
 			array_push(args.fds, ffd);
 		}
