@@ -104,7 +104,7 @@ configured in the config file.
 
    Enable/disable using IPv4 for contacting upstream nameservers.
 
-.. function:: net.listen(addresses, [port = 53, flags = {tls = (port == 853)}])
+.. function:: net.listen(addresses, [port = 53, { kind = 'dns' }])
 
    :return: boolean
 
@@ -114,13 +114,16 @@ configured in the config file.
    The command can be given multiple times, but note that it silently skips
    any addresses that have already been bound.
 
+   If you specify port 853, ``kind = 'tls'`` by default.
+
    Examples:
 
    .. code-block:: lua
 
 	net.listen('::1')
 	net.listen(net.lo, 5353)
-	net.listen({net.eth0, '127.0.0.1'}, 53853, {tls = true})
+	net.listen({net.eth0, '127.0.0.1'}, 53853, { kind = 'tls' })
+	net.listen('::', 8453, { kind = 'webmgmt' }) -- see http module
 
 .. function:: net.close(address, [port])
 
