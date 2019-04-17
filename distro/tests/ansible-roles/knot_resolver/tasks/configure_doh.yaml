@@ -1,10 +1,4 @@
 ---
-- name: doh_config enable kresd-doh.socket
-  systemd:
-    name: kresd-doh.socket
-    enabled: true
-    masked: false
-
 - name: doh_config set up kresd.conf
   blockinfile:
     marker: "-- {mark} ANSIBLE MANAGED BLOCK"

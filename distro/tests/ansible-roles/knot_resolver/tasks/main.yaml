@@ -26,18 +26,21 @@
     - include: test_tls.yaml
     - include: test_dnssec.yaml
 
-    - name: Install knot-resolver-module-http
-      package:
-        name: knot-resolver-module-http
-        state: latest
+    - name: Test DoH
+      block:
+        - name: Install knot-resolver-module-http
+          package:
+            name: knot-resolver-module-http
+            state: latest
 
-    - include: configure_doh.yaml
-      when: ansible_distribution not in ["CentOS", "openSUSE_Leap", "openSUSE_Tumbleweed"]
-    - include: configure_doh_nosocket.yaml
-      when: ansible_distribution == "CentOS"
+        - include: configure_doh.yaml
+          when: ansible_distribution in ["Fedora", "Debian", "Ubuntu"]
+        - include: configure_doh_nosocket.yaml
+          when: ansible_distribution == "CentOS"
 
-    - include: restart_kresd.yaml
-    - include: test_doh.yaml
+        - include: restart_kresd.yaml
+        - include: test_doh.yaml
+      when: distro in ["Fedora", "Debian", "CentOS"] or (distro == "Ubuntu" and ansible_distribution_major_version|int >= 18)
 
   always:
 
