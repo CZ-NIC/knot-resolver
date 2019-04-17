@@ -8,8 +8,8 @@ Before=sockets.target
 FreeBind=true
 BindIPv6Only=both
 FileDescriptorName=doh
-ListenStream=[::1]:443
-ListenStream=127.0.0.1:443
+ListenStream=[::1]:44353
+ListenStream=127.0.0.1:44353
 Service=kresd@1.service
 Slice=system-kresd.slice
 
