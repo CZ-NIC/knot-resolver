@@ -356,25 +356,12 @@ static void tls_accept(uv_stream_t *master, int status)
 	_tcp_accept(master, status, true);
 }
 
-int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog,
-		  int8_t security)
+int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bool has_tls)
 {
-	uv_connection_cb connection;
-	switch (security) {
-	case NET_EFS_NONE:
-		connection = tcp_accept;
-		break;
-	case NET_EFS_TLS:
-		connection = tls_accept;
-		break;
-	default:
-		connection = NULL;
-	}
-	if (!connection || !handle) {
-		assert(!EINVAL);
+	const uv_connection_cb connection = has_tls ? tls_accept : tcp_accept;
+	if (!handle) {
 		return kr_error(EINVAL);
 	}
-
 	int ret = uv_tcp_init(loop, handle);
 	if (ret) return ret;
 

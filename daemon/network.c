@@ -263,7 +263,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 	}
 
 	if (ep->flags.sock_type == SOCK_DGRAM) {
-		if (ep->flags.security != NET_EFS_NONE) {
+		if (ep->flags.tls) {
 			assert(!EINVAL);
 			return kr_error(EINVAL);
 		}
@@ -281,8 +281,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 		if (!ep->handle) {
 			return kr_error(ENOMEM);
 		}
-		return io_listen_tcp(net->loop, ep_handle, fd, net->tcp_backlog,
-					ep->flags.security);
+		return io_listen_tcp(net->loop, ep_handle, fd, net->tcp_backlog, ep->flags.tls);
 	} /* else */
 
 	assert(!EINVAL);
@@ -337,8 +336,7 @@ int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags)
 	if (ret != 0) {
 		return kr_error(errno);
 	}
-	if (flags.sock_type == SOCK_DGRAM && !flags.kind
-	    && flags.security != NET_EFS_NONE) {
+	if (flags.sock_type == SOCK_DGRAM && !flags.kind && flags.tls) {
 		assert(!EINVAL); /* Perhaps DTLS some day. */
 		return kr_error(EINVAL);
 	}
