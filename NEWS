@@ -42,6 +42,8 @@ Bugfixes
 Module API changes
 ------------------
 - kr_straddr_split() changed API a bit (compiler will catch that)
+- C modules defining `*_layer` or `*_props` symbols need to change a bit
+  See the upgrading guide for details.  It's detected on module load.
 
 
 Knot Resolver 3.2.1 (2019-01-10)

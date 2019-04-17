@@ -31,11 +31,11 @@ struct kr_prop;
 /**
  * Export module API version (place this at the end of your module).
  *
- * @param module module name (f.e. hints)
+ * @param module module name (e.g. policy)
  */
 #define KR_MODULE_EXPORT(module) \
     KR_EXPORT uint32_t module ## _api() { return KR_MODULE_API; }
-#define KR_MODULE_API ((uint32_t) 0x20180401)
+#define KR_MODULE_API ((uint32_t) 0x20190314)
 
 typedef uint32_t (module_api_cb)(void);
 
@@ -55,10 +55,10 @@ struct kr_module {
 	int (*deinit)(struct kr_module *self);
 	/** Configure with encoded JSON (NULL if missing).  @return error code. */
 	int (*config)(struct kr_module *self, const char *input);
-	/** Get a pointer to packet processing API specs.  See docs on that type. */
-	const kr_layer_api_t * (*layer)(struct kr_module *self);
-	/** Get a pointer to list of properties, terminated by { NULL, NULL, NULL }. */
-	const struct kr_prop * (*props)(void);
+	/** Packet processing API specs.  May be NULL.  See docs on that type. */
+	const kr_layer_api_t *layer;
+	/** List of properties.  May be NULL.  Terminated by { NULL, NULL, NULL }. */
+	const struct kr_prop *props;
 
 	void *lib;      /**< Shared library handle or RTLD_DEFAULT */
 	void *data;     /**< Custom data context. */
@@ -103,9 +103,10 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
 KR_EXPORT
 void kr_module_unload(struct kr_module *module);
 
+typedef int (*kr_module_init_cb)(struct kr_module *);
 /**
- * Get embedded module prototype by name (or NULL).
+ * Get embedded module's init function by name (or NULL).
  */
 KR_EXPORT
-const struct kr_module * kr_module_embedded(const char *name);
+kr_module_init_cb kr_module_get_embedded(const char *name);
 

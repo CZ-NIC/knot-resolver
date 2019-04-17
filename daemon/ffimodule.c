@@ -81,12 +81,12 @@ static int l_ffi_defer(lua_State *L)
 	return uv_idle_start(check, l_ffi_resume_cb);
 }
 
-/** @internal Helper for calling the entrypoint. */
-static inline int l_ffi_call(lua_State *L, int argc)
+/** @internal Helper for calling the entrypoint, for kr_module functions. */
+static inline int l_ffi_call_mod(lua_State *L, int argc)
 {
 	int status = lua_pcall(L, argc, 1, 0);
 	if (status != 0) {
-		fprintf(stderr, "error: %s\n", lua_tostring(L, -1));
+		kr_log_error("error: %s\n", lua_tostring(L, -1));
 		lua_pop(L, 1);
 		return kr_error(EIO);
 	}
@@ -99,13 +99,21 @@ static inline int l_ffi_call(lua_State *L, int argc)
 	return status;
 }
 
+/** @internal Helper for calling the entrypoint, for kr_layer_api functions. */
+static inline int l_ffi_call_layer(lua_State *L, int argc)
+{
+	int ret = l_ffi_call_mod(L, argc);
+	/* The return codes are mixed at this point.  We need to return KR_STATE_* */
+	return ret < 0 ? KR_STATE_FAIL : ret;
+}
+
 static int l_ffi_init(struct kr_module *module)
 {
 	lua_State *L = l_ffi_preface(module, "init");
 	if (!L) {
 		return 0;
 	}
-	return l_ffi_call(L, 1);
+	return l_ffi_call_mod(L, 1);
 }
 
 static int l_ffi_deinit(struct kr_module *module)
@@ -114,7 +122,7 @@ static int l_ffi_deinit(struct kr_module *module)
 	int ret = 0;
 	lua_State *L = module->lib;
 	if (l_ffi_preface(module, "deinit")) {
-		ret = l_ffi_call(L, 1);
+		ret = l_ffi_call_mod(L, 1);
 	}
 	module->lib = NULL;
 	/* Free the layer API wrapper (unconst it) */
@@ -147,14 +155,14 @@ static int l_ffi_layer_begin(kr_layer_t *ctx)
 {
 	LAYER_FFI_CALL(ctx, begin);
 	lua_pushlightuserdata(L, ctx->req);
-	return l_ffi_call(L, 2);
+	return l_ffi_call_layer(L, 2);
 }
 
 static int l_ffi_layer_reset(kr_layer_t *ctx)
 {
 	LAYER_FFI_CALL(ctx, reset);
 	lua_pushlightuserdata(L, ctx->req);
-	return l_ffi_call(L, 2);
+	return l_ffi_call_layer(L, 2);
 }
 
 static int l_ffi_layer_finish(kr_layer_t *ctx)
@@ -163,7 +171,7 @@ static int l_ffi_layer_finish(kr_layer_t *ctx)
 	LAYER_FFI_CALL(ctx, finish);
 	lua_pushlightuserdata(L, req);
 	lua_pushlightuserdata(L, req->answer);
-	return l_ffi_call(L, 3);
+	return l_ffi_call_layer(L, 3);
 }
 
 static int l_ffi_layer_consume(kr_layer_t *ctx, knot_pkt_t *pkt)
@@ -174,7 +182,7 @@ static int l_ffi_layer_consume(kr_layer_t *ctx, knot_pkt_t *pkt)
 	LAYER_FFI_CALL(ctx, consume);
 	lua_pushlightuserdata(L, ctx->req);
 	lua_pushlightuserdata(L, pkt);
-	return l_ffi_call(L, 3);
+	return l_ffi_call_layer(L, 3);
 }
 
 static int l_ffi_layer_produce(kr_layer_t *ctx, knot_pkt_t *pkt)
@@ -185,7 +193,7 @@ static int l_ffi_layer_produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 	LAYER_FFI_CALL(ctx, produce);
 	lua_pushlightuserdata(L, ctx->req);
 	lua_pushlightuserdata(L, pkt);
-	return l_ffi_call(L, 3);
+	return l_ffi_call_layer(L, 3);
 }
 
 static int l_ffi_layer_checkout(kr_layer_t *ctx, knot_pkt_t *pkt, struct sockaddr *dst, int type)
@@ -198,14 +206,14 @@ static int l_ffi_layer_checkout(kr_layer_t *ctx, knot_pkt_t *pkt, struct sockadd
 	lua_pushlightuserdata(L, pkt);
 	lua_pushlightuserdata(L, dst);
 	lua_pushboolean(L, type == SOCK_STREAM);
-	return l_ffi_call(L, 5);
+	return l_ffi_call_layer(L, 5);
 }
 
 static int l_ffi_layer_answer_finalize(kr_layer_t *ctx)
 {
 	LAYER_FFI_CALL(ctx, answer_finalize);
 	lua_pushlightuserdata(L, ctx->req);
-	return l_ffi_call(L, 2);
+	return l_ffi_call_layer(L, 2);
 }
 #undef LAYER_FFI_CALL
 
@@ -246,14 +254,6 @@ static kr_layer_api_t *l_ffi_layer_create(lua_State *L, struct kr_module *module
 	return api;
 }
 
-/** @internal Retrieve C layer api wrapper. */
-static const kr_layer_api_t *l_ffi_layer(struct kr_module *module)
-{
-	if (module) {
-		return (const kr_layer_api_t *)module->data;
-	}
-	return NULL;
-}
 #undef LAYER_REGISTER
 
 int ffimodule_register_lua(struct engine *engine, struct kr_module *module, const char *name)
@@ -263,7 +263,7 @@ int ffimodule_register_lua(struct engine *engine, struct kr_module *module, cons
 	lua_getglobal(L, "require");
 	lua_pushfstring(L, "kres_modules.%s", name);
 	if (lua_pcall(L, 1, LUA_MULTRET, 0) != 0) {
-		fprintf(stderr, "error: %s\n", lua_tostring(L, -1));
+		kr_log_error("error: %s\n", lua_tostring(L, -1));
 		lua_pop(L, 1);
 		return kr_error(ENOENT);
 	}
@@ -278,8 +278,9 @@ int ffimodule_register_lua(struct engine *engine, struct kr_module *module, cons
 	/* Bake layer API if defined in module */
 	lua_getfield(L, -1, "layer");
 	if (!lua_isnil(L, -1)) {
-		module->layer = &l_ffi_layer;
-		module->data = l_ffi_layer_create(L, module);
+		module->layer = l_ffi_layer_create(L, module);
+		/* most likely not needed, but compatibility for now */
+		module->data = (void *)module->layer;
 	}
 	module->lib = L;
 	lua_pop(L, 2); /* Clear the layer + module global */

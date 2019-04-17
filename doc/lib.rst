@@ -45,6 +45,9 @@ Modules
 .. doxygenfile:: module.h
    :project: libkres
 
+.. doxygenfile:: layer.h
+   :project: libkres
+
 Utilities
 ---------
 
