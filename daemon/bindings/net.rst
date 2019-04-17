@@ -60,6 +60,8 @@ machine.
    ListenDatagram=[::1]:53000
    ListenStream=[::1]:53000
 
+.. _kresd-tls-socket-override-port:
+
 The ``kresd-tls.socket`` can also be configured in the same way to listen for
 TLS connections.
 

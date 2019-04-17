@@ -3,72 +3,132 @@
 HTTP/2 services
 ---------------
 
-This is a module that does the heavy lifting to provide an HTTP/2 enabled
-server that provides endpoint for other modules
-in order to enable them to export restful APIs and websocket streams.
+This module does the heavy lifting to provide an HTTP/2 enabled
+server which provides few built-in services and also allows other
+modules to export restful APIs and websocket streams.
+
 One example is statistics module that can stream live metrics on the website,
 or publish metrics on request for Prometheus scraper.
 
-The server allows other modules to either use default endpoint that provides
-built-in webpage, restful APIs and websocket streams, or create new endpoints.
+By default this module provides two kinds of endpoints,
+and unlimited number of "used-defined kinds" can be added in configuration.
 
-By default the server provides plain HTTP and TLS on the same port. See below
-if you want to use only one of these.
++--------------+---------------------------------------------+
+| **Endpoint** | **Explanation**                             |
++--------------+---------------------------------------------+
+| doh          | :ref:`mod-http-doh`                         |
++--------------+---------------------------------------------+
+| webmgmt      | built-in web management APIs (includes DoH) |
++--------------+---------------------------------------------+
 
-.. warning:: This module provides access to various API endpoints
-             and must not be directly exposed to untrusted parties.
-             Use `reverse-proxy`_ like Apache_ or Nginx_ if you need to
-             authenticate API clients.
+Each network address and port combination can be configured to expose
+one kind of endpoint. This is done using the same mechanisms as
+network configuration for plain DNS and DNS-over-TLS,
+see chapter :ref:`network configuration <kresd-tls-socket-override-port>`
+for more details.
+
+.. warning:: Management endpoint (``webmgmt``) must not be directly exposed
+             to untrusted parties. Use `reverse-proxy`_ like Apache_
+             or Nginx_ if you need to authenticate API clients
+             for the management API.
+
+By default all endpoints share the same configuration for TLS certificates etc.
+This can be changed using ``http.config()`` configuration call explained below.
+
+.. _mod-http-example:
 
 Example configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
-By default, the web interface starts HTTPS/2 on port 8053 using an ephemeral
-certificate that is valid for 90 days and is automatically renewed. It is of
-course self-signed. Why not use something like
-`Let's Encrypt <https://letsencrypt.org>`_?
+Here we show how to configure web management API on loopback interface
+on port 8453, and how to expose :ref:`mod-http-doh` endpoint on public IP addresses.
+
+Modern distributions use systemd socket activation and thus IP addresses of endpoints
+are configured using systemd. (Beware, CentOS 7 has too old version of systemd and
+you have to configure IP addresses in Knot Resolver's configuration file instead.)
+
+.. warning:: Make sure you read section :ref:`mod-http-doh`
+             before copy&pasting this snippet.
+
+.. code-block:: bash
+
+        # IP address configuration for modern systems
+        # with systemd socket activation (not CentOS 7)
+
+        # configuring DoH on public IP addresses, port 44353
+        $ vim /etc/systemd/system/kresd-doh.socket.d/override.conf
+        # /etc/systemd/system/kresd-doh.socket.d/override.conf
+        [Socket]
+        ListenStream=
+        ListenStream=192.0.2.1:44353
+        ListenStream=[2001:db8::1]:44353
+
+        # configuring web management on loopback port 8453
+        $ vim /etc/systemd/system/kresd-webmgmt.socket.d/override.conf
+        # /etc/systemd/system/kresd-webmgmt.socket.d/override.conf
+        [Socket]
+        ListenStream=
+        ListenStream=127.0.0.1:8453
+
 
 .. code-block:: lua
 
-	-- Load HTTP module with defaults
-	modules = {
-		http = {
-			host = 'localhost', -- Default: 'localhost'
-			port = 8053,        -- Default: 8053
-			geoip = 'GeoLite2-City.mmdb', -- Optional, see
-			-- e.g. https://dev.maxmind.com/geoip/geoip2/geolite2/
-			-- and install mmdblua library
-		}
-	}
+        -- use net.listen() only on old systems like CentOS 7
+        -- which lack proper support for systemd socket activation
+
+        -- expose management interface on loopback
+        -- net.listen('127.0.0.1', '8453', { kind = 'webmgmt' })
+
+        -- expose DoH on public interfaces
+        -- net.listen('192.0.2.1', '44353', { kind = 'doh' })
+        -- net.listen('2001:db8::1', '44353', { kind = 'doh' })
+
+        -- load HTTP module with defaults (self-signed TLS cert)
+        modules.load('http')
+        -- optionally load geoIP database for server map
+        http.config({
+                geoip = 'GeoLite2-City.mmdb',
+                -- e.g. https://dev.maxmind.com/geoip/geoip2/geolite2/
+                -- and install mmdblua library
+        })
 
 Now you can reach the web services and APIs, done!
 
 .. code-block:: bash
 
-	$ curl -k https://localhost:8053
-	$ curl -k https://localhost:8053/stats
+	$ curl -k https://localhost:8453
+	$ curl -k https://localhost:8453/stats
 
 .. _mod-http-tls:
 
 Configuring TLS
 ^^^^^^^^^^^^^^^
+
+By default, the web interface starts HTTPS/2 on specified port using an ephemeral
+TLS certificate that is valid for 90 days and is automatically renewed. It is of
+course self-signed. Why not use something like
+`Let's Encrypt <https://letsencrypt.org>`_?
+
+
 You can disable unecrypted HTTP and enforce HTTPS by passing
-``tls = true`` option.
+``tls = true`` option for all HTTP endpoints:
 
 .. code-block:: lua
 
-	http = {
+        http.config({
+                tls = true,
+        })
+
+It is also possible to provide different configuration for each
+kind of endpoint, e.g. to enforce TLS and use custom certificate only for DoH:
+
+.. code-block:: lua
+
+	http.config({
 		tls = true,
-	}
-
-If you want to provide your own certificate and key, you're welcome to do so:
-
-.. code-block:: lua
-
-	http = {
-		cert = 'mycert.crt',
-		key  = 'mykey.key',
-	}
+		cert = '/etc/knot-resolver/mycert.crt',
+		key  = '/etc/knot-resolver/mykey.key',
+	}, 'doh')
 
 The format of both certificate and key is expected to be PEM, e.g. equivalent to
 the outputs of following:
@@ -100,15 +160,15 @@ The HTTP module has several built-in services to use.
  "``/trace/:name/:type``", "Tracking", "Trace resolution of the query and return the verbose logs."
  "``/doh``", "DNS-over-HTTP", ":rfc:`8484` endpoint, see :ref:`mod-http-doh`."
 
-Enabling Prometheus metrics endpoint
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Prometheus metrics endpoint
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The module exposes ``/metrics`` endpoint that serves internal metrics in Prometheus_ text format.
 You can use it out of the box:
 
 .. code-block:: bash
 
-	$ curl -k https://localhost:8053/metrics | tail
+	$ curl -k https://localhost:8453/metrics | tail
 	# TYPE latency histogram
 	latency_bucket{le=10} 2.000000
 	latency_bucket{le=50} 2.000000
@@ -125,25 +185,19 @@ You can namespace the metrics in configuration, using `http.prometheus.namespace
 
 .. code-block:: lua
 
-	http = {
-		host = 'localhost',
-	}
-
-	-- Set Prometheus namespace
-	http.prometheus.namespace = 'resolver_'
+        modules.load('http')
+        -- Set Prometheus namespace
+        http.prometheus.namespace = 'resolver_'
 
 You can also add custom metrics or rewrite existing metrics before they are returned to Prometheus client.
 
 .. code-block:: lua
 
-	http = {
-		host = 'localhost',
-	}
-
-	-- Add an arbitrary metric to Prometheus
-	http.prometheus.finalize = function (metrics)
-		table.insert(metrics, 'build_info{version="1.2.3"} 1')
-	end
+        modules.load('http')
+        -- Add an arbitrary metric to Prometheus
+        http.prometheus.finalize = function (metrics)
+        	table.insert(metrics, 'build_info{version="1.2.3"} 1')
+        end
 
 Tracing requests
 ^^^^^^^^^^^^^^^^
@@ -153,7 +207,7 @@ The basic mode allows you to resolve a query and trace verbose logs (and message
 
 .. code-block:: bash
 
-   $ curl https://localhost:8053/trace/e.root-servers.net
+   $ curl https://localhost:8453/trace/e.root-servers.net
    [ 8138] [iter] 'e.root-servers.net.' type 'A' created outbound query, parent id 0
    [ 8138] [ rc ] => rank: 020, lowest 020, e.root-servers.net. A
    [ 8138] [ rc ] => satisfied from cache
@@ -170,15 +224,21 @@ The basic mode allows you to resolve a query and trace verbose logs (and message
    [ 8138] [iter] <= rcode: NOERROR
    [ 8138] [resl] finished: 4, queries: 1, mempool: 81952 B
 
-How to expose services over HTTP
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+How to expose custom services over HTTP
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The module provides a table ``endpoints`` of already existing endpoints, it is free for reading and
-writing. It contains tables describing a triplet - ``{mime, on_serve, on_websocket}``.
-In order to register a new service, simply add it to the table:
+Each kind of endpoint provides table of HTTP endpoints, and the default table
+can be replaced using ``http.config()`` configuration call
+which allows your to provide your own HTTP endpoints.
+
+It contains tables describing a triplet - ``{mime, on_serve, on_websocket}``.
+In order to register a new `webmgmt` HTTP endpoint
+add the new endpoint description to respective table:
+
 
 .. code-block:: lua
 
+	-- custom function to handle HTTP /health requests
 	local on_health = {'application/json',
 	function (h, stream)
 		-- API call, return a JSON table
@@ -195,20 +255,24 @@ In order to register a new service, simply add it to the table:
 		-- Finalize the WebSocket
 		ws:close()
 	end}
-	-- Load module
-	modules = {
-		http = {
-			endpoints = { ['/health'] = on_health }
-		}
-	}
+
+	modules.load('http')
+	-- copy all existing webmgmt endpoints
+	my_mgmt_endpoints = http.templates.webmgmt.endpoints
+	-- add custom endpoint to the copy
+	my_mgmt_endpoints['/health'] = on_health
+	-- use custom HTTP configuration for webmgmt
+	http.config({
+	        endpoints = my_mgmt_endpoints
+	}, 'webmgmt')
 
 Then you can query the API endpoint, or tail the WebSocket using curl.
 
 .. code-block:: bash
 
-	$ curl -k https://localhost:8053/health
+	$ curl -k https://localhost:8453/health
 	{"state":"up","uptime":0}
-	$ curl -k -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Host: localhost:8053/health"  -H "Sec-Websocket-Key: nope" -H "Sec-Websocket-Version: 13" https://localhost:8053/health
+	$ curl -k -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Host: localhost:8453/health"  -H "Sec-Websocket-Key: nope" -H "Sec-Websocket-Version: 13" https://localhost:8453/health
 	HTTP/1.1 101 Switching Protocols
 	upgrade: websocket
 	sec-websocket-accept: eg18mwU7CDRGUF1Q+EJwPM335eM=
@@ -216,7 +280,9 @@ Then you can query the API endpoint, or tail the WebSocket using curl.
 
 	?["up"]?["up"]?["up"]
 
-Since the stream handlers are effectively coroutines, you are free to keep state and yield using cqueues.
+Since the stream handlers are effectively coroutines, you are free to keep state
+and yield using `cqueues library <http://www.25thandclement.com/~william/projects/cqueues.html>`_.
+
 This is especially useful for WebSockets, as you can stream content in a simple loop instead of
 chains of callbacks.
 
@@ -227,8 +293,8 @@ exported restful APIs and subscribe to WebSockets.
 
 	http.snippets['/health'] = {'Health service', '<p>UP!</p>'}
 
-How to expose RESTful services
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+How to expose custom RESTful services
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A RESTful service is likely to respond differently to different type of methods and requests,
 there are three things that you can do in a service handler to send back results.
@@ -264,12 +330,13 @@ the HTTP response code or send headers and body yourself.
 			return 405, 'Cannot do that'
 		end
 	end}
-	-- Load the module
-	modules = {
-		http = {
-			endpoints = { ['/service'] = service }
-		}
-	}
+	modules.load('http')
+	http.config({
+		endpoints = { ['/service'] = service }
+	}, 'myservice')
+	-- do not forget to create socket of new kind using
+	-- net.listen(..., { kind = 'myservice' })
+	-- or configure systemd socket kresd-myservice.socket
 
 In some cases you might need to send back your own headers instead of default provided by HTTP handler,
 you can do this, but then you have to return ``false`` to notify handler that it shouldn't try to generate
@@ -291,32 +358,10 @@ a response.
 		return false
 	end
 
-How to expose more interfaces
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Services exposed in the previous part share the same external interface. This means that it's either accessible to the outside world or internally, but not one or another. This is not always desired, i.e. you might want to offer DNS/HTTPS to everyone, but allow application firewall configuration only on localhost. ``http`` module allows you to create additional interfaces with custom endpoints for this purpose.
-
-.. code-block:: lua
-
-	http.add_interface {
-		endpoints = {
-			['/conf'] = {
-				'application/json', function (h, stream)
-					return 'configuration API\n'
-				end
-			},
-		},
-		-- Same options as the config() method
-		host = 'localhost',
-		port = '8054',
-	}
-
-This way you can have different internal-facing and external-facing services at the same time.
-
 Dependencies
 ^^^^^^^^^^^^
 
-* `lua-http <https://github.com/daurnimator/lua-http>`_ (>= 0.1) available in LuaRocks
+* `lua-http <https://github.com/daurnimator/lua-http>`_ (>= 0.3) available in LuaRocks
 
     If you're installing via Homebrew on OS X, you need OpenSSL too.
 
