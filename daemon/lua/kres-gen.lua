@@ -350,7 +350,7 @@ int kr_cache_commit(struct kr_cache *);
 uint32_t packet_ttl(const knot_pkt_t *, _Bool);
 typedef struct {
 	int sock_type;
-	_Bool tls;
+	int8_t security;
 	const char *kind;
 } endpoint_flags_t;
 struct endpoint {
