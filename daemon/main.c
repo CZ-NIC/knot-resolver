@@ -632,7 +632,9 @@ static int start_listening(struct network *net, flagged_fd_array_t *fds) {
 		int ret = network_listen_fd(net, ffd->fd, ffd->flags);
 		if (ret != 0) {
 			some_bad_ret = ret;
-			/* FIXME: logging addresses! */
+			/* TODO: try logging address@port.  It's not too important,
+			 * because typical problems happen during binding already.
+			 * (invalid address, permission denied) */
 			kr_log_error("[system] listen on fd=%d: %s\n",
 					ffd->fd, kr_strerror(ret));
 			/* Continue printing all of these before exiting. */

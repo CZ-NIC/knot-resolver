@@ -37,33 +37,43 @@ void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog)
 	}
 }
 
-/** Notify the registered function about endpoint getting open. */
-static int endpoint_open_lua_cb(struct network *net, struct endpoint *ep)
+/** Notify the registered function about endpoint getting open.
+ * If log_port < 1, don't log it. */
+static int endpoint_open_lua_cb(struct network *net, struct endpoint *ep,
+				const char *log_addr, int log_port)
 {
 	const bool ok = ep->flags.kind && !ep->handle && !ep->engaged && ep->fd != -1;
 	if (!ok) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
+	/* First find callback in the endpoint registry. */
 	struct worker_ctx *worker = net->loop->data; // LATER: the_worker
 	lua_State *L = worker->engine->L;
 	void **pp = trie_get_try(net->endpoint_kinds, ep->flags.kind,
 				strlen(ep->flags.kind));
 	if (!pp && net->missing_kind_is_error) {
-		kr_log_error("error: missing kind '%s' in endpoint registry\n",
-				ep->flags.kind);
+		kr_log_error("error: network socket kind '%s' not handled when opening '%s",
+				ep->flags.kind, log_addr);
+		if (log_port >= 0)
+			kr_log_error("#%d", log_port);
+		kr_log_error("'.  Likely causes: typo or not loading 'http' module.\n");
 		return kr_error(ENOENT);
 	}
 	if (!pp) return kr_ok();
 
+	/* Now execute the callback. */
 	const int fun_id = (char *)*pp - (char *)NULL;
 	lua_rawgeti(L, LUA_REGISTRYINDEX, fun_id);
 	lua_pushboolean(L, true /* open */);
 	lua_pushpointer(L, ep);
-	lua_pushstring(L, "FIXME:endpoint-identifier");
+	if (log_port < 0) {
+		lua_pushstring(L, log_addr);
+	} else {
+		lua_pushfstring(L, "%s#%d", log_addr, log_port);
+	}
 	if (lua_pcall(L, 3, 0, 0)) {
-		kr_log_error("failed to open FIXME:endpoint-identifier: %s\n",
-				lua_tostring(L, -1));
+		kr_log_error("error opening %s: %s\n", log_addr, lua_tostring(L, -1));
 		return kr_error(ENOSYS); /* TODO: better value? */
 	}
 	ep->engaged = true;
@@ -77,7 +87,7 @@ static int engage_endpoint_array(const char *key, void *endpoints, void *net)
 		struct endpoint *ep = &eps->at[i];
 		const bool match = !ep->engaged && ep->flags.kind;
 		if (!match) continue;
-		int ret = endpoint_open_lua_cb(net, ep);
+		int ret = endpoint_open_lua_cb(net, ep, key, ep->port);
 		if (ret) return ret;
 	}
 	return 0;
@@ -223,7 +233,8 @@ static int insert_endpoint(struct network *net, const char *addr, struct endpoin
 
 /** Open endpoint protocols.  ep->flags were pre-set. */
 static int open_endpoint(struct network *net, struct endpoint *ep,
-			 const struct sockaddr *sa, int fd)
+			 const struct sockaddr *sa, int fd,
+			 const char *log_addr, uint16_t log_port)
 {
 	if ((sa != NULL) == (fd != -1)) {
 		assert(!EINVAL);
@@ -240,7 +251,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 	ep->fd = fd;
 	if (ep->flags.kind) {
 		/* This EP isn't to be managed internally after binding. */
-		return endpoint_open_lua_cb(net, ep);
+		return endpoint_open_lua_cb(net, ep, log_addr, log_port);
 	} else {
 		ep->engaged = true;
 		/* .engaged seems not really meaningful with .kind == NULL, but... */
@@ -302,7 +313,7 @@ static int create_endpoint(struct network *net, const char *addr_str,
 		.port = port,
 		.flags = flags,
 	};
-	int ret = open_endpoint(net, &ep, sa, fd);
+	int ret = open_endpoint(net, &ep, sa, fd, addr_str, port);
 	if (ret == 0) {
 		ret = insert_endpoint(net, addr_str, &ep);
 	}
