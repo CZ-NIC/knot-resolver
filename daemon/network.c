@@ -375,7 +375,7 @@ int network_listen(struct network *net, const char *addr, uint16_t port,
 		return kr_error(EINVAL);
 	}
 	if (endpoint_get(net, addr, port, flags)) {
-		return kr_ok(); /* Already listening */
+		return kr_error(EADDRINUSE); /* Already listening */
 	}
 
 	/* Parse address. */

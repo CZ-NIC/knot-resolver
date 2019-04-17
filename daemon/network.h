@@ -95,7 +95,7 @@ void network_deinit(struct network *net);
 
 /** Start listenting on addr#port with flags.
  * \note if we did listen on that combination already,
- *       nothing is done and kr_ok() is returned.
+ *       nothing is done and kr_error(EADDRINUSE) is returned.
  * \note there's no short-hand to listen both on UDP and TCP.
  * \note ownership of flags.* is taken on success.  TODO: non-success?
  */
