@@ -44,38 +44,19 @@ This integrated DoH server has following properties:
         - Let's Encrypt integration is not automated.
 
 
-Example configuration:
+For example configuration please see :ref:`example configuration <mod-http-example>`.
 
-.. code-block:: lua
-
-	-- Load HTTP module with defaults
-        modules.load('http')
-        http.config({
-                host = '::',        -- listen on ALL IPv4 and IPv6 addresses
-                port = 443,         -- feel free to use any other port
-                tls = true,
-                -- use valid X.509 cert issued by a recognized Certificate authority
-                cert = '/etc/knot-resolver/mycert.crt',
-                key  = '/etc/knot-resolver/mykey.key',
-        })
-
-        -- disable all HTTP endpoints except DoH
-        for endpoint, _ in pairs(http.endpoints) do
-                if endpoint ~= '/doh' then
-                        http.endpoints[endpoint] = nil
-                end
-        end
-
-Now you can reach the DoH endpoint using URL ``https://hostname.example/doh``, done!
+After configuring your endpoint you can reach the DoH endpoint using URL
+``https://your.resolver.hostname.example:44353/doh``, done!
 
 .. code-block:: bash
 
 	# query for www.knot-resolver.cz AAAA
-	$ curl -k https://hostname.example/doh?dns=l1sBAAABAAAAAAAAA3d3dw1rbm90LXJlc29sdmVyAmN6AAAcAAE
+	$ curl -k https://your.resolver.hostname.example:44353/doh?dns=l1sBAAABAAAAAAAAA3d3dw1rbm90LXJlc29sdmVyAmN6AAAcAAE
 
 Please see section :ref:`mod-http-tls` for further details about TLS configuration.
 
-Alternative configurations use HTTP proxies between clients and Knot Resolver instance:
+Alternative configurations use HTTP proxies between clients and a Knot Resolver instance:
 
 Normal HTTP proxy
 ^^^^^^^^^^^^^^^^^
