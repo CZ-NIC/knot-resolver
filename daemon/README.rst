@@ -385,8 +385,14 @@ Environment
 Trust anchors and DNSSEC
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-Since version 4.0, *DNSSEC validation is enabled by default*.  To turn it off,
-add the following snippet to your configuration file.
+Since version 4.0, **DNSSEC validation is enabled by default**.
+This is secure default and should not be changed unless absolutely necessary.
+
+**Options in this section are intended only for expert users and normally
+should not be needed.**
+
+If you really need to turn DNSSEC off and are okay with lowering security of your
+system by doing so, add the following snippet to your configuration file.
 
 .. code-block:: lua
 
@@ -397,6 +403,10 @@ The resolver supports DNSSEC including :rfc:`5011` automated DNSSEC TA updates
 and :rfc:`7646` negative trust anchors.  Depending on your distribution, DNSSEC
 trust anchors should be either maintained in accordance with the distro-wide
 policy, or automatically maintained by the resolver itself.
+
+In practice this means that you can forget about it and your favorite Linux
+distribution will take care of it for you.
+
 
 .. function:: trust_anchors.add_file(keyfile[, readonly = false])
 

@@ -189,6 +189,9 @@ The basic mode allows you to resolve a query and trace verbose logs (and message
    [ 8138] [iter] <= rcode: NOERROR
    [ 8138] [resl] finished: 4, queries: 1, mempool: 81952 B
 
+
+.. _mod-http-custom-endpoint:
+
 How to expose custom services over HTTP
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

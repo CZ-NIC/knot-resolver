@@ -17,18 +17,17 @@ Users
   :ref:`dnssec-config`.
 * ``-k/--keyfile`` and ``-K/--keyfile-ro`` daemon options were removed. If needed,
   use ``trust_anchors.add_file()`` in configuration file instead.
-* Configuration for ``http`` module changed significantly, especially for
-  network interfaces. Refer to :ref:`mod-http` and update your configuration
-  accordingly.
+* Configuration for :ref:`HTTP module <mod-http>` changed significantly as result of
+  adding :ref:`mod-http-doh` support. Please see examples below.
 * In case you are using your own custom modules, move them to the new module
   location. The exact location depends on your distribution. Generally, modules previously
   in ``/usr/lib/kdns_modules`` should be moved to ``/usr/lib/knot-resolver/kres_modules``.
 
-Configuration
-~~~~~~~~~~~~~
+Configuration file
+~~~~~~~~~~~~~~~~~~
 
 * ``trust_anchors.file``, ``trust_anchors.config()`` and ``trust_anchors.negative``
-  aliases were removed to avoid duplicity
+  aliases were removed to avoid duplicity and confusion. Migration table:
 
   .. csv-table::
      :header: "3.x configuration", "4.x configuration"
@@ -37,14 +36,24 @@ Configuration
      "``trust_anchors.config(path, readonly)``", "``trust_anchors.add_file(path, readonly)``"
      "``trust_anchors.negative = nta_set``", "``trust_anchors.set_insecure(nta_set)``"
 
-* ``trust_anchors.keyfile_default`` is no longer accessible and is only possible to set
-  at compile time. To turn off DNSSEC, use ``trust_anchors.remove('.')``.
+* ``trust_anchors.keyfile_default`` is no longer accessible and is can be set
+  only at compile time. To turn off DNSSEC, use :func:`trust_anchors.remove()`.
 
   .. csv-table::
      :header: "3.x configuration", "4.x configuration"
 
      "``trust_anchors.keyfile_default = nil``", "``trust_anchors.remove('.')``"
 
+* Network for HTTP endpoints is now configured using same mechanism as for normal DNS enpoints,
+  please refer to chapter :ref:`network-configuration`. Migration table:
+
+  .. csv-table::
+     :header: "3.x configuration", "4.x configuration"
+
+     "``modules = { http = { host = '192.0.2.1', port = 443 }}``","see chapter :ref:`network-configuration`"
+     "``http.config({ host = '192.0.2.1', port = 443 })``","see chapter :ref:`network-configuration`"
+     "``modules = { http = { endpoints = ... }}``","see chapter :ref:`mod-http-custom-endpoint`"
+     "``http.config({ endpoints = ... })``","see chapter :ref:`mod-http-custom-endpoint`"
 
 Packagers & Developers
 ----------------------
