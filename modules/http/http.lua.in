@@ -396,7 +396,7 @@ local function add_socket(fd, kind, addr_str)
 	-- Create certificate renewal timer if ephemeral
 	if crt and conf.ephemeral then
 		local _, expiry = crt:getLifetime()
-		expiry = math.max(0, expiry - (os.time() - 3 * 24 * 3600))
+		expiry = 1000 * math.max(0, expiry - (os.time() - 3 * 24 * 3600))
 		event.after(expiry, function ()
 			log('[http] refreshed ephemeral certificate')
 			crt, key = updatecert(conf.cert, conf.key)
