@@ -7,7 +7,7 @@ else
 	local request = require('http.request')
 
 	modules.load('http')
-	local endpoints = http.templates.webmgmt.endpoints
+	local endpoints = http.configs._builtin.webmgmt.endpoints
 
 	-- custom endpoints
 	endpoints['/test'] = {'text/custom', function () return 'hello' end}

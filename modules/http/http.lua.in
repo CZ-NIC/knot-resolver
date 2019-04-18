@@ -22,11 +22,11 @@ local has_mmdb, mmdb  = pcall(require, 'mmdb')
 -- Module declaration
 local M = {
 	servers = {},
-	templates = {}  -- configuration templates
+	configs = { _builtin = {} }  -- configuration templates
 }
 
 -- inherited by all configurations
-M.templates._builtin = {
+M.configs._builtin._all = {
 	cq = worker.bg_worker.cq,
 	cert = 'self.crt',
 	key = 'self.key',
@@ -34,7 +34,7 @@ M.templates._builtin = {
 	client_timeout = 5
 }
 -- log errors but do not throw
-M.templates._builtin.onerror = function(myserver, context, op, err, errno) -- luacheck: ignore 212
+M.configs._builtin._all.onerror = function(myserver, context, op, err, errno) -- luacheck: ignore 212
 	local msg = '[http] ' .. op .. ' on ' .. tostring(context) .. ' failed'
 	if err then
 		msg = msg .. ': ' .. tostring(err)
@@ -45,13 +45,13 @@ M.templates._builtin.onerror = function(myserver, context, op, err, errno) -- lu
 end
 
 -- M.config() without explicit "kind" modifies this
-M.templates._default = {}
+M.configs._all = {}
 
 -- DoH
-M.templates.doh = {}
+M.configs._builtin.doh = {}
 
 -- management endpoint
-M.templates.webmgmt = {}
+M.configs._builtin.webmgmt = {}
 
 -- Map extensions to MIME type
 local mime_types = {
@@ -119,9 +119,9 @@ local function serve_root()
 end
 
 -- Export HTTP service endpoints
-M.templates.doh.endpoints = {}
-M.templates.webmgmt.endpoints = {}
-local mgmt_endpoints = M.templates.webmgmt.endpoints
+M.configs._builtin.doh.endpoints = {}
+M.configs._builtin.webmgmt.endpoints = {}
+local mgmt_endpoints = M.configs._builtin.webmgmt.endpoints
 
 mgmt_endpoints['/'] = {'text/html', serve_root()}
 
@@ -144,11 +144,11 @@ for k, v in pairs(http_trace.endpoints) do
 end
 M.trace = http_trace
 
-M.templates.doh.endpoints = {}
+M.configs._builtin.doh.endpoints = {}
 local http_doh = require('kres_modules.http_doh')
 for k, v in pairs(http_doh.endpoints) do
 	mgmt_endpoints[k] = v
-	M.templates.doh.endpoints[k] = v
+	M.configs._builtin.doh.endpoints[k] = v
 end
 M.doh = http_doh
 
@@ -318,14 +318,19 @@ local function updatecert(crtfile, keyfile)
 	return crt, key
 end
 
--- @function Merge dictionaries.
+-- @function Merge dictionaries, nil is like empty dict.
 -- Values from right-hand side dictionaries take precedence.
 local function mergeconf(...)
 	local merged = {}
-	for _, intable in ipairs({...}) do
-		assert(type(intable) == 'table', 'cannot merge non-tables')
-		for key, val in pairs(intable) do
-			merged[key] = val
+	local ntables = select('#', ...)
+	local tables = {...}
+	for i = 1, ntables do
+		local intable = tables[i]
+		if intable ~= nil then
+			assert(type(intable) == 'table', 'cannot merge non-tables')
+			for key, val in pairs(intable) do
+				merged[key] = val
+			end
 		end
 	end
 	return merged
@@ -359,7 +364,7 @@ end
 local function add_socket(fd, kind, addr_str)
 	assert(M.servers[fd] == nil, 'socket is already served by an HTTP instance')
 	local conf, crt, key
-	conf = mergeconf(M.templates._builtin, M.templates._default, M.templates[kind] or {})
+	conf = mergeconf(M.configs._builtin._all, M.configs._builtin[kind], M.configs._all, M.configs[kind])
 	conf.socket = cqueues.socket.fdopen(fd)
 	if conf.tls ~= false then
 		-- Check if a cert file was specified
@@ -376,12 +381,6 @@ local function add_socket(fd, kind, addr_str)
 	end
 	-- Compose server handler
 	local routes = route(conf.endpoints)
-	-- Enable SO_REUSEPORT by default (unless explicitly turned off)
-	if not conf.reuseport and worker.id > 0 then
-		warn('[http] the "reuseport" option is disabled and multiple forks are used, ' ..
-			 'port binding will fail on some instances')
-	end
-	-- Check if UNIX socket path is used TODO
 	conf.ctx = crt and tlscontext(crt, key)
 	conf.onstream = routes
 	-- Create TLS context and start listening
@@ -458,16 +457,20 @@ function M.config(conf, kind)
 		return
 	end
 
-	kind = kind or '_default'
+	kind = kind or '_all'
 	assert(type(kind) == 'string')
 
 	local operation
-	if M.templates[kind] then  -- config on an existing template
+	-- builtins cannot be removed or added
+	if M.configs._builtin[kind] then
+		operation = 'modify'
+		conf = conf or {}
+	elseif M.configs[kind] then  -- config on an existing user template
 		if conf then	operation = 'modify'
 		else		operation = 'delete' end
 	else  -- config for not-yet-existing template
 		if conf then	operation = 'add'
-		else		panic('endpoint kind "%s" does not exist, '
+		else		panic('[http] endpoint kind "%s" does not exist, '
 					.. 'nothing to delete', kind) end
 	end
 
@@ -494,7 +497,7 @@ function M.config(conf, kind)
 	for _, instance in pairs(M.servers) do
 		-- modification cannot be implemented as
 		-- remove_socket + add_socket because remove closes the socket
-		if instance.kind == kind then
+		if instance.kind == kind or kind == '_all' then
 			panic('unable to modify configration for '
 				.. 'endpoint kind "%s" because it is in '
 				.. 'use, use net.close() first', kind)
@@ -506,7 +509,7 @@ function M.config(conf, kind)
 	elseif operation == 'delete' then
 		net.register_endpoint_kind(kind)
 	end
-	M.templates[kind] = conf
+	M.configs[kind] = conf
 end
 
 return M
