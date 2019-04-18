@@ -238,19 +238,6 @@ lint:tidy:
     when:
       - script_failure
 
-pkg:debian.symbols:
-  <<: *test
-  dependencies:
-    - kres-gen
-  before_script: []
-  only:
-    refs:
-      - /^release.*$/
-  script:
-    - ln -s distro/deb debian
-    - sed -i "s/__VERSION__/99/g" distro/deb/changelog
-    - dpkg-gensymbols -c4 -ebuild_ci_lib/lib/$LIBKRES_NAME.so.$LIBKRES_ABI -P. -p$LIBKRES_NAME$LIBKRES_ABI
-
 pkg:epel-7:
   <<: *pkgbuild
   script:
