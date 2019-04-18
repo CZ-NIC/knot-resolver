@@ -1,10 +1,9 @@
-Knot Resolver 4.0.0 (2019-0m-dd)
+Knot Resolver 4.0.0 (2019-04-18)
 ================================
 
 Incompatible changes
 --------------------
-- see upgrading guide:
-  https://knot-resolver.readthedocs.io/en/v4.0.0/upgrading.html#upgrade-from-3-to-4
+- see upgrading guide: https://knot-resolver.readthedocs.io/en/stable/upgrading.html
 - configuration: trust_anchors aliases .file, .config() and .negative were removed (!788)
 - configuration: trust_anchors.keyfile_default is no longer accessible (!788)
 - daemon: -k/--keyfile and -K/--keyfile-ro options were removed
@@ -14,17 +13,24 @@ Incompatible changes
 - DNSSEC is enabled by default
 - upstream packages for Debian now require systemd
 - libknot >= 2.8 is required
-- net.list() output format changed
+- net.list() output format changed (#448)
 - net.listen() reports error when address-port pair is in use
+- bind to DNS-over-TLS port by default (!792)
+- stop versioning libkres library
+- default port for web management and APIs changed to 8453
 
 Improvements
 ------------
-- policy.TLS_FORWARD: if hostname is configured, send it on wire (!759)
+- policy.TLS_FORWARD: if hostname is configured, send it on wire (!762)
 - hints module: allow configuring the TTL and change default from 0 to 5s
 - policy module: policy.rpz() will watch the file for changes by default
 - packaging: lua cqueues added to default dependencies where available
 - systemd: service is no longer auto-restarted on configuration errors
-- always send DO+CD flags upstream, even in insecure zones
+- always send DO+CD flags upstream, even in insecure zones (#153)
+- TODO: https://gitlab.labs.nic.cz/knot/knot-resolver/merge_requests/775
+- improve usability of table_print() (!790, !801)
+- add DNS-over-HTTPS support (#280)
+- docker image supports and exposes DNS-over-HTTPS
 
 Bugfixes
 --------
@@ -35,10 +41,11 @@ Bugfixes
 - policy module: support '#' for separating port numbers, for consistency
 - fix startup on macOS+BSD when </dev/null and cqueues installed
 - policy.RPZ: log problems from zone-file level of parser as well (#453)
-- fix flushing of messages to logs in some cases (!781)
+- fix flushing of messages to logs in some cases (notably systemd) (!781)
 - fix fallback when SERVFAIL or REFUSED is received from upstream (!784)
 - fix crash when dealing with unknown TA key algorhitm (#449)
 - go insecure due to algorithm support even if DNSKEY is NODATA (!798)
+- TODO? https://gitlab.labs.nic.cz/knot/knot-resolver/merge_requests/804
 
 Module API changes
 ------------------
