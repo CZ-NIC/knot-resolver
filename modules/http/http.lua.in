@@ -381,12 +381,6 @@ local function add_socket(fd, kind, addr_str)
 	end
 	-- Compose server handler
 	local routes = route(conf.endpoints)
-	-- Enable SO_REUSEPORT by default (unless explicitly turned off)
-	if not conf.reuseport and worker.id > 0 then
-		warn('[http] the "reuseport" option is disabled and multiple forks are used, ' ..
-			 'port binding will fail on some instances')
-	end
-	-- Check if UNIX socket path is used TODO
 	conf.ctx = crt and tlscontext(crt, key)
 	conf.onstream = routes
 	-- Create TLS context and start listening
