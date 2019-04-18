@@ -331,6 +331,29 @@ function mergeconf(...)
 	return merged
 end
 
+function load_cert(certname, keyname)
+	local f, err = io.open(certname, 'r')
+	if not f then
+		panic('[http] unable to read TLS certificate file %s: %s', certname, err)
+	end
+	crt = x509.new(f:read('*all'))
+	f:close()
+	if not crt then
+		panic('[http] unable to parse TLS certificate file %s', certname)
+	end
+
+	f, err = io.open(keyname, 'r')
+	if not f then
+		panic('[http] unable to open TLS key file %s: %s', keyname, err)
+	end
+	key = pkey.new(f:read('*all'))
+	f:close()
+	if not key then
+		panic('[http] unable to parse TLS key file %s', keyname)
+	end
+	return crt, key
+end
+
 -- @function Listen on given socket
 -- using configuration for specific "kind" of HTTP server
 function add_socket(fd, kind)
@@ -341,22 +364,10 @@ function add_socket(fd, kind)
 	if conf.tls ~= false then
 		-- Check if a cert file was specified
 		-- Read or create self-signed x509 certificate
-		local f = io.open(conf.cert, 'r')
-		if f then
-			crt = assert(x509.new(f:read('*all')))
-			f:close()
-			-- Continue reading key file
-			if crt then
-				f = io.open(conf.key, 'r')
-				if not f then
-					panic('enable to open HTTP key file %s',
-						conf.key)
-				end
-				key = assert(pkey.new(f:read('*all')))
-				f:close()
-			end
-		elseif conf.ephemeral then
+		if conf.ephemeral then
 			crt, key = updatecert(conf.cert, conf.key)
+		else
+			crt, key = load_cert(conf.cert, conf.key)
 		end
 		-- Check loaded certificate
 		if not crt or not key then
@@ -467,8 +478,10 @@ function M.config(conf, kind)
 		if conf.cert then
 			conf.ephemeral = false
 			if not conf.key then
-				error('certificate provided, but missing key')
+				panic('[http] certificate provided, but missing key')
 			end
+			-- test if it can be loaded or not
+			load_cert(conf.cert, conf.key)
 		end
 		if conf.geoip then
 			if has_mmdb then
