@@ -62,6 +62,10 @@ To configure \fBkresd\fR to listen on public interfaces, drop-in files (see
 .RE
 .fi
 
+If you change network interfaces of systemd sockets for already running kresd instance,
+make sure to call \fBsystemctl restart system-kresd.slice\fR for these changes
+to take effect.
+
 For example, to configure \fBkresd\fR to listen on 192.0.2.115 on ports 53 and
 853, the drop-in files would look like:
 

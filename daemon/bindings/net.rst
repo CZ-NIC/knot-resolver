@@ -4,11 +4,11 @@ Network configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
 Modern Linux distributions use so-called *Systemd socket activation*, which
-effectivelly means that IP addresses and ports to listen on are configured
+effectively means that IP addresses and ports to listen on are configured
 in Systemd configuration files.
 
 Older Linux systems and all non-Linux systems do not support this modern method
-and have to resort to old fashioned way of configuring things using
+and have to resort to old fashioned way of configuring network interfaces using
 ``net.listen()`` configuration call.
 Most notable examples of such systems are CentOS 7 and macOS.
 
@@ -31,7 +31,7 @@ Each protocol has its own configuration file:
   ":ref:`mod-http-doh`","``kresd-doh.socket``"
   ":ref:`Web management <mod-http-built-in-services>`","``kresd-webmgmt.socket``"
 
-To configure kresd to listen on public a interface using the original DNS protocol,
+To configure kresd to listen on a public interface using the original DNS protocol,
 create a drop-in file:
 
 .. code-block:: bash
@@ -45,6 +45,10 @@ create a drop-in file:
    [Socket]
    ListenDatagram=192.0.2.115:53
    ListenStream=192.0.2.115:53
+
+.. note:: If you change network interfaces of systemd sockets for already running
+   kresd instance, make sure to call ``systemctl restart system-kresd.slice`` for
+   these changes to take effect.
 
 Configuration you provide is automatically merged with defaults from your
 distribution. It is also possible to check resulting configuration using
