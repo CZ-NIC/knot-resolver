@@ -1,5 +1,5 @@
 [Unit]
-Description=Knot Resolver TLS network listener
+Description=Knot Resolver DNS-over-TLS socket
 Documentation=man:kresd.systemd(7)
 Documentation=man:kresd(8)
 Before=sockets.target

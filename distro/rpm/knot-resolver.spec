@@ -47,25 +47,27 @@ BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
 
-Requires:	systemd
+Requires:       systemd
 
 # Distro-dependent dependencies
 %if 0%{?rhel}
 BuildRequires:  lmdb-devel
 # Lua 5.1 version of the libraries have different package names
+Requires:       lua-basexx
 Requires:       lua-socket
 Requires:       lua-sec
 Requires:       lua-filesystem
-Requires(pre):	shadow-utils
+Requires(pre):  shadow-utils
 %endif
 %if 0%{?fedora}
 BuildRequires:  pkgconfig(lmdb)
 BuildRequires:  python3-sphinx
-Requires:       lua-cqueues-compat
+Requires:       lua5.1-basexx
+Requires:       lua5.1-cqueues
 Requires:       lua-filesystem-compat
 Requires:       lua-socket-compat
 Requires:       lua-sec-compat
-Requires(pre):	shadow-utils
+Requires(pre):  shadow-utils
 %endif
 %if 0%{?suse_version}
 %define NINJA ninja
@@ -74,7 +76,7 @@ BuildRequires:  python3-Sphinx
 Requires:       lua51-luafilesystem
 Requires:       lua51-luasocket
 Requires:       lua51-luasec
-Requires(pre):	shadow
+Requires(pre):  shadow
 %endif
 
 %if "x%{?rhel}" == "x"
@@ -110,6 +112,24 @@ Requires:       %{name} = %{version}-%{release}
 
 %description doc
 Documentation for Knot Resolver
+%endif
+
+%if "x%{?suse_version}" == "x"
+%package module-http
+Summary:        HTTP/2 module for Knot Resolver
+Requires:       knot-resolver
+%if 0%{?fedora}
+Requires:       lua5.1-http
+Requires:       lua5.1-mmdb
+%else
+Requires:       lua-http
+Requires:       lua-mmdb
+%endif
+
+%description module-http
+HTTP/2 module for Knot Resolver has multiple uses. It enables use of
+DNS-over-HTTP, can serve as API ednpoint for other modules or provide a web
+interface for local visualization of the resolver cache and queries.
 %endif
 
 %prep
@@ -161,10 +181,16 @@ install -m 0750 -d %{buildroot}/run/%{name}
 
 # remove modules with missing dependencies
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/etcd.lua
+
+%if 0%{?suse_version}
+rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/experimental_dot_auth.lua
 rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http
-rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/http.lua
-rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/http_trace.lua
+rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/http*.lua
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/prometheus.lua
+rm %{buildroot}%{_unitdir}/kresd@.service.d/module-http.conf
+rm %{buildroot}%{_unitdir}/kresd-doh.socket
+rm %{buildroot}%{_unitdir}/kresd-webmgmt.socket
+%endif
 
 # rename doc directory for centos, opensuse
 %if "x%{?fedora}" == "x"
@@ -207,12 +233,15 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %attr(664,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/root.keys
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/root.hints
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/icann-ca.pem
-%{_unitdir}/kresd*.service
+%{_unitdir}/kresd@.service
 %{_unitdir}/kresd.target
 %dir %{_unitdir}/multi-user.target.wants
 %{_unitdir}/multi-user.target.wants/kresd.target
 %if "x%{?rhel}" == "x"
-%{_unitdir}/kresd*.socket
+%dir %{_unitdir}/kresd@.service.d
+%{_unitdir}/kresd.socket
+%{_unitdir}/kresd-tls.socket
+%{_unitdir}/kresd-control@.socket
 %ghost /run/%{name}/
 %{_mandir}/man7/kresd.systemd.7.gz
 %else
@@ -223,7 +252,32 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %{_sbindir}/kresd
 %{_sbindir}/kresc
 %{_libdir}/libkres.so.*
-%{_libdir}/knot-resolver
+%dir %{_libdir}/knot-resolver
+%{_libdir}/knot-resolver/*.so
+%{_libdir}/knot-resolver/*.lua
+%dir %{_libdir}/knot-resolver/kres_modules
+%{_libdir}/knot-resolver/kres_modules/*.so
+%{_libdir}/knot-resolver/kres_modules/daf
+%{_libdir}/knot-resolver/kres_modules/daf.lua
+%{_libdir}/knot-resolver/kres_modules/detect_time_jump.lua
+%{_libdir}/knot-resolver/kres_modules/detect_time_skew.lua
+%{_libdir}/knot-resolver/kres_modules/dns64.lua
+%if "x%{?suse_version}" == "x"
+%{_libdir}/knot-resolver/kres_modules/experimental_dot_auth.lua
+%endif
+%{_libdir}/knot-resolver/kres_modules/graphite.lua
+%{_libdir}/knot-resolver/kres_modules/policy.lua
+%{_libdir}/knot-resolver/kres_modules/predict.lua
+%{_libdir}/knot-resolver/kres_modules/prefill.lua
+%{_libdir}/knot-resolver/kres_modules/priming.lua
+%{_libdir}/knot-resolver/kres_modules/rebinding.lua
+%{_libdir}/knot-resolver/kres_modules/renumber.lua
+%{_libdir}/knot-resolver/kres_modules/serve_stale.lua
+%{_libdir}/knot-resolver/kres_modules/ta_sentinel.lua
+%{_libdir}/knot-resolver/kres_modules/ta_signal_query.lua
+%{_libdir}/knot-resolver/kres_modules/ta_update.lua
+%{_libdir}/knot-resolver/kres_modules/view.lua
+%{_libdir}/knot-resolver/kres_modules/workarounds.lua
 %{_mandir}/man8/kresd.8.gz
 
 %files devel
@@ -235,6 +289,18 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %files doc
 %dir %{_pkgdocdir}
 %doc %{_pkgdocdir}/html
+%endif
+
+%if "x%{?suse_version}" == "x"
+%files module-http
+%if 0%{?fedora}
+%{_unitdir}/kresd@.service.d/module-http.conf
+%{_unitdir}/kresd-doh.socket
+%{_unitdir}/kresd-webmgmt.socket
+%endif
+%{_libdir}/knot-resolver/kres_modules/http
+%{_libdir}/knot-resolver/kres_modules/http*.lua
+%{_libdir}/knot-resolver/kres_modules/prometheus.lua
 %endif
 
 %changelog

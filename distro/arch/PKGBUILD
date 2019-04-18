@@ -24,6 +24,7 @@ depends=(
     'systemd'
 )
 optdepends=(
+    'lua51-basexx: experimental_dot_auth module',
     'lua51-http: http module',
     'lua51-filesystem: prefill module',
 )
@@ -61,7 +62,7 @@ package() {
     DESTDIR=${pkgdir} ninja -C build_arch install
 
     # add kresd.target to multi-user.target.wants to support enabling kresd services
-    install -dm 0755 "${pkgdir}/usr/lib/systemd/system/multi-user.target.wants"
+    install -d -m 0755 "${pkgdir}/usr/lib/systemd/system/multi-user.target.wants"
     ln -s ../kresd.target "${pkgdir}/usr/lib/systemd/system/multi-user.target.wants/kresd.target"
 
     # remove modules with missing dependencies

@@ -39,8 +39,10 @@ Replaces:
 Breaks:
   libkres9 (<< 3.2.1-2),
 Recommends:
- knot-resolver-module-http,
+ lua-basexx,
  lua-cqueues,
+Suggests:
+ knot-resolver-module-http,
 Description: caching, DNSSEC-validating DNS resolver
  The Knot Resolver is a caching full resolver implementation
  written in C and LuaJIT, including both a resolver library and a
@@ -61,11 +63,14 @@ Description: caching, DNSSEC-validating DNS resolver
 Package: knot-resolver-module-http
 Architecture: all
 Depends:
+ knot-resolver,
  libjs-bootstrap,
  libjs-d3,
  libjs-jquery,
+ lua-cqueues (>= 20171014),
  lua-http,
  lua-mmdb,
+ systemd,
  ${misc:Depends},
  ${shlibs:Depends},
 Breaks:

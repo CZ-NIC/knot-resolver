@@ -13,19 +13,18 @@ or publish metrics on request for Prometheus scraper.
 By default this module provides two kinds of endpoints,
 and unlimited number of "used-defined kinds" can be added in configuration.
 
-+--------------+---------------------------------------------+
-| **Endpoint** | **Explanation**                             |
-+--------------+---------------------------------------------+
-| doh          | :ref:`mod-http-doh`                         |
-+--------------+---------------------------------------------+
-| webmgmt      | built-in web management APIs (includes DoH) |
-+--------------+---------------------------------------------+
++--------------+---------------------------------------------------------------------------------+
+| **Endpoint** | **Explanation**                                                                 |
++--------------+---------------------------------------------------------------------------------+
+| doh          | :ref:`mod-http-doh`                                                             |
++--------------+---------------------------------------------------------------------------------+
+| webmgmt      | :ref:`built-in web management <mod-http-built-in-services>` APIs (includes DoH) |
++--------------+---------------------------------------------------------------------------------+
 
 Each network address and port combination can be configured to expose
 one kind of endpoint. This is done using the same mechanisms as
 network configuration for plain DNS and DNS-over-TLS,
-see chapter :ref:`network configuration <kresd-tls-socket-override-port>`
-for more details.
+see chapter :ref:`network-configuration` for more details.
 
 .. warning:: Management endpoint (``webmgmt``) must not be directly exposed
              to untrusted parties. Use `reverse-proxy`_ like Apache_
@@ -40,48 +39,11 @@ This can be changed using ``http.config()`` configuration call explained below.
 Example configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
-Here we show how to configure web management API on loopback interface
-on port 8453, and how to expose :ref:`mod-http-doh` endpoint on public IP addresses.
-
-Modern distributions use systemd socket activation and thus IP addresses of endpoints
-are configured using systemd. (Beware, CentOS 7 has too old version of systemd and
-you have to configure IP addresses in Knot Resolver's configuration file instead.)
-
-.. warning:: Make sure you read section :ref:`mod-http-doh`
-             before copy&pasting this snippet.
-
-.. code-block:: bash
-
-        # IP address configuration for modern systems
-        # with systemd socket activation (not CentOS 7)
-
-        # configuring DoH on public IP addresses, port 44353
-        $ vim /etc/systemd/system/kresd-doh.socket.d/override.conf
-        # /etc/systemd/system/kresd-doh.socket.d/override.conf
-        [Socket]
-        ListenStream=
-        ListenStream=192.0.2.1:44353
-        ListenStream=[2001:db8::1]:44353
-
-        # configuring web management on loopback port 8453
-        $ vim /etc/systemd/system/kresd-webmgmt.socket.d/override.conf
-        # /etc/systemd/system/kresd-webmgmt.socket.d/override.conf
-        [Socket]
-        ListenStream=
-        ListenStream=127.0.0.1:8453
-
+This section shows how to configure HTTP module itself. For information how
+to configure HTTP server's IP addresses and ports please see chapter
+:ref:`network-configuration`.
 
 .. code-block:: lua
-
-        -- use net.listen() only on old systems like CentOS 7
-        -- which lack proper support for systemd socket activation
-
-        -- expose management interface on loopback
-        -- net.listen('127.0.0.1', '8453', { kind = 'webmgmt' })
-
-        -- expose DoH on public interfaces
-        -- net.listen('192.0.2.1', '44353', { kind = 'doh' })
-        -- net.listen('2001:db8::1', '44353', { kind = 'doh' })
 
         -- load HTTP module with defaults (self-signed TLS cert)
         modules.load('http')
@@ -146,6 +108,7 @@ for authentication to API etc.
 Safari doesn't allow WebSockets over HTTPS with a self-signed certificate.
 Major drawback is that current browsers won't do HTTP/2 over insecure connection.)
 
+.. _mod-http-built-in-services:
 
 Built-in services
 ^^^^^^^^^^^^^^^^^
@@ -155,9 +118,9 @@ The HTTP module has several built-in services to use.
 .. csv-table::
  :header: "Endpoint", "Service", "Description"
 
- "``/stats``", "Statistics/metrics", "Exported metrics in JSON."
- "``/metrics``", "Prometheus metrics", "Exported metrics for Prometheus_"
- "``/trace/:name/:type``", "Tracking", "Trace resolution of the query and return the verbose logs."
+ "``/stats``", "Statistics/metrics", "Exported :ref:`metrics <mod-stats-list>` from :ref:`mod-stats` in JSON format."
+ "``/metrics``", "Prometheus metrics", "Exported metrics for Prometheus_."
+ "``/trace/:name/:type``", "Tracking", ":ref:`Trace resolution <mod-http-trace>` of a DNS query and return the verbose logs."
  "``/doh``", "DNS-over-HTTP", ":rfc:`8484` endpoint, see :ref:`mod-http-doh`."
 
 Prometheus metrics endpoint
@@ -199,6 +162,8 @@ You can also add custom metrics or rewrite existing metrics before they are retu
         	table.insert(metrics, 'build_info{version="1.2.3"} 1')
         end
 
+.. _mod-http-trace:
+
 Tracing requests
 ^^^^^^^^^^^^^^^^
 
@@ -223,6 +188,9 @@ The basic mode allows you to resolve a query and trace verbose logs (and message
 
    [ 8138] [iter] <= rcode: NOERROR
    [ 8138] [resl] finished: 4, queries: 1, mempool: 81952 B
+
+
+.. _mod-http-custom-endpoint:
 
 How to expose custom services over HTTP
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

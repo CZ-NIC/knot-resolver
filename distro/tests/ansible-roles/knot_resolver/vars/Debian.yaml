@@ -1,0 +1,6 @@
+---
+obs_distro_name: "{{ distro }}_9.0"
+show_package_version: dpkg -s knot-resolver | grep '^Version'
+packages:
+  - knot-resolver
+  - knot-dnsutils
