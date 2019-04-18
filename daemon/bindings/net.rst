@@ -3,15 +3,36 @@
 Network configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
-For when listening on ``localhost`` just doesn't cut it.
+Modern Linux distributions use so-called *Systemd socket activation*, which
+effectivelly means that IP addresses and ports to listen on are configured
+in Systemd configuration files.
 
-**Systemd socket configuration**
+Older Linux systems and all non-Linux systems do not support this modern method
+and have to resort to old fashioned way of configuring things using
+``net.listen()`` configuration call.
+Most notable examples of such systems are CentOS 7 and macOS.
+
+.. warning:: On machines with multiple IP addresses avoid listening on wildcards
+        ``0.0.0.0`` or ``::``. Knot Resolver could answer from different IP
+        addresses if the network address ranges overlap,
+        and clients would probably refuse such a response.
+
+**Network configuration using systemd**
 
 If you're using our packages with systemd with sockets support (not supported
-on CentOS 7), network interfaces are configured using systemd drop-in files for
-``kresd.socket``, ``kresd-tls.socket`` and ``kresd-doh.socket``.
+on CentOS 7), network interfaces are configured using systemd drop-in files.
+Each protocol has its own configuration file:
 
-To configure kresd to listen on public interface, create a drop-in file:
+.. csv-table::
+  :header: "**Network protocol**", "**Socket file name**"
+
+  "DNS (UDP+TCP, :rfc:`1034`)","``kresd.socket``"
+  ":ref:`DNS-over-TLS (DoT) <tls-server-config>`","``kresd-tls.socket``"
+  ":ref:`mod-http-doh`","``kresd-doh.socket``"
+  ":ref:`Web management <mod-http-built-in-services>`","``kresd-webmgmt.socket``"
+
+To configure kresd to listen on public a interface using the original DNS protocol,
+create a drop-in file:
 
 .. code-block:: bash
 
@@ -20,13 +41,37 @@ To configure kresd to listen on public interface, create a drop-in file:
 .. code-block:: none
 
    # /etc/systemd/system/kresd.socket.d/override.conf
+   # always listen on UDP (datagram) and TCP (stream) as well
    [Socket]
    ListenDatagram=192.0.2.115:53
    ListenStream=192.0.2.115:53
 
+Configuration you provide is automatically merged with defaults from your
+distribution. It is also possible to check resulting configuration using
+``systemctl cat``:
+
+.. code-block:: bash
+
+   $ systemctl cat kresd.socket
+
+.. code-block:: none
+
+   # merged result: user configuration + distro defaults
+   [Socket]
+   FileDescriptorName=dns
+   FreeBind=true
+   BindIPv6Only=both
+   ListenDatagram=[::1]:53
+   ListenStream=[::1]:53
+   ListenDatagram=127.0.0.1:53
+   ListenStream=127.0.0.1:53
+   ListenDatagram=192.0.2.115:53
+   ListenStream=192.0.2.115:53
+
+
 .. _kresd-socket-override-port:
 
-The default locahost interface/port can also be removed/overriden by using an
+The default localhost interface/port can also be removed/overriden by using an
 empty ``ListenDatagram=`` or ``ListenStream=`` directive. This can be used when
 you want to configure kresd to listen on all IPv4/IPv6 network interfaces (if
 you've disabled IPv6 support in kernel, use ``0.0.0.0`` instead of ``[::]`` ).
@@ -45,9 +90,10 @@ you've disabled IPv6 support in kernel, use ``0.0.0.0`` instead of ``[::]`` ).
    possible workarounds, see
    https://gitlab.labs.nic.cz/knot/knot-resolver/issues/445
 
-It can also be useful if you want to use the Knot DNS with the `dnsproxy
-module`_ to have both resolver and authoritative server running on the same
-machine.
+It can also be useful if you want to use the Knot DNS authoritative server
+with the `dnsproxy module`_ to have both resolver and authoritative server
+running on the same machine. This is not recommended configuration but it can
+be done like this:
 
 .. code-block:: none
 
@@ -63,7 +109,7 @@ machine.
 .. _kresd-tls-socket-override-port:
 
 The ``kresd-tls.socket`` can also be configured in the same way to listen for
-TLS connections.
+DNS-over-TLS connections (:rfc:`7858`).
 
 .. code-block:: bash
 
@@ -72,17 +118,23 @@ TLS connections.
 .. code-block:: none
 
    # /etc/systemd/system/kresd-tls.socket.d/override.conf
+   # specify only TCP (stream), DTLS is not supported
    [Socket]
    ListenStream=192.0.2.115:853
 
-To configure socket for DNS-over-HTTPS, make sure you have
-``kresd-doh.socket`` installed (it might be part of a separate
-``knot-resolver-module-http`` package).  Then, you can configure its network
-interfaces as above. Also, don't forget to load http module in configuration
-file, otherwise the socket won't have any function.
+When configuring sockets for :ref:`mod-http-doh`, make sure you have
+``kresd-doh.socket`` installed, it might be part of a separate
+``knot-resolver-module-http`` package.
+
+.. warning:: Make sure you read section :ref:`mod-http-doh` before exposing
+             the DoH protocol to outside.
 
 For example, to remove the default localhost:44353 and listen on all interfaces
 on port 443, create the following drop-in file for ``kresd-doh.socket``:
+
+.. code-block:: bash
+
+   $ systemctl edit kresd-doh.socket
 
 .. code-block:: bash
 
@@ -93,26 +145,58 @@ on port 443, create the following drop-in file for ``kresd-doh.socket``:
 
 Make sure no other service is using port 443, as that will result in
 unpredictable behaviour. Alternately, you can use port 44353 where a collision
-is unlikely. Also, don't forget to load http module in configuration file.
+is unlikely.
 
-**Daemon network configuration**
+Also, don't forget to :ref:`load http module in configuration <mod-http-example>`
+file, otherwise the socket won't work.
 
-If you don't use systemd with sockets to run kresd, network interfaces are
-configured in the config file.
+**Legacy network configuration using configuration file**
 
-.. tip:: Use declarative interface for network.
+If you don't use systemd with sockets to run kresd, addresses and ports to listen
+on are configured in the config file.
 
-         .. code-block:: lua
+.. function:: net.listen(addresses, [port = 53, { kind = 'dns' }])
 
-            net = { '127.0.0.1', net.eth0, net.eth1.addr[1] }
-            net.ipv4 = false
+   :return: boolean
 
-.. warning:: On machines with multiple IP addresses avoid binding to wildcard ``0.0.0.0`` or ``::`` (see example below). Knot Resolver could answer from different IP in case the ranges overlap and client will probably refuse such a response.
+   Listen on addresses; port and flags are optional.
+   The addresses can be specified as a string or device.
+   The command can be given multiple times,
+   but repeating an address-port combination is an error.
+   Port 853 implies ``kind = 'tls'`` but it is always better to be explicit.
 
-         .. code-block:: lua
+.. csv-table::
+  :header: "**Network protocol**", "**Configuration command**"
 
-            net = { '0.0.0.0' }
+  "DNS (UDP+TCP, :rfc:`1034`)","``net.listen('192.0.2.123', 53)``"
+  ":ref:`DNS-over-TLS (DoT) <tls-server-config>`","``net.listen('192.0.2.123', 853, { kind = 'tls' })``"
+  ":ref:`mod-http-doh`","``net.listen('192.0.2.123', 443, { kind = 'doh' })``"
+  ":ref:`Web management <mod-http-built-in-services>`","``net.listen('192.0.2.123', 8453, { kind = 'webmgmt' })``"
 
+
+Examples:
+
+   .. code-block:: lua
+
+	net.listen('::1')
+	net.listen(net.lo, 53)
+	net.listen(net.eth0, 853, { kind = 'tls' })
+	net.listen('::', 443, { kind = 'doh' }) -- see http module
+	net.listen('::', 8453, { kind = 'webmgmt' }) -- see http module
+
+.. warning:: Make sure you read section :ref:`mod-http-doh` before exposing
+             the DNS-over-HTTP protocol to outside.
+
+.. function:: net.close(address, [port])
+
+   :return: boolean (at least one endpoint closed)
+
+   Close all endpoints listening on the specified address, optionally restricted by port as well.
+
+
+**Additional network configuration options**
+
+Following commands are useful in special situations and can be usef with and without systemd socket activation:
 
 .. envvar:: net.ipv6 = true|false
 
@@ -125,34 +209,6 @@ configured in the config file.
    :return: boolean (default: true)
 
    Enable/disable using IPv4 for contacting upstream nameservers.
-
-.. function:: net.listen(addresses, [port = 53, { kind = 'dns' }])
-
-   :return: boolean
-
-   Listen on addresses; port and flags are optional.
-   The addresses can be specified as a string or device,
-   or a list of addresses (recursively).
-   The command can be given multiple times,
-   but repeating an address-port combination is an error.
-
-   If you specify port 853, ``kind = 'tls'`` by default.
-
-   Examples:
-
-   .. code-block:: lua
-
-	net.listen('::1')
-	net.listen(net.lo, 5353)
-	net.listen({net.eth0, '127.0.0.1'}, 53853, { kind = 'tls' })
-	net.listen('::', 443, { kind = 'doh' }) -- see http module
-	net.listen('::', 8453, { kind = 'webmgmt' }) -- see http module
-
-.. function:: net.close(address, [port])
-
-   :return: boolean (at least one endpoint closed)
-
-   Close all endpoints listening on the specified address, optionally restricted by port as well.
 
 .. function:: net.list()
 
@@ -250,21 +306,13 @@ configured in the config file.
 
 TLS server configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^
-.. note:: Installations using systemd should be configured using systemd-specific procedures
-          described in manual page ``kresd.systemd(7)``.
+DNS-over-TLS server (:rfc:`7858`) is enabled by default on loopback interface port 853.
+Information how to configure listening on specific IP addresses is in previous sections
+:ref:`network-configuration`.
 
-DNS-over-TLS server (:rfc:`7858`) can be enabled using ``{tls = true}`` parameter
-in :c:func:`net.listen()` function call. For example:
-
-.. code-block:: lua
-
-      > net.listen("::", 53)  -- plain UDP+TCP on port 53 (standard DNS)
-      > net.listen("::", 853, {tls = true})  -- DNS-over-TLS on port 853 (standard DoT)
-      > net.listen("::", 443, {tls = true})  -- DNS-over-TLS on port 443 (non-standard)
-
-By default an self-signed certificate will be generated. For serious deployments
-it is strongly recommended to provide TLS certificates signed by a trusted CA
-using :c:func:`net.tls()`.
+By default a self-signed certificate is generated. For serious deployments
+it is strongly recommended to configure your own TLS certificates signed
+by a trusted CA. This is done using function :c:func:`net.tls()`.
 
 .. function:: net.tls([cert_path], [key_path])
 

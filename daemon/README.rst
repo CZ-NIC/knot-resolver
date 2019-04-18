@@ -6,8 +6,8 @@ The server is in the `daemon` directory, it works out of the box without any con
 
 .. code-block:: bash
 
-   $ kresd -h # Get help
-   $ kresd -a ::1
+   $ kresd -v  # run with defaults in verbose mode
+   $ kresd -h  # Get help
 
 If you're using our packages, they also provide systemd integration. To start the resolver under systemd, you can use the ``kresd@1.service`` service. By default, the resolver only binds to local interfaces.
 

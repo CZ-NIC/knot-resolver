@@ -24,8 +24,7 @@ and unlimited number of "used-defined kinds" can be added in configuration.
 Each network address and port combination can be configured to expose
 one kind of endpoint. This is done using the same mechanisms as
 network configuration for plain DNS and DNS-over-TLS,
-see chapter :ref:`network configuration <kresd-tls-socket-override-port>`
-for more details.
+see chapter :ref:`network-configuration` for more details.
 
 .. warning:: Management endpoint (``webmgmt``) must not be directly exposed
              to untrusted parties. Use `reverse-proxy`_ like Apache_
@@ -40,20 +39,9 @@ This can be changed using ``http.config()`` configuration call explained below.
 Example configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
-Here we show how to configure web management API on loopback interface
-on port 8453, and how to expose :ref:`mod-http-doh` endpoint on public IP addresses.
-
-For network configuration when using systemd socket activation, refer to
-:ref:`network-configuration`. Please note ``kresd-webmgmt.socket`` is
-configured to listen on loopack interface on port 8453 by default and requires
-no further configurtion.
-
-If your distribution isn't using systemd socket activation (e.g. CentOS 7 or
-macOS), use ``net.listen()`` and use kind ``doh`` for DNS-over-HTTPS and
-``webmgmt`` for web management API.
-
-.. warning:: Make sure you read section :ref:`mod-http-doh`
-             before copy&pasting this snippet.
+This section shows how to configure HTTP module itself. For information how
+to configure HTTP server's IP addresses and ports please see chapter
+:ref:`network-configuration`.
 
 .. code-block:: lua
 
@@ -120,6 +108,7 @@ for authentication to API etc.
 Safari doesn't allow WebSockets over HTTPS with a self-signed certificate.
 Major drawback is that current browsers won't do HTTP/2 over insecure connection.)
 
+.. _mod-http-built-in-services:
 
 Built-in services
 ^^^^^^^^^^^^^^^^^
