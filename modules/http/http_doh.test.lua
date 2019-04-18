@@ -77,28 +77,39 @@ if not has_http then
 	pass('skipping http module test because its not installed')
 	done()
 else
-	local request = require('http.request')
-	local endpoints = require('kres_modules.http').endpoints
-
-	-- setup resolver
-	modules = {
-		http = {
-			port = 0, -- Select random port
-			cert = false,
-			endpoints = endpoints,
-		}
-	}
 	policy.add(policy.suffix(policy.DROP, policy.todnames({'servfail.test.'})))
 	policy.add(policy.suffix(policy.DENY, policy.todnames({'nxdomain.test.'})))
 	policy.add(policy.suffix(gen_varying_ttls, policy.todnames({'noerror.test.'})))
 
-	local server = http.servers[1]
-	ok(server ~= nil, 'creates server instance')
-	local _, host, port = server:localname()
-	ok(host and port, 'binds to an interface')
-	local uri_templ = string.format('http://%s:%d/doh', host, port)
-	local req_templ = assert(request.new_from_uri(uri_templ))
-	req_templ.headers:upsert('content-type', 'application/dns-message')
+	modules.load('http')
+	http.config({
+		tls = false,
+		endpoints = http.templates.doh.endpoints
+	}, 'doh')
+
+	local bound
+	for i = 1,1000 do
+		bound = net.listen('127.0.0.1', math.random(1025,65535), { kind = 'doh'} )
+		if bound then
+			break
+		end
+	end
+	assert(bound, 'unable to bind a port for HTTP module (1000 attempts)')
+
+	local _, host, port, req_templ, uri_templ
+	local function start_server()
+		local request = require('http.request')
+		local server_fd = next(http.servers)
+		assert(server_fd)
+		local server = http.servers[server_fd].server
+		ok(server ~= nil, 'creates server instance')
+		_, host, port = server:localname()
+		ok(host and port, 'binds to an interface')
+		uri_templ = string.format('http://%s:%d/doh', host, port)
+		req_templ = assert(request.new_from_uri(uri_templ))
+		req_templ.headers:upsert('content-type', 'application/dns-message')
+	end
+
 
 	-- test a valid DNS query using POST
 	local function test_doh_servfail()
@@ -255,6 +266,7 @@ else
 
 	-- plan tests
 	local tests = {
+		start_server,
 		test_unsupp_method,
 		test_post_short_input,
 		test_post_long_input,
