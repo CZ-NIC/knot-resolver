@@ -60,6 +60,8 @@ machine.
    ListenDatagram=[::1]:53000
    ListenStream=[::1]:53000
 
+.. _kresd-tls-socket-override-port:
+
 The ``kresd-tls.socket`` can also be configured in the same way to listen for
 TLS connections.
 
@@ -104,15 +106,17 @@ configured in the config file.
 
    Enable/disable using IPv4 for contacting upstream nameservers.
 
-.. function:: net.listen(addresses, [port = 53, flags = {tls = (port == 853)}])
+.. function:: net.listen(addresses, [port = 53, { kind = 'dns' }])
 
    :return: boolean
 
    Listen on addresses; port and flags are optional.
    The addresses can be specified as a string or device,
    or a list of addresses (recursively).
-   The command can be given multiple times, but note that it silently skips
-   any addresses that have already been bound.
+   The command can be given multiple times,
+   but repeating an address-port combination is an error.
+
+   If you specify port 853, ``kind = 'tls'`` by default.
 
    Examples:
 
@@ -120,13 +124,14 @@ configured in the config file.
 
 	net.listen('::1')
 	net.listen(net.lo, 5353)
-	net.listen({net.eth0, '127.0.0.1'}, 53853, {tls = true})
+	net.listen({net.eth0, '127.0.0.1'}, 53853, { kind = 'tls' })
+	net.listen('::', 8453, { kind = 'webmgmt' }) -- see http module
 
-.. function:: net.close(address, [port = 53])
+.. function:: net.close(address, [port])
 
-   :return: boolean
+   :return: boolean (at least one endpoint closed)
 
-   Close opened address/port pair, noop if not listening.
+   Close all endpoints listening on the specified address, optionally restricted by port as well.
 
 .. function:: net.list()
 
@@ -136,11 +141,33 @@ configured in the config file.
 
    .. code-block:: none
 
-	[127.0.0.1] => {
-	    [port] => 53
-	    [tcp] => true
-	    [udp] => true
-	}
+      [1] => {
+          [kind] => tls
+          [transport] => {
+              [family] => inet4
+              [ip] => 127.0.0.1
+              [port] => 853
+              [protocol] => tcp
+          }
+      }
+      [2] => {
+          [kind] => dns
+          [transport] => {
+              [family] => inet6
+              [ip] => ::1
+              [port] => 53
+              [protocol] => udp
+          }
+      }
+      [3] => {
+          [kind] => dns
+          [transport] => {
+              [family] => inet6
+              [ip] => ::1
+              [port] => 53
+              [protocol] => tcp
+          }
+      }
 
 .. function:: net.interfaces()
 

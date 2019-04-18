@@ -5,6 +5,7 @@ set -o pipefail -o errexit -o nounset
 cd "$(dirname ${0})"
 CDEFS="../../scripts/gen-cdefs.sh"
 LIBKRES="${MESON_BUILD_ROOT}/lib/libkres.so"
+KRESD="${MESON_BUILD_ROOT}/daemon/kresd"
 
 # Write to kres-gen.lua instead of stdout
 mv kres-gen.lua{,.bak} ||:
@@ -215,6 +216,11 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	packet_ttl
 EOF
 
+## kresd daemon stuff, too
+${CDEFS} ${KRESD} types <<-EOF
+	endpoint_flags_t
+EOF
+echo "struct endpoint" | ${CDEFS} ${KRESD} types | sed 's/uv_handle_t \*/void */'
 
 ## libzscanner API for ./zonefile.lua
 ${CDEFS} libzscanner types <<-EOF

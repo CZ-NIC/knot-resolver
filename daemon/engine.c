@@ -680,10 +680,19 @@ void engine_deinit(struct engine *engine)
 	if (engine == NULL) {
 		return;
 	}
+	/* Only close sockets and services; no need to clean up mempool. */
 
-	/* Only close sockets and services,
-	 * no need to clean up mempool. */
-	network_deinit(&engine->net);
+	/* Network deinit is split up.  We first need to stop listening,
+	 * then we can unload modules during which we still want
+	 * e.g. the endpoint kind registry to work (inside ->net),
+	 * and this registry deinitization uses the lua state. */
+	network_close_force(&engine->net);
+	for (size_t i = 0; i < engine->ipc_set.len; ++i) {
+		close(engine->ipc_set.at[i]);
+	}
+	for (size_t i = 0; i < engine->modules.len; ++i) {
+		engine_unload(engine, engine->modules.at[i]);
+	}
 	kr_zonecut_deinit(&engine->resolver.root_hints);
 	kr_cache_close(&engine->resolver.cache);
 
@@ -692,18 +701,8 @@ void engine_deinit(struct engine *engine)
 	lru_free(engine->resolver.cache_rep);
 	lru_free(engine->resolver.cache_cookie);
 
-	/* Clear IPC pipes */
-	for (size_t i = 0; i < engine->ipc_set.len; ++i) {
-		close(engine->ipc_set.at[i]);
-	}
-
-	/* Unload modules and engine. */
-	for (size_t i = 0; i < engine->modules.len; ++i) {
-		engine_unload(engine, engine->modules.at[i]);
-	}
-	if (engine->L) {
-		lua_close(engine->L);
-	}
+	network_deinit(&engine->net);
+	lua_close(engine->L);
 
 	/* Free data structures */
 	array_clear(engine->modules);

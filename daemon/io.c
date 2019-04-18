@@ -104,40 +104,48 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	mp_flush(worker->pkt_pool.ctx);
 }
 
-static int udp_bind_finalize(uv_handle_t *handle)
+int io_bind(const struct sockaddr *addr, int type)
 {
-	check_bufsize(handle);
-	/* Handle is already created, just create context. */
-	struct session *s = session_new(handle, false);
-	assert(s);
-	session_flags(s)->outgoing = false;
-	return io_start_read(handle);
+	const int fd = socket(addr->sa_family, type, 0);
+	if (fd < 0) return kr_error(errno);
+
+	int yes = 1;
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)))
+		return kr_error(errno);
+#ifdef SO_REUSEPORT
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(yes)))
+		return kr_error(errno);
+#endif
+#ifdef IPV6_V6ONLY
+	if (addr->sa_family == AF_INET6
+	    && setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &yes, sizeof(yes)))
+		return kr_error(errno);
+#endif
+
+	if (bind(fd, addr, kr_sockaddr_len(addr)))
+		return kr_error(errno);
+
+	return fd;
 }
 
-int udp_bind(uv_udp_t *handle, const struct sockaddr *addr)
-{
-	unsigned flags = UV_UDP_REUSEADDR;
-	if (addr->sa_family == AF_INET6) {
-		flags |= UV_UDP_IPV6ONLY;
-	}
-	int ret = uv_udp_bind(handle, addr, flags);
-	if (ret != 0) {
-		return ret;
-	}
-	return udp_bind_finalize((uv_handle_t *)handle);
-}
-
-int udp_bindfd(uv_udp_t *handle, int fd)
+int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
 {
 	if (!handle) {
 		return kr_error(EINVAL);
 	}
+	int ret = uv_udp_init(loop, handle);
+	if (ret) return ret;
 
-	int ret = uv_udp_open(handle, (uv_os_sock_t) fd);
-	if (ret != 0) {
-		return ret;
-	}
-	return udp_bind_finalize((uv_handle_t *)handle);
+	ret = uv_udp_open(handle, fd);
+	if (ret) return ret;
+
+	uv_handle_t *h = (uv_handle_t *)handle;
+	check_bufsize(h);
+	/* Handle is already created, just create context. */
+	struct session *s = session_new(h, false);
+	assert(s);
+	session_flags(s)->outgoing = false;
+	return io_start_read(h);
 }
 
 void tcp_timeout_trigger(uv_timer_t *timer)
@@ -348,94 +356,46 @@ static void tls_accept(uv_stream_t *master, int status)
 	_tcp_accept(master, status, true);
 }
 
-static int set_tcp_option(uv_handle_t *handle, int option, int val)
+int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bool has_tls)
 {
-	uv_os_fd_t fd = 0;
-	if (uv_fileno(handle, &fd) == 0) {
-		return setsockopt(fd, IPPROTO_TCP, option, &val, sizeof(val));
+	const uv_connection_cb connection = has_tls ? tls_accept : tcp_accept;
+	if (!handle) {
+		return kr_error(EINVAL);
 	}
-	return 0; /* N/A */
-}
+	int ret = uv_tcp_init(loop, handle);
+	if (ret) return ret;
 
-static int tcp_bind_finalize(uv_handle_t *handle)
-{
+	ret = uv_tcp_open(handle, (uv_os_sock_t) fd);
+	if (ret) return ret;
+
+	int val; (void)val;
+	/* TCP_DEFER_ACCEPT delays accepting connections until there is readable data. */
+#ifdef TCP_DEFER_ACCEPT
+	val = KR_CONN_RTT_MAX/1000;
+	if (setsockopt(fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &val, sizeof(val))) {
+		kr_log_error("[ io ] tcp_bind (defer_accept): %s\n", strerror(errno));
+	}
+#endif
+
+	ret = uv_listen((uv_stream_t *)handle, tcp_backlog, connection);
+	if (ret != 0) {
+		return ret;
+	}
+
 	/* TCP_FASTOPEN enables 1 RTT connection resumptions. */
 #ifdef TCP_FASTOPEN
-# ifdef __linux__
-	(void) set_tcp_option(handle, TCP_FASTOPEN, 16); /* Accepts queue length hint */
-# else
-	(void) set_tcp_option(handle, TCP_FASTOPEN, 1);  /* Accepts on/off */
-# endif
+	#ifdef __linux__
+	val = 16; /* Accepts queue length hint */
+	#else
+	val = 1; /* Accepts on/off */
+	#endif
+	if (setsockopt(fd, IPPROTO_TCP, TCP_FASTOPEN, &val, sizeof(val))) {
+		kr_log_error("[ io ] tcp_bind (fastopen): %s\n", strerror(errno));
+	}
 #endif
 
 	handle->data = NULL;
 	return 0;
-}
-
-static int _tcp_bind(uv_tcp_t *handle, const struct sockaddr *addr,
-			uv_connection_cb connection, int tcp_backlog)
-{
-	unsigned flags = 0;
-	if (addr->sa_family == AF_INET6) {
-		flags |= UV_TCP_IPV6ONLY;
-	}
-
-	int ret = uv_tcp_bind(handle, addr, flags);
-	if (ret != 0) {
-		return ret;
-	}
-
-	/* TCP_DEFER_ACCEPT delays accepting connections until there is readable data. */
-#ifdef TCP_DEFER_ACCEPT
-	if (set_tcp_option((uv_handle_t *)handle, TCP_DEFER_ACCEPT, KR_CONN_RTT_MAX/1000) != 0) {
-		kr_log_info("[ io ] tcp_bind (defer_accept): %s\n", strerror(errno));
-	}
-#endif
-
-	ret = uv_listen((uv_stream_t *)handle, tcp_backlog, connection);
-	if (ret != 0) {
-		return ret;
-	}
-
-	return tcp_bind_finalize((uv_handle_t *)handle);
-}
-
-int tcp_bind(uv_tcp_t *handle, const struct sockaddr *addr, int tcp_backlog)
-{
-	return _tcp_bind(handle, addr, tcp_accept, tcp_backlog);
-}
-
-int tcp_bind_tls(uv_tcp_t *handle, const struct sockaddr *addr, int tcp_backlog)
-{
-	return _tcp_bind(handle, addr, tls_accept, tcp_backlog);
-}
-
-static int _tcp_bindfd(uv_tcp_t *handle, int fd, uv_connection_cb connection, int tcp_backlog)
-{
-	if (!handle) {
-		return kr_error(EINVAL);
-	}
-
-	int ret = uv_tcp_open(handle, (uv_os_sock_t) fd);
-	if (ret != 0) {
-		return ret;
-	}
-
-	ret = uv_listen((uv_stream_t *)handle, tcp_backlog, connection);
-	if (ret != 0) {
-		return ret;
-	}
-	return tcp_bind_finalize((uv_handle_t *)handle);
-}
-
-int tcp_bindfd(uv_tcp_t *handle, int fd, int tcp_backlog)
-{
-	return _tcp_bindfd(handle, fd, tcp_accept, tcp_backlog);
-}
-
-int tcp_bindfd_tls(uv_tcp_t *handle, int fd, int tcp_backlog)
-{
-	return _tcp_bindfd(handle, fd, tls_accept, tcp_backlog);
 }
 
 int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family, bool has_tls)

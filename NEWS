@@ -15,6 +15,7 @@ Incompatible changes
 - upstream packages for Debian now require systemd
 - libknot >= 2.8 is required
 - net.list() output format changed
+- net.listen() reports error when address-port pair is in use
 
 Improvements
 ------------

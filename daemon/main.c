@@ -38,28 +38,28 @@
 #include "lib/defines.h"
 #include "lib/resolve.h"
 #include "lib/dnssec.h"
+#include "daemon/io.h"
 #include "daemon/network.h"
 #include "daemon/worker.h"
 #include "daemon/engine.h"
 #include "daemon/tls.h"
 #include "lib/dnssec/ta.h"
 
-/* We can fork early on Linux 3.9+ and do SO_REUSEPORT for better performance. */
-#if defined(UV_VERSION_HEX) && defined(SO_REUSEPORT) && defined(__linux__)
- #define CAN_FORK_EARLY 1
-#endif
-
 /* @internal Array of ip address shorthand. */
 typedef array_t(char*) addr_array_t;
 
+typedef struct {
+	int fd;
+	endpoint_flags_t flags; /**< .sock_type isn't meaningful here */
+} flagged_fd_t;
+typedef array_t(flagged_fd_t) flagged_fd_array_t;
+
 struct args {
-	int forks;
-	addr_array_t addr_set;
-	addr_array_t tls_set;
-	fd_array_t fd_set;
-	fd_array_t tls_fd_set;
-	const char *config;
+	addr_array_t addrs, addrs_tls;
+	flagged_fd_array_t fds;
 	int control_fd;
+	int forks;
+	const char *config;
 	const char *rundir;
 	bool interactive;
 	bool quiet;
@@ -369,8 +369,7 @@ static void help(int argc, char *argv[])
 	printf("\nParameters:\n"
 	       " -a, --addr=[addr]      Server address (default: localhost@53).\n"
 	       " -t, --tls=[addr]       Server address for TLS (default: off).\n"
-	       " -S, --fd=[fd]          Listen on given fd (handed out by supervisor).\n"
-	       " -T, --tlsfd=[fd]       Listen using TLS on given fd (handed out by supervisor).\n"
+	       " -S, --fd=[fd:kind]     Listen on given fd (handed out by supervisor, :kind is optional).\n"
 	       " -c, --config=[path]    Config file path (relative to [rundir]) (default: config).\n"
 	       " -f, --forks=N          Start N forks sharing the configuration.\n"
 	       " -q, --quiet            No command prompt in interactive mode.\n"
@@ -472,14 +471,21 @@ static void free_sd_socket_names(char **socket_names, int count)
 static void args_init(struct args *args)
 {
 	memset(args, 0, sizeof(struct args));
+	/* Zeroed arrays are OK. */
 	args->forks = 1;
-	array_init(args->addr_set);
-	array_init(args->tls_set);
-	array_init(args->fd_set);
-	array_init(args->tls_fd_set);
 	args->control_fd = -1;
 	args->interactive = true;
 	args->quiet = false;
+}
+
+/* Free pointed-to resources. */
+static void args_deinit(struct args *args)
+{
+	array_clear(args->addrs);
+	array_clear(args->addrs_tls);
+	for (int i = 0; i < args->fds.len; ++i)
+		free_const(args->fds.at[i].flags.kind);
+	array_clear(args->fds);
 }
 
 static long strtol_10(const char *s)
@@ -501,7 +507,6 @@ static int parse_args(int argc, char **argv, struct args *args)
 		{"addr",       required_argument, 0, 'a'},
 		{"tls",        required_argument, 0, 't'},
 		{"fd",         required_argument, 0, 'S'},
-		{"tlsfd",      required_argument, 0, 'T'},
 		{"config",     required_argument, 0, 'c'},
 		{"forks",      required_argument, 0, 'f'},
 		{"verbose",          no_argument, 0, 'v'},
@@ -510,20 +515,14 @@ static int parse_args(int argc, char **argv, struct args *args)
 		{"help",             no_argument, 0, 'h'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:t:S:T:c:f:m:K:k:vqVh", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:t:S:c:f:m:K:k:vqVh", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
-			array_push(args->addr_set, optarg);
+			array_push(args->addrs, optarg);
 			break;
 		case 't':
-			array_push(args->tls_set, optarg);
-			break;
-		case 'S':
-			array_push(args->fd_set, strtol_10(optarg));
-			break;
-		case 'T':
-			array_push(args->tls_fd_set, strtol_10(optarg));
+			array_push(args->addrs_tls, optarg);
 			break;
 		case 'c':
 			args->config = optarg;
@@ -556,6 +555,28 @@ static int parse_args(int argc, char **argv, struct args *args)
 		default:
 			help(argc, argv);
 			return EXIT_FAILURE;
+		case 'S':
+			(void)0;
+			flagged_fd_t ffd = { 0 };
+			char *endptr;
+			ffd.fd = strtol(optarg, &endptr, 10);
+			if (endptr != optarg && endptr[0] == '\0') {
+				/* Plain DNS */
+				ffd.flags.tls = false;
+			} else if (endptr[0] == ':' && strcasecmp(endptr + 1, "tls") == 0) {
+				/* DoT */
+				ffd.flags.tls = true;
+				/* We know what .sock_type should be but it wouldn't help. */
+			} else if (endptr[0] == ':' && endptr[1] != '\0') {
+				/* Some other kind; no checks here. */
+				ffd.flags.kind = strdup(endptr + 1);
+			} else {
+				kr_log_error("[system] incorrect value passed to '-S/--fd': %s\n",
+						optarg);
+				return EXIT_FAILURE;
+			}
+			array_push(args->fds, ffd);
+			break;
 		}
 	}
 	if (optind < argc) {
@@ -564,76 +585,125 @@ static int parse_args(int argc, char **argv, struct args *args)
 	return -1;
 }
 
-static int bind_fds(struct network *net, fd_array_t *fd_set, bool tls) {
-	int ret = 0;
-	for (size_t i = 0; i < fd_set->len; ++i) {
-		ret = network_listen_fd(net, fd_set->at[i], tls);
-		if (ret != 0) {
-			kr_log_error("[system] %slisten on fd=%d %s\n",
-				 tls ? "TLS " : "", fd_set->at[i], kr_strerror(ret));
-			break;
-		}
-	}
-	return ret;
-}
-
-static int bind_sockets(struct network *net, addr_array_t *addr_set, bool tls) {
-	endpoint_flags_t flags = { .tls = tls };
-	for (size_t i = 0; i < addr_set->len; ++i) {
+/** Just convert addresses to file-descriptors; clear *addrs on success.
+ * @return zero or exit code for main()
+ */
+static int bind_sockets(addr_array_t *addrs, bool tls, flagged_fd_array_t *fds)
+{
+	for (size_t i = 0; i < addrs->len; ++i) {
 		uint16_t port = tls ? KR_DNS_TLS_PORT : KR_DNS_PORT;
 		char addr_str[INET6_ADDRSTRLEN + 1];
-		int ret = kr_straddr_split(addr_set->at[i], addr_str, &port);
-
+		int ret = kr_straddr_split(addrs->at[i], addr_str, &port);
+		struct sockaddr *sa = NULL;
+		if (ret == 0) {
+			sa = kr_straddr_socket(addr_str, port, NULL);
+			if (!sa) ret = kr_error(EINVAL); /* could be ENOMEM but unlikely */
+		}
+		flagged_fd_t ffd = { .flags = { .tls = tls } };
 		if (ret == 0 && !tls) {
-			flags.sock_type = SOCK_DGRAM;
-			ret = network_listen(net, addr_str, port, flags);
+			ffd.fd = io_bind(sa, SOCK_DGRAM);
+			if (ffd.fd < 0)
+				ret = ffd.fd;
+			else if (array_push(*fds, ffd) < 0)
+				ret = kr_error(ENOMEM);
 		}
 		if (ret == 0) { /* common for TCP and TLS */
-			flags.sock_type = SOCK_STREAM;
-			ret = network_listen(net, addr_str, port, flags);
+			ffd.fd = io_bind(sa, SOCK_STREAM);
+			if (ffd.fd < 0)
+				ret = ffd.fd;
+			else if (array_push(*fds, ffd) < 0)
+				ret = kr_error(ENOMEM);
 		}
-
+		free(sa);
 		if (ret != 0) {
 			kr_log_error("[system] bind to '%s' %s%s\n",
-				addr_set->at[i], tls ? "(TLS) " : "", kr_strerror(ret));
-			return ret;
+				addrs->at[i], tls ? "(TLS) " : "", kr_strerror(ret));
+			return EXIT_FAILURE;
 		}
 	}
+	array_clear(*addrs);
 	return kr_ok();
+}
+
+static int start_listening(struct network *net, flagged_fd_array_t *fds) {
+	int some_bad_ret = 0;
+	for (size_t i = 0; i < fds->len; ++i) {
+		flagged_fd_t *ffd = &fds->at[i];
+		int ret = network_listen_fd(net, ffd->fd, ffd->flags);
+		if (ret != 0) {
+			some_bad_ret = ret;
+			/* TODO: try logging address@port.  It's not too important,
+			 * because typical problems happen during binding already.
+			 * (invalid address, permission denied) */
+			kr_log_error("[system] listen on fd=%d: %s\n",
+					ffd->fd, kr_strerror(ret));
+			/* Continue printing all of these before exiting. */
+		} else {
+			ffd->flags.kind = NULL; /* ownership transferred */
+		}
+	}
+	return some_bad_ret;
 }
 
 int main(int argc, char **argv)
 {
-	int ret = 0;
 	struct args args;
 	args_init(&args);
-	if ((ret = parse_args(argc, argv, &args)) >= 0) {
-		return ret;
-	}
+	int ret = parse_args(argc, argv, &args);
+	if (ret >= 0) goto cleanup_args;
+
+	ret = bind_sockets(&args.addrs, false, &args.fds);
+	if (ret) goto cleanup_args;
+	ret = bind_sockets(&args.addrs_tls, true, &args.fds);
+	if (ret) goto cleanup_args;
 
 #ifdef HAS_SYSTEMD
 	/* Accept passed sockets from systemd supervisor. */
 	char **socket_names = NULL;
 	int sd_nsocks = sd_listen_fds_with_names(0, &socket_names);
+	if (sd_nsocks < 0) {
+		kr_log_error("[system] failed passing sockets from systemd: %s\n",
+			     kr_strerror(sd_nsocks));
+		free_sd_socket_names(socket_names, sd_nsocks);
+		ret = EXIT_FAILURE;
+		goto cleanup_args;
+	}
+	if (sd_nsocks > 0 && args.forks != 1) {
+		kr_log_error("[system] when run under systemd-style supervision, "
+			     "use single-process only (bad: --forks=%d).\n", args.forks);
+		free_sd_socket_names(socket_names, sd_nsocks);
+		ret = EXIT_FAILURE;
+		goto cleanup_args;
+	}
 	for (int i = 0; i < sd_nsocks; ++i) {
-		int fd = SD_LISTEN_FDS_START + i;
 		/* when run under systemd supervision, do not use interactive mode */
 		args.interactive = false;
-		if (args.forks != 1) {
-			kr_log_error("[system] when run under systemd-style supervision, "
-				     "use single-process only (bad: --forks=%d).\n", args.forks);
-			free_sd_socket_names(socket_names, sd_nsocks);
-			return EXIT_FAILURE;
-		}
-		if (!strcasecmp("control",socket_names[i])) {
-			args.control_fd = fd;
-		} else if (!strcasecmp("tls",socket_names[i])) {
-			array_push(args.tls_fd_set, fd);
+		flagged_fd_t ffd = { .fd = SD_LISTEN_FDS_START + i };
+
+		if (!strcasecmp("control", socket_names[i])) {
+			if (args.control_fd != -1) {
+				kr_log_error("[system] multiple control sockets passed from systemd\n");
+				ret = EXIT_FAILURE;
+				break;
+			}
+			args.control_fd = ffd.fd;
+			free(socket_names[i]);
 		} else {
-			array_push(args.fd_set, fd);
+			if (!strcasecmp("dns", socket_names[i])) {
+				free(socket_names[i]);
+			} else if (!strcasecmp("tls", socket_names[i])) {
+				ffd.flags.tls = true;
+				free(socket_names[i]);
+			} else {
+				ffd.flags.kind = socket_names[i];
+			}
+			array_push(args.fds, ffd);
 		}
+		/* Either freed or passed ownership. */
+		socket_names[i] = NULL;
 	}
 	free_sd_socket_names(socket_names, sd_nsocks);
+	if (ret) goto cleanup_args;
 #endif
 
 	/* Switch to rundir. */
@@ -657,17 +727,6 @@ int main(int argc, char **argv)
 	if (!args.config && access("config", R_OK) == 0) {
 		args.config = "config";
 	}
-
-#ifndef CAN_FORK_EARLY
-	/* Forking is currently broken with libuv. We need libuv to bind to
-	 * sockets etc. before forking, but at the same time can't touch it before
-	 * forking otherwise it crashes, so it's a chicken and egg problem.
-	 * Disabling until https://github.com/libuv/libuv/pull/846 is done. */
-	 if (args.forks > 1 && args.fd_set.len == 0 && args.tls_fd_set.len == 0) {
-	 	kr_log_error("[system] forking >1 workers supported only on Linux 3.9+ or with supervisor\n");
-	 	return EXIT_FAILURE;
-	 }
-#endif
 
 	/* Connect forks with local socket */
 	fd_array_t ipc_set;
@@ -728,12 +787,8 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	/* Bind to passed fds and sockets*/
-	if (bind_fds(&engine.net, &args.fd_set, false) != 0 ||
-	    bind_fds(&engine.net, &args.tls_fd_set, true) != 0 ||
-	    bind_sockets(&engine.net, &args.addr_set, false) != 0 ||
-	    bind_sockets(&engine.net, &args.tls_set, true) != 0
-	) {
+	/* Start listening, in the sense of network_listen_fd(). */
+	if (start_listening(&engine.net, &args.fds) != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -761,6 +816,11 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	if (network_engage_endpoints(&engine.net)) {
+		ret = EXIT_FAILURE;
+		goto cleanup;
+	}
+
 	/* Run the event loop */
 	ret = run_worker(loop, &engine, &ipc_set, fork_id == 0, &args);
 
@@ -771,8 +831,8 @@ cleanup:/* Cleanup. */
 		uv_loop_close(loop);
 	}
 	mp_delete(pool.ctx);
-	array_clear(args.addr_set);
-	array_clear(args.tls_set);
+cleanup_args:
+	args_deinit(&args);
 	kr_crypto_cleanup();
 	return ret;
 }

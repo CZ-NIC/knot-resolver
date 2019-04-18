@@ -5,24 +5,38 @@ if not has_http then
 	done()
 else
 	local request = require('http.request')
-	local endpoints = require('kres_modules.http').endpoints
+
+	modules.load('http')
+	local endpoints = http.templates.webmgmt.endpoints
 
 	-- custom endpoints
 	endpoints['/test'] = {'text/custom', function () return 'hello' end}
 
-	-- setup resolver
-	modules = {
-		http = {
-			port = 0, -- Select random port
-			cert = false,
-			endpoints = endpoints,
-		}
-	}
+	-- setup HTTP module with an additional endpoint
+	http.config({
+		tls = false,
+		endpoints = endpoints,
+	}, 'webtest')
 
-	local server = http.servers[1]
-	ok(server ~= nil, 'creates server instance')
-	local _, host, port = server:localname()
-	ok(host and port, 'binds to an interface')
+	local bound
+	for _ = 1,1000 do
+		bound = net.listen('127.0.0.1', math.random(1025,65535), { kind = 'webtest'} )
+		if bound then
+			break
+		end
+	end
+	assert(bound, 'unable to bind a port for HTTP module (1000 attempts)')
+
+	-- globals for this module
+	local _, host, port
+	local function start_server()
+		local server_fd = next(http.servers)
+		assert(server_fd)
+		local server = http.servers[server_fd].server
+		ok(server ~= nil, 'creates server instance')
+		_, host, port = server:localname()
+		ok(host and port, 'binds to an interface')
+	end
 
 	-- helper for returning useful values to test on
 	local function http_get(uri)
@@ -82,6 +96,7 @@ else
 
 	-- plan tests
 	local tests = {
+		start_server,
 		test_builtin_pages,
 	}
 

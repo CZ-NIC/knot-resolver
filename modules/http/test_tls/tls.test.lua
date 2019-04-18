@@ -14,10 +14,21 @@ else
 		modules.load('http')
 		same(http.config(config), nil, desc .. ' can be configured')
 
-		local server = http.servers[1]
-		ok(server ~= nil, desc .. ' creates server instance')
-		local _, host, port = server:localname()
-		ok(host and port, desc .. ' binds to an interface')
+		local bound
+		for _ = 1,1000 do
+			bound = net.listen('127.0.0.1', math.random(1025,65535), { kind = 'webmgmt'} )
+			if bound then
+				break
+			end
+		end
+		assert(bound, 'unable to bind a port for HTTP module (1000 attempts)')
+
+		local server_fd = next(http.servers)
+		assert(server_fd)
+		local server = http.servers[server_fd].server
+		ok(server ~= nil, 'creates server instance')
+		_, host, port = server:localname()
+		ok(host and port, 'binds to an interface')
 		return host, port
 	end
 
@@ -46,7 +57,7 @@ else
 	end
 
 	local function test_defaults()
-		local host, port = setup_module('HTTP module default config', {})
+		local host, port = setup_module('HTTP module default config', nil)
 
 		local uri = string.format('http://%s:%d', host, port)
 		check_protocol(uri, 'HTTP is enabled by default', true)
@@ -65,7 +76,6 @@ else
 		local desc = 'HTTP-only config'
 		local host, port = setup_module(desc,
 			{
-				port = 0, -- Select random port
 				tls = false,
 			})
 
@@ -79,7 +89,6 @@ else
 		local desc = 'HTTPS-only config'
 		local host, port = setup_module(desc,
 			{
-				port = 0, -- Select random port
 				tls = true,
 			})
 
@@ -92,8 +101,6 @@ else
 	local function test_custom_cert()
 		desc = 'config with custom certificate'
 		local host, port = setup_module(desc, {{
-				host = host,
-				port = port,
 				cert = 'test.crt',
 				key = 'test.key'
 			}})
@@ -105,7 +112,6 @@ else
 	local function test_nonexistent_cert()
 		desc = 'config with non-existing certificate file'
 		boom(http.config, {{
-				port = 0,
 				cert = '/tmp/surely_nonexistent_cert_1532432095',
 				key = 'test.key'
 			}}, desc)
@@ -114,7 +120,6 @@ else
 	local function test_nonexistent_key()
 		desc = 'config with non-existing key file'
 		boom(http.config, {{
-				port = 0,
 				cert = 'test.crt',
 				key = '/tmp/surely_nonexistent_cert_1532432095'
 			}}, desc)
@@ -123,7 +128,6 @@ else
 	local function test_missing_key_param()
 		desc = 'config with missing key= param'
 		boom(http.config, {{
-				port = 0,
 				cert = 'test.crt'
 			}}, desc)
 	end
@@ -131,7 +135,6 @@ else
 	local function test_broken_cert()
 		desc = 'config with broken file in cert= param'
 		boom(http.config, {{
-				port = 0,
 				cert = 'broken.crt',
 				key = 'test.key'
 			}}, desc)
@@ -140,7 +143,6 @@ else
 	local function test_broken_key()
 		desc = 'config with broken file in key= param'
 		boom(http.config, {{
-				port = 0,
 				cert = 'test.crt',
 				key = 'broken.key'
 			}}, desc)
