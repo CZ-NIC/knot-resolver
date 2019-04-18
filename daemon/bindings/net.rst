@@ -75,8 +75,6 @@ TLS connections.
    [Socket]
    ListenStream=192.0.2.115:853
 
-.. _kresd-doh-socket-configuration:
-
 To configure socket for DNS-over-HTTPS, make sure you have
 ``kresd-doh.socket`` installed (it might be part of a separate
 ``knot-resolver-module-http`` package).  Then, you can configure its network
@@ -147,6 +145,7 @@ configured in the config file.
 	net.listen('::1')
 	net.listen(net.lo, 5353)
 	net.listen({net.eth0, '127.0.0.1'}, 53853, { kind = 'tls' })
+	net.listen('::', 443, { kind = 'doh' }) -- see http module
 	net.listen('::', 8453, { kind = 'webmgmt' }) -- see http module
 
 .. function:: net.close(address, [port])
