@@ -302,11 +302,11 @@ root.hints:
     - scripts/update-root-hints.sh
 
 test:valgrind:
-  <<: *test_flaky  # lost block in /bin/bash during ta_update
   when: delayed
   start_in: '30 seconds'
   script:
-    - ${MESON_TEST} --suite unit --suite config --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
+    - ${MESON_TEST} --suite unit --suite config --no-suite snowflake --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
+    - MESON_TESTTHREADS=1 ${MESON_TEST} --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" --suite snowflake
 # }}}
 
 # extended {{{
