@@ -86,6 +86,7 @@ and include subrequests. The list maximum size is 5000 entries, make diffs if yo
 
 Clear the list of most frequent iterative queries.
 
+.. _mod-stats-list:
 
 Built-in statistics
 ^^^^^^^^^^^^^^^^^^^

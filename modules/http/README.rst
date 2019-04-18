@@ -13,13 +13,13 @@ or publish metrics on request for Prometheus scraper.
 By default this module provides two kinds of endpoints,
 and unlimited number of "used-defined kinds" can be added in configuration.
 
-+--------------+---------------------------------------------+
-| **Endpoint** | **Explanation**                             |
-+--------------+---------------------------------------------+
-| doh          | :ref:`mod-http-doh`                         |
-+--------------+---------------------------------------------+
-| webmgmt      | built-in web management APIs (includes DoH) |
-+--------------+---------------------------------------------+
++--------------+---------------------------------------------------------------------------------+
+| **Endpoint** | **Explanation**                                                                 |
++--------------+---------------------------------------------------------------------------------+
+| doh          | :ref:`mod-http-doh`                                                             |
++--------------+---------------------------------------------------------------------------------+
+| webmgmt      | :ref:`built-in web management <mod-http-built-in-services>` APIs (includes DoH) |
++--------------+---------------------------------------------------------------------------------+
 
 Each network address and port combination can be configured to expose
 one kind of endpoint. This is done using the same mechanisms as
@@ -118,9 +118,9 @@ The HTTP module has several built-in services to use.
 .. csv-table::
  :header: "Endpoint", "Service", "Description"
 
- "``/stats``", "Statistics/metrics", "Exported metrics in JSON."
- "``/metrics``", "Prometheus metrics", "Exported metrics for Prometheus_"
- "``/trace/:name/:type``", "Tracking", "Trace resolution of the query and return the verbose logs."
+ "``/stats``", "Statistics/metrics", "Exported :ref:`metrics <mod-stats-list>` from :ref:`mod-stats` in JSON format."
+ "``/metrics``", "Prometheus metrics", "Exported metrics for Prometheus_."
+ "``/trace/:name/:type``", "Tracking", ":ref:`Trace resolution <mod-http-trace>` of a DNS query and return the verbose logs."
  "``/doh``", "DNS-over-HTTP", ":rfc:`8484` endpoint, see :ref:`mod-http-doh`."
 
 Prometheus metrics endpoint
@@ -161,6 +161,8 @@ You can also add custom metrics or rewrite existing metrics before they are retu
         http.prometheus.finalize = function (metrics)
         	table.insert(metrics, 'build_info{version="1.2.3"} 1')
         end
+
+.. _mod-http-trace:
 
 Tracing requests
 ^^^^^^^^^^^^^^^^
