@@ -19,7 +19,7 @@ else
 	}, 'webtest')
 
 	local bound
-	for i = 1,1000 do
+	for _ = 1,1000 do
 		bound = net.listen('127.0.0.1', math.random(1025,65535), { kind = 'webtest'} )
 		if bound then
 			break

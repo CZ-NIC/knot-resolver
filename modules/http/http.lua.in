@@ -2,8 +2,8 @@
 if not stats then modules.load('stats') end
 if not bogus_log then modules.load('bogus_log') end
 
-ffi = require('ffi')
-cqueues = require('cqueues')
+local ffi = require('ffi')
+local cqueues = require('cqueues')
 cqueues.socket = require('cqueues.socket')
 assert(cqueues.VERSION >= 20150112)  -- fdopen changed semantics
 
@@ -320,7 +320,7 @@ end
 
 -- @function Merge dictionaries.
 -- Values from right-hand side dictionaries take precedence.
-function mergeconf(...)
+local function mergeconf(...)
 	local merged = {}
 	for _, intable in ipairs({...}) do
 		assert(type(intable) == 'table', 'cannot merge non-tables')
@@ -331,12 +331,12 @@ function mergeconf(...)
 	return merged
 end
 
-function load_cert(certname, keyname)
+local function load_cert(certname, keyname)
 	local f, err = io.open(certname, 'r')
 	if not f then
-		panic('[http] unable to read TLS certificate file %s: %s', certname, err)
+		panic('[http] unable to read TLS certificate file: %s', err)
 	end
-	crt = x509.new(f:read('*all'))
+	local crt = x509.new(f:read('*all'))
 	f:close()
 	if not crt then
 		panic('[http] unable to parse TLS certificate file %s', certname)
@@ -344,9 +344,9 @@ function load_cert(certname, keyname)
 
 	f, err = io.open(keyname, 'r')
 	if not f then
-		panic('[http] unable to open TLS key file %s: %s', keyname, err)
+		panic('[http] unable to open TLS key file: %s', err)
 	end
-	key = pkey.new(f:read('*all'))
+	local key = pkey.new(f:read('*all'))
 	f:close()
 	if not key then
 		panic('[http] unable to parse TLS key file %s', keyname)
@@ -356,7 +356,7 @@ end
 
 -- @function Listen on given socket
 -- using configuration for specific "kind" of HTTP server
-function add_socket(fd, kind)
+local function add_socket(fd, kind, addr_str)
 	assert(M.servers[fd] == nil, 'socket is already served by an HTTP instance')
 	local conf, crt, key
 	conf = mergeconf(M.templates._builtin, M.templates._default, M.templates[kind] or {})
@@ -377,12 +377,11 @@ function add_socket(fd, kind)
 	-- Compose server handler
 	local routes = route(conf.endpoints)
 	-- Enable SO_REUSEPORT by default (unless explicitly turned off)
-	if not reuseport and worker.id > 0 then
+	if not conf.reuseport and worker.id > 0 then
 		warn('[http] the "reuseport" option is disabled and multiple forks are used, ' ..
 			 'port binding will fail on some instances')
 	end
-	-- Check if UNIX socket path is used
-	local addr_str  -- TODO
+	-- Check if UNIX socket path is used TODO
 	conf.ctx = crt and tlscontext(crt, key)
 	conf.onstream = routes
 	-- Create TLS context and start listening
@@ -409,13 +408,26 @@ function add_socket(fd, kind)
 end
 
 -- @function Stop listening on given socket
-function remove_socket(fd)
+local function remove_socket(fd)
 	local instance = M.servers[fd]
 	assert(instance, 'HTTP module is not listening on given socket')
 
 	instance.server:close()
 	M.servers[fd] = nil
 	-- TODO stop refresh timer
+end
+
+-- @function Listen for config changes from net.listen()/net.close()
+local function cb_socket(...)
+	local added, endpoint, addr_str = unpack({...})
+	endpoint = ffi.cast('struct endpoint **', endpoint)[0]
+	local kind = ffi.string(endpoint.flags.kind)
+	local socket = endpoint.fd
+	if added then
+		return add_socket(socket, kind, addr_str)
+	else
+		return remove_socket(socket)
+	end
 end
 
 -- @function Init module
@@ -436,19 +448,6 @@ function M.deinit()
 	prometheus.deinit()
 	net.register_endpoint_kind('doh')
 	net.register_endpoint_kind('webmgmt')
-end
-
--- @function Listen for config changes from net.listen()/net.close()
-function cb_socket(...)
-	local added, endpoint, _ = unpack({...})
-	endpoint = ffi.cast('struct endpoint **', endpoint)[0]
-	local kind = ffi.string(endpoint.flags.kind)
-	local socket = endpoint.fd
-	if added then
-		return add_socket(socket, kind)
-	else
-		return remove_socket(socket)
-	end
 end
 
 -- @function Configure module, i.e. store new configuration template
