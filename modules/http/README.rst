@@ -43,45 +43,19 @@ Example configuration
 Here we show how to configure web management API on loopback interface
 on port 8453, and how to expose :ref:`mod-http-doh` endpoint on public IP addresses.
 
-Modern distributions use systemd socket activation and thus IP addresses of endpoints
-are configured using systemd. (Beware, CentOS 7 has too old version of systemd and
-you have to configure IP addresses in Knot Resolver's configuration file instead.)
+For network configuration when using systemd socket activation, refer to
+:ref:`network-configuration`. Please note ``kresd-webmgmt.socket`` is
+configured to listen on loopack interface on port 8453 by default and requires
+no further configurtion.
+
+If your distribution isn't using systemd socket activation (e.g. CentOS 7 or
+macOS), use ``net.listen()`` and use kind ``doh`` for DNS-over-HTTPS and
+``webmgmt`` for web management API.
 
 .. warning:: Make sure you read section :ref:`mod-http-doh`
              before copy&pasting this snippet.
 
-.. code-block:: bash
-
-        # IP address configuration for modern systems
-        # with systemd socket activation (not CentOS 7)
-
-        # configuring DoH on public IP addresses, port 44353
-        $ vim /etc/systemd/system/kresd-doh.socket.d/override.conf
-        # /etc/systemd/system/kresd-doh.socket.d/override.conf
-        [Socket]
-        ListenStream=
-        ListenStream=192.0.2.1:44353
-        ListenStream=[2001:db8::1]:44353
-
-        # configuring web management on loopback port 8453
-        $ vim /etc/systemd/system/kresd-webmgmt.socket.d/override.conf
-        # /etc/systemd/system/kresd-webmgmt.socket.d/override.conf
-        [Socket]
-        ListenStream=
-        ListenStream=127.0.0.1:8453
-
-
 .. code-block:: lua
-
-        -- use net.listen() only on old systems like CentOS 7
-        -- which lack proper support for systemd socket activation
-
-        -- expose management interface on loopback
-        -- net.listen('127.0.0.1', '8453', { kind = 'webmgmt' })
-
-        -- expose DoH on public interfaces
-        -- net.listen('192.0.2.1', '44353', { kind = 'doh' })
-        -- net.listen('2001:db8::1', '44353', { kind = 'doh' })
 
         -- load HTTP module with defaults (self-signed TLS cert)
         modules.load('http')

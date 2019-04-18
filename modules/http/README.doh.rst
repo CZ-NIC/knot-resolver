@@ -46,12 +46,12 @@ This integrated DoH server has following properties:
 
 :ref:`Example configuration <mod-http-example>` is part of examples for generic
 HTTP module. After configuring your endpoint you can reach the DoH endpoint using
-URL ``https://your.resolver.hostname.example:44353/doh``, done!
+URL ``https://your.resolver.hostname.example/doh``, done!
 
 .. code-block:: bash
 
 	# query for www.knot-resolver.cz AAAA
-	$ curl -k https://your.resolver.hostname.example:44353/doh?dns=l1sBAAABAAAAAAAAA3d3dw1rbm90LXJlc29sdmVyAmN6AAAcAAE
+	$ curl -k https://your.resolver.hostname.example/doh?dns=l1sBAAABAAAAAAAAA3d3dw1rbm90LXJlc29sdmVyAmN6AAAcAAE
 
 Please see section :ref:`mod-http-tls` for further details about TLS configuration.
 
