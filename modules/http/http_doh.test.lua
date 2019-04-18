@@ -84,7 +84,6 @@ else
 	modules.load('http')
 	http.config({
 		tls = false,
-		endpoints = http.templates.doh.endpoints
 	}, 'doh')
 
 	local bound

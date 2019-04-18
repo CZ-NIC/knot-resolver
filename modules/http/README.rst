@@ -258,7 +258,7 @@ add the new endpoint description to respective table:
 
 	modules.load('http')
 	-- copy all existing webmgmt endpoints
-	my_mgmt_endpoints = http.templates.webmgmt.endpoints
+	my_mgmt_endpoints = http.configs._builtin.webmgmt.endpoints
 	-- add custom endpoint to the copy
 	my_mgmt_endpoints['/health'] = on_health
 	-- use custom HTTP configuration for webmgmt
