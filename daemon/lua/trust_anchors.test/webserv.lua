@@ -159,7 +159,7 @@ function M.add_interface(conf)
 	local addr_str
 	if not conf.path then
 		conf.host = conf.host or 'localhost'
-		conf.port = conf.port or 8053
+		conf.port = conf.port or 8453
 		addr_str = string.format('%s@%d', conf.host, conf.port)
 	else
 		if conf.host or conf.port then
