@@ -14,31 +14,33 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <stdarg.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <arpa/inet.h>
-#include <sys/time.h>
-#include <contrib/cleanup.h>
-#include <contrib/ccan/asprintf/asprintf.h>
-#include <ucw/mempool.h>
+#include "lib/utils.h"
+
+#include "contrib/ccan/asprintf/asprintf.h"
+#include "contrib/cleanup.h"
+#include "contrib/ucw/mempool.h"
+#include "kresconfig.h"
+#include "lib/defines.h"
+#include "lib/generic/array.h"
+#include "lib/module.h"
+#include "lib/nsrep.h"
+#include "lib/resolve.h"
+
 #include <gnutls/gnutls.h>
 #include <libknot/descriptor.h>
 #include <libknot/dname.h>
-#include <libknot/rrtype/rrsig.h>
 #include <libknot/rrset-dump.h>
+#include <libknot/rrtype/rrsig.h>
 #include <libknot/version.h>
 #include <uv.h>
 
-#include "kresconfig.h"
-#include "lib/defines.h"
-#include "lib/utils.h"
-#include "lib/generic/array.h"
-#include "lib/nsrep.h"
-#include "lib/module.h"
-#include "lib/resolve.h"
-
+#include <arpa/inet.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/time.h>
+#include <sys/un.h>
 
 /* Always compile-in log symbols, even if disabled. */
 #undef kr_verbose_status
@@ -343,6 +345,7 @@ int kr_sockaddr_len(const struct sockaddr *addr)
 	switch (addr->sa_family) {
 	case AF_INET:  return sizeof(struct sockaddr_in);
 	case AF_INET6: return sizeof(struct sockaddr_in6);
+	case AF_UNIX:  return sizeof(struct sockaddr_un);
 	default:       return kr_error(EINVAL);
 	}
 }
@@ -440,6 +443,9 @@ int kr_straddr_family(const char *addr)
 	if (!addr) {
 		return kr_error(EINVAL);
 	}
+	if (addr[0] == '/') {
+		return AF_UNIX;
+	}
 	if (strchr(addr, ':')) {
 		return AF_INET6;
 	}
@@ -475,6 +481,17 @@ struct sockaddr * kr_straddr_socket(const char *addr, int port, knot_mm_t *pool)
 			mm_free(pool, res);
 			return NULL;
 		}
+	}
+	case AF_UNIX: {
+		struct sockaddr_un *res;
+		const size_t alen = strlen(addr) + 1;
+		if (alen > sizeof(res->sun_path)) {
+			return NULL;
+		}
+		res = mm_alloc(pool, sizeof(*res));
+		res->sun_family = AF_UNIX;
+		memcpy(res->sun_path, addr, alen);
+		return (struct sockaddr *)res;
 	}
 	default:
 		assert(!EINVAL);

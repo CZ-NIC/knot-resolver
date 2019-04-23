@@ -586,28 +586,42 @@ static int parse_args(int argc, char **argv, struct args *args)
 }
 
 /** Just convert addresses to file-descriptors; clear *addrs on success.
+ * @note AF_UNIX is supported (starting with '/').
  * @return zero or exit code for main()
  */
 static int bind_sockets(addr_array_t *addrs, bool tls, flagged_fd_array_t *fds)
 {
+	bool has_error = false;
 	for (size_t i = 0; i < addrs->len; ++i) {
+		/* Get port and separate address string. */
 		uint16_t port = tls ? KR_DNS_TLS_PORT : KR_DNS_PORT;
-		char addr_str[INET6_ADDRSTRLEN + 1];
-		int ret = kr_straddr_split(addrs->at[i], addr_str, &port);
+		char addr_buf[INET6_ADDRSTRLEN + 1];
+		int ret;
+		char *addr_str;
+		const int family = kr_straddr_family(addrs->at[i]);
+		if (family == AF_UNIX) {
+			ret = 0;
+			addr_str = addrs->at[i];
+		} else { /* internet socket (or garbage) */
+			ret = kr_straddr_split(addrs->at[i], addr_buf, &port);
+			addr_str = addr_buf;
+		}
+		/* Get sockaddr. */
 		struct sockaddr *sa = NULL;
 		if (ret == 0) {
 			sa = kr_straddr_socket(addr_str, port, NULL);
 			if (!sa) ret = kr_error(EINVAL); /* could be ENOMEM but unlikely */
 		}
 		flagged_fd_t ffd = { .flags = { .tls = tls } };
-		if (ret == 0 && !tls) {
+		if (ret == 0 && !tls && family != AF_UNIX) {
+			/* AF_UNIX can do SOCK_DGRAM, but let's not support that *here*. */
 			ffd.fd = io_bind(sa, SOCK_DGRAM);
 			if (ffd.fd < 0)
 				ret = ffd.fd;
 			else if (array_push(*fds, ffd) < 0)
 				ret = kr_error(ENOMEM);
 		}
-		if (ret == 0) { /* common for TCP and TLS */
+		if (ret == 0) { /* common for TCP and TLS, including AF_UNIX cases */
 			ffd.fd = io_bind(sa, SOCK_STREAM);
 			if (ffd.fd < 0)
 				ret = ffd.fd;
@@ -616,13 +630,13 @@ static int bind_sockets(addr_array_t *addrs, bool tls, flagged_fd_array_t *fds)
 		}
 		free(sa);
 		if (ret != 0) {
-			kr_log_error("[system] bind to '%s' %s%s\n",
-				addrs->at[i], tls ? "(TLS) " : "", kr_strerror(ret));
-			return EXIT_FAILURE;
+			kr_log_error("[system] bind to '%s'%s: %s\n",
+				addrs->at[i], tls ? " (TLS)" : "", kr_strerror(ret));
+			has_error = true;
 		}
 	}
 	array_clear(*addrs);
-	return kr_ok();
+	return has_error ? EXIT_FAILURE : kr_ok();
 }
 
 static int start_listening(struct network *net, flagged_fd_array_t *fds) {
