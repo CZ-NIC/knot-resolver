@@ -4,6 +4,7 @@ Knot Resolver 4.x.y (2019-0m-dd)
 Improvements
 ------------
 - DNS-over-HTTPS: answers include `access-control-allow-origin: *` (!823)
+- support named AF_UNIX stream sockets for the http module (again)
 
 Bugfixes
 --------
