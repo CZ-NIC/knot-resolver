@@ -40,8 +40,8 @@ if build_dnstap
   dnstap_mod = shared_module(
     'dnstap',
     dnstap_src,
-    dnstap_pb[1],
     dependencies: [
+      declare_dependency(sources: dnstab_pb),
       libfstrm,
       libprotobuf_c,
     ],
