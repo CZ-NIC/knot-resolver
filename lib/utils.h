@@ -346,7 +346,8 @@ int kr_straddr_family(const char *addr);
 KR_EXPORT KR_CONST
 int kr_family_len(int family);
 
-/** Create a sockaddr* from string+port representation (also accepts IPv6 link-local). */
+/** Create a sockaddr* from string+port representation.
+ * Also accepts IPv6 link-local and AF_UNIX starting with "/" (ignoring port) */
 KR_EXPORT
 struct sockaddr * kr_straddr_socket(const char *addr, int port, knot_mm_t *pool);
 
@@ -362,6 +363,7 @@ int kr_straddr_subnet(void *dst, const char *addr);
  * \param port[out] written in case it's specified in instr
  * \return error code
  * \note Typically you follow this by kr_straddr_socket().
+ * \note Only internet addresses are supported, i.e. no AF_UNIX sockets.
  */
 KR_EXPORT
 int kr_straddr_split(const char *instr, char ipaddr[static restrict (INET6_ADDRSTRLEN + 1)],

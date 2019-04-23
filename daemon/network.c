@@ -14,13 +14,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <unistd.h>
-#include <assert.h>
-#include "daemon/bindings/impl.h"
 #include "daemon/network.h"
-#include "daemon/worker.h"
+
+#include "daemon/bindings/impl.h"
 #include "daemon/io.h"
 #include "daemon/tls.h"
+#include "daemon/worker.h"
+
+#include <assert.h>
+#include <sys/un.h>
+#include <unistd.h>
 
 void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog)
 {
@@ -137,6 +140,19 @@ static void endpoint_close_lua_cb(struct network *net, struct endpoint *ep)
 static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 {
 	assert(!ep->handle != !ep->flags.kind);
+	if (ep->family == AF_UNIX) { /* The FS name would be left behind. */
+		/* Extract local address for this socket. */
+		struct sockaddr_un sa;
+		sa.sun_path[0] = '\0'; /*< probably only for lint:scan-build */
+		socklen_t addr_len = sizeof(sa);
+		if (getsockname(ep->fd, (struct sockaddr *)&sa, &addr_len)
+		    || unlink(sa.sun_path)) {
+			kr_log_error("error (ignored) when closing unix socket (fd = %d): %s\n",
+					ep->fd, strerror(errno));
+			return;
+		}
+	}
+
 	if (ep->flags.kind) { /* Special endpoint. */
 		if (ep->engaged) {
 			endpoint_close_lua_cb(net, ep);
@@ -260,6 +276,16 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 		/* .engaged seems not really meaningful with .kind == NULL, but... */
 	}
 
+	if (ep->family == AF_UNIX) {
+		/* Some parts of connection handling would need more work,
+		 * so let's support AF_UNIX only with .kind != NULL for now. */
+		kr_log_error("[system] AF_UNIX only supported with set { kind = '...' }\n");
+		return kr_error(EAFNOSUPPORT);
+		/*
+		uv_pipe_t *ep_handle = malloc(sizeof(uv_pipe_t));
+		*/
+	}
+
 	if (ep->flags.sock_type == SOCK_DGRAM) {
 		if (ep->flags.tls) {
 			assert(!EINVAL);
@@ -310,7 +336,6 @@ static struct endpoint * endpoint_get(struct network *net, const char *addr,
 static int create_endpoint(struct network *net, const char *addr_str,
 				struct endpoint *ep, const struct sockaddr *sa)
 {
-	/* Bind interfaces */
 	int ret = open_endpoint(net, ep, sa, addr_str);
 	if (ret == 0) {
 		ret = insert_endpoint(net, addr_str, ep);
@@ -351,16 +376,28 @@ int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags)
 		.fd = fd,
 	};
 	/* Extract address string and port. */
-	char addr_str[INET6_ADDRSTRLEN]; /* https://tools.ietf.org/html/rfc4291 */
-	if (ss.ss_family == AF_INET) {
-		uv_ip4_name((const struct sockaddr_in*)&ss, addr_str, sizeof(addr_str));
+	char addr_buf[INET6_ADDRSTRLEN]; /* https://tools.ietf.org/html/rfc4291 */
+	const char *addr_str;
+	switch (ep.family) {
+	case AF_INET:
+		ret = uv_ip4_name((const struct sockaddr_in*)&ss, addr_buf, sizeof(addr_buf));
+		addr_str = addr_buf;
 		ep.port = ntohs(((struct sockaddr_in *)&ss)->sin_port);
-	} else if (ss.ss_family == AF_INET6) {
-		uv_ip6_name((const struct sockaddr_in6*)&ss, addr_str, sizeof(addr_str));
+		break;
+	case AF_INET6:
+		ret = uv_ip6_name((const struct sockaddr_in6*)&ss, addr_buf, sizeof(addr_buf));
+		addr_str = addr_buf;
 		ep.port = ntohs(((struct sockaddr_in6 *)&ss)->sin6_port);
-	} else {
-		return kr_error(EAFNOSUPPORT);
+		break;
+	case AF_UNIX:
+		/* No SOCK_DGRAM with AF_UNIX support, at least for now. */
+		ret = flags.sock_type == SOCK_STREAM ? kr_ok() : kr_error(EAFNOSUPPORT);
+		addr_str = ((struct sockaddr_un *)&ss)->sun_path;
+		break;
+	default:
+		ret = kr_error(EAFNOSUPPORT);
 	}
+	if (ret) return ret;
 
 	/* always create endpoint for supervisor supplied fd
 	 * even if addr+port is not unique */
@@ -379,23 +416,19 @@ int network_listen(struct network *net, const char *addr, uint16_t port,
 	}
 
 	/* Parse address. */
-	int ret = 0;
-	union inaddr sa;
-	if (strchr(addr, ':') != NULL) {
-		ret = uv_ip6_addr(addr, port, &sa.ip6);
-	} else {
-		ret = uv_ip4_addr(addr, port, &sa.ip4);
-	}
-	if (ret != 0) {
-		return ret;
+	const struct sockaddr *sa = kr_straddr_socket(addr, port, NULL);
+	if (!sa) {
+		return kr_error(EINVAL);
 	}
 	struct endpoint ep = {
 		.flags = flags,
 		.fd = -1,
 		.port = port,
-		.family = sa.ip.sa_family,
+		.family = sa->sa_family,
 	};
-	return create_endpoint(net, addr, &ep, &sa.ip);
+	int ret = create_endpoint(net, addr, &ep, sa);
+	free_const(sa);
+	return ret;
 }
 
 int network_close(struct network *net, const char *addr, int port)

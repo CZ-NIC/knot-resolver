@@ -49,11 +49,12 @@ static inline bool endpoint_flags_eq(endpoint_flags_t f1, endpoint_flags_t f2)
  * There are two types: normal have handle, special have flags.kind (and never both).
  *
  * LATER: .family might be unexpected for IPv4-in-IPv6 addresses.
+ * ATM AF_UNIX is only supported with flags.kind != NULL
  */
 struct endpoint {
 	uv_handle_t *handle; /**< uv_udp_t or uv_tcp_t; NULL in case flags.kind != NULL */
 	int fd;              /**< POSIX file-descriptor; always used. */
-	int family;          /**< AF_INET or AF_INET6 or (in future) AF_UNIX */
+	int family;          /**< AF_INET or AF_INET6 or AF_UNIX */
 	uint16_t port;       /**< TCP/UDP port.  Meaningless with AF_UNIX. */
 	bool engaged;        /**< to some module or internally */
 	endpoint_flags_t flags;
