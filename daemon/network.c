@@ -143,6 +143,7 @@ static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 	if (ep->family == AF_UNIX) { /* The FS name would be left behind. */
 		/* Extract local address for this socket. */
 		struct sockaddr_un sa;
+		sa.sun_path[0] = '\0'; /*< probably only for lint:scan-build */
 		socklen_t addr_len = sizeof(sa);
 		if (getsockname(ep->fd, (struct sockaddr *)&sa, &addr_len)
 		    || unlink(sa.sun_path)) {

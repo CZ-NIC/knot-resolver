@@ -363,7 +363,7 @@ int kr_straddr_subnet(void *dst, const char *addr);
  * \param port[out] written in case it's specified in instr
  * \return error code
  * \note Typically you follow this by kr_straddr_socket().
- * \note Only internet addresses are supported, i.e. no unix sockets.
+ * \note Only internet addresses are supported, i.e. no AF_UNIX sockets.
  */
 KR_EXPORT
 int kr_straddr_split(const char *instr, char ipaddr[static restrict (INET6_ADDRSTRLEN + 1)],
