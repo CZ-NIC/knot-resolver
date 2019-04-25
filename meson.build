@@ -8,6 +8,13 @@ project(
 )
 
 
+# Unity build
+if get_option('unity') != 'off'
+  error('unity builds are not supported! ' +
+    'https://gitlab.labs.nic.cz/knot/knot-resolver/issues/460')
+endif
+
+
 message('--- required dependencies ---')
 knot_version = '>=2.8'
 libknot = dependency('libknot', version: knot_version)
