@@ -270,10 +270,10 @@ respdiff:basic:
   artifacts:
     when: always
     paths:
-      - kresd.log.xz
+      - kresd.log*
       - results/*.txt
       - results/*.png
-      - results/respdiff.db/data.mdb.xz
+      - results/respdiff.db/data.mdb*
       - ./*.info
   tags:
     - docker
@@ -289,6 +289,7 @@ root.hints:
     - scripts/update-root-hints.sh
 
 test:valgrind:
+  <<: *test
   when: delayed
   start_in: '30 seconds'
   script:
