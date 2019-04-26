@@ -1,4 +1,4 @@
-FROM debian:buster-20190228
+FROM debian:buster-20190326
 MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
 ARG KNOT_BRANCH=2.8
 
