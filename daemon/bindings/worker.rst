@@ -22,16 +22,14 @@ specified worker count and process rank.
 
 .. function:: worker.stats()
 
-   Return table of statistics.
+   Return table of statistics.  See member descriptions in :c:type:`worker_stats`.
+   A few fields are added, mainly from POSIX ``getrusage()``:
 
-   * ``udp`` - number of outbound queries over UDP
-   * ``tcp`` - number of outbound queries over TCP
-   * ``ipv6`` - number of outbound queries over IPv6
-   * ``ipv4`` - number of outbound queries over IPv4
-   * ``timeout`` - number of timeouted outbound queries
-   * ``concurrent`` - number of concurrent queries at the moment
-   * ``queries`` - number of inbound queries
-   * ``dropped`` - number of dropped inbound queries
+   * ``usertime`` and ``systime`` -- CPU time used, in seconds
+   * ``pagefaults`` -- the number of hard page faults, i.e. those that required I/O activity
+   * ``swaps`` -- the number of times the process was “swapped” out of main memory; unused on Linux
+   * ``csw`` -- the number of context switches, both voluntary and involuntary
+   * ``rss`` -- current memory usage in bytes, including whole cache (resident set size)
 
    Example:
 

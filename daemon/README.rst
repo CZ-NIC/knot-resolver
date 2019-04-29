@@ -648,6 +648,13 @@ Example:
 	$ echo $?
 	0
 
+
+Code reference
+==============
+
+.. doxygenfile:: daemon/worker.h
+
+
 .. _`JSON-encoded`: http://json.org/example
 .. _`Learn Lua in 15 minutes`: http://tylerneylon.com/a/learn-lua/
 .. _`PowerDNS Recursor`: https://doc.powerdns.com/md/recursor/scripting/
