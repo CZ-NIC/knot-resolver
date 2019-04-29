@@ -107,6 +107,22 @@ uint64_t worker_task_creation_time(struct qr_task *task);
 void worker_task_subreq_finalize(struct qr_task *task);
 bool worker_task_finished(struct qr_task *task);
 
+
+/** Various worker statistics.  Sync with wrk_stats() */
+struct worker_stats {
+	size_t queries;     /**< Total number of requests (from clients and internal ones). */
+	size_t concurrent;  /**< The number of requests currently in processing. */
+	size_t rconcurrent; /*< TODO: remove?  I see no meaningful difference from .concurrent. */
+	size_t dropped;     /**< The number of requests dropped due to being badly formed.  See #471. */
+
+	size_t timeout; /**< Number of outbound queries that timed out. */
+	size_t udp;  /**< Number of outbound queries over UDP. */
+	size_t tcp;  /**< Number of outbound queries over TCP (excluding TLS). */
+	size_t tls;  /**< Number of outbound queries over TLS. */
+	size_t ipv4; /**< Number of outbound queries over IPv4.*/
+	size_t ipv6; /**< Number of outbound queries over IPv6. */
+};
+
 /** @cond internal */
 
 /** Number of request within timeout window. */
@@ -140,18 +156,7 @@ struct worker_ctx {
 
 	uint8_t wire_buf[RECVMMSG_BATCH * KNOT_WIRE_MAX_PKTSIZE];
 
-	struct {
-		size_t concurrent;
-		size_t rconcurrent;
-		size_t udp;
-		size_t tcp;
-		size_t tls;
-		size_t ipv4;
-		size_t ipv6;
-		size_t queries;
-		size_t dropped;
-		size_t timeout;
-	} stats;
+	struct worker_stats stats;
 
 	struct zone_import_ctx* z_import;
 	bool too_many_open;

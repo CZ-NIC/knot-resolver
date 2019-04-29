@@ -127,24 +127,26 @@ static int wrk_stats(lua_State *L)
 		return 0;
 	}
 	lua_newtable(L);
+	lua_pushnumber(L, worker->stats.queries);
+	lua_setfield(L, -2, "queries");
 	lua_pushnumber(L, worker->stats.concurrent);
 	lua_setfield(L, -2, "concurrent");
+	lua_pushnumber(L, worker->stats.dropped);
+	lua_setfield(L, -2, "dropped");
+
+	lua_pushnumber(L, worker->stats.timeout);
+	lua_setfield(L, -2, "timeout");
 	lua_pushnumber(L, worker->stats.udp);
 	lua_setfield(L, -2, "udp");
 	lua_pushnumber(L, worker->stats.tcp);
 	lua_setfield(L, -2, "tcp");
 	lua_pushnumber(L, worker->stats.tls);
 	lua_setfield(L, -2, "tls");
-	lua_pushnumber(L, worker->stats.ipv6);
-	lua_setfield(L, -2, "ipv6");
 	lua_pushnumber(L, worker->stats.ipv4);
 	lua_setfield(L, -2, "ipv4");
-	lua_pushnumber(L, worker->stats.queries);
-	lua_setfield(L, -2, "queries");
-	lua_pushnumber(L, worker->stats.dropped);
-	lua_setfield(L, -2, "dropped");
-	lua_pushnumber(L, worker->stats.timeout);
-	lua_setfield(L, -2, "timeout");
+	lua_pushnumber(L, worker->stats.ipv6);
+	lua_setfield(L, -2, "ipv6");
+
 	/* Add subset of rusage that represents counters. */
 	uv_rusage_t rusage;
 	if (uv_getrusage(&rusage) == 0) {
