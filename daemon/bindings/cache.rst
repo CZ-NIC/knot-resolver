@@ -56,7 +56,7 @@ daemons or manipulated from other processes, making for example synchronized loa
 
    .. code-block:: lua
 
-	print(cache.storage)
+	print(cache.current_storage)
 
 .. function:: cache.backends()
 
