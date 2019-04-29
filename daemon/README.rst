@@ -651,7 +651,7 @@ Example:
 .. _`JSON-encoded`: http://json.org/example
 .. _`Learn Lua in 15 minutes`: http://tylerneylon.com/a/learn-lua/
 .. _`PowerDNS Recursor`: https://doc.powerdns.com/md/recursor/scripting/
-.. _LuaRocks: https://rocks.moonscript.org/
+.. _LuaRocks: https://luarocks.org/
 .. _libuv: https://github.com/libuv/libuv
 .. _Lua: https://www.lua.org/about.html
 .. _LuaJIT: http://luajit.org/luajit.html
