@@ -138,7 +138,10 @@ static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 		}
 
 		for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
-			if (cur_addr_score >= KR_NS_TIMEOUT) {
+			bool select;
+			if (cur_addr_score < KR_NS_TIMEOUT) {
+				select = cur_addr_score < rtt_cache_entry_score[i] + favour;
+			} else {
 				/* We can't use favour here.
 				 * If all of the conditions below are true
 				 *
@@ -146,15 +149,12 @@ static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 				 * rtt_cache_entry_score[i] + favour > KR_NS_TIMEOUT
 				 * cur_addr_score < rtt_cache_entry_score[i] + favour
 				 *
-				 * we will prefer "certainly dead" cur_addr_score
+				 * we would prefer "certainly dead" cur_addr_score
 				 * instead of "almost dead, but alive" rtt_cache_entry_score[i]
 				 */
-				if (cur_addr_score >= rtt_cache_entry_score[i]) {
-					continue;
-				}
+				select = cur_addr_score < rtt_cache_entry_score[i];
 			}
-			if (cur_addr_score >= KR_NS_TIMEOUT
-			    || cur_addr_score < rtt_cache_entry_score[i] + favour) {
+			if (select) {
 				/* Shake down previous contenders */
 				for (size_t j = KR_NSREP_MAXADDR - 1; j > i; --j) {
 					addr[j] = addr[j - 1];
