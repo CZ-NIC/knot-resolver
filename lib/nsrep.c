@@ -137,35 +137,30 @@ static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 			}
 		}
 
+		/* We can't always use favour.  If these conditions held:
+		 *
+		 * rtt_cache_entry_score[i] < KR_NS_TIMEOUT
+		 * rtt_cache_entry_score[i] + favour > KR_NS_TIMEOUT
+		 * cur_addr_score < rtt_cache_entry_score[i] + favour
+		 *
+		 * we would prefer "certainly dead" cur_addr_score
+		 * instead of "almost dead but alive" rtt_cache_entry_score[i]
+		 */
+		const unsigned cur_favour = cur_addr_score < KR_NS_TIMEOUT ? favour : 0;
 		for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
-			if (cur_addr_score >= KR_NS_TIMEOUT) {
-				/* We can't use favour here.
-				 * If all of the conditions below are true
-				 *
-				 * rtt_cache_entry_score[i] < KR_NS_TIMEOUT
-				 * rtt_cache_entry_score[i] + favour > KR_NS_TIMEOUT
-				 * cur_addr_score < rtt_cache_entry_score[i] + favour
-				 *
-				 * we will prefer "certainly dead" cur_addr_score
-				 * instead of "almost dead, but alive" rtt_cache_entry_score[i]
-				 */
-				if (cur_addr_score >= rtt_cache_entry_score[i]) {
-					continue;
-				}
+			if (cur_addr_score >= rtt_cache_entry_score[i] + cur_favour)
+				continue;
+
+			/* Shake down previous contenders */
+			for (size_t j = KR_NSREP_MAXADDR - 1; j > i; --j) {
+				addr[j] = addr[j - 1];
+				rtt_cache_entry_ptr[j] = rtt_cache_entry_ptr[j - 1];
+				rtt_cache_entry_score[j] = rtt_cache_entry_score[j - 1];
 			}
-			if (cur_addr_score >= KR_NS_TIMEOUT
-			    || cur_addr_score < rtt_cache_entry_score[i] + favour) {
-				/* Shake down previous contenders */
-				for (size_t j = KR_NSREP_MAXADDR - 1; j > i; --j) {
-					addr[j] = addr[j - 1];
-					rtt_cache_entry_ptr[j] = rtt_cache_entry_ptr[j - 1];
-					rtt_cache_entry_score[j] = rtt_cache_entry_score[j - 1];
-				}
-				addr[i] = it;
-				rtt_cache_entry_score[i] = cur_addr_score;
-				rtt_cache_entry_ptr[i] = cached;
-				break;
-			}
+			addr[i] = it;
+			rtt_cache_entry_score[i] = cur_addr_score;
+			rtt_cache_entry_ptr[i] = cached;
+			break;
 		}
 	}
 
