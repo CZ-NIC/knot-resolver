@@ -21,8 +21,7 @@
 /** resolve_pkt(pkt, options, init_cb) */
 static int wrk_resolve_pkt(lua_State *L)
 {
-	struct worker_ctx *worker = wrk_luaget(L);
-	if (!worker) {
+	if (!the_worker) {
 		return 0;
 	}
 
@@ -36,7 +35,7 @@ static int wrk_resolve_pkt(lua_State *L)
 		lua_error_p(L, "invalid options");
 
 	/* Create task and start with a first question */
-	struct qr_task *task = worker_resolve_start(worker, pkt, *options);
+	struct qr_task *task = worker_resolve_start(the_worker, pkt, *options);
 	if (!task) {
 		lua_error_p(L, "couldn't create a resolution request");
 	}
