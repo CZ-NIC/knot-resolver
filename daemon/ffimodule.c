@@ -221,10 +221,16 @@ int ffimodule_init(lua_State *L)
 }
 void ffimodule_deinit(lua_State *L)
 {
-	const int wrap1 = l_ffi_wrap_slots[SLOT_begin];
-	const int wrap2 = l_ffi_wrap_slots[SLOT_consume];
-	luaL_unref(L, LUA_REGISTRYINDEX, wrap1);
-	luaL_unref(L, LUA_REGISTRYINDEX, wrap2);
+	/* Unref each wrapper function from lua.
+	 * It's probably useless, as we're about to destroy lua_State, but... */
+	const int wrapsIndices[] = {
+		SLOT_begin,
+		SLOT_consume,
+		SLOT_checkout,
+	};
+	for (int i = 0; i < sizeof(wrapsIndices) / sizeof(wrapsIndices[0]); ++i) {
+		luaL_unref(L, LUA_REGISTRYINDEX, l_ffi_wrap_slots[i]);
+	}
 }
 
 /** @internal Conditionally register layer trampoline
