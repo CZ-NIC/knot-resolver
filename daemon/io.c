@@ -323,8 +323,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 		return;
 	}
 
-	const struct engine *engine = worker->engine;
-	const struct network *net = &engine->net;
+	const struct network *net = &worker->engine->net;
 	uint64_t idle_in_timeout = net->tcp.in_idle_timeout;
 
 	uint64_t timeout = KR_CONN_RTT_MAX / 2;

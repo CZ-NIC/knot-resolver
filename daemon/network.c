@@ -48,8 +48,7 @@ static int endpoint_open_lua_cb(struct network *net, struct endpoint *ep,
 		return kr_error(EINVAL);
 	}
 	/* First find callback in the endpoint registry. */
-	struct worker_ctx *worker = net->loop->data; // LATER: the_worker
-	lua_State *L = worker->engine->L;
+	lua_State *L = the_worker->engine->L;
 	void **pp = trie_get_try(net->endpoint_kinds, ep->flags.kind,
 				strlen(ep->flags.kind));
 	if (!pp && net->missing_kind_is_error) {
@@ -112,8 +111,7 @@ int network_engage_endpoints(struct network *net)
 /** Notify the registered function about endpoint about to be closed. */
 static void endpoint_close_lua_cb(struct network *net, struct endpoint *ep)
 {
-	struct worker_ctx *worker = net->loop->data; // LATER: the_worker
-	lua_State *L = worker->engine->L;
+	lua_State *L = the_worker->engine->L;
 	void **pp = trie_get_try(net->endpoint_kinds, ep->flags.kind,
 				strlen(ep->flags.kind));
 	if (!pp && net->missing_kind_is_error) {
@@ -199,8 +197,7 @@ void network_deinit(struct network *net)
 {
 	if (net != NULL) {
 		network_close_force(net);
-		struct worker_ctx *worker = net->loop->data; // LATER: the_worker
-		trie_apply(net->endpoint_kinds, kind_unregister, worker->engine->L);
+		trie_apply(net->endpoint_kinds, kind_unregister, the_worker->engine->L);
 		trie_free(net->endpoint_kinds);
 
 		tls_credentials_free(net->tls_credentials);

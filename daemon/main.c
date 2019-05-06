@@ -122,8 +122,7 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 			goto finish;
 		}
 
-		struct engine *engine = the_worker->engine;
-		lua_State *L = engine->L;
+		lua_State *L = the_worker->engine->L;
 		int ret = engine_cmd(L, cmd, false);
 		const char *message = "";
 		if (lua_gettop(L) > 0) {
