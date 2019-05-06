@@ -1779,6 +1779,35 @@ int worker_end_tcp(struct session *session)
 	return kr_ok();
 }
 
+knot_pkt_t * worker_resolve_mk_pkt(const char *qname_str, uint16_t qtype, uint16_t qclass,
+				   const struct kr_qflags *options)
+{
+	uint8_t qname[KNOT_DNAME_MAXLEN];
+	if (!knot_dname_from_str(qname, qname_str, sizeof(qname)))
+		return NULL;
+	knot_pkt_t *pkt = knot_pkt_new(NULL, KNOT_EDNS_MAX_UDP_PAYLOAD, NULL);
+	if (!pkt)
+		return NULL;
+	knot_pkt_put_question(pkt, qname, qclass, qtype);
+	knot_wire_set_rd(pkt->wire);
+	knot_wire_set_ad(pkt->wire);
+
+	/* Add OPT RR */
+	pkt->opt_rr = knot_rrset_copy(the_worker->engine->resolver.opt_rr, NULL);
+	if (!pkt->opt_rr) {
+		knot_pkt_free(pkt);
+		return NULL;
+	}
+	if (options->DNSSEC_WANT) {
+		knot_edns_set_do(pkt->opt_rr);
+	}
+	if (options->DNSSEC_CD) {
+		knot_wire_set_cd(pkt->wire);
+	}
+
+	return pkt;
+}
+
 struct qr_task *worker_resolve_start(knot_pkt_t *query, struct kr_qflags options)
 {
 	struct worker_ctx *worker = the_worker;
