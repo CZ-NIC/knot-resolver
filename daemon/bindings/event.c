@@ -132,7 +132,7 @@ static int event_cancel(lua_State *L)
 	if (ok) {
 		lua_rawgeti(L, -1, 2);
 		timer_pp = lua_touserdata(L, -1);
-		ok = timer_pp != NULL;
+		ok = timer_pp && *timer_pp;
 		/* That have been sufficient safety checks, hopefully. */
 	}
 	if (ok && !uv_is_closing(*timer_pp)) {
@@ -156,8 +156,8 @@ static int event_reschedule(lua_State *L)
 	uv_handle_t **timer_pp = NULL;
 	if (ok) {
 		lua_rawgeti(L, -1, 2);
-		lua_touserdata(L, -1);
-		ok = timer_pp != NULL;
+		timer_pp = lua_touserdata(L, -1);
+		ok = timer_pp && *timer_pp;
 		/* That have been sufficient safety checks, hopefully. */
 	}
 	if (ok && !uv_is_closing(*timer_pp)) {
