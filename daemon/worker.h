@@ -55,7 +55,9 @@ int worker_submit(struct session *session, knot_pkt_t *query);
  */
 int worker_end_tcp(struct session *session);
 
-/** FIXME docs */
+/**
+ * Create a packet suitable for worker_resolve_start().  All in malloc() memory.
+ */
 KR_EXPORT knot_pkt_t *
 worker_resolve_mk_pkt(const char *qname_str, uint16_t qtype, uint16_t qclass,
 			const struct kr_qflags *options);
