@@ -50,14 +50,15 @@ struct kr_module {
 	char *name;
 
 	/** Constructor.  Called after loading the module.  @return error code.
-	 * Lua API: not populated, called via lua directly. */
+	 * Lua modules: not populated, called via lua directly. */
 	int (*init)(struct kr_module *self);
 
 	/** Destructor.  Called before unloading the module.  @return error code. */
 	int (*deinit)(struct kr_module *self);
 
 	/** Configure with encoded JSON (NULL if missing).  @return error code.
-	 * Lua API: not used and not useful (from C). */
+	 * Lua modules: not used and not useful from C.
+	 * When called from lua, input is JSON, like for kr_prop_cb. */
 	int (*config)(struct kr_module *self, const char *input);
 
 	/** Packet processing API specs.  May be NULL.  See docs on that type.
@@ -65,7 +66,7 @@ struct kr_module {
 	const kr_layer_api_t *layer;
 
 	/** List of properties.  May be NULL.  Terminated by { NULL, NULL, NULL }.
-	 * Lua API: not used and not useful (from C). */
+	 * Lua modules: not used and not useful. */
 	const struct kr_prop *props;
 
 	/** dlopen() handle; RTLD_DEFAULT for embedded modules; NULL for lua modules. */
@@ -79,7 +80,8 @@ struct kr_module {
  * @param env pointer to the lua engine, i.e. struct engine *env (TODO: explicit type)
  * @param input parameter (NULL if missing/nil on lua level)
  * @return a free-form JSON output (malloc-ated)
- * @note see l_trampoline() implementation for details about the input/output conversion.
+ * @note see modules_create_table_for_c() implementation for details
+ *       about the input/output conversion.
  */
 typedef char *(kr_prop_cb)(void *env, struct kr_module *self, const char *input);
 
