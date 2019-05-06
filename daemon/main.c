@@ -709,13 +709,10 @@ int main(int argc, char **argv)
 	/* Switch to rundir. */
 	if (args.rundir != NULL) {
 		/* FIXME: access isn't a good way if we start as root and drop privileges later */
-		if (access(args.rundir, W_OK) != 0) {
-			kr_log_error("[system] rundir '%s': %s\n", args.rundir, strerror(errno));
-			return EXIT_FAILURE;
-		}
-		ret = chdir(args.rundir);
-		if (ret != 0) {
-			kr_log_error("[system] rundir '%s': %s\n", args.rundir, strerror(errno));
+		if (access(args.rundir, W_OK) != 0
+		    || chdir(args.rundir) != 0) {
+			kr_log_error("[system] rundir '%s': %s\n",
+					args.rundir, strerror(errno));
 			return EXIT_FAILURE;
 		}
 	}
