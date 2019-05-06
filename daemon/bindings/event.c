@@ -125,20 +125,18 @@ static int event_cancel(lua_State *L)
 
 	/* Fetch event if it exists */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, lua_tointeger(L, 1));
-	bool ok = lua_istable(L, -1);
+	if (!lua_istable(L, -1)) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
 
 	/* Close the timer */
-	uv_handle_t **timer_pp = NULL;
-	if (ok) {
-		lua_rawgeti(L, -1, 2);
-		timer_pp = lua_touserdata(L, -1);
-		ok = timer_pp != NULL;
-		/* That have been sufficient safety checks, hopefully. */
+	lua_rawgeti(L, -1, 2);
+	uv_handle_t *timer = *(uv_handle_t **)lua_touserdata(L, -1);
+	if (!uv_is_closing(timer)) {
+		uv_close(timer, (uv_close_cb) event_free);
 	}
-	if (ok && !uv_is_closing(*timer_pp)) {
-		uv_close(*timer_pp, (uv_close_cb)event_free);
-	}
-	lua_pushboolean(L, ok);
+	lua_pushboolean(L, true);
 	return 1;
 }
 
@@ -150,25 +148,26 @@ static int event_reschedule(lua_State *L)
 
 	/* Fetch event if it exists */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, lua_tointeger(L, 1));
-	bool ok = lua_istable(L, -1);
+	if (!lua_istable(L, -1)) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
 
 	/* Reschedule the timer */
-	uv_handle_t **timer_pp = NULL;
-	if (ok) {
-		lua_rawgeti(L, -1, 2);
-		lua_touserdata(L, -1);
-		ok = timer_pp != NULL;
-		/* That have been sufficient safety checks, hopefully. */
-	}
-	if (ok && !uv_is_closing(*timer_pp)) {
-		int ret = uv_timer_start((uv_timer_t *)*timer_pp,
-				event_callback, lua_tointeger(L, 2), 0);
+	lua_rawgeti(L, -1, 2);
+	uv_handle_t *timer = *(uv_handle_t **)lua_touserdata(L, -1);
+	if (!uv_is_closing(timer)) {
+		if (uv_is_active(timer)) {
+			uv_timer_stop((uv_timer_t *)timer);
+		}
+		int ret = uv_timer_start((uv_timer_t *)timer, event_callback, lua_tointeger(L, 2), 0);
 		if (ret != 0) {
-			uv_close(*timer_pp, (uv_close_cb)event_free);
-			ok = false;
+			event_cancel(L);
+			lua_pushboolean(L, false);
+			return 1;
 		}
 	}
-	lua_pushboolean(L, ok);
+	lua_pushboolean(L, true);
 	return 1;
 }
 
