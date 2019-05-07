@@ -40,9 +40,7 @@ Layers can also change course of resolution, for example by appending additional
 .. code-block:: lua
 
 	consume = function (state, req, answer)
-		answer = kres.pkt_t(answer)
 		if answer:qtype() == kres.type.NS then
-			req = kres.request_t(req)
 			local qry = req:push(answer:qname(), kres.type.SOA, kres.class.IN)
 			qry.flags.AWAIT_CUT = true
 		end
@@ -54,13 +52,11 @@ This **doesn't** block currently processed query, and the newly created sub-requ
 .. code-block:: lua
 
 	consume = function (state, req, answer)
-		answer = kres.pkt_t(answer)
 		if state == kres.YIELD then
 			print('continuing yielded layer')
 			return kres.DONE
 		else
 			if answer:qtype() == kres.type.NS then
-				req = kres.request_t(req)
 				local qry = req:push(answer:qname(), kres.type.SOA, kres.class.IN)
 				qry.flags.AWAIT_CUT = true
 				print('planned SOA query, yielding')
@@ -200,7 +196,6 @@ First you need to convert it to a type known to FFI and check basic properties. 
 .. code-block:: lua
 
 	consume = function (state, req, pkt)
-		pkt = kres.pkt_t(answer)
 		print('rcode:', pkt:rcode())
 		print('query:', kres.dname2str(pkt:qname()), pkt:qclass(), pkt:qtype())
 		if pkt:rcode() ~= kres.rcode.NOERROR then
@@ -245,7 +240,6 @@ You primarily need to retrieve currently processed query.
 .. code-block:: lua
 
 	consume = function (state, req, pkt)
-		req = kres.request_t(req)
 		print(req.options)
 		print(req.state)
 

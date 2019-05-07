@@ -237,7 +237,7 @@ local function refresh_plan(keyset, delay)
 		resolve(owner_str, kres.type.DNSKEY, kres.class.IN, 'NO_CACHE',
 		function (pkt)
 			-- Schedule itself with updated timeout
-			local delay_new = active_refresh(keyset, kres.pkt_t(pkt))
+			local delay_new = active_refresh(keyset, pkt)
 			delay_new = keyset.refresh_time or ta_update.refresh_time or delay_new
 			log('[ta_update] next refresh for ' .. owner_str .. ' in '
 				.. delay_new/hour .. ' hours')
