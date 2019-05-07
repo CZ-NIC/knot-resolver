@@ -3,6 +3,9 @@ Knot Resolver 4.x.y (2019-0m-dd)
 
 Improvements
 ------------
+- aarch64 support, even kernels with ARM64_VA_BITS >= 48 (#216, !797)
+  This is done by working around a LuaJIT incompatibility.
+- lua modules may omit casting parameters of layer functions (!797)
 - lua tables for C modules are more strict by default, e.g. `nsid.foo`
   will throw an error instead of returning `nil` (!797)
 
