@@ -626,13 +626,28 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 		ret = uv_udp_send(send_req, (uv_udp_t *)handle, &buf, 1, addr, &on_send);
 	} else if (handle->type == UV_TCP) {
 		uv_write_t *write_req = (uv_write_t *)ioreq;
-		uint16_t pkt_size = htons(pkt->size);
-		uv_buf_t buf[2] = {
-			{ (char *)&pkt_size, sizeof(pkt_size) },
-			{ (char *)pkt->wire, pkt->size }
+		/* We need to write message length in native byte order,
+		 * but we don't have a convenient place to store those bytes.
+		 * The problem is that all memory referenced from buf[] MUST retain
+		 * its contents at least until on_write() is called, and I currently
+		 * can't see any convenient place outside the `pkt` structure.
+		 * So we use directly the *individual* bytes in pkt->size.
+		 * The call to htonl() and the condition will probably be inlinable. */
+		int lsbi, slsbi; /* (second) least significant byte index */
+		if (htonl(1) == 1) { /* big endian */
+			lsbi  = sizeof(pkt->size) - 1;
+			slsbi = sizeof(pkt->size) - 2;
+		} else {
+			lsbi  = 0;
+			slsbi = 1;
+		}
+		uv_buf_t buf[3] = {
+			{ (char *)pkt->size + slsbi, 1 },
+			{ (char *)pkt->size + lsbi,  1 },
+			{ (char *)pkt->wire, pkt->size },
 		};
 		write_req->data = task;
-		ret = uv_write(write_req, (uv_stream_t *)handle, buf, 2, &on_write);
+		ret = uv_write(write_req, (uv_stream_t *)handle, buf, 3, &on_write);
 	} else {
 		assert(false);
 	}
