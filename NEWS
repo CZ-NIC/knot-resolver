@@ -1,3 +1,11 @@
+Knot Resolver 4.x.y (2019-0m-dd)
+================================
+
+Bugfixes
+--------
+- TCP to upstream: don't send wrong message length (unlikely, !816)
+
+
 Knot Resolver 4.0.0 (2019-04-18)
 ================================
 

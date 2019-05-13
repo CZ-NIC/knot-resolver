@@ -626,9 +626,15 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 		ret = uv_udp_send(send_req, (uv_udp_t *)handle, &buf, 1, addr, &on_send);
 	} else if (handle->type == UV_TCP) {
 		uv_write_t *write_req = (uv_write_t *)ioreq;
-		uint16_t pkt_size = htons(pkt->size);
+		/* Re-use pkt->reserved for DNS message size.
+		 * We're very unlikely to touch such fields from now on,
+		 * and ->reserved seems a relatively safe place anyway.  Why do this?
+		 * The problem is that all memory referenced from buf[] MUST retain
+		 * its contents at least until on_write() is called, and I currently
+		 * can't see any convenient place outside the `pkt` structure. */
+		pkt->reserved = htons(pkt->size);
 		uv_buf_t buf[2] = {
-			{ (char *)&pkt_size, sizeof(pkt_size) },
+			{ (char *)&pkt->reserved, 2 },
 			{ (char *)pkt->wire, pkt->size }
 		};
 		write_req->data = task;
