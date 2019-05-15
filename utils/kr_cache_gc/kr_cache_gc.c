@@ -228,6 +228,11 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 			break;
 		default:
 			printf("Warning: skipping deleting because of error (%s)\n", knot_strerror(ret));
+			api->txn_abort(&txn);
+			ret = api->txn_begin(db, &txn, 0);
+			if (ret != KNOT_EOK) {
+				break;
+			}
 			continue;
 		}
 		if ((cfg->rw_txn_items > 0 &&
