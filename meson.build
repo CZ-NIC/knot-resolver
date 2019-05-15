@@ -156,6 +156,7 @@ subdir('lib')
 subdir('client')
 subdir('daemon')
 subdir('modules')
+subdir('utils')
 if get_option('bench') == 'enabled'
   subdir('bench')
 endif
@@ -241,6 +242,7 @@ run_target(
 s_managed_ta = managed_ta ? 'enabled' : 'disabled'
 s_systemd_socket = libsystemd.found() ? 'enabled' : 'disabled'
 s_build_client = build_client ? 'enabled' : 'disabled'
+s_build_utils = build_utils ? 'enabled' : 'disabled'
 s_build_dnstap = build_dnstap ? 'enabled' : 'disabled'
 s_build_unit_tests = build_unit_tests ? 'enabled' : 'disabled'
 s_build_config_tests = build_config_tests ? 'enabled' : 'disabled'
@@ -268,6 +270,7 @@ message('''
 
   optional components
     client:             @0@'''.format(s_build_client) + '''
+    utils:              @0@'''.format(s_build_utils) + '''
     dnstap:             @0@'''.format(s_build_dnstap) + '''
     unit_tests:         @0@'''.format(s_build_unit_tests) + '''
     config_tests:       @0@'''.format(s_build_config_tests) + '''
