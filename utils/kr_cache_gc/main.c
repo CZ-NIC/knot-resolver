@@ -49,6 +49,7 @@ int main(int argc, char *argv[])
 	signal(SIGINT, got_killed);
 
 	kr_cache_gc_cfg_t cfg = { 0 };
+	cfg.rw_txn_items = 100
 
 	int o;
 	while ((o = getopt(argc, argv, "hnc:d:l:m:w:t:")) != -1) {
