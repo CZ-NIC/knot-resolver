@@ -103,6 +103,18 @@ option(
 )
 
 option(
+  'utils',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'auto',
+  description: 'build kres utilities',
+)
+
+option(
   'dnstap',
   type: 'combo',
   choices: [
