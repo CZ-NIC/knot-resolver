@@ -157,12 +157,14 @@ int kr_gc_cache_iter(knot_db_t *knot_db, kr_gc_iter_callback callback, void *ctx
 		if (entry_type != NULL) {
 			struct entry_h *entry = entry_h_consistent(val, *entry_type);
 
-			info.rrtype = *entry_type;
-			info.entry_size = key.len + val.len;
-			info.expires_in = entry->time + entry->ttl - now;
-			info.no_labels = entry_labels(&key);
+			if (entry != NULL) {
+				info.rrtype = *entry_type;
+				info.entry_size = key.len + val.len;
+				info.expires_in = entry->time + entry->ttl - now;
+				info.no_labels = entry_labels(&key);
 
-			ret = callback(&key, &info, ctx);
+				ret = callback(&key, &info, ctx);
+			}
 		}
 
 		if (ret != KNOT_EOK) {
