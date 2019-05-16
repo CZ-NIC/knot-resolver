@@ -18,9 +18,6 @@
 #include "categories.h"
 #include "db.h"
 
-#define MAX_OK_PERCENT_USAGE 80.0
-#define TO_BE_FREED_PERCENT 10.0
-
 // section: timer
 // TODO replace/move to contrib
 
@@ -153,7 +150,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 		return ret;
 	}
 
-	if (cfg->dry_run || db_usage < MAX_OK_PERCENT_USAGE) {
+	if (cfg->dry_run || db_usage < cfg->cache_max_usage) {
 		kr_gc_cache_close(&kres_db, db);
 		return KNOT_EOK;
 	}
@@ -168,7 +165,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 		return ret;
 	}
 
-	ssize_t amount_tofree = (double)knot_db_lmdb_get_mapsize(db) * TO_BE_FREED_PERCENT / 100.0;
+	ssize_t amount_tofree = (double)knot_db_lmdb_get_mapsize(db) * cfg->cache_to_be_freed / 100.0;
 
 	// debug
 	/*printf("tofree: %zd\n", amount_tofree);
