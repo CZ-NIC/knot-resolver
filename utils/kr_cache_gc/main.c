@@ -33,6 +33,8 @@ static void print_help()
 	printf(" -d <garbage_interval(millis)>\n");
 	printf(" -l <deletes_per_txn>\n");
 	printf(" -m <rw_txn_duration(usecs)>\n");
+	printf(" -u <cache_max_usage(percent)>\n");
+	printf(" -f <cache_to_be_freed(percent)>\n");
 	printf(" -w <wait_next_rw_txn(usecs)>\n");
 	printf(" -t <temporary_memory(MBytes)>\n");
 	printf(" -n (= dry run)\n");
@@ -48,11 +50,14 @@ int main(int argc, char *argv[])
 	signal(SIGCHLD, got_killed);
 	signal(SIGINT, got_killed);
 
-	kr_cache_gc_cfg_t cfg = { 0 };
-	cfg.rw_txn_items = 100
+	kr_cache_gc_cfg_t cfg = {
+		.rw_txn_items = 100,
+		.cache_max_usage = 80,
+		.cache_to_be_freed = 10
+	};
 
 	int o;
-	while ((o = getopt(argc, argv, "hnc:d:l:m:w:t:")) != -1) {
+	while ((o = getopt(argc, argv, "hnc:d:l:m:u:f:w:t:")) != -1) {
 		switch (o) {
 		case 'c':
 			cfg.cache_path = optarg;
@@ -67,6 +72,12 @@ int main(int argc, char *argv[])
 			break;
 		case 'm':
 			get_nonneg_optarg(cfg.rw_txn_duration);
+			break;
+		case 'u':
+			get_nonneg_optarg(cfg.cache_max_usage);
+			break;
+		case 'f':
+			get_nonneg_optarg(cfg.cache_to_be_freed);
 			break;
 		case 'w':
 			get_nonneg_optarg(cfg.rw_txn_delay);
