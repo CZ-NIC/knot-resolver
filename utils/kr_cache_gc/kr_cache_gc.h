@@ -22,6 +22,9 @@ typedef struct {
         unsigned long rw_txn_duration;   // maximum duration of RW transaction in usecs (0 = unlimited)
         unsigned long rw_txn_delay;      // waiting time between two RW transactions in usecs
 
+	  uint8_t cache_max_usage;         // maximum cache usage before triggering GC (percent)
+	  uint8_t cache_to_be_freed;       // percent of cache to be freed during GC
+
         bool dry_run;
 } kr_cache_gc_cfg_t;
 
