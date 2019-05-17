@@ -520,12 +520,15 @@ static int write_extra_ranked_records(const ranked_rr_array_t *arr, uint16_t reo
 }
 
 /** @internal Add an EDNS padding RR into the answer if requested and required. */
-static int answer_padding(struct kr_request *request)
+static int answer_padding_maybe(struct kr_request *request)
 {
 	if (!request || !request->answer || !request->ctx) {
 		assert(false);
 		return kr_error(EINVAL);
 	}
+	const bool want_pad = request->qsource.flags.tls;
+	if (!want_pad) return kr_ok();
+
 	int32_t padding = request->ctx->tls_padding;
 	knot_pkt_t *answer = request->answer;
 	knot_rrset_t *opt_rr = answer->opt_rr;
@@ -563,7 +566,7 @@ static int answer_fail(struct kr_request *request)
 	if (ret == 0 && answer->opt_rr) {
 		/* OPT in SERVFAIL response is still useful for cookies/additional info. */
 		knot_pkt_begin(answer, KNOT_ADDITIONAL);
-		answer_padding(request); /* Ignore failed padding in SERVFAIL answer. */
+		answer_padding_maybe(request); /* Ignore failed padding in SERVFAIL answer. */
 		ret = edns_put(answer, false);
 	}
 	return ret;
@@ -628,10 +631,8 @@ static int answer_finalize(struct kr_request *request, int state)
 	}
 	/* Write EDNS information */
 	if (answer->opt_rr) {
-		if (request->qsource.flags.tls) {
-			if (answer_padding(request) != kr_ok()) {
-				return answer_fail(request);
-			}
+		if (answer_padding_maybe(request) != kr_ok()) {
+			return answer_fail(request);
 		}
 		knot_pkt_begin(answer, KNOT_ADDITIONAL);
 		int ret = knot_pkt_put(answer, KNOT_COMPR_HINT_NONE,
