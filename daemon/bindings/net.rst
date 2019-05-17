@@ -332,13 +332,18 @@ by a trusted CA. This is done using function :c:func:`net.tls()`.
 
 .. function:: net.tls_padding([true | false])
 
-   Get/set EDNS(0) padding of answers to queries that arrive over TLS
-   transport.  If set to `true` (the default), it will use a sensible
+   Get/set padding of answers to queries that arrive over TLS
+   transport, as defined in :rfc:`7830`.
+
+   If set to `true` (the default), it will use a sensible
    default padding scheme, as implemented by libknot if available at
    compile time.  If set to a numeric value >= 2 it will pad the
    answers to nearest *padding* boundary, e.g. if set to `64`, the
    answer will have size of a multiple of 64 (64, 128, 192, ...).  If
    set to `false` (or a number < 2), it will disable padding entirely.
+
+   You may force padding even on unencrypted answers via ``policy.FLAGS('FORCE_PADDING')``,
+   e.g. in conditioned on the request coming from a TLS-stripping proxy.
 
 .. function:: net.tls_sticket_secret([string with pre-shared secret])
 
