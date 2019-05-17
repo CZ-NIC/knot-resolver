@@ -9,7 +9,7 @@ KRESD="${MESON_BUILD_ROOT}/daemon/kresd"
 if [ ! -e "$LIBKRES" ]; then
 	# We probably use static libkres.
 	LIBKRES="$KRESD"
-end
+fi
 
 # Write to kres-gen.lua instead of stdout
 mv kres-gen.lua{,.bak} ||:
