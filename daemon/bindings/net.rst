@@ -342,8 +342,9 @@ by a trusted CA. This is done using function :c:func:`net.tls()`.
    answer will have size of a multiple of 64 (64, 128, 192, ...).  If
    set to `false` (or a number < 2), it will disable padding entirely.
 
-   You may force padding even on unencrypted answers via ``policy.FLAGS('FORCE_PADDING')``,
-   e.g. in conditioned on the request coming from a TLS-stripping proxy.
+   You may force padding even on unencrypted answers via ``policy.FLAGS('FORCE_PADDING')``
+   action, e.g. conditioned on the request coming from a TLS-stripping proxy;
+   see :ref:`mod-policy` for details.
 
 .. function:: net.tls_sticket_secret([string with pre-shared secret])
 
