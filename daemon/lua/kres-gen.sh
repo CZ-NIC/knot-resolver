@@ -6,6 +6,10 @@ cd "$(dirname ${0})"
 CDEFS="../../scripts/gen-cdefs.sh"
 LIBKRES="${MESON_BUILD_ROOT}/lib/libkres.so"
 KRESD="${MESON_BUILD_ROOT}/daemon/kresd"
+if [ ! -e "$LIBKRES" ]; then
+	# We probably use static libkres.
+	LIBKRES="$KRESD"
+fi
 
 for REQFILE in "$CDEFS" "$LIBKRES" "$KRESD"
 do
