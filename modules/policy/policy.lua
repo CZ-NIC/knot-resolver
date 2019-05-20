@@ -204,8 +204,10 @@ end
 function policy.FLAGS(opts_set, opts_clear)
 	return function(_, req)
 		local qry = req:current()
-		ffi.C.kr_qflags_set  (qry.flags, kres.mk_qflags(opts_set   or {}))
-		ffi.C.kr_qflags_clear(qry.flags, kres.mk_qflags(opts_clear or {}))
+		ffi.C.kr_qflags_set  (qry.flags,   kres.mk_qflags(opts_set   or {}))
+		ffi.C.kr_qflags_set  (req.options, kres.mk_qflags(opts_set   or {}))
+		ffi.C.kr_qflags_clear(qry.flags,   kres.mk_qflags(opts_clear or {}))
+		ffi.C.kr_qflags_clear(req.options, kres.mk_qflags(opts_clear or {}))
 		return nil -- chain rule
 	end
 end
