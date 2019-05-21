@@ -10,6 +10,8 @@ Improvements
 - lua modules may omit casting parameters of layer functions (!797)
 - lua tables for C modules are more strict by default, e.g. `nsid.foo`
   will throw an error instead of returning `nil` (!797)
+- http module: also send intermediate TLS certificate to clients,
+  if available and luaossl >= 20181207 (!819)
 
 Bugfixes
 --------
