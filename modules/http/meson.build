@@ -13,6 +13,7 @@ lua_mod_src += [
   lua_http,
   files('http_doh.lua'),
   files('http_trace.lua'),
+  files('http_tls_cert.lua'),
   files('prometheus.lua'),
 ]
 
