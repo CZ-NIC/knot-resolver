@@ -16,8 +16,10 @@ local http_server = require('http.server')
 local http_headers = require('http.headers')
 local http_websocket = require('http.websocket')
 local http_util = require "http.util"
-local x509, pkey = require('openssl.x509'), require('openssl.pkey')
 local has_mmdb, mmdb  = pcall(require, 'mmdb')
+
+-- A sub-module for certificate management.
+local tls_cert = require('kres_modules.http_tls_cert')
 
 -- Module declaration
 local M = {
@@ -252,76 +254,6 @@ local function route(endpoints)
 	end
 end
 
--- @function Create self-signed certificate
-local function ephemeralcert(host)
-	-- Import luaossl directly
-	local name = require('openssl.x509.name')
-	local altname = require('openssl.x509.altname')
-	local openssl_bignum = require('openssl.bignum')
-	local openssl_rand = require('openssl.rand')
-	-- Create self-signed certificate
-	host = host or hostname()
-	local crt = x509.new()
-	local now = os.time()
-	crt:setVersion(3)
-	-- serial needs to be unique or browsers will show uninformative error messages
-	crt:setSerial(openssl_bignum.fromBinary(openssl_rand.bytes(16)))
-	-- use the host we're listening on as canonical name
-	local dn = name.new()
-	dn:add("CN", host)
-	crt:setSubject(dn)
-	crt:setIssuer(dn) -- should match subject for a self-signed
-	local alt = altname.new()
-	alt:add("DNS", host)
-	crt:setSubjectAlt(alt)
-	-- Valid for 90 days
-	crt:setLifetime(now, now + 90*60*60*24)
-	-- Can't be used as a CA
-	crt:setBasicConstraints{CA=false}
-	crt:setBasicConstraintsCritical(true)
-	-- Create and set key (default: EC/P-256 as a most "interoperable")
-	local key = pkey.new {type = 'EC', curve = 'prime256v1'}
-	crt:setPublicKey(key)
-	crt:sign(key)
-	return crt, key
-end
-
--- @function Prefer HTTP/2 or HTTP/1.1
-local function alpnselect(_, protos)
-	for _, proto in ipairs(protos) do
-		if proto == 'h2' or proto == 'http/1.1' then
-			return proto
-		end
-	end
-	return nil
-end
-
--- @function Create TLS context
-local function tlscontext(crt, key)
-	local http_tls = require('http.tls')
-	local ctx = http_tls.new_server_context()
-	if ctx.setAlpnSelect then
-		ctx:setAlpnSelect(alpnselect)
-	end
-	assert(ctx:setPrivateKey(key))
-	assert(ctx:setCertificate(crt))
-	return ctx
-end
-
--- @function Refresh self-signed certificates
-local function updatecert(crtfile, keyfile)
-	local f = assert(io.open(crtfile, 'w'), string.format('cannot open "%s" for writing', crtfile))
-	local crt, key = ephemeralcert()
-	-- Write back to file
-	f:write(tostring(crt))
-	f:close()
-	f = assert(io.open(keyfile, 'w'), string.format('cannot open "%s" for writing', keyfile))
-	local pub, priv = key:toPEM('public', 'private')
-	assert(f:write(pub..priv))
-	f:close()
-	return crt, key
-end
-
 -- @function Merge dictionaries, nil is like empty dict.
 -- Values from right-hand side dictionaries take precedence.
 local function mergeconf(...)
@@ -340,52 +272,29 @@ local function mergeconf(...)
 	return merged
 end
 
-local function load_cert(certname, keyname)
-	local f, err = io.open(certname, 'r')
-	if not f then
-		panic('[http] unable to read TLS certificate file: %s', err)
-	end
-	local crt = x509.new(f:read('*all'))
-	f:close()
-	if not crt then
-		panic('[http] unable to parse TLS certificate file %s', certname)
-	end
-
-	f, err = io.open(keyname, 'r')
-	if not f then
-		panic('[http] unable to open TLS key file: %s', err)
-	end
-	local key = pkey.new(f:read('*all'))
-	f:close()
-	if not key then
-		panic('[http] unable to parse TLS key file %s', keyname)
-	end
-	return crt, key
-end
-
 -- @function Listen on given socket
 -- using configuration for specific "kind" of HTTP server
 local function add_socket(fd, kind, addr_str)
 	assert(M.servers[fd] == nil, 'socket is already served by an HTTP instance')
-	local conf, crt, key
+	local conf, certs, key
 	conf = mergeconf(M.configs._builtin._all, M.configs._builtin[kind], M.configs._all, M.configs[kind])
 	conf.socket = cqueues.socket.fdopen(fd)
 	if conf.tls ~= false then
 		-- Check if a cert file was specified
 		-- Read or create self-signed x509 certificate
 		if conf.ephemeral then
-			crt, key = updatecert(conf.cert, conf.key)
+			certs, key = tls_cert.new_ephemeral_files(conf.cert, conf.key)
 		else
-			crt, key = load_cert(conf.cert, conf.key)
+			certs, key = tls_cert.load(conf.cert, conf.key)
 		end
 		-- Check loaded certificate
-		if not crt or not key then
+		if not certs or not key then
 			panic('failed to load certificate "%s"', conf.cert)
 		end
 	end
 	-- Compose server handler
 	local routes = route(conf.endpoints)
-	conf.ctx = crt and tlscontext(crt, key)
+	conf.ctx = certs and tls_cert.new_tls_context(certs, key)
 	conf.onstream = routes
 	-- Create TLS context and start listening
 	local s, err = http_server.new(conf)
@@ -397,15 +306,15 @@ local function add_socket(fd, kind, addr_str)
 		panic('failed to listen on %s: %s', addr_str, err)
 	end
 	M.servers[fd] = {kind = kind, server = s, config = conf}
-	-- Create certificate renewal timer if ephemeral
-	if crt and conf.ephemeral then
-		local _, expiry = crt:getLifetime()
+	-- Create certificate renewal timer if ephemeral; FIXME: renew more than once, not per-socket? etc.
+	if certs and conf.ephemeral then
+		local _, expiry = certs[1]:getLifetime()
 		expiry = 1000 * math.max(0, expiry - (os.time() - 3 * 24 * 3600))
 		event.after(expiry, function ()
 			log('[http] refreshed ephemeral certificate')
-			crt, key = updatecert(conf.cert, conf.key)
+			certs, key = tls_cert.new_ephemeral_files(conf.cert, conf.key)
 			-- TODO servers sharing cert?!
-			s.ctx = tlscontext(crt, key)
+			s.ctx = tls_cert.new_tls_context(certs, key)
 		end)
 	end
 end
@@ -487,7 +396,7 @@ function M.config(conf, kind)
 				panic('[http] certificate provided, but missing key')
 			end
 			-- test if it can be loaded or not
-			load_cert(conf.cert, conf.key)
+			tls_cert.load(conf.cert, conf.key)
 		end
 		if conf.geoip then
 			if has_mmdb then

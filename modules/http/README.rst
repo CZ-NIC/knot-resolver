@@ -71,6 +71,10 @@ TLS certificate that is valid for 90 days and is automatically renewed. It is of
 course self-signed. Why not use something like
 `Let's Encrypt <https://letsencrypt.org>`_?
 
+.. warning::
+
+   If you use package ``luaossl < 20181207``, intermediate certificate is not sent to clients,
+   which may cause problems with validating the connection in some cases.
 
 You can disable unecrypted HTTP and enforce HTTPS by passing
 ``tls = true`` option for all HTTP endpoints:
