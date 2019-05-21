@@ -1,3 +1,12 @@
+Knot Resolver 4.x.y (2019-0m-dd)
+================================
+
+Improvements
+------------
+- http module: also send intermediate TLS certificate to clients,
+  if available and luaossl >= 20181207 (!819)
+
+
 Knot Resolver 4.0.0 (2019-04-18)
 ================================
 
