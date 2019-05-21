@@ -301,6 +301,10 @@ local function tlscontext(crt, key)
 	end
 	assert(ctx:setPrivateKey(key))
 	assert(ctx:setCertificate(crt))
+	if ctx.setCertificateChain then
+		local crt_chain = require('openssl.x509.chain').new():add(crt)
+		assert(crt_chain and ctx:setCertificateChain(crt_chain))
+	end -- otherwise old luaossl version -> only final cert sent to clients
 	return ctx
 end
 
