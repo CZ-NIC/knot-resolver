@@ -21,7 +21,9 @@ Most notable examples of such systems are CentOS 7 and macOS.
 
 If you're using our packages with systemd with sockets support (not supported
 on CentOS 7), network interfaces are configured using systemd drop-in files.
-Each protocol has its own configuration file:
+
+Each protocol has its own configuration file. *By default, these are configured
+to listen on localhost.*
 
 .. csv-table::
   :header: "**Network protocol**", "**Socket file name**"
@@ -31,7 +33,12 @@ Each protocol has its own configuration file:
   ":ref:`mod-http-doh`","``kresd-doh.socket``"
   ":ref:`Web management <mod-http-built-in-services>`","``kresd-webmgmt.socket``"
 
-To configure kresd to listen on a public interface using the original DNS protocol,
+.. warning:: You MUST NOT repeat the localhost defaults in the following
+   drop-in overrides, otherwise the socket will fail to start with "Address in
+   use" error. To view the entire socket configuration, including any drop-ins,
+   use systemctl cat.
+
+To configure kresd to listen on a **public interface** using the original DNS protocol,
 create a drop-in file:
 
 .. code-block:: bash

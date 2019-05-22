@@ -28,7 +28,15 @@ system-kresd.slice
 This manual page describes how to manage \fBkresd\fR using \fBsystemd\fR
 units.
 
-.B Socket activation
+.B QUICKSTART
+
+.nf
+.RS 4n
+\fBsystemctl start kresd@1\fR - single instance of kresd, responding on localhost
+.RE
+.fi
+
+.B SOCKET ACTIVATION
 
 \fBkresd\fR integration with systemd takes advantage of socket activation,
 which enables the daemon to run without super user priviledges or any
@@ -49,9 +57,15 @@ these systemd sockets associated with it:
 .RE
 .fi
 
-.B Configuring network interfaces
+.B CONFIGURING NETWORK INTERFACES
 
-To configure \fBkresd\fR to listen on public interfaces, drop-in files (see
+By default, \fBkresd is configured to listen on localhost\fR (see ports above).
+You MUST NOT repeat these defaults in the following drop-in overrides,
+otherwise the socket will fail to start with "Address in use" error. To view
+the entire socket configuration, including any drop-ins, use \fBsystemctl
+cat\fR.
+
+To configure \fBkresd\fR to listen on \fBpublic interfaces\fR, drop-in files (see
 \fIsystemd.unit\fR(5)) should be used. These can be created with:
 
 .nf
@@ -132,7 +146,7 @@ is unlikely.
 
 For more detailed socket configuration, see \fBsystemd.socket\fR(5).
 
-.B Concurrent daemons
+.B CONCURRENT DAEMONS
 
 \fBkresd\fR daemon can be executed in multiple independent processes, which are
 managed with \fBsystemd\fR via systemd templates (see \fBsystemd.unit\fR(5)).
