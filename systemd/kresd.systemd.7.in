@@ -84,8 +84,8 @@ ListenStream=192.0.2.115:853
 
 To configure \fBkresd\fR to listen on all IPv4 and IPv6 interfaces, use empty
 \fIListenDatagram=\fR and \fIListenStream=\fR directives to remove the default
-localhost address and then  bind to the [::] address. If you've disabled IPv6
-support in kernel, use the 0.0.0.0 address instead.
+localhost address and then specify port to bind to. If you've disabled IPv6
+support in kernel, use the 0.0.0.0:port syntax instead.
 
 .nf
 .RS 4n
@@ -93,13 +93,13 @@ support in kernel, use the 0.0.0.0 address instead.
 [Socket]
 ListenDatagram=
 ListenStream=
-ListenDatagram=[::]:53
-ListenStream=[::]:53
+ListenDatagram=53
+ListenStream=53
 
 # /etc/systemd/system/kresd-tls.socket.d/override.conf
 [Socket]
 ListenStream=
-ListenStream=[::]:853
+ListenStream=853
 .RE
 .fi
 
@@ -122,7 +122,7 @@ on port 443, create the following drop-in file for \fBkresd-doh.socket\fR:
 # /etc/systemd/system/kresd-doh.socket.d/override.conf
 [Socket]
 ListenStream=
-ListenStream=[::]:443
+ListenStream=443
 .RE
 .fi
 

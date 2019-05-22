@@ -78,7 +78,7 @@ distribution. It is also possible to check resulting configuration using
 The default localhost interface/port can also be removed/overriden by using an
 empty ``ListenDatagram=`` or ``ListenStream=`` directive. This can be used when
 you want to configure kresd to listen on all IPv4/IPv6 network interfaces (if
-you've disabled IPv6 support in kernel, use ``0.0.0.0`` instead of ``[::]`` ).
+you've disabled IPv6 support in kernel, use ``0.0.0.0:port`` instead`` ).
 
 .. code-block:: none
 
@@ -86,8 +86,8 @@ you've disabled IPv6 support in kernel, use ``0.0.0.0`` instead of ``[::]`` ).
    [Socket]
    ListenDatagram=
    ListenStream=
-   ListenDatagram=[::]:53
-   ListenStream=[::]:53
+   ListenDatagram=53
+   ListenStream=53
 
 .. note:: Using IPv6 to bind to IPv4 interfaces is currently not compatible
    with IPv4 syntax in ``view:addr()`` when using the ``view`` module. For
@@ -145,7 +145,7 @@ on port 443, create the following drop-in file for ``kresd-doh.socket``:
    # /etc/systemd/system/kresd-doh.socket.d/override.conf
    [Socket]
    ListenStream=
-   ListenStream=[::]:443
+   ListenStream=443
 
 Make sure no other service is using port 443, as that will result in
 unpredictable behaviour. Alternately, you can use port 44353 where a collision
