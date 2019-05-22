@@ -296,6 +296,7 @@ local function alpnselect(_, protos)
 	return nil
 end
 
+local warned_old_luaossl = false
 -- @function Create TLS context
 local function tlscontext(crt, key)
 	local http_tls = require('http.tls')
@@ -308,7 +309,11 @@ local function tlscontext(crt, key)
 	if ctx.setCertificateChain then
 		local crt_chain = require('openssl.x509.chain').new():add(crt)
 		assert(crt_chain and ctx:setCertificateChain(crt_chain))
-	end -- otherwise old luaossl version -> only final cert sent to clients
+	elseif not warned_old_luaossl then
+		-- old luaossl version -> only final cert sent to clients
+		warn('[http] Warning: need luaossl >= 20181207 to support sending intermediary certificate to clients')
+		warned_old_luaossl = true
+	end
 	return ctx
 end
 
