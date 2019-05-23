@@ -283,7 +283,8 @@ Following commands are useful in special situations and can be usef with and wit
 
    .. code-block:: lua
 
-	> net.bufsize 4096
+	> net.bufsize(4096)
+	nil
 	> net.bufsize()
 	4096
 
