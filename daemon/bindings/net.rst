@@ -21,7 +21,9 @@ Most notable examples of such systems are CentOS 7 and macOS.
 
 If you're using our packages with systemd with sockets support (not supported
 on CentOS 7), network interfaces are configured using systemd drop-in files.
-Each protocol has its own configuration file:
+
+Each protocol has its own configuration file. *By default, these are configured
+to listen on localhost.*
 
 .. csv-table::
   :header: "**Network protocol**", "**Socket file name**"
@@ -31,7 +33,12 @@ Each protocol has its own configuration file:
   ":ref:`mod-http-doh`","``kresd-doh.socket``"
   ":ref:`Web management <mod-http-built-in-services>`","``kresd-webmgmt.socket``"
 
-To configure kresd to listen on a public interface using the original DNS protocol,
+.. warning:: You MUST NOT repeat the localhost defaults in the following
+   drop-in overrides, otherwise the socket will fail to start with "Address in
+   use" error. To view the entire socket configuration, including any drop-ins,
+   use systemctl cat.
+
+To configure kresd to listen on a **public interface** using the original DNS protocol,
 create a drop-in file:
 
 .. code-block:: bash
@@ -78,7 +85,7 @@ distribution. It is also possible to check resulting configuration using
 The default localhost interface/port can also be removed/overriden by using an
 empty ``ListenDatagram=`` or ``ListenStream=`` directive. This can be used when
 you want to configure kresd to listen on all IPv4/IPv6 network interfaces (if
-you've disabled IPv6 support in kernel, use ``0.0.0.0`` instead of ``[::]`` ).
+you've disabled IPv6 support in kernel, use ``0.0.0.0:port`` instead`` ).
 
 .. code-block:: none
 
@@ -86,8 +93,8 @@ you've disabled IPv6 support in kernel, use ``0.0.0.0`` instead of ``[::]`` ).
    [Socket]
    ListenDatagram=
    ListenStream=
-   ListenDatagram=[::]:53
-   ListenStream=[::]:53
+   ListenDatagram=53
+   ListenStream=53
 
 .. note:: Using IPv6 to bind to IPv4 interfaces is currently not compatible
    with IPv4 syntax in ``view:addr()`` when using the ``view`` module. For
@@ -145,7 +152,7 @@ on port 443, create the following drop-in file for ``kresd-doh.socket``:
    # /etc/systemd/system/kresd-doh.socket.d/override.conf
    [Socket]
    ListenStream=
-   ListenStream=[::]:443
+   ListenStream=443
 
 Make sure no other service is using port 443, as that will result in
 unpredictable behaviour. Alternately, you can use port 44353 where a collision
