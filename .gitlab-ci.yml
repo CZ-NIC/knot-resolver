@@ -46,13 +46,21 @@ archive:
   script:
     - ./scripts/make-dev-archive.sh
 
-build:
+build: &tmp
   <<: *build
   script:
     - meson build_ci --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled
     - ninja -C build_ci
     - ninja -C build_ci install >/dev/null
     - ${MESON_TEST} --suite unit --suite config
+
+b2: *tmp
+b3: *tmp
+b4: *tmp
+b5: *tmp
+b6: *tmp
+b7: *tmp
+b8: *tmp
 
 build-asan:
   <<: *build
