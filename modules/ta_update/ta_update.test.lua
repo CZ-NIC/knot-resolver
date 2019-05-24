@@ -35,7 +35,7 @@ local function test_ta_update_vs_trust_anchors_dependency()
 	same(ta_update.tracked['\0'], nil, 'stopping removed metadata')
 	same(trust_anchors.keysets['\0'].managed, false, 'now unmanaged TA does not have managed flag')
 	counter = 0
-	worker.sleep(sleep_time)
+	worker.sleep(3 * sleep_time)
 	same(counter, 0, 'stop() actually prevents further TA refreshes')
 
 	ok(modules.unload('ta_update'), 'module can be unloaded')
