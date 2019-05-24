@@ -1,7 +1,7 @@
 -- shorten update interval
-ta_update.refresh_time = 0.3 * sec
-ta_update.hold_down_time = 0.6 * sec
-sleep_time = 0.9
+ta_update.refresh_time = 0.5 * sec
+ta_update.hold_down_time = 1 * sec
+sleep_time = 1.5
 
 -- prevent build-time config from interfering with the test
 trust_anchors.remove('.')
