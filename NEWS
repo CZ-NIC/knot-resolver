@@ -1,6 +1,10 @@
 Knot Resolver 4.x.y (2019-0m-dd)
 ================================
 
+Improvements
+------------
+- DNS-over-HTTPS: answers include `access-control-allow-origin: *` (!823)
+
 Bugfixes
 --------
 - TCP to upstream: don't send wrong message length (unlikely, !816)
