@@ -1,3 +1,11 @@
+Knot Resolver 4.x.y (2019-0m-dd)
+================================
+
+Improvements
+------------
+- DNS-over-HTTPS: answers include `access-control-allow-origin: *` (!823)
+
+
 Knot Resolver 4.0.0 (2019-04-18)
 ================================
 
