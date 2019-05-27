@@ -165,11 +165,12 @@ local function serve(endpoints, h, stream)
 		entry = endpoints[path:match '^/[^/?]*']
 	end
 	-- Unpack MIME and data
-	local data, mime, ttl, err
+	local data, mime, ttl, any_origin, err
 	if entry then
 		mime = entry[1]
 		data = entry[2]
 		ttl = entry[4]
+		any_origin = entry[5]
 	end
 	-- Get string data out of service endpoint
 	if type(data) == 'function' then
@@ -195,6 +196,9 @@ local function serve(endpoints, h, stream)
 		hsend:append('content-length', tostring(#data))
 		if ttl then
 			hsend:append('cache-control', string.format('max-age=%d', ttl))
+		end
+		if any_origin then
+			hsend:append('access-control-allow-origin', '*')
 		end
 		assert(stream:write_headers(hsend, false))
 		assert(stream:write_chunk(data, true))
