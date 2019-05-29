@@ -203,10 +203,13 @@ getent group knot-resolver >/dev/null || groupadd -r knot-resolver
 getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
 
 %post
-%systemd_post 'kresd@*.service'
 %if 0%{?fedora}
+# in case socket/service files are updated
+systemctl daemon-reload
+%systemd_post 'system-kresd.slice'
 # https://fedoraproject.org/wiki/Changes/Removing_ldconfig_scriptlets
 %else
+%systemd_post 'kresd@*.service'
 /sbin/ldconfig
 %endif
 
