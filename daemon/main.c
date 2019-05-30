@@ -647,6 +647,7 @@ static int start_listening(struct network *net, flagged_fd_array_t *fds) {
 
 int main(int argc, char **argv)
 {
+	return EXIT_FAILURE;
 	struct args args;
 	args_init(&args);
 	int ret = parse_args(argc, argv, &args);
