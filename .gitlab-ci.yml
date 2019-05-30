@@ -26,7 +26,10 @@ stages:
 .build: &build
   stage: build
   except:
-    - master
+    refs:
+      - master
+    variables:
+      - $SKIP_CI == "1"
   artifacts:
     when: always
     paths:
@@ -96,7 +99,10 @@ kres-gen:
 .test: &test
   stage: test
   except:
-    - master
+    refs:
+      - master
+    variables:
+      - $SKIP_CI == "1"
   tags:
     - docker
     - linux
@@ -123,7 +129,10 @@ kres-gen:
 .test_nodep: &test_nodep
   stage: test
   except:
-    - master
+    refs:
+      - master
+    variables:
+      - $SKIP_CI == "1"
   dependencies: []  # do not download build artifacts
   tags:
     - docker
@@ -218,7 +227,10 @@ lint:tidy:
 .pkgbuild: &pkgbuild
   stage: test
   except:
-    - master
+    refs:
+      - master
+    variables:
+      - $SKIP_CI == "1"
   image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
   only:  # trigger job only in repos under our control
     - branches@knot/knot-resolver
@@ -313,7 +325,10 @@ pytests:
     - branches@knot/knot-resolver
     - branches@knot/knot-resolver-security
   except:
-    - master
+    refs:
+      - master
+    variables:
+      - $SKIP_CI == "1"
   script:
     - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPDIFF_FORCE -gt 0 || exit 0
     - export LABEL=gl$(date +%s)
@@ -383,7 +398,10 @@ fwd-udp6-unbound.tls6:
     - branches@knot/knot-resolver
     - branches@knot/knot-resolver-security
   except:
-    - master
+    refs:
+      - master
+    variables:
+      - $SKIP_CI == "1"
   script:
     - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPERF_FORCE -gt 0 || exit 0
     - export LABEL=gl$(date +%s)
