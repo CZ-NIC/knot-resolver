@@ -13,6 +13,7 @@ variables:
   LIBKRES_NAME: libkres
   MESON_TEST: meson test -C build_ci* -t 2 --print-errorlogs
   PREFIX: $CI_PROJECT_DIR/.local
+  TEST_DEFAULT: default
 
 image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
 
@@ -52,6 +53,7 @@ archive:
 build:
   <<: *build
   script:
+    - echo $TEST_DEFAULT
     - meson build_ci --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled
     - ninja -C build_ci
     - ninja -C build_ci install >/dev/null
