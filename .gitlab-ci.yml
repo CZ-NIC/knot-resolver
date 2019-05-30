@@ -5,6 +5,7 @@ variables:
   GIT_SUBMODULE_STRATEGY: recursive
   GIT_STRATEGY: clone # sometimes unclean submodule dirs otherwise
   RESPDIFF_PRIORITY: 5
+  DISTROTEST_PRIORITY: 6
   RESPDIFF_COUNT: 1
   RESPDIFF_FORCE: 0
   RESPERF_FORCE: 0
@@ -13,7 +14,6 @@ variables:
   LIBKRES_NAME: libkres
   MESON_TEST: meson test -C build_ci* -t 2 --print-errorlogs
   PREFIX: $CI_PROJECT_DIR/.local
-  TEST_DEFAULT: default
 
 image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
 
@@ -22,6 +22,7 @@ stages:
   - test
   - extended
   - deploy
+  - deploy-test
 
 # build {{{
 .build: &build
@@ -47,6 +48,7 @@ archive:
   variables:
     GIT_COMMITER_NAME: 'ci'
     EMAIL: 'ci@nic'
+  except: null
   script:
     - ./scripts/make-dev-archive.sh
 
@@ -444,20 +446,21 @@ resperf:iter.udp-asan:
 # }}}
 
 # deploy {{{
-pkg:obs:devel:
+obs:trigger:
   stage: deploy
   only:
     variables:
-      - $OBS_BUILD == "1"
-    refs:
-      - nightly@knot/knot-resolver
+      - $OBS_REPO
   dependencies:
     - archive
+  environment:
+    name: OBS/$OBS_REPO
+    url: https://build.opensuse.org/package/show/home:CZ-NIC:$OBS_REPO/knot-resolver
+  tags:
+    - respdiff
   script:
     - scripts/make-distrofiles.sh
-    - echo -e "[general]\napiurl = https://api.opensuse.org\n\n[https://api.opensuse.org]\nuser = CZ-NIC-automation\npass = $OBS_PASSWORD" > /root/.oscrc
-    - scripts/build-in-obs.sh knot-dns-devel  # build against latest development version of knot
-    - scripts/build-in-obs.sh knot-resolver-devel  # build against knot in knot-resolver-latest
+    - scripts/build-in-obs.sh $OBS_REPO
 
 # copy snapshot of current master to nightly branch for further processing
 # (this is workaround for missing complex conditions for job limits in Gitlab)
@@ -476,4 +479,40 @@ nightly:copy:
     # recreate nightly branch from current master
     - 'curl --request POST --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches?branch=nightly&ref=master"'
     - 'curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/protect"'
+# }}}
+
+# deploy-test {{{
+.distrotest: &distrotest
+  stage: deploy-test
+  only:
+    variables:
+      - $OBS_REPO
+  tags:
+    - respdiff
+  script:
+    - "osc results home:CZ-NIC:$OBS_REPO knot-resolver -a x86_64 -r $DISTROTEST_REPO -w >/dev/null"
+    - >
+      osc results home:CZ-NIC:$OBS_REPO knot-resolver -a x86_64 -r $DISTROTEST_REPO --csv | grep 'succeeded|$' -q || \
+        (echo "ERROR: build failed"; exit 1)
+    - export LABEL=gl$(date +%s)
+    - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
+    - export TESTDIR="$COMMITDIR/distrotest.$DISTROTEST_NAME
+    - ln -s $COMMITDIR distrotest_commitdir
+    - sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
+      -p $DISTROTEST_PRIORITY
+      $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
+      "$(git rev-parse --short HEAD)" -l $LABEL -t distrotest.$DISTROTEST_NAME)
+    - exit $(cat distrotest_commitdir/distrotest.$DISTROTEST_NAME/j*_exitcode)
+    - export EXITCODE=$(cat $TESTDIR/j*_exitcode)
+    - if [[ "$EXITCODE" != "0" ]]; then cat $TESTDIR/j*_vagrant.log; fi
+    - exit $EXITCODE
+  after_script:
+    - 'cp -t . distrotest_commitdir/distrotest.$DISTROTEST_NAME/j* ||:'
+
+obs:centos7:x86_64:
+  <<: *distrotest
+  variables:
+    DISTROTEST_NAME: centos7
+    DISTROTEST_REPO: CentOS_7_EPEL
+
 # }}}
