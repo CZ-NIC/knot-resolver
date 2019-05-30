@@ -235,6 +235,7 @@ EOF
 
 ${CDEFS} ${KRESD} types <<-EOF
 	endpoint_flags_t
+	struct simul_loss
 EOF
 
 echo "struct endpoint"    | ${CDEFS} ${KRESD} types | sed 's/uv_handle_t \*/void */'
@@ -248,6 +249,7 @@ ${CDEFS} ${KRESD} functions <<-EOF
 	worker_resolve_exec
 	worker_resolve_mk_pkt
 	worker_resolve_start
+	worker_simul_loss
 EOF
 
 

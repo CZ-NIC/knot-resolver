@@ -152,6 +152,16 @@ typedef array_t(struct mempool *) mp_freelist_t;
 /** List of query resolution tasks. */
 typedef array_t(struct qr_task *) qr_tasklist_t;
 
+/** Testing only: simulation of network problems. */
+struct simul_loss {
+	bool allow; /**< false -> completely disable these simulations */
+	uint16_t seed; /**< randomness */
+	uint32_t udp4_ratio, udp6_ratio; /**< proportion of failure */
+};
+
+/** For lua: get the structure. */
+KR_EXPORT struct simul_loss * worker_simul_loss();
+
 /** \details Worker state is meant to persist during the whole life of daemon. */
 struct worker_ctx {
 	struct engine *engine;
@@ -181,6 +191,7 @@ struct worker_ctx {
 	mp_freelist_t pool_mp;
 	knot_mm_t pkt_pool;
 	unsigned int next_request_uid;
+	struct simul_loss simul_loss; /**< See the struct definition. */
 };
 
 /** @endcond */

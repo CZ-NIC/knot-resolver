@@ -22,6 +22,7 @@
 #include <contrib/ucw/lib.h>
 #include <contrib/ucw/mempool.h>
 #include <contrib/wire.h>
+#include "contrib/murmurhash3/murmurhash3.h" /* hash() for simul_loss */
 #if defined(__GLIBC__) && defined(_GNU_SOURCE)
 #include <malloc.h>
 #endif
@@ -124,6 +125,29 @@ static void on_tcp_connect_timeout(uv_timer_t *timer);
 
 struct worker_ctx the_worker_value; /**< Static allocation is suitable for the singleton. */
 struct worker_ctx *the_worker = NULL;
+
+struct simul_loss * worker_simul_loss()
+{
+	return &the_worker->simul_loss;
+}
+/** Decide whether to simulate loss of communication to the given address. */
+static bool do_simul_loss(const struct worker_ctx *worker, const struct sockaddr *addr,
+			  struct session *session, uv_handle_type type)
+{
+	if (likely(!worker->simul_loss.allow || !session_flags(session)->outgoing))
+		return false;
+	assert(type == UV_UDP);
+	char buf[16/*IP addr*/ + sizeof(worker->simul_loss.seed)];
+	const size_t alen = kr_inaddr_len(addr);
+	memcpy(buf, kr_inaddr(addr), alen);
+	memcpy(buf + alen, &worker->simul_loss.seed, sizeof(worker->simul_loss.seed));
+	uint32_t h = hash(buf, alen + sizeof(worker->simul_loss.seed));
+	uint32_t limit = addr->sa_family == AF_INET
+		? worker->simul_loss.udp4_ratio : worker->simul_loss.udp6_ratio;
+	kr_log_verbose("[simul_loss]          %.10zd < %.10zd\n",
+			(size_t)h, (size_t)limit);
+	return h < limit;
+}
 
 /*! @internal Create a UDP/TCP handle for an outgoing AF_INET* connection.
  *  socktype is SOCK_* */
@@ -619,7 +643,15 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 		uv_udp_send_t *send_req = (uv_udp_send_t *)ioreq;
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
 		send_req->data = task;
-		ret = uv_udp_send(send_req, (uv_udp_t *)handle, &buf, 1, addr, &on_send);
+		if (!do_simul_loss(worker, addr, session, handle->type)) {
+			ret = uv_udp_send(send_req, (uv_udp_t *)handle, &buf, 1,
+					  addr, &on_send);
+		} else {
+			/* Just *pretend* we sent the packet. */
+			ret = 0;
+			send_req->handle = (uv_udp_t *)handle;
+			on_send(send_req, 0);
+		}
 	} else if (handle->type == UV_TCP) {
 		uv_write_t *write_req = (uv_write_t *)ioreq;
 		/* We need to write message length in native byte order,

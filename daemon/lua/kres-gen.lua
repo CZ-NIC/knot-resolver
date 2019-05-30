@@ -392,6 +392,12 @@ typedef struct {
 	_Bool tls;
 	const char *kind;
 } endpoint_flags_t;
+struct simul_loss {
+	_Bool allow;
+	uint16_t seed;
+	uint32_t udp4_ratio;
+	uint32_t udp6_ratio;
+};
 struct endpoint {
 	void *handle;
 	int fd;
@@ -411,6 +417,7 @@ struct qr_task {
 int worker_resolve_exec(struct qr_task *, knot_pkt_t *);
 knot_pkt_t *worker_resolve_mk_pkt(const char *, uint16_t, uint16_t, const struct kr_qflags *);
 struct qr_task *worker_resolve_start(knot_pkt_t *, struct kr_qflags);
+struct simul_loss *worker_simul_loss();
 typedef struct {
 	uint8_t bitmap[32];
 	uint8_t length;
