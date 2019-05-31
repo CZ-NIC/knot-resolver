@@ -484,10 +484,10 @@ if has_cqueues then
 			-- Reschedule timeout or create new one
 			local timeout = self.cq:timeout()
 			if timeout then
-				-- Throttle timeouts to avoid too frequent wakeups
-				if timeout == 0 then timeout = 0.00001 end
-				-- Convert from seconds to duration
+				-- Convert from seconds to duration (milliseconds)
 				timeout = timeout * sec
+				-- Don't allow 0ms timeout.
+				if timeout < 1 then timeout = 1 end
 				if not self.next_timeout then
 					self.next_timeout = event.after(timeout, self.on_step)
 				else
