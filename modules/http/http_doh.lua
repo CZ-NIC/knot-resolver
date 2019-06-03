@@ -112,6 +112,6 @@ end
 -- Export endpoints
 return {
 	endpoints = {
-		['/doh']   = {'text/plain', serve_doh},
+		['/doh']   = {'text/plain', serve_doh, nil, nil, true},
 	}
 }
