@@ -504,12 +504,16 @@ nightly:copy:
       -p $DISTROTEST_PRIORITY
       $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
       "$(git rev-parse --short HEAD)" -l $LABEL -t distrotest.$DISTROTEST_NAME)
-    - exit $(cat distrotest_commitdir/distrotest.$DISTROTEST_NAME/j*_exitcode)
     - export EXITCODE=$(cat $TESTDIR/j*_exitcode)
     - if [[ "$EXITCODE" != "0" ]]; then cat $TESTDIR/j*_vagrant.log; fi
     - exit $EXITCODE
   after_script:
     - 'cp -t . distrotest_commitdir/distrotest.$DISTROTEST_NAME/j* ||:'
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - ./j*
 
 obs:centos7:x86_64:
   <<: *distrotest
@@ -517,4 +521,45 @@ obs:centos7:x86_64:
     DISTROTEST_NAME: centos7
     DISTROTEST_REPO: CentOS_7_EPEL
 
+obs:debian9:x86_64:
+  <<: *distrotest
+  variables:
+    DISTROTEST_NAME: debian9
+    DISTROTEST_REPO: Debian_9.0
+
+obs:fedora29:x86_64:
+  <<: *distrotest
+  variables:
+    DISTROTEST_NAME: fedora29
+    DISTROTEST_REPO: Fedora_29
+
+obs:fedora30:x86_64:
+  <<: *distrotest
+  variables:
+    DISTROTEST_NAME: fedora30
+    DISTROTEST_REPO: Fedora_30
+
+obs:leap15:x86_64:
+  <<: *distrotest
+  variables:
+    DISTROTEST_NAME: leap15
+    DISTROTEST_REPO: openSUSE_Leap_15.0
+
+obs:ubuntu1604:x86_64:
+  <<: *distrotest
+  variables:
+    DISTROTEST_NAME: ubuntu1604
+    DISTROTEST_REPO: xUbuntu_16.04
+
+obs:ubuntu1804:x86_64:
+  <<: *distrotest
+  variables:
+    DISTROTEST_NAME: ubuntu1804
+    DISTROTEST_REPO: xUbuntu_18.04
+
+obs:ubuntu1904:x86_64:
+  <<: *distrotest
+  variables:
+    DISTROTEST_NAME: ubuntu1904
+    DISTROTEST_REPO: xUbuntu_19.04
 # }}}
