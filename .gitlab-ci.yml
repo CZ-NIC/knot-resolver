@@ -561,4 +561,19 @@ obs:ubuntu1904:x86_64:
   variables:
     DISTROTEST_NAME: ubuntu1904
     DISTROTEST_REPO: xUbuntu_19.04
+
+obs:build:all:
+  stage: deploy-test
+  only:
+    variables:
+      - $OBS_REPO
+  when: delayed
+  start_in: 3 minutes  # give OBS build some time
+  tags:
+    - respdiff
+  script:
+    - "osc results home:CZ-NIC:$OBS_REPO knot-resolver -w"
+    - >
+      osc results home:CZ-NIC:$OBS_REPO knot-resolver --csv | grep 'succeeded|$' -q || \
+        (echo "ERROR: build(s) failed"; exit 1)
 # }}}
