@@ -508,7 +508,7 @@ obs:build:all:
   script:
     - "osc results home:CZ-NIC:$OBS_REPO knot-resolver -w"
     - >
-      osc results home:CZ-NIC:$OBS_REPO knot-resolver --csv | grep 'succeeded|$' -q || \
+      ! osc results home:CZ-NIC:$OBS_REPO knot-resolver --csv | grep -v 'succeeded' -q || \
         (echo "ERROR: build(s) failed"; exit 1)
 
 .distrotest: &distrotest
