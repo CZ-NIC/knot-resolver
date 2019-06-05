@@ -445,6 +445,24 @@ resperf:iter.udp-asan:
 # }}}
 
 # deploy {{{
+# copy snapshot of current master to nightly branch for further processing
+# (this is workaround for missing complex conditions for job limits in Gitlab)
+nightly:copy:
+  stage: deploy
+  only:
+    variables:
+      - $CREATE_NIGHTLY == "1"
+    refs:
+      - master@knot/knot-resolver
+  dependencies: []
+  script:
+    # delete nightly branch
+    - 'curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/unprotect"'
+    - 'curl --request DELETE --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly"'
+    # recreate nightly branch from current master
+    - 'curl --request POST --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches?branch=nightly&ref=master"'
+    - 'curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/protect"'
+
 obs:trigger: &obs_trigger
   stage: deploy
   only:
@@ -469,28 +487,10 @@ obs:release:
   variables:
     OBS_REPO: knot-resolver-latest
   when: manual
-
-# copy snapshot of current master to nightly branch for further processing
-# (this is workaround for missing complex conditions for job limits in Gitlab)
-nightly:copy:
-  stage: deploy
-  only:
-    variables:
-      - $CREATE_NIGHTLY == "1"
-    refs:
-      - master@knot/knot-resolver
-  dependencies: []
-  script:
-    # delete nightly branch
-    - 'curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/unprotect"'
-    - 'curl --request DELETE --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly"'
-    # recreate nightly branch from current master
-    - 'curl --request POST --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches?branch=nightly&ref=master"'
-    - 'curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/protect"'
 # }}}
 
 # deploy-test {{{
-.distrotest: &distrotest
+.deploytest: &deploytest
   stage: deploy-test
   only:
     variables:
@@ -502,6 +502,17 @@ nightly:copy:
   start_in: 3 minutes  # give OBS build some time
   tags:
     - respdiff
+
+obs:build:all:
+  <<: *deploytest
+  script:
+    - "osc results home:CZ-NIC:$OBS_REPO knot-resolver -w"
+    - >
+      osc results home:CZ-NIC:$OBS_REPO knot-resolver --csv | grep 'succeeded|$' -q || \
+        (echo "ERROR: build(s) failed"; exit 1)
+
+.distrotest: &distrotest
+  <<: *deploytest
   script:
     - "osc results home:CZ-NIC:$OBS_REPO knot-resolver -a x86_64 -r $DISTROTEST_REPO -w"
     - >
@@ -573,19 +584,4 @@ obs:ubuntu1904:x86_64:
   variables:
     DISTROTEST_NAME: ubuntu1904
     DISTROTEST_REPO: xUbuntu_19.04
-
-obs:build:all:
-  stage: deploy-test
-  only:
-    variables:
-      - $OBS_REPO
-  when: delayed
-  start_in: 3 minutes  # give OBS build some time
-  tags:
-    - respdiff
-  script:
-    - "osc results home:CZ-NIC:$OBS_REPO knot-resolver -w"
-    - >
-      osc results home:CZ-NIC:$OBS_REPO knot-resolver --csv | grep 'succeeded|$' -q || \
-        (echo "ERROR: build(s) failed"; exit 1)
 # }}}
