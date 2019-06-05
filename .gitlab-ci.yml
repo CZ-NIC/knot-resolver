@@ -445,7 +445,7 @@ resperf:iter.udp-asan:
 # }}}
 
 # deploy {{{
-obs:trigger:
+obs:trigger: &obs_trigger
   stage: deploy
   only:
     variables:
@@ -457,9 +457,18 @@ obs:trigger:
     url: https://build.opensuse.org/package/show/home:CZ-NIC:$OBS_REPO/knot-resolver
   tags:
     - respdiff
+  allow_failure: false
   script:
     - scripts/make-distrofiles.sh
     - scripts/build-in-obs.sh $OBS_REPO
+
+obs:release:
+  <<: *obs_trigger
+  only:
+    - tags
+  variables:
+    OBS_REPO: knot-resolver-latest
+  when: manual
 
 # copy snapshot of current master to nightly branch for further processing
 # (this is workaround for missing complex conditions for job limits in Gitlab)
@@ -485,7 +494,10 @@ nightly:copy:
   stage: deploy-test
   only:
     variables:
-      - $OBS_REPO
+      - $OBS_REPO =~ /^knot-resolver-devel|knot-resolver-testing$/
+      - $CI_COMMIT_TAG
+  variables:
+    OBS_REPO: knot-resolver-latest
   when: delayed
   start_in: 3 minutes  # give OBS build some time
   tags:
