@@ -508,6 +508,10 @@ obs:build:all:
   script:
     - "osc results home:CZ-NIC:$OBS_REPO knot-resolver -w"
     - >
+      ! osc ls -b home:CZ-NIC:$OBS_REPO knot-resolver | \
+        grep -E '(rpm|deb|tar\.xz)$' | grep -v $CI_COMMIT_SHORT_SHA || \
+        (echo "ERROR: version mismatch"; exit 1)
+    - >
       ! osc results home:CZ-NIC:$OBS_REPO knot-resolver --csv | grep -v 'succeeded' -q || \
         (echo "ERROR: build(s) failed"; exit 1)
 
