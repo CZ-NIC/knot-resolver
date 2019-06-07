@@ -1,0 +1,41 @@
+-- vim:syntax=lua:set ts=4 sw=4:
+-- Refer to manual: http://knot-resolver.readthedocs.org/en/stable/daemon.html#configuration
+@config_defaults@
+
+-- For DNS-over-HTTPS and web management when using http module
+-- modules.load('http')
+-- http.config({
+-- 	cert = '/etc/knot-resolver/mycert.crt',
+-- 	key = '/etc/knot-resolver/mykey.key',
+-- 	tls = true,
+-- })
+
+-- To disable DNSSEC validation, uncomment the following line (not recommended)
+-- trust_anchors.remove('.')
+
+-- Load useful modules
+modules = {
+	'hints > iterate',  -- Load /etc/hosts and allow custom root hints
+	'stats',            -- Track internal statistics
+	'predict',          -- Prefetch expiring/frequent records
+}
+
+fwd_targets = {
+	-- TODO remove after testing
+	--policy.FORWARD('1.1.1.1'),
+	--policy.FORWARD('8.8.8.8'),
+	--policy.FORWARD('9.9.9.10'),
+	--policy.FORWARD('193.17.47.1'),
+
+	policy.TLS_FORWARD({{'1.1.1.1', hostname='cloudflare-dns.com'}}),
+	--policy.TLS_FORWARD({{'8.8.8.8', hostname='dns.google'}}),  -- TODO why doesn't it work?
+	policy.TLS_FORWARD({{'9.9.9.10', hostname='dns.quad9.net'}}),
+	policy.TLS_FORWARD({{'193.17.47.1', hostname='odvr.nic.cz'}}),
+}
+
+for i = 1, #fwd_targets do
+	policy.add(policy.slice(fwd_targets[i], i, #fwd_targets))
+end
+
+-- Cache size
+cache.size = 100 * MB
