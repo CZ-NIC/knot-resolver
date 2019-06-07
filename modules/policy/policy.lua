@@ -444,6 +444,52 @@ function policy.rpz(action, path, watch)
 	end
 end
 
+-- Get a stable subset of domains in an "index" slice out of "count" total slices
+function policy.slice(action, index, count)
+	if index < 1 or index > count then
+		error('[poli] invalid slice index "' .. index .. '" (valid range: 1 to' ..
+			count .. ')')
+	end
+	local has_psl, psl_lib = pcall(require, 'psl')
+	if not has_psl then
+		error('[poli] lua-psl is required for policy.slice')
+	end
+
+	-- load psl
+	local has_latest, psl = pcall(psl_lib.latest)
+	if not has_latest then -- compatiblity with lua-psl < 0.15
+		psl = psl_lib.builtin()
+	end
+
+	return function(_, query)
+		local domain = kres.dname2str(query:name())
+		if domain:len() > 1 then  --remove trailing dot
+			domain = domain:sub(0, -2)
+		end
+
+		-- do psl lookup for registrable domain
+		local reg_domain = psl:registrable_domain(domain)
+		if reg_domain == nil then  -- fallback to unreg. domain
+			reg_domain = psl:unregistrable_domain(domain)
+			if reg_domain == nil then
+				return action
+			end
+		end
+
+		-- simple algorithm that maps string -> int in a stable way
+		local hash = 0
+		for i = 1, #reg_domain do
+			hash = hash + reg_domain:byte(i)
+		end
+
+		-- assign domain to a slice
+		if hash % count == (index - 1) then
+			return action
+		end
+		return nil
+	end
+end
+
 function policy.DENY_MSG(msg)
 	if msg and (type(msg) ~= 'string' or #msg >= 255) then
 		error('DENY_MSG: optional msg must be string shorter than 256 characters')

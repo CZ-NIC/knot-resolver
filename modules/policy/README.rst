@@ -28,6 +28,9 @@ A *filter* selects which queries will be affected by specified *action*. There a
 * :any:`policy.suffix_common`
 * ``rpz(default_action, path)``
   - implements a subset of RPZ_ in zonefile format.  See below for details: :any:`policy.rpz`.
+* ``slice(action, index, count)`` - splits the entire domain space into
+  ``count`` slices and applies action if the domain belongs to the ``index``
+  slice. For details, see :any:`policy.slice`.
 * custom filter function
 
 .. _mod-policy-actions:
@@ -266,6 +269,40 @@ Most properties (actions, filters) are described above.
    "NSDNAME", "no"
    "NS-IP", "no"
 
+.. function:: policy.slice(action, index, count)
+
+  :param action: action if the QNAME belongs to slice
+  :param index: selected slice - ``1`` to ``count``
+  :param count: total number of slices
+
+  This function splits the entire domain space into ``count`` slices.
+  ``action`` is applied if the QNAME belongs to the ``index`` slice.
+
+  For a given ``count``, the assignment of domains to slices is always
+  **stable** - domain will never change which slice it belongs to. In this
+  case, *domain* means a registrable domain, determined with the use of
+  `Public Suffix List`_.
+
+  The following example demonstrates a distribution among 3 slices:
+
+  .. code-block::
+
+    slice 1/3:
+    example.com
+    a.example.com
+    b.example.com
+    x.b.example.com
+    example3.com
+
+    slice 2/3:
+    example2.co.uk
+
+    slice 3/3:
+    example.co.uk
+    a.example.co.uk
+
+  This function requires `lua-psl` and `libpsl`.
+
 .. function:: policy.todnames({name, ...})
 
    :param: names table of domain names in textual format
@@ -291,3 +328,4 @@ Most properties (actions, filters) are described above.
 .. _`DNS Privacy Project`: https://dnsprivacy.org/
 .. _`IETF draft dprive-dtls-and-tls-profiles`: https://tools.ietf.org/html/draft-ietf-dprive-dtls-and-tls-profiles
 .. _SNI: https://en.wikipedia.org/wiki/Server_Name_Indication
+.. _`Public Suffix List`: https://publicsuffix.org
