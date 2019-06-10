@@ -194,6 +194,7 @@ Examples:
 	net.listen(net.eth0, 853, { kind = 'tls' })
 	net.listen('::', 443, { kind = 'doh' }) -- see http module
 	net.listen('::', 8453, { kind = 'webmgmt' }) -- see http module
+	net.listen('/tmp/kresd-socket', nil, { kind = 'webmgmt' }) -- webmgmt supports AF_UNIX
 
 .. warning:: Make sure you read section :ref:`mod-http-doh` before exposing
              the DNS-over-HTTP protocol to outside.
