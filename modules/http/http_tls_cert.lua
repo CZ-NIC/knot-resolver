@@ -43,10 +43,8 @@ local function new_ephemeral(host)
 	return { crt }, key
 end
 
--- @function Create new self-signed certificate, write to files; return certs, key
--- Well, we actually never read from these files anyway (in case of ephemeral).
-function tls_cert.new_ephemeral_files(certfile, keyfile)
-	local certs, key = new_ephemeral()
+-- @function Write certs and key to files
+local function write_cert_files(certs, key, certfile, keyfile)
 	-- Write certs
 	local f = assert(io.open(certfile, 'w'), string.format('cannot open "%s" for writing', certfile))
 	for _, cert in ipairs(certs) do
@@ -58,7 +56,30 @@ function tls_cert.new_ephemeral_files(certfile, keyfile)
 	local pub, priv = key:toPEM('public', 'private')
 	assert(f:write(pub .. priv))
 	f:close()
-	return certs, key
+end
+
+-- @function Start maintenance of a self-signed TLS context (at ephem_state.ctx).
+-- Stop updating by calling _destroy()
+-- TODO: each process maintains its own ephemeral cert ATM, and the files aren't ever read from.
+function tls_cert.ephemeral_state_maintain(ephem_state, certfile, keyfile)
+	local certs, key = new_ephemeral()
+	write_cert_files(certs, key, certfile, keyfile)
+	ephem_state.ctx = tls_cert.new_tls_context(certs, key)
+	log('[http] created new ephemeral TLS certificate')
+	local _, lifetime_sec = certs[1]:getLifetime()
+	local wait_msec = 1000 * math.max(1, lifetime_sec - (os.time() - 3 * 24 * 3600))
+	if not ephem_state.timer_id then
+		ephem_state.timer_id = event.after(wait_msec, function ()
+			tls_cert.ephemeral_state_maintain(ephem_state, certfile, keyfile)
+		end)
+	else
+		event.reschedule(ephem_state.timer_id, wait_msec)
+	end
+end
+function tls_cert.ephemeral_state_destroy(ephem_state)
+	if ephem_state and ephem_state.timer_id then
+		event.cancel(ephem_state.timer_id)
+	end
 end
 
 -- @function Read a certificate chain and a key from files; return certs, key

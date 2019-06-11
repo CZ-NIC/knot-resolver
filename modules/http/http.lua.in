@@ -276,25 +276,24 @@ end
 -- using configuration for specific "kind" of HTTP server
 local function add_socket(fd, kind, addr_str)
 	assert(M.servers[fd] == nil, 'socket is already served by an HTTP instance')
-	local conf, certs, key
-	conf = mergeconf(M.configs._builtin._all, M.configs._builtin[kind], M.configs._all, M.configs[kind])
+	local conf = mergeconf(M.configs._builtin._all, M.configs._builtin[kind],
+						M.configs._all, M.configs[kind])
 	conf.socket = cqueues.socket.fdopen(fd)
-	if conf.tls ~= false then
-		-- Check if a cert file was specified
-		-- Read or create self-signed x509 certificate
+	if conf.tls ~= false then -- Create a TLS context, either from files or new.
 		if conf.ephemeral then
-			certs, key = tls_cert.new_ephemeral_files(conf.cert, conf.key)
+			if not M.ephem_state then
+				M.ephem_state = {}
+				tls_cert.ephemeral_state_maintain(M.ephem_state, conf.cert, conf.key)
+			end
+			conf.ctx = M.ephem_state.ctx
 		else
-			certs, key = tls_cert.load(conf.cert, conf.key)
+			local certs, key = tls_cert.load(conf.cert, conf.key)
+			conf.ctx = tls_cert.new_tls_context(certs, key)
 		end
-		-- Check loaded certificate
-		if not certs or not key then
-			panic('failed to load certificate "%s"', conf.cert)
-		end
+		assert(conf.ctx)
 	end
 	-- Compose server handler
 	local routes = route(conf.endpoints)
-	conf.ctx = certs and tls_cert.new_tls_context(certs, key)
 	conf.onstream = routes
 	-- Create TLS context and start listening
 	local s, err = http_server.new(conf)
@@ -306,17 +305,6 @@ local function add_socket(fd, kind, addr_str)
 		panic('failed to listen on %s: %s', addr_str, err)
 	end
 	M.servers[fd] = {kind = kind, server = s, config = conf}
-	-- Create certificate renewal timer if ephemeral; FIXME: renew more than once, not per-socket? etc.
-	if certs and conf.ephemeral then
-		local _, expiry = certs[1]:getLifetime()
-		expiry = 1000 * math.max(0, expiry - (os.time() - 3 * 24 * 3600))
-		event.after(expiry, function ()
-			log('[http] refreshed ephemeral certificate')
-			certs, key = tls_cert.new_ephemeral_files(conf.cert, conf.key)
-			-- TODO servers sharing cert?!
-			s.ctx = tls_cert.new_tls_context(certs, key)
-		end)
-	end
 end
 
 -- @function Stop listening on given socket
@@ -358,6 +346,7 @@ function M.deinit()
 		remove_socket(fd)
 	end
 	prometheus.deinit()
+	tls_cert.ephemeral_state_destroy(M.ephem_state)
 	net.register_endpoint_kind('doh')
 	net.register_endpoint_kind('webmgmt')
 end

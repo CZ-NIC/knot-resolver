@@ -10,6 +10,7 @@ Improvements
 Bugfixes
 --------
 - TCP to upstream: don't send wrong message length (unlikely, !816)
+- http module: fix problems around maintenance of ephemeral certs (!819)
 
 
 Knot Resolver 4.0.0 (2019-04-18)
