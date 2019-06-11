@@ -112,6 +112,12 @@ for authentication to API etc.
 Safari doesn't allow WebSockets over HTTPS with a self-signed certificate.
 Major drawback is that current browsers won't do HTTP/2 over insecure connection.)
 
+.. warning::
+
+   If you use multiple Knot Resolver instances with these automatically maintained ephemeral certificates,
+   they currently won't be shared.
+   It's assumed that you don't want a self-signed certificate for serious deployments anyway.
+
 .. _mod-http-built-in-services:
 
 Built-in services
