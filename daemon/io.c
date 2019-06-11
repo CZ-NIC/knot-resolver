@@ -373,7 +373,7 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
 #ifdef TCP_DEFER_ACCEPT
 	val = KR_CONN_RTT_MAX/1000;
 	if (setsockopt(fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &val, sizeof(val))) {
-		kr_log_error("[ io ] tcp_bind (defer_accept): %s\n", strerror(errno));
+		kr_log_error("[ io ] listen TCP (defer_accept): %s\n", strerror(errno));
 	}
 #endif
 
@@ -390,7 +390,7 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
 	val = 1; /* Accepts on/off */
 	#endif
 	if (setsockopt(fd, IPPROTO_TCP, TCP_FASTOPEN, &val, sizeof(val))) {
-		kr_log_error("[ io ] tcp_bind (fastopen): %s\n", strerror(errno));
+		kr_log_error("[ io ] listen TCP (fastopen): %s\n", strerror(errno));
 	}
 #endif
 

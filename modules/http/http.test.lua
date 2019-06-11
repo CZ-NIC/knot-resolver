@@ -94,10 +94,29 @@ else
 		same(code, 400, '/trace requires name')
 	end
 
+	-- AF_UNIX tests (very basic ATM)
+	local function test_unix_socket()
+		local s_path = os.tmpname()
+		os.remove(s_path) -- on POSIX .tmpname() (usually) creates a file :-/
+		ok(net.listen(s_path, nil, { kind = 'webmgmt' }),  'AF_UNIX net.listen() on ' .. s_path)
+		-- Unfortunately we can't use standard functions for fetching http://
+		local socket = require("cqueues.socket")
+		local sock = socket.connect({ path = s_path })
+		local connection = require('http.h2_connection')
+		local conn = connection.new(sock, 'client')
+		local _, err = conn:connect()
+		os.remove(s_path) -- don't leave garbage around, hopefully not even on errors
+		same(err, nil, 'AF_UNIX connect(): ' .. (err or 'OK'))
+		same(conn:ping(), true, 'AF_UNIX http ping')
+		-- here we might do `conn:new_stream()` and some real queries
+		same(conn:close(), true, 'AF_UNIX close')
+	end
+
 	-- plan tests
 	local tests = {
 		start_server,
 		test_builtin_pages,
+		test_unix_socket,
 	}
 
 	return tests
