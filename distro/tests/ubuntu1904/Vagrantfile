@@ -4,16 +4,21 @@
 
 Vagrant.configure(2) do |config|
 
-    config.vm.box = "fedora/28-cloud-base"
+    config.vm.box = "generic/ubuntu1904"
     config.vm.synced_folder ".", "/vagrant", disabled: true
 
-    config.vm.define "fedora28_knot-resolver"  do |machine|
+    config.vm.define "ubuntu1904_knot-resolver"  do |machine|
         machine.vm.provision "ansible" do |ansible|
             ansible.playbook = "../knot-resolver-pkgtest.yaml"
             ansible.extra_vars = {
                 ansible_python_interpreter: "/usr/bin/python3"
             }
         end
+    end
+
+    config.vm.provider :libvirt do |libvirt|
+      libvirt.cpus = 1
+      libvirt.memory = 512
     end
 
 end

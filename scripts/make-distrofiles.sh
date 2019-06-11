@@ -2,26 +2,12 @@
 set -o errexit -o nounset -o xtrace
 
 cd "$(dirname ${0})/.."
-PKGDIR="build_dist/meson-dist"
-
-# Run with -s to include *.symbols files.
+pkgdir="build_dist/meson-dist"
 
 package=knot-resolver
-withsymbols=false
-
-while getopts "s" o; do
-	case "${o}" in
-		s)
-			withsymbols=true
-			;;
-		*)
-			;;
-	esac
-done
-shift $((OPTIND-1))
 
 
-pushd ${PKGDIR}
+pushd ${pkgdir}
 version=$(ls ${package}*.tar.xz | sed "s/${package}-\(.*\).tar.xz/\1/")
 popd
 
@@ -40,17 +26,12 @@ done
 # Rename archive to debian format
 pkgname="${package}-${version}"
 debname="${package}_${version}.orig"
-cp "${PKGDIR}/${pkgname}.tar.xz" "${debname}.tar.xz"
+cp "${pkgdir}/${pkgname}.tar.xz" "${debname}.tar.xz"
 
 # Prepare clean debian-specific directory
 tar -xf "${debname}.tar.xz"
 pushd "${pkgname}" > /dev/null
 cp -arL ../distro/deb debian
-
-# Optionally remove symbols file
-if [ "$withsymbols" = false ]; then
-    rm -f debian/*.symbols
-fi
 
 # Create debian archive and dsc
 dpkg-source -b .
