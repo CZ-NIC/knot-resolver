@@ -5,6 +5,7 @@ Improvements
 ------------
 - DNS-over-HTTPS: answers include `access-control-allow-origin: *` (!823)
 - support named AF_UNIX stream sockets for the http module (again)
+- aggressive caching is disabled on minimal NSEC* ranges (!826)
 
 Bugfixes
 --------
