@@ -132,7 +132,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	const uint8_t lowest_rank = get_lowest_rank(req, qry);
 
 	/**** 1. find the name or the closest (available) zone, not considering wildcards
-	 **** 1a. exact name+type match (can be negative answer in insecure zones) */
+	 **** 1a. exact name+type match (can be negative, mainly in insecure zones) */
 	{
 		knot_db_val_t key = key_exact_type_maypkt(k, qry->stype);
 		knot_db_val_t val = { NULL, 0 };
@@ -496,7 +496,8 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 	if (eh->is_packet) {
 		/* Note: we answer here immediately, even if it's (theoretically)
 		 * possible that we could generate a higher-security negative proof.
-		 * Rank is high-enough so we take it to save time searching. */
+		 * Rank is high-enough so we take it to save time searching;
+		 * in practice this also helps in some incorrect zones (live-signed). */
 		return answer_from_pkt  (ctx, pkt, qry->stype, eh, eh_bound, new_ttl);
 	} else {
 		return answer_simple_hit(ctx, pkt, qry->stype, eh, eh_bound, new_ttl);

@@ -5,6 +5,7 @@ Improvements
 ------------
 - DNS-over-HTTPS: answers include `access-control-allow-origin: *` (!823)
 - support named AF_UNIX stream sockets for the http module (again)
+- aggressive caching is disabled on minimal NSEC* ranges (!826)
 - aarch64 support, even kernels with ARM64_VA_BITS >= 48 (#216, !797)
   This is done by working around a LuaJIT incompatibility.
 - lua modules may omit casting parameters of layer functions (!797)
