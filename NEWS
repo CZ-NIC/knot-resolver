@@ -14,13 +14,15 @@ Improvements
 - http module: also send intermediate TLS certificate to clients,
   if available and luaossl >= 20181207 (!819)
 - systemd: basic watchdog is now available and turned on by default (#275)
+- experimental cache garbage collector daemon is available (#257)
 
 Bugfixes
 --------
 - TCP to upstream: don't send wrong message length (unlikely, !816)
 - http module: fix problems around maintenance of ephemeral certs (!819)
+- http module: also send intermediate TLS certificate to clients,
+  if available and luaossl >= 20181207 (!819)
 - send EDNS with SERVFAILs, e.g. on validation failures (#180, !827)
-
 
 Knot Resolver 4.0.0 (2019-04-18)
 ================================
