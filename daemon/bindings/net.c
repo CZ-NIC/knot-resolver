@@ -279,7 +279,7 @@ static int net_interfaces(lua_State *L)
 			buf[0] = '\0';
 		}
 		lua_pushstring(L, buf);
-		lua_rawseti(L, -2, lua_rawlen(L, -2) + 1);
+		lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
 		lua_setfield(L, -2, "addr");
 
 		/* Hardware address. */
@@ -319,7 +319,7 @@ static int net_bufsize(lua_State *L)
 /** Set TCP pipelining size. */
 static int net_pipeline(lua_State *L)
 {
-	struct worker_ctx *worker = wrk_luaget(L);
+	struct worker_ctx *worker = the_worker;
 	if (!worker) {
 		return 0;
 	}
@@ -824,12 +824,11 @@ static int net_tls_sticket_secret_file(lua_State *L)
 
 static int net_outgoing(lua_State *L, int family)
 {
-	struct worker_ctx *worker = wrk_luaget(L);
 	union inaddr *addr;
 	if (family == AF_INET)
-		addr = (union inaddr*)&worker->out_addr4;
+		addr = (union inaddr*)&the_worker->out_addr4;
 	else
-		addr = (union inaddr*)&worker->out_addr6;
+		addr = (union inaddr*)&the_worker->out_addr6;
 
 	if (lua_gettop(L) == 0) { /* Return the current value. */
 		if (addr->ip.sa_family == AF_UNSPEC) {
@@ -1031,7 +1030,7 @@ int kr_bindings_net(lua_State *L)
 		{ "register_endpoint_kind", net_register_endpoint_kind },
 		{ NULL, NULL }
 	};
-	register_lib(L, "net", lib);
+	luaL_register(L, "net", lib);
 	return 1;
 }
 

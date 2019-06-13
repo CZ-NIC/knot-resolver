@@ -122,8 +122,7 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 			goto finish;
 		}
 
-		struct engine *engine = ((struct worker_ctx *)stream->loop->data)->engine;
-		lua_State *L = engine->L;
+		lua_State *L = the_worker->engine->L;
 		int ret = engine_cmd(L, cmd, false);
 		const char *message = "";
 		if (lua_gettop(L) > 0) {
@@ -723,13 +722,10 @@ int main(int argc, char **argv)
 	/* Switch to rundir. */
 	if (args.rundir != NULL) {
 		/* FIXME: access isn't a good way if we start as root and drop privileges later */
-		if (access(args.rundir, W_OK) != 0) {
-			kr_log_error("[system] rundir '%s': %s\n", args.rundir, strerror(errno));
-			return EXIT_FAILURE;
-		}
-		ret = chdir(args.rundir);
-		if (ret != 0) {
-			kr_log_error("[system] rundir '%s': %s\n", args.rundir, strerror(errno));
+		if (access(args.rundir, W_OK) != 0
+		    || chdir(args.rundir) != 0) {
+			kr_log_error("[system] rundir '%s': %s\n",
+					args.rundir, strerror(errno));
 			return EXIT_FAILURE;
 		}
 	}
@@ -758,23 +754,22 @@ int main(int argc, char **argv)
 		.ctx = mp_new (4096),
 		.alloc = (knot_mm_alloc_t) mp_alloc
 	};
-	struct engine engine;
+	/** Static to work around lua_pushlightuserdata() limitations.
+	 * TODO: convert to a proper singleton like worker, most likely. */
+	static struct engine engine;
 	ret = engine_init(&engine, &pool);
 	if (ret != 0) {
 		kr_log_error("[system] failed to initialize engine: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;
 	}
-	/* Create worker */
-	struct worker_ctx *worker = worker_create(&engine, &pool, fork_id, args.forks);
-	if (!worker) {
-		kr_log_error("[system] not enough memory\n");
+	/* Initialize the worker */
+	ret = worker_init(&engine, fork_id, args.forks);
+	if (ret != 0) {
+		kr_log_error("[system] failed to initialize worker: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;
 	}
 
 	uv_loop_t *loop = uv_default_loop();
-	worker->loop = loop;
-	loop->data = worker;
-
 	/* Catch some signals. */
 	uv_signal_t sigint, sigterm;
 	if (true) ret = uv_signal_init(loop, &sigint);
@@ -840,7 +835,7 @@ int main(int argc, char **argv)
 
 cleanup:/* Cleanup. */
 	engine_deinit(&engine);
-	worker_reclaim(worker);
+	worker_deinit();
 	if (loop != NULL) {
 		uv_loop_close(loop);
 	}

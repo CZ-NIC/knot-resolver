@@ -18,16 +18,12 @@
 #include <lua.h>
 #include <lauxlib.h>
 
+#include "daemon/bindings/impl.h"
 #include "daemon/engine.h"
 #include "daemon/ffimodule.h"
+#include "daemon/worker.h"
 #include "lib/module.h"
 #include "lib/layer.h"
-
-#if LUA_VERSION_NUM >= 502
-#define l_resume(L, argc) lua_resume((L), NULL, (argc))
-#else
-#define l_resume(L, argc) lua_resume((L), (argc))
-#endif
 
 /** @internal Slots for layer callbacks.
   * Each slot ID corresponds to Lua reference in module API. */
@@ -41,27 +37,15 @@ enum {
 	SLOT_answer_finalize,
 	SLOT_count /* dummy, must be the last */
 };
-#define SLOT_size sizeof(int)
 
-/** @internal Helper for retrieving the right function entrypoint. */
-static inline lua_State *l_ffi_preface(struct kr_module *module, const char *call) {
-	lua_State *L = module->lib;
-	lua_getglobal(L, module->name);
-	lua_getfield(L, -1, call);
-	lua_remove(L, -2);
-	if (lua_isnil(L, -1)) {
-		lua_pop(L, 1);
-		return NULL;
-	}
-	lua_pushlightuserdata(L, module);
-	return L;
-}
+/** Lua registry indices for functions that wrap layer callbacks (shared by all lua modules). */
+static int l_ffi_wrap_slots[SLOT_count] = { 0 };
 
 /** @internal Continue with coroutine. */
 static void l_ffi_resume_cb(uv_idle_t *check)
 {
 	lua_State *L = check->data;
-	int status = l_resume(L, 0);
+	int status = lua_resume(L, 0);
 	if (status != LUA_YIELD) {
 		uv_idle_stop(check); /* Stop coroutine */
 		uv_close((uv_handle_t *)check, (uv_close_cb)free);
@@ -82,7 +66,7 @@ static int l_ffi_defer(lua_State *L)
 }
 
 /** @internal Helper for calling the entrypoint, for kr_module functions. */
-static inline int l_ffi_call_mod(lua_State *L, int argc)
+static int l_ffi_call_mod(lua_State *L, int argc)
 {
 	int status = lua_pcall(L, argc, 1, 0);
 	if (status != 0) {
@@ -93,40 +77,42 @@ static inline int l_ffi_call_mod(lua_State *L, int argc)
 	if (lua_isnumber(L, -1)) { /* Return code */
 		status = lua_tointeger(L, -1);
 	} else if (lua_isthread(L, -1)) { /* Continuations */
+		/* TODO: unused, possibly in a bad shape.  Meant KR_STATE_YIELD? */
+		assert(!ENOTSUP);
 		status = l_ffi_defer(lua_tothread(L, -1));
 	}
 	lua_pop(L, 1);
 	return status;
 }
 
-/** @internal Helper for calling the entrypoint, for kr_layer_api functions. */
-static inline int l_ffi_call_layer(lua_State *L, int argc)
+/** Common part of calling modname.(de)init in lua.
+ * The function to call should be on top of the stack and it gets popped. */
+static int l_ffi_modcb(lua_State *L, struct kr_module *module)
 {
-	int ret = l_ffi_call_mod(L, argc);
-	/* The return codes are mixed at this point.  We need to return KR_STATE_* */
-	return ret < 0 ? KR_STATE_FAIL : ret;
-}
-
-static int l_ffi_init(struct kr_module *module)
-{
-	lua_State *L = l_ffi_preface(module, "init");
-	if (!L) {
-		return 0;
+	if (lua_isnil(L, -1)) {
+		lua_pop(L, 1); /* .(de)init == nil, maybe even the module table doesn't exist */
+		return kr_ok();
 	}
-	return l_ffi_call_mod(L, 1);
+	lua_getglobal(L, "modules_ffi_wrap_modcb");
+	lua_insert(L, -2); /* swap with .(de)init */
+	lua_pushpointer(L, module);
+	if (lua_pcall(L, 2, 0, 0) == 0)
+		return kr_ok();
+	kr_log_error("error: %s\n", lua_tostring(L, -1));
+	lua_pop(L, 1);
+	return kr_error(1);
 }
 
 static int l_ffi_deinit(struct kr_module *module)
 {
-	/* Deinit the module in Lua (if possible) */
-	int ret = 0;
-	lua_State *L = module->lib;
-	if (l_ffi_preface(module, "deinit")) {
-		ret = l_ffi_call_mod(L, 1);
-	}
-	module->lib = NULL;
-	/* Free the layer API wrapper (unconst it) */
-	kr_layer_api_t* api = module->data;
+	/* Call .deinit(), if it exists. */
+	lua_State *L = the_worker->engine->L;
+	lua_getglobal(L, module->name);
+	lua_getfield(L, -1, "deinit");
+	const int ret = l_ffi_modcb(L, module);
+	lua_pop(L, 1); /* the module's table */
+
+	const kr_layer_api_t *api = module->layer;
 	if (!api) {
 		return ret;
 	}
@@ -136,42 +122,39 @@ static int l_ffi_deinit(struct kr_module *module)
 			luaL_unref(L, LUA_REGISTRYINDEX, api->cb_slots[si]);
 		}
 	}
-	free(api);
+	free_const(api);
 	return ret;
 }
 
-/** @internal Helper for retrieving layer Lua function by name. */
-#define LAYER_FFI_CALL(ctx, slot_name) \
-	const int *cb_slot = (ctx)->api->cb_slots + SLOT_ ## slot_name; \
-	if (*cb_slot <= 0) { \
-		return (ctx)->state; \
-	} \
-	struct kr_module *module = (ctx)->api->data; \
-	lua_State *L = module->lib; \
-	lua_rawgeti(L, LUA_REGISTRYINDEX, *cb_slot); \
-	lua_pushnumber(L, (ctx)->state)
+/** @internal Helper for calling a layer Lua function by e.g. SLOT_begin. */
+static int l_ffi_call_layer(kr_layer_t *ctx, int slot_ix)
+{
+	const int wrap_slot = l_ffi_wrap_slots[slot_ix];
+	const int cb_slot = ctx->api->cb_slots[slot_ix];
+	assert(wrap_slot > 0 && cb_slot > 0);
+	lua_State *L = the_worker->engine->L;
+	lua_rawgeti(L, LUA_REGISTRYINDEX, wrap_slot);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_slot);
+	lua_pushpointer(L, ctx);
+	const int ret = l_ffi_call_mod(L, 2);
+	/* The return codes are mixed at this point.  We need to return KR_STATE_* */
+	return ret < 0 ? KR_STATE_FAIL : ret;
+}
 
 static int l_ffi_layer_begin(kr_layer_t *ctx)
 {
-	LAYER_FFI_CALL(ctx, begin);
-	lua_pushlightuserdata(L, ctx->req);
-	return l_ffi_call_layer(L, 2);
+	return l_ffi_call_layer(ctx, SLOT_begin);
 }
 
 static int l_ffi_layer_reset(kr_layer_t *ctx)
 {
-	LAYER_FFI_CALL(ctx, reset);
-	lua_pushlightuserdata(L, ctx->req);
-	return l_ffi_call_layer(L, 2);
+	return l_ffi_call_layer(ctx, SLOT_reset);
 }
 
 static int l_ffi_layer_finish(kr_layer_t *ctx)
 {
-	struct kr_request *req = ctx->req;
-	LAYER_FFI_CALL(ctx, finish);
-	lua_pushlightuserdata(L, req);
-	lua_pushlightuserdata(L, req->answer);
-	return l_ffi_call_layer(L, 3);
+	ctx->pkt = ctx->req->answer;
+	return l_ffi_call_layer(ctx, SLOT_finish);
 }
 
 static int l_ffi_layer_consume(kr_layer_t *ctx, knot_pkt_t *pkt)
@@ -179,43 +162,76 @@ static int l_ffi_layer_consume(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (ctx->state & KR_STATE_FAIL) {
 		return ctx->state; /* Already failed, skip */
 	}
-	LAYER_FFI_CALL(ctx, consume);
-	lua_pushlightuserdata(L, ctx->req);
-	lua_pushlightuserdata(L, pkt);
-	return l_ffi_call_layer(L, 3);
+	ctx->pkt = pkt;
+	return l_ffi_call_layer(ctx, SLOT_consume);
 }
 
 static int l_ffi_layer_produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
-	if (ctx->state & (KR_STATE_FAIL)) {
-		return ctx->state; /* Already failed or done, skip */
+	if (ctx->state & KR_STATE_FAIL) {
+		return ctx->state; /* Already failed, skip */
 	}
-	LAYER_FFI_CALL(ctx, produce);
-	lua_pushlightuserdata(L, ctx->req);
-	lua_pushlightuserdata(L, pkt);
-	return l_ffi_call_layer(L, 3);
+	ctx->pkt = pkt;
+	return l_ffi_call_layer(ctx, SLOT_produce);
 }
 
-static int l_ffi_layer_checkout(kr_layer_t *ctx, knot_pkt_t *pkt, struct sockaddr *dst, int type)
+static int l_ffi_layer_checkout(kr_layer_t *ctx, knot_pkt_t *pkt,
+				struct sockaddr *dst, int type)
 {
-	if (ctx->state & (KR_STATE_FAIL)) {
-		return ctx->state; /* Already failed or done, skip */
+	if (ctx->state & KR_STATE_FAIL) {
+		return ctx->state; /* Already failed, skip */
 	}
-	LAYER_FFI_CALL(ctx, checkout);
-	lua_pushlightuserdata(L, ctx->req);
-	lua_pushlightuserdata(L, pkt);
-	lua_pushlightuserdata(L, dst);
-	lua_pushboolean(L, type == SOCK_STREAM);
-	return l_ffi_call_layer(L, 5);
+	ctx->pkt = pkt;
+	ctx->dst = dst;
+	ctx->is_stream = (type == SOCK_STREAM);
+	return l_ffi_call_layer(ctx, SLOT_checkout);
 }
 
 static int l_ffi_layer_answer_finalize(kr_layer_t *ctx)
 {
-	LAYER_FFI_CALL(ctx, answer_finalize);
-	lua_pushlightuserdata(L, ctx->req);
-	return l_ffi_call_layer(L, 2);
+	return l_ffi_call_layer(ctx, SLOT_answer_finalize);
 }
-#undef LAYER_FFI_CALL
+
+int ffimodule_init(lua_State *L)
+{
+	/* Wrappers defined in ./lua/sandbox.lua */
+	/* for API: (int state, kr_request_t *req) */
+	lua_getglobal(L, "modules_ffi_layer_wrap1");
+	const int wrap1 = luaL_ref(L, LUA_REGISTRYINDEX);
+	/* for API: (int state, kr_request_t *req, knot_pkt_t *) */
+	lua_getglobal(L, "modules_ffi_layer_wrap2");
+	const int wrap2 = luaL_ref(L, LUA_REGISTRYINDEX);
+	lua_getglobal(L, "modules_ffi_layer_wrap_checkout");
+	const int wrap_checkout = luaL_ref(L, LUA_REGISTRYINDEX);
+	if (wrap1 == LUA_REFNIL || wrap2 == LUA_REFNIL || wrap_checkout == LUA_REFNIL) {
+		return kr_error(ENOENT);
+	}
+
+	const int slots[SLOT_count] = {
+		[SLOT_begin]   = wrap1,
+		[SLOT_reset]   = wrap1,
+		[SLOT_finish]  = wrap2,
+		[SLOT_consume] = wrap2,
+		[SLOT_produce] = wrap2,
+		[SLOT_checkout] = wrap_checkout,
+		[SLOT_answer_finalize] = wrap1,
+	};
+	memcpy(l_ffi_wrap_slots, slots, sizeof(l_ffi_wrap_slots));
+	return kr_ok();
+}
+void ffimodule_deinit(lua_State *L)
+{
+	/* Unref each wrapper function from lua.
+	 * It's probably useless, as we're about to destroy lua_State, but... */
+	const int wrapsIndices[] = {
+		SLOT_begin,
+		SLOT_consume,
+		SLOT_checkout,
+	};
+	for (int i = 0; i < sizeof(wrapsIndices) / sizeof(wrapsIndices[0]); ++i) {
+		luaL_unref(L, LUA_REGISTRYINDEX, l_ffi_wrap_slots[wrapsIndices[i]]);
+	}
+}
 
 /** @internal Conditionally register layer trampoline
   * @warning Expects 'module.layer' to be on top of Lua stack. */
@@ -236,7 +252,7 @@ static kr_layer_api_t *l_ffi_layer_create(lua_State *L, struct kr_module *module
 	/* Fabricate layer API wrapping the Lua functions
 	 * reserve slots after it for references to Lua callbacks. */
 	const size_t api_length = offsetof(kr_layer_api_t, cb_slots)
-				+ (SLOT_count * SLOT_size);
+				+ (SLOT_count * sizeof(module->layer->cb_slots[0]));
 	kr_layer_api_t *api = malloc(api_length);
 	if (api) {
 		memset(api, 0, api_length);
@@ -247,9 +263,6 @@ static kr_layer_api_t *l_ffi_layer_create(lua_State *L, struct kr_module *module
 		LAYER_REGISTER(L, api, checkout);
 		LAYER_REGISTER(L, api, answer_finalize);
 		LAYER_REGISTER(L, api, reset);
-		/* Begin is always set, as it initializes layer baton. */
-		api->begin = l_ffi_layer_begin;
-		api->data = module;
 	}
 	return api;
 }
@@ -273,19 +286,17 @@ int ffimodule_register_lua(struct engine *engine, struct kr_module *module, cons
 	/* Create FFI module with trampolined functions. */
 	memset(module, 0, sizeof(*module));
 	module->name = strdup(name);
-	module->init = &l_ffi_init;
 	module->deinit = &l_ffi_deinit;
 	/* Bake layer API if defined in module */
 	lua_getfield(L, -1, "layer");
 	if (!lua_isnil(L, -1)) {
 		module->layer = l_ffi_layer_create(L, module);
-		/* most likely not needed, but compatibility for now */
-		module->data = (void *)module->layer;
 	}
-	module->lib = L;
-	lua_pop(L, 2); /* Clear the layer + module global */
-	if (module->init) {
-		return module->init(module);
-	}
-	return kr_ok();
+	lua_pop(L, 1); /* .layer table */
+
+	/* Now call .init(), if it exists. */
+	lua_getfield(L, -1, "init");
+	const int ret = l_ffi_modcb(L, module);
+	lua_pop(L, 1); /* the module's table */
+	return ret;
 }

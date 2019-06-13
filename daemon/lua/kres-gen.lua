@@ -38,6 +38,9 @@ typedef struct {
 	knot_rdataset_t rrs;
 	void *additional;
 } knot_rrset_t;
+
+struct kr_module;
+typedef char *(kr_prop_cb)(void *, struct kr_module *, const char *);
 typedef struct knot_pkt knot_pkt_t;
 typedef struct {
 	uint8_t *ptr[15];
@@ -84,6 +87,7 @@ typedef struct {
 	void *root;
 	struct knot_mm *pool;
 } map_t;
+typedef struct trie trie_t;
 struct kr_qflags {
 	_Bool NO_MINIMIZE : 1;
 	_Bool NO_THROTTLE : 1;
@@ -142,7 +146,6 @@ typedef struct {
 	size_t len;
 	size_t cap;
 } ranked_rr_array_t;
-typedef struct trie trie_t;
 struct kr_zonecut {
 	knot_dname_t *name;
 	knot_rrset_t *key;
@@ -198,7 +201,6 @@ struct kr_request {
 	int vars_ref;
 	knot_mm_t pool;
 	unsigned int uid;
-	void *daemon_context;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
 struct kr_cdb_stats {
@@ -225,6 +227,42 @@ struct kr_cache {
 	uint32_t ttl_max;
 	struct timeval checkpoint_walltime;
 	uint64_t checkpoint_monotime;
+};
+struct kr_layer {
+	int state;
+	struct kr_request *req;
+	const struct kr_layer_api *api;
+	knot_pkt_t *pkt;
+	struct sockaddr *dst;
+	_Bool is_stream;
+};
+typedef struct kr_layer kr_layer_t;
+struct kr_layer_api {
+	int (*begin)(kr_layer_t *);
+	int (*reset)(kr_layer_t *);
+	int (*finish)(kr_layer_t *);
+	int (*consume)(kr_layer_t *, knot_pkt_t *);
+	int (*produce)(kr_layer_t *, knot_pkt_t *);
+	int (*checkout)(kr_layer_t *, knot_pkt_t *, struct sockaddr *, int);
+	int (*answer_finalize)(kr_layer_t *);
+	void *data;
+	int cb_slots[];
+};
+typedef struct kr_layer_api kr_layer_api_t;
+struct kr_prop {
+	kr_prop_cb *cb;
+	const char *name;
+	const char *info;
+};
+struct kr_module {
+	char *name;
+	int (*init)(struct kr_module *);
+	int (*deinit)(struct kr_module *);
+	int (*config)(struct kr_module *, const char *);
+	const kr_layer_api_t *layer;
+	const struct kr_prop *props;
+	void *lib;
+	void *data;
 };
 
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
@@ -281,6 +319,7 @@ char *knot_dname_to_str(char *, const knot_dname_t *, size_t);
 knot_rdata_t *knot_rdataset_at(const knot_rdataset_t *, uint16_t);
 int knot_rdataset_merge(knot_rdataset_t *, const knot_rdataset_t *, knot_mm_t *);
 int knot_rrset_add_rdata(knot_rrset_t *, const uint8_t *, uint16_t, knot_mm_t *);
+void knot_rrset_free(knot_rrset_t *, knot_mm_t *);
 int knot_rrset_txt_dump(const knot_rrset_t *, char **, size_t *, const knot_dump_style_t *);
 int knot_rrset_txt_dump_data(const knot_rrset_t *, const size_t, char *, const size_t, const knot_dump_style_t *);
 size_t knot_rrset_size(const knot_rrset_t *);
@@ -361,6 +400,17 @@ struct endpoint {
 	_Bool engaged;
 	endpoint_flags_t flags;
 };
+struct request_ctx {
+	struct kr_request req;
+	/* beware: hidden stub, to avoid hardcoding sockaddr lengths */
+};
+struct qr_task {
+	struct request_ctx *ctx;
+	/* beware: hidden stub, to avoid qr_tasklist_t */
+};
+int worker_resolve_exec(struct qr_task *, knot_pkt_t *);
+knot_pkt_t *worker_resolve_mk_pkt(const char *, uint16_t, uint16_t, const struct kr_qflags *);
+struct qr_task *worker_resolve_start(knot_pkt_t *, struct kr_qflags);
 typedef struct {
 	uint8_t bitmap[32];
 	uint8_t length;

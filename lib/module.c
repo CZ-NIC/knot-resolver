@@ -98,7 +98,9 @@ static int load_sym_c(struct kr_module *module, uint32_t api_required)
 	    || load_symbol(module->lib, m_prefix, "props")) {
 		/* In case someone re-compiled against new kresd
 		 * but haven't actually changed the symbols. */
-		kr_log_error("[system] module %s needs to change API.\n", module->name);
+		kr_log_error("[system] module %s requires upgrade.  Please refer to "
+			"https://knot-resolver.readthedocs.io/en/stable/upgrading.hml",
+			module->name);
 		return kr_error(ENOTSUP);
 	}
 

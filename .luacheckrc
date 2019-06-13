@@ -12,6 +12,7 @@ new_read_globals = {
 	'quit',
 	'resolve',
 	'ta_update',
+	'fromjson',
 	'todname',
 	'tojson',
 	'user',
@@ -40,7 +41,6 @@ new_read_globals = {
 	'table_print',
 	'__engine',
 	'_ENV',
-	'_SANDBOX',
 }
 
 new_globals = {

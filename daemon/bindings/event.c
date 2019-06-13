@@ -87,7 +87,7 @@ static int event_sched(lua_State *L, unsigned timeout, unsigned repeat)
 	lua_newtable(L);
 	lua_pushvalue(L, 2);
 	lua_rawseti(L, -2, 1);
-	lua_pushlightuserdata(L, timer);
+	lua_pushpointer(L, timer);
 	lua_rawseti(L, -2, 2);
 	int ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
@@ -125,18 +125,20 @@ static int event_cancel(lua_State *L)
 
 	/* Fetch event if it exists */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, lua_tointeger(L, 1));
-	if (!lua_istable(L, -1)) {
-		lua_pushboolean(L, false);
-		return 1;
-	}
+	bool ok = lua_istable(L, -1);
 
 	/* Close the timer */
-	lua_rawgeti(L, -1, 2);
-	uv_handle_t *timer = lua_touserdata(L, -1);
-	if (!uv_is_closing(timer)) {
-		uv_close(timer, (uv_close_cb) event_free);
+	uv_handle_t **timer_pp = NULL;
+	if (ok) {
+		lua_rawgeti(L, -1, 2);
+		timer_pp = lua_touserdata(L, -1);
+		ok = timer_pp && *timer_pp;
+		/* That have been sufficient safety checks, hopefully. */
 	}
-	lua_pushboolean(L, true);
+	if (ok && !uv_is_closing(*timer_pp)) {
+		uv_close(*timer_pp, (uv_close_cb)event_free);
+	}
+	lua_pushboolean(L, ok);
 	return 1;
 }
 
@@ -148,26 +150,25 @@ static int event_reschedule(lua_State *L)
 
 	/* Fetch event if it exists */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, lua_tointeger(L, 1));
-	if (!lua_istable(L, -1)) {
-		lua_pushboolean(L, false);
-		return 1;
-	}
+	bool ok = lua_istable(L, -1);
 
 	/* Reschedule the timer */
-	lua_rawgeti(L, -1, 2);
-	uv_handle_t *timer = lua_touserdata(L, -1);
-	if (!uv_is_closing(timer)) {
-		if (uv_is_active(timer)) {
-			uv_timer_stop((uv_timer_t *)timer);
-		}
-		int ret = uv_timer_start((uv_timer_t *)timer, event_callback, lua_tointeger(L, 2), 0);
+	uv_handle_t **timer_pp = NULL;
+	if (ok) {
+		lua_rawgeti(L, -1, 2);
+		timer_pp = lua_touserdata(L, -1);
+		ok = timer_pp && *timer_pp;
+		/* That have been sufficient safety checks, hopefully. */
+	}
+	if (ok && !uv_is_closing(*timer_pp)) {
+		int ret = uv_timer_start((uv_timer_t *)*timer_pp,
+				event_callback, lua_tointeger(L, 2), 0);
 		if (ret != 0) {
-			event_cancel(L);
-			lua_pushboolean(L, false);
-			return 1;
+			uv_close(*timer_pp, (uv_close_cb)event_free);
+			ok = false;
 		}
 	}
-	lua_pushboolean(L, true);
+	lua_pushboolean(L, ok);
 	return 1;
 }
 
@@ -197,7 +198,7 @@ static int event_fdwatch(lua_State *L)
 	lua_newtable(L);
 	lua_pushvalue(L, 2);
 	lua_rawseti(L, -2, 1);
-	lua_pushlightuserdata(L, handle);
+	lua_pushpointer(L, handle);
 	lua_rawseti(L, -2, 2);
 	int ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
@@ -218,7 +219,7 @@ int kr_bindings_event(lua_State *L)
 		{ NULL, NULL }
 	};
 
-	register_lib(L, "event", lib);
+	luaL_register(L, "event", lib);
 	return 1;
 }
 

@@ -17,6 +17,7 @@
 #include <contrib/cleanup.h>
 #include <ccan/json/json.h>
 #include <ccan/asprintf/asprintf.h>
+#include <dlfcn.h>
 #include <uv.h>
 #include <unistd.h>
 #include <grp.h>
@@ -53,11 +54,6 @@
 	#endif
 #endif
 
-/** @internal Compatibility wrapper for Lua < 5.2 */
-#if LUA_VERSION_NUM < 502
-#define lua_rawlen(L, obj) lua_objlen((L), (obj))
-#endif
-
 /**@internal Maximum number of incomplete TCP connections in queue.
 * Default is from Redis and Apache. */
 #ifndef TCP_BACKLOG_DEFAULT
@@ -78,13 +74,6 @@ const size_t CLEANUP_TIMER = 5*60*1000;
  * Global bindings.
  */
 
-/** Register module callback into Lua world. */
-#define REGISTER_MODULE_CALL(L, module, cb, name) do { \
-	lua_pushlightuserdata((L), (module)); \
-	lua_pushlightuserdata((L), (cb)); \
-	lua_pushcclosure((L), l_trampoline, 2); \
-	lua_setfield((L), -2, (name)); \
-	} while (0)
 
 /** Print help and available commands. */
 static int l_help(lua_State *L)
@@ -313,7 +302,7 @@ static void l_unpack_json(lua_State *L, JsonNode *table)
 		if (node->key) {
 			lua_setfield(L, -2, node->key);
 		} else {
-			lua_rawseti(L, -2, lua_rawlen(L, -2) + 1);
+			lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
 		}
 	}
 }
@@ -397,7 +386,7 @@ static int l_fromjson(lua_State *L)
 
 /** @internal Throw Lua error if expr is false */
 #define expr_checked(expr) \
-	if (!(expr)) { lua_pushboolean(L, false); lua_rawseti(L, -2, lua_rawlen(L, -2) + 1); continue; }
+	if (!(expr)) { lua_pushboolean(L, false); lua_rawseti(L, -2, lua_objlen(L, -2) + 1); continue; }
 
 static int l_map(lua_State *L)
 {
@@ -436,65 +425,18 @@ static int l_map(lua_State *L)
 				lua_pushlstring(L, rbuf, rlen);
 			}
 			json_delete(root_node);
-			lua_rawseti(L, -2, lua_rawlen(L, -2) + 1);
+			lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
 			continue;
 		}
 		/* Didn't respond */
 		lua_pushboolean(L, false);
-		lua_rawseti(L, -2, lua_rawlen(L, -2) + 1);
+		lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
 	}
 	return 1;
 }
 
 #undef expr_checked
 
-
-/** Trampoline function for module properties. */
-static int l_trampoline(lua_State *L)
-{
-	struct kr_module *module = lua_touserdata(L, lua_upvalueindex(1));
-	void* callback = lua_touserdata(L, lua_upvalueindex(2));
-	struct engine *engine = engine_luaget(L);
-	if (!module)
-		lua_error_p(L, "module closure missing upvalue");
-
-	/* Now we only have property callback or config,
-	 * if we expand the callables, we might need a callback_type.
-	 */
-	const char *args = NULL;
-	auto_free char *cleanup_args = NULL;
-	if (lua_gettop(L) > 0) {
-		if (lua_istable(L, 1) || lua_isboolean(L, 1)) {
-			cleanup_args = l_pack_json(L, 1);
-			args = cleanup_args;
-		} else {
-			args = lua_tostring(L, 1);
-		}
-	}
-	#pragma GCC diagnostic push
-	#pragma GCC diagnostic ignored "-Wpedantic" /* void* vs. function pointer */
-	if (callback == module->config) {
-		module->config(module, args);
-	} else {
-		kr_prop_cb *prop = (kr_prop_cb *)callback;
-		auto_free char *ret = prop(engine, module, args);
-		if (!ret) { /* No results */
-			return 0;
-		}
-		JsonNode *root_node = json_decode(ret);
-		if (root_node) {
-			l_unpack_json(L, root_node);
-		} else {
-			lua_pushstring(L, ret);
-		}
-		json_delete(root_node);
-		return 1;
-	}
-	#pragma GCC diagnostic pop
-
-	/* No results */
-	return 0;
-}
 
 /*
  * Engine API.
@@ -665,8 +607,8 @@ int engine_init(struct engine *engine, knot_mm_t *pool)
 /** Unregister a (found) module */
 static void engine_unload(struct engine *engine, struct kr_module *module)
 {
-	auto_free char *name = strdup(module->name);
-	kr_module_unload(module);
+	auto_free char *name = module->name ? strdup(module->name) : NULL;
+	kr_module_unload(module); /* beware: lua/C mix, could be confusing */
 	/* Clear in Lua world, but not for embedded modules ('cache' in particular). */
 	if (name && !kr_module_get_embedded(name)) {
 		lua_pushnil(engine->L);
@@ -678,6 +620,10 @@ static void engine_unload(struct engine *engine, struct kr_module *module)
 void engine_deinit(struct engine *engine)
 {
 	if (engine == NULL) {
+		return;
+	}
+	if (!engine->L) {
+		assert(false);
 		return;
 	}
 	/* Only close sockets and services; no need to clean up mempool. */
@@ -702,6 +648,7 @@ void engine_deinit(struct engine *engine)
 	lru_free(engine->resolver.cache_cookie);
 
 	network_deinit(&engine->net);
+	ffimodule_deinit(engine->L);
 	lua_close(engine->L);
 
 	/* Free data structures */
@@ -715,10 +662,6 @@ void engine_deinit(struct engine *engine)
 
 int engine_pcall(lua_State *L, int argc)
 {
-#if LUA_VERSION_NUM >= 502
-	lua_getglobal(L, "_SANDBOX");
-	lua_setupvalue(L, -(2 + argc), 1);
-#endif
 	return lua_pcall(L, argc, LUA_MULTRET, 0);
 }
 
@@ -756,13 +699,14 @@ int engine_ipc(struct engine *engine, const char *expr)
 int engine_load_sandbox(struct engine *engine)
 {
 	/* Init environment */
-    int ret = l_dosandboxfile(engine->L, LIBDIR "/sandbox.lua");
+	int ret = l_dosandboxfile(engine->L, LIBDIR "/sandbox.lua");
 	if (ret != 0) {
 		fprintf(stderr, "[system] error %s\n", lua_tostring(engine->L, -1));
 		lua_pop(engine->L, 1);
 		return kr_error(ENOEXEC);
 	}
-	return kr_ok();
+	ret = ffimodule_init(engine->L);
+	return ret;
 }
 
 int engine_loadconf(struct engine *engine, const char *config_path)
@@ -807,37 +751,6 @@ void engine_stop(struct engine *engine)
 	uv_stop(uv_default_loop());
 }
 
-/** Register module properties in Lua environment, if any. */
-static int register_properties(struct engine *engine, struct kr_module *module)
-{
-	#pragma GCC diagnostic push
-	#pragma GCC diagnostic ignored "-Wpedantic" /* casts in lua_pushlightuserdata() */
-	if (!module->config && !module->props) {
-		return kr_ok();
-	}
-	lua_newtable(engine->L);
-	if (module->config != NULL) {
-		REGISTER_MODULE_CALL(engine->L, module, module->config, "config");
-	}
-
-	for (const struct kr_prop *p = module->props; p && p->name; ++p) {
-		if (p->cb != NULL) {
-			REGISTER_MODULE_CALL(engine->L, module, p->cb, p->name);
-		}
-	}
-	lua_setglobal(engine->L, module->name);
-	#pragma GCC diagnostic pop
-
-	/* Register module in Lua env */
-	lua_getglobal(engine->L, "modules_register");
-	lua_getglobal(engine->L, module->name);
-	if (engine_pcall(engine->L, 1) != 0) {
-		lua_pop(engine->L, 1);
-	}
-
-	return kr_ok();
-}
-
 /** @internal Find matching module */
 static size_t module_find(module_array_t *mod_list, const char *name)
 {
@@ -855,6 +768,7 @@ static size_t module_find(module_array_t *mod_list, const char *name)
 int engine_register(struct engine *engine, const char *name, const char *precedence, const char* ref)
 {
 	if (engine == NULL || name == NULL) {
+		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
 	/* Make sure module is unloaded */
@@ -873,24 +787,57 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 	if (!module) {
 		return kr_error(ENOMEM);
 	}
-	module->data = engine;
+	module->data = engine; /*< some outside modules may still use this value */
+
 	int ret = kr_module_load(module, name, LIBDIR "/kres_modules");
-	/* Load Lua module if not a binary */
-	if (ret == kr_error(ENOENT)) {
+	if (ret == 0) {
+		/* We have a C module, loaded and init() was called.
+		 * Now we need to prepare the lua side. */
+		lua_State *L = engine->L;
+		lua_getglobal(L, "modules_create_table_for_c");
+		lua_pushpointer(L, module);
+		if (lua_isnil(L, -2)) {
+			/* When loading the three embedded modules, we don't
+			 * have the "modules_*" lua function yet, but fortunately
+			 * we don't need it there.  Let's just check they're embedded.
+			 * TODO: solve this better *without* breaking stuff. */
+			lua_pop(L, 2);
+			if (module->lib != RTLD_DEFAULT) {
+				ret = kr_error(1);
+				lua_pushliteral(L, "missing modules_create_table_for_c()");
+			}
+		} else {
+			ret = engine_pcall(L, 1);
+		}
+		if (ret) {
+			kr_log_error("[system] internal error when loading C module %s: %s\n",
+					module->name, lua_tostring(L, -1));
+			lua_pop(L, 1);
+			assert(false); /* probably not critical, but weird */
+		}
+
+	} else if (ret == kr_error(ENOENT)) {
+		/* No luck with C module, so try to load and .init() lua module. */
 		ret = ffimodule_register_lua(engine, module, name);
+		if (ret != 0) {
+			kr_log_error("[system] failed to load module '%s'\n", name);
+		}
+
 	} else if (ret == kr_error(ENOTSUP)) {
 		/* Print a more helpful message when module is linked against an old resolver ABI. */
-		fprintf(stderr, "[system] module '%s' links to unsupported ABI, please rebuild it\n", name);
+		kr_log_error("[system] module '%s' links to unsupported ABI, please rebuild it\n", name);
 	}
+
 	if (ret != 0) {
-		free(module);
+		engine_unload(engine, module);
 		return ret;
 	}
+
+	/* Push to the right place in engine->modules */
 	if (array_push(engine->modules, module) < 0) {
 		engine_unload(engine, module);
 		return kr_error(ENOMEM);
 	}
-	/* Evaluate precedence operator */
 	if (precedence) {
 		struct kr_module **arr = mod_list->at;
 		size_t emplacement = mod_list->len;
@@ -908,7 +855,7 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 		}
 	}
 
-	return register_properties(engine, module);
+	return kr_ok();
 }
 
 int engine_unregister(struct engine *engine, const char *name)
