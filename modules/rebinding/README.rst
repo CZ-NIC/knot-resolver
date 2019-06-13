@@ -17,9 +17,11 @@ Please note that this module does not offer stable configuration interface
 yet. For this reason it is suitable mainly for public resolver operators
 who do not need to whitelist certain subnets.
 
-.. warning:: Some like to "misuse" such addresses, e.g. `127.*.*.*`
-  in blacklists served over DNS, and this module will block such uses.
+.. warning:: DNS Blacklists (`RFC 5782`_) often use `127.0.0.0/8` to blacklist
+   a domain. Using the rebinding module prevents DNSBL from functioning
+   properly.
 
 .. _`DNS Rebinding attack`: https://en.wikipedia.org/wiki/DNS_rebinding
 .. _IPv4: https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml
 .. _IPv6: https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml
+.. _`RFC 5782`: https://tools.ietf.org/html/rfc5782#section-2.1
