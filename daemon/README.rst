@@ -613,6 +613,30 @@ For more details, see ``kresd.systemd(7)``.
 .. note:: On recent Linux supporting ``SO_REUSEPORT`` (since 3.9, backported to RHEL 2.6.32) it is also able to bind to the same endpoint and distribute the load between the forked processes. If your OS doesn't support it, use only one daemon process.
 
 
+Cache Garbage Collector
+=======================
+
+.. warning:: Garbage collector is experimental and subject to change in future
+   releases. This feature isn't currently turned on by default.
+
+By default, kresd uses the available cache until it's full. When more space is
+required, the entire cache is dropped. To avoid starting over with an empty
+cache, a separate garbage collector daemon is available to periodically trim
+the cache instead.
+
+The cache garbage collector daemon (``kr_cache_gc``) monitors the cache usage
+and attempts to free up space when a threshold is reached. To spawn the daemon
+and configure it to run every minute, use:
+
+.. code-block:: bash
+
+   $ kr_cache_gc -c /var/cache/knot-resolver -d 60000
+
+It's also possible to run this under systemd. However, a dedicated systemd unit
+is not currently part of the upstream package. See `message#167`_ on our
+mailing list for an example of such a unit file.
+
+
 Using CLI tools
 ===============
 
@@ -665,3 +689,4 @@ Code reference
 .. _`real process managers`: http://blog.crocodoc.com/post/48703468992/process-managers-the-good-the-bad-and-the-ugly
 .. _`socket activation`: http://0pointer.de/blog/projects/socket-activation.html
 .. _`dnsproxy module`: https://www.knot-dns.cz/docs/2.7/html/modules.html#dnsproxy-tiny-dns-proxy
+.. _`message#167`: https://lists.nic.cz/pipermail/knot-resolver-users/2019/000167.html
