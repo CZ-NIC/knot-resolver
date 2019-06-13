@@ -14,6 +14,7 @@ Improvements
 - http module: also send intermediate TLS certificate to clients,
   if available and luaossl >= 20181207 (!819)
 - systemd: basic watchdog is now available and turned on by default (#275)
+- experimental cache garbage collector daemon is available (#257)
 
 Bugfixes
 --------
