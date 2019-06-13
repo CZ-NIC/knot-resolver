@@ -495,7 +495,7 @@ obs:release:
   stage: deploy-test
   only:
     variables:
-      - $OBS_REPO =~ /^knot-resolver-devel|knot-resolver-testing$/
+      - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing$/
       - $CI_COMMIT_TAG
   variables:
     OBS_REPO: knot-resolver-latest
