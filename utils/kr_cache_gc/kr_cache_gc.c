@@ -60,8 +60,8 @@ static knot_db_val_t *dbval_copy(const knot_db_val_t *from)
 
 // section: rrtype list
 
-dynarray_declare(rrtype, uint16_t, DYNARRAY_VISIBILITY_STATIC, 64);
-dynarray_define(rrtype, uint16_t, DYNARRAY_VISIBILITY_STATIC);
+dynarray_declare(rrtype, uint16_t, DYNARRAY_VISIBILITY_STATIC, 64)
+dynarray_define(rrtype, uint16_t, DYNARRAY_VISIBILITY_STATIC)
 
 static void rrtypelist_add(rrtype_dynarray_t *arr, uint16_t add_type)
 {
@@ -87,8 +87,8 @@ static void rrtypelist_print(rrtype_dynarray_t *arr)
 	printf("\n");
 }
 
-dynarray_declare(entry, knot_db_val_t*, DYNARRAY_VISIBILITY_STATIC, 256);
-dynarray_define(entry, knot_db_val_t*, DYNARRAY_VISIBILITY_STATIC);
+dynarray_declare(entry, knot_db_val_t*, DYNARRAY_VISIBILITY_STATIC, 256)
+dynarray_define(entry, knot_db_val_t*, DYNARRAY_VISIBILITY_STATIC)
 static void entry_dynarray_deep_free(entry_dynarray_t *d)
 {
 	dynarray_foreach(entry, knot_db_val_t*, i, *d) {
@@ -158,7 +158,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 	gc_timer_t timer_analyze = { 0 }, timer_choose = { 0 }, timer_delete = { 0 }, timer_rw_txn = { 0 };
 
 	gc_timer_start(&timer_analyze);
-	ctx_compute_categories_t cats = { 0 };
+	ctx_compute_categories_t cats = {{ 0 }};
 	ret = kr_gc_cache_iter(db, cb_compute_categories, &cats);
 	if (ret != KNOT_EOK) {
 		kr_gc_cache_close(&kres_db, db);
