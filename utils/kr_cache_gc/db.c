@@ -90,20 +90,20 @@ const uint16_t *kr_gc_key_consistent(knot_db_val_t key)
 {
 	const static uint16_t NSEC1 = KNOT_RRTYPE_NSEC;
 	const static uint16_t NSEC3 = KNOT_RRTYPE_NSEC3;
-	uint8_t *p = key.data;
-	while(*p != 0) {
-		while(*p++ != 0) {
-			if (p - (uint8_t *)key.data >= key.len) {
-				return NULL;
-			}
-		}
+	// find the first double zero in the key; CACHE_KEY_DEF
+	const uint8_t *kd = key.data;
+	ssize_t i;
+	for (i = 2; !(kd[i - 1] == 0 && kd[i - 2] == 0); ++i) {
+		if (i >= key.len) return NULL;
 	}
-	if (p - (uint8_t *)key.data >= key.len) {
-		return NULL;
-	}
-	switch (*++p) {
+	// the next character can be used for classification
+	switch (kd[i]) {
 	case 'E':
-		return (p + 2 - (uint8_t *)key.data >= key.len ? NULL : (uint16_t *)(p + 1));
+		if (i + 1 + sizeof(uint16_t) > key.len) {
+			assert(!EINVAL);
+			return NULL;
+		}
+		return (uint16_t *)&kd[i + 1];
 	case '1':
 		return &NSEC1;
 	case '3':
