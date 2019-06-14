@@ -216,7 +216,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 		switch (ret) {
 		case KNOT_EOK:
 			deleted_records++;
-			const uint16_t *entry_type = ret == KNOT_EOK ? kr_gc_key_consistent(**i) : NULL;
+			const uint16_t *entry_type = kr_gc_key_consistent(**i);
 			assert(entry_type != NULL);
 			rrtypelist_add(&deleted_rrtypes, *entry_type);
 			break;
