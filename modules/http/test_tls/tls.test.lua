@@ -148,6 +148,48 @@ else
 			}}, desc)
 	end
 
+	local function test_certificate_chain()
+		local desc = 'config with certificate chain (with intermediate CA cert)'
+		local host, port = setup_module(desc,
+			{
+				tls = true,
+				cert = 'chain.crt',
+				key = 'test.key',
+			})
+
+		local function read_cert(path)
+			local f = io.open(path, 'r')
+			if f == nil then
+				return nil
+			end
+			local data = f:read('*a')
+			f:close()
+			if #data == 0 then
+				return nil
+			end
+			return data
+		end
+
+		local c_crt = read_cert('chain.crt')
+		assert(c_crt ~= nil, 'failed to read chain.crt')
+
+		local r_crt_path = os.tmpname()
+		local cmd = string.format('gnutls-cli %s -p %d --save-cert %s --x509cafile ca.crt &',
+			host, port, r_crt_path)
+		io.popen(cmd)
+
+		for i=1,10 do
+			r_crt = read_cert(r_crt_path)
+			if r_crt ~= nil then
+				os.remove(r_crt_path)
+				ok(r_crt == c_crt, 'received correct certificate chain')
+				return
+			end
+			worker.sleep(0.1)
+		end
+		assert(false, 'failed to received certificate (timeout?)')
+	end
+
 
 	-- plan tests
 	local tests = {
@@ -159,7 +201,8 @@ else
 		test_nonexistent_key,
 		test_missing_key_param,
 		test_broken_cert,
-		test_broken_key
+		test_broken_key,
+		test_certificate_chain,
 	}
 
 	return tests
