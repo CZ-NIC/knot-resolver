@@ -63,8 +63,7 @@ struct entry_apex;
 /** Check basic consistency of entry_h for 'E' entries, not looking into ->data.
  * (for is_packet the length of data is checked)
  */
-KR_EXPORT
-struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t type);
+struct entry_h * entry_h_consistent_E(knot_db_val_t data, uint16_t type);
 
 struct entry_apex * entry_apex_consistent(knot_db_val_t val);
 
@@ -72,12 +71,22 @@ struct entry_apex * entry_apex_consistent(knot_db_val_t val);
 static inline struct entry_h * entry_h_consistent_NSEC(knot_db_val_t data)
 {
 	/* ATM it's enough to just extend the checks for exact entries. */
-	const struct entry_h *eh = entry_h_consistent(data, KNOT_RRTYPE_NSEC);
+	const struct entry_h *eh = entry_h_consistent_E(data, KNOT_RRTYPE_NSEC);
 	bool ok = eh != NULL;
 	ok = ok && !eh->is_packet && !eh->has_optout;
 	return ok ? /*const-cast*/(struct entry_h *)eh : NULL;
 }
 
+static inline struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t type)
+{
+	switch (type) {
+	case KNOT_RRTYPE_NSEC:
+	case KNOT_RRTYPE_NSEC3:
+		return entry_h_consistent_NSEC(data);
+	default:
+		return entry_h_consistent_E(data, type);
+	}
+}
 
 /* nsec_p* - NSEC* chain parameters */
 
