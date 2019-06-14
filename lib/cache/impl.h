@@ -63,6 +63,7 @@ struct entry_apex;
 /** Check basic consistency of entry_h for 'E' entries, not looking into ->data.
  * (for is_packet the length of data is checked)
  */
+KR_EXPORT
 struct entry_h * entry_h_consistent_E(knot_db_val_t data, uint16_t type);
 
 struct entry_apex * entry_apex_consistent(knot_db_val_t val);
