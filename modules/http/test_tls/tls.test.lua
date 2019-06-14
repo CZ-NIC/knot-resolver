@@ -148,6 +148,31 @@ else
 			}}, desc)
 	end
 
+	local function test_certificate_chain()
+		local desc = 'config with certificate chain (with intermediate CA cert)'
+		local host, port = setup_module(desc,
+			{
+				tls = true,
+				cert = 'chain.crt',
+				key = 'test.key',
+			})
+		local uri = string.format('https://%s:%d', host, port)
+		local req = request.new_from_uri(uri)
+		req.ctx = openssl_ctx.new()
+
+		if req.ctx.setCertificateChain == nil then
+			pass(string.format('SKIP (luaossl <= 20181207) - %s', desc))
+		else
+			local store = req.ctx:getStore()
+			store:add('ca.crt')
+			req.ctx:setVerify(openssl_ctx.VERIFY_PEER)
+
+			local headers = assert(req:go())
+			local code = tonumber(headers:get(':status'))
+			same(code, 200, desc)
+		end
+	end
+
 
 	-- plan tests
 	local tests = {
@@ -159,7 +184,8 @@ else
 		test_nonexistent_key,
 		test_missing_key_param,
 		test_broken_cert,
-		test_broken_key
+		test_broken_key,
+		test_certificate_chain,
 	}
 
 	return tests
