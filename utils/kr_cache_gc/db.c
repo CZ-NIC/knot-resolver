@@ -89,6 +89,7 @@ void kr_gc_cache_close(struct kr_cache *kres_db, knot_db_t *knot_db)
 const uint16_t *kr_gc_key_consistent(knot_db_val_t key)
 {
 	const static uint16_t NSEC1 = KNOT_RRTYPE_NSEC;
+	const static uint16_t NSEC3 = KNOT_RRTYPE_NSEC3;
 	uint8_t *p = key.data;
 	while(*p != 0) {
 		while(*p++ != 0) {
@@ -105,13 +106,15 @@ const uint16_t *kr_gc_key_consistent(knot_db_val_t key)
 		return (p + 2 - (uint8_t *)key.data >= key.len ? NULL : (uint16_t *)(p + 1));
 	case '1':
 		return &NSEC1;
+	case '3':
+		return &NSEC3;
 	default:
 		return NULL;
 	}
 }
 
-// expects that key is consistent!
-static uint8_t entry_labels(knot_db_val_t *key)
+/// expects that key is consistent! CACHE_KEY_DEF
+static uint8_t entry_labels(knot_db_val_t *key, uint16_t rrtype)
 {
 	uint8_t lab = 0, *p = key->data;
 	while (*p != 0) {
@@ -121,6 +124,12 @@ static uint8_t entry_labels(knot_db_val_t *key)
 			}
 		}
 		lab++;
+	}
+	if (rrtype == KNOT_RRTYPE_NSEC3) {
+		// We don't know the number of labels so easily,
+		// but let's classify everything as directly
+		// below the zone apex (that's most common).
+		++lab;
 	}
 	return lab;
 }
@@ -161,7 +170,7 @@ int kr_gc_cache_iter(knot_db_t *knot_db, kr_gc_iter_callback callback, void *ctx
 				info.rrtype = *entry_type;
 				info.entry_size = key.len + val.len;
 				info.expires_in = entry->time + entry->ttl - now;
-				info.no_labels = entry_labels(&key);
+				info.no_labels = entry_labels(&key, *entry_type);
 
 				ret = callback(&key, &info, ctx);
 			}
