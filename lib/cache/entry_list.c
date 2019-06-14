@@ -234,7 +234,7 @@ int entry_h_splice(
 		}
 		/* val is on the entry, in either case (or error) */
 		if (!ret) {
-			eh_orig = entry_h_consistent(val, type);
+			eh_orig = entry_h_consistent_E(val, type);
 		}
 	} else {
 		/* We want to fully overwrite the entry, so don't even read it. */
