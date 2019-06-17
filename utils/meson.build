@@ -1,8 +1,6 @@
 # utils
 
-subdir('client')
-
 build_utils = get_option('utils') != 'disabled'
-if build_utils
-  subdir('cache_gc')
-endif
+
+subdir('client')
+subdir('cache_gc')
