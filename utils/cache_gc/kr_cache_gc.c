@@ -165,7 +165,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 		return ret;
 	}
 
-	ssize_t amount_tofree = (double)knot_db_lmdb_get_mapsize(db) * cfg->cache_to_be_freed / 100.0;
+	ssize_t amount_tofree = knot_db_lmdb_get_mapsize(db) * cfg->cache_to_be_freed / 100;
 
 	// debug
 	/*printf("tofree: %zd\n", amount_tofree);
