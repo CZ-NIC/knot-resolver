@@ -40,6 +40,17 @@ static void print_help()
 	printf(" -n (= dry run)\n");
 }
 
+static long get_nonneg_optarg()
+{
+	char *end;
+	const long result = strtol(optarg, &end, 10);
+	if (result >= 0 && end && *end == '\0')
+		return result;
+	// not OK
+	print_help();
+	exit(2);
+}
+
 int main(int argc, char *argv[])
 {
 	printf("Knot Resolver Cache Garbage Collector v. %s\n", KR_CACHE_GC_VERSION);
@@ -62,31 +73,29 @@ int main(int argc, char *argv[])
 		case 'c':
 			cfg.cache_path = optarg;
 			break;
-#define get_nonneg_optarg(to) do { if (atol(optarg) < 0) { print_help(); return 2; } to = atol(optarg); } while (0)
 		case 'd':
-			get_nonneg_optarg(cfg.gc_interval);
+			cfg.gc_interval = get_nonneg_optarg();
 			cfg.gc_interval *= 1000;
 			break;
 		case 'l':
-			get_nonneg_optarg(cfg.rw_txn_items);
+			cfg.rw_txn_items = get_nonneg_optarg();
 			break;
 		case 'm':
-			get_nonneg_optarg(cfg.rw_txn_duration);
+			cfg.rw_txn_duration = get_nonneg_optarg();
 			break;
 		case 'u':
-			get_nonneg_optarg(cfg.cache_max_usage);
+			cfg.cache_max_usage = get_nonneg_optarg();
 			break;
 		case 'f':
-			get_nonneg_optarg(cfg.cache_to_be_freed);
+			cfg.cache_to_be_freed = get_nonneg_optarg();
 			break;
 		case 'w':
-			get_nonneg_optarg(cfg.rw_txn_delay);
+			cfg.rw_txn_delay = get_nonneg_optarg();
 			break;
 		case 't':
-			get_nonneg_optarg(cfg.temp_keys_space);
+			cfg.temp_keys_space = get_nonneg_optarg();
 			cfg.temp_keys_space *= 1048576;
 			break;
-#undef get_nonneg_optarg
 		case 'n':
 			cfg.dry_run = true;
 			break;
