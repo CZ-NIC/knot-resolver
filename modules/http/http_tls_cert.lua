@@ -71,8 +71,8 @@ function tls_cert.ephemeral_state_maintain(ephem_state, certfile, keyfile)
 		s.config.ctx = ephem_state.ctx -- not required, but let's keep it synchonized
 	end
 	log('[http] created new ephemeral TLS certificate')
-	local _, lifetime_sec = certs[1]:getLifetime()
-	local wait_msec = 1000 * math.max(1, lifetime_sec - (os.time() - 3 * 24 * 3600))
+	local _, expiry_stamp = certs[1]:getLifetime()
+	local wait_msec = 1000 * math.max(1, expiry_stamp - os.time() - 3 * 24 * 3600)
 	if not ephem_state.timer_id then
 		ephem_state.timer_id = event.after(wait_msec, function ()
 			tls_cert.ephemeral_state_maintain(ephem_state, certfile, keyfile)
