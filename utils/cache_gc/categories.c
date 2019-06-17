@@ -1,6 +1,7 @@
 #include "categories.h"
 
 #include <libknot/libknot.h>
+#include "lib/utils.h"
 
 static bool rrtype_is_infrastructure(uint16_t r)
 {
@@ -18,7 +19,9 @@ static bool rrtype_is_infrastructure(uint16_t r)
 
 static int get_random(int to)
 {
-	return rand() % to;
+	// We don't need these to be really unpredictable,
+	// but this should be cheap enough not to be noticeable.
+	return kr_rand_bytes(1) % to;
 }
 
 // TODO this is just an example, make this more clever
