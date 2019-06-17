@@ -1,15 +1,15 @@
-## utils/kr_cache_gc
+## utils/cache_gc
 
-kr_cache_gc_src = files([
+cache_gc_src = files([
   'categories.c',
   'db.c',
   'kr_cache_gc.c',
   'main.c',
 ])
 
-kr_cache_gc = executable(
-  'kr_cache_gc',
-  kr_cache_gc_src,
+cache_gc = executable(
+  'kres_cache_gc',
+  cache_gc_src,
   dependencies: [
     contrib_dep,
     libkres_dep,

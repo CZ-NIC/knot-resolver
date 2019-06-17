@@ -254,7 +254,7 @@ systemctl daemon-reload
 %attr(750,knot-resolver,knot-resolver) %dir %{_localstatedir}/cache/%{name}
 %{_sbindir}/kresd
 %{_sbindir}/kresc
-%{_sbindir}/kr_cache_gc
+%{_sbindir}/kres_cache_gc
 %{_libdir}/libkres.so.*
 %dir %{_libdir}/knot-resolver
 %{_libdir}/knot-resolver/*.so
