@@ -155,7 +155,6 @@ subdir('contrib')
 subdir('lib')
 
 ## Remaining code
-subdir('client')
 subdir('daemon')
 subdir('modules')
 subdir('utils')
