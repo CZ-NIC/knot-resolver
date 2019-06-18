@@ -59,12 +59,17 @@ local function write_cert_files(certs, key, certfile, keyfile)
 end
 
 -- @function Start maintenance of a self-signed TLS context (at ephem_state.ctx).
--- Stop updating by calling _destroy()
+-- Keep updating the ephem_state.servers table.  Stop updating by calling _destroy().
 -- TODO: each process maintains its own ephemeral cert ATM, and the files aren't ever read from.
 function tls_cert.ephemeral_state_maintain(ephem_state, certfile, keyfile)
 	local certs, key = new_ephemeral()
 	write_cert_files(certs, key, certfile, keyfile)
 	ephem_state.ctx = tls_cert.new_tls_context(certs, key)
+	-- Each server needs to have its ctx updated.
+	for _, s in pairs(ephem_state.servers) do
+		s.server.ctx = ephem_state.ctx
+		s.config.ctx = ephem_state.ctx -- not required, but let's keep it synchonized
+	end
 	log('[http] created new ephemeral TLS certificate')
 	local _, expiry_stamp = certs[1]:getLifetime()
 	local wait_msec = 1000 * math.max(1, expiry_stamp - os.time() - 3 * 24 * 3600)

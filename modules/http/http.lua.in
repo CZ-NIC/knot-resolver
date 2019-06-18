@@ -282,7 +282,7 @@ local function add_socket(fd, kind, addr_str)
 	if conf.tls ~= false then -- Create a TLS context, either from files or new.
 		if conf.ephemeral then
 			if not M.ephem_state then
-				M.ephem_state = {}
+				M.ephem_state = { servers = M.servers }
 				tls_cert.ephemeral_state_maintain(M.ephem_state, conf.cert, conf.key)
 			end
 			conf.ctx = M.ephem_state.ctx
