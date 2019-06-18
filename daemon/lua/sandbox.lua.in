@@ -411,8 +411,9 @@ end
 _G = make_sandbox(getfenv(0))
 setfenv(0, _G)
 
--- Load embedded modules
+-- Load default modules
 trust_anchors = require('trust_anchors')
+@sd_watchdog@
 modules.load('ta_update')
 modules.load('ta_signal_query')
 modules.load('policy')
