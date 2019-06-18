@@ -5,21 +5,26 @@ config_tests += [
   ['ta_bootstrap', files('trust_anchors.test/bootstrap.test.lua')],
 ]
 
-ta_config = configuration_data()
-ta_config.set('keyfile_default', keyfile_default)
-ta_config.set('etc_dir', etc_dir)
-ta_config.set('unmanaged', managed_ta ? 'false' : 'true')
+lua_config = configuration_data()
+lua_config.set('keyfile_default', keyfile_default)
+lua_config.set('etc_dir', etc_dir)
+lua_config.set('unmanaged', managed_ta ? 'false' : 'true')
+if libsystemd.found() and libsystemd.version().version_compare('>=183')
+  lua_config.set('sd_watchdog', 'modules.load(\'sd_watchdog\')')
+else
+  lua_config.set('sd_watchdog', '')
+endif
 
 trust_anchors = configure_file(
   input: 'trust_anchors.lua.in',
   output: 'trust_anchors.lua',
-  configuration: ta_config,
+  configuration: lua_config,
 )
 
 sandbox = configure_file(
   input: 'sandbox.lua.in',
   output: 'sandbox.lua',
-  configuration: ta_config,
+  configuration: lua_config,
 )
 
 run_target(  # run manually to re-generate kres-gen.lua
