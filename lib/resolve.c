@@ -555,15 +555,17 @@ static int answer_padding(struct kr_request *request)
 
 static int answer_fail(struct kr_request *request)
 {
+	/* Note: OPT in SERVFAIL response is still useful for cookies/additional info. */
 	knot_pkt_t *answer = request->answer;
+	knot_rrset_t *opt_rr = answer->opt_rr; /* it gets NULLed below */
 	int ret = kr_pkt_clear_payload(answer);
 	knot_wire_clear_ad(answer->wire);
 	knot_wire_clear_aa(answer->wire);
 	knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
-	if (ret == 0 && answer->opt_rr) {
-		/* OPT in SERVFAIL response is still useful for cookies/additional info. */
+	if (ret == 0 && opt_rr) {
 		knot_pkt_begin(answer, KNOT_ADDITIONAL);
 		answer_padding(request); /* Ignore failed padding in SERVFAIL answer. */
+		answer->opt_rr = opt_rr;
 		ret = edns_put(answer, false);
 	}
 	return ret;
@@ -1592,9 +1594,7 @@ int kr_resolve_finish(struct kr_request *request, int state)
 {
 	/* Finalize answer and construct wire-buffer. */
 	ITERATE_LAYERS(request, NULL, answer_finalize);
-	if (request->state & KR_STATE_FAIL) {
-		state = KR_STATE_FAIL;
-	} else if (answer_finalize(request, state) != 0) {
+	if (answer_finalize(request, state) != 0) {
 		state = KR_STATE_FAIL;
 	}
 
