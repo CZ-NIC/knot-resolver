@@ -27,7 +27,7 @@
 
 #include <lua.h>
 #include <uv.h>
-#ifdef HAS_SYSTEMD
+#if SYSTEMD_VERSION > 0
 #include <systemd/sd-daemon.h>
 #endif
 #include <libknot/error.h>
@@ -445,7 +445,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	memcpy(&engine->ipc_set, ipc_set, sizeof(*ipc_set));
 
 	/* Notify supervisor. */
-#ifdef HAS_SYSTEMD
+#if SYSTEMD_VERSION > 0
 	sd_notify(0, "READY=1");
 #endif
 	/* Run event loop */
@@ -457,7 +457,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	return EXIT_SUCCESS;
 }
 
-#ifdef HAS_SYSTEMD
+#if SYSTEMD_VERSION >= 227
 static void free_sd_socket_names(char **socket_names, int count)
 {
 	for (int i = 0; i < count; i++) {
@@ -670,7 +670,7 @@ int main(int argc, char **argv)
 	ret = bind_sockets(&args.addrs_tls, true, &args.fds);
 	if (ret) goto cleanup_args;
 
-#ifdef HAS_SYSTEMD
+#if SYSTEMD_VERSION >= 227
 	/* Accept passed sockets from systemd supervisor. */
 	char **socket_names = NULL;
 	int sd_nsocks = sd_listen_fds_with_names(0, &socket_names);

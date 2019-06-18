@@ -85,9 +85,10 @@ group = get_option('group')
 
 ## Systemd
 message('--- systemd socket activation ---')
-libsystemd = dependency('libsystemd', version: '>=227', required: false)
+libsystemd = dependency('libsystemd', required: false)
 systemd_files = get_option('systemd_files')
-if systemd_files == 'enabled' and not libsystemd.found()
+if systemd_files == 'enabled' and (
+    not libsystemd.found() or libsystemd.version().version_compare('<227'))
   error('systemd_files=enabled requires libsystemd >= 227')
 endif
 message('---------------------------')
@@ -133,7 +134,8 @@ conf_data.set_quoted('libzscanner_SONAME',
   libzscanner.get_pkgconfig_variable('soname'))
 conf_data.set_quoted('libknot_SONAME',
   libknot.get_pkgconfig_variable('soname'))
-conf_data.set('HAS_SYSTEMD', libsystemd.found())
+conf_data.set('SYSTEMD_VERSION',
+  libsystemd.found() ? libsystemd.version().to_int() : -1)
 conf_data.set('NOVERBOSELOG', not verbose_log)
 
 kresconfig = configure_file(
