@@ -49,7 +49,9 @@ subdir('nsid')
 subdir('policy')
 subdir('stats')
 subdir('view')
-
+if libsystemd.found()
+  subdir('sd_watchdog')
+endif
 
 # install lua modules
 foreach mod : lua_mod_src

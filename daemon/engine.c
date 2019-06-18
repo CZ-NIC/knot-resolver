@@ -470,6 +470,9 @@ static int init_resolver(struct engine *engine)
 	engine_register(engine, "iterate", NULL, NULL);
 	engine_register(engine, "validate", NULL, NULL);
 	engine_register(engine, "cache", NULL, NULL);
+#if SYSTEMD_VERSION >= 183
+	engine_register(engine, "sd_watchdog", NULL, NULL);
+#endif
 
 	return array_push(engine->backends, kr_cdb_lmdb());
 }
