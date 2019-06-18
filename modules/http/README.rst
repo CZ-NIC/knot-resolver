@@ -71,6 +71,10 @@ TLS certificate that is valid for 90 days and is automatically renewed. It is of
 course self-signed. Why not use something like
 `Let's Encrypt <https://letsencrypt.org>`_?
 
+.. warning::
+
+   If you use package ``luaossl < 20181207``, intermediate certificate is not sent to clients,
+   which may cause problems with validating the connection in some cases.
 
 You can disable unecrypted HTTP and enforce HTTPS by passing
 ``tls = true`` option for all HTTP endpoints:
@@ -107,6 +111,12 @@ for authentication to API etc.
 (Unencrypted HTTP could be fine for localhost tests as, for example,
 Safari doesn't allow WebSockets over HTTPS with a self-signed certificate.
 Major drawback is that current browsers won't do HTTP/2 over insecure connection.)
+
+.. warning::
+
+   If you use multiple Knot Resolver instances with these automatically maintained ephemeral certificates,
+   they currently won't be shared.
+   It's assumed that you don't want a self-signed certificate for serious deployments anyway.
 
 .. _mod-http-built-in-services:
 
