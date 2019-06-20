@@ -35,7 +35,7 @@ static knot_db_t *knot_db_t_kres2libknot(const knot_db_t *db)
 	return libknot_db;
 }
 
-int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db, knot_db_t **libknot_db, double *usage)
+int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db, knot_db_t **libknot_db)
 {
 	char cache_data[strlen(cache_path) + 10];
 	snprintf(cache_data, sizeof(cache_data), "%s/data.mdb", cache_path);
@@ -64,19 +64,6 @@ open_kr_cache:
 		return -ENOMEM;
 	}
 
-	size_t real_size = knot_db_lmdb_get_mapsize(*libknot_db), usageb = knot_db_lmdb_get_usage(*libknot_db);
-	*usage = (double)usageb / real_size * 100.0;
-	printf("Cache size: %zu, Usage: %zu (%.2lf%%)\n", real_size, usageb, *usage);
-
-#if 1
-	if (*usage > 90.0) {
-		free(*libknot_db);
-		kr_cache_close(kres_db);
-		cache_size += cache_size / 10;
-		opts.maxsize = cache_size;
-		goto open_kr_cache;
-	}
-# endif
 	return 0;
 }
 
