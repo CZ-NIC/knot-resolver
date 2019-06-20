@@ -116,7 +116,8 @@ int main(int argc, char *argv[])
 
 	do {
 		int ret = kr_cache_gc(&cfg);
-		if (ret) {
+		// ENOENT: kresd may not be started yet or cleared the cache now
+		if (ret && ret != -ENOENT) {
 			printf("Error (%s)\n", kr_strerror(ret));
 			return 10;
 		}
