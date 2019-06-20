@@ -36,7 +36,12 @@ int sd_watchdog_init(struct kr_module *module)
 	module->data = conf;
 
 	/* Check if watchdog is enabled */
-	conf->enabled = (bool)sd_watchdog_enabled(1, &conf->timeout_usec);
+	int ret = sd_watchdog_enabled(1, &conf->timeout_usec);
+	if (ret < 0) {
+		kr_log_error("[sd_watchdog] error: %s\n", strerror(abs(ret)));
+		return kr_error(ret);
+	}
+	conf->enabled = ret > 0;
 	if (!conf->enabled) {
 		kr_log_verbose("[sd_watchdog] disabled (not required)\n");
 		return kr_ok();
@@ -50,7 +55,7 @@ int sd_watchdog_init(struct kr_module *module)
 
 	uv_loop_t *loop = uv_default_loop();
 	uv_timer_init(loop, &conf->timer);
-	int ret = uv_timer_start(&conf->timer, keepalive_ping, delay_ms, delay_ms);
+	ret = uv_timer_start(&conf->timer, keepalive_ping, delay_ms, delay_ms);
 	if (ret != 0) {
 		kr_log_error("[sd_watchdog] error: failed to start uv_timer!\n");
 		return kr_error(ret);
