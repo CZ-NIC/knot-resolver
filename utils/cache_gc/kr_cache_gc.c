@@ -143,14 +143,29 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 {
 	struct kr_cache kres_db = { 0 };
 	knot_db_t *db = NULL;
-	double db_usage;
 
-	int ret = kr_gc_cache_open(cfg->cache_path, &kres_db, &db, &db_usage);
+	int ret = kr_gc_cache_open(cfg->cache_path, &kres_db, &db);
 	if (ret) {
 		return ret;
 	}
 
-	if (cfg->dry_run || db_usage < cfg->cache_max_usage) {
+	const size_t db_size = knot_db_lmdb_get_mapsize(db);
+	const size_t db_usage_abs = knot_db_lmdb_get_usage(db);
+	const double db_usage = (double)db_usage_abs / db_size * 100.0;
+#if 0 // Probably not worth it, better reduce the risk by checking more often.
+	if (db_usage > 90.0) {
+		free(*libknot_db);
+		kr_cache_close(kres_db);
+		cache_size += cache_size / 10;
+		opts.maxsize = cache_size;
+		goto open_kr_cache;
+	}
+# endif
+	const bool large_usage = db_usage >= cfg->cache_max_usage;
+	if (cfg->dry_run || large_usage) { // don't print this on every size check
+		printf("Usage: %.2lf%% (%zu / %zu)\n", db_usage, db_usage_abs, db_size);
+	}
+	if (cfg->dry_run || !large_usage) {
 		kr_gc_cache_close(&kres_db, db);
 		return KNOT_EOK;
 	}
