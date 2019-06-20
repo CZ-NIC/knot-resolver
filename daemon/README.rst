@@ -630,7 +630,7 @@ and configure it to run every minute, use:
 
 .. code-block:: bash
 
-   $ kres_cache_gc -c /var/cache/knot-resolver -d 60000
+   $ kres_cache_gc -c /var/cache/knot-resolver -d 10000
 
 It's also possible to run this under systemd. However, a dedicated systemd unit
 is not currently part of the upstream package. See `message#167`_ on our
