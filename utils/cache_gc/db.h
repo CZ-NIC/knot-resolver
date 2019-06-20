@@ -5,7 +5,7 @@
 
 #include "kr_cache_gc.h"
 
-int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db, knot_db_t **libknot_db, double *usage);
+int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db, knot_db_t **libknot_db);
 
 void kr_gc_cache_close(struct kr_cache *kres_db, knot_db_t *knot_db);
 
