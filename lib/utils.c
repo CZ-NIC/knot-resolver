@@ -1076,6 +1076,10 @@ void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 	assert(rrset);
 	knot_rrset_init(rrset, owner, type, rclass, ttl);
 }
+uint16_t kr_pkt_has_dnssec(const knot_pkt_t *pkt)
+{
+	return knot_pkt_has_dnssec(pkt);
+}
 uint16_t kr_pkt_qclass(const knot_pkt_t *pkt)
 {
 	return knot_pkt_qclass(pkt);
