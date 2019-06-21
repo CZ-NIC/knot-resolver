@@ -26,20 +26,32 @@ end
 -- Layers
 M.layer = { }
 function M.layer.consume(state, req, pkt)
-	if state == kres.FAIL then return state end
-	local qry = req:current()
-	-- Observe only final answers in IN class where request has no CD flag.
-	if M.proxy == nil or not qry.flags.RESOLVED
-			or pkt:qclass() ~= kres.class.IN or req.answer:cd() then
+	if M.proxy == nil then  -- no configuration
 		return state
 	end
-	-- Synthetic AAAA from marked A responses
-	local answer = pkt:section(kres.section.ANSWER)
 
+	local rcode = pkt:rcode()
+	if (pkt:qclass() ~= kres.class.IN  -- RFC 6147 section 5.1
+		or rcode == kres.rcode.NXDOMAIN  -- RFC 6147 section 5.1.2.
+		or (req.answer:cd() and req.answer:dobit()) -- RFC 6147 section 5.5
+		-- optimization
+		or (pkt:qtype() ~= kres.type.AAAA and pkt:qtype() ~= kres.type.A)) then
+		return state
+	end
+
+	local qry = req:current()
+	print(state, pkt:rcode(), pkt:qname(), pkt:qtype(), qry.flags.RESOLVED)
+	if bit.band(state, kres.FAIL) ~= 0 and not qry.flags.RESOLVED then
+		-- resolution is not finished yet
+		return state
+	end
 	-- Observe final AAAA NODATA responses to the current SNAME.
-	local is_nodata = pkt:rcode() == kres.rcode.NOERROR and #answer == 0
-	if pkt:qtype() == kres.type.AAAA and is_nodata and pkt:qname() == qry:name()
-			and qry.flags.RESOLVED and not qry.flags.CNAME and qry.parent == nil then
+	local noaddress = state == kres.FAIL  -- workaround for auths which break on AAAA query
+			or (rcode == kres.rcode.NOERROR and tonumber(req.answ_selected.len) == 0)
+	print('noaddress ' .. tostring(noaddress))
+	if pkt:qtype() == kres.type.AAAA and pkt:qname() == qry:name()
+			and not qry.flags.CNAME and qry.parent == nil
+			and noaddress then
 		-- Start a *marked* corresponding A sub-query.
 		local extraFlags = kres.mk_qflags({})
 		extraFlags.DNSSEC_WANT = qry.flags.DNSSEC_WANT
@@ -49,7 +61,7 @@ function M.layer.consume(state, req, pkt)
 		return state
 	end
 
-
+	-- Synthetic AAAA from marked A responses
 	-- Observe answer to the marked sub-query, and convert all A records in ANSWER
 	-- to corresponding AAAA records to be put into the request's answer.
 	if not qry.flags.DNS64_MARK then return state end
