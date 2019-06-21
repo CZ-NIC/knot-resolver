@@ -254,6 +254,42 @@ else
 		same(pkt:ancount(), 2, desc .. ': ANSWER contains both RRs')
 	end
 
+	local function test_get_no_dns_param()
+		local req = assert(req_templ:clone())
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path', '/doh?notdns=' .. basexx.to_url64(string.rep('\0', 1024)))
+		check_err(req, '400', 'GET without dns paramter finishes with 400')
+	end
+
+	local function test_unparseble_get()
+                local req = assert(req_templ:clone())
+                req.headers:upsert(':method', 'GET')
+                req.headers:upsert(':path', '/doh??dns=' .. basexx.to_url64(string.rep('\0', 1024)))
+                check_err(req, '400', 'unparseble GET finishes with 400')
+        end
+
+        local function test_get_other_params()
+                local desc = 'valid GET query with other parameters than dns finishes with 200'
+                local req = req_templ:clone()
+                req.headers:upsert(':method', 'GET')
+                req.headers:upsert(':path', '/doh?other=something&dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB&another=something')
+                local headers, pkt = check_ok(req, desc)
+        end
+
+	local function test_get_invalid_b64()
+                local req = assert(req_templ:clone())
+                req.headers:upsert(':method', 'GET')
+                req.headers:upsert(':path', '/doh?dns=thisisnotb64')
+                check_err(req, '400', 'GET with invalid base64 finishes with 400')
+        end
+
+	local function test_get_invalid_chars()
+                local req = assert(req_templ:clone())
+                req.headers:upsert(':method', 'GET')
+                req.headers:upsert(':path', '/doh?dns=' .. basexx.to_url64(string.rep('\0', 200)) .. '@#$%?!')
+                check_err(req, '400', 'GET with invalid characters in b64 finishes with 400')
+        end
+
 --	not implemented
 --	local function test_post_unsupp_accept()
 --		local req = assert(req_templ:clone())
@@ -277,7 +313,12 @@ else
 		test_doh_noerror,
 		test_dstaddr,
 		test_srcaddr,
-		test_huge_answer
+		test_huge_answer,
+		test_get_no_dns_param,
+		test_unparseble_get,
+		test_get_other_params,
+		test_get_invalid_b64,
+		test_get_invalid_chars
 	}
 
 	return tests
