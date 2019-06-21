@@ -548,6 +548,12 @@ ffi.metatype( knot_pkt_t, {
 		cd = function (pkt, val) return pkt_bit(pkt, 3, 0x10, val) end,
 		ad = function (pkt, val) return pkt_bit(pkt, 3, 0x20, val) end,
 		ra = function (pkt, val) return pkt_bit(pkt, 3, 0x80, val) end,
+		-- "do" is a reserved word in Lua; only getter
+		dobit = function(pkt, val)
+			assert(val == nil, 'dobit is getter only')
+			assert(ffi.istype(knot_pkt_t, pkt))
+			return C.kr_pkt_has_dnssec(pkt)
+		end,
 		-- Question
 		qname = function(pkt)
 			assert(ffi.istype(knot_pkt_t, pkt))
