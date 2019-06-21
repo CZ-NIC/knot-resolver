@@ -1,3 +1,11 @@
+Knot Resolver 4.2.2 (2019-09-2?)
+================================
+
+Bugfixes
+--------
+- DNS64 module works around broken auth servers as mandated
+  by RFC 6147 section 5.1.2 (#483)
+
 Knot Resolver 4.2.1 (2019-09-26)
 ================================
 
