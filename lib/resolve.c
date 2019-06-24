@@ -553,7 +553,8 @@ static int answer_padding(struct kr_request *request)
 	return kr_ok();
 }
 
-static int answer_fail(struct kr_request *request)
+/* Make a clean SERVFAIL answer. */
+static void answer_fail(struct kr_request *request)
 {
 	/* Note: OPT in SERVFAIL response is still useful for cookies/additional info. */
 	knot_pkt_t *answer = request->answer;
@@ -566,31 +567,32 @@ static int answer_fail(struct kr_request *request)
 		knot_pkt_begin(answer, KNOT_ADDITIONAL);
 		answer_padding(request); /* Ignore failed padding in SERVFAIL answer. */
 		answer->opt_rr = opt_rr;
-		ret = edns_put(answer, false);
+		edns_put(answer, false);
 	}
-	return ret;
 }
 
-static int answer_finalize(struct kr_request *request, int state)
+static void answer_finalize(struct kr_request *request)
 {
 	struct kr_rplan *rplan = &request->rplan;
 	knot_pkt_t *answer = request->answer;
 
-	/* Always set SERVFAIL for bogus answers. */
-	if ((state & KR_STATE_FAIL) && rplan->pending.len > 0) {
-		struct kr_query *last = array_tail(rplan->pending);
-		if ((last->flags.DNSSEC_WANT) && (last->flags.DNSSEC_BOGUS)) {
-			return answer_fail(request);
-		}
-	}
-
-	struct kr_query *last = rplan->resolved.len > 0 ? array_tail(rplan->resolved) : NULL;
+	struct kr_query *const last =
+		rplan->resolved.len > 0 ? array_tail(rplan->resolved) : NULL;
 		/* TODO  ^^^^ this is slightly fragile */
+
+	if (!last) {
+		return answer_fail(request); /*< suspicious */
+	}
+	/* TODO: clean this up in !660 or followup, and it isn't foolproof anyway. */
+	if (last->flags.DNSSEC_BOGUS
+	    || (rplan->pending.len > 0 && array_tail(rplan->pending)->flags.DNSSEC_BOGUS)) {
+		return answer_fail(request);
+	}
 
 	/* AD flag.  We can only change `secure` from true to false.
 	 * Be conservative.  Primary approach: check ranks of all RRs in wire.
 	 * Only "negative answers" need special handling. */
-	bool secure = last != NULL && state == KR_STATE_DONE /*< suspicious otherwise */
+	bool secure = last != NULL && request->state == KR_STATE_DONE /*< suspicious otherwise */
 		&& knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG;
 	if (last && (last->flags.STUB)) {
 		secure = false; /* don't trust forwarding for now */
@@ -674,8 +676,6 @@ static int answer_finalize(struct kr_request *request, int state)
 	if (!secure) {
 		knot_wire_clear_ad(answer->wire);
 	}
-
-	return kr_ok();
 }
 
 static int query_finalize(struct kr_request *request, struct kr_query *qry, knot_pkt_t *pkt)
@@ -1592,23 +1592,24 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 
 int kr_resolve_finish(struct kr_request *request, int state)
 {
+	request->state = state;
 	/* Finalize answer and construct wire-buffer. */
 	ITERATE_LAYERS(request, NULL, answer_finalize);
-	if (answer_finalize(request, state) != 0) {
-		state = KR_STATE_FAIL;
-	}
+	answer_finalize(request);
 
-	/* Error during processing, internal failure */
-	if (state != KR_STATE_DONE) {
-		knot_pkt_t *answer = request->answer;
-		if (knot_wire_get_rcode(answer->wire) == KNOT_RCODE_NOERROR) {
-			knot_wire_clear_ad(answer->wire);
-			knot_wire_clear_aa(answer->wire);
-			knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
+	/* Defensive style, in case someone has forgotten.
+	 * Beware: non-empty answers do make sense even with SERVFAIL case, etc. */
+	if (request->state != KR_STATE_DONE) {
+		uint8_t *wire = request->answer->wire;
+		switch (knot_wire_get_rcode(wire)) {
+		case KNOT_RCODE_NOERROR:
+		case KNOT_RCODE_NXDOMAIN:
+			knot_wire_clear_ad(wire);
+			knot_wire_clear_aa(wire);
+			knot_wire_set_rcode(wire, KNOT_RCODE_SERVFAIL);
 		}
 	}
 
-	request->state = state;
 	ITERATE_LAYERS(request, NULL, finish);
 
 #ifndef NOVERBOSELOG

@@ -308,7 +308,7 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
  *       be destroyed, as it's owned by caller.
  *
  * @param  request request state
- * @param  state   either DONE or FAIL state
+ * @param  state   either DONE or FAIL state (to be assigned to request->state)
  * @return         DONE
  */
 KR_EXPORT
