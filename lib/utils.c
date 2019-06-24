@@ -963,6 +963,11 @@ uint64_t kr_now()
 	return uv_now(uv_default_loop());
 }
 
+void kr_uv_free_cb(uv_handle_t* handle)
+{
+	free(handle->data);
+}
+
 const char *kr_strptime_diff(const char *format, const char *time1_str,
 		             const char *time0_str, double *diff) {
 	assert(format != NULL);
