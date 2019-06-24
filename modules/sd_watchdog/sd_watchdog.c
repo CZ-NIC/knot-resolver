@@ -17,6 +17,7 @@ struct watchdog_config {
 static void keepalive_ping(uv_timer_t *timer)
 {
 	// NOTE: in the future, some sanity checks could be used here
+	// It is generally recommended to ignore the return value of this call.
 	sd_notify(0, "WATCHDOG=1");
 }
 
@@ -51,7 +52,9 @@ int sd_watchdog_init(struct kr_module *module)
 	uv_timer_init(loop, &conf->timer);
 	ret = uv_timer_start(&conf->timer, keepalive_ping, delay_ms, delay_ms);
 	if (ret != 0) {
-		kr_log_error("[sd_watchdog] error: failed to start uv_timer!\n");
+		kr_log_error("[sd_watchdog] error: failed to start uv_timer: %s\n",
+				uv_strerror(ret));
+		conf->timer.loop = NULL;
 		return kr_error(ret);
 	}
 
@@ -64,8 +67,19 @@ int sd_watchdog_init(struct kr_module *module)
 KR_EXPORT
 int sd_watchdog_deinit(struct kr_module *module)
 {
-	struct stat_data *conf = module->data;
-	if (conf) {
+	struct watchdog_config *conf = module->data;
+	if (conf && conf->timer.loop == uv_default_loop()) { /* normal state */
+		int ret = uv_timer_stop(&conf->timer);
+		if (ret != 0) {
+			kr_log_error("[sd_watchdog] error: failed to stop uv_timer: %s\n",
+					uv_strerror(ret));
+		}
+		/* We have a problem: UV timer can't be closed immediately,
+		 * but as soon as we return from _deinit(), we get dlclose()
+		 * so no function from this module may be usable anymore. */
+		conf->timer.data = conf;
+		uv_close((uv_handle_t *)&conf->timer, kr_uv_free_cb);
+	} else { /* watchdog might be just disabled */
 		free(conf);
 	}
 	return kr_ok();
