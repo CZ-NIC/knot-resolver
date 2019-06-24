@@ -585,12 +585,14 @@ static void answer_finalize(struct kr_request *request)
 		 * so let's (defensively) SERVFAIL the request.
 		 * ATM many checks below depend on `last` anyway,
 		 * so this helps to avoid surprises. */
-		return answer_fail(request); /*< suspicious */
+		answer_fail(request);
+		return;
 	}
 	/* TODO: clean this up in !660 or followup, and it isn't foolproof anyway. */
 	if (last->flags.DNSSEC_BOGUS
 	    || (rplan->pending.len > 0 && array_tail(rplan->pending)->flags.DNSSEC_BOGUS)) {
-		return answer_fail(request);
+		answer_fail(request);
+		return;
 	}
 
 	/* AD flag.  We can only change `secure` from true to false.
@@ -617,7 +619,8 @@ static void answer_finalize(struct kr_request *request)
 		if (write_extra_ranked_records(&request->answ_selected, reorder,
 						answer, &secure, &answ_all_cnames))
 		{
-			return answer_fail(request);
+			answer_fail(request);
+			return;
 		}
 	}
 
@@ -627,25 +630,29 @@ static void answer_finalize(struct kr_request *request)
 	}
 	if (write_extra_ranked_records(&request->auth_selected, reorder,
 	    answer, &secure, NULL)) {
-		return answer_fail(request);
+		answer_fail(request);
+		return;
 	}
 	/* Write additional records. */
 	knot_pkt_begin(answer, KNOT_ADDITIONAL);
 	if (write_extra_records(&request->additional, reorder, answer)) {
-		return answer_fail(request);
+		answer_fail(request);
+		return;
 	}
 	/* Write EDNS information */
 	if (answer->opt_rr) {
 		if (request->qsource.flags.tls) {
 			if (answer_padding(request) != kr_ok()) {
-				return answer_fail(request);
+				answer_fail(request);
+				return;
 			}
 		}
 		knot_pkt_begin(answer, KNOT_ADDITIONAL);
 		int ret = knot_pkt_put(answer, KNOT_COMPR_HINT_NONE,
 				       answer->opt_rr, KNOT_PF_FREE);
 		if (ret != KNOT_EOK) {
-			return answer_fail(request);
+			answer_fail(request);
+			return;
 		}
 	}
 
