@@ -513,7 +513,8 @@ obs:build:all:
         grep -E '(rpm|deb|tar\.xz)$' | grep -v $CI_COMMIT_SHORT_SHA || \
         (echo "ERROR: version mismatch"; exit 1)
     - >
-      ! osc results home:CZ-NIC:$OBS_REPO knot-resolver --csv | grep -v 'succeeded' -q || \
+      ! osc results home:CZ-NIC:$OBS_REPO knot-resolver --csv | \
+        grep -Ev 'disabled|excluded|Rawhide' | grep -v 'succeeded' -q || \
         (echo "ERROR: build(s) failed"; exit 1)
 
 .distrotest: &distrotest
@@ -523,7 +524,7 @@ obs:build:all:
     - >
       osc results home:CZ-NIC:$OBS_REPO knot-resolver -a x86_64 -r $DISTROTEST_REPO --csv | grep 'succeeded|$' -q || \
         (echo "ERROR: build failed"; exit 1)
-    - export LABEL=gl$(date +%s)
+    - export LABEL="gl$(date +%s)_$DISTROTEST_REPO"
     - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
     - export TESTDIR="$COMMITDIR/distrotest.$DISTROTEST_NAME"
     - ln -s $COMMITDIR distrotest_commitdir
