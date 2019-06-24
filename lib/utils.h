@@ -30,6 +30,7 @@
 #include <libknot/packet/pkt.h>
 #include <libknot/rrset.h>
 #include <libknot/rrtype/rrsig.h>
+#include <uv.h>
 
 #include "kresconfig.h"
 #include "lib/generic/array.h"
@@ -477,6 +478,9 @@ static inline uint16_t kr_rrset_type_maysig(const knot_rrset_t *rr)
  */
 KR_EXPORT
 uint64_t kr_now();
+
+/** Call free(handle->data); it's useful e.g. as a callback in uv_close(). */
+KR_EXPORT void kr_uv_free_cb(uv_handle_t* handle);
 
 /** Convert name from lookup format to wire.  See knot_dname_lf
  *
