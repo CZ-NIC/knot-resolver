@@ -23,16 +23,10 @@ static void keepalive_ping(uv_timer_t *timer)
 KR_EXPORT
 int sd_watchdog_init(struct kr_module *module)
 {
-	static kr_layer_api_t layer = { 0 };
-	layer.data = module;
-	module->layer = &layer;
-	module->props = NULL;
-
-	struct watchdog_config *conf = malloc(sizeof(*conf));
+	struct watchdog_config *conf = calloc(1, sizeof(*conf));
 	if (!conf) {
 		return kr_error(ENOMEM);
 	}
-	memset(conf, 0, sizeof(*conf));
 	module->data = conf;
 
 	/* Check if watchdog is enabled */
