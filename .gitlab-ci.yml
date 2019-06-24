@@ -513,7 +513,8 @@ obs:build:all:
         grep -E '(rpm|deb|tar\.xz)$' | grep -v $CI_COMMIT_SHORT_SHA || \
         (echo "ERROR: version mismatch"; exit 1)
     - >
-      ! osc results home:CZ-NIC:$OBS_REPO knot-resolver --csv | grep -v 'succeeded' -q || \
+      ! osc results home:CZ-NIC:$OBS_REPO knot-resolver --csv | \
+        grep -Ev 'disabled|excluded|Rawhide' | grep -v 'succeeded' -q || \
         (echo "ERROR: build(s) failed"; exit 1)
 
 .distrotest: &distrotest
