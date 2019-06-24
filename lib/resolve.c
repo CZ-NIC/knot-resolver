@@ -463,7 +463,7 @@ static int answer_prepare(struct kr_request *req, knot_pkt_t *query)
 static int write_extra_records(const rr_array_t *arr, uint16_t reorder, knot_pkt_t *answer)
 {
 	for (size_t i = 0; i < arr->len; ++i) {
-		int err = knot_pkt_put_rotate(answer, 0, arr->at[i], reorder, 0);
+		int err = knot_pkt_put_rotate(answer, 0, arr->at[i], reorder, KNOT_PF_NOTRUNC);
 		if (err != KNOT_EOK) {
 			return err == KNOT_ESPACE ? kr_ok() : kr_error(err);
 		}
