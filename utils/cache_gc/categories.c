@@ -28,6 +28,8 @@ static int get_random(int to)
 category_t kr_gc_categorize(gc_record_info_t *info)
 {
 	category_t res = 60;
+	if (!info->valid)
+		return CATEGORIES - 1;
 
 	switch (info->no_labels) {
 	case 0:

@@ -1,3 +1,5 @@
+// #define DEBUG 1
+
 #include "db.h"
 
 #include <lib/cache/impl.h>
@@ -129,8 +131,28 @@ static uint8_t entry_labels(knot_db_val_t *key, uint16_t rrtype)
 	return lab;
 }
 
+#ifdef DEBUG
+void debug_printbin(const char *str, unsigned int len) {
+	putchar('"');
+	for (int idx = 0; idx < len; idx++) {
+		char c = str[idx];
+		if (isprint(c))
+			putchar(c);
+		else
+			printf("`%02x`", c);
+	}
+	putchar('"');
+}
+#endif
+
 int kr_gc_cache_iter(knot_db_t *knot_db, kr_gc_iter_callback callback, void *ctx)
 {
+#ifdef DEBUG
+	unsigned int counter_iter = 0;
+	unsigned int counter_gc_consistent = 0;
+	unsigned int counter_kr_consistent = 0;
+#endif
+
 	knot_db_txn_t txn = { 0 };
 	knot_db_iter_t *it = NULL;
 	const knot_db_api_t *api = knot_db_lmdb_api();
@@ -160,20 +182,34 @@ int kr_gc_cache_iter(knot_db_t *knot_db, kr_gc_iter_callback callback, void *ctx
 		if (ret == KNOT_EOK) {
 			ret = api->iter_val(it, &val);
 		}
+#ifdef DEBUG
+		counter_iter++;
+#endif
 
+		info.entry_size = key.len + val.len;
+		info.valid = false;
 		const uint16_t *entry_type = ret == KNOT_EOK ? kr_gc_key_consistent(key) : NULL;
+		struct entry_h *entry = NULL;
 		if (entry_type != NULL) {
-			struct entry_h *entry = entry_h_consistent(val, *entry_type);
-
+#ifdef DEBUG
+			counter_gc_consistent++;
+#endif
+			entry = entry_h_consistent(val, *entry_type);
 			if (entry != NULL) {
+				info.valid = true;
 				info.rrtype = *entry_type;
-				info.entry_size = key.len + val.len;
 				info.expires_in = entry->time + entry->ttl - now;
 				info.no_labels = entry_labels(&key, *entry_type);
-
-				ret = callback(&key, &info, ctx);
 			}
 		}
+#ifdef DEBUG
+		counter_kr_consistent += info.valid;
+		printf("GC %sconsistent, KR %sconsistent, size %u, key len %u: ",
+			entry_type ? "" : "in", entry ? "" : "IN", (key.len + val.len), key.len);
+		debug_printbin(key.data, key.len);
+		printf("\n");
+#endif
+		ret = callback(&key, &info, ctx);
 
 		if (ret != KNOT_EOK) {
 			printf("Error iterating database (%s).\n", knot_strerror(ret));
@@ -187,5 +223,8 @@ skip:
 	}
 
 	api->txn_abort(&txn);
+#ifdef DEBUG
+	printf("DEBUG: iterated %u items, gc consistent %u, kr consistent %u\n", counter_iter, counter_gc_consistent, counter_kr_consistent);
+#endif
 	return KNOT_EOK;
 }
