@@ -524,7 +524,7 @@ obs:build:all:
     - >
       osc results home:CZ-NIC:$OBS_REPO knot-resolver -a x86_64 -r $DISTROTEST_REPO --csv | grep 'succeeded|$' -q || \
         (echo "ERROR: build failed"; exit 1)
-    - export LABEL="gl$(date +%s)_$DISTROTEST_REPO"
+    - export LABEL="gl$(date +%s)_$OBS_REPO"
     - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
     - export TESTDIR="$COMMITDIR/distrotest.$DISTROTEST_NAME"
     - ln -s $COMMITDIR distrotest_commitdir
