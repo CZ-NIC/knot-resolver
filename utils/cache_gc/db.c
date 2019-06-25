@@ -77,11 +77,19 @@ const uint16_t *kr_gc_key_consistent(knot_db_val_t key)
 {
 	const static uint16_t NSEC1 = KNOT_RRTYPE_NSEC;
 	const static uint16_t NSEC3 = KNOT_RRTYPE_NSEC3;
-	// find the first double zero in the key; CACHE_KEY_DEF
 	const uint8_t *kd = key.data;
 	ssize_t i;
-	for (i = 2; !(kd[i - 1] == 0 && kd[i - 2] == 0); ++i) {
-		if (i >= key.len) return NULL;
+	/* CACHE_KEY_DEF */
+	if (key.len >= 2 && kd[0] == '\0') {
+                /* Beware: root zone is special and starts with
+		 *         a single \0 followed by type sign */
+                i = 1;
+	} else {
+		/* find the first double zero in the key */
+                for (i = 2; !kd[i - 1] == 0 || !kd[i - 2] == 0; ++i) {
+                    if (i >= key.len)
+			    return NULL;
+                }
 	}
 	// the next character can be used for classification
 	switch (kd[i]) {
