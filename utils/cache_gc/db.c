@@ -153,6 +153,10 @@ int kr_gc_cache_iter(knot_db_t *knot_db, kr_gc_iter_callback callback, void *ctx
 	while (it != NULL) {
 		knot_db_val_t key = { 0 }, val = { 0 };
 		ret = api->iter_key(it, &key);
+		if (key.len == 4 && memcmp("VERS", key.data, 4) == 0) {
+			/* skip DB metadata */
+			goto skip;
+		}
 		if (ret == KNOT_EOK) {
 			ret = api->iter_val(it, &val);
 		}
@@ -178,6 +182,7 @@ int kr_gc_cache_iter(knot_db_t *knot_db, kr_gc_iter_callback callback, void *ctx
 			return ret;
 		}
 
+skip:
 		it = api->iter_next(it);
 	}
 
