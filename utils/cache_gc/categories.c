@@ -27,30 +27,28 @@ static int get_random(int to)
 // TODO this is just an example, make this more clever
 category_t kr_gc_categorize(gc_record_info_t *info)
 {
-	category_t res = 60;
+	category_t res;
+
 	if (!info->valid)
 		return CATEGORIES - 1;
 
 	switch (info->no_labels) {
-	case 0:
+	case 0: /* root zone */
 		res = 5;
 		break;
-	case 1:
+	case 1: /* TLD */
 		res = 10;
 		break;
-	case 2:
+	default: /* SLD and below */
 		res = (rrtype_is_infrastructure(info->rrtype) ? 15 : 20);
+		if (info->entry_size > 300)
+			/* Penalty for big answers */
+			res += 30;
 		break;
 	}
 
-	if (info->entry_size > 300) {
-		res += 30;
-	}
-
-	if (rrtype_is_infrastructure(info->rrtype)) {
-		if (info->expires_in > 0) {
-			res = res > 40 ? 40 : res;
-		}
+	if (info->expires_in <= 0) {
+		res += 40;
 	}
 
 	return res + get_random(5);
