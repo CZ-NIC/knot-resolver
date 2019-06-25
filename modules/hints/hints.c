@@ -140,7 +140,7 @@ static int satisfy_forward(/*const*/ struct hints_data *data,
 static int query(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_query *qry = ctx->req->current_query;
-	if (!qry || ctx->state & (KR_STATE_FAIL)) {
+	if (!qry || (ctx->state & KR_STATE_FAIL)) {
 		return ctx->state;
 	}
 

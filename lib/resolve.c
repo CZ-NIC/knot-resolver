@@ -463,7 +463,7 @@ static int answer_prepare(struct kr_request *req, knot_pkt_t *query)
 static int write_extra_records(const rr_array_t *arr, uint16_t reorder, knot_pkt_t *answer)
 {
 	for (size_t i = 0; i < arr->len; ++i) {
-		int err = knot_pkt_put_rotate(answer, 0, arr->at[i], reorder, 0);
+		int err = knot_pkt_put_rotate(answer, 0, arr->at[i], reorder, KNOT_PF_NOTRUNC);
 		if (err != KNOT_EOK) {
 			return err == KNOT_ESPACE ? kr_ok() : kr_error(err);
 		}
@@ -553,42 +553,52 @@ static int answer_padding(struct kr_request *request)
 	return kr_ok();
 }
 
-static int answer_fail(struct kr_request *request)
+/* Make a clean SERVFAIL answer. */
+static void answer_fail(struct kr_request *request)
 {
+	/* Note: OPT in SERVFAIL response is still useful for cookies/additional info. */
 	knot_pkt_t *answer = request->answer;
+	knot_rrset_t *opt_rr = answer->opt_rr; /* it gets NULLed below */
 	int ret = kr_pkt_clear_payload(answer);
 	knot_wire_clear_ad(answer->wire);
 	knot_wire_clear_aa(answer->wire);
 	knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
-	if (ret == 0 && answer->opt_rr) {
-		/* OPT in SERVFAIL response is still useful for cookies/additional info. */
+	if (ret == 0 && opt_rr) {
 		knot_pkt_begin(answer, KNOT_ADDITIONAL);
 		answer_padding(request); /* Ignore failed padding in SERVFAIL answer. */
-		ret = edns_put(answer, false);
+		answer->opt_rr = opt_rr;
+		edns_put(answer, false);
 	}
-	return ret;
 }
 
-static int answer_finalize(struct kr_request *request, int state)
+static void answer_finalize(struct kr_request *request)
 {
 	struct kr_rplan *rplan = &request->rplan;
 	knot_pkt_t *answer = request->answer;
 
-	/* Always set SERVFAIL for bogus answers. */
-	if (state == KR_STATE_FAIL && rplan->pending.len > 0) {
-		struct kr_query *last = array_tail(rplan->pending);
-		if ((last->flags.DNSSEC_WANT) && (last->flags.DNSSEC_BOGUS)) {
-			return answer_fail(request);
-		}
-	}
-
-	struct kr_query *last = rplan->resolved.len > 0 ? array_tail(rplan->resolved) : NULL;
+	struct kr_query *const last =
+		rplan->resolved.len > 0 ? array_tail(rplan->resolved) : NULL;
 		/* TODO  ^^^^ this is slightly fragile */
+
+	if (!last) {
+		/* Suspicious: no kr_query got resolved (not even from cache),
+		 * so let's (defensively) SERVFAIL the request.
+		 * ATM many checks below depend on `last` anyway,
+		 * so this helps to avoid surprises. */
+		answer_fail(request);
+		return;
+	}
+	/* TODO: clean this up in !660 or followup, and it isn't foolproof anyway. */
+	if (last->flags.DNSSEC_BOGUS
+	    || (rplan->pending.len > 0 && array_tail(rplan->pending)->flags.DNSSEC_BOGUS)) {
+		answer_fail(request);
+		return;
+	}
 
 	/* AD flag.  We can only change `secure` from true to false.
 	 * Be conservative.  Primary approach: check ranks of all RRs in wire.
 	 * Only "negative answers" need special handling. */
-	bool secure = last != NULL && state == KR_STATE_DONE /*< suspicious otherwise */
+	bool secure = last != NULL && request->state == KR_STATE_DONE /*< suspicious otherwise */
 		&& knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG;
 	if (last && (last->flags.STUB)) {
 		secure = false; /* don't trust forwarding for now */
@@ -609,7 +619,8 @@ static int answer_finalize(struct kr_request *request, int state)
 		if (write_extra_ranked_records(&request->answ_selected, reorder,
 						answer, &secure, &answ_all_cnames))
 		{
-			return answer_fail(request);
+			answer_fail(request);
+			return;
 		}
 	}
 
@@ -619,25 +630,29 @@ static int answer_finalize(struct kr_request *request, int state)
 	}
 	if (write_extra_ranked_records(&request->auth_selected, reorder,
 	    answer, &secure, NULL)) {
-		return answer_fail(request);
+		answer_fail(request);
+		return;
 	}
 	/* Write additional records. */
 	knot_pkt_begin(answer, KNOT_ADDITIONAL);
 	if (write_extra_records(&request->additional, reorder, answer)) {
-		return answer_fail(request);
+		answer_fail(request);
+		return;
 	}
 	/* Write EDNS information */
 	if (answer->opt_rr) {
 		if (request->qsource.flags.tls) {
 			if (answer_padding(request) != kr_ok()) {
-				return answer_fail(request);
+				answer_fail(request);
+				return;
 			}
 		}
 		knot_pkt_begin(answer, KNOT_ADDITIONAL);
 		int ret = knot_pkt_put(answer, KNOT_COMPR_HINT_NONE,
 				       answer->opt_rr, KNOT_PF_FREE);
 		if (ret != KNOT_EOK) {
-			return answer_fail(request);
+			answer_fail(request);
+			return;
 		}
 	}
 
@@ -672,8 +687,6 @@ static int answer_finalize(struct kr_request *request, int state)
 	if (!secure) {
 		knot_wire_clear_ad(answer->wire);
 	}
-
-	return kr_ok();
 }
 
 static int query_finalize(struct kr_request *request, struct kr_query *qry, knot_pkt_t *pkt)
@@ -853,7 +866,7 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 {
 	struct kr_context *ctx = request->ctx;
 	/* On successful answer, update preference list RTT and penalise timer  */
-	if (request->state != KR_STATE_FAIL) {
+	if (!(request->state & KR_STATE_FAIL)) {
 		/* Update RTT information for preference list */
 		update_nslist_rtt(ctx, qry, src);
 		/* Do not complete NS address resolution on soft-fail. */
@@ -929,7 +942,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 		update_nslist_score(request, qry, src, packet);
 	}
 	/* Resolution failed, invalidate current NS. */
-	if (request->state == KR_STATE_FAIL) {
+	if (request->state & KR_STATE_FAIL) {
 		invalidate_ns(rplan, qry);
 		qry->flags.RESOLVED = false;
 	}
@@ -1284,7 +1297,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 	int state = KR_STATE_FAIL;
 	do {
 		state = ns_fetch_cut(qry, requested_name, request, packet);
-		if (state == KR_STATE_DONE || state == KR_STATE_FAIL) {
+		if (state == KR_STATE_DONE || (state & KR_STATE_FAIL)) {
 			return state;
 		} else if (state == KR_STATE_CONSUME) {
 			requested_name = knot_wire_next_label(requested_name, NULL);
@@ -1354,7 +1367,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		/* Resolve current query and produce dependent or finish */
 		request->state = KR_STATE_PRODUCE;
 		ITERATE_LAYERS(request, qry, produce, packet);
-		if (request->state != KR_STATE_FAIL && knot_wire_get_qr(packet->wire)) {
+		if (!(request->state & KR_STATE_FAIL) && knot_wire_get_qr(packet->wire)) {
 			/* Produced an answer from cache, consume it. */
 			qry->secret = 0;
 			request->state = KR_STATE_CONSUME;
@@ -1542,7 +1555,7 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 	 * don't affect the resolution or rest of the processing. */
 	int state = request->state;
 	ITERATE_LAYERS(request, qry, checkout, packet, dst, type);
-	if (request->state == KR_STATE_FAIL) {
+	if (request->state & KR_STATE_FAIL) {
 		request->state = state; /* Restore */
 		return kr_error(ECANCELED);
 	}
@@ -1590,25 +1603,24 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 
 int kr_resolve_finish(struct kr_request *request, int state)
 {
+	request->state = state;
 	/* Finalize answer and construct wire-buffer. */
 	ITERATE_LAYERS(request, NULL, answer_finalize);
-	if (request->state == KR_STATE_FAIL) {
-		state = KR_STATE_FAIL;
-	} else if (answer_finalize(request, state) != 0) {
-		state = KR_STATE_FAIL;
-	}
+	answer_finalize(request);
 
-	/* Error during processing, internal failure */
-	if (state != KR_STATE_DONE) {
-		knot_pkt_t *answer = request->answer;
-		if (knot_wire_get_rcode(answer->wire) == KNOT_RCODE_NOERROR) {
-			knot_wire_clear_ad(answer->wire);
-			knot_wire_clear_aa(answer->wire);
-			knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
+	/* Defensive style, in case someone has forgotten.
+	 * Beware: non-empty answers do make sense even with SERVFAIL case, etc. */
+	if (request->state != KR_STATE_DONE) {
+		uint8_t *wire = request->answer->wire;
+		switch (knot_wire_get_rcode(wire)) {
+		case KNOT_RCODE_NOERROR:
+		case KNOT_RCODE_NXDOMAIN:
+			knot_wire_clear_ad(wire);
+			knot_wire_clear_aa(wire);
+			knot_wire_set_rcode(wire, KNOT_RCODE_SERVFAIL);
 		}
 	}
 
-	request->state = state;
 	ITERATE_LAYERS(request, NULL, finish);
 
 #ifndef NOVERBOSELOG
