@@ -1626,8 +1626,11 @@ int worker_submit(struct session *session, knot_pkt_t *query)
 			return kr_error(ENOMEM);
 		}
 	} else if (query) { /* response from upstream */
-		task = session_tasklist_del_msgid(session, knot_wire_get_id(query->wire));
+		const uint16_t id = knot_wire_get_id(query->wire);
+		task = session_tasklist_del_msgid(session, id);
 		if (task == NULL) {
+			VERBOSE_MSG(NULL, "=> ignoring packet with mismatching ID %d\n",
+					(int)id);
 			return kr_error(ENOENT);
 		}
 		assert(!session_flags(session)->closing);

@@ -49,7 +49,12 @@
 enum kr_layer_state {
 	KR_STATE_CONSUME = 1 << 0, /*!< Consume data. */
 	KR_STATE_PRODUCE = 1 << 1, /*!< Produce data. */
-	KR_STATE_DONE    = 1 << 2, /*!< Finished successfully. */
+
+	/*! Finished successfully or a special case: in CONSUME phase this can
+	 * be used (by iterator) to do a transition to PRODUCE phase again,
+	 * in which case the packet wasn't accepted for some reason. */
+	KR_STATE_DONE    = 1 << 2,
+
 	KR_STATE_FAIL    = 1 << 3, /*!< Error. */
 	KR_STATE_YIELD   = 1 << 4, /*!< Paused, waiting for a sub-query. */
 };

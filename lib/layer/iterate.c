@@ -85,9 +85,11 @@ static bool is_paired_to_query(const knot_pkt_t *answer, struct kr_query *query)
 	/* ID should already match, thanks to session_tasklist_del_msgid()
 	 * in worker_submit(), but it won't hurt to check again. */
 	return query->id      == knot_wire_get_id(answer->wire) &&
-	       knot_wire_get_qdcount(answer->wire) > 0 &&
+	       knot_wire_get_qdcount(answer->wire) == 1 &&
 	       query->sclass  == knot_pkt_qclass(answer) &&
 	       qtype          == knot_pkt_qtype(answer) &&
+	       /* qry->secret had been xor-applied to answer already,
+		* so this also checks for correctness of case randomization */
 	       knot_dname_is_equal(qname, knot_pkt_qname(answer));
 }
 
