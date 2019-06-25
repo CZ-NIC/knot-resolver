@@ -414,7 +414,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* LATER(optim.): typically we also have corresponding NS record in the list,
 	 * so we might save a cache operation. */
 
-	if (check_dname_for_lf(knot_pkt_qname(pkt), qry)) {
+	if (qry->flags.PKT_IS_SANE && check_dname_for_lf(knot_pkt_qname(pkt), qry)) {
 		stash_pkt(pkt, qry, req, needs_pkt);
 	}
 
