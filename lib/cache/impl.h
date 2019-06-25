@@ -265,7 +265,8 @@ void entry_list_memcpy(struct entry_apex *ea, entry_list_t list);
 
 /** Stash the packet into cache (if suitable, etc.)
  * \param needs_pkt we need the packet due to not stashing some RRs;
- * 		see stash_rrset() for details */
+ * 		see stash_rrset() for details
+ * It assumes check_dname_for_lf(). */
 void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 		const struct kr_request *req, bool needs_pkt);
 
