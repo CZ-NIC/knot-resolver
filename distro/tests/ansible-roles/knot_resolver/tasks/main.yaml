@@ -9,7 +9,7 @@
   package:
     name: '*'
     state: latest
-  when: update_packages
+  when: update_packages|bool
 
 - name: Install packages
   package:
