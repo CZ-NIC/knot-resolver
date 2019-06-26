@@ -508,8 +508,8 @@ obs:build:all:
   <<: *deploytest
   script:
     - "osc results home:CZ-NIC:$OBS_REPO knot-resolver -w"
-    - >
-      ! osc ls -b home:CZ-NIC:$OBS_REPO knot-resolver | \
+    - > # check version only for one (reliable) repo to avoid false negatives
+      ! osc ls -b home:CZ-NIC:$OBS_REPO knot-resolver Debian_9.0 x86_64 | \
         grep -E '(rpm|deb|tar\.xz)$' | grep -v $CI_COMMIT_SHORT_SHA || \
         (echo "ERROR: version mismatch"; exit 1)
     - >
