@@ -534,7 +534,7 @@ obs:build:all:
       $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
       "$(git rev-parse --short HEAD)" -l $LABEL -t distrotest.$DISTROTEST_NAME)
     - export EXITCODE=$(cat $TESTDIR/j*_exitcode)
-    - if [[ "$EXITCODE" != "0" ]]; then cat $TESTDIR/j*_{vagrant.log,stdout.txt}; fi
+    - if [[ "$EXITCODE" != "0" ]]; then cat $TESTDIR/j*_{vagrant.log.txt,stdout.txt}; fi
     - exit $EXITCODE
   after_script:
     - 'cp -t . distrotest_commitdir/distrotest.$DISTROTEST_NAME/j* ||:'
