@@ -87,7 +87,7 @@ const uint16_t *kr_gc_key_consistent(knot_db_val_t key)
                 i = 1;
 	} else {
 		/* find the first double zero in the key */
-                for (i = 2; !kd[i - 1] == 0 || !kd[i - 2] == 0; ++i) {
+                for (i = 2; kd[i - 1] || kd[i - 2]; ++i) {
                     if (i >= key.len)
 			    return NULL;
                 }
