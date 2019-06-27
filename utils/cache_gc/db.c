@@ -52,8 +52,6 @@ int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db, knot_db_t
 
 	struct kr_cdb_opts opts = { cache_path, cache_size };
 
-open_kr_cache:
-	;
 	int ret = kr_cache_open(kres_db, NULL, &opts, NULL);
 	if (ret || kres_db->db == NULL) {
 		printf("Error opening Resolver cache (%s).\n", kr_strerror(ret));
