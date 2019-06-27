@@ -237,7 +237,7 @@ int entry_h_splice(
 	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp);
 
 /** Parse an entry_apex into individual items.  @return error code. */
-int entry_list_parse(const knot_db_val_t val, entry_list_t list);
+KR_EXPORT int entry_list_parse(const knot_db_val_t val, entry_list_t list);
 
 static inline size_t to_even(size_t n)
 {
