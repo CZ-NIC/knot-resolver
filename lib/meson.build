@@ -72,6 +72,10 @@ unit_tests += [
   ['zonecut', files('test_zonecut.c')],
 ]
 
+integr_tests += [
+  ['cache_minimal_nsec', join_paths(meson.current_source_dir(), 'cache', 'test.integr')]
+]
+
 libkres_inc = include_directories('..')
 
 libkres_lib = library('kres',

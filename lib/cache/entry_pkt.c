@@ -57,15 +57,15 @@ uint32_t packet_ttl(const knot_pkt_t *pkt, bool is_negative)
 
 
 void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
-		const struct kr_request *req, const bool has_optout)
+		const struct kr_request *req, const bool needs_pkt)
 {
 	/* In some cases, stash also the packet. */
 	const bool is_negative = kr_response_classify(pkt)
 				& (PKT_NODATA|PKT_NXDOMAIN);
 	const struct kr_qflags * const qf = &qry->flags;
-	const bool want_negative = qf->DNSSEC_INSECURE || !qf->DNSSEC_WANT || has_optout;
+	const bool want_negative = qf->DNSSEC_INSECURE || !qf->DNSSEC_WANT;
 	const bool want_pkt = qf->DNSSEC_BOGUS /*< useful for +cd answers */
-				|| (is_negative && want_negative);
+				|| (is_negative && want_negative) || needs_pkt;
 
 	if (!want_pkt || !knot_wire_get_aa(pkt->wire)
 	    || pkt->parsed != pkt->size /*< malformed packet; still can't detect KNOT_EFEWDATA */
@@ -89,7 +89,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 			kr_rank_set(&rank, KR_RANK_INSECURE);
 		} else if (!qf->DNSSEC_WANT) {
 			/* no TAs at all, leave _RANK_AUTH */
-		} else if (has_optout) {
+		} else if (needs_pkt) {
 			/* All bad cases should be filtered above,
 			 * at least the same way as pktcache in kresd 1.5.x. */
 			kr_rank_set(&rank, KR_RANK_SECURE);
