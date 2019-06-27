@@ -1,5 +1,4 @@
 ---
-obs_distro_name: "x{{ distro }}_{{ ansible_distribution_version }}"
 show_package_version: dpkg -s knot-resolver | grep '^Version'
 packages:
   - knot-resolver

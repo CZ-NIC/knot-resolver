@@ -1,0 +1,2 @@
+---
+obs_repo_version: "{{ obs_distro }}_{{ ansible_distribution_version }}"

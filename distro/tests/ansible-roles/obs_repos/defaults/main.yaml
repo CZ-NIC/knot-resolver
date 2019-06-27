@@ -1,0 +1,3 @@
+---
+obs_distro: "{{ ansible_distribution | replace(' ', '_') }}"
+obs_repofile_url: "https://download.opensuse.org/repositories/home:CZ-NIC:{{ item }}/{{ obs_repo_version }}/home:CZ-NIC:{{ item }}.repo"
