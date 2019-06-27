@@ -1,7 +1,7 @@
 ---
 - name: Add upstream repo(s)
   zypper_repository:
-    repo: "{{ repo_file_url}}"
+    repo: "{{ obs_repofile_url }}"
     state: present
     disable_gpg_check: true  # auto_import_keys is broken
   with_items: "{{ repos }}"

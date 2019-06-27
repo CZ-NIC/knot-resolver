@@ -1,0 +1,6 @@
+---
+- name: Include distribution specific vars
+  include_vars: "{{ obs_distro }}.yaml"
+
+- name: Configure upstream reporitories
+  include: "{{ obs_distro }}.yaml"

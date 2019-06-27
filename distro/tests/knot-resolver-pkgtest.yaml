@@ -8,4 +8,5 @@
     - repos.yaml
 
   roles:
+    - obs_repos
     - knot_resolver

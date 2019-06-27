@@ -2,5 +2,4 @@
 repos:
   - knot-resolver-latest
 distro: "{{ ansible_distribution | replace(' ', '_') }}"
-repo_file_url: "https://download.opensuse.org/repositories/home:CZ-NIC:{{ item }}/{{ obs_distro_name }}/home:CZ-NIC:{{ item }}.repo"
 update_packages: false

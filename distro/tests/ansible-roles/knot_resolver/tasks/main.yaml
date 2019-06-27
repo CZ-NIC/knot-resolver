@@ -2,9 +2,6 @@
 - name: Include distribution specific vars
   include_vars: "{{ distro }}.yaml"
 
-- name: Configure upstream reporitories
-  include: "configure_repos/{{ distro }}.yaml"
-
 - name: Update all packages
   package:
     name: '*'

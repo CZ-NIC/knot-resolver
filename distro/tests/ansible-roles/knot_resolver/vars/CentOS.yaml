@@ -1,5 +1,4 @@
 ---
-obs_distro_name: "{{ distro }}_{{ ansible_distribution_major_version }}_EPEL"
 show_package_version: rpm -qi knot-resolver | grep '^Version'
 packages:
   - knot-resolver
