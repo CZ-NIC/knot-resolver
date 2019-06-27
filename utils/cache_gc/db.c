@@ -144,6 +144,25 @@ void debug_printbin(const char *str, unsigned int len) {
 }
 #endif
 
+/** Return one entry_h reference from a cache DB value.  NULL if not consistent/suitable. */
+static const struct entry_h * val2entry(const knot_db_val_t val, uint16_t ktype)
+{
+	if (ktype != KNOT_RRTYPE_NS)
+		return entry_h_consistent(val, ktype);
+	/* Otherwise we have a multi-purpose entry.
+	 * Well, for now we simply choose the most suitable entry;
+	 * the only realistic collision is DNAME in apex where we'll prefer NS. */
+	entry_list_t el;
+	if (entry_list_parse(val, el))
+		return NULL;
+	for (int i = ENTRY_APEX_NSECS_CNT; i < EL_LENGTH; ++i) {
+		if (el[i].len)
+			return entry_h_consistent(el[i], EL2RRTYPE(i));
+	}
+	/* Only NSEC* meta-data inside. */
+	return NULL;
+}
+
 int kr_gc_cache_iter(knot_db_t *knot_db, kr_gc_iter_callback callback, void *ctx)
 {
 #ifdef DEBUG
@@ -188,18 +207,23 @@ int kr_gc_cache_iter(knot_db_t *knot_db, kr_gc_iter_callback callback, void *ctx
 		info.entry_size = key.len + val.len;
 		info.valid = false;
 		const uint16_t *entry_type = ret == KNOT_EOK ? kr_gc_key_consistent(key) : NULL;
-		struct entry_h *entry = NULL;
+		const struct entry_h *entry = NULL;
 		if (entry_type != NULL) {
 #ifdef DEBUG
 			counter_gc_consistent++;
 #endif
-			entry = entry_h_consistent(val, *entry_type);
-			if (entry != NULL) {
-				info.valid = true;
-				info.rrtype = *entry_type;
-				info.expires_in = entry->time + entry->ttl - now;
-				info.no_labels = entry_labels(&key, *entry_type);
-			}
+			entry = val2entry(val, *entry_type);
+		}
+		/* TODO: perhaps improve some details around here:
+		 *  - xNAME have .rrtype NS
+		 *  - DNAME hidden on NS name will not be considered here
+		 *  - if zone has NSEC* meta-data but no NS, it will be seen
+		 *    here as kr_inconsistent */
+		if (entry != NULL) {
+			info.valid = true;
+			info.rrtype = *entry_type;
+			info.expires_in = entry->time + entry->ttl - now;
+			info.no_labels = entry_labels(&key, *entry_type);
 		}
 #ifdef DEBUG
 		counter_kr_consistent += info.valid;
