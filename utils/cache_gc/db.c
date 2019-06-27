@@ -5,6 +5,7 @@
 #include <lib/cache/impl.h>
 //#include <lib/defines.h>
 
+#include <ctype.h> //DEBUG
 #include <time.h>
 #include <sys/stat.h>
 
@@ -202,7 +203,7 @@ int kr_gc_cache_iter(knot_db_t *knot_db, kr_gc_iter_callback callback, void *ctx
 		}
 #ifdef DEBUG
 		counter_kr_consistent += info.valid;
-		printf("GC %sconsistent, KR %sconsistent, size %u, key len %u: ",
+		printf("GC %sconsistent, KR %sconsistent, size %zu, key len %zu: ",
 			entry_type ? "" : "in", entry ? "" : "IN", (key.len + val.len), key.len);
 		debug_printbin(key.data, key.len);
 		printf("\n");
