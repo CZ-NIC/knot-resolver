@@ -23,6 +23,8 @@
     - include: test_tls.yaml
     - include: test_dnssec.yaml
 
+    - include: test_kres_cache_gc.yaml
+
     - name: Test DoH
       block:
         - name: Install knot-resolver-module-http
