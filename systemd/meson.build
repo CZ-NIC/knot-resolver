@@ -30,6 +30,12 @@ if systemd_files == 'enabled'
     configuration: systemd_config,
     install_dir: systemd_unit_dir,
   )
+  kres_cache_gc_service = configure_file(
+    input: 'kres-cache-gc.service.in',
+    output: 'kres-cache-gc.service',
+    configuration: systemd_config,
+    install_dir: systemd_unit_dir,
+  )
   install_data(
     sources: [
       'kresd.socket',
