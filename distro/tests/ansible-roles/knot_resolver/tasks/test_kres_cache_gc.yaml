@@ -1,0 +1,3 @@
+---
+- name: check kres-cache-gc.service is active
+  shell: systemctl is-active -q kres-cache-gc.service
