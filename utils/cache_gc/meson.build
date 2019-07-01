@@ -10,7 +10,7 @@ c_src_lint += cache_gc_src
 
 if build_utils
   cache_gc = executable(
-    'kres_cache_gc',
+    'kres-cache-gc',
     cache_gc_src,
     dependencies: [
       contrib_dep,
