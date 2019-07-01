@@ -60,12 +60,14 @@ worker.resolve = function (qname, qtype, qclass, options, finish, init)
 	if type(qname) == 'table' then
 		local t = qname
 		qname = t.name
-		qtype = t.type or kres.type.A
-		qclass = t.class or kres.class.IN
+		qtype = t.type
+		qclass = t.class
 		options = t.options
 		finish = t.finish
 		init = t.init
 	end
+	qtype = qtype or kres.type.A
+	qclass = qclass or kres.class.IN
 	options = kres.mk_qflags(options)
 	-- LATER: nicer errors for rubbish in qname, qtype, qclass?
 	local pkt = ffi.C.worker_resolve_mk_pkt(qname, qtype, qclass, options)
