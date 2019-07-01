@@ -1,5 +1,6 @@
 etc/knot-resolver/kresd.conf
 usr/lib/systemd/system/kresd@.service lib/systemd/system/
+usr/lib/systemd/system/kres-cache-gc.service lib/systemd/system/
 usr/lib/systemd/system/kresd.target lib/systemd/system/
 usr/lib/systemd/system/kresd.socket lib/systemd/system/
 usr/lib/systemd/system/kresd-tls.socket lib/systemd/system/

@@ -214,7 +214,7 @@ systemctl daemon-reload
 %endif
 
 %preun
-%systemd_preun 'kresd@*.service' kresd.target kresd.socket kresd-tls.socket
+%systemd_preun 'kresd@*.service' kres-cache-gc.service kresd.target kresd.socket kresd-tls.socket
 
 %postun
 # NOTE: this doesn't restart the services on CentOS 7
@@ -237,6 +237,7 @@ systemctl daemon-reload
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/root.hints
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/icann-ca.pem
 %{_unitdir}/kresd@.service
+%{_unitdir}/kres-cache-gc.service
 %{_unitdir}/kresd.target
 %dir %{_unitdir}/multi-user.target.wants
 %{_unitdir}/multi-user.target.wants/kresd.target
