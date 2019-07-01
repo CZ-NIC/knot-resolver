@@ -624,13 +624,13 @@ required, the entire cache is dropped. To avoid starting over with an empty
 cache, a separate garbage collector daemon is available to periodically trim
 the cache instead.
 
-The cache garbage collector daemon (``kres_cache_gc``) monitors the cache usage
+The cache garbage collector daemon (``kres-cache-gc``) monitors the cache usage
 and attempts to free up space when a threshold is reached. To spawn the daemon
-and configure it to run every minute, use:
+and configure it to run every second, use:
 
 .. code-block:: bash
 
-   $ kres_cache_gc -c /var/cache/knot-resolver -d 10000
+   $ kres-cache-gc -c /var/cache/knot-resolver -d 1000
 
 It's also possible to run this under systemd. However, a dedicated systemd unit
 is not currently part of the upstream package. See `message#167`_ on our
