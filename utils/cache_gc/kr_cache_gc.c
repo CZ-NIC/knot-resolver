@@ -249,11 +249,12 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 			already_gone++;
 			break;
 		default:
-			printf("Warning: skipping deleting because of error (%s)\n", knot_strerror(ret));
+			printf("Warning: skipping deletion because of error (%s)\n", knot_strerror(ret));
 			api->txn_abort(&txn);
 			ret = api->txn_begin(db, &txn, 0);
 			if (ret != KNOT_EOK) {
-				break;
+				printf("Error: can't begin txn because of error (%s)\n", knot_strerror(ret));
+				goto finish;
 			}
 			continue;
 		}
@@ -269,16 +270,17 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 				ret = api->txn_begin(db, &txn, 0);
 			}
 			if (ret != KNOT_EOK) {
-				break;
+				printf("Error: transaction failed (%s)\n", knot_strerror(ret));
+				goto finish;
 			}
 		}
 	}
+	ret = api->txn_commit(&txn);
 
+finish:
 	printf("Deleted %zu records (%zu already gone) types", deleted_records, already_gone);
 	rrtypelist_print(&deleted_rrtypes);
 	printf("It took %.2lf secs, %zu transactions (%s)\n", gc_timer_end(&timer_delete), rw_txn_count, knot_strerror(ret));
-
-	ret = api->txn_commit(&txn);
 
 	rrtype_dynarray_free(&deleted_rrtypes);
 	entry_dynarray_deep_free(&to_del.to_delete);
