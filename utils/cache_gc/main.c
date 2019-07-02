@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include <lib/defines.h>
+#include <libknot/libknot.h>
 
 #include "kr_cache_gc.h"
 
@@ -118,7 +119,7 @@ int main(int argc, char *argv[])
 		int ret = kr_cache_gc(&cfg);
 		// ENOENT: kresd may not be started yet or cleared the cache now
 		if (ret && ret != -ENOENT) {
-			printf("Error (%s)\n", kr_strerror(ret));
+			printf("Error (%s)\n", knot_strerror(ret));
 			return 10;
 		}
 
