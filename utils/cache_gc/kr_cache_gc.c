@@ -180,7 +180,16 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg)
 		return ret;
 	}
 
-	ssize_t amount_tofree = knot_db_lmdb_get_mapsize(db) * cfg->cache_to_be_freed / 100;
+	//ssize_t amount_tofree = knot_db_lmdb_get_mapsize(db) * cfg->cache_to_be_freed / 100;
+	// Mixing ^^ page usage and entry sizes (key+value lengths) didn't work
+	// too well, probably due to internal fragmentation after some GC cycles.
+	// Therefore let's scale this by the ratio of these two sums.
+	ssize_t cats_sumsize = 0;
+	for (int i = 0; i < CATEGORIES; ++i) {
+		cats_sumsize += cats.categories_sizes[i];
+	}
+	ssize_t amount_tofree = knot_db_lmdb_get_mapsize(db) * cfg->cache_to_be_freed
+		* cats_sumsize / (100 * knot_db_lmdb_get_usage(db));
 
 #ifdef DEBUG
 	printf("tofree: %zd\n", amount_tofree);
