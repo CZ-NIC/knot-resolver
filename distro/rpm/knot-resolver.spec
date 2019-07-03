@@ -2,6 +2,7 @@
 %{!?_pkgdocdir: %global _pkgdocdir %{_docdir}/%{name}}
 
 %define GPG_CHECK 0
+%define OBS_BUILD 1
 %define VERSION __VERSION__
 %define repodir %{_builddir}/%{name}-%{version}
 %define NINJA ninja-build
@@ -16,7 +17,7 @@ URL:            https://www.knot-resolver.cz/
 Source0:        knot-resolver_%{version}.orig.tar.xz
 
 # LuaJIT only on these arches
-%if 0%{?rhel}
+%if 0%{?rhel} <= 7 && 0%{?OBS_BUILD} == 0
 # RHEL 7 does not have aarch64 LuaJIT
 ExclusiveArch:	%{ix86} x86_64
 %else
