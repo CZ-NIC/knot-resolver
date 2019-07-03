@@ -201,7 +201,7 @@ int kr_cache_clear(struct kr_cache *cache)
 }
 
 /* When going stricter, BEWARE of breaking entry_h_consistent_NSEC() */
-struct entry_h * entry_h_consistent(knot_db_val_t data, uint16_t type)
+struct entry_h * entry_h_consistent_E(knot_db_val_t data, uint16_t type)
 {
 	(void) type; /* unused, for now */
 	if (!data.data) return NULL;
@@ -599,7 +599,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		eh->rank = 0;
 		assert(false);
 	}
-	assert(entry_h_consistent(val_new_entry, rr->type));
+	assert(entry_h_consistent_E(val_new_entry, rr->type));
 
 	#if 0 /* Occasionally useful when debugging some kinds of changes. */
 	{
@@ -802,7 +802,7 @@ static int peek_exact_real(struct kr_cache *cache, const knot_dname_t *name, uin
 	if (!ret) ret = entry_h_seek(&val, type);
 	if (ret) return kr_error(ret);
 
-	const struct entry_h *eh = entry_h_consistent(val, type);
+	const struct entry_h *eh = entry_h_consistent_E(val, type);
 	if (!eh || eh->is_packet) {
 		// TODO: no packets, but better get rid of whole kr_cache_peek_exact().
 		return kr_error(ENOENT);
