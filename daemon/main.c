@@ -795,6 +795,13 @@ int main(int argc, char **argv)
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
+	/* Profiling: avoid SIGPROF waking up the event loop.  Otherwise the profiles
+	 * (of the usual type) may skew results, e.g. epoll_pwait() taking lots of time. */
+	ret = uv_loop_configure(loop, UV_LOOP_BLOCK_SIGNAL, SIGPROF);
+	if (ret) {
+		kr_log_info("[system] failed to block SIGPROF in event loop, ignoring: %s\n",
+				uv_strerror(ret));
+	}
 
 	/* Start listening, in the sense of network_listen_fd(). */
 	if (start_listening(&engine.net, &args.fds) != 0) {
