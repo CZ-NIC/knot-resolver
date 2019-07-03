@@ -89,8 +89,10 @@ int session_tasklist_finalize_expired(struct session *session);
 bool session_is_empty(const struct session *session);
 /** Get pointer to session flags */
 struct session_flags *session_flags(struct session *session);
-/** Get peer address. */
+/** Get pointer to peer address. */
 struct sockaddr *session_get_peer(struct session *session);
+/** Get pointer to sockname (address of our end). */
+struct sockaddr *session_get_sockname(struct session *session);
 /** Get pointer to server-side tls-related data. */
 struct tls_ctx_t *session_tls_get_server_ctx(const struct session *session);
 /** Set pointer to server-side tls-related data. */

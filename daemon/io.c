@@ -145,6 +145,14 @@ int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
 	struct session *s = session_new(h, false);
 	assert(s);
 	session_flags(s)->outgoing = false;
+
+	int socklen = sizeof(union inaddr);
+	ret = uv_udp_getsockname(handle, session_get_sockname(s), &socklen);
+	if (ret) {
+		kr_log_error("ERROR: getsockname failed: %s\n", uv_strerror(ret));
+		abort(); /* It might be nontrivial not to leak something here. */
+	}
+
 	return io_start_read(h);
 }
 
@@ -312,16 +320,26 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 		return;
 	}
 
-	/* Set deadlines for TCP connection and start reading.
-	 * It will re-check every half of a request time limit if the connection
-	 * is idle and should be terminated, this is an educated guess. */
-	struct sockaddr *peer = session_get_peer(s);
-	int peer_len = sizeof(union inaddr);
-	int ret = uv_tcp_getpeername(client, peer, &peer_len);
-	if (ret || peer->sa_family == AF_UNSPEC) {
+	/* Get peer's and our address.  We apparently get specific sockname here
+	 * even if we listened on a wildcard address. */
+	struct sockaddr *sa = session_get_peer(s);
+	int sa_len = sizeof(union inaddr);
+	int ret = uv_tcp_getpeername(client, sa, &sa_len);
+	if (ret || sa->sa_family == AF_UNSPEC) {
 		session_close(s);
 		return;
 	}
+	sa = session_get_sockname(s);
+	sa_len = sizeof(union inaddr);
+	ret = uv_tcp_getsockname(client, sa, &sa_len);
+	if (ret || sa->sa_family == AF_UNSPEC) {
+		session_close(s);
+		return;
+	}
+
+	/* Set deadlines for TCP connection and start reading.
+	 * It will re-check every half of a request time limit if the connection
+	 * is idle and should be terminated, this is an educated guess. */
 
 	const struct network *net = &worker->engine->net;
 	uint64_t idle_in_timeout = net->tcp.in_idle_timeout;

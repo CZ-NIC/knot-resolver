@@ -33,7 +33,8 @@
  */
 struct session {
 	struct session_flags sflags;  /**< miscellaneous flags. */
-	union inaddr peer;            /**< address of peer; is not set for client's UDP sessions. */
+	union inaddr peer;            /**< address of peer. */
+	union inaddr sockname;        /**< our local address; beware of wildcards on UDP. FIXME info */
 	uv_handle_t *handle;          /**< libuv handle for IO operations. */
 	uv_timer_t timeout;           /**< libuv handle for timer. */
 
@@ -258,6 +259,11 @@ struct session_flags *session_flags(struct session *session)
 struct sockaddr *session_get_peer(struct session *session)
 {
 	return &session->peer.ip;
+}
+
+struct sockaddr *session_get_sockname(struct session *session)
+{
+	return &session->sockname.ip;
 }
 
 struct tls_ctx_t *session_tls_get_server_ctx(const struct session *session)
