@@ -253,7 +253,7 @@ ${CDEFS} ${KRESD} types <<-EOF
 EOF
 
 echo "struct endpoint"    | ${CDEFS} ${KRESD} types | sed 's/uv_handle_t \*/void */'
-echo "struct request_ctx" | ${CDEFS} ${KRESD} types | sed '/struct {/,$ d'
+echo "struct request_ctx" | ${CDEFS} ${KRESD} types | sed '/struct session/,$ d'
 printf "\t/* beware: hidden stub, to avoid hardcoding sockaddr lengths */\n};\n"
 
 echo "struct qr_task" | ${CDEFS} ${KRESD} types | sed '/pktbuf/,$ d'
