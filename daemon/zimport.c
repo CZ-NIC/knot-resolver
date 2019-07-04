@@ -678,6 +678,7 @@ static int zi_record_store(zs_scanner_t *s)
 /** @internal zscanner callback. */
 static int zi_state_parsing(zs_scanner_t *s)
 {
+	bool empty = true;
 	while (zs_parse_record(s) == 0) {
 		switch (s->state) {
 		case ZS_STATE_DATA:
@@ -685,6 +686,7 @@ static int zi_state_parsing(zs_scanner_t *s)
 				return -1;
 			}
 			zone_import_ctx_t *z_import = (zone_import_ctx_t *) s->process.data;
+			empty = false;
 			if (z_import->origin == 0) {
 				z_import->origin = knot_dname_copy(s->zone_origin,
 								  &z_import->pool);
@@ -708,6 +710,10 @@ static int zi_state_parsing(zs_scanner_t *s)
 			return -1;
 		case ZS_STATE_EOF:
 		case ZS_STATE_STOP:
+			if (empty) {
+				kr_log_error("[zimport] empty zone file\n");
+				return -1;
+			}
 			return (s->error.counter == 0) ? 0 : -1;
 		default:
 			kr_log_error("[zscanner] line: %"PRIu64
