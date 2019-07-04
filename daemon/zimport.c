@@ -687,14 +687,9 @@ static int zi_state_parsing(zs_scanner_t *s)
 			}
 			zone_import_ctx_t *z_import = (zone_import_ctx_t *) s->process.data;
 			empty = false;
-			if (z_import->origin == 0) {
-				z_import->origin = knot_dname_copy(s->zone_origin,
-								  &z_import->pool);
-			} else if (!knot_dname_is_equal(z_import->origin, s->zone_origin)) {
-				kr_log_error("[zscanner] line: %"PRIu64
-					     ": zone origin changed unexpectedly\n",
-					     s->line_counter);
-				return -1;
+			if (s->r_type == 6) {
+				z_import->origin = knot_dname_copy(s->r_owner,
+                                                                 &z_import->pool);
 			}
 			break;
 		case ZS_STATE_ERROR:
@@ -712,6 +707,10 @@ static int zi_state_parsing(zs_scanner_t *s)
 		case ZS_STATE_STOP:
 			if (empty) {
 				kr_log_error("[zimport] empty zone file\n");
+				return -1;
+			}
+			if (!((zone_import_ctx_t *) s->process.data)->origin) {
+				kr_log_error("[zimport] zone file doesn't contain SOA record\n");
 				return -1;
 			}
 			return (s->error.counter == 0) ? 0 : -1;
