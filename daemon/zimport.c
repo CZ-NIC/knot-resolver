@@ -773,20 +773,22 @@ int zi_zone_import(struct zone_import_ctx *z_import,
 		VERBOSE_MSG(NULL, "[zscanner] started; zone file `%s`\n",
 			    zone_file);
 		ret = zi_state_parsing(s);
-		/* Try to find TA for worker->z_import.origin. */
-		map_t *trust_anchors = &z_import->worker->engine->resolver.trust_anchors;
-		knot_rrset_t *rr = kr_ta_get(trust_anchors, z_import->origin);
-		if (rr) {
-			z_import->ta = rr;
-		} else {
-			/* For now - fail.
-			 * TODO - query DS and continue after answer had been obtained. */
-			KR_DNAME_GET_STR(zone_name_str, z_import->origin);
-			kr_log_error("[zimport] no TA found for `%s`, fail\n", zone_name_str);
-			ret = 1;
+		if (ret == 0) {
+			/* Try to find TA for worker->z_import.origin. */
+			map_t *trust_anchors = &z_import->worker->engine->resolver.trust_anchors;
+			knot_rrset_t *rr = kr_ta_get(trust_anchors, z_import->origin);
+			if (rr) {
+				z_import->ta = rr;
+			} else {
+				/* For now - fail.
+				 * TODO - query DS and continue after answer had been obtained. */
+				KR_DNAME_GET_STR(zone_name_str, z_import->origin);
+				kr_log_error("[zimport] no TA found for `%s`, fail\n", zone_name_str);
+				ret = 1;
+			}
+			elapsed = kr_now() - z_import->start_timestamp;
+			elapsed = elapsed > UINT_MAX ? UINT_MAX : elapsed;
 		}
-		elapsed = kr_now() - z_import->start_timestamp;
-		elapsed = elapsed > UINT_MAX ? UINT_MAX : elapsed;
 	}
 	zs_deinit(s);
 	free(s);
