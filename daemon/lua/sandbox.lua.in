@@ -424,6 +424,7 @@ modules.load('detect_time_skew')
 modules.load('detect_time_jump')
 modules.load('ta_sentinel')
 modules.load('edns_keepalive')
+modules.load('refuse_nord')
 
 -- Load keyfile_default
 trust_anchors.add_file('@keyfile_default@', @unmanaged@)
