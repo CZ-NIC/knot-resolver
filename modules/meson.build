@@ -10,6 +10,7 @@ lua_mod_src = [  # add lua modules without separate meson.build
   files('prefill/prefill.lua'),
   files('priming/priming.lua'),
   files('rebinding/rebinding.lua'),
+  files('refuse_nord/refuse_nord.lua'),
   files('renumber/renumber.lua'),
   files('serve_stale/serve_stale.lua'),
   files('ta_sentinel/ta_sentinel.lua'),
