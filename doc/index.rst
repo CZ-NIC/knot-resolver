@@ -11,6 +11,7 @@ and it provides a state-machine like API for extensions.
    :name: users
    :maxdepth: 2
 
+   quickref
    daemon
    modules
 
