@@ -1,6 +1,11 @@
 Knot Resolver 4.1.0 (2019-07-10)
 ================================
 
+Security
+--------
+- fix CVE-2019-10190: do not pass bogus negative answer to client (!827)
+- fix CVE-2019-10191: do not cache negative answer with forged QNAME+QTYPE (!839)
+
 Improvements
 ------------
 - new cache garbage collector is available and enabled by default (#257)
