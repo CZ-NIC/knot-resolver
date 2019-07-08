@@ -1,0 +1,58 @@
+; File written on Tue Jul  9 10:53:17 2019
+; dnssec_signzone version 9.11.3-1ubuntu1.8-Ubuntu
+.			86400	IN SOA	rootns. you.test. (
+					2017071102 ; serial
+					1800       ; refresh (30 minutes)
+					900        ; retry (15 minutes)
+					604800     ; expire (1 week)
+					86400      ; minimum (1 day)
+					)
+			86400	RRSIG	SOA 8 0 86400 (
+					20190808075316 20190709075316 62034 .
+					S86QA1UlKYCxzFK1QDYb9ec6DHg59Y+xWREy
+					duooWAMYB2gi5xSks9KPs/G0ATnOWrHEO/7q
+					HPfgZAUyPR0GEQ== )
+			86400	NS	rootns.
+			86400	RRSIG	NS 8 0 86400 (
+					20190808075316 20190709075316 62034 .
+					cTzIDk1fP13okhc5q3ZFz+Fx2O/xwSuz6gVV
+					2CEGGCrS/g1ePXOkk5vEwHkJqR9nIbIxgkao
+					nj2mL12zeSY2Sw== )
+			86400	NSEC	a.b.subtree1. NS SOA RRSIG NSEC DNSKEY
+			86400	RRSIG	NSEC 8 0 86400 (
+					20190808075316 20190709075316 62034 .
+					E5fbgQXbNcBfSDrryxim5to8Thavqkkj2JK3
+					wT0gHd8Uz8op2hImWzKmkvX6NZkd7HBdtsWg
+					1a38Y0GySh5nTQ== )
+			86400	DNSKEY	256 3 8 (
+					AwEAAbSwbjkbn1oPDNdIUjdRhaUeODrQdwfb
+					EI0upUGEYqQV2LO7iXH5Nvvds9EQmFo9g+Xw
+					nhOimjcuQG9YYGZuG6c=
+					) ; ZSK; alg = RSASHA256 ; key id = 62034
+			86400	DNSKEY	257 3 8 (
+					AwEAAbSV3HkhePQXQNSJUx2wKiVwdwvMFdeY
+					Zfn/jNWe77usNjFmJB1T6Jz0Gyu0b95j686H
+					U3/8jqQ0vB4/ugFr3v8=
+					) ; KSK; alg = RSASHA256 ; key id = 136
+			86400	RRSIG	DNSKEY 8 0 86400 (
+					20190808075316 20190709075316 136 .
+					HmH/IEMRWFarlsxDQ4sD8byhCcuklhDKC+Vi
+					59+4tcP34rJ+gDsdfVfEY4Hs03UF7tXQiyhv
+					4ut02AZFJMangg== )
+			86400	RRSIG	DNSKEY 8 0 86400 (
+					20190808075316 20190709075316 62034 .
+					Hk4HEUmALb98i0XNn7ZwOZeuLYrv+mEoX9Do
+					6YI1XqFcIRaY7vBCyQEpbRRs+DXPXBbi3EHc
+					PDtyu1VjN9xEJA== )
+a.b.subtree1.		86400	IN AAAA	2001:db8::
+			86400	RRSIG	AAAA 8 3 86400 (
+					20190808075316 20190709075316 62034 .
+					MAisFZ8EU/NdNenJKvmlqZhxBx8K6Io69Cgg
+					Ux15CI4EozX5i2T/pPDpjp2Oe3Xxxj1TcegE
+					VgNzaayBj9fKbw== )
+			86400	NSEC	. AAAA RRSIG NSEC
+			86400	RRSIG	NSEC 8 3 86400 (
+					20190808075316 20190709075316 62034 .
+					ZJT5KzQS/1I8gZl5J/QYpa35jrjBtNoAYxC1
+					+vOhgFB/iLVVdiTtWpY23+Uv5buxSxlweBuh
+					AoMwrFGk76K0EQ== )
