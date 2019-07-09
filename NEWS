@@ -23,6 +23,7 @@ Bugfixes
 - http module: also send intermediate TLS certificate to clients,
   if available and luaossl >= 20181207 (!819)
 - send EDNS with SERVFAILs, e.g. on validation failures (#180, !827)
+- prefill module: avoid crash on empty zone file (#474, !840)
 
 Knot Resolver 4.0.0 (2019-04-18)
 ================================
