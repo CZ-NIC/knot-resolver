@@ -33,14 +33,14 @@ ev = event.after(0, function () return 1 end)
 
 -- Import fake root zone; avoid interference with configured keyfile_default.
 trust_anchors.remove('.')
-trust_anchors.add('. IN DS 48409 8 2 3D63A0C25BCE86621DE63636F11B35B908EFE8E9381E0E3E9DEFD89EA952C27D')
+trust_anchors.add('.    IN DS 136 8 2 CF6782894E5BD62F0B0B7E9E8126B033FC752909BBE3577E27406FC1 78A9BC27')
 
 local function check_answer(desc, qname, qtype, expected_rcode)
 	qtype_str = kres.tostring.type[qtype]
 	callback = function(pkt)
 		same(pkt:rcode(), expected_rcode,
 		     desc .. ': expecting answer for query ' .. qname .. ' ' .. qtype_str
-		      .. ' with rcode ' .. kres.tostring.rcode[expected_rcode])
+		      .. ' with rcode ' .. kres.tostring.rcode[expected_rcode] .. ' got ' .. kres.tostring.rcode[pkt:rcode()])
 
 		ok((pkt:ancount() > 0) == (pkt:rcode() == kres.rcode.NOERROR),
 		   desc ..': checking number of answers for ' .. qname .. ' ' .. qtype_str)
@@ -91,7 +91,7 @@ end
 
 local function import_not_root_zone()
 	cache.clear()
-	local import_res = cache.zone_import('example.com.zone')
+        local import_res = cache.zone_import('example.com.zone')
 	assert(import_res.code == 1)
 	-- beware that import takes at least 100 ms
 	worker.sleep(0.2)  -- zimport is delayed by 100 ms from function call
