@@ -79,6 +79,12 @@ Queries affected by `TLS_FORWARD` policy will always be resolved over TLS connec
 
 To test this feature you need to either :ref:`configure Knot Resolver as DNS-over-TLS server <tls-server-config>`, or pick some public DNS-over-TLS server. Please see `DNS Privacy Project`_ homepage for list of public servers.
 
+.. note:: Some public DNS-over-TLS providers may apply rate-limiting which
+   makes their service incompatible with Knot Resolver's TLS forwarding.
+   Notably, `Google Public DNS
+   <https://developers.google.com/speed/public-dns/docs/dns-over-tls>`_ doesn't
+   work as of 2019-07-10.
+
 When multiple servers are specified, the one with the lowest round-trip time is used.
 
 CA+hostname authentication
