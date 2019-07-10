@@ -1,6 +1,10 @@
 Knot Resolver 4.x.y (2019-0m-dd)
 ================================
 
+Security
+--------
+- fix CVE-2019-10191: caching negative answer with forged QNAME+QTYPE
+
 Improvements
 ------------
 - DNS-over-HTTPS: answers include `access-control-allow-origin: *` (!823)
