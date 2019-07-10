@@ -26,6 +26,7 @@ Bugfixes
 - prefill module: avoid crash on empty zone file (#474, !840)
 - rebinding module: avoid excessive iteration on blocked attempts (!842)
 - rebinding module: fix crash caused by race condition (!842)
+- rebinding module: log each blocked query only in verbose mode (!842)
 
 
 Knot Resolver 4.0.0 (2019-04-18)

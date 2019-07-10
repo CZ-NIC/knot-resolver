@@ -1,3 +1,5 @@
+local ffi = require('ffi')
+
 -- Protection from DNS rebinding attacks
 local kres = require('kres')
 local renumber = require('kres_modules.renumber')
@@ -101,9 +103,12 @@ function M.layer.consume(state, req, pkt)
 	qry.flags.RESOLVED = 1  -- stop iteration
 	qry.flags.CACHED = 1  -- do not cache
 	refuse(req)
-	log('[' .. string.format('%5d', qry.id) .. '][rebinding] '
-	    .. 'blocking blacklisted IP \'' .. kres.rr2str(bad_rr)
-	    .. '\' received from IP ' .. tostring(kres.sockaddr_t(req.upstream.addr)))
+	if verbose() then
+		ffi.C.kr_log_qverbose_impl(qry, 'rebinding',
+		    'blocking blacklisted IP in RR \'%s\' received from IP %s\n',
+		    kres.rr2str(bad_rr),
+		    tostring(kres.sockaddr_t(req.upstream.addr)))
+	end
 	return kres.DONE
 end
 
