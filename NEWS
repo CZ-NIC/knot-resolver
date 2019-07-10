@@ -27,6 +27,7 @@ Bugfixes
 - rebinding module: avoid excessive iteration on blocked attempts (!842)
 - rebinding module: fix crash caused by race condition (!842)
 - rebinding module: log each blocked query only in verbose mode (!842)
+- cache: automatically clear stale reader locks (!844)
 
 
 Knot Resolver 4.0.0 (2019-04-18)
