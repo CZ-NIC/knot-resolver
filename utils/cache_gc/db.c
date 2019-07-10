@@ -5,29 +5,27 @@
 #include <lib/cache/impl.h>
 //#include <lib/defines.h>
 
-#include <ctype.h> //DEBUG
+#include <ctype.h>		//DEBUG
 #include <time.h>
 #include <sys/stat.h>
 
-struct libknot_lmdb_env
-{
+struct libknot_lmdb_env {
 	bool shared;
 	unsigned dbi;
 	void *env;
 	knot_mm_t *pool;
 };
 
-struct kres_lmdb_env
-{
+struct kres_lmdb_env {
 	size_t mapsize;
 	unsigned dbi;
 	void *env;
 	// sub-struct txn ommited
 };
 
-static knot_db_t *knot_db_t_kres2libknot(const knot_db_t *db)
+static knot_db_t *knot_db_t_kres2libknot(const knot_db_t * db)
 {
-	const struct kres_lmdb_env *kres_db = db; // this is struct lmdb_env as in resolver/cdb_lmdb.c
+	const struct kres_lmdb_env *kres_db = db;	// this is struct lmdb_env as in resolver/cdb_lmdb.c
 	struct libknot_lmdb_env *libknot_db = malloc(sizeof(*libknot_db));
 	if (libknot_db != NULL) {
 		libknot_db->shared = false;
@@ -38,13 +36,15 @@ static knot_db_t *knot_db_t_kres2libknot(const knot_db_t *db)
 	return libknot_db;
 }
 
-int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db, knot_db_t **libknot_db)
+int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db,
+		     knot_db_t ** libknot_db)
 {
 	char cache_data[strlen(cache_path) + 10];
 	snprintf(cache_data, sizeof(cache_data), "%s/data.mdb", cache_path);
 
 	struct stat st = { 0 };
-	if (stat(cache_path, &st) || !(st.st_mode & S_IFDIR) || stat(cache_data, &st)) {
+	if (stat(cache_path, &st) || !(st.st_mode & S_IFDIR)
+	    || stat(cache_data, &st)) {
 		printf("Error: %s does not exist or is not a LMDB.\n", cache_path);
 		return -ENOENT;
 	}
@@ -68,7 +68,7 @@ int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db, knot_db_t
 	return 0;
 }
 
-void kr_gc_cache_close(struct kr_cache *kres_db, knot_db_t *knot_db)
+void kr_gc_cache_close(struct kr_cache *kres_db, knot_db_t * knot_db)
 {
 	free(knot_db);
 	kr_cache_close(kres_db);
@@ -82,15 +82,15 @@ const uint16_t *kr_gc_key_consistent(knot_db_val_t key)
 	ssize_t i;
 	/* CACHE_KEY_DEF */
 	if (key.len >= 2 && kd[0] == '\0') {
-                /* Beware: root zone is special and starts with
+		/* Beware: root zone is special and starts with
 		 *         a single \0 followed by type sign */
-                i = 1;
+		i = 1;
 	} else {
 		/* find the first double zero in the key */
-                for (i = 2; kd[i - 1] || kd[i - 2]; ++i) {
-                    if (i >= key.len)
-			    return NULL;
-                }
+		for (i = 2; kd[i - 1] || kd[i - 2]; ++i) {
+			if (i >= key.len)
+				return NULL;
+		}
 	}
 	// the next character can be used for classification
 	switch (kd[i]) {
@@ -99,7 +99,7 @@ const uint16_t *kr_gc_key_consistent(knot_db_val_t key)
 			assert(!EINVAL);
 			return NULL;
 		}
-		return (uint16_t *)&kd[i + 1];
+		return (uint16_t *) & kd[i + 1];
 	case '1':
 		return &NSEC1;
 	case '3':
@@ -110,12 +110,12 @@ const uint16_t *kr_gc_key_consistent(knot_db_val_t key)
 }
 
 /// expects that key is consistent! CACHE_KEY_DEF
-static uint8_t entry_labels(knot_db_val_t *key, uint16_t rrtype)
+static uint8_t entry_labels(knot_db_val_t * key, uint16_t rrtype)
 {
 	uint8_t lab = 0, *p = key->data;
 	while (*p != 0) {
 		while (*p++ != 0) {
-			if (p - (uint8_t *)key->data >= key->len) {
+			if (p - (uint8_t *) key->data >= key->len) {
 				return 0;
 			}
 		}
@@ -131,7 +131,8 @@ static uint8_t entry_labels(knot_db_val_t *key, uint16_t rrtype)
 }
 
 #ifdef DEBUG
-void debug_printbin(const char *str, unsigned int len) {
+void debug_printbin(const char *str, unsigned int len)
+{
 	putchar('"');
 	for (int idx = 0; idx < len; idx++) {
 		char c = str[idx];
@@ -145,7 +146,7 @@ void debug_printbin(const char *str, unsigned int len) {
 #endif
 
 /** Return one entry_h reference from a cache DB value.  NULL if not consistent/suitable. */
-static const struct entry_h * val2entry(const knot_db_val_t val, uint16_t ktype)
+static const struct entry_h *val2entry(const knot_db_val_t val, uint16_t ktype)
 {
 	if (ktype != KNOT_RRTYPE_NS)
 		return entry_h_consistent(val, ktype);
@@ -163,7 +164,7 @@ static const struct entry_h * val2entry(const knot_db_val_t val, uint16_t ktype)
 	return NULL;
 }
 
-int kr_gc_cache_iter(knot_db_t *knot_db, kr_gc_iter_callback callback, void *ctx)
+int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ctx)
 {
 #ifdef DEBUG
 	unsigned int counter_iter = 0;
@@ -206,7 +207,8 @@ int kr_gc_cache_iter(knot_db_t *knot_db, kr_gc_iter_callback callback, void *ctx
 
 		info.entry_size = key.len + val.len;
 		info.valid = false;
-		const uint16_t *entry_type = ret == KNOT_EOK ? kr_gc_key_consistent(key) : NULL;
+		const uint16_t *entry_type =
+		    ret == KNOT_EOK ? kr_gc_key_consistent(key) : NULL;
 		const struct entry_h *entry = NULL;
 		if (entry_type != NULL) {
 #ifdef DEBUG
@@ -227,10 +229,11 @@ int kr_gc_cache_iter(knot_db_t *knot_db, kr_gc_iter_callback callback, void *ctx
 		}
 #ifdef DEBUG
 		counter_kr_consistent += info.valid;
-		if (!entry_type || !entry) { // don't log fully consistent entries
-			printf("GC %sconsistent, KR %sconsistent, size %zu, key len %zu: ",
-				entry_type ? "" : "in", entry ? "" : "IN",
-				(key.len + val.len), key.len);
+		if (!entry_type || !entry) {	// don't log fully consistent entries
+			printf
+			    ("GC %sconsistent, KR %sconsistent, size %zu, key len %zu: ",
+			     entry_type ? "" : "in", entry ? "" : "IN",
+			     (key.len + val.len), key.len);
 			debug_printbin(key.data, key.len);
 			printf("\n");
 		}
@@ -238,7 +241,8 @@ int kr_gc_cache_iter(knot_db_t *knot_db, kr_gc_iter_callback callback, void *ctx
 		ret = callback(&key, &info, ctx);
 
 		if (ret != KNOT_EOK) {
-			printf("Error iterating database (%s).\n", knot_strerror(ret));
+			printf("Error iterating database (%s).\n",
+			       knot_strerror(ret));
 			api->iter_finish(it);
 			api->txn_abort(&txn);
 			return ret;
@@ -250,7 +254,8 @@ skip:
 
 	api->txn_abort(&txn);
 #ifdef DEBUG
-	printf("DEBUG: iterated %u items, gc consistent %u, kr consistent %u\n", counter_iter, counter_gc_consistent, counter_kr_consistent);
+	printf("DEBUG: iterated %u items, gc consistent %u, kr consistent %u\n",
+	       counter_iter, counter_gc_consistent, counter_kr_consistent);
 #endif
 	return KNOT_EOK;
 }
