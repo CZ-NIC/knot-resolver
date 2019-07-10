@@ -103,7 +103,8 @@ typedef struct {
 	size_t records;
 } ctx_compute_categories_t;
 
-int cb_compute_categories(const knot_db_val_t * key, gc_record_info_t * info, void *vctx)
+int cb_compute_categories(const knot_db_val_t * key, gc_record_info_t * info,
+			  void *vctx)
 {
 	ctx_compute_categories_t *ctx = vctx;
 	category_t cat = kr_gc_categorize(info);
@@ -121,7 +122,8 @@ typedef struct {
 	size_t oversize_records;
 } ctx_delete_categories_t;
 
-int cb_delete_categories(const knot_db_val_t * key, gc_record_info_t * info, void *vctx)
+int cb_delete_categories(const knot_db_val_t * key, gc_record_info_t * info,
+			 void *vctx)
 {
 	ctx_delete_categories_t *ctx = vctx;
 	category_t cat = kr_gc_categorize(info);
@@ -163,7 +165,8 @@ int kr_cache_gc(kr_cache_gc_cfg_t * cfg)
 #endif
 	const bool large_usage = db_usage >= cfg->cache_max_usage;
 	if (cfg->dry_run || large_usage) {	// don't print this on every size check
-		printf("Usage: %.2lf%% (%zu / %zu)\n", db_usage, db_usage_abs, db_size);
+		printf("Usage: %.2lf%% (%zu / %zu)\n", db_usage, db_usage_abs,
+		       db_size);
 	}
 	if (cfg->dry_run || !large_usage) {
 		kr_gc_cache_close(&kres_db, db);
@@ -182,16 +185,26 @@ int kr_cache_gc(kr_cache_gc_cfg_t * cfg)
 		return ret;
 	}
 
-	ssize_t amount_tofree =
-	    knot_db_lmdb_get_mapsize(db) * cfg->cache_to_be_freed / 100;
+	//ssize_t amount_tofree = knot_db_lmdb_get_mapsize(db) * cfg->cache_to_be_freed / 100;
+	// Mixing ^^ page usage and entry sizes (key+value lengths) didn't work
+	// too well, probably due to internal fragmentation after some GC cycles.
+	// Therefore let's scale this by the ratio of these two sums.
+	ssize_t cats_sumsize = 0;
+	for (int i = 0; i < CATEGORIES; ++i) {
+		cats_sumsize += cats.categories_sizes[i];
+	}
+	ssize_t amount_tofree = knot_db_lmdb_get_mapsize(db) * cfg->cache_to_be_freed
+	    * cats_sumsize / (100 * knot_db_lmdb_get_usage(db));
 
-	// debug
-	/*printf("tofree: %zd\n", amount_tofree);
-	   for (int i = 0; i < CATEGORIES; i++) {
-	   if (cats.categories_sizes[i] > 0) {
-	   printf("category %d size %zu\n", i, cats.categories_sizes[i]);
-	   }
-	   } */
+#ifdef DEBUG
+	printf("tofree: %zd\n", amount_tofree);
+	for (int i = 0; i < CATEGORIES; i++) {
+		if (cats.categories_sizes[i] > 0) {
+			printf("category %d size %zu\n", i,
+			       cats.categories_sizes[i]);
+		}
+	}
+#endif
 
 	category_t limit_category = CATEGORIES;
 	while (limit_category > 0 && amount_tofree > 0) {
@@ -226,7 +239,8 @@ int kr_cache_gc(kr_cache_gc_cfg_t * cfg)
 
 	ret = api->txn_begin(db, &txn, 0);
 	if (ret != KNOT_EOK) {
-		printf("Error starting R/W DB transaction (%s).\n", knot_strerror(ret));
+		printf("Error starting R/W DB transaction (%s).\n",
+		       knot_strerror(ret));
 		entry_dynarray_deep_free(&to_del.to_delete);
 		kr_gc_cache_close(&kres_db, db);
 		return ret;
@@ -245,12 +259,15 @@ int kr_cache_gc(kr_cache_gc_cfg_t * cfg)
 			already_gone++;
 			break;
 		default:
-			printf("Warning: skipping deleting because of error (%s)\n",
+			printf("Warning: skipping deletion because of error (%s)\n",
 			       knot_strerror(ret));
 			api->txn_abort(&txn);
 			ret = api->txn_begin(db, &txn, 0);
 			if (ret != KNOT_EOK) {
-				break;
+				printf
+				    ("Error: can't begin txn because of error (%s)\n",
+				     knot_strerror(ret));
+				goto finish;
 			}
 			continue;
 		}
@@ -266,18 +283,20 @@ int kr_cache_gc(kr_cache_gc_cfg_t * cfg)
 				ret = api->txn_begin(db, &txn, 0);
 			}
 			if (ret != KNOT_EOK) {
-				break;
+				printf("Error: transaction failed (%s)\n",
+				       knot_strerror(ret));
+				goto finish;
 			}
 		}
 	}
+	ret = api->txn_commit(&txn);
 
+finish:
 	printf("Deleted %zu records (%zu already gone) types", deleted_records,
 	       already_gone);
 	rrtypelist_print(&deleted_rrtypes);
-	printf("It took %.2lf secs, %zu transactions (%s)\n", gc_timer_end(&timer_delete),
-	       rw_txn_count, knot_strerror(ret));
-
-	ret = api->txn_commit(&txn);
+	printf("It took %.2lf secs, %zu transactions (%s)\n",
+	       gc_timer_end(&timer_delete), rw_txn_count, knot_strerror(ret));
 
 	rrtype_dynarray_free(&deleted_rrtypes);
 	entry_dynarray_deep_free(&to_del.to_delete);

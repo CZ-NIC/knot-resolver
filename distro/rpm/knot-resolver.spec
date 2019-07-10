@@ -203,15 +203,18 @@ getent group knot-resolver >/dev/null || groupadd -r knot-resolver
 getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
 
 %post
-%systemd_post 'kresd@*.service'
 %if 0%{?fedora}
+# in case socket/service files are updated
+systemctl daemon-reload
+%systemd_post 'system-kresd.slice'
 # https://fedoraproject.org/wiki/Changes/Removing_ldconfig_scriptlets
 %else
+%systemd_post 'kresd@*.service'
 /sbin/ldconfig
 %endif
 
 %preun
-%systemd_preun 'kresd@*.service' kresd.target kresd.socket kresd-tls.socket
+%systemd_preun 'kresd@*.service' kres-cache-gc.service kresd.target kresd.socket kresd-tls.socket
 
 %postun
 # NOTE: this doesn't restart the services on CentOS 7
@@ -234,6 +237,7 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/root.hints
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/icann-ca.pem
 %{_unitdir}/kresd@.service
+%{_unitdir}/kres-cache-gc.service
 %{_unitdir}/kresd.target
 %dir %{_unitdir}/multi-user.target.wants
 %{_unitdir}/multi-user.target.wants/kresd.target
@@ -251,7 +255,7 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %attr(750,knot-resolver,knot-resolver) %dir %{_localstatedir}/cache/%{name}
 %{_sbindir}/kresd
 %{_sbindir}/kresc
-%{_sbindir}/kres_cache_gc
+%{_sbindir}/kres-cache-gc
 %{_libdir}/libkres.so.*
 %dir %{_libdir}/knot-resolver
 %{_libdir}/knot-resolver/*.so
