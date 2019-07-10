@@ -258,7 +258,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		knot_db_val_t val = { NULL, 0 };
 		ret = cache_op(cache, read, &key, &val, 1);
 		const struct entry_h *eh;
-		if (ret || !(eh = entry_h_consistent_E(val, KNOT_RRTYPE_SOA))) {
+		if (ret || !(eh = entry_h_consistent(val, KNOT_RRTYPE_SOA))) {
 			assert(ret); /* only want to catch `eh` failures */
 			VERBOSE_MSG(qry, "=> SOA missed\n");
 			return ctx->state;
@@ -472,7 +472,7 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 
 	int ret = entry_h_seek(&val, qry->stype);
 	if (ret) return ret;
-	const struct entry_h *eh = entry_h_consistent_E(val, qry->stype);
+	const struct entry_h *eh = entry_h_consistent(val, qry->stype);
 	if (!eh) {
 		assert(false);
 		return kr_error(ENOENT);
@@ -532,7 +532,7 @@ static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clenc
 		return ret;
 	}
 	/* Check if the record is OK. */
-	const struct entry_h *eh = entry_h_consistent_E(val, type);
+	const struct entry_h *eh = entry_h_consistent(val, type);
 	if (!eh) {
 		assert(false);
 		return kr_error(ret);
@@ -697,7 +697,7 @@ static int check_NS_entry(struct key *k, const knot_db_val_t entry, const int i,
 	} else {
 		type = EL2RRTYPE(i);
 		/* Find the entry for the type, check positivity, TTL */
-		const struct entry_h *eh = entry_h_consistent_E(entry, type);
+		const struct entry_h *eh = entry_h_consistent(entry, type);
 		if (!eh) {
 			VERBOSE_MSG(qry, "=> EH not consistent\n");
 			assert(false);
