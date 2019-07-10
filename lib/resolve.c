@@ -573,10 +573,48 @@ static void answer_fail(struct kr_request *request)
 	}
 }
 
+/* Append EDNS records into the answer. */
+static int answer_append_edns(struct kr_request *request)
+{
+	knot_pkt_t *answer = request->answer;
+	if (!answer->opt_rr)
+		return kr_ok();
+	int ret = 0;
+	if (request->qsource.flags.tls) {
+		ret = answer_padding(request);
+	}
+	if (!ret) ret = knot_pkt_begin(answer, KNOT_ADDITIONAL);
+	if (!ret) ret = knot_pkt_put(answer, KNOT_COMPR_HINT_NONE,
+				     answer->opt_rr, KNOT_PF_FREE);
+	return ret;
+}
+
 static void answer_finalize(struct kr_request *request)
 {
 	struct kr_rplan *rplan = &request->rplan;
 	knot_pkt_t *answer = request->answer;
+
+	if (answer->rrset_count != 0) {
+		/* Non-standard: we assume the answer had been constructed.
+		 * Let's check we don't have a "collision". */
+		const ranked_rr_array_t *selected[] = kr_request_selected(request);
+		for (int psec = KNOT_ANSWER; psec <= KNOT_ADDITIONAL; ++psec) {
+			const ranked_rr_array_t *arr = selected[psec];
+			for (ssize_t i = 0; i < arr->len; ++i) {
+				if (unlikely(arr->at[i]->to_wire)) {
+					assert(false);
+					answer_fail(request);
+					return;
+				}
+			}
+		}
+		/* We only add EDNS, and we even assume AD bit was correct. */
+		if (answer_append_edns(request)) {
+			answer_fail(request);
+			return;
+		}
+		return;
+	}
 
 	struct kr_query *const last =
 		rplan->resolved.len > 0 ? array_tail(rplan->resolved) : NULL;
@@ -641,21 +679,10 @@ static void answer_finalize(struct kr_request *request)
 		answer_fail(request);
 		return;
 	}
-	/* Write EDNS information */
-	if (answer->opt_rr) {
-		if (request->qsource.flags.tls) {
-			if (answer_padding(request) != kr_ok()) {
-				answer_fail(request);
-				return;
-			}
-		}
-		knot_pkt_begin(answer, KNOT_ADDITIONAL);
-		int ret = knot_pkt_put(answer, KNOT_COMPR_HINT_NONE,
-				       answer->opt_rr, KNOT_PF_FREE);
-		if (ret != KNOT_EOK) {
-			answer_fail(request);
-			return;
-		}
+
+	if (answer_append_edns(request)) {
+		answer_fail(request);
+		return;
 	}
 
 	if (!last) secure = false; /*< should be no-op, mostly documentation */
