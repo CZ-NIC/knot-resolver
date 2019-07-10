@@ -70,6 +70,8 @@ end
 local function refuse(req)
 	-- we are deleting packet in consume() phase so other modules
 	-- might have chosen some RRs from the original packet already
+	-- *_selected arrays are in mempool
+	-- so explicit deallocation is not necessary
 	req.answ_selected.len = 0
 	req.auth_selected.len = 0
 	req.add_selected.len = 0
