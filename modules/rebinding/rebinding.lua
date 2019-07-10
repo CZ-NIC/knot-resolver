@@ -104,7 +104,7 @@ function M.layer.consume(state, req, pkt)
 	log('[' .. string.format('%5d', qry.id) .. '][rebinding] '
 	    .. 'blocking blacklisted IP \'' .. kres.rr2str(bad_rr)
 	    .. '\' received from IP ' .. tostring(kres.sockaddr_t(req.upstream.addr)))
-	return kres.FAIL
+	return kres.DONE
 end
 
 return M
