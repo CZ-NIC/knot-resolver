@@ -25,6 +25,7 @@
 #include <lmdb.h>
 
 #include "contrib/cleanup.h"
+#include "contrib/ucw/lib.h"
 #include "lib/cache/cdb_lmdb.h"
 #include "lib/cache/cdb_api.h"
 #include "lib/cache/api.h"
@@ -110,35 +111,43 @@ static int set_mapsize(MDB_env *env, size_t map_size)
 }
 
 #define FLAG_RENEW (2*MDB_RDONLY)
-/** mdb_txn_begin or _renew + handle MDB_MAP_RESIZED.
+/** mdb_txn_begin or _renew + handle retries in some situations
  *
- * The retrying logic for MDB_MAP_RESIZED is so ugly that it has its own function.
+ * The retrying logic is so ugly that it has its own function.
  * \note this assumes no transactions are active
  * \return MDB_ errcode, not usual kr_error(...)
  */
 static int txn_get_noresize(struct lmdb_env *env, unsigned int flag, MDB_txn **txn)
 {
 	assert(!env->txn.rw && (!env->txn.ro || !env->txn.ro_active));
+	int attempts = 0;
 	int ret;
+retry:
+	/* Do a few attempts in case we encounter multiple issues at once. */
+	if (++attempts > 2) {
+		return kr_error(1);
+	}
+
 	if (flag == FLAG_RENEW) {
 		ret = mdb_txn_renew(*txn);
 	} else {
 		ret = mdb_txn_begin(env->env, NULL, flag, txn);
 	}
-	if (ret != MDB_MAP_RESIZED) {
-		return ret;
-	}
-	//:unlikely
-	/* Another process increased the size; let's try to recover. */
-	kr_log_info("[cache] detected size increased by another process\n");
-	ret = mdb_env_set_mapsize(env->env, 0);
-	if (ret != MDB_SUCCESS) {
-		return ret;
-	}
-	if (flag == FLAG_RENEW) {
-		ret = mdb_txn_renew(*txn);
-	} else {
-		ret = mdb_txn_begin(env->env, NULL, flag, txn);
+
+	if (unlikely(ret == MDB_MAP_RESIZED)) {
+		kr_log_info("[cache] detected size increased by another process\n");
+		ret = mdb_env_set_mapsize(env->env, 0);
+		if (ret == MDB_SUCCESS) {
+			goto retry;
+		}
+	} else if (unlikely(ret == MDB_READERS_FULL)) {
+		int cleared;
+		ret = mdb_reader_check(env->env, &cleared);
+		if (ret == MDB_SUCCESS)
+			kr_log_info("[cache] cleared %d stale reader locks\n", cleared);
+		else
+			kr_log_error("[cache] failed to clear stale reader locks: LMDB error %d\n", ret);
+		goto retry;
 	}
 	return ret;
 }
