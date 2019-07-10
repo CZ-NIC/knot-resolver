@@ -1,3 +1,5 @@
+local ffi = require('ffi')
+
 -- Protection from DNS rebinding attacks
 local kres = require('kres')
 local renumber = require('kres_modules.renumber')
@@ -68,6 +70,8 @@ end
 local function refuse(req)
 	-- we are deleting packet in consume() phase so other modules
 	-- might have chosen some RRs from the original packet already
+	-- *_selected arrays are in mempool
+	-- so explicit deallocation is not necessary
 	req.answ_selected.len = 0
 	req.auth_selected.len = 0
 	req.add_selected.len = 0
@@ -101,10 +105,13 @@ function M.layer.consume(state, req, pkt)
 	qry.flags.RESOLVED = 1  -- stop iteration
 	qry.flags.CACHED = 1  -- do not cache
 	refuse(req)
-	log('[' .. string.format('%5d', qry.id) .. '][rebinding] '
-	    .. 'blocking blacklisted IP \'' .. kres.rr2str(bad_rr)
-	    .. '\' received from IP ' .. tostring(kres.sockaddr_t(req.upstream.addr)))
-	return kres.FAIL
+	if verbose() then
+		ffi.C.kr_log_qverbose_impl(qry, 'rebinding',
+		    'blocking blacklisted IP in RR \'%s\' received from IP %s\n',
+		    kres.rr2str(bad_rr),
+		    tostring(kres.sockaddr_t(req.upstream.addr)))
+	end
+	return kres.DONE
 end
 
 return M
