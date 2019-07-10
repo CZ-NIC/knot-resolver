@@ -646,39 +646,20 @@ static void answer_finalize(struct kr_request *request)
 		secure = false; /* the last answer is insecure due to opt-out */
 	}
 
+	/* Write all RRsets meant for the answer. */
 	const uint16_t reorder = last ? last->reorder : 0;
 	bool answ_all_cnames = false/*arbitrary*/;
-	if (request->answ_selected.len > 0) {
-		assert(answer->current <= KNOT_ANSWER);
-		/* Write answer records. */
-		if (answer->current < KNOT_ANSWER) {
-			knot_pkt_begin(answer, KNOT_ANSWER);
-		}
-		if (write_extra_ranked_records(&request->answ_selected, reorder,
-						answer, &secure, &answ_all_cnames))
-		{
-			answer_fail(request);
-			return;
-		}
-	}
-
-	/* Write authority records. */
-	if (answer->current < KNOT_AUTHORITY) {
-		knot_pkt_begin(answer, KNOT_AUTHORITY);
-	}
-	if (write_extra_ranked_records(&request->auth_selected, reorder,
-	    answer, &secure, NULL)) {
-		answer_fail(request);
-		return;
-	}
-	/* Write additional records. */
-	knot_pkt_begin(answer, KNOT_ADDITIONAL);
-	if (write_extra_records(&request->additional, reorder, answer)) {
-		answer_fail(request);
-		return;
-	}
-
-	if (answer_append_edns(request)) {
+	if (knot_pkt_begin(answer, KNOT_ANSWER)
+	    || write_extra_ranked_records(&request->answ_selected, reorder,
+					answer, &secure, &answ_all_cnames)
+	    || knot_pkt_begin(answer, KNOT_AUTHORITY)
+	    || write_extra_ranked_records(&request->auth_selected, reorder,
+					answer, &secure, NULL)
+	    || knot_pkt_begin(answer, KNOT_ADDITIONAL)
+	    || write_extra_records(&request->additional, reorder, answer)
+	    || answer_append_edns(request)
+	   )
+	{
 		answer_fail(request);
 		return;
 	}
