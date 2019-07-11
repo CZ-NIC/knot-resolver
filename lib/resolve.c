@@ -417,11 +417,6 @@ static int edns_erase_and_reserve(knot_pkt_t *pkt)
 	return knot_pkt_reserve(pkt, len);
 }
 
-static inline bool want_padding(const struct kr_request *req)
-{
-	return req->qsource.flags.tls || req->options.FORCE_PADDING;
-}
-
 static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request *req)
 {
 	pkt->opt_rr = knot_rrset_copy(req->ctx->opt_rr, &pkt->mm);
@@ -432,7 +427,7 @@ static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request 
 		wire_size += KR_COOKIE_OPT_MAX_LEN;
 	}
 #endif /* defined(ENABLE_COOKIES) */
-	if (want_padding(req)) {
+	if (req->options.PADDING_REQUIRED) {
 		if (req->ctx->tls_padding == -1)
 			/* FIXME: we do not know how to reserve space for the
 			 * default padding policy, since we can't predict what
@@ -531,7 +526,7 @@ static int answer_padding_maybe(struct kr_request *request)
 		assert(false);
 		return kr_error(EINVAL);
 	}
-	if (!want_padding(request)) return kr_ok();
+	if (!request->options.PADDING_REQUIRED) return kr_ok();
 
 	int32_t padding = request->ctx->tls_padding;
 	knot_pkt_t *answer = request->answer;
@@ -717,6 +712,7 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 	request->ctx = ctx;
 	request->answer = answer;
 	request->options = ctx->options;
+	request->options.PADDING_REQUIRED = true; //WIP: this sets the flag for every request
 	request->state = KR_STATE_CONSUME;
 	request->current_query = NULL;
 	array_init(request->additional);
