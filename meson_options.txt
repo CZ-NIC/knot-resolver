@@ -64,7 +64,7 @@ option(
 )
 
 option(
-  'enable_sendmmsg',
+  'sendmmsg',
   type: 'combo',
   choices: [
     'auto',
@@ -72,7 +72,7 @@ option(
     'disabled',
   ],
   value: 'auto',
-  description: 'enable using sendmmsg syscall towards clients',
+  description: 'use sendmmsg syscall towards clients',
 )
 
 ## Systemd

@@ -14,6 +14,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "kresconfig.h"
 #include "daemon/udp_queue.h"
 
 #if !ENABLE_SENDMMSG
