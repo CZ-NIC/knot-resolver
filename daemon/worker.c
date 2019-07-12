@@ -1196,7 +1196,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		const int fd = ((const uv_udp_t *)src_handle)->io_watcher.fd;
 		udp_queue_push(fd, &ctx->req, task);
 		ret = 0;
-	} else if (src_handle->type == UV_TCP) {
+	} else {
 		ret = qr_task_send(task, source_session,
 			       (struct sockaddr *)&ctx->source.addr,
 			        ctx->req.answer);
