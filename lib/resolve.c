@@ -427,15 +427,6 @@ static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request 
 		wire_size += KR_COOKIE_OPT_MAX_LEN;
 	}
 #endif /* defined(ENABLE_COOKIES) */
-	if (req->options.PADDING_REQUIRED) {
-		if (req->ctx->tls_padding == -1)
-			/* FIXME: we do not know how to reserve space for the
-			 * default padding policy, since we can't predict what
-			 * it will select. So i'm just guessing :/ */
-			wire_size += KNOT_EDNS_OPTION_HDRLEN + 512;
-		if (req->ctx->tls_padding >= 2)
-			wire_size += KNOT_EDNS_OPTION_HDRLEN + req->ctx->tls_padding;
-	}
 	return knot_pkt_reserve(pkt, wire_size);
 }
 
@@ -519,42 +510,6 @@ static int write_extra_ranked_records(const ranked_rr_array_t *arr, uint16_t reo
 	return err;
 }
 
-/** @internal Add an EDNS padding RR into the answer if requested and required. */
-static int answer_padding_maybe(struct kr_request *request)
-{
-	if (!request || !request->answer || !request->ctx) {
-		assert(false);
-		return kr_error(EINVAL);
-	}
-	if (!request->options.PADDING_REQUIRED) return kr_ok();
-
-	int32_t padding = request->ctx->tls_padding;
-	knot_pkt_t *answer = request->answer;
-	knot_rrset_t *opt_rr = answer->opt_rr;
-	int32_t pad_bytes = -1;
-
-	if (padding == -1) { /* use the default padding policy from libknot */
-		pad_bytes =  knot_pkt_default_padding_size(answer, opt_rr);
-	}
-	if (padding >= 2) {
-		int32_t max_pad_bytes = knot_edns_get_payload(opt_rr) - (answer->size + knot_rrset_size(opt_rr));
-		pad_bytes = MIN(knot_edns_alignment_size(answer->size, knot_rrset_size(opt_rr), padding),
-				max_pad_bytes);
-	}
-
-	if (pad_bytes >= 0) {
-		uint8_t zeros[MAX(1, pad_bytes)];
-		memset(zeros, 0, sizeof(zeros));
-		int r = knot_edns_add_option(opt_rr, KNOT_EDNS_OPTION_PADDING,
-					     pad_bytes, zeros, &answer->mm);
-		if (r != KNOT_EOK) {
-			knot_rrset_clear(opt_rr, &answer->mm);
-			return kr_error(r);
-		}
-	}
-	return kr_ok();
-}
-
 static int answer_fail(struct kr_request *request)
 {
 	knot_pkt_t *answer = request->answer;
@@ -565,7 +520,6 @@ static int answer_fail(struct kr_request *request)
 	if (ret == 0 && answer->opt_rr) {
 		/* OPT in SERVFAIL response is still useful for cookies/additional info. */
 		knot_pkt_begin(answer, KNOT_ADDITIONAL);
-		answer_padding_maybe(request); /* Ignore failed padding in SERVFAIL answer. */
 		ret = edns_put(answer, false);
 	}
 	return ret;
@@ -630,9 +584,6 @@ static int answer_finalize(struct kr_request *request, int state)
 	}
 	/* Write EDNS information */
 	if (answer->opt_rr) {
-		if (answer_padding_maybe(request) != kr_ok()) {
-			return answer_fail(request);
-		}
 		knot_pkt_begin(answer, KNOT_ADDITIONAL);
 		int ret = knot_pkt_put(answer, KNOT_COMPR_HINT_NONE,
 				       answer->opt_rr, KNOT_PF_FREE);
@@ -712,7 +663,6 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 	request->ctx = ctx;
 	request->answer = answer;
 	request->options = ctx->options;
-	request->options.PADDING_REQUIRED = true; //WIP: this sets the flag for every request
 	request->state = KR_STATE_CONSUME;
 	request->current_query = NULL;
 	array_init(request->additional);
