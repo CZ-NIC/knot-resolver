@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <libknot/packet/pkt.h>
+
 #include <stdbool.h>
 #include <uv.h>
 

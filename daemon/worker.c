@@ -14,6 +14,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "kresconfig.h"
+#include "daemon/worker.h"
+
 #include <uv.h>
 #include <lua.h>
 #include <lauxlib.h>
@@ -29,15 +32,16 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <gnutls/gnutls.h>
-#include "lib/utils.h"
-#include "lib/layer.h"
-#include "daemon/worker.h"
+
 #include "daemon/bindings/api.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
-#include "daemon/tls.h"
-#include "daemon/zimport.h"
 #include "daemon/session.h"
+#include "daemon/tls.h"
+#include "daemon/udp_queue.h"
+#include "daemon/zimport.h"
+#include "lib/layer.h"
+#include "lib/utils.h"
 
 
 /* Magic defaults for the worker. */
@@ -510,7 +514,7 @@ static void qr_task_complete(struct qr_task *task)
 }
 
 /* This is called when we send subrequest / answer */
-static int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status)
+int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status)
 {
 
 	if (task->finished) {
@@ -1180,10 +1184,26 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	/* Send back answer */
 	assert(!session_flags(source_session)->closing);
 	assert(ctx->source.addr.ip.sa_family != AF_UNSPEC);
-	int res = qr_task_send(task, source_session,
+
+	int ret;
+	const uv_handle_t *src_handle = session_get_handle(source_session);
+	if (src_handle->type != UV_UDP && src_handle->type != UV_TCP) {
+		assert(false);
+		ret = kr_error(EINVAL);
+	} else if (src_handle->type == UV_UDP && ENABLE_SENDMMSG) {
+		/* TODO: this is an ugly way of getting the FD number, as we're
+		 * touching a private field of UV.  We might want to e.g. pass
+		 * a pointer to struct endpoint in kr_request::qsource. */
+		const int fd = ((const uv_udp_t *)src_handle)->io_watcher.fd;
+		udp_queue_push(fd, &ctx->req, task);
+		ret = 0;
+	} else {
+		ret = qr_task_send(task, source_session,
 			       (struct sockaddr *)&ctx->source.addr,
 			        ctx->req.answer);
-	if (res != kr_ok()) {
+	}
+
+	if (ret != kr_ok()) {
 		(void) qr_task_on_send(task, NULL, kr_error(EIO));
 		/* Since source session is erroneous detach all tasks. */
 		while (!session_tasklist_is_empty(source_session)) {

@@ -14,6 +14,22 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "kresconfig.h"
+
+#include "contrib/ccan/asprintf/asprintf.h"
+#include "contrib/cleanup.h"
+#include "contrib/ucw/mempool.h"
+#include "daemon/engine.h"
+#include "daemon/io.h"
+#include "daemon/network.h"
+#include "daemon/tls.h"
+#include "daemon/udp_queue.h"
+#include "daemon/worker.h"
+#include "lib/defines.h"
+#include "lib/dnssec.h"
+#include "lib/dnssec/ta.h"
+#include "lib/resolve.h"
+
 #include <arpa/inet.h>
 #include <assert.h>
 #include <getopt.h>
@@ -23,8 +39,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "kresconfig.h"
-
 #include <lua.h>
 #include <uv.h>
 #if SYSTEMD_VERSION > 0
@@ -32,18 +46,6 @@
 #endif
 #include <libknot/error.h>
 
-#include <contrib/cleanup.h>
-#include <contrib/ucw/mempool.h>
-#include <contrib/ccan/asprintf/asprintf.h>
-#include "lib/defines.h"
-#include "lib/resolve.h"
-#include "lib/dnssec.h"
-#include "daemon/io.h"
-#include "daemon/network.h"
-#include "daemon/worker.h"
-#include "daemon/engine.h"
-#include "daemon/tls.h"
-#include "lib/dnssec/ta.h"
 
 /* @internal Array of ip address shorthand. */
 typedef array_t(char*) addr_array_t;
@@ -805,6 +807,14 @@ int main(int argc, char **argv)
 
 	/* Start listening, in the sense of network_listen_fd(). */
 	if (start_listening(&engine.net, &args.fds) != 0) {
+		ret = EXIT_FAILURE;
+		goto cleanup;
+	}
+
+	ret = udp_queue_init_global(loop);
+	if (ret) {
+		kr_log_error("[system] failed to initialize UDP queue: %s\n",
+				kr_strerror(ret));
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
