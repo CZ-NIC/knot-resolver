@@ -16,7 +16,10 @@
 
 #include "daemon/session.h"
 #include "daemon/worker.h"
+#include "lib/generic/array.h"
 #include "lib/utils.h"
+
+struct qr_task;
 
 #include <assert.h>
 #include <stdlib.h>
@@ -26,7 +29,6 @@
  * but the structures below would have to change a little (broken up). */
 #define UDP_QUEUE_LEN 64
 
-struct qr_task;
 /** A queue of up to UDP_QUEUE_LEN messages, meant for the same socket. */
 typedef struct {
 	int len; /**< The number of messages in the queue: 0..UDP_QUEUE_LEN */
@@ -51,15 +53,23 @@ static udp_queue_t * udp_queue_create()
 	return q;
 }
 
-/** Singleton map: fd -> udp_queue_t, as a simple array of pointers.
- * FIXME: either free at exit or ignore the leaks. */
-static udp_queue_t **the_udp_queues = NULL;
-static int the_udp_queues_len = 0;
+/** Global state for udp_queue_*.  Note: we never free the pointed-to memory. */
+struct {
+	/** Singleton map: fd -> udp_queue_t, as a simple array of pointers. */
+	udp_queue_t **udp_queues;
+	int udp_queues_len;
 
-/** The queue is assumed to exist and nonempty. */
+	/** List of FD numbers that might have a non-empty queue. */
+	array_t(int) waiting_fds;
+
+	uv_check_t check_handle;
+} static state = {0};
+
+/** Empty the given queue.  The queue is assumed to exist (but may be empty). */
 static void udp_queue_send(int fd)
 {
-	udp_queue_t *const q = the_udp_queues[fd];
+	udp_queue_t *const q = state.udp_queues[fd];
+	if (!q->len) return;
 	int sent_len = sendmmsg(fd, q->msgvec, q->len, 0);
 	/* ATM we don't really do anything about failures. */
 	int err = sent_len < 0 ? errno : EAGAIN /* unknown error, really */;
@@ -72,6 +82,22 @@ static void udp_queue_send(int fd)
 	q->len = 0;
 }
 
+/** Periodical callback to send all queued packets. */
+static void udp_queue_check(uv_check_t *handle)
+{
+	for (int i = 0; i < state.waiting_fds.len; ++i) {
+		udp_queue_send(state.waiting_fds.at[i]);
+	}
+	state.waiting_fds.len = 0;
+}
+
+int udp_queue_init_global(uv_loop_t *loop)
+{
+	int ret = uv_check_init(loop, &state.check_handle);
+	if (!ret) ret = uv_check_start(&state.check_handle, udp_queue_check);
+	return ret;
+}
+
 void udp_queue_push(int fd, struct kr_request *req, struct qr_task *task)
 {
 	if (fd < 0 || fd >= 65536) {
@@ -79,18 +105,18 @@ void udp_queue_push(int fd, struct kr_request *req, struct qr_task *task)
 		abort();
 	}
 	/* Get a valid correct queue. */
-	if (fd >= the_udp_queues_len) {
+	if (fd >= state.udp_queues_len) {
 		const int new_len = fd + 1;
-		the_udp_queues = realloc(the_udp_queues,
-					sizeof(the_udp_queues[0]) * new_len);
-		if (!the_udp_queues) abort();
-		memset(the_udp_queues + the_udp_queues_len, 0,
-			sizeof(the_udp_queues[0]) * (new_len - the_udp_queues_len));
-		the_udp_queues_len = new_len;
+		state.udp_queues = realloc(state.udp_queues,
+					sizeof(state.udp_queues[0]) * new_len);
+		if (!state.udp_queues) abort();
+		memset(state.udp_queues + state.udp_queues_len, 0,
+			sizeof(state.udp_queues[0]) * (new_len - state.udp_queues_len));
+		state.udp_queues_len = new_len;
 	}
-	if (unlikely(the_udp_queues[fd] == NULL))
-		the_udp_queues[fd] = udp_queue_create();
-	udp_queue_t *const q = the_udp_queues[fd];
+	if (unlikely(state.udp_queues[fd] == NULL))
+		state.udp_queues[fd] = udp_queue_create();
+	udp_queue_t *const q = state.udp_queues[fd];
 
 	/* Append to the queue */
 	struct sockaddr *sa = (struct sockaddr *)/*const-cast*/req->qsource.addr;
@@ -101,36 +127,15 @@ void udp_queue_push(int fd, struct kr_request *req, struct qr_task *task)
 		.iov_base = req->answer->wire,
 		.iov_len  = req->answer->size,
 	};
+	if (q->len == 0)
+		array_push(state.waiting_fds, fd);
 	++(q->len);
 
 	if (q->len >= UDP_QUEUE_LEN) {
 		assert(q->len == UDP_QUEUE_LEN);
 		udp_queue_send(fd);
+		/* We don't need to search state.waiting_fds;
+		 * anyway, it's more efficient to let the hook do that. */
 	}
-}
-
-static void udp_queue_check(uv_idle_t *handle)
-{
-	static uint64_t last_stamp = 0;
-	//uv_update_time(handle->loop);
-	uint64_t now = uv_now(handle->loop);
-	if (likely(now == last_stamp)) return;
-	last_stamp = now;
-	/* LATER(optim.): this probably isn't ideal, and we might better
-	 * maintain a list of fd numbers that might be non-empty ATM -
-	 * appended when a queue gets its first item and emptied just here. */
-	for (int fd = 0; fd < the_udp_queues_len; ++fd) {
-		udp_queue_t *const q = the_udp_queues[fd];
-		if (unlikely(q && q->len))
-			udp_queue_send(fd);
-	}
-}
-
-int udp_queue_init_global(uv_loop_t *loop)
-{
-	static uv_idle_t handle;
-	int ret = uv_idle_init(loop, &handle);
-	if (!ret) ret = uv_idle_start(&handle, udp_queue_check);
-	return ret;
 }
 

@@ -1184,17 +1184,25 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	assert(!session_flags(source_session)->closing);
 	assert(ctx->source.addr.ip.sa_family != AF_UNSPEC);
 
-	/* FIXME: this is an ugly way of getting the FD number, as we're
-	 * touching a private field of UV.  We might want to e.g. pass
-	 * a pointer to struct endpoint in kr_request::qsource. */
-	const int fd = ((uv_udp_t *)session_get_handle(source_session))
-		->io_watcher.fd;
+	int ret;
+	const uv_handle_t *src_handle = session_get_handle(source_session);
+	if (src_handle->type == UV_UDP) {
+		/* TODO: this is an ugly way of getting the FD number, as we're
+		 * touching a private field of UV.  We might want to e.g. pass
+		 * a pointer to struct endpoint in kr_request::qsource. */
+		const int fd = ((const uv_udp_t *)src_handle)->io_watcher.fd;
+		udp_queue_push(fd, &ctx->req, task);
+		ret = 0;
+	} else if (src_handle->type == UV_TCP) {
+		ret = qr_task_send(task, source_session,
+			       (struct sockaddr *)&ctx->source.addr,
+			        ctx->req.answer);
+	} else {
+		assert(false);
+		ret = kr_error(EINVAL);
+	}
 
-	// FIXME: TCP, too
-
-	// was: qr_task_send()
-	int res = 0; udp_queue_push(fd, &ctx->req, task);
-	if (res != kr_ok()) { // FIXME
+	if (ret != kr_ok()) {
 		(void) qr_task_on_send(task, NULL, kr_error(EIO));
 		/* Since source session is erroneous detach all tasks. */
 		while (!session_tasklist_is_empty(source_session)) {
