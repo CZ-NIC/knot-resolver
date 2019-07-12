@@ -56,7 +56,7 @@ build:
   <<: *build
   script:
       # sendmmsg: deckard can't handle that syscall
-    - meson build_ci --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled -Denable_sendmmsg=disabled
+    - meson configure build_ci --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled -Dsendmmsg=disabled
     - ninja -C build_ci
     - ninja -C build_ci install >/dev/null
     - ${MESON_TEST} --suite unit --suite config
