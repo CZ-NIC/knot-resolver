@@ -83,10 +83,16 @@ verbose_log = get_option('verbose_log') == 'enabled' or get_option('verbose_log'
 user = get_option('user')
 group = get_option('group')
 
-enable_sendmmsg = (get_option('enable_sendmmsg') != 'disabled'
-  and meson.get_compiler('c').has_function('sendmmsg',
-      prefix : '#define _GNU_SOURCE\n#include <sys/socket.h>')
-  )
+## sendmmsg
+has_sendmmsg = meson.get_compiler('c').has_function('sendmmsg',
+  prefix: '#define _GNU_SOURCE\n#include <sys/socket.h>')
+if get_option('sendmmsg') == 'enabled' and not has_sendmmsg
+  error('missing compiler function: sendmmsg(), use -Dsendmmsg=disabled')
+elif get_option('sendmmsg') == 'auto'
+  sendmmsg = has_sendmmsg
+else
+  sendmmsg = get_option('sendmmsg') == 'enabled'
+endif
 
 ## Systemd
 message('--- systemd socket activation ---')
@@ -106,7 +112,6 @@ add_project_arguments(
   '-Wtype-limits',
   '-Wshadow',
   '-fvisibility=hidden',
-  '-DENABLE_SENDMMSG=@0@'.format(enable_sendmmsg.to_int()),
   language: 'c',
 )
 
@@ -143,6 +148,7 @@ conf_data.set_quoted('libknot_SONAME',
 conf_data.set('SYSTEMD_VERSION',
   libsystemd.found() ? libsystemd.version().to_int() : -1)
 conf_data.set('NOVERBOSELOG', not verbose_log)
+conf_data.set('ENABLE_SENDMMSG', sendmmsg.to_int())
 
 kresconfig = configure_file(
   output: 'kresconfig.h',
@@ -255,6 +261,7 @@ s_build_unit_tests = build_unit_tests ? 'enabled' : 'disabled'
 s_build_config_tests = build_config_tests ? 'enabled' : 'disabled'
 s_build_extra_tests = build_extra_tests ? 'enabled' : 'disabled'
 s_install_kresd_conf = install_kresd_conf ? 'enabled' : 'disabled'
+s_sendmmsg = sendmmsg ? 'enabled': 'disabled'
 message('''
 
 ======================= SUMMARY =======================
@@ -287,7 +294,7 @@ message('''
     user:               @0@'''.format(user) + '''
     group:              @0@'''.format(group) + '''
     install_kresd_conf: @0@'''.format(s_install_kresd_conf) + '''
-    sendmmsg enabled:   @0@ -> @1@'''.format(get_option('enable_sendmmsg'), enable_sendmmsg) + '''
+    sendmmsg:           @0@'''.format(s_sendmmsg) + '''
 
 =======================================================
 
