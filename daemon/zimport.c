@@ -678,6 +678,7 @@ static int zi_record_store(zs_scanner_t *s)
 /** @internal zscanner callback. */
 static int zi_state_parsing(zs_scanner_t *s)
 {
+	bool empty = true;
 	while (zs_parse_record(s) == 0) {
 		switch (s->state) {
 		case ZS_STATE_DATA:
@@ -685,14 +686,10 @@ static int zi_state_parsing(zs_scanner_t *s)
 				return -1;
 			}
 			zone_import_ctx_t *z_import = (zone_import_ctx_t *) s->process.data;
-			if (z_import->origin == 0) {
-				z_import->origin = knot_dname_copy(s->zone_origin,
-								  &z_import->pool);
-			} else if (!knot_dname_is_equal(z_import->origin, s->zone_origin)) {
-				kr_log_error("[zscanner] line: %"PRIu64
-					     ": zone origin changed unexpectedly\n",
-					     s->line_counter);
-				return -1;
+			empty = false;
+			if (s->r_type == 6) {
+				z_import->origin = knot_dname_copy(s->r_owner,
+                                                                 &z_import->pool);
 			}
 			break;
 		case ZS_STATE_ERROR:
@@ -708,6 +705,14 @@ static int zi_state_parsing(zs_scanner_t *s)
 			return -1;
 		case ZS_STATE_EOF:
 		case ZS_STATE_STOP:
+			if (empty) {
+				kr_log_error("[zimport] empty zone file\n");
+				return -1;
+			}
+			if (!((zone_import_ctx_t *) s->process.data)->origin) {
+				kr_log_error("[zimport] zone file doesn't contain SOA record\n");
+				return -1;
+			}
 			return (s->error.counter == 0) ? 0 : -1;
 		default:
 			kr_log_error("[zscanner] line: %"PRIu64
@@ -773,20 +778,22 @@ int zi_zone_import(struct zone_import_ctx *z_import,
 		VERBOSE_MSG(NULL, "[zscanner] started; zone file `%s`\n",
 			    zone_file);
 		ret = zi_state_parsing(s);
-		/* Try to find TA for worker->z_import.origin. */
-		map_t *trust_anchors = &z_import->worker->engine->resolver.trust_anchors;
-		knot_rrset_t *rr = kr_ta_get(trust_anchors, z_import->origin);
-		if (rr) {
-			z_import->ta = rr;
-		} else {
-			/* For now - fail.
-			 * TODO - query DS and continue after answer had been obtained. */
-			KR_DNAME_GET_STR(zone_name_str, z_import->origin);
-			kr_log_error("[zimport] no TA found for `%s`, fail\n", zone_name_str);
-			ret = 1;
+		if (ret == 0) {
+			/* Try to find TA for worker->z_import.origin. */
+			map_t *trust_anchors = &z_import->worker->engine->resolver.trust_anchors;
+			knot_rrset_t *rr = kr_ta_get(trust_anchors, z_import->origin);
+			if (rr) {
+				z_import->ta = rr;
+			} else {
+				/* For now - fail.
+				 * TODO - query DS and continue after answer had been obtained. */
+				KR_DNAME_GET_STR(zone_name_str, z_import->origin);
+				kr_log_error("[zimport] no TA found for `%s`, fail\n", zone_name_str);
+				ret = 1;
+			}
+			elapsed = kr_now() - z_import->start_timestamp;
+			elapsed = elapsed > UINT_MAX ? UINT_MAX : elapsed;
 		}
-		elapsed = kr_now() - z_import->start_timestamp;
-		elapsed = elapsed > UINT_MAX ? UINT_MAX : elapsed;
 	}
 	zs_deinit(s);
 	free(s);

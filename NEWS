@@ -1,25 +1,46 @@
-Knot Resolver 4.x.y (2019-0m-dd)
+Knot Resolver 4.1.0 (2019-07-10)
 ================================
+
+Security
+--------
+- fix CVE-2019-10190: do not pass bogus negative answer to client (!827)
+- fix CVE-2019-10191: do not cache negative answer with forged QNAME+QTYPE (!839)
 
 Improvements
 ------------
+- new cache garbage collector is available and enabled by default (#257)
+  This improves cache efficiency on big installations.
+- DNS-over-HTTPS: unknown HTTP parameters are ignored to improve compatibility
+  with non-standard clients (!832)
 - DNS-over-HTTPS: answers include `access-control-allow-origin: *` (!823)
-- support named AF_UNIX stream sockets for the http module (again)
+  which allows JavaScript to use DoH endpoint.
+- http module: support named AF_UNIX stream sockets (again)
 - aggressive caching is disabled on minimal NSEC* ranges (!826)
+  This improves cache effectivity with DNSSEC black lies and also accidentally
+  works around bug in proofs-of-nonexistence from F5 BIG-IP load-balancers.
 - aarch64 support, even kernels with ARM64_VA_BITS >= 48 (#216, !797)
-  This is done by working around a LuaJIT incompatibility.
-- lua modules may omit casting parameters of layer functions (!797)
+  This is done by working around a LuaJIT incompatibility. Please report bugs.
 - lua tables for C modules are more strict by default, e.g. `nsid.foo`
   will throw an error instead of returning `nil` (!797)
-- http module: also send intermediate TLS certificate to clients,
-  if available and luaossl >= 20181207 (!819)
-- systemd: basic watchdog is now available and turned on by default (#275)
+- systemd: basic watchdog is now available and enabled by default (#275)
 
 Bugfixes
 --------
-- TCP to upstream: don't send wrong message length (unlikely, !816)
+- TCP to upstream: fix unlikely case of sending out wrong message length (!816)
 - http module: fix problems around maintenance of ephemeral certs (!819)
+- http module: also send intermediate TLS certificate to clients,
+  if available and luaossl >= 20181207 (!819)
 - send EDNS with SERVFAILs, e.g. on validation failures (#180, !827)
+- prefill module: avoid crash on empty zone file (#474, !840)
+- rebinding module: avoid excessive iteration on blocked attempts (!842)
+- rebinding module: fix crash caused by race condition (!842)
+- rebinding module: log each blocked query only in verbose mode (!842)
+- cache: automatically clear stale reader locks (!844)
+
+
+Module API changes
+------------------
+- lua modules may omit casting parameters of layer functions (!797)
 
 
 Knot Resolver 4.0.0 (2019-04-18)

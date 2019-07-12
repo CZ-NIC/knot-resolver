@@ -64,6 +64,8 @@ struct kr_qflags {
 	bool DNS64_MARK : 1;     /**< Internal mark for dns64 module. */
 	bool CACHE_TRIED : 1;    /**< Internal to cache module. */
 	bool NO_NS_FOUND : 1;    /**< No valid NS found during last PRODUCE stage. */
+	bool PKT_IS_SANE : 1;    /**< Set by iterator in consume phase to indicate whether
+				  * some basic aspects of the packet are OK, e.g. QNAME. */
 };
 
 /** Combine flags together.  This means set union for simple flags. */

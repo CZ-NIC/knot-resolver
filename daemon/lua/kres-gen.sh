@@ -6,16 +6,29 @@ cd "$(dirname ${0})"
 CDEFS="../../scripts/gen-cdefs.sh"
 LIBKRES="${MESON_BUILD_ROOT}/lib/libkres.so"
 KRESD="${MESON_BUILD_ROOT}/daemon/kresd"
+if [ ! -e "$LIBKRES" ]; then
+	# We probably use static libkres.
+	LIBKRES="$KRESD"
+fi
+
+for REQFILE in "$CDEFS" "$LIBKRES" "$KRESD"
+do
+	test '!' -s "$REQFILE" -a -r "$REQFILE" \
+		&& echo "Required file $REQFILE cannot be read, did you build binaries and shared libraries?" \
+		&& exit 1
+done
 
 # Write to kres-gen.lua instead of stdout
 mv kres-gen.lua{,.bak} ||:
-exec 1>&-
-exec 1<>kres-gen.lua
+exec 5<&1-  # move stdout into FD 5
+exec 1<>kres-gen.lua  # replace stdout with file
 
 restore() {
-    exec 1>&-
-    mv kres-gen.lua{.bak,} ||:
-    (>&2 echo "Failed to re-generate kres-gen.lua! Missing debugsymbols?")
+    exec 1>&-  # close stdout redirected into kres-gen.lua
+    exec 1<&5-  # restore original stdout
+    mv -v kres-gen.lua{,.fail} ||:
+    mv -v kres-gen.lua{.bak,} ||:
+    (>&2 echo "Failed to re-generate kres-gen.lua! Missing debugsymbols? Missing shared library?")
 }
 trap restore ERR INT TERM
 
@@ -173,11 +186,13 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 # Nameservers
 	kr_nsrep_set
 # Utils
+	kr_log_qverbose_impl
 	kr_make_query
 	kr_pkt_make_auth_header
 	kr_pkt_put
 	kr_pkt_recycle
 	kr_pkt_clear_payload
+	kr_pkt_has_dnssec
 	kr_pkt_qclass
 	kr_pkt_qtype
 	kr_pkt_text

@@ -124,6 +124,7 @@ struct kr_qflags {
 	_Bool DNS64_MARK : 1;
 	_Bool CACHE_TRIED : 1;
 	_Bool NO_NS_FOUND : 1;
+	_Bool PKT_IS_SANE : 1;
 };
 typedef struct {
 	knot_rrset_t **at;
@@ -336,11 +337,13 @@ int kr_rplan_pop(struct kr_rplan *, struct kr_query *);
 struct kr_query *kr_rplan_resolved(struct kr_rplan *);
 struct kr_query *kr_rplan_last(struct kr_rplan *);
 int kr_nsrep_set(struct kr_query *, size_t, const struct sockaddr *);
+void kr_log_qverbose_impl(const struct kr_query *, const char *, const char *, ...);
 int kr_make_query(struct kr_query *, knot_pkt_t *);
 void kr_pkt_make_auth_header(knot_pkt_t *);
 int kr_pkt_put(knot_pkt_t *, const knot_dname_t *, uint32_t, uint16_t, uint16_t, const uint8_t *, uint16_t);
 int kr_pkt_recycle(knot_pkt_t *);
 int kr_pkt_clear_payload(knot_pkt_t *);
+uint16_t kr_pkt_has_dnssec(const knot_pkt_t *);
 uint16_t kr_pkt_qclass(const knot_pkt_t *);
 uint16_t kr_pkt_qtype(const knot_pkt_t *);
 char *kr_pkt_text(const knot_pkt_t *);

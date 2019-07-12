@@ -150,6 +150,8 @@ static void randomized_qname_case(knot_dname_t * restrict qname, uint32_t secret
 	assert(qname);
 	const int len = knot_dname_size(qname) - 2; /* Skip first, last label. */
 	for (int i = 0; i < len; ++i) {
+		/* Note: this relies on the fact that correct label lengths
+		 * can't pass the isletter() test (by "luck"). */
 		if (isletter(*++qname)) {
 				*qname ^= ((secret >> (i & 31)) & 1) * 0x20;
 		}

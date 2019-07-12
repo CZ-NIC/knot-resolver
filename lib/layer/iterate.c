@@ -82,10 +82,14 @@ static bool is_paired_to_query(const knot_pkt_t *answer, struct kr_query *query)
 	uint16_t qtype = query->stype;
 	const knot_dname_t *qname = minimized_qname(query, &qtype);
 
+	/* ID should already match, thanks to session_tasklist_del_msgid()
+	 * in worker_submit(), but it won't hurt to check again. */
 	return query->id      == knot_wire_get_id(answer->wire) &&
-	       knot_wire_get_qdcount(answer->wire) > 0 &&
+	       knot_wire_get_qdcount(answer->wire) == 1 &&
 	       query->sclass  == knot_pkt_qclass(answer) &&
 	       qtype          == knot_pkt_qtype(answer) &&
+	       /* qry->secret had been xor-applied to answer already,
+		* so this also checks for correctness of case randomization */
 	       knot_dname_is_equal(qname, knot_pkt_qname(answer));
 }
 
@@ -1015,6 +1019,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (!query) {
 		return ctx->state;
 	}
+	query->flags.PKT_IS_SANE = false;
 
 	WITH_VERBOSE(query) {
 		if (query->flags.TRACE) {
@@ -1057,6 +1062,10 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 		return KR_STATE_CONSUME;
 	}
+
+	/* If exiting above here, there's no sense to put it into packet cache.
+	 * The most important part is to check for spoofing: is_paired_to_query() */
+	query->flags.PKT_IS_SANE = true;
 
 #ifndef NOVERBOSELOG
 	const knot_lookup_t *rcode = knot_lookup_by_id(knot_rcode_names, knot_wire_get_rcode(pkt->wire));

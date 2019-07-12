@@ -351,12 +351,14 @@ pytests:
   after_script:
     - 'cp -t . respdiff_commitdir/$RESPDIFF_TEST/j* ||:'
     - 'cp -t . respdiff_commitdir/*$RESPDIFF_TEST*.png ||:'
+    - 'tar xf respdiff_commitdir/$RESPDIFF_TEST/*histogram.tar.gz ||:'
   artifacts:
     when: always
     expire_in: 1 week
     paths:
       - ./j*
       - ./*.png
+      - ./*histogram/*
   tags:
     - respdiff
 

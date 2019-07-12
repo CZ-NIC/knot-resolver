@@ -613,6 +613,25 @@ For more details, see ``kresd.systemd(7)``.
 .. note:: On recent Linux supporting ``SO_REUSEPORT`` (since 3.9, backported to RHEL 2.6.32) it is also able to bind to the same endpoint and distribute the load between the forked processes. If your OS doesn't support it, use only one daemon process.
 
 
+Cache Garbage Collector
+=======================
+
+kresd daemon uses the available cache until it's full. When more space is
+required, the entire cache is dropped. To avoid starting over with an empty
+cache, a separate garbage collector daemon is available to periodically trim
+the cache instead.
+
+The cache garbage collector daemon (``kres-cache-gc``) monitors the cache usage
+and attempts to free up space when a threshold is reached. A garbage collector
+systemd service, ``kres-cache-gc.service`` is turned on in our upstream packages.
+
+To spawn the daemon manually and configure it to run every second, use:
+
+.. code-block:: bash
+
+   $ kres-cache-gc -c /var/cache/knot-resolver -d 1000
+
+
 Using CLI tools
 ===============
 
