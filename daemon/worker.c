@@ -1186,7 +1186,10 @@ static int qr_task_finalize(struct qr_task *task, int state)
 
 	int ret;
 	const uv_handle_t *src_handle = session_get_handle(source_session);
-	if (src_handle->type == UV_UDP) {
+	if (src_handle->type != UV_UDP && src_handle->type != UV_TCP) {
+		assert(false);
+		ret = kr_error(EINVAL);
+	} else if (src_handle->type == UV_UDP && ENABLE_SENDMMSG) {
 		/* TODO: this is an ugly way of getting the FD number, as we're
 		 * touching a private field of UV.  We might want to e.g. pass
 		 * a pointer to struct endpoint in kr_request::qsource. */
@@ -1197,9 +1200,6 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		ret = qr_task_send(task, source_session,
 			       (struct sockaddr *)&ctx->source.addr,
 			        ctx->req.answer);
-	} else {
-		assert(false);
-		ret = kr_error(EINVAL);
 	}
 
 	if (ret != kr_ok()) {

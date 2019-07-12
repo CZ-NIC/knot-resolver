@@ -14,6 +14,15 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "daemon/udp_queue.h"
+
+#if !ENABLE_SENDMMSG
+int udp_queue_init_global(uv_loop_t *loop)
+{
+	return 0;
+}
+#else
+
 #include "daemon/session.h"
 #include "daemon/worker.h"
 #include "lib/generic/array.h"
@@ -138,4 +147,6 @@ void udp_queue_push(int fd, struct kr_request *req, struct qr_task *task)
 		 * anyway, it's more efficient to let the hook do that. */
 	}
 }
+
+#endif
 

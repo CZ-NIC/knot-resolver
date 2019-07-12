@@ -83,6 +83,11 @@ verbose_log = get_option('verbose_log') == 'enabled' or get_option('verbose_log'
 user = get_option('user')
 group = get_option('group')
 
+enable_sendmmsg = (get_option('enable_sendmmsg') != 'disabled'
+  and meson.get_compiler('c').has_function('sendmmsg',
+      prefix : '#define _GNU_SOURCE\n#include <sys/socket.h>')
+  )
+
 ## Systemd
 message('--- systemd socket activation ---')
 libsystemd = dependency('libsystemd', required: false)
@@ -101,6 +106,7 @@ add_project_arguments(
   '-Wtype-limits',
   '-Wshadow',
   '-fvisibility=hidden',
+  '-DENABLE_SENDMMSG=@0@'.format(enable_sendmmsg.to_int()),
   language: 'c',
 )
 
@@ -281,6 +287,7 @@ message('''
     user:               @0@'''.format(user) + '''
     group:              @0@'''.format(group) + '''
     install_kresd_conf: @0@'''.format(s_install_kresd_conf) + '''
+    sendmmsg enabled:   @0@ -> @1@'''.format(get_option('enable_sendmmsg'), enable_sendmmsg) + '''
 
 =======================================================
 
