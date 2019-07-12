@@ -63,6 +63,18 @@ option(
   description: 'group which is used for running kresd',
 )
 
+option(
+  'sendmmsg',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'auto',
+  description: 'use sendmmsg syscall towards clients',
+)
+
 ## Systemd
 option(
   'systemd_files',
