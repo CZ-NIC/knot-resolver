@@ -118,7 +118,7 @@ uint64_t worker_task_creation_time(struct qr_task *task);
 void worker_task_subreq_finalize(struct qr_task *task);
 bool worker_task_finished(struct qr_task *task);
 
-//TODO
+/** To be called after sending a DNS message.  It mainly deals with cleanups. */
 int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status);
 
 /** Various worker statistics.  Sync with wrk_stats() */
