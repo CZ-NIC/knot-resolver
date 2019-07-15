@@ -56,6 +56,13 @@ local function test_tls_forward()
 
 end
 
+local function test_slice()
+	boom(policy.slice, {function() end}, 'policy.slice() without any action')
+	ok(policy.slice, {function() end, policy.FORWARD, policy.FORWARD})
+end
+
+
 return {
-	test_tls_forward
+	test_tls_forward,
+	test_slice,
 }
