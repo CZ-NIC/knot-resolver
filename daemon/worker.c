@@ -64,11 +64,7 @@ struct request_ctx
 
 	/** NULL if the request didn't come over network. */
 	struct session *session;
-
-	// FIXME: listening on UDP has shared session per socket :-/
-	// so try sockname in session and peername in here?
-	// (Perhaps keep both here and copy sockname from session
-	//  instead of recomputing it?)
+	union inaddr peer;
 
 	struct worker_ctx *worker;
 	struct qr_task *task;
@@ -263,6 +259,7 @@ static int subreq_key(char *dst, knot_pkt_t *pkt)
  */
 static struct request_ctx *request_create(struct worker_ctx *worker,
 					  struct session *session,
+					  const struct sockaddr *peer,
 					  uint32_t uid)
 {
 	knot_mm_t pool = {
@@ -294,6 +291,9 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		req->qsource.dst_addr = session_get_sockname(session);
 		req->qsource.flags.tcp = session_get_handle(session)->type == UV_TCP;
 		req->qsource.flags.tls = session_flags(session)->has_tls;
+		/* We need to store a copy of peer address. */
+		memcpy(&ctx->peer.ip, peer, kr_sockaddr_len(peer));
+		req->qsource.addr = &ctx->peer.ip;
 	}
 
 	worker->stats.rconcurrent += 1;
@@ -1542,7 +1542,7 @@ static int parse_packet(knot_pkt_t *query)
 	return ret;
 }
 
-int worker_submit(struct session *session, knot_pkt_t *query)
+int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt_t *query)
 {
 	if (!session) {
 		assert(false);
@@ -1574,9 +1574,9 @@ int worker_submit(struct session *session, knot_pkt_t *query)
 	/* Start new task on listening sockets,
 	 * or resume if this is subrequest */
 	struct qr_task *task = NULL;
-	struct sockaddr *addr = NULL;
+	const struct sockaddr *addr = NULL;
 	if (!is_outgoing) { /* request from a client */
-		struct request_ctx *ctx = request_create(worker, session,
+		struct request_ctx *ctx = request_create(worker, session, peer,
 							 knot_wire_get_id(query->wire));
 		if (!ctx) {
 			return kr_error(ENOMEM);
@@ -1603,7 +1603,7 @@ int worker_submit(struct session *session, knot_pkt_t *query)
 			return kr_error(ENOENT);
 		}
 		assert(!session_flags(session)->closing);
-		addr = session_get_peer(session);
+		addr = peer;
 	}
 	assert(uv_is_closing(session_get_handle(session)) == false);
 
@@ -1804,7 +1804,7 @@ struct qr_task *worker_resolve_start(knot_pkt_t *query, struct kr_qflags options
 	}
 
 
-	struct request_ctx *ctx = request_create(worker, NULL, worker->next_request_uid);
+	struct request_ctx *ctx = request_create(worker, NULL, NULL, worker->next_request_uid);
 	if (!ctx) {
 		return NULL;
 	}

@@ -129,7 +129,7 @@ size_t session_wirebuf_get_free_size(struct session *session);
 void session_wirebuf_discard(struct session *session);
 /** Move all data to the beginning of the buffer. */
 void session_wirebuf_compress(struct session *session);
-int session_wirebuf_process(struct session *session);
+int session_wirebuf_process(struct session *session, const struct sockaddr *peer);
 ssize_t session_wirebuf_consume(struct session *session,
 				const uint8_t *data, ssize_t len);
 
