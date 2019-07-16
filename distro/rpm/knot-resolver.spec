@@ -54,6 +54,7 @@ Requires:       systemd
 BuildRequires:  lmdb-devel
 # Lua 5.1 version of the libraries have different package names
 Requires:       lua-basexx
+Requires:       lua-psl
 Requires:       lua-socket
 Requires:       lua-sec
 Requires:       lua-filesystem
@@ -64,6 +65,7 @@ BuildRequires:  pkgconfig(lmdb)
 BuildRequires:  python3-sphinx
 Requires:       lua5.1-basexx
 Requires:       lua5.1-cqueues
+Recommends:     lua5.1-psl
 Requires:       lua-filesystem-compat
 Requires:       lua-socket-compat
 Requires:       lua-sec-compat

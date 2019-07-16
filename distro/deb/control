@@ -41,6 +41,7 @@ Breaks:
 Recommends:
  lua-basexx,
  lua-cqueues,
+ lua-psl,
 Suggests:
  knot-resolver-module-http,
 Description: caching, DNSSEC-validating DNS resolver
