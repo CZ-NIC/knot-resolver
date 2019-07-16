@@ -64,6 +64,7 @@ struct request_ctx
 
 	/** NULL if the request didn't come over network. */
 	struct session *session;
+	/** Requestor's address; separate because of UDP session "sharing". */
 	union inaddr peer;
 
 	struct worker_ctx *worker;
@@ -1152,10 +1153,9 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	qr_task_ref(task);
 
 	/* Send back answer */
-	const struct sockaddr *source_addr = session_get_peer(source_session);
 	assert(!session_flags(source_session)->closing);
-	assert(source_addr->sa_family != AF_UNSPEC);
-	int res = qr_task_send(task, source_session, source_addr, ctx->req.answer);
+	assert(ctx->peer.ip.sa_family != AF_UNSPEC);
+	int res = qr_task_send(task, source_session, &ctx->peer.ip, ctx->req.answer);
 	if (res != kr_ok()) {
 		(void) qr_task_on_send(task, NULL, kr_error(EIO));
 		/* Since source session is erroneous detach all tasks. */
