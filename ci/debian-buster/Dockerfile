@@ -94,9 +94,9 @@ RUN apt-get install -y curl
 # configure knot-resolver-testing OBS repo for dependencies missing in Debian
 RUN echo 'deb http://download.opensuse.org/repositories/home:/CZ-NIC:/knot-resolver-testing/Debian_10/ /' > /etc/apt/sources.list.d/knot-resolver-testing.list
 RUN wget -nv https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-testing/Debian_10/Release.key -O Release.key
-RUN apt-key add - < Release.key
+RUN APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1 apt-key add Release.key
 RUN rm Release.key
-RUN apt update
+RUN apt-get update -qq
 
 # packages from our knot-resolver-testing repo
-RUN apt install lua-psl
+RUN apt-get install -y -qqq lua-http lua-psl
