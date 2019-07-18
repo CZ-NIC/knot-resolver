@@ -335,9 +335,7 @@ Most properties (actions, filters) are described above.
   distribution, pass a fixed value. To re-shuffle on every resolver restart,
   use ``os.time()``.
 
-  The following example demonstrates a distribution among 3 slices:
-
-  .. code-block::
+  The following example demonstrates a distribution among 3 slices::
 
     slice 1/3:
     example.com
