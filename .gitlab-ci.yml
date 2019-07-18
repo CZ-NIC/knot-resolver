@@ -535,7 +535,8 @@ obs:build:all:
     - sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
       -p $DISTROTEST_PRIORITY
       $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
-      "$(git rev-parse --short HEAD)" -l $LABEL -t distrotest.$DISTROTEST_NAME)
+        "$(git rev-parse --short HEAD)" -l $LABEL -t distrotest.$DISTROTEST_NAME
+        --obs-repo $OBS_REPO)
     - export EXITCODE=$(cat $TESTDIR/j*_exitcode)
     - if [[ "$EXITCODE" != "0" ]]; then cat $TESTDIR/j*_{vagrant.log.txt,stdout.txt}; fi
     - exit $EXITCODE
