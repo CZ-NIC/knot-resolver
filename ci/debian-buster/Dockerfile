@@ -1,4 +1,4 @@
-FROM debian:buster-20190326
+FROM debian:buster
 MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
 ARG KNOT_BRANCH=2.8
 
@@ -11,7 +11,7 @@ RUN apt-get update -qq
 # RUN apt-get upgrade -y -qqq
 
 # Knot and Knot Resolver dependecies
-RUN apt-get install -y -qqq git make cmake pkg-config build-essential bsdmainutils libtool autoconf liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev libidn11-dev protobuf-c-compiler libfstrm-dev libuv1-dev libcmocka-dev libluajit-5.1-dev lua-sec lua-socket lua-http meson
+RUN apt-get install -y -qqq git make cmake pkg-config build-essential bsdmainutils libtool autoconf liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev libidn11-dev protobuf-c-compiler libfstrm-dev libuv1-dev libcmocka-dev libluajit-5.1-dev lua-sec lua-socket meson
 # documentation dependecies
 RUN apt-get install -y -qqq doxygen python3-sphinx python3-breathe python3-sphinx-rtd-theme
 
@@ -90,3 +90,13 @@ RUN apt-get install -y osc
 
 # curl (API)
 RUN apt-get install -y curl
+
+# configure knot-resolver-testing OBS repo for dependencies missing in Debian
+RUN echo 'deb http://download.opensuse.org/repositories/home:/CZ-NIC:/knot-resolver-testing/Debian_10/ /' > /etc/apt/sources.list.d/knot-resolver-testing.list
+RUN wget -nv https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-testing/Debian_10/Release.key -O Release.key
+RUN APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1 apt-key add Release.key
+RUN rm Release.key
+RUN apt-get update -qq
+
+# packages from our knot-resolver-testing repo
+RUN apt-get install -y -qqq lua-http lua-psl
