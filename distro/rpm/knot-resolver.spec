@@ -54,7 +54,7 @@ Requires:       systemd
 BuildRequires:  lmdb-devel
 # Lua 5.1 version of the libraries have different package names
 Requires:       lua-basexx
-Recommends:     lua-psl
+Requires:       lua-psl
 Requires:       lua-socket
 Requires:       lua-sec
 Requires:       lua-filesystem
