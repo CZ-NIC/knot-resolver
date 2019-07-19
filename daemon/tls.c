@@ -484,7 +484,11 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
 	while (true) {
 		ssize_t count = gnutls_record_recv(tls_p->tls_session, wire_buf, wire_buf_size);
 		if (count == GNUTLS_E_AGAIN) {
-			break; /* No data available */
+			if (tls_p->consumed == tls_p->nread) {
+				/* See https://www.gnutls.org/manual/html_node/Asynchronous-operation.html */
+				break; /* No more data available in this libuv buffer */
+			}
+			continue;
 		} else if (count == GNUTLS_E_INTERRUPTED) {
 			continue;
 		} else if (count == GNUTLS_E_REHANDSHAKE) {
