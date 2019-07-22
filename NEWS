@@ -1,3 +1,11 @@
+Knot Resolver 4.y.z (2019-aa-bb)
+================================
+
+Bugfixes
+--------
+
+- tls_client: fix issue with TLS session resumption (#489)
+
 Knot Resolver 4.1.0 (2019-07-10)
 ================================
 
