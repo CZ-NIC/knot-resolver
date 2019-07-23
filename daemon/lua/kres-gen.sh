@@ -103,7 +103,6 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	trie_t
 	# libkres
 	struct kr_qflags
-	rr_array_t
 	struct ranked_rr_array_entry
 	ranked_rr_array_entry_t
 	ranked_rr_array_t

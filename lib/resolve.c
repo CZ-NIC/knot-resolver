@@ -461,18 +461,6 @@ static int answer_prepare(struct kr_request *req, knot_pkt_t *query)
 	return kr_ok();
 }
 
-/** @return error code, ignoring if forced to truncate the packet. */
-static int write_extra_records(const rr_array_t *arr, uint16_t reorder, knot_pkt_t *answer)
-{
-	for (size_t i = 0; i < arr->len; ++i) {
-		int err = knot_pkt_put_rotate(answer, 0, arr->at[i], reorder, KNOT_PF_NOTRUNC);
-		if (err != KNOT_EOK) {
-			return err == KNOT_ESPACE ? kr_ok() : kr_error(err);
-		}
-	}
-	return kr_ok();
-}
-
 /**
  * @param all_secure optionally &&-combine security of written RRs into its value.
  *		     (i.e. if you pass a pointer to false, it will always remain)
@@ -573,10 +561,48 @@ static void answer_fail(struct kr_request *request)
 	}
 }
 
+/* Append EDNS records into the answer. */
+static int answer_append_edns(struct kr_request *request)
+{
+	knot_pkt_t *answer = request->answer;
+	if (!answer->opt_rr)
+		return kr_ok();
+	int ret = 0;
+	if (request->qsource.flags.tls) {
+		ret = answer_padding(request);
+	}
+	if (!ret) ret = knot_pkt_begin(answer, KNOT_ADDITIONAL);
+	if (!ret) ret = knot_pkt_put(answer, KNOT_COMPR_HINT_NONE,
+				     answer->opt_rr, KNOT_PF_FREE);
+	return ret;
+}
+
 static void answer_finalize(struct kr_request *request)
 {
 	struct kr_rplan *rplan = &request->rplan;
 	knot_pkt_t *answer = request->answer;
+
+	if (answer->rrset_count != 0) {
+		/* Non-standard: we assume the answer had been constructed.
+		 * Let's check we don't have a "collision". */
+		const ranked_rr_array_t *selected[] = kr_request_selected(request);
+		for (int psec = KNOT_ANSWER; psec <= KNOT_ADDITIONAL; ++psec) {
+			const ranked_rr_array_t *arr = selected[psec];
+			for (ssize_t i = 0; i < arr->len; ++i) {
+				if (unlikely(arr->at[i]->to_wire)) {
+					assert(false);
+					answer_fail(request);
+					return;
+				}
+			}
+		}
+		/* We only add EDNS, and we even assume AD bit was correct. */
+		if (answer_append_edns(request)) {
+			answer_fail(request);
+			return;
+		}
+		return;
+	}
 
 	struct kr_query *const last =
 		rplan->resolved.len > 0 ? array_tail(rplan->resolved) : NULL;
@@ -610,52 +636,23 @@ static void answer_finalize(struct kr_request *request)
 		secure = false; /* the last answer is insecure due to opt-out */
 	}
 
+	/* Write all RRsets meant for the answer. */
 	const uint16_t reorder = last ? last->reorder : 0;
 	bool answ_all_cnames = false/*arbitrary*/;
-	if (request->answ_selected.len > 0) {
-		assert(answer->current <= KNOT_ANSWER);
-		/* Write answer records. */
-		if (answer->current < KNOT_ANSWER) {
-			knot_pkt_begin(answer, KNOT_ANSWER);
-		}
-		if (write_extra_ranked_records(&request->answ_selected, reorder,
-						answer, &secure, &answ_all_cnames))
-		{
-			answer_fail(request);
-			return;
-		}
-	}
-
-	/* Write authority records. */
-	if (answer->current < KNOT_AUTHORITY) {
-		knot_pkt_begin(answer, KNOT_AUTHORITY);
-	}
-	if (write_extra_ranked_records(&request->auth_selected, reorder,
-	    answer, &secure, NULL)) {
+	if (knot_pkt_begin(answer, KNOT_ANSWER)
+	    || write_extra_ranked_records(&request->answ_selected, reorder,
+					answer, &secure, &answ_all_cnames)
+	    || knot_pkt_begin(answer, KNOT_AUTHORITY)
+	    || write_extra_ranked_records(&request->auth_selected, reorder,
+					answer, &secure, NULL)
+	    || knot_pkt_begin(answer, KNOT_ADDITIONAL)
+	    || write_extra_ranked_records(&request->add_selected, reorder,
+					answer, NULL/*not relevant to AD*/, NULL)
+	    || answer_append_edns(request)
+	   )
+	{
 		answer_fail(request);
 		return;
-	}
-	/* Write additional records. */
-	knot_pkt_begin(answer, KNOT_ADDITIONAL);
-	if (write_extra_records(&request->additional, reorder, answer)) {
-		answer_fail(request);
-		return;
-	}
-	/* Write EDNS information */
-	if (answer->opt_rr) {
-		if (request->qsource.flags.tls) {
-			if (answer_padding(request) != kr_ok()) {
-				answer_fail(request);
-				return;
-			}
-		}
-		knot_pkt_begin(answer, KNOT_ADDITIONAL);
-		int ret = knot_pkt_put(answer, KNOT_COMPR_HINT_NONE,
-				       answer->opt_rr, KNOT_PF_FREE);
-		if (ret != KNOT_EOK) {
-			answer_fail(request);
-			return;
-		}
 	}
 
 	if (!last) secure = false; /*< should be no-op, mostly documentation */
@@ -729,7 +726,6 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
 	request->options = ctx->options;
 	request->state = KR_STATE_CONSUME;
 	request->current_query = NULL;
-	array_init(request->additional);
 	array_init(request->answ_selected);
 	array_init(request->auth_selected);
 	array_init(request->add_selected);
