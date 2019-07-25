@@ -43,11 +43,12 @@ void worker_deinit(void);
 /**
  * Process an incoming packet (query from a client or answer from upstream).
  *
- * @param session  session the where packet came from
+ * @param session  session the packet came from
+ * @param peer     address the packet came from
  * @param query    the packet, or NULL on an error from the transport layer
  * @return 0 or an error code
  */
-int worker_submit(struct session *session, knot_pkt_t *query);
+int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt_t *query);
 
 /**
  * End current DNS/TCP session, this disassociates pending tasks from this session

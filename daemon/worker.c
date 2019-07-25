@@ -65,14 +65,14 @@
 struct request_ctx
 {
 	struct kr_request req;
-	struct {
-		union inaddr addr;
-		union inaddr dst_addr;
-		/* uv_handle_t *handle; */
 
+	struct {
+		/** Requestor's address; separate because of UDP session "sharing". */
+		union inaddr addr;
 		/** NULL if the request didn't come over network. */
 		struct session *session;
 	} source;
+
 	struct worker_ctx *worker;
 	struct qr_task *task;
 };
@@ -114,7 +114,7 @@ static int qr_task_step(struct qr_task *task,
 			const struct sockaddr *packet_source,
 			knot_pkt_t *packet);
 static int qr_task_send(struct qr_task *task, struct session *session,
-			struct sockaddr *addr, knot_pkt_t *pkt);
+			const struct sockaddr *addr, knot_pkt_t *pkt);
 static int qr_task_finalize(struct qr_task *task, int state);
 static void qr_task_complete(struct qr_task *task);
 static struct session* worker_find_tcp_connected(struct worker_ctx *worker,
@@ -265,8 +265,8 @@ static int subreq_key(char *dst, knot_pkt_t *pkt)
  * in case the request didn't come from network.
  */
 static struct request_ctx *request_create(struct worker_ctx *worker,
-					  uv_handle_t *handle,
-					  const struct sockaddr *addr,
+					  struct session *session,
+					  const struct sockaddr *peer,
 					  uint32_t uid)
 {
 	knot_mm_t pool = {
@@ -285,48 +285,26 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 
 	/* TODO Relocate pool to struct request */
 	ctx->worker = worker;
-	struct session *s = handle ? handle->data : NULL;
-	if (s) {
-		assert(session_flags(s)->outgoing == false);
+	if (session) {
+		assert(session_flags(session)->outgoing == false);
 	}
-	ctx->source.session = s;
+	ctx->source.session = session;
 
 	struct kr_request *req = &ctx->req;
 	req->pool = pool;
 	req->vars_ref = LUA_NOREF;
 	req->uid = uid;
-
-	/* Remember query source addr */
-	if (!addr || (addr->sa_family != AF_INET && addr->sa_family != AF_INET6)) {
-		ctx->source.addr.ip.sa_family = AF_UNSPEC;
-	} else {
-		memcpy(&ctx->source.addr, addr, kr_sockaddr_len(addr));
-		ctx->req.qsource.addr = &ctx->source.addr.ip;
+	if (session) {
+		/* We assume the session will be alive during the whole life of the request. */
+		req->qsource.dst_addr = session_get_sockname(session);
+		req->qsource.flags.tcp = session_get_handle(session)->type == UV_TCP;
+		req->qsource.flags.tls = session_flags(session)->has_tls;
+		/* We need to store a copy of peer address. */
+		memcpy(&ctx->source.addr.ip, peer, kr_sockaddr_len(peer));
+		req->qsource.addr = &ctx->source.addr.ip;
 	}
 
 	worker->stats.rconcurrent += 1;
-
-	if (!handle) {
-		return ctx;
-	}
-
-	/* Remember the destination address. */
-	int addr_len = sizeof(ctx->source.dst_addr);
-	struct sockaddr *dst_addr = &ctx->source.dst_addr.ip;
-	ctx->source.dst_addr.ip.sa_family = AF_UNSPEC;
-	if (handle->type == UV_UDP) {
-		if (uv_udp_getsockname((uv_udp_t *)handle, dst_addr, &addr_len) == 0) {
-			req->qsource.dst_addr = dst_addr;
-		}
-		req->qsource.flags.tcp = false;
-		req->qsource.flags.tls = false;
-	} else if (handle->type == UV_TCP) {
-		if (uv_tcp_getsockname((uv_tcp_t *)handle, dst_addr, &addr_len) == 0) {
-			req->qsource.dst_addr = dst_addr;
-		}
-		req->qsource.flags.tcp = true;
-		req->qsource.flags.tls = s && session_flags(s)->has_tls;
-	}
 
 	return ctx;
 }
@@ -567,7 +545,7 @@ static void on_write(uv_write_t *req, int status)
 }
 
 static int qr_task_send(struct qr_task *task, struct session *session,
-			struct sockaddr *addr, knot_pkt_t *pkt)
+			const struct sockaddr *addr, knot_pkt_t *pkt)
 {
 	if (!session) {
 		return qr_task_on_send(task, NULL, kr_error(EIO));
@@ -1198,9 +1176,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		udp_queue_push(fd, &ctx->req, task);
 		ret = 0;
 	} else {
-		ret = qr_task_send(task, source_session,
-			       (struct sockaddr *)&ctx->source.addr,
-			        ctx->req.answer);
+		ret = qr_task_send(task, source_session, &ctx->source.addr.ip, ctx->req.answer);
 	}
 
 	if (ret != kr_ok()) {
@@ -1589,7 +1565,7 @@ static int parse_packet(knot_pkt_t *query)
 	return ret;
 }
 
-int worker_submit(struct session *session, knot_pkt_t *query)
+int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt_t *query)
 {
 	if (!session) {
 		assert(false);
@@ -1621,10 +1597,9 @@ int worker_submit(struct session *session, knot_pkt_t *query)
 	/* Start new task on listening sockets,
 	 * or resume if this is subrequest */
 	struct qr_task *task = NULL;
-	struct sockaddr *addr = NULL;
+	const struct sockaddr *addr = NULL;
 	if (!is_outgoing) { /* request from a client */
-		struct request_ctx *ctx = request_create(worker, handle,
-							 session_get_peer(session),
+		struct request_ctx *ctx = request_create(worker, session, peer,
 							 knot_wire_get_id(query->wire));
 		if (!ctx) {
 			return kr_error(ENOMEM);
@@ -1654,7 +1629,7 @@ int worker_submit(struct session *session, knot_pkt_t *query)
 			return kr_error(ENOENT);
 		}
 		assert(!session_flags(session)->closing);
-		addr = session_get_peer(session);
+		addr = peer;
 	}
 	assert(uv_is_closing(session_get_handle(session)) == false);
 

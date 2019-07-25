@@ -28,12 +28,16 @@
 
 #define TLS_CHUNK_SIZE (16 * 1024)
 
-/* Per-session (TCP or UDP) persistent structure,
- * that exists between remote counterpart and a local socket.
+/* Per-socket (TCP or UDP) persistent structure.
+ *
+ * In particular note that for UDP clients it's just one session (per socket)
+ * shared for all clients.  For TCP/TLS it's for the connection-specific socket,
+ * i.e one session per connection.
  */
 struct session {
 	struct session_flags sflags;  /**< miscellaneous flags. */
-	union inaddr peer;            /**< address of peer; is not set for client's UDP sessions. */
+	union inaddr peer;            /**< address of peer; not for UDP clients (downstream) */
+	union inaddr sockname;        /**< our local address; for UDP it may be a wildcard */
 	uv_handle_t *handle;          /**< libuv handle for IO operations. */
 	uv_timer_t timeout;           /**< libuv handle for timer. */
 
@@ -258,6 +262,11 @@ struct session_flags *session_flags(struct session *session)
 struct sockaddr *session_get_peer(struct session *session)
 {
 	return &session->peer.ip;
+}
+
+struct sockaddr *session_get_sockname(struct session *session)
+{
+	return &session->sockname.ip;
 }
 
 struct tls_ctx_t *session_tls_get_server_ctx(const struct session *session)
@@ -708,7 +717,7 @@ void session_unpoison(struct session *session)
 	kr_asan_unpoison(session, sizeof(*session));
 }
 
-int session_wirebuf_process(struct session *session)
+int session_wirebuf_process(struct session *session, const struct sockaddr *peer)
 {
 	int ret = 0;
 	if (session->wire_buf_start_idx == session->wire_buf_end_idx) {
@@ -721,7 +730,7 @@ int session_wirebuf_process(struct session *session)
 	while (((query = session_produce_packet(session, &worker->pkt_pool)) != NULL) &&
 	       (ret < max_iterations)) {
 		assert (!session_wirebuf_error(session));
-		int res = worker_submit(session, query);
+		int res = worker_submit(session, peer, query);
 		if (res != kr_error(EILSEQ)) {
 			/* Packet has been successfully parsed. */
 			ret += 1;
