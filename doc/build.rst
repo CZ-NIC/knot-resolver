@@ -171,13 +171,15 @@ The following command runs all enabled tests. By default, only unit tests are en
    $ ninja -C build_dir
    $ meson test -C build_dir
 
-More comprehensive tests require you to install ``kresd`` into the configured prefix
-before running the test suite. To run all available tests,
-use ``-Dextra_tests=enabled`` build option.
+More comprehensive tests require you to install ``kresd`` into the configured
+prefix before running the test suite. They also have to be explicitly enabled
+by using either ``-Dconfig_tests=enabled`` for postinstall config tests, or
+``-Dextra_tests=enabled`` for all tests, including deckard tests. Please note
+the latter also requires ``-Dsendmmsg=disabled``.
 
 .. code-block:: bash
 
-   $ ninja -C build_dir
+   $ meson configure build_dir -Dconfig_tests=enabled
    $ ninja install -C build_dir
    $ meson test -C build_dir
 

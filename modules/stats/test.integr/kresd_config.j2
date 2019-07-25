@@ -54,6 +54,9 @@ policy.add(policy.all(FWD_TARGET)) -- avoid iteration
 -- make sure DNSSEC is turned off for tests
 trust_anchors.remove('.')
 
+-- Enable queries without RD bit
+pcall(modules.unload, 'refuse_nord')
+
 -- Disable RFC5011 TA update
 if ta_update then
         modules.unload('ta_update')
