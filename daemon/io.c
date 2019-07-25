@@ -80,26 +80,26 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	}
 	if (nread <= 0) {
 		if (nread < 0) { /* Error response, notify resolver */
-			worker_submit(s, NULL);
+			worker_submit(s, NULL, NULL);
 		} /* nread == 0 is for freeing buffers, we don't need to do this */
 		return;
 	}
 	if (addr->sa_family == AF_UNSPEC) {
 		return;
 	}
-	struct sockaddr *peer = session_get_peer(s);
 	if (session_flags(s)->outgoing) {
+		const struct sockaddr *peer = session_get_peer(s);
 		assert(peer->sa_family != AF_UNSPEC);
 		if (kr_sockaddr_cmp(peer, addr) != 0) {
+			kr_log_verbose("[io] <= ignoring UDP from unexpected address '%s'\n",
+					kr_straddr(addr));
 			return;
 		}
-	} else {
-		memcpy(peer, addr, kr_sockaddr_len(addr));
 	}
 	ssize_t consumed = session_wirebuf_consume(s, (const uint8_t *)buf->base,
 						   nread);
 	assert(consumed == nread); (void)consumed;
-	session_wirebuf_process(s);
+	session_wirebuf_process(s, addr);
 	session_wirebuf_discard(s);
 	mp_flush(worker->pkt_pool.ctx);
 }
@@ -145,6 +145,14 @@ int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
 	struct session *s = session_new(h, false);
 	assert(s);
 	session_flags(s)->outgoing = false;
+
+	int socklen = sizeof(union inaddr);
+	ret = uv_udp_getsockname(handle, session_get_sockname(s), &socklen);
+	if (ret) {
+		kr_log_error("ERROR: getsockname failed: %s\n", uv_strerror(ret));
+		abort(); /* It might be nontrivial not to leak something here. */
+	}
+
 	return io_start_read(h);
 }
 
@@ -265,7 +273,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	consumed = session_wirebuf_consume(s, data, data_len);
 	assert(consumed == data_len);
 
-	int ret = session_wirebuf_process(s);
+	int ret = session_wirebuf_process(s, session_get_peer(s));
 	if (ret < 0) {
 		/* An error has occurred, close the session. */
 		worker_end_tcp(s);
@@ -312,16 +320,26 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 		return;
 	}
 
-	/* Set deadlines for TCP connection and start reading.
-	 * It will re-check every half of a request time limit if the connection
-	 * is idle and should be terminated, this is an educated guess. */
-	struct sockaddr *peer = session_get_peer(s);
-	int peer_len = sizeof(union inaddr);
-	int ret = uv_tcp_getpeername(client, peer, &peer_len);
-	if (ret || peer->sa_family == AF_UNSPEC) {
+	/* Get peer's and our address.  We apparently get specific sockname here
+	 * even if we listened on a wildcard address. */
+	struct sockaddr *sa = session_get_peer(s);
+	int sa_len = sizeof(struct sockaddr_in6);
+	int ret = uv_tcp_getpeername(client, sa, &sa_len);
+	if (ret || sa->sa_family == AF_UNSPEC) {
 		session_close(s);
 		return;
 	}
+	sa = session_get_sockname(s);
+	sa_len = sizeof(struct sockaddr_in6);
+	ret = uv_tcp_getsockname(client, sa, &sa_len);
+	if (ret || sa->sa_family == AF_UNSPEC) {
+		session_close(s);
+		return;
+	}
+
+	/* Set deadlines for TCP connection and start reading.
+	 * It will re-check every half of a request time limit if the connection
+	 * is idle and should be terminated, this is an educated guess. */
 
 	const struct network *net = &worker->engine->net;
 	uint64_t idle_in_timeout = net->tcp.in_idle_timeout;

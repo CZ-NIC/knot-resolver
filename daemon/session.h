@@ -91,8 +91,10 @@ int session_tasklist_finalize_expired(struct session *session);
 bool session_is_empty(const struct session *session);
 /** Get pointer to session flags */
 struct session_flags *session_flags(struct session *session);
-/** Get peer address. */
+/** Get pointer to peer address. */
 struct sockaddr *session_get_peer(struct session *session);
+/** Get pointer to sockname (address of our end, not meaningful for UDP downstream). */
+struct sockaddr *session_get_sockname(struct session *session);
 /** Get pointer to server-side tls-related data. */
 struct tls_ctx_t *session_tls_get_server_ctx(const struct session *session);
 /** Set pointer to server-side tls-related data. */
@@ -129,7 +131,7 @@ size_t session_wirebuf_get_free_size(struct session *session);
 void session_wirebuf_discard(struct session *session);
 /** Move all data to the beginning of the buffer. */
 void session_wirebuf_compress(struct session *session);
-int session_wirebuf_process(struct session *session);
+int session_wirebuf_process(struct session *session, const struct sockaddr *peer);
 ssize_t session_wirebuf_consume(struct session *session,
 				const uint8_t *data, ssize_t len);
 
