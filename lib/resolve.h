@@ -199,7 +199,9 @@ struct kr_request {
 	struct {
 		/** Address that originated the request. NULL for internal origin. */
 		const struct sockaddr *addr;
-		/** Address that accepted the request.  NULL for internal origin. */
+		/** Address that accepted the request.  NULL for internal origin.
+		 * Beware: in case of UDP on wildcard address it will be wildcard;
+		 * closely related: issue #173. */
 		const struct sockaddr *dst_addr;
 		const knot_pkt_t *packet;
 		struct kr_request_qsource_flags flags; /**< See definition above. */
