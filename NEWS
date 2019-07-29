@@ -10,6 +10,7 @@ Bugfixes
 --------
 
 - tls_client: fix issue with TLS session resumption (#489)
+- policy: special domain home.arpa. gets NXDOMAIN (!855)
 
 Module API changes
 ------------------
