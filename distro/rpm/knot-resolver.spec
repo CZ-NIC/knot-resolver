@@ -63,7 +63,6 @@ Requires(pre):  shadow-utils
 BuildRequires:  pkgconfig(lmdb)
 BuildRequires:  python3-sphinx
 Requires:       lua5.1-basexx
-Requires:       lua5.1-cqueues
 Requires:       lua-filesystem-compat
 Requires:       lua-socket-compat
 Requires:       lua-sec-compat
