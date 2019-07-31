@@ -126,6 +126,8 @@ static int l_ffi_deinit(struct kr_module *module)
 	return ret;
 }
 
+kr_layer_t kr_layer_t_static;
+
 /** @internal Helper for calling a layer Lua function by e.g. SLOT_begin. */
 static int l_ffi_call_layer(kr_layer_t *ctx, int slot_ix)
 {
@@ -135,8 +137,11 @@ static int l_ffi_call_layer(kr_layer_t *ctx, int slot_ix)
 	lua_State *L = the_worker->engine->L;
 	lua_rawgeti(L, LUA_REGISTRYINDEX, wrap_slot);
 	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_slot);
-	lua_pushpointer(L, ctx);
-	const int ret = l_ffi_call_mod(L, 2);
+	/* We pass the content of *ctx via a global structure to avoid
+	 * lua (full) userdata, as that's relatively expensive (GC-allocated).
+	 * Performance: copying isn't ideal, but it's not visible in profiles. */
+	memcpy(&kr_layer_t_static, ctx, sizeof(*ctx));
+	const int ret = l_ffi_call_mod(L, 1);
 	/* The return codes are mixed at this point.  We need to return KR_STATE_* */
 	return ret < 0 ? KR_STATE_FAIL : ret;
 }

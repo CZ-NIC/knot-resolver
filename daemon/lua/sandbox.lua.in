@@ -262,17 +262,15 @@ function modules_create_table_for_c(kr_module_ud)
 	})
 end
 
+local ctx = ffi.C.kr_layer_t_static -- FIXME: longer name than ctx
 -- Utilities internal for lua layer glue; see ../ffimodule.c
-modules_ffi_layer_wrap1 = function (layer_cb, ctx_udata)
-	local ctx = ffi.cast('kr_layer_t **', ctx_udata)[0]
+modules_ffi_layer_wrap1 = function (layer_cb)
 	return layer_cb(ctx.state, ctx.req)
 end
 modules_ffi_layer_wrap2 = function (layer_cb, ctx_udata)
-	local ctx = ffi.cast('kr_layer_t **', ctx_udata)[0]
 	return layer_cb(ctx.state, ctx.req, ctx.pkt)
 end
 modules_ffi_layer_wrap_checkout = function (layer_cb, ctx_udata)
-	local ctx = ffi.cast('kr_layer_t **', ctx_udata)[0]
 	return layer_cb(ctx.state, ctx.req, ctx.pkt, ctx.dst, ctx.is_stream)
 end
 modules_ffi_wrap_modcb = function (cb, kr_module_ud) -- this one isn't for layer
