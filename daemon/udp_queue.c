@@ -17,6 +17,17 @@
 #include "kresconfig.h"
 #include "daemon/udp_queue.h"
 
+#include "daemon/session.h"
+#include "daemon/worker.h"
+#include "lib/generic/array.h"
+#include "lib/utils.h"
+
+struct qr_task;
+
+#include <assert.h>
+#include <sys/socket.h>
+
+
 #if !ENABLE_SENDMMSG
 int udp_queue_init_global(uv_loop_t *loop)
 {
@@ -28,17 +39,6 @@ void udp_queue_push(int fd, struct kr_request *req, struct qr_task *task)
 	abort();
 }
 #else
-
-#include "daemon/session.h"
-#include "daemon/worker.h"
-#include "lib/generic/array.h"
-#include "lib/utils.h"
-
-struct qr_task;
-
-#include <assert.h>
-#include <stdlib.h>
-#include <sys/socket.h>
 
 /* LATER: it might be useful to have this configurable during runtime,
  * but the structures below would have to change a little (broken up). */
