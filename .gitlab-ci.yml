@@ -494,7 +494,7 @@ obs:release:
   stage: build
   dependencies: []
   variables:
-    OBS_REPO: knot-resolver-latest
+    OBS_REPO: knot-resolver-testing
   when: manual
 # }}}
 
