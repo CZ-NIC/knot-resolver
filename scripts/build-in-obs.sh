@@ -1,9 +1,10 @@
-#!/bin/bash -e
+#!/bin/bash
 
 # Example usage:
 # 1. place tarball to be released in git root dir
 # 2. scripts/make-distrofiles.sh
 # 3. scripts/build-in-obs.sh knot-resolver-latest
+set -o errexit -o nounset -o xtrace
 
 project=home:CZ-NIC:$1
 package=knot-resolver
