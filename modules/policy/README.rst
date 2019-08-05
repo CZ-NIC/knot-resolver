@@ -28,6 +28,10 @@ A *filter* selects which queries will be affected by specified *action*. There a
 * :any:`policy.suffix_common`
 * ``rpz(default_action, path)``
   - implements a subset of RPZ_ in zonefile format.  See below for details: :any:`policy.rpz`.
+* ``slice(slice_func, action, action, ...)`` - splits the entire domain space
+  into multiple slices, uses the slicing function to determine to which slice
+  does the query belong, and perfroms the corresponding action. For details, see
+  :any:`policy.slice`.
 * custom filter function
 
 .. _mod-policy-actions:
@@ -70,6 +74,8 @@ Also, it is possible to write your own action (i.e. Lua function). It is possibl
 .. warning:: The policy module currently only looks at whole DNS requests.  The rules won't be re-applied e.g. when following CNAMEs.
 
 .. note:: The module (and ``kres``) expects domain names in wire format, not textual representation. So each label in name is prefixed with its length, e.g. "example.com" equals to ``"\7example\3com"``. You can use convenience function ``todname('example.com')`` for automatic conversion.
+
+.. _tls-forwarding:
 
 Forwarding over TLS protocol (DNS-over-TLS)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -130,6 +136,37 @@ TLS Examples
 		-- server must present certificate issued by specified CA and hostname must match
 		{'2001:DB8::d0c', hostname='res.example.com', ca_file='/etc/knot-resolver/tlsca.crt'}
 	})
+
+Forwarding to multiple targets
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+With the use of :any:`policy.slice` function, it is possible to split the
+entire DNS namespace into distinct slices. When used in conjuction with
+``policy.TLS_FORWARD``, it's possible to forward different queries to different
+targets.
+
+.. code-block:: lua
+
+   policy.add(policy.slice(
+       policy.slice_randomize_psl(),
+       policy.TLS_FORWARD({{'192.0.2.1', hostname='res.example.com'}}),
+       policy.TLS_FORWARD({
+           -- multiple servers can be specified for a single slice
+           -- the one with lowest round-trip time will be used
+           {'193.17.47.1', hostname='odvr.nic.cz'},
+           {'185.43.135.1', hostname='odvr.nic.cz'},
+       })
+   ))
+
+.. note:: The privacy implications of using this feature aren't clear. Since
+   websites often make requests to multiple domains, these might be forwarded
+   to different targets. This could result in decreased privacy (e.g. when the
+   remote targets are both logging or otherwise processing your DNS traffic).
+   The intended use-case is to use this feature with semi-trusted resolvers
+   which claim to do no logging (such as those listed on `dnsprivacy.org
+   <https://dnsprivacy.org/wiki/display/DP/DNS+Privacy+Test+Servers>`_), to
+   decrease the potential exposure of your DNS data to a malicious resolver
+   operator.
 
 .. _policy_examples:
 
@@ -272,6 +309,48 @@ Most properties (actions, filters) are described above.
    "NSDNAME", "no"
    "NS-IP", "no"
 
+.. function:: policy.slice(slice_func, action[, action[, ...])
+
+  :param slice_func: slicing function that returns index based on query
+  :param action: action to be performed for the slice
+
+  This function splits the entire domain space into multiple slices (determined
+  by the number of provided ``action``s) A ``slice_func`` is called to determine
+  which slice a query belongs to. The corresponding ``action`` is then executed.
+
+
+.. function:: policy.slice_randomize_psl(seed = os.time() / (3600 * 24 * 7))
+
+  :param seed: seed for random assignment
+
+  The function initializes and returns a slicing function, which
+  deterministically assigns ``query`` to a slice based on the QNAME.
+
+  It utilizes the `Public Suffix List`_ to ensure domains under the same
+  registrable domain end up in a single slice. (see example below)
+
+  ``seed`` can be used to re-shuffle the slicing algorhitm when the slicing
+  function is initialized. By default, the assigment is re-shuffled after one
+  week (when resolver restart / reloads config). To force a stable
+  distribution, pass a fixed value. To re-shuffle on every resolver restart,
+  use ``os.time()``.
+
+  The following example demonstrates a distribution among 3 slices::
+
+    slice 1/3:
+    example.com
+    a.example.com
+    b.example.com
+    x.b.example.com
+    example3.com
+
+    slice 2/3:
+    example2.co.uk
+
+    slice 3/3:
+    example.co.uk
+    a.example.co.uk
+
 .. function:: policy.todnames({name, ...})
 
    :param: names table of domain names in textual format
@@ -297,3 +376,4 @@ Most properties (actions, filters) are described above.
 .. _`DNS Privacy Project`: https://dnsprivacy.org/
 .. _`IETF draft dprive-dtls-and-tls-profiles`: https://tools.ietf.org/html/draft-ietf-dprive-dtls-and-tls-profiles
 .. _SNI: https://en.wikipedia.org/wiki/Server_Name_Indication
+.. _`Public Suffix List`: https://publicsuffix.org
