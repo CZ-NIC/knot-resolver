@@ -491,11 +491,16 @@ obs:trigger: &obs_trigger
 
 obs:release:
   <<: *obs_trigger
+  stage: build
+  depends: []
   only:
     - tags
   variables:
     OBS_REPO: knot-resolver-latest
   when: manual
+  script:
+    #- scripts/make-distrofiles.sh
+    - scripts/build-in-obs.sh $OBS_REPO
 # }}}
 
 # deploy-test {{{
