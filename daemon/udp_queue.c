@@ -22,6 +22,11 @@ int udp_queue_init_global(uv_loop_t *loop)
 {
 	return 0;
 }
+/* Appease the linker in case this unused call isn't optimized out. */
+void udp_queue_push(int fd, struct kr_request *req, struct qr_task *task)
+{
+	abort();
+}
 #else
 
 #include "daemon/session.h"
