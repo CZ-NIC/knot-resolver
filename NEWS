@@ -1,15 +1,15 @@
-Knot Resolver 4.y.z (2019-aa-bb)
+Knot Resolver 4.2.0 (2019-08-05)
 ================================
 
 Improvements
 ------------
-
 - queries without RD bit set are REFUSED by default (!838)
+- support forwarding to multiple targets (!825)
 
 Bugfixes
 --------
-
 - tls_client: fix issue with TLS session resumption (#489)
+- rebinding module: fix another false-positive assertion case (!851)
 
 Module API changes
 ------------------

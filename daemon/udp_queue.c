@@ -17,13 +17,6 @@
 #include "kresconfig.h"
 #include "daemon/udp_queue.h"
 
-#if !ENABLE_SENDMMSG
-int udp_queue_init_global(uv_loop_t *loop)
-{
-	return 0;
-}
-#else
-
 #include "daemon/session.h"
 #include "daemon/worker.h"
 #include "lib/generic/array.h"
@@ -32,8 +25,20 @@ int udp_queue_init_global(uv_loop_t *loop)
 struct qr_task;
 
 #include <assert.h>
-#include <stdlib.h>
 #include <sys/socket.h>
+
+
+#if !ENABLE_SENDMMSG
+int udp_queue_init_global(uv_loop_t *loop)
+{
+	return 0;
+}
+/* Appease the linker in case this unused call isn't optimized out. */
+void udp_queue_push(int fd, struct kr_request *req, struct qr_task *task)
+{
+	abort();
+}
+#else
 
 /* LATER: it might be useful to have this configurable during runtime,
  * but the structures below would have to change a little (broken up). */
