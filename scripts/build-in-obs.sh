@@ -4,6 +4,7 @@
 # 1. place tarball to be released in git root dir
 # 2. scripts/make-distrofiles.sh
 # 3. scripts/build-in-obs.sh knot-resolver-latest
+set -o errexit -o nounset -o xtrace
 
 project=home:CZ-NIC:$1
 package=knot-resolver
@@ -17,6 +18,8 @@ if ! [[ "$1" == *-devel || "$1" == *-testing ]]; then
             exit 1
 	esac
 fi
+
+exit 0
 
 osc co "${project}" "${package}"
 pushd "${project}/${package}"
