@@ -50,8 +50,12 @@ archive:
     EMAIL: 'ci@nic'
   except: null
   script:
-    - '[ -z "${CI_COMMIT_TAG}" ] && ./scripts/make-dev-archive.sh'
-    - '[ ! -z "${CI_COMMIT_TAG}" ] && meson build_dist && ninja -C build_dist dist'
+    - >
+      if [[ -z "${CI_COMMIT_TAG}" ]]; then
+        ./scripts/make-dev-archive.sh
+      else
+        meson build_dist; ninja -C build_dist dist
+      fi
 
 build:
   <<: *build
