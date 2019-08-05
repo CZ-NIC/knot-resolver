@@ -89,7 +89,7 @@ has_sendmmsg = meson.get_compiler('c').has_function('sendmmsg',
 if get_option('sendmmsg') == 'enabled' and not has_sendmmsg
   error('missing compiler function: sendmmsg(), use -Dsendmmsg=disabled')
 elif get_option('sendmmsg') == 'auto'
-  sendmmsg = has_sendmmsg
+  sendmmsg = 'disabled' # for now; LATER: has_sendmmsg
 else
   sendmmsg = get_option('sendmmsg') == 'enabled'
 endif
