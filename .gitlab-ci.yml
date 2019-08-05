@@ -486,8 +486,8 @@ obs:trigger: &obs_trigger
     - respdiff
   allow_failure: false
   script:
-    - scripts/make-distrofiles.sh
-    - scripts/build-in-obs.sh $OBS_REPO
+    #- scripts/make-distrofiles.sh
+    - echo y | scripts/build-in-obs.sh $OBS_REPO
 
 obs:release:
   <<: *obs_trigger
@@ -496,9 +496,6 @@ obs:release:
   variables:
     OBS_REPO: knot-resolver-latest
   when: manual
-  script:
-    #- scripts/make-distrofiles.sh
-    - echo y | scripts/build-in-obs.sh $OBS_REPO
 # }}}
 
 # deploy-test {{{
