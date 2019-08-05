@@ -498,7 +498,7 @@ obs:release:
   when: manual
   script:
     #- scripts/make-distrofiles.sh
-    - scripts/build-in-obs.sh $OBS_REPO
+    - echo y | scripts/build-in-obs.sh $OBS_REPO
 # }}}
 
 # deploy-test {{{
