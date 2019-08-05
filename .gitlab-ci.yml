@@ -493,8 +493,6 @@ obs:release:
   <<: *obs_trigger
   stage: build
   dependencies: []
-  only:
-    - tags
   variables:
     OBS_REPO: knot-resolver-latest
   when: manual
