@@ -1169,12 +1169,12 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		assert(false);
 		ret = kr_error(EINVAL);
 	} else if (src_handle->type == UV_UDP && ENABLE_SENDMMSG) {
-		/* TODO: this is an ugly way of getting the FD number, as we're
-		 * touching a private field of UV.  We might want to e.g. pass
-		 * a pointer to struct endpoint in kr_request::qsource. */
-		const int fd = ((const uv_udp_t *)src_handle)->io_watcher.fd;
-		udp_queue_push(fd, &ctx->req, task);
-		ret = 0;
+		int fd;
+		ret = uv_fileno(src_handle, &fd);
+		assert(!ret);
+		if (ret == 0) {
+			udp_queue_push(fd, &ctx->req, task);
+		}
 	} else {
 		ret = qr_task_send(task, source_session, &ctx->source.addr.ip, ctx->req.answer);
 	}
