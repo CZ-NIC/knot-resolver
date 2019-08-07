@@ -262,18 +262,17 @@ function modules_create_table_for_c(kr_module_ud)
 	})
 end
 
+local layer_ctx = ffi.C.kr_layer_t_static
 -- Utilities internal for lua layer glue; see ../ffimodule.c
-modules_ffi_layer_wrap1 = function (layer_cb, ctx_udata)
-	local ctx = ffi.cast('kr_layer_t **', ctx_udata)[0]
-	return layer_cb(ctx.state, ctx.req)
+modules_ffi_layer_wrap1 = function (layer_cb)
+	return layer_cb(layer_ctx.state, layer_ctx.req)
 end
-modules_ffi_layer_wrap2 = function (layer_cb, ctx_udata)
-	local ctx = ffi.cast('kr_layer_t **', ctx_udata)[0]
-	return layer_cb(ctx.state, ctx.req, ctx.pkt)
+modules_ffi_layer_wrap2 = function (layer_cb)
+	return layer_cb(layer_ctx.state, layer_ctx.req, layer_ctx.pkt)
 end
-modules_ffi_layer_wrap_checkout = function (layer_cb, ctx_udata)
-	local ctx = ffi.cast('kr_layer_t **', ctx_udata)[0]
-	return layer_cb(ctx.state, ctx.req, ctx.pkt, ctx.dst, ctx.is_stream)
+modules_ffi_layer_wrap_checkout = function (layer_cb)
+	return layer_cb(layer_ctx.state, layer_ctx.req, layer_ctx.pkt,
+					layer_ctx.dst, layer_ctx.is_stream)
 end
 modules_ffi_wrap_modcb = function (cb, kr_module_ud) -- this one isn't for layer
 	local kr_module = ffi.cast('struct kr_module **', kr_module_ud)[0]
