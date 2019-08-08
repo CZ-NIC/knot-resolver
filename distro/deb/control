@@ -61,6 +61,17 @@ Description: caching, DNSSEC-validating DNS resolver
  MVCC cache that may be shared). You can start and stop additional
  nodes depending on the contention without downtime.
 
+Package: knot-resolver-dbg
+Architecture: any
+Depends: knot-resolver (= ${binary:Version}),
+         ${misc:Depends}
+Recommends: gdb
+Section: debug
+Priority: extra
+Description: Debug symbols for Knot Resolver
+ This package provides the debug symbols for Knot Resolver needed
+ for properly debugging errors in Knot Resolver with gdb.
+
 Package: knot-resolver-module-http
 Architecture: all
 Depends:
