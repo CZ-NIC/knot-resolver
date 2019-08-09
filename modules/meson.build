@@ -7,7 +7,7 @@ lua_mod_src = [  # add lua modules without separate meson.build
   files('etcd/etcd.lua'),
   files('graphite/graphite.lua'),
   files('predict/predict.lua'),
-  files('prefill/prefill.lua'),
+  # files('prefill/prefill.lua'),  # https://gitlab.labs.nic.cz/knot/knot-resolver/issues/496
   files('priming/priming.lua'),
   files('rebinding/rebinding.lua'),
   files('renumber/renumber.lua'),
