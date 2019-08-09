@@ -95,7 +95,7 @@ function M.layer.consume(state, req, pkt)
 		return state end
 
 	local qry = req:current()
-	if qry.flags.CACHED then  -- do not slow down cached queries
+	if qry.flags.CACHED or qry.flags.ALLOW_LOCAL then  -- do not slow down cached queries
 		return state end
 
 	local bad_rr = check_pkt(pkt)
