@@ -577,28 +577,6 @@ function policy.evaluate(rules, req, query, state)
 	return
 end
 
--- Top-down policy list walk until we hit a match
--- the caller is responsible for reordering policy list
--- from most specific to least specific.
--- Some rules may be chained, in this case they are evaluated
--- as a dependency chain, e.g. r1,r2,r3 -> r3(r2(r1(state)))
-policy.layer = {
-	begin = function(state, req)
-		-- Don't act on "resolved" cases.
-		if bit.band(state, bit.bor(kres.FAIL, kres.DONE)) ~= 0 then return state end
-		return policy.evaluate(policy.rules, req, req:current(), state) or
-		       policy.evaluate(policy.special_names, req, req:current(), state) or
-		       state
-	end,
-	finish = function(state, req)
-		-- Optimization for the typical case
-		if #policy.postrules == 0 then return state end
-		-- Don't act on "resolved" cases.
-		if bit.band(state, bit.bor(kres.FAIL, kres.DONE)) ~= 0 then return state end
-		return policy.evaluate(policy.postrules, req, req:current(), state) or state
-	end
-}
-
 -- Add rule to policy list
 function policy.add(rule, postrule)
 	-- Compatibility with 1.0.0 API
@@ -755,6 +733,7 @@ policy.todnames(private_zones)
 policy.rules = {}
 policy.postrules = {}
 policy.special_names = {
+	-- XXX: beware of special_names_optim() when modifying these filters
 	{
 		cb=policy.suffix_common(policy.DENY_MSG(
 			'Blocking is mandated by standards, see references on '
@@ -787,6 +766,45 @@ policy.special_names = {
 			todname('arpa.')),
 		count=0
 	},
+}
+
+-- Return boolean; false = no special name may apply, true = some might apply.
+-- The point is to *efficiently* filter almost all QNAMEs that do not apply.
+local function special_names_optim(req, sname)
+	local qname_size = req.qsource.packet.qname_size
+	if qname_size < 9 then return true end -- don't want to special-case bad array access
+	local root = sname + qname_size - 1
+	return
+		-- .a???. or .t???.
+		(root[-5] == 4 and (root[-4] == 97 or root[-4] == 116))
+		-- .on???. or .in?????. or lo???
+		or (root[-6] == 5 and root[-5] == 111 and root[-4] == 110)
+		or (root[-8] == 7 and root[-7] == 105 and root[-6] == 110)
+		or (root[-6] == 5 and root[-5] == 108 and root[-4] == 111)
+end
+
+-- Top-down policy list walk until we hit a match
+-- the caller is responsible for reordering policy list
+-- from most specific to least specific.
+-- Some rules may be chained, in this case they are evaluated
+-- as a dependency chain, e.g. r1,r2,r3 -> r3(r2(r1(state)))
+policy.layer = {
+	begin = function(state, req)
+		-- Don't act on "resolved" cases.
+		if bit.band(state, bit.bor(kres.FAIL, kres.DONE)) ~= 0 then return state end
+		local qry = req:current()
+		return policy.evaluate(policy.rules, req, qry, state)
+			or (special_names_optim(req, qry.sname)
+					and policy.evaluate(policy.special_names, req, qry, state))
+			or state
+	end,
+	finish = function(state, req)
+		-- Optimization for the typical case
+		if #policy.postrules == 0 then return state end
+		-- Don't act on "resolved" cases.
+		if bit.band(state, bit.bor(kres.FAIL, kres.DONE)) ~= 0 then return state end
+		return policy.evaluate(policy.postrules, req, req:current(), state) or state
+	end
 }
 
 return policy
