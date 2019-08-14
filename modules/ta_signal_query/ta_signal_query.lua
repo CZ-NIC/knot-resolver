@@ -50,10 +50,13 @@ local function send_ta_query(domain)
 end
 
 -- act on DNSKEY queries which were not answered from cache
-function M.layer.consume(state, req, _)
-	local qry = req:current()
-	if qry.stype == kres.type.DNSKEY and not qry.flags.CACHED then
-		send_ta_query(qry:name())
+function M.layer.consume(state, req, pkt)
+	-- First check for standard "cached packets": PKT_SIZE_NOWIRE, for efficiency.
+	if pkt.size ~= -1 and pkt:qtype() == kres.type.DNSKEY then
+		local qry = req:current()
+		if not qry.flags.CACHED then
+			send_ta_query(qry:name())
+		end
 	end
 	return state  -- do not interfere with normal query processing
 end
