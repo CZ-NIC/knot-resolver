@@ -3,22 +3,21 @@ M.layer = {}
 local ffi = require('ffi')
 
 function M.layer.finish(state, req, pkt)
-	if bit.band(state, kres.DONE) == 0 then
-		return state end -- not resolved yet, exit
-
-	local qry = req:resolved()
-	if qry.parent ~= nil then
-		return state end -- an internal query, exit
-
-	if not (pkt:qtype() == kres.type.A or pkt:qtype() == kres.type.AAAA) then
-		return state end
-
-	-- fast filter by the length of the first label
-	local label_len = qry:name():byte(1)
+	-- fast filter by the length of the first QNAME label
+	if pkt.wire[5] == 0 then return state end -- QDCOUNT % 256 == 0, in case we produced that
+	local label_len = pkt.wire[12]
 	if label_len ~= 29 and label_len ~= 30 then
 		return state end
 	-- end of hot path
+
+	local qtype = pkt:qtype()
+	if not (qtype == kres.type.A or qtype == kres.type.AAAA) then
+		return state end
+	if bit.band(state, kres.FAIL) ~= 0 then
+		return state end
+
 	-- check the label name
+	local qry = req:resolved()
 	local qname = kres.dname2str(qry:name()):lower()
 	local sentype, keytag
 	if label_len == 29 then
