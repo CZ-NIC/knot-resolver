@@ -29,7 +29,6 @@
 #include <errno.h>
 #include <stdlib.h>
 
-#include "contrib/ucw/lib.h"
 #include "contrib/base64.h"
 #include "daemon/io.h"
 #include "daemon/tls.h"

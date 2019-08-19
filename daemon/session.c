@@ -18,6 +18,7 @@
 
 #include <libknot/packet/pkt.h>
 
+#include "contrib/macros.h"
 #include "lib/defines.h"
 #include "daemon/session.h"
 #include "daemon/engine.h"

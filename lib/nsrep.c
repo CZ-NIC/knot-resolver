@@ -26,7 +26,6 @@
 #include "lib/resolve.h"
 #include "lib/defines.h"
 #include "lib/generic/pack.h"
-#include "contrib/ucw/lib.h"
 
 /** Some built-in unfairness ... */
 #ifndef FAVOUR_IPV6
