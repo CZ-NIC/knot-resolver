@@ -68,7 +68,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "contrib/ucw/lib.h"
 #include "lib/utils.h"
 #include "libknot/mm_ctx.h"
 

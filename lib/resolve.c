@@ -24,6 +24,7 @@
 #include <libknot/descriptor.h>
 #include <ucw/mempool.h>
 #include "kresconfig.h"
+#include "contrib/macros.h"
 #include "lib/resolve.h"
 #include "lib/layer.h"
 #include "lib/rplan.h"

@@ -66,7 +66,7 @@
 #pragma once
 
 #include "lib/defines.h"
-#include "contrib/ucw/lib.h"
+#include "contrib/macros.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>

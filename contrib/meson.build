@@ -5,7 +5,6 @@ contrib_src = files([
   'ccan/ilog/ilog.c',
   'ccan/json/json.c',
   'ucw/mempool.c',
-  'ucw/mempool-fmt.c',
   'murmurhash3/murmurhash3.c',
   'base32hex.c',
   'base64.c'

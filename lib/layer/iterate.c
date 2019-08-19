@@ -37,6 +37,7 @@
 #include <libknot/rrtype/rrsig.h>
 
 #include "kresconfig.h"
+#include "contrib/macros.h"
 #include "lib/layer/iterate.h"
 #include "lib/resolve.h"
 #include "lib/rplan.h"

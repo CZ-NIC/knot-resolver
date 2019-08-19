@@ -19,6 +19,7 @@
  * Prototypes in ./impl.h
  */
 
+#include "contrib/macros.h"
 #include "lib/cache/impl.h"
 
 int pkt_renew(knot_pkt_t *pkt, const knot_dname_t *name, uint16_t type)
