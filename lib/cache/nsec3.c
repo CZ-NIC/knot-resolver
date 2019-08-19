@@ -21,6 +21,7 @@
 #include "lib/cache/impl.h"
 
 #include "contrib/base32hex.h"
+#include "contrib/macros.h"
 #include "lib/dnssec/nsec.h"
 #include "lib/layer/iterate.h"
 

@@ -23,7 +23,7 @@
 
 #include "lib/generic/trie.h"
 #include "lib/utils.h"
-#include "contrib/ucw/lib.h"
+#include "contrib/macros.h"
 
 #if defined(__i386) || defined(__x86_64) || defined(_M_IX86) \
 	|| (defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN) \
