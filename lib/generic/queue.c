@@ -14,6 +14,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "contrib/macros.h"
 #include "lib/generic/queue.h"
 #include <string.h>
 

@@ -22,7 +22,7 @@
 #include <lauxlib.h>
 #include <libknot/packet/pkt.h>
 #include <libknot/descriptor.h>
-#include <contrib/ucw/lib.h>
+#include <contrib/macros.h>
 #include <contrib/ucw/mempool.h>
 #include <contrib/wire.h>
 #if defined(__GLIBC__) && defined(_GNU_SOURCE)
@@ -197,30 +197,6 @@ static void ioreq_kill_pending(struct qr_task *task)
 	task->pending_count = 0;
 }
 
-/** @cond This memory layout is internal to mempool.c, use only for debugging. */
-#if defined(__SANITIZE_ADDRESS__)
-struct mempool_chunk {
-  struct mempool_chunk *next;
-  size_t size;
-};
-static void mp_poison(struct mempool *mp, bool poison)
-{
-	if (!poison) { /* @note mempool is part of the first chunk, unpoison it first */
-		kr_asan_unpoison(mp, sizeof(*mp));
-	}
-	struct mempool_chunk *chunk = mp->state.last[0];
-	void *chunk_off = (uint8_t *)chunk - chunk->size;
-	if (poison) {
-		kr_asan_poison(chunk_off, chunk->size);
-	} else {
-		kr_asan_unpoison(chunk_off, chunk->size);
-	}
-}
-#else
-#define mp_poison(mp, enable)
-#endif
-/** @endcond */
-
 /** Get a mempool.  (Recycle if possible.)  */
 static inline struct mempool *pool_borrow(struct worker_ctx *worker)
 {
@@ -228,7 +204,6 @@ static inline struct mempool *pool_borrow(struct worker_ctx *worker)
 	if (worker->pool_mp.len > 0) {
 		mp = array_tail(worker->pool_mp);
 		array_pop(worker->pool_mp);
-		mp_poison(mp, 0);
 	} else { /* No mempool on the freelist, create new one */
 		mp = mp_new (4 * CPU_PAGE_SIZE);
 	}
@@ -241,7 +216,6 @@ static inline void pool_release(struct worker_ctx *worker, struct mempool *mp)
 	if (worker->pool_mp.len < MP_FREELIST_SIZE) {
 		mp_flush(mp);
 		array_push(worker->pool_mp, mp);
-		mp_poison(mp, 1);
 	} else {
 		mp_delete(mp);
 	}
@@ -2013,7 +1987,6 @@ static inline void reclaim_mp_freelist(mp_freelist_t *list)
 {
 	for (unsigned i = 0; i < list->len; ++i) {
 		struct mempool *e = list->at[i];
-		kr_asan_unpoison(e, sizeof(*e));
 		mp_delete(e);
 	}
 	array_clear(*list);
