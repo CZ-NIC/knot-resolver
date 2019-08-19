@@ -17,6 +17,7 @@
 #include "lib/zonecut.h"
 
 #include "contrib/cleanup.h"
+#include "contrib/macros.h"
 #include "lib/defines.h"
 #include "lib/generic/pack.h"
 #include "lib/layer.h"

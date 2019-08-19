@@ -19,6 +19,7 @@
 #include "contrib/ccan/asprintf/asprintf.h"
 #include "contrib/cleanup.h"
 #include "contrib/ucw/mempool.h"
+#include "contrib/macros.h"
 #include "kresconfig.h"
 #include "lib/defines.h"
 #include "lib/generic/array.h"
@@ -838,7 +839,10 @@ static void flags_to_str(char *dst, const knot_pkt_t *pkt, size_t maxlen)
 	dst[offset] = 0;
 }
 
-static char *print_section_opt(struct mempool *mp, char *endp, const knot_rrset_t *rr, const uint8_t rcode)
+/**
+ * Caller must free() strung returned in printp argument.
+ */
+static int print_section_opt(char *outstr, int outsize, const knot_rrset_t *rr, const uint8_t rcode)
 {
 	uint8_t ercode = knot_edns_get_ext_rcode(rr);
 	uint16_t ext_rcode_id = knot_edns_whole_rcode(ercode, rcode);
@@ -854,7 +858,7 @@ static char *print_section_opt(struct mempool *mp, char *endp, const knot_rrset_
 		}
 	}
 
-	return mp_printf_append(mp, endp,
+	return snprintf(outstr, outsize,
 		";; EDNS PSEUDOSECTION:\n;; "
 		"Version: %u; flags: %s; UDP size: %u B; ext-rcode: %s\n\n",
 		knot_edns_get_version(rr),
@@ -864,13 +868,11 @@ static char *print_section_opt(struct mempool *mp, char *endp, const knot_rrset_
 
 }
 
-char *kr_pkt_text(const knot_pkt_t *pkt)
+static int kr_pkt_text_internal(char *outstr, int outsize, const knot_pkt_t *pkt)
 {
 	if (!pkt) {
-		return NULL;
+		return -1;
 	}
-
-	struct mempool *mp = mp_new(512);
 
 	static const char * snames[] = {
 		";; ANSWER SECTION", ";; AUTHORITY SECTION", ";; ADDITIONAL SECTION"
@@ -884,6 +886,8 @@ char *kr_pkt_text(const knot_pkt_t *pkt)
 	const knot_lookup_t *opcode = knot_lookup_by_id(knot_opcode_names, pkt_opcode);
 	uint16_t qry_id = knot_wire_get_id(pkt->wire);
 	uint16_t qdcount = knot_wire_get_qdcount(pkt->wire);
+	int totalsize = 0;
+	int remainingsize = outsize;
 
 	if (rcode != NULL) {
 		rcode_str = rcode->name;
@@ -893,7 +897,7 @@ char *kr_pkt_text(const knot_pkt_t *pkt)
 	}
 	flags_to_str(flags, pkt, sizeof(flags));
 
-	char *ptr = mp_printf(mp,
+	totalsize = snprintf(outstr, remainingsize,
 		";; ->>HEADER<<- opcode: %s; status: %s; id: %hu\n"
 		";; Flags: %s QUERY: %hu; ANSWER: %hu; "
 		"AUTHORITY: %hu; ADDITIONAL: %hu\n\n",
@@ -903,18 +907,24 @@ char *kr_pkt_text(const knot_pkt_t *pkt)
 		knot_wire_get_ancount(pkt->wire),
 		knot_wire_get_nscount(pkt->wire),
 		knot_wire_get_arcount(pkt->wire));
+	remainingsize = MAX(outsize - totalsize, 0);
 
 	if (knot_pkt_has_edns(pkt)) {
-		ptr = print_section_opt(mp, ptr, pkt->opt_rr, knot_wire_get_rcode(pkt->wire));
+		totalsize += print_section_opt(outstr + totalsize, remainingsize,
+					  pkt->opt_rr, knot_wire_get_rcode(pkt->wire));
+		remainingsize = MAX(outsize - totalsize, 0);
 	}
 
 	if (qdcount == 1) {
 		KR_DNAME_GET_STR(qname, knot_pkt_qname(pkt));
 		KR_RRTYPE_GET_STR(rrtype, knot_pkt_qtype(pkt));
-		ptr = mp_printf_append(mp, ptr, ";; QUESTION SECTION\n%s\t\t%s\n", qname, rrtype);
+		totalsize += snprintf(outstr + totalsize, remainingsize,
+					";; QUESTION SECTION\n%s\t\t%s\n", qname, rrtype);
 	} else if (qdcount > 1) {
-		ptr = mp_printf_append(mp, ptr, ";; Warning: unsupported QDCOUNT %hu\n", qdcount);
+		totalsize += snprintf(outstr + totalsize, remainingsize,
+					";; Warning: unsupported QDCOUNT %hu\n", qdcount);
 	}
+	remainingsize = MAX(outsize - totalsize, 0);
 
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
@@ -923,22 +933,42 @@ char *kr_pkt_text(const knot_pkt_t *pkt)
 			continue;
 		}
 
-		ptr = mp_printf_append(mp, ptr, "\n%s\n", snames[i - KNOT_ANSWER]);
+		totalsize += snprintf(outstr + totalsize, remainingsize, "\n%s\n", snames[i - KNOT_ANSWER]);
+		remainingsize = MAX(outsize - totalsize, 0);
 		for (unsigned k = 0; k < sec->count; ++k) {
 			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
 			if (rr->type == KNOT_RRTYPE_OPT) {
 				continue;
 			}
 			auto_free char *rr_text = kr_rrset_text(rr);
-			ptr = mp_printf_append(mp, ptr, "%s", rr_text);
+			totalsize += snprintf(outstr + totalsize, remainingsize, "%s", rr_text);
+			remainingsize = MAX(outsize - totalsize, 0);
 		}
 	}
-
-	/* Close growing buffer and duplicate result before deleting */
-	char *result = strdup(ptr);
-	mp_delete(mp);
-	return result;
+	return totalsize;
 }
+
+char *kr_pkt_text(const knot_pkt_t *pkt)
+{
+	if (!pkt) {
+		return NULL;
+	}
+	int bufsize = 2048;
+	while (1) {
+		int strsize;
+		auto_free char *buf = malloc(bufsize);
+		if (!buf)
+			return NULL;
+		strsize = kr_pkt_text_internal(buf, bufsize, pkt);
+		if(strsize < bufsize)
+			return strdup(buf);
+		else
+			/* reallocate and try again */
+			bufsize = strsize + 1;
+	};
+}
+
+
 
 char *kr_rrset_text(const knot_rrset_t *rr)
 {

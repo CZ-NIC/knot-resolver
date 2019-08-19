@@ -20,6 +20,7 @@
  * The packet is stashed in entry_h::data as uint16_t length + full packet wire format.
  */
 
+#include "contrib/macros.h"
 #include "lib/utils.h"
 #include "lib/layer/iterate.h" /* kr_response_classify */
 #include "lib/cache/impl.h"

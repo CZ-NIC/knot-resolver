@@ -18,6 +18,8 @@
  * Implementation of NSEC (1) handling.  Prototypes in ./impl.h
  */
 
+#include "contrib/macros.h"
+
 #include "lib/cache/impl.h"
 #include "lib/dnssec/nsec.h"
 #include "lib/layer/iterate.h"
