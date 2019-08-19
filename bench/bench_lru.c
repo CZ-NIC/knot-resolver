@@ -21,7 +21,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "contrib/ucw/lib.h"
+#include "contrib/macros.h"
 #include "daemon/engine.h"
 #include "lib/nsrep.h"
 

@@ -29,7 +29,7 @@
 
 #include "contrib/base32hex.h"
 #include "contrib/cleanup.h"
-#include "contrib/ucw/lib.h"
+#include "contrib/macros.h"
 #include "lib/cache/api.h"
 #include "lib/cache/cdb_lmdb.h"
 #include "lib/defines.h"

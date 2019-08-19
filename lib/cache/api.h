@@ -21,7 +21,6 @@
 #include <sys/time.h>
 #include "lib/cache/cdb_api.h"
 #include "lib/defines.h"
-#include "contrib/ucw/config.h" /*uint*/
 
 /** When knot_pkt is passed from cache without ->wire, this is the ->size. */
 static const size_t PKT_SIZE_NOWIRE = -1;

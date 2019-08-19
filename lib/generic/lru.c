@@ -15,6 +15,7 @@
  */
 
 #include "lib/generic/lru.h"
+#include "contrib/macros.h"
 #include "contrib/murmurhash3/murmurhash3.h"
 #include "contrib/ucw/mempool.h"
 
