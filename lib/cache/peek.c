@@ -16,6 +16,7 @@
 
 #include "lib/cache/impl.h"
 
+#include "contrib/macros.h"
 #include "lib/dnssec/ta.h"
 #include "lib/layer/iterate.h"
 
