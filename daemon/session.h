@@ -133,11 +133,6 @@ int session_wirebuf_process(struct session *session);
 ssize_t session_wirebuf_consume(struct session *session,
 				const uint8_t *data, ssize_t len);
 
-/** poison session structure with ASAN. */
-void session_poison(struct session *session);
-/** unpoison session structure with ASAN. */
-void session_unpoison(struct session *session);
-
 knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm);
 int session_discard_packet(struct session *session, const knot_pkt_t *pkt);
 

@@ -18,6 +18,7 @@
 
 #include <libknot/packet/pkt.h>
 
+#include "contrib/macros.h"
 #include "lib/defines.h"
 #include "daemon/session.h"
 #include "daemon/engine.h"
@@ -696,16 +697,6 @@ uint8_t *session_wirebuf_get_free_start(struct session *session)
 size_t session_wirebuf_get_free_size(struct session *session)
 {
 	return session->wire_buf_size - session->wire_buf_end_idx;
-}
-
-void session_poison(struct session *session)
-{
-	kr_asan_poison(session, sizeof(*session));
-}
-
-void session_unpoison(struct session *session)
-{
-	kr_asan_unpoison(session, sizeof(*session));
 }
 
 int session_wirebuf_process(struct session *session)
