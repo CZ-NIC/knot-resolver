@@ -21,6 +21,7 @@
 
 #include <arpa/inet.h>
 
+#include "contrib/macros.h"
 #include "lib/nsrep.h"
 #include "lib/rplan.h"
 #include "lib/resolve.h"
