@@ -25,7 +25,7 @@ config_tests += [
   ['dns64', files('dns64/dns64.test.lua')],
   ['ta_update', files('ta_update/ta_update.test.lua'), ['snowflake']],
   # NOTE: https://gitlab.labs.nic.cz/knot/knot-resolver/issues/496
-  # ['prefill', files('prefill/prefill.test/prefill.test.lua')],
+  ['prefill', files('prefill/prefill.test/prefill.test.lua')],
 ]
 
 integr_tests += [

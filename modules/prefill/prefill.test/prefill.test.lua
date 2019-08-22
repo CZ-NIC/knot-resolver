@@ -33,7 +33,7 @@ ev = event.after(0, function () return 1 end)
 
 -- Import fake root zone; avoid interference with configured keyfile_default.
 trust_anchors.remove('.')
-trust_anchors.add('.    IN DS 136 8 2 CF6782894E5BD62F0B0B7E9E8126B033FC752909BBE3577E27406FC1 78A9BC27')
+trust_anchors.add('.			IN DS 18213 7 2 A1D391053583A4BC597DB9588B296060FC55EAC80B3831CA371BA1FA AE997244')
 
 local function check_answer(desc, qname, qtype, expected_rcode)
 	qtype_str = kres.tostring.type[qtype]
