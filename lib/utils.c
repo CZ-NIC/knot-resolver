@@ -839,9 +839,7 @@ static void flags_to_str(char *dst, const knot_pkt_t *pkt, size_t maxlen)
 	dst[offset] = 0;
 }
 
-/**
- * Caller must free() strung returned in printp argument.
- */
+/** It has snprtinf() semantics. */
 static int print_section_opt(char *outstr, int outsize, const knot_rrset_t *rr, const uint8_t rcode)
 {
 	uint8_t ercode = knot_edns_get_ext_rcode(rr);
@@ -868,6 +866,7 @@ static int print_section_opt(char *outstr, int outsize, const knot_rrset_t *rr, 
 
 }
 
+/** It has snprtinf() semantics. */
 static int kr_pkt_text_internal(char *outstr, int outsize, const knot_pkt_t *pkt)
 {
 	if (!pkt) {
@@ -888,6 +887,7 @@ static int kr_pkt_text_internal(char *outstr, int outsize, const knot_pkt_t *pkt
 	uint16_t qdcount = knot_wire_get_qdcount(pkt->wire);
 	int totalsize = 0;
 	int remainingsize = outsize;
+	char * const outend = outstr + outsize;
 
 	if (rcode != NULL) {
 		rcode_str = rcode->name;
@@ -910,7 +910,7 @@ static int kr_pkt_text_internal(char *outstr, int outsize, const knot_pkt_t *pkt
 	remainingsize = MAX(outsize - totalsize, 0);
 
 	if (knot_pkt_has_edns(pkt)) {
-		totalsize += print_section_opt(outstr + totalsize, remainingsize,
+		totalsize += print_section_opt(outend - remainingsize, remainingsize,
 					  pkt->opt_rr, knot_wire_get_rcode(pkt->wire));
 		remainingsize = MAX(outsize - totalsize, 0);
 	}
@@ -918,10 +918,10 @@ static int kr_pkt_text_internal(char *outstr, int outsize, const knot_pkt_t *pkt
 	if (qdcount == 1) {
 		KR_DNAME_GET_STR(qname, knot_pkt_qname(pkt));
 		KR_RRTYPE_GET_STR(rrtype, knot_pkt_qtype(pkt));
-		totalsize += snprintf(outstr + totalsize, remainingsize,
+		totalsize += snprintf(outend - remainingsize, remainingsize,
 					";; QUESTION SECTION\n%s\t\t%s\n", qname, rrtype);
 	} else if (qdcount > 1) {
-		totalsize += snprintf(outstr + totalsize, remainingsize,
+		totalsize += snprintf(outend - remainingsize, remainingsize,
 					";; Warning: unsupported QDCOUNT %hu\n", qdcount);
 	}
 	remainingsize = MAX(outsize - totalsize, 0);
@@ -933,7 +933,8 @@ static int kr_pkt_text_internal(char *outstr, int outsize, const knot_pkt_t *pkt
 			continue;
 		}
 
-		totalsize += snprintf(outstr + totalsize, remainingsize, "\n%s\n", snames[i - KNOT_ANSWER]);
+		totalsize += snprintf(outend - remainingsize, remainingsize,
+					"\n%s\n", snames[i - KNOT_ANSWER]);
 		remainingsize = MAX(outsize - totalsize, 0);
 		for (unsigned k = 0; k < sec->count; ++k) {
 			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
@@ -941,7 +942,8 @@ static int kr_pkt_text_internal(char *outstr, int outsize, const knot_pkt_t *pkt
 				continue;
 			}
 			auto_free char *rr_text = kr_rrset_text(rr);
-			totalsize += snprintf(outstr + totalsize, remainingsize, "%s", rr_text);
+			totalsize += snprintf(outend - remainingsize, remainingsize,
+						"%s", rr_text);
 			remainingsize = MAX(outsize - totalsize, 0);
 		}
 	}
