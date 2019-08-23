@@ -11,6 +11,7 @@
 
 #undef LOCAL_DEBUG
 
+#include <valgrind/memcheck.h>
 #include <string.h>
 #include <strings.h>
 #include <stdlib.h>
@@ -71,6 +72,7 @@ mp_align_size(unsigned size)
 #endif
 }
 
+/*
 void
 mp_init(struct mempool *pool, unsigned chunk_size)
 {
@@ -81,6 +83,7 @@ mp_init(struct mempool *pool, unsigned chunk_size)
 		.last_big = &pool->last_big
 	};
 }
+*/
 
 static void *
 mp_new_big_chunk(unsigned size)
@@ -90,8 +93,10 @@ mp_new_big_chunk(unsigned size)
 		return NULL;
 	}
 	ASAN_POISON_MEMORY_REGION(data, size);
+	VALGRIND_MAKE_MEM_NOACCESS(data, size);
 	struct mempool_chunk *chunk = (struct mempool_chunk *)(data + size);
 	chunk->size = size;
+	VALGRIND_CREATE_MEMPOOL(chunk, 0, 0);
 	return chunk;
 }
 
@@ -100,6 +105,7 @@ mp_free_big_chunk(struct mempool_chunk *chunk)
 {
 	void *ptr = (uint8_t *)chunk - chunk->size;
 	ASAN_UNPOISON_MEMORY_REGION(ptr, chunk->size);
+	VALGRIND_DESTROY_MEMPOOL(chunk);
 	free(ptr);
 }
 
@@ -112,8 +118,10 @@ mp_new_chunk(unsigned size)
 		return NULL;
 	}
 	ASAN_POISON_MEMORY_REGION(data, size);
+	VALGRIND_MAKE_MEM_NOACCESS(data, size);
 	struct mempool_chunk *chunk = (struct mempool_chunk *)(data + size);
 	chunk->size = size;
+	VALGRIND_CREATE_MEMPOOL(chunk, 0, 0);
 	return chunk;
 #else
 	return mp_new_big_chunk(size);
@@ -127,6 +135,7 @@ mp_free_chunk(struct mempool_chunk *chunk)
 	uint8_t *data = (uint8_t *)chunk - chunk->size;
 	ASAN_UNPOISON_MEMORY_REGION(data, chunk->size);
 	page_free(data, chunk->size + MP_CHUNK_TAIL);
+	VALGRIND_DESTROY_MEMPOOL(chunk);
 #else
 	mp_free_big_chunk(chunk);
 #endif
@@ -139,6 +148,7 @@ mp_new(unsigned chunk_size)
 	struct mempool_chunk *chunk = mp_new_chunk(chunk_size);
 	struct mempool *pool = (void *)((char *)chunk - chunk_size);
 	ASAN_UNPOISON_MEMORY_REGION(pool, sizeof(*pool));
+	VALGRIND_MEMPOOL_ALLOC(chunk, pool, sizeof(*pool));
 	DBG("Creating mempool %p with %u bytes long chunks", pool, chunk_size);
 	chunk->next = NULL;
 	ASAN_POISON_MEMORY_REGION(chunk, sizeof(struct mempool_chunk));
@@ -203,6 +213,16 @@ mp_flush(struct mempool *pool)
 	}
 	pool->state.last[0] = chunk;
 	if (chunk) {
+		/* deallocate everything in current chuck except pool header */
+		/*
+		VALGRIND_DESTROY_MEMPOOL(chunk);
+		VALGRIND_MAKE_MEM_NOACCESS((char *)chunk - chunk->size + sizeof(*pool),
+						chunk->size - sizeof(*pool));
+		VALGRIND_CREATE_MEMPOOL(chunk, 0, 0);
+		VALGRIND_MEMPOOL_ALLOC(chunk, pool, sizeof(*pool));
+		VALGRIND_MAKE_MEM_DEFINED(chunk, sizeof(*pool));
+		*/
+		/* keep pool header */
 		pool->state.free[0] = chunk->size - sizeof(*pool);
 		ASAN_POISON_MEMORY_REGION(chunk, sizeof(struct mempool_chunk));
 	} else {
@@ -262,6 +282,7 @@ mp_alloc_internal(struct mempool *pool, unsigned size)
 		ASAN_POISON_MEMORY_REGION(chunk, sizeof(struct mempool_chunk));
 		pool->state.last[0] = chunk;
 		pool->state.free[0] = pool->chunk_size - size;
+		VALGRIND_MEMPOOL_ALLOC(chunk, (uint8_t *)chunk - pool->chunk_size, size);
 		return (uint8_t *)chunk - pool->chunk_size;
 	} else if (size <= MP_SIZE_MAX) {
 		pool->idx = 1;
@@ -274,7 +295,9 @@ mp_alloc_internal(struct mempool *pool, unsigned size)
 		ASAN_POISON_MEMORY_REGION(chunk, sizeof(struct mempool_chunk));
 		pool->state.last[1] = chunk;
 		pool->state.free[1] = aligned - size;
-		return pool->last_big = (uint8_t *)chunk - aligned;
+		pool->last_big = (uint8_t *)chunk - aligned;
+		VALGRIND_MEMPOOL_ALLOC(chunk, pool->last_big, size);
+		return pool->last_big;
 	} else {
 		fprintf(stderr, "Cannot allocate %u bytes from a mempool", size);
 		assert(0);
@@ -290,6 +313,7 @@ mp_alloc(struct mempool *pool, unsigned size)
 	if (size <= avail) {
 		pool->state.free[0] = avail - size;
 		ptr = (uint8_t*)pool->state.last[0] - avail;
+		VALGRIND_MEMPOOL_ALLOC(pool->state.last[0], ptr, size);
 	} else {
 		ptr = mp_alloc_internal(pool, size);
 	}
@@ -304,6 +328,7 @@ mp_alloc_noalign(struct mempool *pool, unsigned size)
 	if (size <= pool->state.free[0]) {
 		ptr = (uint8_t*)pool->state.last[0] - pool->state.free[0];
 		pool->state.free[0] -= size;
+		VALGRIND_MEMPOOL_ALLOC(pool->state.last[0], ptr, size);
 	} else {
 		ptr = mp_alloc_internal(pool, size);
 	}
