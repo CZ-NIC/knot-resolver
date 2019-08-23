@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <lmdb.h>
+#include <valgrind/memcheck.h>
 
 #include "contrib/cleanup.h"
 #include "contrib/macros.h"
@@ -86,6 +87,9 @@ static inline knot_db_val_t val_mdb2knot(MDB_val v)
 }
 static inline MDB_val val_knot2mdb(knot_db_val_t v)
 {
+	/* data == NULL means "preallocate" */
+	if (v.data)
+		VALGRIND_CHECK_MEM_IS_DEFINED(v.data, v.len);
 	return (MDB_val){ .mv_size = v.len, .mv_data = v.data };
 }
 
