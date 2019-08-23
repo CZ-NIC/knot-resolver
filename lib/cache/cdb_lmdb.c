@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <lmdb.h>
+#include <valgrind/memcheck.h>
 
 #include "contrib/cleanup.h"
 #include "contrib/macros.h"
@@ -503,6 +504,7 @@ static int cdb_readv(knot_db_t *db, struct kr_cdb_stats *stats,
 
 	for (int i = 0; i < maxcount; ++i) {
 		/* Convert key structs */
+		VALGRIND_CHECK_MEM_IS_DEFINED(key->data, key->len);
 		MDB_val _key = val_knot2mdb(key[i]);
 		MDB_val _val = val_knot2mdb(val[i]);
 		stats->read++;
@@ -517,6 +519,7 @@ static int cdb_readv(knot_db_t *db, struct kr_cdb_stats *stats,
 			}
 			return ret;
 		}
+		VALGRIND_CHECK_MEM_IS_DEFINED(_val.mv_data, _val.mv_size);
 		/* Update the result. */
 		val[i] = val_mdb2knot(_val);
 	}
@@ -528,8 +531,12 @@ static int cdb_write(struct lmdb_env *env, MDB_txn **txn, const knot_db_val_t *k
 			struct kr_cdb_stats *stats)
 {
 	/* Convert key structs and write */
+	VALGRIND_CHECK_MEM_IS_DEFINED(key->data, key->len);
 	MDB_val _key = val_knot2mdb(*key);
 	MDB_val _val = val_knot2mdb(*val);
+	if (!(flags & MDB_RESERVE))
+		VALGRIND_CHECK_MEM_IS_DEFINED(val->data, val->len);
+
 	stats->write++;
 	int ret = mdb_put(*txn, env->dbi, &_key, &_val, flags);
 
@@ -586,6 +593,7 @@ static int cdb_remove(knot_db_t *db, struct kr_cdb_stats *stats,
 	int deleted = 0;
 
 	for (int i = 0; ret == kr_ok() && i < maxcount; ++i) {
+		VALGRIND_CHECK_MEM_IS_DEFINED(keys[i].data, keys[i].len);
 		MDB_val _key = val_knot2mdb(keys[i]);
 		MDB_val val = { 0, NULL };
 		stats->remove++;
@@ -618,6 +626,7 @@ static int cdb_match(knot_db_t *db, struct kr_cdb_stats *stats,
 		return lmdb_error(ret);
 	}
 
+	VALGRIND_CHECK_MEM_IS_DEFINED(key->data, key->len);
 	MDB_val cur_key = val_knot2mdb(*key);
 	MDB_val cur_val = { 0, NULL };
 	stats->match++;
@@ -661,6 +670,7 @@ static int cdb_read_leq(knot_db_t *env, struct kr_cdb_stats *stats,
 	int ret = txn_curs_get(env, &curs, stats);
 	if (ret) return ret;
 
+	VALGRIND_CHECK_MEM_IS_DEFINED(key->data, key->len);
 	MDB_val key2_m = val_knot2mdb(*key);
 	MDB_val val2_m = { 0, NULL };
 	stats->read_leq++;
@@ -669,6 +679,8 @@ static int cdb_read_leq(knot_db_t *env, struct kr_cdb_stats *stats,
 		stats->read_leq_miss++;
 		return lmdb_error(ret);
 	}
+	VALGRIND_CHECK_MEM_IS_DEFINED(key2_m.mv_data, key2_m.mv_size);
+	VALGRIND_CHECK_MEM_IS_DEFINED(val2_m.mv_data, val2_m.mv_size);
 	/* test for equality //:unlikely */
 	if (key2_m.mv_size == key->len
 	    && memcmp(key2_m.mv_data, key->data, key->len) == 0) {
