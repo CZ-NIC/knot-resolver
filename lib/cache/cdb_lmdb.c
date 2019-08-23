@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <lmdb.h>
+#include <valgrind/memcheck.h>
 
 #include "contrib/cleanup.h"
 #include "contrib/macros.h"
@@ -504,6 +505,7 @@ static int cdb_readv(knot_db_t *db, struct kr_cdb_stats *stats,
 	for (int i = 0; i < maxcount; ++i) {
 		/* Convert key structs */
 		MDB_val _key = val_knot2mdb(key[i]);
+		VALGRIND_CHECK_MEM_IS_DEFINED(_key.data, _key.len);
 		MDB_val _val = val_knot2mdb(val[i]);
 		stats->read++;
 		ret = mdb_get(txn, env->dbi, &_key, &_val);
@@ -529,7 +531,11 @@ static int cdb_write(struct lmdb_env *env, MDB_txn **txn, const knot_db_val_t *k
 {
 	/* Convert key structs and write */
 	MDB_val _key = val_knot2mdb(*key);
+	VALGRIND_CHECK_MEM_IS_DEFINED(_key.data, _key.len);
 	MDB_val _val = val_knot2mdb(*val);
+	if (!(flags & MDB_RESERVE))
+		VALGRIND_CHECK_MEM_IS_DEFINED(_val.data, _val.len);
+
 	stats->write++;
 	int ret = mdb_put(*txn, env->dbi, &_key, &_val, flags);
 
@@ -587,6 +593,7 @@ static int cdb_remove(knot_db_t *db, struct kr_cdb_stats *stats,
 
 	for (int i = 0; ret == kr_ok() && i < maxcount; ++i) {
 		MDB_val _key = val_knot2mdb(keys[i]);
+		VALGRIND_CHECK_MEM_IS_DEFINED(_key.data, _key.len);
 		MDB_val val = { 0, NULL };
 		stats->remove++;
 		ret = lmdb_error(mdb_del(txn, env->dbi, &_key, &val));
@@ -619,6 +626,7 @@ static int cdb_match(knot_db_t *db, struct kr_cdb_stats *stats,
 	}
 
 	MDB_val cur_key = val_knot2mdb(*key);
+	VALGRIND_CHECK_MEM_IS_DEFINED(_key.data, _key.len);
 	MDB_val cur_val = { 0, NULL };
 	stats->match++;
 	ret = mdb_cursor_get(cur, &cur_key, &cur_val, MDB_SET_RANGE);
