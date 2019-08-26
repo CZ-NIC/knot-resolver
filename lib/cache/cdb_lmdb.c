@@ -23,10 +23,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <lmdb.h>
-#include <valgrind/memcheck.h>
 
 #include "contrib/cleanup.h"
 #include "contrib/macros.h"
+#include "contrib/memcheck.h"
 #include "lib/cache/cdb_lmdb.h"
 #include "lib/cache/cdb_api.h"
 #include "lib/cache/api.h"

@@ -11,7 +11,6 @@
 
 #undef LOCAL_DEBUG
 
-#include <valgrind/memcheck.h>
 #include <string.h>
 #include <strings.h>
 #include <stdlib.h>
@@ -19,6 +18,7 @@
 #include <assert.h>
 #include "contrib/asan.h"
 #include "contrib/macros.h"
+#include "contrib/memcheck.h"
 #include "contrib/ucw/mempool.h"
 
 /** Align an integer \p s to the nearest higher multiple of \p a (which should be a power of two) **/
