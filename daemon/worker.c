@@ -33,6 +33,7 @@
 #include <unistd.h>
 #include <gnutls/gnutls.h>
 
+#include "daemon/af_xdp.h"
 #include "daemon/bindings/api.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
@@ -329,7 +330,13 @@ static int request_start(struct request_ctx *ctx, knot_pkt_t *query)
 		req->qsource.size += query->tsig_wire.len;
 	}
 
-	knot_pkt_t *answer = knot_pkt_new(NULL, answer_max, &req->pool);
+	uint16_t answer_max2;
+	void *wire = kr_xsk_alloc_wire(&answer_max2);
+	if (!wire) {
+		return kr_error(ENOMEM);
+	}
+	//FIXME: "dealloc" the wire in cases the answer isn't sent (if possible)
+	knot_pkt_t *answer = knot_pkt_new(wire, MIN(answer_max, answer_max2), &req->pool);
 	if (!answer) { /* Failed to allocate answer */
 		return kr_error(ENOMEM);
 	}
@@ -1168,6 +1175,9 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	if (src_handle->type != UV_UDP && src_handle->type != UV_TCP) {
 		assert(false);
 		ret = kr_error(EINVAL);
+	} else if (src_handle->type == UV_UDP && ctx->source.addr.ip.sa_family == AF_INET) {
+		kr_xsk_push(&ctx->source.addr.ip, session_get_sockname(source_session)/*FIXME*/,
+				&ctx->req, task);
 	} else if (src_handle->type == UV_UDP && ENABLE_SENDMMSG) {
 		int fd;
 		ret = uv_fileno(src_handle, &fd);

@@ -19,6 +19,7 @@
 #include "contrib/ccan/asprintf/asprintf.h"
 #include "contrib/cleanup.h"
 #include "contrib/ucw/mempool.h"
+#include "daemon/af_xdp.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
 #include "daemon/network.h"
@@ -811,7 +812,8 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	ret = udp_queue_init_global(loop);
+	//ret = udp_queue_init_global(loop);
+	ret = kr_xsk_init_global();
 	if (ret) {
 		kr_log_error("[system] failed to initialize UDP queue: %s\n",
 				kr_strerror(ret));
