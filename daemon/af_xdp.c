@@ -136,13 +136,12 @@ static uint64_t xsk_alloc_umem_frame(struct xsk_socket_info *xsk) // TODO: confu
 static struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
 						    struct xsk_umem_info *umem)
 {
-	struct xsk_socket_info *xsk_info;
 	//uint32_t idx;
 	//uint32_t prog_id = 0;
 	int i;
 	int ret;
 
-	xsk_info = calloc(1, sizeof(*xsk_info));
+	struct xsk_socket_info *xsk_info = calloc(1, sizeof(*xsk_info));
 	if (!xsk_info)
 		return NULL;
 
@@ -339,8 +338,10 @@ static bool process_packet(struct xsk_socket_info *xsk, uint64_t addr, uint32_t 
 
 int main(int argc, char **argv)
 {
+	/*
 	test_pkt_ipv4_checksum();
 	return 0;
+	*/
 
 
 
@@ -361,13 +362,18 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
+	/* Hard-coded configuration */
 	const char
 		saddr[4] = "",
 		daddr[4] = "";
 	static struct config cfg = { // static to get zeroed by default
 		.ifname = "enp9s0",
 		.xsk_if_queue = 0,
-		.xsk = { .tx_size = XSK_RING_PROD__DEFAULT_NUM_DESCS },
+		.xsk = {
+			.tx_size = XSK_RING_PROD__DEFAULT_NUM_DESCS,
+			/* Otherwise it tries to load the non-existent program. */
+			.libbpf_flags = XSK_LIBBPF_FLAGS__INHIBIT_PROG_LOAD,
+		},
 		.pkt_template = {
 			.eth = {
 				.h_dest = "",
