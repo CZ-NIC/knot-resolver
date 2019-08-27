@@ -12,7 +12,7 @@
 
 #include <byteswap.h>
 
-//#include <arpa/inet.h>
+#include <arpa/inet.h>
 //#include <net/if.h>
 #include <netinet/in.h>
 //#include <linux/if_link.h>
@@ -25,6 +25,9 @@
 // placate libclang :-/
 typedef uint64_t size_t;
 
+
+// TODO
+#define unlikely(x) x
 
 #define INVALID_UMEM_FRAME SIZE_MAX
 
@@ -39,7 +42,7 @@ struct udpv4 {
 	struct ethhdr eth; // no VLAN support; CRC at the "end" of .data!
 	struct iphdr ipv4;
 	struct udphdr udp;
-	uint8_t *data[];
+	uint8_t data[];
 } __attribute__((packed));
 
 
@@ -211,6 +214,8 @@ static inline uint16_t from32to16(uint32_t sum)
  *
  * Slightly inspired by Linux 5.2 csum_tcpudp_* and friends.
  * This version only works on little endian; the result is in BE/network order.
+ *
+ * FIXME: this is wrong, apparently; use *_2() at least for now.
  */
 static __be16 pkt_ipv4_checksum(const struct iphdr *h)
 {
@@ -248,8 +253,17 @@ static void test_pkt_ipv4_checksum()
 		fprintf(stderr, "0x%x != 0x%x\n", cc1, c1);
 }
 
+static __be16 pkt_ipv4_checksum_2(const struct iphdr *h)
+{
+	const uint16_t *ha = (const uint16_t *)h;
+	uint32_t sum32 = 0;
+	for (int i = 0; i < 10; ++i)
+		if (i != 5)
+			sum32 += BS16(ha[i]);
+	return ~BS16(from32to16(sum32));
+}
 
-static void pkt_headers(struct udpv4 *dst, struct udpv4 *template, int data_len)
+static void pkt_fill_headers(struct udpv4 *dst, struct udpv4 *template, int data_len)
 {
 	memcpy(dst, template, sizeof(*template));
 
@@ -258,7 +272,9 @@ static void pkt_headers(struct udpv4 *dst, struct udpv4 *template, int data_len)
 
 	assert(dst->ipv4.ihl == 5); // header length 20
 	dst->ipv4.tot_len = BS16(20 + udp_len);
-	dst->ipv4.check = pkt_ipv4_checksum(&dst->ipv4);
+	dst->ipv4.check = pkt_ipv4_checksum_2(&dst->ipv4);
+
+	return; // ethernet checksum not needed?
 
 	/* Finally CRC32 over the whole ethernet frame; we use zlib here. */
 	uLong eth_crc = crc32(0L, Z_NULL, 0);
@@ -266,10 +282,33 @@ static void pkt_headers(struct udpv4 *dst, struct udpv4 *template, int data_len)
 	uint32_t eth_crc_be = BS32(eth_crc);
 	memcpy(dst->data + data_len, &eth_crc_be, sizeof(eth_crc_be));
 
+	return; // code below is broken/wrong, probably
 #ifndef NDEBUG
+	fprintf(stderr, "%x\n", (uint32_t)eth_crc);
 	eth_crc = crc32(eth_crc, (const void *)&dst->data[data_len], 4);
+	fprintf(stderr, "%x\n", (uint32_t)eth_crc);
+	eth_crc = crc32(0L, Z_NULL, 0);
+	eth_crc = crc32(eth_crc, (const void *)dst, offsetof(struct udpv4, data) + data_len + 4);
+	fprintf(stderr, "%x\n", (uint32_t)eth_crc);
 	assert(eth_crc == 0xC704DD7B);
 #endif
+}
+
+static void pkt_send(struct xsk_socket_info *xsk, uint64_t addr, uint32_t len)
+{
+	uint32_t tx_idx;
+	int ret = xsk_ring_prod__reserve(&xsk->tx, 1, &tx_idx);
+	if (unlikely(ret != 1)) {
+		fprintf(stderr, "No more transmit slots, dropping the packet\n");
+		return ;
+	}
+
+	xsk_ring_prod__tx_desc(&xsk->tx, tx_idx)->addr = addr;
+	xsk_ring_prod__tx_desc(&xsk->tx, tx_idx)->len = len;
+	xsk_ring_prod__submit(&xsk->tx, 1);
+
+	// We need to wake up the kernel, apparently.
+	sendto(xsk_socket__fd(xsk->xsk), NULL, 0, MSG_DONTWAIT, NULL, 0);
 }
 
 
@@ -338,34 +377,10 @@ static bool process_packet(struct xsk_socket_info *xsk, uint64_t addr, uint32_t 
 
 int main(int argc, char **argv)
 {
-	/*
-	test_pkt_ipv4_checksum();
-	return 0;
-	*/
-
-
-
-	/* Allocate memory for NUM_FRAMES of the default XDP frame size */
-	if (posix_memalign(&packet_buffer,
-			   getpagesize(), /* PAGE_SIZE aligned */
-			   packet_buffer_size)) {
-		fprintf(stderr, "ERROR: Can't allocate buffer memory \"%s\"\n",
-			strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	/* Initialize shared packet_buffer for umem usage */
-	struct xsk_umem_info *umem = configure_xsk_umem(packet_buffer, packet_buffer_size);
-	if (umem == NULL) {
-		fprintf(stderr, "ERROR: Can't create umem \"%s\"\n",
-			strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
 	/* Hard-coded configuration */
 	const char
-		saddr[4] = "",
-		daddr[4] = "";
+		sip_str[] = "192.168.8.71",
+		dip_str[] = "192.168.8.1";
 	static struct config cfg = { // static to get zeroed by default
 		.ifname = "enp9s0",
 		.xsk_if_queue = 0,
@@ -376,8 +391,8 @@ int main(int argc, char **argv)
 		},
 		.pkt_template = {
 			.eth = {
-				.h_dest = "",
-				.h_source = "",
+				.h_dest   = "\xd8\x58\xd7\x00\x74\x34",
+				.h_source = "\x70\x85\xc2\x3a\xc7\x84",
 				.h_proto = BS16(ETH_P_IP),
 			},
 			.ipv4 = {
@@ -399,8 +414,42 @@ int main(int argc, char **argv)
 			},
 		},
 	};
-	memcpy(&cfg.pkt_template.ipv4.saddr, saddr, sizeof(saddr));
-	memcpy(&cfg.pkt_template.ipv4.daddr, daddr, sizeof(daddr));
+	if (inet_pton(AF_INET, sip_str, &cfg.pkt_template.ipv4.saddr) != 1
+	    || inet_pton(AF_INET, dip_str, &cfg.pkt_template.ipv4.daddr) != 1) {
+		fprintf(stderr, "ERROR: failed to convert IPv4 address\n");
+		exit(EXIT_FAILURE);
+	}
+
+	/* Some failed test
+	void *data = malloc(2048);
+	struct udpv4 *pkt = data;
+	pkt_fill_headers(pkt, &cfg.pkt_template, 0);
+	// */
+
+	/* This one is OK!
+	test_pkt_ipv4_checksum();
+	return 0;
+	// */
+
+
+
+	/* Allocate memory for NUM_FRAMES of the default XDP frame size */
+	if (posix_memalign(&packet_buffer,
+			   getpagesize(), /* PAGE_SIZE aligned */
+			   packet_buffer_size)) {
+		fprintf(stderr, "ERROR: Can't allocate buffer memory \"%s\"\n",
+			strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	/* Initialize shared packet_buffer for umem usage */
+	struct xsk_umem_info *umem = configure_xsk_umem(packet_buffer, packet_buffer_size);
+	if (umem == NULL) {
+		fprintf(stderr, "ERROR: Can't create umem \"%s\"\n",
+			strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
 
 	/* Open and configure the AF_XDP (xsk) socket */
 	struct xsk_socket_info *xsk_socket = xsk_configure_socket(&cfg, umem);
@@ -409,6 +458,15 @@ int main(int argc, char **argv)
 			strerror(errno));
 		exit(EXIT_FAILURE);
 	}
+
+	struct udpv4 *pkt = umem->buffer;
+	int len = 0;
+	pkt_fill_headers(pkt, &cfg.pkt_template, len);
+	pkt_send(xsk_socket, 0/*byte address relative to start of umem->buffer*/,
+			offsetof(struct udpv4, data) + len + 4);
+
+
+
 	return 0; // for now, try to make it work up to here
 
 
