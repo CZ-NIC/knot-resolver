@@ -351,7 +351,7 @@ static void pkt_send(struct xsk_socket_info *xsk, uint64_t addr, uint32_t len)
 void kr_xsk_push(const struct sockaddr *src, const struct sockaddr *dst,
 		 struct kr_request *req, struct qr_task *task)
 {
-	fprintf(stderr, "pushing a packet\n");
+	kr_log_verbose("[uxsk] pushing a packet\n");
 	assert(src->sa_family == AF_INET && dst->sa_family == AF_INET);
 	uint8_t *uframe_p = req->answer->wire - offsetof(struct umem_frame, udpv4.data);
 	const uint8_t *umem_mem_start = the_socket->umem->frames->bytes;
@@ -422,54 +422,62 @@ static void xsk_check(uv_check_t *handle)
 }
 
 
+static struct config the_config_storage = { // static to get zeroed by default
+	.ifname = "eno1",
+	.xsk_if_queue = 0,
+	.xsk = {
+		.tx_size = XSK_RING_PROD__DEFAULT_NUM_DESCS,
+		.rx_size = XSK_RING_CONS__DEFAULT_NUM_DESCS,
+		/* Otherwise it tries to load the non-existent program. */
+		.libbpf_flags = XSK_LIBBPF_FLAGS__INHIBIT_PROG_LOAD,
+	},
+	.pkt_template = {
+		.eth = {
+			//.h_dest   = "\xd8\x58\xd7\x00\x74\x34",
+			//.h_source = "\x70\x85\xc2\x3a\xc7\x84",
+			// mirkwood -> knot-bench-player:
+			//.h_dest   = "\xa0\x36\x9f\x50\x2a\x9c",
+			//.h_source = "\x3c\xfd\xfe\x2b\xcf\x02",
+			// doriath -> eriador
+			.h_dest   = "\x00\x15\x17\xf8\xd0\x4a",
+			.h_source = "\xf0\x1f\xaf\xe2\x80\x0d",
+			//.h_source = "\x00\x1e\x67\xe3\xb1\x24", // rohan
+			.h_proto = BS16(ETH_P_IP),
+		},
+		.ipv4 = {
+			.version = 4,
+			.ihl = 5,
+			.tos = 0, // default: best-effort DSCP + no ECN support
+			.tot_len = BS16(0), // to be overwritten
+			.id = BS16(0), // probably anything; details: RFC 6864
+			.frag_off = BS16(0), // TODO: add the DF flag, probably (1 << 14)
+			.ttl = 5,
+			.protocol = 0x11, // UDP
+			.check = 0, // to be overwritten
+		},
+		.udp = {
+			.source = BS16(5353),
+			.dest   = BS16(5353),
+			.len    = BS16(0), // to be overwritten
+			.check  = BS16(0), // checksum is optional
+		},
+	},
+};
+
 int kr_xsk_init_global(uv_loop_t *loop)
 {
 	/* Hard-coded configuration */
 	const int FRAME_COUNT = 4096;
 	const char
-		sip_str[] = "192.168.8.71",
-		dip_str[] = "192.168.8.1";
+		//sip_str[] = "192.168.8.71",
+		//dip_str[] = "192.168.8.1";
 		//sip_str[] = "192.168.100.8",
 		//dip_str[] = "192.168.100.3";
-	static struct config cfg = { // static to get zeroed by default
-		.ifname = "enp9s0",
-		.xsk_if_queue = 0,
-		.xsk = {
-			.tx_size = XSK_RING_PROD__DEFAULT_NUM_DESCS,
-			/* Otherwise it tries to load the non-existent program. */
-			.libbpf_flags = XSK_LIBBPF_FLAGS__INHIBIT_PROG_LOAD,
-		},
-		.pkt_template = {
-			.eth = {
-				.h_dest   = "\xd8\x58\xd7\x00\x74\x34",
-				.h_source = "\x70\x85\xc2\x3a\xc7\x84",
-				// mirkwood - knot-bench-player:
-				//.h_dest   = "\xa0\x36\x9f\x50\x2a\x9c",
-				//.h_source = "\x3c\xfd\xfe\x2b\xcf\x02",
-				.h_proto = BS16(ETH_P_IP),
-			},
-			.ipv4 = {
-				.version = 4,
-				.ihl = 5,
-				.tos = 0, // default: best-effort DSCP + no ECN support
-				.tot_len = BS16(0), // to be overwritten
-				.id = BS16(0), // probably anything; details: RFC 6864
-				.frag_off = BS16(0), // TODO: add the DF flag, probably (1 << 14)
-				.ttl = 5,
-				.protocol = 0x11, // UDP
-				.check = 0, // to be overwritten
-			},
-			.udp = {
-				.source = BS16(5353),
-				.dest   = BS16(5353),
-				.len    = BS16(0), // to be overwritten
-				.check  = BS16(0), // checksum is optional
-			},
-		},
-	};
-	the_config = &cfg;
-	if (inet_pton(AF_INET, sip_str, &cfg.pkt_template.ipv4.saddr) != 1
-	    || inet_pton(AF_INET, dip_str, &cfg.pkt_template.ipv4.daddr) != 1) {
+		sip_str[] = "217.31.193.167",
+		dip_str[] = "217.31.193.166";
+	the_config = &the_config_storage;
+	if (inet_pton(AF_INET, sip_str, &the_config->pkt_template.ipv4.saddr) != 1
+	    || inet_pton(AF_INET, dip_str, &the_config->pkt_template.ipv4.daddr) != 1) {
 		fprintf(stderr, "ERROR: failed to convert IPv4 address\n");
 		exit(EXIT_FAILURE);
 	}
@@ -477,7 +485,7 @@ int kr_xsk_init_global(uv_loop_t *loop)
 	/* Some failed test
 	void *data = malloc(2048);
 	struct udpv4 *pkt = data;
-	pkt_fill_headers(pkt, &cfg.pkt_template, 0);
+	pkt_fill_headers(pkt, &the_config->pkt_template, 0);
 	// */
 
 	/* This one is OK!
@@ -495,7 +503,7 @@ int kr_xsk_init_global(uv_loop_t *loop)
 
 	/* Open and configure the AF_XDP (xsk) socket */
 	assert(!the_socket);
-	the_socket = xsk_configure_socket(&cfg, umem);
+	the_socket = xsk_configure_socket(the_config, umem);
 	if (!the_socket) {
 		fprintf(stderr, "ERROR: Can't setup AF_XDP socket \"%s\"\n",
 			strerror(errno));
@@ -503,24 +511,60 @@ int kr_xsk_init_global(uv_loop_t *loop)
 	}
 	kr_log_verbose("[uxsk] busy frames: %d\n",
 			the_socket->umem->frame_count - the_socket->umem->free_count);
-
+	//return 0;
 	int ret = uv_check_init(loop, &the_socket->check_handle);
 	if (!ret) ret = uv_check_start(&the_socket->check_handle, xsk_check);
 	return ret;
 }
 
+#define SOL_XDP 283
+static void print_stats()
+{
+	struct xdp_statistics stats;
+	socklen_t optlen = sizeof(stats);
+	int err = getsockopt(xsk_socket__fd(the_socket->xsk), SOL_XDP, XDP_STATISTICS,
+				&stats, &optlen);
+	if (err) {
+		fprintf(stderr, "getsockopt: %s\n", strerror(errno));
+	} else {
+		fprintf(stderr, "stats: RX drop %d, RX ID %d, TX ID %d\n",
+			(int)stats.rx_dropped, (int)stats.rx_invalid_descs,
+			(int)stats.tx_invalid_descs);
+	}
+}
+
 #if 0
 int main(int argc, char **argv)
 {
+	if (argc >= 2) {
+		the_config_storage.ifname = argv[1];
+	}
+	fprintf(stderr, "ifname = '%s'\n", the_config_storage.ifname);
 	kr_xsk_init_global(NULL);
+
+	print_stats();
+	int ret = sendto(xsk_socket__fd(the_socket->xsk), NULL, 0,
+			 MSG_DONTWAIT, NULL, 0);
+	fprintf(stderr, "sendto: %d %s\n", ret, strerror(errno));
+	print_stats();
 
 	struct udpv4 *pkt = (struct udpv4 *)the_socket->umem->frames;
 	int len = 0;
 	pkt_fill_headers(pkt, &the_config->pkt_template, len);
 	pkt_send(the_socket, 0/*byte address relative to start of umem->buffer*/,
 			offsetof(struct udpv4, data) + len + 4);
+	print_stats();
 	// We need to wake up the kernel, apparently.
-	sendto(xsk_socket__fd(the_socket->xsk), NULL, 0, MSG_DONTWAIT, NULL, 0);
+	ret = sendto(xsk_socket__fd(the_socket->xsk), NULL, 0,
+			 MSG_DONTWAIT, NULL, 0);
+	if (unlikely(ret == -1))
+		fprintf(stderr, "sendto: %s\n", strerror(errno));
+	print_stats();
+	ret = sendto(1, NULL, 0,
+			 MSG_DONTWAIT, NULL, 0);
+	if (unlikely(ret == -1))
+		fprintf(stderr, "sendto: %s\n", strerror(errno));
+	print_stats();
 }
 #endif
 
