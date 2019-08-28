@@ -312,7 +312,8 @@ static int cdb_open(struct lmdb_env *env, const char *path, size_t mapsize,
 {
 	/* Cache doesn't require durability, we can be
 	 * loose with the requirements as a tradeoff for speed. */
-	const unsigned flags = MDB_WRITEMAP | MDB_MAPASYNC | MDB_NOTLS;
+	const unsigned flags = MDB_NOTLS; // TODO
+	// const unsigned flags = MDB_WRITEMAP | MDB_MAPASYNC | MDB_NOTLS; 
 	int ret = cdb_open_env(env, flags, path, mapsize, stats);
 	if (ret != 0) {
 		return ret;
@@ -519,7 +520,7 @@ static int cdb_readv(knot_db_t *db, struct kr_cdb_stats *stats,
 			}
 			return ret;
 		}
-		VALGRIND_CHECK_MEM_IS_DEFINED(_val.mv_data, _val.mv_size);
+		VALGRIND_MAKE_MEM_DEFINED(_val.mv_data, _val.mv_size);
 		/* Update the result. */
 		val[i] = val_mdb2knot(_val);
 	}

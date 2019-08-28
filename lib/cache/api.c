@@ -30,6 +30,7 @@
 #include "contrib/base32hex.h"
 #include "contrib/cleanup.h"
 #include "contrib/macros.h"
+#include "contrib/memcheck.h"
 #include "lib/cache/api.h"
 #include "lib/cache/cdb_lmdb.h"
 #include "lib/defines.h"
@@ -593,6 +594,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	eh->time = timestamp;
 	eh->ttl  = MAX(MIN(ttl, cache->ttl_max), cache->ttl_min);
 	eh->rank = rank;
+	VALGRIND_CHECK_MEM_IS_ADDRESSABLE(val_new_entry.data, val_new_entry.len);
 	if (rdataset_dematerialize(&rr->rrs, eh->data)
 	    || rdataset_dematerialize(rds_sigs, eh->data + rr_ssize)) {
 		/* minimize the damage from incomplete write; TODO: better */
@@ -601,7 +603,9 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		eh->rank = 0;
 		assert(false);
 	}
+	VALGRIND_CHECK_MEM_IS_DEFINED(val_new_entry.data, val_new_entry.len);
 	assert(entry_h_consistent_E(val_new_entry, rr->type));
+	VALGRIND_CHECK_MEM_IS_DEFINED(val_new_entry.data, val_new_entry.len);
 
 	#if 0 /* Occasionally useful when debugging some kinds of changes. */
 	{
@@ -628,6 +632,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 			);
 	} }
 
+	VALGRIND_CHECK_MEM_IS_DEFINED(val_new_entry.data, val_new_entry.len);
 	return (ssize_t) val_new_entry.len;
 return_needs_pkt:
 	if (needs_pkt) *needs_pkt = true;

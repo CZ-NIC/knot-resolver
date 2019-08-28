@@ -20,6 +20,7 @@
  */
 
 #include "lib/cache/impl.h"
+#include "contrib/memcheck.h"
 
 int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
 {
@@ -37,6 +38,7 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
 	data += sizeof(rr_count);
 	if (rr_count) {
 		size_t size = knot_rdataset_size(rds);
+		VALGRIND_CHECK_MEM_IS_DEFINED(rds->rdata, size);
 		memcpy(data, rds->rdata, size);
 		data += size;
 	}

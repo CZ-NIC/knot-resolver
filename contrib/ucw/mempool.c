@@ -158,6 +158,7 @@ mp_new(unsigned chunk_size)
 		.threshold = chunk_size >> 1,
 		.last_big = &pool->last_big
 	};
+	VALGRIND_CHECK_MEM_IS_DEFINED(pool, sizeof(pool)); // TODO
 	return pool;
 }
 
@@ -189,6 +190,7 @@ mp_delete(struct mempool *pool)
 	if (pool == NULL) {
 		return;
 	}
+	VALGRIND_CHECK_MEM_IS_DEFINED(pool, sizeof(pool)); // TODO
 	DBG("Deleting mempool %p", pool);
 	mp_free_big_chain(pool->state.last[1]);
 	mp_free_chain(pool->unused);
@@ -198,6 +200,7 @@ mp_delete(struct mempool *pool)
 void
 mp_flush(struct mempool *pool)
 {
+	VALGRIND_CHECK_MEM_IS_DEFINED(pool, sizeof(pool)); // TODO
 	mp_free_big_chain(pool->state.last[1]);
 	struct mempool_chunk *chunk = pool->state.last[0], *next;
 	while (chunk) {
@@ -229,6 +232,7 @@ mp_flush(struct mempool *pool)
 	pool->state.last[1] = NULL;
 	pool->state.free[1] = 0;
 	pool->last_big = &pool->last_big;
+	VALGRIND_CHECK_MEM_IS_DEFINED(pool, sizeof(pool)); // TODO
 }
 
 static void
@@ -249,6 +253,7 @@ mp_stats_chain(struct mempool_chunk *chunk, struct mempool_stats *stats, unsigne
 void
 mp_stats(struct mempool *pool, struct mempool_stats *stats)
 {
+	VALGRIND_CHECK_MEM_IS_DEFINED(pool, sizeof(pool)); // TODO
 	bzero(stats, sizeof(*stats));
 	mp_stats_chain(pool->state.last[0], stats, 0);
 	mp_stats_chain(pool->state.last[1], stats, 1);
@@ -258,6 +263,7 @@ mp_stats(struct mempool *pool, struct mempool_stats *stats)
 uint64_t
 mp_total_size(struct mempool *pool)
 {
+	VALGRIND_CHECK_MEM_IS_DEFINED(pool, sizeof(pool)); // TODO
 	struct mempool_stats stats;
 	mp_stats(pool, &stats);
 	return stats.total_size;
@@ -266,6 +272,7 @@ mp_total_size(struct mempool *pool)
 static void *
 mp_alloc_internal(struct mempool *pool, unsigned size)
 {
+	VALGRIND_CHECK_MEM_IS_DEFINED(pool, sizeof(pool)); // TODO
 	struct mempool_chunk *chunk;
 	if (size <= pool->threshold) {
 		pool->idx = 0;
@@ -306,22 +313,27 @@ mp_alloc_internal(struct mempool *pool, unsigned size)
 void *
 mp_alloc(struct mempool *pool, unsigned size)
 {
+	VALGRIND_CHECK_MEM_IS_DEFINED(pool, sizeof(pool)); // TODO
 	unsigned avail = pool->state.free[0] & ~(CPU_STRUCT_ALIGN - 1);
+	VALGRIND_CHECK_MEM_IS_DEFINED(&avail, sizeof(unsigned)); // TODO
 	void *ptr = NULL;
 	if (size <= avail) {
 		pool->state.free[0] = avail - size;
+		VALGRIND_CHECK_MEM_IS_DEFINED(pool->state.last[0], sizeof(uint8_t *));
 		ptr = (uint8_t*)pool->state.last[0] - avail;
 		VALGRIND_MEMPOOL_ALLOC(pool->state.last[0], ptr, size);
 	} else {
 		ptr = mp_alloc_internal(pool, size);
 	}
 	ASAN_UNPOISON_MEMORY_REGION(ptr, size);
+	VALGRIND_CHECK_MEM_IS_ADDRESSABLE(ptr, size);
 	return ptr;
 }
 
 void *
 mp_alloc_noalign(struct mempool *pool, unsigned size)
 {
+	VALGRIND_CHECK_MEM_IS_DEFINED(pool, sizeof(pool)); // TODO
 	void *ptr = NULL;
 	if (size <= pool->state.free[0]) {
 		ptr = (uint8_t*)pool->state.last[0] - pool->state.free[0];
@@ -331,6 +343,7 @@ mp_alloc_noalign(struct mempool *pool, unsigned size)
 		ptr = mp_alloc_internal(pool, size);
 	}
 	ASAN_UNPOISON_MEMORY_REGION(ptr, size);
+	VALGRIND_CHECK_MEM_IS_ADDRESSABLE(ptr, size);
 	return ptr;
 }
 

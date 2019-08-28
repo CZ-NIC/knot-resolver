@@ -25,6 +25,7 @@
 #include <contrib/macros.h>
 #include <contrib/ucw/mempool.h>
 #include <contrib/wire.h>
+#include <contrib/memcheck.h>
 #if defined(__GLIBC__) && defined(_GNU_SOURCE)
 #include <malloc.h>
 #endif
@@ -1542,6 +1543,23 @@ static int qr_task_step(struct qr_task *task,
 	return ret;
 }
 
+static void check_rrset(const knot_rrset_t      *rrset)
+{
+	VALGRIND_CHECK_MEM_IS_DEFINED(rrset, sizeof(rrset));
+	//VALGRIND_CHECK_MEM_IS_DEFINED(rrset->rrs, sizeof(rrset->rrs));
+        uint16_t rr_count = rrset->rrs.count;
+        knot_rdata_t *rr = rrset->rrs.rdata;
+        // Loop over rdata in rrset.
+        for (uint16_t i = 0; i < rr_count; i++) {
+		VALGRIND_CHECK_MEM_IS_DEFINED(&rr->len, sizeof(rr->len));
+		if (rr->len > 0)
+			VALGRIND_CHECK_MEM_IS_DEFINED(rr->data, rr->len);
+
+		rr = knot_rdataset_next(rr);
+        }
+}
+
+
 static int parse_packet(knot_pkt_t *query)
 {
 	if (!query){
@@ -1551,12 +1569,16 @@ static int parse_packet(knot_pkt_t *query)
 	/* Parse query packet. */
 	int ret = knot_pkt_parse(query, 0);
 	if (ret == KNOT_ETRAIL) {
+		if (query->rrset_count > 0)  // TODO
+			check_rrset(query->rr);
 		/* Extra data after message end. */
 		ret = kr_error(EMSGSIZE);
 	} else if (ret != KNOT_EOK) {
 		/* Malformed query. */
 		ret = kr_error(EPROTO);
 	} else {
+		if (query->rrset_count > 0)  // TODO
+			check_rrset(query->rr);
 		ret = kr_ok();
 	}
 

@@ -20,6 +20,7 @@
 
 #include "lib/cache/impl.h"
 #include "lib/utils.h"
+#include "contrib/memcheck.h"
 
 
 static int entry_h_len(knot_db_val_t val);
@@ -28,6 +29,7 @@ static int entry_h_len(knot_db_val_t val);
 void entry_list_memcpy(struct entry_apex *ea, entry_list_t list)
 {
 	assert(ea);
+	VALGRIND_CHECK_MEM_IS_DEFINED(list, sizeof(entry_list_t));
 	memset(ea, 0, offsetof(struct entry_apex, data));
 	ea->has_ns	= list[EL_NS	].len;
 	ea->has_cname	= list[EL_CNAME	].len;
@@ -39,6 +41,7 @@ void entry_list_memcpy(struct entry_apex *ea, entry_list_t list)
 	uint8_t *it = ea->data;
 	for (int i = 0; i < EL_LENGTH; ++i) {
 		if (list[i].data) {
+			VALGRIND_CHECK_MEM_IS_DEFINED(list[i].data, list[i].len);
 			memcpy(it, list[i].data, list[i].len);
 			/* LATER(optim.): coalesce consecutive writes? */
 		} else {
