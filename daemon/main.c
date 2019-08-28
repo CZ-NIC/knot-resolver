@@ -813,7 +813,7 @@ int main(int argc, char **argv)
 	}
 
 	//ret = udp_queue_init_global(loop);
-	ret = kr_xsk_init_global();
+	ret = kr_xsk_init_global(loop);
 	if (ret) {
 		kr_log_error("[system] failed to initialize UDP queue: %s\n",
 				kr_strerror(ret));

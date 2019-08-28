@@ -1,4 +1,4 @@
-#include "af_xdp.h"
+#include "daemon/af_xdp.h"
 
 
 #include <assert.h>
@@ -44,15 +44,24 @@ typedef uint64_t size_t;
 #define FRAME_SIZE 2048
 
 struct udpv4 {
+	union { uint8_t bytes[1]; struct {
+
 	struct ethhdr eth; // no VLAN support; CRC at the "end" of .data!
 	struct iphdr ipv4;
 	struct udphdr udp;
 	uint8_t data[];
-} __attribute__((packed));
 
+	} __attribute__((packed)); };
+};
+
+/** The memory layout of each umem frame. */
 struct umem_frame {
+	union { uint8_t bytes[FRAME_SIZE]; struct {
+
 	struct qr_task *task;
 	struct udpv4 udpv4;
+
+	}; };
 };
 
 struct config {
@@ -91,7 +100,7 @@ struct xsk_umem_info {
 	/** Handle internal to libbpf. */
 	struct xsk_umem *umem;
 
-	uint8_t (*frames)[FRAME_SIZE]; /**< The memory frames. */
+	struct umem_frame *frames; /**< The memory frames. TODO: (uint8_t *frammem) might be more practical. */
 	uint32_t frame_count;
 	uint32_t free_count; /**< The number of free frames. */
 	uint32_t *free_indices; /**< Stack of indices of the free frames. */
@@ -143,7 +152,7 @@ failed:
 	return NULL;
 }
 
-static void *xsk_alloc_umem_frame(struct xsk_umem_info *umem) // TODO: confusing to use xsk_
+static struct umem_frame *xsk_alloc_umem_frame(struct xsk_umem_info *umem) // TODO: confusing to use xsk_
 {
 	if (unlikely(umem->free_count == 0))
 		return NULL;
@@ -151,25 +160,26 @@ static void *xsk_alloc_umem_frame(struct xsk_umem_info *umem) // TODO: confusing
 	#ifndef NDEBUG
 		umem->free_indices[umem->free_count] = -1;
 	#endif
-	return umem->frames[index];
+	return umem->frames + index;
 }
 void *kr_xsk_alloc_wire(uint16_t *maxlen)
 {
 	struct umem_frame *uframe = xsk_alloc_umem_frame(the_socket->umem);
 	if (!uframe) return NULL;
-	*maxlen = MIN(UINT16_MAX, FRAME_SIZE - offsetof(struct umem_frame, udpv4)
-				- offsetof(struct udpv4, data) - 4/*eth CRC*/);
+	*maxlen = MIN(UINT16_MAX, FRAME_SIZE - offsetof(struct umem_frame, udpv4.data)
+				- 4/*eth CRC*/);
 	return uframe->udpv4.data;
 }
 
 static void xsk_dealloc_umem_frame(struct xsk_umem_info *umem, uint8_t *uframe_p)
 // TODO: confusing to use xsk_
 {
-	ptrdiff_t diff = uframe_p - (uint8_t *)umem->frames;
+	assert(umem->free_count < umem->frame_count);
+	ptrdiff_t diff = uframe_p - umem->frames->bytes;
 	assert(diff % FRAME_SIZE == 0);
 	size_t index = diff / FRAME_SIZE;
 	assert(index < umem->frame_count);
-	umem->free_indices[umem->free_count--] = index;
+	umem->free_indices[umem->free_count++] = index;
 }
 
 static struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
@@ -328,8 +338,10 @@ static void pkt_send(struct xsk_socket_info *xsk, uint64_t addr, uint32_t len)
 		return;
 	}
 
-	xsk_ring_prod__tx_desc(&xsk->tx, tx_idx)->addr = addr;
-	xsk_ring_prod__tx_desc(&xsk->tx, tx_idx)->len = len;
+	*xsk_ring_prod__tx_desc(&xsk->tx, tx_idx) = (struct xdp_desc){
+		.addr = addr,
+		.len = len,
+	};
 	xsk_ring_prod__submit(&xsk->tx, 1);
 	xsk->kernel_needs_wakeup = true;
 }
@@ -339,16 +351,18 @@ static void pkt_send(struct xsk_socket_info *xsk, uint64_t addr, uint32_t len)
 void kr_xsk_push(const struct sockaddr *src, const struct sockaddr *dst,
 		 struct kr_request *req, struct qr_task *task)
 {
+	fprintf(stderr, "pushing a packet\n");
 	assert(src->sa_family == AF_INET && dst->sa_family == AF_INET);
-	uint8_t *uframe_p = (uint8_t *)req->answer->wire - offsetof(struct udpv4, data)
-					- offsetof(struct umem_frame, udpv4);
-	assert((uframe_p - (uint8_t *)NULL) % FRAME_SIZE == 0
-		//&& uframe_p - the_socket->umem->frames );
-		);
+	uint8_t *uframe_p = req->answer->wire - offsetof(struct umem_frame, udpv4.data);
+	const uint8_t *umem_mem_start = the_socket->umem->frames->bytes;
+	#ifndef NDEBUG
+		assert((uframe_p - (uint8_t *)NULL) % FRAME_SIZE == 0);
+		size_t offset = uframe_p - umem_mem_start;
+		assert(offset / FRAME_SIZE < the_socket->umem->frame_count);
+	#endif
 	struct umem_frame *uframe = (struct umem_frame *)uframe_p;
 	uframe->task = task;
 
-	const uint8_t *umem_mem_start = (uint8_t *)the_socket->umem->frames;
 
 
 	// Filling headers; testing version in pkt_fill_headers()
@@ -371,9 +385,8 @@ void kr_xsk_push(const struct sockaddr *src, const struct sockaddr *dst,
 	memcpy(&uframe->udpv4.ipv4.daddr, &dst_v4->sin_addr, sizeof(dst_v4->sin_addr));
 	uframe->udpv4.ipv4.check = pkt_ipv4_checksum_2(&uframe->udpv4.ipv4);
 
-
-	pkt_send(the_socket, (uint8_t *)&uframe->udpv4 - umem_mem_start,
-			offsetof(struct udpv4, data) + req->answer->size + 4/*eth CRC*/);
+	uint32_t eth_len = offsetof(struct udpv4, data) + req->answer->size + 4/*CRC*/;
+	pkt_send(the_socket, uframe->udpv4.bytes - umem_mem_start, eth_len);
 }
 
 
@@ -392,7 +405,7 @@ static void xsk_check(uv_check_t *handle)
 	/* Collect completed packets. */
 	struct xsk_ring_cons *cq = &the_socket->umem->cq;
 	uint32_t idx_cq;
-	uint32_t completed = xsk_ring_cons__peek(cq, UINT32_MAX, &idx_cq);
+	const uint32_t completed = xsk_ring_cons__peek(cq, UINT32_MAX, &idx_cq);
 	if (!completed) return;
 	for (int i = 0; i < completed; ++i, ++idx_cq) {
 		uint8_t *uframe_p = (uint8_t *)the_socket->umem->frames
@@ -403,19 +416,23 @@ static void xsk_check(uv_check_t *handle)
 		xsk_dealloc_umem_frame(the_socket->umem, uframe_p);
 	}
 	xsk_ring_cons__release(cq, completed);
+	kr_log_verbose("[uxsk] completed %d frames; busy frames: %d\n", (int)completed,
+			the_socket->umem->frame_count - the_socket->umem->free_count);
+	//TODO: one uncompleted packet/batch is left until the next I/O :-/
 }
 
 
 int kr_xsk_init_global(uv_loop_t *loop)
 {
 	/* Hard-coded configuration */
+	const int FRAME_COUNT = 4096;
 	const char
-		//sip_str[] = "192.168.8.71",
-		//dip_str[] = "192.168.8.1";
-		sip_str[] = "192.168.100.8",
-		dip_str[] = "192.168.100.3";
+		sip_str[] = "192.168.8.71",
+		dip_str[] = "192.168.8.1";
+		//sip_str[] = "192.168.100.8",
+		//dip_str[] = "192.168.100.3";
 	static struct config cfg = { // static to get zeroed by default
-		.ifname = "eth2",
+		.ifname = "enp9s0",
 		.xsk_if_queue = 0,
 		.xsk = {
 			.tx_size = XSK_RING_PROD__DEFAULT_NUM_DESCS,
@@ -424,11 +441,11 @@ int kr_xsk_init_global(uv_loop_t *loop)
 		},
 		.pkt_template = {
 			.eth = {
-				//.h_dest   = "\xd8\x58\xd7\x00\x74\x34",
-				//.h_source = "\x70\x85\xc2\x3a\xc7\x84",
+				.h_dest   = "\xd8\x58\xd7\x00\x74\x34",
+				.h_source = "\x70\x85\xc2\x3a\xc7\x84",
 				// mirkwood - knot-bench-player:
-				.h_dest   = "\xa0\x36\x9f\x50\x2a\x9c",
-				.h_source = "\x3c\xfd\xfe\x2b\xcf\x02",
+				//.h_dest   = "\xa0\x36\x9f\x50\x2a\x9c",
+				//.h_source = "\x3c\xfd\xfe\x2b\xcf\x02",
 				.h_proto = BS16(ETH_P_IP),
 			},
 			.ipv4 = {
@@ -469,7 +486,7 @@ int kr_xsk_init_global(uv_loop_t *loop)
 	// */
 
 	/* Initialize shared packet_buffer for umem usage */
-	struct xsk_umem_info *umem = configure_xsk_umem(4096);
+	struct xsk_umem_info *umem = configure_xsk_umem(FRAME_COUNT);
 	if (umem == NULL) {
 		fprintf(stderr, "ERROR: Can't create umem \"%s\"\n",
 			strerror(errno));
@@ -484,29 +501,26 @@ int kr_xsk_init_global(uv_loop_t *loop)
 			strerror(errno));
 		exit(EXIT_FAILURE);
 	}
-
+	kr_log_verbose("[uxsk] busy frames: %d\n",
+			the_socket->umem->frame_count - the_socket->umem->free_count);
 
 	int ret = uv_check_init(loop, &the_socket->check_handle);
 	if (!ret) ret = uv_check_start(&the_socket->check_handle, xsk_check);
 	return ret;
-
-
-
-
 }
 
 #if 0
 int main(int argc, char **argv)
 {
-	return kr_xsk_init();
+	kr_xsk_init_global(NULL);
 
-	struct udpv4 *pkt = xsk_alloc_umem_frame(the_socket->umem);
+	struct udpv4 *pkt = (struct udpv4 *)the_socket->umem->frames;
 	int len = 0;
 	pkt_fill_headers(pkt, &the_config->pkt_template, len);
 	pkt_send(the_socket, 0/*byte address relative to start of umem->buffer*/,
 			offsetof(struct udpv4, data) + len + 4);
 	// We need to wake up the kernel, apparently.
-	sendto(xsk_socket__fd(xsk->xsk), NULL, 0, MSG_DONTWAIT, NULL, 0);
+	sendto(xsk_socket__fd(the_socket->xsk), NULL, 0, MSG_DONTWAIT, NULL, 0);
 }
 #endif
 

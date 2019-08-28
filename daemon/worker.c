@@ -1176,8 +1176,9 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		assert(false);
 		ret = kr_error(EINVAL);
 	} else if (src_handle->type == UV_UDP && ctx->source.addr.ip.sa_family == AF_INET) {
-		kr_xsk_push(&ctx->source.addr.ip, session_get_sockname(source_session)/*FIXME*/,
-				&ctx->req, task);
+		kr_xsk_push(session_get_sockname(source_session)/*FIXME*/,
+				&ctx->source.addr.ip, &ctx->req, task);
+		ret = 0;
 	} else if (src_handle->type == UV_UDP && ENABLE_SENDMMSG) {
 		int fd;
 		ret = uv_fileno(src_handle, &fd);
