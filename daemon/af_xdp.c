@@ -398,8 +398,16 @@ static void xsk_check(uv_check_t *handle)
 		the_socket->kernel_needs_wakeup = false;
 		int ret = sendto(xsk_socket__fd(the_socket->xsk), NULL, 0,
 				 MSG_DONTWAIT, NULL, 0);
-		if (unlikely(ret == -1))
-			fprintf(stderr, "sendto: %s\n", strerror(errno));
+
+		if (unlikely(ret == -1)) {
+			const uint64_t stamp_now = kr_now();
+			static uint64_t stamp_last = 0;
+			if (stamp_now > stamp_last + 60*1000) {
+				kr_log_info("WARNING: sendto error (reported at most once per minute)\n\t%s\n",
+						strerror(errno));
+				stamp_last = stamp_now;
+			}
+		}
 	}
 
 	/* Collect completed packets. */
