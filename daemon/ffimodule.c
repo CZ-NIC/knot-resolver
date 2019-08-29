@@ -219,16 +219,13 @@ int ffimodule_init(lua_State *L)
 		return kr_error(ENOENT);
 	}
 
-	const int slots[SLOT_count] = {
-		[SLOT_begin]   = wrap1,
-		[SLOT_reset]   = wrap1,
-		[SLOT_finish]  = wrap2,
-		[SLOT_consume] = wrap2,
-		[SLOT_produce] = wrap2,
-		[SLOT_checkout] = wrap_checkout,
-		[SLOT_answer_finalize] = wrap1,
-	};
-	memcpy(l_ffi_wrap_slots, slots, sizeof(l_ffi_wrap_slots));
+	l_ffi_wrap_slots[SLOT_begin]   = wrap1;
+	l_ffi_wrap_slots[SLOT_reset]   = wrap1;
+	l_ffi_wrap_slots[SLOT_finish]  = wrap2;
+	l_ffi_wrap_slots[SLOT_consume] = wrap2;
+	l_ffi_wrap_slots[SLOT_produce] = wrap2;
+	l_ffi_wrap_slots[SLOT_checkout] = wrap_checkout;
+	l_ffi_wrap_slots[SLOT_answer_finalize] = wrap1;
 	return kr_ok();
 }
 void ffimodule_deinit(lua_State *L)
