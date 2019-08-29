@@ -3,6 +3,8 @@
  *
  * This module logs (query name, type) pairs which failed DNSSEC validation. */
 
+#include <stdarg.h>
+
 #include <libknot/packet/pkt.h>
 #include <libknot/dname.h>
 #include <ccan/json/json.h>
@@ -26,8 +28,10 @@ struct stat_data {
 	namehash_t *frequent;
 };
 
-static int consume(kr_layer_t *ctx, knot_pkt_t *pkt)
+static int consume(kr_layer_t *ctx, va_list ap /* knot_pkt_t *pkt */)
 {
+	knot_pkt_t *pkt = va_arg(ap, knot_pkt_t *);
+
 	if (!(ctx->state & KR_STATE_FAIL)
 	    || !ctx->req
 	    || !ctx->req->current_query
@@ -101,7 +105,9 @@ KR_EXPORT
 int bogus_log_init(struct kr_module *module)
 {
 	static kr_layer_api_t layer = {
-		.consume = &consume,
+		.funcs = {
+			[SLOT_consume] = &consume,
+		}
 	};
 	layer.data = module;
 	module->layer = &layer;

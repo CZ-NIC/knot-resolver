@@ -17,6 +17,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -876,8 +877,10 @@ static int wildcard_adjust_to_wire(struct kr_request *req, const struct kr_query
 	return kr_ok();
 }
 
-static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
+static int validate(kr_layer_t *ctx, va_list ap /* knot_pkt_t *pkt */)
 {
+	knot_pkt_t *pkt = va_arg(ap, knot_pkt_t *);
+
 	int ret = 0;
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
@@ -1121,7 +1124,9 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 int validate_init(struct kr_module *self)
 {
 	static const kr_layer_api_t layer = {
-		.consume = &validate,
+		.funcs = {
+			[SLOT_consume] = &validate,
+		}
 	};
 	self->layer = &layer;
 	return kr_ok();

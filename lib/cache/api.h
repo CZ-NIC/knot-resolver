@@ -28,8 +28,8 @@ static const size_t PKT_SIZE_NOWIRE = -1;
 
 #include "lib/module.h"
 /* Prototypes for the 'cache' module implementation. */
-int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt);
-int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt);
+int cache_peek(kr_layer_t *ctx, va_list ap /* knot_pkt_t *pkt */);
+int cache_stash(kr_layer_t *ctx, va_list ap /* knot_pkt_t *pkt */);
 
 
 /**

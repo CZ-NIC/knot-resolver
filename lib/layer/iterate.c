@@ -30,6 +30,7 @@
 #include <sys/time.h>
 #include <assert.h>
 #include <arpa/inet.h>
+#include <stdarg.h>
 
 #include <contrib/cleanup.h>
 #include <libknot/descriptor.h>
@@ -869,10 +870,10 @@ static int resolve_error(knot_pkt_t *pkt, struct kr_request *req)
 }
 
 /* State-less single resolution iteration step, not needed. */
-static int reset(kr_layer_t *ctx)  { return KR_STATE_PRODUCE; }
+static int reset(kr_layer_t *ctx, va_list ap /* none */)  { return KR_STATE_PRODUCE; }
 
 /* Set resolution context and parameters. */
-static int begin(kr_layer_t *ctx)
+static int begin(kr_layer_t *ctx, va_list ap /* none */)
 {
 	if (ctx->state & (KR_STATE_DONE|KR_STATE_FAIL)) {
 		return ctx->state;
@@ -898,7 +899,8 @@ static int begin(kr_layer_t *ctx)
 		return KR_STATE_FAIL;
 	}
 
-	return reset(ctx);
+	/* this will require va_copy() or wrapper in case we add arguments */
+	return reset(ctx, ap);
 }
 
 int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
@@ -930,8 +932,10 @@ int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 	return kr_ok();
 }
 
-static int prepare_query(kr_layer_t *ctx, knot_pkt_t *pkt)
+static int prepare_query(kr_layer_t *ctx, va_list ap /* knot_pkt_t *pkt */)
 {
+	knot_pkt_t *pkt = va_arg(ap, knot_pkt_t *);
+
 	assert(pkt && ctx);
 	struct kr_request *req = ctx->req;
 	struct kr_query *query = req->current_query;
@@ -1012,8 +1016,10 @@ static int resolve_notimpl(knot_pkt_t *pkt, struct kr_request *req, struct kr_qu
  *
  *  This roughly corresponds to RFC1034, 5.3.3 4a-d.
  */
-static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
+static int resolve(kr_layer_t *ctx, va_list ap /* knot_pkt_t *pkt */)
 {
+	knot_pkt_t *pkt = va_arg(ap, knot_pkt_t *);
+
 	assert(pkt && ctx);
 	struct kr_request *req = ctx->req;
 	struct kr_query *query = req->current_query;
@@ -1124,10 +1130,12 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 int iterate_init(struct kr_module *self)
 {
 	static const kr_layer_api_t layer = {
-		.begin = &begin,
-		.reset = &reset,
-		.consume = &resolve,
-		.produce = &prepare_query
+		.funcs = {
+			[SLOT_begin] = &begin,
+			[SLOT_reset] = &reset,
+			[SLOT_consume] = &resolve,
+			[SLOT_produce] = &prepare_query
+		}
 	};
 	self->layer = &layer;
 	return kr_ok();

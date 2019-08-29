@@ -72,33 +72,49 @@ typedef struct kr_layer {
 	bool is_stream;       /*!< In glue for checkout layer it's used to pass the parameter. */
 } kr_layer_t;
 
+/** @internal Mapping from name to slot # in kr_layer_api.
+  * Each slot ID corresponds to Lua reference in module API. */
+enum slot_idx {
+	SLOT_begin = 0,
+	SLOT_reset,
+	SLOT_finish,
+	SLOT_consume,
+	SLOT_produce,
+	SLOT_checkout,
+	SLOT_answer_finalize,
+	SLOT_count /* dummy, must be the last */
+};
+
 /** Packet processing module API.  All functions return the new kr_layer_state. */
 struct kr_layer_api {
-      	/** Start of processing the DNS request. */
+	int (*funcs[SLOT_count])(kr_layer_t *ctx, va_list ap);
+	/* Content of funcs array:
+	** Start of processing the DNS request.
 	int (*begin)(kr_layer_t *ctx);
 
 	int (*reset)(kr_layer_t *ctx);
 
-	/** Paired to begin, called both on successes and failures. */
+	** Paired to begin, called both on successes and failures.
 	int (*finish)(kr_layer_t *ctx);
 
-	/** Processing an answer from upstream or the answer to the request.
-	 * Lua API: call is omitted iff (state & KR_STATE_FAIL). */
+	** Processing an answer from upstream or the answer to the request.
+	 * Lua API: call is omitted iff (state & KR_STATE_FAIL).
 	int (*consume)(kr_layer_t *ctx, knot_pkt_t *pkt);
 
-	/** Produce either an answer to the request or a query for upstream (or fail).
-	 * Lua API: call is omitted iff (state & KR_STATE_FAIL). */
+	** Produce either an answer to the request or a query for upstream (or fail).
+	 * Lua API: call is omitted iff (state & KR_STATE_FAIL).
 	int (*produce)(kr_layer_t *ctx, knot_pkt_t *pkt);
 
-	/** Finalises the outbound query packet with the knowledge of the IP addresses.
+	** Finalises the outbound query packet with the knowledge of the IP addresses.
 	 * The checkout layer doesn't persist the state, so canceled subrequests
 	 * don't affect the resolution or rest of the processing.
-	 * Lua API: call is omitted iff (state & KR_STATE_FAIL). */
+	 * Lua API: call is omitted iff (state & KR_STATE_FAIL).
 	int (*checkout)(kr_layer_t *ctx, knot_pkt_t *packet, struct sockaddr *dst, int type);
 
-	/** Finalises the answer.
-	 * Last chance to affect what will get into the answer, including EDNS.*/
+	** Finalises the answer.
+	 * Last chance to affect what will get into the answer, including EDNS.
 	int (*answer_finalize)(kr_layer_t *ctx);
+	*/
 
 	/** The C module can store anything in here. */
 	void *data;

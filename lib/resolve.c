@@ -16,6 +16,7 @@
 
 #include <ctype.h>
 #include <inttypes.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <assert.h>
@@ -59,6 +60,7 @@ bool kr_rank_check(uint8_t rank)
 	}
 }
 
+
 /** @internal Set @a yielded to all RRs with matching @a qry_uid. */
 static void set_yield(ranked_rr_array_t *array, const uint32_t qry_uid, const bool yielded)
 {
@@ -74,8 +76,10 @@ static void set_yield(ranked_rr_array_t *array, const uint32_t qry_uid, const bo
  * @internal Defer execution of current query.
  * The current layer state and input will be pushed to a stack and resumed on next iteration.
  */
-static int consume_yield(kr_layer_t *ctx, knot_pkt_t *pkt)
+static int consume_yield(kr_layer_t *ctx, va_list ap /* knot_pkt_t *pkt */)
 {
+	knot_pkt_t *pkt = va_arg(ap, knot_pkt_t *);
+
 	struct kr_request *req = ctx->req;
 	size_t pkt_size = pkt->size;
 	if (knot_pkt_has_tsig(pkt)) {
@@ -96,30 +100,48 @@ static int consume_yield(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	return kr_error(ENOMEM);
 }
-static int begin_yield(kr_layer_t *ctx) { return kr_ok(); }
-static int reset_yield(kr_layer_t *ctx) { return kr_ok(); }
-static int finish_yield(kr_layer_t *ctx) { return kr_ok(); }
-static int produce_yield(kr_layer_t *ctx, knot_pkt_t *pkt) { return kr_ok(); }
-static int checkout_yield(kr_layer_t *ctx, knot_pkt_t *packet, struct sockaddr *dst, int type) { return kr_ok(); }
-static int answer_finalize_yield(kr_layer_t *ctx) { return kr_ok(); }
+static int begin_yield(kr_layer_t *ctx, va_list ap /* none */) { return kr_ok(); }
+static int reset_yield(kr_layer_t *ctx, va_list ap /* none */) { return kr_ok(); }
+static int finish_yield(kr_layer_t *ctx, va_list ap /* none */) { return kr_ok(); }
+static int produce_yield(kr_layer_t *ctx, va_list ap /* knot_pkt_t *pkt */) { return kr_ok(); }
+static int checkout_yield(kr_layer_t *ctx, va_list ap /* knot_pkt_t *packet, struct sockaddr *dst, int type */) { return kr_ok(); }
+static int answer_finalize_yield(kr_layer_t *ctx, va_list ap /* none */) { return kr_ok(); }
+
+/** Map slot enum slot_idx -> yield function.
+ */
+static const int (*yield_funcs[SLOT_count])(kr_layer_t *ctx, va_list ap) = {
+	[SLOT_begin] = begin_yield,
+	[SLOT_reset] = reset_yield,
+	[SLOT_finish] = finish_yield,
+	[SLOT_consume] = consume_yield,
+	[SLOT_produce] = produce_yield,
+	[SLOT_checkout] = checkout_yield,
+	[SLOT_answer_finalize] = answer_finalize_yield
+};
 
 /** @internal Macro for iterating module layers. */
-#define RESUME_LAYERS(from, r, qry, func, ...) \
-    (r)->current_query = (qry); \
-	for (size_t i = (from); i < (r)->ctx->modules->len; ++i) { \
-		struct kr_module *mod = (r)->ctx->modules->at[i]; \
-		if (mod->layer) { \
-			struct kr_layer layer = {.state = (r)->state, .api = mod->layer, .req = (r)}; \
-			if (layer.api && layer.api->func) { \
-				(r)->state = layer.api->func(&layer, ##__VA_ARGS__); \
-				if ((r)->state == KR_STATE_YIELD) { \
-					func ## _yield(&layer, ##__VA_ARGS__); \
-					break; \
-				} \
-			} \
-		} \
-	} /* Invalidate current query. */ \
-	(r)->current_query = NULL
+void RESUME_LAYERS(size_t from, struct kr_request *r, struct kr_query *qry, enum slot_idx function, ...) {
+	va_list ap;
+    (r)->current_query = (qry);
+	for (size_t i = (from); i < (r)->ctx->modules->len; ++i) {
+		struct kr_module *mod = (r)->ctx->modules->at[i];
+		if (mod->layer) {
+			struct kr_layer layer = {.state = (r)->state, .api = mod->layer, .req = (r)};
+			if (layer.api && layer.api->funcs[function]) {
+				va_start(ap, function);
+				(r)->state = layer.api->funcs[function](&layer, ap);
+				va_end(ap);
+				if ((r)->state == KR_STATE_YIELD) {
+					va_start(ap, function);
+					yield_funcs[function](&layer, ap);
+					va_end(ap);
+					break;
+				}
+			}
+		}
+	} /* Invalidate current query. */
+	(r)->current_query = NULL;
+}
 
 /** @internal Macro for starting module iteration. */
 #define ITERATE_LAYERS(req, qry, func, ...) RESUME_LAYERS(0, req, qry, func, ##__VA_ARGS__)
@@ -791,7 +813,7 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	}
 
 	/* Expect answer, pop if satisfied immediately */
-	ITERATE_LAYERS(request, qry, begin);
+	ITERATE_LAYERS(request, qry, SLOT_begin);
 	if ((request->state & KR_STATE_DONE) != 0) {
 		kr_rplan_pop(rplan, qry);
 	} else if (qname == NULL) {
@@ -926,12 +948,12 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 		}
 		request->state = KR_STATE_CONSUME;
 		if (qry->flags.CACHED) {
-			ITERATE_LAYERS(request, qry, consume, packet);
+			ITERATE_LAYERS(request, qry, SLOT_consume, packet);
 		} else {
 			/* Fill in source and latency information. */
 			request->upstream.rtt = kr_now() - qry->timestamp_mono;
 			request->upstream.addr = src;
-			ITERATE_LAYERS(request, qry, consume, packet);
+			ITERATE_LAYERS(request, qry, SLOT_consume, packet);
 			/* Clear temporary information */
 			request->upstream.addr = NULL;
 			request->upstream.rtt = 0;
@@ -962,7 +984,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 		}
 	}
 
-	ITERATE_LAYERS(request, qry, reset);
+	ITERATE_LAYERS(request, qry, SLOT_reset);
 
 	/* Do not finish with bogus answer. */
 	if (qry->flags.DNSSEC_BOGUS)  {
@@ -1348,7 +1370,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		request->state = KR_STATE_YIELD;
 		set_yield(&request->answ_selected, qry->uid, false);
 		set_yield(&request->auth_selected, qry->uid, false);
-		RESUME_LAYERS(layer_id(request, pickle->api), request, qry, consume, pickle->pkt);
+		RESUME_LAYERS(layer_id(request, pickle->api), request, qry, SLOT_consume, pickle->pkt);
 		if (request->state != KR_STATE_YIELD) {
 			/* No new deferred answers, take the next */
 			qry->deferred = pickle->next;
@@ -1367,12 +1389,12 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		}
 		/* Resolve current query and produce dependent or finish */
 		request->state = KR_STATE_PRODUCE;
-		ITERATE_LAYERS(request, qry, produce, packet);
+		ITERATE_LAYERS(request, qry, SLOT_produce, packet);
 		if (!(request->state & KR_STATE_FAIL) && knot_wire_get_qr(packet->wire)) {
 			/* Produced an answer from cache, consume it. */
 			qry->secret = 0;
 			request->state = KR_STATE_CONSUME;
-			ITERATE_LAYERS(request, qry, consume, packet);
+			ITERATE_LAYERS(request, qry, SLOT_consume, packet);
 		}
 	}
 	switch(request->state) {
@@ -1383,7 +1405,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		if (qry->flags.RESOLVED && request->state != KR_STATE_YIELD) {
 			kr_rplan_pop(rplan, qry);
 		}
-		ITERATE_LAYERS(request, qry, reset);
+		ITERATE_LAYERS(request, qry, SLOT_reset);
 		return kr_rplan_empty(rplan) ? KR_STATE_DONE : KR_STATE_PRODUCE;
 	}
 
@@ -1443,7 +1465,7 @@ ns_election:
 			if (!qry->flags.NO_NS_FOUND) {
 				qry->flags.NO_NS_FOUND = true;
 			} else {
-				ITERATE_LAYERS(request, qry, reset);
+				ITERATE_LAYERS(request, qry, SLOT_reset);
 				kr_rplan_pop(rplan, qry);
 			}
 			return KR_STATE_PRODUCE;
@@ -1460,7 +1482,7 @@ ns_election:
 			qry->ns.name = NULL;
 			goto ns_election; /* Must try different NS */
 		}
-		ITERATE_LAYERS(request, qry, reset);
+		ITERATE_LAYERS(request, qry, SLOT_reset);
 		return KR_STATE_PRODUCE;
 	}
 
@@ -1555,7 +1577,7 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 	 * The checkout layer doesn't persist the state, so canceled subrequests
 	 * don't affect the resolution or rest of the processing. */
 	int state = request->state;
-	ITERATE_LAYERS(request, qry, checkout, packet, dst, type);
+	ITERATE_LAYERS(request, qry, SLOT_checkout, packet, dst, type);
 	if (request->state & KR_STATE_FAIL) {
 		request->state = state; /* Restore */
 		return kr_error(ECANCELED);
@@ -1606,7 +1628,7 @@ int kr_resolve_finish(struct kr_request *request, int state)
 {
 	request->state = state;
 	/* Finalize answer and construct wire-buffer. */
-	ITERATE_LAYERS(request, NULL, answer_finalize);
+	ITERATE_LAYERS(request, NULL, SLOT_answer_finalize);
 	answer_finalize(request);
 
 	/* Defensive style, in case someone has forgotten.
@@ -1622,7 +1644,7 @@ int kr_resolve_finish(struct kr_request *request, int state)
 		}
 	}
 
-	ITERATE_LAYERS(request, NULL, finish);
+	ITERATE_LAYERS(request, NULL, SLOT_finish);
 
 #ifndef NOVERBOSELOG
 	struct kr_rplan *rplan = &request->rplan;

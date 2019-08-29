@@ -155,8 +155,12 @@ static void collect_sample(struct stat_data *data, struct kr_rplan *rplan, knot_
 	}
 }
 
-static int collect_rtt(kr_layer_t *ctx, knot_pkt_t *pkt)
+static int collect_rtt(kr_layer_t *ctx, va_list ap /* knot_pkt_t *pkt */)
 {
+	/* pkt is unused in this function
+	knot_pkt_t *pkt = va_arg(ap, knot_pkt_t *);
+	*/
+
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 	if (qry->flags.CACHED || !req->upstream.addr) {
@@ -184,7 +188,7 @@ static int collect_rtt(kr_layer_t *ctx, knot_pkt_t *pkt)
 	return ctx->state;
 }
 
-static int collect_transport(kr_layer_t *ctx)
+static int collect_transport(kr_layer_t *ctx, va_list ap /* none */)
 {
 	struct kr_request *req = ctx->req;
 	struct kr_module *module = ctx->api->data;
@@ -211,7 +215,7 @@ static int collect_transport(kr_layer_t *ctx)
 	return ctx->state;
 }
 
-static int collect(kr_layer_t *ctx)
+static int collect(kr_layer_t *ctx, va_list ap /* none */)
 {
 	struct kr_request *param = ctx->req;
 	struct kr_module *module = ctx->api->data;
@@ -459,9 +463,11 @@ KR_EXPORT
 int stats_init(struct kr_module *module)
 {
 	static kr_layer_api_t layer = {
-		.consume = &collect_rtt,
-		.finish = &collect,
-		.begin = &collect_transport,
+		.funcs = {
+			[SLOT_consume] = &collect_rtt,
+			[SLOT_finish] = &collect,
+			[SLOT_begin] = &collect_transport,
+		}
 	};
 	/* Store module reference */
 	layer.data = module;

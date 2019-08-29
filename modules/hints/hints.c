@@ -137,8 +137,10 @@ static int satisfy_forward(/*const*/ struct hints_data *data,
 	return put_answer(pkt, qry, &rr, data->use_nodata);
 }
 
-static int query(kr_layer_t *ctx, knot_pkt_t *pkt)
+static int query(kr_layer_t *ctx, va_list ap /* knot_pkt_t *pkt */)
 {
+	knot_pkt_t *pkt = va_arg(ap, knot_pkt_t *);
+
 	struct kr_query *qry = ctx->req->current_query;
 	if (!qry || (ctx->state & KR_STATE_FAIL)) {
 		return ctx->state;
@@ -605,7 +607,9 @@ KR_EXPORT
 int hints_init(struct kr_module *module)
 {
 	static kr_layer_api_t layer = {
-		.produce = &query,
+		.funcs = {
+			[SLOT_produce] = &query,
+		}
 	};
 	/* Store module reference */
 	layer.data = module;

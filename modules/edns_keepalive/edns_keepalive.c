@@ -26,7 +26,7 @@
 #include "lib/module.h"
 #include "lib/layer.h"
 
-static int edns_keepalive_finalize(kr_layer_t *ctx)
+static int edns_keepalive_finalize(kr_layer_t *ctx, va_list ap /* none */)
 {
 	struct kr_request *req = ctx->req;
 	knot_pkt_t *answer = req->answer;
@@ -63,7 +63,9 @@ static int edns_keepalive_finalize(kr_layer_t *ctx)
 KR_EXPORT int edns_keeapalive_init(struct kr_module *self)
 {
 	static const kr_layer_api_t layer = {
-		.answer_finalize = &edns_keepalive_finalize,
+		.funcs = {
+			[SLOT_answer_finalize] = &edns_keepalive_finalize
+		}
 	};
 	self->layer = &layer;
 	return kr_ok();

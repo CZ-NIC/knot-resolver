@@ -21,8 +21,10 @@
 int cache_init(struct kr_module *self)
 {
 	static const kr_layer_api_t layer = {
-		.produce = &cache_peek,
-		.consume = &cache_stash,
+		.funcs = {
+			[SLOT_produce] = &cache_peek,
+			[SLOT_consume] = &cache_stash,
+		}
 	};
 	self->layer = &layer;
 	return kr_ok();

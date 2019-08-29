@@ -25,21 +25,21 @@
 #include "lib/module.h"
 #include "lib/layer.h"
 
-/** @internal Slots for layer callbacks.
-  * Each slot ID corresponds to Lua reference in module API. */
-enum {
-	SLOT_begin = 0,
-	SLOT_reset,
-	SLOT_finish,
-	SLOT_consume,
-	SLOT_produce,
-	SLOT_checkout,
-	SLOT_answer_finalize,
-	SLOT_count /* dummy, must be the last */
-};
-
 /** Lua registry indices for functions that wrap layer callbacks (shared by all lua modules). */
 static int l_ffi_wrap_slots[SLOT_count] = { 0 };
+
+/** @internal Mapping from name # to slot name in kr_layer_api.
+  * Each slot ID corresponds to name of Lua function. */
+static const char *slot_name[] = {
+	[SLOT_begin] = "begin",
+	[SLOT_reset] = "reset",
+	[SLOT_finish] = "finish",
+	[SLOT_consume] = "consume",
+	[SLOT_produce] = "produce",
+	[SLOT_checkout] = "checkout",
+	[SLOT_answer_finalize] = "answer_finalize"
+};
+
 
 /** @internal Continue with coroutine. */
 static void l_ffi_resume_cb(uv_idle_t *check)
@@ -127,10 +127,10 @@ static int l_ffi_deinit(struct kr_module *module)
 }
 
 /** @internal Helper for calling a layer Lua function by e.g. SLOT_begin. */
-static int l_ffi_call_layer(kr_layer_t *ctx, int slot_ix)
+static int l_ffi_call_layer(kr_layer_t *ctx, enum slot_idx slot_idx)
 {
-	const int wrap_slot = l_ffi_wrap_slots[slot_ix];
-	const int cb_slot = ctx->api->cb_slots[slot_ix];
+	const int wrap_slot = l_ffi_wrap_slots[slot_idx];
+	const int cb_slot = ctx->api->cb_slots[slot_idx];
 	assert(wrap_slot > 0 && cb_slot > 0);
 	lua_State *L = the_worker->engine->L;
 	lua_rawgeti(L, LUA_REGISTRYINDEX, wrap_slot);
@@ -141,56 +141,68 @@ static int l_ffi_call_layer(kr_layer_t *ctx, int slot_ix)
 	return ret < 0 ? KR_STATE_FAIL : ret;
 }
 
-static int l_ffi_layer_begin(kr_layer_t *ctx)
+static int l_ffi_layer_begin(kr_layer_t *ctx, va_list ap /* none */)
 {
 	return l_ffi_call_layer(ctx, SLOT_begin);
 }
 
-static int l_ffi_layer_reset(kr_layer_t *ctx)
+static int l_ffi_layer_reset(kr_layer_t *ctx, va_list ap /* none */)
 {
 	return l_ffi_call_layer(ctx, SLOT_reset);
 }
 
-static int l_ffi_layer_finish(kr_layer_t *ctx)
+static int l_ffi_layer_finish(kr_layer_t *ctx, va_list ap /* none */)
 {
 	ctx->pkt = ctx->req->answer;
 	return l_ffi_call_layer(ctx, SLOT_finish);
 }
 
-static int l_ffi_layer_consume(kr_layer_t *ctx, knot_pkt_t *pkt)
+static int l_ffi_layer_consume(kr_layer_t *ctx, va_list ap /* knot_pkt_t *pkt */)
 {
 	if (ctx->state & KR_STATE_FAIL) {
 		return ctx->state; /* Already failed, skip */
 	}
-	ctx->pkt = pkt;
+	ctx->pkt = va_arg(ap, knot_pkt_t *);
+
 	return l_ffi_call_layer(ctx, SLOT_consume);
 }
 
-static int l_ffi_layer_produce(kr_layer_t *ctx, knot_pkt_t *pkt)
+static int l_ffi_layer_produce(kr_layer_t *ctx, va_list ap /* knot_pkt_t *pkt */)
 {
 	if (ctx->state & KR_STATE_FAIL) {
 		return ctx->state; /* Already failed, skip */
 	}
-	ctx->pkt = pkt;
+	ctx->pkt = va_arg(ap, knot_pkt_t *);
 	return l_ffi_call_layer(ctx, SLOT_produce);
 }
 
-static int l_ffi_layer_checkout(kr_layer_t *ctx, knot_pkt_t *pkt,
-				struct sockaddr *dst, int type)
+static int l_ffi_layer_checkout(kr_layer_t *ctx, va_list ap
+		/* knot_pkt_t *pkt, struct sockaddr *dst, int type */)
 {
 	if (ctx->state & KR_STATE_FAIL) {
 		return ctx->state; /* Already failed, skip */
 	}
-	ctx->pkt = pkt;
-	ctx->dst = dst;
-	ctx->is_stream = (type == SOCK_STREAM);
+	ctx->pkt = va_arg(ap, knot_pkt_t *);
+	ctx->dst = va_arg(ap, struct sockaddr *);
+	ctx->is_stream = (va_arg(ap, int) == SOCK_STREAM);
 	return l_ffi_call_layer(ctx, SLOT_checkout);
 }
 
-static int l_ffi_layer_answer_finalize(kr_layer_t *ctx)
+static int l_ffi_layer_answer_finalize(kr_layer_t *ctx, va_list ap /* none */)
 {
 	return l_ffi_call_layer(ctx, SLOT_answer_finalize);
 }
+
+/** @internal Mapping enum slot_idx -> Lua wrapper */
+static const int (*l_wrap_funcs[SLOT_count])(kr_layer_t *ctx, va_list ap) = {
+	[SLOT_begin] = l_ffi_layer_begin,
+	[SLOT_reset] = l_ffi_layer_reset,
+	[SLOT_finish] = l_ffi_layer_finish,
+	[SLOT_consume] = l_ffi_layer_consume,
+	[SLOT_produce] = l_ffi_layer_produce,
+	[SLOT_checkout] = l_ffi_layer_checkout,
+	[SLOT_answer_finalize] = l_ffi_layer_answer_finalize
+};
 
 int ffimodule_init(lua_State *L)
 {
@@ -235,16 +247,16 @@ void ffimodule_deinit(lua_State *L)
 
 /** @internal Conditionally register layer trampoline
   * @warning Expects 'module.layer' to be on top of Lua stack. */
-#define LAYER_REGISTER(L, api, name) do { \
-	int *cb_slot = (api)->cb_slots + SLOT_ ## name; \
-	lua_getfield((L), -1, #name); \
-	if (!lua_isnil((L), -1)) { \
-		(api)->name = l_ffi_layer_ ## name; \
-		*cb_slot = luaL_ref((L), LUA_REGISTRYINDEX); \
-	} else { \
-		lua_pop((L), 1); \
-	} \
-} while(0)
+static void LAYER_REGISTER(lua_State *L, kr_layer_api_t *capi, enum slot_idx fidx) {
+	int *cb_slot = capi->cb_slots + fidx;
+	lua_getfield(L, -1, slot_name[fidx]);
+	if (!lua_isnil(L, -1)) {
+		capi->funcs[fidx] = l_wrap_funcs[fidx];
+		*cb_slot = luaL_ref(L, LUA_REGISTRYINDEX);
+	} else {
+		lua_pop(L, 1);
+	}
+}
 
 /** @internal Create C layer api wrapper. */
 static kr_layer_api_t *l_ffi_layer_create(lua_State *L, struct kr_module *module)
@@ -256,18 +268,16 @@ static kr_layer_api_t *l_ffi_layer_create(lua_State *L, struct kr_module *module
 	kr_layer_api_t *api = malloc(api_length);
 	if (api) {
 		memset(api, 0, api_length);
-		LAYER_REGISTER(L, api, begin);
-		LAYER_REGISTER(L, api, finish);
-		LAYER_REGISTER(L, api, consume);
-		LAYER_REGISTER(L, api, produce);
-		LAYER_REGISTER(L, api, checkout);
-		LAYER_REGISTER(L, api, answer_finalize);
-		LAYER_REGISTER(L, api, reset);
+		LAYER_REGISTER(L, api, SLOT_begin);
+		LAYER_REGISTER(L, api, SLOT_finish);
+		LAYER_REGISTER(L, api, SLOT_consume);
+		LAYER_REGISTER(L, api, SLOT_produce);
+		LAYER_REGISTER(L, api, SLOT_checkout);
+		LAYER_REGISTER(L, api, SLOT_answer_finalize);
+		LAYER_REGISTER(L, api, SLOT_reset);
 	}
 	return api;
 }
-
-#undef LAYER_REGISTER
 
 int ffimodule_register_lua(struct engine *engine, struct kr_module *module, const char *name)
 {

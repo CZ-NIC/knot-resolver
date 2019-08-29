@@ -87,7 +87,7 @@ static void set_address(const struct sockaddr *sockaddr,
 }
 
 /* dnstap_log prepares dnstap message and sent it to fstrm */
-static int dnstap_log(kr_layer_t *ctx) {
+static int dnstap_log(kr_layer_t *ctx, va_list ap /* none */) {
 	const struct kr_request *req = ctx->req;
 	const struct kr_module *module = ctx->api->data;
 	const struct kr_rplan *rplan = &req->rplan;
@@ -212,7 +212,9 @@ static int dnstap_log(kr_layer_t *ctx) {
 KR_EXPORT
 int dnstap_init(struct kr_module *module) {
 	static kr_layer_api_t layer = {
-		.finish = &dnstap_log,
+		.funcs = {
+			[SLOT_finish] = &dnstap_log,
+		}
 	};
 	/* Store module reference */
 	layer.data = module;

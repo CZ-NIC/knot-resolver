@@ -9,7 +9,7 @@
 #include "lib/module.h"
 #include "lib/layer.h"
 
-static int refuse_nord_query(kr_layer_t *ctx)
+static int refuse_nord_query(kr_layer_t *ctx, va_list ap /* none */)
 {
 	struct kr_request *req = ctx->req;
 	uint8_t rd = knot_wire_get_rd(req->qsource.packet->wire);
@@ -27,7 +27,9 @@ static int refuse_nord_query(kr_layer_t *ctx)
 KR_EXPORT int refuse_nord_init(struct kr_module *module)
 {
 	static const kr_layer_api_t layer = {
-		.begin = &refuse_nord_query,
+		.funcs = {
+			[SLOT_begin] = &refuse_nord_query,
+		}
 	};
 	module->layer = &layer;
 	return kr_ok();

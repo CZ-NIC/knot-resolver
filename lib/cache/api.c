@@ -313,8 +313,10 @@ knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type)
 /** The inside for cache_peek(); implementation separated to ./peek.c */
 int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt);
 /** function for .produce phase */
-int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
+int cache_peek(kr_layer_t *ctx, va_list ap /* knot_pkt_t *pkt */)
 {
+	knot_pkt_t *pkt = va_arg(ap, knot_pkt_t *);
+
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 	/* We first check various exit-conditions and then call the _real function. */
@@ -355,8 +357,10 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 			struct kr_request *req);
 
 /** The whole .consume phase for the cache module. */
-int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
+int cache_stash(kr_layer_t *ctx, va_list ap /* knot_pkt_t *pkt */)
 {
+	knot_pkt_t *pkt = va_arg(ap, knot_pkt_t *);
+
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 	struct kr_cache *cache = &req->ctx->cache;

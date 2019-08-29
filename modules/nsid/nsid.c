@@ -16,7 +16,7 @@ struct nsid_config {
 	size_t local_nsid_len;
 };
 
-static int nsid_finalize(kr_layer_t *ctx) {
+static int nsid_finalize(kr_layer_t *ctx, va_list ap /* none */) {
 	const struct kr_module *module = ctx->api->data;
 	const struct nsid_config *config = module->data;
 	struct kr_request *req = ctx->req;
@@ -81,7 +81,9 @@ static char* nsid_name(void *env, struct kr_module *module, const char *args)
 KR_EXPORT
 int nsid_init(struct kr_module *module) {
 	static kr_layer_api_t layer = {
-		.answer_finalize = &nsid_finalize,
+		.funcs = {
+			[SLOT_answer_finalize] = &nsid_finalize,
+		}
 	};
 	layer.data = module;
 	module->layer = &layer;
