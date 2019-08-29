@@ -233,13 +233,7 @@ struct kr_layer {
 };
 typedef struct kr_layer kr_layer_t;
 struct kr_layer_api {
-	int (*begin)(kr_layer_t *);
-	int (*reset)(kr_layer_t *);
-	int (*finish)(kr_layer_t *);
-	int (*consume)(kr_layer_t *, knot_pkt_t *);
-	int (*produce)(kr_layer_t *, knot_pkt_t *);
-	int (*checkout)(kr_layer_t *, knot_pkt_t *, struct sockaddr *, int);
-	int (*answer_finalize)(kr_layer_t *);
+	int (*funcs[7])(kr_layer_t *, struct __va_list_tag *);
 	void *data;
 	int cb_slots[];
 };
