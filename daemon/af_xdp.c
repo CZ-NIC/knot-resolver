@@ -20,15 +20,16 @@
 #include <byteswap.h>
 
 #include <arpa/inet.h>
-//#include <net/if.h>
+#include <net/if.h>
 #include <netinet/in.h>
-//#include <linux/if_link.h>
+#include <linux/if_link.h>
 #include <linux/if_ether.h>
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/udp.h>
 //#include <linux/icmpv6.h>
 
+#include <sys/resource.h> // setrlimit
 
 #include "contrib/ucw/lib.h"
 
@@ -72,8 +73,8 @@ struct config {
 
 	struct udpv4 pkt_template;
 
-	/*
 	uint32_t xdp_flags;
+	/*
 	int ifindex;
 	char *ifname;
 	//char ifname_buf[IF_NAMESIZE];
@@ -106,7 +107,7 @@ struct xsk_umem_info {
 	uint32_t *free_indices; /**< Stack of indices of the free frames. */
 };
 struct xsk_socket_info {
-	//struct xsk_ring_cons rx;
+	struct xsk_ring_cons rx;
 	struct xsk_ring_prod tx;
 	struct xsk_umem_info *umem;
 	struct xsk_socket *xsk;
@@ -182,16 +183,34 @@ static void xsk_dealloc_umem_frame(struct xsk_umem_info *umem, uint8_t *uframe_p
 	umem->free_indices[umem->free_count++] = index;
 }
 
+static int clear_prog(struct config *cfg)
+{
+	unsigned int opt_ifindex = if_nametoindex(cfg->ifname);
+	if (!opt_ifindex) return EINVAL;
+	int ret = bpf_set_link_xdp_fd(opt_ifindex, -1, cfg->xdp_flags);
+	if (ret) fprintf(stderr, "bpf_set_link_xdp_fd() == %d\n", ret);
+	return ret;
+}
+static void cleanup(struct config *cfg)
+{
+	clear_prog(cfg);
+	xsk_socket__delete(the_socket->xsk);
+	xsk_umem__delete(the_socket->umem->umem);
+	//TODO: memory
+}
+
 static struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
 						    struct xsk_umem_info *umem)
 {
+	clear_prog(cfg);
+
 	struct xsk_socket_info *xsk_info = calloc(1, sizeof(*xsk_info));
 	if (!xsk_info)
 		return NULL;
 
 	xsk_info->umem = umem;
 	int ret = xsk_socket__create(&xsk_info->xsk, cfg->ifname,
-				 cfg->xsk_if_queue, umem->umem, NULL/*&xsk_info->rx*/,
+				 cfg->xsk_if_queue, umem->umem, &xsk_info->rx,
 				 &xsk_info->tx, &cfg->xsk);
 
 	if (ret)
@@ -441,8 +460,9 @@ static struct config the_config_storage = { // static to get zeroed by default
 		.tx_size = XSK_RING_PROD__DEFAULT_NUM_DESCS,
 		.rx_size = XSK_RING_CONS__DEFAULT_NUM_DESCS,
 		/* Otherwise it tries to load the non-existent program. */
-		.libbpf_flags = XSK_LIBBPF_FLAGS__INHIBIT_PROG_LOAD,
+		//.libbpf_flags = XSK_LIBBPF_FLAGS__INHIBIT_PROG_LOAD, TODO: why is this a problem??
 	},
+	.xdp_flags = XDP_FLAGS_UPDATE_IF_NOEXIST,
 	.pkt_template = {
 		.eth = {
 			//.h_dest   = "\xd8\x58\xd7\x00\x74\x34",
@@ -590,6 +610,8 @@ int main(int argc, char **argv)
 	if (unlikely(ret == -1))
 		fprintf(stderr, "sendto: %s\n", strerror(errno));
 	print_stats();
+
+	cleanup(the_config);
 }
 #endif
 
