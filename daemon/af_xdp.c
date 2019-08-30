@@ -505,6 +505,14 @@ int kr_xsk_init_global(uv_loop_t *loop)
 	return 0;
 	// */
 
+	/* I'm not sure if this is needed/useful. */
+	struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
+	if (setrlimit(RLIMIT_MEMLOCK, &r)) {
+		fprintf(stderr, "ERROR: setrlimit(RLIMIT_MEMLOCK) \"%s\"\n",
+			strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
 	/* Initialize shared packet_buffer for umem usage */
 	struct xsk_umem_info *umem = configure_xsk_umem(FRAME_COUNT);
 	if (umem == NULL) {
