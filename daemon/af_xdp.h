@@ -5,6 +5,7 @@
 #include <uv.h>
 
 int kr_xsk_init_global(uv_loop_t *loop);
+void kr_xsk_deinit_global(void);
 
 void *kr_xsk_alloc_wire(uint16_t *maxlen);
 

@@ -853,6 +853,7 @@ int main(int argc, char **argv)
 	ret = run_worker(loop, &engine, &ipc_set, fork_id == 0, &args);
 
 cleanup:/* Cleanup. */
+	kr_xsk_deinit_global();
 	engine_deinit(&engine);
 	worker_deinit();
 	if (loop != NULL) {

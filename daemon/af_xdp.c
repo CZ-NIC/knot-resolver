@@ -10,6 +10,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <bpf/bpf.h>
 #include <bpf/xsk.h>
 #include <uv.h>
 
@@ -27,7 +28,27 @@
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/udp.h>
+#include <linux/filter.h>
 //#include <linux/icmpv6.h>
+
+#ifndef BPF_MOV32_IMM // rather new <linux/filter.h> is needed
+#define BPF_MOV32_IMM(DST, IMM)					\
+	((struct bpf_insn) {					\
+		.code  = BPF_ALU | BPF_MOV | BPF_K,		\
+		.dst_reg = DST,					\
+		.src_reg = 0,					\
+		.off   = 0,					\
+		.imm   = IMM })
+#endif
+#ifndef BPF_EXIT_INSN
+#define BPF_EXIT_INSN()						\
+	((struct bpf_insn) {					\
+		.code  = BPF_JMP | BPF_EXIT,			\
+		.dst_reg = 0,					\
+		.src_reg = 0,					\
+		.off   = 0,					\
+		.imm   = 0 })
+#endif
 
 #include <sys/resource.h> // setrlimit
 
@@ -39,10 +60,14 @@
 // placate libclang :-/
 typedef uint64_t size_t;
 
+#if TRIVIAL_DEMO
+	#define kr_log_verbose printf
+#endif
+
 
 #define INVALID_UMEM_FRAME SIZE_MAX
 
-#define FRAME_SIZE 2048
+#define FRAME_SIZE 4096 // when changing, beware of xsk_umem__create
 
 struct udpv4 {
 	union { uint8_t bytes[1]; struct {
@@ -67,6 +92,7 @@ struct umem_frame {
 
 struct config {
 	const char *ifname;
+	int ifindex; /**< computed from ifname */
 	int xsk_if_queue;
 
 	struct xsk_socket_config xsk;
@@ -75,7 +101,6 @@ struct config {
 
 	uint32_t xdp_flags;
 	/*
-	int ifindex;
 	char *ifname;
 	//char ifname_buf[IF_NAMESIZE];
 	int redirect_ifindex;
@@ -142,7 +167,7 @@ static struct xsk_umem_info *configure_xsk_umem(uint32_t frame_count)
 	// NOTE: we don't need a fill queue (fq), but the API won't allow us to call
 	// with NULL - perhaps it doesn't matter that we don't utilize it later.
 	errno = -xsk_umem__create(&umem->umem, umem->frames, FRAME_SIZE * frame_count,
-				  &umem->fq, &umem->cq, NULL);
+				  &umem->fq, &umem->cq, NULL/*FIXME: xsk_umem_config*/);
 	if (errno) goto failed;
 
 	return umem;
@@ -155,9 +180,12 @@ failed:
 
 static struct umem_frame *xsk_alloc_umem_frame(struct xsk_umem_info *umem) // TODO: confusing to use xsk_
 {
-	if (unlikely(umem->free_count == 0))
+	if (unlikely(umem->free_count == 0)) {
+		fprintf(stderr, "[uxsk] no free frame!\n");
 		return NULL;
+	}
 	uint32_t index = umem->free_indices[--umem->free_count];
+	kr_log_verbose("[uxsk] allocating frame %d\n", (int)index);
 	#ifndef NDEBUG
 		umem->free_indices[umem->free_count] = -1;
 	#endif
@@ -185,34 +213,86 @@ static void xsk_dealloc_umem_frame(struct xsk_umem_info *umem, uint8_t *uframe_p
 
 static int clear_prog(struct config *cfg)
 {
-	unsigned int opt_ifindex = if_nametoindex(cfg->ifname);
-	if (!opt_ifindex) return EINVAL;
-	int ret = bpf_set_link_xdp_fd(opt_ifindex, -1, cfg->xdp_flags);
+	int ret = bpf_set_link_xdp_fd(cfg->ifindex, -1, cfg->xdp_flags);
 	if (ret) fprintf(stderr, "bpf_set_link_xdp_fd() == %d\n", ret);
 	return ret;
 }
-static void cleanup(struct config *cfg)
+
+void kr_xsk_deinit_global(void)
 {
-	clear_prog(cfg);
+	clear_prog(the_config);
 	xsk_socket__delete(the_socket->xsk);
 	xsk_umem__delete(the_socket->umem->umem);
 	//TODO: memory
 }
 
+
+static int load_noop_prog(struct xsk_socket *xsk)
+{
+	static const int log_buf_size = 16 * 1024;
+	char log_buf[log_buf_size];
+
+	struct bpf_insn prog[] = {
+		BPF_MOV32_IMM(BPF_REG_0, 2),
+		BPF_EXIT_INSN(),
+	};
+	size_t insns_cnt = sizeof(prog) / sizeof(struct bpf_insn);
+
+	int prog_fd = bpf_load_program(BPF_PROG_TYPE_XDP, prog, insns_cnt,
+			"LGPL-2.1 or BSD-2-Clause", 0, log_buf, log_buf_size);
+	if (prog_fd < 0) {
+		fprintf(stderr, "BPF log buffer:\n%s", log_buf);
+		return prog_fd;
+	}
+
+	/*TODO:hacky combination of (non-)globals*/
+	int err = bpf_set_link_xdp_fd(the_config->ifindex,
+			prog_fd, the_config->xdp_flags);
+	if (err) {
+		close(prog_fd);
+		return err;
+	}
+
+	//xsk->prog_fd = prog_fd;
+	return 0;
+}
+
 static struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
 						    struct xsk_umem_info *umem)
 {
-	clear_prog(cfg);
+	/* Put a couple RX buffers into the fill queue.
+	 * It probably doesn't matter, but it silences a dmesg line. */
+	const int to_reserve = 1024;
+	uint32_t idx;
+	int ret = xsk_ring_prod__reserve(&umem->fq, to_reserve, &idx);
+	if (ret != to_reserve)
+		return NULL;
+	for (int i = 0; i < to_reserve; ++i, ++idx) {
+		struct umem_frame *uframe = xsk_alloc_umem_frame(umem);
+		if (!uframe) {
+			errno = ENOSPC;
+			return NULL;
+		}
+		size_t offset = uframe->bytes - umem->frames->bytes;
+		*xsk_ring_prod__fill_addr(&umem->fq, idx) = offset;
+	}
+	xsk_ring_prod__submit(&umem->fq, to_reserve);
+
 
 	struct xsk_socket_info *xsk_info = calloc(1, sizeof(*xsk_info));
 	if (!xsk_info)
 		return NULL;
 
+	cfg->ifindex = if_nametoindex(cfg->ifname);
+	if (!cfg->ifindex)
+		return NULL;
+
 	xsk_info->umem = umem;
-	int ret = xsk_socket__create(&xsk_info->xsk, cfg->ifname,
+	ret = xsk_socket__create(&xsk_info->xsk, cfg->ifname,
 				 cfg->xsk_if_queue, umem->umem, &xsk_info->rx,
 				 &xsk_info->tx, &cfg->xsk);
-
+	if (!ret) ret = clear_prog(cfg);
+	if (!ret) ret = load_noop_prog(xsk_info->xsk);
 	if (ret)
 		goto error_exit;
 
@@ -220,23 +300,6 @@ static struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
 	ret = bpf_get_link_xdp_id(cfg->ifindex, &prog_id, cfg->xdp_flags);
 	if (ret)
 		goto error_exit;
-	*/
-
-	/* Stuff the receive path with buffers, we assume we have enough */
-	/*
-	ret = xsk_ring_prod__reserve(&xsk_info->umem->fq,
-				     XSK_RING_PROD__DEFAULT_NUM_DESCS,
-				     &idx);
-
-	if (ret != XSK_RING_PROD__DEFAULT_NUM_DESCS)
-		goto error_exit;
-
-	for (i = 0; i < XSK_RING_PROD__DEFAULT_NUM_DESCS; i ++)
-		*xsk_ring_prod__fill_addr(&xsk_info->umem->fq, idx++) =
-			xsk_alloc_umem_frame(xsk_info);
-
-	xsk_ring_prod__submit(&xsk_info->umem->fq,
-			      XSK_RING_PROD__DEFAULT_NUM_DESCS);
 	*/
 
 	return xsk_info;
@@ -409,7 +472,7 @@ void kr_xsk_push(const struct sockaddr *src, const struct sockaddr *dst,
 	pkt_send(the_socket, uframe->udpv4.bytes - umem_mem_start, eth_len);
 }
 
-
+#if !TRIVIAL_DEMO
 /** Periodical callback . */
 static void xsk_check(uv_check_t *handle)
 {
@@ -437,6 +500,7 @@ static void xsk_check(uv_check_t *handle)
 	struct xsk_ring_cons *cq = &the_socket->umem->cq;
 	uint32_t idx_cq;
 	const uint32_t completed = xsk_ring_cons__peek(cq, UINT32_MAX, &idx_cq);
+	kr_log_verbose(".");
 	if (!completed) return;
 	for (int i = 0; i < completed; ++i, ++idx_cq) {
 		uint8_t *uframe_p = (uint8_t *)the_socket->umem->frames
@@ -451,16 +515,17 @@ static void xsk_check(uv_check_t *handle)
 			the_socket->umem->frame_count - the_socket->umem->free_count);
 	//TODO: one uncompleted packet/batch is left until the next I/O :-/
 }
+#endif
 
 
 static struct config the_config_storage = { // static to get zeroed by default
-	.ifname = "eno1",
-	.xsk_if_queue = 0,
+	.ifname = "eth2",
+	.xsk_if_queue = 2,
 	.xsk = {
 		.tx_size = XSK_RING_PROD__DEFAULT_NUM_DESCS,
 		.rx_size = XSK_RING_CONS__DEFAULT_NUM_DESCS,
 		/* Otherwise it tries to load the non-existent program. */
-		//.libbpf_flags = XSK_LIBBPF_FLAGS__INHIBIT_PROG_LOAD, TODO: why is this a problem??
+		.libbpf_flags = XSK_LIBBPF_FLAGS__INHIBIT_PROG_LOAD, // TODO: why is this a problem??
 	},
 	.xdp_flags = XDP_FLAGS_UPDATE_IF_NOEXIST,
 	.pkt_template = {
@@ -468,11 +533,11 @@ static struct config the_config_storage = { // static to get zeroed by default
 			//.h_dest   = "\xd8\x58\xd7\x00\x74\x34",
 			//.h_source = "\x70\x85\xc2\x3a\xc7\x84",
 			// mirkwood -> knot-bench-player:
-			//.h_dest   = "\xa0\x36\x9f\x50\x2a\x9c",
-			//.h_source = "\x3c\xfd\xfe\x2b\xcf\x02",
+			.h_dest   = "\xa0\x36\x9f\x50\x2a\x9c",
+			.h_source = "\x3c\xfd\xfe\x2b\xcf\x02",
 			// doriath -> eriador
-			.h_dest   = "\x00\x15\x17\xf8\xd0\x4a",
-			.h_source = "\xf0\x1f\xaf\xe2\x80\x0d",
+			//.h_dest   = "\x00\x15\x17\xf8\xd0\x4a",
+			//.h_source = "\xf0\x1f\xaf\xe2\x80\x0d",
 			//.h_source = "\x00\x1e\x67\xe3\xb1\x24", // rohan
 			.h_proto = BS16(ETH_P_IP),
 		},
@@ -503,10 +568,10 @@ int kr_xsk_init_global(uv_loop_t *loop)
 	const char
 		//sip_str[] = "192.168.8.71",
 		//dip_str[] = "192.168.8.1";
-		//sip_str[] = "192.168.100.8",
-		//dip_str[] = "192.168.100.3";
-		sip_str[] = "217.31.193.167",
-		dip_str[] = "217.31.193.166";
+		sip_str[] = "192.168.100.8",
+		dip_str[] = "192.168.100.3";
+		//sip_str[] = "217.31.193.167",
+		//dip_str[] = "217.31.193.166";
 	the_config = &the_config_storage;
 	if (inet_pton(AF_INET, sip_str, &the_config->pkt_template.ipv4.saddr) != 1
 	    || inet_pton(AF_INET, dip_str, &the_config->pkt_template.ipv4.daddr) != 1) {
@@ -556,10 +621,13 @@ int kr_xsk_init_global(uv_loop_t *loop)
 
 	kr_log_verbose("[uxsk] busy frames: %d\n",
 			the_socket->umem->frame_count - the_socket->umem->free_count);
-	//return 0;
+#if TRIVIAL_DEMO
+	return 0;
+#else
 	int ret = uv_check_init(loop, &the_socket->check_handle);
 	if (!ret) ret = uv_check_start(&the_socket->check_handle, xsk_check);
 	return ret;
+#endif
 }
 
 #define SOL_XDP 283
@@ -578,7 +646,7 @@ static void print_stats()
 	}
 }
 
-#if 0
+#if TRIVIAL_DEMO
 int main(int argc, char **argv)
 {
 	if (argc >= 2) {
@@ -605,13 +673,9 @@ int main(int argc, char **argv)
 	if (unlikely(ret == -1))
 		fprintf(stderr, "sendto: %s\n", strerror(errno));
 	print_stats();
-	ret = sendto(1, NULL, 0,
-			 MSG_DONTWAIT, NULL, 0);
-	if (unlikely(ret == -1))
-		fprintf(stderr, "sendto: %s\n", strerror(errno));
-	print_stats();
 
-	cleanup(the_config);
+	kr_xsk_deinit_global();
+	return 0;
 }
 #endif
 
