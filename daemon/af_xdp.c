@@ -223,6 +223,7 @@ static struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
 	return xsk_info;
 
 error_exit:
+	free(xsk_info);
 	errno = -ret;
 	return NULL;
 }
@@ -393,17 +394,20 @@ void kr_xsk_push(const struct sockaddr *src, const struct sockaddr *dst,
 /** Periodical callback . */
 static void xsk_check(uv_check_t *handle)
 {
-	/* Send queued packets. */
+	/* Trigger sending queued packets. */
 	if (the_socket->kernel_needs_wakeup) {
-		the_socket->kernel_needs_wakeup = false;
-		int ret = sendto(xsk_socket__fd(the_socket->xsk), NULL, 0,
-				 MSG_DONTWAIT, NULL, 0);
-
-		if (unlikely(ret == -1)) {
+		bool is_ok = sendto(xsk_socket__fd(the_socket->xsk), NULL, 0,
+				 MSG_DONTWAIT, NULL, 0) != -1;
+		const bool is_again = !is_ok && (errno == EWOULDBLOCK || errno == EAGAIN);
+		if (is_ok || is_again) {
+			the_socket->kernel_needs_wakeup = false;
+			// EAGAIN is unclear; we'll retry the syscall later, to be sure
+		}
+		if (!is_ok && !is_again) {
 			const uint64_t stamp_now = kr_now();
 			static uint64_t stamp_last = 0;
-			if (stamp_now > stamp_last + 60*1000) {
-				kr_log_info("WARNING: sendto error (reported at most once per minute)\n\t%s\n",
+			if (stamp_now > stamp_last + 10*1000) {
+				kr_log_info("WARNING: sendto error (reported at most once per 10s)\n\t%s\n",
 						strerror(errno));
 				stamp_last = stamp_now;
 			}
@@ -511,12 +515,17 @@ int kr_xsk_init_global(uv_loop_t *loop)
 
 	/* Open and configure the AF_XDP (xsk) socket */
 	assert(!the_socket);
-	the_socket = xsk_configure_socket(the_config, umem);
-	if (!the_socket) {
-		fprintf(stderr, "ERROR: Can't setup AF_XDP socket \"%s\"\n",
-			strerror(errno));
-		exit(EXIT_FAILURE);
+
+	for (int i = 0; i < 16; ++i) {
+		the_config->xsk_if_queue = i;
+		the_socket = xsk_configure_socket(the_config, umem);
+		if (the_socket) break;
+		fprintf(stderr, "ERROR, can't setup AF_XDP socket on queue %d: %s\n",
+			i, strerror(errno));
 	}
+	if (!the_socket)
+		exit(EXIT_FAILURE);
+
 	kr_log_verbose("[uxsk] busy frames: %d\n",
 			the_socket->umem->frame_count - the_socket->umem->free_count);
 	//return 0;
