@@ -27,8 +27,9 @@
 #include <libknot/rrtype/dnskey.h>
 #include <libknot/rrtype/nsec.h>
 #include <libknot/rrtype/rrsig.h>
-#include <contrib/wire.h>
 
+#include "contrib/cleanup.h"
+#include "contrib/wire.h"
 #include "lib/defines.h"
 #include "lib/dnssec/nsec.h"
 #include "lib/dnssec/nsec3.h"
@@ -38,7 +39,7 @@
 
 /* forward */
 static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
-	const knot_rrset_t *covered, size_t key_pos, const struct dseckey *key);
+	knot_rrset_t *covered, size_t key_pos, const struct dseckey *key);
 
 void kr_crypto_init(void)
 {
@@ -138,7 +139,7 @@ static inline int wildcard_radix_len_diff(const knot_dname_t *expanded,
 	return knot_dname_labels(expanded, NULL) - knot_rrsig_labels(rrsig);
 }
 
-int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *covered)
+int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx, knot_rrset_t *covered)
 {
 	if (!vctx) {
 		return kr_error(EINVAL);
@@ -161,14 +162,15 @@ int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *cover
 /**
  * Validate RRSet using a specific key.
  * @param vctx    Pointer to validation context.
- * @param covered RRSet covered by a signature. It must be in canonical format.
+ * @param covered RRSet covered by a signature.  It must be in canonical format.
+ * 		  TTL may get lowered.
  * @param key_pos Position of the key to be validated with.
  * @param key     Key to be used to validate.
  *		  If NULL, then key from DNSKEY RRSet is used.
  * @return        0 or error code, same as vctx->result.
  */
 static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
-				const knot_rrset_t *covered,
+				knot_rrset_t *covered,
 				size_t key_pos, const struct dseckey *key)
 {
 	const knot_pkt_t *pkt         = vctx->pkt;
@@ -256,7 +258,23 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 				}
 				vctx->flags |= KR_DNSSEC_VFLG_WEXPAND;
 			}
-			/* Validated with current key, OK */
+			/* Validated with current key, OK;
+			 * now just trim TTL in case it's over-extended. */
+			const uint32_t ttl_max = MIN(knot_rrsig_original_ttl(rdata_j),
+					knot_rrsig_sig_expiration(rdata_j) - timestamp);
+			if (unlikely(covered->ttl > ttl_max)) {
+				if (VERBOSE_STATUS) {
+					auto_free char
+						*name_str = kr_dname_text(covered->owner),
+						*type_str = kr_rrtype_text(covered->type);
+					QRVERBOSE(NULL, "vldr",
+						"trimming TTL of %s %s: %d -> %d\n",
+						name_str, type_str,
+						(int)covered->ttl, (int)ttl_max);
+				}
+				covered->ttl = ttl_max;
+			}
+
 			kr_dnssec_key_free(&created_key);
 			vctx->result = kr_ok();
 			return vctx->result;
@@ -286,7 +304,7 @@ bool kr_ds_algo_support(const knot_rrset_t *ta)
 int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
 {
 	const knot_pkt_t *pkt         = vctx->pkt;
-	const knot_rrset_t *keys      = vctx->keys;
+	knot_rrset_t *keys            = vctx->keys;
 
 	const bool ok = pkt && keys && ta && ta->rrs.count && ta->rrs.rdata
 			&& ta->type == KNOT_RRTYPE_DS;
@@ -303,7 +321,7 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
 	for (uint16_t i = 0; i < keys->rrs.count; ++i) {
 		/* RFC4035 5.3.1, bullet 8 */ /* ZSK */
 		/* LATER(optim.): more efficient way to iterate than _at() */
-		const knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, i);
+		knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, i);
 		if (!kr_dnssec_key_zsk(krr->data) || kr_dnssec_key_revoked(krr->data)) {
 			continue;
 		}

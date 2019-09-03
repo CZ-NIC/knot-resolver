@@ -109,7 +109,7 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 	int validation_result = 0;
 	for (ssize_t i = 0; i < vctx->rrs->len; ++i) {
 		ranked_rr_array_entry_t *entry = vctx->rrs->at[i];
-		const knot_rrset_t *rr = entry->rr;
+		knot_rrset_t * const rr = entry->rr;
 
 		if (entry->yielded || vctx->qry_uid != entry->qry_uid) {
 			continue;
@@ -1053,7 +1053,8 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Validate all records, fail as bogus if it doesn't match.
-	 * Do not revalidate data from cache, as it's already trusted. */
+	 * Do not revalidate data from cache, as it's already trusted.
+	 * TTLs of RRsets may get lowered. */
 	if (!(qry->flags.CACHED)) {
 		ret = validate_records(req, pkt, req->rplan.pool, has_nsec3);
 		if (ret != 0) {
