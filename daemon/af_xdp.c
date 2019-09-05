@@ -95,6 +95,9 @@ struct config {
 	int ifindex; /**< computed from ifname */
 	int xsk_if_queue;
 
+	struct xsk_umem_config umem;
+	uint32_t umem_frame_count;
+
 	struct xsk_socket_config xsk;
 
 	struct udpv4 pkt_template;
@@ -148,7 +151,8 @@ struct config *the_config = NULL;
 #define BS16(n) (((n) >> 8) + (((n) & 0xff) << 8))
 #define BS32 bswap_32
 
-static struct xsk_umem_info *configure_xsk_umem(uint32_t frame_count)
+static struct xsk_umem_info *configure_xsk_umem(const struct xsk_umem_config *umem_config,
+						uint32_t frame_count)
 {
 	struct xsk_umem_info *umem = calloc(1, sizeof(*umem));
 	if (!umem) return NULL;
@@ -167,7 +171,7 @@ static struct xsk_umem_info *configure_xsk_umem(uint32_t frame_count)
 	// NOTE: we don't need a fill queue (fq), but the API won't allow us to call
 	// with NULL - perhaps it doesn't matter that we don't utilize it later.
 	errno = -xsk_umem__create(&umem->umem, umem->frames, FRAME_SIZE * frame_count,
-				  &umem->fq, &umem->cq, NULL/*FIXME: xsk_umem_config*/);
+				  &umem->fq, &umem->cq, umem_config);
 	if (errno) goto failed;
 
 	return umem;
@@ -229,9 +233,7 @@ void kr_xsk_deinit_global(void)
 
 static int load_noop_prog(struct xsk_socket *xsk)
 {
-	static const int log_buf_size = 16 * 1024;
-	char log_buf[log_buf_size];
-
+	char log_buf[4096];
 	struct bpf_insn prog[] = {
 		BPF_MOV32_IMM(BPF_REG_0, 2),
 		BPF_EXIT_INSN(),
@@ -239,7 +241,7 @@ static int load_noop_prog(struct xsk_socket *xsk)
 	size_t insns_cnt = sizeof(prog) / sizeof(struct bpf_insn);
 
 	int prog_fd = bpf_load_program(BPF_PROG_TYPE_XDP, prog, insns_cnt,
-			"LGPL-2.1 or BSD-2-Clause", 0, log_buf, log_buf_size);
+			"LGPL-2.1 or BSD-2-Clause", 0, log_buf, sizeof(log_buf));
 	if (prog_fd < 0) {
 		fprintf(stderr, "BPF log buffer:\n%s", log_buf);
 		return prog_fd;
@@ -260,11 +262,15 @@ static int load_noop_prog(struct xsk_socket *xsk)
 static struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
 						    struct xsk_umem_info *umem)
 {
+	int ret;
+#if 1
 	/* Put a couple RX buffers into the fill queue.
-	 * It probably doesn't matter, but it silences a dmesg line. */
+	 * We don't need them ATM, but it silences a dmesg line,
+	 * and it avoids 100% CPU usage of ksoftirqd/i for each queue i!
+	 * TODO: redone when retried after failure. */
 	const int to_reserve = 1024;
 	uint32_t idx;
-	int ret = xsk_ring_prod__reserve(&umem->fq, to_reserve, &idx);
+	ret = xsk_ring_prod__reserve(&umem->fq, to_reserve, &idx);
 	if (ret != to_reserve)
 		return NULL;
 	for (int i = 0; i < to_reserve; ++i, ++idx) {
@@ -277,22 +283,24 @@ static struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
 		*xsk_ring_prod__fill_addr(&umem->fq, idx) = offset;
 	}
 	xsk_ring_prod__submit(&umem->fq, to_reserve);
+#endif
 
 
 	struct xsk_socket_info *xsk_info = calloc(1, sizeof(*xsk_info));
 	if (!xsk_info)
 		return NULL;
 
-	cfg->ifindex = if_nametoindex(cfg->ifname);
-	if (!cfg->ifindex)
-		return NULL;
-
 	xsk_info->umem = umem;
 	ret = xsk_socket__create(&xsk_info->xsk, cfg->ifname,
 				 cfg->xsk_if_queue, umem->umem, &xsk_info->rx,
 				 &xsk_info->tx, &cfg->xsk);
-	if (!ret) ret = clear_prog(cfg);
-	if (!ret) ret = load_noop_prog(xsk_info->xsk);
+	fprintf(stderr, "xsk_socket__create() == %d\n", ret);
+
+	cfg->ifindex = if_nametoindex(cfg->ifname);
+	if (!cfg->ifindex)
+		return NULL;
+	//clear_prog(cfg); // ignore return values??
+	load_noop_prog(xsk_info->xsk);
 	if (ret)
 		goto error_exit;
 
@@ -519,8 +527,14 @@ static void xsk_check(uv_check_t *handle)
 
 
 static struct config the_config_storage = { // static to get zeroed by default
-	.ifname = "eth2",
-	.xsk_if_queue = 2,
+	.ifname = "eth3", .xsk_if_queue = 0, // defaults overridable by command-line -x eth3:0
+	.umem_frame_count = 8192,
+	.umem = {
+		.fill_size = XSK_RING_PROD__DEFAULT_NUM_DESCS,
+		.comp_size = XSK_RING_CONS__DEFAULT_NUM_DESCS,
+		.frame_size = FRAME_SIZE, // we need to know this value explicitly
+		.frame_headroom = XSK_UMEM__DEFAULT_FRAME_HEADROOM,
+	},
 	.xsk = {
 		.tx_size = XSK_RING_PROD__DEFAULT_NUM_DESCS,
 		.rx_size = XSK_RING_CONS__DEFAULT_NUM_DESCS,
@@ -561,10 +575,9 @@ static struct config the_config_storage = { // static to get zeroed by default
 	},
 };
 
-int kr_xsk_init_global(uv_loop_t *loop)
+int kr_xsk_init_global(uv_loop_t *loop, char *cmdarg)
 {
 	/* Hard-coded configuration */
-	const int FRAME_COUNT = 4096;
 	const char
 		//sip_str[] = "192.168.8.71",
 		//dip_str[] = "192.168.8.1";
@@ -577,6 +590,15 @@ int kr_xsk_init_global(uv_loop_t *loop)
 	    || inet_pton(AF_INET, dip_str, &the_config->pkt_template.ipv4.daddr) != 1) {
 		fprintf(stderr, "ERROR: failed to convert IPv4 address\n");
 		exit(EXIT_FAILURE);
+	}
+
+	if (cmdarg) {
+		char *colon = strchr(cmdarg, ':');
+		if (colon) {
+			*colon = '\0'; // yes, modifying argv[i][j] isn't very nice
+			the_config->xsk_if_queue = atoi(colon + 1);
+		}
+		the_config->ifname = cmdarg;
 	}
 
 	/* Some failed test
@@ -599,7 +621,8 @@ int kr_xsk_init_global(uv_loop_t *loop)
 	}
 
 	/* Initialize shared packet_buffer for umem usage */
-	struct xsk_umem_info *umem = configure_xsk_umem(FRAME_COUNT);
+	struct xsk_umem_info *umem =
+		configure_xsk_umem(&the_config->umem, the_config->umem_frame_count);
 	if (umem == NULL) {
 		fprintf(stderr, "ERROR: Can't create umem \"%s\"\n",
 			strerror(errno));
@@ -609,6 +632,13 @@ int kr_xsk_init_global(uv_loop_t *loop)
 	/* Open and configure the AF_XDP (xsk) socket */
 	assert(!the_socket);
 
+	#if 0
+	/* TODO: all except the first attempt is getting EINVAL inside
+	 *   xsk_configure_socket()
+	 *   xsk_socket__create()
+	 *     if (rx) {
+		err = setsockopt(xsk->fd, SOL_XDP, XDP_RX_RING,
+	 */
 	for (int i = 0; i < 16; ++i) {
 		the_config->xsk_if_queue = i;
 		the_socket = xsk_configure_socket(the_config, umem);
@@ -616,8 +646,13 @@ int kr_xsk_init_global(uv_loop_t *loop)
 		fprintf(stderr, "ERROR, can't setup AF_XDP socket on queue %d: %s\n",
 			i, strerror(errno));
 	}
-	if (!the_socket)
+	#endif
+	the_socket = xsk_configure_socket(the_config, umem);
+	if (!the_socket) {
+		fprintf(stderr, "ERROR, can't setup AF_XDP socket on %s:%d: %s\n",
+			the_config->ifname, the_config->xsk_if_queue, strerror(errno));
 		exit(EXIT_FAILURE);
+	}
 
 	kr_log_verbose("[uxsk] busy frames: %d\n",
 			the_socket->umem->frame_count - the_socket->umem->free_count);

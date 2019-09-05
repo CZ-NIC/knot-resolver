@@ -62,6 +62,7 @@ struct args {
 	flagged_fd_array_t fds;
 	int control_fd;
 	int forks;
+	char *xsk;
 	const char *config;
 	const char *rundir;
 	bool interactive;
@@ -511,13 +512,14 @@ static int parse_args(int argc, char **argv, struct args *args)
 		{"fd",         required_argument, 0, 'S'},
 		{"config",     required_argument, 0, 'c'},
 		{"forks",      required_argument, 0, 'f'},
+		{"xsk",        required_argument, 0, 'x'}, // TODO: temporary?
 		{"verbose",          no_argument, 0, 'v'},
 		{"quiet",            no_argument, 0, 'q'},
 		{"version",          no_argument, 0, 'V'},
 		{"help",             no_argument, 0, 'h'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:t:S:c:f:m:K:k:vqVh", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:t:S:c:f:x:m:K:k:vqVh", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
@@ -537,6 +539,9 @@ static int parse_args(int argc, char **argv, struct args *args)
 						" number, not '%s'\n", optarg);
 				return EXIT_FAILURE;
 			}
+			break;
+		case 'x':
+			args->xsk = optarg;
 			break;
 		case 'v':
 			kr_verbose_set(true);
@@ -813,7 +818,7 @@ int main(int argc, char **argv)
 	}
 
 	//ret = udp_queue_init_global(loop);
-	ret = kr_xsk_init_global(loop);
+	ret = kr_xsk_init_global(loop, args.xsk);
 	if (ret) {
 		kr_log_error("[system] failed to initialize UDP queue: %s\n",
 				kr_strerror(ret));
