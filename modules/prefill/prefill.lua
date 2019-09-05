@@ -181,7 +181,7 @@ local function config_zone(zone_cfg)
 end
 
 function prefill.config(config)
-	if not config then return end -- e.g. just modules = { 'prefill' }
+	if config == nil then return end -- e.g. just modules = { 'prefill' }
 	local root_configured = false
 	if type(config) ~= 'table' then
 		error('[prefill] configuration must be in table '
