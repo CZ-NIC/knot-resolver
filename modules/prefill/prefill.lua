@@ -181,8 +181,9 @@ local function config_zone(zone_cfg)
 end
 
 function prefill.config(config)
+	if not config then return end -- e.g. just modules = { 'prefill' }
 	local root_configured = false
-	if not config or type(config) ~= 'table' then
+	if type(config) ~= 'table' then
 		error('[prefill] configuration must be in table '
 			.. '{owner name = {per-zone config}}')
 	end

@@ -6,6 +6,7 @@ Bugfixes
 - rebinding module: fix handling some requests, respect ALLOW_LOCAL flag
 - fix incorrect SERVFAIL on cached bogus answer for +cd request (!860)
   (regression since 4.1.0 release, in less common cases)
+- prefill module: allow a different module-loading style (#506)
 
 
 Knot Resolver 4.2.0 (2019-08-05)
