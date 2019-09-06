@@ -132,7 +132,7 @@ static int entry_h_len(const knot_db_val_t val)
 	if (!eh->is_packet) { /* Positive RRset + its RRsig set (may be empty). */
 		int sets = 2;
 		while (sets-- > 0) {
-			d += rdataset_dematerialized_size(d);
+			d += KR_CACHE_RR_COUNT_SIZE + rdataset_dematerialized_size(d, NULL);
 			if (d > data_bound) {
 				assert(!EILSEQ);
 				return kr_error(EILSEQ);

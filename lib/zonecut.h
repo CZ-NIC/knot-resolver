@@ -21,6 +21,15 @@
 #include "lib/generic/pack.h"
 #include "lib/generic/trie.h"
 
+
+/* TMP: compatibility for using libknot 2.8 API with 2.9. */
+#if KNOT_VERSION_MINOR >= 9
+static inline size_t knot_rdataset_size(const knot_rdataset_t *rrs)
+{
+	return rrs->size;
+}
+#endif
+
 struct kr_rplan;
 struct kr_context;
 

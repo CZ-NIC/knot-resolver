@@ -307,12 +307,19 @@ static inline int rdataset_dematerialize_size(const knot_rdataset_t *rds)
 	return KR_CACHE_RR_COUNT_SIZE + (rds == NULL ? 0 : knot_rdataset_size(rds));
 }
 
-static inline int rdataset_dematerialized_size(const uint8_t *data)
+/** Analyze the length of a dematerialized rdataset.
+ * Note that in the data it's KR_CACHE_RR_COUNT_SIZE and then this returned size. */
+static inline int rdataset_dematerialized_size(const uint8_t *data, uint16_t *rdataset_count)
 {
-	knot_rdataset_t rds;
-	memcpy(&rds.count, data, sizeof(rds.count));
-	rds.rdata = (knot_rdata_t *)(data + sizeof(rds.count));
-	return sizeof(rds.count) + knot_rdataset_size(&rds);
+	uint16_t count;
+	assert(sizeof(count) == KR_CACHE_RR_COUNT_SIZE);
+	memcpy(&count, data, sizeof(count));
+	const uint8_t *rdata = data + sizeof(count);
+	if (rdataset_count)
+		*rdataset_count = count;
+	for (int i = 0; i < count; ++i)
+		rdata += knot_rdata_size(((knot_rdata_t *)rdata)->len);
+	return rdata - (data + sizeof(count));
 }
 
 /** Serialize an rdataset. */
