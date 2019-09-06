@@ -75,8 +75,8 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	knot_section_t
 	knot_rrinfo_t
 	knot_dname_t
-	knot_rdata_t
-	knot_rdataset_t
+	#knot_rdata_t
+	#knot_rdataset_t
 EOF
 
 genResType() {
