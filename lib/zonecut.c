@@ -400,7 +400,7 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 		return kr_error(ESTALE);
 	}
 	/* Materialize the rdataset temporarily, for simplicity. */
-	knot_rdataset_t ns_rds = { 0, NULL };
+	knot_rdataset_t ns_rds = { 0 };
 	ret = kr_cache_materialize(&ns_rds, &peek, cut->pool);
 	if (ret < 0) {
 		return ret;

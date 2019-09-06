@@ -55,25 +55,19 @@ static int rdataset_materialize(knot_rdataset_t * restrict rds, const uint8_t * 
 		/*&& !((size_t)data & 1)*/);
 	assert(pool); /* not required, but that's our current usage; guard leaks */
 	const uint8_t *d = data; /* iterates over the cache data */
-	{
-		uint16_t rr_count;
-		memcpy(&rr_count, d, sizeof(rr_count));
-		d += sizeof(rr_count);
-		rds->count = rr_count;
-		if (!rr_count) { /* avoid mm_alloc(pool, 0); etc. */
-			return d - data;
-		}
-	}
 	/* First sum up the sizes for wire format length. */
-	const knot_rdataset_t rds_tmp = {
-		.count = rds->count,
-		.rdata = (knot_rdata_t *)d,
-	};
-	size_t rds_size = knot_rdataset_size(&rds_tmp); /* TODO: we might overrun here already,
-							but we need to trust cache anyway...*/
+	/* TODO: we might overrun here already, but we need to trust cache anyway...*/
+	const uint32_t rds_size = rdataset_dematerialized_size(d, &rds->count);
+	d += KR_CACHE_RR_COUNT_SIZE;
+	#if KNOT_VERSION_MINOR >= 9
+		rds->size = rds_size;
+	#endif
 	if (d + rds_size > data_bound) {
 		VERBOSE_MSG(NULL, "materialize: EILSEQ!\n");
 		return kr_error(EILSEQ);
+	}
+	if (!rds->count) { /* avoid mm_alloc(pool, 0); etc. */
+		return d - data;
 	}
 	rds->rdata = mm_alloc(pool, rds_size);
 	if (!rds->rdata) {
