@@ -36,7 +36,11 @@ static int edns_keepalive_finalize(kr_layer_t *ctx)
 	const bool ka_want =
 		req->qsource.flags.tcp &&
 		src_opt != NULL &&
-		knot_edns_get_option(src_opt, KNOT_EDNS_OPTION_TCP_KEEPALIVE) &&
+		knot_edns_get_option(src_opt, KNOT_EDNS_OPTION_TCP_KEEPALIVE
+					#if KNOT_VERSION_MINOR >= 9
+						, NULL
+					#endif
+				) &&
 		answ_opt != NULL;
 	if (!ka_want) {
 		return ctx->state;
