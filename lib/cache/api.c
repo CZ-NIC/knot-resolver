@@ -49,8 +49,9 @@
  */
 
 
-/** Cache version */
-static const uint16_t CACHE_VERSION = 5;
+/** Cache version
+ * KNOT_VERSION_: in 2.9 there's a change in knot_rdataset_t, affecting cache contents. */
+static const uint16_t CACHE_VERSION = 5 + (KNOT_VERSION_MINOR - 8);
 /** Key size */
 #define KEY_HSIZE (sizeof(uint8_t) + sizeof(uint16_t))
 #define KEY_SIZE (KEY_HSIZE + KNOT_DNAME_MAXLEN)
