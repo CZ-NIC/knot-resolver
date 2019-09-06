@@ -64,7 +64,7 @@ local sover_pos = string.find(libknot_SONAME, '%d')
 if not sover_pos then
 	error('unexpected libknot soname: ' .. libknot_SONAME)
 end
-local sover = string.sub(libknot_SONAME, sover_pos , sover_pos + 1)
+local sover = string.sub(libknot_SONAME, sover_pos , sover_pos)
 if sover == '8' then
 	knot_rdataset_t_cdef = [[
 		typedef struct {
@@ -84,12 +84,11 @@ else
 	error('unexpected libknot version: ' .. sover)
 end
 ffi.cdef([[
-	typedef struct {
-		uint16_t len;
-		uint8_t data[];
-	} knot_rdata_t;
-]])
-ffi.cdef(knot_rdataset_t_cdef)
+		typedef struct {
+			uint16_t len;
+			uint8_t data[];
+		} knot_rdata_t;
+	]] .. knot_rdataset_t_cdef)
 
 
 require('kres-gen')
