@@ -53,8 +53,10 @@
 #include <sys/resource.h> // setrlimit
 
 #include "contrib/ucw/lib.h"
+#include "contrib/ucw/mempool.h"
 
 #include "lib/resolve.h"
+#include "daemon/session.h"
 #include "daemon/worker.h"
 
 // placate libclang :-/
@@ -65,9 +67,8 @@ typedef uint64_t size_t;
 #endif
 
 
-#define INVALID_UMEM_FRAME SIZE_MAX
-
-#define FRAME_SIZE 4096 // when changing, beware of xsk_umem__create
+#define FRAME_SIZE 4096
+#define RX_BATCH_SIZE 64
 
 struct udpv4 {
 	union { uint8_t bytes[1]; struct {
@@ -141,7 +142,11 @@ struct xsk_socket_info {
 	struct xsk_socket *xsk;
 
 	bool kernel_needs_wakeup;
+
+	/* kresd-specific stuff */
 	uv_check_t check_handle;
+	uv_poll_t poll_handle;
+	struct session *session; /**< mock session, to minimize kresd changes for now */
 };
 
 struct xsk_socket_info *the_socket = NULL;
@@ -189,7 +194,7 @@ static struct umem_frame *xsk_alloc_umem_frame(struct xsk_umem_info *umem) // TO
 		return NULL;
 	}
 	uint32_t index = umem->free_indices[--umem->free_count];
-	kr_log_verbose("[uxsk] allocating frame %d\n", (int)index);
+	//kr_log_verbose("[uxsk] allocating frame %d\n", (int)index);
 	#ifndef NDEBUG
 		umem->free_indices[umem->free_count] = -1;
 	#endif
@@ -209,7 +214,7 @@ static void xsk_dealloc_umem_frame(struct xsk_umem_info *umem, uint8_t *uframe_p
 {
 	assert(umem->free_count < umem->frame_count);
 	ptrdiff_t diff = uframe_p - umem->frames->bytes;
-	assert(diff % FRAME_SIZE == 0);
+	assert(diff % FRAME_SIZE == 0); // for now it should always hold
 	size_t index = diff / FRAME_SIZE;
 	assert(index < umem->frame_count);
 	umem->free_indices[umem->free_count++] = index;
@@ -259,32 +264,54 @@ static int load_noop_prog(struct xsk_socket *xsk)
 	return 0;
 }
 
-static struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
-						    struct xsk_umem_info *umem)
+/** Add some free frames into the RX fill queue (possibly zero, etc.) */
+int kxsk_umem_refill(const struct config *cfg, struct xsk_umem_info *umem)
 {
-	int ret;
-#if 1
-	/* Put a couple RX buffers into the fill queue.
-	 * We don't need them ATM, but it silences a dmesg line,
-	 * and it avoids 100% CPU usage of ksoftirqd/i for each queue i!
-	 * TODO: redone when retried after failure. */
-	const int to_reserve = 1024;
+	/* First find to_reserve: how many frames to move to the RX fill queue.
+	 * Let's keep about as many frames ready for TX (free_count) as for RX (fq_ready),
+	 * and don't fill the queue to more than a half. */
+	const int fq_target = cfg->umem.fill_size / 2;
+	uint32_t fq_free = xsk_prod_nb_free(&umem->fq, fq_target);
+	if (fq_free <= fq_target)
+		return 0;
+	const int fq_ready = cfg->umem.fill_size - fq_free;
+	const int balance = (fq_ready + umem->free_count) / 2;
+	const int fq_want = MIN(balance, fq_target); // don't overshoot the target
+	const int to_reserve = fq_want - fq_ready;
+	kr_log_verbose("[uxsk] refilling %d frames TX->RX; TX = %d, RX = %d\n",
+			to_reserve, (int)umem->free_count, (int)fq_ready);
+	if (to_reserve <= 0)
+		return 0;
+
+	/* Now really reserve the frames. */
 	uint32_t idx;
-	ret = xsk_ring_prod__reserve(&umem->fq, to_reserve, &idx);
-	if (ret != to_reserve)
-		return NULL;
+	int ret = xsk_ring_prod__reserve(&umem->fq, to_reserve, &idx);
+	if (ret != to_reserve) {
+		assert(false);
+		return ENOSPC;
+	}
 	for (int i = 0; i < to_reserve; ++i, ++idx) {
 		struct umem_frame *uframe = xsk_alloc_umem_frame(umem);
 		if (!uframe) {
-			errno = ENOSPC;
-			return NULL;
+			assert(false);
+			return ENOSPC;
 		}
 		size_t offset = uframe->bytes - umem->frames->bytes;
 		*xsk_ring_prod__fill_addr(&umem->fq, idx) = offset;
 	}
 	xsk_ring_prod__submit(&umem->fq, to_reserve);
-#endif
+	return 0;
+}
 
+static struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
+						    struct xsk_umem_info *umem)
+{
+	int ret;
+	/* Put a couple RX buffers into the fill queue.
+	 * Even if we don't need them, it silences a dmesg line,
+	 * and it avoids 100% CPU usage of ksoftirqd/i for each queue i!
+	 * TODO: redone when retried after failure. */
+	ret = kxsk_umem_refill(cfg, umem);
 
 	struct xsk_socket_info *xsk_info = calloc(1, sizeof(*xsk_info));
 	if (!xsk_info)
@@ -522,6 +549,99 @@ static void xsk_check(uv_check_t *handle)
 	kr_log_verbose("[uxsk] completed %d frames; busy frames: %d\n", (int)completed,
 			the_socket->umem->frame_count - the_socket->umem->free_count);
 	//TODO: one uncompleted packet/batch is left until the next I/O :-/
+	/* And feed frames into RX fill queue. */
+	kxsk_umem_refill(the_config, the_socket->umem);
+}
+
+
+static void rx_desc(struct xsk_socket_info *xsi, const struct xdp_desc *desc)
+{
+	uint8_t *uframe_p = xsi->umem->frames->bytes + desc->addr;
+	const struct ethhdr *eth = (struct ethhdr *)uframe_p;
+	const struct iphdr *ipv4 = NULL;
+	const struct ipv6hdr *ipv6 = NULL;
+	const struct udphdr *udp;
+
+	// FIXME: length checks on multiple places
+	if (eth->h_proto == BS16(ETH_P_IP)) {
+		ipv4 = (struct iphdr *)(uframe_p + sizeof(struct ethhdr));
+		kr_log_verbose("frame len %d, ipv4 len %d\n",
+				(int)desc->len, (int)ipv4->tot_len);
+		// Any fragmentation stuff is bad for use, except for the DF flag
+		if (ipv4->version != 4 || (ipv4->frag_off & ~(1 << 14))) {
+			kr_log_info("[kxsk] weird IPv4 received: "
+					"version %d, frag_off %d\n",
+					(int)ipv4->version, (int)ipv4->frag_off);
+			goto free_frame;
+		}
+		if (ipv4->protocol != 0x11) // UDP
+			goto free_frame;
+		// FIXME ipv4->check (sensitive to ipv4->ihl), ipv4->tot_len, udp->len
+		udp = (struct udphdr *)(uframe_p + sizeof(struct ethhdr) + ipv4->ihl * 4);
+
+	} else if (eth->h_proto == BS16(ETH_P_IPV6)) {
+		(void)ipv6;
+		goto free_frame; // TODO
+
+	} else {
+		goto free_frame;
+	}
+
+	assert(eth && (!!ipv4 != !!ipv6) && udp);
+	uint8_t *udp_data = (uint8_t *)udp + sizeof(struct udphdr);
+	const uint16_t udp_data_len = BS16(udp->len) - sizeof(struct udphdr);
+
+	// process the packet; ownership is passed on, but beware of holding frames
+	// LATER: filter the address-port combinations that we listen on?
+
+	union inaddr sa_peer;
+	if (ipv4) {
+		sa_peer.ip4.sin_family = AF_INET;
+		sa_peer.ip4.sin_port = udp->source;
+		memcpy(&sa_peer.ip4.sin_addr, &ipv4->saddr, sizeof(ipv4->saddr));
+	} else {
+		sa_peer.ip6.sin6_family = AF_INET6;
+		sa_peer.ip6.sin6_port = udp->source;
+		memcpy(&sa_peer.ip6.sin6_addr, &ipv6->saddr, sizeof(ipv6->saddr));
+		//sa_peer.ip6.sin6_scope_id = the_config->xsk_if_queue;
+		//sin6_flowinfo: probably completely useless here
+	}
+
+	knot_pkt_t *kpkt = knot_pkt_new(udp_data, udp_data_len, &the_worker->pkt_pool);
+	int ret = kpkt == NULL ? kr_error(ENOMEM) :
+		worker_submit(xsi->session, &sa_peer.ip, kpkt);
+	if (ret)
+		kr_log_verbose("[kxsk] worker_submit() == %d: %s\n", ret, kr_strerror(ret));
+	mp_flush(the_worker->pkt_pool.ctx);
+
+	return;
+
+free_frame:
+	xsk_dealloc_umem_frame(xsi->umem, uframe_p);
+}
+// TODO: probably split up into generic part and kresd+UV part.
+void kxsk_rx(uv_poll_t* handle, int status, int events)
+{
+	if (status < 0) {
+		kr_log_error("[kxsk] poll status %d: %s\n", status, uv_strerror(status));
+		return;
+	}
+	if (events != UV_READABLE) {
+		kr_log_error("[kxsk] poll unexpected events: %d\n", events);
+		return;
+	}
+
+	struct xsk_socket_info *xsi = handle->data;
+	assert(xsi == the_socket); // for now
+
+	uint32_t idx_rx;
+	const size_t rcvd = xsk_ring_cons__peek(&xsi->rx, RX_BATCH_SIZE, &idx_rx);
+	if (!rcvd)
+		return;
+	for (int i = 0; i < rcvd; ++i, ++idx_rx) {
+		rx_desc(xsi, xsk_ring_cons__rx_desc(&xsi->rx, idx_rx));
+	}
+	xsk_ring_cons__release(&xsi->rx, rcvd);
 }
 #endif
 
@@ -661,6 +781,20 @@ int kr_xsk_init_global(uv_loop_t *loop, char *cmdarg)
 #else
 	int ret = uv_check_init(loop, &the_socket->check_handle);
 	if (!ret) ret = uv_check_start(&the_socket->check_handle, xsk_check);
+
+	if (!ret) ret = uv_poll_init(loop, &the_socket->poll_handle,
+					xsk_socket__fd(the_socket->xsk));
+	if (!ret) {
+		// beware: this sets poll_handle->data
+		the_socket->session =
+			session_new((uv_handle_t *)&the_socket->poll_handle, false);
+		assert(!session_flags(the_socket->session)->outgoing);
+		ret = the_socket->session ? 0 : kr_error(ENOMEM);
+	}
+	if (!ret) {
+		the_socket->poll_handle.data = the_socket;
+		ret = uv_poll_start(&the_socket->poll_handle, UV_READABLE, kxsk_rx);
+	}
 	return ret;
 #endif
 }
