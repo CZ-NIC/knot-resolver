@@ -341,6 +341,7 @@ pytests:
       - $SKIP_CI == "1"
   script:
     - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPDIFF_FORCE -gt 0 || exit 0
+    - test ! -f /var/tmp/respdiff-jobs/buffer/buffer_$RESPDIFF_TEST_stats.json || test $RESPDIFF_FORCE -gt 0 || ( echo "Reference unstable, try again in ~3h or use RESPDIFF_FORCE=1."; exit 1 )
     - export LABEL=gl$(date +%s)
     - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
     - export TESTDIR="$COMMITDIR/$RESPDIFF_TEST"
