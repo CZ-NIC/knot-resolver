@@ -1172,10 +1172,13 @@ static int qr_task_finalize(struct qr_task *task, int state)
 
 	int ret;
 	const uv_handle_t *src_handle = session_get_handle(source_session);
-	if (src_handle->type != UV_UDP && src_handle->type != UV_TCP) {
+	if (src_handle->type != UV_UDP && src_handle->type != UV_TCP
+				       && src_handle->type != UV_POLL) {
 		assert(false);
 		ret = kr_error(EINVAL);
-	} else if (src_handle->type == UV_UDP && ctx->source.addr.ip.sa_family == AF_INET) {
+	} else
+	if ((src_handle->type == UV_UDP || src_handle->type == UV_POLL)
+			&& ctx->source.addr.ip.sa_family == AF_INET) {
 		kr_xsk_push(session_get_sockname(source_session)/*FIXME*/,
 				&ctx->source.addr.ip, &ctx->req, task);
 		ret = 0;

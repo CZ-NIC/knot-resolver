@@ -214,7 +214,6 @@ static void xsk_dealloc_umem_frame(struct xsk_umem_info *umem, uint8_t *uframe_p
 {
 	assert(umem->free_count < umem->frame_count);
 	ptrdiff_t diff = uframe_p - umem->frames->bytes;
-	assert(diff % FRAME_SIZE == 0); // for now it should always hold
 	size_t index = diff / FRAME_SIZE;
 	assert(index < umem->frame_count);
 	umem->free_indices[umem->free_count++] = index;
@@ -310,7 +309,7 @@ static struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
 	/* Put a couple RX buffers into the fill queue.
 	 * Even if we don't need them, it silences a dmesg line,
 	 * and it avoids 100% CPU usage of ksoftirqd/i for each queue i!
-	 * TODO: redone when retried after failure. */
+	 */
 	ret = kxsk_umem_refill(cfg, umem);
 
 	struct xsk_socket_info *xsk_info = calloc(1, sizeof(*xsk_info));
@@ -327,7 +326,7 @@ static struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
 	if (!cfg->ifindex)
 		return NULL;
 	//clear_prog(cfg); // ignore return values??
-	load_noop_prog(xsk_info->xsk);
+	//load_noop_prog(xsk_info->xsk);
 	if (ret)
 		goto error_exit;
 
@@ -562,10 +561,11 @@ static void rx_desc(struct xsk_socket_info *xsi, const struct xdp_desc *desc)
 	const struct ipv6hdr *ipv6 = NULL;
 	const struct udphdr *udp;
 
+
 	// FIXME: length checks on multiple places
 	if (eth->h_proto == BS16(ETH_P_IP)) {
 		ipv4 = (struct iphdr *)(uframe_p + sizeof(struct ethhdr));
-		kr_log_verbose("frame len %d, ipv4 len %d\n",
+		kr_log_verbose("[kxsk] frame len %d, ipv4 len %d\n",
 				(int)desc->len, (int)ipv4->tot_len);
 		// Any fragmentation stuff is bad for use, except for the DF flag
 		if (ipv4->version != 4 || (ipv4->frag_off & ~(1 << 14))) {
@@ -584,6 +584,8 @@ static void rx_desc(struct xsk_socket_info *xsi, const struct xdp_desc *desc)
 		goto free_frame; // TODO
 
 	} else {
+		kr_log_verbose("[kxsk] frame with unknown h_proto %d (ignored)\n",
+				(int)BS16(eth->h_proto));
 		goto free_frame;
 	}
 
@@ -636,6 +638,8 @@ void kxsk_rx(uv_poll_t* handle, int status, int events)
 
 	uint32_t idx_rx;
 	const size_t rcvd = xsk_ring_cons__peek(&xsi->rx, RX_BATCH_SIZE, &idx_rx);
+	kr_log_verbose("[kxsk] poll triggered, processing a batch of %d packets\n",
+			(int)rcvd);
 	if (!rcvd)
 		return;
 	for (int i = 0; i < rcvd; ++i, ++idx_rx) {
@@ -658,8 +662,7 @@ static struct config the_config_storage = { // static to get zeroed by default
 	.xsk = {
 		.tx_size = XSK_RING_PROD__DEFAULT_NUM_DESCS,
 		.rx_size = XSK_RING_CONS__DEFAULT_NUM_DESCS,
-		/* Otherwise it tries to load the non-existent program. */
-		.libbpf_flags = XSK_LIBBPF_FLAGS__INHIBIT_PROG_LOAD, // TODO: why is this a problem??
+		//.libbpf_flags = XSK_LIBBPF_FLAGS__INHIBIT_PROG_LOAD, // TODO: why is this a problem??
 	},
 	.xdp_flags = XDP_FLAGS_UPDATE_IF_NOEXIST,
 	.pkt_template = {
@@ -786,10 +789,18 @@ int kr_xsk_init_global(uv_loop_t *loop, char *cmdarg)
 					xsk_socket__fd(the_socket->xsk));
 	if (!ret) {
 		// beware: this sets poll_handle->data
-		the_socket->session =
+		struct session *s = the_socket->session =
 			session_new((uv_handle_t *)&the_socket->poll_handle, false);
-		assert(!session_flags(the_socket->session)->outgoing);
-		ret = the_socket->session ? 0 : kr_error(ENOMEM);
+		assert(!session_flags(s)->outgoing);
+
+		// TMP: because worker will pass this back as source address to us
+		struct sockaddr_in *ssa = (struct sockaddr_in *)session_get_sockname(s);
+		ssa->sin_family = AF_INET;
+		memcpy(&ssa->sin_addr, &the_config->pkt_template.ipv4.saddr,
+				sizeof(ssa->sin_addr));
+		ssa->sin_port = the_config->pkt_template.udp.source;
+
+		ret = s ? 0 : kr_error(ENOMEM);
 	}
 	if (!ret) {
 		the_socket->poll_handle.data = the_socket;
