@@ -37,27 +37,6 @@
 #include <linux/filter.h>
 //#include <linux/icmpv6.h>
 
-#ifndef BPF_MOV32_IMM // rather new <linux/filter.h> is needed
-#define BPF_MOV32_IMM(DST, IMM)					\
-	((struct bpf_insn) {					\
-		.code  = BPF_ALU | BPF_MOV | BPF_K,		\
-		.dst_reg = DST,					\
-		.src_reg = 0,					\
-		.off   = 0,					\
-		.imm   = IMM })
-#endif
-#ifndef BPF_EXIT_INSN
-#define BPF_EXIT_INSN()						\
-	((struct bpf_insn) {					\
-		.code  = BPF_JMP | BPF_EXIT,			\
-		.dst_reg = 0,					\
-		.src_reg = 0,					\
-		.off   = 0,					\
-		.imm   = 0 })
-#endif
-
-#include <sys/resource.h> // setrlimit
-
 #include "contrib/ucw/lib.h"
 #include "contrib/ucw/mempool.h"
 
@@ -220,39 +199,10 @@ static int clear_prog(struct config *cfg)
 
 void kr_xsk_deinit_global(void)
 {
-	clear_prog(the_config);
+	//clear_prog(the_config);
 	xsk_socket__delete(the_socket->xsk);
 	xsk_umem__delete(the_socket->umem->umem);
 	//TODO: memory
-}
-
-
-static int load_noop_prog(struct xsk_socket *xsk)
-{
-	char log_buf[4096];
-	struct bpf_insn prog[] = {
-		BPF_MOV32_IMM(BPF_REG_0, 2),
-		BPF_EXIT_INSN(),
-	};
-	size_t insns_cnt = sizeof(prog) / sizeof(struct bpf_insn);
-
-	int prog_fd = bpf_load_program(BPF_PROG_TYPE_XDP, prog, insns_cnt,
-			"LGPL-2.1 or BSD-2-Clause", 0, log_buf, sizeof(log_buf));
-	if (prog_fd < 0) {
-		fprintf(stderr, "BPF log buffer:\n%s", log_buf);
-		return prog_fd;
-	}
-
-	/*TODO:hacky combination of (non-)globals*/
-	int err = bpf_set_link_xdp_fd(the_config->ifindex,
-			prog_fd, the_config->xsk.xdp_flags);
-	if (err) {
-		close(prog_fd);
-		return err;
-	}
-
-	//xsk->prog_fd = prog_fd;
-	return 0;
 }
 
 
@@ -866,14 +816,6 @@ int kr_xsk_init_global(uv_loop_t *loop, char *cmdarg)
 	test_pkt_ipv4_checksum();
 	return 0;
 	// */
-
-	/* I'm not sure if this is needed/useful. */
-	struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
-	if (setrlimit(RLIMIT_MEMLOCK, &r)) {
-		fprintf(stderr, "ERROR: setrlimit(RLIMIT_MEMLOCK) \"%s\"\n",
-			strerror(errno));
-		exit(EXIT_FAILURE);
-	}
 
 	/* Initialize shared packet_buffer for umem usage */
 	struct xsk_umem_info *umem =
