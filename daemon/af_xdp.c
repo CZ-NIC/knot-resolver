@@ -109,24 +109,6 @@ struct config {
 	struct xsk_socket_config xsk;
 
 	struct udpv4 pkt_template;
-
-	uint32_t xdp_flags;
-	/*
-	char *ifname;
-	//char ifname_buf[IF_NAMESIZE];
-	int redirect_ifindex;
-	char *redirect_ifname;
-	//char redirect_ifname_buf[IF_NAMESIZE];
-	bool do_unload;
-	bool reuse_maps;
-	char pin_dir[512];
-	char filename[512];
-	char progsec[32];
-	char src_mac[18];
-	char dest_mac[18];
-	uint16_t xsk_bind_flags;
-	bool xsk_poll_mode;
-	*/
 };
 
 struct xsk_umem_info {
@@ -231,7 +213,7 @@ static void xsk_dealloc_umem_frame(struct xsk_umem_info *umem, uint8_t *uframe_p
 
 static int clear_prog(struct config *cfg)
 {
-	int ret = bpf_set_link_xdp_fd(cfg->ifindex, -1, cfg->xdp_flags);
+	int ret = bpf_set_link_xdp_fd(cfg->ifindex, -1, cfg->xsk.xdp_flags);
 	if (ret) fprintf(stderr, "bpf_set_link_xdp_fd() == %d\n", ret);
 	return ret;
 }
@@ -263,7 +245,7 @@ static int load_noop_prog(struct xsk_socket *xsk)
 
 	/*TODO:hacky combination of (non-)globals*/
 	int err = bpf_set_link_xdp_fd(the_config->ifindex,
-			prog_fd, the_config->xdp_flags);
+			prog_fd, the_config->xsk.xdp_flags);
 	if (err) {
 		close(prog_fd);
 		return err;
@@ -281,7 +263,7 @@ static int ensure_udp_prog(struct config *cfg)
 	int ret;
 
 	uint32_t prog_id;
-	ret = bpf_get_link_xdp_id(cfg->ifindex, &prog_id, cfg->xdp_flags);
+	ret = bpf_get_link_xdp_id(cfg->ifindex, &prog_id, cfg->xsk.xdp_flags);
 	if (ret)
 		return -abs(ret);
 	if (prog_id)
@@ -298,7 +280,7 @@ static int ensure_udp_prog(struct config *cfg)
 		return -abs(ret);
 	}
 
-	ret = bpf_set_link_xdp_fd(cfg->ifindex, prog_fd, cfg->xdp_flags);
+	ret = bpf_set_link_xdp_fd(cfg->ifindex, prog_fd, cfg->xsk.xdp_flags);
 	if (ret) {
 		fprintf(stderr, "bpf_set_link_xdp_fd() == %d\n", ret);
 		return -abs(ret);
@@ -813,8 +795,8 @@ static struct config the_config_storage = { // static to get zeroed by default
 		.tx_size = XSK_RING_PROD__DEFAULT_NUM_DESCS,
 		.rx_size = XSK_RING_CONS__DEFAULT_NUM_DESCS,
 		.libbpf_flags = XSK_LIBBPF_FLAGS__INHIBIT_PROG_LOAD,
+		.xdp_flags = XDP_FLAGS_UPDATE_IF_NOEXIST,
 	},
-	.xdp_flags = XDP_FLAGS_UPDATE_IF_NOEXIST,
 	.pkt_template = {
 		.eth = {
 			//.h_dest   = "\xd8\x58\xd7\x00\x74\x34",
@@ -835,7 +817,7 @@ static struct config the_config_storage = { // static to get zeroed by default
 			.tot_len = BS16(0), // to be overwritten
 			.id = BS16(0), // probably anything; details: RFC 6864
 			.frag_off = BS16(0), // TODO: add the DF flag, probably (1 << 14)
-			.ttl = 5,
+			.ttl = IPDEFTTL,
 			.protocol = 0x11, // UDP
 			.check = 0, // to be overwritten
 		},
