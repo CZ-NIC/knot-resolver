@@ -776,7 +776,7 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 		qry->flags.AWAIT_CUT = true;
 		/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
 		if ((knot_wire_get_ad(packet->wire) || knot_pkt_has_dnssec(packet)) &&
-		    kr_ta_covers_qry(request->ctx, qname, qtype)) {
+		    kr_ta_covers_qry(request->ctx, qry->sname, qtype)) {
 			qry->flags.DNSSEC_WANT = true;
 		}
 	}
