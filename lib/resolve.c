@@ -420,7 +420,7 @@ static int edns_erase_and_reserve(knot_pkt_t *pkt)
 	return knot_pkt_reserve(pkt, len);
 }
 
-static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request *req)
+static int edns_create(knot_pkt_t *pkt, const struct kr_request *req)
 {
 	pkt->opt_rr = knot_rrset_copy(req->ctx->upstream_opt_rr, &pkt->mm);
 	size_t wire_size = knot_edns_wire_size(pkt->opt_rr);
@@ -704,7 +704,7 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 	/* Remove any EDNS records from any previous iteration. */
 	int ret = edns_erase_and_reserve(pkt);
 	if (ret) return ret;
-	ret = edns_create(pkt, request->answer, request);
+	ret = edns_create(pkt, request);
 	if (ret) return ret;
 	if (qry->flags.STUB) {
 		/* Stub resolution (ask for +rd and +do) */
