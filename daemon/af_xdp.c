@@ -47,11 +47,6 @@
 // placate libclang :-/
 typedef uint64_t size_t;
 
-#if TRIVIAL_DEMO
-	#define kr_log_verbose printf
-#endif
-
-
 #define FRAME_SIZE 4096
 #define RX_BATCH_SIZE 64
 
@@ -584,7 +579,6 @@ void kr_xsk_push(const struct sockaddr *src, const struct sockaddr *dst,
 	pkt_send(the_socket, uframe->udpv4.bytes - umem_mem_start, eth_len);
 }
 
-#if !TRIVIAL_DEMO
 /** Periodical callback . */
 static void xsk_check(uv_check_t *handle)
 {
@@ -728,7 +722,6 @@ void kxsk_rx(uv_poll_t* handle, int status, int events)
 	}
 	xsk_ring_cons__release(&xsi->rx, rcvd);
 }
-#endif
 
 
 static struct config the_config_storage = { // static to get zeroed by default
@@ -853,9 +846,8 @@ int kr_xsk_init_global(uv_loop_t *loop, char *cmdarg)
 
 	kr_log_verbose("[uxsk] busy frames: %d\n",
 			the_socket->umem->frame_count - the_socket->umem->free_count);
-#if TRIVIAL_DEMO
-	return 0;
-#else
+
+
 	int ret = uv_check_init(loop, &the_socket->check_handle);
 	if (!ret) ret = uv_check_start(&the_socket->check_handle, xsk_check);
 
@@ -881,7 +873,6 @@ int kr_xsk_init_global(uv_loop_t *loop, char *cmdarg)
 		ret = uv_poll_start(&the_socket->poll_handle, UV_READABLE, kxsk_rx);
 	}
 	return ret;
-#endif
 }
 
 #define SOL_XDP 283
@@ -899,37 +890,4 @@ static void print_stats()
 			(int)stats.tx_invalid_descs);
 	}
 }
-
-#if TRIVIAL_DEMO
-int main(int argc, char **argv)
-{
-	if (argc >= 2) {
-		the_config_storage.ifname = argv[1];
-	}
-	fprintf(stderr, "ifname = '%s'\n", the_config_storage.ifname);
-	kr_xsk_init_global(NULL);
-
-	print_stats();
-	int ret = sendto(xsk_socket__fd(the_socket->xsk), NULL, 0,
-			 MSG_DONTWAIT, NULL, 0);
-	fprintf(stderr, "sendto: %d %s\n", ret, strerror(errno));
-	print_stats();
-
-	struct udpv4 *pkt = (struct udpv4 *)the_socket->umem->frames;
-	int len = 0;
-	pkt_fill_headers(pkt, &the_config->pkt_template, len);
-	pkt_send(the_socket, 0/*byte address relative to start of umem->buffer*/,
-			offsetof(struct udpv4, data) + len + 4);
-	print_stats();
-	// We need to wake up the kernel, apparently.
-	ret = sendto(xsk_socket__fd(the_socket->xsk), NULL, 0,
-			 MSG_DONTWAIT, NULL, 0);
-	if (unlikely(ret == -1))
-		fprintf(stderr, "sendto: %s\n", strerror(errno));
-	print_stats();
-
-	kr_xsk_deinit_global();
-	return 0;
-}
-#endif
 
