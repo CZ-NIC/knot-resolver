@@ -113,6 +113,8 @@ Instead of CAs, you can specify hashes of accepted certificates in ``pin_sha256`
 They are in the usual format -- base64 from sha256.
 You may still specify ``hostname`` if you want SNI_ to be sent.
 
+.. _tls-examples:
+
 TLS Examples
 ~~~~~~~~~~~~
 
