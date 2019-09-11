@@ -31,7 +31,7 @@ function M.layer.consume(state, req, pkt)
 	local qry = req:current()
 	-- Observe only final answers in IN class where request has no CD flag.
 	if M.proxy == nil or not qry.flags.RESOLVED
-			or pkt:qclass() ~= kres.class.IN or req.answer:cd() then
+			or pkt:qclass() ~= kres.class.IN or req.qsource.packet:cd() then
 		return state
 	end
 	-- Synthetic AAAA from marked A responses
