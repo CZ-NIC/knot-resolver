@@ -1829,6 +1829,9 @@ knot_pkt_t * worker_resolve_mk_pkt(const char *qname_str, uint16_t qtype, uint16
 	knot_pkt_put_question(pkt, qname, qclass, qtype);
 	knot_wire_set_rd(pkt->wire);
 	knot_wire_set_ad(pkt->wire);
+	if (options->DNSSEC_CD) {
+		knot_wire_set_cd(pkt->wire);
+	}
 
 	/* Add OPT RR */
 	pkt->opt_rr = knot_rrset_copy(the_worker->engine->resolver.opt_rr, NULL);
@@ -1839,8 +1842,10 @@ knot_pkt_t * worker_resolve_mk_pkt(const char *qname_str, uint16_t qtype, uint16
 	if (options->DNSSEC_WANT) {
 		knot_edns_set_do(pkt->opt_rr);
 	}
-	if (options->DNSSEC_CD) {
-		knot_wire_set_cd(pkt->wire);
+	if (knot_pkt_begin(pkt, KNOT_ADDITIONAL)
+	    || knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, pkt->opt_rr, KNOT_PF_FREE)) {
+		knot_pkt_free(pkt);
+		return NULL;
 	}
 
 	return pkt;
