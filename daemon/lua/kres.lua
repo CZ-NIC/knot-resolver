@@ -893,6 +893,11 @@ ffi.metatype( kr_request_t, {
 			req.vars_ref = ref
 			return var
 		end,
+		-- Ensure that answer exists and return it; can't fail.
+		ensure_answer = function (req)
+			assert(ffi.istype(kr_request_t, req))
+			return C.kr_request_ensure_answer(req)
+		end,
 	},
 })
 

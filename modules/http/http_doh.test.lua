@@ -3,7 +3,7 @@ local basexx = require('basexx')
 local ffi = require('ffi')
 
 local function gen_huge_answer(_, req)
-	local answer = req.answer
+	local answer = req:ensure_answer()
 	ffi.C.kr_pkt_make_auth_header(answer)
 
 	answer:rcode(kres.rcode.NOERROR)
@@ -19,7 +19,7 @@ end
 
 local function gen_varying_ttls(_, req)
 	local qry = req:current()
-	local answer = req.answer
+	local answer = req:ensure_answer()
 	ffi.C.kr_pkt_make_auth_header(answer)
 
 	answer:rcode(kres.rcode.NOERROR)
