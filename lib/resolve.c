@@ -567,6 +567,7 @@ static void answer_finalize(struct kr_request *request)
 {
 	struct kr_rplan *rplan = &request->rplan;
 	knot_pkt_t *answer = request->answer;
+	const uint8_t *q_wire = request->qsource.packet->wire;
 
 	if (answer->rrset_count != 0) {
 		/* Non-standard: we assume the answer had been constructed.
@@ -605,7 +606,7 @@ static void answer_finalize(struct kr_request *request)
 	/* TODO: clean this up in !660 or followup, and it isn't foolproof anyway. */
 	if (last->flags.DNSSEC_BOGUS
 	    || (rplan->pending.len > 0 && array_tail(rplan->pending)->flags.DNSSEC_BOGUS)) {
-		if (!knot_wire_get_cd(request->qsource.packet->wire)) {
+		if (!knot_wire_get_cd(q_wire)) {
 			answer_fail(request);
 			return;
 		}
@@ -670,9 +671,10 @@ static void answer_finalize(struct kr_request *request)
 	VERBOSE_MSG(last, "AD: request%s classified as SECURE\n", secure ? "" : " NOT");
 	request->rank = secure ? KR_RANK_SECURE : KR_RANK_INITIAL;
 
-	/* Clear AD if not secure.  ATM answer has AD=1 if requested secured answer. */
-	if (!secure) {
-		knot_wire_clear_ad(answer->wire);
+	/* Set AD if secure and AD bit "was requested". */
+	if (secure && !knot_wire_get_cd(q_wire)
+	    && (knot_pkt_has_dnssec(answer) || knot_wire_get_ad(q_wire))) {
+		knot_wire_set_ad(answer->wire);
 	}
 }
 
@@ -811,8 +813,6 @@ knot_pkt_t * kr_request_ensure_answer(struct kr_request *request)
 	knot_wire_set_rcode(wire, KNOT_RCODE_NOERROR);
 	if (knot_wire_get_cd(qs_pkt->wire)) {
 		knot_wire_set_cd(wire);
-	} else if (request->current_query && request->current_query->flags.DNSSEC_WANT) { // FIXME: ugly
-		knot_wire_set_ad(wire);
 	}
 
 	// Prepare EDNS if required.
