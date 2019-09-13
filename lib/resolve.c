@@ -789,7 +789,6 @@ knot_pkt_t * kr_request_ensure_answer(struct kr_request *request)
 	 * for easier error handling (and we assume mempool takes care of leaks). */
 	knot_pkt_t *answer = request->answer =
 		knot_pkt_new(NULL, answer_max, &request->pool);
-	kr_log_verbose("packet allocated: %p\n", answer);
 	if (!answer || knot_pkt_init_response(answer, request->qsource.packet) != 0)
 		goto enomem;
 
