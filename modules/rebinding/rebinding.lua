@@ -71,7 +71,7 @@ end
 
 local function refuse(req)
 	policy.REFUSE(nil, req)
-	local pkt = req.answer
+	local pkt = req:ensure_answer()
 	pkt:aa(false)
 	pkt:begin(kres.section.ADDITIONAL)
 
