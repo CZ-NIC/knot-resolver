@@ -11,7 +11,7 @@ trust_anchors.remove('.')
 -- count . IN DNSKEY queries
 counter = 0
 local function counter_func (state, req)
-        local answer = req.answer
+        local answer = req:ensure_answer()
         local qry = req:current()
         if answer:qclass() == kres.class.IN
 		and qry.stype == kres.type.DNSKEY
