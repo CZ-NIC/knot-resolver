@@ -442,26 +442,6 @@ static int edns_create(knot_pkt_t *pkt, const struct kr_request *req)
 	return knot_pkt_reserve(pkt, wire_size);
 }
 
-static int answer_prepare(struct kr_request *req, knot_pkt_t *query)
-{
-	knot_pkt_t *answer = req->answer;
-	if (knot_pkt_init_response(answer, query) != 0) {
-		return kr_error(ENOMEM); /* Failed to initialize answer */
-	}
-	/* Handle EDNS in the query */
-	if (knot_pkt_has_edns(query)) {
-		answer->opt_rr = knot_rrset_copy(req->ctx->downstream_opt_rr, &answer->mm);
-		if (answer->opt_rr == NULL){
-			return kr_error(ENOMEM);
-		}
-		/* Set DO bit if set (DNSSEC requested). */
-		if (knot_pkt_has_dnssec(query)) {
-			knot_edns_set_do(answer->opt_rr);
-		}
-	}
-	return kr_ok();
-}
-
 /**
  * @param all_secure optionally &&-combine security of written RRs into its value.
  *		     (i.e. if you pass a pointer to false, it will always remain)
@@ -726,11 +706,11 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 	return kr_ok();
 }
 
-int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pkt_t *answer)
+int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx)
 {
 	/* Initialize request */
 	request->ctx = ctx;
-	request->answer = answer;
+	request->answer = NULL;
 	request->options = ctx->options;
 	request->state = KR_STATE_CONSUME;
 	request->current_query = NULL;
@@ -781,20 +761,6 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 		}
 	}
 
-	/* Initialize answer packet */
-	knot_pkt_t *answer = request->answer;
-	knot_wire_set_qr(answer->wire);
-	knot_wire_clear_aa(answer->wire);
-	knot_wire_set_ra(answer->wire);
-	knot_wire_set_rcode(answer->wire, KNOT_RCODE_NOERROR);
-
-	assert(request->qsource.packet);
-	if (knot_wire_get_cd(request->qsource.packet->wire)) {
-		knot_wire_set_cd(answer->wire);
-	} else if (qry->flags.DNSSEC_WANT) {
-		knot_wire_set_ad(answer->wire);
-	}
-
 	/* Expect answer, pop if satisfied immediately */
 	ITERATE_LAYERS(request, qry, begin);
 	if ((request->state & KR_STATE_DONE) != 0) {
@@ -806,6 +772,64 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 		request->state = KR_STATE_FAIL;
 	}
 	return request->state;
+}
+
+knot_pkt_t * kr_request_ensure_answer(struct kr_request *request)
+{
+	if (request->answer)
+		return request->answer;
+
+	const knot_pkt_t *qs_pkt = request->qsource.packet;
+	assert(qs_pkt);
+	// Find answer_max: limit on DNS wire length.
+	size_t answer_max;
+	const struct kr_request_qsource_flags *qs_flags = &request->qsource.flags;
+	assert((qs_flags->tls || qs_flags->http) ? qs_flags->tcp : true);
+	if (!request->qsource.addr || qs_flags->tcp) {
+		// not on UDP
+		answer_max = KNOT_WIRE_MAX_PKTSIZE;
+	} else if (knot_pkt_has_edns(qs_pkt)) {
+		// UDP with EDNS
+		answer_max = MIN(knot_edns_get_payload(qs_pkt->opt_rr),
+				 knot_edns_get_payload(request->ctx->downstream_opt_rr));
+		answer_max = MAX(answer_max, KNOT_WIRE_MIN_PKTSIZE);
+	} else {
+		// UDP without EDNS
+		answer_max = KNOT_WIRE_MIN_PKTSIZE;
+	}
+
+	// Allocate the packet.
+	knot_pkt_t *answer = request->answer =
+		knot_pkt_new(NULL, answer_max, &request->pool);
+	if (!answer || knot_pkt_init_response(answer, qs_pkt) != 0) {
+		assert(!answer); // otherwise we messed something up
+		goto enomem;
+	}
+
+	uint8_t *wire = answer->wire; // much was done by knot_pkt_init_response()
+	knot_wire_set_ra(wire);
+	knot_wire_set_rcode(wire, KNOT_RCODE_NOERROR);
+	if (knot_wire_get_cd(qs_pkt->wire)) {
+		knot_wire_set_cd(wire);
+	} else if (request->current_query && request->current_query->flags.DNSSEC_WANT) { // FIXME: ugly
+		knot_wire_set_ad(wire);
+	}
+
+	// Prepare EDNS if required.
+	if (knot_pkt_has_edns(qs_pkt)) {
+		answer->opt_rr = knot_rrset_copy(request->ctx->downstream_opt_rr,
+						 &answer->mm);
+		if (!answer->opt_rr)
+			goto enomem;
+		if (knot_pkt_has_dnssec(qs_pkt))
+			knot_edns_set_do(answer->opt_rr);
+	}
+
+	return request->answer;
+enomem:
+	// Consequences of `return NULL` would be way too complicated to handle.
+	kr_log_error("ERROR: irrecoverable out of memory condition in %s\n", __func__);
+	abort();
 }
 
 KR_PURE static bool kr_inaddr_equal(const struct sockaddr *a, const struct sockaddr *b)
@@ -904,9 +928,6 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 
 	/* Empty resolution plan, push packet as the new query */
 	if (packet && kr_rplan_empty(rplan)) {
-		if (answer_prepare(request, packet) != 0) {
-			return KR_STATE_FAIL;
-		}
 		return resolve_query(request, packet);
 	}
 
@@ -1633,6 +1654,7 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 int kr_resolve_finish(struct kr_request *request, int state)
 {
 	request->state = state;
+	kr_request_ensure_answer(request);
 	/* Finalize answer and construct wire-buffer. */
 	ITERATE_LAYERS(request, NULL, answer_finalize);
 	answer_finalize(request);

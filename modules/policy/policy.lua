@@ -213,7 +213,7 @@ end
 function policy.ANSWER(rtable, nodata)
 	return function(_, req)
 		local qry = req:current()
-		local answer = req.answer
+		local answer = req:ensure_answer()
 		local data = rtable[qry.stype]
 
 		ffi.C.kr_pkt_make_auth_header(answer)
@@ -254,7 +254,7 @@ local dname_localhost = todname('localhost.')
 -- Rule for localhost. zone; see RFC6303, sec. 3
 local function localhost(_, req)
 	local qry = req:current()
-	local answer = req.answer
+	local answer = req:ensure_answer()
 	ffi.C.kr_pkt_make_auth_header(answer)
 
 	local is_exact = ffi.C.knot_dname_is_equal(qry.sname, dname_localhost)
@@ -286,7 +286,7 @@ local dname_rev4_localhost_apex = todname('127.in-addr.arpa');
 -- TODO: much of this would better be left to the hints module (or coordinated).
 local function localhost_reversed(_, req)
 	local qry = req:current()
-	local answer = req.answer
+	local answer = req:ensure_answer()
 
 	-- classify qry.sname:
 	local is_exact   -- exact dname for localhost
@@ -606,7 +606,7 @@ local function answer_clear(req)
 	req.add_selected.len = 0
 
 	-- Let's be defensive and clear the answer, too.
-	local pkt = req.answer
+	local pkt = req:ensure_answer()
 	pkt:clear_payload()
 	return pkt
 end
@@ -718,8 +718,8 @@ function policy.REFUSE(_, req)
 end
 
 function policy.TC(state, req)
-	-- Skip non-UDP queries
-	if req.answer.max_size == 65535 then
+	-- Avoid non-UDP queries
+	if req.qsource.flags.tcp then
 		return state
 	end
 
