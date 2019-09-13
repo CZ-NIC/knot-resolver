@@ -477,7 +477,7 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 static void finalize_answer(knot_pkt_t *pkt, struct kr_request *req)
 {
 	/* Finalize header */
-	knot_pkt_t *answer = req->answer;
+	knot_pkt_t *answer = kr_request_ensure_answer(req);
 	knot_wire_set_rcode(answer->wire, knot_wire_get_rcode(pkt->wire));
 }
 
@@ -902,7 +902,8 @@ static int begin(kr_layer_t *ctx)
 	if (qry->sclass != KNOT_CLASS_IN
 	    || (knot_rrtype_is_metatype(qry->stype)
 		    /* && qry->stype != KNOT_RRTYPE_ANY hmm ANY seems broken ATM */)) {
-		knot_wire_set_rcode(ctx->req->answer->wire, KNOT_RCODE_NOTIMPL);
+		knot_pkt_t *ans = kr_request_ensure_answer(ctx->req);
+		knot_wire_set_rcode(ans->wire, KNOT_RCODE_NOTIMPL);
 		return KR_STATE_FAIL;
 	}
 
