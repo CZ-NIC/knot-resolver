@@ -378,7 +378,7 @@ static int zi_rrset_import(zone_import_ctx_t *z_import, knot_rrset_t *rr)
 	qry->zone_cut.key = z_import->key;
 	qry->zone_cut.trust_anchor = z_import->ta;
 
-	if (knot_pkt_init_response(request->answer, query) != 0) {
+	if (knot_pkt_init_response(answer, query) != 0) {
 		goto cleanup;
 	}
 
