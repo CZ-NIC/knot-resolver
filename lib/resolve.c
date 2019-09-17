@@ -619,8 +619,10 @@ static void answer_finalize(struct kr_request *request)
 	/* TODO: clean this up in !660 or followup, and it isn't foolproof anyway. */
 	if (last->flags.DNSSEC_BOGUS
 	    || (rplan->pending.len > 0 && array_tail(rplan->pending)->flags.DNSSEC_BOGUS)) {
-		answer_fail(request);
-		return;
+		if (!knot_wire_get_cd(request->qsource.packet->wire)) {
+			answer_fail(request);
+			return;
+		}
 	}
 
 	/* AD flag.  We can only change `secure` from true to false.
