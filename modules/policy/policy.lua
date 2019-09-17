@@ -707,11 +707,7 @@ policy.special_names = {
 				todname('test.'),
 				todname('onion.'),
 				todname('invalid.'),
-
-				--[[ RFC6762 22.1.4 mandates to return NXDOMAIN without asking upstream.
-					By default we use QNAME minimization and aggressive caching,
-					in which case we can't see why follow this RFC advice ("SHOULD").
-				todname('local.'), --]]
+				todname('local.'),
 			}),
 		count=0
 	},
