@@ -11,6 +11,7 @@ Bugfixes
 Improvements
 ------------
 - add compatibility with (future) libknot 2.9
+- policy: special domains home.arpa. and local. get NXDOMAIN (!855)
 
 
 Knot Resolver 4.2.0 (2019-08-05)

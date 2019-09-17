@@ -744,6 +744,8 @@ local private_zones = {
 	'a.e.f.ip6.arpa.',
 	'b.e.f.ip6.arpa.',
 	'8.b.d.0.1.0.0.2.ip6.arpa.',
+	-- RFC8375
+	'home.arpa.',
 }
 policy.todnames(private_zones)
 
@@ -768,6 +770,7 @@ policy.special_names = {
 				todname('test.'),
 				todname('onion.'),
 				todname('invalid.'),
+				todname('local.'), -- RFC 8375.4
 			}),
 		count=0
 	},
