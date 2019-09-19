@@ -532,7 +532,7 @@ void kxsk_rx(uv_poll_t* handle, int status, int events)
 
 static struct config the_config_storage = { // static to get zeroed by default
 	.ifname = "eth3", .xsk_if_queue = 0, // defaults overridable by command-line -x eth3:0
-	.xdp_prog_filename = "./af_xdp_kernel.o", // FIXME: proper installation, etc.
+	.xdp_prog_filename = "./bpf-kernel.o", // FIXME: proper installation, etc.
 	.umem_frame_count = 8192,
 	.umem = {
 		.fill_size = XSK_RING_PROD__DEFAULT_NUM_DESCS,
