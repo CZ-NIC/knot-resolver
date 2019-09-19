@@ -7,6 +7,7 @@ Bugfixes
 - fix incorrect SERVFAIL on cached bogus answer for +cd request (!860)
   (regression since 4.1.0 release, in less common cases)
 - validation: trim TTLs by RRSIG's expiration and original TTL (#319, #504)
+- prefill module: allow a different module-loading style (#506)
 - policy: special domains home.arpa. and local. get NXDOMAIN (!855)
 
 
