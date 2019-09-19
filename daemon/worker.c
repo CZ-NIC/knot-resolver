@@ -321,19 +321,10 @@ static int request_start(struct request_ctx *ctx, knot_pkt_t *query)
 		req->qsource.size += query->tsig_wire.len;
 	}
 
-	//FIXME: move this block to kr_request_ensure_answer()
-	uint16_t answer_max2;
-	void *wire = kr_xsk_alloc_wire(&answer_max2);
-	if (!wire) {
-		return kr_error(ENOMEM);
-	}
-	//FIXME: "dealloc" the wire in cases the answer isn't sent (if possible)
-	knot_pkt_t *answer = knot_pkt_new(wire, MIN(answer_max, answer_max2), &req->pool);
 	knot_pkt_t *pkt = knot_pkt_new(NULL, req->qsource.size, &req->pool);
 	if (!pkt) {
 		return kr_error(ENOMEM);
 	}
-
 	int ret = knot_pkt_copy(pkt, query);
 	if (ret != KNOT_EOK && ret != KNOT_ETRAIL) {
 		return kr_error(ENOMEM);

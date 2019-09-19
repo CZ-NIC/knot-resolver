@@ -775,6 +775,8 @@ static struct config the_config_storage = { // static to get zeroed by default
 
 int kr_xsk_init_global(uv_loop_t *loop, char *cmdarg)
 {
+	kxsk_alloc_hack = kr_xsk_alloc_wire;
+
 	/* Hard-coded configuration */
 	const char
 		//sip_str[] = "192.168.8.71",

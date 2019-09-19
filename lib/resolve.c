@@ -24,6 +24,7 @@
 #include <libknot/descriptor.h>
 #include <ucw/mempool.h>
 #include "kresconfig.h"
+#include "daemon/af_xdp.h"
 #include "lib/resolve.h"
 #include "lib/layer.h"
 #include "lib/rplan.h"
@@ -39,6 +40,8 @@
 #endif /* defined(ENABLE_COOKIES) */
 
 #define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "resl",  __VA_ARGS__)
+
+alloc_wire_fun kxsk_alloc_hack = NULL;
 
 bool kr_rank_check(uint8_t rank)
 {
@@ -786,14 +789,29 @@ knot_pkt_t * kr_request_ensure_answer(struct kr_request *request)
 	}
 	// FIXME: configurability of the limit
 
-	/* Allocate the packet.  We don't assign it until the final success,
-	 * for easier error handling (and we assume mempool takes care of leaks). */
+	uint8_t *wire = NULL;
+	const bool want_xsk = request->qsource.addr != NULL;
+		// ^ FIXME: better, probably look at session flags?
+	if (want_xsk) {
+		uint16_t answer_max2;
+		wire = kxsk_alloc_hack(&answer_max2);
+		if (wire && answer_max2 < answer_max)
+			answer_max = answer_max2;
+		// !wire -> ENOBUFS, fall back to normally allocated wire
+		// FIXME: do NOT try sending it out, though the AF_XDP driver will
+		// probably just skip it already.
+		assert(wire);
+	}
+	// FIXME: "dealloc" the umem wire in cases the answer isn't sent (if possible)
+
+	/* Allocate the packet. */
 	knot_pkt_t *answer = request->answer =
-		knot_pkt_new(NULL, answer_max, &request->pool);
+		knot_pkt_new(wire, answer_max, &request->pool);
 	if (!answer || knot_pkt_init_response(answer, request->qsource.packet) != 0)
 		goto enomem;
+	if (!wire)
+		wire = answer->wire;
 
-	uint8_t *wire = answer->wire;
 	knot_wire_clear_aa(wire);
 	knot_wire_set_ra(wire);
 	knot_wire_set_rcode(wire, KNOT_RCODE_NOERROR);

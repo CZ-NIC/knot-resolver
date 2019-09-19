@@ -73,6 +73,15 @@
  */
 
 
+/* The issue: XSK wire allocation is an overlap of library and daemon:
+ *  - it needs to be called from the library
+ *  - it needs to rely on lots of stuff from daemon
+ * That makes separation difficult, e.g. tests are without daemon.
+ * FIXME: try for a better solution. */
+typedef void * (*alloc_wire_fun)(uint16_t *maxlen);
+extern alloc_wire_fun kxsk_alloc_hack;
+
+
 /**
  * RRset rank - for cache and ranked_rr_*.
  *
