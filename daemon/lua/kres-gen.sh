@@ -178,6 +178,7 @@ EOF
 ## libkres API
 ${CDEFS} ${LIBKRES} functions <<-EOF
 # Resolution request
+	kr_request_ensure_answer
 	kr_resolve_plan
 	kr_resolve_pool
 # Resolution plan

@@ -77,7 +77,7 @@ local function refuse(req)
 	req.add_selected.len = 0
 
 	-- construct brand new answer packet
-	local pkt = req.answer
+	local pkt = req:ensure_answer()
 	pkt:clear_payload()
 	pkt:rcode(kres.rcode.REFUSED)
 	pkt:ad(false)

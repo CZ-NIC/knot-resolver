@@ -486,10 +486,10 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	return result;
 }
 
-static void finalize_answer(knot_pkt_t *pkt, struct kr_query *qry, struct kr_request *req)
+static void finalize_answer(knot_pkt_t *pkt, struct kr_request *req)
 {
 	/* Finalize header */
-	knot_pkt_t *answer = req->answer;
+	knot_pkt_t *answer = kr_request_ensure_answer(req);
 	knot_wire_set_rcode(answer->wire, knot_wire_get_rcode(pkt->wire));
 }
 
@@ -669,7 +669,7 @@ static int process_final(knot_pkt_t *pkt, struct kr_request *req,
 			array->at[last_idx] = entry;
 			entry->to_wire = true;
 		}
-		finalize_answer(pkt, query, req);
+		finalize_answer(pkt, req);
 		return KR_STATE_DONE;
 	}
 	return kr_ok();
@@ -793,7 +793,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		if (state != kr_ok()) {
 			return KR_STATE_FAIL;
 		}
-		finalize_answer(pkt, query, req);
+		finalize_answer(pkt, req);
 	} else {
 		/* Answer for sub-query; DS, IP for NS etc.
 		 * It may contains NSEC \ NSEC3 records for
@@ -856,7 +856,7 @@ static int process_stub(knot_pkt_t *pkt, struct kr_request *req)
 		return KR_STATE_FAIL;
 	}
 
-	finalize_answer(pkt, query, req);
+	finalize_answer(pkt, req);
 	return KR_STATE_DONE;
 }
 
@@ -893,7 +893,8 @@ static int begin(kr_layer_t *ctx)
 	if (qry->sclass != KNOT_CLASS_IN
 	    || (knot_rrtype_is_metatype(qry->stype)
 		    /* && qry->stype != KNOT_RRTYPE_ANY hmm ANY seems broken ATM */)) {
-		knot_wire_set_rcode(ctx->req->answer->wire, KNOT_RCODE_NOTIMPL);
+		knot_pkt_t *ans = kr_request_ensure_answer(ctx->req);
+		knot_wire_set_rcode(ans->wire, KNOT_RCODE_NOTIMPL);
 		return KR_STATE_FAIL;
 	}
 

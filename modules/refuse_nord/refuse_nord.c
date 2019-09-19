@@ -15,7 +15,7 @@ static int refuse_nord_query(kr_layer_t *ctx)
 	uint8_t rd = knot_wire_get_rd(req->qsource.packet->wire);
 
 	if (!rd) {
-		knot_pkt_t *answer = req->answer;
+		knot_pkt_t *answer = kr_request_ensure_answer(req);
 		knot_wire_set_rcode(answer->wire, KNOT_RCODE_REFUSED);
 		knot_wire_clear_ad(answer->wire);
 		ctx->state = KR_STATE_DONE;
