@@ -127,16 +127,9 @@ static void xsk_dealloc_umem_frame(struct xsk_umem_info *umem, uint8_t *uframe_p
 	umem->free_indices[umem->free_count++] = index;
 }
 
-static int clear_prog(struct config *cfg)
-{
-	int ret = bpf_set_link_xdp_fd(cfg->ifindex, -1, cfg->xsk.xdp_flags);
-	if (ret) fprintf(stderr, "bpf_set_link_xdp_fd() == %d\n", ret);
-	return ret;
-}
-
 void kr_xsk_deinit_global(void)
 {
-	//clear_prog(the_config);
+	kxsk_bpf_deinit(the_config, the_socket);
 	xsk_socket__delete(the_socket->xsk);
 	xsk_umem__delete(the_socket->umem->umem);
 	//TODO: memory
@@ -213,7 +206,7 @@ static struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
 	//load_noop_prog(xsk_info->xsk);
 
 	if (!ret)
-		ret = kxsk_bpf_setup(cfg, xsk_info);
+		ret = kxsk_bpf_init(cfg, xsk_info);
 	if (!ret)
 		return xsk_info;
 

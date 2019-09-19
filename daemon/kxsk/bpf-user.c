@@ -43,7 +43,8 @@ static int ensure_udp_prog(const struct config *cfg)
 /** Get FDs for the two maps and assign them into xsk_info-> fields.
  *
  * It's almost precise copy of xsk_lookup_bpf_maps() from libbpf
- * (version before they eliminated qidconf_map) */
+ * (version before they eliminated qidconf_map)
+ * Copyright by Intel, LGPL-2.1 or BSD-2-Clause. */
 static int get_bpf_maps(int prog_fd, struct xsk_socket_info *xsk_info)
 {
 	__u32 i, *map_ids, num_maps, prog_len = sizeof(struct bpf_prog_info);
@@ -111,6 +112,12 @@ out_map_ids:
 	free(map_ids);
 	return err;
 }
+static void unget_bpf_maps(struct xsk_socket_info *xsk_info)
+{
+	close(xsk_info->qidconf_map_fd);
+	close(xsk_info->xsks_map_fd);
+	xsk_info->qidconf_map_fd = xsk_info->xsks_map_fd = -1;
+}
 
 /** Activate this AF_XDP socket through the BPF maps. */
 static int update_bpf_maps(struct xsk_socket_info *xsk_info, int queue_id)
@@ -127,7 +134,7 @@ static int update_bpf_maps(struct xsk_socket_info *xsk_info, int queue_id)
 	return err;
 }
 /** Deactivate this AF_XDP socket through the BPF maps. */
-static int clear_bpf_maps(struct xsk_socket_info *xsk_info, int queue_id)
+static int clear_bpf_maps(int queue_id, struct xsk_socket_info *xsk_info)
 {
 	int qid = false;
 	int err = bpf_map_update_elem(xsk_info->qidconf_map_fd, &queue_id, &qid, 0);
@@ -136,13 +143,20 @@ static int clear_bpf_maps(struct xsk_socket_info *xsk_info, int queue_id)
 	return err;
 }
 
-int kxsk_bpf_setup(const struct config *cfg, struct xsk_socket_info *xsk_info)
+int kxsk_bpf_init(const struct config *cfg, struct xsk_socket_info *xsk_info)
 {
 	int ret = ensure_udp_prog(cfg);
 	if (ret >= 0)
 		ret = get_bpf_maps(ret, xsk_info);
 	if (ret == 0)
 		ret = update_bpf_maps(xsk_info, cfg->xsk_if_queue);
+	return ret;
+}
+
+int kxsk_bpf_deinit(const struct config *cfg, struct xsk_socket_info *xsk_info)
+{
+	int ret = clear_bpf_maps(cfg->xsk_if_queue, xsk_info);
+	unget_bpf_maps(xsk_info);
 	return ret;
 }
 

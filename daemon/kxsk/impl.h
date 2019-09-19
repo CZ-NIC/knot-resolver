@@ -66,10 +66,25 @@ struct xsk_socket_info {
 };
 
 
+/* eBPF stuff (user-space part), implemented in ./bpf-user.c */
+
 /** Ensure the BPF program and maps are set up; return it's FD or error < 0.
  *
- * Note: if one is loaded on the interface already, we assume it's ours. (Is it checkable?)
- * Implemented in ./bpf-user.c
+ * Note: if one is loaded on the interface already, we assume it's ours.
+ * LATER: it might be possible to check, e.g. by naming our maps unusually.
  */
-int kxsk_bpf_setup(const struct config *cfg, struct xsk_socket_info *xsk_info);
+int kxsk_bpf_init(const struct config *cfg, struct xsk_socket_info *xsk_info);
+
+/** Stop the BPF part, so packets should no longer come to the socket.
+ *
+ * Note: the program is not unloaded, but that only adds some overhead.
+ * This way only the single interface queue is affected.
+ */
+int kxsk_bpf_deinit(const struct config *cfg, struct xsk_socket_info *xsk_info);
+
+/** Forcefully unload BPF program from the interface.  (whole interface is affected) */
+static inline int kxsk_bpf_unload(struct config *cfg)
+{
+	return bpf_set_link_xdp_fd(cfg->ifindex, -1, cfg->xsk.xdp_flags);
+}
 
