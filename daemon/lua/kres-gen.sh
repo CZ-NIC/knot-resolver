@@ -75,8 +75,8 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	knot_section_t
 	knot_rrinfo_t
 	knot_dname_t
-	knot_rdata_t
-	knot_rdataset_t
+	#knot_rdata_t
+	#knot_rdataset_t
 EOF
 
 genResType() {
@@ -178,6 +178,7 @@ EOF
 ## libkres API
 ${CDEFS} ${LIBKRES} functions <<-EOF
 # Resolution request
+	kr_request_ensure_answer
 	kr_resolve_plan
 	kr_resolve_pool
 # Resolution plan

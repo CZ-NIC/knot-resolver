@@ -77,7 +77,7 @@ local function refuse(req)
 	req.add_selected.len = 0
 
 	-- construct brand new answer packet
-	local pkt = req.answer
+	local pkt = req:ensure_answer()
 	pkt:clear_payload()
 	pkt:rcode(kres.rcode.REFUSED)
 	pkt:ad(false)
@@ -95,7 +95,7 @@ function M.layer.consume(state, req, pkt)
 		return state end
 
 	local qry = req:current()
-	if qry.flags.CACHED then  -- do not slow down cached queries
+	if qry.flags.CACHED or qry.flags.ALLOW_LOCAL then  -- do not slow down cached queries
 		return state end
 
 	local bad_rr = check_pkt(pkt)
@@ -104,7 +104,14 @@ function M.layer.consume(state, req, pkt)
 
 	qry.flags.RESOLVED = 1  -- stop iteration
 	qry.flags.CACHED = 1  -- do not cache
-	refuse(req)
+
+	--[[ In case we're in a sub-query, we do not touch the final req answer.
+		Only this sub-query will get finished without a result - there we
+		rely on the iterator reacting to flags.RESOLVED
+		Typical example: NS address resolution -> only this NS won't be used
+		but others may still be OK (or we SERVFAIL due to no NS being usable).
+	--]]
+	if qry.parent == nil then refuse(req) end
 	if verbose() then
 		ffi.C.kr_log_qverbose_impl(qry, 'rebinding',
 		    'blocking blacklisted IP in RR \'%s\' received from IP %s\n',

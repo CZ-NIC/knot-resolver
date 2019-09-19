@@ -183,7 +183,7 @@ Policy examples
 	-- Custom rule
 	local ffi = require('ffi')
 	local function genRR (state, req)
-		local answer = req.answer
+		local answer = req:ensure_answer()
 		local qry = req:current()
 		if qry.stype ~= kres.type.A then
 			return state

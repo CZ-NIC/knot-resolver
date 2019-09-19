@@ -4,7 +4,9 @@
 
 Vagrant.configure(2) do |config|
 
-    config.vm.box = "opensuse/openSUSE-15.0-x86_64"
+    config.vm.box = "openSUSE-Leap-15.1-Vagrant.x86_64"
+    config.vm.box_url = "https://download.opensuse.org/repositories/Virtualization:/Appliances:/Images:/openSUSE-Leap-15.1/images/boxes/openSUSE-Leap-15.1-Vagrant.x86_64.json"
+
     config.vm.synced_folder ".", "/vagrant", disabled: true
 
     config.vm.define "leap15_knot-resolver"  do |machine|

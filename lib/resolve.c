@@ -418,7 +418,7 @@ static int edns_erase_and_reserve(knot_pkt_t *pkt)
 	return knot_pkt_reserve(pkt, len);
 }
 
-static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request *req)
+static int edns_create(knot_pkt_t *pkt, const struct kr_request *req)
 {
 	pkt->opt_rr = knot_rrset_copy(req->ctx->opt_rr, &pkt->mm);
 	size_t wire_size = knot_edns_wire_size(pkt->opt_rr);
@@ -438,26 +438,6 @@ static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request 
 			wire_size += KNOT_EDNS_OPTION_HDRLEN + req->ctx->tls_padding;
 	}
 	return knot_pkt_reserve(pkt, wire_size);
-}
-
-static int answer_prepare(struct kr_request *req, knot_pkt_t *query)
-{
-	knot_pkt_t *answer = req->answer;
-	if (knot_pkt_init_response(answer, query) != 0) {
-		return kr_error(ENOMEM); /* Failed to initialize answer */
-	}
-	/* Handle EDNS in the query */
-	if (knot_pkt_has_edns(query)) {
-		answer->opt_rr = knot_rrset_copy(req->ctx->opt_rr, &answer->mm);
-		if (answer->opt_rr == NULL){
-			return kr_error(ENOMEM);
-		}
-		/* Set DO bit if set (DNSSEC requested). */
-		if (knot_pkt_has_dnssec(query)) {
-			knot_edns_set_do(answer->opt_rr);
-		}
-	}
-	return kr_ok();
 }
 
 /**
@@ -580,6 +560,7 @@ static void answer_finalize(struct kr_request *request)
 {
 	struct kr_rplan *rplan = &request->rplan;
 	knot_pkt_t *answer = request->answer;
+	const uint8_t *q_wire = request->qsource.packet->wire;
 
 	if (answer->rrset_count != 0) {
 		/* Non-standard: we assume the answer had been constructed.
@@ -618,8 +599,10 @@ static void answer_finalize(struct kr_request *request)
 	/* TODO: clean this up in !660 or followup, and it isn't foolproof anyway. */
 	if (last->flags.DNSSEC_BOGUS
 	    || (rplan->pending.len > 0 && array_tail(rplan->pending)->flags.DNSSEC_BOGUS)) {
-		answer_fail(request);
-		return;
+		if (!knot_wire_get_cd(q_wire)) {
+			answer_fail(request);
+			return;
+		}
 	}
 
 	/* AD flag.  We can only change `secure` from true to false.
@@ -681,9 +664,10 @@ static void answer_finalize(struct kr_request *request)
 	VERBOSE_MSG(last, "AD: request%s classified as SECURE\n", secure ? "" : " NOT");
 	request->rank = secure ? KR_RANK_SECURE : KR_RANK_INITIAL;
 
-	/* Clear AD if not secure.  ATM answer has AD=1 if requested secured answer. */
-	if (!secure) {
-		knot_wire_clear_ad(answer->wire);
+	/* Set AD if secure and AD bit "was requested". */
+	if (secure && !knot_wire_get_cd(q_wire)
+	    && (knot_pkt_has_dnssec(answer) || knot_wire_get_ad(q_wire))) {
+		knot_wire_set_ad(answer->wire);
 	}
 }
 
@@ -695,7 +679,7 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 	/* Remove any EDNS records from any previous iteration. */
 	int ret = edns_erase_and_reserve(pkt);
 	if (ret) return ret;
-	ret = edns_create(pkt, request->answer, request);
+	ret = edns_create(pkt, request);
 	if (ret) return ret;
 	if (qry->flags.STUB) {
 		/* Stub resolution (ask for +rd and +do) */
@@ -717,11 +701,11 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 	return kr_ok();
 }
 
-int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pkt_t *answer)
+int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx)
 {
 	/* Initialize request */
 	request->ctx = ctx;
-	request->answer = answer;
+	request->answer = NULL;
 	request->options = ctx->options;
 	request->state = KR_STATE_CONSUME;
 	request->current_query = NULL;
@@ -767,23 +751,9 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 		qry->flags.AWAIT_CUT = true;
 		/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
 		if ((knot_wire_get_ad(packet->wire) || knot_pkt_has_dnssec(packet)) &&
-		    kr_ta_covers_qry(request->ctx, qname, qtype)) {
+		    kr_ta_covers_qry(request->ctx, qry->sname, qtype)) {
 			qry->flags.DNSSEC_WANT = true;
 		}
-	}
-
-	/* Initialize answer packet */
-	knot_pkt_t *answer = request->answer;
-	knot_wire_set_qr(answer->wire);
-	knot_wire_clear_aa(answer->wire);
-	knot_wire_set_ra(answer->wire);
-	knot_wire_set_rcode(answer->wire, KNOT_RCODE_NOERROR);
-
-	assert(request->qsource.packet);
-	if (knot_wire_get_cd(request->qsource.packet->wire)) {
-		knot_wire_set_cd(answer->wire);
-	} else if (qry->flags.DNSSEC_WANT) {
-		knot_wire_set_ad(answer->wire);
 	}
 
 	/* Expect answer, pop if satisfied immediately */
@@ -797,6 +767,55 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 		request->state = KR_STATE_FAIL;
 	}
 	return request->state;
+}
+
+knot_pkt_t * kr_request_ensure_answer(struct kr_request *request)
+{
+	if (request->answer)
+		return request->answer;
+
+	assert(request->qsource.packet);
+	/* Find answer_max: limit on DNS wire length. */
+	size_t answer_max = KNOT_WIRE_MIN_PKTSIZE;
+	struct kr_request_qsource_flags *qsflags = &request->qsource.flags;
+	if (!request->qsource.addr || qsflags->tcp || qsflags->http) {
+		answer_max = KNOT_WIRE_MAX_PKTSIZE;
+	} else if (knot_pkt_has_edns(request->qsource.packet)) { /* EDNS */
+		answer_max = MAX(knot_edns_get_payload(request->qsource.packet->opt_rr),
+				 KNOT_WIRE_MIN_PKTSIZE);
+	}
+	// FIXME: configurability of the limit
+
+	/* Allocate the packet.  We don't assign it until the final success,
+	 * for easier error handling (and we assume mempool takes care of leaks). */
+	knot_pkt_t *answer = request->answer =
+		knot_pkt_new(NULL, answer_max, &request->pool);
+	if (!answer || knot_pkt_init_response(answer, request->qsource.packet) != 0)
+		goto enomem;
+
+	uint8_t *wire = answer->wire;
+	knot_wire_clear_aa(wire);
+	knot_wire_set_ra(wire);
+	knot_wire_set_rcode(wire, KNOT_RCODE_NOERROR);
+	if (knot_wire_get_cd(request->qsource.packet->wire)) {
+		knot_wire_set_cd(wire);
+	}
+
+	/* Handle EDNS in the query */
+	if (knot_pkt_has_edns(request->qsource.packet)) {
+		answer->opt_rr = knot_rrset_copy(request->ctx->opt_rr, &answer->mm);
+		if (!answer->opt_rr)
+			goto enomem;
+		/* Set DO bit if set (DNSSEC requested). */
+		if (knot_pkt_has_dnssec(request->qsource.packet))
+			knot_edns_set_do(answer->opt_rr);
+	}
+
+	return request->answer;
+enomem:
+	/* Consequences of `return NULL` would be way too complicated to handle. */
+	kr_log_error("ERROR: irrecoverable out of memory condition in %s\n", __func__);
+	abort();
 }
 
 KR_PURE static bool kr_inaddr_equal(const struct sockaddr *a, const struct sockaddr *b)
@@ -895,9 +914,6 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 
 	/* Empty resolution plan, push packet as the new query */
 	if (packet && kr_rplan_empty(rplan)) {
-		if (answer_prepare(request, packet) != 0) {
-			return KR_STATE_FAIL;
-		}
 		return resolve_query(request, packet);
 	}
 
@@ -1601,6 +1617,7 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 int kr_resolve_finish(struct kr_request *request, int state)
 {
 	request->state = state;
+	kr_request_ensure_answer(request);
 	/* Finalize answer and construct wire-buffer. */
 	ITERATE_LAYERS(request, NULL, answer_finalize);
 	answer_finalize(request);
