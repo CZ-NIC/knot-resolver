@@ -57,6 +57,40 @@ int inet_pton(int af, const char *src, void *dst);
 int gettimeofday(struct timeval *tv, struct timezone *tz);
 ]]
 
+
+-- TMP: compatibility with both libknot 2.8 and 2.9
+local knot_rdataset_t_cdef
+local sover_pos = string.find(libknot_SONAME, '%d')
+if not sover_pos then
+	error('unexpected libknot soname: ' .. libknot_SONAME)
+end
+local sover = string.sub(libknot_SONAME, sover_pos , sover_pos)
+if sover == '8' then
+	knot_rdataset_t_cdef = [[
+		typedef struct {
+			uint16_t count;
+			knot_rdata_t *rdata;
+		} knot_rdataset_t;
+	]]
+elseif sover == '9' then
+	knot_rdataset_t_cdef = [[
+		typedef struct {
+			uint16_t count;
+			uint32_t size;
+			knot_rdata_t *rdata;
+		} knot_rdataset_t;
+	]]
+else
+	error('unexpected libknot version: ' .. sover)
+end
+ffi.cdef([[
+		typedef struct {
+			uint16_t len;
+			uint8_t data[];
+		} knot_rdata_t;
+	]] .. knot_rdataset_t_cdef)
+
+
 require('kres-gen')
 
 -- Error code representation
