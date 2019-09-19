@@ -16,9 +16,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <bpf/bpf.h>
-#include <bpf/xsk.h>
-#include <uv.h>
 
 #ifdef KR_XDP_ETH_CRC
 #include <zlib.h>
@@ -30,10 +27,6 @@
 #include <net/if.h>
 #include <netinet/in.h>
 #include <linux/if_link.h>
-#include <linux/if_ether.h>
-#include <linux/ip.h>
-#include <linux/ipv6.h>
-#include <linux/udp.h>
 #include <linux/filter.h>
 //#include <linux/icmpv6.h>
 
@@ -44,22 +37,14 @@
 #include "daemon/session.h"
 #include "daemon/worker.h"
 
+
+#include "daemon/kxsk/impl.h"
+
 // placate libclang :-/
 typedef uint64_t size_t;
 
 #define FRAME_SIZE 4096
 #define RX_BATCH_SIZE 64
-
-struct udpv4 {
-	union { uint8_t bytes[1]; struct {
-
-	struct ethhdr eth; // no VLAN support; CRC at the "end" of .data!
-	struct iphdr ipv4;
-	struct udphdr udp;
-	uint8_t data[];
-
-	} __attribute__((packed)); };
-};
 
 /** The memory layout of each umem frame. */
 struct umem_frame {
@@ -71,49 +56,6 @@ struct umem_frame {
 	}; };
 };
 
-struct config {
-	const char *ifname;
-	int ifindex; /**< computed from ifname */
-	int xsk_if_queue;
-	const char *xdp_prog_filename;
-
-	struct xsk_umem_config umem;
-	uint32_t umem_frame_count;
-
-	struct xsk_socket_config xsk;
-
-	struct udpv4 pkt_template;
-};
-
-struct xsk_umem_info {
-	/** Fill queue: passing memory frames to kernel - ready to receive. */
-	struct xsk_ring_prod fq;
-	/** Completion queue: passing memory frames from kernel - after send finishes. */
-	struct xsk_ring_cons cq;
-	/** Handle internal to libbpf. */
-	struct xsk_umem *umem;
-
-	struct umem_frame *frames; /**< The memory frames. TODO: (uint8_t *frammem) might be more practical. */
-	uint32_t frame_count;
-	uint32_t free_count; /**< The number of free frames. */
-	uint32_t *free_indices; /**< Stack of indices of the free frames. */
-};
-struct xsk_socket_info {
-	struct xsk_ring_cons rx;
-	struct xsk_ring_prod tx;
-	struct xsk_umem_info *umem;
-	struct xsk_socket *xsk;
-
-	bool kernel_needs_wakeup;
-	/* File-descriptors to BPF maps for the program running on the interface. */
-	int qidconf_map_fd;
-	int xsks_map_fd;
-
-	/* kresd-specific stuff */
-	uv_check_t check_handle;
-	uv_poll_t poll_handle;
-	struct session *session; /**< mock session, to minimize kresd changes for now */
-};
 
 struct xsk_socket_info *the_socket = NULL;
 struct config *the_config = NULL;
@@ -200,139 +142,6 @@ void kr_xsk_deinit_global(void)
 	//TODO: memory
 }
 
-
-/** Ensure the BPF program is loaded (and maps exist); return it's FD or error < 0.
- * Note: if one is loaded already, we assume it's ours. (Is it checkable?) */
-static int ensure_udp_prog(struct config *cfg)
-{
-	int ret;
-
-	uint32_t prog_id;
-	ret = bpf_get_link_xdp_id(cfg->ifindex, &prog_id, cfg->xsk.xdp_flags);
-	if (ret)
-		return -abs(ret);
-	if (prog_id)
-		return bpf_prog_get_fd_by_id(prog_id);
-
-	/* Use libbpf for extracting BPF byte-code from BPF-ELF object, and
-	 * loading this into the kernel via bpf-syscall */
-	int prog_fd;
-	struct bpf_object *obj; // TODO: leak or what?
-	ret = bpf_prog_load(cfg->xdp_prog_filename, BPF_PROG_TYPE_XDP, &obj, &prog_fd);
-	if (ret) {
-		fprintf(stderr, "[kxsk] failed loading BPF program (%s) (%d): %s\n",
-			cfg->xdp_prog_filename, ret, strerror(-ret));
-		return -abs(ret);
-	}
-
-	ret = bpf_set_link_xdp_fd(cfg->ifindex, prog_fd, cfg->xsk.xdp_flags);
-	if (ret) {
-		fprintf(stderr, "bpf_set_link_xdp_fd() == %d\n", ret);
-		return -abs(ret);
-	} else {
-		fprintf(stderr, "[kxsk] loaded BPF program\n");
-	}
-
-	return prog_fd;
-}
-
-/** Get FDs for the two maps and assign them into xsk_info-> fields.
- *
- * It's almost precise copy of xsk_lookup_bpf_maps() from libbpf
- * (version before they eliminated qidconf_map) */
-static int get_bpf_maps(int prog_fd, struct xsk_socket_info *xsk_info)
-{
-	__u32 i, *map_ids, num_maps, prog_len = sizeof(struct bpf_prog_info);
-	__u32 map_len = sizeof(struct bpf_map_info);
-	struct bpf_prog_info prog_info = {};
-	struct bpf_map_info map_info;
-	int fd, err;
-
-	err = bpf_obj_get_info_by_fd(prog_fd, &prog_info, &prog_len);
-	if (err)
-		return err;
-
-	num_maps = prog_info.nr_map_ids;
-
-	map_ids = calloc(prog_info.nr_map_ids, sizeof(*map_ids));
-	if (!map_ids)
-		return -ENOMEM;
-
-	memset(&prog_info, 0, prog_len);
-	prog_info.nr_map_ids = num_maps;
-	prog_info.map_ids = (__u64)(unsigned long)map_ids;
-
-	err = bpf_obj_get_info_by_fd(prog_fd, &prog_info, &prog_len);
-	if (err)
-		goto out_map_ids;
-
-	for (i = 0; i < prog_info.nr_map_ids; ++i) {
-		if (xsk_info->qidconf_map_fd >= 0 && xsk_info->xsks_map_fd >= 0)
-			break;
-
-		fd = bpf_map_get_fd_by_id(map_ids[i]);
-		if (fd < 0)
-			continue;
-
-		err = bpf_obj_get_info_by_fd(fd, &map_info, &map_len);
-		if (err) {
-			close(fd);
-			continue;
-		}
-
-		if (!strcmp(map_info.name, "qidconf_map")) {
-			xsk_info->qidconf_map_fd = fd;
-			continue;
-		}
-
-		if (!strcmp(map_info.name, "xsks_map")) {
-			xsk_info->xsks_map_fd = fd;
-			continue;
-		}
-
-		close(fd);
-	}
-
-	if (xsk_info->qidconf_map_fd < 0 || xsk_info->xsks_map_fd < 0) {
-		err = -ENOENT;
-		close(xsk_info->qidconf_map_fd);
-		close(xsk_info->xsks_map_fd);
-		xsk_info->qidconf_map_fd = xsk_info->xsks_map_fd = -1;
-		goto out_map_ids;
-	}
-
-	err = 0; // success!
-
-out_map_ids:
-	free(map_ids);
-	return err;
-}
-
-/** Activate this AF_XDP socket through the BPF maps. */
-static int update_bpf_maps(struct xsk_socket_info *xsk_info, int queue_id)
-{
-	int fd = xsk_socket__fd(xsk_info->xsk);
-	int err = bpf_map_update_elem(xsk_info->xsks_map_fd, &queue_id, &fd, 0);
-	if (err)
-		return err;
-
-	int qid = true;
-	err = bpf_map_update_elem(xsk_info->qidconf_map_fd, &queue_id, &qid, 0);
-	if (err)
-		bpf_map_delete_elem(xsk_info->xsks_map_fd, &queue_id);
-	return err;
-}
-/** Deactivate this AF_XDP socket through the BPF maps. */
-static int clear_bpf_maps(struct xsk_socket_info *xsk_info, int queue_id)
-{
-	int qid = false;
-	int err = bpf_map_update_elem(xsk_info->qidconf_map_fd, &queue_id, &qid, 0);
-	// Clearing the second map doesn't seem important, but why not.
-	bpf_map_delete_elem(xsk_info->xsks_map_fd, &queue_id);
-	return err;
-}
-
-
 /** Add some free frames into the RX fill queue (possibly zero, etc.) */
 int kxsk_umem_refill(const struct config *cfg, struct xsk_umem_info *umem)
 {
@@ -403,12 +212,9 @@ static struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
 	//clear_prog(cfg); // ignore return values??
 	//load_noop_prog(xsk_info->xsk);
 
-	ret = -abs(ret);
-	if (ret == 0) ret = ensure_udp_prog(cfg);
-	if (ret >= 0) ret = get_bpf_maps(ret, xsk_info);
-	if (ret == 0) ret = update_bpf_maps(xsk_info, cfg->xsk_if_queue);
-
-	if (ret == 0)
+	if (!ret)
+		ret = kxsk_bpf_setup(cfg, xsk_info);
+	if (!ret)
 		return xsk_info;
 
 //error_exit:

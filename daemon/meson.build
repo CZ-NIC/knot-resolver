@@ -11,6 +11,7 @@ kresd_src = files([
   'engine.c',
   'ffimodule.c',
   'io.c',
+  'kxsk/bpf-user.c',
   'main.c',
   'network.c',
   'session.c',
