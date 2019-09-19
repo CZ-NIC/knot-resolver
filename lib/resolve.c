@@ -790,8 +790,10 @@ knot_pkt_t * kr_request_ensure_answer(struct kr_request *request)
 	// FIXME: configurability of the limit
 
 	uint8_t *wire = NULL;
-	const bool want_xsk = request->qsource.addr != NULL;
+	const bool want_xsk = request->qsource.addr != NULL && !request->qsource.flags.tcp
+				&& !request->qsource.flags.http;
 		// ^ FIXME: better, probably look at session flags?
+		// (need to find concrete XDP socket of the request)
 	if (want_xsk) {
 		uint16_t answer_max2;
 		wire = kxsk_alloc_hack(&answer_max2);

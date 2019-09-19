@@ -129,6 +129,8 @@ static void xsk_dealloc_umem_frame(struct xsk_umem_info *umem, uint8_t *uframe_p
 
 void kr_xsk_deinit_global(void)
 {
+	if (!the_socket)
+		return;
 	kxsk_bpf_deinit(the_config, the_socket);
 	xsk_socket__delete(the_socket->xsk);
 	xsk_umem__delete(the_socket->umem->umem);
@@ -440,7 +442,7 @@ static void rx_desc(struct xsk_socket_info *xsi, const struct xdp_desc *desc)
 	if (eth->h_proto == BS16(ETH_P_IP)) {
 		ipv4 = (struct iphdr *)(uframe_p + sizeof(struct ethhdr));
 		kr_log_verbose("[kxsk] frame len %d, ipv4 len %d\n",
-				(int)desc->len, (int)ipv4->tot_len);
+				(int)desc->len, (int)BS16(ipv4->tot_len));
 		// Any fragmentation stuff is bad for use, except for the DF flag
 		if (ipv4->version != 4 || (ipv4->frag_off & ~(1 << 14))) {
 			kr_log_info("[kxsk] weird IPv4 received: "
@@ -575,6 +577,8 @@ static struct config the_config_storage = { // static to get zeroed by default
 int kr_xsk_init_global(uv_loop_t *loop, char *cmdarg)
 {
 	kxsk_alloc_hack = kr_xsk_alloc_wire;
+	if (!cmdarg)
+		return 0;
 
 	/* Hard-coded configuration */
 	const char
@@ -677,13 +681,11 @@ int kr_xsk_init_global(uv_loop_t *loop, char *cmdarg)
 }
 
 #define SOL_XDP 283
-static void print_stats()
+static void print_stats(struct xsk_socket *xsk)
 {
 	struct xdp_statistics stats;
 	socklen_t optlen = sizeof(stats);
-	int err = getsockopt(xsk_socket__fd(the_socket->xsk), SOL_XDP, XDP_STATISTICS,
-				&stats, &optlen);
-	if (err) {
+	if (getsockopt(xsk_socket__fd(xsk), SOL_XDP, XDP_STATISTICS, &stats, &optlen)) {
 		fprintf(stderr, "getsockopt: %s\n", strerror(errno));
 	} else {
 		fprintf(stderr, "stats: RX drop %d, RX ID %d, TX ID %d\n",
