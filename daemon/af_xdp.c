@@ -336,11 +336,8 @@ static void pkt_send(struct xsk_socket_info *xsk, uint64_t addr, uint32_t len)
 	xsk_ring_prod__submit(&xsk->tx, 1);
 	xsk->kernel_needs_wakeup = true;
 }
-
-
-
 void kr_xsk_push(const struct sockaddr *src, const struct sockaddr *dst,
-		 struct kr_request *req, struct qr_task *task)
+		 struct kr_request *req, struct qr_task *task, uint8_t eth_addrs[2][6])
 {
 	kr_log_verbose("[uxsk] pushing a packet\n");
 	assert(src->sa_family == AF_INET && dst->sa_family == AF_INET);
@@ -361,23 +358,37 @@ void kr_xsk_push(const struct sockaddr *src, const struct sockaddr *dst,
 	// sockaddr* contents is already in network byte order
 	const struct sockaddr_in *src_v4 = (const struct sockaddr_in *)src;
 	const struct sockaddr_in *dst_v4 = (const struct sockaddr_in *)dst;
-	// Copy eth and ipv4; there's nothing useful in udp anymore
-	// TODO: hardcoded eth addresses.
-	memcpy(&uframe->udpv4, &the_config->pkt_template, offsetof(struct udpv4, udp));
 
-	const uint16_t udp_len = sizeof(uframe->udpv4.udp) + req->answer->size;
-	uframe->udpv4.udp.len = BS16(udp_len);
-	uframe->udpv4.udp.source = src_v4->sin_port;
-	uframe->udpv4.udp.dest   = dst_v4->sin_port;
+	const struct udpv4 *t = &the_config->pkt_template;
+	struct udpv4 *h = &uframe->udpv4;
 
-	assert(uframe->udpv4.ipv4.ihl == 5); // header length 20
-	uframe->udpv4.ipv4.tot_len = BS16(20 + udp_len);
-	memcpy(&uframe->udpv4.ipv4.saddr, &src_v4->sin_addr, sizeof(src_v4->sin_addr));
-	memcpy(&uframe->udpv4.ipv4.daddr, &dst_v4->sin_addr, sizeof(dst_v4->sin_addr));
-	uframe->udpv4.ipv4.check = pkt_ipv4_checksum_2(&uframe->udpv4.ipv4);
+	// UDP: struct udphdr
+	const uint16_t udp_len = sizeof(h->udp) + req->answer->size;
+	h->udp.len = BS16(udp_len);
+	h->udp.source = src_v4->sin_port;
+	h->udp.dest   = dst_v4->sin_port;
+	h->udp.check  = 0;
 
+	// IPv4: struct iphdr
+	h->ipv4.ihl      = t->ipv4.ihl;
+	h->ipv4.version  = t->ipv4.version;
+	h->ipv4.tos      = t->ipv4.tos;
+	assert(h->ipv4.ihl == 5); // header length 20
+	h->ipv4.tot_len  = BS16(20 + udp_len);
+	h->ipv4.id       = t->ipv4.id;
+	h->ipv4.frag_off = t->ipv4.frag_off;
+	h->ipv4.ttl      = t->ipv4.ttl;
+	h->ipv4.protocol = t->ipv4.protocol;
+	memcpy(&h->ipv4.saddr, &src_v4->sin_addr, sizeof(src_v4->sin_addr));
+	memcpy(&h->ipv4.daddr, &dst_v4->sin_addr, sizeof(dst_v4->sin_addr));
+	h->ipv4.check = pkt_ipv4_checksum_2(&h->ipv4);
+
+	// Ethernet: struct ethhdr
+	memcpy(h->eth.h_dest,   eth_addrs[1], sizeof(eth_addrs[1]));
+	memcpy(h->eth.h_source, eth_addrs[0], sizeof(eth_addrs[0]));
+	h->eth.h_proto = t->eth.h_proto;
 	uint32_t eth_len = offsetof(struct udpv4, data) + req->answer->size + 4/*CRC*/;
-	pkt_send(the_socket, uframe->udpv4.bytes - umem_mem_start, eth_len);
+	pkt_send(the_socket, h->bytes - umem_mem_start, eth_len);
 }
 
 /** Periodical callback . */
@@ -487,7 +498,7 @@ static void rx_desc(struct xsk_socket_info *xsi, const struct xdp_desc *desc)
 
 	knot_pkt_t *kpkt = knot_pkt_new(udp_data, udp_data_len, &the_worker->pkt_pool);
 	int ret = kpkt == NULL ? kr_error(ENOMEM) :
-		worker_submit(xsi->session, &sa_peer.ip, kpkt);
+		worker_submit(xsi->session, &sa_peer.ip, (const uint8_t (*)[6])eth, kpkt);
 	if (ret)
 		kr_log_verbose("[kxsk] worker_submit() == %d: %s\n", ret, kr_strerror(ret));
 	mp_flush(the_worker->pkt_pool.ctx);

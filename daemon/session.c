@@ -730,7 +730,7 @@ int session_wirebuf_process(struct session *session, const struct sockaddr *peer
 	while (((query = session_produce_packet(session, &worker->pkt_pool)) != NULL) &&
 	       (ret < max_iterations)) {
 		assert (!session_wirebuf_error(session));
-		int res = worker_submit(session, peer, query);
+		int res = worker_submit(session, peer, NULL, query);
 		if (res != kr_error(EILSEQ)) {
 			/* Packet has been successfully parsed. */
 			ret += 1;

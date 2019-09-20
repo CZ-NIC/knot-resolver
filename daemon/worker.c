@@ -68,6 +68,8 @@ struct request_ctx
 	struct kr_request req;
 
 	struct {
+		/** MAC addresses - ours and client's, in case of AF_XDP socket. */
+		uint8_t eth_addrs[2][6];
 		/** Requestor's address; separate because of UDP session "sharing". */
 		union inaddr addr;
 		/** NULL if the request didn't come over network. */
@@ -262,12 +264,13 @@ static int subreq_key(char *dst, knot_pkt_t *pkt)
 
 /** Create and initialize a request_ctx (on a fresh mempool).
  *
- * handle and addr point to the source of the request, and they are NULL
+ * handle and peer point to the source of the request, and they are NULL
  * in case the request didn't come from network.
  */
 static struct request_ctx *request_create(struct worker_ctx *worker,
 					  struct session *session,
 					  const struct sockaddr *peer,
+					  const uint8_t eth_addrs[2][6],
 					  uint32_t uid)
 {
 	knot_mm_t pool = {
@@ -290,6 +293,9 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		assert(session_flags(session)->outgoing == false);
 	}
 	ctx->source.session = session;
+	if (eth_addrs) {
+		memcpy(ctx->source.eth_addrs, eth_addrs, sizeof(ctx->source.eth_addrs));
+	}
 
 	struct kr_request *req = &ctx->req;
 	req->pool = pool;
@@ -1159,7 +1165,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	if ((src_handle->type == UV_UDP || src_handle->type == UV_POLL)
 			&& ctx->source.addr.ip.sa_family == AF_INET) {
 		kr_xsk_push(session_get_sockname(source_session)/*FIXME*/,
-				&ctx->source.addr.ip, &ctx->req, task);
+				&ctx->source.addr.ip, &ctx->req, task, ctx->source.eth_addrs);
 		ret = 0;
 	} else if (src_handle->type == UV_UDP && ENABLE_SENDMMSG) {
 		int fd;
@@ -1558,7 +1564,8 @@ static int parse_packet(knot_pkt_t *query)
 	return ret;
 }
 
-int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt_t *query)
+int worker_submit(struct session *session, const struct sockaddr *peer,
+		  const uint8_t eth_addrs[2][6], knot_pkt_t *query)
 {
 	if (!session) {
 		assert(false);
@@ -1592,7 +1599,7 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 	struct qr_task *task = NULL;
 	const struct sockaddr *addr = NULL;
 	if (!is_outgoing) { /* request from a client */
-		struct request_ctx *ctx = request_create(worker, session, peer,
+		struct request_ctx *ctx = request_create(worker, session, peer, eth_addrs,
 							 knot_wire_get_id(query->wire));
 		if (!ctx) {
 			return kr_error(ENOMEM);
@@ -1829,7 +1836,7 @@ struct qr_task *worker_resolve_start(knot_pkt_t *query, struct kr_qflags options
 	}
 
 
-	struct request_ctx *ctx = request_create(worker, NULL, NULL, worker->next_request_uid);
+	struct request_ctx *ctx = request_create(worker, NULL, NULL, NULL, worker->next_request_uid);
 	if (!ctx) {
 		return NULL;
 	}

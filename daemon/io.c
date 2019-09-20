@@ -80,7 +80,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	}
 	if (nread <= 0) {
 		if (nread < 0) { /* Error response, notify resolver */
-			worker_submit(s, NULL, NULL);
+			worker_submit(s, NULL, NULL, NULL);
 		} /* nread == 0 is for freeing buffers, we don't need to do this */
 		return;
 	}
