@@ -50,7 +50,7 @@ struct kr_rrset_validation_ctx {
 	const knot_pkt_t *pkt;		/*!< Packet to be validated. */
 	ranked_rr_array_t *rrs;		/*!< List of preselected RRs to be validated. */
 	knot_section_t section_id;	/*!< Section to work with. */
-	const knot_rrset_t *keys;	/*!< DNSKEY RRSet. */
+	knot_rrset_t *keys;		/*!< DNSKEY RRSet; TTLs may get lowered when validating this set. */
         const knot_dname_t *zone_name;	/*!< Name of the zone containing the RRSIG RRSet. */
 	uint32_t timestamp;		/*!< Validation time. */
         bool has_nsec3;			/*!< Whether to use NSEC3 validation. */
@@ -76,10 +76,10 @@ typedef struct kr_rrset_validation_ctx kr_rrset_validation_ctx_t;
  * Validate RRSet.
  * @param vctx    Pointer to validation context.
  * @param covered RRSet covered by a signature. It must be in canonical format.
+ * 		  Its TTL may get lowered.
  * @return        0 or error code, same as vctx->result.
  */
-int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx,
-			const knot_rrset_t *covered);
+int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx, knot_rrset_t *covered);
 
 /**
  * Return true iff the RRset contains at least one usable DS.  See RFC6840 5.2.
@@ -89,7 +89,7 @@ bool kr_ds_algo_support(const knot_rrset_t *ta);
 
 /**
  * Check whether the DNSKEY rrset matches the supplied trust anchor RRSet.
- * @param vctx  Pointer to validation context.
+ * @param vctx  Pointer to validation context.  Note that TTL of vctx->keys may get lowered.
  * @param ta    Trust anchor RRSet against which to validate the DNSKEY RRSet.
  * @return      0 or error code, same as vctx->result.
  */
