@@ -21,16 +21,25 @@ struct udpv4 {
 	} __attribute__((packed)); };
 };
 
-struct config {
+
+/** Data around one network interface. */
+struct kxsk_iface {
 	const char *ifname;
 	int ifindex; /**< computed from ifname */
-	int xsk_if_queue;
-	const char *xdp_prog_filename;
 
-	struct xsk_umem_config umem;
+	/* File-descriptors to BPF maps for the program running on the interface. */
+	int qidconf_map_fd;
+	int xsks_map_fd;
+};
+
+
+struct config {
+	int xsk_if_queue;
+
+	struct xsk_umem_config umem; /**< For xsk_umem__create() from libbpf. */
 	uint32_t umem_frame_count;
 
-	struct xsk_socket_config xsk;
+	struct xsk_socket_config xsk; /**< For xsk_socket__create() from libbpf. */
 
 	struct udpv4 pkt_template;
 };
@@ -49,15 +58,18 @@ struct xsk_umem_info {
 	uint32_t *free_indices; /**< Stack of indices of the free frames. */
 };
 struct xsk_socket_info {
+	/** Receive queue: passing arrived packets from kernel. */
 	struct xsk_ring_cons rx;
+	/** Transmit queue: passing packets to kernel for sending. */
 	struct xsk_ring_prod tx;
+	/** Information about memory frames for all the passed packets. */
 	struct xsk_umem_info *umem;
+	/** Handle internal to libbpf. */
 	struct xsk_socket *xsk;
 
 	bool kernel_needs_wakeup;
-	/* File-descriptors to BPF maps for the program running on the interface. */
-	int qidconf_map_fd;
-	int xsks_map_fd;
+
+	const struct kxsk_iface *iface;
 
 	/* kresd-specific stuff */
 	uv_check_t check_handle;
@@ -68,23 +80,23 @@ struct xsk_socket_info {
 
 /* eBPF stuff (user-space part), implemented in ./bpf-user.c */
 
-/** Ensure the BPF program and maps are set up; return it's FD or error < 0.
+/** Ensure the BPF program and maps are set up.  On failure return NULL + errno.
  *
  * Note: if one is loaded on the interface already, we assume it's ours.
  * LATER: it might be possible to check, e.g. by naming our maps unusually.
  */
-int kxsk_bpf_init(const struct config *cfg, struct xsk_socket_info *xsk_info);
+struct kxsk_iface * kxsk_iface_new(const char *ifname, const char *prog_fname);
 
-/** Stop the BPF part, so packets should no longer come to the socket.
+/** Undo kxsk_iface_new().  It's always freed, even if some problems happen.
  *
- * Note: the program is not unloaded, but that only adds some overhead.
- * This way only the single interface queue is affected.
+ * Unloading the BPF program is optional, as keeping it only adds some overhead,
+ * and in case of multi-process it isn't easy to find that we're the last instance.
  */
-int kxsk_bpf_deinit(const struct config *cfg, struct xsk_socket_info *xsk_info);
+int kxsk_iface_free(struct kxsk_iface *iface, bool unload_bpf);
 
-/** Forcefully unload BPF program from the interface.  (whole interface is affected) */
-static inline int kxsk_bpf_unload(struct config *cfg)
-{
-	return bpf_set_link_xdp_fd(cfg->ifindex, -1, cfg->xsk.xdp_flags);
-}
+/** Activate this AF_XDP socket through the BPF maps. */
+int kxsk_socket_start(const struct kxsk_iface *iface, int queue_id, struct xsk_socket *xsk);
+
+/** Deactivate this AF_XDP socket through the BPF maps. */
+int kxsk_socket_stop(const struct kxsk_iface *iface, int queue_id);
 

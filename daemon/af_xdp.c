@@ -24,7 +24,6 @@
 #include <byteswap.h>
 
 #include <arpa/inet.h>
-#include <net/if.h>
 #include <netinet/in.h>
 #include <linux/if_link.h>
 #include <linux/filter.h>
@@ -131,10 +130,12 @@ void kr_xsk_deinit_global(void)
 {
 	if (!the_socket)
 		return;
-	kxsk_bpf_deinit(the_config, the_socket);
+	kxsk_socket_stop(the_socket->iface, the_config->xsk_if_queue);
 	xsk_socket__delete(the_socket->xsk);
 	xsk_umem__delete(the_socket->umem->umem);
-	//TODO: memory
+
+	kxsk_iface_free((struct kxsk_iface *)/*const-cast*/the_socket->iface, false);
+	//TODO: more memory
 }
 
 /** Add some free frames into the RX fill queue (possibly zero, etc.) */
@@ -176,46 +177,29 @@ int kxsk_umem_refill(const struct config *cfg, struct xsk_umem_info *umem)
 	return 0;
 }
 
-static struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
-						    struct xsk_umem_info *umem)
+static struct xsk_socket_info * xsk_configure_socket(struct config *cfg,
+				struct xsk_umem_info *umem, const struct kxsk_iface *iface)
 {
-	int ret;
-
 	/* Put a couple RX buffers into the fill queue.
 	 * Even if we don't need them, it silences a dmesg line,
 	 * and it avoids 100% CPU usage of ksoftirqd/i for each queue i!
 	 */
-	ret = kxsk_umem_refill(cfg, umem);
-
-	cfg->ifindex = if_nametoindex(cfg->ifname);
-	if (!cfg->ifindex)
+	errno = kxsk_umem_refill(cfg, umem);
+	if (errno)
 		return NULL;
 
 	struct xsk_socket_info *xsk_info = calloc(1, sizeof(*xsk_info));
 	if (!xsk_info)
 		return NULL;
-	xsk_info->xsks_map_fd = -1;
-	xsk_info->qidconf_map_fd = -1;
+	xsk_info->iface = iface;
 	xsk_info->umem = umem;
 
 	assert(cfg->xsk.libbpf_flags & XSK_LIBBPF_FLAGS__INHIBIT_PROG_LOAD);
-	ret = xsk_socket__create(&xsk_info->xsk, cfg->ifname,
+	errno = xsk_socket__create(&xsk_info->xsk, iface->ifname,
 				 cfg->xsk_if_queue, umem->umem, &xsk_info->rx,
 				 &xsk_info->tx, &cfg->xsk);
-	fprintf(stderr, "xsk_socket__create() == %d\n", ret);
 
-	//clear_prog(cfg); // ignore return values??
-	//load_noop_prog(xsk_info->xsk);
-
-	if (!ret)
-		ret = kxsk_bpf_init(cfg, xsk_info);
-	if (!ret)
-		return xsk_info;
-
-//error_exit:
-	free(xsk_info);
-	errno = -ret;
-	return NULL;
+	return xsk_info;
 }
 
 
@@ -537,8 +521,7 @@ void kxsk_rx(uv_poll_t* handle, int status, int events)
 
 
 static struct config the_config_storage = { // static to get zeroed by default
-	.ifname = "eth3", .xsk_if_queue = 0, // defaults overridable by command-line -x eth3:0
-	.xdp_prog_filename = "./bpf-kernel.o", // FIXME: proper installation, etc.
+	.xsk_if_queue = 0, // defaults overridable by command-line -x eth3:0
 	.umem_frame_count = 8192,
 	.umem = {
 		.fill_size = XSK_RING_PROD__DEFAULT_NUM_DESCS,
@@ -606,13 +589,18 @@ int kr_xsk_init_global(uv_loop_t *loop, char *cmdarg)
 		exit(EXIT_FAILURE);
 	}
 
-	if (cmdarg) {
-		char *colon = strchr(cmdarg, ':');
-		if (colon) {
-			*colon = '\0'; // yes, modifying argv[i][j] isn't very nice
-			the_config->xsk_if_queue = atoi(colon + 1);
-		}
-		the_config->ifname = cmdarg;
+	char *colon = strchr(cmdarg, ':');
+	if (colon) {
+		*colon = '\0'; // yes, modifying argv[i][j] isn't very nice
+		the_config->xsk_if_queue = atoi(colon + 1);
+	}
+	struct kxsk_iface *iface = kxsk_iface_new(cmdarg,
+		"./bpf-kernel.o" // FIXME: proper installation, etc.
+	);
+	if (!iface) {
+		fprintf(stderr, "ERROR: Can't set up network interface %s: %s\n",
+			cmdarg, strerror(errno));
+		exit(EXIT_FAILURE);
 	}
 
 	/* Some failed test
@@ -638,25 +626,17 @@ int kr_xsk_init_global(uv_loop_t *loop, char *cmdarg)
 	/* Open and configure the AF_XDP (xsk) socket */
 	assert(!the_socket);
 
-	#if 0
-	/* TODO: all except the first attempt is getting EINVAL inside
-	 *   xsk_configure_socket()
-	 *   xsk_socket__create()
-	 *     if (rx) {
-		err = setsockopt(xsk->fd, SOL_XDP, XDP_RX_RING,
-	 */
-	for (int i = 0; i < 16; ++i) {
-		the_config->xsk_if_queue = i;
-		the_socket = xsk_configure_socket(the_config, umem);
-		if (the_socket) break;
-		fprintf(stderr, "ERROR, can't setup AF_XDP socket on queue %d: %s\n",
-			i, strerror(errno));
-	}
-	#endif
-	the_socket = xsk_configure_socket(the_config, umem);
+	the_socket = xsk_configure_socket(the_config, umem, iface);
 	if (!the_socket) {
 		fprintf(stderr, "ERROR, can't setup AF_XDP socket on %s:%d: %s\n",
-			the_config->ifname, the_config->xsk_if_queue, strerror(errno));
+			iface->ifname, the_config->xsk_if_queue, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	int ret = kxsk_socket_start(iface, the_config->xsk_if_queue, the_socket->xsk);
+	if (ret) {
+		fprintf(stderr, "ERROR, can't start listening on AF_XDP socket on %s:%d: %s\n",
+			iface->ifname, the_config->xsk_if_queue, strerror(ret));
 		exit(EXIT_FAILURE);
 	}
 
@@ -664,7 +644,7 @@ int kr_xsk_init_global(uv_loop_t *loop, char *cmdarg)
 			the_socket->umem->frame_count - the_socket->umem->free_count);
 
 
-	int ret = uv_check_init(loop, &the_socket->check_handle);
+	ret = uv_check_init(loop, &the_socket->check_handle);
 	if (!ret) ret = uv_check_start(&the_socket->check_handle, xsk_check);
 
 	if (!ret) ret = uv_poll_init(loop, &the_socket->poll_handle,
