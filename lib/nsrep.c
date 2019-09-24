@@ -26,12 +26,15 @@
 #include "lib/resolve.h"
 #include "lib/defines.h"
 #include "lib/generic/pack.h"
+#include "contrib/cleanup.h"
 #include "contrib/ucw/lib.h"
 
 /** Some built-in unfairness ... */
 #ifndef FAVOUR_IPV6
 #define FAVOUR_IPV6 20 /* 20ms bonus for v6 */
 #endif
+
+#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "nsre",  __VA_ARGS__)
 
 /** @internal Macro to set address structure. */
 #define ADDR_SET(sa, family, addr, len, port) do {\
@@ -146,10 +149,26 @@ static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 		 * we would prefer "certainly dead" cur_addr_score
 		 * instead of "almost dead but alive" rtt_cache_entry_score[i]
 		 */
-		const unsigned cur_favour = cur_addr_score < KR_NS_TIMEOUT ? favour : 0;
+		const unsigned cur_favour =
+			//0;
+			cur_addr_score < KR_NS_TIMEOUT ? favour : 0;
+
+		if (VERBOSE_STATUS) {
+			char addr_str[INET6_ADDRSTRLEN + 1];
+			int af = (len == sizeof(struct in6_addr)) ? AF_INET6 : AF_INET;
+			if (!inet_ntop(af, val, addr_str, sizeof(addr_str)))
+				assert(false);
+			VERBOSE_MSG(NULL, "      eval_addr_set(): score %d - %d \t(cached: %d) for \t%s\n",
+				cur_addr_score, cur_favour, cached ? cached->score : -1, addr_str);
+		}
+
 		for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
 			if (cur_addr_score >= rtt_cache_entry_score[i] + cur_favour)
 				continue;
+			VERBOSE_MSG(NULL, "                       to position %d (ATM); "
+					  "                       %d < %d + %d\n",
+					(int)i, (int)cur_addr_score,
+					(int)rtt_cache_entry_score[i], (int)cur_favour);
 
 			/* Shake down previous contenders */
 			for (size_t j = KR_NSREP_MAXADDR - 1; j > i; --j) {
@@ -215,6 +234,10 @@ static int eval_nsrep(const knot_dname_t *owner, const pack_t *addr_set, struct 
 		}
 	}
 
+	auto_free char *owner_str = kr_dname_text(owner);
+	VERBOSE_MSG(qry, "  eval_nsrep(): reputation %d\tfor %s (%d bytes of addresses)\n",
+			reputation, owner_str, (int)addr_set->len);
+
 	/* Favour nameservers with unknown addresses to probe them,
 	 * otherwise discover the current best address for the NS. */
 	if (addr_set->len == 0) {
@@ -238,6 +261,8 @@ static int eval_nsrep(const knot_dname_t *owner, const pack_t *addr_set, struct 
 		score = eval_addr_set(addr_set, ctx, qry->flags, score, addr_choice);
 	}
 
+	VERBOSE_MSG(qry, "  eval_nsrep(): current score %d\tvs. %d\tfor %s\n",
+			(int)ns->score, (int)score, owner_str);
 	/* Probabilistic bee foraging strategy (naive).
 	 * The fastest NS is preferred by workers until it is depleted (timeouts or degrades),
 	 * at the same time long distance scouts probe other sources (low probability).
@@ -248,18 +273,21 @@ static int eval_nsrep(const knot_dname_t *owner, const pack_t *addr_set, struct 
 		return kr_ok();
 	} else if (score <= ns->score &&
 	   (score < KR_NS_LONG  || qry->flags.NO_THROTTLE)) {
+		VERBOSE_MSG(qry, "  eval_nsrep(): win by score\n");
 		update_nsrep_set(ns, owner, addr_choice, score);
 		ns->reputation = reputation;
 	} else if (kr_rand_coin(1, 10) &&
 		   !kr_rand_coin(score, KR_NS_MAX_SCORE)) {
 		/* With 10% chance probe server with a probability
 		 * given by its RTT / MAX_RTT. */
+		VERBOSE_MSG(qry, "  eval_nsrep(): win by chance+score\n");
 		update_nsrep_set(ns, owner, addr_choice, score);
 		ns->reputation = reputation;
 		return 1; /* Stop evaluation */
 	} else if (ns->score > KR_NS_MAX_SCORE || addr_choice[KR_NSREP_MAXADDR - 1] == NULL) {
 		/* Check if any server was already selected.
 		 * If no, pick current server and continue evaluation. */
+		VERBOSE_MSG(qry, "  eval_nsrep(): win by being first or not full\n");
 		update_nsrep_set(ns, owner, addr_choice, score);
 		ns->reputation = reputation;
 	}
@@ -332,6 +360,7 @@ int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx)
 		//assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
+	VERBOSE_MSG(qry, "_elect() over %d names\n", (int)trie_weight(qry->zone_cut.nsset));
 
 	struct kr_nsrep *ns = &qry->ns;
 	ELECT_INIT(ns, ctx);
@@ -357,6 +386,7 @@ int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx)
 
 int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx)
 {
+	VERBOSE_MSG(qry, "_elect_addr()\n");
 	if (!qry || !ctx) {
 		//assert(!EINVAL);
 		return kr_error(EINVAL);
