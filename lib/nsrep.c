@@ -150,7 +150,7 @@ static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 		 * instead of "almost dead but alive" rtt_cache_entry_score[i]
 		 */
 		const unsigned cur_favour =
-			0;
+			0; (void)favour;
 			//cur_addr_score < KR_NS_TIMEOUT ? favour : 0;
 
 		if (VERBOSE_STATUS) {
