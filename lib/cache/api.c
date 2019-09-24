@@ -568,7 +568,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		key = key_exact_type(k, rr->type);
 	}
 
-	/* Compute materialized sizes of the new data. */
+	/* Compute in-cache size for the new data. */
 	const knot_rdataset_t *rds_sigs = rr_sigs ? &rr_sigs->rrs : NULL;
 	const int rr_ssize = rdataset_dematerialize_size(&rr->rrs);
 	assert(rr_ssize == to_even(rr_ssize));
