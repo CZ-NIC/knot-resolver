@@ -8,6 +8,7 @@ Bugfixes
   (regression since 4.1.0 release, in less common cases)
 - prefill module: allow a different module-loading style (#506)
 - validation: trim TTLs by RRSIG's expiration and original TTL (#319, #504)
+- NS choice algorithm: fix a regression since 4.0.0 (#497, !868)
 
 Improvements
 ------------
