@@ -7,6 +7,15 @@ We advise users to also read :ref:`release_notes` for respective versions.
 
 .. _upgrade-from-3-to-4:
 
+4.x to 4.2.1
+============
+
+Users
+-----
+
+* If you have previously installed ``knot-resolver-dbgsym`` package on Debian,
+  please remove it and install ``knot-resolver-dbg`` instead.
+
 3.x to 4.x
 ==========
 
