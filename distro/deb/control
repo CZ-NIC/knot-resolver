@@ -63,8 +63,14 @@ Description: caching, DNSSEC-validating DNS resolver
 
 Package: knot-resolver-dbg
 Architecture: any
-Depends: knot-resolver (= ${binary:Version}),
-         ${misc:Depends}
+Depends:
+ knot-resolver (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Replaces:
+ knot-resolver-dbgsym (<< 4.2.1-1),
+Breaks:
+ knot-resolver-dbgsym (<< 4.2.1-1),
 Recommends: gdb
 Section: debug
 Priority: extra
