@@ -557,54 +557,63 @@ obs:build:all:
 obs:centos7:x86_64:
   <<: *distrotest
   variables:
+    OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: centos7
     DISTROTEST_REPO: CentOS_7_EPEL
 
 obs:debian9:x86_64:
   <<: *distrotest
   variables:
+    OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: debian9
     DISTROTEST_REPO: Debian_9.0
 
 obs:debian10:x86_64:
   <<: *distrotest
   variables:
+    OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: debian10
     DISTROTEST_REPO: Debian_10
 
 obs:fedora29:x86_64:
   <<: *distrotest
   variables:
+    OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: fedora29
     DISTROTEST_REPO: Fedora_29
 
 obs:fedora30:x86_64:
   <<: *distrotest
   variables:
+    OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: fedora30
     DISTROTEST_REPO: Fedora_30
 
 obs:leap15:x86_64:
   <<: *distrotest
   variables:
+    OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: leap15
     DISTROTEST_REPO: openSUSE_Leap_15.0
 
 obs:ubuntu1604:x86_64:
   <<: *distrotest
   variables:
+    OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: ubuntu1604
     DISTROTEST_REPO: xUbuntu_16.04
 
 obs:ubuntu1804:x86_64:
   <<: *distrotest
   variables:
+    OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: ubuntu1804
     DISTROTEST_REPO: xUbuntu_18.04
 
 obs:ubuntu1904:x86_64:
   <<: *distrotest
   variables:
+    OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: ubuntu1904
     DISTROTEST_REPO: xUbuntu_19.04
 # }}}
