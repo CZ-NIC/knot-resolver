@@ -27,6 +27,8 @@ example_configs = [
   'config.isp',
   'config.personal',
   'config.splitview',
+  'config.internal',
+  'config.privacy-preserving',
 ]
 
 conf_config = configuration_data()

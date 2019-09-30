@@ -1,40 +1,58 @@
 -- vim:syntax=lua:set ts=4 sw=4:
--- Config file example useable for multi-user ISP resolver
--- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/daemon.html#configuration
+-- Config file example usable for ISP resolver
+-- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/startguide.html#isp-resolver
 @config_defaults@
-
--- For DNS-over-HTTPS and web management when using http module
--- modules.load('http')
--- http.config({
--- 	cert = '/etc/knot-resolver/mycert.crt',
--- 	key = '/etc/knot-resolver/mykey.key',
--- 	tls = true,
--- })
-
--- To disable DNSSEC validation, uncomment the following line (not recommended)
--- trust_anchors.remove('.')
 
 -- Large cache size, so we don't need to flush often
 -- This can be larger than available RAM, least frequently accessed
 -- records will be paged out
 cache.size = 4 * GB
 
--- Load Useful modules
+-- load modules
 modules = {
-	'view',     -- Views for certain clients
-	'hints > iterate', -- Load /etc/hosts and allow custom root hints
-	'stats',    -- Track internal statistics
-	graphite = { -- Send statistics to local InfluxDB
-		-- `worker.id` allows us to keep per-fork statistics
-		prefix = hostname()..worker.id,
-		-- Address of the Graphite/InfluxDB server
-		host = '192.168.1.2',
-	},
+    'view',
+    'stats'
 }
 
--- Block all `site.nl` for `10.0.0.0/24` subnet
-view:addr('10.0.0.0/24', policy.suffix(policy.DROP, {todname('site.nl')}))
--- Force all clients from `192.168.2.0/24` to TCP
-view:addr('192.168.2.0/24', policy.all(policy.TC))
--- Apply RPZ for all clients, default rule is DENY
+-- log statistics every second
+local stat_id = event.recurrent(1 * second, function(evid)
+    log(table_print(stats.list()))
+end)
+
+-- stop printing statistics after first minute
+event.after(1 * minute, function(evid)
+        event.cancel(stat_id)
+end)
+
+-- make a closure, encapsulating counter
+function speed_monitor()
+        local previous = stats.list()
+        -- monitoring function
+        return function(evid)
+                local now = stats.list()
+                local total_increment = now['answer.total'] - previous['answer.total']
+                local slow_increment = now['answer.slow'] - previous['answer.slow']
+                if slow_increment / total_increment > 0.05 then
+                        log('WARNING! More than 5 %% of queries was slow!')
+                end
+                previous = now  -- store current value in closure
+         end
+end
+
+-- speed monitor every minute
+local monitor_id = event.recurrent(1 * minute, speed_monitor())
+
+-- apply RPZ for all clients, default rule is DENY
 policy.add(policy.rpz(policy.DENY, 'blacklist.rpz'))
+
+-- block local IPv4 clients (ACL like)
+view:addr('127.0.0.1', policy.all(policy.DENY))
+
+-- drop queries with suffix match for remote client
+view:addr('10.0.0.0/8', policy.suffix(policy.TC, policy.todnames({'example.com'})))
+
+-- force all clients from 192.168.2.0/24 to TCP
+view:addr('192.168.2.0/24', policy.all(policy.TC))
+
+-- whitelist queries identified by TSIG key
+view:tsig('\5mykey', policy.all(policy.PASS))

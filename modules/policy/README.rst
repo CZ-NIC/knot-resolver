@@ -317,7 +317,7 @@ Most properties (actions, filters) are described above.
   :param action: action to be performed for the slice
 
   This function splits the entire domain space into multiple slices (determined
-  by the number of provided ``action``s) A ``slice_func`` is called to determine
+  by the number of provided ``actions``). A ``slice_func`` is called to determine
   which slice a query belongs to. The corresponding ``action`` is then executed.
 
 
