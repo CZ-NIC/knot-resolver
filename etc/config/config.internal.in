@@ -1,0 +1,10 @@
+-- vim:syntax=lua:set ts=4 sw=4:
+-- Config file example usable for multi-user ISP resolver
+-- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/startguide.html#internal-resolver
+@config_defaults@
+
+-- define list of internal-only domains
+internalDomains = policy.todnames({'company.example', 'internal.example'})
+
+-- forward all queries below 'internalDomains' to '192.168.1.2@443'
+policy.add(policy.suffix(policy.FORWARD({'192.168.1.2@443'}), internalDomains))
