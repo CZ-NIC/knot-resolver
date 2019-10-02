@@ -58,7 +58,7 @@ int sd_watchdog_init(struct kr_module *module)
 		return kr_error(ret);
 	}
 
-	kr_log_verbose("[sd_watchdog] enabled (repeat: %ld ms, timeout: %ld ms)\n",
+	kr_log_verbose("[sd_watchdog] enabled (repeat: %"PRIu64" ms, timeout: %"PRIu64" ms)\n",
 		delay_ms, conf->timeout_usec / 1000);
 
 	return kr_ok();
