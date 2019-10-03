@@ -184,6 +184,10 @@ Personal privacy-preserving Resolver
 DNS queries can be used to gather data about user behavior. Knot Resolver can be configured to forward DNS queries elsewhere, and to protect them from eavesdropping by TLS encryption.
 
 .. warning: Latest research (https://irtf.org/anrw/2019/slides-anrw19-final44.pdf, https://dl.acm.org/authorize?N687437) has proven that encrypting DNS traffic is not sufficient to protect privacy of users. For this reason we recommend all users to use full VPN instead of encrypting *just* DNS queries. Following configuration is provided *only for users who cannot encrypt all their traffic*.
+
+DNS queries can be used to gather data about user behavior. Knot Resolver can be configured to forward DNS queries elsewhere, and to protect them from eavesdropping by TLS encryption.
+
+.. warning: Latest research (https://irtf.org/anrw/2019/slides-anrw19-final44.pdf, https://dl.acm.org/authorize?N687437) has proven that encrypting DNS traffic is not sufficient to protect privacy of users. For this reason we recommend all users to use full VPN instead of encrypting *just* DNS queries. Following configuration is provided *only for users who cannot encrypt all their traffic*.
 Forwarding over TLS protocol (DNS-over-TLS)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Forwarding over TLS protocol protects queries sent out by resolver.
