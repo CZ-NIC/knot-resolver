@@ -154,7 +154,7 @@ Forward internal-only domain
 For instance, ``company.example`` is the internal-only domain which is not available from the public Internet.
 To resolve internal-only domain, e.g. ``company.example`` a query policy to forward query has to be added.
 The followind example will add query policy that will trigger ``FORWARD`` action based on suffix of a domain.
-This configuration will forward everything below ``company.example`` domain to ``192.168.1.2`` IP address, port ``443``.
+This configuration will forward all domains with suffix ``company.example.`` to DNS server with IP address ``192.168.1.2``.
 
 .. code-block:: lua
 
