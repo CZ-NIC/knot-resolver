@@ -11,16 +11,18 @@
 cache.storage = 'lmdb:///tmp/knot-resolver'
 
 -- forwarding to multiple targets
+-- splits the entire DNS namespace into distinct slices
 policy.add(policy.slice(
+   -- slicing function
    policy.slice_randomize_psl(),
    -- forward over TLS
    policy.TLS_FORWARD({
       {'2001:DB8::d0c', hostname='res.example.com'},
       {'192.0.2.1', pin_sha256={'YQ=='}
    }),
-   -- multiple servers can be specified for a single slice
-   -- the one with lowest round-trip time will be used
    policy.TLS_FORWARD({
+      -- multiple servers can be specified for a single slice
+      -- the one with lowest round-trip time will be used
       {'193.17.47.1', hostname='odvr.nic.cz'},
       {'185.43.135.1', hostname='odvr.nic.cz'},
    })

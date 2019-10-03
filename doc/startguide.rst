@@ -52,14 +52,28 @@ After installation, Knot Resolver's default configuration should work for loopba
 queries. This allows you to test that installation and service setup works before
 managing configuration.
 
+For instance you can use tool `kdig` to send DNS queries. It is provided by package with different name across Linux distributions.
+Mostly the name of the package is one of these ``dnsutils`` (Ubuntu, Debian), ``bind-utils`` (CentOS, Fedora) or ``bind-tools`` (Arch Linux).
+Use ``dig -v`` command to check if ``DiG`` is installed.
+
+.. code-block:: bash
+
+    $ dig @localhost
+
+
+
+.. note::
+
+    `Single instance`_ of Knot Resolver will utilize single CPU code on your machine.
+    If your machine handles a lot of DNS traffic, run `multiple instances`_.
+    Advantage of doing using multiple instances is that problem in single instance
+    will not affect others, so single program crash will not bring large DNS resolver down.
 
 Single instance
 ===============
 
 If you're using our packages, the simplest way to run **single instance** of
 Knot Resolver is to use provided Knot Resolver's ``systemd`` integration.
-
-.. note:: The instance of Knot Resolver is a single process incapable of multithreading.
 
 For help run ``man kresd.systemd``
 
@@ -122,31 +136,31 @@ Easiest way to configure Knot Resolver is to paste your configuration to
 You can easily save configuration files and switch between them.
 All configuration files of following examples and more are stored in `/etc/config`_ directory.
 
-Bind to interfaces
+Listening on network interfaces
 ==================
 
-Knot Resolver can listen on multiple interfaces that are defined in
-configuration by :func:`net.listen()` function.
-It also makes possible to configure ports for ``tls``, ``doh``, ``webmgmt``.
+Network interfaces to listen on and supported protocols are configured using :func:`net.listen()` function.
+
+Following configuration listens for plain DNS queries on IP addresses `192.168.1.1` and `2001:db8::1`, and for DNS-over-TLS queries on all IP addresses configured on network interface `eth0`.
 
 .. code-block:: lua
 
     -- examples
     net.listen('192.168.1.1')
-    net.listen('fc00::1:1')
+    net.listen('2001:db8::1')
     net.listen(net.eth0, 853, { kind = 'tls' })
 
 .. warning::
 
-    On machines with multiple IP addresses avoid listening on wildcards ``0.0.0.0`` or ``::``.
+    On machines with multiple IP addresses on the same interface avoid listening on wildcards ``0.0.0.0`` or ``::``.
     Knot Resolver could answer from different IP addresses if the network address ranges
-    overlap, and clients would probably refuse such a response.
+    overlap, and clients would refuse such a response.
 
 
 Internal Resolver
 =================
 
-How to configure Knot Resolver to resolve internal-only domains.
+This is typical configuration for company-internal resolver which is not accessible from outside of company network.
 
 Forward internal-only domain
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -154,15 +168,16 @@ Forward internal-only domain
 For instance, ``company.example`` is the internal-only domain which is not available from the public Internet.
 To resolve internal-only domain, e.g. ``company.example`` a query policy to forward query has to be added.
 The followind example will add query policy that will trigger ``FORWARD`` action based on suffix of a domain.
-This configuration will forward everything below ``company.example`` domain to ``192.168.1.2`` IP address, port ``443``.
+This configuration will forward all domains with suffix ``company.example.`` to DNS server with IP address ``192.168.1.2``.
 
 .. code-block:: lua
 
     -- define internal only domains
     internalDomains = policy.todnames({'company.example', 'internal.example'})
 
-    -- forward all queries below 'internalDomains' to '192.168.1.2@443'
-    policy.add(policy.suffix(policy.FORWARD({'192.168.1.2@443'}), internalDomains))
+    -- forward all queries below 'internalDomains' to '192.168.1.2'
+    policy.add(policy.suffix(policy.FORWARD({'192.168.1.2'}), internalDomains))
+
 
 
 .. _personalresolver:
@@ -171,9 +186,16 @@ This configuration will forward everything below ``company.example`` domain to `
 Personal privacy-preserving Resolver
 ====================================
 
+DNS queries can be used to gather data about user behavior. Knot Resolver can be configured to forward DNS queries elsewhere, and to protect them from eavesdropping by TLS encryption.
+
+.. warning: Latest research (https://irtf.org/anrw/2019/slides-anrw19-final44.pdf, https://dl.acm.org/authorize?N687437) has proven that encrypting DNS traffic is not sufficient to protect privacy of users. For this reason we recommend all users to use full VPN instead of encrypting *just* DNS queries. Following configuration is provided *only for users who cannot encrypt all their traffic*.
+
+DNS queries can be used to gather data about user behavior. Knot Resolver can be configured to forward DNS queries elsewhere, and to protect them from eavesdropping by TLS encryption.
+
+.. warning: Latest research (https://irtf.org/anrw/2019/slides-anrw19-final44.pdf, https://dl.acm.org/authorize?N687437) has proven that encrypting DNS traffic is not sufficient to protect privacy of users. For this reason we recommend all users to use full VPN instead of encrypting *just* DNS queries. Following configuration is provided *only for users who cannot encrypt all their traffic*.
 Forwarding over TLS protocol (DNS-over-TLS)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Forwarding over TLS protocol protects queries send out by resolver.
+Forwarding over TLS protocol protects queries sent out by resolver.
 It is done by :func:`policy.TLS_FORWARD()` function which provides methods for authentication.
 There is a list of `DNS Privacy Test Servers`_ supporting DNS-over-TLS to test your configuration.
 
