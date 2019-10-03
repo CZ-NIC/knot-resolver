@@ -138,7 +138,7 @@ Following configuration listens for plain DNS queries on IP addresses `192.168.1
 
 .. warning::
 
-    On machines with multiple IP addresses avoid listening on wildcards ``0.0.0.0`` or ``::``.
+    On machines with multiple IP addresses on the same interface avoid listening on wildcards ``0.0.0.0`` or ``::``.
     Knot Resolver could answer from different IP addresses if the network address ranges
     overlap, and clients would probably refuse such a response.
 
