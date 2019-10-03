@@ -161,8 +161,9 @@ This configuration will forward all domains with suffix ``company.example.`` to 
     -- define internal only domains
     internalDomains = policy.todnames({'company.example', 'internal.example'})
 
-    -- forward all queries below 'internalDomains' to '192.168.1.2@443'
-    policy.add(policy.suffix(policy.FORWARD({'192.168.1.2@443'}), internalDomains))
+    -- forward all queries below 'internalDomains' to '192.168.1.2'
+    policy.add(policy.suffix(policy.FORWARD({'192.168.1.2'}), internalDomains))
+
 
 
 .. _personalresolver:
