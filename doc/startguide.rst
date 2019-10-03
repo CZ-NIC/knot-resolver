@@ -146,7 +146,7 @@ Following configuration listens for plain DNS queries on IP addresses `192.168.1
 Internal Resolver
 =================
 
-How to configure Knot Resolver to resolve internal-only domains.
+This is typical configuration for company-internal resolver which is not accessible from outside of company network.
 
 Forward internal-only domain
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
