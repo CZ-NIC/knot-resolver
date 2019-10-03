@@ -133,7 +133,7 @@ Following configuration listens for plain DNS queries on IP addresses `192.168.1
 
     -- examples
     net.listen('192.168.1.1')
-    net.listen('fc00::1:1')
+    net.listen('2001:db8::1')
     net.listen(net.eth0, 853, { kind = 'tls' })
 
 .. warning::
