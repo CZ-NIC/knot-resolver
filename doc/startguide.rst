@@ -125,9 +125,9 @@ All configuration files of following examples and more are stored in `/etc/confi
 Bind to interfaces
 ==================
 
-Knot Resolver can listen on multiple interfaces that are defined in
-configuration by :func:`net.listen()` function.
-It also makes possible to configure ports for ``tls``, ``doh``, ``webmgmt``.
+Network interfaces to listen on and supported protocols are configured using :func:`net.listen()` function.
+
+Following configuration listens for plain DNS queries on IP addresses `192.168.1.1` and `2001:db8::1`, and for DNS-over-TLS queries on all IP addresses configured on network interface `eth0`.
 
 .. code-block:: lua
 
