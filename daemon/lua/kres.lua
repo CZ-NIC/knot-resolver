@@ -65,14 +65,14 @@ if not sover_pos then
 	error('unexpected libknot soname: ' .. libknot_SONAME)
 end
 local sover = string.sub(libknot_SONAME, sover_pos , sover_pos)
-if sover == '8' then
+if sover == '9' then
 	knot_rdataset_t_cdef = [[
 		typedef struct {
 			uint16_t count;
 			knot_rdata_t *rdata;
 		} knot_rdataset_t;
 	]]
-elseif sover == '9' then
+elseif sover == '1' then -- it's 10 really, but this is simpler
 	knot_rdataset_t_cdef = [[
 		typedef struct {
 			uint16_t count;
