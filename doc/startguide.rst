@@ -131,7 +131,7 @@ Easiest way to configure Knot Resolver is to paste your configuration to
 You can easily save configuration files and switch between them.
 All configuration files of following examples and more are stored in `/etc/config`_ directory.
 
-Bind to interfaces
+Listening on network interfaces
 ==================
 
 Network interfaces to listen on and supported protocols are configured using :func:`net.listen()` function.
