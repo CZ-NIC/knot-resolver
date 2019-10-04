@@ -52,7 +52,7 @@ After installation, Knot Resolver's default configuration should work for loopba
 queries. This allows you to test that installation and service setup works before
 managing configuration.
 
-For instance you can use `DiG`. It is provided by package with different name across Linux distributions.
+For instance you can use tool `kdig` to send DNS queries. It is provided by package with different name across Linux distributions.
 Mostly the name of the package is one of these ``dnsutils`` (Ubuntu, Debian), ``bind-utils`` (CentOS, Fedora) or ``bind-tools`` (Arch Linux).
 Use ``dig -v`` command to check if ``DiG`` is installed.
 
