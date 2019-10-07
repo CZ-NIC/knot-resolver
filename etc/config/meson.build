@@ -25,10 +25,10 @@ example_configs = [
   'config.cluster',
   'config.docker',
   'config.isp',
+  'config.internal',
+  'config.privacy',
   'config.personal',
   'config.splitview',
-  'config.internal',
-  'config.privacy-preserving',
 ]
 
 conf_config = configuration_data()

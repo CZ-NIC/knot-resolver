@@ -4,7 +4,7 @@
 @config_defaults@
 
 -- TLS server configuration
--- Use this to configure your TLS certificates
+-- use this to configure your TLS certificates
 -- net.tls("/etc/knot-resolver/server-cert.pem", "/etc/knot-resolver/server-key.pem")
 
 -- move cache to '/tmp/knot-resolver' tmpfs

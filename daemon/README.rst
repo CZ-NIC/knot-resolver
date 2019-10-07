@@ -566,11 +566,11 @@ When successfully connected to a socket, the command line should change to somet
 Then you can interact with kresd to see configuration or set a new one.
 There are some basic commands to start with.
 
-.. code-block:: bash
+.. code-block:: lua
 
-   > help()            # shows help
-   > net.interfaces()  # lists available interfaces
-   > net.list()        # lists running network services
+   > help()            -- shows help
+   > net.interfaces()  -- lists available interfaces
+   > net.list()        -- lists running network services
 
 
 The *direct output* of the CLI command is captured and sent over the socket, while also printed to the daemon standard outputs (for accountability). This gives you an immediate response on the outcome of your command.
