@@ -13,6 +13,7 @@ User=@user@
 TimeoutStopSec=10s
 WatchdogSec=10s
 Restart=on-abnormal
+LimitNOFILE=1048576
 Sockets=kresd.socket
 Sockets=kresd-tls.socket
 Sockets=kresd-control@%i.socket
