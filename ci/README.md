@@ -11,13 +11,6 @@ $ docker login registry.labs.nic.cz
 $ docker push registry.labs.nic.cz/knot/knot-resolver/ci/debian-buster:knot-$KNOT_BRANCH
 ```
 
-* fedora
-
-```
-$ docker build --no-cache -t registry.labs.nic.cz/knot/knot-resolver/ci/fedora fedora
-$ docker push registry.labs.nic.cz/knot/knot-resolver/ci/fedora
-```
-
 * turris
 
 ```
