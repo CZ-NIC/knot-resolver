@@ -754,7 +754,7 @@ int main(int argc, char **argv)
 		kr_log_error("[system] failed to get or set file-descriptor limit: %s\n",
 				strerror(errno));
 	} else if (rlim.rlim_cur < 1024*1024) {
-		kr_log_info("[system] warning: file-descriptor (hard) limit is only %ld\n",
+		kr_log_info("[system] warning: hard limit for number of file-descriptors is only %ld but recommended value is 1048576\n",
 				rlim.rlim_cur);
 	}
 	/* LATER: it's possible that we have high privileges (e.g. root at this point),
