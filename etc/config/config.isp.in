@@ -24,35 +24,33 @@ event.after(1 * minute, function(evid)
         event.cancel(stat_id)
 end)
 
--- make a closure, encapsulating counter
+-- speed_monitor definition
+-- prints warning if more than 5% of total answers was slow
 function speed_monitor()
-        local previous = stats.list()
-        -- monitoring function
+        local previous = stats.list()   -- store statistics in persistent variable
         return function(evid)
-                local now = stats.list()
+                local now = stats.list()    -- save actual statistics to variable
+                -- number of total answers between 'now' and 'previous' states
                 local total_increment = now['answer.total'] - previous['answer.total']
+                -- number of slow answers between 'now' and 'previous' states
                 local slow_increment = now['answer.slow'] - previous['answer.slow']
+                -- if percentage of slow answers is bigger than 5%, print warning
                 if slow_increment / total_increment > 0.05 then
                         log('WARNING! More than 5 %% of queries was slow!')
                 end
-                previous = now  -- store current value in closure
+                previous = now
          end
 end
 
--- speed monitor every minute
+-- execute speed_monitor every minute
 local monitor_id = event.recurrent(1 * minute, speed_monitor())
 
 -- apply RPZ for all clients, default rule is DENY
 policy.add(policy.rpz(policy.DENY, 'blacklist.rpz'))
 
--- block local IPv4 clients (ACL like)
-view:addr('127.0.0.1', policy.all(policy.DENY))
+-- whitelist queries identified by subnet
+view:addr(''192.168.1.0/24'', policy.all(policy.PASS))
 
--- drop queries with suffix match for remote client
-view:addr('10.0.0.0/8', policy.suffix(policy.TC, policy.todnames({'example.com'})))
+-- drop everything that hasn't matched
+view:addr('0.0.0.0/0', policy.all(policy.DROP))
 
--- force all clients from 192.168.2.0/24 to TCP
-view:addr('192.168.2.0/24', policy.all(policy.TC))
-
--- whitelist queries identified by TSIG key
-view:tsig('\5mykey', policy.all(policy.PASS))

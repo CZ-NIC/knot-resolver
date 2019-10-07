@@ -44,22 +44,23 @@ Add the *OBS* package repository `home:CZ-NIC:knot-resolver-latest <https://buil
 package for Arch Linux is maintained in AUR_.
 
 
-*****************
-Run Knot Resolver
-*****************
+*******
+Startup
+*******
 
 After installation, Knot Resolver's default configuration should work for loopback
 queries. This allows you to test that installation and service setup works before
 managing configuration.
 
-For instance you can use tool `kdig` to send DNS queries. It is provided by package with different name across Linux distributions.
-Mostly the name of the package is one of these ``dnsutils`` (Ubuntu, Debian), ``bind-utils`` (CentOS, Fedora) or ``bind-tools`` (Arch Linux).
-Use ``dig -v`` command to check if ``DiG`` is installed.
+For instance you can use advanced DNS lookup utility ``kdig`` to send DNS queries.
+It is provided by ``knot-dnsutils`` package on Ubuntu/Debian.
+On Arch Linux complete AUR package of KnotDNS_ named ``knot`` must be installed.
+
+Use ``kdig -V`` command to check if ``kdig`` is installed.
 
 .. code-block:: bash
 
-    $ dig @localhost
-
+    $ kdig @localhost
 
 
 .. note::
@@ -134,14 +135,16 @@ Detailed configuration of daemon and implemented modules:
 Easiest way to configure Knot Resolver is to paste your configuration to
 ``/etc/knot-resolver/kresd.conf`` configuration file loaded on resolver's startup.
 You can easily save configuration files and switch between them.
-All configuration files of following examples and more are stored in `/etc/config`_ directory.
+Configurations files of following examples
+can be found `here <https://github.com/CZ-NIC/knot-resolver/tree/master/etc/config>`_.
 
 Listening on network interfaces
-==================
+===============================
 
 Network interfaces to listen on and supported protocols are configured using :func:`net.listen()` function.
 
-Following configuration listens for plain DNS queries on IP addresses `192.168.1.1` and `2001:db8::1`, and for DNS-over-TLS queries on all IP addresses configured on network interface `eth0`.
+Following configuration listens for plain DNS queries on IP addresses `192.168.1.1` and `2001:db8::1`,
+and for DNS-over-TLS queries on all IP addresses configured on network interface `eth0`.
 
 .. code-block:: lua
 
@@ -178,21 +181,22 @@ This configuration will forward all domains with suffix ``company.example.`` to 
     -- forward all queries below 'internalDomains' to '192.168.1.2'
     policy.add(policy.suffix(policy.FORWARD({'192.168.1.2'}), internalDomains))
 
-
-
 .. _personalresolver:
-
 
 Personal privacy-preserving Resolver
 ====================================
 
-DNS queries can be used to gather data about user behavior. Knot Resolver can be configured to forward DNS queries elsewhere, and to protect them from eavesdropping by TLS encryption.
+DNS queries can be used to gather data about user behavior.
+Knot Resolver can be configured to forward DNS queries elsewhere,
+and to protect them from eavesdropping by TLS encryption.
 
-.. warning: Latest research (https://irtf.org/anrw/2019/slides-anrw19-final44.pdf, https://dl.acm.org/authorize?N687437) has proven that encrypting DNS traffic is not sufficient to protect privacy of users. For this reason we recommend all users to use full VPN instead of encrypting *just* DNS queries. Following configuration is provided *only for users who cannot encrypt all their traffic*.
+.. warning::
 
-DNS queries can be used to gather data about user behavior. Knot Resolver can be configured to forward DNS queries elsewhere, and to protect them from eavesdropping by TLS encryption.
+    Latest research (https://irtf.org/anrw/2019/slides-anrw19-final44.pdf, https://dl.acm.org/authorize?N687437)
+    has proven that encrypting DNS traffic is not sufficient to protect privacy of users.
+    For this reason we recommend all users to use full VPN instead of encrypting *just* DNS queries.
+    Following configuration is provided *only for users who cannot encrypt all their traffic*.
 
-.. warning: Latest research (https://irtf.org/anrw/2019/slides-anrw19-final44.pdf, https://dl.acm.org/authorize?N687437) has proven that encrypting DNS traffic is not sufficient to protect privacy of users. For this reason we recommend all users to use full VPN instead of encrypting *just* DNS queries. Following configuration is provided *only for users who cannot encrypt all their traffic*.
 Forwarding over TLS protocol (DNS-over-TLS)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Forwarding over TLS protocol protects queries sent out by resolver.
@@ -244,16 +248,36 @@ targets.
     policy.add(policy.slice(
        policy.slice_randomize_psl(),
        policy.TLS_FORWARD({{'192.0.2.1', hostname='res.example.com'}}),
-       -- multiple servers can be specified for a single slice
-       -- the one with lowest round-trip time will be used
        policy.TLS_FORWARD({
+          -- multiple servers can be specified for a single slice
+          -- the one with lowest round-trip time will be used
           {'193.17.47.1', hostname='odvr.nic.cz'},
           {'185.43.135.1', hostname='odvr.nic.cz'},
        })
     ))
 
-Non-persistent cache
-^^^^^^^^^^^^^^^^^^^^
+.. Non-persistent cache
+    ^^^^^^^^^^^^^^^^^^^^
+
+    Knot Resolver's cache contains data clients queried for.
+    By default the cache is saved on persistent storage device
+    it means content in cache is persisted during power-off and reboot.
+
+    If you are concerned about attackers who are able to get access to your
+    computer system in power-off state and your storage device is not secured by
+    encryption you can move the cache to **tmpfs**, temporary file storage.
+    The cache content will be saved in memory and lost on power-off or reboot.
+    In most of the Unix-like systems ``/tmp``, ``/var/lock`` and ``/var/run`` are commonly *tmpfs*.
+
+    If temporary directory don't exist it will be created automatically with access only for ``knot-resolver`` user and group.
+
+    .. code-block:: lua
+
+       cache.storage = 'lmdb:///tmp/knot-resolver'
+
+
+Non-persistent storage
+^^^^^^^^^^^^^^^^^^^^^^
 
 Knot Resolver's cache contains data clients queried for.
 By default the cache is saved on persistent storage device
@@ -261,40 +285,40 @@ it means content in cache is persisted during power-off and reboot.
 
 If you are concerned about attackers who are able to get access to your
 computer system in power-off state and your storage device is not secured by
-encryption you can move the cache to **tmpfs**, temporary file storage.
+encryption you can move Knot Resolver's cache or working directory to **tmpfs**, temporary file storage.
 The cache content will be saved in memory and lost on power-off or reboot.
 In most of the Unix-like systems ``/tmp``, ``/var/lock`` and ``/var/run`` are commonly *tmpfs*.
-Directory for resolver can be configured by ``systemd-tmpfiles`` to be automatically created on boot.
 
-Copy Knot Resolver's ``tmpfiles.d`` configuration to ``/etc/tmpfiles.d``.
+Moving cache
+````````````
+
+If temporary directory don't exist it will be created automatically with access only for ``knot-resolver`` user and group.
+
+    .. code-block:: lua
+
+       cache.storage = 'lmdb:///tmp/knot-resolver'
+
+
+Changing working directory
+``````````````````````````
+Changing whole working directory instead of just moving cache is quite harder.
+First of all there is need to ensure that the **tmpfs** directory will be created before Knot Resolver's startup.
+For that ``systemd-tmpfiles.d`` is used.
 
 .. code-block:: bash
 
-   $ cp /usr/lib/tmpfiles.d/knot-resolver.conf /etc/tmpfiles.d/knot-resolver.conf
+    $ cp /usr/lib/tmpfiles.d/knot-resolver.conf /etc/tmpfiles.d/knot-resolver.conf
+    $ echo 'd /tmp/knot-resolver 0750 knot-resolver knot-resolver - -' | sudo tee -a /etc/tmpfiles.d/knot-resolver.conf
 
-Add directory rules to ``knot-resolver.conf``.
-
-.. code-block:: bash
-
-   $ echo 'd /tmp/knot-resolver 0750 knot-resolver knot-resolver - -' | sudo tee -a /etc/tmpfiles.d/knot-resolver.conf
-
-The file should look like this
+After the directory creation is secured, ``WorkingDirectory`` for ``kresd@.service`` can be override.
 
 .. code-block:: bash
 
-   $ cat /etc/tmpfiles.d/knot-resolver.conf
-   # tmpfiles.d(5) directories for knot-resolver (kresd)
-   # Type Path                     Mode UID           GID           Age Argument
-     d     /run/knot-resolver       0750 root          root          -   -
-     d     /var/cache/knot-resolver 0750 knot-resolver knot-resolver -   -
-     d     /tmp/knot-resolver       0750 knot-resolver knot-resolver -   -
+    $ systemctl edit kresd@.service
 
-You can reboot system to check if directory was created and then cache can be moved to ``/tmp/knot-resolver``
-
-.. code-block:: lua
-
-   cache.storage = 'lmdb:///tmp/knot-resolver'
-
+Paste ``WorkingDirectory=/tmp/knot-resolver`` to the new created file.
+On every computer startup directory should be created.
+This can be tested by ``systemd-tmpfiles --create`` command.
 
 TLS server configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -342,14 +366,11 @@ View module allows you to combine query source information with policy rules.
 
     modules = { 'view' }
 
-    -- block local IPv4 clients (ACL like)
-    view:addr('127.0.0.1', policy.all(policy.DENY))
+    -- whitelist queries identified by subnet
+    view:addr(''192.168.1.0/24'', policy.all(policy.PASS))
 
-    -- brop queries with suffix match for remote client
-    view:addr('10.0.0.0/8', policy.suffix(policy.TC, policy.todnames({'example.com'})))
-
-    -- whitelist queries identified by TSIG key
-    view:tsig('\5mykey', policy.all(policy.PASS))
+    -- drop everything that hasn't matched
+    view:addr('0.0.0.0/0', policy.all(policy.DROP))
 
 
 Mandatory domain blocking
@@ -368,54 +389,19 @@ Max cache size
 ^^^^^^^^^^^^^^
 Maximal cache size can be larger than available RAM,
 least frequently accessed records will be paged out.
-For large cache size we don't need to flush cache often.
+For large cache size there is no need to flush cache often.
 
 .. code-block:: lua
 
    cache.size = 4 * GB
-
-
-..   Statistics
-    ^^^^^^^^^^
-
-    Worker is a service over event loop that tracks and schedules outstanding queries,
-    you can see the statistics or schedule new queries.
-
-    .. code-block:: lua
-
-       -- return table of worker statistics
-       > worker.stats()
-
-       -- return table of low-level cache statistics
-       > cache.stats()
-
-
-    ``worker.stats() cache.stats()`` commands can be executed synchronously over all forks.
-    Results are returned as a table ordered as forks.
-    Expression inserted to ``map ''`` can be any valid expression in Lua.
-
-    .. code-block:: lua
-
-        > map 'worker.stats()'
-
-
-    :ref:`mod-stats` gathers various counters from the query resolution and server internals,
-    and offers them as a key-value storage :func:`stats.list()`.
-
-    .. code-block:: lua
-
-        -- statistics collector is a module
-        > modules.load('stats')
-
-        -- enumerate metrics
-        > stats.list()
-
 
 Monitoring/logging
 ^^^^^^^^^^^^^^^^^^
 
 Lua supports a concept called `closures`_, this is extremely useful for scripting actions upon various events,
 say for example - publish statistics each minute and so on.
+All available statistics are listed in :ref:`mod-stats-list`.
+
 Here's an example of an anonymous function with :func:`event.recurrent()`.
 
 .. note::
@@ -443,31 +429,31 @@ function which will provide persistent variable (called ``previous``):
 
 .. code-block:: lua
 
-    -- load module for statistics
-    modules = { 'stats' }
-
-    -- make a closure, encapsulating counter
+    -- speed_monitor definition
+    -- prints warning if more than 5% of total answers was slow
     function speed_monitor()
-            local previous = stats.list()
-            -- monitoring function
+            local previous = stats.list()   -- store statistics in persistent variable
             return function(evid)
-                    local now = stats.list()
+                    local now = stats.list()    -- save actual statistics to variable
+                    -- number of total answers between 'now' and 'previous' states
                     local total_increment = now['answer.total'] - previous['answer.total']
+                    -- number of slow answers between 'now' and 'previous' states
                     local slow_increment = now['answer.slow'] - previous['answer.slow']
+                    -- if percentage of slow answers is bigger than 5%, print warning
                     if slow_increment / total_increment > 0.05 then
                             log('WARNING! More than 5 %% of queries was slow!')
                     end
-                    previous = now  -- store current value in closure
+                    previous = now
              end
     end
 
-    -- speed monitor every minute
+    -- execute speed_monitor every minute
     local monitor_id = event.recurrent(1 * minute, speed_monitor())
-
 
 .. _SNI: https://en.wikipedia.org/wiki/Server_Name_Indication
 .. _closures: https://www.lua.org/pil/6.1.html
 .. _AUR: https://wiki.archlinux.org/index.php/Arch_User_Repository
 .. _`Learn Lua in 15 minutes`: http://tylerneylon.com/a/learn-lua/
 .. _`DNS Privacy Test Servers`: https://dnsprivacy.org/wiki/display/DP/DNS+Privacy+Test+Servers
-.. _`/etc/config`: https://github.com/CZ-NIC/knot-resolver/tree/master/etc/config
+.. _lua-filesystem: https://keplerproject.github.io/luafilesystem//manual.html#reference
+.. _KnotDNS: https://www.knot-dns.cz/
