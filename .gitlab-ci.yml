@@ -241,7 +241,7 @@ lint:tidy:
       - master
     variables:
       - $SKIP_CI == "1"
-  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora
+  image: $CI_REGISTRY/knot/knot-resolver/ci/fedora:30
   only:  # trigger job only in repos under our control
     - branches@knot/knot-resolver
     - branches@knot/knot-resolver-security
@@ -251,7 +251,7 @@ lint:tidy:
     when: always
     paths:
       - epel-7-x86_64/
-      - fedora-29-x86_64/
+      - fedora-30-x86_64/
       - "*.src.rpm"
   tags:
     - privileged  # mock requires additional capabilities (e.g. mount)
@@ -268,13 +268,13 @@ pkg:epel-7:
   after_script:
     - mv /var/lib/mock/epel-7-x86_64/result epel-7-x86_64
 
-pkg:fedora-29:
+pkg:fedora-30:
   <<: *pkgbuild
   script:
     - ./scripts/make-srpm.sh
-    - mock --no-clean --old-chroot -r fedora-29-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/fedora-29-x86_64/result/build.log; false)
+    - mock --no-clean --old-chroot -r fedora-30-x86_64 --rebuild *.src.rpm || (cat /var/lib/mock/fedora-30-x86_64/result/build.log; false)
   after_script:
-    - mv /var/lib/mock/fedora-29-x86_64/result fedora-29-x86_64
+    - mv /var/lib/mock/fedora-30-x86_64/result fedora-30-x86_64
 
 respdiff:basic:
   <<: *test
