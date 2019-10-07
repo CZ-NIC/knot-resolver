@@ -758,14 +758,14 @@ int main(int argc, char **argv)
 	};
 	/** Static to work around lua_pushlightuserdata() limitations.
 	 * TODO: convert to a proper singleton like worker, most likely. */
-	static struct engine engine;
-	ret = engine_init(&engine, &pool);
+	struct engine *engine = malloc(sizeof(*engine));
+	ret = engine_init(engine, &pool);
 	if (ret != 0) {
 		kr_log_error("[system] failed to initialize engine: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;
 	}
 	/* Initialize the worker */
-	ret = worker_init(&engine, fork_id, args.forks);
+	ret = worker_init(engine, fork_id, args.forks);
 	if (ret != 0) {
 		kr_log_error("[system] failed to initialize worker: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;
@@ -806,7 +806,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Start listening, in the sense of network_listen_fd(). */
-	if (start_listening(&engine.net, &args.fds) != 0) {
+	if (start_listening(&engine->net, &args.fds) != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -820,38 +820,39 @@ int main(int argc, char **argv)
 	}
 
 	/* Start the scripting engine */
-	if (engine_load_sandbox(&engine) != 0) {
+	if (engine_load_sandbox(engine) != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
 	if (args.config != NULL && strcmp(args.config, "-") != 0) {
-		if(engine_loadconf(&engine, args.config) != 0) {
+		if(engine_loadconf(engine, args.config) != 0) {
 			ret = EXIT_FAILURE;
 			goto cleanup;
 		}
-		lua_settop(engine.L, 0);
+		lua_settop(engine->L, 0);
 	}
 	if (args.config == NULL || strcmp(args.config, "-") !=0) {
-		if(engine_load_defaults(&engine) != 0) {
+		if(engine_load_defaults(engine) != 0) {
 			ret = EXIT_FAILURE;
 			goto cleanup;
 		}
 	}
-	if (engine_start(&engine) != 0) {
+	if (engine_start(engine) != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
 
-	if (network_engage_endpoints(&engine.net)) {
+	if (network_engage_endpoints(&engine->net)) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
 
 	/* Run the event loop */
-	ret = run_worker(loop, &engine, &ipc_set, fork_id == 0, &args);
+	ret = run_worker(loop, engine, &ipc_set, fork_id == 0, &args);
 
 cleanup:/* Cleanup. */
-	engine_deinit(&engine);
+	engine_deinit(engine);
+	free(engine);
 	worker_deinit();
 	if (loop != NULL) {
 		uv_loop_close(loop);
