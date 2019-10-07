@@ -62,13 +62,18 @@ Use ``dig -v`` command to check if ``DiG`` is installed.
 
 
 
+.. note::
+
+    `Single instance`_ of Knot Resolver will utilize single CPU code on your machine.
+    If your machine handles a lot of DNS traffic, run `multiple instances`_.
+    Advantage of doing using multiple instances is that problem in single instance
+    will not affect others, so single program crash will not bring large DNS resolver down.
+
 Single instance
 ===============
 
 If you're using our packages, the simplest way to run **single instance** of
 Knot Resolver is to use provided Knot Resolver's ``systemd`` integration.
-
-.. note:: The instance of Knot Resolver is a single process incapable of multithreading.
 
 For help run ``man kresd.systemd``
 
