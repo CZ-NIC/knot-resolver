@@ -1,4 +1,12 @@
-Knot Resolver 4.2.2 (2019-10-07)
+Knot Resolver ??
+================================
+
+Improvements
+------------
+- increase file-descriptor count limits to 1M by default
+
+
+Knot Resolver 4.2.2 (2019-10-dd)
 ================================
 
 Bugfixes
