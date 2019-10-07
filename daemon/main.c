@@ -37,6 +37,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
 #include <unistd.h>
 
 #include <lua.h>
@@ -738,6 +739,23 @@ int main(int argc, char **argv)
 	}
 	if (!args.config && access("config", R_OK) == 0) {
 		args.config = "config";
+	}
+
+	/* File-descriptor count limit: soft->hard. */
+	struct rlimit rlim;
+	ret = getrlimit(RLIMIT_NOFILE, &rlim);
+	if (ret == 0 && rlim.rlim_cur != rlim.rlim_max) {
+		kr_log_verbose("[system] increasing file-descriptor limit: %ld -> %ld\n",
+				(long)rlim.rlim_cur, (long)rlim.rlim_max);
+		rlim.rlim_cur = rlim.rlim_max;
+		ret = setrlimit(RLIMIT_NOFILE, &rlim);
+	}
+	if (ret) {
+		kr_log_error("[system] failed to get or set file-descriptor limit: %s\n",
+				strerror(errno));
+	} else if (rlim.rlim_cur < 1024*1024) {
+		kr_log_info("[system] warning: hard limit for number of file-descriptors is only %ld but recommended value is 1048576\n",
+				rlim.rlim_cur);
 	}
 
 	/* Connect forks with local socket */
