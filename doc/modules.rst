@@ -37,3 +37,4 @@ Modules
 .. include:: ../modules/edns_keepalive/README.rst
 .. include:: ../modules/experimental_dot_auth/README.rst
 .. include:: ../modules/refuse_nord/README.rst
+.. include:: ../modules/watchdog/README.rst

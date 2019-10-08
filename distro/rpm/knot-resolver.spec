@@ -284,6 +284,7 @@ systemctl daemon-reload
 %{_libdir}/knot-resolver/kres_modules/ta_signal_query.lua
 %{_libdir}/knot-resolver/kres_modules/ta_update.lua
 %{_libdir}/knot-resolver/kres_modules/view.lua
+%{_libdir}/knot-resolver/kres_modules/watchdog.lua
 %{_libdir}/knot-resolver/kres_modules/workarounds.lua
 %{_mandir}/man8/kresd.8.gz
 
