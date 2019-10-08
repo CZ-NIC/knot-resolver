@@ -757,8 +757,6 @@ int main(int argc, char **argv)
 		kr_log_info("[system] warning: hard limit for number of file-descriptors is only %ld but recommended value is 1048576\n",
 				rlim.rlim_cur);
 	}
-	/* LATER: it's possible that we have high privileges (e.g. root at this point),
-	 * so we might try increasing the hard limit, too?  Configurable value here? */
 
 	/* Connect forks with local socket */
 	fd_array_t ipc_set;
