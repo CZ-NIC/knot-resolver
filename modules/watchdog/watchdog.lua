@@ -73,17 +73,17 @@ function watchdog.config(cfg)
 		return private
 	end
 
-	if cfg.interval then
-		local interval = tonumber(cfg.interval)
-		if not interval or interval < 1 then
-			error('[watchdog] interval must be >= 1 ms')
-		end
-		private.interval = interval
+	cfg.interval = cfg.interval or private.interval or 10000
+	local interval = tonumber(cfg.interval)
+	if not interval or interval < 1 then
+		error('[watchdog] interval must be >= 1 ms')
 	end
-	if cfg.qname then
-		private.qname = cfg.qname
-		private.qtype = cfg.qtype or kres.type.A
-	end
+	private.interval = interval
+
+	-- qname = nil will disable DNS queries
+	private.qname = cfg.qname
+	private.qtype = cfg.qtype or kres.type.A
+
 	-- restart timers
 	watchdog.deinit()
 	private.event = event.recurrent(private.interval, timer)
