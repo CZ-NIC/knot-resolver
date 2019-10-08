@@ -1,3 +1,11 @@
+Knot Resolver ??
+================================
+
+Improvements
+------------
+- increase file-descriptor count limit to maximum allowed value (hard limit)
+
+
 Knot Resolver 4.2.2 (2019-10-07)
 ================================
 
