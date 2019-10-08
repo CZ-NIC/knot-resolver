@@ -104,7 +104,7 @@ function watchdog.init()
 	end
 	private.ok_callback = sd_signal_ok
 	if ret < 0 then
-		error('[watchdog] %s', ffi.C.strerror(math.abs(ret)))
+		error('[watchdog] %s', ffi.string(ffi.C.knot_strerror(math.abs(ret))))
 		return
 	elseif ret == 0 then
 		if verbose() then
