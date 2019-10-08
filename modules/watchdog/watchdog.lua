@@ -34,7 +34,8 @@ local function add_tracer(logbuf)
 end
 
 local function check_answer(logbuf)
-	return function (pkt, _)
+	return function (pkt, req)
+		req.trace_log:free()
 		if pkt:rcode() == kres.rcode.NOERROR or pkt:rcode() == kres.rcode.NXDOMAIN then
 			private.ok_callback()
 			return
