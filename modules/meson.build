@@ -15,6 +15,7 @@ lua_mod_src = [  # add lua modules without separate meson.build
   files('ta_sentinel/ta_sentinel.lua'),
   files('ta_signal_query/ta_signal_query.lua'),
   files('ta_update/ta_update.lua'),
+  files('watchdog/watchdog.lua'),
   files('workarounds/workarounds.lua'),
 ]
 
@@ -52,9 +53,6 @@ subdir('policy')
 subdir('refuse_nord')
 subdir('stats')
 subdir('view')
-if libsystemd.found() and libsystemd.version().version_compare('>=183')
-  subdir('sd_watchdog')
-endif
 
 # install lua modules
 foreach mod : lua_mod_src
