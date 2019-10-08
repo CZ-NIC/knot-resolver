@@ -79,9 +79,9 @@ function watchdog.config(cfg)
 		end
 		private.interval = interval
 	end
-	if cfg.qname or cfg.qtype then
+	if cfg.qname then
 		private.qname = cfg.qname
-		private.qtype = cfg.qtype
+		private.qtype = cfg.qtype or kres.type.A
 	end
 	-- restart timers
 	watchdog.deinit()
