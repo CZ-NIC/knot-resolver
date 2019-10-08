@@ -278,7 +278,7 @@ local function add_socket(fd, kind, addr_str)
 	assert(M.servers[fd] == nil, 'socket is already served by an HTTP instance')
 	local conf = mergeconf(M.configs._builtin._all, M.configs._builtin[kind],
 						M.configs._all, M.configs[kind])
-	conf.socket = cqueues.socket.fdopen(fd)
+	conf.socket = cqueues.socket.fdopen({ fd = fd, reuseport = true, reuseaddr = true })
 	if conf.tls ~= false then -- Create a TLS context, either from files or new.
 		if conf.ephemeral then
 			if not M.ephem_state then
