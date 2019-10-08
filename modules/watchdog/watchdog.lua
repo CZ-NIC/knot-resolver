@@ -73,8 +73,7 @@ function watchdog.config(cfg)
 		return private
 	end
 
-	cfg.interval = cfg.interval or private.interval or 10000
-	local interval = tonumber(cfg.interval)
+	local interval = tonumber(cfg.interval or private.interval or 10000)
 	if not interval or interval < 1 then
 		error('[watchdog] interval must be >= 1 ms')
 	end
