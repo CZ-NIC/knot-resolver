@@ -377,15 +377,6 @@ static void request_free(struct request_ctx *ctx)
 	/* Return mempool to ring or free it if it's full */
 	pool_release(worker, ctx->req.pool.ctx);
 	/* @note The 'task' is invalidated from now on. */
-	/* Decommit memory every once in a while */
-	static int mp_delete_count = 0;
-	if (++mp_delete_count == 100000) {
-		lua_gc(worker->engine->L, LUA_GCCOLLECT, 0);
-#if defined(__GLIBC__) && defined(_GNU_SOURCE)
-		malloc_trim(0);
-#endif
-		mp_delete_count = 0;
-	}
 	worker->stats.rconcurrent -= 1;
 }
 
@@ -1729,7 +1720,7 @@ int worker_end_tcp(struct session *session)
 	}
 
 	session_timer_stop(session);
-	
+
 	uv_handle_t *handle = session_get_handle(session);
 	struct worker_ctx *worker = handle->loop->data;
 	struct sockaddr *peer = session_get_peer(session);
