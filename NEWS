@@ -1,9 +1,14 @@
 Knot Resolver ??
 ================================
 
+Bugfixes
+--------
+- http module: use SO_REUSEPORT (!579)
+
 Improvements
 ------------
 - increase file-descriptor count limit to maximum allowed value (hard limit)
+- watchdog module: support testing a DNS query (and switch C -> lua)
 
 
 Knot Resolver 4.2.2 (2019-10-07)
