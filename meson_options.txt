@@ -71,7 +71,7 @@ option(
     'enabled',
     'disabled',
   ],
-  value: 'disabled', # for now; LATER: 'auto',
+  value: 'auto',
   description: 'use sendmmsg syscall towards clients',
 )
 
