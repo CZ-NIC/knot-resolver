@@ -3,6 +3,7 @@ local ffi = require('ffi')
 ffi.cdef([[
 	int sd_watchdog_enabled(int unset_environment, uint64_t *usec);
 	int sd_notify(int unset_environment, const char *state);
+	void abort(void);
 ]])
 
 local watchdog = {}
@@ -13,8 +14,8 @@ local function sd_signal_ok()
 end
 
 function private.fail_callback()
-	log('[watchdog] TERMINATING resolver, supervisor is expected to restart it')
-	os.exit(69)  -- unclean exit code = EX_UNAVAILABLE
+	log('[watchdog] ABORTING resolver, supervisor is expected to restart it')
+	ffi.C.abort()
 end
 
 -- logging

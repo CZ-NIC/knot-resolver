@@ -12,7 +12,6 @@ ExecStart=@sbin_dir@/kresd --config=@etc_dir@/kresd.conf
 User=@user@
 TimeoutStopSec=10s
 WatchdogSec=10s
-RestartForceExitStatus=69
 Restart=on-abnormal
 RestartSec=0
 LimitNOFILE=1048576
