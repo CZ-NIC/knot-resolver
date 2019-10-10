@@ -230,7 +230,7 @@ static inline uint64_t kr_rand_bytes(unsigned int size)
 	kr_rnd_buffered(data, size);
 	/* I would have liked to dump the random data into a size_t directly,
 	 * but that would work well only on little-endian machines,
-	 * so intsead I hope that the compiler will optimize this out.
+	 * so instead I hope that the compiler will optimize this out.
 	 * (Tested via reading assembly from usual gcc -O2 setup.)
 	 * Alternatively we could waste more rnd bytes, but that seemed worse. */
 	result = 0;

@@ -82,7 +82,7 @@ struct kr_layer_api {
 	/** Paired to begin, called both on successes and failures. */
 	int (*finish)(kr_layer_t *ctx);
 
-	/** Processing an answer from upstream or the answer to the request.
+	/** Process an answer from upstream or from cache.
 	 * Lua API: call is omitted iff (state & KR_STATE_FAIL). */
 	int (*consume)(kr_layer_t *ctx, knot_pkt_t *pkt);
 
