@@ -14,6 +14,7 @@ TimeoutStopSec=10s
 WatchdogSec=10s
 RestartForceExitStatus=69
 Restart=on-abnormal
+RestartSec=0
 LimitNOFILE=1048576
 Sockets=kresd.socket
 Sockets=kresd-tls.socket
