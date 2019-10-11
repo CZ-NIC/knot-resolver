@@ -11,6 +11,7 @@ import tempfile
 DISTROS_PATH = Path(os.path.realpath('scripts/distros'))
 GEN_SCRIPT = Path(os.path.realpath('scripts/dockerfile_gen.py'))
 
+
 def unpack(archive, targetdir):
     '''
     Prepare workdir for Docker build by unpacking fresh distribution tarball
@@ -63,10 +64,11 @@ def gen_dockerfile(args, tmpdir, srcdir):
 
 def docker_build(tmpdir, delete):
     subprocess.check_call(
-        ['sudo',
-         'docker',
+        ['docker',
          'build',
          '--rm={}'.format(str(delete).lower()),
+         '--network',
+         'host',
          tmpdir]
     )
 
