@@ -16,7 +16,7 @@ endif
 
 
 message('--- required dependencies ---')
-knot_version = [ '>=2.8', '<2.10.0' ] # this would allow unreleased 2.10.dev
+knot_version = [ '>=2.8', '<3.0.0' ] # this would allow unreleased 3.0.dev
 libknot = dependency('libknot', version: knot_version)
 libdnssec = dependency('libdnssec', version: knot_version)
 libzscanner = dependency('libzscanner', version: knot_version)
