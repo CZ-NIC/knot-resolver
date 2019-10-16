@@ -75,7 +75,6 @@ class Image():
         self.cmds = []
         self._init_cmds()
         # fill in Dockerfile with image preparation commands
-        self.img_script('prep.sh')
 
     def _img_path(self, filename):
         '''Prepend distro-specific path before filename'''
@@ -119,11 +118,16 @@ class Image():
         assert cmd
         self.cmds.append(cmd)
 
+    def run_script(self, script):
+        '''Shedule script from root directory'''
+        if os.path.isfile(script):
+            self.cmds.append(script)
+
     def img_script(self, script):
         '''Schedule script from image's directory'''
         path = self._img_path(script)
         assert os.path.isfile(path)
-        self.cmds.append(path)
+        self.run_script(path)
 
 
 class Component():
@@ -148,6 +152,7 @@ class Component():
             self.image.cmd(path)
 
     def install_builddeps(self):
+        self.image.run_script(self.compimg_path + '/pre-build.sh')
         self.image.action_arglist('pkg_install', self.compimg_path, 'builddeps')
 
     def build(self):
@@ -160,8 +165,10 @@ class Component():
 
     def remove_builddeps(self):
         self.image.action_arglist('pkg_remove', self.compimg_path, 'builddeps')
+        self.image.run_script(self.compimg_path + '/post-build.sh')
 
     def install_rundeps(self):
+        self.image.run_script(self.compimg_path + '/pre-run.sh')
         self.image.action_arglist('pkg_install', self.compimg_path, 'rundeps')
 
     def test(self):
@@ -171,6 +178,7 @@ class Component():
             self._comp_script('test.sh')
         elif os.path.exists(configtestpath):
             self.image.cmd('kresd -f 1 -c {}'.format(configtestpath))
+        self.image.run_script(self.compimg_path + '/post-run.sh')
 
 
 def foreach_component(components, action):

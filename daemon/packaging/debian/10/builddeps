@@ -7,3 +7,4 @@ libluajit-5.1-dev
 libuv1-dev
 liblmdb-dev
 bsdmainutils
+pkg-config
