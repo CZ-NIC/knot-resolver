@@ -1,6 +1,6 @@
 FROM debian:buster
 MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
-ARG KNOT_BRANCH=2.8
+ARG KNOT_BRANCH=2.9
 
 WORKDIR /root
 CMD ["/bin/bash"]
