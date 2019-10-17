@@ -48,27 +48,32 @@ package for Arch Linux is maintained in AUR_.
 Startup
 *******
 
-After installation, Knot Resolver's default configuration should work for loopback
-queries. This allows you to test that installation and service setup works before
-managing configuration.
-
-For instance you can use advanced DNS lookup utility ``kdig`` to send DNS queries.
-It is provided by ``knot-dnsutils`` package on Ubuntu/Debian.
-On Arch Linux complete AUR package of KnotDNS_ named ``knot`` must be installed.
-
-Use ``kdig -V`` command to check if ``kdig`` is installed.
-
-.. code-block:: bash
-
-    $ kdig @localhost
-
-
 .. note::
 
-    `Single instance`_ of Knot Resolver will utilize single CPU code on your machine.
+    `Single instance`_ of Knot Resolver will utilize single CPU core on your machine.
     If your machine handles a lot of DNS traffic, run `multiple instances`_.
     Advantage of doing using multiple instances is that problem in single instance
     will not affect others, so single program crash will not bring large DNS resolver down.
+
+
+After installation, Knot Resolver's default configuration should work for queries on loopback.
+This allows you to test that the installation and service setup were successful before
+managing configuration.
+
+For instance, you can use advanced DNS lookup utility ``kdig`` to send DNS queries.
+It is provided by ``knot-dnsutils`` package on Ubuntu/Debian.
+On Arch Linux ``kdig`` is part of  KnotDNS_ AUR named ``knot``.
+
+Type ``kdig -V`` to check if ``kdig`` is installed and then make query.
+The query should return Root Name Servers.
+
+.. code-block:: bash
+
+    $ kdig +short @localhost
+    a.root-servers.net.
+    ...
+    m.root-servers.net.
+
 
 Single instance
 ===============
@@ -76,7 +81,7 @@ Single instance
 If you're using our packages, the simplest way to run **single instance** of
 Knot Resolver is to use provided Knot Resolver's ``systemd`` integration.
 
-For help run ``man kresd.systemd``
+For help type ``man kresd.systemd``
 
 .. code-block:: bash
 
@@ -137,6 +142,8 @@ Easiest way to configure Knot Resolver is to paste your configuration to
 You can easily save configuration files and switch between them.
 Configurations files of following examples
 can be found `here <https://github.com/CZ-NIC/knot-resolver/tree/master/etc/config>`_.
+The example configuration files are also installed as a documentation files in ``/usr/share/doc/knot-resolver/examples/``.
+Their location may be different based on Linux distribution.
 
 Listening on network interfaces
 ===============================
@@ -310,31 +317,30 @@ For that ``systemd-tmpfiles.d`` is used.
     $ cp /usr/lib/tmpfiles.d/knot-resolver.conf /etc/tmpfiles.d/knot-resolver.conf
     $ echo 'd /tmp/knot-resolver 0750 knot-resolver knot-resolver - -' | sudo tee -a /etc/tmpfiles.d/knot-resolver.conf
 
-After the directory creation is secured, ``WorkingDirectory`` for ``kresd@.service`` can be override.
+On every computer startup directory should be created.
+This can be tested by ``systemd-tmpfiles --create`` command.
+
+After the directory creation is secure, ``WorkingDirectory`` for ``kresd@.service`` can be override.
 
 .. code-block:: bash
 
     $ systemctl edit kresd@.service
 
-Paste ``WorkingDirectory=/tmp/knot-resolver`` to the new created file.
-On every computer startup directory should be created.
-This can be tested by ``systemd-tmpfiles --create`` command.
+Paste ``WorkingDirectory=/tmp/knot-resolver`` to the new file.
 
 TLS server configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 This allows clients to send queries to your resolver
 using DNS-over-TLS. It does not protect queries send out by your resolver.
-To protect queries send out by your resolver DNS forwarding over
-DNS-over-TLS needs to be configured.
+To protect queries send out by your resolver `Forwarding over TLS protocol (DNS-over-TLS)`_ needs to be configured.
 
-Enable tls on listening interfaces.
+Enable TLS on listening interfaces.
 
 .. code-block:: lua
 
    net.listen('192.168.1.1', 853, { kind = 'tls' })
    net.listen('fc00::1:1', 853, { kind = 'tls' })
-
 
 .. Warning::
 
@@ -424,7 +430,7 @@ Here's an example of an anonymous function with :func:`event.recurrent()`.
         event.cancel(stat_id)
     end)
 
-If you need to persist state between events, encapsulate even handle in closure
+If you need to persist state between events, encapsulate event handle in closure
 function which will provide persistent variable (called ``previous``):
 
 .. code-block:: lua
