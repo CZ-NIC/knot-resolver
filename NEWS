@@ -4,6 +4,8 @@ Knot Resolver ??
 Bugfixes
 --------
 - http module: use SO_REUSEPORT (!879)
+- systemd: kresd@.service now properly starts after network interfaces
+  have been configured with IP addresses after reboot (!884)
 
 Improvements
 ------------
