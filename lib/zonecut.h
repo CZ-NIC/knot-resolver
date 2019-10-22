@@ -23,7 +23,7 @@
 
 
 /* TMP: compatibility for using libknot 2.8 API with 2.9. */
-#if KNOT_VERSION_MINOR >= 9
+#if KNOT_VERSION_HEX >= 0x020900
 static inline size_t knot_rdataset_size(const knot_rdataset_t *rrs)
 {
 	return rrs->size;
