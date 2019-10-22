@@ -110,7 +110,7 @@ static void init_keylog_file(void)
     const char *filename = getenv("OPENSSLKEYLOGFILE");
     if (filename) {
 	/* ctime output is max 26 bytes, POSIX 1003.1-2017 */
-	keylog_file_fd = open(filename, O_WRONLY | O_APPEND | O_CREAT, 0644);
+	keylog_file_fd = open(filename, O_WRONLY | O_APPEND | O_CREAT, 0600);
         if (keylog_file_fd >= 0 && lseek(keylog_file_fd, 0, SEEK_END) == 0) {
             time_t timenow = time(NULL);
             char txtnow[30] = { '#', ' ', 0 };
