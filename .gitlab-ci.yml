@@ -473,6 +473,10 @@ obs:release:
 
 obs:build:all:
   <<: *deploytest
+  only:
+    variables:
+      - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing|knot-resolver-odvr$/
+      - $CI_COMMIT_TAG
   script:
     - "osc results home:CZ-NIC:$OBS_REPO knot-resolver -w"
     - version=$(sed 's/^v//' <(git describe --exact-match HEAD || git rev-parse --short HEAD) )
@@ -521,6 +525,10 @@ obs:centos7:x86_64:
 
 obs:debian9:x86_64:
   <<: *distrotest
+  only:
+    variables:
+      - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing|knot-resolver-odvr$/
+      - $CI_COMMIT_TAG
   variables:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: debian9
@@ -563,6 +571,10 @@ obs:ubuntu1604:x86_64:
 
 obs:ubuntu1804:x86_64:
   <<: *distrotest
+  only:
+    variables:
+      - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing|knot-resolver-odvr$/
+      - $CI_COMMIT_TAG
   variables:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: ubuntu1804
