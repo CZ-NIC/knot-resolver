@@ -71,6 +71,12 @@ Requires:       lua-socket-compat
 Requires:       lua-sec-compat
 Requires(pre):  shadow-utils
 %endif
+
+# we do not build HTTP module on SuSE so the build requires is not needed
+%if "x%{?suse_version}" == "x"
+BuildRequires:  openssl-devel
+%endif
+
 %if 0%{?suse_version}
 %define NINJA ninja
 BuildRequires:  lmdb-devel
@@ -187,6 +193,7 @@ rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/etcd.lua
 %if 0%{?suse_version}
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/experimental_dot_auth.lua
 rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http
+rm -r %{buildroot}%{_libdir}/knot-resolver/debug_opensslkeylog.so
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/http*.lua
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/prometheus.lua
 rm %{buildroot}%{_unitdir}/kresd@.service.d/module-http.conf
@@ -306,6 +313,7 @@ systemctl daemon-reload
 %{_unitdir}/kresd-doh.socket
 %{_unitdir}/kresd-webmgmt.socket
 %endif
+%{_libdir}/knot-resolver/debug_opensslkeylog.so
 %{_libdir}/knot-resolver/kres_modules/http
 %{_libdir}/knot-resolver/kres_modules/http*.lua
 %{_libdir}/knot-resolver/kres_modules/prometheus.lua
