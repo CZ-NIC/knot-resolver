@@ -27,7 +27,10 @@
 #   define NO_OPENSSL_102_SUPPORT
 #endif
 
-#define _GNU_SOURCE /* for RTLD_NEXT */
+#ifndef _GNU_SOURCE
+#   define _GNU_SOURCE /* for RTLD_NEXT */
+#endif
+
 #include <dlfcn.h>
 #ifndef NO_OPENSSL_102_SUPPORT
 #   include <openssl/ssl.h>
