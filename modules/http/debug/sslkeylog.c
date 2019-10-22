@@ -107,7 +107,7 @@ static void init_keylog_file(void)
     if (keylog_file_fd >= 0)
         return;
 
-    const char *filename = getenv("SSLKEYLOGFILE");
+    const char *filename = getenv("OPENSSLKEYLOGFILE");
     if (filename) {
         keylog_file_fd = open(filename, O_WRONLY | O_APPEND | O_CREAT, 0644);
         if (keylog_file_fd >= 0 && lseek(keylog_file_fd, 0, SEEK_END) == 0) {
