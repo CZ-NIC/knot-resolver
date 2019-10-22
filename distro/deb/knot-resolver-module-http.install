@@ -1,6 +1,7 @@
 usr/lib/systemd/system/kresd@.service.d/module-http.conf lib/systemd/system/kresd@.service.d/
 usr/lib/systemd/system/kresd-doh.socket lib/systemd/system/
 usr/lib/systemd/system/kresd-webmgmt.socket lib/systemd/system/
+usr/lib/knot-resolver/debug_opensslkeylog.so
 usr/lib/knot-resolver/kres_modules/http*.lua
 usr/lib/knot-resolver/kres_modules/prometheus.lua
 usr/lib/knot-resolver/kres_modules/http/*.css
