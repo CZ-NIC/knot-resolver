@@ -70,6 +70,8 @@ static int keylog_file_fd = -1;
 #define PREFIX      "CLIENT_RANDOM "
 #define PREFIX_LEN  (sizeof(PREFIX) - 1)
 
+#pragma GCC diagnostic ignored "-Wpedantic"
+
 static inline void put_hex(char *buffer, int pos, char c)
 {
     unsigned char c1 = ((unsigned char) c) >> 4;
