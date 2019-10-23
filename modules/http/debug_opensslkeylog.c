@@ -1,4 +1,7 @@
 /*
+
+:q
+
  * Dumps master keys for OpenSSL clients to file. The format is documented at
  * https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS/Key_Log_Format
  * Supports TLS 1.3 when used with OpenSSL 1.1.1.
