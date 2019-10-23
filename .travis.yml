@@ -10,6 +10,7 @@ addons:
             - libuv
             - lmdb
             - meson
+            - openssl
 compiler:
     - clang
 notifications:
