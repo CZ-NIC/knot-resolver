@@ -17,8 +17,8 @@ answers correctly. To use this feature you must configure DNS name and type to q
 
 Each single query from watchdog must result in answer with
 RCODE = NOERROR or NXDOMAIN. Any other result will terminate the resolver
-(with exit code 69) to allow the supervisor process to do cleanup and restart
-the resolver.
+(with SIGABRT) to allow the supervisor process to do cleanup, gather coredump
+and restart the resolver.
 
 It is recommended to use a name with a very short TTL to make sure the watchdog
 is testing all parts of resolver and not only its cache. Obviously this check
