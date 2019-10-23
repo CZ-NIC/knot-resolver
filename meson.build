@@ -30,6 +30,7 @@ luajit = dependency('luajit')
 # NOTE avoid using link_args for luajit due to a macOS issue
 # https://github.com/Homebrew/homebrew-core/issues/37169
 luajit_inc = luajit.partial_dependency(compile_args: true, includes: true)
+openssl = dependency('openssl', required: false)
 message('------------------------------')
 
 
@@ -262,6 +263,7 @@ s_build_config_tests = build_config_tests ? 'enabled' : 'disabled'
 s_build_extra_tests = build_extra_tests ? 'enabled' : 'disabled'
 s_install_kresd_conf = install_kresd_conf ? 'enabled' : 'disabled'
 s_sendmmsg = sendmmsg ? 'enabled': 'disabled'
+s_openssl = openssl.found() ? 'present': 'missing'
 message('''
 
 ======================= SUMMARY =======================
@@ -295,6 +297,7 @@ message('''
     group:              @0@'''.format(group) + '''
     install_kresd_conf: @0@'''.format(s_install_kresd_conf) + '''
     sendmmsg:           @0@'''.format(s_sendmmsg) + '''
+    openssl debug:      @0@'''.format(s_openssl) + '''
 
 =======================================================
 
