@@ -30,17 +30,18 @@ install_subdir(
   install_dir: join_paths(modules_dir, 'http'),
 )
 
-openssl = dependency('openssl')
 # auxiliary debug library for HTTP module
-debug_opensslkeylog_mod = shared_module(
-  'debug_opensslkeylog',
-  ['debug_opensslkeylog.c'],
-  # visibility=default == public is required for LD_PRELOAD trick
-  c_args: '-fvisibility=default',
-  name_prefix: '',
-  install: true,
-  install_dir: lib_dir,
-  dependencies: [
-    openssl,
-  ],
-)
+if openssl.found()
+  debug_opensslkeylog_mod = shared_module(
+    'debug_opensslkeylog',
+    ['debug_opensslkeylog.c'],
+    # visibility=default == public is required for LD_PRELOAD trick
+    c_args: '-fvisibility=default',
+    name_prefix: '',
+    install: true,
+    install_dir: lib_dir,
+    dependencies: [
+      openssl,
+    ],
+  )
+endif
