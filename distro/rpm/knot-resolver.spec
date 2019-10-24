@@ -154,6 +154,8 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
     -Dclient=enabled \
     -Dunit_tests=enabled \
     -Dmanaged_ta=enabled \
+    -Dkeyfile_default="%{_sharedstatedir}/knot-resolver/root.keys" \
+    -Dinstall_root_keys=enabled \
     -Dinstall_kresd_conf=enabled \
     --buildtype=plain \
     --prefix="%{_prefix}" \
@@ -233,11 +235,12 @@ systemctl daemon-reload
 %doc %{_pkgdocdir}/AUTHORS
 %doc %{_pkgdocdir}/NEWS
 %doc %{_pkgdocdir}/examples
-%attr(775,root,knot-resolver) %dir %{_sysconfdir}/knot-resolver
+%attr(755,root,knot-resolver) %dir %{_sysconfdir}/knot-resolver
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/kresd.conf
-%attr(664,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/root.keys
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/root.hints
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/icann-ca.pem
+%attr(775,root,knot-resolver) %dir %{_sysconfdir}/knot-resolver
+%attr(664,root,knot-resolver) %config(noreplace) %{_sharedstatedir}/knot-resolver/root.keys
 %{_unitdir}/kresd@.service
 %{_unitdir}/kres-cache-gc.service
 %{_unitdir}/kresd.target
