@@ -63,11 +63,7 @@ if keyfile_default == join_paths(etc_dir, 'root.keys')
   install_root_keys = true
   managed_ta = managed_ta or get_option('managed_ta') == 'auto'
 else
-  install_root_keys = false
-  if managed_ta
-    warning('Using managed_ta along with non-standard keyfile_default. ' +
-	    'Ensure keyfile_default directory will be writable by kresd.')
-  endif
+  install_root_keys = managed_ta
 endif
 
 ## Root hints

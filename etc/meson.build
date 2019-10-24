@@ -11,7 +11,19 @@ if managed_ta
 endif
 
 if install_root_keys
-  etc_files += 'root.keys'
+  root_keys_path = keyfile_default.split('/')
+  root_keys_filename = root_keys_path[-1]
+  root_keys_dir = []
+  foreach el : root_keys_path
+    if el != root_keys_filename
+      root_keys_dir += el
+    endif
+  endforeach
+  install_data(
+    sources: 'root.keys',
+    rename: root_keys_filename,
+    install_dir: '/'.join(root_keys_dir)
+  )
 endif
 
 
