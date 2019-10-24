@@ -7,6 +7,7 @@ Bugfixes
 - systemd: kresd@.service now properly starts after network interfaces
   have been configured with IP addresses after reboot (!884)
 - sendmmsg: improve reliability (!704)
+- cache: fix crash on insertion via lua for NS and CNAME (!889)
 
 Improvements
 ------------

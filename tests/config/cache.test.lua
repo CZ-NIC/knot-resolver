@@ -43,14 +43,19 @@ local function test_context_cache()
 	is(type(c), 'cdata', 'context has a cache object')
 	local s = c.stats
 	isnt(s.read and s.read_miss and s.write, 'context cache stats works')
-	-- insert a record into cache
+	-- insert A record into cache
 	local rdata = '\1\2\3\4'
 	local rr = kres.rrset('\3com\0', kres.type.A, kres.class.IN, 66)
 	rr:add_rdata(rdata, #rdata)
 	local s_write = s.write
-	ok(c:insert(rr, nil, 0, 0), 'cache insertion works')
+	ok(c:insert(rr, nil, 0, 0), 'cache insertion works (A)')
 	ok(c:commit(), 'cache commit works')
 	isnt(s.write, s_write, 'cache insertion increments counters')
+	-- insert NS record into cache
+	local rr_ns = kres.rrset('\3com\0', kres.type.NS, kres.class.IN, 66)
+	local rdata_ns = todname('c.gtld-servers.net')
+	ok(rr_ns:add_rdata(rdata_ns, #rdata_ns), 'adding rdata works')
+	ok(c:insert(rr_ns, nil, 0), 'cache insertion works (NS)')
 end
 
 return {
