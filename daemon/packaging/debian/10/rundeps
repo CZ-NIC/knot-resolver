@@ -1,4 +1,4 @@
-libknot5
-libluajit-5.1
+knot
+libluajit-5.1-2
 libuv1
 liblmdb0

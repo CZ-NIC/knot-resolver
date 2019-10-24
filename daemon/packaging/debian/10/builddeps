@@ -1,10 +1,13 @@
 meson
 ninja-build
 libknot-dev
+cmake
 gcc
 g++
+git
+luajit
 libluajit-5.1-dev
+lua-cqueues
 libuv1-dev
 liblmdb-dev
-bsdmainutils
 pkg-config
