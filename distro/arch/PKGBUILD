@@ -47,6 +47,7 @@ build() {
         --prefix=/usr \
         --sbindir=bin \
         -Dkeyfile_default=/etc/trusted-key.key \
+        -Dmanaged_ta=disabled \
         -Dsystemd_files=enabled \
         -Dclient=enabled \
         -Dinstall_kresd_conf=enabled \
