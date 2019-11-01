@@ -16,3 +16,6 @@ sysrepo_mod = shared_module(
   install: true,
   install_dir: modules_dir,
 )
+# FIXME: dependency on the sysrepo package
+
+
