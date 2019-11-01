@@ -52,6 +52,7 @@ subdir('nsid')
 subdir('policy')
 subdir('refuse_nord')
 subdir('stats')
+subdir('sysrepo')
 subdir('view')
 
 # install lua modules
