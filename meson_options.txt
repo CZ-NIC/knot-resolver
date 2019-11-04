@@ -139,6 +139,18 @@ option(
 )
 
 option(
+  'sysrepo',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'auto',
+  description: 'build sysrepo module',
+)
+
+option(
   'doc',
   type: 'combo',
   choices: [
