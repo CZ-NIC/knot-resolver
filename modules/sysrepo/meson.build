@@ -11,12 +11,12 @@ if get_option('sysrepo') != 'disabled'
   libsysrepo = dependency('libsysrepo', version: '>=1', required: sysrepo_required)
   message('----------------------------------')
   if libsysrepo.found()
-    build_dnstap = true
+    build_sysrepo = true
   endif
 endif
 
 
-if build_dnstap
+if build_sysrepo
   c_src_lint += sysrepo_src
 
   sysrepo_mod = shared_module(
