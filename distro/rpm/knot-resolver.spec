@@ -238,7 +238,7 @@ systemctl daemon-reload
 %attr(755,root,knot-resolver) %dir %{_sysconfdir}/knot-resolver
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/kresd.conf
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/root.hints
-%attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/icann-ca.pem
+%attr(644,root,knot-resolver) %{_sysconfdir}/knot-resolver/icann-ca.pem
 %attr(775,root,knot-resolver) %dir %{_sysconfdir}/knot-resolver
 %attr(775,root,knot-resolver) %dir %{_sharedstatedir}/knot-resolver
 %attr(664,root,knot-resolver) %{_sharedstatedir}/knot-resolver/root.keys
