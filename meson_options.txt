@@ -38,6 +38,18 @@ option(
 )
 
 option(
+  'install_root_keys',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'auto',
+  description: 'installs DNSSEC TA to keyfile_default location',
+)
+
+option(
   'verbose_log',
   type: 'combo',
   choices: [
