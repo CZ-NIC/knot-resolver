@@ -4,10 +4,11 @@
 
 Vagrant.configure(2) do |config|
 
-    config.vm.box = "generic/ubuntu1904"
+    # TODO: switch to generic/ubuntu1910 when available (has libvirt box)
+    config.vm.box = "ubuntu/eoan64"
     config.vm.synced_folder ".", "/vagrant", disabled: true
 
-    config.vm.define "ubuntu1904_knot-resolver"  do |machine|
+    config.vm.define "ubuntu1910_knot-resolver"  do |machine|
         machine.vm.provision "ansible" do |ansible|
             ansible.playbook = "../knot-resolver-pkgtest.yaml"
             ansible.extra_vars = {
