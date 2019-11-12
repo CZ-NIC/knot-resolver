@@ -9,6 +9,8 @@
 #include <uv.h>
 
 #include "lib/module.h"
+#include "daemon/worker.h"
+#include "daemon/network.h"
 
 typedef struct subscr subscr_t;
 /** Callback for our sysrepo subscriptions */
@@ -66,8 +68,7 @@ static subscr_t * subscr_new(sr_subscription_ctx_t *sr_sub, subscr_cb cb)
 	return sub;
 }
 
-static void
-print_val(const sr_val_t *value)
+static void print_val(const sr_val_t *value)
 {
     if (NULL == value) {
         return;
@@ -153,8 +154,7 @@ print_val(const sr_val_t *value)
     }
 }
 
-static void
-print_change(sr_change_oper_t op, sr_val_t *old_val, sr_val_t *new_val)
+static void print_change(sr_change_oper_t op, sr_val_t *old_val, sr_val_t *new_val)
 {
     switch(op) {
     case SR_OP_CREATED:
@@ -177,8 +177,7 @@ print_change(sr_change_oper_t op, sr_val_t *old_val, sr_val_t *new_val)
     }
 }
 
-static void
-print_current_config(sr_session_ctx_t *session, const char *module_name)
+static void set_current_config(sr_session_ctx_t *session, const char *module_name)
 {
     sr_val_t *values = NULL;
     size_t count = 0;
@@ -193,29 +192,41 @@ print_current_config(sr_session_ctx_t *session, const char *module_name)
         return;
     }
 
+    printf("\n\nCHANGING CONFIG TO: \n");
+
     for (size_t i = 0; i < count; i++){
-        print_val(&values[i]);
+
+        sr_val_t *value = &values[i];
+
+        if (strcmp(value->xpath,"/cznic-resolver-common:dns-resolver/cache/min-ttl")==0)
+        {         
+            the_worker->engine->resolver.cache.ttl_min = value->data.uint32_val;
+            printf("\n%s = %d\n", value->xpath, value->data.uint32_val);
+        }
+        else if (strcmp(value->xpath,"/cznic-resolver-common:dns-resolver/cache/max-ttl")==0){
+            the_worker->engine->resolver.cache.ttl_max = value->data.uint32_val;
+            printf("\n%s = %d\n", value->xpath, value->data.uint32_val);
+        }
     }
+    printf("\n\n");
+
     sr_free_values(values, count);
 }
 
-const char *
-ev_to_str(sr_event_t ev)
+const char *ev_to_str(sr_event_t ev)
 {
     switch (ev) {
     case SR_EV_CHANGE:
-        return "change";
+        return "CHANGE";
     case SR_EV_DONE:
-        return "done";
+        return "DONE";
     case SR_EV_ABORT:
     default:
-        return "abort";
+        return "ABORT";
     }
 }
 
-static int
-module_change_cb(sr_session_ctx_t *session, const char *module_name, const char *xpath, sr_event_t event,
-        uint32_t request_id, void *private_data)
+static int module_change_cb(sr_session_ctx_t *session, const char *module_name, const char *xpath, sr_event_t event, uint32_t request_id, void *private_data)
 {
     sr_change_iter_t *it = NULL;
     int rc = SR_ERR_OK;
@@ -227,24 +238,23 @@ module_change_cb(sr_session_ctx_t *session, const char *module_name, const char 
     (void)request_id;
     (void)private_data;
 
-    printf("\n\n ========== EVENT %s CHANGES: ====================================\n\n", ev_to_str(event));
-
     rc = sr_get_changes_iter(session, "//." , &it);
     if (rc != SR_ERR_OK) {
         goto cleanup;
     }
 
-    while ((rc = sr_get_change_next(session, it, &oper, &old_value, &new_value)) == SR_ERR_OK) {
-        print_change(oper, old_value, new_value);
-        sr_free_val(old_value);
-        sr_free_val(new_value);
+    if (event == SR_EV_CHANGE){
+        printf("\n\n%s callback\n\n", ev_to_str(event));
+
+        while ((rc = sr_get_change_next(session, it, &oper, &old_value, &new_value)) == SR_ERR_OK) {
+            print_change(oper, old_value, new_value);
+            sr_free_val(old_value);
+            sr_free_val(new_value);
+        }
     }
 
-    printf("\n ========== END OF CHANGES =======================================");
-
-    if (event == SR_EV_DONE) {
-        printf("\n\n ========== CONFIG HAS CHANGED, CURRENT RUNNING CONFIG: ==========\n\n");
-        print_current_config(session, module_name);
+    if (event == SR_EV_DONE) {   
+        set_current_config(session, module_name);
     }
 
 cleanup:
@@ -252,10 +262,8 @@ cleanup:
     return SR_ERR_OK;
 }
 
-/* subscr_new(sr_sub, subscr_cb_example); */
-static void subscr_cb_example(subscr_t *sub, int status)
+static void new_subscr_cb(subscr_t *sub, int status)
 {
-    printf("Callback");  
 	if (status) {
 		/* some error */
 		return;
@@ -272,12 +280,13 @@ int sysrepo_init(struct kr_module *module)
     sr_subscription_ctx_t *subscription = NULL;
     int rc = SR_ERR_OK;
     const char *mod_name, *xpath = NULL;
-    mod_name = "examples";
+    mod_name = "cznic-resolver-common";
 
     /* connect to sysrepo */
     rc = sr_connect(0, &connection);
     if (rc != SR_ERR_OK) {
-        return kr_error;
+        sr_disconnect(sr_connection);
+        return kr_error(rc);
     }
 
     sr_connection = connection;
@@ -285,37 +294,35 @@ int sysrepo_init(struct kr_module *module)
     /* start session with sysrepo */
     rc = sr_session_start(connection, SR_DS_RUNNING, &session);
     if (rc != SR_ERR_OK) {
-        return kr_error;
+        sr_disconnect(sr_connection);
+        return kr_error(rc);
     }
 
-    /* read current config */
-    printf("\n\n ========== RUNNING CONFIG: ==========\n\n");
-    print_current_config(session, mod_name);
+    /* read and set current config to knot-resolver*/
+    set_current_config(session, mod_name);
 
-    /* subscribe for changes*/
+    /* subscribe for changes */
     rc = sr_module_change_subscribe(session, mod_name, xpath, module_change_cb, NULL, 0, SR_SUBSCR_NO_THREAD , &subscription);
     if (rc != SR_ERR_OK) {
-        return kr_error;
+        sr_disconnect(sr_connection);
+        return kr_error(rc);
     }
 
-    subscr_t *subscr_ctx = subscr_new(subscription, subscr_cb_example);
+    /* add subscription to event loop */
+    subscr_t *subscr_ctx = subscr_new(subscription, new_subscr_cb);
     subscr_ctx->sr_session = session;
     module->data = subscr_ctx;
 
-    //sr_disconnect(connection);
     return kr_ok();  
 }
 
 KR_EXPORT
 int sysrepo_deinit(struct kr_module *module)
 {
-    /* TODO: don't forget to subscr_free() everything. */
-
+    sr_disconnect(sr_connection);
     subscr_t *data = module->data;
     subscr_free(data);
-
-    sr_disconnect(sr_connection);
-
+    
     return kr_ok();
 }
 
