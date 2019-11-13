@@ -195,6 +195,7 @@ struct ranked_rr_array_entry {
 	bool yielded : 1;
 	bool to_wire : 1; /**< whether to be put into the answer */
 	bool expiring : 1; /**< low remaining TTL; see is_expiring; only used in cache ATM */
+	bool in_progress : 1; /**< build of RRset in progress, i.e. different format of RR data */
 	knot_rrset_t *rr;
 };
 typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
@@ -407,10 +408,17 @@ KR_EXPORT
 int kr_rrkey(char *key, uint16_t class, const knot_dname_t *owner,
 	     uint16_t type, uint16_t additional);
 
-/** @internal Add RRSet copy to ranked RR array. */
+/** Add RRSet copy to a ranked RR array.
+ *
+ * To convert to standard RRs inside, you need to call _finalize() afterwards,
+ * and the memory of rr->rrs.rdata has to remain until then.
+ */
 KR_EXPORT
 int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 			  uint8_t rank, bool to_wire, uint32_t qry_uid, knot_mm_t *pool);
+/** Finalize in_progress sets - all with matching qry_uid. */
+KR_EXPORT
+int kr_ranked_rrarray_finalize(ranked_rr_array_t *array, uint32_t qry_uid, knot_mm_t *pool);
 
 /** @internal Mark the RRSets from particular query as
  * "have (not) to be recorded in the final answer".

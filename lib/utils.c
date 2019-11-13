@@ -692,6 +692,11 @@ static int to_wire_ensure_unique(ranked_rr_array_t *array, size_t index)
 	return kr_ok();
 }
 
+/* Implementation overview of _add() and _finalize():
+ * - for rdata we just maintain a list of pointers (in knot_rrset_t::additional)
+ * - we only construct the final rdataset at the end (and thus more efficiently)
+ */
+typedef array_t(knot_rdata_t *) rdata_array_t;
 int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 			  uint8_t rank, bool to_wire, uint32_t qry_uid, knot_mm_t *pool)
 {
@@ -711,42 +716,85 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 			continue;
 		}
 		/* Found the entry to merge with.  Check consistency and merge. */
-		bool ok = stashed->rank == rank && !stashed->cached;
+		bool ok = stashed->rank == rank && !stashed->cached && stashed->in_progress;
 		if (!ok) {
 			assert(false);
 			return kr_error(EEXIST);
 		}
+		/* assert(rr->rrs.count == 1); */
+		/* ^^ shouldn't be a problem for this function, but it's probably a bug */
+
 		/* It may happen that an RRset is first considered useful
 		 * (to_wire = false, e.g. due to being part of glue),
 		 * and later we may find we also want it in the answer. */
 		stashed->to_wire = stashed->to_wire || to_wire;
 
-		return knot_rdataset_merge(&stashed->rr->rrs, &rr->rrs, pool);
+		/* We just add the reference into this in_progress RRset. */
+		rdata_array_t *ra = stashed->rr->additional;
+		if (ra == NULL) {
+			/* RRset not in array format yet -> convert it. */
+			ra = stashed->rr->additional = mm_alloc(pool, sizeof(*ra));
+			if (!ra) {
+				return kr_error(ENOMEM);
+			}
+			array_init(*ra);
+			int ret = array_reserve_mm(*ra, stashed->rr->rrs.count + rr->rrs.count,
+							kr_memreserve, pool);
+			if (ret) {
+				return kr_error(ret);
+			}
+			knot_rdata_t *r_it = stashed->rr->rrs.rdata;
+			for (int ri = 0; ri < stashed->rr->rrs.count;
+					++ri, r_it = knot_rdataset_next(r_it)) {
+				if (array_push(*ra, r_it) < 0) {
+					abort();
+				}
+			}
+		} else {
+			int ret = array_reserve_mm(*ra, ra->len + rr->rrs.count,
+							kr_memreserve, pool);
+			if (ret) {
+				return kr_error(ret);
+			}
+		}
+		/* Append to the array. */
+		knot_rdata_t *r_it = rr->rrs.rdata;
+		for (int ri = 0; ri < rr->rrs.count;
+				++ri, r_it = knot_rdataset_next(r_it)) {
+			if (array_push(*ra, r_it) < 0) {
+				abort();
+			}
+		}
+		return kr_ok();
 	}
 
 	/* No stashed rrset found, add */
 	int ret = array_reserve_mm(*array, array->len + 1, kr_memreserve, pool);
-	if (ret != 0) {
-		return kr_error(ENOMEM);
+	if (ret) {
+		return kr_error(ret);
 	}
 
 	ranked_rr_array_entry_t *entry = mm_alloc(pool, sizeof(ranked_rr_array_entry_t));
 	if (!entry) {
 		return kr_error(ENOMEM);
 	}
-	knot_rrset_t *copy = knot_rrset_copy(rr, pool);
-	if (!copy) {
+
+	knot_rrset_t *rr_new = knot_rrset_new(rr->owner, rr->type, rr->rclass, rr->ttl, pool);
+	if (!rr_new) {
 		mm_free(pool, entry);
 		return kr_error(ENOMEM);
 	}
+	rr_new->rrs = rr->rrs;
+	assert(rr_new->additional == NULL);
 
 	entry->qry_uid = qry_uid;
-	entry->rr = copy;
+	entry->rr = rr_new;
 	entry->rank = rank;
 	entry->revalidation_cnt = 0;
 	entry->cached = false;
 	entry->yielded = false;
 	entry->to_wire = to_wire;
+	entry->in_progress = true;
 	if (array_push(*array, entry) < 0) {
 		/* Silence coverity.  It shouldn't be possible to happen,
 		 * due to the array_reserve_mm call above. */
@@ -756,6 +804,84 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 
 	return to_wire_ensure_unique(array, array->len - 1);
 }
+
+/** Comparator for qsort() on an array of knot_data_t pointers. */
+static int rdata_p_cmp(const void *rp1, const void *rp2)
+{
+	/* Just correct types of the parameters and pass them dereferenced. */
+	const knot_rdata_t
+		*const *r1 = rp1,
+		*const *r2 = rp2;
+	return knot_rdata_cmp(*r1, *r2);
+}
+int kr_ranked_rrarray_finalize(ranked_rr_array_t *array, uint32_t qry_uid, knot_mm_t *pool)
+{
+	for (ssize_t array_i = array->len - 1; array_i >= 0; --array_i) {
+		ranked_rr_array_entry_t *stashed = array->at[array_i];
+		if (stashed->qry_uid != qry_uid) {
+			continue; /* We apparently can't always short-cut the cycle. */
+		}
+		if (!stashed->in_progress) {
+			continue;
+		}
+		rdata_array_t *ra = stashed->rr->additional;
+		if (!ra) {
+			/* No array, so we just need to copy the rdataset. */
+			knot_rdataset_t *rds = &stashed->rr->rrs;
+			knot_rdataset_t tmp = *rds;
+			int ret = knot_rdataset_copy(rds, &tmp, pool);
+			if (ret) {
+				return kr_error(ret);
+			}
+		} else {
+			/* Multiple RRs; first: sort the array. */
+			stashed->rr->additional = NULL;
+			qsort(ra->at, ra->len, sizeof(ra->at[0]), rdata_p_cmp);
+			/* Prune duplicates: NULL all except the last instance. */
+			int dup_count = 0;
+			for (int i = 0; i + 1 < ra->len; ++i) {
+				if (knot_rdata_cmp(ra->at[i], ra->at[i + 1]) == 0) {
+					ra->at[i] = NULL;
+					++dup_count;
+					QRVERBOSE(NULL, "iter", "deleted duplicate RR\n");
+				}
+			}
+			/* Prepare rdataset, except rdata contents. */
+			int size_sum = 0;
+			for (int i = 0; i < ra->len; ++i) {
+				if (ra->at[i]) {
+					size_sum += knot_rdata_size(ra->at[i]->len);
+				}
+			}
+			knot_rdataset_t *rds = &stashed->rr->rrs;
+			rds->count = ra->len - dup_count;
+			#if KNOT_VERSION_HEX >= 0x020900
+				rds->size = size_sum;
+			#endif
+			if (size_sum) {
+				rds->rdata = mm_alloc(pool, size_sum);
+				if (!rds->rdata) {
+					return kr_error(ENOMEM);
+				}
+			} else {
+				rds->rdata = NULL;
+			}
+			/* Everything is ready; now just copy all the rdata. */
+			uint8_t *raw_it = (uint8_t *)rds->rdata;
+			for (int i = 0; i < ra->len; ++i) {
+				if (ra->at[i] && size_sum/*linters*/) {
+					const int size = knot_rdata_size(ra->at[i]->len);
+					memcpy(raw_it, ra->at[i], size);
+					raw_it += size;
+				}
+			}
+			assert(raw_it == (uint8_t *)rds->rdata + size_sum);
+		}
+		stashed->in_progress = false;
+	}
+	return kr_ok();
+}
+
 
 int kr_ranked_rrarray_set_wire(ranked_rr_array_t *array, bool to_wire,
 			       uint32_t qry_uid, bool check_dups,

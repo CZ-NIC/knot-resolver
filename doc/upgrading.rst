@@ -5,6 +5,16 @@ Upgrading
 This section summarizes steps required for upgrade to newer Knot Resolver versions.
 We advise users to also read :ref:`release_notes` for respective versions.
 
+4.2.2 to 4.3+
+=============
+
+Module changes
+--------------
+
+* In case you directly call ``kr_ranked_rrarray_add()`` from your own module,
+  you need to additionally call ``kr_ranked_rrarray_finalize()`` after each batch
+  (before changing the added memory regions).
+
 .. _upgrade-from-3-to-4:
 
 4.x to 4.2.1+

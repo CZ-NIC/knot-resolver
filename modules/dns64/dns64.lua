@@ -96,6 +96,7 @@ function M.layer.consume(state, req, pkt)
 				req.pool)
 		end
 	end
+	ffi.C.kr_ranked_rrarray_finalize(req.answ_selected, qry.uid, req.pool);
 end
 
 return M

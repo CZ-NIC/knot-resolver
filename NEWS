@@ -1,6 +1,10 @@
 Knot Resolver ??
 ================================
 
+Security
+--------
+- improve performance with huge RRsets (DoS, #518)
+
 Bugfixes
 --------
 - http module: use SO_REUSEPORT (!879)
