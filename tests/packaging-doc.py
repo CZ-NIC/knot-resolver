@@ -53,8 +53,8 @@ def test_combinations(distro_vers, components):
     tests = []
     for distro, ver in distro_vers:
         for comp in components:
-            comps = ['daemon/packaging']  # always include daemon
-            if comp != 'daemon/packaging':
+            comps = ['scripts/distros', 'daemon/packaging']   # always include daemon
+            if comp not in comps:
                 comps.append(comp)
             tests.append([distro, ver, *comps])
     tests.sort()

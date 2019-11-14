@@ -156,12 +156,10 @@ class Component():
         self.image.action_arglist('pkg_install', self.compimg_path, 'builddeps')
 
     def build(self):
-        '''Schedule component-specific image-independent build script'''
-        self._comp_script('build.sh')
+        self.image.run_script(self.compimg_path + '/build.sh')
 
     def install(self):
-        '''Schedule component-specific image-independent install script'''
-        self._comp_script('install.sh')
+        self.image.run_script(self.compimg_path + '/install.sh')
 
     def remove_builddeps(self):
         self.image.action_arglist('pkg_remove', self.compimg_path, 'builddeps')
@@ -239,10 +237,9 @@ Examples:
     if args.builddeps:
         foreach_component(components, 'install_builddeps')
     if args.build:
-        image.img_script('build.sh')
         foreach_component(components, 'build')
     if args.install:
-        image.img_script('install.sh')
+        foreach_component(components, 'install')
     if args.remove_builddeps:
         foreach_component(components, 'remove_builddeps')
     if args.rundeps:
