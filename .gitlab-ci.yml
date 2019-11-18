@@ -17,6 +17,7 @@ variables:
   # print stack trace for all crashes no matter where
   SEGFAULT_SIGNALS: all
   LD_PRELOAD: libSegFault.so
+  ASAN_OPTIONS: disable_coredump=0,abort_on_error=1
 
 image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
 
