@@ -47,6 +47,8 @@
 #endif
 #include <libknot/error.h>
 
+// Cause a rebuild!
+
 
 /* @internal Array of ip address shorthand. */
 typedef array_t(char*) addr_array_t;
