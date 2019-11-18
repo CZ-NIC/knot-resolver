@@ -364,6 +364,7 @@ static uint8_t get_initial_rank(const knot_rrset_t *rr, const struct kr_query *q
 
 static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 {
+	req = NULL;
 	struct kr_query *qry = req->current_query;
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 
