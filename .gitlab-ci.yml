@@ -14,6 +14,9 @@ variables:
   LIBKRES_NAME: libkres
   MESON_TEST: meson test -C build_ci* -t 2 --print-errorlogs
   PREFIX: $CI_PROJECT_DIR/.local
+  # print stack trace for all crashes no matter where
+  SEGFAULT_SIGNALS: all
+  LD_PRELOAD: libSegFault.so
 
 image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
 
