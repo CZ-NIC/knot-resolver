@@ -8,6 +8,8 @@ cache_gc_src = files([
 ])
 c_src_lint += cache_gc_src
 
+libyang = dependency('libyang', version: '>=1')
+
 if build_utils
   cache_gc = executable(
     'kres-cache-gc',
@@ -15,6 +17,8 @@ if build_utils
     dependencies: [
       contrib_dep,
       libkres_dep,
+      libsysrepo,
+      libyang,
       libknot,
       luajit_inc,
     ],
