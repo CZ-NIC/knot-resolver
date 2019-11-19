@@ -291,7 +291,7 @@ pytests:
   dependencies: []
   only:  # trigger job only in repos under our control
     - branches@knot/knot-resolver
-    - branches@knot/knot-resolver-security
+    - branches@knot/security/knot-resolver
   except:
     refs:
       - master
@@ -367,7 +367,7 @@ fwd-udp6-unbound.tls6:
   dependencies: []
   only:  # trigger job only in repos under our control
     - branches@knot/knot-resolver
-    - branches@knot/knot-resolver-security
+    - branches@knot/security/knot-resolver
   except:
     refs:
       - master
