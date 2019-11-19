@@ -103,6 +103,7 @@ static void udp_queue_send(int fd)
 	}
 	for (int i = 0; i < q->len; ++i) {
 		qr_task_on_send(q->items[i].task, NULL, i < sent_len ? 0 : err);
+		worker_task_unref(q->items[i].task);
 	}
 	q->len = 0;
 }
@@ -129,6 +130,7 @@ void udp_queue_push(int fd, struct kr_request *req, struct qr_task *task)
 		kr_log_error("ERROR: called udp_queue_push(fd = %d, ...)\n", fd);
 		abort();
 	}
+	worker_task_ref(task);
 	/* Get a valid correct queue. */
 	if (fd >= state.udp_queues_len) {
 		const int new_len = fd + 1;
