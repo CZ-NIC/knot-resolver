@@ -287,7 +287,7 @@ pytests:
     - ${MESON_TEST} --suite pytests
 
 .respdiff:  &respdiff
-  stage: extended
+  stage: build
   dependencies: []
   only:  # trigger job only in repos under our control
     - branches@knot/knot-resolver
@@ -363,7 +363,7 @@ fwd-udp6-unbound.tls6:
     RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6.j256
 
 .resperf:  &resperf
-  stage: extended
+  stage: build
   dependencies: []
   only:  # trigger job only in repos under our control
     - branches@knot/knot-resolver
