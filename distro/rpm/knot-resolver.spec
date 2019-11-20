@@ -193,7 +193,6 @@ rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/etcd.lua
 %if 0%{?suse_version}
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/experimental_dot_auth.lua
 rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http
-rm -r %{buildroot}%{_libdir}/knot-resolver/debug_opensslkeylog.so
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/http*.lua
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/prometheus.lua
 rm %{buildroot}%{_unitdir}/kresd@.service.d/module-http.conf
