@@ -71,6 +71,12 @@ Requires:       lua-socket-compat
 Requires:       lua-sec-compat
 Requires(pre):  shadow-utils
 %endif
+
+# we do not build HTTP module on SuSE so the build requires is not needed
+%if "x%{?suse_version}" == "x"
+BuildRequires:  openssl-devel
+%endif
+
 %if 0%{?suse_version}
 %define NINJA ninja
 BuildRequires:  lmdb-devel
@@ -309,6 +315,7 @@ systemctl daemon-reload
 %{_unitdir}/kresd-doh.socket
 %{_unitdir}/kresd-webmgmt.socket
 %endif
+%{_libdir}/knot-resolver/debug_opensslkeylog.so
 %{_libdir}/knot-resolver/kres_modules/http
 %{_libdir}/knot-resolver/kres_modules/http*.lua
 %{_libdir}/knot-resolver/kres_modules/prometheus.lua
