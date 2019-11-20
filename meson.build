@@ -60,15 +60,13 @@ mod_inc_dir = include_directories('.', 'contrib/')
 managed_ta = get_option('managed_ta') == 'enabled'
 keyfile_default = join_paths(etc_dir, get_option('keyfile_default'))
 if keyfile_default == join_paths(etc_dir, 'root.keys')
-  install_root_keys = true
   managed_ta = managed_ta or get_option('managed_ta') == 'auto'
-else
-  install_root_keys = false
-  if managed_ta
-    warning('Using managed_ta along with non-standard keyfile_default. ' +
-	    'Ensure keyfile_default directory will be writable by kresd.')
-  endif
 endif
+install_root_keys = get_option('install_root_keys') == 'enabled'
+if get_option('install_root_keys') == 'auto'
+  install_root_keys = managed_ta
+endif
+
 
 ## Root hints
 root_hints = join_paths(etc_dir, get_option('root_hints'))
@@ -253,6 +251,7 @@ run_target(
 # NOTE: ternary operator in format() not supported
 # https://github.com/mesonbuild/meson/issues/2404
 s_managed_ta = managed_ta ? 'enabled' : 'disabled'
+s_install_root_keys = install_root_keys ? 'enabled' : 'disabled'
 s_systemd_socket = libsystemd.found() ? 'enabled' : 'disabled'
 s_build_client = build_client ? 'enabled' : 'disabled'
 s_build_utils = build_utils ? 'enabled' : 'disabled'
@@ -276,6 +275,7 @@ message('''
   trust_anchors
     keyfile_default:    @0@'''.format(keyfile_default) + '''
     managed_ta:         @0@'''.format(s_managed_ta) + '''
+    install_root_keys:  @0@'''.format(s_install_root_keys) + '''
 
   systemd:
     socket activation:  @0@'''.format(s_systemd_socket) + '''
