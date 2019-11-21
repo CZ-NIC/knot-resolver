@@ -711,6 +711,9 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 		}
 		if (stashed->qry_uid != qry_uid) {
 			break;
+			/* We do not guarantee merging RRs "across" any point that switched
+			 * to processing a different upstream packet (i.e. qry_uid).
+			 * In particular, iterator never returns KR_STATE_YIELD. */
 		}
 		if (!rrsets_match(stashed->rr, rr)) {
 			continue;
