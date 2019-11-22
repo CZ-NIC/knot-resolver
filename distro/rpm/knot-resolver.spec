@@ -212,7 +212,40 @@ mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 getent group knot-resolver >/dev/null || groupadd -r knot-resolver
 getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
 
+# upgrade-4-to-5
+if [ -f %{_unitdir}/kresd.socket ] ; then
+	export UPG_DIR=%{_sysconfdir}/knot-resolver/.upgrade-4-to-5
+	mkdir -p ${UPG_DIR}
+
+	for sock in kresd.socket kresd-tls.socket kresd-webmgmt.socket kresd-doh.socket ; do
+		if systemctl is-enabled ${sock} 2>/dev/null | grep -qv masked ; then
+			systemctl show ${sock} -p Listen > ${UPG_DIR}/${sock}
+			case "$(systemctl show ${sock} -p BindIPv6Only)" in
+			*ipv6-only)
+				touch ${UPG_DIR}/${sock}.v6only
+				;;
+			*default)
+				if cat /proc/sys/net/ipv6/bindv6only | grep -q 1 ; then
+					touch ${UPG_DIR}/${sock}.v6only
+				fi
+				;;
+			esac
+		fi
+	done
+fi
+
+
 %post
+# upgrade-4-to-5
+export UPG_DIR=%{_sysconfdir}/knot-resolver/.upgrade-4-to-5
+if [ -d ${UPG_DIR} ] ; then
+	kresd -c %{_libdir}/knot-resolver/upgrade-4-to-5.lua
+	echo -e "   !!! WARNING !!!\n"
+	echo -e "Knot Resolver configuration file was automatically upgraded.\n"
+	echo -e "Verify changes manually in %{_sysconfdir}/knot-resolver/kresd.conf\n"
+	mv ${UPG_DIR} ${UPG_DIR}.bak
+fi
+
 %if 0%{?fedora}
 # in case socket/service files are updated
 systemctl daemon-reload
