@@ -98,7 +98,7 @@ local function import(fname)
 	end
 end
 
-local function timer()
+local function fill_cache()
 	local file_ttl = get_file_ttl(rz_local_fname)
 
 	if file_ttl > rz_interval_threshold then
@@ -133,6 +133,10 @@ local function timer()
 			display_delay(rz_cur_interval))
 	end
 	event.reschedule(rz_event_id, rz_cur_interval * sec)
+end
+
+local function timer()
+	worker.bg_worker.cq:wrap(fill_cache)
 end
 
 function prefill.init()
