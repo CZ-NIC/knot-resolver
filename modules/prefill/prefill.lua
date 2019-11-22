@@ -1,5 +1,4 @@
 local http_request = require('http.request')
-local ltn12 = require('ltn12')
 local lfs = require('lfs')
 
 local rz_url = "https://www.internic.net/domain/root.zone"
