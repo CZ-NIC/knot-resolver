@@ -212,6 +212,13 @@ mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 getent group knot-resolver >/dev/null || groupadd -r knot-resolver
 getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
 
+# upgrade script to 5.0
+if { [ -f %{_unitdir}/kresd.socket ] || [ -f %{_mandir}/man7/kresd.systemd.nosocket.7.gz ] ;} && [ ! -e %{_sysconfdir}/knot-resolver/upgrade5 ] then
+	echo "manual upgrade required: 'touch %{_sysconfdir}/knot-resolver/upgrade5'"
+	exit 1
+fi
+
+
 %post
 %if 0%{?fedora}
 # in case socket/service files are updated
