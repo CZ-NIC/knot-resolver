@@ -1,10 +1,9 @@
-local https = require('ssl.https')
+local http_request = require('http.request')
 local ltn12 = require('ltn12')
 local ffi = require('ffi')
 
 local rz_url = "https://www.internic.net/domain/root.zone"
 local rz_local_fname = "root.zone"
-local rz_ca_file = nil
 local rz_event_id = nil
 
 local rz_default_interval = 86400
@@ -19,24 +18,21 @@ local prefill = {
 }
 
 
--- Fetch over HTTPS with peert cert checked
-local function https_fetch(url, ca_file)
+-- Fetch over HTTPS
+local function https_fetch(url)
 	assert(string.match(url, '^https://'))
-	assert(ca_file)
 
-	local resp = {}
-	local r, c = https.request{
-	       url = url,
-	       verify = {'peer', 'fail_if_no_peer_cert' },
-	       cafile = ca_file,
-	       protocol = 'tlsv1_2',
-	       sink = ltn12.sink.table(resp),
-	}
-	if r == nil then
-		return r, c
+	local headers, stream = http_request.new_from_uri(url):go()
+	assert(headers, 'HTTP client library error')
+	if headers:get(':status') ~= "200" then
+		return nil, headers:get(':status')
 	end
-	return resp, "[prefill] "..url.." downloaded"
+
+	local tmpfile, err = stream:get_body_as_file()
+
+	return tmpfile, (tmpfile and "[prefill] "..url.." downloaded" or err)
 end
+
 
 -- Write zone to a file
 local function zone_write(zone, fname)
@@ -45,10 +41,8 @@ local function zone_write(zone, fname)
 		error(string.format("[prefill] unable to open file %s (%s)",
 			fname, errmsg))
 	end
-	for i = 1, #zone do
-		local zone_chunk = zone[i]
-		file:write(zone_chunk)
-	end
+
+	file:write(zone:read("*a"))
 	file:close()
 end
 
@@ -86,13 +80,14 @@ end
 
 local function download(url, fname)
 	log("[prefill] downloading root zone...")
-	local rzone, err = https_fetch(url, rz_ca_file)
+	local rzone, err = https_fetch(url)
 	if rzone == nil then
 		error(string.format("[prefill] fetch of `%s` failed: %s", url, err))
 	end
 
 	log("[prefill] saving root zone...")
 	zone_write(rzone, fname)
+	rzone:close()
 end
 
 local function import(fname)
@@ -168,12 +163,6 @@ local function config_zone(zone_cfg)
 		rz_default_interval = zone_cfg.interval
 		rz_cur_interval = zone_cfg.interval
 	end
-
-	if not zone_cfg.ca_file then
-		error('[prefill] option ca_file must point '
-			.. 'to a file with CA certificate(s) in PEM format')
-	end
-	rz_ca_file = zone_cfg.ca_file
 
 	if not zone_cfg.url or not string.match(zone_cfg.url, '^https://') then
 		error('[prefill] option url must contain a '
