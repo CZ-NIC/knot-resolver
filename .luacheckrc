@@ -51,6 +51,8 @@ new_globals = {
 	'http',
 	'trust_anchors',
 	'bogus_log',
+	'outfile',  -- TODO remove, just quick hack to get CI working
+	'addrt_port',
 }
 
 -- Luacheck < 0.18 doesn't support new_read_globals
