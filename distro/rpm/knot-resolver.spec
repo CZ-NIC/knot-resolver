@@ -212,6 +212,7 @@ mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 getent group knot-resolver >/dev/null || groupadd -r knot-resolver
 getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
 
+%if "x%{?rhel}" == "x"
 # upgrade-4-to-5
 if [ -f %{_unitdir}/kresd.socket ] ; then
 	export UPG_DIR=%{_sysconfdir}/knot-resolver/.upgrade-4-to-5
@@ -233,18 +234,30 @@ if [ -f %{_unitdir}/kresd.socket ] ; then
 		fi
 	done
 fi
+%endif
 
 
 %post
 # upgrade-4-to-5
+%if 0%{?fedora}
 export UPG_DIR=%{_sysconfdir}/knot-resolver/.upgrade-4-to-5
 if [ -d ${UPG_DIR} ] ; then
 	kresd -c %{_libdir}/knot-resolver/upgrade-4-to-5.lua
-	echo -e "   !!! WARNING !!!\n"
-	echo -e "Knot Resolver configuration file was automatically upgraded.\n"
+	echo -e "\n   !!! WARNING !!!"
+	echo -e "Knot Resolver configuration file was automatically upgraded."
 	echo -e "Verify changes manually in %{_sysconfdir}/knot-resolver/kresd.conf\n"
 	mv ${UPG_DIR} ${UPG_DIR}.bak
 fi
+%endif
+%if 0%{?suse_version}
+export UPG_DIR=%{_sysconfdir}/knot-resolver/.upgrade-4-to-5
+if [ -d ${UPG_DIR} ] ; then
+	echo -e "\n   !!! WARNING !!!"
+	echo -e "Manual upgrade required, run:"
+	echo -e "kresd -c %{_libdir}/knot-resolver/upgrade-4-to-5.lua"
+	echo -e "and verify changes manually in %{_sysconfdir}/knot-resolver/kresd.conf\n"
+fi
+%endif
 
 %if 0%{?fedora}
 # in case socket/service files are updated
