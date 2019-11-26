@@ -41,6 +41,7 @@ kresd_deps = [
   luajit,
   gnutls,
   libsystemd,
+  capng,
 ]
 
 
