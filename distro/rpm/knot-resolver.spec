@@ -125,7 +125,7 @@ Documentation for Knot Resolver
 %if "x%{?suse_version}" == "x"
 %package module-http
 Summary:        HTTP/2 module for Knot Resolver
-Requires:       knot-resolver
+Requires:       %{name} = %{version}-%{release}
 %if 0%{?fedora}
 Requires:       lua5.1-http
 Requires:       lua5.1-mmdb

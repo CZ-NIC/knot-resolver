@@ -76,7 +76,7 @@ Description: Debug symbols for Knot Resolver
 Package: knot-resolver-module-http
 Architecture: all
 Depends:
- knot-resolver,
+ knot-resolver (= ${binary:Version}),
  libjs-bootstrap,
  libjs-d3,
  libjs-jquery,
