@@ -40,6 +40,10 @@
 #include <sys/resource.h>
 #include <unistd.h>
 
+#ifdef ENABLE_CAP_NG
+#include <cap-ng.h>
+#endif
+
 #include <lua.h>
 #include <uv.h>
 #if SYSTEMD_VERSION > 0
@@ -661,6 +665,25 @@ static int start_listening(struct network *net, flagged_fd_array_t *fds) {
 	return some_bad_ret;
 }
 
+/* Drop POSIX 1003.1e capabilities. */
+static void drop_capabilities(void)
+{
+#ifdef ENABLE_CAP_NG
+	/* Drop all capabilities. */
+	if (capng_have_capability(CAPNG_EFFECTIVE, CAP_SETPCAP)) {
+		capng_clear(CAPNG_SELECT_BOTH);
+
+		/* Apply. */
+		if (capng_apply(CAPNG_SELECT_BOTH) < 0) {
+			kr_log_error("[system] failed to set process capabilities: %s\n",
+			          strerror(errno));
+		}
+	} else {
+		kr_log_info("[system] process not allowed to set capabilities, skipping\n");
+	}
+#endif /* ENABLE_CAP_NG */
+}
+
 int main(int argc, char **argv)
 {
 	struct args args;
@@ -855,6 +878,7 @@ int main(int argc, char **argv)
 			goto cleanup;
 		}
 	}
+	drop_capabilities();
 	if (engine_start(&engine) != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
