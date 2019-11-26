@@ -242,7 +242,7 @@ fi
 %if 0%{?fedora}
 export UPG_DIR=%{_sysconfdir}/knot-resolver/.upgrade-4-to-5
 if [ -d ${UPG_DIR} ] ; then
-	kresd -c %{_libdir}/knot-resolver/upgrade-4-to-5.lua
+	kresd -c %{_libdir}/knot-resolver/upgrade-4-to-5.lua &>/dev/null
 	echo -e "\n   !!! WARNING !!!"
 	echo -e "Knot Resolver configuration file was automatically upgraded."
 	echo -e "Verify changes manually in %{_sysconfdir}/knot-resolver/kresd.conf\n"
