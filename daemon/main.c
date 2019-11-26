@@ -745,7 +745,7 @@ int main(int argc, char **argv)
 	struct rlimit rlim;
 	ret = getrlimit(RLIMIT_NOFILE, &rlim);
 	if (ret == 0 && rlim.rlim_cur != rlim.rlim_max) {
-		kr_log_verbose("[system] increasing file-descriptor limit: %ld -> %ld\n",
+		kr_log_info("[system] increasing file-descriptor limit: %ld -> %ld\n",
 				(long)rlim.rlim_cur, (long)rlim.rlim_max);
 		rlim.rlim_cur = rlim.rlim_max;
 		ret = setrlimit(RLIMIT_NOFILE, &rlim);
@@ -753,9 +753,6 @@ int main(int argc, char **argv)
 	if (ret) {
 		kr_log_error("[system] failed to get or set file-descriptor limit: %s\n",
 				strerror(errno));
-	} else if (rlim.rlim_cur < 1024*1024) {
-		kr_log_info("[system] warning: hard limit for number of file-descriptors is only %ld but recommended value is 1048576\n",
-				rlim.rlim_cur);
 	}
 
 	/* Connect forks with local socket */
