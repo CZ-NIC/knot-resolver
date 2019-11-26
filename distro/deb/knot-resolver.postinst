@@ -5,7 +5,7 @@ set -e
 # upgrade-4-to-5
 export UPG_DIR=/etc/knot-resolver/.upgrade-4-to-5
 if [ -d ${UPG_DIR} ] ; then
-       kresd -c /usr/lib/knot-resolver/upgrade-4-to-5.lua
+       kresd -c /usr/lib/knot-resolver/upgrade-4-to-5.lua &>/dev/null
        echo "\n   !!! WARNING !!!"
        echo "Knot Resolver configuration file was automatically upgraded."
        echo "Verify changes manually in /etc/knot-resolver/kresd.conf\n"
