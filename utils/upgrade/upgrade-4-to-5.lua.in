@@ -35,7 +35,7 @@ end
 
 local function convert(line, kind, ipv6only)
 	local patterns = {
-		'^[^=]+=(%d+%.%d+%.%d+%.%d):(%d+)',  -- IPv4
+		'^[^=]+=(%d+%.%d+%.%d+%.%d+):(%d+)',  -- IPv4
 		'^[^=]+=%[([^%]]+)%]:(%d+)',  -- IPv6
 		'^[^=]+=(/.*)',  -- UNIX
 	}
