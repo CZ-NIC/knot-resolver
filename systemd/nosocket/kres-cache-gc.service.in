@@ -6,7 +6,8 @@ Documentation=man:kresd(8)
 [Service]
 Type=simple
 ExecStart=@sbin_dir@/kres-cache-gc -c @systemd_work_dir@ -d 1000
-User=knot-resolver
+User=@user@
+Group=@group@
 Restart=on-failure
 RestartSec=30
 StartLimitInterval=400
