@@ -16,10 +16,7 @@ net.listen('::1', 853, { kind = 'tls' })
 -- net.listen('127.0.0.1', 44353, { kind = 'doh' })
 -- net.listen('::1', 44353, { kind = 'doh' })
 -- net.listen('127.0.0.1', 8453, { kind = 'webmgmt' })
--- net.listen('::1', 8453, { kind = 'webmgmt' })
-
--- Drop root privileges
-user('@0@', '@1@')'''.format(user, group)
+-- net.listen('::1', 8453, { kind = 'webmgmt' })'''
 endif
 
 
