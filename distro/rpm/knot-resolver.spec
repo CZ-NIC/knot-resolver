@@ -44,6 +44,7 @@ BuildRequires:  pkgconfig(libknot) >= 2.8
 BuildRequires:  pkgconfig(libzscanner) >= 2.8
 BuildRequires:  pkgconfig(libdnssec) >= 2.8
 BuildRequires:  pkgconfig(libsystemd)
+BuildRequires:  pkgconfig(libcap-ng)
 BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
 
