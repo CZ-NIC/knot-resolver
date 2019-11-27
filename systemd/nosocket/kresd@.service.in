@@ -11,6 +11,10 @@ After=network-online.target
 Type=notify
 WorkingDirectory=@systemd_work_dir@
 ExecStart=@sbin_dir@/kresd --config=@etc_dir@/kresd.conf --forks=1
+User=@user@
+Group=@group@
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_SETPCAP
+AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_SETPCAP
 TimeoutStopSec=10s
 WatchdogSec=10s
 Restart=on-abnormal
