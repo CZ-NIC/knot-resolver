@@ -12,7 +12,7 @@ variables:
   KNOT_VERSION: '2.9'
   LIBKRES_ABI: 9
   LIBKRES_NAME: libkres
-  MESON_TEST: meson test -C build_ci* -t 2 --print-errorlogs
+  MESON_TEST: meson test -C build_ci* -t 4 --print-errorlogs
   PREFIX: $CI_PROJECT_DIR/.local
 
 image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
