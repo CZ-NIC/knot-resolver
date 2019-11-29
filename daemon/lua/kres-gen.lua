@@ -280,6 +280,7 @@ struct kr_query {
 	struct timeval timestamp;
 	struct kr_zonecut zone_cut;
 	struct kr_layer_pickle *deferred;
+	int8_t cname_depth;
 	struct kr_query *cname_parent;
 	struct kr_request *request;
 	kr_stale_cb stale_cb;

@@ -501,10 +501,12 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	const knot_dname_t *cname = NULL;
 	const knot_dname_t *pending_cname = query->sname;
-	unsigned cname_chain_len = 0;
 	bool is_final = (query->parent == NULL);
-	uint32_t iter_count = 0;
 	bool strict_mode = (query->flags.STRICT);
+
+	query->cname_depth = query->cname_parent ? query->cname_parent->cname_depth : 1;
+	VERBOSE_MSG("<= TMP: cname chain length: %d\n", (int)query->cname_depth);
+
 	do {
 		/* CNAME was found at previous iteration, but records may not follow the correct order.
 		 * Try to find records for pending_cname owner from section start. */
@@ -562,14 +564,9 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			if ((query->stype == KNOT_RRTYPE_CNAME) || (rr->type != KNOT_RRTYPE_CNAME)) {
 				continue;
 			}
-			cname_chain_len += 1;
 			pending_cname = knot_cname_name(rr->rrs.rdata);
 			if (!pending_cname) {
 				break;
-			}
-			if (cname_chain_len > an->count || cname_chain_len > KR_CNAME_CHAIN_LIMIT) {
-				VERBOSE_MSG("<= too long cname chain\n");
-				return KR_STATE_FAIL;
 			}
 			/* Don't use pending_cname immediately.
 			 * There are can be records for "old" cname. */
@@ -577,6 +574,13 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 		if (!pending_cname) {
 			break;
 		}
+		if (++(query->cname_depth) > KR_CNAME_CHAIN_LIMIT) {
+			VERBOSE_MSG("<= cname chain longer than %d\n",
+					(int)KR_CNAME_CHAIN_LIMIT);
+			return KR_STATE_FAIL;
+		}
+		VERBOSE_MSG("<= TMP: cname chain length: %d\n", (int)query->cname_depth);
+
 		if (knot_dname_is_equal(cname, pending_cname)) {
 			VERBOSE_MSG("<= cname chain loop\n");
 			return KR_STATE_FAIL;
@@ -605,11 +609,7 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			cname = pending_cname;
 			break;
 		}
-	} while (++iter_count < KR_CNAME_CHAIN_LIMIT);
-	if (iter_count >= KR_CNAME_CHAIN_LIMIT) {
-		VERBOSE_MSG("<= too long cname chain\n");
-		return KR_STATE_FAIL;
-	}
+	} while (true);
 	*cname_ret = cname;
 	return kr_ok();
 }
