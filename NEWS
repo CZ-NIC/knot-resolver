@@ -1,3 +1,11 @@
+Knot Resolver ??
+================================
+
+Improvements
+------------
+- net.listen(): allow binding to non-local address with freebind option (!898)
+
+
 Knot Resolver 4.3.0 (2019-12-04)
 ================================
 
