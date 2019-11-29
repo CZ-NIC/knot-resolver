@@ -44,6 +44,9 @@ static int net_list_add(const char *key, void *val, void *ext)
 
 		lua_newtable(L);  // "transport" table
 
+		lua_pushboolean(L, ep->flags.freebind);
+		lua_setfield(L, -2, "freebind");
+
 		switch (ep->family) {
 		case AF_INET:
 			lua_pushliteral(L, "inet4");
