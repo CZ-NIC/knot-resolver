@@ -26,7 +26,7 @@ struct tls_ctx_t;
 struct tls_client_ctx_t;
 
 /** Bind address into a file-descriptor (only, no libuv).  type is e.g. SOCK_DGRAM */
-int io_bind(const struct sockaddr *addr, int type);
+int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags);
 /** Initialize a UDP handle and start listening. */
 int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd);
 /** Initialize a TCP handle and start listening. */
