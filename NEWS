@@ -15,6 +15,7 @@ Improvements
 - watchdog module: support testing a DNS query (and switch C -> lua; !878)
 - performance: use sendmmsg syscall towards clients by default (!877)
 - daemon now attempts to drop all capabilities (!896)
+- reduce CNAME chain length limit - now <= 12 (!899)
 
 
 Knot Resolver 4.2.2 (2019-10-07)
