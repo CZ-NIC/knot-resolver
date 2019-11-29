@@ -262,7 +262,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 	}
 
 	if (sa) {
-		ep->fd = io_bind(sa, ep->flags.sock_type);
+		ep->fd = io_bind(sa, ep->flags.sock_type, &ep->flags);
 		if (ep->fd < 0) return ep->fd;
 	}
 	if (ep->flags.kind) {
