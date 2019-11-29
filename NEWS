@@ -1,10 +1,10 @@
 Knot Resolver 4.x.y (20yy-mm-dd)
-================================
 
 Improvements
 ------------
 - logging: control-socket commands don't log unless --verbose (#528)
 - use SO_REUSEPORT_LB if available (FreeBSD 12.0+)
+- net.listen(): allow binding to non-local address with freebind option (!898)
 
 
 Knot Resolver 4.3.0 (2019-12-04)
