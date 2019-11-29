@@ -14,6 +14,7 @@ Improvements
 - increase file-descriptor count limit to maximum allowed value (hard limit)
 - watchdog module: support testing a DNS query (and switch C -> lua; !878)
 - performance: use sendmmsg syscall towards clients by default (!877)
+- net.listen(): allow binding to non-local address with freebind option (!898)
 
 
 Knot Resolver 4.2.2 (2019-10-07)
