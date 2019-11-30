@@ -61,7 +61,7 @@ local function renumber_record(tbl, rr)
 end
 
 -- Renumber addresses based on config
-local function rule()
+local function rule(prefixes)
 	return function (state, req)
 		if state == kres.FAIL then return state end
 		local pkt = req.answer
@@ -119,7 +119,7 @@ end
 
 -- Layers
 M.layer = {
-	finish = rule(),
+	finish = rule(prefixes),
 }
 
 return M
