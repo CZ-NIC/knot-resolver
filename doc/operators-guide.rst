@@ -88,5 +88,41 @@ individual services for classic DNS, DoT and DoH from each other.
    end
 
 
+Cache
+=====
+
+Cache size
+----------
+
+Increasing the cache size is suitable for larger deployments. Values of 1 GB or
+larger should be considered.
+
+.. code-block:: lua
+
+   cache.size = 1 * GB
+
+Ensure sufficient space is available on the filesystem, otherwise a runtime
+error of ``SIGBUS`` will be raised when Knot Resolver tries to allocate more
+space.
+
+Cache in tmpfs
+--------------
+
+.. tip:: Using tmpfs for cache improves performance and reduces disk I/O.
+
+Mounting the cache directory as tmpfs is recommended for larger deployments.
+Make sure to use appropriate ``size=`` option and don't forget to adjust the
+size in the config file as well.
+
+.. code-block::
+
+   # /etc/fstab
+   tmpfs	/var/cache/knot-resolver	tmpfs	rw,size=1G,uid=knot-resolver,gid=knot-resolver,nosuid,nodev,noexec,mode=0700 0 0
+
+.. note:: While it is technically possible to move the cache to an existing
+   tmpfs filesystem, it is *not* recommended. The path to cache is specified in
+   multiple systemd units. Also, a shared tmpfs space could be used up by other
+   applications, leading to ``SIGBUS`` errors during runtime.
+
 
 .. _`supervisord`: http://supervisord.org/
