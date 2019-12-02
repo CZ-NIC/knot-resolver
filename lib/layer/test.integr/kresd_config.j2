@@ -1,7 +1,3 @@
-{% for TAF in TRUST_ANCHOR_FILES %}
--- trust_anchors.add_file('{{TAF}}')
-{% endfor %}
-
 {% raw %}
 -- Disable RFC5011 TA update
 if ta_update then
