@@ -27,7 +27,7 @@ and it provides a state-machine like API for extensions.
    :maxdepth: 2
 
    build
-   tuning
+   operators-guide
 
 .. toctree::
    :caption: Developers

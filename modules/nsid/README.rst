@@ -21,6 +21,9 @@ NSID value can be configured in the resolver's configuration file:
    modules.load('nsid')
    nsid.name('instance 1')
 
+.. tip:: When dealing with multiple kresd instances managed with
+   systemd, see :ref:`instance-specific-configuration`.
+
 You can also obtain configured NSID value:
 
 .. code-block:: lua
