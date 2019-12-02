@@ -125,4 +125,19 @@ size in the config file as well.
    applications, leading to ``SIGBUS`` errors during runtime.
 
 
+Watchdog
+========
+
+.. tip:: Configuring a query watchdog may improve the resilience of the
+   service.
+
+While Knot Resolver is automatically restarted by systemd if it crashes,
+activating a query watchdog is useful for potential edge-case bugs that might
+cause the resolver to stop properly responding to queries while it is still
+running.
+
+See :ref:`mod-watchdog` for more information about this functionality and its
+configuration.
+
+
 .. _`supervisord`: http://supervisord.org/
