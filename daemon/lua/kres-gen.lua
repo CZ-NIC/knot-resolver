@@ -251,7 +251,7 @@ struct kr_module {
 	void *lib;
 	void *data;
 };
-
+kr_layer_t kr_layer_t_static;
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
 				const struct kr_query *qry);
 

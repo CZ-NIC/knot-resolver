@@ -16,6 +16,12 @@
 
 #pragma once
 
+#include "lib/defines.h"
+#include "lib/layer.h"
+#include <lua.h>
+struct engine;
+struct kr_module;
+
 /**
  * Register Lua module as a FFI module.
  * This fabricates a standard module interface,
@@ -34,4 +40,9 @@ int ffimodule_register_lua(struct engine *engine, struct kr_module *module, cons
 
 int ffimodule_init(lua_State *L);
 void ffimodule_deinit(lua_State *L);
+
+/** Static storage for faster passing of layer function parameters to lua callbacks.
+ *
+ * We don't need to declare it in a header, but let's give it visibility. */
+KR_EXPORT kr_layer_t kr_layer_t_static;
 

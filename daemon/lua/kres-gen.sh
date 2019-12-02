@@ -124,6 +124,9 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_module
 EOF
 
+# a static variable; the line might not be simple to generate
+printf "kr_layer_t kr_layer_t_static;"
+
 printf "
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
 				const struct kr_query *qry);
