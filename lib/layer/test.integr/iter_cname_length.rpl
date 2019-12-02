@@ -1,0 +1,84 @@
+; config options
+	stub-addr: 193.0.14.129 	# k.root-servers.net.
+CONFIG_END
+
+SCENARIO_BEGIN Test restriction on CNAME chain length.
+
+
+; k.root-servers.net.
+RANGE_BEGIN 0 100
+	ADDRESS 193.0.14.129
+ENTRY_BEGIN
+MATCH opcode qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+n1.root.	IN NS
+SECTION ANSWER
+n1.root.	IN CNAME	n2.root.
+n2.root.	IN CNAME	n3.root.
+n3.root.	IN CNAME	n4.root.
+n4.root.	IN CNAME	n5.root.
+n5.root.	IN CNAME	n6.root.
+n6.root.	IN CNAME	n7.sub.
+SECTION AUTHORITY
+sub.		IN NS		ns.sub.
+SECTION ADDITIONAL
+ns.sub.		IN A		194.0.14.1
+ENTRY_END
+RANGE_END
+
+
+; ns.sub.
+RANGE_BEGIN 0 100
+	ADDRESS 194.0.14.1
+ENTRY_BEGIN
+MATCH opcode qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+n7.sub.		IN A
+SECTION ANSWER
+n7.root.	IN CNAME	n8.root.
+n8.root.	IN CNAME	n9.root.
+n9.root.	IN CNAME	n10.root.
+n10.root.	IN CNAME	n11.root.
+n11.root.	IN CNAME	n11.root.
+n12.root.	IN CNAME	n11.root.
+n13.root.	IN CNAME	n14.root.
+n14.root.	IN A		198.18.0.1
+ENTRY_END
+RANGE_END
+
+
+
+STEP 10 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+n1.root.	IN A
+ENTRY_END
+
+STEP 11 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all
+REPLY QR RD RA SERVFAIL
+SECTION QUESTION
+n1.root.	IN A
+SECTION ANSWER
+n1.root.	IN CNAME	n2.root.
+n2.root.	IN CNAME	n3.root.
+n3.root.	IN CNAME	n4.root.
+n4.root.	IN CNAME	n5.root.
+n5.root.	IN CNAME	n6.root.
+n6.root.	IN CNAME	n7.sub.
+n7.root.	IN CNAME	n8.root.
+n8.root.	IN CNAME	n9.root.
+n9.root.	IN CNAME	n10.root.
+n10.root.	IN CNAME	n11.root.
+n11.root.	IN CNAME	n11.root.
+n12.root.	IN CNAME	n11.root.
+n13.root.	IN CNAME	n14.root.
+ENTRY_END
+
+SCENARIO_END
