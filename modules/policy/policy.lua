@@ -777,10 +777,11 @@ local function special_names_optim(req, sname)
 	return
 		-- .a???. or .t???.
 		(root[-5] == 4 and (root[-4] == 97 or root[-4] == 116))
-		-- .on???. or .in?????. or lo???
+		-- .on???. or .in?????. or lo???. or *ost.
 		or (root[-6] == 5 and root[-5] == 111 and root[-4] == 110)
 		or (root[-8] == 7 and root[-7] == 105 and root[-6] == 110)
 		or (root[-6] == 5 and root[-5] == 108 and root[-4] == 111)
+		or (root[-3] == 111 and root[-2] == 115 and root[-1] == 116)
 end
 
 -- Top-down policy list walk until we hit a match
