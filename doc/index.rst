@@ -33,6 +33,7 @@ and it provides a state-machine like API for extensions.
    :maxdepth: 2
 
    build
+   tuning
 
 .. toctree::
    :caption: Developers
