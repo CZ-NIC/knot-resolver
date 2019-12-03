@@ -1,6 +1,6 @@
 -- Module interface
 local ffi = require('ffi')
-local prefixes = {}
+local prefixes_global = {}
 
 -- Create subnet prefix rule
 local function matchprefix(subnet, addr)
@@ -28,7 +28,7 @@ end
 
 -- Add subnet prefix rewrite rule
 local function add_prefix(subnet, addr)
-	table.insert(prefixes, matchprefix(subnet, addr))
+	table.insert(prefixes_global, matchprefix(subnet, addr))
 end
 
 -- Match IP against given subnet or record owner
@@ -119,7 +119,7 @@ end
 
 -- Layers
 M.layer = {
-	finish = rule(prefixes),
+	finish = rule(prefixes_global),
 }
 
 return M
