@@ -574,13 +574,14 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			break;
 		}
 		if (++(query->cname_depth) > KR_CNAME_CHAIN_LIMIT) {
-			VERBOSE_MSG("<= cname chain longer than %d\n",
-					(int)KR_CNAME_CHAIN_LIMIT);
+			VERBOSE_MSG("<= error: CNAME chain exceeded max length %d\n",
+					/* people count objects from 0, no CNAME = 0 */
+					(int)KR_CNAME_CHAIN_LIMIT - 1);
 			return KR_STATE_FAIL;
 		}
 
 		if (knot_dname_is_equal(cname, pending_cname)) {
-			VERBOSE_MSG("<= cname chain loop\n");
+			VERBOSE_MSG("<= error: CNAME chain loop detected\n");
 			return KR_STATE_FAIL;
 		}
 		/* In strict mode, explicitly fetch each CNAME target. */
