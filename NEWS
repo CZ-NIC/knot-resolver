@@ -19,6 +19,7 @@ Improvements
 Bugfixes
 --------
 - correctly use EDNS(0) padding in failed answers (!921)
+- policy and daf modules: fix reroute rules (!901)
 
 
 Knot Resolver 4.3.0 (2019-12-04)
