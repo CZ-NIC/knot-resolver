@@ -8,6 +8,7 @@ Bugfixes
   have been configured with IP addresses after reboot (!884)
 - sendmmsg: improve reliability (!704)
 - cache: fix crash on insertion via lua for NS and CNAME (!889)
+- policy and daf modules: fix reroute rules (!901)
 
 Improvements
 ------------
