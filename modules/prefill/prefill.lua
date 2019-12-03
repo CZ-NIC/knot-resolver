@@ -1,8 +1,8 @@
-local http_request = require('http.request')
 local ffi = require('ffi')
 
 local rz_url = "https://www.internic.net/domain/root.zone"
 local rz_local_fname = "root.zone"
+local rz_ca_file = nil
 local rz_event_id = nil
 
 local rz_default_interval = 86400
@@ -18,10 +18,26 @@ local prefill = {
 
 
 -- Fetch over HTTPS
-local function https_fetch(url)
-	assert(string.match(url, '^https://'))
+local function https_fetch(url, ca_file)
+	local http_ok, http_request = pcall(require, 'http.request')
+	local openssl_ok, openssl_ctx = pcall(require, 'openssl.ssl.context')
 
-	local headers, stream = http_request.new_from_uri(url):go()
+	if not http_ok or not openssl_ok then
+		return nil, 'lua-http and luaossl needed for root TA bootstrap'
+	end
+
+	assert(string.match(url, '^https://'))
+	assert(ca_file)
+
+	local req = http_request.new_from_uri(url)
+	req.ctx = openssl_ctx.new()
+	local store = req.ctx:getStore()
+	store:add(ca_file)
+
+	req.ctx:setVerify(openssl_ctx.VERIFY_PEER)
+	req.tls = true
+
+	local headers, stream = req:go()
 	assert(headers, 'HTTP client library error')
 	if headers:get(':status') ~= "200" then
 		return nil, headers:get(':status')
@@ -79,7 +95,7 @@ end
 
 local function download(url, fname)
 	log("[prefill] downloading root zone...")
-	local rzone, err = https_fetch(url)
+	local rzone, err = https_fetch(url, rz_ca_file)
 	if rzone == nil then
 		error(string.format("[prefill] fetch of `%s` failed: %s", url, err))
 	end
@@ -166,6 +182,12 @@ local function config_zone(zone_cfg)
 		rz_default_interval = zone_cfg.interval
 		rz_cur_interval = zone_cfg.interval
 	end
+
+	if not zone_cfg.ca_file then
+		error('[prefill] option ca_file must point '
+			.. 'to a file with CA certificate(s) in PEM format')
+	end
+	rz_ca_file = zone_cfg.ca_file
 
 	if not zone_cfg.url or not string.match(zone_cfg.url, '^https://') then
 		error('[prefill] option url must contain a '
