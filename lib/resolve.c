@@ -477,6 +477,7 @@ static int write_extra_ranked_records(const ranked_rr_array_t *arr, uint16_t reo
 
 	for (size_t i = 0; i < arr->len; ++i) {
 		ranked_rr_array_entry_t * entry = arr->at[i];
+		assert(!entry->in_progress);
 		if (!entry->to_wire) {
 			continue;
 		}

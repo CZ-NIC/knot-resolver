@@ -216,6 +216,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_straddr_socket
 	kr_straddr_split
 	kr_ranked_rrarray_add
+	kr_ranked_rrarray_finalize
 	kr_qflags_set
 	kr_qflags_clear
 	kr_zonecut_add

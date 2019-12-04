@@ -658,6 +658,7 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 		/* TODO: ATM we assume that some properties are the same
 		 * for all RRSIGs in the set (esp. label count). */
 		ranked_rr_array_entry_t *e = arr->at[j];
+		assert(!e->in_progress);
 		bool ok = e->qry_uid == qry->uid && !e->cached
 			&& e->rr->type == KNOT_RRTYPE_RRSIG
 			&& knot_rrsig_type_covered(e->rr->rrs.rdata) == rr->type
