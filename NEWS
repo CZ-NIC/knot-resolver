@@ -1,4 +1,4 @@
-Knot Resolver ??
+Knot Resolver 4.3.0 (2019-12-04)
 ================================
 
 Security
@@ -12,12 +12,15 @@ Bugfixes
   have been configured with IP addresses after reboot (!884)
 - sendmmsg: improve reliability (!704)
 - cache: fix crash on insertion via lua for NS and CNAME (!889)
+- rpm package: move root.keys to /var/lib/knot-resolver (#513, !888)
 
 Improvements
 ------------
-- increase file-descriptor count limit to maximum allowed value (hard limit)
-- watchdog module: support testing a DNS query (and switch C -> lua; !878)
+- increase file-descriptor count limit to maximum allowed value (hard limit; !876)
+- watchdog module: support testing a DNS query (and switch C -> lua; !878, !881)
 - performance: use sendmmsg syscall towards clients by default (!877)
+- performance: avoid excessive getsockname() syscalls (!854)
+- performance: lua-related improvements (!874)
 - daemon now attempts to drop all capabilities (!896)
 - reduce CNAME chain length limit - now <= 12 (!899)
 
