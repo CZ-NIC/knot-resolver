@@ -5,6 +5,19 @@ Upgrading
 This section summarizes steps required for upgrade to newer Knot Resolver versions.
 We advise users to also read :ref:`release_notes` for respective versions.
 
+4.2.2 to 4.3+
+=============
+
+Module changes
+--------------
+
+* In case you wrote your own module which directly calls function
+  ``kr_ranked_rrarray_add()``, you need to additionally call function
+  ``kr_ranked_rrarray_finalize()`` after each batch (before changing
+  the added memory regions). For a specific example see `changes in dns64 module
+  <https://gitlab.labs.nic.cz/knot/security/knot-resolver/commit/6845a9b8a1c595b5c240fa09eaaafe9f779f28c3#1fe36e8ac0729b279645f7237b7122b1c457a982>`_.
+  TODO: update link right before merge into master
+
 .. _upgrade-from-3-to-4:
 
 4.x to 4.2.1+

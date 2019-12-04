@@ -461,6 +461,7 @@ int kr_dnssec_matches_name_and_type(const ranked_rr_array_t *rrs, uint32_t qry_u
 	int ret = kr_error(ENOENT);
 	for (size_t i = 0; i < rrs->len; ++i) {
 		const ranked_rr_array_entry_t *entry = rrs->at[i];
+		assert(!entry->in_progress);
 		const knot_rrset_t *nsec = entry->rr;
 		if (entry->qry_uid != qry_uid || entry->yielded) {
 			continue;
