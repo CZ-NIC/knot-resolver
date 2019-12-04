@@ -1,6 +1,10 @@
 Knot Resolver ??
 ================================
 
+Security
+--------
+- fix CVE-2019-19331: improve CNAME chain length accounting (DoS, #518)
+
 Bugfixes
 --------
 - http module: use SO_REUSEPORT (!879)

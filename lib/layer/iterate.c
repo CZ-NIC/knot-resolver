@@ -1095,13 +1095,15 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return resolve_error(pkt, req);
 	}
 
+	int state;
 	/* Forwarding/stub mode is special. */
 	if (query->flags.STUB) {
-		return process_stub(pkt, req);
+		state = process_stub(pkt, req);
+		goto rrarray_finalize;
 	}
 
 	/* Resolve authority to see if it's referral or authoritative. */
-	int state = process_authority(pkt, req);
+	state = process_authority(pkt, req);
 	switch(state) {
 	case KR_STATE_CONSUME: /* Not referral, process answer. */
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
@@ -1113,6 +1115,17 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		break;
 	default:
 		break;
+	}
+
+rrarray_finalize:
+	/* Finish construction of libknot-format RRsets. */
+	(void)0;
+	ranked_rr_array_t *selected[] = kr_request_selected(req);
+	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
+		int ret = kr_ranked_rrarray_finalize(selected[i], query->uid, &req->pool);
+		if (unlikely(ret)) {
+			return KR_STATE_FAIL;
+		}
 	}
 
 	return state;
