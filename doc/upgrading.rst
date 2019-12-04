@@ -11,9 +11,11 @@ We advise users to also read :ref:`release_notes` for respective versions.
 Module changes
 --------------
 
-* In case you directly call ``kr_ranked_rrarray_add()`` from your own module,
-  you need to additionally call ``kr_ranked_rrarray_finalize()`` after each batch
-  (before changing the added memory regions).
+* In case you wrote your own module which directly calls function
+  ``kr_ranked_rrarray_add()``, you need to additionally call function
+  ``kr_ranked_rrarray_finalize()`` after each batch (before changing
+  the added memory regions). For a specific example see `changes in dns64 module
+  <https://gitlab.labs.nic.cz/knot/knot-resolver/commit/edb8ffef7fbe48befeb3f7164d38079dd0be3302#1fe36e8ac0729b279645f7237b7122b1c457a982>`_.
 
 .. _upgrade-from-3-to-4:
 
