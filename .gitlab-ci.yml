@@ -149,6 +149,13 @@ kres-gen:
 
 build:darwin:
   <<: *test_nodep
+  except:
+    refs:
+      - master
+      - branches@knot/security/knot-resolver
+    variables:
+      - $SKIP_CI == "1"
+      - $SKIP_TRAVIS == "1"
   when: delayed
   start_in: 3 minutes  # give the build in Travis CI time to finish
   script:
