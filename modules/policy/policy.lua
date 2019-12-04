@@ -802,8 +802,7 @@ policy.layer = {
 	finish = function(state, req)
 		-- Optimization for the typical case
 		if #policy.postrules == 0 then return state end
-		-- Don't act on "resolved" cases.
-		if bit.band(state, bit.bor(kres.FAIL, kres.DONE)) ~= 0 then return state end
+		-- Act even on failed cases!
 		return policy.evaluate(policy.postrules, req, req:current(), state) or state
 	end
 }
