@@ -507,6 +507,21 @@ function policy.slice_randomize_psl(seed)
 	end
 end
 
+-- Prepare for making an answer from scratch.  (Return the packet for convenience.)
+local function answer_clear(req)
+	-- If we're in postrules, previous resolving might have chosen some RRs
+	-- for inclusion in the answer, so we need to avoid those.
+	-- *_selected arrays are in mempool, so explicit deallocation is not necessary.
+	req.answ_selected.len = 0
+	req.auth_selected.len = 0
+	req.add_selected.len = 0
+
+	-- Let's be defensive and clear the answer, too.
+	local pkt = req.answer
+	pkt:clear_payload()
+	return pkt
+end
+
 function policy.DENY_MSG(msg)
 	if msg and (type(msg) ~= 'string' or #msg >= 255) then
 		error('DENY_MSG: optional msg must be string shorter than 256 characters')
@@ -514,7 +529,7 @@ function policy.DENY_MSG(msg)
 
 	return function (_, req)
 		-- Write authority information
-		local answer = req.answer
+		local answer = answer_clear(req)
 		ffi.C.kr_pkt_make_auth_header(answer)
 		answer:rcode(kres.rcode.NXDOMAIN)
 		answer:begin(kres.section.AUTHORITY)
@@ -530,19 +545,20 @@ function policy.DENY_MSG(msg)
 end
 policy.DENY = policy.DENY_MSG() -- compatibility with < 2.0
 
-function policy.DROP(_, _)
+function policy.DROP(_, req)
+	answer_clear(req)
 	return kres.FAIL
 end
 
 function policy.REFUSE(_, req)
-	local answer = req.answer
+	local answer = answer_clear(req)
 	answer:rcode(kres.rcode.REFUSED)
 	answer:ad(false)
 	return kres.DONE
 end
 
 function policy.TC(state, req)
-	local answer = req.answer
+	local answer = answer_clear(req)
 	if answer.max_size ~= 65535 then
 		answer:tc(1) -- ^ Only UDP queries
 		answer:ad(false)
