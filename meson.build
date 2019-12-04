@@ -30,7 +30,6 @@ luajit = dependency('luajit')
 # NOTE avoid using link_args for luajit due to a macOS issue
 # https://github.com/Homebrew/homebrew-core/issues/37169
 luajit_inc = luajit.partial_dependency(compile_args: true, includes: true)
-openssl = dependency('openssl', required: false)
 message('------------------------------')
 
 
@@ -82,7 +81,12 @@ verbose_log = get_option('verbose_log') == 'enabled' or get_option('verbose_log'
 user = get_option('user')
 group = get_option('group')
 
-## sendmmsg
+## Optional dependencies
+message('--- optional dependencies ---')
+capng = dependency('libcap-ng', required: false)
+openssl = dependency('openssl', required: false)
+
+### sendmmsg
 has_sendmmsg = meson.get_compiler('c').has_function('sendmmsg',
   prefix: '#define _GNU_SOURCE\n#include <sys/socket.h>')
 if get_option('sendmmsg') == 'enabled' and not has_sendmmsg
@@ -93,8 +97,7 @@ else
   sendmmsg = get_option('sendmmsg') == 'enabled'
 endif
 
-## Systemd
-message('--- systemd socket activation ---')
+### Systemd
 libsystemd = dependency('libsystemd', required: false)
 systemd_files = get_option('systemd_files')
 if systemd_files == 'enabled' and (
@@ -148,6 +151,7 @@ conf_data.set('SYSTEMD_VERSION',
   libsystemd.found() ? libsystemd.version().to_int() : -1)
 conf_data.set('NOVERBOSELOG', not verbose_log)
 conf_data.set('ENABLE_SENDMMSG', sendmmsg.to_int())
+conf_data.set('ENABLE_CAP_NG', capng.found())
 
 kresconfig = configure_file(
   output: 'kresconfig.h',
