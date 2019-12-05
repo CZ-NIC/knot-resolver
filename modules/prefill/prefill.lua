@@ -18,7 +18,7 @@ local prefill = {
 
 
 -- Fetch over HTTPS
-local function https_fetch(url, ca_file)
+local function https_fetch(url, ca_file, fname)
 	local http_ok, http_request = pcall(require, 'http.request')
 	local openssl_ok, openssl_ctx = pcall(require, 'openssl.ssl.context')
 
@@ -43,22 +43,21 @@ local function https_fetch(url, ca_file)
 		return nil, headers:get(':status')
 	end
 
-	local tmpfile, err = stream:get_body_as_file()
-
-	return tmpfile, (tmpfile and "[prefill] "..url.." downloaded" or err)
-end
-
-
--- Write zone to a file
-local function zone_write(zone, fname)
 	local file, errmsg = io.open(fname, 'w')
 	if not file then
 		error(string.format("[prefill] unable to open file %s (%s)",
 			fname, errmsg))
 	end
 
-	file:write(zone:read("*a"))
+	local err
+	err, errmsg = stream:save_body_to_file(file)
+	if err == nil then
+		return err, errmsg
+	end
+
 	file:close()
+
+	return file
 end
 
 local function display_delay(time)
@@ -94,15 +93,11 @@ local function get_file_ttl(fname)
 end
 
 local function download(url, fname)
-	log("[prefill] downloading root zone...")
-	local rzone, err = https_fetch(url, rz_ca_file)
+	log("[prefill] downloading root zone to file %s ...", fname)
+	local rzone, err = https_fetch(url, rz_ca_file, fname)
 	if rzone == nil then
 		error(string.format("[prefill] fetch of `%s` failed: %s", url, err))
 	end
-
-	log("[prefill] saving root zone...")
-	zone_write(rzone, fname)
-	rzone:close()
 end
 
 local function import(fname)
