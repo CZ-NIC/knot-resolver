@@ -24,21 +24,28 @@ end
 -- TODO: Move bootstrap to a separate module or even its own binary
 -- Fetch over HTTPS with peert cert checked
 local function https_fetch(url, ca)
-	local ssl_ok, https = pcall(require, 'ssl.https')
-	local ltn_ok, ltn12 = pcall(require, 'ltn12')
-	if not ssl_ok or not ltn_ok then
-		return nil, 'luasec and luasocket needed for root TA bootstrap'
+	local http_ok, http_request = pcall(require, 'http.request')
+	local openssl_ok, openssl_ctx = pcall(require, 'openssl.ssl.context')
+
+	if not http_ok or not openssl_ok then
+		return nil, 'lua-http needed for root TA bootstrap'
 	end
-	local resp = {}
-	local r, c = https.request{
-		url = url,
-		cafile = ca,
-		verify = {'peer', 'fail_if_no_peer_cert' },
-		protocol = 'tlsv1_2',
-		sink = ltn12.sink.table(resp),
-	}
-	if r == nil then return r, c end
-	return resp[1]
+
+	local request = http_request.new_from_uri(url)
+	request.ctx = openssl_ctx.new('TLSv1_2')
+	local store = request.ctx:getStore()
+	store:add(ca)
+
+	request.ctx:setVerify(openssl_ctx.VERIFY_PEER)
+	request.tls = true
+
+	local headers, stream = request:go()
+	if headers == nil then return nil, 'HTTP client library error' end
+	if headers:get(':status') ~= "200" then return nil, headers:get(':status') end
+
+	local resp, err = stream:get_body_as_string()
+
+	return resp, (resp and "" or err)
 end
 
 -- remove UTC timezone specification if present or throw error
