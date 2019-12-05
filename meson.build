@@ -165,6 +165,7 @@ kresconfig_dep = declare_dependency(
 ## Dependencies first
 subdir('contrib')
 subdir('lib')
+subdir('utils/common')
 
 ## Remaining code
 subdir('daemon')

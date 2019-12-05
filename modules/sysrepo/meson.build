@@ -2,6 +2,8 @@
 
 sysrepo_src = files([
   'sysrepo.c',
+  'conf_callbacks.c',
+  'kr_conf.c',
 ])
 
 build_sysrepo = false
@@ -15,7 +17,6 @@ if get_option('sysrepo') != 'disabled'
   endif
 endif
 
-
 if build_sysrepo
   c_src_lint += sysrepo_src
 
@@ -23,6 +24,7 @@ if build_sysrepo
 	'sysrepo',
 	sysrepo_src,
 	dependencies: [
+    common_dep,
 	  luajit_inc,
 	  libsysrepo,
 	],
