@@ -30,7 +30,6 @@ Architecture: any
 Depends:
  adduser,
  dns-root-data,
- lua-sec,
  lua-socket,
  lua-filesystem,
  systemd,
@@ -43,6 +42,7 @@ Breaks:
 Recommends:
  lua-basexx,
  lua-cqueues,
+ lua-http,
  lua-psl,
 Suggests:
  knot-resolver-module-http,
@@ -82,7 +82,6 @@ Depends:
  libjs-d3,
  libjs-jquery,
  lua-cqueues (>= 20171014),
- lua-http,
  lua-mmdb,
  systemd,
  ${misc:Depends},

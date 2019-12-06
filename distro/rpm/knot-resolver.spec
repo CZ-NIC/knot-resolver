@@ -57,7 +57,6 @@ BuildRequires:  lmdb-devel
 Requires:       lua-basexx
 Requires:       lua-psl
 Requires:       lua-socket
-Requires:       lua-sec
 Requires:       lua-filesystem
 Requires(pre):  shadow-utils
 %endif
@@ -69,7 +68,6 @@ Requires:       lua5.1-cqueues
 Recommends:     lua5.1-psl
 Requires:       lua-filesystem-compat
 Requires:       lua-socket-compat
-Requires:       lua-sec-compat
 Requires(pre):  shadow-utils
 %endif
 

@@ -1,6 +1,5 @@
 adduser
 dns-root-data
-lua-sec
 lua-socket
 lua-filesystem
 systemd
