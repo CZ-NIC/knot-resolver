@@ -2,8 +2,8 @@
 
 sysrepo_src = files([
   'sysrepo.c',
-  'conf_callbacks.c',
-  'kr_conf.c',
+  'callbacks.c',
+  'conversion.c',
 ])
 
 build_sysrepo = false

@@ -1,8 +1,8 @@
 #include <string.h>
 #include <sysrepo.h>
 
-#include "conf_callbacks.h"
-#include "conf_conversion.h"
+#include "callbacks.h"
+#include "conversion.h"
 #include "utils/common/sysrepo_conf.h"
 #include "utils/common/string_helper.h"
 

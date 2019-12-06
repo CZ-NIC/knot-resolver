@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <lua.h>
 #include <sysrepo.h>
-#include "conf_conversion.h"
+
+#include "conversion.h"
 
 static const conv_struct_t cache_conv_table[] = {  
 	{ NULL }
