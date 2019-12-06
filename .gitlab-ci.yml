@@ -468,6 +468,15 @@ obs:release:
   variables:
     OBS_REPO: knot-resolver-latest
   when: manual
+
+obs:odvr:
+  <<: *obs_trigger
+  stage: deploy-test  # last stage to ensure it doesn't block anything
+  only:
+    - tags
+  variables:
+    OBS_REPO: knot-resolver-odvr
+  when: manual
 # }}}
 
 # deploy-test {{{
