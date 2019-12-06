@@ -57,7 +57,6 @@ BuildRequires:  lmdb-devel
 Requires:       lua-basexx
 Requires:       lua-psl
 Requires:       lua-socket
-Requires:       lua-sec
 Requires(pre):  shadow-utils
 %endif
 %if 0%{?fedora}
@@ -65,9 +64,9 @@ BuildRequires:  pkgconfig(lmdb)
 BuildRequires:  python3-sphinx
 Requires:       lua5.1-basexx
 Requires:       lua5.1-cqueues
+Requires:       lua5.1-http
 Recommends:     lua5.1-psl
 Requires:       lua-socket-compat
-Requires:       lua-sec-compat
 Requires(pre):  shadow-utils
 %endif
 
@@ -81,7 +80,6 @@ BuildRequires:  openssl-devel
 BuildRequires:  lmdb-devel
 BuildRequires:  python3-Sphinx
 Requires:       lua51-luasocket
-Requires:       lua51-luasec
 Requires(pre):  shadow
 %endif
 
