@@ -415,6 +415,7 @@ distribution will take care of it for you.
    The format is standard zone file, though additional information may be persisted in comments.
    Either DS or DNSKEY records can be used for TAs.
    If the file does not exist, bootstrapping of *root* TA will be attempted.
+   If you want to use bootstrapping, install `lua-http`_ library.
 
    Each file can only contain records for a single domain.
    The TAs will be updated according to :rfc:`5011` and persisted in the file (if allowed).
@@ -684,3 +685,4 @@ Code reference
 .. _`real process managers`: http://blog.crocodoc.com/post/48703468992/process-managers-the-good-the-bad-and-the-ugly
 .. _`socket activation`: http://0pointer.de/blog/projects/socket-activation.html
 .. _`dnsproxy module`: https://www.knot-dns.cz/docs/2.7/html/modules.html#dnsproxy-tiny-dns-proxy
+.. _`lua-http`: https://luarocks.org/modules/daurnimator/http
