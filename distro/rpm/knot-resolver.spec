@@ -56,8 +56,7 @@ BuildRequires:  lmdb-devel
 # Lua 5.1 version of the libraries have different package names
 Requires:       lua-basexx
 Requires:       lua-psl
-Requires:       lua-socket
-Requires:       lua-sec
+Requires:       lua-http
 Requires:       lua-filesystem
 Requires(pre):  shadow-utils
 %endif
@@ -68,8 +67,7 @@ Requires:       lua5.1-basexx
 Requires:       lua5.1-cqueues
 Recommends:     lua5.1-psl
 Requires:       lua-filesystem-compat
-Requires:       lua-socket-compat
-Requires:       lua-sec-compat
+Requires:       lua-http
 Requires(pre):  shadow-utils
 %endif
 
