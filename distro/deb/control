@@ -30,8 +30,7 @@ Architecture: any
 Depends:
  adduser,
  dns-root-data,
- lua-sec,
- lua-socket,
+ lua-http
  lua-filesystem,
  systemd,
  ${misc:Depends},
