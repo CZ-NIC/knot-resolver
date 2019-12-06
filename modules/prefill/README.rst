@@ -33,10 +33,3 @@ Root zone to import must be signed using DNSSEC and the resolver must have valid
 
 Only root zone import is supported at the moment.
 
-Dependencies
-^^^^^^^^^^^^
-
-Depends on the luasec_ and luafilesystem_ libraries.
-
-.. _luasec: https://luarocks.org/modules/brunoos/luasec
-.. _luafilesystem: https://keplerproject.github.io/luafilesystem/
