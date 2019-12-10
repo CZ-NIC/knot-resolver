@@ -151,20 +151,23 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 		/* Log to remote socket if connected */
 		const char *delim = args->quiet ? "" : "> ";
 		if (stream_fd != STDIN_FILENO) {
-			fprintf(stdout, "%s\n", cmd); /* Duplicate command to logs */
+			if (VERBOSE_STATUS)
+				fprintf(stdout, "%s\n", cmd); /* Duplicate command to logs */
 			if (message)
 				fprintf(out, "%s", message); /* Duplicate output to sender */
 			if (message || !args->quiet)
 				fprintf(out, "\n");
 			fprintf(out, "%s", delim);
 		}
-		/* Log to standard streams */
-		FILE *fp_out = ret ? stderr : stdout;
-		if (message)
-			fprintf(fp_out, "%s", message);
-		if (message || !args->quiet)
-			fprintf(fp_out, "\n");
-		fprintf(fp_out, "%s", delim);
+		if (stream_fd == STDIN_FILENO || VERBOSE_STATUS) {
+			/* Log to standard streams */
+			FILE *fp_out = ret ? stderr : stdout;
+			if (message)
+				fprintf(fp_out, "%s", message);
+			if (message || !args->quiet)
+				fprintf(fp_out, "\n");
+			fprintf(fp_out, "%s", delim);
+		}
 		lua_settop(L, 0);
 	}
 finish:
