@@ -537,6 +537,7 @@ static int parse_args(int argc, char **argv, struct args *args)
 			array_push(args->addrs_tls, optarg);
 			break;
 		case 'c':
+			assert(optarg != NULL);
 			array_push(args->config, optarg);
 			break;
 		case 'f':
@@ -762,17 +763,21 @@ int main(int argc, char **argv)
 		}
 	}
 
-	/* Check config(s) are read-able */
+	/* Select which config files to load and verify they are read-able. */
+	bool load_defaults = true;
 	for (size_t i = 0; i < args.config.len; ++i) {
 		const char *config = args.config.at[i];
-		if (config != NULL && strcmp(config, "-") != 0 && access(config, R_OK) != 0) {
+		if (strcmp(config, "-") == 0) {
+			load_defaults = false;
+		} else if (access(config, R_OK) != 0) {
 			kr_log_error("[system] config '%s': %s\n", config, strerror(errno));
 			return EXIT_FAILURE;
 		}
 	}
-	if (args.config.len == 0 && access("config", R_OK) == 0) {
+	if (args.config.len == 0 && access("config", R_OK) == 0)
 		array_push(args.config, "config");
-	}
+	if (load_defaults)
+		array_push(args.config, LIBDIR "/config.lua");
 
 	/* File-descriptor count limit: soft->hard. */
 	struct rlimit rlim;
@@ -876,24 +881,13 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	bool load_defaults = true;
 	for (size_t i = 0; i < args.config.len; ++i) {
 		const char *config = args.config.at[i];
-		if (config == NULL)
-			continue;
-		if (strcmp(config, "-") == 0) {
-			load_defaults = false;
-			continue;
-		}
-		if(engine_loadconf(&engine, config) != 0) {
+		if (strcmp(config, "-") != 0 && engine_loadconf(&engine, config) != 0) {
 			ret = EXIT_FAILURE;
 			goto cleanup;
 		}
 		lua_settop(engine.L, 0);
-	}
-	if (load_defaults && engine_load_defaults(&engine) != 0) {
-		ret = EXIT_FAILURE;
-		goto cleanup;
 	}
 
 	drop_capabilities();
