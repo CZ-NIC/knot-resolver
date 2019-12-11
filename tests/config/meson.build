@@ -1,6 +1,9 @@
 config_tests += [
+  # NOTE _leaks: not sure what exactly is wrong in leak detection on config tests
+  # NOTE skip_asan: all three of these disappear locally when using gcc 9.1 (except some leaks)
   ['basic', files('basic.test.lua'), ['skip_asan']],
   ['cache', files('cache.test.lua'), ['skip_asan']],
+  ['net', files('net.test.lua'), ['config_net']],  # requires privileged docker
   ['lru', files('lru.test.lua')],
   ['tls', files('tls.test.lua')],
   ['worker', files('worker.test.lua')],
