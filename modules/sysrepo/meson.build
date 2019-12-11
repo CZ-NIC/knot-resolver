@@ -11,8 +11,9 @@ if get_option('sysrepo') != 'disabled'
   sysrepo_required = get_option('sysrepo') == 'enabled'
   message('--- sysrepo module dependencies ---')
   libsysrepo = dependency('libsysrepo', version: '>=1', required: sysrepo_required)
+  libyang = dependency('libyang', version: '>=1', required: sysrepo_required)
   message('----------------------------------')
-  if libsysrepo.found()
+  if libsysrepo.found() and libyang.found()
     build_sysrepo = true
   endif
 endif

@@ -96,7 +96,6 @@ static void el_subscr_cb(el_subscription_ctx_t *el_subscr, int status)
 KR_EXPORT
 int sysrepo_init(struct kr_module *module)
 {
-    char *xpath = NULL;
     int sr_err = SR_ERR_OK;
     sr_conn_ctx_t *sr_connection = NULL;
     sr_session_ctx_t *sr_session = NULL;
@@ -127,11 +126,9 @@ int sysrepo_init(struct kr_module *module)
     el_subscr->session = sr_session;
     module->data = el_subscr;
 
-    free(xpath);
     return kr_ok(); 
 
     cleanup:
-        free(xpath);
         sr_disconnect(sr_connection);
         printf("Error (%s)\n", sr_strerror(sr_err));
         return kr_error(sr_err);

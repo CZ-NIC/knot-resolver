@@ -12,7 +12,6 @@ int conf_set_current(sr_session_ctx_t *session, const char *module_name)
     size_t count = 0;  
     int sr_err = SR_ERR_OK;
     sr_val_t *values = NULL;
-    char *xpath = NULL;
 
     sr_err = sr_get_items(session, XPATH_BASE"/*//.", 0, &values, &count);
     if (sr_err != SR_ERR_OK) goto cleanup;
@@ -27,7 +26,6 @@ int conf_set_current(sr_session_ctx_t *session, const char *module_name)
     }
 
     cleanup:
-        free(xpath);
         sr_free_values(values, count);
         return sr_err;
 }
@@ -65,6 +63,5 @@ int conf_cache_cb(sr_session_ctx_t *session, const char *module_name, const char
         sr_free_val(old_value);
         sr_free_val(new_value);
         sr_free_change_iter(it);   
-        return SR_ERR_OK;
-            
+        return SR_ERR_OK;    
 }
