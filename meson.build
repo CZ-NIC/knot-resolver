@@ -255,7 +255,7 @@ run_target(
 # https://github.com/mesonbuild/meson/issues/2404
 s_managed_ta = managed_ta ? 'enabled' : 'disabled'
 s_systemd_socket = libsystemd.found() ? 'enabled' : 'disabled'
-s_build_client = build_client ? 'enabled' : 'disabled'
+s_build_kresc = build_kresc ? 'enabled' : 'disabled'
 s_build_utils = build_utils ? 'enabled' : 'disabled'
 s_build_dnstap = build_dnstap ? 'enabled' : 'disabled'
 s_build_sysrepo = build_sysrepo ? 'enabled' : 'disabled'
@@ -285,10 +285,10 @@ message('''
     work_dir:           @0@'''.format(systemd_work_dir) + '''
 
   optional components
-    client:             @0@'''.format(s_build_client) + '''
+    kresc:              @0@'''.format(s_build_kresc) + '''
+    sysrepo:            @0@'''.format(s_build_sysrepo) + '''
     utils:              @0@'''.format(s_build_utils) + '''
     dnstap:             @0@'''.format(s_build_dnstap) + '''
-    sysrepo:            @0@'''.format(s_build_sysrepo) + '''
     unit_tests:         @0@'''.format(s_build_unit_tests) + '''
     config_tests:       @0@'''.format(s_build_config_tests) + '''
     extra_tests:        @0@'''.format(s_build_extra_tests) + '''

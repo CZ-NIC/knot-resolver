@@ -103,7 +103,7 @@ option(
 )
 
 option(
-  'client',
+  'kresc',
   type: 'combo',
   choices: [
     'auto',
