@@ -770,7 +770,10 @@ int main(int argc, char **argv)
 		if (strcmp(config, "-") == 0) {
 			load_defaults = false;
 		} else if (access(config, R_OK) != 0) {
-			kr_log_error("[system] config '%s': %s\n", config, strerror(errno));
+			char cwd[PATH_MAX];
+			get_workdir(cwd, sizeof(cwd));
+			kr_log_error("[system] config '%s' (workdir '%s'): %s\n",
+				config, cwd, strerror(errno));
 			return EXIT_FAILURE;
 		}
 	}
