@@ -5,6 +5,15 @@ Upgrading
 This section summarizes steps required for upgrade to newer Knot Resolver versions.
 We advise users to also read :ref:`release_notes` for respective versions.
 
+4.x to 5.x
+==========
+
+Configuration file
+------------------
+
+* ``net.listen()`` throws an error if it fails to bind. Use ``freebind=true`` option
+  to bind to nonlocal addresses.
+
 4.2.2 to 4.3+
 =============
 
