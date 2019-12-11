@@ -191,10 +191,19 @@ local function test_json_functions()
 	end
 end
 
+-- test freebind option for net.listen()
+local function test_freebind()
+	boom(net.listen, {'192.0.2.1', 50049},
+		'net.listen() without freebind should fail')
+	ok(net.listen('192.0.2.1', 50049, { freebind=true }),
+		'net.listen() with freebind succeeds')
+end
+
 return {
 	test_constants,
 	test_globals,
 	test_rrset_functions,
 	test_packet_functions,
 	test_json_functions,
+	test_freebind,
 }
