@@ -64,7 +64,7 @@ build:
     - meson build_ci --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled -Dsendmmsg=disabled
     - ninja -C build_ci
     - ninja -C build_ci install >/dev/null
-    - ${MESON_TEST} --suite unit --suite config
+    - ${MESON_TEST} --suite unit --suite config --no-suite config_net
 
 build-asan:
   <<: *build
@@ -72,9 +72,7 @@ build-asan:
     - meson build_ci_asan --default-library=static --prefix=$PREFIX -Db_sanitize=address -Dextra_tests=enabled
     - ninja -C build_ci_asan
     - ninja -C build_ci_asan install >/dev/null
-      # TODO _leaks: not sure what exactly is wrong in leak detection on config tests
-      # TODO skip_asan: all three of these disappear locally when using gcc 9.1 (except some leaks)
-    - ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite unit --suite config --no-suite skip_asan
+    - ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite unit --suite config --no-suite skip_asan --no-suite config_net
 
 # NOTE: build for turris when meson is available and packaging files updated
 #build:turris:
@@ -281,12 +279,20 @@ root.hints:
   script:
     - scripts/update-root-hints.sh
 
+test:privileged:
+  <<: *test
+  when: delayed
+  start_in: '60 seconds'
+  script:
+    - ${MESON_TEST} --suite config_net
+    - ${MESON_TEST} --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" --suite config_net
+
 test:valgrind:
   <<: *test
   when: delayed
   start_in: '30 seconds'
   script:
-    - ${MESON_TEST} --suite unit --suite config --no-suite snowflake --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
+    - ${MESON_TEST} --suite unit --suite config --no-suite snowflake --no-suite config_net --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
     - MESON_TESTTHREADS=1 ${MESON_TEST} --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" --suite snowflake
 # }}}
 
