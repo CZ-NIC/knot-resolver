@@ -104,9 +104,9 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	mp_flush(worker->pkt_pool.ctx);
 }
 
-int freebind_option(const struct sockaddr *addr, int *level, int *name)
+static int family_to_freebind_option(sa_family_t sa_family, int *level, int *name)
 {
-	switch (addr->sa_family) {
+	switch (sa_family) {
 	case AF_INET:
 		*level = IPPROTO_IP;
 #if defined(IP_FREEBIND)
@@ -159,7 +159,7 @@ int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags
 	if (flags != NULL && flags->freebind) {
 		int optlevel;
 		int optname;
-		int ret = freebind_option(addr, &optlevel, &optname);
+		int ret = family_to_freebind_option(addr->sa_family, &optlevel, &optname);
 		if (ret) return kr_error(ret);
 		if (setsockopt(fd, optlevel, optname, &yes, sizeof(yes)))
 			return kr_error(errno);
