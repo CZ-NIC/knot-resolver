@@ -145,7 +145,9 @@ int kxsk_umem_refill(const struct config *cfg, struct xsk_umem_info *umem)
 	 * Let's keep about as many frames ready for TX (free_count) as for RX (fq_ready),
 	 * and don't fill the queue to more than a half. */
 	const int fq_target = cfg->umem.fill_size / 2;
-	uint32_t fq_free = xsk_prod_nb_free(&umem->fq, fq_target);
+	uint32_t fq_free = xsk_prod_nb_free(&umem->fq, 65536*256);
+		/* TODO: not nice - ^^ the caching logic inside is the other way,
+		 * so we disable it clumsily by passing a high value. */
 	if (fq_free <= fq_target)
 		return 0;
 	const int fq_ready = cfg->umem.fill_size - fq_free;
