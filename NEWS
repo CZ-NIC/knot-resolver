@@ -1,3 +1,11 @@
+Knot Resolver 4.x.y (20yy-mm-dd)
+================================
+
+Improvements
+------------
+- logging: control-socket commands don't log unless --verbose (#528)
+
+
 Knot Resolver 4.3.0 (2019-12-04)
 ================================
 
