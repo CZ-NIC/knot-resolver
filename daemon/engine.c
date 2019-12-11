@@ -717,17 +717,6 @@ int engine_loadconf(struct engine *engine, const char *config_path)
 	return ret;
 }
 
-int engine_load_defaults(struct engine *engine)
-{
-	/* Load defaults */
-	int ret = luaL_dofile(engine->L, LIBDIR "/config.lua");
-	if (ret != 0) {
-		fprintf(stderr, "%s\n", lua_tostring(engine->L, -1));
-		lua_pop(engine->L, 1);
-	}
-	return ret;
-}
-
 int engine_start(struct engine *engine)
 {
 	/* Clean up stack and restart GC */
