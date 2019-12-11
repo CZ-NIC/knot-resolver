@@ -22,6 +22,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <netinet/in.h>
+#include <unistd.h>
 
 #include <gnutls/gnutls.h>
 #include <gnutls/crypto.h>
@@ -182,6 +183,14 @@ static inline long time_diff(struct timeval *begin, struct timeval *end) {
         res.tv_usec += 1000000;
     }
     return res.tv_sec * 1000 + res.tv_usec / 1000;
+}
+
+/** Get current working directory with fallback value. */
+static inline void get_workdir(char *out, size_t len) {
+	if(getcwd(out, len) == NULL) {
+		const char errprefix[] = "<invalid working directory>";
+		strncpy(out, errprefix, len);
+	}
 }
 
 /** @cond internal Array types */
