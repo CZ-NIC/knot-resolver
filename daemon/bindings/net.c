@@ -224,9 +224,9 @@ static int net_listen(lua_State *L)
 
 	/* Now focus on the first argument. */
 	lua_settop(L, 1);
-	const bool res = net_listen_addrs(L, port, tls, kind, freebind);
-	lua_pushboolean(L, res);
-	return 1;
+	if (!net_listen_addrs(L, port, tls, kind, freebind))
+		lua_error_p(L, "net.listen() failed to bind");
+	return 0;
 }
 
 /** Close endpoint. */
