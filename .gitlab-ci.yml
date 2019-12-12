@@ -499,6 +499,7 @@ obs:build:all:
     variables:
       - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing|knot-resolver-odvr$/
       - $CI_COMMIT_TAG
+  allow_failure: true
   script:
     - "osc results home:CZ-NIC:$OBS_REPO knot-resolver -w"
     - version=$(sed 's/^v//' <(git describe --exact-match HEAD || git rev-parse --short HEAD) )
