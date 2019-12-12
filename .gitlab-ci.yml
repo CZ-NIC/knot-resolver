@@ -456,7 +456,7 @@ obs:trigger: &obs_trigger
     url: https://build.opensuse.org/package/show/home:CZ-NIC:$OBS_REPO/knot-resolver
   tags:
     - respdiff
-  allow_failure: false
+  allow_failure: false  # required to make when: manual action blocking
   script:
     - scripts/make-distrofiles.sh
     - echo y | scripts/build-in-obs.sh $OBS_REPO
