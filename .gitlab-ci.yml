@@ -456,7 +456,7 @@ obs:trigger: &obs_trigger
     url: https://build.opensuse.org/package/show/home:CZ-NIC:$OBS_REPO/knot-resolver
   tags:
     - respdiff
-  allow_failure: false
+  allow_failure: false  # required to make when: manual action blocking
   script:
     - scripts/make-distrofiles.sh
     - echo y | scripts/build-in-obs.sh $OBS_REPO
@@ -499,6 +499,7 @@ obs:build:all:
     variables:
       - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing|knot-resolver-odvr$/
       - $CI_COMMIT_TAG
+  allow_failure: true
   script:
     - "osc results home:CZ-NIC:$OBS_REPO knot-resolver -w"
     - version=$(sed 's/^v//' <(git describe --exact-match HEAD || git rev-parse --short HEAD) )
