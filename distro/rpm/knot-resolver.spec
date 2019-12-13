@@ -56,7 +56,6 @@ BuildRequires:  lmdb-devel
 # Lua 5.1 version of the libraries have different package names
 Requires:       lua-basexx
 Requires:       lua-psl
-Requires:       lua-socket
 Requires(pre):  shadow-utils
 %endif
 %if 0%{?fedora}
@@ -66,7 +65,6 @@ Requires:       lua5.1-basexx
 Requires:       lua5.1-cqueues
 Requires:       lua5.1-http
 Recommends:     lua5.1-psl
-Requires:       lua-socket-compat
 Requires(pre):  shadow-utils
 %endif
 
@@ -79,7 +77,6 @@ BuildRequires:  openssl-devel
 %define NINJA ninja
 BuildRequires:  lmdb-devel
 BuildRequires:  python3-Sphinx
-Requires:       lua51-luasocket
 Requires(pre):  shadow
 %endif
 

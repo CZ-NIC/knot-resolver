@@ -1,6 +1,5 @@
 adduser
 dns-root-data
-lua-socket
 systemd
 libc6
 libdnssec7
