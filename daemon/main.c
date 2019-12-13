@@ -765,10 +765,13 @@ int main(int argc, char **argv)
 
 	/* Select which config files to load and verify they are read-able. */
 	bool load_defaults = true;
-	for (size_t i = 0; i < args.config.len; ++i) {
+	size_t i = 0;
+	while (i < args.config.len) {
 		const char *config = args.config.at[i];
 		if (strcmp(config, "-") == 0) {
 			load_defaults = false;
+			array_del(args.config, i);
+			continue;  /* don't increment i */
 		} else if (access(config, R_OK) != 0) {
 			char cwd[PATH_MAX];
 			get_workdir(cwd, sizeof(cwd));
@@ -776,6 +779,7 @@ int main(int argc, char **argv)
 				config, cwd, strerror(errno));
 			return EXIT_FAILURE;
 		}
+		i++;
 	}
 	if (args.config.len == 0 && access("config", R_OK) == 0)
 		array_push(args.config, "config");
@@ -884,9 +888,9 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	for (size_t i = 0; i < args.config.len; ++i) {
+	for (i = 0; i < args.config.len; ++i) {
 		const char *config = args.config.at[i];
-		if (strcmp(config, "-") != 0 && engine_loadconf(&engine, config) != 0) {
+		if (engine_loadconf(&engine, config) != 0) {
 			ret = EXIT_FAILURE;
 			goto cleanup;
 		}
