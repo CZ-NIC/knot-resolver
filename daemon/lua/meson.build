@@ -34,6 +34,7 @@ lua_src = [
   sandbox,
   trust_anchors,
   files('zonefile.lua'),
+  files('kluautil.lua'),
 ]
 
 # install daemon lua sources
