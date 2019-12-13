@@ -4,42 +4,29 @@ if not stats then modules.load('stats') end
 -- This is leader-only module
 if worker.id > 0 then return {} end
 local M = {}
-local socket = require('socket')
+local socket = require("cqueues.socket")
 
--- Create connected UDP socket
-local function make_udp(host, port)
+local function make_socket(host, port, stype)
 	local s, err, status
-	if host:find(':') then
-		s, err = socket.udp6()
-	else
-		s, err = socket.udp()
-	end
-	if not s then
-		return nil, err
-	end
-	status, err = s:setpeername(host, port)
+
+	s = socket.connect({ host = host, port = port, type = stype })
+	s:setmode('bn', 'bn')
+	status, err = pcall(s.connect, s)
+
 	if not status then
-		return nil, err
+		return status, err
 	end
 	return s
 end
 
+-- Create connected UDP socket
+local function make_udp(host, port)
+	return make_socket(host, port, socket.SOCK_DGRAM)
+end
+
 -- Create connected TCP socket
 local function make_tcp(host, port)
-	local s, err, status
-	if host:find(':') then
-		s, err = socket.tcp6()
-	else
-		s, err = socket.tcp()
-	end
-	if not s then
-		return nil, err
-	end
-	status, err = s:connect(host, port)
-	if not status then
-		return s, err
-	end
-	return s
+	return make_socket(host, port, socket.SOCK_STREAM)
 end
 
 local function merge(results)
@@ -60,7 +47,7 @@ local function publish_table(metrics, prefix, now)
 			msg = prefix..'.'..msg
 		end
 		for i in ipairs(M.cli) do
-			local ok, err = M.cli[i]:send(msg)
+			local ok, err = M.cli[i]:write(msg)
 			if not ok then
 				-- Best-effort reconnect once per two tries
 				local tcp = M.cli[i]['connect'] ~= nil
