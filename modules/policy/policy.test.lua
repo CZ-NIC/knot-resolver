@@ -1,6 +1,12 @@
 -- setup resolver
 -- policy module should be loaded by default, do not load it explicitly
 
+-- do not attempt to contact outside world, operate only on cache
+net.ipv4 = false
+net.ipv6 = false
+-- do not listen, test is driven by config code
+env.KRESD_NO_LISTEN = true
+
 -- test for default configuration
 local function test_tls_forward()
 	boom(policy.TLS_FORWARD, {}, 'TLS_FORWARD without arguments')
@@ -61,8 +67,77 @@ local function test_slice()
 	ok(policy.slice, {function() end, policy.FORWARD, policy.FORWARD})
 end
 
+local function mirror_parser(srv, cv, nqueries)
+	local ffi = require('ffi')
+	local test_end = 0
+	local TIMEOUT = 5  -- seconds
+
+	while true do
+		local input = srv:xread('*a', 'bn', TIMEOUT)
+		if not input then
+			cv:signal()
+			return false, 'mirror: timeout'
+		end
+		--print(#input, input)
+		-- convert query to knot_pkt_t
+		local wire = ffi.cast("void *", input)
+		local pkt = ffi.gc(ffi.C.knot_pkt_new(wire, #input, nil), ffi.C.knot_pkt_free)
+		if not pkt then
+			cv:signal()
+			return false, 'mirror: packet allocation error'
+		end
+
+		local result = ffi.C.knot_pkt_parse(pkt, 0)
+		if result ~= 0 then
+			cv:signal()
+			return false, 'mirror: packet parse error'
+		end
+		--print(pkt)
+		test_end = test_end + 1
+
+		if test_end == nqueries then
+			cv:signal()
+			return true, 'packet mirror pass'
+		end
+
+	end
+end
+
+local function test_mirror()
+	local socket = require("cqueues.socket")
+	local cond = require("cqueues.condition")
+	local cv = cond.new()
+	local queries = {}
+	local srv = socket.listen({
+		host = "127.0.0.1",
+		port = 36659,
+		type = socket.SOCK_DGRAM,
+	})
+	-- binary mode, no buffering
+	srv:setmode('bn', 'bn')
+
+	queries["bla.mujtest.cz."] = kres.type.AAAA
+	queries["bla.mujtest2.cz."] = kres.type.AAAA
+
+	-- UDP server for test
+	worker.bg_worker.cq:wrap(function()
+		local err, msg = mirror_parser(srv, cv, kluautil.tableLen(queries))
+
+		ok(err, msg)
+	end)
+
+	policy.add(policy.suffix(policy.MIRROR('127.0.0.1@36659'), policy.todnames({'mujtest.cz.'})))
+	policy.add(policy.suffix(policy.MIRROR('127.0.0.1@36659'), policy.todnames({'mujtest2.cz.'})))
+
+	for name, rtype in pairs(queries) do
+		resolve(name, rtype)
+	end
+
+	cv:wait()
+end
 
 return {
 	test_tls_forward,
+	test_mirror,
 	test_slice,
 }
