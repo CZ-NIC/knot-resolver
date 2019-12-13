@@ -12,22 +12,20 @@ local function getruleid()
 end
 
 -- Support for client sockets from inside policy actions
-local socket_client = function () return error("missing luasocket, can't create socket client") end
-local has_socket, socket = pcall(require, 'socket')
+local socket_client = function ()
+	return error("missing lua-cqueues library, can't create socket client") 
+end
+local has_socket, socket = pcall(require, 'cqueues.socket')
 if has_socket then
 	socket_client = function (host, port)
 		local s, err, status
-		if host:find(':') then
-			s, err = socket.udp6()
-		else
-			s, err = socket.udp()
-		end
-		if not s then
-			return nil, err
-		end
-		status, err = s:setpeername(host, port)
+
+		s = socket.connect({ host = host, port = port, type = socket.SOCK_DGRAM })
+		s:setmode('bn', 'bn')
+		status, err = pcall(s.connect, s)
+
 		if not status then
-			return nil, err
+			return status, err
 		end
 		return s
 	end
@@ -65,13 +63,13 @@ end
 -- Mirror request elsewhere, and continue solving
 function policy.MIRROR(target)
 	local addr, port = addr_split_port(target, 53)
-	local sink, err = socket_client(addr, port)
+	local sink, err = socket_client(ffi.string(addr), port)
 	if not sink then panic('MIRROR target %s is not a valid: %s', target, err) end
 	return function(state, req)
 		if state == kres.FAIL then return state end
 		local query = req.qsource.packet
 		if query ~= nil then
-			sink:send(ffi.string(query.wire, query.size))
+			sink:send(ffi.string(query.wire, query.size), 1, tonumber(query.size))
 		end
 		return -- Chain action to next
 	end
