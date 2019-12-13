@@ -1,3 +1,11 @@
+Knot Resolver ?
+================================
+
+Improvements
+------------
+- lua: remove dependency on lua-socket and lua-sec, used lua-http and cqueues (#512, #521, !894)
+
+
 Knot Resolver 4.3.0 (2019-12-04)
 ================================
 
