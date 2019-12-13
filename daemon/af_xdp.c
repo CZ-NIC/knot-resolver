@@ -441,10 +441,10 @@ static void rx_desc(struct xsk_socket_info *xsi, const struct xdp_desc *desc)
 		kr_log_verbose("[kxsk] frame len %d, ipv4 len %d\n",
 				(int)desc->len, (int)BS16(ipv4->tot_len));
 		// Any fragmentation stuff is bad for use, except for the DF flag
-		if (ipv4->version != 4 || (ipv4->frag_off & ~(1 << 14))) {
+		if (ipv4->version != 4 || (BS16(ipv4->frag_off) & ~(1 << 14))) {
 			kr_log_info("[kxsk] weird IPv4 received: "
 					"version %d, frag_off %d\n",
-					(int)ipv4->version, (int)ipv4->frag_off);
+					(int)ipv4->version, (int)BS16(ipv4->frag_off));
 			goto free_frame;
 		}
 		if (ipv4->protocol != 0x11) // UDP
