@@ -56,7 +56,6 @@ BuildRequires:  lmdb-devel
 # Lua 5.1 version of the libraries have different package names
 Requires:       lua-basexx
 Requires:       lua-psl
-Requires:       lua-socket
 Requires:       lua-filesystem
 Requires(pre):  shadow-utils
 %endif
@@ -67,7 +66,6 @@ Requires:       lua5.1-basexx
 Requires:       lua5.1-cqueues
 Recommends:     lua5.1-psl
 Requires:       lua-filesystem-compat
-Requires:       lua-socket-compat
 Requires(pre):  shadow-utils
 %endif
 
@@ -81,7 +79,6 @@ BuildRequires:  openssl-devel
 BuildRequires:  lmdb-devel
 BuildRequires:  python3-Sphinx
 Requires:       lua51-luafilesystem
-Requires:       lua51-luasocket
 Requires(pre):  shadow
 %endif
 

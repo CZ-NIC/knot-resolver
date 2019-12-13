@@ -1,6 +1,5 @@
 adduser
 dns-root-data
-lua-socket
 lua-filesystem
 systemd
 libc6
