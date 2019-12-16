@@ -69,7 +69,7 @@ build:
 build-asan:
   <<: *build
   script:
-    - meson build_ci_asan --default-library=static --prefix=$PREFIX -Db_sanitize=address -Dextra_tests=enabled
+    - CC=clang CXX=clang++ meson build_ci_asan --default-library=static --prefix=$PREFIX -Db_sanitize=address -Dextra_tests=enabled
     - ninja -C build_ci_asan
     - ninja -C build_ci_asan install >/dev/null
       # TODO _leaks: not sure what exactly is wrong in leak detection on config tests
