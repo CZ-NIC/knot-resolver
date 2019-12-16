@@ -798,8 +798,8 @@ int main(int argc, char **argv)
 	if (ret) {
 		kr_log_error("[system] failed to get or set file-descriptor limit: %s\n",
 				strerror(errno));
-	} else if (rlim.rlim_cur < 1024*1024) {
-		kr_log_info("[system] warning: hard limit for number of file-descriptors is only %ld but recommended value is 1048576\n",
+	} else if (rlim.rlim_cur < 512*1024) {
+		kr_log_info("[system] warning: hard limit for number of file-descriptors is only %ld but recommended value is 524288\n",
 				rlim.rlim_cur);
 	}
 
