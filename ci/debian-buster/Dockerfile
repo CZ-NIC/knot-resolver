@@ -11,7 +11,7 @@ RUN apt-get update -qq
 # RUN apt-get upgrade -y -qqq
 
 # Knot and Knot Resolver dependecies
-RUN apt-get install -y -qqq git make cmake pkg-config build-essential bsdmainutils libtool autoconf liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev libidn11-dev protobuf-c-compiler libfstrm-dev libuv1-dev libcmocka-dev libluajit-5.1-dev lua-socket lua-http meson libssl-dev
+RUN apt-get install -y -qqq git make cmake pkg-config build-essential bsdmainutils libtool autoconf liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev libidn11-dev protobuf-c-compiler libfstrm-dev libuv1-dev libcmocka-dev libluajit-5.1-dev lua-http meson libssl-dev
 # documentation dependecies
 RUN apt-get install -y -qqq doxygen python3-sphinx python3-breathe python3-sphinx-rtd-theme
 
