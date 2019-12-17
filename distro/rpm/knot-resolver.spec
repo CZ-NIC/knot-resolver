@@ -56,6 +56,7 @@ BuildRequires:  lmdb-devel
 # Lua 5.1 version of the libraries have different package names
 Requires:       lua-basexx
 Requires:       lua-psl
+Requires:       lua-http
 Requires:       lua-filesystem
 Requires(pre):  shadow-utils
 %endif
