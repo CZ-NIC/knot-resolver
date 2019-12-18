@@ -58,7 +58,6 @@ Requires:       lua-basexx
 Requires:       lua-psl
 Requires:       lua-socket
 Requires:       lua-sec
-Requires:       lua-filesystem
 Requires(pre):  shadow-utils
 %endif
 %if 0%{?fedora}
@@ -67,7 +66,6 @@ BuildRequires:  python3-sphinx
 Requires:       lua5.1-basexx
 Requires:       lua5.1-cqueues
 Recommends:     lua5.1-psl
-Requires:       lua-filesystem-compat
 Requires:       lua-socket-compat
 Requires:       lua-sec-compat
 Requires(pre):  shadow-utils
@@ -82,7 +80,6 @@ BuildRequires:  openssl-devel
 %define NINJA ninja
 BuildRequires:  lmdb-devel
 BuildRequires:  python3-Sphinx
-Requires:       lua51-luafilesystem
 Requires:       lua51-luasocket
 Requires:       lua51-luasec
 Requires(pre):  shadow
