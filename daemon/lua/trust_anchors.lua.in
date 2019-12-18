@@ -28,7 +28,7 @@ local function https_fetch(url, ca)
 	local openssl_ok, openssl_ctx = pcall(require, 'openssl.ssl.context')
 
 	if not http_ok or not openssl_ok then
-		return nil, 'lua-http and luaossl needed for root TA bootstrap'
+		return nil, 'error: lua-http and luaossl libraries are missing (but required) for root TA bootstrap'
 	end
 
 	local request = http_request.new_from_uri(url)
@@ -45,7 +45,7 @@ local function https_fetch(url, ca)
 
 	local resp, err = stream:get_body_as_string()
 
-	return resp, (resp and "" or err)
+	return resp, err or ""
 end
 
 -- remove UTC timezone specification if present or throw error
