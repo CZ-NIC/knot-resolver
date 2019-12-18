@@ -121,7 +121,7 @@ local function test_mirror()
 
 	-- UDP server for test
 	worker.bg_worker.cq:wrap(function()
-		local err, msg = mirror_parser(srv, cv, kluautil.tableLen(queries))
+		local err, msg = mirror_parser(srv, cv, kr_table_len(queries))
 
 		ok(err, msg)
 	end)
