@@ -224,6 +224,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_zonecut_set
 	kr_now
 	kr_strptime_diff
+	kr_file_mtime
 	lru_free_items_impl
 	lru_create_impl
 	lru_get_impl

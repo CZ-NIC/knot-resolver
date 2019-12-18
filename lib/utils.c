@@ -40,6 +40,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 
 /* Always compile-in log symbols, even if disabled. */
@@ -1233,5 +1234,15 @@ uint32_t kr_rrsig_sig_expiration(const knot_rdata_t *rdata)
 uint16_t kr_rrsig_type_covered(const knot_rdata_t *rdata)
 {
 	return knot_rrsig_type_covered(rdata);
+}
+
+time_t kr_file_mtime (const char* fname) {
+	struct stat fstat;
+
+	if (stat(fname, &fstat) != 0) {
+		return 0;
+	}
+
+	return fstat.st_mtime;
 }
 

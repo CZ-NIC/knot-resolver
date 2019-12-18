@@ -32,7 +32,6 @@ Depends:
  dns-root-data,
  lua-sec,
  lua-socket,
- lua-filesystem,
  systemd,
  ${misc:Depends},
  ${shlibs:Depends},
