@@ -36,7 +36,6 @@ Only root zone import is supported at the moment.
 Dependencies
 ^^^^^^^^^^^^
 
-Depends on the luasec_ and luafilesystem_ libraries.
+Depends on the luasec_ library.
 
 .. _luasec: https://luarocks.org/modules/brunoos/luasec
-.. _luafilesystem: https://keplerproject.github.io/luafilesystem/

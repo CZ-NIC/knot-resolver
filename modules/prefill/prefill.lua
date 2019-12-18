@@ -1,6 +1,6 @@
 local https = require('ssl.https')
 local ltn12 = require('ltn12')
-local lfs = require('lfs')
+local ffi = require('ffi')
 
 local rz_url = "https://www.internic.net/domain/root.zone"
 local rz_local_fname = "root.zone"
@@ -70,9 +70,13 @@ end
 -- returns: number of seconds the file is valid for
 -- 0 indicates immediate download
 local function get_file_ttl(fname)
-	local attrs = lfs.attributes(fname)
-	if attrs then
-		local age = os.time() - attrs.modification
+	local c_str = ffi.new("char[?]", #fname)
+	ffi.copy(c_str, fname)
+	local mtime = tonumber(ffi.C.kr_file_mtime(c_str))
+	local err = ffi.errno()
+
+	if mtime > 0 then
+		local age = os.time() - mtime
 		return math.max(
 			rz_cur_interval - age,
 			0)
