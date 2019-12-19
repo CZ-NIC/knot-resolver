@@ -90,7 +90,7 @@ local function get_file_ttl(fname)
 end
 
 local function download(url, fname)
-	log("[prefill] downloading root zone to %s file ...", fname)
+	log("[prefill] downloading root zone to file %s ...", fname)
 	local rzone, err = https_fetch(url, rz_ca_file, fname)
 	if rzone == nil then
 		error(string.format("[prefill] fetch of `%s` failed: %s", url, err))
