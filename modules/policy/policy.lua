@@ -12,7 +12,9 @@ local function getruleid()
 end
 
 -- Support for client sockets from inside policy actions
-local socket_client = function () return error("missing cqueues, can't create socket client") end
+local socket_client = function ()
+	return error("missing lua-cqueues library, can't create socket client") 
+end
 local has_socket, socket = pcall(require, 'cqueues.socket')
 if has_socket then
 	socket_client = function (host, port)
