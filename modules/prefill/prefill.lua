@@ -13,8 +13,27 @@ local rz_interval_randomizator_limit = 10
 local rz_interval_threshold = 5
 local rz_interval_min = 3600
 
-local prefill = {
-}
+local prefill = {}
+
+-- hack for circular depedency between timer() and fill_cache()
+local forward_references = {}
+
+local function stop_timer()
+	if rz_event_id then
+		event.cancel(rz_event_id)
+		rz_event_id = nil
+	end
+end
+
+local function timer()
+	stop_timer()
+	worker.bg_worker.cq:wrap(forward_references.fill_cache)
+end
+
+local function restart_timer(after)
+	stop_timer()
+	rz_event_id = event.after(after * sec, timer)
+end
 
 local function display_delay(time)
 	local days = math.floor(time / 86400)
@@ -77,7 +96,7 @@ local function import(fname)
 	end
 end
 
-local function fill_cache()
+function forward_references.fill_cache()
 	local file_ttl = get_file_ttl(rz_local_fname)
 
 	if file_ttl > rz_interval_threshold then
@@ -91,7 +110,7 @@ local function fill_cache()
 			log("[prefill] cannot download new zone (%s), "
 				.. "will retry root zone download in %s",
 				errmsg, display_delay(rz_cur_interval))
-			event.reschedule(rz_event_id, rz_cur_interval * sec)
+			restart_timer(rz_cur_interval)
 			return
 		end
 		file_ttl = rz_default_interval
@@ -111,11 +130,7 @@ local function fill_cache()
 		log("[prefill] root zone refresh in %s",
 			display_delay(rz_cur_interval))
 	end
-	event.reschedule(rz_event_id, rz_cur_interval * sec)
-end
-
-local function timer()
-	worker.bg_worker.cq:wrap(fill_cache)
+	restart_timer(rz_cur_interval)
 end
 
 function prefill.init()
@@ -123,10 +138,7 @@ function prefill.init()
 end
 
 function prefill.deinit()
-	if rz_event_id then
-		event.cancel(rz_event_id)
-		rz_event_id = nil
-	end
+	stop_timer()
 end
 
 -- process one item from configuration table
@@ -179,9 +191,7 @@ function prefill.config(config)
 			.. 'for root zone')
 	end
 
-	-- ability to change intervals
-	prefill.deinit()
-	rz_event_id = event.after(0, timer)
+	restart_timer(0)  -- start now
 end
 
 return prefill
