@@ -715,7 +715,8 @@ int engine_loadconf(struct engine *engine, const char *config_path)
 
 	int ret = luaL_dofile(engine->L, config_path);
 	if (ret != 0) {
-		fprintf(stderr, "%s\n", lua_tostring(engine->L, -1));
+		fprintf(stderr, "[system] error while loading config: "
+			"%s (workdir '%s')\n", lua_tostring(engine->L, -1), cwd);
 		lua_pop(engine->L, 1);
 	}
 	return ret;
