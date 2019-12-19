@@ -49,7 +49,7 @@ local function get_file_ttl(fname)
 end
 
 local function download(url, fname)
-	local kluautil = pcall(require, 'kluautil')
+	local kluautil = require('kluautil')
 	local file, rcode, errmsg
 	file, errmsg = io.open(fname, 'w')
 	if not file then

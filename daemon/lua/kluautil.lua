@@ -1,6 +1,7 @@
+local kluautil = {}
 
 -- Get length of table
-function kr_table_len (t)
+function kluautil.kr_table_len(t)
 	local len = 0
 	for _ in pairs(t) do
 		len = len + 1
@@ -9,7 +10,7 @@ function kr_table_len (t)
 end
 
 -- Fetch over HTTPS
-function kr_https_fetch (url, ca_file, file)
+function kluautil.kr_https_fetch(url, ca_file, file)
 	local http_ok, http_request = pcall(require, 'http.request')
 	local openssl_ok, openssl_ctx = pcall(require, 'openssl.ssl.context')
 
@@ -44,3 +45,4 @@ function kr_https_fetch (url, ca_file, file)
 	return true
 end
 
+return kluautil
