@@ -22,32 +22,6 @@ local function upgrade_required(msg)
 end
 
 -- TODO: Move bootstrap to a separate module or even its own binary
--- Fetch over HTTPS with peert cert checked
-local function https_fetch(url, ca)
-	local http_ok, http_request = pcall(require, 'http.request')
-	local openssl_ok, openssl_ctx = pcall(require, 'openssl.ssl.context')
-
-	if not http_ok or not openssl_ok then
-		return nil, 'error: lua-http and luaossl libraries are missing (but required) for root TA bootstrap'
-	end
-
-	local request = http_request.new_from_uri(url)
-	request.ctx = openssl_ctx.new('TLSv1_2')
-	local store = request.ctx:getStore()
-	store:add(ca)
-
-	request.ctx:setVerify(openssl_ctx.VERIFY_PEER)
-	request.tls = true
-
-	local headers, stream = request:go()
-	if headers == nil then return nil, 'HTTP client library error' end
-	if headers:get(':status') ~= "200" then return nil, headers:get(':status') end
-
-	local resp, err = stream:get_body_as_string()
-
-	return resp, err or ""
-end
-
 -- remove UTC timezone specification if present or throw error
 local function time2utc(orig_timespec)
 	local patterns = {'[+-]00:00$', 'Z$'}
@@ -144,14 +118,19 @@ end
 -- Fetch root anchors in XML over HTTPS, returning a zone-file-style string
 -- or false in case of error, and a message.
 local function bootstrap(url, ca)
+	file = io.tmpfile()
 	-- RFC 7958, sec. 2, but we don't do precise XML parsing.
 	-- @todo ICANN certificate is verified against current CA
 	--       this is not ideal, as it should rather verify .xml signature which
 	--       is signed by ICANN long-lived cert, but luasec has no PKCS7
-	local xml, err = https_fetch(url, ca)
-	if not xml then
-		return false, string.format('[ ta ] fetch of "%s" failed: %s', url, err)
+	local rcode, errmsg = kr_https_fetch(url, ca, file)
+	if rcode == nil then
+		file:close()
+		return false, string.format('[ ta ] fetch of "%s" failed: %s', url, errmsg)
 	end
+
+	local xml = file:read("*a")
+	file:close()
 
 	-- we support only minimal subset of https://tools.ietf.org/html/rfc7958
 	assert_str_match(xml, '<?xml version="1%.0" encoding="UTF%-8"%?>', 1)
