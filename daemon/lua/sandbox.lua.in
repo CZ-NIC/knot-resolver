@@ -32,9 +32,6 @@ if rawget(kres, 'str2dname') ~= nil then
 	todname = kres.str2dname
 end
 
--- Binding lua helper
-kluautil = require('kluautil')
-
 worker.resolve_pkt = function (pkt, options, finish, init)
 	options = kres.mk_qflags(options)
 	local task = ffi.C.worker_resolve_start(pkt, options)
