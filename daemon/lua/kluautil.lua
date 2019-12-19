@@ -11,6 +11,7 @@ end
 
 -- Fetch over HTTPS
 function kluautil.kr_https_fetch(url, ca_file, file)
+	print('start!')
 	local http_ok, http_request = pcall(require, 'http.request')
 	local openssl_ok, openssl_ctx = pcall(require, 'openssl.ssl.context')
 
@@ -29,13 +30,18 @@ function kluautil.kr_https_fetch(url, ca_file, file)
 	req.ctx:setVerify(openssl_ctx.VERIFY_PEER)
 	req.tls = true
 
+	print('go')
 	local headers, stream = req:go()
+	print('go done')
 	assert(headers, 'HTTP client library error')
 	if headers:get(':status') ~= "200" then
+		print('not 200!')
 		return nil, headers:get(':status')
 	end
 
+	print('before')
 	local err, errmsg = stream:save_body_to_file(file)
+	print('after')
 	if err == nil then
 		return err, errmsg
 	end

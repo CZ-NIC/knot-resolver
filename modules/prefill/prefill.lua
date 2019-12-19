@@ -6,15 +6,16 @@ local rz_ca_file = nil
 local rz_event_id = nil
 
 local rz_default_interval = 86400
-local rz_https_fail_interval = 600
-local rz_no_ta_interval = 600
+local rz_https_fail_interval = 6
+local rz_no_ta_interval = 20
 local rz_cur_interval = rz_default_interval
 local rz_interval_randomizator_limit = 10
 local rz_interval_threshold = 5
 local rz_interval_min = 3600
 
-local prefill = {
-}
+local prefill = {}
+
+local forward_references = {}
 
 local function display_delay(time)
 	local days = math.floor(time / 86400)
@@ -88,7 +89,7 @@ local function fill_cache()
 			log("[prefill] cannot download new zone (%s), "
 				.. "will retry root zone download in %s",
 				errmsg, display_delay(rz_cur_interval))
-			event.reschedule(rz_event_id, rz_cur_interval * sec)
+			rz_event_id = event.after(rz_cur_interval * sec, forward_references.timer)
 			return
 		end
 		file_ttl = rz_default_interval
@@ -108,10 +109,12 @@ local function fill_cache()
 		log("[prefill] root zone refresh in %s",
 			display_delay(rz_cur_interval))
 	end
-	event.reschedule(rz_event_id, rz_cur_interval * sec)
+	rz_event_id = event.after(rz_cur_interval * sec, forward_references.timer)
 end
 
-local function timer()
+function forward_references.timer()
+	-- we use only one-off timers but IDs can be reused elsewhere
+	rz_event_id = nil
 	worker.bg_worker.cq:wrap(fill_cache)
 end
 
@@ -178,7 +181,7 @@ function prefill.config(config)
 
 	-- ability to change intervals
 	prefill.deinit()
-	rz_event_id = event.after(0, timer)
+	rz_event_id = event.after(0, forward_references.timer)
 end
 
 return prefill
