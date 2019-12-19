@@ -19,8 +19,6 @@
 #include "daemon/worker.h"
 #include "daemon/zimport.h"
 
-#include <unistd.h>
-
 /** @internal return cache, or throw lua error if not open */
 struct kr_cache * cache_assert_open(lua_State *L)
 {
@@ -209,10 +207,7 @@ static int cache_open(lua_State *L)
 	int ret = kr_cache_open(&engine->resolver.cache, api, &opts, engine->pool);
 	if (ret != 0) {
 		char cwd[PATH_MAX];
-		if(getcwd(cwd, sizeof(cwd)) == NULL) {
-			const char errprefix[] = "<invalid working directory>";
-			strncpy(cwd, errprefix, sizeof(cwd));
-		}
+		get_workdir(cwd, sizeof(cwd));
 		return luaL_error(L, "can't open cache path '%s'; working directory '%s'", opts.path, cwd);
 	}
 
