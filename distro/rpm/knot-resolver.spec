@@ -65,6 +65,7 @@ BuildRequires:  pkgconfig(lmdb)
 BuildRequires:  python3-sphinx
 Requires:       lua5.1-basexx
 Requires:       lua5.1-cqueues
+Requires:       lua5.1-http
 Recommends:     lua5.1-psl
 Requires:       lua-filesystem-compat
 Requires(pre):  shadow-utils

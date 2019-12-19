@@ -81,6 +81,7 @@ Depends:
  libjs-d3,
  libjs-jquery,
  lua-cqueues (>= 20171014),
+ lua-http,
  lua-mmdb,
  systemd,
  ${misc:Depends},

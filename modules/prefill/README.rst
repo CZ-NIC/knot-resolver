@@ -36,6 +36,7 @@ Only root zone import is supported at the moment.
 Dependencies
 ^^^^^^^^^^^^
 
-Depends on the prefill-lua-http_ library.
+Depends on the prefill-lua-http_ and luafilesystem_ libraries.
 
 .. _prefill-lua-http: https://luarocks.org/modules/daurnimator/http
+.. _luafilesystem: https://keplerproject.github.io/luafilesystem/
