@@ -16,50 +16,6 @@ local rz_interval_min = 3600
 local prefill = {
 }
 
-
--- Fetch over HTTPS
-local function https_fetch(url, ca_file, fname)
-	local http_ok, http_request = pcall(require, 'http.request')
-	local openssl_ok, openssl_ctx = pcall(require, 'openssl.ssl.context')
-
-	if not http_ok or not openssl_ok then
-		return nil, 'lua-http and luaossl needed for root TA bootstrap'
-	end
-
-	assert(string.match(url, '^https://'))
-	assert(ca_file)
-
-	local req = http_request.new_from_uri(url)
-	req.ctx = openssl_ctx.new()
-	local store = req.ctx:getStore()
-	store:add(ca_file)
-
-	req.ctx:setVerify(openssl_ctx.VERIFY_PEER)
-	req.tls = true
-
-	local headers, stream = req:go()
-	assert(headers, 'HTTP client library error')
-	if headers:get(':status') ~= "200" then
-		return nil, headers:get(':status')
-	end
-
-	local file, errmsg = io.open(fname, 'w')
-	if not file then
-		error(string.format("[prefill] unable to open file %s (%s)",
-			fname, errmsg))
-	end
-
-	local err
-	err, errmsg = stream:save_body_to_file(file)
-	if err == nil then
-		return err, errmsg
-	end
-
-	file:close()
-
-	return file
-end
-
 local function display_delay(time)
 	local days = math.floor(time / 86400)
 	local hours = math.floor((time % 86400) / 3600)
@@ -90,11 +46,21 @@ local function get_file_ttl(fname)
 end
 
 local function download(url, fname)
-	log("[prefill] downloading root zone to file %s ...", fname)
-	local rzone, err = https_fetch(url, rz_ca_file, fname)
-	if rzone == nil then
-		error(string.format("[prefill] fetch of `%s` failed: %s", url, err))
+	local kluautil = pcall(require, 'kluautil')
+	local file, rcode, errmsg
+	file, errmsg = io.open(fname, 'w')
+	if not file then
+		error(string.format("[prefill] unable to open file %s (%s)",
+			fname, errmsg))
 	end
+
+	log("[prefill] downloading root zone to file %s ...", fname)
+	rcode, errmsg = kluautil.kr_https_fetch(url, rz_ca_file, file)
+	if rcode == nil then
+		error(string.format("[prefill] fetch of `%s` failed: %s", url, errmsg))
+	end
+
+	file:close()
 end
 
 local function import(fname)
