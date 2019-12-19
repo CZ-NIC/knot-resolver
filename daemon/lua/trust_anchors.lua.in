@@ -118,7 +118,7 @@ end
 -- Fetch root anchors in XML over HTTPS, returning a zone-file-style string
 -- or false in case of error, and a message.
 local function bootstrap(url, ca)
-	local kluautil = pcall(require, 'kluautil')
+	local kluautil = require('kluautil')
 	local file = io.tmpfile()
 	-- RFC 7958, sec. 2, but we don't do precise XML parsing.
 	-- @todo ICANN certificate is verified against current CA

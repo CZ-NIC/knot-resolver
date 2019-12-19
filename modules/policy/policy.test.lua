@@ -104,8 +104,9 @@ local function mirror_parser(srv, cv, nqueries)
 end
 
 local function test_mirror()
-	local socket = require("cqueues.socket")
-	local cond = require("cqueues.condition")
+	local kluautil = require('kluautil')
+	local socket = require('cqueues.socket')
+	local cond = require('cqueues.condition')
 	local cv = cond.new()
 	local queries = {}
 	local srv = socket.listen({
@@ -121,7 +122,7 @@ local function test_mirror()
 
 	-- UDP server for test
 	worker.bg_worker.cq:wrap(function()
-		local err, msg = mirror_parser(srv, cv, kr_table_len(queries))
+		local err, msg = mirror_parser(srv, cv, kluautil.kr_table_len(queries))
 
 		ok(err, msg)
 	end)
