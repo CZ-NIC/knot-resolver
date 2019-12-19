@@ -66,9 +66,6 @@ const size_t CLEANUP_TIMER = 5*60*1000;
 /* Execute byte code */
 #define l_dobytecode(L, arr, len, name) \
 	(luaL_loadbuffer((L), (arr), (len), (name)) || lua_pcall((L), 0, LUA_MULTRET, 0))
-/** Load file in a sandbox environment. */
-#define l_dosandboxfile(L, filename) \
-	(luaL_loadfile((L), (filename)) || engine_pcall((L), 0))
 
 /*
  * Global bindings.
@@ -698,7 +695,7 @@ int engine_ipc(struct engine *engine, const char *expr)
 int engine_load_sandbox(struct engine *engine)
 {
 	/* Init environment */
-	int ret = l_dosandboxfile(engine->L, LIBDIR "/sandbox.lua");
+	int ret = luaL_dofile(engine->L, LIBDIR "/sandbox.lua");
 	if (ret != 0) {
 		fprintf(stderr, "[system] error %s\n", lua_tostring(engine->L, -1));
 		lua_pop(engine->L, 1);
@@ -711,20 +708,15 @@ int engine_load_sandbox(struct engine *engine)
 int engine_loadconf(struct engine *engine, const char *config_path)
 {
 	assert(config_path != NULL);
-	int ret = l_dosandboxfile(engine->L, config_path);
-	if (ret != 0) {
-		fprintf(stderr, "%s\n", lua_tostring(engine->L, -1));
-		lua_pop(engine->L, 1);
-	}
-	return ret;
-}
 
-int engine_load_defaults(struct engine *engine)
-{
-	/* Load defaults */
-	int ret = l_dosandboxfile(engine->L, LIBDIR "/config.lua");
+	char cwd[PATH_MAX];
+	get_workdir(cwd, sizeof(cwd));
+	kr_log_verbose("[system] loading config '%s' (workdir '%s')\n", config_path, cwd);
+
+	int ret = luaL_dofile(engine->L, config_path);
 	if (ret != 0) {
-		fprintf(stderr, "%s\n", lua_tostring(engine->L, -1));
+		fprintf(stderr, "[system] error while loading config: "
+			"%s (workdir '%s')\n", lua_tostring(engine->L, -1), cwd);
 		lua_pop(engine->L, 1);
 	}
 	return ret;

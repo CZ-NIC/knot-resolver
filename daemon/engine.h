@@ -57,7 +57,6 @@ int engine_ipc(struct engine *engine, const char *expr);
 
 int engine_load_sandbox(struct engine *engine);
 int engine_loadconf(struct engine *engine, const char *config_path);
-int engine_load_defaults(struct engine *engine);
 
 /** Start the lua engine and execute the config. */
 int engine_start(struct engine *engine);
