@@ -39,9 +39,8 @@ The module supports sending data to multiple servers at once.
 Dependencies
 ^^^^^^^^^^^^
 
-* `luasocket <http://w3.impa.br/~diego/software/luasocket/>`_ available in LuaRocks
+* `lua cqueues <https://25thandclement.com/~william/projects/cqueues.html>`_ package.
 
-    ``$ luarocks install luasocket``
 
 .. _Graphite: https://graphite.readthedocs.io/en/latest/feeding-carbon.html
 .. _InfluxDB: https://influxdb.com/

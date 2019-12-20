@@ -1,5 +1,3 @@
-local https = require('ssl.https')
-local ltn12 = require('ltn12')
 local ffi = require('ffi')
 
 local rz_url = "https://www.internic.net/domain/root.zone"
@@ -15,41 +13,26 @@ local rz_interval_randomizator_limit = 10
 local rz_interval_threshold = 5
 local rz_interval_min = 3600
 
-local prefill = {
-}
+local prefill = {}
 
+-- hack for circular depedency between timer() and fill_cache()
+local forward_references = {}
 
--- Fetch over HTTPS with peert cert checked
-local function https_fetch(url, ca_file)
-	assert(string.match(url, '^https://'))
-	assert(ca_file)
-
-	local resp = {}
-	local r, c = https.request{
-	       url = url,
-	       verify = {'peer', 'fail_if_no_peer_cert' },
-	       cafile = ca_file,
-	       protocol = 'tlsv1_2',
-	       sink = ltn12.sink.table(resp),
-	}
-	if r == nil then
-		return r, c
+local function stop_timer()
+	if rz_event_id then
+		event.cancel(rz_event_id)
+		rz_event_id = nil
 	end
-	return resp, "[prefill] "..url.." downloaded"
 end
 
--- Write zone to a file
-local function zone_write(zone, fname)
-	local file, errmsg = io.open(fname, 'w')
-	if not file then
-		error(string.format("[prefill] unable to open file %s (%s)",
-			fname, errmsg))
-	end
-	for i = 1, #zone do
-		local zone_chunk = zone[i]
-		file:write(zone_chunk)
-	end
-	file:close()
+local function timer()
+	stop_timer()
+	worker.bg_worker.cq:wrap(forward_references.fill_cache)
+end
+
+local function restart_timer(after)
+	stop_timer()
+	rz_event_id = event.after(after * sec, timer)
 end
 
 local function display_delay(time)
@@ -85,14 +68,21 @@ local function get_file_ttl(fname)
 end
 
 local function download(url, fname)
-	log("[prefill] downloading root zone...")
-	local rzone, err = https_fetch(url, rz_ca_file)
-	if rzone == nil then
-		error(string.format("[prefill] fetch of `%s` failed: %s", url, err))
+	local kluautil = require('kluautil')
+	local file, rcode, errmsg
+	file, errmsg = io.open(fname, 'w')
+	if not file then
+		error(string.format("[prefill] unable to open file %s (%s)",
+			fname, errmsg))
 	end
 
-	log("[prefill] saving root zone...")
-	zone_write(rzone, fname)
+	log("[prefill] downloading root zone to file %s ...", fname)
+	rcode, errmsg = kluautil.kr_https_fetch(url, rz_ca_file, file)
+	if rcode == nil then
+		error(string.format("[prefill] fetch of `%s` failed: %s", url, errmsg))
+	end
+
+	file:close()
 end
 
 local function import(fname)
@@ -106,7 +96,7 @@ local function import(fname)
 	end
 end
 
-local function timer()
+function forward_references.fill_cache()
 	local file_ttl = get_file_ttl(rz_local_fname)
 
 	if file_ttl > rz_interval_threshold then
@@ -120,7 +110,7 @@ local function timer()
 			log("[prefill] cannot download new zone (%s), "
 				.. "will retry root zone download in %s",
 				errmsg, display_delay(rz_cur_interval))
-			event.reschedule(rz_event_id, rz_cur_interval * sec)
+			restart_timer(rz_cur_interval)
 			return
 		end
 		file_ttl = rz_default_interval
@@ -140,7 +130,7 @@ local function timer()
 		log("[prefill] root zone refresh in %s",
 			display_delay(rz_cur_interval))
 	end
-	event.reschedule(rz_event_id, rz_cur_interval * sec)
+	restart_timer(rz_cur_interval)
 end
 
 function prefill.init()
@@ -148,10 +138,7 @@ function prefill.init()
 end
 
 function prefill.deinit()
-	if rz_event_id then
-		event.cancel(rz_event_id)
-		rz_event_id = nil
-	end
+	stop_timer()
 end
 
 -- process one item from configuration table
@@ -204,9 +191,7 @@ function prefill.config(config)
 			.. 'for root zone')
 	end
 
-	-- ability to change intervals
-	prefill.deinit()
-	rz_event_id = event.after(0, timer)
+	restart_timer(0)  -- start now
 end
 
 return prefill
