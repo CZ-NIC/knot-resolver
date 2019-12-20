@@ -166,7 +166,7 @@ file, otherwise the socket won't work.
 If you don't use systemd with sockets to run kresd, addresses and ports to listen
 on are configured in the config file.
 
-.. function:: net.listen(addresses, [port = 53, { kind = 'dns' }])
+.. function:: net.listen(addresses, [port = 53, { kind = 'dns', freebind = false }])
 
    :return: boolean
 
@@ -175,6 +175,7 @@ on are configured in the config file.
    The command can be given multiple times,
    but repeating an address-port combination is an error.
    Port 853 implies ``kind = 'tls'`` but it is always better to be explicit.
+   Freebind allows binding to a non-local or not yet available address.
 
 .. csv-table::
   :header: "**Network protocol**", "**Configuration command**"
@@ -192,6 +193,7 @@ Examples:
 	net.listen('::1')
 	net.listen(net.lo, 53)
 	net.listen(net.eth0, 853, { kind = 'tls' })
+	net.listen('192.0.2.1', 53, { freebind = true })
 	net.listen('::', 443, { kind = 'doh' }) -- see http module
 	net.listen('::', 8453, { kind = 'webmgmt' }) -- see http module
 	net.listen('/tmp/kresd-socket', nil, { kind = 'webmgmt' }) -- http module supports AF_UNIX
