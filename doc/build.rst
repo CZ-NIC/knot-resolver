@@ -44,8 +44,7 @@ Resolver:
    :header: "Optional", "Needed for", "Notes"
 
    "`lua-http`_", "``modules/http``", "HTTP/2 client/server for Lua."
-   "luasocket_", "``trust anchors, modules/stats``", "Sockets for Lua."
-   "luasec_", "``trust anchors``", "TLS for Lua."
+   "`lua-cqueues`_", "``modules/graphite``", "Send statistics over the Graphite protocol."
    "cmocka_", "``unit tests``", "Unit testing framework."
    "Doxygen_", "``documentation``", "Generating API documentation."
    "Sphinx_ and sphinx_rtd_theme_", "``documentation``", "Building this
@@ -298,9 +297,8 @@ For development, it's possible to build the container directly from your git tre
 .. _pkg-config: https://www.freedesktop.org/wiki/Software/pkg-config/
 .. _libknot: https://gitlab.labs.nic.cz/knot/knot-dns
 .. _cmocka: https://cmocka.org/
-.. _luasec: https://luarocks.org/modules/brunoos/luasec
-.. _luasocket: https://luarocks.org/modules/luarocks/luasocket
 .. _lua-http: https://luarocks.org/modules/daurnimator/http
+.. _lua-cqueues: https://25thandclement.com/~william/projects/cqueues.html
 .. _boot2docker: http://boot2docker.io/
 .. _deckard: https://gitlab.labs.nic.cz/knot/deckard
 .. _libsystemd: https://www.freedesktop.org/wiki/Software/systemd/
