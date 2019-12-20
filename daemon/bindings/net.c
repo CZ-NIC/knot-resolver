@@ -44,6 +44,9 @@ static int net_list_add(const char *key, void *val, void *ext)
 
 		lua_newtable(L);  // "transport" table
 
+		lua_pushboolean(L, ep->flags.freebind);
+		lua_setfield(L, -2, "freebind");
+
 		switch (ep->family) {
 		case AF_INET:
 			lua_pushliteral(L, "inet4");
@@ -107,7 +110,7 @@ static int net_list(lua_State *L)
 /** Listen on an address list represented by the top of lua stack.
  * \note kind ownership is not transferred
  * \return success */
-static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind)
+static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind, bool freebind)
 {
 	/* Case: table with 'addr' field; only follow that field directly. */
 	lua_getfield(L, -1, "addr");
@@ -122,7 +125,7 @@ static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind)
 	if (str != NULL) {
 		struct engine *engine = engine_luaget(L);
 		int ret = 0;
-		endpoint_flags_t flags = { .tls = tls };
+		endpoint_flags_t flags = { .tls = tls, .freebind = freebind };
 		if (!kind && !flags.tls) { /* normal UDP */
 			flags.sock_type = SOCK_DGRAM;
 			ret = network_listen(&engine->net, str, port, flags);
@@ -149,7 +152,7 @@ static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind)
 		lua_error_p(L, "bad type for address");
 	lua_pushnil(L);
 	while (lua_next(L, -2)) {
-		if (!net_listen_addrs(L, port, tls, kind))
+		if (!net_listen_addrs(L, port, tls, kind, freebind))
 			return false;
 		lua_pop(L, 1);
 	}
@@ -189,11 +192,13 @@ static int net_listen(lua_State *L)
 	}
 
 	bool tls = (port == KR_DNS_TLS_PORT);
+	bool freebind = false;
 	const char *kind = NULL;
 	if (n > 2 && !lua_isnil(L, 3)) {
 		if (!lua_istable(L, 3))
 			lua_error_p(L, "wrong type of third parameter (table expected)");
 		tls = table_get_flag(L, 3, "tls", tls);
+		freebind = table_get_flag(L, 3, "freebind", tls);
 
 		lua_getfield(L, 3, "kind");
 		const char *k = lua_tostring(L, -1);
@@ -219,8 +224,9 @@ static int net_listen(lua_State *L)
 
 	/* Now focus on the first argument. */
 	lua_settop(L, 1);
-	const bool res = net_listen_addrs(L, port, tls, kind);
-	lua_pushboolean(L, res);
+	if (!net_listen_addrs(L, port, tls, kind, freebind))
+		lua_error_p(L, "net.listen() failed to bind");
+	lua_pushboolean(L, true);
 	return 1;
 }
 

@@ -384,6 +384,7 @@ typedef struct {
 	int sock_type;
 	_Bool tls;
 	const char *kind;
+	_Bool freebind;
 } endpoint_flags_t;
 struct endpoint {
 	void *handle;

@@ -33,6 +33,7 @@ typedef struct {
 	int sock_type;    /**< SOCK_DGRAM or SOCK_STREAM */
 	bool tls;         /**< only used together with .kind == NULL and .tcp */
 	const char *kind; /**< tag for other types than the three usual */
+	bool freebind;    /**< used for binding to non-local address **/
 } endpoint_flags_t;
 
 static inline bool endpoint_flags_eq(endpoint_flags_t f1, endpoint_flags_t f2)
