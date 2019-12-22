@@ -572,7 +572,7 @@ int main(int argc, char **argv)
 				strerror(errno));
 	} else if (rlim.rlim_cur < 512*1024) {
 		kr_log_info("[system] warning: hard limit for number of file-descriptors is only %ld but recommended value is 524288\n",
-				rlim.rlim_cur);
+				(long)rlim.rlim_cur);
 	}
 
 	/* Connect forks with local socket */
