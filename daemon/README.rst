@@ -151,6 +151,8 @@ to download cache from parent, to avoid cold-cache start.
                 cache.open(cache_size, 'lmdb://' .. cache_path)
 	end
 
+.. _async-events:
+
 Asynchronous events
 ^^^^^^^^^^^^^^^^^^^
 

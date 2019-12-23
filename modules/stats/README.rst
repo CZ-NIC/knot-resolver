@@ -9,6 +9,8 @@ in new ones.
 
 .. code-block:: none
 
+        modules.load('stats')
+
 	-- Enumerate metrics
 	> stats.list()
 	[answer.cached] => 486178
