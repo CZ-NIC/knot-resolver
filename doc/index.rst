@@ -7,11 +7,17 @@ Modular architecture keeps the core tiny and efficient,
 and it provides a state-machine like API for extensions.
 
 .. toctree::
+   :caption: Quick Start
+   :name: quickstart
+   :maxdepth: 2
+
+   startguide
+
+.. toctree::
    :caption: Users
    :name: users
    :maxdepth: 2
 
-   quickref
    daemon
    modules
 
