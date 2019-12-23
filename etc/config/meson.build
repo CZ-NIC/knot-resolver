@@ -25,6 +25,8 @@ example_configs = [
   'config.cluster',
   'config.docker',
   'config.isp',
+  'config.internal',
+  'config.privacy',
   'config.personal',
   'config.splitview',
 ]
