@@ -7,11 +7,13 @@ local rz_event_id = nil
 
 local rz_default_interval = 86400
 local rz_https_fail_interval = 600
-local rz_no_ta_interval = 600
+local rz_import_error_interval = 600
 local rz_cur_interval = rz_default_interval
 local rz_interval_randomizator_limit = 10
 local rz_interval_threshold = 5
 local rz_interval_min = 3600
+
+local rz_first_try = true
 
 local prefill = {}
 
@@ -120,8 +122,13 @@ function forward_references.fill_cache()
 	-- import/filter function gets executed after resolver/module
 	local ok, errmsg = pcall(import, rz_local_fname)
 	if not ok then
-		rz_cur_interval = rz_no_ta_interval
-					- math.random(rz_interval_randomizator_limit)
+		if rz_first_try then
+			rz_first_try = false
+			rz_cur_interval = 1
+		else
+			rz_cur_interval = rz_import_error_interval
+				- math.random(rz_interval_randomizator_limit)
+		end
 		log("[prefill] root zone import failed (%s), retry in %s",
 			errmsg, display_delay(rz_cur_interval))
 	else
