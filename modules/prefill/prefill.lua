@@ -111,6 +111,7 @@ function forward_references.fill_cache()
 				.. "will retry root zone download in %s",
 				errmsg, display_delay(rz_cur_interval))
 			restart_timer(rz_cur_interval)
+			os.remove(rz_local_fname)
 			return
 		end
 		file_ttl = rz_default_interval
