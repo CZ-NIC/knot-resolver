@@ -1,3 +1,4 @@
+local cqerrno = require('cqueues.errno')
 local kluautil = {}
 
 -- Get length of table
@@ -39,6 +40,10 @@ function kluautil.kr_https_fetch(url, out_file, ca_file)
 	local headers, stream, errmsg = req:go()
 	if not headers then
 		errmsg = errmsg or 'unknown error'
+		if type(errmsg) == 'number' then
+			errmsg = cqerrno.strerror(errmsg) ..
+				' (' .. tostring(errmsg) .. ')'
+		end
 		return nil, 'HTTP client library error: ' .. errmsg
 	end
 	if headers:get(':status') ~= "200" then
