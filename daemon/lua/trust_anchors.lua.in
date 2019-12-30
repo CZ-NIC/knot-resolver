@@ -124,7 +124,7 @@ local function bootstrap(url, ca)
 	-- @todo ICANN certificate is verified against current CA
 	--       this is not ideal, as it should rather verify .xml signature which
 	--       is signed by ICANN long-lived cert, but luasec has no PKCS7
-	local rcode, errmsg = kluautil.kr_https_fetch(url, ca, file)
+	local rcode, errmsg = kluautil.kr_https_fetch(url, file, ca)
 	if rcode == nil then
 		file:close()
 		return false, string.format('[ ta ] fetch of "%s" failed: %s', url, errmsg)
