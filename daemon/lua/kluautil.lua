@@ -29,15 +29,19 @@ function kluautil.kr_https_fetch(url, ca_file, file)
 	req.ctx:setVerify(openssl_ctx.VERIFY_PEER)
 	req.tls = true
 
-	local headers, stream = req:go()
-	assert(headers, 'HTTP client library error')
+	local headers, stream, errmsg = req:go()
+	if not headers then
+		errmsg = errmsg or 'unknown error'
+		return nil, 'HTTP client library error: ' .. errmsg
+	end
 	if headers:get(':status') ~= "200" then
-		return nil, headers:get(':status')
+		return nil, 'HTTP status != 200, got ' .. headers:get(':status')
 	end
 
-	local err, errmsg = stream:save_body_to_file(file)
+	local err
+	err, errmsg = stream:save_body_to_file(file)
 	if err == nil then
-		return err, errmsg
+		return nil, errmsg
 	end
 
 	file:seek ("set", 0)
