@@ -77,7 +77,7 @@ local function download(url, fname)
 	end
 
 	log("[prefill] downloading root zone to file %s ...", fname)
-	rcode, errmsg = kluautil.kr_https_fetch(url, rz_ca_file, file)
+	rcode, errmsg = kluautil.kr_https_fetch(url, file, rz_ca_file)
 	if rcode == nil then
 		error(string.format("[prefill] fetch of `%s` failed: %s", url, errmsg))
 	end
@@ -156,10 +156,6 @@ local function config_zone(zone_cfg)
 		rz_cur_interval = zone_cfg.interval
 	end
 
-	if not zone_cfg.ca_file then
-		error('[prefill] option ca_file must point '
-			.. 'to a file with CA certificate(s) in PEM format')
-	end
 	rz_ca_file = zone_cfg.ca_file
 
 	if not zone_cfg.url or not string.match(zone_cfg.url, '^https://') then
