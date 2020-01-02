@@ -3,10 +3,11 @@
 #include <string.h>
 #include <sysrepo.h>
 
-#include "conversion.h"
 #include "daemon/worker.h"
 #include "utils/common/string_helper.h"
 #include "utils/common/sysrepo_conf.h"
+
+set_leaf_conf_t set_leaf_conf = NULL;
 
 int conf_set_current(sr_session_ctx_t *session, const char *module_name)
 {

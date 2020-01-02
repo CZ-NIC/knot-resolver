@@ -158,13 +158,8 @@ local function type_to_str(tp)
     end
 end
 
-local sr_val_t_table = {
-  -- conversion from ctype to table is done by calling the object because it does not
-  -- require any imports of modules and the function can be simply placed in this file
-  --
-  -- it definitely not the best solution, but for now it works :/
-  -- FIXME
-  __call = function(val)
+--- Converts from cdata sr_val_t to table (using table is slower, but safer)
+local function sr_val_to_table(val)
     local tbl = {
         dflt = val.dflt,
         xpath = ffi.string(val.xpath),
@@ -174,7 +169,7 @@ local sr_val_t_table = {
     setmetatable(tbl, {
         __tostring = function(slf)
             return string.format(
-                "{ xpath = '%s', type = '%s', dflt = '%s', data = '%s'}",
+                "{\n\txpath = '%s',\n\ttype = '%s',\n\tdflt = '%s',\n\tdata = '%s'\n}",
                 slf.xpath,
                 slf.type,
                 tostring(slf.dflt),
@@ -183,7 +178,46 @@ local sr_val_t_table = {
         end
     })
     return tbl
-  end
-}
+end
 
-ffi.metatype("sr_val_t", sr_val_t_table)
+-- FIXME remove absolute path
+local clib = ffi.load("/tmp/kr/lib/knot-resolver/kres_modules/sysrepo_clib.so")
+ffi.cdef[[
+typedef void (*set_leaf_conf_t)(sr_val_t *val);
+int sysrepo_init(set_leaf_conf_t set_leaf_conf_cb);
+int sysrepo_deinit(void);
+]]
+
+local callbacks = {}
+local function create_callback(ctype ,func)
+    assert(type(ctype) == "string")
+    assert(type(func) == "function")
+
+    local cb = ffi.cast(ctype, func)
+    table.insert(callbacks, cb)
+    return cb
+end
+
+local function free_callbacks()
+    for _, cb in ipairs(callbacks) do
+        cb:free()
+    end
+end
+
+return {
+    init = function(apply_conf_func)
+        local cb = create_callback("set_leaf_conf_t", apply_conf_func)
+        local res = clib.sysrepo_init(cb)
+        if res ~= 0 then
+            error("Deinitialization failed with error code " .. tostring(res))
+        end
+    end,
+    deinit = function()
+        local res = clib.sysrepo_deinit()
+        free_callbacks()
+        if res ~= 0 then
+            error("Deinitialization failed with error code " .. tostring(res))
+        end
+    end,
+    sr_val_to_table = sr_val_to_table
+}

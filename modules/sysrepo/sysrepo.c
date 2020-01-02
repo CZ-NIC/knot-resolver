@@ -40,6 +40,8 @@ struct el_subscription_ctx {
 	uv_poll_t uv_handle;
 };
 
+static el_subscription_ctx_t *el_subscription_ctx = NULL;
+
 void el_subscr_finish_closing(uv_handle_t *handle)
 {
 	el_subscription_ctx_t *el_subscr = handle->data;
@@ -101,9 +103,10 @@ static void el_subscr_cb(el_subscription_ctx_t *el_subscr, int status)
 }
 
 KR_EXPORT
-int sysrepo_init(struct kr_module *module)
-{
-	// TODO code validation
+int sysrepo_init(set_leaf_conf_t set_leaf_conf_cb)
+{	
+	// store callback to Lua
+	set_leaf_conf = set_leaf_conf_cb;
 
 	int sr_err = SR_ERR_OK;
 	sr_conn_ctx_t *sr_connection = NULL;
@@ -144,11 +147,10 @@ int sysrepo_init(struct kr_module *module)
 	/* additional sysrepo subscriptions will be here */
 
 	/* add subscriptions to kres event loop */
-	el_subscription_ctx_t *el_subscr =
+	el_subscription_ctx =
 		el_subscription_new(sr_subscription, el_subscr_cb);
-	el_subscr->connection = sr_connection;
-	el_subscr->session = sr_session;
-	module->data = el_subscr;
+	el_subscription_ctx->connection = sr_connection;
+	el_subscription_ctx->session = sr_session;
 
 	return kr_ok();
 
@@ -159,11 +161,9 @@ cleanup:
 }
 
 KR_EXPORT
-int sysrepo_deinit(struct kr_module *module)
+int sysrepo_deinit()
 {
-	el_subscription_ctx_t *el_subscr = module->data;
-	el_subscription_free(el_subscr);
+	set_leaf_conf = NULL; // remove reference to Lua callback
+	el_subscription_free(el_subscription_ctx);
 	return kr_ok();
 }
-
-KR_MODULE_EXPORT(sysrepo)
