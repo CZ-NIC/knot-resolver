@@ -32,7 +32,6 @@ and it provides a state-machine like API for extensions.
    :name: experts
    :maxdepth: 2
 
-   build
    operators-guide
 
 .. toctree::
@@ -40,8 +39,10 @@ and it provides a state-machine like API for extensions.
    :name: developers
    :maxdepth: 2
 
+   build
    lib
    modules_api
+   worker_api
 
 
 Indices and tables
