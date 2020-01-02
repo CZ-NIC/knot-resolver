@@ -2,6 +2,7 @@
 #include <string.h>
 #include "string_helper.h"
 
+/// Source: https://stackoverflow.com/questions/47116974/remove-a-substring-from-a-string-in-c
 char *remove_substr(char *str, const char *substr) {
     char *p, *q, *r;
     if ((q = r = strstr(str, substr)) != NULL) {

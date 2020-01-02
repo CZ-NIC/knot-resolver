@@ -1,15 +1,5 @@
 #pragma once
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <lua.h>
 #include <sysrepo.h>
 
-
-typedef struct conv_struct conv_struct_t;
-
-struct conv_struct {
-    char *xpath;
-};
-
-int conf_cache(sr_val_t *value);
+sr_error_t set_leaf_conf(sr_val_t *val);

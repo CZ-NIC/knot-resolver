@@ -6,6 +6,11 @@ sysrepo_src = files([
   'conversion.c',
 ])
 
+lua_mod_src += [
+  files('sysrepo_conf_applicator.lua'),
+  files('sysrepo_ffi.lua'),
+]
+
 build_sysrepo = false
 if get_option('sysrepo') != 'disabled'
   sysrepo_required = get_option('sysrepo') == 'enabled'
