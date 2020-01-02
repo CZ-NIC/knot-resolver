@@ -14,25 +14,25 @@ and it provides a state-machine like API for extensions.
    startguide
 
 .. toctree::
-   :caption: Users
+   :caption: Configuration
    :name: users
    :maxdepth: 2
 
+   config
    daemon
    modules
 
+
+.. _operation:
+
 .. toctree::
+   :caption: Operation
    :maxdepth: 1
 
+   performance
+   monitoring
    upgrading
    NEWS
-
-.. toctree::
-   :caption: Experts
-   :name: experts
-   :maxdepth: 2
-
-   operators-guide
 
 .. toctree::
    :caption: Developers
