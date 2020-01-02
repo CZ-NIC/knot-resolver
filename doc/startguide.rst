@@ -68,13 +68,6 @@ Add the `OBS <https://en.opensuse.org/Portal:Build_Service>`_ package repository
 Startup
 *******
 
-Knot Resolver can run in multiple independent instances (processes), where each `single instance`_ of Knot Resolver will utilize at most single CPU core on your machine. If your machine handles a lot of DNS traffic, run `multiple instances`_.
-
-Advantage of using multiple instances is that a problem in a single instance will not affect others, so a single instance crash will not bring whole DNS resolver service down.
-
-Single instance
-===============
-
 The simplest way to run single instance of
 Knot Resolver is to use provided Knot Resolver's Systemd integration:
 
@@ -89,30 +82,8 @@ See logs and status of running instance with ``systemctl status kresd@1.service`
     ``kresd@*.service`` is not enabled by default, thus Knot Resolver won't start automatically after reboot.
     To start and enable service in one command use ``systemctl enable --now kresd@1.service``
 
-
-Multiple instances
-==================
-
-Knot Resolver can run in multiple independent processes, all sharing the same configuration and cache. Incomming queries will be distributed among all instances automatically.
-
-To use up all resources, for instance of 4 CPUs system, the best way is to run four instances at a time.
-
-.. code-block:: bash
-
-    $ sudo systemctl start kresd@1.service
-    $ sudo systemctl start kresd@2.service
-    $ sudo systemctl start kresd@3.service
-    $ sudo systemctl start kresd@4.service
-
-or simpler way
-
-.. code-block:: bash
-
-    $ sudo systemctl start kresd@{1..4}.service
-
-
-Testing
-=======
+First DNS query
+===============
 After installation and first startup, Knot Resolver's default configuration accepts queries on loopback interface. This allows you to test that the installation and service startup were successful before continuing with configuration.
 
 For instance, you can use DNS lookup utility ``kdig`` to send DNS queries. The ``kdig`` command is provided by following packages:
@@ -187,61 +158,6 @@ The following configuration instructs Knot Resolver to receive standard unencryp
     Knot Resolver could answer from different IP addresses if the network address ranges
     overlap, and clients would refuse such a response.
 
-Cache configuration
-===================
-
-Sizing
-^^^^^^
-
-For personal use-cases and small deployments cache size around 100 MB is more than enough.
-
-For large deployments we recommend to run Knot Resolver on a dedicated machine, and to allocate 90% of machine's free memory for resolver's cache.
-
-For example, imagine you have a machine with 16 GB of memory.
-After machine restart you use command ``free -m`` to determine amount of free memory (without swap):
-
-.. code-block:: bash
-
-  $ free -m
-                total        used        free
-  Mem:          15907         979       14928
-
-Now you can configure cache size to be 90% of the free memory 14 928 MB, i.e. 13 453 MB:
-
-.. code-block:: lua
-
-   -- 90 % of free memory after machine restart
-   cache.size = 13453 * MB
-
-.. _quick-cache_persistence:
-
-Cache persistence
-^^^^^^^^^^^^^^^^^
-By default the cache is saved on a persistent storage device
-so the content of the cache is persisted during system reboot.
-This usually leads to smaller latency after restart etc.,
-however in certain situations a non-persistent cache storage might be preferred, e.g.:
-
-  - Resolver handles high volume of queries and I/O performance to disk is too low.
-  - Threat model includes attacker getting access to disk content in power-off state.
-  - Disk has limited number of writes (e.g. flash memory in routers).
-
-If non-persistent cache is desired configure cache directory to be on
-tmpfs_ filesystem, a temporary in-memory file storage.
-The cache content will be saved in memory, and thus have faster access
-and will be lost on power-off or reboot.
-
-In most of the Unix-like systems ``/tmp`` and ``/var/run`` are commonly mounted to *tmpfs*.
-This allows us to move cache e.g. to directory ``/tmp/knot-resolver``:
-
-.. code-block:: lua
-
-   -- do not forget the lmdb:// prefix before absolute path
-   cache.storage = 'lmdb:///tmp/knot-resolver'
-
-If the temporary directory doesn't exist it will be created automatically with access only
-for ``knot-resolver`` user and group.
-
 
 Scenario: Internal Resolver
 ===========================
@@ -309,10 +225,6 @@ signed by a trusted CA. Once the certificate was obtained a path to certificate 
 
     net.tls("/etc/knot-resolver/server-cert.pem", "/etc/knot-resolver/server-key.pem")
 
-
-Performance tunning
-^^^^^^^^^^^^^^^^^^^
-For very high-volume traffic do not forget to run `multiple instances`_ and consider using :ref:`non-persistent cache storage <quick-cache_persistence>`.
 
 Mandatory domain blocking
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -389,27 +301,13 @@ Knot Resolver's cache contains data clients queried for.
 If you are concerned about attackers who are able to get access to your
 computer system in power-off state and your storage device is not secured by
 encryption you can move the cache to tmpfs_.
-See previous chapter :ref:`quick-cache_persistence`.
+See chapter :ref:`cache_persistence`.
 
 
 **********
-Monitoring
+Next steps
 **********
-
-Statistics for monitoring purposes are available in :ref:`mod-stats` module. If you want to export these statistics to a central system like Graphite, Metronome, InfluxDB or any other compatible storage see :ref:`mod-graphite`. Statistics can also be made available over HTTP protocol in Prometheus format, see module providing :ref:`mod-http`, Prometheus is supported by ``webmgmt`` endpoint.
-
-More extensive logging can be enabled using :ref:`mod-bogus_log` module.
-
-If none of these options fits your deployment or if you have special needs you can configure your own checks and exports using :ref:`async-events`.
-
-.. note::
-
-  Please remember that each Knot Resolver instance keeps its own statistics, and instances can be started and stopped dynamically. This might affect your data postprocessing procedures.
-
-*********
-Upgrading
-*********
-Before upgrade please see :ref:`upgrading` guide for each respective version.
+Congratulations! Your resolver is now up and running and ready for queries. For serious deployments do not forget to read :ref:`operation` chapter.
 
 
 
