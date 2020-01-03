@@ -14,6 +14,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <sys/statvfs.h>
 #include "daemon/bindings/impl.h"
 
 #include "daemon/worker.h"
@@ -172,29 +173,59 @@ static int cache_min_ttl(lua_State *L)
 	return 1;
 }
 
+static unsigned long partition_size(const char *path)
+{
+	int ret;
+	struct statvfs buf;
+
+	if (!path)
+		return 0;
+
+	ret = statvfs(path, &buf);
+	if (ret != 0)
+		return 0;
+
+	return  buf.f_bsize * buf.f_bavail;
+}
+
 /** Open cache */
 static int cache_open(lua_State *L)
 {
 	/* Check parameters */
 	int n = lua_gettop(L);
-	if (n < 1 || !lua_isnumber(L, 1))
+	if (n < 1 || !lua_isstring(L, 1))
 		lua_error_p(L, "expected 'open(number max_size, string config = \"\")'");
 
 	/* Select cache storage backend */
 	struct engine *engine = engine_luaget(L);
-
-	lua_Integer csize_lua = lua_tointeger(L, 1);
-	if (!(csize_lua >= 8192 && csize_lua < SIZE_MAX)) { /* min. is basically arbitrary */
-		lua_error_p(L, "invalid cache size specified, it must be in range <8192, "
-				STR(SIZE_MAX)  ">");
-	}
-	size_t cache_size = csize_lua;
 
 	const char *conf = n > 1 ? lua_tostring(L, 2) : NULL;
 	const char *uri = conf;
 	const struct kr_cdb_api *api = cache_select(engine, &conf);
 	if (!api)
 		lua_error_p(L, "unsupported cache backend");
+
+	/* Set cache size */
+	lua_Integer csize_lua = 0;
+
+	if (lua_isnumber(L, 1)) {
+		csize_lua = lua_tointeger(L, 1);
+	} else {
+		if (!strcmp(lua_tostring(L, 1), "max") || !strcmp(lua_tostring(L, 1), "MAX")) {
+			csize_lua = partition_size(conf);
+		} else {
+			lua_error_p(L, "max_size must be number or string \"max\"");
+		}
+	}
+
+	if (!(csize_lua >= 8192 && csize_lua < SIZE_MAX)) { /* min. is basically arbitrary */
+		lua_error_p(L, "invalid cache size specified, it must be in range <8192, "
+				STR(SIZE_MAX)  ">");
+	}
+	size_t cache_size = csize_lua;
+
+	if (csize_lua > partition_size((conf && strlen(conf)) ? conf : "."))
+		lua_error_p(L, "max_size must be smaller than partition size");
 
 	/* Close if already open */
 	kr_cache_close(&engine->resolver.cache);
