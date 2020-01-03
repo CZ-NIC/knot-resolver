@@ -1,7 +1,7 @@
-Timers and events
-^^^^^^^^^^^^^^^^^
+Timers and events reference
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The timer represents exactly the thing described in the examples - it allows you to execute closures
+The timer represents exactly the thing described in the examples - it allows you to execute closures_
 after specified time, or event recurrent events. Time is always described in milliseconds,
 but there are convenient variables that you can use - ``sec, minute, hour``.
 For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
@@ -112,12 +112,26 @@ The `event` package provides a very basic mean for non-blocking execution - it a
 
    Pause execution of current function (asynchronously if running inside a worker coroutine).
 
-When daemon is running in forked mode, each process acts independently. This is good because it reduces software complexity and allows for runtime scaling, but not ideal because of additional operational burden.
-For example, when you want to add a new policy, you'd need to add it to either put it in the configuration, or execute command on each process independently. The daemon simplifies this by promoting process group leader which is able to execute commands synchronously over forks.
+Example:
 
-   Example:
+.. code-block:: lua
 
-   .. code-block:: lua
+     function async_print(testname, sleep)
+             log(testname .. ': system time before sleep' .. tostring(os.time())
+             worker.sleep(sleep)  -- other corroutines continue execution now
+             log(testname .. ': system time AFTER sleep' .. tostring(os.time())
+     end
 
-      worker.sleep(1)
+     worker.coroutine(function() async_print('call #1', 5) end)
+     worker.coroutine(function() async_print('call #2', 3) end)
+
+Output from this example demonstrates that both calls to function ``async_print`` were executed asynchronously:
+
+
+.. code-block:: none
+
+     call #2: system time before sleep 1578065073
+     call #1: system time before sleep 1578065073
+     call #2: system time AFTER  sleep 1578065076
+     call #1: system time AFTER  sleep 1578065078
 

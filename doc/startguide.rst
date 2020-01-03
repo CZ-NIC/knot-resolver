@@ -64,6 +64,8 @@ package from AUR_.
 Add the `OBS <https://en.opensuse.org/Portal:Build_Service>`_ package repository `home:CZ-NIC:knot-resolver-latest <https://build.opensuse.org/package/show/home:CZ-NIC:knot-resolver-latest/knot-resolver>`_ to your system.
 
 
+.. _startup:
+
 *******
 Startup
 *******
@@ -120,8 +122,7 @@ Configuration
 .. note::
 
    Copy&pasting examples from this manual is sufficient for normal use-cases.
-   Please pay close attention to brackets, especially
-   in more complex configurations like :func:`policy.add` and :func:`view:addr`.
+   Please pay close attention to brackets.
 
    If you want to use full power of configuration language, see article
    `Learn Lua in 15 minutes`_ for a syntax overview.
