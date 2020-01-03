@@ -19,7 +19,6 @@ and it provides a state-machine like API for extensions.
    :maxdepth: 2
 
    config
-   modules
 
 
 .. _operation:
