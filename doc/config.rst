@@ -1,3 +1,41 @@
+.. _config-syntax:
+
+Files and syntax
+================
+
+Configuration file is named ``/etc/knot-resolver/kresd.conf`` and is read when you execute Knot Resolver using systemd commands described in section :ref:`startup`. [#]_
+
+
+The syntax for options is like follows: ``group.option = value`` or ``group.action(parameter1, parameter2)``. You can also comment using a ``--`` prefix.
+
+Following example sets cache size and starts listening for unencrypted and also encrypted DNS queries on IP address 192.0.2.1.
+
+.. code-block:: lua
+
+        cache.size = 10 * MB
+        -- this is a comment: listen for unencrypted queries
+        net.listen('192.0.2.1')
+        -- another comment: listen for queries encrypted using TLS on port 853
+        net.listen('192.0.2.1', 853, { kind = 'tls' })
+
+.. tip:: The configuration and CLI syntax is Lua language which allows great
+   flexibility. Luckily you do not need to learn Lua, copy&pasting examples
+   from this manual is sufficient for normal use-cases. Just pay close
+   attention to brackets.
+
+   If you want to use full power of configuration language see article
+   `Learn Lua in 15 minutes`_ for a syntax overview.
+
+
+.. [#] If you decide to run binary ``/usr/sbin/kresd`` manually (instead of using systemd) do not forget to specify ``-c`` option with path to configuration file, otherwise ``kresd`` will read file named ``config`` from its current working directory.
+
+.. include:: ../daemon/bindings/net.rst
+.. include:: ../daemon/bindings/cache.rst
+.. include:: ../daemon/lua/trust_anchors.rst
+
+.. include:: ../daemon/README.rst
+.. include:: ../daemon/scripting.rst
+
 Multiple instances
 ==================
 

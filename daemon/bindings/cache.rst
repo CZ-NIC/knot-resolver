@@ -1,9 +1,10 @@
-
 Cache configuration
-^^^^^^^^^^^^^^^^^^^
+===================
 
-The default cache in Knot Resolver is persistent with LMDB backend, this means that the daemon doesn't lose
-the cached data on restart or crash to avoid cold-starts. The cache may be reused between cache
+The default cache in Knot Resolver is persistent on disk, which means that the daemon doesn't lose
+the cached data on restart or crash, and thus performace does not suffer from cold-starts.
+
+The cache may be reused between cache
 daemons or manipulated from other processes, making for example synchronized load-balanced recursors possible.
 
 .. function:: cache.open(max_size[, config_uri])
@@ -234,3 +235,5 @@ daemons or manipulated from other processes, making for example synchronized loa
      [subtree] => example.com.
 
 .. [#] This is a consequence of DNSSEC negative cache which relies on proofs of non-existence on various owner nodes. It is impossible to efficiently flush part of DNS zones signed with NSEC3.
+
+.. include:: ../utils/cache_gc/README.rst
