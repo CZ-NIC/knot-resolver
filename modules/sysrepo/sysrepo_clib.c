@@ -1,4 +1,4 @@
-/*  Copyright (C) 2019 CZ.NIC, z.s.p.o. <knot-resolver@labs.nic.cz>
+/*  Copyright (C) 2020 CZ.NIC, z.s.p.o. <knot-resolver@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -14,24 +14,21 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <sysrepo_clib.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sysrepo.h>
 #include <uv.h>
 
-#include "callbacks.h"
 #include "lib/module.h"
 #include "utils/common/sysrepo_conf.h"
 
-// TODO write the core of the module in Lua
-// FIXME kr_props - module nsid as an example
+EXPORT_STRDEF_TO_LUA_IMPL(YM_DIR)
+EXPORT_STRDEF_TO_LUA_IMPL(YM_COMMON)
+EXPORT_STRDEF_TO_LUA_IMPL(YM_KNOT)
+EXPORT_STRDEF_TO_LUA_IMPL(XPATH_BASE)
 
-typedef struct el_subscription_ctx el_subscription_ctx_t;
-/** Callback for our sysrepo subscriptions */
-typedef void (*el_subsription_cb)(el_subscription_ctx_t *el_subscr, int status);
-
-/** Context for our sysrepo subscriptions.
- * might add some other fields in future */
 struct el_subscription_ctx {
 	sr_conn_ctx_t *connection;
 	sr_session_ctx_t *session;
@@ -40,12 +37,64 @@ struct el_subscription_ctx {
 	uv_poll_t uv_handle;
 };
 
+/** Callback to Lua used for applying configuration  */
+static set_leaf_conf_t apply_conf_f = NULL;
 static el_subscription_ctx_t *el_subscription_ctx = NULL;
+
+/**
+ * Change callback getting called by sysrepo. Iterates over changed options and passes
+ * them over to Lua.
+ */
+static int sysrepo_conf_change_callback(sr_session_ctx_t *session,
+					const char *module_name,
+					const char *xpath, sr_event_t event,
+					uint32_t request_id, void *private_data)
+{
+	if (event == SR_EV_CHANGE) {
+		// gets called before the actual change of configuration is commited. If we
+		// return an error, the change is aborted can be used for configuration
+		// verification. Must have no sideeffects.
+
+		// TODO
+	} else if (event == SR_EV_ABORT) {
+		// Gets called when the transaction gets aborted. Because we have no
+		// sideeffects during verification, we don't care and and there is nothing
+		// to do
+	} else if (event == SR_EV_DONE) {
+		// after configuration change commit. We should apply the configuration.
+		// Will not hurt if we verify the changes again, but we have no way of
+		// declining the change now
+
+		int sr_err = SR_ERR_OK;
+		sr_change_iter_t *it = NULL;
+		sr_change_oper_t oper;
+		sr_val_t *old_value = NULL;
+		sr_val_t *new_value = NULL;
+
+		// get all changes
+		sr_err = sr_get_changes_iter(session, XPATH_BASE "//.", &it);
+		if (sr_err != SR_ERR_OK)
+			goto cleanup;
+
+		while ((sr_get_change_next(session, it, &oper, &old_value,
+					   &new_value)) == SR_ERR_OK) {
+			apply_conf_f(new_value);
+		}
+	cleanup:
+		if (sr_err != SR_ERR_OK && sr_err != SR_ERR_NOT_FOUND)
+			kr_log_error("Sysrepo module error: %s\n",
+				     sr_strerror(sr_err));
+		sr_free_val(old_value);
+		sr_free_val(new_value);
+		sr_free_change_iter(it);
+	}
+	return SR_ERR_OK;
+}
 
 void el_subscr_finish_closing(uv_handle_t *handle)
 {
 	el_subscription_ctx_t *el_subscr = handle->data;
-	assert(el_subscr);
+	assert(el_subscr != NULL);
 	free(el_subscr);
 }
 
@@ -73,10 +122,10 @@ el_subscription_new(sr_subscription_ctx_t *sr_subscr,
 	if (err != SR_ERR_OK)
 		return NULL;
 	el_subscription_ctx_t *el_subscr = malloc(sizeof(*el_subscr));
-	if (!el_subscr)
+	if (el_subscr == NULL)
 		return NULL;
 	err = uv_poll_init(uv_default_loop(), &el_subscr->uv_handle, fd);
-	if (err) {
+	if (err != 0) {
 		free(el_subscr);
 		return NULL;
 	}
@@ -85,7 +134,7 @@ el_subscription_new(sr_subscription_ctx_t *sr_subscr,
 	el_subscr->uv_handle.data = el_subscr;
 	err = uv_poll_start(&el_subscr->uv_handle, UV_READABLE,
 			    el_subscr_cb_tramp);
-	if (err) {
+	if (err != 0) {
 		el_subscription_free(el_subscr);
 		return NULL;
 	}
@@ -102,11 +151,10 @@ static void el_subscr_cb(el_subscription_ctx_t *el_subscr, int status)
 	sr_process_events(el_subscr->subscription, el_subscr->session, NULL);
 }
 
-KR_EXPORT
-int sysrepo_init(set_leaf_conf_t set_leaf_conf_cb)
-{	
+int sysrepo_init(set_leaf_conf_t apply_conf_callback)
+{
 	// store callback to Lua
-	set_leaf_conf = set_leaf_conf_cb;
+	apply_conf_f = apply_conf_callback;
 
 	int sr_err = SR_ERR_OK;
 	sr_conn_ctx_t *sr_connection = NULL;
@@ -125,26 +173,16 @@ int sysrepo_init(set_leaf_conf_t set_leaf_conf_cb)
 	if (sr_err != SR_ERR_OK)
 		goto cleanup;
 
-	/* read and set current running configuration */
-	sr_err = conf_set_current(sr_session, YM_COMMON);
-	if (sr_err != SR_ERR_OK)
-		goto cleanup;
-
-	/* register sysrepo subscriptions and callbacks */
+	/* register sysrepo subscriptions and callbacks
+		SR_SUBSCR_NO_THREAD - don't create a thread for handling them
+		SR_SUBSCR_ENABLED - send us current configuration in a callback just after subscribing
+	 */
 	sr_err = sr_module_change_subscribe(
-		sr_session, YM_COMMON, XPATH_BASE "/cache", cache_change_cb,
-		NULL, 0, SR_SUBSCR_NO_THREAD, &sr_subscription);
+		sr_session, YM_COMMON, XPATH_BASE, sysrepo_conf_change_callback,
+		NULL, 0, SR_SUBSCR_NO_THREAD | SR_SUBSCR_ENABLED,
+		&sr_subscription);
 	if (sr_err != SR_ERR_OK)
 		goto cleanup;
-
-	sr_err = sr_module_change_subscribe(
-		sr_session, YM_COMMON, XPATH_BASE "/network/listen-interfaces",
-		net_change_cb, NULL, 0,
-		SR_SUBSCR_NO_THREAD | SR_SUBSCR_CTX_REUSE, &sr_subscription);
-	if (sr_err != SR_ERR_OK)
-		goto cleanup;
-
-	/* additional sysrepo subscriptions will be here */
 
 	/* add subscriptions to kres event loop */
 	el_subscription_ctx =
@@ -156,14 +194,14 @@ int sysrepo_init(set_leaf_conf_t set_leaf_conf_cb)
 
 cleanup:
 	sr_disconnect(sr_connection);
-	printf("Error (%s)\n", sr_strerror(sr_err));
+	kr_log_error("Error (%s)\n", sr_strerror(sr_err));
 	return kr_error(sr_err);
 }
 
-KR_EXPORT
 int sysrepo_deinit()
 {
-	set_leaf_conf = NULL; // remove reference to Lua callback
 	el_subscription_free(el_subscription_ctx);
+	// remove reference to Lua callback so that it can be free'd safely
+	apply_conf_f = NULL;
 	return kr_ok();
 }

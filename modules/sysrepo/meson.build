@@ -1,8 +1,7 @@
 # C module: sysrepo
 
 sysrepo_src = files([
-  'sysrepo.c',
-  'callbacks.c',
+  'sysrepo_clib.c',
 ])
 
 lua_mod_src += [
