@@ -33,9 +33,6 @@ Following example sets cache size and starts listening for unencrypted and also 
 .. include:: ../daemon/bindings/cache.rst
 .. include:: ../daemon/lua/trust_anchors.rst
 
-.. include:: ../daemon/README.rst
-.. include:: ../daemon/scripting.rst
-
 Multiple instances
 ==================
 
@@ -126,5 +123,59 @@ individual services for classic DNS, DoT and DoH from each other.
    else
    	panic("Use kresd@dns*, kresd@tls* or kresd@doh* instance names")
    end
+
+.. include:: ../daemon/README.rst
+.. include:: ../daemon/bindings/modules.rst
+
+Monitoring and diagnostics
+==========================
+.. contents::
+   :depth: 1
+   :local:
+.. include:: ../modules/nsid/README.rst
+.. include:: ../modules/graphite/README.rst
+.. include:: ../modules/dnstap/README.rst
+.. include:: ../modules/watchdog/README.rst
+.. include:: ../modules/bogus_log/README.rst
+.. include:: ../modules/ta_sentinel/README.rst
+.. include:: ../modules/ta_signal_query/README.rst
+.. include:: ../modules/detect_time_skew/README.rst
+.. include:: ../modules/detect_time_jump/README.rst
+
+Policy, access control, data manipulation
+=========================================
+.. include:: ../modules/hints/README.rst
+.. include:: ../modules/stats/README.rst
+.. include:: ../modules/policy/README.rst
+.. include:: ../modules/view/README.rst
+.. include:: ../modules/rebinding/README.rst
+.. include:: ../modules/refuse_nord/README.rst
+.. include:: ../modules/dns64/README.rst
+.. include:: ../modules/renumber/README.rst
+
+
+Performance and resiliency
+==========================
+.. include:: ../modules/predict/README.rst
+.. include:: ../modules/priming/README.rst
+.. include:: ../modules/rfc7706.rst
+.. include:: ../modules/prefill/README.rst
+.. include:: ../modules/serve_stale/README.rst
+.. include:: ../modules/workarounds/README.rst
+.. include:: ../modules/edns_keepalive/README.rst
+
+
+Other
+=====
+.. include:: ../modules/http/README.rst
+.. include:: ../modules/http/README.doh.rst
+.. include:: ../modules/daf/README.rst
+.. include:: ../modules/etcd/README.rst
+
+Experimental features
+=====================
+.. include:: ../modules/experimental_dot_auth/README.rst
+
+.. include:: ../daemon/scripting.rst
 
 
