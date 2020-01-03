@@ -1,10 +1,13 @@
 # C module: sysrepo
 
 sysrepo_src = files([
-  'sysrepo.c',
-  'callbacks.c',
-  'conversion.c',
+  'sysrepo_clib.c',
 ])
+
+lua_mod_src += [
+  files('sysrepo_ffi.lua'),
+  files('sysrepo.lua')
+]
 
 build_sysrepo = false
 if get_option('sysrepo') != 'disabled'
@@ -22,7 +25,7 @@ if build_sysrepo
   c_src_lint += sysrepo_src
 
   sysrepo_mod = shared_module(
-	'sysrepo',
+	'sysrepo_clib',
 	sysrepo_src,
 	dependencies: [
     common_dep,

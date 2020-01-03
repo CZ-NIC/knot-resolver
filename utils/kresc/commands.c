@@ -33,7 +33,7 @@ void print_examples()
     printf("\nExamples:\n");
 
     // TODO: add some configuration examples
-    printf("");
+    //printf("");
 }
 
 void print_commands_help()
