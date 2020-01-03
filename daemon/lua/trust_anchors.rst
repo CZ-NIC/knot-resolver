@@ -25,6 +25,8 @@ policy, or automatically maintained by the resolver itself.
 In practice this means that you can forget about it and your favorite Linux
 distribution will take care of it for you.
 
+Following functions allow to modify DNSSEC configuration *if you really have to*:
+
 
 .. function:: trust_anchors.add_file(keyfile[, readonly = false])
 

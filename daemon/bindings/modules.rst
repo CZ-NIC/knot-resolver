@@ -1,8 +1,8 @@
 
-Modules configuration
-^^^^^^^^^^^^^^^^^^^^^
+TODO: Modules configuration
+===========================
 
-The daemon provides an interface for dynamic loading of :ref:`daemon modules <modules-implemented>`.
+The daemon provides an interface for dynamic loading of daemon modules.
 
 .. tip:: Use declarative interface for module loading.
 

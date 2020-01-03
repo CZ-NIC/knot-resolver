@@ -134,10 +134,6 @@ can be found `here <https://gitlab.labs.nic.cz/knot/knot-resolver/tree/master/et
 The example configuration files are also installed as documentation files, typically in directory ``/usr/share/doc/knot-resolver/examples/`` (their location may be different based on your Linux distribution).
 Detailed configuration of daemon and implemented modules can be found in configuration reference:
 
-- :ref:`Daemon configuration <daemon>`
-- :ref:`Modules configuration <modules-implemented>`
-
-
 
 Listening on network interfaces
 ===============================
