@@ -1,4 +1,3 @@
-
 Timers and events
 ^^^^^^^^^^^^^^^^^
 
@@ -121,39 +120,4 @@ For example, when you want to add a new policy, you'd need to add it to either p
    .. code-block:: lua
 
       worker.sleep(1)
-
-.. function:: map(expr)
-
-   Run expression synchronously over all forks, results are returned as a table ordered as forks. Expression can be any valid expression in Lua.
-
-
-   Example:
-
-   .. code-block:: lua
-
-      -- Current instance only
-      hostname()
-      localhost
-      -- Mapped to forks
-      map 'hostname()'
-      [1] => localhost
-      [2] => localhost
-      -- Get worker ID from each fork
-      map 'worker.id'
-      [1] => 0
-      [2] => 1
-      -- Get cache stats from each fork
-      map 'cache.stats()'
-      [1] => {
-          [hit] => 0
-          [delete] => 0
-          [miss] => 0
-          [insert] => 0
-      }
-      [2] => {
-          [hit] => 0
-          [delete] => 0
-          [miss] => 0
-          [insert] => 0
-      }
 
