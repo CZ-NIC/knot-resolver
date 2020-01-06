@@ -1,8 +1,3 @@
-.. _performance:
-
-Performance tunning
-===================
-
 .. _cache_sizing:
 
 Cache sizing
@@ -70,8 +65,3 @@ size in the config file as well.
    cache.size = 2 * GB
 
 .. _tmpfs: https://en.wikipedia.org/wiki/Tmpfs
-
-
-Utilizing all CPUs
-------------------
-
