@@ -96,7 +96,13 @@ For debugging purposes it is possible to enable very verbose logging using
    On busy systems vebose logging can produce several MB of logs per
    second and will slow down operation.
 
-More fine-grained tools are available in following modules:
+Less verbose logging for DNSSEC validation errors can be enabled using :ref:`mod-bogus_log` module.
+
+Various statistics for monitoring purposes are available in :ref:`mod-stats` module, including export to central systems like Graphite, Metronome, InfluxDB, or Prometheus format.
+
+Resolver :ref:`mod-watchdog` is tool to detect and recover from potential bugs that cause the resolver to stop responding properly to queries.
+
+If none of these options fits your deployment or if you have special needs you can configure your own checks and exports using :ref:`async-events`.
 
 .. contents::
    :depth: 1
