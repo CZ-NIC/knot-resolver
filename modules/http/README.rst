@@ -63,8 +63,8 @@ Now you can reach the web services and APIs, done!
 
 .. _mod-http-tls:
 
-Configuring TLS
-^^^^^^^^^^^^^^^
+HTTPS (TLS for HTTP)
+^^^^^^^^^^^^^^^^^^^^
 
 By default, the web interface starts HTTPS/2 on specified port using an ephemeral
 TLS certificate that is valid for 90 days and is automatically renewed. It is of
@@ -132,73 +132,6 @@ The HTTP module has several built-in services to use.
  "``/metrics``", "Prometheus metrics", "Exported metrics for Prometheus_."
  "``/trace/:name/:type``", "Tracking", ":ref:`Trace resolution <mod-http-trace>` of a DNS query and return the verbose logs."
  "``/doh``", "DNS-over-HTTP", ":rfc:`8484` endpoint, see :ref:`mod-http-doh`."
-
-Prometheus metrics endpoint
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The module exposes ``/metrics`` endpoint that serves internal metrics in Prometheus_ text format.
-You can use it out of the box:
-
-.. code-block:: bash
-
-	$ curl -k https://localhost:8453/metrics | tail
-	# TYPE latency histogram
-	latency_bucket{le=10} 2.000000
-	latency_bucket{le=50} 2.000000
-	latency_bucket{le=100} 2.000000
-	latency_bucket{le=250} 2.000000
-	latency_bucket{le=500} 2.000000
-	latency_bucket{le=1000} 2.000000
-	latency_bucket{le=1500} 2.000000
-	latency_bucket{le=+Inf} 2.000000
-	latency_count 2.000000
-	latency_sum 11.000000
-
-You can namespace the metrics in configuration, using `http.prometheus.namespace` attribute:
-
-.. code-block:: lua
-
-        modules.load('http')
-        -- Set Prometheus namespace
-        http.prometheus.namespace = 'resolver_'
-
-You can also add custom metrics or rewrite existing metrics before they are returned to Prometheus client.
-
-.. code-block:: lua
-
-        modules.load('http')
-        -- Add an arbitrary metric to Prometheus
-        http.prometheus.finalize = function (metrics)
-        	table.insert(metrics, 'build_info{version="1.2.3"} 1')
-        end
-
-.. _mod-http-trace:
-
-Tracing requests
-^^^^^^^^^^^^^^^^
-
-With the ``/trace`` endpoint you can trace various aspects of the request execution.
-The basic mode allows you to resolve a query and trace verbose logs (and messages received):
-
-.. code-block:: bash
-
-   $ curl https://localhost:8453/trace/e.root-servers.net
-   [ 8138] [iter] 'e.root-servers.net.' type 'A' created outbound query, parent id 0
-   [ 8138] [ rc ] => rank: 020, lowest 020, e.root-servers.net. A
-   [ 8138] [ rc ] => satisfied from cache
-   [ 8138] [iter] <= answer received:
-   ;; ->>HEADER<<- opcode: QUERY; status: NOERROR; id: 8138
-   ;; Flags: qr aa  QUERY: 1; ANSWER: 0; AUTHORITY: 0; ADDITIONAL: 0
-
-   ;; QUESTION SECTION
-   e.root-servers.net.		A
-
-   ;; ANSWER SECTION
-   e.root-servers.net. 	3556353	A	192.203.230.10
-
-   [ 8138] [iter] <= rcode: NOERROR
-   [ 8138] [resl] finished: 4, queries: 1, mempool: 81952 B
-
 
 .. _mod-http-custom-endpoint:
 
@@ -355,7 +288,7 @@ Dependencies
 
        $ luarocks install http
 
-* `mmdblua <https://github.com/daurnimator/mmdblua>`_ available in LuaRocks
+* (*optional*) `mmdblua <https://github.com/daurnimator/mmdblua>`_ available in LuaRocks
 
     .. code-block:: bash
 

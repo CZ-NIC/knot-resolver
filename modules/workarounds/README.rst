@@ -1,14 +1,9 @@
 .. _mod-workarounds:
 
-Workarounds
------------
+Module `workarounds` resolver behavior on specific broken sub-domains.
+Currently it mainly disables case randomization.
 
-A simple module that alters resolver behavior on specific broken sub-domains.
-Currently it mainly disables case randomization on them.
-
-Running
-^^^^^^^
 .. code-block:: lua
 
-    modules = { 'workarounds < iterate' }
+    modules.load('workarounds < iterate')
 
