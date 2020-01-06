@@ -119,6 +119,7 @@ Features in this section allow to configure what clients can get access to what 
 .. include:: ../modules/stats/README.rst
 .. include:: ../modules/policy/README.rst
 .. include:: ../modules/view/README.rst
+.. include:: ../modules/daf/README.rst
 .. include:: ../modules/rebinding/README.rst
 .. include:: ../modules/refuse_nord/README.rst
 .. include:: ../modules/dns64/README.rst
@@ -174,7 +175,6 @@ TODO: Other
 ===========
 .. include:: ../modules/http/README.rst
 .. include:: ../modules/http/README.doh.rst
-.. include:: ../modules/daf/README.rst
 
 Experimental features
 =====================
