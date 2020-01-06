@@ -34,15 +34,6 @@ TODO: Basics
       Operation not permitted
 
 
-.. function:: reorder_RR([true | false])
-
-   :param boolean value: New value for the option *(optional)*
-   :return: The (new) value of the option
-
-   If set, resolver will vary the order of resource records within RR-sets.
-   It is disabled by default.
-
-
 .. _`JSON-encoded`: http://json.org/example
 .. _`Learn Lua in 15 minutes`: http://tylerneylon.com/a/learn-lua/
 .. _`PowerDNS Recursor`: https://doc.powerdns.com/md/recursor/scripting/
