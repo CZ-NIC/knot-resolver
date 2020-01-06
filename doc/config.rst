@@ -66,9 +66,14 @@ One last thing before we dive into configuring features:
 Now you know what configuration file to modify, how to read examples and what modules are so you are ready for a real configuration work!
 
 .. include:: ../daemon/README.rst
-.. include:: ../daemon/bindings/net.rst
 .. include:: ../daemon/lua/trust_anchors.rst
 
+Networking and protocols
+========================
+.. include:: ../daemon/bindings/net.rst
+.. include:: ../daemon/bindings/net_tlssrv.rst
+.. include:: ../modules/http/README.rst
+.. include:: ../modules/http/README.doh.rst
 
 Logging, monitoring, diagnostics
 ================================
@@ -98,10 +103,17 @@ More fine-grained tools are available in following modules:
    :local:
 
 .. include:: ../modules/nsid/README.rst
+
+.. include:: ../modules/stats/README.rst
+.. .. subchapter of stats module
 .. include:: ../modules/graphite/README.rst
+.. .. subchapter of stats module
+.. include:: ../modules/http/prometheus.rst
+
 .. include:: ../modules/dnstap/README.rst
 .. include:: ../modules/watchdog/README.rst
 .. include:: ../modules/bogus_log/README.rst
+.. include:: ../modules/http/trace.rst
 .. include:: ../modules/ta_sentinel/README.rst
 .. include:: ../modules/ta_signal_query/README.rst
 .. include:: ../modules/detect_time_skew/README.rst
@@ -116,7 +128,6 @@ Features in this section allow to configure what clients can get access to what 
    :local:
 
 .. include:: ../modules/hints/README.rst
-.. include:: ../modules/stats/README.rst
 .. include:: ../modules/policy/README.rst
 .. include:: ../modules/view/README.rst
 .. include:: ../modules/daf/README.rst
@@ -167,14 +178,7 @@ impact than cache settings and number of instances.
 .. include:: ../modules/rfc7706.rst
 .. include:: ../modules/prefill/README.rst
 .. include:: ../modules/serve_stale/README.rst
-.. include:: ../modules/workarounds/README.rst
 .. include:: ../modules/edns_keepalive/README.rst
-
-
-TODO: Other
-===========
-.. include:: ../modules/http/README.rst
-.. include:: ../modules/http/README.doh.rst
 
 Experimental features
 =====================
