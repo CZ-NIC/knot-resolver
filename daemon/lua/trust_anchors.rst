@@ -1,7 +1,7 @@
 .. _dnssec-config:
 
-Trust anchors and DNSSEC
-========================
+DNSSEC
+======
 
 Since version 4.0, **DNSSEC validation is enabled by default**.
 This is secure default and should not be changed unless absolutely necessary.
