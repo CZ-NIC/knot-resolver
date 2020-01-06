@@ -27,7 +27,6 @@ and it provides a state-machine like API for extensions.
    :caption: Operation
    :maxdepth: 1
 
-   monitoring
    upgrading
    NEWS
 
