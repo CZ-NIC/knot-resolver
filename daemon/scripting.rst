@@ -284,6 +284,8 @@ Filesystem watchers are possible with :func:`worker.coroutine()` and cqueues_, s
 
 .. include:: ../daemon/bindings/event.rst
 
+.. include:: ../modules/etcd/README.rst
+
 .. _closures: https://www.lua.org/pil/6.1.html
 .. _cqueues: https://25thandclement.com/~william/projects/cqueues.html
 .. _LuaRocks: https://luarocks.org/

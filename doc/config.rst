@@ -175,7 +175,6 @@ TODO: Other
 .. include:: ../modules/http/README.rst
 .. include:: ../modules/http/README.doh.rst
 .. include:: ../modules/daf/README.rst
-.. include:: ../modules/etcd/README.rst
 
 Experimental features
 =====================
