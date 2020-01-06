@@ -1,6 +1,6 @@
 
-TODO: Modules configuration
-===========================
+TODO: Modules
+=============
 
 The daemon provides an interface for dynamic loading of daemon modules.
 

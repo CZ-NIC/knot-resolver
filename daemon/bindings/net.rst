@@ -1,7 +1,7 @@
 .. _network-configuration:
 
-Network configuration
-=====================
+Network
+=======
 
 Modern Linux distributions use so-called *Systemd socket activation*, which
 effectively means that IP addresses and ports to listen on are configured
@@ -320,8 +320,8 @@ Following commands are useful in special situations and can be usef with and wit
 
 .. _tls-server-config:
 
-TLS server configuration
-========================
+TLS server
+==========
 DNS-over-TLS server (:rfc:`7858`) is enabled by default on loopback interface port 853.
 Information how to configure listening on specific IP addresses is in previous sections
 :ref:`network-configuration`.

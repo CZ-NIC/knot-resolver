@@ -1,5 +1,5 @@
-Cache configuration
-===================
+Cache
+=====
 
 The default cache in Knot Resolver is persistent on disk, which means that the daemon doesn't lose
 the cached data on restart or crash, and thus performace does not suffer from cold-starts.
