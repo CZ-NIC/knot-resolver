@@ -1,7 +1,7 @@
 .. _dnssec-config:
 
-DNSSEC
-======
+DNSSEC, data verification
+=========================
 
 Since version 4.0, **DNSSEC validation is enabled by default**.
 This is secure default and should not be changed unless absolutely necessary.
@@ -124,3 +124,8 @@ Following functions allow to modify DNSSEC configuration *if you really have to*
 .. function:: trust_anchors.summary()
 
    Return string with summary of configured DNSSEC trust anchors, including negative TAs.
+
+DNSSEC is main technology to protect data, but it is also possible to change how strictly
+resolver checks data from insecure DNS zones:
+
+.. include:: ../lib/layer/mode.rst
