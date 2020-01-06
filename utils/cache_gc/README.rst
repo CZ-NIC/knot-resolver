@@ -1,7 +1,7 @@
 Garbage Collector
------------------
+^^^^^^^^^^^^^^^^^
 
-Knot Resolver employs a separate garbage collector daemon (process ``kres-cache-gc``) which periodically trims the cache to keep its size below a configured size limit.
+Knot Resolver employs a separate garbage collector daemon which periodically trims the cache to keep its size below size limit configured using :envvar:`cache.size`.
 
 Systemd service ``kres-cache-gc.service`` is enabled by default and does not need any manual intervention.
 
