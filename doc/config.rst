@@ -103,11 +103,11 @@ For more details see ``kresd.systemd(7)``.
 
 Zero-downtime restarts
 ----------------------
-When using `multiple instances`_, it is also possible to do a rolling
-restart with zero downtime of the service. This can be done by restarting
-only a subset of the processes at a time.
+Resolver restart normally takes just miliseconds and cache content is persistent to avoid performance drop
+after restart. If you want real zero-downtime restarts use `multiple instances`_ and do rolling
+restart, i.e. restart only one resolver process at a time.
 
-On a system with 4 instances we can restart them one-by-one:
+On a system with 4 instances run these commands sequentially:
 
 .. code-block:: bash
 
