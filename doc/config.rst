@@ -124,14 +124,33 @@ individual services for classic DNS, DoT and DoH from each other.
    	panic("Use kresd@dns*, kresd@tls* or kresd@doh* instance names")
    end
 
-.. include:: ../daemon/README.rst
-.. include:: ../daemon/bindings/modules.rst
+Logging, monitoring, diagnostics
+================================
+Knot Resolver logs to standard outputs, which is then captured by supervisor
+and sent to logging system for further processing.
+To read logs use commands usual for your distribution.
+E.g. on distributions using systemd-journald use command ``journalctl -u kresd@* -f``.
 
-Monitoring and diagnostics
-==========================
+During normal operation only errors and other very important events are logged,
+so by default logs from Knot Resolver should contain only couple lines a day.
+For debugging purposes it is possible to enable very verbose logging using
+:func:`verbose` function.
+
+.. function:: verbose([true | false])
+
+   :param: ``true`` to enable, ``false`` to disable verbose logging.
+   :return: boolean Current state of verbose logging.
+
+   Toggle global verbose logging. Use only for debugging purposes.
+   On busy systems vebose logging can produce several MB of logs per
+   second and will slow down operation.
+
+More fine-grained tools are available in following modules:
+
 .. contents::
    :depth: 1
    :local:
+
 .. include:: ../modules/nsid/README.rst
 .. include:: ../modules/graphite/README.rst
 .. include:: ../modules/dnstap/README.rst
