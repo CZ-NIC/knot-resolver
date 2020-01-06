@@ -121,10 +121,11 @@ Configuration
 
 .. note::
 
-   Copy&pasting examples from this manual is sufficient for normal use-cases.
-   Please pay close attention to brackets.
+   When copy&pasting examples from this manual please pay close
+   attention to brackets and also line ordering - order of lines matters.
 
-   If you want to use full power of configuration language, see article
+   The configuration language is in fact Lua script, so you can use full power
+   of this programming language. See article
    `Learn Lua in 15 minutes`_ for a syntax overview.
 
 Easiest way to configure Knot Resolver is to paste your configuration into
