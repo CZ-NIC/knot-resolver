@@ -165,8 +165,8 @@ Performance and resiliency
 .. include:: ../modules/edns_keepalive/README.rst
 
 
-Other
-=====
+TODO: Other
+===========
 .. include:: ../modules/http/README.rst
 .. include:: ../modules/http/README.doh.rst
 .. include:: ../modules/daf/README.rst
