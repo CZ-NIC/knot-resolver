@@ -1,3 +1,5 @@
+.. _runtime-cfg:
+
 Run-time reconfiguration
 ========================
 
