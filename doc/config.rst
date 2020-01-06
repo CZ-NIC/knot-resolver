@@ -1,34 +1,71 @@
 .. _config-syntax:
 
-Files and syntax
-================
+Files, syntax, basics
+=====================
 
 Configuration file is named ``/etc/knot-resolver/kresd.conf`` and is read when you execute Knot Resolver using systemd commands described in section :ref:`startup`. [#]_
 
+The configuration file syntax allows you to specify different kinds of data:
 
-The syntax for options is like follows: ``group.option = value`` or ``group.action(parameter1, parameter2)``. You can also comment using a ``--`` prefix.
+  - ``group.option = 123456``
+  - ``group.option = "string value"``
+  - ``group.command(123456, "string value")``
+  - ``group.command({ key1 = "value1", key2 = 222, key3 = "third value" })``
+  - ``globalcommand(a_parameter_1, a_parameter_2, a_parameter_3, etc)``
+  - ``-- any text after -- sign is ignored till end of line``
 
-Following example sets cache size and starts listening for unencrypted and also encrypted DNS queries on IP address 192.0.2.1.
+Following **configuration file snippet** starts listening for unencrypted and also encrypted DNS queries on IP address 192.0.2.1, and sets cache size.
 
 .. code-block:: lua
 
-        cache.size = 10 * MB
         -- this is a comment: listen for unencrypted queries
         net.listen('192.0.2.1')
         -- another comment: listen for queries encrypted using TLS on port 853
         net.listen('192.0.2.1', 853, { kind = 'tls' })
+        -- 10 MB cache is suitable for a very small deployment
+        cache.size = 10 * MB
 
-.. tip:: The configuration and CLI syntax is Lua language which allows great
-   flexibility. Luckily you do not need to learn Lua, copy&pasting examples
-   from this manual is sufficient for normal use-cases. Just pay close
-   attention to brackets.
+.. tip::
+   When copy&pasting examples from this manual please pay close
+   attention to brackets and also line ordering - order of lines matters.
 
-   If you want to use full power of configuration language see article
+   The configuration language is in fact Lua script, so you can use full power
+   of this programming language. See article
    `Learn Lua in 15 minutes`_ for a syntax overview.
 
+When you modify configuration file on disk restart resolver process to get changes into effect. See chapter `Zero-downtime restarts`_ if even short outages are not acceptable for your deployment.
 
 .. [#] If you decide to run binary ``/usr/sbin/kresd`` manually (instead of using systemd) do not forget to specify ``-c`` option with path to configuration file, otherwise ``kresd`` will read file named ``config`` from its current working directory.
 
+Besides text configuration file, Knot Resolver also supports interactive and dynamic configuration using scripts or external systems, which is described in chapter :ref:`runtime-cfg`. Through this manual we present examples for both usage types - static configuration in a text file (see above) and also the interactive mode.
+
+The **interactive prompt** is denoted by ``>``, so all examples starting with ``>`` character are transcripts of user (or script) interaction with Knot Resolver and resolver's responses. For example:
+
+.. code-block:: lua
+
+        > -- this is a comment entered into interactive prompt
+        > -- comments have no effect here
+        > -- the next line shows a command entered interactivelly and its output
+        > verbose()
+        false
+        > -- the previous line without > character is output from verbose() command
+
+Following example demontrates how to interactivelly list all currently loaded modules, and includes multi-line output:
+
+.. code-block:: lua
+
+        > modules.list()
+        [1] => iterate
+        [2] => validate
+        [3] => cache
+
+One last thing before we dive into configuring features:
+
+.. include:: ../daemon/bindings/modules.rst
+
+Now you know what configuration file to modify, how to read examples and what modules are so you are ready for a real configuration work!
+
+.. include:: ../daemon/README.rst
 .. include:: ../daemon/bindings/net.rst
 .. include:: ../daemon/bindings/cache.rst
 .. include:: ../daemon/lua/trust_anchors.rst

@@ -1,23 +1,23 @@
+Modules
+-------
+Knot Resolver functionality consists of separate modules, which allow you
+to mix-and-match features you need without slowing down operation
+by features you do not use.
 
-TODO: Modules
-=============
+This practically means that you need to load module before using features contained in it, for example:
 
-The daemon provides an interface for dynamic loading of daemon modules.
+.. code-block:: lua
 
-.. tip:: Use declarative interface for module loading.
+        -- load module and make dnstap features available
+        modules.load('dnstap')
+        -- configure dnstap features
+        dnstap.config({
+                socket_path = "/tmp/dnstap.sock"
+        })
 
-         .. code-block:: lua
+Obviously ordering matters, so you have to load module first and configure it after it is loaded.
 
-		modules = {
-			hints = {file = '/etc/hosts'}
-		}
-
-         Equals to:
-
-         .. code-block:: lua
-
-		modules.load('hints')
-		hints.config({file = '/etc/hosts'})
+Here is full reference manual for module configuration:
 
 
 .. function:: modules.list()
@@ -27,14 +27,14 @@ The daemon provides an interface for dynamic loading of daemon modules.
 .. function:: modules.load(name)
 
    :param string name: Module name, e.g. "hints"
-   :return: boolean
+   :return: ``true`` if modules was (or already is) loaded, error otherwise.
 
    Load a module by name.
 
 .. function:: modules.unload(name)
 
-   :param string name: Module name
-   :return: boolean
+   :param string name: Module name, e.g. "detect_time_jump"
+   :return: ``true`` if modules was unloaded, error otherwise.
 
-   Unload a module by name.
+   Unload a module by name. This is useful for unloading modules loaded by default, mainly for debugging purposes.
 
