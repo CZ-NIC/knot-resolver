@@ -9,6 +9,10 @@ These metrics can be either exported to :ref:`mod-graphite`,
 exposed as :ref:`mod-http-prometheus`, or processed using user-provided script
 as described in chapter :ref:`async-events`.
 
+.. note::
+
+  Please remember that each Knot Resolver instance keeps its own statistics, and instances can be started and stopped dynamically. This might affect your data postprocessing procedures if you are using `Multiple instances`_.
+
 .. _mod-stats-list:
 
 Built-in statistics
