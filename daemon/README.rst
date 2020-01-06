@@ -1,7 +1,7 @@
 .. _daemon:
 
-TODO: Environment
-=================
+TODO: Basics
+============
 
 .. function:: user(name, [group])
 
