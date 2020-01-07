@@ -14,11 +14,11 @@ Control sockets
 ---------------
 Control socket acts like "an interactive configuration file" so all actions available in configuration file can be executed interactively using the control socket. One possible use-case is reconfiguring Resolver instances from another program, e.g. a maintenance script.
 
-.. note::
+.. note:: Each instance of Knot Resolver exposes its own control socket. Take
+   that into account when scripting deployments with
+   :ref:`systemd-multiple-instances`.
 
-        Each instance of Knot Resolver exposes its own control socket. Take that into account when scripting deployments with `Multiple instances`_.
-
-When Knot Resolver is started using Systemd (see section :ref:`startup`) it creates a control socket in path ``/run/knot-resolver/control@$INSTANCENAME``. Connection to the socket can be made from command line using e.g. ``netcat`` or ``socat``:
+When Knot Resolver is started using Systemd (see section :ref:`quickstart-startup`) it creates a control socket in path ``/run/knot-resolver/control@$INSTANCENAME``. Connection to the socket can be made from command line using e.g. ``netcat`` or ``socat``:
 
 .. code-block:: bash
 

@@ -1,7 +1,7 @@
 .. _mod-stats:
 
 Statistics collector
---------------------
+====================
 
 Module ``stats`` gathers various counters from the query resolution
 and server internals, and offers them as a key-value storage.
@@ -9,14 +9,15 @@ These metrics can be either exported to :ref:`mod-graphite`,
 exposed as :ref:`mod-http-prometheus`, or processed using user-provided script
 as described in chapter :ref:`async-events`.
 
-.. note::
-
-  Please remember that each Knot Resolver instance keeps its own statistics, and instances can be started and stopped dynamically. This might affect your data postprocessing procedures if you are using `Multiple instances`_.
+.. note:: Please remember that each Knot Resolver instance keeps its own
+   statistics, and instances can be started and stopped dynamically. This might
+   affect your data postprocessing procedures if you are using
+   :ref:`systemd-multiple-instances`.
 
 .. _mod-stats-list:
 
 Built-in statistics
-^^^^^^^^^^^^^^^^^^^
+-------------------
 
 Built-in counters keep track of number of queries and answers matching specific criteria.
 
@@ -158,7 +159,7 @@ Example:
 	5
 
 Module reference
-^^^^^^^^^^^^^^^^
+----------------
 
 .. function:: stats.get(key)
 

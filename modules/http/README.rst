@@ -1,7 +1,7 @@
 .. _mod-http:
 
 HTTP/2 services
----------------
+===============
 
 This module does the heavy lifting to provide an HTTP/2 enabled
 server which provides few built-in services and also allows other
@@ -37,7 +37,7 @@ This can be changed using ``http.config()`` configuration call explained below.
 .. _mod-http-example:
 
 Example configuration
-^^^^^^^^^^^^^^^^^^^^^
+---------------------
 
 This section shows how to configure HTTP module itself. For information how
 to configure HTTP server's IP addresses and ports please see chapter
@@ -64,7 +64,7 @@ Now you can reach the web services and APIs, done!
 .. _mod-http-tls:
 
 HTTPS (TLS for HTTP)
-^^^^^^^^^^^^^^^^^^^^
+--------------------
 
 By default, the web interface starts HTTPS/2 on specified port using an ephemeral
 TLS certificate that is valid for 90 days and is automatically renewed. It is of
@@ -121,7 +121,7 @@ Major drawback is that current browsers won't do HTTP/2 over insecure connection
 .. _mod-http-built-in-services:
 
 Built-in services
-^^^^^^^^^^^^^^^^^
+-----------------
 
 The HTTP module has several built-in services to use.
 
@@ -136,7 +136,7 @@ The HTTP module has several built-in services to use.
 .. _mod-http-custom-endpoint:
 
 How to expose custom services over HTTP
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+---------------------------------------
 
 Each kind of endpoint provides table of HTTP endpoints, and the default table
 can be replaced using ``http.config()`` configuration call
@@ -205,7 +205,7 @@ exported restful APIs and subscribe to WebSockets.
 	http.snippets['/health'] = {'Health service', '<p>UP!</p>'}
 
 How to expose custom RESTful services
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-------------------------------------
 
 A RESTful service is likely to respond differently to different type of methods and requests,
 there are three things that you can do in a service handler to send back results.
@@ -270,7 +270,7 @@ a response.
 	end
 
 Dependencies
-^^^^^^^^^^^^
+------------
 
 * `lua-http <https://github.com/daurnimator/lua-http>`_ (>= 0.3) available in LuaRocks
 

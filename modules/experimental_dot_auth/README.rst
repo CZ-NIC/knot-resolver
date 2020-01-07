@@ -1,7 +1,7 @@
 .. _mod-experimental_dot_auth:
 
 Experimental DNS-over-TLS Auto-discovery
-----------------------------------------
+========================================
 
 This experimental module provides automatic discovery of authoritative servers' supporting DNS-over-TLS.
 The module uses magic NS names to detect SPKI_ fingerprint which is very similar to `dnscurve`_ mechanism.
@@ -9,7 +9,7 @@ The module uses magic NS names to detect SPKI_ fingerprint which is very similar
 .. warning:: This protocol and module is experimental and can be changed or removed at any time. Use at own risk, security properties were not analyzed!
 
 How it works
-^^^^^^^^^^^^
+------------
 
 The module will look for NS target names formatted as:
 ``dot-{base32(sha256(SPKI))}....``
@@ -27,7 +27,7 @@ In that example, the base32 encoded (no padding) version of the sha256 PIN is ``
 converted to base64 translates to ``m+12GgMFIiheEhKvUcOynjbn3WYQUp5tVGDh7Snwj/Q=``.
 
 Generating NS target names
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+--------------------------
 
 To generate the NS target name, use the following command to generate the base32 encoded string of the SPKI fingerprint:
 
@@ -61,7 +61,7 @@ Finally, map ``dot-${b32}.a.example.com`` to the right set of IPs.
   ...
 
 Example configuration
-^^^^^^^^^^^^^^^^^^^^^
+---------------------
 
 To enable the module, add this snippet to your config:
 
@@ -73,7 +73,7 @@ To enable the module, add this snippet to your config:
 This module requires standard ``basexx`` Lua library which is typically provided by ``lua-basexx`` package.
 
 Caveats
-^^^^^^^
+-------
 
 The module relies on seeing the reply of the NS query and as such will not work
 if Knot Resolver uses data from its cache. You may need to delete the cache before starting ``kresd`` to work around this.
@@ -81,7 +81,7 @@ if Knot Resolver uses data from its cache. You may need to delete the cache befo
 The module also assumes that the NS query answer will return both the NS targets in the Authority section as well as the glue records in the Additional section.
 
 Dependencies
-^^^^^^^^^^^^
+------------
 
 * `lua-basexx <https://github.com/aiq/basexx>`_ available in LuaRocks
 

@@ -1,7 +1,7 @@
 .. _mod-ta_sentinel:
 
 Sentinel for Detecting Trusted Root Keys
-----------------------------------------
+========================================
 
 The module ``ta_sentinel`` implements A Root Key Trust Anchor Sentinel for DNSSEC
 according to standard :rfc:`8509`.

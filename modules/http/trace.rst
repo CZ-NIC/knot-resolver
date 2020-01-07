@@ -1,7 +1,7 @@
 .. _mod-http-trace:
 
 Tracing requests
-----------------
+================
 
 The `HTTP module <mod-http>`_ provides ``/trace`` endpoint which allows to trace various
 aspects of the request execution. The basic mode allows you to resolve a query
