@@ -1,7 +1,7 @@
 .. _mod-dnstap:
 
 Dnstap
-------
+======
 
 The ``dnstap`` module supports logging DNS responses to a unix socket
 in dnstap_ format using fstrm framing library.

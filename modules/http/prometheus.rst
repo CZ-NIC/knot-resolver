@@ -1,7 +1,7 @@
 .. _mod-http-prometheus:
 
 Prometheus metrics endpoint
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+===========================
 
 The `HTTP module <mod-http>`_ exposes ``/metrics`` endpoint that serves metrics
 from :ref:`mod-stats` in Prometheus_ text format.
@@ -40,3 +40,4 @@ You can also add custom metrics or rewrite existing metrics before they are retu
         	table.insert(metrics, 'build_info{version="1.2.3"} 1')
         end
 
+.. _Prometheus: https://prometheus.io

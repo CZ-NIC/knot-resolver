@@ -1,7 +1,7 @@
 .. _mod-edns_keepalive:
 
 EDNS keepalive
---------------
+==============
 
 The ``edns_keepalive`` module implements :rfc:`7828` for *clients* connecting to Knot Resolver via TCP and TLS.
 Note that client connections are timed-out the same way *regardless* of them sending the EDNS option;

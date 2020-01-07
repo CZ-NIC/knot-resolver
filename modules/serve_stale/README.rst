@@ -1,7 +1,7 @@
 .. _mod-serve_stale:
 
 Serve stale
------------
+===========
 
 Demo module that allows using timed-out records in case kresd is
 unable to contact upstream servers.
@@ -12,7 +12,7 @@ It's quite configurable/flexible; see the beginning of the module source for det
 See also the RFC draft_ (not fully followed) and :any:`cache.ns_tout`.
 
 Running
-^^^^^^^
+-------
 .. code-block:: lua
 
     modules = { 'serve_stale < cache' }

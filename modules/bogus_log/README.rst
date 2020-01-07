@@ -1,7 +1,7 @@
 .. _mod-bogus_log:
 
 DNSSEC validation failure logging
----------------------------------
+=================================
 
 This module adds error message for each DNSSEC validation failure.
 It is meant to provide hint to operators which queries should be

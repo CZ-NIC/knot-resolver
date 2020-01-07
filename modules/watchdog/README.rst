@@ -1,7 +1,7 @@
 .. _mod-watchdog:
 
 Watchdog
---------
+========
 
 This module cooperates with Systemd watchdog to restart the process in case
 the internal event loop gets stuck. The upstream Systemd unit files are configured

@@ -1,5 +1,7 @@
+.. _systemd-multiple-instances:
+
 Multiple instances
-------------------
+==================
 
 Knot Resolver can utilize multiple CPUs running in multiple independent instances (processes), where each process utilizes at most single CPU core on your machine. If your machine handles a lot of DNS traffic run multiple instances.
 
@@ -29,8 +31,10 @@ With the use of brace expansion in BASH the equivalent command looks like this:
 For more details see ``kresd.systemd(7)``.
 
 
+.. _systemd-zero-downtime-restarts:
+
 Zero-downtime restarts
-^^^^^^^^^^^^^^^^^^^^^^
+----------------------
 Resolver restart normally takes just miliseconds and cache content is persistent to avoid performance drop
 after restart. If you want real zero-downtime restarts use `multiple instances`_ and do rolling
 restart, i.e. restart only one resolver process at a time.
@@ -50,7 +54,7 @@ At any given time only a single instance is stopped and restarted so remaining t
 .. _instance-specific-configuration:
 
 Instance-specific configuration
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-------------------------------
 
 Instances can use arbitraty identifiers for the instances, for example we can name instances like `dns1`, `tls` and so on.
 

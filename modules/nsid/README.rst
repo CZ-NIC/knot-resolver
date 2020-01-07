@@ -1,13 +1,13 @@
 .. _mod-nsid:
 
 Name Server Identifier (NSID)
------------------------------
+=============================
 
 Module ``nsid`` provides server-side support for :rfc:`5001`
 which allows DNS clients to request resolver to send back its NSID
 along with the reply to a DNS request.
 This is useful for debugging larger resolver farms
-(e.g. when using `multiple instances`_, anycast or load balancers).
+(e.g. when using :ref:`systemd-multiple-instances`, anycast or load balancers).
 
 NSID value can be configured in the resolver's configuration file:
 
