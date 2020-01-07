@@ -67,7 +67,7 @@ Mounting the cache directory as tmpfs_ is recommended apparoach.
 Make sure to use appropriate ``size=`` option and don't forget to adjust the
 size in the config file as well.
 
-.. code-block::
+.. code-block:: none
 
    # /etc/fstab
    tmpfs	/var/cache/knot-resolver	tmpfs	rw,size=2G,uid=knot-resolver,gid=knot-resolver,nosuid,nodev,noexec,mode=0700 0 0
