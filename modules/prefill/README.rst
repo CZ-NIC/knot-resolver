@@ -15,8 +15,8 @@ Example configuration is:
 	prefill.config({
               ['.'] = {
                       url = 'https://www.internic.net/domain/root.zone',
-                      ca_file = '/etc/pki/tls/certs/ca-bundle.crt',
                       interval = 86400  -- seconds
+                      ca_file = '/etc/pki/tls/certs/ca-bundle.crt', -- optional
               }
         })
 
@@ -27,7 +27,7 @@ Root zone to import must be signed using DNSSEC and the resolver must have valid
 .. csv-table::
  :header: "Parameter", "Description"
 
- "ca_file", "path to CA certificate bundle used to authenticate the HTTPS connection"
+ "ca_file", "path to CA certificate bundle used to authenticate the HTTPS connection (optional, system-wide store will be used if not specified)"
  "interval", "number of seconds between zone data refresh attempts"
  "url", "URL of a file in :rfc:`1035` zone file format"
 

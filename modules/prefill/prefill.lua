@@ -7,11 +7,13 @@ local rz_event_id = nil
 
 local rz_default_interval = 86400
 local rz_https_fail_interval = 600
-local rz_no_ta_interval = 600
+local rz_import_error_interval = 600
 local rz_cur_interval = rz_default_interval
 local rz_interval_randomizator_limit = 10
 local rz_interval_threshold = 5
 local rz_interval_min = 3600
+
+local rz_first_try = true
 
 local prefill = {}
 
@@ -77,7 +79,7 @@ local function download(url, fname)
 	end
 
 	log("[prefill] downloading root zone to file %s ...", fname)
-	rcode, errmsg = kluautil.kr_https_fetch(url, rz_ca_file, file)
+	rcode, errmsg = kluautil.kr_https_fetch(url, file, rz_ca_file)
 	if rcode == nil then
 		error(string.format("[prefill] fetch of `%s` failed: %s", url, errmsg))
 	end
@@ -111,6 +113,7 @@ function forward_references.fill_cache()
 				.. "will retry root zone download in %s",
 				errmsg, display_delay(rz_cur_interval))
 			restart_timer(rz_cur_interval)
+			os.remove(rz_local_fname)
 			return
 		end
 		file_ttl = rz_default_interval
@@ -119,8 +122,13 @@ function forward_references.fill_cache()
 	-- import/filter function gets executed after resolver/module
 	local ok, errmsg = pcall(import, rz_local_fname)
 	if not ok then
-		rz_cur_interval = rz_no_ta_interval
-					- math.random(rz_interval_randomizator_limit)
+		if rz_first_try then
+			rz_first_try = false
+			rz_cur_interval = 1
+		else
+			rz_cur_interval = rz_import_error_interval
+				- math.random(rz_interval_randomizator_limit)
+		end
 		log("[prefill] root zone import failed (%s), retry in %s",
 			errmsg, display_delay(rz_cur_interval))
 	else
@@ -156,10 +164,6 @@ local function config_zone(zone_cfg)
 		rz_cur_interval = zone_cfg.interval
 	end
 
-	if not zone_cfg.ca_file then
-		error('[prefill] option ca_file must point '
-			.. 'to a file with CA certificate(s) in PEM format')
-	end
 	rz_ca_file = zone_cfg.ca_file
 
 	if not zone_cfg.url or not string.match(zone_cfg.url, '^https://') then
