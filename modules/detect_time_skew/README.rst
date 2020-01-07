@@ -1,7 +1,7 @@
 .. _mod-detect_time_skew:
 
 System time skew detector
--------------------------
+=========================
 
 This module compares local system time with inception and expiration time
 bounds in DNSSEC signatures for ``. NS`` records. If the local system time is

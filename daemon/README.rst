@@ -35,7 +35,6 @@ TODO: Basics
 
 
 .. _`JSON-encoded`: http://json.org/example
-.. _`Learn Lua in 15 minutes`: http://tylerneylon.com/a/learn-lua/
 .. _`PowerDNS Recursor`: https://doc.powerdns.com/md/recursor/scripting/
 .. _libuv: https://github.com/libuv/libuv
 .. _Lua: https://www.lua.org/about.html

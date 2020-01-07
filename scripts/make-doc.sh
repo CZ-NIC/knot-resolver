@@ -12,4 +12,5 @@ fi
 
 set -o errexit -o nounset
 
+rm -rf doc/html
 ${SPHINX} -W -b html -d doc/.doctrees doc doc/html

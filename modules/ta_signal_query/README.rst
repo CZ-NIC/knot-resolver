@@ -1,7 +1,7 @@
 .. _mod-ta_signal_query:
 
 Signaling Trust Anchor Knowledge in DNSSEC
-------------------------------------------
+==========================================
 
 The module for Signaling Trust Anchor Knowledge in DNSSEC Using Key Tag Query,
 implemented according to :rfc:`8145#section-5`.

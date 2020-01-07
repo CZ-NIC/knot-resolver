@@ -1,5 +1,5 @@
 Garbage Collector
-^^^^^^^^^^^^^^^^^
+-----------------
 
 Knot Resolver employs a separate garbage collector daemon which periodically trims the cache to keep its size below size limit configured using :envvar:`cache.size`.
 

@@ -1,13 +1,8 @@
-.. _dnssec-config:
+Trust anchors
+=============
 
-DNSSEC, data verification
-=========================
-
-Since version 4.0, **DNSSEC validation is enabled by default**.
-This is secure default and should not be changed unless absolutely necessary.
-
-**Options in this section are intended only for expert users and normally
-should not be needed.**
+.. warning:: Options in this section are intended only for expert users and
+   normally should not be needed.
 
 If you really need to turn DNSSEC off and are okay with lowering security of your
 system by doing so, add the following snippet to your configuration file.
@@ -125,7 +120,4 @@ Following functions allow to modify DNSSEC configuration *if you really have to*
 
    Return string with summary of configured DNSSEC trust anchors, including negative TAs.
 
-DNSSEC is main technology to protect data, but it is also possible to change how strictly
-resolver checks data from insecure DNS zones:
-
-.. include:: ../lib/layer/mode.rst
+.. _lua-http: https://luarocks.org/modules/daurnimator/http

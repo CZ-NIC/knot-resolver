@@ -1,7 +1,7 @@
 .. _network-configuration:
 
 Server addresses
------------------
+================
 
 Modern Linux distributions use so-called *Systemd socket activation*, which
 effectively means that IP addresses and ports to listen on are configured
@@ -17,7 +17,8 @@ Most notable examples of such systems are CentOS 7 and macOS.
         addresses if the network address ranges overlap,
         and clients would probably refuse such a response.
 
-**Network configuration using systemd**
+Network configuration using systemd
+-----------------------------------
 
 If you're using our packages with systemd with sockets support (not supported
 on CentOS 7), network interfaces are configured using systemd drop-in files.
@@ -161,7 +162,8 @@ is unlikely.
 Also, don't forget to :ref:`load http module in configuration <mod-http-example>`
 file, otherwise the socket won't work.
 
-**Legacy network configuration using configuration file**
+Legacy network configuration using configuration file
+-----------------------------------------------------
 
 If you don't use systemd with sockets to run kresd, addresses and ports to listen
 on are configured in the config file.
@@ -208,7 +210,8 @@ Examples:
    Close all endpoints listening on the specified address, optionally restricted by port as well.
 
 
-**Additional network configuration options**
+Additional network configuration options
+----------------------------------------
 
 Following commands are useful in special situations and can be usef with and without systemd socket activation:
 
@@ -285,50 +288,5 @@ Following commands are useful in special situations and can be usef with and wit
 
    .. warning:: Please note that too large limit may have negative impact on performance and can lead to increased number of SERVFAIL answers.
 
-Client
-------
-Following settings affect client part of the resolver, i.e. communication between the resolver itself and other DNS servers.
+.. _`dnsproxy module`: https://www.knot-dns.cz/docs/2.7/html/modules.html#dnsproxy-tiny-dns-proxy
 
-.. envvar:: net.ipv4 = true|false
-
-   :return: boolean (default: true)
-
-   Enable/disable using IPv4 for contacting upstream nameservers.
-
-.. function:: net.outgoing_v4([string address])
-
-   Get/set the IPv4 address used to perform queries.
-   The default is ``nil``, which lets the OS choose any address.
-
-.. envvar:: net.ipv6 = true|false
-
-   :return: boolean (default: true)
-
-   Enable/disable using IPv6 for contacting upstream nameservers.
-
-.. function:: net.outgoing_v6([string address])
-
-   Get/set the IPv6 address used to perform queries.
-   The default is ``nil``, which lets the OS choose any address.
-
-DNS protocol
-------------
-Following settings change low-level details of DNS protocol implementation.
-Default values should not be changed except for very special cases.
-
-.. function:: net.bufsize([udp_bufsize])
-
-   Get/set maximum EDNS payload size advertised in DNS packets. Default is 4096 bytes and the default will be lowered to value around 1220 bytes in future, once `DNS Flag Day 2020 <https://dnsflagday.net/>`_ becomes effective.
-
-   Minimal value allowed by standard :rfc:`6891` is 512 bytes, which is equal to DNS packet size without Extension Mechanisms for DNS. Value 1220 bytes is minimum size required in DNSSEC standard :rfc:`4035`.
-
-   Example output:
-
-   .. code-block:: lua
-
-	> net.bufsize(4096)
-	nil
-	> net.bufsize()
-	4096
-
-.. include:: ../modules/workarounds/README.rst

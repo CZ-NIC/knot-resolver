@@ -1,8 +1,9 @@
 Cache
------
+=====
 
-Cache in Knot Resolver is stored on disk and also shared between `Multiple instances`_
-so resolver doesn't lose the cached data on restart or crash.
+Cache in Knot Resolver is stored on disk and also shared between
+:ref:`systemd-multiple-instances` so resolver doesn't lose the cached data on
+restart or crash.
 
 To improve performance even further the resolver implements so-called aggressive caching
 for DNSSEC-validated data (:rfc:`8198`), which improves performance and also protects
@@ -12,7 +13,7 @@ against some types of Random Subdomain Attacks.
 .. _`cache_sizing`:
 
 Sizing
-^^^^^^
+------
 
 For personal and small office use-cases cache size around 100 MB is more than enough.
 
@@ -39,7 +40,7 @@ Now you can configure cache size to be 90% of the free memory 14 928 MB, i.e. 13
 .. _`cache_persistence`:
 
 Persistence
-^^^^^^^^^^^
+-----------
 .. tip:: Using tmpfs for cache improves performance and reduces disk I/O.
 
 By default the cache is saved on a persistent storage device
@@ -80,7 +81,7 @@ size in the config file as well.
 .. _tmpfs: https://en.wikipedia.org/wiki/Tmpfs
 
 Configuration reference
-^^^^^^^^^^^^^^^^^^^^^^^
+-----------------------
 
 .. function:: cache.open(max_size[, config_uri])
 
