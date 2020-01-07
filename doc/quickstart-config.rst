@@ -1,115 +1,4 @@
-.. _startguide:
-
-Welcome to Knot Resolver Quick Start Guide! This chapter will guide you through first installation and basic setup recommended for your use-case.
-
-Before we start let us explain basic conventions used in this text:
-
-This is Linux/Unix shell command to be executed and an output from this command:
-
-.. code-block:: bash
-
-    $ echo "This is output!"
-    This is output!
-    $ echo "We use sudo to execute commands as root:"
-    We use sudo to execute commands as root:
-    $ sudo id
-    uid=0(root) gid=0(root) groups=0(root)
-
-Snippets from Knot Resolver's configuration file **do not start with $ sign** and look like this:
-
-.. code-block:: lua
-
-    -- this is a comment
-    -- following line will start listening on IP address 192.0.2.1 port 53
-    net.listen('192.0.2.1')
-
-
-************
-Installation
-************
-
-As a first step add following repositories with the **latest version** of Knot Resolver. Please note that the packages available in distribution's repositories are often outdated, especially in Debian and Ubuntu repositories, and this guide might not work with their old versions.
-
-**Arch Linux**
-
-Use
-`knot-resolver <https://aur.archlinux.org/packages/knot-resolver/>`_
-package from AUR_.
-
-**CentOS**
-
-.. code-block:: bash
-
-    $ sudo yum install -y https://secure.nic.cz/files/knot-resolver/knot-resolver-release.el.rpm
-    $ sudo yum install -y knot-resolver
-
-**Debian/Ubuntu**
-
-.. code-block:: bash
-
-    $ wget https://secure.nic.cz/files/knot-resolver/knot-resolver-release.deb
-    $ sudo dpkg -i knot-resolver-release.deb
-    $ sudo apt update
-    $ sudo apt install -y knot-resolver
-
-**Fedora**
-
-.. code-block:: bash
-
-    $ sudo dnf install -y https://secure.nic.cz/files/knot-resolver/knot-resolver-release.fedora.rpm
-    $ sudo dnf install -y knot-resolver
-
-**OpenSUSE Leap / Tumbleweed**
-
-Add the `OBS <https://en.opensuse.org/Portal:Build_Service>`_ package repository `home:CZ-NIC:knot-resolver-latest <https://build.opensuse.org/package/show/home:CZ-NIC:knot-resolver-latest/knot-resolver>`_ to your system.
-
-
-.. _startup:
-
-*******
-Startup
-*******
-
-The simplest way to run single instance of
-Knot Resolver is to use provided Knot Resolver's Systemd integration:
-
-.. code-block:: bash
-
-   $ sudo systemctl start kresd@1.service
-
-See logs and status of running instance with ``systemctl status kresd@1.service`` command. For more information about Systemd integration see ``man kresd.systemd``.
-
-.. warning::
-
-    ``kresd@*.service`` is not enabled by default, thus Knot Resolver won't start automatically after reboot.
-    To start and enable service in one command use ``systemctl enable --now kresd@1.service``
-
-First DNS query
-===============
-After installation and first startup, Knot Resolver's default configuration accepts queries on loopback interface. This allows you to test that the installation and service startup were successful before continuing with configuration.
-
-For instance, you can use DNS lookup utility ``kdig`` to send DNS queries. The ``kdig`` command is provided by following packages:
-
-============   =================
-Distribution   package with kdig
-============   =================
-Arch           knot
-CentOS         knot-utils
-Debian         knot-dnsutils
-Fedora         knot-utils
-OpenSUSE       knot-utils
-Ubuntu         knot-dnsutils
-============   =================
-
-The following query should return list of Root Name Servers:
-
-.. code-block:: bash
-
-    $ kdig +short @localhost . NS
-    a.root-servers.net.
-    ...
-    m.root-servers.net.
-
+.. _quickstart-config:
 
 *************
 Configuration
@@ -252,7 +141,7 @@ and to protect them from eavesdropping by TLS encryption.
     For this reason we recommend all users to use full VPN instead of encrypting *just* DNS queries.
     Following configuration is provided **only for users who cannot encrypt all their traffic**.
     For more information please see following articles:
-    
+
     - Simran Patil and Nikita Borisov. 2019. What can you learn from an IP? (`slides <https://irtf.org/anrw/2019/slides-anrw19-final44.pdf>`_, `the article itself <https://dl.acm.org/authorize?N687437>`_)
     - `Bert Hubert. 2019. Centralised DoH is bad for Privacy, in 2019 and beyond <https://labs.ripe.net/Members/bert_hubert/centralised-doh-is-bad-for-privacy-in-2019-and-beyond>`_
 
@@ -302,17 +191,12 @@ encryption you can move the cache to tmpfs_.
 See chapter :ref:`cache_persistence`.
 
 
-**********
-Next steps
-**********
+.. raw:: html
+
+   <h2>Next steps</h2>
+
 Congratulations! Your resolver is now up and running and ready for queries. For serious deployments do not forget to read :ref:`operation` chapter.
 
-
-
-.. _SNI: https://en.wikipedia.org/wiki/Server_Name_Indication
-.. _AUR: https://wiki.archlinux.org/index.php/Arch_User_Repository
 .. _`Learn Lua in 15 minutes`: http://tylerneylon.com/a/learn-lua/
 .. _`DNS Privacy Test Servers`: https://dnsprivacy.org/wiki/display/DP/DNS+Privacy+Test+Servers
-.. _lua-filesystem: https://keplerproject.github.io/luafilesystem//manual.html#reference
-.. _KnotDNS: https://www.knot-dns.cz/
 .. _tmpfs: https://en.wikipedia.org/wiki/Tmpfs

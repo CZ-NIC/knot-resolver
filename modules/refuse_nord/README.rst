@@ -1,7 +1,7 @@
 .. _mod-refuse_nord:
 
 Refuse queries without RD bit
------------------------------
+=============================
 
 This module ensures all queries without RD (recursion desired) bit set in query
 are answered with REFUSED. This prevents snooping on the resolver's cache content.

@@ -1,7 +1,7 @@
 .. _mod-detect_time_jump:
 
 Detect discontinuous jumps in the system time
----------------------------------------------
+=============================================
 
 This module detect discontinuous jumps in the system time when resolver
 is running.  It clears cache when a significant backward time jumps occurs.

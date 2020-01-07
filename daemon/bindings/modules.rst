@@ -1,5 +1,6 @@
 Modules
--------
+=======
+
 Knot Resolver functionality consists of separate modules, which allow you
 to mix-and-match features you need without slowing down operation
 by features you do not use.
