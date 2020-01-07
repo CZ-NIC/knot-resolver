@@ -334,6 +334,27 @@ static int cdb_open(struct lmdb_env *env, const char *path, size_t mapsize,
 		return lmdb_error(ret);
 	}
 
+#if !defined(__MACOSX__) && !(defined(__APPLE__) && defined(__MACH__))
+	auto_free char *mdb_datafile = kr_strcatdup(2, path, "/data.mdb");
+	int fd = open(mdb_datafile, O_RDWR);
+	if (fd == -1) {
+		mdb_txn_abort(txn);
+		stats->close++;
+		mdb_env_close(env->env);
+		return kr_error(errno);
+	}
+
+	ret = posix_fallocate(fd, 0, mapsize);
+	if (ret != 0) {
+		mdb_txn_abort(txn);
+		stats->close++;
+		mdb_env_close(env->env);
+		close(fd);
+		return kr_error(ret);
+	}
+	close(fd);
+#endif
+
 	stats->commit++;
 	ret = mdb_txn_commit(txn);
 	if (ret != MDB_SUCCESS) {

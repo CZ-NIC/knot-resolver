@@ -6,6 +6,7 @@ Improvements
 - use SO_REUSEPORT_LB if available (FreeBSD 12.0+)
 - lua: remove dependency on lua-socket and lua-sec, used lua-http and cqueues (#512, #521, !894)
 - net.listen(): allow binding to non-local address with freebind option (!898)
+- cache: pre-allocate the file to avoid SIGBUS later (not macOS; !917, #525)
 
 
 Knot Resolver 4.3.0 (2019-12-04)
