@@ -208,7 +208,8 @@ static int cache_open(lua_State *L)
 	if (ret != 0) {
 		char cwd[PATH_MAX];
 		get_workdir(cwd, sizeof(cwd));
-		return luaL_error(L, "can't open cache path '%s'; working directory '%s'", opts.path, cwd);
+		return luaL_error(L, "can't open cache path '%s'; working directory '%s'; %s",
+				  opts.path, cwd, kr_strerror(ret));
 	}
 
 	/* Store current configuration */
