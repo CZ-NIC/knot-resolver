@@ -38,6 +38,8 @@ test(
   args: [
     '-m', 'pytest',
     '-d',
+    '--html', 'pytests.parallel.html',
+    '--self-contained-html',
     '-n', '24',
     '-v',
   ],
