@@ -25,9 +25,9 @@ impact than cache settings and number of instances.
    daemon-bindings-cache
    systemd-multiinst
    modules-predict
-   modules-priming
-   modules-rfc7706
    modules-prefill
    modules-serve_stale
+   modules-rfc7706
+   modules-priming
    modules-edns_keepalive
 
