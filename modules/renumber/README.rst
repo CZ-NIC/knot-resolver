@@ -1,7 +1,7 @@
 .. _mod-renumber:
 
-Renumber
-========
+IP address renumbering
+======================
 
 The module renumbers addresses in answers to different address space.
 e.g. you can redirect malicious addresses to a blackhole, or use private address ranges
