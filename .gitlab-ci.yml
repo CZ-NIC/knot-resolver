@@ -282,7 +282,7 @@ root.hints:
     - scripts/update-root-hints.sh
 
 test:valgrind:
-  <<: *test
+  <<: *test_flaky
   when: delayed
   start_in: '30 seconds'
   script:
@@ -296,6 +296,11 @@ pytests:
   dependencies:
     - build-asan
   stage: extended  # use this stage to avoid clash with other resource-intensive jobs
+  artifacts:
+    when: always
+    paths:
+      - build_ci*/meson-logs/testlog*.txt
+      - tests/pytests/*.html
   script:
     - ${MESON_TEST} --suite pytests
 
