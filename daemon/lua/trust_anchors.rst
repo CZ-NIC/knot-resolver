@@ -1,9 +1,7 @@
-Trust anchors
-=============
-
 .. warning:: Options in this section are intended only for expert users and
    normally should not be needed.
 
+Since version 4.0, **DNSSEC validation is enabled by default**.
 If you really need to turn DNSSEC off and are okay with lowering security of your
 system by doing so, add the following snippet to your configuration file.
 
