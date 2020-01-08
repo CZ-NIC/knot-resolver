@@ -341,7 +341,7 @@ static int cdb_open(struct lmdb_env *env, const char *path, size_t mapsize,
 		mdb_txn_abort(txn);
 		stats->close++;
 		mdb_env_close(env->env);
-		return errno;
+		return kr_error(errno);
 	}
 
 	ret = posix_fallocate(fd, 0, mapsize);
@@ -350,7 +350,7 @@ static int cdb_open(struct lmdb_env *env, const char *path, size_t mapsize,
 		stats->close++;
 		mdb_env_close(env->env);
 		close(fd);
-		return ret;
+		return kr_error(ret);
 	}
 	close(fd);
 #endif
