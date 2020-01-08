@@ -135,8 +135,20 @@ option(
     'enabled',
     'disabled',
   ],
-  value: 'auto',
+  value: 'disabled',
   description: 'build kresc client binary',
+)
+
+option(
+  'sysrepo',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'auto',
+  description: 'build with sysrepo integration',
 )
 
 option(

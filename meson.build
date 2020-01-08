@@ -112,6 +112,20 @@ systemd_files = get_option('systemd_files')
 libsystemd = dependency('libsystemd', required: systemd_files == 'enabled')
 message('---------------------------')
 
+### Sysrepo
+message('--- sysrepo dependencies ---')
+libsysrepo = dependency('libsysrepo', version: '>=1', required: false)
+libyang = dependency('libyang', version: '>=1', required: false)
+sysrepo_build = get_option('sysrepo')
+if (sysrepo_build == 'auto' or sysrepo_build == 'enabled') and libsysrepo.found() and libyang.found()
+  enable_sysrepo = true
+elif sysrepo_build == 'enabled' and not libsysrepo.found() and not libyang.found()
+  error('sysrepo=enabled requires libsysrepo and libyang')
+else
+  enable_sysrepo = false
+endif
+message('---------------------------')
+
 ## Compiler args
 add_project_arguments(
   '-D_GNU_SOURCE',
@@ -169,6 +183,7 @@ conf_data.set('SYSTEMD_VERSION',
   libsystemd.found() ? libsystemd.version().to_int() : -1)
 conf_data.set('NOVERBOSELOG', not verbose_log)
 conf_data.set('ENABLE_SENDMMSG', sendmmsg.to_int())
+conf_data.set('ENABLE_SYSREPO', enable_sysrepo.to_int())
 conf_data.set('ENABLE_CAP_NG', capng.found())
 
 kresconfig = configure_file(
@@ -275,6 +290,8 @@ run_target(
 # https://github.com/mesonbuild/meson/issues/2404
 s_managed_ta = managed_ta ? 'enabled' : 'disabled'
 s_install_root_keys = install_root_keys ? 'enabled' : 'disabled'
+s_systemd_socket = libsystemd.found() ? 'enabled' : 'disabled'
+s_enable_sysrepo = enable_sysrepo ? 'enabled' : 'disabled'
 s_build_client = build_client ? 'enabled' : 'disabled'
 s_build_utils = build_utils ? 'enabled' : 'disabled'
 s_build_dnstap = build_dnstap ? 'enabled' : 'disabled'
@@ -307,6 +324,7 @@ message('''
     cache_dir:          @0@'''.format(systemd_cache_dir) + '''
 
   optional components
+    sysrepo:            @0@'''.format(s_enable_sysrepo) + '''
     client:             @0@'''.format(s_build_client) + '''
     utils:              @0@'''.format(s_build_utils) + '''
     dnstap:             @0@'''.format(s_build_dnstap) + '''
