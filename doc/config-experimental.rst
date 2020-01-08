@@ -1,12 +1,12 @@
 *********************
-Experimental Features
+Experimental features
 *********************
 
-The functionality and API of experimental features may changed or be dropped
-without any advance notice.
+Following functionality and APIs are in continuous development.
+Features in this section may changed, replaced or dropped in any release.
 
 .. toctree::
    :maxdepth: 1
 
-   modules-experimental_dot_auth
    daemon-scripting
+   modules-experimental_dot_auth
