@@ -37,6 +37,14 @@ Now you can configure cache size to be 90% of the free memory 14 928 MB, i.e. 13
    -- 90 % of free memory after machine restart
    cache.size = 13453 * MB
 
+It is also possible to set the cache size based on the file system size. This is useful
+if you use a dedicated partition for cache (e.g. non-persistent tmpfs). It is recommended
+to leave some free space for special files, such as locks.:
+
+.. code-block:: lua
+
+   cache.size = cache.fssize() - 10*MB
+
 .. note:: The :ref:`garbage-collector` can be used to periodically trim the
    cache. It is enabled and configured by default when running kresd with
    systemd integration.
@@ -68,9 +76,9 @@ and will be lost on power-off or reboot.
    multiple systemd units, and a shared tmpfs space could be used up by other
    applications, leading to ``SIGBUS`` errors during runtime.
 
-Mounting the cache directory as tmpfs_ is recommended approach.
-Make sure to use appropriate ``size=`` option and don't forget to adjust the
-size in the config file as well.
+Mounting the cache directory as tmpfs_ is the recommended approach.  Make sure
+to use appropriate ``size=`` option and don't forget to adjust the size in the
+config file as well.
 
 .. code-block:: none
 
@@ -79,8 +87,8 @@ size in the config file as well.
 
 .. code-block:: lua
 
-   # /etc/knot-resolver/config
-   cache.size = 2 * GB
+   -- /etc/knot-resolver/kresd.conf
+   cache.size = cache.fssize() - 10*MB
 
 .. _tmpfs: https://en.wikipedia.org/wiki/Tmpfs
 
@@ -166,6 +174,10 @@ Configuration reference
    Close the cache.
 
    .. note:: This may or may not clear the cache, depending on the cache backend.
+
+.. function:: cache.fssize()
+
+   :return: Partition size of cache storage.
 
 .. function:: cache.stats()
 
