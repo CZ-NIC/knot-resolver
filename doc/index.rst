@@ -43,6 +43,7 @@ and it provides a state-machine like API for extensions.
    :maxdepth: 2
 
    build
+   modules-http-custom-services
    lib
    modules_api
    worker_api
