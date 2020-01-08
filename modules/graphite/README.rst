@@ -1,7 +1,7 @@
 .. _mod-graphite:
 
 Graphite/InfluxDB/Metronome
-===========================
+---------------------------
 
 The ``graphite`` sends statistics over the Graphite_ protocol to either Graphite_, Metronome_, InfluxDB_ or any compatible storage. This allows powerful visualization over metrics collected by Knot Resolver.
 
@@ -36,7 +36,7 @@ The module supports sending data to multiple servers at once.
 	}
 
 Dependencies
-------------
+^^^^^^^^^^^^
 
 * `lua cqueues <https://25thandclement.com/~william/projects/cqueues.html>`_ package.
 
