@@ -22,9 +22,9 @@ and it provides a state-machine like API for extensions.
 
    config-overview
    config-network
-   config-logging-monitoring
-   config-policy
    config-performance
+   config-policy
+   config-logging-monitoring
    config-dnssec
    config-experimental
 
