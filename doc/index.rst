@@ -22,10 +22,10 @@ and it provides a state-machine like API for extensions.
 
    config-overview
    config-network
-   config-dnssec
    config-logging-monitoring
    config-policy
    config-performance
+   config-dnssec
    config-experimental
 
 .. _operation:

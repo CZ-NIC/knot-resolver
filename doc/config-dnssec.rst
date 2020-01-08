@@ -4,13 +4,10 @@
 DNSSEC, data verification
 *************************
 
-Since version 4.0, **DNSSEC validation is enabled by default**.
-This is secure default and should not be changed unless absolutely necessary.
+Good news! Knot Resolver uses secure configuration by default, and this configuration
+should not be changed unless absolutely necessary, so feel free to skip over this section.
 
 .. include:: ../daemon/lua/trust_anchors.rst
-
-TODO: Some heading?
-===================
 
 DNSSEC is main technology to protect data, but it is also possible to change how strictly
 resolver checks data from insecure DNS zones:
