@@ -1,10 +1,10 @@
 .. _mod-dnstap:
 
-Dnstap
-======
+Dnstap (traffic collection)
+===========================
 
 The ``dnstap`` module supports logging DNS responses to a unix socket
-in dnstap_ format using fstrm framing library.
+in `dnstap format <https://dnstap.info>`_ using fstrm framing library.
 This logging is useful if you need effectivelly log all DNS traffic.
 
 The unix socket and the socket reader must be present before starting resolver instances.
