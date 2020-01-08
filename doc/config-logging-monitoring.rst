@@ -34,8 +34,6 @@ If none of these options fits your deployment or if you have special needs you c
 
    modules-nsid
    modules-stats
-   modules-graphite
-   modules-http-prometheus
    modules-dnstap
    modules-watchdog
    modules-bogus_log
