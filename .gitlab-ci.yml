@@ -282,7 +282,7 @@ root.hints:
     - scripts/update-root-hints.sh
 
 test:valgrind:
-  <<: *test
+  <<: *test_flaky
   when: delayed
   start_in: '30 seconds'
   script:
