@@ -41,6 +41,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <sys/un.h>
 
 /* Always compile-in log symbols, even if disabled. */
@@ -1244,5 +1245,17 @@ time_t kr_file_mtime (const char* fname) {
 	}
 
 	return fstat.st_mtime;
+}
+
+long long kr_fssize(const char *path)
+{
+	if (!path)
+		return kr_error(EINVAL);
+
+	struct statvfs buf;
+	if (statvfs(path, &buf) != 0)
+		return kr_error(errno);
+
+	return buf.f_frsize * buf.f_blocks;
 }
 
