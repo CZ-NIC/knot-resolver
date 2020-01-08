@@ -1,11 +1,11 @@
 .. _mod-http-trace:
 
-Tracing requests
-================
+Debugging a single request
+==========================
 
 The `HTTP module <mod-http>`_ provides ``/trace`` endpoint which allows to trace various
 aspects of the request execution. The basic mode allows you to resolve a query
-and trace verbose logs (and messages received):
+and trace verbose logs for it (and messages received):
 
 .. code-block:: bash
 
@@ -26,4 +26,5 @@ and trace verbose logs (and messages received):
    [ 8138] [iter] <= rcode: NOERROR
    [ 8138] [resl] finished: 4, queries: 1, mempool: 81952 B
 
-See chapter about `HTTP module <mod-http>`_ for further instructions how to load HTTP module.
+See chapter about `HTTP module <mod-http>`_ for further instructions how to load ``webmgmt``
+endpoint into HTTP module, it is a prerequisite for using ``/trace``.
