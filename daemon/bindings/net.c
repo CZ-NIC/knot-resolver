@@ -139,9 +139,14 @@ static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind,
 			ret = network_listen(&engine->net, str, port, flags);
 		}
 		if (ret != 0) {
-			const char *stype = flags.sock_type == SOCK_DGRAM ? "UDP" : "TCP";
-			kr_log_error("[system] bind to '%s@%d' (%s): %s\n",
-					str, port, stype, kr_strerror(ret));
+			if (str[0] == '/') {
+				kr_log_error("[system] bind to '%s' (UNIX): %s\n",
+						str, kr_strerror(ret));
+			} else {
+				const char *stype = flags.sock_type == SOCK_DGRAM ? "UDP" : "TCP";
+				kr_log_error("[system] bind to '%s@%d' (%s): %s\n",
+						str, port, stype, kr_strerror(ret));
+			}
 		}
 		return ret == 0;
 	}
