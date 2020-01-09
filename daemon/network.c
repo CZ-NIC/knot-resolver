@@ -59,11 +59,7 @@ static int endpoint_open_lua_cb(struct network *net, struct endpoint *ep,
 				ep->flags.kind, log_addr);
 		if (ep->family != AF_UNIX)
 			kr_log_error("#%d", ep->port);
-		kr_log_error("'.  Likely causes: typo or not loading 'http' module.\n");
-		/* No hard error, for now.  LATER: perhaps differentiate between
-		 * explicit net.listen() calls and "just unused" systemd sockets.
 		return kr_error(ENOENT);
-		*/
 	}
 	if (!pp) return kr_ok();
 
