@@ -1,14 +1,14 @@
 .. _mod-http:
 
-HTTP/2 services
-===============
+HTTP services
+=============
 
-This module does the heavy lifting to provide an HTTP/2 enabled
+This module does the heavy lifting to provide an HTTP and HTTP/2 enabled
 server which provides few built-in services and also allows other
 modules to export restful APIs and websocket streams.
 
 One example is statistics module that can stream live metrics on the website,
-or publish metrics on request for Prometheus scraper.
+or publish metrics on request for Prometheus scraper, and also :ref:`mod-http-doh`.
 
 By default this module provides two kinds of endpoints,
 and unlimited number of "used-defined kinds" can be added in configuration.
