@@ -589,6 +589,27 @@ void io_tty_accept(uv_stream_t *master, int status)
 	}
 }
 
+int io_listen_pipe(uv_loop_t *loop, uv_pipe_t *handle, int fd)
+{
+	if (!handle) {
+		return kr_error(EINVAL);
+	}
+	int ret = uv_pipe_init(loop, handle, 0);
+	if (ret) return ret;
+
+	ret = uv_pipe_open(handle, fd);
+	if (ret) return ret;
+
+	ret = uv_listen((uv_stream_t *)handle, 16, io_tty_accept);
+	if (ret != 0) {
+		return ret;
+	}
+
+	handle->data = NULL;
+
+	return 0;
+}
+
 int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family, bool has_tls)
 {
 	int ret = -1;
@@ -613,8 +634,10 @@ void io_deinit(uv_handle_t *handle)
 	if (!handle) {
 		return;
 	}
-	session_free(handle->data);
-	handle->data = NULL;
+	if (handle->data) {
+		session_free(handle->data);
+		handle->data = NULL;
+	}
 }
 
 void io_free(uv_handle_t *handle)
