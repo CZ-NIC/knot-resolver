@@ -233,6 +233,8 @@ Policy examples
 	policy.del(rule.id)
 
 
+.. _dns-graft:
+
 Replacing part of the DNS tree
 ------------------------------
 

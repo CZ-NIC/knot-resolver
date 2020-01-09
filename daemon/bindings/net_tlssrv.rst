@@ -1,7 +1,7 @@
 .. _tls-server-config:
 
 DNS-over-TLS server (DoT)
-=========================
+-------------------------
 
 DNS-over-TLS server (:rfc:`7858`) is enabled by default on loopback interface port 853.
 Information how to configure listening on specific IP addresses is in previous sections
