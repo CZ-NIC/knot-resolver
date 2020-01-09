@@ -260,7 +260,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 		kr_log_error(
 			"[system] error: standard input is not a terminal or pipe; "
 			"use '-f 1' if you want non-interactive mode.  "
-			"Commands can be simply added to your configuration file or sent over the tty/$PID control socket.\n"
+			"Commands can be simply added to your configuration file or sent over the control socket.\n"
 			);
 		return EXIT_FAILURE;
 	}

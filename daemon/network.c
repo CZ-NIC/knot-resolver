@@ -133,7 +133,8 @@ static void endpoint_close_lua_cb(struct network *net, struct endpoint *ep)
 
 static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 {
-	assert(!ep->handle != !ep->flags.kind);
+	bool control = ep->flags.kind && strcmp(ep->flags.kind, "control") == 0;
+
 	if (ep->family == AF_UNIX) { /* The FS name would be left behind. */
 		/* Extract local address for this socket. */
 		struct sockaddr_un sa;
@@ -147,7 +148,9 @@ static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 		}
 	}
 
-	if (ep->flags.kind) { /* Special endpoint. */
+	if (ep->flags.kind && !control) {
+		assert(!ep->handle);
+		/* Special lua-handled endpoint. */
 		if (ep->engaged) {
 			endpoint_close_lua_cb(net, ep);
 		}
@@ -158,6 +161,7 @@ static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 		return;
 	}
 
+	assert(ep->handle);
 	if (force) { /* Force close if event loop isn't running. */
 		if (ep->fd >= 0) {
 			close(ep->fd);
@@ -249,6 +253,7 @@ static int insert_endpoint(struct network *net, const char *addr, struct endpoin
 static int open_endpoint(struct network *net, struct endpoint *ep,
 			 const struct sockaddr *sa, const char *log_addr)
 {
+	bool control = ep->flags.kind && strcmp(ep->flags.kind, "control") == 0;
 	if ((sa != NULL) == (ep->fd != -1)) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
@@ -261,12 +266,21 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 		ep->fd = io_bind(sa, ep->flags.sock_type, &ep->flags);
 		if (ep->fd < 0) return ep->fd;
 	}
-	if (ep->flags.kind) {
+	if (ep->flags.kind && !control) {
 		/* This EP isn't to be managed internally after binding. */
 		return endpoint_open_lua_cb(net, ep, log_addr);
 	} else {
 		ep->engaged = true;
 		/* .engaged seems not really meaningful with .kind == NULL, but... */
+	}
+
+	if (control) {
+		uv_pipe_t *ep_handle = malloc(sizeof(uv_pipe_t));
+		ep->handle = (uv_handle_t *)ep_handle;
+		if (!ep->handle) {
+			return kr_error(ENOMEM);
+		}
+		return io_listen_pipe(net->loop, ep_handle, ep->fd);
 	}
 
 	if (ep->family == AF_UNIX) {
