@@ -1,3 +1,6 @@
+IPv4 and IPv6 usage
+-------------------
+
 Following settings affect client part of the resolver,
 i.e. communication between the resolver itself and other DNS servers.
 
