@@ -44,9 +44,6 @@ static int net_list_add(const char *key, void *val, void *ext)
 
 		lua_newtable(L);  // "transport" table
 
-		lua_pushboolean(L, ep->flags.freebind);
-		lua_setfield(L, -2, "freebind");
-
 		switch (ep->family) {
 		case AF_INET:
 			lua_pushliteral(L, "inet4");
@@ -73,6 +70,8 @@ static int net_list_add(const char *key, void *val, void *ext)
 		if (ep->family != AF_UNIX) {
 			lua_pushinteger(L, ep->port);
 			lua_setfield(L, -2, "port");
+			lua_pushboolean(L, ep->flags.freebind);
+			lua_setfield(L, -2, "freebind");
 		}
 
 		if (ep->family == AF_UNIX) {
