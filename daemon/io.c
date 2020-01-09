@@ -140,29 +140,31 @@ int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags
 	if (fd < 0) return kr_error(errno);
 
 	int yes = 1;
-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)))
-		return kr_error(errno);
+	if (addr->sa_family == AF_INET || addr->sa_family == AF_INET6) {
+		if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)))
+			return kr_error(errno);
 
 #ifdef SO_REUSEPORT_LB
-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT_LB, &yes, sizeof(yes)))
-		return kr_error(errno);
+		if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT_LB, &yes, sizeof(yes)))
+			return kr_error(errno);
 #elif defined(SO_REUSEPORT) && defined(__linux__) /* different meaning on (Free)BSD */
-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(yes)))
-		return kr_error(errno);
+		if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(yes)))
+			return kr_error(errno);
 #endif
 
 #ifdef IPV6_V6ONLY
-	if (addr->sa_family == AF_INET6
-	    && setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &yes, sizeof(yes)))
-		return kr_error(errno);
-#endif
-	if (flags != NULL && flags->freebind) {
-		int optlevel;
-		int optname;
-		int ret = family_to_freebind_option(addr->sa_family, &optlevel, &optname);
-		if (ret) return kr_error(ret);
-		if (setsockopt(fd, optlevel, optname, &yes, sizeof(yes)))
+		if (addr->sa_family == AF_INET6
+		    && setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &yes, sizeof(yes)))
 			return kr_error(errno);
+#endif
+		if (flags != NULL && flags->freebind) {
+			int optlevel;
+			int optname;
+			int ret = family_to_freebind_option(addr->sa_family, &optlevel, &optname);
+			if (ret) return kr_error(ret);
+			if (setsockopt(fd, optlevel, optname, &yes, sizeof(yes)))
+				return kr_error(errno);
+		}
 	}
 
 	if (bind(fd, addr, kr_sockaddr_len(addr)))
