@@ -1,181 +1,30 @@
-.. _network-configuration:
+Addresses and services
+----------------------
 
-Server addresses
-================
+Addresses, ports, protocols, and API calls available for clients communicating
+with resolver are configured using :func:`net.listen`.
 
-Modern Linux distributions use so-called *Systemd socket activation*, which
-effectively means that IP addresses and ports to listen on are configured
-in Systemd configuration files.
-
-Older Linux systems and all non-Linux systems do not support this modern method
-and have to resort to old fashioned way of configuring network interfaces using
-``net.listen()`` configuration call.
-Most notable examples of such systems are CentOS 7 and macOS.
-
-.. warning:: On machines with multiple IP addresses avoid listening on wildcards
-        ``0.0.0.0`` or ``::``. Knot Resolver could answer from different IP
-        addresses if the network address ranges overlap,
-        and clients would probably refuse such a response.
-
-Network configuration using systemd
------------------------------------
-
-If you're using our packages with systemd with sockets support (not supported
-on CentOS 7), network interfaces are configured using systemd drop-in files.
-
-Each protocol has its own configuration file. *By default, these are configured
-to listen on localhost.*
+First you need to decide what service should be available on given IP address
++ port combination.
 
 .. csv-table::
-  :header: "**Network protocol**", "**Socket file name**"
+  :header: "Protocol/service", "net.listen *kind*"
 
-  "DNS (UDP+TCP, :rfc:`1034`)","``kresd.socket``"
-  ":ref:`DNS-over-TLS (DoT) <tls-server-config>`","``kresd-tls.socket``"
-  ":ref:`mod-http-doh`","``kresd-doh.socket``"
-  ":ref:`Web management <mod-http-built-in-services>`","``kresd-webmgmt.socket``"
-
-.. warning:: You MUST NOT repeat the localhost defaults in the following
-   drop-in overrides, otherwise the socket will fail to start with "Address in
-   use" error. To view the entire socket configuration, including any drop-ins,
-   use systemctl cat.
-
-To configure kresd to listen on a **public interface** using the original DNS protocol,
-create a drop-in file:
-
-.. code-block:: bash
-
-   $ systemctl edit kresd.socket
-
-.. code-block:: none
-
-   # /etc/systemd/system/kresd.socket.d/override.conf
-   # always listen on UDP (datagram) and TCP (stream) as well
-   [Socket]
-   ListenDatagram=192.0.2.115:53
-   ListenStream=192.0.2.115:53
-
-.. note:: If you change network interfaces of systemd sockets for already running
-   kresd instance, make sure to call ``systemctl restart system-kresd.slice`` for
-   these changes to take effect.
-
-Configuration you provide is automatically merged with defaults from your
-distribution. It is also possible to check resulting configuration using
-``systemctl cat``:
-
-.. code-block:: bash
-
-   $ systemctl cat kresd.socket
-
-.. code-block:: none
-
-   # merged result: user configuration + distro defaults
-   [Socket]
-   FileDescriptorName=dns
-   FreeBind=true
-   BindIPv6Only=both
-   ListenDatagram=[::1]:53
-   ListenStream=[::1]:53
-   ListenDatagram=127.0.0.1:53
-   ListenStream=127.0.0.1:53
-   ListenDatagram=192.0.2.115:53
-   ListenStream=192.0.2.115:53
+  "DNS (unencrypted UDP+TCP, :rfc:`1034`)","``dns``"
+  ":ref:`DNS-over-TLS (DoT) <tls-server-config>`","``tls``"
+  ":ref:`mod-http-doh`","``doh``"
+  ":ref:`Web management <mod-http-built-in-services>`","``webmgmt``"
 
 
-.. _kresd-socket-override-port:
 
-The default localhost interface/port can also be removed/overriden by using an
-empty ``ListenDatagram=`` or ``ListenStream=`` directive. This can be used when
-you want to configure kresd to listen on all IPv4/IPv6 network interfaces (if
-you've disabled IPv6 support in kernel, use ``0.0.0.0:port`` instead`` ).
-
-.. code-block:: none
-
-   # /etc/systemd/system/kresd.socket.d/override.conf
-   [Socket]
-   ListenDatagram=
-   ListenStream=
-   ListenDatagram=53
-   ListenStream=53
-
-.. note:: Using IPv6 to bind to IPv4 interfaces is currently not compatible
-   with IPv4 syntax in ``view:addr()`` when using the ``view`` module. For
-   possible workarounds, see
-   https://gitlab.labs.nic.cz/knot/knot-resolver/issues/445
-
-It can also be useful if you want to use the Knot DNS authoritative server
-with the `dnsproxy module`_ to have both resolver and authoritative server
-running on the same machine. This is not recommended configuration but it can
-be done like this:
-
-.. code-block:: none
-
-   # /etc/systemd/system/kresd.socket.d/override.conf
-   [Socket]
-   ListenDatagram=
-   ListenStream=
-   ListenDatagram=127.0.0.1:53000
-   ListenStream=127.0.0.1:53000
-   ListenDatagram=[::1]:53000
-   ListenStream=[::1]:53000
-
-.. _kresd-tls-socket-override-port:
-
-The ``kresd-tls.socket`` can also be configured in the same way to listen for
-DNS-over-TLS connections (:rfc:`7858`).
-
-.. code-block:: bash
-
-   $ systemctl edit kresd-tls.socket
-
-.. code-block:: none
-
-   # /etc/systemd/system/kresd-tls.socket.d/override.conf
-   # specify only TCP (stream), DTLS is not supported
-   [Socket]
-   ListenStream=192.0.2.115:853
-
-When configuring sockets for :ref:`mod-http-doh`, make sure you have
-``kresd-doh.socket`` installed, it might be part of a separate
-``knot-resolver-module-http`` package.
-
-.. warning:: Make sure you read section :ref:`mod-http-doh` before exposing
-             the DoH protocol to outside.
-
-For example, to remove the default localhost:44353 and listen on all interfaces
-on port 443, create the following drop-in file for ``kresd-doh.socket``:
-
-.. code-block:: bash
-
-   $ systemctl edit kresd-doh.socket
-
-.. code-block:: bash
-
-   # /etc/systemd/system/kresd-doh.socket.d/override.conf
-   [Socket]
-   ListenStream=
-   ListenStream=443
-
-Make sure no other service is using port 443, as that will result in
-unpredictable behaviour. Alternately, you can use port 44353 where a collision
-is unlikely.
-
-Also, don't forget to :ref:`load http module in configuration <mod-http-example>`
-file, otherwise the socket won't work.
-
-Legacy network configuration using configuration file
------------------------------------------------------
-
-If you don't use systemd with sockets to run kresd, addresses and ports to listen
-on are configured in the config file.
+*By default, these are configured to listen on localhost.*
 
 .. function:: net.listen(addresses, [port = 53, { kind = 'dns', freebind = false }])
 
-   :return: boolean
+   :return: ``true`` if port is bound, an error otherwise
 
    Listen on addresses; port and flags are optional.
    The addresses can be specified as a string or device.
-   The command can be given multiple times,
-   but repeating an address-port combination is an error.
    Port 853 implies ``kind = 'tls'`` but it is always better to be explicit.
    Freebind allows binding to a non-local or not yet available address.
 
@@ -203,17 +52,22 @@ Examples:
 .. warning:: Make sure you read section :ref:`mod-http-doh` before exposing
              the DNS-over-HTTP protocol to outside.
 
+.. warning:: On machines with multiple IP addresses avoid listening on wildcards
+        ``0.0.0.0`` or ``::``. Knot Resolver could answer from different IP
+        addresses if the network address ranges overlap,
+        and clients would probably refuse such a response.
+
+
+Features for scripting
+^^^^^^^^^^^^^^^^^^^^^^
+Following configuration functions are useful mainly for scripting or :ref:`runtime-cfg`.
+
 .. function:: net.close(address, [port])
 
    :return: boolean (at least one endpoint closed)
 
    Close all endpoints listening on the specified address, optionally restricted by port as well.
 
-
-Additional network configuration options
-----------------------------------------
-
-Following commands are useful in special situations and can be usef with and without systemd socket activation:
 
 .. function:: net.list()
 

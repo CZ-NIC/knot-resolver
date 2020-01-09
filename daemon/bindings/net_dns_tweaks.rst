@@ -1,5 +1,5 @@
 DNS protocol tweaks
-===================
+-------------------
 
 Following settings change low-level details of DNS protocol implementation.
 Default values should not be changed except for very special cases.
