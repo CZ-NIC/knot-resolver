@@ -354,7 +354,6 @@ static int parse_args(int argc, char **argv, struct args *args)
 	struct option opts[] = {
 		{"addr",       required_argument, 0, 'a'},
 		{"tls",        required_argument, 0, 't'},
-		{"fd",         required_argument, 0, 'S'},
 		{"config",     required_argument, 0, 'c'},
 		{"forks",      required_argument, 0, 'f'},
 		{"noninteractive",   no_argument, 0, 'n'},
@@ -362,9 +361,10 @@ static int parse_args(int argc, char **argv, struct args *args)
 		{"quiet",            no_argument, 0, 'q'},
 		{"version",          no_argument, 0, 'V'},
 		{"help",             no_argument, 0, 'h'},
+		{"fd",         required_argument, 0, 'S'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:t:S:c:f:nm:K:k:vqVh", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:t:c:f:nvqVhS:", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
