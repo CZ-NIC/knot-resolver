@@ -272,7 +272,6 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	}
 
 	/* Control sockets or TTY */
-	auto_free char *sock_file = NULL;
 	uv_pipe_t pipe;
 	uv_pipe_init(loop, &pipe, 0);
 	pipe.data = args;
@@ -281,19 +280,8 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 			printf("[system] interactive mode\n> ");
 		uv_pipe_open(&pipe, 0);
 		uv_read_start((uv_stream_t*) &pipe, io_tty_alloc, io_tty_process_input);
-	} else {
-		int pipe_ret = -1;
-		if (args->control_fd != -1) {
-			pipe_ret = uv_pipe_open(&pipe, args->control_fd);
-		} else {
-			(void) mkdir("tty", S_IRWXU|S_IRWXG);
-			sock_file = afmt("tty/%ld", (long)getpid());
-			if (sock_file) {
-				pipe_ret = uv_pipe_bind(&pipe, sock_file);
-			}
-		}
-		if (!pipe_ret)
-			uv_listen((uv_stream_t *) &pipe, 16, io_tty_accept);
+	} else if (args->control_fd != -1 && uv_pipe_open(&pipe, args->control_fd)) {
+		uv_listen((uv_stream_t *) &pipe, 16, io_tty_accept);
 	}
 	/* Watch IPC pipes (or just assign them if leading the pgroup). */
 	if (!leader) {
@@ -312,9 +300,6 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 #endif
 	/* Run event loop */
 	uv_run(loop, UV_RUN_DEFAULT);
-	if (sock_file) {
-		unlink(sock_file);
-	}
 	uv_close((uv_handle_t *)&pipe, NULL); /* Seems OK even on the stopped loop. */
 	return EXIT_SUCCESS;
 }
