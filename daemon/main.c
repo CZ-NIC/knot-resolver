@@ -232,7 +232,8 @@ static void help(int argc, char *argv[])
 	       " -t, --tls=[addr]       Server address for TLS (default: off).\n"
 	       " -S, --fd=[fd:kind]     Listen on given fd (handed out by supervisor, :kind is optional).\n"
 	       " -c, --config=[path]    Config file path (relative to [rundir]) (default: config).\n"
-	       " -f, --forks=N          Start N forks sharing the configuration.\n"
+	       " -f, --forks=N          Start N forks sharing the configuration (implies -n).\n"
+	       " -n, --noninteractive   Don't start the read-eval-print loop for stdin+stdout.\n"
 	       " -q, --quiet            No command prompt in interactive mode.\n"
 	       " -v, --verbose          Run in verbose mode."
 #ifdef NOVERBOSELOG
@@ -356,13 +357,14 @@ static int parse_args(int argc, char **argv, struct args *args)
 		{"fd",         required_argument, 0, 'S'},
 		{"config",     required_argument, 0, 'c'},
 		{"forks",      required_argument, 0, 'f'},
+		{"noninteractive",   no_argument, 0, 'n'},
 		{"verbose",          no_argument, 0, 'v'},
 		{"quiet",            no_argument, 0, 'q'},
 		{"version",          no_argument, 0, 'V'},
 		{"help",             no_argument, 0, 'h'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:t:S:c:f:m:K:k:vqVh", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:t:S:c:f:nm:K:k:vqVh", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
@@ -376,13 +378,15 @@ static int parse_args(int argc, char **argv, struct args *args)
 			array_push(args->config, optarg);
 			break;
 		case 'f':
-			args->interactive = false;
 			args->forks = strtol_10(optarg);
 			if (args->forks <= 0) {
 				kr_log_error("[system] error '-f' requires a positive"
 						" number, not '%s'\n", optarg);
 				return EXIT_FAILURE;
 			}
+			/* fall through */
+		case 'n':
+			args->interactive = false;
 			break;
 		case 'v':
 			kr_verbose_set(true);
