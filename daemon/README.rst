@@ -539,11 +539,11 @@ with the ``-v`` option.  You can also toggle it on runtime with
 
    $ kresd -v
 
-To run the daemon by hand, such as under ``nohup``, use ``-f 1`` to start a single fork. For example:
+To run the daemon by hand, such as under ``nohup``, use ``-n`` to start in non-interactive mode. For example:
 
 .. code-block:: bash
 
-   $ nohup ./daemon/kresd -a 127.0.0.1 -f 1 -v &
+   $ nohup ./daemon/kresd -a 127.0.0.1 -n -v &
 
 
 Control sockets
