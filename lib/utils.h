@@ -51,6 +51,7 @@ typedef void (*trace_log_f)(const struct kr_query *query, const char *source, co
 
 #define kr_log_info printf
 #define kr_log_error(...) fprintf(stderr, ## __VA_ARGS__)
+#define kr_log_deprecate(...) fprintf(stderr, "deprecation warning: " __VA_ARGS__)
 
 /* Always export these, but override direct calls by macros conditionally. */
 /** Whether in --verbose mode.  Only use this for reading. */

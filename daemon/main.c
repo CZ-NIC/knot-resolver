@@ -382,7 +382,6 @@ static void help(int argc, char *argv[])
 	       " -t, --tls=[addr]       Server address for TLS (default: off).\n"
 	       " -S, --fd=[fd:kind]     Listen on given fd (handed out by supervisor, :kind is optional).\n"
 	       " -c, --config=[path]    Config file path (relative to [rundir]) (default: config).\n"
-	       " -f, --forks=N          Start N forks sharing the configuration (implies -n).\n"
 	       " -n, --noninteractive   Don't start the read-eval-print loop for stdin+stdout.\n"
 	       " -q, --quiet            No command prompt in interactive mode.\n"
 	       " -v, --verbose          Run in verbose mode."
@@ -544,6 +543,11 @@ static int parse_args(int argc, char **argv, struct args *args)
 			break;
 		case 'f':
 			args->forks = strtol_10(optarg);
+			if (args->forks == 1) {
+				kr_log_deprecate("use --noninteractive instead of --forks=1\n");
+			} else {
+				kr_log_deprecate("support for running multiple --forks will be removed\n");
+			}
 			if (args->forks <= 0) {
 				kr_log_error("[system] error '-f' requires a positive"
 						" number, not '%s'\n", optarg);

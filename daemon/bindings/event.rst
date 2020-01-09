@@ -113,9 +113,6 @@ The `event` package provides a very basic mean for non-blocking execution - it a
 
    Pause execution of current function (asynchronously if running inside a worker coroutine).
 
-When daemon is running in forked mode, each process acts independently. This is good because it reduces software complexity and allows for runtime scaling, but not ideal because of additional operational burden.
-For example, when you want to add a new policy, you'd need to add it to either put it in the configuration, or execute command on each process independently. The daemon simplifies this by promoting process group leader which is able to execute commands synchronously over forks.
-
    Example:
 
    .. code-block:: lua
@@ -123,6 +120,7 @@ For example, when you want to add a new policy, you'd need to add it to either p
       worker.sleep(1)
 
 .. function:: map(expr)
+.. deprecated:: 5.0.0 Forked mode should not be used anymore.  Use a supervisor instead, e.g. systemd.
 
    Run expression synchronously over all forks, results are returned as a table ordered as forks. Expression can be any valid expression in Lua.
 
