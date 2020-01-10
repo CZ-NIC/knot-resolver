@@ -1,3 +1,10 @@
+Knot Resolver 5.2.0 (2020-xx-xx)
+================================
+
+Improvements
+------------
+- lower default EDNS buffer size to 1232 (#538, #300, !920)
+
 Knot Resolver 5.1.1 (2020-05-19)
 ================================
 
@@ -58,7 +65,6 @@ Improvements
 - cache: add cache.fssize() lua function to configure entire free disk space on
   dedicated cache partition (#524, !932)
 
-
 Knot Resolver 5.0.0 (2020-01-27)
 ================================
 
@@ -89,7 +95,6 @@ Bugfixes
 - correctly use EDNS(0) padding in failed answers (!921)
 - policy and daf modules: fix postrules and reroute rules (!901)
 - renumber module: don't accidentally zero-out request's .state (!901)
-
 
 Knot Resolver 4.3.0 (2019-12-04)
 ================================
