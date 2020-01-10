@@ -8,7 +8,7 @@ Bugfixes
 Improvements
 ------------
 - cache: add fssize lua function to configure entire free disk space on dedicated cache partition (#524, !932)
-
+- lower default EDNS buffer size to 1232 (#538, #300, !920)
 
 Knot Resolver 5.0.0 (2020-01-27)
 ================================
@@ -28,18 +28,6 @@ Improvements
 - lua: remove dependency on lua-socket and lua-sec, used lua-http and cqueues (#512, #521, !894)
 - lua: remove dependency on lua-filesystem (#520, !912)
 - net.listen(): allow binding to non-local address with freebind option (!898)
-- cache: pre-allocate the file to avoid SIGBUS later (not macOS; !917, #525)
-- lua: be stricter around nonsense returned from modules (!901)
-- user documentation was reorganized and extended (!900, !867)
-- multiple config files can be used with --config/-c option (!909)
-- lua: stop trying to tweak lua's GC (!201)
-- systemd: add SYSTEMD_INSTANCE env variable to identify different instances (!906)
-
-Bugfixes
---------
-- correctly use EDNS(0) padding in failed answers (!921)
-- policy and daf modules: fix postrules and reroute rules (!901)
-- renumber module: don't accidentally zero-out request's .state (!901)
 
 
 Knot Resolver 4.3.0 (2019-12-04)
