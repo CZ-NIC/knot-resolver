@@ -254,7 +254,14 @@ EOF
 
 ${CDEFS} ${KRESD} types <<-EOF
 	endpoint_flags_t
+	# struct args is a bit complex
+	addr_array_t
+	flagged_fd_t
+	flagged_fd_array_t
+	config_array_t
+	struct args
 EOF
+echo "struct args *the_args;"
 
 echo "struct endpoint"    | ${CDEFS} ${KRESD} types | sed 's/uv_handle_t \*/void */'
 echo "struct request_ctx" | ${CDEFS} ${KRESD} types | sed '/struct {/,$ d'
