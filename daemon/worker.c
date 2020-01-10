@@ -2051,6 +2051,11 @@ int worker_init(struct engine *engine, int worker_id, int worker_count)
 	lua_pushnumber(engine->L, worker_count);
 	lua_setfield(engine->L, -2, "count");
 
+	char cwd[PATH_MAX];
+	get_workdir(cwd, sizeof(cwd));
+	lua_pushstring(engine->L, cwd);
+	lua_setfield(engine->L, -2, "cwd");
+
 	the_worker = worker;
 	loop->data = the_worker;
 	/* ^^^^ This shouldn't be used anymore, but it's hard to be 100% sure. */
