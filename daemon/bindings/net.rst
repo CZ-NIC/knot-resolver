@@ -286,9 +286,9 @@ Following commands are useful in special situations and can be usef with and wit
 
 .. function:: net.bufsize([udp_bufsize])
 
-   Get/set maximum EDNS payload size advertised in DNS packets. Default is 4096 bytes and the default will be lowered to value around 1220 bytes in future, once `DNS Flag Day 2020 <https://dnsflagday.net/>`_ becomes effective.
+   Get/set maximum EDNS payload size advertised in DNS packets. Default is 1232 bytes. Default was 4096 bytes in the past, but it was lowered on `DNS Flag Day 2020 <https://dnsflagday.net/>`_ event.
 
-   Minimal value allowed by standard :rfc:`6891` is 512 bytes, which is equal to DNS packet size without Extension Mechanisms for DNS. Value 1220 bytes is minimum size required in DNSSEC standard :rfc:`4035`.
+   Minimal value allowed by standard :rfc:`6891` is 512 bytes, which is equal to DNS packet size without Extension Mechanisms for DNS. Minimum size required in DNSSEC standard :rfc:`4035` is 1220 bytes.
 
    Example output:
 
