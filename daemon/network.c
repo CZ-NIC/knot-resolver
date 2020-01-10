@@ -22,6 +22,7 @@
 #include "daemon/worker.h"
 
 #include <assert.h>
+#include <libgen.h>
 #include <sys/un.h>
 #include <unistd.h>
 
@@ -263,6 +264,14 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 	}
 
 	if (sa) {
+		if (sa->sa_family == AF_UNIX) {
+			struct sockaddr_un *sun = (struct sockaddr_un*)sa;
+			char *dirc = strdup(sun->sun_path);
+			char *dname = dirname(dirc);
+			(void)unlink(sun->sun_path);  /** Attempt to unlink if socket path exists. */
+			(void)mkdir(dname, S_IRWXU|S_IRWXG);  /** Attempt to create dir. */
+			free(dirc);
+		}
 		ep->fd = io_bind(sa, ep->flags.sock_type, &ep->flags);
 		if (ep->fd < 0) return ep->fd;
 	}
