@@ -7,6 +7,10 @@ Improvements
 - lua: remove dependency on lua-socket and lua-sec, used lua-http and cqueues (#512, #521, !894)
 - net.listen(): allow binding to non-local address with freebind option (!898)
 
+Bugfixes
+--------
+- correctly use EDNS(0) padding in failed answers (!921)
+
 
 Knot Resolver 4.3.0 (2019-12-04)
 ================================
