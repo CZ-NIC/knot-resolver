@@ -3,6 +3,7 @@ Knot Resolver 5.2.0 (2020-1m-dd)
 
 Improvements
 ------------
+- lower default EDNS buffer size to 1232 (#538, #300, !920)
 - net: split the EDNS buffer size into upstream and downstream (!1026)
 - lua-http doh: answer to /dns-query endpoint as well as /doh (!1069)
 - improve resiliency against UDP fragmentation attacks (disable PMTUD) (!1061)
