@@ -15,6 +15,8 @@ and *client configuration*.
 
 .. image:: server_terminology.svg
 
+*Attribution: Icons by Bernar Novalyi from the Noun Project*
+
 For *resolver's clients* the resolver itself acts as a DNS server.
 
 After receiving a query the resolver will attempt to find
