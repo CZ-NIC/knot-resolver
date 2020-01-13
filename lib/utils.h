@@ -22,6 +22,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <netinet/in.h>
+#include <unistd.h>
 
 #include <gnutls/gnutls.h>
 #include <gnutls/crypto.h>
@@ -184,6 +185,14 @@ static inline long time_diff(struct timeval *begin, struct timeval *end) {
     return res.tv_sec * 1000 + res.tv_usec / 1000;
 }
 
+/** Get current working directory with fallback value. */
+static inline void get_workdir(char *out, size_t len) {
+	if(getcwd(out, len) == NULL) {
+		static const char errprefix[] = "<invalid working directory>";
+		strncpy(out, errprefix, len);
+	}
+}
+
 /** @cond internal Array types */
 struct kr_context;
 
@@ -195,6 +204,7 @@ struct ranked_rr_array_entry {
 	bool yielded : 1;
 	bool to_wire : 1; /**< whether to be put into the answer */
 	bool expiring : 1; /**< low remaining TTL; see is_expiring; only used in cache ATM */
+	bool in_progress : 1; /**< build of RRset in progress, i.e. different format of RR data */
 	knot_rrset_t *rr;
 };
 typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
@@ -230,7 +240,7 @@ static inline uint64_t kr_rand_bytes(unsigned int size)
 	kr_rnd_buffered(data, size);
 	/* I would have liked to dump the random data into a size_t directly,
 	 * but that would work well only on little-endian machines,
-	 * so intsead I hope that the compiler will optimize this out.
+	 * so instead I hope that the compiler will optimize this out.
 	 * (Tested via reading assembly from usual gcc -O2 setup.)
 	 * Alternatively we could waste more rnd bytes, but that seemed worse. */
 	result = 0;
@@ -407,10 +417,17 @@ KR_EXPORT
 int kr_rrkey(char *key, uint16_t class, const knot_dname_t *owner,
 	     uint16_t type, uint16_t additional);
 
-/** @internal Add RRSet copy to ranked RR array. */
+/** Add RRSet copy to a ranked RR array.
+ *
+ * To convert to standard RRs inside, you need to call _finalize() afterwards,
+ * and the memory of rr->rrs.rdata has to remain until then.
+ */
 KR_EXPORT
 int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 			  uint8_t rank, bool to_wire, uint32_t qry_uid, knot_mm_t *pool);
+/** Finalize in_progress sets - all with matching qry_uid. */
+KR_EXPORT
+int kr_ranked_rrarray_finalize(ranked_rr_array_t *array, uint32_t qry_uid, knot_mm_t *pool);
 
 /** @internal Mark the RRSets from particular query as
  * "have (not) to be recorded in the final answer".
@@ -533,3 +550,4 @@ KR_EXPORT uint16_t kr_pkt_qtype(const knot_pkt_t *pkt);
 KR_EXPORT uint32_t kr_rrsig_sig_inception(const knot_rdata_t *rdata);
 KR_EXPORT uint32_t kr_rrsig_sig_expiration(const knot_rdata_t *rdata);
 KR_EXPORT uint16_t kr_rrsig_type_covered(const knot_rdata_t *rdata);
+KR_EXPORT time_t kr_file_mtime (const char* fname);

@@ -13,6 +13,7 @@ Build-Depends:
  liblmdb-dev,
  libluajit-5.1-dev,
  libsystemd-dev (>= 227) [linux-any],
+ libcap-ng-dev,
  libuv1-dev,
  luajit,
  pkg-config,
@@ -21,6 +22,7 @@ Build-Depends:
  python3-breathe,
  python3-sphinx,
  python3-sphinx-rtd-theme,
+ libssl-dev,
 Homepage: https://www.knot-resolver.cz/
 
 Package: knot-resolver
@@ -28,9 +30,6 @@ Architecture: any
 Depends:
  adduser,
  dns-root-data,
- lua-sec,
- lua-socket,
- lua-filesystem,
  systemd,
  ${misc:Depends},
  ${shlibs:Depends},
@@ -41,6 +40,7 @@ Breaks:
 Recommends:
  lua-basexx,
  lua-cqueues,
+ lua-http,
  lua-psl,
 Suggests:
  knot-resolver-module-http,
@@ -75,7 +75,7 @@ Description: Debug symbols for Knot Resolver
 Package: knot-resolver-module-http
 Architecture: all
 Depends:
- knot-resolver,
+ knot-resolver (= ${binary:Version}),
  libjs-bootstrap,
  libjs-d3,
  libjs-jquery,

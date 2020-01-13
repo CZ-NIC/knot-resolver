@@ -32,7 +32,6 @@ if rawget(kres, 'str2dname') ~= nil then
 	todname = kres.str2dname
 end
 
-
 worker.resolve_pkt = function (pkt, options, finish, init)
 	options = kres.mk_qflags(options)
 	local task = ffi.C.worker_resolve_start(pkt, options)
@@ -413,7 +412,6 @@ setfenv(0, _G)
 
 -- Load default modules
 trust_anchors = require('trust_anchors')
-@sd_watchdog@
 modules.load('ta_update')
 modules.load('ta_signal_query')
 modules.load('policy')
@@ -423,6 +421,7 @@ modules.load('detect_time_jump')
 modules.load('ta_sentinel')
 modules.load('edns_keepalive')
 modules.load('refuse_nord')
+modules.load('watchdog')
 
 -- Load keyfile_default
 trust_anchors.add_file('@keyfile_default@', @unmanaged@)

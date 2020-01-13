@@ -26,6 +26,9 @@ config_tests += [
   ['cache.clear', files('cache.test/clear.test.lua')],
 ]
 
+integr_tests += [
+  ['cache_insert_ns', join_paths(meson.current_source_dir(), 'cache.test', 'insert_ns.test.integr')]
+]
 
 kresd_deps = [
   contrib_dep,
@@ -38,6 +41,7 @@ kresd_deps = [
   luajit,
   gnutls,
   libsystemd,
+  capng,
 ]
 
 

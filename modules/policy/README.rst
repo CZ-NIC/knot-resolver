@@ -113,6 +113,8 @@ Instead of CAs, you can specify hashes of accepted certificates in ``pin_sha256`
 They are in the usual format -- base64 from sha256.
 You may still specify ``hostname`` if you want SNI_ to be sent.
 
+.. _tls-examples:
+
 TLS Examples
 ~~~~~~~~~~~~
 
@@ -315,7 +317,7 @@ Most properties (actions, filters) are described above.
   :param action: action to be performed for the slice
 
   This function splits the entire domain space into multiple slices (determined
-  by the number of provided ``action``s) A ``slice_func`` is called to determine
+  by the number of provided ``actions``). A ``slice_func`` is called to determine
   which slice a query belongs to. The corresponding ``action`` is then executed.
 
 

@@ -37,7 +37,7 @@ static int edns_keepalive_finalize(kr_layer_t *ctx)
 		req->qsource.flags.tcp &&
 		src_opt != NULL &&
 		knot_edns_get_option(src_opt, KNOT_EDNS_OPTION_TCP_KEEPALIVE
-					#if KNOT_VERSION_MINOR >= 9
+					#if KNOT_VERSION_HEX >= 0x020900
 						, NULL
 					#endif
 				) &&

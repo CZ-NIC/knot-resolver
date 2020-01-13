@@ -1,4 +1,52 @@
-Knot Resolver 4.x.y (2019-08-dd)
+Knot Resolver 4.x.y (20yy-mm-dd)
+
+Improvements
+------------
+- logging: control-socket commands don't log unless --verbose (#528)
+- use SO_REUSEPORT_LB if available (FreeBSD 12.0+)
+- lua: remove dependency on lua-socket and lua-sec, used lua-http and cqueues (#512, #521, !894)
+- net.listen(): allow binding to non-local address with freebind option (!898)
+- cache: pre-allocate the file to avoid SIGBUS later (not macOS; !917, #525)
+
+
+Knot Resolver 4.3.0 (2019-12-04)
+================================
+
+Security - CVE-2019-19331
+-------------------------
+- fix speed of processing large RRsets (DoS, #518)
+- improve CNAME chain length accounting (DoS, !899)
+
+Bugfixes
+--------
+- http module: use SO_REUSEPORT (!879)
+- systemd: kresd@.service now properly starts after network interfaces
+  have been configured with IP addresses after reboot (!884)
+- sendmmsg: improve reliability (!704)
+- cache: fix crash on insertion via lua for NS and CNAME (!889)
+- rpm package: move root.keys to /var/lib/knot-resolver (#513, !888)
+
+Improvements
+------------
+- increase file-descriptor count limit to maximum allowed value (hard limit; !876)
+- watchdog module: support testing a DNS query (and switch C -> lua; !878, !881)
+- performance: use sendmmsg syscall towards clients by default (!877)
+- performance: avoid excessive getsockname() syscalls (!854)
+- performance: lua-related improvements (!874)
+- daemon now attempts to drop all capabilities (!896)
+- reduce CNAME chain length limit - now <= 12 (!899)
+
+
+Knot Resolver 4.2.2 (2019-10-07)
+================================
+
+Bugfixes
+--------
+- lua bindings: fix a 4.2.1 regression on 32-bit systems (#514)
+  which also fixes libknot 2.9 support on all systems
+
+
+Knot Resolver 4.2.1 (2019-09-26)
 ================================
 
 Bugfixes
@@ -6,8 +54,9 @@ Bugfixes
 - rebinding module: fix handling some requests, respect ALLOW_LOCAL flag
 - fix incorrect SERVFAIL on cached bogus answer for +cd request (!860)
   (regression since 4.1.0 release, in less common cases)
-- validation: trim TTLs by RRSIG's expiration and original TTL (#319, #504)
 - prefill module: allow a different module-loading style (#506)
+- validation: trim TTLs by RRSIG's expiration and original TTL (#319, #504)
+- NS choice algorithm: fix a regression since 4.0.0 (#497, !868)
 - policy: special domains home.arpa. and local. get NXDOMAIN (!855)
 
 Improvements

@@ -59,7 +59,7 @@ static int rdataset_materialize(knot_rdataset_t * restrict rds, const uint8_t * 
 	/* TODO: we might overrun here already, but we need to trust cache anyway...*/
 	const uint32_t rds_size = rdataset_dematerialized_size(d, &rds->count);
 	d += KR_CACHE_RR_COUNT_SIZE;
-	#if KNOT_VERSION_MINOR >= 9
+	#if KNOT_VERSION_HEX >= 0x020900
 		rds->size = rds_size;
 	#endif
 	if (d + rds_size > data_bound) {

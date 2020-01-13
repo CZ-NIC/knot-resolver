@@ -44,6 +44,7 @@ BuildRequires:  pkgconfig(libknot) >= 2.8
 BuildRequires:  pkgconfig(libzscanner) >= 2.8
 BuildRequires:  pkgconfig(libdnssec) >= 2.8
 BuildRequires:  pkgconfig(libsystemd)
+BuildRequires:  pkgconfig(libcap-ng)
 BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
 
@@ -55,9 +56,7 @@ BuildRequires:  lmdb-devel
 # Lua 5.1 version of the libraries have different package names
 Requires:       lua-basexx
 Requires:       lua-psl
-Requires:       lua-socket
-Requires:       lua-sec
-Requires:       lua-filesystem
+Requires:       lua-http
 Requires(pre):  shadow-utils
 %endif
 %if 0%{?fedora}
@@ -65,19 +64,20 @@ BuildRequires:  pkgconfig(lmdb)
 BuildRequires:  python3-sphinx
 Requires:       lua5.1-basexx
 Requires:       lua5.1-cqueues
+Requires:       lua5.1-http
 Recommends:     lua5.1-psl
-Requires:       lua-filesystem-compat
-Requires:       lua-socket-compat
-Requires:       lua-sec-compat
 Requires(pre):  shadow-utils
 %endif
+
+# we do not build HTTP module on SuSE so the build requires is not needed
+%if "x%{?suse_version}" == "x"
+BuildRequires:  openssl-devel
+%endif
+
 %if 0%{?suse_version}
 %define NINJA ninja
 BuildRequires:  lmdb-devel
 BuildRequires:  python3-Sphinx
-Requires:       lua51-luafilesystem
-Requires:       lua51-luasocket
-Requires:       lua51-luasec
 Requires(pre):  shadow
 %endif
 
@@ -119,7 +119,7 @@ Documentation for Knot Resolver
 %if "x%{?suse_version}" == "x"
 %package module-http
 Summary:        HTTP/2 module for Knot Resolver
-Requires:       knot-resolver
+Requires:       %{name} = %{version}-%{release}
 %if 0%{?fedora}
 Requires:       lua5.1-http
 Requires:       lua5.1-mmdb
@@ -154,6 +154,8 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
     -Dclient=enabled \
     -Dunit_tests=enabled \
     -Dmanaged_ta=enabled \
+    -Dkeyfile_default="%{_sharedstatedir}/knot-resolver/root.keys" \
+    -Dinstall_root_keys=enabled \
     -Dinstall_kresd_conf=enabled \
     --buildtype=plain \
     --prefix="%{_prefix}" \
@@ -233,11 +235,12 @@ systemctl daemon-reload
 %doc %{_pkgdocdir}/AUTHORS
 %doc %{_pkgdocdir}/NEWS
 %doc %{_pkgdocdir}/examples
-%attr(775,root,knot-resolver) %dir %{_sysconfdir}/knot-resolver
+%attr(755,root,knot-resolver) %dir %{_sysconfdir}/knot-resolver
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/kresd.conf
-%attr(664,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/root.keys
 %attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/root.hints
-%attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/icann-ca.pem
+%attr(644,root,knot-resolver) %{_sysconfdir}/knot-resolver/icann-ca.pem
+%attr(775,root,knot-resolver) %dir %{_sharedstatedir}/knot-resolver
+%attr(664,root,knot-resolver) %{_sharedstatedir}/knot-resolver/root.keys
 %{_unitdir}/kresd@.service
 %{_unitdir}/kres-cache-gc.service
 %{_unitdir}/kresd.target
@@ -284,6 +287,7 @@ systemctl daemon-reload
 %{_libdir}/knot-resolver/kres_modules/ta_signal_query.lua
 %{_libdir}/knot-resolver/kres_modules/ta_update.lua
 %{_libdir}/knot-resolver/kres_modules/view.lua
+%{_libdir}/knot-resolver/kres_modules/watchdog.lua
 %{_libdir}/knot-resolver/kres_modules/workarounds.lua
 %{_mandir}/man8/kresd.8.gz
 
@@ -305,6 +309,7 @@ systemctl daemon-reload
 %{_unitdir}/kresd-doh.socket
 %{_unitdir}/kresd-webmgmt.socket
 %endif
+%{_libdir}/knot-resolver/debug_opensslkeylog.so
 %{_libdir}/knot-resolver/kres_modules/http
 %{_libdir}/knot-resolver/kres_modules/http*.lua
 %{_libdir}/knot-resolver/kres_modules/prometheus.lua

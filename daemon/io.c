@@ -104,7 +104,37 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	mp_flush(worker->pkt_pool.ctx);
 }
 
-int io_bind(const struct sockaddr *addr, int type)
+static int family_to_freebind_option(sa_family_t sa_family, int *level, int *name)
+{
+	switch (sa_family) {
+	case AF_INET:
+		*level = IPPROTO_IP;
+#if defined(IP_FREEBIND)
+		*name = IP_FREEBIND;
+#elif defined(IP_BINDANY)
+		*name = IP_BINDANY;
+#else
+		return kr_error(ENOTSUP);
+#endif
+		break;
+	case AF_INET6:
+#if defined(IP_FREEBIND)
+		*level = IPPROTO_IP;
+		*name = IP_FREEBIND;
+#elif defined(IPV6_BINDANY)
+		*level = IPPROTO_IPV6;
+		*name = IPV6_BINDANY;
+#else
+		return kr_error(ENOTSUP);
+#endif
+		break;
+	default:
+		return kr_error(ENOTSUP);
+	}
+	return kr_ok();
+}
+
+int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags)
 {
 	const int fd = socket(addr->sa_family, type, 0);
 	if (fd < 0) return kr_error(errno);
@@ -112,15 +142,28 @@ int io_bind(const struct sockaddr *addr, int type)
 	int yes = 1;
 	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)))
 		return kr_error(errno);
-#ifdef SO_REUSEPORT
+
+#ifdef SO_REUSEPORT_LB
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT_LB, &yes, sizeof(yes)))
+		return kr_error(errno);
+#elif defined(SO_REUSEPORT) && defined(__linux__) /* different meaning on (Free)BSD */
 	if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(yes)))
 		return kr_error(errno);
 #endif
+
 #ifdef IPV6_V6ONLY
 	if (addr->sa_family == AF_INET6
 	    && setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &yes, sizeof(yes)))
 		return kr_error(errno);
 #endif
+	if (flags != NULL && flags->freebind) {
+		int optlevel;
+		int optname;
+		int ret = family_to_freebind_option(addr->sa_family, &optlevel, &optname);
+		if (ret) return kr_error(ret);
+		if (setsockopt(fd, optlevel, optname, &yes, sizeof(yes)))
+			return kr_error(errno);
+	}
 
 	if (bind(fd, addr, kr_sockaddr_len(addr)))
 		return kr_error(errno);
@@ -220,7 +263,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 {
 	struct session *s = handle->data;
 	assert(s && session_get_handle(s) == (uv_handle_t *)handle &&
-	       handle->type == UV_TCP);	
+	       handle->type == UV_TCP);
 
 	if (session_flags(s)->closing) {
 		return;

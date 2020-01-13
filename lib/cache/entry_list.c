@@ -268,7 +268,6 @@ int entry_h_splice(
 	/* Now we're in trouble.  In some cases, parts of data to be written
 	 * is an lmdb entry that may be invalidated by our write request.
 	 * (lmdb does even in-place updates!) Therefore we copy all into a buffer.
-	 * (We don't bother deallocating from the mempool.)
 	 * LATER(optim.): do this only when neccessary, or perhaps another approach.
 	 * This is also complicated by the fact that the val_new_entry part
 	 * is to be written *afterwards* by the caller.
@@ -281,13 +280,13 @@ int entry_h_splice(
 		.len = entry_list_serial_size(el),
 		.data = NULL,
 	};
-	void *buf = mm_alloc(&qry->request->pool, val.len);
-	entry_list_memcpy(buf, el);
+	uint8_t buf[val.len];
+	entry_list_memcpy((struct entry_apex *)buf, el);
 	ret = cache_write_or_clear(cache, &key, &val, qry);
 	if (ret) return kr_error(ret);
 	memcpy(val.data, buf, val.len); /* we also copy the "empty" space, but well... */
 	val_new_entry->data = (uint8_t *)val.data
-			    + ((uint8_t *)el[i_type].data - (uint8_t *)buf);
+			    + ((uint8_t *)el[i_type].data - buf);
 	return kr_ok();
 }
 

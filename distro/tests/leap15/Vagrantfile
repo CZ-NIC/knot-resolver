@@ -4,8 +4,7 @@
 
 Vagrant.configure(2) do |config|
 
-    config.vm.box = "openSUSE-Leap-15.1-Vagrant.x86_64"
-    config.vm.box_url = "https://download.opensuse.org/repositories/Virtualization:/Appliances:/Images:/openSUSE-Leap-15.1/images/boxes/openSUSE-Leap-15.1-Vagrant.x86_64.json"
+    config.vm.box = "generic/opensuse15"
 
     config.vm.synced_folder ".", "/vagrant", disabled: true
 
@@ -18,6 +17,7 @@ Vagrant.configure(2) do |config|
     config.vm.provider :libvirt do |libvirt|
       libvirt.cpus = 1
       libvirt.memory = 1024
+      libvirt.disk_bus = "sata"
     end
 
     config.vm.provider :virtualbox do |vbox|
