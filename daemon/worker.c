@@ -275,7 +275,8 @@ static int subreq_key(char *dst, knot_pkt_t *pkt)
 static struct request_ctx *request_create(struct worker_ctx *worker,
 					  struct session *session,
 					  const struct sockaddr *peer,
-					  const uint8_t eth_addrs[2][6],
+					  const uint8_t *eth_from,
+					  const uint8_t *eth_to,
 					  uint32_t uid)
 {
 	knot_mm_t pool = {
@@ -298,8 +299,11 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		assert(session_flags(session)->outgoing == false);
 	}
 	ctx->source.session = session;
-	if (eth_addrs) {
-		memcpy(ctx->source.eth_addrs, eth_addrs, sizeof(ctx->source.eth_addrs));
+	if (eth_to) {
+		memcpy(&ctx->source.eth_addrs[0], eth_to,   sizeof(ctx->source.eth_addrs[0]));
+	}
+	if (eth_from) {
+		memcpy(&ctx->source.eth_addrs[1], eth_from, sizeof(ctx->source.eth_addrs[1]));
 	}
 
 	struct kr_request *req = &ctx->req;
@@ -1160,9 +1164,20 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	} else
 	if ((src_handle->type == UV_UDP || src_handle->type == UV_POLL)
 			&& ctx->source.addr.ip.sa_family == AF_INET) {
-		kr_xsk_push(session_get_sockname(source_session)/*FIXME*/,
-				&ctx->source.addr.ip, &ctx->req, task, ctx->source.eth_addrs);
-		ret = 0;
+
+		knot_xsk_msg_t msg;
+		const struct sockaddr *ip_from = session_get_sockname(source_session); // FIXME
+		const struct sockaddr *ip_to = &ctx->source.addr.ip;
+		memcpy(&msg.ip_from, ip_from, kr_sockaddr_len(ip_from));
+		memcpy(&msg.ip_to,   ip_to,   kr_sockaddr_len(ip_to));
+		msg.eth_from = ctx->source.eth_addrs[0];
+		msg.eth_to   = ctx->source.eth_addrs[1];
+		msg.payload.iov_base = ctx->req.answer->wire;
+		msg.payload.iov_len  = ctx->req.answer->size;
+		ret = knot_xsk_sendmsg(the_socket/*FIXME*/, &msg);
+		kr_log_verbose("[uxsk] pushed a packet, ret = %d\n", ret);
+		ret = qr_task_on_send(task, NULL/*doesn't matter for UDP*/, ret);
+
 	} else if (src_handle->type == UV_UDP && ENABLE_SENDMMSG) {
 		int fd;
 		ret = uv_fileno(src_handle, &fd);
@@ -1561,7 +1576,7 @@ static int parse_packet(knot_pkt_t *query)
 }
 
 int worker_submit(struct session *session, const struct sockaddr *peer,
-		  const uint8_t eth_addrs[2][6], knot_pkt_t *query)
+		  const uint8_t *eth_from, const uint8_t *eth_to, knot_pkt_t *query)
 {
 	if (!session) {
 		assert(false);
@@ -1595,8 +1610,9 @@ int worker_submit(struct session *session, const struct sockaddr *peer,
 	struct qr_task *task = NULL;
 	const struct sockaddr *addr = NULL;
 	if (!is_outgoing) { /* request from a client */
-		struct request_ctx *ctx = request_create(worker, session, peer, eth_addrs,
-							 knot_wire_get_id(query->wire));
+		struct request_ctx *ctx =
+			request_create(worker, session, peer, eth_from, eth_to,
+					 knot_wire_get_id(query->wire));
 		if (!ctx) {
 			return kr_error(ENOMEM);
 		}
@@ -1832,7 +1848,8 @@ struct qr_task *worker_resolve_start(knot_pkt_t *query, struct kr_qflags options
 	}
 
 
-	struct request_ctx *ctx = request_create(worker, NULL, NULL, NULL, worker->next_request_uid);
+	struct request_ctx *ctx = request_create(worker, NULL, NULL, NULL, NULL,
+						 worker->next_request_uid);
 	if (!ctx) {
 		return NULL;
 	}

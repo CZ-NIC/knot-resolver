@@ -50,7 +50,7 @@ void worker_deinit(void);
  * @return 0 or an error code
  */
 int worker_submit(struct session *session, const struct sockaddr *peer,
-		  const uint8_t eth_addrs[2][6], knot_pkt_t *query);
+		  const uint8_t *eth_from, const uint8_t *eth_to, knot_pkt_t *query);
 
 /**
  * End current DNS/TCP session, this disassociates pending tasks from this session
