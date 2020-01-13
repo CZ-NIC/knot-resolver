@@ -27,6 +27,7 @@ and it provides a state-machine like API for extensions.
    config-logging-monitoring
    config-dnssec
    config-experimental
+   config-no-systemd
 
 .. _operation:
 
