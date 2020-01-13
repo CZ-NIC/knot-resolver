@@ -12,22 +12,20 @@ local function getruleid()
 end
 
 -- Support for client sockets from inside policy actions
-local socket_client = function () return error("missing luasocket, can't create socket client") end
-local has_socket, socket = pcall(require, 'socket')
+local socket_client = function ()
+	return error("missing lua-cqueues library, can't create socket client")
+end
+local has_socket, socket = pcall(require, 'cqueues.socket')
 if has_socket then
 	socket_client = function (host, port)
 		local s, err, status
-		if host:find(':') then
-			s, err = socket.udp6()
-		else
-			s, err = socket.udp()
-		end
-		if not s then
-			return nil, err
-		end
-		status, err = s:setpeername(host, port)
+
+		s = socket.connect({ host = host, port = port, type = socket.SOCK_DGRAM })
+		s:setmode('bn', 'bn')
+		status, err = pcall(s.connect, s)
+
 		if not status then
-			return nil, err
+			return status, err
 		end
 		return s
 	end
@@ -65,13 +63,13 @@ end
 -- Mirror request elsewhere, and continue solving
 function policy.MIRROR(target)
 	local addr, port = addr_split_port(target, 53)
-	local sink, err = socket_client(addr, port)
+	local sink, err = socket_client(ffi.string(addr), port)
 	if not sink then panic('MIRROR target %s is not a valid: %s', target, err) end
 	return function(state, req)
 		if state == kres.FAIL then return state end
 		local query = req.qsource.packet
 		if query ~= nil then
-			sink:send(ffi.string(query.wire, query.size))
+			sink:send(ffi.string(query.wire, query.size), 1, tonumber(query.size))
 		end
 		return -- Chain action to next
 	end
@@ -777,9 +775,11 @@ local function special_names_optim(req, sname)
 	return
 		-- .a???. or .t???.
 		(root[-5] == 4 and (root[-4] == 97 or root[-4] == 116))
-		-- .on???. or .in?????.
+		-- .on???. or .in?????. or lo???. or *ost.
 		or (root[-6] == 5 and root[-5] == 111 and root[-4] == 110)
 		or (root[-8] == 7 and root[-7] == 105 and root[-6] == 110)
+		or (root[-6] == 5 and root[-5] == 108 and root[-4] == 111)
+		or (root[-3] == 111 and root[-2] == 115 and root[-1] == 116)
 end
 
 -- Top-down policy list walk until we hit a match

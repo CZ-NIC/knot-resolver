@@ -104,6 +104,10 @@ struct kr_query {
 	struct timeval timestamp; /**< Real time for TTL+DNSSEC checks (.tv_sec only). */
 	struct kr_zonecut zone_cut;
 	struct kr_layer_pickle *deferred;
+
+	/** Current xNAME depth, set by iterator.  0 = uninitialized, 1 = no CNAME, ...
+	 * See also KR_CNAME_CHAIN_LIMIT. */
+	int8_t cname_depth;
 	/** Pointer to the query that originated this one because of following a CNAME (or NULL). */
 	struct kr_query *cname_parent;
 	struct kr_request *request; /**< Parent resolution request. */

@@ -20,7 +20,7 @@ matrix:
     fast_finish: true
 env:
     global:
-        - KNOT_DNS_VERSION=2.8
+        - KNOT_DNS_VERSION=2.9
         - MALLOC_CHECK_=3
         - MALLOC_PERTURB_=223
 before_script:

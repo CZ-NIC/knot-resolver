@@ -501,10 +501,11 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	const knot_dname_t *cname = NULL;
 	const knot_dname_t *pending_cname = query->sname;
-	unsigned cname_chain_len = 0;
 	bool is_final = (query->parent == NULL);
-	uint32_t iter_count = 0;
 	bool strict_mode = (query->flags.STRICT);
+
+	query->cname_depth = query->cname_parent ? query->cname_parent->cname_depth : 1;
+
 	do {
 		/* CNAME was found at previous iteration, but records may not follow the correct order.
 		 * Try to find records for pending_cname owner from section start. */
@@ -562,14 +563,9 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			if ((query->stype == KNOT_RRTYPE_CNAME) || (rr->type != KNOT_RRTYPE_CNAME)) {
 				continue;
 			}
-			cname_chain_len += 1;
 			pending_cname = knot_cname_name(rr->rrs.rdata);
 			if (!pending_cname) {
 				break;
-			}
-			if (cname_chain_len > an->count || cname_chain_len > KR_CNAME_CHAIN_LIMIT) {
-				VERBOSE_MSG("<= too long cname chain\n");
-				return KR_STATE_FAIL;
 			}
 			/* Don't use pending_cname immediately.
 			 * There are can be records for "old" cname. */
@@ -577,8 +573,15 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 		if (!pending_cname) {
 			break;
 		}
+		if (++(query->cname_depth) > KR_CNAME_CHAIN_LIMIT) {
+			VERBOSE_MSG("<= error: CNAME chain exceeded max length %d\n",
+					/* people count objects from 0, no CNAME = 0 */
+					(int)KR_CNAME_CHAIN_LIMIT - 1);
+			return KR_STATE_FAIL;
+		}
+
 		if (knot_dname_is_equal(cname, pending_cname)) {
-			VERBOSE_MSG("<= cname chain loop\n");
+			VERBOSE_MSG("<= error: CNAME chain loop detected\n");
 			return KR_STATE_FAIL;
 		}
 		/* In strict mode, explicitly fetch each CNAME target. */
@@ -605,11 +608,7 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			cname = pending_cname;
 			break;
 		}
-	} while (++iter_count < KR_CNAME_CHAIN_LIMIT);
-	if (iter_count >= KR_CNAME_CHAIN_LIMIT) {
-		VERBOSE_MSG("<= too long cname chain\n");
-		return KR_STATE_FAIL;
-	}
+	} while (true);
 	*cname_ret = cname;
 	return kr_ok();
 }
@@ -1097,13 +1096,15 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return resolve_error(pkt, req);
 	}
 
+	int state;
 	/* Forwarding/stub mode is special. */
 	if (query->flags.STUB) {
-		return process_stub(pkt, req);
+		state = process_stub(pkt, req);
+		goto rrarray_finalize;
 	}
 
 	/* Resolve authority to see if it's referral or authoritative. */
-	int state = process_authority(pkt, req);
+	state = process_authority(pkt, req);
 	switch(state) {
 	case KR_STATE_CONSUME: /* Not referral, process answer. */
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
@@ -1115,6 +1116,17 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		break;
 	default:
 		break;
+	}
+
+rrarray_finalize:
+	/* Finish construction of libknot-format RRsets. */
+	(void)0;
+	ranked_rr_array_t *selected[] = kr_request_selected(req);
+	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
+		int ret = kr_ranked_rrarray_finalize(selected[i], query->uid, &req->pool);
+		if (unlikely(ret)) {
+			return KR_STATE_FAIL;
+		}
 	}
 
 	return state;

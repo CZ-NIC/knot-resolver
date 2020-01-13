@@ -257,7 +257,7 @@ static int eval_nsrep(const knot_dname_t *owner, const pack_t *addr_set, struct 
 		update_nsrep_set(ns, owner, addr_choice, score);
 		ns->reputation = reputation;
 		return 1; /* Stop evaluation */
-	} else if (ns->score > KR_NS_MAX_SCORE || addr_choice[KR_NSREP_MAXADDR - 1] == NULL) {
+	} else if (ns->score > KR_NS_MAX_SCORE) {
 		/* Check if any server was already selected.
 		 * If no, pick current server and continue evaluation. */
 		update_nsrep_set(ns, owner, addr_choice, score);
@@ -333,19 +333,43 @@ int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx)
 		return kr_error(EINVAL);
 	}
 
-	struct kr_nsrep *ns = &qry->ns;
-	ELECT_INIT(ns, ctx);
+	// First we dump the nsset into a temporary array
+	const int nsset_len = trie_weight(qry->zone_cut.nsset);
+	struct {
+		const knot_dname_t *name;
+		const pack_t *addrs;
+	} nsset[nsset_len];
 
-	int ret = kr_ok();
 	trie_it_t *it;
+	int i = 0;
 	for (it = trie_it_begin(qry->zone_cut.nsset); !trie_it_finished(it);
-							trie_it_next(it)) {
-		ret = eval_nsrep(/* we trust it's a correct dname */
-				 (const knot_dname_t *)trie_it_key(it, NULL),
-				 (const pack_t *)*trie_it_val(it), qry);
-		if (ret) break;
+							trie_it_next(it), ++i) {
+		/* we trust it's a correct dname */
+		nsset[i].name = (const knot_dname_t *)trie_it_key(it, NULL);
+		nsset[i].addrs = (const pack_t *)*trie_it_val(it);
 	}
 	trie_it_free(it);
+	assert(i == nsset_len);
+
+	// Now we sort it randomly, by select-sort.
+	for (i = 0; i < nsset_len - 1; ++i) {
+		// The winner for position i will be uniformly chosen from indices >= i
+		const int j = i + kr_rand_bytes(1) % (nsset_len - i);
+		// Now we swap the winner with index i
+		if (i == j) continue;
+		__typeof__((nsset[i])) tmp = nsset[i];
+		nsset[i] = nsset[j];
+		nsset[j] = tmp;
+	}
+
+	// Finally we run the original algorithm, in this randomized order.
+	struct kr_nsrep *ns = &qry->ns;
+	ELECT_INIT(ns, ctx);
+	int ret = kr_ok();
+	for (i = 0; i < nsset_len; ++i) {
+		ret = eval_nsrep(nsset[i].name, nsset[i].addrs, qry);
+		if (ret) break;
+	}
 
 	if (qry->ns.score <= KR_NS_MAX_SCORE && qry->ns.score >= KR_NS_LONG) {
 		/* This is a low-reliability probe,

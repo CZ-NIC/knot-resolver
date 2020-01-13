@@ -31,7 +31,7 @@ static int nsid_finalize(kr_layer_t *ctx) {
 		return ctx->state;
 
 	const uint8_t *req_nsid = knot_edns_get_option(src_opt, KNOT_EDNS_OPTION_NSID
-							#if KNOT_VERSION_MINOR >= 9
+							#if KNOT_VERSION_HEX >= 0x020900
 								, NULL
 							#endif
 							);

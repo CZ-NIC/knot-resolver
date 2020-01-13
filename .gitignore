@@ -1,7 +1,6 @@
 *.6
 *.Plo
 *.a
-*.d
 *.db
 *.dylib
 *.dylib.*

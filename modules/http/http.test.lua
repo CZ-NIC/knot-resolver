@@ -20,7 +20,7 @@ else
 
 	local bound
 	for _ = 1,1000 do
-		bound = net.listen('127.0.0.1', math.random(1025,65535), { kind = 'webtest'} )
+		bound, _err = pcall(net.listen, '127.0.0.1', math.random(20000, 29999), { kind = 'webtest'})
 		if bound then
 			break
 		end

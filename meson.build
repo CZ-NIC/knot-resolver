@@ -2,7 +2,7 @@ project(
   'knot-resolver',
   ['c', 'cpp'],
   license: 'GPLv3+',
-  version: '4.2.0',
+  version: '4.3.0',
   default_options: ['c_std=gnu11', 'b_ndebug=if-release'],
   meson_version: '>=0.46',
 )
@@ -16,7 +16,7 @@ endif
 
 
 message('--- required dependencies ---')
-knot_version = [ '>=2.8', '<2.10.0' ] # this would allow unreleased 2.10.dev
+knot_version = '>=2.8'
 libknot = dependency('libknot', version: knot_version)
 libdnssec = dependency('libdnssec', version: knot_version)
 libzscanner = dependency('libzscanner', version: knot_version)
@@ -61,15 +61,13 @@ mod_inc_dir = include_directories('.', 'contrib/')
 managed_ta = get_option('managed_ta') == 'enabled'
 keyfile_default = join_paths(etc_dir, get_option('keyfile_default'))
 if keyfile_default == join_paths(etc_dir, 'root.keys')
-  install_root_keys = true
   managed_ta = managed_ta or get_option('managed_ta') == 'auto'
-else
-  install_root_keys = false
-  if managed_ta
-    warning('Using managed_ta along with non-standard keyfile_default. ' +
-	    'Ensure keyfile_default directory will be writable by kresd.')
-  endif
 endif
+install_root_keys = get_option('install_root_keys') == 'enabled'
+if get_option('install_root_keys') == 'auto'
+  install_root_keys = managed_ta
+endif
+
 
 ## Root hints
 root_hints = join_paths(etc_dir, get_option('root_hints'))
@@ -84,7 +82,12 @@ verbose_log = get_option('verbose_log') == 'enabled' or get_option('verbose_log'
 user = get_option('user')
 group = get_option('group')
 
-## sendmmsg
+## Optional dependencies
+message('--- optional dependencies ---')
+capng = dependency('libcap-ng', required: false)
+openssl = dependency('openssl', required: false)
+
+### sendmmsg
 has_sendmmsg = meson.get_compiler('c').has_function('sendmmsg',
   prefix: '#define _GNU_SOURCE\n#include <sys/socket.h>')
 if get_option('sendmmsg') == 'enabled' and not has_sendmmsg
@@ -95,8 +98,7 @@ else
   sendmmsg = get_option('sendmmsg') == 'enabled'
 endif
 
-## Systemd
-message('--- systemd socket activation ---')
+### Systemd
 libsystemd = dependency('libsystemd', required: false)
 systemd_files = get_option('systemd_files')
 if systemd_files == 'enabled' and (
@@ -150,6 +152,7 @@ conf_data.set('SYSTEMD_VERSION',
   libsystemd.found() ? libsystemd.version().to_int() : -1)
 conf_data.set('NOVERBOSELOG', not verbose_log)
 conf_data.set('ENABLE_SENDMMSG', sendmmsg.to_int())
+conf_data.set('ENABLE_CAP_NG', capng.found())
 
 kresconfig = configure_file(
   output: 'kresconfig.h',
@@ -254,6 +257,7 @@ run_target(
 # NOTE: ternary operator in format() not supported
 # https://github.com/mesonbuild/meson/issues/2404
 s_managed_ta = managed_ta ? 'enabled' : 'disabled'
+s_install_root_keys = install_root_keys ? 'enabled' : 'disabled'
 s_systemd_socket = libsystemd.found() ? 'enabled' : 'disabled'
 s_build_client = build_client ? 'enabled' : 'disabled'
 s_build_utils = build_utils ? 'enabled' : 'disabled'
@@ -263,6 +267,7 @@ s_build_config_tests = build_config_tests ? 'enabled' : 'disabled'
 s_build_extra_tests = build_extra_tests ? 'enabled' : 'disabled'
 s_install_kresd_conf = install_kresd_conf ? 'enabled' : 'disabled'
 s_sendmmsg = sendmmsg ? 'enabled': 'disabled'
+s_openssl = openssl.found() ? 'present': 'missing'
 message('''
 
 ======================= SUMMARY =======================
@@ -277,6 +282,7 @@ message('''
   trust_anchors
     keyfile_default:    @0@'''.format(keyfile_default) + '''
     managed_ta:         @0@'''.format(s_managed_ta) + '''
+    install_root_keys:  @0@'''.format(s_install_root_keys) + '''
 
   systemd:
     socket activation:  @0@'''.format(s_systemd_socket) + '''
@@ -296,6 +302,7 @@ message('''
     group:              @0@'''.format(group) + '''
     install_kresd_conf: @0@'''.format(s_install_kresd_conf) + '''
     sendmmsg:           @0@'''.format(s_sendmmsg) + '''
+    openssl debug:      @0@'''.format(s_openssl) + '''
 
 =======================================================
 

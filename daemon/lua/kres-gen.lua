@@ -126,6 +126,7 @@ struct ranked_rr_array_entry {
 	_Bool yielded : 1;
 	_Bool to_wire : 1;
 	_Bool expiring : 1;
+	_Bool in_progress : 1;
 	knot_rrset_t *rr;
 };
 typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
@@ -280,6 +281,7 @@ struct kr_query {
 	struct timeval timestamp;
 	struct kr_zonecut zone_cut;
 	struct kr_layer_pickle *deferred;
+	int8_t cname_depth;
 	struct kr_query *cname_parent;
 	struct kr_request *request;
 	kr_stale_cb stale_cb;
@@ -352,6 +354,7 @@ int kr_family_len(int);
 struct sockaddr *kr_straddr_socket(const char *, int, knot_mm_t *);
 int kr_straddr_split(const char *, char * restrict, uint16_t *);
 int kr_ranked_rrarray_add(ranked_rr_array_t *, const knot_rrset_t *, uint8_t, _Bool, uint32_t, knot_mm_t *);
+int kr_ranked_rrarray_finalize(ranked_rr_array_t *, uint32_t, knot_mm_t *);
 void kr_qflags_set(struct kr_qflags *, struct kr_qflags);
 void kr_qflags_clear(struct kr_qflags *, struct kr_qflags);
 int kr_zonecut_add(struct kr_zonecut *, const knot_dname_t *, const void *, int);
@@ -359,6 +362,7 @@ _Bool kr_zonecut_is_empty(struct kr_zonecut *);
 void kr_zonecut_set(struct kr_zonecut *, const knot_dname_t *);
 uint64_t kr_now();
 const char *kr_strptime_diff(const char *, const char *, const char *, double *);
+time_t kr_file_mtime(const char *);
 void lru_free_items_impl(struct lru *);
 struct lru *lru_create_impl(unsigned int, unsigned int, knot_mm_t *, knot_mm_t *);
 void *lru_get_impl(struct lru *, const char *, unsigned int, unsigned int, _Bool, _Bool *);
@@ -381,6 +385,7 @@ typedef struct {
 	int sock_type;
 	_Bool tls;
 	const char *kind;
+	_Bool freebind;
 } endpoint_flags_t;
 struct endpoint {
 	void *handle;

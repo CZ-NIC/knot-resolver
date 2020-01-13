@@ -38,7 +38,12 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
 #include <unistd.h>
+
+#ifdef ENABLE_CAP_NG
+#include <cap-ng.h>
+#endif
 
 #include <lua.h>
 #include <uv.h>
@@ -50,6 +55,8 @@
 
 /* @internal Array of ip address shorthand. */
 typedef array_t(char*) addr_array_t;
+
+typedef array_t(const char*) config_array_t;
 
 typedef struct {
 	int fd;
@@ -63,7 +70,7 @@ struct args {
 	int control_fd;
 	int forks;
 	char *xsk;
-	const char *config;
+	config_array_t config;
 	const char *rundir;
 	bool interactive;
 	bool quiet;
@@ -148,20 +155,23 @@ static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t
 		/* Log to remote socket if connected */
 		const char *delim = args->quiet ? "" : "> ";
 		if (stream_fd != STDIN_FILENO) {
-			fprintf(stdout, "%s\n", cmd); /* Duplicate command to logs */
+			if (VERBOSE_STATUS)
+				fprintf(stdout, "%s\n", cmd); /* Duplicate command to logs */
 			if (message)
 				fprintf(out, "%s", message); /* Duplicate output to sender */
 			if (message || !args->quiet)
 				fprintf(out, "\n");
 			fprintf(out, "%s", delim);
 		}
-		/* Log to standard streams */
-		FILE *fp_out = ret ? stderr : stdout;
-		if (message)
-			fprintf(fp_out, "%s", message);
-		if (message || !args->quiet)
-			fprintf(fp_out, "\n");
-		fprintf(fp_out, "%s", delim);
+		if (stream_fd == STDIN_FILENO || VERBOSE_STATUS) {
+			/* Log to standard streams */
+			FILE *fp_out = ret ? stderr : stdout;
+			if (message)
+				fprintf(fp_out, "%s", message);
+			if (message || !args->quiet)
+				fprintf(fp_out, "\n");
+			fprintf(fp_out, "%s", delim);
+		}
 		lua_settop(L, 0);
 	}
 finish:
@@ -489,6 +499,7 @@ static void args_deinit(struct args *args)
 	for (int i = 0; i < args->fds.len; ++i)
 		free_const(args->fds.at[i].flags.kind);
 	array_clear(args->fds);
+	array_clear(args->config);
 }
 
 static long strtol_10(const char *s)
@@ -529,7 +540,8 @@ static int parse_args(int argc, char **argv, struct args *args)
 			array_push(args->addrs_tls, optarg);
 			break;
 		case 'c':
-			args->config = optarg;
+			assert(optarg != NULL);
+			array_push(args->config, optarg);
 			break;
 		case 'f':
 			args->interactive = false;
@@ -622,14 +634,14 @@ static int bind_sockets(addr_array_t *addrs, bool tls, flagged_fd_array_t *fds)
 		flagged_fd_t ffd = { .flags = { .tls = tls } };
 		if (ret == 0 && !tls && family != AF_UNIX) {
 			/* AF_UNIX can do SOCK_DGRAM, but let's not support that *here*. */
-			ffd.fd = io_bind(sa, SOCK_DGRAM);
+			ffd.fd = io_bind(sa, SOCK_DGRAM, NULL);
 			if (ffd.fd < 0)
 				ret = ffd.fd;
 			else if (array_push(*fds, ffd) < 0)
 				ret = kr_error(ENOMEM);
 		}
 		if (ret == 0) { /* common for TCP and TLS, including AF_UNIX cases */
-			ffd.fd = io_bind(sa, SOCK_STREAM);
+			ffd.fd = io_bind(sa, SOCK_STREAM, NULL);
 			if (ffd.fd < 0)
 				ret = ffd.fd;
 			else if (array_push(*fds, ffd) < 0)
@@ -664,6 +676,25 @@ static int start_listening(struct network *net, flagged_fd_array_t *fds) {
 		}
 	}
 	return some_bad_ret;
+}
+
+/* Drop POSIX 1003.1e capabilities. */
+static void drop_capabilities(void)
+{
+#ifdef ENABLE_CAP_NG
+	/* Drop all capabilities. */
+	if (capng_have_capability(CAPNG_EFFECTIVE, CAP_SETPCAP)) {
+		capng_clear(CAPNG_SELECT_BOTH);
+
+		/* Apply. */
+		if (capng_apply(CAPNG_SELECT_BOTH) < 0) {
+			kr_log_error("[system] failed to set process capabilities: %s\n",
+			          strerror(errno));
+		}
+	} else {
+		kr_log_info("[system] process not allowed to set capabilities, skipping\n");
+	}
+#endif /* ENABLE_CAP_NG */
 }
 
 int main(int argc, char **argv)
@@ -738,12 +769,44 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (args.config && strcmp(args.config, "-") != 0 && access(args.config, R_OK) != 0) {
-		kr_log_error("[system] config '%s': %s\n", args.config, strerror(errno));
-		return EXIT_FAILURE;
+	/* Select which config files to load and verify they are read-able. */
+	bool load_defaults = true;
+	size_t i = 0;
+	while (i < args.config.len) {
+		const char *config = args.config.at[i];
+		if (strcmp(config, "-") == 0) {
+			load_defaults = false;
+			array_del(args.config, i);
+			continue;  /* don't increment i */
+		} else if (access(config, R_OK) != 0) {
+			char cwd[PATH_MAX];
+			get_workdir(cwd, sizeof(cwd));
+			kr_log_error("[system] config '%s' (workdir '%s'): %s\n",
+				config, cwd, strerror(errno));
+			return EXIT_FAILURE;
+		}
+		i++;
 	}
-	if (!args.config && access("config", R_OK) == 0) {
-		args.config = "config";
+	if (args.config.len == 0 && access("config", R_OK) == 0)
+		array_push(args.config, "config");
+	if (load_defaults)
+		array_push(args.config, LIBDIR "/config.lua");
+
+	/* File-descriptor count limit: soft->hard. */
+	struct rlimit rlim;
+	ret = getrlimit(RLIMIT_NOFILE, &rlim);
+	if (ret == 0 && rlim.rlim_cur != rlim.rlim_max) {
+		kr_log_verbose("[system] increasing file-descriptor limit: %ld -> %ld\n",
+				(long)rlim.rlim_cur, (long)rlim.rlim_max);
+		rlim.rlim_cur = rlim.rlim_max;
+		ret = setrlimit(RLIMIT_NOFILE, &rlim);
+	}
+	if (ret) {
+		kr_log_error("[system] failed to get or set file-descriptor limit: %s\n",
+				strerror(errno));
+	} else if (rlim.rlim_cur < 512*1024) {
+		kr_log_info("[system] warning: hard limit for number of file-descriptors is only %ld but recommended value is 524288\n",
+				rlim.rlim_cur);
 	}
 
 	/* Connect forks with local socket */
@@ -831,19 +894,18 @@ int main(int argc, char **argv)
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
-	if (args.config != NULL && strcmp(args.config, "-") != 0) {
-		if(engine_loadconf(&engine, args.config) != 0) {
+
+	for (i = 0; i < args.config.len; ++i) {
+		const char *config = args.config.at[i];
+		if (engine_loadconf(&engine, config) != 0) {
 			ret = EXIT_FAILURE;
 			goto cleanup;
 		}
 		lua_settop(engine.L, 0);
 	}
-	if (args.config == NULL || strcmp(args.config, "-") !=0) {
-		if(engine_load_defaults(&engine) != 0) {
-			ret = EXIT_FAILURE;
-			goto cleanup;
-		}
-	}
+
+	drop_capabilities();
+
 	if (engine_start(&engine) != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;

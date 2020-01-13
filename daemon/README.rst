@@ -151,6 +151,8 @@ to download cache from parent, to avoid cold-cache start.
                 cache.open(cache_size, 'lmdb://' .. cache_path)
 	end
 
+.. _async-events:
+
 Asynchronous events
 ^^^^^^^^^^^^^^^^^^^
 
@@ -415,6 +417,7 @@ distribution will take care of it for you.
    The format is standard zone file, though additional information may be persisted in comments.
    Either DS or DNSKEY records can be used for TAs.
    If the file does not exist, bootstrapping of *root* TA will be attempted.
+   If you want to use bootstrapping, install `lua-http`_ library.
 
    Each file can only contain records for a single domain.
    The TAs will be updated according to :rfc:`5011` and persisted in the file (if allowed).
@@ -548,15 +551,29 @@ Control sockets
 
 Unless ran manually, knot-resolver is typically started in non-interactive mode.
 The mode gets triggered by using the ``-f`` command-line parameter or by passing sockets from systemd.
-You can attach to the the consoles for each process; by default they are in ``rundir/tty/$PID``.
 
-.. note:: When running kresd with systemd, you can find the location of the socket(s) using ``systemctl status kresd-control@*.socket``. Typically, these are in ``/run/knot-resolver/control@*``.
+You can attach to the the consoles for each process; by default they are in ``rundir/tty/$PID``.
+When running kresd with systemd, you can find the location of the socket(s) using
+``systemctl status kresd-control@*.socket``. Typically, these are in ``/run/knot-resolver/control@*``.
+
+Connection to the socket can be made by ``netcat`` or ``socat`` through command line.
 
 .. code-block:: bash
 
-   $ nc -U rundir/tty/3008 # or socat - UNIX-CONNECT:rundir/tty/3008
+   $ nc -U rundir/tty/3008 # or socat - UNIX-CONNECT:/run/knot-resolver/control@1
    > cache.count()
-   53
+   83
+
+When successfully connected to a socket, the command line should change to something like ``>``.
+Then you can interact with kresd to see configuration or set a new one.
+There are some basic commands to start with.
+
+.. code-block:: lua
+
+   > help()            -- shows help
+   > net.interfaces()  -- lists available interfaces
+   > net.list()        -- lists running network services
+
 
 The *direct output* of the CLI command is captured and sent over the socket, while also printed to the daemon standard outputs (for accountability). This gives you an immediate response on the outcome of your command.
 Error or debug logs aren't captured, but you can find them in the daemon standard outputs.
@@ -684,3 +701,4 @@ Code reference
 .. _`real process managers`: http://blog.crocodoc.com/post/48703468992/process-managers-the-good-the-bad-and-the-ugly
 .. _`socket activation`: http://0pointer.de/blog/projects/socket-activation.html
 .. _`dnsproxy module`: https://www.knot-dns.cz/docs/2.7/html/modules.html#dnsproxy-tiny-dns-proxy
+.. _`lua-http`: https://luarocks.org/modules/daurnimator/http

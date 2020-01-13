@@ -1,3 +1,5 @@
+.. _upgrading:
+
 *********
 Upgrading
 *********
@@ -5,7 +7,37 @@ Upgrading
 This section summarizes steps required for upgrade to newer Knot Resolver versions.
 We advise users to also read :ref:`release_notes` for respective versions.
 
+4.x to 5.x
+==========
+
+Configuration file
+------------------
+
+* ``net.listen()`` throws an error if it fails to bind. Use ``freebind=true`` option
+  to bind to nonlocal addresses.
+
+4.2.2 to 4.3+
+=============
+
+Module changes
+--------------
+
+* In case you wrote your own module which directly calls function
+  ``kr_ranked_rrarray_add()``, you need to additionally call function
+  ``kr_ranked_rrarray_finalize()`` after each batch (before changing
+  the added memory regions). For a specific example see `changes in dns64 module
+  <https://gitlab.labs.nic.cz/knot/knot-resolver/commit/edb8ffef7fbe48befeb3f7164d38079dd0be3302#1fe36e8ac0729b279645f7237b7122b1c457a982>`_.
+
 .. _upgrade-from-3-to-4:
+
+4.x to 4.2.1+
+=============
+
+Users
+-----
+
+* If you have previously installed ``knot-resolver-dbgsym`` package on Debian,
+  please remove it and install ``knot-resolver-dbg`` instead.
 
 3.x to 4.x
 ==========
