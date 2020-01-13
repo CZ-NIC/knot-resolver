@@ -3,6 +3,9 @@
 Multiple instances
 ==================
 
+.. note:: This section describes the usage of kresd when running under systemd.
+   For other uses, please refer to :ref:`usage-without-systemd`.
+
 Knot Resolver can utilize multiple CPUs running in multiple independent instances (processes), where each process utilizes at most single CPU core on your machine. If your machine handles a lot of DNS traffic run multiple instances.
 
 All instances typically share the same configuration and cache, and incomming queries are automatically distributed by operating system among all instances.

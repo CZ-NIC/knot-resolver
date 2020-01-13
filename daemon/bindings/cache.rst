@@ -37,6 +37,10 @@ Now you can configure cache size to be 90% of the free memory 14 928 MB, i.e. 13
    -- 90 % of free memory after machine restart
    cache.size = 13453 * MB
 
+.. note:: The :ref:`garbage-collector` can be used to periodically trim the
+   cache. It is enabled and configured by default when running kresd with
+   systemd integration.
+
 .. _`cache_persistence`:
 
 Persistence
@@ -311,5 +315,3 @@ Configuration reference
      [subtree] => example.com.
 
 .. [#] This is a consequence of DNSSEC negative cache which relies on proofs of non-existence on various owner nodes. It is impossible to efficiently flush part of DNS zones signed with NSEC3.
-
-.. include:: ../utils/cache_gc/README.rst
