@@ -18,7 +18,7 @@ and it provides a state-machine like API for extensions.
 .. toctree::
    :caption: Configuration
    :name: users
-   :maxdepth: 2
+   :maxdepth: 3
 
    config-overview
    config-network
