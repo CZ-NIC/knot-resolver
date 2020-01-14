@@ -3,9 +3,9 @@
 DNS-over-TLS server (DoT)
 -------------------------
 
-DNS-over-TLS server (:rfc:`7858`) is enabled by default on loopback interface port 853.
-Information how to configure listening on specific IP addresses is in previous sections
-:ref:`network-configuration`.
+DNS-over-TLS server (:rfc:`7858`) is enabled by default on localhost.
+Information how to configure listening on specific IP addresses is in previous sections:
+:func:`net.listen()`.
 
 By default a self-signed certificate is generated. For serious deployments
 it is strongly recommended to configure your own TLS certificates signed
