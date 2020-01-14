@@ -1,7 +1,12 @@
 -- vim:syntax=lua:set ts=4 sw=4:
 -- Config file example usable for multi-user ISP resolver
 -- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/
-@config_defaults@
+
+-- Network interface configuration
+net.listen('127.0.0.1', 53, { kind = 'dns' })
+net.listen('::1', 53, { kind = 'dns'})
+net.listen('127.0.0.1', 853, { kind = 'tls' })
+net.listen('::1', 853, { kind = 'tls' })
 
 -- define list of internal-only domains
 internalDomains = policy.todnames({'company.example', 'internal.example'})
