@@ -11,9 +11,6 @@ net.listen('::1', 53, { kind = 'dns'})
 net.listen('127.0.0.1', 853, { kind = 'tls' })
 net.listen('::1', 853, { kind = 'tls' })
 
--- To disable DNSSEC validation, uncomment the following line (not recommended)
--- trust_anchors.remove('.')
-
 -- Large cache size, so we don't need to flush ever
 -- This can be larger than available RAM, least frequently accessed
 -- records will be paged out as long as there's enough disk space to back it
