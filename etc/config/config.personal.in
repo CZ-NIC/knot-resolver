@@ -1,5 +1,5 @@
 -- vim:syntax=lua:set ts=4 sw=4:
--- Refer to manual: http://knot-resolver.readthedocs.org/en/stable/daemon.html#configuration
+-- Refer to manual: https://knot-resolver.readthedocs.org/en/stable/
 @config_defaults@
 
 -- For DNS-over-HTTPS and web management when using http module
