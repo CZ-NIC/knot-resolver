@@ -97,7 +97,7 @@ Configuration reference
 
    .. tip:: Use ``kB, MB, GB`` constants as a multiplier, e.g. ``100*MB``.
 
-   As of now, the built-in backend with URI ``lmdb://`` allows you to change the cache directory.
+   The URI ``lmdb://path`` allows you to change the cache directory.
 
    Example:
 
@@ -142,6 +142,8 @@ Configuration reference
 .. function:: cache.backends()
 
    :return: map of backends
+
+   .. note:: For now there is only one backend implementation, even though the APIs are ready for different (synchronous) backends.
 
    The cache supports runtime-changeable backends, using the optional :rfc:`3986` URI, where the scheme
    represents backend protocol and the rest of the URI backend-specific configuration. By default, it
