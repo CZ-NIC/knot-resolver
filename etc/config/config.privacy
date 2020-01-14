@@ -12,8 +12,7 @@ net.listen('::1', 853, { kind = 'tls' })
 -- use this to configure your TLS certificates
 -- net.tls("/etc/knot-resolver/server-cert.pem", "/etc/knot-resolver/server-key.pem")
 
--- move cache to '/tmp/knot-resolver' tmpfs
-cache.storage = 'lmdb:///tmp/knot-resolver'
+-- Refer to manual if you would like to use non-persistent cache
 
 -- forwarding to multiple targets
 -- splits the entire DNS namespace into distinct slices
