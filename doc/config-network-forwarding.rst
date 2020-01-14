@@ -1,7 +1,7 @@
 Forwarding
 ----------
 
-*Forwarding* configuration instructs resolver to forward cache-miss queries from clients to a manually specified DNS resolvers *(upstream servers)*. In other words the *forwarding* mode does exact opposite of the default *recursive* mode because resolver in *recursive* mode automatically selects which servers to ask.
+*Forwarding* configuration instructs resolver to forward cache-miss queries from clients to manually specified DNS resolvers *(upstream servers)*. In other words the *forwarding* mode does exact opposite of the default *recursive* mode because resolver in *recursive* mode automatically selects which servers to ask.
 
 Main use-cases are:
 
@@ -12,7 +12,7 @@ Main use-cases are:
 Forwarding implementation in Knot Resolver has following properties:
 
   - Answers from *upstream* servers are cached.
-  - Answers from *upstream* servers are locally DNSSEC-validated.
+  - Answers from *upstream* servers are locally DNSSEC-validated, unless ``policy.STUB`` is used.
   - Resolver automatically selects which IP address from given set of IP addresses will be used (based on performance characteristics).
   - Forwarding can use either unencrypted DNS protocol, or :ref:`tls-forwarding`.
 
