@@ -10,11 +10,24 @@ We advise users to also read :ref:`release_notes` for respective versions.
 4.x to 5.x
 ==========
 
+Users
+-----
+
+* Control socket location has changed
+
+  .. csv-table::
+     :header: "","4.x location","5.x location"
+
+     "with systemd","``/run/knot-resolver/control@$ID``","``/run/knot-resolver/control/$ID``"
+     "without systemd","``$PWD/tty/$PID``","``$PWD/control/$PID``"
+
+
 Configuration file
 ------------------
 
-* ``net.listen()`` throws an error if it fails to bind. Use ``freebind=true`` option
+* :func:`net.listen` throws an error if it fails to bind. Use ``freebind=true`` option
   to bind to nonlocal addresses.
+
 
 4.2.2 to 4.3+
 =============

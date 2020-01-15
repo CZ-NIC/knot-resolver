@@ -29,7 +29,7 @@ program, e.g. a maintenance script.
 
 When Knot Resolver is started using Systemd (see section
 :ref:`quickstart-startup`) it creates a control socket in path
-``/run/knot-resolver/control/$SYSTEMD_INSTANCE``. Connection to the socket can
+``/run/knot-resolver/control/$ID``. Connection to the socket can
 be made from command line using e.g. ``netcat`` or ``socat``:
 
 .. code-block:: bash
