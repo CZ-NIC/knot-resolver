@@ -11,7 +11,7 @@ sysrepo_common_src = files([
 ])
 c_src_lint += sysrepo_common_src
 
-if enable_sysrepo
+if build_sysrepo
     sysrepo_mod = shared_module(
 	'sysrepo',
 	sysrepo_src,
