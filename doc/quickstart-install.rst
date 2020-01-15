@@ -68,7 +68,7 @@ Use
 package from AUR_.
 
 
-**OpenSUSE Leap / Tumbleweed**
+**openSUSE Leap / Tumbleweed**
 Add the `OBS <https://en.opensuse.org/Portal:Build_Service>`_ package repository `home:CZ-NIC:knot-resolver-latest <https://software.opensuse.org/download.html?project=home%3ACZ-NIC%3Aknot-resolver-latest&package=knot-resolver>`_ to your system.
 
 .. _AUR: https://wiki.archlinux.org/index.php/Arch_User_Repository

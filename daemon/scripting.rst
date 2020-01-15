@@ -13,6 +13,9 @@ a little Lua function which gathers statistics and returns them in JSON string.
 This can be used by an external system which uses control socket to call this
 user-defined function and to retrieve its results.
 
+
+.. _control-sockets:
+
 Control sockets
 ---------------
 Control socket acts like "an interactive configuration file" so all actions
