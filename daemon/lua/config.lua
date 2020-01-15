@@ -21,7 +21,7 @@ if not C.the_args.interactive and n_control_socks == 0 and not env.KRESD_NO_LIST
 	local path = worker.cwd..'/control/'..worker.pid
 	local ok, err = pcall(net.listen, path, nil, { kind = 'control' })
 	if not ok then
-		error('bind to '..path..' failed '..err)
+		warn('bind to '..path..' failed '..err)
 	end
 end
 
