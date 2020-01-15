@@ -10,6 +10,7 @@
 
 #include "kresconfig.h"
 #include "kr_cache_gc.h"
+#include "modules/sysrepo/common/sysrepo_conf.h"
 
 volatile static int killed = 0;
 
@@ -132,6 +133,8 @@ int main(int argc, char *argv[])
 			exit_code = 10;
 			break;
 		}
+
+		sysrepo_repo_config();
 
 		usleep(cfg.gc_interval);
 	} while (cfg.gc_interval > 0 && !killed);

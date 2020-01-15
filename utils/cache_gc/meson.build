@@ -13,10 +13,13 @@ if build_utils
   cache_gc = executable(
     'kres-cache-gc',
     cache_gc_src,
+    sysrepo_common_src,
     dependencies: [
       kresconfig_dep,
       contrib_dep,
       libkres_dep,
+      libyang,
+      libsysrepo,
       libknot,
       luajit_inc,
     ],
