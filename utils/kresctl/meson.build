@@ -1,12 +1,12 @@
-kresc_src = files([
+kresctl_src = files([
     'main.c',
 ])
-c_src_lint += kresc_src
+c_src_lint += kresctl_src
 
-if enable_sysrepo
+if build_sysrepo
     kresc = executable(
-    'kresc',
-    kresc_src,
+    'kresctl',
+    kresctl_src,
     sysrepo_common_src,
     dependencies: [
       contrib_dep,

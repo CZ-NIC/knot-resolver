@@ -3,6 +3,6 @@
 sysrepo_lua_src = files([
 ])
 
-if enable_sysrepo
+if build_sysrepo
 
 endif

@@ -3,7 +3,7 @@ kres_watcher_src = files([
 ])
 c_src_lint += kres_watcher_src
 
-if enable_sysrepo
+if build_sysrepo
     kres_watcher = executable(
     'kres-watcher',
     kres_watcher_src,

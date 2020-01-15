@@ -112,11 +112,11 @@ libsysrepo = dependency('sysrepo', version: '>=1', required: false)
 libyang = dependency('libyang', version: '>=1', required: false)
 sysrepo = get_option('sysrepo')
 if (sysrepo == 'auto' or sysrepo == 'enabled') and libsysrepo.found() and libyang.found()
-  enable_sysrepo = true
-elif sysrepo == 'enabled' and not libsysrepo.found() and not libyang.found()
+  build_sysrepo = true
+elif sysrepo == 'enabled' and (not libsysrepo.found() or not libyang.found())
   error('sysrepo=enabled requires libsysrepo and libyang')
 else
-  enable_sysrepo = false
+  build_sysrepo = false
 endif
 message('---------------------------')
 
@@ -166,7 +166,7 @@ conf_data.set('SYSTEMD_VERSION',
 conf_data.set('NOVERBOSELOG', not verbose_log)
 conf_data.set('ENABLE_SENDMMSG', sendmmsg.to_int())
 conf_data.set('ENABLE_CAP_NG', capng.found())
-conf_data.set('ENABLE_SYSREPO', enable_sysrepo)
+conf_data.set('ENABLE_SYSREPO', build_sysrepo)
 
 kresconfig = configure_file(
   output: 'kresconfig.h',
@@ -273,7 +273,7 @@ run_target(
 s_managed_ta = managed_ta ? 'enabled' : 'disabled'
 s_install_root_keys = install_root_keys ? 'enabled' : 'disabled'
 s_systemd_socket = libsystemd.found() ? 'enabled' : 'disabled'
-s_enable_sysrepo = enable_sysrepo ? 'enabled' : 'disabled'
+s_build_sysrepo = build_sysrepo ? 'enabled' : 'disabled'
 s_build_client = build_client ? 'enabled' : 'disabled'
 s_build_utils = build_utils ? 'enabled' : 'disabled'
 s_build_dnstap = build_dnstap ? 'enabled' : 'disabled'
@@ -305,7 +305,7 @@ message('''
     work_dir:           @0@'''.format(systemd_work_dir) + '''
 
   optional components
-    sysrepo:            @0@'''.format(s_enable_sysrepo) + '''
+    sysrepo:            @0@'''.format(s_build_sysrepo) + '''
     client:             @0@'''.format(s_build_client) + '''
     utils:              @0@'''.format(s_build_utils) + '''
     dnstap:             @0@'''.format(s_build_dnstap) + '''
