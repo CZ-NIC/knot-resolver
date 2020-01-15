@@ -33,7 +33,7 @@ The following dependencies are needed to build and run Knot Resolver:
    "`pkg-config`_", "*build only* [#]_"
    "libknot_ 2.8+", "Knot DNS libraries"
    "LuaJIT_ 2.0+", "Embedded scripting language"
-   "libuv_ 1.7+", "Multiplatform I/O and services [#]_"
+   "libuv_ 1.7+", "Multiplatform I/O and services"
    "lmdb", "Memory-mapped database for cache"
    "GnuTLS", "TLS"
 
@@ -67,9 +67,6 @@ Resolver:
 .. [#] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS``
    to configure dependencies manually (i.e. ``libknot_CFLAGS`` and
    ``libknot_LIBS``).
-.. [#] libuv 1.7 brings SO_REUSEPORT support that is needed for multiple forks.
-   libuv < 1.7 can be still used, but only in single-process mode. Use
-   :ref:`different method <daemon-reuseport>` for load balancing.
 
 Packaged dependencies
 ~~~~~~~~~~~~~~~~~~~~~

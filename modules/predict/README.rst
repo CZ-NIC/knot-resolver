@@ -1,7 +1,7 @@
 .. _mod-predict:
 
 Prefetching records
--------------------
+===================
 
 The module refreshes records that are about to expire when they're used (having less than 1% of original TTL).
 This improves latency for frequently used records, as they are fetched in advance.
@@ -13,7 +13,7 @@ ahead of time. This is helpful to minimize the perceived latency and keeps the c
 .. tip:: The tracking window and period length determine memory requirements. If you have a server with relatively fast query turnover, keep the period low (hour for start) and shorter tracking window (5 minutes). For personal slower resolver, keep the tracking window longer (i.e. 30 minutes) and period longer (a day), as the habitual queries occur daily. Experiment to get the best results.
 
 Example configuration
-^^^^^^^^^^^^^^^^^^^^^
+---------------------
 
 .. code-block:: lua
 
@@ -32,7 +32,7 @@ Defaults are 15 minutes window, 6 hours period.
 .. note:: Otherwise this module requires :ref:`stats <mod-stats>` module and loads it if not present.
 
 Exported metrics
-^^^^^^^^^^^^^^^^
+----------------
 
 To visualize the efficiency of the predictions, the module exports following statistics.
 
@@ -42,7 +42,7 @@ To visualize the efficiency of the predictions, the module exports following sta
 
 
 Properties
-^^^^^^^^^^
+----------
 
 .. function:: predict.config({ window = 15, period = 24})
 
