@@ -30,22 +30,15 @@ Snippets from Knot Resolver's configuration file **do not start with $ sign** an
 Installation
 ************
 
-As a first step add following repositories with the **latest version** of Knot Resolver. Please note that the packages available in distribution's repositories are often outdated, especially in Debian and Ubuntu repositories, and this guide might not work with their old versions.
-
-**Arch Linux**
-
-Use
-`knot-resolver <https://aur.archlinux.org/packages/knot-resolver/>`_
-package from AUR_.
-
-**CentOS 7**
-
-.. code-block:: bash
-
-    $ sudo yum install -y https://secure.nic.cz/files/knot-resolver/knot-resolver-release.el.rpm
-    $ sudo yum install -y knot-resolver
+As a first step, configure your system to use upstream repositories which have
+the **latest version** of Knot Resolver. Follow the instructions below for your
+distribution.
 
 **Debian/Ubuntu**
+
+.. note:: Please note that the packages available in distribution repositories
+   of Debian and Ubuntu are outdated. Make sure to follow these steps to use
+   our upstream repositories.
 
 .. code-block:: bash
 
@@ -54,12 +47,26 @@ package from AUR_.
     $ sudo apt update
     $ sudo apt install -y knot-resolver
 
+**CentOS 7**
+
+.. code-block:: bash
+
+    $ sudo yum install -y https://secure.nic.cz/files/knot-resolver/knot-resolver-release.el.rpm
+    $ sudo yum install -y knot-resolver
+
 **Fedora**
 
 .. code-block:: bash
 
     $ sudo dnf install -y https://secure.nic.cz/files/knot-resolver/knot-resolver-release.fedora.rpm
     $ sudo dnf install -y knot-resolver
+
+**Arch Linux**
+
+Use
+`knot-resolver <https://aur.archlinux.org/packages/knot-resolver/>`_
+package from AUR_.
+
 
 **OpenSUSE Leap / Tumbleweed**
 Add the `OBS <https://en.opensuse.org/Portal:Build_Service>`_ package repository `home:CZ-NIC:knot-resolver-latest <https://software.opensuse.org/download.html?project=home%3ACZ-NIC%3Aknot-resolver-latest&package=knot-resolver>`_ to your system.
