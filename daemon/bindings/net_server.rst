@@ -38,7 +38,7 @@ First you need to decide what service should be available on given IP address
   ":ref:`DNS-over-TLS (DoT) <tls-server-config>`","``net.listen('192.0.2.123', 853, { kind = 'tls' })``"
   ":ref:`mod-http-doh`","``net.listen('192.0.2.123', 443, { kind = 'doh' })``"
   ":ref:`Web management <mod-http-built-in-services>`","``net.listen('192.0.2.123', 8453, { kind = 'webmgmt' })``"
-  ":ref:`Control socket <control-sockets>`","``net.listen('/tmp/kresd.control', nil, { kind = 'control' })``"
+  ":ref:`Control socket <control-sockets>`","``net.listen('/tmp/kres.control', nil, { kind = 'control' })``"
 
 
 Examples:
