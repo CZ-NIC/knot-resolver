@@ -304,16 +304,6 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	return EXIT_SUCCESS;
 }
 
-#if SYSTEMD_VERSION >= 227
-static void free_sd_socket_names(char **socket_names, int count)
-{
-	for (int i = 0; i < count; i++) {
-		free(socket_names[i]);
-	}
-	free(socket_names);
-}
-#endif
-
 static void args_init(struct args *args)
 {
 	memset(args, 0, sizeof(struct args));
@@ -537,55 +527,6 @@ int main(int argc, char **argv)
 	if (ret) goto cleanup_args;
 	ret = bind_sockets(&the_args->addrs_tls, true, &the_args->fds);
 	if (ret) goto cleanup_args;
-
-#if SYSTEMD_VERSION >= 227
-	/* Accept passed sockets from systemd supervisor. */
-	char **socket_names = NULL;
-	int sd_nsocks = sd_listen_fds_with_names(0, &socket_names);
-	if (sd_nsocks < 0) {
-		kr_log_error("[system] failed passing sockets from systemd: %s\n",
-			     kr_strerror(sd_nsocks));
-		free_sd_socket_names(socket_names, sd_nsocks);
-		ret = EXIT_FAILURE;
-		goto cleanup_args;
-	}
-	if (sd_nsocks > 0 && the_args->forks != 1) {
-		kr_log_error("[system] when run under systemd-style supervision, "
-			     "use single-process only (bad: --forks=%d).\n", the_args->forks);
-		free_sd_socket_names(socket_names, sd_nsocks);
-		ret = EXIT_FAILURE;
-		goto cleanup_args;
-	}
-	for (int i = 0; i < sd_nsocks; ++i) {
-		/* when run under systemd supervision, do not use interactive mode */
-		the_args->interactive = false;
-		flagged_fd_t ffd = { .fd = SD_LISTEN_FDS_START + i };
-
-		if (!strcasecmp("control", socket_names[i])) {
-			if (the_args->control_fd != -1) {
-				kr_log_error("[system] multiple control sockets passed from systemd\n");
-				ret = EXIT_FAILURE;
-				break;
-			}
-			the_args->control_fd = ffd.fd;
-			free(socket_names[i]);
-		} else {
-			if (!strcasecmp("dns", socket_names[i])) {
-				free(socket_names[i]);
-			} else if (!strcasecmp("tls", socket_names[i])) {
-				ffd.flags.tls = true;
-				free(socket_names[i]);
-			} else {
-				ffd.flags.kind = socket_names[i];
-			}
-			array_push(the_args->fds, ffd);
-		}
-		/* Either freed or passed ownership. */
-		socket_names[i] = NULL;
-	}
-	free_sd_socket_names(socket_names, sd_nsocks);
-	if (ret) goto cleanup_args;
-#endif
 
 	/* Switch to rundir. */
 	if (the_args->rundir != NULL) {
