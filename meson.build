@@ -98,12 +98,8 @@ else
 endif
 
 ### Systemd
-libsystemd = dependency('libsystemd', required: false)
 systemd_files = get_option('systemd_files')
-if systemd_files == 'enabled' and (
-    not libsystemd.found() or libsystemd.version().version_compare('<227'))
-  error('systemd_files=enabled requires libsystemd >= 227')
-endif
+libsystemd = dependency('libsystemd', required: systemd_files == 'enabled')
 message('---------------------------')
 
 ## Compiler args
@@ -257,7 +253,6 @@ run_target(
 # https://github.com/mesonbuild/meson/issues/2404
 s_managed_ta = managed_ta ? 'enabled' : 'disabled'
 s_install_root_keys = install_root_keys ? 'enabled' : 'disabled'
-s_systemd_socket = libsystemd.found() ? 'enabled' : 'disabled'
 s_build_client = build_client ? 'enabled' : 'disabled'
 s_build_utils = build_utils ? 'enabled' : 'disabled'
 s_build_dnstap = build_dnstap ? 'enabled' : 'disabled'
@@ -284,7 +279,6 @@ message('''
     install_root_keys:  @0@'''.format(s_install_root_keys) + '''
 
   systemd:
-    socket activation:  @0@'''.format(s_systemd_socket) + '''
     files:              @0@'''.format(systemd_files) + '''
     work_dir:           @0@'''.format(systemd_work_dir) + '''
 
