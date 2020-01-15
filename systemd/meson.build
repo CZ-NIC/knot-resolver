@@ -1,11 +1,5 @@
 # systemd
 
-## paths
-systemd_work_dir = join_paths(
-  prefix, get_option('localstatedir'), 'cache', 'knot-resolver')
-systemd_unit_dir = join_paths(prefix, 'lib', 'systemd', 'system')
-systemd_tmpfiles_dir = join_paths(prefix, 'lib', 'tmpfiles.d')
-
 ## configuration
 systemd_config = configuration_data()
 systemd_config.set('user', user)
@@ -14,6 +8,7 @@ systemd_config.set('systemd_work_dir', systemd_work_dir)
 systemd_config.set('sbin_dir', sbin_dir)
 systemd_config.set('etc_dir', etc_dir)
 systemd_config.set('run_dir', run_dir)
+systemd_config.set('lib_dir', lib_dir)
 
 if systemd_files == 'enabled'
   ## unit files
