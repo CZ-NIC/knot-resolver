@@ -3,6 +3,10 @@
 HTTP services
 =============
 
+.. tip:: In most distributions, the ``http`` module is available from a
+   separate package ``knot-resolver-module-http``. The module isn't packaged
+   for openSUSE.
+
 This module does the heavy lifting to provide an HTTP and HTTP/2 enabled
 server which provides few built-in services and also allows other
 modules to export restful APIs and websocket streams.
