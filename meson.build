@@ -108,12 +108,12 @@ message('---------------------------')
 
 ### Sysrepo
 message('--- sysrepo dependencies ---')
-libsysrepo = dependency('libsysrepo', version: '>=1', required: false)
+libsysrepo = dependency('sysrepo', version: '>=1', required: false)
 libyang = dependency('libyang', version: '>=1', required: false)
-sysrepo_build = get_option('sysrepo')
-if (sysrepo_build == 'auto' or sysrepo_build == 'enabled') and libsysrepo.found() and libyang.found()
+sysrepo = get_option('sysrepo')
+if (sysrepo == 'auto' or sysrepo == 'enabled') and libsysrepo.found() and libyang.found()
   enable_sysrepo = true
-elif sysrepo_build == 'enabled' and not libsysrepo.found() and not libyang.found()
+elif sysrepo == 'enabled' and not libsysrepo.found() and not libyang.found()
   error('sysrepo=enabled requires libsysrepo and libyang')
 else
   enable_sysrepo = false
@@ -165,8 +165,8 @@ conf_data.set('SYSTEMD_VERSION',
   libsystemd.found() ? libsystemd.version().to_int() : -1)
 conf_data.set('NOVERBOSELOG', not verbose_log)
 conf_data.set('ENABLE_SENDMMSG', sendmmsg.to_int())
-conf_data.set('ENABLE_SYSREPO', enable_sysrepo.to_int())
 conf_data.set('ENABLE_CAP_NG', capng.found())
+conf_data.set('ENABLE_SYSREPO', enable_sysrepo)
 
 kresconfig = configure_file(
   output: 'kresconfig.h',
