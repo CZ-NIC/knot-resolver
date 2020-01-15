@@ -3,7 +3,6 @@
 ## paths
 systemd_work_dir = join_paths(
   prefix, get_option('localstatedir'), 'cache', 'knot-resolver')
-run_dir = join_paths('/run', 'knot-resolver')
 systemd_unit_dir = join_paths(prefix, 'lib', 'systemd', 'system')
 systemd_tmpfiles_dir = join_paths(prefix, 'lib', 'tmpfiles.d')
 
@@ -24,12 +23,6 @@ if systemd_files == 'enabled'
     configuration: systemd_config,
     install_dir: systemd_unit_dir,
   )
-  kresd_control_socket = configure_file(
-    input: 'kresd-control@.socket.in',
-    output: 'kresd-control@.socket',
-    configuration: systemd_config,
-    install_dir: systemd_unit_dir,
-  )
   kres_cache_gc_service = configure_file(
     input: 'kres-cache-gc.service.in',
     output: 'kres-cache-gc.service',
@@ -37,20 +30,8 @@ if systemd_files == 'enabled'
     install_dir: systemd_unit_dir,
   )
   install_data(
-    sources: [
-      'kresd.socket',
-      'kresd-tls.socket',
-      'kresd-doh.socket',
-      'kresd-webmgmt.socket',
-      'kresd.target',
-    ],
+    sources: 'kresd.target',
     install_dir: systemd_unit_dir,
-  )
-  install_data(
-    sources: [
-      'kresd@.service.d/module-http.conf',
-    ],
-    install_dir: join_paths(systemd_unit_dir, 'kresd@.service.d'),
   )
 
   ## man page
@@ -68,29 +49,4 @@ if systemd_files == 'enabled'
     configuration: systemd_config,
     install_dir: systemd_tmpfiles_dir,
   )
-
-  ## example drop-ins
-  install_data(
-    sources: [
-      'kresd.socket.d/all-interfaces.conf',
-      'kresd.socket.d/specific-interfaces.conf',
-    ],
-    install_dir: join_paths(examples_dir, 'kresd.socket.d'),
-  )
-  install_data(
-    sources: [
-      'kresd-tls.socket.d/all-interfaces.conf',
-      'kresd-tls.socket.d/specific-interfaces.conf',
-    ],
-    install_dir: join_paths(examples_dir, 'kresd-tls.socket.d'),
-  )
-  install_data(
-    sources: [
-      'kresd-doh.socket.d/all-interfaces.conf',
-      'kresd-doh.socket.d/specific-interfaces.conf',
-    ],
-    install_dir: join_paths(examples_dir, 'kresd-doh.socket.d'),
-  )
-elif systemd_files == 'nosocket'
-  subdir('nosocket')
 endif

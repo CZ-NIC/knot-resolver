@@ -94,7 +94,6 @@ option(
   choices: [
     'disabled',
     'enabled',
-    'nosocket',
   ],
   value: 'disabled',
   description: 'installs systemd-related files',
