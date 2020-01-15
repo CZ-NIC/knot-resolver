@@ -221,7 +221,6 @@ systemctl daemon-reload
 %systemd_preun 'kresd@*.service' kres-cache-gc.service kresd.target kresd.socket kresd-tls.socket
 
 %postun
-# NOTE: this doesn't restart the services on CentOS 7
 %systemd_postun_with_restart 'kresd@*.service'
 %if 0%{?fedora}
 # https://fedoraproject.org/wiki/Changes/Removing_ldconfig_scriptlets
