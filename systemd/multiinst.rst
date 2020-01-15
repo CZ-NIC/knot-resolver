@@ -59,7 +59,7 @@ At any given time only a single instance is stopped and restarted so remaining t
 Instance-specific configuration
 -------------------------------
 
-Instances can use arbitraty identifiers for the instances, for example we can name instances like `dns1`, `tls` and so on.
+Instances can use arbitrary identifiers for the instances, for example we can name instances like `dns1`, `tls` and so on.
 
 .. code-block:: bash
 

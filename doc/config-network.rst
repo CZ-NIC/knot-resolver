@@ -9,7 +9,7 @@ and protocols. Please keep in mind that DNS resolvers act
 as *DNS server* and *DNS client* at the same time,
 and that these roles require different configuration.
 
-This picture ilustrates different actors involved DNS resolution process,
+This picture illustrates different actors involved DNS resolution process,
 supported protocols, and clarifies what we call *server configuration*
 and *client configuration*.
 
