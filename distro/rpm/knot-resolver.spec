@@ -81,13 +81,9 @@ BuildRequires:  python3-Sphinx
 Requires(pre):  shadow
 %endif
 
-%if "x%{?rhel}" == "x"
-# dependencies for doc package
-# enable once CentOS 7.6 makes it into OBS buildroot
 BuildRequires:  doxygen
 BuildRequires:  python3-breathe
 BuildRequires:  python3-sphinx_rtd_theme
-%endif
 
 %description
 The Knot Resolver is a DNSSEC-enabled caching full resolver implementation
@@ -106,7 +102,6 @@ Requires:       %{name}%{?_isa} = %{version}-%{release}
 %description devel
 The package contains development headers for Knot Resolver.
 
-%if "x%{?rhel}" == "x"
 %package doc
 Summary:        Documentation for Knot Resolver
 BuildArch:      noarch
@@ -114,7 +109,6 @@ Requires:       %{name} = %{version}-%{release}
 
 %description doc
 Documentation for Knot Resolver
-%endif
 
 %if "x%{?suse_version}" == "x"
 %package module-http
@@ -146,11 +140,11 @@ gpg2 --verify %{SOURCE1} %{SOURCE0}
 %build
 CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
 %if "x%{?rhel}" == "x"
-    -Ddoc=enabled \
     -Dsystemd_files=enabled \
 %else
     -Dsystemd_files=nosocket \
 %endif
+    -Ddoc=enabled \
     -Dclient=enabled \
     -Dunit_tests=enabled \
     -Dmanaged_ta=enabled \
@@ -165,9 +159,7 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
     --sysconfdir="%{_sysconfdir}" \
 
 %{NINJA} -v -C build_rpm
-%if "x%{?rhel}" == "x"
 %{NINJA} -v -C build_rpm doc
-%endif
 
 %check
 meson test -C build_rpm
@@ -296,11 +288,9 @@ systemctl daemon-reload
 %{_libdir}/pkgconfig/libkres.pc
 %{_libdir}/libkres.so
 
-%if "x%{?rhel}" == "x"
 %files doc
 %dir %{_pkgdocdir}
 %doc %{_pkgdocdir}/html
-%endif
 
 %if "x%{?suse_version}" == "x"
 %files module-http
