@@ -1,7 +1,7 @@
 .. _mod-policy:
 
 Query policies
---------------
+==============
 
 This module can block, rewrite, or alter inbound queries based on user-defined policies.
 
@@ -15,7 +15,7 @@ These rules can be overriden by action ``PASS``, see `Policy examples`_ below.  
 
 
 Filters
-^^^^^^^
+-------
 A *filter* selects which queries will be affected by specified *action*. There are several policy filters available in the ``policy.`` table:
 
 * ``all(action)``
@@ -37,12 +37,13 @@ A *filter* selects which queries will be affected by specified *action*. There a
 .. _mod-policy-actions:
 
 Actions
-^^^^^^^
+-------
 An *action* is function which modifies DNS query, and is either of type *chain* or *non-chain*. So-called *chain* actions modify the query and allow other rules to evaluate and modify the same query. *Non-chain* actions have opposite behavior, i.e. modify the query and stop rule processing.
 
 Resolver comes with several actions available in the ``policy.`` table:
 
-**Non-chain actions**
+Non-chain actions
+^^^^^^^^^^^^^^^^^
 
 Following actions stop the policy matching on the query, i.e. other rules are not evaluated once rule with following actions matches:
 
@@ -60,7 +61,8 @@ Following actions stop the policy matching on the query, i.e. other rules are no
 
 ``FORWARD``, ``TLS_FORWARD`` and ``STUB`` support up to four IP addresses "in a single call".
 
-**Chain actions**
+Chain actions
+^^^^^^^^^^^^^
 
 Following actions allow to keep trying to match other rules, until a non-chain action is triggered:
 
@@ -78,7 +80,7 @@ Also, it is possible to write your own action (i.e. Lua function). It is possibl
 .. _tls-forwarding:
 
 Forwarding over TLS protocol (DNS-over-TLS)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-------------------------------------------
 Policy `TLS_FORWARD` allows you to forward queries using `Transport Layer Security`_ protocol, which hides the content of your queries from an attacker observing the network traffic. Further details about this protocol can be found in :rfc:`7858` and `IETF draft dprive-dtls-and-tls-profiles`_.
 
 Queries affected by `TLS_FORWARD` policy will always be resolved over TLS connection. Knot Resolver does not implement fallback to non-TLS connection, so if TLS connection cannot be established or authenticated according to the configuration, the resolution will fail.
@@ -94,7 +96,7 @@ To test this feature you need to either :ref:`configure Knot Resolver as DNS-ove
 When multiple servers are specified, the one with the lowest round-trip time is used.
 
 CA+hostname authentication
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 Traditional PKI authentication requires server to present certificate with specified hostname, which is issued by one of trusted CAs. Example policy is:
 
 .. code-block:: lua
@@ -108,7 +110,7 @@ Traditional PKI authentication requires server to present certificate with speci
   A list of paths is also accepted, but all of them must be valid PEMs.
 
 Key-pinned authentication
-~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^
 Instead of CAs, you can specify hashes of accepted certificates in ``pin_sha256``.
 They are in the usual format -- base64 from sha256.
 You may still specify ``hostname`` if you want SNI_ to be sent.
@@ -116,7 +118,7 @@ You may still specify ``hostname`` if you want SNI_ to be sent.
 .. _tls-examples:
 
 TLS Examples
-~~~~~~~~~~~~
+^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -140,7 +142,7 @@ TLS Examples
 	})
 
 Forwarding to multiple targets
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 With the use of :any:`policy.slice` function, it is possible to split the
 entire DNS namespace into distinct slices. When used in conjuction with
@@ -173,7 +175,7 @@ targets.
 .. _policy_examples:
 
 Policy examples
-^^^^^^^^^^^^^^^
+---------------
 
 .. code-block:: lua
 
@@ -231,8 +233,10 @@ Policy examples
 	policy.del(rule.id)
 
 
+.. _dns-graft:
+
 Replacing part of the DNS tree
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+------------------------------
 
 You may want to resolve most of the DNS namespace by usual means while letting some other resolver solve specific subtrees.
 Such data would typically be rejected by DNSSEC validation starting from the ICANN root keys.  Therefore, if you trust the resolver and your link to it, you can simply use the ``STUB`` action instead of ``FORWARD`` to avoid validation only for those subtrees.
@@ -251,7 +255,7 @@ For example, if you add an alternative top-level domain while using the ICANN ro
 
 
 Additional properties
-^^^^^^^^^^^^^^^^^^^^^
+---------------------
 
 Most properties (actions, filters) are described above.
 

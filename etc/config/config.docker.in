@@ -1,5 +1,5 @@
 -- vim:syntax=lua:set ts=4 sw=4:
--- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/daemon.html#configuration
+-- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/
 
 -- Listen on all interfaces (localhost would not work in Docker)
 net.listen('0.0.0.0')

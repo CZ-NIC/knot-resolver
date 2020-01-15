@@ -59,7 +59,7 @@ See the documentation at [knot-resolver.readthedocs.io][doc] for more options.
 
 [depends]: https://knot-resolver.readthedocs.io/en/stable/build.html
 [doc]: https://knot-resolver.readthedocs.io/en/stable/index.html
-[scaling]: https://knot-resolver.readthedocs.io/en/stable/daemon.html#scaling-out
+[scaling]: https://knot-resolver.readthedocs.io/en/stable/systemd-multiinst.html
 [deckard]: https://gitlab.labs.nic.cz/knot/deckard
 [luajit]: https://luajit.org/
 [libuv]: http://libuv.org

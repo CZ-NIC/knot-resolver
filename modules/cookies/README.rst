@@ -1,12 +1,12 @@
 .. _mod-cookies:
 
 DNS Cookies
------------
+===========
 
 The module performs most of the :rfc:`7873` DNS cookies functionality. Its main purpose is to check the cookies of inbound queries and responses. It is also used to alter the behaviour of the cookie functionality.
 
 Example Configuration
-^^^^^^^^^^^^^^^^^^^^^
+---------------------
 
 .. code-block:: lua
 
@@ -38,7 +38,7 @@ Example Configuration
 .. warning:: The module must be loaded before any other module that has direct influence on query processing and response generation. The module must be able to intercept an incoming query before the processing of the actual query starts. It must also be able to check the cookies of inbound responses and eventually discard them before they are handled by other functional units.
 
 Properties
-^^^^^^^^^^
+----------
 
 .. function:: cookies.config(configuration)
 
@@ -48,7 +48,7 @@ Properties
   The function may be called without any parameter. In such case it only returns current configuration. The returned JSON also contains available algorithm choices.
 
 Dependencies
-^^^^^^^^^^^^
+------------
 
 * `Nettle <https://www.lysator.liu.se/~nisse/nettle/>`_ required for HMAC-SHA256
 

@@ -1,12 +1,12 @@
 .. _mod-daf:
 
 DNS Application Firewall
-------------------------
+========================
 
 This module is a high-level interface for other powerful filtering modules and DNS views. It provides an easy interface to apply and monitor DNS filtering rules and a persistent memory for them. It also provides a restful service interface and an HTTP interface.
 
 Example configuration
-^^^^^^^^^^^^^^^^^^^^^
+---------------------
 
 Firewall rules are declarative and consist of filters and actions. Filters have ``field operator operand`` notation (e.g. ``qname = example.com``), and may be chained using AND/OR keywords. Actions may or may not have parameters after the action name.
 
@@ -80,14 +80,14 @@ If you're not sure what firewall rules are in effect, see ``daf.rules``:
     }
 
 Web interface
-^^^^^^^^^^^^^
+-------------
 
 If you have :ref:`HTTP/2 <mod-http>` loaded, the firewall automatically loads as a snippet.
 You can create, track, suspend and remove firewall rules from the web interface.
 If you load both modules, you have to load `daf` after `http`.
 
 RESTful interface
-^^^^^^^^^^^^^^^^^
+-----------------
 
 The module also exports a RESTful API for operations over rule chains.
 

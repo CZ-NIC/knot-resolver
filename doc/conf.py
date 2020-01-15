@@ -25,7 +25,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Knot Resolver'
-copyright = u'2014-2019 CZ.NIC labs'
+copyright = u'2014-2020 CZ.NIC labs'
 with open('../meson.build') as f:
     for line in f:
         match = re.match(r"\s*version\s*:\s*'([^']+)'.*", line)
@@ -55,6 +55,16 @@ htmlhelp_basename = 'apidoc'
 # Theme
 html_theme = 'sphinx_rtd_theme'
 html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+
+html_theme_options = {
+    'logo_only': True,  # if we have a html_logo below, this shows only the logo with no title text
+    # Toc options
+    'collapse_navigation': False,
+    'sticky_navigation': True,
+    'navigation_depth': 3,
+    'includehidden': False,
+}
+html_logo = '_static/logo-negativ.svg'
 
 # -- Options for LaTeX output --------------------------------------------------
 

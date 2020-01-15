@@ -1,11 +1,12 @@
 .. _mod-etcd:
 
-Etcd module
------------
+Etcd support
+------------
 
-The module connects to Etcd peers and watches for configuration change.
-By default, the module looks for the subtree under ``/knot-resolver`` directory,
-but you can change this `in the configuration <https://github.com/mah0x211/lua-etcd#cli-err--etcdnew-optiontable->`_.
+The `etcd` module connects to `etcd <https://etcd.io/>`_ peers and watches
+for configuration changes. By default, the module watches the subtree under
+``/knot-resolver`` directory, but you can change this in the
+`etcd library configuration <https://github.com/mah0x211/lua-etcd#cli-err--etcdnew-optiontable->`_.
 
 The subtree structure corresponds to the configuration variables in the declarative style.
 
@@ -26,19 +27,18 @@ Example configuration
 
 .. code-block:: lua
 
-	modules = {
-		etcd = {
-			prefix = '/knot-resolver',
-			peer = 'http://127.0.0.1:7001'
-		}
-	}
+	modules.load('etcd')
+        etcd.config({
+                prefix = '/knot-resolver',
+                peer = 'http://127.0.0.1:7001'
+        })
 
 .. warning:: Work in progress!
 
 Dependencies
 ^^^^^^^^^^^^
 
-* `lua-etcd <https://github.com/mah0x211/lua-etcd>`_ available in LuaRocks
+* `lua-etcd <https://github.com/mah0x211/lua-etcd>`_ library available in LuaRocks
 
     ``$ luarocks install etcd --from=https://mah0x211.github.io/rocks/``
 

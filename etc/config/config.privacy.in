@@ -1,6 +1,6 @@
 -- vim:syntax=lua:set ts=4 sw=4:
 -- Config file example usable for privacy-preserving resolver
--- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/startguide.html#personal-privacy-preserving-resolver
+-- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/
 @config_defaults@
 
 -- TLS server configuration
