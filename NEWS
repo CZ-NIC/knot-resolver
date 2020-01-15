@@ -1,5 +1,11 @@
-Knot Resolver 4.x.y (20yy-mm-dd)
+Knot Resolver 5.0.0 (20yy-mm-dd)
 ================================
+
+Incompatible changes
+--------------------
+- see upgrading guide: https://knot-resolver.readthedocs.io/en/stable/upgrading.html
+- net.listen() throws an error if it fails to bind; use freebind option if needed
+- control socket location has changed
 
 Improvements
 ------------
