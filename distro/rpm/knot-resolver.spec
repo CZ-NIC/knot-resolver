@@ -139,11 +139,7 @@ gpg2 --verify %{SOURCE1} %{SOURCE0}
 
 %build
 CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
-%if "x%{?rhel}" == "x"
     -Dsystemd_files=enabled \
-%else
-    -Dsystemd_files=nosocket \
-%endif
     -Ddoc=enabled \
     -Dclient=enabled \
     -Dunit_tests=enabled \
@@ -183,9 +179,6 @@ rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/experimental_dot_auth.lua
 rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/http*.lua
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/prometheus.lua
-rm %{buildroot}%{_unitdir}/kresd@.service.d/module-http.conf
-rm %{buildroot}%{_unitdir}/kresd-doh.socket
-rm %{buildroot}%{_unitdir}/kresd-webmgmt.socket
 %endif
 
 # rename doc directory for centos, opensuse
@@ -199,24 +192,19 @@ getent group knot-resolver >/dev/null || groupadd -r knot-resolver
 getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
 
 %post
-%if 0%{?fedora}
 # in case socket/service files are updated
 systemctl daemon-reload
-%systemd_post 'system-kresd.slice'
-# https://fedoraproject.org/wiki/Changes/Removing_ldconfig_scriptlets
-%else
 %systemd_post 'kresd@*.service'
+%if "x%{?fedora}" == "x"
 /sbin/ldconfig
 %endif
 
 %preun
-%systemd_preun 'kresd@*.service' kres-cache-gc.service kresd.target kresd.socket kresd-tls.socket
+%systemd_preun 'kresd@*.service' kres-cache-gc.service kresd.target
 
 %postun
 %systemd_postun_with_restart 'kresd@*.service'
-%if 0%{?fedora}
-# https://fedoraproject.org/wiki/Changes/Removing_ldconfig_scriptlets
-%else
+%if "x%{?fedora}" == "x"
 /sbin/ldconfig
 %endif
 
@@ -237,18 +225,11 @@ systemctl daemon-reload
 %{_unitdir}/kresd.target
 %dir %{_unitdir}/multi-user.target.wants
 %{_unitdir}/multi-user.target.wants/kresd.target
-%if "x%{?rhel}" == "x"
-%dir %{_unitdir}/kresd@.service.d
-%{_unitdir}/kresd.socket
-%{_unitdir}/kresd-tls.socket
-%{_unitdir}/kresd-control@.socket
 %ghost /run/%{name}/
 %{_mandir}/man7/kresd.systemd.7.gz
-%else
-%{_mandir}/man7/kresd.systemd.nosocket.7.gz
-%endif
 %{_tmpfilesdir}/knot-resolver.conf
 %attr(750,knot-resolver,knot-resolver) %dir %{_localstatedir}/cache/%{name}
+%attr(750,knot-resolver,knot-resolver) %dir %{_libdir}/%{name}
 %{_sbindir}/kresd
 %{_sbindir}/kresc
 %{_sbindir}/kres-cache-gc
@@ -293,11 +274,6 @@ systemctl daemon-reload
 
 %if "x%{?suse_version}" == "x"
 %files module-http
-%if 0%{?fedora}
-%{_unitdir}/kresd@.service.d/module-http.conf
-%{_unitdir}/kresd-doh.socket
-%{_unitdir}/kresd-webmgmt.socket
-%endif
 %{_libdir}/knot-resolver/debug_opensslkeylog.so
 %{_libdir}/knot-resolver/kres_modules/http
 %{_libdir}/knot-resolver/kres_modules/http*.lua
