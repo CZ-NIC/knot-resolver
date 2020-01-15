@@ -1,2 +1,2 @@
-/lib/systemd/system/kresd@.service.d
 /var/lib/knot-resolver
+/var/cache/knot-resolver
