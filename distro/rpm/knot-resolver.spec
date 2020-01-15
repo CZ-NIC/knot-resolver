@@ -159,9 +159,7 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
     --sysconfdir="%{_sysconfdir}" \
 
 %{NINJA} -v -C build_rpm
-%if "x%{?rhel}" == "x"
 %{NINJA} -v -C build_rpm doc
-%endif
 
 %check
 meson test -C build_rpm
