@@ -50,10 +50,11 @@ etc_dir = join_paths(prefix, get_option('sysconfdir'), 'knot-resolver')
 lib_dir = join_paths(prefix, get_option('libdir'), 'knot-resolver')
 modules_dir = join_paths(lib_dir, 'kres_modules')
 sbin_dir = join_paths(prefix, get_option('sbindir'))
-systemd_work_dir = ''
-run_dir = ''
-systemd_unit_dir = ''
-systemd_tmpfiles_dir = ''
+run_dir = join_paths('/run', 'knot-resolver')
+systemd_work_dir = join_paths(prefix, get_option('localstatedir'), 'lib', 'knot-resolver')
+systemd_cache_dir = join_paths(prefix, get_option('localstatedir'), 'cache', 'knot-resolver')
+systemd_unit_dir = join_paths(prefix, 'lib', 'systemd', 'system')
+systemd_tmpfiles_dir = join_paths(prefix, 'lib', 'tmpfiles.d')
 mod_inc_dir = include_directories('.', 'contrib/')
 
 ## Trust anchors
@@ -281,6 +282,7 @@ message('''
   systemd:
     files:              @0@'''.format(systemd_files) + '''
     work_dir:           @0@'''.format(systemd_work_dir) + '''
+    cache_dir:          @0@'''.format(systemd_cache_dir) + '''
 
   optional components
     client:             @0@'''.format(s_build_client) + '''

@@ -8,6 +8,8 @@ config_tests += [
 lua_config = configuration_data()
 lua_config.set('keyfile_default', keyfile_default)
 lua_config.set('etc_dir', etc_dir)
+lua_config.set('run_dir', run_dir)
+lua_config.set('systemd_cache_dir', systemd_cache_dir)
 lua_config.set('unmanaged', managed_ta ? 'false' : 'true')
 
 trust_anchors = configure_file(
@@ -19,6 +21,12 @@ trust_anchors = configure_file(
 sandbox = configure_file(
   input: 'sandbox.lua.in',
   output: 'sandbox.lua',
+  configuration: lua_config,
+)
+
+distro_preconfig = configure_file(
+  input: 'distro-preconfig.lua.in',
+  output: 'distro-preconfig.lua',
   configuration: lua_config,
 )
 
@@ -35,6 +43,7 @@ lua_src = [
   trust_anchors,
   files('zonefile.lua'),
   files('kluautil.lua'),
+  distro_preconfig,
 ]
 
 # install daemon lua sources
