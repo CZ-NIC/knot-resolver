@@ -50,6 +50,7 @@ BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
 
 Requires:       systemd
+Requires(post): systemd
 
 # Distro-dependent dependencies
 %if 0%{?rhel}
