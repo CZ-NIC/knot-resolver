@@ -33,9 +33,7 @@
             state: latest
 
         - include: configure_doh.yaml
-          when: ansible_distribution in ["Fedora", "Debian", "Ubuntu"]
-        - include: configure_doh_nosocket.yaml
-          when: ansible_distribution == "CentOS"
+          when: ansible_distribution in ["CentOS", "Fedora", "Debian", "Ubuntu"]
 
         - include: restart_kresd.yaml
         - include: test_doh.yaml
