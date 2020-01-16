@@ -34,6 +34,7 @@ Source102:	gpgkey-4A8BA48C2AED933BD495C509A1FBA5F7EF8C4869.gpg.asc
 BuildRequires:  gnupg2
 %endif
 
+BuildRequires:  doxygen
 BuildRequires:  gcc
 BuildRequires:  gcc-c++
 BuildRequires:  meson
@@ -53,6 +54,9 @@ Requires:       systemd
 # Distro-dependent dependencies
 %if 0%{?rhel}
 BuildRequires:  lmdb-devel
+BuildRequires:  python36-breathe
+BuildRequires:  python36-sphinx
+BuildRequires:  python36-sphinx_rtd_theme
 # Lua 5.1 version of the libraries have different package names
 Requires:       lua-basexx
 Requires:       lua-psl
@@ -61,7 +65,9 @@ Requires(pre):  shadow-utils
 %endif
 %if 0%{?fedora}
 BuildRequires:  pkgconfig(lmdb)
+BuildRequires:  python3-breathe
 BuildRequires:  python3-sphinx
+BuildRequires:  python3-sphinx_rtd_theme
 Requires:       lua5.1-basexx
 Requires:       lua5.1-cqueues
 Requires:       lua5.1-http
@@ -77,13 +83,11 @@ BuildRequires:  openssl-devel
 %if 0%{?suse_version}
 %define NINJA ninja
 BuildRequires:  lmdb-devel
+BuildRequires:  python3-breathe
 BuildRequires:  python3-Sphinx
+BuildRequires:  python3-sphinx_rtd_theme
 Requires(pre):  shadow
 %endif
-
-BuildRequires:  doxygen
-BuildRequires:  python3-breathe
-BuildRequires:  python3-sphinx_rtd_theme
 
 %description
 The Knot Resolver is a DNSSEC-enabled caching full resolver implementation
