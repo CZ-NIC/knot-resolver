@@ -230,6 +230,7 @@ Recommended build options for packagers:
 * ``--prefix=/usr`` to customize
   prefix, other directories can be set in a similar fashion, see ``meson setup
   --help``
+* ``-Dsystemd_files=enabled`` for systemd unit files
 * ``-Ddoc=enabled`` for offline html documentation (see :ref:`build-html-doc`)
 * ``-Dinstall_kresd_conf=enabled`` to install default config file
 * ``-Dclient=enabled`` to force build of kresc
@@ -242,12 +243,7 @@ It's recommended to use the upstream system unit files. If any customizations
 are required, drop-in files should be used, instead of patching/changing the
 unit files themselves.
 
-Depending on your systemd version, choose the appropriate build option:
-
-* ``-Dsystemd_files=enabled`` (recommended) installs unit files with
-  systemd socket activation support. Requires systemd >=227.
-* ``-Dsystemd_files=nosocket`` for systemd <227. Unit files won't use
-  socket activation.
+To install systemd unit files, use the ``-Dsystemd_files=enabled`` build option.
 
 To support enabling services after boot, you must also link ``kresd.target`` to
 ``multi-user.target.wants``:
