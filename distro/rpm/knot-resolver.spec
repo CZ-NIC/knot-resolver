@@ -55,9 +55,10 @@ Requires(post): systemd
 # Distro-dependent dependencies
 %if 0%{?rhel}
 BuildRequires:  lmdb-devel
-BuildRequires:  python36-breathe
-BuildRequires:  python36-sphinx
-BuildRequires:  python36-sphinx_rtd_theme
+# using python36 for doc build doesn't work
+BuildRequires:  python2-breathe
+BuildRequires:  python2-sphinx
+BuildRequires:  python2-sphinx_rtd_theme
 # Lua 5.1 version of the libraries have different package names
 Requires:       lua-basexx
 Requires:       lua-psl
