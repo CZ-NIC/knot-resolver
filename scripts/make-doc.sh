@@ -7,7 +7,10 @@ popd
 
 SPHINX=$(command -v sphinx-build-3)
 if [ $? -ne 0 ]; then
-    SPHINX=$(command -v sphinx-build)
+    SPHINX=$(command -v sphinx-build-3.6)
+    if [ $? -ne 0 ]; then
+        SPHINX=$(command -v sphinx-build)
+    fi
 fi
 
 set -o errexit -o nounset
