@@ -26,7 +26,10 @@ if get_option('doc') == 'enabled'
   doxygen = find_program('doxygen')
   sphinx_build = find_program('sphinx-build-3', required: false)
   if not sphinx_build.found()
-    sphinx_build = find_program('sphinx-build')
+    sphinx_build = find_program('sphinx-build-3.6', required: false)
+    if not sphinx_build.found()
+      sphinx_build = find_program('sphinx-build')
+    endif
   endif
 
   # python dependencies: breathe, sphinx_rtd_theme
