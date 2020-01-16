@@ -1,7 +1,9 @@
 ---
 - name: doh_config set up kresd.conf
   blockinfile:
-    marker: "-- {mark} ANSIBLE MANAGED BLOCK"
+    marker: -- {mark} ANSIBLE MANAGED BLOCK
     block: |
+      net.listen('127.0.0.1', 44353, { kind = 'doh' })
       modules.load('http')
     path: /etc/knot-resolver/kresd.conf
+    insertbefore: BOF
