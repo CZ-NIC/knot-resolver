@@ -15,6 +15,8 @@ and it provides a state-machine like API for extensions.
    quickstart-startup
    quickstart-config
 
+.. _configuration-chapter:
+
 .. toctree::
    :caption: Configuration
    :name: users
@@ -29,7 +31,7 @@ and it provides a state-machine like API for extensions.
    config-experimental
    config-no-systemd
 
-.. _operation:
+.. _operation-chapter:
 
 .. toctree::
    :caption: Operation
