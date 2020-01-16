@@ -203,8 +203,8 @@ getent group knot-resolver >/dev/null || groupadd -r knot-resolver
 getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
 
 %post
-# in case socket/service files are updated
-systemctl daemon-reload
+# in case service files are updated
+systemctl daemon-reload &>/dev/null ||:
 %systemd_post 'kresd@*.service'
 %if "x%{?fedora}" == "x"
 /sbin/ldconfig
