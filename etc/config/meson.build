@@ -28,7 +28,7 @@ endif
 if install_kresd_conf
   install_data(
     sources: 'config.personal',
-    output: 'kresd.conf',
+    rename: 'kresd.conf',
     install_dir: etc_dir,
   )
 endif
