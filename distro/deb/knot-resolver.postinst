@@ -3,6 +3,7 @@ set -e
 
 if [ "$1" = "configure" ]; then
     adduser --quiet --system --group --no-create-home --home /var/cache/knot-resolver knot-resolver
+    systemd-tmpfiles --create
 fi
 
 # Restart any running kresd instances if the root key is updated.
