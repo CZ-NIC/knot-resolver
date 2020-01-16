@@ -195,7 +195,9 @@ See chapter :ref:`cache_persistence`.
 
    <h2>Next steps</h2>
 
-Congratulations! Your resolver is now up and running and ready for queries. For serious deployments do not forget to read :ref:`operation` chapter.
+Congratulations! Your resolver is now up and running and ready for queries. For
+serious deployments do not forget to read :ref:`configuration-chapter` and
+:ref:`operation-chapter` chapters.
 
 .. _`Learn Lua in 15 minutes`: http://tylerneylon.com/a/learn-lua/
 .. _`DNS Privacy Test Servers`: https://dnsprivacy.org/wiki/display/DP/DNS+Privacy+Test+Servers
