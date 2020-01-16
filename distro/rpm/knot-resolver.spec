@@ -84,7 +84,8 @@ Requires(pre):  shadow
 
 %if "x%{?rhel}" == "x"
 # dependencies for doc package
-# enable once CentOS 7.6 makes it into OBS buildroot
+# NOTE: doc isn't possible to build on CentOS 7
+#       python2-sphinx is too old and python36-breathe is broken
 BuildRequires:  doxygen
 BuildRequires:  python3-breathe
 BuildRequires:  python3-sphinx_rtd_theme
