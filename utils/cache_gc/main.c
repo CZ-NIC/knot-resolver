@@ -13,6 +13,7 @@
 #ifdef ENABLE_SYSREPO
 
 #include <poll.h>
+#include <string.h>
 
 #include <sysrepo.h>
 #include <libyang/libyang.h>
@@ -184,22 +185,6 @@ sr_event_t event, uint32_t request_id, void *private_data)
 	return SR_ERR_OK;
 }
 
-struct pollfd *new_pollfd(sr_subscription_ctx_t *subscription){
-
-	int fd, sr_err;
-	sr_err = sr_get_event_pipe(subscription, &fd);
-
-	if (sr_err != SR_ERR_OK) {
-		printf("Error (%s)\n", sr_strerror(sr_err));
-		return NULL;
-	}
-	struct pollfd *poll = malloc(sizeof(poll));
-	poll->fd = fd;
-	poll->events = POLLIN;
-
-	return poll;
-}
-
 #endif
 
 int main(int argc, char *argv[])
@@ -260,35 +245,39 @@ int main(int argc, char *argv[])
 	}
 
 	#ifdef ENABLE_SYSREPO
-
-	int sr_err = SR_ERR_OK;
-	struct pollfd *sr_poll = NULL;
+	int fd;
+	int rv = SR_ERR_OK;
+	struct pollfd fds[1];
 	sr_conn_ctx_t *sr_connection = NULL;
 	sr_session_ctx_t *sr_session = NULL;
 	sr_subscription_ctx_t *sr_subscription = NULL;
 
-	sr_err = sr_connect(0, &sr_connection);
-	if (sr_err != SR_ERR_OK) goto cleanup;
+	rv = sr_connect(0, &sr_connection);
+	if (rv != SR_ERR_OK) goto sr_error;
 
-	sr_err = sr_connection_recover(sr_connection);
-	if (sr_err != SR_ERR_OK) goto cleanup;
+	rv = sr_connection_recover(sr_connection);
+	if (rv != SR_ERR_OK) goto sr_error;
 
-	sr_err = sr_session_start(sr_connection, SR_DS_RUNNING, &sr_session);
-	if (sr_err != SR_ERR_OK) goto cleanup;
+	rv = sr_session_start(sr_connection, SR_DS_RUNNING, &sr_session);
+	if (rv != SR_ERR_OK) goto sr_error;
 
 	/* config data subscriptions*/
-	sr_err = sr_module_change_subscribe(sr_session, YM_COMMON, XPATH_GC, cache_gc_change_cb, NULL, 0, SR_SUBSCR_NO_THREAD|SR_SUBSCR_ENABLED, &sr_subscription);
-	if (sr_err != SR_ERR_OK) goto cleanup;
+	rv = sr_module_change_subscribe(sr_session, YM_COMMON, XPATH_GC, cache_gc_change_cb, NULL, 0, SR_SUBSCR_NO_THREAD|SR_SUBSCR_ENABLED, &sr_subscription);
+	if (rv != SR_ERR_OK) goto sr_error;
 
-	sr_err = sr_module_change_subscribe(sr_session, YM_COMMON, XPATH_BASE"/cache/"YM_KRES":storage", cache_storage_change_cb, NULL, 0, SR_SUBSCR_NO_THREAD|SR_SUBSCR_ENABLED|SR_SUBSCR_CTX_REUSE, &sr_subscription);
-	if (sr_err != SR_ERR_OK) goto cleanup;
+	rv = sr_module_change_subscribe(sr_session, YM_COMMON, XPATH_BASE"/cache/"YM_KRES":storage", cache_storage_change_cb, NULL, 0, SR_SUBSCR_NO_THREAD|SR_SUBSCR_ENABLED|SR_SUBSCR_CTX_REUSE, &sr_subscription);
+	if (rv != SR_ERR_OK) goto sr_error;
 
 	/* state data subscriptions*/
-	sr_err = sr_oper_get_items_subscribe(sr_session, YM_COMMON, XPATH_GC"/version", get_gc_version_cb, NULL, SR_SUBSCR_NO_THREAD|SR_SUBSCR_CTX_REUSE, &sr_subscription);
-	if (sr_err != SR_ERR_OK) goto cleanup;
+	rv = sr_oper_get_items_subscribe(sr_session, YM_COMMON, XPATH_GC"/version", get_gc_version_cb, NULL, SR_SUBSCR_NO_THREAD|SR_SUBSCR_CTX_REUSE, &sr_subscription);
+	if (rv != SR_ERR_OK) goto sr_error;
 
-	sr_poll = new_pollfd(sr_subscription);
-	if(!sr_poll) goto cleanup;
+	/* get file descriptor */
+	rv = sr_get_event_pipe(sr_subscription, &fd);
+	if (rv != SR_ERR_OK) goto sr_error;
+
+	fds[0].fd = fd;
+	fds[0].events = POLLIN;
 
 	#endif
 
@@ -298,6 +287,7 @@ int main(int argc, char *argv[])
 		if (ret && ret != -ENOENT) {
 			printf("Error (%s)\n", knot_strerror(ret));
 			#ifdef ENABLE_SYSREPO
+				rv = 10;
 				goto cleanup;
 			#else
 				return 10;
@@ -305,9 +295,15 @@ int main(int argc, char *argv[])
 		}
 
 		#ifdef ENABLE_SYSREPO
-			int poll_ret = poll(sr_poll, (unsigned long)1, (int)cfg.gc_interval/1000);
-			if(poll_ret)
+			int poll_res = poll(fds, 1, (int)cfg.gc_interval/1000);
+			if(poll_res > 0)
 				sr_process_events(sr_subscription, sr_session, NULL);
+			else if (poll_res < 0){
+				rv = errno;
+				if (rv && rv != EINTR)
+					printf("Error (%s)\n", strerror(rv));
+				goto cleanup;
+			}
 		#else
 			usleep(cfg.gc_interval);
 		#endif
@@ -315,15 +311,15 @@ int main(int argc, char *argv[])
 	} while (cfg.gc_interval > 0 && !killed);
 
 	#ifdef ENABLE_SYSREPO
+		sr_error:
+		if (rv != SR_ERR_OK)
+			printf("Error (%s)\n", sr_strerror(rv));
 
-	cleanup:
-	free(sr_poll);
-	sr_disconnect(sr_connection);
+		cleanup:
+		sr_disconnect(sr_connection);
 
-	if (sr_err != SR_ERR_OK)
-		printf("Error: (%s)\n", sr_strerror(sr_err));
-
+		return rv;
+	#else
+		return 0;
 	#endif
-
-	return 0;
 }
