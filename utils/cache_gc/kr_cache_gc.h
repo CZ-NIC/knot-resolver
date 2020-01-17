@@ -15,7 +15,7 @@ typedef struct {
 } gc_record_info_t;
 
 typedef struct {
-	const char *cache_path;	// path to the LMDB with resolver cache
+	char *cache_path;	// path to the LMDB with resolver cache
 	unsigned long gc_interval;	// waiting time between two whole garbage collections in usecs (0 = just one-time cleanup)
 
 	size_t temp_keys_space;	// maximum amount of temporary memory for copied keys in bytes (0 = unlimited)
