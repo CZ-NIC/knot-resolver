@@ -88,7 +88,6 @@ static int l_help(lua_State *L)
 		"resolve(name, type[, class, flags, callback])\n    resolve query, callback when it's finished\n"
 		"todname(name)\n    convert name to wire format\n"
 		"tojson(val)\n    convert value to JSON\n"
-		"map(expr)\n    run expression on all workers\n"
 		"net\n    network configuration\n"
 		"cache\n    network configuration\n"
 		"modules\n    modules configuration\n"
@@ -387,6 +386,9 @@ static int l_fromjson(lua_State *L)
 
 static int l_map(lua_State *L)
 {
+	/* We don't kr_log_deprecate() here for now.  Plan: after --forks gets *removed*,
+	 * kill internal uses of map() (e.g. from daf module) and add deprecation here.
+	 * Alternatively we might (attempt to) implement map() in another way. */
 	if (lua_gettop(L) != 1 || !lua_isstring(L, 1))
 		lua_error_p(L, "map('string with a lua expression')");
 
