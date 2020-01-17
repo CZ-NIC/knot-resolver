@@ -162,6 +162,7 @@ static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 		return;
 	}
 
+	free_const(ep->flags.kind); /* needed if (control) */
 	assert(ep->handle);
 	if (force) { /* Force close if event loop isn't running. */
 		if (ep->fd >= 0) {
