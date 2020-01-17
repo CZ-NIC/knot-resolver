@@ -79,3 +79,28 @@ int engine_set_hostname(struct engine *engine, const char *hostname);
 KR_EXPORT
 const char* engine_hint_root_file(struct kr_context *ctx, const char *file);
 
+/* @internal Array of ip address shorthand. */
+typedef array_t(char*) addr_array_t;
+
+typedef array_t(const char*) config_array_t;
+
+typedef struct {
+	int fd;
+	endpoint_flags_t flags; /**< .sock_type isn't meaningful here */
+} flagged_fd_t;
+typedef array_t(flagged_fd_t) flagged_fd_array_t;
+
+struct args {
+	addr_array_t addrs, addrs_tls;
+	flagged_fd_array_t fds;
+	int control_fd;
+	int forks;
+	config_array_t config;
+	const char *rundir;
+	bool interactive;
+	bool quiet;
+	bool tty_binary_output;
+};
+
+/** Pointer to kresd arguments. */
+KR_EXPORT struct args *the_args;

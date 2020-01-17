@@ -44,9 +44,6 @@ static int net_list_add(const char *key, void *val, void *ext)
 
 		lua_newtable(L);  // "transport" table
 
-		lua_pushboolean(L, ep->flags.freebind);
-		lua_setfield(L, -2, "freebind");
-
 		switch (ep->family) {
 		case AF_INET:
 			lua_pushliteral(L, "inet4");
@@ -73,6 +70,8 @@ static int net_list_add(const char *key, void *val, void *ext)
 		if (ep->family != AF_UNIX) {
 			lua_pushinteger(L, ep->port);
 			lua_setfield(L, -2, "port");
+			lua_pushboolean(L, ep->flags.freebind);
+			lua_setfield(L, -2, "freebind");
 		}
 
 		if (ep->family == AF_UNIX) {
@@ -140,9 +139,14 @@ static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind,
 			ret = network_listen(&engine->net, str, port, flags);
 		}
 		if (ret != 0) {
-			const char *stype = flags.sock_type == SOCK_DGRAM ? "UDP" : "TCP";
-			kr_log_error("[system] bind to '%s@%d' (%s): %s\n",
-					str, port, stype, kr_strerror(ret));
+			if (str[0] == '/') {
+				kr_log_error("[system] bind to '%s' (UNIX): %s\n",
+						str, kr_strerror(ret));
+			} else {
+				const char *stype = flags.sock_type == SOCK_DGRAM ? "UDP" : "TCP";
+				kr_log_error("[system] bind to '%s@%d' (%s): %s\n",
+						str, port, stype, kr_strerror(ret));
+			}
 		}
 		return ret == 0;
 	}
