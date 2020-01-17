@@ -21,6 +21,11 @@ Users
      "with systemd","``/run/knot-resolver/control@$ID``","``/run/knot-resolver/control/$ID``"
      "without systemd","``$PWD/tty/$PID``","``$PWD/control/$PID``"
 
+* ``-f`` / ``--forks`` command-line option is deprecated.
+  In case you just want to trigger non-interactive mode, there's new ``-n`` / ``--noninteractive``.
+  This forking style `was not ergonomic <https://gitlab.labs.nic.cz/knot/knot-resolver/issues/529>`_;
+  with independent kresd processes you can better utilize a process manager (e.g. systemd).
+
 
 Configuration file
 ------------------

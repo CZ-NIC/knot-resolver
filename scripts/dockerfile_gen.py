@@ -175,7 +175,7 @@ class Component():
         if os.path.exists(configcmdpath):
             self._comp_script('test.sh')
         elif os.path.exists(configtestpath):
-            self.image.cmd('kresd -f 1 -c {}'.format(configtestpath))
+            self.image.cmd('kresd -n -c {}'.format(configtestpath))
         self.image.run_script(self.compimg_path + '/post-run.sh')
 
 
