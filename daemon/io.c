@@ -601,9 +601,7 @@ int io_listen_pipe(uv_loop_t *loop, uv_pipe_t *handle, int fd)
 	if (ret) return ret;
 
 	ret = uv_listen((uv_stream_t *)handle, 16, io_tty_accept);
-	if (ret != 0) {
-		return ret;
-	}
+	if (ret) return ret;
 
 	handle->data = NULL;
 
