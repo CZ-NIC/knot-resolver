@@ -280,7 +280,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 			printf("[system] interactive mode\n> ");
 		uv_pipe_open(&pipe, 0);
 		uv_read_start((uv_stream_t*) &pipe, io_tty_alloc, io_tty_process_input);
-	} else if (args->control_fd != -1 && uv_pipe_open(&pipe, args->control_fd)) {
+	} else if (args->control_fd != -1 && uv_pipe_open(&pipe, args->control_fd) == 0) {
 		uv_listen((uv_stream_t *) &pipe, 16, io_tty_accept);
 	}
 	/* Watch IPC pipes (or just assign them if leading the pgroup). */
