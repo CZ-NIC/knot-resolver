@@ -45,7 +45,7 @@ if n_dns_socks == 0 and not env.KRESD_NO_LISTEN then
 		log('bind to ::1@853 '..err)
 	end
 	-- Exit when kresd isn't listening on any interfaces
-	local n_dns_socks, _ = count_sockets()
+	n_dns_socks, _ = count_sockets()
 	if n_dns_socks == 0 then
 		panic('not listening on any interface, exiting...')
 	end
