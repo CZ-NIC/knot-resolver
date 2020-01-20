@@ -76,5 +76,6 @@ files['**/daemon/lua/kres-gen.lua'].ignore = {'631'} -- Allow overly long lines
 -- Tests and scripts can use global variables
 files['scripts'].ignore = {'111', '112', '113'}
 files['tests'].ignore = {'111', '112', '113'}
+files['**/utils/upgrade'].ignore = {'111', '112', '113'}
 files['**/modules/**/*.test.lua'].ignore = {'111', '112', '113', '121', '122'}
 files['**/daemon/**/*.test.lua'].ignore = {'111', '112', '113', '121', '122'}
