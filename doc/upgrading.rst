@@ -30,6 +30,39 @@ Users
 Configuration file
 ------------------
 
+* Network interface are now configured in ``kresd.conf`` with
+  :func:`net.listen` instead of systemd sockets (`#485
+  <https://gitlab.labs.nic.cz/knot/knot-resolver/issues/485>`_). See
+  the following examples.
+
+  .. tip:: For Debian, Ubuntu, CentOS and Fedora users, the configuration file
+     is upgraded automatically and only needs to be verified for corectness.
+
+  .. csv-table::
+     :header: "4.x - systemd socket file", "5.x - kresd.conf"
+
+      "kresd.socket
+      | [Socket]
+      | ListenDatagram=127.0.0.1:53
+      | ListenStream=127.0.0.1:53","| net.listen('127.0.0.1', 53, { kind = 'dns' })"
+      "kresd.socket
+      | [Socket]
+      | FreeBind=true
+      | BindIPv6Only=both
+      | ListenDatagram=[::1]:53
+      | ListenStream=[::1]:53
+      "," | net.listen('127.0.0.1', 53, { kind = 'dns', freebind = true })
+      | net.listen('::1', 53, { kind = 'dns', freebind = true })"
+      "kresd-tls.socket
+      | [Socket]
+      | ListenStream=127.0.0.1:853","| net.listen('127.0.0.1', 853, { kind = 'tls' })"
+      "kresd-doh.socket
+      | [Socket]
+      | ListenStream=127.0.0.1:443","| net.listen('127.0.0.1', 443, { kind = 'doh' })"
+      "kresd-webmgmt.socket
+      | [Socket]
+      | ListenStream=127.0.0.1:8453","| net.listen('127.0.0.1', 8453, { kind = 'webmgmt' })"
+
 * :func:`net.listen` throws an error if it fails to bind. Use ``freebind=true`` option
   to bind to nonlocal addresses.
 
