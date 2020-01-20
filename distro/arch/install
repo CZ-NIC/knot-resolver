@@ -6,6 +6,11 @@ post_install() {
 
 post_upgrade() {
   chown -R root:knot-resolver /etc/knot-resolver
+
+  if echo $2 | grep -q '^[0-4]'; then
+    echo -e "  Knot Resolver version 5+ uses a different configuration for network interfaces."
+    echo -e "  Please refer to https://knot-resolver.readthedocs.io/en/stable/upgrading.html"
+  fi
 }
 
 post_remove() {
