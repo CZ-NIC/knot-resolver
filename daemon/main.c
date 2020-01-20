@@ -265,12 +265,6 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 		return EXIT_FAILURE;
 	}
 
-	if (setvbuf(stdout, NULL, _IONBF, 0) || setvbuf(stderr, NULL, _IONBF, 0)) {
-		kr_log_error("[system] failed to to set output buffering (ignored): %s\n",
-				strerror(errno));
-		fflush(stderr);
-	}
-
 	/* Control sockets or TTY */
 	uv_pipe_t pipe;
 	uv_pipe_init(loop, &pipe, 0);
@@ -526,6 +520,12 @@ static void drop_capabilities(void)
 
 int main(int argc, char **argv)
 {
+	if (setvbuf(stdout, NULL, _IONBF, 0) || setvbuf(stderr, NULL, _IONBF, 0)) {
+		kr_log_error("[system] failed to to set output buffering (ignored): %s\n",
+				strerror(errno));
+		fflush(stderr);
+	}
+
 	the_args = &the_args_value;
 	args_init(the_args);
 	int ret = parse_args(argc, argv, the_args);
