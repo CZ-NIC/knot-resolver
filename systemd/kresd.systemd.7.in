@@ -38,18 +38,13 @@ managed with \fBsystemd\fR via systemd templates (see \fBsystemd.unit\fR(5)).
 Each \fBsystemd\fR service instance of \fBkresd\fR (\fIkresd@.service\fR)
 represents a single, independent kresd process.
 
-The systemd-managed \fBkresd\fR service set is grouped in the
-\fIsystem-kresd.slice\fR slice.  The slice includes all running daemons
-(instances of \fIkresd@.service\fR).
-
-If you have more than one CPU core available, a single running
-\fBkresd\fR daemon will only be able to make use of one core at a
-time, leaving the other cores idle.  If you want \fBkresd\fR to take
-advantage of all available cores, while sharing both cache and public
-listening ports, you should enable and start as many instances of the
-\fBkresd@.service\fR as you have cores.  Typically, each instance is
-just named \fIkresd@\fBN\fI.service\fR, where \fIN\fR is a decimal
-number.  To enable and start 3 concurrent daemons:
+If you have more than one CPU core available, a single running \fBkresd\fR
+daemon will only be able to make use of one core at a time, leaving the other
+cores idle.  If you want \fBkresd\fR to take advantage of all available cores,
+while sharing both cache and sockets, you should enable and start as many
+instances of the \fBkresd@.service\fR as you have cores.  Typically, each
+instance is just named \fIkresd@\fBN\fI.service\fR, where \fIN\fR is a decimal
+number. For example, to enable and start 3 concurrent daemons:
 
 .nf
 .RS 4n
@@ -57,8 +52,11 @@ number.  To enable and start 3 concurrent daemons:
 .RE
 .fi
 
-.SH "EXAMPLES"
+The systemd-managed \fBkresd\fR service set is grouped in the
+\fIsystem-kresd.slice\fR slice.  The slice includes all running daemons
+(instances of \fIkresd@.service\fR).
 
+.SH "EXAMPLES"
 
 To start a single kresd instance and enable it at boot:
 .nf
@@ -67,14 +65,16 @@ To start a single kresd instance and enable it at boot:
 .RE
 .fi
 
-To restart (or stop) all running instances, you can use a glob expression:
+To restart (or stop) all running instances, you can use a glob expression.
+Please note that glob can't be used to start or enable instances.
 .nf
 .RS 4n
 .B systemctl restart 'kresd@*'
 .RE
 .fi
 
-Please note that glob can't be used to start or enable instances. These can be either listed manually. It is also possible to use Bash Brace Expansion.
+Bash users can also use Brace Expansion to enable or start multiple instances,
+instead of listing them manually.
 .nf
 .RS 4n
 .B systemctl enable --now kresd@{1..4}.service
@@ -82,7 +82,6 @@ Please note that glob can't be used to start or enable instances. These can be e
 .fi
 
 To start all enabled kresd daemons, you can also use the provided \fIkresd.target\fR:
-
 .nf
 .RS 4n
 .B systemctl start kresd.target
