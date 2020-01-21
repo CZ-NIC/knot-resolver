@@ -5,6 +5,7 @@ set -e
 if [ -f /lib/systemd/system/kresd.socket ] ; then
        export UPG_DIR=/etc/knot-resolver/.upgrade-4-to-5
        mkdir -p ${UPG_DIR}
+       touch ${UPG_DIR}/.unfinished
 
        for sock in kresd.socket kresd-tls.socket kresd-webmgmt.socket kresd-doh.socket ; do
                if systemctl is-enabled ${sock} 2>/dev/null | grep -qv masked ; then
