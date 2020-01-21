@@ -1,17 +1,11 @@
 -- vim:syntax=lua:set ts=4 sw=4:
 -- Refer to manual: https://knot-resolver.readthedocs.org/en/stable/
-@config_defaults@
 
--- For DNS-over-HTTPS and web management when using http module
--- modules.load('http')
--- http.config({
--- 	cert = '/etc/knot-resolver/mycert.crt',
--- 	key = '/etc/knot-resolver/mykey.key',
--- 	tls = true,
--- })
-
--- To disable DNSSEC validation, uncomment the following line (not recommended)
--- trust_anchors.remove('.')
+-- Network interface configuration
+net.listen('127.0.0.1', 53, { kind = 'dns' })
+net.listen('127.0.0.1', 853, { kind = 'tls' })
+net.listen('::1', 53, { kind = 'dns', freebind = true })
+net.listen('::1', 853, { kind = 'tls', freebind = true })
 
 -- Load useful modules
 modules = {

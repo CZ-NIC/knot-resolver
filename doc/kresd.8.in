@@ -46,8 +46,6 @@ loss of cache entries. In multi-user scenario a shared cache
 is potential privacy/security issue, with kresd each user can have resolver cache
 in their private directory and use it in similar fashion to keychain.
 
-By default, no configuration is needed, only a directory where the daemon can store
-runtime data (cache, control sockets, ...)
 .P
 To use a locally running
 .B kresd
@@ -61,36 +59,14 @@ into
 .IR resolv.conf (5)
 and start
 .B kresd
-.PP
-.nf
-.RS 6n
-$ kresd -a 127.0.0.1
-[system] interactive mode
->
-.RE
-.fi
-.PP
+
 .P
-The daemon may be configured also as a plain forwarder using query policies, that requires
-creating a file
-.B config
-in daemon runtime directory. See \fIdaemon/README.md\fR for more information about interacting
-with CLI and configuration file options, or visit
-.B https://knot-resolver.readthedocs.io
-online documentation.
-.PP
-.nf
-.RS 6n
-# Create a basic forwarder configuration
-$ cat << EOF > config
-modules = { 'policy' }
-policy.add(policy.all(policy.FORWARD('192.168.1.1')))
-$ kresd -a 127.0.0.1
-EOF
-.RE
-.fi
-.PP
-.P
+The daemon may be configured also as a plain forwarder using query policies.
+This requires using a config file. Please refer to documentation for
+configuration file options. It is available at
+\fIhttps://knot-resolver.readthedocs.io\fR or in package documentation
+(available as knot-resolver-doc package in most distributions).
+
 The available CLI options are:
 .TP
 .B \-a\fI addr[@port]\fR, \fB\-\-addr=\fI<addr[@port]>
@@ -112,8 +88,7 @@ Option may be passed multiple times to listen on more file descriptors.
 .TP
 .B \-c\fI config\fR, \fB\-\-config=\fI<config>
 Set the config file with settings for kresd to read instead of reading the
-file at the default location (\fIconfig\fR). The syntax is
-described in \fIdaemon/README.md\fR.
+file at the default location (\fIconfig\fR).
 .TP
 .B \-f\fI N\fR, \fB\-\-forks=\fI<N>
 This option is deprecated since 5.0.0!
@@ -123,10 +98,8 @@ UNIX socket in \fIrundir\fR that the operator can connect to for interactive ses
 A number greater than 1 forks the daemon N times, all forks will bind to same addresses
 and the kernel will load-balance between them on Linux with \fISO_REUSEPORT\fR support.
 
-When socket-activated and supervised by systemd or the equivalent, kresd defaults to
---noninteractive.  If you want multiple concurrent
-processes supervised in this way, they should be supervised independently (see
-\fBkresd.systemd(7)\fR).
+If you want multiple concurrent processes supervised in this way,
+they should be supervised independently (see \fBkresd.systemd(7)\fR).
 .TP
 .B \-n\fR, \fB\-\-noninteractive
 Daemon will refrain from entering into read-eval-print loop for stdin+stdout.

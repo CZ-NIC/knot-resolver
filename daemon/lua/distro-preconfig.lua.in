@@ -1,0 +1,14 @@
+local id = os.getenv('SYSTEMD_INSTANCE')
+if not id then
+	warn('environment variable $SYSTEMD_INSTANCE not set')
+else
+	-- Bind to control socket in run_dir
+	local path = '@run_dir@/control/'..id
+	local ok, err = pcall(net.listen, path, nil, { kind = 'control' })
+	if not ok then
+		warn('bind to '..path..' failed '..err)
+	end
+end
+
+-- Set cache location
+rawset(cache, 'current_storage', 'lmdb://@systemd_cache_dir@')
