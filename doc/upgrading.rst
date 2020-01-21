@@ -44,24 +44,24 @@ Configuration file
       "kresd.socket
       | [Socket]
       | ListenDatagram=127.0.0.1:53
-      | ListenStream=127.0.0.1:53","| net.listen('127.0.0.1', 53, { kind = 'dns' })"
+      | ListenStream=127.0.0.1:53","| ``net.listen('127.0.0.1', 53, { kind = 'dns' })``"
       "kresd.socket
       | [Socket]
       | FreeBind=true
       | BindIPv6Only=both
       | ListenDatagram=[::1]:53
       | ListenStream=[::1]:53
-      "," | net.listen('127.0.0.1', 53, { kind = 'dns', freebind = true })
-      | net.listen('::1', 53, { kind = 'dns', freebind = true })"
+      "," | ``net.listen('127.0.0.1', 53, { kind = 'dns', freebind = true })``
+      | ``net.listen('::1', 53, { kind = 'dns', freebind = true })``"
       "kresd-tls.socket
       | [Socket]
-      | ListenStream=127.0.0.1:853","| net.listen('127.0.0.1', 853, { kind = 'tls' })"
+      | ListenStream=127.0.0.1:853","| ``net.listen('127.0.0.1', 853, { kind = 'tls' })``"
       "kresd-doh.socket
       | [Socket]
-      | ListenStream=127.0.0.1:443","| net.listen('127.0.0.1', 443, { kind = 'doh' })"
+      | ListenStream=127.0.0.1:443","| ``net.listen('127.0.0.1', 443, { kind = 'doh' })``"
       "kresd-webmgmt.socket
       | [Socket]
-      | ListenStream=127.0.0.1:8453","| net.listen('127.0.0.1', 8453, { kind = 'webmgmt' })"
+      | ListenStream=127.0.0.1:8453","| ``net.listen('127.0.0.1', 8453, { kind = 'webmgmt' })``"
 
 * :func:`net.listen` throws an error if it fails to bind. Use ``freebind=true`` option
   to bind to nonlocal addresses.
