@@ -2,7 +2,7 @@
 set -e
 
 # upgrade-4-to-5
-export UPG_DIR=/etc/knot-resolver/.upgrade-4-to-5
+export UPG_DIR=/var/lib/knot-resolver/.upgrade-4-to-5
 if [ -f ${UPG_DIR}/.unfinished ] ; then
        rm -f ${UPG_DIR}/.unfinished
        kresd -c /usr/lib/knot-resolver/upgrade-4-to-5.lua >/dev/null 2>/dev/null

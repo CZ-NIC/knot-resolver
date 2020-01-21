@@ -5,8 +5,8 @@ post_install() {
 }
 
 pre_upgrade() {
-  if [ -f /lib/systemd/system/kresd.socket ] ; then
-    export UPG_DIR=%{_sysconfdir}/knot-resolver/.upgrade-4-to-5
+  if [ -f /usr/lib/systemd/system/kresd.socket ] ; then
+    export UPG_DIR=/var/lib/knot-resolver/.upgrade-4-to-5
     mkdir -p ${UPG_DIR}
 
     for sock in kresd.socket kresd-tls.socket kresd-webmgmt.socket kresd-doh.socket ; do
@@ -30,7 +30,7 @@ pre_upgrade() {
 post_upgrade() {
   chown -R root:knot-resolver /etc/knot-resolver
 
-  export UPG_DIR=%{_sysconfdir}/knot-resolver/.upgrade-4-to-5
+  export UPG_DIR=/var/lib/knot-resolver/.upgrade-4-to-5
   if [ -f ${UPG_DIR}/.unfinished ] ; then
     rm -f ${UPG_DIR}/.unfinished
     kresd -c %{_libdir}/knot-resolver/upgrade-4-to-5.lua &>/dev/null
