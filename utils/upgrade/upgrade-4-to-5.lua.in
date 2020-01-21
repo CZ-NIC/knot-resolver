@@ -9,17 +9,17 @@ local sockets = {
 
 -- globals
 addr_port = {}
-outfile = io.open(out, 'a')
+outfile = io.open(out, 'w')
 
 if outfile == nil then
-	-- this is technicaly an error, but upgrade script should fail in scriptlets
+	-- this is technicaly an error, but upgrade script shouldn't fail in scriptlets
 	os.exit(0)  -- make no changes and exit
 end
 
 outfile:write("-- Suggested network interface configuration\n")
-outfile:write("-- Please verify these settings match your desired configuration\n")
-outfile:write("-- and add them to @etc_dir@/kresd.conf\n")
 outfile:write("-- See https://knot-resolver.readthedocs.io/en/stable/upgrading.html\n\n")
+outfile:write("-- Please remove any unused or undesired interfaces and add them to\n")
+outfile:write("-- @etc_dir@/kresd.conf\n\n")
 
 local function write_net_listen(addr, port, kind)
 	-- make sure (addr, port) combination is unique
