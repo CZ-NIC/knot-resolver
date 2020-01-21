@@ -53,12 +53,6 @@ Example configuration
 	-- Drop everything that hasn't matched
 	view:addr('0.0.0.0/0', policy.all(policy.DROP))
 
-.. note:: When using systemd socket activation, it's possible to bind to IPv6
-   socket that also handles IPv4 connections via v4-mapped-on-v6 addresses.
-   With this setup, using IPv4 syntax in ``view:addr()`` is currently not
-   supported.  Instead, you can use the v4-mapped-on-v6 syntax, e.g.
-   ``::ffff:127.0.0.0/104`` instead of ``127.0.0.0/8``.
-
 Rule order
 ----------
 

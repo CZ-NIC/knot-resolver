@@ -50,7 +50,7 @@ Resolver:
    "Sphinx_ and sphinx_rtd_theme_", "``documentation``", "Building this
    HTML/PDF documentation."
    "breathe_", "``documentation``", "Exposing Doxygen API doc to Sphinx."
-   "libsystemd_ >= 227", "``daemon``", "Systemd socket activation support."
+   "libsystemd_", "``daemon``", "Systemd watchdog support."
    "libprotobuf_ 3.0+", "``modules/dnstap``", "Protocol Buffers support for
    dnstap_."
    "`libprotobuf-c`_ 1.0+", "``modules/dnstap``", "C bindings for Protobuf."
