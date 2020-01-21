@@ -36,7 +36,7 @@ run_target(  # run manually to re-generate kres-gen.lua
 )
 
 lua_src = [
-  files('config.lua'),
+  files('postconfig.lua'),
   files('kres.lua'),
   files('kres-gen.lua'),
   sandbox,
