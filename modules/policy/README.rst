@@ -217,7 +217,7 @@ Policy examples
 	-- Forward all queries matching pattern
 	policy.add(policy.pattern(policy.FORWARD('2001:DB8::1'), '\4bad[0-9]\2cz'))
 	-- Forward all queries (to public resolvers https://www.nic.cz/odvr)
-	policy.add(policy.all(policy.FORWARD({'2001:678:1::206', '193.29.206.206'})))
+	policy.add(policy.all(policy.FORWARD({'2001:148f:fffe::1', '193.14.47.1'})))
 	-- Print all responses with matching suffix
 	policy.add(policy.suffix(policy.QTRACE, {todname('rhybar.cz.')}))
 	-- Print all responses
