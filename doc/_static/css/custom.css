@@ -1,0 +1,5 @@
+@import "theme.css";
+
+table.docutils blockquote {
+    margin-left: 0;
+}

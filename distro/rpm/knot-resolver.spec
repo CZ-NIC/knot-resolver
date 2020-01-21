@@ -49,6 +49,7 @@ BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
 
 Requires:       systemd
+Requires(post): systemd
 
 # Distro-dependent dependencies
 %if 0%{?rhel}
@@ -83,7 +84,8 @@ Requires(pre):  shadow
 
 %if "x%{?rhel}" == "x"
 # dependencies for doc package
-# enable once CentOS 7.6 makes it into OBS buildroot
+# NOTE: doc isn't possible to build on CentOS 7
+#       python2-sphinx is too old and python36-breathe is broken
 BuildRequires:  doxygen
 BuildRequires:  python3-breathe
 BuildRequires:  python3-sphinx_rtd_theme
@@ -147,10 +149,8 @@ gpg2 --verify %{SOURCE1} %{SOURCE0}
 CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
 %if "x%{?rhel}" == "x"
     -Ddoc=enabled \
-    -Dsystemd_files=enabled \
-%else
-    -Dsystemd_files=nosocket \
 %endif
+    -Dsystemd_files=enabled \
     -Dclient=enabled \
     -Dunit_tests=enabled \
     -Dmanaged_ta=enabled \
@@ -191,9 +191,6 @@ rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/experimental_dot_auth.lua
 rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/http*.lua
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/prometheus.lua
-rm %{buildroot}%{_unitdir}/kresd@.service.d/module-http.conf
-rm %{buildroot}%{_unitdir}/kresd-doh.socket
-rm %{buildroot}%{_unitdir}/kresd-webmgmt.socket
 %endif
 
 # rename doc directory for centos, opensuse
@@ -207,25 +204,19 @@ getent group knot-resolver >/dev/null || groupadd -r knot-resolver
 getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
 
 %post
-%if 0%{?fedora}
-# in case socket/service files are updated
-systemctl daemon-reload
-%systemd_post 'system-kresd.slice'
-# https://fedoraproject.org/wiki/Changes/Removing_ldconfig_scriptlets
-%else
+# in case service files are updated
+systemctl daemon-reload &>/dev/null ||:
 %systemd_post 'kresd@*.service'
+%if "x%{?fedora}" == "x"
 /sbin/ldconfig
 %endif
 
 %preun
-%systemd_preun 'kresd@*.service' kres-cache-gc.service kresd.target kresd.socket kresd-tls.socket
+%systemd_preun 'kresd@*.service' kres-cache-gc.service kresd.target
 
 %postun
-# NOTE: this doesn't restart the services on CentOS 7
 %systemd_postun_with_restart 'kresd@*.service'
-%if 0%{?fedora}
-# https://fedoraproject.org/wiki/Changes/Removing_ldconfig_scriptlets
-%else
+%if "x%{?fedora}" == "x"
 /sbin/ldconfig
 %endif
 
@@ -246,18 +237,11 @@ systemctl daemon-reload
 %{_unitdir}/kresd.target
 %dir %{_unitdir}/multi-user.target.wants
 %{_unitdir}/multi-user.target.wants/kresd.target
-%if "x%{?rhel}" == "x"
-%dir %{_unitdir}/kresd@.service.d
-%{_unitdir}/kresd.socket
-%{_unitdir}/kresd-tls.socket
-%{_unitdir}/kresd-control@.socket
 %ghost /run/%{name}/
 %{_mandir}/man7/kresd.systemd.7.gz
-%else
-%{_mandir}/man7/kresd.systemd.nosocket.7.gz
-%endif
 %{_tmpfilesdir}/knot-resolver.conf
 %attr(750,knot-resolver,knot-resolver) %dir %{_localstatedir}/cache/%{name}
+%attr(750,knot-resolver,knot-resolver) %dir %{_libdir}/%{name}
 %{_sbindir}/kresd
 %{_sbindir}/kresc
 %{_sbindir}/kres-cache-gc
@@ -304,11 +288,6 @@ systemctl daemon-reload
 
 %if "x%{?suse_version}" == "x"
 %files module-http
-%if 0%{?fedora}
-%{_unitdir}/kresd@.service.d/module-http.conf
-%{_unitdir}/kresd-doh.socket
-%{_unitdir}/kresd-webmgmt.socket
-%endif
 %{_libdir}/knot-resolver/debug_opensslkeylog.so
 %{_libdir}/knot-resolver/kres_modules/http
 %{_libdir}/knot-resolver/kres_modules/http*.lua

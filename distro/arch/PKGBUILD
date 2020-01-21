@@ -1,4 +1,4 @@
-# Maintainer:	Tomas Krizek <tomas.krizek@mailbox.org>
+# Maintainer:	Tomas Krizek <tomas.krizek@nic.cz>
 # Contributor:	Ondřej Surý <ondrej@sury.org>
 
 pkgname=knot-resolver
