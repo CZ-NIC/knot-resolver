@@ -49,6 +49,7 @@ Examples:
 	net.listen(net.lo, 53)
 	net.listen(net.eth0, 853, { kind = 'tls' })
 	net.listen('192.0.2.1', 53, { freebind = true })
+	net.listen({'127.0.0.1', '::1'}, 53, { kind = 'dns' })
 	net.listen('::', 443, { kind = 'doh' }) -- see http module
 	net.listen('::', 8453, { kind = 'webmgmt' }) -- see http module
 	net.listen('/tmp/kresd-socket', nil, { kind = 'webmgmt' }) -- http module supports AF_UNIX
