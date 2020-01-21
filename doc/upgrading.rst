@@ -35,8 +35,10 @@ Configuration file
   <https://gitlab.labs.nic.cz/knot/knot-resolver/issues/485>`_). See
   the following examples.
 
-  .. tip:: For Debian, Ubuntu, CentOS and Fedora users, the configuration file
-     is upgraded automatically and only needs to be verified for corectness.
+  .. tip:: You can find suggested network interface settings based on your
+     previous systemd socket configuration in
+     ``/var/lib/knot-resolver/.upgrade-4-to-5/kresd.conf.net`` which is created
+     during the package update to version 5.x.
 
   .. csv-table::
      :header: "4.x - systemd socket file", "5.x - kresd.conf"
