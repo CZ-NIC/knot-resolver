@@ -185,7 +185,7 @@ Bugfixes
 - policy.RPZ: log problems from zone-file level of parser as well (#453)
 - fix flushing of messages to logs in some cases (notably systemd) (!781)
 - fix fallback when SERVFAIL or REFUSED is received from upstream (!784)
-- fix crash when dealing with unknown TA key algorhitm (#449)
+- fix crash when dealing with unknown TA key algorithm (#449)
 - go insecure due to algorithm support even if DNSKEY is NODATA (!798)
 - fix mac addresses in the output of net.interfaces() command (!804)
 - http module: fix too early renewal of ephemeral certificates (!808)
