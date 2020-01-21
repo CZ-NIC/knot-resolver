@@ -2,6 +2,7 @@
 
 upgrade_config = configuration_data()
 upgrade_config.set('etc_dir', etc_dir)
+upgrade_config.set('systemd_work_dir', systemd_work_dir)
 
 configure_file(
   input: 'upgrade-4-to-5.lua.in',
