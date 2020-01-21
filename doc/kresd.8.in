@@ -98,10 +98,8 @@ UNIX socket in \fIrundir\fR that the operator can connect to for interactive ses
 A number greater than 1 forks the daemon N times, all forks will bind to same addresses
 and the kernel will load-balance between them on Linux with \fISO_REUSEPORT\fR support.
 
-When socket-activated and supervised by systemd or the equivalent, kresd defaults to
---noninteractive.  If you want multiple concurrent
-processes supervised in this way, they should be supervised independently (see
-\fBkresd.systemd(7)\fR).
+If you want multiple concurrent processes supervised in this way,
+they should be supervised independently (see \fBkresd.systemd(7)\fR).
 .TP
 .B \-n\fR, \fB\-\-noninteractive
 Daemon will refrain from entering into read-eval-print loop for stdin+stdout.
