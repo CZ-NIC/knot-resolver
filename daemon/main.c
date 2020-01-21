@@ -568,7 +568,7 @@ int main(int argc, char **argv)
 	if (the_args->config.len == 0 && access("config", R_OK) == 0)
 		array_push(the_args->config, "config");
 	if (load_defaults)
-		array_push(the_args->config, LIBDIR "/config.lua");
+		array_push(the_args->config, LIBDIR "/postconfig.lua");
 
 	/* File-descriptor count limit: soft->hard. */
 	struct rlimit rlim;
