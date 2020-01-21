@@ -3,7 +3,7 @@ set -e
 
 # upgrade-4-to-5
 if [ -f /lib/systemd/system/kresd.socket ] ; then
-       export UPG_DIR=/etc/knot-resolver/.upgrade-4-to-5
+       export UPG_DIR=/var/lib/knot-resolver/.upgrade-4-to-5
        mkdir -p ${UPG_DIR}
        touch ${UPG_DIR}/.unfinished
 

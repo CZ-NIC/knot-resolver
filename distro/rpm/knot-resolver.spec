@@ -206,7 +206,7 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %if "x%{?rhel}" == "x"
 # upgrade-4-to-5
 if [ -f %{_unitdir}/kresd.socket ] ; then
-	export UPG_DIR=%{_sysconfdir}/knot-resolver/.upgrade-4-to-5
+	export UPG_DIR=%{_sharedstatedir}/knot-resolver/.upgrade-4-to-5
 	mkdir -p ${UPG_DIR}
 	touch ${UPG_DIR}/.unfinished
 
@@ -232,7 +232,7 @@ fi
 %post
 # upgrade-4-to-5
 %if "x%{?rhel}" == "x"
-export UPG_DIR=%{_sysconfdir}/knot-resolver/.upgrade-4-to-5
+export UPG_DIR=%{_sharedstatedir}/knot-resolver/.upgrade-4-to-5
 if [ -f ${UPG_DIR}/.unfinished ] ; then
 	rm -f ${UPG_DIR}/.unfinished
 	kresd -c %{_libdir}/knot-resolver/upgrade-4-to-5.lua &>/dev/null
