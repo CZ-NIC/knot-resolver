@@ -16,6 +16,13 @@ function M.config()
 
 		todname('magazine-fashion.net.'),
 	}))
+
+end
+
+function M.blabla()
+	print("lua blabla function")
+end
+
 end
 
 -- Issue #139: When asking certain nameservers for PTR, disable 0x20.
