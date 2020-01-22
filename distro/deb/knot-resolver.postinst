@@ -20,6 +20,8 @@ fi
 # upon a change, we can and should remove this trigger.
 if [ "$1" = "triggered" ]; then
     if [ "$2" = "/usr/share/dns/root.key" ]; then
+        # use daemon-reload to load any unit changes
+        systemctl daemon-reload || true
         # systemctl of the sub-services is the preferred method to restart
         systemctl try-restart 'kresd@*.service' || true
     fi
@@ -27,6 +29,7 @@ if [ "$1" = "triggered" ]; then
 fi
 
 if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ] ; then
+    systemctl daemon-reload || true
     systemctl try-restart 'kresd@*.service' || true
 fi
 
