@@ -250,7 +250,7 @@ systemctl daemon-reload &>/dev/null ||:
 %endif
 
 %preun
-%systemd_preun 'kresd@*.service' kres-cache-gc.service kresd.target
+%systemd_preun kres-cache-gc.service kresd.target
 
 %postun
 %systemd_postun_with_restart 'kresd@*.service'
