@@ -179,10 +179,6 @@ DESTDIR="${RPM_BUILD_ROOT}" %{NINJA} -v -C build_rpm install
 install -m 0755 -d %{buildroot}%{_unitdir}/multi-user.target.wants
 ln -s ../kresd.target %{buildroot}%{_unitdir}/multi-user.target.wants/kresd.target
 
-# install .tmpfiles.d dirs
-install -m 0750 -d %{buildroot}%{_localstatedir}/cache/%{name}
-install -m 0750 -d %{buildroot}/run/%{name}
-
 # remove modules with missing dependencies
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/etcd.lua
 
@@ -245,6 +241,7 @@ fi
 # in case service files are updated
 systemctl daemon-reload &>/dev/null ||:
 %systemd_post 'kresd@*.service'
+%tmpfiles_create %{_tmpfilesdir}/knot-resolver.conf
 %if "x%{?fedora}" == "x"
 /sbin/ldconfig
 %endif
@@ -277,8 +274,8 @@ systemctl daemon-reload &>/dev/null ||:
 %{_unitdir}/multi-user.target.wants/kresd.target
 %{_mandir}/man7/kresd.systemd.7.gz
 %{_tmpfilesdir}/knot-resolver.conf
-%attr(750,knot-resolver,knot-resolver) %dir /run/%{name}
-%attr(750,knot-resolver,knot-resolver) %dir %{_localstatedir}/cache/%{name}
+%ghost /run/%{name}
+%ghost %{_localstatedir}/cache/%{name}
 %attr(750,knot-resolver,knot-resolver) %dir %{_libdir}/%{name}
 %{_sbindir}/kresd
 %{_sbindir}/kresc
