@@ -30,7 +30,7 @@ struct kr_module;
  * @note Lua module is loaded in it's own coroutine,
  *       so it's possible to yield and resume at arbitrary
  *       places except deinit()
- * 
+ *
  * @param  engine daemon engine
  * @param  module prepared module
  * @param  name   module name
@@ -44,5 +44,5 @@ void ffimodule_deinit(lua_State *L);
 /** Static storage for faster passing of layer function parameters to lua callbacks.
  *
  * We don't need to declare it in a header, but let's give it visibility. */
-KR_EXPORT kr_layer_t kr_layer_t_static;
+KR_EXPORT extern kr_layer_t kr_layer_t_static;
 
