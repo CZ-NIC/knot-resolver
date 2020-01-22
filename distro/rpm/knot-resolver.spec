@@ -275,9 +275,9 @@ systemctl daemon-reload &>/dev/null ||:
 %{_unitdir}/kresd.target
 %dir %{_unitdir}/multi-user.target.wants
 %{_unitdir}/multi-user.target.wants/kresd.target
-%ghost /run/%{name}/
 %{_mandir}/man7/kresd.systemd.7.gz
 %{_tmpfilesdir}/knot-resolver.conf
+%attr(750,knot-resolver,knot-resolver) %dir /run/%{name}
 %attr(750,knot-resolver,knot-resolver) %dir %{_localstatedir}/cache/%{name}
 %attr(750,knot-resolver,knot-resolver) %dir %{_libdir}/%{name}
 %{_sbindir}/kresd
