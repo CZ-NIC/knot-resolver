@@ -2,12 +2,12 @@
 set -e
 
 # upgrade-4-to-5
-if [ -f /lib/systemd/system/kresd.socket ] ; then
+if [ -f /lib/systemd/system/kresd-doh.socket ] ; then
        export UPG_DIR=/var/lib/knot-resolver/.upgrade-4-to-5
        mkdir -p ${UPG_DIR}
        touch ${UPG_DIR}/.unfinished
 
-       for sock in kresd.socket kresd-tls.socket ; do
+       for sock in kresd-webmgmt.socket kresd-doh.socket ; do
                if systemctl is-enabled ${sock} 2>/dev/null | grep -qv masked ; then
                        systemctl show ${sock} -p Listen > ${UPG_DIR}/${sock}
                        case "$(systemctl show ${sock} -p BindIPv6Only)" in
