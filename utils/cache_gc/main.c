@@ -20,9 +20,7 @@
 #include <libyang/libyang.h>
 
 #include "modules/sysrepo/common/sysrepo_conf.h"
-#include "modules/sysrepo/common/helpers.h"
-
-#define XPATH_GC    XPATH_BASE"/cache/"YM_KRES":garbage-collector"
+#include "modules/sysrepo/common/string_helper.h"
 
 #endif
 
