@@ -20,7 +20,7 @@ Improvements
 Bugfixes
 --------
 - correctly use EDNS(0) padding in failed answers (!921)
-- policy and daf modules: fix reroute rules (!901)
+- policy and daf modules: fix postrules and reroute rules (!901)
 - renumber module: don't accidentally zero-out request's .state (!901)
 
 
