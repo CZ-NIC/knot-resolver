@@ -82,7 +82,7 @@ local function rule(prefixes)
 			end
 		end
 		-- If not rewritten, chain action
-		if not changed then return end
+		if not changed then return state end
 		-- Replace section if renumbering
 		local qname = pkt:qname()
 		local qclass = pkt:qclass()
