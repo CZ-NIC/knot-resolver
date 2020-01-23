@@ -59,6 +59,12 @@ enum kr_layer_state {
 	KR_STATE_YIELD   = 1 << 4, /*!< Paused, waiting for a sub-query. */
 };
 
+/** Check that a kr_layer_state makes sense.  We're not very strict ATM. */
+static inline bool kr_state_consistent(enum kr_layer_state s)
+{
+	return s >= 0 && s < (1 << 5);
+}
+
 /* Forward declarations. */
 struct kr_layer_api;
 
@@ -72,7 +78,10 @@ typedef struct kr_layer {
 	bool is_stream;       /*!< In glue for checkout layer it's used to pass the parameter. */
 } kr_layer_t;
 
-/** Packet processing module API.  All functions return the new kr_layer_state. */
+/** Packet processing module API.  All functions return the new kr_layer_state.
+ *
+ * Lua modules are allowed to return nil/nothing, meaning the state shall not change.
+ */
 struct kr_layer_api {
       	/** Start of processing the DNS request. */
 	int (*begin)(kr_layer_t *ctx);
