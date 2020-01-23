@@ -302,6 +302,17 @@ int ffimodule_register_lua(struct engine *engine, struct kr_module *module, cons
 	/* Now call .init(), if it exists. */
 	lua_getfield(L, -1, "init");
 	const int ret = l_ffi_modcb(L, module);
+
+	/* Call .config(), if it exists. */
+	lua_getfield(L, -1, "config");
+	if (!lua_isnil(L, -1)) {
+		if (lua_pcall(L, 0, 0, 0) != 0) {
+			kr_log_error("error: %s\n", lua_tostring(L, -1));
+			lua_pop(L, 1);
+		}
+	}
+
 	lua_pop(L, 1); /* the module's table */
+
 	return ret;
 }

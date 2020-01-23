@@ -797,6 +797,8 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 			}
 		} else {
 			ret = engine_pcall(L, 1);
+			if(!ret && module->config != NULL)
+				ret = module->config(module, NULL);
 		}
 		if (ret) {
 			kr_log_error("[system] internal error when loading C module %s: %s\n",
