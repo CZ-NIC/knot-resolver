@@ -65,26 +65,6 @@ static int l_ffi_defer(lua_State *L)
 	return uv_idle_start(check, l_ffi_resume_cb);
 }
 
-/** @internal Helper for calling the entrypoint, for kr_module functions. */
-static int l_ffi_call_mod(lua_State *L, int argc)
-{
-	int status = lua_pcall(L, argc, 1, 0);
-	if (status != 0) {
-		kr_log_error("error: %s\n", lua_tostring(L, -1));
-		lua_pop(L, 1);
-		return kr_error(EIO);
-	}
-	if (lua_isnumber(L, -1)) { /* Return code */
-		status = lua_tointeger(L, -1);
-	} else if (lua_isthread(L, -1)) { /* Continuations */
-		/* TODO: unused, possibly in a bad shape.  Meant KR_STATE_YIELD? */
-		assert(!ENOTSUP);
-		status = l_ffi_defer(lua_tothread(L, -1));
-	}
-	lua_pop(L, 1);
-	return status;
-}
-
 /** Common part of calling modname.(de)init in lua.
  * The function to call should be on top of the stack and it gets popped. */
 static int l_ffi_modcb(lua_State *L, struct kr_module *module)
@@ -141,9 +121,35 @@ static int l_ffi_call_layer(kr_layer_t *ctx, int slot_ix)
 	 * lua (full) userdata, as that's relatively expensive (GC-allocated).
 	 * Performance: copying isn't ideal, but it's not visible in profiles. */
 	memcpy(&kr_layer_t_static, ctx, sizeof(*ctx));
-	const int ret = l_ffi_call_mod(L, 1);
-	/* The return codes are mixed at this point.  We need to return KR_STATE_* */
-	return ret < 0 ? KR_STATE_FAIL : ret;
+
+	if (lua_pcall(L, 1, 1, 0) != 0) {
+		kr_log_error("error: %s\n", lua_tostring(L, -1));
+		lua_pop(L, 1);
+		return KR_STATE_FAIL;
+	}
+
+	/* Handle result of the pcall.
+	 * Default state: ctx->req->state seems safer than ctx->state,
+	 * in case the pcall touched req->state. */
+	int state = ctx->req->state;
+	if (lua_isnumber(L, -1)) { /* Explicitly returned state. */
+		state = lua_tointeger(L, -1);
+		// TODO: check range?
+
+	} else if (lua_isnil(L, -1)) { /* Don't change state. */
+
+	} else if (lua_isthread(L, -1)) { /* Continuations */
+		/* TODO: unused, possibly in a bad shape.  Meant KR_STATE_YIELD? */
+		assert(!ENOTSUP);
+		if (l_ffi_defer(lua_tothread(L, -1)) != 0)
+			state = KR_STATE_FAIL;
+
+	} else { /* Nonsense returned. */
+		state = KR_STATE_FAIL;
+		kr_log_error("error: %s\n", lua_tostring(L, -1));
+	}
+	lua_pop(L, 1);
+	return state;
 }
 
 static int l_ffi_layer_begin(kr_layer_t *ctx)
