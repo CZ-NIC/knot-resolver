@@ -103,4 +103,4 @@ struct args {
 };
 
 /** Pointer to kresd arguments. */
-KR_EXPORT struct args *the_args;
+KR_EXPORT extern struct args *the_args;

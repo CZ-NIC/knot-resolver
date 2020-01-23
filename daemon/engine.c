@@ -70,6 +70,7 @@ const size_t CLEANUP_TIMER = 5*60*1000;
 /*
  * Global bindings.
  */
+struct args *the_args;
 
 
 /** Print help and available commands. */
