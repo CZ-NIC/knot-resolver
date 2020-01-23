@@ -1,27 +1,30 @@
 # C module: sysrepo
 
 sysrepo_src = files([
-    'sysrepo.c',
+	'sysrepo.c',
+	'callbacks.c',
+	'conversion.c',
+	'conv_funcs.c',
 ])
 c_src_lint += sysrepo_src
 
 sysrepo_common_src = files([
-    'common/sysrepo_conf.c',
-    'common/sysrepo_conf.h',
-	'common/helpers.h',
-	'common/helpers.c',
+	'common/sysrepo_conf.c',
+	'common/sysrepo_conf.h',
+	'common/string_helper.h',
+	'common/string_helper.c',
 ])
 c_src_lint += sysrepo_common_src
 
 if build_sysrepo
-    sysrepo_mod = shared_module(
+	sysrepo_mod = shared_module(
 	'sysrepo',
 	sysrepo_src,
-    sysrepo_common_src,
+	sysrepo_common_src,
 	dependencies: [
 	  luajit_inc,
 	  libyang,
-      libsysrepo,
+	  libsysrepo,
 	],
 	include_directories: mod_inc_dir,
 	name_prefix: '',
