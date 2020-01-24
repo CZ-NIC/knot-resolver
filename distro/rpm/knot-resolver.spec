@@ -179,10 +179,6 @@ DESTDIR="${RPM_BUILD_ROOT}" %{NINJA} -v -C build_rpm install
 install -m 0755 -d %{buildroot}%{_unitdir}/multi-user.target.wants
 ln -s ../kresd.target %{buildroot}%{_unitdir}/multi-user.target.wants/kresd.target
 
-# install .tmpfiles.d dirs
-install -m 0750 -d %{buildroot}%{_localstatedir}/cache/%{name}
-install -m 0750 -d %{buildroot}/run/%{name}
-
 # remove modules with missing dependencies
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/etcd.lua
 
@@ -203,16 +199,55 @@ mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 getent group knot-resolver >/dev/null || groupadd -r knot-resolver
 getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
 
+%if "x%{?rhel}" == "x"
+# upgrade-4-to-5
+if [ -f %{_unitdir}/kresd.socket ] ; then
+	export UPG_DIR=%{_sharedstatedir}/knot-resolver/.upgrade-4-to-5
+	mkdir -p ${UPG_DIR}
+	touch ${UPG_DIR}/.unfinished
+
+	for sock in kresd.socket kresd-tls.socket kresd-webmgmt.socket kresd-doh.socket ; do
+		if systemctl is-enabled ${sock} 2>/dev/null | grep -qv masked ; then
+			systemctl show ${sock} -p Listen > ${UPG_DIR}/${sock}
+			case "$(systemctl show ${sock} -p BindIPv6Only)" in
+			*ipv6-only)
+				touch ${UPG_DIR}/${sock}.v6only
+				;;
+			*default)
+				if cat /proc/sys/net/ipv6/bindv6only | grep -q 1 ; then
+					touch ${UPG_DIR}/${sock}.v6only
+				fi
+				;;
+			esac
+		fi
+	done
+fi
+%endif
+
+
 %post
+# upgrade-4-to-5
+%if "x%{?rhel}" == "x"
+export UPG_DIR=%{_sharedstatedir}/knot-resolver/.upgrade-4-to-5
+if [ -f ${UPG_DIR}/.unfinished ] ; then
+	rm -f ${UPG_DIR}/.unfinished
+	kresd -c %{_libdir}/knot-resolver/upgrade-4-to-5.lua &>/dev/null
+	echo -e "\n   !!! WARNING !!!"
+	echo -e "Knot Resolver configuration file requires manual upgrade.\n"
+	cat ${UPG_DIR}/kresd.conf.net 2>/dev/null
+fi
+%endif
+
 # in case service files are updated
 systemctl daemon-reload &>/dev/null ||:
 %systemd_post 'kresd@*.service'
+%tmpfiles_create %{_tmpfilesdir}/knot-resolver.conf
 %if "x%{?fedora}" == "x"
 /sbin/ldconfig
 %endif
 
 %preun
-%systemd_preun 'kresd@*.service' kres-cache-gc.service kresd.target
+%systemd_preun kres-cache-gc.service kresd.target
 
 %postun
 %systemd_postun_with_restart 'kresd@*.service'
@@ -237,10 +272,10 @@ systemctl daemon-reload &>/dev/null ||:
 %{_unitdir}/kresd.target
 %dir %{_unitdir}/multi-user.target.wants
 %{_unitdir}/multi-user.target.wants/kresd.target
-%ghost /run/%{name}/
 %{_mandir}/man7/kresd.systemd.7.gz
 %{_tmpfilesdir}/knot-resolver.conf
-%attr(750,knot-resolver,knot-resolver) %dir %{_localstatedir}/cache/%{name}
+%ghost /run/%{name}
+%ghost %{_localstatedir}/cache/%{name}
 %attr(750,knot-resolver,knot-resolver) %dir %{_libdir}/%{name}
 %{_sbindir}/kresd
 %{_sbindir}/kresc
