@@ -1,6 +1,6 @@
 -- Module interface
 local ffi = require('ffi')
-local prefixes = {}
+local prefixes_global = {}
 
 -- Create subnet prefix rule
 local function matchprefix(subnet, addr)
@@ -28,7 +28,7 @@ end
 
 -- Add subnet prefix rewrite rule
 local function add_prefix(subnet, addr)
-	table.insert(prefixes, matchprefix(subnet, addr))
+	table.insert(prefixes_global, matchprefix(subnet, addr))
 end
 
 -- Match IP against given subnet or record owner
@@ -61,7 +61,7 @@ local function renumber_record(tbl, rr)
 end
 
 -- Renumber addresses based on config
-local function rule()
+local function rule(prefixes)
 	return function (state, req)
 		if state == kres.FAIL then return state end
 		local pkt = req.answer
@@ -82,7 +82,7 @@ local function rule()
 			end
 		end
 		-- If not rewritten, chain action
-		if not changed then return end
+		if not changed then return state end
 		-- Replace section if renumbering
 		local qname = pkt:qname()
 		local qclass = pkt:qclass()
@@ -119,7 +119,7 @@ end
 
 -- Layers
 M.layer = {
-	finish = rule(),
+	finish = rule(prefixes_global),
 }
 
 return M

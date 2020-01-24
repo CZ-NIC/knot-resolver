@@ -30,6 +30,7 @@ config_tests += [
 
 integr_tests += [
   ['bogus_log', join_paths(meson.current_source_dir(), 'bogus_log', 'test.integr')],
+  ['daf', join_paths(meson.current_source_dir(), 'daf', 'test.integr')],
   ['rebinding', join_paths(meson.current_source_dir(), 'rebinding', 'test.integr')],
   ['serve_stale', join_paths(meson.current_source_dir(), 'serve_stale', 'test.integr')],
   # NOTE: ta_update may pass in cases when it should fail due to race conditions
