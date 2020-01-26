@@ -108,7 +108,7 @@ message('---------------------------')
 
 ### Sysrepo
 message('--- sysrepo dependencies ---')
-libsysrepo = dependency('sysrepo', version: '>=1', required: false)
+libsysrepo = dependency('libsysrepo', version: '>=1', required: false)
 libyang = dependency('libyang', version: '>=1', required: false)
 sysrepo = get_option('sysrepo')
 if (sysrepo == 'auto' or sysrepo == 'enabled') and libsysrepo.found() and libyang.found()
