@@ -1,8 +1,7 @@
 local ffi = require("ffi")
 
--- FIXME remove absolute path
--- the load opens the file relative to CWD. That could be anywhere. So we need to know, where is knot installed.
-local clib = ffi.load("/tmp/kr/lib/knot-resolver/kres_modules/sysrepo-lua/cbindings.so")
+-- The exact path is configured during project build by meson
+local clib = ffi.load("@modules_dir@/sysrepo-lua/cbindings.so")
 
 -------------------------------------------------------------------------------
 --                      FFI initialization
@@ -110,7 +109,7 @@ else
     _KNOT_SYSREPO_FFI_INITIALIZED = true
 end
 
--- TODO version check so that we cant load new module into an old Knot
+-- TODO version check so that we can not load new module into an old Knot
 
 -------------------------------------------------------------------------------
 --                      Data convertsion helpers
