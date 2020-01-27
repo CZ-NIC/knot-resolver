@@ -491,6 +491,7 @@ obs:odvr:
     variables:
       - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing$/
       - $CI_COMMIT_TAG
+  dependencies: []
   variables:
     OBS_REPO: knot-resolver-latest
   when: delayed
