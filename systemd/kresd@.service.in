@@ -20,6 +20,7 @@ TimeoutStopSec=10s
 WatchdogSec=10s
 Restart=on-abnormal
 LimitNOFILE=524288
+Slice=system-kresd.slice
 
 [Install]
 WantedBy=kresd.target
