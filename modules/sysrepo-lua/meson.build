@@ -1,9 +1,18 @@
 # lua module: sysrepo-lua
 
-sysrepo_lua_src = files([
-  'ffi.lua',
-  'init.lua',
-])
+lua_config = configuration_data()
+lua_config.set('modules_dir', modules_dir)
+
+ffi = configure_file(
+  input: 'ffi.lua.in',
+  output: 'ffi.lua',
+  configuration: lua_config,
+)
+
+sysrepo_lua_src = [
+  ffi,
+  files('init.lua'),
+]
 
 sysrepo_src = files([
   'cbindings/sysrepo_clib.h',
