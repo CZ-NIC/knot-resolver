@@ -182,7 +182,7 @@ doc:
     - meson build_doc -Ddoc=enabled
     - ninja -C build_doc doc
   artifacts:
-    expire_in: 1 hour
+    expire_in: 6 hour
     paths:
       - doc/html
 
