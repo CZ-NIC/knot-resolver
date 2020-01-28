@@ -77,7 +77,7 @@ and will be lost on power-off or reboot.
 .. note:: In most of the Unix-like systems ``/tmp`` and ``/var/run`` are
    commonly mounted as tmpfs.  While it is technically possible to move the
    cache to an existing tmpfs filesystem, it is *not recommended*, since the
-   path to cache is specified in multiple systemd units.
+   path to cache is configured on multiple places.
 
 Mounting the cache directory as tmpfs_ is the recommended approach.  Make sure
 to use appropriate ``size=`` option and don't forget to adjust the size in the
