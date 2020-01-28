@@ -20,6 +20,10 @@ For personal and small office use-cases cache size around 100 MB is more than en
 For large deployments we recommend to run Knot Resolver on a dedicated machine,
 and to allocate 90% of machine's free memory for resolver's cache.
 
+.. note:: Choosing a cache size that can fit into RAM is important even if the
+   cache is stored on disk (default). Otherwise, the extra I/O caused by disk
+   access for missing pages can cause performance issues.
+
 For example, imagine you have a machine with 16 GB of memory.
 After machine restart you use command ``free -m`` to determine
 amount of free memory (without swap):
