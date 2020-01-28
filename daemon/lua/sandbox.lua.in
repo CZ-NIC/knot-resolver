@@ -280,7 +280,7 @@ end
 
 -- Return filesystem size where the cache resides.
 cache.fssize = function ()
-	local path = cache.current_storage
+	local path = cache.current_storage or '.'
 	-- As it is now, `path` may or may not include the lmdb:// prefix.
 	if string.sub(path, 1, 7) == 'lmdb://' then
 		path = string.sub(path, 8)

@@ -37,15 +37,15 @@ Now you can configure cache size to be 90% of the free memory 14 928 MB, i.e. 13
    -- 90 % of free memory after machine restart
    cache.size = 13453 * MB
 
-Or you can use the entire cache partition with small free disk space, i.e. 10 MB:
+.. _`cache.fssize()`:
+
+It is also possible to set the cache size based on the file system size. This is useful
+if you use a dedicated partition for cache (e.g. non-persistent tmpfs). It is recommended
+to leave some free space for special files, such as locks.:
 
 .. code-block:: lua
 
-   cache.size = fssize(cache.current_storage) - 10*MB
-
-.. tip:: We recommended that you use ``fssize`` on a cache-only partition (like RAM disk).
-   So you can better estimate the available free space. It is also a good idea to
-   leave 1-10% free disk space (for small files, locks etc.).
+   cache.size = cache.fssize() - 10*MB
 
 .. note:: The :ref:`garbage-collector` can be used to periodically trim the
    cache. It is enabled and configured by default when running kresd with
@@ -56,6 +56,8 @@ Or you can use the entire cache partition with small free disk space, i.e. 10 MB
 Persistence
 -----------
 .. tip:: Using tmpfs for cache improves performance and reduces disk I/O.
+.. tip:: It's possible to configure the cache to take up the entire dedicated
+   filesystem (see `cache.fssize()`_ example).
 
 By default the cache is saved on a persistent storage device
 so the content of the cache is persisted during system reboot.
@@ -177,9 +179,7 @@ Configuration reference
 
    .. note:: This may or may not clear the cache, depending on the cache backend.
 
-.. function:: cache.fssize(storage)
-
-   :param string storage: Cache storage.
+.. function:: cache.fssize()
 
    :return: Partition size of cache storage.
 
