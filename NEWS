@@ -1,3 +1,11 @@
+Knot Resolver 5.?.? (2020-??-??)
+================================
+
+Improvements
+------------
+- cache: add fssize lua function to configure entire free disk space on dedicated cache partition (#524, !932)
+
+
 Knot Resolver 5.0.0 (2020-01-27)
 ================================
 
