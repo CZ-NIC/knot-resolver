@@ -37,6 +37,18 @@ Now you can configure cache size to be 90% of the free memory 14 928 MB, i.e. 13
    -- 90 % of free memory after machine restart
    cache.size = 13453 * MB
 
+Or you can use the entire cache partition with small free disk space, i.e. 10 MB:
+
+.. code-block:: lua
+
+   cache.size = fssize(cache.current_storage) - 10*MB
+
+.. tip::
+
+	We recommended that you use ``fssize`` on a cache-only partition (like RAM disk).
+  So you can better estimate the available free space. It is also a good idea to
+  leave 1-10% free disk space (for small files, locks etc.).
+
 .. note:: The :ref:`garbage-collector` can be used to periodically trim the
    cache. It is enabled and configured by default when running kresd with
    systemd integration.
