@@ -43,11 +43,9 @@ Or you can use the entire cache partition with small free disk space, i.e. 10 MB
 
    cache.size = fssize(cache.current_storage) - 10*MB
 
-.. tip::
-
-	We recommended that you use ``fssize`` on a cache-only partition (like RAM disk).
-  So you can better estimate the available free space. It is also a good idea to
-  leave 1-10% free disk space (for small files, locks etc.).
+.. tip:: We recommended that you use ``fssize`` on a cache-only partition (like RAM disk).
+   So you can better estimate the available free space. It is also a good idea to
+   leave 1-10% free disk space (for small files, locks etc.).
 
 .. note:: The :ref:`garbage-collector` can be used to periodically trim the
    cache. It is enabled and configured by default when running kresd with
@@ -178,6 +176,12 @@ Configuration reference
    Close the cache.
 
    .. note:: This may or may not clear the cache, depending on the cache backend.
+
+.. function:: cache.fssize(storage)
+
+   :param string storage: Cache storage.
+
+   :return: Partition size of cache storage.
 
 .. function:: cache.stats()
 
