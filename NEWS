@@ -1,3 +1,10 @@
+Knot Resolver 5.y.z (yyyy-mm-dd)
+================================
+
+Bugfixes
+--------
+- systemd: use correct cache location for garbage collector (#543)
+
 Knot Resolver 5.0.0 (2020-01-27)
 ================================
 
