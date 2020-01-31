@@ -21,7 +21,7 @@
 #include <sysrepo.h>
 
 #include "lib/module.h"
-#include "common/sysrepo_conf.h"
+#include "common/sysrepo_utils.h"
 #include "callbacks.h"
 
 

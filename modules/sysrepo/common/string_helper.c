@@ -17,6 +17,17 @@ char *remove_substr(char *str, const char *substr) {
     return str;
 }
 
+/// Source: https://stackoverflow.com/questions/40195731/how-to-concatenate-two-char-arrays-in-c
+char *concat(const char *a, const char *b){
+    int lena = strlen(a);
+    int lenb = strlen(b);
+    char *con = malloc(lena+lenb+1);
+    // copy & concat (including string termination)
+    memcpy(con,a,lena);
+    memcpy(con+lena,b,lenb+1);
+    return con;
+}
+
 char *replace_char(char *str, const char subchar, const char repchar) {
     for(int i = 0; str[i] != '\0'; i++)
         if(str[i] == subchar) str[i] = repchar;

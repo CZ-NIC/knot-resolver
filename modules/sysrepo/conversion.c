@@ -6,7 +6,7 @@
 
 #include "conversion.h"
 #include "conv_funcs.h"
-#include "modules/sysrepo/common/sysrepo_conf.h"
+#include "modules/sysrepo/common/sysrepo_utils.h"
 
 
 /** Configuration conversion table:

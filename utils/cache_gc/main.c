@@ -18,7 +18,7 @@
 #include <sysrepo.h>
 #include <libyang/libyang.h>
 
-#include "modules/sysrepo/common/sysrepo_conf.h"
+#include "modules/sysrepo/common/sysrepo_utils.h"
 #include "modules/sysrepo/common/string_helper.h"
 
 #endif

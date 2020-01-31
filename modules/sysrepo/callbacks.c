@@ -3,13 +3,12 @@
 
 #include "callbacks.h"
 #include "conversion.h"
-#include "common/sysrepo_conf.h"
+#include "common/sysrepo_utils.h"
 
 
-static int kresd_change_cb(sr_session_ctx_t *session, const char *module_name, const char *xpath,
-sr_event_t event, uint32_t request_id, void *private_data)
+static int kresd_change_cb(sr_session_ctx_t *session, const char *module_name, const char *xpath, sr_event_t event, uint32_t request_id, void *private_data)
 {
-	if(event == SR_EV_CHANGE)
+	if (event == SR_EV_CHANGE)
 	{
 		/* validation actions*/
 	}

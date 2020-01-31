@@ -9,8 +9,8 @@ sysrepo_src = files([
 c_src_lint += sysrepo_src
 
 sysrepo_common_src = files([
-	'common/sysrepo_conf.c',
-	'common/sysrepo_conf.h',
+	'common/sysrepo_utils.c',
+	'common/sysrepo_utils.h',
 	'common/string_helper.h',
 	'common/string_helper.c',
 ])
