@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <sysrepo.h>
 #include <uv.h>
+#include <libyang/libyang.h>
 
 #include "lib/module.h"
 #include "common/sysrepo_conf.h"
@@ -36,7 +37,9 @@ struct el_subscription_ctx {
 };
 
 /** Callback to Lua used for applying configuration  */
-static set_leaf_conf_t apply_conf_f = NULL;
+static apply_conf_f apply_conf = NULL;
+/** Callback to Lua used for reading configuration */
+static read_conf_f read_conf = NULL;
 static el_subscription_ctx_t *el_subscription_ctx = NULL;
 
 /**
@@ -64,27 +67,20 @@ static int sysrepo_conf_change_callback(sr_session_ctx_t *session,
 		// declining the change now
 
 		int sr_err = SR_ERR_OK;
-		sr_change_iter_t *it = NULL;
-		sr_change_oper_t oper;
-		sr_val_t *old_value = NULL;
-		sr_val_t *new_value = NULL;
+		struct lyd_node* tree;
 
-		// get all changes
-		sr_err = sr_get_changes_iter(session, XPATH_BASE "//.", &it);
+		// get the whole config tree
+		sr_err = sr_get_data(session, XPATH_BASE, 0, 0, 0, &tree);
 		if (sr_err != SR_ERR_OK)
 			goto cleanup;
 
-		while ((sr_get_change_next(session, it, &oper, &old_value,
-					   &new_value)) == SR_ERR_OK) {
-			apply_conf_f(new_value);
-		}
+		// apply the configuration
+		apply_conf(tree);
 	cleanup:
 		if (sr_err != SR_ERR_OK && sr_err != SR_ERR_NOT_FOUND)
 			kr_log_error("Sysrepo module error: %s\n",
 				     sr_strerror(sr_err));
-		sr_free_val(old_value);
-		sr_free_val(new_value);
-		sr_free_change_iter(it);
+		lyd_free_withsiblings(tree); // FIXME sure about this?
 	}
 	return SR_ERR_OK;
 }
@@ -149,10 +145,10 @@ static void el_subscr_cb(el_subscription_ctx_t *el_subscr, int status)
 	sr_process_events(el_subscr->subscription, el_subscr->session, NULL);
 }
 
-int sysrepo_init(set_leaf_conf_t apply_conf_callback)
+int sysrepo_init(apply_conf_f apply_conf_callback)
 {
 	// store callback to Lua
-	apply_conf_f = apply_conf_callback;
+	apply_conf = apply_conf_callback;
 
 	int sr_err = SR_ERR_OK;
 	sr_conn_ctx_t *sr_connection = NULL;
@@ -200,6 +196,33 @@ int sysrepo_deinit()
 {
 	el_subscription_free(el_subscription_ctx);
 	// remove reference to Lua callback so that it can be free'd safely
-	apply_conf_f = NULL;
+	apply_conf = NULL;
 	return kr_ok();
+}
+
+KR_EXPORT struct lyd_node* node_child_first(struct lyd_node* parent) {
+	assert(
+		parent->schema->nodetype == LYS_CONTAINER ||
+		parent->schema->nodetype == LYS_LIST ||
+		parent->schema->nodetype == LYS_CHOICE
+	);
+
+	return parent->child;
+}
+
+KR_EXPORT struct lyd_node* node_child_next(struct lyd_node* prev_child) {
+	return prev_child->next;
+}
+
+KR_EXPORT const char* node_get_name(struct lyd_node* node) {
+	return node->schema->name;
+}
+
+KR_EXPORT const char* node_get_value_str(struct lyd_node* node) {
+	assert(
+		node->schema->nodetype ==  LYS_LEAF ||
+		node->schema->nodetype == LYS_LEAFLIST
+	);
+
+	return ((struct lyd_node_leaf_list*) node)->value_str;
 }

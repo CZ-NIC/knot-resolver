@@ -12,6 +12,8 @@ ffi = configure_file(
 sysrepo_lua_src = [
   ffi,
   files('init.lua'),
+  files('debug.lua'),
+  files('model.lua'),
 ]
 
 sysrepo_src = files([
@@ -39,7 +41,7 @@ if build_sysrepo
 	sysrepo_src,
 	dependencies: [
 	  luajit_inc,
-      libyang,
+    libyang,
 	  libsysrepo,
 	],
 	include_directories: mod_inc_dir,

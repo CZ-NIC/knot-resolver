@@ -24,6 +24,7 @@
 
 #include "lib/defines.h"
 #include "lib/utils.h"
+#include <libyang/libyang.h>
 
 #include "common/sysrepo_conf.h"
 
@@ -43,7 +44,17 @@ typedef struct el_subscription_ctx el_subscription_ctx_t;
 /** Callback for our sysrepo subscriptions */
 typedef void (*el_subsription_cb)(el_subscription_ctx_t *el_subscr, int status);
 /** Callback to Lua for applying configuration */
-typedef void (*set_leaf_conf_t)(sr_val_t *val);
+typedef void (*apply_conf_f)(struct lyd_node *root);
+typedef void (*read_conf_f)(struct lyd_node* root);
 
-KR_EXPORT int sysrepo_init(set_leaf_conf_t set_leaf_conf_cb);
+KR_EXPORT int sysrepo_init(apply_conf_f set_leaf_conf_cb);
 KR_EXPORT int sysrepo_deinit(void);
+
+/** Given a libyang node, returns it's first child */
+KR_EXPORT struct lyd_node* node_child_first(struct lyd_node* parent);
+/** Given a libyang node, return next sibling or NULL if there isn't any */
+KR_EXPORT struct lyd_node* node_child_next(struct lyd_node* prev_child);
+/** Given a libyang node, return it's name from schema */
+KR_EXPORT const char* node_get_name(struct lyd_node* node);
+/** Given a libyang node, return it's value as a string */
+KR_EXPORT const char* node_get_value_str(struct lyd_node* node);
