@@ -1,12 +1,17 @@
 local sysrepo_ffi = require("kres_modules/sysrepo-lua/ffi")
+ -- following require returns only module constructor, calling it straight away
+local data_model = require("kres_modules/sysrepo-lua/model")(sysrepo_ffi.get_clib_bindings())
 
 local sysrepo = {}
 
-local function apply_configuration(sr_val)
-    local sr_val_table = sysrepo_ffi.sr_val_to_table(sr_val)
+local function apply_configuration(root_node)
+    print("Configuration has changed. Applying the new config!")
 
-    print("Configuration change")
-    print(tostring(sr_val_table))
+    data_model.apply_configuration(root_node)
+end
+
+local function read_configuration()
+    return data_model.serialize_model(nil)
 end
 
 function sysrepo.init()
