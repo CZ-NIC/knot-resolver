@@ -132,7 +132,7 @@ Requires:       lua-mmdb
 
 %description module-http
 HTTP/2 module for Knot Resolver has multiple uses. It enables use of
-DNS-over-HTTP, can serve as API ednpoint for other modules or provide a web
+DNS-over-HTTP, can serve as API endpoint for other modules or provide a web
 interface for local visualization of the resolver cache and queries.
 %endif
 
