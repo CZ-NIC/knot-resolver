@@ -238,8 +238,13 @@ if [ -f ${UPG_DIR}/.unfinished ] ; then
 fi
 %endif
 
-# in case service files are updated
-systemctl daemon-reload &>/dev/null ||:
+# 5.0.1 fix to force restart of kres-cache-gc.service, which was missing in %systemd_postun_with_restart
+# TODO: remove once most users upgrade to 5.0.1+
+systemctl daemon-reload >/dev/null 2>&1 || :
+if [ $1 -ge 2 ] ; then
+        systemctl try-restart kres-cache-gc.service >/dev/null 2>&1 || :
+fi
+
 %systemd_post 'kresd@*.service'
 %tmpfiles_create %{_tmpfilesdir}/knot-resolver.conf
 %if "x%{?fedora}" == "x"
@@ -250,7 +255,6 @@ systemctl daemon-reload &>/dev/null ||:
 %systemd_preun kres-cache-gc.service kresd.target
 
 %postun
-systemctl daemon-reload &>/dev/null ||:
 %systemd_postun_with_restart 'kresd@*.service' kres-cache-gc.service
 %if "x%{?fedora}" == "x"
 /sbin/ldconfig
