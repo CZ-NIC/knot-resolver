@@ -1,7 +1,11 @@
 kres_watcher_src = files([
     'main.c',
+    'watcher.c',
+    'sdbus_client.c',
+    'sysrepo_client.c',
 ])
 c_src_lint += kres_watcher_src
+
 
 if build_sysrepo
     kres_watcher = executable(
@@ -13,6 +17,7 @@ if build_sysrepo
       libkres_dep,
       libyang,
       libsysrepo,
+      libsystemd,
       libknot,
       luajit_inc,
     ],

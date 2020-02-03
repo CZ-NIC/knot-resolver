@@ -141,7 +141,7 @@ LYD_FORMAT format, int flags, struct lyd_node **data)
 	return 0;
 }
 
-int import_file_to_startup_ds(sr_session_ctx_t *session, const char *file_path,
+int import_from_file(sr_session_ctx_t *session, const char *file_path,
 const char *module_name, LYD_FORMAT format, int not_strict, int timeout_s)
 {
 	int ret = 0;
@@ -154,7 +154,6 @@ const char *module_name, LYD_FORMAT format, int not_strict, int timeout_s)
 		return 1;
 	}
 
-	sr_session_switch_ds(session,SR_DS_STARTUP);
 	ret = sr_replace_config(session, module_name,
 		data, sr_session_get_ds(session), timeout_s * 1000);
 
@@ -165,4 +164,41 @@ const char *module_name, LYD_FORMAT format, int not_strict, int timeout_s)
 		return 1;
 	}
 	return 0;
+}
+
+int export_to_file(sr_session_ctx_t *sess, const char *file_path,
+const char *xpath, LYD_FORMAT format, uint32_t max_depth, int timeout_s)
+{
+	int ret = SR_ERR_OK;
+	FILE *file = NULL;
+	struct lyd_node *data;
+
+	if (format == LYD_UNKNOWN) {
+		format = LYD_JSON;
+	}
+
+	file = fopen(file_path, "w");
+	if (!file) {
+		kr_log_error("[sysrepo] failed to open '%s' for writing, %s\n", file_path, strerror(errno));
+		goto cleanup;
+	}
+
+	ret = sr_get_data(sess, xpath, max_depth, timeout_s * 1000, 0, &data);
+	if (ret != SR_ERR_OK) {
+		kr_log_error("[sysrepo] failed to get data, %s\n", sr_strerror(ret));
+		if (file) {
+			fclose(file);
+		}
+		goto cleanup;
+	}
+
+	/* print exported data */
+	lyd_print_file(file, data, format, LYP_FORMAT | LYP_WITHSIBLINGS);
+	lyd_free_withsiblings(data);
+
+	cleanup:
+	if (file) {
+		fclose(file);
+	}
+	return ret;
 }
