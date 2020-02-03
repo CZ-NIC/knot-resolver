@@ -245,7 +245,7 @@ if [ $1 -ge 2 ] ; then
         systemctl try-restart kres-cache-gc.service >/dev/null 2>&1 || :
 fi
 
-%systemd_post 'kresd@*.service'
+#%systemd_post is not needed for anything
 %tmpfiles_create %{_tmpfilesdir}/knot-resolver.conf
 %if "x%{?fedora}" == "x"
 /sbin/ldconfig
