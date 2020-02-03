@@ -250,6 +250,7 @@ systemctl daemon-reload &>/dev/null ||:
 %systemd_preun kres-cache-gc.service kresd.target
 
 %postun
+systemctl daemon-reload &>/dev/null ||:
 %systemd_postun_with_restart 'kresd@*.service' kres-cache-gc.service
 %if "x%{?fedora}" == "x"
 /sbin/ldconfig
