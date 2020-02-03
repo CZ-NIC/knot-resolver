@@ -238,20 +238,19 @@ if [ -f ${UPG_DIR}/.unfinished ] ; then
 fi
 %endif
 
-# in case service files are updated
-systemctl daemon-reload &>/dev/null ||:
-%systemd_post 'kresd@*.service'
 %tmpfiles_create %{_tmpfilesdir}/knot-resolver.conf
 %if "x%{?fedora}" == "x"
 /sbin/ldconfig
 %endif
 
 %preun
-%systemd_preun kres-cache-gc.service kresd.target
+%systemd_preun kresd.target
+%systemd_preun kres-cache-gc.service
 
 %postun
 systemctl daemon-reload &>/dev/null ||:
-%systemd_postun_with_restart 'kresd@*.service' kres-cache-gc.service
+%systemd_postun_with_restart 'kresd@*.service'
+%systemd_postun_with_restart kres-cache-gc.service
 %if "x%{?fedora}" == "x"
 /sbin/ldconfig
 %endif
