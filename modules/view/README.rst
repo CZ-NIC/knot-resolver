@@ -1,7 +1,7 @@
 .. _mod-view:
 
 Views and ACLs
---------------
+==============
 
 The :ref:`policy <mod-policy>` module implements policies for global query matching, e.g. solves "how to react to certain query".
 This module combines it with query source matching, e.g. "who asked the query". This allows you to create personalized blacklists, filters and ACLs.
@@ -32,7 +32,7 @@ You can combine view selectors with RPZ_ to create personalized filters for exam
 
 
 Example configuration
-^^^^^^^^^^^^^^^^^^^^^
+---------------------
 
 .. code-block:: lua
 
@@ -53,14 +53,8 @@ Example configuration
 	-- Drop everything that hasn't matched
 	view:addr('0.0.0.0/0', policy.all(policy.DROP))
 
-.. note:: When using systemd socket activation, it's possible to bind to IPv6
-   socket that also handles IPv4 connections via v4-mapped-on-v6 addresses.
-   With this setup, using IPv4 syntax in ``view:addr()`` is currently not
-   supported.  Instead, you can use the v4-mapped-on-v6 syntax, e.g.
-   ``::ffff:127.0.0.0/104`` instead of ``127.0.0.0/8``.
-
 Rule order
-^^^^^^^^^^
+----------
 
 The current implementation is best understood as three separate rule chains:
 vanilla ``policy.add``, ``view:tsig`` and ``view:addr``.
@@ -75,7 +69,7 @@ By default :ref:`policy module <mod-policy>` acts before ``view`` module due to 
 
 
 Properties
-^^^^^^^^^^
+----------
 
 .. function:: view:addr(subnet, rule)
 

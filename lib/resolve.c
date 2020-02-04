@@ -496,6 +496,10 @@ static int answer_padding(struct kr_request *request)
 		assert(false);
 		return kr_error(EINVAL);
 	}
+	if (!request->qsource.flags.tls) {
+		/* Not meaningful to pad without encryption. */
+		return kr_ok();
+	}
 	int32_t padding = request->ctx->tls_padding;
 	knot_pkt_t *answer = request->answer;
 	knot_rrset_t *opt_rr = answer->opt_rr;
@@ -535,8 +539,8 @@ static void answer_fail(struct kr_request *request)
 	knot_wire_set_rcode(answer->wire, KNOT_RCODE_SERVFAIL);
 	if (ret == 0 && opt_rr) {
 		knot_pkt_begin(answer, KNOT_ADDITIONAL);
-		answer_padding(request); /* Ignore failed padding in SERVFAIL answer. */
 		answer->opt_rr = opt_rr;
+		answer_padding(request); /* Ignore failed padding in SERVFAIL answer. */
 		edns_put(answer, false);
 	}
 }
@@ -547,10 +551,7 @@ static int answer_append_edns(struct kr_request *request)
 	knot_pkt_t *answer = request->answer;
 	if (!answer->opt_rr)
 		return kr_ok();
-	int ret = 0;
-	if (request->qsource.flags.tls) {
-		ret = answer_padding(request);
-	}
+	int ret = answer_padding(request);
 	if (!ret) ret = knot_pkt_begin(answer, KNOT_ADDITIONAL);
 	if (!ret) ret = knot_pkt_put(answer, KNOT_COMPR_HINT_NONE,
 				     answer->opt_rr, KNOT_PF_FREE);

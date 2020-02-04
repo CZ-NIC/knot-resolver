@@ -1,7 +1,7 @@
 .. _mod-rebinding:
 
 Rebinding protection
---------------------
+====================
 
 This module provides protection from `DNS Rebinding attack`_ by blocking
 answers which cointain IPv4_ or IPv6_ addresses for private use

@@ -2,7 +2,7 @@ project(
   'knot-resolver',
   ['c', 'cpp'],
   license: 'GPLv3+',
-  version: '4.3.0',
+  version: '5.0.0',
   default_options: ['c_std=gnu11', 'b_ndebug=if-release'],
   meson_version: '>=0.46',
 )
@@ -50,10 +50,11 @@ etc_dir = join_paths(prefix, get_option('sysconfdir'), 'knot-resolver')
 lib_dir = join_paths(prefix, get_option('libdir'), 'knot-resolver')
 modules_dir = join_paths(lib_dir, 'kres_modules')
 sbin_dir = join_paths(prefix, get_option('sbindir'))
-systemd_work_dir = ''
-run_dir = ''
-systemd_unit_dir = ''
-systemd_tmpfiles_dir = ''
+run_dir = join_paths('/run', 'knot-resolver')
+systemd_work_dir = join_paths(prefix, get_option('localstatedir'), 'lib', 'knot-resolver')
+systemd_cache_dir = join_paths(prefix, get_option('localstatedir'), 'cache', 'knot-resolver')
+systemd_unit_dir = join_paths(prefix, 'lib', 'systemd', 'system')
+systemd_tmpfiles_dir = join_paths(prefix, 'lib', 'tmpfiles.d')
 mod_inc_dir = include_directories('.', 'contrib/')
 
 ## Trust anchors
@@ -98,12 +99,8 @@ else
 endif
 
 ### Systemd
-libsystemd = dependency('libsystemd', required: false)
 systemd_files = get_option('systemd_files')
-if systemd_files == 'enabled' and (
-    not libsystemd.found() or libsystemd.version().version_compare('<227'))
-  error('systemd_files=enabled requires libsystemd >= 227')
-endif
+libsystemd = dependency('libsystemd', required: systemd_files == 'enabled')
 message('---------------------------')
 
 ## Compiler args
@@ -257,7 +254,6 @@ run_target(
 # https://github.com/mesonbuild/meson/issues/2404
 s_managed_ta = managed_ta ? 'enabled' : 'disabled'
 s_install_root_keys = install_root_keys ? 'enabled' : 'disabled'
-s_systemd_socket = libsystemd.found() ? 'enabled' : 'disabled'
 s_build_client = build_client ? 'enabled' : 'disabled'
 s_build_utils = build_utils ? 'enabled' : 'disabled'
 s_build_dnstap = build_dnstap ? 'enabled' : 'disabled'
@@ -284,9 +280,9 @@ message('''
     install_root_keys:  @0@'''.format(s_install_root_keys) + '''
 
   systemd:
-    socket activation:  @0@'''.format(s_systemd_socket) + '''
     files:              @0@'''.format(systemd_files) + '''
     work_dir:           @0@'''.format(systemd_work_dir) + '''
+    cache_dir:          @0@'''.format(systemd_cache_dir) + '''
 
   optional components
     client:             @0@'''.format(s_build_client) + '''

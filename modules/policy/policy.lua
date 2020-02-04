@@ -789,7 +789,7 @@ end
 -- as a dependency chain, e.g. r1,r2,r3 -> r3(r2(r1(state)))
 policy.layer = {
 	begin = function(state, req)
-		-- Don't act on "resolved" cases.
+		-- Don't act on "finished" cases.
 		if bit.band(state, bit.bor(kres.FAIL, kres.DONE)) ~= 0 then return state end
 		local qry = req:current()
 		return policy.evaluate(policy.rules, req, qry, state)
@@ -800,8 +800,8 @@ policy.layer = {
 	finish = function(state, req)
 		-- Optimization for the typical case
 		if #policy.postrules == 0 then return state end
-		-- Don't act on "resolved" cases.
-		if bit.band(state, bit.bor(kres.FAIL, kres.DONE)) ~= 0 then return state end
+		-- Don't act on failed cases.
+		if bit.band(state, kres.FAIL) ~= 0 then return state end
 		return policy.evaluate(policy.postrules, req, req:current(), state) or state
 	end
 }

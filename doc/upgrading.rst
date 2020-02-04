@@ -10,11 +10,64 @@ We advise users to also read :ref:`release_notes` for respective versions.
 4.x to 5.x
 ==========
 
+Users
+-----
+
+* Control socket location has changed
+
+  .. csv-table::
+     :header: "","4.x location","5.x location"
+
+     "with systemd","``/run/knot-resolver/control@$ID``","``/run/knot-resolver/control/$ID``"
+     "without systemd","``$PWD/tty/$PID``","``$PWD/control/$PID``"
+
+* ``-f`` / ``--forks`` command-line option is deprecated.
+  In case you just want to trigger non-interactive mode, there's new ``-n`` / ``--noninteractive``.
+  This forking style `was not ergonomic <https://gitlab.labs.nic.cz/knot/knot-resolver/issues/529>`_;
+  with independent kresd processes you can better utilize a process manager (e.g. systemd).
+
+
 Configuration file
 ------------------
 
-* ``net.listen()`` throws an error if it fails to bind. Use ``freebind=true`` option
+* Network interface are now configured in ``kresd.conf`` with
+  :func:`net.listen` instead of systemd sockets (`#485
+  <https://gitlab.labs.nic.cz/knot/knot-resolver/issues/485>`_). See
+  the following examples.
+
+  .. tip:: You can find suggested network interface settings based on your
+     previous systemd socket configuration in
+     ``/var/lib/knot-resolver/.upgrade-4-to-5/kresd.conf.net`` which is created
+     during the package update to version 5.x.
+
+  .. csv-table::
+     :header: "4.x - systemd socket file", "5.x - kresd.conf"
+
+      "kresd.socket
+      | [Socket]
+      | ListenDatagram=127.0.0.1:53
+      | ListenStream=127.0.0.1:53","| ``net.listen('127.0.0.1', 53, { kind = 'dns' })``"
+      "kresd.socket
+      | [Socket]
+      | FreeBind=true
+      | BindIPv6Only=both
+      | ListenDatagram=[::1]:53
+      | ListenStream=[::1]:53
+      "," | ``net.listen('127.0.0.1', 53, { kind = 'dns', freebind = true })``
+      | ``net.listen('::1', 53, { kind = 'dns', freebind = true })``"
+      "kresd-tls.socket
+      | [Socket]
+      | ListenStream=127.0.0.1:853","| ``net.listen('127.0.0.1', 853, { kind = 'tls' })``"
+      "kresd-doh.socket
+      | [Socket]
+      | ListenStream=127.0.0.1:443","| ``net.listen('127.0.0.1', 443, { kind = 'doh' })``"
+      "kresd-webmgmt.socket
+      | [Socket]
+      | ListenStream=127.0.0.1:8453","| ``net.listen('127.0.0.1', 8453, { kind = 'webmgmt' })``"
+
+* :func:`net.listen` throws an error if it fails to bind. Use ``freebind=true`` option
   to bind to nonlocal addresses.
+
 
 4.2.2 to 4.3+
 =============

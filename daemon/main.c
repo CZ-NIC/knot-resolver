@@ -52,158 +52,8 @@
 #include <libknot/error.h>
 
 
-/* @internal Array of ip address shorthand. */
-typedef array_t(char*) addr_array_t;
+struct args the_args_value;  /** Static allocation for the_args singleton. */
 
-typedef array_t(const char*) config_array_t;
-
-typedef struct {
-	int fd;
-	endpoint_flags_t flags; /**< .sock_type isn't meaningful here */
-} flagged_fd_t;
-typedef array_t(flagged_fd_t) flagged_fd_array_t;
-
-struct args {
-	addr_array_t addrs, addrs_tls;
-	flagged_fd_array_t fds;
-	int control_fd;
-	int forks;
-	config_array_t config;
-	const char *rundir;
-	bool interactive;
-	bool quiet;
-	bool tty_binary_output;
-};
-
-/**
- * TTY control: process input and free() the buffer.
- *
- * For parameters see http://docs.libuv.org/en/v1.x/stream.html#c.uv_read_cb
- *
- * - This is just basic read-eval-print; libedit is supported through kresc;
- * - stream->data contains program arguments (struct args);
- */
-static void tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
-{
-	char *cmd = buf ? buf->base : NULL; /* To be free()d on return. */
-
-	/* Set output streams */
-	FILE *out = stdout;
-	uv_os_fd_t stream_fd = 0;
-	struct args *args = stream->data;
-	if (uv_fileno((uv_handle_t *)stream, &stream_fd)) {
-		uv_close((uv_handle_t *)stream, (uv_close_cb) free);
-		free(cmd);
-		return;
-	}
-	if (stream_fd != STDIN_FILENO) {
-		if (nread < 0) { /* Close if disconnected */
-			uv_close((uv_handle_t *)stream, (uv_close_cb) free);
-		}
-		if (nread <= 0) {
-			free(cmd);
-			return;
-		}
-		uv_os_fd_t dup_fd = dup(stream_fd);
-		if (dup_fd >= 0) {
-			out = fdopen(dup_fd, "w");
-		}
-	}
-
-	/* Execute */
-	if (stream && cmd && nread > 0) {
-		/* Ensure cmd is 0-terminated */
-		if (cmd[nread - 1] == '\n') {
-			cmd[nread - 1] = '\0';
-		} else {
-			if (nread >= buf->len) { /* only equality should be possible */
-				char *newbuf = realloc(cmd, nread + 1);
-				if (!newbuf)
-					goto finish;
-				cmd = newbuf;
-			}
-			cmd[nread] = '\0';
-		}
-
-		/* Pseudo-command for switching to "binary output"; */
-		if (strcmp(cmd, "__binary") == 0) {
-			args->tty_binary_output = true;
-			goto finish;
-		}
-
-		lua_State *L = the_worker->engine->L;
-		int ret = engine_cmd(L, cmd, false);
-		const char *message = "";
-		if (lua_gettop(L) > 0) {
-			message = lua_tostring(L, -1);
-		}
-
-		/* Simpler output in binary mode */
-		if (args->tty_binary_output) {
-			size_t len_s = strlen(message);
-			if (len_s > UINT32_MAX)
-				goto finish;
-			uint32_t len_n = htonl(len_s);
-			fwrite(&len_n, sizeof(len_n), 1, out);
-			fwrite(message, len_s, 1, out);
-			lua_settop(L, 0);
-			goto finish;
-		}
-
-		/* Log to remote socket if connected */
-		const char *delim = args->quiet ? "" : "> ";
-		if (stream_fd != STDIN_FILENO) {
-			if (VERBOSE_STATUS)
-				fprintf(stdout, "%s\n", cmd); /* Duplicate command to logs */
-			if (message)
-				fprintf(out, "%s", message); /* Duplicate output to sender */
-			if (message || !args->quiet)
-				fprintf(out, "\n");
-			fprintf(out, "%s", delim);
-		}
-		if (stream_fd == STDIN_FILENO || VERBOSE_STATUS) {
-			/* Log to standard streams */
-			FILE *fp_out = ret ? stderr : stdout;
-			if (message)
-				fprintf(fp_out, "%s", message);
-			if (message || !args->quiet)
-				fprintf(fp_out, "\n");
-			fprintf(fp_out, "%s", delim);
-		}
-		lua_settop(L, 0);
-	}
-finish:
-	free(cmd);
-	/* Close if redirected */
-	if (stream_fd != STDIN_FILENO) {
-		fclose(out);
-	}
-}
-
-static void tty_alloc(uv_handle_t *handle, size_t suggested, uv_buf_t *buf) {
-	buf->len = suggested;
-	buf->base = malloc(suggested);
-}
-
-static void tty_accept(uv_stream_t *master, int status)
-{
-	uv_tcp_t *client = malloc(sizeof(*client));
-	struct args *args = master->data;
-	if (client) {
-		 uv_tcp_init(master->loop, client);
-		 if (uv_accept(master, (uv_stream_t *)client) != 0) {
-			free(client);
-			return;
-		 }
-		 client->data = args;
-		 uv_read_start((uv_stream_t *)client, tty_alloc, tty_process_input);
-		 /* Write command line */
-		 if (!args->quiet) {
-		 	uv_buf_t buf = { "> ", 2 };
-		 	uv_try_write((uv_stream_t *)client, &buf, 1);
-		 }
-	}
-}
 
 /* @internal AF_LOCAL reads may still be interrupted, loop it. */
 static bool ipc_readall(int fd, char *dst, size_t len)
@@ -382,7 +232,7 @@ static void help(int argc, char *argv[])
 	       " -t, --tls=[addr]       Server address for TLS (default: off).\n"
 	       " -S, --fd=[fd:kind]     Listen on given fd (handed out by supervisor, :kind is optional).\n"
 	       " -c, --config=[path]    Config file path (relative to [rundir]) (default: config).\n"
-	       " -f, --forks=N          Start N forks sharing the configuration.\n"
+	       " -n, --noninteractive   Don't start the read-eval-print loop for stdin+stdout.\n"
 	       " -q, --quiet            No command prompt in interactive mode.\n"
 	       " -v, --verbose          Run in verbose mode."
 #ifdef NOVERBOSELOG
@@ -410,19 +260,12 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 		kr_log_error(
 			"[system] error: standard input is not a terminal or pipe; "
 			"use '-f 1' if you want non-interactive mode.  "
-			"Commands can be simply added to your configuration file or sent over the tty/$PID control socket.\n"
+			"Commands can be simply added to your configuration file or sent over the control socket.\n"
 			);
 		return EXIT_FAILURE;
 	}
 
-	if (setvbuf(stdout, NULL, _IONBF, 0) || setvbuf(stderr, NULL, _IONBF, 0)) {
-		kr_log_error("[system] failed to to set output buffering (ignored): %s\n",
-				strerror(errno));
-		fflush(stderr);
-	}
-
 	/* Control sockets or TTY */
-	auto_free char *sock_file = NULL;
 	uv_pipe_t pipe;
 	uv_pipe_init(loop, &pipe, 0);
 	pipe.data = args;
@@ -430,20 +273,9 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 		if (!args->quiet)
 			printf("[system] interactive mode\n> ");
 		uv_pipe_open(&pipe, 0);
-		uv_read_start((uv_stream_t*) &pipe, tty_alloc, tty_process_input);
-	} else {
-		int pipe_ret = -1;
-		if (args->control_fd != -1) {
-			pipe_ret = uv_pipe_open(&pipe, args->control_fd);
-		} else {
-			(void) mkdir("tty", S_IRWXU|S_IRWXG);
-			sock_file = afmt("tty/%ld", (long)getpid());
-			if (sock_file) {
-				pipe_ret = uv_pipe_bind(&pipe, sock_file);
-			}
-		}
-		if (!pipe_ret)
-			uv_listen((uv_stream_t *) &pipe, 16, tty_accept);
+		uv_read_start((uv_stream_t*) &pipe, io_tty_alloc, io_tty_process_input);
+	} else if (args->control_fd != -1 && uv_pipe_open(&pipe, args->control_fd) == 0) {
+		uv_listen((uv_stream_t *) &pipe, 16, io_tty_accept);
 	}
 	/* Watch IPC pipes (or just assign them if leading the pgroup). */
 	if (!leader) {
@@ -462,22 +294,9 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 #endif
 	/* Run event loop */
 	uv_run(loop, UV_RUN_DEFAULT);
-	if (sock_file) {
-		unlink(sock_file);
-	}
 	uv_close((uv_handle_t *)&pipe, NULL); /* Seems OK even on the stopped loop. */
 	return EXIT_SUCCESS;
 }
-
-#if SYSTEMD_VERSION >= 227
-static void free_sd_socket_names(char **socket_names, int count)
-{
-	for (int i = 0; i < count; i++) {
-		free(socket_names[i]);
-	}
-	free(socket_names);
-}
-#endif
 
 static void args_init(struct args *args)
 {
@@ -518,16 +337,17 @@ static int parse_args(int argc, char **argv, struct args *args)
 	struct option opts[] = {
 		{"addr",       required_argument, 0, 'a'},
 		{"tls",        required_argument, 0, 't'},
-		{"fd",         required_argument, 0, 'S'},
 		{"config",     required_argument, 0, 'c'},
 		{"forks",      required_argument, 0, 'f'},
+		{"noninteractive",   no_argument, 0, 'n'},
 		{"verbose",          no_argument, 0, 'v'},
 		{"quiet",            no_argument, 0, 'q'},
 		{"version",          no_argument, 0, 'V'},
 		{"help",             no_argument, 0, 'h'},
+		{"fd",         required_argument, 0, 'S'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:t:S:c:f:m:K:k:vqVh", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:t:c:f:nvqVhS:", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
@@ -541,13 +361,20 @@ static int parse_args(int argc, char **argv, struct args *args)
 			array_push(args->config, optarg);
 			break;
 		case 'f':
-			args->interactive = false;
 			args->forks = strtol_10(optarg);
+			if (args->forks == 1) {
+				kr_log_deprecate("use --noninteractive instead of --forks=1\n");
+			} else {
+				kr_log_deprecate("support for running multiple --forks will be removed\n");
+			}
 			if (args->forks <= 0) {
 				kr_log_error("[system] error '-f' requires a positive"
 						" number, not '%s'\n", optarg);
 				return EXIT_FAILURE;
 			}
+			/* fall through */
+		case 'n':
+			args->interactive = false;
 			break;
 		case 'v':
 			kr_verbose_set(true);
@@ -693,72 +520,29 @@ static void drop_capabilities(void)
 
 int main(int argc, char **argv)
 {
-	struct args args;
-	args_init(&args);
-	int ret = parse_args(argc, argv, &args);
+	if (setvbuf(stdout, NULL, _IONBF, 0) || setvbuf(stderr, NULL, _IONBF, 0)) {
+		kr_log_error("[system] failed to to set output buffering (ignored): %s\n",
+				strerror(errno));
+		fflush(stderr);
+	}
+
+	the_args = &the_args_value;
+	args_init(the_args);
+	int ret = parse_args(argc, argv, the_args);
 	if (ret >= 0) goto cleanup_args;
 
-	ret = bind_sockets(&args.addrs, false, &args.fds);
+	ret = bind_sockets(&the_args->addrs, false, &the_args->fds);
 	if (ret) goto cleanup_args;
-	ret = bind_sockets(&args.addrs_tls, true, &args.fds);
+	ret = bind_sockets(&the_args->addrs_tls, true, &the_args->fds);
 	if (ret) goto cleanup_args;
-
-#if SYSTEMD_VERSION >= 227
-	/* Accept passed sockets from systemd supervisor. */
-	char **socket_names = NULL;
-	int sd_nsocks = sd_listen_fds_with_names(0, &socket_names);
-	if (sd_nsocks < 0) {
-		kr_log_error("[system] failed passing sockets from systemd: %s\n",
-			     kr_strerror(sd_nsocks));
-		free_sd_socket_names(socket_names, sd_nsocks);
-		ret = EXIT_FAILURE;
-		goto cleanup_args;
-	}
-	if (sd_nsocks > 0 && args.forks != 1) {
-		kr_log_error("[system] when run under systemd-style supervision, "
-			     "use single-process only (bad: --forks=%d).\n", args.forks);
-		free_sd_socket_names(socket_names, sd_nsocks);
-		ret = EXIT_FAILURE;
-		goto cleanup_args;
-	}
-	for (int i = 0; i < sd_nsocks; ++i) {
-		/* when run under systemd supervision, do not use interactive mode */
-		args.interactive = false;
-		flagged_fd_t ffd = { .fd = SD_LISTEN_FDS_START + i };
-
-		if (!strcasecmp("control", socket_names[i])) {
-			if (args.control_fd != -1) {
-				kr_log_error("[system] multiple control sockets passed from systemd\n");
-				ret = EXIT_FAILURE;
-				break;
-			}
-			args.control_fd = ffd.fd;
-			free(socket_names[i]);
-		} else {
-			if (!strcasecmp("dns", socket_names[i])) {
-				free(socket_names[i]);
-			} else if (!strcasecmp("tls", socket_names[i])) {
-				ffd.flags.tls = true;
-				free(socket_names[i]);
-			} else {
-				ffd.flags.kind = socket_names[i];
-			}
-			array_push(args.fds, ffd);
-		}
-		/* Either freed or passed ownership. */
-		socket_names[i] = NULL;
-	}
-	free_sd_socket_names(socket_names, sd_nsocks);
-	if (ret) goto cleanup_args;
-#endif
 
 	/* Switch to rundir. */
-	if (args.rundir != NULL) {
+	if (the_args->rundir != NULL) {
 		/* FIXME: access isn't a good way if we start as root and drop privileges later */
-		if (access(args.rundir, W_OK) != 0
-		    || chdir(args.rundir) != 0) {
+		if (access(the_args->rundir, W_OK) != 0
+		    || chdir(the_args->rundir) != 0) {
 			kr_log_error("[system] rundir '%s': %s\n",
-					args.rundir, strerror(errno));
+					the_args->rundir, strerror(errno));
 			return EXIT_FAILURE;
 		}
 	}
@@ -766,11 +550,11 @@ int main(int argc, char **argv)
 	/* Select which config files to load and verify they are read-able. */
 	bool load_defaults = true;
 	size_t i = 0;
-	while (i < args.config.len) {
-		const char *config = args.config.at[i];
+	while (i < the_args->config.len) {
+		const char *config = the_args->config.at[i];
 		if (strcmp(config, "-") == 0) {
 			load_defaults = false;
-			array_del(args.config, i);
+			array_del(the_args->config, i);
 			continue;  /* don't increment i */
 		} else if (access(config, R_OK) != 0) {
 			char cwd[PATH_MAX];
@@ -781,10 +565,10 @@ int main(int argc, char **argv)
 		}
 		i++;
 	}
-	if (args.config.len == 0 && access("config", R_OK) == 0)
-		array_push(args.config, "config");
+	if (the_args->config.len == 0 && access("config", R_OK) == 0)
+		array_push(the_args->config, "config");
 	if (load_defaults)
-		array_push(args.config, LIBDIR "/config.lua");
+		array_push(the_args->config, LIBDIR "/postconfig.lua");
 
 	/* File-descriptor count limit: soft->hard. */
 	struct rlimit rlim;
@@ -807,7 +591,7 @@ int main(int argc, char **argv)
 	fd_array_t ipc_set;
 	array_init(ipc_set);
 	/* Fork subprocesses if requested */
-	int fork_id = fork_workers(&ipc_set, args.forks);
+	int fork_id = fork_workers(&ipc_set, the_args->forks);
 	if (fork_id < 0) {
 		return EXIT_FAILURE;
 	}
@@ -828,7 +612,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	/* Initialize the worker */
-	ret = worker_init(&engine, fork_id, args.forks);
+	ret = worker_init(&engine, fork_id, the_args->forks);
 	if (ret != 0) {
 		kr_log_error("[system] failed to initialize worker: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;
@@ -869,7 +653,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Start listening, in the sense of network_listen_fd(). */
-	if (start_listening(&engine.net, &args.fds) != 0) {
+	if (start_listening(&engine.net, &the_args->fds) != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -888,8 +672,8 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	for (i = 0; i < args.config.len; ++i) {
-		const char *config = args.config.at[i];
+	for (i = 0; i < the_args->config.len; ++i) {
+		const char *config = the_args->config.at[i];
 		if (engine_loadconf(&engine, config) != 0) {
 			ret = EXIT_FAILURE;
 			goto cleanup;
@@ -910,7 +694,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Run the event loop */
-	ret = run_worker(loop, &engine, &ipc_set, fork_id == 0, &args);
+	ret = run_worker(loop, &engine, &ipc_set, fork_id == 0, the_args);
 
 cleanup:/* Cleanup. */
 	engine_deinit(&engine);
@@ -920,7 +704,7 @@ cleanup:/* Cleanup. */
 	}
 	mp_delete(pool.ctx);
 cleanup_args:
-	args_deinit(&args);
+	args_deinit(the_args);
 	kr_crypto_cleanup();
 	return ret;
 }

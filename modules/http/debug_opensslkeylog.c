@@ -1,7 +1,4 @@
 /*
-
-:q
-
  * Dumps master keys for OpenSSL clients to file. The format is documented at
  * https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS/Key_Log_Format
  * Supports TLS 1.3 when used with OpenSSL 1.1.1.
@@ -71,6 +68,7 @@ static int keylog_file_fd = -1;
 #define PREFIX_LEN  (sizeof(PREFIX) - 1)
 
 #pragma GCC diagnostic ignored "-Wpedantic"
+#pragma GCC diagnostic ignored "-Wunused-result"
 
 static inline void put_hex(char *buffer, int pos, char c)
 {
