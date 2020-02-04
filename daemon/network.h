@@ -28,12 +28,12 @@
 
 struct engine;
 
-/** Ways to listen on a socket. */
+/** Ways to listen on a socket (which may exist already). */
 typedef struct {
 	int sock_type;    /**< SOCK_DGRAM or SOCK_STREAM */
 	bool tls;         /**< only used together with .kind == NULL and .tcp */
-	const char *kind; /**< tag for other types than the three usual */
 	bool freebind;    /**< used for binding to non-local address **/
+	const char *kind; /**< tag for other types: "control" or module-handled kinds */
 } endpoint_flags_t;
 
 static inline bool endpoint_flags_eq(endpoint_flags_t f1, endpoint_flags_t f2)

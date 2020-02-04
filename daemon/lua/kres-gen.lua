@@ -384,8 +384,8 @@ uint32_t packet_ttl(const knot_pkt_t *, _Bool);
 typedef struct {
 	int sock_type;
 	_Bool tls;
-	const char *kind;
 	_Bool freebind;
+	const char *kind;
 } endpoint_flags_t;
 typedef struct {
 	char **at;
