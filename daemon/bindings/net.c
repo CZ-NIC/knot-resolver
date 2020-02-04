@@ -122,6 +122,7 @@ static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind,
 	/* Case: string, representing a single address. */
 	const char *str = lua_tostring(L, -1);
 	if (str != NULL) {
+		const bool is_UNIX = str[0] == '/';
 		struct engine *engine = engine_luaget(L);
 		int ret = 0;
 		endpoint_flags_t flags = { .tls = tls, .freebind = freebind };
@@ -136,10 +137,11 @@ static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind,
 		if (kind) {
 			flags.kind = strdup(kind);
 			flags.sock_type = SOCK_STREAM; /* TODO: allow to override this? */
-			ret = network_listen(&engine->net, str, port, flags);
+			ret = network_listen(&engine->net, str,
+						(is_UNIX ? 0 : port), flags);
 		}
 		if (ret != 0) {
-			if (str[0] == '/') {
+			if (is_UNIX) {
 				kr_log_error("[system] bind to '%s' (UNIX): %s\n",
 						str, kr_strerror(ret));
 			} else {

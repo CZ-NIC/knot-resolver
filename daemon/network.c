@@ -332,7 +332,9 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 }
 
 /** @internal Fetch a pointer to endpoint of given parameters (or NULL).
- * Beware that there might be multiple matches, though that's not common. */
+ * Beware that there might be multiple matches, though that's not common.
+ * The matching isn't really precise in the sense that it might not find
+ * and endpoint that would *collide* the passed one. */
 static struct endpoint * endpoint_get(struct network *net, const char *addr,
 					uint16_t port, endpoint_flags_t flags)
 {
@@ -425,7 +427,7 @@ int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags)
 int network_listen(struct network *net, const char *addr, uint16_t port,
 		   endpoint_flags_t flags)
 {
-	if (net == NULL || addr == 0 || port == 0) {
+	if (net == NULL || addr == 0) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
