@@ -414,6 +414,7 @@ struct args {
 	int forks;
 	config_array_t config;
 	const char *rundir;
+	char *xsk;
 	_Bool interactive;
 	_Bool quiet;
 	_Bool tty_binary_output;
