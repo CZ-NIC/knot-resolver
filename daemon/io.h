@@ -35,6 +35,9 @@ int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd);
 int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bool has_tls);
 /** Initialize a pipe handle and start listening. */
 int io_listen_pipe(uv_loop_t *loop, uv_pipe_t *handle, int fd);
+/** Initialize a poll handle (ep->handle) and start listening over AF_XDP on ifname.
+ * Sets ep->session. */
+int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname);
 
 /** Control socket / TTY - related functions. */
 void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);

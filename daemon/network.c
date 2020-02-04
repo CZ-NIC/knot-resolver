@@ -252,12 +252,18 @@ static int insert_endpoint(struct network *net, const char *addr, struct endpoin
 	return kr_ok();
 }
 
-/** Open endpoint protocols.  ep->flags were pre-set. */
+/** Open endpoint protocols.  ep->flags were pre-set.
+ * \p addr_str is only used for logging or for XDP "address". */
 static int open_endpoint(struct network *net, struct endpoint *ep,
-			 const struct sockaddr *sa, const char *log_addr)
+			 const struct sockaddr *sa, const char *addr_str)
 {
-	bool control = ep->flags.kind && strcmp(ep->flags.kind, "control") == 0;
-	if ((sa != NULL) == (ep->fd != -1)) {
+	const bool is_control = ep->flags.kind && strcmp(ep->flags.kind, "control") == 0;
+	const bool is_xdp     = ep->family == AF_XDP;
+	bool ok = is_xdp
+		? sa == NULL && ep->fd == -1 && ep->xdp_queue >= 0
+			&& ep->flags.sock_type == SOCK_DGRAM && !ep->flags.tls
+		: (sa != NULL) != (ep->fd != -1);
+	if (!ok) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
@@ -277,21 +283,21 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 		ep->fd = io_bind(sa, ep->flags.sock_type, &ep->flags);
 		if (ep->fd < 0) return ep->fd;
 	}
-	if (ep->flags.kind && !control) {
+	if (ep->flags.kind && !is_control && !is_xdp) {
 		/* This EP isn't to be managed internally after binding. */
-		return endpoint_open_lua_cb(net, ep, log_addr);
+		return endpoint_open_lua_cb(net, ep, addr_str);
 	} else {
 		ep->engaged = true;
-		/* .engaged seems not really meaningful with .kind == NULL, but... */
+		/* .engaged seems not really meaningful in this case, but... */
 	}
 
-	if (control) {
+	int ret;
+	if (is_control) {
 		uv_pipe_t *ep_handle = malloc(sizeof(uv_pipe_t));
 		ep->handle = (uv_handle_t *)ep_handle;
-		if (!ep->handle) {
-			return kr_error(ENOMEM);
-		}
-		return io_listen_pipe(net->loop, ep_handle, ep->fd);
+		ret = !ep->handle ? ENOMEM
+			: io_listen_pipe(net->loop, ep_handle, ep->fd);
+		goto finish_ret;
 	}
 
 	if (ep->family == AF_UNIX) {
@@ -304,6 +310,13 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 		*/
 	}
 
+	if (is_xdp) {
+		ep->handle = malloc(sizeof(uv_poll_t));
+		ret = !ep->handle ? ENOMEM
+			: io_listen_xdp(net->loop, ep, addr_str);
+		goto finish_ret;
+	} /* else */
+
 	if (ep->flags.sock_type == SOCK_DGRAM) {
 		if (ep->flags.tls) {
 			assert(!EINVAL);
@@ -311,24 +324,29 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 		}
 		uv_udp_t *ep_handle = malloc(sizeof(uv_udp_t));
 		ep->handle = (uv_handle_t *)ep_handle;
-		if (!ep->handle) {
-			return kr_error(ENOMEM);
-		}
-		return io_listen_udp(net->loop, ep_handle, ep->fd);
+		ret = !ep->handle ? ENOMEM
+			: io_listen_udp(net->loop, ep_handle, ep->fd);
+		if (!ret) ep->session = ep_handle->data;
+		goto finish_ret;
 	} /* else */
 
 	if (ep->flags.sock_type == SOCK_STREAM) {
 		uv_tcp_t *ep_handle = malloc(sizeof(uv_tcp_t));
 		ep->handle = (uv_handle_t *)ep_handle;
-		if (!ep->handle) {
-			return kr_error(ENOMEM);
-		}
-		return io_listen_tcp(net->loop, ep_handle, ep->fd,
+		ret = !ep->handle ? ENOMEM
+			: io_listen_tcp(net->loop, ep_handle, ep->fd,
 					net->tcp_backlog, ep->flags.tls);
+		if (!ret) ep->session = ep_handle->data;
+		goto finish_ret;
 	} /* else */
 
 	assert(!EINVAL);
 	return kr_error(EINVAL);
+finish_ret:
+	if (!ret) return ret;
+	free(ep->handle);
+	ep->handle = NULL;
+	return kr_error(ret);
 }
 
 /** @internal Fetch a pointer to endpoint of given parameters (or NULL).
@@ -425,7 +443,7 @@ int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags)
 }
 
 int network_listen(struct network *net, const char *addr, uint16_t port,
-		   endpoint_flags_t flags)
+		   int8_t xdp_queue, endpoint_flags_t flags)
 {
 	if (net == NULL || addr == 0) {
 		assert(!EINVAL);
@@ -435,17 +453,22 @@ int network_listen(struct network *net, const char *addr, uint16_t port,
 		return kr_error(EADDRINUSE); /* Already listening */
 	}
 
-	/* Parse address. */
-	const struct sockaddr *sa = kr_straddr_socket(addr, port, NULL);
-	if (!sa) {
-		return kr_error(EINVAL);
-	}
-	struct endpoint ep = {
-		.flags = flags,
-		.fd = -1,
-		.port = port,
-		.family = sa->sa_family,
+	/* Parse address, if not XDP. */
+	/* LATER: in XDP case we might like to support selecting interface by IP address. */
+	const struct sockaddr *sa = NULL;
+	if (xdp_queue < 0) {
+		sa = kr_straddr_socket(addr, port, NULL);
+		if (!sa) {
+			return kr_error(EINVAL);
+		}
 	};
+
+	struct endpoint ep = { 0 };
+	ep.flags = flags,
+	ep.fd = -1,
+	ep.port = port,
+	ep.family = xdp_queue < 0 ? AF_XDP : sa->sa_family;
+
 	int ret = create_endpoint(net, addr, &ep, sa);
 	free_const(sa);
 	return ret;

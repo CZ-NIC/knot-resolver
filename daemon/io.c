@@ -16,6 +16,7 @@
 
 #include <string.h>
 #include <libknot/errcode.h>
+#include <libknot/xdp/af_xdp.h>
 #include <contrib/ucw/lib.h>
 #include <contrib/ucw/mempool.h>
 #include <assert.h>
@@ -607,6 +608,75 @@ int io_listen_pipe(uv_loop_t *loop, uv_pipe_t *handle, int fd)
 
 	return 0;
 }
+
+
+#define XDP_RX_BATCH_SIZE 64
+static void xdp_rx(uv_poll_t* handle, int status, int events)
+{
+	if (status < 0) {
+		kr_log_error("[kxsk] poll status %d: %s\n", status, uv_strerror(status));
+		return;
+	}
+	if (events != UV_READABLE) {
+		kr_log_error("[kxsk] poll unexpected events: %d\n", events);
+		return;
+	}
+
+	//struct ts_aux *socket_aux = handle->data;
+	const struct endpoint *ep = handle->data;
+	assert(ep && ep->session && ep->xdp_socket);
+	uint32_t rcvd;
+	knot_xsk_msg_t msgs[XDP_RX_BATCH_SIZE];
+	int ret = knot_xsk_recvmmsg(ep->xdp_socket, msgs, XDP_RX_BATCH_SIZE, &rcvd);
+	if (ret == KNOT_EOK) {
+		kr_log_verbose("[kxsk] poll triggered, processing a batch of %d packets\n",
+			(int)rcvd);
+	} else {
+		kr_log_error("[kxsk] knot_xsk_recvmmsg(): %d, %s\n",
+				ret, knot_strerror(ret));
+	}
+	assert(rcvd <= XDP_RX_BATCH_SIZE);
+	for (int i = 0; i < rcvd; ++i) {
+		const knot_xsk_msg_t *msg = &msgs[i];
+		knot_pkt_t *kpkt = knot_pkt_new(msg->payload.iov_base, msg->payload.iov_len,
+						&the_worker->pkt_pool);
+		ret = kpkt == NULL ? kr_error(ENOMEM) :
+			worker_submit(ep->session, (const struct sockaddr *)&msg->ip_from,
+					msg->eth_from, msg->eth_to, kpkt);
+		if (ret)
+			kr_log_verbose("[kxsk] worker_submit() == %d: %s\n", ret, kr_strerror(ret));
+		mp_flush(the_worker->pkt_pool.ctx);
+		knot_xsk_free_recvd(ep->xdp_socket, msg);
+	}
+}
+int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
+{
+	if (!ep || !ep->handle) {
+		return kr_error(EINVAL);
+	}
+	const int port = ep->port ? ep->port : (1 << 16)/*any port*/;
+	int ret = knot_xsk_init(&ep->xdp_socket, ifname, ep->xdp_queue, port, true);
+	if (ret) return kr_error(ret);
+	assert(ep->xdp_socket);
+	ret = uv_poll_init(loop, (uv_poll_t *)ep->handle,
+				knot_xsk_get_poll_fd(ep->xdp_socket));
+	if (ret) {
+		knot_xsk_deinit(ep->xdp_socket);
+		ep->xdp_socket = NULL;
+		return kr_error(ret);
+	}
+
+	// beware: this sets poll_handle->data
+	ep->session = session_new(ep->handle, false);
+	assert(!session_flags(ep->session)->outgoing);
+	session_get_sockname(ep->session)->sa_family = AF_XDP; // to have something in there
+	// FIXME: worker will pass this back as source address to us
+
+	ep->handle->data = (void *)/*const-cast*/ep;
+	ret = uv_poll_start((uv_poll_t *)ep->handle, UV_READABLE, xdp_rx);
+	return ret;
+}
+
 
 int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family, bool has_tls)
 {

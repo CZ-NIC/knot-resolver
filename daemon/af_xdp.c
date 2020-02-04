@@ -76,44 +76,6 @@ void kr_xsk_deinit_global(void)
 	//TODO: more memory
 }
 
-static void kxsk_rx(uv_poll_t* handle, int status, int events)
-{
-	if (status < 0) {
-		kr_log_error("[kxsk] poll status %d: %s\n", status, uv_strerror(status));
-		return;
-	}
-	if (events != UV_READABLE) {
-		kr_log_error("[kxsk] poll unexpected events: %d\n", events);
-		return;
-	}
-
-	struct ts_aux *socket_aux = handle->data;
-	assert(socket_aux == the_socket_aux && socket_aux->socket == the_socket); // for now
-	uint32_t rcvd;
-	knot_xsk_msg_t msgs[RX_BATCH_SIZE];
-	int ret = knot_xsk_recvmmsg(socket_aux->socket, msgs, RX_BATCH_SIZE, &rcvd);
-	if (ret == KNOT_EOK) {
-		kr_log_verbose("[kxsk] poll triggered, processing a batch of %d packets\n",
-			(int)rcvd);
-	} else {
-		kr_log_error("[kxsk] knot_xsk_recvmmsg(): %d, %s\n",
-				ret, knot_strerror(ret));
-	}
-	assert(rcvd <= RX_BATCH_SIZE);
-	for (int i = 0; i < rcvd; ++i) {
-		const knot_xsk_msg_t *msg = &msgs[i];
-		knot_pkt_t *kpkt = knot_pkt_new(msg->payload.iov_base, msg->payload.iov_len,
-						&the_worker->pkt_pool);
-		ret = kpkt == NULL ? kr_error(ENOMEM) :
-			worker_submit(socket_aux->session, (const struct sockaddr *)&msg->ip_from,
-					msg->eth_from, msg->eth_to, kpkt);
-		if (ret)
-			kr_log_verbose("[kxsk] worker_submit() == %d: %s\n", ret, kr_strerror(ret));
-		mp_flush(the_worker->pkt_pool.ctx);
-		knot_xsk_free_recvd(socket_aux->socket, msg);
-	}
-}
-
 static struct config the_config_storage = { // static to get zeroed by default
 	.xsk_if_queue = 0, // defaults overridable by command-line -x eth3:0
 	.port = KR_DNS_PORT,
@@ -169,7 +131,7 @@ static void xsk_check(uv_check_t *handle)
 	if (ret != KNOT_EOK)
 		kr_log_error("[kxsk] check: ret = %d, %s\n", ret, knot_strerror(ret));
 }
-int kr_xsk_init_global(uv_loop_t *loop, char *cmdarg)
+int kr_xsk_init_global(uv_loop_t *loop, char *cmdarg) // FIXME: remove
 {
 	kxsk_alloc_hack = kr_xsk_alloc_wire;
 	if (!cmdarg)
@@ -230,7 +192,7 @@ int kr_xsk_init_global(uv_loop_t *loop, char *cmdarg)
 	}
 	if (!ret) {
 		the_socket_aux->poll_handle.data = the_socket_aux;
-		ret = uv_poll_start(&the_socket_aux->poll_handle, UV_READABLE, kxsk_rx);
+		//ret = uv_poll_start(&the_socket_aux->poll_handle, UV_READABLE, kxsk_rx);
 	}
 	return ret;
 }

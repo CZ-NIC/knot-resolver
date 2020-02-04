@@ -108,6 +108,7 @@ static int net_list(lua_State *L)
 
 /** Listen on an address list represented by the top of lua stack.
  * \note kind ownership is not transferred
+ * FIXME: handle XDP, in some kind of syntax
  * \return success */
 static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind, bool freebind)
 {
@@ -128,17 +129,17 @@ static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind,
 		endpoint_flags_t flags = { .tls = tls, .freebind = freebind };
 		if (!kind && !flags.tls) { /* normal UDP */
 			flags.sock_type = SOCK_DGRAM;
-			ret = network_listen(&engine->net, str, port, flags);
+			ret = network_listen(&engine->net, str, port, -1, flags);
 		}
 		if (!kind && ret == 0) { /* common for normal TCP and TLS */
 			flags.sock_type = SOCK_STREAM;
-			ret = network_listen(&engine->net, str, port, flags);
+			ret = network_listen(&engine->net, str, port, -1, flags);
 		}
 		if (kind) {
 			flags.kind = strdup(kind);
 			flags.sock_type = SOCK_STREAM; /* TODO: allow to override this? */
 			ret = network_listen(&engine->net, str,
-						(is_UNIX ? 0 : port), flags);
+						(is_UNIX ? 0 : port), -1, flags);
 		}
 		if (ret != 0) {
 			if (is_UNIX) {

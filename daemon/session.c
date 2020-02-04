@@ -333,7 +333,7 @@ struct session *session_new(uv_handle_t *handle, bool has_tls)
 		}
 		session->wire_buf = wire_buf;
 		session->wire_buf_size = wire_buffer_size;
-	} else if (handle->type == UV_UDP) {
+	} else if (handle->type == UV_UDP || handle->type == UV_POLL/*XDP*/) {
 		/* We use the singleton buffer from worker for all UDP (!)
 		 * libuv documentation doesn't really guarantee this is OK,
 		 * but the implementation for unix systems does not hold
