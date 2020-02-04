@@ -39,6 +39,28 @@ struct ts_aux {
 	uv_poll_t poll_handle;
 };
 
+
+// TODO: temporary section, to be replaced
+#include <linux/if_ether.h>
+#include <linux/ip.h>
+#include <linux/udp.h>
+struct udpv4 {
+	union { uint8_t bytes[1]; struct {
+
+	struct ethhdr eth; // no VLAN support; CRC at the "end" of .data!
+	struct iphdr ipv4;
+	struct udphdr udp;
+	uint8_t data[];
+
+	} __attribute__((packed)); };
+};
+struct config {
+	int xsk_if_queue;
+	int port;
+	struct udpv4 pkt_template;
+};
+
+
 struct knot_xsk_socket *the_socket = NULL;
 struct ts_aux *the_socket_aux = NULL;
 struct config *the_config = NULL;
@@ -178,10 +200,10 @@ int kr_xsk_init_global(uv_loop_t *loop, char *cmdarg)
 	assert(!the_socket);
 	int ret = knot_xsk_init(&the_socket, cmdarg, the_config->xsk_if_queue,
 				the_config->port, true);
-
+	/*
 	kr_log_verbose("[uxsk] busy frames: %d\n",
 			the_socket->umem->frame_count - the_socket->umem->free_count);
-
+	*/
 	assert(!the_socket_aux);
 	the_socket_aux = &the_socket_aux_storage;
 	the_socket_aux->socket = the_socket;
@@ -211,19 +233,5 @@ int kr_xsk_init_global(uv_loop_t *loop, char *cmdarg)
 		ret = uv_poll_start(&the_socket_aux->poll_handle, UV_READABLE, kxsk_rx);
 	}
 	return ret;
-}
-
-#define SOL_XDP 283
-static void print_stats(struct xsk_socket *xsk)
-{
-	struct xdp_statistics stats;
-	socklen_t optlen = sizeof(stats);
-	if (getsockopt(xsk_socket__fd(xsk), SOL_XDP, XDP_STATISTICS, &stats, &optlen)) {
-		fprintf(stderr, "getsockopt: %s\n", strerror(errno));
-	} else {
-		fprintf(stderr, "stats: RX drop %d, RX ID %d, TX ID %d\n",
-			(int)stats.rx_dropped, (int)stats.rx_invalid_descs,
-			(int)stats.tx_invalid_descs);
-	}
 }
 
