@@ -187,7 +187,7 @@ struct kr_context
  * (and lines here were too long anyway). */
 struct kr_request_qsource_flags {
 	bool tcp:1; /**< true if the request is on TCP (or TLS); only meaningful if (dst_addr). */
-	bool tls:1; /**< true if the request is on TLS; only meaningful if (dst_addr). */
+	bool tls:1; /**< true if the request is on TLS (or HTTPS); only meaningful if (dst_addr). */
 	bool http:1; /**< true if the request is on HTTP; only meaningful if (dst_addr). */
 };
 

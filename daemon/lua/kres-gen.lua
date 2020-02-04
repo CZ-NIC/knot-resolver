@@ -387,6 +387,38 @@ typedef struct {
 	const char *kind;
 	_Bool freebind;
 } endpoint_flags_t;
+typedef struct {
+	char **at;
+	size_t len;
+	size_t cap;
+} addr_array_t;
+typedef struct {
+	int fd;
+	endpoint_flags_t flags;
+} flagged_fd_t;
+typedef struct {
+	flagged_fd_t *at;
+	size_t len;
+	size_t cap;
+} flagged_fd_array_t;
+typedef struct {
+	const char **at;
+	size_t len;
+	size_t cap;
+} config_array_t;
+struct args {
+	addr_array_t addrs;
+	addr_array_t addrs_tls;
+	flagged_fd_array_t fds;
+	int control_fd;
+	int forks;
+	config_array_t config;
+	const char *rundir;
+	_Bool interactive;
+	_Bool quiet;
+	_Bool tty_binary_output;
+};
+struct args *the_args;
 struct endpoint {
 	void *handle;
 	int fd;

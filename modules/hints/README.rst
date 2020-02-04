@@ -1,7 +1,7 @@
 .. _mod-hints:
 
 Static hints
-------------
+============
 
 This is a module providing static hints for forward records (A/AAAA) and reverse records (PTR).
 The records can be loaded from ``/etc/hosts``-like files and/or added directly.
@@ -10,7 +10,7 @@ You can also use the module to change the root hints; they are used as a safety 
 drops out of cache.
 
 Examples
-^^^^^^^^
+--------
 
 .. code-block:: lua
 
@@ -29,7 +29,7 @@ Examples
     That can be worked around e.g. by explicit ``policy.PASS`` action.
 
 Properties
-^^^^^^^^^^
+----------
 
 .. function:: hints.config([path])
 

@@ -7,5 +7,5 @@ service bind9 start && service bind9 status;
 # dig @localhost -p 53533
 
 #run kresd
-$PREFIX/sbin/kresd -f 1 -q -c $(pwd)/ci/respdiff/kresd.config &>kresd.log &
+$PREFIX/sbin/kresd -n -q -c $(pwd)/ci/respdiff/kresd.config &>kresd.log &
 # dig @localhost -p 5353

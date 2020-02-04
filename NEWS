@@ -1,12 +1,33 @@
-Knot Resolver 4.x.y (20yy-mm-dd)
+Knot Resolver 5.0.0 (2020-01-27)
+================================
+
+Incompatible changes
+--------------------
+- see upgrading guide: https://knot-resolver.readthedocs.io/en/stable/upgrading.html
+- systemd sockets are no longer supported (#485)
+- net.listen() throws an error if it fails to bind; use freebind option if needed
+- control socket location has changed (!922)
+- -f/--forks is deprecated (#529, !919)
 
 Improvements
 ------------
 - logging: control-socket commands don't log unless --verbose (#528)
 - use SO_REUSEPORT_LB if available (FreeBSD 12.0+)
 - lua: remove dependency on lua-socket and lua-sec, used lua-http and cqueues (#512, #521, !894)
+- lua: remove dependency on lua-filesystem (#520, !912)
 - net.listen(): allow binding to non-local address with freebind option (!898)
 - cache: pre-allocate the file to avoid SIGBUS later (not macOS; !917, #525)
+- lua: be stricter around nonsense returned from modules (!901)
+- user documentation was reorganized and extended (!900, !867)
+- multiple config files can be used with --config/-c option (!909)
+- lua: stop trying to tweak lua's GC (!201)
+- systemd: add SYSTEMD_INSTANCE env variable to identify different instances (!906)
+
+Bugfixes
+--------
+- correctly use EDNS(0) padding in failed answers (!921)
+- policy and daf modules: fix postrules and reroute rules (!901)
+- renumber module: don't accidentally zero-out request's .state (!901)
 
 
 Knot Resolver 4.3.0 (2019-12-04)
@@ -173,7 +194,7 @@ Bugfixes
 - policy.RPZ: log problems from zone-file level of parser as well (#453)
 - fix flushing of messages to logs in some cases (notably systemd) (!781)
 - fix fallback when SERVFAIL or REFUSED is received from upstream (!784)
-- fix crash when dealing with unknown TA key algorhitm (#449)
+- fix crash when dealing with unknown TA key algorithm (#449)
 - go insecure due to algorithm support even if DNSKEY is NODATA (!798)
 - fix mac addresses in the output of net.interfaces() command (!804)
 - http module: fix too early renewal of ephemeral certificates (!808)

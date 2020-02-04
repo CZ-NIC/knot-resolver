@@ -9,38 +9,47 @@ and it provides a state-machine like API for extensions.
 .. toctree::
    :caption: Quick Start
    :name: quickstart
-   :maxdepth: 2
+   :maxdepth: 1
 
-   startguide
+   quickstart-install
+   quickstart-startup
+   quickstart-config
+
+.. _configuration-chapter:
 
 .. toctree::
-   :caption: Users
+   :caption: Configuration
    :name: users
-   :maxdepth: 2
+   :maxdepth: 3
 
-   daemon
-   modules
+   config-overview
+   config-network
+   config-performance
+   config-policy
+   config-logging-monitoring
+   config-dnssec
+   config-experimental
+   config-no-systemd
+
+.. _operation-chapter:
 
 .. toctree::
+   :caption: Operation
    :maxdepth: 1
 
    upgrading
    NEWS
 
 .. toctree::
-   :caption: Experts
-   :name: experts
-   :maxdepth: 2
-
-   build
-
-.. toctree::
    :caption: Developers
    :name: developers
    :maxdepth: 2
 
+   build
+   modules-http-custom-services
    lib
    modules_api
+   worker_api
 
 
 Indices and tables

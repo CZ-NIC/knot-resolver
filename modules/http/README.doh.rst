@@ -1,7 +1,7 @@
 .. _mod-http-doh:
 
 DNS-over-HTTP (DoH)
--------------------
+===================
 
 .. warning::
 
@@ -23,7 +23,7 @@ Following section compares several options for running a DoH capable server.
 Make sure you read through this chapter before exposing the DoH service to users.
 
 DoH support in Knot Resolver
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+----------------------------
 
 The :ref:`HTTP module <mod-http>` in Knot Resolver also provides support for
 binary DNS-over-HTTP protocol standardized in :rfc:`8484`.
@@ -58,7 +58,7 @@ Please see section :ref:`mod-http-tls` for further details about TLS configurati
 Alternative configurations use HTTP proxies between clients and a Knot Resolver instance:
 
 Normal HTTP proxy
-^^^^^^^^^^^^^^^^^
+-----------------
 :Scenario:
         A standard HTTP-compliant proxy is configured to proxy `GET`
         and `POST` requests to HTTP endpoint `/doh` to a machine
@@ -77,7 +77,7 @@ Normal HTTP proxy
         - More complicated setup with two components (proxy + Knot Resolver).
 
 HTTP proxy with DoH support
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+---------------------------
 :Scenario:
         HTTP proxy extended with a
         `special module for DNS-over-HTTP <https://github.com/facebookexperimental/doh-proxy>`_.
@@ -100,7 +100,7 @@ HTTP proxy with DoH support
         - More complicated setup with three components (proxy + special module + Knot Resolver).
 
 Client configuration
-^^^^^^^^^^^^^^^^^^^^
+--------------------
 Most common client today is web browser Firefox. Relevant configuration is described e.g. in following
 `article <https://www.internetsociety.org/blog/2018/12/dns-privacy-support-in-mozilla-firefox/>`_.
 To use your own DoH server just change ``network.trr.uri`` configuration option

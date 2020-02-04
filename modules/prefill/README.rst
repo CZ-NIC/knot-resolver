@@ -1,7 +1,7 @@
 .. _mod-prefill:
 
 Cache prefilling
-----------------
+================
 
 This module provides ability to periodically prefill DNS cache by importing root zone data obtained over HTTPS.
 
@@ -34,7 +34,7 @@ Root zone to import must be signed using DNSSEC and the resolver must have valid
 Only root zone import is supported at the moment.
 
 Dependencies
-^^^^^^^^^^^^
+------------
 
 Depends on the prefill-lua-http_ and luafilesystem_ libraries.
 

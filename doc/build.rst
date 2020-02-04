@@ -33,7 +33,7 @@ The following dependencies are needed to build and run Knot Resolver:
    "`pkg-config`_", "*build only* [#]_"
    "libknot_ 2.8+", "Knot DNS libraries"
    "LuaJIT_ 2.0+", "Embedded scripting language"
-   "libuv_ 1.7+", "Multiplatform I/O and services [#]_"
+   "libuv_ 1.7+", "Multiplatform I/O and services"
    "lmdb", "Memory-mapped database for cache"
    "GnuTLS", "TLS"
 
@@ -50,7 +50,7 @@ Resolver:
    "Sphinx_ and sphinx_rtd_theme_", "``documentation``", "Building this
    HTML/PDF documentation."
    "breathe_", "``documentation``", "Exposing Doxygen API doc to Sphinx."
-   "libsystemd_ >= 227", "``daemon``", "Systemd socket activation support."
+   "libsystemd_", "``daemon``", "Systemd watchdog support."
    "libprotobuf_ 3.0+", "``modules/dnstap``", "Protocol Buffers support for
    dnstap_."
    "`libprotobuf-c`_ 1.0+", "``modules/dnstap``", "C bindings for Protobuf."
@@ -67,9 +67,6 @@ Resolver:
 .. [#] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS``
    to configure dependencies manually (i.e. ``libknot_CFLAGS`` and
    ``libknot_LIBS``).
-.. [#] libuv 1.7 brings SO_REUSEPORT support that is needed for multiple forks.
-   libuv < 1.7 can be still used, but only in single-process mode. Use
-   :ref:`different method <daemon-reuseport>` for load balancing.
 
 Packaged dependencies
 ~~~~~~~~~~~~~~~~~~~~~
@@ -233,6 +230,7 @@ Recommended build options for packagers:
 * ``--prefix=/usr`` to customize
   prefix, other directories can be set in a similar fashion, see ``meson setup
   --help``
+* ``-Dsystemd_files=enabled`` for systemd unit files
 * ``-Ddoc=enabled`` for offline html documentation (see :ref:`build-html-doc`)
 * ``-Dinstall_kresd_conf=enabled`` to install default config file
 * ``-Dclient=enabled`` to force build of kresc
@@ -245,12 +243,7 @@ It's recommended to use the upstream system unit files. If any customizations
 are required, drop-in files should be used, instead of patching/changing the
 unit files themselves.
 
-Depending on your systemd version, choose the appropriate build option:
-
-* ``-Dsystemd_files=enabled`` (recommended) installs unit files with
-  systemd socket activation support. Requires systemd >=227.
-* ``-Dsystemd_files=nosocket`` for systemd <227. Unit files won't use
-  socket activation.
+To install systemd unit files, use the ``-Dsystemd_files=enabled`` build option.
 
 To support enabling services after boot, you must also link ``kresd.target`` to
 ``multi-user.target.wants``:
