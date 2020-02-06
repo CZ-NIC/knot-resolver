@@ -1,0 +1,15 @@
+adduser
+dns-root-data
+systemd
+libc6
+libdnssec7
+libedit2
+libgcc1
+libgnutls30
+libknot10
+liblmdb0
+libluajit-5.1-2
+libstdc++6
+libsystemd0
+libuv1
+libzscanner3
