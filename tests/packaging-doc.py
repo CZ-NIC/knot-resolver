@@ -133,6 +133,10 @@ def main():
 
             logging.debug('generating Dockerfile for %s', args)
             gen_dockerfile(args, tmpdir, srcdir)
+            from shutil import copyfile
+            copyfile(os.path.join(tmpdir, "Dockerfile"),
+                    "/tmp/Dockerfile_" + args[0] + args[1] + "_" + args[-1].replace('/', '-'))
+            continue
             logging.info('testing combination %s', args)
             docker_build(tmpdir, delete=not baseimg)
             baseimg = False
