@@ -189,6 +189,7 @@ struct kr_request {
 	int vars_ref;
 	knot_mm_t pool;
 	unsigned int uid;
+	alloc_wire_f alloc_wire_cb;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
 struct kr_cdb_stats {
@@ -409,12 +410,12 @@ typedef struct {
 struct args {
 	addr_array_t addrs;
 	addr_array_t addrs_tls;
+	addr_array_t addrs_xdp;
 	flagged_fd_array_t fds;
 	int control_fd;
 	int forks;
 	config_array_t config;
 	const char *rundir;
-	char *xsk;
 	_Bool interactive;
 	_Bool quiet;
 	_Bool tty_binary_output;
@@ -425,11 +426,16 @@ struct endpoint {
 	int fd;
 	int family;
 	uint16_t port;
+	int8_t xdp_queue;
 	_Bool engaged;
 	endpoint_flags_t flags;
+	struct session *session;
+	struct knot_xsk_socket *xdp_socket;
 };
 struct request_ctx {
 	struct kr_request req;
+	struct worker_ctx *worker;
+	struct qr_task *task;
 	/* beware: hidden stub, to avoid hardcoding sockaddr lengths */
 };
 struct qr_task {

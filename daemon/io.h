@@ -57,3 +57,11 @@ void io_free(uv_handle_t *handle);
 
 int io_start_read(uv_handle_t *handle);
 int io_stop_read(uv_handle_t *handle);
+
+
+typedef struct {
+	struct knot_xsk_socket *socket;
+	struct session *session;
+	uv_check_t tx_waker;
+} xdp_handle_data_t;
+

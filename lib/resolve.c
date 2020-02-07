@@ -24,7 +24,6 @@
 #include <libknot/descriptor.h>
 #include <ucw/mempool.h>
 #include "kresconfig.h"
-#include "daemon/af_xdp.h"
 #include "lib/resolve.h"
 #include "lib/layer.h"
 #include "lib/rplan.h"
@@ -40,8 +39,6 @@
 #endif /* defined(ENABLE_COOKIES) */
 
 #define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "resl",  __VA_ARGS__)
-
-alloc_wire_fun kxsk_alloc_hack = NULL;
 
 bool kr_rank_check(uint8_t rank)
 {
@@ -781,7 +778,7 @@ knot_pkt_t * kr_request_ensure_answer(struct kr_request *request)
 
 	assert(request->qsource.packet);
 	/* Find answer_max: limit on DNS wire length. */
-	size_t answer_max = KNOT_WIRE_MIN_PKTSIZE;
+	uint16_t answer_max = KNOT_WIRE_MIN_PKTSIZE;
 	struct kr_request_qsource_flags *qsflags = &request->qsource.flags;
 	if (!request->qsource.addr || qsflags->tcp || qsflags->http) {
 		answer_max = KNOT_WIRE_MAX_PKTSIZE;
@@ -792,21 +789,11 @@ knot_pkt_t * kr_request_ensure_answer(struct kr_request *request)
 	// FIXME: configurability of the limit
 
 	uint8_t *wire = NULL;
-	const bool want_xsk = request->qsource.addr != NULL && !request->qsource.flags.tcp
-				&& !request->qsource.flags.http;
-		// ^ FIXME: better, probably look at session flags?
-		// (need to find concrete XDP socket of the request)
-	if (want_xsk) {
-		uint16_t answer_max2;
-		wire = kxsk_alloc_hack(&answer_max2);
-		if (wire && answer_max2 < answer_max)
-			answer_max = answer_max2;
-		// !wire -> ENOBUFS, fall back to normally allocated wire
-		// FIXME: do NOT try sending it out, though the AF_XDP driver will
-		// probably just skip it already.
-		assert(wire);
+	if (request->alloc_wire_cb) {
+		wire = request->alloc_wire_cb(request, &answer_max);
+		if (!wire)
+			goto enomem;
 	}
-	// FIXME: "dealloc" the umem wire in cases the answer isn't sent (if possible)
 
 	/* Allocate the packet. */
 	knot_pkt_t *answer = request->answer =

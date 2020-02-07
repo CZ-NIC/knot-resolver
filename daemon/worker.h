@@ -45,11 +45,13 @@ void worker_deinit(void);
  *
  * @param session  session the packet came from, or NULL (not from network)
  * @param peer     address the packet came from, or NULL (not from network)
- * @param eth_addrs MAC addresses, or NULL (not from AF_XDP)
+ * @param dst_addr address the packet came to, or NULL (take from session)
+ * @param eth_*    MAC addresses or NULL (for AF_XDP)
  * @param query    the packet, or NULL on an error from the transport layer
  * @return 0 or an error code
  */
-int worker_submit(struct session *session, const struct sockaddr *peer,
+int worker_submit(struct session *session,
+		  const struct sockaddr *peer, const struct sockaddr *dst_addr,
 		  const uint8_t *eth_from, const uint8_t *eth_to, knot_pkt_t *query);
 
 /**

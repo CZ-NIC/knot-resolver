@@ -73,14 +73,15 @@
  */
 
 
-/* The issue: XSK wire allocation is an overlap of library and daemon:
+struct kr_request;
+/** The issue: XSK wire allocation is an overlap of library and daemon:
  *  - it needs to be called from the library
- *  - it needs to rely on lots of stuff from daemon
- * That makes separation difficult, e.g. tests are without daemon.
- * FIXME: try for a better solution. */
-typedef void * (*alloc_wire_fun)(uint16_t *maxlen);
-extern alloc_wire_fun kxsk_alloc_hack;
-
+ *  - it needs to rely on some daemon's internals
+ *  - the library (currently) isn't allowed to directly use symbols from daemon
+ *    (contrary to modules)
+ * That makes separation difficult, e.g. some of our tests run without daemon.
+ */
+typedef uint8_t * (*alloc_wire_f)(struct kr_request *req, uint16_t *maxlen);
 
 /**
  * RRset rank - for cache and ranked_rr_*.
@@ -242,7 +243,9 @@ struct kr_request {
 	trace_callback_f trace_finish; /**< Request finish tracepoint */
 	int vars_ref; /**< Reference to per-request variable table. LUA_NOREF if not set. */
 	knot_mm_t pool;
-	unsigned int uid; /** for logging purposes only */
+	unsigned int uid; /**< for logging purposes only */
+	alloc_wire_f alloc_wire_cb; /**< CB to allocate answer wire (can be NULL). */
+	// FIXME: "dealloc" the umem wire in cases the answer isn't sent (if possible)
 };
 
 /** Initializer for an array of *_selected. */

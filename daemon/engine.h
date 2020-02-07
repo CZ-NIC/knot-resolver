@@ -91,13 +91,12 @@ typedef struct {
 typedef array_t(flagged_fd_t) flagged_fd_array_t;
 
 struct args {
-	addr_array_t addrs, addrs_tls;
+	addr_array_t addrs, addrs_tls, addrs_xdp;
 	flagged_fd_array_t fds;
 	int control_fd;
 	int forks;
 	config_array_t config;
 	const char *rundir;
-	char *xsk;
 	bool interactive;
 	bool quiet;
 	bool tty_binary_output;

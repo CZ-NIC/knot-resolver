@@ -23,7 +23,7 @@
 #include "daemon/session.h"
 #include "daemon/worker.h"
 
-#include "daemon/kxsk/impl.h"
+//#include "daemon/kxsk/impl.h"
 
 // placate libclang :-/
 typedef uint64_t size_t;
@@ -133,7 +133,7 @@ static void xsk_check(uv_check_t *handle)
 }
 int kr_xsk_init_global(uv_loop_t *loop, char *cmdarg) // FIXME: remove
 {
-	kxsk_alloc_hack = kr_xsk_alloc_wire;
+	abort();
 	if (!cmdarg)
 		return 0;
 

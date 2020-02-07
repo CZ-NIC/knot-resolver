@@ -67,17 +67,19 @@ struct request_ctx
 {
 	struct kr_request req;
 
-	struct {
-		/** MAC addresses - ours and client's, in case of AF_XDP socket. */
-		uint8_t eth_addrs[2][6];
-		/** Requestor's address; separate because of UDP session "sharing". */
-		union inaddr addr;
-		/** NULL if the request didn't come over network. */
-		struct session *session;
-	} source;
-
 	struct worker_ctx *worker;
 	struct qr_task *task;
+	struct {
+		/** NULL if the request didn't come over network. */
+		struct session *session;
+		/** Requestor's address; separate because of UDP session "sharing". */
+		union inaddr addr;
+		/** Local address.  For AF_XDP we couldn't use session's,
+		 * as the address might be different every time. */
+		union inaddr dst_addr;
+		/** MAC addresses - ours and client's, in case of AF_XDP socket. */
+		uint8_t eth_addrs[2][6];
+	} source;
 };
 
 /** Query resolution task. */
@@ -267,6 +269,32 @@ static int subreq_key(char *dst, knot_pkt_t *pkt)
 			knot_pkt_qtype(pkt), knot_pkt_qtype(pkt));
 }
 
+static uint8_t *alloc_wire_cb(struct kr_request *req, uint16_t *maxlen)
+{
+	assert(maxlen);
+	struct request_ctx *ctx = (struct request_ctx *)req;
+	//if (!ctx->source.session)
+	//	return NULL;
+	uv_handle_t *handle = session_get_handle(ctx->source.session);
+	//if (handle->type != UV_POLL)
+	//	return NULL;
+	/* Now we know it's an AF_XDP socket. */
+	xdp_handle_data_t *xhd = handle->data;
+	knot_xsk_msg_t out;
+	int ret = knot_xsk_alloc_packet(xhd->socket, ctx->source.addr.ip.sa_family == AF_INET6,
+					&out, NULL);
+	if (ret != KNOT_EOK) {
+		assert(!ret);
+		*maxlen = 0;
+		return NULL;
+	}
+	*maxlen = MIN(*maxlen, out.payload.iov_len);
+	/* It's most convenient to fill the MAC addresses at this point. */
+	memcpy(out.eth_from, &ctx->source.eth_addrs[0], 6);
+	memcpy(out.eth_to,   &ctx->source.eth_addrs[1], 6);
+	return out.payload.iov_base;
+}
+
 /** Create and initialize a request_ctx (on a fresh mempool).
  *
  * handle and peer point to the source of the request, and they are NULL
@@ -274,7 +302,8 @@ static int subreq_key(char *dst, knot_pkt_t *pkt)
  */
 static struct request_ctx *request_create(struct worker_ctx *worker,
 					  struct session *session,
-					  const struct sockaddr *peer,
+					  const struct sockaddr *addr,
+					  const struct sockaddr *dst_addr,
 					  const uint8_t *eth_from,
 					  const uint8_t *eth_to,
 					  uint32_t uid)
@@ -299,11 +328,13 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		assert(session_flags(session)->outgoing == false);
 	}
 	ctx->source.session = session;
-	if (eth_to) {
+	assert(!!eth_to == !!eth_from);
+	const bool is_xdp = eth_to != NULL;
+	if (is_xdp) {
+		assert(session);
 		memcpy(&ctx->source.eth_addrs[0], eth_to,   sizeof(ctx->source.eth_addrs[0]));
-	}
-	if (eth_from) {
 		memcpy(&ctx->source.eth_addrs[1], eth_from, sizeof(ctx->source.eth_addrs[1]));
+		ctx->req.alloc_wire_cb = alloc_wire_cb;
 	}
 
 	struct kr_request *req = &ctx->req;
@@ -311,13 +342,15 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	req->vars_ref = LUA_NOREF;
 	req->uid = uid;
 	if (session) {
-		/* We assume the session will be alive during the whole life of the request. */
-		req->qsource.dst_addr = session_get_sockname(session);
 		req->qsource.flags.tcp = session_get_handle(session)->type == UV_TCP;
 		req->qsource.flags.tls = session_flags(session)->has_tls;
 		/* We need to store a copy of peer address. */
-		memcpy(&ctx->source.addr.ip, peer, kr_sockaddr_len(peer));
+		memcpy(&ctx->source.addr.ip, addr, kr_sockaddr_len(addr));
 		req->qsource.addr = &ctx->source.addr.ip;
+		if (!dst_addr) /* We wouldn't have to copy in this case, but for consistency. */
+			dst_addr = session_get_sockname(session);
+		memcpy(&ctx->source.dst_addr.ip, dst_addr, kr_sockaddr_len(dst_addr));
+		req->qsource.dst_addr = &ctx->source.dst_addr.ip;
 	}
 
 	worker->stats.rconcurrent += 1;
@@ -1161,20 +1194,19 @@ static int qr_task_finalize(struct qr_task *task, int state)
 				       && src_handle->type != UV_POLL) {
 		assert(false);
 		ret = kr_error(EINVAL);
-	} else
-	if ((src_handle->type == UV_UDP || src_handle->type == UV_POLL)
-			&& ctx->source.addr.ip.sa_family == AF_INET) {
 
+	} else if (src_handle->type == UV_POLL) { // AF_XDP
 		knot_xsk_msg_t msg;
-		const struct sockaddr *ip_from = session_get_sockname(source_session); // FIXME
-		const struct sockaddr *ip_to = &ctx->source.addr.ip;
+		const struct sockaddr *ip_from = &ctx->source.dst_addr.ip;
+		const struct sockaddr *ip_to   = &ctx->source.addr.ip;
 		memcpy(&msg.ip_from, ip_from, kr_sockaddr_len(ip_from));
 		memcpy(&msg.ip_to,   ip_to,   kr_sockaddr_len(ip_to));
-		msg.eth_from = ctx->source.eth_addrs[0];
-		msg.eth_to   = ctx->source.eth_addrs[1];
 		msg.payload.iov_base = ctx->req.answer->wire;
 		msg.payload.iov_len  = ctx->req.answer->size;
-		ret = knot_xsk_sendmsg(the_socket/*FIXME*/, &msg);
+
+		xdp_handle_data_t *xhd = src_handle->data;
+		assert(xhd && xhd->socket && xhd->session == source_session);
+		ret = knot_xsk_sendmsg(xhd->socket, &msg);
 		kr_log_verbose("[uxsk] pushed a packet, ret = %d\n", ret);
 		ret = qr_task_on_send(task, NULL/*doesn't matter for UDP*/, ret);
 
@@ -1575,7 +1607,8 @@ static int parse_packet(knot_pkt_t *query)
 	return ret;
 }
 
-int worker_submit(struct session *session, const struct sockaddr *peer,
+int worker_submit(struct session *session,
+		  const struct sockaddr *peer, const struct sockaddr *dst_addr,
 		  const uint8_t *eth_from, const uint8_t *eth_to, knot_pkt_t *query)
 {
 	if (!session) {
@@ -1611,7 +1644,7 @@ int worker_submit(struct session *session, const struct sockaddr *peer,
 	const struct sockaddr *addr = NULL;
 	if (!is_outgoing) { /* request from a client */
 		struct request_ctx *ctx =
-			request_create(worker, session, peer, eth_from, eth_to,
+			request_create(worker, session, peer, dst_addr, eth_from, eth_to,
 					 knot_wire_get_id(query->wire));
 		if (!ctx) {
 			return kr_error(ENOMEM);
@@ -1848,7 +1881,7 @@ struct qr_task *worker_resolve_start(knot_pkt_t *query, struct kr_qflags options
 	}
 
 
-	struct request_ctx *ctx = request_create(worker, NULL, NULL, NULL, NULL,
+	struct request_ctx *ctx = request_create(worker, NULL, NULL, NULL, NULL, NULL,
 						 worker->next_request_uid);
 	if (!ctx) {
 		return NULL;

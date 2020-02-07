@@ -19,7 +19,6 @@
 #include "contrib/ccan/asprintf/asprintf.h"
 #include "contrib/cleanup.h"
 #include "contrib/ucw/mempool.h"
-#include "daemon/af_xdp.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
 #include "daemon/network.h"
@@ -314,6 +313,7 @@ static void args_deinit(struct args *args)
 {
 	array_clear(args->addrs);
 	array_clear(args->addrs_tls);
+	array_clear(args->addrs_xdp);
 	for (int i = 0; i < args->fds.len; ++i)
 		free_const(args->fds.at[i].flags.kind);
 	array_clear(args->fds);
@@ -379,7 +379,7 @@ static int parse_args(int argc, char **argv, struct args *args)
 			args->interactive = false;
 			break;
 		case 'x':
-			args->xsk = optarg;
+			array_push(args->addrs_xdp, optarg);
 			break;
 		case 'v':
 			kr_verbose_set(true);
@@ -553,27 +553,29 @@ int main(int argc, char **argv)
 	}
 
 	/* Select which config files to load and verify they are read-able. */
-	bool load_defaults = true;
-	size_t i = 0;
-	while (i < the_args->config.len) {
-		const char *config = the_args->config.at[i];
-		if (strcmp(config, "-") == 0) {
-			load_defaults = false;
-			array_del(the_args->config, i);
-			continue;  /* don't increment i */
-		} else if (access(config, R_OK) != 0) {
-			char cwd[PATH_MAX];
-			get_workdir(cwd, sizeof(cwd));
-			kr_log_error("[system] config '%s' (workdir '%s'): %s\n",
-				config, cwd, strerror(errno));
-			return EXIT_FAILURE;
+	{
+		bool load_defaults = true;
+		size_t i = 0;
+		while (i < the_args->config.len) {
+			const char *config = the_args->config.at[i];
+			if (strcmp(config, "-") == 0) {
+				load_defaults = false;
+				array_del(the_args->config, i);
+				continue;  /* don't increment i */
+			} else if (access(config, R_OK) != 0) {
+				char cwd[PATH_MAX];
+				get_workdir(cwd, sizeof(cwd));
+				kr_log_error("[system] config '%s' (workdir '%s'): %s\n",
+					config, cwd, strerror(errno));
+				return EXIT_FAILURE;
+			}
+			i++;
 		}
-		i++;
+		if (the_args->config.len == 0 && access("config", R_OK) == 0)
+			array_push(the_args->config, "config");
+		if (load_defaults)
+			array_push(the_args->config, LIBDIR "/postconfig.lua");
 	}
-	if (the_args->config.len == 0 && access("config", R_OK) == 0)
-		array_push(the_args->config, "config");
-	if (load_defaults)
-		array_push(the_args->config, LIBDIR "/postconfig.lua");
 
 	/* File-descriptor count limit: soft->hard. */
 	struct rlimit rlim;
@@ -662,9 +664,40 @@ int main(int argc, char **argv)
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
+	/* Start listening on AF_XDP sockets. */
+	for (size_t i = 0; i < the_args->addrs_xdp.len; ++i) {
+		int8_t xdp_queue;
+		char *addr = the_args->addrs_xdp.at[i];
+		char *colon = strchr(addr, ':');
+		if (colon) {
+			char *endptr;
+			xdp_queue = strtol(colon + 1, &endptr, 10);
+			if (endptr == colon + 1 || endptr[0] != '\0') {
+				kr_log_error("[system] incorrect value passed to '-x/--xdp': %s\n",
+						addr);
+				ret = EXIT_FAILURE;
+				goto cleanup;
+			}
+			*colon = '\0'; // TODO: modifying argv[i][j] isn't very nice
+		} else {
+			xdp_queue = 0; // let's allow this default
+		}
+		endpoint_flags_t ep_flags = {
+			.sock_type = SOCK_DGRAM,
+			.tls = false,
+			.freebind = true,
+			.kind = NULL,
+		};
+		ret = network_listen(&engine.net, addr, 0, xdp_queue, ep_flags);
+		if (ret != 0) {
+			kr_log_error("[system] listen on --xdp=%s:%d failed: %s\n",
+					addr, (int)xdp_queue, kr_strerror(ret));
+			ret = EXIT_FAILURE;
+			goto cleanup;
+		}
+	}
 
-	//ret = udp_queue_init_global(loop);
-	ret = kr_xsk_init_global(loop, the_args->xsk);
+	ret = udp_queue_init_global(loop);
 	if (ret) {
 		kr_log_error("[system] failed to initialize UDP queue: %s\n",
 				kr_strerror(ret));
@@ -678,7 +711,7 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	for (i = 0; i < the_args->config.len; ++i) {
+	for (int i = 0; i < the_args->config.len; ++i) {
 		const char *config = the_args->config.at[i];
 		if (engine_loadconf(&engine, config) != 0) {
 			ret = EXIT_FAILURE;
@@ -703,7 +736,6 @@ int main(int argc, char **argv)
 	ret = run_worker(loop, &engine, &ipc_set, fork_id == 0, the_args);
 
 cleanup:/* Cleanup. */
-	kr_xsk_deinit_global();
 	engine_deinit(&engine);
 	worker_deinit();
 	if (loop != NULL) {

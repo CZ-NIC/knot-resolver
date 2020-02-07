@@ -67,6 +67,7 @@ struct endpoint {
 	int8_t xdp_queue;    /**< -1 or queue number of the interface for AF_XDP use. */
 	bool engaged;        /**< to some module or internally */
 	endpoint_flags_t flags;
+	//FIXME: remove these two again?
 	struct session *session; /**< Valid for all internally handled endpoints except "control". */
 	struct knot_xsk_socket *xdp_socket;
 };

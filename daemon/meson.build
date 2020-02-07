@@ -7,7 +7,6 @@ kresd_src = files([
   'bindings/modules.c',
   'bindings/net.c',
   'bindings/worker.c',
-  'af_xdp.c',
   'engine.c',
   'ffimodule.c',
   'io.c',

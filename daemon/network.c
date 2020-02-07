@@ -135,7 +135,8 @@ static void endpoint_close_lua_cb(struct network *net, struct endpoint *ep)
 
 static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 {
-	bool control = ep->flags.kind && strcmp(ep->flags.kind, "control") == 0;
+	const bool is_control = ep->flags.kind && strcmp(ep->flags.kind, "control") == 0;
+	const bool is_xdp     = ep->family == AF_XDP;
 
 	if (ep->family == AF_UNIX) { /* The FS name would be left behind. */
 		/* Extract local address for this socket. */
@@ -150,7 +151,7 @@ static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 		}
 	}
 
-	if (ep->flags.kind && !control) {
+	if (ep->flags.kind && !is_control && !is_xdp) {
 		assert(!ep->handle);
 		/* Special lua-handled endpoint. */
 		if (ep->engaged) {
@@ -163,7 +164,7 @@ static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 		return;
 	}
 
-	free_const(ep->flags.kind); /* needed if (control) */
+	free_const(ep->flags.kind); /* needed if (is_control) */
 	assert(ep->handle);
 	if (force) { /* Force close if event loop isn't running. */
 		if (ep->fd >= 0) {
@@ -254,8 +255,8 @@ static int insert_endpoint(struct network *net, const char *addr, struct endpoin
 
 /** Open endpoint protocols.  ep->flags were pre-set.
  * \p addr_str is only used for logging or for XDP "address". */
-static int open_endpoint(struct network *net, struct endpoint *ep,
-			 const struct sockaddr *sa, const char *addr_str)
+static int open_endpoint(struct network *net, const char *addr_str,
+			 struct endpoint *ep, const struct sockaddr *sa)
 {
 	const bool is_control = ep->flags.kind && strcmp(ep->flags.kind, "control") == 0;
 	const bool is_xdp     = ep->family == AF_XDP;
@@ -369,12 +370,12 @@ static struct endpoint * endpoint_get(struct network *net, const char *addr,
 	return NULL;
 }
 
-/** \note pass either sa != NULL xor ep.fd != -1;
+/** \note pass (either sa != NULL xor ep.fd != -1) or XDP case (neither sa nor ep.fd)
  *  \note ownership of ep.flags.* is taken on success. */
 static int create_endpoint(struct network *net, const char *addr_str,
 				struct endpoint *ep, const struct sockaddr *sa)
 {
-	int ret = open_endpoint(net, ep, sa, addr_str);
+	int ret = open_endpoint(net, addr_str, ep, sa);
 	if (ret == 0) {
 		ret = insert_endpoint(net, addr_str, ep);
 	}
@@ -467,7 +468,7 @@ int network_listen(struct network *net, const char *addr, uint16_t port,
 	ep.flags = flags,
 	ep.fd = -1,
 	ep.port = port,
-	ep.family = xdp_queue < 0 ? AF_XDP : sa->sa_family;
+	ep.family = xdp_queue < 0 ? sa->sa_family : AF_XDP;
 
 	int ret = create_endpoint(net, addr, &ep, sa);
 	free_const(sa);
