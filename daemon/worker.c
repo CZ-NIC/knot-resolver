@@ -273,12 +273,9 @@ static uint8_t *alloc_wire_cb(struct kr_request *req, uint16_t *maxlen)
 {
 	assert(maxlen);
 	struct request_ctx *ctx = (struct request_ctx *)req;
-	//if (!ctx->source.session)
-	//	return NULL;
+	/* We know it's an AF_XDP socket; otherwise this CB isn't assigned. */
 	uv_handle_t *handle = session_get_handle(ctx->source.session);
-	//if (handle->type != UV_POLL)
-	//	return NULL;
-	/* Now we know it's an AF_XDP socket. */
+	assert(handle->type == UV_POLL);
 	xdp_handle_data_t *xhd = handle->data;
 	knot_xsk_msg_t out;
 	int ret = knot_xsk_alloc_packet(xhd->socket, ctx->source.addr.ip.sa_family == AF_INET6,

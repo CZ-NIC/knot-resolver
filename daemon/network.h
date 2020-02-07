@@ -37,8 +37,8 @@ struct knot_xsk_socket;
 /** Ways to listen on a socket (which may exist already). */
 typedef struct {
 	int sock_type;    /**< SOCK_DGRAM or SOCK_STREAM */
-	bool tls;         /**< only used together with .kind == NULL and .tcp */
-	bool freebind;    /**< used for binding to non-local address **/
+	bool tls;         /**< only used for DoT, i.e. together with .kind == NULL and .tcp */
+	bool freebind;    /**< used for binding to non-local address */
 	const char *kind; /**< tag for other types: "control" or module-handled kinds */
 } endpoint_flags_t;
 
@@ -59,7 +59,8 @@ static inline bool endpoint_flags_eq(endpoint_flags_t f1, endpoint_flags_t f2)
  * ATM AF_UNIX is only supported with flags.kind != NULL
  */
 struct endpoint {
-	/** uv_{udp,tcp,poll}_t (poll for XDP); NULL in case flags.kind != NULL */
+	/** uv_{udp,tcp,poll}_t (poll for XDP);
+	 * NULL in case of endpoints that are to be handled by modules. */
 	uv_handle_t *handle;
 	int fd;              /**< POSIX file-descriptor; always used. */
 	int family;          /**< AF_INET or AF_INET6 or AF_UNIX or AF_XDP(TODO: check) */

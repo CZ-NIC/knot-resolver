@@ -58,7 +58,8 @@ void io_free(uv_handle_t *handle);
 int io_start_read(uv_handle_t *handle);
 int io_stop_read(uv_handle_t *handle);
 
-
+/** When uv_handle_t::type == UV_PIPE, ::data points to this malloc-ed helper.
+ * (Other cases store a direct struct session pointer in ::data.) */
 typedef struct {
 	struct knot_xsk_socket *socket;
 	struct session *session;
