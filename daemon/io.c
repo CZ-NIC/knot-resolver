@@ -679,9 +679,8 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 	ep->fd = knot_xsk_get_poll_fd(xhd->socket); // probably not useful
 	ret = uv_poll_init(loop, (uv_poll_t *)ep->handle, ep->fd);
 	if (ret) {
+		knot_xsk_deinit(xhd->socket);
 		free(xhd);
-		knot_xsk_deinit(ep->xdp_socket);
-		ep->xdp_socket = NULL;
 		return kr_error(ret);
 	}
 

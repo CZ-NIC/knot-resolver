@@ -429,8 +429,6 @@ struct endpoint {
 	int8_t xdp_queue;
 	_Bool engaged;
 	endpoint_flags_t flags;
-	struct session *session;
-	struct knot_xsk_socket *xdp_socket;
 };
 struct request_ctx {
 	struct kr_request req;

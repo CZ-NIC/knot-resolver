@@ -32,7 +32,6 @@ struct session_flags {
 	bool connected : 1;     /**< True: TCP connection is established. */
 	bool closing : 1;       /**< True: session close sequence is in progress. */
 	bool wirebuf_error : 1; /**< True: last operation with wirebuf ended up with an error. */
-	bool has_xdp : 1;       /**< True: given session uses AF_XDP. */
 };
 
 /* Allocate new session for a libuv handle.

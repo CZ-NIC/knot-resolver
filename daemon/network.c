@@ -327,7 +327,6 @@ static int open_endpoint(struct network *net, const char *addr_str,
 		ep->handle = (uv_handle_t *)ep_handle;
 		ret = !ep->handle ? ENOMEM
 			: io_listen_udp(net->loop, ep_handle, ep->fd);
-		if (!ret) ep->session = ep_handle->data;
 		goto finish_ret;
 	} /* else */
 
@@ -337,7 +336,6 @@ static int open_endpoint(struct network *net, const char *addr_str,
 		ret = !ep->handle ? ENOMEM
 			: io_listen_tcp(net->loop, ep_handle, ep->fd,
 					net->tcp_backlog, ep->flags.tls);
-		if (!ret) ep->session = ep_handle->data;
 		goto finish_ret;
 	} /* else */
 
