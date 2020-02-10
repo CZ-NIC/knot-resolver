@@ -5,27 +5,24 @@ from pathlib import Path
 EXCLUDED_TEST_DIRS = [ "tests", "daemon" ]
 
 PYTESTS_DIR = os.path.dirname(os.path.realpath(__file__))
-ROOT_DIR = PYTESTS_DIR + "/../../"
+ROOT_DIR = os.path.join(PYTESTS_DIR, "..", "..")
 
-def list_dirs(path, include=None, exclude=None, depth=None):
-    dirs = []
+def list_dirs(path, include=None, exclude=None):
+    filtered_dirs = []
     root_depth = path.count(os.path.sep)
 
-    for rootpath, dirpath, files in os.walk(path):
+    for rootpath, dirs, files in os.walk(path):
         if exclude is not None:
-            dirpath[:] = [d for d in dirpath if d not in exclude]
+            dirs[:] = [d for d in dirs if d not in exclude]
 
-        for d in dirpath:
-            if depth is not None and (os.path.join(rootpath, d).count(os.path.sep) - root_depth != depth):
-                continue
-
+        for d in dirs:
             if include is None:
-                dirs.append(os.path.join(rootpath, d))
+                filtered_dirs.append(os.path.join(rootpath, d))
             else:
                 if os.path.basename(os.path.normpath(d)) in include:
-                    dirs.append(os.path.join(rootpath, d))
+                    filtered_dirs.append(os.path.join(rootpath, d))
 
-    return dirs
+    return filtered_dirs
 
 def list_tests_dirs():
     return list_dirs(ROOT_DIR, ["packaging"], EXCLUDED_TEST_DIRS)
@@ -55,12 +52,12 @@ def read_deps(deps_file):
 
 
 MODULES=list_tests_dirs()
-DISTROS=list_distro_vers(ROOT_DIR + "tests/packaging/distros")
+DISTROS=list_distro_vers(os.path.join(ROOT_DIR, "tests/packaging/distros"))
 
 @pytest.mark.parametrize('module', MODULES)
 @pytest.mark.parametrize('distro', DISTROS)
 def test_collect(module, distro):
-    distro_dir = module + '/' + distro[0] + '/' + distro[1]
+    distro_dir = os.path.join(module, distro[0], distro[1])
 
     if os.path.isdir(distro_dir):
         bdeps = read_deps(distro_dir + "/builddeps")
