@@ -563,7 +563,7 @@ static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar
 	if (raw && outchar_len < TLS_SHA256_RAW_LEN) {
 		assert(false);
 		return kr_error(ENOSPC);
-		/* With !raw we have check inside base64_encode. */
+		/* With !raw we have check inside kr_base64_encode. */
 	}
 	gnutls_pubkey_t key;
 	int err = gnutls_pubkey_init(&key);
@@ -582,11 +582,11 @@ static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar
 	if (err != GNUTLS_E_SUCCESS || raw/*success*/)
 		goto leave;
 	/* Convert to non-raw. */
-	err = base64_encode((uint8_t *)raw_pin, sizeof(raw_pin),
+	err = kr_base64_encode((uint8_t *)raw_pin, sizeof(raw_pin),
 			    (uint8_t *)outchar, outchar_len);
 	if (err >= 0 && err < outchar_len) {
 		err = GNUTLS_E_SUCCESS;
-		outchar[err] = '\0'; /* base64_encode() doesn't do it */
+		outchar[err] = '\0'; /* kr_base64_encode() doesn't do it */
 	} else if (err >= 0) {
 		assert(false);
 		err = kr_error(ENOSPC); /* base64 fits but '\0' doesn't */

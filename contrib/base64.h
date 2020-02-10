@@ -40,7 +40,7 @@
  * \retval >=0		length of output string.
  * \retval KNOT_E*	if error.
  */
-int32_t base64_encode(const uint8_t  *in,
+int32_t kr_base64_encode(const uint8_t  *in,
                       const uint32_t in_len,
                       uint8_t        *out,
                       const uint32_t out_len);
@@ -60,7 +60,7 @@ int32_t base64_encode(const uint8_t  *in,
  * \retval >=0		length of output string.
  * \retval KNOT_E*	if error.
  */
-int32_t base64_encode_alloc(const uint8_t  *in,
+int32_t kr_base64_encode_alloc(const uint8_t  *in,
                             const uint32_t in_len,
                             uint8_t        **out);
 
@@ -79,7 +79,7 @@ int32_t base64_encode_alloc(const uint8_t  *in,
  * \retval >=0		length of output data.
  * \retval KNOT_E*	if error.
  */
-int32_t base64_decode(const uint8_t  *in,
+int32_t kr_base64_decode(const uint8_t  *in,
                       const uint32_t in_len,
                       uint8_t        *out,
                       const uint32_t out_len);
@@ -100,7 +100,7 @@ int32_t base64_decode(const uint8_t  *in,
  * \retval >=0		length of output data.
  * \retval KNOT_E*	if error.
  */
-int32_t base64_decode_alloc(const uint8_t  *in,
+int32_t kr_base64_decode_alloc(const uint8_t  *in,
                             const uint32_t in_len,
                             uint8_t        **out);
 
