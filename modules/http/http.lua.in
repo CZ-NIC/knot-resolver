@@ -115,7 +115,6 @@ local function serve_root()
 		end
 		-- Return index page
 		return data
-		        :gsub('{{ secure }}', stream:checktls() and 'true' or 'false')
 		        :gsub('{{ snippets }}', table.concat(rsnippets, '\n'))
 	end
 end

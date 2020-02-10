@@ -332,7 +332,7 @@ $(function() {
 	}
 
 	/* WebSocket endpoints */
-	var wsStats = (secure ? 'wss://' : 'ws://') + location.host + '/stats';
+	var wsStats = ('https:' == document.location.protocol ? 'wss://' : 'ws://') + location.host + '/stats';
 	var ws = new Socket(wsStats);
 	ws.onmessage = function(evt) {
 		var data = JSON.parse(evt.data);
