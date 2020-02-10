@@ -450,7 +450,7 @@ static int tls_params2lua(lua_State *L, trie_t *params)
 		lua_createtable(L, e->pins.len, 0);
 		for (size_t i = 0; i < e->pins.len; ++i) {
 			uint8_t pin_base64[TLS_SHA256_BASE64_BUFLEN];
-			int err = base64_encode(e->pins.at[i], TLS_SHA256_RAW_LEN,
+			int err = kr_base64_encode(e->pins.at[i], TLS_SHA256_RAW_LEN,
 						pin_base64, sizeof(pin_base64));
 			if (err < 0) {
 				assert(false);
@@ -593,7 +593,7 @@ static int net_tls_client(lua_State *L)
 				free(pin_raw);
 				ERROR("%s", kr_strerror(ENOMEM));
 			}
-			int ret = base64_decode((const uint8_t *)pin, strlen(pin),
+			int ret = kr_base64_decode((const uint8_t *)pin, strlen(pin),
 						pin_raw, TLS_SHA256_RAW_LEN + 8);
 			if (ret < 0) {
 				ERROR("not a valid pin_sha256: '%s' (length %d), %s\n",
