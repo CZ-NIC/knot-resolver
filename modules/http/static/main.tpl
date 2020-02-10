@@ -4,7 +4,6 @@
 <title>{{ title }}</title>
 <script type="text/javascript">
 	var host = "{{ host }}";
-	var secure = {{ secure }};
 </script>
 <script src="jquery.js"></script>
 <script src="bootstrap.min.js"></script>
