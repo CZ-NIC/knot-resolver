@@ -42,7 +42,6 @@ kresd_deps = [
   gnutls,
   libsystemd,
   capng,
-  libbpf,
 ]
 
 

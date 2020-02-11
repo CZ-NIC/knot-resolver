@@ -22,6 +22,7 @@
 #include <lauxlib.h>
 #include <libknot/packet/pkt.h>
 #include <libknot/descriptor.h>
+#include <libknot/xdp/af_xdp.h>
 #include <contrib/ucw/lib.h>
 #include <contrib/ucw/mempool.h>
 #include <contrib/wire.h>
@@ -33,7 +34,6 @@
 #include <unistd.h>
 #include <gnutls/gnutls.h>
 
-#include "daemon/af_xdp.h"
 #include "daemon/bindings/api.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
