@@ -338,6 +338,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	req->pool = pool;
 	req->vars_ref = LUA_NOREF;
 	req->uid = uid;
+	req->qsource.flags.xdp = is_xdp;
 	if (session) {
 		req->qsource.flags.tcp = session_get_handle(session)->type == UV_TCP;
 		req->qsource.flags.tls = session_flags(session)->has_tls;

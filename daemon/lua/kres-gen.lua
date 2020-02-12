@@ -160,6 +160,7 @@ struct kr_request_qsource_flags {
 	_Bool tcp : 1;
 	_Bool tls : 1;
 	_Bool http : 1;
+	_Bool xdp : 1;
 };
 struct kr_request {
 	struct kr_context *ctx;
