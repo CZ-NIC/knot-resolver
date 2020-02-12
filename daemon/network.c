@@ -463,10 +463,11 @@ int network_listen(struct network *net, const char *addr, uint16_t port,
 	};
 
 	struct endpoint ep = { 0 };
-	ep.flags = flags,
-	ep.fd = -1,
-	ep.port = port,
+	ep.flags = flags;
+	ep.fd = -1;
+	ep.port = port;
 	ep.family = xdp_queue < 0 ? sa->sa_family : AF_XDP;
+	ep.xdp_queue = xdp_queue;
 
 	int ret = create_endpoint(net, addr, &ep, sa);
 	free_const(sa);

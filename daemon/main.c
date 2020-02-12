@@ -691,7 +691,7 @@ int main(int argc, char **argv)
 		ret = network_listen(&engine.net, addr, 0, xdp_queue, ep_flags);
 		if (ret != 0) {
 			kr_log_error("[system] listen on --xdp=%s:%d failed: %s\n",
-					addr, (int)xdp_queue, kr_strerror(ret));
+					addr, (int)xdp_queue, knot_strerror(ret));
 			ret = EXIT_FAILURE;
 			goto cleanup;
 		}
