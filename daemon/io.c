@@ -665,7 +665,8 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 
 	const int port = ep->port ? ep->port : (1 << 16)/*any port*/;
 	xhd->socket = NULL; // needed for some reason
-	int ret = knot_xsk_init(&xhd->socket, ifname, ep->xdp_queue, port, true);
+	int ret = knot_xsk_init(&xhd->socket, ifname, ep->xdp_queue, port,
+				KNOT_XSK_LOAD_BPF_MAYBE);
 
 	if (!ret) ret = uv_check_init(loop, &xhd->tx_waker);
 	xhd->tx_waker.data = xhd->socket;
