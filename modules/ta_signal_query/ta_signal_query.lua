@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 -- Module implementing RFC 8145 section 5
 -- Signaling Trust Anchor Knowledge in DNS using Key Tag Query
 local kres = require('kres')

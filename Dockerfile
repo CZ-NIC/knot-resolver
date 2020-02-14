@@ -1,4 +1,5 @@
 # Intermediate container for Knot DNS build (not persistent)
+# SPDX-License-Identifier: GPL-3.0-or-later
 FROM debian:stable AS knot-dns-build
 ARG KNOT_DNS_VERSION=v2.9.0
 

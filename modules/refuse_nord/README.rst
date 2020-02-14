@@ -1,3 +1,5 @@
+.. SPDX-License-Identifier: GPL-3.0-or-later
+
 .. _mod-refuse_nord:
 
 Refuse queries without RD bit

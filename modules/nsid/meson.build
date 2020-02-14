@@ -1,4 +1,5 @@
 # C module: nsid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 nsid_src = files([
   'nsid.c',

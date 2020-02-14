@@ -1,4 +1,5 @@
 # LUA module: http
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 lua_http_config = configuration_data()
 lua_http_config.set('modules_dir', modules_dir)

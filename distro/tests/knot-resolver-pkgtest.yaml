@@ -1,4 +1,6 @@
 ---
+# SPDX-License-Identifier: GPL-3.0-or-later
+:x
 - hosts: all
 
   remote_user: root

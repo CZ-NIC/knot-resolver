@@ -2,6 +2,7 @@
  * critbit89 - A crit-bit tree implementation for strings in C89
  * Written by Jonas Gehring <jonas@jgehring.net>
  * Implemented key-value storing by Marek Vavrusa <marek.vavrusa@nic.cz>
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * The code makes the assumption that malloc returns pointers aligned at at
  * least a two-byte boundary. Since the C standard requires that malloc return
