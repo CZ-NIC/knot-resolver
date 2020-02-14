@@ -2,7 +2,6 @@
 
 contrib_src = files([
   'ccan/asprintf/asprintf.c',
-  'ccan/ilog/ilog.c',
   'ccan/json/json.c',
   'ucw/mempool.c',
   'ucw/mempool-fmt.c',
