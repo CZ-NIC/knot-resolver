@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # Run with "ninja kres-gen" to re-generate kres-gen.lua
 set -o pipefail -o errexit -o nounset
 

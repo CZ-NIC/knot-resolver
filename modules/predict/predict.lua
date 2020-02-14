@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 -- Speculative prefetching for repetitive and soon-expiring records to reduce latency.
 -- @module predict
 -- @field queue queue of scheduled queries

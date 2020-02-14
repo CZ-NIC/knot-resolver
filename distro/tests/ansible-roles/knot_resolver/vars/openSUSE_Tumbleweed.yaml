@@ -1,4 +1,5 @@
 ---
+# SPDX-License-Identifier: GPL-3.0-or-later
 show_package_version: rpm -qi knot-resolver | grep '^Version'
 update_packages: true
 packages:

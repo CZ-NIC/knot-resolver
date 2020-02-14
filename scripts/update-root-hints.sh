@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 set -o nounset -o xtrace
 
 TEMP_FILE=/tmp/root.hints

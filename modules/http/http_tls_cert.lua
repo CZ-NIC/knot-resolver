@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 --[[
 	Conventions:
 		- key = private+public key-pair in openssl.pkey format

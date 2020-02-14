@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
+
 -- check prerequisites
 local has_http = pcall(require, 'kres_modules.http') and pcall(require, 'http.request')
 if not has_http then

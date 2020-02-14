@@ -1,4 +1,5 @@
 # modules
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 lua_mod_src = [  # add lua modules without separate meson.build
   files('detect_time_jump/detect_time_jump.lua'),
