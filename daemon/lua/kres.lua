@@ -1,4 +1,6 @@
 -- LuaJIT ffi bindings for libkres, a DNS resolver library.
+-- SPDX-License-Identifier: GPL-3.0-or-later
+--
 -- @note Since it's statically compiled, it expects to find the symbols in the C namespace.
 
 local kres -- the module

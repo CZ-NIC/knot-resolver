@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 local condition = require('cqueues.condition')
 
 -- setup resolver

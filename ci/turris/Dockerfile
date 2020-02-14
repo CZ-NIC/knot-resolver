@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 FROM debian:stable
 MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
 ARG SDK_NAME=OpenWrt-SDK*x86_64

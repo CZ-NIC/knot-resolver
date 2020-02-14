@@ -1,4 +1,5 @@
 ---
+# SPDX-License-Identifier: GPL-3.0-or-later
 - name: Include distribution specific vars
   include_vars: "{{ distro }}.yaml"
 

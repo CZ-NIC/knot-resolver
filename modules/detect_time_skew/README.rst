@@ -1,3 +1,5 @@
+.. SPDX-License-Identifier: GPL-3.0-or-later
+
 .. _mod-detect_time_skew:
 
 System time skew detector
