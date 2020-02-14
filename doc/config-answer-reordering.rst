@@ -1,3 +1,5 @@
+.. SPDX-License-Identifier: GPL-3.0-or-later
+
 Answer reordering
 =================
 Certain clients are "dumb" and always connect to first IP address or name found

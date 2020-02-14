@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 local ffi = require('ffi')
 
 local rz_url = "https://www.internic.net/domain/root.zone"

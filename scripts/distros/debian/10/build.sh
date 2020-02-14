@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 CFLAGS="$CFLAGS -Wall -pedantic -fno-omit-frame-pointer"
 LDFLAGS="$LDFLAGS -Wl,--as-needed"
 meson build_packaging \

@@ -1,3 +1,5 @@
+.. SPDX-License-Identifier: GPL-3.0-or-later
+
 .. _tls-server-config:
 
 DNS-over-TLS server (DoT)

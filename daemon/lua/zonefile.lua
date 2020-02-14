@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
+
 -- LuaJIT ffi bindings for zscanner, a DNS zone parser.
 -- Author: Marek Vavrusa <marek.vavrusa@nic.cz>
 

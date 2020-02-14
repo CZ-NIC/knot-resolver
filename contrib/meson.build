@@ -1,4 +1,5 @@
 # contrib
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 contrib_src = files([
   'ccan/asprintf/asprintf.c',

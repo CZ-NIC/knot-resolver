@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 -- setup resolver
 -- policy module should be loaded by default, do not load it explicitly
 

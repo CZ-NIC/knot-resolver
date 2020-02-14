@@ -1,4 +1,5 @@
 # tests: unit
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # mock module for test_module
 mock_cmodule_src = files([

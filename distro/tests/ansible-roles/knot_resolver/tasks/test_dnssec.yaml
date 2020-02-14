@@ -1,4 +1,5 @@
 ---
+# SPDX-License-Identifier: GPL-3.0-or-later
 - name: dnssec_test dnssec-failed.org +cd returns NOERROR
   tags:
     - test

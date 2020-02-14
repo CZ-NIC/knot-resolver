@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
+
 trust_anchors.remove('.')
 
 local ffi = require('ffi')
