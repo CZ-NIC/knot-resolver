@@ -1,4 +1,5 @@
 # C module: bogus_log
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 bogus_log_src = files([
   'bogus_log.c',

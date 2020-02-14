@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
+
 -- This is a module that does the heavy lifting to provide an HTTP/2 enabled
 -- server that supports TLS by default and provides endpoint for other modules
 -- in order to enable them to export restful APIs and websocket streams.

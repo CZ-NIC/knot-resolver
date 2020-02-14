@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 %global _hardened_build 1
 %{!?_pkgdocdir: %global _pkgdocdir %{_docdir}/%{name}}
 

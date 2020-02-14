@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 -- unload modules which are not related to this test
 if ta_signal_query then
         modules.unload('ta_signal_query')

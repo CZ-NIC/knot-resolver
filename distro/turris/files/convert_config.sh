@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
 
 convert_hostname_config(){
 	#convert hostname_config from option to list

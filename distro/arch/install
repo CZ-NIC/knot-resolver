@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 post_install() {
   getent group knot-resolver &>/dev/null || groupadd -r knot-resolver >/dev/null
   getent passwd knot-resolver &>/dev/null || useradd -r -g knot-resolver -d /dev/null -s /bin/false -c knot-resolver knot-resolver >/dev/null
