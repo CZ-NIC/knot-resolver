@@ -106,7 +106,7 @@ local function serve_root()
 	data = data
 	        :gsub('{{ title }}', M.title or ('kresd @ ' .. hostname()))
 	        :gsub('{{ host }}', hostname())
-	return function (_, stream)
+	return function (_, _)
 		-- Render snippets
 		local rsnippets = {}
 		for _,v in pairs(M.snippets) do
