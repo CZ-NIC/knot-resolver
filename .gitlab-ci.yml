@@ -152,18 +152,13 @@ kres-gen:
 
 build:darwin:
   <<: *test_nodep
+  when: delayed
+  only:  # trigger job only in the main repo
+    refs:
+      - branches@knot/knot-resolver
   except:
     refs:
       - master@knot/knot-resolver
-      - branches@knot/security/knot-resolver
-    variables:
-      - $SKIP_CI == "1"
-      - $SKIP_TRAVIS == "1"
-  when: delayed
-  except:  # trigger job only in repos under our control
-    refs:
-      - master@knot/knot-resolver
-      - branches@knot/security/knot-resolver
     variables:
       - $SKIP_CI == "1"
   start_in: 3 minutes  # give the build in Travis CI time to finish
