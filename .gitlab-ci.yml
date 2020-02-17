@@ -186,6 +186,9 @@ doc:
 
 docker:
   <<: *test_nodep
+  only:  # trigger only for repos in our control (requires dind runner)
+    - branches@knot/knot-resolver
+    - branches@knot/security/knot-resolver
   image: docker:latest
   tags:
     - dind
