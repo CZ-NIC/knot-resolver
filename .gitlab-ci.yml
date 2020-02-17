@@ -29,7 +29,8 @@ stages:
   stage: build
   except:
     refs:
-      - master
+      - master@knot/knot-resolver
+      - master@knot/security/knot-resolver
     variables:
       - $SKIP_CI == "1"
   artifacts:
@@ -110,7 +111,8 @@ kres-gen:
   stage: test
   except:
     refs:
-      - master
+      - master@knot/knot-resolver
+      - master@knot/security/knot-resolver
     variables:
       - $SKIP_CI == "1"
   tags:
@@ -140,7 +142,8 @@ kres-gen:
   stage: test
   except:
     refs:
-      - master
+      - master@knot/knot-resolver
+      - master@knot/security/knot-resolver
     variables:
       - $SKIP_CI == "1"
   dependencies: []  # do not download build artifacts
@@ -151,7 +154,7 @@ build:darwin:
   <<: *test_nodep
   except:
     refs:
-      - master
+      - master@knot/knot-resolver
       - branches@knot/security/knot-resolver
     variables:
       - $SKIP_CI == "1"
@@ -159,7 +162,7 @@ build:darwin:
   when: delayed
   except:  # trigger job only in repos under our control
     refs:
-      - master
+      - master@knot/knot-resolver
       - branches@knot/security/knot-resolver
     variables:
       - $SKIP_CI == "1"
@@ -312,7 +315,8 @@ pytests:
     - branches@knot/security/knot-resolver
   except:
     refs:
-      - master
+      - master@knot/knot-resolver
+      - master@knot/security/knot-resolver
     variables:
       - $SKIP_CI == "1"
   script:
@@ -388,7 +392,8 @@ fwd-udp6-unbound.tls6:
     - branches@knot/security/knot-resolver
   except:
     refs:
-      - master
+      - master@knot/knot-resolver
+      - master@knot/security/knot-resolver
     variables:
       - $SKIP_CI == "1"
   script:
