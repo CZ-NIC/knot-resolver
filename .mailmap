@@ -1,17 +1,8 @@
-Knot Resolver was conceived and is being developed
-by research department of CZ.NIC, the CZ TLD operator.
-
-Over the years many organizations and individuals contributed to the project.
-Special thanks belongs to following organizations:
-- Comcast
-- Cloudflare
-- ICANN
-
-People who contributed commits to our Git repo are:
-Aleš Mrázek <ales.mrazek@nic.cz>
+Aleš Mrázek <ales.mrazek@nic.cz> Ales Mrazek <ales.mrazek@nic.cz>
 Alex Forster <aforster@cloudflare.com>
 Ali Asad Lotia <ali.asad.lotia@gmail.com>
-Anbang Wen <anbang@cloudflare.com>
+Anbang Wen <anbang@cloudflare.com> <xofyarg@gmail.com>
+Anbang Wen <anbang@cloudflare.com> <anb@dev.null>
 Andreas Rammhold <andreas@rammhold.de>
 Daniel Kahn Gillmor <dkg@fifthhorseman.net>
 Daniel Salzman <daniel.salzman@nic.cz>
@@ -19,23 +10,25 @@ daurnimator <quae@daurnimator.com>
 David Beitey <david@davidjb.com>
 Grigorii Demidov <grigorii.demidov@nic.cz>
 Hasnat <hasnat.ullah@gmail.com>
+Jiří Helebrant <jiri.helebrant@nic.cz> <helb@helb.cz>
 Ivana Krumlová <ivana.krumlova@nic.cz>
 Jan Holuša <jan.holusa@nic.cz>
 Jan Pavlinec <jan.pavlinec@nic.cz>
+Jan Včelák <jan.vcelak@nic.cz> <jv@fcelda.cz>
 Jan Včelák <jan.vcelak@nic.cz>
 Jayson Reis <santosdosreis@gmail.com>
-Jiří Helebrant <jiri.helebrant@nic.cz>
 Jonathan Coetzee <jon@thancoetzee.com>
 Karel Slaný <karel.slany@nic.cz>
-Leo Vandewoestijne <github@unicycle.net>
 Libor Peltan <libor.peltan@nic.cz>
 Lukáš Ježek <lukas.jezek@nic.cz>
 Manu Bretelle <chantr4@gmail.com>
 Marek Vavruša <marek.vavrusa@nic.cz>
+Marek Vavruša <mvavrusa@cloudflare.com> <marek@vavrusa.com>
 Marek Vavruša <mvavrusa@cloudflare.com>
 Michal Karm Babáček <karm@email.cz>
 Michal Lupečka <mlupecka@nic.cz>
-Ondřej Surý <ondrej.sury@nic.cz>
+Ondřej Surý <ondrej.sury@nic.cz> <ondrej@sury.org>
+Paul Hoffman <paul.hoffman@icann.org> <phoffman@proper.com>
 Paul Hoffman <paul.hoffman@icann.org>
 Pavel Valach <valach.pavel@gmail.com>
 Petr Špaček <petr.spacek@nic.cz>
@@ -43,29 +36,13 @@ rickhg12hs <rickhg12hs@users.noreply.github.com>
 Robert Šefr <robert.sefr@outlook.com>
 SH <sh@analogic.cz>
 Štěpán Balážik <stepan.balazik@nic.cz>
+Štěpán Kotek <stepan.kotek@nic.cz> <stepan.kotek@gmail.com>
 Štěpán Kotek <stepan.kotek@nic.cz>
 The Gitter Badger <badger@gitter.im>
 Tomáš Hozza <thozza@redhat.com>
 Tomáš Křížek <tomas.krizek@nic.cz>
 Ulrich Wisser <ulrich.wisser@iis.se>
-Vicky Shrestha <vicky@cloudflare.com>
+Leo Vandewoestijne <github@unicycle.net>
+Vicky Shrestha <vicky@cloudflare.com> <vicky@geeks.net.np>
 Vítězslav Kříž <vitezslav.kriz@nic.cz>
-Vladimír Čunát <vladimir.cunat@nic.cz>
-
-Knot Resolver source tree also bundles code and content published by:
-Austin Appleby <aappleby@gmail.com>
-Dan Vanderkam <danvdk@gmail.com>
-Jonas Gehring <jonas@jgehring.net>
-Jonathan Allard <jonathan@allard.io>
-Joseph A. Adams <joeyadams3.14159@gmail.com>
-Mark DiMarco <mark.dimarco@gmail.com>
-Michael Bostock <mike@ocks.org>
-Rusty Russell <rusty@rustcorp.com.au>
-Thomas Park <thomas@thomaspark.co>
-Fastly
-jQuery Foundation
-Knot DNS contributors
-Twitter
-United Computer Wizards
-
-Thanks to everyone who knowingly or unknowingly contributed!
+Vladimír Čunát <vladimir.cunat@nic.cz> <vcunat@gmail.com>
