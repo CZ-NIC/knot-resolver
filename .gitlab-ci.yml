@@ -283,6 +283,14 @@ root.hints:
   script:
     - scripts/update-root-hints.sh
 
+authors:
+  <<: *test_nodep
+  only:
+    refs:
+      - /^release.*$/
+  script:
+    - scripts/update-authors.sh
+
 test:valgrind:
   <<: *test_flaky
   when: delayed
