@@ -5,8 +5,6 @@
 
 #include "modules/sysrepo/common/sysrepo_utils.h"
 
-#define XPATH_TLS_SECRET	XPATH_BASE"/network/tls/"YM_KRES":sticket-secret"
-
 typedef struct sysrepo_uv_ctx sysrepo_uv_ctx_t;
 /** Callback for our sysrepo subscriptions */
 typedef void (*sysrepo_uv_cb)(sysrepo_uv_ctx_t *sysrepo_ctx, int status);
@@ -21,6 +19,8 @@ struct sysrepo_uv_ctx {
 	uv_poll_t uv_handle;
 };
 
-int sysrepo_client_init(uv_loop_t *loop);
+int set_tst_secret(const char *new_secret);
 
-int sysrepo_client_deinit(uv_loop_t *loop);
+sysrepo_uv_ctx_t *sysrepo_client_init(uv_loop_t *loop);
+
+int sysrepo_client_deinit(sysrepo_uv_ctx_t *sysrepo_ctx);

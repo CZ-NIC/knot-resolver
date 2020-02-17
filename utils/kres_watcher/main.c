@@ -7,12 +7,16 @@
 #include <uv.h>
 #include <string.h>
 #include <stdbool.h>
+#include <gnutls/gnutls.h>
+#include <gnutls/crypto.h>
 
 #include <lib/defines.h>
 #include <libknot/libknot.h>
 
+#include "base64.h"
 #include "kresconfig.h"
 #include "modules/sysrepo/common/sysrepo_utils.h"
+#include "modules/sysrepo/common/string_helper.h"
 #include "lib/utils.h"
 #include "watcher.h"
 
@@ -33,7 +37,7 @@ static void print_help()
 			"Usage: "PROGRAM_NAME" -c <file> -y <dir>\n"
 			"\n"
 			"Optional params:\n"
-			" -c <file>"SPACE"Use a JSON/XML configuration file.\n"
+			" -c <path>"SPACE"Path to a JSON/XML configuration file.\n"
 			" -y <dir> "SPACE"Path to YANG modules directory.\n"
 			" -h       "SPACE"Print the program help.\n"
 			" -v       "SPACE"Print the program version.\n"
@@ -116,9 +120,39 @@ int import_file_conf(const char *conf_file_path)
 	return ret;
 }
 
+static int run_watcher(uv_loop_t *loop)
+{
+	int ret = 0;
+
+	ret = uv_run(loop, UV_RUN_DEFAULT);
+
+	return ret;
+}
+
+
+
+static void tst_secret_check(uv_timer_t *timer, bool force_update);
+static void tst_timer_callback(uv_timer_t *timer)
+{
+	tst_secret_check(timer, false);
+}
+
+static void tst_secret_check(uv_timer_t *timer, bool force_update)
+{
+	uv_update_time(timer->loop);
+
+
+	kr_log_info("Callback\n");
+
+	uv_timer_start(timer, &tst_timer_callback, 500, 0);
+
+}
+
+
 int main(int argc, char *argv[])
 {
 	int opt;
+	int ret = 0;
 	const char *conf_file_path = CONF_FILE_DEF;
 	const char *ymods_path = YMODS_PATH_DEF;
 
@@ -145,31 +179,34 @@ int main(int argc, char *argv[])
 
 	print_header();
 
+	/* Preconfigure sysrepo before running kresd,
+	 * install module and import configuration file */
+	// if (!ret) ret = sysrepo_preconfig(ymods_path);
+	// if (!ret) ret = import_file_conf(conf_file_path);
+	// if (ret) return 1;
+
 	/* event loop init */
-	int ret = 0;
 	uv_signal_t sigint, sigterm;
 	uv_loop_t *loop = uv_default_loop();
-
 	if (true) ret = uv_signal_init(loop, &sigint);
 	if (!ret) ret = uv_signal_init(loop, &sigterm);
 	if (!ret) ret = uv_signal_start(&sigint, signal_handler, SIGINT);
 	if (!ret) ret = uv_signal_start(&sigterm, signal_handler, SIGTERM);
 	if (ret) goto cleanup;
 
-	/* Preconfigure sysrepo before running kresd,
-	 * install module and import configuration file */
-	if (!ret) ret = sysrepo_preconfig(ymods_path);
-	if (!ret) ret = import_file_conf(conf_file_path);
-	if (ret) goto cleanup;
+	/* init sysrepo*/
+	//sysrepo_ctx = sysrepo_client_init(loop);
+	//if (!sysrepo_ctx) goto cleanup;
 
-	/* Initialize and run watcher*/
-	if (!ret) ret = watcher_init(loop);
-	if (!ret) ret = watcher_run(loop);
+	watcher_init(loop);
 
-	/* Deinit watcher */
-	watcher_deinit(loop);
+	/* run loop*/
+	ret = run_watcher(loop);
+
+	/* Deinit */
 
 	cleanup:
+	watcher_deinit();
 	if (loop != NULL) {
 		uv_loop_close(loop);
 	}

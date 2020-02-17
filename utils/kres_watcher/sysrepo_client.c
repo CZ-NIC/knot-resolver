@@ -18,8 +18,30 @@
 #include "watcher.h"
 
 #define XPATH_SERVER		XPATH_BASE"/server"
+#define XPATH_TST_SECRET	XPATH_BASE"/network/tls/"YM_KRES":sticket-secret"
 
-/* Configuration data callbacks */
+
+int set_tst_secret(const char *new_secret)
+{
+	int ret = 0;
+	sr_conn_ctx_t *connection = NULL;
+    sr_session_ctx_t *session = NULL;
+
+	if (!ret) ret = sr_connect(0, &connection);
+    if (!ret) ret = sr_session_start(connection, SR_DS_RUNNING, &session);
+	if (!ret) ret = sr_set_item_str(session, XPATH_TST_SECRET, new_secret, NULL, 0);
+	if (!ret) ret = sr_apply_changes(session, 0);
+	if (ret)
+		kr_log_error(
+			"[sysrepo] failed to set '%s', %s\n",
+			XPATH_TST_SECRET, sr_strerror(ret));
+
+	sr_disconnect(connection);
+
+	return ret;
+}
+
+/* Configuration of data callbacks */
 
 static int server_change_cb(sr_session_ctx_t *session, const char *module_name, const char *xpath,
 sr_event_t event, uint32_t request_id, void *private_data)
@@ -44,21 +66,22 @@ sr_event_t event, uint32_t request_id, void *private_data)
 			const char *leaf = remove_substr(new_value->xpath, XPATH_SERVER"/cznic-resolver-knot:");
 
 			if (!strcmp(leaf, "start-on-boot"))
-				server_conf.start_on_boot = new_value->data.bool_val;
+				config.start_on_boot = new_value->data.bool_val;
 			else if (!strcmp(leaf, "kresd-instances"))
-				server_conf.kresd_inst = new_value->data.uint8_val;
+				config.kresd_instances_num = new_value->data.uint8_val;
 			else if (!strcmp(leaf, "use-cache-gc"))
-				server_conf.start_cache_gc = new_value->data.bool_val;
+				config.cache_gc.auto_start = new_value->data.bool_val;
 			else if (!strcmp(leaf, "persistent-configuration"))
-				server_conf.persist_conf = new_value->data.bool_val;
+				config.persistent_config = new_value->data.bool_val;
 
 			sr_free_val(old_value);
 			sr_free_val(new_value);
 		}
 
-		if (server_conf.start_on_boot)
-		{
-			control_knot_resolver(UNIT_START);
+		/* get number of machine's CPUs */
+		if (!config.kresd_instances_num){
+			config.kresd_instances_num = get_nprocs_conf();
+			kr_log_info("[conf] discovered %d CPUs\n", config.kresd_instances_num);
 		}
 
 		cleanup:
@@ -85,7 +108,12 @@ uint32_t request_id, void *private_data)
 	}
 	else if (event == SR_EV_DONE)
 	{
-		printf("tls sticket secret\n");
+		int ret = 0;
+		uv_loop_t *loop = the_watcher->loop;
+		ret = tst_secret_timer_init(loop);
+		if (ret){
+			kr_log_error("[sysrepo] failed to init tls session ticket secret");
+		}
 	}
 	else if(event == SR_EV_ABORT)
 	{
@@ -95,15 +123,13 @@ uint32_t request_id, void *private_data)
 	return SR_ERR_OK;
 }
 
-
-
 /* RPC operations callbacks*/
 
 static int rpc_resolver_start_cb(sr_session_ctx_t *session, const char *path,
 const sr_val_t *input, const size_t input_cnt, sr_event_t event,
 uint32_t request_id, sr_val_t **output, size_t *output_cnt, void *private_data)
 {
-	control_knot_resolver(UNIT_START);
+	//sdbus_watcher_init(the_watcher->loop);
 
 	return 0;
 }
@@ -112,7 +138,8 @@ static int rpc_resolver_stop_cb(sr_session_ctx_t *session, const char *path,
 const sr_val_t *input, const size_t input_cnt, sr_event_t event,
 uint32_t request_id, sr_val_t **output, size_t *output_cnt, void *private_data)
 {
-	control_knot_resolver(UNIT_STOP);
+	//control_knot_resolver(UNIT_STOP);
+	//sdbus_watcher_deinit(the_watcher->sdbus);
 
 	return 0;
 }
@@ -121,7 +148,7 @@ static int rpc_resolver_restart_cb(sr_session_ctx_t *session, const char *path,
 const sr_val_t *input, const size_t input_cnt, sr_event_t event,
 uint32_t request_id, sr_val_t **output, size_t *output_cnt, void *private_data)
 {
-	control_knot_resolver(UNIT_RESTART);
+	//control_knot_resolver(UNIT_RESTART);
 
 	return 0;
 }
@@ -131,7 +158,7 @@ const sr_val_t *input, const size_t input_cnt, sr_event_t event,
 uint32_t request_id, sr_val_t **output, size_t *output_cnt, void *private_data)
 {
 
-	control_cache_gc(UNIT_START);
+	//control_cache_gc(UNIT_START);
 
 	return 0;
 }
@@ -140,7 +167,7 @@ static int rpc_cache_gc_stop_cb(sr_session_ctx_t *session, const char *path,
 const sr_val_t *input, const size_t input_cnt, sr_event_t event,
 uint32_t request_id, sr_val_t **output, size_t *output_cnt, void *private_data)
 {
-	control_cache_gc(UNIT_STOP);
+	//control_cache_gc(UNIT_STOP);
 	return 0;
 }
 
@@ -148,7 +175,7 @@ static int rpc_cache_gc_restart_cb(sr_session_ctx_t *session, const char *path,
 const sr_val_t *input, const size_t input_cnt, sr_event_t event,
 uint32_t request_id, sr_val_t **output, size_t *output_cnt, void *private_data)
 {
-	control_cache_gc(UNIT_RESTART);
+	//control_cache_gc(UNIT_RESTART);
 	return 0;
 }
 
@@ -159,11 +186,11 @@ static int sysrepo_subscr_register(sr_session_ctx_t *session, sr_subscription_ct
 	/* Configuration changes subscriptions */
 
 	err = sr_module_change_subscribe(session, YM_COMMON, XPATH_SERVER,
-	server_change_cb, NULL, 0, SR_SUBSCR_NO_THREAD|SR_SUBSCR_ENABLED, subscription);
+	server_change_cb, NULL, 0, SR_SUBSCR_NO_THREAD|SR_SUBSCR_ENABLED|SR_SUBSCR_DONE_ONLY, subscription);
 	if (err != SR_ERR_OK) return err;
 
-	err = sr_module_change_subscribe(session, YM_COMMON, XPATH_TLS_SECRET,
-	tls_sticket_secret_change_cb, NULL, 0, SR_SUBSCR_NO_THREAD|SR_SUBSCR_CTX_REUSE, subscription);
+	err = sr_module_change_subscribe(session, YM_COMMON, XPATH_TST_SECRET,
+	tls_sticket_secret_change_cb, NULL, 0, SR_SUBSCR_NO_THREAD|SR_SUBSCR_CTX_REUSE|SR_SUBSCR_DONE_ONLY, subscription);
 	if (err != SR_ERR_OK) return err;
 
 	/* DNS resolver RPCs subscriptions */
@@ -229,7 +256,7 @@ static void el_subscr_cb(sysrepo_uv_ctx_t *el_subscr, int status)
 	sr_process_events(el_subscr->subscription, el_subscr->session,NULL);
 }
 
-int sysrepo_client_init(uv_loop_t *loop)
+sysrepo_uv_ctx_t *sysrepo_client_init(uv_loop_t *loop)
 {
 	int ret = SR_ERR_OK;
 	sr_conn_ctx_t *sr_connection = NULL;
@@ -244,7 +271,7 @@ int sysrepo_client_init(uv_loop_t *loop)
 		kr_log_error(
 			"[sysrepo] failed to initialize sysrepo subscriptions:  %s\n",
 			sr_strerror(ret));
-		return ret;
+		return NULL;
 	}
 
 	struct sysrepo_uv_ctx *sr_ctx = malloc(sizeof(*sr_ctx));
@@ -258,30 +285,27 @@ int sysrepo_client_init(uv_loop_t *loop)
 	if (ret != SR_ERR_OK) {
 		kr_log_error("[sysrepo] failed to get sysrepo event pipe:  %s\n", sr_strerror(ret));
 		free(sr_ctx);
-		return ret;
+		return NULL;
 	}
 	ret = uv_poll_init(loop, &sr_ctx->uv_handle, pipe);
 	if (ret) {
 		kr_log_error("[libuv] failed to initialize uv_poll:  %s\n", uv_strerror(ret));
 		free(sr_ctx);
-		return ret;
+		return NULL;
 	}
 	sr_ctx->uv_handle.data = sr_ctx;
 	ret = uv_poll_start(&sr_ctx->uv_handle, UV_READABLE, el_subscr_cb_tramp);
 	if (ret) {
 		kr_log_error("[libuv] failed to start uv_poll:  %s\n", uv_strerror(ret));
 		el_subscription_free(sr_ctx);
-		return ret;
+		return NULL;
 	}
 
-	the_watcher->sysrepo = sr_ctx;
-
-	return ret;
+	return sr_ctx;
 }
 
-int sysrepo_client_deinit(uv_loop_t *loop)
+int sysrepo_client_deinit(sysrepo_uv_ctx_t *sysrepo_ctx)
 {
-	struct  sysrepo_uv_ctx *sysrepo_ctx = the_watcher->sysrepo;
 	el_subscription_free(sysrepo_ctx);
 
 	return 0;
