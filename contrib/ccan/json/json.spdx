@@ -1,0 +1,10 @@
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: ccan-json
+DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-d9b4db4c-062f-4add-89b6-f603224f5a2c
+
+PackageName: json
+PackageDownloadLocation: git+https://github.com/rustyrussell/ccan@f4eb3a18caf946ee6cc2cb57e2a0c6a6f115157f#ccan/json
+PackageOriginator: Person: Joseph A. Adams (joeyadams3.14159@gmail.com)
+PackageLicenseDeclared: MIT

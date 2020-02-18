@@ -1,0 +1,10 @@
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: ccan-asprintf
+DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-40d4b71d-00e9-4e75-b6da-559203e6b815
+
+PackageName: asprintf
+PackageDownloadLocation: git+https://github.com/rustyrussell/ccan@fb1dfd092940905883ea6473162f5f6e36624da2#ccan/asprintf
+PackageOriginator: Person: Rusty Russell (rusty@rustcorp.com.au)
+PackageLicenseDeclared: MIT
