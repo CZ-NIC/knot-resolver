@@ -87,6 +87,9 @@ message('--- optional dependencies ---')
 capng = dependency('libcap-ng', required: false)
 openssl = dependency('openssl', required: false)
 
+have_asprintf = meson.get_compiler('c').has_function('asprintf',
+  prefix: '#define _GNU_SOURCE\n#include <stdio.h>')
+
 ### sendmmsg
 has_sendmmsg = meson.get_compiler('c').has_function('sendmmsg',
   prefix: '#define _GNU_SOURCE\n#include <sys/socket.h>')
@@ -111,6 +114,7 @@ add_project_arguments(
   '-Wtype-limits',
   '-Wshadow',
   '-fvisibility=hidden',
+  '-DHAVE_ASPRINTF=' + have_asprintf.to_int().to_string(),
   language: 'c',
 )
 
