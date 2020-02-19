@@ -680,7 +680,7 @@ int main(int argc, char **argv)
 			}
 			*colon = '\0'; // TODO: modifying argv[i][j] isn't very nice
 		} else {
-			xdp_queue = 0; // let's allow this default
+			xdp_queue = fork_id; // useful for --forks, e.g. our shotgun
 		}
 		endpoint_flags_t ep_flags = {
 			.sock_type = SOCK_DGRAM,
