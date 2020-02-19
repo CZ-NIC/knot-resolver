@@ -16,8 +16,12 @@
 
 struct watcher_ctx;
 struct knot_resolver_conf;
+struct kres_running_conf;
+struct sysrepo_conf;
 
 extern struct watcher_ctx *the_watcher;
+extern struct sysrepo_conf sysrepo_conf;
+extern struct kres_running_conf running_conf;
 extern struct knot_resolver_conf config;
 
 typedef struct tst_secret_ctx {
@@ -36,8 +40,21 @@ struct kresd_instance {
 	sd_bus_slot *slot;
 };
 
+struct kres_running_conf {
+	struct cache_gc cache_gc;
+	uint8_t kresd_instances_num;
+	struct kresd_instance *kresd;
+};
+
+struct sysrepo_conf {
+	bool auto_start;
+	bool persistent_config;
+	bool use_cache_gc;
+	uint8_t kresd_instances;
+};
+
 struct knot_resolver_conf {
-	bool start_on_boot;
+	bool auto_start;
 	bool persistent_config;
 	struct cache_gc cache_gc;
 	uint8_t kresd_instances_num;

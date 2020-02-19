@@ -20,13 +20,17 @@ struct sdbus_uv_ctx {
 	uv_poll_t uv_handle;
 };
 
+int watch_kresd(sd_bus *bus, sd_bus_slot **slot, const char *instance);
+
+int watch_cache_gc(sd_bus *bus, sd_bus_slot **slot);
+
 int sdbus_watcher_init(uv_loop_t *loop);
 
 sdbus_uv_ctx_t *sdbus_watcher_create(uv_loop_t *loop);
 
 void sdbus_watcher_deinit(sdbus_uv_ctx_t *sdbus_ctx);
 
-int control_knot_resolver(const char *method);
+int kresd_ctl(sd_bus *bus, const char *method, const char *instance);
 
-int control_cache_gc(const char *method);
+int cache_gc_ctl(sd_bus *bus, const char *method);
 

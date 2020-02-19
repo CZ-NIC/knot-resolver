@@ -21,6 +21,6 @@ struct sysrepo_uv_ctx {
 
 int set_tst_secret(const char *new_secret);
 
-sysrepo_uv_ctx_t *sysrepo_client_init(uv_loop_t *loop);
+sysrepo_uv_ctx_t *sysrepo_watcher_create(uv_loop_t *loop);
 
 int sysrepo_client_deinit(sysrepo_uv_ctx_t *sysrepo_ctx);

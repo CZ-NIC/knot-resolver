@@ -181,9 +181,9 @@ int main(int argc, char *argv[])
 
 	/* Preconfigure sysrepo before running kresd,
 	 * install module and import configuration file */
-	// if (!ret) ret = sysrepo_preconfig(ymods_path);
-	// if (!ret) ret = import_file_conf(conf_file_path);
-	// if (ret) return 1;
+	if (!ret) ret = sysrepo_preconfig(ymods_path);
+	if (!ret) ret = import_file_conf(conf_file_path);
+	if (ret) return 1;
 
 	/* event loop init */
 	uv_signal_t sigint, sigterm;
@@ -194,10 +194,7 @@ int main(int argc, char *argv[])
 	if (!ret) ret = uv_signal_start(&sigterm, signal_handler, SIGTERM);
 	if (ret) goto cleanup;
 
-	/* init sysrepo*/
-	//sysrepo_ctx = sysrepo_client_init(loop);
-	//if (!sysrepo_ctx) goto cleanup;
-
+	/* watchers initialization */
 	watcher_init(loop);
 
 	/* run loop*/

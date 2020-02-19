@@ -22,7 +22,7 @@
 /* default configuration */
 struct knot_resolver_conf config = {
 	.persistent_config = false,
-	.start_on_boot = false,
+	.auto_start = false,
 	.kresd_instances_num = 0,
 	.kresd = NULL,
 	.cache_gc = {
@@ -141,11 +141,16 @@ int watcher_init(uv_loop_t *loop)
 
 	watcher->loop = loop;
 	watcher->tst_secret = tst_secret_timer_create(loop);
-	watcher->sysrepo = sysrepo_client_init(loop);
-	//watcher->sdbus = sdbus_watcher_create(loop);
+	watcher->sysrepo = sysrepo_watcher_create(loop);
+	watcher->sdbus = sdbus_watcher_create(loop);
 
 	the_watcher = watcher;
 	loop->data = the_watcher;
+
+	/* Start Knot Resolver if start on boot */
+	if (config.auto_start){
+
+	}
 
 	return ret;
 }
@@ -157,7 +162,7 @@ int watcher_deinit(uv_loop_t *loop)
 	assert(watcher);
 
 	sysrepo_client_deinit(watcher->sysrepo);
-	//sdbus_watcher_deinit(watcher->sdbus);
+	sdbus_watcher_deinit(watcher->sdbus);
 
 	the_watcher =NULL;
 
