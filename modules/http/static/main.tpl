@@ -17,7 +17,7 @@
 <link rel="icon" type="image/ico" href="favicon.ico">
 <link href="kresd.css" rel="stylesheet">
 <link href="bootstrap.min.css" rel="stylesheet">
-<link href="selectize.bootstrap3.min.css" rel="stylesheet">
+<link href="selectize.bootstrap3.css" rel="stylesheet">
 <nav class="navbar navbar-inverse navbar-fixed-top">
 	<div class="container">
 		<div class="navbar-header">
