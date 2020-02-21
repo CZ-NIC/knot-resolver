@@ -1,0 +1,11 @@
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: bootswatch-yeti-bootstrap.min.css
+DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-da039738-1b9b-430a-984b-a97d1415ad0f
+
+PackageName: bootswatch-yeti-bootstrap.min.css
+PackageVersion: 3.3.6+2
+PackageDownloadLocation: git+https://github.com/twbs/bootstrap.git@a78dc3aed640a35914361b837ce24573a0515e19#yeti/bootstrap.min.css
+PackageOriginator: Person: Thomas Park (thomas@thomaspark.co)
+PackageLicenseDeclared: MIT
