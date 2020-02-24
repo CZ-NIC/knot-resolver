@@ -10,6 +10,7 @@ addons:
             - libuv
             - lmdb
             - meson
+        update: true
 compiler:
     - clang
 notifications:
