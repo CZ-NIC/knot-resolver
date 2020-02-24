@@ -16,7 +16,7 @@ char *PRINTF_FMT(1, 2) afmt(const char *fmt, ...)
 	return ptr;
 }
 
-#if !HAVE_ASPRINTF && !defined(__USE_FORTIFY_LEVEL)
+#if !HAVE_ASPRINTF
 #include <stdarg.h>
 #include <stdlib.h>
 
