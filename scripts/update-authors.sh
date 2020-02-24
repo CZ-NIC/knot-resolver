@@ -10,7 +10,7 @@ function spdx_originator_to_authors {
 
 cd "$(git rev-parse --show-toplevel)"
 AUTHORS_FILE=AUTHORS
-TEMP_FILE=/tmp/AUTHORS
+TEMP_FILE="$(mktemp AUTHORS.XXXXXXXXXX)"
 
 # drop all names from the current file
 sed '/^People who contributed commits to our Git repo are/q' "${AUTHORS_FILE}" > "${TEMP_FILE}"
