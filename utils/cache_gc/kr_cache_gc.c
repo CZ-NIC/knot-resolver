@@ -143,12 +143,24 @@ int cb_delete_categories(const knot_db_val_t * key, gc_record_info_t * info,
 
 int kr_cache_gc(kr_cache_gc_cfg_t * cfg)
 {
-	struct kr_cache kres_db = { 0 };
-	knot_db_t *db = NULL;
-
-	int ret = kr_gc_cache_open(cfg->cache_path, &kres_db, &db);
-	if (ret) {
-		return ret;
+	// statically open cache, its clean up and initialization
+	static bool is_open = false;
+	static struct kr_cache kres_db = { 0 };
+	static knot_db_t *db = NULL;
+	if (!cfg) {
+		if (is_open) {
+			kr_gc_cache_close(&kres_db, db);
+			is_open = false;
+		}
+		return 0;
+	}
+	if (!is_open) {
+		int ret = kr_gc_cache_open(cfg->cache_path, &kres_db, &db);
+		if (ret) {
+			return ret;
+		} else {
+			is_open = true;
+		}
 	}
 
 	const size_t db_size = knot_db_lmdb_get_mapsize(db);
@@ -169,7 +181,6 @@ int kr_cache_gc(kr_cache_gc_cfg_t * cfg)
 		       db_size);
 	}
 	if (cfg->dry_run || !large_usage) {
-		kr_gc_cache_close(&kres_db, db);
 		return KNOT_EOK;
 	}
 
@@ -179,9 +190,8 @@ int kr_cache_gc(kr_cache_gc_cfg_t * cfg)
 	gc_timer_start(&timer_analyze);
 	ctx_compute_categories_t cats = { { 0 }
 	};
-	ret = kr_gc_cache_iter(db, cb_compute_categories, &cats);
+	int ret = kr_gc_cache_iter(db, cb_compute_categories, &cats);
 	if (ret != KNOT_EOK) {
-		kr_gc_cache_close(&kres_db, db);
 		return ret;
 	}
 
@@ -221,7 +231,6 @@ int kr_cache_gc(kr_cache_gc_cfg_t * cfg)
 	ret = kr_gc_cache_iter(db, cb_delete_categories, &to_del);
 	if (ret != KNOT_EOK) {
 		entry_dynarray_deep_free(&to_del.to_delete);
-		kr_gc_cache_close(&kres_db, db);
 		return ret;
 	}
 	printf
@@ -242,7 +251,6 @@ int kr_cache_gc(kr_cache_gc_cfg_t * cfg)
 		printf("Error starting R/W DB transaction (%s).\n",
 		       knot_strerror(ret));
 		entry_dynarray_deep_free(&to_del.to_delete);
-		kr_gc_cache_close(&kres_db, db);
 		return ret;
 	}
 
@@ -301,7 +309,9 @@ finish:
 	rrtype_dynarray_free(&deleted_rrtypes);
 	entry_dynarray_deep_free(&to_del.to_delete);
 
+	// OK, let's close it in this case.
 	kr_gc_cache_close(&kres_db, db);
+	is_open = false;
 
 	return ret;
 }
