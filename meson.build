@@ -115,6 +115,7 @@ add_project_arguments(
   '-Wformat-security',
   '-Wtype-limits',
   '-Wshadow',
+  '-Werror=implicit-function-declaration', # Probably messed up includes; implicit functions are evil!
   '-fvisibility=hidden',
   '-DHAVE_ASPRINTF=' + have_asprintf.to_int().to_string(),
   language: 'c',
