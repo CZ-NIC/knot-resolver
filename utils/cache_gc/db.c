@@ -2,8 +2,10 @@
 
 #include "db.h"
 
+#include <lib/cache/cdb_lmdb.h>
 #include <lib/cache/impl.h>
 //#include <lib/defines.h>
+#include <lmdb.h>
 
 #include <ctype.h>		//DEBUG
 #include <time.h>
@@ -22,6 +24,28 @@ struct kres_lmdb_env {
 	void *env;
 	// sub-struct txn ommited
 };
+
+int kr_gc_usage(struct kr_cache *kres_db, size_t *size, size_t *usage)
+{
+	assert(kres_db && size && usage);
+	MDB_txn *txn;
+	struct kres_lmdb_env *db = kres_db->db;
+	int ret = kr_lmdb_txn_get(db, &txn, true);
+	if (ret) return ret;
+	MDB_stat st;
+	ret = mdb_stat(txn, db->dbi, &st);
+	if (ret) goto finish;
+	MDB_envinfo info;
+	ret = mdb_env_info(db->env, &info);
+	if (ret) goto finish;
+
+	*size = info.me_mapsize;
+	*usage = st.ms_psize // vv from knot_db_lmdb_get_usage()
+		* (st.ms_branch_pages + st.ms_leaf_pages + st.ms_overflow_pages);
+finish:
+	kr_cache_commit(kres_db);
+	return ret;
+}
 
 static knot_db_t *knot_db_t_kres2libknot(const knot_db_t * db)
 {

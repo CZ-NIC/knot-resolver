@@ -16,3 +16,6 @@ typedef int (*kr_gc_iter_callback)(const knot_db_val_t * key,
 int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ctx);
 
 const uint16_t *kr_gc_key_consistent(knot_db_val_t key);
+
+int kr_gc_usage(struct kr_cache *kres_db, size_t *size, size_t *usage);
+

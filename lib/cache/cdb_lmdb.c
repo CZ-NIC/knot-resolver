@@ -195,6 +195,10 @@ static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 	assert(*txn);
 	return kr_ok();
 }
+int kr_lmdb_txn_get(knot_db_t *db, MDB_txn **txn, bool rdonly)
+{
+	return txn_get(db, txn, rdonly);
+}
 
 static int cdb_commit(knot_db_t *db, struct kr_cdb_stats *stats)
 {

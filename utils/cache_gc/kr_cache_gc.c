@@ -162,10 +162,15 @@ int kr_cache_gc(kr_cache_gc_cfg_t * cfg)
 			is_open = true;
 		}
 	}
+	assert(is_open);
 
-	const size_t db_size = knot_db_lmdb_get_mapsize(db);
-	const size_t db_usage_abs = knot_db_lmdb_get_usage(db);
+	size_t db_usage_abs, db_size;
+	int ret = kr_gc_usage(&kres_db, &db_size, &db_usage_abs);
+	if (ret) {
+		return ret;
+	}
 	const double db_usage = (double)db_usage_abs / db_size * 100.0;
+
 #if 0				// Probably not worth it, better reduce the risk by checking more often.
 	if (db_usage > 90.0) {
 		free(*libknot_db);
@@ -190,7 +195,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t * cfg)
 	gc_timer_start(&timer_analyze);
 	ctx_compute_categories_t cats = { { 0 }
 	};
-	int ret = kr_gc_cache_iter(db, cb_compute_categories, &cats);
+	ret = kr_gc_cache_iter(db, cb_compute_categories, &cats);
 	if (ret != KNOT_EOK) {
 		return ret;
 	}

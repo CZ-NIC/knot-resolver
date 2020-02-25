@@ -21,3 +21,8 @@
 
 KR_EXPORT KR_CONST
 const struct kr_cdb_api *kr_cdb_lmdb(void);
+
+struct MDB_txn;
+KR_EXPORT
+int kr_lmdb_txn_get(knot_db_t *db, struct MDB_txn **txn, bool rdonly);
+
