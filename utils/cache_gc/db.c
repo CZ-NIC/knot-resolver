@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 // #define DEBUG 1
 
 #include "db.h"

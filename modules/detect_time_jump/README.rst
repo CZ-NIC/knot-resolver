@@ -1,3 +1,5 @@
+.. SPDX-License-Identifier: GPL-3.0-or-later
+
 .. _mod-detect_time_jump:
 
 Detect discontinuous jumps in the system time

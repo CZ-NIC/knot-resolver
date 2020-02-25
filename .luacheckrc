@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 std = 'luajit'
 new_read_globals = {
 	'cache',

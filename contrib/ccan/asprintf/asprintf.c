@@ -1,4 +1,5 @@
-/* Licensed under BSD-MIT - see LICENSE file for details */
+/* SPDX-License-Identifier: MIT
+ * Source: https://ccodearchive.net/info/asprintf.html */
 #include <ccan/asprintf/asprintf.h>
 #include <stdarg.h>
 #include <stdio.h>

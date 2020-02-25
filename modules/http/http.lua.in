@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
+
 -- Load dependent modules
 if not stats then modules.load('stats') end
 if not bogus_log then modules.load('bogus_log') end
@@ -92,8 +94,7 @@ local pages = {
 	'datamaps.world.min.js',
 	'dygraph.min.js',
 	'selectize.min.js',
-	'selectize.min.css',
-	'selectize.bootstrap3.min.css',
+	'selectize.bootstrap3.css',
 	'bootstrap.min.js',
 	'bootstrap.min.css',
 	'bootstrap-theme.min.css',

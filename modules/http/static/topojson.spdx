@@ -1,0 +1,12 @@
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: topojson
+DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-2a02fcb5-2889-42c1-ac6a-2674fb1b7be0
+
+PackageName: topojson
+PackageVersion: 1.6.9
+PackageDownloadLocation: https://unpkg.com/topojson@1.6.9/topojson.min.js
+PackageChecksum: SHA256: 091bee8a099772d9a377ddbb4f2a43a026c4877e986d6c6a9291daf043b0b37e
+PackageOriginator: Person: Michael Bostock (mike@ocks.org)
+PackageLicenseDeclared: BSD-3-Clause

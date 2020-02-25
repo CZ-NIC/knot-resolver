@@ -1,5 +1,8 @@
 /* This is MurmurHash3. The original C++ code was placed in the public domain
- * by its author, Austin Appleby. */
+ * by its author, Austin Appleby.
+ *
+ * SPDX-License-Identifier: CC0-1.0
+ * Source: https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp */
 
 #include "murmurhash3.h"
 #include "string.h"

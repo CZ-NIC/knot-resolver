@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # vim:foldmethod=marker
 variables:
   DEBIAN_FRONTEND: noninteractive
@@ -281,6 +282,14 @@ root.hints:
       - /^release.*$/
   script:
     - scripts/update-root-hints.sh
+
+authors:
+  <<: *test_nodep
+  only:
+    refs:
+      - /^release.*$/
+  script:
+    - scripts/update-authors.sh
 
 test:valgrind:
   <<: *test_flaky

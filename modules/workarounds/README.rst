@@ -1,3 +1,5 @@
+.. SPDX-License-Identifier: GPL-3.0-or-later
+
 .. _mod-workarounds:
 
 Module `workarounds` resolver behavior on specific broken sub-domains.

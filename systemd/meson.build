@@ -1,4 +1,5 @@
 # systemd
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ## configuration
 systemd_config = configuration_data()
