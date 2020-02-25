@@ -1,4 +1,5 @@
 #!/usr/bin/env luajit
+-- SPDX-License-Identifier: GPL-3.0-or-later
 
 -- parse install commands from stdin
 -- input: PREFIX=... make install --dry-run --always-make

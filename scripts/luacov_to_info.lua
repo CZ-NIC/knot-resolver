@@ -1,4 +1,5 @@
 #!/usr/bin/env luajit
+-- SPDX-License-Identifier: GPL-3.0-or-later
 
 local luacov = require('luacov')
 local ReporterBase = require('luacov.reporter').ReporterBase

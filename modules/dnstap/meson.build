@@ -1,4 +1,5 @@
 # C module: dnstap
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 dnstap_src = files([
   'dnstap.c',

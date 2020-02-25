@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 -- Module interface
 local ffi = require('ffi')
 local prefixes_global = {}

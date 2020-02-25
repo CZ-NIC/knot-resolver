@@ -1,4 +1,5 @@
 # tests: integration (using deckard)
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # deckard dependencies
 cmake = find_program('cmake')  # for libswrapper

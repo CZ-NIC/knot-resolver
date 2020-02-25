@@ -1,4 +1,5 @@
-/* Licensed under BSD-MIT - see LICENSE file for details */
+/* SPDX-License-Identifier: MIT
+ * Source: https://ccodearchive.net/info/asprintf.html */
 #ifndef CCAN_ASPRINTF_H
 #define CCAN_ASPRINTF_H
 #include "config.h"

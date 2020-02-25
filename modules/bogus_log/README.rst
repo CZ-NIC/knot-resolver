@@ -1,3 +1,5 @@
+.. SPDX-License-Identifier: GPL-3.0-or-later
+
 .. _mod-bogus_log:
 
 DNSSEC validation failure logging

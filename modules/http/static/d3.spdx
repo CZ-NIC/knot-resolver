@@ -1,0 +1,12 @@
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: d3js
+DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-d849c611-6d18-4c73-9318-f01eab74a036
+
+PackageName: d3js
+PackageVersion: 3.5.6
+PackageDownloadLocation: https://github.com/d3/d3/releases/download/v3.5.6/d3.zip#d3.min.js
+PackageChecksum: SHA256: 3865a5ee7b9f91126f2ef1121a7635e57bd820c9dbc384c2c48626b93a13d3f6
+PackageOriginator: Person: Michael Bostock (mike@ocks.org)
+PackageLicenseDeclared: BSD-3-Clause

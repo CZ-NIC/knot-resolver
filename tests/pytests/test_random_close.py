@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """TLS test when forward target closes connection after one second
 
 Test utilizes TLS proxy, which forwards queries to configured

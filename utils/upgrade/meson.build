@@ -1,4 +1,5 @@
 ## utils/upgrade
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 upgrade_config = configuration_data()
 upgrade_config.set('etc_dir', etc_dir)
