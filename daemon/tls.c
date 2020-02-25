@@ -293,7 +293,7 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 			kr_log_error("[tls] X.509 credentials are missing, and ephemeral credentials failed; no TLS\n");
 			return NULL;
 		}
-		kr_log_info("[tls] Using ephemeral TLS credentials:\n");
+		kr_log_info("[tls] Using ephemeral TLS credentials\n");
 		tls_credentials_log_pins(net->tls_credentials);
 	}
 
@@ -631,7 +631,7 @@ void tls_credentials_log_pins(struct tls_credentials *tls_credentials)
 #else
 void tls_credentials_log_pins(struct tls_credentials *tls_credentials)
 {
-	kr_log_error("[tls] could not calculate RFC 7858 OOB key-pin; GnuTLS 3.4.0+ required\n");
+	kr_log_verbose("[tls] could not calculate RFC 7858 OOB key-pin; GnuTLS 3.4.0+ required\n");
 }
 #endif
 
