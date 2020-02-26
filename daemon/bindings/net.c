@@ -912,8 +912,6 @@ static int net_tls_handshake_timeout(lua_State *L)
 
 static int net_bpf_set(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-
 	if (lua_gettop(L) != 1 || !lua_isnumber(L, 1)) {
 		lua_error_p(L, "net.bpf_set(fd) takes one parameter:"
 				" the open file descriptor of a loaded BPF program");
@@ -921,6 +919,7 @@ static int net_bpf_set(lua_State *L)
 
 #if __linux__
 
+	struct engine *engine = engine_luaget(L);
 	struct network *net = &engine->net;
 	int progfd = lua_tointeger(L, 1);
 	if (progfd == 0) {
@@ -945,13 +944,12 @@ static int net_bpf_set(lua_State *L)
 
 static int net_bpf_clear(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-
 	if (lua_gettop(L) != 0)
 		lua_error_p(L, "net.bpf_clear() does not take any parameters");
 
 #if __linux__
 
+	struct engine *engine = engine_luaget(L);
 	struct network *net = &engine->net;
 	network_clear_bpf(net);
 
