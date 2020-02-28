@@ -319,7 +319,7 @@ finish:
 	printf("Deleted %zu records (%zu already gone) types", deleted_records,
 	       already_gone);
 	rrtypelist_print(&deleted_rrtypes);
-	printf("It took %.2lf secs, %zu transactions (%s)\n",
+	printf("It took %.2lf secs, %zu transactions (%s)\n\n",
 	       gc_timer_end(&timer_delete), rw_txn_count, knot_strerror(ret));
 
 	rrtype_dynarray_free(&deleted_rrtypes);
