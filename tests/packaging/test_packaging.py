@@ -35,7 +35,14 @@ class ContainerHandler():
         self.container.kill()
 
     def exec_cmd(self, cmd, workdir):
-        rcode, out = self.container.exec_run('/bin/sh -c \'' + cmd + '\'', workdir=workdir)
+        logger.debug('exec_cmd: workdir={}'.format(workdir))
+        # workaround: workdir argument doesn't work in gitLab CI/CD
+        inter_cmd=''
+        if workdir is not None:
+            inter_cmd = 'cd {}; '.format(workdir)
+
+        logger.debug('exec_cmd: inter_cmd={}'.format(inter_cmd))
+        rcode, out = self.container.exec_run('/bin/sh -c \'' + inter_cmd + cmd + '\'')
         if rcode != 0:
             raise DockerCmdError(rcode, out)
 
@@ -360,12 +367,21 @@ def test_collect(module, buildenv, tmp_path):
                 ch = ContainerHandler(buildenv.run_id)
                 ch.run()
 
+
+
+#        rcode, out = ch.container.exec_run('/bin/sh -c \'ls -l; pwd; exit 2\'', workdir='/root/kresd/install_packaging/')
+##        print('{0},{1}\n'.format(rcode, out))
+#        if rcode != 0:
+#            raise DockerCmdError(rcode, out)
+
+
+
         # run test
         if os.path.isfile(os.path.join(module_dir, 'test.config')):
             ch.exec_cmd('/root/kresd/install_packaging/sbin/kresd -n -c ' + os.path.join('..',
-                        module, 'test.config'), '/root/kresd/install_packaging')
+                        module, 'test.config'), '/root/kresd/install_packaging/')
         elif os.path.isfile(os.path.join(module_dir, 'test.sh')):
-            ch.exec_cmd('/bin/sh -c ' + os.path.join('..', module, 'test.sh'),
+            ch.exec_cmd(os.path.join('..', module, 'test.sh'),
                         '/root/kresd/install_packaging/')
         else:
             ch.stop()
