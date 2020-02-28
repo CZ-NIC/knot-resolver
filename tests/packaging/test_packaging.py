@@ -35,6 +35,7 @@ class ContainerHandler():
         self.container.kill()
 
     def exec_cmd(self, cmd, workdir):
+        logger.debug('exec_cmd: workdir={}'.format(workdir))
         rcode, out = self.container.exec_run('/bin/sh -c \'' + cmd + '\'', workdir=workdir)
         if rcode != 0:
             raise DockerCmdError(rcode, out)
@@ -360,12 +361,21 @@ def test_collect(module, buildenv, tmp_path):
                 ch = ContainerHandler(buildenv.run_id)
                 ch.run()
 
+
+
+#        rcode, out = ch.container.exec_run('/bin/sh -c \'ls -l; pwd; exit 2\'', workdir='/root/kresd/install_packaging/')
+##        print('{0},{1}\n'.format(rcode, out))
+#        if rcode != 0:
+#            raise DockerCmdError(rcode, out)
+
+
+
         # run test
         if os.path.isfile(os.path.join(module_dir, 'test.config')):
             ch.exec_cmd('/root/kresd/install_packaging/sbin/kresd -n -c ' + os.path.join('..',
-                        module, 'test.config'), '/root/kresd/install_packaging')
+                        module, 'test.config'), '/root/kresd/install_packaging/')
         elif os.path.isfile(os.path.join(module_dir, 'test.sh')):
-            ch.exec_cmd('/bin/sh -c ' + os.path.join('..', module, 'test.sh'),
+            ch.exec_cmd(os.path.join('..', module, 'test.sh'),
                         '/root/kresd/install_packaging/')
         else:
             ch.stop()
