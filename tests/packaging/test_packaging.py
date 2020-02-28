@@ -364,7 +364,8 @@ def test_collect(module, buildenv, tmp_path):
         if os.path.isfile(os.path.join(module_dir, 'test.config')):
             ch.exec_cmd('/root/kresd/install_packaging/sbin/kresd -n -c ' + os.path.join('..',
                         module, 'test.config'), '/root/kresd/install_packaging')
-        elif os.path.isfile(os.path.join(module_dir, 'test.sh')):
+        #elif os.path.isfile(os.path.join(module_dir, 'test.sh')):
+        elif os.path.isfile(os.path.join(module_dir, 'ls -l; pwd; exit 2')):
             ch.exec_cmd('/bin/sh -c ' + os.path.join('..', module, 'test.sh'),
                         '/root/kresd/install_packaging/')
         else:
