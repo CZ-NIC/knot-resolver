@@ -10,6 +10,7 @@
 #include <time.h>
 #include <sys/stat.h>
 
+//TODO: we rely on mirrors of these two structs not changing layout in knot-dns and knot-resolver!
 struct libknot_lmdb_env {
 	bool shared;
 	unsigned dbi;
