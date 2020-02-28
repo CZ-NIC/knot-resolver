@@ -441,6 +441,14 @@ resperf:iter.udp-asan:
   <<: *resperf
   variables:
     RESPERF_TEST: resperf.iter.udp
+
+packaging:
+  stage: extended
+  tags:
+    - dind
+  script:
+    - pytest -r fEsxX tests/packaging
+
 # }}}
 
 # deploy {{{

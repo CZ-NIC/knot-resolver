@@ -35,7 +35,12 @@ class ContainerHandler():
         self.container.kill()
 
     def exec_cmd(self, cmd, workdir):
-        rcode, out = self.container.exec_run('/bin/sh -c \'' + cmd + '\'', workdir=workdir)
+        # workaround: When exec_run is called in GitLab CI/CD workdir argument doesn't work.
+        inter_cmd=''
+        if workdir is not None:
+            inter_cmd = 'cd {}; '.format(workdir)
+
+        rcode, out = self.container.exec_run('/bin/sh -c \'' + inter_cmd + cmd + '\'')
         if rcode != 0:
             raise DockerCmdError(rcode, out)
 
@@ -366,9 +371,9 @@ def test_collect(module, buildenv, tmp_path):
         # run test
         if os.path.isfile(os.path.join(module_dir, 'test.config')):
             ch.exec_cmd('/root/kresd/install_packaging/sbin/kresd -n -c ' + os.path.join('..',
-                        module, 'test.config'), '/root/kresd/install_packaging')
+                        module, 'test.config'), '/root/kresd/install_packaging/')
         elif os.path.isfile(os.path.join(module_dir, 'test.sh')):
-            ch.exec_cmd('/bin/sh -c ' + os.path.join('..', module, 'test.sh'),
+            ch.exec_cmd(os.path.join('..', module, 'test.sh'),
                         '/root/kresd/install_packaging/')
         else:
             ch.stop()
