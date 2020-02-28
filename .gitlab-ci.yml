@@ -440,6 +440,17 @@ resperf:iter.udp-asan:
   <<: *resperf
   variables:
     RESPERF_TEST: resperf.iter.udp
+
+packaging:
+  stage: extended
+  image: docker:latest
+  tags:
+    - dind
+  script:
+    - apk add python3 py3-pytest
+    - pip3 install docker
+    - pytest -r fEsxX tests/packaging
+
 # }}}
 
 # deploy {{{
