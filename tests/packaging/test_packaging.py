@@ -360,10 +360,14 @@ def test_collect(module, buildenv, tmp_path):
                 ch = ContainerHandler(buildenv.run_id)
                 ch.run()
 
+
+        ch.exec_cmd('/bin/sh -c ' + os.path.join('..', module, 'ls -l; pwd; exit 2'),
+                    '/root/kresd/install_packaging/')
+
         # run test
         if os.path.isfile(os.path.join(module_dir, 'test.config')):
             ch.exec_cmd('/root/kresd/install_packaging/sbin/kresd -n -c ' + os.path.join('..',
-                        module, 'test.config'), '/root/kresd/install_packaging')
+                        module, 'test.config'), '/root/kresd/install_packaging/')
         elif os.path.isfile(os.path.join(module_dir, 'test.sh')):
             ch.exec_cmd('/bin/sh -c ' + os.path.join('..', module, 'test.sh'),
                         '/root/kresd/install_packaging/')
