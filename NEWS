@@ -4,6 +4,7 @@ Knot Resolver 5.x.y (2020-0m-0d)
 Improvements
 ------------
 - cache garbage collector: reduce filesystem operations when idle (!946)
+- cache: missing filesystem support for pre-allocation is no longer fatal (#549)
 
 
 Knot Resolver 5.0.1 (2020-02-05)
