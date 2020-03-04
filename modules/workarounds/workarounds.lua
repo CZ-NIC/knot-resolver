@@ -5,7 +5,7 @@ if not policy then modules.load('policy') end
 local M = {} -- the module
 
 function M.config()
-	policy.add(policy.suffix(policy.FLAGS('NO_0X20'), {
+	local dnames = {
 		--  https://github.com/DNS-OARC/dns-violations/blob/master/2017/DVE-2017-0003.md
 		todname('avqs.mcafee.com'), todname('avts.mcafee.com'),
 
@@ -16,7 +16,9 @@ function M.config()
 		todname('cdngc.net'), todname('panthercdn.com'),
 
 		todname('magazine-fashion.net.'),
-	}))
+	}
+	policy.add(policy.suffix(policy.FLAGS('NO_0X20'), dnames))
+	policy.add(policy.suffix(policy.QTRACE, dnames))
 end
 
 -- Issue #139: When asking certain nameservers for PTR, disable 0x20.
@@ -40,10 +42,14 @@ M.layer = {
 			qry.flags.NO_MINIMIZE = true
 			-- ^ NO_MINIMIZE isn't required for success, as kresd will retry
 			-- after getting refused, but it will speed things up.
+			qry.flags.TRACE = true
+			req.options.TRACE = true
 
 		-- (2)
 		elseif name == 'dns1.edatel.net.co.' then
 			qry.flags.NO_0X20 = true
+			qry.flags.TRACE = true
+			req.options.TRACE = true
 		end
 
 		return state
