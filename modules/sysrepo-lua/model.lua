@@ -15,19 +15,32 @@ end
 --- Nodes can be read by node:read(data_node) and written by node:write(parent_data_node)
 ---
 --- @param name Name of the vertex for constructing XPath
---- @param read_func Function which takes self and data node from libyang and applies the configuration to the system
---- @param write_func Function which takes self and data node from libyang and adds a child to it with data from the system
-function Node:create(name, read_func, write_func)
+--- @param apply_func Function which takes self and data node from libyang and applies the configuration to the system
+--- @param read_func Function which takes self and data node from libyang and adds a child to it with data from
+---        the system. Returns a node it added.
+function Node:create(name, apply_func, read_func, initialize_schema_func)
     assert(type(name) == "string")
+    assert(type(apply_func) == 'function')
     assert(type(read_func) == 'function')
-    assert(type(write_func) == 'function')
+    assert(initialize_schema_func == nil or type(initialize_schema_func) == 'function')
 
     local handler = {}
     setmetatable(handler, Node)
 
-    handler.read = read_func
-    handler.write = write_func
+    handler.apply = apply_func
+    handler.serialize = read_func
     handler.name = name
+    handler.module = nil -- must be filled in later by initialize_schema method
+
+    -- default implementation
+    local function schema_init(self, lys_node)
+        assert(ffi.string(clib().schema_get_name(lys_node)) == self.name)
+        self.module = clib().schema_get_module(lys_node)
+    end
+    if initialize_schema_func == nil then
+        initialize_schema_func = schema_init
+    end
+    handler.initialize_schema = initialize_schema_func
 
     return handler
 end
@@ -52,9 +65,10 @@ local function DummyLeafNode(name, ignore_value)
 
     local function dummy_write(self, node)
         debug.log("dummy write on node named {}", self.name)
+        return nil
     end
 
-    return Node:create(name, dummy_read, dummy_write)
+    return Node:create(name, dummy_read, dummy_write, nil)
 end
 
 local function ContainerNode(name, container_model)
@@ -64,7 +78,7 @@ local function ContainerNode(name, container_model)
         child_lookup_table[v.name] = v
     end
 
-    --- Node's read function
+    --- Node's apply function
     local function handle_cont_read(self, node)
         local node_name = ffi.string(clib().node_get_name(node))
         debug.log("Attempting to read container \"{}\", it's actual name is \"{}\"", self.name, node_name)
@@ -73,21 +87,55 @@ local function ContainerNode(name, container_model)
         local child = clib().node_child_first(node)
         while child ~= nil do
             local nm = ffi.string(clib().node_get_name(child))
-            child_lookup_table[nm]:read(child)
+            child_lookup_table[nm]:apply(child)
             child = clib().node_child_next(child)
         end
     end
 
-    --- Node's write function
+    --- Node's serialize function
     local function handle_cont_write(self, parent_node)
-        local node = nil -- TODO get current node from parent_node
+        local node = clib().node_new_container(parent_node, self.module, self.name)
 
         for _,v in ipairs(container_model) do
-            v:write(node)
+            _ = v:serialize(node)
+        end
+
+        return node
+    end
+
+    local function schema_init(self, lys_node)
+        assert(ffi.string(clib().schema_get_name(lys_node)) == self.name)
+        self.module = clib().schema_get_module(lys_node)
+
+        local lookup = {}
+        local child = clib().schema_child_first(lys_node)
+        while child ~= nil do
+            local nm = ffi.string(clib().schema_get_name(child))
+            lookup[nm] = child
+            child = clib().schema_child_next(child)
+        end
+
+        -- apply to all children
+        for _,v in ipairs(container_model) do
+            v:initialize_schema(lookup[v.name])
         end
     end
 
-    return Node:create(name, handle_cont_read, handle_cont_write)
+    return Node:create(name, handle_cont_read, handle_cont_write, schema_init)
+end
+
+local function StateNode(name, get_val)
+    --- Node's apply function
+    local function handle_apply(self, node)
+        -- do nothing, it's only a state node
+    end
+
+    --- Node's serialize function
+    local function handle_serialize(self, parent_node)
+        return clib().node_new_leaf(parent_node, self.module, self.name, tostring(get_val()))
+    end
+
+    return Node:create(name, handle_apply, handle_serialize, nil)
 end
 
 
@@ -95,7 +143,7 @@ end
 local model = 
     ContainerNode("dns-resolver", {
         ContainerNode("cache", {
-            DummyLeafNode("current-size"),
+            StateNode("current-size", function() return cache.current_size end),
             DummyLeafNode("max-size"),
             DummyLeafNode("max-ttl"),
             DummyLeafNode("min-ttl"),
@@ -111,18 +159,27 @@ local model =
         DummyLeafNode("server", true),
     })
 
-
 --- Module constructor
 return function(clib_binding)
     _clib = clib_binding
 
+    local initialized_schema = false
+    local function init_schema()
+        if not initialized_schema then
+            model:initialize_schema(clib().schema_root())
+            initialized_schema = true
+        end
+    end
+
     local module = {}
     function module.serialize_configuration(root_node)
-        model:write(root_node)
+        init_schema()
+        model:serialize(root_node)
     end
 
     function module.apply_configuration(root_node)
-        model:read(root_node)
+        init_schema()
+        model:apply(root_node)
     end
 
     return module

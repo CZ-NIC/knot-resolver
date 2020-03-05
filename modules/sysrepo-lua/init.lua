@@ -11,11 +11,13 @@ local function apply_configuration(root_node)
 end
 
 local function read_configuration()
-    return data_model.serialize_model(nil)
+    print("Current configuration requested")
+
+    return data_model.serialize_configuration(nil)
 end
 
 function sysrepo.init()
-    sysrepo_ffi.init(apply_configuration)
+    sysrepo_ffi.init(apply_configuration, read_configuration)
 end
 
 function sysrepo.deinit()
