@@ -45,9 +45,9 @@ typedef struct el_subscription_ctx el_subscription_ctx_t;
 typedef void (*el_subsription_cb)(el_subscription_ctx_t *el_subscr, int status);
 /** Callback to Lua for applying configuration */
 typedef void (*apply_conf_f)(struct lyd_node *root);
-typedef void (*read_conf_f)(struct lyd_node* root);
+typedef struct lyd_node* (*read_conf_f)();
 
-KR_EXPORT int sysrepo_init(apply_conf_f set_leaf_conf_cb);
+KR_EXPORT int sysrepo_init(apply_conf_f apply_conf_callback, read_conf_f read_conf_callback);
 KR_EXPORT int sysrepo_deinit(void);
 
 /** Given a libyang node, returns it's first child */
@@ -58,3 +58,17 @@ KR_EXPORT struct lyd_node* node_child_next(struct lyd_node* prev_child);
 KR_EXPORT const char* node_get_name(struct lyd_node* node);
 /** Given a libyang node, return it's value as a string */
 KR_EXPORT const char* node_get_value_str(struct lyd_node* node);
+/** Create a new libyang leaf node */
+KR_EXPORT struct lyd_node* node_new_leaf(struct lyd_node* parent, const struct lys_module* module, const char* name, const char* value);
+/** Create a new libyang container node */
+KR_EXPORT struct lyd_node* node_new_container(struct lyd_node* parent, const struct lys_module* module, const char* name);
+/** Returns module given a schema node */
+KR_EXPORT const struct lys_module* schema_get_module(const struct lys_node* schema);
+/** Given a libyang schema node, returns it's first child */
+KR_EXPORT const struct lys_node* schema_child_first(const struct lys_node* parent);
+/** Given a libyang schema node, return next sibling or NULL if there isn't any */
+KR_EXPORT const struct lys_node* schema_child_next(const struct lys_node* prev_child);
+/** Given a libyang schema node, return it's name */
+KR_EXPORT const char* schema_get_name(const struct lys_node* node);
+/** Get schema root */
+KR_EXPORT const struct lys_node* schema_root();

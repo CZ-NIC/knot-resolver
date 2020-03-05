@@ -11,20 +11,38 @@ local function initialize_ffi()
     --- Definition of `sr_val_t` copied from sysrepo.h on 2020-01-01.
     ffi.cdef[[
 
-    typedef void (*apply_conf_f)(struct lyd_node *root);
-    typedef void (*read_conf_f)(struct lyd_node* root);
-    int sysrepo_init(apply_conf_f apply_conf);
-    int sysrepo_deinit(void);
+        typedef struct el_subscription_ctx el_subscription_ctx_t;
+        /** Callback for our sysrepo subscriptions */
+        typedef void (*el_subsription_cb)(el_subscription_ctx_t *el_subscr, int status);
+        /** Callback to Lua for applying configuration */
+        typedef void (*apply_conf_f)(struct lyd_node *root);
+        typedef struct lyd_node* (*read_conf_f)();
 
-    /** Given a libyang node, returns it's first child */
-    struct lyd_node* node_child_first(struct lyd_node* parent);
-    /** Given a libyang node, return next sibling or NULL if there isn't any */
-    struct lyd_node* node_child_next(struct lyd_node* prev_child);
-    /** Given a libyang node, return it's name from schema */
-    const char* node_get_name(struct lyd_node* node);
-    /** Given a libyang node, return it's value as a string */
-    const char* node_get_value_str(struct lyd_node* node);
+        int sysrepo_init(apply_conf_f apply_conf_callback, read_conf_f read_conf_callback);
+        int sysrepo_deinit(void);
 
+        /** Given a libyang node, returns it's first child */
+        struct lyd_node* node_child_first(struct lyd_node* parent);
+        /** Given a libyang node, return next sibling or NULL if there isn't any */
+        struct lyd_node* node_child_next(struct lyd_node* prev_child);
+        /** Given a libyang node, return it's name from schema */
+        const char* node_get_name(struct lyd_node* node);
+        /** Given a libyang node, return it's value as a string */
+        const char* node_get_value_str(struct lyd_node* node);
+        /** Create a new libyang leaf node */
+        struct lyd_node* node_new_leaf(struct lyd_node* parent, const struct lys_module* module, const char* name, const char* value);
+        /** Create a new libyang container node */
+        struct lyd_node* node_new_container(struct lyd_node* parent, const struct lys_module* module, const char* name);
+        /** Returns module given a schema node */
+        const struct lys_module* schema_get_module(const struct lys_node* schema);
+        /** Given a libyang schema node, returns it's first child */
+        const struct lys_node* schema_child_first(const struct lys_node* parent);
+        /** Given a libyang schema node, return next sibling or NULL if there isn't any */
+        const struct lys_node* schema_child_next(const struct lys_node* prev_child);
+        /** Given a libyang schema node, return it's name */
+        const char* schema_get_name(const struct lys_node* node);
+        /** Get schema root */
+        const struct lys_node* schema_root();
     ]]
 end
 
@@ -66,9 +84,10 @@ end
 
 local sysrepo_ffi = {}
 
-function sysrepo_ffi.init(apply_conf_func)
-    local cb = create_callback("apply_conf_f", apply_conf_func)
-    local res = clib.sysrepo_init(cb)
+function sysrepo_ffi.init(apply_conf_func, read_conf_func)
+    local apply = create_callback("apply_conf_f", apply_conf_func)
+    local read = create_callback("read_conf_f", read_conf_func)
+    local res = clib.sysrepo_init(apply, read)
     if res ~= 0 then
         error("Initialization failed with error code " .. tostring(res))
     end

@@ -41,6 +41,7 @@ static apply_conf_f apply_conf = NULL;
 /** Callback to Lua used for reading configuration */
 static read_conf_f read_conf = NULL;
 static el_subscription_ctx_t *el_subscription_ctx = NULL;
+static const struct lys_node* lys_root = NULL;
 
 /**
  * Change callback getting called by sysrepo. Iterates over changed options and passes
@@ -82,6 +83,18 @@ static int sysrepo_conf_change_callback(sr_session_ctx_t *session,
 				     sr_strerror(sr_err));
 		lyd_free_withsiblings(tree); // FIXME sure about this?
 	}
+	return SR_ERR_OK;
+}
+
+static int sysrepo_conf_read_callback(sr_session_ctx_t *session, const char *module_name, const char *path, const char *request_xpath, uint32_t request_id, struct lyd_node **parent, void *private_data) {
+	// *parent is expected to be NULL, because we are subscribed only on the top-level node
+	assert(*parent == NULL);
+	// so we can safely ignore it and overwrite it with our new tree
+	struct lyd_node *res = read_conf();
+	if (res == NULL)
+		return SR_ERR_CALLBACK_FAILED;
+	
+	*parent = res;
 	return SR_ERR_OK;
 }
 
@@ -145,10 +158,11 @@ static void el_subscr_cb(el_subscription_ctx_t *el_subscr, int status)
 	sr_process_events(el_subscr->subscription, el_subscr->session, NULL);
 }
 
-int sysrepo_init(apply_conf_f apply_conf_callback)
+int sysrepo_init(apply_conf_f apply_conf_callback, read_conf_f read_conf_callback)
 {
 	// store callback to Lua
 	apply_conf = apply_conf_callback;
+	read_conf = read_conf_callback;
 
 	int sr_err = SR_ERR_OK;
 	sr_conn_ctx_t *sr_connection = NULL;
@@ -167,7 +181,12 @@ int sysrepo_init(apply_conf_f apply_conf_callback)
 	if (sr_err != SR_ERR_OK)
 		goto cleanup;
 
-	/* register sysrepo subscriptions and callbacks
+	/* obtain schema root node, will be used from within Lua */
+	const struct ly_ctx* ly_context = sr_get_context(sr_connection);
+	lys_root = ly_ctx_get_node(ly_context, NULL, XPATH_BASE, 0);
+	assert(lys_root != NULL);
+
+	/* register sysrepo subscription and callback
 		SR_SUBSCR_NO_THREAD - don't create a thread for handling them
 		SR_SUBSCR_ENABLED - send us current configuration in a callback just after subscribing
 	 */
@@ -175,6 +194,14 @@ int sysrepo_init(apply_conf_f apply_conf_callback)
 		sr_session, YM_COMMON, XPATH_BASE, sysrepo_conf_change_callback,
 		NULL, 0, SR_SUBSCR_NO_THREAD | SR_SUBSCR_ENABLED,
 		&sr_subscription);
+	if (sr_err != SR_ERR_OK)
+		goto cleanup;
+
+	sr_err = sr_oper_get_items_subscribe(
+		sr_session, YM_COMMON, XPATH_BASE, sysrepo_conf_read_callback,
+		NULL, SR_SUBSCR_CTX_REUSE | SR_SUBSCR_NO_THREAD,
+		&sr_subscription
+	);
 	if (sr_err != SR_ERR_OK)
 		goto cleanup;
 
@@ -195,8 +222,11 @@ cleanup:
 int sysrepo_deinit()
 {
 	el_subscription_free(el_subscription_ctx);
+	
 	// remove reference to Lua callback so that it can be free'd safely
 	apply_conf = NULL;
+	read_conf = NULL;
+
 	return kr_ok();
 }
 
@@ -225,4 +255,37 @@ KR_EXPORT const char* node_get_value_str(struct lyd_node* node) {
 	);
 
 	return ((struct lyd_node_leaf_list*) node)->value_str;
+}
+
+KR_EXPORT struct lyd_node* node_new_leaf(struct lyd_node* parent, const struct lys_module* module, const char* name, const char* value) {
+	return lyd_new_leaf(parent, module, name, value);
+}
+KR_EXPORT struct lyd_node* node_new_container(struct lyd_node* parent, const struct lys_module* module, const char* name) {
+	return lyd_new(parent, module, name);
+}
+KR_EXPORT const struct lys_module* schema_get_module(const struct lys_node* schema) {
+	return schema->module;
+}
+
+KR_EXPORT const struct lys_node* schema_child_first(const struct lys_node* parent) {
+	assert(
+		parent->nodetype == LYS_CONTAINER ||
+		parent->nodetype == LYS_LIST ||
+		parent->nodetype == LYS_CHOICE
+	);
+
+	return parent->child;
+}
+
+KR_EXPORT const struct lys_node* schema_child_next(const struct lys_node* prev_child) {
+	return prev_child->next;
+}
+
+KR_EXPORT const char* schema_get_name(const struct lys_node* node) {
+	return node->name;
+}
+
+KR_EXPORT const struct lys_node* schema_root() {
+	assert(lys_root != NULL);
+	return lys_root;
 }
