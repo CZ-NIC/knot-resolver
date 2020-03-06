@@ -190,7 +190,6 @@ class DebianImage(DockerImages):
                     --prefix=/root/kresd/install_packaging \\
                     --libdir=lib \\
                     --default-library=static \\
-                    -Ddoc=enabled \\
                     -Dsystemd_files=enabled \\
                     -Dclient=enabled \\
                     -Dkeyfile_default=/usr/share/dns/root.key \\
@@ -384,7 +383,7 @@ def test_collect(module, buildenv, tmp_path):
 
         rcode = 0
 
-        if os.path.isfile(os.path.join(distro_dir, 'pre-run.sh')):
+        if os.path.isfile(os.path.join(distro_dir, 'post-run.sh')):
             ch.exec_cmd(os.path.join(module, buildenv.distro, buildenv.version, 'post-run.sh'),
                         '/root/kresd/')
 
