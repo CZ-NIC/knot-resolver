@@ -632,10 +632,12 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 	} else {
 		kr_log_error("[kxsk] knot_xsk_recvmmsg(): %d, %s\n",
 				ret, knot_strerror(ret));
+		//FIXME?
 	}
 	assert(rcvd <= XDP_RX_BATCH_SIZE);
 	for (int i = 0; i < rcvd; ++i) {
 		const knot_xsk_msg_t *msg = &msgs[i];
+		assert(msg->payload.iov_len < 65536);
 		knot_pkt_t *kpkt = knot_pkt_new(msg->payload.iov_base, msg->payload.iov_len,
 						&the_worker->pkt_pool);
 		ret = kpkt == NULL ? kr_error(ENOMEM) :
@@ -646,14 +648,17 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 		if (ret)
 			kr_log_verbose("[kxsk] worker_submit() == %d: %s\n", ret, kr_strerror(ret));
 		mp_flush(the_worker->pkt_pool.ctx);
-		knot_xsk_free_recvd(xhd->socket, msg);
+		knot_xsk_free_recvd(xhd->socket, msg, 1);
 	}
 }
 void xdp_tx_waker(uv_check_t* handle)
 {
-	int ret = knot_xsk_check(handle->data);
+	int ret = knot_xsk_sendmsg_finish(handle->data);
 	if (ret != KNOT_EOK)
 		kr_log_error("[kxsk] check: ret = %d, %s\n", ret, knot_strerror(ret));
+	knot_xsk_prepare_alloc(handle->data);
+	// LATER(opt.): it _might_ be better for performance to do these two steps
+	// at different points in time
 }
 int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 {
