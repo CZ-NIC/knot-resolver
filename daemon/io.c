@@ -440,7 +440,9 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
 	val = 1; /* Accepts on/off */
 	#endif
 	if (setsockopt(fd, IPPROTO_TCP, TCP_FASTOPEN, &val, sizeof(val))) {
-		kr_log_error("[ io ] listen TCP (fastopen): %s\n", strerror(errno));
+		kr_log_error("[ io ] listen TCP (fastopen): %s%s\n", strerror(errno),
+			(errno != EPERM ? "" :
+			 ".  This may be caused by TCP Fast Open being disabled in the OS."));
 	}
 #endif
 
