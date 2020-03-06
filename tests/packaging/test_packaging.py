@@ -95,7 +95,9 @@ class DockerImages(ABC):
         dockerf = open(os.path.join(path, 'Dockerfile-build'), 'w')
 
         dockerf.write('FROM {}\n'.format(from_image))
-        dockerf.write('WORKDIR /root/kresd\nCOPY . /root/kresd\n')
+        dockerf.write('WORKDIR /root/kresd\n')
+        if self.module == 'daemon/packaging':
+            dockerf.write('COPY . /root/kresd\n')
         # when this file doesn't exists, tzdata needs user interaction
         dockerf.write('RUN if [ ! -f /etc/localtime ];' +
                       'then ln -fs /usr/share/zoneinfo/Europe/Prague /etc/localtime; fi\n')
