@@ -300,6 +300,8 @@ def buildenv(request, tmpdir_factory):
                       from_image=img.build_id)
 
     yield img
+    client.images.remove(img.run_id)
+    client.images.remove(img.build_id)
 
 
 @pytest.mark.parametrize('module', MODULES)
@@ -393,5 +395,8 @@ def test_collect(module, buildenv, tmp_path):
     finally:
         ch.stop()
         ch.container.remove()
+        if buildmod is not None and buildmod is not buildenv:
+            client.images.remove(buildmod.run_id)
+            client.images.remove(buildmod.build_id)
 
     assert(rcode == 0)
