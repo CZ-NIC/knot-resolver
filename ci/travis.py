@@ -44,7 +44,7 @@ while time.time() < end_time:
         else:
             exit("Travis CI Result: {}!".format(state.upper()))
     else:
-        exit("API Response Code: {code}".format(response.status_code), code=2)
+        exit("API Response Code: {}".format(response.status_code), code=2)
     time.sleep(POLL_DELAY)
 
 exit("Timed out!")
