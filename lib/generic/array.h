@@ -53,14 +53,25 @@
 #pragma once
 #include <stdlib.h>
 
-/** Simplified Qt containers growth strategy. */
-static inline size_t array_next_count(size_t want)
+/** Growth strategy agorithm from GCC libstdc++ (also GPL 3+)
+    https://github.com/gcc-mirror/gcc/blob/releases/gcc-9.2.0/gcc/vec.c#L159
+ */
+static inline size_t array_next_count(size_t alloc, size_t desired)
 {
-	if (want < 2048) {
-		return (want < 20) ? want + 4 : want * 2;
-	} else {
-		return want + 2048;
-	}
+	/* Exponential growth. */
+	if (!alloc)
+		alloc = 4;
+	else if (alloc < 16)
+		/* Double when small.  */
+		alloc = alloc * 2;
+	else
+		/* Grow slower when large.  */
+		alloc = (alloc * 3 / 2);
+
+	/* If this is still too small, set it to the right size. */
+	if (alloc < desired)
+		alloc = desired;
+	return alloc;
 }
 
 /** @internal Incremental memory reservation */
@@ -70,7 +81,7 @@ static inline int array_std_reserve(void *baton, char **mem, size_t elm_size, si
 		return 0;
 	}
 	/* Simplified Qt containers growth strategy */
-	size_t next_size = array_next_count(want);
+	size_t next_size = array_next_count(*have, want);
 	void *mem_new = realloc(*mem, next_size * elm_size);
 	if (mem_new != NULL) {
 		*mem = mem_new;
