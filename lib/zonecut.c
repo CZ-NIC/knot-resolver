@@ -162,7 +162,8 @@ int kr_zonecut_copy_trust(struct kr_zonecut *dst, const struct kr_zonecut *src)
 	return kr_ok();
 }
 
-int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const void *data, int len)
+int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns,
+		   const void *data, int len, bool check_dup)
 {
 	if (!cut || !ns || !cut->nsset || (data && len <= 0)) {
 		assert(!EINVAL);
@@ -188,7 +189,7 @@ int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const void *d
 		return kr_ok();
 	}
 	/* Check for duplicates */
-	if (pack_obj_find(*pack, data, len)) {
+	if (check_dup && pack_obj_find(*pack, data, len)) {
 		return kr_ok();
 	}
 	/* Push new address */
