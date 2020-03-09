@@ -403,7 +403,7 @@ end
 function policy.rpz(action, path, watch)
 	local rules = rpz_parse(action, path)
 
-	if watch or true then
+	if watch ~= false then
 		local has_notify, notify  = pcall(require, 'cqueues.notify')
 		if has_notify then
 			local bit = require('bit')

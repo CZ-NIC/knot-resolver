@@ -28,7 +28,7 @@ A *filter* selects which queries will be affected by specified *action*. There a
   - applies the action if QNAME suffix matches one of suffixes in the table (useful for "is domain in zone" rules),
   uses `Aho-Corasick`_ string matching algorithm `from CloudFlare <https://github.com/cloudflare/lua-aho-corasick>`_ (BSD 3-clause)
 * :any:`policy.suffix_common`
-* ``rpz(default_action, path)``
+* ``rpz(default_action, path, [watch])``
   - implements a subset of RPZ_ in zonefile format.  See below for details: :any:`policy.rpz`.
 * ``slice(slice_func, action, action, ...)`` - splits the entire domain space
   into multiple slices, uses the slicing function to determine to which slice
@@ -209,7 +209,7 @@ Policy examples
 		end
 	end)
 	-- Enforce local RPZ
-	policy.add(policy.rpz(policy.DENY, 'blacklist.rpz'))
+	policy.add(policy.rpz(policy.DENY, 'blocklist.rpz'))
 	-- Forward all queries below 'company.se' to given resolver;
 	-- beware: typically this won't work due to DNSSEC - see "Replacing part..." below
 	policy.add(policy.suffix(policy.FORWARD('192.168.1.1'), {todname('company.se')}))
@@ -285,37 +285,73 @@ Most properties (actions, filters) are described above.
   Like suffix match, but you can also provide a common suffix of all matches for faster processing (nil otherwise).
   This function is faster for small suffix tables (in the order of "hundreds").
 
-.. function:: policy.rpz(action, path, watch)
+.. function:: policy.rpz(action, path, [watch = true])
 
   :param action: the default action for match in the zone; typically you want ``policy.DENY``
   :param path: path to zone file | database
-  :param watch: boolean, if not false, the file will be reparsed and the ruleset reloaded on file change
+  :param watch: boolean, if true, the file will be reloaded on file change
 
   Enforce RPZ_ rules. This can be used in conjunction with published blocklist feeds.
   The RPZ_ operation is well described in this `Jan-Piet Mens's post`_,
-  or the `Pro DNS and BIND`_ book. Here's compatibility table:
+  or the `Pro DNS and BIND`_ book.
+
+  .. warning::
+
+     There is no published Internet Standard for RPZ_ and implementations vary.
+     At the moment Knot Resolver supports limited subset of RPZ format and deviates
+     from implementation in BIND. Nevertheless it is good enough
+     for blocking large lists of spam or advertising domains.
+
+  The RPZ file format is basically a DNS zone file with *very special* semantics.
+  For example:
+
+  .. code-block:: none
+
+     ; left hand side          ; TTL and class  ; right hand side
+     ; encodes RPZ trigger     ; ignored        ; encodes action
+     blocked.domain.example    600 IN           CNAME .           ; block main domain
+     *.blocked.domain.example  600 IN           CNAME .           ; block subdomains
+
+  The only "trigger" supported in Knot Resolver is query name,
+  i.e. left hand side must be a domain name which triggers the action specified
+  on the right hand side.
+
+  Subset of possible RPZ actions is supported, namely:
 
   .. csv-table::
-   :header: "Policy Action", "RH Value", "Support"
+   :header: "RPZ Right Hand Side", "Knot Resolver Action", "BIND Compatibility"
 
-   "``action`` is used", "``.``", "**yes**, if ``action`` is ``DENY``"
-   "``action`` is used ", "``*.``", "*partial* [#]_"
-   "``policy.PASS``", "``rpz-passthru.``", "**yes**"
-   "``policy.DROP``", "``rpz-drop.``", "**yes**"
-   "``policy.TC``", "``rpz-tcp-only.``", "**yes**"
-   "Modified", "anything", "no"
+   "``.``", "``action`` is used", "compatible if ``action`` is ``policy.DENY``"
+   "``*.``", "``action`` is used", "good enough [#]_ if ``action`` is ``policy.DENY``"
+   "``rpz-passthru.``", "``policy.PASS``", "yes"
+   "``rpz-tcp-only.``", "``policy.TC``", "yes"
+   "``rpz-drop.``", "``policy.DROP``", "no [#]_"
+   "fake A/AAAA", "*not supported*", "no"
 
-  .. [#] The specification for ``*.`` wants a ``NODATA`` answer.
-    For now, ``policy.DENY`` action doing ``NXDOMAIN`` is typically used instead.
+  .. [#] RPZ action ``*.`` in BIND causes *NODATA* answer
+     but typically our users configure ``policy.rpz(policy.DENY, ...)``
+     which replies with *NXDOMAIN*. Good news is that from client's
+     perspective it does not make a visible difference.
+  .. [#] Our ``policy.DROP`` returns *SERVFAIL* answer (for historical reasons).
 
-  .. csv-table::
-   :header: "Policy Trigger", "Support"
 
-   "QNAME", "**yes**"
-   "CLIENT-IP", "*partial*, may be done with :ref:`views <mod-view>`"
-   "IP", "no"
-   "NSDNAME", "no"
-   "NS-IP", "no"
+  For example, we can store the example snippet with domain ``blocked.domain.example``
+  (above) into file ``/etc/knot-resolver/blocklist.rpz`` and configure resolver to
+  answer with *NXDOMAIN* plus the specified additional text to queries for this domain:
+
+  .. code-block:: lua
+
+    policy.add(
+         policy.rpz(policy.DENY_MSG('domain blocked by your resolver operator'),
+                    '/etc/knot-resolver/blocklist.rpz',
+                    true))
+
+  Resolver will reload RPZ file at run-time if the RPZ file changes.
+  Recommended RPZ update procedure is to store new blocklist in a new file
+  (*newblocklist.rpz*) and then rename the new file to the original file name
+  (*blocklist.rpz*). This avoids problems where resolver might attempt
+  to re-read an incomplete file.
+
 
 .. function:: policy.slice(slice_func, action[, action[, ...])
 
