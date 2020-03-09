@@ -97,10 +97,12 @@ int kr_zonecut_copy_trust(struct kr_zonecut *dst, const struct kr_zonecut *src);
  * @param ns     nameserver name
  * @param data   typically knot_rdata_t::data
  * @param len    typically knot_rdata_t::len
+ * @param check_dup check for duplicates and return 0 without without adding in that case
  * @return 0 or error code
  */
 KR_EXPORT
-int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const void *data, int len);
+int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns,
+		   const void *data, int len, bool check_dup);
 
 /**
  * Delete nameserver/address pair from the zone cut.

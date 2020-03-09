@@ -9,6 +9,16 @@ Upgrading
 This section summarizes steps required for upgrade to newer Knot Resolver versions.
 We advise users to also read :ref:`release_notes` for respective versions.
 
+5.0.1 to 5.1.0
+==============
+
+Module changes
+--------------
+
+* In case you wrote your own module which directly calls function ``kr_zonecut_add()``,
+  you need to append another ``bool`` parameter: ``true`` for the old behavior.
+
+
 4.x to 5.x
 ==========
 
