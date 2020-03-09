@@ -8,6 +8,7 @@ Improvements
 Bugfixes
 --------
 - cache: missing filesystem support for pre-allocation is no longer fatal (#549)
+- lua: policy.rpz() no longer watches the file when watch is set to false (!954)
 
 
 Knot Resolver 5.0.1 (2020-02-05)
