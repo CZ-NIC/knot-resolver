@@ -527,7 +527,7 @@ obs:build:all:
         (echo "ERROR: version mismatch"; exit 1)
     - >
       ! osc results home:CZ-NIC:$OBS_REPO knot-resolver --csv | \
-        grep -Ev 'disabled|excluded|Rawhide' | grep -v 'succeeded' -q || \
+        grep -Ev 'disabled|excluded|Rawhide|CentOS_8_EPEL' | grep -v 'succeeded' -q || \
         (echo "ERROR: build(s) failed"; exit 1)
 
 .distrotest: &distrotest
