@@ -23,7 +23,7 @@ local function publish_hints(nsset)
 	for dname, addrsets in pairs(nsset) do
 		for i = 0, addrsets:rdcount() - 1 do
 			local rdpt = addrsets:rdata_pt(i)
-			ffi.C.kr_zonecut_add(roothints, dname, rdpt.data, rdpt.len)
+			ffi.C.kr_zonecut_add(roothints, dname, rdpt.data, rdpt.len, true)
 		end
 	end
 end

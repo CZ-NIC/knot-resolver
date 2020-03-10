@@ -237,7 +237,7 @@ static int add_pair(struct kr_zonecut *hints, const char *name, const char *addr
 		return kr_error(EINVAL);
 	}
 
-	return kr_zonecut_add(hints, key, kr_inaddr(&ia.ip), kr_inaddr_len(&ia.ip));
+	return kr_zonecut_add(hints, key, kr_inaddr(&ia.ip), kr_inaddr_len(&ia.ip), false);
 }
 
 static int add_reverse_pair(struct kr_zonecut *hints, const char *name, const char *addr)
@@ -253,7 +253,7 @@ static int add_reverse_pair(struct kr_zonecut *hints, const char *name, const ch
 		return kr_error(EINVAL);
 	}
 
-	return kr_zonecut_add(hints, key, ptr_name, knot_dname_size(ptr_name));
+	return kr_zonecut_add(hints, key, ptr_name, knot_dname_size(ptr_name), false);
 }
 
 /** For a given name, remove either one address or all of them (if == NULL).
