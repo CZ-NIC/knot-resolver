@@ -42,6 +42,7 @@ static apply_conf_f apply_conf = NULL;
 static read_conf_f read_conf = NULL;
 static el_subscription_ctx_t *el_subscription_ctx = NULL;
 static const struct lys_node* lys_root = NULL;
+static const struct ly_ctx* ly_context = NULL;
 
 /**
  * Change callback getting called by sysrepo. Iterates over changed options and passes
@@ -182,7 +183,8 @@ int sysrepo_init(apply_conf_f apply_conf_callback, read_conf_f read_conf_callbac
 		goto cleanup;
 
 	/* obtain schema root node, will be used from within Lua */
-	const struct ly_ctx* ly_context = sr_get_context(sr_connection);
+	ly_context = sr_get_context(sr_connection);
+	assert(ly_context != NULL);
 	lys_root = ly_ctx_get_node(ly_context, NULL, XPATH_BASE, 0);
 	assert(lys_root != NULL);
 
@@ -264,10 +266,12 @@ KR_EXPORT struct lyd_node* node_new_container(struct lyd_node* parent, const str
 	return lyd_new(parent, module, name);
 }
 KR_EXPORT const struct lys_module* schema_get_module(const struct lys_node* schema) {
+	assert(schema != NULL);
 	return schema->module;
 }
 
 KR_EXPORT const struct lys_node* schema_child_first(const struct lys_node* parent) {
+	assert(parent != NULL);
 	assert(
 		parent->nodetype == LYS_CONTAINER ||
 		parent->nodetype == LYS_LIST ||
@@ -278,14 +282,26 @@ KR_EXPORT const struct lys_node* schema_child_first(const struct lys_node* paren
 }
 
 KR_EXPORT const struct lys_node* schema_child_next(const struct lys_node* prev_child) {
+	assert(prev_child != NULL);
 	return prev_child->next;
 }
 
 KR_EXPORT const char* schema_get_name(const struct lys_node* node) {
+	assert(node != NULL);
 	return node->name;
 }
 
 KR_EXPORT const struct lys_node* schema_root() {
 	assert(lys_root != NULL);
 	return lys_root;
+}
+
+KR_EXPORT int node_validate(struct lyd_node* node) {
+	assert(node != NULL);
+	assert(ly_context != NULL);
+	return lyd_validate(&node, LYD_OPT_DATA | LYD_OPT_STRICT, (void*) ly_context);
+}
+
+KR_EXPORT void node_free(struct lyd_node* node) {
+	lyd_free_withsiblings(node);
 }

@@ -43,6 +43,10 @@ local function initialize_ffi()
         const char* schema_get_name(const struct lys_node* node);
         /** Get schema root */
         const struct lys_node* schema_root();
+        /** Validate data tree */
+        int node_validate(struct lyd_node* node);
+        /** Free data nodes recursively */
+        void node_free(struct lyd_node* node);
     ]]
 end
 
