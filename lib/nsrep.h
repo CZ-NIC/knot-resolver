@@ -14,7 +14,7 @@
 
 struct kr_query;
 
-/** 
+/**
   * NS RTT score (special values).
   * @note RTT is measured in milliseconds.
   */
