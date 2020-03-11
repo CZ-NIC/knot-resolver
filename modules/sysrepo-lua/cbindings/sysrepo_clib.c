@@ -174,10 +174,6 @@ int sysrepo_init(apply_conf_f apply_conf_callback, read_conf_f read_conf_callbac
 	if (sr_err != SR_ERR_OK)
 		goto cleanup;
 
-	sr_err = sr_connection_recover(sr_connection);
-	if (sr_err != SR_ERR_OK)
-		goto cleanup;
-
 	sr_err = sr_session_start(sr_connection, SR_DS_RUNNING, &sr_session);
 	if (sr_err != SR_ERR_OK)
 		goto cleanup;
