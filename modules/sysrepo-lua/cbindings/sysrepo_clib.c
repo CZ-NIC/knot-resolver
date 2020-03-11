@@ -295,7 +295,7 @@ KR_EXPORT const struct lys_node* schema_root() {
 KR_EXPORT int node_validate(struct lyd_node* node) {
 	assert(node != NULL);
 	assert(ly_context != NULL);
-	return lyd_validate(&node, LYD_OPT_DATA | LYD_OPT_STRICT, (void*) ly_context);
+	return lyd_validate(&node, LYD_OPT_DATA | LYD_OPT_STRICT | LYD_OPT_DATA_NO_YANGLIB, (void*) ly_context);
 }
 
 KR_EXPORT void node_free(struct lyd_node* node) {
