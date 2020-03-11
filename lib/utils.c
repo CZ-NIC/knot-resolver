@@ -983,6 +983,20 @@ static char *print_section_opt(struct mempool *mp, char *endp, const knot_rrset_
 
 }
 
+/**
+ * Detect if qname contains an uppercase letter.
+ */
+static bool qname_has_uppercase(const knot_dname_t *qname) {
+	const int len = knot_dname_size(qname) - 2; /* Skip first, last label. */
+	for (int i = 0; i < len; ++i) {
+		/* Note: this relies on the fact that correct label lengths
+		 * can't pass the this test by "luck". */
+		if (*++qname >= 'A' && *qname <= 'Z')
+			return true;
+	}
+	return false;
+}
+
 char *kr_pkt_text(const knot_pkt_t *pkt)
 {
 	if (!pkt) {
@@ -1030,7 +1044,14 @@ char *kr_pkt_text(const knot_pkt_t *pkt)
 	if (qdcount == 1) {
 		KR_DNAME_GET_STR(qname, knot_pkt_qname(pkt));
 		KR_RRTYPE_GET_STR(rrtype, knot_pkt_qtype(pkt));
-		ptr = mp_printf_append(mp, ptr, ";; QUESTION SECTION\n%s\t\t%s\n", qname, rrtype);
+		const char *qnwarn;
+		if (qname_has_uppercase(knot_pkt_qname(pkt)))
+			qnwarn = \
+"; WARNING! Uppercase positions indicate positions with letter case mismatches!\n"
+";          Normally you should see all-lowercase qname here.\n";
+		else
+			qnwarn = "";
+		ptr = mp_printf_append(mp, ptr, ";; QUESTION SECTION\n%s%s\t\t%s\n", qnwarn, qname, rrtype);
 	} else if (qdcount > 1) {
 		ptr = mp_printf_append(mp, ptr, ";; Warning: unsupported QDCOUNT %hu\n", qdcount);
 	}
