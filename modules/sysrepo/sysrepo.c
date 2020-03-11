@@ -106,11 +106,6 @@ int sysrepo_init(struct kr_module *module)
 	if (ret != SR_ERR_OK)
 		goto cleanup;
 
-	/* Try to recover (clean up) any stale connections of clients that no longer exist */
-	ret = sr_connection_recover(sr_connection);
-	if (ret != SR_ERR_OK)
-		goto cleanup;
-
 	/* start a new session on RUNNING datastore */
 	ret = sr_session_start(sr_connection, SR_DS_RUNNING, &sr_session);
 	if (ret != SR_ERR_OK)
