@@ -124,10 +124,35 @@ local function ContainerNode(name, container_model)
     return Node:create(name, handle_cont_read, handle_cont_write, schema_init)
 end
 
-local function StateNode(name, get_val)
+local function StateNode(name, type, bind_variable)
+    local get_val = load("return " .. bind_variable)
+
     --- Node's apply function
     local function handle_apply(self, node)
         -- do nothing, it's only a state node
+    end
+
+    --- Node's serialize function
+    local function handle_serialize(self, parent_node)
+        return clib().node_new_leaf(parent_node, self.module, self.name, tostring(get_val()))
+    end
+
+    return Node:create(name, handle_apply, handle_serialize, nil)
+end
+
+local function ConfigFnNode(name, type, bind_variable)
+    local get_val = load("return " .. bind_variable .. "()")
+    local set_val = load("return function(data) " .. bind_variable .. "(data) end")()
+
+    --- Node's apply function
+    local function handle_apply(self, node)
+        local val = nil
+        if type == "uint32" or type == "uint64" then
+            val = tonumber(ffi.string(clib().node_get_value_str(node)))
+        else
+            assert(false, "Trying to serialize unknown type")
+        end
+        set_val(val)
     end
 
     --- Node's serialize function
@@ -143,11 +168,10 @@ end
 local model = 
     ContainerNode("dns-resolver", {
         ContainerNode("cache", {
-            StateNode("current-size", function() return cache.current_size end),
+            StateNode("current-size", "uint64", "cache.current_size"),
             DummyLeafNode("max-size"),
-            DummyLeafNode("max-ttl"),
-            DummyLeafNode("min-ttl"),
-            DummyLeafNode("prefill"),
+            ConfigFnNode("max-ttl", "uint32", "cache.max_ttl"),
+            ConfigFnNode("min-ttl", "uint32", "cache.min_ttl"),
         }),
         DummyLeafNode("debugging", true),
         DummyLeafNode("dns64", true),
