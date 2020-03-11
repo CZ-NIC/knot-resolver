@@ -174,7 +174,20 @@ return function(clib_binding)
     local module = {}
     function module.serialize_configuration(root_node)
         init_schema()
-        model:serialize(root_node)
+
+        -- serialize operational data
+        local node = model:serialize(root_node)
+        assert(node ~= nil)
+
+        -- validate the result
+        local validation_result = clib().node_validate(node)
+        if validation_result ~= 0 then
+            clib().node_free(node)
+            print("Tree validation failed, see printed libyang errors")
+            node = nil
+        end
+
+        return node
     end
 
     function module.apply_configuration(root_node)

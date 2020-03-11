@@ -72,3 +72,7 @@ KR_EXPORT const struct lys_node* schema_child_next(const struct lys_node* prev_c
 KR_EXPORT const char* schema_get_name(const struct lys_node* node);
 /** Get schema root */
 KR_EXPORT const struct lys_node* schema_root();
+/** Validate data tree */
+KR_EXPORT int node_validate(struct lyd_node* node);
+/** Free data nodes recursively */
+KR_EXPORT void node_free(struct lyd_node* node);
