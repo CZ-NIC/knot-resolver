@@ -124,28 +124,14 @@ local function ContainerNode(name, container_model)
     return Node:create(name, handle_cont_read, handle_cont_write, schema_init)
 end
 
-local function StateNode(name, type, bind_variable)
-    local get_val = load("return " .. bind_variable)
-
+local function BindNode(name, type, get_val, set_val)
     --- Node's apply function
     local function handle_apply(self, node)
-        -- do nothing, it's only a state node
-    end
+        -- do nothing when there is no set func
+        if set_val == nil then
+            return
+        end
 
-    --- Node's serialize function
-    local function handle_serialize(self, parent_node)
-        return clib().node_new_leaf(parent_node, self.module, self.name, tostring(get_val()))
-    end
-
-    return Node:create(name, handle_apply, handle_serialize, nil)
-end
-
-local function ConfigFnNode(name, type, bind_variable)
-    local get_val = load("return " .. bind_variable .. "()")
-    local set_val = load("return function(data) " .. bind_variable .. "(data) end")()
-
-    --- Node's apply function
-    local function handle_apply(self, node)
         local val = nil
         if type == "uint32" or type == "uint64" then
             val = tonumber(ffi.string(clib().node_get_value_str(node)))
@@ -157,15 +143,34 @@ local function ConfigFnNode(name, type, bind_variable)
 
     --- Node's serialize function
     local function handle_serialize(self, parent_node)
+        if get_val == nil then
+            return nil
+        end
+
         return clib().node_new_leaf(parent_node, self.module, self.name, tostring(get_val()))
     end
 
     return Node:create(name, handle_apply, handle_serialize, nil)
 end
 
+local function StateNode(name, type, bind_variable)
+    -- generate get function
+    local get_val = load("return " .. bind_variable)
+
+    return BindNode(name, type, get_val, nil)
+end
+
+local function ConfigFnNode(name, type, bind_variable)
+    -- generate set and get functions
+    local get_val = load("return " .. bind_variable .. "()")
+    local set_val = load("return function(data) " .. bind_variable .. "(data) end")()
+
+    return BindNode(name, type, get_val, set_val)
+end
+
 
 --- Configuration schema reprezentation
-local model = 
+local model =
     ContainerNode("dns-resolver", {
         ContainerNode("cache", {
             StateNode("current-size", "uint64", "cache.current_size"),
