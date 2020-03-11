@@ -253,9 +253,6 @@ int main(int argc, char *argv[])
 	rv = sr_connect(0, &sr_connection);
 	if (rv != SR_ERR_OK) goto sr_error;
 
-	rv = sr_connection_recover(sr_connection);
-	if (rv != SR_ERR_OK) goto sr_error;
-
 	rv = sr_session_start(sr_connection, SR_DS_RUNNING, &sr_session);
 	if (rv != SR_ERR_OK) goto sr_error;
 
