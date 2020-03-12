@@ -1047,7 +1047,7 @@ char *kr_pkt_text(const knot_pkt_t *pkt)
 		const char *qnwarn;
 		if (qname_has_uppercase(knot_pkt_qname(pkt)))
 			qnwarn = \
-"; WARNING! Uppercase positions indicate positions with letter case mismatches!\n"
+"; WARNING! Uppercase letters indicate positions with letter case mismatches!\n"
 ";          Normally you should see all-lowercase qname here.\n";
 		else
 			qnwarn = "";
