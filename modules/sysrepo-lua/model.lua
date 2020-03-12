@@ -3,10 +3,12 @@ local ffi = require("ffi")
 
 local Node = {}
 Node.__index = Node
-
 local _clib = nil
+
+--- Access function to the C helper library. Returns table on which C functions can be called
+--- directly. When retrieving strings, you must intern them first using `ffi.string()`
 local function clib()
-    assert(_clib ~= nil)
+    assert(_clib ~= nil, "Tried to use C library before it was properly initialized.")
     return _clib
 end
 
@@ -45,6 +47,10 @@ function Node:create(name, apply_func, read_func, initialize_schema_func)
     return handler
 end
 
+--- Tree node that just prints its name and value. Used for development.
+---
+--- @param name Name of the vertex for constructing XPath
+--- @param ignore_value When set to true, it does not print container value when configuration changes
 local function DummyLeafNode(name, ignore_value)
     local function dummy_read(self, node)
         if ignore_value then
@@ -71,6 +77,10 @@ local function DummyLeafNode(name, ignore_value)
     return Node:create(name, dummy_read, dummy_write, nil)
 end
 
+--- Node representing a container in YANG schema. Recursively calls its children.
+---
+--- @param name Name of the vertex for constructing XPath
+--- @param container_model List of child {@link Node}s
 local function ContainerNode(name, container_model)
     -- optimize child lookup by name with table
     local child_lookup_table = {}
@@ -124,6 +134,12 @@ local function ContainerNode(name, container_model)
     return Node:create(name, handle_cont_read, handle_cont_write, schema_init)
 end
 
+--- Node used for binding values
+---
+--- @param name Name of the vertex for constructing XPath
+--- @param type Type of the binded value as a string
+--- @param get_val Function that returns value with proper type, provides current state of the resolver.
+--- @param set_val Function with one argument of appropriate type, configures resolver
 local function BindNode(name, type, get_val, set_val)
     --- Node's apply function
     local function handle_apply(self, node)
@@ -132,12 +148,15 @@ local function BindNode(name, type, get_val, set_val)
             return
         end
 
+        -- obtain value from the lyd_node according to specified type
         local val = nil
-        if type == "uint32" or type == "uint64" then
+        if type == "uint8" or type == "uint32" or type == "uint64" then
             val = tonumber(ffi.string(clib().node_get_value_str(node)))
         else
             assert(false, "Trying to serialize unknown type")
         end
+
+        -- set the value
         set_val(val)
     end
 
@@ -153,6 +172,11 @@ local function BindNode(name, type, get_val, set_val)
     return Node:create(name, handle_apply, handle_serialize, nil)
 end
 
+--- Specialized {@link BindNode} which provides read only binding to a variable
+---
+--- @param name Name of the vertex for constructing XPath
+--- @param type Type of the binded value as a string
+--- @param bind_variable String name of the binded global variable
 local function StateNode(name, type, bind_variable)
     -- generate get function
     local get_val = load("return " .. bind_variable)
@@ -160,10 +184,29 @@ local function StateNode(name, type, bind_variable)
     return BindNode(name, type, get_val, nil)
 end
 
-local function ConfigFnNode(name, type, bind_variable)
+--- Specialized {@link BindNode} which provides read-write binding to a function
+---
+--- @param name Name of the vertex for constructing XPath
+--- @param type Type of the binded value as a string
+--- @param bind_func String name of the binded global function. When called without arguments, returns
+---     current state. When called with one argument, sets value.
+local function ConfigFnNode(name, type, bind_func)
     -- generate set and get functions
-    local get_val = load("return " .. bind_variable .. "()")
-    local set_val = load("return function(data) " .. bind_variable .. "(data) end")()
+    local get_val = load("return " .. bind_func .. "()")
+    local set_val = load("return function(data) " .. bind_func .. "(data) end")()
+
+    return BindNode(name, type, get_val, set_val)
+end
+
+--- Specialized {@link BindNode} which provides read-write binding to a variable
+---
+--- @param name Name of the vertex for constructing XPath
+--- @param type Type of the binded value as a string
+--- @param bind_value String name of the binded global variable.
+local function ConfigVarNode(name, type, bind_variable)
+    -- generate set and get functions
+    local get_val = load("return " .. bind_variable)
+    local set_val = load("return function(data) " .. bind_variable .. "= data end")()
 
     return BindNode(name, type, get_val, set_val)
 end
@@ -174,7 +217,7 @@ local model =
     ContainerNode("dns-resolver", {
         ContainerNode("cache", {
             StateNode("current-size", "uint64", "cache.current_size"),
-            DummyLeafNode("max-size"),
+            BindNode("max-size", "uint64", function() return cache.current_size end, function(v) cache.size = v end),
             ConfigFnNode("max-ttl", "uint32", "cache.max_ttl"),
             ConfigFnNode("min-ttl", "uint32", "cache.min_ttl"),
         }),
@@ -182,7 +225,9 @@ local model =
         DummyLeafNode("dns64", true),
         DummyLeafNode("dnssec", true),
         DummyLeafNode("garbage-collector", true),
-        DummyLeafNode("logging", true),
+        ContainerNode("logging", {
+            BindNode("verbosity", "uint8", function() return verbose() and 1 or 0 end, function(v) verbose(v > 0) end)
+        }),
         DummyLeafNode("network", true),
         DummyLeafNode("resolver", true),
         DummyLeafNode("server", true),
