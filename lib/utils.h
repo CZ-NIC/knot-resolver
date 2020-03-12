@@ -34,8 +34,10 @@ struct kr_request;
 
 /** @brief Callback for request events. */
 typedef void (*trace_callback_f)(struct kr_request *request);
-/** @brief Callback for request logging handler. */
-typedef void (*trace_log_f)(const struct kr_query *query, const char *source, const char *msg);
+/**
+ * @brief Callback for request logging handler.
+ * @param[in] msg Log message. Pointer is not valid after handler returns. */
+typedef void (*trace_log_f)(const char *msg);
 
 #define kr_log_info printf
 #define kr_log_error(...) fprintf(stderr, ## __VA_ARGS__)
@@ -48,14 +50,6 @@ KR_EXPORT extern bool kr_verbose_status;
 /** Set --verbose mode.  Not available if compiled with -DNOVERBOSELOG. */
 KR_EXPORT bool kr_verbose_set(bool status);
 
-/** Log a message if in --verbose mode. */
-KR_EXPORT KR_PRINTF(1)
-void kr_log_verbose(const char *fmt, ...);
-
-/** Utility for QRVERBOSE - use that instead. */
-KR_EXPORT KR_PRINTF(3)
-void kr_log_qverbose_impl(const struct kr_query *qry, const char *cls, const char *fmt, ...);
-
 /**
  * @brief Return true if the query has request log handler installed.
  */
@@ -64,14 +58,14 @@ void kr_log_qverbose_impl(const struct kr_query *qry, const char *cls, const cha
 	false))
 
 /**
- * Log a message through the request log handler.
+ * Log a message through the request log handler or stdout.
+ * Caller is responsible for detecting verbose mode, use QRVERBOSE() macro.
  * @param  query current query
  * @param  source message source
  * @param  fmt message format
- * @return true if the message was logged
  */
-KR_EXPORT KR_PRINTF(3)
-bool kr_log_trace(const struct kr_query *query, const char *source, const char *fmt, ...);
+void kr_qlog(const struct kr_query *query, const char *source, const char *fmt, ...)
+KR_EXPORT KR_PRINTF(3);
 
 #ifdef NOVERBOSELOG
 /* Efficient compile-time disabling of verbose messages. */
@@ -82,7 +76,7 @@ bool kr_log_trace(const struct kr_query *query, const char *source, const char *
 /** Block run in --verbose mode; optimized when not run. */
 #define VERBOSE_STATUS __builtin_expect(kr_verbose_status, false)
 #define WITH_VERBOSE(query) if(__builtin_expect(kr_verbose_status || kr_log_trace_enabled(query), false))
-#define kr_log_verbose if(VERBOSE_STATUS) kr_log_verbose
+#define kr_log_verbose if(VERBOSE_STATUS) printf
 
 #define KR_DNAME_GET_STR(dname_str, dname) \
 	char dname_str[KR_DNAME_STR_MAXLEN]; \

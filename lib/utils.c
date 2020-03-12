@@ -35,7 +35,6 @@
 /* Always compile-in log symbols, even if disabled. */
 #undef kr_verbose_status
 #undef kr_verbose_set
-#undef kr_log_verbose
 
 /* Logging & debugging */
 bool kr_verbose_status = false;
@@ -121,52 +120,31 @@ bool kr_verbose_set(bool status)
 	return kr_verbose_status;
 }
 
-void kr_log_verbose(const char *fmt, ...)
+void kr_qlog(const struct kr_query *qry, const char *source, const char *fmt, ...)
 {
-	if (unlikely(kr_verbose_status)) {
-		va_list args;
-		va_start(args, fmt);
-		vprintf(fmt, args);
-		va_end(args);
-	}
-}
+	struct mempool *mp = mp_new(512);
 
-void kr_log_qverbose_impl(const struct kr_query *qry, const char *cls, const char *fmt, ...)
-{
 	unsigned ind = 0;
 	for (const struct kr_query *q = qry; q; q = q->parent)
 		ind += 2;
 	uint32_t qry_uid = qry ? qry->uid : 0;
 	uint32_t req_uid = qry && qry->request ? qry->request->uid : 0;
-	/* Simplified kr_log_verbose() calls, first prefix then passed fmt...
-	 * Calling it would take about the same amount of code. */
-	printf("[%05u.%02u][%s] %*s", req_uid, qry_uid, cls, ind, "");
-	va_list args;
-	va_start(args, fmt);
-	vprintf(fmt, args);
-	va_end(args);
-}
 
-bool kr_log_trace(const struct kr_query *query, const char *source, const char *fmt, ...)
-{
-	if (!kr_log_trace_enabled(query)) {
-		return false;
-	}
-
-	auto_free char *msg = NULL;
+	char *msg = mp_printf(mp, "[%05u.%02u][%s] %*s", req_uid, qry_uid, source, ind, "");
 
 	va_list args;
 	va_start(args, fmt);
-	int len = vasprintf(&msg, fmt, args);
+	msg = mp_vprintf_append(mp, msg, fmt, args);
 	va_end(args);
 
-	/* Check formatting result before logging */
-	if (len < 0) {
-		return false;
-	}
+	if (kr_log_trace_enabled(qry))
+		qry->request->trace_log(msg);
+	else
+		/* caller is responsible for detecting verbose mode, use QRVERBOSE() macro */
+		printf("%s", msg);
 
-	query->request->trace_log(query, source, msg);
-	return true;
+	mp_delete(mp);
+	return;
 }
 
 char* kr_strcatdup(unsigned n, ...)
