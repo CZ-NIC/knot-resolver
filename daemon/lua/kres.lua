@@ -766,6 +766,24 @@ ffi.metatype( kr_request_t, {
 			assert(ffi.istype(kr_request_t, req))
 			return C.kr_rplan_pop(C.kr_resolve_plan(req), qry)
 		end,
+		selected_tostring = function(req)
+			assert(ffi.istype(kr_request_t, req))
+			local buf = {}
+			if #req.answ_selected ~= 0 then
+				table.insert(buf, string.format('[%05d.00][dbg ] selected rrsets from answer sections:\n', req.uid))
+				table.insert(buf, tostring(req.answ_selected))
+			end
+			if #req.auth_selected ~= 0 then
+				table.insert(buf, string.format('[%05d.00][dbg ] selected rrsets from authority sections:\n', req.uid))
+				table.insert(buf, tostring(req.auth_selected))
+			end
+			if #req.add_selected ~= 0 then
+				table.insert(buf, string.format('[%05d.00][dbg ] selected rrsets from additional sections:\n', req.uid))
+				table.insert(buf, tostring(req.add_selected))
+			end
+			return table.concat(buf, '')
+		end,
+
 		-- Return per-request variable table
 		-- The request can store anything in this Lua table and it will be freed
 		-- when the request is closed, it doesn't have to worry about contents.
@@ -801,7 +819,17 @@ local function c_array_iter(t, i)
 	return i, t.at[i][0]
 end
 
--- Metatype for ranked record array
+-- Metatype for a single ranked record array entry (one RRset)
+local ranked_rr_array_entry_t = ffi.typeof('ranked_rr_array_entry_t')
+ffi.metatype(ranked_rr_array_entry_t, {
+	__tostring = function(self)
+		return string.format('; ranked rrset to_wire %s, rank 0x%02x, cached %s, qry_uid %s, revalidations %s\n%s',
+		self.to_wire, self.rank, self.cached, self.qry_uid,
+		self.revalidation_cnt, string.format('%s', self.rr))
+	end
+})
+
+-- Metatype for ranked record array (array of RRsets)
 local ranked_rr_array_t = ffi.typeof('ranked_rr_array_t')
 ffi.metatype(ranked_rr_array_t, {
 	__len = function(self)
@@ -815,7 +843,14 @@ ffi.metatype(ranked_rr_array_t, {
 			if i < 0 or i > self.len then return nil end
 			return self.at[i][0]
 		end,
-	}
+	},
+	__tostring = function(self)
+		local buf = {}
+		for _, rrset in ipairs(self) do
+			table.insert(buf, tostring(rrset))
+		end
+		return table.concat(buf, '')
+	end
 })
 
 -- Cache metatype
