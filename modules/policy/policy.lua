@@ -527,6 +527,56 @@ function policy.DENY_MSG(msg)
 		return kres.DONE
 	end
 end
+
+local debug_logline_cb = ffi.cast('trace_log_f', function (msg)
+	-- msg typically ends with newline
+	io.write(ffi.string(msg))
+end)
+
+local debug_logselected_cb = ffi.cast('trace_callback_f', function (req)
+	print(req:selected_tostring())
+end)
+
+function policy.DEBUG(_, req)
+	policy.QTRACE(_, req)
+	req.trace_log = debug_logline_cb
+	req.trace_finish = debug_logselected_cb
+	return
+end
+
+local function request_answered_from_cache(req)
+	local rplan = ffi.C.kr_resolve_plan(req)
+	if tonumber(rplan.pending.len) > 0 then
+		-- an unresolved query, i.e. something is missing from the cache
+		return false
+	end
+	for idx=0, tonumber(rplan.resolved.len) - 1 do
+		if not rplan.resolved.at[idx].flags.CACHED then
+			return false
+		end
+	end
+	return true
+end
+
+function policy.DEBUG_CACHE_MISS(_, req)
+	policy.QTRACE(_, req)
+	local debug_log_buf = {}
+	req.trace_log = ffi.cast('trace_log_f', function (msg)
+		-- stash messages for conditional logging in trace_finish
+		table.insert(debug_log_buf, ffi.string(msg))
+	end)
+
+	req.trace_finish = ffi.cast('trace_callback_f', function (cbreq)
+		if not request_answered_from_cache(cbreq) then
+			log(table.concat(debug_log_buf, ''))
+			log(cbreq:selected_tostring())
+		end
+		req.trace_log:free()
+		req.trace_finish:free()
+	end)
+	return
+end
+
 policy.DENY = policy.DENY_MSG() -- compatibility with < 2.0
 
 function policy.DROP(_, _)
