@@ -527,6 +527,51 @@ function policy.DENY_MSG(msg)
 		return kres.DONE
 	end
 end
+
+local debug_logline_cb = ffi.cast('trace_log_f', function (msg)
+	-- msg typically ends with newline
+	io.write(ffi.string(msg))
+end)
+
+local debug_logselected_cb = ffi.cast('trace_callback_f', function (req)
+	log(req:selected_tostring())
+end)
+
+function policy.DEBUG(_, req)
+	policy.QTRACE(_, req)
+	req.trace_log = debug_logline_cb
+	req.trace_finish = debug_logselected_cb
+	return
+end
+
+function policy.DEBUG_CACHE_MISS(_, req)
+	policy.QTRACE(_, req)
+	req:vars().debug_log_buf = {}
+	req.trace_log = ffi.cast('trace_log_f', function (msg)
+		-- stash messages for later processing
+		table.insert(req:vars().debug_log_buf, ffi.string(msg))
+	end)
+
+	req.trace_finish = ffi.cast('trace_callback_f', function (req)
+		-- do we have a non-cached rrset?
+		local cache_miss = false
+		for _, selected_section in ipairs({ req.answ_selected, req.auth_selected, req.add_selected }) do
+			for _, rrset in ipairs(selected_section) do
+				-- "rrset.cached" is misleading name
+				-- it means "it was cached in this round"
+				cache_miss = cache_miss or rrset.cached
+			end
+		end
+		if cache_miss == true then
+			log(table.concat(req:vars().debug_log_buf, ''))
+			log(req:selected_tostring())
+		end
+		req.trace_log:free()
+		req.trace_finish:free()
+	end)
+	return
+end
+
 policy.DENY = policy.DENY_MSG() -- compatibility with < 2.0
 
 function policy.DROP(_, _)
