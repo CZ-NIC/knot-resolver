@@ -60,15 +60,15 @@ class DockerImages(ABC):
         self.run_id = None
 
     @abstractmethod
+    def cmd_pkgs_install(self):
+        raise NotImplementedError
+
+    @abstractmethod
     def cmd_kresd_install(self):
         raise NotImplementedError
 
     @abstractmethod
     def cmd_kresd_build(self):
-        raise NotImplementedError
-
-    @abstractmethod
-    def cmd_pkgs_install(self):
         raise NotImplementedError
 
     def readDependencies(self, deps_file):
@@ -87,8 +87,13 @@ class DockerImages(ABC):
         if self.module is None:
             raise AttributeError
 
+
         if from_image is None:
-            from_image = '{0}:{1}'.format(self.distro, self.version)
+            if os.path.isfile(os.path.join(self.module, self.distro, 'docker-image-name')):
+                with open(os.path.join(self.module, self.distro, 'docker-image-name')) as f:
+                    from_image = f.read()
+            else:
+                from_image = '{0}:{1}'.format(self.distro, self.version)
 
         distro_dir = os.path.join(self.module, self.distro, self.version)
 
@@ -125,7 +130,11 @@ class DockerImages(ABC):
             raise AttributeError
 
         if from_image is None:
-            from_image = '{0}:{1}'.format(self.distro, self.version)
+            if os.path.isfile(os.path.join(self.module, self.distro, 'docker-image-name')):
+                with open(os.path.join(self.module, self.distro, 'docker-image-name')) as f:
+                    from_image = f.read()
+            else:
+                from_image = '{0}:{1}'.format(self.distro, self.version)
 
         distro_dir = os.path.join(self.module, self.distro, self.version)
 
@@ -176,8 +185,10 @@ class DebianImage(DockerImages):
         super().__init__(version)
         self.distro = 'debian'
 
+    def cmd_pkgs_install(self):
+        return 'apt-get install -y '
+
     def cmd_kresd_install(self):
-        # apt install
         return 'ninja -C build_packaging install >/dev/null'
 
     def cmd_kresd_build(self):
@@ -197,11 +208,9 @@ class DebianImage(DockerImages):
                     -Dinstall_kresd_conf=enabled \\
                     -Dunit_tests=enabled \\
                     -Dc_args=\"${CFLAGS}\" \\
-                    -Dc_link_args=\"${LDFLAGS}\";
+                    -Dc_link_args=\"${LDFLAGS}\"; \\
+                ninja -C build_packaging
                 """
-
-    def cmd_pkgs_install(self):
-        return 'apt-get install -y '
 
 
 class UbuntuImage(DebianImage):
@@ -215,17 +224,76 @@ class CentosImage(DockerImages):
         super().__init__(version)
         self.distro = 'centos'
 
+    def cmd_pkgs_install(self):
+        return "yum install -y "
+
     def cmd_kresd_install(self):
-        raise NotImplementedError
-        return ""
+        return 'ninja-build -C build_packaging install >/dev/null'
 
     def cmd_kresd_build(self):
-        raise NotImplementedError
-        return ""
+        return """\\
+                [ -d /root/kresd/build_packaging ] && rm -rf /root/kresd/build_packaging/; \\
+                CFLAGS=\"$CFLAGS -Wall -pedantic -fno-omit-frame-pointer\"; \\
+                LDFLAGS=\"$LDFLAGS -Wl,--as-needed\"; \\
+                meson build_packaging \\
+                    --buildtype=plain \\
+                    --prefix=/root/kresd/install_packaging \\
+                    --sbindir=sbin \\
+                    --libdir=lib \\
+                    --includedir=include \\
+                    --sysconfdir=etc \\
+                    -Dsystemd_files=enabled \\
+                    -Dclient=enabled \\
+                    -Dunit_tests=enabled \\
+                    -Dmanaged_ta=enabled \\
+                    -Dkeyfile_default=/var/lib/knot-resolver/root.keys \\
+                    -Dinstall_root_keys=enabled \\
+                    -Dinstall_kresd_conf=enabled; \\
+                ninja-build -C build_packaging
+                """
+
+
+class FedoraImage(DockerImages):
+    def __init__(self, version):
+        super().__init__(version)
+        self.distro = 'fedora'
 
     def cmd_pkgs_install(self):
-        raise NotImplementedError
-        return ""
+        return "dnf install -y "
+
+    def cmd_kresd_install(self):
+        return 'ninja -C build_packaging install >/dev/null'
+
+    def cmd_kresd_build(self):
+        return """\\
+                [ -d /root/kresd/build_packaging ] && rm -rf /root/kresd/build_packaging/; \\
+                CFLAGS=\"$CFLAGS -Wall -pedantic -fno-omit-frame-pointer\"; \\
+                LDFLAGS=\"$LDFLAGS -Wl,--as-needed\"; \\
+                meson build_packaging \\
+                    --buildtype=plain \\
+                    --prefix=/root/kresd/install_packaging \\
+                    --sbindir=sbin \\
+                    --libdir=lib \\
+                    --includedir=include \\
+                    --sysconfdir=etc \\
+                    -Dsystemd_files=enabled \\
+                    -Dclient=enabled \\
+                    -Dunit_tests=enabled \\
+                    -Dmanaged_ta=enabled \\
+                    -Dkeyfile_default=/var/lib/knot-resolver/root.keys \\
+                    -Dinstall_root_keys=enabled \\
+                    -Dinstall_kresd_conf=enabled; \\
+                ninja -C build_packaging
+                """
+
+
+class LeapImage(FedoraImage):
+    def __init__(self, version):
+        super().__init__(version)
+        self.distro = 'leap'
+
+    def cmd_pkgs_install(self):
+        return "zypper install -y "
 
 
 def create_distro_image(name, version):
@@ -237,6 +305,10 @@ def create_distro_image(name, version):
         img = UbuntuImage(version)
     elif (name == 'centos'):
         img = CentosImage(version)
+    elif (name == 'fedora'):
+        img = FedoraImage(version)
+    elif (name == 'leap'):
+        img = LeapImage(version)
     else:
         img = None
 
@@ -316,6 +388,9 @@ def test_collect(module, buildenv, tmp_path):
     buildmod = None
     module_dir = os.path.join(pytest.KR_ROOT_DIR, module)
     distro_dir = os.path.join(module_dir, buildenv.distro, buildenv.version)
+
+    if os.path.isfile(os.path.join(distro_dir, 'NOTSUPPORTED')):
+        pytest.skip('Unsupported linux distribution ({0} {1})'.format(buildenv.distro, buildenv.version))
 
     try:
         if module == 'daemon/packaging':
