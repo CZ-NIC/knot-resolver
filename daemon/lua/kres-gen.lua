@@ -15,7 +15,7 @@ typedef struct knot_mm {
 
 typedef void *(*map_alloc_f)(void *, size_t);
 typedef void (*map_free_f)(void *baton, void *ptr);
-typedef void (*trace_log_f) (const struct kr_query *, const char *, const char *);
+typedef void (*trace_log_f) (const char *);
 typedef void (*trace_callback_f)(struct kr_request *);
 typedef enum {KNOT_ANSWER, KNOT_AUTHORITY, KNOT_ADDITIONAL} knot_section_t;
 typedef struct {
