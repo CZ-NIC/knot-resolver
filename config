@@ -8,8 +8,8 @@ cache.clear()
 ffi = require('ffi')
 
 -- local buffer = {}
-local buffer_log_cb = ffi.cast('trace_log_f', function (query, source, msg)
-	ffi.C.kr_log_qverbose_impl(query, source, '%s', msg)
+local buffer_log_cb = ffi.cast('trace_log_f', function (msg)
+	io.write(ffi.string(msg))
 end)
 
 
@@ -17,7 +17,7 @@ local finish_cb = ffi.cast('trace_callback_f', function (req)
 	log(req:selected_tostring())
 end)
 
--- verbose(true)
+--verbose(true)
 function t()
 	resolve {
 		name = 'c.577qr.com.',
