@@ -529,7 +529,7 @@ function policy.DENY_MSG(msg)
 end
 
 local debug_logline_cb = ffi.cast('trace_log_f', function (msg)
-	-- msg should end with newline, avoid print()
+	-- msg typically ends with newline
 	io.write(ffi.string(msg))
 end)
 
