@@ -441,12 +441,58 @@ resperf:iter.udp-asan:
   variables:
     RESPERF_TEST: resperf.iter.udp
 
-packaging:
+.packagingtest: &packagingtest
   stage: extended
+  only:
+    ref:
+      - nightly@knot/knot-resolver
+  dependencies: []
   tags:
     - dind
+  variables:
+    DISTRO: debian_10
   script:
-    - pytest -r fEsxX tests/packaging
+    - pytest -r fEsxX tests/packaging -k $DISTRO
+
+packaging:debian_10:
+  <<: *packagingtest
+  variables:
+    - DISTRO = debian_10
+
+packaging:debian_9:
+  <<: *packagingtest
+  variables:
+    DISTRO: debian_9
+
+packaging:ubuntu_18.04:
+  <<: *packagingtest
+  variables:
+    - DISTRO = ubuntu_18.04
+
+packaging:ubuntu_16.04:
+  <<: *packagingtest
+  variables:
+    - DISTRO = ubuntu_16.04
+
+packaging:centos_7:
+  <<: *packagingtest
+  variables:
+    - DISTRO = centos_7
+
+packaging:fedora_31:
+  <<: *packagingtest
+  variables:
+    - DISTRO = fedora_31
+
+packaging:fedora_30:
+  <<: *packagingtest
+  variables:
+    - DISTRO = fedora_30
+
+packaging:leap_15.2:
+  <<: *packagingtest
+  variables:
+    - DISTRO = leap_15.2
 
 # }}}
 
