@@ -20,8 +20,9 @@ image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
 
 stages:
   - build
-  - test
+#  - test
   - extended
+  - packaging_test
   - deploy
   - deploy-test
 
@@ -45,19 +46,19 @@ stages:
     - linux
     - amd64
 
-archive:
-  <<: *build
-  variables:
-    GIT_COMMITER_NAME: 'ci'
-    EMAIL: 'ci@nic'
-  except: null
-  script:
-    - >
-      if [[ -z "${CI_COMMIT_TAG}" ]]; then
-        ./scripts/make-dev-archive.sh
-      else
-        meson build_dist; ninja -C build_dist dist
-      fi
+#archive:
+#  <<: *build
+#  variables:
+#    GIT_COMMITER_NAME: 'ci'
+#    EMAIL: 'ci@nic'
+#  except: null
+#  script:
+#    - >
+#      if [[ -z "${CI_COMMIT_TAG}" ]]; then
+#        ./scripts/make-dev-archive.sh
+#      else
+#        meson build_dist; ninja -C build_dist dist
+#      fi
 
 build:
   <<: *build
@@ -78,23 +79,23 @@ build-asan:
       # TODO skip_asan: all three of these disappear locally when using gcc 9.1 (except some leaks)
     - ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite unit --suite config --no-suite skip_asan
 
-# NOTE: build for turris when meson is available and packaging files updated
-#build:turris:
-#  <<: *build
-#  image: $CI_REGISTRY/knot/knot-resolver/ci/turris:omnia
-#  script:
-#    - ./scripts/make-archive.sh
-#    - cp knot-resolver*.tar.xz /tmp/turris/dl/
-#    - ./scripts/make-distrofiles.sh
-#    - cp -r distro/turris /tmp/turris/package/knot-resolver
-#    - pushd /tmp/turris
-#    - export PATH=$PATH:$PWD/staging_dir/toolchain-*/bin
-#    - USE_CCACHE=n make CC=arm-openwrt-linux-gcc CXX=arm-openwrt-linux-g++ LD=arm-openwrt-linux-ld -C $PWD V=s
-#    - popd
-#    - cp /tmp/turris/bin/mvebu-musl/packages/base/*.ipk ./
-#  artifacts:
-#    paths:
-#      - "*.ipk"
+## NOTE: build for turris when meson is available and packaging files updated
+##build:turris:
+##  <<: *build
+##  image: $CI_REGISTRY/knot/knot-resolver/ci/turris:omnia
+##  script:
+##    - ./scripts/make-archive.sh
+##    - cp knot-resolver*.tar.xz /tmp/turris/dl/
+##    - ./scripts/make-distrofiles.sh
+##    - cp -r distro/turris /tmp/turris/package/knot-resolver
+##    - pushd /tmp/turris
+##    - export PATH=$PATH:$PWD/staging_dir/toolchain-*/bin
+##    - USE_CCACHE=n make CC=arm-openwrt-linux-gcc CXX=arm-openwrt-linux-g++ LD=arm-openwrt-linux-ld -C $PWD V=s
+##    - popd
+##    - cp /tmp/turris/bin/mvebu-musl/packages/base/*.ipk ./
+##  artifacts:
+##    paths:
+##      - "*.ipk"
 
 kres-gen:
   <<: *build
@@ -139,165 +140,165 @@ kres-gen:
     when:
       - script_failure
 
-.test_nodep: &test_nodep
-  stage: test
-  except:
-    refs:
-      - master@knot/knot-resolver
-      - master@knot/security/knot-resolver
-    variables:
-      - $SKIP_CI == "1"
-  dependencies: []  # do not download build artifacts
-  tags:
-    - docker
-
-build:darwin:
-  <<: *test_nodep
-  when: delayed
-  only:  # trigger job only in the main repo
-    refs:
-      - branches@knot/knot-resolver
-  except:
-    refs:
-      - master@knot/knot-resolver
-    variables:
-      - $SKIP_CI == "1"
-  start_in: 3 minutes  # give the build in Travis CI time to finish
-  script:
-    - ci/travis.py ${CI_COMMIT_REF_NAME}
-
-deckard:
-  <<: *test_flaky
-  variables:
-    TMPDIR: $CI_PROJECT_DIR
-  script:
-    - ${MESON_TEST} --suite integration
-
-doc:
-  <<: *test_nodep
-  when: delayed
-  start_in: '30 seconds'
-  script:
-    - meson build_doc -Ddoc=enabled
-    - ninja -C build_doc doc
-  artifacts:
-    expire_in: 6 hour
-    paths:
-      - doc/html
-
-docker:
-  <<: *test_nodep
-  only:  # trigger only for repos in our control (requires dind runner)
-    - branches@knot/knot-resolver
-    - branches@knot/security/knot-resolver
-  image: docker:latest
-  tags:
-    - dind
-  variables:
-    DOCKER_IMAGE_NAME: knot-resolver-test:${CI_COMMIT_SHA}
-  script:
-    - docker build --no-cache -t ${DOCKER_IMAGE_NAME} .
-    - echo "quit()" | docker run -i ${DOCKER_IMAGE_NAME}
-  after_script:  # remove dangling images to avoid running out of disk space
-    - docker rmi ${DOCKER_IMAGE_NAME}
-    - docker rmi $(docker images -f "dangling=true" -q)
-
-lint:other:
-  <<: *test_nodep
-  when: delayed
-  start_in: '30 seconds'
-  stage: test
-  script:
-    - meson build_ci_lint &>/dev/null
-    - ninja -C build_ci* pylint
-    - ninja -C build_ci* flake8
-    - ninja -C build_ci* luacheck
-
-lint:pedantic:
-  <<: *test_nodep
-  when: delayed
-  start_in: '30 seconds'
-  tags:
-    - docker
-    - linux
-    - amd64
-  script:
-    - meson build_pedantic_gcc -Dwerror=true -Dc_args='-Wpedantic' -Dextra_tests=enabled
-    - ninja -C build_pedantic_gcc
-    - >
-      CC=clang CXX=clang++ meson build_pedantic_clang -Dwerror=true -Dextra_tests=enabled -Dc_args='
-      -Wpedantic -Wno-newline-eof -Wno-gnu-zero-variadic-macro-arguments -Wno-gnu-folding-constant'
-    - ninja -C build_pedantic_clang
-
-lint:scan-build:
-  <<: *test
-  stage: test
-  artifacts:
-    when: on_failure
-    expire_in: '1 day'
-    paths:
-      - build_ci*/meson-logs/scanbuild
-  before_script: []
-  script:
-    - export SCANBUILD="scan-build --status-bugs -no-failure-reports $(./scripts/get-scanbuild-args.sh)"
-    - ninja -C build_ci* scan-build || true
-    - test "$(ls build_ci*/meson-logs/scanbuild/*/report-*.html | wc -l)" = 38 # we have this many errors ATM :-)
-
-lint:tidy:
-  <<: *test
-  artifacts:
-  script:
-    - ninja -C build_ci* tidy
-
-respdiff:basic:
-  <<: *test
-  dependencies:
-    - build-asan
-  script:
-    - ulimit -n "$(ulimit -Hn)" # applies only for kresd ATM
-    - ./ci/respdiff/start-resolvers.sh
-    - ./ci/respdiff/run-respdiff-tests.sh udp
-    - cat results/respdiff.txt
-    - echo 'test if mismatch rate < 1.0 %'
-    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
-  after_script:
-    - killall --wait kresd
-  artifacts:
-    when: always
-    paths:
-      - kresd.log*
-      - results/*.txt
-      - results/*.png
-      - results/respdiff.db/data.mdb*
-      - ./*.info
-  tags:
-    - docker
-    - linux
-    - amd64
-
-root.hints:
-  <<: *test_nodep
-  only:
-    refs:
-      - /^release.*$/
-  script:
-    - scripts/update-root-hints.sh
-
-authors:
-  <<: *test_nodep
-  only:
-    refs:
-      - /^release.*$/
-  script:
-    - scripts/update-authors.sh
-
-test:valgrind:
-  <<: *test_flaky
-  when: delayed
-  start_in: '30 seconds'
-  script:
-    - ${MESON_TEST} --suite unit --suite config --no-suite snowflake --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
-    - MESON_TESTTHREADS=1 ${MESON_TEST} --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" --suite snowflake
+#.test_nodep: &test_nodep
+#  stage: test
+#  except:
+#    refs:
+#      - master@knot/knot-resolver
+#      - master@knot/security/knot-resolver
+#    variables:
+#      - $SKIP_CI == "1"
+#  dependencies: []  # do not download build artifacts
+#  tags:
+#    - docker
+#
+#build:darwin:
+#  <<: *test_nodep
+#  when: delayed
+#  only:  # trigger job only in the main repo
+#    refs:
+#      - branches@knot/knot-resolver
+#  except:
+#    refs:
+#      - master@knot/knot-resolver
+#    variables:
+#      - $SKIP_CI == "1"
+#  start_in: 3 minutes  # give the build in Travis CI time to finish
+#  script:
+#    - ci/travis.py ${CI_COMMIT_REF_NAME}
+#
+#deckard:
+#  <<: *test_flaky
+#  variables:
+#    TMPDIR: $CI_PROJECT_DIR
+#  script:
+#    - ${MESON_TEST} --suite integration
+#
+#doc:
+#  <<: *test_nodep
+#  when: delayed
+#  start_in: '30 seconds'
+#  script:
+#    - meson build_doc -Ddoc=enabled
+#    - ninja -C build_doc doc
+#  artifacts:
+#    expire_in: 6 hour
+#    paths:
+#      - doc/html
+#
+#docker:
+#  <<: *test_nodep
+#  only:  # trigger only for repos in our control (requires dind runner)
+#    - branches@knot/knot-resolver
+#    - branches@knot/security/knot-resolver
+#  image: docker:latest
+#  tags:
+#    - dind
+#  variables:
+#    DOCKER_IMAGE_NAME: knot-resolver-test:${CI_COMMIT_SHA}
+#  script:
+#    - docker build --no-cache -t ${DOCKER_IMAGE_NAME} .
+#    - echo "quit()" | docker run -i ${DOCKER_IMAGE_NAME}
+#  after_script:  # remove dangling images to avoid running out of disk space
+#    - docker rmi ${DOCKER_IMAGE_NAME}
+#    - docker rmi $(docker images -f "dangling=true" -q)
+#
+#lint:other:
+#  <<: *test_nodep
+#  when: delayed
+#  start_in: '30 seconds'
+#  stage: test
+#  script:
+#    - meson build_ci_lint &>/dev/null
+#    - ninja -C build_ci* pylint
+#    - ninja -C build_ci* flake8
+#    - ninja -C build_ci* luacheck
+#
+#lint:pedantic:
+#  <<: *test_nodep
+#  when: delayed
+#  start_in: '30 seconds'
+#  tags:
+#    - docker
+#    - linux
+#    - amd64
+#  script:
+#    - meson build_pedantic_gcc -Dwerror=true -Dc_args='-Wpedantic' -Dextra_tests=enabled
+#    - ninja -C build_pedantic_gcc
+#    - >
+#      CC=clang CXX=clang++ meson build_pedantic_clang -Dwerror=true -Dextra_tests=enabled -Dc_args='
+#      -Wpedantic -Wno-newline-eof -Wno-gnu-zero-variadic-macro-arguments -Wno-gnu-folding-constant'
+#    - ninja -C build_pedantic_clang
+#
+#lint:scan-build:
+#  <<: *test
+#  stage: test
+#  artifacts:
+#    when: on_failure
+#    expire_in: '1 day'
+#    paths:
+#      - build_ci*/meson-logs/scanbuild
+#  before_script: []
+#  script:
+#    - export SCANBUILD="scan-build --status-bugs -no-failure-reports $(./scripts/get-scanbuild-args.sh)"
+#    - ninja -C build_ci* scan-build || true
+#    - test "$(ls build_ci*/meson-logs/scanbuild/*/report-*.html | wc -l)" = 38 # we have this many errors ATM :-)
+#
+#lint:tidy:
+#  <<: *test
+#  artifacts:
+#  script:
+#    - ninja -C build_ci* tidy
+#
+#respdiff:basic:
+#  <<: *test
+#  dependencies:
+#    - build-asan
+#  script:
+#    - ulimit -n "$(ulimit -Hn)" # applies only for kresd ATM
+#    - ./ci/respdiff/start-resolvers.sh
+#    - ./ci/respdiff/run-respdiff-tests.sh udp
+#    - cat results/respdiff.txt
+#    - echo 'test if mismatch rate < 1.0 %'
+#    - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
+#  after_script:
+#    - killall --wait kresd
+#  artifacts:
+#    when: always
+#    paths:
+#      - kresd.log*
+#      - results/*.txt
+#      - results/*.png
+#      - results/respdiff.db/data.mdb*
+#      - ./*.info
+#  tags:
+#    - docker
+#    - linux
+#    - amd64
+#
+#root.hints:
+#  <<: *test_nodep
+#  only:
+#    refs:
+#      - /^release.*$/
+#  script:
+#    - scripts/update-root-hints.sh
+#
+#authors:
+#  <<: *test_nodep
+#  only:
+#    refs:
+#      - /^release.*$/
+#  script:
+#    - scripts/update-authors.sh
+#
+#test:valgrind:
+#  <<: *test_flaky
+#  when: delayed
+#  start_in: '30 seconds'
+#  script:
+#    - ${MESON_TEST} --suite unit --suite config --no-suite snowflake --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
+#    - MESON_TESTTHREADS=1 ${MESON_TEST} --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" --suite snowflake
 # }}}
 
 # extended {{{
@@ -314,140 +315,190 @@ pytests:
   script:
     - ${MESON_TEST} --suite pytests
 
-.respdiff:  &respdiff
-  stage: extended
-  dependencies: []
-  only:  # trigger job only in repos under our control
-    - branches@knot/knot-resolver
-    - branches@knot/security/knot-resolver
-  except:
-    refs:
-      - master@knot/knot-resolver
-      - master@knot/security/knot-resolver
+#.respdiff:  &respdiff
+#  stage: extended
+#  dependencies: []
+#  only:  # trigger job only in repos under our control
+#    - branches@knot/knot-resolver
+#    - branches@knot/security/knot-resolver
+#  except:
+#    refs:
+#      - master@knot/knot-resolver
+#      - master@knot/security/knot-resolver
+#    variables:
+#      - $SKIP_CI == "1"
+#  script:
+#    - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPDIFF_FORCE -gt 0 || exit 0
+#    - test ! -f /var/tmp/respdiff-jobs/buffer/buffer_$RESPDIFF_TEST_stats.json || test $RESPDIFF_FORCE -gt 0 || ( echo "Reference unstable, try again in ~3h or use RESPDIFF_FORCE=1."; exit 1 )
+#    - export LABEL=gl$(date +%s)
+#    - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
+#    - export TESTDIR="$COMMITDIR/$RESPDIFF_TEST"
+#    - ln -s $COMMITDIR respdiff_commitdir
+#    - >
+#      sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
+#      -p $RESPDIFF_PRIORITY
+#      -c $RESPDIFF_COUNT
+#      $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
+#      "$(git rev-parse --short HEAD)" -l $LABEL -t $RESPDIFF_TEST --knot-branch=$KNOT_VERSION
+#      --respdiff-stats /var/tmp/respdiff-jobs/ref_current/*_${RESPDIFF_TEST}_stats.json)
+#    - for f in $TESTDIR/*.json; do test -s "$f" || (cat $TESTDIR/*stderr*; cat $TESTDIR/j*_docker.txt; exit 1); done
+#    - sudo -u respdiff /var/opt/respdiff/contrib/job_manager/plot_ref.sh $TESTDIR/.. /var/tmp/respdiff-jobs/ref_current $RESPDIFF_TEST
+#  after_script:
+#    - 'cp -t . respdiff_commitdir/$RESPDIFF_TEST/j* ||:'
+#    - 'cp -t . respdiff_commitdir/*$RESPDIFF_TEST*.png ||:'
+#    - 'cat respdiff_commitdir/$RESPDIFF_TEST/*histogram.tar.gz | tar -xf - -i ||:'
+#  artifacts:
+#    when: always
+#    expire_in: 1 week
+#    paths:
+#      - ./j*
+#      - ./*.png
+#      - ./*histogram/*
+#  tags:
+#    - respdiff
+#
+#fwd-tls6-kresd.udp6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.fwd-tls6-kresd.udp6
+#
+#fwd-udp6-kresd.udp6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.fwd-udp6-kresd.udp6
+#
+#iter.udp6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.iter.udp6
+#
+#iter.tls6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.iter.tls6
+#
+#fwd-udp6-unbound.udp6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.udp6
+#
+#fwd-udp6-unbound.tcp6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tcp6
+#
+#fwd-udp6-unbound.tls6:
+#  <<: *respdiff
+#  variables:
+#    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6
+#
+#.resperf:  &resperf
+#  stage: extended
+#  dependencies: []
+#  only:  # trigger job only in repos under our control
+#    - branches@knot/knot-resolver
+#    - branches@knot/security/knot-resolver
+#  except:
+#    refs:
+#      - master@knot/knot-resolver
+#      - master@knot/security/knot-resolver
+#    variables:
+#      - $SKIP_CI == "1"
+#  script:
+#    - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPERF_FORCE -gt 0 || exit 0
+#    - export LABEL=gl$(date +%s)
+#    - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
+#    - export TESTDIR="$COMMITDIR/$RESPERF_TEST"
+#    - ln -s $COMMITDIR resperf_commitdir
+#    - >
+#      sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
+#      $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
+#      "$(git rev-parse --short HEAD)" -l $LABEL --asan -t $RESPERF_TEST --knot-branch=$KNOT_VERSION)
+#    - export EXITCODE=$(cat $TESTDIR/j*_exitcode)
+#    - if [[ "$EXITCODE" == "0" ]]; then cat $TESTDIR/j*_resperf.txt; else cat $TESTDIR/j*_docker.txt; fi
+#    - exit $EXITCODE
+#  after_script:
+#    - 'cp -t . resperf_commitdir/$RESPERF_TEST/j* ||:'
+#  artifacts:
+#    when: always
+#    expire_in: 1 week
+#    paths:
+#      - ./j*
+#  tags:
+#    - respdiff
+#
+#resperf:fwd-tls6.udp-asan:
+#  <<: *resperf
+#  variables:
+#    RESPERF_TEST: resperf.fwd-tls6.udp
+#
+#resperf:fwd-udp6.udp-asan:
+#  <<: *resperf
+#  variables:
+#    RESPERF_TEST: resperf.fwd-udp6.udp
+#
+#resperf:iter.udp-asan:
+#  <<: *resperf
+#  variables:
+#    RESPERF_TEST: resperf.iter.udp
+
+# }}}
+
+
+# packaging_test {{{
+.packagingtest: &packagingtes
+  stage: packaging_test
+  only:
     variables:
       - $SKIP_CI == "1"
-  script:
-    - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPDIFF_FORCE -gt 0 || exit 0
-    - test ! -f /var/tmp/respdiff-jobs/buffer/buffer_$RESPDIFF_TEST_stats.json || test $RESPDIFF_FORCE -gt 0 || ( echo "Reference unstable, try again in ~3h or use RESPDIFF_FORCE=1."; exit 1 )
-    - export LABEL=gl$(date +%s)
-    - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
-    - export TESTDIR="$COMMITDIR/$RESPDIFF_TEST"
-    - ln -s $COMMITDIR respdiff_commitdir
-    - >
-      sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
-      -p $RESPDIFF_PRIORITY
-      -c $RESPDIFF_COUNT
-      $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
-      "$(git rev-parse --short HEAD)" -l $LABEL -t $RESPDIFF_TEST --knot-branch=$KNOT_VERSION
-      --respdiff-stats /var/tmp/respdiff-jobs/ref_current/*_${RESPDIFF_TEST}_stats.json)
-    - for f in $TESTDIR/*.json; do test -s "$f" || (cat $TESTDIR/*stderr*; cat $TESTDIR/j*_docker.txt; exit 1); done
-    - sudo -u respdiff /var/opt/respdiff/contrib/job_manager/plot_ref.sh $TESTDIR/.. /var/tmp/respdiff-jobs/ref_current $RESPDIFF_TEST
-  after_script:
-    - 'cp -t . respdiff_commitdir/$RESPDIFF_TEST/j* ||:'
-    - 'cp -t . respdiff_commitdir/*$RESPDIFF_TEST*.png ||:'
-    - 'cat respdiff_commitdir/$RESPDIFF_TEST/*histogram.tar.gz | tar -xf - -i ||:'
-  artifacts:
-    when: always
-    expire_in: 1 week
-    paths:
-      - ./j*
-      - ./*.png
-      - ./*histogram/*
-  tags:
-    - respdiff
-
-fwd-tls6-kresd.udp6:
-  <<: *respdiff
-  variables:
-    RESPDIFF_TEST: shortlist.fwd-tls6-kresd.udp6
-
-fwd-udp6-kresd.udp6:
-  <<: *respdiff
-  variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-kresd.udp6
-
-iter.udp6:
-  <<: *respdiff
-  variables:
-    RESPDIFF_TEST: shortlist.iter.udp6
-
-iter.tls6:
-  <<: *respdiff
-  variables:
-    RESPDIFF_TEST: shortlist.iter.tls6
-
-fwd-udp6-unbound.udp6:
-  <<: *respdiff
-  variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.udp6
-
-fwd-udp6-unbound.tcp6:
-  <<: *respdiff
-  variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tcp6
-
-fwd-udp6-unbound.tls6:
-  <<: *respdiff
-  variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6
-
-.resperf:  &resperf
-  stage: extended
-  dependencies: []
-  only:  # trigger job only in repos under our control
-    - branches@knot/knot-resolver
-    - branches@knot/security/knot-resolver
-  except:
-    refs:
-      - master@knot/knot-resolver
-      - master@knot/security/knot-resolver
-    variables:
-      - $SKIP_CI == "1"
-  script:
-    - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPERF_FORCE -gt 0 || exit 0
-    - export LABEL=gl$(date +%s)
-    - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
-    - export TESTDIR="$COMMITDIR/$RESPERF_TEST"
-    - ln -s $COMMITDIR resperf_commitdir
-    - >
-      sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
-      $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
-      "$(git rev-parse --short HEAD)" -l $LABEL --asan -t $RESPERF_TEST --knot-branch=$KNOT_VERSION)
-    - export EXITCODE=$(cat $TESTDIR/j*_exitcode)
-    - if [[ "$EXITCODE" == "0" ]]; then cat $TESTDIR/j*_resperf.txt; else cat $TESTDIR/j*_docker.txt; fi
-    - exit $EXITCODE
-  after_script:
-    - 'cp -t . resperf_commitdir/$RESPERF_TEST/j* ||:'
-  artifacts:
-    when: always
-    expire_in: 1 week
-    paths:
-      - ./j*
-  tags:
-    - respdiff
-
-resperf:fwd-tls6.udp-asan:
-  <<: *resperf
-  variables:
-    RESPERF_TEST: resperf.fwd-tls6.udp
-
-resperf:fwd-udp6.udp-asan:
-  <<: *resperf
-  variables:
-    RESPERF_TEST: resperf.fwd-udp6.udp
-
-resperf:iter.udp-asan:
-  <<: *resperf
-  variables:
-    RESPERF_TEST: resperf.iter.udp
-
-packaging:
-  stage: extended
+      - $TESTS_PACKAGING == "1"
   tags:
     - dind
+  variables:
+    DISTRO: debian_10
   script:
-    - pytest -r fEsxX tests/packaging
+    - pytest -r fEsxX tests/packaging -s -k $DISTRO
 
+#packaging:debian_10:
+#  <<: *packagingtes
+#  variables:
+#    - DISTRO = debain_10
+
+packaging:debian_9:
+  <<: *packagingtes
+  variables:
+    DISTRO: debian_9
+
+#packaging:ubuntu_18.04:
+#  <<: *packagingtes
+#  variables:
+#    - DISTRO = ubuntu_18.04
+#
+#packaging:ubuntu_16.04:
+#  <<: *packagingtes
+#  variables:
+#    - DISTRO = ubuntu_16.04
+#
+#packaging:centos_7:
+#  <<: *packagingtes
+#  variables:
+#    - DISTRO = centos_7
+#
+#packaging:fedora_31:
+#  <<: *packagingtes
+#  variables:
+#    - DISTRO = fedora_31
+#
+#packaging:fedora_30:
+#  <<: *packagingtes
+#  variables:
+#    - DISTRO = fedora_30
+#
+#packaging:leap_15.2:
+#  <<: *packagingtes
+#  variables:
+#    - DISTRO = leap_15.2
+#
 # }}}
 
 # deploy {{{
