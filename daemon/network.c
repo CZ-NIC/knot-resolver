@@ -312,7 +312,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 			return kr_error(ENOMEM);
 		}
 		return io_listen_tcp(net->loop, ep_handle, ep->fd,
-					net->tcp_backlog, ep->flags.tls);
+					net->tcp_backlog, ep->flags.tls, ep->flags.http);
 	} /* else */
 
 	assert(!EINVAL);

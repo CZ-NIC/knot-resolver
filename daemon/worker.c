@@ -125,7 +125,8 @@ struct worker_ctx *the_worker = NULL;
 /*! @internal Create a UDP/TCP handle for an outgoing AF_INET* connection.
  *  socktype is SOCK_* */
 static uv_handle_t *ioreq_spawn(struct worker_ctx *worker,
-				int socktype, sa_family_t family, bool has_tls)
+				int socktype, sa_family_t family, bool has_tls,
+				bool has_http)
 {
 	bool precond = (socktype == SOCK_DGRAM || socktype == SOCK_STREAM)
 			&& (family == AF_INET  || family == AF_INET6);
@@ -141,7 +142,7 @@ static uv_handle_t *ioreq_spawn(struct worker_ctx *worker,
 	if (!handle) {
 		return NULL;
 	}
-	int ret = io_create(worker->loop, handle, socktype, family, has_tls);
+	int ret = io_create(worker->loop, handle, socktype, family, has_tls, has_http);
 	if (ret) {
 		if (ret == UV_EMFILE) {
 			worker->too_many_open = true;
@@ -292,6 +293,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		req->qsource.dst_addr = session_get_sockname(session);
 		req->qsource.flags.tcp = session_get_handle(session)->type == UV_TCP;
 		req->qsource.flags.tls = session_flags(session)->has_tls;
+		req->qsource.flags.http = session_flags(session)->has_http;
 		/* We need to store a copy of peer address. */
 		memcpy(&ctx->source.addr.ip, peer, kr_sockaddr_len(peer));
 		req->qsource.addr = &ctx->source.addr.ip;
@@ -577,6 +579,11 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 	struct worker_ctx *worker = ctx->worker;
 	/* Send using given protocol */
 	assert(!session_flags(session)->closing);
+//	if (session_flags(session)->has_http) {
+//		uv_write_t *write_req = (uv_write_t *)ioreq;
+//		write_req->data = task;
+//		ret = http_pack(write_req, handle, pkt);
+//	}
 	if (session_flags(session)->has_tls) {
 		uv_write_t *write_req = (uv_write_t *)ioreq;
 		write_req->data = task;
@@ -1008,7 +1015,7 @@ static uv_handle_t *retransmit(struct qr_task *task)
 		if (kr_resolve_checkout(&ctx->req, NULL, (struct sockaddr *)choice, SOCK_DGRAM, task->pktbuf) != 0) {
 			return ret;
 		}
-		ret = ioreq_spawn(ctx->worker, SOCK_DGRAM, choice->sin6_family, false);
+		ret = ioreq_spawn(ctx->worker, SOCK_DGRAM, choice->sin6_family, false, false);
 		if (!ret) {
 			return ret;
 		}
@@ -1160,6 +1167,11 @@ static int qr_task_finalize(struct qr_task *task, int state)
 			udp_queue_push(fd, &ctx->req, task);
 		}
 	} else {
+		if (session_flags(source_session)->has_http) {
+			//knot_pkt_t *answer = ctx->req.answer;
+			http_pack(source_session, ctx->req.answer);
+			//ret = qr_task_send(task, source_session, &ctx->source.addr.ip, ctx->req.answer);
+		}
 		ret = qr_task_send(task, source_session, &ctx->source.addr.ip, ctx->req.answer);
 	}
 
@@ -1309,8 +1321,9 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 		tls_client_ctx_free(tls_ctx);
 		return kr_error(EINVAL);
 	}
+	bool has_http = (false);
 	bool has_tls = (tls_ctx != NULL);
-	uv_handle_t *client = ioreq_spawn(worker, SOCK_STREAM, addr->sa_family, has_tls);
+	uv_handle_t *client = ioreq_spawn(worker, SOCK_STREAM, addr->sa_family, has_tls, has_http);
 	if (!client) {
 		tls_client_ctx_free(tls_ctx);
 		free(conn);
