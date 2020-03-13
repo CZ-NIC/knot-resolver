@@ -1,4 +1,4 @@
-/*  Copyright (C) 2018 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2018-2020 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -10,6 +10,7 @@
 #include "daemon/session.h"
 #include "daemon/engine.h"
 #include "daemon/tls.h"
+#include "daemon/http.h"
 #include "daemon/worker.h"
 #include "daemon/io.h"
 #include "lib/generic/queue.h"
@@ -31,6 +32,8 @@ struct session {
 
 	struct tls_ctx_t *tls_ctx;    /**< server side tls-related data. */
 	struct tls_client_ctx_t *tls_client_ctx; /**< client side tls-related data. */
+
+	struct http_ctx_t *http_ctx;
 
 	trie_t *tasks;                /**< list of tasks assotiated with given session. */
 	queue_t(struct qr_task *) waiting;  /**< list of tasks waiting for sending to upstream. */
@@ -97,6 +100,9 @@ void session_close(struct session *session)
 
 	if (!uv_is_closing((uv_handle_t *)&session->timeout)) {
 		uv_timer_stop(&session->timeout);
+		if (session->http_ctx) {
+			http_close(session->http_ctx);
+		}
 		if (session->tls_client_ctx) {
 			tls_close(&session->tls_client_ctx->c);
 		}
@@ -284,6 +290,16 @@ struct tls_common_ctx *session_tls_get_common_ctx(const struct session *session)
 	return tls_ctx;
 }
 
+struct http_ctx_t *session_http_get_server_ctx(const struct session *session)
+{
+	return session->http_ctx;
+}
+
+void session_http_set_server_ctx(struct session *session, struct http_ctx_t *ctx)
+{
+	session->http_ctx = ctx;
+}
+
 uv_handle_t *session_get_handle(struct session *session)
 {
 	return session->handle;
@@ -294,7 +310,7 @@ struct session *session_get(uv_handle_t *h)
 	return h->data;
 }
 
-struct session *session_new(uv_handle_t *handle, bool has_tls)
+struct session *session_new(uv_handle_t *handle, bool has_tls, bool has_http)
 {
 	if (!handle) {
 		return NULL;
@@ -313,6 +329,9 @@ struct session *session_new(uv_handle_t *handle, bool has_tls)
 			 * gnutls gives the application chunks of size 16 kb each. */
 			wire_buffer_size += TLS_CHUNK_SIZE;
 			session->sflags.has_tls = true;
+		}
+		if (has_http) {
+			session->sflags.has_http = true;
 		}
 		uint8_t *wire_buf = malloc(wire_buffer_size);
 		if (!wire_buf) {
