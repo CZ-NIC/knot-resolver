@@ -337,6 +337,13 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 	tls->c.worker = worker;
 	tls->c.client_side = false;
 
+	//TODO Move to HTTP
+	//const gnutls_datum_t protos[] = {
+	//	{(unsigned char *)"h2", 2}
+	//};
+	//gnutls_alpn_set_protocols(tls->c.tls_session, protos, sizeof(protos)/sizeof(*protos), 0);
+	//END TODO
+
 	gnutls_transport_set_pull_function(tls->c.tls_session, kres_gnutls_pull);
 	gnutls_transport_set_vec_push_function(tls->c.tls_session, kres_gnutls_vec_push);
 	gnutls_transport_set_ptr(tls->c.tls_session, tls);
