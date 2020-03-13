@@ -1,4 +1,4 @@
-/*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2014-2020 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -59,6 +59,8 @@ static inline int KR_COLD kr_error(int x) {
  * Defines.
  */
 #define KR_DNS_PORT   53
+#define KR_DNS_HTTP_PORT 80
+#define KR_DNS_DOH_PORT 443
 #define KR_DNS_TLS_PORT 853
 #define KR_EDNS_VERSION 0
 #define KR_EDNS_PAYLOAD 4096 /* Default UDP payload (max unfragmented UDP is 1452B) */
