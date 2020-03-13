@@ -53,9 +53,25 @@ KR_EXPORT bool kr_verbose_set(bool status);
 /**
  * @brief Return true if the query has request log handler installed.
  */
-#define kr_log_trace_enabled(query) (__builtin_expect( \
-	(query) && (query)->request && (query)->request->trace_log, \
+#define kr_log_rtrace_enabled(req) (__builtin_expect( \
+	(req) && (req)->trace_log, \
 	false))
+
+#define kr_log_qtrace_enabled(qry) (__builtin_expect( \
+	(qry) && kr_log_rtrace_enabled(qry->request), \
+	false))
+
+/**
+ * Log a message through the request log handler or stdout.
+ * Caller is responsible for detecting verbose mode, use QRVERBOSE() macro.
+ * @param  qry_uid query ID to append to request ID, 0 means "no query"
+ * @param  indent level of indentation between [req.qry][source] and message
+ * @param  source message source
+ * @param  fmt message format
+ */
+void kr_log_req(const struct kr_request * const req, uint32_t qry_uid,
+		const unsigned int indent, const char *source, const char *fmt, ...)
+KR_EXPORT KR_PRINTF(5);
 
 /**
  * Log a message through the request log handler or stdout.
@@ -64,7 +80,7 @@ KR_EXPORT bool kr_verbose_set(bool status);
  * @param  source message source
  * @param  fmt message format
  */
-void kr_qlog(const struct kr_query *query, const char *source, const char *fmt, ...)
+void kr_log_q(const struct kr_query *qry, const char *source, const char *fmt, ...)
 KR_EXPORT KR_PRINTF(3);
 
 #ifdef NOVERBOSELOG
@@ -75,7 +91,7 @@ KR_EXPORT KR_PRINTF(3);
 
 /** Block run in --verbose mode; optimized when not run. */
 #define VERBOSE_STATUS __builtin_expect(kr_verbose_status, false)
-#define WITH_VERBOSE(query) if(__builtin_expect(kr_verbose_status || kr_log_trace_enabled(query), false))
+#define WITH_VERBOSE(query) if(__builtin_expect(kr_verbose_status || kr_log_qtrace_enabled(query), false))
 #define kr_log_verbose if(VERBOSE_STATUS) printf
 
 #define KR_DNAME_GET_STR(dname_str, dname) \
