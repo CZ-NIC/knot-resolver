@@ -29,6 +29,7 @@ if not lmdb.found()  # darwin workaround: missing pkgconfig
 endif
 gnutls = dependency('gnutls')
 luajit = dependency('luajit')
+nghttp2 = dependency('libnghttp2')
 # NOTE avoid using link_args for luajit due to a macOS issue
 # https://github.com/Homebrew/homebrew-core/issues/37169
 luajit_inc = luajit.partial_dependency(compile_args: true, includes: true)
