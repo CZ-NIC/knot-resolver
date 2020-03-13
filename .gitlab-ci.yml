@@ -446,7 +446,9 @@ packaging:
   tags:
     - dind
   script:
-    - pytest -r fEsxX tests/packaging
+#    - pytest -r fEsxX tests/packaging
+    - pytest -r -fEsxX -s test_collect[leap_15.2-modules/graphite/packaging]
+    - pytest -r -fEsxX -s test_collect[leap_15.2-modules/experimental_dot_auth/packaging]
 
 # }}}
 
