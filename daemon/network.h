@@ -20,6 +20,7 @@ struct engine;
 typedef struct {
 	int sock_type;    /**< SOCK_DGRAM or SOCK_STREAM */
 	bool tls;         /**< only used together with .kind == NULL and .tcp */
+	bool http;        /**< only used together with .kind == NULL and .tcp */
 	const char *kind; /**< tag for other types than the three usual */
 	bool freebind;    /**< used for binding to non-local address **/
 } endpoint_flags_t;
