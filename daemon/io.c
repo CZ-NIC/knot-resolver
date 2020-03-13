@@ -1,4 +1,4 @@
-/*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2014-2020 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -12,6 +12,7 @@
 #include "daemon/network.h"
 #include "daemon/worker.h"
 #include "daemon/tls.h"
+#include "daemon/http.h"
 #include "daemon/session.h"
 
 #define negotiate_bufsize(func, handle, bufsize_want) do { \
@@ -175,7 +176,7 @@ int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
 	uv_handle_t *h = (uv_handle_t *)handle;
 	check_bufsize(h);
 	/* Handle is already created, just create context. */
-	struct session *s = session_new(h, false);
+	struct session *s = session_new(h, false, false);
 	assert(s);
 	session_flags(s)->outgoing = false;
 
@@ -300,6 +301,24 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		data = session_wirebuf_get_free_start(s);
 		data_len = consumed;
 	}
+	if (session_flags(s)->has_http) {
+		consumed = http_process_input_data(s, data, data_len);
+		if (consumed < 0) {
+			if (kr_verbose_status) {
+				struct sockaddr *peer = session_get_peer(s);
+				char *peer_str = kr_straddr(peer);
+				kr_log_verbose("[io] => connection to '%s': "
+				       "error processing HTTP data, close\n",
+				       peer_str ? peer_str : "");
+			}
+			worker_end_tcp(s);
+			return;
+		} else if (consumed == 0) {
+			return;
+		}
+		data = session_wirebuf_get_free_start(s);
+		data_len = consumed;
+	}
 
 	/* data points to start of the free space in session wire buffer.
 	   Simple increase internal counter. */
@@ -316,7 +335,17 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	mp_flush(worker->pkt_pool.ctx);
 }
 
-static void _tcp_accept(uv_stream_t *master, int status, bool tls)
+static ssize_t tls_send(const uint8_t *buffer, const size_t buffer_len, void *user_ctx)
+{
+	struct tls_ctx_t *ctx = user_ctx;
+	ssize_t len = 0;
+	if ((len = gnutls_record_send(ctx->c.tls_session, buffer, buffer_len)) < 0) {
+		return kr_error(EIO);
+	}
+	return len;
+}
+
+static void _tcp_accept(uv_stream_t *master, int status, bool tls, bool http)
 {
  	if (status != 0) {
 		return;
@@ -328,7 +357,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 		return;
 	}
 	int res = io_create(master->loop, (uv_handle_t *)client,
-			    SOCK_STREAM, AF_UNSPEC, tls);
+			    SOCK_STREAM, AF_UNSPEC, tls, http);
 	if (res) {
 		if (res == UV_EMFILE) {
 			worker->too_many_open = true;
@@ -392,23 +421,71 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 			session_tls_set_server_ctx(s, ctx);
 		}
 	}
+	if (http) {
+		struct http_ctx_t *ctx = session_http_get_server_ctx(s);
+		if (!ctx) {
+			//TODO add TCP callback (replace NULL) for plaintext HTTP
+			ctx = http_new((tls) ? tls_send : NULL,
+			               (tls) ? session_tls_get_server_ctx(s) : NULL
+			);
+			if (!ctx) {
+				session_close(s);
+				return;
+			}
+
+			struct tls_ctx_t *tls_ctx = session_tls_get_server_ctx(s);
+			if (tls_ctx) {
+				const gnutls_datum_t protos[] = {
+					{(unsigned char *)"h2", 2}
+				};
+				ret = gnutls_alpn_set_protocols(tls_ctx->c.tls_session,
+				                                protos, sizeof(protos)/sizeof(*protos),
+												0);
+				if (ret != GNUTLS_E_SUCCESS) {
+					session_close(s);
+					return;
+				}
+			}
+			session_http_set_server_ctx(s, ctx);
+		}
+	}
 	session_timer_start(s, tcp_timeout_trigger, timeout, idle_in_timeout);
 	io_start_read((uv_handle_t *)client);
 }
 
 static void tcp_accept(uv_stream_t *master, int status)
 {
-	_tcp_accept(master, status, false);
+	_tcp_accept(master, status, false, false);
 }
 
 static void tls_accept(uv_stream_t *master, int status)
 {
-	_tcp_accept(master, status, true);
+	_tcp_accept(master, status, true, false);
 }
 
-int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bool has_tls)
+static void http_accept(uv_stream_t *master, int status)
 {
-	const uv_connection_cb connection = has_tls ? tls_accept : tcp_accept;
+	_tcp_accept(master, status, false, true);
+}
+
+static void https_accept(uv_stream_t *master, int status)
+{
+	_tcp_accept(master, status, true, true);
+}
+
+int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bool has_tls, bool has_http)
+{
+	uv_connection_cb connection;
+	if (has_tls && has_http) {
+		connection = https_accept;
+	} else if (has_tls) {
+		connection = tls_accept;
+	} else if (has_http) {
+		connection = http_accept;
+	} else {
+		connection = tcp_accept;
+	}
+
 	if (!handle) {
 		return kr_error(EINVAL);
 	}
@@ -596,7 +673,7 @@ int io_listen_pipe(uv_loop_t *loop, uv_pipe_t *handle, int fd)
 	return 0;
 }
 
-int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family, bool has_tls)
+int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family, bool has_tls, bool has_http)
 {
 	int ret = -1;
 	if (type == SOCK_DGRAM) {
@@ -608,7 +685,7 @@ int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family, b
 	if (ret != 0) {
 		return ret;
 	}
-	struct session *s = session_new(handle, has_tls);
+	struct session *s = session_new(handle, has_tls, has_http);
 	if (s == NULL) {
 		ret = -1;
 	}
