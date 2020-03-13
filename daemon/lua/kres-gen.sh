@@ -190,7 +190,8 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 # Nameservers
 	kr_nsrep_set
 # Utils
-	kr_qlog
+	kr_log_req
+	kr_log_q
 	kr_make_query
 	kr_pkt_make_auth_header
 	kr_pkt_put
