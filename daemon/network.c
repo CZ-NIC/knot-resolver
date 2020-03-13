@@ -1,4 +1,4 @@
-/*  Copyright (C) 2015-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2015-2020 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -312,7 +312,7 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 			return kr_error(ENOMEM);
 		}
 		return io_listen_tcp(net->loop, ep_handle, ep->fd,
-					net->tcp_backlog, ep->flags.tls);
+					net->tcp_backlog, ep->flags.tls, ep->flags.http);
 	} /* else */
 
 	assert(!EINVAL);
