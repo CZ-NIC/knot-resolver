@@ -10,6 +10,7 @@ kresd_src = files([
   'bindings/worker.c',
   'engine.c',
   'ffimodule.c',
+  'http.c',
   'io.c',
   'main.c',
   'network.c',
@@ -17,6 +18,7 @@ kresd_src = files([
   'tls.c',
   'tls_ephemeral_credentials.c',
   'tls_session_ticket-srv.c',
+  'http.c',
   'udp_queue.c',
   'worker.c',
   'zimport.c',
@@ -43,6 +45,7 @@ kresd_deps = [
   gnutls,
   libsystemd,
   capng,
+  nghttp2,
 ]
 
 
