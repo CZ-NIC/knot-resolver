@@ -120,30 +120,51 @@ bool kr_verbose_set(bool status)
 	return kr_verbose_status;
 }
 
-void kr_qlog(const struct kr_query *qry, const char *source, const char *fmt, ...)
+static void kr_vlog_req(
+	const struct kr_request * const req, uint32_t qry_uid,
+	const unsigned int indent, const char *source, const char *fmt,
+	va_list args)
 {
 	struct mempool *mp = mp_new(512);
 
-	unsigned ind = 0;
-	for (const struct kr_query *q = qry; q; q = q->parent)
-		ind += 2;
-	uint32_t qry_uid = qry ? qry->uid : 0;
-	uint32_t req_uid = qry && qry->request ? qry->request->uid : 0;
+	const uint32_t req_uid = req ? req->uid : 0;
+	char *msg = mp_printf(mp, "[%05u.%02u][%-4s] %*s",
+				req_uid, qry_uid, source, indent, "");
 
-	char *msg = mp_printf(mp, "[%05u.%02u][%s] %*s", req_uid, qry_uid, source, ind, "");
-
-	va_list args;
-	va_start(args, fmt);
 	msg = mp_vprintf_append(mp, msg, fmt, args);
-	va_end(args);
 
-	if (kr_log_trace_enabled(qry))
-		qry->request->trace_log(msg);
+	if (kr_log_rtrace_enabled(req))
+		req->trace_log(msg);
 	else
 		/* caller is responsible for detecting verbose mode, use QRVERBOSE() macro */
 		printf("%s", msg);
 
 	mp_delete(mp);
+	return;
+}
+
+void kr_log_req(const struct kr_request * const req, uint32_t qry_uid,
+		const unsigned int indent, const char *source, const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	kr_vlog_req(req, qry_uid, indent, source, fmt, args);
+	va_end(args);
+}
+
+void kr_log_q(const struct kr_query * const qry,
+		const char *source, const char *fmt, ...)
+{
+	unsigned ind = 0;
+	for (const struct kr_query *q = qry; q; q = q->parent)
+		ind += 2;
+	const uint32_t qry_uid = qry ? qry->uid : 0;
+	const struct kr_request *req = qry ? qry->request : NULL;
+
+	va_list args;
+	va_start(args, fmt);
+	kr_vlog_req(req, qry_uid, ind, source, fmt, args);
+	va_end(args);
 	return;
 }
 
