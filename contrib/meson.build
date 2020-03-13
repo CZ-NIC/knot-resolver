@@ -8,7 +8,8 @@ contrib_src = files([
   'ucw/mempool-fmt.c',
   'murmurhash3/murmurhash3.c',
   'base32hex.c',
-  'base64.c'
+  'base64.c',
+  'base64url.c'
 ])
 
 contrib_inc = include_directories('.', '..')
