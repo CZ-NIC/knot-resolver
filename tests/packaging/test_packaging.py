@@ -430,7 +430,9 @@ def test_collect(module, buildenv, tmp_path):
                                 'pre-run.sh'), '/root/kresd/')
 
                 if os.path.isfile(os.path.join(distro_dir, 'rundeps')):
-                    ch.exec_cmd(buildenv.cmd_pkgs_install() + ' '.join(
+                    logger.debug(buildmod.cmd_pkgs_install() + ' '.join(
+                                  buildmod.readDependencies(os.path.join(distro_dir, 'rundeps'))))
+                    ch.exec_cmd(buildmod.cmd_pkgs_install() + ' '.join(
                                 buildmod.readDependencies(os.path.join(distro_dir, 'rundeps'))),
                                 '/root/kresd/')
 
