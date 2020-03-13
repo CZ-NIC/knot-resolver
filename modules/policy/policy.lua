@@ -533,14 +533,19 @@ local debug_logline_cb = ffi.cast('trace_log_f', function (msg)
 	io.write(ffi.string(msg))
 end)
 
-local debug_logselected_cb = ffi.cast('trace_callback_f', function (req)
-	print(req:selected_tostring())
+local debug_logfinish_cb = ffi.cast('trace_callback_f', function (req)
+	ffi.C.kr_log_req(req, 0, 0, 'dbg',
+		'following rrsets were marked as interesting:\n' ..
+		req:selected_tostring())
+	ffi.C.kr_log_req(req, 0, 0, 'dbg',
+		'answer packet:\n' ..
+		tostring(req.answer))
 end)
 
 function policy.DEBUG(_, req)
 	policy.QTRACE(_, req)
 	req.trace_log = debug_logline_cb
-	req.trace_finish = debug_logselected_cb
+	req.trace_finish = debug_logfinish_cb
 	return
 end
 
@@ -568,8 +573,8 @@ function policy.DEBUG_CACHE_MISS(_, req)
 
 	req.trace_finish = ffi.cast('trace_callback_f', function (cbreq)
 		if not request_answered_from_cache(cbreq) then
-			log(table.concat(debug_log_buf, ''))
-			log(cbreq:selected_tostring())
+			debug_logfinish_cb(cbreq)  -- unconditional version
+			io.write(table.concat(debug_log_buf, ''))
 		end
 		req.trace_log:free()
 		req.trace_finish:free()
