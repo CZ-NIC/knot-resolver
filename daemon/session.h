@@ -1,4 +1,4 @@
-/*  Copyright (C) 2018 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2018-2020 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -20,11 +20,12 @@ struct session_flags {
 	bool connected : 1;     /**< True: TCP connection is established. */
 	bool closing : 1;       /**< True: session close sequence is in progress. */
 	bool wirebuf_error : 1; /**< True: last operation with wirebuf ended up with an error. */
+	bool has_http : 1;
 };
 
 /* Allocate new session for a libuv handle.
  * If handle->tyoe is UV_UDP, tls parameter will be ignored. */
-struct session *session_new(uv_handle_t *handle, bool has_tls);
+struct session *session_new(uv_handle_t *handle, bool has_tls, bool has_http);
 /* Clear and free given session. */
 void session_free(struct session *session);
 /* Clear session. */
@@ -94,6 +95,11 @@ void session_tls_set_client_ctx(struct session *session, struct tls_client_ctx_t
 /** Get pointer to that part of tls-related data which has common structure for 
  *  server and client. */
 struct tls_common_ctx *session_tls_get_common_ctx(const struct session *session);
+
+/** Get **/
+struct http_ctx_t *session_http_get_server_ctx(const struct session *session);
+/** Set pointer **/
+void session_http_set_server_ctx(struct session *session, struct http_ctx_t *ctx);
 
 /** Get pointer to underlying libuv handle for IO operations. */
 uv_handle_t *session_get_handle(struct session *session);
