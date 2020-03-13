@@ -371,8 +371,8 @@ def buildenv(request, tmpdir_factory):
                       from_image=img.build_id)
 
     yield img
-    client.images.remove(img.run_id)
-    client.images.remove(img.build_id)
+#    client.images.remove(img.run_id)
+#    client.images.remove(img.build_id)
 
 
 @pytest.mark.parametrize('module', MODULES)
@@ -390,7 +390,7 @@ def test_collect(module, buildenv, tmp_path):
     distro_dir = os.path.join(module_dir, buildenv.distro, buildenv.version)
 
     if os.path.isfile(os.path.join(distro_dir, 'NOTSUPPORTED')):
-        pytest.skip('Unsupported linux distribution ({0} {1})'.format(buildenv.distro, buildenv.version))
+        pytest.skip('Unsupported linux distribution ({0} {1}:{2})'.format(buildenv.distro, buildenv.version, module))
 
     try:
         if module == 'daemon/packaging':
@@ -430,7 +430,9 @@ def test_collect(module, buildenv, tmp_path):
                                 'pre-run.sh'), '/root/kresd/')
 
                 if os.path.isfile(os.path.join(distro_dir, 'rundeps')):
-                    ch.exec_cmd(buildenv.cmd_pkgs_install() + ' '.join(
+                    logger.debug(buildmod.cmd_pkgs_install() + ' '.join(
+                                  buildmod.readDependencies(os.path.join(distro_dir, 'rundeps'))))
+                    ch.exec_cmd(buildmod.cmd_pkgs_install() + ' '.join(
                                 buildmod.readDependencies(os.path.join(distro_dir, 'rundeps'))),
                                 '/root/kresd/')
 
@@ -469,8 +471,8 @@ def test_collect(module, buildenv, tmp_path):
     finally:
         ch.stop()
         ch.container.remove()
-        if buildmod is not None and buildmod is not buildenv:
-            client.images.remove(buildmod.run_id)
-            client.images.remove(buildmod.build_id)
+#        if buildmod is not None and buildmod is not buildenv:
+#            client.images.remove(buildmod.run_id)
+#            client.images.remove(buildmod.build_id)
 
     assert(rcode == 0)
