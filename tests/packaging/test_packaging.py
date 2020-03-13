@@ -390,7 +390,7 @@ def test_collect(module, buildenv, tmp_path):
     distro_dir = os.path.join(module_dir, buildenv.distro, buildenv.version)
 
     if os.path.isfile(os.path.join(distro_dir, 'NOTSUPPORTED')):
-        pytest.skip('Unsupported linux distribution ({0} {1})'.format(buildenv.distro, buildenv.version))
+        pytest.skip('Unsupported linux distribution ({0} {1}:{2})'.format(buildenv.distro, buildenv.version, module))
 
     try:
         if module == 'daemon/packaging':
@@ -430,7 +430,9 @@ def test_collect(module, buildenv, tmp_path):
                                 'pre-run.sh'), '/root/kresd/')
 
                 if os.path.isfile(os.path.join(distro_dir, 'rundeps')):
-                    ch.exec_cmd(buildenv.cmd_pkgs_install() + ' '.join(
+                    logger.debug(buildmod.cmd_pkgs_install() + ' '.join(
+                                  buildmod.readDependencies(os.path.join(distro_dir, 'rundeps'))))
+                    ch.exec_cmd(buildmod.cmd_pkgs_install() + ' '.join(
                                 buildmod.readDependencies(os.path.join(distro_dir, 'rundeps'))),
                                 '/root/kresd/')
 
