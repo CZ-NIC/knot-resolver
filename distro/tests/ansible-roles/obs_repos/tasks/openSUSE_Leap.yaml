@@ -16,3 +16,4 @@
   zypper_repository:
     repo: '*'
     runrefresh: true
+  failed_when: false
