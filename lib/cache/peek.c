@@ -293,7 +293,6 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	knot_wire_set_rcode(pkt->wire, real_rcode);
 
 	bool expiring = false; // TODO
-	VERBOSE_MSG(qry, "=> writing RRsets: ");
 	for (int i = 0; i < sizeof(ans.rrsets) / sizeof(ans.rrsets[0]); ++i) {
 		if (i == 1) knot_pkt_begin(pkt, KNOT_AUTHORITY);
 		if (!ans.rrsets[i].set.rr) continue;
@@ -303,10 +302,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 			assert(false);
 			return ctx->state;
 		}
-		kr_log_verbose(kr_rank_test(ans.rrsets[i].set.rank, KR_RANK_SECURE)
-				? "+" : "-");
 	}
-	kr_log_verbose("\n");
 
 	/* Finishing touches. */
 	struct kr_qflags * const qf = &qry->flags;
