@@ -178,6 +178,10 @@ Following actions act on request and then processing continue until first non-ch
         -- requests for example.net. and its subdomains
         policy.add(policy.suffix(policy.QTRACE, policy.todnames({'example.net'})))
 
+.. py:attribute:: REQTRACE
+
+   Pretty-print DNS requests from clients into the verbose log. It's useful for debugging weird DNS clients. Verbose logging must be enabled using :func:`verbose` for this policy to be effective. It makes most sense together with :ref:`mod-view`.
+
 .. py:attribute:: DEBUG_ALWAYS
 
    Enable extra verbose logging for all requests, including cache hits. See caveats for :func:`policy.DEBUG_IF`.
