@@ -178,6 +178,40 @@ Following actions act on request and then processing continue until first non-ch
         -- requests for example.net. and its subdomains
         policy.add(policy.suffix(policy.QTRACE, policy.todnames({'example.net'})))
 
+.. py:attribute:: DEBUG_ALWAYS
+
+   Enable extra verbose logging for all requests, including cache hits. See caveats for :func:`policy.DEBUG_IF`.
+
+.. py:data:: DEBUG_CACHE_MISS
+
+   Enable extra verbose logging but print logs only for requests which required information which was not available locally (i.e. requests which forced resolver to communicate over network). Intended usage is for debugging problems with remote servers. This action typically produces less logs than :func:`policy.DEBUG_ALWAYS` but all caveats from :func:`policy.DEBUG_IF` apply as well.
+
+   .. code-block:: lua
+
+        policy.add(policy.suffix(
+                policy.DEBUG_CACHE_MISS,
+                policy.todnames({'example.com.'})))
+
+.. py:function:: DEBUG_IF(test_function)
+
+   :param test_function: Function with single argument of type :c:type:`kr_request` which returns ``true`` if verbose logs for a given request should be printed and ``false`` otherwise.
+
+   Enable extra verbose logging but print logs only for requests which match condition specified by ``test_function``. This allows to fine-tune which requests should be printed.
+
+   .. warning:: Verbose logging has significant performance impact on resolver and might also overload you logging system because one request can easily generate tens of kilobytes of logs. Always use appropriate `Filters`_ to limit number of requests triggering this action to a minimum!
+
+   .. note:: ``test_function`` is evaluated only when request is finished. As a result verbose logs for all requests must be collected until request is finished because it is not possible to know beforehand how ``test_function`` at the end evaluates given request. When a request is finalized logs are either printed or thrown away.
+
+   Example usage which gathers verbose logs for all requests in subtree ``dnssec-failed.org.`` and prints verbose logs for all requests finished with states different than ``kres.DONE`` (most importantly ``kres.FAIL``, see :c:type:`kr_layer_state`).
+
+   .. code-block:: lua
+
+        policy.add(policy.suffix(
+                policy.DEBUG_IF(function(req)
+                                        return (req.state ~= kres.DONE)
+                                end),
+                policy.todnames({'dnssec-failed.org.'})))
+
 
 Custom actions
 ^^^^^^^^^^^^^^
