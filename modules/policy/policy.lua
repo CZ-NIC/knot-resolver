@@ -542,10 +542,17 @@ local debug_logfinish_cb = ffi.cast('trace_callback_f', function (req)
 		tostring(req.answer))
 end)
 
+-- log request packet
+function policy.REQTRACE(_, req)
+	ffi.C.kr_log_req(req, 0, 0, 'dbg', 'request packet:\n%s',
+		tostring(req.qsource.packet))
+end
+
 function policy.DEBUG_ALWAYS(_, req)
 	policy.QTRACE(_, req)
 	req.trace_log = debug_logline_cb
 	req.trace_finish = debug_logfinish_cb
+	policy.REQTRACE(_, req)
 	return
 end
 
@@ -567,6 +574,7 @@ function policy.DEBUG_IF(test)
 			req.trace_log:free()
 			req.trace_finish:free()
 		end)
+		policy.REQTRACE(_, req)
 		return
 	end
 end
