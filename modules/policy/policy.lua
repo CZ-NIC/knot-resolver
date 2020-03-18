@@ -542,14 +542,36 @@ local debug_logfinish_cb = ffi.cast('trace_callback_f', function (req)
 		tostring(req.answer))
 end)
 
-function policy.DEBUG(_, req)
+function policy.DEBUG_ALWAYS(_, req)
 	policy.QTRACE(_, req)
 	req.trace_log = debug_logline_cb
 	req.trace_finish = debug_logfinish_cb
 	return
 end
 
-local function request_answered_from_cache(req)
+-- buffer verbose logs and print then only if test() returns a truhy value
+function policy.DEBUG_IF(test)
+	return function (state, req)
+		policy.QTRACE(state, req)
+		local debug_log_buf = {}
+		req.trace_log = ffi.cast('trace_log_f', function (msg)
+			-- stash messages for conditional logging in trace_finish
+			table.insert(debug_log_buf, ffi.string(msg))
+		end)
+
+		req.trace_finish = ffi.cast('trace_callback_f', function (cbreq)
+			if test(cbreq) then
+				debug_logfinish_cb(cbreq)  -- unconditional version
+				io.write(table.concat(debug_log_buf, ''))
+			end
+			req.trace_log:free()
+			req.trace_finish:free()
+		end)
+		return
+	end
+end
+
+local function is_request_answered_from_cache(req)
 	local rplan = ffi.C.kr_resolve_plan(req)
 	if tonumber(rplan.pending.len) > 0 then
 		-- an unresolved query, i.e. something is missing from the cache
@@ -563,24 +585,11 @@ local function request_answered_from_cache(req)
 	return true
 end
 
-function policy.DEBUG_CACHE_MISS(_, req)
-	policy.QTRACE(_, req)
-	local debug_log_buf = {}
-	req.trace_log = ffi.cast('trace_log_f', function (msg)
-		-- stash messages for conditional logging in trace_finish
-		table.insert(debug_log_buf, ffi.string(msg))
-	end)
-
-	req.trace_finish = ffi.cast('trace_callback_f', function (cbreq)
-		if not request_answered_from_cache(cbreq) then
-			debug_logfinish_cb(cbreq)  -- unconditional version
-			io.write(table.concat(debug_log_buf, ''))
-		end
-		req.trace_log:free()
-		req.trace_finish:free()
-	end)
-	return
-end
+policy.DEBUG_CACHE_MISS = policy.DEBUG_IF(
+	function(req)
+		return not is_request_answered_from_cache(req)
+	end
+)
 
 policy.DENY = policy.DENY_MSG() -- compatibility with < 2.0
 
