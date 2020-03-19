@@ -140,7 +140,6 @@ static void kr_vlog_req(
 		printf("%s", msg);
 
 	mp_delete(mp);
-	return;
 }
 
 void kr_log_req(const struct kr_request * const req, uint32_t qry_uid,
@@ -165,7 +164,6 @@ void kr_log_q(const struct kr_query * const qry,
 	va_start(args, fmt);
 	kr_vlog_req(req, qry_uid, ind, source, fmt, args);
 	va_end(args);
-	return;
 }
 
 char* kr_strcatdup(unsigned n, ...)
