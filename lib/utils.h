@@ -80,7 +80,7 @@ KR_EXPORT KR_PRINTF(5);
  * @param  source message source
  * @param  fmt message format
  */
-void kr_log_q(const struct kr_query *query, const char *source, const char *fmt, ...)
+void kr_log_q(const struct kr_query *qry, const char *source, const char *fmt, ...)
 KR_EXPORT KR_PRINTF(3);
 
 #ifdef NOVERBOSELOG
