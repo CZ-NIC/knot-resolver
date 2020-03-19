@@ -556,7 +556,7 @@ function policy.DEBUG_ALWAYS(_, req)
 	return
 end
 
--- buffer verbose logs and print then only if test() returns a truhy value
+-- buffer verbose logs and print then only if test() returns a truthy value
 function policy.DEBUG_IF(test)
 	return function (state, req)
 		policy.QTRACE(state, req)
