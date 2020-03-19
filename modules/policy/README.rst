@@ -156,7 +156,7 @@ Chain actions
 
 Following actions act on request and then processing continue until first non-chain action (specified in the previous section) is triggered:
 
-.. function:: policy.MIRROR(ip_address)
+.. function:: MIRROR(ip_address)
 
    Send copy of incoming DNS queries to a given IP address using DNS-over-UDP and continue resolving them as usual. This is useful for sanity testing new versions of DNS resolvers.
 
@@ -164,11 +164,11 @@ Following actions act on request and then processing continue until first non-ch
 
        policy.add(policy.all(policy.MIRROR('127.0.0.2')))
 
-.. function:: policy.FLAGS(set, clear)
+.. function:: FLAGS(set, clear)
 
    Set and/or clear some flags for the query.  There can be multiple flags to set/clear.  You can just pass a single flag name (string) or a set of names. Flag names correspond to :c:type:`kr_qflags` structure.  Use only if you know what you are doing.
 
-.. py:attribute:: policy.QTRACE
+.. py:attribute:: QTRACE
 
    Pretty-print DNS response packets from authoritative servers into the verbose log for the query and its sub-queries.  It's useful for debugging weird DNS servers. Verbose logging must be enabled using :func:`verbose` for this policy to be effective.
 
@@ -178,15 +178,15 @@ Following actions act on request and then processing continue until first non-ch
         -- requests for example.net. and its subdomains
         policy.add(policy.suffix(policy.QTRACE, policy.todnames({'example.net'})))
 
-.. py:attribute:: policy.REQTRACE
+.. py:attribute:: REQTRACE
 
    Pretty-print DNS requests from clients into the verbose log. It's useful for debugging weird DNS clients. Verbose logging must be enabled using :func:`verbose` for this policy to be effective. It makes most sense together with :ref:`mod-view`.
 
-.. py:attribute:: policy.DEBUG_ALWAYS
+.. py:attribute:: DEBUG_ALWAYS
 
    Enable extra verbose logging for all requests, including cache hits. See caveats for :func:`policy.DEBUG_IF`.
 
-.. py:data:: policy.DEBUG_CACHE_MISS
+.. py:data:: DEBUG_CACHE_MISS
 
    Enable extra verbose logging but print logs only for requests which required information which was not available locally (i.e. requests which forced resolver to communicate over network). Intended usage is for debugging problems with remote servers. This action typically produces less logs than :func:`policy.DEBUG_ALWAYS` but all caveats from :func:`policy.DEBUG_IF` apply as well.
 
@@ -196,7 +196,7 @@ Following actions act on request and then processing continue until first non-ch
                 policy.DEBUG_CACHE_MISS,
                 policy.todnames({'example.com.'})))
 
-.. py:function:: policy.DEBUG_IF(test_function)
+.. py:function:: DEBUG_IF(test_function)
 
    :param test_function: Function with single argument of type :c:type:`kr_request` which returns ``true`` if verbose logs for a given request should be printed and ``false`` otherwise.
 
@@ -381,7 +381,7 @@ entire DNS namespace into distinct slices. When used in conjuction with
 :func:`policy.TLS_FORWARD`, it's possible to forward different queries to
 different targets.
 
-.. function:: policy.slice(slice_func, action[, action[, ...])
+.. function:: slice(slice_func, action[, action[, ...])
 
   :param slice_func: slicing function that returns index based on query
   :param action: action to be performed for the slice
@@ -391,7 +391,7 @@ different targets.
   which slice a query belongs to. The corresponding ``action`` is then executed.
 
 
-.. function:: policy.slice_randomize_psl(seed = os.time() / (3600 * 24 * 7))
+.. function:: slice_randomize_psl(seed = os.time() / (3600 * 24 * 7))
 
   :param seed: seed for random assignment
 
@@ -550,7 +550,7 @@ Response policy zones
   .. [#] Our :func:`policy.DROP` returns *SERVFAIL* answer (for historical reasons).
 
 
-.. function:: policy.rpz(action, path, [watch = true])
+.. function:: rpz(action, path, [watch = true])
 
   :param action: the default action for match in the zone; typically you want :func:`policy.DENY`
   :param path: path to zone file
@@ -584,7 +584,7 @@ Additional properties
 
 Most properties (actions, filters) are described above.
 
-.. function:: policy.add(rule, postrule)
+.. function:: add(rule, postrule)
 
   :param rule: added rule, i.e. ``policy.pattern(policy.DENY, '[0-9]+\2cz')``
   :param postrule: boolean, if true the rule will be evaluated on answer instead of query
@@ -599,14 +599,14 @@ Most properties (actions, filters) are described above.
        -- we can print statistics about this rule any time later
        print(string.format('id: %d, matched queries: %d', rule.id, rule.count)
 
-.. function:: policy.del(id)
+.. function:: del(id)
 
   :param id: identifier of a given rule returned by :func:`policy.add`
   :return: boolean ``true`` if rule was deleted, ``false`` otherwise
 
   Remove a rule from policy list.
 
-.. function:: policy.todnames({name, ...})
+.. function:: todnames({name, ...})
 
    :param: names table of domain names in textual format
 
