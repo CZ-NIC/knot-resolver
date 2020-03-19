@@ -188,7 +188,7 @@ Following actions act on request and then processing continue until first non-ch
 
 .. py:data:: DEBUG_CACHE_MISS
 
-   Enable extra verbose logging but print logs only for requests which required information which was not available locally (i.e. requests which forced resolver to communicate over network). Intended usage is for debugging problems with remote servers. This action typically produces less logs than :func:`policy.DEBUG_ALWAYS` but all caveats from :func:`policy.DEBUG_IF` apply as well.
+   Enable extra verbose logging but print logs only for requests which required information that wasn't available locally (i.e. requests which forced resolver to communicate over network). The intended usage is to debug issues with remote servers. This action typically produces less logs than :func:`policy.DEBUG_ALWAYS` but all caveats from :func:`policy.DEBUG_IF` apply as well.
 
    .. code-block:: lua
 
