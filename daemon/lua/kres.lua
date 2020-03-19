@@ -727,6 +727,22 @@ ffi.metatype( kr_query_t, {
 local kr_request_t = ffi.typeof('struct kr_request')
 ffi.metatype( kr_request_t, {
 	__index = {
+		-- makes sense only when request is finished
+		all_from_cache = function(req)
+			assert(ffi.istype(kr_request_t, req))
+			local rplan = ffi.C.kr_resolve_plan(req)
+			if tonumber(rplan.pending.len) > 0 then
+				-- an unresolved query,
+				-- i.e. something is missing from the cache
+				return false
+			end
+			for idx=0, tonumber(rplan.resolved.len) - 1 do
+				if not rplan.resolved.at[idx].flags.CACHED then
+					return false
+				end
+			end
+			return true
+		end,
 		current = function(req)
 			assert(ffi.istype(kr_request_t, req))
 			if req.current_query == nil then return nil end

@@ -579,23 +579,9 @@ function policy.DEBUG_IF(test)
 	end
 end
 
-local function is_request_answered_from_cache(req)
-	local rplan = ffi.C.kr_resolve_plan(req)
-	if tonumber(rplan.pending.len) > 0 then
-		-- an unresolved query, i.e. something is missing from the cache
-		return false
-	end
-	for idx=0, tonumber(rplan.resolved.len) - 1 do
-		if not rplan.resolved.at[idx].flags.CACHED then
-			return false
-		end
-	end
-	return true
-end
-
 policy.DEBUG_CACHE_MISS = policy.DEBUG_IF(
 	function(req)
-		return not is_request_answered_from_cache(req)
+		return not req:all_from_cache()
 	end
 )
 
