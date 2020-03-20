@@ -117,6 +117,7 @@ static inline void free_const(const void *what)
 	free((void *)what);
 }
 
+// Use this for alocations with mm.
 static inline void *mm_alloc(knot_mm_t *mm, size_t size)
 {
 	if (mm) return mm->alloc(mm->ctx, size);
@@ -136,6 +137,7 @@ KR_EXPORT
 void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t prev_size);
 
 /** Trivial malloc() wrapper. */
+// Use mm_alloc for alocations into mempool
 void *mm_malloc(void *ctx, size_t n);
 /** posix_memalign() wrapper. */
 void *mm_malloc_aligned(void *ctx, size_t n);

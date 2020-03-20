@@ -33,6 +33,7 @@
  */
 
 #include <inttypes.h> /* PRIu64 */
+#include <limits.h>
 #include <stdlib.h>
 #include <uv.h>
 #include <ucw/mempool.h>

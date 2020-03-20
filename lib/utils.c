@@ -11,7 +11,7 @@
 #include "lib/defines.h"
 #include "lib/generic/array.h"
 #include "lib/module.h"
-#include "lib/nsrep.h"
+#include "lib/selection.h"
 #include "lib/resolve.h"
 
 #include <gnutls/gnutls.h>

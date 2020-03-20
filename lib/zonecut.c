@@ -337,17 +337,8 @@ static addrset_info_t fetch_addr(pack_t *addrs, const knot_dname_t *ns, uint16_t
 					(int)rd->len, (int)rrtype);
 			continue;
 		}
-		/* Check RTT cache - whether the IP is usable or not. */
-		kr_nsrep_rtt_lru_entry_t *rtt_e = ctx->cache_rtt
-			? lru_get_try(ctx->cache_rtt, (const char *)rd->data, rd->len)
-			: NULL;
-		const bool unusable = rtt_e && rtt_e->score >= KR_NS_TIMEOUT
-			&& qry->creation_time_mono
-			   < rtt_e->tout_timestamp + ctx->cache_rtt_tout_retry_interval;
-		if (!unusable) {
-			result = AI_OK;
-			++usable_cnt;
-		}
+		result = AI_OK;
+		++usable_cnt;
 
 		ret = pack_obj_push(addrs, rd->data, rd->len);
 		assert(!ret); /* didn't fit because of incorrectly reserved memory */
@@ -413,16 +404,10 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 		pack_init(**pack);
 
 		addrset_info_t infos[2];
+
 		/* Fetch NS reputation and decide whether to prefetch A/AAAA records. */
-		unsigned *cached = lru_get_try(ctx->cache_rep,
-					(const char *)ns_name, ns_size);
-		unsigned reputation = (cached) ? *cached : 0;
-		infos[0] = (reputation & KR_NS_NOIP4) || qry->flags.NO_IPV4
-			? AI_REPUT
-			: fetch_addr(*pack, ns_name, KNOT_RRTYPE_A, cut->pool, qry);
-		infos[1] = (reputation & KR_NS_NOIP6) || qry->flags.NO_IPV6
-			? AI_REPUT
-			: fetch_addr(*pack, ns_name, KNOT_RRTYPE_AAAA, cut->pool, qry);
+		infos[0] = fetch_addr(*pack, ns_name, KNOT_RRTYPE_A, cut->pool, qry);
+		infos[1] = fetch_addr(*pack, ns_name, KNOT_RRTYPE_AAAA, cut->pool, qry);
 
 		#if 0 /* rather unlikely to be useful unless changing some zcut code */
 		WITH_VERBOSE(qry) {
