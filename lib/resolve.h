@@ -13,7 +13,7 @@
 #include "lib/layer.h"
 #include "lib/generic/map.h"
 #include "lib/generic/array.h"
-#include "lib/nsrep.h"
+#include "lib/selection.h"
 #include "lib/rplan.h"
 #include "lib/module.h"
 #include "lib/cache/api.h"
@@ -147,9 +147,7 @@ struct kr_context
 	map_t negative_anchors;
 	struct kr_zonecut root_hints;
 	struct kr_cache cache;
-	kr_nsrep_rtt_lru_t *cache_rtt;
 	unsigned cache_rtt_tout_retry_interval;
-	kr_nsrep_lru_t *cache_rep;
 	module_array_t *modules;
 	/* The cookie context structure should not be held within the cookies
 	 * module because of better access. */
@@ -166,6 +164,9 @@ struct kr_request_qsource_flags {
 	bool tls:1; /**< true if the request is encrypted; only meaningful if (dst_addr). */
 	bool http:1; /**< true if the request is on HTTP; only meaningful if (dst_addr). */
 };
+
+typedef bool (*addr_info_f)(struct sockaddr*);
+typedef void (*async_resolution_f)(knot_dname_t*, enum knot_rr_type);
 
 /**
  * Name resolution request.
@@ -195,7 +196,7 @@ struct kr_request {
 	} qsource;
 	struct {
 		unsigned rtt;                  /**< Current upstream RTT */
-		const struct sockaddr *addr;   /**< Current upstream address */
+		const struct kr_transport *transport;   /**< Current upstream transport */
 	} upstream;                        /**< Upstream information, valid only in consume() phase */
 	struct kr_qflags options;
 	int state;
@@ -219,6 +220,14 @@ struct kr_request {
 	trace_callback_f trace_finish; /**< Request finish tracepoint */
 	int vars_ref; /**< Reference to per-request variable table. LUA_NOREF if not set. */
 	knot_mm_t pool;
+	struct {
+		addr_info_f is_tls_capable;
+		addr_info_f is_tcp_connected;
+		addr_info_f is_tcp_waiting;
+		async_resolution_f async_ns_resolution;
+		union inaddr *forwarding_targets; /**< When forwarding, possible targets are put here */
+		size_t forward_targets_num;
+	} selection_context;
 	unsigned int uid; /** for logging purposes only */
 	unsigned int count_no_nsaddr;
 	unsigned int count_fail_row;
@@ -256,7 +265,7 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
  * @return         any state
  */
 KR_EXPORT
-int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, knot_pkt_t *packet);
+int kr_resolve_consume(struct kr_request *request, struct kr_transport **transport, knot_pkt_t *packet);
 
 /**
  * Produce either next additional query or finish.
@@ -272,7 +281,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
  * @return         any state
  */
 KR_EXPORT
-int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *type, knot_pkt_t *packet);
+int kr_resolve_produce(struct kr_request *request, struct kr_transport **transport, knot_pkt_t *packet);
 
 /**
  * Finalises the outbound query packet with the knowledge of the IP addresses.
@@ -288,7 +297,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
  */
 KR_EXPORT
 int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
-                        struct sockaddr *dst, int type, knot_pkt_t *packet);
+                        struct kr_transport *transport, knot_pkt_t *packet);
 
 /**
  * Finish resolution and commit results if the state is DONE.
@@ -318,4 +327,3 @@ struct kr_rplan *kr_resolve_plan(struct kr_request *request);
  */
 KR_EXPORT KR_PURE
 knot_mm_t *kr_resolve_pool(struct kr_request *request);
-

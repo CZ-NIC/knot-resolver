@@ -29,7 +29,7 @@
 #include "lib/resolve.h"
 #include "lib/rplan.h"
 #include "lib/defines.h"
-#include "lib/nsrep.h"
+#include "lib/selection.h"
 #include "lib/module.h"
 #include "lib/dnssec/ta.h"
 
@@ -716,6 +716,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	if (!is_authoritative(pkt, query)) {
 		if (!(query->flags.FORWARD) &&
 		    pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) {
+			query->server_selection.error(query, req->upstream.transport, KR_SELECTION_LAME_DELEGATION);
 			VERBOSE_MSG("<= lame response: non-auth sent negative response\n");
 			return KR_STATE_FAIL;
 		}
@@ -772,12 +773,6 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 
 		if (query->flags.FORWARD) {
 			next->forward_flags.CNAME = true;
-			if (query->parent == NULL) {
-				state = kr_nsrep_copy_set(&next->ns, &query->ns);
-				if (state != kr_ok()) {
-					return KR_STATE_FAIL;
-				}
-			}
 		}
 		next->cname_parent = query;
 		/* Want DNSSEC if and only if it's posible to secure
@@ -1026,7 +1021,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	} else if (!is_paired_to_query(pkt, query)) {
 		WITH_VERBOSE(query) {
 			const char *ns_str =
-				req->upstream.addr ? kr_straddr(req->upstream.addr) : "(internal)";
+				req->upstream.transport ? kr_straddr(&req->upstream.transport->address.ip) : "(internal)";
 			VERBOSE_MSG("<= ignoring mismatching response from %s\n",
 					ns_str ? ns_str : "(kr_straddr failed)");
 		}
@@ -1038,11 +1033,12 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		VERBOSE_MSG("<= truncated response, failover to TCP\n");
 		if (query) {
 			/* Fail if already on TCP. */
-			if (query->flags.TCP) {
+			if (req->upstream.transport->protocol != KR_TRANSPORT_UDP) {
 				VERBOSE_MSG("<= TC=1 with TCP, bailing out\n");
+				query->server_selection.error(query, req->upstream.transport, KR_SELECTION_TRUNCATED);
 				return resolve_error(pkt, req);
 			}
-			query->flags.TCP = true;
+			query->server_selection.error(query, req->upstream.transport, KR_SELECTION_TRUNCATED);
 		}
 		return KR_STATE_CONSUME;
 	}
@@ -1055,6 +1051,10 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	const knot_lookup_t *rcode = knot_lookup_by_id(knot_rcode_names, knot_wire_get_rcode(pkt->wire));
 #endif
 
+	// We can't return directly from the switch because we have to give feedback to server selection first
+	int ret = 0;
+	int selection_error = -1;
+
 	/* Check response code. */
 	switch(knot_wire_get_rcode(pkt->wire)) {
 	case KNOT_RCODE_NOERROR:
@@ -1064,19 +1064,51 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		knot_wire_set_rcode(req->answer->wire, KNOT_RCODE_YXDOMAIN);
 		break;
 	case KNOT_RCODE_REFUSED:
+		if (query->flags.STUB) {
+			 /* just pass answer through if in stub mode */
+			break;
+		}
+		selection_error = KR_SELECTION_REFUSED;
+		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
+		ret = resolve_badmsg(pkt, req, query);
+		break;
 	case KNOT_RCODE_SERVFAIL:
 		if (query->flags.STUB) {
 			 /* just pass answer through if in stub mode */
 			break;
 		}
-		/* fall through */
+		selection_error = KR_SELECTION_SERVFAIL;
+		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
+		ret = resolve_badmsg(pkt, req, query);
+		break;
 	case KNOT_RCODE_FORMERR:
+		selection_error = KR_SELECTION_FORMERROR;
+		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
+		ret = resolve_badmsg(pkt, req, query);
+		break;
 	case KNOT_RCODE_NOTIMPL:
+		selection_error = KR_SELECTION_NOTIMPL;
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		return resolve_badmsg(pkt, req, query);
+		ret = resolve_badmsg(pkt, req, query);
+		break;
 	default:
+		selection_error = KR_SELECTION_OTHER_RCODE;
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		return resolve_error(pkt, req);
+		ret = resolve_error(pkt, req);
+		break;
+	}
+
+	if (query->server_selection.initialized) {
+		if (selection_error != -1) {
+			query->server_selection.error(query, req->upstream.transport, selection_error);
+		} else {
+			// Is this even true? Is this neccesary?
+			query->server_selection.success(query, req->upstream.transport);
+		}
+	}
+
+	if (ret) {
+		return ret;
 	}
 
 	int state;
@@ -1106,7 +1138,7 @@ rrarray_finalize:
 	(void)0;
 	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
-		int ret = kr_ranked_rrarray_finalize(selected[i], query->uid, &req->pool);
+		ret = kr_ranked_rrarray_finalize(selected[i], query->uid, &req->pool);
 		if (unlikely(ret)) {
 			return KR_STATE_FAIL;
 		}
