@@ -723,6 +723,16 @@ ffi.metatype( kr_query_t, {
 		end,
 	},
 })
+
+-- helper for trace_chain_callbacks
+-- ignores return values from successfull calls but logs tracebacks for throws
+local function void_xpcall_log_tb(func, arg)
+	local ok, err = xpcall(func, debug.traceback, arg)
+	if not ok then
+		log('error: callback %s arg %s stack traceback:\n%s', func, arg, err)
+	end
+end
+
 -- Metatype for request
 local kr_request_t = ffi.typeof('struct kr_request')
 ffi.metatype( kr_request_t, {
@@ -798,6 +808,49 @@ ffi.metatype( kr_request_t, {
 				table.insert(buf, tostring(req.add_selected))
 			end
 			return table.concat(buf, '')
+		end,
+
+		-- chain new callbacks after the old ones
+		-- creates new wrapper functions as necessary
+		-- note: callbacks are FFI cdata pointers so tests must
+		--       use explicit "cb == nil", just "if cb" does not work
+		--
+		trace_chain_callbacks = function (req, new_log, new_finish)
+			local log_wrapper
+			if req.trace_log == nil then
+				req.trace_log = new_log
+			else
+				local old_log = req.trace_log
+				log_wrapper = ffi.cast('trace_log_f',
+				function(msg)
+					jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
+					void_xpcall_log_tb(old_log, msg)
+					void_xpcall_log_tb(new_log, msg)
+				end)
+				req.trace_log = log_wrapper
+			end
+			local old_finish = req.trace_finish
+			if not (log_wrapper ~= nil or old_finish ~= nil) then
+				req.trace_finish = new_finish
+			else
+				local fin_wrapper
+				fin_wrapper = ffi.cast('trace_callback_f',
+				function(cbreq)
+					jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
+					if old_finish ~= nil then
+						void_xpcall_log_tb(old_finish, cbreq)
+					end
+					if new_finish ~= nil then
+						void_xpcall_log_tb(new_finish, cbreq)
+					end
+					-- beware: finish callbacks can call log callback
+					if log_wrapper ~= nil then
+						log_wrapper:free()
+					end
+					fin_wrapper:free()
+				end)
+				req.trace_finish = fin_wrapper
+			end
 		end,
 
 		-- Return per-request variable table

@@ -529,11 +529,13 @@ function policy.DENY_MSG(msg)
 end
 
 local debug_logline_cb = ffi.cast('trace_log_f', function (msg)
+	jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
 	-- msg typically ends with newline
 	io.write(ffi.string(msg))
 end)
 
 local debug_logfinish_cb = ffi.cast('trace_callback_f', function (req)
+	jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
 	ffi.C.kr_log_req(req, 0, 0, 'dbg',
 		'following rrsets were marked as interesting:\n' ..
 		req:selected_tostring())
@@ -548,32 +550,35 @@ function policy.REQTRACE(_, req)
 		tostring(req.qsource.packet))
 end
 
-function policy.DEBUG_ALWAYS(_, req)
-	policy.QTRACE(_, req)
-	req.trace_log = debug_logline_cb
-	req.trace_finish = debug_logfinish_cb
-	policy.REQTRACE(_, req)
-	return
+function policy.DEBUG_ALWAYS(state, req)
+	policy.QTRACE(state, req)
+	req:trace_chain_callbacks(debug_logline_cb, debug_logfinish_cb)
+	policy.REQTRACE(state, req)
 end
 
 -- buffer verbose logs and print then only if test() returns a truthy value
 function policy.DEBUG_IF(test)
 	return function (state, req)
 		policy.QTRACE(state, req)
-		local debug_log_buf = {}
-		req.trace_log = ffi.cast('trace_log_f', function (msg)
+		local priv_log_buf = {}
+		local priv_log_cb = ffi.cast('trace_log_f', function (msg)
+			jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
+
 			-- stash messages for conditional logging in trace_finish
-			table.insert(debug_log_buf, ffi.string(msg))
+			table.insert(priv_log_buf, ffi.string(msg))
 		end)
 
-		req.trace_finish = ffi.cast('trace_callback_f', function (cbreq)
+		local priv_finish_cb
+		priv_finish_cb = ffi.cast('trace_callback_f', function (cbreq)
+			jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
 			if test(cbreq) then
 				debug_logfinish_cb(cbreq)  -- unconditional version
-				io.write(table.concat(debug_log_buf, ''))
+				io.write(table.concat(priv_log_buf, ''))
 			end
-			req.trace_log:free()
-			req.trace_finish:free()
+			priv_log_cb:free()
+			priv_finish_cb:free()
 		end)
+		req:trace_chain_callbacks(priv_log_cb, priv_finish_cb)
 		policy.REQTRACE(state, req)
 		return
 	end
