@@ -183,7 +183,7 @@ static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 		rtt_cache_entry_ptr[i]->tout_timestamp = now;
 	}
 
-	return rtt_cache_entry_score[0];
+	return 175;
 }
 
 static int eval_nsrep(const knot_dname_t *owner, const pack_t *addr_set, struct kr_query *qry)
@@ -237,19 +237,12 @@ static int eval_nsrep(const knot_dname_t *owner, const pack_t *addr_set, struct 
 	} else if (score <= ns->score &&
 	   (score < KR_NS_LONG  || qry->flags.NO_THROTTLE)) {
 		update_nsrep_set(ns, owner, addr_choice, score);
-		ns->reputation = reputation;
-	} else if (kr_rand_coin(1, 10) &&
-		   !kr_rand_coin(score, KR_NS_MAX_SCORE)) {
-		/* With 10% chance probe server with a probability
-		 * given by its RTT / MAX_RTT. */
-		update_nsrep_set(ns, owner, addr_choice, score);
-		ns->reputation = reputation;
-		return 1; /* Stop evaluation */
+		ns->reputation = 2;
 	} else if (ns->score > KR_NS_MAX_SCORE) {
 		/* Check if any server was already selected.
 		 * If no, pick current server and continue evaluation. */
 		update_nsrep_set(ns, owner, addr_choice, score);
-		ns->reputation = reputation;
+		ns->reputation = 2;
 	}
 
 	return kr_ok();
@@ -359,11 +352,11 @@ int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx)
 		if (ret) break;
 	}
 
-	if (qry->ns.score <= KR_NS_MAX_SCORE && qry->ns.score >= KR_NS_LONG) {
-		/* This is a low-reliability probe,
-		 * go with TCP to get ICMP reachability check. */
-		qry->flags.TCP = true;
-	}
+	// if (qry->ns.score <= KR_NS_MAX_SCORE && qry->ns.score >= KR_NS_LONG) {
+	// 	/* This is a low-reliability probe,
+	// 	 * go with TCP to get ICMP reachability check. */
+	// 	qry->flags.TCP = true;
+	// }
 	return ret;
 }
 
