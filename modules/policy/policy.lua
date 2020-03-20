@@ -77,17 +77,12 @@ function policy.MIRROR(target)
 end
 
 -- Override the list of nameservers (forwarders)
-local function set_nslist(qry, list)
+local function set_nslist(req, list)
 	local ns_i = 0
 	for _, ns in ipairs(list) do
-		-- kr_nsrep_set() can return kr_error(ENOENT), it's OK
-		if ffi.C.kr_nsrep_set(qry, ns_i, ns) == 0 then
+		if ffi.C.kr_forward_add_target(req, ns) == 0 then
 			ns_i = ns_i + 1
 		end
-	end
-	-- If less than maximum NSs, insert guard to terminate the list
-	if ns_i < 3 then
-		assert(ffi.C.kr_nsrep_set(qry, ns_i, nil) == 0);
 	end
 	if ns_i == 0 then
 		-- would use assert() but don't want to compose the message if not triggered
@@ -102,7 +97,6 @@ function policy.STUB(target)
 	if type(target) == 'table' then
 		for _, v in pairs(target) do
 			table.insert(list, addr2sock(v, 53))
-			assert(#list <= 4, 'at most 4 STUB targets are supported')
 		end
 	else
 		table.insert(list, addr2sock(target, 53))
@@ -112,7 +106,7 @@ function policy.STUB(target)
 		-- Switch mode to stub resolver, do not track origin zone cut since it's not real authority NS
 		qry.flags.STUB = true
 		qry.flags.ALWAYS_CUT = false
-		set_nslist(qry, list)
+		set_nslist(req, list)
 		return state
 	end
 end
@@ -123,7 +117,6 @@ function policy.FORWARD(target)
 	if type(target) == 'table' then
 		for _, v in pairs(target) do
 			table.insert(list, addr2sock(v, 53))
-			assert(#list <= 4, 'at most 4 FORWARD targets are supported')
 		end
 	else
 		table.insert(list, addr2sock(target, 53))
@@ -136,7 +129,7 @@ function policy.FORWARD(target)
 		qry.flags.ALWAYS_CUT = false
 		qry.flags.NO_MINIMIZE = true
 		qry.flags.AWAIT_CUT = true
-		set_nslist(qry, list)
+		set_nslist(req, list)
 		return state
 	end
 end
@@ -145,8 +138,6 @@ end
 function policy.TLS_FORWARD(targets)
 	if type(targets) ~= 'table' or #targets < 1 then
 		error('TLS_FORWARD argument must be a non-empty table')
-	elseif #targets > 4 then
-		error('TLS_FORWARD supports at most four targets (in a single call)')
 	end
 
 	local sockaddr_c_set = {}
@@ -182,7 +173,7 @@ function policy.TLS_FORWARD(targets)
 		qry.flags.AWAIT_CUT = true
 		req.options.TCP = true
 		qry.flags.TCP = true
-		set_nslist(qry, nslist)
+		set_nslist(req, nslist)
 		return state
 	end
 end

@@ -29,7 +29,7 @@
 #include "lib/resolve.h"
 #include "lib/rplan.h"
 #include "lib/defines.h"
-#include "lib/nsrep.h"
+#include "lib/selection.h"
 #include "lib/module.h"
 #include "lib/dnssec/ta.h"
 
@@ -213,10 +213,12 @@ static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, bool in_bailiwic
 
 			if ((rr->type == KNOT_RRTYPE_A) &&
 			    (req->ctx->options.NO_IPV4)) {
+				QVERBOSE_MSG(qry, "<= skipping IPv4 glue due to network settings\n");
 				continue;
 			}
 			if ((rr->type == KNOT_RRTYPE_AAAA) &&
 			    (req->ctx->options.NO_IPV6)) {
+				QVERBOSE_MSG(qry, "<= skipping IPv6 glue due to network settings\n");
 				continue;
 			}
 			(void) update_nsaddr(rr, req->current_query, glue_cnt);
@@ -258,6 +260,7 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 		     && knot_dname_in_bailiwick(qry->sname, rr->owner)  >= 0;
 	if (!ok) {
 		VERBOSE_MSG("<= authority: ns outside bailiwick\n");
+		qry->server_selection.error(qry, req->upstream.transport, KR_SELECTION_LAME_DELEGATION);
 #ifdef STRICT_MODE
 		return KR_STATE_FAIL;
 #else
@@ -632,10 +635,11 @@ static int process_referral_answer(knot_pkt_t *pkt, struct kr_request *req)
 {
 	const knot_dname_t *cname = NULL;
 	int state = unroll_cname(pkt, req, true, &cname);
+	struct kr_query *query = req->current_query;
 	if (state != kr_ok()) {
+		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_BAD_CNAME);
 		return KR_STATE_FAIL;
 	}
-	struct kr_query *query = req->current_query;
 	if (!(query->flags.CACHED)) {
 		/* If not cached (i.e. got from upstream)
 		 * make sure that this is not an authoritative answer
@@ -721,6 +725,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	if (!is_authoritative(pkt, query)) {
 		if (!(query->flags.FORWARD) &&
 		    pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) {
+			query->server_selection.error(query, req->upstream.transport, KR_SELECTION_LAME_DELEGATION);
 			VERBOSE_MSG("<= lame response: non-auth sent negative response\n");
 			return KR_STATE_FAIL;
 		}
@@ -730,6 +735,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	/* Process answer type */
 	int state = unroll_cname(pkt, req, false, &cname);
 	if (state != kr_ok()) {
+		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_BAD_CNAME);
 		return state;
 	}
 	/* Make sure that this is an authoritative answer (even with AA=0) for other layers */
@@ -760,6 +766,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			    q->stype == query->stype   &&
 			    knot_dname_is_equal(q->sname, cname)) {
 				VERBOSE_MSG("<= cname chain loop\n");
+				query->server_selection.error(query, req->upstream.transport, KR_SELECTION_BAD_CNAME);
 				return KR_STATE_FAIL;
 			}
 		}
@@ -777,12 +784,6 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 
 		if (query->flags.FORWARD) {
 			next->forward_flags.CNAME = true;
-			if (query->parent == NULL) {
-				state = kr_nsrep_copy_set(&next->ns, &query->ns);
-				if (state != kr_ok()) {
-					return KR_STATE_FAIL;
-				}
-			}
 		}
 		next->cname_parent = query;
 		/* Want DNSSEC if and only if it's posible to secure
@@ -998,10 +999,8 @@ static int resolve_badmsg(knot_pkt_t *pkt, struct kr_request *req, struct kr_que
 	/* Work around broken auths/load balancers */
 	if (query->flags.SAFEMODE) {
 		return resolve_error(pkt, req);
-	} else if (query->flags.NO_MINIMIZE) {
-		query->flags.SAFEMODE = true;
-		return KR_STATE_DONE;
 	} else {
+		query->flags.SAFEMODE = true;
 		query->flags.NO_MINIMIZE = true;
 		return KR_STATE_DONE;
 	}
@@ -1044,13 +1043,16 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return resolve_badmsg(pkt, req, query);
 	} else
 #endif
+	/* LATER: Query minimization, 0x20 randomization, EDNS… should really be
+	 * set and managed by selection.c and SAFEMODE should be split and
+	 * removed altogether because it's doing many things at once. */
 	if (pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
 		VERBOSE_MSG("<= malformed response (parsed %d)\n", (int)pkt->parsed);
 		return resolve_badmsg(pkt, req, query);
 	} else if (!is_paired_to_query(pkt, query)) {
 		WITH_VERBOSE(query) {
 			const char *ns_str =
-				req->upstream.addr ? kr_straddr(req->upstream.addr) : "(internal)";
+				req->upstream.transport ? kr_straddr(&req->upstream.transport->address.ip) : "(internal)";
 			VERBOSE_MSG("<= ignoring mismatching response from %s\n",
 					ns_str ? ns_str : "(kr_straddr failed)");
 		}
@@ -1062,11 +1064,12 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		VERBOSE_MSG("<= truncated response, failover to TCP\n");
 		if (query) {
 			/* Fail if already on TCP. */
-			if (query->flags.TCP) {
+			if (req->upstream.transport->protocol != KR_TRANSPORT_UDP) {
 				VERBOSE_MSG("<= TC=1 with TCP, bailing out\n");
+				query->server_selection.error(query, req->upstream.transport, KR_SELECTION_TRUNCATED);
 				return resolve_error(pkt, req);
 			}
-			query->flags.TCP = true;
+			query->server_selection.error(query, req->upstream.transport, KR_SELECTION_TRUNCATED);
 		}
 		return KR_STATE_CONSUME;
 	}
@@ -1079,6 +1082,10 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	const knot_lookup_t *rcode = knot_lookup_by_id(knot_rcode_names, knot_wire_get_rcode(pkt->wire));
 #endif
 
+	// We can't return directly from the switch because we have to give feedback to server selection first
+	int ret = 0;
+	int selection_error = -1;
+
 	/* Check response code. */
 	switch(knot_wire_get_rcode(pkt->wire)) {
 	case KNOT_RCODE_NOERROR:
@@ -1090,19 +1097,48 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		knot_wire_set_rcode(req->answer->wire, KNOT_RCODE_YXDOMAIN);
 		break;
 	case KNOT_RCODE_REFUSED:
+		if (query->flags.STUB) {
+			 /* just pass answer through if in stub mode */
+			break;
+		}
+		selection_error = KR_SELECTION_REFUSED;
+		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
+		ret = resolve_badmsg(pkt, req, query);
+		break;
 	case KNOT_RCODE_SERVFAIL:
 		if (query->flags.STUB) {
 			 /* just pass answer through if in stub mode */
 			break;
 		}
-		/* fall through */
+		selection_error = KR_SELECTION_SERVFAIL;
+		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
+		ret = resolve_badmsg(pkt, req, query);
+		break;
 	case KNOT_RCODE_FORMERR:
+		selection_error = KR_SELECTION_FORMERROR;
+		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
+		ret = resolve_badmsg(pkt, req, query);
+		break;
 	case KNOT_RCODE_NOTIMPL:
+		selection_error = KR_SELECTION_NOTIMPL;
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		return resolve_badmsg(pkt, req, query);
+		ret = resolve_badmsg(pkt, req, query);
+		break;
 	default:
+		selection_error = KR_SELECTION_OTHER_RCODE;
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		return resolve_error(pkt, req);
+		ret = resolve_error(pkt, req);
+		break;
+	}
+
+	if (query->server_selection.initialized) {
+		if (selection_error != -1) {
+			query->server_selection.error(query, req->upstream.transport, selection_error);
+		}
+	}
+
+	if (ret) {
+		return ret;
 	}
 
 	int state;
@@ -1145,7 +1181,7 @@ rrarray_finalize:
 	(void)0;
 	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
-		int ret = kr_ranked_rrarray_finalize(selected[i], query->uid, &req->pool);
+		ret = kr_ranked_rrarray_finalize(selected[i], query->uid, &req->pool);
 		if (unlikely(ret)) {
 			return KR_STATE_FAIL;
 		}
