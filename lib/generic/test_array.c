@@ -46,7 +46,7 @@ static void test_array(void **state)
 }
 
 /** Reservation through tracked memory allocator. */
-static int test_reserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have)
+static int test_reserve(void *baton, void **mem, size_t elm_size, size_t want, size_t *have)
 {
 	if (want > *have) {
 		void *new_mem = mm_alloc(baton, elm_size * want);
@@ -62,7 +62,7 @@ static int test_reserve(void *baton, char **mem, size_t elm_size, size_t want, s
 }
 
 /** Reservation through fake memory allocator. */
-static int fake_reserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have)
+static int fake_reserve(void *baton, void **mem, size_t elm_size, size_t want, size_t *have)
 {
 	return -1;
 }
