@@ -159,22 +159,13 @@ static struct kr_query *kr_rplan_push_query(struct kr_rplan *rplan,
 	qry->flags = rplan->request->options;
 	qry->parent = parent;
 	qry->request = rplan->request;
-	qry->ns.ctx = rplan->request->ctx;
-	qry->ns.addr[0].ip.sa_family = AF_UNSPEC;
+
 	gettimeofday(&qry->timestamp, NULL);
 	qry->timestamp_mono = kr_now();
 	qry->creation_time_mono = parent ? parent->creation_time_mono : qry->timestamp_mono;
 	kr_zonecut_init(&qry->zone_cut, (const uint8_t *)"", rplan->pool);
 	qry->reorder = qry->flags.REORDER_RR ? kr_rand_bytes(sizeof(qry->reorder)) : 0;
 
-	/* When forwarding, keep the nameserver addresses. */
-	if (parent && parent->flags.FORWARD && qry->flags.FORWARD) {
-		ret = kr_nsrep_copy_set(&qry->ns, &parent->ns);
-		if (ret) {
-			query_free(rplan->pool, qry);
-			return NULL;
-		}
-	}
 
 	assert((rplan->pending.len == 0 && rplan->resolved.len == 0)
 		== (rplan->initial == NULL));

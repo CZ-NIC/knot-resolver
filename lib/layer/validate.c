@@ -23,6 +23,7 @@
 #include "lib/utils.h"
 #include "lib/defines.h"
 #include "lib/module.h"
+#include "lib/selection.h"
 
 #define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "vldr", __VA_ARGS__)
 
@@ -349,7 +350,7 @@ static knot_rrset_t *update_ds(struct kr_zonecut *cut, const knot_pktsection_t *
 			return NULL;
 		}
 	}
-	return new_ds;	
+	return new_ds;
 }
 
 static void mark_insecure_parents(const struct kr_query *qry)
@@ -1190,11 +1191,22 @@ static int hide_bogus(kr_layer_t *ctx) {
 	return ctx->state;
 }
 
+static int validate_wrapper(kr_layer_t *ctx, knot_pkt_t *pkt) {
+	// Wrapper for now.
+	int ret = validate(ctx, pkt);
+	struct kr_request *req = ctx->req;
+	struct kr_query *qry = req->current_query;
+	if (ret & KR_STATE_FAIL && qry->flags.DNSSEC_BOGUS)
+		qry->server_selection.error(qry, req->upstream.transport, KR_SELECTION_DNSSEC_ERROR);
+	return ret;
+}
+
+
 /** Module implementation. */
 int validate_init(struct kr_module *self)
 {
 	static const kr_layer_api_t layer = {
-		.consume = &validate,
+		.consume = &validate_wrapper,
 		.answer_finalize = &hide_bogus,
 	};
 	self->layer = &layer;
