@@ -45,8 +45,7 @@ local function serve_trace(h, _)
 		type = qtype,
 		options = {'TRACE'},
 		init = function (req)
-			req.trace_log = buffer_log_cb
-			req.trace_finish = finish_cb
+			req:trace_chain_callbacks(buffer_log_cb, finish_cb)
 		end
 	}
 
