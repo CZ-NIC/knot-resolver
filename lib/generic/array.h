@@ -64,7 +64,7 @@ static inline size_t array_next_count(size_t want)
 }
 
 /** @internal Incremental memory reservation */
-static inline int array_std_reserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have)
+static inline int array_std_reserve(void *baton, void **mem, size_t elm_size, size_t want, size_t *have)
 {
 	if (*have >= want) {
 		return 0;
@@ -110,7 +110,7 @@ static inline void array_std_free(void *baton, void *p)
  * Mempool usage: pass kr_memreserve and a knot_mm_t* .
  * @return 0 if success, <0 on failure */
 #define array_reserve_mm(array, n, reserve, baton) \
-	(reserve)((baton), (char **) &(array).at, sizeof((array).at[0]), (n), &(array).cap)
+	(reserve)((baton), (void **) &(array).at, sizeof((array).at[0]), (n), &(array).cap)
 
 /**
  * Push value at the end of the array, resize it if necessary.

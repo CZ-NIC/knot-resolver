@@ -261,7 +261,7 @@ static inline bool kr_rand_coin(unsigned int nomin, unsigned int denomin)
 
 /** Memory reservation routine for knot_mm_t */
 KR_EXPORT
-int kr_memreserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have);
+int kr_memreserve(void *baton, void **mem, size_t elm_size, size_t want, size_t *have);
 
 /** @internal Fast packet reset. */
 KR_EXPORT
