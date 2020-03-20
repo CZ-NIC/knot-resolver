@@ -11,7 +11,7 @@
 
 #include "contrib/ucw/lib.h"
 #include "daemon/engine.h"
-#include "lib/nsrep.h"
+#include "lib/selection.h"
 
 typedef kr_nsrep_lru_t lru_bench_t;
 
