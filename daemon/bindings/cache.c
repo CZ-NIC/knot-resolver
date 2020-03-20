@@ -268,8 +268,6 @@ static int cache_clear_everything(lua_State *L)
 
 	/* Clear reputation tables */
 	struct kr_context *ctx = &the_worker->engine->resolver;
-	lru_reset(ctx->cache_rtt);
-	lru_reset(ctx->cache_rep);
 	lru_reset(ctx->cache_cookie);
 	lua_pushboolean(L, true);
 	return 1;

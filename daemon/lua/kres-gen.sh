@@ -60,6 +60,14 @@ struct kr_cdb_api {};
 struct lru {};
 "
 
+${CDEFS} ${LIBKRES} types <<-EOF
+	knot_section_t
+	knot_rrinfo_t
+	knot_dname_t
+	#knot_rdata_t
+	#knot_rdataset_t
+EOF
+
 # The generator doesn't work well with typedefs of functions.
 printf "
 typedef struct knot_mm {
@@ -71,15 +79,8 @@ typedef void (*map_free_f)(void *baton, void *ptr);
 typedef void (*trace_log_f) (const struct kr_request *, const char *);
 typedef void (*trace_callback_f)(struct kr_request *);
 typedef uint8_t * (*alloc_wire_f)(struct kr_request *req, uint16_t *maxlen);
+typedef bool (*addr_info_f)(struct sockaddr*);
 "
-
-${CDEFS} ${LIBKRES} types <<-EOF
-	knot_section_t
-	knot_rrinfo_t
-	knot_dname_t
-	#knot_rdata_t
-	#knot_rdataset_t
-EOF
 
 genResType() {
 	echo "$1" | ${CDEFS} ${LIBKRES} types
@@ -108,6 +109,7 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_qflags
 	ranked_rr_array_entry_t
 	ranked_rr_array_t
+	inaddr_array_t
 	struct kr_zonecut
 	kr_qarray_t
 	struct kr_rplan
@@ -124,6 +126,7 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	# lib/module.h
 	struct kr_prop
 	struct kr_module
+	struct kr_server_selection
 EOF
 
 # a static variable; the line might not be simple to generate
@@ -139,13 +142,14 @@ void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 
 ## Some definitions would need too many deps, so shorten them.
 
-genResType "struct kr_nsrep" | sed '/union/,$ d'
-printf "\t/* beware: hidden stub, to avoid hardcoding sockaddr lengths */\n};\n"
-
 genResType "struct kr_query"
 
-genResType "struct kr_context" | sed '/kr_nsrep_rtt_lru_t/,$ d'
+genResType "struct kr_context" | sed '/module_array_t/,$ d'
 printf "\tchar _stub[];\n};\n"
+
+
+echo "struct kr_transport" | ${CDEFS} ${KRESD} types | sed '/union /,$ d'
+printf "\t/* beware: hidden stub, to avoid hardcoding sockaddr lengths */\n};\n"
 
 ## libknot API
 ${CDEFS} libknot functions <<-EOF
@@ -188,8 +192,8 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_rplan_pop
 	kr_rplan_resolved
 	kr_rplan_last
-# Nameservers
-	kr_nsrep_set
+# Forwarding
+	kr_forward_add_target
 # Utils
 	kr_log_req
 	kr_log_q
@@ -276,6 +280,7 @@ printf "\t/* beware: hidden stub, to avoid hardcoding sockaddr lengths */\n};\n"
 
 echo "struct qr_task" | ${CDEFS} ${KRESD} types | sed '/pktbuf/,$ d'
 printf "\t/* beware: hidden stub, to avoid qr_tasklist_t */\n};\n"
+
 
 ${CDEFS} ${KRESD} functions <<-EOF
 	worker_resolve_exec
