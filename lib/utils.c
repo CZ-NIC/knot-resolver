@@ -213,7 +213,7 @@ char* kr_strcatdup(unsigned n, ...)
 	return result;
 }
 
-int kr_memreserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have)
+int kr_memreserve(void *baton, void **mem, size_t elm_size, size_t want, size_t *have)
 {
     if (*have >= want) {
         return 0;
