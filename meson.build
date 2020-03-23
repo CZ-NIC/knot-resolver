@@ -118,6 +118,14 @@ add_project_arguments(
   '-Werror=implicit-function-declaration', # Probably messed up includes; implicit functions are evil!
   '-fvisibility=hidden',
   '-DHAVE_ASPRINTF=' + have_asprintf.to_int().to_string(),
+
+  # libuv handles have aliasing problems; see:
+  # https://github.com/libuv/libuv/pull/2588/files#diff-04c6e90faac2675aa89e2176d2eec7d8
+  # https://github.com/libuv/libuv/issues/1230#issuecomment-569030944
+  # Performance impact in our case seems OK:
+  # https://gitlab.labs.nic.cz/knot/knot-resolver/-/merge_requests/962#note_147407
+  '-fno-strict-aliasing',
+
   language: 'c',
 )
 
