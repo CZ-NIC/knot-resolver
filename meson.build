@@ -117,6 +117,7 @@ add_project_arguments(
   '-Wshadow',
   '-Werror=implicit-function-declaration', # Probably messed up includes; implicit functions are evil!
   '-fvisibility=hidden',
+  '-fno-strict-aliasing',
   '-DHAVE_ASPRINTF=' + have_asprintf.to_int().to_string(),
   language: 'c',
 )
