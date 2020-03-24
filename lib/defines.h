@@ -52,6 +52,7 @@ static inline int KR_COLD kr_error(int x) {
 #define KR_CNAME_CHAIN_LIMIT 13 /* Built-in maximum CNAME chain length */
 #define KR_TIMEOUT_LIMIT 4   /* Maximum number of retries after timeout. */
 #define KR_QUERY_NSRETRY_LIMIT 4 /* Maximum number of retries per query. */
+#define KR_COUNT_NO_NSADDR_LIMIT 5
 
 /*
  * Defines.

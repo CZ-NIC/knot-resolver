@@ -299,10 +299,10 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	return KR_STATE_PRODUCE;
 }
 
-static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
+static int ns_resolve_addr(struct kr_query *qry, struct kr_request *req)
 {
-	struct kr_rplan *rplan = &param->rplan;
-	struct kr_context *ctx = param->ctx;
+	struct kr_rplan *rplan = &req->rplan;
+	struct kr_context *ctx = req->ctx;
 
 
 	/* Start NS queries from root, to avoid certain cases
@@ -333,7 +333,9 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 			return kr_error(EAGAIN);
 		}
 		/* No IPv4 nor IPv6, flag server as unusable. */
-		VERBOSE_MSG(qry, "=> unresolvable NS address, bailing out\n");
+		++req->count_no_nsaddr;
+		VERBOSE_MSG(qry, "=> unresolvable NS address, bailing out (counter: %u)\n",
+				req->count_no_nsaddr);
 		qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
 		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
 		invalidate_ns(rplan, qry);
@@ -1396,6 +1398,11 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 
 ns_election:
 
+	if (unlikely(request->count_no_nsaddr >= KR_COUNT_NO_NSADDR_LIMIT)) {
+		VERBOSE_MSG(qry, "=> too many unresolvable NSs, bail out "
+				"(mitigation for NXNSAttack CVE-2020-12667)\n");
+		return KR_STATE_FAIL;
+	}
 	/* If the query has already selected a NS and is waiting for IPv4/IPv6 record,
 	 * elect best address only, otherwise elect a completely new NS.
 	 */

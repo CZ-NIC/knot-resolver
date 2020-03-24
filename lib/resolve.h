@@ -227,6 +227,7 @@ struct kr_request {
 	int vars_ref; /**< Reference to per-request variable table. LUA_NOREF if not set. */
 	knot_mm_t pool;
 	unsigned int uid; /** for logging purposes only */
+	unsigned int count_no_nsaddr;
 };
 
 /** Initializer for an array of *_selected. */
