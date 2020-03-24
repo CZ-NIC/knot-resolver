@@ -220,11 +220,13 @@ local model =
             BindNode("max-size", "uint64", function() return cache.current_size end, function(v) cache.size = v end),
             ConfigFnNode("max-ttl", "uint32", "cache.max_ttl"),
             ConfigFnNode("min-ttl", "uint32", "cache.min_ttl"),
+            DummyLeafNode("storage", true),
+            DummyLeafNode("prefill", true),
+            DummyLeafNode("garbage-collector", true),
         }),
-        DummyLeafNode("debugging", true),
+        -- DummyLeafNode("debugging", true),
         DummyLeafNode("dns64", true),
         DummyLeafNode("dnssec", true),
-        DummyLeafNode("garbage-collector", true),
         ContainerNode("logging", {
             BindNode("verbosity", "uint8", function() return verbose() and 1 or 0 end, function(v) verbose(v > 0) end)
         }),
