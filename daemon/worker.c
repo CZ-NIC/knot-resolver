@@ -277,8 +277,8 @@ static uint8_t *alloc_wire_cb(struct kr_request *req, uint16_t *maxlen)
 	uv_handle_t *handle = session_get_handle(ctx->source.session);
 	assert(handle->type == UV_POLL);
 	xdp_handle_data_t *xhd = handle->data;
-	knot_xsk_msg_t out;
-	int ret = knot_xsk_alloc_packet(xhd->socket, ctx->source.addr.ip.sa_family == AF_INET6,
+	knot_xdp_msg_t out;
+	int ret = knot_xdp_send_alloc(xhd->socket, ctx->source.addr.ip.sa_family == AF_INET6,
 					&out, NULL);
 	if (ret != KNOT_EOK) {
 		assert(!ret);
@@ -1194,7 +1194,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		ret = kr_error(EINVAL);
 
 	} else if (src_handle->type == UV_POLL) { // AF_XDP
-		knot_xsk_msg_t msg;
+		knot_xdp_msg_t msg;
 		const struct sockaddr *ip_from = &ctx->source.dst_addr.ip;
 		const struct sockaddr *ip_to   = &ctx->source.addr.ip;
 		memcpy(&msg.ip_from, ip_from, kr_sockaddr_len(ip_from));
@@ -1204,7 +1204,8 @@ static int qr_task_finalize(struct qr_task *task, int state)
 
 		xdp_handle_data_t *xhd = src_handle->data;
 		assert(xhd && xhd->socket && xhd->session == source_session);
-		ret = knot_xsk_sendmsg(xhd->socket, &msg);
+		uint32_t sent;
+		ret = knot_xdp_send(xhd->socket, &msg, 1, &sent);
 		kr_log_verbose("[uxsk] pushed a packet, ret = %d\n", ret);
 		ret = qr_task_on_send(task, NULL/*doesn't matter for UDP*/, ret);
 

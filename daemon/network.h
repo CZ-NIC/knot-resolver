@@ -32,7 +32,6 @@
 
 struct engine;
 struct session;
-struct knot_xsk_socket;
 
 /** Ways to listen on a socket (which may exist already). */
 typedef struct {

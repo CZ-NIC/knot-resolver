@@ -624,19 +624,18 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 	xdp_handle_data_t *xhd = handle->data;
 	assert(xhd && xhd->session && xhd->socket);
 	uint32_t rcvd;
-	knot_xsk_msg_t msgs[XDP_RX_BATCH_SIZE];
-	int ret = knot_xsk_recvmmsg(xhd->socket, msgs, XDP_RX_BATCH_SIZE, &rcvd);
+	knot_xdp_msg_t msgs[XDP_RX_BATCH_SIZE];
+	int ret = knot_xdp_recv(xhd->socket, msgs, XDP_RX_BATCH_SIZE, &rcvd);
 	if (ret == KNOT_EOK) {
 		kr_log_verbose("[kxsk] poll triggered, processing a batch of %d packets\n",
 			(int)rcvd);
 	} else {
-		kr_log_error("[kxsk] knot_xsk_recvmmsg(): %d, %s\n",
-				ret, knot_strerror(ret));
+		kr_log_error("[kxsk] knot_xdp_recv(): %d, %s\n", ret, knot_strerror(ret));
 		//FIXME?
 	}
 	assert(rcvd <= XDP_RX_BATCH_SIZE);
 	for (int i = 0; i < rcvd; ++i) {
-		const knot_xsk_msg_t *msg = &msgs[i];
+		const knot_xdp_msg_t *msg = &msgs[i];
 		assert(msg->payload.iov_len < 65536);
 		knot_pkt_t *kpkt = knot_pkt_new(msg->payload.iov_base, msg->payload.iov_len,
 						&the_worker->pkt_pool);
@@ -648,15 +647,15 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 		if (ret)
 			kr_log_verbose("[kxsk] worker_submit() == %d: %s\n", ret, kr_strerror(ret));
 		mp_flush(the_worker->pkt_pool.ctx);
-		knot_xsk_free_recvd(xhd->socket, msg, 1);
 	}
+	knot_xdp_recv_finish(xhd->socket, msgs, rcvd);
 }
 void xdp_tx_waker(uv_check_t* handle)
 {
-	int ret = knot_xsk_sendmsg_finish(handle->data);
+	int ret = knot_xdp_send_finish(handle->data);
 	if (ret != KNOT_EOK)
 		kr_log_error("[kxsk] check: ret = %d, %s\n", ret, knot_strerror(ret));
-	knot_xsk_prepare_alloc(handle->data);
+	knot_xdp_send_prepare(handle->data);
 	// LATER(opt.): it _might_ be better for performance to do these two steps
 	// at different points in time
 }
@@ -670,8 +669,8 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 
 	const int port = ep->port ? ep->port : (1 << 16)/*any port*/;
 	xhd->socket = NULL; // needed for some reason
-	int ret = knot_xsk_init(&xhd->socket, ifname, ep->xdp_queue, port,
-				KNOT_XSK_LOAD_BPF_MAYBE);
+	int ret = knot_xdp_init(&xhd->socket, ifname, ep->xdp_queue, port,
+				KNOT_XDP_LOAD_BPF_MAYBE);
 
 	if (!ret) ret = uv_check_init(loop, &xhd->tx_waker);
 	xhd->tx_waker.data = xhd->socket;
@@ -682,10 +681,10 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 	}
 	assert(xhd->socket);
 
-	ep->fd = knot_xsk_get_poll_fd(xhd->socket); // probably not useful
+	ep->fd = knot_xdp_socket_fd(xhd->socket); // probably not useful
 	ret = uv_poll_init(loop, (uv_poll_t *)ep->handle, ep->fd);
 	if (ret) {
-		knot_xsk_deinit(xhd->socket);
+		knot_xdp_deinit(xhd->socket);
 		free(xhd);
 		return kr_error(ret);
 	}
@@ -732,7 +731,7 @@ void io_deinit(uv_handle_t *handle)
 		uv_check_stop(&xhd->tx_waker);
 		uv_close((uv_handle_t *)&xhd->tx_waker, NULL);
 		session_free(xhd->session);
-		knot_xsk_deinit(xhd->socket);
+		knot_xdp_deinit(xhd->socket);
 		free(xhd);
 	}
 }
