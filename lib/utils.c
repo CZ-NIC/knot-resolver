@@ -134,7 +134,7 @@ static void kr_vlog_req(
 	msg = mp_vprintf_append(mp, msg, fmt, args);
 
 	if (kr_log_rtrace_enabled(req))
-		req->trace_log(msg);
+		req->trace_log(req, msg);
 	else
 		/* caller is responsible for detecting verbose mode, use QRVERBOSE() macro */
 		printf("%s", msg);

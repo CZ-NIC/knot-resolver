@@ -528,7 +528,7 @@ function policy.DENY_MSG(msg)
 	end
 end
 
-local debug_logline_cb = ffi.cast('trace_log_f', function (msg)
+local debug_logline_cb = ffi.cast('trace_log_f', function (_, msg)
 	jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
 	-- msg typically ends with newline
 	io.write(ffi.string(msg))
@@ -556,29 +556,29 @@ function policy.DEBUG_ALWAYS(state, req)
 	policy.REQTRACE(state, req)
 end
 
+local debug_stashlog_cb = ffi.cast('trace_log_f', function (req, msg)
+	jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
+
+	-- stash messages for conditional logging in trace_finish
+	local stash = req:vars()['policy_debug_stash']
+	table.insert(stash, ffi.string(msg))
+end)
+
 -- buffer verbose logs and print then only if test() returns a truthy value
 function policy.DEBUG_IF(test)
+	local debug_finish_cb = ffi.cast('trace_callback_f', function (cbreq)
+		jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
+		if test(cbreq) then
+			debug_logfinish_cb(cbreq)  -- unconditional version
+			local stash = cbreq:vars()['policy_debug_stash']
+			io.write(table.concat(stash, ''))
+		end
+	end)
+
 	return function (state, req)
+		req:vars()['policy_debug_stash'] = {}
 		policy.QTRACE(state, req)
-		local priv_log_buf = {}
-		local priv_log_cb = ffi.cast('trace_log_f', function (msg)
-			jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
-
-			-- stash messages for conditional logging in trace_finish
-			table.insert(priv_log_buf, ffi.string(msg))
-		end)
-
-		local priv_finish_cb
-		priv_finish_cb = ffi.cast('trace_callback_f', function (cbreq)
-			jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
-			if test(cbreq) then
-				debug_logfinish_cb(cbreq)  -- unconditional version
-				io.write(table.concat(priv_log_buf, ''))
-			end
-			priv_log_cb:free()
-			priv_finish_cb:free()
-		end)
-		req:trace_chain_callbacks(priv_log_cb, priv_finish_cb)
+		req:trace_chain_callbacks(debug_stashlog_cb, debug_finish_cb)
 		policy.REQTRACE(state, req)
 		return
 	end

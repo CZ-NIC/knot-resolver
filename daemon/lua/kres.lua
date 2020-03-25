@@ -726,12 +726,20 @@ ffi.metatype( kr_query_t, {
 
 -- helper for trace_chain_callbacks
 -- ignores return values from successfull calls but logs tracebacks for throws
-local function void_xpcall_log_tb(func, arg)
-	local ok, err = xpcall(func, debug.traceback, arg)
+local function void_xpcall_log_tb(func, req, msg)
+	local ok, err = xpcall(func, debug.traceback, req, msg)
 	if not ok then
-		log('error: callback %s arg %s stack traceback:\n%s', func, arg, err)
+		log('error: callback %s req %s msg %s stack traceback:\n%s', func, req, msg, err)
 	end
 end
+
+local function void_xpcall_finish_tb(func, req)
+	local ok, err = xpcall(func, debug.traceback, req)
+	if not ok then
+		log('error: callback %s req %s stack traceback:\n%s', func, req, err)
+	end
+end
+
 
 -- Metatype for request
 local kr_request_t = ffi.typeof('struct kr_request')
@@ -822,10 +830,10 @@ ffi.metatype( kr_request_t, {
 			else
 				local old_log = req.trace_log
 				log_wrapper = ffi.cast('trace_log_f',
-				function(msg)
+				function(cbreq, msg)
 					jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
-					void_xpcall_log_tb(old_log, msg)
-					void_xpcall_log_tb(new_log, msg)
+					void_xpcall_log_tb(old_log, cbreq, msg)
+					void_xpcall_log_tb(new_log, cbreq, msg)
 				end)
 				req.trace_log = log_wrapper
 			end
@@ -838,10 +846,10 @@ ffi.metatype( kr_request_t, {
 				function(cbreq)
 					jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
 					if old_finish ~= nil then
-						void_xpcall_log_tb(old_finish, cbreq)
+						void_xpcall_finish_tb(old_finish, cbreq)
 					end
 					if new_finish ~= nil then
-						void_xpcall_log_tb(new_finish, cbreq)
+						void_xpcall_finish_tb(new_finish, cbreq)
 					end
 					-- beware: finish callbacks can call log callback
 					if log_wrapper ~= nil then

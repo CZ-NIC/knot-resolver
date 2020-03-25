@@ -22,7 +22,7 @@ end
 -- logging
 local function add_tracer(logbuf)
 	return function (req)
-		local function qrylogger(msg)
+		local function qrylogger(_, msg)
 			table.insert(logbuf, ffi.string(msg))
 		end
 		req.trace_log = ffi.cast('trace_log_f', qrylogger)
