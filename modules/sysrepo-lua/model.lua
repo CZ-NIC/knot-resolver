@@ -91,13 +91,19 @@ local function ContainerNode(name, container_model)
     --- Node's apply function
     local function handle_cont_read(self, node)
         local node_name = ffi.string(clib().node_get_name(node))
-        debug.log("Attempting to read container \"{}\", it's actual name is \"{}\"", self.name, node_name)
+        debug.log("Reading container \"{}\"", self.name)
         assert(node_name == self.name)
 
         local child = clib().node_child_first(node)
         while child ~= nil do
             local nm = ffi.string(clib().node_get_name(child))
-            child_lookup_table[nm]:apply(child)
+            -- our model doesn't have to be a full copy of the actual model
+            -- it has to be a subset. So there might be a node that we can't
+            -- find.
+            if child_lookup_table[nm] ~= nil then
+                child_lookup_table[nm]:apply(child)
+            end
+
             child = clib().node_child_next(child)
         end
     end
@@ -192,8 +198,8 @@ end
 ---     current state. When called with one argument, sets value.
 local function ConfigFnNode(name, type, bind_func)
     -- generate set and get functions
-    local get_val = load("return " .. bind_func .. "()")
-    local set_val = load("return function(data) " .. bind_func .. "(data) end")()
+    local get_val = function() return bind_func() end
+    local set_val = function(new_val) bind_func(new_val) end
 
     return BindNode(name, type, get_val, set_val)
 end
@@ -211,28 +217,18 @@ local function ConfigVarNode(name, type, bind_variable)
     return BindNode(name, type, get_val, set_val)
 end
 
-
 --- Configuration schema reprezentation
 local model =
     ContainerNode("dns-resolver", {
         ContainerNode("cache", {
             StateNode("current-size", "uint64", "cache.current_size"),
             BindNode("max-size", "uint64", function() return cache.current_size end, function(v) cache.size = v end),
-            ConfigFnNode("max-ttl", "uint32", "cache.max_ttl"),
-            ConfigFnNode("min-ttl", "uint32", "cache.min_ttl"),
-            DummyLeafNode("storage", true),
-            DummyLeafNode("prefill", true),
-            DummyLeafNode("garbage-collector", true),
+            ConfigFnNode("max-ttl", "uint32", cache.max_ttl),
+            ConfigFnNode("min-ttl", "uint32", cache.min_ttl),
         }),
-        -- DummyLeafNode("debugging", true),
-        DummyLeafNode("dns64", true),
-        DummyLeafNode("dnssec", true),
         ContainerNode("logging", {
             BindNode("verbosity", "uint8", function() return verbose() and 1 or 0 end, function(v) verbose(v > 0) end)
         }),
-        DummyLeafNode("network", true),
-        DummyLeafNode("resolver", true),
-        DummyLeafNode("server", true),
     })
 
 --- Module constructor
