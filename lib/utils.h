@@ -37,7 +37,7 @@ typedef void (*trace_callback_f)(struct kr_request *request);
 /**
  * @brief Callback for request logging handler.
  * @param[in] msg Log message. Pointer is not valid after handler returns. */
-typedef void (*trace_log_f)(const char *msg);
+typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
 
 #define kr_log_info printf
 #define kr_log_error(...) fprintf(stderr, ## __VA_ARGS__)

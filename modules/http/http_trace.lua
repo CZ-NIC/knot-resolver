@@ -22,7 +22,7 @@ local function serve_trace(h, _)
 
 	-- Create logging handler callback
 	local buffer = {}
-	local buffer_log_cb = ffi.cast('trace_log_f', function (msg)
+	local buffer_log_cb = ffi.cast('trace_log_f', function (_, msg)
 		table.insert(buffer, ffi.string(msg))
 	end)
 
