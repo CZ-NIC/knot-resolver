@@ -36,9 +36,6 @@ static void update_nsrep(struct kr_nsrep *ns, size_t pos, uint8_t *addr, size_t 
 		return;
 	}
 
-	/* Rotate previous addresses to the right. */
-	memmove(ns->addr + pos + 1, ns->addr + pos, (KR_NSREP_MAXADDR - pos - 1) * sizeof(ns->addr[0]));
-
 	switch(addr_len) {
 	case sizeof(struct in_addr):
 		ADDR_SET(ns->addr[pos].ip4.sin, AF_INET, addr, addr_len, port); break;
@@ -87,100 +84,19 @@ static unsigned eval_addr_set(const pack_t *addr_set, struct kr_context *ctx,
 		void *val = pack_obj_val(it);
 		size_t len = pack_obj_len(it);
 		unsigned favour = 0;
-		bool is_valid = false;
-		/* Check if the address isn't disabled. */
-		if (len == sizeof(struct in6_addr)) {
-			is_valid = !(opts.NO_IPV6);
-			favour = FAVOUR_IPV6;
-		} else if (len == sizeof(struct in_addr)) {
-			is_valid = !(opts.NO_IPV4);
-		} else {
-			assert(!EINVAL);
-			is_valid = false;
-		}
-
-		if (!is_valid) {
-			continue;
-		}
 
 		/* Get score for the current address. */
 		kr_nsrep_rtt_lru_entry_t *cached = rtt_cache ?
 						   lru_get_try(rtt_cache, val, len) :
 						   NULL;
-		unsigned cur_addr_score = KR_NS_GLUED;
-		if (cached) {
-			cur_addr_score = cached->score;
-			if (cached->score >= KR_NS_TIMEOUT) {
-				/* If NS once was marked as "timeouted",
-				 * it won't participate in NS elections
-				 * at least ctx->cache_rtt_tout_retry_interval milliseconds. */
-				uint64_t elapsed = now - cached->tout_timestamp;
-				elapsed = elapsed > UINT_MAX ? UINT_MAX : elapsed;
-				if (elapsed > ctx->cache_rtt_tout_retry_interval) {
-					/* Select this NS for probing in this particular query,
-					 * but don't change the cached score.
-					 * For other queries this NS will remain "timeouted". */
-					cur_addr_score = KR_NS_LONG - 1;
-				}
-			}
-		}
+		unsigned cur_addr_score = 175;
 
-		/* We can't always use favour.  If these conditions held:
-		 *
-		 * rtt_cache_entry_score[i] < KR_NS_TIMEOUT
-		 * rtt_cache_entry_score[i] + favour > KR_NS_TIMEOUT
-		 * cur_addr_score < rtt_cache_entry_score[i] + favour
-		 *
-		 * we would prefer "certainly dead" cur_addr_score
-		 * instead of "almost dead but alive" rtt_cache_entry_score[i]
-		 */
-		const unsigned cur_favour = cur_addr_score < KR_NS_TIMEOUT ? favour : 0;
 		for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
-			if (cur_addr_score >= rtt_cache_entry_score[i] + cur_favour)
-				continue;
-
-			/* Shake down previous contenders */
-			for (size_t j = KR_NSREP_MAXADDR - 1; j > i; --j) {
-				addr[j] = addr[j - 1];
-				rtt_cache_entry_ptr[j] = rtt_cache_entry_ptr[j - 1];
-				rtt_cache_entry_score[j] = rtt_cache_entry_score[j - 1];
-			}
 			addr[i] = it;
 			rtt_cache_entry_score[i] = cur_addr_score;
 			rtt_cache_entry_ptr[i] = cached;
 			break;
 		}
-	}
-
-	/* At this point, rtt_cache_entry_ptr contains up to KR_NSREP_MAXADDR
-	 * pointers to the rtt cache entries with the best scores for the given addr_set.
-	 * Check if there are timeouted NS. */
-
-	for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
-		if (rtt_cache_entry_ptr[i] == NULL)
-			continue;
-		if (rtt_cache_entry_ptr[i]->score < KR_NS_TIMEOUT)
-			continue;
-
-		uint64_t elapsed = now - rtt_cache_entry_ptr[i]->tout_timestamp;
-		elapsed = elapsed > UINT_MAX ? UINT_MAX : elapsed;
-		if (elapsed <= ctx->cache_rtt_tout_retry_interval)
-			continue;
-
-		/* rtt_cache_entry_ptr[i] points to "timeouted" rtt cache entry.
-		 * The period of the ban on participation in elections has expired. */
-
-		if (VERBOSE_STATUS) {
-			void *val = pack_obj_val(addr[i]);
-			size_t len = pack_obj_len(addr[i]);
-			char sa_str[INET6_ADDRSTRLEN];
-			int af = (len == sizeof(struct in6_addr)) ? AF_INET6 : AF_INET;
-			inet_ntop(af, val, sa_str, sizeof(sa_str));
-			kr_log_verbose("[     ][nsre] probing timeouted NS: %s, score %i\n",
-				       sa_str, rtt_cache_entry_ptr[i]->score);
-		}
-
-		rtt_cache_entry_ptr[i]->tout_timestamp = now;
 	}
 
 	return 175;
@@ -191,59 +107,18 @@ static int eval_nsrep(const knot_dname_t *owner, const pack_t *addr_set, struct 
 	struct kr_nsrep *ns = &qry->ns;
 	struct kr_context *ctx = ns->ctx;
 	unsigned score = KR_NS_MAX_SCORE;
-	unsigned reputation = 0;
 	uint8_t *addr_choice[KR_NSREP_MAXADDR] = { NULL, };
-
-	/* Fetch NS reputation */
-	if (ctx->cache_rep) {
-		unsigned *cached = lru_get_try(ctx->cache_rep, (const char *)owner,
-					       knot_dname_size(owner));
-		if (cached) {
-			reputation = *cached;
-		}
-	}
 
 	/* Favour nameservers with unknown addresses to probe them,
 	 * otherwise discover the current best address for the NS. */
 	if (addr_set->len == 0) {
 		score = KR_NS_UNKNOWN;
-		/* If the server doesn't have IPv6, give it disadvantage. */
-		if (reputation & KR_NS_NOIP6) {
-			score += FAVOUR_IPV6;
-			/* If the server is unknown but has rep record, treat it as timeouted */
-			if (reputation & KR_NS_NOIP4) {
-				score = KR_NS_UNKNOWN;
-				/* Try to start with clean slate */
-				if (!(qry->flags.NO_IPV6)) {
-					reputation &= ~KR_NS_NOIP6;
-				}
-				if (!(qry->flags.NO_IPV4)) {
-					reputation &= ~KR_NS_NOIP4;
-				}
-			}
-		}
 	} else {
 		score = eval_addr_set(addr_set, ctx, qry->flags, score, addr_choice);
 	}
 
-	/* Probabilistic bee foraging strategy (naive).
-	 * The fastest NS is preferred by workers until it is depleted (timeouts or degrades),
-	 * at the same time long distance scouts probe other sources (low probability).
-	 * Servers on TIMEOUT will not have probed at all.
-	 * Servers with score above KR_NS_LONG will have periodically removed from
-	 * reputation cache, so that kresd can reprobe them. */
-	if (score >= KR_NS_TIMEOUT) {
-		return kr_ok();
-	} else if (score <= ns->score &&
-	   (score < KR_NS_LONG  || qry->flags.NO_THROTTLE)) {
-		update_nsrep_set(ns, owner, addr_choice, score);
-		ns->reputation = 2;
-	} else if (ns->score > KR_NS_MAX_SCORE) {
-		/* Check if any server was already selected.
-		 * If no, pick current server and continue evaluation. */
-		update_nsrep_set(ns, owner, addr_choice, score);
-		ns->reputation = 2;
-	}
+	update_nsrep_set(ns, owner, addr_choice, score);
+	ns->reputation = 2;
 
 	return kr_ok();
 }
@@ -331,17 +206,6 @@ int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx)
 	}
 	trie_it_free(it);
 	assert(i == nsset_len);
-
-	// Now we sort it randomly, by select-sort.
-	for (i = 0; i < nsset_len - 1; ++i) {
-		// The winner for position i will be uniformly chosen from indices >= i
-		const int j = i + kr_rand_bytes(1) % (nsset_len - i);
-		// Now we swap the winner with index i
-		if (i == j) continue;
-		__typeof__((nsset[i])) tmp = nsset[i];
-		nsset[i] = nsset[j];
-		nsset[j] = tmp;
-	}
 
 	// Finally we run the original algorithm, in this randomized order.
 	struct kr_nsrep *ns = &qry->ns;
