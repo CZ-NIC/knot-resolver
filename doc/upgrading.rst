@@ -8,6 +8,7 @@ Upgrading
 
 This section summarizes steps required for upgrade to newer Knot Resolver versions.
 We advise users to also read :ref:`release_notes` for respective versions.
+Section *Module changes* is relevant only for users who develop or use third-party modules.
 
 5.0 to 5.1
 ==========
@@ -15,7 +16,7 @@ We advise users to also read :ref:`release_notes` for respective versions.
 Module changes
 --------------
 
-* Custom modules which use :c:type:`trace_log_f` handler in request structure :c:type:`kr_request` need update to simplified handler API.
+* Custom modules which use :c:type:`trace_log_f` handler in request structure :c:type:`kr_request` need update to modified handler API. See https://gitlab.labs.nic.cz/knot/knot-resolver/-/merge_requests/957/diffs#diff-content-6831501329bbf9e494048fe269c6b02944fc227c for an example migration.
 
 
 4.x to 5.x
