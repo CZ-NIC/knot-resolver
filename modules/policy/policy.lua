@@ -209,6 +209,22 @@ function policy.FLAGS(opts_set, opts_clear)
 	end
 end
 
+-- Create answer with passed arguments
+function policy.ANSWER(rtype, rdata, ttl)
+	return function(_, req)
+		local qry = req:current()
+		local answer = req.answer
+		ffi.C.kr_pkt_make_auth_header(answer)
+
+		if (rtype == qry.stype) then
+			answer:rcode(kres.rcode.NOERROR)
+			answer:begin(kres.section.ANSWER)
+			answer:put(qry.sname, ttl, qry.sclass, rtype, rdata)
+			return kres.DONE
+		end
+	end
+end
+
 local function mkauth_soa(answer, dname, mname)
 	if mname == nil then
 		mname = dname
