@@ -900,7 +900,7 @@ end
 local ranked_rr_array_entry_t = ffi.typeof('ranked_rr_array_entry_t')
 ffi.metatype(ranked_rr_array_entry_t, {
 	__tostring = function(self)
-		return string.format('; ranked rrset to_wire %s, rank 0x%02x, cached %s, qry_uid %s, revalidations %s\n%s',
+		return string.format('; ranked rrset to_wire %s, rank 0%.2o, cached %s, qry_uid %s, revalidations %s\n%s',
 		self.to_wire, self.rank, self.cached, self.qry_uid,
 		self.revalidation_cnt, string.format('%s', self.rr))
 	end
