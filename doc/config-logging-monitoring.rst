@@ -14,7 +14,7 @@ so by default logs from Knot Resolver should contain only couple lines a day.
 For debugging purposes it is possible to enable very verbose logging using
 :func:`verbose` function.
 
-.. function:: verbose([true | false])
+.. py:function:: verbose([true | false])
 
    :param: ``true`` to enable, ``false`` to disable verbose logging.
    :return: boolean Current state of verbose logging.

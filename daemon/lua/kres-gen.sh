@@ -69,7 +69,7 @@ typedef struct knot_mm {
 
 typedef void *(*map_alloc_f)(void *, size_t);
 typedef void (*map_free_f)(void *baton, void *ptr);
-typedef void (*trace_log_f) (const struct kr_query *, const char *, const char *);
+typedef void (*trace_log_f) (const struct kr_request *, const char *);
 typedef void (*trace_callback_f)(struct kr_request *);
 "
 
@@ -190,7 +190,8 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 # Nameservers
 	kr_nsrep_set
 # Utils
-	kr_log_qverbose_impl
+	kr_log_req
+	kr_log_q
 	kr_make_query
 	kr_pkt_make_auth_header
 	kr_pkt_put

@@ -125,8 +125,12 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 			kr_rank_set(&entry->rank, KR_RANK_SECURE);
 
 		} else if (kr_rank_test(rank_orig, KR_RANK_TRY)) {
-			log_bogus_rrsig(vctx, qry, rr,
-					"failed to validate non-authoritative data but continuing");
+			/* RFC 4035 section 2.2:
+			 * NS RRsets that appear at delegation points (...)
+			 * MUST NOT be signed */
+			if (vctx->rrs_counters.matching_name_type > 0)
+				log_bogus_rrsig(vctx, qry, rr,
+					"found unexpected signatures for non-authoritative data which failed to validate, continuing");
 			vctx->result = kr_ok();
 			kr_rank_set(&entry->rank, KR_RANK_TRY);
 			/* ^^ BOGUS would be more accurate, but it might change

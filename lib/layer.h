@@ -18,10 +18,8 @@
 	 */
 	#define QRVERBOSE(_query, _cls, ...) do { \
 		const struct kr_query *_qry = (_query); \
-		if (kr_log_trace_enabled(_qry)) { \
-			kr_log_trace(_qry, (_cls), __VA_ARGS__); \
-		} else if (VERBOSE_STATUS) { \
-			kr_log_qverbose_impl(_qry, (_cls), __VA_ARGS__); \
+		if (VERBOSE_STATUS || kr_log_qtrace_enabled(_qry)) { \
+			kr_log_q(_qry, (_cls), __VA_ARGS__); \
 		}  \
 	} while (false)
 #endif
