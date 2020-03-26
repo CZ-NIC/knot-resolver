@@ -15,7 +15,7 @@ typedef struct knot_mm {
 
 typedef void *(*map_alloc_f)(void *, size_t);
 typedef void (*map_free_f)(void *baton, void *ptr);
-typedef void (*trace_log_f) (const struct kr_query *, const char *, const char *);
+typedef void (*trace_log_f) (const struct kr_request *, const char *);
 typedef void (*trace_callback_f)(struct kr_request *);
 typedef enum {KNOT_ANSWER, KNOT_AUTHORITY, KNOT_ADDITIONAL} knot_section_t;
 typedef struct {
@@ -327,7 +327,8 @@ int kr_rplan_pop(struct kr_rplan *, struct kr_query *);
 struct kr_query *kr_rplan_resolved(struct kr_rplan *);
 struct kr_query *kr_rplan_last(struct kr_rplan *);
 int kr_nsrep_set(struct kr_query *, size_t, const struct sockaddr *);
-void kr_log_qverbose_impl(const struct kr_query *, const char *, const char *, ...);
+void kr_log_req(const struct kr_request * const, uint32_t, const unsigned int, const char *, const char *, ...);
+void kr_log_q(const struct kr_query * const, const char *, const char *, ...);
 int kr_make_query(struct kr_query *, knot_pkt_t *);
 void kr_pkt_make_auth_header(knot_pkt_t *);
 int kr_pkt_put(knot_pkt_t *, const knot_dname_t *, uint32_t, uint16_t, uint16_t, const uint8_t *, uint16_t);
