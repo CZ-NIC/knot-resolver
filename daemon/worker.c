@@ -1803,17 +1803,20 @@ knot_pkt_t * worker_resolve_mk_pkt(const char *qname_str, uint16_t qtype, uint16
 
 	/* Add OPT RR, including wire format so modules can see both representations.
 	 * knot_pkt_put() copies the outside; we need to duplicate the inside manually. */
-	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
-	int ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE,
-				the_worker->engine->resolver.opt_rr, KNOT_PF_FREE);
-	if (ret == KNOT_EOK)
-		ret = knot_rdataset_copy(&pkt->opt_rr->rrs, &pkt->opt_rr->rrs, NULL);
-	if (ret == KNOT_EOK) {
-		pkt->opt_rr->owner = knot_dname_copy(pkt->opt_rr->owner, NULL);
-		ret = pkt->opt_rr->owner ? KNOT_EOK : KNOT_ENOMEM;
-	}
-	if (ret != KNOT_EOK)
+	knot_rrset_t *opt = knot_rrset_copy(the_worker->engine->resolver.opt_rr, NULL);
+	if (!opt) {
+		knot_pkt_free(pkt);
 		return NULL;
+	}
+	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
+	int ret = knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, opt, KNOT_PF_FREE);
+	if (ret == KNOT_EOK) {
+		free(opt); /* inside is owned by pkt now */
+	} else {
+		knot_rrset_free(opt, NULL);
+		knot_pkt_free(pkt);
+		return NULL;
+	}
 
 	if (options->DNSSEC_WANT) {
 		knot_edns_set_do(pkt->opt_rr);
