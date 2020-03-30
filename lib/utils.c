@@ -755,7 +755,7 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 				abort();
 			}
 		}
-		return kr_ok();
+		return i;
 	}
 
 	/* No stashed rrset found, add */
@@ -768,6 +768,7 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 	if (!entry) {
 		return kr_error(ENOMEM);
 	}
+	memset(entry, 0, sizeof(*entry)); /* default all to zeros */
 
 	knot_rrset_t *rr_new = knot_rrset_new(rr->owner, rr->type, rr->rclass, rr->ttl, pool);
 	if (!rr_new) {
@@ -780,9 +781,6 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 	entry->qry_uid = qry_uid;
 	entry->rr = rr_new;
 	entry->rank = rank;
-	entry->revalidation_cnt = 0;
-	entry->cached = false;
-	entry->yielded = false;
 	entry->to_wire = to_wire;
 	entry->in_progress = true;
 	if (array_push(*array, entry) < 0) {
@@ -792,7 +790,9 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 		return kr_error(ENOMEM);
 	}
 
-	return to_wire_ensure_unique(array, array->len - 1);
+	ret = to_wire_ensure_unique(array, array->len - 1);
+	if (ret < 0) return ret;
+	return array->len - 1;
 }
 
 /** Comparator for qsort() on an array of knot_data_t pointers. */
