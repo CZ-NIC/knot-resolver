@@ -11,6 +11,7 @@ Bugfixes
 - cache: missing filesystem support for pre-allocation is no longer fatal (#549)
 - lua: policy.rpz() no longer watches the file when watch is set to false (!954)
 - fix a strict aliasing problem that might've lead to "miscompilation" (!962)
+- fix handling of DNAMEs, especially signed ones (#234, !965)
 
 Incompatible changes
 --------------------
