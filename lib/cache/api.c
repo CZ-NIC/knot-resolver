@@ -375,9 +375,9 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 		/* uncached entries are located at the end */
 		for (ssize_t i = arr->len - 1; i >= 0; --i) {
 			ranked_rr_array_entry_t *entry = arr->at[i];
-			if (entry->qry_uid != qry->uid) {
+			if (entry->qry_uid != qry->uid || entry->dont_cache) {
 				continue;
-				/* TODO: probably safe to break but maybe not worth it */
+				/* TODO: probably safe to break on uid mismatch but maybe not worth it */
 			}
 			int ret = stash_rrarray_entry(
 					arr, i, qry, cache, &unauth_cnt, nsec_pmap,
