@@ -76,6 +76,7 @@ worker.resolve = function (qname, qtype, qclass, options, finish, init)
 		panic('failure in worker.resolve(); probably invalid qname "%s"', qname)
 	end
 	local ret = worker.resolve_pkt(pkt, options, finish, init)
+	ffi.C.knot_rrset_free(pkt.opt_rr, nil);
 	ffi.C.knot_pkt_free(pkt);
 	return ret
 end
