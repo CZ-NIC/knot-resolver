@@ -1,3 +1,5 @@
+.. SPDX-License-Identifier: GPL-3.0-or-later
+
 .. _mod-hints:
 
 Static hints
@@ -8,6 +10,11 @@ The records can be loaded from ``/etc/hosts``-like files and/or added directly.
 
 You can also use the module to change the root hints; they are used as a safety belt or if the root NS
 drops out of cache.
+
+.. tip::
+
+   For blocking large lists of domains please use :func:`policy.rpz`
+   instead of creating huge list of domains with IP address *0.0.0.0*.
 
 Examples
 --------

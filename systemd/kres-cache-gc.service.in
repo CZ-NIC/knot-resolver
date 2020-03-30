@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: CC0-1.0
 [Unit]
 Description=Knot Resolver Garbage Collector daemon
 Documentation=man:kresd.systemd(7)
@@ -5,7 +6,7 @@ Documentation=man:kresd(8)
 
 [Service]
 Type=simple
-ExecStart=@sbin_dir@/kres-cache-gc -c @systemd_work_dir@ -d 1000
+ExecStart=@sbin_dir@/kres-cache-gc -c @systemd_cache_dir@ -d 1000
 User=@user@
 Group=@group@
 Restart=on-failure

@@ -1,17 +1,5 @@
 /*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include "lib/utils.h"
@@ -41,12 +29,12 @@
 #include <string.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <sys/un.h>
 
 /* Always compile-in log symbols, even if disabled. */
 #undef kr_verbose_status
 #undef kr_verbose_set
-#undef kr_log_verbose
 
 /* Logging & debugging */
 bool kr_verbose_status = false;
@@ -132,52 +120,50 @@ bool kr_verbose_set(bool status)
 	return kr_verbose_status;
 }
 
-void kr_log_verbose(const char *fmt, ...)
+static void kr_vlog_req(
+	const struct kr_request * const req, uint32_t qry_uid,
+	const unsigned int indent, const char *source, const char *fmt,
+	va_list args)
 {
-	if (unlikely(kr_verbose_status)) {
-		va_list args;
-		va_start(args, fmt);
-		vprintf(fmt, args);
-		va_end(args);
-	}
+	struct mempool *mp = mp_new(512);
+
+	const uint32_t req_uid = req ? req->uid : 0;
+	char *msg = mp_printf(mp, "[%05u.%02u][%-4s] %*s",
+				req_uid, qry_uid, source, indent, "");
+
+	msg = mp_vprintf_append(mp, msg, fmt, args);
+
+	if (kr_log_rtrace_enabled(req))
+		req->trace_log(req, msg);
+	else
+		/* caller is responsible for detecting verbose mode, use QRVERBOSE() macro */
+		printf("%s", msg);
+
+	mp_delete(mp);
 }
 
-void kr_log_qverbose_impl(const struct kr_query *qry, const char *cls, const char *fmt, ...)
+void kr_log_req(const struct kr_request * const req, uint32_t qry_uid,
+		const unsigned int indent, const char *source, const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	kr_vlog_req(req, qry_uid, indent, source, fmt, args);
+	va_end(args);
+}
+
+void kr_log_q(const struct kr_query * const qry,
+		const char *source, const char *fmt, ...)
 {
 	unsigned ind = 0;
 	for (const struct kr_query *q = qry; q; q = q->parent)
 		ind += 2;
-	uint32_t qry_uid = qry ? qry->uid : 0;
-	uint32_t req_uid = qry && qry->request ? qry->request->uid : 0;
-	/* Simplified kr_log_verbose() calls, first prefix then passed fmt...
-	 * Calling it would take about the same amount of code. */
-	printf("[%05u.%02u][%s] %*s", req_uid, qry_uid, cls, ind, "");
-	va_list args;
-	va_start(args, fmt);
-	vprintf(fmt, args);
-	va_end(args);
-}
-
-bool kr_log_trace(const struct kr_query *query, const char *source, const char *fmt, ...)
-{
-	if (!kr_log_trace_enabled(query)) {
-		return false;
-	}
-
-	auto_free char *msg = NULL;
+	const uint32_t qry_uid = qry ? qry->uid : 0;
+	const struct kr_request *req = qry ? qry->request : NULL;
 
 	va_list args;
 	va_start(args, fmt);
-	int len = vasprintf(&msg, fmt, args);
+	kr_vlog_req(req, qry_uid, ind, source, fmt, args);
 	va_end(args);
-
-	/* Check formatting result before logging */
-	if (len < 0) {
-		return false;
-	}
-
-	query->request->trace_log(query, source, msg);
-	return true;
 }
 
 char* kr_strcatdup(unsigned n, ...)
@@ -224,7 +210,7 @@ char* kr_strcatdup(unsigned n, ...)
 	return result;
 }
 
-int kr_memreserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have)
+int kr_memreserve(void *baton, void **mem, size_t elm_size, size_t want, size_t *have)
 {
     if (*have >= want) {
         return 0;
@@ -994,6 +980,21 @@ static char *print_section_opt(struct mempool *mp, char *endp, const knot_rrset_
 
 }
 
+/**
+ * Detect if qname contains an uppercase letter.
+ */
+static bool qname_has_uppercase(const knot_dname_t *qname) {
+	const int len = knot_dname_size(qname) - 1;  /* skip root label at the end */
+	for (int i = 1; i < len; ++i) {  /* skip first length byte */
+		/* Note: this relies on the fact that correct label lengths
+		 * can't pass this test by "luck" and that correctness
+		 * is checked earlier by packet parser. */
+		if (qname[i] >= 'A' && qname[i] <= 'Z')
+			return true;
+	}
+	return false;
+}
+
 char *kr_pkt_text(const knot_pkt_t *pkt)
 {
 	if (!pkt) {
@@ -1041,7 +1042,14 @@ char *kr_pkt_text(const knot_pkt_t *pkt)
 	if (qdcount == 1) {
 		KR_DNAME_GET_STR(qname, knot_pkt_qname(pkt));
 		KR_RRTYPE_GET_STR(rrtype, knot_pkt_qtype(pkt));
-		ptr = mp_printf_append(mp, ptr, ";; QUESTION SECTION\n%s\t\t%s\n", qname, rrtype);
+		const char *qnwarn;
+		if (qname_has_uppercase(knot_pkt_qname(pkt)))
+			qnwarn = \
+"; WARNING! Uppercase letters indicate positions with letter case mismatches!\n"
+";          Normally you should see all-lowercase qname here.\n";
+		else
+			qnwarn = "";
+		ptr = mp_printf_append(mp, ptr, ";; QUESTION SECTION\n%s%s\t\t%s\n", qnwarn, qname, rrtype);
 	} else if (qdcount > 1) {
 		ptr = mp_printf_append(mp, ptr, ";; Warning: unsupported QDCOUNT %hu\n", qdcount);
 	}
@@ -1244,5 +1252,17 @@ time_t kr_file_mtime (const char* fname) {
 	}
 
 	return fstat.st_mtime;
+}
+
+long long kr_fssize(const char *path)
+{
+	if (!path)
+		return kr_error(EINVAL);
+
+	struct statvfs buf;
+	if (statvfs(path, &buf) != 0)
+		return kr_error(errno);
+
+	return buf.f_frsize * buf.f_blocks;
 }
 

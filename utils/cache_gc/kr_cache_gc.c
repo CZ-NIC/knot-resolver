@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 // standard includes
 #include <inttypes.h>
 #include <limits.h>
@@ -141,15 +142,39 @@ int cb_delete_categories(const knot_db_val_t * key, gc_record_info_t * info,
 	return KNOT_EOK;
 }
 
-int kr_cache_gc(kr_cache_gc_cfg_t * cfg)
-{
-	struct kr_cache kres_db = { 0 };
-	knot_db_t *db = NULL;
+struct kr_cache_gc_state {
+	struct kr_cache kres_db;
+	knot_db_t *db;
+};
 
-	int ret = kr_gc_cache_open(cfg->cache_path, &kres_db, &db);
-	if (ret) {
-		return ret;
+void kr_cache_gc_free_state(kr_cache_gc_state_t **state)
+{
+	assert(state);
+	if (!*state) { // not open
+		return;
 	}
+	kr_gc_cache_close(&(*state)->kres_db, (*state)->db);
+	free(*state);
+	*state = NULL;
+}
+
+int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
+{
+	assert(cfg && state);
+	if (!*state) { // Cache not open -> do that.
+		*state = calloc(1, sizeof(**state));
+		if (!*state) {
+			return KNOT_ENOMEM;
+		}
+		int ret = kr_gc_cache_open(cfg->cache_path, &(*state)->kres_db,
+					   &(*state)->db);
+		if (ret) {
+			free(*state);
+			*state = NULL;
+			return ret;
+		}
+	}
+	knot_db_t *const db = (*state)->db; // frequently used shortcut
 
 	const size_t db_size = knot_db_lmdb_get_mapsize(db);
 	const size_t db_usage_abs = knot_db_lmdb_get_usage(db);
@@ -169,7 +194,6 @@ int kr_cache_gc(kr_cache_gc_cfg_t * cfg)
 		       db_size);
 	}
 	if (cfg->dry_run || !large_usage) {
-		kr_gc_cache_close(&kres_db, db);
 		return KNOT_EOK;
 	}
 
@@ -179,9 +203,9 @@ int kr_cache_gc(kr_cache_gc_cfg_t * cfg)
 	gc_timer_start(&timer_analyze);
 	ctx_compute_categories_t cats = { { 0 }
 	};
-	ret = kr_gc_cache_iter(db, cb_compute_categories, &cats);
+	int ret = kr_gc_cache_iter(db, cb_compute_categories, &cats);
 	if (ret != KNOT_EOK) {
-		kr_gc_cache_close(&kres_db, db);
+		kr_cache_gc_free_state(state);
 		return ret;
 	}
 
@@ -221,7 +245,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t * cfg)
 	ret = kr_gc_cache_iter(db, cb_delete_categories, &to_del);
 	if (ret != KNOT_EOK) {
 		entry_dynarray_deep_free(&to_del.to_delete);
-		kr_gc_cache_close(&kres_db, db);
+		kr_cache_gc_free_state(state);
 		return ret;
 	}
 	printf
@@ -242,7 +266,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t * cfg)
 		printf("Error starting R/W DB transaction (%s).\n",
 		       knot_strerror(ret));
 		entry_dynarray_deep_free(&to_del.to_delete);
-		kr_gc_cache_close(&kres_db, db);
+		kr_cache_gc_free_state(state);
 		return ret;
 	}
 
@@ -295,13 +319,14 @@ finish:
 	printf("Deleted %zu records (%zu already gone) types", deleted_records,
 	       already_gone);
 	rrtypelist_print(&deleted_rrtypes);
-	printf("It took %.2lf secs, %zu transactions (%s)\n",
+	printf("It took %.2lf secs, %zu transactions (%s)\n\n",
 	       gc_timer_end(&timer_delete), rw_txn_count, knot_strerror(ret));
 
 	rrtype_dynarray_free(&deleted_rrtypes);
 	entry_dynarray_deep_free(&to_del.to_delete);
 
-	kr_gc_cache_close(&kres_db, db);
+	// OK, let's close it in this case.
+	kr_cache_gc_free_state(state);
 
 	return ret;
 }

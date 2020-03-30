@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 language: c
 os:
     - osx
@@ -10,6 +12,7 @@ addons:
             - libuv
             - lmdb
             - meson
+        update: true
 compiler:
     - clang
 notifications:

@@ -1,4 +1,6 @@
 -- LuaJIT ffi bindings for libkres, a DNS resolver library.
+-- SPDX-License-Identifier: GPL-3.0-or-later
+--
 -- @note Since it's statically compiled, it expects to find the symbols in the C namespace.
 
 local kres -- the module
@@ -721,10 +723,44 @@ ffi.metatype( kr_query_t, {
 		end,
 	},
 })
+
+-- helper for trace_chain_callbacks
+-- ignores return values from successfull calls but logs tracebacks for throws
+local function void_xpcall_log_tb(func, req, msg)
+	local ok, err = xpcall(func, debug.traceback, req, msg)
+	if not ok then
+		log('error: callback %s req %s msg %s stack traceback:\n%s', func, req, msg, err)
+	end
+end
+
+local function void_xpcall_finish_tb(func, req)
+	local ok, err = xpcall(func, debug.traceback, req)
+	if not ok then
+		log('error: callback %s req %s stack traceback:\n%s', func, req, err)
+	end
+end
+
+
 -- Metatype for request
 local kr_request_t = ffi.typeof('struct kr_request')
 ffi.metatype( kr_request_t, {
 	__index = {
+		-- makes sense only when request is finished
+		all_from_cache = function(req)
+			assert(ffi.istype(kr_request_t, req))
+			local rplan = ffi.C.kr_resolve_plan(req)
+			if tonumber(rplan.pending.len) > 0 then
+				-- an unresolved query,
+				-- i.e. something is missing from the cache
+				return false
+			end
+			for idx=0, tonumber(rplan.resolved.len) - 1 do
+				if not rplan.resolved.at[idx].flags.CACHED then
+					return false
+				end
+			end
+			return true
+		end,
 		current = function(req)
 			assert(ffi.istype(kr_request_t, req))
 			if req.current_query == nil then return nil end
@@ -764,6 +800,67 @@ ffi.metatype( kr_request_t, {
 			assert(ffi.istype(kr_request_t, req))
 			return C.kr_rplan_pop(C.kr_resolve_plan(req), qry)
 		end,
+		selected_tostring = function(req)
+			assert(ffi.istype(kr_request_t, req))
+			local buf = {}
+			if #req.answ_selected ~= 0 then
+				table.insert(buf, string.format('[%05d.00][dbg ] selected rrsets from answer sections:\n', req.uid))
+				table.insert(buf, tostring(req.answ_selected))
+			end
+			if #req.auth_selected ~= 0 then
+				table.insert(buf, string.format('[%05d.00][dbg ] selected rrsets from authority sections:\n', req.uid))
+				table.insert(buf, tostring(req.auth_selected))
+			end
+			if #req.add_selected ~= 0 then
+				table.insert(buf, string.format('[%05d.00][dbg ] selected rrsets from additional sections:\n', req.uid))
+				table.insert(buf, tostring(req.add_selected))
+			end
+			return table.concat(buf, '')
+		end,
+
+		-- chain new callbacks after the old ones
+		-- creates new wrapper functions as necessary
+		-- note: callbacks are FFI cdata pointers so tests must
+		--       use explicit "cb == nil", just "if cb" does not work
+		--
+		trace_chain_callbacks = function (req, new_log, new_finish)
+			local log_wrapper
+			if req.trace_log == nil then
+				req.trace_log = new_log
+			else
+				local old_log = req.trace_log
+				log_wrapper = ffi.cast('trace_log_f',
+				function(cbreq, msg)
+					jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
+					void_xpcall_log_tb(old_log, cbreq, msg)
+					void_xpcall_log_tb(new_log, cbreq, msg)
+				end)
+				req.trace_log = log_wrapper
+			end
+			local old_finish = req.trace_finish
+			if not (log_wrapper ~= nil or old_finish ~= nil) then
+				req.trace_finish = new_finish
+			else
+				local fin_wrapper
+				fin_wrapper = ffi.cast('trace_callback_f',
+				function(cbreq)
+					jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
+					if old_finish ~= nil then
+						void_xpcall_finish_tb(old_finish, cbreq)
+					end
+					if new_finish ~= nil then
+						void_xpcall_finish_tb(new_finish, cbreq)
+					end
+					-- beware: finish callbacks can call log callback
+					if log_wrapper ~= nil then
+						log_wrapper:free()
+					end
+					fin_wrapper:free()
+				end)
+				req.trace_finish = fin_wrapper
+			end
+		end,
+
 		-- Return per-request variable table
 		-- The request can store anything in this Lua table and it will be freed
 		-- when the request is closed, it doesn't have to worry about contents.
@@ -804,7 +901,17 @@ local function c_array_iter(t, i)
 	return i, t.at[i][0]
 end
 
--- Metatype for ranked record array
+-- Metatype for a single ranked record array entry (one RRset)
+local ranked_rr_array_entry_t = ffi.typeof('ranked_rr_array_entry_t')
+ffi.metatype(ranked_rr_array_entry_t, {
+	__tostring = function(self)
+		return string.format('; ranked rrset to_wire %s, rank 0%.2o, cached %s, qry_uid %s, revalidations %s\n%s',
+		self.to_wire, self.rank, self.cached, self.qry_uid,
+		self.revalidation_cnt, string.format('%s', self.rr))
+	end
+})
+
+-- Metatype for ranked record array (array of RRsets)
 local ranked_rr_array_t = ffi.typeof('ranked_rr_array_t')
 ffi.metatype(ranked_rr_array_t, {
 	__len = function(self)
@@ -818,7 +925,14 @@ ffi.metatype(ranked_rr_array_t, {
 			if i < 0 or i > self.len then return nil end
 			return self.at[i][0]
 		end,
-	}
+	},
+	__tostring = function(self)
+		local buf = {}
+		for _, rrset in ipairs(self) do
+			table.insert(buf, tostring(rrset))
+		end
+		return table.concat(buf, '')
+	end
 })
 
 -- Cache metatype

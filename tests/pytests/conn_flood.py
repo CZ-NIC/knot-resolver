@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Test opening as many connections as possible.
 
 Due to resource-intensity of this test, it's filename doesn't contain

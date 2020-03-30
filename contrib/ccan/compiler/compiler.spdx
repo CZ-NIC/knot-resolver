@@ -1,0 +1,10 @@
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: ccan-compiler
+DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-1569e849-880d-4ce7-ba3e-f4aaec8fce52
+
+PackageName: compiler
+PackageDownloadLocation: git+https://github.com/rustyrussell/ccan@23e96f89d54b8d5c4675284bbcd44fba68d8f826#ccan/compiler
+PackageOriginator: Person: Rusty Russell (rusty@rustcorp.com.au)
+PackageLicenseDeclared: CC0-1.0

@@ -1,4 +1,5 @@
 #!/usr/bin/env luajit
+-- SPDX-License-Identifier: GPL-3.0-or-later
 cli_bin = 'kresd -q -c -'
 -- Work around OS X stripping dyld variables
 libdir = os.getenv('DYLD_LIBRARY_PATH')

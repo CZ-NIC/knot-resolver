@@ -1,0 +1,11 @@
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: epoch
+DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-4efd8b6e-174f-48e4-a228-3059f191c7e8
+
+PackageName: epoch
+PackageVersion: 0.8.3
+PackageDownloadLocation: git+https://github.com/epochjs/epoch.git@47aef0a5aa8458bdd5011d108ab92a560215bc57#dist/
+PackageOriginator: Organization: Fastly
+PackageLicenseDeclared: MIT

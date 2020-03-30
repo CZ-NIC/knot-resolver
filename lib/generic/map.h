@@ -1,6 +1,7 @@
 /*
  * critbit89 - A crit-bit map implementation for strings in C89
  * Written by Jonas Gehring <jonas@jgehring.net>
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 /**

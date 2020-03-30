@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """TLS rehandshake test
 
 Test is using TLS proxy with rehandshake. When queries are sent, they are

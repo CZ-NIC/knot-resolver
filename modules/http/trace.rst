@@ -1,9 +1,11 @@
+.. SPDX-License-Identifier: GPL-3.0-or-later
+
 .. _mod-http-trace:
 
 Debugging a single request
 ==========================
 
-The `HTTP module <mod-http>`_ provides ``/trace`` endpoint which allows to trace various
+The :ref:`http module <mod-http>` provides ``/trace`` endpoint which allows to trace various
 aspects of the request execution. The basic mode allows you to resolve a query
 and trace verbose logs for it (and messages received):
 
@@ -26,5 +28,5 @@ and trace verbose logs for it (and messages received):
    [ 8138] [iter] <= rcode: NOERROR
    [ 8138] [resl] finished: 4, queries: 1, mempool: 81952 B
 
-See chapter about `HTTP module <mod-http>`_ for further instructions how to load ``webmgmt``
+See chapter about :ref:`mod-http` for further instructions how to load ``webmgmt``
 endpoint into HTTP module, it is a prerequisite for using ``/trace``.

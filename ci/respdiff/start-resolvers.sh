@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 #run unbound
 service unbound start && service unbound status;
 # dig @localhost -p 53535

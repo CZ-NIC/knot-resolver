@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # vim:foldmethod=marker
 variables:
   DEBIAN_FRONTEND: noninteractive
@@ -29,7 +30,8 @@ stages:
   stage: build
   except:
     refs:
-      - master
+      - master@knot/knot-resolver
+      - master@knot/security/knot-resolver
     variables:
       - $SKIP_CI == "1"
   artifacts:
@@ -110,7 +112,8 @@ kres-gen:
   stage: test
   except:
     refs:
-      - master
+      - master@knot/knot-resolver
+      - master@knot/security/knot-resolver
     variables:
       - $SKIP_CI == "1"
   tags:
@@ -140,7 +143,8 @@ kres-gen:
   stage: test
   except:
     refs:
-      - master
+      - master@knot/knot-resolver
+      - master@knot/security/knot-resolver
     variables:
       - $SKIP_CI == "1"
   dependencies: []  # do not download build artifacts
@@ -149,18 +153,13 @@ kres-gen:
 
 build:darwin:
   <<: *test_nodep
+  when: delayed
+  only:  # trigger job only in the main repo
+    refs:
+      - branches@knot/knot-resolver
   except:
     refs:
-      - master
-      - branches@knot/security/knot-resolver
-    variables:
-      - $SKIP_CI == "1"
-      - $SKIP_TRAVIS == "1"
-  when: delayed
-  except:  # trigger job only in repos under our control
-    refs:
-      - master
-      - branches@knot/security/knot-resolver
+      - master@knot/knot-resolver
     variables:
       - $SKIP_CI == "1"
   start_in: 3 minutes  # give the build in Travis CI time to finish
@@ -182,12 +181,15 @@ doc:
     - meson build_doc -Ddoc=enabled
     - ninja -C build_doc doc
   artifacts:
-    expire_in: 1 hour
+    expire_in: 6 hour
     paths:
       - doc/html
 
 docker:
   <<: *test_nodep
+  only:  # trigger only for repos in our control (requires dind runner)
+    - branches@knot/knot-resolver
+    - branches@knot/security/knot-resolver
   image: docker:latest
   tags:
     - dind
@@ -281,6 +283,14 @@ root.hints:
   script:
     - scripts/update-root-hints.sh
 
+authors:
+  <<: *test_nodep
+  only:
+    refs:
+      - /^release.*$/
+  script:
+    - scripts/update-authors.sh
+
 test:valgrind:
   <<: *test_flaky
   when: delayed
@@ -312,7 +322,8 @@ pytests:
     - branches@knot/security/knot-resolver
   except:
     refs:
-      - master
+      - master@knot/knot-resolver
+      - master@knot/security/knot-resolver
     variables:
       - $SKIP_CI == "1"
   script:
@@ -388,7 +399,8 @@ fwd-udp6-unbound.tls6:
     - branches@knot/security/knot-resolver
   except:
     refs:
-      - master
+      - master@knot/knot-resolver
+      - master@knot/security/knot-resolver
     variables:
       - $SKIP_CI == "1"
   script:
@@ -491,6 +503,7 @@ obs:odvr:
     variables:
       - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing$/
       - $CI_COMMIT_TAG
+  dependencies: []
   variables:
     OBS_REPO: knot-resolver-latest
   when: delayed
@@ -514,7 +527,7 @@ obs:build:all:
         (echo "ERROR: version mismatch"; exit 1)
     - >
       ! osc results home:CZ-NIC:$OBS_REPO knot-resolver --csv | \
-        grep -Ev 'disabled|excluded|Rawhide' | grep -v 'succeeded' -q || \
+        grep -Ev 'disabled|excluded|Rawhide|CentOS_8_EPEL' | grep -v 'succeeded' -q || \
         (echo "ERROR: build(s) failed"; exit 1)
 
 .distrotest: &distrotest

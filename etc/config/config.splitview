@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: CC0-1.0
 -- vim:syntax=lua:set ts=4 sw=4:
 -- Config file with split-view for internal zone
 -- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/
@@ -22,9 +23,7 @@ modules = {
 	dns64 = 'fe80::21b:77ff:0:0',
 }
 
--- Large cache size, so we don't need to flush often
--- This can be larger than available RAM, least frequently accessed
--- records will be paged out
+-- Refer to manual for optimal cache size
 cache.size = 4 * GB
 
 -- Forward everything below `company.cz` to `192.168.1.3`

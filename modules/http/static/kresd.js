@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 var colours = ["#081d58", "#253494", "#225ea8", "#1d91c0", "#41b6c4", "#7fcdbb", "#c7e9b4", "#edf8b1", "#edf8b1"];
 var latency = ["slow", "1500ms", "1000ms", "500ms", "250ms", "100ms", "50ms", "10ms", "1ms"];
 var Socket = "MozWebSocket" in window ? MozWebSocket : WebSocket;
@@ -332,7 +333,7 @@ $(function() {
 	}
 
 	/* WebSocket endpoints */
-	var wsStats = (secure ? 'wss://' : 'ws://') + location.host + '/stats';
+	var wsStats = ('https:' == document.location.protocol ? 'wss://' : 'ws://') + location.host + '/stats';
 	var ws = new Socket(wsStats);
 	ws.onmessage = function(evt) {
 		var data = JSON.parse(evt.data);

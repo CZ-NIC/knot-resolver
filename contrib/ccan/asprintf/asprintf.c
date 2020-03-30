@@ -1,4 +1,5 @@
-/* Licensed under BSD-MIT - see LICENSE file for details */
+/* SPDX-License-Identifier: MIT
+ * Source: https://ccodearchive.net/info/asprintf.html */
 #include <ccan/asprintf/asprintf.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -16,7 +17,7 @@ char *PRINTF_FMT(1, 2) afmt(const char *fmt, ...)
 	return ptr;
 }
 
-#if !HAVE_ASPRINTF && !defined(__USE_FORTIFY_LEVEL)
+#if !HAVE_ASPRINTF
 #include <stdarg.h>
 #include <stdlib.h>
 

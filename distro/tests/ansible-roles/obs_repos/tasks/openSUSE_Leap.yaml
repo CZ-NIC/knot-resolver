@@ -1,4 +1,5 @@
 ---
+# SPDX-License-Identifier: GPL-3.0-or-later
 - name: Install python-xml dependency for zypper_repository
   shell: zypper install -y python-xml
   args:
@@ -15,3 +16,4 @@
   zypper_repository:
     repo: '*'
     runrefresh: true
+  failed_when: false

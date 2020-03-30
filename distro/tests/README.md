@@ -23,19 +23,19 @@ Run the following command for every distro (aka directory with
 Vagrantfile):
 
 ```
-./test-distro.sh devel debian9
+./test-distro.sh knot-resolver-devel debian9
 ```
 
 or
 
 ```
-./test-distro.sh testing debian9
+./test-distro.sh knot-resolver-testing debian9
 ```
 
 or
 
 ```
-./test-distro.sh latest debian9
+./test-distro.sh knot-resolver-latest debian9
 ```
 
 At the end of the test, the package version that was tested is

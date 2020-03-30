@@ -1,17 +1,5 @@
 /*  Copyright (C) 2016-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *  SPDX-License-Identifier: GPL-3.0-or-later
 */
 
 #include <assert.h>
@@ -345,7 +333,12 @@ static int cdb_open(struct lmdb_env *env, const char *path, size_t mapsize,
 	}
 
 	ret = posix_fallocate(fd, 0, mapsize);
-	if (ret != 0) {
+	if (ret == EINVAL) {
+		/* POSIX says this can happen when the feature isn't supported by the FS.
+		 * We haven't seen this happen on Linux+glibc but it was reported on FreeBSD.*/
+		kr_log_info("[cache] space pre-allocation failed and ignored; "
+				"your (file)system probably doesn't support it.\n");
+	} else if (ret != 0) {
 		mdb_txn_abort(txn);
 		stats->close++;
 		mdb_env_close(env->env);

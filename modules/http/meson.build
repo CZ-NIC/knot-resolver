@@ -1,4 +1,5 @@
 # LUA module: http
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 lua_http_config = configuration_data()
 lua_http_config.set('modules_dir', modules_dir)
@@ -27,6 +28,19 @@ config_tests += [
 install_subdir(
   'static',
   strip_directory: true,
+  exclude_files: [
+    'bootstrap.min.css.spdx',
+    'bootstrap.min.js.spdx',
+    'bootstrap-theme.min.css.spdx',
+    'datamaps.world.min.spdx',
+    'dygraph.min.js.spdx',
+    'd3.spdx',
+    'epoch.spdx',
+    'glyphicons-halflings-regular.spdx',
+    'jquery.spdx',
+    'selectize.spdx',
+    'topojson.spdx',
+  ],
   install_dir: join_paths(modules_dir, 'http'),
 )
 

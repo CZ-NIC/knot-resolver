@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # CA
 certtool --generate-privkey > ca-key.pem
 certtool --generate-self-signed --load-privkey ca-key.pem   --template ca.tmpl --outfile ca.pem

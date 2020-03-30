@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 local ffi = require('ffi')
 
 ffi.cdef([[
@@ -21,14 +22,8 @@ end
 -- logging
 local function add_tracer(logbuf)
 	return function (req)
-		local function qrylogger(qry, src, msg)
-			local req_uid = (qry and qry.request and qry.request.uid) or 0
-			local qry_uid = (qry and qry.uid) or 0
-			local logline = string.format("[%05u.%02u][%s] %s", req_uid, qry_uid, ffi.string(src), ffi.string(msg))
-			table.insert(logbuf, logline)
-			if verbose() then  -- without this message would be missing in verbose log
-				ffi.C.kr_log_qverbose_impl(qry, src, msg)
-			end
+		local function qrylogger(_, msg)
+			table.insert(logbuf, ffi.string(msg))
 		end
 		req.trace_log = ffi.cast('trace_log_f', qrylogger)
 	end
