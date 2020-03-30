@@ -129,6 +129,7 @@ struct ranked_rr_array_entry {
 	_Bool to_wire : 1;
 	_Bool expiring : 1;
 	_Bool in_progress : 1;
+	_Bool dont_cache : 1;
 	knot_rrset_t *rr;
 };
 typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
