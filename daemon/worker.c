@@ -1791,21 +1791,20 @@ knot_pkt_t * worker_resolve_mk_pkt(const char *qname_str, uint16_t qtype, uint16
 	}
 
 	/* Add OPT RR */
-	knot_rrset_t *opt_rr = knot_rrset_copy(the_worker->engine->resolver.opt_rr, NULL);
-	if (!opt_rr) {
+	pkt->opt_rr = knot_rrset_copy(the_worker->engine->resolver.opt_rr, NULL);
+	if (!pkt->opt_rr) {
 		knot_pkt_free(pkt);
 		return NULL;
 	}
 	if (options->DNSSEC_WANT) {
-		knot_edns_set_do(opt_rr);
+		knot_edns_set_do(pkt->opt_rr);
 	}
 	if (knot_pkt_begin(pkt, KNOT_ADDITIONAL)
-	    || knot_pkt_put(pkt, KNOT_COMPR_HINT_NOCOMP, opt_rr, KNOT_PF_FREE)) {
-		knot_rrset_free(opt_rr, NULL);
+	    || knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, pkt->opt_rr, KNOT_PF_FREE)) {
 		knot_pkt_free(pkt);
 		return NULL;
 	}
-	free(opt_rr); // ownership of the inside was handed over to pkt
+
 	return pkt;
 }
 
