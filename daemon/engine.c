@@ -57,7 +57,7 @@
 /**@internal Maximum number of incomplete TCP connections in queue.
 * Default is from Redis and Apache. */
 #ifndef TCP_BACKLOG_DEFAULT
-#define TCP_BACKLOG_DEFAULT 511
+#define TCP_BACKLOG_DEFAULT 63
 #endif
 
 /* Cleanup engine state every 5 minutes */
