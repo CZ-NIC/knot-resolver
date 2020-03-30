@@ -176,10 +176,10 @@ end
 
 -- @function Remove a rule
 function M.del(id)
-	for _, r in ipairs(M.rules) do
+	for key, r in ipairs(M.rules) do
 		if r.rule.id == id then
 			policy.del(id)
-			table.remove(M.rules, id)
+			table.remove(M.rules, key)
 			return true
 		end
 	end
