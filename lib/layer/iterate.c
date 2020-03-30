@@ -506,11 +506,28 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			/* Skip the RR if its owner+type doesn't interest us. */
 			const uint16_t type = kr_rrset_type_maysig(rr);
 			const bool type_OK = rr->type == query->stype || type == query->stype
-				|| type == KNOT_RRTYPE_CNAME || type == KNOT_RRTYPE_DNAME;
-				/* TODO: actually handle DNAMEs */
-			if (rr->rclass != KNOT_CLASS_IN || !type_OK
-			    || !knot_dname_is_equal(rr->owner, cname)
+				|| type == KNOT_RRTYPE_CNAME;
+			if (rr->rclass != KNOT_CLASS_IN
 			    || knot_dname_in_bailiwick(rr->owner, query->zone_cut.name) < 0) {
+				continue;
+			}
+			const bool all_OK = type_OK && knot_dname_is_equal(rr->owner, cname);
+
+			const bool to_wire = is_final && !referral;
+
+			if (!all_OK && type == KNOT_RRTYPE_DNAME) {
+				/* We mark DNAMEs as interesting even if we haven't
+				 * really verified that they are useful in the
+				 * xNAME chain (as that would be too complicated). */
+				uint8_t rank = get_initial_rank(rr, query, true,
+						query->flags.FORWARD || referral);
+				int state = kr_ranked_rrarray_add(&req->answ_selected, rr,
+						rank, to_wire, query->uid, &req->pool);
+				if (state != kr_ok()) {
+					return KR_STATE_FAIL;
+				}
+			}
+			if (!all_OK) {
 				continue;
 			}
 
@@ -529,11 +546,7 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 
 			/* Process records matching current SNAME */
 			int state = KR_STATE_FAIL;
-			bool to_wire = false;
-			if (is_final) {
-				/* if not referral, mark record to be written to final answer */
-				to_wire = !referral;
-			} else {
+			if (!is_final) {
 				int cnt_ = 0;
 				state = update_nsaddr(rr, query->parent, &cnt_);
 				if (state & KR_STATE_FAIL) {

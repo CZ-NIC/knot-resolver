@@ -82,6 +82,27 @@ static void log_bogus_rrsig(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 	}
 }
 
+/** TODO: describe */
+static bool cname_matches_dname(const knot_rrset_t *rr_cn, const knot_rrset_t *rr_dn)
+{
+	assert(rr_cn->type == KNOT_RRTYPE_CNAME && rr_dn->type == KNOT_RRTYPE_DNAME);
+	/* When DNAME substitution happens, let's consider the "prefix"
+	 * that is carried over and the "suffix" that is replaced.
+	 * (Here we consider the label order used in wire and presentation.) */
+	const int prefix_labels = knot_dname_in_bailiwick(rr_cn->owner, rr_dn->owner);
+	if (prefix_labels < 1)
+		return false;
+	const knot_dname_t *cn_target = knot_cname_name(rr_cn->rrs.rdata);
+	const knot_dname_t *dn_target = knot_dname_target(rr_dn->rrs.rdata);
+	if (knot_dname_in_bailiwick(cn_target, dn_target) != prefix_labels)
+		return false;
+	/* Now we know that the suffixes are correct.  Let's check that prefixes match. */
+	const knot_dname_t *cn_se = rr_cn->owner;
+	for (int i = 0; i < prefix_labels; ++i)
+		cn_se += 1 + *cn_se;
+	return memcmp(rr_cn->owner, cn_target, cn_se - rr_cn->owner) == 0;
+}
+
 static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_query *qry,
 			    knot_mm_t *pool)
 {
@@ -94,7 +115,6 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 	 */
 	vctx->zone_name = vctx->keys ? vctx->keys->owner : NULL;
 
-	int validation_result = 0;
 	for (ssize_t i = 0; i < vctx->rrs->len; ++i) {
 		ranked_rr_array_entry_t *entry = vctx->rrs->at[i];
 		knot_rrset_t * const rr = entry->rr;
@@ -120,7 +140,26 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 		}
 
 		uint8_t rank_orig = entry->rank;
-		validation_result = kr_rrset_validate(vctx, rr);
+		int validation_result = kr_rrset_validate(vctx, rr);
+
+		/* Handle the case of CNAMEs synthesized from DNAMEs (they don't have RRSIGs). */
+		if (validation_result == kr_error(ENOENT) && rr->type == KNOT_RRTYPE_CNAME) {
+			for (ssize_t j = 0; j < vctx->rrs->len; ++j) {
+				ranked_rr_array_entry_t *e_dname = vctx->rrs->at[j];
+				if (e_dname->rr->type != KNOT_RRTYPE_DNAME) {
+					continue;
+				}
+				if (!kr_rank_test(e_dname->rank, KR_RANK_SECURE)) {
+					continue; // not strictly needed, but it's "safer"
+				}
+				if (cname_matches_dname(rr, e_dname->rr)) {
+					// now we believe the CNAME is OK
+					validation_result = kr_ok();
+					break;
+				}
+			}
+		}
+
 		if (validation_result == kr_ok()) {
 			kr_rank_set(&entry->rank, KR_RANK_SECURE);
 
