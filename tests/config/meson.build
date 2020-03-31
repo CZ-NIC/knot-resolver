@@ -29,7 +29,7 @@ foreach config_test : config_tests
     run_configtest,
     args: [
 	'-c', files('test.cfg'),
-	'-f', '1',
+	'-n'
     ],
     env: conftest_env,
     suite: [
