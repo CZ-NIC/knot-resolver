@@ -172,7 +172,7 @@ function loadTable(resp) {
 	}
 }
 
-$(function() {
+document.addEventListener("DOMContentLoaded", () => {
 	/* Load the filter table. */
 	$.ajax({
 		url: 'daf',
@@ -181,6 +181,7 @@ $(function() {
 		success: loadTable
 	});
 	/* Listen for counter updates */
+	const secure = window.location.protocol == "https";
 	const wsStats = (secure ? 'wss://' : 'ws://') + location.host + '/daf';
 	const ws = new Socket(wsStats);
 	var lastRateUpdate = Date.now();
