@@ -393,7 +393,7 @@ local function rpz_parse(action, path)
 		rules[name] = action_map[name_action]
 		-- Warn when NYI
 		if #name > 1 and not action_map[name_action] then
-			rules[name] = policy.ANSWER(parser.r_type, name_action, 666)
+			rules[name] = policy.ANSWER(parser.r_type, name_action, parser.r_ttl)
 		end
 	end
 	collectgarbage()
