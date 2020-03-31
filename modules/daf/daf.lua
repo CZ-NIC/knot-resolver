@@ -75,6 +75,9 @@ end
 local function parse_rule(g)
 	-- Allow action without filter
 	local tok = g()
+	if tok == nil then
+		error('empty rule is not allowed')
+	end
 	if not filters[tok:lower()] then
 		return tok, nil
 	end
