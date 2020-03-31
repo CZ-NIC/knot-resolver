@@ -328,11 +328,16 @@ local function publish(_, ws)
 	end
 end
 
+function M.init()
+	-- avoid ordering problem between HTTP and daf module
+	event.after(0, M.config)
+end
+
 -- @function Configure module
 function M.config()
 	if not http then
 		if verbose() then
-			log('[daf ] HTTP API unavailable because HTTP module is not loaded, use modules.load("daf > http")')
+			log('[daf ] HTTP API unavailable because HTTP module is not loaded, use modules.load("http")')
 		end
 		return
 	end
