@@ -118,7 +118,7 @@ function ruleControl(cell, type, url, action) {
 		url: 'daf/' + row.data('rule-id') + url,
 		type: type,
 		success: action,
-		fail: function (data) {
+		error: function (data) {
 			row.show();
 			const reason = data.responseText.length > 0 ? data.responseText : 'internal error';
 			cell.find('.alert').remove();
