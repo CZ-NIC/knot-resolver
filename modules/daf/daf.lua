@@ -137,9 +137,10 @@ local M = {
 
 -- @function Cleanup module
 function M.deinit()
-	if http and http.endpoints then
-		http.endpoints['/daf'] = nil
-		http.endpoints['/daf.js'] = nil
+	if http then
+		local endpoints = http.configs._builtin.webmgmt.endpoints
+		endpoints['/daf'] = nil
+		endpoints['/daf.js'] = nil
 		http.snippets['/daf'] = nil
 	end
 end
@@ -325,10 +326,16 @@ end
 
 -- @function Configure module
 function M.config()
-	if not http or not http.endpoints then return end
+	if not http then
+		if verbose() then
+			log('[daf ] HTTP API unavailable because HTTP module is not loaded, use modules.load("daf > http")')
+		end
+		return
+	end
+	local endpoints = http.configs._builtin.webmgmt.endpoints
 	-- Export API and data publisher
-	http.endpoints['/daf.js'] = http.page('daf.js', 'daf')
-	http.endpoints['/daf'] = {'application/json', api, publish}
+	endpoints['/daf.js'] = http.page('daf.js', 'daf')
+	endpoints['/daf'] = {'application/json', api, publish}
 	-- Export snippet
 	http.snippets['/daf'] = {'Application Firewall', [[
 		<script type="text/javascript" src="daf.js"></script>
