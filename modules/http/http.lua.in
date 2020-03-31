@@ -222,6 +222,10 @@ local function route(endpoints)
 		local h = assert(stream:get_headers())
 		local m = h:get(':method')
 		local path = h:get(':path')
+		if verbose() then
+			log('[http] %s %s HTTP/%d', m, path, connection.version)
+		end
+
 		-- Upgrade connection to WebSocket
 		local ws = http_websocket.new_from_stream(stream, h)
 		if ws then
