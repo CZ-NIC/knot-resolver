@@ -251,7 +251,7 @@ local function api(h, stream)
 		local path = h:get(':path')
 		local id = tonumber(path:match '/([^/]*)$')
 		if id then
-			if consensus('daf.del "%s"', id) then
+			if consensus('daf.del(%s)', id) then
 				return tojson(true)
 			end
 			return 404, '"No such rule"' -- Not found
