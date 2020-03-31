@@ -18,6 +18,7 @@ Module changes
 
 * Modules which use :c:type:`kr_request::trace_log` handler in request structure :c:type:`kr_request` need update to modified handler API. Example migration is `modules/watchdog/watchdog.lua <https://gitlab.labs.nic.cz/knot/knot-resolver/-/merge_requests/957/diffs#6831501329bbf9e494048fe269c6b02944fc227c>`_.
 * Modules which were using logger :c:func:`kr_log_qverbose_impl` need migration to new logger :c:func:`kr_log_q`. Example migration is `modules/rebinding/rebinding.lua <https://gitlab.labs.nic.cz/knot/knot-resolver/-/merge_requests/957/diffs#6c74dcae147221ca64286a3ed028057adb6813b9>`_.
+* Modules which were using :c:func:`kr_ranked_rrarray_add` should note that on success it no longer returns exclusively zero but index into the array (non-negative).  Error states are unchanged (negative).
 
 
 4.x to 5.x

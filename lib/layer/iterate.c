@@ -374,7 +374,7 @@ static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 						qry->flags.FORWARD || referral);
 		int ret = kr_ranked_rrarray_add(&req->auth_selected, rr,
 						rank, to_wire, qry->uid, &req->pool);
-		if (ret != kr_ok()) {
+		if (ret < 0) {
 			return ret;
 		}
 	}
@@ -498,6 +498,7 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 		/* CNAME was found at previous iteration, but records may not follow the correct order.
 		 * Try to find records for pending_cname owner from section start. */
 		cname = pending_cname;
+		bool cname_is_occluded = false; /* whether `cname` is in a DNAME's bailiwick */
 		pending_cname = NULL;
 		const int cname_labels = knot_dname_labels(cname, NULL);
 		for (unsigned i = 0; i < an->count; ++i) {
@@ -515,15 +516,16 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 
 			const bool to_wire = is_final && !referral;
 
-			if (!all_OK && type == KNOT_RRTYPE_DNAME) {
-				/* We mark DNAMEs as interesting even if we haven't
-				 * really verified that they are useful in the
-				 * xNAME chain (as that would be too complicated). */
+			if (!all_OK && type == KNOT_RRTYPE_DNAME
+					&& knot_dname_in_bailiwick(cname, rr->owner) >= 1) {
+				/* This DNAME (or RRSIGs) cover the current target (`cname`),
+				 * so it is interesting and will occlude its CNAME. */
+				cname_is_occluded = true;
 				uint8_t rank = get_initial_rank(rr, query, true,
 						query->flags.FORWARD || referral);
-				int state = kr_ranked_rrarray_add(&req->answ_selected, rr,
+				int ret = kr_ranked_rrarray_add(&req->answ_selected, rr,
 						rank, to_wire, query->uid, &req->pool);
-				if (state != kr_ok()) {
+				if (ret < 0) {
 					return KR_STATE_FAIL;
 				}
 			}
@@ -545,20 +547,22 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			}
 
 			/* Process records matching current SNAME */
-			int state = KR_STATE_FAIL;
 			if (!is_final) {
 				int cnt_ = 0;
-				state = update_nsaddr(rr, query->parent, &cnt_);
+				int state = update_nsaddr(rr, query->parent, &cnt_);
 				if (state & KR_STATE_FAIL) {
 					return state;
 				}
 			}
 			uint8_t rank = get_initial_rank(rr, query, true,
 					query->flags.FORWARD || referral);
-			state = kr_ranked_rrarray_add(&req->answ_selected, rr,
-						      rank, to_wire, query->uid, &req->pool);
-			if (state != kr_ok()) {
+			int ret = kr_ranked_rrarray_add(&req->answ_selected, rr,
+						rank, to_wire, query->uid, &req->pool);
+			if (ret < 0) {
 				return KR_STATE_FAIL;
+			}
+			if (cname_is_occluded) {
+				req->answ_selected.at[ret]->dont_cache = true;
 			}
 			/* Jump to next CNAME target */
 			if ((query->stype == KNOT_RRTYPE_CNAME) || (rr->type != KNOT_RRTYPE_CNAME)) {
@@ -841,7 +845,7 @@ static int process_stub(knot_pkt_t *pkt, struct kr_request *req)
 		/* KR_RANK_AUTH: we don't have the records directly from
 		 * an authoritative source, but we do trust the server and it's
 		 * supposed to only send us authoritative records. */
-		if (err != kr_ok()) {
+		if (err < 0) {
 			return KR_STATE_FAIL;
 		}
 	}
