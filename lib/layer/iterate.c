@@ -498,6 +498,7 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 		/* CNAME was found at previous iteration, but records may not follow the correct order.
 		 * Try to find records for pending_cname owner from section start. */
 		cname = pending_cname;
+		size_t cname_answ_selected_i = -1;
 		bool cname_is_occluded = false; /* whether `cname` is in a DNAME's bailiwick */
 		pending_cname = NULL;
 		const int cname_labels = knot_dname_labels(cname, NULL);
@@ -561,9 +562,7 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			if (ret < 0) {
 				return KR_STATE_FAIL;
 			}
-			if (cname_is_occluded) {
-				req->answ_selected.at[ret]->dont_cache = true;
-			}
+			cname_answ_selected_i = ret;
 			/* Jump to next CNAME target */
 			if ((query->stype == KNOT_RRTYPE_CNAME) || (rr->type != KNOT_RRTYPE_CNAME)) {
 				continue;
@@ -573,10 +572,14 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 				break;
 			}
 			/* Don't use pending_cname immediately.
-			 * There are can be records for "old" cname. */
+			 * There are can be records for "old" cname;
+			 * more importantly there might be a DNAME for `cname_is_occluded`. */
 		}
 		if (!pending_cname) {
 			break;
+		}
+		if (cname_is_occluded) {
+			req->answ_selected.at[cname_answ_selected_i]->dont_cache = true;
 		}
 		if (++(query->cname_depth) > KR_CNAME_CHAIN_LIMIT) {
 			VERBOSE_MSG("<= error: CNAME chain exceeded max length %d\n",

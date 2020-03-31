@@ -150,13 +150,17 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 					continue;
 				}
 				if (!kr_rank_test(e_dname->rank, KR_RANK_SECURE)) {
-					continue; // not strictly needed, but it's "safer"
+					/* If the order is wrong, we will need two passes. */
+					continue;
 				}
 				if (cname_matches_dname(rr, e_dname->rr)) {
-					// now we believe the CNAME is OK
+					/* Now we believe the CNAME is OK. */
 					validation_result = kr_ok();
 					break;
 				}
+			}
+			if (validation_result != kr_ok()) {
+				vctx->cname_norrsig_cnt += 1;
 			}
 		}
 
@@ -209,10 +213,16 @@ static int validate_records(struct kr_request *req, knot_pkt_t *answer, knot_mm_
 		.has_nsec3	= has_nsec3,
 		.flags		= 0,
 		.err_cnt	= 0,
+		.cname_norrsig_cnt = 0,
 		.result		= 0
 	};
 
 	int ret = validate_section(&vctx, qry, pool);
+	if (vctx.err_cnt && vctx.err_cnt == vctx.cname_norrsig_cnt) {
+		VERBOSE_MSG(qry, ">< all validation errors are missing RRSIGs on CNAMES, trying again in hope for DNAMEs\n");
+		vctx.err_cnt = vctx.cname_norrsig_cnt = vctx.result = 0;
+		ret = validate_section(&vctx, qry, pool);
+	}
 	req->answ_validated = (vctx.err_cnt == 0);
 	if (ret != kr_ok()) {
 		return ret;
