@@ -25,7 +25,7 @@ Firewall rules are declarative and consist of filters and actions. Filters have 
     daf.add('qname ~ %w+.example.com AND src = 192.0.2.0/24 deny')
 
     -- We also can reroute addresses in response to alternate target
-    -- This reroutes 1.2.3.4 to localhost
+    -- This reroutes 192.0.2.1 to localhost
     daf.add('src = 127.0.0.0/8 reroute 192.0.2.1-127.0.0.1')
 
     -- Subnets work too, this reroutes a whole subnet
