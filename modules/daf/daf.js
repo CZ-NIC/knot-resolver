@@ -181,8 +181,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		success: loadTable
 	});
 	/* Listen for counter updates */
-	const secure = window.location.protocol == "https";
-	const wsStats = (secure ? 'wss://' : 'ws://') + location.host + '/daf';
+	const wsStats = ('https:' == document.location.protocol ? 'wss://' : 'ws://') + location.host + '/daf';
 	const ws = new Socket(wsStats);
 	var lastRateUpdate = Date.now();
 	ws.onmessage = function(evt) {
