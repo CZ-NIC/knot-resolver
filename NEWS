@@ -11,6 +11,8 @@ Bugfixes
 - cache: missing filesystem support for pre-allocation is no longer fatal (#549)
 - lua: policy.rpz() no longer watches the file when watch is set to false (!954)
 - fix a strict aliasing problem that might've lead to "miscompilation" (!962)
+- lua resolve(): correctly include EDNS0 in the virtual packet (!963)
+  Custom modules might have been confused by that.
 
 Incompatible changes
 --------------------
