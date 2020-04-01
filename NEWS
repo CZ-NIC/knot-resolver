@@ -5,6 +5,7 @@ Improvements
 ------------
 - cache garbage collector: reduce filesystem operations when idle (!946)
 - policy.DEBUG_ALWAYS and policy.DEBUG_IF for limited verbose logging (!957)
+- daemon: improve TCP query latency under heavy TCP load (!968)
 
 Bugfixes
 --------

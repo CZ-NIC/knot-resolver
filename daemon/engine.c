@@ -43,9 +43,11 @@
 #endif
 
 /**@internal Maximum number of incomplete TCP connections in queue.
-* Default is from Redis and Apache. */
+* Default is from empirical testing - in our case, more isn't necessarily better.
+* See https://gitlab.labs.nic.cz/knot/knot-resolver/-/merge_requests/968
+* */
 #ifndef TCP_BACKLOG_DEFAULT
-#define TCP_BACKLOG_DEFAULT 511
+#define TCP_BACKLOG_DEFAULT 128
 #endif
 
 /* Cleanup engine state every 5 minutes */
