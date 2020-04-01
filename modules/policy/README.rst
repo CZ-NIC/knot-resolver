@@ -146,9 +146,9 @@ Following actions stop the policy matching on the query, i.e. other rules are no
        -- (the "true" at the end of policy.add)
        policy.add(policy.REROUTE({'192.0.2.0/24', '127.0.0.0'}), true)
 
-.. function:: ANSWER({ type = { ttl=ttl, rdata=data} })
+.. function:: ANSWER({ type = { ttl=ttl, rdata=data} }, nodata)
 
-   Overwrite rr data in response. ``rdata`` takes just IP address.
+   Overwrite rr data in response. ``rdata`` takes just IP address. If `nodata` is `true` policy return `NODATA` when requested type from client isn't specified (default: ``nodata=false``).
 
    .. code-block:: lua
 
