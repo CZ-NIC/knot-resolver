@@ -210,19 +210,28 @@ function policy.FLAGS(opts_set, opts_clear)
 end
 
 -- Create answer with passed arguments
-function policy.ANSWER(rtable)
+function policy.ANSWER(rtable, nodata)
 	return function(_, req)
 		local qry = req:current()
 		local answer = req.answer
+		local data = rtable[qry.stype]
+
+		nodata = nodata or false
 		ffi.C.kr_pkt_make_auth_header(answer)
 
-		for rtype, data in pairs(rtable) do
-			if (rtype == qry.stype) then
-				answer:rcode(kres.rcode.NOERROR)
-				answer:begin(kres.section.ANSWER)
-				answer:put(qry.sname, data.ttl, qry.sclass, rtype, data.rdata)
+		if data == nil then
+			if nodata == true then
+				answer:rcode(kres.rcode.NODATA)
 				return kres.DONE
 			end
+		else
+			local ttl = data.ttl or 1
+
+			answer:rcode(kres.rcode.NOERROR)
+			answer:begin(kres.section.ANSWER)
+			answer:put(qry.sname, ttl, qry.sclass, qry.stype, data.rdata)
+
+			return kres.DONE
 		end
 	end
 end
