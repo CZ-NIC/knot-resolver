@@ -6,7 +6,11 @@ if not policy then modules.load('policy') end
 
 -- Actions
 local actions = {
-	pass = 1, deny = 2, drop = 3, tc = 4, truncate = 4,
+	pass = function() return policy.PASS end,
+	deny = function () return policy.DENY end,
+	drop = function() return policy.DROP end,
+	tc = function() return policy.TC end,
+	truncate = function() return policy.TC end,
 	forward = function (g)
 		local addrs = {}
 		local tok = g()
