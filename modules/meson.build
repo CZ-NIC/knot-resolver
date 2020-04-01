@@ -21,7 +21,6 @@ lua_mod_src = [  # add lua modules without separate meson.build
 ]
 
 config_tests += [
-  ['daf_http', files('daf/daf_http.test.lua')],
   ['predict', files('predict/predict.test.lua')],
   ['hints', files('hints/tests/hints.test.lua'), ['skip_asan']],
   ['nsid', files('nsid/nsid.test.lua')],
