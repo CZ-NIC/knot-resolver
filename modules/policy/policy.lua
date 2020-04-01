@@ -210,17 +210,19 @@ function policy.FLAGS(opts_set, opts_clear)
 end
 
 -- Create answer with passed arguments
-function policy.ANSWER(rtype, rdata, ttl)
+function policy.ANSWER(rtable)
 	return function(_, req)
 		local qry = req:current()
 		local answer = req.answer
 		ffi.C.kr_pkt_make_auth_header(answer)
 
-		if (rtype == qry.stype) then
-			answer:rcode(kres.rcode.NOERROR)
-			answer:begin(kres.section.ANSWER)
-			answer:put(qry.sname, ttl, qry.sclass, rtype, rdata)
-			return kres.DONE
+		for rtype, data in pairs(rtable) do
+			if (rtype == qry.stype) then
+				answer:rcode(kres.rcode.NOERROR)
+				answer:begin(kres.section.ANSWER)
+				answer:put(qry.sname, data.ttl, qry.sclass, rtype, data.rdata)
+				return kres.DONE
+			end
 		end
 	end
 end
@@ -367,6 +369,7 @@ end
 
 local function rpz_parse(action, path)
 	local rules = {}
+	local new_actions = {}
 	local action_map = {
 		-- RPZ Policy Actions
 		['\0'] = action,
@@ -393,10 +396,14 @@ local function rpz_parse(action, path)
 		rules[name] = action_map[name_action]
 		-- Warn when NYI
 		if #name > 1 and not action_map[name_action] then
-			rules[name] = policy.ANSWER(parser.r_type, name_action, parser.r_ttl)
+			if new_actions[name] == nil then new_actions[name] = {} end
+			new_actions[name][parser.r_type] = { ttl=parser.r_ttl, rdata=name_action }
 		end
 	end
 	collectgarbage()
+	for k, v in pairs(new_actions) do
+		rules[k] = policy.ANSWER(v)
+	end
 	return rules
 end
 

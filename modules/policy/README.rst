@@ -60,6 +60,7 @@ Following actions stop the policy matching on the query, i.e. other rules are no
 * ``STUB(ip)`` - similar to ``FORWARD(ip)`` but *without* attempting DNSSEC validation.
   Each request may be either answered from cache or simply sent to one of the IPs with proxying back the answer.
 * ``REROUTE({{subnet,target}, ...})`` - reroute addresses in response matching given subnet to given target, e.g. ``{'192.0.2.0/24', '127.0.0.0'}`` will rewrite '192.0.2.55' to '127.0.0.55', see :ref:`renumber module <mod-renumber>` for more information.
+* ``ANSWER({ type = { ttl=ttl, rdata=data} })`` - Overwrite rr data in response. ``rdata`` takes just IP address, e.g. ``policy.ANSWER({ [kres.type.A] = { ttl=123, rdata='\192\168\6\7' } })``
 
 ``FORWARD``, ``TLS_FORWARD`` and ``STUB`` support up to four IP addresses "in a single call".
 
@@ -326,7 +327,7 @@ Most properties (actions, filters) are described above.
    "``rpz-passthru.``", "``policy.PASS``", "yes"
    "``rpz-tcp-only.``", "``policy.TC``", "yes"
    "``rpz-drop.``", "``policy.DROP``", "no [#]_"
-   "fake A/AAAA", "*not supported*", "no"
+   "fake A/AAAA", "``policy.ANSWER``", "no"
 
   .. [#] RPZ action ``*.`` in BIND causes *NODATA* answer
      but typically our users configure ``policy.rpz(policy.DENY, ...)``

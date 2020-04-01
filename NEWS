@@ -4,6 +4,8 @@ Knot Resolver 5.x.y (2020-0m-0d)
 Improvements
 ------------
 - cache garbage collector: reduce filesystem operations when idle (!946)
+- add policy.ANSWER action (!964, #192)
+- policy.rpz support fake A/AAAA (!964, #194)
 
 Bugfixes
 --------
