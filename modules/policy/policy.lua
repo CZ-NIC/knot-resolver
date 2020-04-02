@@ -416,19 +416,24 @@ local function rpz_parse(action, path)
 		if not ok then break end
 
 		local name = ffi.string(parser.r_owner, parser.r_owner_length)
-		local name_action = ffi.string(parser.r_data, parser.r_data_length)
-		rules[name] = action_map[name_action]
-		-- Warn when NYI
-		if #name > 1 and not action_map[name_action] then
+		local rdata = ffi.string(parser.r_data, parser.r_data_length)
 
-			if parser.r_type == kres.type.CNAME then
-				log('[poli] RPZ %s:%d: CNAME in RPZ is not supported', path, tonumber(parser.line_counter))
-			elseif unsupp_rrs(parser.r_type) then
-				log('[poli] RPZ %s:%d: RR type %s is not allowed in RPZ', path, tonumber(parser.line_counter),
-				    kres.tostring.type[parser.r_type])
+		if parser.r_type == kres.type.CNAME then
+			if action_map[rdata] then
+				rules[name] = action_map[rdata]
 			else
-				if new_actions[name] == nil then new_actions[name] = {} end
-				new_actions[name][parser.r_type] = { ttl=parser.r_ttl, rdata=name_action }
+				log('[poli] RPZ %s:%d: CNAME in RPZ is not supported', path, tonumber(parser.line_counter))
+			end
+		else
+			-- Warn when NYI
+			if #name then
+				if unsupp_rrs(parser.r_type) then
+					log('[poli] RPZ %s:%d: RR type %s is not allowed in RPZ', path, tonumber(parser.line_counter),
+					    kres.tostring.type[parser.r_type])
+				else
+					if new_actions[name] == nil then new_actions[name] = {} end
+					new_actions[name][parser.r_type] = { ttl=parser.r_ttl, rdata=rdata }
+				end
 			end
 		end
 	end
