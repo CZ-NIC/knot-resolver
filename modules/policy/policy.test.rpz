@@ -1,0 +1,11 @@
+$TTL 30
+@        SOA nonexistent.nodomain.none. dummy.nodomain.none. 1 12h 15m 3w 2h
+         NS  nonexistant.nodomain.none.
+
+example.cz	CNAME	.
+*.example.cz	CNAME	*.
+nic.cz		CNAME	rpz-drop.
+;*.nic.cz CNAME rpz-tcp-only.
+example.com	CNAME	rpz-passthru.
+example2.cz	A	192.168.55.5
+example2.cz	CNAME	local.dname
