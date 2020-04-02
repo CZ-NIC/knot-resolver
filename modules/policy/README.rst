@@ -550,7 +550,8 @@ Response policy zones
    "``rpz-passthru.``", ":func:`policy.PASS`", "yes"
    "``rpz-tcp-only.``", ":func:`policy.TC`", "yes"
    "``rpz-drop.``", ":func:`policy.DROP`", "no [#]_"
-   "fake A/AAAA", ":func:`policy.ANSWER`", "no"
+   "fake A/AAAA", ":func:`policy.ANSWER`", "yes"
+   "fake CNAME", "not supported", "no"
 
   .. [#] RPZ action ``*.`` in BIND causes *NODATA* answer
      but typically our users configure ``policy.rpz(policy.DENY, ...)``
