@@ -880,7 +880,7 @@ policy.layer = {
 	begin = function(state, req)
 		-- Don't act on "finished" cases.
 		if bit.band(state, bit.bor(kres.FAIL, kres.DONE)) ~= 0 then return state end
-		local qry = req:current()
+		local qry = req:initial() -- same as :current() but more descriptive
 		return policy.evaluate(policy.rules, req, qry, state)
 			or (special_names_optim(req, qry.sname)
 					and policy.evaluate(policy.special_names, req, qry, state))
@@ -891,7 +891,7 @@ policy.layer = {
 		if #policy.postrules == 0 then return state end
 		-- Don't act on failed cases.
 		if bit.band(state, kres.FAIL) ~= 0 then return state end
-		return policy.evaluate(policy.postrules, req, req:current(), state) or state
+		return policy.evaluate(policy.postrules, req, req:initial(), state) or state
 	end
 }
 
