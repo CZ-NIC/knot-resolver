@@ -216,12 +216,11 @@ function policy.ANSWER(rtable, nodata)
 		local answer = req.answer
 		local data = rtable[qry.stype]
 
-		nodata = nodata or false
 		ffi.C.kr_pkt_make_auth_header(answer)
 
 		if data == nil then
 			if nodata == true then
-				answer:rcode(kres.rcode.NODATA)
+				answer:rcode(kres.rcode.NOERROR)
 				return kres.DONE
 			end
 		else
@@ -388,6 +387,22 @@ local function rpz_parse(action, path)
 		['\012rpz-tcp-only\0'] = policy.TC,
 		-- Policy triggers @NYI@
 	}
+	local unsupp_rrs = function (rtype)
+		local set = {
+			kres.type.DNAME,
+			kres.type.NS,
+			kres.type.SOA,
+			kres.type.DNSKEY,
+			kres.type.DS,
+			kres.type.RRSIG,
+			kres.type.NSEC,
+			kres.type.NSEC3,
+		}
+		for _, l in pairs(set) do
+			if rtype == l then return true end
+		end
+		return false
+	end
 	local parser = require('zonefile').new()
 	local ok, errstr = parser:open(path)
 	if not ok then
@@ -405,8 +420,16 @@ local function rpz_parse(action, path)
 		rules[name] = action_map[name_action]
 		-- Warn when NYI
 		if #name > 1 and not action_map[name_action] then
-			if new_actions[name] == nil then new_actions[name] = {} end
-			new_actions[name][parser.r_type] = { ttl=parser.r_ttl, rdata=name_action }
+
+			if parser.r_type == kres.type.CNAME then
+				log('[poli] RPZ %s:%d: CNAME in RPZ is not supported', path, tonumber(parser.line_counter))
+			elseif unsupp_rrs(parser.r_type) then
+				log('[poli] RPZ %s:%d: RR type %s is not allowed in RPZ', path, tonumber(parser.line_counter),
+				    kres.tostring.type[parser.r_type])
+			else
+				if new_actions[name] == nil then new_actions[name] = {} end
+				new_actions[name][parser.r_type] = { ttl=parser.r_ttl, rdata=name_action }
+			end
 		end
 	end
 	collectgarbage()
