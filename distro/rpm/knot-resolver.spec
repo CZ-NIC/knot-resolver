@@ -283,7 +283,7 @@ fi
 %{_tmpfilesdir}/knot-resolver.conf
 %ghost /run/%{name}
 %ghost %{_localstatedir}/cache/%{name}
-%attr(750,knot-resolver,knot-resolver) %dir %{_libdir}/%{name}
+%attr(770,root,knot-resolver) %dir %{_libdir}/%{name}
 %{_sbindir}/kresd
 %{_sbindir}/kresc
 %{_sbindir}/kres-cache-gc
