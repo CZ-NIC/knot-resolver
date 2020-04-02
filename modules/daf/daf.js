@@ -118,7 +118,7 @@ function ruleControl(cell, type, url, action) {
 		url: 'daf/' + row.data('rule-id') + url,
 		type: type,
 		success: action,
-		fail: function (data) {
+		error: function (data) {
 			row.show();
 			const reason = data.responseText.length > 0 ? data.responseText : 'internal error';
 			cell.find('.alert').remove();
@@ -172,7 +172,7 @@ function loadTable(resp) {
 	}
 }
 
-$(function() {
+document.addEventListener("DOMContentLoaded", () => {
 	/* Load the filter table. */
 	$.ajax({
 		url: 'daf',
@@ -181,7 +181,7 @@ $(function() {
 		success: loadTable
 	});
 	/* Listen for counter updates */
-	const wsStats = (secure ? 'wss://' : 'ws://') + location.host + '/daf';
+	const wsStats = ('https:' == document.location.protocol ? 'wss://' : 'ws://') + location.host + '/daf';
 	const ws = new Socket(wsStats);
 	var lastRateUpdate = Date.now();
 	ws.onmessage = function(evt) {

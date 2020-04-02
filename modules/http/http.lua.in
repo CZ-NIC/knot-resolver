@@ -222,9 +222,14 @@ local function route(endpoints)
 		local h = assert(stream:get_headers())
 		local m = h:get(':method')
 		local path = h:get(':path')
+
 		-- Upgrade connection to WebSocket
 		local ws = http_websocket.new_from_stream(stream, h)
 		if ws then
+			if verbose() then
+				log('[http] %s %s HTTP/%d web socket open',
+					m, path, connection.version)
+			end
 			assert(ws:accept { protocols = {'json'} })
 			-- Continue streaming results to client
 			local ep = endpoints[path]
@@ -233,23 +238,34 @@ local function route(endpoints)
 				cb(h, ws)
 			end
 			ws:close()
+			if verbose() then
+				log('[http] %s %s HTTP/%d web socket closed',
+					m, path, connection.version)
+			end
 			return
 		else
 			local ok, err, reason = http_util.yieldable_pcall(serve, endpoints, h, stream)
 			if not ok or err then
-				if err ~= '404' and verbose() then
-					log('[http] %s %s: %s (%s)', m, path, err or '500', reason)
+				err = err or '500'
+				if verbose() then
+					log('[http] %s %s HTTTP/%d %s %s',
+						m, path, connection.version, err, reason or '')
 				end
 				-- Method is not supported
 				local hsend = http_headers.new()
-				hsend:append(':status', err or '500')
+				hsend:append(':status', err)
 				if reason then
 					assert(stream:write_headers(hsend, false))
 					assert(stream:write_chunk(reason, true))
 				else
 					assert(stream:write_headers(hsend, true))
 				end
+			else if verbose() then
+				log('[http] %s %s HTTP/%d 200',
+					m, path, connection.version)
+				end
 			end
+
 		end
 	end
 end
