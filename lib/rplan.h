@@ -121,6 +121,8 @@ struct kr_rplan {
 					as the last is the next one to solve,
 					and they may be inter-dependent. */
 	kr_qarray_t resolved;       /**< List of resolved queries. */
+	struct kr_query *initial;   /**< The initial query (also in pending or resolved). */
+
 	struct kr_request *request; /**< Parent resolution request. */
 	knot_mm_t *pool;            /**< Temporary memory pool. */
 	uint32_t next_uid;          /**< Next value for kr_query::uid (incremental). */
