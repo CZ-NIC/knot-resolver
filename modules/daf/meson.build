@@ -6,6 +6,10 @@ config_tests += [
   ['daf_http', files('daf_http.test.lua')],
 ]
 
+integr_tests += [
+  ['daf', join_paths(meson.current_source_dir(), 'test.integr')],
+]
+
 lua_mod_src += [
   files('daf.lua'),
 ]
