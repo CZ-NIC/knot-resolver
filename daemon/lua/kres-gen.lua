@@ -153,6 +153,7 @@ typedef struct {
 struct kr_rplan {
 	kr_qarray_t pending;
 	kr_qarray_t resolved;
+	struct kr_query *initial;
 	struct kr_request *request;
 	knot_mm_t *pool;
 	uint32_t next_uid;
