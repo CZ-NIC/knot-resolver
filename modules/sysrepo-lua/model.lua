@@ -5,6 +5,32 @@ local Node = {}
 Node.__index = Node
 local _clib = nil
 
+local Hook = {}
+Hook.__index = Hook
+
+function Hook:create(apply_pre, apply_post)
+    assert(apply_pre == nil or type(apply_pre) == "function")
+    assert(apply_post == nil or type(apply_post) == "function")
+
+    local res = {}
+    setmetatable(res, Hook)
+
+    res.apply_pre = apply_pre
+    res.apply_post = apply_post
+
+    return res
+end
+
+function Hook:apply_pre(self)
+    -- empty default
+end
+
+function Hook:apply_post(self)
+    -- empty default
+end
+
+local EMPTY_HOOK = Hook:create()
+
 --- Access function to the C helper library. Returns table on which C functions can be called
 --- directly. When retrieving strings, you must intern them first using `ffi.string()`
 local function clib()
@@ -17,9 +43,9 @@ end
 --- Nodes can be read by node:read(data_node) and written by node:write(parent_data_node)
 ---
 --- @param name Name of the vertex for constructing XPath
---- @param apply_func Function which takes self and data node from libyang and applies the configuration to the system
---- @param read_func Function which takes self and data node from libyang and adds a child to it with data from
----        the system. Returns a node it added.
+--- @param apply_func Function which takes self, data node from libyang and applies the configuration to the system
+--- @param read_func Function which takes self, data node from libyang and optional argument. It adds children to the
+---        given node with data from the system or its argument. Returns last node it added.
 function Node:create(name, apply_func, read_func, initialize_schema_func)
     assert(type(name) == "string")
     assert(type(apply_func) == 'function')
@@ -36,6 +62,8 @@ function Node:create(name, apply_func, read_func, initialize_schema_func)
 
     -- default implementation
     local function schema_init(self, lys_node)
+        assert(lys_node ~= nil, "Node named \'" .. self.name .. "\' does not exist in the YANG schema"
+                                                            .. " (or something else happened).")
         assert(ffi.string(clib().schema_get_name(lys_node)) == self.name)
         self.module = clib().schema_get_module(lys_node)
     end
@@ -69,8 +97,8 @@ local function DummyLeafNode(name, ignore_value)
         end
     end
 
-    local function dummy_write(self, node)
-        debug.log("dummy write on node named {}", self.name)
+    local function dummy_write(self, node, arg)
+        debug.log("dummy write on node named {}, arg={}", self.name, arg)
         return nil
     end
 
@@ -81,7 +109,12 @@ end
 ---
 --- @param name Name of the vertex for constructing XPath
 --- @param container_model List of child {@link Node}s
-local function ContainerNode(name, container_model)
+local function ContainerNode(name, container_model, hooks)
+    -- default hooks
+    if hooks == nil then
+        hooks = EMPTY_HOOK
+    end
+
     -- optimize child lookup by name with table
     local child_lookup_table = {}
     for _,v in ipairs(container_model) do
@@ -90,6 +123,8 @@ local function ContainerNode(name, container_model)
 
     --- Node's apply function
     local function handle_cont_read(self, node)
+        hooks:apply_pre()
+
         local node_name = ffi.string(clib().node_get_name(node))
         debug.log("Reading container \"{}\"", self.name)
         assert(node_name == self.name)
@@ -106,6 +141,8 @@ local function ContainerNode(name, container_model)
 
             child = clib().node_child_next(child)
         end
+
+        hooks:apply_post()
     end
 
     --- Node's serialize function
@@ -217,6 +254,66 @@ local function ConfigVarNode(name, type, bind_variable)
     return BindNode(name, type, get_val, set_val)
 end
 
+local function ListenInterfacesNode()
+    -- |  |  +--rw listen-interfaces* [name]
+    -- |  |  |  +--rw ip-address <ip-address(union)>
+    -- |  |  |  +--rw name <string>
+    -- |  |  |  +--rw port? <port-number(uint16)>
+
+    local function handle_apply(self, node)
+        -- open new listen sockets
+
+        -- create lookup table for nodes by name
+        local lookup = {}
+        local child = clib().node_child_first(node)
+        while child ~= nil do
+            local nm = ffi.string(clib().node_get_name(child))
+            lookup[nm] = child
+            child = clib().node_child_next(child)
+        end
+
+        local port = tonumber(ffi.string(clib().node_get_value_str(lookup["port"])))
+        local ip = ffi.string(clib().node_get_value_str(lookup["ip-address"]))
+
+        debug.log("New interface config - listen on {}:{}", ip, port)
+        net.listen(ip, port)
+    end
+
+    local function handle_serialize(self, parent_node)
+        local function gen_name(ip, port)
+            return tostring(ip) .. ":" .. tostring(port)
+        end
+
+        local cont = nil
+        for _,v in ipairs(net.list()) do
+            -- handle only udp protocol, because TCP sockets mirror UDP
+            if v['transport']['protocol'] == 'udp' then
+                local ip = v['transport']['ip']
+                local port = v['transport']['port']
+
+                cont = clib().node_new_container(parent_node, self.module, self.name)
+                clib().node_new_leaf(cont, self.module, "ip-address", ip)
+                clib().node_new_leaf(cont, self.module, "name", gen_name(ip, port))
+                clib().node_new_leaf(cont, self.module, "port", tostring(port))
+            end
+        end
+
+        return cont -- we should return the most recently added child
+    end
+
+    return Node:create("listen-interfaces", handle_apply, handle_serialize, nil)
+end
+
+local function hook_apply_pre_network()
+    debug.log("Cleaning previously created listen sockets")
+
+    -- close all previously opened listen sockets
+    local already_listening = net.list()
+    for _,v in ipairs(already_listening) do
+        net.close(v['transport']['ip'], v['transport']['port'])
+    end
+end
+
 --- Configuration schema reprezentation
 local model =
     ContainerNode("dns-resolver", {
@@ -229,6 +326,9 @@ local model =
         ContainerNode("logging", {
             BindNode("verbosity", "uint8", function() return verbose() and 1 or 0 end, function(v) verbose(v > 0) end)
         }),
+        ContainerNode("network", {
+            ListenInterfacesNode(),
+        }, Hook:create(hook_apply_pre_network, nil)),
     })
 
 --- Module constructor
