@@ -1,12 +1,56 @@
 local debug = require("kres_modules/sysrepo-lua/debug")
 local ffi = require("ffi")
 
+local _clib = nil
+
+--- Access function to the C helper library. Returns table on which C functions can be called
+--- directly. When retrieving strings, you must intern them first using `ffi.string()`
+local function clib()
+    assert(_clib ~= nil, "Tried to use C library before it was properly initialized.")
+    return _clib
+end
+
 local Node = {}
 Node.__index = Node
-local _clib = nil
 
 local Hook = {}
 Hook.__index = Hook
+
+local Helpers = {}
+function Helpers.get_children_table(node)
+    -- create lookup table for nodes by name
+    local lookup = {}
+    local child = clib().node_child_first(node)
+    while child ~= nil do
+        local nm = ffi.string(clib().node_get_name(child))
+        lookup[nm] = child
+        child = clib().node_child_next(child)
+    end
+
+    return lookup
+end
+
+function Helpers.get_children_str_values(node)
+    local children = Helpers.get_children_table(node)
+
+    local result = {}
+    for nm,nd in ipairs(children) do
+        result[nm] = ffi.string(clib().node_get_value_str(nd))
+    end
+    return result
+end
+
+function Helpers.get_schema_children_table(schema_node)
+    local lookup = {}
+    local child = clib().schema_child_first(schema_node)
+    while child ~= nil do
+        local nm = ffi.string(clib().schema_get_name(child))
+        lookup[nm] = child
+        child = clib().schema_child_next(child)
+    end
+
+    return lookup
+end
 
 function Hook:create(apply_pre, apply_post)
     assert(apply_pre == nil or type(apply_pre) == "function")
@@ -30,13 +74,6 @@ function Hook:apply_post(self)
 end
 
 local EMPTY_HOOK = Hook:create()
-
---- Access function to the C helper library. Returns table on which C functions can be called
---- directly. When retrieving strings, you must intern them first using `ffi.string()`
-local function clib()
-    assert(_clib ~= nil, "Tried to use C library before it was properly initialized.")
-    return _clib
-end
 
 --- Tree node for representing a vertex in configuration model tree
 ---
@@ -160,17 +197,11 @@ local function ContainerNode(name, container_model, hooks)
         assert(ffi.string(clib().schema_get_name(lys_node)) == self.name)
         self.module = clib().schema_get_module(lys_node)
 
-        local lookup = {}
-        local child = clib().schema_child_first(lys_node)
-        while child ~= nil do
-            local nm = ffi.string(clib().schema_get_name(child))
-            lookup[nm] = child
-            child = clib().schema_child_next(child)
-        end
+        local children = Helpers.get_schema_children_table(lys_node)
 
         -- apply to all children
         for _,v in ipairs(container_model) do
-            v:initialize_schema(lookup[v.name])
+            v:initialize_schema(children[v.name])
         end
     end
 
@@ -259,24 +290,30 @@ local function ListenInterfacesNode()
     -- |  |  |  +--rw ip-address <ip-address(union)>
     -- |  |  |  +--rw name <string>
     -- |  |  |  +--rw port? <port-number(uint16)>
+    -- |  |  |  +--rw cznic-resolver-knot:kind? <dns-transport-protocol(enumeration)>
+
+    local function init_schema(self, lys_node)
+        -- save our module
+        assert(ffi.string(clib().schema_get_name(lys_node)) == self.name)
+        self.module = clib().schema_get_module(lys_node)
+
+        -- save module for "kind" child
+        local children = Helpers.get_schema_children_table(lys_node)
+        self.module_kind = clib().schema_get_module(children["kind"])
+    end
 
     local function handle_apply(self, node)
-        -- open new listen sockets
+        -- this function will be called multiple times for each list item
 
         -- create lookup table for nodes by name
-        local lookup = {}
-        local child = clib().node_child_first(node)
-        while child ~= nil do
-            local nm = ffi.string(clib().node_get_name(child))
-            lookup[nm] = child
-            child = clib().node_child_next(child)
-        end
+        local children_vals = Helpers.get_children_str_values(node)
 
-        local port = tonumber(ffi.string(clib().node_get_value_str(lookup["port"])))
-        local ip = ffi.string(clib().node_get_value_str(lookup["ip-address"]))
+        local port = tonumber(children_vals["port"])
+        local ip = children_vals["ip-address"]
+        local kind = children_vals["kind"]
 
         debug.log("New interface config - listen on {}:{}", ip, port)
-        net.listen(ip, port)
+        net.listen(ip, port, { kind = kind })
     end
 
     local function handle_serialize(self, parent_node)
@@ -290,18 +327,45 @@ local function ListenInterfacesNode()
             if v['transport']['protocol'] == 'udp' then
                 local ip = v['transport']['ip']
                 local port = v['transport']['port']
+                local kind = v['kind']
 
                 cont = clib().node_new_container(parent_node, self.module, self.name)
                 clib().node_new_leaf(cont, self.module, "ip-address", ip)
                 clib().node_new_leaf(cont, self.module, "name", gen_name(ip, port))
                 clib().node_new_leaf(cont, self.module, "port", tostring(port))
+                clib().node_new_leaf(cont, self.module_kind, "kind", kind)
             end
         end
 
         return cont -- we should return the most recently added child
     end
 
-    return Node:create("listen-interfaces", handle_apply, handle_serialize, nil)
+    return Node:create("listen-interfaces", handle_apply, handle_serialize, init_schema)
+end
+
+local function TLSNode()
+    -- |  |  +--rw tls
+    -- |  |  |  +--rw cert? <fs-path(string)>
+    -- |  |  |  +--rw cert-key? <fs-path(string)>
+
+
+    local function handle_apply(self, node)
+        -- open new listen sockets
+
+        local children_vals = Helpers.get_children_str_values(node)
+
+        local cert_path = children_vals["cert"]
+        local key_path = children_vals["cert-key"]
+
+        net.tls(cert_path, key_path)
+    end
+
+    local function handle_serialize(self, parent_node)
+        -- TODO implement
+        return nil
+    end
+
+    return Node:create("tls", handle_apply, handle_serialize, nil)
 end
 
 local function hook_apply_pre_network()
@@ -328,6 +392,7 @@ local model =
         }),
         ContainerNode("network", {
             ListenInterfacesNode(),
+            TLSNode(),
         }, Hook:create(hook_apply_pre_network, nil)),
     })
 
