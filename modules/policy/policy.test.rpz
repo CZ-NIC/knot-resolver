@@ -1,9 +1,10 @@
 $TTL 30
-@        SOA nonexistent.nodomain.none. dummy.nodomain.none. 1 12h 15m 3w 2h
-         NS  nonexistant.nodomain.none.
+testdomain.		SOA nonexistent.testdomain. testdomain. 1 12h 15m 3w 2h
+			NS  nonexistant.testdomain.
 
-nxdomain.	CNAME	.
-nodata.		CNAME	*.
-rpzdrop.	CNAME	rpz-drop.
-rpzpassthru.	CNAME	rpz-passthru.
-rra.		A	192.168.55.5
+nxdomain.		CNAME	.
+nodata.			CNAME	*.
+rpzdrop.		CNAME	rpz-drop.
+rpzpassthru.		CNAME	rpz-passthru.
+rra.			A	192.168.55.5
+rra-zonename-suffix.testdomain.		A 	192.168.66.6

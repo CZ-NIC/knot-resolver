@@ -378,6 +378,7 @@ end
 local function rpz_parse(action, path)
 	local rules = {}
 	local new_actions = {}
+	local origin = '.'
 	local action_map = {
 		-- RPZ Policy Actions
 		['\0'] = action,
@@ -418,6 +419,14 @@ local function rpz_parse(action, path)
 		local name = ffi.string(parser.r_owner, parser.r_owner_length)
 		local rdata = ffi.string(parser.r_data, parser.r_data_length)
 
+		if (parser.r_type == kres.type.SOA) then
+			-- parser return \0 if SOA use @ as owner
+			origin = (name == '\0') and origin or name
+			goto continue
+		end
+
+		name = (name == origin) and name or name:gsub('%'..origin, '')
+
 		if parser.r_type == kres.type.CNAME then
 			if action_map[rdata] then
 				rules[name] = action_map[rdata]
@@ -436,6 +445,8 @@ local function rpz_parse(action, path)
 				end
 			end
 		end
+
+		::continue::
 	end
 	collectgarbage()
 	for k, v in pairs(new_actions) do
