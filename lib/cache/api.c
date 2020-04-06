@@ -359,6 +359,12 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (knot_wire_get_tc(pkt->wire)) {
 		return ctx->state;
 	}
+	bool needs_pkt = false;
+	if (qry->flags.STUB) {
+		needs_pkt = true;
+		goto stash_packet;
+	}
+
 	/* Stash individual records. */
 	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	int unauth_cnt = 0;
@@ -367,9 +373,6 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 		assert(!ENOMEM);
 		goto finally;
 	}
-	bool needs_pkt = false;
-		/* ^^ DNSSEC_OPTOUT is not fired in cases like `com. A`,
-		 * but currently we don't stash separate NSEC3 proving that. */
 	for (int psec = KNOT_ANSWER; psec <= KNOT_ADDITIONAL; ++psec) {
 		ranked_rr_array_t *arr = selected[psec];
 		/* uncached entries are located at the end */
@@ -401,7 +404,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	trie_it_free(it);
 	/* LATER(optim.): typically we also have corresponding NS record in the list,
 	 * so we might save a cache operation. */
-
+stash_packet:
 	if (qry->flags.PKT_IS_SANE && check_dname_for_lf(knot_pkt_qname(pkt), qry)) {
 		stash_pkt(pkt, qry, req, needs_pkt);
 	}
