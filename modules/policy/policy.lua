@@ -382,7 +382,7 @@ local function rpz_parse(action, path)
 	local action_map = {
 		-- RPZ Policy Actions
 		['\0'] = action,
-		['\1*\0'] = action, -- deviates from RPZ spec
+		['\1*\0'] = policy.ANSWER({}, true),
 		['\012rpz-passthru\0'] = policy.PASS, -- the grammar...
 		['\008rpz-drop\0'] = policy.DROP,
 		['\012rpz-tcp-only\0'] = policy.TC,

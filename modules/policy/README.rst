@@ -546,17 +546,13 @@ Response policy zones
    :header: "RPZ Right Hand Side", "Knot Resolver Action", "BIND Compatibility"
 
    "``.``", "``action`` is used", "compatible if ``action`` is :func:`policy.DENY`"
-   "``*.``", "``action`` is used", "good enough [#]_ if ``action`` is :func:`policy.DENY`"
+   "``*.``", ":func:`policy.ANSWER`", "yes"
    "``rpz-passthru.``", ":func:`policy.PASS`", "yes"
    "``rpz-tcp-only.``", ":func:`policy.TC`", "yes"
    "``rpz-drop.``", ":func:`policy.DROP`", "no [#]_"
    "fake A/AAAA", ":func:`policy.ANSWER`", "yes"
    "fake CNAME", "not supported", "no"
 
-  .. [#] RPZ action ``*.`` in BIND causes *NODATA* answer
-     but typically our users configure ``policy.rpz(policy.DENY, ...)``
-     which replies with *NXDOMAIN*. Good news is that from client's
-     perspective it does not make a visible difference.
   .. [#] Our :func:`policy.DROP` returns *SERVFAIL* answer (for historical reasons).
 
 
