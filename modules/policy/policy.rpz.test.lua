@@ -53,6 +53,8 @@ local function test_rpz()
 		'rpzpassthru.', kres.type.A, kres.rcode.NOERROR, '127.0.0.9')
 	check_answer('"A 192.168.55.5" return local A rrset',
 		'rra.', kres.type.A, kres.rcode.NOERROR, '192.168.55.5')
+	check_answer('"A 192.168.66.6" with suffixed zone name in owner return local A rrset',
+		'rra-zonename-suffix.', kres.type.A, kres.rcode.NOERROR, '192.168.66.6')
 	check_answer('non existing AAAA on rra domain return NODATA',
 		'rra.', kres.type.AAAA, kres.rcode.NOERROR)
 end
