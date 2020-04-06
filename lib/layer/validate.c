@@ -98,13 +98,14 @@ static bool cname_matches_dname(const knot_rrset_t *rr_cn, const knot_rrset_t *r
 	/* Check that the suffixes are correct - and even prefix label counts. */
 	if (knot_dname_in_bailiwick(cn_target, dn_target) != prefix_labels)
 		return false;
-	/* Check that prefixes match.  Find end of the first one and memcmp(). */
+	/* Check that prefixes match.  Find end of the first one and compare. */
 	const knot_dname_t *cn_se = rr_cn->owner;
 	for (int i = 0; i < prefix_labels; ++i)
 		cn_se += 1 + *cn_se;
-	return memcmp(rr_cn->owner, cn_target, cn_se - rr_cn->owner) == 0;
-		/* ^ Well, for a mismatch there might be a *small* read
-		 * past the buffer where cn_target resides, but that seems OK. */
+	return strncmp((const char *)rr_cn->owner, (const char *)cn_target,
+			cn_se - rr_cn->owner) == 0;
+		/* ^ We use the fact that dnames are always zero-terminated
+		 * to avoid any possible over-read in cn_target. */
 }
 
 static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_query *qry,
