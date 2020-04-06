@@ -10,12 +10,6 @@ local function clib()
     return _clib
 end
 
-local Node = {}
-Node.__index = Node
-
-local Hook = {}
-Hook.__index = Hook
-
 local Helpers = {}
 function Helpers.get_children_table(node)
     -- create lookup table for nodes by name
@@ -34,7 +28,7 @@ function Helpers.get_children_str_values(node)
     local children = Helpers.get_children_table(node)
 
     local result = {}
-    for nm,nd in ipairs(children) do
+    for nm,nd in pairs(children) do
         result[nm] = ffi.string(clib().node_get_value_str(nd))
     end
     return result
@@ -51,6 +45,25 @@ function Helpers.get_schema_children_table(schema_node)
 
     return lookup
 end
+
+function Helpers.str_cast(type, val)
+    if type == "uint8" or type == "uint32" or type == "uint64" then
+        return tonumber(val)
+    elseif type == "string" then
+        return val
+    else
+        assert(false, "Trying to serialize unknown type")
+    end
+end
+
+
+-------------------------------------------------------------------------------
+------------------------ Generic Config Modeling Infra ------------------------
+-------------------------------------------------------------------------------
+
+
+local Hook = {}
+Hook.__index = Hook
 
 function Hook:create(apply_pre, apply_post)
     assert(apply_pre == nil or type(apply_pre) == "function")
@@ -74,6 +87,10 @@ function Hook:apply_post(self)
 end
 
 local EMPTY_HOOK = Hook:create()
+
+
+local Node = {}
+Node.__index = Node
 
 --- Tree node for representing a vertex in configuration model tree
 ---
@@ -142,15 +159,54 @@ local function DummyLeafNode(name, ignore_value)
     return Node:create(name, dummy_read, dummy_write, nil)
 end
 
+--- Creates a simple child for ContainerNode
+---
+--- @param node Node that should be used.
+local function Child(node)
+    return {
+        type = 'simple',
+        name = node.name,
+        node = node,
+    }
+end
+
+--- Creates a list child for ContainerNode
+---
+--- @param get_args_func Function that will return a list of arguments that will be passed one by one into
+---                      the created node
+--- @param factory_func Node factory function that takes a name as its first argument
+--- @param name Name of the node (for XPath creation)
+--- @param ... arguments passed through to the factory
+local function ListChild(get_args_func, factory_func, name, ...)
+    assert(type(get_args_func) == "function")
+    assert(type(factory_func) == "function")
+    assert(type(name) == "string")
+
+    local args = {...}
+    local fact = factory_func(name, unpack(args))
+
+    return {
+        type = 'list',
+        name = name,
+        node_factory = fact,
+        node = fact(nil),
+        get_args = get_args_func,
+    }
+end
+
 --- Node representing a container in YANG schema. Recursively calls its children.
 ---
 --- @param name Name of the vertex for constructing XPath
---- @param container_model List of child {@link Node}s
+--- @param container_model List of children. A child is a table created by some of the functions above.
+--- @param hooks Table containing hooks that will be called in specified moments while processing the container.
 local function ContainerNode(name, container_model, hooks)
     -- default hooks
     if hooks == nil then
         hooks = EMPTY_HOOK
     end
+
+    -- local variables stored in closure
+    local child_schema_nodes = {}
 
     -- optimize child lookup by name with table
     local child_lookup_table = {}
@@ -173,7 +229,9 @@ local function ContainerNode(name, container_model, hooks)
             -- it has to be a subset. So there might be a node that we can't
             -- find.
             if child_lookup_table[nm] ~= nil then
-                child_lookup_table[nm]:apply(child)
+                -- we don't have to worry about types of children, because
+                -- all of them have node property for config application
+                child_lookup_table[nm].node:apply(child)
             end
 
             child = clib().node_child_next(child)
@@ -184,24 +242,43 @@ local function ContainerNode(name, container_model, hooks)
 
     --- Node's serialize function
     local function handle_cont_write(self, parent_node)
-        local node = clib().node_new_container(parent_node, self.module, self.name)
+        local cont = clib().node_new_container(parent_node, self.module, self.name)
 
         for _,v in ipairs(container_model) do
-            _ = v:serialize(node)
+            if v.type == "simple" then
+                _ = v.node:serialize(cont)
+            elseif v.type == "list" then
+                -- prepare argument list
+                local args = v.get_args()
+                local function get_nth(n)
+                    return function()
+                        return args[n]
+                    end
+                end
+
+                -- for each argument, we use the node factory to create special node with
+                -- that argument. And after initializing, use it once
+                for i,_ in ipairs(args) do
+                    local node = v.node_factory(get_nth(i))
+                    node:initialize_schema(child_schema_nodes[v.name])
+                    _ = node:serialize(cont)
+                end
+            end
         end
 
-        return node
+        return cont
     end
 
     local function schema_init(self, lys_node)
         assert(ffi.string(clib().schema_get_name(lys_node)) == self.name)
         self.module = clib().schema_get_module(lys_node)
 
-        local children = Helpers.get_schema_children_table(lys_node)
+        child_schema_nodes = Helpers.get_schema_children_table(lys_node)
 
         -- apply to all children
         for _,v in ipairs(container_model) do
-            v:initialize_schema(children[v.name])
+            -- all children have node property, so we initialize just that
+            v.node:initialize_schema(child_schema_nodes[v.name])
         end
     end
 
@@ -223,12 +300,7 @@ local function BindNode(name, type, get_val, set_val)
         end
 
         -- obtain value from the lyd_node according to specified type
-        local val = nil
-        if type == "uint8" or type == "uint32" or type == "uint64" then
-            val = tonumber(ffi.string(clib().node_get_value_str(node)))
-        else
-            assert(false, "Trying to serialize unknown type")
-        end
+        local val = Helpers.str_cast(type, ffi.string(clib().node_get_value_str(node)))
 
         -- set the value
         set_val(val)
@@ -285,87 +357,120 @@ local function ConfigVarNode(name, type, bind_variable)
     return BindNode(name, type, get_val, set_val)
 end
 
-local function ListenInterfacesNode()
-    -- |  |  +--rw listen-interfaces* [name]
-    -- |  |  |  +--rw ip-address <ip-address(union)>
-    -- |  |  |  +--rw name <string>
-    -- |  |  |  +--rw port? <port-number(uint16)>
-    -- |  |  |  +--rw cznic-resolver-knot:kind? <dns-transport-protocol(enumeration)>
+--- Binding node that binds whole container instead of single values.
+--- Works with one level deep containers.
+---
+--- @param name Name of the vertex for constructing XPath
+--- @param child_names_to_types String names to string types map. Configures which child nodes
+---                             will be used
+--- @param get_func Function that will return table map with names to values (with types as specified above).
+---                 Those values will be used during serialization.
+--- @param set_func Function that takes a table map of names to values (with types as specified above). Configures
+---                 Knot Resolver.
+local function ContainerBindNode(name, child_names_to_types, get_func, set_func)
+    local child_modules = {}
 
     local function init_schema(self, lys_node)
         -- save our module
         assert(ffi.string(clib().schema_get_name(lys_node)) == self.name)
         self.module = clib().schema_get_module(lys_node)
 
-        -- save module for "kind" child
+        -- save module for children
         local children = Helpers.get_schema_children_table(lys_node)
-        self.module_kind = clib().schema_get_module(children["kind"])
+        for nm, _ in pairs(child_names_to_types) do
+            child_modules[name] = clib().schema_get_module(children[nm])
+        end
     end
 
     local function handle_apply(self, node)
-        -- this function will be called multiple times for each list item
+        -- do nothing when set function is not present (node is read only)
+        if set_func == nil then
+            return
+        end
 
-        -- create lookup table for nodes by name
+        -- create data table that will be given to the set function
         local children_vals = Helpers.get_children_str_values(node)
+        local typed_values = {}
+        for nm, type in pairs(child_names_to_types) do
+            typed_values[nm] = Helpers.str_cast(type, children_vals[nm])
+        end
 
-        local port = tonumber(children_vals["port"])
-        local ip = children_vals["ip-address"]
-        local kind = children_vals["kind"]
-
-        debug.log("New interface config - listen on {}:{}", ip, port)
-        net.listen(ip, port, { kind = kind })
+        -- call set function
+        set_func(typed_values)
     end
 
     local function handle_serialize(self, parent_node)
-        local function gen_name(ip, port)
-            return tostring(ip) .. ":" .. tostring(port)
+        -- do nothing when get function is not present (node is write only)
+        if get_func == nil then
+            return
         end
 
-        local cont = nil
-        for _,v in ipairs(net.list()) do
-            -- handle only udp protocol, because TCP sockets mirror UDP
-            if v['transport']['protocol'] == 'udp' then
-                local ip = v['transport']['ip']
-                local port = v['transport']['port']
-                local kind = v['kind']
-
-                cont = clib().node_new_container(parent_node, self.module, self.name)
-                clib().node_new_leaf(cont, self.module, "ip-address", ip)
-                clib().node_new_leaf(cont, self.module, "name", gen_name(ip, port))
-                clib().node_new_leaf(cont, self.module, "port", tostring(port))
-                clib().node_new_leaf(cont, self.module_kind, "kind", kind)
-            end
+        local values = get_func()
+        local cont = clib().node_new_container(parent_node, self.module, self.name)
+        for nm, module in pairs(child_modules) do
+            clib().node_new_leaf(cont, module, nm, tostring(values[nm]))
         end
 
-        return cont -- we should return the most recently added child
+        return cont
     end
 
-    return Node:create("listen-interfaces", handle_apply, handle_serialize, init_schema)
+    return Node:create(name, handle_apply, handle_serialize, init_schema)
+end
+
+--- Factory that was left here for now as an example
+-- local function ContainerBindNodeFactory(name, child_names_to_types, set_func)
+--     assert(type(set_func) == 'function' or set_func == nil)
+--     assert(type(child_names_to_types) == 'table')
+--     assert(type(name) == 'string')
+--
+--     return function(get_func)
+--         assert(type(get_func) == 'function' or get_func == nil)
+--
+--         return ContainerBindNode(name, child_names_to_types, get_func, set_func)
+--     end
+-- end
+
+
+-------------------------------------------------------------------------------
+------------------------ Actual Configuration Binding -------------------------
+-------------------------------------------------------------------------------
+
+
+local function ListenInterfacesNodeFactory(name)
+    -- |  |  +--rw listen-interfaces* [name]
+    -- |  |  |  +--rw name <string>
+    -- |  |  |  +--rw ip-address <ip-address(union)>
+    -- |  |  |  +--rw port? <port-number(uint16)>
+    -- |  |  |  +--rw cznic-resolver-knot:kind? <dns-transport-protocol(enumeration)>
+
+    assert(name == "listen-interfaces") -- this argument must be there due to the way container node works
+
+    --- the actual factory function
+    return function(get_arg_func)
+        -- return configured container bind node
+        return ContainerBindNode(
+            "listen-interfaces",
+            { ["ip-address"] = "string", ["name"] = "string", ["port"] = "uint16", ["kind"] = "string" },
+            get_arg_func,
+            function(v)
+                net.listen(v["ip-address"], v["port"], { kind = v["kind"] })
+            end
+        )
+    end
 end
 
 local function TLSNode()
     -- |  |  +--rw tls
     -- |  |  |  +--rw cert? <fs-path(string)>
     -- |  |  |  +--rw cert-key? <fs-path(string)>
+    -- |  |  |  +--rw cznic-resolver-knot:sticket-secret? <secret-string(string)>
 
-
-    local function handle_apply(self, node)
-        -- open new listen sockets
-
-        local children_vals = Helpers.get_children_str_values(node)
-
-        local cert_path = children_vals["cert"]
-        local key_path = children_vals["cert-key"]
-
-        net.tls(cert_path, key_path)
-    end
-
-    local function handle_serialize(self, parent_node)
-        -- TODO implement
-        return nil
-    end
-
-    return Node:create("tls", handle_apply, handle_serialize, nil)
+    return ContainerBindNode(
+        "tls",
+        { ["cert"] = "string", ["cert-key"] = "string" },
+        nil,
+        function(vals) net.tls(vals["cert"], vals["cert-key"]) end
+    )
 end
 
 local function hook_apply_pre_network()
@@ -378,23 +483,53 @@ local function hook_apply_pre_network()
     end
 end
 
+local function get_listen_interfaces()
+    -- the data structure from `net.list()` has to be transformed to be understood
+    -- by ContainerBindNode
+    local function transform(arg)
+        return {
+            ["ip-address"] = arg['transport']['ip'],
+            ["name"] = arg["kind"] .. "://" .. arg['transport']['ip'] .. tostring(arg['transport']['port']),
+            ["port"] = arg['transport']['port'],
+            ["kind"] = arg['kind'],
+        }
+    end
+
+    local res = {}
+    for _,v in ipairs(net.list()) do
+        if v["kind"] == "dns" and v["transport"]["protocol"] == "tcp" then
+            -- nothing
+        else
+            table.insert(res, transform(v))
+        end
+    end
+
+    return res
+end
+
 --- Configuration schema reprezentation
 local model =
     ContainerNode("dns-resolver", {
-        ContainerNode("cache", {
-            StateNode("current-size", "uint64", "cache.current_size"),
-            BindNode("max-size", "uint64", function() return cache.current_size end, function(v) cache.size = v end),
-            ConfigFnNode("max-ttl", "uint32", cache.max_ttl),
-            ConfigFnNode("min-ttl", "uint32", cache.min_ttl),
-        }),
-        ContainerNode("logging", {
-            BindNode("verbosity", "uint8", function() return verbose() and 1 or 0 end, function(v) verbose(v > 0) end)
-        }),
-        ContainerNode("network", {
-            ListenInterfacesNode(),
-            TLSNode(),
-        }, Hook:create(hook_apply_pre_network, nil)),
+        Child(ContainerNode("cache", {
+            Child(StateNode("current-size", "uint64", "cache.current_size")),
+            Child(BindNode("max-size", "uint64", function() return cache.current_size end, function(v) cache.size = v end)),
+            Child(ConfigFnNode("max-ttl", "uint32", cache.max_ttl)),
+            Child(ConfigFnNode("min-ttl", "uint32", cache.min_ttl)),
+        })),
+        Child(ContainerNode("logging", {
+            Child(BindNode("verbosity", "uint8", function() return verbose() and 1 or 0 end, function(v) verbose(v > 0) end))
+        })),
+        Child(ContainerNode("network", {
+            ListChild(get_listen_interfaces, ListenInterfacesNodeFactory, "listen-interfaces"),
+            Child(TLSNode()),
+        }, Hook:create(hook_apply_pre_network, nil))),
     })
+
+
+-------------------------------------------------------------------------------
+------------------------ Module Exports ---------------------------------------
+-------------------------------------------------------------------------------
+
 
 --- Module constructor
 return function(clib_binding)
