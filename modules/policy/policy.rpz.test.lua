@@ -46,7 +46,7 @@ local function test_rpz()
 	check_answer('"CNAME ." return NXDOMAIN',
 		'nxdomain.', kres.type.A, kres.rcode.NXDOMAIN)
 	check_answer('"CNAME *." return NXDOMAIN',
-		'nodata.', kres.type.A, kres.rcode.NXDOMAIN)
+		'nodata.', kres.type.A, kres.rcode.NOERROR)
 	check_answer('"CNAME rpz-drop." be dropped',
 		'rpzdrop.', kres.type.A, kres.rcode.SERVFAIL)
 	check_answer('"CNAME rpz-passthru" return A rrset',
