@@ -655,7 +655,7 @@ static int check_NS_entry(struct key *k, const knot_db_val_t entry, const int i,
 	const int ESKIP = ABS(ENOENT);
 	if (!entry.len
 		/* On a zone cut we want DS from the parent zone. */
-		|| (i <= EL_NS && exact_match && is_DS)
+		|| (exact_match && is_DS)
 		/* CNAME is interesting only if we
 		 * directly hit the name that was asked.
 		 * Note that we want it even in the DS case. */
