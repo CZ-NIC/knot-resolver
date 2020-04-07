@@ -477,6 +477,13 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		const knot_rrset_t *rr, const knot_rrset_t *rr_sigs, uint32_t timestamp,
 		uint8_t rank, trie_t *nsec_pmap, bool *needs_pkt)
 {
+	if (kr_rank_test(rank, KR_RANK_BOGUS)) {
+		WITH_VERBOSE(qry) {
+			auto_free char *type_str = kr_rrtype_text(rr->type);
+			VERBOSE_MSG(qry, "=> skipping bogus RR set %s\n", type_str);
+		}
+		return kr_ok();
+	}
 	assert(stash_rrset_precond(rr, qry) > 0);
 	if (!cache) {
 		assert(!EINVAL);
