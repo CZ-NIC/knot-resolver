@@ -137,7 +137,8 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 			 * to MISMATCH on revalidation, e.g. in test val_referral_nods :-/
 			 */
 
-		} else if (validation_result == kr_error(ENOENT)) {
+		} else if (validation_result == kr_error(ENOENT)
+				&& vctx->rrs_counters.matching_name_type == 0) {
 			/* no RRSIGs found */
 			kr_rank_set(&entry->rank, KR_RANK_MISSING);
 			vctx->err_cnt += 1;
