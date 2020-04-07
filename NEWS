@@ -14,6 +14,7 @@ Bugfixes
 - fix a strict aliasing problem that might've lead to "miscompilation" (!962)
 - lua resolve(): correctly include EDNS0 in the virtual packet (!963)
   Custom modules might have been confused by that.
+- do not leak bogus data into SERVFAIL answers (#396)
 
 Incompatible changes
 --------------------
