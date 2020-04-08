@@ -146,7 +146,6 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 			log_bogus_rrsig(vctx, qry, rr, "no valid RRSIGs found");
 		} else {
 			kr_rank_set(&entry->rank, KR_RANK_BOGUS);
-			entry->to_wire = false;
 			vctx->err_cnt += 1;
 			log_bogus_rrsig(vctx, qry, rr, "bogus signatures");
 		}
@@ -1115,6 +1114,9 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 /** Hide RRsets which did not validate from clients. */
 static int hide_bogus(kr_layer_t *ctx) {
+	if (knot_wire_get_cd(ctx->req->qsource.packet->wire)) {
+		return ctx->state;
+	}
 	/* We don't want to send bogus answers to clients, not even in SERVFAIL
 	 * answers, but we cannot drop whole sections. If a CNAME chain
 	 * SERVFAILs somewhere, the steps that were OK should be put into
