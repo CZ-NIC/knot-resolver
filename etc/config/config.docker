@@ -40,6 +40,10 @@ function interactive_mode()
 end
 
 function debug_mode(qname, qtype)
+	event.after(20*sec, function()
+		print('ERROR: timeout which cannot happen actually happened, exiting')
+		os.exit(1)
+	end)
 	env.KRESD_NO_LISTEN = 1
 
 	-- limit noise in verbose logs
@@ -47,7 +51,6 @@ function debug_mode(qname, qtype)
 	modules.unload('priming')
 	modules.unload('ta_signal_query')
 	modules.unload('ta_update')
-
 
 	-- execute query right after start up and exit when the query is finished
 	event.after(0, function()
@@ -61,7 +64,7 @@ function debug_mode(qname, qtype)
 			finish = function(pkt)
 				-- delay exit after packet is finished
 				-- to prevent us from losing policy.DEBUG finish callback
-				event.after(1,
+				event.after(1, -- milisecond
 					function()
 						os.exit()
 					end)
