@@ -1029,7 +1029,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	} else
 #endif
 	if (pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
-		VERBOSE_MSG("<= malformed response\n");
+		VERBOSE_MSG("<= malformed response (parsed %d)\n", (int)pkt->parsed);
 		return resolve_badmsg(pkt, req, query);
 	} else if (!is_paired_to_query(pkt, query)) {
 		WITH_VERBOSE(query) {
