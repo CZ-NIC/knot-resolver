@@ -435,7 +435,7 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
 	/* TCP_FASTOPEN enables 1 RTT connection resumptions. */
 #ifdef TCP_FASTOPEN
 	#ifdef __linux__
-	val = 16; /* Accepts queue length hint */
+	val = 65536; /* Accepts queue length hint */
 	#else
 	val = 1; /* Accepts on/off */
 	#endif
