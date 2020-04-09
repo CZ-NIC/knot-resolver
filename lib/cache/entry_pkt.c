@@ -145,14 +145,22 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 
+	const uint16_t msgid = knot_wire_get_id(pkt->wire);
+
+	/* Ensure the wire buffer is large enough.  Strategy: fit and at least double. */
 	uint16_t pkt_len;
 	memcpy(&pkt_len, eh->data, sizeof(pkt_len));
 	if (pkt_len > pkt->max_size) {
-		return kr_error(ENOENT);
+		pkt->max_size = MIN(KNOT_WIRE_MAX_PKTSIZE,
+				    MAX(pkt->max_size * 2, pkt_len));
+		mm_free(&ctx->req->pool, pkt->wire); /* no-op, but... */
+		pkt->wire = mm_alloc(&ctx->req->pool, pkt->max_size);
+		pkt->compr.wire = pkt->wire;
+		/* TODO: ^^ nicer way how to replace knot_pkt_t::wire ? */
 	}
+	assert(pkt->max_size >= pkt_len);
 
 	/* Copy answer and reparse it, but keep the original message id. */
-	uint16_t msgid = knot_wire_get_id(pkt->wire);
 	knot_pkt_clear(pkt);
 	memcpy(pkt->wire, eh->data + 2, pkt_len);
 	pkt->size = pkt_len;
