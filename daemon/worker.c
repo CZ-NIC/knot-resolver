@@ -375,12 +375,13 @@ static void request_free(struct request_ctx *ctx)
 
 static struct qr_task *qr_task_create(struct request_ctx *ctx)
 {
-	/* How much can client handle? */
-	struct engine *engine = ctx->worker->engine;
-	size_t pktbuf_max = KR_EDNS_PAYLOAD;
-	if (engine->resolver.opt_rr) {
-		pktbuf_max = MAX(knot_edns_get_payload(engine->resolver.opt_rr),
-				 pktbuf_max);
+	/* Choose (initial) pktbuf size.  As it is now, pktbuf can be used
+	 * for UDP answers from upstream *and* from cache
+	 * and for sending non-UDP queries upstream (?) */
+	uint16_t pktbuf_max = KR_EDNS_PAYLOAD;
+	const knot_rrset_t *opt_our = ctx->worker->engine->resolver.opt_rr;
+	if (opt_our) {
+		pktbuf_max = MAX(pktbuf_max, knot_edns_get_payload(opt_our));
 	}
 
 	/* Create resolution task */
