@@ -50,7 +50,7 @@ typedef struct lyd_node* (*read_conf_f)();
 KR_EXPORT int sysrepo_init(apply_conf_f apply_conf_callback, read_conf_f read_conf_callback);
 KR_EXPORT int sysrepo_deinit(void);
 
-/** Given a libyang node, returns it's first child */
+/** Given a libyang node, returns it's first child (or NULL if there aren't any) */
 KR_EXPORT struct lyd_node* node_child_first(struct lyd_node* parent);
 /** Given a libyang node, return next sibling or NULL if there isn't any */
 KR_EXPORT struct lyd_node* node_child_next(struct lyd_node* prev_child);
@@ -64,7 +64,7 @@ KR_EXPORT struct lyd_node* node_new_leaf(struct lyd_node* parent, const struct l
 KR_EXPORT struct lyd_node* node_new_container(struct lyd_node* parent, const struct lys_module* module, const char* name);
 /** Returns module given a schema node */
 KR_EXPORT const struct lys_module* schema_get_module(const struct lys_node* schema);
-/** Given a libyang schema node, returns it's first child */
+/** Given a libyang schema node, returns it's first child (or NULL if there aren't any) */
 KR_EXPORT const struct lys_node* schema_child_first(const struct lys_node* parent);
 /** Given a libyang schema node, return next sibling or NULL if there isn't any */
 KR_EXPORT const struct lys_node* schema_child_next(const struct lys_node* prev_child);

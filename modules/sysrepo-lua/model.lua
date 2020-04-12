@@ -278,7 +278,7 @@ local function ContainerNode(name, container_model, hooks)
         -- apply to all children
         for _,v in ipairs(container_model) do
             -- all children have node property, so we initialize just that
-            v.node:initialize_schema(child_schema_nodes[v.name])
+            v.node:initialize_schema(child_schema_nodes[v.node.name])
         end
     end
 
@@ -537,7 +537,26 @@ return function(clib_binding)
 
     local initialized_schema = false
     local function init_schema()
+        local depth = 0
+        local function print_schema_tree(schema_node)
+            debug.log("{}{}", string.rep("  ", depth), ffi.string(clib().schema_get_name(schema_node)))
+            depth = depth + 1
+            local children = Helpers.get_schema_children_table(schema_node)
+            for _,node in pairs(children) do
+                print_schema_tree(node)
+            end
+            depth = depth - 1
+        end
+
+
         if not initialized_schema then
+            -- dump schema tree for debugging purpose
+            debug.log("Loaded schema tree:")
+            debug.log("")
+            print_schema_tree(clib().schema_root())
+            debug.log("")
+            debug.log("Schema tree end")
+
             model:initialize_schema(clib().schema_root())
             initialized_schema = true
         end

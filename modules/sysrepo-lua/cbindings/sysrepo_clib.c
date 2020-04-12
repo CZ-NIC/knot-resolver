@@ -229,24 +229,33 @@ int sysrepo_deinit()
 }
 
 KR_EXPORT struct lyd_node* node_child_first(struct lyd_node* parent) {
-	assert(
-		parent->schema->nodetype == LYS_CONTAINER ||
-		parent->schema->nodetype == LYS_LIST ||
-		parent->schema->nodetype == LYS_CHOICE
-	);
+	assert(parent != NULL);
+
+	/* return null when the node does not contain children */
+	if(
+		parent->schema->nodetype != LYS_CONTAINER &&
+		parent->schema->nodetype != LYS_LIST &&
+		parent->schema->nodetype != LYS_CHOICE
+	) {
+		return NULL;
+	}
 
 	return parent->child;
 }
 
 KR_EXPORT struct lyd_node* node_child_next(struct lyd_node* prev_child) {
+	assert(prev_child != NULL);
 	return prev_child->next;
 }
 
 KR_EXPORT const char* node_get_name(struct lyd_node* node) {
+	assert(node != NULL);
 	return node->schema->name;
 }
 
 KR_EXPORT const char* node_get_value_str(struct lyd_node* node) {
+	assert(node != NULL);
+
 	assert(
 		node->schema->nodetype ==  LYS_LEAF ||
 		node->schema->nodetype == LYS_LEAFLIST
@@ -268,11 +277,15 @@ KR_EXPORT const struct lys_module* schema_get_module(const struct lys_node* sche
 
 KR_EXPORT const struct lys_node* schema_child_first(const struct lys_node* parent) {
 	assert(parent != NULL);
-	assert(
-		parent->nodetype == LYS_CONTAINER ||
-		parent->nodetype == LYS_LIST ||
-		parent->nodetype == LYS_CHOICE
-	);
+
+	/* if the node does not contain children, return NULL */
+	if (
+		parent->nodetype != LYS_CONTAINER &&
+		parent->nodetype != LYS_LIST &&
+		parent->nodetype != LYS_CHOICE
+	) {
+		return NULL;
+	}
 
 	return parent->child;
 }
