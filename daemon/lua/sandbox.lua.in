@@ -638,4 +638,5 @@ else
 	worker.sleep = disabled
 	worker.map = disabled
 	worker.coroutine = disabled
+	worker.bg_worker = setmetatable({}, { __index = disabled })
 end
