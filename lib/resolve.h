@@ -145,7 +145,12 @@ typedef array_t(struct kr_module *) module_array_t;
 struct kr_context
 {
 	struct kr_qflags options;
+
+	/** Default EDNS towards *both* clients and upstream.
+	 * LATER: consider splitting the two, e.g. allow separately
+	 * configured limits for UDP packet size (say, LAN is under control). */
 	knot_rrset_t *opt_rr;
+
 	map_t trust_anchors;
 	map_t negative_anchors;
 	struct kr_zonecut root_hints;
@@ -165,8 +170,8 @@ struct kr_context
 /* Kept outside, because kres-gen.lua can't handle this depth
  * (and lines here were too long anyway). */
 struct kr_request_qsource_flags {
-	bool tcp:1; /**< true if the request is on TCP (or TLS); only meaningful if (dst_addr). */
-	bool tls:1; /**< true if the request is on TLS (or HTTPS); only meaningful if (dst_addr). */
+	bool tcp:1; /**< true if the request is not on UDP; only meaningful if (dst_addr). */
+	bool tls:1; /**< true if the request is encrypted; only meaningful if (dst_addr). */
 	bool http:1; /**< true if the request is on HTTP; only meaningful if (dst_addr). */
 };
 
