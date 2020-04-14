@@ -76,7 +76,7 @@ void kr_log_req(const struct kr_request * const req, uint32_t qry_uid,
 /**
  * Log a message through the request log handler or stdout.
  * Caller is responsible for detecting verbose mode, use QRVERBOSE() macro.
- * @param  query current query
+ * @param  qry current query
  * @param  source message source
  * @param  fmt message format
  */
@@ -367,10 +367,10 @@ KR_EXPORT
 int kr_straddr_subnet(void *dst, const char *addr);
 
 /** Splits ip address specified as "addr@port" or "addr#port" into addr and port.
- * \param instr[in] zero-terminated input, e.g. "192.0.2.1#12345\0"
- * \param ipaddr[out] working buffer for the port-less prefix of instr;
+ * \param[in]  instr zero-terminated input, e.g. "192.0.2.1#12345\0"
+ * \param[out] ipaddr working buffer for the port-less prefix of instr;
  *                    length >= INET6_ADDRSTRLEN + 1.
- * \param port[out] written in case it's specified in instr
+ * \param[out] port written in case it's specified in instr
  * \return error code
  * \note Typically you follow this by kr_straddr_socket().
  * \note Only internet addresses are supported, i.e. no AF_UNIX sockets.
@@ -536,8 +536,8 @@ static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, bool add_wi
 
 /**
  * Difference between two calendar times specified as strings.
- * \param format[in] format for strptime
- * \param diff[out] result from C difftime(time1, time0)
+ * \param[in]  format format for strptime
+ * \param[out] diff result from C difftime(time1, time0)
  */
 KR_EXPORT
 const char *kr_strptime_diff(const char *format, const char *time1_str,
