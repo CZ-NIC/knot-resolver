@@ -51,7 +51,7 @@ A *filter* selects which queries will be affected by specified Actions_. There a
   Like :func:`policy.suffix` match, but you can also provide a common suffix of all matches for faster processing (nil otherwise).
   This function is faster for small suffix tables (in the order of "hundreds").
 
-.. py:function:: rpz(default_action, path, [watch])
+.. :noindex: py:function:: rpz(default_action, path, [watch])
 
    Implements a subset of `Response Policy Zone` (RPZ_) stored in zonefile format.  See below for details: :func:`policy.rpz`.
 
