@@ -13,7 +13,7 @@ By default a self-signed certificate is generated. For serious deployments
 it is strongly recommended to configure your own TLS certificates signed
 by a trusted CA. This is done using function :c:func:`net.tls()`.
 
-.. function:: net.tls([cert_path], [key_path])
+.. py:function:: net.tls([cert_path], [key_path])
 
    Get/set path to a server TLS certificate and private key for DNS/TLS.
 
@@ -25,7 +25,7 @@ by a trusted CA. This is done using function :c:func:`net.tls()`.
       > net.tls()  -- print configured paths
       ("/etc/knot-resolver/server-cert.pem", "/etc/knot-resolver/server-key.pem")
 
-.. function:: net.tls_padding([true | false])
+.. py:function:: net.tls_padding([true | false])
 
    Get/set EDNS(0) padding of answers to queries that arrive over TLS
    transport.  If set to `true` (the default), it will use a sensible
@@ -35,7 +35,7 @@ by a trusted CA. This is done using function :c:func:`net.tls()`.
    answer will have size of a multiple of 64 (64, 128, 192, ...).  If
    set to `false` (or a number < 2), it will disable padding entirely.
 
-.. function:: net.tls_sticket_secret([string with pre-shared secret])
+.. py:function:: net.tls_sticket_secret([string with pre-shared secret])
 
    Set secret for TLS session resumption via tickets, by :rfc:`5077`.
 
@@ -59,7 +59,7 @@ by a trusted CA. This is done using function :c:func:`net.tls()`.
       Therefore setting the secrets should be considered experimental for now
       and might not be available on your system.
 
-.. function:: net.tls_sticket_secret_file([string with path to a file containing pre-shared secret])
+.. py:function:: net.tls_sticket_secret_file([string with path to a file containing pre-shared secret])
 
    The same as :func:`net.tls_sticket_secret`,
    except the secret is read from a (binary) file.

@@ -73,14 +73,14 @@ By default :ref:`policy module <mod-policy>` acts before ``view`` module due to 
 Properties
 ----------
 
-.. function:: view:addr(subnet, rule)
+.. py:function:: view:addr(subnet, rule)
 
   :param subnet: client subnet, i.e. ``10.0.0.1``
   :param rule: added rule, i.e. ``policy.pattern(policy.DENY, '[0-9]+\2cz')``
 
   Apply rule to clients in given subnet.
 
-.. function:: view:tsig(key, rule)
+.. py:function:: view:tsig(key, rule)
 
   :param key: client TSIG key domain name, i.e. ``\5mykey``
   :param rule: added rule, i.e. ``policy.pattern(policy.DENY, '[0-9]+\2cz')``

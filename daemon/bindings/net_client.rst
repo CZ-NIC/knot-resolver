@@ -22,12 +22,12 @@ on your system.
 
    Enable/disable using IPv6 for contacting upstream nameservers.
 
-.. function:: net.outgoing_v4([string address])
+.. py:function:: net.outgoing_v4([string address])
 
    Get/set the IPv4 address used to perform queries.
    The default is ``nil``, which lets the OS choose any address.
 
-.. function:: net.outgoing_v6([string address])
+.. py:function:: net.outgoing_v6([string address])
 
    Get/set the IPv6 address used to perform queries.
    The default is ``nil``, which lets the OS choose any address.

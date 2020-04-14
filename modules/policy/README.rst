@@ -24,15 +24,15 @@ Filters
 -------
 A *filter* selects which queries will be affected by specified Actions_. There are several policy filters available in the ``policy.`` table:
 
-.. function:: all(action)
+.. py:function:: all(action)
 
    Always applies the action.
 
-.. function:: pattern(action, pattern)
+.. py:function:: pattern(action, pattern)
 
    Applies the action if query name matches a `Lua regular expression <http://lua-users.org/wiki/PatternsTutorial>`_.
 
-.. function:: suffix(action, suffix_table)
+.. py:function:: suffix(action, suffix_table)
 
    Applies the action if query name suffix matches one of suffixes in the table (useful for "is domain in zone" rules).
 
@@ -42,7 +42,7 @@ A *filter* selects which queries will be affected by specified Actions_. There a
 
       policy.suffix(policy.DENY, policy.todnames({'example.com', 'example.net'}))
 
-.. function:: suffix_common(action, suffix_table[, common_suffix])
+.. py:function:: suffix_common(action, suffix_table[, common_suffix])
 
   :param action: action if the pattern matches query name
   :param suffix_table: table of valid suffixes
@@ -51,13 +51,13 @@ A *filter* selects which queries will be affected by specified Actions_. There a
   Like :func:`policy.suffix` match, but you can also provide a common suffix of all matches for faster processing (nil otherwise).
   This function is faster for small suffix tables (in the order of "hundreds").
 
-.. function:: rpz(default_action, path, [watch])
+.. py:function:: rpz(default_action, path, [watch])
 
    Implements a subset of `Response Policy Zone` (RPZ_) stored in zonefile format.  See below for details: :func:`policy.rpz`.
 
 It is also possible to define custom filter function with any name.
 
-.. function:: custom_filter(state, query)
+.. py:function:: custom_filter(state, query)
 
    :param state: Request processing state :c:type:`kr_layer_state`, typically not used by filter function.
    :param query: Incoming DNS query as :c:type:`kr_query` structure.
@@ -119,7 +119,7 @@ Following actions stop the policy matching on the query, i.e. other rules are no
 
    Deny existence of names matching filter, i.e. reply NXDOMAIN authoritatively.
 
-.. function:: DENY_MSG(message)
+.. py:function:: DENY_MSG(message)
 
    Deny existence of a given domain and add explanatory message. NXDOMAIN reply contains an additional explanatory message as TXT record in the additional section.
 
@@ -135,7 +135,7 @@ Following actions stop the policy matching on the query, i.e. other rules are no
 
    Force requestor to use TCP. It sets truncated bit (*TC*) in response to true if the request came through UDP, which will force standard-compliant clients to retry the request over TCP.
 
-.. function:: REROUTE({{subnet,target}, ...})
+.. py:function:: REROUTE({{subnet,target}, ...})
 
    Reroute IP addresses in response matching given subnet to given target, e.g. ``{'192.0.2.0/24', '127.0.0.0'}`` will rewrite '192.0.2.55' to '127.0.0.55', see :ref:`renumber module <mod-renumber>` for more information. See :func:`policy.add` and do not forget to specify that this is *postrule*. Quick example:
 
@@ -156,7 +156,7 @@ Chain actions
 
 Following actions act on request and then processing continue until first non-chain action (specified in the previous section) is triggered:
 
-.. function:: MIRROR(ip_address)
+.. py:function:: MIRROR(ip_address)
 
    Send copy of incoming DNS queries to a given IP address using DNS-over-UDP and continue resolving them as usual. This is useful for sanity testing new versions of DNS resolvers.
 
@@ -164,7 +164,7 @@ Following actions act on request and then processing continue until first non-ch
 
        policy.add(policy.all(policy.MIRROR('127.0.0.2')))
 
-.. function:: FLAGS(set, clear)
+.. py:function:: FLAGS(set, clear)
 
    Set and/or clear some flags for the query.  There can be multiple flags to set/clear.  You can just pass a single flag name (string) or a set of names. Flag names correspond to :c:type:`kr_qflags` structure.  Use only if you know what you are doing.
 
@@ -220,7 +220,7 @@ Following actions act on request and then processing continue until first non-ch
 Custom actions
 ^^^^^^^^^^^^^^
 
-.. function:: custom_action(state, request)
+.. py:function:: custom_action(state, request)
 
    :param state: Request processing state :c:type:`kr_layer_state`.
    :param request: Current DNS request as :c:type:`kr_request` structure.
@@ -265,7 +265,7 @@ Forwarding action alters behavior for cache-miss events. If an information is mi
 
 Actions :func:`policy.FORWARD`, :func:`policy.TLS_FORWARD` and :func:`policy.STUB` accept up to four IP addresses at once and the resolver will automatically select IP address which statistically responds the fastest.
 
-.. function:: FORWARD(ip_address)
+.. py:function:: FORWARD(ip_address)
               FORWARD({ ip_address, [ip_address, ...] })
 
    Forward cache-miss queries to specified IP addresses via DNS-over-UDP, DNSSEC validate received answers and cache them. Target IP addresses are expected to be DNS resolvers.
@@ -282,7 +282,7 @@ Actions :func:`policy.FORWARD`, :func:`policy.TLS_FORWARD` and :func:`policy.STU
 
    A variant which uses encrypted DNS-over-TLS transport is called :func:`policy.TLS_FORWARD`, please see section :ref:`tls-forwarding`.
 
-.. function:: STUB(ip_address)
+.. py:function:: STUB(ip_address)
               STUB({ ip_address, [ip_address, ...] })
 
    Similar to :func:`policy.FORWARD` but *without* attempting DNSSEC validation.
@@ -305,7 +305,7 @@ Actions :func:`policy.FORWARD`, :func:`policy.TLS_FORWARD` and :func:`policy.STU
 
 Forwarding over TLS protocol (DNS-over-TLS)
 -------------------------------------------
-.. function:: TLS_FORWARD( { {ip_address, authentication}, [...] } )
+.. py:function:: TLS_FORWARD( { {ip_address, authentication}, [...] } )
 
    Same as :func:`FORWARD` but send query over DNS-over-TLS protocol (encrypted).
    Each target IP address needs explicit configuration how to validate
@@ -381,7 +381,7 @@ entire DNS namespace into distinct slices. When used in conjuction with
 :func:`policy.TLS_FORWARD`, it's possible to forward different queries to
 different targets.
 
-.. function:: slice(slice_func, action[, action[, ...])
+.. py:function:: slice(slice_func, action[, action[, ...])
 
   :param slice_func: slicing function that returns index based on query
   :param action: action to be performed for the slice
@@ -391,7 +391,7 @@ different targets.
   which slice a query belongs to. The corresponding ``action`` is then executed.
 
 
-.. function:: slice_randomize_psl(seed = os.time() / (3600 * 24 * 7))
+.. py:function:: slice_randomize_psl(seed = os.time() / (3600 * 24 * 7))
 
   :param seed: seed for random assignment
 
@@ -550,7 +550,7 @@ Response policy zones
   .. [#] Our :func:`policy.DROP` returns *SERVFAIL* answer (for historical reasons).
 
 
-.. function:: rpz(action, path, [watch = true])
+.. py:function:: rpz(action, path, [watch = true])
 
   :param action: the default action for match in the zone; typically you want :func:`policy.DENY`
   :param path: path to zone file
@@ -584,7 +584,7 @@ Additional properties
 
 Most properties (actions, filters) are described above.
 
-.. function:: add(rule, postrule)
+.. py:function:: add(rule, postrule)
 
   :param rule: added rule, i.e. ``policy.pattern(policy.DENY, '[0-9]+\2cz')``
   :param postrule: boolean, if true the rule will be evaluated on answer instead of query
@@ -599,14 +599,14 @@ Most properties (actions, filters) are described above.
        -- we can print statistics about this rule any time later
        print(string.format('id: %d, matched queries: %d', rule.id, rule.count)
 
-.. function:: del(id)
+.. py:function:: del(id)
 
   :param id: identifier of a given rule returned by :func:`policy.add`
   :return: boolean ``true`` if rule was deleted, ``false`` otherwise
 
   Remove a rule from policy list.
 
-.. function:: todnames({name, ...})
+.. py:function:: todnames({name, ...})
 
    :param: names table of domain names in textual format
 

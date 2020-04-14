@@ -22,7 +22,7 @@ Running as non-privileged user
 Another possibility is to start the process as privileged user and then switch
 to a non-privileged user after binding to network interfaces.
 
-.. function:: user(name, [group])
+.. py:function:: user(name, [group])
 
    :param string name: user name
    :param string group: group name (optional)

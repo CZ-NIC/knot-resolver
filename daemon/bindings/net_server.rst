@@ -24,7 +24,7 @@ First you need to decide what service should be available on given IP address
    Control sockets are created either in
    ``/run/knot-resolver/control/`` (when using systemd) or ``$PWD/control/``.
 
-.. function:: net.listen(addresses, [port = 53, { kind = 'dns', freebind = false }])
+.. py:function:: net.listen(addresses, [port = 53, { kind = 'dns', freebind = false }])
 
    :return: ``true`` if port is bound, an error otherwise
 
@@ -69,14 +69,14 @@ Features for scripting
 ^^^^^^^^^^^^^^^^^^^^^^
 Following configuration functions are useful mainly for scripting or :ref:`runtime-cfg`.
 
-.. function:: net.close(address, [port])
+.. py:function:: net.close(address, [port])
 
    :return: boolean (at least one endpoint closed)
 
    Close all endpoints listening on the specified address, optionally restricted by port as well.
 
 
-.. function:: net.list()
+.. py:function:: net.list()
 
    :return: Table of bound interfaces.
 
@@ -112,7 +112,7 @@ Following configuration functions are useful mainly for scripting or :ref:`runti
           }
       }
 
-.. function:: net.interfaces()
+.. py:function:: net.interfaces()
 
    :return: Table of available interfaces and their addresses.
 
@@ -136,7 +136,7 @@ Following configuration functions are useful mainly for scripting or :ref:`runti
 
    .. tip:: You can use ``net.<iface>`` as a shortcut for specific interface, e.g. ``net.eth0``
 
-.. function:: net.tcp_pipeline([len])
+.. py:function:: net.tcp_pipeline([len])
 
    Get/set per-client TCP pipeline limit, i.e. the number of outstanding queries that a single client connection can make in parallel.  Default is 100.
 

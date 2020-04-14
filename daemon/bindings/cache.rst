@@ -100,7 +100,7 @@ config file as well.
 Configuration reference
 -----------------------
 
-.. function:: cache.open(max_size[, config_uri])
+.. py:function:: cache.open(max_size[, config_uri])
 
    :param number max_size: Maximum cache size in bytes.
    :return: ``true`` if cache was opened
@@ -152,7 +152,7 @@ Configuration reference
 
 	print(cache.current_storage)
 
-.. function:: cache.backends()
+.. py:function:: cache.backends()
 
    :return: map of backends
 
@@ -168,11 +168,11 @@ Configuration reference
 
    	[lmdb://] => true
 
-.. function:: cache.count()
+.. py:function:: cache.count()
 
    :return: Number of entries in the cache. Meaning of the number is an implementation detail and is subject of change.
 
-.. function:: cache.close()
+.. py:function:: cache.close()
 
    :return: ``true`` if cache was closed
 
@@ -180,11 +180,11 @@ Configuration reference
 
    .. note:: This may or may not clear the cache, depending on the cache backend.
 
-.. function:: cache.fssize()
+.. py:function:: cache.fssize()
 
    :return: Partition size of cache storage.
 
-.. function:: cache.stats()
+.. py:function:: cache.stats()
 
    Return table with low-level statistics for each internal cache operation.
    This counts each access to cache and does not directly map to individual
@@ -215,7 +215,7 @@ Configuration reference
    and 4 out of 9 operations were finished with *cache miss*.
 
 
-.. function:: cache.max_ttl([ttl])
+.. py:function:: cache.max_ttl([ttl])
 
   :param number ttl: maximum cache TTL in seconds (default: 6 days)
 
@@ -238,7 +238,7 @@ Configuration reference
      cache.max_ttl(172800)
      172800
 
-.. function:: cache.min_ttl([ttl])
+.. py:function:: cache.min_ttl([ttl])
 
   :param number ttl: minimum cache TTL in seconds (default: 5 seconds)
 
@@ -261,7 +261,7 @@ Configuration reference
      cache.min_ttl(5)
      5
 
-.. function:: cache.ns_tout([timeout])
+.. py:function:: cache.ns_tout([timeout])
 
   :param number timeout: NS retry interval in milliseconds (default: :c:macro:`KR_NS_TIMEOUT_RETRY_INTERVAL`)
   :return: current timeout
@@ -271,12 +271,12 @@ Configuration reference
 
   .. warning:: This settings applies only to the current kresd process.
 
-.. function:: cache.get([domain])
+.. py:function:: cache.get([domain])
 
   This function is not implemented at this moment.
   We plan to re-introduce it soon, probably with a slightly different API.
 
-.. function:: cache.clear([name], [exact_name], [rr_type], [chunk_size], [callback], [prev_state])
+.. py:function:: cache.clear([name], [exact_name], [rr_type], [chunk_size], [callback], [prev_state])
 
      Purge cache records matching specified criteria. There are two specifics:
 

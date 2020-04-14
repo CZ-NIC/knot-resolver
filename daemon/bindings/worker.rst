@@ -12,7 +12,7 @@ specified worker count and process rank.
    Current worker process PID (number).
 
 
-.. function:: worker.stats()
+.. py:function:: worker.stats()
 
    Return table of statistics.  See member descriptions in :c:type:`worker_stats`.
    A few fields are added, mainly from POSIX ``getrusage()``:

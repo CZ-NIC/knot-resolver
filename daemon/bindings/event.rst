@@ -8,7 +8,7 @@ after specified time, or event recurrent events. Time is always described in mil
 but there are convenient variables that you can use - ``sec, minute, hour``.
 For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
 
-.. function:: event.after(time, function)
+.. py:function:: event.after(time, function)
 
    :return: event id
 
@@ -21,7 +21,7 @@ For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
 
       event.after(1 * minute, function() print('Hi!') end)
 
-.. function:: event.recurrent(interval, function)
+.. py:function:: event.recurrent(interval, function)
 
    :return: event id
 
@@ -37,7 +37,7 @@ For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
          print('Hi #'..msg_count)
       end)
 
-.. function:: event.reschedule(event_id, timeout)
+.. py:function:: event.reschedule(event_id, timeout)
 
    Reschedule a running event, it has no effect on canceled events.
    New events may reuse the event_id, so the behaviour is undefined if the function
@@ -55,7 +55,7 @@ For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
          event.reschedule(ev, interval)
       end)
 
-.. function:: event.cancel(event_id)
+.. py:function:: event.cancel(event_id)
 
    Cancel running event, it has no effect on already canceled events.
    New events may reuse the event_id, so the behaviour is undefined if the function
@@ -72,7 +72,7 @@ Watch for file descriptor activity. This allows embedding other event loops or s
 firing events when a pipe endpoint becomes active. In another words, asynchronous
 notifications for daemon.
 
-.. function:: event.socket(fd, cb)
+.. py:function:: event.socket(fd, cb)
 
    :param number fd: file descriptor to watch
    :param cb: closure or callback to execute when fd becomes active
@@ -95,7 +95,7 @@ Asynchronous function execution
 
 The `event` package provides a very basic mean for non-blocking execution - it allows running code when activity on a file descriptor is detected, and when a certain amount of time passes. It doesn't however provide an easy to use abstraction for non-blocking I/O. This is instead exposed through the `worker` package (if `cqueues` Lua package is installed in the system).
 
-.. function:: worker.coroutine(function)
+.. py:function:: worker.coroutine(function)
 
    Start a new coroutine with given function (closure). The function can do I/O or run timers without blocking the main thread. See cqueues_ for documentation of possible operations and synchronization primitives. The main limitation is that you can't wait for a finish of a coroutine from processing layers, because it's not currently possible to suspend and resume execution of processing layers.
 
@@ -110,7 +110,7 @@ The `event` package provides a very basic mean for non-blocking execution - it a
         end
       end)
 
-.. function:: worker.sleep(seconds)
+.. py:function:: worker.sleep(seconds)
 
    Pause execution of current function (asynchronously if running inside a worker coroutine).
 

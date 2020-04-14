@@ -6,7 +6,7 @@ DNS protocol tweaks
 Following settings change low-level details of DNS protocol implementation.
 Default values should not be changed except for very special cases.
 
-.. function:: net.bufsize([udp_bufsize])
+.. py:function:: net.bufsize([udp_bufsize])
 
    Get/set maximum EDNS payload size advertised in DNS packets. Default is 4096 bytes and the default will be lowered to value around 1220 bytes in future, once `DNS Flag Day 2020 <https://dnsflagday.net/>`_ becomes effective.
 

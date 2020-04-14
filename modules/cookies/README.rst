@@ -42,7 +42,7 @@ Example Configuration
 Properties
 ----------
 
-.. function:: cookies.config(configuration)
+.. py:function:: cookies.config(configuration)
 
   :param table configuration: part of cookie configuration to be changed, may be called without parameter
   :return: JSON dictionary containing current configuration
