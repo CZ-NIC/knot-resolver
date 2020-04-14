@@ -378,7 +378,7 @@ end
 local function rpz_parse(action, path)
 	local rules = {}
 	local new_actions = {}
-	local origin = '.'
+	local origin = ffi.C.knot_dname_from_str(nil, '.', 0)
 	local action_map = {
 		-- RPZ Policy Actions
 		['\0'] = action,
@@ -416,16 +416,30 @@ local function rpz_parse(action, path)
 		end
 		if not ok then break end
 
-		local name = ffi.string(parser.r_owner, parser.r_owner_length)
+		local full_name = ffi.C.knot_dname_copy(parser.r_owner, nil)
 		local rdata = ffi.string(parser.r_data, parser.r_data_length)
+		ffi.C.knot_dname_to_lower(full_name)
 
 		if (parser.r_type == kres.type.SOA) then
 			-- parser return \0 if SOA use @ as owner
-			origin = (name == '\0') and origin or name
+			origin = (parser.r_owner ~= '\0') and ffi.C.knot_dname_copy(full_name, nil)
 			goto continue
 		end
 
-		name = (name == origin) and name or name:gsub('%'..origin, '')
+		local prefix_labels = ffi.C.knot_dname_in_bailiwick(full_name, origin)
+		local name
+		if prefix_labels > 0 then
+			local p_labels = full_name
+			local bytes = 0
+			for _=1,prefix_labels do
+				bytes = bytes + 1 + p_labels[0]
+				p_labels = p_labels + 1 + p_labels[0]
+			end
+			name = ffi.string(ffi.C.knot_dname_copy(full_name, nil), bytes)
+			name = name..'\0'
+		else
+			name = ffi.string(ffi.C.knot_dname_copy(full_name, nil), parser.r_owner_length)
+		end
 
 		if parser.r_type == kres.type.CNAME then
 			if action_map[rdata] then
