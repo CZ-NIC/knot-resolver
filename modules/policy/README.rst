@@ -146,6 +146,15 @@ Following actions stop the policy matching on the query, i.e. other rules are no
        -- (the "true" at the end of policy.add)
        policy.add(policy.REROUTE({'192.0.2.0/24', '127.0.0.0'}), true)
 
+.. function:: ANSWER({ type = { ttl=ttl, rdata=data} }, nodata)
+
+   Overwrite rr data in response. ``rdata`` takes just IP address. If `nodata` is `true` policy return `NODATA` when requested type from client isn't specified (default: ``nodata=false``).
+
+   .. code-block:: lua
+
+       -- this policy changes IPv4 adress and TTL for `exmaple.com`
+       policy.add(policy.suffix(policy.ANSWER({ [kres.type.A] = { ttl=300, rdata='\192\0\2\7' } }), { todname('example.com') }))
+
 More complex non-chain actions are described in their own chapters, namely:
 
   * :ref:`forwarding`
@@ -537,16 +546,13 @@ Response policy zones
    :header: "RPZ Right Hand Side", "Knot Resolver Action", "BIND Compatibility"
 
    "``.``", "``action`` is used", "compatible if ``action`` is :func:`policy.DENY`"
-   "``*.``", "``action`` is used", "good enough [#]_ if ``action`` is :func:`policy.DENY`"
+   "``*.``", ":func:`policy.ANSWER`", "yes"
    "``rpz-passthru.``", ":func:`policy.PASS`", "yes"
    "``rpz-tcp-only.``", ":func:`policy.TC`", "yes"
    "``rpz-drop.``", ":func:`policy.DROP`", "no [#]_"
-   "fake A/AAAA", "*not supported*", "no"
+   "fake A/AAAA", ":func:`policy.ANSWER`", "yes"
+   "fake CNAME", "not supported", "no"
 
-  .. [#] RPZ action ``*.`` in BIND causes *NODATA* answer
-     but typically our users configure ``policy.rpz(policy.DENY, ...)``
-     which replies with *NXDOMAIN*. Good news is that from client's
-     perspective it does not make a visible difference.
   .. [#] Our :func:`policy.DROP` returns *SERVFAIL* answer (for historical reasons).
 
 
