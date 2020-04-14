@@ -45,18 +45,24 @@ end
 local function test_rpz()
 	check_answer('"CNAME ." return NXDOMAIN',
 		'nxdomain.', kres.type.A, kres.rcode.NXDOMAIN)
-	check_answer('"CNAME *." return NXDOMAIN',
+	check_answer('"CNAME *." return NODATA',
 		'nodata.', kres.type.A, kres.rcode.NOERROR)
+	check_answer('"CNAME *. on wildcard" return NODATA',
+		'nodata.nxdomain.', kres.type.A, kres.rcode.NOERROR)
 	check_answer('"CNAME rpz-drop." be dropped',
 		'rpzdrop.', kres.type.A, kres.rcode.SERVFAIL)
 	check_answer('"CNAME rpz-passthru" return A rrset',
 		'rpzpassthru.', kres.type.A, kres.rcode.NOERROR, '127.0.0.9')
-	check_answer('"A 192.168.55.5" return local A rrset',
-		'rra.', kres.type.A, kres.rcode.NOERROR, '192.168.55.5')
-	check_answer('"A 192.168.66.6" with suffixed zone name in owner return local A rrset',
-		'rra-zonename-suffix.', kres.type.A, kres.rcode.NOERROR, '192.168.66.6')
+	check_answer('"A 192.168.5.5" return local A rrset',
+		'rra.', kres.type.A, kres.rcode.NOERROR, '192.168.5.5')
+	check_answer('"A 192.168.6.6" with suffixed zone name in owner return local A rrset',
+		'rra-zonename-suffix.', kres.type.A, kres.rcode.NOERROR, '192.168.6.6')
+	check_answer('"A 192.168.7.7" with suffixed zone name in owner return local A rrset',
+		'testdomain.rra.', kres.type.A, kres.rcode.NOERROR, '192.168.7.7')
 	check_answer('non existing AAAA on rra domain return NODATA',
 		'rra.', kres.type.AAAA, kres.rcode.NOERROR)
+	check_answer('"A 192.168.8.8" and domain with uppercase and lowercase letters',
+		'case.sensitive.', kres.type.A, kres.rcode.NOERROR, '192.168.8.8')
 end
 
 net.ipv4 = false
