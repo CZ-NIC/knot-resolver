@@ -634,7 +634,7 @@ if has_cqueues then
 	end
 else
 	-- Disable asynchronous execution
-	local function disabled () error('cqueues are required for asynchronous execution') end
+	local function disabled () error('Lua library cqueues is required for asynchronous execution (luaJIT requires library for Lua 5.1)') end
 	worker.sleep = disabled
 	worker.map = disabled
 	worker.coroutine = disabled
