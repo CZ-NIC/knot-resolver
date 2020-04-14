@@ -152,7 +152,7 @@ Following actions stop the policy matching on the query, i.e. other rules are no
 
    .. code-block:: lua
 
-       -- this policy change IPv4 adress and TTL for `exmaple.com`
+       -- this policy changes IPv4 adress and TTL for `exmaple.com`
        policy.add(policy.suffix(policy.ANSWER({ [kres.type.A] = { ttl=300, rdata='\192\0\2\7' } }), { todname('example.com') }))
 
 More complex non-chain actions are described in their own chapters, namely:

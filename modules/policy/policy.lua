@@ -378,7 +378,7 @@ end
 local function rpz_parse(action, path)
 	local rules = {}
 	local new_actions = {}
-	local origin = '.'
+	local origin = '\0'
 	local action_map = {
 		-- RPZ Policy Actions
 		['\0'] = action,
@@ -416,22 +416,33 @@ local function rpz_parse(action, path)
 		end
 		if not ok then break end
 
-		local name = ffi.string(parser.r_owner, parser.r_owner_length)
+		local full_name = ffi.gc(ffi.C.knot_dname_copy(parser.r_owner, nil), ffi.C.free)
 		local rdata = ffi.string(parser.r_data, parser.r_data_length)
+		ffi.C.knot_dname_to_lower(full_name)
 
 		if (parser.r_type == kres.type.SOA) then
-			-- parser return \0 if SOA use @ as owner
-			origin = (name == '\0') and origin or name
+			origin = ffi.gc(ffi.C.knot_dname_copy(full_name, nil), ffi.C.free)
 			goto continue
 		end
 
-		name = (name == origin) and name or name:gsub('%'..origin, '')
+		local prefix_labels = ffi.C.knot_dname_in_bailiwick(full_name, origin)
+		local name
+		if prefix_labels > 0 then
+			local bytes = 0
+			for _=1,prefix_labels do
+				bytes = bytes + 1 + full_name[bytes]
+			end
+			name = ffi.string(full_name, bytes)
+			name = name..'\0'
+		else
+			name = ffi.string(full_name, parser.r_owner_length)
+		end
 
 		if parser.r_type == kres.type.CNAME then
 			if action_map[rdata] then
 				rules[name] = action_map[rdata]
 			else
-				log('[poli] RPZ %s:%d: CNAME in RPZ is not supported', path, tonumber(parser.line_counter))
+				log('[poli] RPZ %s:%d: CNAME with custom target in RPZ is not supported', path, tonumber(parser.line_counter))
 			end
 		else
 			-- Warn when NYI
@@ -449,8 +460,8 @@ local function rpz_parse(action, path)
 		::continue::
 	end
 	collectgarbage()
-	for k, v in pairs(new_actions) do
-		rules[k] = policy.ANSWER(v, true)
+	for qname, rrsets in pairs(new_actions) do
+		rules[qname] = policy.ANSWER(rrsets, true)
 	end
 	return rules
 end
