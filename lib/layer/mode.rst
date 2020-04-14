@@ -1,6 +1,6 @@
 .. SPDX-License-Identifier: GPL-3.0-or-later
 
-.. function:: mode(['strict' | 'normal' | 'permissive'])
+.. py:function:: mode(['strict' | 'normal' | 'permissive'])
 
    :param: New checking level specified as string (*optional*).
    :return: Current checking level.

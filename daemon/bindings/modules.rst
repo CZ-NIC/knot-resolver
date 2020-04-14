@@ -23,18 +23,18 @@ Obviously ordering matters, so you have to load module first and configure it af
 Here is full reference manual for module configuration:
 
 
-.. function:: modules.list()
+.. py:function:: modules.list()
 
    :return: List of loaded modules.
 
-.. function:: modules.load(name)
+.. py:function:: modules.load(name)
 
    :param string name: Module name, e.g. "hints"
    :return: ``true`` if modules was (or already is) loaded, error otherwise.
 
    Load a module by name.
 
-.. function:: modules.unload(name)
+.. py:function:: modules.unload(name)
 
    :param string name: Module name, e.g. "detect_time_jump"
    :return: ``true`` if modules was unloaded, error otherwise.

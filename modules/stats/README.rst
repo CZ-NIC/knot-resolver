@@ -163,38 +163,38 @@ Example:
 Module reference
 ----------------
 
-.. function:: stats.get(key)
+.. py:function:: stats.get(key)
 
   :param string key: i.e. ``"answer.total"``
   :return: ``number``
 
 Return nominal value of given metric.
 
-.. function:: stats.set(key, val)
+.. py:function:: stats.set(key, val)
 
   :param string key:  i.e. ``"answer.total"``
   :param number val:  i.e. ``5``
 
 Set nominal value of given metric.
 
-.. function:: stats.list([prefix])
+.. py:function:: stats.list([prefix])
 
   :param string prefix:  optional metric prefix, i.e. ``"answer"`` shows only metrics beginning with "answer"
 
 Outputs collected metrics as a JSON dictionary.
 
-.. function:: stats.upstreams()
+.. py:function:: stats.upstreams()
 
 Outputs a list of recent upstreams and their RTT. It is sorted by time and stored in a ring buffer of
 a fixed size. This means it's not aggregated and readable by multiple consumers, but also that
 you may lose entries if you don't read quickly enough. The default ring size is 512 entries, and may be overriden on compile time by ``-DUPSTREAMS_COUNT=X``.
 
-.. function:: stats.frequent()
+.. py:function:: stats.frequent()
 
 Outputs list of most frequent iterative queries as a JSON array. The queries are sampled probabilistically,
 and include subrequests. The list maximum size is 5000 entries, make diffs if you want to track it over time.
 
-.. function:: stats.clear_frequent()
+.. py:function:: stats.clear_frequent()
 
 Clear the list of most frequent iterative queries.
 

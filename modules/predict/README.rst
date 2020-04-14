@@ -46,7 +46,7 @@ To visualize the efficiency of the predictions, the module exports following sta
 Properties
 ----------
 
-.. function:: predict.config({ window = 15, period = 24})
+.. py:function:: predict.config({ window = 15, period = 24})
 
   Reconfigure the predictor to given tracking window and period length. Both parameters are optional.
   Window length is in minutes, period is a number of windows that can be kept in memory.

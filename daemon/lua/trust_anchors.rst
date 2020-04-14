@@ -23,7 +23,7 @@ distribution will take care of it for you.
 Following functions allow to modify DNSSEC configuration *if you really have to*:
 
 
-.. function:: trust_anchors.add_file(keyfile[, readonly = false])
+.. py:function:: trust_anchors.add_file(keyfile[, readonly = false])
 
    :param string keyfile: path to the file.
    :param readonly: if true, do not attempt to update the file.
@@ -47,7 +47,7 @@ Following functions allow to modify DNSSEC configuration *if you really have to*
 
       [ ta ] key: 19036 state: Valid
 
-.. function:: trust_anchors.remove(zonename)
+.. py:function:: trust_anchors.remove(zonename)
 
    Remove specified trust anchor from trusted key set. Removing trust anchor for the root zone effectivelly disables DNSSEC validation (unless you configured another trust anchor).
 
@@ -81,7 +81,7 @@ Following functions allow to modify DNSSEC configuration *if you really have to*
    Note: all ``Removed`` keys will be purged from key file after restarting the process.
 
 
-.. function:: trust_anchors.set_insecure(nta_set)
+.. py:function:: trust_anchors.set_insecure(nta_set)
 
    :param table nta_list: List of domain names (text format) representing NTAs.
 
@@ -101,7 +101,7 @@ Following functions allow to modify DNSSEC configuration *if you really have to*
    .. warning:: If you set NTA on a name that is not a zone cut,
       it may not always affect names not separated from the NTA by a zone cut.
 
-.. function:: trust_anchors.add(rr_string)
+.. py:function:: trust_anchors.add(rr_string)
 
    :param string rr_string: DS/DNSKEY records in presentation format (e.g. ``. 3600 IN DS 19036 8 2 49AAC11...``)
 
@@ -116,7 +116,7 @@ Following functions allow to modify DNSSEC configuration *if you really have to*
 
       > trust_anchors.add('. 3600 IN DS 19036 8 2 49AAC11...')
 
-.. function:: trust_anchors.summary()
+.. py:function:: trust_anchors.summary()
 
    Return string with summary of configured DNSSEC trust anchors, including negative TAs.
 

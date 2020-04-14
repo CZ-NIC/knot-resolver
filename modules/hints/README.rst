@@ -38,7 +38,7 @@ Examples
 Properties
 ----------
 
-.. function:: hints.config([path])
+.. py:function:: hints.config([path])
 
   :param string path:  path to hosts-like file, default: no file
   :return: ``{ result: bool }``
@@ -46,13 +46,13 @@ Properties
   Clear any configured hints, and optionally load a hosts-like file as in ``hints.add_hosts(path)``.
   (Root hints are not touched.)
 
-.. function:: hints.add_hosts([path])
+.. py:function:: hints.add_hosts([path])
 
   :param string path:  path to hosts-like file, default: ``/etc/hosts``
 
   Add hints from a host-like file.
 
-.. function:: hints.get(hostname)
+.. py:function:: hints.get(hostname)
 
   :param string hostname: i.e. ``"localhost"``
   :return: ``{ result: [address1, address2, ...] }``
@@ -60,7 +60,7 @@ Properties
   Return list of address record matching given name.
   If no hostname is specified, all hints are returned in the table format used by ``hints.root()``.
 
-.. function:: hints.set(pair)
+.. py:function:: hints.set(pair)
 
   :param string pair:  ``hostname address`` i.e. ``"localhost 127.0.0.1"``
   :return: ``{ result: bool }``
@@ -74,18 +74,18 @@ Properties
     If multiple names have been added to an address, the last one defined is returned
     in a corresponding PTR query.
 
-.. function:: hints.del(pair)
+.. py:function:: hints.del(pair)
 
   :param string pair:  ``hostname address`` i.e. ``"localhost 127.0.0.1"``, or just ``hostname``
   :return: ``{ result: bool }``
 
   Remove a hostname - address pair hint.  If address is omitted, all addresses for the given name are deleted.
 
-.. function:: hints.root_file(path)
+.. py:function:: hints.root_file(path)
 
   Replace current root hints from a zonefile.  If the path is omitted, the compiled-in path is used, i.e. the root hints are reset to the default.
 
-.. function:: hints.root(root_hints)
+.. py:function:: hints.root(root_hints)
 
   :param table root_hints: new set of root hints i.e. ``{['name'] = 'addr', ...}``
   :return: ``{ ['a.root-servers.net.'] = { '1.2.3.4', '5.6.7.8', ...}, ... }``
@@ -111,14 +111,14 @@ Properties
 
   .. tip:: A good rule of thumb is to select only a few fastest root hints. The server learns RTT and NS quality over time, and thus tries all servers available. You can help it by preselecting the candidates.
 
-.. function:: hints.use_nodata(toggle)
+.. py:function:: hints.use_nodata(toggle)
 
   :param bool toggle: true if enabling NODATA synthesis, false if disabling
   :return: ``{ result: bool }``
 
   If set to true (the default), NODATA will be synthesised for matching hint name, but mismatching type (e.g. AAAA query when only A hint exists).
 
-.. function:: hints.ttl([new_ttl])
+.. py:function:: hints.ttl([new_ttl])
 
   :param int new_ttl: new TTL to set (optional)
   :return: the TTL setting
