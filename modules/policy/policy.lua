@@ -378,7 +378,7 @@ end
 local function rpz_parse(action, path)
 	local rules = {}
 	local new_actions = {}
-	local origin = ffi.C.knot_dname_from_str(nil, '.', 0)
+	local origin = '\0'
 	local action_map = {
 		-- RPZ Policy Actions
 		['\0'] = action,
@@ -416,36 +416,33 @@ local function rpz_parse(action, path)
 		end
 		if not ok then break end
 
-		local full_name = ffi.C.knot_dname_copy(parser.r_owner, nil)
+		local full_name = ffi.gc(ffi.C.knot_dname_copy(parser.r_owner, nil), ffi.C.free)
 		local rdata = ffi.string(parser.r_data, parser.r_data_length)
 		ffi.C.knot_dname_to_lower(full_name)
 
 		if (parser.r_type == kres.type.SOA) then
-			-- parser return \0 if SOA use @ as owner
-			origin = (parser.r_owner ~= '\0') and ffi.C.knot_dname_copy(full_name, nil)
+			origin = ffi.gc(ffi.C.knot_dname_copy(full_name, nil), ffi.C.free)
 			goto continue
 		end
 
 		local prefix_labels = ffi.C.knot_dname_in_bailiwick(full_name, origin)
 		local name
 		if prefix_labels > 0 then
-			local p_labels = full_name
 			local bytes = 0
 			for _=1,prefix_labels do
-				bytes = bytes + 1 + p_labels[0]
-				p_labels = p_labels + 1 + p_labels[0]
+				bytes = bytes + 1 + full_name[bytes]
 			end
-			name = ffi.string(ffi.C.knot_dname_copy(full_name, nil), bytes)
+			name = ffi.string(ffi.gc(ffi.C.knot_dname_copy(full_name, nil), ffi.C.free), bytes)
 			name = name..'\0'
 		else
-			name = ffi.string(ffi.C.knot_dname_copy(full_name, nil), parser.r_owner_length)
+			name = ffi.string(ffi.gc(ffi.C.knot_dname_copy(full_name, nil), ffi.C.free), parser.r_owner_length)
 		end
 
 		if parser.r_type == kres.type.CNAME then
 			if action_map[rdata] then
 				rules[name] = action_map[rdata]
 			else
-				log('[poli] RPZ %s:%d: CNAME in RPZ is not supported', path, tonumber(parser.line_counter))
+				log('[poli] RPZ %s:%d: CNAME with custom target in RPZ is not supported', path, tonumber(parser.line_counter))
 			end
 		else
 			-- Warn when NYI
@@ -463,8 +460,8 @@ local function rpz_parse(action, path)
 		::continue::
 	end
 	collectgarbage()
-	for k, v in pairs(new_actions) do
-		rules[k] = policy.ANSWER(v, true)
+	for qname, rrsets in pairs(new_actions) do
+		rules[qname] = policy.ANSWER(rrsets, true)
 	end
 	return rules
 end

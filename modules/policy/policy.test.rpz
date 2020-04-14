@@ -1,6 +1,6 @@
 $TTL 30
 testdomain.		SOA nonexistent.testdomain. testdomain. 1 12h 15m 3w 2h
-			NS  nonexistant.testdomain.
+			NS  nonexistent.testdomain.
 
 nxdomain.		CNAME	.
 nodata.			CNAME	*.

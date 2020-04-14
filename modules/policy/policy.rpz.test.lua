@@ -63,6 +63,8 @@ local function test_rpz()
 		'rra.', kres.type.AAAA, kres.rcode.NOERROR)
 	check_answer('"A 192.168.8.8" and domain with uppercase and lowercase letters',
 		'case.sensitive.', kres.type.A, kres.rcode.NOERROR, '192.168.8.8')
+	check_answer('"A 192.168.8.8" and domain with uppercase and lowercase letters',
+		'CASe.SENSItivE.', kres.type.A, kres.rcode.NOERROR, '192.168.8.8')
 end
 
 net.ipv4 = false
