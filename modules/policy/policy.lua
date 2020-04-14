@@ -432,10 +432,10 @@ local function rpz_parse(action, path)
 			for _=1,prefix_labels do
 				bytes = bytes + 1 + full_name[bytes]
 			end
-			name = ffi.string(ffi.gc(ffi.C.knot_dname_copy(full_name, nil), ffi.C.free), bytes)
+			name = ffi.string(full_name, bytes)
 			name = name..'\0'
 		else
-			name = ffi.string(ffi.gc(ffi.C.knot_dname_copy(full_name, nil), ffi.C.free), parser.r_owner_length)
+			name = ffi.string(full_name, parser.r_owner_length)
 		end
 
 		if parser.r_type == kres.type.CNAME then
