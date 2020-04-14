@@ -81,7 +81,8 @@ struct kr_query {
 	uint16_t sclass;
 	uint16_t id;
 	uint16_t reorder; /**< Seed to reorder (cached) RRs in answer or zero. */
-	struct kr_qflags flags, forward_flags;
+	struct kr_qflags flags;
+	struct kr_qflags forward_flags;
 	uint32_t secret;
 	uint32_t uid; /**< Query iteration number, unique within the kr_rplan. */
 	uint64_t creation_time_mono; /* The time of query's creation (milliseconds).
