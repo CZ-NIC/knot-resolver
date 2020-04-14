@@ -69,9 +69,9 @@ KR_EXPORT bool kr_verbose_set(bool status);
  * @param  source message source
  * @param  fmt message format
  */
+KR_EXPORT KR_PRINTF(5)
 void kr_log_req(const struct kr_request * const req, uint32_t qry_uid,
-		const unsigned int indent, const char *source, const char *fmt, ...)
-KR_EXPORT KR_PRINTF(5);
+		const unsigned int indent, const char *source, const char *fmt, ...);
 
 /**
  * Log a message through the request log handler or stdout.
@@ -80,8 +80,8 @@ KR_EXPORT KR_PRINTF(5);
  * @param  source message source
  * @param  fmt message format
  */
-void kr_log_q(const struct kr_query *qry, const char *source, const char *fmt, ...)
-KR_EXPORT KR_PRINTF(3);
+KR_EXPORT KR_PRINTF(3)
+void kr_log_q(const struct kr_query *qry, const char *source, const char *fmt, ...);
 
 #ifdef NOVERBOSELOG
 /* Efficient compile-time disabling of verbose messages. */
