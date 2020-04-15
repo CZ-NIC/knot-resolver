@@ -41,7 +41,7 @@ exclude_patterns = ['_build']
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
 highlight_language = 'c'
-primary_domain = 'c'
+primary_domain = 'py'
 
 # -- Options for HTML output ---------------------------------------------------
 
