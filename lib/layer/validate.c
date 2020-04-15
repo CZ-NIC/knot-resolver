@@ -115,7 +115,8 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 				vctx->err_cnt += 1;
 				break;
 			}
-			kr_rank_set(&entry->rank, KR_RANK_OMIT);
+			if (!kr_rank_test(entry->rank, KR_RANK_BOGUS))
+				kr_rank_set(&entry->rank, KR_RANK_OMIT);
 			continue;
 		}
 
@@ -137,7 +138,8 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 			 * to MISMATCH on revalidation, e.g. in test val_referral_nods :-/
 			 */
 
-		} else if (validation_result == kr_error(ENOENT)) {
+		} else if (validation_result == kr_error(ENOENT)
+				&& vctx->rrs_counters.matching_name_type == 0) {
 			/* no RRSIGs found */
 			kr_rank_set(&entry->rank, KR_RANK_MISSING);
 			vctx->err_cnt += 1;
@@ -1110,11 +1112,40 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	return KR_STATE_DONE;
 }
 
+/** Hide RRsets which did not validate from clients. */
+static int hide_bogus(kr_layer_t *ctx) {
+	if (knot_wire_get_cd(ctx->req->qsource.packet->wire)) {
+		return ctx->state;
+	}
+	/* We don't want to send bogus answers to clients, not even in SERVFAIL
+	 * answers, but we cannot drop whole sections. If a CNAME chain
+	 * SERVFAILs somewhere, the steps that were OK should be put into
+	 * answer.
+	 *
+	 * There is one specific issue: currently we follow CNAME *before*
+	 * we validate it, because... iterator comes before validator.
+	 * Therefore some rrsets might be added into req->*_selected before
+	 * we detected failure in validator.
+	 * TODO: better approach, probably during work on parallel queries.
+	 */
+	const ranked_rr_array_t *sel[] = kr_request_selected(ctx->req);
+	for (knot_section_t sect = KNOT_ANSWER; sect <= KNOT_ADDITIONAL; ++sect) {
+		 for (size_t i = 0; i < sel[sect]->len; ++i) {
+			  ranked_rr_array_entry_t *e = sel[sect]->at[i];
+			  if (kr_rank_test(e->rank, KR_RANK_BOGUS)) {
+				   e->to_wire = false;
+			  }
+		 }
+	}
+	return ctx->state;
+}
+
 /** Module implementation. */
 int validate_init(struct kr_module *self)
 {
 	static const kr_layer_api_t layer = {
 		.consume = &validate,
+		.answer_finalize = &hide_bogus,
 	};
 	self->layer = &layer;
 	return kr_ok();
