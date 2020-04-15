@@ -500,6 +500,13 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "map");
 	lua_pushlightuserdata(engine->L, engine);
 	lua_setglobal(engine->L, "__engine");
+	/* Random number generator */
+	lua_getfield(engine->L, LUA_GLOBALSINDEX, "math");
+	lua_getfield(engine->L, -1, "randomseed");
+	lua_remove(engine->L, -2);
+	lua_Number seed = kr_rand_bytes(sizeof(lua_Number));
+	lua_pushnumber(engine->L, seed);
+	lua_call(engine->L, 1, 0);
 	return kr_ok();
 }
 
