@@ -28,6 +28,9 @@ RUN pip3 install pytest-xdist
 # tests/pytest dependencies
 RUN pip3 install dnspython jinja2 pytest pytest-html pytest-xdist
 
+# Wireshark/dumpcap for Deckard
+RUN apt-get install -y -qqq wireshark-common
+
 # C dependencies for python-augeas
 RUN apt-get install -y -qqq libaugeas-dev libffi-dev
 # Python dependencies for Deckard
