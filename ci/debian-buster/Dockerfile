@@ -29,6 +29,7 @@ RUN pip3 install pytest-xdist
 RUN pip3 install dnspython jinja2 pytest pytest-html pytest-xdist
 
 # Wireshark/dumpcap for Deckard
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get install -y -qqq wireshark-common
 
 # C dependencies for python-augeas
