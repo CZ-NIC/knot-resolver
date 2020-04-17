@@ -1180,12 +1180,14 @@ static int hide_bogus(kr_layer_t *ctx) {
 	 */
 	const ranked_rr_array_t *sel[] = kr_request_selected(ctx->req);
 	for (knot_section_t sect = KNOT_ANSWER; sect <= KNOT_ADDITIONAL; ++sect) {
-		 for (size_t i = 0; i < sel[sect]->len; ++i) {
-			  ranked_rr_array_entry_t *e = sel[sect]->at[i];
-			  if (kr_rank_test(e->rank, KR_RANK_BOGUS)) {
-				   e->to_wire = false;
-			  }
-		 }
+		for (size_t i = 0; i < sel[sect]->len; ++i) {
+			ranked_rr_array_entry_t *e = sel[sect]->at[i];
+			e->to_wire = e->to_wire
+				&& !kr_rank_test(e->rank, KR_RANK_INDET)
+				&& !kr_rank_test(e->rank, KR_RANK_BOGUS)
+				&& !kr_rank_test(e->rank, KR_RANK_MISMATCH)
+				&& !kr_rank_test(e->rank, KR_RANK_MISSING);
+		}
 	}
 	return ctx->state;
 }
