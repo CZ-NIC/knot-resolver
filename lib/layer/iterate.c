@@ -569,7 +569,9 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			/* Select the next CNAME target, but don't jump immediately.
 			 * There can be records for "old" cname (RRSIGs are interesting);
 			 * more importantly there might be a DNAME for `cname_is_occluded`. */
-			if (query->stype != KNOT_RRTYPE_CNAME && rr->type == KNOT_RRTYPE_CNAME) {
+			if (query->stype != KNOT_RRTYPE_CNAME && rr->type == KNOT_RRTYPE_CNAME
+			    /* No point in jumping xNAMEs for RRSIGs. */
+			    && query->stype != KNOT_RRTYPE_RRSIG) {
 				pending_cname = knot_cname_name(rr->rrs.rdata);
 				if (!pending_cname) {
 					break;
