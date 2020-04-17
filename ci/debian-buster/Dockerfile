@@ -3,6 +3,7 @@
 FROM debian:buster
 MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
 ARG KNOT_BRANCH=2.9
+ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /root
 CMD ["/bin/bash"]
