@@ -3,6 +3,7 @@
 FROM debian:buster
 MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
 ARG KNOT_BRANCH=2.9
+ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /root
 CMD ["/bin/bash"]
@@ -29,7 +30,6 @@ RUN pip3 install pytest-xdist
 RUN pip3 install dnspython jinja2 pytest pytest-html pytest-xdist
 
 # Wireshark/dumpcap for Deckard
-ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get install -y -qqq wireshark-common
 
 # C dependencies for python-augeas
