@@ -1074,8 +1074,6 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 			 /* Pass through in stub mode */
 			break;
 		}
-		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		return KR_STATE_FAIL;
 	}
 	case KNOT_RCODE_FORMERR:
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
