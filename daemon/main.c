@@ -513,6 +513,10 @@ int main(int argc, char **argv)
 				strerror(errno));
 		fflush(stderr);
 	}
+	if (strcmp("linux", OPERATING_SYSTEM) != 0)
+		kr_log_info("[warn] Knot Resolver is tested on Linux, other platforms might exhibit bugs.\n"
+				"Please report issues to https://gitlab.labs.nic.cz/knot/knot-resolver/issues/\n"
+				"Thank you for your time and interest!\n");
 
 	the_args = &the_args_value;
 	args_init(the_args);
