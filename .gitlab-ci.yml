@@ -634,4 +634,11 @@ obs:ubuntu1910:x86_64:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: ubuntu1910
     DISTROTEST_REPO: xUbuntu_19.10
+
+obs:ubuntu2004:x86_64:
+  <<: *distrotest
+  variables:
+    OBS_REPO: knot-resolver-latest
+    DISTROTEST_NAME: ubuntu2004
+    DISTROTEST_REPO: xUbuntu_20.04
 # }}}
