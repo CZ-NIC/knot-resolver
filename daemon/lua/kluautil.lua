@@ -1,6 +1,7 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 
 local cqerrno = require('cqueues.errno')
+local ffi = require('ffi')
 local kluautil = {}
 
 -- Get length of table
@@ -61,6 +62,28 @@ function kluautil.kr_https_fetch(url, out_file, ca_file)
 	out_file:seek("set", 0)
 
 	return true
+end
+
+-- List directory
+function kluautil.list_dir (path)
+	local results = {}
+	local dir = ffi.C.opendir(path)
+	if dir == nil then
+		return results
+	end
+
+	local entry = ffi.C.readdir(dir)
+	while entry ~= nil do
+		local file = ffi.string(entry.d_name)
+		if file ~= "." and file ~= ".." then
+			table.insert(results, file)
+		end
+		entry = ffi.C.readdir(dir)
+	end
+
+	ffi.C.closedir(dir)
+
+	return results
 end
 
 return kluautil
