@@ -5,6 +5,7 @@ Improvements
 ------------
 - capabilities are no longer constrained when running as root (!1012)
 - cache: add percentage usage to cache.stats() (!1025)
+- map() command now uses control sockets and works with systemd integration
 
 Bugfixes
 --------

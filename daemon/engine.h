@@ -13,15 +13,11 @@ struct lua_State;
 #include "lib/resolve.h"
 #include "daemon/network.h"
 
-/* @internal Array of file descriptors shorthand. */
-typedef array_t(int) fd_array_t;
-
 struct engine {
     struct kr_context resolver;
     struct network net;
     module_array_t modules;
     array_t(const struct kr_cdb_api *) backends;
-    fd_array_t ipc_set;
     knot_mm_t *pool;
     char *hostname;
     struct lua_State *L;
@@ -39,9 +35,6 @@ int engine_cmd(struct lua_State *L, const char *str, bool raw);
 
 /** Execute current chunk in the sandbox */
 int engine_pcall(struct lua_State *L, int argc);
-
-int engine_ipc(struct engine *engine, const char *expr);
-
 
 int engine_load_sandbox(struct engine *engine);
 int engine_loadconf(struct engine *engine, const char *config_path);
