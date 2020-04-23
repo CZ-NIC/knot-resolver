@@ -642,3 +642,83 @@ else
 	worker.coroutine = disabled
 	worker.bg_worker = setmetatable({}, { __index = disabled })
 end
+
+-- Global commands - map()
+ffi.cdef([[
+	typedef struct __dirstream DIR;
+	struct dirent {
+		unsigned long int	d_ino;
+		long int		d_off;
+		unsigned short		d_reclen;
+		unsigned char		d_type;
+		char			d_name[256];
+	};
+	DIR *opendir(const char *name);
+	struct dirent *readdir(DIR *dirp);
+	int closedir(DIR *dirp);
+	char *strerror(int errnum);
+]])
+
+function list_dir(path)
+	local dir = ffi.C.opendir(path)
+	if dir == nil then
+		error('Error listing directory "' .. path .. '": ' .. ffi.string(ffi.C.strerror(ffi.errno())))
+	end
+
+	local results = {}
+	local entry = ffi.C.readdir(dir)
+	while entry ~= nil do
+		local file = ffi.string(entry.d_name)
+		if file ~= "." and file ~= ".." then
+			table.insert(results, file)
+		end
+		entry = ffi.C.readdir(dir)
+	end
+
+	ffi.C.closedir(dir)
+
+	return results
+end
+
+function map(cmd)
+	local socket = require("cqueues.socket")
+	local bit = require("bit")
+	local local_socket = ''
+	local results = {}
+
+	for k,v in pairs(net.list()) do
+		if (v['kind'] == 'control') and (v['transport']['family'] == 'unix') then
+			local_socket = string.match(v['transport']['path'], "^.+/(.+)$")
+		end
+	end
+
+	filetab = list_dir(worker.control_path)
+
+	for _,file in ipairs(filetab) do
+		if file == local_socket then
+			table.insert(results, eval_cmd(cmd, true))
+		else
+			s = socket.connect({ path = worker.control_path..file })
+			s:setmode('bn', 'bn')
+			status, err = pcall(s.connect, s)
+			if not status then
+				print(err)
+			else
+				s:write('__binary\n')
+				recv = s:read(2)
+				s:write('tojson('..cmd..')\n')
+				local recv = s:read(4)
+				local len = tonumber(recv:byte(1))
+				for i=2,4 do
+					len = bit.bor(bit.lshift(len, 8), tonumber(recv:byte(i)))
+				end
+				recv = s:read(len)
+				table.insert(results, fromjson(recv))
+
+				s:close()
+			end
+		end
+	end
+
+	return results
+end
