@@ -2,6 +2,7 @@
 std = 'luajit'
 new_read_globals = {
 	'cache',
+	'eval_cmd',
 	'event',
 	'help',
 	'_hint_root_file',
