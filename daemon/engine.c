@@ -12,6 +12,7 @@
 #include <pwd.h>
 #include <sys/param.h>
 #include <libzscanner/scanner.h>
+#include <sys/un.h>
 
 #include <lua.h>
 #include <lualib.h>
@@ -375,6 +376,30 @@ static int l_fromjson(lua_State *L)
 #define expr_checked(expr) \
 	if (!(expr)) { lua_pushboolean(L, false); lua_rawseti(L, -2, lua_objlen(L, -2) + 1); continue; }
 
+static char *engine_ipc_cmd(lua_State *L, int fd, const char *cmd, size_t *out_len)
+{
+	char *msg = NULL;
+
+	if (strlen(cmd) == 0)
+		return NULL;
+
+	do {
+		expr_checked(write(fd, cmd, strlen(cmd)) == strlen(cmd));
+		sync();
+
+		uint32_t len = 0;
+		expr_checked(read(fd, &len, sizeof(len)) == sizeof(len));
+		len = ntohl(len);
+		msg = malloc(1 + (size_t) len);
+		expr_checked(msg != NULL);
+		expr_checked(read(fd, msg, len) == len);
+		msg[len] = '\0';
+		*out_len = len;
+	} while (0);
+
+	return msg;
+}
+
 static int l_map(lua_State *L)
 {
 	/* We don't kr_log_deprecate() here for now.  Plan: after --forks gets *removed*,
@@ -383,9 +408,7 @@ static int l_map(lua_State *L)
 	if (lua_gettop(L) != 1 || !lua_isstring(L, 1))
 		lua_error_p(L, "map('string with a lua expression')");
 
-	struct engine *engine = engine_luaget(L);
 	const char *cmd = lua_tostring(L, 1);
-	uint32_t len = strlen(cmd);
 	lua_newtable(L);
 
 	/* Execute on leader instance */
@@ -394,34 +417,60 @@ static int l_map(lua_State *L)
 	lua_settop(L, ntop + 1); /* Push only one return value to table */
 	lua_rawseti(L, -2, 1);
 
-	for (size_t i = 0; i < engine->ipc_set.len; ++i) {
-		int fd = engine->ipc_set.at[i];
-		/* Send command */
-		expr_checked(write(fd, &len, sizeof(len)) == sizeof(len));
-		expr_checked(write(fd, cmd, len) == len);
-		/* Read response */
-		uint32_t rlen = 0;
-		if (read(fd, &rlen, sizeof(rlen)) == sizeof(rlen)) {
-			expr_checked(rlen < UINT32_MAX);
-			auto_free char *rbuf = malloc(rlen + 1);
-			expr_checked(rbuf != NULL);
-			expr_checked(read(fd, rbuf, rlen) == rlen);
-			rbuf[rlen] = '\0';
-			/* Unpack from JSON */
-			JsonNode *root_node = json_decode(rbuf);
-			if (root_node) {
-				l_unpack_json(L, root_node);
-			} else {
-				lua_pushlstring(L, rbuf, rlen);
-			}
-			json_delete(root_node);
-			lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
+	struct dirent *de;
+	char buf[2];
+	pid_t pid = getpid();
+
+	// Get control sockets directory
+	char cwd[PATH_MAX-strlen("/control/")];
+	get_workdir(cwd, sizeof(cwd));
+	auto_free char *cdir = malloc(sizeof(cwd) + strlen("/control/") + 1);
+	strncpy(cdir, cwd, strlen(cwd));
+	cdir[strlen(cwd)] = '\0';
+	strcat(cdir, "/control/");
+
+	DIR *dr = opendir(cdir);
+
+	while (dr != NULL && (de = readdir(dr)) != NULL) {
+		if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0 || atoi(de->d_name) == pid)
 			continue;
+
+		// Get control sockets
+		size_t plen = strlen(cdir) + strlen(de->d_name) + 1;
+		auto_free char *path = malloc(plen);
+		strncpy(path, cdir, strlen(cdir));
+		path[strlen(cdir)] = '\0';
+		strcat(path, de->d_name);
+
+		int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+		expr_checked(fd > 0);
+
+		struct sockaddr_un addr;
+		addr.sun_family = AF_UNIX;
+		expr_checked(plen + 1 <= sizeof(addr.sun_path));
+		memcpy(addr.sun_path, path, plen + 1);
+		expr_checked(connect(fd, (const struct sockaddr *)&addr, sizeof(addr)) == 0);
+
+		// Switch to binary mode and consume the text "> "
+		expr_checked(write(fd, "__binary\n", 9) == 9);
+		expr_checked(read(fd, &buf, 2) == 2);
+		sync();
+
+		// Call command remotely
+		size_t rlen;
+		auto_free char *rbuf = engine_ipc_cmd(L, fd, cmd, &rlen);
+		if (rbuf) {
+			lua_pushlstring(L, rbuf, rlen);
+		} else {
+			lua_pushlstring(L, "test\n", 5);
+//			lua_pushboolean(L, false);
 		}
-		/* Didn't respond */
-		lua_pushboolean(L, false);
 		lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
+
+		close(fd);
 	}
+	closedir(dr);
+
 	return 1;
 }
 
@@ -674,22 +723,6 @@ int engine_cmd(lua_State *L, const char *str, bool raw)
 
 	/* Check result. */
 	return engine_pcall(L, 2);
-}
-
-int engine_ipc(struct engine *engine, const char *expr)
-{
-	if (engine == NULL || engine->L == NULL) {
-		return kr_error(ENOEXEC);
-	}
-
-	/* Run expression and serialize response. */
-	engine_cmd(engine->L, expr, true);
-	if (lua_gettop(engine->L) > 0) {
-		l_tojson(engine->L);
-		return 1;
-	} else {
-		return 0;
-	}
 }
 
 int engine_load_sandbox(struct engine *engine)
