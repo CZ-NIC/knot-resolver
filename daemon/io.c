@@ -501,7 +501,7 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 
 		/* Pseudo-command for switching to "binary output"; */
 		if (strcmp(cmd, "__binary") == 0) {
-			args->tty_binary_output = true;
+			stream->data = (void *)io_mode_binary;
 			goto finish;
 		}
 
@@ -513,7 +513,7 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 		}
 
 		/* Simpler output in binary mode */
-		if (args->tty_binary_output) {
+		if (stream->data == (void *)io_mode_binary) {
 			size_t len_s = strlen(message);
 			if (len_s > UINT32_MAX)
 				goto finish;
@@ -570,6 +570,7 @@ void io_tty_accept(uv_stream_t *master, int status)
 			free(client);
 			return;
 		 }
+		 client->data = (void *) io_mode_text;
 		 uv_read_start((uv_stream_t *)client, io_tty_alloc, io_tty_process_input);
 		 /* Write command line */
 		 if (!args->quiet) {
