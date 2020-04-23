@@ -1069,14 +1069,12 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	case KNOT_RCODE_NXDOMAIN:
 		break; /* OK */
 	case KNOT_RCODE_REFUSED:
-	case KNOT_RCODE_SERVFAIL: {
+	case KNOT_RCODE_SERVFAIL:
 		if (query->flags.STUB) {
-			 /* Pass through in stub mode */
+			 /* just pass answer through if in stub mode */
 			break;
 		}
-		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		return KR_STATE_FAIL;
-	}
+		/* fall through */
 	case KNOT_RCODE_FORMERR:
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		return resolve_badmsg(pkt, req, query);
