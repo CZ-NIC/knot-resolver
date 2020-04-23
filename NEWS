@@ -18,6 +18,8 @@ Bugfixes
   Custom modules might have been confused by that.
 - do not leak bogus data into SERVFAIL answers (#396)
 - improve random Lua number generator initialization (!979)
+- cache: fix CNAME caching when validation is disabled (#472, !974)
+- cache: fix CNAME caching in policy.STUB mode (!974)
 
 Incompatible changes
 --------------------

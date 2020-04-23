@@ -75,11 +75,11 @@ static int nsec_p_ttl(knot_db_val_t entry, const uint32_t timestamp, int32_t *ne
 	return newttl < 0 ? kr_error(ESTALE) : kr_ok();
 }
 
-static uint8_t get_lowest_rank(const struct kr_request *req, const struct kr_query *qry)
+static uint8_t get_lowest_rank(const struct kr_query *qry, const knot_dname_t *name, const uint16_t type)
 {
 	/* TODO: move rank handling into the iterator (DNSSEC_* flags)? */
 	const bool allow_unverified =
-		knot_wire_get_cd(req->qsource.packet->wire) || qry->flags.STUB;
+		knot_wire_get_cd(qry->request->qsource.packet->wire) || qry->flags.STUB;
 		/* in stub mode we don't trust RRs anyway ^^ */
 	if (qry->flags.NONAUTH) {
 		return KR_RANK_INITIAL;
@@ -91,7 +91,7 @@ static uint8_t get_lowest_rank(const struct kr_request *req, const struct kr_que
 	} else if (!allow_unverified) {
 		/* Records not present under any TA don't have their security
 		 * verified at all, so we also accept low ranks in that case. */
-		const bool ta_covers = kr_ta_covers_qry(req->ctx, qry->sname, qry->stype);
+		const bool ta_covers = kr_ta_covers_qry(qry->request->ctx, name, type);
 		/* ^ TODO: performance?  TODO: stype - call sites */
 		if (ta_covers) {
 			return KR_RANK_INSECURE | KR_RANK_AUTH;
@@ -117,7 +117,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	const uint8_t lowest_rank = get_lowest_rank(req, qry);
+	const uint8_t lowest_rank = get_lowest_rank(qry, qry->sname, qry->stype);
 
 	/**** 1. find the name or the closest (available) zone, not considering wildcards
 	 **** 1a. exact name+type match (can be negative, mainly in insecure zones) */
@@ -655,7 +655,7 @@ static int check_NS_entry(struct key *k, const knot_db_val_t entry, const int i,
 	const int ESKIP = ABS(ENOENT);
 	if (!entry.len
 		/* On a zone cut we want DS from the parent zone. */
-		|| (i <= EL_NS && exact_match && is_DS)
+		|| (exact_match && is_DS)
 		/* CNAME is interesting only if we
 		 * directly hit the name that was asked.
 		 * Note that we want it even in the DS case. */
@@ -688,12 +688,13 @@ static int check_NS_entry(struct key *k, const knot_db_val_t entry, const int i,
 			return kr_error(EILSEQ);
 		}
 		const int32_t log_new_ttl = get_new_ttl(eh, qry, k->zname, type, timestamp);
-		const uint8_t rank_min = KR_RANK_INSECURE | KR_RANK_AUTH;
-		const bool ok = /* For NS any kr_rank is accepted,
-				 * as insecure or even nonauth is OK */
-				(type == KNOT_RRTYPE_NS || eh->rank >= rank_min)
-				/* Not interested in negative bogus or outdated RRs. */
-				&& !eh->is_packet && log_new_ttl >= 0;
+
+		const bool ok = /* Not interested in negative bogus or outdated RRs. */
+			!eh->is_packet && log_new_ttl >= 0
+			/* For NS any kr_rank is accepted, as insecure or even nonauth is OK */
+			&& (type == KNOT_RRTYPE_NS
+			    || eh->rank >= get_lowest_rank(qry, k->zname, type));
+
 		WITH_VERBOSE(qry) { if (!ok) {
 			auto_free char *type_str = kr_rrtype_text(type);
 			const char *packet_str = eh->is_packet ? "packet" : "RR";
