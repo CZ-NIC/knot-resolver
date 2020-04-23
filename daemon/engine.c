@@ -12,6 +12,7 @@
 #include <pwd.h>
 #include <sys/param.h>
 #include <libzscanner/scanner.h>
+#include <sys/un.h>
 
 #include <lua.h>
 #include <lualib.h>
@@ -371,9 +372,56 @@ static int l_fromjson(lua_State *L)
 	return 1;
 }
 
-/** @internal Throw Lua error if expr is false */
-#define expr_checked(expr) \
-	if (!(expr)) { lua_pushboolean(L, false); lua_rawseti(L, -2, lua_objlen(L, -2) + 1); continue; }
+static int l_engine_ipc_cmd(lua_State *L, int fd, const char *cmd, size_t *out_len)
+{
+	uint32_t len = 0;
+	auto_free char *msg = NULL;
+	auto_free char *cmd_json = NULL;
+
+	if (strlen(cmd) == 0) {
+		lua_pushboolean(L, false);
+		return 0;
+	}
+
+	cmd_json = malloc(strlen(cmd) + strlen("tojson()") + 1);
+	sprintf(cmd_json, "tojson(%s)", cmd);
+
+	if(write(fd, cmd_json, strlen(cmd_json)) != strlen(cmd_json)) {
+		goto err_handle_lua;
+	}
+	fsync(fd);
+
+	len = 0;
+	if (read(fd, &len, sizeof(len)) != sizeof(len)) {
+		goto err_handle_lua;
+	}
+	len = ntohl(len);
+	msg = malloc((size_t) len + 1);
+	if (msg == NULL) {
+		goto err_handle_lua;
+	}
+	if(read(fd, msg, len) != len) {
+		goto err_handle_lua;
+	}
+	msg[len] = '\0';
+
+	JsonNode *root_node = json_decode(msg);
+	if (root_node) {
+		l_unpack_json(L, root_node);
+	} else {
+		lua_pushlstring(L, msg, len);
+	}
+	json_delete(root_node);
+
+	*out_len = len;
+	lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
+	return 1;
+
+err_handle_lua:
+	lua_pushboolean(L, false);
+	lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
+	return 1;
+}
 
 static int l_map(lua_State *L)
 {
@@ -383,9 +431,7 @@ static int l_map(lua_State *L)
 	if (lua_gettop(L) != 1 || !lua_isstring(L, 1))
 		lua_error_p(L, "map('string with a lua expression')");
 
-	struct engine *engine = engine_luaget(L);
 	const char *cmd = lua_tostring(L, 1);
-	uint32_t len = strlen(cmd);
 	lua_newtable(L);
 
 	/* Execute on leader instance */
@@ -394,39 +440,71 @@ static int l_map(lua_State *L)
 	lua_settop(L, ntop + 1); /* Push only one return value to table */
 	lua_rawseti(L, -2, 1);
 
-	for (size_t i = 0; i < engine->ipc_set.len; ++i) {
-		int fd = engine->ipc_set.at[i];
-		/* Send command */
-		expr_checked(write(fd, &len, sizeof(len)) == sizeof(len));
-		expr_checked(write(fd, cmd, len) == len);
-		/* Read response */
-		uint32_t rlen = 0;
-		if (read(fd, &rlen, sizeof(rlen)) == sizeof(rlen)) {
-			expr_checked(rlen < UINT32_MAX);
-			auto_free char *rbuf = malloc(rlen + 1);
-			expr_checked(rbuf != NULL);
-			expr_checked(read(fd, rbuf, rlen) == rlen);
-			rbuf[rlen] = '\0';
-			/* Unpack from JSON */
-			JsonNode *root_node = json_decode(rbuf);
-			if (root_node) {
-				l_unpack_json(L, root_node);
-			} else {
-				lua_pushlstring(L, rbuf, rlen);
-			}
-			json_delete(root_node);
-			lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
+	struct dirent *de;
+	char buf[2];
+	pid_t pid = getpid();
+
+	// Get control sockets directory
+	lua_getglobal(L, "worker");
+	lua_pushstring(L, "control_path");
+	lua_gettable(L, -2);
+	const char *cdir = lua_tostring(L, -1);
+	lua_pop(L, 2);
+	// Finish when control sockets directory doesn't exists
+	DIR *dr = opendir(cdir);
+	if (dr == NULL)
+		return 1;
+
+	while (dr != NULL && (de = readdir(dr)) != NULL) {
+		if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0 || strtol(de->d_name, NULL, 10) == pid)
 			continue;
+
+		// Get control sockets
+		size_t plen = strlen(cdir) + strlen(de->d_name) + 2;
+		auto_free char *path = malloc(plen);
+		sprintf(path, "%s/%s", cdir, de->d_name);
+
+		int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+		if (fd <= 0) {
+			goto err_handle_lua;
 		}
-		/* Didn't respond */
+
+		struct sockaddr_un addr;
+		memset(&addr, 0, sizeof(addr));
+		addr.sun_family = AF_UNIX;
+		if(plen + 1 > sizeof(addr.sun_path)) {
+			goto err_close_fd;
+		}
+		strncpy(addr.sun_path, path, plen + 1);
+		if (connect(fd, (const struct sockaddr *)&addr, sizeof(addr)) != 0) {
+			goto err_close_fd;
+		}
+
+		// Switch to binary mode and consume the text "> "
+		if(write(fd, "__binary\n", 9) != 9) {
+			goto err_close_fd;
+		}
+		if(read(fd, &buf, 2) != 2) {
+			goto err_close_fd;
+		}
+		fsync(fd);
+
+		// Call command remotely
+		size_t rlen;
+		l_engine_ipc_cmd(L, fd, cmd, &rlen);
+		close(fd);
+		continue;
+
+err_close_fd:
+		close(fd);
+err_handle_lua:
 		lua_pushboolean(L, false);
 		lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
 	}
+	closedir(dr);
+
 	return 1;
 }
-
-#undef expr_checked
-
 
 /*
  * Engine API.
@@ -674,22 +752,6 @@ int engine_cmd(lua_State *L, const char *str, bool raw)
 
 	/* Check result. */
 	return engine_pcall(L, 2);
-}
-
-int engine_ipc(struct engine *engine, const char *expr)
-{
-	if (engine == NULL || engine->L == NULL) {
-		return kr_error(ENOEXEC);
-	}
-
-	/* Run expression and serialize response. */
-	engine_cmd(engine->L, expr, true);
-	if (lua_gettop(engine->L) > 0) {
-		l_tojson(engine->L);
-		return 1;
-	} else {
-		return 0;
-	}
 }
 
 int engine_load_sandbox(struct engine *engine)
