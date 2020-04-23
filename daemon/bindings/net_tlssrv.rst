@@ -4,6 +4,15 @@
 
 DNS-over-TLS server (DoT)
 -------------------------
+DoT encrypts DNS traffic with Transport Security Layer protocol and thus protects DNS traffic from certain types of attacks.
+
+.. warning::
+
+   It is important to understand **limits of encrypting only DNS traffic**.
+   Relevant security analysis can be found in article
+   *Simran Patil and Nikita Borisov. 2019. What can you learn from an IP?*
+   See `slides <https://irtf.org/anrw/2019/slides-anrw19-final44.pdf>`_
+   or `the article itself <https://dl.acm.org/authorize?N687437>`_.
 
 DNS-over-TLS server (:rfc:`7858`) is enabled by default on localhost.
 Information how to configure listening on specific IP addresses is in previous sections:
