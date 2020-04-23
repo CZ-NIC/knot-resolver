@@ -1,6 +1,10 @@
 Knot Resolver 5.x.y (2020-0m-dd)
 ================================
 
+Improvements
+------------
+- map() command now uses control sockets and works with systemd integration
+
 Bugfixes
 --------
 - hints module: NODATA answers also for non-address queries (!1005)
