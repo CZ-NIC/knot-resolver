@@ -1,6 +1,10 @@
 Knot Resolver 5.1.1 (2020-05-xx)
 ================================
 
+Improvements
+------------
+- map() command use control sockets
+
 Bugfixes
 --------
 - control sockets: recognize newline as command boundary
