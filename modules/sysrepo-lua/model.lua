@@ -40,7 +40,7 @@ function Helpers.get_schema_children_table(schema_node)
     while child ~= nil do
         local nm = ffi.string(clib().schema_get_name(child))
         lookup[nm] = child
-        child = clib().schema_child_next(child)
+        child = clib().schema_child_next(schema_node, child)
     end
 
     return lookup
@@ -450,10 +450,12 @@ local function ListenInterfacesNodeFactory(name)
         -- return configured container bind node
         return ContainerBindNode(
             "listen-interfaces",
-            { ["ip-address"] = "string", ["name"] = "string", ["port"] = "uint16", ["kind"] = "string" },
+            { ["ip-address"] = "string", ["id"] = "string", ["port"] = "uint16", ["kind"] = "string" },
+            -- { ["ip-address"] = "string", ["name"] = "string", ["port"] = "uint16" },
             get_arg_func,
             function(v)
                 net.listen(v["ip-address"], v["port"], { kind = v["kind"] })
+                -- net.listen(v["ip-address"], v["port"])
             end
         )
     end
@@ -468,7 +470,13 @@ local function TLSNode()
     return ContainerBindNode(
         "tls",
         { ["cert"] = "string", ["cert-key"] = "string" },
-        nil,
+        function()
+            local t = net.tls()
+            return {
+                ["cert"] = t[1],
+                ["cert-key"] = t[2],
+            }
+        end,
         function(vals) net.tls(vals["cert"], vals["cert-key"]) end
     )
 end
@@ -486,10 +494,13 @@ end
 local function get_listen_interfaces()
     -- the data structure from `net.list()` has to be transformed to be understood
     -- by ContainerBindNode
+    local id = -1;
+
     local function transform(arg)
+        id = id + 1
         return {
             ["ip-address"] = arg['transport']['ip'],
-            ["name"] = arg["kind"] .. "://" .. arg['transport']['ip'] .. tostring(arg['transport']['port']),
+            ["id"] = tostring(id),
             ["port"] = arg['transport']['port'],
             ["kind"] = arg['kind'],
         }
