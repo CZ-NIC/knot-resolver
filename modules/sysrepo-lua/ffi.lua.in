@@ -38,8 +38,7 @@ local function initialize_ffi()
         /** Given a libyang schema node, returns it's first child */
         const struct lys_node* schema_child_first(const struct lys_node* parent);
         /** Given a libyang schema node, return next sibling or NULL if there isn't any */
-        const struct lys_node* schema_child_next(const struct lys_node* prev_child);
-        /** Given a libyang schema node, return it's name */
+        const struct lys_node* schema_child_next(const struct lys_node* parent, const struct lys_node* prev_child);        /** Given a libyang schema node, return it's name */
         const char* schema_get_name(const struct lys_node* node);
         /** Get schema root */
         const struct lys_node* schema_root();

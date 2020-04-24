@@ -287,12 +287,14 @@ KR_EXPORT const struct lys_node* schema_child_first(const struct lys_node* paren
 		return NULL;
 	}
 
-	return parent->child;
+	return lys_getnext(NULL, parent, NULL, 0);
 }
 
-KR_EXPORT const struct lys_node* schema_child_next(const struct lys_node* prev_child) {
+KR_EXPORT const struct lys_node* schema_child_next(const struct lys_node* parent, const struct lys_node* prev_child) {
 	assert(prev_child != NULL);
-	return prev_child->next;
+	assert(parent != NULL);
+
+	return lys_getnext(prev_child, parent, NULL, 0);
 }
 
 KR_EXPORT const char* schema_get_name(const struct lys_node* node) {

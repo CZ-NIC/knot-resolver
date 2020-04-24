@@ -67,7 +67,7 @@ KR_EXPORT const struct lys_module* schema_get_module(const struct lys_node* sche
 /** Given a libyang schema node, returns it's first child (or NULL if there aren't any) */
 KR_EXPORT const struct lys_node* schema_child_first(const struct lys_node* parent);
 /** Given a libyang schema node, return next sibling or NULL if there isn't any */
-KR_EXPORT const struct lys_node* schema_child_next(const struct lys_node* prev_child);
+KR_EXPORT const struct lys_node* schema_child_next(const struct lys_node* parent, const struct lys_node* prev_child);
 /** Given a libyang schema node, return it's name */
 KR_EXPORT const char* schema_get_name(const struct lys_node* node);
 /** Get schema root */
