@@ -494,6 +494,15 @@ static void zi_zone_process(uv_timer_t* handle)
 	}
 	z_import->key = rr_key;
 
+	map_t *trust_anchors = &z_import->worker->engine->resolver.trust_anchors;
+	knot_rrset_t *rr_ta = kr_ta_get(trust_anchors, z_import->origin);
+	if (!rr_ta) {
+		kr_log_error("[zimport] error: TA vanished in middle of import");
+		failed = 1;
+		goto finish;
+	}
+	z_import->ta = rr_ta;
+
 	VERBOSE_MSG(NULL, "started: zone: '%s'\n", zone_name_str);
 
 	z_import->start_timestamp = kr_now();
@@ -770,9 +779,7 @@ int zi_zone_import(struct zone_import_ctx *z_import,
 			/* Try to find TA for worker->z_import.origin. */
 			map_t *trust_anchors = &z_import->worker->engine->resolver.trust_anchors;
 			knot_rrset_t *rr = kr_ta_get(trust_anchors, z_import->origin);
-			if (rr) {
-				z_import->ta = rr;
-			} else {
+			if (!rr) {
 				/* For now - fail.
 				 * TODO - query DS and continue after answer had been obtained. */
 				KR_DNAME_GET_STR(zone_name_str, z_import->origin);
