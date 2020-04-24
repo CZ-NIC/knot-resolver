@@ -20,6 +20,7 @@ Bugfixes
 - improve random Lua number generator initialization (!979)
 - cache: fix CNAME caching when validation is disabled (#472, !974)
 - cache: fix CNAME caching in policy.STUB mode (!974)
+- prefill: fix crash caused by race condition with resolver startup (!983)
 
 Incompatible changes
 --------------------
