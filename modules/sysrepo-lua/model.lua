@@ -1,5 +1,6 @@
 local debug = require("kres_modules/sysrepo-lua/debug")
 local ffi = require("ffi")
+local os = require("os")
 
 local _clib = nil
 
@@ -22,6 +23,85 @@ function Helpers.get_children_table(node)
     end
 
     return lookup
+end
+
+function Helpers.node_to_table(node)
+    if node == nil then
+        return nil
+    end
+
+    if clib().node_is_leaf(node) then
+        -- is primitive
+
+        if clib().node_is_number_type(node) then
+            return tonumber(ffi.string(clib().node_get_value_str(node)))
+        else
+            return ffi.string(clib().node_get_value_str(node))
+        end
+    else
+        -- is composite
+        local result = {}
+        local child = clib().node_child_first(node)
+        while child ~= nil do
+            local nm = ffi.string(clib().node_get_name(child))
+
+            if clib().node_is_list_item(child) then
+                if result[nm] == nil then
+                    result[nm] = {}
+                end
+
+                table.insert(result[nm], Helpers.node_to_table(child))
+            else
+                result[nm] = Helpers.node_to_table(child)
+            end
+
+            child = clib().node_child_next(child)
+        end
+
+        return result
+    end
+end
+
+function Helpers.object_to_node(object, name, schema_node, parent_node)
+    if object == nil then
+        return nil
+    end
+
+    assert(schema_node ~= nil)
+    assert(parent_node ~= nil)
+    assert(type(name) == "string")
+    assert(name == ffi.string(clib().schema_get_name(schema_node)))
+
+    if type(object) ~= "table" then
+        -- primitive
+        return clib().node_new_leaf(parent_node, clib().schema_get_module(schema_node), name, tostring(object))
+    else
+        -- composite
+
+        if object[1] ~= nil then
+            -- list
+            local last = nil
+            for _,v in ipairs(object) do
+                last = Helpers.object_to_node(v, name, schema_node, parent_node)
+            end
+            return last
+        else
+            -- container
+
+            local cont = clib().node_new_container(parent_node, clib().schema_get_module(schema_node), name)
+            local child_schema_nodes = Helpers.get_schema_children_table(schema_node)
+            for k,v in pairs(object) do
+                assert(type(k) == "string")
+
+                if child_schema_nodes[k] == nil then
+                    debug.log("Warning while serializing table - unknown child with name {}. Schema does not correspond.", k)
+                else
+                    Helpers.object_to_node(v, k, child_schema_nodes[k], cont)
+                end
+            end
+            return cont
+        end
+    end
 end
 
 function Helpers.get_children_str_values(node)
@@ -113,6 +193,7 @@ function Node:create(name, apply_func, read_func, initialize_schema_func)
     handler.serialize = read_func
     handler.name = name
     handler.module = nil -- must be filled in later by initialize_schema method
+    handler.schema = nil -- must be filled in later by initialize_schema method
 
     -- default implementation
     local function schema_init(self, lys_node)
@@ -120,6 +201,7 @@ function Node:create(name, apply_func, read_func, initialize_schema_func)
                                                             .. " (or something else happened).")
         assert(ffi.string(clib().schema_get_name(lys_node)) == self.name)
         self.module = clib().schema_get_module(lys_node)
+        self.schema = lys_node
     end
     if initialize_schema_func == nil then
         initialize_schema_func = schema_init
@@ -357,6 +439,40 @@ local function ConfigVarNode(name, type, bind_variable)
     return BindNode(name, type, get_val, set_val)
 end
 
+--- Node used for binding values
+---
+--- @param name Name of the vertex for constructing XPath
+--- @param type Type of the binded value as a string
+--- @param get_val Function that returns value with proper type, provides current state of the resolver.
+--- @param set_val Function with one argument of appropriate type, configures resolver
+local function StructuralBindNode(name, get_val, set_val)
+    --- Node's apply function
+    local function handle_apply(self, node)
+        -- do nothing when there is no set func
+        if set_val == nil then
+            return
+        end
+
+        -- obtain value from the lyd_node according to specified type
+        local val = Helpers.node_to_table(node)
+
+        -- set the value
+        set_val(val)
+    end
+
+    --- Node's serialize function
+    local function handle_serialize(self, parent_node)
+        if get_val == nil then
+            return nil
+        end
+
+        local val = get_val()
+        return Helpers.object_to_node(val, name, self.schema, parent_node)
+    end
+
+    return Node:create(name, handle_apply, handle_serialize, nil)
+end
+
 --- Binding node that binds whole container instead of single values.
 --- Works with one level deep containers.
 ---
@@ -519,23 +635,61 @@ local function get_listen_interfaces()
 end
 
 --- Configuration schema reprezentation
-local model =
-    ContainerNode("dns-resolver", {
-        Child(ContainerNode("cache", {
-            Child(StateNode("current-size", "uint64", "cache.current_size")),
-            Child(BindNode("max-size", "uint64", function() return cache.current_size end, function(v) cache.size = v end)),
-            Child(ConfigFnNode("max-ttl", "uint32", cache.max_ttl)),
-            Child(ConfigFnNode("min-ttl", "uint32", cache.min_ttl)),
-        })),
-        Child(ContainerNode("logging", {
-            Child(BindNode("verbosity", "uint8", function() return verbose() and 1 or 0 end, function(v) verbose(v > 0) end))
-        })),
-        Child(ContainerNode("network", {
-            ListChild(get_listen_interfaces, ListenInterfacesNodeFactory, "listen-interfaces"),
-            Child(TLSNode()),
-        }, Hook:create(hook_apply_pre_network, nil))),
-    })
+-- local model =
+--     ContainerNode("dns-resolver", {
+--         Child(ContainerNode("cache", {
+--             Child(StateNode("current-size", "uint64", "cache.current_size")),
+--             Child(BindNode("max-size", "uint64", function() return cache.current_size end, function(v) cache.size = v end)),
+--             Child(ConfigFnNode("max-ttl", "uint32", cache.max_ttl)),
+--             Child(ConfigFnNode("min-ttl", "uint32", cache.min_ttl)),
+--         })),
+--         Child(ContainerNode("logging", {
+--             Child(BindNode("verbosity", "uint8", function() return verbose() and 1 or 0 end, function(v) verbose(v > 0) end))
+--         })),
+--         Child(ContainerNode("network", {
+--             ListChild(get_listen_interfaces, ListenInterfacesNodeFactory, "listen-interfaces"),
+--             Child(TLSNode()),
+--         }, Hook:create(hook_apply_pre_network, nil))),
+--     })
 
+local items = {}
+local start_time = nil
+
+local function pre_load()
+    items = {}
+
+    start_time = os.clock()
+end
+
+local function post_load()
+    local elapsed_cpu_time = os.clock() - start_time
+
+    debug.log("[BENCH] Data loading finished in {} sec (cpu time), the dataset follows", elapsed_cpu_time)
+    -- debug.dump_table(items)
+end
+
+local function ItemNodeFactory(name)
+    -- +--rw items* [name]
+    --    +--rw name       string
+    --    +--rw actions*   string
+    --    +--rw ids*       uint64
+
+    assert(name == "items") -- this argument must be there due to the way container node works
+
+    --- the actual factory function
+    return function(get_arg_func)
+        return StructuralBindNode(name, get_arg_func, function(val) table.insert(items, val) end)
+    end
+end
+
+local function get_items()
+    return items
+end
+
+local model =
+  ContainerNode("tests", {
+      ListChild(get_items, ItemNodeFactory, "items")
+  }, Hook:create(pre_load, post_load))
 
 -------------------------------------------------------------------------------
 ------------------------ Module Exports ---------------------------------------
@@ -594,6 +748,7 @@ return function(clib_binding)
 
     function module.apply_configuration(root_node)
         init_schema()
+
         model:apply(root_node)
     end
 

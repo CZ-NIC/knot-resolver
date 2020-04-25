@@ -72,7 +72,7 @@ static int sysrepo_conf_change_callback(sr_session_ctx_t *session,
 		struct lyd_node* tree;
 
 		// get the whole config tree
-		sr_err = sr_get_data(session, XPATH_BASE, 0, 0, 0, &tree);
+		sr_err = sr_get_data(session, "/cznic-test-sysrepo:tests" /* XPATH_BASE */, 0, 0, 0, &tree);
 		if (sr_err != SR_ERR_OK)
 			goto cleanup;
 
@@ -181,7 +181,7 @@ int sysrepo_init(apply_conf_f apply_conf_callback, read_conf_f read_conf_callbac
 	/* obtain schema root node, will be used from within Lua */
 	ly_context = sr_get_context(sr_connection);
 	assert(ly_context != NULL);
-	lys_root = ly_ctx_get_node(ly_context, NULL, XPATH_BASE, 0);
+	lys_root = ly_ctx_get_node(ly_context, NULL, "/cznic-test-sysrepo:tests", 0);
 	assert(lys_root != NULL);
 
 	/* register sysrepo subscription and callback
@@ -189,14 +189,14 @@ int sysrepo_init(apply_conf_f apply_conf_callback, read_conf_f read_conf_callbac
 		SR_SUBSCR_ENABLED - send us current configuration in a callback just after subscribing
 	 */
 	sr_err = sr_module_change_subscribe(
-		sr_session, YM_COMMON, XPATH_BASE, sysrepo_conf_change_callback,
+		sr_session, "cznic-test-sysrepo", "/cznic-test-sysrepo:tests", sysrepo_conf_change_callback,
 		NULL, 0, SR_SUBSCR_NO_THREAD | SR_SUBSCR_ENABLED,
 		&sr_subscription);
 	if (sr_err != SR_ERR_OK)
 		goto cleanup;
 
 	sr_err = sr_oper_get_items_subscribe(
-		sr_session, YM_COMMON, XPATH_BASE, sysrepo_conf_read_callback,
+		sr_session, "cznic-test-sysrepo", "/cznic-test-sysrepo:tests", sysrepo_conf_read_callback,
 		NULL, SR_SUBSCR_CTX_REUSE | SR_SUBSCR_NO_THREAD,
 		&sr_subscription
 	);
@@ -315,4 +315,42 @@ KR_EXPORT int node_validate(struct lyd_node* node) {
 
 KR_EXPORT void node_free(struct lyd_node* node) {
 	lyd_free_withsiblings(node);
+}
+
+KR_EXPORT bool node_is_list_item(struct lyd_node* node) {
+	assert(node != NULL);
+
+	return node->schema->nodetype == LYS_LIST || node->schema->nodetype == LYS_LEAFLIST;
+}
+
+KR_EXPORT bool node_is_container(struct lyd_node* node) {
+	assert(node != NULL);
+
+	return node->schema->nodetype == LYS_CONTAINER;
+}
+
+KR_EXPORT bool node_is_leaf(struct lyd_node* node) {
+	assert(node != NULL);
+
+	return node->schema->nodetype == LYS_LEAF || node->schema->nodetype == LYS_LEAFLIST;
+}
+
+KR_EXPORT bool node_is_number_type(struct lyd_node* node) {
+	assert(node != NULL);
+	assert(node->schema->nodetype == LYS_LEAF || node->schema->nodetype == LYS_LEAFLIST);
+
+	LY_DATA_TYPE type = ((struct lyd_node_leaf_list*) node)->value_type;
+	switch (type) {
+		case LY_TYPE_INT8:
+		case LY_TYPE_UINT8:
+		case LY_TYPE_INT16:
+		case LY_TYPE_UINT16:
+		case LY_TYPE_INT32:
+		case LY_TYPE_UINT32:
+		case LY_TYPE_INT64:
+		case LY_TYPE_UINT64:
+			return true;
+		default:
+			return false;
+	}
 }
