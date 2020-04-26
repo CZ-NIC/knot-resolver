@@ -46,6 +46,13 @@ local function initialize_ffi()
         int node_validate(struct lyd_node* node);
         /** Free data nodes recursively */
         void node_free(struct lyd_node* node);
+        /** Returns true when a data node is a list item */
+        bool node_is_list_item(struct lyd_node* node);
+        /** Returns true when a data node is a container */
+        bool node_is_container(struct lyd_node* node);
+        bool node_is_leaf(struct lyd_node* node);
+        /** Returns true when the given data node contains a number */
+        bool node_is_number_type(struct lyd_node* node);
     ]]
 end
 

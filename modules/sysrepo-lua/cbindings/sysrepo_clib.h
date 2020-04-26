@@ -76,3 +76,13 @@ KR_EXPORT const struct lys_node* schema_root();
 KR_EXPORT int node_validate(struct lyd_node* node);
 /** Free data nodes recursively */
 KR_EXPORT void node_free(struct lyd_node* node);
+/** Returns true when a data node is a list item */
+KR_EXPORT bool node_is_list_item(struct lyd_node* node);
+/** Returns true when a data node is a container */
+KR_EXPORT bool node_is_container(struct lyd_node* node);
+/** Returns true when a data node is a leaf node */
+KR_EXPORT bool node_is_leaf(struct lyd_node* node);
+/** Returns true when the given data node contains a number */
+KR_EXPORT bool node_is_number_type(struct lyd_node* node);
+
+
