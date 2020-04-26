@@ -316,3 +316,41 @@ KR_EXPORT int node_validate(struct lyd_node* node) {
 KR_EXPORT void node_free(struct lyd_node* node) {
 	lyd_free_withsiblings(node);
 }
+
+KR_EXPORT bool node_is_list_item(struct lyd_node* node) {
+	assert(node != NULL);
+
+	return node->schema->nodetype == LYS_LIST || node->schema->nodetype == LYS_LEAFLIST;
+}
+
+KR_EXPORT bool node_is_container(struct lyd_node* node) {
+	assert(node != NULL);
+
+	return node->schema->nodetype == LYS_CONTAINER;
+}
+
+KR_EXPORT bool node_is_leaf(struct lyd_node* node) {
+	assert(node != NULL);
+
+	return node->schema->nodetype == LYS_LEAF || node->schema->nodetype == LYS_LEAFLIST;
+}
+
+KR_EXPORT bool node_is_number_type(struct lyd_node* node) {
+	assert(node != NULL);
+	assert(node->schema->nodetype == LYS_LEAF || node->schema->nodetype == LYS_LEAFLIST);
+
+	LY_DATA_TYPE type = ((struct lyd_node_leaf_list*) node)->value_type;
+	switch (type) {
+		case LY_TYPE_INT8:
+		case LY_TYPE_UINT8:
+		case LY_TYPE_INT16:
+		case LY_TYPE_UINT16:
+		case LY_TYPE_INT32:
+		case LY_TYPE_UINT32:
+		case LY_TYPE_INT64:
+		case LY_TYPE_UINT64:
+			return true;
+		default:
+			return false;
+	}
+}

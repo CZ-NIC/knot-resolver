@@ -20,4 +20,26 @@ function debug.log(msg, ...)
     print("[LUA DEBUG] " .. msg)
 end
 
+function debug.dump_table(table, indent)
+    if indent == nil then indent = 0 end
+
+    if table == nil then
+        debug.log("table is nil")
+        return
+    end
+
+    if indent == 0 then debug.log("{") end
+    for k,v in pairs(table) do
+        local space = string.rep(' ', (indent+1)*2)
+        if type(v) == 'table' then
+            debug.log(space .. "[" .. tostring(k) .. "] = {")
+            debug.dump_table(v, indent+1)
+            debug.log(space .. "},")
+        else
+            debug.log(space .. "[" .. tostring(k) .. "] = \"" .. tostring(v) .. "\", -- (" .. type(v) .. ")")
+        end
+    end
+    if indent == 0 then debug.log("}") end
+end
+
 return debug
