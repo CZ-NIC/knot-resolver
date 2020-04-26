@@ -25,7 +25,7 @@ function Helpers.get_children_table(node)
     return lookup
 end
 
-function Helpers.node_to_table(node)
+function Helpers.node_to_object(node)
     if node == nil then
         return nil
     end
@@ -50,9 +50,9 @@ function Helpers.node_to_table(node)
                     result[nm] = {}
                 end
 
-                table.insert(result[nm], Helpers.node_to_table(child))
+                table.insert(result[nm], Helpers.node_to_object(child))
             else
-                result[nm] = Helpers.node_to_table(child)
+                result[nm] = Helpers.node_to_object(child)
             end
 
             child = clib().node_child_next(child)
@@ -124,16 +124,6 @@ function Helpers.get_schema_children_table(schema_node)
     end
 
     return lookup
-end
-
-function Helpers.str_cast(type, val)
-    if type == "uint8" or type == "uint32" or type == "uint64" then
-        return tonumber(val)
-    elseif type == "string" then
-        return val
-    else
-        assert(false, "Trying to serialize unknown type")
-    end
 end
 
 
@@ -209,36 +199,6 @@ function Node:create(name, apply_func, read_func, initialize_schema_func)
     handler.initialize_schema = initialize_schema_func
 
     return handler
-end
-
---- Tree node that just prints its name and value. Used for development.
----
---- @param name Name of the vertex for constructing XPath
---- @param ignore_value When set to true, it does not print container value when configuration changes
-local function DummyLeafNode(name, ignore_value)
-    local function dummy_read(self, node)
-        if ignore_value then
-            debug.log(
-                "Dummy read on node named \"{}\", actual name \"{}\"",
-                self.name,
-                ffi.string(clib().node_get_name(node))
-            )
-        else
-            debug.log(
-                "Dummy read on node named \"{}\", actual name \"{}\". Contains value (as a string) \"{}\"",
-                self.name,
-                ffi.string(clib().node_get_name(node)),
-                ffi.string(clib().node_get_value_str(node))
-            )
-        end
-    end
-
-    local function dummy_write(self, node, arg)
-        debug.log("dummy write on node named {}, arg={}", self.name, arg)
-        return nil
-    end
-
-    return Node:create(name, dummy_read, dummy_write, nil)
 end
 
 --- Creates a simple child for ContainerNode
@@ -367,13 +327,13 @@ local function ContainerNode(name, container_model, hooks)
     return Node:create(name, handle_cont_read, handle_cont_write, schema_init)
 end
 
---- Node used for binding values
+--- Node used for binding of any values. Uses conversion between table and libyang tree.
+--- The type that will be returned is deduced from the schema.
 ---
 --- @param name Name of the vertex for constructing XPath
---- @param type Type of the binded value as a string
---- @param get_val Function that returns value with proper type, provides current state of the resolver.
---- @param set_val Function with one argument of appropriate type, configures resolver
-local function BindNode(name, type, get_val, set_val)
+--- @param get_val Function that returns an object with resolvers state, that will be transformed into a libyang tree
+--- @param set_val Function with one argument, will get an object with the same structure as the model tree
+local function BindNode(name, get_val, set_val)
     --- Node's apply function
     local function handle_apply(self, node)
         -- do nothing when there is no set func
@@ -382,10 +342,20 @@ local function BindNode(name, type, get_val, set_val)
         end
 
         -- obtain value from the lyd_node according to specified type
-        local val = Helpers.str_cast(type, ffi.string(clib().node_get_value_str(node)))
+        local val = Helpers.node_to_object(node)
 
         -- set the value
-        set_val(val)
+        local status, err = pcall(set_val, val)
+
+        -- error reporting
+        if not status then
+            debug.log("Error applying configuration in BindNode(name='{}') with the following object:", name)
+            debug.dump_table(val)
+            if type(val) == "table" and next(val) == nil then
+                debug.log("That table is empty => container node was present, but with no children.")
+            end
+            error("Error in BindNode(name='" .. name .. "') set_val:\n       " .. err)
+        end
     end
 
     --- Node's serialize function
@@ -394,7 +364,13 @@ local function BindNode(name, type, get_val, set_val)
             return nil
         end
 
-        return clib().node_new_leaf(parent_node, self.module, self.name, tostring(get_val()))
+        -- get the desired value safely
+        local status, val = pcall(get_val)
+        if not status then
+            error("Error in BindNode(name='" .. name .. "') get_val:\n       " .. val)
+        end
+
+        return Helpers.object_to_node(val, name, self.schema, parent_node)
     end
 
     return Node:create(name, handle_apply, handle_serialize, nil)
@@ -403,148 +379,38 @@ end
 --- Specialized {@link BindNode} which provides read only binding to a variable
 ---
 --- @param name Name of the vertex for constructing XPath
---- @param type Type of the binded value as a string
 --- @param bind_variable String name of the binded global variable
-local function StateNode(name, type, bind_variable)
+local function StateNode(name, bind_variable)
     -- generate get function
     local get_val = load("return " .. bind_variable)
 
-    return BindNode(name, type, get_val, nil)
+    return BindNode(name, get_val, nil)
 end
 
 --- Specialized {@link BindNode} which provides read-write binding to a function
 ---
 --- @param name Name of the vertex for constructing XPath
---- @param type Type of the binded value as a string
 --- @param bind_func String name of the binded global function. When called without arguments, returns
 ---     current state. When called with one argument, sets value.
-local function ConfigFnNode(name, type, bind_func)
+local function ConfigFnNode(name, bind_func)
     -- generate set and get functions
     local get_val = function() return bind_func() end
     local set_val = function(new_val) bind_func(new_val) end
 
-    return BindNode(name, type, get_val, set_val)
+    return BindNode(name, get_val, set_val)
 end
 
 --- Specialized {@link BindNode} which provides read-write binding to a variable
 ---
 --- @param name Name of the vertex for constructing XPath
---- @param type Type of the binded value as a string
 --- @param bind_value String name of the binded global variable.
-local function ConfigVarNode(name, type, bind_variable)
+local function ConfigVarNode(name, bind_variable)
     -- generate set and get functions
     local get_val = load("return " .. bind_variable)
     local set_val = load("return function(data) " .. bind_variable .. "= data end")()
 
-    return BindNode(name, type, get_val, set_val)
+    return BindNode(name, get_val, set_val)
 end
-
---- Node used for binding values
----
---- @param name Name of the vertex for constructing XPath
---- @param type Type of the binded value as a string
---- @param get_val Function that returns value with proper type, provides current state of the resolver.
---- @param set_val Function with one argument of appropriate type, configures resolver
-local function StructuralBindNode(name, get_val, set_val)
-    --- Node's apply function
-    local function handle_apply(self, node)
-        -- do nothing when there is no set func
-        if set_val == nil then
-            return
-        end
-
-        -- obtain value from the lyd_node according to specified type
-        local val = Helpers.node_to_table(node)
-
-        -- set the value
-        set_val(val)
-    end
-
-    --- Node's serialize function
-    local function handle_serialize(self, parent_node)
-        if get_val == nil then
-            return nil
-        end
-
-        local val = get_val()
-        return Helpers.object_to_node(val, name, self.schema, parent_node)
-    end
-
-    return Node:create(name, handle_apply, handle_serialize, nil)
-end
-
---- Binding node that binds whole container instead of single values.
---- Works with one level deep containers.
----
---- @param name Name of the vertex for constructing XPath
---- @param child_names_to_types String names to string types map. Configures which child nodes
----                             will be used
---- @param get_func Function that will return table map with names to values (with types as specified above).
----                 Those values will be used during serialization.
---- @param set_func Function that takes a table map of names to values (with types as specified above). Configures
----                 Knot Resolver.
-local function ContainerBindNode(name, child_names_to_types, get_func, set_func)
-    local child_modules = {}
-
-    local function init_schema(self, lys_node)
-        -- save our module
-        assert(ffi.string(clib().schema_get_name(lys_node)) == self.name)
-        self.module = clib().schema_get_module(lys_node)
-
-        -- save module for children
-        local children = Helpers.get_schema_children_table(lys_node)
-        for nm, _ in pairs(child_names_to_types) do
-            child_modules[name] = clib().schema_get_module(children[nm])
-        end
-    end
-
-    local function handle_apply(self, node)
-        -- do nothing when set function is not present (node is read only)
-        if set_func == nil then
-            return
-        end
-
-        -- create data table that will be given to the set function
-        local children_vals = Helpers.get_children_str_values(node)
-        local typed_values = {}
-        for nm, type in pairs(child_names_to_types) do
-            typed_values[nm] = Helpers.str_cast(type, children_vals[nm])
-        end
-
-        -- call set function
-        set_func(typed_values)
-    end
-
-    local function handle_serialize(self, parent_node)
-        -- do nothing when get function is not present (node is write only)
-        if get_func == nil then
-            return
-        end
-
-        local values = get_func()
-        local cont = clib().node_new_container(parent_node, self.module, self.name)
-        for nm, module in pairs(child_modules) do
-            clib().node_new_leaf(cont, module, nm, tostring(values[nm]))
-        end
-
-        return cont
-    end
-
-    return Node:create(name, handle_apply, handle_serialize, init_schema)
-end
-
---- Factory that was left here for now as an example
--- local function ContainerBindNodeFactory(name, child_names_to_types, set_func)
---     assert(type(set_func) == 'function' or set_func == nil)
---     assert(type(child_names_to_types) == 'table')
---     assert(type(name) == 'string')
---
---     return function(get_func)
---         assert(type(get_func) == 'function' or get_func == nil)
---
---         return ContainerBindNode(name, child_names_to_types, get_func, set_func)
---     end
--- end
 
 
 -------------------------------------------------------------------------------
@@ -564,14 +430,11 @@ local function ListenInterfacesNodeFactory(name)
     --- the actual factory function
     return function(get_arg_func)
         -- return configured container bind node
-        return ContainerBindNode(
+        return BindNode(
             "listen-interfaces",
-            { ["ip-address"] = "string", ["id"] = "string", ["port"] = "uint16", ["kind"] = "string" },
-            -- { ["ip-address"] = "string", ["name"] = "string", ["port"] = "uint16" },
             get_arg_func,
             function(v)
                 net.listen(v["ip-address"], v["port"], { kind = v["kind"] })
-                -- net.listen(v["ip-address"], v["port"])
             end
         )
     end
@@ -583,9 +446,8 @@ local function TLSNode()
     -- |  |  |  +--rw cert-key? <fs-path(string)>
     -- |  |  |  +--rw cznic-resolver-knot:sticket-secret? <secret-string(string)>
 
-    return ContainerBindNode(
+    return BindNode(
         "tls",
-        { ["cert"] = "string", ["cert-key"] = "string" },
         function()
             local t = net.tls()
             return {
@@ -638,13 +500,13 @@ end
 local model =
     ContainerNode("dns-resolver", {
         Child(ContainerNode("cache", {
-            Child(StateNode("current-size", "uint64", "cache.current_size")),
-            Child(BindNode("max-size", "uint64", function() return cache.current_size end, function(v) cache.size = v end)),
-            Child(ConfigFnNode("max-ttl", "uint32", cache.max_ttl)),
-            Child(ConfigFnNode("min-ttl", "uint32", cache.min_ttl)),
+            Child(StateNode("current-size", "cache.current_size")),
+            Child(BindNode("max-size", function() return cache.current_size end, function(v) cache.size = v end)),
+            Child(ConfigFnNode("max-ttl", cache.max_ttl)),
+            Child(ConfigFnNode("min-ttl", cache.min_ttl)),
         })),
         Child(ContainerNode("logging", {
-            Child(BindNode("verbosity", "uint8", function() return verbose() and 1 or 0 end, function(v) verbose(v > 0) end))
+            Child(BindNode("verbosity", function() return verbose() and 1 or 0 end, function(v) verbose(v > 0) end))
         })),
         Child(ContainerNode("network", {
             ListChild(get_listen_interfaces, ListenInterfacesNodeFactory, "listen-interfaces"),
