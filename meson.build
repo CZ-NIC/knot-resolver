@@ -155,6 +155,7 @@ conf_data.set_quoted('PACKAGE_VERSION', meson.project_version())
 conf_data.set_quoted('LIBDIR', lib_dir)
 conf_data.set_quoted('ROOTHINTS', root_hints)
 conf_data.set_quoted('LIBEXT', libext)
+conf_data.set_quoted('OPERATING_SYSTEM', host_machine.system())
 conf_data.set_quoted('libzscanner_SONAME',
   libzscanner.get_pkgconfig_variable('soname'))
 conf_data.set_quoted('libknot_SONAME',
