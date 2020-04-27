@@ -55,12 +55,15 @@ function debug_mode(qname, qtype)
 	-- always empty cache so this config works reliably outside Docker
 	cache.clear()
 
+	local cqueues = require('cqueues')
+
 	-- execute query right after start up and exit when the query is finished
 	event.after(0, function()
 		-- ultra verbose log
 		verbose(true)
 		policy.add(policy.all(policy.DEBUG_ALWAYS))
-		log('INFO: starting your DNS query for %s %s, verbose log follows', qname, kres.tostring.type[qtype])
+		log('INFO: starting DNS query for %s %s', qname, kres.tostring.type[qtype])
+		local starttime = cqueues.monotime()
 		resolve({
 			name = qname,
 			type = qtype,
@@ -70,6 +73,8 @@ function debug_mode(qname, qtype)
 				-- to prevent us from losing policy.DEBUG finish callback
 				event.after(1, -- milisecond
 					function()
+						local endtime = cqueues.monotime()
+						log('\nrequest finished in %f ms', (endtime - starttime) * 1000)
 						os.exit()
 					end)
 				end
