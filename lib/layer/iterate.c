@@ -374,7 +374,7 @@ static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 						qry->flags.FORWARD || referral);
 		int ret = kr_ranked_rrarray_add(&req->auth_selected, rr,
 						rank, to_wire, qry->uid, &req->pool);
-		if (ret != kr_ok()) {
+		if (ret < 0) {
 			return ret;
 		}
 	}
@@ -498,6 +498,8 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 		/* CNAME was found at previous iteration, but records may not follow the correct order.
 		 * Try to find records for pending_cname owner from section start. */
 		cname = pending_cname;
+		size_t cname_answ_selected_i = -1;
+		bool cname_is_occluded = false; /* whether `cname` is in a DNAME's bailiwick */
 		pending_cname = NULL;
 		const int cname_labels = knot_dname_labels(cname, NULL);
 		for (unsigned i = 0; i < an->count; ++i) {
@@ -506,11 +508,31 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			/* Skip the RR if its owner+type doesn't interest us. */
 			const uint16_t type = kr_rrset_type_maysig(rr);
 			const bool type_OK = rr->type == query->stype || type == query->stype
-				|| type == KNOT_RRTYPE_CNAME || type == KNOT_RRTYPE_DNAME;
-				/* TODO: actually handle DNAMEs */
-			if (rr->rclass != KNOT_CLASS_IN || !type_OK
-			    || !knot_dname_is_equal(rr->owner, cname)
+						|| type == KNOT_RRTYPE_CNAME;
+			if (rr->rclass != KNOT_CLASS_IN
 			    || knot_dname_in_bailiwick(rr->owner, query->zone_cut.name) < 0) {
+				continue;
+			}
+			const bool all_OK = type_OK && knot_dname_is_equal(rr->owner, cname);
+
+			const bool to_wire = is_final && !referral;
+
+			if (!all_OK && type == KNOT_RRTYPE_DNAME
+					&& knot_dname_in_bailiwick(cname, rr->owner) >= 1) {
+				/* This DNAME (or RRSIGs) cover the current target (`cname`),
+				 * so it is interesting and will occlude its CNAME.
+				 * We rely on CNAME being sent along with DNAME
+				 * (mandatory unless YXDOMAIN). */
+				cname_is_occluded = true;
+				uint8_t rank = get_initial_rank(rr, query, true,
+						query->flags.FORWARD || referral);
+				int ret = kr_ranked_rrarray_add(&req->answ_selected, rr,
+						rank, to_wire, query->uid, &req->pool);
+				if (ret < 0) {
+					return KR_STATE_FAIL;
+				}
+			}
+			if (!all_OK) {
 				continue;
 			}
 
@@ -528,38 +550,37 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			}
 
 			/* Process records matching current SNAME */
-			int state = KR_STATE_FAIL;
-			bool to_wire = false;
-			if (is_final) {
-				/* if not referral, mark record to be written to final answer */
-				to_wire = !referral;
-			} else {
+			if (!is_final) {
 				int cnt_ = 0;
-				state = update_nsaddr(rr, query->parent, &cnt_);
+				int state = update_nsaddr(rr, query->parent, &cnt_);
 				if (state & KR_STATE_FAIL) {
 					return state;
 				}
 			}
 			uint8_t rank = get_initial_rank(rr, query, true,
 					query->flags.FORWARD || referral);
-			state = kr_ranked_rrarray_add(&req->answ_selected, rr,
-						      rank, to_wire, query->uid, &req->pool);
-			if (state != kr_ok()) {
+			int ret = kr_ranked_rrarray_add(&req->answ_selected, rr,
+						rank, to_wire, query->uid, &req->pool);
+			if (ret < 0) {
 				return KR_STATE_FAIL;
 			}
-			/* Jump to next CNAME target */
-			if ((query->stype == KNOT_RRTYPE_CNAME) || (rr->type != KNOT_RRTYPE_CNAME)) {
-				continue;
+			cname_answ_selected_i = ret;
+
+			/* Select the next CNAME target, but don't jump immediately.
+			 * There can be records for "old" cname (RRSIGs are interesting);
+			 * more importantly there might be a DNAME for `cname_is_occluded`. */
+			if (query->stype != KNOT_RRTYPE_CNAME && rr->type == KNOT_RRTYPE_CNAME) {
+				pending_cname = knot_cname_name(rr->rrs.rdata);
+				if (!pending_cname) {
+					break;
+				}
 			}
-			pending_cname = knot_cname_name(rr->rrs.rdata);
-			if (!pending_cname) {
-				break;
-			}
-			/* Don't use pending_cname immediately.
-			 * There are can be records for "old" cname. */
 		}
 		if (!pending_cname) {
 			break;
+		}
+		if (cname_is_occluded) {
+			req->answ_selected.at[cname_answ_selected_i]->dont_cache = true;
 		}
 		if (++(query->cname_depth) > KR_CNAME_CHAIN_LIMIT) {
 			VERBOSE_MSG("<= error: CNAME chain exceeded max length %d\n",
@@ -828,7 +849,7 @@ static int process_stub(knot_pkt_t *pkt, struct kr_request *req)
 		/* KR_RANK_AUTH: we don't have the records directly from
 		 * an authoritative source, but we do trust the server and it's
 		 * supposed to only send us authoritative records. */
-		if (err != kr_ok()) {
+		if (err < 0) {
 			return KR_STATE_FAIL;
 		}
 	}
@@ -1068,6 +1089,9 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	case KNOT_RCODE_NOERROR:
 	case KNOT_RCODE_NXDOMAIN:
 		break; /* OK */
+	case KNOT_RCODE_YXDOMAIN: /* Basically a successful answer; name just doesn't fit. */
+		knot_wire_set_rcode(req->answer->wire, KNOT_RCODE_YXDOMAIN);
+		break;
 	case KNOT_RCODE_REFUSED:
 	case KNOT_RCODE_SERVFAIL:
 		if (query->flags.STUB) {

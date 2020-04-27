@@ -16,6 +16,8 @@ static int closest_NS(struct kr_cache *cache, struct key *k, entry_list_t el,
 			struct kr_query *qry, bool only_NS, bool is_DS);
 static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
+static int answer_dname_hit(kr_layer_t *ctx, knot_pkt_t *pkt, const knot_dname_t *dname_owner,
+		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
 static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,
 		    uint16_t type, uint8_t lowest_rank,
 		    const struct kr_query *qry, struct kr_cache *cache);
@@ -77,6 +79,8 @@ static int nsec_p_ttl(knot_db_val_t entry, const uint32_t timestamp, int32_t *ne
 
 static uint8_t get_lowest_rank(const struct kr_query *qry, const knot_dname_t *name, const uint16_t type)
 {
+	/* Shut up linters. */
+	if (unlikely(!qry || !qry->request)) abort();
 	/* TODO: move rank handling into the iterator (DNSSEC_* flags)? */
 	const bool allow_unverified =
 		knot_wire_get_cd(qry->request->qsource.packet->wire) || qry->flags.STUB;
@@ -161,12 +165,18 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 						KNOT_RRTYPE_CNAME, qry->timestamp.tv_sec);
 		ret = answer_simple_hit(ctx, pkt, KNOT_RRTYPE_CNAME, v.data,
 					knot_db_val_bound(v), new_ttl);
-		/* TODO: ^^ cumbersome code; we also recompute the TTL */
 		return ret == kr_ok() ? KR_STATE_DONE : ctx->state;
 		}
-	case KNOT_RRTYPE_DNAME:
-		VERBOSE_MSG(qry, "=> DNAME not supported yet\n"); // LATER
-		return ctx->state;
+	case KNOT_RRTYPE_DNAME: {
+		const knot_db_val_t v = el[EL_DNAME];
+		assert(v.data && v.len);
+		/* TTL: for simplicity, we just ask for TTL of the generated CNAME. */
+		const int32_t new_ttl = get_new_ttl(v.data, qry, qry->sname,
+						KNOT_RRTYPE_CNAME, qry->timestamp.tv_sec);
+		ret = answer_dname_hit(ctx, pkt, k->zname, v.data,
+					knot_db_val_bound(v), new_ttl);
+		return ret == kr_ok() ? KR_STATE_DONE : ctx->state;
+		}
 	}
 
 	/* We have to try proving from NSEC*. */
@@ -405,12 +415,25 @@ static int peek_encloser(
 	return -ABS(ENOENT);
 }
 
+static void answer_simple_qflags(struct kr_qflags *qf, const struct entry_h *eh,
+				 uint32_t new_ttl)
+{
+	/* Finishing touches. */
+	qf->EXPIRING = is_expiring(eh->ttl, new_ttl);
+	qf->CACHED = true;
+	qf->NO_MINIMIZE = true;
+	qf->DNSSEC_INSECURE = kr_rank_test(eh->rank, KR_RANK_INSECURE);
+	if (qf->DNSSEC_INSECURE) {
+		qf->DNSSEC_WANT = false;
+	}
+}
 
-static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
-		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl)
 #define CHECK_RET(ret) do { \
 	if ((ret) < 0) { assert(false); return kr_error((ret)); } \
 } while (false)
+
+static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
+		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl)
 {
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
@@ -430,22 +453,71 @@ static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	ret = pkt_append(pkt, &ans.rrsets[AR_ANSWER], eh->rank);
 	CHECK_RET(ret);
 
-	/* Finishing touches. */
-	struct kr_qflags * const qf = &qry->flags;
-	qf->EXPIRING = is_expiring(eh->ttl, new_ttl);
-	qf->CACHED = true;
-	qf->NO_MINIMIZE = true;
-	qf->DNSSEC_INSECURE = kr_rank_test(eh->rank, KR_RANK_INSECURE);
-	if (qf->DNSSEC_INSECURE) {
-		qf->DNSSEC_WANT = false;
-	}
+	answer_simple_qflags(&qry->flags, eh, new_ttl);
+
 	VERBOSE_MSG(qry, "=> satisfied by exact %s: rank 0%.2o, new TTL %d\n",
 			(type == KNOT_RRTYPE_CNAME ? "CNAME" : "RRset"),
 			eh->rank, new_ttl);
 	return kr_ok();
 }
-#undef CHECK_RET
 
+static int answer_dname_hit(kr_layer_t *ctx, knot_pkt_t *pkt, const knot_dname_t *dname_owner,
+		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl)
+{
+	struct kr_request *req = ctx->req;
+	struct kr_query *qry = req->current_query;
+
+	/* All OK, so start constructing the (pseudo-)packet. */
+	int ret = pkt_renew(pkt, qry->sname, qry->stype);
+	CHECK_RET(ret);
+
+	/* Materialize the DNAME for the answer in (pseudo-)packet. */
+	struct answer ans;
+	memset(&ans, 0, sizeof(ans));
+	ans.mm = &pkt->mm;
+	ret = entry2answer(&ans, AR_ANSWER, eh, eh_bound,
+			   dname_owner, KNOT_RRTYPE_DNAME, new_ttl);
+	CHECK_RET(ret);
+	/* Put link to the RRset into the pkt. */
+	ret = pkt_append(pkt, &ans.rrsets[AR_ANSWER], eh->rank);
+	CHECK_RET(ret);
+	const knot_dname_t *dname_target =
+		knot_dname_target(ans.rrsets[AR_ANSWER].set.rr->rrs.rdata);
+
+	/* Generate CNAME RRset for the answer in (pseudo-)packet. */
+	const int AR_CNAME = AR_SOA;
+	knot_rrset_t *rr = ans.rrsets[AR_CNAME].set.rr
+		= knot_rrset_new(qry->sname, KNOT_RRTYPE_CNAME, KNOT_CLASS_IN,
+				 new_ttl, ans.mm);
+	CHECK_RET(rr ? kr_ok() : -ENOMEM);
+	const knot_dname_t *cname_target = knot_dname_replace_suffix(qry->sname,
+			knot_dname_labels(dname_owner, NULL), dname_target, ans.mm);
+	CHECK_RET(cname_target ? kr_ok() : -ENOMEM);
+	const int rdata_len = knot_dname_size(cname_target);
+
+	if (rdata_len <= KNOT_DNAME_MAXLEN
+	    && knot_dname_labels(cname_target, NULL) <= KNOT_DNAME_MAXLABELS) {
+		/* Normal case: the target name fits. */
+		rr->rrs.count = 1;
+		rr->rrs.size = knot_rdata_size(rdata_len);
+		rr->rrs.rdata = mm_alloc(ans.mm, rr->rrs.size);
+		CHECK_RET(rr->rrs.rdata ? kr_ok() : -ENOMEM);
+		knot_rdata_init(rr->rrs.rdata, rdata_len, cname_target);
+		/* Put link to the RRset into the pkt. */
+		ret = pkt_append(pkt, &ans.rrsets[AR_CNAME], eh->rank);
+		CHECK_RET(ret);
+	} else {
+		/* Note that it's basically a successful answer; name just doesn't fit. */
+		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_YXDOMAIN);
+	}
+
+	answer_simple_qflags(&qry->flags, eh, new_ttl);
+	VERBOSE_MSG(qry, "=> satisfied by DNAME+CNAME: rank 0%.2o, new TTL %d\n",
+			eh->rank, new_ttl);
+	return kr_ok();
+}
+
+#undef CHECK_RET
 
 /** TODO: description; see the single call site for now. */
 static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
@@ -619,8 +691,22 @@ static int closest_NS(struct kr_cache *cache, struct key *k, entry_list_t el,
 		need_zero = false;
 		/* More types are possible; try in order.
 		 * For non-fatal failures just "continue;" to try the next type. */
+		/* Now a complication - we need to try EL_DNAME before NSEC*
+		 * (Unfortunately that's not easy to write very nicely.) */
+		if (!only_NS) {
+			const int i = EL_DNAME;
+			ret = check_NS_entry(k, el[i], i, exact_match, is_DS,
+						qry, timestamp);
+			if (ret < 0) goto next_label; else
+			if (!ret) {
+				/* We found our match. */
+				k->zlf_len = zlf_len;
+				return kr_ok();
+			}
+		}
 		const int el_count = only_NS ? EL_NS + 1 : EL_LENGTH;
 		for (int i = 0; i < el_count; ++i) {
+			if (i == EL_DNAME) continue;
 			ret = check_NS_entry(k, el[i], i, exact_match, is_DS,
 						qry, timestamp);
 			if (ret < 0) goto next_label; else
