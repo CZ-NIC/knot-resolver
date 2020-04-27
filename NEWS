@@ -30,8 +30,8 @@ Bugfixes
 
 Incompatible changes
 --------------------
-- see upgrading guide: https://knot-resolver.readthedocs.io/en/stable/upgrading.html
-- minor changes in module API
+- minor changes in module API; see upgrading guide:
+  https://knot-resolver.readthedocs.io/en/stable/upgrading.html
 
 
 Knot Resolver 5.0.1 (2020-02-05)
