@@ -168,6 +168,8 @@ build:darwin:
 
 deckard:
   <<: *test_flaky
+  tags:
+    - privileged
   variables:
     TMPDIR: $CI_PROJECT_DIR
   script:
