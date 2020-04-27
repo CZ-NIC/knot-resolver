@@ -3,6 +3,9 @@
 -- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/
 print('Knot Resolver ' .. package_version())
 
+-- Smaller cache size
+cache.size = 10 * MB
+
 function interactive_mode()
 	-- Listen on all interfaces (localhost would not work in Docker)
 	net.listen('0.0.0.0', 53, { kind = 'dns' })
@@ -15,9 +18,6 @@ function interactive_mode()
 		'stats',    -- Track internal statistics
 		'http',
 	}
-
-	-- Smaller cache size
-	cache.size = 10 * MB
 
 	function print_help()
 		print('\nUsage\n'
@@ -51,6 +51,9 @@ function debug_mode(qname, qtype)
 	modules.unload('priming')
 	modules.unload('ta_signal_query')
 	modules.unload('ta_update')
+
+	-- always empty cache so this config works reliably outside Docker
+	cache.clear()
 
 	-- execute query right after start up and exit when the query is finished
 	event.after(0, function()
