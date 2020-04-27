@@ -641,4 +641,20 @@ obs:ubuntu2004:x86_64:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: ubuntu2004
     DISTROTEST_REPO: xUbuntu_20.04
+
+obs:knot-resolver-release:
+  stage: build  # TODO
+  image: registry.labs.nic.cz/knot/knot-resolver-release/debian-buster
+  #only:
+  #  variables:
+  #    - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing$/
+  #    - $CI_COMMIT_TAG
+  tags:
+    - docker
+    - linux
+    - amd64
+  script:
+    - wget https://secure.nic.cz/files/knot-resolver/knot-resolver-release.deb
+    - dpkg -i knot-resolver-release.deb
+    - LD_PRELOAD=/usr/local/lib/faketime/libfaketime.so.1 FAKETIME="+1d" apt update
 # }}}
