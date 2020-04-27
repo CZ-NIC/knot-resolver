@@ -64,6 +64,7 @@ function debug_mode(qname, qtype)
 		resolve({
 			name = qname,
 			type = qtype,
+			options = {'DNSSEC_WANT'},
 			finish = function(pkt)
 				-- delay exit after packet is finished
 				-- to prevent us from losing policy.DEBUG finish callback
