@@ -145,7 +145,7 @@ end
 local Hook = {}
 Hook.__index = Hook
 
-function Hook:create(apply_pre, apply_post)
+function Hook:create(apply_pre, apply_post, serialize_pre, serialize_post)
     assert(apply_pre == nil or type(apply_pre) == "function")
     assert(apply_post == nil or type(apply_post) == "function")
 
@@ -154,6 +154,8 @@ function Hook:create(apply_pre, apply_post)
 
     res.apply_pre = apply_pre
     res.apply_post = apply_post
+    res.serialize_pre = serialize_pre
+    res.serialize_post = serialize_post
 
     return res
 end
@@ -163,6 +165,14 @@ function Hook:apply_pre(self)
 end
 
 function Hook:apply_post(self)
+    -- empty default
+end
+
+function Hook:serialize_pre(self)
+    -- empty default
+end
+
+function Hook:serialize_post(self)
     -- empty default
 end
 
@@ -324,6 +334,8 @@ local function ContainerNode(name, container_model, hooks)
 
     --- Node's serialize function
     local function handle_cont_write(self, parent_node)
+        hooks:serialize_pre()
+
         local cont = clib().node_new_container(parent_node, self.module, self.name)
 
         for _,v in ipairs(container_model) do
@@ -347,6 +359,8 @@ local function ContainerNode(name, container_model, hooks)
                 end
             end
         end
+
+        hooks:serialize_post()
 
         return cont
     end
@@ -664,8 +678,17 @@ end
 local function post_load()
     local elapsed_cpu_time = os.clock() - start_time
 
-    debug.log("[BENCH] Data loading finished in {} sec (cpu time), the dataset follows", elapsed_cpu_time)
-    -- debug.dump_table(items)
+    debug.log("[BENCH] Data loading finished in {} sec (cpu time). There are {} items", elapsed_cpu_time, #items)
+end
+
+local function pre_serialize()
+    start_time = os.clock()
+end
+
+local function post_serialize()
+    local elapsed_cpu_time = os.clock() - start_time
+
+    debug.log("[BENCH] Data serialization finished in {} sec (cpu time). There are {} items", elapsed_cpu_time, #items)
 end
 
 local function ItemNodeFactory(name)
@@ -689,7 +712,7 @@ end
 local model =
   ContainerNode("tests", {
       ListChild(get_items, ItemNodeFactory, "items")
-  }, Hook:create(pre_load, post_load))
+  }, Hook:create(pre_load, post_load, pre_serialize, post_serialize))
 
 -------------------------------------------------------------------------------
 ------------------------ Module Exports ---------------------------------------
