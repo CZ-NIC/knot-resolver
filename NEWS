@@ -11,6 +11,7 @@ Bugfixes
 --------
 - avoid an assert() error in stash_rrset() (!1072)
 - fix emergency cache locking bug introduced in 5.1.3 (!1078)
+- map() command now uses control sockets and works with systemd integration (!1000)
 
 
 Knot Resolver 5.1.3 (2020-09-08)

@@ -12,6 +12,7 @@
 #include <pwd.h>
 #include <sys/param.h>
 #include <libzscanner/scanner.h>
+#include <sys/un.h>
 
 #include <lua.h>
 #include <lualib.h>
@@ -371,62 +372,6 @@ static int l_fromjson(lua_State *L)
 	return 1;
 }
 
-/** @internal Throw Lua error if expr is false */
-#define expr_checked(expr) \
-	if (!(expr)) { lua_pushboolean(L, false); lua_rawseti(L, -2, lua_objlen(L, -2) + 1); continue; }
-
-static int l_map(lua_State *L)
-{
-	/* We don't kr_log_deprecate() here for now.  Plan: after --forks gets *removed*,
-	 * kill internal uses of map() (e.g. from daf module) and add deprecation here.
-	 * Alternatively we might (attempt to) implement map() in another way. */
-	if (lua_gettop(L) != 1 || !lua_isstring(L, 1))
-		lua_error_p(L, "map('string with a lua expression')");
-
-	const char *cmd = lua_tostring(L, 1);
-	uint32_t len = strlen(cmd);
-	lua_newtable(L);
-
-	/* Execute on leader instance */
-	int ntop = lua_gettop(L);
-	engine_cmd(L, cmd, true);
-	lua_settop(L, ntop + 1); /* Push only one return value to table */
-	lua_rawseti(L, -2, 1);
-
-	for (size_t i = 0; i < the_worker->engine->ipc_set.len; ++i) {
-		int fd = the_worker->engine->ipc_set.at[i];
-		/* Send command */
-		expr_checked(write(fd, &len, sizeof(len)) == sizeof(len));
-		expr_checked(write(fd, cmd, len) == len);
-		/* Read response */
-		uint32_t rlen = 0;
-		if (read(fd, &rlen, sizeof(rlen)) == sizeof(rlen)) {
-			expr_checked(rlen < UINT32_MAX);
-			auto_free char *rbuf = malloc(rlen + 1);
-			expr_checked(rbuf != NULL);
-			expr_checked(read(fd, rbuf, rlen) == rlen);
-			rbuf[rlen] = '\0';
-			/* Unpack from JSON */
-			JsonNode *root_node = json_decode(rbuf);
-			if (root_node) {
-				l_unpack_json(L, root_node);
-			} else {
-				lua_pushlstring(L, rbuf, rlen);
-			}
-			json_delete(root_node);
-			lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
-			continue;
-		}
-		/* Didn't respond */
-		lua_pushboolean(L, false);
-		lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
-	}
-	return 1;
-}
-
-#undef expr_checked
-
-
 /*
  * Engine API.
  */
@@ -497,8 +442,6 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "tojson");
 	lua_pushcfunction(engine->L, l_fromjson);
 	lua_setglobal(engine->L, "fromjson");
-	lua_pushcfunction(engine->L, l_map);
-	lua_setglobal(engine->L, "map");
 	/* Random number generator */
 	lua_getfield(engine->L, LUA_GLOBALSINDEX, "math");
 	lua_getfield(engine->L, -1, "randomseed");
@@ -628,9 +571,6 @@ void engine_deinit(struct engine *engine)
 	 * e.g. the endpoint kind registry to work (inside ->net),
 	 * and this registry deinitization uses the lua state. */
 	network_close_force(&engine->net);
-	for (size_t i = 0; i < engine->ipc_set.len; ++i) {
-		close(engine->ipc_set.at[i]);
-	}
 	for (size_t i = 0; i < engine->modules.len; ++i) {
 		engine_unload(engine, engine->modules.at[i]);
 	}
@@ -649,7 +589,6 @@ void engine_deinit(struct engine *engine)
 	/* Free data structures */
 	array_clear(engine->modules);
 	array_clear(engine->backends);
-	array_clear(engine->ipc_set);
 	kr_ta_clear(&engine->resolver.trust_anchors);
 	kr_ta_clear(&engine->resolver.negative_anchors);
 	free(engine->hostname);
@@ -673,22 +612,6 @@ int engine_cmd(lua_State *L, const char *str, bool raw)
 
 	/* Check result. */
 	return engine_pcall(L, 2);
-}
-
-int engine_ipc(struct engine *engine, const char *expr)
-{
-	if (engine == NULL || engine->L == NULL) {
-		return kr_error(ENOEXEC);
-	}
-
-	/* Run expression and serialize response. */
-	engine_cmd(engine->L, expr, true);
-	if (lua_gettop(engine->L) > 0) {
-		l_tojson(engine->L);
-		return 1;
-	} else {
-		return 0;
-	}
 }
 
 int engine_load_sandbox(struct engine *engine)
