@@ -5,6 +5,7 @@ Improvements
 ------------
 - net: split the EDNS buffer size into upstream and downstream (!1026)
 - lua-http doh: answer to /dns-query endpoint as well as /doh (!1069)
+- map() command now uses control sockets and works with systemd integration
 
 
 Knot Resolver 5.1.3 (2020-09-08)
