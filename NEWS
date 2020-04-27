@@ -1,4 +1,4 @@
-Knot Resolver 5.x.y (2020-0m-0d)
+Knot Resolver 5.1.0 (2020-04-29)
 ================================
 
 Improvements
@@ -22,6 +22,11 @@ Bugfixes
 - cache: fix CNAME caching when validation is disabled (#472, !974)
 - cache: fix CNAME caching in policy.STUB mode (!974)
 - prefill: fix crash caused by race condition with resolver startup (!983)
+- webmgmt: use javascript scheme detection for websockets' protocol (#546)
+- daf module: fix del(), deny(), drop(), tc(), pass() functions (#553, !966)
+- policy and daf modules: expose initial query when evaluating postrules (#556)
+- cache: fix some cases of caching answers over 4 KiB (!976)
+- docs: support sphinx 3.0.0+ (!978)
 
 Incompatible changes
 --------------------
@@ -297,7 +302,6 @@ Bugfixes
 - avoid SERVFAILs due to certain kind of NS dependency cycles, again
   (#374) this time seen as 'circular dependency' in verbose logs
 - policy and view modules do not overwrite result finished requests (!678)
-- cache: fix some cases of caching answers over 4 KiB (!976)
 
 Improvements
 ------------
