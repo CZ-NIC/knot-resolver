@@ -6,6 +6,19 @@
 Policy, access control, data manipulation
 *****************************************
 
+.. note::
+
+   Knot Resolver developers need your feedback to make the software even better!
+
+   What features do you use? What features are missing?
+   If you want to help us please send your feedback to e-mail
+   `knot-resolver@labs.nic.cz <mailto:knot-resolver@labs.nic.cz>`_.
+   You can get bonus points for sending in sanitized configuration files :-)
+
+   The data will be used to tailor enhacements to configuration language
+   and will never be published. Thank you!
+
+
 Features in this section allow to configure what clients can get access to what
 DNS data, i.e. DNS data filtering and manipulation.
 
