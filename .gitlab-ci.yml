@@ -3,7 +3,6 @@
 variables:
   DEBIAN_FRONTEND: noninteractive
   LC_ALL: C.UTF-8
-  LC_COLLATE: en_US.UTF-8
   GIT_SUBMODULE_STRATEGY: recursive
   GIT_STRATEGY: clone # sometimes unclean submodule dirs otherwise
   RESPDIFF_PRIORITY: 5
@@ -290,7 +289,7 @@ authors:
     refs:
       - /^release.*$/
   script:
-    - scripts/update-authors.sh
+    - LC_ALL=en_US.UTF-8 scripts/update-authors.sh
 
 test:valgrind:
   <<: *test_flaky
