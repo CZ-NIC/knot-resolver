@@ -603,6 +603,13 @@ obs:fedora31:x86_64:
     DISTROTEST_NAME: fedora31
     DISTROTEST_REPO: Fedora_31
 
+obs:fedora32:x86_64:
+  <<: *distrotest
+  variables:
+    OBS_REPO: knot-resolver-latest
+    DISTROTEST_NAME: fedora32
+    DISTROTEST_REPO: Fedora_32
+
 obs:leap15:x86_64:
   <<: *distrotest
   variables:
