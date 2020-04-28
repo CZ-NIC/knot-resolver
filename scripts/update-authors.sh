@@ -1,6 +1,7 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 set -o nounset -o xtrace
+LC_COLLATE=en_US.UTF-8
 
 function spdx_originator_to_authors {
 	# $1 = Person/Organization
