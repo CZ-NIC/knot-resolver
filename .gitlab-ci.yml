@@ -289,7 +289,7 @@ authors:
     refs:
       - /^release.*$/
   script:
-    - scripts/update-authors.sh
+    - LC_ALL=en_US.UTF-8 scripts/update-authors.sh
 
 test:valgrind:
   <<: *test_flaky
