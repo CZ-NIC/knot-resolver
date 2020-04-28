@@ -109,3 +109,8 @@ RUN apt-get update -qq
 
 # packages from our knot-resolver-testing repo
 RUN apt-get install -y -qqq lua-http lua-psl
+
+# en_US.UTF-8 locale for scripts.update-authors.sh
+RUN apt-get install -y -qqq locales
+RUN sed -i "/en_US.UTF-8/ s/^#\(.*\)/\1/" /etc/locale.gen
+RUN locale-gen
