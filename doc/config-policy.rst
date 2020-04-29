@@ -10,13 +10,13 @@ Policy, access control, data manipulation
 
    Knot Resolver developers need your feedback to make the software even better!
 
-   What features do you use? What features are missing?
-   If you want to help us please send your feedback to e-mail
-   `knot-resolver@labs.nic.cz <mailto:knot-resolver@labs.nic.cz>`_.
-   You can get bonus points for sending in sanitized configuration files :-)
+   We believe features described in this section are harder to use than
+   necessary. To fix this, we plan to rework these features, possibly even in
+   an incompatible way if we determine it is needed.
 
-   The data will be used to tailor enhacements to configuration language
-   and will never be published. Thank you!
+   Please `participate in survey <https://www.knot-resolver.cz/survey/>`_
+   to provide developers with necessary information. Your answers will help us
+   tailor Knot Resolver to your needs. Thank you!
 
 
 Features in this section allow to configure what clients can get access to what
