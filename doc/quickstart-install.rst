@@ -49,7 +49,7 @@ distribution.
     $ sudo apt update
     $ sudo apt install -y knot-resolver
 
-**CentOS 7**
+**CentOS**
 
 .. code-block:: bash
 
