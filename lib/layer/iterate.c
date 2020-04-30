@@ -773,10 +773,11 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		if (query->flags.FORWARD) {
 			next->forward_flags.CNAME = true;
 			if (query->parent == NULL) {
-				state = kr_nsrep_copy_set(&next->ns, &query->ns);
-				if (state != kr_ok()) {
-					return KR_STATE_FAIL;
-				}
+				// NS_REP
+				// state = kr_nsrep_copy_set(&next->ns, &query->ns);
+				// if (state != kr_ok()) {
+				// 	return KR_STATE_FAIL;
+				// }
 			}
 		}
 		next->cname_parent = query;

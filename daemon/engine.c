@@ -440,7 +440,7 @@ static int init_resolver(struct engine *engine)
 	engine->resolver.negative_anchors = map_make(NULL);
 	engine->resolver.pool = engine->pool;
 	engine->resolver.modules = &engine->modules;
-	engine->resolver.cache_rtt_tout_retry_interval = KR_NS_TIMEOUT_RETRY_INTERVAL;
+	// NS_REP engine->resolver.cache_rtt_tout_retry_interval = KR_NS_TIMEOUT_RETRY_INTERVAL;
 	/* Create OPT RR */
 	engine->resolver.opt_rr = mm_alloc(engine->pool, sizeof(knot_rrset_t));
 	if (!engine->resolver.opt_rr) {
@@ -452,8 +452,9 @@ static int init_resolver(struct engine *engine)
 	/* Empty init; filled via ./lua/postconfig.lua */
 	kr_zonecut_init(&engine->resolver.root_hints, (const uint8_t *)"", engine->pool);
 	/* Open NS rtt + reputation cache */
-	lru_create(&engine->resolver.cache_rtt, LRU_RTT_SIZE, NULL, NULL);
-	lru_create(&engine->resolver.cache_rep, LRU_REP_SIZE, NULL, NULL);
+	// NS_REP
+	// lru_create(&engine->resolver.cache_rtt, LRU_RTT_SIZE, NULL, NULL);
+	// lru_create(&engine->resolver.cache_rep, LRU_REP_SIZE, NULL, NULL);
 	lru_create(&engine->resolver.cache_cookie, LRU_COOKIES_SIZE, NULL, NULL);
 
 	/* Load basic modules */
@@ -639,8 +640,9 @@ void engine_deinit(struct engine *engine)
 	kr_cache_close(&engine->resolver.cache);
 
 	/* The LRUs are currently malloc-ated and need to be freed. */
-	lru_free(engine->resolver.cache_rtt);
-	lru_free(engine->resolver.cache_rep);
+	// NS_REP
+	// lru_free(engine->resolver.cache_rtt);
+	// lru_free(engine->resolver.cache_rep);
 	lru_free(engine->resolver.cache_cookie);
 
 	network_deinit(&engine->net);

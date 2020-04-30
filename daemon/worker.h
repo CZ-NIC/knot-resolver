@@ -128,7 +128,7 @@ struct worker_stats {
 /** @cond internal */
 
 /** Number of request within timeout window. */
-#define MAX_PENDING KR_NSREP_MAXADDR
+#define MAX_PENDING 4 //NS_REP KR_NSREP_MAXADDR
 
 /** Maximum response time from TCP upstream, milliseconds */
 #define MAX_TCP_INACTIVITY (KR_RESOLVE_TIME_LIMIT + KR_CONN_RTT_MAX)

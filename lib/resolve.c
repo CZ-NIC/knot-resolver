@@ -147,21 +147,22 @@ static void randomized_qname_case(knot_dname_t * restrict qname, uint32_t secret
 }
 
 /** Invalidate current NS/addr pair. */
-static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
-{
-	if (qry->ns.addr[0].ip.sa_family != AF_UNSPEC) {
-		const char *addr = kr_inaddr(&qry->ns.addr[0].ip);
-		int addr_len = kr_inaddr_len(&qry->ns.addr[0].ip);
-		int ret = kr_zonecut_del(&qry->zone_cut, qry->ns.name, addr, addr_len);
-		/* Also remove it from the qry->ns.addr array.
-		 * That's useful at least for STUB and FORWARD modes. */
-		memmove(qry->ns.addr, qry->ns.addr + 1,
-			sizeof(qry->ns.addr[0]) * (KR_NSREP_MAXADDR - 1));
-		return ret;
-	} else {
-		return kr_zonecut_del_all(&qry->zone_cut, qry->ns.name);
-	}
-}
+// NS_REP
+// static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
+// {
+// 	if (qry->ns.addr[0].ip.sa_family != AF_UNSPEC) {
+// 		const char *addr = kr_inaddr(&qry->ns.addr[0].ip);
+// 		int addr_len = kr_inaddr_len(&qry->ns.addr[0].ip);
+// 		int ret = kr_zonecut_del(&qry->zone_cut, qry->ns.name, addr, addr_len);
+// 		/* Also remove it from the qry->ns.addr array.
+// 		 * That's useful at least for STUB and FORWARD modes. */
+// 		memmove(qry->ns.addr, qry->ns.addr + 1,
+// 			sizeof(qry->ns.addr[0]) * (KR_NSREP_MAXADDR - 1));
+// 		return ret;
+// 	} else {
+// 		return kr_zonecut_del_all(&qry->zone_cut, qry->ns.name);
+// 	}
+// }
 
 /** This turns of QNAME minimisation if there is a non-terminal between current zone cut, and name target.
  *  It save several minimization steps, as the zone cut is likely final one.
@@ -320,8 +321,9 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 		next_type = KNOT_RRTYPE_A;
 		qry->flags.AWAIT_IPV4 = true;
 		/* Hmm, no useable IPv6 then. */
-		qry->ns.reputation |= KR_NS_NOIP6;
-		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
+		// NS_REP
+		// qry->ns.reputation |= KR_NS_NOIP6;
+		// kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
 	}
 	/* Bail out if the query is already pending or dependency loop. */
 	if (!next_type || kr_rplan_satisfies(qry->parent, qry->ns.name, KNOT_CLASS_IN, next_type)) {
@@ -334,9 +336,9 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 		}
 		/* No IPv4 nor IPv6, flag server as unusable. */
 		VERBOSE_MSG(qry, "=> unresolvable NS address, bailing out\n");
-		qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
-		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
-		invalidate_ns(rplan, qry);
+		// NS_REP: qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
+		// NS_REP: kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
+		// NS_REP: invalidate_ns(rplan, qry);
 		return kr_error(EHOSTUNREACH);
 	}
 	/* Push new query to the resolution plan */
@@ -816,40 +818,41 @@ static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, cons
 	 * The NS in the preference list that responded will have RTT relative to the
 	 * time when the query was sent out, not when it was originated.
 	 */
-	for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
-		const struct sockaddr *addr = &qry->ns.addr[i].ip;
-		if (addr->sa_family == AF_UNSPEC) {
-			break;
-		}
-		/* If this address is the source of the answer, update its RTT */
-		if (kr_inaddr_equal(src, addr)) {
-			kr_nsrep_update_rtt(&qry->ns, addr, elapsed, ctx->cache_rtt, KR_NS_UPDATE);
-			WITH_VERBOSE(qry) {
-				char addr_str[INET6_ADDRSTRLEN];
-				inet_ntop(addr->sa_family, kr_inaddr(addr), addr_str, sizeof(addr_str));
-				VERBOSE_MSG(qry, "<= server: '%s' rtt: %"PRIu64" ms\n",
-						addr_str, elapsed);
-			}
-		} else {
-			/* Response didn't come from this IP, but we know the RTT must be at least
-			 * several RETRY timer tries, e.g. if we have addresses [a, b, c] and we have
-			 * tried [a, b] when the answer from 'a' came after 350ms, then we know
-			 * that 'b' didn't respond for at least 350 - (1 * 300) ms. We can't say that
-			 * its RTT is 50ms, but we can say that its score shouldn't be less than 50. */
-			 kr_nsrep_update_rtt(&qry->ns, addr, elapsed, ctx->cache_rtt, KR_NS_MAX);
-			 WITH_VERBOSE(qry) {
-			 	char addr_str[INET6_ADDRSTRLEN];
-			 	inet_ntop(addr->sa_family, kr_inaddr(addr), addr_str, sizeof(addr_str));
-				VERBOSE_MSG(qry, "<= server: '%s' rtt: >= %"PRIu64" ms\n",
-						addr_str, elapsed);
-			 }
-		}
-		/* Subtract query start time from elapsed time */
-		if (elapsed < KR_CONN_RETRY) {
-			break;
-		}
-		elapsed = elapsed - KR_CONN_RETRY;
-	}
+	// NSREP
+	// for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
+	// 	const struct sockaddr *addr = &qry->ns.addr[i].ip;
+	// 	if (addr->sa_family == AF_UNSPEC) {
+	// 		break;
+	// 	}
+	// 	/* If this address is the source of the answer, update its RTT */
+	// 	if (kr_inaddr_equal(src, addr)) {
+	// 		kr_nsrep_update_rtt(&qry->ns, addr, elapsed, ctx->cache_rtt, KR_NS_UPDATE);
+	// 		WITH_VERBOSE(qry) {
+	// 			char addr_str[INET6_ADDRSTRLEN];
+	// 			inet_ntop(addr->sa_family, kr_inaddr(addr), addr_str, sizeof(addr_str));
+	// 			VERBOSE_MSG(qry, "<= server: '%s' rtt: %"PRIu64" ms\n",
+	// 					addr_str, elapsed);
+	// 		}
+	// 	} else {
+	// 		/* Response didn't come from this IP, but we know the RTT must be at least
+	// 		 * several RETRY timer tries, e.g. if we have addresses [a, b, c] and we have
+	// 		 * tried [a, b] when the answer from 'a' came after 350ms, then we know
+	// 		 * that 'b' didn't respond for at least 350 - (1 * 300) ms. We can't say that
+	// 		 * its RTT is 50ms, but we can say that its score shouldn't be less than 50. */
+	// 		 kr_nsrep_update_rtt(&qry->ns, addr, elapsed, ctx->cache_rtt, KR_NS_MAX);
+	// 		 WITH_VERBOSE(qry) {
+	// 		 	char addr_str[INET6_ADDRSTRLEN];
+	// 		 	inet_ntop(addr->sa_family, kr_inaddr(addr), addr_str, sizeof(addr_str));
+	// 			VERBOSE_MSG(qry, "<= server: '%s' rtt: >= %"PRIu64" ms\n",
+	// 					addr_str, elapsed);
+	// 		 }
+	// 	}
+	// 	/* Subtract query start time from elapsed time */
+	// 	if (elapsed < KR_CONN_RETRY) {
+	// 		break;
+	// 	}
+	// 	elapsed = elapsed - KR_CONN_RETRY;
+	// }
 }
 
 static void update_nslist_score(struct kr_request *request, struct kr_query *qry, const struct sockaddr *src, knot_pkt_t *packet)
@@ -865,7 +868,7 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 			qry->flags.AWAIT_IPV6 = false;
 			qry->flags.AWAIT_IPV4 = false;
 		} else { /* Penalize SERVFAILs. */
-			kr_nsrep_update_rtt(&qry->ns, src, KR_NS_PENALTY, ctx->cache_rtt, KR_NS_ADD);
+			//NSREP: kr_nsrep_update_rtt(&qry->ns, src, KR_NS_PENALTY, ctx->cache_rtt, KR_NS_ADD);
 		}
 	}
 }
@@ -933,7 +936,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	}
 	/* Resolution failed, invalidate current NS. */
 	if (request->state & KR_STATE_FAIL) {
-		invalidate_ns(rplan, qry);
+		// NS_REP: invalidate_ns(rplan, qry);
 		qry->flags.RESOLVED = false;
 	}
 
@@ -1394,8 +1397,10 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		}
 	}
 
-ns_election:
+int ret = kr_ok();
 
+ns_election:
+	printf("test test test: %d\n", qry->ns.addr[0].ip);
 	/* If the query has already selected a NS and is waiting for IPv4/IPv6 record,
 	 * elect best address only, otherwise elect a completely new NS.
 	 */
@@ -1407,40 +1412,46 @@ ns_election:
 	const struct kr_qflags qflg = qry->flags;
 	const bool retry = qflg.TCP || qflg.BADCOOKIE_AGAIN;
 	if (qflg.AWAIT_IPV4 || qflg.AWAIT_IPV6) {
-		kr_nsrep_elect_addr(qry, request->ctx);
+		// NS_REP kr_nsrep_elect_addr(qry, request->ctx);
 	} else if (qflg.FORWARD || qflg.STUB) {
-		kr_nsrep_sort(&qry->ns, request->ctx);
-		if (qry->ns.score > KR_NS_MAX_SCORE) {
-			/* At the moment all NS have bad reputation.
-			 * But there can be existing connections*/
-			VERBOSE_MSG(qry, "=> no valid NS left\n");
-			return KR_STATE_FAIL;
-		}
+		// NS_REP
+		// kr_nsrep_sort(&qry->ns, request->ctx);
+		// if (qry->ns.score > KR_NS_MAX_SCORE) {
+		// 	/* At the moment all NS have bad reputation.
+		// 	 * But there can be existing connections*/
+		// 	VERBOSE_MSG(qry, "=> no valid NS left\n");
+		// 	return KR_STATE_FAIL;
+		// }
 	} else if (!qry->ns.name || !retry) { /* Keep NS when requerying/stub/badcookie. */
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
 		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
 			kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);
 			qry->flags.NO_THROTTLE = true; /* Pick even bad SBELT servers */
 		}
-		kr_nsrep_elect(qry, request->ctx);
-		if (qry->ns.score > KR_NS_MAX_SCORE) {
-			if (kr_zonecut_is_empty(&qry->zone_cut)) {
-				VERBOSE_MSG(qry, "=> no NS with an address\n");
-			} else {
-				VERBOSE_MSG(qry, "=> no valid NS left\n");
-			}
-			if (!qry->flags.NO_NS_FOUND) {
-				qry->flags.NO_NS_FOUND = true;
-			} else {
-				ITERATE_LAYERS(request, qry, reset);
-				kr_rplan_pop(rplan, qry);
-			}
-			return KR_STATE_PRODUCE;
+
+		if (ret) {
+		 	if (kr_zonecut_is_empty(&qry->zone_cut)) {
+		 		VERBOSE_MSG(qry, "=> no NS with an address\n");
+		 	} else {
+		 		VERBOSE_MSG(qry, "=> no valid NS left\n");
+		 	}
+		 	if (!qry->flags.NO_NS_FOUND) {
+		 		qry->flags.NO_NS_FOUND = true;
+		 	} else {
+		 		ITERATE_LAYERS(request, qry, reset);
+		 		kr_rplan_pop(rplan, qry);
+		 	}
+		 	return KR_STATE_PRODUCE;
 		}
 	}
 
+	ret = kr_nsrep_elect(qry);
+
+
+
 	/* Resolve address records */
 	if (qry->ns.addr[0].ip.sa_family == AF_UNSPEC) {
+		printf("hi!");
 		int ret = ns_resolve_addr(qry, request);
 		if (ret != 0) {
 			qry->flags.AWAIT_IPV6 = false;
@@ -1564,29 +1575,29 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 		}
 	}
 
-	WITH_VERBOSE(qry) {
+	// WITH_VERBOSE(qry) {
 
-	KR_DNAME_GET_STR(qname_str, knot_pkt_qname(packet));
-	KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
-	KR_RRTYPE_GET_STR(type_str, knot_pkt_qtype(packet));
+	// KR_DNAME_GET_STR(qname_str, knot_pkt_qname(packet));
+	// KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
+	// KR_RRTYPE_GET_STR(type_str, knot_pkt_qtype(packet));
 
-	for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
-		struct sockaddr *addr = &qry->ns.addr[i].ip;
-		if (addr->sa_family == AF_UNSPEC) {
-			break;
-		}
-		if (!kr_inaddr_equal(dst, addr)) {
-			continue;
-		}
-		const char *ns_str = kr_straddr(addr);
-		VERBOSE_MSG(qry,
-			"=> id: '%05u' querying: '%s' score: %u zone cut: '%s' "
-			"qname: '%s' qtype: '%s' proto: '%s'\n",
-			qry->id, ns_str ? ns_str : "", qry->ns.score, zonecut_str,
-			qname_str, type_str, (qry->flags.TCP) ? "tcp" : "udp");
+	// for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
+	// 	struct sockaddr *addr = &qry->ns.addr[i].ip;
+	// 	if (addr->sa_family == AF_UNSPEC) {
+	// 		break;
+	// 	}
+	// 	if (!kr_inaddr_equal(dst, addr)) {
+	// 		continue;
+	// 	}
+	// 	const char *ns_str = kr_straddr(addr);
+	// 	VERBOSE_MSG(qry,
+	// 		"=> id: '%05u' querying: '%s' score: %u zone cut: '%s' "
+	// 		"qname: '%s' qtype: '%s' proto: '%s'\n",
+	// 		qry->id, ns_str ? ns_str : "", qry->ns.score, zonecut_str,
+	// 		qname_str, type_str, (qry->flags.TCP) ? "tcp" : "udp");
 
-		break;
-	}}
+	// 	break;
+	// }}
 
 	return kr_ok();
 }

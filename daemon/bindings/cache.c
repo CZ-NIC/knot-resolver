@@ -258,8 +258,8 @@ static int cache_clear_everything(lua_State *L)
 
 	/* Clear reputation tables */
 	struct engine *engine = engine_luaget(L);
-	lru_reset(engine->resolver.cache_rtt);
-	lru_reset(engine->resolver.cache_rep);
+	// lru_reset(engine->resolver.cache_rtt);
+	// lru_reset(engine->resolver.cache_rep);
 	lru_reset(engine->resolver.cache_cookie);
 	lua_pushboolean(L, true);
 	return 1;

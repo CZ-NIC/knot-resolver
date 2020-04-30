@@ -675,10 +675,11 @@ static int session_tls_hs_cb(struct session *session, int status)
 		struct qr_task *task = session_waitinglist_get(session);
 		if (task) {
 			struct kr_qflags *options = &task->ctx->req.options;
-			unsigned score = options->FORWARD || options->STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
-			kr_nsrep_update_rtt(NULL, peer, score,
-					    worker->engine->resolver.cache_rtt,
-					    KR_NS_UPDATE_NORESET);
+			// NS_REP
+			// unsigned score = options->FORWARD || options->STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+			// kr_nsrep_update_rtt(NULL, peer, score,
+			// 		    worker->engine->resolver.cache_rtt,
+			// 		    KR_NS_UPDATE_NORESET);
 		}
 #ifndef NDEBUG
 		else {
@@ -857,10 +858,11 @@ static void on_connect(uv_connect_t *req, int status)
 			 * In case of UV_ETIMEDOUT upstream has been
 			 * already penalized in on_tcp_connect_timeout() */
 			struct kr_qflags *options = &task->ctx->req.options;
-			unsigned score = options->FORWARD || options->STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
-			kr_nsrep_update_rtt(NULL, peer, score,
-					    worker->engine->resolver.cache_rtt,
-					    KR_NS_UPDATE_NORESET);
+			// NS_REP
+			// unsigned score = options->FORWARD || options->STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+			// kr_nsrep_update_rtt(NULL, peer, score,
+			// 		    worker->engine->resolver.cache_rtt,
+			// 		    KR_NS_UPDATE_NORESET);
 		}
 		assert(session_tasklist_is_empty(session));
 		session_waitinglist_retry(session, false);
@@ -942,10 +944,11 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 			    peer_str ? peer_str : "");
 	}
 
-	unsigned score = qry->flags.FORWARD || qry->flags.STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
-	kr_nsrep_update_rtt(NULL, peer, score,
-			    worker->engine->resolver.cache_rtt,
-			    KR_NS_UPDATE_NORESET);
+	// NS_REP
+	// unsigned score = qry->flags.FORWARD || qry->flags.STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+	// kr_nsrep_update_rtt(NULL, peer, score,
+	// 		    worker->engine->resolver.cache_rtt,
+	// 		    KR_NS_UPDATE_NORESET);
 
 	worker->stats.timeout += session_waitinglist_get_len(session);
 	session_waitinglist_retry(session, true);
@@ -982,10 +985,11 @@ static void on_udp_timeout(uv_timer_t *timer)
 				char *addr_str = kr_straddr(choice);
 				VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str ? addr_str : "");
 			}
-			unsigned score = qry->flags.FORWARD || qry->flags.STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
-			kr_nsrep_update_rtt(&qry->ns, choice, score,
-					    worker->engine->resolver.cache_rtt,
-					    KR_NS_UPDATE_NORESET);
+			// NS_REP
+			// unsigned score = qry->flags.FORWARD || qry->flags.STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+			// kr_nsrep_update_rtt(&qry->ns, choice, score,
+			// 		    worker->engine->resolver.cache_rtt,
+			// 		    KR_NS_UPDATE_NORESET);
 		}
 	}
 	task->timeouts += 1;
@@ -1043,8 +1047,10 @@ static void on_retransmit(uv_timer_t *req)
 	if (retransmit(task) == NULL) {
 		/* Not possible to spawn request, start timeout timer with remaining deadline. */
 		struct kr_qflags *options = &task->ctx->req.options;
-		uint64_t timeout = options->FORWARD || options->STUB ? KR_NS_FWD_TIMEOUT / 2 :
-				   KR_CONN_RTT_MAX - task->pending_count * KR_CONN_RETRY;
+		// NS_REP
+		// uint64_t timeout = options->FORWARD || options->STUB ? KR_NS_FWD_TIMEOUT / 2 :
+		// 		   KR_CONN_RTT_MAX - task->pending_count * KR_CONN_RETRY;
+		uint64_t timeout = KR_CONN_RTT_MAX - task->pending_count * KR_CONN_RETRY;
 		uv_timer_start(req, on_udp_timeout, timeout, 0);
 	} else {
 		uv_timer_start(req, on_retransmit, KR_CONN_RETRY, 0);
@@ -1206,13 +1212,15 @@ static int udp_task_step(struct qr_task *task,
 	assert(qry != NULL);
 	/* Retransmit at default interval, or more frequently if the mean
 	 * RTT of the server is better. If the server is glued, use default rate. */
-	size_t timeout = qry->ns.score;
-	if (timeout > KR_NS_GLUED) {
-		/* We don't have information about variance in RTT, expect +10ms */
-		timeout = MIN(qry->ns.score + 10, KR_CONN_RETRY);
-	} else {
-		timeout = KR_CONN_RETRY;
-	}
+	// NS_REP
+	// size_t timeout = qry->ns.score;
+	// if (timeout > KR_NS_GLUED) {
+	// 	/* We don't have information about variance in RTT, expect +10ms */
+	// 	timeout = MIN(qry->ns.score + 10, KR_CONN_RETRY);
+	// } else {
+	// 	timeout = KR_CONN_RETRY;
+	// }
+	size_t timeout = KR_CONN_RETRY;
 	/* Announce and start subrequest.
 	 * @note Only UDP can lead I/O as it doesn't touch 'task->pktbuf' for reassembly.
 	 */
@@ -1361,10 +1369,11 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 		worker_del_tcp_waiting(worker, addr);
 		free(conn);
 		session_close(session);
-		unsigned score = qry->flags.FORWARD || qry->flags.STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
-		kr_nsrep_update_rtt(NULL, peer, score,
-				    worker->engine->resolver.cache_rtt,
-				    KR_NS_UPDATE_NORESET);
+		// NS_REP
+		// unsigned score = qry->flags.FORWARD || qry->flags.STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
+		// kr_nsrep_update_rtt(NULL, peer, score,
+		// 		    worker->engine->resolver.cache_rtt,
+		// 		    KR_NS_UPDATE_NORESET);
 		WITH_VERBOSE (qry) {
 			const char *peer_str = kr_straddr(peer);
 			kr_log_verbose( "[wrkr]=> connect to '%s' failed (%s), flagged as 'bad'\n",
@@ -1504,7 +1513,8 @@ static int qr_task_step(struct qr_task *task,
 
 	/* Count available address choices */
 	struct sockaddr_in6 *choice = (struct sockaddr_in6 *)task->addrlist;
-	for (size_t i = 0; i < KR_NSREP_MAXADDR && choice->sin6_family != AF_UNSPEC; ++i) {
+	// NS_REP
+	for (size_t i = 0; i < 4 && choice->sin6_family != AF_UNSPEC; ++i) {
 		task->addrlist_count += 1;
 		choice += 1;
 	}
