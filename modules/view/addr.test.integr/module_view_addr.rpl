@@ -54,7 +54,7 @@ REPLY QR RD RA AA NXDOMAIN
 SECTION QUESTION
 example.com. IN A
 SECTION ADDITIONAL
-explanation.invalid. 10800 IN TXT "addr 127.0.0.0/24 matched com"
+explanation.invalid. 10800 IN TXT "addr 127.127.0.0/16 matched com"
 ENTRY_END
 
 ; blocked by view:addr + inner policy.suffix net
@@ -73,7 +73,7 @@ REPLY QR RD RA AA NXDOMAIN
 SECTION QUESTION
 example.net. IN A
 SECTION ADDITIONAL
-explanation.invalid. 10800 IN TXT "addr 127.0.0.0/24 matched net"
+explanation.invalid. 10800 IN TXT "addr 127.127.0.0/16 matched net"
 ENTRY_END
 
 SCENARIO_END
