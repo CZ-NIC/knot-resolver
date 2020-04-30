@@ -37,15 +37,8 @@ if build_extra_tests
   python3 = find_program('python3')
   py3_deps = []
 
-  libuv_before_sendmmsg = dependency('libuv', version: '<1.35', required: false)
   subdir('pytests')
-  if sendmmsg
-    warning('Integration tests do not work with sendmmsg, disable sendmmsg using meson configure -Dsendmmsg=disabled builddir')
-  elif not libuv_before_sendmmsg.found()
-    warning('Integration tests do not work with libuv >= 1.35 because it internally uses sendmmsg which is not supported by Deckard, use an older version of libuv')
-  else
-    subdir('integration')
-  endif
+  subdir('integration')
 
   foreach py3_dep : py3_deps
     py3_import = run_command(python3, '-c', 'import @0@'.format(py3_dep[0]))

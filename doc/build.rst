@@ -172,8 +172,7 @@ The following command runs all enabled tests. By default, only unit tests are en
 More comprehensive tests require you to install ``kresd`` into the configured
 prefix before running the test suite. They also have to be explicitly enabled
 by using either ``-Dconfig_tests=enabled`` for postinstall config tests, or
-``-Dextra_tests=enabled`` for all tests, including deckard tests. Please note
-the latter also requires ``-Dsendmmsg=disabled``.
+``-Dextra_tests=enabled`` for all tests, including deckard tests.
 
 .. code-block:: bash
 
