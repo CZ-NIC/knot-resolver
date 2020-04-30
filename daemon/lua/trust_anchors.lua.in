@@ -476,6 +476,13 @@ trust_anchors = {
 	set_insecure = function (list)
 		assert(type(list) == 'table', 'parameter must be list of domain names (e.g. {"a.test", "b.example"})')
 		local store = kres.context().negative_anchors
+		for i = 1, #list do
+			local dname = kres.str2dname(list[i])
+			if trust_anchors.keysets[dname] then
+				error('cannot add NTA '..list[i]..' because it is TA. Use trust_anchors.remove() instead')
+			end
+		end
+
 		C.kr_ta_clear(store)
 		for i = 1, #list do
 			local dname = kres.str2dname(list[i])
