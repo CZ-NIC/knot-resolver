@@ -32,6 +32,7 @@ integr_tests += [
 ]
 
 kresd_deps = [
+  luajit, # first to minimize likelihood of using wrong lua headers from /usr/include/*.h
   contrib_dep,
   kresconfig_dep,
   libkres_dep,
@@ -39,7 +40,6 @@ kresd_deps = [
   libzscanner,
   libdnssec,
   libuv,
-  luajit,
   gnutls,
   libsystemd,
   capng,
