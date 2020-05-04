@@ -497,7 +497,7 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 					goto finish;
 				commands = newbuf;
 			}
-			commands[nread] = '\n';
+			commands[nread] = '\0';
 		}
 
 		const char *delim = args->quiet ? "" : "> ";
