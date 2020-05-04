@@ -32,6 +32,9 @@ RUN pip3 install dnspython jinja2 pytest pytest-html pytest-xdist
 # Wireshark/dumpcap for Deckard
 RUN apt-get install -y -qqq wireshark-common
 
+# Faketime for Deckard
+RUN apt-get install -y -qqq faketime
+
 # C dependencies for python-augeas
 RUN apt-get install -y -qqq libaugeas-dev libffi-dev
 # Python dependencies for Deckard
