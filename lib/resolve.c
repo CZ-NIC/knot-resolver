@@ -828,6 +828,23 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 		qry->flags.RESOLVED = false;
 	}
 
+	/* For multiple errors in a row; invalidate_ns() is not enough. */
+	if (!qry->flags.CACHED) {
+		if (request->state & KR_STATE_FAIL) {
+			if (++request->count_fail_row > KR_CONSUME_FAIL_ROW_LIMIT) {
+				if (VERBOSE_STATUS || kr_log_rtrace_enabled(request)) {
+					kr_log_req(request, 0, 2, "resl",
+						"=> too many failures in a row, "
+						"bail out (mitigation for NXNSAttack "
+						"CVE-2020-12667)");
+				}
+				return KR_STATE_FAIL;
+			}
+		} else {
+			request->count_fail_row = 0;
+		}
+	}
+
 	/* Pop query if resolved. */
 	if (request->state == KR_STATE_YIELD) {
 		return KR_STATE_PRODUCE; /* Requery */
