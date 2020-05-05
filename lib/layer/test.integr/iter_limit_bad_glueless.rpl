@@ -1,0 +1,219 @@
+; config options
+;	target-fetch-policy: "0 0 0 0 0"
+;	name: "."
+	stub-addr: 193.0.14.129 	# K.ROOT-SERVERS.NET.
+CONFIG_END
+
+SCENARIO_BEGIN Test resolution with lame reply looks like nodata with noSOA
+
+; K.ROOT-SERVERS.NET.
+RANGE_BEGIN 0 100
+	ADDRESS 193.0.14.129
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+. IN NS
+SECTION ANSWER
+. IN NS	K.ROOT-SERVERS.NET.
+SECTION ADDITIONAL
+K.ROOT-SERVERS.NET.	IN	A	193.0.14.129
+ENTRY_END
+
+; com
+ENTRY_BEGIN
+MATCH opcode subdomain
+ADJUST copy_id copy_query
+REPLY QR NOERROR
+SECTION QUESTION
+com. IN NS
+SECTION AUTHORITY
+com.	IN NS	a.gtld-servers.net.
+SECTION ADDITIONAL
+a.gtld-servers.net.	IN 	A	192.5.6.30
+ENTRY_END
+
+; net
+ENTRY_BEGIN
+MATCH opcode subdomain
+ADJUST copy_id copy_query
+REPLY QR NOERROR
+SECTION QUESTION
+net. IN NS
+SECTION AUTHORITY
+net.	IN NS	e.gtld-servers.net.
+SECTION ADDITIONAL
+e.gtld-servers.net.	IN 	A	192.12.94.30
+ENTRY_END
+
+RANGE_END
+
+; a.gtld-servers.net. - com
+RANGE_BEGIN 0 100
+	ADDRESS 192.5.6.30
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+com. IN NS
+SECTION ANSWER
+com.	IN NS	a.gtld-servers.net.
+SECTION ADDITIONAL
+a.gtld-servers.net.	IN 	A	192.5.6.30
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode subdomain
+ADJUST copy_id copy_query
+REPLY QR NOERROR
+SECTION QUESTION
+victim.com. IN NS
+SECTION AUTHORITY
+victim.com.	IN NS	ns.victim.com.
+SECTION ADDITIONAL
+ns.victim.com.	IN A	1.2.3.55
+ENTRY_END
+RANGE_END
+
+; e.gtld-servers.net. - net
+RANGE_BEGIN 0 100
+	ADDRESS 192.12.94.30
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+net. IN NS
+SECTION ANSWER
+net.	IN NS	e.gtld-servers.net.
+SECTION ADDITIONAL
+e.gtld-servers.net.	IN 	A	192.12.94.30
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode subdomain
+ADJUST copy_id copy_query
+REPLY QR NOERROR
+SECTION QUESTION
+attacker.net. IN NS
+SECTION AUTHORITY
+attacker.net.	IN NS	ns.attacker.net.
+SECTION ADDITIONAL
+ns.attacker.net.		IN 	A	1.2.3.44
+ENTRY_END
+RANGE_END
+
+; ns.attacker.net.
+RANGE_BEGIN 0 100
+	ADDRESS 1.2.3.44
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+attacker.net. IN NS
+SECTION ANSWER
+attacker.net.	IN NS	ns.attacker.net.
+SECTION ADDITIONAL
+ns.attacker.net.		IN 	A	1.2.3.44
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+ns.attacker.net. IN A
+SECTION ANSWER
+ns.attacker.net. IN A	1.2.3.44
+SECTION AUTHORITY
+attacker.net.	IN NS	ns.attacker.net.
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+ns.attacker.net. IN AAAA
+SECTION AUTHORITY
+SECTION ADDITIONAL
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode subdomain
+ADJUST copy_id copy_query
+REPLY QR NOERROR
+SECTION QUESTION
+sub.attacker.net. IN NS
+SECTION AUTHORITY
+sub.attacker.net. IN NS	ns1.victim.com.
+sub.attacker.net. IN NS	ns2.victim.com.
+sub.attacker.net. IN NS	ns3.victim.com.
+sub.attacker.net. IN NS	ns4.victim.com.
+sub.attacker.net. IN NS	ns5.victim.com.
+sub.attacker.net. IN NS	ns6.victim.com.
+sub.attacker.net. IN NS	ns7.victim.com.
+sub.attacker.net. IN NS	ns8.victim.com.
+sub.attacker.net. IN NS	ns9.victim.com.
+ENTRY_END
+RANGE_END
+
+; ns.victim.com.
+; returns NXDOMAIN for all queries (attacker generated NS names are not present)
+RANGE_BEGIN 0 100
+	ADDRESS 1.2.3.55
+ENTRY_BEGIN
+MATCH opcode subdomain
+ADJUST copy_id copy_query
+REPLY QR NXDOMAIN
+SECTION QUESTION
+victim.com. IN NS
+SECTION AUTHORITY
+victim.com.	0	IN SOA . . 1 1 1 1 1
+SECTION ADDITIONAL
+ENTRY_END
+RANGE_END
+
+
+STEP 10 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+www.sub.attacker.net. IN A
+ENTRY_END
+
+; in any case we must get SERVFAIL, no deleation works
+STEP 11 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all
+REPLY QR RD RA SERVFAIL
+SECTION QUESTION
+www.sub.attacker.net. IN A
+SECTION ANSWER
+ENTRY_END
+
+; recursion happens here
+STEP 20 QUERY
+ENTRY_BEGIN
+REPLY RD DO
+SECTION QUESTION
+glueless.trigger.check.max.number.of.upstream.queries. IN TXT
+ENTRY_END
+
+STEP 21 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all
+REPLY QR AA RD RA NOERROR
+SECTION QUESTION
+glueless.trigger.check.max.number.of.upstream.queries. IN TXT
+SECTION ANSWER
+glueless.trigger.check.max.number.of.upstream.queries. IN TXT "pass"
+SECTION AUTHORITY
+SECTION ADDITIONAL
+ENTRY_END
+
+
+SCENARIO_END

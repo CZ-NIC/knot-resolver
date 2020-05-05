@@ -1,4 +1,38 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
+
+-- hook for iter_refuse_toomany.rpl
+local function check_max_number_of_upstream_queries(maxcnt)
+	return function (state, req)
+		local vals = worker.stats()
+		local upstream_packets = vals.ipv4 + vals.ipv6
+		log('%d packets sent to upstream', upstream_packets)
+		local answ_f
+		if upstream_packets > maxcnt then  -- . + com. + ????
+			answ_f = policy.ANSWER(
+				{ [kres.type.TXT] = { ttl=300, rdata='\4fail' } })
+
+		else
+			answ_f = policy.ANSWER(
+				{ [kres.type.TXT] = { ttl=300, rdata='\4pass' } })
+		end
+		return answ_f(state, req)
+	end
+end
+
+policy.add(
+	policy.suffix(check_max_number_of_upstream_queries(8),
+		policy.todnames({'refused.trigger.check.max.number.of.upstream.queries.'})
+	)
+)
+policy.add(
+	policy.suffix(check_max_number_of_upstream_queries(16),
+		policy.todnames({'glueless.trigger.check.max.number.of.upstream.queries.'})
+	)
+)
+
+-- hook end iter_refuse_toomany.rpl
+
+
 trust_anchors.remove('.')
 {% for TAF in TRUST_ANCHOR_FILES %}
 -- trust_anchors.add_file('{{TAF}}')
@@ -28,6 +62,7 @@ end
 _hint_root_file('hints')
 cache.size = 2*MB
 verbose(true)
+policy.add(policy.all(policy.DEBUG_ALWAYS))
 {% endraw %}
 
 net = { '{{SELF_ADDR}}' }

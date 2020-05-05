@@ -19,16 +19,6 @@ py3_deps += [
 
 prepare_deckard = find_program('../../scripts/test-integration-prepare.sh')
 
-# compile libswrap, libfaketime
-deckard_contrib = custom_target(
-  'deckard_contrib',
-  command: [
-    prepare_deckard,
-    '@0@'.format(join_paths(meson.current_source_dir(), 'deckard')),
-  ],
-  output: 'deckard_contrib',
-)
-
 deckard_env = environment()
 deckard_env.prepend('PATH', sbin_dir)
 
@@ -47,7 +37,6 @@ test(
   ],
   is_parallel: false,
   timeout: 300,
-  depends: deckard_contrib,
 )
 
 deckard_run = find_program('deckard/run.sh')
@@ -69,6 +58,5 @@ foreach integr_test : integr_tests
     ],
     is_parallel: false,
     workdir: meson.source_root(),
-    depends: deckard_contrib,
   )
 endforeach
