@@ -228,6 +228,7 @@ struct kr_request {
 	knot_mm_t pool;
 	unsigned int uid; /** for logging purposes only */
 	unsigned int count_no_nsaddr;
+	unsigned int count_fail_row;
 };
 
 /** Initializer for an array of *_selected. */
