@@ -1,5 +1,9 @@
-Knot Resolver 5.1.1 (2020-05-xx)
+Knot Resolver 5.1.1 (2020-05-19)
 ================================
+
+Security
+--------
+- fix CVE-2020-12667: mitigation for NXNSAttack DNS protocol vulnerability
 
 Bugfixes
 --------
