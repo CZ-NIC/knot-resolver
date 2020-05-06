@@ -479,7 +479,7 @@ trust_anchors = {
 		for i = 1, #list do
 			local dname = kres.str2dname(list[i])
 			if trust_anchors.keysets[dname] then
-				error('Cannot add NTA '..list[i]..', it exists in TA list')
+				error('cannot add NTA '..list[i]..' because it is TA. Use trust_anchors.remove() instead')
 			end
 		end
 
