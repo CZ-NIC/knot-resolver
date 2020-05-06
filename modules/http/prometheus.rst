@@ -5,7 +5,7 @@
 Prometheus metrics endpoint
 ---------------------------
 
-The `HTTP module <mod-http>`_ exposes ``/metrics`` endpoint that serves metrics
+The :ref:`HTTP module <mod-http>` exposes ``/metrics`` endpoint that serves metrics
 from :ref:`mod-stats` in Prometheus_ text format.
 You can use it as soon as HTTP module is configured:
 
