@@ -503,7 +503,7 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 		const char *delim = args->quiet ? "" : "> ";
 
 		/* No command, just new line */
-		if (nread == 1) {
+		if (nread == 1 && args->tty_binary_output == false && commands[nread-1] == '\0') {
 			if (stream_fd != STDIN_FILENO) {
 				fprintf(out, "%s", delim);
 			}
