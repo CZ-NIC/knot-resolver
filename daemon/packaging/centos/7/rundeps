@@ -1,3 +1,9 @@
+gnutls
+knot-libs
+libedit
+libuv
+lmdb-libs
+luajit
+systemd
 lua-basexx
-lua-psl
 lua-http

@@ -2,3 +2,5 @@ libopenssl-devel
 lua51-devel
 lua51-luarocks
 git
+gcc
+make
