@@ -228,7 +228,8 @@ class CentosImage(DockerImages):
         return "yum install -y "
 
     def cmd_kresd_install(self):
-        return 'ninja-build -C build_packaging install >/dev/null'
+        #return 'ninja-build -C build_packaging install >/dev/null'
+        return 'ninja-build -C build_packaging install'
 
     def cmd_kresd_build(self):
         return """\\
@@ -242,11 +243,12 @@ class CentosImage(DockerImages):
                     --libdir=lib \\
                     --includedir=include \\
                     --sysconfdir=etc \\
+                    --default-library=static \\
                     -Dsystemd_files=enabled \\
                     -Dclient=enabled \\
                     -Dunit_tests=enabled \\
                     -Dmanaged_ta=enabled \\
-                    -Dkeyfile_default=/var/lib/knot-resolver/root.keys \\
+                    -Dkeyfile_default=/root/kresd/install_packaging/var/lib/knot-resolver/root.keys \\
                     -Dinstall_root_keys=enabled \\
                     -Dinstall_kresd_conf=enabled; \\
                 ninja-build -C build_packaging
@@ -276,11 +278,12 @@ class FedoraImage(DockerImages):
                     --libdir=lib \\
                     --includedir=include \\
                     --sysconfdir=etc \\
+                    --default-library=static \\
                     -Dsystemd_files=enabled \\
                     -Dclient=enabled \\
                     -Dunit_tests=enabled \\
                     -Dmanaged_ta=enabled \\
-                    -Dkeyfile_default=/var/lib/knot-resolver/root.keys \\
+                    -Dkeyfile_default=/root/kresd/install_packaging/var/lib/knot-resolver/root.keys \\
                     -Dinstall_root_keys=enabled \\
                     -Dinstall_kresd_conf=enabled; \\
                 ninja -C build_packaging
@@ -367,8 +370,7 @@ def buildenv(request, tmpdir_factory):
         tmpdir = tmpdir_factory.mktemp(distro['name']+distro['version'])
         img.build(tmpdir, tag=pytest.KR_PREFIX+distro['name']+distro['version']+'-build')
         img.build_run(tmpdir, img.build_id,
-                      tag=pytest.KR_PREFIX+distro['name']+distro['version']+'-run',
-                      from_image=img.build_id)
+                      tag=pytest.KR_PREFIX+distro['name']+distro['version']+'-run')
 
     yield img
 #    client.images.remove(img.run_id)
@@ -471,8 +473,8 @@ def test_collect(module, buildenv, tmp_path):
     finally:
         ch.stop()
         ch.container.remove()
-#        if buildmod is not None and buildmod is not buildenv:
-#            client.images.remove(buildmod.run_id)
-#            client.images.remove(buildmod.build_id)
+        if buildmod is not None and buildmod is not buildenv:
+            client.images.remove(buildmod.run_id)
+            client.images.remove(buildmod.build_id)
 
     assert(rcode == 0)
