@@ -284,7 +284,7 @@ For development, it's possible to build the container directly from your git tre
 .. _Docker images: https://hub.docker.com/r/cznic/knot-resolver
 .. _libuv: https://github.com/libuv/libuv
 .. _LuaJIT: http://luajit.org/luajit.html
-.. _Doxygen: http://www.doxygen.nl/manual/index.html
+.. _Doxygen: https://www.doxygen.nl/manual/index.html
 .. _breathe: https://github.com/michaeljones/breathe
 .. _Sphinx: http://sphinx-doc.org/
 .. _sphinx_rtd_theme: https://pypi.python.org/pypi/sphinx_rtd_theme
