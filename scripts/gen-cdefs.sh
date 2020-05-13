@@ -6,6 +6,9 @@ if [ "$2" != types ] && [ "$2" != functions ]; then
 	echo "Usage: $0 libkres (types|functions)" >&2
 	echo "    and input identifiers, one per line." >&2
 	echo "    You need debug symbols in the library." >&2
+	echo
+	echo "    If you call this on a type that's a typedef, it gets expanded." >&2
+	echo "    To avoid that, prefix the identifier with 'typedef '." >&2
 	exit 1
 fi
 
@@ -50,10 +53,14 @@ grep -v '^#\|^$' | while read -r ident; do
 				output="$("${GDB[@]}" --ex "ptype $ident" \
 						| sed '0,/^type = /s/^type = /\n/; $ s/$/;/')"
 				;;
-			*)
-				output="$("${GDB[@]}" --ex "info types ^$ident\$" \
+			typedef\ *) # typedef that shouldn't be expanded
+				output="$("${GDB[@]}" --ex "info types ^"$(echo "$ident" | sed 's/^typedef //')"\$" \
 						| sed -e '0,/^File .*:$/ d' -e '/^File .*:$/,$ d')"
 						# we need to stop early to remove ^^ multiple matches
+				;;
+			*) # we assume it's a typedef that should be expanded
+				output="$("${GDB[@]}" --ex "ptype $ident" \
+						| sed "0,/^type = /s/^type = /typedef /; $ s/$/ $ident;/")"
 				;;
 		esac
 	fi

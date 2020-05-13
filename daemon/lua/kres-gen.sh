@@ -94,18 +94,18 @@ typedef char *(kr_prop_cb)(void *, struct kr_module *, const char *);
 "
 
 ${CDEFS} ${LIBKRES} types <<-EOF
-	knot_pkt_t
+	#knot_pkt_t contains indirect recursion
+	typedef knot_pkt_t
 	knot_edns_options_t
 	knot_pktsection_t
-	struct knot_compr
 	knot_compr_t
 	struct knot_pkt
 	# lib/generic/
 	map_t
-	trie_t
+	#trie_t inside is private to libknot
+	typedef trie_t
 	# libkres
 	struct kr_qflags
-	struct ranked_rr_array_entry
 	ranked_rr_array_entry_t
 	ranked_rr_array_t
 	struct kr_zonecut
@@ -117,9 +117,7 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_cdb_stats
 	struct kr_cache
 	# lib/layer.h
-	struct kr_layer
 	kr_layer_t
-	struct kr_layer_api
 	kr_layer_api_t
 	# lib/module.h
 	struct kr_prop
@@ -287,8 +285,9 @@ ${CDEFS} libzscanner types <<-EOF
 	zs_apl_t
 	zs_loc_t
 	zs_state_t
+	#zs_scanner_t contains recursion
+	typedef zs_scanner_t
 	zs_scanner_t
-	struct zs_scanner
 EOF
 ${CDEFS} libzscanner functions <<-EOF
 	zs_deinit
