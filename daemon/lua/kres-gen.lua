@@ -44,15 +44,14 @@ typedef struct {
 	uint16_t pos;
 	uint16_t count;
 } knot_pktsection_t;
-struct knot_compr {
+typedef struct knot_compr {
 	uint8_t *wire;
 	knot_rrinfo_t *rrinfo;
 	struct {
 		uint16_t pos;
 		uint8_t labels;
 	} suffix;
-};
-typedef struct knot_compr knot_compr_t;
+} knot_compr_t;
 struct knot_pkt {
 	uint8_t *wire;
 	size_t size;
@@ -120,7 +119,7 @@ struct kr_qflags {
 	_Bool NO_NS_FOUND : 1;
 	_Bool PKT_IS_SANE : 1;
 };
-struct ranked_rr_array_entry {
+typedef struct ranked_rr_array_entry {
 	uint32_t qry_uid;
 	uint8_t rank;
 	uint8_t revalidation_cnt;
@@ -131,8 +130,7 @@ struct ranked_rr_array_entry {
 	_Bool in_progress : 1;
 	_Bool dont_cache : 1;
 	knot_rrset_t *rr;
-};
-typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
+} ranked_rr_array_entry_t;
 typedef struct {
 	ranked_rr_array_entry_t **at;
 	size_t len;
@@ -220,16 +218,15 @@ struct kr_cache {
 	struct timeval checkpoint_walltime;
 	uint64_t checkpoint_monotime;
 };
-struct kr_layer {
+typedef struct kr_layer {
 	int state;
 	struct kr_request *req;
 	const struct kr_layer_api *api;
 	knot_pkt_t *pkt;
 	struct sockaddr *dst;
 	_Bool is_stream;
-};
-typedef struct kr_layer kr_layer_t;
-struct kr_layer_api {
+} kr_layer_t;
+typedef struct kr_layer_api {
 	int (*begin)(kr_layer_t *);
 	int (*reset)(kr_layer_t *);
 	int (*finish)(kr_layer_t *);
@@ -239,8 +236,7 @@ struct kr_layer_api {
 	int (*answer_finalize)(kr_layer_t *);
 	void *data;
 	int cb_slots[];
-};
-typedef struct kr_layer_api kr_layer_api_t;
+} kr_layer_api_t;
 struct kr_prop {
 	kr_prop_cb *cb;
 	const char *name;
@@ -469,7 +465,7 @@ typedef struct {
 } zs_loc_t;
 typedef enum {ZS_STATE_NONE, ZS_STATE_DATA, ZS_STATE_ERROR, ZS_STATE_INCLUDE, ZS_STATE_EOF, ZS_STATE_STOP} zs_state_t;
 typedef struct zs_scanner zs_scanner_t;
-struct zs_scanner {
+typedef struct zs_scanner {
 	int cs;
 	int top;
 	int stack[16];
@@ -531,7 +527,7 @@ struct zs_scanner {
 	uint16_t r_type;
 	uint32_t r_data_length;
 	uint8_t r_data[65535];
-};
+} zs_scanner_t;
 void zs_deinit(zs_scanner_t *);
 int zs_init(zs_scanner_t *, const char *, const uint16_t, const uint32_t);
 int zs_parse_record(zs_scanner_t *);
