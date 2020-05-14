@@ -18,7 +18,7 @@ struct tls_client_ctx_t;
 /** Bind address into a file-descriptor (only, no libuv).  type is e.g. SOCK_DGRAM */
 int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags);
 /** Initialize a UDP handle and start listening. */
-int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd);
+int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd, bool has_quic);
 /** Initialize a TCP handle and start listening. */
 int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bool has_tls);
 /** Initialize a pipe handle and start listening. */

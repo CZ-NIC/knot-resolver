@@ -7,6 +7,18 @@ contrib_src = files([
   'ucw/mempool.c',
   'ucw/mempool-fmt.c',
   'murmurhash3/murmurhash3.c',
+  'quicly/quicly.c',
+  'quicly/defaults.c',
+  'quicly/cc-reno.c',
+  'quicly/frame.c',
+  'quicly/streambuf.c',
+  'quicly/sendstate.c',
+  'quicly/recvstate.c',
+  'quicly/sentmap.c',
+  'quicly/ranges.c',
+  'quicly/picotls/picotls.c',
+  'quicly/picotls/openssl.c',
+  'quicly/picotls/pembase64.c',
   'base32hex.c',
   'base64.c'
 ])
@@ -17,7 +29,7 @@ contrib_lib = static_library(
   'contrib',
   contrib_src,
   include_directories: contrib_inc,
-  dependencies: libknot,
+  dependencies: [libknot, openssl],
 )
 
 contrib_dep = declare_dependency(

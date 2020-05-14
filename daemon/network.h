@@ -5,6 +5,7 @@
 #pragma once
 
 #include "daemon/tls.h"
+#include "daemon/quic.h"
 
 #include "lib/generic/array.h"
 #include "lib/generic/map.h"
@@ -20,6 +21,7 @@ struct engine;
 typedef struct {
 	int sock_type;    /**< SOCK_DGRAM or SOCK_STREAM */
 	bool tls;         /**< only used together with .kind == NULL and .tcp */
+	bool quic;        /**< only used together with .kind == NULL and .udp */
 	const char *kind; /**< tag for other types than the three usual */
 	bool freebind;    /**< used for binding to non-local address **/
 } endpoint_flags_t;
@@ -31,7 +33,7 @@ static inline bool endpoint_flags_eq(endpoint_flags_t f1, endpoint_flags_t f2)
 	if (f1.kind && f2.kind)
 		return strcasecmp(f1.kind, f2.kind);
 	else
-		return f1.tls == f2.tls && f1.kind == f2.kind;
+		return f1.tls == f2.tls && f1.kind == f2.kind && f1.quic == f2.quic;
 }
 
 /** Wrapper for a single socket to listen on.
@@ -74,6 +76,7 @@ struct network {
 	bool missing_kind_is_error;
 
 	struct tls_credentials *tls_credentials;
+	struct quic_credentials *quic_credentials;
 	tls_client_params_t *tls_client_params; /**< Use tls_client_params_*() functions. */
 	struct tls_session_ticket_ctx *tls_session_ticket_ctx;
 	struct net_tcp_param tcp;

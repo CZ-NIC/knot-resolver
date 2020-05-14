@@ -302,10 +302,14 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 		if (!ep->handle) {
 			return kr_error(ENOMEM);
 		}
-		return io_listen_udp(net->loop, ep_handle, ep->fd);
+		return io_listen_udp(net->loop, ep_handle, ep->fd, ep->flags.quic);
 	} /* else */
 
 	if (ep->flags.sock_type == SOCK_STREAM) {
+		if (ep->flags.quic) {
+			assert(!EINVAL);
+			return kr_error(EINVAL);
+		}
 		uv_tcp_t *ep_handle = malloc(sizeof(uv_tcp_t));
 		ep->handle = (uv_handle_t *)ep_handle;
 		if (!ep->handle) {
