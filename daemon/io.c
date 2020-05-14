@@ -12,6 +12,7 @@
 #include "daemon/network.h"
 #include "daemon/worker.h"
 #include "daemon/tls.h"
+#include "daemon/quic.h"
 #include "daemon/session.h"
 
 #define negotiate_bufsize(func, handle, bufsize_want) do { \
@@ -161,8 +162,9 @@ int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags
 	return fd;
 }
 
-int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
+int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd, bool has_quic)
 {
+	uv_udp_recv_cb recv = has_quic ? &quic_recv : &udp_recv;
 	if (!handle) {
 		return kr_error(EINVAL);
 	}
@@ -175,7 +177,7 @@ int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
 	uv_handle_t *h = (uv_handle_t *)handle;
 	check_bufsize(h);
 	/* Handle is already created, just create context. */
-	struct session *s = session_new(h, false);
+	struct session *s = session_new(h, false, has_quic);
 	assert(s);
 	session_flags(s)->outgoing = false;
 
@@ -186,7 +188,7 @@ int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
 		abort(); /* It might be nontrivial not to leak something here. */
 	}
 
-	return io_start_read(h);
+	return uv_udp_recv_start((uv_udp_t *)h, &handle_getbuf, recv);
 }
 
 void tcp_timeout_trigger(uv_timer_t *timer)
@@ -610,7 +612,7 @@ int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family, b
 	if (ret != 0) {
 		return ret;
 	}
-	struct session *s = session_new(handle, has_tls);
+	struct session *s = session_new(handle, has_tls, false);
 	if (s == NULL) {
 		ret = -1;
 	}

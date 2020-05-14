@@ -10,6 +10,7 @@
 #include "daemon/session.h"
 #include "daemon/engine.h"
 #include "daemon/tls.h"
+#include "daemon/quic.h"
 #include "daemon/worker.h"
 #include "daemon/io.h"
 #include "lib/generic/queue.h"
@@ -31,6 +32,8 @@ struct session {
 
 	struct tls_ctx_t *tls_ctx;    /**< server side tls-related data. */
 	struct tls_client_ctx_t *tls_client_ctx; /**< client side tls-related data. */
+
+	struct quic_ctx_t *quic_ctx;
 
 	trie_t *tasks;                /**< list of tasks assotiated with given session. */
 	queue_t(struct qr_task *) waiting;  /**< list of tasks waiting for sending to upstream. */
@@ -284,6 +287,19 @@ struct tls_common_ctx *session_tls_get_common_ctx(const struct session *session)
 	return tls_ctx;
 }
 
+struct quic_ctx_t *session_quic_get_server_ctx(const struct session *session)
+{
+	return session->quic_ctx;
+}
+
+void session_quic_set_server_ctx(struct session *session, struct quic_ctx_t *ctx)
+{
+	session->sflags.has_quic = true;
+	session->quic_ctx = ctx;
+	ctx->session = session;
+}
+
+
 uv_handle_t *session_get_handle(struct session *session)
 {
 	return session->handle;
@@ -294,7 +310,7 @@ struct session *session_get(uv_handle_t *h)
 	return h->data;
 }
 
-struct session *session_new(uv_handle_t *handle, bool has_tls)
+struct session *session_new(uv_handle_t *handle, bool has_tls, bool has_quic)
 {
 	if (!handle) {
 		return NULL;
@@ -334,6 +350,12 @@ struct session *session_new(uv_handle_t *handle, bool has_tls)
 		struct worker_ctx *worker = handle->loop->data;
 		session->wire_buf = worker->wire_buf;
 		session->wire_buf_size = sizeof(worker->wire_buf);
+
+		if (has_quic) {
+			session_quic_set_server_ctx(session, new_quic());
+			//session->sflags.has_quic = true;
+			//session->quic_ctx = new_quic();
+		}
 	}
 
 	uv_timer_init(handle->loop, &session->timeout);

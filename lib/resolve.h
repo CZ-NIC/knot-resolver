@@ -173,6 +173,7 @@ struct kr_request_qsource_flags {
 	bool tcp:1; /**< true if the request is not on UDP; only meaningful if (dst_addr). */
 	bool tls:1; /**< true if the request is encrypted; only meaningful if (dst_addr). */
 	bool http:1; /**< true if the request is on HTTP; only meaningful if (dst_addr). */
+	bool quic:1; /**< true if the request is on QUIC; only meaningful if (dst_addr). */
 };
 
 /**

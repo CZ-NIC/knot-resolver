@@ -1,4 +1,4 @@
-/*  Copyright (C) 2015-2019 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2015-2020 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -7,6 +7,7 @@
 #include "contrib/base64.h"
 #include "daemon/network.h"
 #include "daemon/tls.h"
+#include "daemon/quic.h"
 #include "daemon/worker.h"
 
 #include <stdlib.h>
@@ -97,7 +98,7 @@ static int net_list(lua_State *L)
 /** Listen on an address list represented by the top of lua stack.
  * \note kind ownership is not transferred
  * \return success */
-static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind, bool freebind)
+static bool net_listen_addrs(lua_State *L, int port, bool tls, bool quic, const char *kind, bool freebind)
 {
 	/* Case: table with 'addr' field; only follow that field directly. */
 	lua_getfield(L, -1, "addr");
@@ -112,12 +113,12 @@ static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind,
 	if (str != NULL) {
 		struct engine *engine = engine_luaget(L);
 		int ret = 0;
-		endpoint_flags_t flags = { .tls = tls, .freebind = freebind };
-		if (!kind && !flags.tls) { /* normal UDP */
+		endpoint_flags_t flags = { .tls = tls, .quic = quic, .freebind = freebind };
+		if (!kind && !flags.tls) { /* common for normal UDP and QUIC */
 			flags.sock_type = SOCK_DGRAM;
 			ret = network_listen(&engine->net, str, port, flags);
 		}
-		if (!kind && ret == 0) { /* common for normal TCP and TLS */
+		if (!kind && !flags.quic && ret == 0) { /* common for normal TCP and TLS */
 			flags.sock_type = SOCK_STREAM;
 			ret = network_listen(&engine->net, str, port, flags);
 		}
@@ -144,7 +145,7 @@ static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind,
 		lua_error_p(L, "bad type for address");
 	lua_pushnil(L);
 	while (lua_next(L, -2)) {
-		if (!net_listen_addrs(L, port, tls, kind, freebind))
+		if (!net_listen_addrs(L, port, tls, quic, kind, freebind))
 			return false;
 		lua_pop(L, 1);
 	}
@@ -183,6 +184,7 @@ static int net_listen(lua_State *L)
 		}
 	}
 
+	bool quic = (port == KR_DNS_QUIC_PORT);
 	bool tls = (port == KR_DNS_TLS_PORT);
 	bool freebind = false;
 	const char *kind = NULL;
@@ -195,9 +197,14 @@ static int net_listen(lua_State *L)
 		lua_getfield(L, 3, "kind");
 		const char *k = lua_tostring(L, -1);
 		if (k && strcasecmp(k, "dns") == 0) {
+			quic = tls = false;
+		} else
+		if (k && strcasecmp(k, "quic") == 0) {
+			quic = true;
 			tls = false;
 		} else
 		if (k && strcasecmp(k, "tls") == 0) {
+			quic = false;
 			tls = true;
 		} else
 		if (k) {
@@ -216,7 +223,7 @@ static int net_listen(lua_State *L)
 
 	/* Now focus on the first argument. */
 	lua_settop(L, 1);
-	if (!net_listen_addrs(L, port, tls, kind, freebind))
+	if (!net_listen_addrs(L, port, tls, quic, kind, freebind))
 		lua_error_p(L, "net.listen() failed to bind");
 	lua_pushboolean(L, true);
 	return 1;
@@ -1001,6 +1008,41 @@ static int net_register_endpoint_kind(lua_State *L)
 	return 0;
 }
 
+static int net_quic(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+	if (!engine) {
+		return 0;
+	}
+	struct network *net = &engine->net;
+	if (!net) {
+		return 0;
+	}
+
+	/* Only return current credentials. */
+	if (lua_gettop(L) == 0) {
+		/* No credentials configured yet. */
+		if (!net->quic_credentials) {
+			return 0;
+		}
+		lua_newtable(L);
+		lua_pushstring(L, net->quic_credentials->quic_cert);
+		lua_setfield(L, -2, "cert_file");
+		lua_pushstring(L, net->quic_credentials->quic_key);
+		lua_setfield(L, -2, "key_file");
+		return 1;
+	}
+
+	if ((lua_gettop(L) != 2) || !lua_isstring(L, 1) || !lua_isstring(L, 2))
+		lua_error_p(L, "net.quic takes two parameters: (\"cert_file\", \"key_file\")");
+
+	int r = quic_certificate_set(net, lua_tostring(L, 1), lua_tostring(L, 2));
+	lua_error_maybe(L, r);
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 int kr_bindings_net(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
@@ -1024,6 +1066,7 @@ int kr_bindings_net(lua_State *L)
 		{ "bpf_set",      net_bpf_set },
 		{ "bpf_clear",    net_bpf_clear },
 		{ "register_endpoint_kind", net_register_endpoint_kind },
+		{ "quic",         net_quic },
 		{ NULL, NULL }
 	};
 	luaL_register(L, "net", lib);
