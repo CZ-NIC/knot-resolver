@@ -26,6 +26,7 @@
 #include "daemon/io.h"
 #include "daemon/session.h"
 #include "daemon/tls.h"
+#include "daemon/quic.h"
 #include "daemon/udp_queue.h"
 #include "daemon/zimport.h"
 #include "lib/layer.h"
@@ -82,6 +83,7 @@ struct qr_task
 	bool finished : 1;
 	bool leading  : 1;
 	uint64_t creation_time;
+	quicly_stream_t *quic_stream;
 };
 
 
@@ -292,6 +294,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		req->qsource.dst_addr = session_get_sockname(session);
 		req->qsource.flags.tcp = session_get_handle(session)->type == UV_TCP;
 		req->qsource.flags.tls = session_flags(session)->has_tls;
+		req->qsource.flags.quic = session_flags(session)->has_quic;
 		/* We need to store a copy of peer address. */
 		memcpy(&ctx->source.addr.ip, peer, kr_sockaddr_len(peer));
 		req->qsource.addr = &ctx->source.addr.ip;
@@ -582,6 +585,12 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 		uv_write_t *write_req = (uv_write_t *)ioreq;
 		write_req->data = task;
 		ret = tls_write(write_req, handle, pkt, &on_write);
+	} else if (session_flags(session)->has_quic) {
+		uv_udp_send_t *send_req = (uv_udp_send_t *)ioreq;
+		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
+		send_req->data = task;
+		ret = quic_write(send_req, (uv_udp_t *)handle, &buf, 1, task->quic_stream);
+		//ret = uv_udp_send(send_req, (uv_udp_t *)handle, &buf, 1, addr, &on_send);
 	} else if (handle->type == UV_UDP) {
 		uv_udp_send_t *send_req = (uv_udp_send_t *)ioreq;
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
@@ -1153,7 +1162,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	if (src_handle->type != UV_UDP && src_handle->type != UV_TCP) {
 		assert(false);
 		ret = kr_error(EINVAL);
-	} else if (src_handle->type == UV_UDP && ENABLE_SENDMMSG) {
+	} else if (src_handle->type == UV_UDP && ENABLE_SENDMMSG && !session_flags(source_session)->has_quic) {
 		int fd;
 		ret = uv_fileno(src_handle, &fd);
 		assert(!ret);
@@ -1612,6 +1621,12 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 		if (!task) {
 			request_free(ctx);
 			return kr_error(ENOMEM);
+		}
+
+		if (session_flags(session)->has_quic) {
+			struct quic_ctx_t *ctx = session_quic_get_server_ctx(session);
+			task->quic_stream = ctx->processed_stream;
+			ctx->processed_stream = NULL;
 		}
 
 		if (handle->type == UV_TCP && qr_task_register(task, session)) {

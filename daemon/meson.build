@@ -17,6 +17,7 @@ kresd_src = files([
   'tls.c',
   'tls_ephemeral_credentials.c',
   'tls_session_ticket-srv.c',
+  'quic.c',
   'udp_queue.c',
   'worker.c',
   'zimport.c',
