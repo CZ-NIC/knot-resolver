@@ -1318,6 +1318,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 } while (0)
 
 uint32_t A_ROOT_IP = 167772161; // This is 1.0.0.10 used in maze tests
+knot_dname_t a_root[255];
 
 int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *type, knot_pkt_t *packet)
 {
@@ -1429,9 +1430,10 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		}
 	}
 
-	qry->ns.name = knot_dname_from_str_alloc("a.root-server.net");
-	printf("here?\n");
-	ADDR_SET(qry->ns.addr[0].ip4.sin, AF_INET, &A_ROOT_IP, 32, KR_DNS_PORT);
+	qry->ns.name = knot_dname_from_str(a_root, "a.root-server.net", 255);
+
+
+	ADDR_SET(qry->ns.addr[0].ip4.sin, AF_INET, &A_ROOT_IP, 4, KR_DNS_PORT);
 
 
 	/* Resolve address records */
