@@ -983,7 +983,7 @@ static void on_udp_timeout(uv_timer_t *timer)
 			struct sockaddr *choice = (struct sockaddr *)(&addrlist[i]);
 			WITH_VERBOSE(qry) {
 				char *addr_str = kr_straddr(choice);
-				VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str ? addr_str : "");
+				// VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str ? addr_str : "");
 			}
 			// NS_REP
 			// unsigned score = qry->flags.FORWARD || qry->flags.STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;

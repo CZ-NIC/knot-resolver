@@ -11,6 +11,7 @@
 #include <libknot/rrtype/rdname.h>
 #include <libknot/descriptor.h>
 #include <ucw/mempool.h>
+#include <sys/socket.h>
 #include "kresconfig.h"
 #include "lib/resolve.h"
 #include "lib/layer.h"
@@ -1309,6 +1310,15 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 	return trust_chain_check(request, qry);
 }
 
+/** @internal Macro to set address structure. */
+#define ADDR_SET(sa, family, addr, len, port) do {\
+    	memcpy(&sa ## _addr, (addr), (len)); \
+    	sa ## _family = (family); \
+	sa ## _port = htons(port); \
+} while (0)
+
+uint32_t A_ROOT_IP = 167772161; // This is 1.0.0.10 used in maze tests
+
 int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *type, knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
@@ -1397,17 +1407,6 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		}
 	}
 
-int ret = kr_ok();
-
-ns_election:
-	printf("test test test: %d\n", qry->ns.addr[0].ip);
-	/* If the query has already selected a NS and is waiting for IPv4/IPv6 record,
-	 * elect best address only, otherwise elect a completely new NS.
-	 */
-	if(++ns_election_iter >= KR_ITER_LIMIT) {
-		VERBOSE_MSG(qry, "=> couldn't converge NS selection, bail out\n");
-		return KR_STATE_FAIL;
-	}
 
 	const struct kr_qflags qflg = qry->flags;
 	const bool retry = qflg.TCP || qflg.BADCOOKIE_AGAIN;
@@ -1428,41 +1427,25 @@ ns_election:
 			kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);
 			qry->flags.NO_THROTTLE = true; /* Pick even bad SBELT servers */
 		}
-
-		if (ret) {
-		 	if (kr_zonecut_is_empty(&qry->zone_cut)) {
-		 		VERBOSE_MSG(qry, "=> no NS with an address\n");
-		 	} else {
-		 		VERBOSE_MSG(qry, "=> no valid NS left\n");
-		 	}
-		 	if (!qry->flags.NO_NS_FOUND) {
-		 		qry->flags.NO_NS_FOUND = true;
-		 	} else {
-		 		ITERATE_LAYERS(request, qry, reset);
-		 		kr_rplan_pop(rplan, qry);
-		 	}
-		 	return KR_STATE_PRODUCE;
-		}
 	}
 
-	ret = kr_nsrep_elect(qry);
-
+	qry->ns.name = knot_dname_from_str_alloc("a.root-server.net");
+	printf("here?\n");
+	ADDR_SET(qry->ns.addr[0].ip4.sin, AF_INET, &A_ROOT_IP, 32, KR_DNS_PORT);
 
 
 	/* Resolve address records */
-	if (qry->ns.addr[0].ip.sa_family == AF_UNSPEC) {
-		printf("hi!");
-		int ret = ns_resolve_addr(qry, request);
-		if (ret != 0) {
-			qry->flags.AWAIT_IPV6 = false;
-			qry->flags.AWAIT_IPV4 = false;
-			qry->flags.TCP = false;
-			qry->ns.name = NULL;
-			goto ns_election; /* Must try different NS */
-		}
-		ITERATE_LAYERS(request, qry, reset);
-		return KR_STATE_PRODUCE;
-	}
+	// if (kr_nsrep_elect(qry)) {
+	// 	int ret = ns_resolve_addr(qry, request);
+	// 	if (ret != 0) {
+	// 		qry->flags.AWAIT_IPV6 = false;
+	// 		qry->flags.AWAIT_IPV4 = false;
+	// 		qry->flags.TCP = false;
+	// 		qry->ns.name = NULL;
+	// 	}
+	// 	ITERATE_LAYERS(request, qry, reset);
+	// 	return KR_STATE_PRODUCE;
+	// }
 
 	/* Randomize query case (if not in safe mode or turned off) */
 	qry->secret = (qry->flags.SAFEMODE || qry->flags.NO_0X20)

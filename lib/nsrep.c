@@ -33,17 +33,22 @@ int kr_nsrep_elect(struct kr_query *qry)
 	trie_it_free(it);
 	assert(i == nsset_len);
 
+    char dname[256];
+    knot_dname_to_str(dname, nsset[0].name, 255);
+    printf("NS name: %s\n", dname);
+
     if (!pack_obj_len(nsset[0].addrs)) {
+        printf("fuck, there is no address in cache, fuck\n");
         qry->ns.addr[0].ip.sa_family = AF_UNSPEC;
         return kr_error(1);
     }
     uint8_t *head = pack_head(*nsset[0].addrs);
 
+
     void *val = pack_obj_val(head);
     size_t len = pack_obj_len(head);
 
-
-    printf("len %u\n", *(unsigned *)val);
+    printf("ip %u\n", *(unsigned *)val);
     // printf("ip? %s\n", kr_straddr(kr_inaddr(ip)));
 
     qry->ns.name = nsset[0].name;
