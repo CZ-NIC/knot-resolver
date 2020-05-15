@@ -25,6 +25,3 @@ typedef struct kr_nsrep_lru {
 typedef struct kr_nsrep_rtt_lru_entry {
 
 } kr_nsrep_rtt_lru_entry_t;
-
-KR_EXPORT
-int kr_nsrep_elect(struct kr_query *qry);
