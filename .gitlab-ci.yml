@@ -485,10 +485,10 @@ packaging:fedora_31:
   variables:
     DISTRO: fedora_31
 
-packaging:fedora_30:
+packaging:fedora_32:
   <<: *packagingtest
   variables:
-    DISTRO: fedora_30
+    DISTRO: fedora_32
 
 packaging:leap_15.2:
   <<: *packagingtest
