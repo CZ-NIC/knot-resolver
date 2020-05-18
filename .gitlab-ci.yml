@@ -444,9 +444,9 @@ resperf:iter.udp-asan:
 
 .packagingtest: &packagingtest
   stage: extended
-  only:
-    refs:
-      - nightly@knot/knot-resolver
+  #only:
+  #  refs:
+  #    - nightly@knot/knot-resolver
   dependencies: []
   tags:
     - dind
