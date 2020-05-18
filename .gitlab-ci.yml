@@ -465,6 +465,11 @@ packaging:debian_9:
   variables:
     DISTRO: debian_9
 
+packaging:ubuntu_20.04:
+  <<: *packagingtest
+  variables:
+    DISTRO: ubuntu_20.04
+
 packaging:ubuntu_18.04:
   <<: *packagingtest
   variables:
