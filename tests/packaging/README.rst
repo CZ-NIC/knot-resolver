@@ -3,7 +3,7 @@
 Packaging tests
 ===============
 
-Packaging tests used pytest, docker and each directory with subdirectory *packaging*
+Packaging tests used pytest, docker and each directory with subdirectory *.packaging*
 is called as *component*.
 
 Run tests for all components:
@@ -18,18 +18,18 @@ List all components:
 
   pytest tests/packaging --collect-only
 
-Run test for specific component (*doc/packaging*):
+Run test for specific component (*doc/.packaging*):
 
 .. code-block::
 
-  pytest -r fEsxX tests/packaging -k test_collect[debian_10-doc/packaging]
+  pytest -r fEsxX tests/packaging -k test_collect[debian_10-doc/.packaging]
 
 .. note::
 
 	For debug add argument :code:`-s`.
 
-daemon/packaging component
---------------------------
+daemon/.packaging component
+---------------------------
 
 This is special component that is used by all others components.
 For each distribution and version are created two docker images with this component.
@@ -40,7 +40,7 @@ and *Run docker image* is tagged as :code:`kr-packaging-tests-<distro><version>-
 Others components
 -----------------
 
-All others components are based on *daemon/packaging* component (docker image).
+All others components are based on *daemon/.packaging* component (docker image).
 When component needs new building dependencies, new running dependencies
 or some scripts that change build or run phase (see `File structure of each component`_),
 new docker image is created.
