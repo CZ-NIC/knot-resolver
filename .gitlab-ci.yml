@@ -480,6 +480,11 @@ packaging:ubuntu_16.04:
   variables:
     DISTRO: ubuntu_16.04
 
+packaging:centos_8:
+  <<: *packagingtest
+  variables:
+    DISTRO: centos_8
+
 packaging:centos_7:
   <<: *packagingtest
   variables:
