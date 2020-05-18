@@ -1,4 +1,4 @@
-"pkgconfig(libedit)"
-"pkgconfig(libknot)"
-"pkgconfig(libuv)"
-"pkgconfig(luajit)"
+libedit
+knot-libs
+libuv
+luajit
