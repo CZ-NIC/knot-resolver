@@ -11,8 +11,6 @@ from abc import ABC, abstractmethod
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-EXCLUDED_TEST_DIRS = ['tests/unit/packaging', 'tests/packaging',
-                      'tests/integration/deckard/contrib/libfaketime/packaging']
 client = docker.from_env()
 
 
@@ -101,7 +99,7 @@ class DockerImages(ABC):
 
         dockerf.write('FROM {}\n'.format(from_image))
         dockerf.write('WORKDIR /root/kresd\n')
-        if self.module == 'daemon/packaging':
+        if self.module == 'daemon/.packaging':
             dockerf.write('COPY . /root/kresd\n')
         # when this file doesn't exists, tzdata needs user interaction
         dockerf.write('RUN if [ ! -f /etc/localtime ];' +
@@ -324,7 +322,7 @@ def list_dirs(path, exclude=None):
 
     for rootpath, dirs, _ in os.walk(path):
 
-        if (os.path.basename(rootpath) == 'packaging'):
+        if (os.path.basename(rootpath) == '.packaging'):
             fdir = os.path.relpath(rootpath, path)
             if exclude is not None:
                 if fdir not in exclude:
@@ -336,8 +334,8 @@ def list_dirs(path, exclude=None):
 
 
 def list_tests_dirs():
-    """return all 'packaging' directories without directories included in EXCLUDED_TEST_DIRS"""
-    return list_dirs(pytest.KR_ROOT_DIR, EXCLUDED_TEST_DIRS)
+    """return all 'packaging' directories"""
+    return list_dirs(pytest.KR_ROOT_DIR)
 
 
 def list_distro_vers(distro_root):
@@ -353,7 +351,7 @@ def list_distro_vers(distro_root):
 
 
 MODULES = list_tests_dirs()
-DISTROS = list_distro_vers(os.path.join(pytest.KR_ROOT_DIR, 'daemon/packaging'))
+DISTROS = list_distro_vers(os.path.join(pytest.KR_ROOT_DIR, 'daemon/.packaging'))
 DISTROS_NAMES = ['{0}_{1}'.format(distro['name'], distro['version']) for distro in DISTROS]
 
 
@@ -366,7 +364,7 @@ def buildenv(request, tmpdir_factory):
     if img is None:
         logger.warning('Unknown distro {}'.format(distro['name']))
     else:
-        img.module = 'daemon/packaging'
+        img.module = 'daemon/.packaging'
         tmpdir = tmpdir_factory.mktemp(distro['name']+distro['version'])
         img.build(tmpdir, tag=pytest.KR_PREFIX+distro['name']+distro['version']+'-build')
         img.build_run(tmpdir, img.build_id,
@@ -395,7 +393,7 @@ def test_collect(module, buildenv, tmp_path):
         pytest.skip('Unsupported linux distribution ({0} {1}:{2})'.format(buildenv.distro, buildenv.version, module))
 
     try:
-        if module == 'daemon/packaging':
+        if module == 'daemon/.packaging':
             # use main "run image" without changes
             logging.info('Use main "run image"')
             ch = ContainerHandler(buildenv.run_id)
@@ -409,14 +407,14 @@ def test_collect(module, buildenv, tmp_path):
                 buildmod.module = module
                 buildmod.build(tmp_path, from_image=buildenv.build_id,
                                tag=pytest.KR_PREFIX+buildmod.distro+buildmod.version+'-' +
-                               module+'-build')
+                               module.replace('/.packaging', '')+'-build')
 
             if buildmod is not None:
                 # new build image was made, create new module specific "run image"
                 logger.info('Create module specific "run image" from Dockerfile')
                 buildmod.build_run(tmp_path, buildmod.build_id,
                                    tag=pytest.KR_PREFIX+buildmod.distro+buildmod.version+'-' +
-                                   module+'-run', from_image=buildenv.run_id)
+                                   module.replace('/.packaging', '')+'-run', from_image=buildenv.run_id)
                 ch = ContainerHandler(buildmod.run_id)
                 ch.run()
             elif os.path.isfile(os.path.join(distro_dir, 'pre-run.sh')) \
