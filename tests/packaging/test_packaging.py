@@ -390,6 +390,7 @@ def test_collect(module, buildenv, tmp_path):
     if os.path.isfile(os.path.join(distro_dir, 'NOTSUPPORTED')):
         pytest.skip('Unsupported linux distribution ({0} {1}:{2})'.format(buildenv.distro, buildenv.version, module))
 
+    ch = None
     try:
         if module == 'daemon/.packaging':
             # use main "run image" without changes
@@ -451,8 +452,9 @@ def test_collect(module, buildenv, tmp_path):
             ch.exec_cmd(os.path.join('..', module, 'test.sh'),
                         '/root/kresd/install_packaging/')
         else:
-            ch.stop()
-            ch.container.remove()
+            if ch is not None:
+                ch.stop()
+                ch.container.remove()
             logger.error('Test file (test.config or test.sh) not found')
             assert False
 
@@ -467,8 +469,9 @@ def test_collect(module, buildenv, tmp_path):
         logger.debug('rcode: {}'.format(rcode))
         logger.error(out.decode('utf-8'))
     finally:
-        ch.stop()
-        ch.container.remove()
+        if ch is not None:
+            ch.stop()
+            ch.container.remove()
         if buildmod is not None and buildmod is not buildenv:
             client.images.remove(buildmod.run_id)
             client.images.remove(buildmod.build_id)
