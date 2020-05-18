@@ -405,14 +405,14 @@ def test_collect(module, buildenv, tmp_path):
                 buildmod.module = module
                 buildmod.build(tmp_path, from_image=buildenv.build_id,
                                tag=pytest.KR_PREFIX+buildmod.distro+buildmod.version+'-' +
-                               module+'-build')
+                               module.replace('/.packaging', '')+'-build')
 
             if buildmod is not None:
                 # new build image was made, create new module specific "run image"
                 logger.info('Create module specific "run image" from Dockerfile')
                 buildmod.build_run(tmp_path, buildmod.build_id,
                                    tag=pytest.KR_PREFIX+buildmod.distro+buildmod.version+'-' +
-                                   module+'-run', from_image=buildenv.run_id)
+                                   module.replace('/.packaging', '')+'-run', from_image=buildenv.run_id)
                 ch = ContainerHandler(buildmod.run_id)
                 ch.run()
             elif os.path.isfile(os.path.join(distro_dir, 'pre-run.sh')) \
