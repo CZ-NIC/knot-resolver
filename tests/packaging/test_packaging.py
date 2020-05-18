@@ -34,7 +34,7 @@ class ContainerHandler():
 
     def exec_cmd(self, cmd, workdir):
         # workaround: When exec_run is called in GitLab CI/CD workdir argument doesn't work.
-        inter_cmd=''
+        inter_cmd = ''
         if workdir is not None:
             inter_cmd = 'cd {}; '.format(workdir)
 
@@ -84,7 +84,6 @@ class DockerImages(ABC):
         """Generate Dockerfile for build image"""
         if self.module is None:
             raise AttributeError
-
 
         if from_image is None:
             if os.path.isfile(os.path.join(self.module, self.distro, 'docker-image-name')):
@@ -226,7 +225,6 @@ class CentosImage(DockerImages):
         return "yum install -y "
 
     def cmd_kresd_install(self):
-        #return 'ninja-build -C build_packaging install >/dev/null'
         return 'ninja-build -C build_packaging install'
 
     def cmd_kresd_build(self):
