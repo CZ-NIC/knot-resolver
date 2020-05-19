@@ -75,7 +75,7 @@ unit_tests += [
 
 integr_tests += [
   ['cache_minimal_nsec', join_paths(meson.current_source_dir(), 'cache', 'test.integr')],
-  ['iter_cname_length' , join_paths(meson.current_source_dir(), 'layer', 'test.integr')],
+  ['iter_limits' , join_paths(meson.current_source_dir(), 'layer', 'test.integr')],
 ]
 
 libkres_inc = include_directories('..')

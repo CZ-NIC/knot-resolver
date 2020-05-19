@@ -869,7 +869,8 @@ static int process_stub(knot_pkt_t *pkt, struct kr_request *req)
 }
 
 
-/** Error handling, RFC1034 5.3.3, 4d. */
+/** Error handling, RFC1034 5.3.3, 4d.
+ * NOTE: returing this does not prevent further queries (by itself). */
 static int resolve_error(knot_pkt_t *pkt, struct kr_request *req)
 {
 	return KR_STATE_FAIL;
