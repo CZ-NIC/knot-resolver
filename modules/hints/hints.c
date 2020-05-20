@@ -106,10 +106,18 @@ static int satisfy_forward(/*const*/ struct hints_data *data,
 	knot_dname_t *qname = knot_dname_copy(qry->sname, &pkt->mm);
 	knot_rrset_t rr;
 	knot_rrset_init(&rr, qname, qry->stype, qry->sclass, data->ttl);
-	size_t family_len = sizeof(struct in_addr);
-	if (rr.type == KNOT_RRTYPE_AAAA) {
+
+	size_t family_len;
+	switch (rr.type) {
+	case KNOT_RRTYPE_A:
+		family_len = sizeof(struct in_addr);
+		break;
+	case KNOT_RRTYPE_AAAA:
 		family_len = sizeof(struct in6_addr);
-	}
+		break;
+	default:
+		goto finish;
+	};
 
 	/* Append address records from hints */
 	uint8_t *addr = pack_head(*addr_set);
@@ -121,7 +129,7 @@ static int satisfy_forward(/*const*/ struct hints_data *data,
 		}
 		addr = pack_obj_next(addr);
 	}
-
+finish:
 	return put_answer(pkt, qry, &rr, data->use_nodata);
 }
 
@@ -137,20 +145,19 @@ static int query(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (!data) { /* No valid file. */
 		return ctx->state;
 	}
+	/* We can optimize for early return like this: */
+	if (!data->use_nodata && qry->stype != KNOT_RRTYPE_A
+	    && qry->stype != KNOT_RRTYPE_AAAA && qry->stype != KNOT_RRTYPE_PTR) {
+		return ctx->state;
+	}
 	/* FIXME: putting directly into packet breaks ordering in case the hint
 	 * is applied after a CNAME jump. */
-	switch(qry->stype) {
-	case KNOT_RRTYPE_A:
-	case KNOT_RRTYPE_AAAA: /* Find forward record hints */
-		if (satisfy_forward(data, pkt, qry) != 0)
-			return ctx->state;
-		break;
-	case KNOT_RRTYPE_PTR: /* Find PTR record */
+	if (knot_dname_in_bailiwick(qry->sname, (const uint8_t *)"\4arpa\0") >= 0) {
 		if (satisfy_reverse(data, pkt, qry) != 0)
 			return ctx->state;
-		break;
-	default:
-		return ctx->state; /* Ignore */
+	} else {
+		if (satisfy_forward(data, pkt, qry) != 0)
+			return ctx->state;
 	}
 
 	VERBOSE_MSG(qry, "<= answered from hints\n");
