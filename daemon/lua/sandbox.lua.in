@@ -457,7 +457,11 @@ function eval_cmd(line, raw)
 	    end
 	end
 	local err, chunk
-	chunk, err = load_code(raw and 'return '..line or 'return table_print('..line..')')
+	chunk, err = load_code(raw and 'return '..line or 'out="" t={'..line..'}\
+			for _,v in pairs(t) do\
+				out=out..table_print(v)\
+			end\
+			return out')
 	if err then
 		chunk, err = load_code(line)
 	end
