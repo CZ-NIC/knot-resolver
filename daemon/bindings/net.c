@@ -301,16 +301,31 @@ static int net_interfaces(lua_State *L)
 /** Set UDP maximum payload size. */
 static int net_bufsize(lua_State *L)
 {
+	int argc = lua_gettop(L);
 	struct engine *engine = engine_luaget(L);
-	knot_rrset_t *opt_rr = engine->resolver.opt_rr;
-	if (!lua_isnumber(L, 1)) {
-		lua_pushinteger(L, knot_edns_get_payload(opt_rr));
-		return 1;
+	knot_rrset_t *downstream_opt_rr = engine->resolver.downstream_opt_rr;
+	knot_rrset_t *upstream_opt_rr = engine->resolver.upstream_opt_rr;
+
+	if (argc == 0) {
+		lua_pushinteger(L, knot_edns_get_payload(downstream_opt_rr));
+		lua_pushinteger(L, knot_edns_get_payload(upstream_opt_rr));
+		return 2;
 	}
-	int bufsize = lua_tointeger(L, 1);
-	if (bufsize < 512 || bufsize > UINT16_MAX)
-		lua_error_p(L, "bufsize must be within <512, " STR(UINT16_MAX) ">");
-	knot_edns_set_payload(opt_rr, (uint16_t) bufsize);
+
+	if (argc == 1) {
+		int bufsize = lua_tointeger(L, 1);
+		if (bufsize < 512 || bufsize > UINT16_MAX)
+			lua_error_p(L, "bufsize must be within <512, " STR(UINT16_MAX) ">");
+		knot_edns_set_payload(downstream_opt_rr, (uint16_t) bufsize);
+		knot_edns_set_payload(upstream_opt_rr, (uint16_t) bufsize);
+	} else if (argc == 2) {
+		int bufsize_downstream = lua_tointeger(L, 1);
+		int bufsize_upstream = lua_tointeger(L, 2);
+		if (bufsize_downstream < 512 || bufsize_upstream < 512 || bufsize_downstream > UINT16_MAX || bufsize_upstream > UINT16_MAX)
+			lua_error_p(L, "bufsize must be within <512, " STR(UINT16_MAX) ">");
+		knot_edns_set_payload(downstream_opt_rr, (uint16_t) bufsize_downstream);
+		knot_edns_set_payload(upstream_opt_rr, (uint16_t) bufsize_upstream);
+	}
 	return 0;
 }
 
