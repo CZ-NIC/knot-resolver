@@ -447,7 +447,7 @@ static int init_resolver(struct engine *engine)
 	if (!engine->resolver.downstream_opt_rr || !engine->resolver.upstream_opt_rr) {
 		return kr_error(ENOMEM);
 	}
-	knot_edns_init(engine->resolver.downstream_opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, engine->pool);
+	knot_edns_init(engine->resolver.downstream_opt_rr, 4096, 0, KR_EDNS_VERSION, engine->pool);
 	knot_edns_init(engine->resolver.upstream_opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, engine->pool);
 	/* Use default TLS padding */
 	engine->resolver.tls_padding = -1;
