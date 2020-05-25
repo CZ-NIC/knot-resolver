@@ -39,8 +39,10 @@ function M.not_contains(table, value, message)
 	return contains(fail, pass, table, value, message)
 end
 
+-- Resolve a name and check the answer.  Do *not* return until finished.
 function M.check_answer(desc, qname, qtype, expected_rcode)
 	qtype_str = kres.tostring.type[qtype]
+	local done = false
 	callback = function(pkt)
 		same(pkt:rcode(), expected_rcode,
 		     desc .. ': expecting answer for query ' .. qname .. ' ' .. qtype_str
@@ -48,8 +50,15 @@ function M.check_answer(desc, qname, qtype, expected_rcode)
 
 		ok((pkt:ancount() > 0) == (pkt:rcode() == kres.rcode.NOERROR),
 		   desc ..': checking number of answers for ' .. qname .. ' ' .. qtype_str)
+		done = true
 	end
 	resolve(qname, qtype, kres.class.IN, {}, callback)
+
+	for delay = 0.1, 4, 0.5 do -- total max 14.9s in 8 steps
+		if done then return end
+		worker.sleep(delay)
+	end
+	if not done then fail('check_answer() timed out') end
 end
 
 return M
