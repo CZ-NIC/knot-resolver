@@ -39,16 +39,20 @@ function M.not_contains(table, value, message)
 	return contains(fail, pass, table, value, message)
 end
 
+M.NODATA = -1
 -- Resolve a name and check the answer.  Do *not* return until finished.
 function M.check_answer(desc, qname, qtype, expected_rcode)
-	qtype_str = kres.tostring.type[qtype]
-	local done = false
-	callback = function(pkt)
-		same(pkt:rcode(), expected_rcode,
-		     desc .. ': expecting answer for query ' .. qname .. ' ' .. qtype_str
-		      .. ' with rcode ' .. kres.tostring.rcode[expected_rcode])
+	local qtype_str = kres.tostring.type[qtype]
+	local wire_rcode = expected_rcode
+	if expected_rcode == M.NODATA then wire_rcode = kres.rcode.NOERROR end
 
-		ok((pkt:ancount() > 0) == (pkt:rcode() == kres.rcode.NOERROR),
+	local done = false
+	local callback = function(pkt)
+		same(pkt:rcode(), wire_rcode,
+		     desc .. ': expecting answer for query ' .. qname .. ' ' .. qtype_str
+		      .. ' with rcode ' .. kres.tostring.rcode[wire_rcode])
+
+		ok((pkt:ancount() > 0) == (expected_rcode == kres.rcode.NOERROR),
 		   desc ..': checking number of answers for ' .. qname .. ' ' .. qtype_str)
 		done = true
 	end
