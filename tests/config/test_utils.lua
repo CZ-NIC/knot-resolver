@@ -39,4 +39,17 @@ function M.not_contains(table, value, message)
 	return contains(fail, pass, table, value, message)
 end
 
+function M.check_answer(desc, qname, qtype, expected_rcode)
+	qtype_str = kres.tostring.type[qtype]
+	callback = function(pkt)
+		same(pkt:rcode(), expected_rcode,
+		     desc .. ': expecting answer for query ' .. qname .. ' ' .. qtype_str
+		      .. ' with rcode ' .. kres.tostring.rcode[expected_rcode])
+
+		ok((pkt:ancount() > 0) == (pkt:rcode() == kres.rcode.NOERROR),
+		   desc ..': checking number of answers for ' .. qname .. ' ' .. qtype_str)
+	end
+	resolve(qname, qtype, kres.class.IN, {}, callback)
+end
+
 return M
