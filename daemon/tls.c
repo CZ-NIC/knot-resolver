@@ -253,6 +253,10 @@ static int tls_handshake(struct tls_common_ctx *ctx, tls_handshake_cb handshake_
 		kr_log_verbose("[%s] gnutls_handshake failed: %s (%d)\n",
 			     logstring,
 		             gnutls_strerror_name(err), err);
+		/* Attemp to notify the client via an alert. The alert may not get through
+		 * if the data gets buffered in kres_gnutls_vec_push() instead of being sent
+		 * immediately and the TCP connection is shut down in the meantime. */
+		gnutls_alert_send_appropriate(ctx->tls_session, err);
 		if (handshake_cb) {
 			handshake_cb(session, -1);
 		}
