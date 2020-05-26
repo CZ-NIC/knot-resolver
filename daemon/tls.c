@@ -253,6 +253,8 @@ static int tls_handshake(struct tls_common_ctx *ctx, tls_handshake_cb handshake_
 		kr_log_verbose("[%s] gnutls_handshake failed: %s (%d)\n",
 			     logstring,
 		             gnutls_strerror_name(err), err);
+		/* Notify the peer about handshake failure via an alert. */
+		gnutls_alert_send_appropriate(ctx->tls_session, err);
 		if (handshake_cb) {
 			handshake_cb(session, -1);
 		}
