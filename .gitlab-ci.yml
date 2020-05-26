@@ -19,11 +19,11 @@ variables:
 image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
 
 stages:
-  - build
-  - test
-  - extended
+  #  - build
+  #  - test
+  #  - extended
   - deploy
-  - deploy-test
+  #- deploy-test
 
 # build {{{
 .build: &build
@@ -516,49 +516,53 @@ nightly:copy:
     variables:
       - $CREATE_NIGHTLY == "1"
     refs:
-      - master@knot/knot-resolver
+      - packaging-pytest@knot/knot-resolver
   dependencies: []
   script:
     # delete nightly branch
-    - 'curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/unprotect"'
-    - 'curl --request DELETE --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly"'
+    - 'STATUS=$(curl --request PUT --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}x" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/unprotect")'
+    - '[ $STATUS -ne 200 ] && exit $STATUS'
+    - 'STATUS=$(curl --request DELETE --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly")'
+    - '[ $STATUS -ne 200 ] && exit $STATUS'
     # recreate nightly branch from current master
-    - 'curl --request POST --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches?branch=nightly&ref=master"'
-    - 'curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/protect"'
+    - 'STATUS=$(curl --request POST --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches?branch=nightly&ref=master")'
+    - '[ $STATUS -ne 200 ] && exit $STATUS'
+    - 'STATUS=$(curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/protect")'
+    - '[ $STATUS -ne 200 ] && exit $STATUS'
 
-obs:trigger: &obs_trigger
-  stage: deploy
-  only:
-    variables:
-      - $OBS_REPO
-  dependencies:
-    - archive
-  environment:
-    name: OBS/$OBS_REPO
-    url: https://build.opensuse.org/package/show/home:CZ-NIC:$OBS_REPO/knot-resolver
-  tags:
-    - respdiff
-  allow_failure: false  # required to make when: manual action blocking
-  script:
-    - scripts/make-distrofiles.sh
-    - echo y | scripts/build-in-obs.sh $OBS_REPO
-
-obs:release:
-  <<: *obs_trigger
-  only:
-    - tags
-  variables:
-    OBS_REPO: knot-resolver-latest
-  when: manual
-
-obs:odvr:
-  <<: *obs_trigger
-  stage: deploy-test  # last stage to ensure it doesn't block anything
-  only:
-    - tags
-  variables:
-    OBS_REPO: knot-resolver-odvr
-  when: manual
+#obs:trigger: &obs_trigger
+#  stage: deploy
+#  only:
+#    variables:
+#      - $OBS_REPO
+#  dependencies:
+#    - archive
+#  environment:
+#    name: OBS/$OBS_REPO
+#    url: https://build.opensuse.org/package/show/home:CZ-NIC:$OBS_REPO/knot-resolver
+#  tags:
+#    - respdiff
+#  allow_failure: false  # required to make when: manual action blocking
+#  script:
+#    - scripts/make-distrofiles.sh
+#    - echo y | scripts/build-in-obs.sh $OBS_REPO
+#
+#obs:release:
+#  <<: *obs_trigger
+#  only:
+#    - tags
+#  variables:
+#    OBS_REPO: knot-resolver-latest
+#  when: manual
+#
+#obs:odvr:
+#  <<: *obs_trigger
+#  stage: deploy-test  # last stage to ensure it doesn't block anything
+#  only:
+#    - tags
+#  variables:
+#    OBS_REPO: knot-resolver-odvr
+#  when: manual
 # }}}
 
 # deploy-test {{{
