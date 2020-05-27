@@ -1,0 +1,7 @@
+libopenssl-devel
+lua51-devel
+lua51-luarocks
+git
+tar
+gzip
+m4
