@@ -441,6 +441,70 @@ resperf:iter.udp-asan:
   <<: *resperf
   variables:
     RESPERF_TEST: resperf.iter.udp
+
+.packagingtest: &packagingtest
+  stage: extended
+  only:
+    refs:
+      - nightly@knot/knot-resolver
+  dependencies: []
+  tags:
+    - dind
+  variables:
+    DISTRO: debian_10
+  script:
+    - pytest -r fEsxX tests/packaging -k $DISTRO
+
+packaging:debian_10:
+  <<: *packagingtest
+  variables:
+    DISTRO: debian_10
+
+packaging:debian_9:
+  <<: *packagingtest
+  variables:
+    DISTRO: debian_9
+
+packaging:ubuntu_20.04:
+  <<: *packagingtest
+  variables:
+    DISTRO: ubuntu_20.04
+
+packaging:ubuntu_18.04:
+  <<: *packagingtest
+  variables:
+    DISTRO: ubuntu_18.04
+
+packaging:ubuntu_16.04:
+  <<: *packagingtest
+  variables:
+    DISTRO: ubuntu_16.04
+
+packaging:centos_8:
+  <<: *packagingtest
+  variables:
+    DISTRO: centos_8
+
+packaging:centos_7:
+  <<: *packagingtest
+  variables:
+    DISTRO: centos_7
+
+packaging:fedora_31:
+  <<: *packagingtest
+  variables:
+    DISTRO: fedora_31
+
+packaging:fedora_32:
+  <<: *packagingtest
+  variables:
+    DISTRO: fedora_32
+
+packaging:leap_15.2:
+  <<: *packagingtest
+  variables:
+    DISTRO: leap_15.2
+
 # }}}
 
 # deploy {{{
@@ -455,12 +519,18 @@ nightly:copy:
       - master@knot/knot-resolver
   dependencies: []
   script:
+    - 'tmp_file=$(mktemp)'
     # delete nightly branch
-    - 'curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/unprotect"'
-    - 'curl --request DELETE --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly"'
+    - 'STATUS=$(curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" -s -o ${tmp_file} -w "%{http_code}" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/unprotect")'
+    - '[ "x${STATUS}" == "x200" ] || { cat ${tmp_file}; rm ${tmp_file}; exit 1; }'
+    # no output from DELETE command
+    - 'STATUS=$(curl --request DELETE --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" -s -o ${tmp_file} -w "%{http_code}" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly")'
     # recreate nightly branch from current master
-    - 'curl --request POST --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches?branch=nightly&ref=master"'
-    - 'curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/protect"'
+    - 'STATUS=$(curl --request POST --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" -s -o ${tmp_file} -w "%{http_code}" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches?branch=nightly&ref=master")'
+    - '[ "x${STATUS}" == "x201" ] || { cat ${tmp_file}; rm ${tmp_file}; exit 1; }'
+    - 'STATUS=$(curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" -s -o ${tmp_file} -w "%{http_code}" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/protect")'
+    - '[ "x${STATUS}" == "x200" ] || { cat ${tmp_file}; rm ${tmp_file}; exit 1; }'
+    - 'rm ${tmp_file}'
 
 obs:trigger: &obs_trigger
   stage: deploy

@@ -1,0 +1,6 @@
+knot-libs
+libedit
+libuv
+luajit
+lua-basexx
+lua-http
