@@ -2,13 +2,12 @@
 
 sysrepo_src = files([
 	'sysrepo.c',
-	'callbacks.c',
-	'conversion.c',
-	'conv_funcs.c',
 ])
 c_src_lint += sysrepo_src
 
 sysrepo_common_src = files([
+	'common/sysrepo.c',
+	'common/sysrepo.h',
 	'common/sysrepo_conf.c',
 	'common/sysrepo_conf.h',
 	'common/string_helper.h',
