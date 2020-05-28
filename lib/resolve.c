@@ -147,24 +147,6 @@ static void randomized_qname_case(knot_dname_t * restrict qname, uint32_t secret
 	}
 }
 
-/** Invalidate current NS/addr pair. */
-// NS_REP
-// static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
-// {
-// 	if (qry->ns.addr[0].ip.sa_family != AF_UNSPEC) {
-// 		const char *addr = kr_inaddr(&qry->ns.addr[0].ip);
-// 		int addr_len = kr_inaddr_len(&qry->ns.addr[0].ip);
-// 		int ret = kr_zonecut_del(&qry->zone_cut, qry->ns.name, addr, addr_len);
-// 		/* Also remove it from the qry->ns.addr array.
-// 		 * That's useful at least for STUB and FORWARD modes. */
-// 		memmove(qry->ns.addr, qry->ns.addr + 1,
-// 			sizeof(qry->ns.addr[0]) * (KR_NSREP_MAXADDR - 1));
-// 		return ret;
-// 	} else {
-// 		return kr_zonecut_del_all(&qry->zone_cut, qry->ns.name);
-// 	}
-// }
-
 /** This turns of QNAME minimisation if there is a non-terminal between current zone cut, and name target.
  *  It save several minimization steps, as the zone cut is likely final one.
  */
@@ -301,70 +283,6 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	return KR_STATE_PRODUCE;
 }
 
-static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
-{
-	struct kr_rplan *rplan = &param->rplan;
-	struct kr_context *ctx = param->ctx;
-
-
-	/* Start NS queries from root, to avoid certain cases
-	 * where a NS drops out of cache and the rest is unavailable,
-	 * this would lead to dependency loop in current zone cut.
-	 * Prefer IPv6 and continue with IPv4 if not available.
-	 */
-	uint16_t next_type = 0;
-	if (!(qry->flags.AWAIT_IPV6) &&
-	    !(ctx->options.NO_IPV6)) {
-		next_type = KNOT_RRTYPE_AAAA;
-		qry->flags.AWAIT_IPV6 = true;
-	} else if (!(qry->flags.AWAIT_IPV4) &&
-		   !(ctx->options.NO_IPV4)) {
-		next_type = KNOT_RRTYPE_A;
-		qry->flags.AWAIT_IPV4 = true;
-		/* Hmm, no useable IPv6 then. */
-		// NS_REP
-		// qry->ns.reputation |= KR_NS_NOIP6;
-		// kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
-	}
-	/* Bail out if the query is already pending or dependency loop. */
-	if (!next_type || kr_rplan_satisfies(qry->parent, qry->ns.name, KNOT_CLASS_IN, next_type)) {
-		/* Fall back to SBELT if root server query fails. */
-		if (!next_type && qry->zone_cut.name[0] == '\0') {
-			VERBOSE_MSG(qry, "=> fallback to root hints\n");
-			kr_zonecut_set_sbelt(ctx, &qry->zone_cut);
-			qry->flags.NO_THROTTLE = true; /* Pick even bad SBELT servers */
-			return kr_error(EAGAIN);
-		}
-		/* No IPv4 nor IPv6, flag server as unusable. */
-		VERBOSE_MSG(qry, "=> unresolvable NS address, bailing out\n");
-		// NS_REP: qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
-		// NS_REP: kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
-		// NS_REP: invalidate_ns(rplan, qry);
-		return kr_error(EHOSTUNREACH);
-	}
-	/* Push new query to the resolution plan */
-	struct kr_query *next =
-		kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, next_type);
-	if (!next) {
-		return kr_error(ENOMEM);
-	}
-	next->flags.NONAUTH = true;
-
-	/* At the root level with no NS addresses, add SBELT subrequest. */
-	int ret = 0;
-	if (qry->zone_cut.name[0] == '\0') {
-		ret = kr_zonecut_set_sbelt(ctx, &next->zone_cut);
-		if (ret == 0) { /* Copy TA and key since it's the same cut to avoid lookup. */
-			kr_zonecut_copy_trust(&next->zone_cut, &qry->zone_cut);
-			kr_zonecut_set_sbelt(ctx, &qry->zone_cut); /* Add SBELT to parent in case query fails. */
-			qry->flags.NO_THROTTLE = true; /* Pick even bad SBELT servers */
-		}
-	} else {
-		next->flags.AWAIT_CUT = true;
-	}
-	return ret;
-}
-
 static int edns_put(knot_pkt_t *pkt, bool reclaim)
 {
 	if (!pkt->opt_rr) {
@@ -381,6 +299,8 @@ static int edns_put(knot_pkt_t *pkt, bool reclaim)
 	assert(pkt->current == KNOT_ADDITIONAL);
 	return knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, pkt->opt_rr, KNOT_PF_FREE);
 }
+
+
 
 /** Removes last EDNS OPT RR written to the packet. */
 static int edns_erase_and_reserve(knot_pkt_t *pkt)
@@ -1310,20 +1230,94 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 	return trust_chain_check(request, qry);
 }
 
-/** @internal Macro to set address structure. */
-#define ADDR_SET(sa, family, addr, len, port) do {\
-    	memcpy(&sa ## _addr, (addr), (len)); \
-    	sa ## _family = (family); \
-	sa ## _port = htons(port); \
-} while (0)
+/** Invalidate current NS/addr pair. */
+static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
+{
+	if (qry->ns.addr[0].ip.sa_family != AF_UNSPEC) {
+		const char *addr = kr_inaddr(&qry->ns.addr[0].ip);
+		int addr_len = kr_inaddr_len(&qry->ns.addr[0].ip);
+		int ret = kr_zonecut_del(&qry->zone_cut, qry->ns.name, addr, addr_len);
+		/* Also remove it from the qry->ns.addr array.
+		 * That's useful at least for STUB and FORWARD modes. */
+		// NS_REP
+		// memmove(qry->ns.addr, qry->ns.addr + 1,
+		// 	sizeof(qry->ns.addr[0]) * (KR_NSREP_MAXADDR - 1));
+		return ret;
+	} else {
+		return kr_zonecut_del_all(&qry->zone_cut, qry->ns.name);
+	}
+}
 
-uint32_t A_ROOT_IP = 167772161; // This is 1.0.0.10 used in maze tests
-knot_dname_t a_root[255];
+int kr_ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
+{
+	struct kr_rplan *rplan = &param->rplan;
+	struct kr_context *ctx = param->ctx;
+
+
+	/* Start NS queries from root, to avoid certain cases
+	 * where a NS drops out of cache and the rest is unavailable,
+	 * this would lead to dependency loop in current zone cut.
+	 * Prefer IPv6 and continue with IPv4 if not available.
+	 */
+	uint16_t next_type = 0;
+	if (!(qry->flags.AWAIT_IPV6) &&
+	    !(ctx->options.NO_IPV6)) {
+		next_type = KNOT_RRTYPE_AAAA;
+		qry->flags.AWAIT_IPV6 = true;
+	} else if (!(qry->flags.AWAIT_IPV4) &&
+		   !(ctx->options.NO_IPV4)) {
+		next_type = KNOT_RRTYPE_A;
+		qry->flags.AWAIT_IPV4 = true;
+		/* Hmm, no useable IPv6 then. */
+		// NS_REP
+		// qry->ns.reputation |= KR_NS_NOIP6;
+		// kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
+	}
+	/* Bail out if the query is already pending or dependency loop. */
+	if (!next_type || kr_rplan_satisfies(qry->parent, qry->ns.name, KNOT_CLASS_IN, next_type)) {
+		/* Fall back to SBELT if root server query fails. */
+		if (!next_type && qry->zone_cut.name[0] == '\0') {
+			VERBOSE_MSG(qry, "=> fallback to root hints\n");
+			kr_zonecut_set_sbelt(ctx, &qry->zone_cut);
+			qry->flags.NO_THROTTLE = true; /* Pick even bad SBELT servers */
+			return kr_error(EAGAIN);
+		}
+		/* No IPv4 nor IPv6, flag server as unusable. */
+		VERBOSE_MSG(qry, "=> unresolvable NS address, bailing out\n");
+		// NS_REP: qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
+		// NS_REP: kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
+		invalidate_ns(rplan, qry);
+		return kr_error(EHOSTUNREACH);
+	}
+	/* Push new query to the resolution plan */
+	struct kr_query *next =
+		kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, next_type);
+	if (!next) {
+		return kr_error(ENOMEM);
+	}
+	next->flags.NONAUTH = true;
+
+	/* At the root level with no NS addresses, add SBELT subrequest. */
+	int ret = 0;
+	if (qry->zone_cut.name[0] == '\0') {
+		ret = kr_zonecut_set_sbelt(ctx, &next->zone_cut);
+		if (ret == 0) { /* Copy TA and key since it's the same cut to avoid lookup. */
+			kr_zonecut_copy_trust(&next->zone_cut, &qry->zone_cut);
+			kr_zonecut_set_sbelt(ctx, &qry->zone_cut); /* Add SBELT to parent in case query fails. */
+			qry->flags.NO_THROTTLE = true; /* Pick even bad SBELT servers */
+		}
+	} else {
+		next->flags.AWAIT_CUT = true;
+	}
+	if(!ret) {
+		ITERATE_LAYERS(param, qry, reset);
+	}
+	return ret;
+}
 
 int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *type, knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
-	unsigned ns_election_iter = 0;
 
 	/* No query left for resolution */
 	if (kr_rplan_empty(rplan)) {
@@ -1430,24 +1424,10 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		}
 	}
 
-	qry->ns.name = knot_dname_from_str(a_root, "a.root-server.net", 255);
+	if(kr_nsrep_elect(qry, request->ctx) == KR_STATE_PRODUCE) {
+		return KR_STATE_PRODUCE;
+	}
 
-
-	ADDR_SET(qry->ns.addr[0].ip4.sin, AF_INET, &A_ROOT_IP, 4, KR_DNS_PORT);
-
-
-	/* Resolve address records */
-	// if (kr_nsrep_elect(qry)) {
-	// 	int ret = ns_resolve_addr(qry, request);
-	// 	if (ret != 0) {
-	// 		qry->flags.AWAIT_IPV6 = false;
-	// 		qry->flags.AWAIT_IPV4 = false;
-	// 		qry->flags.TCP = false;
-	// 		qry->ns.name = NULL;
-	// 	}
-	// 	ITERATE_LAYERS(request, qry, reset);
-	// 	return KR_STATE_PRODUCE;
-	// }
 
 	/* Randomize query case (if not in safe mode or turned off) */
 	qry->secret = (qry->flags.SAFEMODE || qry->flags.NO_0X20)

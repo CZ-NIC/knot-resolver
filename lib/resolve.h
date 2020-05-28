@@ -254,7 +254,7 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
  * Consume input packet (may be either first query or answer to query originated from kr_resolve_produce())
  *
  * @note If the I/O fails, provide an empty or NULL packet, this will make iterator recognize nameserver failure.
- * 
+ *
  * @param  request request state (awaiting input)
  * @param  src     [in] packet source address
  * @param  packet  [in] input packet
@@ -269,7 +269,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
  * If the CONSUME is returned then dst, type and packet will be filled with
  * appropriate values and caller is responsible to send them and receive answer.
  * If it returns any other state, then content of the variables is undefined.
- * 
+ *
  * @param  request request state (in PRODUCE state)
  * @param  dst     [out] possible address of the next nameserver
  * @param  type    [out] possible used socket type (SOCK_STREAM, SOCK_DGRAM)
@@ -308,6 +308,9 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 KR_EXPORT
 int kr_resolve_finish(struct kr_request *request, int state);
 
+KR_EXPORT
+int kr_ns_resolve_addr(struct kr_query *qry, struct kr_request *param);
+
 /**
  * Return resolution plan.
  * @param  request request state
@@ -323,4 +326,3 @@ struct kr_rplan *kr_resolve_plan(struct kr_request *request);
  */
 KR_EXPORT KR_PURE
 knot_mm_t *kr_resolve_pool(struct kr_request *request);
-
