@@ -1,0 +1,9 @@
+modules.unload('priming')
+
+policy.add(policy.all(policy.DEBUG_ALWAYS))
+policy.add(policy.suffix(policy.MIRROR('192.0.2.1'),
+			 policy.todnames({'example.com', 'example.net'})))
+
+event.after(100, function()
+	print(table_print(policy.list()))
+end)
