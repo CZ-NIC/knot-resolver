@@ -357,8 +357,8 @@ pytests:
     - 'cat respdiff_commitdir/$RESPDIFF_TEST/*histogram.tar.gz | tar -xf - -i ||:'
     - 'rm -f *histogram.tar.gz'
     # copy respdiff reference data for hand-processing
-    - 'mkdir ref-$(readlink ref_current)'
-    - 'cp -t ref-$(readlink ref_current) -r -L /var/tmp/respdiff-jobs/ref_current/*$RESPDIFF_TEST*'
+    - 'mkdir ref-$(readlink /var/tmp/respdiff-jobs/ref_current)'
+    - 'cp -t ref-$(readlink /var/tmp/respdiff-jobs/ref_current) -r -L /var/tmp/respdiff-jobs/ref_current/*$RESPDIFF_TEST*'
   artifacts:
     when: always
     expire_in: 1 week
