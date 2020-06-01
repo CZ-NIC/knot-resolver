@@ -54,19 +54,26 @@ local function addr2sock(target, default_port)
 	return sock
 end
 
+-- translation from functions back to their names and parameters
+local poldesc = {} -- function -> { name, parameters }
+local poldesc_mt = {}  -- metatable with weak keys
+poldesc_mt.__mode = 'k'
+setmetatable(poldesc, poldesc_mt)
+
 -- policy functions are defined below
 local policy = {}
 
 function policy.PASS(state, _)
 	return state
 end
+poldesc[policy.PASS] = {'policy.PASS'}
 
 -- Mirror request elsewhere, and continue solving
 function policy.MIRROR(target)
 	local addr, port = addr_split_port(target, 53)
 	local sink, err = socket_client(ffi.string(addr), port)
 	if not sink then panic('MIRROR target %s is not a valid: %s', target, err) end
-	return function(state, req)
+	local newaction = function(state, req)
 		if state == kres.FAIL then return state end
 		local query = req.qsource.packet
 		if query ~= nil then
@@ -74,6 +81,8 @@ function policy.MIRROR(target)
 		end
 		return -- Chain action to next
 	end
+	poldesc[newaction] = {'policy.MIRROR', target}
+	return newaction
 end
 
 -- Override the list of nameservers (forwarders)
@@ -328,20 +337,24 @@ end
 
 -- All requests
 function policy.all(action)
-	return function(_, _) return action end
+	local newfilter = function(_, _) return action end
+	poldesc[newfilter] = {'policy.all', action}
+	return newfilter
 end
 
 -- Requests which QNAME matches given zone list (i.e. suffix match)
 function policy.suffix(action, zone_list)
 	local AC = require('ahocorasick')
 	local tree = AC.create(zone_list)
-	return function(_, query)
+	local newfilter = function(_, query)
 		local match = AC.match(tree, query:name(), false)
 		if match ~= nil then
 			return action
 		end
 		return nil
 	end
+	poldesc[newfilter] = {'policy.suffix', action, zone_list}
+	return newfilter
 end
 
 -- Check for common suffix first, then suffix match (specialized version of suffix match)
@@ -658,6 +671,7 @@ function policy.DEBUG_ALWAYS(state, req)
 	req:trace_chain_callbacks(debug_logline_cb, debug_logfinish_cb)
 	policy.REQTRACE(state, req)
 end
+poldesc[policy.DEBUG_ALWAYS] = {'policy.DEBUG_ALWAYS'}
 
 local debug_stashlog_cb = ffi.cast('trace_log_f', function (req, msg)
 	jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
@@ -781,6 +795,51 @@ function policy.del(id)
 	return true
 end
 
+function table2string(tab)
+	items = {}
+	for idx, val in pairs(tab) do
+		table.insert(items, '[' .. tostring(idx) .. ']')
+		table.insert(items, '=')
+		if type(val) == 'table' then
+			table.insert(items, table2string(val) .. ',')
+		elseif type(val) == 'string' then
+			table.insert(items, '\'' .. val .. '\',')
+		else
+			table.insert(items, tostring(val) .. ',')
+		end
+	end
+	return '{ ' .. table.concat(items, ' ') .. ' }'
+end
+
+function rule2string(rulefunc)
+	local funcdesc = poldesc[rulefunc] or {}
+	print(rulefunc, funcdesc, #funcdesc)
+	local name = funcdesc[1] or tostring(rulefunc)
+	local argstrs = {}
+	for idx = 2, #funcdesc do
+		local arg = funcdesc[idx]
+		if type(arg) == 'function' then
+			table.insert(argstrs, rule2string(arg))
+		elseif type(arg) == 'table' then
+			table.insert(argstrs, table2string(arg))
+		end
+	end
+	if #argstrs > 0 then
+		return name .. '(' .. table.concat(argstrs, ', ') .. ')'
+	else
+		return name
+	end
+end
+
+function policy.list()
+	local mapping = {}
+	for i = 1, #policy.rules do
+		local rule = policy.rules[i]
+		mapping[rule.id] = rule2string(rule.cb)
+	end
+	return mapping
+end
+
 -- Convert list of string names to domain names
 function policy.todnames(names)
 	for i, v in ipairs(names) do
@@ -788,6 +847,7 @@ function policy.todnames(names)
 	end
 	return names
 end
+
 
 -- RFC1918 Private, local, broadcast, test and special zones
 -- Considerations: RFC6761, sec 6.1.
@@ -977,4 +1037,5 @@ policy.layer = {
 	end
 }
 
+policy.desc = poldesc
 return policy
