@@ -62,6 +62,7 @@ setmetatable(poldesc, poldesc_mt)
 
 -- policy functions are defined below
 local policy = {}
+policy._desc = poldesc
 
 function policy.PASS(state, _)
 	return state
@@ -116,7 +117,7 @@ function policy.STUB(target)
 	else
 		table.insert(list, addr2sock(target, 53))
 	end
-	return function(state, req)
+	local newaction = function(state, req)
 		local qry = req:current()
 		-- Switch mode to stub resolver, do not track origin zone cut since it's not real authority NS
 		qry.flags.STUB = true
@@ -124,6 +125,8 @@ function policy.STUB(target)
 		set_nslist(qry, list)
 		return state
 	end
+	poldesc[newaction] = {'policy.STUB', target}
+	return newaction
 end
 
 -- Forward request and all subrequests to upstream; validate answers
@@ -137,7 +140,7 @@ function policy.FORWARD(target)
 	else
 		table.insert(list, addr2sock(target, 53))
 	end
-	return function(state, req)
+	local newaction = function(state, req)
 		local qry = req:current()
 		req.options.FORWARD = true
 		req.options.NO_MINIMIZE = true
@@ -148,6 +151,8 @@ function policy.FORWARD(target)
 		set_nslist(qry, list)
 		return state
 	end
+	poldesc[newaction] = {'policy.FORWARD', target}
+	return newaction
 end
 
 -- Forward request and all subrequests to upstream over TLS; validate answers
@@ -181,7 +186,7 @@ function policy.TLS_FORWARD(targets)
 		net.tls_client(target)
 	end
 
-	return function(state, req)
+	local newaction = function(state, req)
 		local qry = req:current()
 		req.options.FORWARD = true
 		req.options.NO_MINIMIZE = true
@@ -194,6 +199,8 @@ function policy.TLS_FORWARD(targets)
 		set_nslist(qry, nslist)
 		return state
 	end
+	poldesc[newaction] = {'policy.TLS_FORWARD', targets}
+	return newaction
 end
 
 -- Rewrite records in packet
@@ -205,22 +212,26 @@ function policy.REROUTE(tbl, names)
 		table.insert(prefixes, names and ren.name(from, to) or ren.prefix(from, to))
 	end
 	-- Return rule closure
-	return ren.rule(prefixes)
+	local newaction = ren.rule(prefixes)
+	poldesc[newaction] = {'policy.REROUTE', tbl, names}
+	return newaction
 end
 
 -- Set and clear some query flags
 function policy.FLAGS(opts_set, opts_clear)
-	return function(_, req)
+	local newaction = function(_, req)
 		local qry = req:current()
 		ffi.C.kr_qflags_set  (qry.flags, kres.mk_qflags(opts_set   or {}))
 		ffi.C.kr_qflags_clear(qry.flags, kres.mk_qflags(opts_clear or {}))
 		return nil -- chain rule
 	end
+	poldesc[newaction] = {'policy.FLAGS', opts_set, opts_clear}
+	return newaction
 end
 
 -- Create answer with passed arguments
 function policy.ANSWER(rtable, nodata)
-	return function(_, req)
+	local newaction = function(_, req)
 		local qry = req:current()
 		local answer = req.answer
 		local data = rtable[qry.stype]
@@ -242,6 +253,8 @@ function policy.ANSWER(rtable, nodata)
 			return kres.DONE
 		end
 	end
+	poldesc[newaction] = {'policy.answer', rtable, nodata}
+	return newaction
 end
 
 local function mkauth_soa(answer, dname, mname)
@@ -361,7 +374,7 @@ end
 function policy.suffix_common(action, suffix_list, common_suffix)
 	local common_len = string.len(common_suffix)
 	local suffix_count = #suffix_list
-	return function(_, query)
+	local newfilter = function(_, query)
 		-- Preliminary check
 		local qname = query:name()
 		if not string.find(qname, common_suffix, -common_len, true) then
@@ -376,16 +389,20 @@ function policy.suffix_common(action, suffix_list, common_suffix)
 		end
 		return nil
 	end
+	poldesc[newfilter] = {'policy.suffix_common', action, suffix_list, common_suffix}
+	return newfilter
 end
 
 -- Filter QNAME pattern
 function policy.pattern(action, pattern)
-	return function(_, query)
+	local newfilter = function(_, query)
 		if string.find(query:name(), pattern) then
 			return action
 		end
 		return nil
 	end
+	poldesc[newfilter] = {'policy.pattern', action, pattern}
+	return newfilter
 end
 
 local function rpz_parse(action, path)
@@ -527,7 +544,7 @@ function policy.rpz(action, path, watch)
 		end
 	end
 
-	return function(_, query)
+	local newrpz = function(_, query)
 		local label = query:name()
 		local rule = rules[label]
 		while rule == nil and string.len(label) > 0 do
@@ -536,6 +553,8 @@ function policy.rpz(action, path, watch)
 		end
 		return rule
 	end
+	poldesc[newrpz] = {'policy.rpz', action, path, watch}
+	return newrpz
 end
 
 -- Apply an action when query belongs to a slice (determined by slice_func())
@@ -545,10 +564,12 @@ function policy.slice(slice_func, ...)
 		error('[poli] at least one action must be provided to policy.slice()')
 	end
 
-	return function(_, query)
+	local newfilter = function(_, query)
 		local index = slice_func(query, #actions)
 		return actions[index]
 	end
+	poldesc[newfilter] = {'policy.slice', slice_func, ...}
+	return newfilter
 end
 
 -- Initializes slicing function that randomly assigns queries to a slice based on their registrable domain
@@ -568,7 +589,7 @@ function policy.slice_randomize_psl(seed)
 	end
 	seed = math.floor(seed)  -- convert to int
 
-	return function(query, length)
+	local newfilter = function(query, length)
 		assert(length > 0)
 
 		local domain = kres.dname2str(query:name())
@@ -599,6 +620,8 @@ function policy.slice_randomize_psl(seed)
 		local rand = (1103515245 * rand_seed + 12345) % 0x10000
 		return 1 + rand % length
 	end
+	poldesc[newfilter] = {'policy.slice_randomize_psl', seed}
+	return newfilter
 end
 
 -- Prepare for making an answer from scratch.  (Return the packet for convenience.)
@@ -621,7 +644,7 @@ function policy.DENY_MSG(msg)
 		error('DENY_MSG: optional msg must be string shorter than 256 characters')
         end
 
-	return function (_, req)
+	local newaction = function (_, req)
 		-- Write authority information
 		local answer = answer_clear(req)
 		ffi.C.kr_pkt_make_auth_header(answer)
@@ -636,6 +659,8 @@ function policy.DENY_MSG(msg)
 		end
 		return kres.DONE
 	end
+	poldesc[newaction] = {'policy.DENY_MSG', msg}
+	return newaction
 end
 
 local function free_cb(func)
@@ -665,6 +690,7 @@ function policy.REQTRACE(_, req)
 	ffi.C.kr_log_req(req, 0, 0, 'dbg', 'request packet:\n%s',
 		tostring(req.qsource.packet))
 end
+poldesc[policy.REQTRACE] = {'policy.REQTRACE'}
 
 function policy.DEBUG_ALWAYS(state, req)
 	policy.QTRACE(state, req)
@@ -694,13 +720,15 @@ function policy.DEBUG_IF(test)
 	end)
 	ffi.gc(debug_finish_cb, function (func) func:free() end)
 
-	return function (state, req)
+	local newaction = function (state, req)
 		req:vars()['policy_debug_stash'] = {}
 		policy.QTRACE(state, req)
 		req:trace_chain_callbacks(debug_stashlog_cb, debug_finish_cb)
 		policy.REQTRACE(state, req)
 		return
 	end
+	poldesc[newaction] = {'policy.DEBUG_IF', test}
+	return newaction
 end
 
 policy.DEBUG_CACHE_MISS = policy.DEBUG_IF(
@@ -708,13 +736,16 @@ policy.DEBUG_CACHE_MISS = policy.DEBUG_IF(
 		return not req:all_from_cache()
 	end
 )
+poldesc[policy.DEBUG_CACHE_MISS] = {'policy.DEBUG_CACHE_MISS'}
 
 policy.DENY = policy.DENY_MSG() -- compatibility with < 2.0
+poldesc[policy.DENY] = {'policy.DENY'}
 
 function policy.DROP(_, req)
 	answer_clear(req)
 	return kres.FAIL
 end
+poldesc[policy.DROP] = {'policy.DROP'}
 
 function policy.REFUSE(_, req)
 	local answer = answer_clear(req)
@@ -722,6 +753,7 @@ function policy.REFUSE(_, req)
 	answer:ad(false)
 	return kres.DONE
 end
+poldesc[policy.REFUSE] = {'policy.REFUSE'}
 
 function policy.TC(state, req)
 	-- Skip non-UDP queries
@@ -734,6 +766,7 @@ function policy.TC(state, req)
 	answer:ad(false)
 	return kres.DONE
 end
+poldesc[policy.TC] = {'policy.TC'}
 
 function policy.QTRACE(_, req)
 	local qry = req:current()
@@ -741,6 +774,7 @@ function policy.QTRACE(_, req)
 	qry.flags.TRACE = true
 	return -- this allows to continue iterating over policy list
 end
+poldesc[policy.QTRACE] = {'policy.QTRACE'}
 
 -- Evaluate packet in given rules to determine policy action
 function policy.evaluate(rules, req, query, state)
@@ -795,34 +829,44 @@ function policy.del(id)
 	return true
 end
 
+-- helpers for policy.list()
+function quoteval(val)
+	if type(val) == 'string' then
+		return string.format('%q', val)
+	elseif type(val) == 'table' then
+		return table2string(val)
+	elseif type(val) == 'function' then
+		return rule2string(val)
+	else
+		return string.format('%s', val)
+	end
+end
+
 function table2string(tab)
-	items = {}
+	local items = {}
+	local previdx = 0
 	for idx, val in pairs(tab) do
-		table.insert(items, '[' .. tostring(idx) .. ']')
-		table.insert(items, '=')
-		if type(val) == 'table' then
-			table.insert(items, table2string(val) .. ',')
-		elseif type(val) == 'string' then
-			table.insert(items, '\'' .. val .. '\',')
+		if previdx and type(idx) == 'number' and idx - 1 == previdx then
+			-- monotonic sequence, do not print key
+			previdx = idx
 		else
-			table.insert(items, tostring(val) .. ',')
+			-- not a monotonic key sequence, print key as well
+			table.insert(items, string.format('[%s]', quoteval(idx)))
+			table.insert(items, '=')
+			previdx = nil
 		end
+		table.insert(items, string.format('%s,', quoteval(val)))
 	end
 	return '{ ' .. table.concat(items, ' ') .. ' }'
 end
 
 function rule2string(rulefunc)
 	local funcdesc = poldesc[rulefunc] or {}
-	print(rulefunc, funcdesc, #funcdesc)
 	local name = funcdesc[1] or tostring(rulefunc)
 	local argstrs = {}
 	for idx = 2, #funcdesc do
 		local arg = funcdesc[idx]
-		if type(arg) == 'function' then
-			table.insert(argstrs, rule2string(arg))
-		elseif type(arg) == 'table' then
-			table.insert(argstrs, table2string(arg))
-		end
+		table.insert(argstrs, string.format('%s', quoteval(arg)))
 	end
 	if #argstrs > 0 then
 		return name .. '(' .. table.concat(argstrs, ', ') .. ')'
@@ -832,10 +876,18 @@ function rule2string(rulefunc)
 end
 
 function policy.list()
-	local mapping = {}
+	local mapping = { pre = {}, post = {} }
 	for i = 1, #policy.rules do
 		local rule = policy.rules[i]
-		mapping[rule.id] = rule2string(rule.cb)
+		mapping.pre[rule.id] = rule2string(rule.cb)
+	end
+	for i = 1, #policy.special_names do
+		local rule = policy.special_names[i]
+		mapping.pre['default_' .. tostring(i)] = rule2string(rule.cb)
+	end
+	for i = 1, #policy.postrules do
+		local rule = policy.postrules[i]
+		mapping.post[rule.id] = rule2string(rule.cb)
 	end
 	return mapping
 end
@@ -1037,5 +1089,4 @@ policy.layer = {
 	end
 }
 
-policy.desc = poldesc
 return policy

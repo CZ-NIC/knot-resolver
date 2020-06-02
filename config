@@ -4,6 +4,14 @@ policy.add(policy.all(policy.DEBUG_ALWAYS))
 policy.add(policy.suffix(policy.MIRROR('192.0.2.1'),
 			 policy.todnames({'example.com', 'example.net'})))
 
-event.after(100, function()
+policy.add(policy.slice(policy.slice_randomize_psl(), policy.TLS_FORWARD({
+	{'192.0.2.1', insecure=true}
+	})))
+
+event.after(300, function()
 	print(table_print(policy.list()))
 end)
+
+t = { 1, { 2 } }
+--print(policy.t2s(t))
+-- exit()
