@@ -802,10 +802,8 @@ function table2string(tab)
 		table.insert(items, '=')
 		if type(val) == 'table' then
 			table.insert(items, table2string(val) .. ',')
-		elseif type(val) == 'string' then
-			table.insert(items, '\'' .. val .. '\',')
 		else
-			table.insert(items, tostring(val) .. ',')
+			table.insert(items, string.format('%q,', val))
 		end
 	end
 	return '{ ' .. table.concat(items, ' ') .. ' }'
@@ -822,6 +820,8 @@ function rule2string(rulefunc)
 			table.insert(argstrs, rule2string(arg))
 		elseif type(arg) == 'table' then
 			table.insert(argstrs, table2string(arg))
+		else
+			table.insert(argstrs, string.format('%q', arg))
 		end
 	end
 	if #argstrs > 0 then
