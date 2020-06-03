@@ -563,6 +563,7 @@ static int net_tls_client(lua_State *L)
 	/* .pin_sha256 */
 	lua_getfield(L, 1, "pin_sha256");
 	if (!lua_isnil(L, -1)) {
+		fprintf(stderr, "found pin_sha256 field\n");
 		if (has_ca_file)
 			ERROR("mixing pin_sha256 with ca_file is not supported");
 		lua_listify(L);
@@ -571,6 +572,7 @@ static int net_tls_client(lua_State *L)
 			ERROR("%s", kr_strerror(ENOMEM));
 		/* Iterate over table at the top of the stack. */
 		for (lua_pushnil(L); lua_next(L, -2); lua_pop(L, 1)) {
+			fprintf(stderr, "got pin\n");
 			const char *pin = lua_tostring(L, -1);
 			if (!pin)
 				ERROR("pin_sha256 is not a string");
