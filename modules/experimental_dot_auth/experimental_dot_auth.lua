@@ -76,39 +76,59 @@ function M.layer.consume(state, _, pkt)
 	local authority = pkt:section(kres.section.AUTHORITY)
 	local additional = pkt:section(kres.section.ADDITIONAL)
 	for _, rr in ipairs(authority) do
-		--log("%d %s", rr.type, kres.dname2str(rr.rdata))
-		if rr.type == kres.type.NS then
-			local name = kres.dname2str(rr.rdata):upper()
-			-- log("NS %d", name:len())
-			if name:len() > 56 and str.starts(name, "DOT-") then
-				local k = basexx.to_base64(
-					basexx.from_base32(
-						base32.pad(string.sub(name, 5, string.find(name, '[.]') - 1))
-					)
-				)
+		-- log("%d %s", rr.type, kres.dname2str(rr.rdata))
+		if rr.type == kres.type.DS then
+			-- local content = kres.dname2str(rr.rdata):upper()
+			local ds = {}
+			ds.owner = rr.owner
+			ds.keytag = string.byte(rr.rdata, 1,1) * 256 + string.byte(rr.rdata, 2, 2)
+			ds.algo = string.byte(rr.rdata, 3, 3)
+			ds.digesttype = string.byte(rr.rdata, 4, 4)
+			ds.digest = string.sub(rr.rdata, 5, #rr.rdata)
+			-- log('1')
+			-- log('type(ds.owner): %s', type(ds.owner))
+			-- log('ds.owner: %s', ds.owner)
+			log("DS for %s algo %s digesttype %s", kres.dname2str(ds.owner), ds.algo, ds.digesttype)
+			-- log('2')
+  		if ds.algo == 225 then
+  			log('2')
+  			-- TODO: we want to add all pins for all IPs, so need to restructure these loops
 				for _, rr_add in ipairs(additional) do
+					log('2.5, rr_add.type=%s', rr_add.type)
 					if rr_add.type == kres.type.A or rr_add.type == kres.type.AAAA then
-						local name_add = kres.dname2str(rr_add.owner):upper()
-						if name == name_add then
-              local addrbuf
-							if rr_add.type == kres.type.A then
-								local ns_addr = ffi.new("struct sockaddr_in")
-								ns_addr.sin_family = AF_INET
+						log('3')
+						log('4')
+						log('rr_add.owner=%s', kres.dname2str(rr_add.owner))
+						log('5')
+	          local addrbuf
+						if rr_add.type == kres.type.A then
+							log('kres.type.A')
+							local ns_addr = ffi.new("struct sockaddr_in")
+							ns_addr.sin_family = AF_INET
 
-								ns_addr.sin_addr.s_addr = rr_add.rdata
-								addrbuf = ffi.new("char[?]", INET_ADDRSTRLEN)
-								C.inet_ntop(AF_INET, ns_addr.sin_addr, addrbuf, INET_ADDRSTRLEN)
-							else
-								local ns_addr = ffi.new("struct sockaddr_in6")
-								ns_addr.sin6_family = AF_INET6
+							ns_addr.sin_addr.s_addr = rr_add.rdata
+							addrbuf = ffi.new("char[?]", INET_ADDRSTRLEN)
+							C.inet_ntop(AF_INET, ns_addr.sin_addr, addrbuf, INET_ADDRSTRLEN)
+						else
+							log('kres.type.AAAA')
+							local ns_addr = ffi.new("struct sockaddr_in6")
+							ns_addr.sin6_family = AF_INET6
 
-								ns_addr.sin6_addr.s6_addr = rr_add.rdata
-								addrbuf = ffi.new("char[?]", INET6_ADDRSTRLEN)
-								C.inet_ntop(AF_INET6, ns_addr.sin6_addr, addrbuf, INET6_ADDRSTRLEN)
-							end
-              net.tls_client(ffi.string(addrbuf).."@853", {k})
-							log("Adding %s IP %s %s", name_add, ffi.string(addrbuf).."@853", k)
+							ns_addr.sin6_addr.s6_addr = rr_add.rdata
+							addrbuf = ffi.new("char[?]", INET6_ADDRSTRLEN)
+							C.inet_ntop(AF_INET6, ns_addr.sin6_addr, addrbuf, INET6_ADDRSTRLEN)
 						end
+						log("Adding IP %s %s", ffi.string(addrbuf).."@853", basexx.to_base64(ds.digest))
+	          net.tls_client(
+		          {
+	          		ffi.string(addrbuf).."@853",
+		          	pin_sha256=basexx.to_base64(ds.digest),
+		            hostname=ds.owner
+		            -- TODO, two problems:
+		            -- the pin turns out to be for any cert in the chain and NOT for the pubkey
+		            -- the pseudo DNSKEY prefix needs to be part of the hashed content
+		          }
+		        )
 					end
 				end
 			end
