@@ -4,16 +4,44 @@
 #include <sysrepo.h>
 #include <libyang/libyang.h>
 
+#include "lib/generic/array.h"
 #include <contrib/ccan/asprintf/asprintf.h>
 
 #include "commands.h"
 #include "interactive.h"
 #include "process.h"
+#include "deps/lookup.h"
 
 
 static void cmds_lookup(EditLine *el, const char *str, size_t str_len)
 {
-	//TODO: fill the lookup with command names
+	lookup_t lookup;
+	int ret = lookup_init(&lookup);
+	if (ret != CLI_EOK) {
+		return;
+	}
+
+	/* Fill the lookup with command names of static cmds. */
+	for (const cmd_help_t *cmd_help = cmd_table; cmd_help->name != NULL; cmd_help++) {
+		ret = lookup_insert(&lookup, cmd_help->name, NULL);
+		if (ret != CLI_EOK) {
+			goto cmds_lookup_finish;
+		}
+	}
+
+	/* Fill the lookup with command names of dynamic cmds. */
+	dynarray_foreach(cmd_help, cmd_help_t *, i, dyn_cmd_help_table) {
+		cmd_help_t *cmd_help = *i;
+		ret = lookup_insert(&lookup, cmd_help->name, NULL);
+		if (ret != CLI_EOK) {
+			goto cmds_lookup_finish;
+		}
+	}
+
+	lookup_complete(&lookup, str, str_len, el, true);
+
+	cmds_lookup_finish:
+	lookup_deinit(&lookup);
 }
 
 static unsigned char complete(EditLine *el, int ch)
@@ -50,8 +78,6 @@ static unsigned char complete(EditLine *el, int ch)
 	if (desc->name == NULL) {
 		goto complete_exit;
 	}
-
-	/* TODO: show list instances */
 
 	complete_exit:
 	tok_reset(tok);

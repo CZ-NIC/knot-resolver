@@ -7,9 +7,11 @@
 #include <libyang/libyang.h>
 
 #include "lib/generic/array.h"
+#include "modules/sysrepo/common/string_helper.h"
 #include "modules/sysrepo/common/sysrepo.h"
 #include "commands.h"
 #include "process.h"
+#include "conf_file.h"
 
 /* Build-in commands */
 #define CMD_EXIT        "exit"
@@ -32,27 +34,27 @@ static int cmd_import(cmd_args_t *args)
 	const char *file_path = args->argv[0];
 	int flags = LYD_OPT_CONFIG | LYD_OPT_TRUSTED | LYD_OPT_STRICT;
 
-	// int ret = sr_session_start(sysrepo_ctx->connection, SR_DS_RUNNING, &sr_session);
-	// if (ret) {
-	// 	printf("failed to start sysrepo session, %s\n", sr_strerror(ret));
-	// 	return CLI_ECMD;
-	// }
+	int ret = sr_session_start(sysrepo_ctx->connection, SR_DS_RUNNING, &sr_session);
+	if (ret) {
+		printf("failed to start sysrepo session, %s\n", sr_strerror(ret));
+		return CLI_ECMD;
+	}
 
-	// if (!ret) ret = step_load_data(sr_session, file_path, flags, &data);
+	if (!ret) ret = step_load_data(sr_session, file_path, flags, &data);
 
 
-	// /* replace config (always spends data) */
-	// ret = sr_replace_config(sr_session, YM_COMMON, data, 0, 0);
-	// if (ret) {
-	// 	printf("failed to replace configuration, %s\n", sr_strerror(ret));
-	// 	return CLI_ECMD;
-	// }
+	/* replace config (always spends data) */
+	ret = sr_replace_config(sr_session, YM_COMMON, data, 0, 0);
+	if (ret) {
+		printf("failed to replace configuration, %s\n", sr_strerror(ret));
+		return CLI_ECMD;
+	}
 
-	// ret = sr_session_stop(sr_session);
-	// if (ret) {
-	// 	printf("failed to stop sysrepo session, %s\n", sr_strerror(ret));
-	// 	return CLI_ECMD;
-	// }
+	ret = sr_session_stop(sr_session);
+	if (ret) {
+		printf("failed to stop sysrepo session, %s\n", sr_strerror(ret));
+		return CLI_ECMD;
+	}
 
 	return CLI_EOK;
 }
@@ -138,7 +140,7 @@ static int cmd_commmit(cmd_args_t *args)
 	ret = sr_session_switch_ds(sysrepo_ctx->session, SR_DS_RUNNING);
 	/* copy configuration from CANDIDATE to RUNNING datastore */
 	if (!ret) ret = sr_copy_config(sysrepo_ctx->session, YM_COMMON,
-	                               SR_DS_CANDIDATE, args->timeout, 0);
+								   SR_DS_CANDIDATE, args->timeout, 0);
 	if (ret) {
 		printf("commit failed, %s\n", sr_strerror(ret));
 		return CLI_ECMD;
@@ -245,7 +247,6 @@ static int cmd_leaf(cmd_args_t *args)
 		sr_session_stop(sr_session);
 		sr_free_val(val);
 		free(strval);
-
 	}
 	/* set configuration data */
 	else if (args->argc == 1) {
@@ -284,7 +285,7 @@ static int cmd_container(cmd_args_t *args)
 		sr_session_ctx_t *sr_session = NULL;
 
 		asprintf(&xpath, "%s/*//.", args->desc->xpath);
-		if (!ret) ret = sr_session_start(sysrepo_ctx->connection, SR_DS_RUNNING, &sr_session);
+		if (!ret) ret = sr_session_start(sysrepo_ctx->connection, SR_DS_OPERATIONAL, &sr_session);
 		if (!ret) ret = sr_get_data(sr_session, xpath, 0, args->timeout, 0, &data);
 		if (ret) {
 			printf("get configuration data failed, %s\n", sr_strerror(ret));
@@ -316,10 +317,41 @@ static int cmd_leaflist(cmd_args_t *args)
 	return CLI_EOK;
 }
 
+static int cmd_rpc(cmd_args_t *args)
+{
+	int ret = CLI_EOK;
+	sr_session_ctx_t *sr_session = NULL;
+	sr_val_t *output = NULL;
+	size_t output_count = 0;
+
+	//TODO: prepare input
+
+	ret = sr_session_start(sysrepo_ctx->connection, SR_DS_RUNNING, &sr_session);
+	if (!ret) ret = sr_rpc_send(sr_session, args->desc->xpath, 0, 0, args->timeout, &output, &output_count);
+	if (ret) {
+		printf("[] failed to send RPC operation, %s\n", sr_strerror(ret));
+		sr_session_stop(sr_session);
+		return CLI_ECMD;
+	}
+
+	sr_free_values(output, output_count);
+	sr_session_stop(sr_session);
+	return CLI_EOK;
+}
+
+static int cmd_notif(cmd_args_t *args)
+{
+	return CLI_EOK;
+}
+
+
 static void cmd_dynarray_deep_free(cmd_dynarray_t * d)
 {
 	dynarray_foreach(cmd, cmd_desc_t *, i, *d) {
-		free(*i);
+		cmd_desc_t *cmd = *i;
+		free(cmd->xpath);
+		free(cmd->name);
+		free(cmd);
 	}
 	cmd_dynarray_free(d);
 }
@@ -327,37 +359,36 @@ static void cmd_dynarray_deep_free(cmd_dynarray_t * d)
 cmd_dynarray_t dyn_cmd_table;
 
 const cmd_desc_t cmd_table[] = {
-	/* name, function, flags, xpath, */
-	{ CMD_EXIT,     NULL,           NULL, CMD_FNONE },
-	{ CMD_HELP,     print_commands, NULL, CMD_FNONE },
-	{ CMD_VERSION,  print_version,  NULL, CMD_FNONE },
+	/* name, function, xpath, flags */
+	{ CMD_EXIT,     NULL,           "", CMD_FNONE },
+	{ CMD_HELP,     print_commands, "", CMD_FNONE },
+	{ CMD_VERSION,  print_version,  "", CMD_FNONE },
 	/* Configuration file */
-	{ CMD_IMPORT,   cmd_import,     NULL, CMD_FNONE },
-	{ CMD_EXPORT,   cmd_export,     NULL, CMD_FNONE },
+	{ CMD_IMPORT,   cmd_import,     "", CMD_FNONE },
+	{ CMD_EXPORT,   cmd_export,     "", CMD_FNONE },
 	/* Transaction */
-	{ CMD_BEGIN,    cmd_begin,      NULL, CMD_FINTER },
-	{ CMD_COMMIT,   cmd_commmit,    NULL, CMD_FINTER },
-	{ CMD_ABORT,    cmd_abort,      NULL, CMD_FINTER },
-	{ CMD_VALIDATE, cmd_validate,   NULL, CMD_FINTER },
-	{ CMD_DIFF,     cmd_diff,       NULL, CMD_FINTER },
-	{ CMD_PERSIST,  cmd_persist,    NULL, CMD_FNONE },
+	{ CMD_BEGIN,    cmd_begin,      "", CMD_FINTER },
+	{ CMD_COMMIT,   cmd_commmit,    "", CMD_FINTER },
+	{ CMD_ABORT,    cmd_abort,      "", CMD_FINTER },
+	{ CMD_VALIDATE, cmd_validate,   "", CMD_FINTER },
+	{ CMD_DIFF,     cmd_diff,       "", CMD_FINTER },
+	{ CMD_PERSIST,  cmd_persist,    "", CMD_FNONE },
 	/*  */
 	{ NULL }
 };
 
-dynarray_declare(cmd_help, cmd_help_t *, DYNARRAY_VISIBILITY_STATIC, 0)
-    dynarray_define(cmd_help, cmd_help_t *, DYNARRAY_VISIBILITY_STATIC)
 static void cmd_help_dynarray_deep_free(cmd_help_dynarray_t * d)
 {
 	dynarray_foreach(cmd_help, cmd_help_t *, i, *d) {
-		free(*i);
+		cmd_help_t *cmd_help = *i;
+		free(cmd_help);
 	}
 	cmd_help_dynarray_free(d);
 }
 
 cmd_help_dynarray_t dyn_cmd_help_table;
 
-static const cmd_help_t cmd_help_table[] = {
+const cmd_help_t cmd_help_table[] = {
 	/* name, arguments, description */
 	{ CMD_EXIT,     "",            "Exit the program." },
 	{ CMD_HELP,     "",            "Print the program help." },
@@ -375,30 +406,131 @@ static const cmd_help_t cmd_help_table[] = {
 	{ NULL }
 };
 
-int create_cmd_table(sr_conn_ctx_t *sr_connection)
+static const char *create_cmd_name(const char* xpath)
 {
-	int ret = CLI_EOK;
-	const char *path = NULL;
-	struct lys_node *root = NULL, *last = NULL;
-	struct ly_ctx *ly_context = NULL;
+	char* name = (char*)malloc(strlen(xpath)+1);
+	if (!name){
+		// memory allocation failed.
+		return "";
+	}
+	strcpy(name,xpath);
 
-	ly_context = sr_get_context(sr_connection);
-	assert(ly_context != NULL);
+	/* remove modules from name, the order is important */
+	remove_substr(name, XPATH_BASE"/");
+	remove_substr(name, XPATH_BASE);
+	remove_substr(name, "/"YM_COMMON":");
+	remove_substr(name, YM_COMMON":");
+	remove_substr(name, YM_KRES":");
+	/* replace '/' with '.' */
+	replace_char(name, '/', '.');
 
-	cmd_help_t *cmd_help = malloc(sizeof(cmd_help_t));
-	cmd_help->name = "server";
-	cmd_help->params = "";
-	cmd_help->desc = "Parameters of the DNS resolver system.";
+	return name;
+}
+
+static int create_cmd(struct lys_node *node)
+{
+	if (node->nodetype == LYS_GROUPING ||
+	    node->nodetype == LYS_USES) {
+		return 0;
+	}
+
+	const char *xpath = lys_data_path(node);
+	const char *name = create_cmd_name(xpath);
+
+	if (!strlen(name)) {
+		free(xpath);
+		free(name);
+		return 0;
+	}
 
 	cmd_desc_t *cmd = malloc(sizeof(cmd_desc_t));
-	cmd->name = "server";
-	cmd->fcn = &cmd_container;
-	cmd->xpath = "/"YM_COMMON":dns-resolver/server";
-	cmd->flags = CMD_FSTATE;
+	cmd->name = name;
+	cmd->xpath = xpath;
+	cmd->fcn = &cmd_leaf;
+	cmd->flags = CMD_FNONE;
+
+	switch (node->nodetype) {
+		case LYS_CONTAINER:
+			cmd->fcn = &cmd_container;
+			break;
+		case LYS_LEAF:
+			cmd->fcn = &cmd_leaf;
+			break;
+		case LYS_LEAFLIST:
+			cmd->fcn = &cmd_leaflist;
+			break;
+		case LYS_LIST:
+			cmd->fcn = &cmd_list;
+			break;
+		case LYS_ACTION:
+			cmd->fcn = &cmd_rpc;
+			break;
+		case LYS_RPC:
+			cmd->fcn = &cmd_rpc;
+			break;
+		case LYS_NOTIF:
+			cmd->fcn = &cmd_notif;
+			break;
+		default:
+			cmd->fcn = &cmd_leaf;
+			break;
+	}
+
+	cmd_help_t *cmd_help = malloc(sizeof(cmd_help_t));
+	cmd_help->name = name;
+	cmd_help->desc = node->dsc;
+	cmd_help->params = "";
 
 	cmd_help_dynarray_add(&dyn_cmd_help_table, &cmd_help);
-
 	cmd_dynarray_add(&dyn_cmd_table, &cmd);
+
+	return CLI_EOK;
+}
+
+static void schema_iterator(struct lys_node *root)
+{
+	assert(root != NULL);
+
+	struct lys_node *node = NULL;
+
+	LY_TREE_FOR(root, node) {
+		assert(node != NULL);
+
+		create_cmd(node);
+
+		/* do childs only for CONTAINERS, ignore others */
+		if (node->child
+			&& (node->nodetype != LYS_LIST)
+			&& (node->nodetype != LYS_RPC)
+			&& (node->nodetype != LYS_ACTION)
+			&& (node->nodetype != LYS_NOTIF)
+			) {
+			schema_iterator(node->child);
+		}
+	}
+}
+
+int create_cmd_table(sr_conn_ctx_t *sr_connection)
+{
+	assert(sr_connection != NULL);
+
+	int ret = CLI_EOK;
+	struct lys_node *root = NULL;
+	struct ly_ctx *ly_context = NULL;
+	struct lys_module *module = NULL;
+
+	ly_context = sr_get_context(sr_connection);
+	if (!ly_context) {
+		printf("[] failed to get libyang context\n");
+		return CLI_ERR;
+	}
+
+	/* get libyang context */
+	root = ly_ctx_get_node(ly_context, NULL, XPATH_BASE, 0);
+	assert(root != NULL);
+
+	/* iterate thrue all schema nodes */
+	schema_iterator(root);
 
 	return CLI_EOK;
 }
@@ -426,11 +558,11 @@ int print_commands(cmd_args_t *args)
 
 	/* Print all created commands */
 	dynarray_foreach(cmd_help, cmd_help_t *, i, dyn_cmd_help_table) {
-		cmd_help_t *cmd = *i;
-		printf(" %-15s %-15s %s\n", cmd->name, cmd->params, cmd->desc);
+		cmd_help_t *cmd_help = *i;
+		printf(" %-40s %-10s %s\n", cmd_help->name, cmd_help->params, cmd_help->desc);
 	}
 
 	printf("\n"
-	       "Note:\n"
-	       "");
+		   "Note:\n"
+		   "");
 }

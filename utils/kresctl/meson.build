@@ -3,6 +3,10 @@ kresctl_src = files([
     'process.c',
     'interactive.c',
     'commands.c',
+    'deps/lookup.c',
+    'deps/mempattern.c',
+    'deps/string.c',
+    'deps/mempattern.c',
 ])
 c_src_lint += kresctl_src
 
