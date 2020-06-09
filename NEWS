@@ -5,6 +5,7 @@ Bugfixes
 --------
 - hints module: NODATA answers also for non-address queries (!1005)
 - tls: send alert to peer if handshake fails (!1007)
+- cache garbage collector: fix flushing of messages to logs (!1009)
 
 
 Knot Resolver 5.1.1 (2020-05-19)
