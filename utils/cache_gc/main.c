@@ -8,6 +8,7 @@
 #include <lib/defines.h>
 #include <libknot/libknot.h>
 
+#include "kresconfig.h"
 #include "kr_cache_gc.h"
 
 volatile static int killed = 0;
@@ -55,7 +56,7 @@ static long get_nonneg_optarg()
 
 int main(int argc, char *argv[])
 {
-	printf("Knot Resolver Cache Garbage Collector v. %s\n", KR_CACHE_GC_VERSION);
+	printf("Knot Resolver Cache Garbage Collector, version %s\n", PACKAGE_VERSION);
 	if (setvbuf(stdout, NULL, _IONBF, 0) || setvbuf(stderr, NULL, _IONBF, 0)) {
 		fprintf(stderr, "Failed to to set output buffering (ignored): %s\n",
 				strerror(errno));
