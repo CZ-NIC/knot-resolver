@@ -38,4 +38,3 @@ typedef struct kr_cache_gc_state kr_cache_gc_state_t;
 int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state);
 void kr_cache_gc_free_state(kr_cache_gc_state_t **state);
 
-#define KR_CACHE_GC_VERSION "0.2"

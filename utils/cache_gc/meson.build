@@ -14,6 +14,7 @@ if build_utils
     'kres-cache-gc',
     cache_gc_src,
     dependencies: [
+      kresconfig_dep,
       contrib_dep,
       libkres_dep,
       libknot,
