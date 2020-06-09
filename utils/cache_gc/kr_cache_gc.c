@@ -217,8 +217,8 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	for (int i = 0; i < CATEGORIES; ++i) {
 		cats_sumsize += cats.categories_sizes[i];
 	}
-	ssize_t amount_tofree = knot_db_lmdb_get_mapsize(db) * cfg->cache_to_be_freed
-	    * cats_sumsize / (100 * knot_db_lmdb_get_usage(db));
+	ssize_t amount_tofree = (uint64_t)cats_sumsize // careful with 32-bit overflow
+		* cfg->cache_to_be_freed / 100;
 
 #ifdef DEBUG
 	printf("tofree: %zd\n", amount_tofree);

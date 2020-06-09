@@ -36,7 +36,7 @@ static void print_help()
 	printf(" -l <deletes_per_txn>\n");
 	printf(" -m <rw_txn_duration(usecs)>\n");
 	printf(" -u <cache_max_usage(percent)>\n");
-	printf(" -f <cache_to_be_freed(percent)>\n");
+	printf(" -f <cache_to_be_freed(percent-of-current-usage)>\n");
 	printf(" -w <wait_next_rw_txn(usecs)>\n");
 	printf(" -t <temporary_memory(MBytes)>\n");
 	printf(" -n (= dry run)\n");
