@@ -1,20 +1,31 @@
 kresctl_src = files([
     'main.c',
+    'process.c',
+    'interactive.c',
+    'commands.c',
+    'conf_file.c',
+    'deps/lookup.c',
+    'deps/mempattern.c',
+    'deps/string.c',
+    'deps/mempattern.c',
 ])
 c_src_lint += kresctl_src
 
-if build_sysrepo
-    kresc = executable(
+message('--- kresctl dependencies ---')
+libedit = dependency('libedit', required: false)
+
+if build_sysrepo and libedit.found()
+  kresctl = executable(
     'kresctl',
     kresctl_src,
     sysrepo_common_src,
     dependencies: [
       contrib_dep,
       libkres_dep,
+      libedit,
       libyang,
       libsysrepo,
       libknot,
-      luajit_inc,
     ],
     install: true,
     install_dir: get_option('sbindir'),

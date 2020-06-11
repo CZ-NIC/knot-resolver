@@ -22,15 +22,15 @@ if get_option('client') != 'disabled'
 endif
 
 
-if build_client
-  kresc = executable(
-    'kresc',
-    kresc_src,
-    dependencies: [
-      contrib_dep,
-      libedit,
-    ],
-    install: true,
-    install_dir: get_option('sbindir'),
-  )
-endif
+# if build_client
+#   kresc = executable(
+#     'kresc',
+#     kresc_src,
+#     dependencies: [
+#       contrib_dep,
+#       libedit,
+#     ],
+#     install: true,
+#     install_dir: get_option('sbindir'),
+#   )
+# endif

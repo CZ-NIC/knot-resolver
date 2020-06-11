@@ -27,6 +27,8 @@ sysrepo_common_src = files([
 	'common/sysrepo_conf.h',
 	'common/string_helper.h',
 	'common/string_helper.c',
+	'common/sysrepo.h',
+	'common/sysrepo.c',
 ])
 c_src_lint += sysrepo_common_src
 

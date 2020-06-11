@@ -1,0 +1,515 @@
+/*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+#include <string.h>
+#include <libknot/errcode.h>
+#include <contrib/ucw/lib.h>
+#include <contrib/ucw/mempool.h>
+#include <assert.h>
+
+#include "io.h"
+#include "network.h"
+#include "worker.h"
+#include "tls.h"
+#include "session.h"
+
+#define negotiate_bufsize(func, handle, bufsize_want) do { \
+    int bufsize = 0; (func)((handle), &bufsize); \
+	if (bufsize < (bufsize_want)) { \
+		bufsize = (bufsize_want); \
+		(func)((handle), &bufsize); \
+	} \
+} while (0)
+
+static void check_bufsize(uv_handle_t* handle)
+{
+	return; /* TODO: resurrect after https://github.com/libuv/libuv/issues/419 */
+	/* We want to buffer at least N waves in advance.
+	 * This is magic presuming we can pull in a whole recvmmsg width in one wave.
+	 * Linux will double this the bufsize wanted.
+	 */
+	const int bufsize_want = 2 * sizeof( ((struct worker_ctx *)NULL)->wire_buf ) ;
+	negotiate_bufsize(uv_recv_buffer_size, handle, bufsize_want);
+	negotiate_bufsize(uv_send_buffer_size, handle, bufsize_want);
+}
+
+#undef negotiate_bufsize
+
+static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
+{
+	/* UDP sessions use worker buffer for wire data,
+	 * TCP sessions use session buffer for wire data
+	 * (see session_set_handle()).
+	 * TLS sessions use buffer from TLS context.
+	 * The content of the worker buffer is
+	 * guaranteed to be unchanged only for the duration of
+	 * udp_read() and tcp_read().
+	 */
+	struct session *s = handle->data;
+	if (!session_flags(s)->has_tls) {
+		buf->base = (char *) session_wirebuf_get_free_start(s);
+		buf->len = session_wirebuf_get_free_size(s);
+	} else {
+		struct tls_common_ctx *ctx = session_tls_get_common_ctx(s);
+		buf->base = (char *) ctx->recv_buf;
+		buf->len = sizeof(ctx->recv_buf);
+	}
+}
+
+void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
+	const struct sockaddr *addr, unsigned flags)
+{
+	uv_loop_t *loop = handle->loop;
+	struct worker_ctx *worker = loop->data;
+	struct session *s = handle->data;
+	if (session_flags(s)->closing) {
+		return;
+	}
+	if (nread <= 0) {
+		if (nread < 0) { /* Error response, notify resolver */
+			worker_submit(s, NULL, NULL);
+		} /* nread == 0 is for freeing buffers, we don't need to do this */
+		return;
+	}
+	if (addr->sa_family == AF_UNSPEC) {
+		return;
+	}
+	if (session_flags(s)->outgoing) {
+		const struct sockaddr *peer = session_get_peer(s);
+		assert(peer->sa_family != AF_UNSPEC);
+		if (kr_sockaddr_cmp(peer, addr) != 0) {
+			kr_log_verbose("[io] <= ignoring UDP from unexpected address '%s'\n",
+					kr_straddr(addr));
+			return;
+		}
+	}
+	ssize_t consumed = session_wirebuf_consume(s, (const uint8_t *)buf->base,
+						   nread);
+	assert(consumed == nread); (void)consumed;
+	session_wirebuf_process(s, addr);
+	session_wirebuf_discard(s);
+	mp_flush(worker->pkt_pool.ctx);
+}
+
+static int family_to_freebind_option(sa_family_t sa_family, int *level, int *name)
+{
+	switch (sa_family) {
+	case AF_INET:
+		*level = IPPROTO_IP;
+#if defined(IP_FREEBIND)
+		*name = IP_FREEBIND;
+#elif defined(IP_BINDANY)
+		*name = IP_BINDANY;
+#else
+		return kr_error(ENOTSUP);
+#endif
+		break;
+	case AF_INET6:
+#if defined(IP_FREEBIND)
+		*level = IPPROTO_IP;
+		*name = IP_FREEBIND;
+#elif defined(IPV6_BINDANY)
+		*level = IPPROTO_IPV6;
+		*name = IPV6_BINDANY;
+#else
+		return kr_error(ENOTSUP);
+#endif
+		break;
+	default:
+		return kr_error(ENOTSUP);
+	}
+	return kr_ok();
+}
+
+int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags)
+{
+	const int fd = socket(addr->sa_family, type, 0);
+	if (fd < 0) return kr_error(errno);
+
+	int yes = 1;
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)))
+		return kr_error(errno);
+
+#ifdef SO_REUSEPORT_LB
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT_LB, &yes, sizeof(yes)))
+		return kr_error(errno);
+#elif defined(SO_REUSEPORT) && defined(__linux__) /* different meaning on (Free)BSD */
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(yes)))
+		return kr_error(errno);
+#endif
+
+#ifdef IPV6_V6ONLY
+	if (addr->sa_family == AF_INET6
+	    && setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &yes, sizeof(yes)))
+		return kr_error(errno);
+#endif
+	if (flags != NULL && flags->freebind) {
+		int optlevel;
+		int optname;
+		int ret = family_to_freebind_option(addr->sa_family, &optlevel, &optname);
+		if (ret) return kr_error(ret);
+		if (setsockopt(fd, optlevel, optname, &yes, sizeof(yes)))
+			return kr_error(errno);
+	}
+
+	if (bind(fd, addr, kr_sockaddr_len(addr)))
+		return kr_error(errno);
+
+	return fd;
+}
+
+int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
+{
+	if (!handle) {
+		return kr_error(EINVAL);
+	}
+	int ret = uv_udp_init(loop, handle);
+	if (ret) return ret;
+
+	ret = uv_udp_open(handle, fd);
+	if (ret) return ret;
+
+	uv_handle_t *h = (uv_handle_t *)handle;
+	check_bufsize(h);
+	/* Handle is already created, just create context. */
+	struct session *s = session_new(h, false);
+	assert(s);
+	session_flags(s)->outgoing = false;
+
+	int socklen = sizeof(union inaddr);
+	ret = uv_udp_getsockname(handle, session_get_sockname(s), &socklen);
+	if (ret) {
+		kr_log_error("ERROR: getsockname failed: %s\n", uv_strerror(ret));
+		abort(); /* It might be nontrivial not to leak something here. */
+	}
+
+	return io_start_read(h);
+}
+
+void tcp_timeout_trigger(uv_timer_t *timer)
+{
+	struct session *s = timer->data;
+
+	assert(!session_flags(s)->closing);
+
+	struct worker_ctx *worker = timer->loop->data;
+
+	if (!session_tasklist_is_empty(s)) {
+		int finalized = session_tasklist_finalize_expired(s);
+		worker->stats.timeout += finalized;
+		/* session_tasklist_finalize_expired() may call worker_task_finalize().
+		 * If session is a source session and there were IO errors,
+		 * worker_task_finalize() can filnalize all tasks and close session. */
+		if (session_flags(s)->closing) {
+			return;
+		}
+
+	}
+	if (!session_tasklist_is_empty(s)) {
+		uv_timer_stop(timer);
+		session_timer_start(s, tcp_timeout_trigger,
+				    KR_RESOLVE_TIME_LIMIT / 2,
+				    KR_RESOLVE_TIME_LIMIT / 2);
+	} else {
+		/* Normally it should not happen,
+		 * but better to check if there anything in this list. */
+		while (!session_waitinglist_is_empty(s)) {
+			struct qr_task *t = session_waitinglist_pop(s, false);
+			worker_task_finalize(t, KR_STATE_FAIL);
+			worker_task_unref(t);
+			worker->stats.timeout += 1;
+			if (session_flags(s)->closing) {
+				return;
+			}
+		}
+		const struct engine *engine = worker->engine;
+		const struct network *net = &engine->net;
+		uint64_t idle_in_timeout = net->tcp.in_idle_timeout;
+		uint64_t last_activity = session_last_activity(s);
+		uint64_t idle_time = kr_now() - last_activity;
+		if (idle_time < idle_in_timeout) {
+			idle_in_timeout -= idle_time;
+			uv_timer_stop(timer);
+			session_timer_start(s, tcp_timeout_trigger,
+					    idle_in_timeout, idle_in_timeout);
+		} else {
+			struct sockaddr *peer = session_get_peer(s);
+			char *peer_str = kr_straddr(peer);
+			kr_log_verbose("[io] => closing connection to '%s'\n",
+				       peer_str ? peer_str : "");
+			if (session_flags(s)->outgoing) {
+				worker_del_tcp_waiting(worker, peer);
+				worker_del_tcp_connected(worker, peer);
+			}
+			session_close(s);
+		}
+	}
+}
+
+static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
+{
+	struct session *s = handle->data;
+	assert(s && session_get_handle(s) == (uv_handle_t *)handle &&
+	       handle->type == UV_TCP);
+
+	if (session_flags(s)->closing) {
+		return;
+	}
+
+	/* nread might be 0, which does not indicate an error or EOF.
+	 * This is equivalent to EAGAIN or EWOULDBLOCK under read(2). */
+	if (nread == 0) {
+		return;
+	}
+
+	if (nread < 0 || !buf->base) {
+		if (kr_verbose_status) {
+			struct sockaddr *peer = session_get_peer(s);
+			char *peer_str = kr_straddr(peer);
+			kr_log_verbose("[io] => connection to '%s' closed by peer (%s)\n",
+				       peer_str ? peer_str : "",
+				       uv_strerror(nread));
+		}
+		worker_end_tcp(s);
+		return;
+	}
+
+	ssize_t consumed = 0;
+	const uint8_t *data = (const uint8_t *)buf->base;
+	ssize_t data_len = nread;
+	if (session_flags(s)->has_tls) {
+		/* buf->base points to start of the tls receive buffer.
+		   Decode data free space in session wire buffer. */
+		consumed = tls_process_input_data(s, (const uint8_t *)buf->base, nread);
+		if (consumed < 0) {
+			if (kr_verbose_status) {
+				struct sockaddr *peer = session_get_peer(s);
+				char *peer_str = kr_straddr(peer);
+				kr_log_verbose("[io] => connection to '%s': "
+					       "error processing TLS data, close\n",
+					       peer_str ? peer_str : "");
+			}
+			worker_end_tcp(s);
+			return;
+		} else if (consumed == 0) {
+			return;
+		}
+		data = session_wirebuf_get_free_start(s);
+		data_len = consumed;
+	}
+
+	/* data points to start of the free space in session wire buffer.
+	   Simple increase internal counter. */
+	consumed = session_wirebuf_consume(s, data, data_len);
+	assert(consumed == data_len);
+
+	int ret = session_wirebuf_process(s, session_get_peer(s));
+	if (ret < 0) {
+		/* An error has occurred, close the session. */
+		worker_end_tcp(s);
+	}
+	session_wirebuf_compress(s);
+	struct worker_ctx *worker = handle->loop->data;
+	mp_flush(worker->pkt_pool.ctx);
+}
+
+static void _tcp_accept(uv_stream_t *master, int status, bool tls)
+{
+ 	if (status != 0) {
+		return;
+	}
+
+	struct worker_ctx *worker = the_worker;
+	uv_tcp_t *client = malloc(sizeof(uv_tcp_t));
+	if (!client) {
+		return;
+	}
+	int res = io_create(master->loop, (uv_handle_t *)client,
+			    SOCK_STREAM, AF_UNSPEC, tls);
+	if (res) {
+		if (res == UV_EMFILE) {
+			worker->too_many_open = true;
+			worker->rconcurrent_highwatermark = worker->stats.rconcurrent;
+		}
+		/* Since res isn't OK struct session wasn't allocated \ borrowed.
+		 * We must release client handle only.
+		 */
+		free(client);
+		return;
+	}
+
+	/* struct session was allocated \ borrowed from memory pool. */
+	struct session *s = client->data;
+	assert(session_flags(s)->outgoing == false);
+	assert(session_flags(s)->has_tls == tls);
+
+	if (uv_accept(master, (uv_stream_t *)client) != 0) {
+		/* close session, close underlying uv handles and
+		 * deallocate (or return to memory pool) memory. */
+		session_close(s);
+		return;
+	}
+
+	/* Get peer's and our address.  We apparently get specific sockname here
+	 * even if we listened on a wildcard address. */
+	struct sockaddr *sa = session_get_peer(s);
+	int sa_len = sizeof(struct sockaddr_in6);
+	int ret = uv_tcp_getpeername(client, sa, &sa_len);
+	if (ret || sa->sa_family == AF_UNSPEC) {
+		session_close(s);
+		return;
+	}
+	sa = session_get_sockname(s);
+	sa_len = sizeof(struct sockaddr_in6);
+	ret = uv_tcp_getsockname(client, sa, &sa_len);
+	if (ret || sa->sa_family == AF_UNSPEC) {
+		session_close(s);
+		return;
+	}
+
+	/* Set deadlines for TCP connection and start reading.
+	 * It will re-check every half of a request time limit if the connection
+	 * is idle and should be terminated, this is an educated guess. */
+
+	const struct network *net = &worker->engine->net;
+	uint64_t idle_in_timeout = net->tcp.in_idle_timeout;
+
+	uint64_t timeout = KR_CONN_RTT_MAX / 2;
+	if (tls) {
+		timeout += TLS_MAX_HANDSHAKE_TIME;
+		struct tls_ctx_t *ctx = session_tls_get_server_ctx(s);
+		if (!ctx) {
+			ctx = tls_new(worker);
+			if (!ctx) {
+				session_close(s);
+				return;
+			}
+			ctx->c.session = s;
+			ctx->c.handshake_state = TLS_HS_IN_PROGRESS;
+			session_tls_set_server_ctx(s, ctx);
+		}
+	}
+	session_timer_start(s, tcp_timeout_trigger, timeout, idle_in_timeout);
+	io_start_read((uv_handle_t *)client);
+}
+
+static void tcp_accept(uv_stream_t *master, int status)
+{
+	_tcp_accept(master, status, false);
+}
+
+static void tls_accept(uv_stream_t *master, int status)
+{
+	_tcp_accept(master, status, true);
+}
+
+int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bool has_tls)
+{
+	const uv_connection_cb connection = has_tls ? tls_accept : tcp_accept;
+	if (!handle) {
+		return kr_error(EINVAL);
+	}
+	int ret = uv_tcp_init(loop, handle);
+	if (ret) return ret;
+
+	ret = uv_tcp_open(handle, (uv_os_sock_t) fd);
+	if (ret) return ret;
+
+	int val; (void)val;
+	/* TCP_DEFER_ACCEPT delays accepting connections until there is readable data. */
+#ifdef TCP_DEFER_ACCEPT
+	val = KR_CONN_RTT_MAX/1000;
+	if (setsockopt(fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &val, sizeof(val))) {
+		kr_log_error("[ io ] listen TCP (defer_accept): %s\n", strerror(errno));
+	}
+#endif
+
+	ret = uv_listen((uv_stream_t *)handle, tcp_backlog, connection);
+	if (ret != 0) {
+		return ret;
+	}
+
+	/* TCP_FASTOPEN enables 1 RTT connection resumptions. */
+#ifdef TCP_FASTOPEN
+	#ifdef __linux__
+	val = 16; /* Accepts queue length hint */
+	#else
+	val = 1; /* Accepts on/off */
+	#endif
+	if (setsockopt(fd, IPPROTO_TCP, TCP_FASTOPEN, &val, sizeof(val))) {
+		kr_log_error("[ io ] listen TCP (fastopen): %s\n", strerror(errno));
+	}
+#endif
+
+	handle->data = NULL;
+	return 0;
+}
+
+int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family, bool has_tls)
+{
+	int ret = -1;
+	if (type == SOCK_DGRAM) {
+		ret = uv_udp_init(loop, (uv_udp_t *)handle);
+	} else if (type == SOCK_STREAM) {
+		ret = uv_tcp_init_ex(loop, (uv_tcp_t *)handle, family);
+		uv_tcp_nodelay((uv_tcp_t *)handle, 1);
+	}
+	if (ret != 0) {
+		return ret;
+	}
+	struct session *s = session_new(handle, has_tls);
+	if (s == NULL) {
+		ret = -1;
+	}
+	return ret;
+}
+
+void io_deinit(uv_handle_t *handle)
+{
+	if (!handle) {
+		return;
+	}
+	session_free(handle->data);
+	handle->data = NULL;
+}
+
+void io_free(uv_handle_t *handle)
+{
+	io_deinit(handle);
+	free(handle);
+}
+
+int io_start_read(uv_handle_t *handle)
+{
+	switch (handle->type) {
+	case UV_UDP:
+		return uv_udp_recv_start((uv_udp_t *)handle, &handle_getbuf, &udp_recv);
+	case UV_TCP:
+		return uv_read_start((uv_stream_t *)handle, &handle_getbuf, &tcp_recv);
+	default:
+		assert(!EINVAL);
+		return kr_error(EINVAL);
+	}
+}
+
+int io_stop_read(uv_handle_t *handle)
+{
+	if (handle->type == UV_UDP) {
+		return uv_udp_recv_stop((uv_udp_t *)handle);
+	} else {
+		return uv_read_stop((uv_stream_t *)handle);
+	}
+}
