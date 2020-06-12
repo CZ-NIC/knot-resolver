@@ -559,12 +559,12 @@ return function(clib_binding)
         assert(node ~= nil)
 
         -- validate the result
-        local validation_result = clib().node_validate(node)
-        if validation_result ~= 0 then
-            clib().node_free(node)
-            print("Tree validation failed, see printed libyang errors")
-            node = nil
-        end
+        -- local validation_result = clib().node_validate(node)
+        -- if validation_result ~= 0 then
+        --     clib().node_free(node)
+        --     print("Tree validation failed, see printed libyang errors")
+        --     node = nil
+        -- end
 
         return node
     end

@@ -131,7 +131,7 @@ static int cmd_commmit(cmd_args_t *args)
 		return CLI_ECMD;
 	}
 
-	int ret = sr_validate(sysrepo_ctx->session, YM_COMMON, 0);
+	int ret = sr_validate(sysrepo_ctx->session, YM_COMMON, args->timeout);
 	if (ret) {
 		printf("validation failed, %s\n", sr_strerror(ret));
 	}
