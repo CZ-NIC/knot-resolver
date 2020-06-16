@@ -20,6 +20,13 @@ enum io_stream_mode {
 	io_mode_binary = 1,
 };
 
+struct io_stream_data {
+	enum io_stream_mode mode;
+	size_t blen;
+	size_t balloc;
+	char *buf;
+};
+
 /** Bind address into a file-descriptor (only, no libuv).  type is e.g. SOCK_DGRAM */
 int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags);
 /** Initialize a UDP handle and start listening. */
