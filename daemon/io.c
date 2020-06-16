@@ -484,26 +484,28 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 		}
 	}
 
-	char *cmd = NULL;
+	char *cmd, *cmd_next = NULL;
+	bool incomplete_cmd = false;
+	struct io_stream_data *data = (struct io_stream_data*) stream->data;
+
 	/* Execute */
 	if (stream && commands && nread > 0) {
-		/* Ensure commands is 0-terminated */
-		if (commands[nread - 1] == '\n') {
-			commands[nread - 1] = '\0';
-		} else {
-			if (nread >= buf->len) { /* only equality should be possible */
-				char *newbuf = realloc(commands, nread + 1);
-				if (!newbuf)
-					goto finish;
-				commands = newbuf;
-			}
-			commands[nread] = '\0';
+		if (commands[nread - 1] != '\n') {
+			incomplete_cmd = true;
 		}
+		/* Ensure commands is 0-terminated */
+		if (nread >= buf->len) { /* only equality should be possible */
+			char *newbuf = realloc(commands, nread + 1);
+			if (!newbuf)
+				goto finish;
+			commands = newbuf;
+		}
+		commands[nread] = '\0';
 
 		const char *delim = args->quiet ? "" : "> ";
 
 		/* No command, just new line */
-		if (nread == 1 && args->tty_binary_output == false && commands[nread-1] == '\0') {
+		if (nread == 1 && args->tty_binary_output == false && commands[nread-1] == '\0' && data->blen == 0) {
 			if (stream_fd != STDIN_FILENO) {
 				fprintf(out, "%s", delim);
 			}
@@ -512,12 +514,61 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 			}
 		}
 
+		char *boundary = "\n\0";
 		cmd = strtok(commands, "\n");
+		/* strtok skip '\n' but we need process alone '\n' too */
+		if (commands[0] == '\n') {
+			cmd_next = cmd;
+			cmd = boundary;
+		} else {
+			cmd_next = strtok(NULL, "\n");
+		}
+
 		while (cmd != NULL) {
+			/* Last command is incomplete - save it and execute later */
+			if (incomplete_cmd && cmd_next == NULL) {
+				if (data->balloc < data->blen + strlen(cmd) + 1) {
+					char *newbuf = realloc(data->buf, data->balloc + strlen(cmd) + 1);
+					if (!newbuf)
+						goto finish;
+					data->balloc = data->balloc + strlen(cmd) + 1;
+					data->buf = newbuf;
+				}
+				strncpy(data->buf + data->blen, cmd, strlen(cmd));
+				data->blen = data->blen + strlen(cmd);
+				data->buf[data->blen] = '\0';
+				cmd = cmd_next;
+				/* There is new incomplete command */
+				if (commands[nread - 1] == '\n')
+					incomplete_cmd = false;
+				cmd_next = strtok(NULL, "\n");
+				continue;
+			}
+
+			/* Process incomplete command from previously call */
+			if (data->blen > 0) {
+				if (commands[0] != '\n' && commands[0] != '\0') {
+
+					if (data->balloc < data->blen + strlen(cmd) + 2) {
+						char *newbuf = realloc(data->buf, data->blen + strlen(cmd) + 2);
+						if (!newbuf)
+							goto finish;
+						data->balloc = data->blen + strlen(cmd) + 2;
+						data->buf = newbuf;
+					}
+					cmd = strncat(data->buf, cmd, strlen(cmd));
+					cmd[data->blen + strlen(cmd)] = '\0';
+				} else {
+					cmd = data->buf;
+				}
+				data->blen = 0;
+			}
+
 			/* Pseudo-command for switching to "binary output"; */
 			if (strcmp(cmd, "__binary") == 0) {
-				stream->data = (void *)io_mode_binary;
-				cmd = strtok(NULL, "\n");
+				data->mode = io_mode_binary;
+				cmd = cmd_next;
+				cmd_next = strtok(NULL, "\n");
 				continue;
 			}
 
@@ -529,17 +580,19 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 			}
 
 			/* Simpler output in binary mode */
-			if (stream->data == (void *)io_mode_binary) {
+			if (data->mode == io_mode_binary) {
 				size_t len_s = strlen(message);
 				if (len_s > UINT32_MAX) {
-					cmd = strtok(NULL, "\n");
+					cmd = cmd_next;
+					cmd_next = strtok(NULL, "\n");
 					continue;
 				}
 				uint32_t len_n = htonl(len_s);
 				fwrite(&len_n, sizeof(len_n), 1, out);
 				fwrite(message, len_s, 1, out);
 				lua_settop(L, 0);
-				cmd = strtok(NULL, "\n");
+				cmd = cmd_next;
+				cmd_next = strtok(NULL, "\n");
 				continue;
 			}
 			/* Log to remote socket if connected */
@@ -562,7 +615,8 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 				fprintf(fp_out, "%s", delim);
 			}
 			lua_settop(L, 0);
-			cmd = strtok(NULL, "\n");
+			cmd = cmd_next;
+			cmd_next = strtok(NULL, "\n");
 		}
 	}
 finish:
@@ -582,14 +636,20 @@ void io_tty_alloc(uv_handle_t *handle, size_t suggested, uv_buf_t *buf)
 void io_tty_accept(uv_stream_t *master, int status)
 {
 	uv_tcp_t *client = malloc(sizeof(*client));
+	struct io_stream_data *data = malloc(sizeof(struct io_stream_data));
 	struct args *args = the_args;
-	if (client) {
+	if (client && data) {
+		 data->mode = io_mode_text;
+		 data->buf = NULL;
+		 data->blen = 0;
+		 data->balloc = 0;
 		 uv_tcp_init(master->loop, client);
 		 if (uv_accept(master, (uv_stream_t *)client) != 0) {
+			free(client->data);
 			free(client);
 			return;
 		 }
-		 client->data = (void *) io_mode_text;
+		 client->data = data;
 		 uv_read_start((uv_stream_t *)client, io_tty_alloc, io_tty_process_input);
 		 /* Write command line */
 		 if (!args->quiet) {
