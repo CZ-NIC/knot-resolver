@@ -116,6 +116,7 @@ add_project_arguments(
   '-Wtype-limits',
   '-Wshadow',
   '-Werror=implicit-function-declaration', # Probably messed up includes; implicit functions are evil!
+  '-Werror=attributes',  # Missing cleanup attribute could lead to memory leaks.
   '-fvisibility=hidden',
   '-DHAVE_ASPRINTF=' + have_asprintf.to_int().to_string(),
 
