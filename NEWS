@@ -1,6 +1,10 @@
 Knot Resolver 5.x.y (2020-0m-dd)
 ================================
 
+Improvements
+------------
+- capabilities are no longer constrained when running as root (!1012)
+
 Bugfixes
 --------
 - hints module: NODATA answers also for non-address queries (!1005)
