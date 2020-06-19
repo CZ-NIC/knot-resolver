@@ -491,7 +491,11 @@ static int start_listening(struct network *net, flagged_fd_array_t *fds) {
 static void drop_capabilities(void)
 {
 #ifdef ENABLE_CAP_NG
-	/* Drop all capabilities. */
+	/* Drop all capabilities when running under non-root user. */
+	if (geteuid() == 0) {
+		kr_log_verbose("[system] running as root, no capabilities dropped\n");
+		return;
+	}
 	if (capng_have_capability(CAPNG_EFFECTIVE, CAP_SETPCAP)) {
 		capng_clear(CAPNG_SELECT_BOTH);
 
@@ -499,9 +503,12 @@ static void drop_capabilities(void)
 		if (capng_apply(CAPNG_SELECT_BOTH) < 0) {
 			kr_log_error("[system] failed to set process capabilities: %s\n",
 			          strerror(errno));
+		} else {
+			kr_log_verbose("[system] all capabilities dropped\n");
 		}
 	} else {
-		kr_log_info("[system] process not allowed to set capabilities, skipping\n");
+		/* If user() was called, the capabilities were already dropped along with SETPCAP. */
+		kr_log_verbose("[system] process not allowed to set capabilities, skipping\n");
 	}
 #endif /* ENABLE_CAP_NG */
 }
