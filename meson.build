@@ -86,11 +86,16 @@ group = get_option('group')
 
 ## Optional dependencies
 message('--- optional dependencies ---')
-capng = dependency('libcap-ng', required: false)
 openssl = dependency('openssl', required: false)
 
 have_asprintf = meson.get_compiler('c').has_function('asprintf',
   prefix: '#define _GNU_SOURCE\n#include <stdio.h>')
+
+### capng
+capng = dependency(
+  # use empty name to disable the dependency, but still compile the dependent kresd
+  get_option('capng') == 'disabled' ? '' : 'libcap-ng',
+  required: get_option('capng') == 'enabled')
 
 ### sendmmsg
 has_sendmmsg = meson.get_compiler('c').has_function('sendmmsg',
@@ -279,6 +284,7 @@ s_build_extra_tests = build_extra_tests ? 'enabled' : 'disabled'
 s_install_kresd_conf = install_kresd_conf ? 'enabled' : 'disabled'
 s_sendmmsg = sendmmsg ? 'enabled': 'disabled'
 s_openssl = openssl.found() ? 'present': 'missing'
+s_capng = capng.found() ? 'enabled': 'disabled'
 message('''
 
 ======================= SUMMARY =======================
@@ -314,6 +320,7 @@ message('''
     install_kresd_conf: @0@'''.format(s_install_kresd_conf) + '''
     sendmmsg:           @0@'''.format(s_sendmmsg) + '''
     openssl debug:      @0@'''.format(s_openssl) + '''
+    capng:              @0@'''.format(s_capng) + '''
 
 =======================================================
 
