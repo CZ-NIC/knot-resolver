@@ -40,9 +40,6 @@ int engine_cmd(struct lua_State *L, const char *str, bool raw);
 /** Execute current chunk in the sandbox */
 int engine_pcall(struct lua_State *L, int argc);
 
-int engine_ipc(struct engine *engine, const char *expr);
-
-
 int engine_load_sandbox(struct engine *engine);
 int engine_loadconf(struct engine *engine, const char *config_path);
 
