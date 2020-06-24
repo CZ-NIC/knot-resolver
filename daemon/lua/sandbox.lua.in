@@ -659,16 +659,22 @@ ffi.cdef([[
 	char *strerror(int errnum);
 ]])
 
-function map(cmd)
-	local socket = require("cqueues.socket")
+function map(cmd, format)
+	local socket = require('cqueues.socket')
 	local kluautil = require('kluautil')
 	local bit = require("bit")
 	local local_sockets = {}
 	local results = {}
 
+	format = format or 'luaobj'
+	if format ~= 'luaobj' and format ~= 'strings' then
+		warn('warning: Unknown map format. Used "luaobj".')
+		format = 'luaobj'
+	end
+
 	for _,v in pairs(net.list()) do
 		if (v['kind'] == 'control') and (v['transport']['family'] == 'unix') then
-			table.insert(local_sockets, string.match(v['transport']['path'], "^.+/(.+)$"))
+			table.insert(local_sockets, string.match(v['transport']['path'], '^.*/([^/]+)$'))
 		end
 	end
 
@@ -676,7 +682,7 @@ function map(cmd)
 	if next(filetab) == nil then
 		local ret = eval_cmd(cmd, true)
 		if ret == nil then
-			result = {}
+			results = {}
 		else
 			table.insert(results, ret)
 		end
@@ -702,14 +708,21 @@ function map(cmd)
 			else
 				s:write('__binary\n')
 				recv = s:read(2)
-				s:write(''..cmd..'\n')
+				if format == 'luaobj' then
+					cmd = 'tojson('..cmd..')'
+				end
+				s:write(cmd..'\n')
 				local recv = s:read(4)
 				local len = tonumber(recv:byte(1))
 				for i=2,4 do
 					len = bit.bor(bit.lshift(len, 8), tonumber(recv:byte(i)))
 				end
 				recv = s:read(len)
-				table.insert(results, recv)
+				if format == 'strings' then
+					table.insert(results, recv)
+				else
+					table.insert(results, fromjson(recv))
+				end
 
 				s:close()
 			end

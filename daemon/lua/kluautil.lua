@@ -59,7 +59,7 @@ function kluautil.kr_https_fetch(url, out_file, ca_file)
 		return nil, errmsg
 	end
 
-	out_file:seek("set", 0)
+	out_file:seek('set', 0)
 
 	return true
 end
@@ -74,9 +74,9 @@ function kluautil.list_dir (path)
 
 	local entry = ffi.C.readdir(dir)
 	while entry ~= nil do
-		local file = ffi.string(entry.d_name)
-		if file ~= "." and file ~= ".." then
-			table.insert(results, file)
+		local entry_name = ffi.string(entry.d_name)
+		if entry_name ~= '.' and entry_name ~= '..' then
+			table.insert(results, entry_name)
 		end
 		entry = ffi.C.readdir(dir)
 	end
