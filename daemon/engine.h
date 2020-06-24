@@ -13,15 +13,11 @@ struct lua_State;
 #include "lib/resolve.h"
 #include "daemon/network.h"
 
-/* @internal Array of file descriptors shorthand. */
-typedef array_t(int) fd_array_t;
-
 struct engine {
     struct kr_context resolver;
     struct network net;
     module_array_t modules;
     array_t(const struct kr_cdb_api *) backends;
-    fd_array_t ipc_set;
     knot_mm_t *pool;
     char *hostname;
     struct lua_State *L;
