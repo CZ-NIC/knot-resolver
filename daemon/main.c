@@ -89,15 +89,10 @@ end:
  * Server operation.
  */
 
-static int fork_workers(fd_array_t *ipc_set, int forks)
+static int fork_workers(int forks)
 {
 	/* Fork subprocesses if requested */
 	while (--forks > 0) {
-		int sv[2] = {-1, -1};
-		if (socketpair(AF_LOCAL, SOCK_STREAM, 0, sv) < 0) {
-			perror("[system] socketpair");
-			return kr_error(errno);
-		}
 		int pid = fork();
 		if (pid < 0) {
 			perror("[system] fork");
@@ -106,16 +101,7 @@ static int fork_workers(fd_array_t *ipc_set, int forks)
 
 		/* Forked process */
 		if (pid == 0) {
-			array_clear(*ipc_set);
-			array_push(*ipc_set, sv[0]);
-			close(sv[1]);
 			return forks;
-		/* Parent process */
-		} else {
-			array_push(*ipc_set, sv[1]);
-			/* Do not share parent-end with other forks. */
-			(void) fcntl(sv[1], F_SETFD, FD_CLOEXEC);
-			close(sv[0]);
 		}
 	}
 	return 0;
@@ -143,7 +129,7 @@ static void help(int argc, char *argv[])
 }
 
 /** \return exit code for main()  */
-static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_set, bool leader, struct args *args)
+static int run_worker(uv_loop_t *loop, struct engine *engine, bool leader, struct args *args)
 {
 	/* Only some kinds of stdin work with uv_pipe_t.
 	 * Otherwise we would abort() from libuv e.g. with </dev/null */
@@ -174,7 +160,6 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	} else if (args->control_fd != -1 && uv_pipe_open(&pipe, args->control_fd) == 0) {
 		uv_listen((uv_stream_t *) &pipe, 16, io_tty_accept);
 	}
-	memcpy(&engine->ipc_set, ipc_set, sizeof(*ipc_set));
 
 	/* Notify supervisor. */
 #if SYSTEMD_VERSION > 0
@@ -479,11 +464,8 @@ int main(int argc, char **argv)
 				(long)rlim.rlim_cur);
 	}
 
-	/* Connect forks with local socket */
-	fd_array_t ipc_set;
-	array_init(ipc_set);
 	/* Fork subprocesses if requested */
-	int fork_id = fork_workers(&ipc_set, the_args->forks);
+	int fork_id = fork_workers(the_args->forks);
 	if (fork_id < 0) {
 		return EXIT_FAILURE;
 	}
@@ -586,7 +568,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Run the event loop */
-	ret = run_worker(loop, &engine, &ipc_set, fork_id == 0, the_args);
+	ret = run_worker(loop, &engine, fork_id == 0, the_args);
 
 cleanup:/* Cleanup. */
 	engine_deinit(&engine);

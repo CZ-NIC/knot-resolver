@@ -571,9 +571,6 @@ void engine_deinit(struct engine *engine)
 	 * e.g. the endpoint kind registry to work (inside ->net),
 	 * and this registry deinitization uses the lua state. */
 	network_close_force(&engine->net);
-	for (size_t i = 0; i < engine->ipc_set.len; ++i) {
-		close(engine->ipc_set.at[i]);
-	}
 	for (size_t i = 0; i < engine->modules.len; ++i) {
 		engine_unload(engine, engine->modules.at[i]);
 	}
@@ -592,7 +589,6 @@ void engine_deinit(struct engine *engine)
 	/* Free data structures */
 	array_clear(engine->modules);
 	array_clear(engine->backends);
-	array_clear(engine->ipc_set);
 	kr_ta_clear(&engine->resolver.trust_anchors);
 	kr_ta_clear(&engine->resolver.negative_anchors);
 	free(engine->hostname);
