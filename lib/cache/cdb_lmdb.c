@@ -29,6 +29,7 @@ struct lmdb_env
 	size_t mapsize;
 	MDB_dbi dbi;
 	MDB_env *env;
+	int fd;
 
 	/** Cached transactions
 	 *
@@ -256,6 +257,7 @@ static void cdb_close_env(struct lmdb_env *env, struct kr_cdb_stats *stats)
 	stats->close++;
 	mdb_dbi_close(env->env, env->dbi);
 	mdb_env_close(env->env);
+	close(env->fd);
 	memset(env, 0, sizeof(*env));
 }
 
@@ -323,16 +325,18 @@ static int cdb_open(struct lmdb_env *env, const char *path, size_t mapsize,
 	}
 
 #if !defined(__MACOSX__) && !(defined(__APPLE__) && defined(__MACH__))
-	auto_free char *mdb_datafile = kr_strcatdup(2, path, "/data.mdb");
-	int fd = open(mdb_datafile, O_RDWR);
-	if (fd == -1) {
-		mdb_txn_abort(txn);
-		stats->close++;
-		mdb_env_close(env->env);
-		return kr_error(errno);
+	if (env->fd == -1) {
+		auto_free char *mdb_datafile = kr_strcatdup(2, path, "/data.mdb");
+		env->fd = open(mdb_datafile, O_RDWR);
+		if (env->fd == -1) {
+			mdb_txn_abort(txn);
+			stats->close++;
+			mdb_env_close(env->env);
+			return kr_error(errno);
+		}
 	}
 
-	ret = posix_fallocate(fd, 0, mapsize);
+	ret = posix_fallocate(env->fd, 0, mapsize);
 	if (ret == EINVAL) {
 		/* POSIX says this can happen when the feature isn't supported by the FS.
 		 * We haven't seen this happen on Linux+glibc but it was reported on FreeBSD.*/
@@ -342,10 +346,9 @@ static int cdb_open(struct lmdb_env *env, const char *path, size_t mapsize,
 		mdb_txn_abort(txn);
 		stats->close++;
 		mdb_env_close(env->env);
-		close(fd);
+		close(env->fd);
 		return kr_error(ret);
 	}
-	close(fd);
 #endif
 
 	stats->commit++;
@@ -371,6 +374,7 @@ static int cdb_init(knot_db_t **db, struct kr_cdb_stats *stats,
 		return kr_error(ENOMEM);
 	}
 	memset(env, 0, sizeof(struct lmdb_env));
+	env->fd = -1;
 
 	/* Clear stale lockfiles. */
 	auto_free char *lockfile = kr_strcatdup(2, opts->path, "/.cachelock");
