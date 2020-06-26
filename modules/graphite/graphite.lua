@@ -15,6 +15,9 @@ local function make_socket(host, port, stype)
 	status, err = pcall(s.connect, s)
 
 	if not status then
+		if verbose() then
+			log('[graphite] socket error: %s', err)
+		end
 		return status, err
 	end
 	return s
@@ -42,26 +45,47 @@ end
 
 -- Send the metrics in a table to multiple Graphite consumers
 local function publish_table(metrics, prefix, now)
-	for key,val in pairs(metrics) do
-		local msg = key..' '..val..' '..now..'\n'
-		if prefix then
-			msg = prefix..'.'..msg
-		end
-		for i in ipairs(M.cli) do
-			local ok, err = M.cli[i]:write(msg)
-			if not ok then
-				-- Best-effort reconnect once per two tries
-				local tcp = M.cli[i]['connect'] ~= nil
-				local host = M.info[i]
-				if tcp and host.seen + 2 * M.interval / 1000 <= now then
-					print(string.format('[graphite] reconnecting: %s@%d reason: %s',
-						  host.addr, host.port, err))
-					M.cli[i] = make_tcp(host.addr, host.port)
-					host.seen = now
-				end
+	local s
+	for i in ipairs(M.cli) do
+		local host = M.info[i]
+
+		if M.cli[i] == -1 then
+			if host.tcp then
+				s = make_tcp(host.addr, host.port)
+			else
+				s = make_udp(host.addr, host.port)
+			end
+			if s then
+				M.cli[i] = s
 			end
 		end
-	end
+
+		if M.cli[i] ~= -1 then
+			for key,val in pairs(metrics) do
+				local msg = key..' '..val..' '..now..'\n'
+				if prefix then
+					msg = prefix..'.'..msg
+				end
+
+				local ok, err = pcall(M.cli[i].write, M.cli[i], msg)
+				if not ok then
+					local tcp = M.cli[i]['connect'] ~= nil
+					if tcp and host.seen + 2 * M.interval / 1000 <= now then
+						log('[graphite] reconnecting: %s@%d reason: %s',
+							  host.addr, host.port, err)
+						s = make_tcp(host.addr, host.port)
+						if s then
+							M.cli[i] = s
+							host.seen = now
+						else
+							M.cli[i] = -1
+							break
+						end
+					end
+				end
+			end -- loop metrics
+		end
+	end -- loop M.cli
 end
 
 function M.init()
@@ -92,17 +116,17 @@ end
 
 -- @function Make connection to Graphite server.
 function M.add_server(_, host, port, tcp)
-	local s, err
+	local s
 	if tcp then
-		s, err = make_tcp(host, port)
+		s = make_tcp(host, port)
 	else
-		s, err = make_udp(host, port)
+		s = make_udp(host, port)
 	end
 	if not s then
-		error(err)
+		s = -1
 	end
 	table.insert(M.cli, s)
-	table.insert(M.info, {addr = host, port = port, seen = 0})
+	table.insert(M.info, {addr = host, port = port, tcp = tcp, seen = 0})
 	return 0
 end
 
