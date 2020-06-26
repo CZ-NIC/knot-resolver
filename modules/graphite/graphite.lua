@@ -15,6 +15,9 @@ local function make_socket(host, port, stype)
 	status, err = pcall(s.connect, s)
 
 	if not status then
+		if verbose() then
+			log('[graphite] socket error: %s', err)
+		end
 		return status, err
 	end
 	return s
@@ -68,8 +71,8 @@ local function publish_table(metrics, prefix, now)
 				if not ok then
 					local tcp = M.cli[i]['connect'] ~= nil
 					if tcp and host.seen + 2 * M.interval / 1000 <= now then
-						print(string.format('[graphite] reconnecting: %s@%d reason: %s',
-							  host.addr, host.port, err))
+						log('[graphite] reconnecting: %s@%d reason: %s',
+							  host.addr, host.port, err)
 						s = make_tcp(host.addr, host.port)
 						if s then
 							M.cli[i] = s
