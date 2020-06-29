@@ -972,7 +972,10 @@ static int resolve_badmsg(knot_pkt_t *pkt, struct kr_request *req, struct kr_que
 
 #ifndef STRICT_MODE
 	/* Work around broken auths/load balancers */
-	if (query->flags.SAFEMODE) {
+	/* In case we get called in FORWARD or STUB mode,
+	 * let's return _FAIL causing retries with other IP addresses.
+	 * Otherwise we would cause immediate SERVFAIL. */
+	if (query->flags.SAFEMODE || query->flags.FORWARD || query->flags.STUB) {
 		return resolve_error(pkt, req);
 	} else if (query->flags.NO_MINIMIZE) {
 		query->flags.SAFEMODE = true;
@@ -1097,6 +1100,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	case KNOT_RCODE_SERVFAIL:
 		if (query->flags.STUB) {
 			 /* just pass answer through if in stub mode */
+			 /* TODO: reconsider this "inconsistency" (e.g. with other RCODEs) */
 			break;
 		}
 		/* fall through */
