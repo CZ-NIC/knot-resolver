@@ -190,8 +190,11 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 #endif
 	const bool large_usage = db_usage >= cfg->cache_max_usage;
 	if (cfg->dry_run || large_usage) {	// don't print this on every size check
-		printf("Usage: %.2lf%% (%zu / %zu)\n", db_usage, db_usage_abs,
-		       db_size);
+		const size_t MiB = 1024 * 1024;
+		#define MiB_round(n) (((n) + MiB/2) / MiB)
+		printf("Usage: %.2lf%% (%zu / %zu MiB)\n",
+			db_usage, MiB_round(db_usage_abs), MiB_round(db_size));
+		#undef MiB_round
 	}
 	if (cfg->dry_run || !large_usage) {
 		return KNOT_EOK;
@@ -217,14 +220,14 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	for (int i = 0; i < CATEGORIES; ++i) {
 		cats_sumsize += cats.categories_sizes[i];
 	}
-	ssize_t amount_tofree = knot_db_lmdb_get_mapsize(db) * cfg->cache_to_be_freed
-	    * cats_sumsize / (100 * knot_db_lmdb_get_usage(db));
+	/* use less precise variant to avoid 32-bit overflow */
+	ssize_t amount_tofree = cats_sumsize / 100 * cfg->cache_to_be_freed;
 
 #ifdef DEBUG
-	printf("tofree: %zd\n", amount_tofree);
+	printf("tofree: %zd / %zd\n", amount_tofree, cats_sumsize);
 	for (int i = 0; i < CATEGORIES; i++) {
 		if (cats.categories_sizes[i] > 0) {
-			printf("category %d size %zu\n", i,
+			printf("category %.2d size %zu\n", i,
 			       cats.categories_sizes[i]);
 		}
 	}
