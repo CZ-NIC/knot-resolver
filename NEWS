@@ -5,6 +5,8 @@ Bugfixes
 --------
 - hints module: NODATA answers also for non-address queries (!1005)
 - tls: send alert to peer if handshake fails (!1007)
+- forwarding: try other IP addresses on bad RCODEs (!1015)
+  For SERVFAIL and REFUSED this is regressed since 5.1.0.
 
 
 Knot Resolver 5.1.1 (2020-05-19)
