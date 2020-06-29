@@ -6,6 +6,10 @@ if not stats then modules.load('stats') end
 if worker.id > 0 then return {} end
 local M = {}
 local socket = require("cqueues.socket")
+local proto_txt = {
+	[socket.SOCK_DGRAM] = 'udp',
+	[socket.SOCK_STREAM] = 'tcp'
+}
 
 local function make_socket(host, port, stype)
 	local s, err, status
@@ -15,9 +19,8 @@ local function make_socket(host, port, stype)
 	status, err = pcall(s.connect, s)
 
 	if not status then
-		if verbose() then
-			log('[graphite] socket error: %s', err)
-		end
+		log('[graphite] connecting: %s@%d %s reason: %s',
+			host, port, proto_txt[stype], err)
 		return status, err
 	end
 	return s
@@ -71,8 +74,10 @@ local function publish_table(metrics, prefix, now)
 				if not ok then
 					local tcp = M.cli[i]['connect'] ~= nil
 					if tcp and host.seen + 2 * M.interval / 1000 <= now then
-						log('[graphite] reconnecting: %s@%d reason: %s',
-							  host.addr, host.port, err)
+						local sock_type = (host.tcp and socket.SOCK_STREAM)
+									or socket.SOCK_DGRAM
+						log('[graphite] reconnecting: %s@%d %s reason: %s',
+							  host.addr, host.port, proto_txt[sock_type], err)
 						s = make_tcp(host.addr, host.port)
 						if s then
 							M.cli[i] = s
