@@ -8,6 +8,7 @@
 #include <lib/defines.h>
 #include <libknot/libknot.h>
 
+#include "kresconfig.h"
 #include "kr_cache_gc.h"
 
 volatile static int killed = 0;
@@ -36,7 +37,7 @@ static void print_help()
 	printf(" -l <deletes_per_txn>\n");
 	printf(" -m <rw_txn_duration(usecs)>\n");
 	printf(" -u <cache_max_usage(percent)>\n");
-	printf(" -f <cache_to_be_freed(percent)>\n");
+	printf(" -f <cache_to_be_freed(percent-of-current-usage)>\n");
 	printf(" -w <wait_next_rw_txn(usecs)>\n");
 	printf(" -t <temporary_memory(MBytes)>\n");
 	printf(" -n (= dry run)\n");
@@ -55,7 +56,12 @@ static long get_nonneg_optarg()
 
 int main(int argc, char *argv[])
 {
-	printf("Knot Resolver Cache Garbage Collector v. %s\n", KR_CACHE_GC_VERSION);
+	printf("Knot Resolver Cache Garbage Collector, version %s\n", PACKAGE_VERSION);
+	if (setvbuf(stdout, NULL, _IONBF, 0) || setvbuf(stderr, NULL, _IONBF, 0)) {
+		fprintf(stderr, "Failed to to set output buffering (ignored): %s\n",
+				strerror(errno));
+		fflush(stderr);
+	}
 
 	signal(SIGTERM, got_killed);
 	signal(SIGKILL, got_killed);
