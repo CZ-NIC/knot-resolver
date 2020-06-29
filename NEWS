@@ -8,6 +8,7 @@ Bugfixes
 - cache: fix interaction between LMDB locks and preallocation (!1013)
 - cache garbage collector: fix flushing of messages to logs (!1009)
 - cache garbage collector: fix insufficient GC on 32-bit systems (!1009)
+- graphite module: do not block resolver on TCP failures (!1014)
 
 
 Knot Resolver 5.1.1 (2020-05-19)
