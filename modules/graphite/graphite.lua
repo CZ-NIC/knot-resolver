@@ -121,16 +121,7 @@ end
 
 -- @function Make connection to Graphite server.
 function M.add_server(_, host, port, tcp)
-	local s
-	if tcp then
-		s = make_tcp(host, port)
-	else
-		s = make_udp(host, port)
-	end
-	if not s then
-		s = -1
-	end
-	table.insert(M.cli, s)
+	table.insert(M.cli, -1)
 	table.insert(M.info, {addr = host, port = port, tcp = tcp, seen = 0})
 	return 0
 end
@@ -141,7 +132,6 @@ function M.config(conf)
 	if not conf.port then conf.port = 2003 end
 	if conf.interval then M.interval = conf.interval end
 	if conf.prefix then M.prefix = conf.prefix end
-	-- connect to host(s)
 	if type(conf.host) == 'table' then
 		for _, val in pairs(conf.host) do
 			M:add_server(val, conf.port, conf.tcp)
@@ -151,7 +141,7 @@ function M.config(conf)
 	end
 	-- start publishing stats
 	if M.ev then event.cancel(M.ev) end
-	M.ev = event.recurrent(M.interval, M.publish)
+	M.ev = event.recurrent(M.interval, function() worker.coroutine(M.publish) end)
 	return 0
 end
 
