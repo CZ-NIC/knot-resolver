@@ -9,6 +9,8 @@ Bugfixes
 - cache garbage collector: fix flushing of messages to logs (!1009)
 - cache garbage collector: fix insufficient GC on 32-bit systems (!1009)
 - graphite module: do not block resolver on TCP failures (!1014)
+- forwarding: try other IP addresses on bad RCODEs (!1015)
+  For SERVFAIL and REFUSED this is regressed since 5.1.0.
 
 
 Knot Resolver 5.1.1 (2020-05-19)
