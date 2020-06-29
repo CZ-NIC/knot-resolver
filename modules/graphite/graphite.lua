@@ -13,10 +13,18 @@ local proto_txt = {
 
 local function make_socket(host, port, stype)
 	local s, err, status
+	-- timeout before next interval begins (roughly)
+	local timeout_sec = (M.interval - 10) / sec
 
 	s = socket.connect({ host = host, port = port, type = stype })
 	s:setmode('bn', 'bn')
-	status, err = pcall(s.connect, s)
+	s:settimeout(timeout_sec)
+	status, err = pcall(s.connect, s, timeout_sec)
+	if status == true and err == nil then
+		err = 'connect timeout'
+		s:close()
+		status = false
+	end
 
 	if not status then
 		log('[graphite] connecting: %s@%d %s reason: %s',
