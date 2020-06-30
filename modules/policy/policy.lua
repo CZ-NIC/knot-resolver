@@ -388,22 +388,17 @@ local function rpz_parse(action, path)
 		['\012rpz-tcp-only\0'] = policy.TC,
 		-- Policy triggers @NYI@
 	}
-	local unsupp_rrs = function (rtype)
-		local set = {
-			kres.type.DNAME,
-			kres.type.NS,
-			kres.type.SOA,
-			kres.type.DNSKEY,
-			kres.type.DS,
-			kres.type.RRSIG,
-			kres.type.NSEC,
-			kres.type.NSEC3,
-		}
-		for _, l in pairs(set) do
-			if rtype == l then return true end
-		end
-		return false
-	end
+	-- RR types to be skipped; boolean denoting whether to throw a warning.
+	local rrtype_bad = {
+		[kres.type.DNAME]  = true,
+		[kres.type.NS]     = false, -- it's mandatory; could be improved to warn based on owner
+		[kres.type.SOA]    = false, -- it's mandatory; could be improved to warn based on owner
+		[kres.type.DNSKEY] = true,
+		[kres.type.DS]     = true,
+		[kres.type.RRSIG]  = true,
+		[kres.type.NSEC]   = true,
+		[kres.type.NSEC3]  = true,
+	}
 	local parser = require('zonefile').new()
 	local ok, errstr = parser:open(path)
 	if not ok then
@@ -447,12 +442,15 @@ local function rpz_parse(action, path)
 		else
 			-- Warn when NYI
 			if #name then
-				if unsupp_rrs(parser.r_type) then
+				local is_bad = rrtype_bad[parser.r_type]
+				if is_bad == true then
 					log('[poli] RPZ %s:%d: RR type %s is not allowed in RPZ', path, tonumber(parser.line_counter),
 					    kres.tostring.type[parser.r_type])
-				else
+				elseif is_bad == nil then
 					if new_actions[name] == nil then new_actions[name] = {} end
 					new_actions[name][parser.r_type] = { ttl=parser.r_ttl, rdata=rdata }
+				else
+					assert(is_bad == false)
 				end
 			end
 		end
