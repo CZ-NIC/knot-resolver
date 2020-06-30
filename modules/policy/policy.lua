@@ -378,7 +378,6 @@ end
 local function rpz_parse(action, path)
 	local rules = {}
 	local new_actions = {}
-	local origin = '\0'
 	local action_map = {
 		-- RPZ Policy Actions
 		['\0'] = action,
