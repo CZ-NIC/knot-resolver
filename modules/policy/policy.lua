@@ -445,7 +445,20 @@ local function rpz_parse(action, path)
 						path, tonumber(parser.line_counter), kres.tostring.type[parser.r_type])
 				elseif is_bad == nil then
 					if new_actions[name] == nil then new_actions[name] = {} end
-					new_actions[name][parser.r_type] = { ttl=parser.r_ttl, rdata=rdata }
+					local act = new_actions[name][parser.r_type]
+					if act == nil then
+						new_actions[name][parser.r_type] = { ttl=parser.r_ttl, rdata=rdata }
+					else -- mutiple RRs: no reordering or deduplication
+						if type(act.rdata) ~= 'table' then
+							act.rdata = { act.rdata }
+						end
+						table.insert(act.rdata, rdata)
+						if parser.r_ttl ~= act.ttl then -- be conservative
+							log('[poli] RPZ %s:%d warning: different TTLs in a set (minimum taken)',
+								path, tonumber(parser.line_counter))
+							act.ttl = math.min(act.ttl, parser.r_ttl)
+						end
+					end
 				else
 					assert(is_bad == false and prefix_labels == 0)
 				end
