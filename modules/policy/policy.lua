@@ -388,11 +388,11 @@ local function rpz_parse(action, path)
 		['\012rpz-tcp-only\0'] = policy.TC,
 		-- Policy triggers @NYI@
 	}
-	-- RR types to be skipped; boolean denoting whether to throw a warning.
+	-- RR types to be skipped; boolean denoting whether to throw a warning even for RPZ apex.
 	local rrtype_bad = {
 		[kres.type.DNAME]  = true,
-		[kres.type.NS]     = false, -- it's mandatory; could be improved to warn based on owner
-		[kres.type.SOA]    = false, -- it's mandatory; could be improved to warn based on owner
+		[kres.type.NS]     = false,
+		[kres.type.SOA]    = false,
 		[kres.type.DNSKEY] = true,
 		[kres.type.DS]     = true,
 		[kres.type.RRSIG]  = true,
@@ -415,42 +415,34 @@ local function rpz_parse(action, path)
 		local rdata = ffi.string(parser.r_data, parser.r_data_length)
 		ffi.C.knot_dname_to_lower(full_name)
 
-		if (parser.r_type == kres.type.SOA) then
-			origin = ffi.gc(ffi.C.knot_dname_copy(full_name, nil), ffi.C.free)
+		local prefix_labels = ffi.C.knot_dname_in_bailiwick(full_name, parser.zone_origin)
+		if prefix_labels < 0 then
+			log('[poli] RPZ %s:%d: RR owner "%s" outside the zone (ignored)',
+				path, tonumber(parser.line_counter), kres.dname2str(full_name))
 			goto continue
 		end
 
-		local prefix_labels = ffi.C.knot_dname_in_bailiwick(full_name, origin)
-		local name
-		if prefix_labels > 0 then
-			local bytes = 0
-			for _=1,prefix_labels do
-				bytes = bytes + 1 + full_name[bytes]
-			end
-			name = ffi.string(full_name, bytes)
-			name = name..'\0'
-		else
-			name = ffi.string(full_name, parser.r_owner_length)
-		end
+		local bytes = ffi.C.knot_dname_size(full_name) - ffi.C.knot_dname_size(parser.zone_origin)
+		local name = ffi.string(full_name, bytes) .. '\0'
 
 		if parser.r_type == kres.type.CNAME then
 			if action_map[rdata] then
 				rules[name] = action_map[rdata]
 			else
-				log('[poli] RPZ %s:%d: CNAME with custom target in RPZ is not supported', path, tonumber(parser.line_counter))
+				log('[poli] RPZ %s:%d: CNAME with custom target in RPZ is not supported yet (ignored)',
+					path, tonumber(parser.line_counter))
 			end
 		else
-			-- Warn when NYI
 			if #name then
 				local is_bad = rrtype_bad[parser.r_type]
-				if is_bad == true then
-					log('[poli] RPZ %s:%d: RR type %s is not allowed in RPZ', path, tonumber(parser.line_counter),
-					    kres.tostring.type[parser.r_type])
+				if is_bad == true or (is_bad == false and prefix_labels ~= 0) then
+					log('[poli] RPZ %s:%d warning: RR type %s is not allowed in RPZ (ignored)',
+						path, tonumber(parser.line_counter), kres.tostring.type[parser.r_type])
 				elseif is_bad == nil then
 					if new_actions[name] == nil then new_actions[name] = {} end
 					new_actions[name][parser.r_type] = { ttl=parser.r_ttl, rdata=rdata }
 				else
-					assert(is_bad == false)
+					assert(is_bad == false and prefix_labels == 0)
 				end
 			end
 		end
