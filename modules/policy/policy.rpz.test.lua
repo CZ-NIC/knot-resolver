@@ -39,6 +39,9 @@ local function test_rpz()
 		'case.sensitive.', kres.type.A, kres.rcode.NOERROR, '192.168.8.8')
 	check_answer('"A 192.168.8.8" and domain with uppercase and lowercase letters',
 		'CASe.SENSItivE.', kres.type.A, kres.rcode.NOERROR, '192.168.8.8')
+	check_answer('two AAAA records',
+		'two.records.', kres.type.AAAA, kres.rcode.NOERROR,
+		{'2001:db8::2', '2001:db8::1'})
 end
 
 net.ipv4 = false
