@@ -1,4 +1,5 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
+modules.load('ta_update')
 
 -- check prerequisites
 local has_http = pcall(require, 'kres_modules.http') and pcall(require, 'http.request')
