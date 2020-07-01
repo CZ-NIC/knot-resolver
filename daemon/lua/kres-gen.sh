@@ -112,6 +112,8 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	kr_qarray_t
 	struct kr_rplan
 	struct kr_request_qsource_flags
+	struct kr_request_qsource
+	struct kr_request_upstream
 	struct kr_request
 	enum kr_rank
 	struct kr_cdb_stats
