@@ -521,14 +521,14 @@ nightly:copy:
   script:
     - 'tmp_file=$(mktemp)'
     # delete nightly branch
-    - 'STATUS=$(curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" -s -o ${tmp_file} -w "%{http_code}" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/unprotect")'
+    - 'STATUS=$(curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" -s -o ${tmp_file} -w "%{http_code}" "https://gitlab.nic.cz/api/v4/projects/147/repository/branches/nightly/unprotect")'
     - '[ "x${STATUS}" == "x200" ] || { cat ${tmp_file}; rm ${tmp_file}; exit 1; }'
     # no output from DELETE command
-    - 'STATUS=$(curl --request DELETE --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" -s -o ${tmp_file} -w "%{http_code}" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly")'
+    - 'STATUS=$(curl --request DELETE --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" -s -o ${tmp_file} -w "%{http_code}" "https://gitlab.nic.cz/api/v4/projects/147/repository/branches/nightly")'
     # recreate nightly branch from current master
-    - 'STATUS=$(curl --request POST --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" -s -o ${tmp_file} -w "%{http_code}" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches?branch=nightly&ref=master")'
+    - 'STATUS=$(curl --request POST --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" -s -o ${tmp_file} -w "%{http_code}" "https://gitlab.nic.cz/api/v4/projects/147/repository/branches?branch=nightly&ref=master")'
     - '[ "x${STATUS}" == "x201" ] || { cat ${tmp_file}; rm ${tmp_file}; exit 1; }'
-    - 'STATUS=$(curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" -s -o ${tmp_file} -w "%{http_code}" "https://gitlab.labs.nic.cz/api/v4/projects/147/repository/branches/nightly/protect")'
+    - 'STATUS=$(curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" -s -o ${tmp_file} -w "%{http_code}" "https://gitlab.nic.cz/api/v4/projects/147/repository/branches/nightly/protect")'
     - '[ "x${STATUS}" == "x200" ] || { cat ${tmp_file}; rm ${tmp_file}; exit 1; }'
     - 'rm ${tmp_file}'
 

@@ -38,11 +38,11 @@ RUN apt-get install -y -qqq faketime
 # C dependencies for python-augeas
 RUN apt-get install -y -qqq libaugeas-dev libffi-dev
 # Python dependencies for Deckard
-RUN wget https://gitlab.labs.nic.cz/knot/deckard/raw/master/requirements.txt -O /tmp/deckard-req.txt
+RUN wget https://gitlab.nic.cz/knot/deckard/raw/master/requirements.txt -O /tmp/deckard-req.txt
 RUN pip3 install -r /tmp/deckard-req.txt
 
 # build and install latest version of Knot DNS
-RUN git clone --depth=1 --branch=$KNOT_BRANCH https://gitlab.labs.nic.cz/knot/knot-dns.git /tmp/knot
+RUN git clone --depth=1 --branch=$KNOT_BRANCH https://gitlab.nic.cz/knot/knot-dns.git /tmp/knot
 WORKDIR /tmp/knot
 RUN pwd
 RUN autoreconf -if
@@ -62,7 +62,7 @@ RUN luarocks install luacheck
 
 # respdiff for kresd CI
 RUN apt-get install lmdb-utils -y -qqq
-RUN git clone --depth=1 https://gitlab.labs.nic.cz/knot/respdiff /var/opt/respdiff
+RUN git clone --depth=1 https://gitlab.nic.cz/knot/respdiff /var/opt/respdiff
 RUN pip3 install -r /var/opt/respdiff/requirements.txt
 
 # Python static analysis for respdiff
