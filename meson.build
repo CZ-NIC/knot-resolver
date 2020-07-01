@@ -13,7 +13,7 @@ project(
 # Unity build
 if get_option('unity') != 'off'
   error('unity builds are not supported! ' +
-    'https://gitlab.labs.nic.cz/knot/knot-resolver/issues/460')
+    'https://gitlab.nic.cz/knot/knot-resolver/issues/460')
 endif
 
 
@@ -124,7 +124,7 @@ add_project_arguments(
   # https://github.com/libuv/libuv/pull/2588/files#diff-04c6e90faac2675aa89e2176d2eec7d8
   # https://github.com/libuv/libuv/issues/1230#issuecomment-569030944
   # Performance impact in our case seems OK:
-  # https://gitlab.labs.nic.cz/knot/knot-resolver/-/merge_requests/962#note_147407
+  # https://gitlab.nic.cz/knot/knot-resolver/-/merge_requests/962#note_147407
   '-fno-strict-aliasing',
 
   language: 'c',

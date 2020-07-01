@@ -5,6 +5,6 @@ DocumentName: knotdns-dynarray
 DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-ce6423dd-ac6a-4e78-90c3-5cbdef1e252c
 
 PackageName: knotdns-dynarray
-PackageDownloadLocation: git+https://gitlab.labs.nic.cz/knot/knot-dns.git@48c8b4f38cf5f7bf505c79b56adf7580688f6d3d#src/contrib/dynarray.h
+PackageDownloadLocation: git+https://gitlab.nic.cz/knot/knot-dns.git@48c8b4f38cf5f7bf505c79b56adf7580688f6d3d#src/contrib/dynarray.h
 PackageOriginator: Organization: Knot DNS contributors
 PackageLicenseDeclared: GPL-3.0-or-later

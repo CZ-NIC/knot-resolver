@@ -270,8 +270,8 @@ As described in the layers, you can not only retrieve information about current 
 		req:pop(qry)
 
 
-.. _libknot:  https://gitlab.labs.nic.cz/knot/knot-dns/tree/master/src/libknot
-.. _bindings: https://gitlab.labs.nic.cz/knot/knot-resolver/blob/master/daemon/lua/kres.lua
+.. _libknot:  https://gitlab.nic.cz/knot/knot-dns/tree/master/src/libknot
+.. _bindings: https://gitlab.nic.cz/knot/knot-resolver/blob/master/daemon/lua/kres.lua
 
 
 .. _significant-lua-changes:
