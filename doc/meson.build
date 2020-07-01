@@ -61,3 +61,9 @@ run_target(
   'doc',
   command: make_doc,
 )
+
+
+run_target(
+  'doc-strict',
+  command: [make_doc, '-W'],
+)
