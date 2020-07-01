@@ -175,6 +175,25 @@ struct kr_request_qsource_flags {
 	bool http:1; /**< true if the request is on HTTP; only meaningful if (dst_addr). */
 };
 
+/* Information about the origin of the request. */
+struct kr_request_qsource {
+	/** Address that originated the request. NULL for internal origin. */
+	const struct sockaddr *addr;
+	/** Address that accepted the request.  NULL for internal origin.
+	 * Beware: in case of UDP on wildcard address it will be wildcard;
+	 * closely related: issue #173. */
+	const struct sockaddr *dst_addr;
+	const knot_pkt_t *packet;
+	struct kr_request_qsource_flags flags; /**< See definition above. */
+	size_t size; /**< query packet size */
+};
+
+/* Information about upstream. */
+struct kr_request_upstream {
+	unsigned rtt;                  /**< Current upstream RTT */
+	const struct sockaddr *addr;   /**< Current upstream address */
+};
+
 /**
  * Name resolution request.
  *
@@ -189,21 +208,8 @@ struct kr_request {
 	struct kr_context *ctx;
 	knot_pkt_t *answer;
 	struct kr_query *current_query;    /**< Current evaluated query. */
-	struct {
-		/** Address that originated the request. NULL for internal origin. */
-		const struct sockaddr *addr;
-		/** Address that accepted the request.  NULL for internal origin.
-		 * Beware: in case of UDP on wildcard address it will be wildcard;
-		 * closely related: issue #173. */
-		const struct sockaddr *dst_addr;
-		const knot_pkt_t *packet;
-		struct kr_request_qsource_flags flags; /**< See definition above. */
-		size_t size; /**< query packet size */
-	} qsource;
-	struct {
-		unsigned rtt;                  /**< Current upstream RTT */
-		const struct sockaddr *addr;   /**< Current upstream address */
-	} upstream;                        /**< Upstream information, valid only in consume() phase */
+	struct kr_request_qsource qsource;
+	struct kr_request_upstream upstream;   /**< Upstream information, valid only in consume() phase */
 	struct kr_qflags options;
 	int state;
 	ranked_rr_array_t answ_selected;
@@ -256,7 +262,7 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
  * Consume input packet (may be either first query or answer to query originated from kr_resolve_produce())
  *
  * @note If the I/O fails, provide an empty or NULL packet, this will make iterator recognize nameserver failure.
- * 
+ *
  * @param  request request state (awaiting input)
  * @param  src     [in] packet source address
  * @param  packet  [in] input packet
@@ -271,7 +277,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
  * If the CONSUME is returned then dst, type and packet will be filled with
  * appropriate values and caller is responsible to send them and receive answer.
  * If it returns any other state, then content of the variables is undefined.
- * 
+ *
  * @param  request request state (in PRODUCE state)
  * @param  dst     [out] possible address of the next nameserver
  * @param  type    [out] possible used socket type (SOCK_STREAM, SOCK_DGRAM)
