@@ -166,17 +166,8 @@ struct kr_request {
 	struct kr_context *ctx;
 	knot_pkt_t *answer;
 	struct kr_query *current_query;
-	struct {
-		const struct sockaddr *addr;
-		const struct sockaddr *dst_addr;
-		const knot_pkt_t *packet;
-		struct kr_request_qsource_flags flags;
-		size_t size;
-	} qsource;
-	struct {
-		unsigned int rtt;
-		const struct sockaddr *addr;
-	} upstream;
+	struct kr_request_qsource qsource;
+	struct kr_request_upstream upstream;
 	struct kr_qflags options;
 	int state;
 	ranked_rr_array_t answ_selected;
