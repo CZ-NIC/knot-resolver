@@ -13,7 +13,7 @@ Version:        %{VERSION}
 Release:        1%{?dist}
 Summary:        Caching full DNS Resolver
 
-License:        GPLv3
+License:        GPL-3.0-or-later
 URL:            https://www.knot-resolver.cz/
 Source0:        knot-resolver_%{version}.orig.tar.xz
 
