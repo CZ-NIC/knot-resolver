@@ -180,7 +180,7 @@ doc:
   start_in: '30 seconds'
   script:
     - meson build_doc -Ddoc=enabled
-    - ninja -C build_doc doc
+    - ninja -C build_doc doc-strict
   artifacts:
     expire_in: 6 hour
     paths:
