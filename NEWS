@@ -4,6 +4,7 @@ Knot Resolver 5.2.0 (2020-0m-dd)
 Improvements
 ------------
 - capabilities are no longer constrained when running as root (!1012)
+- validator: better reaction when RRSIGs are missing unexpectedly (!1020)
 
 Bugfixes
 --------
