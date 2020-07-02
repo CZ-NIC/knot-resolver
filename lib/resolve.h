@@ -90,7 +90,7 @@ enum kr_rank {
 	KR_RANK_INDET = 4,   /**< Unable to determine whether it should be secure. */
 	KR_RANK_BOGUS,       /**< Ought to be secure but isn't. */
 	KR_RANK_MISMATCH,
-	KR_RANK_MISSING,     /**< Unable to obtain a good signature. */
+	KR_RANK_MISSING,     /**< No RRSIG found for that owner+type combination. */
 
 	/** Proven to be insecure, i.e. we have a chain of trust from TAs
 	 * that cryptographically denies the possibility of existence
