@@ -14,7 +14,8 @@ an unprivileged user.
 
 * ``CAP_NET_BIND_SERVICE`` is required to bind to well-known ports.
 * ``CAP_SETPCAP`` when this capability is available, kresd drops any extra
-  privileges after the daemon successfully starts.
+  capabilities after the daemon successfully starts when running as
+  a non-root user.
 
 Running as non-privileged user
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -62,7 +63,3 @@ Running as root
    proccesses have unconstrained access to the complete system at runtime.
 
 While not recommended, it is also possible to run kresd directly as root.
-
-Please note the process will still attempt to drop capabilities after startup.
-Among other things, this means the cache directory should belong to root to
-have write access.

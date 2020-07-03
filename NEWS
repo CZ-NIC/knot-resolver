@@ -1,3 +1,11 @@
+Knot Resolver 5.2.0 (2020-0m-dd)
+================================
+
+Improvements
+------------
+- capabilities are no longer constrained when running as root (!1012)
+
+
 Knot Resolver 5.1.2 (2020-07-01)
 ================================
 
