@@ -548,9 +548,9 @@ static int rrsig_not_found(kr_layer_t *ctx, const knot_rrset_t *rr)
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 
-	/* Parent-side record, so don't ask for RRSIG.
-	 * We won't receive it anyway. */
-	if (qry->stype == KNOT_RRTYPE_DS) {
+	/* - Parent-side record, so don't ask for RRSIG. We won't receive it anyway.
+	 * - RRSIG QTYPE is expensive as-is, and there would be risk of cycling. */
+	if (qry->stype == KNOT_RRTYPE_DS || qry->stype == KNOT_RRTYPE_RRSIG) {
 		return KR_STATE_FAIL;
 	}
 
