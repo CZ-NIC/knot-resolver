@@ -408,7 +408,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	}
 
 	/* Start Processes if Enabled */
-	//resolver_start();
+	resolver_start();
 
 	/* Only some kinds of stdin work with uv_pipe_t.
 	 * Otherwise we would abort() from libuv e.g. with </dev/null */

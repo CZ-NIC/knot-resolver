@@ -22,7 +22,7 @@ static void cmds_lookup(EditLine *el, const char *str, size_t str_len)
 	}
 
 	/* Fill the lookup with command names of static cmds. */
-	for (const cmd_help_t *cmd_help = cmd_table; cmd_help->name != NULL; cmd_help++) {
+	for (const cmd_help_t *cmd_help = cmd_help_table; cmd_help->name != NULL; cmd_help++) {
 		ret = lookup_insert(&lookup, cmd_help->name, NULL);
 		if (ret != CLI_EOK) {
 			goto cmds_lookup_finish;
@@ -31,7 +31,7 @@ static void cmds_lookup(EditLine *el, const char *str, size_t str_len)
 
 	/* Fill the lookup with command names of dynamic cmds. */
 	dynarray_foreach(cmd_help, cmd_help_t *, i, dyn_cmd_help_table) {
-		cmd_help_t *cmd_help = *i;
+		const cmd_help_t *cmd_help = *i;
 		ret = lookup_insert(&lookup, cmd_help->name, NULL);
 		if (ret != CLI_EOK) {
 			goto cmds_lookup_finish;

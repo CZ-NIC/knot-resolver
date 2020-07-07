@@ -3,6 +3,7 @@
 #include <string.h>
 #include <assert.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <sysrepo.h>
 #include <libyang/libyang.h>
 
@@ -26,6 +27,78 @@
 #define CMD_DIFF        "diff"
 #define CMD_PERSIST     "persist"
 
+#define BASE_PATH        "/home/jetconf/kres-sysrepo/yaml_conversion"
+//#define BASE_PATH       "/home/alesmrazek/src/sysrepo-cli/src"
+
+#define JSON_FILE        BASE_PATH"/conversion.json"
+#define YAML_FILE        BASE_PATH"/conversion.yaml"
+
+#define STDIN_FILENO 0
+
+
+static char *to_yaml(struct lyd_node *data)
+{
+	FILE *json_file = NULL;
+	FILE *yaml_file = NULL;
+
+	json_file = fopen(JSON_FILE, "w");
+	if (!json_file) {
+		printf("Failed to open \"%s\" for writing (%s)", JSON_FILE, strerror(errno));
+		return CLI_ECMD;
+	}
+
+	lyd_print_file(json_file, data, LYD_JSON, LYP_FORMAT | LYP_WITHSIBLINGS);
+
+	system("python3 "BASE_PATH"/to_yaml.py");
+
+	yaml_file = fopen(YAML_FILE, "r");
+	char *yaml_out = NULL;
+	size_t size = 0;
+
+	if (!yaml_file) {
+			printf("Failed to open \"%s\" for reading (%s)", YAML_FILE, strerror(errno));
+			return;
+		}
+
+	/* Get the buffer size */
+	fseek(yaml_file, 0, SEEK_END); /* Go to end of file */
+	size = ftell(yaml_file); /* How many bytes did we pass ? */
+
+	/* Set position of stream to the beginning */
+	rewind(yaml_file);
+
+	/* Allocate the buffer (no need to initialize it with calloc) */
+	yaml_out = malloc((size + 1) * sizeof(*yaml_out)); /* size + 1 byte for the \0 */
+
+	/* Read the file into the buffer */
+	fread(yaml_out, size, 1, yaml_file); /* Read 1 chunk of size bytes from fp into buffer */
+
+	/* NULL-terminate the buffer */
+	yaml_out[size] = '\0';
+
+	fclose(yaml_file);
+
+	return yaml_out;
+}
+
+static int to_json(const char *yaml_in, sr_session_ctx_t *sr_session, int flags, struct lyd_node **data)
+{
+
+	FILE *yaml_file = NULL;
+
+	yaml_file = fopen(YAML_FILE, "w");
+	if (!yaml_file) {
+		printf("Failed to open \"%s\" for writing (%s)", YAML_FILE, strerror(errno));
+		return CLI_ECMD;
+	}
+
+	fprintf(yaml_file, yaml_in);
+	fclose(yaml_file);
+
+	system("python3 "BASE_PATH"/to_json.py");
+
+	step_load_data(sr_session, JSON_FILE, flags, data);
+}
 
 static int cmd_import(cmd_args_t *args)
 {
@@ -40,8 +113,36 @@ static int cmd_import(cmd_args_t *args)
 		return CLI_ECMD;
 	}
 
-	if (!ret) ret = step_load_data(sr_session, file_path, flags, &data);
+	FILE *yaml_file = NULL;
+	yaml_file = fopen(YAML_FILE, "r");
+	char *yaml_out = NULL;
+	size_t size = 0;
 
+	if (!yaml_file) {
+			printf("Failed to open \"%s\" for reading (%s)", YAML_FILE, strerror(errno));
+			return;
+		}
+
+	/* Get the buffer size */
+	fseek(yaml_file, 0, SEEK_END); /* Go to end of file */
+	size = ftell(yaml_file); /* How many bytes did we pass ? */
+
+	/* Set position of stream to the beginning */
+	rewind(yaml_file);
+
+	/* Allocate the buffer (no need to initialize it with calloc) */
+	yaml_out = malloc((size + 1) * sizeof(*yaml_out)); /* size + 1 byte for the \0 */
+
+	/* Read the file into the buffer */
+	fread(yaml_out, size, 1, yaml_file); /* Read 1 chunk of size bytes from fp into buffer */
+
+	/* NULL-terminate the buffer */
+	yaml_out[size] = '\0';
+
+	// if (!ret) ret = step_load_data(sr_session, file_path, flags, &data);
+	to_json(yaml_out, sr_session, flags, &data);
+	fclose(yaml_file);
+	free(yaml_out);
 
 	/* replace config (always spends data) */
 	ret = sr_replace_config(sr_session, YM_COMMON, data, 0, 0);
@@ -91,9 +192,16 @@ static int cmd_export(cmd_args_t *args)
 	}
 
 	/* print exported data to file or stdout */
-	lyd_print_file(file ? file : stdout, data, LYD_JSON, LYP_FORMAT | LYP_WITHSIBLINGS);
+	//lyd_print_file(file ? file : stdout, data, LYD_JSON, LYP_FORMAT | LYP_WITHSIBLINGS);
+
+	char *yaml_out;
+	yaml_out = to_yaml(data);
+
+	fprintf(file ? file : stdout, yaml_out);
+
 	lyd_free_withsiblings(data);
 	free(xpath);
+	free(yaml_out);
 
 	return CLI_EOK;
 }
@@ -250,7 +358,7 @@ static int cmd_leaf(cmd_args_t *args)
 	}
 	/* set configuration data */
 	else if (args->argc == 1) {
-		/* check if there is active session */
+		/* check if there is an active session */
 		if (!sysrepo_ctx->session) {
 			printf("no active transaction\n");
 			return CLI_ECMD;
@@ -285,7 +393,7 @@ static int cmd_container(cmd_args_t *args)
 		sr_session_ctx_t *sr_session = NULL;
 
 		asprintf(&xpath, "%s/*//.", args->desc->xpath);
-		if (!ret) ret = sr_session_start(sysrepo_ctx->connection, SR_DS_OPERATIONAL, &sr_session);
+		if (!ret) ret = sr_session_start(sysrepo_ctx->connection, SR_DS_RUNNING, &sr_session);
 		if (!ret) ret = sr_get_data(sr_session, xpath, 0, args->timeout, 0, &data);
 		if (ret) {
 			printf("get configuration data failed, %s\n", sr_strerror(ret));
@@ -293,11 +401,16 @@ static int cmd_container(cmd_args_t *args)
 			return CLI_ECMD;
 		}
 
-		lyd_print_file(stdout, data, LYD_JSON, LYP_FORMAT | LYP_WITHSIBLINGS);
+		//lyd_print_file(stdout, data, LYD_JSON, LYP_FORMAT | LYP_WITHSIBLINGS);
+
+		char *yaml;
+		yaml = to_yaml(data);
+		printf("\n%s\n", yaml);
 
 		lyd_free_withsiblings(data);
 		sr_session_stop(sr_session);
 		free(xpath);
+		free(yaml);
 	}
 	else {
 		printf("too many arguments\n");
@@ -339,11 +452,151 @@ static int cmd_rpc(cmd_args_t *args)
 	return CLI_EOK;
 }
 
-static int cmd_notif(cmd_args_t *args)
+static void print_val(const sr_val_t *value)
 {
-	return CLI_EOK;
+	if (NULL == value) {
+		return;
+	}
+
+	printf("%s", value->xpath);
+
+	switch (value->type) {
+	case SR_CONTAINER_T:
+	case SR_CONTAINER_PRESENCE_T:
+		printf("(container)");
+		break;
+	case SR_LIST_T:
+		printf("(list instance)");
+		break;
+	case SR_STRING_T:
+		printf(": %s", value->data.string_val);
+		break;
+	case SR_BOOL_T:
+		printf(": %s", value->data.bool_val ? "true" : "false");
+		break;
+	case SR_DECIMAL64_T:
+		printf(": %g", value->data.decimal64_val);
+		break;
+	case SR_INT8_T:
+		printf(": %" PRId8, value->data.int8_val);
+		break;
+	case SR_INT16_T:
+		printf(": %" PRId16, value->data.int16_val);
+		break;
+	case SR_INT32_T:
+		printf(": %" PRId32, value->data.int32_val);
+		break;
+	case SR_INT64_T:
+		printf(": %" PRId64, value->data.int64_val);
+		break;
+	case SR_UINT8_T:
+		printf(": %" PRIu8, value->data.uint8_val);
+		break;
+	case SR_UINT16_T:
+		printf(": %" PRIu16, value->data.uint16_val);
+		break;
+	case SR_UINT32_T:
+		printf(": %" PRIu32, value->data.uint32_val);
+		break;
+	case SR_UINT64_T:
+		printf(": %" PRIu64, value->data.uint64_val);
+		break;
+	case SR_IDENTITYREF_T:
+		printf(": %s", value->data.identityref_val);
+		break;
+	case SR_INSTANCEID_T:
+		printf(": %s", value->data.instanceid_val);
+		break;
+	case SR_BITS_T:
+		printf(": %s", value->data.bits_val);
+		break;
+	case SR_BINARY_T:
+		printf(": %s", value->data.binary_val);
+		break;
+	case SR_ENUM_T:
+		printf(": %s", value->data.enum_val);
+		break;
+	case SR_LEAF_EMPTY_T:
+		printf("(empty leaf)");
+		break;
+	default:
+		printf("(unprintable)");
+		break;
+	}
+
+	switch (value->type) {
+	case SR_UNKNOWN_T:
+	case SR_CONTAINER_T:
+	case SR_CONTAINER_PRESENCE_T:
+	case SR_LIST_T:
+	case SR_LEAF_EMPTY_T:
+		printf("\n");
+		break;
+	default:
+		printf("%s\n", value->dflt ? " [default]" : "");
+		break;
+	}
 }
 
+static void
+notif_cb(sr_session_ctx_t *session, const sr_ev_notif_type_t notif_type, const char *path, const sr_val_t *values,
+		const size_t values_cnt, time_t timestamp, void *private_data)
+{
+	size_t i;
+
+	(void)session;
+	(void)notif_type;
+	(void)timestamp;
+	(void)private_data;
+
+	printf("\n\nMessage Received \n\n", path);
+
+	for (i = 0; i < values_cnt; ++i) {
+		print_val(&values[i]);
+	}
+}
+
+int kbhit()
+{
+	struct timeval tv;
+	fd_set fds;
+	tv.tv_sec = 0;
+	tv.tv_usec = 0;
+	FD_ZERO(&fds);
+	FD_SET(STDIN_FILENO, &fds); //STDIN_FILENO is 0
+	select(STDIN_FILENO+1, &fds, NULL, NULL, &tv);
+	return FD_ISSET(STDIN_FILENO, &fds);
+}
+
+static int cmd_notif(cmd_args_t *args)
+{
+	int ret = CLI_EOK;
+	sr_session_ctx_t *sr_session = NULL;
+	sr_subscription_ctx_t *sr_subscription = NULL;
+
+	ret = sr_session_start(sysrepo_ctx->connection, SR_DS_RUNNING, &sr_session);
+	if (!ret) ret = sr_event_notif_subscribe(sr_session, YM_COMMON, args->desc->xpath, 0, 0, notif_cb, NULL, 0, &sr_subscription);
+	if (ret) {
+		printf("[] failed to subscribe notification, %s\n", sr_strerror(ret));
+		sr_session_stop(sr_session);
+		return CLI_ECMD;
+	}
+
+	printf("\nListening Notifications on \"%s\" \n(press ENTER to stop listening)\n\n", args->desc->name);
+
+	while(!kbhit())
+	{
+		usleep(1000);
+	}
+
+	printf("Unsubscribing\n");
+
+cleanup:
+	sr_unsubscribe(sr_subscription);
+	sr_session_stop(sr_session);
+
+	return CLI_EOK;
+}
 
 static void cmd_dynarray_deep_free(cmd_dynarray_t * d)
 {
@@ -357,6 +610,25 @@ static void cmd_dynarray_deep_free(cmd_dynarray_t * d)
 }
 
 cmd_dynarray_t dyn_cmd_table;
+
+// const cmd_desc_t cmd_table[] = {
+// 	/* name, function, xpath, flags */
+// 	{ CMD_EXIT,     NULL,           NULL, CMD_FNONE },
+// 	{ CMD_HELP,     print_commands, NULL, CMD_FNONE },
+// 	{ CMD_VERSION,  print_version,  "", CMD_FNONE },
+// 	/* Configuration file */
+// 	{ CMD_IMPORT,   cmd_import,     "", CMD_FNONE },
+// 	{ CMD_EXPORT,   cmd_export,     "", CMD_FNONE },
+// 	/* Transaction */
+// 	{ CMD_BEGIN,    cmd_begin,      "", CMD_FINTER },
+// 	{ CMD_COMMIT,   cmd_commmit,    "", CMD_FINTER },
+// 	{ CMD_ABORT,    cmd_abort,      "", CMD_FINTER },
+// 	{ CMD_VALIDATE, cmd_validate,   "", CMD_FINTER },
+// 	{ CMD_DIFF,     cmd_diff,       "", CMD_FINTER },
+// 	{ CMD_PERSIST,  cmd_persist,    "", CMD_FNONE },
+// 	/*  */
+// 	{ NULL }
+// };
 
 const cmd_desc_t cmd_table[] = {
 	/* name, function, xpath, flags */
@@ -381,6 +653,7 @@ static void cmd_help_dynarray_deep_free(cmd_help_dynarray_t * d)
 {
 	dynarray_foreach(cmd_help, cmd_help_t *, i, *d) {
 		cmd_help_t *cmd_help = *i;
+		free(cmd_help->params);
 		free(cmd_help);
 	}
 	cmd_help_dynarray_free(d);
@@ -393,10 +666,8 @@ const cmd_help_t cmd_help_table[] = {
 	{ CMD_EXIT,     "",            "Exit the program." },
 	{ CMD_HELP,     "",            "Print the program help." },
 	{ CMD_VERSION,  "",            "Print the program version." },
-	{ "", "", "" },
 	{ CMD_IMPORT,   "<file-path>", "Import YAML configuration file." },
-	{ CMD_EXPORT,   "<file-path>", "Export YAML configuration file." },
-	{ "", "", "" },
+	{ CMD_EXPORT,   "[<file-path>]", "Export YAML configuration to file or STDOUT." },
 	{ CMD_BEGIN,    "",            "Begin a transaction." },
 	{ CMD_COMMIT,   "",            "Commit a transaction." },
 	{ CMD_ABORT,    "",            "Abort a transaction." },
@@ -427,15 +698,25 @@ static const char *create_cmd_name(const char* xpath)
 	return name;
 }
 
+static const char *create_cmd_params(struct lys_node *node)
+{
+	char* params;
+
+	return params;
+}
+
 static int create_cmd(struct lys_node *node)
 {
 	if (node->nodetype == LYS_GROUPING ||
-	    node->nodetype == LYS_USES) {
+		node->nodetype == LYS_USES) {
 		return 0;
 	}
 
 	const char *xpath = lys_data_path(node);
 	const char *name = create_cmd_name(xpath);
+
+	const char *type = "";
+	char *params;
 
 	if (!strlen(name)) {
 		free(xpath);
@@ -452,34 +733,51 @@ static int create_cmd(struct lys_node *node)
 	switch (node->nodetype) {
 		case LYS_CONTAINER:
 			cmd->fcn = &cmd_container;
+			asprintf(&params, "%s", type);
 			break;
 		case LYS_LEAF:
 			cmd->fcn = &cmd_leaf;
+			type = ((struct lys_node_leaf *)node)->type.der->name;
+			if (((node->flags & LYS_CONFIG_W) == LYS_CONFIG_W) && type)
+				asprintf(&params, "[<%s>]", type);
+			else
+				asprintf(&params, "%s", type);
 			break;
 		case LYS_LEAFLIST:
 			cmd->fcn = &cmd_leaflist;
+			type = ((struct lys_node_leaflist *)node)->type.der->name;
+			if (((node->flags & LYS_CONFIG_W) == LYS_CONFIG_W) && type)
+				asprintf(&params, "[<%s>]", type);
+			else
+				asprintf(&params, "%s", type);
 			break;
 		case LYS_LIST:
 			cmd->fcn = &cmd_list;
+			asprintf(&params, "%s", type);
 			break;
 		case LYS_ACTION:
 			cmd->fcn = &cmd_rpc;
+			asprintf(&params, "%s", type);
 			break;
 		case LYS_RPC:
 			cmd->fcn = &cmd_rpc;
+			asprintf(&params, "%s", type);
 			break;
 		case LYS_NOTIF:
 			cmd->fcn = &cmd_notif;
+			asprintf(&params, "%s", type);
 			break;
 		default:
 			cmd->fcn = &cmd_leaf;
+			asprintf(&params, "%s", type);
 			break;
 	}
 
 	cmd_help_t *cmd_help = malloc(sizeof(cmd_help_t));
 	cmd_help->name = name;
 	cmd_help->desc = node->dsc;
-	cmd_help->params = "";
+	cmd_help->params = params;
+
 
 	cmd_help_dynarray_add(&dyn_cmd_help_table, &cmd_help);
 	cmd_dynarray_add(&dyn_cmd_table, &cmd);
@@ -528,7 +826,6 @@ int create_cmd_table(sr_conn_ctx_t *sr_connection)
 	/* get libyang context */
 	root = ly_ctx_get_node(ly_context, NULL, XPATH_BASE, 0);
 	assert(root != NULL);
-
 	/* iterate thrue all schema nodes */
 	schema_iterator(root);
 

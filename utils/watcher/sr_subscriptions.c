@@ -82,10 +82,13 @@ int resolver_start()
 	int ret = SR_ERR_OK;
 	struct server_config cfg = the_worker->engine->watcher.config;
 
-	kresd_instances_start(UNIT_START);
+	/* If autostart => start processes */
+	if (cfg.auto_start) {
+		kresd_instances_start(UNIT_START);
 
-	if (cfg.auto_cache_gc)
-		cache_gc_ctl(UNIT_START);
+		if (cfg.auto_cache_gc)
+			cache_gc_ctl(UNIT_START);
+	}
 
 	return ret;
 }

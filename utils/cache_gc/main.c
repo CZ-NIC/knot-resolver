@@ -294,9 +294,10 @@ int main(int argc, char *argv[])
 			if(poll_res > 0)
 				sr_process_events(sr_subscription, sr_session, NULL);
 			else if (poll_res < 0){
-				rv = errno;
-				if (rv && rv != EINTR)
+				if (rv && rv != EINTR) {
+					rv = errno;
 					printf("Error (%s)\n", strerror(rv));
+				}
 				goto cleanup;
 			}
 		#else

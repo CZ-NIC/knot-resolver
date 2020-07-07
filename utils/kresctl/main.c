@@ -9,7 +9,7 @@
 
 
 params_t params = {
-	.timeout = SYSREPO_TIMEOUT * 1000,
+	.timeout = SYSREPO_TIMEOUT * 1000
 };
 
 sysrepo_ctx_t *sysrepo_ctx;
