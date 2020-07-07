@@ -115,7 +115,7 @@ function M.config (conf)
 	if type(conf) ~= 'table' or type(conf[1]) ~= 'table' then
 		error('[renumber] expected { {prefix, target}, ... }')
 	end
-	for i = 1, #conf do add_prefix(conf[i][1], conf[1][2]) end
+	for i = 1, #conf do add_prefix(conf[i][1], conf[i][2]) end
 end
 
 -- Layers
