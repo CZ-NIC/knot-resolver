@@ -200,8 +200,6 @@ static int cmd_export(cmd_args_t *args)
 	char *yaml_out;
 	yaml_out = to_yaml(data);
 
-	printf(yaml_out);
-
 	fprintf(file ? file : stdout, yaml_out);
 
 	lyd_free_withsiblings(data);
@@ -431,6 +429,50 @@ static int cmd_container(cmd_args_t *args)
 
 static int cmd_list(cmd_args_t *args)
 {
+	int ret = CLI_EOK;
+
+	/* get operational data */
+	if (!args->argc) {
+
+		struct lyd_node *data = NULL;
+		sr_session_ctx_t *sr_session = NULL;
+
+		if (!ret) ret = sr_session_start(sysrepo_ctx->connection, SR_DS_RUNNING, &sr_session);
+		if (!ret) ret = sr_get_data(sr_session, args->desc->xpath, 0, args->timeout, 0, &data);
+		if (ret) {
+			printf("get configuration data failed, %s\n", sr_strerror(ret));
+			sr_session_stop(sr_session);
+			return CLI_ECMD;
+		}
+
+		//lyd_print_file(stdout, data, LYD_JSON, LYP_FORMAT | LYP_WITHSIBLINGS);
+
+		char *yaml;
+		yaml = to_yaml(data);
+		printf("\n%s\n", yaml);
+
+		lyd_free_withsiblings(data);
+		sr_session_stop(sr_session);
+		free(yaml);
+	}
+	else {
+		/* check if there is an active session */
+		if (!sysrepo_ctx->session) {
+			printf("no active transaction\n");
+			return CLI_ECMD;
+		}
+
+		if (!ret) ret = sr_session_switch_ds(sysrepo_ctx->session,SR_DS_CANDIDATE);
+
+		/* set new configuration */
+
+		if (!ret) ret = sr_apply_changes(sysrepo_ctx->session, 0, 0);
+		if (ret) {
+			printf("set data value failed, %s\n", sr_strerror(ret));
+			return CLI_ECMD;
+		}
+	}
+
 	return CLI_EOK;
 }
 
