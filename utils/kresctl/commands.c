@@ -114,12 +114,12 @@ static int cmd_import(cmd_args_t *args)
 	}
 
 	FILE *yaml_file = NULL;
-	yaml_file = fopen(YAML_FILE, "r");
+	yaml_file = fopen(file_path, "r");
 	char *yaml_out = NULL;
 	size_t size = 0;
 
 	if (!yaml_file) {
-			printf("Failed to open \"%s\" for reading (%s)", YAML_FILE, strerror(errno));
+			printf("Failed to open \"%s\" for reading (%s)", file_path, strerror(errno));
 			return;
 		}
 
@@ -138,6 +138,8 @@ static int cmd_import(cmd_args_t *args)
 
 	/* NULL-terminate the buffer */
 	yaml_out[size] = '\0';
+
+	printf(yaml_out);
 
 	// if (!ret) ret = step_load_data(sr_session, file_path, flags, &data);
 	to_json(yaml_out, sr_session, flags, &data);
@@ -178,6 +180,7 @@ static int cmd_export(cmd_args_t *args)
 
 	asprintf(&xpath, "/%s:*", YM_COMMON);
 	int ret = sr_session_start(sysrepo_ctx->connection, SR_DS_RUNNING, &sr_session);
+
 	if (!ret) ret = sr_get_data(sr_session, xpath, 0, 0, 0, &data);
 	if (ret) {
 		printf("failed to get configuration from sysrepo, %s\n", sr_strerror(ret));
@@ -197,11 +200,17 @@ static int cmd_export(cmd_args_t *args)
 	char *yaml_out;
 	yaml_out = to_yaml(data);
 
+	printf(yaml_out);
+
 	fprintf(file ? file : stdout, yaml_out);
 
 	lyd_free_withsiblings(data);
 	free(xpath);
 	free(yaml_out);
+
+	/* Do not forget to close the file. */
+	if (file)
+		fclose(file);
 
 	return CLI_EOK;
 }
@@ -393,7 +402,7 @@ static int cmd_container(cmd_args_t *args)
 		sr_session_ctx_t *sr_session = NULL;
 
 		asprintf(&xpath, "%s/*//.", args->desc->xpath);
-		if (!ret) ret = sr_session_start(sysrepo_ctx->connection, SR_DS_RUNNING, &sr_session);
+		if (!ret) ret = sr_session_start(sysrepo_ctx->connection, SR_DS_OPERATIONAL, &sr_session);
 		if (!ret) ret = sr_get_data(sr_session, xpath, 0, args->timeout, 0, &data);
 		if (ret) {
 			printf("get configuration data failed, %s\n", sr_strerror(ret));
@@ -698,12 +707,12 @@ static const char *create_cmd_name(const char* xpath)
 	return name;
 }
 
-static const char *create_cmd_params(struct lys_node *node)
-{
-	char* params;
+// static const char *create_cmd_params(struct lys_node *node)
+// {
+// 	char* params;
 
-	return params;
-}
+// 	return params;
+// }
 
 static int create_cmd(struct lys_node *node)
 {
@@ -741,7 +750,7 @@ static int create_cmd(struct lys_node *node)
 			if (((node->flags & LYS_CONFIG_W) == LYS_CONFIG_W) && type)
 				asprintf(&params, "[<%s>]", type);
 			else
-				asprintf(&params, "%s", type);
+				asprintf(&params, "%s", "");
 			break;
 		case LYS_LEAFLIST:
 			cmd->fcn = &cmd_leaflist;
