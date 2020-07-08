@@ -25,6 +25,7 @@ config_tests += [
   ['dns64', files('dns64/dns64.test.lua')],
   ['predict', files('predict/predict.test.lua')],
   ['prefill', files('prefill/prefill.test/prefill.test.lua')],
+  ['renumber', files('renumber/renumber.test.lua')],
   ['ta_update', files('ta_update/ta_update.test.lua'), ['snowflake']],
 ]
 
