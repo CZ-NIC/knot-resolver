@@ -27,12 +27,12 @@ int kresd_get_status(const char *instance, char **status)
 
 	int ret = sd_bus_default_system(&bus);
 
-	asprintf(&instance_service, SERVICE_KRESD, instance);
+	asprintf(&instance_service, DBUS_PATH_KRESD, instance);
 
 	ret = sd_bus_get_property_string(
 		bus,
 		DBUS_SD_NAME,
-		DBUS_PATH_GC,
+		instance_service,
 		DBUS_INT_UNIT,
 		"ActiveState",
 		&err,

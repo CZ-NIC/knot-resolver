@@ -119,12 +119,11 @@ int set_tst_secret(const char *new_secret)
 static int server_status_cb(sr_session_ctx_t *session, const char *module_name, const char *xpath,
 const char *request_xpath, uint32_t request_id, struct lyd_node **parent, void *private_data)
 {
-	char *cache_gc_status;
-
 	/* kresd instances status */
 	kresd_instances_status(parent);
 
 	/* Cache Garbage Collector status */
+	char *cache_gc_status;
 	cache_gc_get_status(&cache_gc_status);
 	lyd_new_path(*parent, NULL, XPATH_STATUS"/cache-gc", cache_gc_status, 0, 0);
 
