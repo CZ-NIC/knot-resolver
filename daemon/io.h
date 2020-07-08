@@ -23,8 +23,8 @@ enum io_stream_mode {
 struct io_stream_data {
 	enum io_stream_mode mode;
 	size_t blen;
-	size_t balloc;
 	char *buf;
+	struct mempool *mp;
 };
 
 /** Bind address into a file-descriptor (only, no libuv).  type is e.g. SOCK_DGRAM */
