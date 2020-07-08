@@ -81,8 +81,17 @@ function M.check_answer(desc, qname, qtype, expected_rcode, expected_rdata)
 			end
 		end
 		done = true
-	end
-	resolve(qname, qtype, kres.class.IN, {}, callback)
+		end
+	resolve(qname, qtype, kres.class.IN, {},
+		function(...)
+			local ok, err = xpcall(callback, debug.traceback, ...)
+			if not ok then
+				fail('error in check_answer callback function')
+				io.stderr:write(string.format('%s\n', err))
+				os.exit(2)
+			end
+		end
+	)
 
 	for delay = 0.1, 4, 0.5 do -- total max 14.9s in 8 steps
 		if done then return end
