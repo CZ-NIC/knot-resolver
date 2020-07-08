@@ -2,10 +2,9 @@
 local M = {}
 
 function M.test(f, ...)
-	local res, exception = pcall(f, ...)
+	local res, exception = xpcall(f, debug.traceback, ...)
 	if not res then
-		local trace = debug.getinfo(2)
-		io.stderr:write(string.format('%s:%d %s\n', trace.source, trace.currentline, exception))
+		io.stderr:write(string.format('%s\n', exception))
 		os.exit(2)
 	end
 	return res
