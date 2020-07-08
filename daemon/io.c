@@ -524,19 +524,14 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 			cmd_next = strtok(NULL, "\n");
 		}
 
+		char *pbuf = data->buf + data->blen;
 		while (cmd != NULL) {
 			/* Last command is incomplete - save it and execute later */
 			if (incomplete_cmd && cmd_next == NULL) {
-				if (data->balloc < data->blen + strlen(cmd) + 1) {
-					char *newbuf = realloc(data->buf, data->balloc + strlen(cmd) + 1);
-					if (!newbuf)
-						goto finish;
-					data->balloc = data->balloc + strlen(cmd) + 1;
-					data->buf = newbuf;
-				}
-				strncpy(data->buf + data->blen, cmd, strlen(cmd));
+				pbuf = mp_append_string(data->mp, pbuf, cmd);
+				mp_append_char(data->mp, pbuf, '\0');
 				data->blen = data->blen + strlen(cmd);
-				data->buf[data->blen] = '\0';
+
 				cmd = cmd_next;
 				/* There is new incomplete command */
 				if (commands[nread - 1] == '\n')
@@ -548,20 +543,14 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 			/* Process incomplete command from previously call */
 			if (data->blen > 0) {
 				if (commands[0] != '\n' && commands[0] != '\0') {
-
-					if (data->balloc < data->blen + strlen(cmd) + 2) {
-						char *newbuf = realloc(data->buf, data->blen + strlen(cmd) + 2);
-						if (!newbuf)
-							goto finish;
-						data->balloc = data->blen + strlen(cmd) + 2;
-						data->buf = newbuf;
-					}
-					cmd = strncat(data->buf, cmd, strlen(cmd));
-					cmd[data->blen + strlen(cmd)] = '\0';
+					pbuf = mp_append_string(data->mp, pbuf, cmd);
+					mp_append_char(data->mp, pbuf, '\0');
+					cmd = data->buf;
 				} else {
 					cmd = data->buf;
 				}
 				data->blen = 0;
+				pbuf = data->buf;
 			}
 
 			/* Pseudo-command for switching to "binary output"; */
@@ -639,17 +628,19 @@ void io_tty_accept(uv_stream_t *master, int status)
 	struct io_stream_data *data = malloc(sizeof(struct io_stream_data));
 	struct args *args = the_args;
 	if (client && data) {
+		 data->mp = mp_new(512);
+		 data->buf = mp_start(data->mp, 512);
 		 data->mode = io_mode_text;
-		 data->buf = NULL;
 		 data->blen = 0;
-		 data->balloc = 0;
+		 client->data = data;
 		 uv_tcp_init(master->loop, client);
 		 if (uv_accept(master, (uv_stream_t *)client) != 0) {
+			mp_end(data->mp, data->buf);
+			mp_delete(data->mp);
 			free(client->data);
 			free(client);
 			return;
 		 }
-		 client->data = data;
 		 uv_read_start((uv_stream_t *)client, io_tty_alloc, io_tty_process_input);
 		 /* Write command line */
 		 if (!args->quiet) {
