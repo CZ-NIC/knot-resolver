@@ -17,18 +17,7 @@ hints['del.'] = '127.0.0.1'
 hints['del2.'] = '127.0.0.1'
 hints['toggle.'] = '127.0.0.1'
 
-local function check_answer(desc, qname, qtype, expected_rcode)
-	qtype_str = kres.tostring.type[qtype]
-	callback = function(pkt)
-		same(pkt:rcode(), expected_rcode,
-		     desc .. ': expecting answer for query ' .. qname .. ' ' .. qtype_str
-		      .. ' with rcode ' .. kres.tostring.rcode[expected_rcode])
-
-		ok((pkt:ancount() > 0) == (pkt:rcode() == kres.rcode.NOERROR),
-		   desc ..': checking number of answers for ' .. qname .. ' ' .. qtype_str)
-	end
-	resolve(qname, qtype, kres.class.IN, {}, callback)
-end
+local check_answer = require('test_utils').check_answer
 
 local function test_sanity()
 	check_answer('daf sanity (no rules)', 'pass.', kres.type.A, kres.rcode.NOERROR)
