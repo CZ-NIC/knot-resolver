@@ -47,7 +47,7 @@
 * See https://gitlab.labs.nic.cz/knot/knot-resolver/-/merge_requests/968
 * */
 #ifndef TCP_BACKLOG_DEFAULT
-#define TCP_BACKLOG_DEFAULT 128
+#define TCP_BACKLOG_DEFAULT 512
 #endif
 
 /* Cleanup engine state every 5 minutes */
