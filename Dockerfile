@@ -16,7 +16,7 @@ RUN apt-get update -qq && \
 	apt-get -y -qqq install -t stretch-backports meson
 
 # Install Knot DNS from sources
-RUN git clone -b $KNOT_DNS_VERSION --depth=1 https://gitlab.labs.nic.cz/knot/knot-dns.git /tmp/knot-dns && \
+RUN git clone -b $KNOT_DNS_VERSION --depth=1 https://gitlab.nic.cz/knot/knot-dns.git /tmp/knot-dns && \
 	cd /tmp/knot-dns && \
 	autoreconf -if && \
 	./configure --disable-static --disable-fastparser --disable-documentation \

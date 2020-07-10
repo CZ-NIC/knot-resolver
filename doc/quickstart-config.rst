@@ -22,7 +22,7 @@ Configuration
 Easiest way to configure Knot Resolver is to paste your configuration into
 configuration file ``/etc/knot-resolver/kresd.conf``.
 Complete configurations files for examples in this chapter
-can be found `here <https://gitlab.labs.nic.cz/knot/knot-resolver/tree/master/etc/config>`_.
+can be found `here <https://gitlab.nic.cz/knot/knot-resolver/tree/master/etc/config>`_.
 The example configuration files are also installed as documentation files, typically in directory ``/usr/share/doc/knot-resolver/examples/`` (their location may be different based on your Linux distribution).
 Detailed configuration of daemon and implemented modules can be found in configuration reference:
 
