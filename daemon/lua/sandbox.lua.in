@@ -511,7 +511,7 @@ local function funcsign(f)
 	return "(" .. table.concat(func_args, ", ") .. ")"
 end
 
-function table_print (tt, indent, done)
+function table_print(tt, indent, done)
 	done = done or {}
 	indent = indent or 0
 	local result = ""
@@ -521,7 +521,17 @@ function table_print (tt, indent, done)
 		for k in pairs(unordered_tt) do
 			table.insert(keys, k)
 		end
-		table.sort(keys, function (a, b) return tostring(a) < tostring(b) end)
+		table.sort(keys,
+			function (a, b)
+				if type(a) ~= type(b) then
+					return type(a) < type(b)
+				end
+				if type(a) == 'number' then
+					return a < b
+				else
+					return tostring(a) < tostring(b)
+				end
+			end)
 		local i = 0
 		return function()
 			i = i + 1
