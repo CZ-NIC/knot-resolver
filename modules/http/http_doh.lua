@@ -21,6 +21,7 @@ local function serve_doh(h, stream)
 				string.match(h:get(':path'), '^/doh%?.*&dns=([a-zA-Z0-9_-]+)$') or
 				string.match(h:get(':path'), '^/doh%?.*&dns=([a-zA-Z0-9_-]+)&')
 		if not input_b64 then
+			warn('http_doh: no input_64 - '..h:get(':path'))
 			return 400, 'base64url query not found'
 		end
 		if #input_b64 > 1368 then  -- base64url encode 1024
@@ -28,6 +29,7 @@ local function serve_doh(h, stream)
 		end
 		input = basexx.from_url64(input_b64)
 		if not input then
+			warn('http_doh: invalid baseurl64 - '..h:get(':path')..' parsed: '..input_b64)
 			return 400, 'invalid base64url'
 		end
 	else
