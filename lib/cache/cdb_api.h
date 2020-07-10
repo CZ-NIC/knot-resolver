@@ -29,6 +29,7 @@ struct kr_cdb_stats {
 	uint64_t match_miss;
 	uint64_t read_leq;
 	uint64_t read_leq_miss;
+	double usage_percent;
 };
 
 
@@ -74,4 +75,8 @@ struct kr_cdb_api {
 	 * return: 0 for equality, > 0 for less, < 0 kr_error */
 	int (*read_leq)(knot_db_t *db, struct kr_cdb_stats *stat,
 			knot_db_val_t *key, knot_db_val_t *val);
+
+	/** Cache usage
+	 * \return */
+	double (*usage_percent)(knot_db_t *db);
 };

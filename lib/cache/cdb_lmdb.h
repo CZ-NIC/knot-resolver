@@ -9,3 +9,5 @@
 
 KR_EXPORT KR_CONST
 const struct kr_cdb_api *kr_cdb_lmdb(void);
+
+knot_db_t *knot_db_t_kres2libknot(const knot_db_t * db);
