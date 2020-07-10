@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 config_tests += [
+  ['krprint', files('krprint.test.lua')],
   ['ta', files('trust_anchors.test/ta.test.lua')],
   ['ta_bootstrap', files('trust_anchors.test/bootstrap.test.lua')],
 ]
@@ -44,6 +45,7 @@ lua_src = [
   trust_anchors,
   files('zonefile.lua'),
   files('kluautil.lua'),
+  files('krprint.lua'),
   distro_preconfig,
 ]
 
