@@ -17,6 +17,7 @@
 #include "lib/cache/cdb_lmdb.h"
 #include "lib/cache/cdb_api.h"
 #include "lib/cache/api.h"
+#include <lib/cache/impl.h>
 #include "lib/utils.h"
 
 
@@ -24,6 +25,7 @@
 #define LMDB_DIR_MODE   0770
 #define LMDB_FILE_MODE  0660
 
+//TODO: we rely on mirrors of these two structs not changing layout in knot-dns and knot-resolver!
 struct lmdb_env
 {
 	size_t mapsize;
@@ -42,6 +44,14 @@ struct lmdb_env
 		MDB_cursor *ro_curs;
 	} txn;
 };
+
+struct libknot_lmdb_env {
+	bool shared;
+	unsigned dbi;
+	void *env;
+	knot_mm_t *pool;
+};
+
 
 /** @brief Convert LMDB error code. */
 static int lmdb_error(int error)
@@ -76,7 +86,6 @@ static inline MDB_val val_knot2mdb(knot_db_val_t v)
 {
 	return (MDB_val){ .mv_size = v.len, .mv_data = v.data };
 }
-
 
 /*! \brief Set the environment map size.
  * \note This also sets the maximum database size, see \fn mdb_env_set_mapsize
@@ -704,6 +713,29 @@ success:
 	return ret;
 }
 
+static double cdb_usage(knot_db_t *db)
+{
+	const size_t db_size = knot_db_lmdb_get_mapsize(db);
+	const size_t db_usage_abs = knot_db_lmdb_get_usage(db);
+	const double db_usage = (double)db_usage_abs / db_size * 100.0;
+
+	return db_usage;
+}
+
+
+/** Conversion between knot and lmdb structs. */
+knot_db_t *knot_db_t_kres2libknot(const knot_db_t * db)
+{
+	const struct lmdb_env *kres_db = db;	// this is struct lmdb_env as in resolver/cdb_lmdb.c
+	struct libknot_lmdb_env *libknot_db = malloc(sizeof(*libknot_db));
+	if (libknot_db != NULL) {
+		libknot_db->shared = false;
+		libknot_db->pool = NULL;
+		libknot_db->env = kres_db->env;
+		libknot_db->dbi = kres_db->dbi;
+	}
+	return libknot_db;
+}
 
 const struct kr_cdb_api *kr_cdb_lmdb(void)
 {
@@ -712,7 +744,8 @@ const struct kr_cdb_api *kr_cdb_lmdb(void)
 		cdb_init, cdb_deinit, cdb_count, cdb_clear, cdb_commit,
 		cdb_readv, cdb_writev, cdb_remove,
 		cdb_match,
-		cdb_read_leq
+		cdb_read_leq,
+		cdb_usage,
 	};
 
 	return &api;

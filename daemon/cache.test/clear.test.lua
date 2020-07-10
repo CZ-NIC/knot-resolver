@@ -186,17 +186,29 @@ local function test_complete_flush()
 	is(cache.count(), 0, 'cache is empty after full clear')
 end
 
+local function test_cache_used(lower, upper)
+	return function()
+		local usage = cache.stats().usage_percent
+		ok(usage >= lower and usage <= upper, string.format('cache percentage usage is between <%d, %d>', lower, upper))
+	end
+end
+
 return {
+	test_cache_used(0, 1),
 	import_zone,
+	test_cache_used(11, 12),
 	test_exact_match_qtype,
 	test_exact_match_qname,
 	test_callback,
 	import_zone,
 	test_subtree,
+	test_cache_used(10, 11),
 	test_subtree_limit,
+	test_cache_used(5, 6),
 	test_apex,
 	import_zone,
 	test_root,
 	import_zone,
 	test_complete_flush,
+	test_cache_used(0, 1),
 }
