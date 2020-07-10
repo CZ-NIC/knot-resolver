@@ -525,7 +525,7 @@ function table_print (tt, indent, done)
 		local i = 0
 		return function()
 			i = i + 1
-			if keys[i] then
+			if keys[i] ~= nil then
 				return keys[i], unordered_tt[keys[i]]
 			end
 		end
