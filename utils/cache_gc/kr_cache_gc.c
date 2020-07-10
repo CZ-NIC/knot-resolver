@@ -13,6 +13,7 @@
 #include <lib/cache/api.h>
 #include <lib/cache/impl.h>
 #include <lib/defines.h>
+#include "lib/cache/cdb_lmdb.h"
 
 #include "kr_cache_gc.h"
 
@@ -176,9 +177,8 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	}
 	knot_db_t *const db = (*state)->db; // frequently used shortcut
 
-	const size_t db_size = knot_db_lmdb_get_mapsize(db);
-	const size_t db_usage_abs = knot_db_lmdb_get_usage(db);
-	const double db_usage = (double)db_usage_abs / db_size * 100.0;
+	const struct kr_cdb_api *cache_api = kr_cdb_lmdb();
+	const double db_usage = cache_api->usage_percent(db);
 #if 0				// Probably not worth it, better reduce the risk by checking more often.
 	if (db_usage > 90.0) {
 		free(*libknot_db);
@@ -190,8 +190,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 #endif
 	const bool large_usage = db_usage >= cfg->cache_max_usage;
 	if (cfg->dry_run || large_usage) {	// don't print this on every size check
-		printf("Usage: %.2lf%% (%zu / %zu)\n", db_usage, db_usage_abs,
-		       db_size);
+		printf("Usage: %.2lf%%\n", db_usage);
 	}
 	if (cfg->dry_run || !large_usage) {
 		return KNOT_EOK;
