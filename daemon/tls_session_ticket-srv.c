@@ -27,11 +27,8 @@
 /** Compile-time support for setting the secret. */
 /* This is not secure with TLS <= 1.2 but TLS 1.3 and secure configuration
  * is not available in GnuTLS yet. See https://gitlab.com/gnutls/gnutls/issues/477 */
-#define TLS_SESSION_RESUMPTION_SYNC (GNUTLS_VERSION_NUMBER >= 0x030603)
-#ifdef TLS_SESSION_RESUMPTION_SYNC
+#if GNUTLS_VERSION_NUMBER >= 0x030603
 	#define TST_HASH GNUTLS_DIG_SHA3_512
-#else
-	#define TST_HASH abort()
 #endif
 
 #if GNUTLS_VERSION_NUMBER < 0x030400
@@ -56,7 +53,7 @@ static bool tst_key_invariants(void)
 	static int result = 0; /*< cache for multiple invocations */
 	if (result) return result > 0;
 	bool ok = true;
-	#if TLS_SESSION_RESUMPTION_SYNC
+	#ifdef TST_HASH
 		/* SHA3-512 output size may never change, but let's check it anyway :-) */
 		ok = ok && gnutls_hash_get_len(TST_HASH) == SESSION_KEY_SIZE;
 	#endif
@@ -83,7 +80,7 @@ static tst_ctx_t * tst_key_create(const char *secret, size_t secret_len, uv_loop
 		assert(!EFAULT);
 		return NULL;
 	}
-	#if !TLS_SESSION_RESUMPTION_SYNC
+	#ifndef TST_HASH
 		if (secret_len) {
 			kr_log_error("[tls] session ticket: secrets were not enabled at compile-time (your GnuTLS version is not supported)\n");
 			return NULL; /* ENOTSUP */
@@ -140,7 +137,7 @@ static int tst_key_update(tst_ctx_t *ctx, time_t epoch, bool force_update)
 		return tst_key_get_random(ctx);
 	}
 	/* Otherwise, deterministic variant of secret rotation, if supported. */
-	#if !TLS_SESSION_RESUMPTION_SYNC
+	#ifndef TST_HASH
 		assert(false);
 		return kr_error(ENOTSUP);
 	#else
