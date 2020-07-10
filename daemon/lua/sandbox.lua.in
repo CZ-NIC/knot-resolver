@@ -659,6 +659,7 @@ ffi.cdef([[
 	char *strerror(int errnum);
 ]])
 
+local krprint = require("krprint")
 function map(cmd, format)
 	local socket = require('cqueues.socket')
 	local kluautil = require('kluautil')
@@ -680,7 +681,7 @@ function map(cmd, format)
 
 	local filetab = kluautil.list_dir(worker.control_path)
 	if next(filetab) == nil then
-		local ret = eval_cmd(cmd, true)
+		local ret = eval_cmd(cmd, format == 'luaobj')
 		if ret == nil then
 			results = {}
 		else
@@ -698,7 +699,9 @@ function map(cmd, format)
 		end
 
 		if local_exec then
-			table.insert(results, eval_cmd(cmd, true))
+			local ret = eval_cmd(cmd, format == 'luaobj')
+			-- crop to a single return value similarly to original map()
+			table.insert(results, ret)
 		else
 			local s = socket.connect({ path = worker.control_path..file })
 			s:setmode('bn', 'bn')
@@ -709,9 +712,10 @@ function map(cmd, format)
 				s:write('__binary\n')
 				recv = s:read(2)
 				if format == 'luaobj' then
-					cmd = 'tojson('..cmd..')'
+					s:write('require("krprint").serialize_lua('..cmd..')\n')
+				else
+					s:write(cmd..'\n')
 				end
-				s:write(cmd..'\n')
 				local recv = s:read(4)
 				local len = tonumber(recv:byte(1))
 				for i=2,4 do
@@ -721,7 +725,7 @@ function map(cmd, format)
 				if format == 'strings' then
 					table.insert(results, recv)
 				else
-					table.insert(results, fromjson(recv))
+					table.insert(results, krprint.deserialize_lua(recv))
 				end
 
 				s:close()
