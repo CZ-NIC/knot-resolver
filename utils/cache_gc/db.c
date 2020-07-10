@@ -3,40 +3,13 @@
 
 #include "db.h"
 
+#include "lib/cache/cdb_lmdb.h"
 #include <lib/cache/impl.h>
 //#include <lib/defines.h>
 
 #include <ctype.h>		//DEBUG
 #include <time.h>
 #include <sys/stat.h>
-
-//TODO: we rely on mirrors of these two structs not changing layout in knot-dns and knot-resolver!
-struct libknot_lmdb_env {
-	bool shared;
-	unsigned dbi;
-	void *env;
-	knot_mm_t *pool;
-};
-
-struct kres_lmdb_env {
-	size_t mapsize;
-	unsigned dbi;
-	void *env;
-	// sub-struct txn ommited
-};
-
-static knot_db_t *knot_db_t_kres2libknot(const knot_db_t * db)
-{
-	const struct kres_lmdb_env *kres_db = db;	// this is struct lmdb_env as in resolver/cdb_lmdb.c
-	struct libknot_lmdb_env *libknot_db = malloc(sizeof(*libknot_db));
-	if (libknot_db != NULL) {
-		libknot_db->shared = false;
-		libknot_db->pool = NULL;
-		libknot_db->env = kres_db->env;
-		libknot_db->dbi = kres_db->dbi;
-	}
-	return libknot_db;
-}
 
 int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db,
 		     knot_db_t ** libknot_db)
