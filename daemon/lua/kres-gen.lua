@@ -210,6 +210,7 @@ struct kr_cdb_stats {
 	uint64_t match_miss;
 	uint64_t read_leq;
 	uint64_t read_leq_miss;
+	double usage_percent;
 };
 struct kr_cache {
 	knot_db_t *db;
