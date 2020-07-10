@@ -28,4 +28,4 @@ See deckard_ documentation on how to write additional tests.
 .. _cmocka: https://cmocka.org/
 .. _`socket_wrapper`: https://cwrap.org/socket_wrapper.html
 .. _`libfaketime`: https://github.com/wolfcw/libfaketime
-.. _deckard: https://gitlab.labs.nic.cz/knot/deckard
+.. _deckard: https://gitlab.nic.cz/knot/deckard

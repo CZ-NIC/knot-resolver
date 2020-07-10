@@ -34,4 +34,4 @@ mind when configuring and running kresd without systemd integration.
    config-no-systemd-processes
    config-no-systemd-privileges
 
-.. _`#529`: https://gitlab.labs.nic.cz/knot/knot-resolver/issues/529
+.. _`#529`: https://gitlab.nic.cz/knot/knot-resolver/issues/529
