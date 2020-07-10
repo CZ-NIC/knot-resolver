@@ -706,6 +706,25 @@ success:
 	return ret;
 }
 
+static double cdb_usage(knot_db_t *db, struct kr_cdb_stats *stat)
+{
+	struct lmdb_env *env = db;
+	MDB_envinfo info;
+	if (mdb_env_info(env->env, &info) != MDB_SUCCESS) {
+		return 0;
+	}
+	size_t db_size = info.me_mapsize;
+	printf("  Page size: %lu\n", db_size);
+
+	printf("  cdb_usage: %p\n", db);
+	printf("  cdb_usage: %p\n", (void*) env->env);
+
+	db_size = knot_db_lmdb_get_mapsize(db);
+
+	printf("  Page size: %lu\n", db_size);
+	return 2;
+}
+
 
 const struct kr_cdb_api *kr_cdb_lmdb(void)
 {
@@ -714,7 +733,8 @@ const struct kr_cdb_api *kr_cdb_lmdb(void)
 		cdb_init, cdb_deinit, cdb_count, cdb_clear, cdb_commit,
 		cdb_readv, cdb_writev, cdb_remove,
 		cdb_match,
-		cdb_read_leq
+		cdb_read_leq,
+		cdb_usage,
 	};
 
 	return &api;

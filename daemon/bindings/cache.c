@@ -77,7 +77,7 @@ static int cache_stats(lua_State *L)
 	struct kr_cache *cache = cache_assert_open(L);
 	lua_newtable(L);
 #define add_stat(name) \
-	lua_pushinteger(L, (cache->stats.name)); \
+	lua_pushnumber(L, (cache->stats.name)); \
 	lua_setfield(L, -2, #name)
 	add_stat(open);
 	add_stat(close);
@@ -93,6 +93,8 @@ static int cache_stats(lua_State *L)
 	add_stat(match_miss);
 	add_stat(read_leq);
 	add_stat(read_leq_miss);
+	cache->stats.usage = cache->api->usage(cache->db, &cache->stats);
+	add_stat(usage);
 #undef add_stat
 
 	return 1;
