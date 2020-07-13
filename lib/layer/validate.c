@@ -527,9 +527,13 @@ static const knot_dname_t *find_first_signer(ranked_rr_array_t *arr)
 		     !kr_rank_test(entry->rank, KR_RANK_MISMATCH))) {
 			continue;
 		}
-		if (rr->type == KNOT_RRTYPE_RRSIG) {
-			return knot_rrsig_signer_name(rr->rrs.rdata);
+		if (rr->type != KNOT_RRTYPE_RRSIG) {
+			continue;
 		}
+		const knot_dname_t *signame = knot_rrsig_signer_name(rr->rrs.rdata);
+		if (knot_dname_in_bailiwick(rr->owner, signame) >= 0) {
+			return signame;
+		} /* otherwise it's some nonsense, so we skip it */
 	}
 	return NULL;
 }
