@@ -516,7 +516,7 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 	return ret;
 }
 
-static const knot_dname_t *find_first_signer(ranked_rr_array_t *arr)
+static const knot_dname_t *find_first_signer(ranked_rr_array_t *arr, struct kr_query *qry)
 {
 	for (size_t i = 0; i < arr->len; ++i) {
 		ranked_rr_array_entry_t *entry = arr->at[i];
@@ -527,8 +527,16 @@ static const knot_dname_t *find_first_signer(ranked_rr_array_t *arr)
 		     !kr_rank_test(entry->rank, KR_RANK_MISMATCH))) {
 			continue;
 		}
-		if (rr->type == KNOT_RRTYPE_RRSIG) {
-			return knot_rrsig_signer_name(rr->rrs.rdata);
+		if (rr->type != KNOT_RRTYPE_RRSIG) {
+			continue;
+		}
+		const knot_dname_t *signame = knot_rrsig_signer_name(rr->rrs.rdata);
+		if (knot_dname_in_bailiwick(rr->owner, signame) >= 0) {
+			return signame;
+		} else {
+			/* otherwise it's some nonsense, so we skip it */
+			kr_log_q(qry, "vldr", "protocol violation: "
+					"out-of-bailwick RRSIG signer, skipping\n");
 		}
 	}
 	return NULL;
@@ -536,9 +544,9 @@ static const knot_dname_t *find_first_signer(ranked_rr_array_t *arr)
 
 static const knot_dname_t *signature_authority(struct kr_request *req)
 {
-	const knot_dname_t *signer_name = find_first_signer(&req->answ_selected);
+	const knot_dname_t *signer_name = find_first_signer(&req->answ_selected, req->current_query);
 	if (!signer_name) {
-		signer_name = find_first_signer(&req->auth_selected);
+		signer_name = find_first_signer(&req->auth_selected, req->current_query);
 	}
 	return signer_name;
 }
