@@ -1,10 +1,14 @@
+local ffi = require('ffi')
+ffi.cdef([[ const char * gnutls_check_version (const char * req_version); ]])
+
 -- SPDX-License-Identifier: GPL-3.0-or-later
 local function test_session_config()
 	ok(net.tls_sticket_secret(),
-	   'net.tls_sticket_secret() to trigger key regeneration')
-	-- There is no sufficiently new stable release of GnuTLS.
-	-- ok(net.tls_sticket_secret('0123456789ABCDEF0123456789ABCDEF'),
-	--    'net.tls_sticket_secret with valid key')
+		 'net.tls_sticket_secret() to trigger key regeneration')
+	if ffi.C.gnutls_check_version("3.6.3") ~= nil then
+		ok(net.tls_sticket_secret('0123456789ABCDEF0123456789ABCDEF'),
+			 'net.tls_sticket_secret with valid key')
+	end
 	boom(net.tls_sticket_secret, {{}},
 	     'net.tls_sticket_secret({}) is invalid')
 	boom(net.tls_sticket_secret, {'0123456789ABCDEF0123456789ABCDE'},
