@@ -21,6 +21,7 @@ net.ipv6=true
 
 {% if kresd.tls_key_path and kresd.tls_cert_path %}
 net.tls("{{ kresd.tls_cert_path }}", "{{ kresd.tls_key_path }}")
+net.tls_sticket_secret('0123456789ABCDEF0123456789ABCDEF')
 {% endif %}
 
 hints['localhost.'] = '127.0.0.1'
