@@ -152,6 +152,7 @@ kres-gen:
 
 build:darwin:
   <<: *test_nodep
+  stage: extended # it takes lots of time ATM
   when: delayed
   only:  # trigger job only in the main repo
     refs:
@@ -161,7 +162,9 @@ build:darwin:
       - master@knot/knot-resolver
     variables:
       - $SKIP_CI == "1"
-  start_in: 3 minutes  # give the build in Travis CI time to finish
+  start_in: 10 minutes  # give the build in Travis CI time to finish
+    # ^^ Travis takes around 20m recently and the CI script waits for 15m,
+    #    and it gets ran a bit later due to the previous phase(s).
   script:
     - ci/travis.py ${CI_COMMIT_REF_NAME}
 
