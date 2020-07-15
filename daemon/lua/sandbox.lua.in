@@ -709,9 +709,10 @@ function map(cmd, format)
 				s:write('__binary\n')
 				recv = s:read(2)
 				if format == 'luaobj' then
-					cmd = 'tojson('..cmd..')'
+					s:write('require("krprint").serialize_lua('..cmd..')')
+				else
+					s:write(cmd..'\n')
 				end
-				s:write(cmd..'\n')
 				local recv = s:read(4)
 				local len = tonumber(recv:byte(1))
 				for i=2,4 do
@@ -721,7 +722,8 @@ function map(cmd, format)
 				if format == 'strings' then
 					table.insert(results, recv)
 				else
-					table.insert(results, fromjson(recv))
+					local deserial_func = loadstring('return ' .. recv)
+					table.insert(results, deserial_func())
 				end
 
 				s:close()
