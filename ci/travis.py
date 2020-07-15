@@ -9,8 +9,8 @@ import requests
 
 BRANCH_API_ENDPOINT = "https://api.travis-ci.com/repos/CZ-NIC/knot-resolver/branches/{branch}"
 JOB_URL = "https://travis-ci.com/CZ-NIC/knot-resolver/jobs/{job_id}"
-TIMEOUT = 600  # 10 mins max
-POLL_DELAY = 15
+TIMEOUT = 15*60 # 15 mins max
+POLL_DELAY = 20
 
 job_id = None
 

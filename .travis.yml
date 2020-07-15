@@ -19,7 +19,7 @@ notifications:
     email:
         on_success: never
         on_failure: never
-matrix:
+jobs:
     fast_finish: true
 env:
     global:
@@ -40,4 +40,3 @@ script:
     - ${HOME}/.local/usr/sbin/kresd -h
     - ${HOME}/.local/usr/sbin/kresd -V
     - echo "quit()" | ${HOME}/.local/usr/sbin/kresd -a 127.0.0.1@53535 .
-sudo: false

@@ -15,7 +15,7 @@
 #endif
 
 
-/** Useful to stringify #defines into error strings. */
+/** Useful to stringify macros into error strings. */
 #define STR(s) STRINGIFY_TOKEN(s)
 #define STRINGIFY_TOKEN(s) #s
 
