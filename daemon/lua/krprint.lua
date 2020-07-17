@@ -19,7 +19,7 @@ function base_class.new(class, unrepresentable)
 end
 
 -- format comment with leading/ending whitespace if needed
-function base_class.format_note(self, note, ws_prefix, ws_suffix)
+function base_class.format_note(_, note, ws_prefix, ws_suffix)
 	if note == nil then
 		return ''
 	else
@@ -40,17 +40,26 @@ function base_class.indent_dec(self)
 	self.cur_indent = self.cur_indent - self.indent_step
 end
 
+function base_class._fallback(self, val)
+	if self.unrepresentable == 'comment' then
+		return 'nil', string.format('missing %s', val)
+	elseif self.unrepresentable == 'error' then
+		local key_path = table.concat(self.tab_key_path, '][')
+		local key_path_msg
+		if key_path ~= '' then
+			key_path_msg = string.format(' (found at [%s])', key_path)
+		end
+		error(string.format('cannot serialize type %s%s', type(val), key_path_msg or ''), 2)
+	end
+end
+
 function base_class.val2expr(self, val)
 	local val_type = type(val)
 	local val_repr = self[val_type]
 	if val_repr then
 		return val_repr(self, val)
-	else  -- function, thread, userdata
-		if self.unrepresentable == 'comment' then
-			return 'nil', string.format('missing %s', val)
-		elseif self.unrepresentable == 'error' then
-			error(string.format('cannot print %s', val_type), 2)
-		end
+	else
+		return self:_fallback(val)
 	end
 end
 
@@ -165,12 +174,14 @@ function base_class.table(self, tab)
 			-- finally serialize one [key=]?value expression
 			local indent = self:indent_head()
 			if addidx then
-				item = string.format('%s%s[%s]%s=%s', indent, self:format_note(idxnote, nil, self.key_val_sep), idxexpr, self.key_val_sep, self.key_val_sep)
+				item = string.format('%s%s[%s]%s=%s',
+					indent, self:format_note(idxnote, nil, self.key_val_sep),
+					idxexpr, self.key_val_sep, self.key_val_sep)
 				indent = ''
 			end
 			item = item .. string.format('%s%s%s,', indent, self:format_note(valnote, nil, self.item_sep), valexpr)
 		else
-			local errmsg = string.format('%s = %s (%s)',
+			local errmsg = string.format('cannot print %s = %s (%s)',
 				tostring(idx),
 				tostring(val),
 				table.concat(errors, ', '))
@@ -218,6 +229,13 @@ local pprinter_class = {
 	__inst_mt = {},
 	format_note = function() return '' end,
 }
+
+function pprinter_class._fallback(self, val)
+	if self.unrepresentable == 'error' then
+		base_class._fallback(self, val)
+	end
+	return tostring(val)
+end
 
 pprinter_class['function'] = function(self, f)
 -- thanks to AnandA777 from StackOverflow! Function funcsign is adapted version of
