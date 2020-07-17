@@ -1,13 +1,10 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
-
-local serializer_class = {
-	__inst_mt = {}
+local base_class = {
+	cur_indent = 0,
 }
--- class instances with following metatable inherit all class members
-serializer_class.__inst_mt.__index = serializer_class
 
--- constructor
-function serializer_class.new(on_unrepresentable)
+-- shared constructor: use as serializer_class:new()
+function base_class.new(class, on_unrepresentable)
 	on_unrepresentable = on_unrepresentable or 'comment'
 	if not (on_unrepresentable == 'comment'
 		or on_unrepresentable == 'error') then
@@ -16,12 +13,12 @@ function serializer_class.new(on_unrepresentable)
 	local inst = {}
 	inst.on_unrepresentable = on_unrepresentable
 	inst.done = {}
-	setmetatable(inst, serializer_class.__inst_mt)
+	setmetatable(inst, class.__inst_mt)
 	return inst
 end
 
 -- format comment with leading/ending whitespace if needed
-local function format_note(note, ws_prefix, ws_suffix)
+function base_class.format_note(self, note, ws_prefix, ws_suffix)
 	if note == nil then
 		return ''
 	else
@@ -30,13 +27,19 @@ local function format_note(note, ws_prefix, ws_suffix)
 	end
 end
 
-local function static_serializer(val, on_unrepresentable)
-	local inst = serializer_class.new(on_unrepresentable)
-	local expr, note = inst:val2expr(val)
-	return string.format('%s%s', format_note(note, nil, ' '), expr)
+function base_class.indent_head(self)
+	return string.rep(' ', self.cur_indent)
 end
 
-function serializer_class.val2expr(self, val)
+function base_class.indent_inc(self)
+	self.cur_indent = self.cur_indent + self.indent_step
+end
+
+function base_class.indent_dec(self)
+	self.cur_indent = self.cur_indent - self.indent_step
+end
+
+function base_class.val2expr(self, val)
 	local val_type = type(val)
 	local val_repr = self[val_type]
 	if val_repr then
@@ -50,12 +53,12 @@ function serializer_class.val2expr(self, val)
 	end
 end
 
-serializer_class['nil'] = function(_, val)
+base_class['nil'] = function(_, val)
 	assert(type(val) == 'nil')
 	return 'nil'
 end
 
-function serializer_class.number(_, val)
+function base_class.number(_, val)
 	assert(type(val) == 'number')
 	if val == math.huge then
 		return 'math.huge'
@@ -68,7 +71,7 @@ function serializer_class.number(_, val)
 	end
 end
 
-function serializer_class.string(_, val)
+function base_class.string(_, val)
 	assert(type(val) == 'string')
 	val = tostring(val)
 	local chars = {'\''}
@@ -86,12 +89,12 @@ function serializer_class.string(_, val)
 	return table.concat(chars)
 end
 
-function serializer_class.boolean(_, val)
+function base_class.boolean(_, val)
 	assert(type(val) == 'boolean')
 	return tostring(val)
 end
 
-function serializer_class.table(self, tab)
+function base_class.table(self, tab)
 	assert(type(tab) == 'table')
 	if self.done[tab] then
 		error('cyclic reference', 0)
@@ -100,6 +103,7 @@ function serializer_class.table(self, tab)
 
 	local items = {'{'}
 	local previdx = 0
+	self:indent_inc()
 	for idx, val in pairs(tab) do
 		local errors, valok, valexpr, valnote, idxok, idxexpr, idxnote
 		errors = {}
@@ -127,14 +131,15 @@ function serializer_class.table(self, tab)
 			end
 		end
 
+		local item = ''
 		if #errors == 0 then
 			-- finally serialize one [key=]?value expression
+			local indent = self:indent_head()
 			if addidx then
-				table.insert(items,
-					string.format('%s[%s]', format_note(idxnote, nil, ' '), idxexpr))
-				table.insert(items, '=')
+				item = string.format('%s%s[%s]%s=%s', indent, self:format_note(idxnote, nil, self.key_val_sep), idxexpr, self.key_val_sep, self.key_val_sep)
+				indent = ''
 			end
-			table.insert(items, string.format('%s%s,', format_note(valnote, nil, ' '), valexpr))
+			item = item .. string.format('%s%s%s,', indent, self:format_note(valnote, nil, self.item_sep), valexpr)
 		else
 			local errmsg = string.format('%s = %s (%s)',
 				tostring(idx),
@@ -144,12 +149,44 @@ function serializer_class.table(self, tab)
 				error(errmsg, 0)
 			else
 				errmsg = string.format('--[[ missing %s ]]', errmsg)
-				table.insert(items, errmsg)
+				item = errmsg
 			end
 		end
+		table.insert(items, item)
 	end  -- one key+value
-	table.insert(items, '}')
-	return table.concat(items, ' '), string.format('%s follows', tab)
+	self:indent_dec()
+	table.insert(items, self:indent_head() .. '}')
+	return table.concat(items, self.item_sep), string.format('%s follows', tab)
+end
+
+local serializer_class = {
+	indent_step = 0,
+	item_sep = ' ',
+	key_val_sep = ' ',
+	__inst_mt = {}
+}
+-- inhertance form base class (for :new())
+setmetatable(serializer_class, { __index = base_class })
+-- class instances with following metatable inherit all class members
+serializer_class.__inst_mt.__index = serializer_class
+
+local function static_serializer(val, on_unrepresentable)
+	local inst = serializer_class:new(on_unrepresentable)
+	local expr, note = inst:val2expr(val)
+	return string.format('%s%s', inst:format_note(note, nil, inst.item_sep), expr)
+	end
+
+local pprinter_class = {
+	indent_step = 4,
+	item_sep = '\n',
+	key_val_sep = ' ',
+	__inst_mt = {},
+	format_note = function() return '' end,
+}
+
+-- default tostring method is better suited for human-intended output
+function pprinter_class.number(_, number)
+	return tostring(number)
 end
 
 local function deserialize_lua(serial)
@@ -161,9 +198,19 @@ local function deserialize_lua(serial)
 	return deserial_func()
 end
 
+setmetatable(pprinter_class, { __index = base_class })
+pprinter_class.__inst_mt.__index = pprinter_class
+
+local function static_pprint(val, on_unrepresentable)
+	local inst = pprinter_class:new(on_unrepresentable)
+	local expr, note = inst:val2expr(val)
+	return string.format('%s%s', inst:format_note(note, nil, inst.item_sep), expr)
+end
+
 local M = {
 	serialize_lua = static_serializer,
-	deserialize_lua = deserialize_lua
+	deserialize_lua = deserialize_lua,
+	pprint = static_pprint
 }
 
 return M
