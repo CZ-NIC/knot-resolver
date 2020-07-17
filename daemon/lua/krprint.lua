@@ -96,6 +96,31 @@ function base_class.boolean(_, val)
 	return tostring(val)
 end
 
+local function ordered_iter(unordered_tt)
+	local keys = {}
+	for k in pairs(unordered_tt) do
+		table.insert(keys, k)
+	end
+	table.sort(keys,
+		function (a, b)
+			if type(a) ~= type(b) then
+				return type(a) < type(b)
+			end
+			if type(a) == 'number' then
+				return a < b
+			else
+				return tostring(a) < tostring(b)
+			end
+		end)
+	local i = 0
+	return function()
+		i = i + 1
+		if keys[i] ~= nil then
+			return keys[i], unordered_tt[keys[i]]
+		end
+	end
+end
+
 function base_class.table(self, tab)
 	assert(type(tab) == 'table')
 	if self.done[tab] then
@@ -106,7 +131,7 @@ function base_class.table(self, tab)
 	local items = {'{'}
 	local previdx = 0
 	self:indent_inc()
-	for idx, val in pairs(tab) do
+	for idx, val in ordered_iter(tab) do
 		local errors, valok, valexpr, valnote, idxok, idxexpr, idxnote
 		errors = {}
 		valok, valexpr, valnote = pcall(self.val2expr, self, val)
