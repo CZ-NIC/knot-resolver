@@ -19,7 +19,7 @@ function base_class.new(class, on_unrepresentable)
 end
 
 -- format comment with leading/ending whitespace if needed
-function base_class.format_note(self, note, ws_prefix, ws_suffix)
+function base_class.format_note(_, note, ws_prefix, ws_suffix)
 	if note == nil then
 		return ''
 	else
@@ -40,17 +40,28 @@ function base_class.indent_dec(self)
 	self.cur_indent = self.cur_indent - self.indent_step
 end
 
+function base_class._fallback(self, val)
+	if self.on_unrepresentable == 'comment' then
+		return 'nil', string.format('missing %s', val)
+	elseif self.on_unrepresentable == 'error' then
+		local key_path_msg
+		if #self.tab_key_path > 0 then
+			local key_path = '[' .. table.concat(self.tab_key_path, '][') .. ']'
+			key_path_msg = string.format(' (found at [%s])', key_path)
+		else
+			key_path_msg = ''
+		end
+		error(string.format('cannot serialize type %s%s', type(val), key_path_msg), 2)
+	end
+end
+
 function base_class.val2expr(self, val)
 	local val_type = type(val)
 	local val_repr = self[val_type]
 	if val_repr then
 		return val_repr(self, val)
-	else  -- function, thread, userdata
-		if self.on_unrepresentable == 'comment' then
-			return 'nil', string.format('missing %s', val)
-		elseif self.on_unrepresentable == 'error' then
-			error(string.format('cannot print %s', val_type), 2)
-		end
+	else
+		return self:_fallback(val)
 	end
 end
 
@@ -166,13 +177,18 @@ function base_class.table(self, tab)
 		if #errors == 0 then
 			-- finally serialize one [key=]?value expression
 			local indent = self:indent_head()
+			local note
 			if addidx then
-				item = string.format('%s%s[%s]%s=%s', indent, self:format_note(idxnote, nil, self.key_val_sep), idxexpr, self.key_val_sep, self.key_val_sep)
+				note = self:format_note(idxnote, nil, self.key_val_sep)
+				item = string.format('%s%s[%s]%s=%s',
+					indent, note,
+					idxexpr, self.key_val_sep, self.key_val_sep)
 				indent = ''
 			end
-			item = item .. string.format('%s%s%s,', indent, self:format_note(valnote, nil, self.item_sep), valexpr)
+			note = self:format_note(valnote, nil, self.item_sep)
+			item = item .. string.format('%s%s%s,', indent, note, valexpr)
 		else
-			local errmsg = string.format('%s = %s (%s)',
+			local errmsg = string.format('cannot print %s = %s (%s)',
 				tostring(idx),
 				tostring(val),
 				table.concat(errors, ', '))
@@ -215,8 +231,19 @@ local pprinter_class = {
 	item_sep = '\n',
 	key_val_sep = ' ',
 	__inst_mt = {},
-	format_note = function() return '' end,
 }
+
+-- should be always empty because pretty-printer has fallback for all types
+function pprinter_class.format_note()
+	return ''
+end
+
+function pprinter_class._fallback(self, val)
+	if self.on_unrepresentable == 'error' then
+		base_class._fallback(self, val)
+	end
+	return tostring(val)
+end
 
 -- "function" is a Lua keyword so assignment below is workaround to create
 -- function pprinter_class.function(self, f)
