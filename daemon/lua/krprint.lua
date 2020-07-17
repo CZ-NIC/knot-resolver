@@ -13,6 +13,7 @@ function base_class.new(class, on_unrepresentable)
 	local inst = {}
 	inst.on_unrepresentable = on_unrepresentable
 	inst.done = {}
+	inst.tab_key_path = {}
 	setmetatable(inst, class.__inst_mt)
 	return inst
 end
@@ -134,6 +135,9 @@ function base_class.table(self, tab)
 	for idx, val in ordered_iter(tab) do
 		local errors, valok, valexpr, valnote, idxok, idxexpr, idxnote
 		errors = {}
+		-- push current index onto key path stack to make it available to sub-printers
+		table.insert(self.tab_key_path, idx)
+
 		valok, valexpr, valnote = pcall(self.val2expr, self, val)
 		if not valok then
 			table.insert(errors, string.format('value: %s', valexpr))
@@ -180,12 +184,14 @@ function base_class.table(self, tab)
 			end
 		end
 		table.insert(items, item)
+		table.remove(self.tab_key_path) -- pop current index from key path stack
 	end  -- one key+value
 	self:indent_dec()
 	table.insert(items, self:indent_head() .. '}')
 	return table.concat(items, self.item_sep), string.format('%s follows', tab)
 end
 
+-- machine readable variant, cannot represent all types and repeated references to a table
 local serializer_class = {
 	indent_step = 0,
 	item_sep = ' ',
@@ -203,6 +209,7 @@ local function static_serializer(val, on_unrepresentable)
 	return string.format('%s%s', inst:format_note(note, nil, inst.item_sep), expr)
 	end
 
+-- human friendly variant, not stable and not intended for machine consumption
 local pprinter_class = {
 	indent_step = 4,
 	item_sep = '\n',
@@ -210,6 +217,52 @@ local pprinter_class = {
 	__inst_mt = {},
 	format_note = function() return '' end,
 }
+
+-- "function" is a Lua keyword so assignment below is workaround to create
+-- function pprinter_class.function(self, f)
+pprinter_class['function'] = function(self, f)
+-- thanks to AnandA777 from StackOverflow! Function funcsign is adapted version of
+-- https://stackoverflow.com/questions/51095022/inspect-function-signature-in-lua-5-1
+	assert(type(f) == 'function', "bad argument #1 to 'funcsign' (function expected)")
+	local debuginfo = debug.getinfo(f)
+	local func_args = {}
+	local args_str
+	if debuginfo.what == 'C' then  -- names N/A
+		args_str = '(?)'
+		goto add_name
+	end
+
+	pcall(function()
+		local oldhook
+		local delay = 2
+		local function hook()
+			delay = delay - 1
+			if delay == 0 then  -- call this only for the introspected function
+				-- stack depth 2 is the introspected function
+				for i = 1, debuginfo.nparams do
+					local k = debug.getlocal(2, i)
+					table.insert(func_args, k)
+				end
+				if debuginfo.isvararg then
+					table.insert(func_args, "...")
+				end
+				debug.sethook(oldhook)
+				error('aborting the call to introspected function')
+			end
+		end
+		oldhook = debug.sethook(hook, "c")  -- invoke hook() on function call
+		f(unpack({}))  -- huh?
+	end)
+	args_str = "(" .. table.concat(func_args, ", ") .. ")"
+	::add_name::
+	local name
+	if #self.tab_key_path > 0 then
+		name = string.format('function %s', self.tab_key_path[#self.tab_key_path])
+	else
+		name = 'function '
+	end
+	return string.format('%s%s: %s', name, args_str, string.sub(tostring(f), 11))
+end
 
 -- default tostring method is better suited for human-intended output
 function pprinter_class.number(_, number)
