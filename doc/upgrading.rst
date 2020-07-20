@@ -45,7 +45,13 @@ Users
 * `DNS Flag Day 2020 <https://dnsflagday.net/2020/>`_ is now effective and Knot Resolver uses
   maximum size of UDP answer to 1232 bytes. Please double-check your firewall,
   it has to allow DNS traffic on UDP and **also TCP** port 53.
-
+* Human readable output in interactive mode and from :ref:`control-sockets` was improved and
+  as consequence slightly changed its format. Users who need machine readable output for scripts
+  should use Lua function ``tojson()`` to convert Lua values into standard JSON format instead
+  of attempting to parse the human readable output.
+  For example API call ``tojson(cache.stats())\n`` will return JSON string with ``cache.stats()``
+  results represented as dictionary.
+  Function ``tojson()`` is available in all resolver versions >= 1.0.0.
 
 Configuration file
 ------------------
