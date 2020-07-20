@@ -14,7 +14,6 @@ local function test_de_serialization(orig_val, desc)
 	local serial = serialize_lua(orig_val)
 	ok(type(serial) == 'string' and #serial > 0,
 		'serialization returns non-empty string: ' .. desc)
-	--print(serial)  -- FIXME
 	local deserial_func = loadstring('return ' .. serial)
 	same(type(deserial_func), 'function',
 		'serialized expression is syntactically valid: ' .. desc)
@@ -142,7 +141,6 @@ function test_table_supported()
 		local t = gen_test_tables_supported()
 		test_de_serialization(t, 'random table no. ' .. i)
 	end
-	print(table_print(t))
 end
 
 return {
