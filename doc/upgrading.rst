@@ -18,12 +18,6 @@ Following section provides information about selected changes in not-yet-release
 We advise users to prepare for these changes sooner rather than later to make it easier to upgrade to
 newer versions when they are released.
 
-* Human readable output from :ref:`control-sockets` is not stable and changes from time to time.
-  Users who need machine readable output for scripts should use Lua function
-  ``tojson()`` to convert Lua values into standard JSON format instead of attempting to parse
-  the human readable output. For example API call ``tojson(cache.stats())\n`` will return JSON string
-  with ``cache.stats()`` results represented as dictionary.
-  Function ``tojson()`` is available in all resolver versions >= 1.0.0.
 * DoH served with http module :ref:`DNS-over-HTTP (DoH) <mod-http-doh>` will be marked as legacy
   and won't receive any more bugfixes. A more reliable and scalable DoH module will be available
   instead. The new DoH module will only support HTTP/2 over TLS.
@@ -41,6 +35,13 @@ Users
 * Users of :ref:`control-sockets` API need to terminate each command sent to resolver with newline
   character (ASCII ``\n``). Correct usage: ``cache.stats()\n``.
   Newline terminated commands are accepted by all resolver versions >= 1.0.0.
+* Human readable output in interactive mode and from :ref:`control-sockets` was improved and
+  as consequence slightly changed its format. Users who need machine readable output for scripts
+  should use Lua function ``tojson()`` to convert Lua values into standard JSON format instead
+  of attempting to parse the human readable output.
+  For example API call ``tojson(cache.stats())\n`` will return JSON string with ``cache.stats()``
+  results represented as dictionary.
+  Function ``tojson()`` is available in all resolver versions >= 1.0.0.
 
 Configuration file
 ------------------

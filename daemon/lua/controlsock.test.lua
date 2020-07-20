@@ -51,10 +51,12 @@ local function test_text_prompt()
 end
 
 local function test_text_single_command()
-	local expect = "this is test"
-	ctrl_sock_txt:xwrite(string.format('"%s"\n', expect), nil, timeout)
-	data = ctrl_sock_txt:xread(#expect + 2, nil, timeout)
-	same(data, expect .. '\n\n',
+	local string = "this is test"
+	local input = string.format("'%s'\n", string)
+	local expect = input
+	ctrl_sock_txt:xwrite(input, nil, timeout)
+	data = ctrl_sock_txt:xread(#expect, nil, timeout)
+	same(data, expect,
 		'text mode returns output in expected format')
 end
 
@@ -76,24 +78,28 @@ local function test_binary_more_syscalls()
 	ctrl_sock_bin:xwrite('id\n', nil, timeout)
 	len = binary_xread_len(ctrl_sock_bin)
 	data = ctrl_sock_bin:xread(len, nil, timeout)
-	same(data, worker.pid..'\n', 'binary mode returns output in expected format')
+	same(data, tostring(worker.pid),
+		'binary mode returns number in expected format')
 
 	ctrl_sock_bin:xwrite('worker.p', nil, timeout)
 	worker.sleep(0.01)
 	ctrl_sock_bin:xwrite('id\nworker.id\n', nil, timeout)
 	len = binary_xread_len(ctrl_sock_bin)
 	data = ctrl_sock_bin:xread(len, nil, timeout)
-	same(data, worker.pid..'\n', 'binary mode returns output in expected format')
+	same(data, tostring(worker.pid),
+		'binary mode returns number in expected format')
 	len = binary_xread_len(ctrl_sock_bin)
 	data = ctrl_sock_bin:xread(len, nil, timeout)
-	same(data, worker.id..'\n', 'binary mode returns output in expected format')
+	same(data, string.format("'%s'", worker.id),
+		'binary mode returns string in expected format')
 
 	ctrl_sock_bin:xwrite('worker.pid', nil, timeout)
 	worker.sleep(0.01)
 	ctrl_sock_bin:xwrite('\n', nil, timeout)
 	len = binary_xread_len(ctrl_sock_bin)
 	data = ctrl_sock_bin:xread(len, nil, timeout)
-	same(data, worker.pid..'\n', 'binary mode returns output in expected format')
+	same(data, tostring(worker.pid),
+		'binary mode returns output in expected format')
 
 	ctrl_sock_bin:xwrite('worker.pid', nil, timeout)
 	worker.sleep(0.01)
@@ -102,24 +108,30 @@ local function test_binary_more_syscalls()
 	ctrl_sock_bin:xwrite('\n', nil, timeout)
 	len = binary_xread_len(ctrl_sock_bin)
 	data = ctrl_sock_bin:xread(len, nil, timeout)
-	same(data, worker.pid..'\n', 'binary mode returns output in expected format')
+	same(data, tostring(worker.pid),
+		'binary mode returns number in expected format')
 	len = binary_xread_len(ctrl_sock_bin)
 	data = ctrl_sock_bin:xread(len, nil, timeout)
-	same(data, worker.id..'\n', 'binary mode returns output in expected format')
+	same(data, string.format("'%s'", worker.id),
+		'binary mode returns string in expected format')
 
 	ctrl_sock_bin:xwrite('worker.pid\nworker.pid\nworker.pid\nworker.pid\n', nil, timeout)
 	len = binary_xread_len(ctrl_sock_bin)
 	data = ctrl_sock_bin:xread(len, nil, timeout)
-	same(data, worker.pid..'\n', 'binary mode returns output in expected format')
+	same(data, tostring(worker.pid),
+		'binary mode returns number in expected format')
 	len = binary_xread_len(ctrl_sock_bin)
 	data = ctrl_sock_bin:xread(len, nil, timeout)
-	same(data, worker.pid..'\n', 'binary mode returns output in expected format')
+	same(data, tostring(worker.pid),
+		'binary mode returns number in expected format')
 	len = binary_xread_len(ctrl_sock_bin)
 	data = ctrl_sock_bin:xread(len, nil, timeout)
-	same(data, worker.pid..'\n', 'binary mode returns output in expected format')
+	same(data, tostring(worker.pid),
+		'binary mode returns number in expected format')
 	len = binary_xread_len(ctrl_sock_bin)
 	data = ctrl_sock_bin:xread(len, nil, timeout)
-	same(data, worker.pid..'\n', 'binary mode returns output in expected format')
+	same(data, tostring(worker.pid),
+		'binary mode returns number in expected format')
 end
 
 local function test_close_uncomplete_cmd()
