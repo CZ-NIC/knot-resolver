@@ -250,6 +250,7 @@ int main(int argc, char *argv[])
 
 	int exit_code = 0;
 	kr_cache_gc_state_t *gc_state = NULL;
+
 	#ifdef ENABLE_SYSREPO
 	int fd;
 	int rv = SR_ERR_OK;
