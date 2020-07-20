@@ -476,7 +476,24 @@ function eval_cmd(line, raw)
 end
 
 -- Pretty printing
-table_print = require('krprint').pprint
+local pprint = require('krprint').pprint
+function table_print(...)
+	local strs = {}
+	local nargs = select('#', ...)
+	if nargs == 0 then
+		return nil
+	end
+	for n=1,nargs do
+		local arg = select(n, ...)
+		local arg_str = pprint(arg)
+		if nargs > 1 then
+			table.insert(strs, string.format("%s\t-- result # %d", arg_str, n))
+		else
+			table.insert(strs, arg_str)
+		end
+	end
+	return table.concat(strs, '\n')
+end
 
 -- This extends the worker module to allow asynchronous execution of functions and nonblocking I/O.
 -- The current implementation combines cqueues for Lua interface, and event.socket() in order to not
