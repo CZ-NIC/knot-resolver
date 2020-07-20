@@ -7,14 +7,14 @@ local serializer_class = {
 serializer_class.__inst_mt.__index = serializer_class
 
 -- constructor
-function serializer_class.new(unrepresentable)
-	unrepresentable = unrepresentable or 'comment'
-	if not (unrepresentable == 'comment'
-		or unrepresentable == 'error') then
-		error('unsupported val2expr unrepresentable option ' .. tostring(unrepresentable))
+function serializer_class.new(on_unrepresentable)
+	on_unrepresentable = on_unrepresentable or 'comment'
+	if not (on_unrepresentable == 'comment'
+		or on_unrepresentable == 'error') then
+		error('unsupported val2expr on_unrepresentable option ' .. tostring(on_unrepresentable))
 	end
 	local inst = {}
-	inst.unrepresentable = unrepresentable
+	inst.on_unrepresentable = on_unrepresentable
 	inst.done = {}
 	setmetatable(inst, serializer_class.__inst_mt)
 	return inst
@@ -30,8 +30,8 @@ local function format_note(note, ws_prefix, ws_suffix)
 	end
 end
 
-local function static_serializer(val, unrepresentable)
-	local inst = serializer_class.new(unrepresentable)
+local function static_serializer(val, on_unrepresentable)
+	local inst = serializer_class.new(on_unrepresentable)
 	local expr, note = inst:val2expr(val)
 	return string.format('%s%s', format_note(note, nil, ' '), expr)
 end
@@ -42,9 +42,9 @@ function serializer_class.val2expr(self, val)
 	if val_repr then
 		return val_repr(self, val)
 	else  -- function, thread, userdata
-		if self.unrepresentable == 'comment' then
+		if self.on_unrepresentable == 'comment' then
 			return 'nil', string.format('missing %s', val)
-		elseif self.unrepresentable == 'error' then
+		elseif self.on_unrepresentable == 'error' then
 			error(string.format('cannot print %s', val_type), 2)
 		end
 	end
@@ -140,7 +140,7 @@ function serializer_class.table(self, tab)
 				tostring(idx),
 				tostring(val),
 				table.concat(errors, ', '))
-			if self.unrepresentable == 'error' then
+			if self.on_unrepresentable == 'error' then
 				error(errmsg, 0)
 			else
 				errmsg = string.format('--[[ missing %s ]]', errmsg)
