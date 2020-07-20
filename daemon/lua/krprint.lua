@@ -71,19 +71,19 @@ end
 function serializer_class.string(_, val)
 	assert(type(val) == 'string')
 	val = tostring(val)
-	local bytes = {'\''}
+	local chars = {'\''}
 	for i = 1, #val do
 		local c = string.byte(val, i)
 		-- ASCII (from space to ~) and not ' or \
 		if (c >= 0x20 and c < 0x7f)
 			and c ~= 0x27 and c ~= 0x5C then
-			table.insert(bytes, string.char(c))
+			table.insert(chars, string.char(c))
 		else
-			table.insert(bytes, string.format('\\%03d', c))
+			table.insert(chars, string.format('\\%03d', c))
 		end
 	end
-	table.insert(bytes, '\'')
-	return table.concat(bytes)
+	table.insert(chars, '\'')
+	return table.concat(chars)
 end
 
 function serializer_class.boolean(_, val)
