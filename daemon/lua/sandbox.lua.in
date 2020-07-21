@@ -680,7 +680,7 @@ function map(cmd, format)
 
 	local filetab = kluautil.list_dir(worker.control_path)
 	if next(filetab) == nil then
-		local ret = eval_cmd(cmd, true)
+		local ret = eval_cmd(cmd, format == 'luaobj')
 		if ret == nil then
 			results = {}
 		else
@@ -698,7 +698,7 @@ function map(cmd, format)
 		end
 
 		if local_exec then
-			table.insert(results, eval_cmd(cmd, true))
+			table.insert(results, eval_cmd(cmd, format == 'luaobj'))
 		else
 			local s = socket.connect({ path = worker.control_path..file })
 			s:setmode('bn', 'bn')
