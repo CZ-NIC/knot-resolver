@@ -22,7 +22,7 @@ local n_dns_socks, n_control_socks = count_sockets()
 worker.control_path = worker.control_path or (worker.cwd .. '/control/')
 
 -- Bind to control socket by default
-if not C.the_args.interactive and n_control_socks == 0 and not env.KRESD_NO_LISTEN then
+if n_control_socks == 0 and not env.KRESD_NO_LISTEN then
 	local path = worker.control_path..worker.pid
 	local ok, err = pcall(net.listen, path, nil, { kind = 'control' })
 	if not ok then
