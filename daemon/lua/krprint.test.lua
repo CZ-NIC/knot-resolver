@@ -143,10 +143,83 @@ function test_table_supported()
 	end
 end
 
+local ffi = require('ffi')
+local const_func = tostring
+local const_thread = coroutine.create(tostring)
+local const_userdata = ffi.C
+local const_cdata = ffi.new('int')
+
+local function gen_unsupported_atomic()
+	-- nested tables are handled elsewhere
+	local unsupported_types = {
+		const_func,
+		const_thread,
+		const_userdata,
+		const_cdata
+	}
+	val = unsupported_types[math.random(1, #unsupported_types)]
+	return val
+end
+
+local function test_unsupported(val, desc)
+	desc = desc or string.format('unsupported %s', type(val))
+	return function()
+		boom(serialize_lua, { val, 'error' }, string.format(
+			'attempt to serialize %s in error mode '
+			.. 'causes error', desc))
+		local output = serialize_lua(val, 'comment')
+		same('string', type(output),
+			string.format('attempt to serialize %s in '
+				.. 'comment mode provides returned a string',
+				desc))
+		ok(string.find(output, '--'), 'returned string contains a comment')
+	end
+end
+
+local kluautil = require('kluautil')
+local function make_table_unsupported(t, always)
+	local tab_len = kluautil.kr_table_len(t)
+	local modified = false
+	-- modify some values
+	for key, val in pairs(t) do
+		if math.random(1, tab_len) == 1 then
+			if type(val) == 'table' then
+				modified = modifier or make_table_unsupported(val, false)
+			else
+				t[key] = gen_unsupported_atomic()
+				modified = true
+			end
+		end
+	end
+	if always and not modified then
+		-- fallback, add an unsupported key
+		t[gen_unsupported_atomic()] = true
+	end
+	return modified
+end
+
+local function gen_test_tables_unsupported()
+	local t = gen_test_tables_supported()
+	make_table_unsupported(t, true)
+	return t
+end
+
+local function test_unsupported_table()
+	for i=1,100 do
+		local t = gen_test_tables_unsupported()
+		test_unsupported(t, 'random unsupported table no. ' .. i)()
+	end
+end
+
 return {
 	test_bool,
 	test_nil,
 	test_number,
 	test_string,
 	test_table_supported,
+	test_unsupported(const_func),
+	test_unsupported(const_thread),
+	test_unsupported(const_userdata),
+	test_unsupported(const_cdata),
+	test_unsupported_table
 }
