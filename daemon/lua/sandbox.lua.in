@@ -659,6 +659,7 @@ ffi.cdef([[
 	char *strerror(int errnum);
 ]])
 
+local krprint = require("krprint")
 function map(cmd, format)
 	local socket = require('cqueues.socket')
 	local kluautil = require('kluautil')
@@ -722,8 +723,7 @@ function map(cmd, format)
 				if format == 'strings' then
 					table.insert(results, recv)
 				else
-					local deserial_func = loadstring('return ' .. recv)
-					table.insert(results, deserial_func())
+					table.insert(results, krprint.deserialize_lua(recv))
 				end
 
 				s:close()

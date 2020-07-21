@@ -152,8 +152,18 @@ function serializer_class.table(self, tab)
 	return table.concat(items, ' '), string.format('%s follows', tab)
 end
 
+local function deserialize_lua(serial)
+	assert(type(serial) == 'string')
+	local deserial_func = loadstring('return ' .. serial)
+	if type(deserial_func) ~= 'function' then
+		panic('insput is not a valid Lua expression')
+	end
+	return deserial_func()
+end
+
 local M = {
-	serialize_lua = static_serializer
+	serialize_lua = static_serializer,
+	deserialize_lua = deserialize_lua
 }
 
 return M
