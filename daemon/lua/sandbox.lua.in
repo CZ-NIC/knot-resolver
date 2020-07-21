@@ -667,13 +667,8 @@ function map(cmd, format)
 
 	local filetab = kluautil.list_dir(worker.control_path)
 	if next(filetab) == nil then
-		local ret = eval_cmd(cmd, format == 'luaobj')
-		if ret == nil then
-			results = {}
-		else
-			table.insert(results, ret)
-		end
-		return results
+		panic('no control sockets found in directory %s',
+			worker.control_path)
 	end
 
 	for _,file in ipairs(filetab) do
