@@ -25,6 +25,7 @@ struct io_stream_data {
 	size_t blen;
 	char *buf;
 	struct mempool *mp;
+	knot_mm_t *pool;
 };
 
 /** Bind address into a file-descriptor (only, no libuv).  type is e.g. SOCK_DGRAM */
@@ -40,6 +41,7 @@ int io_listen_pipe(uv_loop_t *loop, uv_pipe_t *handle, int fd);
 void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
 void io_tty_alloc(uv_handle_t *handle, size_t suggested, uv_buf_t *buf);
 void io_tty_accept(uv_stream_t *master, int status);
+struct io_stream_data *io_tty_alloc_data(void);
 
 void tcp_timeout_trigger(uv_timer_t *timer);
 
