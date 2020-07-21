@@ -1,4 +1,5 @@
 local serialize_lua = require('krprint').serialize_lua
+local deserialize_lua = require('krprint').deserialize_lua
 
 local function gen_string(maxlen)
 	maxlen = maxlen or 100
@@ -14,10 +15,7 @@ local function test_de_serialization(orig_val, desc)
 	local serial = serialize_lua(orig_val)
 	ok(type(serial) == 'string' and #serial > 0,
 		'serialization returns non-empty string: ' .. desc)
-	local deserial_func = loadstring('return ' .. serial)
-	same(type(deserial_func), 'function',
-		'serialized expression is syntactically valid: ' .. desc)
-	local deserial_val = deserial_func()
+	local deserial_val = deserialize_lua(serial)
 	same(type(orig_val), type(deserial_val),
 		'deserialized value has the same type: ' .. desc)
 	if type(orig_val) == 'number' then
