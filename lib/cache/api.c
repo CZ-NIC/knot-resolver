@@ -24,6 +24,7 @@
 #include "lib/generic/trie.h"
 #include "lib/resolve.h"
 #include "lib/rplan.h"
+#include "lib/rules/api.h"
 #include "lib/utils.h"
 
 #include "lib/cache/impl.h"
@@ -107,7 +108,7 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 	}
 	/* Open cache */
 	if (!api) {
-		api = kr_cdb_lmdb();
+		api = kr_cdb_lmdb(true);
 	}
 	cache->api = api;
 	memset(&cache->stats, 0, sizeof(cache->stats));
@@ -313,6 +314,7 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	/* ATM cache only peeks for qry->sname and that would be useless
 	 * to repeat on every iteration, so disable it from now on.
+	 * Note that xNAME causes a followup kr_query, so cache will get re-tried.
 	 * LATER(optim.): assist with more precise QNAME minimization. */
 	qry->flags.CACHE_TRIED = true;
 
@@ -324,7 +326,14 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	int ret = peek_nosync(ctx, pkt);
+	/* TODO: we _might_ want to process rules here even when some of the cache
+	 * exit-conditions happen, though I don't expect these cases to be important. */
+	int ret = kr_rule_local_data(qry, pkt);
+	if (ret != -ENOENT) {
+		return ret;
+	}
+
+	ret = peek_nosync(ctx, pkt);
 	kr_cache_commit(&req->ctx->cache);
 	return ret;
 }

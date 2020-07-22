@@ -33,10 +33,7 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
 	return kr_ok();
 }
 
-/** Materialize a knot_rdataset_t from cache with given TTL.
- * Return the number of bytes consumed or an error code.
- */
-static int rdataset_materialize(knot_rdataset_t * restrict rds, const uint8_t * const data,
+int rdataset_materialize(knot_rdataset_t * restrict rds, const uint8_t * const data,
 				const uint8_t *data_bound, knot_mm_t *pool)
 {
 	assert(rds && data && data_bound && data_bound > data && !rds->rdata

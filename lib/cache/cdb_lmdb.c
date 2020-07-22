@@ -304,12 +304,14 @@ static int cdb_open_env(struct lmdb_env *env, unsigned flags, const char *path, 
 	return 0;
 }
 
-static int cdb_open(struct lmdb_env *env, const char *path, size_t mapsize,
+static int cdb_open(bool is_cache, struct lmdb_env *env, const char *path, size_t mapsize,
 		struct kr_cdb_stats *stats)
 {
-	/* Cache doesn't require durability, we can be
-	 * loose with the requirements as a tradeoff for speed. */
-	const unsigned flags = MDB_WRITEMAP | MDB_MAPASYNC | MDB_NOTLS;
+	const unsigned flags = is_cache
+		/* Cache doesn't require durability, we can be
+		 * loose with the requirements as a tradeoff for speed. */
+		? MDB_WRITEMAP | MDB_NOTLS | MDB_MAPASYNC
+		: MDB_WRITEMAP | MDB_NOTLS;
 	int ret = cdb_open_env(env, flags, path, mapsize, stats);
 	if (ret != 0) {
 		return ret;
@@ -324,7 +326,8 @@ static int cdb_open(struct lmdb_env *env, const char *path, size_t mapsize,
 		return lmdb_error(ret);
 	}
 
-	ret = mdb_dbi_open(txn, NULL, 0, &env->dbi);
+	const unsigned dbi_flags = is_cache ? 0 : MDB_DUPSORT;
+	ret = mdb_dbi_open(txn, NULL, dbi_flags, &env->dbi);
 	if (ret != MDB_SUCCESS) {
 		mdb_txn_abort(txn);
 		stats->close++;
@@ -367,7 +370,7 @@ static int cdb_open(struct lmdb_env *env, const char *path, size_t mapsize,
 	return 0;
 }
 
-static int cdb_init(knot_db_t **db, struct kr_cdb_stats *stats,
+static int cdb_init(bool is_cache, knot_db_t **db, struct kr_cdb_stats *stats,
 		struct kr_cdb_opts *opts, knot_mm_t *pool)
 {
 	if (!db || !stats || !opts) {
@@ -392,7 +395,7 @@ static int cdb_init(knot_db_t **db, struct kr_cdb_stats *stats,
 	}
 
 	/* Open the database. */
-	int ret = cdb_open(env, opts->path, opts->maxsize, stats);
+	int ret = cdb_open(is_cache, env, opts->path, opts->maxsize, stats);
 	if (ret != 0) {
 		free(env);
 		return ret;
@@ -401,6 +404,12 @@ static int cdb_init(knot_db_t **db, struct kr_cdb_stats *stats,
 	*db = env;
 	return 0;
 }
+static int cdb_init_cache(knot_db_t **db, struct kr_cdb_stats *stats,
+		struct kr_cdb_opts *opts, knot_mm_t *pool)
+	{ return cdb_init(true, db, stats, opts, pool); }
+static int cdb_init_rules(knot_db_t **db, struct kr_cdb_stats *stats,
+		struct kr_cdb_opts *opts, knot_mm_t *pool)
+	{ return cdb_init(false, db, stats, opts, pool); }
 
 static void cdb_deinit(knot_db_t *db, struct kr_cdb_stats *stats)
 {
@@ -425,8 +434,9 @@ static int cdb_count(knot_db_t *db, struct kr_cdb_stats *stats)
 	return (ret == MDB_SUCCESS) ? stat.ms_entries : lmdb_error(ret);
 }
 
-static int cdb_clear(knot_db_t *db, struct kr_cdb_stats *stats)
+static int cdb_clear(bool is_cache, knot_db_t *db, struct kr_cdb_stats *stats)
 {
+	//TODO: adjust logging based on is_cache
 	struct lmdb_env *env = db;
 	stats->clear++;
 	/* First try mdb_drop() to clear the DB; this may fail with ENOSPC. */
@@ -507,11 +517,15 @@ static int cdb_clear(knot_db_t *db, struct kr_cdb_stats *stats)
 	auto_free char *path_copy = strdup(path);
 	size_t mapsize = env->mapsize;
 	cdb_close_env(env, stats);
-	ret = cdb_open(env, path_copy, mapsize, stats);
+	ret = cdb_open(is_cache, env, path_copy, mapsize, stats);
 	/* Environment updated, release lockfile. */
 	unlink(lockfile);
 	return ret;
 }
+static int cdb_clear_cache(knot_db_t *db, struct kr_cdb_stats *stats)
+	{ return cdb_clear(true, db, stats); }
+static int cdb_clear_rules(knot_db_t *db, struct kr_cdb_stats *stats)
+	{ return cdb_clear(false, db, stats); }
 
 static int cdb_readv(knot_db_t *db, struct kr_cdb_stats *stats,
 		const knot_db_val_t *key, knot_db_val_t *val, int maxcount)
@@ -739,16 +753,24 @@ knot_db_t *knot_db_t_kres2libknot(const knot_db_t * db)
 	return libknot_db;
 }
 
-const struct kr_cdb_api *kr_cdb_lmdb(void)
+const struct kr_cdb_api *kr_cdb_lmdb(bool is_cache)
 {
-	static const struct kr_cdb_api api = {
+	static const struct kr_cdb_api api_cache = {
 		"lmdb",
-		cdb_init, cdb_deinit, cdb_count, cdb_clear, cdb_commit,
+		cdb_init_cache, cdb_deinit, cdb_count, cdb_clear_cache, cdb_commit,
+		cdb_readv, cdb_writev, cdb_remove,
+		cdb_match,
+		cdb_read_leq,
+		cdb_usage,
+	};
+	static const struct kr_cdb_api api_rules = {
+		"lmdb",
+		cdb_init_rules, cdb_deinit, cdb_count, cdb_clear_rules, cdb_commit,
 		cdb_readv, cdb_writev, cdb_remove,
 		cdb_match,
 		cdb_read_leq,
 		cdb_usage,
 	};
 
-	return &api;
+	return is_cache ? &api_cache : &api_rules;
 }

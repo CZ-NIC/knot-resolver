@@ -20,6 +20,7 @@
 #include "lib/zonecut.h"
 #include "lib/module.h"
 #include "lib/layer.h"
+#include "lib/rules/api.h"
 
 #include <inttypes.h>
 #include <math.h>
@@ -244,7 +245,22 @@ static int add_pair(struct kr_zonecut *hints, const char *name, const char *addr
 		return kr_error(EINVAL);
 	}
 
-	return kr_zonecut_add(hints, key, kr_inaddr(&ia.ip), kr_inaddr_len(&ia.ip));
+	uint16_t rrtype = ia.ip.sa_family == AF_INET6 ? KNOT_RRTYPE_AAAA : KNOT_RRTYPE_A;
+	knot_rrset_t rrs;
+	knot_rrset_init(&rrs, key, rrtype, KNOT_CLASS_IN, HINTS_TTL_DEFAULT/*FIXME*/);
+	int ret;
+	if (ia.ip.sa_family == AF_INET6) {
+		ret = knot_rrset_add_rdata(&rrs, (const uint8_t *)&ia.ip6.sin6_addr, 16, NULL);
+	} else {
+		ret = knot_rrset_add_rdata(&rrs, (const uint8_t *)&ia.ip4.sin_addr, 4, NULL);
+	}
+	if (ret == KNOT_EOK) {
+		ret = kr_rule_local_data_ins(&rrs, NULL, KR_RULE_TAGS_ALL);
+	}
+	knot_rdataset_clear(&rrs.rrs, NULL);
+	return ret;
+	
+	//return kr_zonecut_add(hints, key, kr_inaddr(&ia.ip), kr_inaddr_len(&ia.ip));
 }
 
 static int add_reverse_pair(struct kr_zonecut *hints, const char *name, const char *addr)
@@ -536,6 +552,7 @@ static char* hint_root(void *env, struct kr_module *module, const char *args)
 	if (args && args[0] != '\0') {
 		JsonNode *root_node = json_decode(args);
 		kr_zonecut_set(root_hints, (const uint8_t *)"");
+		abort(); // FIXME: add_pair inside isn't suitable for root hints (ATM)
 		unpack_hint(root_hints, root_node, NULL);
 		json_delete(root_node);
 	}

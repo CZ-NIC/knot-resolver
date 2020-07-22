@@ -461,7 +461,7 @@ static int init_resolver(struct engine *engine)
 	engine_register(engine, "validate", NULL, NULL);
 	engine_register(engine, "cache", NULL, NULL);
 
-	return array_push(engine->backends, kr_cdb_lmdb());
+	return array_push(engine->backends, kr_cdb_lmdb(true));
 }
 
 static int init_state(struct engine *engine)
