@@ -25,7 +25,7 @@ struct kr_qflags {
 	bool AWAIT_IPV6 : 1;     /**< Query is waiting for AAAA address. */
 	bool AWAIT_CUT : 1;      /**< Query is waiting for zone cut lookup */
 	bool SAFEMODE : 1;       /**< Don't use fancy stuff (EDNS, 0x20, ...) */
-	bool CACHED : 1;         /**< Query response is cached. */
+	bool CACHED : 1;         /**< Query response is cached (or generated locally). */
 	bool NO_CACHE : 1;       /**< No cache for lookup; exception: finding NSs and subqueries. */
 	bool EXPIRING : 1;       /**< Query response is cached, but expiring. */
 	bool ALLOW_LOCAL : 1;    /**< Allow queries to local or private address ranges. */
