@@ -274,7 +274,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
  * This assumes the TTL is OK and entry_h_consistent, but it may still return error.
  * On success it handles all the rest, incl. qry->flags.
  */
-int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
+int answer_from_pkt(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
 
 
