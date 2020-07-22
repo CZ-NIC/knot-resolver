@@ -34,8 +34,6 @@
  *	- Reconsider when RRSIGs are put in and retrieved from the cache.
  *	  Currently it's always done, which _might_ be spurious, depending
  *	  on how kresd will use the returned result.
- *	  There's also the "problem" that kresd ATM does _not_ ask upstream
- *	  with DO bit in some cases.
  */
 
 
