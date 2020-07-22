@@ -24,7 +24,6 @@ struct io_stream_data {
 	enum io_stream_mode mode;
 	size_t blen;
 	char *buf;
-	struct mempool *mp;
 	knot_mm_t *pool;
 };
 

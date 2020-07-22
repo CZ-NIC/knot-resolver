@@ -529,8 +529,8 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 		while (cmd != NULL) {
 			/* Last command is incomplete - save it and execute later */
 			if (incomplete_cmd && cmd_next == NULL) {
-				pbuf = mp_append_string(data->mp, pbuf, cmd);
-				mp_append_char(data->mp, pbuf, '\0');
+				pbuf = mp_append_string(data->pool->ctx, pbuf, cmd);
+				mp_append_char(data->pool->ctx, pbuf, '\0');
 				data->blen = data->blen + strlen(cmd);
 
 				cmd = cmd_next;
@@ -544,8 +544,8 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 			/* Process incomplete command from previously call */
 			if (data->blen > 0) {
 				if (commands[0] != '\n' && commands[0] != '\0') {
-					pbuf = mp_append_string(data->mp, pbuf, cmd);
-					mp_append_char(data->mp, pbuf, '\0');
+					pbuf = mp_append_string(data->pool->ctx, pbuf, cmd);
+					mp_append_char(data->pool->ctx, pbuf, '\0');
 					cmd = data->buf;
 				} else {
 					cmd = data->buf;
