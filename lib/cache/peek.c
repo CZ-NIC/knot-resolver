@@ -10,13 +10,13 @@
 /* The whole file only exports peek_nosync().
  * Forwards for larger chunks of code: */
 
-static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
+static int found_exact_hit(struct kr_query *qry, knot_pkt_t *pkt, knot_db_val_t val,
 			   uint8_t lowest_rank);
 static int closest_NS(struct kr_cache *cache, struct key *k, entry_list_t el,
 			struct kr_query *qry, bool only_NS, bool is_DS);
-static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
+static int answer_simple_hit(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
-static int answer_dname_hit(kr_layer_t *ctx, knot_pkt_t *pkt, const knot_dname_t *dname_owner,
+static int answer_dname_hit(struct kr_query *qry, knot_pkt_t *pkt, const knot_dname_t *dname_owner,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
 static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clencl_name,
 		    uint16_t type, uint8_t lowest_rank,
@@ -131,7 +131,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		ret = cache_op(cache, read, &key, &val, 1);
 		if (!ret) {
 			/* found an entry: test conditions, materialize into pkt, etc. */
-			ret = found_exact_hit(ctx, pkt, val, lowest_rank);
+			ret = found_exact_hit(qry, pkt, val, lowest_rank);
 		}
 	}
 	if (ret && ret != -abs(ENOENT)) {
@@ -163,7 +163,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		assert(v.data && v.len);
 		const int32_t new_ttl = get_new_ttl(v.data, qry, qry->sname,
 						KNOT_RRTYPE_CNAME, qry->timestamp.tv_sec);
-		ret = answer_simple_hit(ctx, pkt, KNOT_RRTYPE_CNAME, v.data,
+		ret = answer_simple_hit(qry, pkt, KNOT_RRTYPE_CNAME, v.data,
 					knot_db_val_bound(v), new_ttl);
 		return ret == kr_ok() ? KR_STATE_DONE : ctx->state;
 		}
@@ -173,7 +173,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		/* TTL: for simplicity, we just ask for TTL of the generated CNAME. */
 		const int32_t new_ttl = get_new_ttl(v.data, qry, qry->sname,
 						KNOT_RRTYPE_CNAME, qry->timestamp.tv_sec);
-		ret = answer_dname_hit(ctx, pkt, k->zname, v.data,
+		ret = answer_dname_hit(qry, pkt, k->zname, v.data,
 					knot_db_val_bound(v), new_ttl);
 		return ret == kr_ok() ? KR_STATE_DONE : ctx->state;
 		}
@@ -432,12 +432,9 @@ static void answer_simple_qflags(struct kr_qflags *qf, const struct entry_h *eh,
 	if ((ret) < 0) { assert(false); return kr_error((ret)); } \
 } while (false)
 
-static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
+static int answer_simple_hit(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl)
 {
-	struct kr_request *req = ctx->req;
-	struct kr_query *qry = req->current_query;
-
 	/* All OK, so start constructing the (pseudo-)packet. */
 	int ret = pkt_renew(pkt, qry->sname, qry->stype);
 	CHECK_RET(ret);
@@ -461,12 +458,9 @@ static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	return kr_ok();
 }
 
-static int answer_dname_hit(kr_layer_t *ctx, knot_pkt_t *pkt, const knot_dname_t *dname_owner,
+static int answer_dname_hit(struct kr_query *qry, knot_pkt_t *pkt, const knot_dname_t *dname_owner,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl)
 {
-	struct kr_request *req = ctx->req;
-	struct kr_query *qry = req->current_query;
-
 	/* All OK, so start constructing the (pseudo-)packet. */
 	int ret = pkt_renew(pkt, qry->sname, qry->stype);
 	CHECK_RET(ret);
@@ -520,12 +514,9 @@ static int answer_dname_hit(kr_layer_t *ctx, knot_pkt_t *pkt, const knot_dname_t
 #undef CHECK_RET
 
 /** TODO: description; see the single call site for now. */
-static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
+static int found_exact_hit(struct kr_query *qry, knot_pkt_t *pkt, knot_db_val_t val,
 			   uint8_t lowest_rank)
 {
-	struct kr_request *req = ctx->req;
-	struct kr_query *qry = req->current_query;
-
 	int ret = entry_h_seek(&val, qry->stype);
 	if (ret) return ret;
 	const struct entry_h *eh = entry_h_consistent_E(val, qry->stype);
@@ -554,9 +545,9 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 		 * possible that we could generate a higher-security negative proof.
 		 * Rank is high-enough so we take it to save time searching;
 		 * in practice this also helps in some incorrect zones (live-signed). */
-		return answer_from_pkt  (ctx, pkt, qry->stype, eh, eh_bound, new_ttl);
+		return answer_from_pkt  (qry, pkt, qry->stype, eh, eh_bound, new_ttl);
 	} else {
-		return answer_simple_hit(ctx, pkt, qry->stype, eh, eh_bound, new_ttl);
+		return answer_simple_hit(qry, pkt, qry->stype, eh, eh_bound, new_ttl);
 	}
 }
 
