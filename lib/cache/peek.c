@@ -304,7 +304,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		if (i == 1) knot_pkt_begin(pkt, KNOT_AUTHORITY);
 		if (!ans.rrsets[i].set.rr) continue;
 		expiring = expiring || ans.rrsets[i].set.expiring;
-		ret = pkt_append(pkt, &ans.rrsets[i], ans.rrsets[i].set.rank);
+		ret = pkt_append(pkt, &ans.rrsets[i]);
 		if (kr_fails_assert(ret == 0))
 			return ctx->state;
 	}
@@ -437,7 +437,7 @@ static int answer_simple_hit(struct kr_query *qry, knot_pkt_t *pkt, uint16_t typ
 			   qry->sname, type, new_ttl);
 	CHECK_RET(ret);
 	/* Put links to the materialized data into the pkt. */
-	ret = pkt_append(pkt, &ans.rrsets[AR_ANSWER], eh->rank);
+	ret = pkt_append(pkt, &ans.rrsets[AR_ANSWER]);
 	CHECK_RET(ret);
 
 	answer_simple_qflags(&qry->flags, eh, new_ttl);
@@ -463,13 +463,14 @@ static int answer_dname_hit(struct kr_query *qry, knot_pkt_t *pkt, const knot_dn
 			   dname_owner, KNOT_RRTYPE_DNAME, new_ttl);
 	CHECK_RET(ret);
 	/* Put link to the RRset into the pkt. */
-	ret = pkt_append(pkt, &ans.rrsets[AR_ANSWER], eh->rank);
+	ret = pkt_append(pkt, &ans.rrsets[AR_ANSWER]);
 	CHECK_RET(ret);
 	const knot_dname_t *dname_target =
 		knot_dname_target(ans.rrsets[AR_ANSWER].set.rr->rrs.rdata);
 
 	/* Generate CNAME RRset for the answer in (pseudo-)packet. */
 	const int AR_CNAME = AR_SOA;
+	ans.rrsets[AR_CNAME].set.rank = ans.rrsets[AR_ANSWER].set.rank;
 	knot_rrset_t *rr = ans.rrsets[AR_CNAME].set.rr
 		= knot_rrset_new(qry->sname, KNOT_RRTYPE_CNAME, KNOT_CLASS_IN,
 				 new_ttl, ans.mm);
@@ -488,7 +489,7 @@ static int answer_dname_hit(struct kr_query *qry, knot_pkt_t *pkt, const knot_dn
 		CHECK_RET(rr->rrs.rdata ? kr_ok() : -ENOMEM);
 		knot_rdata_init(rr->rrs.rdata, rdata_len, cname_target);
 		/* Put link to the RRset into the pkt. */
-		ret = pkt_append(pkt, &ans.rrsets[AR_CNAME], eh->rank);
+		ret = pkt_append(pkt, &ans.rrsets[AR_CNAME]);
 		CHECK_RET(ret);
 	} else {
 		/* Note that it's basically a successful answer; name just doesn't fit. */
