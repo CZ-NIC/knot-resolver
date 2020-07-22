@@ -26,6 +26,7 @@
 #include "lib/generic/trie.h"
 #include "lib/resolve.h"
 #include "lib/rplan.h"
+#include "lib/rules/api.h"
 #include "lib/utils.h"
 
 #include "lib/cache/impl.h"
@@ -124,8 +125,7 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 		 * LMDB only restricts our env without changing the in-file maxsize.
 		 * That is worked around by reopening (found no other reliable way). */
 		cache->api->close(cache->db, &cache->stats);
-		struct kr_cdb_opts opts2;
-		memcpy(&opts2, opts, sizeof(opts2));
+		struct kr_cdb_opts opts2 = *opts;
 		opts2.maxsize = 0;
 		ret = cache->api->open(&cache->db, &cache->stats, &opts2, mm);
 	}
@@ -326,6 +326,7 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	/* ATM cache only peeks for qry->sname and that would be useless
 	 * to repeat on every iteration, so disable it from now on.
+	 * Note that xNAME causes a followup kr_query, so cache will get re-tried.
 	 * LATER(optim.): assist with more precise QNAME minimization. */
 	qry->flags.CACHE_TRIED = true;
 
@@ -337,7 +338,14 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	int ret = peek_nosync(ctx, pkt);
+	/* TODO: we _might_ want to process rules here even when some of the cache
+	 * exit-conditions happen, though I don't expect these cases to be important. */
+	int ret = kr_rule_local_data_answer(qry, pkt);
+	if (ret != -ENOENT) {
+		return ret;
+	}
+
+	ret = peek_nosync(ctx, pkt);
 	kr_cache_commit(&req->ctx->cache);
 	return ret;
 }

@@ -16,6 +16,7 @@
 #include "lib/rplan.h"
 #include "lib/module.h"
 #include "lib/cache/api.h"
+#include "lib/rules/api.h"
 
 /**
  * @file resolve.h
@@ -270,6 +271,7 @@ struct kr_request {
 	unsigned int count_no_nsaddr;
 	unsigned int count_fail_row;
 	alloc_wire_f alloc_wire_cb; /**< CB to allocate answer wire (can be NULL). */
+	kr_rule_tags_t rule_tags; /**< TagSet applying to this request. */
 	struct kr_extended_error extended_error;  /**< EDE info; don't modify directly, use kr_request_set_extended_error() */
 };
 

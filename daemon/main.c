@@ -13,6 +13,8 @@
 #include "lib/defines.h"
 #include "lib/dnssec.h"
 #include "lib/log.h"
+#include "lib/resolve.h"
+#include "lib/rules/api.h"
 
 #include <arpa/inet.h>
 #include <getopt.h>
@@ -575,6 +577,14 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	ret = kr_rules_init();
+	if (ret) {
+		kr_log_error(RULES, "failed to initialize policy rule engine: %s\n",
+				kr_strerror(ret));
+		ret = EXIT_FAILURE;
+		goto cleanup;
+	}
+
 	for (i = 0; i < the_args->config.len; ++i) {
 		const char *config = the_args->config.at[i];
 		if (engine_loadconf(&engine, config) != 0) {
@@ -602,6 +612,7 @@ int main(int argc, char **argv)
 cleanup:/* Cleanup. */
 	engine_deinit(&engine);
 	worker_deinit();
+	kr_rules_deinit();
 	if (loop != NULL) {
 		uv_loop_close(loop);
 	}

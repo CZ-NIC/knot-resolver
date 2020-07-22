@@ -328,6 +328,11 @@ static inline int rdataset_dematerialized_size(const uint8_t *data, uint16_t *rd
 /** Serialize an rdataset.  It may be NULL as short-hand for empty. */
 void rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data);
 
+/** Materialize a knot_rdataset_t from cache.
+ * Return the number of bytes consumed or an error code. */
+int rdataset_materialize(knot_rdataset_t * restrict rds, const uint8_t * const data,
+				const uint8_t *data_bound, knot_mm_t *pool);
+
 
 /** Partially constructed answer when gathering RRsets from cache. */
 struct answer {

@@ -42,6 +42,8 @@ struct lmdb_env
 		MDB_cursor *ro_curs;
 	} txn;
 
+	bool is_cache; /**< cache vs. rules; from struct kr_cdb_opts::is_cache */
+
 	/* Cached part of struct stat for data.mdb. */
 	dev_t st_dev;
 	ino_t st_ino;
@@ -336,9 +338,11 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 		if (ret != MDB_SUCCESS) goto error_mdb;
 	}
 
-	/* Cache doesn't require durability, we can be
-	 * loose with the requirements as a tradeoff for speed. */
-	const unsigned flags = MDB_WRITEMAP | MDB_MAPASYNC | MDB_NOTLS;
+	const unsigned flags = env->is_cache
+		/* Cache doesn't require durability, we can be
+		 * loose with the requirements as a tradeoff for speed. */
+		? MDB_WRITEMAP | MDB_NOTLS | MDB_MAPASYNC
+		: MDB_WRITEMAP | MDB_NOTLS;
 	ret = mdb_env_open(env->env, path, flags, LMDB_FILE_MODE);
 	if (ret != MDB_SUCCESS) goto error_mdb;
 
@@ -367,14 +371,19 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	ret = mdb_txn_begin(env->env, NULL, 0, &txn);
 	if (ret != MDB_SUCCESS) goto error_mdb;
 
-	ret = mdb_dbi_open(txn, NULL, 0, &env->dbi);
+
+	//FIXME: perhaps we want MDB_DUPSORT in future,
+	//  but for that we'd have to avoid MDB_RESERVE.
+	//  (including a proper assertion, instead of sometimes-crash inside lmdb)
+	const unsigned dbi_flags = 0; //is_cache ? 0 : MDB_DUPSORT;
+	ret = mdb_dbi_open(txn, NULL, dbi_flags, &env->dbi);
 	if (ret != MDB_SUCCESS) {
 		mdb_txn_abort(txn);
 		goto error_mdb;
 	}
 
 #if !defined(__MACOSX__) && !(defined(__APPLE__) && defined(__MACH__))
-	if (size_requested) {
+	if (size_requested && env->is_cache) { // prealloc makes no sense for rules
 		ret = posix_fallocate(fd, 0, MAX(env->mapsize, env->st_size));
 	} else {
 		ret = 0;
@@ -424,6 +433,8 @@ static int cdb_init(kr_cdb_pt *db, struct kr_cdb_stats *stats,
 	if (!env) {
 		return kr_error(ENOMEM);
 	}
+	env->is_cache = opts->is_cache;
+
 	int ret = cdb_open_env(env, opts->path, opts->maxsize, stats);
 	if (ret != 0) {
 		free(env);
@@ -542,6 +553,7 @@ static int lockfile_release(int fd)
 
 static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 {
+	//TODO: adjust logging based on env->is_cache
 	struct lmdb_env *env = db2env(db);
 	stats->clear++;
 	/* First try mdb_drop() to clear the DB; this may fail with ENOSPC. */
@@ -859,10 +871,8 @@ const struct kr_cdb_api *kr_cdb_lmdb(void)
 		cdb_readv, cdb_writev, cdb_remove,
 		cdb_match,
 		cdb_read_leq,
-		cdb_usage_percent,
-		cdb_get_maxsize,
+		cdb_usage_percent, cdb_get_maxsize,
 		cdb_check_health,
 	};
-
 	return &api;
 }

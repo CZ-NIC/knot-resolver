@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include <libknot/db/db.h>
@@ -12,6 +13,7 @@
 struct kr_cdb_opts {
 	const char *path; /*!< Cache URI path. */
 	size_t maxsize;   /*!< Suggested cache size in bytes; pass 0 to keep unchanged/default. */
+	bool is_cache;    /*!< Some behavior changes based on use case.  TODO: details. */
 };
 
 struct kr_cdb_stats {
