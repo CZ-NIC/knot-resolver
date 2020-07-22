@@ -531,6 +531,7 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 			if (incomplete_cmd && cmd_next == NULL) {
 				pbuf = mp_append_string(data->pool->ctx, pbuf, cmd);
 				mp_append_char(data->pool->ctx, pbuf, '\0');
+				data->buf = mp_ptr(data->pool->ctx);
 				data->blen = data->blen + strlen(cmd);
 
 				cmd = cmd_next;
@@ -546,6 +547,7 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 				if (commands[0] != '\n' && commands[0] != '\0') {
 					pbuf = mp_append_string(data->pool->ctx, pbuf, cmd);
 					mp_append_char(data->pool->ctx, pbuf, '\0');
+					data->buf = mp_ptr(data->pool->ctx);
 					cmd = data->buf;
 				} else {
 					cmd = data->buf;
