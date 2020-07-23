@@ -101,8 +101,8 @@ struct kr_query {
 	struct kr_query *cname_parent;
 	struct kr_request *request; /**< Parent resolution request. */
 	kr_stale_cb stale_cb; /**< See the type */
-	/* Beware: this must remain the last, because of lua bindings. */
-	struct kr_nsrep ns;
+	struct kr_server_selection server_selection;
+	struct kr_transport transport;
 };
 
 /** @cond internal Array of queries. */

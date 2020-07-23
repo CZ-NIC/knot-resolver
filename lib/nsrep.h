@@ -7,24 +7,39 @@
 #include <netinet/in.h>
 #include "lib/utils.h"
 
-struct kr_nsrep
-{
-    knot_dname_t* name;
-    union inaddr addr[4];
+#define DEFAULT_LOCAL_STATE_SIZE 10
+
+enum kr_selection_error {
+    KR_SELECTION_TIMEOUT,
+    KR_SELECTION_REFUSED,
+    KR_SELECTION_DNSSEC_ERROR,
+    KR_SELECTION_FORMERROR,
 };
 
-typedef struct kr_nsrep_rtt_lru
+enum kr_transport_protocol {
+    KR_TRANSPORT_UDP,
+    KR_TRANSPORT_TCP,
+    KR_TRANSPORT_TLS,
+    KR_TRANSPORT_NOADDR,
+};
+
+struct kr_transport {
+    knot_dname_t *name;
+    union inaddr address;
+    enum kr_transport_protocol protocol;
+    unsigned timeout;
+};
+
+struct kr_server_selection
 {
+    void (*choose_transport)(struct kr_query *qry);
+    void (*success)(struct kr_query *qry, struct kr_transport transport);
+    void (*update_rtt)(struct kr_query *qry, struct kr_transport transport, unsigned rtt);
+    void (*error)(struct kr_query *qry, struct kr_transport transport, enum kr_selection_error error);
 
-} kr_nsrep_rtt_lru_t;
+    void *local_state;
+};
 
-typedef struct kr_nsrep_lru {
-
-} kr_nsrep_lru_t;
-
-typedef struct kr_nsrep_rtt_lru_entry {
-
-} kr_nsrep_rtt_lru_entry_t;
-
+// Initialize server selection structure inside qry.
 KR_EXPORT
-int kr_nsrep_elect(struct kr_query *qry, struct kr_context *ctx);
+void kr_server_selection_init(struct kr_query *qry);

@@ -1233,19 +1233,19 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 /** Invalidate current NS/addr pair. */
 static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 {
-	if (qry->ns.addr[0].ip.sa_family != AF_UNSPEC) {
-		const char *addr = kr_inaddr(&qry->ns.addr[0].ip);
-		int addr_len = kr_inaddr_len(&qry->ns.addr[0].ip);
-		int ret = kr_zonecut_del(&qry->zone_cut, qry->ns.name, addr, addr_len);
-		/* Also remove it from the qry->ns.addr array.
-		 * That's useful at least for STUB and FORWARD modes. */
-		// NS_REP
-		// memmove(qry->ns.addr, qry->ns.addr + 1,
-		// 	sizeof(qry->ns.addr[0]) * (KR_NSREP_MAXADDR - 1));
-		return ret;
-	} else {
-		return kr_zonecut_del_all(&qry->zone_cut, qry->ns.name);
-	}
+	// if (qry->ns.addr[0].ip.sa_family != AF_UNSPEC) {
+	// 	const char *addr = kr_inaddr(&qry->ns.addr[0].ip);
+	// 	int addr_len = kr_inaddr_len(&qry->ns.addr[0].ip);
+	// 	int ret = kr_zonecut_del(&qry->zone_cut, qry->ns.name, addr, addr_len);
+	// 	/* Also remove it from the qry->ns.addr array.
+	// 	 * That's useful at least for STUB and FORWARD modes. */
+	// 	// NS_REP
+	// 	// memmove(qry->ns.addr, qry->ns.addr + 1,
+	// 	// 	sizeof(qry->ns.addr[0]) * (KR_NSREP_MAXADDR - 1));
+	// 	return ret;
+	// } else {
+		return kr_zonecut_del_all(&qry->zone_cut, qry->transport.name);
+	// }
 }
 
 int kr_ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
@@ -1274,7 +1274,7 @@ int kr_ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 		// kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
 	}
 	/* Bail out if the query is already pending or dependency loop. */
-	if (!next_type || kr_rplan_satisfies(qry->parent, qry->ns.name, KNOT_CLASS_IN, next_type)) {
+	if (!next_type || kr_rplan_satisfies(qry->parent, qry->transport.name, KNOT_CLASS_IN, next_type)) {
 		/* Fall back to SBELT if root server query fails. */
 		if (!next_type && qry->zone_cut.name[0] == '\0') {
 			VERBOSE_MSG(qry, "=> fallback to root hints\n");
@@ -1291,7 +1291,7 @@ int kr_ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	}
 	/* Push new query to the resolution plan */
 	struct kr_query *next =
-		kr_rplan_push(rplan, qry, qry->ns.name, KNOT_CLASS_IN, next_type);
+		kr_rplan_push(rplan, qry, qry->transport.name, KNOT_CLASS_IN, next_type);
 	if (!next) {
 		return kr_error(ENOMEM);
 	}
@@ -1309,9 +1309,7 @@ int kr_ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	} else {
 		next->flags.AWAIT_CUT = true;
 	}
-	if(!ret) {
-		ITERATE_LAYERS(param, qry, reset);
-	}
+
 	return ret;
 }
 
@@ -1325,6 +1323,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	}
 	/* If we have deferred answers, resume them. */
 	struct kr_query *qry = array_tail(rplan->pending);
+	kr_server_selection_init(qry);
 	if (qry->deferred != NULL) {
 		/* @todo: Refactoring validator, check trust chain before resuming. */
 		int state = 0;
@@ -1416,7 +1415,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		// 	VERBOSE_MSG(qry, "=> no valid NS left\n");
 		// 	return KR_STATE_FAIL;
 		// }
-	} else if (!qry->ns.name || !retry) { /* Keep NS when requerying/stub/badcookie. */
+	} else if (!qry->transport.name || !retry) { /* Keep NS when requerying/stub/badcookie. */
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
 		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
 			kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);
@@ -1424,10 +1423,12 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		}
 	}
 
-	if(kr_nsrep_elect(qry, request->ctx) == KR_STATE_PRODUCE) {
-		return KR_STATE_PRODUCE;
-	}
+	qry->server_selection.choose_transport(qry);
 
+	if (qry->transport.protocol == KR_TRANSPORT_NOADDR) {
+		kr_ns_resolve_addr(qry, qry->request);
+		return KR_STATE_YIELD;
+	}
 
 	/* Randomize query case (if not in safe mode or turned off) */
 	qry->secret = (qry->flags.SAFEMODE || qry->flags.NO_0X20)
@@ -1440,7 +1441,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	 * kr_resolve_checkout().
 	 */
 	qry->timestamp_mono = kr_now();
-	*dst = &qry->ns.addr[0].ip;
+	*dst = &qry->transport.address.ip;
 	*type = (qry->flags.TCP) ? SOCK_STREAM : SOCK_DGRAM;
 	return request->state;
 }
