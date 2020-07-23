@@ -17,6 +17,7 @@
 #include "lib/rplan.h"
 #include "lib/module.h"
 #include "lib/cache/api.h"
+#include "lib/rules/api.h"
 
 /**
  * @file resolve.h
@@ -229,6 +230,7 @@ struct kr_request {
 	unsigned int uid; /** for logging purposes only */
 	unsigned int count_no_nsaddr;
 	unsigned int count_fail_row;
+	kr_rule_tags_t rule_tags; /**< TagSet applying to this request. */
 };
 
 /** Initializer for an array of *_selected. */

@@ -71,9 +71,19 @@ void kr_rules_deinit()
 struct kr_request;
 bool kr_rule_consume_tags(knot_db_val_t *val, const struct kr_request *req)
 {
-	val->data += sizeof(uint64_t);
-	val->len  -= sizeof(uint64_t);
-	return true; // FIXME, also length check
+	const size_t tl = sizeof(kr_rule_tags_t);
+	if (val->len < tl) {
+		val->len = 0;
+		assert(false);
+		/* We may not fail immediately, but further processing
+		 * will fail anyway due to zero remaining length. */
+		return false;
+	}
+	kr_rule_tags_t tags;
+	memcpy(&tags, val->data, tl);
+	val->data += tl;
+	val->len  -= tl;
+	return tags == KR_RULE_TAGS_ALL || (tags & req->rule_tags);
 }
 
 

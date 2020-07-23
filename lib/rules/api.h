@@ -8,7 +8,7 @@ struct kr_query;
 struct knot_pkt;
 
 typedef uint64_t kr_rule_tags_t;
-#define KR_RULE_TAGS_ALL (uint64_t)0xFFFFffff
+#define KR_RULE_TAGS_ALL ((uint64_t)0)
 
 KR_EXPORT
 int kr_rules_init();
