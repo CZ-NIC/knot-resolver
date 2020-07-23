@@ -1,4 +1,4 @@
-Knot Resolver 5.2.0 (2020-0m-dd)
+Knot Resolver 5.y.z (2020-0m-dd)
 ================================
 
 Improvements
@@ -9,6 +9,7 @@ Improvements
 Bugfixes
 --------
 - tls: fix compilation to support net.tls_sticket_secret() (!1021)
+- validator: ignore bogus RRSIGs present in insecure domains (!1022, #587)
 
 
 Knot Resolver 5.1.2 (2020-07-01)
