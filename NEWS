@@ -5,6 +5,7 @@ Improvements
 ------------
 - capabilities are no longer constrained when running as root (!1012)
 - cache: add percentage usage to cache.stats() (!1025)
+- cache: add number of cache entries to cache.stats() (!1028)
 - aarch64 support again, as some systems still didn't work (!1033)
 
 Bugfixes
