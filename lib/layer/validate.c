@@ -551,7 +551,8 @@ static const knot_dname_t *signature_authority(struct kr_request *req)
 	return signer_name;
 }
 
-static int rrsig_not_found(kr_layer_t *ctx, const knot_pkt_t *pkt, const knot_rrset_t *rr)
+static int rrsig_not_found(const kr_layer_t * const ctx, const knot_pkt_t * const pkt,
+				const knot_rrset_t * const rr)
 {
 	/* Signatures are missing.  There might be a zone cut that we've skipped
 	 * and transitions to insecure.  That can commonly happen when iterating
@@ -559,8 +560,8 @@ static int rrsig_not_found(kr_layer_t *ctx, const knot_pkt_t *pkt, const knot_rr
 	 * We'll try proving that the name truly is insecure - by spawning
 	 * a DS sub-query on a suitable QNAME.
 	 */
-	struct kr_request *req = ctx->req;
-	struct kr_query *qry = req->current_query;
+	struct kr_request * const req = ctx->req;
+	struct kr_query * const qry = req->current_query;
 
 	if (qry->flags.FORWARD || qry->flags.STUB) {
 		/* Undiscovered signed cuts can't happen in the current forwarding
@@ -569,27 +570,17 @@ static int rrsig_not_found(kr_layer_t *ctx, const knot_pkt_t *pkt, const knot_rr
 	}
 
 	/* Find cut_next: the name at which to try finding the "missing" zone cut. */
-	const knot_dname_t *cut_next = rr->owner;
 	const knot_dname_t * const cut_top = qry->zone_cut.name;
 	const int next_depth = knot_dname_in_bailiwick(rr->owner, cut_top);
 	if (next_depth <= 0) {
 		return KR_STATE_FAIL; // shouldn't happen, I think
-	} else if (next_depth > 1) {
-		/* Try finding SOA.  That can speed up things in deeper zones. */
-		const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_AUTHORITY);
-		for (int i = sec->pos; i < sec->pos + sec->count; ++i) {
-			if (pkt->rr[i].type != KNOT_RRTYPE_SOA) continue;
-			const knot_dname_t *owner = pkt->rr[i].owner;
-			if (knot_dname_in_bailiwick(owner, cut_top) >= 1
-			    && knot_dname_in_bailiwick(cut_next, owner) >= 1) {
-				cut_next = owner;
-				break;
-			}
-		}
 	}
+	/* Add one extra label to cur_top, i.e. descend one level below current zone cut */
+	const knot_dname_t * const cut_next = rr->owner +
+		knot_dname_prefixlen(rr->owner, next_depth - 1, NULL);
 
 	/* Spawn that DS sub-query. */
-	struct kr_query *next = kr_rplan_push(&req->rplan, qry, cut_next,
+	struct kr_query * const next = kr_rplan_push(&req->rplan, qry, cut_next,
 						rr->rclass, KNOT_RRTYPE_DS);
 	if (!next) {
 		return KR_STATE_FAIL;
