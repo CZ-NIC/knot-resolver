@@ -3,8 +3,7 @@
 
 build_utils = get_option('utils') != 'disabled'
 
-subdir('kresctl')
-subdir('kres_watcher')
+subdir('watcher')
 subdir('client')
 subdir('cache_gc')
 subdir('upgrade')

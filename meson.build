@@ -128,22 +128,6 @@ else
 endif
 message('---------------------------')
 
-### Sysrepo
-message('--- sysrepo dependencies ---')
-libsysrepo = dependency('sysrepo', version: '>=1.4.2', required: false)
-libyang = dependency('libyang', version: '>=1.0.130', required: false)
-sysrepo = get_option('sysrepo')
-if (sysrepo == 'auto' or sysrepo == 'enabled') and libsysrepo.found() and libyang.found()
-  build_sysrepo = true
-elif sysrepo == 'enabled' and not libyang.found()
-  error('sysrepo=enabled requires libyang >= 1.0.130')
-elif sysrepo == 'enabled' and not libsysrepo.found()
-  error('sysrepo=enabled requires sysrepo >= 1.4.2')
-else
-  build_sysrepo = false
-endif
-message('---------------------------')
-
 ## Compiler args
 add_project_arguments(
   '-D_GNU_SOURCE',

@@ -1,20 +1,17 @@
-kresctl_src = files([
+watcher_src = files([
     'main.c',
 ])
-c_src_lint += kresctl_src
+c_src_lint += watcher_src
 
 if build_sysrepo
-    kresc = executable(
-    'kresctl',
-    kresctl_src,
+  watcher = executable(
+    'kres-watcher',
+    watcher_src,
     sysrepo_common_src,
     dependencies: [
-      contrib_dep,
-      libkres_dep,
       libyang,
       libsysrepo,
-      libknot,
-      luajit_inc,
+      gnutls,
     ],
     install: true,
     install_dir: get_option('sbindir'),
