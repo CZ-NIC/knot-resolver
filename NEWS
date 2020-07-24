@@ -5,6 +5,7 @@ Improvements
 ------------
 - capabilities are no longer constrained when running as root (!1012)
 - cache: add percentage usage to cache.stats() (!1025)
+- cache: add number of entries to cache.stats() (!1028)
 
 Bugfixes
 --------
