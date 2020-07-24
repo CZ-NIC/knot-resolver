@@ -566,19 +566,9 @@ static int rrsig_not_found(kr_layer_t *ctx, const knot_pkt_t *pkt, const knot_rr
 	const int next_depth = knot_dname_in_bailiwick(rr->owner, cut_top);
 	if (next_depth <= 0) {
 		return KR_STATE_FAIL; // shouldn't happen, I think
-	} else if (next_depth > 1) {
-		/* Try finding SOA.  That can speed up things in deeper zones. */
-		const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_AUTHORITY);
-		for (int i = sec->pos; i < sec->pos + sec->count; ++i) {
-			if (pkt->rr[i].type != KNOT_RRTYPE_SOA) continue;
-			const knot_dname_t *owner = pkt->rr[i].owner;
-			if (knot_dname_in_bailiwick(owner, cut_top) >= 1
-			    && knot_dname_in_bailiwick(cut_next, owner) >= 1) {
-				cut_next = owner;
-				break;
-			}
-		}
 	}
+	/* Add one extra label to cur_top, i.e. descend one level below current zone cut */
+	cut_next = rr->owner + knot_dname_prefixlen(rr->owner, next_depth - 1, NULL);
 
 	/* Spawn that DS sub-query. */
 	struct kr_query *next = kr_rplan_push(&req->rplan, qry, cut_next,
