@@ -34,7 +34,7 @@
 
 #include <lua.h>
 #include <uv.h>
-#if SYSTEMD_VERSION > 0
+#if ENABLE_LIBSYSTEMD
 #include <systemd/sd-daemon.h>
 #endif
 #include <libknot/error.h>
@@ -277,7 +277,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	memcpy(&engine->ipc_set, ipc_set, sizeof(*ipc_set));
 
 	/* Notify supervisor. */
-#if SYSTEMD_VERSION > 0
+#if ENABLE_LIBSYSTEMD
 	sd_notify(0, "READY=1");
 #endif
 	/* Run event loop */
