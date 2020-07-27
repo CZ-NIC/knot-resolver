@@ -165,8 +165,7 @@ conf_data.set_quoted('libzscanner_SONAME',
   libzscanner.get_pkgconfig_variable('soname'))
 conf_data.set_quoted('libknot_SONAME',
   libknot.get_pkgconfig_variable('soname'))
-conf_data.set('SYSTEMD_VERSION',
-  libsystemd.found() ? libsystemd.version().to_int() : -1)
+conf_data.set('ENABLE_LIBSYSTEMD', libsystemd.found() ? 1 : 0)
 conf_data.set('NOVERBOSELOG', not verbose_log)
 conf_data.set('ENABLE_SENDMMSG', sendmmsg.to_int())
 conf_data.set('ENABLE_CAP_NG', capng.found())
