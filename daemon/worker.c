@@ -73,15 +73,18 @@ struct qr_task
 	qr_tasklist_t waiting;
 	struct session *pending[MAX_PENDING];
 	uint16_t pending_count;
-	uint16_t addrlist_count;
-	uint16_t addrlist_turn;
+	// uint16_t addrlist_count;
+	// uint16_t addrlist_turn;
 	uint16_t timeouts;
 	uint16_t iter_count;
-	struct sockaddr *addrlist;
+	// struct sockaddr *addrlist;
 	uint32_t refs;
 	bool finished : 1;
 	bool leading  : 1;
 	uint64_t creation_time;
+	uint64_t send_time;
+	uint64_t recv_time;
+	struct kr_transport *transport;
 };
 
 
@@ -110,12 +113,12 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 			const struct sockaddr *addr, knot_pkt_t *pkt);
 static int qr_task_finalize(struct qr_task *task, int state);
 static void qr_task_complete(struct qr_task *task);
-static struct session* worker_find_tcp_connected(struct worker_ctx *worker,
+struct session* worker_find_tcp_connected(struct worker_ctx *worker,
 						 const struct sockaddr *addr);
 static int worker_add_tcp_waiting(struct worker_ctx *worker,
 				  const struct sockaddr *addr,
 				  struct session *session);
-static struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
+struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
 					       const struct sockaddr *addr);
 static void on_tcp_connect_timeout(uv_timer_t *timer);
 
@@ -576,6 +579,8 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 	qr_task_ref(task);
 
 	struct worker_ctx *worker = ctx->worker;
+	/* Note time for upstream RTT */
+	task->send_time = kr_now();
 	/* Send using given protocol */
 	assert(!session_flags(session)->closing);
 	if (session_flags(session)->has_tls) {
@@ -674,12 +679,9 @@ static int session_tls_hs_cb(struct session *session, int status)
 	if (status) {
 		struct qr_task *task = session_waitinglist_get(session);
 		if (task) {
-			struct kr_qflags *options = &task->ctx->req.options;
-			// NS_REP
-			// unsigned score = options->FORWARD || options->STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
-			// kr_nsrep_update_rtt(NULL, peer, score,
-			// 		    worker->engine->resolver.cache_rtt,
-			// 		    KR_NS_UPDATE_NORESET);
+			// TLS handshake failed, report it to server selection
+			struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
+			qry->server_selection.error(qry, task->transport, KR_SELECTION_TLS_HANDSHAKE_FAILED);
 		}
 #ifndef NDEBUG
 		else {
@@ -854,15 +856,8 @@ static void on_connect(uv_connect_t *req, int status)
 		worker_del_tcp_waiting(worker, peer);
 		struct qr_task *task = session_waitinglist_get(session);
 		if (task && status != UV_ETIMEDOUT) {
-			/* Penalize upstream.
-			 * In case of UV_ETIMEDOUT upstream has been
-			 * already penalized in on_tcp_connect_timeout() */
-			struct kr_qflags *options = &task->ctx->req.options;
-			// NS_REP
-			// unsigned score = options->FORWARD || options->STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
-			// kr_nsrep_update_rtt(NULL, peer, score,
-			// 		    worker->engine->resolver.cache_rtt,
-			// 		    KR_NS_UPDATE_NORESET);
+			struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
+			qry->server_selection.error(qry, task->transport, KR_SELECTION_TCP_CONNECT_FAILED);
 		}
 		assert(session_tasklist_is_empty(session));
 		session_waitinglist_retry(session, false);
@@ -944,11 +939,7 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 			    peer_str ? peer_str : "");
 	}
 
-	// NS_REP
-	// unsigned score = qry->flags.FORWARD || qry->flags.STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
-	// kr_nsrep_update_rtt(NULL, peer, score,
-	// 		    worker->engine->resolver.cache_rtt,
-	// 		    KR_NS_UPDATE_NORESET);
+	qry->server_selection.error(qry, task->transport, KR_SELECTION_TCP_CONNECT_TIMEOUT);
 
 	worker->stats.timeout += session_waitinglist_get_len(session);
 	session_waitinglist_retry(session, true);
@@ -973,35 +964,28 @@ static void on_udp_timeout(uv_timer_t *timer)
 
 	uv_timer_stop(timer);
 
-	/* Penalize all tried nameservers with a timeout. */
 	struct qr_task *task = session_tasklist_get_first(session);
 	struct worker_ctx *worker = task->ctx->worker;
+
 	if (task->leading && task->pending_count > 0) {
 		struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
-		struct sockaddr_in6 *addrlist = (struct sockaddr_in6 *)task->addrlist;
-		for (uint16_t i = 0; i < MIN(task->pending_count, task->addrlist_count); ++i) {
-			struct sockaddr *choice = (struct sockaddr *)(&addrlist[i]);
-			WITH_VERBOSE(qry) {
-				char *addr_str = kr_straddr(choice);
-				// VERBOSE_MSG(qry, "=> server: '%s' flagged as 'bad'\n", addr_str ? addr_str : "");
-			}
-			// NS_REP
-			// unsigned score = qry->flags.FORWARD || qry->flags.STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
-			// kr_nsrep_update_rtt(&qry->ns, choice, score,
-			// 		    worker->engine->resolver.cache_rtt,
-			// 		    KR_NS_UPDATE_NORESET);
-		}
+		qry->server_selection.error(qry, task->transport, KR_SELECTION_TIMEOUT);
 	}
+
 	task->timeouts += 1;
 	worker->stats.timeout += 1;
 	qr_task_step(task, NULL, NULL);
 }
 
-static uv_handle_t *retransmit(struct qr_task *task)
+static uv_handle_t *transmit(struct qr_task *task)
 {
 	uv_handle_t *ret = NULL;
-	if (task && task->addrlist && task->addrlist_count > 0) {
-		struct sockaddr_in6 *choice = &((struct sockaddr_in6 *)task->addrlist)[task->addrlist_turn];
+
+	if (task) {
+		struct kr_transport* transport = task->transport;
+
+		struct sockaddr_in6 *choice = (struct sockaddr_in6 *)&transport->address;
+
 		if (!choice) {
 			return ret;
 		}
@@ -1029,33 +1013,12 @@ static uv_handle_t *retransmit(struct qr_task *task)
 		} else {
 			task->pending[task->pending_count] = session;
 			task->pending_count += 1;
-			task->addrlist_turn = (task->addrlist_turn + 1) %
-					      task->addrlist_count; /* Round robin */
 			session_start_read(session); /* Start reading answer */
 		}
 	}
 	return ret;
 }
 
-static void on_retransmit(uv_timer_t *req)
-{
-	struct session *session = req->data;
-	assert(session_tasklist_get_len(session) == 1);
-
-	uv_timer_stop(req);
-	struct qr_task *task = session_tasklist_get_first(session);
-	if (retransmit(task) == NULL) {
-		/* Not possible to spawn request, start timeout timer with remaining deadline. */
-		struct kr_qflags *options = &task->ctx->req.options;
-		// NS_REP
-		// uint64_t timeout = options->FORWARD || options->STUB ? KR_NS_FWD_TIMEOUT / 2 :
-		// 		   KR_CONN_RTT_MAX - task->pending_count * KR_CONN_RETRY;
-		uint64_t timeout = KR_CONN_RTT_MAX - task->pending_count * KR_CONN_RETRY;
-		uv_timer_start(req, on_udp_timeout, timeout, 0);
-	} else {
-		uv_timer_start(req, on_retransmit, KR_CONN_RETRY, 0);
-	}
-}
 
 static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_source, knot_pkt_t *pkt)
 {
@@ -1083,6 +1046,7 @@ static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_
 			struct kr_query *qry = array_tail(follower->ctx->req.rplan.pending);
 			qry->id = leader_qry->id;
 			qry->secret = leader_qry->secret;
+			follower->transport = task->transport;
 			leader_qry->secret = 0; /* Next will be already decoded */
 		}
 		qr_task_step(follower, packet_source, pkt);
@@ -1202,7 +1166,7 @@ static int udp_task_step(struct qr_task *task,
 		return kr_ok(); /* Will be notified when outgoing query finishes. */
 	}
 	/* Start transmitting */
-	uv_handle_t *handle = retransmit(task);
+	uv_handle_t *handle = transmit(task);
 	if (handle == NULL) {
 		subreq_finalize(task, packet_source, packet);
 		return qr_task_finalize(task, KR_STATE_FAIL);
@@ -1210,24 +1174,16 @@ static int udp_task_step(struct qr_task *task,
 	/* Check current query NSLIST */
 	struct kr_query *qry = array_tail(req->rplan.pending);
 	assert(qry != NULL);
-	/* Retransmit at default interval, or more frequently if the mean
-	 * RTT of the server is better. If the server is glued, use default rate. */
-	// NS_REP
-	// size_t timeout = qry->ns.score;
-	// if (timeout > KR_NS_GLUED) {
-	// 	/* We don't have information about variance in RTT, expect +10ms */
-	// 	timeout = MIN(qry->ns.score + 10, KR_CONN_RETRY);
-	// } else {
-	// 	timeout = KR_CONN_RETRY;
-	// }
-	size_t timeout = KR_CONN_RETRY;
+
+	size_t timeout = task->transport->timeout;
+
 	/* Announce and start subrequest.
 	 * @note Only UDP can lead I/O as it doesn't touch 'task->pktbuf' for reassembly.
 	 */
 	subreq_lead(task);
 	struct session *session = handle->data;
 	assert(session_get_handle(session) == handle && (handle->type == UV_UDP));
-	int ret = session_timer_start(session, on_retransmit, timeout, 0);
+	int ret = session_timer_start(session, on_udp_timeout, timeout, 0);
 	/* Start next step with timeout, fatal if can't start a timer. */
 	if (ret != 0) {
 		subreq_finalize(task, packet_source, packet);
@@ -1369,16 +1325,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 		worker_del_tcp_waiting(worker, addr);
 		free(conn);
 		session_close(session);
-		// NS_REP
-		// unsigned score = qry->flags.FORWARD || qry->flags.STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
-		// kr_nsrep_update_rtt(NULL, peer, score,
-		// 		    worker->engine->resolver.cache_rtt,
-		// 		    KR_NS_UPDATE_NORESET);
-		WITH_VERBOSE (qry) {
-			const char *peer_str = kr_straddr(peer);
-			kr_log_verbose( "[wrkr]=> connect to '%s' failed (%s), flagged as 'bad'\n",
-					peer_str ? peer_str : "", uv_strerror(ret));
-		}
+		qry->server_selection.error(qry, task->transport, KR_SELECTION_TCP_CONNECT_FAILED);
 		return kr_error(EAGAIN);
 	}
 
@@ -1402,7 +1349,7 @@ static int tcp_task_step(struct qr_task *task,
 	assert(task->pending_count == 0);
 
 	/* target */
-	const struct sockaddr *addr = task->addrlist;
+	const struct sockaddr *addr = &task->transport->address.ip;
 	if (addr->sa_family == AF_UNSPEC) {
 		/* Target isn't defined. Finalize task with SERVFAIL.
 		 * Although task->pending_count is zero, there are can be followers,
@@ -1462,10 +1409,6 @@ static int qr_task_step(struct qr_task *task,
 	assert(ctx);
 	struct kr_request *req = &ctx->req;
 	struct worker_ctx *worker = ctx->worker;
-	int sock_type = -1;
-	task->addrlist = NULL;
-	task->addrlist_count = 0;
-	task->addrlist_turn = 0;
 
 	if (worker->too_many_open) {
 		/* */
@@ -1476,22 +1419,29 @@ static int qr_task_step(struct qr_task *task,
 		} else {
 			if (packet && kr_rplan_empty(rplan)) {
 				/* new query; TODO - make this detection more obvious */
-				kr_resolve_consume(req, packet_source, packet);
+				kr_resolve_consume(req, &task->transport, packet);
 			}
 			return qr_task_finalize(task, KR_STATE_FAIL);
 		}
 	}
 
-	int state = kr_resolve_consume(req, packet_source, packet);
+	// Report network RTT back to server selection
+	if (task->send_time && task->recv_time) {
+		struct kr_query *qry = array_tail(req->rplan.pending);
+		qry->server_selection.update_rtt(qry, task->transport, task->recv_time - task->send_time);
+	}
+
+	int state = kr_resolve_consume(req, &task->transport, packet);
+
+	task->transport = NULL;
 	while (state == KR_STATE_PRODUCE) {
-		state = kr_resolve_produce(req, &task->addrlist,
-					   &sock_type, task->pktbuf);
+		state = kr_resolve_produce(req, &task->transport, task->pktbuf);
 		if (unlikely(++task->iter_count > KR_ITER_LIMIT ||
 			     task->timeouts >= KR_TIMEOUT_LIMIT)) {
 
 			#ifndef NOVERBOSELOG
 			struct kr_rplan *rplan = &req->rplan;
-			struct kr_query *last  = kr_rplan_last(rplan);
+			struct kr_query *last = kr_rplan_last(rplan);
 			if (task->iter_count > KR_ITER_LIMIT) {
 				VERBOSE_MSG(last, "canceling query due to exceeded iteration count limit of %d\n", KR_ITER_LIMIT);
 			}
@@ -1507,48 +1457,22 @@ static int qr_task_step(struct qr_task *task,
 	/* We're done, no more iterations needed */
 	if (state & (KR_STATE_DONE|KR_STATE_FAIL)) {
 		return qr_task_finalize(task, state);
-	} else if (!task->addrlist || sock_type < 0) {
+	} else if (!task->transport->protocol) {
 		return qr_task_step(task, NULL, NULL);
 	}
 
-	/* Count available address choices */
-	struct sockaddr_in6 *choice = (struct sockaddr_in6 *)task->addrlist;
-	// NS_REP
-	for (size_t i = 0; i < 4 && choice->sin6_family != AF_UNSPEC; ++i) {
-		task->addrlist_count += 1;
-		choice += 1;
+	switch (task->transport->protocol)
+	{
+	case KR_TRANSPORT_UDP:
+		return udp_task_step(task, packet_source, packet);
+		break;
+	case KR_TRANSPORT_TCP: // fall through
+	case KR_TRANSPORT_TLS:
+		return tcp_task_step(task, packet_source, packet);
+	default:
+		assert(0);
+		break;
 	}
-
-	/* Upgrade to TLS if the upstream address is configured as DoT capable. */
-	if (task->addrlist_count > 0 && kr_inaddr_port(task->addrlist) == KR_DNS_PORT) {
-		/* TODO if there are multiple addresses (task->addrlist_count > 1)
-		 * check all of them. */
-		struct network *net = &worker->engine->net;
-		/* task->addrlist has to contain TLS port before tls_client_param_get() call */
-		kr_inaddr_set_port(task->addrlist, KR_DNS_TLS_PORT);
-		tls_client_param_t *tls_entry =
-			tls_client_param_get(net->tls_client_params, task->addrlist);
-		if (tls_entry) {
-			packet_source = NULL;
-			sock_type = SOCK_STREAM;
-			/* TODO in this case in tcp_task_make_connection() will be performed
-			 * redundant map_get() call. */
-		} else {
-			/* The function is fairly cheap, so we just change there and back. */
-			kr_inaddr_set_port(task->addrlist, KR_DNS_PORT);
-		}
-	}
-
-	int ret = 0;
-	if (sock_type == SOCK_DGRAM) {
-		/* Start fast retransmit with UDP. */
-		ret = udp_task_step(task, packet_source, packet);
-	} else {
-		/* TCP. Connect to upstream or send the query if connection already exists. */
-		assert (sock_type == SOCK_STREAM);
-		ret = tcp_task_step(task, packet_source, packet);
-	}
-	return ret;
 }
 
 static int parse_packet(knot_pkt_t *query)
@@ -1637,12 +1561,15 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 		}
 		assert(!session_flags(session)->closing);
 		addr = peer;
+		/* Note recieve time for RTT calculation */
+		task->recv_time = kr_now();
 	}
 	assert(uv_is_closing(session_get_handle(session)) == false);
 
 	/* Packet was successfully parsed.
 	 * Task was created (found). */
 	session_touch(session);
+
 	/* Consume input and produce next message */
 	return qr_task_step(task, addr, query);
 }
@@ -1697,7 +1624,7 @@ int worker_del_tcp_connected(struct worker_ctx *worker,
 	return map_del_tcp_session(&worker->tcp_connected, addr);
 }
 
-static struct session* worker_find_tcp_connected(struct worker_ctx *worker,
+struct session* worker_find_tcp_connected(struct worker_ctx *worker,
 						 const struct sockaddr* addr)
 {
 	return map_find_tcp_session(&worker->tcp_connected, addr);
@@ -1723,7 +1650,7 @@ int worker_del_tcp_waiting(struct worker_ctx *worker,
 	return map_del_tcp_session(&worker->tcp_waiting, addr);
 }
 
-static struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
+struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
 					       const struct sockaddr* addr)
 {
 	return map_find_tcp_session(&worker->tcp_waiting, addr);

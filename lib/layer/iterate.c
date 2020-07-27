@@ -772,13 +772,6 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 
 		if (query->flags.FORWARD) {
 			next->forward_flags.CNAME = true;
-			if (query->parent == NULL) {
-				// NS_REP
-				// state = kr_nsrep_copy_set(&next->ns, &query->ns);
-				// if (state != kr_ok()) {
-				// 	return KR_STATE_FAIL;
-				// }
-			}
 		}
 		next->cname_parent = query;
 		/* Want DNSSEC if and only if it's posible to secure
@@ -1056,7 +1049,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	} else if (!is_paired_to_query(pkt, query)) {
 		WITH_VERBOSE(query) {
 			const char *ns_str =
-				req->upstream.addr ? kr_straddr(req->upstream.addr) : "(internal)";
+				req->upstream.transport ? kr_straddr(&req->upstream.transport->address.ip) : "(internal)";
 			VERBOSE_MSG("<= ignoring mismatching response from %s\n",
 					ns_str ? ns_str : "(kr_straddr failed)");
 		}
@@ -1089,24 +1082,38 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	switch(knot_wire_get_rcode(pkt->wire)) {
 	case KNOT_RCODE_NOERROR:
 	case KNOT_RCODE_NXDOMAIN:
+		query->server_selection.success(query, req->upstream.transport);
 		break; /* OK */
 	case KNOT_RCODE_YXDOMAIN: /* Basically a successful answer; name just doesn't fit. */
+		query->server_selection.success(query, req->upstream.transport);
 		knot_wire_set_rcode(req->answer->wire, KNOT_RCODE_YXDOMAIN);
 		break;
 	case KNOT_RCODE_REFUSED:
+		if (query->flags.STUB) {
+			 /* just pass answer through if in stub mode */
+			break;
+		}
+		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_REFUSED);
+		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
+		return resolve_badmsg(pkt, req, query);
 	case KNOT_RCODE_SERVFAIL:
 		if (query->flags.STUB) {
 			 /* just pass answer through if in stub mode */
 			break;
 		}
-		/* fall through */
+		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_SERVFAIL);
+		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
+		return resolve_badmsg(pkt, req, query);
 	case KNOT_RCODE_FORMERR:
+		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_FORMERROR);
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		return resolve_badmsg(pkt, req, query);
 	case KNOT_RCODE_NOTIMPL:
+		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_NOTIMPL);
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		return resolve_notimpl(pkt, req, query);
 	default:
+		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_OTHER_RCODE);
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		return resolve_error(pkt, req);
 	}

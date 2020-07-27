@@ -99,8 +99,11 @@ static int answer_finalize_yield(kr_layer_t *ctx) { return kr_ok(); }
 		if (mod->layer) { \
 			struct kr_layer layer = {.state = (r)->state, .api = mod->layer, .req = (r)}; \
 			if (layer.api && layer.api->func) { \
+				printf("%s %s\n", STRINGIFY(func), (mod->name)); \
 				(r)->state = layer.api->func(&layer, ##__VA_ARGS__); \
+				printf("%s %s %x\n", STRINGIFY(func), (mod->name), (r->state)); \
 				if ((r)->state == KR_STATE_YIELD) { \
+					printf("%s_yield %s\n", STRINGIFY(func), (mod->name)); \
 					func ## _yield(&layer, ##__VA_ARGS__); \
 					break; \
 				} \
@@ -137,7 +140,7 @@ static void randomized_qname_case(knot_dname_t * restrict qname, uint32_t secret
 		return;
 	}
 	assert(qname);
-	const int len = knot_dname_size(qname) - 2; /* Skip first, last label. */
+	const int len = knot_dname_size(qname) - 2; /* Skip first, last label. First is length, last is always root */
 	for (int i = 0; i < len; ++i) {
 		/* Note: this relies on the fact that correct label lengths
 		 * can't pass the isletter() test (by "luck"). */
@@ -722,78 +725,6 @@ KR_PURE static bool kr_inaddr_equal(const struct sockaddr *a, const struct socka
 	return a_len == b_len && memcmp(kr_inaddr(a), kr_inaddr(b), a_len) == 0;
 }
 
-static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, const struct sockaddr *src)
-{
-	/* Do not track in safe mode. */
-	if (qry->flags.SAFEMODE) {
-		return;
-	}
-
-	/* Calculate total resolution time from the time the query was generated. */
-	uint64_t elapsed = kr_now() - qry->timestamp_mono;
-	elapsed = elapsed > UINT_MAX ? UINT_MAX : elapsed;
-
-	/* NSs in the preference list prior to the one who responded will be penalised
-	 * with the RETRY timer interval. This is because we know they didn't respond
-	 * for N retries, so their RTT must be at least N * RETRY.
-	 * The NS in the preference list that responded will have RTT relative to the
-	 * time when the query was sent out, not when it was originated.
-	 */
-	// NSREP
-	// for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
-	// 	const struct sockaddr *addr = &qry->ns.addr[i].ip;
-	// 	if (addr->sa_family == AF_UNSPEC) {
-	// 		break;
-	// 	}
-	// 	/* If this address is the source of the answer, update its RTT */
-	// 	if (kr_inaddr_equal(src, addr)) {
-	// 		kr_nsrep_update_rtt(&qry->ns, addr, elapsed, ctx->cache_rtt, KR_NS_UPDATE);
-	// 		WITH_VERBOSE(qry) {
-	// 			char addr_str[INET6_ADDRSTRLEN];
-	// 			inet_ntop(addr->sa_family, kr_inaddr(addr), addr_str, sizeof(addr_str));
-	// 			VERBOSE_MSG(qry, "<= server: '%s' rtt: %"PRIu64" ms\n",
-	// 					addr_str, elapsed);
-	// 		}
-	// 	} else {
-	// 		/* Response didn't come from this IP, but we know the RTT must be at least
-	// 		 * several RETRY timer tries, e.g. if we have addresses [a, b, c] and we have
-	// 		 * tried [a, b] when the answer from 'a' came after 350ms, then we know
-	// 		 * that 'b' didn't respond for at least 350 - (1 * 300) ms. We can't say that
-	// 		 * its RTT is 50ms, but we can say that its score shouldn't be less than 50. */
-	// 		 kr_nsrep_update_rtt(&qry->ns, addr, elapsed, ctx->cache_rtt, KR_NS_MAX);
-	// 		 WITH_VERBOSE(qry) {
-	// 		 	char addr_str[INET6_ADDRSTRLEN];
-	// 		 	inet_ntop(addr->sa_family, kr_inaddr(addr), addr_str, sizeof(addr_str));
-	// 			VERBOSE_MSG(qry, "<= server: '%s' rtt: >= %"PRIu64" ms\n",
-	// 					addr_str, elapsed);
-	// 		 }
-	// 	}
-	// 	/* Subtract query start time from elapsed time */
-	// 	if (elapsed < KR_CONN_RETRY) {
-	// 		break;
-	// 	}
-	// 	elapsed = elapsed - KR_CONN_RETRY;
-	// }
-}
-
-static void update_nslist_score(struct kr_request *request, struct kr_query *qry, const struct sockaddr *src, knot_pkt_t *packet)
-{
-	struct kr_context *ctx = request->ctx;
-	/* On successful answer, update preference list RTT and penalise timer  */
-	if (!(request->state & KR_STATE_FAIL)) {
-		/* Update RTT information for preference list */
-		update_nslist_rtt(ctx, qry, src);
-		/* Do not complete NS address resolution on soft-fail. */
-		const int rcode = packet ? knot_wire_get_rcode(packet->wire) : 0;
-		if (rcode != KNOT_RCODE_SERVFAIL && rcode != KNOT_RCODE_REFUSED) {
-			qry->flags.AWAIT_IPV6 = false;
-			qry->flags.AWAIT_IPV4 = false;
-		} else { /* Penalize SERVFAILs. */
-			//NSREP: kr_nsrep_update_rtt(&qry->ns, src, KR_NS_PENALTY, ctx->cache_rtt, KR_NS_ADD);
-		}
-	}
-}
-
 static bool resolution_time_exceeded(struct kr_query *qry, uint64_t now)
 {
 	uint64_t resolving_time = now - qry->creation_time_mono;
@@ -806,7 +737,7 @@ static bool resolution_time_exceeded(struct kr_query *qry, uint64_t now)
 	return false;
 }
 
-int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, knot_pkt_t *packet)
+int kr_resolve_consume(struct kr_request *request, struct kr_transport **transport, knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
 
@@ -843,22 +774,12 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 		} else {
 			/* Fill in source and latency information. */
 			request->upstream.rtt = kr_now() - qry->timestamp_mono;
-			request->upstream.addr = src;
+			request->upstream.transport = *transport;
 			ITERATE_LAYERS(request, qry, consume, packet);
 			/* Clear temporary information */
-			request->upstream.addr = NULL;
+			request->upstream.transport = NULL;
 			request->upstream.rtt = 0;
 		}
-	}
-
-	/* Track RTT for iterative answers */
-	if (src && !(qry->flags.CACHED)) {
-		update_nslist_score(request, qry, src, packet);
-	}
-	/* Resolution failed, invalidate current NS. */
-	if (request->state & KR_STATE_FAIL) {
-		// NS_REP: invalidate_ns(rplan, qry);
-		qry->flags.RESOLVED = false;
 	}
 
 	/* Pop query if resolved. */
@@ -1230,25 +1151,8 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 	return trust_chain_check(request, qry);
 }
 
-/** Invalidate current NS/addr pair. */
-static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
-{
-	// if (qry->ns.addr[0].ip.sa_family != AF_UNSPEC) {
-	// 	const char *addr = kr_inaddr(&qry->ns.addr[0].ip);
-	// 	int addr_len = kr_inaddr_len(&qry->ns.addr[0].ip);
-	// 	int ret = kr_zonecut_del(&qry->zone_cut, qry->ns.name, addr, addr_len);
-	// 	/* Also remove it from the qry->ns.addr array.
-	// 	 * That's useful at least for STUB and FORWARD modes. */
-	// 	// NS_REP
-	// 	// memmove(qry->ns.addr, qry->ns.addr + 1,
-	// 	// 	sizeof(qry->ns.addr[0]) * (KR_NSREP_MAXADDR - 1));
-	// 	return ret;
-	// } else {
-		return kr_zonecut_del_all(&qry->zone_cut, qry->transport.name);
-	// }
-}
 
-int kr_ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
+int ns_resolve_addr(struct kr_query *qry, struct kr_request *param, struct kr_transport *transport)
 {
 	struct kr_rplan *rplan = &param->rplan;
 	struct kr_context *ctx = param->ctx;
@@ -1268,13 +1172,9 @@ int kr_ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 		   !(ctx->options.NO_IPV4)) {
 		next_type = KNOT_RRTYPE_A;
 		qry->flags.AWAIT_IPV4 = true;
-		/* Hmm, no useable IPv6 then. */
-		// NS_REP
-		// qry->ns.reputation |= KR_NS_NOIP6;
-		// kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
 	}
 	/* Bail out if the query is already pending or dependency loop. */
-	if (!next_type || kr_rplan_satisfies(qry->parent, qry->transport.name, KNOT_CLASS_IN, next_type)) {
+	if (!next_type || kr_rplan_satisfies(qry->parent, transport->name, KNOT_CLASS_IN, next_type)) {
 		/* Fall back to SBELT if root server query fails. */
 		if (!next_type && qry->zone_cut.name[0] == '\0') {
 			VERBOSE_MSG(qry, "=> fallback to root hints\n");
@@ -1284,14 +1184,12 @@ int kr_ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 		}
 		/* No IPv4 nor IPv6, flag server as unusable. */
 		VERBOSE_MSG(qry, "=> unresolvable NS address, bailing out\n");
-		// NS_REP: qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
-		// NS_REP: kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
-		invalidate_ns(rplan, qry);
+		kr_zonecut_del_all(&qry->zone_cut, transport->name);
 		return kr_error(EHOSTUNREACH);
 	}
 	/* Push new query to the resolution plan */
 	struct kr_query *next =
-		kr_rplan_push(rplan, qry, qry->transport.name, KNOT_CLASS_IN, next_type);
+		kr_rplan_push(rplan, qry, transport->name, KNOT_CLASS_IN, next_type);
 	if (!next) {
 		return kr_error(ENOMEM);
 	}
@@ -1313,7 +1211,7 @@ int kr_ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 	return ret;
 }
 
-int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *type, knot_pkt_t *packet)
+int kr_resolve_produce(struct kr_request *request, struct kr_transport **transport, knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
 
@@ -1321,9 +1219,15 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	if (kr_rplan_empty(rplan)) {
 		return KR_STATE_FAIL;
 	}
-	/* If we have deferred answers, resume them. */
+
 	struct kr_query *qry = array_tail(rplan->pending);
-	kr_server_selection_init(qry);
+
+	/* Initialize server selection */
+	if (!qry->server_selection.local_state) {
+		kr_server_selection_init(qry);
+	}
+
+	/* If we have deferred answers, resume them. */
 	if (qry->deferred != NULL) {
 		/* @todo: Refactoring validator, check trust chain before resuming. */
 		int state = 0;
@@ -1404,18 +1308,7 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 
 	const struct kr_qflags qflg = qry->flags;
 	const bool retry = qflg.TCP || qflg.BADCOOKIE_AGAIN;
-	if (qflg.AWAIT_IPV4 || qflg.AWAIT_IPV6) {
-		// NS_REP kr_nsrep_elect_addr(qry, request->ctx);
-	} else if (qflg.FORWARD || qflg.STUB) {
-		// NS_REP
-		// kr_nsrep_sort(&qry->ns, request->ctx);
-		// if (qry->ns.score > KR_NS_MAX_SCORE) {
-		// 	/* At the moment all NS have bad reputation.
-		// 	 * But there can be existing connections*/
-		// 	VERBOSE_MSG(qry, "=> no valid NS left\n");
-		// 	return KR_STATE_FAIL;
-		// }
-	} else if (!qry->transport.name || !retry) { /* Keep NS when requerying/stub/badcookie. */
+	if (!qflg.FORWARD && !qflg.STUB && !retry) { /* Keep NS when requerying/stub/badcookie. */
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
 		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
 			kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);
@@ -1423,10 +1316,10 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 		}
 	}
 
-	qry->server_selection.choose_transport(qry);
+	qry->server_selection.choose_transport(qry, transport);
 
-	if (qry->transport.protocol == KR_TRANSPORT_NOADDR) {
-		kr_ns_resolve_addr(qry, qry->request);
+	if ((*transport)->protocol == KR_TRANSPORT_NOADDR) {
+		ns_resolve_addr(qry, qry->request, *transport);
 		return KR_STATE_YIELD;
 	}
 
@@ -1441,8 +1334,6 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 	 * kr_resolve_checkout().
 	 */
 	qry->timestamp_mono = kr_now();
-	*dst = &qry->transport.address.ip;
-	*type = (qry->flags.TCP) ? SOCK_STREAM : SOCK_DGRAM;
 	return request->state;
 }
 

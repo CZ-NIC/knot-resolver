@@ -4,23 +4,29 @@
 
 #pragma once
 
-#include <netinet/in.h>
 #include "lib/utils.h"
-
-#define DEFAULT_LOCAL_STATE_SIZE 10
 
 enum kr_selection_error {
     KR_SELECTION_TIMEOUT,
+    KR_SELECTION_TLS_HANDSHAKE_FAILED,
+    KR_SELECTION_TCP_CONNECT_FAILED,
+    KR_SELECTION_TCP_CONNECT_TIMEOUT,
+
     KR_SELECTION_REFUSED,
-    KR_SELECTION_DNSSEC_ERROR,
+    KR_SELECTION_SERVFAIL,
     KR_SELECTION_FORMERROR,
+    KR_SELECTION_NOTIMPL,
+    KR_SELECTION_OTHER_RCODE,
+
+    KR_SELECTION_DNSSEC_ERROR,
+
 };
 
 enum kr_transport_protocol {
+    KR_TRANSPORT_NOADDR = 0,
     KR_TRANSPORT_UDP,
     KR_TRANSPORT_TCP,
     KR_TRANSPORT_TLS,
-    KR_TRANSPORT_NOADDR,
 };
 
 struct kr_transport {
@@ -32,10 +38,10 @@ struct kr_transport {
 
 struct kr_server_selection
 {
-    void (*choose_transport)(struct kr_query *qry);
-    void (*success)(struct kr_query *qry, struct kr_transport transport);
-    void (*update_rtt)(struct kr_query *qry, struct kr_transport transport, unsigned rtt);
-    void (*error)(struct kr_query *qry, struct kr_transport transport, enum kr_selection_error error);
+    void (*choose_transport)(struct kr_query *qry, struct kr_transport **transport);
+    void (*success)(struct kr_query *qry, const struct kr_transport *transport);
+    void (*update_rtt)(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt);
+    void (*error)(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error error);
 
     void *local_state;
 };

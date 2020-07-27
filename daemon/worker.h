@@ -93,6 +93,10 @@ int worker_del_tcp_connected(struct worker_ctx *worker,
 			     const struct sockaddr *addr);
 int worker_del_tcp_waiting(struct worker_ctx *worker,
 			   const struct sockaddr* addr);
+struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
+					       const struct sockaddr* addr);
+struct session* worker_find_tcp_connected(struct worker_ctx *worker,
+					       const struct sockaddr* addr);
 knot_pkt_t *worker_task_get_pktbuf(const struct qr_task *task);
 
 struct request_ctx *worker_task_get_request(struct qr_task *task);
@@ -128,7 +132,7 @@ struct worker_stats {
 /** @cond internal */
 
 /** Number of request within timeout window. */
-#define MAX_PENDING 4 //NS_REP KR_NSREP_MAXADDR
+#define MAX_PENDING 4
 
 /** Maximum response time from TCP upstream, milliseconds */
 #define MAX_TCP_INACTIVITY (KR_RESOLVE_TIME_LIMIT + KR_CONN_RTT_MAX)

@@ -200,7 +200,7 @@ struct kr_request {
 	} qsource;
 	struct {
 		unsigned rtt;                  /**< Current upstream RTT */
-		const struct sockaddr *addr;   /**< Current upstream address */
+		const struct kr_transport *transport;   /**< Current upstream transport */
 	} upstream;                        /**< Upstream information, valid only in consume() phase */
 	struct kr_qflags options;
 	int state;
@@ -259,7 +259,7 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
  * @return         any state
  */
 KR_EXPORT
-int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, knot_pkt_t *packet);
+int kr_resolve_consume(struct kr_request *request, struct kr_transport **transport, knot_pkt_t *packet);
 
 /**
  * Produce either next additional query or finish.
@@ -275,7 +275,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
  * @return         any state
  */
 KR_EXPORT
-int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *type, knot_pkt_t *packet);
+int kr_resolve_produce(struct kr_request *request, struct kr_transport **transport, knot_pkt_t *packet);
 
 /**
  * Finalises the outbound query packet with the knowledge of the IP addresses.
@@ -305,9 +305,6 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
  */
 KR_EXPORT
 int kr_resolve_finish(struct kr_request *request, int state);
-
-KR_EXPORT
-int kr_ns_resolve_addr(struct kr_query *qry, struct kr_request *param);
 
 /**
  * Return resolution plan.

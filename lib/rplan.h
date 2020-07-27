@@ -8,9 +8,9 @@
 #include <libknot/dname.h>
 #include <libknot/codes.h>
 
+#include "lib/nsrep.h"
 #include "lib/cache/api.h"
 #include "lib/zonecut.h"
-#include "lib/nsrep.h"
 
 /** Query flags */
 struct kr_qflags {
@@ -102,7 +102,6 @@ struct kr_query {
 	struct kr_request *request; /**< Parent resolution request. */
 	kr_stale_cb stale_cb; /**< See the type */
 	struct kr_server_selection server_selection;
-	struct kr_transport transport;
 };
 
 /** @cond internal Array of queries. */

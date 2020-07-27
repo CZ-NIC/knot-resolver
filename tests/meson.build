@@ -8,7 +8,7 @@ if get_option('unit_tests') != 'disabled'
   cmocka = dependency('cmocka', required: get_option('unit_tests') == 'enabled')
   if cmocka.found()
     build_unit_tests = true
-    subdir('unit')
+    # subdir('unit')
   endif
   message('-------------------------------')
 endif
