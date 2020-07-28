@@ -12,17 +12,17 @@
 #include "kr_cache_gc.h"
 
 #ifdef ENABLE_SYSREPO
-
 #include <poll.h>
 #include <string.h>
-
 #include <sysrepo.h>
 #include <libyang/libyang.h>
 
 #include "modules/sysrepo/common/sysrepo_conf.h"
 #include "modules/sysrepo/common/string_helper.h"
 
+#define XPATH_CACHE_STORAGE   XPATH_BASE"/cache/"YM_KRES":storage"
 #endif
+
 
 volatile static int killed = 0;
 
@@ -76,19 +76,20 @@ static long get_nonneg_optarg()
 #ifdef ENABLE_SYSREPO
 
 static int get_gc_version_cb(sr_session_ctx_t *session, const char *module_name, const char *xpath,
-const char *request_xpath, uint32_t request_id, struct lyd_node **parent, void *private_data)
+                             const char *request_xpath, uint32_t request_id, struct lyd_node **parent,
+                             void *private_data)
 {
 	const char *gc_version_xpath = XPATH_GC"/version";
 
 	if (!strcmp(module_name, YM_COMMON) && !strcmp(xpath, gc_version_xpath))
 	{
-		lyd_new_path(*parent, NULL, gc_version_xpath, PACKAGE_VERSION, 0, 0);
+		lyd_new_path(*parent, NULL, gc_version_xpath, PACKAGE_VERSION, LYD_ANYDATA_CONSTSTRING, 0);
 	}
 	return SR_ERR_OK;
 }
 
 static int cache_storage_change_cb(sr_session_ctx_t *session, const char *module_name, const char *xpath,
-sr_event_t event, uint32_t request_id, void *private_data)
+                                   sr_event_t event, uint32_t request_id, void *private_data)
 {
 	if(event == SR_EV_CHANGE)
 	{
@@ -102,7 +103,7 @@ sr_event_t event, uint32_t request_id, void *private_data)
 		sr_val_t *new_value = NULL;
 		sr_change_iter_t *it = NULL;
 
-		sr_err = sr_get_changes_iter(session, XPATH_BASE"/cache/"YM_KRES":storage" , &it);
+		sr_err = sr_get_changes_iter(session, XPATH_CACHE_STORAGE , &it);
 		if (sr_err != SR_ERR_OK) goto cleanup;
 
 		while ((sr_get_change_next(session, it, &oper, &old_value, &new_value)) == SR_ERR_OK) {
@@ -127,11 +128,11 @@ sr_event_t event, uint32_t request_id, void *private_data)
 }
 
 static int cache_gc_change_cb(sr_session_ctx_t *session, const char *module_name, const char *xpath,
-sr_event_t event, uint32_t request_id, void *private_data)
+                              sr_event_t event, uint32_t request_id, void *private_data)
 {
 	if(event == SR_EV_CHANGE)
 	{
-		/* validation actions*/
+		/* validation actions */
 	}
 	else if (event == SR_EV_DONE)
 	{
@@ -248,37 +249,41 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	int exit_code = 0;
+	int ret, exit_code = 0;
 	kr_cache_gc_state_t *gc_state = NULL;
 
 	#ifdef ENABLE_SYSREPO
+
 	int fd;
-	int rv = SR_ERR_OK;
 	struct pollfd fds[1];
 	sr_conn_ctx_t *sr_connection = NULL;
 	sr_session_ctx_t *sr_session = NULL;
 	sr_subscription_ctx_t *sr_subscription = NULL;
 
-	rv = sr_connect(0, &sr_connection);
-	if (rv != SR_ERR_OK) goto sr_error;
+	/* Connection and session creation. */
+	ret = sr_connect(0, &sr_connection);
+	if (ret) goto sr_error;
 
-	rv = sr_session_start(sr_connection, SR_DS_RUNNING, &sr_session);
-	if (rv != SR_ERR_OK) goto sr_error;
+	ret = sr_session_start(sr_connection, SR_DS_RUNNING, &sr_session);
+	if (ret) goto sr_error;
 
-	/* config data subscriptions*/
-	rv = sr_module_change_subscribe(sr_session, YM_COMMON, XPATH_GC, cache_gc_change_cb, NULL, 0, SR_SUBSCR_NO_THREAD|SR_SUBSCR_ENABLED, &sr_subscription);
-	if (rv != SR_ERR_OK) goto sr_error;
+	/* Configuration data subscriptions. */
+	ret = sr_module_change_subscribe(sr_session, YM_COMMON, XPATH_GC, cache_gc_change_cb, NULL, 0,
+	                                 SR_SUBSCR_NO_THREAD|SR_SUBSCR_ENABLED, &sr_subscription);
+	if (ret) goto sr_error;
 
-	rv = sr_module_change_subscribe(sr_session, YM_COMMON, XPATH_BASE"/cache/"YM_KRES":storage", cache_storage_change_cb, NULL, 0, SR_SUBSCR_NO_THREAD|SR_SUBSCR_ENABLED|SR_SUBSCR_CTX_REUSE, &sr_subscription);
-	if (rv != SR_ERR_OK) goto sr_error;
+	ret = sr_module_change_subscribe(sr_session, YM_COMMON, XPATH_CACHE_STORAGE, cache_storage_change_cb, NULL, 0,
+	                                 SR_SUBSCR_NO_THREAD|SR_SUBSCR_ENABLED|SR_SUBSCR_CTX_REUSE, &sr_subscription);
+	if (ret) goto sr_error;
 
-	/* state data subscriptions*/
-	rv = sr_oper_get_items_subscribe(sr_session, YM_COMMON, XPATH_GC"/version", get_gc_version_cb, NULL, SR_SUBSCR_NO_THREAD|SR_SUBSCR_CTX_REUSE, &sr_subscription);
-	if (rv != SR_ERR_OK) goto sr_error;
+	/* Operational data subscription. */
+	ret = sr_oper_get_items_subscribe(sr_session, YM_COMMON, XPATH_GC"/version", get_gc_version_cb,
+	                                  NULL, SR_SUBSCR_NO_THREAD|SR_SUBSCR_CTX_REUSE, &sr_subscription);
+	if (ret) goto sr_error;
 
-	/* get file descriptor */
-	rv = sr_get_event_pipe(sr_subscription, &fd);
-	if (rv != SR_ERR_OK) goto sr_error;
+	/* Get file descriptor for sysrepo subscriptions. */
+	ret = sr_get_event_pipe(sr_subscription, &fd);
+	if (ret) goto sr_error;
 
 	fds[0].fd = fd;
 	fds[0].events = POLLIN;
@@ -286,7 +291,7 @@ int main(int argc, char *argv[])
 	#endif
 
 	do {
-		int ret = kr_cache_gc(&cfg, &gc_state);
+		ret = kr_cache_gc(&cfg, &gc_state);
 		// ENOENT: kresd may not be started yet or cleared the cache now
 		if (ret && ret != -ENOENT) {
 			printf("Error (%s)\n", knot_strerror(ret));
@@ -304,9 +309,9 @@ int main(int argc, char *argv[])
 			if(poll_res > 0)
 				sr_process_events(sr_subscription, sr_session, NULL);
 			else if (poll_res < 0){
-				rv = errno;
-				if (rv && rv != EINTR)
-					printf("Error (%s)\n", strerror(rv));
+				ret = errno;
+				if (ret && ret != EINTR)
+					printf("Error (%s)\n", strerror(ret));
 				goto cleanup;
 			}
 		#else
@@ -317,14 +322,12 @@ int main(int argc, char *argv[])
 
 	#ifdef ENABLE_SYSREPO
 		sr_error:
-		if (rv != SR_ERR_OK) {
-			exit_code = rv;
-			printf("Error (%s)\n", sr_strerror(rv));
+		if (ret != 0) {
+			printf("Error (%s)\n", sr_strerror(ret));
+			exit_code = 10;
 		}
-
 		cleanup:
 		sr_disconnect(sr_connection);
-
 	#endif
 
 	kr_cache_gc_free_state(&gc_state);
