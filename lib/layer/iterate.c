@@ -251,13 +251,16 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 	struct kr_zonecut *cut = &qry->zone_cut;
 	int state = KR_STATE_CONSUME;
 
-	/* New authority MUST be at/below the authority of the current cut;
-	 * also qname must be below new authority;
-	 * otherwise it's a possible cache injection attempt. */
+	/* New authority MUST be at or below the authority of the current (previous) cut;
+	 * and not "below" the SNAME+STYPE.  (It might be a cache injection attempt.) */
 	const bool ok = knot_dname_in_bailiwick(rr->owner, current_cut) >= 0
-		     && knot_dname_in_bailiwick(qry->sname, rr->owner)  >= 0;
+			&& knot_dname_in_bailiwick(qry->sname, rr->owner)
+				>= (qry->stype == KNOT_RRTYPE_DS ? 1 : 0);
 	if (!ok) {
-		VERBOSE_MSG("<= authority: ns outside bailiwick\n");
+		WITH_VERBOSE (qry) {
+			KR_DNAME_GET_STR(cut_str, rr->owner);
+			VERBOSE_MSG("<= referral to 'NS %s' does not make sense\n", cut_str);
+		}
 #ifdef STRICT_MODE
 		return KR_STATE_FAIL;
 #else
