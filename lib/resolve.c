@@ -1318,9 +1318,20 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 
 	qry->server_selection.choose_transport(qry, transport);
 
+	if (*transport == NULL) {
+		// There is no point in continuing.
+		return KR_STATE_FAIL;
+	}
+
 	if ((*transport)->protocol == KR_TRANSPORT_NOADDR) {
-		ns_resolve_addr(qry, qry->request, *transport);
-		return KR_STATE_YIELD;
+		int ret = ns_resolve_addr(qry, qry->request, *transport);
+		if (ret) {
+			qry->flags.AWAIT_IPV4 = false;
+			qry->flags.AWAIT_IPV6 = false;
+		}
+		printf("ns_resolve_addr ret: %d\n", ret);
+		ITERATE_LAYERS(request, qry, reset);
+		return KR_STATE_PRODUCE;
 	}
 
 	/* Randomize query case (if not in safe mode or turned off) */
@@ -1370,7 +1381,7 @@ static bool outbound_request_update_cookies(struct kr_request *req,
 #endif /* defined(ENABLE_COOKIES) */
 
 int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
-                        struct sockaddr *dst, int type, knot_pkt_t *packet)
+                        struct kr_transport *transport, knot_pkt_t *packet)
 {
 	/* @todo: Update documentation if this function becomes approved. */
 
@@ -1394,7 +1405,7 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 		 * actual cookie. If we don't know the server address then we
 		 * also don't know the actual cookie size.
 		 */
-		if (!outbound_request_update_cookies(request, src, dst)) {
+		if (!outbound_request_update_cookies(request, src, &transport->address.ip)) {
 			return kr_error(EINVAL);
 		}
 	}
@@ -1411,8 +1422,20 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 	/* Run the checkout layers and cancel on failure.
 	 * The checkout layer doesn't persist the state, so canceled subrequests
 	 * don't affect the resolution or rest of the processing. */
+	int type = -1;
+	switch(transport->protocol) {
+	case KR_TRANSPORT_UDP:
+		type = SOCK_DGRAM;
+		break;
+	case KR_TRANSPORT_TCP:
+	case KR_TRANSPORT_TLS:
+		type = SOCK_PACKET;
+		break;
+	default:
+		assert(0);
+	}
 	int state = request->state;
-	ITERATE_LAYERS(request, qry, checkout, packet, dst, type);
+	ITERATE_LAYERS(request, qry, checkout, packet, &transport->address.ip, type);
 	if (request->state & KR_STATE_FAIL) {
 		request->state = state; /* Restore */
 		return kr_error(ECANCELED);
@@ -1432,29 +1455,20 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 		}
 	}
 
-	// WITH_VERBOSE(qry) {
+	WITH_VERBOSE(qry) {
 
-	// KR_DNAME_GET_STR(qname_str, knot_pkt_qname(packet));
-	// KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
-	// KR_RRTYPE_GET_STR(type_str, knot_pkt_qtype(packet));
+	KR_DNAME_GET_STR(qname_str, knot_pkt_qname(packet));
+	KR_DNAME_GET_STR(ns_name, transport->name);
+	KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
+	KR_RRTYPE_GET_STR(type_str, knot_pkt_qtype(packet));
+	const char *ns_str = kr_straddr(&transport->address.ip);
 
-	// for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
-	// 	struct sockaddr *addr = &qry->ns.addr[i].ip;
-	// 	if (addr->sa_family == AF_UNSPEC) {
-	// 		break;
-	// 	}
-	// 	if (!kr_inaddr_equal(dst, addr)) {
-	// 		continue;
-	// 	}
-	// 	const char *ns_str = kr_straddr(addr);
-	// 	VERBOSE_MSG(qry,
-	// 		"=> id: '%05u' querying: '%s' score: %u zone cut: '%s' "
-	// 		"qname: '%s' qtype: '%s' proto: '%s'\n",
-	// 		qry->id, ns_str ? ns_str : "", qry->ns.score, zonecut_str,
-	// 		qname_str, type_str, (qry->flags.TCP) ? "tcp" : "udp");
-
-	// 	break;
-	// }}
+	VERBOSE_MSG(qry,
+			"=> id: '%05u' querying: '%s'@'%s' zone cut: '%s' "
+			"qname: '%s' qtype: '%s' proto: '%s'\n",
+			qry->id, ns_name, ns_str ? ns_str : "", zonecut_str,
+			qname_str, type_str, (qry->flags.TCP) ? "tcp" : "udp");
+	}
 
 	return kr_ok();
 }

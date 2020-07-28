@@ -994,7 +994,7 @@ static uv_handle_t *transmit(struct qr_task *task)
 		}
 		/* Checkout answer before sending it */
 		struct request_ctx *ctx = task->ctx;
-		if (kr_resolve_checkout(&ctx->req, NULL, (struct sockaddr *)choice, SOCK_DGRAM, task->pktbuf) != 0) {
+		if (kr_resolve_checkout(&ctx->req, NULL, transport, task->pktbuf) != 0) {
 			return ret;
 		}
 		ret = ioreq_spawn(ctx->worker, SOCK_DGRAM, choice->sin6_family, false);
@@ -1359,8 +1359,7 @@ static int tcp_task_step(struct qr_task *task,
 	}
 	/* Checkout task before connecting */
 	struct request_ctx *ctx = task->ctx;
-	if (kr_resolve_checkout(&ctx->req, NULL, (struct sockaddr *)addr,
-				SOCK_STREAM, task->pktbuf) != 0) {
+	if (kr_resolve_checkout(&ctx->req, NULL, task->transport, task->pktbuf) != 0) {
 		subreq_finalize(task, packet_source, packet);
 		return qr_task_finalize(task, KR_STATE_FAIL);
 	}
@@ -1726,12 +1725,9 @@ int worker_end_tcp(struct session *session)
 	return kr_ok();
 }
 
-knot_pkt_t * worker_resolve_mk_pkt(const char *qname_str, uint16_t qtype, uint16_t qclass,
+knot_pkt_t *worker_resolve_mk_pkt_dname(knot_dname_t qname, uint16_t qtype, uint16_t qclass,
 				   const struct kr_qflags *options)
 {
-	uint8_t qname[KNOT_DNAME_MAXLEN];
-	if (!knot_dname_from_str(qname, qname_str, sizeof(qname)))
-		return NULL;
 	knot_pkt_t *pkt = knot_pkt_new(NULL, KNOT_EDNS_MAX_UDP_PAYLOAD, NULL);
 	if (!pkt)
 		return NULL;
@@ -1764,6 +1760,15 @@ knot_pkt_t * worker_resolve_mk_pkt(const char *qname_str, uint16_t qtype, uint16
 	}
 
 	return pkt;
+}
+
+knot_pkt_t *worker_resolve_mk_pkt(const char *qname_str, uint16_t qtype, uint16_t qclass,
+				   const struct kr_qflags *options)
+{
+	uint8_t qname[KNOT_DNAME_MAXLEN];
+	if (!knot_dname_from_str(qname, qname_str, sizeof(qname)))
+		return NULL;
+	return worker_resolve_mk_pkt_dname(qname, qtype, qclass, options);
 }
 
 struct qr_task *worker_resolve_start(knot_pkt_t *query, struct kr_qflags options)

@@ -291,7 +291,7 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
  */
 KR_EXPORT
 int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
-                        struct sockaddr *dst, int type, knot_pkt_t *packet);
+                        struct kr_transport *transport, knot_pkt_t *packet);
 
 /**
  * Finish resolution and commit results if the state is DONE.

@@ -90,6 +90,14 @@ struct choice {
     struct iter_address_state *address_state;
 };
 
+void async_ns_resolution(knot_dname_t *name, enum knot_rr_type type) {
+    struct kr_qflags flags;
+    memset(&flags, 0, sizeof(struct kr_qflags));
+    knot_pkt_t* pkt = worker_resolve_mk_pkt_dname(name, type, KNOT_CLASS_IN, &flags);
+    worker_resolve_start(pkt, flags);
+    free(pkt);
+}
+
 void iter_update_state_from_rtt_cache(struct iter_local_state *local_state, struct kr_cache *cache) {
     trie_it_t *it;
     for(it = trie_it_begin(local_state->addresses); !trie_it_finished(it); trie_it_next(it)) {

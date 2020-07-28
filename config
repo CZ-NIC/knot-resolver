@@ -1,6 +1,5 @@
 modules.unload('ta_update')
 modules.unload('ta_signal_query')
-modules.unload('priming')
 modules.unload('detect_time_skew')
 modules.unload('detect_time_jump')
 modules.unload('ta_sentinel')
