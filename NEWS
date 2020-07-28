@@ -5,6 +5,7 @@ Improvements
 ------------
 - capabilities are no longer constrained when running as root (!1012)
 - cache: add percentage usage to cache.stats() (!1025)
+- iterator: refuse more non-sensical referrals (!1031)
 
 Bugfixes
 --------
