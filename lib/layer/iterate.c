@@ -251,9 +251,9 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 	struct kr_zonecut *cut = &qry->zone_cut;
 	int state = KR_STATE_CONSUME;
 
-	/* New authority MUST be at or below the authority of the current (previous) cut;
+	/* New authority MUST be strictly below the authority of the current (previous) cut;
 	 * and not "below" the SNAME+STYPE.  (It might be a cache injection attempt.) */
-	const bool ok = knot_dname_in_bailiwick(rr->owner, current_cut) >= 0
+	const bool ok = knot_dname_in_bailiwick(rr->owner, current_cut) > 0
 			&& knot_dname_in_bailiwick(qry->sname, rr->owner)
 				>= (qry->stype == KNOT_RRTYPE_DS ? 1 : 0);
 	if (!ok) {
@@ -393,6 +393,9 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	int result = KR_STATE_CONSUME;
 	if (qry->flags.FORWARD) {
 		return result;
+	}
+	if (knot_wire_get_rcode(pkt->wire) != KNOT_RCODE_NOERROR) {
+		return result; // can't be a referral
 	}
 
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
