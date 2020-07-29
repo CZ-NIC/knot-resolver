@@ -242,8 +242,9 @@ int entry_h_splice(
 			WITH_VERBOSE(qry) {
 				auto_free char *type_str = kr_rrtype_text(type),
 					*owner_str = kr_dname_text(owner);
-				VERBOSE_MSG(qry, "=> not overwriting %s %s\n",
-						type_str, owner_str);
+				VERBOSE_MSG(qry, "=> not overwriting %s %s, "
+						"it is not expiring yet\n",
+						owner_str, type_str);
 			}
 			return kr_error(EEXIST);
 		}
