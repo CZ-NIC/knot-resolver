@@ -251,9 +251,11 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 	struct kr_zonecut *cut = &qry->zone_cut;
 	int state = KR_STATE_CONSUME;
 
-	/* New authority MUST be strictly below the authority of the current (previous) cut;
-	 * and not "below" the SNAME+STYPE.  (It might be a cache injection attempt.) */
-	const bool ok = knot_dname_in_bailiwick(rr->owner, current_cut) > 0
+	/* New authority MUST be at or below the authority of the current (previous) cut;
+	 * and not "below" the SNAME+STYPE.  (It might be a cache injection attempt.)
+	 * Some broken servers send a NODATA that looks like a referral to self (in here),
+	 * so we don't want to fail on that. */
+	const bool ok = knot_dname_in_bailiwick(rr->owner, current_cut) >= 0
 			&& knot_dname_in_bailiwick(qry->sname, rr->owner)
 				>= (qry->stype == KNOT_RRTYPE_DS ? 1 : 0);
 	if (!ok) {
