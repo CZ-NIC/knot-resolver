@@ -18,7 +18,6 @@
 #include <libyang/libyang.h>
 
 #include "modules/sysrepo/common/sysrepo_conf.h"
-#include "modules/sysrepo/common/string_helper.h"
 
 #define XPATH_CACHE_STORAGE   XPATH_BASE"/cache/"YM_KRES":storage"
 #endif
@@ -147,26 +146,24 @@ static int cache_gc_change_cb(sr_session_ctx_t *session, const char *module_name
 
 		while ((sr_get_change_next(session, it, &oper, &old_value, &new_value)) == SR_ERR_OK) {
 
-			const char *leaf = remove_substr(new_value->xpath, XPATH_GC"/");
-
-			if (!strcmp(leaf, "interval"))
+			if (!strcmp(new_value->xpath, XPATH_GC"/interval"))
 				cfg.gc_interval = new_value->data.uint64_val*1000;
-			else if (!strcmp(leaf, "threshold"))
+			else if (!strcmp(new_value->xpath, XPATH_GC"/threshold"))
 				cfg.cache_max_usage = new_value->data.uint8_val;
-			else if (!strcmp(leaf, "release-percentage"))
+			else if (!strcmp(new_value->xpath, XPATH_GC"/release-percentage"))
 				cfg.cache_to_be_freed = new_value->data.uint8_val;
-			else if (!strcmp(leaf, "temporary-keys-space"))
+			else if (!strcmp(new_value->xpath, XPATH_GC"/temporary-keys-space"))
 				cfg.temp_keys_space = new_value->data.uint64_val*1048576;
-			else if (!strcmp(leaf, "rw-items"))
+			else if (!strcmp(new_value->xpath, XPATH_GC"/rw-items"))
 				cfg.rw_txn_items = new_value->data.uint64_val;
-			else if (!strcmp(leaf, "rw-duration"))
+			else if (!strcmp(new_value->xpath, XPATH_GC"/rw-duration"))
 				cfg.rw_txn_duration = new_value->data.uint64_val;
-			else if (!strcmp(leaf, "rw-delay"))
+			else if (!strcmp(new_value->xpath, XPATH_GC"/rw-delay"))
 				cfg.rw_txn_delay = new_value->data.uint64_val;
-			else if (!strcmp(leaf, "dry-run"))
+			else if (!strcmp(new_value->xpath, XPATH_GC"/dry-run"))
 				cfg.dry_run = new_value->data.bool_val;
 			else
-				printf("Uknown configuration option: %s\n", leaf);
+				printf("Uknown configuration node, XPath: %s\n", new_value->xpath);
 
 			sr_free_val(old_value);
 			sr_free_val(new_value);
