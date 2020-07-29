@@ -29,8 +29,8 @@ RUN pip3 install pytest-xdist
 # tests/pytest dependencies
 RUN pip3 install dnspython jinja2 pytest pytest-html pytest-xdist
 
-# Wireshark/dumpcap for Deckard
-RUN apt-get install -y -qqq wireshark-common
+# packet capture tools for Deckard
+RUN apt-get install --no-install-suggests --no-install-recommends -y -qqq tcpdump wireshark-common
 
 # Faketime for Deckard
 RUN apt-get install -y -qqq faketime
