@@ -1015,6 +1015,7 @@ char *kr_pkt_text(const knot_pkt_t *pkt)
 	const knot_lookup_t *opcode = knot_lookup_by_id(knot_opcode_names, pkt_opcode);
 	uint16_t qry_id = knot_wire_get_id(pkt->wire);
 	uint16_t qdcount = knot_wire_get_qdcount(pkt->wire);
+	int opt_count = 0;
 
 	if (rcode != NULL) {
 		rcode_str = rcode->name;
@@ -1056,21 +1057,29 @@ char *kr_pkt_text(const knot_pkt_t *pkt)
 
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
-		if (sec->count == 0 || knot_pkt_rr(sec, 0)->type == KNOT_RRTYPE_OPT) {
-			/* OPT RRs are _supposed_ to be the last ^^, if they appear */
+		if (sec->count == 0)
 			continue;
-		}
 
 		ptr = mp_printf_append(mp, ptr, "\n%s\n", snames[i - KNOT_ANSWER]);
 		for (unsigned k = 0; k < sec->count; ++k) {
 			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
 			if (rr->type == KNOT_RRTYPE_OPT) {
+				if (i != KNOT_ADDITIONAL || k + 1 != sec->count) {
+					ptr = mp_printf_append(mp, ptr,
+						";; Warning: unexpected OPT RR here (%s)\n",
+						rr == pkt->opt_rr ? "effective" : "ignored");
+					ptr = print_section_opt(mp, ptr, rr, knot_wire_get_rcode(pkt->wire));
+				}
+				opt_count += 1;
 				continue;
 			}
 			auto_free char *rr_text = kr_rrset_text(rr);
 			ptr = mp_printf_append(mp, ptr, "%s", rr_text);
 		}
 	}
+	if (opt_count > 1)
+		ptr = mp_printf_append(mp, ptr,
+			";; Warning: %d OPT RRs found, some were ignored\n", opt_count);
 
 	/* Close growing buffer and duplicate result before deleting */
 	char *result = strdup(ptr);
