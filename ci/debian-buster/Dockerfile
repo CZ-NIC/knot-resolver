@@ -26,8 +26,8 @@ RUN pip3 install --upgrade pip
 RUN pip3 install pylint
 RUN pip3 install pep8
 RUN pip3 install pytest-xdist
-# tests/pytest dependencies
-RUN pip3 install dnspython jinja2 pytest pytest-html pytest-xdist
+# tests/pytest dependencies: skip over broken versions
+RUN pip3 install 'dnspython != 2.0.0' jinja2 'pytest != 6.0.0' pytest-html pytest-xdist
 
 # packet capture tools for Deckard
 RUN apt-get install --no-install-suggests --no-install-recommends -y -qqq tcpdump wireshark-common
