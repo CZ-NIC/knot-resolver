@@ -145,6 +145,7 @@ genResType "struct kr_query"
 genResType "struct kr_context" | sed '/kr_nsrep_rtt_lru_t/,$ d'
 printf "\tchar _stub[];\n};\n"
 
+
 ## libknot API
 ${CDEFS} libknot functions <<-EOF
 # Utils
@@ -277,6 +278,14 @@ ${CDEFS} ${KRESD} functions <<-EOF
 	worker_resolve_mk_pkt
 	worker_resolve_start
 EOF
+
+echo "struct engine" | ${CDEFS} ${KRESD} types | sed '/struct network/,$ d'
+printf "\tchar _stub[];\n};\n"
+
+echo "struct worker_ctx" | ${CDEFS} ${KRESD} types | sed '/uv_loop_t/,$ d'
+printf "\tchar _stub[];\n};\n"
+
+echo "struct worker_ctx *the_worker;"
 
 
 ## libzscanner API for ./zonefile.lua
