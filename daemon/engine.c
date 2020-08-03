@@ -21,6 +21,7 @@
 #include "kresconfig.h"
 #include "daemon/engine.h"
 #include "daemon/ffimodule.h"
+#include "daemon/worker.h"
 #include "lib/nsrep.h"
 #include "lib/cache/api.h"
 #include "lib/defines.h"
@@ -498,8 +499,6 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "fromjson");
 	lua_pushcfunction(engine->L, l_map);
 	lua_setglobal(engine->L, "map");
-	lua_pushlightuserdata(engine->L, engine);
-	lua_setglobal(engine->L, "__engine");
 	/* Random number generator */
 	lua_getfield(engine->L, LUA_GLOBALSINDEX, "math");
 	lua_getfield(engine->L, -1, "randomseed");
@@ -860,9 +859,5 @@ int engine_unregister(struct engine *engine, const char *name)
 
 struct engine *engine_luaget(lua_State *L)
 {
-	lua_getglobal(L, "__engine");
-	struct engine *engine = lua_touserdata(L, -1);
-	if (!engine) luaL_error(L, "internal error, empty engine pointer");
-	lua_pop(L, 1);
-	return engine;
+	return the_worker->engine;
 }
