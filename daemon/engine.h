@@ -52,7 +52,7 @@ void engine_stop(struct engine *engine);
 int engine_register(struct engine *engine, const char *name, const char *precedence, const char* ref);
 int engine_unregister(struct engine *engine, const char *name);
 
-/** Return engine light userdata. */
+/** Return engine light userdata; TODO: remove this function? */
 struct engine *engine_luaget(struct lua_State *L);
 
 /** Set/get the per engine hostname */
