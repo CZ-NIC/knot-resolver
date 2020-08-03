@@ -1056,8 +1056,7 @@ char *kr_pkt_text(const knot_pkt_t *pkt)
 
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
-		if (sec->count == 0 || knot_pkt_rr(sec, 0)->type == KNOT_RRTYPE_OPT) {
-			/* OPT RRs are _supposed_ to be the last ^^, if they appear */
+		if (sec->count == 0) {
 			continue;
 		}
 
