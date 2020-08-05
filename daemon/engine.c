@@ -136,7 +136,7 @@ static int l_setuser(lua_State *L)
 /** Quit current executable. */
 static int l_quit(lua_State *L)
 {
-	engine_stop(engine_luaget(L));
+	engine_stop(the_worker->engine);
 	return 0;
 }
 
@@ -185,7 +185,7 @@ int engine_set_hostname(struct engine *engine, const char *hostname) {
 /** Return hostname. */
 static int l_hostname(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
+	struct engine *engine = the_worker->engine;
 	if (lua_gettop(L) == 0) {
 		lua_pushstring(L, engine_get_hostname(engine));
 		return 1;
@@ -210,8 +210,7 @@ static int l_package_version(lua_State *L)
 /** Load root hints from zonefile. */
 static int l_hint_root_file(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	struct kr_context *ctx = &engine->resolver;
+	struct kr_context *ctx = &the_worker->engine->resolver;
 	const char *file = lua_tostring(L, 1);
 
 	const char *err = engine_hint_root_file(ctx, file);
@@ -384,7 +383,6 @@ static int l_map(lua_State *L)
 	if (lua_gettop(L) != 1 || !lua_isstring(L, 1))
 		lua_error_p(L, "map('string with a lua expression')");
 
-	struct engine *engine = engine_luaget(L);
 	const char *cmd = lua_tostring(L, 1);
 	uint32_t len = strlen(cmd);
 	lua_newtable(L);
@@ -395,8 +393,8 @@ static int l_map(lua_State *L)
 	lua_settop(L, ntop + 1); /* Push only one return value to table */
 	lua_rawseti(L, -2, 1);
 
-	for (size_t i = 0; i < engine->ipc_set.len; ++i) {
-		int fd = engine->ipc_set.at[i];
+	for (size_t i = 0; i < the_worker->engine->ipc_set.len; ++i) {
+		int fd = the_worker->engine->ipc_set.at[i];
 		/* Send command */
 		expr_checked(write(fd, &len, sizeof(len)) == sizeof(len));
 		expr_checked(write(fd, cmd, len) == len);
@@ -857,7 +855,3 @@ int engine_unregister(struct engine *engine, const char *name)
 	return kr_error(ENOENT);
 }
 
-struct engine *engine_luaget(lua_State *L)
-{
-	return the_worker->engine;
-}
