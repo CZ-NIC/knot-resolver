@@ -5,6 +5,7 @@
 #pragma once
 
 #include "daemon/engine.h"
+#include "daemon/worker.h" /* the_worker is often useful */
 
 #include <lua.h>
 #include <lauxlib.h>
