@@ -664,11 +664,8 @@ static struct kr_query *task_get_last_pending_query(struct qr_task *task)
 static int session_tls_hs_cb(struct session *session, int status)
 {
 	assert(session_flags(session)->outgoing);
-	uv_handle_t *handle = session_get_handle(session);
-	uv_loop_t *loop = handle->loop;
-	struct worker_ctx *worker = loop->data;
 	struct sockaddr *peer = session_get_peer(session);
-	int deletion_res = worker_del_tcp_waiting(worker, peer);
+	int deletion_res = worker_del_tcp_waiting(the_worker, peer);
 	int ret = kr_ok();
 
 	if (status) {
@@ -677,7 +674,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 			struct kr_qflags *options = &task->ctx->req.options;
 			unsigned score = options->FORWARD || options->STUB ? KR_NS_FWD_DEAD : KR_NS_DEAD;
 			kr_nsrep_update_rtt(NULL, peer, score,
-					    worker->engine->resolver.cache_rtt,
+					    the_worker->engine->resolver.cache_rtt,
 					    KR_NS_UPDATE_NORESET);
 		}
 #ifndef NDEBUG
@@ -689,7 +686,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 			assert(deletion_res != 0);
 			const char *key = tcpsess_key(peer);
 			assert(key);
-			assert(map_contains(&worker->tcp_connected, key) != 0);
+			assert(map_contains(&the_worker->tcp_connected, key) != 0);
 		}
 #endif
 		return ret;
@@ -717,7 +714,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 		}
 	}
 
-	struct session *s = worker_find_tcp_connected(worker, peer);
+	struct session *s = worker_find_tcp_connected(the_worker, peer);
 	ret = kr_ok();
 	if (deletion_res == kr_ok()) {
 		/* peer was in the waiting list, add to the connected list. */
@@ -726,7 +723,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 			 * peer already is in the connected list. */
 			ret = kr_error(EINVAL);
 		} else {
-			ret = worker_add_tcp_connected(worker, peer, session);
+			ret = worker_add_tcp_connected(the_worker, peer, session);
 		}
 	} else {
 		/* peer wasn't in the waiting list.
@@ -758,7 +755,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 		/* Something went wrong.
 		 * Either addition to the list of connected sessions
 		 * or write to upstream failed. */
-		worker_del_tcp_connected(worker, peer);
+		worker_del_tcp_connected(the_worker, peer);
 		session_waitinglist_finalize(session, KR_STATE_FAIL);
 		assert(session_tasklist_is_empty(session));
 		session_close(session);
@@ -1576,8 +1573,6 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 		return kr_error(EINVAL);
 	}
 
-	struct worker_ctx *worker = handle->loop->data;
-
 	/* Parse packet */
 	int ret = parse_packet(query);
 
@@ -1587,7 +1582,7 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 	if (!query ||
 	    (ret != kr_ok() && ret != kr_error(EMSGSIZE)) ||
 	    (is_query == is_outgoing)) {
-		if (query && !is_outgoing) worker->stats.dropped += 1;
+		if (query && !is_outgoing) the_worker->stats.dropped += 1;
 		return kr_error(EILSEQ);
 	}
 
@@ -1596,7 +1591,7 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 	struct qr_task *task = NULL;
 	const struct sockaddr *addr = NULL;
 	if (!is_outgoing) { /* request from a client */
-		struct request_ctx *ctx = request_create(worker, session, peer,
+		struct request_ctx *ctx = request_create(the_worker, session, peer,
 							 knot_wire_get_id(query->wire));
 		if (!ctx) {
 			return kr_error(ENOMEM);
@@ -1727,12 +1722,10 @@ int worker_end_tcp(struct session *session)
 
 	session_timer_stop(session);
 
-	uv_handle_t *handle = session_get_handle(session);
-	struct worker_ctx *worker = handle->loop->data;
 	struct sockaddr *peer = session_get_peer(session);
 
-	worker_del_tcp_waiting(worker, peer);
-	worker_del_tcp_connected(worker, peer);
+	worker_del_tcp_waiting(the_worker, peer);
+	worker_del_tcp_connected(the_worker, peer);
 	session_flags(session)->connected = false;
 
 	struct tls_client_ctx_t *tls_client_ctx = session_tls_get_client_ctx(session);
@@ -2070,7 +2063,7 @@ int worker_init(struct engine *engine, int worker_id, int worker_count)
 
 	the_worker = worker;
 	loop->data = the_worker;
-	/* ^^^^ This shouldn't be used anymore, but it's hard to be 100% sure. */
+	/* ^^^^ Now this shouldn't be used anymore, but it's hard to be 100% sure. */
 	return kr_ok();
 }
 
