@@ -5,14 +5,12 @@
 #include "daemon/bindings/impl.h"
 #include "lib/cache/cdb_lmdb.h"
 
-#include "daemon/worker.h"
 #include "daemon/zimport.h"
 
 /** @internal return cache, or throw lua error if not open */
-struct kr_cache * cache_assert_open(lua_State *L)
+static struct kr_cache * cache_assert_open(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	struct kr_cache *cache = &engine->resolver.cache;
+	struct kr_cache *cache = &the_worker->engine->resolver.cache;
 	assert(cache);
 	if (!cache || !kr_cache_is_open(cache))
 		lua_error_p(L, "no cache is open yet, use cache.open() or cache.size, etc.");
@@ -22,7 +20,7 @@ struct kr_cache * cache_assert_open(lua_State *L)
 /** Return available cached backends. */
 static int cache_backends(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
+	struct engine *engine = the_worker->engine;
 
 	lua_newtable(L);
 	for (unsigned i = 0; i < engine->backends.len; ++i) {
@@ -176,7 +174,7 @@ static int cache_open(lua_State *L)
 		lua_error_p(L, "expected 'open(number max_size, string config = \"\")'");
 
 	/* Select cache storage backend */
-	struct engine *engine = engine_luaget(L);
+	struct engine *engine = the_worker->engine;
 
 	lua_Integer csize_lua = lua_tointeger(L, 1);
 	if (!(csize_lua >= 8192 && csize_lua < SIZE_MAX)) { /* min. is basically arbitrary */
@@ -223,8 +221,7 @@ static int cache_open(lua_State *L)
 
 static int cache_close(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	struct kr_cache *cache = &engine->resolver.cache;
+	struct kr_cache *cache = &the_worker->engine->resolver.cache;
 	if (!kr_cache_is_open(cache)) {
 		return 0;
 	}
@@ -264,10 +261,10 @@ static int cache_clear_everything(lua_State *L)
 	lua_error_maybe(L, ret);
 
 	/* Clear reputation tables */
-	struct engine *engine = engine_luaget(L);
-	lru_reset(engine->resolver.cache_rtt);
-	lru_reset(engine->resolver.cache_rep);
-	lru_reset(engine->resolver.cache_cookie);
+	struct kr_context *ctx = &the_worker->engine->resolver;
+	lru_reset(ctx->cache_rtt);
+	lru_reset(ctx->cache_rep);
+	lru_reset(ctx->cache_cookie);
 	lua_pushboolean(L, true);
 	return 1;
 }
@@ -339,8 +336,7 @@ static int cache_get(lua_State *L)
  * in NS elections again. */
 static int cache_ns_tout(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	struct kr_context *ctx = &engine->resolver;
+	struct kr_context *ctx = &the_worker->engine->resolver;
 
 	/* Check parameters */
 	int n = lua_gettop(L);
