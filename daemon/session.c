@@ -331,9 +331,8 @@ struct session *session_new(uv_handle_t *handle, bool has_tls)
 		 * We still need to keep in mind to only touch the buffer
 		 * in this callback... */
 		assert(handle->loop->data);
-		struct worker_ctx *worker = handle->loop->data;
-		session->wire_buf = worker->wire_buf;
-		session->wire_buf_size = sizeof(worker->wire_buf);
+		session->wire_buf = the_worker->wire_buf;
+		session->wire_buf_size = sizeof(the_worker->wire_buf);
 	}
 
 	uv_timer_init(handle->loop, &session->timeout);
@@ -711,11 +710,10 @@ int session_wirebuf_process(struct session *session, const struct sockaddr *peer
 	if (session->wire_buf_start_idx == session->wire_buf_end_idx) {
 		return ret;
 	}
-	struct worker_ctx *worker = session_get_handle(session)->loop->data;
 	size_t wirebuf_data_size = session->wire_buf_end_idx - session->wire_buf_start_idx;
 	uint32_t max_iterations = (wirebuf_data_size / (KNOT_WIRE_HEADER_SIZE + KNOT_WIRE_QUESTION_MIN_SIZE)) + 1;
 	knot_pkt_t *query = NULL;
-	while (((query = session_produce_packet(session, &worker->pkt_pool)) != NULL) &&
+	while (((query = session_produce_packet(session, &the_worker->pkt_pool)) != NULL) &&
 	       (ret < max_iterations)) {
 		assert (!session_wirebuf_error(session));
 		int res = worker_submit(session, peer, query);

@@ -60,8 +60,6 @@ static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* 
 void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	const struct sockaddr *addr, unsigned flags)
 {
-	uv_loop_t *loop = handle->loop;
-	struct worker_ctx *worker = loop->data;
 	struct session *s = handle->data;
 	if (session_flags(s)->closing) {
 		return;
@@ -89,7 +87,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	assert(consumed == nread); (void)consumed;
 	session_wirebuf_process(s, addr);
 	session_wirebuf_discard(s);
-	mp_flush(worker->pkt_pool.ctx);
+	mp_flush(the_worker->pkt_pool.ctx);
 }
 
 static int family_to_freebind_option(sa_family_t sa_family, int *level, int *name)
@@ -195,11 +193,9 @@ void tcp_timeout_trigger(uv_timer_t *timer)
 
 	assert(!session_flags(s)->closing);
 
-	struct worker_ctx *worker = timer->loop->data;
-
 	if (!session_tasklist_is_empty(s)) {
 		int finalized = session_tasklist_finalize_expired(s);
-		worker->stats.timeout += finalized;
+		the_worker->stats.timeout += finalized;
 		/* session_tasklist_finalize_expired() may call worker_task_finalize().
 		 * If session is a source session and there were IO errors,
 		 * worker_task_finalize() can filnalize all tasks and close session. */
@@ -220,13 +216,12 @@ void tcp_timeout_trigger(uv_timer_t *timer)
 			struct qr_task *t = session_waitinglist_pop(s, false);
 			worker_task_finalize(t, KR_STATE_FAIL);
 			worker_task_unref(t);
-			worker->stats.timeout += 1;
+			the_worker->stats.timeout += 1;
 			if (session_flags(s)->closing) {
 				return;
 			}
 		}
-		const struct engine *engine = worker->engine;
-		const struct network *net = &engine->net;
+		const struct network *net = &the_worker->engine->net;
 		uint64_t idle_in_timeout = net->tcp.in_idle_timeout;
 		uint64_t last_activity = session_last_activity(s);
 		uint64_t idle_time = kr_now() - last_activity;
@@ -241,8 +236,8 @@ void tcp_timeout_trigger(uv_timer_t *timer)
 			kr_log_verbose("[io] => closing connection to '%s'\n",
 				       peer_str ? peer_str : "");
 			if (session_flags(s)->outgoing) {
-				worker_del_tcp_waiting(worker, peer);
-				worker_del_tcp_connected(worker, peer);
+				worker_del_tcp_waiting(the_worker, peer);
+				worker_del_tcp_connected(the_worker, peer);
 			}
 			session_close(s);
 		}
@@ -312,8 +307,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		worker_end_tcp(s);
 	}
 	session_wirebuf_compress(s);
-	struct worker_ctx *worker = handle->loop->data;
-	mp_flush(worker->pkt_pool.ctx);
+	mp_flush(the_worker->pkt_pool.ctx);
 }
 
 static void _tcp_accept(uv_stream_t *master, int status, bool tls)
