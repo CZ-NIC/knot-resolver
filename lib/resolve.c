@@ -1203,6 +1203,7 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 		qry->flags.DNSSEC_NODS = false;
 		qry->flags.DNSSEC_WANT = false;
 		qry->flags.DNSSEC_INSECURE = true;
+		QRVERBOSE(qry, "vldr", "<= DS doesn't exist, going insecure\n");
 	}
 	/* Enable DNSSEC if entering a new (or different) island of trust,
 	 * and update the TA RRset if required. */
