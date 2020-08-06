@@ -8,7 +8,7 @@
 /** List loaded modules */
 static int mod_list(lua_State *L)
 {
-	const module_array_t *modules = &the_worker->engine->modules;
+	const module_array_t * const modules = &the_worker->engine->modules;
 	lua_newtable(L);
 	for (unsigned i = 0; i < modules->len; ++i) {
 		struct kr_module *module = modules->at[i];
