@@ -1061,7 +1061,7 @@ kres = {
 		if ret ~= 1 then return nil end
 		return ffi.string(addr_buf, C.kr_family_len(family))
 	end,
-	context = function () return ffi.cast('struct kr_context *', __engine) end,
+	context = function () return ffi.C.the_worker.engine.resolver end,
 
 	knot_pkt_rr = knot_pkt_rr,
 }
