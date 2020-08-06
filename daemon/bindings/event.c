@@ -4,15 +4,12 @@
 
 #include "daemon/bindings/impl.h"
 
-#include "daemon/worker.h"
-
 #include <unistd.h>
 #include <uv.h>
 
 static void event_free(uv_timer_t *timer)
 {
-	struct worker_ctx *worker = timer->loop->data;
-	lua_State *L = worker->engine->L;
+	lua_State *L = the_worker->engine->L;
 	int ref = (intptr_t) timer->data;
 	luaL_unref(L, LUA_REGISTRYINDEX, ref);
 	free(timer);
@@ -20,8 +17,7 @@ static void event_free(uv_timer_t *timer)
 
 static void event_callback(uv_timer_t *timer)
 {
-	struct worker_ctx *worker = timer->loop->data;
-	lua_State *L = worker->engine->L;
+	lua_State *L = the_worker->engine->L;
 
 	/* Retrieve callback and execute */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) timer->data);
@@ -38,8 +34,7 @@ static void event_callback(uv_timer_t *timer)
 
 static void event_fdcallback(uv_poll_t* handle, int status, int events)
 {
-	struct worker_ctx *worker = handle->loop->data;
-	lua_State *L = worker->engine->L;
+	lua_State *L = the_worker->engine->L;
 
 	/* Retrieve callback and execute */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) handle->data);

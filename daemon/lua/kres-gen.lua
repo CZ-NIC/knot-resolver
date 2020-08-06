@@ -442,6 +442,15 @@ struct qr_task {
 int worker_resolve_exec(struct qr_task *, knot_pkt_t *);
 knot_pkt_t *worker_resolve_mk_pkt(const char *, uint16_t, uint16_t, const struct kr_qflags *);
 struct qr_task *worker_resolve_start(knot_pkt_t *, struct kr_qflags);
+struct engine {
+	struct kr_context resolver;
+	char _stub[];
+};
+struct worker_ctx {
+	struct engine *engine;
+	char _stub[];
+};
+struct worker_ctx *the_worker;
 typedef struct {
 	uint8_t bitmap[32];
 	uint8_t length;

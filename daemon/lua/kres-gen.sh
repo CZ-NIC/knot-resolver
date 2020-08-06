@@ -278,6 +278,14 @@ ${CDEFS} ${KRESD} functions <<-EOF
 	worker_resolve_start
 EOF
 
+echo "struct engine" | ${CDEFS} ${KRESD} types | sed '/struct network/,$ d'
+printf "\tchar _stub[];\n};\n"
+
+echo "struct worker_ctx" | ${CDEFS} ${KRESD} types | sed '/uv_loop_t/,$ d'
+printf "\tchar _stub[];\n};\n"
+
+echo "struct worker_ctx *the_worker;"
+
 
 ## libzscanner API for ./zonefile.lua
 ${CDEFS} libzscanner types <<-EOF
