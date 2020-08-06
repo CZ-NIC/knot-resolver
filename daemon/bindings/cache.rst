@@ -186,7 +186,7 @@ Configuration reference
 
 .. function:: cache.stats()
 
-   Return table with low-level statistics for each internal cache operation.
+   Return table with low-level statistics for internal cache operation and storage.
    This counts each access to cache and does not directly map to individual
    DNS queries or resource records.
    For query-level statistics see :ref:`stats module <mod-stats>`.
@@ -196,23 +196,27 @@ Configuration reference
    .. code-block:: lua
 
        > cache.stats()
-       [read_leq_miss] => 4
-       [write] => 189
-       [read_leq] => 9
-       [read] => 4313
-       [read_miss] => 1143
-       [open] => 0
-       [close] => 0
-       [remove_miss] => 0
-       [commit] => 117
-       [match_miss] => 2
-       [match] => 21
-       [count] => 2
        [clear] => 0
+       [close] => 0
+       [commit] => 117
+       [count] => 2
+       [count_entries] => 6187
+       [match] => 21
+       [match_miss] => 2
+       [open] => 0
+       [read] => 4313
+       [read_leq] => 9
+       [read_leq_miss] => 4
+       [read_miss] => 1143
        [remove] => 17
+       [remove_miss] => 0
+       [usage_percent] => 15.625
+       [write] => 189
+
 
    Cache operation `read_leq` (*read less or equal*, i.e. range search) was requested 9 times,
    and 4 out of 9 operations were finished with *cache miss*.
+   Cache contains 6187 internal entries which occupy 15.625 % cache size.
 
 
 .. function:: cache.max_ttl([ttl])

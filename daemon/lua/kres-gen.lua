@@ -199,6 +199,7 @@ struct kr_cdb_stats {
 	uint64_t open;
 	uint64_t close;
 	uint64_t count;
+	uint64_t count_entries;
 	uint64_t clear;
 	uint64_t commit;
 	uint64_t read;

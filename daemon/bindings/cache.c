@@ -81,6 +81,8 @@ static int cache_stats(lua_State *L)
 	add_stat(open);
 	add_stat(close);
 	add_stat(count);
+	cache->stats.count_entries = cache->api->count(cache->db, &cache->stats);
+	add_stat(count_entries);
 	add_stat(clear);
 	add_stat(commit);
 	add_stat(read);
