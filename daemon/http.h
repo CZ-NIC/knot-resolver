@@ -12,17 +12,24 @@
 #include <nghttp2/nghttp2.h>
 #include <libknot/packet/pkt.h>
 
+#include "lib/generic/queue.h"
+
 /** Transport session (opaque). */
 struct session;
 
 typedef ssize_t(*http_send_callback)(const uint8_t *buffer, const size_t buffer_len, void *user_ctx);
 
+typedef queue_t(int32_t) queue_int32_t;
+
 struct http_ctx_t {
 	struct nghttp2_session *session;
 	http_send_callback send_cb;
 	void *user_ctx;
-	int32_t request_stream_id;
+	queue_int32_t streams;  /* List of stream IDs of read HTTP/2 frames. */
+	bool incomplete_stream;
+	ssize_t submitted;
 	uint8_t *wire;
+	uint8_t *wire_start_idx;
 	int32_t wire_len;
 };
 
