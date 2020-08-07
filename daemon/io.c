@@ -359,12 +359,12 @@ static ssize_t tcp_send(const uint8_t *buffer, const size_t buffer_len, void *us
 	//	return kr_error(EIO);
 	//}
 	//memcpy(buffer_backup, buffer, buffer_len);
-	
+
 	uv_write_t *req = (uv_write_t *)calloc(1, sizeof(uv_write_t));
 	if (!req) {
 		return kr_error(EIO);
 	}
-	
+
 	const uv_buf_t uv_buffer = {
 		//.base = buffer_backup,
 		.base = buffer,
