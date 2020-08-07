@@ -196,20 +196,12 @@ static int net_listen(lua_State *L)
 		const char *k = lua_tostring(L, -1);
 		if (k && strcasecmp(k, "dns") == 0) {
 			tls = http = false;
-		} else
-		if (k && strcasecmp(k, "tls") == 0) {
+		} else if (k && strcasecmp(k, "tls") == 0) {
 			tls = true;
 			http = false;
-		} else
-		//TODO temporary moved HTTP (without TLS) here
-		if (k && strcasecmp(k, "http") == 0) {
-			tls = false;
-			http = true;
-		} else
-		if (k && strcasecmp(k, "doh") == 0) {
+		} else if (k && strcasecmp(k, "doh2") == 0) {
 			tls = http = true;
-		} else
-		if (k) {
+		} else if (k) {
 			kind = k;
 		}
 	}
