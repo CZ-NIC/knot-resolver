@@ -28,5 +28,5 @@ struct http_ctx_t {
 
 struct http_ctx_t* http_new(http_send_callback cb, void *user_ctx);
 ssize_t http_process_input_data(struct session *s, const uint8_t *buf, ssize_t nread);
-int http_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, uv_write_cb cb);
+int http_write(uv_write_t *req, uv_handle_t *handle, int32_t stream_id, knot_pkt_t *pkt, uv_write_cb cb);
 void http_free(struct http_ctx_t *ctx);
