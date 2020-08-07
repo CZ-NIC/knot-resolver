@@ -121,7 +121,7 @@ ssize_t http_process_input_data(struct session *s, const uint8_t *in_buf, ssize_
 
 	ssize_t submitted = 0;
 	if (http_p->request_stream_id >= 0) {
-		knot_wire_write_u16(http_p->wire, http_p->wire_len);
+		knot_wire_write_u16(http_p->wire, http_p->wire_len);  // TODO wire_len can be overflow when negative  int32_t
 		submitted = http_p->wire_len + sizeof(uint16_t);
 	}
 
