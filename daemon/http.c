@@ -143,9 +143,9 @@ static ssize_t send_response_callback(nghttp2_session *session, int32_t stream_i
 	return send;
 }
 
-int http_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, uv_write_cb cb)
+int http_write(uv_write_t *req, uv_handle_t *handle, int32_t stream_id, knot_pkt_t *pkt, uv_write_cb cb)
 {
-	if (!pkt || !handle || !handle->data) {
+	if (!pkt || !handle || !handle->data || stream_id < 0) {
 		return kr_error(EINVAL);
 	}
 
@@ -176,7 +176,7 @@ int http_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, uv_write_c
 		MAKE_NV("content-length", 14, size, size_len)
 	};
 
-	int ret = nghttp2_submit_response(http_ctx->session, http_ctx->request_stream_id, hdrs, sizeof(hdrs)/sizeof(*hdrs), &data_prd);
+	int ret = nghttp2_submit_response(http_ctx->session, stream_id, hdrs, sizeof(hdrs)/sizeof(*hdrs), &data_prd);
 	if (ret != 0) {
 		kr_log_error("[%s] nghttp2_submit_response failed: %s (%d)\n", server_logstring, nghttp2_strerror(ret), ret);
 		return kr_error(EIO);
@@ -186,7 +186,7 @@ int http_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, uv_write_c
 		kr_log_error("[%s] nghttp2_session_send failed: %s (%d)\n", server_logstring, nghttp2_strerror(ret), ret);
  		return kr_error(EIO);
 	}
-	
+
 	/* The data is now accepted in gnutls internal buffers, the message can be treated as sent */
 	req->handle = (uv_stream_t *)handle;
 	cb(req, 0);
