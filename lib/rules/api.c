@@ -3,6 +3,7 @@
  */
 
 #include "lib/rules/api.h"
+#include "lib/rules/impl.h"
 
 #include "lib/cache/cdb_lmdb.h"
 
@@ -72,11 +73,15 @@ int kr_rules_init()
 	if (ret != 0) goto failure;
 	assert(the_rules->db);
 
+	ret = rules_defaults_insert();
+	if (ret != 0) goto failure;
+
 	/* Activate one default ruleset. */
 	uint8_t key_rs[] = "\0rulesets";
 	knot_db_val_t key = { .data = key_rs, .len = sizeof(key_rs) };
 	knot_db_val_t rulesets = { .data = &RULESET_DEFAULT, .len = strlen(RULESET_DEFAULT) + 1 };
 	ret = ruledb_op(write, &key, &rulesets, 1);
+	if (ret == 0) ret = ruledb_op(commit);
 	if (ret == 0) return kr_ok();
 failure:
 	free(the_rules);

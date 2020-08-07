@@ -24,6 +24,7 @@ libkres_src = files([
   'layer/iterate.c',
   'layer/validate.c',
   'rules/api.c',
+  'rules/defaults.c',
   'module.c',
   'nsrep.c',
   'resolve.c',
