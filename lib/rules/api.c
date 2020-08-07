@@ -31,9 +31,9 @@ struct kr_rules *the_rules = NULL;
  - otherwise it's rulesets - each has a prefix, e.g. RULESET_DEFAULT,
    its length is bounded by KEY_RULESET_MAXLEN - 1; after that prefix:
     - KEY_EXACT_MATCH + dname_lf ended by double '\0' + KNOT_RRTYPE_FOO
-    	-> exact-match rule (for the given name)
+	-> exact-match rule (for the given name)
     - KEY_ZONELIKE_A  + dname_lf (no '\0' at end)
-    	-> zone-like apex (on the given name)
+	-> zone-like apex (on the given name)
  */
 
 const int KEY_RULESET_MAXLEN = 16; /**< max. len of ruleset ID + 1(for kind) */
@@ -411,18 +411,19 @@ static int answer_zla_empty(struct kr_query *qry, knot_pkt_t *pkt,
 	arrset.set.rank = KR_RANK_SECURE | KR_RANK_AUTH; // local data has high trust
 	arrset.set.expiring = false;
 
-	/* A small difference if we asked that SOA explicitly. */
-	const bool apex_matches = knot_dname_is_equal(qry->sname, apex_name)
-				&& qry->stype == KNOT_RRTYPE_SOA;
-	if (apex_matches) {
-		ret = knot_pkt_begin(pkt, KNOT_ANSWER);
-		CHECK_RET(ret);
+	/* Small differences if we exactly hit the name or even type. */
+	const bool name_matches = knot_dname_is_equal(qry->sname, apex_name);
+	if (name_matches) {
 		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_NOERROR);
 	} else {
-		ret = knot_pkt_begin(pkt, KNOT_AUTHORITY);
-		CHECK_RET(ret);
 		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_NXDOMAIN);
 	}
+	if (name_matches && qry->stype == KNOT_RRTYPE_SOA) {
+		ret = knot_pkt_begin(pkt, KNOT_ANSWER);
+	} else {
+		ret = knot_pkt_begin(pkt, KNOT_AUTHORITY);
+	}
+	CHECK_RET(ret);
 
 	/* Put links to the SOA into the pkt. */
 	ret = pkt_append(pkt, &arrset);
