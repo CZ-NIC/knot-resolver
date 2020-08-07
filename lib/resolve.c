@@ -553,6 +553,9 @@ static int answer_padding(struct kr_request *request)
 static void answer_fail(struct kr_request *request)
 {
 	/* Note: OPT in SERVFAIL response is still useful for cookies/additional info. */
+	if (VERBOSE_STATUS || kr_log_rtrace_enabled(request))
+		kr_log_req(request, 0, 0, "resl",
+			"request failed, answering with empty SERVFAIL\n");
 	knot_pkt_t *answer = request->answer;
 	knot_rrset_t *opt_rr = answer->opt_rr; /* it gets NULLed below */
 	int ret = kr_pkt_clear_payload(answer);
@@ -637,7 +640,7 @@ static void answer_finalize(struct kr_request *request)
 		secure = false; /* don't trust forwarding for now */
 	}
 	if (last && (last->flags.DNSSEC_OPTOUT)) {
-		VERBOSE_MSG(NULL, "AD: opt-out\n");
+		VERBOSE_MSG(last, "insecure because of opt-out\n");
 		secure = false; /* the last answer is insecure due to opt-out */
 	}
 
