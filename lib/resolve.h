@@ -190,6 +190,7 @@ struct kr_request {
 		const knot_pkt_t *packet;
 		struct kr_request_qsource_flags flags; /**< See definition above. */
 		size_t size; /**< query packet size */
+		int32_t stream_id; /**< HTTP/2 stream ID for DoH requests */
 	} qsource;
 	struct {
 		unsigned rtt;                  /**< Current upstream RTT */
@@ -247,7 +248,7 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pk
  * Consume input packet (may be either first query or answer to query originated from kr_resolve_produce())
  *
  * @note If the I/O fails, provide an empty or NULL packet, this will make iterator recognize nameserver failure.
- * 
+ *
  * @param  request request state (awaiting input)
  * @param  src     [in] packet source address
  * @param  packet  [in] input packet
@@ -262,7 +263,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
  * If the CONSUME is returned then dst, type and packet will be filled with
  * appropriate values and caller is responsible to send them and receive answer.
  * If it returns any other state, then content of the variables is undefined.
- * 
+ *
  * @param  request request state (in PRODUCE state)
  * @param  dst     [out] possible address of the next nameserver
  * @param  type    [out] possible used socket type (SOCK_STREAM, SOCK_DGRAM)
