@@ -335,6 +335,7 @@ static int cdb_open(bool is_cache, struct lmdb_env *env, const char *path, size_
 		return lmdb_error(ret);
 	}
 
+	if (!is_cache) goto no_prealloc; // doesn't make sense for rules
 #if !defined(__MACOSX__) && !(defined(__APPLE__) && defined(__MACH__))
 	mdb_filehandle_t fd = -1;
 	ret = mdb_env_get_fd(env->env, &fd);
@@ -358,6 +359,7 @@ static int cdb_open(bool is_cache, struct lmdb_env *env, const char *path, size_
 		return kr_error(ret);
 	}
 #endif
+no_prealloc:
 
 	stats->commit++;
 	ret = mdb_txn_commit(txn);

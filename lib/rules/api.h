@@ -17,7 +17,7 @@ KR_EXPORT
 void kr_rules_deinit();
 
 /** Try answering the query from local data. */
-int kr_rule_local_data(struct kr_query *qry, struct knot_pkt *pkt);
+int kr_rule_local_data_answer(struct kr_query *qry, struct knot_pkt *pkt);
 
 /** Insert/overwrite a local data rule.
  * Into the default rule-set ATM. */

@@ -43,7 +43,7 @@ int kr_rules_init()
 	};
 	int ret = the_rules->cdb_api->open(&the_rules->db, &the_rules->db_stats, &opts, NULL);
 	/* No persistence - we always refill from config for now.
-	 * LATER: "\0stamp" key when loading config(s). */
+	 * LATER: "\0stamp" key when loading config(s). Also make it include versioning? */
 	if (ret == 0) ret = ruledb_op(clear);
 	if (ret != 0) goto failure;
 	assert(the_rules->db);
@@ -92,7 +92,7 @@ const int KEY_DNAME_END_OFFSET = KNOT_DNAME_MAXLEN + KEY_RULESET_MAXLEN;
 const int KEY_MAXLEN = KEY_DNAME_END_OFFSET + 64;
 //FIXME: cleanup design of the key space
 
-int kr_rule_local_data(struct kr_query *qry, knot_pkt_t *pkt)
+int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 {
 	const uint16_t rrtype = qry->stype;
 
