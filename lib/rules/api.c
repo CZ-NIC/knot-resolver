@@ -29,8 +29,10 @@ struct kr_rules *the_rules = NULL;
  - some future additions?
  - otherwise it's rulesets - each has a prefix, e.g. RULESET_DEFAULT,
    its length is bounded by KEY_RULESET_MAXLEN - 1; after that prefix:
-    - KEY_EXACT_MATCH + dname_lf -> exact-match rules (for the given name)
-    - KEY_ZONELIKE_A  + dname_lf -> zone-like apex (on the given name)
+    - KEY_EXACT_MATCH + dname_lf ended by double '\0' + KNOT_RRTYPE_FOO
+    	-> exact-match rule (for the given name)
+    - KEY_ZONELIKE_A  + dname_lf (no '\0' at end)
+    	-> zone-like apex (on the given name)
  */
 
 const int KEY_RULESET_MAXLEN = 16; /**< max. len of ruleset ID + 1(for kind) */
@@ -39,10 +41,18 @@ static /*const*/ char RULESET_DEFAULT[] = "d";
 static const uint8_t KEY_EXACT_MATCH[1] = "e";
 static const uint8_t KEY_ZONELIKE_A [1] = "a";
 
+/** The first byte of zone-like apex value is its type. */
+typedef uint8_t val_zla_type_t;
+enum {
+	/** Empty zone. No data in DB value after this byte. */
+	VAL_ZLAT_EMPTY = 1,
+};
 
-static int answer_rule_hit(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,
+
+static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,
 		const uint8_t *data, const uint8_t *data_bound);
-
+static int answer_zla_empty(struct kr_query *qry, knot_pkt_t *pkt,
+		const knot_db_val_t zla_lf, const knot_db_val_t val);
 
 int kr_rules_init()
 {
@@ -100,9 +110,52 @@ bool kr_rule_consume_tags(knot_db_val_t *val, const struct kr_request *req)
 	return tags == KR_RULE_TAGS_ALL || (tags & req->rule_tags);
 }
 
-/** When constructing a key, it's convenient that the dname_lf ends on a fixed offset. */
+
+
+
+
+
+/** When constructing a key, it's convenient that the dname_lf ends on a fixed offset.
+ * Convention: the end here is before the final '\0' byte (if any). */
 const int KEY_DNAME_END_OFFSET = KEY_RULESET_MAXLEN + KNOT_DNAME_MAXLEN;
-const int KEY_MAXLEN = KEY_DNAME_END_OFFSET + 64; //TODO: unused 64 ATM, perhaps later
+const int KEY_MAXLEN = KEY_DNAME_END_OFFSET + 64; //TODO: most of 64 is unused ATM
+
+/** Add name lookup format on the fixed end-position inside key_data.
+ *
+ * Note: key_data[KEY_DNAME_END_OFFSET] = '\0' even though
+ * not always used as a part of the key. */
+static inline uint8_t * key_dname_lf(const knot_dname_t *name, uint8_t *key_data)
+{
+	return knot_dname_lf(name, key_data + KEY_RULESET_MAXLEN + 1);
+}
+
+/** Return length of the common prefix of two strings (knot_db_val_t). */
+static size_t key_common_prefix(knot_db_val_t k1, knot_db_val_t k2)
+{
+	const size_t maxlen = MAX(k1.len, k2.len);
+	const uint8_t *data1 = k1.data, *data2 = k2.data;
+	assert(maxlen == 0 || (data1 && data2));
+	ssize_t i;
+	for (i = 0; i < maxlen; ++i) {
+		if (data1[i] != data2[i])
+			break;
+	}
+	return i;
+}
+
+/** Find common "subtree" of two strings that both end in a dname_lf ('\0' terminator excluded).
+ *
+ * Note: return value < lf_start can happen - mismatch happened before LF. */
+static size_t key_common_subtree(knot_db_val_t k1, knot_db_val_t k2, size_t lf_start_i)
+{
+	ssize_t i = key_common_prefix(k1, k2);
+	if (i == k1.len || i == k2.len)
+		return i;
+	const char *data = k1.data;
+	while (i > lf_start_i && data[i] != '\0')
+		--i;
+	return i;
+}
 
 int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 {
@@ -121,11 +174,11 @@ int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key;
-	key.data = knot_dname_lf(qry->sname, key_data + KEY_RULESET_MAXLEN);
-	key_data[KEY_DNAME_END_OFFSET] = '\0';
+	key.data = key_dname_lf(qry->sname, key_data);
+	key_data[KEY_DNAME_END_OFFSET + 1] = '\0'; // double zero
 
 	key.data -= sizeof(KEY_EXACT_MATCH);
-	memcpy(key.data, &KEY_EXACT_MATCH, sizeof(KEY_EXACT_MATCH));
+	uint8_t * const key_data_ruleset_end = key.data;
 
 	/* Iterate over all rulesets. */
 	while (rulesets.len > 0) {
@@ -139,11 +192,12 @@ int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 		}
 
 		/* Probe for exact and CNAME rule. */
-		key.len = key_data + KEY_DNAME_END_OFFSET + 1 + sizeof(rrtype)
+		memcpy(key_data_ruleset_end, &KEY_EXACT_MATCH, sizeof(KEY_EXACT_MATCH));
+		key.len = key_data + KEY_DNAME_END_OFFSET + 2 + sizeof(rrtype)
 			- (uint8_t *)key.data;
 		const uint16_t types[] = { rrtype, KNOT_RRTYPE_CNAME };
 		for (int i = 0; i < (2 - (rrtype == KNOT_RRTYPE_CNAME)); ++i) {
-			memcpy(key_data + KEY_DNAME_END_OFFSET + 1, &types[i], sizeof(rrtype));
+			memcpy(key_data + KEY_DNAME_END_OFFSET + 2, &types[i], sizeof(rrtype));
 			knot_db_val_t val;
 			// LATER: use cursor to iterate over multiple rules on the same key,
 			// testing tags on each
@@ -156,10 +210,60 @@ int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 			if (!kr_rule_consume_tags(&val, qry->request)) continue;
 
 			/* We found a rule that applies to the dname+rrtype+req. */
-			return answer_rule_hit(qry, pkt, types[i], val.data, val.data + val.len);
+			return answer_exact_match(qry, pkt, types[i],
+							val.data, val.data + val.len);
 		}
-
-		/* LATER: find the closest zone-like apex that applies. */
+		
+		//continue; // FIXME: TMP
+		/* Find the closest zone-like apex that applies. */
+		static_assert(sizeof(KEY_ZONELIKE_A) == sizeof(KEY_EXACT_MATCH));
+		memcpy(key_data_ruleset_end, &KEY_ZONELIKE_A, sizeof(KEY_ZONELIKE_A));
+		const size_t lf_start_i = key_data_ruleset_end + sizeof(KEY_ZONELIKE_A) - key_data;
+		knot_db_val_t key_leq = key;
+		knot_db_val_t val;
+		// LATER: again, use cursor to iterate over multiple rules on the same key.
+		do {
+			ret = ruledb_op(read_leq, &key_leq, &val);
+			if (ret == -ENOENT) break;
+			if (ret < 0) return kr_error(ret);
+			if (ret > 0) { // found a previous key
+				size_t cs_len = key_common_subtree(key, key_leq, lf_start_i);
+				if (cs_len < lf_start_i) // no suitable key can exist in DB
+					break;
+				if (cs_len < key_leq.len) { // retry at the common subtree
+					key_leq.len = cs_len;
+					continue;
+				}
+			}
+			const knot_db_val_t zla_lf = {
+				.data = key_leq.data + lf_start_i,
+				.len  = key_leq.len  - lf_start_i,
+			};
+			/* Found some good key, now check tags. */
+			if (!kr_rule_consume_tags(&val, qry->request)) {
+				/* Shorten key_leq by one label and retry. */
+				if (key_leq.len <= lf_start_i) { // nowhere to shorten
+					assert(key_leq.len == lf_start_i);
+					break;
+				}
+				const char *data = key_leq.data;
+				while (key_leq.len > lf_start_i && data[key_leq.len] != '\0')
+					--key_leq.len;
+				continue;
+			}
+			/* Tags OK; execute the rule. */
+			val_zla_type_t ztype;
+			if (val.len < sizeof(ztype))
+				return kr_error(EILSEQ);
+			memcpy(&ztype, val.data, sizeof(ztype));
+			++val.data; --val.len;
+			switch (ztype) {
+			case VAL_ZLAT_EMPTY:
+				return answer_zla_empty(qry, pkt, zla_lf, val);
+			default:
+				return kr_error(EILSEQ);
+			}
+		} while (true);
 	}
 
 	return kr_error(ENOENT);
@@ -169,7 +273,7 @@ int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 	if ((ret) < 0) { assert(false); return kr_error((ret)); } \
 } while (false)
 
-static int answer_rule_hit(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,
+static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,
 		const uint8_t *data, const uint8_t *data_bound)
 {
 	/* Extract ttl from data. */
@@ -221,7 +325,7 @@ static int answer_rule_hit(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,
 	qry->flags.CACHED = true;
 	qry->flags.NO_MINIMIZE = true;
 
-	VERBOSE_MSG(qry, "=> satisfied by local data\n");
+	VERBOSE_MSG(qry, "=> satisfied by local data (positive)\n");
 	return kr_ok();
 }
 
@@ -230,8 +334,8 @@ int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_r
 {
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key;
-	key.data = knot_dname_lf(rrs->owner, key_data + KEY_RULESET_MAXLEN);
-	key_data[KEY_DNAME_END_OFFSET] = '\0';
+	key.data = key_dname_lf(rrs->owner, key_data);
+	key_data[KEY_DNAME_END_OFFSET + 1] = '\0'; // double zero
 
 	key.data -= sizeof(KEY_EXACT_MATCH);
 	memcpy(key.data, &KEY_EXACT_MATCH, sizeof(KEY_EXACT_MATCH));
@@ -240,8 +344,8 @@ int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_r
 	key.data -= rsp_len;
 	memcpy(key.data, RULESET_DEFAULT, rsp_len);
 
-	memcpy(key_data + KEY_DNAME_END_OFFSET + 1, &rrs->type, sizeof(rrs->type));
-	key.len = key_data + KEY_DNAME_END_OFFSET + 1 + sizeof(rrs->type)
+	memcpy(key_data + KEY_DNAME_END_OFFSET + 2, &rrs->type, sizeof(rrs->type));
+	key.len = key_data + KEY_DNAME_END_OFFSET + 2 + sizeof(rrs->type)
 		- (uint8_t *)key.data;
 
 	const int rr_ssize = rdataset_dematerialize_size(&rrs->rrs);
@@ -262,5 +366,82 @@ int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_r
 	CHECK_RET(ret);
 
 	return kr_ok();
+}
+
+
+static int answer_zla_empty(struct kr_query *qry, knot_pkt_t *pkt,
+				const knot_db_val_t zla_lf, const knot_db_val_t val)
+{
+	if (val.len) {
+		kr_log_error("[rule] ERROR: unused bytes: %zu\n", val.len);
+		assert(!EILSEQ);
+		return kr_error(EILSEQ);
+	}
+
+	knot_dname_t apex_name[KNOT_DNAME_MAXLEN];
+	int ret = knot_dname_lf2wire(apex_name, val.len, val.data);
+	if (ret < 0) return kr_error(ret);
+
+	/* Start constructing the (pseudo-)packet. */
+	ret = pkt_renew(pkt, qry->sname, qry->stype);
+	CHECK_RET(ret);
+	struct answer_rrset arrset;
+	memset(&arrset, 0, sizeof(arrset));
+
+	/* Construct SOA data (hardcoded content). */
+	static const uint8_t soa_rdata[] =
+		"\6nobody\7invalid\0\0\0\0\1\0\0\xe\x10\0\0\4\xb0\0\x9\x3a\x80\0\0\x2a\x30";
+	arrset.set.rr = knot_rrset_new(apex_name, KNOT_RRTYPE_SOA, KNOT_CLASS_IN, 10800, &pkt->mm);
+	if (!arrset.set.rr) {
+		assert(!ENOMEM);
+		return kr_error(ENOMEM);
+	}
+	ret = knot_rrset_add_rdata(arrset.set.rr, soa_rdata, sizeof(soa_rdata), &pkt->mm);
+	CHECK_RET(ret);
+	arrset.set.rank = KR_RANK_SECURE | KR_RANK_AUTH; // local data has high trust
+	arrset.set.expiring = false;
+
+	/* A small difference if we asked that SOA explicitly. */
+	const bool apex_matches = knot_dname_is_equal(qry->sname, apex_name)
+				&& qry->stype == KNOT_RRTYPE_SOA;
+	if (apex_matches) {
+		ret = knot_pkt_begin(pkt, KNOT_ANSWER);
+		CHECK_RET(ret);
+		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_NOERROR);
+	} else {
+		ret = knot_pkt_begin(pkt, KNOT_AUTHORITY);
+		CHECK_RET(ret);
+		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_NXDOMAIN);
+	}
+
+	/* Put links to the SOA into the pkt. */
+	ret = pkt_append(pkt, &arrset);
+	CHECK_RET(ret);
+
+	/* Finishing touches. */
+	qry->flags.EXPIRING = false;
+	qry->flags.CACHED = true;
+	qry->flags.NO_MINIMIZE = true;
+
+	VERBOSE_MSG(qry, "=> satisfied by local data (empty zone)\n");
+	return kr_ok();
+}
+
+int kr_rule_local_data_emptyzone(const knot_dname_t *apex, kr_rule_tags_t tags)
+{
+	uint8_t key_data[KEY_MAXLEN];
+	knot_db_val_t key;
+	key.data = key_dname_lf(apex, key_data);
+
+	key.data -= sizeof(KEY_ZONELIKE_A);
+	memcpy(key.data, &KEY_ZONELIKE_A, sizeof(KEY_ZONELIKE_A));
+
+	const size_t rsp_len = strlen(RULESET_DEFAULT);
+	key.data -= rsp_len;
+	memcpy(key.data, RULESET_DEFAULT, rsp_len);
+
+	val_zla_type_t ztype = VAL_ZLAT_EMPTY;
+	knot_db_val_t val = { .data = &ztype, .len = sizeof(ztype) };
+	return ruledb_op(write, &key, &val, 1);
 }
 

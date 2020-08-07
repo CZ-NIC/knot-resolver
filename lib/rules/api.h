@@ -25,3 +25,8 @@ KR_EXPORT
 int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_rds,
 				kr_rule_tags_t tags);
 
+/** Insert an empty zone.
+ * Into the default rule-set ATM. */
+KR_EXPORT
+int kr_rule_local_data_emptyzone(const knot_dname_t *apex, kr_rule_tags_t tags);
+
