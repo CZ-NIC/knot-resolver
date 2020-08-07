@@ -171,6 +171,7 @@ struct kr_request {
 		const knot_pkt_t *packet;
 		struct kr_request_qsource_flags flags;
 		size_t size;
+		int32_t stream_id;
 	} qsource;
 	struct {
 		unsigned int rtt;

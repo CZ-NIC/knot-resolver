@@ -298,6 +298,14 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		req->qsource.flags.tcp = session_get_handle(session)->type == UV_TCP;
 		req->qsource.flags.tls = session_flags(session)->has_tls;
 		req->qsource.flags.http = session_flags(session)->has_http;
+		req->qsource.stream_id = -1;
+		if (req->qsource.flags.http) {
+			struct http_ctx_t *http_ctx = session_http_get_server_ctx(session);
+			// TODO maybe assert?
+			if (http_ctx) {
+				req->qsource.stream_id = http_ctx->request_stream_id;
+			}
+		}
 		/* We need to store a copy of peer address. */
 		memcpy(&ctx->source.addr.ip, peer, kr_sockaddr_len(peer));
 		req->qsource.addr = &ctx->source.addr.ip;
@@ -612,7 +620,7 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 	if (session_flags(session)->has_http) {
 		uv_write_t *write_req = (uv_write_t *)ioreq;
 		write_req->data = task;
-		ret = http_write(write_req, handle, pkt, &on_write);
+		ret = http_write(write_req, handle, ctx->req.qsource.stream_id, pkt, &on_write);
 	} else if (session_flags(session)->has_tls) {
 		uv_write_t *write_req = (uv_write_t *)ioreq;
 		write_req->data = task;
