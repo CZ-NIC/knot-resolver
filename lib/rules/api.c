@@ -223,7 +223,8 @@ int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 		/* Find the closest zone-like apex that applies.
 		 * Now the key needs one byte change and a little truncation
 		 * (we may truncate repeatedly). */
-		static_assert(sizeof(KEY_ZONELIKE_A) == sizeof(KEY_EXACT_MATCH));
+		static_assert(sizeof(KEY_ZONELIKE_A) == sizeof(KEY_EXACT_MATCH),
+				"bad combination of constants");
 		memcpy(key_data_ruleset_end, &KEY_ZONELIKE_A, sizeof(KEY_ZONELIKE_A));
 		key.len = key_data + KEY_DNAME_END_OFFSET - (uint8_t *)key.data;
 		const size_t lf_start_i = key_data_ruleset_end + sizeof(KEY_ZONELIKE_A)
