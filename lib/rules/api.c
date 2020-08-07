@@ -23,7 +23,21 @@ struct kr_rules *the_rules = NULL;
 #define ruledb_op(op, ...) \
 	the_rules->cdb_api->op(the_rules->db, &the_rules->db_stats, ## __VA_ARGS__)
 
+/* DB key-space summary
+
+ - "\0" starts special keys like "\0rulesets" or "\0stamp"
+ - some future additions?
+ - otherwise it's rulesets - each has a prefix, e.g. RULESET_DEFAULT,
+   its length is bounded by KEY_RULESET_MAXLEN - 1; after that prefix:
+    - KEY_EXACT_MATCH + dname_lf -> exact-match rules (for the given name)
+    - KEY_ZONELIKE_A  + dname_lf -> zone-like apex (on the given name)
+ */
+
+const int KEY_RULESET_MAXLEN = 16; /**< max. len of ruleset ID + 1(for kind) */
 static /*const*/ char RULESET_DEFAULT[] = "d";
+
+static const uint8_t KEY_EXACT_MATCH[1] = "e";
+static const uint8_t KEY_ZONELIKE_A [1] = "a";
 
 
 static int answer_rule_hit(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,
@@ -86,11 +100,9 @@ bool kr_rule_consume_tags(knot_db_val_t *val, const struct kr_request *req)
 	return tags == KR_RULE_TAGS_ALL || (tags & req->rule_tags);
 }
 
-
-const int KEY_RULESET_MAXLEN = 16; /**< max. len of ruleset ID */
-const int KEY_DNAME_END_OFFSET = KNOT_DNAME_MAXLEN + KEY_RULESET_MAXLEN;
-const int KEY_MAXLEN = KEY_DNAME_END_OFFSET + 64;
-//FIXME: cleanup design of the key space
+/** When constructing a key, it's convenient that the dname_lf ends on a fixed offset. */
+const int KEY_DNAME_END_OFFSET = KEY_RULESET_MAXLEN + KNOT_DNAME_MAXLEN;
+const int KEY_MAXLEN = KEY_DNAME_END_OFFSET + 64; //TODO: unused 64 ATM, perhaps later
 
 int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 {
@@ -112,10 +124,14 @@ int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 	key.data = knot_dname_lf(qry->sname, key_data + KEY_RULESET_MAXLEN);
 	key_data[KEY_DNAME_END_OFFSET] = '\0';
 
+	key.data -= sizeof(KEY_EXACT_MATCH);
+	memcpy(key.data, &KEY_EXACT_MATCH, sizeof(KEY_EXACT_MATCH));
+
 	/* Iterate over all rulesets. */
 	while (rulesets.len > 0) {
 		{ /* Write ruleset-specific prefix of the key. */
 			const size_t rsp_len = strnlen(rulesets_str, rulesets.len);
+			assert(rsp_len <= KEY_RULESET_MAXLEN - 1);
 			key.data -= rsp_len;
 			memcpy(key.data, rulesets_str, rsp_len);
 			rulesets_str += rsp_len + 1;
@@ -216,6 +232,9 @@ int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_r
 	knot_db_val_t key;
 	key.data = knot_dname_lf(rrs->owner, key_data + KEY_RULESET_MAXLEN);
 	key_data[KEY_DNAME_END_OFFSET] = '\0';
+
+	key.data -= sizeof(KEY_EXACT_MATCH);
+	memcpy(key.data, &KEY_EXACT_MATCH, sizeof(KEY_EXACT_MATCH));
 
 	const size_t rsp_len = strlen(RULESET_DEFAULT);
 	key.data -= rsp_len;
