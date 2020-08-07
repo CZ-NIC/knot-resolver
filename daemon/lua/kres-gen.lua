@@ -193,6 +193,7 @@ struct kr_request {
 	unsigned int uid;
 	unsigned int count_no_nsaddr;
 	unsigned int count_fail_row;
+	kr_rule_tags_t rule_tags;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
 struct kr_cdb_stats {
