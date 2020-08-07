@@ -46,6 +46,17 @@ bool kr_rank_check(uint8_t rank)
 	}
 }
 
+bool kr_rank_test(uint8_t rank, uint8_t kr_flag)
+{
+	assert(kr_rank_check(rank) && kr_rank_check(kr_flag));
+	if (kr_flag == KR_RANK_AUTH) {
+		return rank & KR_RANK_AUTH;
+	}
+	assert(!(kr_flag & KR_RANK_AUTH));
+	/* The rest are exclusive values - exactly one has to be set. */
+	return (rank & ~KR_RANK_AUTH) == kr_flag;
+}
+
 /** @internal Set @a yielded to all RRs with matching @a qry_uid. */
 static void set_yield(ranked_rr_array_t *array, const uint32_t qry_uid, const bool yielded)
 {
