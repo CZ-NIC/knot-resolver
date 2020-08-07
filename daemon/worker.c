@@ -299,8 +299,9 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		if (req->qsource.flags.http) {
 			struct http_ctx_t *http_ctx = session_http_get_server_ctx(session);
 			// TODO maybe assert?
-			if (http_ctx) {
-				req->qsource.stream_id = http_ctx->request_stream_id;
+			if (http_ctx && queue_len(http_ctx->streams) > 0) {
+				req->qsource.stream_id = queue_head(http_ctx->streams);
+				queue_pop(http_ctx->streams);
 			}
 		}
 		/* We need to store a copy of peer address. */
