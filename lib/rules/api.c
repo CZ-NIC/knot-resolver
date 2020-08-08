@@ -399,34 +399,45 @@ static int answer_zla_empty(struct kr_query *qry, knot_pkt_t *pkt,
 	struct answer_rrset arrset;
 	memset(&arrset, 0, sizeof(arrset));
 
-	/* Construct SOA data (hardcoded content). */
+	/* Construct SOA or NS data (hardcoded content).  The SOA content is
+	 * as recommended except for using a fixed mname (for simplicity):
+		https://tools.ietf.org/html/rfc6303#section-3
+	 */
 	static const uint8_t soa_rdata[] = "\6nobody\7invalid\0\6nobody\7invalid\0"
 		"\0\0\0\1\0\0\x0e\x10\0\0\4\xb0\0\x09\x3a\x80\0\0\x2a\x30";
-	arrset.set.rr = knot_rrset_new(apex_name, KNOT_RRTYPE_SOA, KNOT_CLASS_IN, 10800, &pkt->mm);
+	const bool name_matches = knot_dname_is_equal(qry->sname, apex_name);
+	const bool want_NS = name_matches && qry->stype == KNOT_RRTYPE_NS;
+	arrset.set.rr = knot_rrset_new(apex_name, want_NS ? KNOT_RRTYPE_NS : KNOT_RRTYPE_SOA,
+					KNOT_CLASS_IN, 10800, &pkt->mm);
 	if (!arrset.set.rr) {
 		assert(!ENOMEM);
 		return kr_error(ENOMEM);
 	}
-	ret = knot_rrset_add_rdata(arrset.set.rr, soa_rdata, sizeof(soa_rdata) - 1, &pkt->mm);
+	if (want_NS) {
+		assert(zla_lf.len + 2 == knot_dname_size(apex_name));
+		ret = knot_rrset_add_rdata(arrset.set.rr, apex_name, zla_lf.len + 2, &pkt->mm);
+	} else {
+		ret = knot_rrset_add_rdata(arrset.set.rr, soa_rdata,
+						sizeof(soa_rdata) - 1, &pkt->mm);
+	}
 	CHECK_RET(ret);
 	arrset.set.rank = KR_RANK_SECURE | KR_RANK_AUTH; // local data has high trust
 	arrset.set.expiring = false;
 
 	/* Small differences if we exactly hit the name or even type. */
-	const bool name_matches = knot_dname_is_equal(qry->sname, apex_name);
 	if (name_matches) {
 		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_NOERROR);
 	} else {
 		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_NXDOMAIN);
 	}
-	if (name_matches && qry->stype == KNOT_RRTYPE_SOA) {
+	if (want_NS || (name_matches && qry->stype == KNOT_RRTYPE_SOA)) {
 		ret = knot_pkt_begin(pkt, KNOT_ANSWER);
 	} else {
 		ret = knot_pkt_begin(pkt, KNOT_AUTHORITY);
 	}
 	CHECK_RET(ret);
 
-	/* Put links to the SOA into the pkt. */
+	/* Put links to the RR into the pkt. */
 	ret = pkt_append(pkt, &arrset);
 	CHECK_RET(ret);
 
