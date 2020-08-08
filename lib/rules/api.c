@@ -408,7 +408,7 @@ static int answer_zla_empty(struct kr_query *qry, knot_pkt_t *pkt,
 	const bool name_matches = knot_dname_is_equal(qry->sname, apex_name);
 	const bool want_NS = name_matches && qry->stype == KNOT_RRTYPE_NS;
 	arrset.set.rr = knot_rrset_new(apex_name, want_NS ? KNOT_RRTYPE_NS : KNOT_RRTYPE_SOA,
-					KNOT_CLASS_IN, 10800, &pkt->mm);
+					KNOT_CLASS_IN, RULE_TTL_DEFAULT, &pkt->mm);
 	if (!arrset.set.rr) {
 		assert(!ENOMEM);
 		return kr_error(ENOMEM);

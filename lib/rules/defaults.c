@@ -105,7 +105,8 @@ int rules_defaults_insert(void)
 		"127.100.in-addr.arpa.",
 		/* RFC6303 */
 		"0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa.",
-		// localhost_reversed handles ::1
+		"1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa.",
+			/* ^ below we inject exact-match PTR over this empty zone */
 		"d.f.ip6.arpa.",
 		"8.e.f.ip6.arpa.",
 		"9.e.f.ip6.arpa.",
@@ -141,6 +142,29 @@ int rules_defaults_insert(void)
 		 * Differentiating the message - perhaps splitting VAL_ZLAT_EMPTY into a few?
 		 */
 	}
+
+	{
+		knot_dname_t name_buf[KNOT_DNAME_MAXLEN];
+		knot_rrset_t rr = {
+			.owner = knot_dname_from_str(name_buf,
+				"1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa.",
+				sizeof(name_buf)),
+			.ttl = RULE_TTL_DEFAULT,
+			.type = KNOT_RRTYPE_PTR,
+			.rclass = KNOT_CLASS_IN,
+			.rrs = { 0 },
+			.additional = NULL,
+		};
+		int ret = knot_rrset_add_rdata(&rr, (const knot_dname_t *)"\x09localhost\0",
+						1+9+1, NULL);
+		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL, KR_RULE_TAGS_ALL);
+		knot_rdataset_clear(&rr.rrs, NULL);
+		if (ret) {
+			assert(!ret);
+			return kr_error(ret);
+		}
+	}
+
 	return kr_ok();
 }
 

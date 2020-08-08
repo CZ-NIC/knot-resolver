@@ -809,7 +809,7 @@ policy.special_names = {
 	{
 		cb=policy.suffix_common(localhost_reversed, {
 			todname('127.in-addr.arpa.'),
-			todname('1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa.')},
+			},
 			todname('arpa.')),
 		count=0
 	},
