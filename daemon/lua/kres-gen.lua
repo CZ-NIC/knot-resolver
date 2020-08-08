@@ -162,6 +162,7 @@ struct kr_request_qsource_flags {
 	_Bool tls : 1;
 	_Bool http : 1;
 };
+typedef unsigned long kr_rule_tags_t;
 struct kr_request {
 	struct kr_context *ctx;
 	knot_pkt_t *answer;
