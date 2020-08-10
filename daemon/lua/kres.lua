@@ -455,6 +455,27 @@ ffi.metatype( knot_rrset_t, {
 			C.free(dump[0])
 			return result
 		end,
+		txt_fields = function(rr, i)
+			assert(ffi.istype(knot_rrset_t, rr))
+			assert(i >= 0 and i < rr:rdcount())
+			local bufsize = 1024
+			local dump = ffi.new('char *', C.malloc(bufsize))
+			ffi.gc(dump, C.free)
+
+			local ret = knot.knot_rrset_txt_dump_data(rr, i, dump, 1024,
+							knot.KNOT_DUMP_STYLE_DEFAULT)
+			if ret >= 0 then
+				local out = {}
+				out.owner = dname2str(rr:owner())
+				out.ttl = rr:ttl()
+				out.class = kres.tostring.class[rr:class()]
+				out.type = kres.tostring.type[rr.type]
+				out.rdata = ffi.string(dump, ret)
+				return out
+			else
+				panic('knot_rrset_txt_dump_data failure ' .. tostring(ret))
+			end
+		end,
 		-- Return RDATA count for this RR set
 		rdcount = function(rr)
 			assert(ffi.istype(knot_rrset_t, rr))
