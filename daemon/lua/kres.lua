@@ -904,11 +904,21 @@ local function c_array_iter(t, i)
 end
 
 -- Metatype for a single ranked record array entry (one RRset)
+local function rank_tostring(rank)
+	local names = {}
+	for name, value in pairs(const_rank) do
+		if ffi.C.kr_rank_test(rank, value) then
+			table.insert(names, string.lower(name))
+		end
+	end
+	return string.format('0%.2o (%s)', rank, table.concat(names, ' '))
+end
+
 local ranked_rr_array_entry_t = ffi.typeof('ranked_rr_array_entry_t')
 ffi.metatype(ranked_rr_array_entry_t, {
 	__tostring = function(self)
-		return string.format('; ranked rrset to_wire %s, rank 0%.2o, cached %s, qry_uid %s, revalidations %s\n%s',
-		self.to_wire, self.rank, self.cached, self.qry_uid,
+		return string.format('; ranked rrset to_wire %s, rank %s, cached %s, qry_uid %s, revalidations %s\n%s',
+		self.to_wire, rank_tostring(self.rank), self.cached, self.qry_uid,
 		self.revalidation_cnt, string.format('%s', self.rr))
 	end
 })

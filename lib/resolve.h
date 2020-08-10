@@ -90,7 +90,7 @@ enum kr_rank {
 	KR_RANK_INDET = 4,   /**< Unable to determine whether it should be secure. */
 	KR_RANK_BOGUS,       /**< Ought to be secure but isn't. */
 	KR_RANK_MISMATCH,
-	KR_RANK_MISSING,     /**< Unable to obtain a good signature. */
+	KR_RANK_MISSING,     /**< No RRSIG found for that owner+type combination. */
 
 	/** Proven to be insecure, i.e. we have a chain of trust from TAs
 	 * that cryptographically denies the possibility of existence
@@ -110,16 +110,7 @@ enum kr_rank {
 bool kr_rank_check(uint8_t rank) KR_PURE;
 
 /** Test the presence of any flag/state in a rank, i.e. including KR_RANK_AUTH. */
-static inline bool kr_rank_test(uint8_t rank, uint8_t kr_flag)
-{
-	assert(kr_rank_check(rank) && kr_rank_check(kr_flag));
-	if (kr_flag == KR_RANK_AUTH) {
-		return rank & KR_RANK_AUTH;
-	}
-	assert(!(kr_flag & KR_RANK_AUTH));
-	/* The rest are exclusive values - exactly one has to be set. */
-	return (rank & ~KR_RANK_AUTH) == kr_flag;
-}
+bool kr_rank_test(uint8_t rank, uint8_t kr_flag) KR_PURE KR_EXPORT;
 
 /** Set the rank state. The _AUTH flag is kept as it was. */
 static inline void kr_rank_set(uint8_t *rank, uint8_t kr_flag)

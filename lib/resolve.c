@@ -46,6 +46,17 @@ bool kr_rank_check(uint8_t rank)
 	}
 }
 
+bool kr_rank_test(uint8_t rank, uint8_t kr_flag)
+{
+	assert(kr_rank_check(rank) && kr_rank_check(kr_flag));
+	if (kr_flag == KR_RANK_AUTH) {
+		return rank & KR_RANK_AUTH;
+	}
+	assert(!(kr_flag & KR_RANK_AUTH));
+	/* The rest are exclusive values - exactly one has to be set. */
+	return (rank & ~KR_RANK_AUTH) == kr_flag;
+}
+
 /** @internal Set @a yielded to all RRs with matching @a qry_uid. */
 static void set_yield(ranked_rr_array_t *array, const uint32_t qry_uid, const bool yielded)
 {
@@ -542,6 +553,9 @@ static int answer_padding(struct kr_request *request)
 static void answer_fail(struct kr_request *request)
 {
 	/* Note: OPT in SERVFAIL response is still useful for cookies/additional info. */
+	if (VERBOSE_STATUS || kr_log_rtrace_enabled(request))
+		kr_log_req(request, 0, 0, "resl",
+			"request failed, answering with empty SERVFAIL\n");
 	knot_pkt_t *answer = request->answer;
 	knot_rrset_t *opt_rr = answer->opt_rr; /* it gets NULLed below */
 	int ret = kr_pkt_clear_payload(answer);
@@ -626,7 +640,7 @@ static void answer_finalize(struct kr_request *request)
 		secure = false; /* don't trust forwarding for now */
 	}
 	if (last && (last->flags.DNSSEC_OPTOUT)) {
-		VERBOSE_MSG(NULL, "AD: opt-out\n");
+		VERBOSE_MSG(last, "insecure because of opt-out\n");
 		secure = false; /* the last answer is insecure due to opt-out */
 	}
 
@@ -1200,6 +1214,7 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	if (qry->flags.DNSSEC_NODS) {
 		/* This is the next query iteration with minimized qname.
 		 * At previous iteration DS non-existance has been proven */
+		VERBOSE_MSG(qry, "<= DS doesn't exist, going insecure\n");
 		qry->flags.DNSSEC_NODS = false;
 		qry->flags.DNSSEC_WANT = false;
 		qry->flags.DNSSEC_INSECURE = true;
