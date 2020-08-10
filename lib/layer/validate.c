@@ -481,7 +481,6 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 			VERBOSE_MSG(qry, "<= bogus proof of DS non-existence\n");
 			qry->flags.DNSSEC_BOGUS = true;
 		} else if (proved_name[0] != '\0') { /* don't go to insecure for . DS */
-			VERBOSE_MSG(qry, "<= DS doesn't exist, going insecure\n");
 			qry->flags.DNSSEC_NODS = true;
 			/* Rank the corresponding nonauth NS as insecure. */
 			for (int i = 0; i < req->auth_selected.len; ++i) {
@@ -551,57 +550,48 @@ static const knot_dname_t *signature_authority(struct kr_request *req)
 	return signer_name;
 }
 
-static int rrsig_not_found(kr_layer_t *ctx, const knot_rrset_t *rr)
+static int rrsig_not_found(const kr_layer_t * const ctx, const knot_pkt_t * const pkt,
+				const knot_rrset_t * const rr)
 {
-	struct kr_request *req = ctx->req;
-	struct kr_query *qry = req->current_query;
+	/* Signatures are missing.  There might be a zone cut that we've skipped
+	 * and transitions to insecure.  That can commonly happen when iterating
+	 * and both sides of that cut are served by the same IP address(es).
+	 * We'll try proving that the name truly is insecure - by spawning
+	 * a DS sub-query on a suitable QNAME.
+	 */
+	struct kr_request * const req = ctx->req;
+	struct kr_query * const qry = req->current_query;
 
-	/* Parent-side record, so don't ask for RRSIG.
-	 * We won't receive it anyway. */
-	if (qry->stype == KNOT_RRTYPE_DS) {
+	if (qry->flags.FORWARD || qry->flags.STUB) {
+		/* Undiscovered signed cuts can't happen in the current forwarding
+		 * algorithm, so this function shouldn't be able to help. */
 		return KR_STATE_FAIL;
 	}
 
-	struct kr_zonecut *cut = &qry->zone_cut;
-	const knot_dname_t *cut_name_start = qry->zone_cut.name;
-	bool use_cut = true;
-	if (knot_dname_in_bailiwick(rr->owner, cut_name_start) < 0) {
-		int zone_labels = knot_dname_labels(qry->zone_cut.name, NULL);
-		int matched_labels = knot_dname_matched_labels(qry->zone_cut.name, rr->owner);
-		int skip_labels = zone_labels - matched_labels;
-		while (skip_labels--) {
-			cut_name_start = knot_wire_next_label(cut_name_start, NULL);
-		}
-		/* try to find the name wanted among ancestors */
-		use_cut = false;
-		while (cut->parent) {
-			cut = cut->parent;
-			if (knot_dname_is_equal(cut_name_start, cut->name)) {
-				use_cut = true;
-				break;
-			}
-		};
+	/* Find cut_next: the name at which to try finding the "missing" zone cut. */
+	const knot_dname_t * const cut_top = qry->zone_cut.name;
+	const int next_depth = knot_dname_in_bailiwick(rr->owner, cut_top);
+	if (next_depth <= 0) {
+		return KR_STATE_FAIL; // shouldn't happen, I think
 	}
-	struct kr_rplan *rplan = &req->rplan;
-	struct kr_query *next = kr_rplan_push(rplan, qry, rr->owner, rr->rclass, KNOT_RRTYPE_RRSIG);
+	/* Add one extra label to cur_top, i.e. descend one level below current zone cut */
+	const knot_dname_t * const cut_next = rr->owner +
+		knot_dname_prefixlen(rr->owner, next_depth - 1, NULL);
+
+	/* Spawn that DS sub-query. */
+	struct kr_query * const next = kr_rplan_push(&req->rplan, qry, cut_next,
+						rr->rclass, KNOT_RRTYPE_DS);
 	if (!next) {
 		return KR_STATE_FAIL;
 	}
-	kr_zonecut_init(&next->zone_cut, cut_name_start, &req->pool);
-	if (use_cut) {
-		kr_zonecut_copy(&next->zone_cut, cut);
-		kr_zonecut_copy_trust(&next->zone_cut, cut);
-	} else {
-		next->flags.AWAIT_CUT = true;
-	}
-	if (qry->flags.FORWARD) {
-		next->flags.AWAIT_CUT = false;
-	}
+	kr_zonecut_init(&next->zone_cut, qry->zone_cut.name, &req->pool);
+	kr_zonecut_copy(&next->zone_cut, &qry->zone_cut);
+	kr_zonecut_copy_trust(&next->zone_cut, &qry->zone_cut);
 	next->flags.DNSSEC_WANT = true;
 	return KR_STATE_YIELD;
 }
 
-static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
+static int check_validation_result(kr_layer_t *ctx, const knot_pkt_t *pkt, ranked_rr_array_t *arr)
 {
 	int ret = KR_STATE_DONE;
 	struct kr_request *req = ctx->req;
@@ -654,7 +644,7 @@ static int check_validation_result(kr_layer_t *ctx, ranked_rr_array_t *arr)
 		VERBOSE_MSG(qry, ">< cut changed (new signer), needs revalidation\n");
 		ret = KR_STATE_YIELD;
 	} else if (kr_rank_test(invalid_entry->rank, KR_RANK_MISSING)) {
-		ret = rrsig_not_found(ctx, rr);
+		ret = rrsig_not_found(ctx, pkt, rr);
 	} else if (!kr_rank_test(invalid_entry->rank, KR_RANK_SECURE)) {
 		qry->flags.DNSSEC_BOGUS = true;
 		ret = KR_STATE_FAIL;
@@ -1118,13 +1108,13 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 		/* check validation state and spawn subrequests */
 		if (!req->answ_validated) {
-			ret = check_validation_result(ctx, &req->answ_selected);
+			ret = check_validation_result(ctx, pkt, &req->answ_selected);
 			if (ret != KR_STATE_DONE) {
 				return ret;
 			}
 		}
 		if (!req->auth_validated) {
-			ret = check_validation_result(ctx, &req->auth_selected);
+			ret = check_validation_result(ctx, pkt, &req->auth_selected);
 			if (ret != KR_STATE_DONE) {
 				return ret;
 			}

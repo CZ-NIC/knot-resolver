@@ -357,6 +357,7 @@ int kr_bitcmp(const char *, const char *, int);
 int kr_family_len(int);
 struct sockaddr *kr_straddr_socket(const char *, int, knot_mm_t *);
 int kr_straddr_split(const char *, char * restrict, uint16_t *);
+_Bool kr_rank_test(uint8_t, uint8_t);
 int kr_ranked_rrarray_add(ranked_rr_array_t *, const knot_rrset_t *, uint8_t, _Bool, uint32_t, knot_mm_t *);
 int kr_ranked_rrarray_finalize(ranked_rr_array_t *, uint32_t, knot_mm_t *);
 void kr_qflags_set(struct kr_qflags *, struct kr_qflags);
