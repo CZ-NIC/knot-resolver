@@ -142,10 +142,10 @@
 
 struct queue;
 /* Non-inline functions are exported to be usable from daemon. */
-void queue_init_impl(struct queue *q, size_t item_size);
-void queue_deinit_impl(struct queue *q);
-void * queue_push_impl(struct queue *q);
-void * queue_push_head_impl(struct queue *q);
+KR_EXPORT void queue_init_impl(struct queue *q, size_t item_size);
+KR_EXPORT void queue_deinit_impl(struct queue *q);
+KR_EXPORT void * queue_push_impl(struct queue *q);
+KR_EXPORT void * queue_push_head_impl(struct queue *q);
 
 struct queue_chunk;
 struct queue {
