@@ -198,6 +198,13 @@ static inline void queue_pop_impl(struct queue *q)
 	assert(h && h->end > h->begin);
 	if (h->end - h->begin == 1) {
 		/* removing the last element in the chunk */
+		assert((q->len == 1) == (q->head == q->tail));
+		if (q->len == 1) {
+			q->tail = NULL;
+			assert(!h->next);
+		} else {
+			assert(h->next);
+		}
 		q->head = h->next;
 		free(h);
 	} else {
