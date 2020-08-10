@@ -14,6 +14,12 @@ static void test_int(void **state_)
 	queue_int_t q;
 	queue_init(q);
 
+	/* Case of emptying the queue (and using again) has been broken for a long time. */
+	queue_push(q, 2);
+	queue_pop(q);
+	queue_push(q, 4);
+	queue_pop(q);
+
 	queue_push_head(q, 2);
 	queue_push_head(q, 1);
 	queue_push_head(q, 0);
