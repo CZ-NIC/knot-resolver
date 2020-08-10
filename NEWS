@@ -13,7 +13,7 @@ Bugfixes
 - tls: fix compilation to support net.tls_sticket_secret() (!1021)
 - validator: ignore bogus RRSIGs present in insecure domains (!1022, #587)
 - build if libsystemd version isn't detected as integer (#592, !1029)
-- validator: more robust reaction when RRSIGs are missing unexpectedly (!1020)
+- validator: more robust reaction on missing RRSIGs (#390, !1020)
 
 
 Knot Resolver 5.1.2 (2020-07-01)
