@@ -35,7 +35,8 @@
 
 struct http_data_buffer {
 	uint8_t *data;
-	const uint8_t *end;
+	size_t len;
+	size_t pos;
 };
 
 static char const server_logstring[] = "http";
@@ -166,12 +167,16 @@ ssize_t http_process_input_data(struct session *s, const uint8_t *in_buf, ssize_
 static ssize_t send_response_callback(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t length, uint32_t *data_flags, nghttp2_data_source *source, void *user_data)
 {
 	struct http_data_buffer *buffer = (struct http_data_buffer *)source->ptr;
-	size_t send = MIN(buffer->end - buffer->data, length);
-	memcpy(buf, buffer->data, send);
-	buffer->data += send;
+	assert(buffer != NULL);
+	size_t send = MIN(buffer->len - buffer->pos, length);
+	memcpy(buf, buffer->data + buffer->pos, send);
+	buffer->pos += send;
 	//*data_flags |= (buffer->data == buffer->end) ? NGHTTP2_DATA_FLAG_EOF : 0;
-	if (buffer->data == buffer->end) {
+	if (buffer->pos == buffer->len) {
 		*data_flags |= NGHTTP2_DATA_FLAG_EOF;
+		free(buffer->data);
+		free(buffer);
+		source->ptr = NULL;
 	}
 	return send;
 }
@@ -189,16 +194,21 @@ int http_write(uv_write_t *req, uv_handle_t *handle, int32_t stream_id, knot_pkt
 	assert (!session_flags(s)->outgoing);
 
 	char size[MAX_DECIMAL_LENGTH(pkt->size)] = { 0 };
-	int size_len = sprintf(size, "%ld", pkt->size);
+	int size_len = sprintf(size, "%ld", pkt->size);  // TODO snprintf
 
-	struct http_data_buffer data_buff = {
-		.data = pkt->wire,
-		.end = pkt->wire + pkt->size
-	};
+	/* Copy the packet data into a separate buffer, because nghttp2_session_send()
+	 * isn't guaranteed to process the data immediately. */
+	uint8_t *buf = malloc(pkt->size);
+	memcpy(buf, pkt->wire, pkt->size);
+
+	struct http_data_buffer *data_buff = malloc(sizeof(struct http_data_buffer));
+	data_buff->data = buf;
+	data_buff->len = pkt->size;
+	data_buff->pos = 0;
 
 	const nghttp2_data_provider data_prd = {
 		.source = {
-			.ptr = &data_buff
+			.ptr = data_buff
 		},
 		.read_callback = send_response_callback
 	};
