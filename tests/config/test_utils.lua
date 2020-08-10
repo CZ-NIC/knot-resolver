@@ -43,16 +43,47 @@ local function rrset_to_texts(rr)
 	for w in rr:txt_dump():gmatch("%S+") do table.insert(rr_text, w) end
 	return rr_text
 end
+
+local function answer2table(pkt)
+	local got_answers = {}
+	local ans_rrs = pkt:rrsets(kres.section.ANSWER)
+	for i = 1, #ans_rrs do
+		rrs = ans_rrs[i]
+		for rri = 0, rrs:rdcount() - 1 do
+			local rr = ans_rrs[i]:txt_fields(rri)
+			got_answers[rr.owner] = got_answers[rr.owner] or {}
+			got_answers[rr.owner][rr.type] = got_answers[rr.owner][rr.type] or {}
+			table.insert(got_answers[rr.owner][rr.type], rr.rdata)
+			table.sort(got_answers[rr.owner][rr.type])
+		end
+	end
+	return got_answers
+end
+
 M.NODATA = -1
 -- Resolve a name and check the answer.  Do *not* return until finished.
 -- expected_rdata is one string or a table of strings in presentation format
--- (not tested beyond IP addresses; TODO: handle ordering somehow?)
 function M.check_answer(desc, qname, qtype, expected_rcode, expected_rdata)
-	if expected_rdata ~= nil and type(expected_rdata) ~= 'table' then
-		expected_rdata = { expected_rdata }
+	assert(type(qtype) == 'number')
+	local qtype_str = kres.tostring.type[qtype]
+	qname = string.lower(qname)
+
+	local expected_answer = {}
+	if expected_rdata ~= nil then
+		if type(expected_rdata) ~= 'table' then
+			expected_rdata = { expected_rdata }
+		end
+		if #expected_rdata > 0 then
+			table.sort(expected_rdata)
+			expected_answer = {
+				[qname] = {
+					[qtype_str] =
+						expected_rdata
+				}
+			}
+		end
 	end
 
-	local qtype_str = kres.tostring.type[qtype]
 	local wire_rcode = expected_rcode
 	if expected_rcode == kres.rcode.NOERROR and type(expected_rdata) == 'table'
 			and #expected_rdata == 0 then
@@ -71,16 +102,10 @@ function M.check_answer(desc, qname, qtype, expected_rcode, expected_rdata)
 		   desc ..': checking number of answers for ' .. qname .. ' ' .. qtype_str)
 
 		if expected_rdata then
-			local ans_rrs = pkt:rrsets(kres.section.ANSWER)
-			ok(#expected_rdata == #ans_rrs,
-				desc .. ': checking number of answer records for ' .. qname .. ' ' .. qtype_str)
-			for i = 1, #ans_rrs do
-				ok(rrset_to_texts(ans_rrs[i])[4] == expected_rdata[i],
-					desc .. ': checking rdata of answer for ' .. qname .. ' ' .. qtype_str)
-			end
+			same(expected_answer, answer2table(pkt), 'ANSWER section matches')
 		end
 		done = true
-		end
+	end
 	resolve(qname, qtype, kres.class.IN, {},
 		function(...)
 			local ok, err = xpcall(callback, debug.traceback, ...)
