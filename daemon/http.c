@@ -28,7 +28,8 @@
 #define MAKE_STATIC_NV(K, V) \
 	MAKE_NV(K, sizeof(K) - 1, V, sizeof(V) - 1)
 
-#define HTTP_MAX_CONCURRENT_STREAMS 1
+// TODO use tcp_pipeline_max instead?
+#define HTTP_MAX_CONCURRENT_STREAMS 100
 
 #define MAX_DECIMAL_LENGTH(VT) (CHAR_BIT * sizeof(VT) / 3) + 3
 
@@ -73,7 +74,7 @@ static int data_chunk_recv_callback(nghttp2_session *session, uint8_t flags, int
 		/* If the received DATA chunk is from a different stream
 		 * than the one being currently handled, ignore it and refuse
 		 * the stream. */
-		// TODO log
+		kr_log_verbose("[doh2] resetting http stream due to incomplete data\n");
 		nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
 		return 0;
 	}
@@ -101,6 +102,7 @@ static int on_frame_recv_callback(nghttp2_session *session, const nghttp2_frame 
 
 		knot_wire_write_u16(ctx->wire - sizeof(uint16_t), ctx->wire_len);  // TODO wire_len can be overflow when negative  int32_t
 		ctx->submitted += ctx->wire_len + sizeof(uint16_t);
+		ctx->wire += ctx->wire_len;
 	}
 
 	return 0;
