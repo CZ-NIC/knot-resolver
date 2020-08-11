@@ -17,6 +17,9 @@
 
 #define TLS_CHUNK_SIZE (16 * 1024)
 
+/* Initial max frame size: https://tools.ietf.org/html/rfc7540#section-6.5.2 */
+#define HTTP_MAX_FRAME_SIZE 16384
+
 /* Per-socket (TCP or UDP) persistent structure.
  *
  * In particular note that for UDP clients it's just one session (per socket)
@@ -329,6 +332,9 @@ struct session *session_new(uv_handle_t *handle, bool has_tls, bool has_http)
 			session->sflags.has_tls = true;
 		}
 		if (has_http) {
+			/* When decoding large packets,
+			 * HTTP/2 frames can be up to 16 KB by default. */
+			wire_buffer_size += HTTP_MAX_FRAME_SIZE;
 			session->sflags.has_http = true;
 		}
 		uint8_t *wire_buf = malloc(wire_buffer_size);
