@@ -28,9 +28,9 @@ struct http_ctx_t {
 	queue_int32_t streams;  /* List of stream IDs of read HTTP/2 frames. */
 	bool incomplete_stream;
 	ssize_t submitted;
-	uint8_t *wire;
-	uint8_t *wire_start_idx;
-	int32_t wire_len;
+	uint8_t *buf;  /* Part of the session->wire_buf that belongs to current HTTP/2 stream. */
+	ssize_t buf_pos;
+	ssize_t buf_size;
 };
 
 struct http_ctx_t* http_new(http_send_callback cb, void *user_ctx);
