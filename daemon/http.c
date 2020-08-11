@@ -49,14 +49,24 @@ static ssize_t send_callback(nghttp2_session *session, const uint8_t *data, size
 
 static int header_callback(nghttp2_session *session, const nghttp2_frame *frame, const uint8_t *name, size_t namelen, const uint8_t *value, size_t valuelen, uint8_t flags, void *user_data)
 {
-	//TODO some validation.. When POST, no DNS variable in path...
-	//In knot we parse path using some static lib, think of use it too but not necessary
+	/* If the HEADERS don't have END_STREAM set, there are some DATA frames,
+	 * which implies POST method.  Skip header processing for POST. */
+	if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM == 0) {
+		return 0;
+	}
+
+	/* If there is incomplete data in the buffer, we can't process the new stream. */
+	if (ctx->incomplete_stream) {
+		kr_log_verbose("[doh2] refusing new http stream due to incomplete data from other stream\n");
+		nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
+		return 0;
+	}
+
 	static const char key[] = "dns=";
 	struct http_ctx_t *ctx = (struct http_ctx_t *)user_data;
 	if (!strcasecmp(":path", (const char *)name)) {
 		char *beg = strstr((const char *)value, key);
 		if (beg) {
-			// TODO check we're not interefing with incomplete stream
 			beg += sizeof(key) - 1;
 			char *end = strchrnul(beg, '&');
 			ctx->wire_len = kr_base64url_decode((uint8_t*)beg, end - beg, ctx->wire + sizeof(uint16_t), ctx->wire_len - sizeof(uint16_t));
@@ -72,10 +82,9 @@ static int data_chunk_recv_callback(nghttp2_session *session, uint8_t flags, int
 	struct http_ctx_t *ctx = (struct http_ctx_t *)user_data;
 
 	if (ctx->incomplete_stream && queue_len(ctx->streams) > 0 && queue_tail(ctx->streams) != stream_id) {
-		/* If the received DATA chunk is from a different stream
-		 * than the one being currently handled, ignore it and refuse
-		 * the stream. */
-		kr_log_verbose("[doh2] resetting http stream due to incomplete data\n");
+		/* If the received DATA chunk is from a new stream and the previous
+		 * one still has unfinished DATA, refuse the new stream. */
+		kr_log_verbose("[doh2] refusing http DATA chunk, other stream has incomplete DATA\n");
 		nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
 		return 0;
 	}
