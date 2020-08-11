@@ -28,8 +28,8 @@
 #define MAKE_STATIC_NV(K, V) \
 	MAKE_NV(K, sizeof(K) - 1, V, sizeof(V) - 1)
 
-// TODO use tcp_pipeline_max instead?
-#define HTTP_MAX_CONCURRENT_STREAMS 100
+/* Use same maximum as for tcp_pipeline_max. */
+#define HTTP_MAX_CONCURRENT_STREAMS UINT16_MAX
 
 #define MAX_DECIMAL_LENGTH(VT) (CHAR_BIT * sizeof(VT) / 3) + 3
 
