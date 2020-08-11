@@ -39,8 +39,6 @@ struct http_data_buffer {
 	size_t pos;
 };
 
-static char const server_logstring[] = "http";
-
 static ssize_t send_callback(nghttp2_session *session, const uint8_t *data, size_t length, int flags, void *user_data)
 {
 	struct http_ctx_t *ctx = (struct http_ctx_t *)user_data;
@@ -57,7 +55,7 @@ static int header_callback(nghttp2_session *session, const nghttp2_frame *frame,
 
 	/* If there is incomplete data in the buffer, we can't process the new stream. */
 	if (ctx->incomplete_stream) {
-		kr_log_verbose("[doh2] refusing new http stream due to incomplete data from other stream\n");
+		kr_log_verbose("[http] refusing new http stream due to incomplete data from other stream\n");
 		nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
 		return 0;
 	}
@@ -84,7 +82,7 @@ static int data_chunk_recv_callback(nghttp2_session *session, uint8_t flags, int
 	if (ctx->incomplete_stream && queue_len(ctx->streams) > 0 && queue_tail(ctx->streams) != stream_id) {
 		/* If the received DATA chunk is from a new stream and the previous
 		 * one still has unfinished DATA, refuse the new stream. */
-		kr_log_verbose("[doh2] refusing http DATA chunk, other stream has incomplete DATA\n");
+		kr_log_verbose("[http] refusing http DATA chunk, other stream has incomplete DATA\n");
 		nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
 		return 0;
 	}
@@ -161,12 +159,12 @@ ssize_t http_process_input_data(struct session *s, const uint8_t *in_buf, ssize_
 	// http_p->wire_len = session_wirebuf_get_free_size(s);  // TODO initialize this for GET
 	ssize_t ret = 0;
 	if ((ret = nghttp2_session_mem_recv(http_p->session, in_buf, in_buf_len)) < 0) {
-		kr_log_error("[%s] nghttp2_session_mem_recv failed: %s (%zd)\n", server_logstring, nghttp2_strerror(ret), ret);
+		kr_log_error("[http] nghttp2_session_mem_recv failed: %s (%zd)\n", nghttp2_strerror(ret), ret);
 		return kr_error(EIO);
 	}
 
 	if ((ret = nghttp2_session_send(http_p->session)) < 0) {
-		kr_log_error("[%s] nghttp2_session_send failed: %s (%zd)\n", server_logstring, nghttp2_strerror(ret), ret);
+		kr_log_error("[http] nghttp2_session_send failed: %s (%zd)\n", nghttp2_strerror(ret), ret);
 		return kr_error(EIO);
 	}
 
@@ -230,12 +228,12 @@ int http_write(uv_write_t *req, uv_handle_t *handle, int32_t stream_id, knot_pkt
 
 	int ret = nghttp2_submit_response(http_ctx->session, stream_id, hdrs, sizeof(hdrs)/sizeof(*hdrs), &data_prd);
 	if (ret != 0) {
-		kr_log_error("[%s] nghttp2_submit_response failed: %s (%d)\n", server_logstring, nghttp2_strerror(ret), ret);
+		kr_log_error("[http] nghttp2_submit_response failed: %s (%d)\n", nghttp2_strerror(ret), ret);
 		return kr_error(EIO);
 	}
 
 	if((ret = nghttp2_session_send(http_ctx->session)) < 0) {
-		kr_log_error("[%s] nghttp2_session_send failed: %s (%d)\n", server_logstring, nghttp2_strerror(ret), ret);
+		kr_log_error("[http] nghttp2_session_send failed: %s (%d)\n", nghttp2_strerror(ret), ret);
  		return kr_error(EIO);
 	}
 
