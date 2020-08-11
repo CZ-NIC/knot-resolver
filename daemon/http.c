@@ -47,27 +47,35 @@ static ssize_t send_callback(nghttp2_session *session, const uint8_t *data, size
 
 static int header_callback(nghttp2_session *session, const nghttp2_frame *frame, const uint8_t *name, size_t namelen, const uint8_t *value, size_t valuelen, uint8_t flags, void *user_data)
 {
+	struct http_ctx_t *ctx = (struct http_ctx_t *)user_data;
+	static const char key[] = "dns=";
+
 	/* If the HEADERS don't have END_STREAM set, there are some DATA frames,
 	 * which implies POST method.  Skip header processing for POST. */
-	if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM == 0) {
+	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) == 0) {
 		return 0;
 	}
 
 	/* If there is incomplete data in the buffer, we can't process the new stream. */
 	if (ctx->incomplete_stream) {
 		kr_log_verbose("[http] refusing new http stream due to incomplete data from other stream\n");
-		nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
+		nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, frame->hd.stream_id, NGHTTP2_REFUSED_STREAM);
 		return 0;
 	}
 
-	static const char key[] = "dns=";
-	struct http_ctx_t *ctx = (struct http_ctx_t *)user_data;
 	if (!strcasecmp(":path", (const char *)name)) {
 		char *beg = strstr((const char *)value, key);
 		if (beg) {
 			beg += sizeof(key) - 1;
 			char *end = strchrnul(beg, '&');
-			ctx->wire_len = kr_base64url_decode((uint8_t*)beg, end - beg, ctx->wire + sizeof(uint16_t), ctx->wire_len - sizeof(uint16_t));
+			ctx->buf_pos = sizeof(uint16_t);
+			ssize_t remaining = ctx->buf_size - ctx->submitted - ctx->buf_pos;
+			ssize_t ret = kr_base64url_decode((uint8_t*)beg, end - beg, ctx->buf + ctx->buf_pos, remaining);
+			if (ret < 0) {
+				nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, frame->hd.stream_id, NGHTTP2_REFUSED_STREAM);
+				return 0;  // TODO maybe return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE?
+			}
+			ctx->buf_pos += ret;
 			queue_push(ctx->streams, frame->hd.stream_id);
 		}
 	}
@@ -87,16 +95,22 @@ static int data_chunk_recv_callback(nghttp2_session *session, uint8_t flags, int
 		return 0;
 	}
 
-	// TODO is there enough space in the wire buffer?
+	/* Check message and its length can still fit into the wire buffer. */
+	ssize_t remaining = ctx->buf_size - ctx->submitted - ctx->buf_pos;
+	if ((len + 2) > remaining) {
+		kr_log_verbose("[http] insufficient space in buffer: remaining %zd B, required %zd B\n", remaining, len + 2);
+		return NGHTTP2_ERR_CALLBACK_FAILURE;
+	}
+
 	if (!ctx->incomplete_stream) {
 		ctx->incomplete_stream = true;
 		queue_push(ctx->streams, stream_id);
 
-		ctx->wire += sizeof(uint16_t);
-		ctx->wire_len = 0;
+		/* 2B at the start of buffer is reserved for message length. */
+		ctx->buf_pos = sizeof(uint16_t);
 	}
-	memcpy(ctx->wire + ctx->wire_len, data, len);
-	ctx->wire_len += len;
+	memcpy(ctx->buf + ctx->buf_pos, data, len);
+	ctx->buf_pos += len;
 
 	return 0;
 }
@@ -105,12 +119,19 @@ static int on_frame_recv_callback(nghttp2_session *session, const nghttp2_frame 
 {
 	struct http_ctx_t *ctx = (struct http_ctx_t *)user_data;
 
-	if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM && ctx->incomplete_stream) {
+	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) && ctx->buf_pos != 0) {
 		ctx->incomplete_stream = false;
 
-		knot_wire_write_u16(ctx->wire - sizeof(uint16_t), ctx->wire_len);  // TODO wire_len can be overflow when negative  int32_t
-		ctx->submitted += ctx->wire_len + sizeof(uint16_t);
-		ctx->wire += ctx->wire_len;
+		ssize_t len = ctx->buf_pos - sizeof(uint16_t);
+		if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
+			kr_log_verbose("[http] invalid dnsmsg size: %zd B\n", len);
+			return NGHTTP2_ERR_CALLBACK_FAILURE;
+		}
+
+		knot_wire_write_u16(ctx->buf, len);
+		ctx->submitted += ctx->buf_pos;
+		ctx->buf += ctx->buf_pos;
+		ctx->buf_pos = 0;
 	}
 
 	return 0;
@@ -154,9 +175,10 @@ ssize_t http_process_input_data(struct session *s, const uint8_t *in_buf, ssize_
 	}
 
 	http_p->submitted = 0;
-	http_p->wire_start_idx = session_wirebuf_get_free_start(s);
-	http_p->wire = http_p->wire_start_idx;
-	// http_p->wire_len = session_wirebuf_get_free_size(s);  // TODO initialize this for GET
+	http_p->buf = session_wirebuf_get_free_start(s);
+	http_p->buf_pos = 0;
+	http_p->buf_size = session_wirebuf_get_free_size(s);
+
 	ssize_t ret = 0;
 	if ((ret = nghttp2_session_mem_recv(http_p->session, in_buf, in_buf_len)) < 0) {
 		kr_log_error("[http] nghttp2_session_mem_recv failed: %s (%zd)\n", nghttp2_strerror(ret), ret);
