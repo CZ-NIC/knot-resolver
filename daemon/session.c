@@ -17,6 +17,9 @@
 
 #define TLS_CHUNK_SIZE (16 * 1024)
 
+/* Initial max frame size: https://tools.ietf.org/html/rfc7540#section-6.5.2 */
+#define HTTP_MAX_FRAME_SIZE 16384
+
 /* Per-socket (TCP or UDP) persistent structure.
  *
  * In particular note that for UDP clients it's just one session (per socket)
@@ -329,6 +332,9 @@ struct session *session_new(uv_handle_t *handle, bool has_tls, bool has_http)
 			session->sflags.has_tls = true;
 		}
 		if (has_http) {
+			/* When decoding large packets,
+			 * HTTP/2 frames can be up to 16 KB by default. */
+			wire_buffer_size += HTTP_MAX_FRAME_SIZE;
 			session->sflags.has_http = true;
 		}
 		uint8_t *wire_buf = malloc(wire_buffer_size);
@@ -538,7 +544,7 @@ knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm)
 		session->wire_buf_end_idx = 0;
 		return NULL;
 	}
-	
+
 	if (session->wire_buf_start_idx > session->wire_buf_end_idx) {
 		session->sflags.wirebuf_error = true;
 		session->wire_buf_start_idx = 0;
@@ -550,7 +556,7 @@ knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm)
 	uint8_t *msg_start = &session->wire_buf[session->wire_buf_start_idx];
 	ssize_t wirebuf_msg_data_size = session->wire_buf_end_idx - session->wire_buf_start_idx;
 	uint16_t msg_size = 0;
-	
+
 	if (!handle) {
 		session->sflags.wirebuf_error = true;
 		return NULL;
@@ -653,7 +659,7 @@ int session_discard_packet(struct session *session, const knot_pkt_t *pkt)
 		session->wire_buf_start_idx += pkt_msg_size;
 	}
 	session->sflags.wirebuf_error = false;
-	
+
 	wirebuf_data_size = session->wire_buf_end_idx - session->wire_buf_start_idx;
 	if (wirebuf_data_size == 0) {
 		session_wirebuf_discard(session);
