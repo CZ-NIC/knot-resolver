@@ -72,8 +72,10 @@ static int header_callback(nghttp2_session *session, const nghttp2_frame *frame,
 			ssize_t remaining = ctx->buf_size - ctx->submitted - ctx->buf_pos;
 			ssize_t ret = kr_base64url_decode((uint8_t*)beg, end - beg, ctx->buf + ctx->buf_pos, remaining);
 			if (ret < 0) {
+				ctx->buf_pos = 0;
 				nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, frame->hd.stream_id, NGHTTP2_REFUSED_STREAM);
-				return 0;  // TODO maybe return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE?
+				kr_log_verbose("[http] refusing GET request, insufficient buffer size\n");
+				return 0;
 			}
 			ctx->buf_pos += ret;
 			queue_push(ctx->streams, frame->hd.stream_id);
@@ -97,8 +99,8 @@ static int data_chunk_recv_callback(nghttp2_session *session, uint8_t flags, int
 
 	/* Check message and its length can still fit into the wire buffer. */
 	ssize_t remaining = ctx->buf_size - ctx->submitted - ctx->buf_pos;
-	if ((len + 2) > remaining) {
-		kr_log_verbose("[http] insufficient space in buffer: remaining %zd B, required %zd B\n", remaining, len + 2);
+	if ((len + sizeof(uint16_t)) > remaining) {
+		kr_log_error("[http] insufficient space in buffer: remaining %zd B, required %zd B\n", remaining, len + sizeof(uint16_t));
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 	}
 
@@ -200,13 +202,14 @@ static ssize_t send_response_callback(nghttp2_session *session, int32_t stream_i
 	size_t send = MIN(buffer->len - buffer->pos, length);
 	memcpy(buf, buffer->data + buffer->pos, send);
 	buffer->pos += send;
-	//*data_flags |= (buffer->data == buffer->end) ? NGHTTP2_DATA_FLAG_EOF : 0;
+
 	if (buffer->pos == buffer->len) {
 		*data_flags |= NGHTTP2_DATA_FLAG_EOF;
 		free(buffer->data);
 		free(buffer);
 		source->ptr = NULL;
 	}
+
 	return send;
 }
 
@@ -223,7 +226,7 @@ int http_write(uv_write_t *req, uv_handle_t *handle, int32_t stream_id, knot_pkt
 	assert (!session_flags(s)->outgoing);
 
 	char size[MAX_DECIMAL_LENGTH(pkt->size)] = { 0 };
-	int size_len = sprintf(size, "%ld", pkt->size);  // TODO snprintf
+	int size_len = snprintf(size, MAX_DECIMAL_LENGTH(pkt->size), "%ld", pkt->size);
 
 	/* Copy the packet data into a separate buffer, because nghttp2_session_send()
 	 * isn't guaranteed to process the data immediately. */
