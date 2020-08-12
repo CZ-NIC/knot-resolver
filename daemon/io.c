@@ -438,6 +438,22 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls, bool http)
 			}
 			ctx->c.session = s;
 			ctx->c.handshake_state = TLS_HS_IN_PROGRESS;
+
+			/* Configure ALPN. */
+			gnutls_datum_t proto;
+			if (!http) {
+				proto.data = (unsigned char *)"dot";
+				proto.size = 3;
+			} else {
+				proto.data = (unsigned char *)"h2";
+				proto.size = 2;
+			}
+			ret = gnutls_alpn_set_protocols(ctx->c.tls_session, &proto, 1, GNUTLS_ALPN_MANDATORY);
+			if (ret != GNUTLS_E_SUCCESS) {
+				session_close(s);
+				return;
+			}
+
 			session_tls_set_server_ctx(s, ctx);
 		}
 	}
@@ -450,20 +466,6 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls, bool http)
 			if (!ctx) {
 				session_close(s);
 				return;
-			}
-
-			struct tls_ctx_t *tls_ctx = session_tls_get_server_ctx(s);
-			if (tls_ctx) {
-				const gnutls_datum_t protos[] = {
-					{(unsigned char *)"h2", 2}
-				};
-				ret = gnutls_alpn_set_protocols(tls_ctx->c.tls_session,
-				                                protos, sizeof(protos)/sizeof(*protos),
-												0);
-				if (ret != GNUTLS_E_SUCCESS) {
-					session_close(s);
-					return;
-				}
 			}
 			session_http_set_server_ctx(s, ctx);
 		}
