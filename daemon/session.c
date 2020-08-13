@@ -739,30 +739,30 @@ int session_wirebuf_process(struct session *session, const struct sockaddr *peer
 	return ret;
 }
 
-void session_kill_ioreq(struct session *s, struct qr_task *task)
+void session_kill_ioreq(struct session *session, struct qr_task *task)
 {
-	if (!s) {
+	if (!session) {
 		return;
 	}
-	assert(s->sflags.outgoing && s->handle);
-	if (s->sflags.closing) {
+	assert(session->sflags.outgoing && session->handle);
+	if (session->sflags.closing) {
 		return;
 	}
-	session_tasklist_del(s, task);
-	if (s->handle->type == UV_UDP) {
-		assert(session_tasklist_is_empty(s));
-		session_close(s);
+	session_tasklist_del(session, task);
+	if (session->handle->type == UV_UDP) {
+		assert(session_tasklist_is_empty(session));
+		session_close(session);
 		return;
 	}
 }
 
 /** Update timestamp */
-void session_touch(struct session *s)
+void session_touch(struct session *session)
 {
-	s->last_activity = kr_now();
+	session->last_activity = kr_now();
 }
 
-uint64_t session_last_activity(struct session *s)
+uint64_t session_last_activity(struct session *session)
 {
-	return s->last_activity;
+	return session->last_activity;
 }
