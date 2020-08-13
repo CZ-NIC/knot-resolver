@@ -35,12 +35,6 @@
 #define DEBUG_MSG(...)
 #endif
 
-struct async_write_ctx {
-	uv_write_t write_req;
-	struct tls_common_ctx *t;
-	char buf[];
-};
-
 static char const server_logstring[] = "tls";
 static char const client_logstring[] = "tls_client";
 
@@ -90,15 +84,9 @@ static void on_write_complete(uv_write_t *req, int status)
 {
 	assert(req->data != NULL);
 	struct async_write_ctx *async_ctx = (struct async_write_ctx *)req->data;
-	struct tls_common_ctx *t = async_ctx->t;
-	assert(t->write_queue_size);
-	t->write_queue_size -= 1;
+	struct session *s = async_ctx->session;
+	assert(session_write_queue_dec(s) == kr_ok());
 	free(req->data);
-}
-
-static bool stream_queue_is_empty(struct tls_common_ctx *t)
-{
-	return (t->write_queue_size == 0);
 }
 
 static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * iov, int iovcnt)
@@ -137,7 +125,7 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 
 	/* Try to perform the immediate write first to avoid copy */
 	int ret = 0;
-	if (stream_queue_is_empty(t)) {
+	if (session_write_queue_is_empty(t->session)) {
 		ret = uv_try_write(handle, uv_buf, iovcnt);
 		DEBUG_MSG("[%s] push %zu <%p> = %d\n",
 		    t->client_side ? "tls_client" : "tls", total_len, h, ret);
@@ -177,7 +165,7 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 	if (p != NULL) {
 		struct async_write_ctx *async_ctx = (struct async_write_ctx *)p;
 		/* Save pointer to session tls context */
-		async_ctx->t = t;
+		async_ctx->session = t->session;
 		char *buf = async_ctx->buf;
 		/* Skip data written in the partial write */
 		size_t to_skip = ret;
@@ -209,7 +197,7 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 		/* Perform an asynchronous write with a callback */
 		if (uv_write(write_req, handle, uv_buf, 1, on_write_complete) == 0) {
 			ret = total_len;
-			t->write_queue_size += 1;
+			session_write_queue_inc(t->session);
 		} else {
 			free(p);
 			errno = EIO;
