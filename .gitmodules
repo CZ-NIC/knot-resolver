@@ -7,3 +7,6 @@
 [submodule "tests/config/tapered"]
 	path = tests/config/tapered
 	url = https://gitlab.nic.cz/knot/3rdparty/lua-tapered.git
+[submodule "modules/sysrepo/yang"]
+	path = modules/sysrepo/yang
+	url = https://gitlab.nic.cz/labs/resolvers-yang.git
