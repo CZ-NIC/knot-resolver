@@ -168,6 +168,12 @@ build:darwin:
   script:
     - ci/travis.py ${CI_COMMIT_REF_NAME}
 
+deckard_commit:
+  <<: *test_nodep
+  script:
+    - ci/deckard_commit_check.sh
+  allow_failure: true
+  
 deckard:
   <<: *test_flaky
   tags:
