@@ -182,6 +182,7 @@ deckard:
     TMPDIR: $CI_PROJECT_DIR
   script:
     - ${MESON_TEST} --suite integration
+    allow_failure: true
 
 doc:
   <<: *test_nodep
