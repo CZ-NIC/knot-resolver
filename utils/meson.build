@@ -5,5 +5,7 @@ build_utils = get_option('utils') != 'disabled'
 
 subdir('watcher')
 subdir('client')
-subdir('cache_gc')
+if build_sysrepo
+  subdir('cache_gc')
+endif
 subdir('upgrade')
