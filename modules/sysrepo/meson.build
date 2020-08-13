@@ -1,10 +1,24 @@
-# C module: sysrepo
+# lua module: sysrepo
+
+lua_config = configuration_data()
+lua_config.set('modules_dir', modules_dir)
+
+ffi = configure_file(
+  input: 'ffi.lua.in',
+  output: 'ffi.lua',
+  configuration: lua_config,
+)
+
+sysrepo_lua_src = [
+  ffi,
+  files('init.lua'),
+  files('debug.lua'),
+  files('model.lua'),
+]
 
 sysrepo_src = files([
-	'sysrepo.c',
-	'callbacks.c',
-	'conversion.c',
-	'conv_funcs.c',
+  'cbindings/sysrepo_clib.h',
+  'cbindings/sysrepo_clib.c',
 ])
 c_src_lint += sysrepo_src
 
@@ -17,18 +31,24 @@ sysrepo_common_src = files([
 c_src_lint += sysrepo_common_src
 
 if build_sysrepo
-	sysrepo_mod = shared_module(
-	'sysrepo',
+  install_data(
+    sysrepo_lua_src,
+    install_dir: modules_dir + '/sysrepo',
+  )
+
+  sysrepo_mod = shared_module(
+	'cbindings',
 	sysrepo_src,
-	sysrepo_common_src,
 	dependencies: [
 	  luajit_inc,
-	  libyang,
+    libyang,
 	  libsysrepo,
 	],
 	include_directories: mod_inc_dir,
 	name_prefix: '',
 	install: true,
-	install_dir: modules_dir,
+	install_dir: modules_dir + '/sysrepo',
   )
 endif
+
+

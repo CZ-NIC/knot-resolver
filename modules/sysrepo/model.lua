@@ -1,4 +1,4 @@
-local debug = require("kres_modules/sysrepo-lua/debug")
+local debug = require("kres_modules/sysrepo/debug")
 local ffi = require("ffi")
 local os = require("os")
 

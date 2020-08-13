@@ -1,6 +1,6 @@
-local sysrepo_ffi = require("kres_modules/sysrepo-lua/ffi")
+local sysrepo_ffi = require("kres_modules/sysrepo/ffi")
  -- following require returns only module constructor, calling it straight away
-local data_model = require("kres_modules/sysrepo-lua/model")(sysrepo_ffi.get_clib_bindings())
+local data_model = require("kres_modules/sysrepo/model")(sysrepo_ffi.get_clib_bindings())
 
 local sysrepo = {}
 

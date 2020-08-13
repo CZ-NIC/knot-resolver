@@ -1,7 +1,7 @@
 local ffi = require("ffi")
 
 -- The exact path is configured during project build by meson
-local clib = ffi.load("@modules_dir@/sysrepo-lua/cbindings.so")
+local clib = ffi.load("@modules_dir@/sysrepo/cbindings.so")
 
 -------------------------------------------------------------------------------
 --                      FFI initialization

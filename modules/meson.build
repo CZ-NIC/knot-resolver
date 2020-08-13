@@ -51,7 +51,6 @@ subdir('policy')
 subdir('refuse_nord')
 subdir('stats')
 subdir('sysrepo')
-subdir('sysrepo-lua')
 subdir('view')
 
 # install lua modules
