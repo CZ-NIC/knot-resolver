@@ -172,6 +172,7 @@ deckard_commit:
   <<: *test_nodep
   script:
     - ci/deckard_commit_check.sh
+  allow-failure: true
   
 deckard:
   <<: *test_flaky
