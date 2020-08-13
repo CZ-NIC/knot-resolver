@@ -50,8 +50,10 @@ subdir('nsid')
 subdir('policy')
 subdir('refuse_nord')
 subdir('stats')
-subdir('sysrepo')
 subdir('view')
+if build_sysrepo
+  subdir('sysrepo')
+endif
 
 # install lua modules
 foreach mod : lua_mod_src
