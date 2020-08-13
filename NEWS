@@ -14,6 +14,7 @@ Bugfixes
 - validator: ignore bogus RRSIGs present in insecure domains (!1022, #587)
 - build if libsystemd version isn't detected as integer (#592, !1029)
 - validator: more robust reaction on missing RRSIGs (#390, !1020)
+- ta_update module: fix broken RFC5011 rollover (!1035)
 
 
 Knot Resolver 5.1.2 (2020-07-01)
