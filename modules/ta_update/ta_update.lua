@@ -102,7 +102,7 @@ local function ta_present(keyset, rr, hold_down_time)
 	elseif not key_revoked then -- First time seen (NewKey)
 		rr.state = key_state.AddPend
 		rr.key_tag = key_tag
-		rr.timer = os.time() + hold_down_time
+		rr.timer = now + hold_down_time
 		table.insert(keyset, rr)
 		return false
 	end
