@@ -146,14 +146,36 @@ Following actions stop the policy matching on the query, i.e. other rules are no
        -- (the "true" at the end of policy.add)
        policy.add(policy.REROUTE({'192.0.2.0/24', '127.0.0.0'}), true)
 
-.. function:: ANSWER({ type = { ttl=ttl, rdata=data} }, nodata)
+.. function:: ANSWER({ type = { rdata=data, [ttl=1] } }, [nodata=false])
 
-   Overwrite rr data in response. ``rdata`` takes just IP address or a lua list of addresses. If `nodata` is `true` policy return `NODATA` when requested type from client isn't specified (default: ``nodata=false``).
+   Overwrite Resource Records in responses with specified values.
+
+      * type
+        - RR type to be replaced, e.g. ``[kres.type.A]`` or `numberic value <https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4>`_.
+      * rdata
+        - RR data in DNS wire format, i.e. binary form specific for given RR type. Set of multiple RRs can be specified as table ``{ rdata1, rdata2, ... }``. Use helper function :func:`kres.str2ip` to generate wire format for A and AAAA records.
+      * ttl
+        - TTL in seconds. Default: 1 second.
+      * nodata
+        - If type requested by client is not configured in this policy:
+
+          - ``true``: Return empty answer (`NODATA`).
+          - ``false``: Ignore this policy and continue processing other rules.
+
+          Default: ``false``.
 
    .. code-block:: lua
 
-       -- this policy changes IPv4 adress and TTL for `example.com`
-       policy.add(policy.suffix(policy.ANSWER({ [kres.type.A] = { ttl=300, rdata='\192\0\2\7' } }), { todname('example.com') }))
+       -- policy to change IPv4 address and TTL for example.com
+       policy.add(
+           policy.suffix(
+               policy.ANSWER({ [kres.type.A] = { rdata=kres.str2ip('192.0.2.7'), ttl=300 } }),
+           { todname('example.com') }))
+       -- policy to generate two TXT records (specified in binary format) for example.net
+       policy.add(
+           policy.suffix(
+               policy.ANSWER({ [kres.type.TXT] = { rdata={'\005first', '\006second'}, ttl=5 } }),
+           { todname('example.net') }))
 
 More complex non-chain actions are described in their own chapters, namely:
 
