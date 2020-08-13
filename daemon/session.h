@@ -137,3 +137,10 @@ void session_touch(struct session *s);
 /** Returns either creation time or time of last IO activity if any occurs. */
 /* Used for TCP timeout calculation. */
 uint64_t session_last_activity(struct session *s);
+
+/** Check whether the write queue is empty. */
+bool session_write_queue_is_empty(struct session *session);
+/** Increment the write queue size. */
+int session_write_queue_inc(struct session *session);
+/** Decrement the write queue size. */
+int session_write_queue_dec(struct session *session);
