@@ -82,6 +82,10 @@ struct iter_address_state {
     bool tls_capable : 1;
     bool tcp_waiting : 1;
     bool tcp_connected : 1;
+
+	int success_count;
+	int refused_count;
+
 };
 
 struct choice {
@@ -279,9 +283,11 @@ struct kr_transport *iter_get_best_transport(struct choice *choices, int len, st
     {
     case sizeof(struct in_addr):
         ADDR_SET(transport->address.ip4.sin, AF_INET, choices[choice].address, choices[choice].address_len, port);
+		transport->address_len = choices[choice].address_len;
         break;
     case sizeof(struct in6_addr):
         ADDR_SET(transport->address.ip6.sin6, AF_INET6, choices[choice].address, choices[choice].address_len, port);
+		transport->address_len = choices[choice].address_len;
         break;
     default:
         assert(0);
@@ -329,8 +335,36 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
     *transport = iter_get_best_transport(choices, valid_addresses, local_state, mempool);
 }
 
-void iter_success(struct kr_query *qry, const struct kr_transport *transport) {return;}
-void iter_update_rtt(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt) {return;}
+struct iter_address_state *get_address_state(struct iter_local_state *local_state, const struct kr_transport *transport) {
+	trie_t *addresses = local_state->addresses;
+	void *address = (void *)&transport->address;
+
+	trie_val_t *address_state = trie_get_try(addresses, address, transport->address_len);
+
+	if (!address_state) {
+		assert(0);
+	}
+	return (struct iter_address_state *)*address_state;
+}
+
+void iter_success(struct kr_query *qry, const struct kr_transport *transport) {
+	struct iter_local_state *local_state = qry->server_selection.local_state;
+	struct iter_address_state *addr_state = get_address_state(local_state, transport);
+
+	addr_state->success_count++;
+}
+
+void iter_update_rtt(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt) {
+	struct iter_local_state *local_state = qry->server_selection.local_state;
+	struct iter_address_state *addr_state = get_address_state(local_state, transport);
+
+	// We will just replace the information in RTT cache for now
+	// later we will do some kind of moving average.
+
+	struct kr_cache *cache = &qry->request->ctx->cache;
+	update_score((uint8_t *)transport->address, transport->address)
+
+}
 void iter_error(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error error) {return;}
 
 void forward_choose_transport(struct kr_query *qry, struct kr_transport **transport) {return;}
