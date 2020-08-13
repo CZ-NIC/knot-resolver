@@ -1,6 +1,5 @@
 local debug = require("kres_modules/sysrepo/debug")
 local ffi = require("ffi")
-local os = require("os")
 
 local _clib = nil
 
@@ -94,7 +93,10 @@ function Helpers.object_to_node(object, name, schema_node, parent_node)
                 assert(type(k) == "string")
 
                 if child_schema_nodes[k] == nil then
-                    debug.log("Warning while serializing table - unknown child with name {}. Schema does not correspond.", k)
+                    debug.log(
+                        "Warning while serializing table - unknown child with name {}. Schema does not correspond.",
+                        k
+                    )
                 else
                     Helpers.object_to_node(v, k, child_schema_nodes[k], cont)
                 end
@@ -131,74 +133,69 @@ end
 ------------------------ Generic Config Modeling Infra ------------------------
 -------------------------------------------------------------------------------
 
-
-local Hook = {}
-Hook.__index = Hook
-
-function Hook:create(apply_pre, apply_post)
+local function Hook(apply_pre, apply_post)
     assert(apply_pre == nil or type(apply_pre) == "function")
     assert(apply_post == nil or type(apply_post) == "function")
 
-    local res = {}
-    setmetatable(res, Hook)
+    local self = {
+        apply_pre = apply_pre,
+        apply_post = apply_post
+    }
 
-    res.apply_pre = apply_pre
-    res.apply_post = apply_post
+    -- empty default handlers
+    if self.apply_pre == nil then
+        self.apply_pre = function() end
+    end
+    if self.apply_post == nil then
+        self.apply_post = function() end
+    end
 
-    return res
+    return self
 end
-
-function Hook:apply_pre(self)
-    -- empty default
-end
-
-function Hook:apply_post(self)
-    -- empty default
-end
-
-local EMPTY_HOOK = Hook:create()
-
-
-local Node = {}
-Node.__index = Node
+local EMPTY_HOOK = Hook()
 
 --- Tree node for representing a vertex in configuration model tree
 ---
---- Nodes can be read by node:read(data_node) and written by node:write(parent_data_node)
+--- Nodes can be read by node.read(data_node) and written by node.write(parent_data_node)
 ---
 --- @param name Name of the vertex for constructing XPath
---- @param apply_func Function which takes self, data node from libyang and applies the configuration to the system
---- @param read_func Function which takes self, data node from libyang and optional argument. It adds children to the
----        given node with data from the system or its argument. Returns last node it added.
-function Node:create(name, apply_func, read_func, initialize_schema_func)
+local function Node(name)
     assert(type(name) == "string")
-    assert(type(apply_func) == 'function')
-    assert(type(read_func) == 'function')
-    assert(initialize_schema_func == nil or type(initialize_schema_func) == 'function')
 
-    local handler = {}
-    setmetatable(handler, Node)
+    local self = {}
 
-    handler.apply = apply_func
-    handler.serialize = read_func
-    handler.name = name
-    handler.module = nil -- must be filled in later by initialize_schema method
-    handler.schema = nil -- must be filled in later by initialize_schema method
+    -- fields
+    self.name = name
+    self.module = nil -- must be filled in later by initialize_schema method
+    self.schema = nil -- must be filled in later by initialize_schema method
 
-    -- default implementation
-    local function schema_init(self, lys_node)
+    --- Given a libyang data node for this node, apply the configuration
+    ---
+    --- @param _: libyang data node of the corresponding node
+    function self.apply(_)
+        error("NotImplementedError: called uninitialized apply function in class Node")
+    end
+
+    --- Given a libyang data node for the parent node, add a child data node to it with current configuration
+    ---
+    --- @param _: libyang data node of the parent node
+    function self.serialize(_)
+        error("NotImplementedError: called uninitialized serialize function in class Node")
+        return nil
+    end
+
+    --- Given a libyang schema node for this node, initialize the tree
+    ---
+    --- @param lys_node: libyang schema node of this node
+    function self.initialize_schema(lys_node)
         assert(lys_node ~= nil, "Node named \'" .. self.name .. "\' does not exist in the YANG schema"
                                                             .. " (or something else happened).")
         assert(ffi.string(clib().schema_get_name(lys_node)) == self.name)
         self.module = clib().schema_get_module(lys_node)
         self.schema = lys_node
     end
-    if initialize_schema_func == nil then
-        initialize_schema_func = schema_init
-    end
-    handler.initialize_schema = initialize_schema_func
 
-    return handler
+    return self
 end
 
 --- Creates a simple child for ContainerNode
@@ -242,12 +239,14 @@ end
 --- @param container_model List of children. A child is a table created by some of the functions above.
 --- @param hooks Table containing hooks that will be called in specified moments while processing the container.
 local function ContainerNode(name, container_model, hooks)
+    local self = Node(name)
+
     -- default hooks
     if hooks == nil then
         hooks = EMPTY_HOOK
     end
 
-    -- local variables stored in closure
+    -- private field
     local child_schema_nodes = {}
 
     -- optimize child lookup by name with table
@@ -257,8 +256,8 @@ local function ContainerNode(name, container_model, hooks)
     end
 
     --- Node's apply function
-    local function handle_cont_read(self, node)
-        hooks:apply_pre()
+    function self.apply(node)
+        hooks.apply_pre()
 
         local node_name = ffi.string(clib().node_get_name(node))
         debug.log("Reading container \"{}\"", self.name)
@@ -273,22 +272,21 @@ local function ContainerNode(name, container_model, hooks)
             if child_lookup_table[nm] ~= nil then
                 -- we don't have to worry about types of children, because
                 -- all of them have node property for config application
-                child_lookup_table[nm].node:apply(child)
+                child_lookup_table[nm].node.apply(child)
             end
 
             child = clib().node_child_next(child)
         end
 
-        hooks:apply_post()
+        hooks.apply_post()
     end
 
-    --- Node's serialize function
-    local function handle_cont_write(self, parent_node)
+    function self.serialize(parent_node)
         local cont = clib().node_new_container(parent_node, self.module, self.name)
 
         for _,v in ipairs(container_model) do
             if v.type == "simple" then
-                _ = v.node:serialize(cont)
+                _ = v.node.serialize(cont)
             elseif v.type == "list" then
                 -- prepare argument list
                 local args = v.get_args()
@@ -302,8 +300,8 @@ local function ContainerNode(name, container_model, hooks)
                 -- that argument. And after initializing, use it once
                 for i,_ in ipairs(args) do
                     local node = v.node_factory(get_nth(i))
-                    node:initialize_schema(child_schema_nodes[v.name])
-                    _ = node:serialize(cont)
+                    node.initialize_schema(child_schema_nodes[v.name])
+                    _ = node.serialize(cont)
                 end
             end
         end
@@ -311,7 +309,7 @@ local function ContainerNode(name, container_model, hooks)
         return cont
     end
 
-    local function schema_init(self, lys_node)
+    function self.initialize_schema(lys_node)
         assert(ffi.string(clib().schema_get_name(lys_node)) == self.name)
         self.module = clib().schema_get_module(lys_node)
 
@@ -320,11 +318,11 @@ local function ContainerNode(name, container_model, hooks)
         -- apply to all children
         for _,v in ipairs(container_model) do
             -- all children have node property, so we initialize just that
-            v.node:initialize_schema(child_schema_nodes[v.node.name])
+            v.node.initialize_schema(child_schema_nodes[v.node.name])
         end
     end
 
-    return Node:create(name, handle_cont_read, handle_cont_write, schema_init)
+    return self
 end
 
 --- Node used for binding of any values. Uses conversion between table and libyang tree.
@@ -334,8 +332,10 @@ end
 --- @param get_val Function that returns an object with resolvers state, that will be transformed into a libyang tree
 --- @param set_val Function with one argument, will get an object with the same structure as the model tree
 local function BindNode(name, get_val, set_val)
+    local self = Node(name)
+
     --- Node's apply function
-    local function handle_apply(self, node)
+    function self.apply(node)
         -- do nothing when there is no set func
         if set_val == nil then
             return
@@ -359,7 +359,7 @@ local function BindNode(name, get_val, set_val)
     end
 
     --- Node's serialize function
-    local function handle_serialize(self, parent_node)
+    function self.serialize(parent_node)
         if get_val == nil then
             return nil
         end
@@ -373,7 +373,7 @@ local function BindNode(name, get_val, set_val)
         return Helpers.object_to_node(val, name, self.schema, parent_node)
     end
 
-    return Node:create(name, handle_apply, handle_serialize, nil)
+    return self
 end
 
 --- Specialized {@link BindNode} which provides read only binding to a variable
@@ -511,7 +511,7 @@ local model =
         Child(ContainerNode("network", {
             ListChild(get_listen_interfaces, ListenInterfacesNodeFactory, "listen-interfaces"),
             Child(TLSNode()),
-        }, Hook:create(hook_apply_pre_network, nil))),
+        }, Hook(hook_apply_pre_network, nil))),
     })
 
 -------------------------------------------------------------------------------
@@ -545,7 +545,7 @@ return function(clib_binding)
             debug.log("")
             debug.log("Schema tree end")
 
-            model:initialize_schema(clib().schema_root())
+            model.initialize_schema(clib().schema_root())
             initialized_schema = true
         end
     end
@@ -555,7 +555,7 @@ return function(clib_binding)
         init_schema()
 
         -- serialize operational data
-        local node = model:serialize(root_node)
+        local node = model.serialize(root_node)
         assert(node ~= nil)
 
         -- validate the result
@@ -572,7 +572,7 @@ return function(clib_binding)
     function module.apply_configuration(root_node)
         init_schema()
 
-        model:apply(root_node)
+        model.apply(root_node)
     end
 
     return module
