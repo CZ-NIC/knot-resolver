@@ -44,7 +44,7 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
  */
 int worker_end_tcp(struct session *session);
 
-knot_pkt_t *worker_resolve_mk_pkt_dname(knot_dname_t qname, uint16_t qtype, uint16_t qclass,
+KR_EXPORT knot_pkt_t *worker_resolve_mk_pkt_dname(knot_dname_t *qname, uint16_t qtype, uint16_t qclass,
 				   const struct kr_qflags *options);
 
 /**

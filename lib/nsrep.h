@@ -7,11 +7,13 @@
 #include "lib/utils.h"
 
 enum kr_selection_error {
+    // Network errors
     KR_SELECTION_TIMEOUT,
     KR_SELECTION_TLS_HANDSHAKE_FAILED,
     KR_SELECTION_TCP_CONNECT_FAILED,
     KR_SELECTION_TCP_CONNECT_TIMEOUT,
 
+    // RCODEs
     KR_SELECTION_REFUSED,
     KR_SELECTION_SERVFAIL,
     KR_SELECTION_FORMERROR,
@@ -19,8 +21,11 @@ enum kr_selection_error {
     KR_SELECTION_OTHER_RCODE,
     KR_SELECTION_TRUNCATED,
 
+    // DNS errors
     KR_SELECTION_DNSSEC_ERROR,
+    KR_SELECTION_LAME_DELEGATION,
 
+    KR_SELECTION_NUMBER_OF_ERRORS // Leave this last as it is used as array size.
 };
 
 enum kr_transport_protocol {
@@ -33,6 +38,7 @@ enum kr_transport_protocol {
 struct kr_transport {
     knot_dname_t *name;
     union inaddr address;
+    size_t address_len;
     enum kr_transport_protocol protocol;
     unsigned timeout;
 };

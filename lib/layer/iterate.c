@@ -263,6 +263,7 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 #else
 		/* Workaround: ignore out-of-bailiwick NSs for authoritative answers,
 		 * but fail for referrals. This is important to detect lame answers. */
+		qry->server_selection.error(qry, req->upstream.transport, KR_SELECTION_LAME_DELEGATION);
 		if (knot_pkt_section(pkt, KNOT_ANSWER)->count == 0) {
 			state = KR_STATE_FAIL;
 		}

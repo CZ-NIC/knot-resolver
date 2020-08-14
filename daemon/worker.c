@@ -581,6 +581,7 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 	struct worker_ctx *worker = ctx->worker;
 	/* Note time for upstream RTT */
 	task->send_time = kr_now();
+	task->recv_time = 0; // task structure is being reused so we have to zero this out here
 	/* Send using given protocol */
 	assert(!session_flags(session)->closing);
 	if (session_flags(session)->has_tls) {
@@ -1725,7 +1726,7 @@ int worker_end_tcp(struct session *session)
 	return kr_ok();
 }
 
-knot_pkt_t *worker_resolve_mk_pkt_dname(knot_dname_t qname, uint16_t qtype, uint16_t qclass,
+knot_pkt_t *worker_resolve_mk_pkt_dname(knot_dname_t *qname, uint16_t qtype, uint16_t qclass,
 				   const struct kr_qflags *options)
 {
 	knot_pkt_t *pkt = knot_pkt_new(NULL, KNOT_EDNS_MAX_UDP_PAYLOAD, NULL);
