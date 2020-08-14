@@ -300,7 +300,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		req->qsource.flags.http = session_flags(session)->has_http;
 		req->qsource.stream_id = -1;
 		if (req->qsource.flags.http) {
-			struct http_ctx_t *http_ctx = session_http_get_server_ctx(session);
+			struct http_ctx *http_ctx = session_http_get_server_ctx(session);
 			// TODO maybe assert?
 			if (http_ctx && queue_len(http_ctx->streams) > 0) {
 				req->qsource.stream_id = queue_head(http_ctx->streams);
