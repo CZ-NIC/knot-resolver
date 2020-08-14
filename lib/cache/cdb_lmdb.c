@@ -44,6 +44,11 @@ struct lmdb_env
 		MDB_txn *ro, *rw;
 		MDB_cursor *ro_curs;
 	} txn;
+
+	/* Cached part of struct stat for data.mdb. */
+	dev_t st_dev;
+	ino_t st_ino;
+	const char *mdb_data_path; /**< path to data.mdb, for convenience */
 };
 
 struct libknot_lmdb_env {
@@ -86,26 +91,6 @@ static inline knot_db_val_t val_mdb2knot(MDB_val v)
 static inline MDB_val val_knot2mdb(knot_db_val_t v)
 {
 	return (MDB_val){ .mv_size = v.len, .mv_data = v.data };
-}
-
-/*! \brief Set the environment map size.
- * \note This also sets the maximum database size, see \fn mdb_env_set_mapsize
- */
-static int set_mapsize(MDB_env *env, size_t map_size)
-{
-	long page_size = sysconf(_SC_PAGESIZE);
-	if (page_size <= 0) {
-		return KNOT_ERROR;
-	}
-
-	/* Round to page size. */
-	map_size = (map_size / page_size) * page_size;
-	int ret = mdb_env_set_mapsize(env, map_size);
-	if (ret != MDB_SUCCESS) {
-		return lmdb_error(ret);
-	}
-
-	return 0;
 }
 
 #define FLAG_RENEW (2*MDB_RDONLY)
@@ -266,82 +251,69 @@ static void cdb_close_env(struct lmdb_env *env, struct kr_cdb_stats *stats)
 	stats->close++;
 	mdb_dbi_close(env->env, env->dbi);
 	mdb_env_close(env->env);
+	free_const(env->mdb_data_path);
 	memset(env, 0, sizeof(*env));
 }
 
-/*! \brief Open database environment. */
-static int cdb_open_env(struct lmdb_env *env, unsigned flags, const char *path, size_t mapsize, struct kr_cdb_stats *stats)
-{
-	int ret = mkdir(path, LMDB_DIR_MODE);
-	if (ret == -1 && errno != EEXIST) {
-		return kr_error(errno);
-	}
-
-	MDB_env *mdb_env = NULL;
-	stats->open++;
-	ret = mdb_env_create(&mdb_env);
-	if (ret != MDB_SUCCESS) {
-		return lmdb_error(ret);
-	}
-
-	ret = set_mapsize(mdb_env, mapsize);
-	if (ret != 0) {
-		stats->close++;
-		mdb_env_close(mdb_env);
-		return ret;
-	}
-
-	ret = mdb_env_open(mdb_env, path, flags, LMDB_FILE_MODE);
-	if (ret != MDB_SUCCESS) {
-		stats->close++;
-		mdb_env_close(mdb_env);
-		return lmdb_error(ret);
-	}
-
-	/* Keep the environment pointer. */
-	env->env = mdb_env;
-	env->mapsize = mapsize;
-	return 0;
-}
-
-static int cdb_open(struct lmdb_env *env, const char *path, size_t mapsize,
+/** We assume that *env is zeroed and we return it zeroed on errors. */
+static int cdb_open_env(struct lmdb_env *env, const char *path, size_t mapsize,
 		struct kr_cdb_stats *stats)
 {
+	int ret = mkdir(path, LMDB_DIR_MODE);
+	if (ret && errno != EEXIST) return kr_error(errno);
+
+	stats->open++;
+	ret = mdb_env_create(&env->env);
+	if (ret != MDB_SUCCESS) return lmdb_error(ret);
+
+	env->mdb_data_path = kr_strcatdup(2, path, "/data.mdb");
+	if (!env->mdb_data_path) {
+		ret = ENOMEM;
+		goto error_sys;
+	}
+
+	/* Set map size, rounded to page size. */
+	errno = 0;
+	const long pagesize = sysconf(_SC_PAGESIZE);
+	if (errno) {
+		ret = errno;
+		goto error_sys;
+	}
+	mapsize = (mapsize / pagesize) * pagesize;
+	ret = mdb_env_set_mapsize(env->env, mapsize);
+	if (ret != MDB_SUCCESS) goto error_mdb;
+	env->mapsize = mapsize;
+
 	/* Cache doesn't require durability, we can be
 	 * loose with the requirements as a tradeoff for speed. */
 	const unsigned flags = MDB_WRITEMAP | MDB_MAPASYNC | MDB_NOTLS;
-	int ret = cdb_open_env(env, flags, path, mapsize, stats);
-	if (ret != 0) {
-		return ret;
+	ret = mdb_env_open(env->env, path, flags, LMDB_FILE_MODE);
+	if (ret != MDB_SUCCESS) goto error_mdb;
+
+	mdb_filehandle_t fd = -1;
+	ret = mdb_env_get_fd(env->env, &fd);
+	if (ret != MDB_SUCCESS) goto error_mdb;
+
+	struct stat st;
+	if (fstat(fd, &st)) {
+		ret = errno;
+		goto error_sys;
 	}
+	env->st_dev = st.st_dev;
+	env->st_ino = st.st_ino;
 
 	/* Open the database. */
 	MDB_txn *txn = NULL;
 	ret = mdb_txn_begin(env->env, NULL, 0, &txn);
-	if (ret != MDB_SUCCESS) {
-		stats->close++;
-		mdb_env_close(env->env);
-		return lmdb_error(ret);
-	}
+	if (ret != MDB_SUCCESS) goto error_mdb;
 
 	ret = mdb_dbi_open(txn, NULL, 0, &env->dbi);
 	if (ret != MDB_SUCCESS) {
 		mdb_txn_abort(txn);
-		stats->close++;
-		mdb_env_close(env->env);
-		return lmdb_error(ret);
+		goto error_mdb;
 	}
 
 #if !defined(__MACOSX__) && !(defined(__APPLE__) && defined(__MACH__))
-	mdb_filehandle_t fd = -1;
-	ret = mdb_env_get_fd(env->env, &fd);
-	if (ret != MDB_SUCCESS) {
-		mdb_txn_abort(txn);
-		stats->close++;
-		mdb_env_close(env->env);
-		return lmdb_error(ret);
-	}
-
 	ret = posix_fallocate(fd, 0, mapsize);
 	if (ret == EINVAL) {
 		/* POSIX says this can happen when the feature isn't supported by the FS.
@@ -350,21 +322,24 @@ static int cdb_open(struct lmdb_env *env, const char *path, size_t mapsize,
 				"your (file)system probably doesn't support it.\n");
 	} else if (ret != 0) {
 		mdb_txn_abort(txn);
-		stats->close++;
-		mdb_env_close(env->env);
-		return kr_error(ret);
+		goto error_sys;
 	}
 #endif
 
 	stats->commit++;
 	ret = mdb_txn_commit(txn);
-	if (ret != MDB_SUCCESS) {
-		stats->close++;
-		mdb_env_close(env->env);
-		return lmdb_error(ret);
-	}
+	if (ret != MDB_SUCCESS) goto error_mdb;
 
-	return 0;
+	return kr_ok();
+
+error_mdb:
+	ret = lmdb_error(ret);
+error_sys:
+	free_const(env->mdb_data_path);
+	stats->close++;
+	mdb_env_close(env->env);
+	memset(env, 0, sizeof(*env));
+	return kr_error(ret);
 }
 
 static int cdb_init(knot_db_t **db, struct kr_cdb_stats *stats,
@@ -373,12 +348,6 @@ static int cdb_init(knot_db_t **db, struct kr_cdb_stats *stats,
 	if (!db || !stats || !opts) {
 		return kr_error(EINVAL);
 	}
-
-	struct lmdb_env *env = malloc(sizeof(*env));
-	if (!env) {
-		return kr_error(ENOMEM);
-	}
-	memset(env, 0, sizeof(struct lmdb_env));
 
 	/* Clear stale lockfiles. */
 	auto_free char *lockfile = kr_strcatdup(2, opts->path, "/.cachelock");
@@ -392,7 +361,11 @@ static int cdb_init(knot_db_t **db, struct kr_cdb_stats *stats,
 	}
 
 	/* Open the database. */
-	int ret = cdb_open(env, opts->path, opts->maxsize, stats);
+	struct lmdb_env *env = calloc(1, sizeof(*env));
+	if (!env) {
+		return kr_error(ENOMEM);
+	}
+	int ret = cdb_open_env(env, opts->path, opts->maxsize, stats);
 	if (ret != 0) {
 		free(env);
 		return ret;
@@ -425,15 +398,43 @@ static int cdb_count(knot_db_t *db, struct kr_cdb_stats *stats)
 	return (ret == MDB_SUCCESS) ? stat.ms_entries : lmdb_error(ret);
 }
 
+static int reopen_env(struct lmdb_env *env, struct kr_cdb_stats *stats)
+{
+	/* Keep copy as it points to current handle internals. */
+	const char *path;
+	int ret = mdb_env_get_path(env->env, &path);
+	if (ret != MDB_SUCCESS) {
+		return lmdb_error(ret);
+	}
+	auto_free char *path_copy = strdup(path);
+	size_t mapsize = env->mapsize;
+	cdb_close_env(env, stats);
+	return cdb_open_env(env, path_copy, mapsize, stats);
+}
+
+static int cdb_check_health(knot_db_t *db, struct kr_cdb_stats *stats)
+{
+	struct lmdb_env *env = db;
+
+	struct stat st;
+	if (stat(env->mdb_data_path, &st)) {
+		int ret = errno;
+		return kr_error(ret);
+		// FIXME: if the file doesn't exist?
+	}
+	if (st.st_dev == env->st_dev && st.st_ino == env->st_ino) {
+		return kr_ok();
+	}
+	kr_log_verbose("[cache] cache file has been replaced, reopening\n");
+	int ret = reopen_env(env, stats);
+	return ret == 0 ? 1 : ret;
+}
+
 static int cdb_clear(knot_db_t *db, struct kr_cdb_stats *stats)
 {
 	struct lmdb_env *env = db;
 	stats->clear++;
 	/* First try mdb_drop() to clear the DB; this may fail with ENOSPC. */
-	/* If we didn't do this, explicit cache.clear() ran on an instance
-	 * would lead to the instance detaching from the cache of others,
-	 * until they reopened cache explicitly or cleared it for some reason.
-	 */
 	{
 		MDB_txn *txn = NULL;
 		int ret = txn_get(env, &txn, false);
@@ -448,34 +449,25 @@ static int cdb_clear(knot_db_t *db, struct kr_cdb_stats *stats)
 		}
 		kr_log_info("[cache] clearing error, falling back\n");
 	}
+	/* Fallback: we'll remove the database files and reopen.
+	 * Other instances can continue to use the removed lmdb,
+	 * though it's best for them to reopen soon. */
 
 	/* We are about to switch to a different file, so end all txns, to be sure. */
 	(void) cdb_commit(db, stats);
 	free_txn_ro(db);
 
-	/* Since there is no guarantee that there will be free
-	 * pages to hold whole dirtied db for transaction-safe clear,
-	 * we simply remove the database files and reopen.
-	 * We can afford this since other readers will continue to read
-	 * from removed file, but will reopen when encountering next
-	 * error. */
-	mdb_filehandle_t fd = -1;
-	int ret = mdb_env_get_fd(env->env, &fd);
-	if (ret != MDB_SUCCESS) {
-		return lmdb_error(ret);
-	}
 	const char *path = NULL;
-	ret = mdb_env_get_path(env->env, &path);
+	int ret = mdb_env_get_path(env->env, &path);
 	if (ret != MDB_SUCCESS) {
 		return lmdb_error(ret);
 	}
-
-	auto_free char *mdb_datafile = kr_strcatdup(2, path, "/data.mdb");
 	auto_free char *mdb_lockfile = kr_strcatdup(2, path, "/lock.mdb");
 	auto_free char *lockfile = kr_strcatdup(2, path, "/.cachelock");
-	if (!mdb_datafile || !mdb_lockfile || !lockfile) {
+	if (!mdb_lockfile || !lockfile) {
 		return kr_error(ENOMEM);
 	}
+
 	/* Find if we get a lock on lockfile. */
 	ret = open(lockfile, O_CREAT|O_EXCL|O_RDONLY, S_IRUSR);
 	if (ret == -1) {
@@ -485,29 +477,25 @@ static int cdb_clear(knot_db_t *db, struct kr_cdb_stats *stats)
 		return kr_error(errno);
 	}
 	close(ret);
-	/* We acquired lockfile.  Now find whether *.mdb are what we have open now. */
-	struct stat old_stat, new_stat;
-	if (fstat(fd, &new_stat) || stat(mdb_datafile, &old_stat)) {
-		ret = errno;
+
+	/* We acquired lockfile.  Now find whether *.mdb are what we have open now.
+	 * If they are not we don't want to remove them; most likely they have been
+	 * cleaned by another instance. */
+	ret = cdb_check_health(db, stats);
+	if (ret != 0) {
 		unlink(lockfile);
-		return kr_error(ret);
+		if (ret == 1) { // file changed and reopened successfuly
+			return kr_ok();
+		} else { // some other error
+			kr_error(ret);
+		}
 	}
-	/* Remove underlying files only if current open environment
-	 * points to file on the disk. Otherwise just reopen as someone
-	 * else has already removed the files.
-	 */
-	if (old_stat.st_dev == new_stat.st_dev && old_stat.st_ino == new_stat.st_ino) {
-		kr_log_verbose("[cache] clear: identical files, unlinking\n");
-		// coverity[toctou]
-		unlink(mdb_datafile);
-		unlink(mdb_lockfile);
-	} else
-		kr_log_verbose("[cache] clear: not identical files, reopening\n");
-	/* Keep copy as it points to current handle internals. */
-	auto_free char *path_copy = strdup(path);
-	size_t mapsize = env->mapsize;
-	cdb_close_env(env, stats);
-	ret = cdb_open(env, path_copy, mapsize, stats);
+
+	kr_log_verbose("[cache] clear: identical files, unlinking\n");
+	// coverity[toctou]
+	unlink(env->mdb_data_path);
+	unlink(mdb_lockfile);
+	ret = reopen_env(env, stats);
 	/* Environment updated, release lockfile. */
 	unlink(lockfile);
 	return ret;
@@ -748,6 +736,7 @@ const struct kr_cdb_api *kr_cdb_lmdb(void)
 		cdb_match,
 		cdb_read_leq,
 		cdb_usage,
+		cdb_check_health,
 	};
 
 	return &api;
