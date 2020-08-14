@@ -29,8 +29,8 @@ struct session {
 	uv_handle_t *handle;          /**< libuv handle for IO operations. */
 	uv_timer_t timeout;           /**< libuv handle for timer. */
 
-	struct tls_ctx_t *tls_ctx;    /**< server side tls-related data. */
-	struct tls_client_ctx_t *tls_client_ctx; /**< client side tls-related data. */
+	struct tls_ctx *tls_ctx;      /**< server side tls-related data. */
+	struct tls_client_ctx *tls_client_ctx;  /**< client side tls-related data. */
 
 	trie_t *tasks;                /**< list of tasks assotiated with given session. */
 	queue_t(struct qr_task *) waiting;  /**< list of tasks waiting for sending to upstream. */
@@ -258,22 +258,22 @@ struct sockaddr *session_get_sockname(struct session *session)
 	return &session->sockname.ip;
 }
 
-struct tls_ctx_t *session_tls_get_server_ctx(const struct session *session)
+struct tls_ctx *session_tls_get_server_ctx(const struct session *session)
 {
 	return session->tls_ctx;
 }
 
-void session_tls_set_server_ctx(struct session *session, struct tls_ctx_t *ctx)
+void session_tls_set_server_ctx(struct session *session, struct tls_ctx *ctx)
 {
 	session->tls_ctx = ctx;
 }
 
-struct tls_client_ctx_t *session_tls_get_client_ctx(const struct session *session)
+struct tls_client_ctx *session_tls_get_client_ctx(const struct session *session)
 {
 	return session->tls_client_ctx;
 }
 
-void session_tls_set_client_ctx(struct session *session, struct tls_client_ctx_t *ctx)
+void session_tls_set_client_ctx(struct session *session, struct tls_client_ctx *ctx)
 {
 	session->tls_client_ctx = ctx;
 }
