@@ -183,7 +183,10 @@ static int net_listen(lua_State *L)
 
 	bool tls = (port == KR_DNS_TLS_PORT);
 	bool http = (port == KR_DNS_HTTP_PORT);
-	http = tls = (port == KR_DNS_DOH_PORT);
+	if (port == KR_DNS_DOH_PORT) {
+		http = tls = true;
+	}
+
 	bool freebind = false;
 	const char *kind = NULL;
 	if (n > 2 && !lua_isnil(L, 3)) {
