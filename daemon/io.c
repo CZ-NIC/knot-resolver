@@ -339,41 +339,6 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	mp_flush(the_worker->pkt_pool.ctx);
 }
 
-static void on_write(uv_write_t *req, int status)
-{
-	struct qr_task *task = req->data;
-	if (task) {
-		uv_handle_t *h = (uv_handle_t *)req->handle;
-		qr_task_on_send(task, h, status);
-	}
-	free(req);
-}
-
-static ssize_t tcp_send(const uint8_t *buffer, const size_t buffer_len, void *user_ctx)
-{
-	//TODO not complete, probably do not respect the sending policy in the software
-	struct session *session = user_ctx;
-	uv_handle_t *handle = session_get_handle(session);
-	//const uint8_t *buffer_backup = (const uint8_t *)calloc(buffer_len, sizeof(*buffer));
-	//if (!buffer_backup) {
-	//	return kr_error(EIO);
-	//}
-	//memcpy(buffer_backup, buffer, buffer_len);
-
-	uv_write_t *req = (uv_write_t *)calloc(1, sizeof(uv_write_t));
-	if (!req) {
-		return kr_error(EIO);
-	}
-
-	const uv_buf_t uv_buffer = {
-		//.base = buffer_backup,
-		.base = buffer,
-		.len = buffer_len
-	};
-	uv_write(req, (uv_stream_t *)handle, &uv_buffer, 1, on_write);
-	return buffer_len;
-}
-
 static ssize_t tls_send(const uint8_t *buffer, const size_t buffer_len, void *user_ctx)
 {
 	struct tls_ctx_t *ctx = user_ctx;
@@ -479,9 +444,11 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls, bool http)
 	if (http) {
 		struct http_ctx_t *ctx = session_http_get_server_ctx(s);
 		if (!ctx) {
-			ctx = http_new((tls) ? tls_send : tcp_send,
-			               (tls) ? (void*)session_tls_get_server_ctx(s) : (void*)s
-			);
+			if (!tls) {  // TODO plain HTTP not supported yet
+				session_close(s);
+				return;
+			}
+			ctx = http_new(tls_send, (void*)session_tls_get_server_ctx(s));
 			if (!ctx) {
 				session_close(s);
 				return;
