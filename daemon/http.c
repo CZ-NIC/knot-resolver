@@ -49,6 +49,7 @@ static int header_callback(nghttp2_session *session, const nghttp2_frame *frame,
 {
 	struct http_ctx_t *ctx = (struct http_ctx_t *)user_data;
 	static const char key[] = "dns=";
+	int32_t stream_id = frame->hd.stream_id;
 
 	/* If the HEADERS don't have END_STREAM set, there are some DATA frames,
 	 * which implies POST method.  Skip header processing for POST. */
@@ -59,7 +60,7 @@ static int header_callback(nghttp2_session *session, const nghttp2_frame *frame,
 	/* If there is incomplete data in the buffer, we can't process the new stream. */
 	if (ctx->incomplete_stream) {
 		kr_log_verbose("[http] refusing new http stream due to incomplete data from other stream\n");
-		nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, frame->hd.stream_id, NGHTTP2_REFUSED_STREAM);
+		nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
 		return 0;
 	}
 
@@ -70,15 +71,16 @@ static int header_callback(nghttp2_session *session, const nghttp2_frame *frame,
 			char *end = strchrnul(beg, '&');
 			ctx->buf_pos = sizeof(uint16_t);
 			ssize_t remaining = ctx->buf_size - ctx->submitted - ctx->buf_pos;
-			ssize_t ret = kr_base64url_decode((uint8_t*)beg, end - beg, ctx->buf + ctx->buf_pos, remaining);
+			uint8_t* dest = ctx->buf + ctx->buf_pos;
+			ssize_t ret = kr_base64url_decode((uint8_t*)beg, end - beg, dest, remaining);
 			if (ret < 0) {
 				ctx->buf_pos = 0;
-				nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, frame->hd.stream_id, NGHTTP2_REFUSED_STREAM);
+				nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
 				kr_log_verbose("[http] refusing GET request, insufficient buffer size\n");
 				return 0;
 			}
 			ctx->buf_pos += ret;
-			queue_push(ctx->streams, frame->hd.stream_id);
+			queue_push(ctx->streams, stream_id);
 		}
 	}
 	return 0;
@@ -89,18 +91,26 @@ static int data_chunk_recv_callback(nghttp2_session *session, uint8_t flags, int
 {
 	struct http_ctx_t *ctx = (struct http_ctx_t *)user_data;
 
-	if (ctx->incomplete_stream && queue_len(ctx->streams) > 0 && queue_tail(ctx->streams) != stream_id) {
-		/* If the received DATA chunk is from a new stream and the previous
-		 * one still has unfinished DATA, refuse the new stream. */
-		kr_log_verbose("[http] refusing http DATA chunk, other stream has incomplete DATA\n");
-		nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
-		return 0;
+	if (ctx->incomplete_stream) {
+		if (queue_len(ctx->streams) <= 0) {
+			return NGHTTP2_ERR_CALLBACK_FAILURE;
+		} else if (queue_tail(ctx->streams) != stream_id) {
+			/* If the received DATA chunk is from a new stream and the previous
+			 * one still has unfinished DATA, refuse the new stream. */
+			kr_log_verbose("[http] refusing http DATA chunk, other stream has incomplete DATA\n");
+			nghttp2_submit_rst_stream(
+				session, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
+			return 0;
+		}
 	}
 
 	/* Check message and its length can still fit into the wire buffer. */
 	ssize_t remaining = ctx->buf_size - ctx->submitted - ctx->buf_pos;
-	if ((len + sizeof(uint16_t)) > remaining) {
-		kr_log_error("[http] insufficient space in buffer: remaining %zd B, required %zd B\n", remaining, len + sizeof(uint16_t));
+	ssize_t required = len + sizeof(uint16_t);
+	if (required > remaining) {
+		kr_log_error(
+			"[http] insufficient space in buffer: remaining %zd B, required %zd B\n",
+			remaining, required);
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 	}
 
