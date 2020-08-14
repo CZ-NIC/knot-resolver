@@ -78,4 +78,10 @@ struct kr_cdb_api {
 			knot_db_val_t *key, knot_db_val_t *val);
 
 	double (*usage_percent)(knot_db_t *db);
+
+	/** Perform maintenance.
+	 * In LMDB case it checks whether data.mdb is still the same
+	 * and reopens it if it isn't.
+	 * \return 0 if OK, 1 if reopened OK, < 0 kr_error */
+	int (*check_health)(knot_db_t *db, struct kr_cdb_stats *stat);
 };
