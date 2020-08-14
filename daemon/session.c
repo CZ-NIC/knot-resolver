@@ -29,8 +29,8 @@ struct session {
 	uv_handle_t *handle;          /**< libuv handle for IO operations. */
 	uv_timer_t timeout;           /**< libuv handle for timer. */
 
-	struct tls_ctx_t *tls_ctx;    /**< server side tls-related data. */
-	struct tls_client_ctx_t *tls_client_ctx; /**< client side tls-related data. */
+	struct tls_ctx *tls_ctx;      /**< server side tls-related data. */
+	struct tls_client_ctx *tls_client_ctx;  /**< client side tls-related data. */
 
 	trie_t *tasks;                /**< list of tasks assotiated with given session. */
 	queue_t(struct qr_task *) waiting;  /**< list of tasks waiting for sending to upstream. */
@@ -257,22 +257,22 @@ struct sockaddr *session_get_sockname(struct session *session)
 	return &session->sockname.ip;
 }
 
-struct tls_ctx_t *session_tls_get_server_ctx(const struct session *session)
+struct tls_ctx *session_tls_get_server_ctx(const struct session *session)
 {
 	return session->tls_ctx;
 }
 
-void session_tls_set_server_ctx(struct session *session, struct tls_ctx_t *ctx)
+void session_tls_set_server_ctx(struct session *session, struct tls_ctx *ctx)
 {
 	session->tls_ctx = ctx;
 }
 
-struct tls_client_ctx_t *session_tls_get_client_ctx(const struct session *session)
+struct tls_client_ctx *session_tls_get_client_ctx(const struct session *session)
 {
 	return session->tls_client_ctx;
 }
 
-void session_tls_set_client_ctx(struct session *session, struct tls_client_ctx_t *ctx)
+void session_tls_set_client_ctx(struct session *session, struct tls_client_ctx *ctx)
 {
 	session->tls_client_ctx = ctx;
 }
@@ -521,7 +521,7 @@ knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm)
 		session->wire_buf_end_idx = 0;
 		return NULL;
 	}
-	
+
 	if (session->wire_buf_start_idx > session->wire_buf_end_idx) {
 		session->sflags.wirebuf_error = true;
 		session->wire_buf_start_idx = 0;
@@ -533,7 +533,7 @@ knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm)
 	uint8_t *msg_start = &session->wire_buf[session->wire_buf_start_idx];
 	ssize_t wirebuf_msg_data_size = session->wire_buf_end_idx - session->wire_buf_start_idx;
 	uint16_t msg_size = 0;
-	
+
 	if (!handle) {
 		session->sflags.wirebuf_error = true;
 		return NULL;
@@ -636,7 +636,7 @@ int session_discard_packet(struct session *session, const knot_pkt_t *pkt)
 		session->wire_buf_start_idx += pkt_msg_size;
 	}
 	session->sflags.wirebuf_error = false;
-	
+
 	wirebuf_data_size = session->wire_buf_end_idx - session->wire_buf_start_idx;
 	if (wirebuf_data_size == 0) {
 		session_wirebuf_discard(session);

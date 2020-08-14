@@ -374,7 +374,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls)
 	uint64_t timeout = KR_CONN_RTT_MAX / 2;
 	if (tls) {
 		timeout += TLS_MAX_HANDSHAKE_TIME;
-		struct tls_ctx_t *ctx = session_tls_get_server_ctx(s);
+		struct tls_ctx *ctx = session_tls_get_server_ctx(s);
 		if (!ctx) {
 			ctx = tls_new(worker);
 			if (!ctx) {

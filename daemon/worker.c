@@ -693,7 +693,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 	}
 
 	/* handshake was completed successfully */
-	struct tls_client_ctx_t *tls_client_ctx = session_tls_get_client_ctx(session);
+	struct tls_client_ctx *tls_client_ctx = session_tls_get_client_ctx(session);
 	tls_client_param_t *tls_params = tls_client_ctx->params;
 	gnutls_session_t tls_session = tls_client_ctx->c.tls_session;
 	if (gnutls_session_is_resumed(tls_session) != 0) {
@@ -888,7 +888,7 @@ static void on_connect(uv_connect_t *req, int status)
 
 	int ret = kr_ok();
 	if (session_flags(session)->has_tls) {
-		struct tls_client_ctx_t *tls_ctx = session_tls_get_client_ctx(session);
+		struct tls_client_ctx *tls_ctx = session_tls_get_client_ctx(session);
 		ret = tls_client_connect_start(tls_ctx, session, session_tls_hs_cb);
 		if (ret == kr_error(EAGAIN)) {
 			session_timer_stop(session);
@@ -1290,7 +1290,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	struct worker_ctx *worker = ctx->worker;
 
 	/* Check if there must be TLS */
-	struct tls_client_ctx_t *tls_ctx = NULL;
+	struct tls_client_ctx *tls_ctx = NULL;
 	struct network *net = &worker->engine->net;
 	tls_client_param_t *entry = tls_client_param_get(net->tls_client_params, addr);
 	if (entry) {
@@ -1728,13 +1728,13 @@ int worker_end_tcp(struct session *session)
 	worker_del_tcp_connected(the_worker, peer);
 	session_flags(session)->connected = false;
 
-	struct tls_client_ctx_t *tls_client_ctx = session_tls_get_client_ctx(session);
+	struct tls_client_ctx *tls_client_ctx = session_tls_get_client_ctx(session);
 	if (tls_client_ctx) {
 		/* Avoid gnutls_bye() call */
 		tls_set_hs_state(&tls_client_ctx->c, TLS_HS_NOT_STARTED);
 	}
 
-	struct tls_ctx_t *tls_ctx = session_tls_get_server_ctx(session);
+	struct tls_ctx *tls_ctx = session_tls_get_server_ctx(session);
 	if (tls_ctx) {
 		/* Avoid gnutls_bye() call */
 		tls_set_hs_state(&tls_ctx->c, TLS_HS_NOT_STARTED);
