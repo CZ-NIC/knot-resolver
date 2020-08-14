@@ -12,8 +12,8 @@
 #include "daemon/worker.h"
 #include "daemon/engine.h"
 
-struct tls_ctx_t;
-struct tls_client_ctx_t;
+struct tls_ctx;
+struct tls_client_ctx;
 
 /** Bind address into a file-descriptor (only, no libuv).  type is e.g. SOCK_DGRAM */
 int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags);
