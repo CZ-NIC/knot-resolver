@@ -36,7 +36,7 @@ struct session {
 	struct tls_ctx *tls_ctx;      /**< server side tls-related data. */
 	struct tls_client_ctx *tls_client_ctx;  /**< client side tls-related data. */
 
-	struct http_ctx_t *http_ctx;  /**< server side http-related data. */
+	struct http_ctx *http_ctx;  /**< server side http-related data. */
 
 	trie_t *tasks;                /**< list of tasks assotiated with given session. */
 	queue_t(struct qr_task *) waiting;  /**< list of tasks waiting for sending to upstream. */
@@ -291,12 +291,12 @@ struct tls_common_ctx *session_tls_get_common_ctx(const struct session *session)
 	return tls_ctx;
 }
 
-struct http_ctx_t *session_http_get_server_ctx(const struct session *session)
+struct http_ctx *session_http_get_server_ctx(const struct session *session)
 {
 	return session->http_ctx;
 }
 
-void session_http_set_server_ctx(struct session *session, struct http_ctx_t *ctx)
+void session_http_set_server_ctx(struct session *session, struct http_ctx *ctx)
 {
 	session->http_ctx = ctx;
 }
