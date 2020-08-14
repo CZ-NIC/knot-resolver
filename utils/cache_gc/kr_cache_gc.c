@@ -162,18 +162,21 @@ void kr_cache_gc_free_state(kr_cache_gc_state_t **state)
 int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 {
 	assert(cfg && state);
+	int ret;
 	if (!*state) { // Cache not open -> do that.
 		*state = calloc(1, sizeof(**state));
 		if (!*state) {
 			return KNOT_ENOMEM;
 		}
-		int ret = kr_gc_cache_open(cfg->cache_path, &(*state)->kres_db,
+		ret = kr_gc_cache_open(cfg->cache_path, &(*state)->kres_db,
 					   &(*state)->db);
-		if (ret) {
-			free(*state);
-			*state = NULL;
-			return ret;
-		}
+	} else { // To be sure, we guard against the file getting replaced.
+		ret = kr_gc_cache_check_health(&(*state)->kres_db, &(*state)->db);
+	}
+	if (ret) {
+		free(*state);
+		*state = NULL;
+		return ret;
 	}
 	knot_db_t *const db = (*state)->db; // frequently used shortcut
 
@@ -202,7 +205,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	gc_timer_start(&timer_analyze);
 	ctx_compute_categories_t cats = { { 0 }
 	};
-	int ret = kr_gc_cache_iter(db, cb_compute_categories, &cats);
+	ret = kr_gc_cache_iter(db, cb_compute_categories, &cats);
 	if (ret != KNOT_EOK) {
 		kr_cache_gc_free_state(state);
 		return ret;
