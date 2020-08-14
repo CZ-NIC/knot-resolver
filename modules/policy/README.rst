@@ -141,10 +141,10 @@ Following actions stop the policy matching on the query, i.e. other rules are no
 
    .. code-block:: lua
 
-       -- this policy is enforced on answers
-       -- therefore we have to use 'postrule'
-       -- (the "true" at the end of policy.add)
-       policy.add(policy.REROUTE({'192.0.2.0/24', '127.0.0.0'}), true)
+      -- this policy is enforced on answers
+      -- therefore we have to use 'postrule'
+      -- (the "true" at the end of policy.add)
+      policy.add(policy.REROUTE({'192.0.2.0/24', '127.0.0.0'}), true)
 
 .. function:: ANSWER({ type = { rdata=data, [ttl=1] } }, [nodata=false])
 
@@ -166,18 +166,18 @@ Following actions stop the policy matching on the query, i.e. other rules are no
 
    .. code-block:: lua
 
-       -- policy to change IPv4 address and TTL for example.com
-       policy.add(
-           policy.suffix(
-               policy.ANSWER(
-                   { [kres.type.A] = { rdata=kres.str2ip('192.0.2.7'), ttl=300 } }
-               ), { todname('example.com') }))
-       -- policy to generate two TXT records (specified in binary format) for example.net
-       policy.add(
-           policy.suffix(
-               policy.ANSWER(
-                   { [kres.type.TXT] = { rdata={'\005first', '\006second'}, ttl=5 } }
-               ), { todname('example.net') }))
+      -- policy to change IPv4 address and TTL for example.com
+      policy.add(
+          policy.suffix(
+              policy.ANSWER(
+                  { [kres.type.A] = { rdata=kres.str2ip('192.0.2.7'), ttl=300 } }
+              ), { todname('example.com') }))
+      -- policy to generate two TXT records (specified in binary format) for example.net
+      policy.add(
+          policy.suffix(
+              policy.ANSWER(
+                  { [kres.type.TXT] = { rdata={'\005first', '\006second'}, ttl=5 } }
+              ), { todname('example.net') }))
 
 More complex non-chain actions are described in their own chapters, namely:
 
@@ -195,7 +195,7 @@ Following actions act on request and then processing continue until first non-ch
 
    .. code-block:: lua
 
-       policy.add(policy.all(policy.MIRROR('127.0.0.2')))
+      policy.add(policy.all(policy.MIRROR('127.0.0.2')))
 
 .. function:: FLAGS(set, clear)
 
@@ -207,9 +207,9 @@ Following actions act on request and then processing continue until first non-ch
 
    .. code-block:: lua
 
-        -- log answers from all authoritative servers involved in resolving
-        -- requests for example.net. and its subdomains
-        policy.add(policy.suffix(policy.QTRACE, policy.todnames({'example.net'})))
+      -- log answers from all authoritative servers involved in resolving
+      -- requests for example.net. and its subdomains
+      policy.add(policy.suffix(policy.QTRACE, policy.todnames({'example.net'})))
 
 .. py:attribute:: REQTRACE
 
@@ -225,9 +225,9 @@ Following actions act on request and then processing continue until first non-ch
 
    .. code-block:: lua
 
-        policy.add(policy.suffix(
-                policy.DEBUG_CACHE_MISS,
-                policy.todnames({'example.com.'})))
+      policy.add(policy.suffix(
+          policy.DEBUG_CACHE_MISS,
+          policy.todnames({'example.com.'})))
 
 .. py:function:: DEBUG_IF(test_function)
 
@@ -243,11 +243,11 @@ Following actions act on request and then processing continue until first non-ch
 
    .. code-block:: lua
 
-        policy.add(policy.suffix(
-                policy.DEBUG_IF(function(req)
-                                        return (req.state ~= kres.DONE)
-                                end),
-                policy.todnames({'dnssec-failed.org.'})))
+      policy.add(policy.suffix(
+          policy.DEBUG_IF(function(req)
+                              return (req.state ~= kres.DONE)
+                          end),
+          policy.todnames({'dnssec-failed.org.'})))
 
 
 Custom actions
@@ -263,20 +263,20 @@ Custom actions
 
 .. code-block:: lua
 
-    -- Custom action which generates fake A record
-    local ffi = require('ffi')
-    local function fake_A_record(state, req)
-        local answer = req.answer
-        local qry = req:current()
-        if qry.stype ~= kres.type.A then
-            return state
-        end
-        ffi.C.kr_pkt_make_auth_header(answer)
-        answer:rcode(kres.rcode.NOERROR)
-        answer:begin(kres.section.ANSWER)
-        answer:put(qry.sname, 900, answer:qclass(), kres.type.A, '\192\168\1\3')
-        return kres.DONE
-    end
+   -- Custom action which generates fake A record
+   local ffi = require('ffi')
+   local function fake_A_record(state, req)
+       local answer = req.answer
+       local qry = req:current()
+       if qry.stype ~= kres.type.A then
+           return state
+       end
+       ffi.C.kr_pkt_make_auth_header(answer)
+       answer:rcode(kres.rcode.NOERROR)
+       answer:begin(kres.section.ANSWER)
+       answer:put(qry.sname, 900, answer:qclass(), kres.type.A, '\192\168\1\3')
+       return kres.DONE
+   end
 
 This custom action can be used as any other built-in action.
 For example this applies our *fake A record action* and executes it on all queries in subtree ``example.net``:
@@ -305,13 +305,11 @@ Actions :func:`policy.FORWARD`, :func:`policy.TLS_FORWARD` and :func:`policy.STU
 
    .. code-block:: lua
 
-	-- Forward all queries to public resolvers https://www.nic.cz/odvr
-	policy.add(policy.all(
-                policy.FORWARD(
-                        {'2001:148f:fffe::1', '2001:148f:ffff::1',
-                         '185.43.135.1', '193.14.47.1'})))
-
-
+      -- Forward all queries to public resolvers https://www.nic.cz/odvr
+      policy.add(policy.all(
+         policy.FORWARD(
+             {'2001:148f:fffe::1', '2001:148f:ffff::1',
+              '185.43.135.1', '193.14.47.1'})))
 
    A variant which uses encrypted DNS-over-TLS transport is called :func:`policy.TLS_FORWARD`, please see section :ref:`tls-forwarding`.
 
@@ -326,13 +324,12 @@ Actions :func:`policy.FORWARD`, :func:`policy.TLS_FORWARD` and :func:`policy.STU
 
    .. code-block:: lua
 
-        -- Answers for reverse queries about the 192.168.1.0/24 subnet
-        -- are to be obtained from IP address 192.0.2.1 port 5353
-	-- This disables DNSSEC validation!
-	policy.add(policy.suffix(
-                        policy.STUB('192.0.2.1@5353'),
-                        {todname('1.168.192.in-addr.arpa')}))
-
+      -- Answers for reverse queries about the 192.168.1.0/24 subnet
+      -- are to be obtained from IP address 192.0.2.1 port 5353
+      -- This disables DNSSEC validation!
+      policy.add(policy.suffix(
+          policy.STUB('192.0.2.1@5353'),
+          {todname('1.168.192.in-addr.arpa')}))
 
 .. _tls-forwarding:
 
@@ -366,8 +363,8 @@ Traditional PKI authentication requires server to present certificate with speci
 
 .. code-block:: lua
 
-        policy.TLS_FORWARD({
-                {'2001:DB8::d0c', hostname='res.example.com'}})
+   policy.TLS_FORWARD({
+       {'2001:DB8::d0c', hostname='res.example.com'}})
 
 - ``hostname`` must be a valid domain name matching server's certificate.  It will also be sent to the server as SNI_.
 - ``ca_file`` optionally contains a path to a CA certificate (or certificate bundle) in `PEM format`_.
@@ -387,24 +384,24 @@ TLS Examples
 
 .. code-block:: lua
 
-	modules = { 'policy' }
-	-- forward all queries over TLS to the specified server
-	policy.add(policy.all(policy.TLS_FORWARD({{'192.0.2.1', pin_sha256='YQ=='}})))
-	-- for brevity, other TLS examples omit policy.add(policy.all())
-	-- single server authenticated using its certificate pin_sha256
-	  policy.TLS_FORWARD({{'192.0.2.1', pin_sha256='YQ=='}})  -- pin_sha256 is base64-encoded
-	-- single server authenticated using hostname and system-wide CA certificates
-	  policy.TLS_FORWARD({{'192.0.2.1', hostname='res.example.com'}})
-	-- single server using non-standard port
-	  policy.TLS_FORWARD({{'192.0.2.1@443', pin_sha256='YQ=='}})  -- use @ or # to specify port
-	-- single server with multiple valid pins (e.g. anycast)
-	  policy.TLS_FORWARD({{'192.0.2.1', pin_sha256={'YQ==', 'Wg=='}})
-	-- multiple servers, each with own authenticator
-	  policy.TLS_FORWARD({ -- please note that { here starts list of servers
-		{'192.0.2.1', pin_sha256='Wg=='},
-		-- server must present certificate issued by specified CA and hostname must match
-		{'2001:DB8::d0c', hostname='res.example.com', ca_file='/etc/knot-resolver/tlsca.crt'}
-	})
+   modules = { 'policy' }
+   -- forward all queries over TLS to the specified server
+   policy.add(policy.all(policy.TLS_FORWARD({{'192.0.2.1', pin_sha256='YQ=='}})))
+   -- for brevity, other TLS examples omit policy.add(policy.all())
+   -- single server authenticated using its certificate pin_sha256
+   policy.TLS_FORWARD({{'192.0.2.1', pin_sha256='YQ=='}})  -- pin_sha256 is base64-encoded
+   -- single server authenticated using hostname and system-wide CA certificates
+   policy.TLS_FORWARD({{'192.0.2.1', hostname='res.example.com'}})
+   -- single server using non-standard port
+   policy.TLS_FORWARD({{'192.0.2.1@443', pin_sha256='YQ=='}})  -- use @ or # to specify port
+   -- single server with multiple valid pins (e.g. anycast)
+   policy.TLS_FORWARD({{'192.0.2.1', pin_sha256={'YQ==', 'Wg=='}})
+   -- multiple servers, each with own authenticator
+   policy.TLS_FORWARD({ -- please note that { here starts list of servers
+       {'192.0.2.1', pin_sha256='Wg=='},
+       -- server must present certificate issued by specified CA and hostname must match
+       {'2001:DB8::d0c', hostname='res.example.com', ca_file='/etc/knot-resolver/tlsca.crt'}
+   })
 
 Forwarding to multiple targets
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -526,17 +523,17 @@ effectivelly making grafted domain unavailable.
 The easiest work-around is to disable reading from cache for grafted domains.
 
 .. code-block:: lua
-    :caption: Example configuration grafting domains onto public DNS namespace
+   :caption: Example configuration grafting domains onto public DNS namespace
 
-    extraTrees = policy.todnames(
-        {'faketldtest.',
-         'sld.example.',
-         'internal.example.com.',
-         '2.0.192.in-addr.arpa.'  -- this applies to reverse DNS tree as well
-         })
-    -- Beware: the rule order is important, as STUB is not a chain action.
-    policy.add(policy.suffix(policy.FLAGS({'NO_CACHE'}),   extraTrees))
-    policy.add(policy.suffix(policy.STUB({'2001:db8::1'}), extraTrees))
+   extraTrees = policy.todnames(
+       {'faketldtest.',
+        'sld.example.',
+        'internal.example.com.',
+        '2.0.192.in-addr.arpa.'  -- this applies to reverse DNS tree as well
+        })
+   -- Beware: the rule order is important, as STUB is not a chain action.
+   policy.add(policy.suffix(policy.FLAGS({'NO_CACHE'}),   extraTrees))
+   policy.add(policy.suffix(policy.STUB({'2001:db8::1'}), extraTrees))
 
 Response policy zones
 ---------------------
@@ -596,7 +593,7 @@ Response policy zones
 
   .. code-block:: lua
 
-    policy.add(
+     policy.add(
          policy.rpz(policy.DENY_MSG('domain blocked by your resolver operator'),
                     '/etc/knot-resolver/blocklist.rpz',
                     true))
@@ -624,10 +621,10 @@ Most properties (actions, filters) are described above.
 
   .. code-block:: lua
 
-       -- mirror all queriesm, keep handle so we can retrieve information later
-       local rule = policy.add(policy.all(policy.MIRROR('127.0.0.2')))
-       -- we can print statistics about this rule any time later
-       print(string.format('id: %d, matched queries: %d', rule.id, rule.count)
+     -- mirror all queriesm, keep handle so we can retrieve information later
+     local rule = policy.add(policy.all(policy.MIRROR('127.0.0.2')))
+     -- we can print statistics about this rule any time later
+     print(string.format('id: %d, matched queries: %d', rule.id, rule.count)
 
 .. function:: del(id)
 
