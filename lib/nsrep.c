@@ -13,7 +13,7 @@
 
 #include "lib/utils.h"
 
-#define KEY_PREFIX 'S'
+#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "nsrep",  __VA_ARGS__)
 
 /** @internal Macro to set address structure. */
 #define ADDR_SET(sa, family, addr, len, port) do {\
@@ -22,6 +22,51 @@
 	sa ## _port = htons(port); \
 } while (0)
 
+// To be held per IP address in the global LMDB cache
+struct rtt_state {
+    int32_t srtt;
+    int32_t variance;
+};
+
+// To be held per query and locally
+struct iter_local_state {
+    trie_t *unresolved_names;
+    trie_t *addresses;
+    unsigned int generation; // Used to distinguish old and valid records in tries
+    knot_dname_t *zonecut_name;
+};
+
+// To be held per NS name and locally
+struct iter_name_state {
+    unsigned int generation;
+};
+
+// To be held per IP address and locally
+struct iter_address_state {
+    unsigned int generation;
+    struct rtt_state rtt_state;
+    knot_dname_t *name;
+    bool tls_capable : 1;
+    bool tcp_waiting : 1;
+    bool tcp_connected : 1;
+
+	int success_count;
+    int error_count;
+	int errors[KR_SELECTION_NUMBER_OF_ERRORS];
+};
+
+// Array of these is one of inputs for the actual selection algorithm (`iter_get_best_transport`)
+struct choice {
+    uint8_t *address;
+    size_t address_len;
+    struct iter_address_state *address_state;
+};
+
+
+
+/* Simple cache interface follows */
+
+#define KEY_PREFIX 'S'
 
 void *prefix_key(const uint8_t *ip, size_t len) {
     void *key = malloc(len+1);
@@ -32,6 +77,42 @@ void *prefix_key(const uint8_t *ip, size_t len) {
 
 #undef PREFIX
 
+struct rtt_state get_rtt_state(const uint8_t *ip, size_t len, struct kr_cache *cache) {
+    struct rtt_state state = {0,0};
+    knot_db_val_t value;
+    knot_db_t *db = cache->db;
+    struct kr_cdb_stats *stats = &cache->stats;
+    uint8_t *prefixed_ip = prefix_key(ip, len);
+
+    knot_db_val_t key = {.len = len + 1, .data = prefixed_ip};
+
+    if(cache->api->read(db, stats, &key, &value, 1)) {
+        state = (struct rtt_state){-1, -1}; // No value
+    } else {
+        assert(value.len == sizeof(struct rtt_state));
+        state = *(struct rtt_state *)value.data;
+    }
+
+    free(prefixed_ip);
+    return state;
+}
+
+int put_rtt_state(const uint8_t *ip, size_t len, struct rtt_state state, struct kr_cache *cache) {
+    knot_db_t *db = cache->db;
+    struct kr_cdb_stats *stats = &cache->stats;
+    uint8_t *prefixed_ip = prefix_key(ip, len);
+
+    knot_db_val_t key = {.len = len + 1, .data = prefixed_ip};
+    knot_db_val_t value = {.len = sizeof(struct rtt_state), .data = &state};
+
+    int ret = cache->api->write(db, stats, &key, &value, 1);
+    cache->api->commit(db, stats);
+
+    free(prefixed_ip);
+    return ret;
+}
+
+/* IP helper functions */
 
 void bytes_to_ip(uint8_t *bytes, size_t len, union inaddr *dst) {
     switch(len) {
@@ -46,7 +127,7 @@ void bytes_to_ip(uint8_t *bytes, size_t len, union inaddr *dst) {
     }
 }
 
-uint8_t* ip_to_bytes(union inaddr *src, size_t len) {
+uint8_t* ip_to_bytes(const union inaddr *src, size_t len) {
     switch(len) {
     case sizeof(struct in_addr):
         return (uint8_t *)&src->ip4.sin_addr;
@@ -57,70 +138,31 @@ uint8_t* ip_to_bytes(union inaddr *src, size_t len) {
     }
 }
 
-int32_t get_score(const uint8_t *ip, size_t len, struct kr_cache *cache) {
-    int32_t score;
-    knot_db_val_t value;
-    knot_db_t *db = cache->db;
-    struct kr_cdb_stats *stats = &cache->stats;
-    uint8_t *prefixed_ip = prefix_key(ip, len);
+#define DEFAULT_TIMEOUT 200
 
-    knot_db_val_t key = {.len = len + 1, .data = prefixed_ip};
-
-    if(cache->api->read(db, stats, &key, &value, 1)) {
-        score = -1; // No value
-    } else {
-        assert(value.len == sizeof(int32_t));
-        score = *(int32_t*)value.data;
+// This is verbatim (minus the default timeout value) RFC2988, sec. 2
+int32_t calc_timeout(struct rtt_state state) {
+    if (state.srtt == -1 && state.variance == -1) {
+        return DEFAULT_TIMEOUT;
     }
-
-    free(prefixed_ip);
-    return score;
+    return state.srtt + 4 * state.variance;
 }
 
-int update_score(const uint8_t *ip, size_t len, int32_t score, struct kr_cache *cache) {
-    knot_db_t *db = cache->db;
-    struct kr_cdb_stats *stats = &cache->stats;
-    uint8_t *prefixed_ip = prefix_key(ip, len);
+// This is verbatim RFC2988, sec. 2
+struct rtt_state calc_rtt_state(struct rtt_state old, unsigned new_rtt) {
+    if (old.srtt == -1 && old.variance == -1) {
+        return (struct rtt_state){new_rtt, new_rtt/2};
+    }
 
-    knot_db_val_t key = {.len = len + 1, .data = prefixed_ip};
-    knot_db_val_t value = {.len = sizeof(int32_t), .data = &score};
+    struct rtt_state ret;
 
-    int ret = cache->api->write(db, stats, &key, &value, 1);
-    cache->api->commit(db, stats);
+    ret.srtt = 0.75 * old.srtt + 0.25 * new_rtt;
+    ret.variance = 0.875 * old.variance + 0.125 * abs(old.srtt - new_rtt);
 
-    free(prefixed_ip);
     return ret;
 }
 
-struct iter_local_state {
-    trie_t *unresolved_names;
-    trie_t *addresses;
-    unsigned int generation; // Used to distinguish old and valid records in tries
-    knot_dname_t *zonecut_name;
-};
-
-struct iter_name_state {
-    unsigned int generation;
-};
-
-struct iter_address_state {
-    unsigned int generation;
-    int32_t current_score;
-    knot_dname_t *name;
-    bool tls_capable : 1;
-    bool tcp_waiting : 1;
-    bool tcp_connected : 1;
-
-	int success_count;
-	int errors[KR_SELECTION_NUMBER_OF_ERRORS];
-};
-
-struct choice {
-    uint8_t *address;
-    size_t address_len;
-    struct iter_address_state *address_state;
-};
-
+// Allows the selection algorithm to start asynchronous NS name resolution for future use
 void async_ns_resolution(knot_dname_t *name, enum knot_rr_type type) {
     struct kr_qflags flags;
     memset(&flags, 0, sizeof(struct kr_qflags));
@@ -129,32 +171,32 @@ void async_ns_resolution(knot_dname_t *name, enum knot_rr_type type) {
     free(pkt);
 }
 
+bool zonecut_changed(knot_dname_t *new, knot_dname_t *old) {
+    return knot_dname_cmp(old, new);
+}
+
 void iter_update_state_from_rtt_cache(struct iter_local_state *local_state, struct kr_cache *cache) {
     trie_it_t *it;
     for(it = trie_it_begin(local_state->addresses); !trie_it_finished(it); trie_it_next(it)) {
         size_t address_len;
         uint8_t *address = (uint8_t *)trie_it_key(it, &address_len);
         struct iter_address_state *address_state = (struct iter_address_state *)*trie_it_val(it);
-        address_state->current_score = get_score(address, address_len, cache);
+        address_state->rtt_state = get_rtt_state(address, address_len, cache);
         union inaddr addr;
         bytes_to_ip(address, address_len, &addr);
-        const char *ns_str = kr_straddr(&addr);
-        printf("<<<<< reading rtt of %s, is's %d\n", ns_str, address_state->current_score);
+        const char *ns_str = kr_straddr(&addr.ip);
+        printf("<<<<< rrtt of %s is %d, variance is %d\n", ns_str, address_state->rtt_state.srtt, address_state->rtt_state.variance);
     }
     trie_it_free(it);
-}
-
-bool zonecut_changed(knot_dname_t *new, knot_dname_t *old) {
-    return knot_dname_cmp(old, new);
 }
 
 void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct kr_zonecut *zonecut, struct knot_mm *mm) {
 	if (zonecut_changed(zonecut->name, local_state->zonecut_name) ||
         local_state->unresolved_names == NULL || local_state->addresses == NULL) {
         // Local state initialization
+        memset(local_state, 0, sizeof(struct iter_local_state));
         local_state->unresolved_names = trie_create(mm);
         local_state->addresses = trie_create(mm);
-        local_state->generation = 0;
         local_state->zonecut_name = knot_dname_copy(zonecut->name, mm);
     }
 
@@ -247,36 +289,63 @@ void iter_local_state_init(struct knot_mm *mm, void **local_state) {
 }
 
 
-// Return a pointer to newly chosen transport. NULL if there is no choice.
-struct kr_transport *iter_get_best_transport(struct choice *choices, int len, struct iter_local_state *local_state, struct knot_mm *mempool) {
+int cmp_choices(const void *a, const void *b) {
+    struct choice *a_ = (struct choice *) a;
+    struct choice *b_ = (struct choice *) b;
+
+    int diff;
+    if ((diff = a_->address_state->errors - b_->address_state->errors)) {
+        return diff;
+    }
+    if ((diff = calc_timeout(a_->address_state->rtt_state) - calc_timeout(b_->address_state->rtt_state))) {
+        return diff;
+    }
+    return 0;
+}
+
+#define ERROR_LIMIT 2
+
+// Return a pointer to newly chosen (and allocated) transport. NULL if there is no choice.
+// Performs the actual selection (currently epsilon-greedy with epsilon = 0.05).
+struct kr_transport *iter_get_best_transport(struct choice *choices,
+                                             int choices_len,
+                                             knot_dname_t **unresolved,
+                                             int unresolved_len,
+                                             struct iter_local_state *local_state,
+                                             struct knot_mm *mempool,
+                                             bool tcp) {
 
     struct kr_transport *transport = mm_alloc(mempool, sizeof(struct kr_transport));
     memset(transport, 0, sizeof(struct kr_transport));
+    int choice = 0;
 
-    if (len == 0) {
-        trie_it_t *it;
-        for(it = trie_it_begin(local_state->unresolved_names); !trie_it_finished(it); trie_it_next(it)) {
-            struct iter_name_state *name_state = *(struct iter_name_state **)trie_it_val(it);
-            if (name_state->generation == local_state->generation) {
-                knot_dname_t *name = (knot_dname_t *)trie_it_key(it, NULL);
-                trie_it_free(it);
-                *transport = (struct kr_transport) {
-                    .name = name,
-                    .protocol = KR_TRANSPORT_NOADDR,
-                };
-                return transport;
-            }
+    if (kr_rand_coin(1, 20 || choices_len == 0)) {
+        // EXPLORE
+        int index = kr_rand_bytes(1) % (choices_len + unresolved_len);
+        if (index < unresolved_len) {
+            // We will resolve a new NS name
+            *transport = (struct kr_transport) {
+                .protocol = KR_TRANSPORT_NOADDR,
+                .name = unresolved[index]
+            };
+            return transport;
+        } else {
+            choice = index - unresolved_len;
         }
-        trie_it_free(it);
-        return NULL; // No addresses and even no names to resolve
+    } else {
+        // EXPLOIT
+        qsort(choices, choices_len, sizeof(choice), cmp_choices);
+        if (choices[0].address_state->error_count > ERROR_LIMIT) {
+            transport = NULL;
+        } else {
+            choice = 0;
+        }
     }
-
-    int choice = kr_rand_bytes(1) % len;
 
     *transport = (struct kr_transport) {
         .name = choices[choice].address_state->name,
-        .protocol = KR_TRANSPORT_UDP,
-        .timeout = 200,
+        .protocol = tcp ? KR_TRANSPORT_TCP : KR_TRANSPORT_UDP,
+        .timeout = calc_timeout(choices[choice].address_state->rtt_state),
     };
 
 
@@ -315,8 +384,8 @@ struct kr_transport *iter_get_best_transport(struct choice *choices, int len, st
 
 }
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "nsrep",  __VA_ARGS__)
-
+// Prepares all the data for selection. The naming sucks currently. So TODO renaming.
+// Maybe factor the preparation out and have this be function that calls one and than the other function.
 void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport) {
     struct knot_mm *mempool = qry->request->rplan.pool;
     struct iter_local_state *local_state = (struct iter_local_state *)qry->server_selection.local_state;
@@ -331,8 +400,10 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
     // also take qry->flags.TCP into consideration (do that in the actual choosing function)
 
     int num_addresses = trie_weight(local_state->addresses);
+    int num_unresolved_names = trie_weight(local_state->unresolved_names);
 
     struct choice choices[num_addresses]; // Some will get unused, oh well
+    knot_dname_t *unresolved_names[num_unresolved_names];
 
     trie_it_t *it;
 
@@ -349,10 +420,23 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
         }
 
     }
+
+    int to_resolve = 0;
+    for(it = trie_it_begin(local_state->unresolved_names); !trie_it_finished(it); trie_it_next(it)) {
+        struct iter_name_state *name_state = *(struct iter_name_state **)trie_it_val(it);
+        if (name_state->generation == local_state->generation) {
+            knot_dname_t *name = (knot_dname_t *)trie_it_key(it, NULL);
+            unresolved_names[to_resolve++] = name;
+        }
+    }
+
     trie_it_free(it);
 
-    *transport = iter_get_best_transport(choices, valid_addresses, local_state, mempool);
-
+    if (valid_addresses || to_resolve) {
+        *transport = iter_get_best_transport(choices, valid_addresses, unresolved_names, to_resolve, local_state, mempool, qry->flags.TCP);
+    } else {
+        *transport = NULL;
+    }
 
     WITH_VERBOSE(qry) {
 
@@ -370,8 +454,7 @@ struct iter_address_state *get_address_state(struct iter_local_state *local_stat
 	trie_t *addresses = local_state->addresses;
 	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
 
-    const char *ns_str = kr_straddr(&transport->address.ip);
-	trie_val_t *address_state = trie_get_try(addresses, address, transport->address_len);
+	trie_val_t *address_state = trie_get_try(addresses, (char *)address, transport->address_len);
 
 	if (!address_state) {
 		assert(0);
@@ -403,9 +486,9 @@ void iter_update_rtt(struct kr_query *qry, const struct kr_transport *transport,
 
 	struct kr_cache *cache = &qry->request->ctx->cache;
 
-    uint8_t *address = ip_to_bytes(&transport->address.ip, transport->address_len);
-	int ret = update_score(address, transport->address_len, rtt, cache);
-    const char *ns_str = kr_straddr(&transport->address.ip);
+    struct rtt_state new_rtt_state = calc_rtt_state(addr_state->rtt_state, rtt);
+    uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
+	put_rtt_state(address, transport->address_len, new_rtt_state, cache);
 
     WITH_VERBOSE(qry) {
 
@@ -414,8 +497,8 @@ void iter_update_rtt(struct kr_query *qry, const struct kr_transport *transport,
 	const char *ns_str = kr_straddr(&transport->address.ip);
 
 	VERBOSE_MSG(qry,
-			"=> id: '%05u' updating: '%s'@'%s' zone cut: '%s with rtt %u'\n",
-			qry->id, ns_name, ns_str ? ns_str : "", zonecut_str, rtt);
+			"=> id: '%05u' updating: '%s'@'%s' zone cut: '%s' with rtt %u to srtt: %d and variance: %d \n",
+			qry->id, ns_name, ns_str ? ns_str : "", zonecut_str, rtt, new_rtt_state.srtt, new_rtt_state.variance);
 	}
 }
 
@@ -431,6 +514,7 @@ void iter_error(struct kr_query *qry, const struct kr_transport *transport, enum
 	struct iter_local_state *local_state = qry->server_selection.local_state;
 	struct iter_address_state *addr_state = get_address_state(local_state, transport);
 	addr_state->errors[error]++;
+    addr_state->error_count++;
 
     WITH_VERBOSE(qry) {
 
@@ -444,6 +528,7 @@ void iter_error(struct kr_query *qry, const struct kr_transport *transport, enum
 	}
 }
 
+// TODO: Forwarding functions
 void forward_choose_transport(struct kr_query *qry, struct kr_transport **transport) {return;}
 void forward_success(struct kr_query *qry, const struct kr_transport *transport) {return;}
 void forward_update_rtt(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt) {return;}
