@@ -151,7 +151,7 @@ Following actions stop the policy matching on the query, i.e. other rules are no
    Overwrite Resource Records in responses with specified values.
 
       * type
-        - RR type to be replaced, e.g. ``[kres.type.A]`` or `numberic value <https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4>`_.
+        - RR type to be replaced, e.g. ``[kres.type.A]`` or `numeric value <https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4>`_.
       * rdata
         - RR data in DNS wire format, i.e. binary form specific for given RR type. Set of multiple RRs can be specified as table ``{ rdata1, rdata2, ... }``. Use helper function :func:`kres.str2ip` to generate wire format for A and AAAA records.
       * ttl
@@ -169,13 +169,15 @@ Following actions stop the policy matching on the query, i.e. other rules are no
        -- policy to change IPv4 address and TTL for example.com
        policy.add(
            policy.suffix(
-               policy.ANSWER({ [kres.type.A] = { rdata=kres.str2ip('192.0.2.7'), ttl=300 } }),
-           { todname('example.com') }))
+               policy.ANSWER(
+                   { [kres.type.A] = { rdata=kres.str2ip('192.0.2.7'), ttl=300 } }
+               ), { todname('example.com') }))
        -- policy to generate two TXT records (specified in binary format) for example.net
        policy.add(
            policy.suffix(
-               policy.ANSWER({ [kres.type.TXT] = { rdata={'\005first', '\006second'}, ttl=5 } }),
-           { todname('example.net') }))
+               policy.ANSWER(
+                   { [kres.type.TXT] = { rdata={'\005first', '\006second'}, ttl=5 } }
+               ), { todname('example.net') }))
 
 More complex non-chain actions are described in their own chapters, namely:
 
