@@ -4,7 +4,7 @@
 #include "db.h"
 
 #include "lib/cache/cdb_lmdb.h"
-#include <lib/cache/impl.h>
+#include "lib/cache/impl.h"
 //#include <lib/defines.h>
 
 #include <ctype.h>		//DEBUG
@@ -40,6 +40,25 @@ int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db,
 		return -ENOMEM;
 	}
 
+	return 0;
+}
+
+int kr_gc_cache_check_health(struct kr_cache *kres_db, knot_db_t ** libknot_db)
+{
+	int ret = kr_cdb_lmdb()->check_health(kres_db->db, &kres_db->stats);
+	if (ret == 0) {
+		return 0;
+	} else if (ret != 1) {
+		kr_gc_cache_close(kres_db, *libknot_db);
+		return ret;
+	}
+	/* Cache was reopen. */
+	free(*libknot_db);
+	*libknot_db = knot_db_t_kres2libknot(kres_db->db);
+	if (*libknot_db == NULL) {
+		printf("Out of memory.\n");
+		return -ENOMEM;
+	}
 	return 0;
 }
 

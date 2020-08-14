@@ -5,7 +5,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include <lib/defines.h>
+#include "lib/defines.h"
+#include "lib/utils.h"
 #include <libknot/libknot.h>
 
 #include "kresconfig.h"
@@ -121,6 +122,10 @@ int main(int argc, char *argv[])
 		print_help();
 		return 1;
 	}
+
+#ifdef DEBUG
+	kr_verbose_set(true); // used inside cache operations
+#endif
 
 	int exit_code = 0;
 	kr_cache_gc_state_t *gc_state = NULL;
