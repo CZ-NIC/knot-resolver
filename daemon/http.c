@@ -41,13 +41,13 @@ struct http_data_buffer {
 
 static ssize_t send_callback(nghttp2_session *session, const uint8_t *data, size_t length, int flags, void *user_data)
 {
-	struct http_ctx_t *ctx = (struct http_ctx_t *)user_data;
+	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	return ctx->send_cb(data, length, ctx->user_ctx);
 }
 
 static int header_callback(nghttp2_session *session, const nghttp2_frame *frame, const uint8_t *name, size_t namelen, const uint8_t *value, size_t valuelen, uint8_t flags, void *user_data)
 {
-	struct http_ctx_t *ctx = (struct http_ctx_t *)user_data;
+	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	static const char key[] = "dns=";
 	int32_t stream_id = frame->hd.stream_id;
 
@@ -89,7 +89,7 @@ static int header_callback(nghttp2_session *session, const nghttp2_frame *frame,
 /* This method is called for data received via POST. */
 static int data_chunk_recv_callback(nghttp2_session *session, uint8_t flags, int32_t stream_id, const uint8_t *data, size_t len, void *user_data)
 {
-	struct http_ctx_t *ctx = (struct http_ctx_t *)user_data;
+	struct http_ctx *ctx = (struct http_ctx *)user_data;
 
 	if (ctx->incomplete_stream) {
 		if (queue_len(ctx->streams) <= 0) {
@@ -129,7 +129,7 @@ static int data_chunk_recv_callback(nghttp2_session *session, uint8_t flags, int
 
 static int on_frame_recv_callback(nghttp2_session *session, const nghttp2_frame *frame, void *user_data)
 {
-	struct http_ctx_t *ctx = (struct http_ctx_t *)user_data;
+	struct http_ctx *ctx = (struct http_ctx *)user_data;
 
 	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) && ctx->buf_pos != 0) {
 		ctx->incomplete_stream = false;
@@ -149,7 +149,7 @@ static int on_frame_recv_callback(nghttp2_session *session, const nghttp2_frame 
 	return 0;
 }
 
-struct http_ctx_t* http_new(http_send_callback cb, void *user_ctx)
+struct http_ctx* http_new(http_send_callback cb, void *user_ctx)
 {
 	assert(cb != NULL);
 
@@ -160,7 +160,7 @@ struct http_ctx_t* http_new(http_send_callback cb, void *user_ctx)
 	nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks, data_chunk_recv_callback);
 	nghttp2_session_callbacks_set_on_frame_recv_callback(callbacks, on_frame_recv_callback);
 
-	struct http_ctx_t *ctx = calloc(1UL, sizeof(struct http_ctx_t));
+	struct http_ctx *ctx = calloc(1UL, sizeof(struct http_ctx));
 	ctx->send_cb = cb;
 	ctx->user_ctx = user_ctx;
 	queue_init(ctx->streams);
@@ -181,7 +181,7 @@ struct http_ctx_t* http_new(http_send_callback cb, void *user_ctx)
 
 ssize_t http_process_input_data(struct session *s, const uint8_t *in_buf, ssize_t in_buf_len)
 {
-	struct http_ctx_t *http_p = session_http_get_server_ctx(s);
+	struct http_ctx *http_p = session_http_get_server_ctx(s);
 	if (!http_p->session) {
 		return kr_error(ENOSYS);
 	}
@@ -230,7 +230,7 @@ int http_write(uv_write_t *req, uv_handle_t *handle, int32_t stream_id, knot_pkt
 	}
 
 	struct session *s = handle->data;
-	struct http_ctx_t *http_ctx = session_http_get_server_ctx(s);
+	struct http_ctx *http_ctx = session_http_get_server_ctx(s);
 
 	assert (http_ctx);
 	assert (!session_flags(s)->outgoing);
@@ -279,7 +279,7 @@ int http_write(uv_write_t *req, uv_handle_t *handle, int32_t stream_id, knot_pkt
 	return kr_ok();
 }
 
-void http_free(struct http_ctx_t *ctx)
+void http_free(struct http_ctx *ctx)
 {
 	if (ctx == NULL || ctx->session == NULL) {
 		return;

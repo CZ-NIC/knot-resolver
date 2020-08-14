@@ -423,7 +423,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls, bool http)
 		}
 	}
 	if (http) {
-		struct http_ctx_t *ctx = session_http_get_server_ctx(s);
+		struct http_ctx *ctx = session_http_get_server_ctx(s);
 		if (!ctx) {
 			if (!tls) {  // TODO plain HTTP not supported yet
 				session_close(s);
