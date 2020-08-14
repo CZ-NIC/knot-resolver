@@ -9,6 +9,8 @@
 int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db,
 		     knot_db_t ** libknot_db);
 
+int kr_gc_cache_check_health(struct kr_cache *kres_db, knot_db_t ** libknot_db);
+
 void kr_gc_cache_close(struct kr_cache *kres_db, knot_db_t * knot_db);
 
 typedef int (*kr_gc_iter_callback)(const knot_db_val_t * key,
