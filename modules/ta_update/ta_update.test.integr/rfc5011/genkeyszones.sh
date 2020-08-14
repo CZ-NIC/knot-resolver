@@ -10,7 +10,7 @@
 
 set -o nounset -o errexit -o xtrace
 
-GEN="dnssec-keygen 	-r /dev/urandom	-K keys/ -a RSASHA256 -b 2048 	-L 21d"
+GEN="dnssec-keygen 	-K keys/ -a RSASHA256 -b 2048 	-L 21d"
 
 function sign {
 	OUTFILE="$(echo "$1" | sed 's/[- :]//g').db"
@@ -18,7 +18,6 @@ function sign {
 	LD_PRELOAD="/usr/lib64/faketime/libfaketimeMT.so.1" \
 	FAKETIME="$1" \
 	dnssec-signzone	\
-	-r /dev/urandom \
 	-K keys/ \
 	-o . \
 	-S \
