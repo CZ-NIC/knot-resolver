@@ -68,7 +68,7 @@ def generate_range(filename, rng_templ, entry_templ):
     os.link(filename, 'root.db')
 
     # run server
-    knotd = subprocess.Popen(['/usr/local/sbin/knotd', '-c', 'knot.root.conf'])
+    knotd = subprocess.Popen(['knotd', '-c', 'knot.root.conf', '-s', '/tmp/knot-dns2rpl.sock'])
     time.sleep(0.1)  # give kresd time to start so we do not wait for first timeout
 
     # query data
