@@ -97,9 +97,9 @@ void session_tls_set_client_ctx(struct session *session, struct tls_client_ctx *
 struct tls_common_ctx *session_tls_get_common_ctx(const struct session *session);
 
 /** Get pointer to server-side http-related data. */
-struct http_ctx_t *session_http_get_server_ctx(const struct session *session);
+struct http_ctx *session_http_get_server_ctx(const struct session *session);
 /** Set pointer to server-side http-related data. */
-void session_http_set_server_ctx(struct session *session, struct http_ctx_t *ctx);
+void session_http_set_server_ctx(struct session *session, struct http_ctx *ctx);
 
 /** Get pointer to underlying libuv handle for IO operations. */
 uv_handle_t *session_get_handle(struct session *session);
