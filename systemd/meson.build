@@ -39,11 +39,14 @@ if systemd_files == 'enabled'
   )
   install_man(kresd_systemd_man)
 
-  ## tmpfiles
-  tmpfiles = configure_file(
-    input: 'tmpfiles.d/knot-resolver.conf.in',
-    output: 'knot-resolver.conf',
-    configuration: systemd_config,
-    install_dir: systemd_tmpfiles_dir,
-  )
+  ## install tmpfiles for distributions with older systemd versions
+  ## ignoring {Runtime,State,Cache}Directory=
+  if libsystemd.version().version_compare('<235')
+    tmpfiles = configure_file(
+      input: 'tmpfiles.d/knot-resolver.conf.in',
+      output: 'knot-resolver.conf',
+      configuration: systemd_config,
+      install_dir: systemd_tmpfiles_dir,
+    )
+  endif
 endif
