@@ -17,23 +17,26 @@
 /** Transport session (opaque). */
 struct session;
 
-typedef ssize_t(*http_send_callback)(const uint8_t *buffer, const size_t buffer_len, void *user_ctx);
+typedef ssize_t(*http_send_callback)(const uint8_t *buffer,
+				     const size_t buffer_len,
+				     struct session *session);
 
 typedef queue_t(int32_t) queue_int32_t;
 
 struct http_ctx {
 	struct nghttp2_session *h2;
 	http_send_callback send_cb;
-	void *user_ctx;
-	queue_int32_t streams;  /* List of stream IDs of read HTTP/2 frames. */
+	struct session *session;
+	queue_int32_t streams;  /* IDs of streams present in the buffer. */
 	bool incomplete_stream;
 	ssize_t submitted;
-	uint8_t *buf;  /* Part of the session->wire_buf that belongs to current HTTP/2 stream. */
+	uint8_t *buf;  /* Part of the wire_buf that belongs to current HTTP/2 stream. */
 	ssize_t buf_pos;
 	ssize_t buf_size;
 };
 
-struct http_ctx* http_new(http_send_callback cb, void *user_ctx);
-ssize_t http_process_input_data(struct session *s, const uint8_t *buf, ssize_t nread);
-int http_write(uv_write_t *req, uv_handle_t *handle, int32_t stream_id, knot_pkt_t *pkt, uv_write_cb cb);
+struct http_ctx* http_new(struct session *session, http_send_callback send_cb);
+ssize_t http_process_input_data(struct session *session, const uint8_t *buf, ssize_t nread);
+int http_write(uv_write_t *req, uv_handle_t *handle, int32_t stream_id, knot_pkt_t *pkt,
+	       uv_write_cb cb);
 void http_free(struct http_ctx *ctx);
