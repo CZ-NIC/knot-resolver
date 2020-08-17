@@ -185,7 +185,7 @@ void iter_update_state_from_rtt_cache(struct iter_local_state *local_state, stru
         union inaddr addr;
         bytes_to_ip(address, address_len, &addr);
         const char *ns_str = kr_straddr(&addr.ip);
-        printf("<<<<< rrtt of %s is %d, variance is %d\n", ns_str, address_state->rtt_state.srtt, address_state->rtt_state.variance);
+        printf("<<<<< rtt of %s is %d, variance is %d\n", ns_str, address_state->rtt_state.srtt, address_state->rtt_state.variance);
     }
     trie_it_free(it);
 }
@@ -480,10 +480,6 @@ void iter_update_rtt(struct kr_query *qry, const struct kr_transport *transport,
 
 	struct iter_local_state *local_state = qry->server_selection.local_state;
 	struct iter_address_state *addr_state = get_address_state(local_state, transport);
-
-	// We will just replace the information in RTT cache for now
-	// later we will do some kind of moving average.
-
 	struct kr_cache *cache = &qry->request->ctx->cache;
 
     struct rtt_state new_rtt_state = calc_rtt_state(addr_state->rtt_state, rtt);
