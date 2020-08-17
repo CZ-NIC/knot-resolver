@@ -42,7 +42,7 @@ struct http_data_buffer {
 /*
  * Write HTTP/2 data to underlying transport layer.
  */
-static ssize_t send_callback(nghttp2_session *session, const uint8_t *data, size_t length,
+static ssize_t send_callback(nghttp2_session *h2, const uint8_t *data, size_t length,
 			     int flags, void *user_data)
 {
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
@@ -86,13 +86,13 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 	return 0;
 }
 
-static void refuse_stream(nghttp2_session *session, int32_t stream_id)
+static void refuse_stream(nghttp2_session *h2, int32_t stream_id)
 {
 	nghttp2_submit_rst_stream(
-		session, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
+		h2, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
 }
 
-static int header_callback(nghttp2_session *session, const nghttp2_frame *frame,
+static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 			   const uint8_t *name, size_t namelen, const uint8_t *value,
 			   size_t valuelen, uint8_t flags, void *user_data)
 {
@@ -107,13 +107,13 @@ static int header_callback(nghttp2_session *session, const nghttp2_frame *frame,
 	/* If there is incomplete data in the buffer, we can't process the new stream. */
 	if (ctx->incomplete_stream) {
 		kr_log_verbose("[http] previous stream incomplete, refusing\n");
-		refuse_stream(session, stream_id);
+		refuse_stream(h2, stream_id);
 		return 0;
 	}
 
 	if (!strcasecmp(":path", (const char *)name)) {
 		if (process_uri_path(ctx, (const char*)value, stream_id) < 0)
-			refuse_stream(session, stream_id);
+			refuse_stream(h2, stream_id);
 	}
 	return 0;
 }
@@ -126,7 +126,7 @@ static int header_callback(nghttp2_session *session, const nghttp2_frame *frame,
  * parse multiple subsequent streams, each one must be fully received before
  * processing a new stream.
  */
-static int data_chunk_recv_callback(nghttp2_session *session, uint8_t flags, int32_t stream_id,
+static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t stream_id,
 				    const uint8_t *data, size_t len, void *user_data)
 {
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
@@ -138,7 +138,7 @@ static int data_chunk_recv_callback(nghttp2_session *session, uint8_t flags, int
 			return NGHTTP2_ERR_CALLBACK_FAILURE;
 		} else if (queue_tail(ctx->streams) != stream_id) {
 			kr_log_verbose("[http] previous stream incomplete, refusing\n");
-			refuse_stream(session, stream_id);
+			refuse_stream(h2, stream_id);
 			return 0;
 		}
 	}
@@ -169,7 +169,7 @@ static int data_chunk_recv_callback(nghttp2_session *session, uint8_t flags, int
  *
  * Unrelated frames (such as SETTINGS) are ignored (no data was buffered).
  */
-static int on_frame_recv_callback(nghttp2_session *session, const nghttp2_frame *frame, void *user_data)
+static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *frame, void *user_data)
 {
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	ssize_t len;
@@ -220,10 +220,10 @@ struct http_ctx* http_new(http_send_callback cb, void *user_ctx)
 	ctx->incomplete_stream = false;
 	ctx->submitted = 0;
 
-	nghttp2_session_server_new(&ctx->session, callbacks, ctx);
+	nghttp2_session_server_new(&ctx->h2, callbacks, ctx);
 	nghttp2_session_callbacks_del(callbacks);
 
-	nghttp2_submit_settings(ctx->session, NGHTTP2_FLAG_NONE,
+	nghttp2_submit_settings(ctx->h2, NGHTTP2_FLAG_NONE,
 		iv, sizeof(iv)/sizeof(*iv));
 
 	return ctx;
@@ -239,7 +239,7 @@ ssize_t http_process_input_data(struct session *s, const uint8_t *in_buf, ssize_
 	struct http_ctx *ctx = session_http_get_server_ctx(s);
 	ssize_t ret = 0;
 
-	if (!ctx->session)  // TODO session vs h2; assert session equals
+	if (!ctx->h2)  // TODO session vs h2; assert session equals
 		return kr_error(ENOSYS);
 
 	ctx->submitted = 0;
@@ -247,14 +247,14 @@ ssize_t http_process_input_data(struct session *s, const uint8_t *in_buf, ssize_
 	ctx->buf_pos = 0;
 	ctx->buf_size = session_wirebuf_get_free_size(s);
 
-	ret = nghttp2_session_mem_recv(ctx->session, in_buf, in_buf_len);
+	ret = nghttp2_session_mem_recv(ctx->h2, in_buf, in_buf_len);
 	if (ret < 0) {
 		kr_log_error("[http] nghttp2_session_mem_recv failed: %s (%zd)\n",
 			     nghttp2_strerror(ret), ret);
 		return kr_error(EIO);
 	}
 
-	ret = nghttp2_session_send(ctx->session);
+	ret = nghttp2_session_send(ctx->h2);
 	if (ret < 0) {
 		kr_log_error("[http] nghttp2_session_send failed: %s (%zd)\n",
 			     nghttp2_strerror(ret), ret);
@@ -267,7 +267,7 @@ ssize_t http_process_input_data(struct session *s, const uint8_t *in_buf, ssize_
 /*
  *
  */
-static ssize_t send_response_callback(nghttp2_session *session, int32_t stream_id, uint8_t *buf,
+static ssize_t send_response_callback(nghttp2_session *h2, int32_t stream_id, uint8_t *buf,
 				      size_t length, uint32_t *data_flags,
 				      nghttp2_data_source *source, void *user_data)
 {
@@ -325,13 +325,13 @@ int http_write(uv_write_t *req, uv_handle_t *handle, int32_t stream_id, knot_pkt
 		MAKE_NV("content-length", 14, size, size_len)
 	};
 
-	int ret = nghttp2_submit_response(http_ctx->session, stream_id, hdrs, sizeof(hdrs)/sizeof(*hdrs), &data_prd);
+	int ret = nghttp2_submit_response(http_ctx->h2, stream_id, hdrs, sizeof(hdrs)/sizeof(*hdrs), &data_prd);
 	if (ret != 0) {
 		kr_log_error("[http] nghttp2_submit_response failed: %s (%d)\n", nghttp2_strerror(ret), ret);
 		return kr_error(EIO);
 	}
 
-	if((ret = nghttp2_session_send(http_ctx->session)) < 0) {
+	if((ret = nghttp2_session_send(http_ctx->h2)) < 0) {
 		kr_log_error("[http] nghttp2_session_send failed: %s (%d)\n", nghttp2_strerror(ret), ret);
  		return kr_error(EIO);
 	}
@@ -352,6 +352,6 @@ void http_free(struct http_ctx *ctx)
 		return;
 
 	queue_deinit(ctx->streams);
-	nghttp2_session_del(ctx->session);
+	nghttp2_session_del(ctx->h2);
 	free(ctx);
 }

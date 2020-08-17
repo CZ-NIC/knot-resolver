@@ -22,7 +22,7 @@ typedef ssize_t(*http_send_callback)(const uint8_t *buffer, const size_t buffer_
 typedef queue_t(int32_t) queue_int32_t;
 
 struct http_ctx {
-	struct nghttp2_session *session;
+	struct nghttp2_session *h2;
 	http_send_callback send_cb;
 	void *user_ctx;
 	queue_int32_t streams;  /* List of stream IDs of read HTTP/2 frames. */
