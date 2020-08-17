@@ -168,8 +168,7 @@ static int cache_write_or_clear(struct kr_cache *cache, const knot_db_val_t *key
 {
 	int ret = cache_op(cache, write, key, val, 1);
 	if (!ret) return kr_ok();
-	/* Clear cache if overfull.  It's nontrivial to do better with LMDB.
-	 * LATER: some garbage-collection mechanism. */
+	/* Clear cache if overfull.  Using kres-cache-gc service should prevent this. */
 	if (ret == kr_error(ENOSPC)) {
 		ret = kr_cache_clear(cache);
 		const char *msg = "[cache] clearing because overfull, ret = %d\n";
