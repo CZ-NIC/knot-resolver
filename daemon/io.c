@@ -320,14 +320,17 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	mp_flush(the_worker->pkt_pool.ctx);
 }
 
-static ssize_t tls_send(const uint8_t *buffer, const size_t buffer_len, void *user_ctx)
+static ssize_t tls_send(const uint8_t *buf, const size_t len, struct session *session)
 {
-	struct tls_ctx *ctx = user_ctx;
-	ssize_t len = 0;
-	if ((len = gnutls_record_send(ctx->c.tls_session, buffer, buffer_len)) < 0) {
+	struct tls_ctx *ctx = session_tls_get_server_ctx(session);
+	ssize_t sent = 0;
+	assert(ctx);
+
+	sent = gnutls_record_send(ctx->c.tls_session, buf, len);
+	if (sent < 0) {
 		return kr_error(EIO);
 	}
-	return len;
+	return sent;
 }
 
 static void _tcp_accept(uv_stream_t *master, int status, bool tls, bool http)
@@ -429,7 +432,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls, bool http)
 				session_close(s);
 				return;
 			}
-			ctx = http_new(tls_send, (void*)session_tls_get_server_ctx(s));
+			ctx = http_new(s, tls_send);
 			if (!ctx) {
 				session_close(s);
 				return;
