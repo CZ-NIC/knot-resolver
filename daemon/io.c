@@ -366,7 +366,7 @@ static ssize_t tcp_send(const uint8_t *buffer, const size_t buffer_len, void *us
 
 static ssize_t tls_send(const uint8_t *buffer, const size_t buffer_len, void *user_ctx)
 {
-	struct tls_ctx_t *ctx = user_ctx;
+	struct tls_ctx *ctx = user_ctx;
 	ssize_t len = 0;
 	if ((len = gnutls_record_send(ctx->c.tls_session, buffer, buffer_len)) < 0) {
 		return kr_error(EIO);
