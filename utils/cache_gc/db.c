@@ -160,8 +160,8 @@ static const struct entry_h *val2entry(const knot_db_val_t val, uint16_t ktype)
 
 int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ctx)
 {
-#ifdef DEBUG
 	unsigned int counter_iter = 0;
+#ifdef DEBUG
 	unsigned int counter_gc_consistent = 0;
 	unsigned int counter_kr_consistent = 0;
 #endif
@@ -199,9 +199,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ct
 			goto error;
 		}
 
-#ifdef DEBUG
 		counter_iter++;
-#endif
 
 		info.entry_size = key.len + val.len;
 		info.valid = false;
@@ -248,7 +246,24 @@ int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ct
 		}
 
 skip:
-		it = api->iter_next(it);
+		if (counter_iter % 1024) {
+			it = api->iter_next(it);
+		} else {
+			/* The transaction has been too long; let's reopen it. */
+			uint8_t key_storage[key.len];
+			memcpy(key_storage, key.data, key.len);
+			key.data = key_storage;
+
+			api->iter_finish(it);
+			api->txn_abort(&txn);
+
+			ret = api->txn_begin(knot_db, &txn, KNOT_DB_RDONLY);
+			if (ret || !it) fprintf(stderr, "Error 1 : %d\n", ret);
+			if (!ret) it = api->iter_begin(&txn, KNOT_DB_NOOP);
+			if (ret || !it) fprintf(stderr, "Error 2 : %d\n", ret);
+			if (!ret && it) it = api->iter_seek(it, &key, KNOT_DB_GEQ);
+			if (ret || !it) fprintf(stderr, "Error 3: %d\n", ret);
+		}
 	}
 
 	api->txn_abort(&txn);
