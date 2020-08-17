@@ -4,4 +4,5 @@
   get_url:
     url: "{{ obs_repofile_url }}"
     dest: "/etc/yum.repos.d/home:CZ-NIC:{{ item }}.repo"
+    mode: 0644
   with_items: "{{ repos }}"
