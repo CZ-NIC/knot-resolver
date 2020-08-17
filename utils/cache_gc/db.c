@@ -158,7 +158,8 @@ static const struct entry_h *val2entry(const knot_db_val_t val, uint16_t ktype)
 	return NULL;
 }
 
-int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ctx)
+int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
+			kr_gc_iter_callback callback, void *ctx)
 {
 #ifdef DEBUG
 	unsigned int counter_iter = 0;
@@ -185,6 +186,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ct
 		return KNOT_ERROR;
 	}
 
+	int txn_steps = 0;
 	while (it != NULL) {
 		knot_db_val_t key = { 0 }, val = { 0 };
 		ret = api->iter_key(it, &key);
@@ -198,10 +200,6 @@ int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ct
 		if (ret != KNOT_EOK) {
 			goto error;
 		}
-
-#ifdef DEBUG
-		counter_iter++;
-#endif
 
 		info.entry_size = key.len + val.len;
 		info.valid = false;
@@ -226,6 +224,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ct
 			info.no_labels = entry_labels(&key, *entry_type);
 		}
 #ifdef DEBUG
+		counter_iter++;
 		counter_kr_consistent += info.valid;
 		if (!entry_type || !entry) {	// don't log fully consistent entries
 			printf
@@ -247,8 +246,34 @@ int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ct
 			return ret;
 		}
 
-skip:
-		it = api->iter_next(it);
+	skip:	// Advance to the next GC item.
+		if (++txn_steps < cfg->ro_txn_items || !cfg->ro_txn_items/*unlimited*/) {
+			it = api->iter_next(it);
+		} else {
+			/* The transaction has been too long; let's reopen it. */
+			txn_steps = 0;
+			uint8_t key_storage[key.len];
+			memcpy(key_storage, key.data, key.len);
+			key.data = key_storage;
+
+			api->iter_finish(it);
+			api->txn_abort(&txn);
+
+			ret = api->txn_begin(knot_db, &txn, KNOT_DB_RDONLY);
+			if (ret != KNOT_EOK) {
+				printf("Error restarting DB transaction (%s).\n",
+					knot_strerror(ret));
+				return ret;
+			}
+			it = api->iter_begin(&txn, KNOT_DB_NOOP);
+			if (it == NULL) {
+				printf("Error iterating database.\n");
+				api->txn_abort(&txn);
+				return KNOT_ERROR;
+			}
+			it = api->iter_seek(it, &key, KNOT_DB_GEQ);
+			// NULL here means we'we reached the end
+		}
 	}
 
 	api->txn_abort(&txn);

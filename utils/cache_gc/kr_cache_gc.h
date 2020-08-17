@@ -21,6 +21,7 @@ typedef struct {
 	size_t temp_keys_space;	// maximum amount of temporary memory for copied keys in bytes (0 = unlimited)
 
 	size_t rw_txn_items;	// maximum number of deleted records per RW transaction (0 = unlimited)
+	size_t ro_txn_items;	// maximum number of iterated records (RO transactions, 0 = unlimited)
 	unsigned long rw_txn_duration;	// maximum duration of RW transaction in usecs (0 = unlimited)
 	unsigned long rw_txn_delay;	// waiting time between two RW transactions in usecs
 
