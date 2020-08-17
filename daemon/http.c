@@ -39,16 +39,61 @@ struct http_data_buffer {
 	size_t pos;
 };
 
-static ssize_t send_callback(nghttp2_session *session, const uint8_t *data, size_t length, int flags, void *user_data)
+static ssize_t send_callback(nghttp2_session *session, const uint8_t *data, size_t length,
+			     int flags, void *user_data)
 {
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	return ctx->send_cb(data, length, ctx->user_ctx);
 }
 
-static int header_callback(nghttp2_session *session, const nghttp2_frame *frame, const uint8_t *name, size_t namelen, const uint8_t *value, size_t valuelen, uint8_t flags, void *user_data)
+/*
+ * Process a query from URI path if there's base64url encoded dns variable.
+ */
+static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stream_id)
+{
+	if (!ctx || !path)
+		return kr_error(EINVAL);
+
+	static const char key[] = "dns=";
+	char *beg = strstr((const char *)path, key);
+	char *end;
+	size_t remaining;
+	ssize_t ret;
+	uint8_t *dest;
+
+	if (!beg)  /* No dns variable in path. */
+		return 0;
+
+	beg += sizeof(key) - 1;
+	end = strchrnul(beg, '&');
+	ctx->buf_pos = sizeof(uint16_t);  /* Reserve 2B for dnsmsg len. */
+	remaining = ctx->buf_size - ctx->submitted - ctx->buf_pos;
+	dest = ctx->buf + ctx->buf_pos;
+
+	ret = kr_base64url_decode((uint8_t*)beg, end - beg, dest, remaining);
+	if (ret < 0) {
+		ctx->buf_pos = 0;
+		kr_log_verbose("[http] base64url decode failed %s\n",
+			       strerror(ret));
+		return ret;
+	}
+
+	ctx->buf_pos += ret;
+	queue_push(ctx->streams, stream_id);
+	return 0;
+}
+
+static void refuse_stream(nghttp2_session *session, int32_t stream_id)
+{
+	nghttp2_submit_rst_stream(
+		session, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
+}
+
+static int header_callback(nghttp2_session *session, const nghttp2_frame *frame,
+			   const uint8_t *name, size_t namelen, const uint8_t *value,
+			   size_t valuelen, uint8_t flags, void *user_data)
 {
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
-	static const char key[] = "dns=";
 	int32_t stream_id = frame->hd.stream_id;
 
 	/* If the HEADERS don't have END_STREAM set, there are some DATA frames,
@@ -59,29 +104,14 @@ static int header_callback(nghttp2_session *session, const nghttp2_frame *frame,
 
 	/* If there is incomplete data in the buffer, we can't process the new stream. */
 	if (ctx->incomplete_stream) {
-		kr_log_verbose("[http] refusing new http stream due to incomplete data from other stream\n");
-		nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
+		kr_log_verbose("[http] previous stream incomplete, refusing\n");
+		refuse_stream(session, stream_id);
 		return 0;
 	}
 
 	if (!strcasecmp(":path", (const char *)name)) {
-		char *beg = strstr((const char *)value, key);
-		if (beg) {
-			beg += sizeof(key) - 1;
-			char *end = strchrnul(beg, '&');
-			ctx->buf_pos = sizeof(uint16_t);
-			ssize_t remaining = ctx->buf_size - ctx->submitted - ctx->buf_pos;
-			uint8_t* dest = ctx->buf + ctx->buf_pos;
-			ssize_t ret = kr_base64url_decode((uint8_t*)beg, end - beg, dest, remaining);
-			if (ret < 0) {
-				ctx->buf_pos = 0;
-				nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
-				kr_log_verbose("[http] refusing GET request, insufficient buffer size\n");
-				return 0;
-			}
-			ctx->buf_pos += ret;
-			queue_push(ctx->streams, stream_id);
-		}
+		if (process_uri_path(ctx, (const char*)value, stream_id) < 0)
+			refuse_stream(session, stream_id);
 	}
 	return 0;
 }
