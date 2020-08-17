@@ -46,7 +46,7 @@ static ssize_t send_callback(nghttp2_session *h2, const uint8_t *data, size_t le
 			     int flags, void *user_data)
 {
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
-	return ctx->send_cb(data, length, ctx->user_ctx);
+	return ctx->send_cb(data, length, ctx->session);
 }
 
 /*
@@ -195,12 +195,13 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 /*
  * Setup and initialize connection with new HTTP/2 context.
  */
-struct http_ctx* http_new(http_send_callback cb, void *user_ctx)
+struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
 {
-	assert(cb != NULL);
+	if (!session || !send_cb)
+		return NULL;
 
 	nghttp2_session_callbacks *callbacks;
-	struct http_ctx *ctx;
+	struct http_ctx *ctx = NULL;
 	static const nghttp2_settings_entry iv[] = {
 		{ NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, HTTP_MAX_CONCURRENT_STREAMS }
 	};
@@ -214,18 +215,20 @@ struct http_ctx* http_new(http_send_callback cb, void *user_ctx)
 		callbacks, on_frame_recv_callback);
 
 	ctx = calloc(1UL, sizeof(struct http_ctx));
-	ctx->send_cb = cb;
-	ctx->user_ctx = user_ctx;
+	if (!ctx)
+		goto finish;
+
+	ctx->send_cb = send_cb;
+	ctx->session = session;
 	queue_init(ctx->streams);
 	ctx->incomplete_stream = false;
 	ctx->submitted = 0;
 
 	nghttp2_session_server_new(&ctx->h2, callbacks, ctx);
-	nghttp2_session_callbacks_del(callbacks);
-
 	nghttp2_submit_settings(ctx->h2, NGHTTP2_FLAG_NONE,
 		iv, sizeof(iv)/sizeof(*iv));
-
+finish:
+	nghttp2_session_callbacks_del(callbacks);
 	return ctx;
 }
 
@@ -234,18 +237,20 @@ struct http_ctx* http_new(http_send_callback cb, void *user_ctx)
  *
  * This function may trigger outgoing HTTP/2 data, such as stream resets, window updates etc.
  */
-ssize_t http_process_input_data(struct session *s, const uint8_t *in_buf, ssize_t in_buf_len)
+ssize_t http_process_input_data(struct session *session, const uint8_t *in_buf,
+				ssize_t in_buf_len)
 {
-	struct http_ctx *ctx = session_http_get_server_ctx(s);
+	struct http_ctx *ctx = session_http_get_server_ctx(session);
 	ssize_t ret = 0;
 
-	if (!ctx->h2)  // TODO session vs h2; assert session equals
+	if (!ctx->h2)
 		return kr_error(ENOSYS);
+	assert(ctx->session == session);
 
 	ctx->submitted = 0;
-	ctx->buf = session_wirebuf_get_free_start(s);
+	ctx->buf = session_wirebuf_get_free_start(session);
 	ctx->buf_pos = 0;
-	ctx->buf_size = session_wirebuf_get_free_size(s);
+	ctx->buf_size = session_wirebuf_get_free_size(session);
 
 	ret = nghttp2_session_mem_recv(ctx->h2, in_buf, in_buf_len);
 	if (ret < 0) {
@@ -293,11 +298,11 @@ int http_write(uv_write_t *req, uv_handle_t *handle, int32_t stream_id, knot_pkt
 		return kr_error(EINVAL);
 	}
 
-	struct session *s = handle->data;
-	struct http_ctx *http_ctx = session_http_get_server_ctx(s);
+	struct session *session = handle->data;
+	struct http_ctx *http_ctx = session_http_get_server_ctx(session);
 
 	assert (http_ctx);
-	assert (!session_flags(s)->outgoing);
+	assert (!session_flags(session)->outgoing);
 
 	char size[MAX_DECIMAL_LENGTH(pkt->size)] = { 0 };
 	int size_len = snprintf(size, MAX_DECIMAL_LENGTH(pkt->size), "%ld", pkt->size);
