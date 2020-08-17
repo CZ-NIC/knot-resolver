@@ -180,7 +180,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ct
 
 	it = api->iter_begin(&txn, KNOT_DB_FIRST);
 	if (it == NULL) {
-		printf("Error iterationg database.\n");
+		printf("Error iterating database.\n");
 		api->txn_abort(&txn);
 		return KNOT_ERROR;
 	}
@@ -188,13 +188,17 @@ int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ct
 	while (it != NULL) {
 		knot_db_val_t key = { 0 }, val = { 0 };
 		ret = api->iter_key(it, &key);
-		if (key.len == 4 && memcmp("VERS", key.data, 4) == 0) {
+		if (ret == KNOT_EOK && key.len == 4 && memcmp("VERS", key.data, 4) == 0) {
 			/* skip DB metadata */
 			goto skip;
 		}
 		if (ret == KNOT_EOK) {
 			ret = api->iter_val(it, &val);
 		}
+		if (ret != KNOT_EOK) {
+			goto error;
+		}
+
 #ifdef DEBUG
 		counter_iter++;
 #endif
@@ -235,6 +239,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ct
 		ret = callback(&key, &info, ctx);
 
 		if (ret != KNOT_EOK) {
+		error:
 			printf("Error iterating database (%s).\n",
 			       knot_strerror(ret));
 			api->iter_finish(it);
