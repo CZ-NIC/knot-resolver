@@ -205,7 +205,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	gc_timer_start(&timer_analyze);
 	ctx_compute_categories_t cats = { { 0 }
 	};
-	ret = kr_gc_cache_iter(db, cb_compute_categories, &cats);
+	ret = kr_gc_cache_iter(db, cfg, cb_compute_categories, &cats);
 	if (ret != KNOT_EOK) {
 		kr_cache_gc_free_state(state);
 		return ret;
@@ -244,7 +244,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	ctx_delete_categories_t to_del = { 0 };
 	to_del.cfg_temp_keys_space = cfg->temp_keys_space;
 	to_del.limit_category = limit_category;
-	ret = kr_gc_cache_iter(db, cb_delete_categories, &to_del);
+	ret = kr_gc_cache_iter(db, cfg, cb_delete_categories, &to_del);
 	if (ret != KNOT_EOK) {
 		entry_dynarray_deep_free(&to_del.to_delete);
 		kr_cache_gc_free_state(state);
