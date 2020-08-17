@@ -226,7 +226,7 @@ success:
 	return kr_ok();
 }
 
-static void free_txn_ro(struct lmdb_env *env)
+static void txn_free_ro(struct lmdb_env *env)
 {
 	if (env->txn.ro) {
 		mdb_txn_abort(env->txn.ro);
@@ -245,7 +245,7 @@ static void cdb_close_env(struct lmdb_env *env, struct kr_cdb_stats *stats)
 
 	/* Get rid of any transactions. */
 	cdb_commit(env, stats);
-	free_txn_ro(env);
+	txn_free_ro(env);
 
 	mdb_env_sync(env->env, 1);
 	stats->close++;
@@ -455,7 +455,7 @@ static int cdb_clear(knot_db_t *db, struct kr_cdb_stats *stats)
 
 	/* We are about to switch to a different file, so end all txns, to be sure. */
 	(void) cdb_commit(db, stats);
-	free_txn_ro(db);
+	txn_free_ro(db);
 
 	const char *path = NULL;
 	int ret = mdb_env_get_path(env->env, &path);
@@ -552,6 +552,7 @@ static int cdb_write(struct lmdb_env *env, MDB_txn **txn, const knot_db_val_t *k
 		if (ret) {
 			stats->write++;
 			ret = mdb_put(*txn, env->dbi, &_key, &_val, flags);
+
 		}
 	}
 	if (ret != MDB_SUCCESS) {
