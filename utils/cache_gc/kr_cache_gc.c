@@ -284,6 +284,10 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 		case KNOT_ENOENT:
 			already_gone++;
 			break;
+		case KNOT_ESPACE:
+			printf("Warning: out of space, bailing out to retry later.\n");
+			api->txn_abort(&txn);
+			goto finish;
 		default:
 			printf("Warning: skipping deletion because of error (%s)\n",
 			       knot_strerror(ret));
