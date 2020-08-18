@@ -72,7 +72,7 @@ static int assert_right_version(struct kr_cache *cache)
 	int ret = cache_op(cache, read, &key, &val, 1);
 	if (ret == 0 && val.len == sizeof(CACHE_VERSION)
 	    && memcmp(val.data, &CACHE_VERSION, sizeof(CACHE_VERSION)) == 0) {
-		ret = kr_error(EEXIST);
+		ret = kr_ok();
 	} else {
 		int oldret = ret;
 		/* Version doesn't match. Recreate cache and write version key. */
