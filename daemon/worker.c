@@ -483,8 +483,8 @@ static void qr_task_complete(struct qr_task *task)
 /* This is called when we send subrequest / answer */
 int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status)
 {
-	printf("we sent id %02x%02x, %lu\n", task->pktbuf->wire[0], task->pktbuf->wire[1], kr_now());
-	printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
+	// printf("we sent id %02x%02x, %lu\n", task->pktbuf->wire[0], task->pktbuf->wire[1], kr_now());
+	// printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
 
 	struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
 	if (task && qry) {
@@ -498,9 +498,9 @@ int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status)
 		} else {
 			timeout = KR_CONN_RETRY;
 		}
-		printf("started transmitting id %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
-		printf("with timeout %d\n", timeout);
-		printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
+		// printf("started transmitting id %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
+		// printf("with timeout %d\n", timeout);
+		// printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
 		struct session *session = handle->data;
 		assert(session_get_handle(session) == handle && (handle->type == UV_UDP));
 		int ret = session_timer_start(session, on_retransmit, timeout, 0);
@@ -1001,8 +1001,8 @@ static void on_udp_timeout(uv_timer_t *timer)
 
 	/* Penalize all tried nameservers with a timeout. */
 	struct qr_task *task = session_tasklist_get_first(session);
-	printf("timeouted id %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
-	printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
+	// printf("timeouted id %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
+	// printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
 	struct worker_ctx *worker = task->ctx->worker;
 	if (task->leading && task->pending_count > 0) {
 		struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
@@ -1071,8 +1071,8 @@ static void on_retransmit(uv_timer_t *req)
 
 	uv_timer_stop(req);
 	struct qr_task *task = session_tasklist_get_first(session);
-	printf("retransmitted id %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
-	printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
+	// printf("retransmitted id %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
+	// printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
 	if (retransmit(task) == NULL) {
 		/* Not possible to spawn request, start timeout timer with remaining deadline. */
 		struct kr_qflags *options = &task->ctx->req.options;
@@ -1148,16 +1148,16 @@ static bool subreq_enqueue(struct qr_task *task)
 	struct qr_task **leader = (struct qr_task **)
 		trie_get_try(task->ctx->worker->subreq_out, key, klen);
 	if (!leader /*ENOMEM*/ || !*leader) {
-		printf("failed to enqueue %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
-		printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
+		// printf("failed to enqueue %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
+		// printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
 		return false;
 	}
 	/* Enqueue itself to leader for this subrequest. */
 	int ret = array_push_mm((*leader)->waiting, task,
 				kr_memreserve, &(*leader)->ctx->req.pool);
-	printf("enqueuing subtask %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
-	printf("leader has id %02x%02x\n", (*leader)->pktbuf->wire[0], (*leader)->pktbuf->wire[1]);
-	printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
+	// printf("enqueuing subtask %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
+	// printf("leader has id %02x%02x\n", (*leader)->pktbuf->wire[0], (*leader)->pktbuf->wire[1]);
+	// printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
 	if (unlikely(ret < 0)) /*ENOMEM*/
 		return false;
 	qr_task_ref(task);
