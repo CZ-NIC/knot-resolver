@@ -593,7 +593,7 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 	if (session_flags(session)->has_http) {
 		uv_write_t *write_req = (uv_write_t *)ioreq;
 		write_req->data = task;
-		ret = http_write(write_req, handle, ctx->req.qsource.stream_id, pkt, &on_write);
+		ret = http_write(write_req, handle, ctx->req.qsource.stream_id, &on_write);
 	} else if (session_flags(session)->has_tls) {
 		uv_write_t *write_req = (uv_write_t *)ioreq;
 		write_req->data = task;
