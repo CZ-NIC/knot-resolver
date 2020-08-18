@@ -1227,7 +1227,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 static int udp_task_step(struct qr_task *task,
 			 const struct sockaddr *packet_source, knot_pkt_t *packet)
 {
-	struct request_ctx *ctx = task->ctx;
+	// struct request_ctx *ctx = task->ctx;
 	// struct kr_request *req = &ctx->req;
 
 	/* If there is already outgoing query, enqueue to it. */
