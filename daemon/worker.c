@@ -118,6 +118,9 @@ static int worker_add_tcp_waiting(struct worker_ctx *worker,
 static struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
 					       const struct sockaddr *addr);
 static void on_tcp_connect_timeout(uv_timer_t *timer);
+static void subreq_lead(struct qr_task *task);
+static void on_retransmit(uv_timer_t *req);
+static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_source, knot_pkt_t *pkt);
 
 struct worker_ctx the_worker_value; /**< Static allocation is suitable for the singleton. */
 struct worker_ctx *the_worker = NULL;
@@ -446,6 +449,7 @@ static int qr_task_register(struct qr_task *task, struct session *session)
 	 * when resuming reading. This is NYI.  */
 	if (session_tasklist_get_len(session) >= task->ctx->worker->tcp_pipeline_max &&
 	    !session_flags(session)->throttled && !session_flags(session)->closing) {
+		printf("we are throttled on id %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
 		session_stop_read(session);
 		session_flags(session)->throttled = true;
 	}
@@ -479,6 +483,33 @@ static void qr_task_complete(struct qr_task *task)
 /* This is called when we send subrequest / answer */
 int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status)
 {
+	printf("we sent id %02x%02x, %lu\n", task->pktbuf->wire[0], task->pktbuf->wire[1], kr_now());
+	printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
+
+	struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
+	if (task && qry) {
+		/* Check current query NSLIST */
+		/* Retransmit at default interval, or more frequently if the mean
+		* RTT of the server is better. If the server is glued, use default rate. */
+		size_t timeout = qry->ns.score;
+		if (timeout > KR_NS_GLUED) {
+			/* We don't have information about variance in RTT, expect +10ms */
+			timeout = MIN(qry->ns.score + 10, KR_CONN_RETRY);
+		} else {
+			timeout = KR_CONN_RETRY;
+		}
+		printf("started transmitting id %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
+		printf("with timeout %d\n", timeout);
+		printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
+		struct session *session = handle->data;
+		assert(session_get_handle(session) == handle && (handle->type == UV_UDP));
+		int ret = session_timer_start(session, on_retransmit, timeout, 0);
+		/* Start next step with timeout, fatal if can't start a timer. */
+		if (status) {
+			subreq_finalize(task, &qry->ns.addr->ip, task->pktbuf);
+			return qr_task_finalize(task, KR_STATE_FAIL);
+		}
+	}
 
 	if (task->finished) {
 		assert(task->leading == false);
@@ -504,6 +535,7 @@ int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status)
 	    session_tasklist_get_len(s) < worker->tcp_pipeline_max/2) {
 	   /* Start reading again if the session is throttled and
 	    * the number of outgoing requests is below watermark. */
+	   	printf("we are throttled but below watermark whatever that means on id %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
 		session_start_read(s);
 		session_flags(s)->throttled = false;
 	}
@@ -969,6 +1001,8 @@ static void on_udp_timeout(uv_timer_t *timer)
 
 	/* Penalize all tried nameservers with a timeout. */
 	struct qr_task *task = session_tasklist_get_first(session);
+	printf("timeouted id %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
+	printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
 	struct worker_ctx *worker = task->ctx->worker;
 	if (task->leading && task->pending_count > 0) {
 		struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
@@ -1037,6 +1071,8 @@ static void on_retransmit(uv_timer_t *req)
 
 	uv_timer_stop(req);
 	struct qr_task *task = session_tasklist_get_first(session);
+	printf("retransmitted id %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
+	printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
 	if (retransmit(task) == NULL) {
 		/* Not possible to spawn request, start timeout timer with remaining deadline. */
 		struct kr_qflags *options = &task->ctx->req.options;
@@ -1111,11 +1147,17 @@ static bool subreq_enqueue(struct qr_task *task)
 		return false;
 	struct qr_task **leader = (struct qr_task **)
 		trie_get_try(task->ctx->worker->subreq_out, key, klen);
-	if (!leader /*ENOMEM*/ || !*leader)
+	if (!leader /*ENOMEM*/ || !*leader) {
+		printf("failed to enqueue %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
+		printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
 		return false;
+	}
 	/* Enqueue itself to leader for this subrequest. */
 	int ret = array_push_mm((*leader)->waiting, task,
 				kr_memreserve, &(*leader)->ctx->req.pool);
+	printf("enqueuing subtask %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
+	printf("leader has id %02x%02x\n", (*leader)->pktbuf->wire[0], (*leader)->pktbuf->wire[1]);
+	printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
 	if (unlikely(ret < 0)) /*ENOMEM*/
 		return false;
 	qr_task_ref(task);
@@ -1198,30 +1240,33 @@ static int udp_task_step(struct qr_task *task,
 		subreq_finalize(task, packet_source, packet);
 		return qr_task_finalize(task, KR_STATE_FAIL);
 	}
-	/* Check current query NSLIST */
-	struct kr_query *qry = array_tail(req->rplan.pending);
-	assert(qry != NULL);
-	/* Retransmit at default interval, or more frequently if the mean
-	 * RTT of the server is better. If the server is glued, use default rate. */
-	size_t timeout = qry->ns.score;
-	if (timeout > KR_NS_GLUED) {
-		/* We don't have information about variance in RTT, expect +10ms */
-		timeout = MIN(qry->ns.score + 10, KR_CONN_RETRY);
-	} else {
-		timeout = KR_CONN_RETRY;
-	}
+	// /* Check current query NSLIST */
+	// struct kr_query *qry = array_tail(req->rplan.pending);
+	// assert(qry != NULL);
+	// /* Retransmit at default interval, or more frequently if the mean
+	//  * RTT of the server is better. If the server is glued, use default rate. */
+	// size_t timeout = qry->ns.score;
+	// if (timeout > KR_NS_GLUED) {
+	// 	/* We don't have information about variance in RTT, expect +10ms */
+	// 	timeout = MIN(qry->ns.score + 10, KR_CONN_RETRY);
+	// } else {
+	// 	timeout = KR_CONN_RETRY;
+	// }
+	// printf("started transmitting id %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
+	// printf("with timeout %d\n", timeout);
+	// printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
 	/* Announce and start subrequest.
-	 * @note Only UDP can lead I/O as it doesn't touch 'task->pktbuf' for reassembly.
-	 */
+	* @note Only UDP can lead I/O as it doesn't touch 'task->pktbuf' for reassembly.
+	*/
 	subreq_lead(task);
-	struct session *session = handle->data;
-	assert(session_get_handle(session) == handle && (handle->type == UV_UDP));
-	int ret = session_timer_start(session, on_retransmit, timeout, 0);
-	/* Start next step with timeout, fatal if can't start a timer. */
-	if (ret != 0) {
-		subreq_finalize(task, packet_source, packet);
-		return qr_task_finalize(task, KR_STATE_FAIL);
-	}
+	// struct session *session = handle->data;
+	// assert(session_get_handle(session) == handle && (handle->type == UV_UDP));
+	// int ret = session_timer_start(session, on_retransmit, timeout, 0);
+	// /* Start next step with timeout, fatal if can't start a timer. */
+	// if (ret != 0) {
+	// 	subreq_finalize(task, packet_source, packet);
+	// 	return qr_task_finalize(task, KR_STATE_FAIL);
+	// }
 	return kr_ok();
 }
 
