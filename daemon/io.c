@@ -61,6 +61,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	const struct sockaddr *addr, unsigned flags)
 {
 	struct session *s = handle->data;
+	printf("msg_id %02x%02x, nread %d\n", buf->base[0] & 0xff, buf->base[1] & 0xff, nread);
 	if (session_flags(s)->closing) {
 		return;
 	}
