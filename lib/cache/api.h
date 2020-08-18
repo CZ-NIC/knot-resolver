@@ -95,7 +95,8 @@ int kr_cache_insert_rr(struct kr_cache *cache, const knot_rrset_t *rr, const kno
 /**
  * Clear all items from the cache.
  * @param cache cache structure
- * @return 0 or an errcode
+ * @return if nonzero is returned, there's a big problem - you probably want to abort(),
+ * 	perhaps except for kr_error(EAGAIN) which probably indicates transient errors.
  */
 KR_EXPORT
 int kr_cache_clear(struct kr_cache *cache);

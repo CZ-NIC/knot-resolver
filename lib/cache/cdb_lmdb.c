@@ -484,10 +484,11 @@ static int cdb_clear(knot_db_t *db, struct kr_cdb_stats *stats)
 	/* Find if we get a lock on lockfile. */
 	ret = open(lockfile, O_CREAT|O_EXCL|O_RDONLY, S_IRUSR);
 	if (ret == -1) {
-		kr_log_error("[cache] clearing failed to get ./.cachelock; retry later\n");
+		kr_log_error("[cache] clearing failed to get ./.cachelock (%s); retry later\n",
+				strerror(errno));
 		/* As we're out of space (almost certainly - mdb_drop didn't work),
 		 * we will retry on the next failing write operation. */
-		return kr_error(errno);
+		return kr_error(EAGAIN);
 	}
 	close(ret);
 

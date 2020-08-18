@@ -168,20 +168,25 @@ static int cache_write_or_clear(struct kr_cache *cache, const knot_db_val_t *key
 {
 	int ret = cache_op(cache, write, key, val, 1);
 	if (!ret) return kr_ok();
-	/* Clear cache if overfull.  Using kres-cache-gc service should prevent this. */
-	if (ret == kr_error(ENOSPC)) {
-		ret = kr_cache_clear(cache);
-		const char *msg = "[cache] clearing because overfull, ret = %d\n";
-		if (ret) {
-			kr_log_error(msg, ret);
-		} else {
-			kr_log_info(msg, ret);
-			ret = kr_error(ENOSPC);
-		}
-		return ret;
+
+	if (ret != kr_error(ENOSPC)) { /* failing a write isn't too bad */
+		VERBOSE_MSG(qry, "=> failed backend write, ret = %d\n", ret);
+		return kr_error(ret);
 	}
-	VERBOSE_MSG(qry, "=> failed backend write, ret = %d\n", ret);
-	return kr_error(ret ? ret : ENOSPC);
+
+	/* Cache is overfull.  Using kres-cache-gc service should prevent this.
+	 * As a fallback, try clearing it. */
+	ret = kr_cache_clear(cache);
+	switch (ret) {
+	default:
+		kr_log_error("CRITICAL: clearing cache failed with %s\n",
+				kr_strerror(ret));
+		abort();
+	case 0:
+		kr_log_info("[cache] overfull cache cleared\n");
+	case -EAGAIN: // fall-through; .cachelock race -> retry later
+		return kr_error(ENOSPC);
+	}
 }
 
 
