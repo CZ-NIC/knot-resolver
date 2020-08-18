@@ -7,13 +7,16 @@ cache_gc_src = files([
   'kr_cache_gc.c',
   'main.c',
 ])
+if build_sysrepo
+  cache_gc_src += sysrepo_common_src
+endif
+
 c_src_lint += cache_gc_src
 
 if build_utils
   cache_gc = executable(
     'kres-cache-gc',
     cache_gc_src,
-    sysrepo_common_src,
     dependencies: [
       kresconfig_dep,
       contrib_dep,
