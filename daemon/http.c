@@ -31,22 +31,98 @@
 /* Use same maximum as for tcp_pipeline_max. */
 #define HTTP_MAX_CONCURRENT_STREAMS UINT16_MAX
 
+#define HTTP_FRAME_HDLEN 9
+#define HTTP_FRAME_PADLEN 1
+
 #define MAX_DECIMAL_LENGTH(VT) (CHAR_BIT * sizeof(VT) / 3) + 3
 
-struct http_data_buffer {
-	uint8_t *data;
+struct http_data {
+	uint8_t *buf;
 	size_t len;
 	size_t pos;
+	uv_write_cb on_write;
+	uv_write_t *req;
 };
 
 /*
- * Write HTTP/2 data to underlying transport layer.
+ * Write HTTP/2 protocol data to underlying transport layer.
  */
 static ssize_t send_callback(nghttp2_session *h2, const uint8_t *data, size_t length,
 			     int flags, void *user_data)
 {
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	return ctx->send_cb(data, length, ctx->session);
+}
+
+static int send_padlen(struct http_ctx *ctx, size_t padlen)
+{
+	int ret;
+	uint8_t buf;
+
+	if (padlen == 0)
+		return 0;
+
+	buf = (uint8_t)padlen;
+	ret = ctx->send_cb(&buf, HTTP_FRAME_PADLEN, ctx->session);
+	if (ret < 0)
+		return NGHTTP2_ERR_CALLBACK_FAILURE;
+
+	return 0;
+}
+
+static int send_padding(struct http_ctx *ctx, size_t padlen)
+{
+	if (padlen <= 1)
+		return 0;
+
+	int ret;
+	uint8_t buf[padlen - 1];
+	memset(&buf, 0, padlen - 1);  // TODO probably not needed
+
+	ret = ctx->send_cb(buf, padlen - 1, ctx->session);
+	if (ret < 0)
+		return NGHTTP2_ERR_CALLBACK_FAILURE;
+
+	return 0;
+}
+
+/*
+ * Write entire DATA frame to underlying transport layer.
+ *
+ * This function reads directly from data provider to avoid copying packet wire buffer.
+ */
+static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const uint8_t *framehd,
+			      size_t length, nghttp2_data_source *source, void *user_data)
+{
+	struct http_data *data;
+	int ret;
+	struct http_ctx *ctx;
+
+	ctx = (struct http_ctx *)user_data;
+	data = (struct http_data*)source->ptr;
+
+	ret = ctx->send_cb(framehd, HTTP_FRAME_HDLEN, ctx->session);
+	if (ret < 0)
+		return NGHTTP2_ERR_CALLBACK_FAILURE;
+
+	ret = send_padlen(ctx, frame->data.padlen);
+	if (ret < 0)
+		return NGHTTP2_ERR_CALLBACK_FAILURE;
+
+	ret = ctx->send_cb(data->buf + data->pos, length, ctx->session);
+	if (ret < 0)
+		return NGHTTP2_ERR_CALLBACK_FAILURE;
+	data->pos += length;
+	assert(data->pos <= data->len);
+
+	ret = send_padding(ctx, frame->data.padlen);
+	if (ret < 0)
+		return NGHTTP2_ERR_CALLBACK_FAILURE;
+
+	if (data->pos == data->len)
+		data->on_write(data->req, 0);
+
+	return 0;
 }
 
 /*
@@ -208,6 +284,7 @@ struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
 
 	nghttp2_session_callbacks_new(&callbacks);
 	nghttp2_session_callbacks_set_send_callback(callbacks, send_callback);
+	nghttp2_session_callbacks_set_send_data_callback(callbacks, send_data_callback);
 	nghttp2_session_callbacks_set_on_header_callback(callbacks, header_callback);
 	nghttp2_session_callbacks_set_on_data_chunk_recv_callback(
 		callbacks, data_chunk_recv_callback);
@@ -270,80 +347,121 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *in_buf,
 }
 
 /*
+ * Provide data from buffer to HTTP/2 library.
  *
+ * To avoid copying the packet wire buffer, we use NGHTTP2_DATA_FLAG_NO_COPY
+ * and take care of sending entire DATA frames ourselves with nghttp2_send_data_callback.
+ *
+ * See https://www.nghttp2.org/documentation/types.html#c.nghttp2_data_source_read_callback
  */
-static ssize_t send_response_callback(nghttp2_session *h2, int32_t stream_id, uint8_t *buf,
-				      size_t length, uint32_t *data_flags,
-				      nghttp2_data_source *source, void *user_data)
+static ssize_t read_callback(nghttp2_session *h2, int32_t stream_id, uint8_t *buf,
+			     size_t length, uint32_t *data_flags,
+			     nghttp2_data_source *source, void *user_data)
 {
-	struct http_data_buffer *buffer = (struct http_data_buffer *)source->ptr;
-	assert(buffer != NULL);
-	size_t send = MIN(buffer->len - buffer->pos, length);
-	memcpy(buf, buffer->data + buffer->pos, send);
-	buffer->pos += send;
+	struct http_data *data;
+	size_t avail;
+	size_t send;
 
-	if (buffer->pos == buffer->len) {
+	data = (struct http_data*)source->ptr;
+	avail = data->len - data->pos;
+	send = MIN(avail, length);
+
+	if (avail == send)
 		*data_flags |= NGHTTP2_DATA_FLAG_EOF;
-		free(buffer->data);
-		free(buffer);
-		source->ptr = NULL;
-	}
 
+	*data_flags |= NGHTTP2_DATA_FLAG_NO_COPY;
 	return send;
 }
 
-int http_write(uv_write_t *req, uv_handle_t *handle, int32_t stream_id, knot_pkt_t *pkt, uv_write_cb cb)
+/*
+ * Send dns response provided by the HTTTP/2 data provider.
+ *
+ * Data isn't guaranteed to be sent immediately due to underlying HTTP/2 flow control.
+ */
+static int http_send_response(nghttp2_session *h2, char *size, size_t size_len,
+			      int32_t stream_id, nghttp2_data_provider *prov)
 {
-	if (!pkt || !handle || !handle->data || stream_id < 0) {
-		return kr_error(EINVAL);
-	}
-
-	struct session *session = handle->data;
-	struct http_ctx *http_ctx = session_http_get_server_ctx(session);
-
-	assert (http_ctx);
-	assert (!session_flags(session)->outgoing);
-
-	char size[MAX_DECIMAL_LENGTH(pkt->size)] = { 0 };
-	int size_len = snprintf(size, MAX_DECIMAL_LENGTH(pkt->size), "%ld", pkt->size);
-
-	/* Copy the packet data into a separate buffer, because nghttp2_session_send()
-	 * isn't guaranteed to process the data immediately. */
-	uint8_t *buf = malloc(pkt->size);
-	memcpy(buf, pkt->wire, pkt->size);
-
-	struct http_data_buffer *data_buff = malloc(sizeof(struct http_data_buffer));
-	data_buff->data = buf;
-	data_buff->len = pkt->size;
-	data_buff->pos = 0;
-
-	const nghttp2_data_provider data_prd = {
-		.source = {
-			.ptr = data_buff
-		},
-		.read_callback = send_response_callback
-	};
-
+	int ret;
 	nghttp2_nv hdrs[] = {
 		MAKE_STATIC_NV(":status", "200"),
 		MAKE_STATIC_NV("content-type", "application/dns-message"),
 		MAKE_NV("content-length", 14, size, size_len)
 	};
 
-	int ret = nghttp2_submit_response(http_ctx->h2, stream_id, hdrs, sizeof(hdrs)/sizeof(*hdrs), &data_prd);
+	ret = nghttp2_submit_response(h2, stream_id, hdrs, sizeof(hdrs)/sizeof(*hdrs), prov);
 	if (ret != 0) {
-		kr_log_error("[http] nghttp2_submit_response failed: %s (%d)\n", nghttp2_strerror(ret), ret);
+		kr_log_error("[http] nghttp2_submit_response failed: %s\n", nghttp2_strerror(ret));
 		return kr_error(EIO);
 	}
 
-	if((ret = nghttp2_session_send(http_ctx->h2)) < 0) {
-		kr_log_error("[http] nghttp2_session_send failed: %s (%d)\n", nghttp2_strerror(ret), ret);
- 		return kr_error(EIO);
+	ret = nghttp2_session_send(h2);
+	if(ret < 0) {
+		kr_log_error("[http] nghttp2_session_send failed: %s\n", nghttp2_strerror(ret));
+		return kr_error(EIO);
 	}
 
-	/* The data is now accepted in gnutls internal buffers, the message can be treated as sent */
-	req->handle = (uv_stream_t *)handle;
-	cb(req, 0);
+	return 0;
+}
+
+/*
+ * Send HTTP/2 stream data created from packet's wire buffer.
+ */
+static int http_write_pkt(nghttp2_session *h2, knot_pkt_t *pkt, int32_t stream_id,
+			  uv_write_t *req, uv_write_cb on_write)
+{
+	char size[MAX_DECIMAL_LENGTH(pkt->size)] = { 0 };
+	int size_len;
+	struct http_data *data;
+	nghttp2_data_provider prov;
+
+	size_len = snprintf(size, MAX_DECIMAL_LENGTH(pkt->size), "%zu", pkt->size);
+
+	data = malloc(sizeof(struct http_data));
+	if (!data)
+		return kr_error(ENOMEM);
+
+	data->buf = pkt->wire;
+	data->len = pkt->size;
+	data->pos = 0;
+	data->on_write = on_write;
+	data->req = req;
+
+	prov.source.ptr = data;
+	prov.read_callback = read_callback;
+
+	return http_send_response(h2, size, size_len, stream_id, &prov);
+}
+
+/*
+ * Write request to HTTP/2 stream.
+ *
+ * Packet wire buffer must stay valid until the on_write callback.
+ */
+int http_write(uv_write_t *req, uv_handle_t *handle, int32_t stream_id, uv_write_cb on_write)
+{
+	struct session *session;
+	struct http_ctx *ctx;
+	struct qr_task *task;
+	knot_pkt_t *pkt;
+	int ret;
+
+	if (!req || !req->data || !handle || !handle->data || stream_id < 0)
+		return kr_error(EINVAL);
+
+	session = handle->data;
+	if (session_flags(session)->outgoing)
+		return kr_error(ENOSYS);
+
+	ctx = session_http_get_server_ctx(session);
+	if (!ctx || !ctx->h2)
+		return kr_error(EINVAL);
+
+	task = (struct qr_task *)req->data;
+	pkt = worker_task_get_pktbuf(task);
+	req->handle = (uv_stream_t *)handle;  // TODO does this have side effects when write fails?
+	ret = http_write_pkt(ctx->h2, pkt, stream_id, req, on_write);
+	if (ret < 0)
+		return ret;
 
 	return kr_ok();
 }
