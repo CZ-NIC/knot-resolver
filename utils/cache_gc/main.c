@@ -134,10 +134,21 @@ int main(int argc, char *argv[])
 
 	int exit_code = 0;
 	kr_cache_gc_state_t *gc_state = NULL;
+	bool last_espace = false;
 	do {
 		int ret = kr_cache_gc(&cfg, &gc_state);
+
+		/* Let's tolerate ESPACE unless twice in a row. */
+		if (ret == KNOT_ESPACE) {
+			if (!last_espace)
+				ret = KNOT_EOK;
+			last_espace = true;
+		} else {
+			last_espace = false;
+		}
+
 		// ENOENT: kresd may not be started yet or cleared the cache now
-		if (ret && ret != -ENOENT) {
+		if (ret && ret != KNOT_ENOENT) {
 			printf("Error (%s)\n", knot_strerror(ret));
 			exit_code = 10;
 			break;
