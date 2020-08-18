@@ -94,7 +94,8 @@ static int event_recurrent(lua_State *L)
 {
 	/* Check parameters */
 	int n = lua_gettop(L);
-	if (n < 2 || !lua_isnumber(L, 1) || !lua_isfunction(L, 2))
+	if (n < 2 || !lua_isnumber(L, 1)  || lua_tointeger(L, 1) == 0
+		|| !lua_isfunction(L, 2))
 		lua_error_p(L, "expected 'recurrent(number interval, function)'");
 
 	return event_sched(L, 0, lua_tointeger(L, 1));
