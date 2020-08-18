@@ -449,7 +449,7 @@ static int qr_task_register(struct qr_task *task, struct session *session)
 	 * when resuming reading. This is NYI.  */
 	if (session_tasklist_get_len(session) >= task->ctx->worker->tcp_pipeline_max &&
 	    !session_flags(session)->throttled && !session_flags(session)->closing) {
-		printf("we are throttled on id %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
+		// printf("we are throttled on id %02x%02x\n", task->pktbuf->wire[0], task->pktbuf->wire[1]);
 		session_stop_read(session);
 		session_flags(session)->throttled = true;
 	}
@@ -503,7 +503,7 @@ int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status)
 		// printf("qname is %s\n", kr_dname_text(knot_pkt_qname(task->pktbuf)));
 		struct session *session = handle->data;
 		assert(session_get_handle(session) == handle && (handle->type == UV_UDP));
-		int ret = session_timer_start(session, on_retransmit, timeout, 0);
+		(void) session_timer_start(session, on_retransmit, timeout, 0);
 		/* Start next step with timeout, fatal if can't start a timer. */
 		if (status) {
 			subreq_finalize(task, &qry->ns.addr->ip, task->pktbuf);
@@ -1228,7 +1228,7 @@ static int udp_task_step(struct qr_task *task,
 			 const struct sockaddr *packet_source, knot_pkt_t *packet)
 {
 	struct request_ctx *ctx = task->ctx;
-	struct kr_request *req = &ctx->req;
+	// struct kr_request *req = &ctx->req;
 
 	/* If there is already outgoing query, enqueue to it. */
 	if (subreq_enqueue(task)) {
