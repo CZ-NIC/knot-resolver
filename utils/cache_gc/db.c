@@ -246,7 +246,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ct
 		}
 
 skip:
-		if (counter_iter % 1024) {
+		if (counter_iter % 256) {
 			it = api->iter_next(it);
 		} else {
 			/* The transaction has been too long; let's reopen it. */
