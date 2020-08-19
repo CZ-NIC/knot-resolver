@@ -1,0 +1,76 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
+
+trust_anchors.remove('.')
+{% for TAF in TRUST_ANCHOR_FILES %}
+trust_anchors.add_file('{{TAF}}')
+{% endfor %}
+
+{% raw %}
+-- Disable RFC5011 TA update
+if ta_update then
+        modules.unload('ta_update')
+end
+
+-- Disable RFC8145 signaling, scenario doesn't provide expected answers
+if ta_signal_query then
+        modules.unload('ta_signal_query')
+end
+
+-- Disable RFC8109 priming, scenario doesn't provide expected answers
+if priming then
+        modules.unload('priming')
+end
+
+-- Disable this module because it make one priming query
+if detect_time_skew then
+        modules.unload('detect_time_skew')
+end
+
+verbose(true)
+policy.add(policy.all(policy.DEBUG_ALWAYS))
+
+cache.open(1*MB)
+
+{% endraw %}
+
+-- both instances listen on both addresses
+-- so queries get distributed between them randomly
+net.listen('{{programs[0]["address"]}}')
+net.listen('{{programs[1]["address"]}}')
+
+{% raw %}
+-- Self-checks on globals
+assert(help() ~= nil)
+assert(worker.id ~= nil)
+-- Self-checks on facilities
+assert(cache.stats() ~= nil)
+assert(cache.backends() ~= nil)
+assert(worker.stats() ~= nil)
+assert(net.interfaces() ~= nil)
+-- Self-checks on loaded stuff
+{% endraw %}
+
+assert(net.list()[1].transport.ip == '{{programs[0]["address"]}}')
+
+{% raw %}
+assert(#modules.list() > 0)
+-- Self-check timers
+ev = event.recurrent(1 * sec, function (ev) return 1 end)
+event.cancel(ev)
+ev = event.after(0, function (ev) return 1 end)
+
+local ffi = require('ffi')
+local kr_cach = kres.context().cache
+
+-- canary for cache overflow
+local kr_rrset = kres.rrset(
+	todname('www.example.com'),
+	kres.type.A,
+	kres.class.IN,
+	604800)
+assert(kr_rrset:add_rdata('\192\000\002\001', 4))
+assert(kr_cach:insert(kr_rrset, nil, ffi.C.KR_RANK_SECURE))
+
+local generators = dofile('./dns_gen.lua')
+event.after(0, generators.gen_batch)
+{% endraw %}
