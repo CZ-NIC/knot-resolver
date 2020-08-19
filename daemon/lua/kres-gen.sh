@@ -115,6 +115,7 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_request
 	enum kr_rank
 	struct kr_cdb_stats
+	typedef uv_timer_t
 	struct kr_cache
 	# lib/layer.h
 	kr_layer_t
