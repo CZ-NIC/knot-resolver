@@ -206,6 +206,13 @@ static int cache_open(lua_State *L)
 		return luaL_error(L, "can't open cache path '%s'; working directory '%s'; %s",
 				  opts.path, cwd, kr_strerror(ret));
 	}
+	/* Let's check_health() every five seconds to avoid keeping old cache alive
+	 * even in case of not having any work to do. */
+	ret = kr_cache_check_health(&engine->resolver.cache, 5000);
+	if (ret != 0) {
+		kr_log_error("[cache] periodic health check failed (ignored): %s\n",
+				kr_strerror(ret));
+	}
 
 	/* Store current configuration */
 	lua_getglobal(L, "cache");
