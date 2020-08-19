@@ -185,7 +185,8 @@ KR_EXPORT
 int kr_unpack_cache_key(knot_db_val_t key, knot_dname_t *buf, uint16_t *type);
 
 /** Periodic kr_cdb_api::check_health().
- * @param interval in milliseconds.  0 for one-time check, -1 to stop the checks. */
+ * @param interval in milliseconds.  0 for one-time check, -1 to stop the checks.
+ * @return see check_health() for one-time check; otherwise normal kr_error() code. */
 KR_EXPORT
 int kr_cache_check_health(struct kr_cache *cache, int interval);
 
