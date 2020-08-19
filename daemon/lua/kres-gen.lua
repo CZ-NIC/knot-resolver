@@ -221,6 +221,7 @@ struct kr_cache {
 	uint32_t ttl_max;
 	struct timeval checkpoint_walltime;
 	uint64_t checkpoint_monotime;
+	uv_timer_t *health_timer;
 };
 typedef struct kr_layer {
 	int state;
