@@ -118,6 +118,9 @@ static int worker_add_tcp_waiting(struct worker_ctx *worker,
 static struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
 					       const struct sockaddr *addr);
 static void on_tcp_connect_timeout(uv_timer_t *timer);
+static void on_retransmit(uv_timer_t *req);
+static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_source, knot_pkt_t *pkt);
+
 
 struct worker_ctx the_worker_value; /**< Static allocation is suitable for the singleton. */
 struct worker_ctx *the_worker = NULL;
@@ -377,7 +380,7 @@ static struct qr_task *qr_task_create(struct request_ctx *ctx)
 {
 	/* Choose (initial) pktbuf size.  As it is now, pktbuf can be used
 	 * for UDP answers from upstream *and* from cache
-	 * and for sending non-UDP queries upstream (?) */
+	 * and for sending queries upstream */
 	uint16_t pktbuf_max = KR_EDNS_PAYLOAD;
 	const knot_rrset_t *opt_our = ctx->worker->engine->resolver.upstream_opt_rr;
 	if (opt_our) {
@@ -485,27 +488,55 @@ int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status)
 		qr_task_complete(task);
 	}
 
-	if (!handle || handle->type != UV_TCP) {
+	if (!handle) {
 		return status;
 	}
 
 	struct session* s = handle->data;
 	assert(s);
-	if (status != 0) {
-		session_tasklist_del(s, task);
+
+	if (handle->type == UV_UDP && session_flags(s)->outgoing) {
+		// We will start the timeout timer for UDP here as this closest to wire we can get
+		struct kr_request *req = &task->ctx->req;
+		/* Check current query NSLIST */
+		struct kr_query *qry = array_tail(req->rplan.pending);
+		assert(qry != NULL);
+		/* Retransmit at default interval, or more frequently if the mean
+		* RTT of the server is better. If the server is glued, use default rate. */
+		size_t timeout = qry->ns.score;
+		if (timeout > KR_NS_GLUED) {
+			/* We don't have information about variance in RTT, expect +10ms */
+			timeout = MIN(qry->ns.score + 10, KR_CONN_RETRY);
+		} else {
+			timeout = KR_CONN_RETRY;
+		}
+
+		int ret = session_timer_start(s, on_retransmit, timeout, 0);
+		/* Start next step with timeout, fatal if can't start a timer. */
+		if (ret != 0) {
+			subreq_finalize(task, &qry->ns.addr->ip, task->pktbuf);
+			qr_task_finalize(task, KR_STATE_FAIL);
+		}
 	}
 
-	if (session_flags(s)->outgoing || session_flags(s)->closing) {
-		return status;
-	}
 
-	struct worker_ctx *worker = task->ctx->worker;
-	if (session_flags(s)->throttled &&
-	    session_tasklist_get_len(s) < worker->tcp_pipeline_max/2) {
-	   /* Start reading again if the session is throttled and
-	    * the number of outgoing requests is below watermark. */
-		session_start_read(s);
-		session_flags(s)->throttled = false;
+	if (handle->type == UV_TCP) {
+		if (status != 0) {
+			session_tasklist_del(s, task);
+		}
+
+		if (session_flags(s)->outgoing || session_flags(s)->closing) {
+			return status;
+		}
+
+		struct worker_ctx *worker = task->ctx->worker;
+		if (session_flags(s)->throttled &&
+			session_tasklist_get_len(s) < worker->tcp_pipeline_max/2) {
+		/* Start reading again if the session is throttled and
+			* the number of outgoing requests is below watermark. */
+			session_start_read(s);
+			session_flags(s)->throttled = false;
+		}
 	}
 
 	return status;
@@ -1185,9 +1216,6 @@ static int qr_task_finalize(struct qr_task *task, int state)
 static int udp_task_step(struct qr_task *task,
 			 const struct sockaddr *packet_source, knot_pkt_t *packet)
 {
-	struct request_ctx *ctx = task->ctx;
-	struct kr_request *req = &ctx->req;
-
 	/* If there is already outgoing query, enqueue to it. */
 	if (subreq_enqueue(task)) {
 		return kr_ok(); /* Will be notified when outgoing query finishes. */
@@ -1198,30 +1226,12 @@ static int udp_task_step(struct qr_task *task,
 		subreq_finalize(task, packet_source, packet);
 		return qr_task_finalize(task, KR_STATE_FAIL);
 	}
-	/* Check current query NSLIST */
-	struct kr_query *qry = array_tail(req->rplan.pending);
-	assert(qry != NULL);
-	/* Retransmit at default interval, or more frequently if the mean
-	 * RTT of the server is better. If the server is glued, use default rate. */
-	size_t timeout = qry->ns.score;
-	if (timeout > KR_NS_GLUED) {
-		/* We don't have information about variance in RTT, expect +10ms */
-		timeout = MIN(qry->ns.score + 10, KR_CONN_RETRY);
-	} else {
-		timeout = KR_CONN_RETRY;
-	}
+
 	/* Announce and start subrequest.
 	 * @note Only UDP can lead I/O as it doesn't touch 'task->pktbuf' for reassembly.
 	 */
 	subreq_lead(task);
-	struct session *session = handle->data;
-	assert(session_get_handle(session) == handle && (handle->type == UV_UDP));
-	int ret = session_timer_start(session, on_retransmit, timeout, 0);
-	/* Start next step with timeout, fatal if can't start a timer. */
-	if (ret != 0) {
-		subreq_finalize(task, packet_source, packet);
-		return qr_task_finalize(task, KR_STATE_FAIL);
-	}
+
 	return kr_ok();
 }
 
