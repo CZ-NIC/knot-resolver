@@ -81,7 +81,7 @@ struct kr_cdb_api {
 
 	/** Perform maintenance.
 	 * In LMDB case it checks whether data.mdb is still the same
-	 * and reopens it if it isn't.
+	 * and reopens it if it isn't; it errors out if the file doesn't exist anymore.
 	 * \return 0 if OK, 1 if reopened OK, < 0 kr_error */
 	int (*check_health)(knot_db_t *db, struct kr_cdb_stats *stat);
 };

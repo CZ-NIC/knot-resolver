@@ -15,6 +15,8 @@
 #include <libknot/errcode.h>
 #include <libknot/rrtype/rrsig.h>
 
+#include <uv.h>
+
 #include "contrib/base32hex.h"
 #include "contrib/cleanup.h"
 #include "contrib/ucw/lib.h"
@@ -105,14 +107,15 @@ static int assert_right_version(struct kr_cache *cache)
 int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct kr_cdb_opts *opts, knot_mm_t *mm)
 {
 	if (!cache) {
+		assert(cache);
 		return kr_error(EINVAL);
 	}
+	memset(cache, 0, sizeof(*cache));
 	/* Open cache */
 	if (!api) {
 		api = kr_cdb_lmdb();
 	}
 	cache->api = api;
-	memset(&cache->stats, 0, sizeof(cache->stats));
 	int ret = cache->api->open(&cache->db, &cache->stats, opts, mm);
 	if (ret != 0) {
 		return ret;
@@ -140,6 +143,7 @@ const char *kr_cache_emergency_file_to_remove = NULL;
 
 void kr_cache_close(struct kr_cache *cache)
 {
+	kr_cache_check_health(cache, -1);
 	if (cache_isvalid(cache)) {
 		cache_op(cache, close);
 		cache->db = NULL;
@@ -939,5 +943,48 @@ cleanup:
 		free(keys[i].data);
 	}
 	return ret;
+}
+
+static void health_timer_cb(uv_timer_t *health_timer)
+{
+	struct kr_cache *cache = health_timer->data;
+	if (cache)
+		cache_op(cache, check_health);
+	/* We don't do anything with the return code.  For example, in some situations
+	 * the file may not exist (temporarily), and we just expect to be more lucky
+	 * when the timer fires again. */
+}
+
+int kr_cache_check_health(struct kr_cache *cache, int interval)
+{
+	if (interval == 0) {
+		return cache_op(cache, check_health);
+	}
+	if (interval < 0) {
+		if (!cache->health_timer)
+			return kr_ok(); // tolerate stopping a "stopped" timer
+		uv_close((uv_handle_t *)cache->health_timer, (uv_close_cb)free);
+		cache->health_timer->data = NULL;
+		cache->health_timer = NULL;
+		return kr_ok();
+	}
+
+	assert(interval > 0);
+	if (!cache->health_timer) {
+		/* We avoid depending on daemon's symbols by using uv_default_loop. */
+		cache->health_timer = malloc(sizeof(*cache->health_timer));
+		if (!cache->health_timer) return kr_error(ENOMEM);
+		uv_loop_t *loop = uv_default_loop();
+		assert(loop);
+		int ret = uv_timer_init(loop, cache->health_timer);
+		if (ret) {
+			free(cache->health_timer);
+			cache->health_timer = NULL;
+			return kr_error(ret);
+		}
+		cache->health_timer->data = cache;
+	}
+	assert(cache->health_timer->data);
+	return kr_error(uv_timer_start(cache->health_timer, health_timer_cb, interval, interval));
 }
 

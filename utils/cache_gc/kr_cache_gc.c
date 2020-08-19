@@ -172,6 +172,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 					   &(*state)->db);
 	} else { // To be sure, we guard against the file getting replaced.
 		ret = kr_gc_cache_check_health(&(*state)->kres_db, &(*state)->db);
+		// In particular, missing data.mdb gives us kr_error(ENOENT) == KNOT_ENOENT
 	}
 	if (ret) {
 		free(*state);

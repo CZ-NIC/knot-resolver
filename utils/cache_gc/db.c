@@ -45,7 +45,7 @@ int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db,
 
 int kr_gc_cache_check_health(struct kr_cache *kres_db, knot_db_t ** libknot_db)
 {
-	int ret = kr_cdb_lmdb()->check_health(kres_db->db, &kres_db->stats);
+	int ret = kr_cache_check_health(kres_db, 0);
 	if (ret == 0) {
 		return 0;
 	} else if (ret != 1) {
