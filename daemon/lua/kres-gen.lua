@@ -213,6 +213,7 @@ struct kr_cdb_stats {
 	uint64_t read_leq_miss;
 	double usage_percent;
 };
+typedef struct uv_timer_s uv_timer_t;
 struct kr_cache {
 	knot_db_t *db;
 	const struct kr_cdb_api *api;

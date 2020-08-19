@@ -235,7 +235,6 @@ static int cache_close(lua_State *L)
 		return 0;
 	}
 
-	kr_cache_check_health(cache, -1);
 	kr_cache_close(cache);
 	lua_getglobal(L, "cache");
 	lua_pushstring(L, "current_size");
