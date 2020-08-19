@@ -8,6 +8,7 @@
 #include "lib/defines.h"
 #include "lib/utils.h"
 #include <libknot/libknot.h>
+#include <lmdb.h>
 
 #include "kresconfig.h"
 #include "kr_cache_gc.h"
@@ -148,7 +149,8 @@ int main(int argc, char *argv[])
 		}
 
 		// ENOENT: kresd may not be started yet or cleared the cache now
-		if (ret && ret != KNOT_ENOENT) {
+		// MDB_MAP_RESIZED: GC bailed out but on next iteration it should be OK
+		if (ret && ret != KNOT_ENOENT && ret != kr_error(MDB_MAP_RESIZED)) {
 			printf("Error (%s)\n", knot_strerror(ret));
 			exit_code = 10;
 			break;
