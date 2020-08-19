@@ -48,6 +48,7 @@ struct lmdb_env
 	/* Cached part of struct stat for data.mdb. */
 	dev_t st_dev;
 	ino_t st_ino;
+	off_t st_size;
 	const char *mdb_data_path; /**< path to data.mdb, for convenience */
 };
 
@@ -309,6 +310,10 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, size_t mapsize,
 	}
 	env->st_dev = st.st_dev;
 	env->st_ino = st.st_ino;
+	env->st_size = st.st_size;
+	if (env->st_size != env->mapsize)
+		kr_log_verbose("[cache] suspicious size of cache file: %zu != %zu\n",
+				(size_t)env->st_size, env->mapsize);
 
 	/* Open the database. */
 	MDB_txn *txn = NULL;
@@ -436,7 +441,15 @@ static int cdb_check_health(knot_db_t *db, struct kr_cdb_stats *stats)
 		// FIXME: if the file doesn't exist?
 	}
 	if (st.st_dev == env->st_dev && st.st_ino == env->st_ino) {
-		return kr_ok();
+		if (st.st_size == env->st_size)
+			return kr_ok();
+		kr_log_info("[cache] detected size change by another process: %zu -> %zu\n",
+				(size_t)env->st_size, (size_t)st.st_size);
+		int ret = cdb_commit(db, stats);
+		if (!ret) ret = lmdb_error(mdb_env_set_mapsize(env->env, st.st_size));
+		if (!ret) env->mapsize = st.st_size;
+		env->st_size = st.st_size; // avoid retrying in cycle even if it failed
+		return kr_error(ret);
 	}
 	kr_log_verbose("[cache] cache file has been replaced, reopening\n");
 	int ret = reopen_env(env, stats);

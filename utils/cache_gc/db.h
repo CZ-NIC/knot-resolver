@@ -9,6 +9,8 @@
 int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db,
 		     knot_db_t ** libknot_db);
 
+/** A wrapper around kr_cdb_api::check_health that keeps libknot_db up to date.
+ * \return zero or negative error code. */
 int kr_gc_cache_check_health(struct kr_cache *kres_db, knot_db_t ** libknot_db);
 
 void kr_gc_cache_close(struct kr_cache *kres_db, knot_db_t * knot_db);
