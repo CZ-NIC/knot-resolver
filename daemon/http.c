@@ -54,6 +54,9 @@ static ssize_t send_callback(nghttp2_session *h2, const uint8_t *data, size_t le
 	return ctx->send_cb(data, length, ctx->session);
 }
 
+/*
+ * Send padding length (if greater than zero).
+ */
 static int send_padlen(struct http_ctx *ctx, size_t padlen)
 {
 	int ret;
@@ -70,14 +73,19 @@ static int send_padlen(struct http_ctx *ctx, size_t padlen)
 	return 0;
 }
 
-static int send_padding(struct http_ctx *ctx, size_t padlen)
+/*
+ * Send HTTP/2 zero-byte padding.
+ *
+ * This sends only padlen-1 bytes of padding (if any), since padlen itself
+ * (already sent) is also considered padding. Refer to RFC7540, section 6.1
+ */
+static int send_padding(struct http_ctx *ctx, uint8_t padlen)
 {
+	static const uint8_t buf[UINT8_MAX];
+	int ret;
+
 	if (padlen <= 1)
 		return 0;
-
-	int ret;
-	uint8_t buf[padlen - 1];
-	memset(&buf, 0, padlen - 1);  // TODO probably not needed
 
 	ret = ctx->send_cb(buf, padlen - 1, ctx->session);
 	if (ret < 0)
@@ -115,7 +123,7 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 	data->pos += length;
 	assert(data->pos <= data->len);
 
-	ret = send_padding(ctx, frame->data.padlen);
+	ret = send_padding(ctx, (uint8_t)frame->data.padlen);
 	if (ret < 0)
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 
