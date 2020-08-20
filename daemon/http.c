@@ -127,9 +127,6 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 	if (ret < 0)
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 
-	if (data->pos == data->len)
-		data->on_write(data->req, 0);
-
 	return 0;
 }
 
@@ -285,6 +282,35 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 }
 
 /*
+ * Call on_write() callback for written (or failed) packet data.
+ */
+static void on_pkt_write(struct http_data *data, int status)
+{
+	if (!data || !data->req || !data->on_write)
+		return;
+
+	data->on_write(data->req, status);
+}
+
+/*
+ * Cleanup for closed steams.
+ *
+ * If any stream_user_data was set, call the on_write callback to allow
+ * freeing of the underlying data structure.
+ */
+static int on_stream_close_callback(nghttp2_session *h2, int32_t stream_id,
+				    uint32_t error_code, void *user_data)
+{
+	struct http_data *data;
+
+	data = nghttp2_session_get_stream_user_data(h2, stream_id);
+	if (data)
+		on_pkt_write(data, error_code == 0 ? 0 : kr_error(EIO));
+
+	return 0;
+}
+
+/*
  * Setup and initialize connection with new HTTP/2 context.
  */
 struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
@@ -306,6 +332,8 @@ struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
 		callbacks, data_chunk_recv_callback);
 	nghttp2_session_callbacks_set_on_frame_recv_callback(
 		callbacks, on_frame_recv_callback);
+	nghttp2_session_callbacks_set_on_stream_close_callback(
+		callbacks, on_stream_close_callback);
 
 	ctx = calloc(1UL, sizeof(struct http_ctx));
 	if (!ctx)
@@ -398,6 +426,7 @@ static int http_send_response(nghttp2_session *h2, char *size, size_t size_len,
 			      int32_t stream_id, nghttp2_data_provider *prov)
 {
 	int ret;
+	struct http_data *data = (struct http_data*)prov->source.ptr;
 	nghttp2_nv hdrs[] = {
 		MAKE_STATIC_NV(":status", "200"),
 		MAKE_STATIC_NV("content-type", "application/dns-message"),
@@ -407,6 +436,14 @@ static int http_send_response(nghttp2_session *h2, char *size, size_t size_len,
 	ret = nghttp2_submit_response(h2, stream_id, hdrs, sizeof(hdrs)/sizeof(*hdrs), prov);
 	if (ret != 0) {
 		kr_log_error("[http] nghttp2_submit_response failed: %s\n", nghttp2_strerror(ret));
+		on_pkt_write(data, kr_error(EIO));
+		return kr_error(EIO);
+	}
+
+	ret = nghttp2_session_set_stream_user_data(h2, stream_id, (void*)data);
+	if (ret != 0) {
+		kr_log_error("[http] failed to set stream user data: %s\n", nghttp2_strerror(ret));
+		on_pkt_write(data, kr_error(EIO));
 		return kr_error(EIO);
 	}
 
