@@ -185,7 +185,9 @@ void iter_update_state_from_rtt_cache(struct iter_local_state *local_state, stru
         union inaddr addr;
         bytes_to_ip(address, address_len, &addr);
         const char *ns_str = kr_straddr(&addr.ip);
-        printf("<<<<< rtt of %s is %d, variance is %d\n", ns_str, address_state->rtt_state.srtt, address_state->rtt_state.variance);
+        if (VERBOSE_STATUS) {
+            printf("[nsrep] rtt of %s is %d, variance is %d\n", ns_str, address_state->rtt_state.srtt, address_state->rtt_state.variance);
+        }
     }
     trie_it_free(it);
 }
@@ -420,6 +422,8 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
         }
 
     }
+
+    trie_it_free(it);
 
     int to_resolve = 0;
     for(it = trie_it_begin(local_state->unresolved_names); !trie_it_finished(it); trie_it_next(it)) {

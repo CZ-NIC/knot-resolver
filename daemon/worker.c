@@ -121,6 +121,9 @@ static int worker_add_tcp_waiting(struct worker_ctx *worker,
 struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
 					       const struct sockaddr *addr);
 static void on_tcp_connect_timeout(uv_timer_t *timer);
+static void on_udp_timeout(uv_timer_t *req);
+static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_source, knot_pkt_t *pkt);
+
 
 struct worker_ctx the_worker_value; /**< Static allocation is suitable for the singleton. */
 struct worker_ctx *the_worker = NULL;
@@ -482,33 +485,49 @@ static void qr_task_complete(struct qr_task *task)
 /* This is called when we send subrequest / answer */
 int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status)
 {
-
 	if (task->finished) {
 		assert(task->leading == false);
 		qr_task_complete(task);
 	}
 
-	if (!handle || handle->type != UV_TCP) {
+	if (!handle) {
 		return status;
 	}
 
 	struct session* s = handle->data;
 	assert(s);
-	if (status != 0) {
-		session_tasklist_del(s, task);
+
+	if (handle->type == UV_UDP && session_flags(s)->outgoing) {
+		// start the timer
+		struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
+		assert(qry != NULL);
+
+		size_t timeout = task->transport->timeout;
+		int ret = session_timer_start(s, on_udp_timeout, timeout, 0);
+		/* Start next step with timeout, fatal if can't start a timer. */
+		if (ret != 0) {
+			subreq_finalize(task, &task->transport->address.ip, task->pktbuf);
+			qr_task_finalize(task, KR_STATE_FAIL);
+		}
 	}
 
-	if (session_flags(s)->outgoing || session_flags(s)->closing) {
-		return status;
-	}
+	if (handle->type == UV_TCP) {
+		if (status != 0) {
+			session_tasklist_del(s, task);
+		}
 
-	struct worker_ctx *worker = task->ctx->worker;
-	if (session_flags(s)->throttled &&
-	    session_tasklist_get_len(s) < worker->tcp_pipeline_max/2) {
-	   /* Start reading again if the session is throttled and
-	    * the number of outgoing requests is below watermark. */
-		session_start_read(s);
-		session_flags(s)->throttled = false;
+		if (session_flags(s)->outgoing || session_flags(s)->closing) {
+			return status;
+		}
+
+		struct worker_ctx *worker = task->ctx->worker;
+		if (session_flags(s)->throttled &&
+			session_tasklist_get_len(s) < worker->tcp_pipeline_max/2) {
+		    /* Start reading again if the session is throttled and
+			* the number of outgoing requests is below watermark. */
+			session_start_read(s);
+			session_flags(s)->throttled = false;
+		}
 	}
 
 	return status;
@@ -1159,8 +1178,6 @@ static int qr_task_finalize(struct qr_task *task, int state)
 static int udp_task_step(struct qr_task *task,
 			 const struct sockaddr *packet_source, knot_pkt_t *packet)
 {
-	struct request_ctx *ctx = task->ctx;
-	struct kr_request *req = &ctx->req;
 
 	/* If there is already outgoing query, enqueue to it. */
 	if (subreq_enqueue(task)) {
@@ -1172,24 +1189,12 @@ static int udp_task_step(struct qr_task *task,
 		subreq_finalize(task, packet_source, packet);
 		return qr_task_finalize(task, KR_STATE_FAIL);
 	}
-	/* Check current query NSLIST */
-	struct kr_query *qry = array_tail(req->rplan.pending);
-	assert(qry != NULL);
-
-	size_t timeout = task->transport->timeout;
 
 	/* Announce and start subrequest.
 	 * @note Only UDP can lead I/O as it doesn't touch 'task->pktbuf' for reassembly.
 	 */
 	subreq_lead(task);
-	struct session *session = handle->data;
-	assert(session_get_handle(session) == handle && (handle->type == UV_UDP));
-	int ret = session_timer_start(session, on_udp_timeout, timeout, 0);
-	/* Start next step with timeout, fatal if can't start a timer. */
-	if (ret != 0) {
-		subreq_finalize(task, packet_source, packet);
-		return qr_task_finalize(task, KR_STATE_FAIL);
-	}
+
 	return kr_ok();
 }
 
