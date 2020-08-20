@@ -437,15 +437,14 @@ static int http_write_pkt(nghttp2_session *h2, knot_pkt_t *pkt, int32_t stream_i
  *
  * Packet wire buffer must stay valid until the on_write callback.
  */
-int http_write(uv_write_t *req, uv_handle_t *handle, int32_t stream_id, uv_write_cb on_write)
+int http_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, int32_t stream_id,
+	       uv_write_cb on_write)
 {
 	struct session *session;
 	struct http_ctx *ctx;
-	struct qr_task *task;
-	knot_pkt_t *pkt;
 	int ret;
 
-	if (!req || !req->data || !handle || !handle->data || stream_id < 0)
+	if (!req || !pkt || !handle || !handle->data || stream_id < 0)
 		return kr_error(EINVAL);
 
 	session = handle->data;
@@ -456,8 +455,6 @@ int http_write(uv_write_t *req, uv_handle_t *handle, int32_t stream_id, uv_write
 	if (!ctx || !ctx->h2)
 		return kr_error(EINVAL);
 
-	task = (struct qr_task *)req->data;
-	pkt = worker_task_get_pktbuf(task);
 	req->handle = (uv_stream_t *)handle;  // TODO does this have side effects when write fails?
 	ret = http_write_pkt(ctx->h2, pkt, stream_id, req, on_write);
 	if (ret < 0)
