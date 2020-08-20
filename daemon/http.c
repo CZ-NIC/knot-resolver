@@ -462,6 +462,7 @@ int http_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, int32_t st
 
 	if (!req || !pkt || !handle || !handle->data || stream_id < 0)
 		return kr_error(EINVAL);
+	req->handle = (uv_stream_t *)handle;
 
 	session = handle->data;
 	if (session_flags(session)->outgoing)
@@ -471,7 +472,6 @@ int http_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, int32_t st
 	if (!ctx || !ctx->h2)
 		return kr_error(EINVAL);
 
-	req->handle = (uv_stream_t *)handle;  // TODO does this have side effects when write fails?
 	ret = http_write_pkt(ctx->h2, pkt, stream_id, req, on_write);
 	if (ret < 0)
 		return ret;
