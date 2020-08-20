@@ -176,6 +176,15 @@ static void refuse_stream(nghttp2_session *h2, int32_t stream_id)
 		h2, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
 }
 
+/*
+ * Process a received header name-value pair.
+ *
+ * In DoH, GET requests contain the base64url-encoded query in dns variable present in path.
+ * This variable is parsed from :path pseudoheader.
+ *
+ * Since we don't need any headers for POST request, avoid processing them entirely to
+ * avoid potential issues if dns variable would be present in path.
+ */
 static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 			   const uint8_t *name, size_t namelen, const uint8_t *value,
 			   size_t valuelen, uint8_t flags, void *user_data)
@@ -188,7 +197,6 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) == 0)
 		return 0;
 
-	/* If there is incomplete data in the buffer, we can't process the new stream. */
 	if (ctx->incomplete_stream) {
 		kr_log_verbose("[http] previous stream incomplete, refusing\n");
 		refuse_stream(h2, stream_id);
