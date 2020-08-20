@@ -107,7 +107,7 @@ static int qr_task_step(struct qr_task *task,
 			const struct sockaddr *packet_source,
 			knot_pkt_t *packet);
 static int qr_task_send(struct qr_task *task, struct session *session,
-			const struct sockaddr *addr, knot_pkt_t *pkt);
+			const struct sockaddr *addr);
 static int qr_task_finalize(struct qr_task *task, int state);
 static void qr_task_complete(struct qr_task *task);
 static struct session* worker_find_tcp_connected(struct worker_ctx *worker,
@@ -529,8 +529,13 @@ static void on_write(uv_write_t *req, int status)
 	free(req);
 }
 
+/*
+ * Send tasks' packet buffer through given session.
+ *
+ * The packet buffer must stay valid until the on_send()/on_write() callback.
+ */
 static int qr_task_send(struct qr_task *task, struct session *session,
-			const struct sockaddr *addr, knot_pkt_t *pkt)
+			const struct sockaddr *addr)
 {
 	if (!session) {
 		return qr_task_on_send(task, NULL, kr_error(EIO));
@@ -538,6 +543,7 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 
 	int ret = 0;
 	struct request_ctx *ctx = task->ctx;
+	knot_pkt_t* pkt = task->pktbuf;
 
 	uv_handle_t *handle = session_get_handle(session);
 	assert(handle && handle->data == session);
@@ -546,10 +552,6 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 
 	if (addr == NULL) {
 		addr = session_get_peer(session);
-	}
-
-	if (pkt == NULL) {
-		pkt = worker_task_get_pktbuf(task);
 	}
 
 	if (session_flags(session)->outgoing && handle->type == UV_TCP) {
@@ -741,7 +743,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 	if (ret == kr_ok()) {
 		while (!session_waitinglist_is_empty(session)) {
 			struct qr_task *t = session_waitinglist_get(session);
-			ret = qr_task_send(t, session, NULL, NULL);
+			ret = qr_task_send(t, session, NULL);
 			if (ret != 0) {
 				break;
 			}
@@ -772,7 +774,7 @@ static int send_waiting(struct session *session)
 	int ret = 0;
 	while (!session_waitinglist_is_empty(session)) {
 		struct qr_task *t = session_waitinglist_get(session);
-		ret = qr_task_send(t, session, NULL, NULL);
+		ret = qr_task_send(t, session, NULL);
 		if (ret != 0) {
 			struct worker_ctx *worker = t->ctx->worker;
 			struct sockaddr *peer = session_get_peer(session);
@@ -1015,8 +1017,7 @@ static uv_handle_t *retransmit(struct qr_task *task)
 		struct sockaddr *peer = session_get_peer(session);
 		assert (peer->sa_family == AF_UNSPEC && session_flags(session)->outgoing);
 		memcpy(peer, addr, kr_sockaddr_len(addr));
-		if (qr_task_send(task, session, (struct sockaddr *)choice,
-				 task->pktbuf) != 0) {
+		if (qr_task_send(task, session, (struct sockaddr *)choice) != 0) {
 			session_close(session);
 			ret = NULL;
 		} else {
@@ -1158,7 +1159,8 @@ static int qr_task_finalize(struct qr_task *task, int state)
 			udp_queue_push(fd, &ctx->req, task);
 		}
 	} else {
-		ret = qr_task_send(task, source_session, &ctx->source.addr.ip, ctx->req.answer);
+		task->pktbuf = ctx->req.answer;
+		ret = qr_task_send(task, source_session, &ctx->source.addr.ip);
 	}
 
 	if (ret != kr_ok()) {
@@ -1271,7 +1273,7 @@ static int tcp_task_existing_connection(struct session *session, struct qr_task 
 	}
 
 	/* Send query to upstream. */
-	ret = qr_task_send(task, session, NULL, NULL);
+	ret = qr_task_send(task, session, NULL);
 	if (ret != 0) {
 		/* Error, finalize task with SERVFAIL and
 		 * close connection to upstream. */
