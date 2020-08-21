@@ -139,13 +139,14 @@ uint8_t* ip_to_bytes(const union inaddr *src, size_t len) {
 }
 
 #define DEFAULT_TIMEOUT 200
+#define MINIMAL_TIMEOUT_ADDITION 20
 
-// This is verbatim (minus the default timeout value) RFC2988, sec. 2
+// This is verbatim (minus the default timeout value and minimal variance) RFC2988, sec. 2
 int32_t calc_timeout(struct rtt_state state) {
     if (state.srtt == -1 && state.variance == -1) {
         return DEFAULT_TIMEOUT;
     }
-    return state.srtt + 4 * state.variance;
+    return state.srtt + MAX(4 * state.variance, MINIMAL_TIMEOUT_ADDITION);
 }
 
 // This is verbatim RFC2988, sec. 2
@@ -299,7 +300,11 @@ int cmp_choices(const void *a, const void *b) {
     if ((diff = a_->address_state->errors - b_->address_state->errors)) {
         return diff;
     }
-    if ((diff = calc_timeout(a_->address_state->rtt_state) - calc_timeout(b_->address_state->rtt_state))) {
+    printf("hi\n");
+    int p = calc_timeout(a_->address_state->rtt_state);
+    int q = calc_timeout(b_->address_state->rtt_state);
+    diff = p - q;
+    if (diff) {
         return diff;
     }
     return 0;
@@ -309,7 +314,7 @@ int cmp_choices(const void *a, const void *b) {
 
 // Return a pointer to newly chosen (and allocated) transport. NULL if there is no choice.
 // Performs the actual selection (currently epsilon-greedy with epsilon = 0.05).
-struct kr_transport *iter_get_best_transport(struct choice *choices,
+struct kr_transport *iter_get_best_transport(struct choice choices[],
                                              int choices_len,
                                              knot_dname_t **unresolved,
                                              int unresolved_len,
@@ -321,7 +326,7 @@ struct kr_transport *iter_get_best_transport(struct choice *choices,
     memset(transport, 0, sizeof(struct kr_transport));
     int choice = 0;
 
-    if (kr_rand_coin(1, 20 || choices_len == 0)) {
+    if (kr_rand_coin(1, 20) || choices_len == 0) {
         // EXPLORE
         int index = kr_rand_bytes(1) % (choices_len + unresolved_len);
         if (index < unresolved_len) {
@@ -336,9 +341,9 @@ struct kr_transport *iter_get_best_transport(struct choice *choices,
         }
     } else {
         // EXPLOIT
-        qsort(choices, choices_len, sizeof(choice), cmp_choices);
+        qsort(choices, choices_len, sizeof(struct choice), cmp_choices);
         if (choices[0].address_state->error_count > ERROR_LIMIT) {
-            transport = NULL;
+            return NULL;
         } else {
             choice = 0;
         }

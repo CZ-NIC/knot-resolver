@@ -383,7 +383,9 @@ static struct qr_task *qr_task_create(struct request_ctx *ctx)
 {
 	/* Choose (initial) pktbuf size.  As it is now, pktbuf can be used
 	 * for UDP answers from upstream *and* from cache
-	 * and for sending non-UDP queries upstream (?) */
+	 * and for sending non-UDP queries upstream (?)
+	 *
+	 * This comment is probably not completely true. */
 	uint16_t pktbuf_max = KR_EDNS_PAYLOAD;
 	const knot_rrset_t *opt_our = ctx->worker->engine->resolver.opt_rr;
 	if (opt_our) {
@@ -498,6 +500,8 @@ int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status)
 	assert(s);
 
 	if (handle->type == UV_UDP && session_flags(s)->outgoing) {
+		// This should ensure that we are only dealing with our question to upstream
+		assert(!knot_wire_get_qr(task->pktbuf));
 		// start the timer
 		struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
 		assert(qry != NULL);

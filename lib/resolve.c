@@ -757,11 +757,7 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 	}
 	bool tried_tcp = (qry->flags.TCP);
 	if (!packet || packet->size == 0) {
-		// if (tried_tcp) {
-		// 	request->state = KR_STATE_FAIL;
-		// } else {
-		// 	qry->flags.TCP = true;
-		// }
+		return KR_STATE_PRODUCE;
 	} else {
 		/* Packet cleared, derandomize QNAME. */
 		knot_dname_t *qname_raw = knot_pkt_qname(packet);
