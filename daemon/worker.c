@@ -497,7 +497,7 @@ int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status)
 
 	if (handle->type == UV_UDP && session_flags(s)->outgoing) {
 		// WIP assert
-		assert(knot_wire_get_qr(task->pktbuf->wire));
+		assert(!knot_wire_get_qr(task->pktbuf->wire));
 		// We will start the timeout timer for UDP here as this closest to wire we can get
 		struct kr_request *req = &task->ctx->req;
 		/* Check current query NSLIST */
