@@ -37,6 +37,7 @@ static void print_help()
 	printf("Optional params:\n");
 	printf(" -d <garbage_interval(millis)>\n");
 	printf(" -l <deletes_per_txn>\n");
+	printf(" -L <reads_per_txn>\n");
 	printf(" -m <rw_txn_duration(usecs)>\n");
 	printf(" -u <cache_max_usage(percent)>\n");
 	printf(" -f <cache_to_be_freed(percent-of-current-usage)>\n");
@@ -72,13 +73,14 @@ int main(int argc, char *argv[])
 	signal(SIGINT, got_killed);
 
 	kr_cache_gc_cfg_t cfg = {
+		.ro_txn_items = 200,
 		.rw_txn_items = 100,
 		.cache_max_usage = 80,
 		.cache_to_be_freed = 10
 	};
 
 	int o;
-	while ((o = getopt(argc, argv, "hnc:d:l:m:u:f:w:t:")) != -1) {
+	while ((o = getopt(argc, argv, "hnc:d:l:L:m:u:f:w:t:")) != -1) {
 		switch (o) {
 		case 'c':
 			cfg.cache_path = optarg;
@@ -89,6 +91,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'l':
 			cfg.rw_txn_items = get_nonneg_optarg();
+			break;
+		case 'L':
+			cfg.ro_txn_items = get_nonneg_optarg();
 			break;
 		case 'm':
 			cfg.rw_txn_duration = get_nonneg_optarg();
