@@ -161,9 +161,12 @@ void kr_cache_gc_free_state(kr_cache_gc_state_t **state)
 
 int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 {
+	// The whole function works in four "big phases":
+	//// 1. find out whether we should even do analysis and deletion.
 	assert(cfg && state);
 	int ret;
-	if (!*state) { // Cache not open -> do that.
+	// Ensure that we have open and "healthy" cache.
+	if (!*state) {
 		*state = calloc(1, sizeof(**state));
 		if (!*state) {
 			return KNOT_ENOMEM;
@@ -181,17 +184,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	}
 	knot_db_t *const db = (*state)->db; // frequently used shortcut
 
-	const struct kr_cdb_api *cache_api = kr_cdb_lmdb();
-	const double db_usage = cache_api->usage_percent(db);
-#if 0				// Probably not worth it, better reduce the risk by checking more often.
-	if (db_usage > 90.0) {
-		free(*libknot_db);
-		kr_cache_close(kres_db);
-		cache_size += cache_size / 10;
-		opts.maxsize = cache_size;
-		goto open_kr_cache;
-	}
-#endif
+	const double db_usage = kr_cdb_lmdb()->usage_percent(db);
 	const bool large_usage = db_usage >= cfg->cache_max_usage;
 	if (cfg->dry_run || large_usage) {	// don't print this on every size check
 		printf("Usage: %.2lf%%\n", db_usage);
@@ -200,6 +193,8 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 		return KNOT_EOK;
 	}
 
+	//// 2. classify all cache items into categories
+	//      and compute which categories to delete.
 	gc_timer_t timer_analyze = { 0 }, timer_choose = { 0 }, timer_delete =
 	    { 0 }, timer_rw_txn = { 0 };
 
@@ -241,6 +236,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	printf("Cache analyzed in %.2lf secs, %zu records, limit category is %d.\n",
 	       gc_timer_end(&timer_analyze), cats.records, limit_category);
 
+	//// 3. pass whole cache again to collect a list of keys that should be deleted.
 	gc_timer_start(&timer_choose);
 	ctx_delete_categories_t to_del = { 0 };
 	to_del.cfg_temp_keys_space = cfg->temp_keys_space;
@@ -256,6 +252,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	     to_del.to_delete.size, ((double)to_del.used_space / 1048576.0),
 	     to_del.oversize_records);
 
+	//// 4. execute the planned deletions.
 	const knot_db_api_t *api = knot_db_lmdb_api();
 	knot_db_txn_t txn = { 0 };
 	size_t deleted_records = 0, already_gone = 0, rw_txn_count = 0;
