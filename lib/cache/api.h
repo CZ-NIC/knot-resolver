@@ -26,7 +26,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt);
  */
 struct kr_cache
 {
-	knot_db_t *db;		      /**< Storage instance */
+	kr_cdb_pt db;                 /**< Storage instance */
 	const struct kr_cdb_api *api; /**< Storage engine */
 	struct kr_cdb_stats stats;
 	uint32_t ttl_min, ttl_max; /**< TTL limits */
