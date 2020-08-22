@@ -95,7 +95,7 @@ static int cache_stats(lua_State *L)
 	add_stat(read_leq);
 	add_stat(read_leq_miss);
 	/* usage_percent statistics special case - double */
-	struct libknot_lmdb_env *libknot_db = knot_db_t_kres2libknot(cache->db);
+	struct libknot_lmdb_env *libknot_db = kr_cdb_pt2knot_db_t(cache->db);
 	cache->stats.usage_percent = cache->api->usage_percent(libknot_db);
 	lua_pushnumber(L, cache->stats.usage_percent);
 	lua_setfield(L, -2, "usage_percent");

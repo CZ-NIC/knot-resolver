@@ -5,7 +5,6 @@ local ffi = require('ffi')
 
 typedef struct knot_dump_style knot_dump_style_t;
 extern const knot_dump_style_t KNOT_DUMP_STYLE_DEFAULT;
-typedef void knot_db_t;
 struct kr_cdb_api {};
 struct lru {};
 
@@ -195,6 +194,7 @@ struct kr_request {
 	unsigned int count_fail_row;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
+typedef struct kr_cdb * kr_cdb_pt;
 struct kr_cdb_stats {
 	uint64_t open;
 	uint64_t close;
@@ -215,7 +215,7 @@ struct kr_cdb_stats {
 };
 typedef struct uv_timer_s uv_timer_t;
 struct kr_cache {
-	knot_db_t *db;
+	kr_cdb_pt db;
 	const struct kr_cdb_api *api;
 	struct kr_cdb_stats stats;
 	uint32_t ttl_min;
