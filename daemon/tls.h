@@ -122,7 +122,6 @@ struct tls_common_ctx {
 	uint8_t recv_buf[16384];
 	tls_handshake_cb handshake_cb;
 	struct worker_ctx *worker;
-	size_t write_queue_size;
 };
 
 struct tls_ctx_t {

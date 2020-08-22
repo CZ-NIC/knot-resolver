@@ -22,6 +22,12 @@ struct session_flags {
 	bool wirebuf_error : 1; /**< True: last operation with wirebuf ended up with an error. */
 };
 
+struct async_write_ctx {
+	uv_write_t write_req;
+	struct session *session;
+	char buf[];
+};
+
 /* Allocate new session for a libuv handle.
  * If handle->tyoe is UV_UDP, tls parameter will be ignored. */
 struct session *session_new(uv_handle_t *handle, bool has_tls);
@@ -91,7 +97,7 @@ void session_tls_set_server_ctx(struct session *session, struct tls_ctx_t *ctx);
 struct tls_client_ctx_t *session_tls_get_client_ctx(const struct session *session);
 /** Set pointer to client-side tls-related data. */
 void session_tls_set_client_ctx(struct session *session, struct tls_client_ctx_t *ctx);
-/** Get pointer to that part of tls-related data which has common structure for 
+/** Get pointer to that part of tls-related data which has common structure for
  *  server and client. */
 struct tls_common_ctx *session_tls_get_common_ctx(const struct session *session);
 
@@ -131,9 +137,16 @@ void session_unpoison(struct session *session);
 knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm);
 int session_discard_packet(struct session *session, const knot_pkt_t *pkt);
 
-void session_kill_ioreq(struct session *s, struct qr_task *task);
+void session_kill_ioreq(struct session *session, struct qr_task *task);
 /** Update timestamp */
-void session_touch(struct session *s);
+void session_touch(struct session *session);
 /** Returns either creation time or time of last IO activity if any occurs. */
 /* Used for TCP timeout calculation. */
-uint64_t session_last_activity(struct session *s);
+uint64_t session_last_activity(struct session *session);
+
+/** Check whether the write queue is empty. */
+bool session_write_queue_is_empty(struct session *session);
+/** Increment the write queue size. */
+int session_write_queue_inc(struct session *session);
+/** Decrement the write queue size. */
+int session_write_queue_dec(struct session *session);
