@@ -177,8 +177,8 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	}
 	knot_db_t *const db = (*state)->db; // frequently used shortcut
 
-	const struct kr_cdb_api *cache_api = kr_cdb_lmdb();
-	const double db_usage = cache_api->usage_percent(db);
+	struct kr_cache *kres_db = &(*state)->kres_db;
+	const double db_usage = kres_db->api->usage_percent(kres_db->db);
 #if 0				// Probably not worth it, better reduce the risk by checking more often.
 	if (db_usage > 90.0) {
 		free(*libknot_db);
