@@ -12,5 +12,5 @@ const struct kr_cdb_api *kr_cdb_lmdb(void);
 
 /** Create a pointer for knot_db_lmdb_api.  You free() it to release it. */
 KR_EXPORT
-knot_db_t *kr_cdb_pt2knot_db_t(const kr_cdb_pt db);
+knot_db_t *kr_cdb_pt2knot_db_t(kr_cdb_pt db);
 
