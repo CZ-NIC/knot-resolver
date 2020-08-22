@@ -3,7 +3,6 @@
  */
 
 #include "daemon/bindings/impl.h"
-#include "lib/cache/cdb_lmdb.h"
 
 #include "daemon/zimport.h"
 
@@ -95,11 +94,9 @@ static int cache_stats(lua_State *L)
 	add_stat(read_leq);
 	add_stat(read_leq_miss);
 	/* usage_percent statistics special case - double */
-	struct libknot_lmdb_env *libknot_db = kr_cdb_pt2knot_db_t(cache->db);
-	cache->stats.usage_percent = cache->api->usage_percent(libknot_db);
+	cache->stats.usage_percent = cache->api->usage_percent(cache->db);
 	lua_pushnumber(L, cache->stats.usage_percent);
 	lua_setfield(L, -2, "usage_percent");
-	free(libknot_db);
 #undef add_stat
 
 	return 1;
