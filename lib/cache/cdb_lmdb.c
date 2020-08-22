@@ -727,12 +727,13 @@ success:
 	return ret;
 }
 
-static double cdb_usage(knot_db_t *db)
+static double cdb_usage_percent(kr_cdb_pt db)
 {
-	const size_t db_size = knot_db_lmdb_get_mapsize(db);
-	const size_t db_usage_abs = knot_db_lmdb_get_usage(db);
-	const double db_usage = (double)db_usage_abs / db_size * 100.0;
-
+	knot_db_t *kdb = kr_cdb_pt2knot_db_t(db);
+	const size_t db_size = knot_db_lmdb_get_mapsize(kdb);
+	const size_t db_usage_abs = knot_db_lmdb_get_usage(kdb);
+	const double db_usage = (double)(100 * db_usage_abs) / db_size;
+	free(kdb);
 	return db_usage;
 }
 
@@ -760,7 +761,7 @@ const struct kr_cdb_api *kr_cdb_lmdb(void)
 		cdb_readv, cdb_writev, cdb_remove,
 		cdb_match,
 		cdb_read_leq,
-		cdb_usage,
+		cdb_usage_percent,
 	};
 
 	return &api;
