@@ -83,7 +83,8 @@ struct kr_cdb_api {
 	int (*read_leq)(kr_cdb_pt db, struct kr_cdb_stats *stat,
 			knot_db_val_t *key, knot_db_val_t *val);
 
-	double (*usage_percent)(knot_db_t *db);
+	/** Return estimated space usage (0--100). */
+	double (*usage_percent)(kr_cdb_pt db);
 
 	/** Return the current cache size limit in bytes; could be cached by check_health(). */
 	size_t (*get_maxsize)(kr_cdb_pt db);
