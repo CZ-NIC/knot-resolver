@@ -34,7 +34,7 @@ int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db,
 		return -EINVAL;
 	}
 
-	*libknot_db = knot_db_t_kres2libknot(kres_db->db);
+	*libknot_db = kr_cdb_pt2knot_db_t(kres_db->db);
 	if (*libknot_db == NULL) {
 		printf("Out of memory.\n");
 		return -ENOMEM;
