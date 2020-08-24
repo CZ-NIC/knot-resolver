@@ -10,7 +10,7 @@ local charset = {
 
 local function gen_bytes(len)
 	local bytes = {}
-	for idx = 1,len do
+	for _ = 1,len do
 		table.insert(bytes, charset[math.random(1, #charset)])
 	end
 	local result = table.concat(bytes)
@@ -103,7 +103,7 @@ ffi.cdef('int usleep(uint32_t usec);') -- at least in current glibc it's always 
 
 local rr_count = 0
 local function gen_batch()
-	for i=1,math.random(1,10) do
+	for _ = 1,math.random(1,10) do
 		add_random_rrset()
 		rr_count = rr_count + 1
 		if rr_count % 100 == 0 then
