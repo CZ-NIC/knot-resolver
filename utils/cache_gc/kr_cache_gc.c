@@ -233,8 +233,8 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 		amount_tofree -= cats.categories_sizes[--limit_category];
 	}
 
-	printf("Cache analyzed in %.2lf secs, %zu records, limit category is %d.\n",
-	       gc_timer_end(&timer_analyze), cats.records, limit_category);
+	printf("Cache analyzed in %.0lf msecs, %zu records, limit category is %d.\n",
+	       gc_timer_end(&timer_analyze) * 1000, cats.records, limit_category);
 
 	//// 3. pass whole cache again to collect a list of keys that should be deleted.
 	gc_timer_start(&timer_choose);
@@ -323,8 +323,8 @@ finish:
 	printf("Deleted %zu records (%zu already gone) types", deleted_records,
 	       already_gone);
 	rrtypelist_print(&deleted_rrtypes);
-	printf("It took %.2lf secs, %zu transactions (%s)\n\n",
-	       gc_timer_end(&timer_delete), rw_txn_count, knot_strerror(ret));
+	printf("It took %.0lf msecs, %zu transactions (%s)\n\n",
+	       gc_timer_end(&timer_delete) * 1000, rw_txn_count, knot_strerror(ret));
 
 	rrtype_dynarray_free(&deleted_rrtypes);
 	entry_dynarray_deep_free(&to_del.to_delete);
