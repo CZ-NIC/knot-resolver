@@ -99,6 +99,7 @@ local function add_random_rrset()
 	assert(kr_cach:insert(kr_rrset, nil, ffi.C.KR_RANK_SECURE))
 end
 
+ffi.cdef('int usleep(uint32_t usec);') -- at least in current glibc it's always 32-bit
 
 local rr_count = 0
 local function gen_batch()
@@ -110,6 +111,7 @@ local function gen_batch()
 		end
 	end
 	kr_cach:commit()
+	ffi.C.usleep(15) -- stop *whole process* to give better chance to GC executing
 	local delay
 	if math.random(1,4) == 1 then
 		delay = 1  -- give a chance to DNS resolving

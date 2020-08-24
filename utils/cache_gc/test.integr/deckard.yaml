@@ -25,8 +25,11 @@ programs:
 - name: gc
   binary: kres-cache-gc
   additional:
-    - -d
-    - "1"
+    # small cache needs shorter RW transactions and larger "percentages"
+    - -l8
+    - -u50
+    - -f20
+    - -d1
     - -c
     - ../kresd1/
   conncheck: False
