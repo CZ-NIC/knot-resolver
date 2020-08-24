@@ -281,6 +281,13 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 			break;
 		case KNOT_ENOENT:
 			already_gone++;
+#ifdef DEBUG
+			// kresd normally only inserts (or overwrites),
+			// so it's generally suspicious when a key goes missing.
+			printf("Record already gone (key len %zu): ", (*i)->len);
+			debug_printbin((*i)->data, (*i)->len);
+			printf("\n");
+#endif
 			break;
 		case KNOT_ESPACE:
 			printf("Warning: out of space, bailing out to retry later.\n");

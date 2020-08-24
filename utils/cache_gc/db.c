@@ -179,12 +179,15 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 		return ret;
 	}
 
-	it = api->iter_begin(&txn, KNOT_DB_FIRST);
+	it = api->iter_begin(&txn, KNOT_DB_NOOP); // _FIRST is split for easier debugging
 	if (it == NULL) {
-		printf("Error iterating database.\n");
+		printf("Error: failed to create an iterator.\n");
 		api->txn_abort(&txn);
 		return KNOT_ERROR;
 	}
+	it = api->iter_seek(it, NULL, KNOT_DB_FIRST);
+	if (it == NULL)
+		printf("Suspicious: completely empty LMDB at this moment?\n");
 
 	int txn_steps = 0;
 	while (it != NULL) {
@@ -267,7 +270,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 			}
 			it = api->iter_begin(&txn, KNOT_DB_NOOP);
 			if (it == NULL) {
-				printf("Error iterating database.\n");
+				printf("Error: failed to create an iterator.\n");
 				api->txn_abort(&txn);
 				return KNOT_ERROR;
 			}
