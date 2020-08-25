@@ -84,13 +84,13 @@ struct sockaddr *session_get_peer(struct session *session);
 /** Get pointer to sockname (address of our end, not meaningful for UDP downstream). */
 struct sockaddr *session_get_sockname(struct session *session);
 /** Get pointer to server-side tls-related data. */
-struct tls_ctx_t *session_tls_get_server_ctx(const struct session *session);
+struct tls_ctx *session_tls_get_server_ctx(const struct session *session);
 /** Set pointer to server-side tls-related data. */
-void session_tls_set_server_ctx(struct session *session, struct tls_ctx_t *ctx);
+void session_tls_set_server_ctx(struct session *session, struct tls_ctx *ctx);
 /** Get pointer to client-side tls-related data. */
-struct tls_client_ctx_t *session_tls_get_client_ctx(const struct session *session);
+struct tls_client_ctx *session_tls_get_client_ctx(const struct session *session);
 /** Set pointer to client-side tls-related data. */
-void session_tls_set_client_ctx(struct session *session, struct tls_client_ctx_t *ctx);
+void session_tls_set_client_ctx(struct session *session, struct tls_client_ctx *ctx);
 /** Get pointer to that part of tls-related data which has common structure for 
  *  server and client. */
 struct tls_common_ctx *session_tls_get_common_ctx(const struct session *session);
