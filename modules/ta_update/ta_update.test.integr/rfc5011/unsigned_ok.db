@@ -1,0 +1,8 @@
+.			86400	IN	SOA	rootns. you.test. 2017071100 1800 900 604800 86400
+
+.			518400	IN	NS	rootns.
+
+rootns.	518400	IN	A	198.41.0.4
+rootns.	518400	IN	AAAA	2001:503:ba3e::2:30
+
+test.	1	IN	TXT	"it works"
