@@ -7,6 +7,8 @@ Improvements
 - cache: add percentage usage to cache.stats() (!1025)
 - cache: add number of cache entries to cache.stats() (!1028)
 - aarch64 support again, as some systems still didn't work (!1033)
+- ta_update: warn if there are differences between statically configured
+  keys and upstream (#251)
 
 Bugfixes
 --------

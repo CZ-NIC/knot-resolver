@@ -48,12 +48,14 @@ local function test_ta_update_vs_trust_anchors_dependency()
 end
 
 local function test_unloaded()
-	boom(trust_anchors.add_file, {'root.keys', false}, 'managed TA cannot be added without ta_update module')
+	same(ta_update, nil, 'ta_update module is nil')
+	same(trust_anchors.add_file('root.keys', false), nil, 'managed TA can be added with unloaded ta_update module')
+	ok(ta_update ~= nil, 'ta_update module automatically loaded')
+	ok(modules.unload('ta_update'), 'ta_update module can be unloaded')
+	same(ta_update, nil, 'ta_update module is nil')
 
-	counter = 0
-	same(trust_anchors.add_file('root.keys', true), nil, 'unmanaged TA can be added without ta_update module')
-	worker.sleep(sleep_time)
-	ok(counter == 0, 'TA is actually unmanaged')
+	same(trust_anchors.add_file('root.keys', true), nil, 'unmanaged TA can be added with unloaded ta_update module')
+	ok(ta_update ~= nil, 'ta_update module automatically loaded')
 
 	ok(trust_anchors.remove('.'), 'unmanaged root TA can be removed')
 	same(trust_anchors.keysets['\0'], nil, 'TA removal works')
