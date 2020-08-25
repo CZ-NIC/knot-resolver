@@ -23,8 +23,6 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 
 const uint16_t *kr_gc_key_consistent(knot_db_val_t key);
 
-#ifdef DEBUG
 /** Printf a *binary* string in a human-readable way. */
 void debug_printbin(const char *str, unsigned int len);
-#endif
 
