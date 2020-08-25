@@ -298,11 +298,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		req->qsource.stream_id = -1;
 		if (req->qsource.flags.http) {
 			struct http_ctx *http_ctx = session_http_get_server_ctx(session);
-			// TODO maybe assert?
-			if (http_ctx && queue_len(http_ctx->streams) > 0) {
-				req->qsource.stream_id = queue_head(http_ctx->streams);
-				queue_pop(http_ctx->streams);
-			}
+			req->qsource.stream_id = queue_head(http_ctx->streams);
 		}
 		/* We need to store a copy of peer address. */
 		memcpy(&ctx->source.addr.ip, peer, kr_sockaddr_len(peer));
@@ -1592,10 +1588,18 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 
 	const bool is_query = (knot_wire_get_qr(pkt->wire) == 0);
 	const bool is_outgoing = session_flags(session)->outgoing;
+	struct http_ctx *http_ctx = session_http_get_server_ctx(session);
+
+	if (!is_outgoing && http_ctx && queue_len(http_ctx->streams) <= 0)
+		return kr_error(ENOENT);
+
 	/* Ignore badly formed queries. */
 	if ((ret != kr_ok() && ret != kr_error(EMSGSIZE)) ||
 	    (is_query == is_outgoing)) {
-		if (!is_outgoing) the_worker->stats.dropped += 1;
+		if (!is_outgoing)
+			the_worker->stats.dropped += 1;
+		if (!is_outgoing && http_ctx)
+			queue_pop(http_ctx->streams);
 		return kr_error(EILSEQ);
 	}
 
@@ -1606,9 +1610,10 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 	if (!is_outgoing) { /* request from a client */
 		struct request_ctx *ctx = request_create(the_worker, session, peer,
 							 knot_wire_get_id(pkt->wire));
-		if (!ctx) {
+		if (http_ctx)
+			queue_pop(http_ctx->streams);
+		if (!ctx)
 			return kr_error(ENOMEM);
-		}
 
 		ret = request_start(ctx, pkt);
 		if (ret != 0) {
