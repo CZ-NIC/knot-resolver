@@ -18,6 +18,10 @@ import dns.resolver
 
 import pydnstest.scenario
 
+try:
+    VARIANT = os.environ["VARIANT"]
+except KeyError:
+    VARIANT = ""
 
 def store_answer(qname, qtype, template):
     answ = dns.resolver.query(qname, qtype, raise_on_no_answer=False)
@@ -114,6 +118,31 @@ test. IN TXT "it works"
 ENTRY_END
 '''.format(id_prefix)
 
+def generate_step_nocheck(id_prefix):
+    return '''STEP {0}000001 CHECK_ANSWER
+ENTRY_BEGIN
+REPLY QR RD RA AD
+MATCH opcode qname question
+SECTION QUESTION
+test. IN TXT
+SECTION ANSWER
+test. IN TXT "it works"
+ENTRY_END
+'''.format(id_prefix)
+
+def generate_step_finish_msg(id_prefix):
+    return '''STEP {0}000001 CHECK_ANSWER
+ENTRY_BEGIN
+REPLY QR RD RA AA NXDOMAIN
+MATCH opcode rcode flags question answer
+SECTION QUESTION
+test. IN TXT
+SECTION AUTHORITY
+test. 10800 IN SOA test. nobody.invalid. 1 3600 1200 604800 10800
+SECTION ADDITIONAL
+explanation.invalid. 10800 IN TXT "check last answer"
+ENTRY_END
+'''.format(id_prefix)
 
 def generate_step_elapse(tstep, id_prefix):
     out = '; move time by {0}\n'.format(tstep)
@@ -126,6 +155,7 @@ def main():
     resolver_init()
     rng_templ, entry_templ = get_templates()
     ranges = []
+    check_last_msg = False
 
     # transform data in zones files into RANGEs
     files = os.listdir()
@@ -143,28 +173,38 @@ def main():
     # steps
     steps = []
     tstart = datetime.datetime(year=2017, month=7, day=1)
-    tend = datetime.datetime(year=2017, month=12, day=31, hour=23, minute=59, second=59)
+    if VARIANT == "unmanaged_key":
+        tend = datetime.datetime(year=2017, month=7, day=21, hour=23, minute=59, second=59)
+        check_last_msg = True
+    else:
+        tend = datetime.datetime(year=2017, month=12, day=31, hour=23, minute=59, second=59)
     tstep = datetime.timedelta(days=1)
     tcurr = tstart
     while tcurr < tend:
         id_prefix = tcurr.strftime('%Y%m%d')
         steps.append(generate_step_query(tcurr, id_prefix))
-        steps.append(generate_step_check(id_prefix))
+        if (check_last_msg is True and tcurr + tstep > tend):
+            steps.append(generate_step_finish_msg(id_prefix))
+        elif VARIANT == "unmanaged_key":
+            steps.append(generate_step_nocheck(id_prefix))
+        else:
+            steps.append(generate_step_check(id_prefix))
         steps.append(generate_step_elapse(tstep, id_prefix))
         tcurr += tstep
 
     # generate output
     with open('keys/ds') as dsfile:
-        ta = dsfile.read().strip()
+        tas = dsfile.read().strip()
 
     # constant RPL file header
-    print("""stub-addr: 2001:503:ba3e::2:30
-    trust-anchor: {ta}
-    val-override-date: 20170701000000
-    query-minimization: off
-    CONFIG_END
+    print("stub-addr: 2001:503:ba3e::2:30")
+    for ta in tas.split('\n'):
+        print ("trust-anchor: " + ta)
+    print("""val-override-date: 20170701000000
+query-minimization: off
+CONFIG_END
 
-    SCENARIO_BEGIN Simulation of successfull RFC 5011 KSK roll-over during 2017
+SCENARIO_BEGIN Simulation of successfull RFC 5011 KSK roll-over during 2017
     """.format(ta=ta))
     for rng in ranges:
         print(rng)
@@ -174,7 +214,7 @@ def main():
 
     # constant RPL file footer
     print('''
-    SCENARIO_END
+SCENARIO_END
     ''')
 
 
