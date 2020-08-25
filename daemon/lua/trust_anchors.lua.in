@@ -367,9 +367,7 @@ local function add_file(path, unmanaged)
 	end
 	-- TODO: if failed and for root, try to rebootstrap?
 
-	if managed then
-		ta_update.start(owner)
-	end
+	ta_update.start(owner, managed)
 end
 
 local function remove(zname)
