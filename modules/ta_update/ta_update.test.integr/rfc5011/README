@@ -1,5 +1,13 @@
-Start with `genkeyszones.sh` and generate DNSSEC keys + signed versions of `unsigned.db`.
+Start with `genkeyszones.sh` and generate DNSSEC keys + signed versions of `unsigned_*.db`.
 Then use `dns2rpl.py` to run Knot DNS server with signed zone
 and to generate RPL file from server's answers.
+
+Generate RFC5011 test:
+`dns2rpl.py`.
+`./genkeyszones.sh`
+
+Generate unmanaged keys tests:
+`./genkeyszones.sh <--unmanaged_key-presens|--unmanagedkey-missing|--unmanagedkey-revoke>`
+`VARIANT="unmanaged_key" ./dns2rpl.py`
 
 See comments in script headers to further details.
