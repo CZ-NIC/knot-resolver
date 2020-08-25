@@ -1,13 +1,11 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-// #define DEBUG 1
 
 #include "db.h"
 
 #include "lib/cache/cdb_lmdb.h"
 #include "lib/cache/impl.h"
-//#include <lib/defines.h>
 
-#include <ctype.h>		//DEBUG
+#include <ctype.h>
 #include <time.h>
 #include <sys/stat.h>
 
@@ -124,7 +122,6 @@ static uint8_t entry_labels(knot_db_val_t * key, uint16_t rrtype)
 	return lab;
 }
 
-#ifdef DEBUG
 void debug_printbin(const char *str, unsigned int len)
 {
 	putchar('"');
@@ -137,7 +134,6 @@ void debug_printbin(const char *str, unsigned int len)
 	}
 	putchar('"');
 }
-#endif
 
 /** Return one entry_h reference from a cache DB value.  NULL if not consistent/suitable. */
 static const struct entry_h *val2entry(const knot_db_val_t val, uint16_t ktype)
@@ -161,11 +157,9 @@ static const struct entry_h *val2entry(const knot_db_val_t val, uint16_t ktype)
 int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 			kr_gc_iter_callback callback, void *ctx)
 {
-#ifdef DEBUG
 	unsigned int counter_iter = 0;
 	unsigned int counter_gc_consistent = 0;
 	unsigned int counter_kr_consistent = 0;
-#endif
 
 	knot_db_txn_t txn = { 0 };
 	knot_db_iter_t *it = NULL;
@@ -210,9 +204,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 		    ret == KNOT_EOK ? kr_gc_key_consistent(key) : NULL;
 		const struct entry_h *entry = NULL;
 		if (entry_type != NULL) {
-#ifdef DEBUG
 			counter_gc_consistent++;
-#endif
 			entry = val2entry(val, *entry_type);
 		}
 		/* TODO: perhaps improve some details around here:
@@ -226,18 +218,18 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 			info.expires_in = entry->time + entry->ttl - now;
 			info.no_labels = entry_labels(&key, *entry_type);
 		}
-#ifdef DEBUG
 		counter_iter++;
 		counter_kr_consistent += info.valid;
-		if (!entry_type || !entry) {	// don't log fully consistent entries
-			printf
-			    ("GC %sconsistent, KR %sconsistent, size %zu, key len %zu: ",
-			     entry_type ? "" : "in", entry ? "" : "IN",
-			     (key.len + val.len), key.len);
-			debug_printbin(key.data, key.len);
-			printf("\n");
+		if (VERBOSE_STATUS) {
+			if (!entry_type || !entry) {	// don't log fully consistent entries
+				printf
+				    ("GC %sconsistent, KR %sconsistent, size %zu, key len %zu: ",
+				     entry_type ? "" : "in", entry ? "" : "IN",
+				     (key.len + val.len), key.len);
+				debug_printbin(key.data, key.len);
+				printf("\n");
+			}
 		}
-#endif
 		ret = callback(&key, &info, ctx);
 
 		if (ret != KNOT_EOK) {
@@ -280,9 +272,8 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 	}
 
 	api->txn_abort(&txn);
-#ifdef DEBUG
-	printf("DEBUG: iterated %u items, gc consistent %u, kr consistent %u\n",
-	       counter_iter, counter_gc_consistent, counter_kr_consistent);
-#endif
+
+	kr_log_verbose("DEBUG: iterated %u items, gc consistent %u, kr consistent %u\n",
+		counter_iter, counter_gc_consistent, counter_kr_consistent);
 	return KNOT_EOK;
 }

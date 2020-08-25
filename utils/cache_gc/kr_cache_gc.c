@@ -14,6 +14,7 @@
 #include <lib/cache/impl.h>
 #include <lib/defines.h>
 #include "lib/cache/cdb_lmdb.h"
+#include "lib/utils.h"
 
 #include "kr_cache_gc.h"
 
@@ -218,15 +219,15 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	/* use less precise variant to avoid 32-bit overflow */
 	ssize_t amount_tofree = cats_sumsize / 100 * cfg->cache_to_be_freed;
 
-#ifdef DEBUG
-	printf("tofree: %zd / %zd\n", amount_tofree, cats_sumsize);
-	for (int i = 0; i < CATEGORIES; i++) {
-		if (cats.categories_sizes[i] > 0) {
-			printf("category %.2d size %zu\n", i,
-			       cats.categories_sizes[i]);
+	kr_log_verbose("tofree: %zd / %zd\n", amount_tofree, cats_sumsize);
+	if (VERBOSE_STATUS) {
+		for (int i = 0; i < CATEGORIES; i++) {
+			if (cats.categories_sizes[i] > 0) {
+				printf("category %.2d size %zu\n", i,
+				       cats.categories_sizes[i]);
+			}
 		}
 	}
-#endif
 
 	category_t limit_category = CATEGORIES;
 	while (limit_category > 0 && amount_tofree > 0) {
@@ -281,13 +282,13 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 			break;
 		case KNOT_ENOENT:
 			already_gone++;
-#ifdef DEBUG
-			// kresd normally only inserts (or overwrites),
-			// so it's generally suspicious when a key goes missing.
-			printf("Record already gone (key len %zu): ", (*i)->len);
-			debug_printbin((*i)->data, (*i)->len);
-			printf("\n");
-#endif
+			if (VERBOSE_STATUS) {
+				// kresd normally only inserts (or overwrites),
+				// so it's generally suspicious when a key goes missing.
+				printf("Record already gone (key len %zu): ", (*i)->len);
+				debug_printbin((*i)->data, (*i)->len);
+				printf("\n");
+			}
 			break;
 		case KNOT_ESPACE:
 			printf("Warning: out of space, bailing out to retry later.\n");

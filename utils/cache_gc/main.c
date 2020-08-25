@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
 	};
 
 	int o;
-	while ((o = getopt(argc, argv, "hnc:d:l:L:m:u:f:w:t:")) != -1) {
+	while ((o = getopt(argc, argv, "hnvc:d:l:L:m:u:f:w:t:")) != -1) {
 		switch (o) {
 		case 'c':
 			cfg.cache_path = optarg;
@@ -114,6 +114,9 @@ int main(int argc, char *argv[])
 		case 'n':
 			cfg.dry_run = true;
 			break;
+		case 'v':
+			kr_verbose_set(true);
+			break;
 		case ':':
 		case '?':
 		case 'h':
@@ -128,10 +131,6 @@ int main(int argc, char *argv[])
 		print_help();
 		return 1;
 	}
-
-#ifdef DEBUG
-	kr_verbose_set(true); // used inside cache operations
-#endif
 
 	int exit_code = 0;
 	kr_cache_gc_state_t *gc_state = NULL;
