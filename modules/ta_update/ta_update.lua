@@ -200,8 +200,56 @@ local function update(keyset, new_keys)
 	return true
 end
 
+local function unmanagedkey_change()
+	warn('[ta_update] you need to update package with trust anchors before it breaks')
+end
+
+local function check_upstream(keyset, new_keys)
+	local process_keys = {}
+
+	for _, rr in ipairs(new_keys) do
+		local key_revoked = (rr.type == kres.type.DNSKEY) and C.kr_dnssec_key_revoked(rr.rdata)
+		local ta = ta_find(keyset, rr)
+		table.insert(process_keys, ta)
+
+		if rr.type == kres.type.DNSKEY and not C.kr_dnssec_key_ksk(rr.rdata) then
+			goto continue -- Ignore
+		end
+
+		if not ta and not key_revoked then
+			-- I see new key
+			ta_update.cb_unmanagedkey_change()
+		end
+
+		if ta and key_revoked then
+			-- I see revoked key
+			ta_update.cb_unmanagedkey_change()
+		end
+
+		::continue::
+	end
+
+	for _, rr in ipairs(keyset) do
+		local missing_rr = true
+		for _, rr_old in ipairs(process_keys) do
+			if (rr.owner == rr_old.owner) and (rr.type == rr_old.type) and (rr.type == kres.type.DNSKEY) then
+				if C.kr_dnssec_key_match(rr.rdata, #rr.rdata, rr_old.rdata, #rr_old.rdata) == 0 then
+					missing_rr = false
+					break
+				end
+			end
+		end
+
+		if missing_rr then
+			-- This key is missing in the new keyset
+			ta_update.cb_unmanagedkey_change()
+		end
+	end
+
+end
+
 -- Refresh the DNSKEYs from the packet, and return time to the next check.
-local function active_refresh(keyset, pkt)
+local function active_refresh(keyset, pkt, managed)
 	local retry = true
 	if pkt:rcode() == kres.rcode.NOERROR then
 		local records = pkt:section(kres.section.ANSWER)
@@ -211,7 +259,12 @@ local function active_refresh(keyset, pkt)
 				table.insert(new_keys, rr)
 			end
 		end
-		update(keyset, new_keys)
+
+		if managed then
+			update(keyset, new_keys)
+		else
+			check_upstream(keyset, new_keys)
+		end
 		retry = false
 	else
 		warn('[ta_update] active refresh failed for ' .. kres.dname2str(keyset.owner)
@@ -226,7 +279,7 @@ local function active_refresh(keyset, pkt)
 end
 
 -- Plan an event for refreshing DNSKEYs and re-scheduling itself
-local function refresh_plan(keyset, delay)
+local function refresh_plan(keyset, delay, managed)
 	local owner = keyset.owner
 	local owner_str = kres.dname2str(keyset.owner)
 	if not tracked_tas[owner] then
@@ -241,11 +294,11 @@ local function refresh_plan(keyset, delay)
 		resolve(owner_str, kres.type.DNSKEY, kres.class.IN, 'NO_CACHE',
 		function (pkt)
 			-- Schedule itself with updated timeout
-			local delay_new = active_refresh(keyset, pkt)
+			local delay_new = active_refresh(keyset, pkt, managed)
 			delay_new = keyset.refresh_time or ta_update.refresh_time or delay_new
 			log('[ta_update] next refresh for ' .. owner_str .. ' in '
 				.. delay_new/hour .. ' hours')
-			refresh_plan(keyset, delay_new)
+			refresh_plan(keyset, delay_new, managed)
 		end)
 	end)
 end
@@ -257,20 +310,17 @@ ta_update = {
 	refresh_time = nil,
 	keep_removed = 0,
 	tracked = tracked_tas, -- debug and visibility, should not be changed by hand
+	cb_unmanagedkey_change = unmanagedkey_change,
 }
 
 -- start tracking (already loaded) TA with given zone name in wire format
 -- do first refresh immediatelly
-function ta_update.start(zname)
+function ta_update.start(zname, managed)
 	local keyset = trust_anchors.keysets[zname]
 	if not keyset then
 		panic('[ta_update] TA must be configured first before tracking it')
 	end
-	if not keyset.managed then
-		panic('[ta_update] TA is configured as unmanaged; remove it and '
-			.. 'add it again as managed using trust_anchors.add_file()')
-	end
-	refresh_plan(keyset, 0)
+	refresh_plan(keyset, 0, managed)
 end
 
 function ta_update.stop(zname)
