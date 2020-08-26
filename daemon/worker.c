@@ -1589,7 +1589,6 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 		return kr_error(EINVAL);
 	}
 
-	/* Parse packet */
 	int ret = parse_packet(query);
 
 	const bool is_query = (knot_wire_get_qr(query->wire) == 0);
@@ -1600,8 +1599,7 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 		return kr_error(ENOENT);
 
 	/* Ignore badly formed queries. */
-	if (!query ||
-	    (ret != kr_ok() && ret != kr_error(EMSGSIZE)) ||
+	if ((ret != kr_ok() && ret != kr_error(EMSGSIZE)) ||
 	    (is_query == is_outgoing)) {
 		if (query && !is_outgoing)
 			the_worker->stats.dropped += 1;
