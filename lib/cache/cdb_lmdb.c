@@ -288,26 +288,16 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, size_t mapsize,
 		ret = errno;
 		goto error_sys;
 	}
-
-	if (mapsize) {
-		mapsize = (mapsize / pagesize) * pagesize;
-		ret = mdb_env_set_mapsize(env->env, mapsize);
-		if (ret != MDB_SUCCESS) goto error_mdb;
-		env->mapsize = mapsize;
-	}
+	mapsize = (mapsize / pagesize) * pagesize;
+	ret = mdb_env_set_mapsize(env->env, mapsize);
+	if (ret != MDB_SUCCESS) goto error_mdb;
+	env->mapsize = mapsize;
 
 	/* Cache doesn't require durability, we can be
 	 * loose with the requirements as a tradeoff for speed. */
 	const unsigned flags = MDB_WRITEMAP | MDB_MAPASYNC | MDB_NOTLS;
 	ret = mdb_env_open(env->env, path, flags, LMDB_FILE_MODE);
 	if (ret != MDB_SUCCESS) goto error_mdb;
-
-	if (!mapsize) {
-		MDB_envinfo info;
-		ret = mdb_env_info(env->env, &info);
-		if (ret != MDB_SUCCESS) goto error_mdb;
-		env->mapsize = mapsize = info.me_mapsize;
-	}
 
 	mdb_filehandle_t fd = -1;
 	ret = mdb_env_get_fd(env->env, &fd);
@@ -435,8 +425,9 @@ static int reopen_env(struct lmdb_env *env, struct kr_cdb_stats *stats)
 		return lmdb_error(ret);
 	}
 	auto_free char *path_copy = strdup(path);
+	size_t mapsize = env->mapsize;
 	cdb_close_env(env, stats);
-	return cdb_open_env(env, path_copy, 0, stats);
+	return cdb_open_env(env, path_copy, mapsize, stats);
 }
 
 static int cdb_check_health(knot_db_t *db, struct kr_cdb_stats *stats)

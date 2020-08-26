@@ -11,7 +11,7 @@
 /* Cache options. */
 struct kr_cdb_opts {
 	const char *path; /*!< Cache URI path. */
-	size_t maxsize;   /*!< Suggested cache size in bytes; pass 0 to keep unchanged/default. */
+	size_t maxsize;   /*!< Suggested cache size in bytes. */
 };
 
 struct kr_cdb_stats {
