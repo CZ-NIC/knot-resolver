@@ -195,14 +195,14 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) == 0)
 		return 0;
 
-	if (ctx->incomplete_stream != -1) {
-		kr_log_verbose(
-			"[http] stream %ld incomplete, refusing\n", ctx->incomplete_stream);
-		refuse_stream(h2, stream_id);
-		return 0;
-	}
-
 	if (!strcasecmp(":path", (const char *)name)) {
+		if (ctx->incomplete_stream != -1) {
+			kr_log_verbose(
+				"[http] stream %d incomplete, refusing\n", ctx->incomplete_stream);
+			refuse_stream(h2, stream_id);
+			return 0;
+		}
+
 		if (process_uri_path(ctx, (const char*)value, stream_id) < 0)
 			refuse_stream(h2, stream_id);
 	}
@@ -226,7 +226,7 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 
 	if (ctx->incomplete_stream != -1 && ctx->incomplete_stream != stream_id) {
 		kr_log_verbose(
-			"[http] stream %ld incomplete, refusing\n",
+			"[http] stream %d incomplete, refusing\n",
 			ctx->incomplete_stream);
 		refuse_stream(h2, stream_id);
 		return 0;
