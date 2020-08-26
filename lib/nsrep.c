@@ -300,11 +300,7 @@ int cmp_choices(const void *a, const void *b) {
     if ((diff = a_->address_state->errors - b_->address_state->errors)) {
         return diff;
     }
-    printf("hi\n");
-    int p = calc_timeout(a_->address_state->rtt_state);
-    int q = calc_timeout(b_->address_state->rtt_state);
-    diff = p - q;
-    if (diff) {
+    if ((diff = calc_timeout(a_->address_state->rtt_state) - calc_timeout(b_->address_state->rtt_state))) {
         return diff;
     }
     return 0;
