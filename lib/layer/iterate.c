@@ -263,7 +263,6 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 #else
 		/* Workaround: ignore out-of-bailiwick NSs for authoritative answers,
 		 * but fail for referrals. This is important to detect lame answers. */
-		qry->server_selection.error(qry, req->upstream.transport, KR_SELECTION_LAME_DELEGATION);
 		if (knot_pkt_section(pkt, KNOT_ANSWER)->count == 0) {
 			state = KR_STATE_FAIL;
 		}
@@ -717,6 +716,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	if (!is_authoritative(pkt, query)) {
 		if (!(query->flags.FORWARD) &&
 		    pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) {
+			query->server_selection.error(query, req->upstream.transport, KR_SELECTION_LAME_DELEGATION);
 			VERBOSE_MSG("<= lame response: non-auth sent negative response\n");
 			return KR_STATE_FAIL;
 		}
