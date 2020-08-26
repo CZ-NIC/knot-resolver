@@ -6,14 +6,21 @@ trust_anchors.add_file('{{TAF}}', true)
 
 {% raw %}
 
+local ffi = require('ffi')
+
 local cb_counter = 0
+local last_check = tonumber(ffi.C.kr_now()) / 1000
 function inc_cb()
+	local now = tonumber(ffi.C.kr_now()) / 1000
+	print('CFG: increment after %d seconds!', now - last_check)
 	cb_counter = cb_counter + 1
+	last_check = now
 end
 
 function check_status(state, query)
 	local answer = query.request.answer
 	-- status was present for 10 days
+	print('--> CFG: cb_counter='..cb_counter)
 	if cb_counter > 1 then
 		return policy.DENY_MSG('check last answer')
 	end
@@ -69,3 +76,5 @@ assert(#modules.list() > 0)
 ev = event.recurrent(1 * sec, function (ev) return 1 end)
 event.cancel(ev)
 ev = event.after(0, function (ev) return 1 end)
+
+event.recurrent(10, function() return log('--> CFG: timer tick') end)
