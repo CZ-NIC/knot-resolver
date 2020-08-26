@@ -141,7 +141,7 @@ local function test_callback()
 	same(cache.clear(test_name, test_exactname, test_rrtype, test_chunksize, check_callback, test_prev_state),
 	     666, 'first callback return value is passed to cache.clear() caller')
 	local cnt_before_wait = cache.count()
-	worker.sleep(0.2)
+	worker.sleep(0.4)
 	is(cnt_before_wait, cache.count(), 'custom callback can stop clearing')
 end
 
