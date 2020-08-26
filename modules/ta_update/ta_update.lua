@@ -14,6 +14,7 @@ local tracked_tas = {}  -- zone name (wire) => {event = number}
 
 -- Find key in current keyset
 local function ta_find(keyset, rr)
+	print(string.format('--> ta_find: %s\n', kres.rr2str(rr)))
 	local rr_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
 	if rr_tag < 0 or rr_tag > 65535 then
 		warn(string.format('[ta_update] ignoring invalid or unsupported RR: %s: %s',
@@ -39,6 +40,7 @@ local function ta_find(keyset, rr)
 				-- DNSKEY superseding DS, inexact match
 				elseif rr.type == kres.type.DNSKEY and ta.type == kres.type.DS then
 					if ta.key_tag == rr_tag then
+						print('--> ta_find: replace DS')
 						keyset[i] = rr -- Replace current DS
 						rr.state = ta.state
 						rr.key_tag = ta.key_tag
@@ -58,7 +60,9 @@ end
 
 -- Evaluate TA status of a RR according to RFC5011.  The time is in seconds.
 local function ta_present(keyset, rr, hold_down_time)
+	print('--> ta_present')
 	if rr.type == kres.type.DNSKEY and not C.kr_dnssec_key_ksk(rr.rdata) then
+		print('--> ta_present: skip ZSK')
 		return false -- Ignore
 	end
 	-- Attempt to extract key_tag
@@ -75,34 +79,42 @@ local function ta_present(keyset, rr, hold_down_time)
 	if ta then
 		-- Key reappears (KeyPres)
 		if ta.state == key_state.Missing then
+			print('--> ta_present: KeyPres')
 			ta.state = key_state.Valid
 			ta.timer = nil
 		end
 		-- Key is revoked (RevBit)
 		if ta.state == key_state.Valid or ta.state == key_state.Missing then
+			print('--> ta_present: RevBit')
 			if key_revoked then
+				print('--> ta_present: key revoked')
 				ta.state = key_state.Revoked
 				ta.timer = now + hold_down_time
 			end
 		end
 		-- Remove hold-down timer expires (RemTime)
 		if ta.state == key_state.Revoked and os.difftime(ta.timer, now) <= 0 then
+			print('--> ta_present: RemTime')
 			ta.state = key_state.Removed
 			ta.timer = nil
 		end
 		-- Add hold-down timer expires (AddTime)
 		if ta.state == key_state.AddPend and os.difftime(ta.timer, now) <= 0 then
+			print('--> ta_present: AddTime')
 			ta.state = key_state.Valid
 			ta.timer = nil
 		end
 		if rr.state ~= key_state.Valid or verbose() then
 			log('[ta_update] key: ' .. key_tag .. ' state: '..ta.state)
+			print('--> ta_present: time=' .. now)
 		end
 		return true
 	elseif not key_revoked then -- First time seen (NewKey)
+		print(string.format('--> ta_present: NewKey (state: %s)\n', rr.state))
 		rr.state = key_state.AddPend
 		rr.key_tag = key_tag
 		rr.timer = os.time() + hold_down_time
+		print(string.format('--> ta_present: Add new RR: %s\n', table_print(rr)))
 		table.insert(keyset, rr)
 		return false
 	end
@@ -110,6 +122,7 @@ end
 
 -- TA is missing in the new key set.  The time is in seconds.
 local function ta_missing(ta, hold_down_time)
+	print('--> ta_missing')
 	-- Key is removed (KeyRem)
 	local keep_ta = true
 	local key_tag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
@@ -139,6 +152,9 @@ end
 
 -- Update existing keyset; return true if successful.
 local function update(keyset, new_keys)
+	print('--> update')
+	print(string.format('--> update: keyset: %s\n', table_print(keyset)))
+	print(string.format('--> update: new_Keys: %s\n', table_print(new_keys)))
 	if not new_keys then return false end
 	if not keyset.managed then
 		-- this may happen due to race condition during testing in CI (refesh time < query time)
@@ -151,6 +167,7 @@ local function update(keyset, new_keys)
 	local keepset = {}
 	local keep_removed = keyset.keep_removed or ta_update.keep_removed
 	for _, ta in ipairs(keyset) do
+		print(string.format('--> TA in keyset: %s\n', table_print(ta)))
 		local keep = true
 		if not ta_find(new_keys, ta) then
 			-- Ad-hoc: RFC 5011 doesn't mention removing a Missing key.
@@ -169,23 +186,27 @@ local function update(keyset, new_keys)
 			table.insert(keepset, ta)
 		end
 	end
+	print('--> update: keepset created')
 	-- 2: remove all TAs - other settings etc. will remain in the keyset
 	for i, _ in ipairs(keyset) do
 		keyset[i] = nil
 	end
 	-- 3: move TAs to be kept into the keyset (same indices)
+	print('--> update: copy keepset to keyset')
 	for k, ta in pairs(keepset) do
 		keyset[k] = ta
 	end
 
 	-- Evaluate new TAs
 	for _, rr in ipairs(new_keys) do
+		print(string.format('--> update: should add new RR to keyset: %s\n', table_print(rr)))
 		if (rr.type == kres.type.DNSKEY or rr.type == kres.type.DS) and rr.rdata ~= nil then
 			ta_present(keyset, rr, hold_down)
 		end
 	end
 
 	-- Store the keyset
+	print(string.format('--> update: write keyset: %s\n', table_print(keyset)))
 	trust_anchors.keyset_write(keyset)
 
 	-- Start using the new TAs.
@@ -205,30 +226,38 @@ local function unmanagedkey_change()
 end
 
 local function check_upstream(keyset, new_keys)
+	print('--> check_upstream')
+
 	local process_keys = {}
 
 	for _, rr in ipairs(new_keys) do
+		local key_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
+		print('--> check_upstream: check keytag '..key_tag)
 		local key_revoked = (rr.type == kres.type.DNSKEY) and C.kr_dnssec_key_revoked(rr.rdata)
 		local ta = ta_find(keyset, rr)
 		table.insert(process_keys, ta)
 
 		if rr.type == kres.type.DNSKEY and not C.kr_dnssec_key_ksk(rr.rdata) then
+			print('--> check_upstream: skip ZSK')
 			goto continue -- Ignore
 		end
 
 		if not ta and not key_revoked then
 			-- I see new key
+			print('--> check_upstream: NEW KEY')
 			ta_update.cb_unmanagedkey_change()
 		end
 
 		if ta and key_revoked then
 			-- I see revoked key
+			print('--> check_upstream: REVOKED')
 			ta_update.cb_unmanagedkey_change()
 		end
 
 		::continue::
 	end
 
+	print('--> check_upstream: trying find out missing keys')
 	for _, rr in ipairs(keyset) do
 		local missing_rr = true
 		for _, rr_old in ipairs(process_keys) do
@@ -242,6 +271,7 @@ local function check_upstream(keyset, new_keys)
 
 		if missing_rr then
 			-- There is missing key on disk
+			print('--> check_upstream: MISSING')
 			ta_update.cb_unmanagedkey_change()
 		end
 	end
@@ -250,12 +280,15 @@ end
 
 -- Refresh the DNSKEYs from the packet, and return time to the next check.
 local function active_refresh(keyset, pkt, managed)
+	print(string.format('--> active_refresh (%s)\n', managed))
+	print(string.format('--> active_refresh: keyset: %s\n', table_print(keyset)))
 	local retry = true
 	if pkt:rcode() == kres.rcode.NOERROR then
 		local records = pkt:section(kres.section.ANSWER)
 		local new_keys = {}
 		for _, rr in ipairs(records) do
 			if rr.type == kres.type.DNSKEY then
+				print(string.format('--> active_refresh: Insert new key: %s\n', kres.rr2str(rr)))
 				table.insert(new_keys, rr)
 			end
 		end
@@ -280,6 +313,7 @@ end
 
 -- Plan an event for refreshing DNSKEYs and re-scheduling itself
 local function refresh_plan(keyset, delay, managed)
+	print('--> refresh_plan: '..tostring(delay))
 	local owner = keyset.owner
 	local owner_str = kres.dname2str(keyset.owner)
 	if not tracked_tas[owner] then
@@ -296,6 +330,7 @@ local function refresh_plan(keyset, delay, managed)
 			-- Schedule itself with updated timeout
 			local delay_new = active_refresh(keyset, pkt, managed)
 			delay_new = keyset.refresh_time or ta_update.refresh_time or delay_new
+			print('--> refresh_plan: delay_new='..tostring(delay_new))
 			log('[ta_update] next refresh for ' .. owner_str .. ' in '
 				.. delay_new/hour .. ' hours')
 			refresh_plan(keyset, delay_new, managed)
@@ -316,6 +351,7 @@ ta_update = {
 -- start tracking (already loaded) TA with given zone name in wire format
 -- do first refresh immediatelly
 function ta_update.start(zname, managed)
+	print('--> Start ta_update')
 	local keyset = trust_anchors.keysets[zname]
 	if not keyset then
 		panic('[ta_update] TA must be configured first before tracking it')
@@ -328,6 +364,7 @@ function ta_update.start(zname, managed)
 end
 
 function ta_update.stop(zname)
+	print('--> Stop ta_update')
 	if tracked_tas[zname] then
 		event.cancel(tracked_tas[zname].event)
 		tracked_tas[zname] = nil
