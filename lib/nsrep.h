@@ -56,3 +56,9 @@ struct kr_server_selection
 // Initialize server selection structure inside qry.
 KR_EXPORT
 void kr_server_selection_init(struct kr_query *qry);
+
+KR_EXPORT
+int kr_forward_init_target(struct kr_query *qry, size_t number);
+
+KR_EXPORT
+int kr_forward_add_target(struct kr_request *req, size_t index, const struct sockaddr *sock);

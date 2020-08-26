@@ -55,6 +55,11 @@ struct iter_address_state {
 	int errors[KR_SELECTION_NUMBER_OF_ERRORS];
 };
 
+struct forward_local_state {
+    struct sockaddr *targets;
+    size_t target_num;
+};
+
 // Array of these is one of inputs for the actual selection algorithm (`iter_get_best_transport`)
 struct choice {
     uint8_t *address;
@@ -289,6 +294,16 @@ void iter_get_tcp_open_connections(trie_t *addresses) {
 void iter_local_state_init(struct knot_mm *mm, void **local_state) {
     *local_state = mm_alloc(mm, sizeof(struct iter_local_state));
     memset(*local_state, 0, sizeof(struct iter_local_state));
+}
+
+
+void forward_local_state_init(struct knot_mm *mm, void **local_state, struct kr_request *req) {
+    assert(req->forwarding_targets);
+    *local_state = mm_alloc(mm, sizeof(struct forward_local_state));
+    memset(*local_state, 0, sizeof(struct forward_local_state));
+
+    struct forward_local_state *forward_state = (struct forward_local_state *)*local_state;
+    forward_state->targets = req->forwarding_targets;
 }
 
 
@@ -537,15 +552,16 @@ void forward_error(struct kr_query *qry, const struct kr_transport *transport, e
 
 
 void kr_server_selection_init(struct kr_query *qry) {
-    struct knot_mm *mempool = qry->request->rplan.pool;
+    struct knot_mm *mempool = &qry->request->pool;
     if (qry->flags.FORWARD || qry->flags.STUB) {
         qry->server_selection = (struct kr_server_selection){
             .choose_transport = forward_choose_transport,
             .success = forward_success,
             .update_rtt = forward_update_rtt,
             .error = forward_error,
+            .local_state = NULL,
         };
-        // local state should be initialized here as well.
+        forward_local_state_init(mempool, &qry->server_selection.local_state, qry->request);
     } else {
         qry->server_selection = (struct kr_server_selection){
             .choose_transport = iter_choose_transport,
@@ -557,3 +573,12 @@ void kr_server_selection_init(struct kr_query *qry) {
         iter_local_state_init(mempool, &qry->server_selection.local_state);
     }
 }
+
+int kr_forward_add_target(struct kr_request *req, size_t index, const struct sockaddr *sock) {
+    if (!req->forwarding_targets) {
+        req->forwarding_targets = mm_alloc(&req->pool, req->forward_targets_num * sizeof(struct sockaddr));
+    }
+    req->forwarding_targets[index] = *sock;
+    return kr_ok();
+}
+
