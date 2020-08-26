@@ -770,7 +770,7 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 		} else {
 			/* Fill in source and latency information. */
 			request->upstream.rtt = kr_now() - qry->timestamp_mono;
-			request->upstream.transport = transport ? NULL : *transport;
+			request->upstream.transport = transport ? *transport : NULL;
 			ITERATE_LAYERS(request, qry, consume, packet);
 			/* Clear temporary information */
 			request->upstream.transport = NULL;
