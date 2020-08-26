@@ -28,7 +28,7 @@ struct http_ctx {
 	http_send_callback send_cb;
 	struct session *session;
 	queue_int32_t streams;  /* IDs of streams present in the buffer. */
-	bool incomplete_stream;
+	int32_t incomplete_stream;
 	ssize_t submitted;
 	uint8_t *buf;  /* Part of the wire_buf that belongs to current HTTP/2 stream. */
 	ssize_t buf_pos;
