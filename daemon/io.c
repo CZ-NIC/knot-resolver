@@ -61,18 +61,9 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	const struct sockaddr *addr, unsigned flags)
 {
 	struct session *s = handle->data;
-	if (session_flags(s)->closing) {
+	if (session_flags(s)->closing || nread <= 0 || addr->sa_family == AF_UNSPEC)
 		return;
-	}
-	if (nread <= 0) {
-		if (nread < 0) { /* Error response, notify resolver */
-			worker_submit(s, NULL, NULL);
-		} /* nread == 0 is for freeing buffers, we don't need to do this */
-		return;
-	}
-	if (addr->sa_family == AF_UNSPEC) {
-		return;
-	}
+
 	if (session_flags(s)->outgoing) {
 		const struct sockaddr *peer = session_get_peer(s);
 		assert(peer->sa_family != AF_UNSPEC);
