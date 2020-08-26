@@ -718,13 +718,6 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	return request->state;
 }
 
-// KR_PURE static bool kr_inaddr_equal(const struct sockaddr *a, const struct sockaddr *b)
-// {
-// 	const int a_len = kr_inaddr_len(a);
-// 	const int b_len = kr_inaddr_len(b);
-// 	return a_len == b_len && memcmp(kr_inaddr(a), kr_inaddr(b), a_len) == 0;
-// }
-
 static bool resolution_time_exceeded(struct kr_query *qry, uint64_t now)
 {
 	uint64_t resolving_time = now - qry->creation_time_mono;
@@ -1219,7 +1212,7 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 	struct kr_query *qry = array_tail(rplan->pending);
 
 	/* Initialize server selection */
-	if (!qry->server_selection.local_state) {
+	if (!qry->server_selection.initialized) {
 		kr_server_selection_init(qry);
 	}
 

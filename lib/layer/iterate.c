@@ -1080,14 +1080,16 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	const knot_lookup_t *rcode = knot_lookup_by_id(knot_rcode_names, knot_wire_get_rcode(pkt->wire));
 #endif
 
+	// We can't return directly from the switch because we have to give feedback to server selection first
+	int ret = 0;
+	int selection_error = -1;
+
 	/* Check response code. */
 	switch(knot_wire_get_rcode(pkt->wire)) {
 	case KNOT_RCODE_NOERROR:
 	case KNOT_RCODE_NXDOMAIN:
-		query->server_selection.success(query, req->upstream.transport);
 		break; /* OK */
 	case KNOT_RCODE_YXDOMAIN: /* Basically a successful answer; name just doesn't fit. */
-		query->server_selection.success(query, req->upstream.transport);
 		knot_wire_set_rcode(req->answer->wire, KNOT_RCODE_YXDOMAIN);
 		break;
 	case KNOT_RCODE_REFUSED:
@@ -1095,29 +1097,47 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 			 /* just pass answer through if in stub mode */
 			break;
 		}
-		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_REFUSED);
+		selection_error = KR_SELECTION_REFUSED;
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		return resolve_badmsg(pkt, req, query);
+		ret = resolve_badmsg(pkt, req, query);
+		break;
 	case KNOT_RCODE_SERVFAIL:
 		if (query->flags.STUB) {
 			 /* just pass answer through if in stub mode */
 			break;
 		}
-		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_SERVFAIL);
+		selection_error = KR_SELECTION_SERVFAIL;
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		return resolve_badmsg(pkt, req, query);
+		ret = resolve_badmsg(pkt, req, query);
+		break;
 	case KNOT_RCODE_FORMERR:
-		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_FORMERROR);
+		selection_error = KR_SELECTION_FORMERROR;
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		return resolve_badmsg(pkt, req, query);
+		ret = resolve_badmsg(pkt, req, query);
+		break;
 	case KNOT_RCODE_NOTIMPL:
-		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_NOTIMPL);
+		selection_error = KR_SELECTION_NOTIMPL;
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		return resolve_notimpl(pkt, req, query);
+		ret = resolve_notimpl(pkt, req, query);
+		break;
 	default:
-		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_OTHER_RCODE);
+		selection_error = KR_SELECTION_OTHER_RCODE;
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		return resolve_error(pkt, req);
+		ret = resolve_error(pkt, req);
+		break;
+	}
+
+	if (query->server_selection.initialized) {
+		if (selection_error != -1) {
+			query->server_selection.error(query, req->upstream.transport, selection_error);
+		} else {
+			// Is this even true? Is this neccesary?
+			query->server_selection.success(query, req->upstream.transport);
+		}
+	}
+
+	if (ret) {
+		return ret;
 	}
 
 	int state;
@@ -1147,7 +1167,7 @@ rrarray_finalize:
 	(void)0;
 	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
-		int ret = kr_ranked_rrarray_finalize(selected[i], query->uid, &req->pool);
+		ret = kr_ranked_rrarray_finalize(selected[i], query->uid, &req->pool);
 		if (unlikely(ret)) {
 			return KR_STATE_FAIL;
 		}

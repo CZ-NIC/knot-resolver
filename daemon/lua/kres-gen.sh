@@ -187,8 +187,8 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_rplan_pop
 	kr_rplan_resolved
 	kr_rplan_last
-# Nameservers
-	kr_nsrep_set
+# Forwarding
+	kr_forward_add_target
 # Utils
 	kr_log_req
 	kr_log_q

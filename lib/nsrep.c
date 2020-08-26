@@ -555,6 +555,7 @@ void kr_server_selection_init(struct kr_query *qry) {
     struct knot_mm *mempool = &qry->request->pool;
     if (qry->flags.FORWARD || qry->flags.STUB) {
         qry->server_selection = (struct kr_server_selection){
+            .initialized = true,
             .choose_transport = forward_choose_transport,
             .success = forward_success,
             .update_rtt = forward_update_rtt,
@@ -564,6 +565,7 @@ void kr_server_selection_init(struct kr_query *qry) {
         forward_local_state_init(mempool, &qry->server_selection.local_state, qry->request);
     } else {
         qry->server_selection = (struct kr_server_selection){
+            .initialized = true,
             .choose_transport = iter_choose_transport,
             .success = iter_success,
             .update_rtt = iter_update_rtt,

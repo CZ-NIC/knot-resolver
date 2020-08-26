@@ -45,6 +45,7 @@ struct kr_transport {
 
 struct kr_server_selection
 {
+    bool initialized;
     void (*choose_transport)(struct kr_query *qry, struct kr_transport **transport);
     void (*success)(struct kr_query *qry, const struct kr_transport *transport);
     void (*update_rtt)(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt);
@@ -56,9 +57,6 @@ struct kr_server_selection
 // Initialize server selection structure inside qry.
 KR_EXPORT
 void kr_server_selection_init(struct kr_query *qry);
-
-KR_EXPORT
-int kr_forward_init_target(struct kr_query *qry, size_t number);
 
 KR_EXPORT
 int kr_forward_add_target(struct kr_request *req, size_t index, const struct sockaddr *sock);
