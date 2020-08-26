@@ -177,12 +177,14 @@ static int cache_write_or_clear(struct kr_cache *cache, const knot_db_val_t *key
 	/* Cache is overfull.  Using kres-cache-gc service should prevent this.
 	 * As a fallback, try clearing it. */
 	ret = kr_cache_clear(cache);
-	if (ret) {
+	switch (ret) {
+	default:
 		kr_log_error("CRITICAL: clearing cache failed with %s\n",
 				kr_strerror(ret));
 		abort();
-	} else {
+	case 0:
 		kr_log_info("[cache] overfull cache cleared\n");
+	case -EAGAIN: // fall-through; .cachelock race -> retry later
 		return kr_error(ENOSPC);
 	}
 }
