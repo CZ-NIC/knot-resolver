@@ -163,6 +163,7 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 	}
 
 	ctx->buf_pos += ret;
+	ctx->incomplete_stream = stream_id;
 	queue_push(ctx->streams, stream_id);
 	return 0;
 }
@@ -194,13 +195,14 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) == 0)
 		return 0;
 
-	if (ctx->incomplete_stream) {
-		kr_log_verbose("[http] previous stream incomplete, refusing\n");
-		refuse_stream(h2, stream_id);
-		return 0;
-	}
-
 	if (!strcasecmp(":path", (const char *)name)) {
+		if (ctx->incomplete_stream != -1) {
+			kr_log_verbose(
+				"[http] stream %d incomplete, refusing\n", ctx->incomplete_stream);
+			refuse_stream(h2, stream_id);
+			return 0;
+		}
+
 		if (process_uri_path(ctx, (const char*)value, stream_id) < 0)
 			refuse_stream(h2, stream_id);
 	}
@@ -222,25 +224,26 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	ssize_t remaining;
 	ssize_t required;
 
-	if (ctx->incomplete_stream) {
-		if (queue_len(ctx->streams) <= 0) {
-			return NGHTTP2_ERR_CALLBACK_FAILURE;
-		} else if (queue_tail(ctx->streams) != stream_id) {
-			kr_log_verbose("[http] previous stream incomplete, refusing\n");
-			refuse_stream(h2, stream_id);
-			return 0;
-		}
+	if (ctx->incomplete_stream != -1 && ctx->incomplete_stream != stream_id) {
+		kr_log_verbose(
+			"[http] stream %d incomplete, refusing\n",
+			ctx->incomplete_stream);
+		refuse_stream(h2, stream_id);
+		return 0;
 	}
 
 	remaining = ctx->buf_size - ctx->submitted - ctx->buf_pos;
-	required = len + sizeof(uint16_t);
+	required = len;
+	if (ctx->incomplete_stream == -1)
+		required += sizeof(uint16_t);
+
 	if (required > remaining) {
 		kr_log_error("[http] insufficient space in buffer\n");
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 	}
 
-	if (!ctx->incomplete_stream) {
-		ctx->incomplete_stream = true;
+	if (ctx->incomplete_stream == -1) {
+		ctx->incomplete_stream = stream_id;
 		ctx->buf_pos = sizeof(uint16_t);  /* Reserve 2B for dnsmsg len. */
 		queue_push(ctx->streams, stream_id);
 	}
@@ -262,9 +265,11 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 {
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	ssize_t len;
+	int32_t stream_id = frame->hd.stream_id;
+	assert(stream_id != -1);
 
-	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) && ctx->buf_pos != 0) {
-		ctx->incomplete_stream = false;
+	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) && ctx->incomplete_stream == stream_id) {
+		ctx->incomplete_stream = -1;
 
 		len = ctx->buf_pos - sizeof(uint16_t);
 		if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
@@ -342,7 +347,7 @@ struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
 	ctx->send_cb = send_cb;
 	ctx->session = session;
 	queue_init(ctx->streams);
-	ctx->incomplete_stream = false;
+	ctx->incomplete_stream = -1;
 	ctx->submitted = 0;
 
 	nghttp2_session_server_new(&ctx->h2, callbacks, ctx);
