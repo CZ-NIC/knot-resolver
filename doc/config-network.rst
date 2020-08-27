@@ -43,7 +43,6 @@ Server (communication with clients)
    daemon-bindings-net_server
    daemon-bindings-net_tlssrv
    modules-http
-   modules-http-doh
 
 Client (retrieving answers from servers)
 ========================================
