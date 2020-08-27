@@ -37,7 +37,7 @@ function sign () {
 	-X +21d \
 	-O full \
 	-f "${OUTFILE}" \
-	unsigned.db
+	"$2"
 
 	# DS for the very first KSK
 	test ! -f keys/ds && dnssec-dsfromkey -2 -f "${OUTFILE}" . > keys/ds || : initial DS RR already exists
@@ -105,9 +105,9 @@ function test_unmanagedkey_present {
 	${GEN} -P 20170621000000 -A 20170701000000 -I 20171001000000 -D 20171011000000 .
 	${GEN} -P 20170919000000 -A 20171001000000 -I 20180101000000 -D 20180111000000 .
 
-	sign "2017-07-01 00:00:00"
-	sign "2017-07-11 00:00:00" # present key is seen 10 days
-	sign "2017-07-21 00:00:00" # last edited message for check result from deckard
+	sign "2017-07-01 00:00:00" unsigned_ok.db
+	sign "2017-07-11 00:00:00" unsigned_ok.db # present key is seen 10 days
+	sign "2017-07-21 00:00:00" unsigned_check.db # last edited message for check result from deckard
 }
 
 function test_unmanagedkey_revoke {
@@ -120,9 +120,9 @@ function test_unmanagedkey_revoke {
 	${GEN} -P 20170621000000 -A 20170701000000 -I 20171001000000 -D 20171011000000 .
 	${GEN} -P 20170919000000 -A 20171001000000 -I 20180101000000 -D 20180111000000 .
 
-	sign "2017-07-01 00:00:00"
-	sign "2017-07-11 00:00:00" # revoke key is seen 10 days
-	sign "2017-07-21 00:00:00" # last edited message for check result from deckard
+	sign "2017-07-01 00:00:00" unsigned_ok.db
+	sign "2017-07-11 00:00:00" unsigned_ok.db # revoke key is seen 10 days
+	sign "2017-07-21 00:00:00" unsigned_check.db # last edited message for check result from deckard
 }
 
 function test_unmanagedkey_missing {
@@ -135,9 +135,9 @@ function test_unmanagedkey_missing {
 	${GEN} -P 20170621000000 -A 20170701000000 -I 20171001000000 -D 20171011000000 .
 	${GEN} -P 20170919000000 -A 20171001000000 -I 20180101000000 -D 20180111000000 .
 
-	sign "2017-07-01 00:00:00"
-	sign "2017-07-11 00:00:00" # missing key is seen 10 days
-	sign "2017-07-21 00:00:00" # last edited message for check result from deckard
+	sign "2017-07-01 00:00:00" unsigned_ok.db
+	sign "2017-07-11 00:00:00" unsigned_ok.db # missing key is seen 10 days
+	sign "2017-07-21 00:00:00" unsigned_check.db # last edited message for check result from deckard
 }
 
 if [ $# -ne 1 ]; then

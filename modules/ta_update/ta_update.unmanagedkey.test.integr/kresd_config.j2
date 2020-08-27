@@ -14,7 +14,8 @@ end
 function check_status(state, query)
 	local answer = query.request.answer
 	-- status was present for 10 days
-	if cb_counter > 1 then
+	print('--> CFG: cb_counter='..cb_counter)
+	if cb_counter > 0 then
 		return policy.DENY_MSG('check last answer')
 	end
 end
