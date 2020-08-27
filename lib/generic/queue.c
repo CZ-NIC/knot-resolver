@@ -5,7 +5,7 @@
 #include "lib/generic/queue.h"
 #include <string.h>
 
-KR_EXPORT void queue_init_impl(struct queue *q, size_t item_size)
+void queue_init_impl(struct queue *q, size_t item_size)
 {
 	q->len = 0;
 	q->item_size = item_size;
@@ -19,7 +19,7 @@ KR_EXPORT void queue_init_impl(struct queue *q, size_t item_size)
 	if (!q->chunk_cap) q->chunk_cap = 1; /* item_size big enough by itself */
 }
 
-KR_EXPORT void queue_deinit_impl(struct queue *q)
+void queue_deinit_impl(struct queue *q)
 {
 	assert(q);
 	struct queue_chunk *p = q->head;
@@ -46,7 +46,7 @@ static struct queue_chunk * queue_chunk_new(const struct queue *q)
 }
 
 /* Return pointer to the space for the new element. */
-KR_EXPORT void * queue_push_impl(struct queue *q)
+void * queue_push_impl(struct queue *q)
 {
 	assert(q);
 	struct queue_chunk *t = q->tail; // shorthand
@@ -75,7 +75,7 @@ KR_EXPORT void * queue_push_impl(struct queue *q)
 }
 
 /* Return pointer to the space for the new element. */
-KR_EXPORT void * queue_push_head_impl(struct queue *q)
+void * queue_push_head_impl(struct queue *q)
 {
 	/* When we have choice, we optimize for further _push_head,
 	 * i.e. when shifting or allocating a chunk,
