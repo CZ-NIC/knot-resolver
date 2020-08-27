@@ -14,7 +14,8 @@ First you need to decide what service should be available on given IP address
 
   "DNS (unencrypted UDP+TCP, :rfc:`1034`)","``dns``"
   ":ref:`DNS-over-TLS (DoT) <tls-server-config>`","``tls``"
-  ":ref:`mod-http-doh`","``doh``"
+  ":ref:`mod-http-doh`","``doh2``"
+  ":ref:`mod-http-doh` (legacy implementation)","``doh``"
   ":ref:`Web management <mod-http-built-in-services>`","``webmgmt``"
   ":ref:`Control socket <control-sockets>`","``control``"
 
@@ -38,7 +39,7 @@ First you need to decide what service should be available on given IP address
 
   "DNS (UDP+TCP, :rfc:`1034`)","``net.listen('192.0.2.123', 53)``"
   ":ref:`DNS-over-TLS (DoT) <tls-server-config>`","``net.listen('192.0.2.123', 853, { kind = 'tls' })``"
-  ":ref:`mod-http-doh`","``net.listen('192.0.2.123', 443, { kind = 'doh' })``"
+  ":ref:`mod-http-doh`","``net.listen('192.0.2.123', 443, { kind = 'doh2' })``"
   ":ref:`Web management <mod-http-built-in-services>`","``net.listen('192.0.2.123', 8453, { kind = 'webmgmt' })``"
   ":ref:`Control socket <control-sockets>`","``net.listen('/tmp/kres.control', nil, { kind = 'control' })``"
 
@@ -52,12 +53,12 @@ Examples:
 	net.listen(net.eth0, 853, { kind = 'tls' })
 	net.listen('192.0.2.1', 53, { freebind = true })
 	net.listen({'127.0.0.1', '::1'}, 53, { kind = 'dns' })
-	net.listen('::', 443, { kind = 'doh' }) -- see http module
+	net.listen('::', 443, { kind = 'doh2' })
 	net.listen('::', 8453, { kind = 'webmgmt' }) -- see http module
 	net.listen('/tmp/kresd-socket', nil, { kind = 'webmgmt' }) -- http module supports AF_UNIX
 
 .. warning:: Make sure you read section :ref:`mod-http-doh` before exposing
-             the DNS-over-HTTP protocol to outside.
+             the DNS-over-HTTPS protocol to outside.
 
 .. warning:: On machines with multiple IP addresses avoid listening on wildcards
         ``0.0.0.0`` or ``::``. Knot Resolver could answer from different IP
