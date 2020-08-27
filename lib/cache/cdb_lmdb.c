@@ -288,16 +288,28 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, size_t mapsize,
 		ret = errno;
 		goto error_sys;
 	}
-	mapsize = (mapsize / pagesize) * pagesize;
-	ret = mdb_env_set_mapsize(env->env, mapsize);
-	if (ret != MDB_SUCCESS) goto error_mdb;
-	env->mapsize = mapsize;
+
+	const bool size_requested = mapsize;
+	if (size_requested) {
+		mapsize = (mapsize / pagesize) * pagesize;
+		ret = mdb_env_set_mapsize(env->env, mapsize);
+		if (ret != MDB_SUCCESS) goto error_mdb;
+		env->mapsize = mapsize;
+	}
 
 	/* Cache doesn't require durability, we can be
 	 * loose with the requirements as a tradeoff for speed. */
 	const unsigned flags = MDB_WRITEMAP | MDB_MAPASYNC | MDB_NOTLS;
 	ret = mdb_env_open(env->env, path, flags, LMDB_FILE_MODE);
 	if (ret != MDB_SUCCESS) goto error_mdb;
+
+	{
+		// Always get the real mapsize.  Shrinking can be restricted, etc.
+		MDB_envinfo info;
+		ret = mdb_env_info(env->env, &info);
+		if (ret != MDB_SUCCESS) goto error_mdb;
+		env->mapsize = mapsize = info.me_mapsize;
+	}
 
 	mdb_filehandle_t fd = -1;
 	ret = mdb_env_get_fd(env->env, &fd);
@@ -327,7 +339,11 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, size_t mapsize,
 	}
 
 #if !defined(__MACOSX__) && !(defined(__APPLE__) && defined(__MACH__))
-	ret = posix_fallocate(fd, 0, mapsize);
+	if (size_requested) {
+		ret = posix_fallocate(fd, 0, MAX(env->mapsize, env->st_size));
+	} else {
+		ret = 0;
+	}
 	if (ret == EINVAL) {
 		/* POSIX says this can happen when the feature isn't supported by the FS.
 		 * We haven't seen this happen on Linux+glibc but it was reported on FreeBSD.*/
@@ -425,9 +441,8 @@ static int reopen_env(struct lmdb_env *env, struct kr_cdb_stats *stats)
 		return lmdb_error(ret);
 	}
 	auto_free char *path_copy = strdup(path);
-	size_t mapsize = env->mapsize;
 	cdb_close_env(env, stats);
-	return cdb_open_env(env, path_copy, mapsize, stats);
+	return cdb_open_env(env, path_copy, 0, stats);
 }
 
 static int cdb_check_health(knot_db_t *db, struct kr_cdb_stats *stats)
@@ -443,6 +458,8 @@ static int cdb_check_health(knot_db_t *db, struct kr_cdb_stats *stats)
 	if (st.st_dev == env->st_dev && st.st_ino == env->st_ino) {
 		if (st.st_size == env->st_size)
 			return kr_ok();
+		/* Cache check through file size works OK without reopening,
+		 * contrary to methods based on mdb_env_info(). */
 		kr_log_info("[cache] detected size change by another process: %zu -> %zu\n",
 				(size_t)env->st_size, (size_t)st.st_size);
 		int ret = cdb_commit(db, stats);
@@ -753,6 +770,11 @@ static double cdb_usage(knot_db_t *db)
 	return db_usage;
 }
 
+static size_t cdb_get_maxsize(knot_db_t *db)
+{
+	struct lmdb_env *env = db;
+	return env->mapsize;
+}
 
 /** Conversion between knot and lmdb structs. */
 knot_db_t *knot_db_t_kres2libknot(const knot_db_t * db)
@@ -778,6 +800,7 @@ const struct kr_cdb_api *kr_cdb_lmdb(void)
 		cdb_match,
 		cdb_read_leq,
 		cdb_usage,
+		cdb_get_maxsize,
 		cdb_check_health,
 	};
 
