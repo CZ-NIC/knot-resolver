@@ -63,7 +63,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 /** Preliminary checks before stash_rrset().  Don't call if returns <= 0. */
 static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qry/*logs*/);
 
-/** @internal Open cache db transaction and check internal data version. */
+/** @internal Ensure the cache version is right, possibly by clearing it. */
 static int assert_right_version(struct kr_cache *cache)
 {
 	/* Check cache ABI version. */
@@ -93,12 +93,14 @@ static int assert_right_version(struct kr_cache *cache)
 			ret = cache_op(cache, clear);
 		}
 		/* Either purged or empty. */
-		if (ret == 0) {
-			/* Key/Val is invalidated by cache purge, recreate it */
-			val.data = /*const-cast*/(void *)&CACHE_VERSION;
-			val.len = sizeof(CACHE_VERSION);
-			ret = cache_op(cache, write, &key, &val, 1);
-		}
+	}
+	/* Rewrite the entry even if it isn't needed.  Because of cache-size-changing
+	 * possibility it's good to always perform some write during opening of cache. */
+	if (ret == 0) {
+		/* Key/Val is invalidated by cache purge, recreate it */
+		val.data = /*const-cast*/(void *)&CACHE_VERSION;
+		val.len = sizeof(CACHE_VERSION);
+		ret = cache_op(cache, write, &key, &val, 1);
 	}
 	kr_cache_commit(cache);
 	return ret;
@@ -117,14 +119,33 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 	}
 	cache->api = api;
 	int ret = cache->api->open(&cache->db, &cache->stats, opts, mm);
+	if (ret == 0) {
+		ret = assert_right_version(cache);
+		// The included write also committed maxsize increase to the file.
+	}
+	if (ret == 0 && opts->maxsize) {
+		/* If some maxsize is requested and it's smaller than in-file maxsize,
+		 * LMDB only restricts our env without changing the in-file maxsize.
+		 * That is worked around by reopening (found no other reliable way). */
+		cache->api->close(cache->db, &cache->stats);
+		struct kr_cdb_opts opts2;
+		memcpy(&opts2, opts, sizeof(opts2));
+		opts2.maxsize = 0;
+		ret = cache->api->open(&cache->db, &cache->stats, &opts2, mm);
+	}
+	if (ret == 0 && opts->maxsize) {
+		size_t maxsize = cache->api->get_maxsize(cache->db);
+		if (maxsize > opts->maxsize) kr_log_info(
+			"[cache] Warning: cache size %zu instead of %zu."
+			"  To reduce the size you need to remove the file by hand.\n",
+			maxsize, opts->maxsize);
+	}
 	if (ret != 0) {
 		return ret;
 	}
 	cache->ttl_min = KR_CACHE_DEFAULT_TTL_MIN;
 	cache->ttl_max = KR_CACHE_DEFAULT_TTL_MAX;
-	/* Check cache ABI version */
 	kr_cache_make_checkpoint(cache);
-	(void)assert_right_version(cache);
 
 	char *fpath;
 	ret = asprintf(&fpath, "%s/data.mdb", opts->path);
