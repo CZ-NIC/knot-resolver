@@ -24,7 +24,8 @@ by a trusted CA. This is done using function :c:func:`net.tls()`.
 
 .. function:: net.tls([cert_path], [key_path])
 
-   Get/set path to a server TLS certificate and private key for DNS/TLS.
+   Get/set path to a server TLS certificate and private key for DNS-over-TLS
+   and DNS-over-HTTPS (doesn't apply to legacy `doh` handled by http module).
 
    Example output:
 
