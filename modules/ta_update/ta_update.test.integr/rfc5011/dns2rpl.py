@@ -125,6 +125,8 @@ REPLY QR RD RA AD
 MATCH opcode qname question
 SECTION QUESTION
 test. IN TXT
+SECTION ANSWER
+test. IN TXT "it works"
 ENTRY_END
 '''.format(id_prefix)
 
