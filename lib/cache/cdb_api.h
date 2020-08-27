@@ -11,7 +11,7 @@
 /* Cache options. */
 struct kr_cdb_opts {
 	const char *path; /*!< Cache URI path. */
-	size_t maxsize;   /*!< Suggested cache size in bytes. */
+	size_t maxsize;   /*!< Suggested cache size in bytes; pass 0 to keep unchanged/default. */
 };
 
 struct kr_cdb_stats {
@@ -78,6 +78,9 @@ struct kr_cdb_api {
 			knot_db_val_t *key, knot_db_val_t *val);
 
 	double (*usage_percent)(knot_db_t *db);
+
+	/** Return the current cache size limit in bytes; could be cached by check_health(). */
+	size_t (*get_maxsize)(knot_db_t *db);
 
 	/** Perform maintenance.
 	 * In LMDB case it checks whether data.mdb is still the same
