@@ -22,9 +22,7 @@ int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db,
 		return -ENOENT;
 	}
 
-	size_t cache_size = st.st_size;
-
-	struct kr_cdb_opts opts = { cache_path, cache_size };
+	struct kr_cdb_opts opts = { .path = cache_path, .maxsize = 0/*don't resize*/ };
 
 	int ret = kr_cache_open(kres_db, NULL, &opts, NULL);
 	if (ret || kres_db->db == NULL) {
