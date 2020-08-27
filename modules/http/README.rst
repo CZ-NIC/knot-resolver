@@ -2,8 +2,8 @@
 
 .. _mod-http:
 
-HTTP services
-=============
+Other HTTP services
+===================
 
 .. tip:: In most distributions, the ``http`` module is available from a
    separate package ``knot-resolver-module-http``. The module isn't packaged
@@ -14,17 +14,17 @@ server which provides few built-in services and also allows other
 modules to export restful APIs and websocket streams.
 
 One example is statistics module that can stream live metrics on the website,
-or publish metrics on request for Prometheus scraper, and also :ref:`mod-http-doh`.
+or publish metrics on request for Prometheus scraper.
 
 By default this module provides two kinds of endpoints,
 and unlimited number of "used-defined kinds" can be added in configuration.
 
 +--------------+---------------------------------------------------------------------------------+
-| **Endpoint** | **Explanation**                                                                 |
-+--------------+---------------------------------------------------------------------------------+
-| doh          | :ref:`mod-http-doh`                                                             |
+| **Kind**     | **Explanation**                                                                 |
 +--------------+---------------------------------------------------------------------------------+
 | webmgmt      | :ref:`built-in web management <mod-http-built-in-services>` APIs (includes DoH) |
++--------------+---------------------------------------------------------------------------------+
+| doh          | :ref:`mod-http-doh`                                                             |
 +--------------+---------------------------------------------------------------------------------+
 
 Each network address and port combination can be configured to expose
@@ -124,6 +124,21 @@ Major drawback is that current browsers won't do HTTP/2 over insecure connection
    they currently won't be shared.
    It's assumed that you don't want a self-signed certificate for serious deployments anyway.
 
+.. _mod-http-doh:
+
+Legacy DNS-over-HTTPS (DoH)
+---------------------------
+
+.. warning:: The DoH implementation using ``http`` module is deprecated. It has
+   known performance and stability issues that won't be fixed. Use
+   :ref:`dns-over-https` instead.
+
+This was an experimental implementation of :rfc:`8484`. It was configured using
+``doh`` kind in :func:`net.listen`. Its configuration (such as certificates)
+took place in ``http.config()``.
+
+Queries were served on ``/doh`` and ``/dns-query`` endpoints.
+
 .. _mod-http-built-in-services:
 
 Built-in services
@@ -137,7 +152,8 @@ The HTTP module has several built-in services to use.
  "``/stats``", "Statistics/metrics", "Exported :ref:`metrics <mod-stats-list>` from :ref:`mod-stats` in JSON format."
  "``/metrics``", "Prometheus metrics", "Exported metrics for Prometheus_."
  "``/trace/:name/:type``", "Tracking", ":ref:`Trace resolution <mod-http-trace>` of a DNS query and return the verbose logs."
- "``/doh``", "DNS-over-HTTP", ":rfc:`8484` endpoint, see :ref:`mod-http-doh`."
+ "``/doh``", "Legacy DNS-over-HTTPS", ":rfc:`8484` endpoint, see :ref:`mod-http-doh`."
+ "``/dns-query``", "Legacy DNS-over-HTTPS", ":rfc:`8484` endpoint, see :ref:`mod-http-doh`."
 
 Dependencies
 ------------
