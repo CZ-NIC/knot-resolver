@@ -2,8 +2,8 @@
 
 .. _mod-http-doh:
 
-DNS-over-HTTP (DoH)
-===================
+DNS-over-HTTPS (DoH)
+====================
 
 .. warning::
 
