@@ -270,6 +270,9 @@ typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t 
 
 void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 			uint16_t type, uint16_t rclass, uint32_t ttl);
+
+typedef bool (*addr_info_f)(struct sockaddr*);
+typedef void (*async_resolution_f)(knot_dname_t, enum knot_rr_type);
 struct kr_query {
 	struct kr_query *parent;
 	knot_dname_t *sname;
