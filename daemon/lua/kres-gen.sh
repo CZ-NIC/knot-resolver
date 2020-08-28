@@ -139,7 +139,6 @@ void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 
 ## Some definitions would need too many deps, so shorten them.
 
-genResType "struct kr_nsrep" | sed '/union/,$ d'
 printf "\t/* beware: hidden stub, to avoid hardcoding sockaddr lengths */\n};\n"
 
 genResType "struct kr_query"
