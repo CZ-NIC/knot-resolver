@@ -126,7 +126,6 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	# lib/module.h
 	struct kr_prop
 	struct kr_module
-	struct kr_transport
 	struct kr_server_selection
 EOF
 
@@ -146,6 +145,9 @@ void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 genResType "struct kr_query"
 
 genResType "struct kr_context"
+
+echo "struct kr_transport" | ${CDEFS} ${KRESD} types | sed '/struct {/,$ d'
+printf "\t/* beware: hidden stub, to avoid hardcoding sockaddr lengths */\n};\n"
 
 ## libknot API
 ${CDEFS} libknot functions <<-EOF
@@ -273,6 +275,7 @@ printf "\t/* beware: hidden stub, to avoid hardcoding sockaddr lengths */\n};\n"
 
 echo "struct qr_task" | ${CDEFS} ${KRESD} types | sed '/pktbuf/,$ d'
 printf "\t/* beware: hidden stub, to avoid qr_tasklist_t */\n};\n"
+
 
 ${CDEFS} ${KRESD} functions <<-EOF
 	worker_resolve_exec
