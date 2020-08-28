@@ -168,15 +168,6 @@ struct rtt_state calc_rtt_state(struct rtt_state old, unsigned new_rtt) {
     return ret;
 }
 
-// Allows the selection algorithm to start asynchronous NS name resolution for future use
-void async_ns_resolution(knot_dname_t *name, enum knot_rr_type type) {
-    struct kr_qflags flags;
-    memset(&flags, 0, sizeof(struct kr_qflags));
-    knot_pkt_t* pkt = worker_resolve_mk_pkt_dname(name, type, KNOT_CLASS_IN, &flags);
-    worker_resolve_start(pkt, flags);
-    free(pkt);
-}
-
 bool zonecut_changed(knot_dname_t *new, knot_dname_t *old) {
     return knot_dname_cmp(old, new);
 }
@@ -247,7 +238,7 @@ void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct
     trie_it_free(it);
 }
 
-void iter_get_tls_capable_peers(trie_t *addresses) {
+void iter_get_tls_capable_peers(trie_t *addresses, struct kr_request *req) {
     trie_it_t *it;
     for(it = trie_it_begin(addresses); !trie_it_finished(it); trie_it_next(it)) {
             size_t address_len;
@@ -257,17 +248,12 @@ void iter_get_tls_capable_peers(trie_t *addresses) {
             bytes_to_ip(address, address_len, &tmp_address);
 
             struct iter_address_state *address_state = (struct iter_address_state *)*trie_it_val(it);
-            tls_client_param_t *tls_entry = tls_client_param_get(the_worker->engine->net.tls_client_params, &tmp_address.ip);
-            if (tls_entry) {
-                address_state->tls_capable = true;
-            } else {
-                address_state->tls_capable = false;
-            }
+            address_state->tls_capable = req->selection_context.is_tls_capable ? req->selection_context.is_tls_capable(&tmp_address.ip) : false;
     }
     trie_it_free(it);
 }
 
-void iter_get_tcp_open_connections(trie_t *addresses) {
+void iter_get_tcp_open_connections(trie_t *addresses, struct kr_request *req) {
     trie_it_t *it;
     for(it = trie_it_begin(addresses); !trie_it_finished(it); trie_it_next(it)) {
             size_t address_len;
@@ -277,16 +263,8 @@ void iter_get_tcp_open_connections(trie_t *addresses) {
             bytes_to_ip(address, address_len, &tmp_address);
 
             struct iter_address_state *address_state = (struct iter_address_state *)*trie_it_val(it);
-            if (worker_find_tcp_connected(the_worker, &tmp_address.ip)) {
-                address_state->tcp_connected = true;
-            } else {
-                address_state->tcp_connected = false;
-            }
-            if (worker_find_tcp_waiting(the_worker, &tmp_address.ip)) {
-                address_state->tcp_waiting = true;
-            } else {
-                address_state->tcp_waiting = false;
-            }
+            address_state->tcp_connected = req->selection_context.is_tcp_connected ? req->selection_context.is_tcp_connected(&tmp_address.ip) : false;
+            address_state->tcp_waiting = req->selection_context.is_tcp_waiting ? req->selection_context.is_tcp_waiting(&tmp_address.ip) : false;
     }
     trie_it_free(it);
 }
@@ -318,12 +296,12 @@ void iter_local_state_init(struct knot_mm *mm, void **local_state) {
 
 
 void forward_local_state_init(struct knot_mm *mm, void **local_state, struct kr_request *req) {
-    assert(req->forwarding_targets);
+    assert(req->selection_context.forwarding_targets);
     *local_state = mm_alloc(mm, sizeof(struct forward_local_state));
     memset(*local_state, 0, sizeof(struct forward_local_state));
 
     struct forward_local_state *forward_state = (struct forward_local_state *)*local_state;
-    forward_state->targets = req->forwarding_targets;
+    forward_state->targets = req->selection_context.forwarding_targets;
 }
 
 
@@ -432,8 +410,8 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
     iter_update_state_from_rtt_cache(local_state, &qry->request->ctx->cache);
 
     // Consider going through the trie only once by refactoring these:
-    iter_get_tls_capable_peers(local_state->addresses);
-    iter_get_tcp_open_connections(local_state->addresses);
+    iter_get_tls_capable_peers(local_state->addresses, qry->request);
+    iter_get_tcp_open_connections(local_state->addresses, qry->request);
     iter_get_network_settings(local_state->addresses, qry->flags.NO_IPV4, qry->flags.NO_IPV4);
 
     // also take qry->flags.TCP into consideration (do that in the actual choosing function)
@@ -598,10 +576,10 @@ void kr_server_selection_init(struct kr_query *qry) {
 }
 
 int kr_forward_add_target(struct kr_request *req, size_t index, const struct sockaddr *sock) {
-    if (!req->forwarding_targets) {
-        req->forwarding_targets = mm_alloc(&req->pool, req->forward_targets_num * sizeof(struct sockaddr));
+    if (!req->selection_context.forwarding_targets) {
+        req->selection_context.forwarding_targets = mm_alloc(&req->pool, req->selection_context.forward_targets_num * sizeof(struct sockaddr));
     }
-    req->forwarding_targets[index] = *sock;
+    req->selection_context.forwarding_targets[index] = *sock;
     return kr_ok();
 }
 

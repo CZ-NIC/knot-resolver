@@ -258,6 +258,28 @@ static int subreq_key(char *dst, knot_pkt_t *pkt)
 			knot_pkt_qtype(pkt), knot_pkt_qtype(pkt));
 }
 
+/* Helper functions for transport selection */
+static inline bool is_tls_capable(struct sockaddr *address) {
+	tls_client_param_t *tls_entry = tls_client_param_get(the_worker->engine->net.tls_client_params, address);
+	return tls_entry;
+}
+
+static inline bool is_tcp_connected(struct sockaddr *address) {
+	return worker_find_tcp_connected(the_worker, address);
+}
+
+static inline bool is_tcp_waiting(struct sockaddr *address) {
+	return worker_find_tcp_waiting(the_worker, address);
+}
+
+void async_ns_resolution(knot_dname_t *name, enum knot_rr_type type) {
+    struct kr_qflags flags;
+    memset(&flags, 0, sizeof(struct kr_qflags));
+    knot_pkt_t* pkt = worker_resolve_mk_pkt_dname(name, type, KNOT_CLASS_IN, &flags);
+    worker_resolve_start(pkt, flags);
+    free(pkt);
+}
+
 /** Create and initialize a request_ctx (on a fresh mempool).
  *
  * handle and addr point to the source of the request, and they are NULL
@@ -302,6 +324,10 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		memcpy(&ctx->source.addr.ip, peer, kr_sockaddr_len(peer));
 		req->qsource.addr = &ctx->source.addr.ip;
 	}
+
+	req->selection_context.is_tls_capable = is_tls_capable;
+	req->selection_context.is_tcp_connected = is_tcp_connected;
+	req->selection_context.is_tcp_waiting = is_tcp_waiting;
 
 	worker->stats.rconcurrent += 1;
 

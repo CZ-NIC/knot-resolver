@@ -224,8 +224,14 @@ struct kr_request {
 	trace_callback_f trace_finish; /**< Request finish tracepoint */
 	int vars_ref; /**< Reference to per-request variable table. LUA_NOREF if not set. */
 	knot_mm_t pool;
-	struct sockaddr *forwarding_targets; /**< When forwarding, possible targets are put here */
-	size_t forward_targets_num;
+	struct {
+		bool (*is_tls_capable)(struct sockaddr*);
+		bool (*is_tcp_connected)(struct sockaddr*);
+		bool (*is_tcp_waiting)(struct sockaddr*);
+		void (*async_ns_resolution)(knot_dname_t , enum knot_rr_type);
+		struct sockaddr *forwarding_targets; /**< When forwarding, possible targets are put here */
+		size_t forward_targets_num;
+	} selection_context;
 	unsigned int uid; /** for logging purposes only */
 };
 
