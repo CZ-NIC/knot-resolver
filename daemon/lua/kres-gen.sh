@@ -71,6 +71,8 @@ typedef void *(*map_alloc_f)(void *, size_t);
 typedef void (*map_free_f)(void *baton, void *ptr);
 typedef void (*trace_log_f) (const struct kr_request *, const char *);
 typedef void (*trace_callback_f)(struct kr_request *);
+typedef bool (*addr_info_f)(struct sockaddr*);
+typedef void (*async_resolution_f)(knot_dname_t, enum knot_rr_type);
 "
 
 ${CDEFS} ${LIBKRES} types <<-EOF
@@ -135,12 +137,6 @@ typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t 
 
 void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 			uint16_t type, uint16_t rclass, uint32_t ttl);
-"
-
-
-printf "
-typedef bool (*addr_info_f)(struct sockaddr*);
-typedef void (*async_resolution_f)(knot_dname_t, enum knot_rr_type);
 "
 
 ## Some definitions would need too many deps, so shorten them.
