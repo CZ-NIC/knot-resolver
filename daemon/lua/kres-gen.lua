@@ -177,7 +177,7 @@ struct kr_request {
 	} qsource;
 	struct {
 		unsigned int rtt;
-		const struct sockaddr *addr;
+		const struct kr_transport *transport;
 	} upstream;
 	struct kr_qflags options;
 	int state;
@@ -192,6 +192,14 @@ struct kr_request {
 	trace_callback_f trace_finish;
 	int vars_ref;
 	knot_mm_t pool;
+	struct {
+		_Bool (*is_tls_capable)(struct sockaddr *);
+		_Bool (*is_tcp_connected)(struct sockaddr *);
+		_Bool (*is_tcp_waiting)(struct sockaddr *);
+		void (*async_ns_resolution)(knot_dname_t, enum knot_rr_type);
+		struct sockaddr *forwarding_targets;
+		size_t forward_targets_num;
+	} selection_context;
 	unsigned int uid;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
@@ -262,11 +270,6 @@ typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t 
 
 void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 			uint16_t type, uint16_t rclass, uint32_t ttl);
-struct kr_nsrep {
-	unsigned int score;
-	unsigned int reputation;
-	const knot_dname_t *name;
-	struct kr_context *ctx;
 	/* beware: hidden stub, to avoid hardcoding sockaddr lengths */
 };
 struct kr_query {
@@ -289,7 +292,7 @@ struct kr_query {
 	struct kr_query *cname_parent;
 	struct kr_request *request;
 	kr_stale_cb stale_cb;
-	struct kr_nsrep ns;
+	struct kr_server_selection server_selection;
 };
 struct kr_context {
 	struct kr_qflags options;
@@ -298,6 +301,13 @@ struct kr_context {
 	map_t negative_anchors;
 	struct kr_zonecut root_hints;
 	struct kr_cache cache;
+	unsigned int cache_rtt_tout_retry_interval;
+	module_array_t *modules;
+	struct kr_cookie_ctx cookie_ctx;
+	kr_cookie_lru_t *cache_cookie;
+	int32_t tls_padding;
+	knot_mm_t *pool;
+};
 	char _stub[];
 };
 const char *knot_strerror(int);
@@ -328,7 +338,7 @@ struct kr_query *kr_rplan_push(struct kr_rplan *, struct kr_query *, const knot_
 int kr_rplan_pop(struct kr_rplan *, struct kr_query *);
 struct kr_query *kr_rplan_resolved(struct kr_rplan *);
 struct kr_query *kr_rplan_last(struct kr_rplan *);
-int kr_nsrep_set(struct kr_query *, size_t, const struct sockaddr *);
+int kr_forward_add_target(struct kr_request *, size_t, const struct sockaddr *);
 void kr_log_req(const struct kr_request * const, uint32_t, const unsigned int, const char *, const char *, ...);
 void kr_log_q(const struct kr_query * const, const char *, const char *, ...);
 int kr_make_query(struct kr_query *, knot_pkt_t *);
