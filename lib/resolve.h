@@ -173,6 +173,9 @@ struct kr_request_qsource_flags {
 	bool http:1; /**< true if the request is on HTTP; only meaningful if (dst_addr). */
 };
 
+typedef bool (*addr_info_f)(struct sockaddr*);
+typedef void (*async_resolution_f)(knot_dname_t, enum knot_rr_type);
+
 /**
  * Name resolution request.
  *
@@ -225,10 +228,10 @@ struct kr_request {
 	int vars_ref; /**< Reference to per-request variable table. LUA_NOREF if not set. */
 	knot_mm_t pool;
 	struct {
-		bool (*is_tls_capable)(struct sockaddr*);
-		bool (*is_tcp_connected)(struct sockaddr*);
-		bool (*is_tcp_waiting)(struct sockaddr*);
-		void (*async_ns_resolution)(knot_dname_t , enum knot_rr_type);
+		addr_info_f is_tls_capable;
+		addr_info_f is_tcp_connected;
+		addr_info_f is_tcp_waiting;
+		async_resolution_f async_ns_resolution;
 		struct sockaddr *forwarding_targets; /**< When forwarding, possible targets are put here */
 		size_t forward_targets_num;
 	} selection_context;
