@@ -270,8 +270,6 @@ typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t 
 
 void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 			uint16_t type, uint16_t rclass, uint32_t ttl);
-	/* beware: hidden stub, to avoid hardcoding sockaddr lengths */
-};
 struct kr_query {
 	struct kr_query *parent;
 	knot_dname_t *sname;
