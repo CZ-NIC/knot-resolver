@@ -61,6 +61,14 @@ struct kr_cdb_api {};
 struct lru {};
 "
 
+${CDEFS} ${LIBKRES} types <<-EOF
+	knot_section_t
+	knot_rrinfo_t
+	knot_dname_t
+	#knot_rdata_t
+	#knot_rdataset_t
+EOF
+
 # The generator doesn't work well with typedefs of functions.
 printf "
 typedef struct knot_mm {
@@ -71,17 +79,6 @@ typedef void *(*map_alloc_f)(void *, size_t);
 typedef void (*map_free_f)(void *baton, void *ptr);
 typedef void (*trace_log_f) (const struct kr_request *, const char *);
 typedef void (*trace_callback_f)(struct kr_request *);
-"
-
-${CDEFS} ${LIBKRES} types <<-EOF
-	knot_section_t
-	knot_rrinfo_t
-	knot_dname_t
-	#knot_rdata_t
-	#knot_rdataset_t
-EOF
-
-printf "
 typedef bool (*addr_info_f)(struct sockaddr*);
 typedef void (*async_resolution_f)(knot_dname_t*, enum knot_rr_type);
 "
@@ -129,6 +126,8 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	# lib/module.h
 	struct kr_prop
 	struct kr_module
+	struct kr_transport
+	struct kr_server_selection
 EOF
 
 # a static variable; the line might not be simple to generate
@@ -146,8 +145,7 @@ void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 
 genResType "struct kr_query"
 
-genResType "struct kr_context" | sed '/kr_nsrep_rtt_lru_t/,$ d'
-printf "\tchar _stub[];\n};\n"
+genResType "struct kr_context"
 
 ## libknot API
 ${CDEFS} libknot functions <<-EOF

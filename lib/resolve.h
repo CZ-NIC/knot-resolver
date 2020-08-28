@@ -174,7 +174,7 @@ struct kr_request_qsource_flags {
 };
 
 typedef bool (*addr_info_f)(struct sockaddr*);
-typedef void (*async_resolution_f)(knot_dname_t, enum knot_rr_type);
+typedef void (*async_resolution_f)(knot_dname_t*, enum knot_rr_type);
 
 /**
  * Name resolution request.
