@@ -60,6 +60,8 @@ struct libknot_lmdb_env {
 };
 
 
+static int cdb_commit(knot_db_t *db, struct kr_cdb_stats *stats);
+
 /** @brief Convert LMDB error code. */
 static int lmdb_error(int error)
 {
@@ -88,6 +90,26 @@ static inline MDB_val val_knot2mdb(knot_db_val_t v)
 	return (MDB_val){ .mv_size = v.len, .mv_data = v.data };
 }
 
+/** Refresh mapsize value from file, including env->mapsize.
+ * It's much lighter than reopen_env(). */
+static int refresh_mapsize(struct lmdb_env *env)
+{
+	int ret = cdb_commit(env, NULL);
+	if (!ret) ret = lmdb_error(mdb_env_set_mapsize(env->env, 0));
+	if (ret) return ret;
+
+	MDB_envinfo info;
+	ret = lmdb_error(mdb_env_info(env->env, &info));
+	if (ret) return ret;
+
+	env->mapsize = info.me_mapsize;
+	if (env->mapsize != env->st_size) {
+		kr_log_info("[cache] suspicious size of cache file: %zu != %zu\n",
+				(size_t)env->st_size, env->mapsize);
+	}
+	return kr_ok();
+}
+
 #define FLAG_RENEW (2*MDB_RDONLY)
 /** mdb_txn_begin or _renew + handle retries in some situations
  *
@@ -114,10 +136,9 @@ retry:
 
 	if (unlikely(ret == MDB_MAP_RESIZED)) {
 		kr_log_info("[cache] detected size increased by another process\n");
-		ret = mdb_env_set_mapsize(env->env, 0);
-		if (ret == MDB_SUCCESS) {
+		ret = refresh_mapsize(env);
+		if (ret == 0)
 			goto retry;
-		}
 	} else if (unlikely(ret == MDB_READERS_FULL)) {
 		int cleared;
 		ret = mdb_reader_check(env->env, &cleared);
@@ -179,7 +200,7 @@ static int cdb_commit(knot_db_t *db, struct kr_cdb_stats *stats)
 	struct lmdb_env *env = db;
 	int ret = kr_ok();
 	if (env->txn.rw) {
-		stats->commit++;
+		if (stats) stats->commit++;
 		ret = lmdb_error(mdb_txn_commit(env->txn.rw));
 		env->txn.rw = NULL; /* the transaction got freed even in case of errors */
 	} else if (env->txn.ro && env->txn.ro_active) {
@@ -294,7 +315,6 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, size_t mapsize,
 		mapsize = (mapsize / pagesize) * pagesize;
 		ret = mdb_env_set_mapsize(env->env, mapsize);
 		if (ret != MDB_SUCCESS) goto error_mdb;
-		env->mapsize = mapsize;
 	}
 
 	/* Cache doesn't require durability, we can be
@@ -302,14 +322,6 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, size_t mapsize,
 	const unsigned flags = MDB_WRITEMAP | MDB_MAPASYNC | MDB_NOTLS;
 	ret = mdb_env_open(env->env, path, flags, LMDB_FILE_MODE);
 	if (ret != MDB_SUCCESS) goto error_mdb;
-
-	{
-		// Always get the real mapsize.  Shrinking can be restricted, etc.
-		MDB_envinfo info;
-		ret = mdb_env_info(env->env, &info);
-		if (ret != MDB_SUCCESS) goto error_mdb;
-		env->mapsize = mapsize = info.me_mapsize;
-	}
 
 	mdb_filehandle_t fd = -1;
 	ret = mdb_env_get_fd(env->env, &fd);
@@ -323,9 +335,14 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, size_t mapsize,
 	env->st_dev = st.st_dev;
 	env->st_ino = st.st_ino;
 	env->st_size = st.st_size;
-	if (env->st_size != env->mapsize)
-		kr_log_verbose("[cache] suspicious size of cache file: %zu != %zu\n",
-				(size_t)env->st_size, env->mapsize);
+
+	/* Get the real mapsize.  Shrinking can be restricted, etc.
+	 * Unfortunately this is only reliable when not setting the size explicitly. */
+	if (!size_requested) {
+		ret = refresh_mapsize(env);
+		if (ret) goto error_sys;
+		mapsize = env->mapsize;
+	}
 
 	/* Open the database. */
 	MDB_txn *txn = NULL;
@@ -455,22 +472,21 @@ static int cdb_check_health(knot_db_t *db, struct kr_cdb_stats *stats)
 		return kr_error(ret);
 		// FIXME: if the file doesn't exist?
 	}
-	if (st.st_dev == env->st_dev && st.st_ino == env->st_ino) {
-		if (st.st_size == env->st_size)
-			return kr_ok();
-		/* Cache check through file size works OK without reopening,
-		 * contrary to methods based on mdb_env_info(). */
-		kr_log_info("[cache] detected size change by another process: %zu -> %zu\n",
-				(size_t)env->st_size, (size_t)st.st_size);
-		int ret = cdb_commit(db, stats);
-		if (!ret) ret = lmdb_error(mdb_env_set_mapsize(env->env, st.st_size));
-		if (!ret) env->mapsize = st.st_size;
-		env->st_size = st.st_size; // avoid retrying in cycle even if it failed
-		return kr_error(ret);
+
+	if (st.st_dev != env->st_dev || st.st_ino != env->st_ino) {
+		kr_log_verbose("[cache] cache file has been replaced, reopening\n");
+		int ret = reopen_env(env, stats);
+		return ret == 0 ? 1 : ret;
 	}
-	kr_log_verbose("[cache] cache file has been replaced, reopening\n");
-	int ret = reopen_env(env, stats);
-	return ret == 0 ? 1 : ret;
+
+	/* Cache check through file size works OK without reopening,
+	 * contrary to methods based on mdb_env_info(). */
+	if (st.st_size == env->st_size)
+		return kr_ok();
+	kr_log_info("[cache] detected file size change by another process: %zu -> %zu\n",
+			(size_t)env->st_size, (size_t)st.st_size);
+	env->st_size = st.st_size; // avoid retrying in cycle even if we fail
+	return refresh_mapsize(env);
 }
 
 static int cdb_clear(knot_db_t *db, struct kr_cdb_stats *stats)
