@@ -310,11 +310,7 @@ struct kr_context {
 	struct kr_zonecut root_hints;
 	struct kr_cache cache;
 	unsigned int cache_rtt_tout_retry_interval;
-	module_array_t *modules;
-	struct kr_cookie_ctx cookie_ctx;
-	kr_cookie_lru_t *cache_cookie;
-	int32_t tls_padding;
-	knot_mm_t *pool;
+	char _stub[];
 };
 struct kr_transport {
 	knot_dname_t *name;
