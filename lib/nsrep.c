@@ -291,6 +291,26 @@ void iter_get_tcp_open_connections(trie_t *addresses) {
     trie_it_free(it);
 }
 
+void iter_get_network_settings(trie_t *addresses, bool no_ipv4, bool no_ipv6) {
+    trie_it_t *it;
+    for(it = trie_it_begin(addresses); !trie_it_finished(it); trie_it_next(it)) {
+            size_t address_len;
+            uint8_t* address = (uint8_t *)trie_it_key(it, &address_len);
+
+            union inaddr tmp_address;
+            bytes_to_ip(address, address_len, &tmp_address);
+
+            struct iter_address_state *address_state = (struct iter_address_state *)*trie_it_val(it);
+            if (no_ipv4 && address_len == sizeof(struct in_addr)) {
+                address_state->generation = -1; // Invalidate due to IPv4 being disabled in flags
+            }
+            if (no_ipv6 && address_len == sizeof(struct in6_addr)) {
+                address_state->generation = -1; // Invalidate due to IPv6 being disabled in flags
+            }
+    }
+    trie_it_free(it);
+}
+
 void iter_local_state_init(struct knot_mm *mm, void **local_state) {
     *local_state = mm_alloc(mm, sizeof(struct iter_local_state));
     memset(*local_state, 0, sizeof(struct iter_local_state));
@@ -403,7 +423,7 @@ struct kr_transport *iter_get_best_transport(struct choice choices[],
 }
 
 // Prepares all the data for selection. The naming sucks currently. So TODO renaming.
-// Maybe factor the preparation out and have this be function that calls one and than the other function.
+// Maybe factor the preparation out and have this be function that calls one and then the other function.
 void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport) {
     struct knot_mm *mempool = qry->request->rplan.pool;
     struct iter_local_state *local_state = (struct iter_local_state *)qry->server_selection.local_state;
@@ -414,6 +434,7 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
     // Consider going through the trie only once by refactoring these:
     iter_get_tls_capable_peers(local_state->addresses);
     iter_get_tcp_open_connections(local_state->addresses);
+    iter_get_network_settings(local_state->addresses, qry->flags.NO_IPV4, qry->flags.NO_IPV4);
 
     // also take qry->flags.TCP into consideration (do that in the actual choosing function)
 

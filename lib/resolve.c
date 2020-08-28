@@ -1318,7 +1318,6 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 			qry->flags.AWAIT_IPV4 = false;
 			qry->flags.AWAIT_IPV6 = false;
 		}
-		printf("ns_resolve_addr ret: %d\n", ret);
 		ITERATE_LAYERS(request, qry, reset);
 		return KR_STATE_PRODUCE;
 	}
