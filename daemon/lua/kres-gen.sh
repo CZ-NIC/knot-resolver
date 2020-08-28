@@ -137,6 +137,12 @@ void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 			uint16_t type, uint16_t rclass, uint32_t ttl);
 "
 
+
+printf "
+typedef bool (*addr_info_f)(struct sockaddr*);
+typedef void (*async_resolution_f)(knot_dname_t, enum knot_rr_type);
+"
+
 ## Some definitions would need too many deps, so shorten them.
 
 genResType "struct kr_query"
