@@ -17,8 +17,6 @@ typedef void *(*map_alloc_f)(void *, size_t);
 typedef void (*map_free_f)(void *baton, void *ptr);
 typedef void (*trace_log_f) (const struct kr_request *, const char *);
 typedef void (*trace_callback_f)(struct kr_request *);
-typedef bool (*addr_info_f)(struct sockaddr*);
-typedef void (*async_resolution_f)(knot_dname_t, enum knot_rr_type);
 typedef enum {KNOT_ANSWER, KNOT_AUTHORITY, KNOT_ADDITIONAL} knot_section_t;
 typedef struct {
 	uint16_t pos;
@@ -26,6 +24,9 @@ typedef struct {
 	uint16_t compress_ptr[16];
 } knot_rrinfo_t;
 typedef unsigned char knot_dname_t;
+
+typedef bool (*addr_info_f)(struct sockaddr*);
+typedef void (*async_resolution_f)(knot_dname_t*, enum knot_rr_type);
 typedef struct {
 	knot_dname_t *_owner;
 	uint32_t _ttl;
