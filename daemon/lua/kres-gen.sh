@@ -144,8 +144,8 @@ void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 
 genResType "struct kr_query"
 
-genResType "struct kr_context" | ${CDEFS} ${KRESD} types | sed '/module_array_t/,$ d'
-printf "\t/* beware: hidden stub, to avoid module_array_t */\n};\n"
+genResType "struct kr_context" | sed '/kr_nsrep_rtt_lru_t/,$ d'
+printf "\tchar _stub[];\n};\n"
 
 
 echo "struct kr_transport" | ${CDEFS} ${KRESD} types | sed '/union /,$ d'
