@@ -8,7 +8,7 @@
 #include <libknot/dname.h>
 #include <libknot/codes.h>
 
-#include "lib/nsrep.h"
+#include "lib/selection.h"
 #include "lib/cache/api.h"
 #include "lib/zonecut.h"
 

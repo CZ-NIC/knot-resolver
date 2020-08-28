@@ -13,7 +13,7 @@
 #include "lib/layer.h"
 #include "lib/generic/map.h"
 #include "lib/generic/array.h"
-#include "lib/nsrep.h"
+#include "lib/selection.h"
 #include "lib/rplan.h"
 #include "lib/module.h"
 #include "lib/cache/api.h"

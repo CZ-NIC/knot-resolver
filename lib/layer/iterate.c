@@ -29,7 +29,7 @@
 #include "lib/resolve.h"
 #include "lib/rplan.h"
 #include "lib/defines.h"
-#include "lib/nsrep.h"
+#include "lib/selection.h"
 #include "lib/module.h"
 #include "lib/dnssec/ta.h"
 
