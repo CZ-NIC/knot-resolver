@@ -266,13 +266,6 @@ struct kr_module {
 	void *lib;
 	void *data;
 };
-struct kr_transport {
-	knot_dname_t *name;
-	union inaddr address;
-	size_t address_len;
-	enum kr_transport_protocol protocol;
-	unsigned int timeout;
-};
 struct kr_server_selection {
 	_Bool initialized;
 	void (*choose_transport)(struct kr_query *, struct kr_transport **);
@@ -322,6 +315,10 @@ struct kr_context {
 	kr_cookie_lru_t *cache_cookie;
 	int32_t tls_padding;
 	knot_mm_t *pool;
+};
+struct kr_transport {
+	knot_dname_t *name;
+	/* beware: hidden stub, to avoid hardcoding sockaddr lengths */
 };
 const char *knot_strerror(int);
 knot_dname_t *knot_dname_copy(const knot_dname_t *, knot_mm_t *);
