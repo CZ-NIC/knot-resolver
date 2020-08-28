@@ -21,7 +21,7 @@
 #include "kresconfig.h"
 #include "daemon/engine.h"
 #include "daemon/ffimodule.h"
-#include "lib/nsrep.h"
+#include "lib/selection.h"
 #include "lib/cache/api.h"
 #include "lib/defines.h"
 #include "lib/cache/cdb_lmdb.h"

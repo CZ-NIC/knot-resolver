@@ -23,7 +23,7 @@
 #include "lib/utils.h"
 #include "lib/defines.h"
 #include "lib/module.h"
-#include "lib/nsrep.h"
+#include "lib/selection.h"
 
 #define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "vldr", __VA_ARGS__)
 
