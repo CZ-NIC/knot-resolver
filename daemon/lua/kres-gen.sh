@@ -71,8 +71,6 @@ typedef void *(*map_alloc_f)(void *, size_t);
 typedef void (*map_free_f)(void *baton, void *ptr);
 typedef void (*trace_log_f) (const struct kr_request *, const char *);
 typedef void (*trace_callback_f)(struct kr_request *);
-typedef bool (*addr_info_f)(struct sockaddr*);
-typedef void (*async_resolution_f)(knot_dname_t, enum knot_rr_type);
 "
 
 ${CDEFS} ${LIBKRES} types <<-EOF
@@ -82,6 +80,11 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	#knot_rdata_t
 	#knot_rdataset_t
 EOF
+
+printf "
+typedef bool (*addr_info_f)(struct sockaddr*);
+typedef void (*async_resolution_f)(knot_dname_t*, enum knot_rr_type);
+"
 
 genResType() {
 	echo "$1" | ${CDEFS} ${LIBKRES} types
