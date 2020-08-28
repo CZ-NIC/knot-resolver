@@ -193,10 +193,10 @@ struct kr_request {
 	int vars_ref;
 	knot_mm_t pool;
 	struct {
-		_Bool (*is_tls_capable)(struct sockaddr *);
-		_Bool (*is_tcp_connected)(struct sockaddr *);
-		_Bool (*is_tcp_waiting)(struct sockaddr *);
-		void (*async_ns_resolution)(knot_dname_t, enum knot_rr_type);
+		addr_info_f is_tls_capable;
+		addr_info_f is_tcp_connected;
+		addr_info_f is_tcp_waiting;
+		async_resolution_f async_ns_resolution;
 		struct sockaddr *forwarding_targets;
 		size_t forward_targets_num;
 	} selection_context;
