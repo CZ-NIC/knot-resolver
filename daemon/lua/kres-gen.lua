@@ -199,7 +199,7 @@ struct kr_request {
 		addr_info_f is_tcp_connected;
 		addr_info_f is_tcp_waiting;
 		async_resolution_f async_ns_resolution;
-		struct sockaddr *forwarding_targets;
+		union inaddr *forwarding_targets;
 		size_t forward_targets_num;
 	} selection_context;
 	unsigned int uid;

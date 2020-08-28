@@ -232,7 +232,7 @@ struct kr_request {
 		addr_info_f is_tcp_connected;
 		addr_info_f is_tcp_waiting;
 		async_resolution_f async_ns_resolution;
-		struct sockaddr *forwarding_targets; /**< When forwarding, possible targets are put here */
+		union inaddr *forwarding_targets; /**< When forwarding, possible targets are put here */
 		size_t forward_targets_num;
 	} selection_context;
 	unsigned int uid; /** for logging purposes only */
