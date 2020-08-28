@@ -146,7 +146,7 @@ genResType "struct kr_query"
 
 genResType "struct kr_context"
 
-echo "struct kr_transport" | ${CDEFS} ${KRESD} types | sed '/union {/,$ d'
+echo "struct kr_transport" | ${CDEFS} ${KRESD} types | sed '/union /,$ d'
 printf "\t/* beware: hidden stub, to avoid hardcoding sockaddr lengths */\n};\n"
 
 ## libknot API
