@@ -42,7 +42,7 @@ struct iter_name_state {
 };
 
 // To be held per IP address and locally
-struct iter_address_state {
+struct address_state {
     unsigned int generation;
     struct rtt_state rtt_state;
     knot_dname_t *name;
@@ -50,21 +50,24 @@ struct iter_address_state {
     bool tcp_waiting : 1;
     bool tcp_connected : 1;
 
+    int forward_index;
 	int success_count;
     int error_count;
 	int errors[KR_SELECTION_NUMBER_OF_ERRORS];
 };
 
 struct forward_local_state {
-    struct sockaddr *targets;
+    union inaddr *targets;
     size_t target_num;
+    struct address_state *addr_states;
+    size_t last_choice_index;
 };
 
 // Array of these is one of inputs for the actual selection algorithm (`iter_get_best_transport`)
 struct choice {
     uint8_t *address;
     size_t address_len;
-    struct iter_address_state *address_state;
+    struct address_state *address_state;
 };
 
 
@@ -177,7 +180,7 @@ void iter_update_state_from_rtt_cache(struct iter_local_state *local_state, stru
     for(it = trie_it_begin(local_state->addresses); !trie_it_finished(it); trie_it_next(it)) {
         size_t address_len;
         uint8_t *address = (uint8_t *)trie_it_key(it, &address_len);
-        struct iter_address_state *address_state = (struct iter_address_state *)*trie_it_val(it);
+        struct address_state *address_state = (struct address_state *)*trie_it_val(it);
         address_state->rtt_state = get_rtt_state(address, address_len, cache);
         union inaddr addr;
         bytes_to_ip(address, address_len, &addr);
@@ -225,10 +228,10 @@ void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct
                 trie_val_t *val = trie_get_ins(local_state->addresses, (char *)address, address_len);
                 if (!*val) {
                     // We have have not seen this address before.
-                    *val = mm_alloc(mm, sizeof(struct iter_address_state));
-                    memset(*val, 0, sizeof(struct iter_address_state));
+                    *val = mm_alloc(mm, sizeof(struct address_state));
+                    memset(*val, 0, sizeof(struct address_state));
                 }
-                struct iter_address_state *address_state = (*(struct iter_address_state **)val);
+                struct address_state *address_state = (*(struct address_state **)val);
                 address_state->generation = current_generation;
                 address_state->name = dname;
             }
@@ -238,55 +241,22 @@ void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct
     trie_it_free(it);
 }
 
-void iter_get_tls_capable_peers(trie_t *addresses, struct kr_request *req) {
-    trie_it_t *it;
-    for(it = trie_it_begin(addresses); !trie_it_finished(it); trie_it_next(it)) {
-            size_t address_len;
-            uint8_t* address = (uint8_t *)trie_it_key(it, &address_len);
-
-            union inaddr tmp_address;
-            bytes_to_ip(address, address_len, &tmp_address);
-
-            struct iter_address_state *address_state = (struct iter_address_state *)*trie_it_val(it);
-            address_state->tls_capable = req->selection_context.is_tls_capable ? req->selection_context.is_tls_capable(&tmp_address.ip) : false;
-    }
-    trie_it_free(it);
+void check_tls_capable(struct address_state *address_state, struct kr_request *req, struct sockaddr *address) {
+    address_state->tls_capable = req->selection_context.is_tls_capable ? req->selection_context.is_tls_capable(address) : false;
 }
 
-void iter_get_tcp_open_connections(trie_t *addresses, struct kr_request *req) {
-    trie_it_t *it;
-    for(it = trie_it_begin(addresses); !trie_it_finished(it); trie_it_next(it)) {
-            size_t address_len;
-            uint8_t* address = (uint8_t *)trie_it_key(it, &address_len);
-
-            union inaddr tmp_address;
-            bytes_to_ip(address, address_len, &tmp_address);
-
-            struct iter_address_state *address_state = (struct iter_address_state *)*trie_it_val(it);
-            address_state->tcp_connected = req->selection_context.is_tcp_connected ? req->selection_context.is_tcp_connected(&tmp_address.ip) : false;
-            address_state->tcp_waiting = req->selection_context.is_tcp_waiting ? req->selection_context.is_tcp_waiting(&tmp_address.ip) : false;
-    }
-    trie_it_free(it);
+void check_tcp_connections(struct address_state *address_state, struct kr_request *req, struct sockaddr *address) {
+    address_state->tcp_connected = req->selection_context.is_tcp_connected ? req->selection_context.is_tcp_connected(address) : false;
+    address_state->tcp_waiting = req->selection_context.is_tcp_waiting ? req->selection_context.is_tcp_waiting(address) : false;
 }
 
-void iter_get_network_settings(trie_t *addresses, bool no_ipv4, bool no_ipv6) {
-    trie_it_t *it;
-    for(it = trie_it_begin(addresses); !trie_it_finished(it); trie_it_next(it)) {
-            size_t address_len;
-            uint8_t* address = (uint8_t *)trie_it_key(it, &address_len);
-
-            union inaddr tmp_address;
-            bytes_to_ip(address, address_len, &tmp_address);
-
-            struct iter_address_state *address_state = (struct iter_address_state *)*trie_it_val(it);
-            if (no_ipv4 && address_len == sizeof(struct in_addr)) {
+void check_network_settings(struct address_state *address_state, size_t address_len, bool no_ipv4, bool no_ipv6) {
+    if (no_ipv4 && address_len == sizeof(struct in_addr)) {
                 address_state->generation = -1; // Invalidate due to IPv4 being disabled in flags
-            }
-            if (no_ipv6 && address_len == sizeof(struct in6_addr)) {
-                address_state->generation = -1; // Invalidate due to IPv6 being disabled in flags
-            }
     }
-    trie_it_free(it);
+    if (no_ipv6 && address_len == sizeof(struct in6_addr)) {
+        address_state->generation = -1; // Invalidate due to IPv6 being disabled in flags
+    }
 }
 
 void iter_local_state_init(struct knot_mm *mm, void **local_state) {
@@ -302,6 +272,10 @@ void forward_local_state_init(struct knot_mm *mm, void **local_state, struct kr_
 
     struct forward_local_state *forward_state = (struct forward_local_state *)*local_state;
     forward_state->targets = req->selection_context.forwarding_targets;
+    forward_state->target_num = req->selection_context.forward_targets_num;
+
+    forward_state->addr_states = mm_alloc(mm, sizeof(struct address_state) * forward_state->target_num);
+    memset(forward_state->addr_states, 0, sizeof(struct address_state) * forward_state->target_num);
 }
 
 
@@ -321,15 +295,14 @@ int cmp_choices(const void *a, const void *b) {
 
 #define ERROR_LIMIT 2
 
-// Return a pointer to newly chosen (and allocated) transport. NULL if there is no choice.
 // Performs the actual selection (currently epsilon-greedy with epsilon = 0.05).
-struct kr_transport *iter_get_best_transport(struct choice choices[],
+struct kr_transport *choose_transport(struct choice choices[],
                                              int choices_len,
                                              knot_dname_t **unresolved,
                                              int unresolved_len,
-                                             struct iter_local_state *local_state,
                                              struct knot_mm *mempool,
-                                             bool tcp) {
+                                             bool tcp,
+                                             size_t *out_forward_index) {
 
     struct kr_transport *transport = mm_alloc(mempool, sizeof(struct kr_transport));
     memset(transport, 0, sizeof(struct kr_transport));
@@ -396,12 +369,15 @@ struct kr_transport *iter_get_best_transport(struct choice choices[],
         break;
     }
 
+    if (out_forward_index) {
+        *out_forward_index = choices[choice].address_state->forward_index;
+    }
+
     return transport;
 
 }
 
-// Prepares all the data for selection. The naming sucks currently. So TODO renaming.
-// Maybe factor the preparation out and have this be function that calls one and then the other function.
+
 void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport) {
     struct knot_mm *mempool = qry->request->rplan.pool;
     struct iter_local_state *local_state = (struct iter_local_state *)qry->server_selection.local_state;
@@ -409,10 +385,20 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
     iter_update_state_from_zonecut(local_state, &qry->zone_cut, mempool);
     iter_update_state_from_rtt_cache(local_state, &qry->request->ctx->cache);
 
-    // Consider going through the trie only once by refactoring these:
-    iter_get_tls_capable_peers(local_state->addresses, qry->request);
-    iter_get_tcp_open_connections(local_state->addresses, qry->request);
-    iter_get_network_settings(local_state->addresses, qry->flags.NO_IPV4, qry->flags.NO_IPV4);
+    trie_it_t *it;
+    for(it = trie_it_begin(local_state->addresses); !trie_it_finished(it); trie_it_next(it)) {
+            size_t address_len;
+            uint8_t* address = (uint8_t *)trie_it_key(it, &address_len);
+
+            union inaddr tmp_address;
+            bytes_to_ip(address, address_len, &tmp_address);
+
+            struct address_state *address_state = (struct address_state *)*trie_it_val(it);
+            check_tls_capable(address_state, qry->request, &tmp_address.ip);
+            check_tcp_connections(address_state, qry->request, &tmp_address.ip);
+            check_network_settings(address_state, address_len, qry->flags.NO_IPV4, qry->flags.NO_IPV6);
+    }
+    trie_it_free(it);
 
     // also take qry->flags.TCP into consideration (do that in the actual choosing function)
 
@@ -422,13 +408,11 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
     struct choice choices[num_addresses]; // Some will get unused, oh well
     knot_dname_t *unresolved_names[num_unresolved_names];
 
-    trie_it_t *it;
-
     int valid_addresses = 0;
     for(it = trie_it_begin(local_state->addresses); !trie_it_finished(it); trie_it_next(it)) {
         size_t address_len;
         uint8_t* address = (uint8_t *)trie_it_key(it, &address_len);
-        struct iter_address_state *address_state = (struct iter_address_state *)*trie_it_val(it);
+        struct address_state *address_state = (struct address_state *)*trie_it_val(it);
         if (address_state->generation == local_state->generation) {
             choices[valid_addresses].address = address;
             choices[valid_addresses].address_len = address_len;
@@ -452,7 +436,7 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
     trie_it_free(it);
 
     if (valid_addresses || to_resolve) {
-        *transport = iter_get_best_transport(choices, valid_addresses, unresolved_names, to_resolve, local_state, mempool, qry->flags.TCP);
+        *transport = choose_transport(choices, valid_addresses, unresolved_names, to_resolve, mempool, qry->flags.TCP, NULL);
     } else {
         *transport = NULL;
     }
@@ -469,7 +453,7 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 	}
 }
 
-struct iter_address_state *get_address_state(struct iter_local_state *local_state, const struct kr_transport *transport) {
+struct address_state *get_address_state(struct iter_local_state *local_state, const struct kr_transport *transport) {
 	trie_t *addresses = local_state->addresses;
 	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
 
@@ -478,7 +462,7 @@ struct iter_address_state *get_address_state(struct iter_local_state *local_stat
 	if (!address_state) {
 		assert(0);
 	}
-	return (struct iter_address_state *)*address_state;
+	return (struct address_state *)*address_state;
 }
 
 void iter_success(struct kr_query *qry, const struct kr_transport *transport) {
@@ -487,20 +471,24 @@ void iter_success(struct kr_query *qry, const struct kr_transport *transport) {
     }
 
 	struct iter_local_state *local_state = qry->server_selection.local_state;
-	struct iter_address_state *addr_state = get_address_state(local_state, transport);
+	struct address_state *addr_state = get_address_state(local_state, transport);
 
 	addr_state->success_count++;
 }
 
-void iter_update_rtt(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt) {
+void forward_success(struct kr_query *qry, const struct kr_transport *transport) {
     if (!transport) {
         return;
     }
 
-	struct iter_local_state *local_state = qry->server_selection.local_state;
-	struct iter_address_state *addr_state = get_address_state(local_state, transport);
-	struct kr_cache *cache = &qry->request->ctx->cache;
+	struct forward_local_state *local_state = qry->server_selection.local_state;
+	struct address_state *addr_state = &local_state->addr_states[local_state->last_choice_index];
 
+	addr_state->success_count++;
+}
+
+void update_rtt(struct kr_query *qry, struct address_state *addr_state, const struct kr_transport *transport, unsigned rtt) {
+    struct kr_cache *cache = &qry->request->ctx->cache;
     struct rtt_state new_rtt_state = calc_rtt_state(addr_state->rtt_state, rtt);
     uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
 	put_rtt_state(address, transport->address_len, new_rtt_state, cache);
@@ -517,18 +505,31 @@ void iter_update_rtt(struct kr_query *qry, const struct kr_transport *transport,
 	}
 }
 
-void iter_error(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error error) {
+void iter_update_rtt(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt) {
     if (!transport) {
         return;
     }
 
-    if (error >= KR_SELECTION_NUMBER_OF_ERRORS) {
-        assert(0);
+	struct iter_local_state *local_state = qry->server_selection.local_state;
+	struct address_state *addr_state = get_address_state(local_state, transport);
+
+    update_rtt(qry, addr_state, transport, rtt);
+
+}
+
+void forward_update_rtt(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt) {
+    if (!transport) {
+        return;
     }
 
-	struct iter_local_state *local_state = qry->server_selection.local_state;
-	struct iter_address_state *addr_state = get_address_state(local_state, transport);
-	addr_state->errors[error]++;
+	struct forward_local_state *local_state = qry->server_selection.local_state;
+	struct address_state *addr_state = &local_state->addr_states[local_state->last_choice_index];
+
+    update_rtt(qry, addr_state, transport, rtt);
+}
+
+void error(struct kr_query *qry, struct address_state *addr_state, const struct kr_transport *transport, enum kr_selection_error sel_error) {
+    addr_state->errors[sel_error]++;
     addr_state->error_count++;
 
     WITH_VERBOSE(qry) {
@@ -539,16 +540,76 @@ void iter_error(struct kr_query *qry, const struct kr_transport *transport, enum
 
 	VERBOSE_MSG(qry,
 			"=> id: '%05u' noting selection error: '%s'@'%s' zone cut: '%s' error no.:%d\n",
-			qry->id, ns_name, ns_str ? ns_str : "", zonecut_str, error);
+			qry->id, ns_name, ns_str ? ns_str : "", zonecut_str, sel_error);
 	}
 }
 
-// TODO: Forwarding functions
-void forward_choose_transport(struct kr_query *qry, struct kr_transport **transport) {return;}
-void forward_success(struct kr_query *qry, const struct kr_transport *transport) {return;}
-void forward_update_rtt(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt) {return;}
-void forward_error(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error error) {return;}
+void iter_error(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error sel_error) {
+    if (!transport) {
+        return;
+    }
 
+    if (sel_error >= KR_SELECTION_NUMBER_OF_ERRORS) {
+        assert(0);
+    }
+
+	struct iter_local_state *local_state = qry->server_selection.local_state;
+	struct address_state *addr_state = get_address_state(local_state, transport);
+	error(qry, addr_state, transport, sel_error);
+}
+
+void forward_error(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error sel_error) {
+    struct forward_local_state *local_state = qry->server_selection.local_state;
+	struct address_state *addr_state = &local_state->addr_states[local_state->last_choice_index];
+	error(qry, addr_state, transport, sel_error);
+}
+
+// TODO: Forwarding functions
+void forward_choose_transport(struct kr_query *qry, struct kr_transport **transport) {
+    struct forward_local_state *local_state = qry->server_selection.local_state;
+    struct choice choices[local_state->target_num];
+    int valid = 0;
+
+    for (int i = 0; i < local_state->target_num; i++) {
+        union inaddr *address = &local_state->targets[i];
+        size_t addr_len;
+        switch (address->ip.sa_family) {
+            case AF_INET:
+                addr_len = sizeof(struct in_addr);
+                break;
+            case AF_INET6:
+                addr_len = sizeof(struct in6_addr);
+                break;
+            default:
+                assert(0);
+        }
+
+        struct address_state *addr_state = &local_state->addr_states[i];
+        addr_state->name = (knot_dname_t *)"";
+        check_tls_capable(addr_state, qry->request, &address->ip);
+        check_tcp_connections(addr_state, qry->request, &address->ip);
+        check_network_settings(addr_state, addr_len, qry->flags.NO_IPV4, qry->flags.NO_IPV6);
+
+        if(addr_state->generation == -1) {
+            continue;
+        }
+        addr_state->forward_index = i;
+
+        addr_state->rtt_state = get_rtt_state(ip_to_bytes(address, addr_len), addr_len, &qry->request->ctx->cache);
+        const char *ns_str = kr_straddr(&address->ip);
+        if (VERBOSE_STATUS) {
+            printf("[nsrep] rtt of %s is %d, variance is %d\n", ns_str, addr_state->rtt_state.srtt, addr_state->rtt_state.variance);
+        }
+
+        choices[valid++] = (struct choice){
+            .address = ip_to_bytes(address, addr_len),
+            .address_len = addr_len,
+            .address_state = addr_state,
+        };
+    }
+
+    *transport = choose_transport(choices, valid, NULL, 0, &qry->request->pool, qry->flags.TCP, &local_state->last_choice_index);
+}
 
 void kr_server_selection_init(struct kr_query *qry) {
     struct knot_mm *mempool = &qry->request->pool;
@@ -577,9 +638,20 @@ void kr_server_selection_init(struct kr_query *qry) {
 
 int kr_forward_add_target(struct kr_request *req, size_t index, const struct sockaddr *sock) {
     if (!req->selection_context.forwarding_targets) {
-        req->selection_context.forwarding_targets = mm_alloc(&req->pool, req->selection_context.forward_targets_num * sizeof(struct sockaddr));
+        req->selection_context.forwarding_targets = mm_alloc(&req->pool, req->selection_context.forward_targets_num * sizeof(union inaddr));
     }
-    req->selection_context.forwarding_targets[index] = *sock;
+
+    switch (sock->sa_family) {
+        case AF_INET:
+            req->selection_context.forwarding_targets[index].ip4 = *(const struct sockaddr_in *)sock;
+            break;
+        case AF_INET6:
+            req->selection_context.forwarding_targets[index].ip6 = *(const struct sockaddr_in6 *)sock;
+            break;
+        default:
+            return kr_error(EINVAL);
+    }
+
     return kr_ok();
 }
 
