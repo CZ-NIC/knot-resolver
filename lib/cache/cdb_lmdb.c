@@ -286,7 +286,7 @@ static void cdb_close_env(struct lmdb_env *env, struct kr_cdb_stats *stats)
 }
 
 /** We assume that *env is zeroed and we return it zeroed on errors. */
-static int cdb_open_env(struct lmdb_env *env, const char *path, size_t mapsize,
+static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t mapsize,
 		struct kr_cdb_stats *stats)
 {
 	int ret = mkdir(path, LMDB_DIR_MODE);
@@ -312,8 +312,8 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, size_t mapsize,
 
 	const bool size_requested = mapsize;
 	if (size_requested) {
-		mapsize = (mapsize / pagesize) * pagesize;
-		ret = mdb_env_set_mapsize(env->env, mapsize);
+		env->mapsize = (mapsize / pagesize) * pagesize;
+		ret = mdb_env_set_mapsize(env->env, env->mapsize);
 		if (ret != MDB_SUCCESS) goto error_mdb;
 	}
 
@@ -341,7 +341,6 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, size_t mapsize,
 	if (!size_requested) {
 		ret = refresh_mapsize(env);
 		if (ret) goto error_sys;
-		mapsize = env->mapsize;
 	}
 
 	/* Open the database. */
