@@ -36,8 +36,8 @@ void *prefix_key(const uint8_t *ip, size_t len) {
 
 #undef PREFIX
 
-#define DEFAULT_TIMEOUT 400
-const struct rtt_state default_rtt_state = {0, DEFAULT_TIMEOUT/4};
+#define DEFAULT_TIMEOUT 200
+const struct rtt_state default_rtt_state = {0, DEFAULT_TIMEOUT/4, 0};
 
 struct rtt_state get_rtt_state(const uint8_t *ip, size_t len, struct kr_cache *cache) {
     struct rtt_state state = {0,0};
@@ -101,26 +101,28 @@ uint8_t* ip_to_bytes(const union inaddr *src, size_t len) {
 }
 
 bool no_rtt_info(struct rtt_state s) {
-    return s.srtt == 0;
+    return s.srtt == 0 && s.consecutive_timeouts == 0;
 }
 
 #define MINIMAL_TIMEOUT_ADDITION 20
 
 // This is verbatim (minus the default timeout value and minimal variance) RFC2988, sec. 2
 int32_t calc_timeout(struct rtt_state state) {
-    return state.srtt + MAX(4 * state.variance, MINIMAL_TIMEOUT_ADDITION);
+    int32_t timeout = state.srtt + MAX(4 * state.variance, MINIMAL_TIMEOUT_ADDITION);
+    return timeout * (1 << state.consecutive_timeouts);
 }
 
 // This is verbatim RFC2988, sec. 2
 struct rtt_state calc_rtt_state(struct rtt_state old, unsigned new_rtt) {
     if (no_rtt_info(old)) {
-        return (struct rtt_state){new_rtt, new_rtt/2};
+        return (struct rtt_state){new_rtt, new_rtt/2, 0};
     }
 
     struct rtt_state ret;
 
     ret.srtt = 0.75 * old.srtt + 0.25 * new_rtt;
     ret.variance = 0.875 * old.variance + 0.125 * abs(old.srtt - new_rtt);
+    ret.consecutive_timeouts = 0;
 
     return ret;
 }
@@ -219,7 +221,7 @@ struct kr_transport *choose_transport(struct choice choices[],
     *transport = (struct kr_transport) {
         .name = choices[choice].address_state->name,
         .protocol = tcp ? KR_TRANSPORT_TCP : KR_TRANSPORT_UDP,
-        .timeout = calc_timeout(choices[choice].address_state->rtt_state),
+        .timeout = timeout,
     };
 
 
@@ -286,6 +288,18 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state, const st
 	}
 }
 
+void cache_timeout(const struct kr_transport *transport, struct address_state *addr_state, struct kr_cache *cache) {
+    uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
+    struct rtt_state old_state = addr_state->rtt_state;
+    struct rtt_state cur_state = get_rtt_state(address, transport->address_len, cache);
+
+    // We can lose some update from other process here, but at least timeout count can't blow up
+    if (cur_state.consecutive_timeouts == old_state.consecutive_timeouts) {
+        cur_state.consecutive_timeouts++;
+        put_rtt_state(address, transport->address_len, cur_state, cache);
+    }
+}
+
 
 void error(struct kr_query *qry, struct address_state *addr_state, const struct kr_transport *transport, enum kr_selection_error sel_error) {
     if (!transport) {
@@ -298,6 +312,7 @@ void error(struct kr_query *qry, struct address_state *addr_state, const struct 
 
     if (sel_error == KR_SELECTION_TIMEOUT) {
         qry->server_selection.timeouts++;
+        cache_timeout(transport, addr_state, &qry->request->ctx->cache);
     }
 
     addr_state->errors[sel_error]++;
