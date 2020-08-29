@@ -38,7 +38,7 @@ Cache
 Nameservers
 -----------
 
-.. doxygenfile:: nsrep.h
+.. doxygenfile:: selection.h
    :project: libkres
 .. doxygenfile:: zonecut.h
    :project: libkres
