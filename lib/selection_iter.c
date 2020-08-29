@@ -95,7 +95,7 @@ void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct
         } else {
             // We have some addresses to work with, let's iterate over them
             for(uint8_t *obj = pack_head(*addresses); obj != pack_tail(*addresses); obj = pack_obj_next(obj)) {
-                uint8_t *address = (uint8_t *)pack_obj_val(obj);
+                uint8_t *address = pack_obj_val(obj);
                 size_t address_len = pack_obj_len(obj);
                 trie_val_t *val = trie_get_ins(local_state->addresses, (char *)address, address_len);
                 if (!*val) {
@@ -193,7 +193,6 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 }
 
 void iter_success(struct kr_query *qry, const struct kr_transport *transport) {
-    return;
 }
 
 void iter_error(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error sel_error) {
