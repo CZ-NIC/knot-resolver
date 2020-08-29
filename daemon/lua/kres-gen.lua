@@ -285,6 +285,7 @@ struct kr_server_selection {
 	void (*success)(struct kr_query *, const struct kr_transport *);
 	void (*update_rtt)(struct kr_query *, const struct kr_transport *, unsigned int);
 	void (*error)(struct kr_query *, const struct kr_transport *, enum kr_selection_error);
+	int timeouts;
 	void *local_state;
 };
 kr_layer_t kr_layer_t_static;
