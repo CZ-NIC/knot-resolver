@@ -139,9 +139,6 @@ end
 function policy.TLS_FORWARD(targets)
 	if type(targets) ~= 'table' or #targets < 1 then
 		error('TLS_FORWARD argument must be a non-empty table')
-	elseif #targets > 4 then
-		error('TLS_FORWARD supports at most four targets (in a single call)')
-	end
 
 	local sockaddr_c_set = {}
 	local nslist = {} -- to persist in closure of the returned function
@@ -176,7 +173,7 @@ function policy.TLS_FORWARD(targets)
 		qry.flags.AWAIT_CUT = true
 		req.options.TCP = true
 		qry.flags.TCP = true
-		set_nslist(qry, nslist)
+		set_nslist(req, nslist)
 		return state
 	end
 end
