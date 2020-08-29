@@ -255,8 +255,10 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state, const st
     }
 
     struct kr_cache *cache = &qry->request->ctx->cache;
-    struct rtt_state new_rtt_state = calc_rtt_state(addr_state->rtt_state, rtt);
+
     uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
+    struct rtt_state cur_rtt_state = get_rtt_state(address, transport->address_len, cache);
+    struct rtt_state new_rtt_state = calc_rtt_state(cur_rtt_state, rtt);
 	put_rtt_state(address, transport->address_len, new_rtt_state, cache);
 
     WITH_VERBOSE(qry) {
