@@ -37,6 +37,12 @@ struct address_state *get_address_state(struct iter_local_state *local_state, co
 	trie_val_t *address_state = trie_get_try(addresses, (char *)address, transport->address_len);
 
 	if (!address_state) {
+        printf("%p\n", transport);
+        KR_DNAME_GET_STR(ns_name, transport->name);
+        const char *ns_str = kr_straddr(&transport->address.ip);
+        printf(
+        "crashing with %s @ %s '\n",
+        ns_name, ns_str ? ns_str : "");
 		assert(0);
 	}
 	return (struct address_state *)*address_state;
