@@ -30,7 +30,7 @@
 void *prefix_key(const uint8_t *ip, size_t len) {
     void *key = malloc(len+1);
     *(char*) key = KEY_PREFIX;
-    memcpy(key+1, ip, len);
+    memcpy((uint8_t *)key+1, ip, len);
     return key;
 }
 
@@ -40,7 +40,7 @@ void *prefix_key(const uint8_t *ip, size_t len) {
 const struct rtt_state default_rtt_state = {0, DEFAULT_TIMEOUT/4, 0};
 
 struct rtt_state get_rtt_state(const uint8_t *ip, size_t len, struct kr_cache *cache) {
-    struct rtt_state state = {0,0};
+    struct rtt_state state;
     knot_db_val_t value;
     knot_db_t *db = cache->db;
     struct kr_cdb_stats *stats = &cache->stats;
@@ -120,8 +120,8 @@ struct rtt_state calc_rtt_state(struct rtt_state old, unsigned new_rtt) {
 
     struct rtt_state ret;
 
-    ret.srtt = 0.75 * old.srtt + 0.25 * new_rtt;
-    ret.variance = 0.875 * old.variance + 0.125 * abs(old.srtt - new_rtt);
+    ret.srtt = (int32_t)(0.75 * old.srtt + 0.25 * new_rtt);
+    ret.variance = (int32_t)(0.875 * old.variance + 0.125 * abs(old.srtt - (int32_t)new_rtt));
     ret.consecutive_timeouts = 0;
 
     return ret;
