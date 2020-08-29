@@ -218,9 +218,18 @@ struct kr_transport *choose_transport(struct choice choices[],
         timeout *= 1 << timeouts;
     }
 
+    enum kr_transport_protocol protocol;
+    if (choices[choice].address_state->tls_capable) {
+        protocol = KR_TRANSPORT_TLS;
+    } else if (tcp) {
+        protocol = KR_TRANSPORT_TCP;
+    } else {
+        protocol = KR_TRANSPORT_UDP;
+    }
+
     *transport = (struct kr_transport) {
         .name = choices[choice].address_state->name,
-        .protocol = tcp ? KR_TRANSPORT_TCP : KR_TRANSPORT_UDP,
+        .protocol = protocol,
         .timeout = timeout,
     };
 
