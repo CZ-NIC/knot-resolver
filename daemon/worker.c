@@ -122,7 +122,7 @@ static int worker_add_tcp_waiting(struct worker_ctx *worker,
 struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
 					       const struct sockaddr *addr);
 static void on_tcp_connect_timeout(uv_timer_t *timer);
-static void on_udp_timeout(uv_timer_t *req);
+static void on_udp_timeout(uv_timer_t *timer);
 static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_source, knot_pkt_t *pkt);
 
 
@@ -1514,7 +1514,7 @@ static int qr_task_step(struct qr_task *task,
 	/* We're done, no more iterations needed */
 	if (state & (KR_STATE_DONE|KR_STATE_FAIL)) {
 		return qr_task_finalize(task, state);
-	} else if (!task->transport->protocol) {
+	} else if (!task->transport || !task->transport->protocol) {
 		return qr_task_step(task, NULL, NULL);
 	}
 
