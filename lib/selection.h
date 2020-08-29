@@ -66,6 +66,7 @@ int kr_forward_add_target(struct kr_request *req, size_t index, const struct soc
 struct rtt_state {
     int32_t srtt;
     int32_t variance;
+    int32_t consecutive_timeouts;
 };
 
 // To be held per IP address and locally
