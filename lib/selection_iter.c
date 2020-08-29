@@ -171,7 +171,7 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
     trie_it_free(it);
 
     if (valid_addresses || to_resolve) {
-        *transport = choose_transport(choices, valid_addresses, unresolved_names, to_resolve, mempool, qry->flags.TCP, NULL);
+        *transport = choose_transport(choices, valid_addresses, unresolved_names, to_resolve, qry->server_selection.timeouts, mempool, qry->flags.TCP, NULL);
     } else {
         *transport = NULL;
     }
