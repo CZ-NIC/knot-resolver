@@ -270,6 +270,10 @@ void error(struct kr_query *qry, struct address_state *addr_state, const struct 
         assert(0);
     }
 
+    if (sel_error == KR_SELECTION_TIMEOUT) {
+        qry->server_selection.timeouts++;
+    }
+
     addr_state->errors[sel_error]++;
     addr_state->error_count++;
 

@@ -51,6 +51,7 @@ struct kr_server_selection
     void (*update_rtt)(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt);
     void (*error)(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error error);
 
+    int timeouts;
     void *local_state;
 };
 
