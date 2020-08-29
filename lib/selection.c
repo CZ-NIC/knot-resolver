@@ -46,7 +46,7 @@ struct rtt_state get_rtt_state(const uint8_t *ip, size_t len, struct kr_cache *c
     knot_db_val_t key = {.len = len + 1, .data = prefixed_ip};
 
     if(cache->api->read(db, stats, &key, &value, 1)) {
-        state = (struct rtt_state){-1, -1}; // No value
+        state = (struct rtt_state){-1, -1, 0}; // No value
     } else {
         assert(value.len == sizeof(struct rtt_state));
         state = *(struct rtt_state *)value.data;
@@ -102,24 +102,32 @@ uint8_t* ip_to_bytes(const union inaddr *src, size_t len) {
 
 // This is verbatim (minus the default timeout value and minimal variance) RFC2988, sec. 2
 int32_t calc_timeout(struct rtt_state state) {
+    int32_t ret;
     if (state.srtt == -1 && state.variance == -1) {
-        return DEFAULT_TIMEOUT;
+        ret = DEFAULT_TIMEOUT;
+    } else {
+        ret = state.srtt + MAX(4 * state.variance, MINIMAL_TIMEOUT_ADDITION);
     }
-    return state.srtt + MAX(4 * state.variance, MINIMAL_TIMEOUT_ADDITION);
+    return ret * (1 << state.consecutive_timeouts); // Exponential back off.
 }
 
 // This is verbatim RFC2988, sec. 2
 struct rtt_state calc_rtt_state(struct rtt_state old, unsigned new_rtt) {
     if (old.srtt == -1 && old.variance == -1) {
-        return (struct rtt_state){new_rtt, new_rtt/2};
+        return (struct rtt_state){new_rtt, new_rtt/2, 0};
     }
 
     struct rtt_state ret;
 
     ret.srtt = 0.75 * old.srtt + 0.25 * new_rtt;
     ret.variance = 0.875 * old.variance + 0.125 * abs(old.srtt - new_rtt);
+    ret.consecutive_timeouts = 0;
 
     return ret;
+}
+
+bool no_rtt_info(struct rtt_state s) {
+    return s.srtt == -1 && s.variance == -1 && s.consecutive_timeouts == 0;
 }
 
 void check_tls_capable(struct address_state *address_state, struct kr_request *req, struct sockaddr *address) {
@@ -133,7 +141,7 @@ void check_tcp_connections(struct address_state *address_state, struct kr_reques
 
 void check_network_settings(struct address_state *address_state, size_t address_len, bool no_ipv4, bool no_ipv6) {
     if (no_ipv4 && address_len == sizeof(struct in_addr)) {
-                address_state->generation = -1; // Invalidate due to IPv4 being disabled in flags
+        address_state->generation = -1; // Invalidate due to IPv4 being disabled in flags
     }
     if (no_ipv6 && address_len == sizeof(struct in6_addr)) {
         address_state->generation = -1; // Invalidate due to IPv6 being disabled in flags
@@ -162,6 +170,7 @@ struct kr_transport *choose_transport(struct choice choices[],
                                              knot_dname_t **unresolved,
                                              int unresolved_len,
                                              struct knot_mm *mempool,
+                                             int timeouts,
                                              bool tcp,
                                              size_t *out_forward_index) {
 
@@ -192,10 +201,18 @@ struct kr_transport *choose_transport(struct choice choices[],
         }
     }
 
+    unsigned timeout = calc_timeout(choices[choice].address_state->rtt_state);
+    if (no_rtt_info(choices[choice].address_state->rtt_state) && timeouts) {
+        // We have no information about chosen server and we have timed out in this query before.
+        // We therefore do a exponential back-off.
+        // This takes care of zones where many servers are slower than DEFAULT_TIMEOUT.
+        timeout *= (1 << timeouts);
+    }
+
     *transport = (struct kr_transport) {
         .name = choices[choice].address_state->name,
         .protocol = tcp ? KR_TRANSPORT_TCP : KR_TRANSPORT_UDP,
-        .timeout = calc_timeout(choices[choice].address_state->rtt_state),
+        .timeout = timeout,
     };
 
 
@@ -243,6 +260,8 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state, const st
         return;
     }
 
+    // We actually got a answer, so no need to back off the timeout again
+    qry->server_selection.timeouts = 0;
     struct kr_cache *cache = &qry->request->ctx->cache;
     struct rtt_state new_rtt_state = calc_rtt_state(addr_state->rtt_state, rtt);
     uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
@@ -268,6 +287,11 @@ void error(struct kr_query *qry, struct address_state *addr_state, const struct 
 
     if (sel_error >= KR_SELECTION_NUMBER_OF_ERRORS) {
         assert(0);
+    }
+
+    if (sel_error == KR_SELECTION_TIMEOUT) {
+        qry->server_selection.timeouts++;
+        addr_state->rtt_state.consecutive_timeouts++;
     }
 
     addr_state->errors[sel_error]++;

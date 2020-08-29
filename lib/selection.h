@@ -51,6 +51,7 @@ struct kr_server_selection
     void (*update_rtt)(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt);
     void (*error)(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error error);
 
+    int timeouts;
     void *local_state;
 };
 
@@ -65,6 +66,7 @@ int kr_forward_add_target(struct kr_request *req, size_t index, const struct soc
 struct rtt_state {
     int32_t srtt;
     int32_t variance;
+    int32_t consecutive_timeouts;
 };
 
 // To be held per IP address and locally
@@ -93,6 +95,7 @@ struct kr_transport *choose_transport(struct choice choices[],
                                              knot_dname_t **unresolved,
                                              int unresolved_len,
                                              struct knot_mm *mempool,
+                                             int timeouts,
                                              bool tcp,
                                              size_t *out_forward_index);
 void update_rtt(struct kr_query *qry, struct address_state *addr_state, const struct kr_transport *transport, unsigned rtt);
