@@ -36,6 +36,9 @@ void *prefix_key(const uint8_t *ip, size_t len) {
 
 #undef PREFIX
 
+#define DEFAULT_TIMEOUT 400
+const struct rtt_state default_rtt_state = {0, DEFAULT_TIMEOUT/4};
+
 struct rtt_state get_rtt_state(const uint8_t *ip, size_t len, struct kr_cache *cache) {
     struct rtt_state state = {0,0};
     knot_db_val_t value;
@@ -46,7 +49,7 @@ struct rtt_state get_rtt_state(const uint8_t *ip, size_t len, struct kr_cache *c
     knot_db_val_t key = {.len = len + 1, .data = prefixed_ip};
 
     if(cache->api->read(db, stats, &key, &value, 1)) {
-        state = (struct rtt_state){-1, -1}; // No value
+        state = default_rtt_state;
     } else {
         assert(value.len == sizeof(struct rtt_state));
         state = *(struct rtt_state *)value.data;
@@ -97,20 +100,20 @@ uint8_t* ip_to_bytes(const union inaddr *src, size_t len) {
     }
 }
 
-#define DEFAULT_TIMEOUT 200
+bool no_rtt_info(struct rtt_state s) {
+    return s.srtt == 0;
+}
+
 #define MINIMAL_TIMEOUT_ADDITION 20
 
 // This is verbatim (minus the default timeout value and minimal variance) RFC2988, sec. 2
 int32_t calc_timeout(struct rtt_state state) {
-    if (state.srtt == -1 && state.variance == -1) {
-        return DEFAULT_TIMEOUT;
-    }
     return state.srtt + MAX(4 * state.variance, MINIMAL_TIMEOUT_ADDITION);
 }
 
 // This is verbatim RFC2988, sec. 2
 struct rtt_state calc_rtt_state(struct rtt_state old, unsigned new_rtt) {
-    if (old.srtt == -1 && old.variance == -1) {
+    if (no_rtt_info(old)) {
         return (struct rtt_state){new_rtt, new_rtt/2};
     }
 
@@ -120,10 +123,6 @@ struct rtt_state calc_rtt_state(struct rtt_state old, unsigned new_rtt) {
     ret.variance = 0.875 * old.variance + 0.125 * abs(old.srtt - new_rtt);
 
     return ret;
-}
-
-bool no_rtt_info(struct rtt_state s) {
-    return s.srtt == -1 && s.variance == -1;
 }
 
 void check_tls_capable(struct address_state *address_state, struct kr_request *req, struct sockaddr *address) {
@@ -149,6 +148,9 @@ int cmp_choices(const void *a, const void *b) {
     struct choice *b_ = (struct choice *) b;
 
     int diff;
+    if ((diff = no_rtt_info(b_->address_state->rtt_state) - no_rtt_info(a_->address_state->rtt_state))) {
+        return diff;
+    }
     if ((diff = a_->address_state->error_count - b_->address_state->error_count)) {
         return diff;
     }
@@ -156,6 +158,16 @@ int cmp_choices(const void *a, const void *b) {
         return diff;
     }
     return 0;
+}
+
+void shuffle_choices(struct choice choices[], int choices_len) {
+    struct choice tmp;
+    for (int i = choices_len - 1; i > 0; i--) {
+        int j = kr_rand_bytes(1) % (i+1);
+        tmp = choices[i];
+        choices[i] = choices[j];
+        choices[j] = tmp;
+    }
 }
 
 #define ERROR_LIMIT 2
@@ -189,6 +201,7 @@ struct kr_transport *choose_transport(struct choice choices[],
         }
     } else {
         // EXPLOIT
+        shuffle_choices(choices, choices_len);
         qsort(choices, choices_len, sizeof(struct choice), cmp_choices);
         if (choices[0].address_state->error_count > ERROR_LIMIT) {
             return NULL;
