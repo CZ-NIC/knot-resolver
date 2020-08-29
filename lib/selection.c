@@ -122,6 +122,10 @@ struct rtt_state calc_rtt_state(struct rtt_state old, unsigned new_rtt) {
     return ret;
 }
 
+bool no_rtt_info(struct rtt_state s) {
+    return s.srtt == -1 && s.variance == -1;
+}
+
 void check_tls_capable(struct address_state *address_state, struct kr_request *req, struct sockaddr *address) {
     address_state->tls_capable = req->selection_context.is_tls_capable ? req->selection_context.is_tls_capable(address) : false;
 }
@@ -161,6 +165,7 @@ struct kr_transport *choose_transport(struct choice choices[],
                                              int choices_len,
                                              knot_dname_t **unresolved,
                                              int unresolved_len,
+                                             int timeouts,
                                              struct knot_mm *mempool,
                                              bool tcp,
                                              size_t *out_forward_index) {
@@ -190,6 +195,12 @@ struct kr_transport *choose_transport(struct choice choices[],
         } else {
             choice = 0;
         }
+    }
+
+    unsigned timeout = calc_timeout(choices[choice].address_state->rtt_state);
+    if (no_rtt_info(choices[choice].address_state->rtt_state)) {
+        // Exponential back-off when retrying after timeout and choosing an unknown server
+        timeout *= 1 << timeouts;
     }
 
     *transport = (struct kr_transport) {

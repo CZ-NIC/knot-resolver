@@ -93,6 +93,7 @@ struct kr_transport *choose_transport(struct choice choices[],
                                              int choices_len,
                                              knot_dname_t **unresolved,
                                              int unresolved_len,
+                                             int timeouts,
                                              struct knot_mm *mempool,
                                              bool tcp,
                                              size_t *out_forward_index);
