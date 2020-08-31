@@ -77,12 +77,19 @@ void forward_success(struct kr_query *qry, const struct kr_transport *transport)
 }
 
 void forward_error(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error sel_error) {
+    if (!qry->server_selection.initialized) {
+        return;
+    }
     struct forward_local_state *local_state = qry->server_selection.local_state;
 	struct address_state *addr_state = &local_state->addr_states[local_state->last_choice_index];
     error(qry, addr_state, transport, sel_error);
 }
 
 void forward_update_rtt(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt) {
+    if (!qry->server_selection.initialized) {
+        return;
+    }
+
     if (!transport) {
         return;
     }

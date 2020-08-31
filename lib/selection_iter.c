@@ -249,12 +249,18 @@ void iter_success(struct kr_query *qry, const struct kr_transport *transport) {
 }
 
 void iter_error(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error sel_error) {
+    if (!qry->server_selection.initialized) {
+        return;
+    }
 	struct iter_local_state *local_state = qry->server_selection.local_state;
 	struct address_state *addr_state = get_address_state(local_state, transport, qry->uid);
 	error(qry, addr_state, transport, sel_error);
 }
 
 void iter_update_rtt(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt) {
+    if (!qry->server_selection.initialized) {
+        return;
+    }
 	struct iter_local_state *local_state = qry->server_selection.local_state;
 	struct address_state *addr_state = get_address_state(local_state, transport, qry->uid);
     update_rtt(qry, addr_state, transport, rtt);
