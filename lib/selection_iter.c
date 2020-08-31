@@ -37,12 +37,6 @@ struct address_state *get_address_state(struct iter_local_state *local_state, co
 	trie_val_t *address_state = trie_get_try(addresses, (char *)address, transport->address_len);
 
 	if (!address_state) {
-        printf("%p\n", transport);
-        KR_DNAME_GET_STR(ns_name, transport->name);
-        const char *ns_str = kr_straddr(&transport->address.ip);
-        printf(
-        "crashing with %s @ %s '\n",
-        ns_name, ns_str ? ns_str : "");
 		assert(0);
 	}
 	return (struct address_state *)*address_state;
@@ -71,13 +65,25 @@ void iter_update_state_from_rtt_cache(struct iter_local_state *local_state, stru
 
 
 void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct kr_zonecut *zonecut, struct knot_mm *mm) {
-	if (zonecut_changed(zonecut->name, local_state->zonecut_name) ||
-        local_state->unresolved_names == NULL || local_state->addresses == NULL) {
+	if (local_state->unresolved_names == NULL || local_state->addresses == NULL) {
         // Local state initialization
         memset(local_state, 0, sizeof(struct iter_local_state));
         local_state->unresolved_names = trie_create(mm);
         local_state->addresses = trie_create(mm);
         local_state->zonecut_name = knot_dname_copy(zonecut->name, mm);
+    }
+
+    if (zonecut_changed(zonecut->name, local_state->zonecut_name)) {
+        // On zonecut change we invalidate all records in trie but we leave them there
+        // because there still might be packets in-flight that will produce some feedback
+        // once they arrive or timeout.
+        local_state->zonecut_name = knot_dname_copy(zonecut->name, mm);
+        trie_it_t *it;
+        for(it = trie_it_begin(local_state->addresses); !trie_it_finished(it); trie_it_next(it)) {
+            struct address_state *address_state = (struct address_state *)*trie_it_val(it);
+            address_state->generation = -1;
+        }
+        trie_it_free(it);
     }
 
     local_state->generation++;
