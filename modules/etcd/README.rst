@@ -42,5 +42,5 @@ Dependencies
 
 * `lua-etcd <https://github.com/mah0x211/lua-etcd>`_ library available in LuaRocks
 
-    ``$ luarocks install etcd --from=https://mah0x211.github.io/rocks/``
+    ``$ luarocks --lua-version 5.1 install etcd --from=https://mah0x211.github.io/rocks/``
 
