@@ -274,7 +274,7 @@ struct kr_transport *choose_transport(struct choice choices[],
 }
 
 void update_rtt(struct kr_query *qry, struct address_state *addr_state, const struct kr_transport *transport, unsigned rtt) {
-    if (!transport) {
+    if (!transport || !addr_state) {
         return;
     }
 
@@ -311,7 +311,7 @@ void cache_timeout(const struct kr_transport *transport, struct address_state *a
 
 
 void error(struct kr_query *qry, struct address_state *addr_state, const struct kr_transport *transport, enum kr_selection_error sel_error) {
-    if (!transport) {
+    if (!transport && !addr_state) {
         return;
     }
 
