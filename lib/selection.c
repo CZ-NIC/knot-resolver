@@ -362,7 +362,7 @@ void kr_server_selection_init(struct kr_query *qry) {
             .error = iter_error,
             .local_state = NULL,
         };
-        iter_local_state_init(mempool, &qry->server_selection.local_state);
+        iter_local_state_init(mempool, &qry->server_selection.local_state, qry->uid);
     }
 }
 

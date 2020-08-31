@@ -26,9 +26,10 @@ struct iter_name_state {
     unsigned int generation;
 };
 
-void iter_local_state_init(struct knot_mm *mm, void **local_state) {
+void iter_local_state_init(struct knot_mm *mm, void **local_state, uint32_t uid) {
     *local_state = mm_alloc(mm, sizeof(struct iter_local_state));
     memset(*local_state, 0, sizeof(struct iter_local_state));
+    ((struct iter_local_state *)local_state)->query_uid = uid;
 }
 
 struct address_state *get_address_state(struct iter_local_state *local_state, const struct kr_transport *transport, uint32_t uid) {
