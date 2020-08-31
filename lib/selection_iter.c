@@ -17,8 +17,6 @@ struct iter_local_state {
     trie_t *unresolved_names;
     trie_t *addresses;
     unsigned int generation; // Used to distinguish old and valid records in tries
-    knot_dname_t *zonecut_name;
-    uint32_t query_uid;
 };
 
 // To be held per NS name and locally
@@ -36,41 +34,17 @@ struct address_state *get_address_state(struct iter_local_state *local_state, co
         return NULL;
     }
 
-    if (uid != local_state->query_uid) {
-        // In rare cases, packet is stuck in-flight for so long that the kr_query structure
-        // is completely overwritten and the local state of the previous one is lost.
-        // We still could report and cache timeout of this packet for example, but this would be
-        // too much hassle, so we employ an ostrich algorithm and lose some information.
-        printf("The query id changed and local state as well. Tough luck.\n");
-        return NULL;
-    }
-
 	trie_t *addresses = local_state->addresses;
 	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
 
 	trie_val_t *address_state = trie_get_try(addresses, (char *)address, transport->address_len);
 
 	if (!address_state) {
-        printf("%p\n", transport);
-        KR_DNAME_GET_STR(ns_name, transport->name);
-        const char *ns_str = kr_straddr(&transport->address.ip);
-        printf(
-        "crashing with %s @ %s '\n",
-        ns_name, ns_str ? ns_str : "");
-
-        printf("Current generation is %d\n", local_state->generation);
-        printf("Address trie dump:\n");
-        trie_it_t *it;
-        for(it = trie_it_begin(local_state->addresses); !trie_it_finished(it); trie_it_next(it)) {
-            struct address_state *s = (struct address_state *)*trie_it_val(it);
-            size_t address_len;
-            uint8_t *aaddress = (uint8_t *)trie_it_key(it, &address_len);
-            union inaddr addr;
-            bytes_to_ip(aaddress, address_len, &addr);
-            const char *ns__str = kr_straddr(&addr.ip);
-            printf("genaration %d %s\n", s->generation, ns__str);
+        if (transport->deduplicated) {
+            // Transport was chosen by a different query
+            return NULL;
         }
-        trie_it_free(it);
+
 		assert(0);
 	}
 	return (struct address_state *)*address_state;
@@ -110,21 +84,6 @@ void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct
         memset(local_state, 0, sizeof(struct iter_local_state));
         local_state->unresolved_names = trie_create(mm);
         local_state->addresses = trie_create(mm);
-        local_state->zonecut_name = knot_dname_copy(zonecut->name, mm);
-        local_state->query_uid = qry_uid;
-    }
-
-    if (zonecut_changed(zonecut->name, local_state->zonecut_name)) {
-        // On zonecut change we invalidate all records in trie but we leave them there
-        // because there still might be packets in-flight that will produce some feedback
-        // once they arrive or timeout.
-        local_state->zonecut_name = knot_dname_copy(zonecut->name, mm);
-        trie_it_t *it;
-        for(it = trie_it_begin(local_state->addresses); !trie_it_finished(it); trie_it_next(it)) {
-            struct address_state *address_state = (struct address_state *)*trie_it_val(it);
-            address_state->generation = -1;
-        }
-        trie_it_free(it);
     }
 
     local_state->generation++;
@@ -175,20 +134,23 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 
     trie_it_t *it;
     for(it = trie_it_begin(local_state->addresses); !trie_it_finished(it); trie_it_next(it)) {
-            size_t address_len;
-            uint8_t* address = (uint8_t *)trie_it_key(it, &address_len);
+        size_t address_len;
+        uint8_t* address = (uint8_t *)trie_it_key(it, &address_len);
 
-            union inaddr tmp_address;
-            bytes_to_ip(address, address_len, &tmp_address);
+        union inaddr tmp_address;
+        bytes_to_ip(address, address_len, &tmp_address);
 
-            struct address_state *address_state = (struct address_state *)*trie_it_val(it);
-            check_tls_capable(address_state, qry->request, &tmp_address.ip);
-            check_tcp_connections(address_state, qry->request, &tmp_address.ip);
-            check_network_settings(address_state, address_len, qry->flags.NO_IPV4, qry->flags.NO_IPV6);
+        struct address_state *address_state = (struct address_state *)*trie_it_val(it);
+        if (address_state->generation != local_state->generation) {
+            // Only look at valid addresses.
+            continue;
+        }
+
+        check_tls_capable(address_state, qry->request, &tmp_address.ip);
+        check_tcp_connections(address_state, qry->request, &tmp_address.ip);
+        check_network_settings(address_state, address_len, qry->flags.NO_IPV4, qry->flags.NO_IPV6);
     }
     trie_it_free(it);
-
-    // also take qry->flags.TCP into consideration (do that in the actual choosing function)
 
     int num_addresses = trie_weight(local_state->addresses);
     int num_unresolved_names = trie_weight(local_state->unresolved_names);

@@ -1094,6 +1094,9 @@ static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_
 			qry->id = leader_qry->id;
 			qry->secret = leader_qry->secret;
 			follower->transport = task->transport;
+
+			// Note that this transport may not be present in `leader_qry`'s server selection
+			follower->transport->deduplicated = true;
 			leader_qry->secret = 0; /* Next will be already decoded */
 		}
 		qr_task_step(follower, packet_source, pkt);
