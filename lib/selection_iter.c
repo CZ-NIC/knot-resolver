@@ -29,7 +29,7 @@ void iter_local_state_alloc(struct knot_mm *mm, void **local_state) {
     memset(*local_state, 0, sizeof(struct iter_local_state));
 }
 
-struct address_state *get_address_state(struct iter_local_state *local_state, const struct kr_transport *transport, uint32_t uid) {
+struct address_state *get_address_state(struct iter_local_state *local_state, const struct kr_transport *transport) {
     if (!transport) {
         return NULL;
     }
@@ -215,7 +215,7 @@ void iter_error(struct kr_query *qry, const struct kr_transport *transport, enum
         return;
     }
 	struct iter_local_state *local_state = qry->server_selection.local_state;
-	struct address_state *addr_state = get_address_state(local_state, transport, qry->uid);
+	struct address_state *addr_state = get_address_state(local_state, transport);
 	error(qry, addr_state, transport, sel_error);
 }
 
@@ -224,6 +224,6 @@ void iter_update_rtt(struct kr_query *qry, const struct kr_transport *transport,
         return;
     }
 	struct iter_local_state *local_state = qry->server_selection.local_state;
-	struct address_state *addr_state = get_address_state(local_state, transport, qry->uid);
+	struct address_state *addr_state = get_address_state(local_state, transport);
     update_rtt(qry, addr_state, transport, rtt);
 }
