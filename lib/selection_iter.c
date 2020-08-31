@@ -31,6 +31,10 @@ void iter_local_state_init(struct knot_mm *mm, void **local_state) {
 }
 
 struct address_state *get_address_state(struct iter_local_state *local_state, const struct kr_transport *transport) {
+    if (!transport) {
+        return NULL;
+    }
+
 	trie_t *addresses = local_state->addresses;
 	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
 
