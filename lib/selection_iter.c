@@ -41,6 +41,26 @@ struct address_state *get_address_state(struct iter_local_state *local_state, co
 	trie_val_t *address_state = trie_get_try(addresses, (char *)address, transport->address_len);
 
 	if (!address_state) {
+        printf("%p\n", transport);
+        KR_DNAME_GET_STR(ns_name, transport->name);
+        const char *ns_str = kr_straddr(&transport->address.ip);
+        printf(
+        "crashing with %s @ %s '\n",
+        ns_name, ns_str ? ns_str : "");
+
+        printf("Current generation is %d\n", local_state->generation);
+        printf("Address trie dump:\n");
+        trie_it_t *it;
+        for(it = trie_it_begin(local_state->addresses); !trie_it_finished(it); trie_it_next(it)) {
+            struct address_state *s = (struct address_state *)*trie_it_val(it);
+            size_t address_len;
+            uint8_t *aaddress = (uint8_t *)trie_it_key(it, &address_len);
+            union inaddr addr;
+            bytes_to_ip(aaddress, address_len, &addr);
+            const char *ns__str = kr_straddr(&addr.ip);
+            printf("genaration %d %s\n", s->generation, ns__str);
+        }
+        trie_it_free(it);
 		assert(0);
 	}
 	return (struct address_state *)*address_state;
