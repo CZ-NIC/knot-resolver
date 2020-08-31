@@ -352,7 +352,7 @@ void kr_server_selection_init(struct kr_query *qry) {
             .error = forward_error,
             .local_state = NULL,
         };
-        forward_local_state_init(mempool, &qry->server_selection.local_state, qry->request);
+        forward_local_state_alloc(mempool, &qry->server_selection.local_state, qry->request);
     } else {
         qry->server_selection = (struct kr_server_selection){
             .initialized = true,
@@ -362,7 +362,7 @@ void kr_server_selection_init(struct kr_query *qry) {
             .error = iter_error,
             .local_state = NULL,
         };
-        iter_local_state_init(mempool, &qry->server_selection.local_state, qry->uid);
+        iter_local_state_alloc(mempool, &qry->server_selection.local_state);
     }
 }
 

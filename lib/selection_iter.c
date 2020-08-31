@@ -26,10 +26,9 @@ struct iter_name_state {
     unsigned int generation;
 };
 
-void iter_local_state_init(struct knot_mm *mm, void **local_state, uint32_t uid) {
+void iter_local_state_alloc(struct knot_mm *mm, void **local_state) {
     *local_state = mm_alloc(mm, sizeof(struct iter_local_state));
     memset(*local_state, 0, sizeof(struct iter_local_state));
-    ((struct iter_local_state *)local_state)->query_uid = uid;
 }
 
 struct address_state *get_address_state(struct iter_local_state *local_state, const struct kr_transport *transport, uint32_t uid) {
@@ -105,13 +104,14 @@ void iter_update_state_from_rtt_cache(struct iter_local_state *local_state, stru
 }
 
 
-void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct kr_zonecut *zonecut, struct knot_mm *mm) {
+void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct kr_zonecut *zonecut, struct knot_mm *mm, uint32_t qry_uid) {
 	if (local_state->unresolved_names == NULL || local_state->addresses == NULL) {
         // Local state initialization
         memset(local_state, 0, sizeof(struct iter_local_state));
         local_state->unresolved_names = trie_create(mm);
         local_state->addresses = trie_create(mm);
         local_state->zonecut_name = knot_dname_copy(zonecut->name, mm);
+        local_state->query_uid = qry_uid;
     }
 
     if (zonecut_changed(zonecut->name, local_state->zonecut_name)) {
@@ -170,7 +170,7 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
     struct knot_mm *mempool = qry->request->rplan.pool;
     struct iter_local_state *local_state = (struct iter_local_state *)qry->server_selection.local_state;
 
-    iter_update_state_from_zonecut(local_state, &qry->zone_cut, mempool);
+    iter_update_state_from_zonecut(local_state, &qry->zone_cut, mempool, qry->uid);
     iter_update_state_from_rtt_cache(local_state, &qry->request->ctx->cache);
 
     trie_it_t *it;
