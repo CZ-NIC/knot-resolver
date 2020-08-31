@@ -18,6 +18,7 @@ struct iter_local_state {
     trie_t *addresses;
     unsigned int generation; // Used to distinguish old and valid records in tries
     knot_dname_t *zonecut_name;
+    uint32_t query_uid;
 };
 
 // To be held per NS name and locally
@@ -30,8 +31,17 @@ void iter_local_state_init(struct knot_mm *mm, void **local_state) {
     memset(*local_state, 0, sizeof(struct iter_local_state));
 }
 
-struct address_state *get_address_state(struct iter_local_state *local_state, const struct kr_transport *transport) {
+struct address_state *get_address_state(struct iter_local_state *local_state, const struct kr_transport *transport, uint32_t uid) {
     if (!transport) {
+        return NULL;
+    }
+
+    if (uid != local_state->query_uid) {
+        // In rare cases, packet is stuck in-flight for so long that the kr_query structure
+        // is completely overwritten and the local state of the previous one is lost.
+        // We still could report and cache timeout of this packet for example, but this would be
+        // too much hassle, so we employ an ostrich algorithm and lose some information.
+        printf("The query id changed and local state as well. Tough luck.\n");
         return NULL;
     }
 
@@ -76,6 +86,12 @@ void iter_update_state_from_rtt_cache(struct iter_local_state *local_state, stru
         size_t address_len;
         uint8_t *address = (uint8_t *)trie_it_key(it, &address_len);
         struct address_state *address_state = (struct address_state *)*trie_it_val(it);
+
+        if (address_state->generation != local_state->generation) {
+            // Only look at valid addresses.
+            continue;
+        }
+
         address_state->rtt_state = get_rtt_state(address, address_len, cache);
         union inaddr addr;
         bytes_to_ip(address, address_len, &addr);
@@ -233,12 +249,12 @@ void iter_success(struct kr_query *qry, const struct kr_transport *transport) {
 
 void iter_error(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error sel_error) {
 	struct iter_local_state *local_state = qry->server_selection.local_state;
-	struct address_state *addr_state = get_address_state(local_state, transport);
+	struct address_state *addr_state = get_address_state(local_state, transport, qry->uid);
 	error(qry, addr_state, transport, sel_error);
 }
 
 void iter_update_rtt(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt) {
 	struct iter_local_state *local_state = qry->server_selection.local_state;
-	struct address_state *addr_state = get_address_state(local_state, transport);
+	struct address_state *addr_state = get_address_state(local_state, transport, qry->uid);
     update_rtt(qry, addr_state, transport, rtt);
 }
