@@ -328,11 +328,11 @@ static inline bool is_tcp_waiting(struct sockaddr *address) {
 }
 
 void async_ns_resolution(knot_dname_t *name, enum knot_rr_type type) {
-    struct kr_qflags flags;
-    memset(&flags, 0, sizeof(struct kr_qflags));
-    knot_pkt_t* pkt = worker_resolve_mk_pkt_dname(name, type, KNOT_CLASS_IN, &flags);
-    worker_resolve_start(pkt, flags);
-    free(pkt);
+	struct kr_qflags flags;
+	memset(&flags, 0, sizeof(struct kr_qflags));
+	knot_pkt_t* pkt = worker_resolve_mk_pkt_dname(name, type, KNOT_CLASS_IN, &flags);
+	worker_resolve_start(pkt, flags);
+	free(pkt);
 }
 
 /** Create and initialize a request_ctx (on a fresh mempool).
