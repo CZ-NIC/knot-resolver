@@ -274,7 +274,7 @@ struct kr_transport *choose_transport(struct choice choices[],
 }
 
 void update_rtt(struct kr_query *qry, struct address_state *addr_state, const struct kr_transport *transport, unsigned rtt) {
-    if (!transport) {
+    if (!transport || !addr_state) {
         return;
     }
 
@@ -298,6 +298,11 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state, const st
 }
 
 void cache_timeout(const struct kr_transport *transport, struct address_state *addr_state, struct kr_cache *cache) {
+    if (transport->deduplicated) {
+        // Transport was chosen by a different query, that one will cache the result.
+        return;
+    }
+
     uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
     struct rtt_state old_state = addr_state->rtt_state;
     struct rtt_state cur_state = get_rtt_state(address, transport->address_len, cache);
@@ -311,7 +316,7 @@ void cache_timeout(const struct kr_transport *transport, struct address_state *a
 
 
 void error(struct kr_query *qry, struct address_state *addr_state, const struct kr_transport *transport, enum kr_selection_error sel_error) {
-    if (!transport) {
+    if (!transport || !addr_state) {
         return;
     }
 
@@ -321,7 +326,10 @@ void error(struct kr_query *qry, struct address_state *addr_state, const struct 
 
     if (sel_error == KR_SELECTION_TIMEOUT) {
         qry->server_selection.timeouts++;
-        cache_timeout(transport, addr_state, &qry->request->ctx->cache);
+        if (!transport->deduplicated) {
+            // Make sure the query was chosen by this query
+            cache_timeout(transport, addr_state, &qry->request->ctx->cache);
+        }
     }
 
     addr_state->errors[sel_error]++;

@@ -41,6 +41,8 @@ struct kr_transport {
     size_t address_len;
     enum kr_transport_protocol protocol;
     unsigned timeout;
+    bool deduplicated; // True iff transport was set in worker.c:subreq_finalize,
+                       // that means it may be different from the one originally chosen one.
 };
 
 struct kr_server_selection

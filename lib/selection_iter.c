@@ -25,18 +25,27 @@ struct iter_name_state {
     unsigned int generation;
 };
 
-void iter_local_state_init(struct knot_mm *mm, void **local_state) {
+void iter_local_state_alloc(struct knot_mm *mm, void **local_state) {
     *local_state = mm_alloc(mm, sizeof(struct iter_local_state));
     memset(*local_state, 0, sizeof(struct iter_local_state));
 }
 
 struct address_state *get_address_state(struct iter_local_state *local_state, const struct kr_transport *transport) {
+    if (!transport) {
+        return NULL;
+    }
+
 	trie_t *addresses = local_state->addresses;
 	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
 
 	trie_val_t *address_state = trie_get_try(addresses, (char *)address, transport->address_len);
 
 	if (!address_state) {
+        if (transport->deduplicated) {
+            // Transport was chosen by a different query
+            return NULL;
+        }
+
 		assert(0);
 	}
 	return (struct address_state *)*address_state;
@@ -196,12 +205,18 @@ void iter_success(struct kr_query *qry, const struct kr_transport *transport) {
 }
 
 void iter_error(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error sel_error) {
+    if (!qry->server_selection.initialized) {
+        return;
+    }
 	struct iter_local_state *local_state = qry->server_selection.local_state;
 	struct address_state *addr_state = get_address_state(local_state, transport);
 	error(qry, addr_state, transport, sel_error);
 }
 
 void iter_update_rtt(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt) {
+    if (!qry->server_selection.initialized) {
+        return;
+    }
 	struct iter_local_state *local_state = qry->server_selection.local_state;
 	struct address_state *addr_state = get_address_state(local_state, transport);
     update_rtt(qry, addr_state, transport, rtt);
