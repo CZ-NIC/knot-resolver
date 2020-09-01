@@ -17,7 +17,6 @@ struct iter_local_state {
     trie_t *unresolved_names;
     trie_t *addresses;
     unsigned int generation; // Used to distinguish old and valid records in tries
-    knot_dname_t *zonecut_name;
 };
 
 // To be held per NS name and locally
@@ -74,13 +73,11 @@ void iter_update_state_from_rtt_cache(struct iter_local_state *local_state, stru
 
 
 void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct kr_zonecut *zonecut, struct knot_mm *mm) {
-	if (zonecut_changed(zonecut->name, local_state->zonecut_name) ||
-        local_state->unresolved_names == NULL || local_state->addresses == NULL) {
+	if (local_state->unresolved_names == NULL || local_state->addresses == NULL) {
         // Local state initialization
         memset(local_state, 0, sizeof(struct iter_local_state));
         local_state->unresolved_names = trie_create(mm);
         local_state->addresses = trie_create(mm);
-        local_state->zonecut_name = knot_dname_copy(zonecut->name, mm);
     }
 
     local_state->generation++;
