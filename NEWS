@@ -7,6 +7,7 @@ Improvements
 - cache: add percentage usage to cache.stats() (!1025)
 - cache: add number of cache entries to cache.stats() (!1028)
 - aarch64 support again, as some systems still didn't work (!1033)
+- support building against Knot DNS 3.0 (!1053)
 
 Bugfixes
 --------
