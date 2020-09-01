@@ -60,6 +60,12 @@ void iter_update_state_from_rtt_cache(struct iter_local_state *local_state, stru
         size_t address_len;
         uint8_t *address = (uint8_t *)trie_it_key(it, &address_len);
         struct address_state *address_state = (struct address_state *)*trie_it_val(it);
+
+        if (address_state->generation != local_state->generation) {
+            // Only look at valid addresses.
+            continue;
+        }
+
         address_state->rtt_state = get_rtt_state(address, address_len, cache);
         union inaddr addr;
         bytes_to_ip(address, address_len, &addr);
@@ -128,20 +134,23 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 
     trie_it_t *it;
     for(it = trie_it_begin(local_state->addresses); !trie_it_finished(it); trie_it_next(it)) {
-            size_t address_len;
-            uint8_t* address = (uint8_t *)trie_it_key(it, &address_len);
+        size_t address_len;
+        uint8_t* address = (uint8_t *)trie_it_key(it, &address_len);
 
-            union inaddr tmp_address;
-            bytes_to_ip(address, address_len, &tmp_address);
+        union inaddr tmp_address;
+        bytes_to_ip(address, address_len, &tmp_address);
 
-            struct address_state *address_state = (struct address_state *)*trie_it_val(it);
-            check_tls_capable(address_state, qry->request, &tmp_address.ip);
-            check_tcp_connections(address_state, qry->request, &tmp_address.ip);
-            check_network_settings(address_state, address_len, qry->flags.NO_IPV4, qry->flags.NO_IPV6);
+        struct address_state *address_state = (struct address_state *)*trie_it_val(it);
+        if (address_state->generation != local_state->generation) {
+            // Only look at valid addresses.
+            continue;
+        }
+
+        check_tls_capable(address_state, qry->request, &tmp_address.ip);
+        check_tcp_connections(address_state, qry->request, &tmp_address.ip);
+        check_network_settings(address_state, address_len, qry->flags.NO_IPV4, qry->flags.NO_IPV6);
     }
     trie_it_free(it);
-
-    // also take qry->flags.TCP into consideration (do that in the actual choosing function)
 
     int num_addresses = trie_weight(local_state->addresses);
     int num_unresolved_names = trie_weight(local_state->unresolved_names);
