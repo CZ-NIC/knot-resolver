@@ -6,7 +6,7 @@
 
 #include "lib/selection.h"
 
-void iter_local_state_init(struct knot_mm *mm, void **local_state);
+void iter_local_state_alloc(struct knot_mm *mm, void **local_state);
 void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport);
 void iter_success(struct kr_query *qry, const struct kr_transport *transport);
 void iter_error(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error sel_error);
