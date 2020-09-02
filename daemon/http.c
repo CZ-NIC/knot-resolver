@@ -387,7 +387,7 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *in_buf,
 
 	ret = nghttp2_session_send(ctx->h2);
 	if (ret < 0) {
-		kr_log_error("[http] nghttp2_session_send failed: %s (%zd)\n",
+		kr_log_verbose("[http] nghttp2_session_send failed: %s (%zd)\n",
 			     nghttp2_strerror(ret), ret);
 		return kr_error(EIO);
 	}
@@ -440,21 +440,21 @@ static int http_send_response(nghttp2_session *h2, char *size, size_t size_len,
 
 	ret = nghttp2_submit_response(h2, stream_id, hdrs, sizeof(hdrs)/sizeof(*hdrs), prov);
 	if (ret != 0) {
-		kr_log_error("[http] nghttp2_submit_response failed: %s\n", nghttp2_strerror(ret));
+		kr_log_verbose("[http] nghttp2_submit_response failed: %s\n", nghttp2_strerror(ret));
 		on_pkt_write(data, kr_error(EIO));
 		return kr_error(EIO);
 	}
 
 	ret = nghttp2_session_set_stream_user_data(h2, stream_id, (void*)data);
 	if (ret != 0) {
-		kr_log_error("[http] failed to set stream user data: %s\n", nghttp2_strerror(ret));
+		kr_log_verbose("[http] failed to set stream user data: %s\n", nghttp2_strerror(ret));
 		on_pkt_write(data, kr_error(EIO));
 		return kr_error(EIO);
 	}
 
 	ret = nghttp2_session_send(h2);
 	if(ret < 0) {
-		kr_log_error("[http] nghttp2_session_send failed: %s\n", nghttp2_strerror(ret));
+		kr_log_verbose("[http] nghttp2_session_send failed: %s\n", nghttp2_strerror(ret));
 		return kr_error(EIO);
 	}
 
