@@ -645,9 +645,18 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 			worker->rconcurrent_highwatermark = worker->stats.rconcurrent;
 			ret = kr_error(UV_EMFILE);
 		}
+
+		if (session_flags(session)->has_http)
+			worker->stats.err_http += 1;
+		else if (session_flags(session)->has_tls)
+			worker->stats.err_tls += 1;
+		else if (handle->type == UV_UDP)
+			worker->stats.err_udp += 1;
+		else
+			worker->stats.err_tcp += 1;
 	}
 
-	/* Update statistics */
+	/* Update outgoing query statistics */
 	if (session_flags(session)->outgoing && addr) {
 		if (session_flags(session)->has_tls)
 			worker->stats.tls += 1;
