@@ -37,6 +37,14 @@ static int wrk_stats(lua_State *L)
 	lua_setfield(L, -2, "ipv4");
 	lua_pushnumber(L, worker->stats.ipv6);
 	lua_setfield(L, -2, "ipv6");
+	lua_pushnumber(L, worker->stats.err_udp);
+	lua_setfield(L, -2, "err_udp");
+	lua_pushnumber(L, worker->stats.err_tcp);
+	lua_setfield(L, -2, "err_tcp");
+	lua_pushnumber(L, worker->stats.err_tls);
+	lua_setfield(L, -2, "err_tls");
+	lua_pushnumber(L, worker->stats.err_http);
+	lua_setfield(L, -2, "err_http");
 
 	/* Add subset of rusage that represents counters. */
 	uv_rusage_t rusage;
