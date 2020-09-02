@@ -123,6 +123,11 @@ struct worker_stats {
 	size_t tls;  /**< Number of outbound queries over TLS. */
 	size_t ipv4; /**< Number of outbound queries over IPv4.*/
 	size_t ipv6; /**< Number of outbound queries over IPv6. */
+
+	size_t err_udp;  /**< Total number of write errors for UDP transport. */
+	size_t err_tcp;  /**< Total number of write errors for TCP transport. */
+	size_t err_tls;  /**< Total number of write errors for TLS transport. */
+	size_t err_http;  /**< Total number of write errors for HTTP(S) transport. */
 };
 
 /** @cond internal */
