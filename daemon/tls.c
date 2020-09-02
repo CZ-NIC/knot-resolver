@@ -155,6 +155,8 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 		if (ret < 0 && ret != UV_EAGAIN) {
 			/* uv_try_write() has returned error code other then UV_EAGAIN.
 			 * Return. */
+			kr_log_verbose("[%s] uv_try_write error: %s\n",
+				       t->client_side ? "tls_client" : "tls", uv_strerror(ret));
 			ret = -1;
 			errno = EIO;
 			return ret;
@@ -212,6 +214,8 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 			t->write_queue_size += 1;
 		} else {
 			free(p);
+			kr_log_verbose("[%s] uv_write error: %s\n",
+				       t->client_side ? "tls_client" : "tls", uv_strerror(ret));
 			errno = EIO;
 			ret = -1;
 		}
@@ -405,8 +409,8 @@ int tls_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, uv_write_cb
 	ssize_t count = 0;
 	if ((count = gnutls_record_send(tls_session, &pkt_size, sizeof(pkt_size)) < 0) ||
 	    (count = gnutls_record_send(tls_session, pkt->wire, pkt->size) < 0)) {
-		kr_log_error("[%s] gnutls_record_send failed: %s (%zd)\n",
-			     logstring, gnutls_strerror_name(count), count);
+		kr_log_verbose("[%s] gnutls_record_send failed: %s (%zd)\n",
+			       logstring, gnutls_strerror_name(count), count);
 		return kr_error(EIO);
 	}
 
@@ -417,8 +421,8 @@ int tls_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, uv_write_cb
 		if (!gnutls_error_is_fatal(ret)) {
 			return kr_error(EAGAIN);
 		} else {
-			kr_log_error("[%s] gnutls_record_uncork failed: %s (%d)\n",
-				     logstring, gnutls_strerror_name(ret), ret);
+			kr_log_verbose("[%s] gnutls_record_uncork failed: %s (%d)\n",
+				       logstring, gnutls_strerror_name(ret), ret);
 			return kr_error(EIO);
 		}
 	}
