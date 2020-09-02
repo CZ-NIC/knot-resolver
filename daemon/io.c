@@ -330,6 +330,8 @@ static ssize_t tls_send(const uint8_t *buf, const size_t len, struct session *se
 
 	sent = gnutls_record_send(ctx->c.tls_session, buf, len);
 	if (sent < 0) {
+		kr_log_verbose("[http] gnutls_record_send failed: %s (%zd)\n",
+			       gnutls_strerror_name(sent), sent);
 		return kr_error(EIO);
 	}
 	return sent;
