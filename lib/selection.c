@@ -37,6 +37,8 @@ void *prefix_key(const uint8_t *ip, size_t len) {
 #undef PREFIX
 
 #define DEFAULT_TIMEOUT 400
+#define MAX_TIMEOUT 10000
+
 const struct rtt_state default_rtt_state = {0, DEFAULT_TIMEOUT/4, 0};
 
 struct rtt_state get_rtt_state(const uint8_t *ip, size_t len, struct kr_cache *cache) {
@@ -109,7 +111,11 @@ bool no_rtt_info(struct rtt_state s) {
 // This is verbatim (minus the default timeout value and minimal variance) RFC2988, sec. 2
 int32_t calc_timeout(struct rtt_state state) {
 	int32_t timeout = state.srtt + MAX(4 * state.variance, MINIMAL_TIMEOUT_ADDITION);
-	return timeout * (1 << state.consecutive_timeouts);
+	timeout = timeout * (1 << state.consecutive_timeouts);
+	if (timeout > MAX_TIMEOUT) {
+		return MAX_TIMEOUT;
+	}
+	return timeout;
 }
 
 // This is verbatim RFC2988, sec. 2
