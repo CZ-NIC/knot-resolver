@@ -235,20 +235,21 @@ struct kr_transport *choose_transport(struct choice choices[],
 
 
 	int port;
-	switch (transport->protocol)
-	{
-	case KR_TRANSPORT_TLS:
-		port = KR_DNS_TLS_PORT;
-		break;
-	case KR_TRANSPORT_UDP:
-	case KR_TRANSPORT_TCP:
-		port = KR_DNS_PORT;
-		break;
-	default:
-		assert(0);
-		break;
+	if (!(port = choices[choice].port)) {
+		switch (transport->protocol)
+		{
+		case KR_TRANSPORT_TLS:
+			port = KR_DNS_TLS_PORT;
+			break;
+		case KR_TRANSPORT_UDP:
+		case KR_TRANSPORT_TCP:
+			port = KR_DNS_PORT;
+			break;
+		default:
+			assert(0);
+			break;
+		}
 	}
-
 
 	switch (choices[choice].address_len)
 	{
