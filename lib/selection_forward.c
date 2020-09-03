@@ -35,11 +35,14 @@ void forward_choose_transport(struct kr_query *qry, struct kr_transport **transp
 	for (int i = 0; i < local_state->target_num; i++) {
 		union inaddr *address = &local_state->targets[i];
 		size_t addr_len;
+		uint16_t port;
 		switch (address->ip.sa_family) {
 			case AF_INET:
+				port = ntohs(address->ip4.sin_port);
 				addr_len = sizeof(struct in_addr);
 				break;
 			case AF_INET6:
+				port = ntohs(address->ip6.sin6_port);
 				addr_len = sizeof(struct in6_addr);
 				break;
 			default:
@@ -67,6 +70,7 @@ void forward_choose_transport(struct kr_query *qry, struct kr_transport **transp
 			.address = ip_to_bytes(address, addr_len),
 			.address_len = addr_len,
 			.address_state = addr_state,
+			.port = port,
 		};
 	}
 
