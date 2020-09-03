@@ -83,7 +83,7 @@ function M.check_answer(desc, qname, qtype, expected_rcode, expected_rdata)
 	end
 	resolve(qname, qtype, kres.class.IN, {}, callback)
 
-	for delay = 0.1, 4, 0.5 do -- total max 14.9s in 8 steps
+	for delay = 0.1, 5, 0.5 do -- total max 23.5s in 9 steps
 		if done then return end
 		worker.sleep(delay)
 	end
