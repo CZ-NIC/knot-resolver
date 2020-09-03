@@ -75,6 +75,10 @@ void forward_choose_transport(struct kr_query *qry, struct kr_transport **transp
 	}
 
 	*transport = choose_transport(choices, valid, NULL, 0, qry->server_selection.timeouts, &qry->request->pool, qry->flags.TCP, &local_state->last_choice_index);
+	if (*transport) {
+		// Set static timeout for forwarding
+		(*transport)->timeout = 2000;
+	}
 }
 
 void forward_success(struct kr_query *qry, const struct kr_transport *transport) {
