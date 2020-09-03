@@ -707,29 +707,35 @@ void session_unpoison(struct session *session)
 int session_wirebuf_process(struct session *session, const struct sockaddr *peer)
 {
 	int ret = 0;
-	if (session->wire_buf_start_idx == session->wire_buf_end_idx) {
+	if (session->wire_buf_start_idx == session->wire_buf_end_idx)
 		return ret;
-	}
+
 	size_t wirebuf_data_size = session->wire_buf_end_idx - session->wire_buf_start_idx;
-	uint32_t max_iterations = (wirebuf_data_size / (KNOT_WIRE_HEADER_SIZE + KNOT_WIRE_QUESTION_MIN_SIZE)) + 1;
+	uint32_t max_iterations = (wirebuf_data_size /
+		(KNOT_WIRE_HEADER_SIZE + KNOT_WIRE_QUESTION_MIN_SIZE)) + 1;
 	knot_pkt_t *query = NULL;
+
 	while (((query = session_produce_packet(session, &the_worker->pkt_pool)) != NULL) &&
 	       (ret < max_iterations)) {
 		assert (!session_wirebuf_error(session));
 		int res = worker_submit(session, peer, query);
-		if (res != kr_error(EILSEQ)) {
-			/* Packet has been successfully parsed. */
+		/* Errors from worker_submit() are intetionally *not* handled in order to
+		 * ensure the entire wire buffer is processed. */
+		if (res == kr_ok())
 			ret += 1;
-		}
 		if (session_discard_packet(session, query) < 0) {
 			/* Packet data isn't stored in memory as expected.
-			   something went wrong, normally should not happen. */
+			 * something went wrong, normally should not happen. */
 			break;
 		}
 	}
-	if (session_wirebuf_error(session)) {
+
+	/* worker_submit() may cause the session to close (e.g. due to IO
+	 * write error when the packet triggers an immediate answer). This is
+	 * an error state, as well as any wirebuf error. */
+	if (session->sflags.closing || session_wirebuf_error(session))
 		ret = -1;
-	}
+
 	return ret;
 }
 

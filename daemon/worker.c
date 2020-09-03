@@ -1126,7 +1126,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 {
 	assert(task && task->leading == false);
 	if (task->finished) {
-		return 0;
+		return kr_ok();
 	}
 	struct request_ctx *ctx = task->ctx;
 	struct session *source_session = ctx->source.session;
@@ -1135,16 +1135,17 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	task->finished = true;
 	if (source_session == NULL) {
 		(void) qr_task_on_send(task, NULL, kr_error(EIO));
-		return state == KR_STATE_DONE ? 0 : kr_error(EIO);
+		return state == KR_STATE_DONE ? kr_ok() : kr_error(EIO);
 	}
+
+	if (session_flags(source_session)->closing ||
+	    ctx->source.addr.ip.sa_family == AF_UNSPEC)
+		return kr_error(EINVAL);
 
 	/* Reference task as the callback handler can close it */
 	qr_task_ref(task);
 
 	/* Send back answer */
-	assert(!session_flags(source_session)->closing);
-	assert(ctx->source.addr.ip.sa_family != AF_UNSPEC);
-
 	int ret;
 	const uv_handle_t *src_handle = session_get_handle(source_session);
 	if (src_handle->type != UV_UDP && src_handle->type != UV_TCP) {
@@ -1179,7 +1180,9 @@ static int qr_task_finalize(struct qr_task *task, int state)
 
 	qr_task_unref(task);
 
-	return state == KR_STATE_DONE ? 0 : kr_error(EIO);
+	if (ret != kr_ok() || state != KR_STATE_DONE)
+		return kr_error(EIO);
+	return kr_ok();
 }
 
 static int udp_task_step(struct qr_task *task,
