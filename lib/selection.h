@@ -85,11 +85,12 @@ struct address_state {
 	int errors[KR_SELECTION_NUMBER_OF_ERRORS];
 };
 
-// Array of these is one of inputs for the actual selection algorithm (`iter_get_best_transport`)
+// Array of these is one of inputs for the actual selection algorithm (`choose_transport`)
 struct choice {
 	uint8_t *address;
 	size_t address_len;
 	struct address_state *address_state;
+	uint16_t port; // used to overwrite the port number; if zero, `choose_transport` determines it
 };
 
 void error(struct kr_query *qry, struct address_state *addr_state, const struct kr_transport *transport, enum kr_selection_error sel_error);
