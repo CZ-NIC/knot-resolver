@@ -1432,7 +1432,7 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 		break;
 	case KR_TRANSPORT_TCP:
 	case KR_TRANSPORT_TLS:
-		type = SOCK_PACKET;
+		type = SOCK_STREAM;
 		break;
 	default:
 		assert(0);
