@@ -1179,7 +1179,9 @@ static int qr_task_finalize(struct qr_task *task, int state)
 
 	qr_task_unref(task);
 
-	return state == KR_STATE_DONE ? 0 : kr_error(EIO);
+	if (ret != kr_ok() || state != KR_STATE_DONE)
+		return kr_error(EIO);
+	return kr_ok();
 }
 
 static int udp_task_step(struct qr_task *task,
