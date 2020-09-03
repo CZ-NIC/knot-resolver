@@ -36,7 +36,7 @@ void *prefix_key(const uint8_t *ip, size_t len) {
 
 #undef PREFIX
 
-#define DEFAULT_TIMEOUT 200
+#define DEFAULT_TIMEOUT 400
 const struct rtt_state default_rtt_state = {0, DEFAULT_TIMEOUT/4, 0};
 
 struct rtt_state get_rtt_state(const uint8_t *ip, size_t len, struct kr_cache *cache) {
