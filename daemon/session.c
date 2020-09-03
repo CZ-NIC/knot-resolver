@@ -719,7 +719,9 @@ int session_wirebuf_process(struct session *session, const struct sockaddr *peer
 	       (ret < max_iterations)) {
 		assert (!session_wirebuf_error(session));
 		int res = worker_submit(session, peer, query);
-		if (res != kr_error(EILSEQ)) {
+		if (res == kr_error(EIO)) {
+			return -1;
+		} else if (res != kr_error(EILSEQ)) {
 			/* Packet has been successfully parsed. */
 			ret += 1;
 		}
