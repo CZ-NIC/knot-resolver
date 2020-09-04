@@ -187,6 +187,10 @@ struct kr_transport *choose_transport(struct choice choices[],
 											 struct knot_mm *mempool,
 											 bool tcp,
 											 size_t *out_forward_index) {
+	if (!choices_len && !unresolved_len) {
+		// There is nothing to choose from :(
+		return NULL;
+	}
 
 	struct kr_transport *transport = mm_alloc(mempool, sizeof(struct kr_transport));
 	memset(transport, 0, sizeof(struct kr_transport));
