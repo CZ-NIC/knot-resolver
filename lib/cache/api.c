@@ -135,8 +135,8 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 		ret = cache->api->open(&cache->db, &cache->stats, &opts2, mm);
 	}
 
-	char *fpath;
-	if (asprintf(&fpath, "%s/data.mdb", opts->path) > 0) {
+	char *fpath = kr_absolutize_path(opts->path, "data.mdb");
+	if (fpath) {
 		kr_cache_emergency_file_to_remove = fpath;
 	} else {
 		assert(false); /* non-critical, but still */

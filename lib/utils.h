@@ -223,6 +223,11 @@ typedef array_t(ranked_rr_array_entry_t *) ranked_rr_array_t;
 KR_EXPORT
 char* kr_strcatdup(unsigned n, ...);
 
+/** Construct absolute file path, without resolving symlinks.
+ * \return malloc-ed string or NULL (+errno in that case) */
+KR_EXPORT
+char * kr_absolutize_path(const char *dirname, const char *fname);
+
 /** You probably want kr_rand_* convenience functions instead.
  * This is a buffered version of gnutls_rnd(GNUTLS_RND_NONCE, ..) */
 KR_EXPORT

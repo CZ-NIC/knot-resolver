@@ -297,7 +297,7 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	ret = mdb_env_create(&env->env);
 	if (ret != MDB_SUCCESS) return lmdb_error(ret);
 
-	env->mdb_data_path = kr_strcatdup(2, path, "/data.mdb");
+	env->mdb_data_path = kr_absolutize_path(path, "data.mdb");
 	if (!env->mdb_data_path) {
 		ret = ENOMEM;
 		goto error_sys;
