@@ -178,8 +178,6 @@ void shuffle_choices(struct choice choices[], int choices_len) {
 	}
 }
 
-#define ERROR_LIMIT 2
-
 // Performs the actual selection (currently epsilon-greedy with epsilon = 0.05).
 struct kr_transport *choose_transport(struct choice choices[],
                                       int choices_len,
@@ -215,11 +213,7 @@ struct kr_transport *choose_transport(struct choice choices[],
 		// EXPLOIT
 		shuffle_choices(choices, choices_len);
 		qsort(choices, choices_len, sizeof(struct choice), cmp_choices);
-		if (choices[0].address_state->error_count > ERROR_LIMIT) {
-			return NULL;
-		} else {
-			choice = 0;
-		}
+		choice = 0;
 	}
 
 	unsigned timeout = calc_timeout(choices[choice].address_state->rtt_state);
