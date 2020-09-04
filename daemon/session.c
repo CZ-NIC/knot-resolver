@@ -717,22 +717,16 @@ int session_wirebuf_process(struct session *session, const struct sockaddr *peer
 	       (ret < max_iterations)) {
 		assert (!session_wirebuf_error(session));
 		int res = worker_submit(session, peer, query);
-		switch(res) {
-		case kr_ok():
+		if (res == kr_ok()) {
 			ret += 1;
-			break;
-		case kr_error(EILSEQ):
-			/* Packet was badly formed and ignored, keep processing. */
-			break;
-		case kr_error(EIO):
+		} else if (res == kr_error(EIO)) {
 			/* Processing triggered immediate answer, but there was a write error.
 			 * Except for UDP, this is fatal and connection should be torn down. */
 			if (session->handle->type != UV_UDP)
 				return -1;
-			break;
-		case kr_error(ENOMEM):
-		case kr_error(EINVAL):
-		default:
+		} else if (res != kr_error(EILSEQ)) {
+			/* EILSEQ means packet was badly formed and ignored, thus processing
+			 * should continue. Remaining unhandled errors are fatal. */
 			return -1;
 		}
 		if (session_discard_packet(session, query) < 0) {
