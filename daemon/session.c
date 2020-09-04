@@ -743,7 +743,7 @@ int session_wirebuf_process(struct session *session, const struct sockaddr *peer
 		}
 	}
 
-	if (err || session_wirebuf_error(session))
+	if (session_wirebuf_error(session))
 		ret = -1;
 	return ret;
 }
