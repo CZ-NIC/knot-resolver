@@ -245,13 +245,13 @@ success:
 
 static void txn_free_ro(struct lmdb_env *env)
 {
-	if (env->txn.ro) {
-		mdb_txn_abort(env->txn.ro);
-		env->txn.ro = NULL;
-	}
 	if (env->txn.ro_curs) {
 		mdb_cursor_close(env->txn.ro_curs);
 		env->txn.ro_curs = NULL;
+	}
+	if (env->txn.ro) {
+		mdb_txn_abort(env->txn.ro);
+		env->txn.ro = NULL;
 	}
 }
 
@@ -606,17 +606,7 @@ static int cdb_write(struct lmdb_env *env, MDB_txn **txn, const knot_db_val_t *k
 	stats->write++;
 	int ret = mdb_put(*txn, env->dbi, &_key, &_val, flags);
 
-	/* Try to recover from doing too much writing in a single transaction. */
-	if (ret == MDB_TXN_FULL) {
-		ret = cdb_commit(env, stats);
-		if (ret) {
-			ret = txn_get(env, txn, false);
-		}
-		if (ret) {
-			stats->write++;
-			ret = mdb_put(*txn, env->dbi, &_key, &_val, flags);
-		}
-	}
+	/* We don't try to recover from MDB_TXN_FULL. */
 	if (ret != MDB_SUCCESS) {
 		txn_abort(env);
 		return lmdb_error(ret);
