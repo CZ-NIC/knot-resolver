@@ -707,7 +707,7 @@ void session_unpoison(struct session *session)
 int session_wirebuf_process(struct session *session, const struct sockaddr *peer)
 {
 	int ret = 0;
-	bool err = false;
+	// bool err = false;
 	if (session->wire_buf_start_idx == session->wire_buf_end_idx)
 		return ret;
 
@@ -729,12 +729,9 @@ int session_wirebuf_process(struct session *session, const struct sockaddr *peer
 		} else if (res == kr_error(EIO)) {
 			/* Processing triggered immediate answer, but there was a write error.
 			 * Except for UDP, this is fatal and connection should be torn down. */
-			if (session->handle->type != UV_UDP)
-				err = true;
 		} else if (res != kr_error(EILSEQ)) {
 			/* EILSEQ means packet was badly formed and ignored, thus processing
 			 * should continue. Remaining unhandled errors are fatal. */
-			err = true;
 		}
 		if (session_discard_packet(session, query) < 0) {
 			/* Packet data isn't stored in memory as expected.
