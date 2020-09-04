@@ -395,17 +395,6 @@ static int cdb_init(knot_db_t **db, struct kr_cdb_stats *stats,
 		return kr_error(EINVAL);
 	}
 
-	/* Clear stale lockfiles. */
-	auto_free char *lockfile = kr_strcatdup(2, opts->path, "/.cachelock");
-	if (lockfile) {
-		if (unlink(lockfile) == 0) {
-			kr_log_info("[cache] cleared stale lockfile '%s'\n", lockfile);
-		} else if (errno != ENOENT) {
-			kr_log_info("[cache] failed to clear stale lockfile '%s': %s\n", lockfile,
-				    strerror(errno));
-		}
-	}
-
 	/* Open the database. */
 	struct lmdb_env *env = calloc(1, sizeof(*env));
 	if (!env) {
@@ -489,6 +478,46 @@ static int cdb_check_health(knot_db_t *db, struct kr_cdb_stats *stats)
 	return refresh_mapsize(env);
 }
 
+/** Obtain exclusive (advisory) lock by creating a file, returning FD or negative kr_error().
+ * The lock is auto-released by OS in case the process finishes in any way (file remains). */
+static int lockfile_get(const char *path)
+{
+	assert(path);
+	const int fd = open(path, O_CREAT|O_RDWR, S_IRUSR);
+	if (fd < 0)
+		return kr_error(errno);
+
+	struct flock lock_info;
+	memset(&lock_info, 0, sizeof(lock_info));
+	lock_info.l_type = F_WRLCK;
+	lock_info.l_whence = SEEK_SET;
+	lock_info.l_start = 0;
+	lock_info.l_len = 1; // it's OK for locks to extend beyond the end of the file
+	int err;
+	do {
+		err = fcntl(fd, F_SETLK, &lock_info);
+	} while (err == -1 && errno == EINTR);
+	if (err) {
+		close(fd);
+		return kr_error(errno);
+	}
+	return fd;
+}
+
+/** Release and remove lockfile created by lockfile_get().  Return kr_error(). */
+static int lockfile_release(const char *path, int fd)
+{
+	assert(path && fd > 0); // fd == 0 is surely a mistake, in our case at least
+	int err = 0;
+	// To avoid a race, we unlink it first.
+	if (unlink(path))
+		err = kr_error(errno);
+	// And we try to close it even on error.
+	if (close(fd) && !err)
+		err = kr_error(errno);
+	return err;
+}
+
 static int cdb_clear(knot_db_t *db, struct kr_cdb_stats *stats)
 {
 	struct lmdb_env *env = db;
@@ -528,36 +557,37 @@ static int cdb_clear(knot_db_t *db, struct kr_cdb_stats *stats)
 	}
 
 	/* Find if we get a lock on lockfile. */
-	ret = open(lockfile, O_CREAT|O_EXCL|O_RDONLY, S_IRUSR);
-	if (ret == -1) {
+	const int lockfile_fd = lockfile_get(lockfile);
+	if (lockfile_fd < 0) {
 		kr_log_error("[cache] clearing failed to get ./.cachelock (%s); retry later\n",
-				strerror(errno));
+				kr_strerror(lockfile_fd));
 		/* As we're out of space (almost certainly - mdb_drop didn't work),
 		 * we will retry on the next failing write operation. */
 		return kr_error(EAGAIN);
 	}
-	close(ret);
 
 	/* We acquired lockfile.  Now find whether *.mdb are what we have open now.
 	 * If they are not we don't want to remove them; most likely they have been
 	 * cleaned by another instance. */
 	ret = cdb_check_health(db, stats);
 	if (ret != 0) {
-		unlink(lockfile);
-		if (ret == 1) { // file changed and reopened successfuly
-			return kr_ok();
-		} else { // some other error
-			kr_error(ret);
-		}
+		if (ret == 1) // file changed and reopened successfuly
+			ret = kr_ok();
+		// else pass some other error
+	} else {
+		kr_log_verbose("[cache] clear: identical files, unlinking\n");
+		// coverity[toctou]
+		unlink(env->mdb_data_path);
+		unlink(mdb_lockfile);
+		ret = reopen_env(env, stats, env->mapsize);
 	}
 
-	kr_log_verbose("[cache] clear: identical files, unlinking\n");
-	// coverity[toctou]
-	unlink(env->mdb_data_path);
-	unlink(mdb_lockfile);
-	ret = reopen_env(env, stats, env->mapsize);
 	/* Environment updated, release lockfile. */
-	unlink(lockfile);
+	int lrerr = lockfile_release(lockfile, lockfile_fd);
+	if (lrerr) {
+		kr_log_error("[cache] failed to release ./.cachelock: %s\n",
+				kr_strerror(lrerr));
+	}
 	return ret;
 }
 
