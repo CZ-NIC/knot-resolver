@@ -86,6 +86,7 @@ struct kr_server_selection
 	void (*error)(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error error);
 
 	int timeouts; /**< Number of timeouts that occured resolving this query.*/
+	bool truncated; /**< Query was truncated, switch to TCP. */
 	void *local_state; /**< Inner state of the implementation.*/
 };
 
