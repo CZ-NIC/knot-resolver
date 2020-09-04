@@ -707,7 +707,6 @@ void session_unpoison(struct session *session)
 int session_wirebuf_process(struct session *session, const struct sockaddr *peer)
 {
 	int ret = 0;
-	// bool err = false;
 	if (session->wire_buf_start_idx == session->wire_buf_end_idx)
 		return ret;
 
@@ -716,23 +715,13 @@ int session_wirebuf_process(struct session *session, const struct sockaddr *peer
 		(KNOT_WIRE_HEADER_SIZE + KNOT_WIRE_QUESTION_MIN_SIZE)) + 1;
 	knot_pkt_t *query = NULL;
 
-	/* Process the entire wire buffer, even if some errors are encountered.
-	 * The buffer may have useful data even if the underlying session is to
-	 * be closed afterwards, e.g. when processing multiple packets from
-	 * upstream (especially TLS forwarding). */
 	while (((query = session_produce_packet(session, &the_worker->pkt_pool)) != NULL) &&
 	       (ret < max_iterations)) {
 		assert (!session_wirebuf_error(session));
 		int res = worker_submit(session, peer, query);
-		if (res == kr_ok()) {
+		// TODO error non-handling
+		if (res == kr_ok())
 			ret += 1;
-		} else if (res == kr_error(EIO)) {
-			/* Processing triggered immediate answer, but there was a write error.
-			 * Except for UDP, this is fatal and connection should be torn down. */
-		} else if (res != kr_error(EILSEQ)) {
-			/* EILSEQ means packet was badly formed and ignored, thus processing
-			 * should continue. Remaining unhandled errors are fatal. */
-		}
 		if (session_discard_packet(session, query) < 0) {
 			/* Packet data isn't stored in memory as expected.
 			   something went wrong, normally should not happen. */
@@ -740,7 +729,7 @@ int session_wirebuf_process(struct session *session, const struct sockaddr *peer
 		}
 	}
 
-	if (session_wirebuf_error(session))
+	if (session_wirebuf_error(session) || session->sflags.closing)
 		ret = -1;
 	return ret;
 }

@@ -1140,7 +1140,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 
 	if (session_flags(source_session)->closing ||
 	    ctx->source.addr.ip.sa_family == AF_UNSPEC)
-		return kr_error(EINVAL);
+		return kr_error(EINVAL);  // TODO is it always safe to return non-0 here?
 
 	/* Reference task as the callback handler can close it */
 	qr_task_ref(task);
@@ -1180,9 +1180,8 @@ static int qr_task_finalize(struct qr_task *task, int state)
 
 	qr_task_unref(task);
 
-	if (ret != kr_ok() || state != KR_STATE_DONE)
-		return kr_error(EIO);
-	return kr_ok();
+	// TODO document why this can't return EIO on error above
+	return state == KR_STATE_DONE ? kr_ok() : kr_error(EIO);
 }
 
 static int udp_task_step(struct qr_task *task,
