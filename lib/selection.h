@@ -11,6 +11,8 @@
 
 #include "lib/cache/api.h"
 
+#define ERROR_LIMIT_PER_SERVER 2
+
 /**
  * These errors are to be reported as feedback to server selection.
  * See `kr_server_selection::error` for more details.
