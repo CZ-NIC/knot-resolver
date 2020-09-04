@@ -179,7 +179,7 @@ static int cache_write_or_clear(struct kr_cache *cache, const knot_db_val_t *key
 	ret = kr_cache_clear(cache);
 	switch (ret) {
 	default:
-		kr_log_error("CRITICAL: clearing cache failed with %s\n",
+		kr_log_error("CRITICAL: clearing cache failed: %s; fatal error, aborting\n",
 				kr_strerror(ret));
 		abort();
 	case 0:
