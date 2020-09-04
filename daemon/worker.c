@@ -757,7 +757,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 		 * or write to upstream failed. */
 		worker_del_tcp_connected(the_worker, peer);
 		session_waitinglist_finalize(session, KR_STATE_FAIL);
-		assert(session_tasklist_is_empty(session));
+		session_tasklist_finalize(session, KR_STATE_FAIL);
 		session_close(session);
 	} else {
 		session_timer_stop(session);
