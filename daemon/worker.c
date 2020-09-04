@@ -1138,13 +1138,14 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		return state == KR_STATE_DONE ? 0 : kr_error(EIO);
 	}
 
+	if (session_flags(source_session)->closing ||
+	    ctx->source.addr.ip.sa_family == AF_UNSPEC)
+		return kr_error(EINVAL);
+
 	/* Reference task as the callback handler can close it */
 	qr_task_ref(task);
 
 	/* Send back answer */
-	assert(!session_flags(source_session)->closing);
-	assert(ctx->source.addr.ip.sa_family != AF_UNSPEC);
-
 	int ret;
 	const uv_handle_t *src_handle = session_get_handle(source_session);
 	if (src_handle->type != UV_UDP && src_handle->type != UV_TCP) {
