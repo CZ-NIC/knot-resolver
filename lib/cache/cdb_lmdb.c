@@ -104,8 +104,9 @@ static int refresh_mapsize(struct lmdb_env *env)
 
 	env->mapsize = info.me_mapsize;
 	if (env->mapsize != env->st_size) {
-		kr_log_info("[cache] suspicious size of cache file: %zu != %zu\n",
-				(size_t)env->st_size, env->mapsize);
+		kr_log_info("[cache] suspicious size of cache file '%s'"
+				": file size %zu != LMDB map size %zu\n",
+				env->mdb_data_path, (size_t)env->st_size, env->mapsize);
 	}
 	return kr_ok();
 }
@@ -481,8 +482,9 @@ static int cdb_check_health(knot_db_t *db, struct kr_cdb_stats *stats)
 	 * contrary to methods based on mdb_env_info(). */
 	if (st.st_size == env->st_size)
 		return kr_ok();
-	kr_log_info("[cache] detected file size change by another process: %zu -> %zu\n",
-			(size_t)env->st_size, (size_t)st.st_size);
+	kr_log_info("[cache] detected size change (by another instance?) of file '%s'"
+			": file size %zu -> file size %zu\n",
+			env->mdb_data_path, (size_t)env->st_size, (size_t)st.st_size);
 	env->st_size = st.st_size; // avoid retrying in cycle even if we fail
 	return refresh_mapsize(env);
 }

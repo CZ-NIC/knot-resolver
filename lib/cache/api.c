@@ -80,15 +80,16 @@ static int assert_right_version(struct kr_cache *cache)
 		/* Version doesn't match. Recreate cache and write version key. */
 		ret = cache_op(cache, count);
 		if (ret != 0) { /* Non-empty cache, purge it. */
-			kr_log_info("[     ][cach] incompatible cache database detected, purging\n");
+			kr_log_info("[cache] incompatible cache database detected, purging\n");
 			if (oldret) {
-				kr_log_verbose("bad ret: %d\n", oldret);
+				kr_log_verbose("[cache] reading version returned: %d\n", oldret);
 			} else if (val.len != sizeof(CACHE_VERSION)) {
-				kr_log_verbose("bad length: %d\n", (int)val.len);
+				kr_log_verbose("[cache] version has bad length: %d\n", (int)val.len);
 			} else {
 				uint16_t ver;
 				memcpy(&ver, val.data, sizeof(ver));
-				kr_log_verbose("bad version: %d\n", (int)ver);
+				kr_log_verbose("[cache] version has bad value: %d instead of %d\n",
+					(int)ver, (int)CACHE_VERSION);
 			}
 			ret = cache_op(cache, clear);
 		}
@@ -133,12 +134,21 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 		opts2.maxsize = 0;
 		ret = cache->api->open(&cache->db, &cache->stats, &opts2, mm);
 	}
+
+	char *fpath;
+	if (asprintf(&fpath, "%s/data.mdb", opts->path) > 0) {
+		kr_cache_emergency_file_to_remove = fpath;
+	} else {
+		assert(false); /* non-critical, but still */
+		fpath = "<ENOMEM>";
+	}
+
 	if (ret == 0 && opts->maxsize) {
 		size_t maxsize = cache->api->get_maxsize(cache->db);
 		if (maxsize > opts->maxsize) kr_log_info(
-			"[cache] Warning: cache size %zu instead of %zu."
-			"  To reduce the size you need to remove the file by hand.\n",
-			maxsize, opts->maxsize);
+			"[cache] Warning: real cache size is %zu instead of the requested %zu bytes."
+			"  To reduce the size you need to remove the file '%s' by hand.\n",
+			maxsize, opts->maxsize, fpath);
 	}
 	if (ret != 0) {
 		return ret;
@@ -146,14 +156,6 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 	cache->ttl_min = KR_CACHE_DEFAULT_TTL_MIN;
 	cache->ttl_max = KR_CACHE_DEFAULT_TTL_MAX;
 	kr_cache_make_checkpoint(cache);
-
-	char *fpath;
-	ret = asprintf(&fpath, "%s/data.mdb", opts->path);
-	if (ret > 0) {
-		kr_cache_emergency_file_to_remove = fpath;
-	} else {
-		assert(false); /* non-critical, but still */
-	}
 	return 0;
 }
 
