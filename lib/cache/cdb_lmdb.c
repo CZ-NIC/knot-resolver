@@ -459,7 +459,6 @@ static int cdb_check_health(knot_db_t *db, struct kr_cdb_stats *stats)
 	if (stat(env->mdb_data_path, &st)) {
 		int ret = errno;
 		return kr_error(ret);
-		// FIXME: if the file doesn't exist?
 	}
 
 	if (st.st_dev != env->st_dev || st.st_ino != env->st_ino) {
