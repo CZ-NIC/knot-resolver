@@ -32,6 +32,9 @@ Users
 * DoH served with http module :ref:`DNS-over-HTTP (DoH) <mod-http-doh>` will be marked as legacy
   and won't receive any more bugfixes. A more reliable and scalable DoH module will be available
   instead. The new DoH module will only support HTTP/2 over TLS.
+* New releases since Octomer 2020 will contain changes for
+  :ref:`DNS Flag Day 2020 <https://dnsflagday.net/2020/>`. Please double-check your firewall,
+  it has to allow DNS traffic on UDP and also TCP port 53.
 
 5.0 to 5.1
 ==========
