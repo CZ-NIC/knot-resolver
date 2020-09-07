@@ -222,7 +222,12 @@ char * kr_absolutize_path(const char *dirname, const char *fname)
 		const char *cwd = getcwd(buf, sizeof(buf));
 		if (!cwd)
 			return NULL; // errno has been set already
-		aret = asprintf(&result, "%s/%s/%s", cwd, dirname, fname);
+		if (strcmp(dirname, ".") == 0) {
+			// get rid of one common case of extraneous "./"
+			aret = asprintf(&result, "%s/%s", cwd, fname);
+		} else {
+			aret = asprintf(&result, "%s/%s/%s", cwd, dirname, fname);
+		}
 	}
 	if (aret > 0)
 		return result;
