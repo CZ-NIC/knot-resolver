@@ -76,24 +76,19 @@ static int assert_right_version(struct kr_cache *cache)
 	    && memcmp(val.data, &CACHE_VERSION, sizeof(CACHE_VERSION)) == 0) {
 		ret = kr_ok();
 	} else {
-		int oldret = ret;
 		/* Version doesn't match. Recreate cache and write version key. */
-		ret = cache_op(cache, count);
-		if (ret != 0) { /* Non-empty cache, purge it. */
-			kr_log_info("[     ][cach] incompatible cache database detected, purging\n");
-			if (oldret) {
-				VERBOSE_MSG(NULL, "reading version returned: %d\n", oldret);
-			} else if (val.len != sizeof(CACHE_VERSION)) {
-				VERBOSE_MSG(NULL, "version has bad length: %d\n", (int)val.len);
-			} else {
-				uint16_t ver;
-				memcpy(&ver, val.data, sizeof(ver));
-				VERBOSE_MSG(NULL, "version has bad value: %d instead of %d\n",
-					(int)ver, (int)CACHE_VERSION);
-			}
-			ret = cache_op(cache, clear);
+		kr_log_info("[     ][cach] incompatible cache database detected, purging\n");
+		if (ret) {
+			VERBOSE_MSG(NULL, "reading version returned: %d\n", ret);
+		} else if (val.len != sizeof(CACHE_VERSION)) {
+			VERBOSE_MSG(NULL, "version has bad length: %d\n", (int)val.len);
+		} else {
+			uint16_t ver;
+			memcpy(&ver, val.data, sizeof(ver));
+			VERBOSE_MSG(NULL, "version has bad value: %d instead of %d\n",
+				(int)ver, (int)CACHE_VERSION);
 		}
-		/* Either purged or empty. */
+		ret = cache_op(cache, clear);
 	}
 	/* Rewrite the entry even if it isn't needed.  Because of cache-size-changing
 	 * possibility it's good to always perform some write during opening of cache. */
