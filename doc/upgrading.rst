@@ -6,9 +6,30 @@
 Upgrading
 *********
 
-This section summarizes steps required for upgrade to newer Knot Resolver versions.
+This section summarizes steps required when upgrading to newer Knot Resolver versions.
 We advise users to also read :ref:`release_notes` for respective versions.
 Section *Module changes* is relevant only for users who develop or use third-party modules.
+
+Upcoming changes
+================
+
+Following section provides information about selected changes in not-yet-released versions.
+We advise users to prepare for these changes sooner rather than later to make it easier to upgrade to
+newer versions when they are released.
+
+Users
+-----
+
+* Users of :ref:`control-sockets` API need to terminate each command sent to resolver with newline
+  character (ASCII ``\n``). Correct usage: ``cache.stats()\n``.
+  Newline terminated commands are accepted by all resolver versions >= 1.0.0.
+* Human readable output from :ref:`control-sockets` is not stable and changes from time to time.
+  Users who need machine readable output for scripts should use Lua function
+  ``tojson()`` to convert Lua values into standard JSON format instead of attempting to parse
+  the human readable output. For example API call ``tojson(cache.stats())\n`` will return JSON string
+  with ``cache.stats()`` results represented as dictionary.
+  Function ``tojson()`` is available in all resolver versions >= 1.0.0.
+
 
 5.0 to 5.1
 ==========
