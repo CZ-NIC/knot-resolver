@@ -77,9 +77,10 @@ static int assert_right_version(struct kr_cache *cache)
 		ret = kr_ok();
 	} else {
 		int oldret = ret;
-		/* Version doesn't match. Recreate cache and write version key. */
+		/* Version doesn't match or we were unable to read it, possibly because DB is empty.
+		 * Recreate cache and write version key. */
 		ret = cache_op(cache, count);
-		if (ret != 0) { /* Non-empty cache, purge it. */
+		if (ret != 0) { /* Log for non-empty cache to limit noise on fresh start. */
 			kr_log_info("[cache] incompatible cache database detected, purging\n");
 			if (oldret) {
 				kr_log_verbose("[cache] reading version returned: %d\n", oldret);
@@ -91,9 +92,8 @@ static int assert_right_version(struct kr_cache *cache)
 				kr_log_verbose("[cache] version has bad value: %d instead of %d\n",
 					(int)ver, (int)CACHE_VERSION);
 			}
-			ret = cache_op(cache, clear);
 		}
-		/* Either purged or empty. */
+		ret = cache_op(cache, clear);
 	}
 	/* Rewrite the entry even if it isn't needed.  Because of cache-size-changing
 	 * possibility it's good to always perform some write during opening of cache. */
