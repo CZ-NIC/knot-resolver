@@ -8,6 +8,8 @@ DNS-over-HTTP (DoH)
 .. warning::
 
   * DoH support was added in version 4.0.0 and is subject to change.
+  * Support for DoH over insecure HTTP and also DoH over HTTP version 1
+    is deprecated and will be removed in future versions.
   * DoH implementation in Knot Resolver is intended for experimentation
     only as there is insufficient experience with the module
     and the DoH protocol in general.

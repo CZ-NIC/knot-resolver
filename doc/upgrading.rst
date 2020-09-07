@@ -29,7 +29,8 @@ Users
   the human readable output. For example API call ``tojson(cache.stats())\n`` will return JSON string
   with ``cache.stats()`` results represented as dictionary.
   Function ``tojson()`` is available in all resolver versions >= 1.0.0.
-
+* Support for unencrypted :ref:`DNS-over-HTTP (DoH) <mod-http-doh>`
+  and also DoH based on HTTP version 1 is deprecated and will be removed in future versions.
 
 5.0 to 5.1
 ==========
