@@ -80,15 +80,15 @@ static int assert_right_version(struct kr_cache *cache)
 		/* Version doesn't match. Recreate cache and write version key. */
 		ret = cache_op(cache, count);
 		if (ret != 0) { /* Non-empty cache, purge it. */
-			kr_log_info("[     ][cach] incompatible cache database detected, purging\n");
+			kr_log_info("[cache] incompatible cache database detected, purging\n");
 			if (oldret) {
-				VERBOSE_MSG(NULL, "reading version returned: %d\n", oldret);
+				kr_log_verbose("[cache] reading version returned: %d\n", oldret);
 			} else if (val.len != sizeof(CACHE_VERSION)) {
-				VERBOSE_MSG(NULL, "version has bad length: %d\n", (int)val.len);
+				kr_log_verbose("[cache] version has bad length: %d\n", (int)val.len);
 			} else {
 				uint16_t ver;
 				memcpy(&ver, val.data, sizeof(ver));
-				VERBOSE_MSG(NULL, "version has bad value: %d instead of %d\n",
+				kr_log_verbose("[cache] version has bad value: %d instead of %d\n",
 					(int)ver, (int)CACHE_VERSION);
 			}
 			ret = cache_op(cache, clear);
