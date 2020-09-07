@@ -58,7 +58,7 @@ RUN wget https://github.com/LuaJIT/LuaJIT/raw/v2.1.0-beta3/src/lj.supp -O /lj.su
 
 # Lua lint for kresd CI
 RUN apt-get install luarocks -y -qqq
-RUN luarocks install luacheck
+RUN luarocks --lua-version 5.1 install luacheck
 
 # respdiff for kresd CI
 RUN apt-get install lmdb-utils -y -qqq
@@ -89,7 +89,7 @@ RUN apt-get install pdns-recursor -y -qqq
 
 # code coverage
 RUN apt-get install -y -qqq lcov
-RUN luarocks install luacov
+RUN luarocks --lua-version 5.1 install luacov
 
 # LuaJIT binary for stand-alone scripting
 RUN apt-get install -y -qqq luajit
