@@ -1000,6 +1000,6 @@ int kr_cache_check_health(struct kr_cache *cache, int interval)
 		cache->health_timer->data = cache;
 	}
 	assert(cache->health_timer->data);
-	return uv_timer_start(cache->health_timer, health_timer_cb, interval, interval);
+	return kr_error(uv_timer_start(cache->health_timer, health_timer_cb, interval, interval));
 }
 
