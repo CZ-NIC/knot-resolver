@@ -30,7 +30,7 @@ Users
   with ``cache.stats()`` results represented as dictionary.
   Function ``tojson()`` is available in all resolver versions >= 1.0.0.
 * Support for unencrypted :ref:`DNS-over-HTTP (DoH) <mod-http-doh>`
-  and also DoH based on HTTP version 1 is deprecated and will be removed in future versions.
+* DoH served with http module :ref:`DNS-over-HTTP (DoH) <mod-http-doh>` will be marked as legacy and won't receive any more bugfixes. A more reliable and scalable DoH module will be available instead. The new DoH module will only support HTTP/2 over TLS.
 
 5.0 to 5.1
 ==========
