@@ -38,6 +38,7 @@ void *prefix_key(const uint8_t *ip, size_t len) {
 
 #define DEFAULT_TIMEOUT 400
 #define MAX_TIMEOUT 10000
+#define MAX_BACKOFF 5
 
 const struct rtt_state default_rtt_state = {0, DEFAULT_TIMEOUT/4, 0};
 
@@ -108,14 +109,21 @@ bool no_rtt_info(struct rtt_state s) {
 
 #define MINIMAL_TIMEOUT_ADDITION 20
 
-// This is verbatim (minus the default timeout value and minimal variance) RFC2988, sec. 2
-int32_t calc_timeout(struct rtt_state state) {
-	int32_t timeout = state.srtt + MAX(4 * state.variance, MINIMAL_TIMEOUT_ADDITION);
-	timeout = timeout * (1 << state.consecutive_timeouts);
-	if (timeout > MAX_TIMEOUT) {
+unsigned back_off_timeout(uint32_t to, int pow) {
+	if (pow > MAX_BACKOFF) {
+		return to *= 1 << MAX_BACKOFF;
+	} else {
+		return to * (1 << pow);
+	}
+	if (to > MAX_TIMEOUT) {
 		return MAX_TIMEOUT;
 	}
-	return timeout;
+}
+
+// This is verbatim (minus the default timeout value and minimal variance) RFC2988, sec. 2
+unsigned calc_timeout(struct rtt_state state) {
+	int32_t timeout = state.srtt + MAX(4 * state.variance, MINIMAL_TIMEOUT_ADDITION);
+	return back_off_timeout(timeout, state.consecutive_timeouts);
 }
 
 // This is verbatim RFC2988, sec. 2
@@ -219,7 +227,7 @@ struct kr_transport *choose_transport(struct choice choices[],
 	unsigned timeout = calc_timeout(choices[choice].address_state->rtt_state);
 	if (no_rtt_info(choices[choice].address_state->rtt_state)) {
 		// Exponential back-off when retrying after timeout and choosing an unknown server
-		timeout *= 1 << timeouts;
+		timeout = back_off_timeout(timeout, timeouts);
 	}
 
 	enum kr_transport_protocol protocol;
