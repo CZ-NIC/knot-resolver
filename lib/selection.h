@@ -143,20 +143,55 @@ struct choice {
 	uint16_t port; /**< used to overwrite the port number; if zero, `choose_transport` determines it*/
 };
 
+/**
+ * @brief Based on passed choices, choose the next transport.
+ *
+ * Common function to both implementations (iteration and forwarding).
+ * The `*_choose_transport` functions from `selection_*.h` preprocess the input for this one.
+ *
+ * @param choices Options to choose from, see struct above
+ * @param unresolved Array of names that can be resolved (i.e. no A/AAAA record)
+ * @param timeouts Number of timeouts that occured in this query (used for exponential backoff)
+ * @param mempool Memory context of current request
+ * @param tcp Force TCP as transport protocol
+ * @param out_forward_index Used to indentify the transport when forwarding
+ * @return Chosen transport or NULL when no choice is viable
+ */
 struct kr_transport *choose_transport(struct choice choices[], int choices_len,
                                       knot_dname_t *unresolved[], int unresolved_len,
                                       int timeouts, struct knot_mm *mempool, bool tcp,
 				      size_t *out_forward_index);
+
+/**
+ * @brief Common part of RTT feedback mechanism. Notes RTT to global cache.
+ */
 void update_rtt(struct kr_query *qry, struct address_state *addr_state,
                 const struct kr_transport *transport, unsigned rtt);
+
+/**
+ * @brief Common part of error feedback mechanism.
+ */
 void error(struct kr_query *qry, struct address_state *addr_state,
            const struct kr_transport *transport, enum kr_selection_error sel_error);
 
+/**
+ * @brief Get RTT state from cache. Returns `default_rtt_state` on unknown addresses.
+ */
 struct rtt_state get_rtt_state(const uint8_t *ip, size_t len, struct kr_cache *cache);
+
 int put_rtt_state(const uint8_t *ip, size_t len, struct rtt_state state, struct kr_cache *cache);
 
+/**
+ * @internal Helper function for conversion between different IP representations.
+ */
 void bytes_to_ip(uint8_t *bytes, size_t len, union inaddr *dst);
+
+/**
+ * @internal Helper function for conversion between different IP representations.
+ */
 uint8_t* ip_to_bytes(const union inaddr *src, size_t len);
+
+
 
 void check_tls_capable(struct address_state *address_state, struct kr_request *req,
                        struct sockaddr *address);
