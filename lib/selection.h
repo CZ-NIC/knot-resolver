@@ -168,14 +168,30 @@ struct kr_transport *choose_transport(struct choice choices[], int choices_len,
 void update_rtt(struct kr_query *qry, struct address_state *addr_state,
                 const struct kr_transport *transport, unsigned rtt);
 
+/**
+ * @brief Common part of error feedback mechanism.
+ */
 void error(struct kr_query *qry, struct address_state *addr_state,
            const struct kr_transport *transport, enum kr_selection_error sel_error);
 
+/**
+ * @brief Get RTT state from cache. Returns `default_rtt_state` on unknown addresses.
+ */
 struct rtt_state get_rtt_state(const uint8_t *ip, size_t len, struct kr_cache *cache);
+
 int put_rtt_state(const uint8_t *ip, size_t len, struct rtt_state state, struct kr_cache *cache);
 
+/**
+ * @internal Helper function for conversion between different IP representations.
+ */
 void bytes_to_ip(uint8_t *bytes, size_t len, union inaddr *dst);
+
+/**
+ * @internal Helper function for conversion between different IP representations.
+ */
 uint8_t* ip_to_bytes(const union inaddr *src, size_t len);
+
+
 
 void check_tls_capable(struct address_state *address_state, struct kr_request *req,
                        struct sockaddr *address);
