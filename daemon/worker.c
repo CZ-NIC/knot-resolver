@@ -1612,10 +1612,11 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 	/* Ignore badly formed queries. */
 	if ((ret != kr_ok() && ret != kr_error(EMSGSIZE)) ||
 	    (is_query == is_outgoing)) {
-		if (!is_outgoing)
+		if (!is_outgoing) {
 			the_worker->stats.dropped += 1;
-		if (!is_outgoing && http_ctx)
-			queue_pop(http_ctx->streams);
+			if (http_ctx)
+				queue_pop(http_ctx->streams);
+		}
 		return kr_error(EILSEQ);
 	}
 
