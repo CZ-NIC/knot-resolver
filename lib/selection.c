@@ -180,13 +180,13 @@ void shuffle_choices(struct choice choices[], int choices_len) {
 
 // Performs the actual selection (currently epsilon-greedy with epsilon = 0.05).
 struct kr_transport *choose_transport(struct choice choices[],
-											 int choices_len,
-											 knot_dname_t **unresolved,
-											 int unresolved_len,
-											 int timeouts,
-											 struct knot_mm *mempool,
-											 bool tcp,
-											 size_t *out_forward_index) {
+                                      int choices_len,
+                                      knot_dname_t **unresolved,
+                                      int unresolved_len,
+                                      int timeouts,
+                                      struct knot_mm *mempool,
+                                      bool tcp,
+                                      size_t *out_forward_index) {
 	if (!choices_len && !unresolved_len) {
 		// There is nothing to choose from :(
 		return NULL;
