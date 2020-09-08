@@ -1564,17 +1564,12 @@ static int parse_packet(knot_pkt_t *query)
 
 int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt_t *pkt)
 {
-	if (!session) {
-		assert(false);
+	if (!session || !pkt)
 		return kr_error(EINVAL);
-	}
 
 	uv_handle_t *handle = session_get_handle(session);
-	bool OK = handle && handle->loop->data;
-	if (!OK) {
-		assert(false);
+	if (!handle || !handle->loop->data)
 		return kr_error(EINVAL);
-	}
 
 	int ret = parse_packet(pkt);
 
@@ -1583,7 +1578,7 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 	/* Ignore badly formed queries. */
 	if ((ret != kr_ok() && ret != kr_error(EMSGSIZE)) ||
 	    (is_query == is_outgoing)) {
-		if (pkt && !is_outgoing) the_worker->stats.dropped += 1;
+		if (!is_outgoing) the_worker->stats.dropped += 1;
 		return kr_error(EILSEQ);
 	}
 
@@ -1613,7 +1608,7 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 		if (handle->type == UV_TCP && qr_task_register(task, session)) {
 			return kr_error(ENOMEM);
 		}
-	} else if (pkt) { /* response from upstream */
+	} else { /* response from upstream */
 		const uint16_t id = knot_wire_get_id(pkt->wire);
 		task = session_tasklist_del_msgid(session, id);
 		if (task == NULL) {
