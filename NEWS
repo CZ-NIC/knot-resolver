@@ -1,4 +1,4 @@
-Knot Resolver 5.y.z (2020-0m-dd)
+Knot Resolver 5.1.3 (2020-09-08)
 ================================
 
 Improvements
@@ -16,6 +16,7 @@ Bugfixes
 - build if libsystemd version isn't detected as integer (#592, !1029)
 - validator: more robust reaction on missing RRSIGs (#390, !1020)
 - ta_update module: fix broken RFC5011 rollover (!1035)
+- garbage collector: avoid keeping multiple copies of cache (!1042)
 
 
 Knot Resolver 5.1.2 (2020-07-01)

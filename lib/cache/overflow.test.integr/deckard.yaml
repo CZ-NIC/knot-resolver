@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+programs:
+- name: kresd1
+  binary: kresd
+  additional:
+    - -n
+  templates:
+    - lib/cache/overflow.test.integr/kresd_config.j2
+    - tests/config/test_dns_generators.lua
+  configs:
+    - config
+    - dns_gen.lua
+- name: kresd2
+  binary: kresd
+  additional:
+    - -n
+  templates:
+    - lib/cache/overflow.test.integr/kresd_config.j2
+    - tests/config/test_dns_generators.lua
+  configs:
+    - config
+    - dns_gen.lua

@@ -34,6 +34,8 @@ struct kr_cache
 	/* A pair of stamps for detection of real-time shifts during runtime. */
 	struct timeval checkpoint_walltime; /**< Wall time on the last check-point. */
 	uint64_t checkpoint_monotime; /**< Monotonic milliseconds on the last check-point. */
+
+	uv_timer_t *health_timer; /**< Timer used for kr_cache_check_health() */
 };
 
 /**
@@ -95,7 +97,8 @@ int kr_cache_insert_rr(struct kr_cache *cache, const knot_rrset_t *rr, const kno
 /**
  * Clear all items from the cache.
  * @param cache cache structure
- * @return 0 or an errcode
+ * @return if nonzero is returned, there's a big problem - you probably want to abort(),
+ * 	perhaps except for kr_error(EAGAIN) which probably indicates transient errors.
  */
 KR_EXPORT
 int kr_cache_clear(struct kr_cache *cache);
@@ -181,3 +184,10 @@ int kr_cache_closest_apex(struct kr_cache *cache, const knot_dname_t *name, bool
  */
 KR_EXPORT
 int kr_unpack_cache_key(knot_db_val_t key, knot_dname_t *buf, uint16_t *type);
+
+/** Periodic kr_cdb_api::check_health().
+ * @param interval in milliseconds.  0 for one-time check, -1 to stop the checks.
+ * @return see check_health() for one-time check; otherwise normal kr_error() code. */
+KR_EXPORT
+int kr_cache_check_health(struct kr_cache *cache, int interval);
+

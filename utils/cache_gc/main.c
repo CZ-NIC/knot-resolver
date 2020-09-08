@@ -5,8 +5,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include <lib/defines.h>
+#include "lib/defines.h"
+#include "lib/utils.h"
 #include <libknot/libknot.h>
+#include <lmdb.h>
 
 #include "kresconfig.h"
 #include "kr_cache_gc.h"
@@ -35,6 +37,7 @@ static void print_help()
 	printf("Optional params:\n");
 	printf(" -d <garbage_interval(millis)>\n");
 	printf(" -l <deletes_per_txn>\n");
+	printf(" -L <reads_per_txn>\n");
 	printf(" -m <rw_txn_duration(usecs)>\n");
 	printf(" -u <cache_max_usage(percent)>\n");
 	printf(" -f <cache_to_be_freed(percent-of-current-usage)>\n");
@@ -70,13 +73,14 @@ int main(int argc, char *argv[])
 	signal(SIGINT, got_killed);
 
 	kr_cache_gc_cfg_t cfg = {
+		.ro_txn_items = 200,
 		.rw_txn_items = 100,
 		.cache_max_usage = 80,
 		.cache_to_be_freed = 10
 	};
 
 	int o;
-	while ((o = getopt(argc, argv, "hnc:d:l:m:u:f:w:t:")) != -1) {
+	while ((o = getopt(argc, argv, "hnvc:d:l:L:m:u:f:w:t:")) != -1) {
 		switch (o) {
 		case 'c':
 			cfg.cache_path = optarg;
@@ -87,6 +91,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'l':
 			cfg.rw_txn_items = get_nonneg_optarg();
+			break;
+		case 'L':
+			cfg.ro_txn_items = get_nonneg_optarg();
 			break;
 		case 'm':
 			cfg.rw_txn_duration = get_nonneg_optarg();
@@ -107,6 +114,9 @@ int main(int argc, char *argv[])
 		case 'n':
 			cfg.dry_run = true;
 			break;
+		case 'v':
+			kr_verbose_set(true);
+			break;
 		case ':':
 		case '?':
 		case 'h':
@@ -124,10 +134,22 @@ int main(int argc, char *argv[])
 
 	int exit_code = 0;
 	kr_cache_gc_state_t *gc_state = NULL;
+	bool last_espace = false;
 	do {
 		int ret = kr_cache_gc(&cfg, &gc_state);
+
+		/* Let's tolerate ESPACE unless twice in a row. */
+		if (ret == KNOT_ESPACE) {
+			if (!last_espace)
+				ret = KNOT_EOK;
+			last_espace = true;
+		} else {
+			last_espace = false;
+		}
+
 		// ENOENT: kresd may not be started yet or cleared the cache now
-		if (ret && ret != -ENOENT) {
+		// MDB_MAP_RESIZED: GC bailed out but on next iteration it should be OK
+		if (ret && ret != KNOT_ENOENT && ret != kr_error(MDB_MAP_RESIZED)) {
 			printf("Error (%s)\n", knot_strerror(ret));
 			exit_code = 10;
 			break;

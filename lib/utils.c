@@ -210,6 +210,31 @@ char* kr_strcatdup(unsigned n, ...)
 	return result;
 }
 
+char * kr_absolutize_path(const char *dirname, const char *fname)
+{
+	assert(dirname && fname);
+	char *result;
+	int aret;
+	if (dirname[0] == '/') { // absolute path is easier
+		aret = asprintf(&result, "%s/%s", dirname, fname);
+	} else { // relative path, but don't resolve symlinks
+		char buf[PATH_MAX];
+		const char *cwd = getcwd(buf, sizeof(buf));
+		if (!cwd)
+			return NULL; // errno has been set already
+		if (strcmp(dirname, ".") == 0) {
+			// get rid of one common case of extraneous "./"
+			aret = asprintf(&result, "%s/%s", cwd, fname);
+		} else {
+			aret = asprintf(&result, "%s/%s/%s", cwd, dirname, fname);
+		}
+	}
+	if (aret > 0)
+		return result;
+	errno = -aret;
+	return NULL;
+}
+
 int kr_memreserve(void *baton, void **mem, size_t elm_size, size_t want, size_t *have)
 {
     if (*have >= want) {
