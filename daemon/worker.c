@@ -379,7 +379,7 @@ static struct qr_task *qr_task_create(struct request_ctx *ctx)
 	 * for UDP answers from upstream *and* from cache
 	 * and for sending non-UDP queries upstream (?) */
 	uint16_t pktbuf_max = KR_EDNS_PAYLOAD;
-	const knot_rrset_t *opt_our = ctx->worker->engine->resolver.opt_rr;
+	const knot_rrset_t *opt_our = ctx->worker->engine->resolver.upstream_opt_rr;
 	if (opt_our) {
 		pktbuf_max = MAX(pktbuf_max, knot_edns_get_payload(opt_our));
 	}
@@ -1797,7 +1797,7 @@ knot_pkt_t * worker_resolve_mk_pkt(const char *qname_str, uint16_t qtype, uint16
 
 	/* Add OPT RR, including wire format so modules can see both representations.
 	 * knot_pkt_put() copies the outside; we need to duplicate the inside manually. */
-	knot_rrset_t *opt = knot_rrset_copy(the_worker->engine->resolver.opt_rr, NULL);
+	knot_rrset_t *opt = knot_rrset_copy(the_worker->engine->resolver.downstream_opt_rr, NULL);
 	if (!opt) {
 		knot_pkt_free(pkt);
 		return NULL;

@@ -422,7 +422,7 @@ static int edns_erase_and_reserve(knot_pkt_t *pkt)
 
 static int edns_create(knot_pkt_t *pkt, knot_pkt_t *template, struct kr_request *req)
 {
-	pkt->opt_rr = knot_rrset_copy(req->ctx->opt_rr, &pkt->mm);
+	pkt->opt_rr = knot_rrset_copy(req->ctx->upstream_opt_rr, &pkt->mm);
 	size_t wire_size = knot_edns_wire_size(pkt->opt_rr);
 #if defined(ENABLE_COOKIES)
 	if (req->ctx->cookie_ctx.clnt.enabled ||
@@ -450,7 +450,7 @@ static int answer_prepare(struct kr_request *req, knot_pkt_t *query)
 	}
 	/* Handle EDNS in the query */
 	if (knot_pkt_has_edns(query)) {
-		answer->opt_rr = knot_rrset_copy(req->ctx->opt_rr, &answer->mm);
+		answer->opt_rr = knot_rrset_copy(req->ctx->downstream_opt_rr, &answer->mm);
 		if (answer->opt_rr == NULL){
 			return kr_error(ENOMEM);
 		}
