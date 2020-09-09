@@ -8,7 +8,7 @@ ENV KNOT_DNS_BUILD_DEPS git-core build-essential libtool autoconf pkg-config \
 	libgnutls28-dev	libprotobuf-dev libprotobuf-c-dev libfstrm-dev
 ENV KNOT_RESOLVER_BUILD_DEPS build-essential pkg-config bsdmainutils liblmdb-dev \
 	libluajit-5.1-dev libuv1-dev libprotobuf-dev libprotobuf-c-dev \
-	libfstrm-dev luajit lua-http libssl-dev
+	libfstrm-dev luajit lua-http libssl-dev libnghttp2-dev
 ENV BUILDENV_DEPS ${KNOT_DNS_BUILD_DEPS} ${KNOT_RESOLVER_BUILD_DEPS}
 RUN echo "deb http://deb.debian.org/debian stretch-backports main" > /etc/apt/sources.list.d/backports.list
 RUN apt-get update -qq && \
