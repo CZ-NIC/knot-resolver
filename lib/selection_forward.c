@@ -55,7 +55,7 @@ void forward_choose_transport(struct kr_query *qry, struct kr_transport **transp
 		check_tcp_connections(addr_state, qry->request, &address->ip);
 		check_network_settings(addr_state, addr_len, qry->flags.NO_IPV4, qry->flags.NO_IPV6);
 
-		if(addr_state->generation == -1 || addr_state->error_count >= ERROR_LIMIT_PER_SERVER) {
+		if(addr_state->generation == -1) {
 			continue;
 		}
 		addr_state->forward_index = i;
