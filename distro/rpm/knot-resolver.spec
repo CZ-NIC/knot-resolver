@@ -45,6 +45,7 @@ BuildRequires:  pkgconfig(libedit)
 BuildRequires:  pkgconfig(libknot) >= 2.8
 BuildRequires:  pkgconfig(libzscanner) >= 2.8
 BuildRequires:  pkgconfig(libdnssec) >= 2.8
+BuildRequires:  pkgconfig(libnghttp2)
 BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  pkgconfig(libcap-ng)
 BuildRequires:  pkgconfig(libuv)
