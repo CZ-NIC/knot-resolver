@@ -140,7 +140,8 @@ struct kr_context
 	/** Default EDNS towards *both* clients and upstream.
 	 * LATER: consider splitting the two, e.g. allow separately
 	 * configured limits for UDP packet size (say, LAN is under control). */
-	knot_rrset_t *opt_rr;
+	knot_rrset_t *downstream_opt_rr;
+	knot_rrset_t *upstream_opt_rr;
 
 	map_t trust_anchors;
 	map_t negative_anchors;
