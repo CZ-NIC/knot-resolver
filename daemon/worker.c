@@ -328,6 +328,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	req->selection_context.is_tls_capable = is_tls_capable;
 	req->selection_context.is_tcp_connected = is_tcp_connected;
 	req->selection_context.is_tcp_waiting = is_tcp_waiting;
+	req->selection_context.async_ns_resolution = async_ns_resolution;
 
 	worker->stats.rconcurrent += 1;
 
