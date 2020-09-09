@@ -22,6 +22,7 @@ depends=(
     'luajit'
     'systemd'
     'libcap-ng'
+    'libnghttp2'
 )
 optdepends=(
     'lua51-basexx: experimental_dot_auth module',
