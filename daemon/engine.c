@@ -441,11 +441,13 @@ static int init_resolver(struct engine *engine)
 	engine->resolver.modules = &engine->modules;
 	engine->resolver.cache_rtt_tout_retry_interval = KR_NS_TIMEOUT_RETRY_INTERVAL;
 	/* Create OPT RR */
-	engine->resolver.opt_rr = mm_alloc(engine->pool, sizeof(knot_rrset_t));
-	if (!engine->resolver.opt_rr) {
+	engine->resolver.downstream_opt_rr = mm_alloc(engine->pool, sizeof(knot_rrset_t));
+	engine->resolver.upstream_opt_rr = mm_alloc(engine->pool, sizeof(knot_rrset_t));
+	if (!engine->resolver.downstream_opt_rr || !engine->resolver.upstream_opt_rr) {
 		return kr_error(ENOMEM);
 	}
-	knot_edns_init(engine->resolver.opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, engine->pool);
+	knot_edns_init(engine->resolver.downstream_opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, engine->pool);
+	knot_edns_init(engine->resolver.upstream_opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, engine->pool);
 	/* Use default TLS padding */
 	engine->resolver.tls_padding = -1;
 	/* Empty init; filled via ./lua/postconfig.lua */

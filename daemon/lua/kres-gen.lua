@@ -295,7 +295,8 @@ struct kr_query {
 };
 struct kr_context {
 	struct kr_qflags options;
-	knot_rrset_t *opt_rr;
+	knot_rrset_t *downstream_opt_rr;
+	knot_rrset_t *upstream_opt_rr;
 	map_t trust_anchors;
 	map_t negative_anchors;
 	struct kr_zonecut root_hints;
