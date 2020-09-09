@@ -23,10 +23,10 @@
 #include "contrib/base64url.h"
 
 #define MAKE_NV(K, KS, V, VS) \
-	{ (uint8_t *)K, (uint8_t *)V, KS, VS, NGHTTP2_NV_FLAG_NONE }
+	{ (uint8_t *)(K), (uint8_t *)(V), (KS), (VS), NGHTTP2_NV_FLAG_NONE }
 
 #define MAKE_STATIC_NV(K, V) \
-	MAKE_NV(K, sizeof(K) - 1, V, sizeof(V) - 1)
+	MAKE_NV((K), sizeof(K) - 1, (V), sizeof(V) - 1)
 
 /* Use same maximum as for tcp_pipeline_max. */
 #define HTTP_MAX_CONCURRENT_STREAMS UINT16_MAX
@@ -34,7 +34,7 @@
 #define HTTP_FRAME_HDLEN 9
 #define HTTP_FRAME_PADLEN 1
 
-#define MAX_DECIMAL_LENGTH(VT) (CHAR_BIT * sizeof(VT) / 3) + 3
+#define MAX_DECIMAL_LENGTH(VT) ((CHAR_BIT * sizeof(VT) / 3) + 3)
 
 struct http_data {
 	uint8_t *buf;
@@ -139,7 +139,7 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 		return kr_error(EINVAL);
 
 	static const char key[] = "dns=";
-	char *beg = strstr((const char *)path, key);
+	char *beg = strstr(path, key);
 	char *end;
 	size_t remaining;
 	ssize_t ret;
@@ -363,8 +363,8 @@ finish:
  *
  * This function may trigger outgoing HTTP/2 data, such as stream resets, window updates etc.
  */
-ssize_t http_process_input_data(struct session *session, const uint8_t *in_buf,
-				ssize_t in_buf_len)
+ssize_t http_process_input_data(struct session *session, const uint8_t *buf,
+				ssize_t nread)
 {
 	struct http_ctx *ctx = session_http_get_server_ctx(session);
 	ssize_t ret = 0;
@@ -378,7 +378,7 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *in_buf,
 	ctx->buf_pos = 0;
 	ctx->buf_size = session_wirebuf_get_free_size(session);
 
-	ret = nghttp2_session_mem_recv(ctx->h2, in_buf, in_buf_len);
+	ret = nghttp2_session_mem_recv(ctx->h2, buf, nread);
 	if (ret < 0) {
 		kr_log_error("[http] nghttp2_session_mem_recv failed: %s (%zd)\n",
 			     nghttp2_strerror(ret), ret);
