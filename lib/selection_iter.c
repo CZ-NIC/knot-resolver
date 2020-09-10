@@ -187,11 +187,6 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 
 	trie_it_free(it);
 
-	if (to_resolve) {
-		qry->request->selection_context.async_ns_resolution(unresolved_names[0], KNOT_RRTYPE_AAAA);
-		qry->request->selection_context.async_ns_resolution(unresolved_names[0], KNOT_RRTYPE_A);
-	}
-
 	if (valid_addresses || to_resolve) {
 		bool tcp = qry->flags.TCP | qry->server_selection.truncated;
 		*transport = choose_transport(choices, valid_addresses, unresolved_names, to_resolve, qry->server_selection.timeouts, mempool, tcp, NULL);
