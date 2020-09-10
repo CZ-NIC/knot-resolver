@@ -488,21 +488,21 @@ int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status)
 		qr_task_complete(task);
 	}
 
-	if (!handle) {
+	if (!handle)
 		return status;
-	}
 
 	struct session* s = handle->data;
 	assert(s);
 
 	if (handle->type == UV_UDP && session_flags(s)->outgoing) {
-		// We will start the timeout timer for UDP here as this closest to wire we can get
+		/* Start the timeout timer for UDP here, since this is the closest
+		 * to the wire we can get. */
 		struct kr_request *req = &task->ctx->req;
 		/* Check current query NSLIST */
 		struct kr_query *qry = array_tail(req->rplan.pending);
 		assert(qry != NULL);
 		/* Retransmit at default interval, or more frequently if the mean
-		* RTT of the server is better. If the server is glued, use default rate. */
+		 * RTT of the server is better. If the server is glued, use default rate. */
 		size_t timeout = qry->ns.score;
 		if (timeout > KR_NS_GLUED) {
 			/* We don't have information about variance in RTT, expect +10ms */
@@ -519,21 +519,18 @@ int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status)
 		}
 	}
 
-
 	if (handle->type == UV_TCP) {
-		if (status != 0) {
+		if (status != 0)
 			session_tasklist_del(s, task);
-		}
 
-		if (session_flags(s)->outgoing || session_flags(s)->closing) {
+		if (session_flags(s)->outgoing || session_flags(s)->closing)
 			return status;
-		}
 
 		struct worker_ctx *worker = task->ctx->worker;
 		if (session_flags(s)->throttled &&
-			session_tasklist_get_len(s) < worker->tcp_pipeline_max/2) {
-		/* Start reading again if the session is throttled and
-			* the number of outgoing requests is below watermark. */
+		    session_tasklist_get_len(s) < worker->tcp_pipeline_max/2) {
+			/* Start reading again if the session is throttled and
+			 * the number of outgoing requests is below watermark. */
 			session_start_read(s);
 			session_flags(s)->throttled = false;
 		}
@@ -1054,7 +1051,7 @@ static uv_handle_t *retransmit(struct qr_task *task)
 			task->pending[task->pending_count] = session;
 			task->pending_count += 1;
 			task->addrlist_turn = (task->addrlist_turn + 1) %
-					      task->addrlist_count; /* Round robin */
+					       task->addrlist_count; /* Round robin */
 			session_start_read(session); /* Start reading answer */
 		}
 	}
