@@ -224,6 +224,16 @@ struct kr_transport *choose_transport(struct choice choices[],
 		choice = 0;
 	}
 
+
+	// Don't try the same server again when there are other choices to be explored
+	if (choices[choice].address_state->errors && unresolved_len) {
+		*transport = (struct kr_transport) {
+			.protocol = KR_TRANSPORT_NOADDR,
+			.name = unresolved[kr_rand_bytes(1) % unresolved_len]
+		};
+		return transport;
+	}
+
 	unsigned timeout = calc_timeout(choices[choice].address_state->rtt_state);
 	if (no_rtt_info(choices[choice].address_state->rtt_state)) {
 		// Exponential back-off when retrying after timeout and choosing an unknown server
