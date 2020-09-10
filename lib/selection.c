@@ -226,7 +226,7 @@ struct kr_transport *choose_transport(struct choice choices[],
 
 
 	// Don't try the same server again when there are other choices to be explored
-	if (choices[choice].address_state->errors && unresolved_len) {
+	if (choices[choice].address_state->error_count && unresolved_len) {
 		*transport = (struct kr_transport) {
 			.protocol = KR_TRANSPORT_NOADDR,
 			.name = unresolved[kr_rand_bytes(1) % unresolved_len]
