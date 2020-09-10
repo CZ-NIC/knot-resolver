@@ -281,7 +281,6 @@ void async_ns_resolution(knot_dname_t *name, enum knot_rr_type type) {
 	knot_pkt_t* pkt = worker_resolve_mk_pkt_dname(name, type, KNOT_CLASS_IN, &flags);
 	struct qr_task *task = worker_resolve_start(pkt, flags);
 	if (task) {
-		task->ctx->req.options.IS_ASYNC_NS = true;
 		worker_resolve_exec(task, pkt);
 	}
 	free(pkt);
