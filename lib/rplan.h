@@ -54,6 +54,7 @@ struct kr_qflags {
 	bool NO_NS_FOUND : 1;    /**< No valid NS found during last PRODUCE stage. */
 	bool PKT_IS_SANE : 1;    /**< Set by iterator in consume phase to indicate whether
 				  * some basic aspects of the packet are OK, e.g. QNAME. */
+	bool IS_ASYNC_NS : 1;    /**< Request is a async NS resolution for server selection */
 };
 
 /** Combine flags together.  This means set union for simple flags. */
