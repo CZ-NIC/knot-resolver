@@ -22,6 +22,8 @@ static int net_list_add(const char *key, void *val, void *ext)
 
 		if (ep->flags.kind) {
 			lua_pushstring(L, ep->flags.kind);
+		} else if (ep->flags.http && ep->flags.tls) {
+			lua_pushliteral(L, "doh2");
 		} else if (ep->flags.tls) {
 			lua_pushliteral(L, "tls");
 		} else {
