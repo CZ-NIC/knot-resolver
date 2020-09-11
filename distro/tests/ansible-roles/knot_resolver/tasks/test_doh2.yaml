@@ -1,0 +1,9 @@
+---
+# SPDX-License-Identifier: GPL-3.0-or-later
+- name: doh2_test query localhost. A
+  get_url:
+    url: https://127.0.0.1:44354/doh?dns=1Y0BAAABAAAAAAAACWxvY2FsaG9zdAAAAQAB
+    sha256sum: e5c2710e6ecb78c089ab608ad5861b87be0d1c623c4d58b4eee3b21c06aa2008
+    dest: /tmp/doh_test
+    mode: 0644
+    validate_certs: false

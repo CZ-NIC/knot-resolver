@@ -1,0 +1,9 @@
+---
+# SPDX-License-Identifier: GPL-3.0-or-later
+- name: doh2_config set up kresd.conf
+  blockinfile:
+    marker: -- {mark} ANSIBLE MANAGED BLOCK
+    block: |
+      net.listen('127.0.0.1', 44354, { kind = 'doh2' })
+    path: /etc/knot-resolver/kresd.conf
+    insertbefore: BOF
