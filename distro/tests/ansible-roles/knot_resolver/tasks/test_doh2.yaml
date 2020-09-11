@@ -1,0 +1,22 @@
+---
+# SPDX-License-Identifier: GPL-3.0-or-later
+- name: doh2_test check kdig version
+  shell: kdig --version | sed 's/.*version \([0-9.]\+\)/\1/'
+  register: kdig_version
+
+- name: doh2_test query localhost. A
+  # use curl instead of ansible builtins (get_url/uri)
+  # because they currently use unsupported HTTP/1.1
+  shell: |
+    curl -k -o /tmp/doh_test https://127.0.0.1:44354/doh?dns=1Y0BAAABAAAAAAAACWxvY2FsaG9zdAAAAQAB
+    echo "e5c2710e6ecb78c089ab608ad5861b87be0d1c623c4d58b4eee3b21c06aa2008  /tmp/doh_test" > /tmp/doh_test.sha256
+    sha256sum --check /tmp/doh_test.sha256
+  args:
+    # disable warning about using curl - we know what we're doing
+    warn: false
+
+- name: doh2_test kdig localhost. A
+  shell: |
+    kdig @127.0.0.1 -p 44354 +https nic.cz || exit 1
+    kdig @127.0.0.1 -p 44354 +https-get nic.cz || exit 2
+  when: kdig_version.stdout >= "3.0.0"
