@@ -9,7 +9,10 @@ local function count_sockets()
 	for _, socket in ipairs(net.list()) do
 		if socket.kind == 'control' then
 			control_socks = control_socks + 1
-		elseif socket.kind == 'dns' or socket.kind == 'tls' or socket.kind == 'doh' then
+		elseif (socket.kind == 'dns' or
+			socket.kind == 'tls' or
+			socket.kind == 'doh' or
+			socket.kind == 'doh2') then
 			dns_socks = dns_socks + 1
 		end
 	end
