@@ -12,6 +12,7 @@ addons:
             - libuv
             - lmdb
             - meson
+            - nghttp2
         update: true
 compiler:
     - clang
