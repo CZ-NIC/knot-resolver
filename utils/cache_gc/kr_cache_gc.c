@@ -185,7 +185,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	}
 	knot_db_t *const db = (*state)->db; // frequently used shortcut
 
-	const double db_usage = kr_cdb_lmdb()->usage_percent(db);
+	const double db_usage = kr_cdb_lmdb()->usage_percent((*state)->kres_db.db);
 	const bool large_usage = db_usage >= cfg->cache_max_usage;
 	if (cfg->dry_run || large_usage || VERBOSE_STATUS) {	// don't print this on every size check
 		printf("Usage: %.2lf%%\n", db_usage);
