@@ -26,7 +26,16 @@
 
     - include: test_kres_cache_gc.yaml
 
-    - name: Test DoH
+    - name: Test DoH (new implementation)
+      block:
+        - include: configure_doh2.yaml
+          when: ansible_distribution in ["CentOS", "Fedora", "Debian", "Ubuntu"]
+
+        - include: restart_kresd.yaml
+        - include: test_doh2.yaml
+      when: distro in ["Fedora", "Debian", "CentOS"] or (distro == "Ubuntu" and ansible_distribution_major_version|int >= 18)
+
+    - name: Test DoH (Legacy)
       block:
         - name: Install knot-resolver-module-http
           package:
