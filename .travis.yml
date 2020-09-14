@@ -23,7 +23,7 @@ jobs:
     fast_finish: true
 env:
     global:
-        - KNOT_DNS_VERSION=2.9
+        - KNOT_DNS_VERSION=3.0
         - MALLOC_CHECK_=3
         - MALLOC_PERTURB_=223
 before_script:

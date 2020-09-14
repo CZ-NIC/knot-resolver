@@ -2,7 +2,7 @@
 
 FROM debian:buster
 MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
-ARG KNOT_BRANCH=2.9
+ARG KNOT_BRANCH=3.0
 ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /root
