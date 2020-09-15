@@ -471,21 +471,20 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 
 	/* Set output streams */
 	FILE *out = stdout;
-	uv_os_fd_t stream_fd = 0;
+	uv_os_fd_t stream_fd = -1;
 	struct args *args = the_args;
-	if (uv_fileno((uv_handle_t *)stream, &stream_fd)) {
+	struct io_stream_data *data = (struct io_stream_data*) stream->data;
+	if (nread < 0 || uv_fileno((uv_handle_t *)stream, &stream_fd)) {
+		mp_delete(data->pool->ctx);
 		uv_close((uv_handle_t *)stream, (uv_close_cb) free);
 		free(commands);
 		return;
 	}
+	if (nread <= 0) {
+		free(commands);
+		return;
+	}
 	if (stream_fd != STDIN_FILENO) {
-		if (nread < 0) { /* Close if disconnected */
-			uv_close((uv_handle_t *)stream, (uv_close_cb) free);
-		}
-		if (nread <= 0) {
-			free(commands);
-			return;
-		}
 		uv_os_fd_t dup_fd = dup(stream_fd);
 		if (dup_fd >= 0) {
 			out = fdopen(dup_fd, "w");
@@ -494,7 +493,6 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 
 	char *cmd, *cmd_next = NULL;
 	bool incomplete_cmd = false;
-	struct io_stream_data *data = (struct io_stream_data*) stream->data;
 
 	/* Execute */
 	if (stream && commands && nread > 0) {
@@ -643,7 +641,7 @@ struct io_stream_data *io_tty_alloc_data() {
 	}
 	memcpy(pool, &_pool, sizeof(*pool));
 
-	struct io_stream_data *data = mm_malloc(pool, sizeof(struct io_stream_data));
+	struct io_stream_data *data = mm_alloc(pool, sizeof(struct io_stream_data));
 
 	data->buf = mp_start(pool->ctx, 512);
 	data->mode = io_mode_text;
@@ -656,7 +654,8 @@ struct io_stream_data *io_tty_alloc_data() {
 void io_tty_accept(uv_stream_t *master, int status)
 {
 	struct io_stream_data *data = io_tty_alloc_data();
-	uv_tcp_t *client = mm_malloc(data->pool, sizeof(*client));
+	/* We can't use any allocations after mp_start() and it's easier anyway. */
+	uv_tcp_t *client = malloc(sizeof(*client));
 	client->data = data;
 
 	struct args *args = the_args;
