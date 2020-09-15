@@ -436,6 +436,19 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
 	return 0;
 }
 
+
+enum io_stream_mode {
+	io_mode_text = 0,
+	io_mode_binary = 1,
+};
+
+struct io_stream_data {
+	enum io_stream_mode mode;
+	size_t blen;
+	char *buf;
+	knot_mm_t *pool;
+};
+
 /**
  * TTY control: process input and free() the buffer.
  *
