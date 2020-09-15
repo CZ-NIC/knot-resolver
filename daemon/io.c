@@ -646,12 +646,12 @@ void io_tty_accept(uv_stream_t *master, int status)
 {
 	struct io_stream_data *data = io_tty_alloc_data();
 	/* We can't use any allocations after mp_start() and it's easier anyway. */
-	uv_tcp_t *client = malloc(sizeof(*client));
+	uv_pipe_t *client = malloc(sizeof(*client));
 	client->data = data;
 
 	struct args *args = the_args;
 	if (client && client->data) {
-		 uv_tcp_init(master->loop, client);
+		 uv_pipe_init(master->loop, client, 0);
 		 if (uv_accept(master, (uv_stream_t *)client) != 0) {
 			mp_delete(data->pool->ctx);
 			return;
