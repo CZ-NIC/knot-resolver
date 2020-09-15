@@ -136,7 +136,6 @@ KR_EXPORT
 void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t prev_size);
 
 /** Trivial malloc() wrapper. */
-KR_EXPORT
 void *mm_malloc(void *ctx, size_t n);
 /** posix_memalign() wrapper. */
 void *mm_malloc_aligned(void *ctx, size_t n);
