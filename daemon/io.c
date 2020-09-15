@@ -151,6 +151,23 @@ int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags
 			if (setsockopt(fd, optlevel, optname, &yes, sizeof(yes)))
 				return kr_error(errno);
 		}
+
+		/* Linux 3.15 has IP_PMTUDISC_OMIT which makes sockets
+		 * ignore PMTU information and send packets with DF=0.
+		 * This mitigates DNS fragmentation attacks by preventing
+		 * forged PMTU information.  FreeBSD already has same semantics
+		 * without setting the option.
+			https://gitlab.nic.cz/knot/knot-dns/-/issues/640
+		 */
+#if defined(IP_MTU_DISCOVER) && defined(IP_PMTUDISC_OMIT)
+		int omit = IP_PMTUDISC_OMIT;
+		if (type == SOCK_DGRAM && addr->sa_family == AF_INET
+		    && setsockopt(fd, IPPROTO_IP, IP_MTU_DISCOVER, &omit, sizeof(omit))) {
+			kr_log_error(
+				"[ io ] failed to disable Path MTU discovery for %s UDP: %s\n",
+				kr_straddr(addr), strerror(errno));
+		}
+#endif
 	}
 
 	if (bind(fd, addr, kr_sockaddr_len(addr)))
