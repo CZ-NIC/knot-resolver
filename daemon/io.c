@@ -485,128 +485,131 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 	char *cmd, *cmd_next = NULL;
 	bool incomplete_cmd = false;
 
+	if (!(stream && commands && nread > 0)) {
+		goto finish;
+	}
 	/* Execute */
-	if (stream && commands && nread > 0) {
-		if (commands[nread - 1] != '\n') {
-			incomplete_cmd = true;
-		}
-		/* Ensure commands is 0-terminated */
-		if (nread >= buf->len) { /* only equality should be possible */
-			char *newbuf = realloc(commands, nread + 1);
-			if (!newbuf)
-				goto finish;
-			commands = newbuf;
-		}
-		commands[nread] = '\0';
 
-		const char *delim = args->quiet ? "" : "> ";
+	if (commands[nread - 1] != '\n') {
+		incomplete_cmd = true;
+	}
+	/* Ensure commands is 0-terminated */
+	if (nread >= buf->len) { /* only equality should be possible */
+		char *newbuf = realloc(commands, nread + 1);
+		if (!newbuf)
+			goto finish;
+		commands = newbuf;
+	}
+	commands[nread] = '\0';
 
-		/* No command, just new line */
-		if (nread == 1 && (data->mode == io_mode_text) == false && commands[nread-1] == '\0' && data->blen == 0) {
-			if (stream_fd != STDIN_FILENO) {
-				fprintf(out, "%s", delim);
-			}
-			if (stream_fd == STDIN_FILENO || VERBOSE_STATUS) {
-				fprintf(stdout, "%s", delim);
-			}
+	const char *delim = args->quiet ? "" : "> ";
+
+	/* No command, just new line */
+	if (nread == 1 && (data->mode == io_mode_text) == false && commands[nread-1] == '\0' && data->blen == 0) {
+		if (stream_fd != STDIN_FILENO) {
+			fprintf(out, "%s", delim);
 		}
+		if (stream_fd == STDIN_FILENO || VERBOSE_STATUS) {
+			fprintf(stdout, "%s", delim);
+		}
+	}
 
-		char *boundary = "\n\0";
-		cmd = strtok(commands, "\n");
-		/* strtok skip '\n' but we need process alone '\n' too */
-		if (commands[0] == '\n') {
-			cmd_next = cmd;
-			cmd = boundary;
-		} else {
+	char *boundary = "\n\0";
+	cmd = strtok(commands, "\n");
+	/* strtok skip '\n' but we need process alone '\n' too */
+	if (commands[0] == '\n') {
+		cmd_next = cmd;
+		cmd = boundary;
+	} else {
+		cmd_next = strtok(NULL, "\n");
+	}
+
+	char *pbuf = data->buf + data->blen;
+	while (cmd != NULL) {
+		/* Last command is incomplete - save it and execute later */
+		if (incomplete_cmd && cmd_next == NULL) {
+			pbuf = mp_append_string(data->pool->ctx, pbuf, cmd);
+			mp_append_char(data->pool->ctx, pbuf, '\0');
+			data->buf = mp_ptr(data->pool->ctx);
+			data->blen = data->blen + strlen(cmd);
+
+			cmd = cmd_next;
+			/* There is new incomplete command */
+			if (commands[nread - 1] == '\n')
+				incomplete_cmd = false;
 			cmd_next = strtok(NULL, "\n");
+			continue;
 		}
 
-		char *pbuf = data->buf + data->blen;
-		while (cmd != NULL) {
-			/* Last command is incomplete - save it and execute later */
-			if (incomplete_cmd && cmd_next == NULL) {
+		/* Process incomplete command from previously call */
+		if (data->blen > 0) {
+			if (commands[0] != '\n' && commands[0] != '\0') {
 				pbuf = mp_append_string(data->pool->ctx, pbuf, cmd);
 				mp_append_char(data->pool->ctx, pbuf, '\0');
 				data->buf = mp_ptr(data->pool->ctx);
-				data->blen = data->blen + strlen(cmd);
-
-				cmd = cmd_next;
-				/* There is new incomplete command */
-				if (commands[nread - 1] == '\n')
-					incomplete_cmd = false;
-				cmd_next = strtok(NULL, "\n");
-				continue;
+				cmd = data->buf;
+			} else {
+				cmd = data->buf;
 			}
+			data->blen = 0;
+			pbuf = data->buf;
+		}
 
-			/* Process incomplete command from previously call */
-			if (data->blen > 0) {
-				if (commands[0] != '\n' && commands[0] != '\0') {
-					pbuf = mp_append_string(data->pool->ctx, pbuf, cmd);
-					mp_append_char(data->pool->ctx, pbuf, '\0');
-					data->buf = mp_ptr(data->pool->ctx);
-					cmd = data->buf;
-				} else {
-					cmd = data->buf;
-				}
-				data->blen = 0;
-				pbuf = data->buf;
-			}
+		/* Pseudo-command for switching to "binary output"; */
+		if (strcmp(cmd, "__binary") == 0) {
+			data->mode = io_mode_binary;
+			cmd = cmd_next;
+			cmd_next = strtok(NULL, "\n");
+			continue;
+		}
 
-			/* Pseudo-command for switching to "binary output"; */
-			if (strcmp(cmd, "__binary") == 0) {
-				data->mode = io_mode_binary;
-				cmd = cmd_next;
-				cmd_next = strtok(NULL, "\n");
-				continue;
-			}
+		lua_State *L = the_worker->engine->L;
+		int ret = engine_cmd(L, cmd, false);
+		const char *message = "";
+		if (lua_gettop(L) > 0) {
+			message = lua_tostring(L, -1);
+		}
 
-			lua_State *L = the_worker->engine->L;
-			int ret = engine_cmd(L, cmd, false);
-			const char *message = "";
-			if (lua_gettop(L) > 0) {
-				message = lua_tostring(L, -1);
-			}
-
-			/* Simpler output in binary mode */
-			if (data->mode == io_mode_binary) {
-				size_t len_s = strlen(message);
-				if (len_s > UINT32_MAX) {
-					cmd = cmd_next;
-					cmd_next = strtok(NULL, "\n");
-					continue;
-				}
-				uint32_t len_n = htonl(len_s);
-				fwrite(&len_n, sizeof(len_n), 1, out);
-				fwrite(message, len_s, 1, out);
-				lua_settop(L, 0);
+		/* Simpler output in binary mode */
+		if (data->mode == io_mode_binary) {
+			size_t len_s = strlen(message);
+			if (len_s > UINT32_MAX) {
 				cmd = cmd_next;
 				cmd_next = strtok(NULL, "\n");
 				continue;
 			}
-			/* Log to remote socket if connected */
-			if (stream_fd != STDIN_FILENO) {
-				if (VERBOSE_STATUS)
-					fprintf(stdout, "%s\n", cmd); /* Duplicate command to logs */
-				if (message)
-					fprintf(out, "%s", message); /* Duplicate output to sender */
-				if (message || !args->quiet)
-					fprintf(out, "\n");
-				fprintf(out, "%s", delim);
-			}
-			if (stream_fd == STDIN_FILENO || VERBOSE_STATUS) {
-				/* Log to standard streams */
-				FILE *fp_out = ret ? stderr : stdout;
-				if (message)
-					fprintf(fp_out, "%s", message);
-				if (message || !args->quiet)
-					fprintf(fp_out, "\n");
-				fprintf(fp_out, "%s", delim);
-			}
+			uint32_t len_n = htonl(len_s);
+			fwrite(&len_n, sizeof(len_n), 1, out);
+			fwrite(message, len_s, 1, out);
 			lua_settop(L, 0);
 			cmd = cmd_next;
 			cmd_next = strtok(NULL, "\n");
+			continue;
 		}
+		/* Log to remote socket if connected */
+		if (stream_fd != STDIN_FILENO) {
+			if (VERBOSE_STATUS)
+				fprintf(stdout, "%s\n", cmd); /* Duplicate command to logs */
+			if (message)
+				fprintf(out, "%s", message); /* Duplicate output to sender */
+			if (message || !args->quiet)
+				fprintf(out, "\n");
+			fprintf(out, "%s", delim);
+		}
+		if (stream_fd == STDIN_FILENO || VERBOSE_STATUS) {
+			/* Log to standard streams */
+			FILE *fp_out = ret ? stderr : stdout;
+			if (message)
+				fprintf(fp_out, "%s", message);
+			if (message || !args->quiet)
+				fprintf(fp_out, "\n");
+			fprintf(fp_out, "%s", delim);
+		}
+		lua_settop(L, 0);
+		cmd = cmd_next;
+		cmd_next = strtok(NULL, "\n");
 	}
+
 finish:
 	free(commands);
 	/* Close if redirected */
