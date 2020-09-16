@@ -510,18 +510,6 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 	}
 	commands[nread] = '\0';
 
-	const char *delim = args->quiet ? "" : "> ";
-
-	/* No command, just new line */
-	if (nread == 1 && (data->mode == io_mode_text) == false && commands[nread-1] == '\0' && data->blen == 0) {
-		if (stream_fd != STDIN_FILENO) {
-			fprintf(out, "%s", delim);
-		}
-		if (stream_fd == STDIN_FILENO || VERBOSE_STATUS) {
-			fprintf(stdout, "%s", delim);
-		}
-	}
-
 	char *boundary = "\n\0";
 	cmd = strtok(commands, "\n");
 	/* strtok skip '\n' but we need process alone '\n' too */
@@ -585,7 +573,9 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 			fwrite(message, len_s, 1, out);
 			goto next_iter;
 		}
+
 		/* Log to remote socket if connected */
+		const char *delim = args->quiet ? "" : "> ";
 		if (stream_fd != STDIN_FILENO) {
 			if (VERBOSE_STATUS)
 				fprintf(stdout, "%s\n", cmd); /* Duplicate command to logs */
