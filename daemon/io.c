@@ -13,6 +13,7 @@
 #include "daemon/worker.h"
 #include "daemon/tls.h"
 #include "daemon/session.h"
+#include "contrib/cleanup.h"
 #include "lib/utils.h"
 
 #define negotiate_bufsize(func, handle, bufsize_want) do { \
@@ -467,7 +468,7 @@ struct io_stream_data {
  */
 void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
-	char *commands = buf ? buf->base : NULL; /* To be free()d on return. */
+	auto_free char *commands = buf ? buf->base : NULL;
 
 	/* Set output streams */
 	FILE *out = stdout;
@@ -477,11 +478,9 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 	if (nread < 0 || uv_fileno((uv_handle_t *)stream, &stream_fd)) {
 		mp_delete(data->pool->ctx);
 		uv_close((uv_handle_t *)stream, (uv_close_cb) free);
-		free(commands);
 		return;
 	}
 	if (nread <= 0) {
-		free(commands);
 		return;
 	}
 	if (stream_fd != STDIN_FILENO) {
@@ -620,7 +619,6 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 	}
 
 finish:
-	free(commands);
 	/* Close if redirected */
 	if (stream_fd != STDIN_FILENO) {
 		fclose(out);
