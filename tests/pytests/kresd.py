@@ -263,9 +263,9 @@ def take_port(port, ip=None, ip6=None, timeout=0):
     end_time = time.time() + timeout
     try:
         port_path.touch(exist_ok=False)
-    except FileExistsError:
+    except FileExistsError as ex:
         raise ValueError(
-            "Port {} already reserved by system or another kresd instance!".format(port))
+            "Port {} already reserved by system or another kresd instance!".format(port)) from ex
 
     while True:
         if is_port_free(port, ip, ip6):

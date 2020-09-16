@@ -103,9 +103,9 @@ def expect_kresd_close(rst_ok=False):
         try:
             time.sleep(0.2)  # give kresd time to close connection with TCP FIN
             yield
-        except ConnectionResetError:
+        except ConnectionResetError as ex:
             if rst_ok:
-                raise BrokenPipeError
+                raise BrokenPipeError from ex
             pytest.skip("kresd closed connection with TCP RST")
         pytest.fail("kresd didn't close the connection")
 
