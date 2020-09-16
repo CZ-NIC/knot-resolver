@@ -533,6 +533,7 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 	}
 
 	char *pbuf = data->buf + data->blen;
+	lua_State *L = the_worker->engine->L;
 	while (cmd != NULL) {
 		/* Last command is incomplete - save it and execute later */
 		if (incomplete_cmd && cmd_next == NULL) {
@@ -541,12 +542,10 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 			data->buf = mp_ptr(data->pool->ctx);
 			data->blen = data->blen + strlen(cmd);
 
-			cmd = cmd_next;
 			/* There is new incomplete command */
 			if (commands[nread - 1] == '\n')
 				incomplete_cmd = false;
-			cmd_next = strtok(NULL, "\n");
-			continue;
+			goto next_iter;
 		}
 
 		/* Process incomplete command from previously call */
@@ -566,12 +565,9 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 		/* Pseudo-command for switching to "binary output"; */
 		if (strcmp(cmd, "__binary") == 0) {
 			data->mode = io_mode_binary;
-			cmd = cmd_next;
-			cmd_next = strtok(NULL, "\n");
-			continue;
+			goto next_iter;
 		}
 
-		lua_State *L = the_worker->engine->L;
 		int ret = engine_cmd(L, cmd, false);
 		const char *message = "";
 		if (lua_gettop(L) > 0) {
@@ -582,17 +578,12 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 		if (data->mode == io_mode_binary) {
 			size_t len_s = strlen(message);
 			if (len_s > UINT32_MAX) {
-				cmd = cmd_next;
-				cmd_next = strtok(NULL, "\n");
-				continue;
+				goto next_iter;
 			}
 			uint32_t len_n = htonl(len_s);
 			fwrite(&len_n, sizeof(len_n), 1, out);
 			fwrite(message, len_s, 1, out);
-			lua_settop(L, 0);
-			cmd = cmd_next;
-			cmd_next = strtok(NULL, "\n");
-			continue;
+			goto next_iter;
 		}
 		/* Log to remote socket if connected */
 		if (stream_fd != STDIN_FILENO) {
@@ -613,7 +604,8 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 				fprintf(fp_out, "\n");
 			fprintf(fp_out, "%s", delim);
 		}
-		lua_settop(L, 0);
+	next_iter:
+		lua_settop(L, 0); /* not required in some cases but harmless */
 		cmd = cmd_next;
 		cmd_next = strtok(NULL, "\n");
 	}
