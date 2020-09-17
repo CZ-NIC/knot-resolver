@@ -2,6 +2,8 @@
 local cqsocket = require('cqueues.socket')
 local strerror = require('cqueues.errno').strerror
 
+-- TODO: we get memory leaks from cqueues, but CI runs this without leak detection anyway
+
 local ctrl_sock_txt, ctrl_sock_bin, ctrl_sock_txt_longcmd, ctrl_sock_bin_longcmd
 local ctrl_sock_txt_partcmd, ctrl_sock_bin_partcmd
 
