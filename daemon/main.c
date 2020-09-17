@@ -282,11 +282,11 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 #endif
 	/* Run event loop */
 	uv_run(loop, UV_RUN_DEFAULT);
-	/* Free pipe's data.  Seems OK even on the stopped loop. */
-	if (args->interactive) {
-		io_tty_process_input((uv_stream_t*)pipe, UV_EPIPE, NULL);
-	} else {
-		uv_close((uv_handle_t *)pipe, (uv_close_cb)free);
+	/* Free pipe's data.  Seems OK even on the stopped loop.
+	 * In interactive case it may have been done in callbacks already (single leak). */
+	if (!args->interactive) {
+		uv_close((uv_handle_t *)pipe, NULL);
+		free(pipe);
 	}
 	return EXIT_SUCCESS;
 }
