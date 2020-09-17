@@ -454,8 +454,8 @@ enum io_stream_mode {
 
 struct io_stream_data {
 	enum io_stream_mode mode;
-	size_t blen;
-	char *buf;
+	size_t blen; ///< length of `buf`
+	char *buf;  ///< growing buffer residing on `pool` (mp_append_*)
 	knot_mm_t *pool;
 };
 
@@ -490,6 +490,7 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 		}
 	}
 
+	/** The current single command and the remaining command(s). */
 	char *cmd, *cmd_next = NULL;
 	bool incomplete_cmd = false;
 
@@ -520,6 +521,7 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 		cmd_next = strtok(NULL, "\n");
 	}
 
+	/** Moving pointer to end of buffer with incomplete command. */
 	char *pbuf = data->buf + data->blen;
 	lua_State *L = the_worker->engine->L;
 	while (cmd != NULL) {
