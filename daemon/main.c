@@ -286,6 +286,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	return EXIT_SUCCESS;
 }
 
+
 static void args_init(struct args *args)
 {
 	memset(args, 0, sizeof(struct args));
