@@ -529,7 +529,6 @@ int main(int argc, char **argv)
 	args_init(the_args);
 	int ret = parse_args(argc, argv, the_args);
 	if (ret >= 0) goto cleanup_args;
-	void* x = malloc(1230);
 
 	ret = bind_sockets(&the_args->addrs, false, &the_args->fds);
 	if (ret) goto cleanup_args;
