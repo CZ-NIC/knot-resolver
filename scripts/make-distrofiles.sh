@@ -19,7 +19,7 @@ if [[ $(echo "${version}" | grep '^[[:alnum:].]$') -ne 0 ]]; then
 fi
 
 # Fill in VERSION field in distribution specific files
-files="distro/rpm/${package}.spec distro/deb/changelog distro/arch/PKGBUILD distro/turris/Makefile"
+files="distro/rpm/${package}.spec distro/deb/changelog distro/arch/PKGBUILD"
 for file in ${files}; do
 	sed -i "s/__VERSION__/${version}/g" "${file}"
 done
