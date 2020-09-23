@@ -158,6 +158,9 @@ deckard_commit:
 
 deckard:
   <<: *test_flaky
+  only:  # trigger job only in repos under our control (privileged runner required)
+    - branches@knot/knot-resolver
+    - branches@knot/security/knot-resolver
   tags:
     - privileged
   variables:
