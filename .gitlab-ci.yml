@@ -77,24 +77,6 @@ build-asan:
       # TODO skip_asan: all three of these disappear locally when using gcc 9.1 (except some leaks)
     - ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite unit --suite config --no-suite skip_asan --no-suite snowflake
 
-# NOTE: build for turris when meson is available and packaging files updated
-#build:turris:
-#  <<: *build
-#  image: $CI_REGISTRY/knot/knot-resolver/ci/turris:omnia
-#  script:
-#    - ./scripts/make-archive.sh
-#    - cp knot-resolver*.tar.xz /tmp/turris/dl/
-#    - ./scripts/make-distrofiles.sh
-#    - cp -r distro/turris /tmp/turris/package/knot-resolver
-#    - pushd /tmp/turris
-#    - export PATH=$PATH:$PWD/staging_dir/toolchain-*/bin
-#    - USE_CCACHE=n make CC=arm-openwrt-linux-gcc CXX=arm-openwrt-linux-g++ LD=arm-openwrt-linux-ld -C $PWD V=s
-#    - popd
-#    - cp /tmp/turris/bin/mvebu-musl/packages/base/*.ipk ./
-#  artifacts:
-#    paths:
-#      - "*.ipk"
-
 kres-gen:
   <<: *build
   tags:
