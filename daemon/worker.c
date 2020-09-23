@@ -1569,30 +1569,23 @@ static int parse_packet(knot_pkt_t *query)
 	return ret;
 }
 
-int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt_t *query)
+int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt_t *pkt)
 {
-	if (!session) {
-		assert(false);
+	if (!session || !pkt)
 		return kr_error(EINVAL);
-	}
 
 	uv_handle_t *handle = session_get_handle(session);
-	bool OK = handle && handle->loop->data;
-	if (!OK) {
-		assert(false);
+	if (!handle || !handle->loop->data)
 		return kr_error(EINVAL);
-	}
 
-	/* Parse packet */
-	int ret = parse_packet(query);
+	int ret = parse_packet(pkt);
 
-	const bool is_query = (knot_wire_get_qr(query->wire) == 0);
+	const bool is_query = (knot_wire_get_qr(pkt->wire) == 0);
 	const bool is_outgoing = session_flags(session)->outgoing;
 	/* Ignore badly formed queries. */
-	if (!query ||
-	    (ret != kr_ok() && ret != kr_error(EMSGSIZE)) ||
+	if ((ret != kr_ok() && ret != kr_error(EMSGSIZE)) ||
 	    (is_query == is_outgoing)) {
-		if (query && !is_outgoing) the_worker->stats.dropped += 1;
+		if (!is_outgoing) the_worker->stats.dropped += 1;
 		return kr_error(EILSEQ);
 	}
 
@@ -1602,12 +1595,12 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 	const struct sockaddr *addr = NULL;
 	if (!is_outgoing) { /* request from a client */
 		struct request_ctx *ctx = request_create(the_worker, session, peer,
-							 knot_wire_get_id(query->wire));
+							 knot_wire_get_id(pkt->wire));
 		if (!ctx) {
 			return kr_error(ENOMEM);
 		}
 
-		ret = request_start(ctx, query);
+		ret = request_start(ctx, pkt);
 		if (ret != 0) {
 			request_free(ctx);
 			return kr_error(ENOMEM);
@@ -1622,8 +1615,8 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 		if (handle->type == UV_TCP && qr_task_register(task, session)) {
 			return kr_error(ENOMEM);
 		}
-	} else if (query) { /* response from upstream */
-		const uint16_t id = knot_wire_get_id(query->wire);
+	} else { /* response from upstream */
+		const uint16_t id = knot_wire_get_id(pkt->wire);
 		task = session_tasklist_del_msgid(session, id);
 		if (task == NULL) {
 			VERBOSE_MSG(NULL, "=> ignoring packet with mismatching ID %d\n",
@@ -1639,7 +1632,7 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 	 * Task was created (found). */
 	session_touch(session);
 	/* Consume input and produce next message */
-	return qr_task_step(task, addr, query);
+	return qr_task_step(task, addr, pkt);
 }
 
 static int map_add_tcp_session(map_t *map, const struct sockaddr* addr,
