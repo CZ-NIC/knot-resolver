@@ -446,31 +446,6 @@ resperf:iter.udp-asan:
   script:
     - pytest -r fEsxX tests/packaging -k $DISTRO
 
-packaging:debian_10:
-  <<: *packagingtest
-  variables:
-    DISTRO: debian_10
-
-packaging:debian_9:
-  <<: *packagingtest
-  variables:
-    DISTRO: debian_9
-
-packaging:ubuntu_20.04:
-  <<: *packagingtest
-  variables:
-    DISTRO: ubuntu_20.04
-
-packaging:ubuntu_18.04:
-  <<: *packagingtest
-  variables:
-    DISTRO: ubuntu_18.04
-
-packaging:ubuntu_16.04:
-  <<: *packagingtest
-  variables:
-    DISTRO: ubuntu_16.04
-
 packaging:centos_8:
   <<: *packagingtest
   variables:
