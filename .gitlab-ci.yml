@@ -20,30 +20,53 @@ image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
 
 stages:
   - build
+  - sanity
   - test
-  - extended
+  - respdiff
+  - resperf
   - deploy
-  - deploy-test
+  - pkgtest
 
-# build {{{
-.build: &build
-  stage: build
+.common: &common
   except:
     refs:
       - master@knot/knot-resolver
       - master@knot/security/knot-resolver
     variables:
       - $SKIP_CI == "1"
+  tags:
+    - docker
+    - linux
+    - amd64
+
+.after_build: &after_build
+  <<: *common
+  needs:
+    - build
+  before_script:
+    # meson detects changes and performs useless rebuild; hide the log
+    - ninja -C build_ci* &>/dev/null
+    - rm build_ci*/meson-logs/testlog*.txt  # start with clean testlog
+  artifacts:
+    when: always
+    paths:
+      - build_ci*/meson-logs/testlog*.txt
+      - tmpdeckard*
+
+.nodep: &nodep
+  <<: *common
+  needs: []
+
+# build {{{
+.build: &build
+  <<: *common
+  stage: build
   artifacts:
     when: always
     paths:
       - .local
       - build_ci*
       - build_dist/meson-dist/*.tar.xz
-  tags:
-    - docker
-    - linux
-    - amd64
 
 archive:
   <<: *build
@@ -77,84 +100,123 @@ build-asan:
       # TODO skip_asan: all three of these disappear locally when using gcc 9.1 (except some leaks)
     - ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite unit --suite config --no-suite skip_asan --no-suite snowflake
 
-kres-gen:
-  <<: *build
-  tags:
-    - docker
-  script:
-    - meson build_ci_lib --prefix=$PREFIX
-    - ninja -C build_ci_lib daemon/kresd
-    - ninja -C build_ci_lib kres-gen
-    - git diff --quiet || (git diff; exit 1)
-# }}}
-
-# test {{{
-.test: &test
-  stage: test
-  except:
-    refs:
-      - master@knot/knot-resolver
-      - master@knot/security/knot-resolver
-    variables:
-      - $SKIP_CI == "1"
-  tags:
-    - docker
-    - linux
-    - amd64
-  dependencies:
-    - build
-  before_script:
-    # meson detects changes and performs useless rebuild; hide the log
-    - ninja -C build_ci* &>/dev/null
-    - rm build_ci*/meson-logs/testlog*.txt  # start with clean testlog
-  artifacts:
-    when: always
-    paths:
-      - build_ci*/meson-logs/testlog*.txt
-      - tmpdeckard*
-
-.test_flaky: &test_flaky
-  <<: *test
-  retry:
-    max: 1
-    when:
-      - script_failure
-
-.test_nodep: &test_nodep
-  stage: test
-  except:
-    refs:
-      - master@knot/knot-resolver
-      - master@knot/security/knot-resolver
-    variables:
-      - $SKIP_CI == "1"
-  dependencies: []  # do not download build artifacts
-  tags:
-    - docker
-
 build:darwin:
-  <<: *test_nodep
-  stage: extended # it takes lots of time ATM
+  <<: *nodep
+  stage: build
   when: delayed
-  only:  # trigger job only in the main repo
-    refs:
-      - branches@knot/knot-resolver
-  except:
-    refs:
-      - master@knot/knot-resolver
-    variables:
-      - $SKIP_CI == "1"
-  start_in: 10 minutes  # give the build in Travis CI time to finish
+  start_in: 20 minutes  # give the build in Travis CI time to finish
     # ^^ Travis takes around 20m recently and the CI script waits for 15m,
     #    and it gets ran a bit later due to the previous phase(s).
   script:
     - ci/travis.py ${CI_COMMIT_REF_NAME}
 
+docker:
+  <<: *nodep
+  stage: build
+  image: docker:latest
+  tags:
+    - dind
+  variables:
+    DOCKER_IMAGE_NAME: knot-resolver-test:${CI_COMMIT_SHA}
+  script:
+    - docker build --no-cache -t ${DOCKER_IMAGE_NAME} .
+    - echo "quit()" | docker run -i ${DOCKER_IMAGE_NAME}
+  after_script:  # remove dangling images to avoid running out of disk space
+    - docker rmi ${DOCKER_IMAGE_NAME}
+    - docker rmi $(docker images -f "dangling=true" -q)
+# }}}
+
+# sanity {{{
+.sanity: &sanity
+  <<: *nodep
+  stage: sanity
+
+authors:
+  <<: *sanity
+  only:
+    refs:
+      - /^release.*$/
+  script:
+    - LC_ALL=en_US.UTF-8 scripts/update-authors.sh
+
 deckard_commit:
-  <<: *test_nodep
+  <<: *sanity
   script:
     - ci/deckard_commit_check.sh
-  allow_failure: true
+
+doc:
+  <<: *sanity
+  script:
+    - meson build_doc -Ddoc=enabled
+    - ninja -C build_doc doc-strict
+  artifacts:
+    expire_in: 6 hour
+    paths:
+      - doc/html
+
+lint:other:
+  <<: *sanity
+  script:
+    - meson build_ci_lint &>/dev/null
+    - ninja -C build_ci* pylint
+    - ninja -C build_ci* flake8
+    - ninja -C build_ci* luacheck
+
+lint:pedantic:
+  <<: *after_build
+  stage: sanity
+  script:
+    - meson build_pedantic_gcc -Dwerror=true -Dc_args='-Wpedantic' -Dextra_tests=enabled
+    - ninja -C build_pedantic_gcc
+    - >
+      CC=clang CXX=clang++ meson build_pedantic_clang -Dwerror=true -Dextra_tests=enabled -Dc_args='
+      -Wpedantic -Wno-newline-eof -Wno-gnu-zero-variadic-macro-arguments -Wno-gnu-folding-constant'
+    - ninja -C build_pedantic_clang
+
+lint:scan-build:
+  <<: *after_build
+  stage: sanity
+  artifacts:
+    when: on_failure
+    expire_in: '1 day'
+    paths:
+      - build_ci*/meson-logs/scanbuild
+  script:
+    - export SCANBUILD="scan-build --status-bugs -no-failure-reports $(./scripts/get-scanbuild-args.sh)"
+    - ninja -C build_ci* scan-build || true
+    - test "$(ls build_ci*/meson-logs/scanbuild/*/report-*.html | wc -l)" = 23 # we have this many errors ATM :-)
+
+lint:tidy:
+  <<: *after_build
+  stage: sanity
+  script:
+    - ninja -C build_ci* tidy
+
+kres-gen:
+  <<: *sanity
+  script:
+    - meson build_ci_lib --prefix=$PREFIX
+    - ninja -C build_ci_lib daemon/kresd
+    - ninja -C build_ci_lib kres-gen
+    - git diff --quiet || (git diff; exit 1)
+
+root.hints:
+  <<: *sanity
+  only:
+    refs:
+      - /^release.*$/
+  script:
+    - scripts/update-root-hints.sh
+# }}}
+
+# test {{{
+.test_flaky: &test_flaky
+  <<: *after_build
+  stage: test
+  retry:
+    max: 1
+    when:
+      - script_failure
 
 deckard:
   <<: *test_flaky
@@ -168,85 +230,10 @@ deckard:
   script:
     - ${MESON_TEST} --suite integration
 
-doc:
-  <<: *test_nodep
-  when: delayed
-  start_in: '30 seconds'
-  script:
-    - meson build_doc -Ddoc=enabled
-    - ninja -C build_doc doc-strict
-  artifacts:
-    expire_in: 6 hour
-    paths:
-      - doc/html
-
-docker:
-  <<: *test_nodep
-  only:  # trigger only for repos in our control (requires dind runner)
-    - branches@knot/knot-resolver
-    - branches@knot/security/knot-resolver
-  image: docker:latest
-  tags:
-    - dind
-  variables:
-    DOCKER_IMAGE_NAME: knot-resolver-test:${CI_COMMIT_SHA}
-  script:
-    - docker build --no-cache -t ${DOCKER_IMAGE_NAME} .
-    - echo "quit()" | docker run -i ${DOCKER_IMAGE_NAME}
-  after_script:  # remove dangling images to avoid running out of disk space
-    - docker rmi ${DOCKER_IMAGE_NAME}
-    - docker rmi $(docker images -f "dangling=true" -q)
-
-lint:other:
-  <<: *test_nodep
-  when: delayed
-  start_in: '30 seconds'
-  stage: test
-  script:
-    - meson build_ci_lint &>/dev/null
-    - ninja -C build_ci* pylint
-    - ninja -C build_ci* flake8
-    - ninja -C build_ci* luacheck
-
-lint:pedantic:
-  <<: *test_nodep
-  when: delayed
-  start_in: '30 seconds'
-  tags:
-    - docker
-    - linux
-    - amd64
-  script:
-    - meson build_pedantic_gcc -Dwerror=true -Dc_args='-Wpedantic' -Dextra_tests=enabled
-    - ninja -C build_pedantic_gcc
-    - >
-      CC=clang CXX=clang++ meson build_pedantic_clang -Dwerror=true -Dextra_tests=enabled -Dc_args='
-      -Wpedantic -Wno-newline-eof -Wno-gnu-zero-variadic-macro-arguments -Wno-gnu-folding-constant'
-    - ninja -C build_pedantic_clang
-
-lint:scan-build:
-  <<: *test
-  stage: test
-  artifacts:
-    when: on_failure
-    expire_in: '1 day'
-    paths:
-      - build_ci*/meson-logs/scanbuild
-  before_script: []
-  script:
-    - export SCANBUILD="scan-build --status-bugs -no-failure-reports $(./scripts/get-scanbuild-args.sh)"
-    - ninja -C build_ci* scan-build || true
-    - test "$(ls build_ci*/meson-logs/scanbuild/*/report-*.html | wc -l)" = 23 # we have this many errors ATM :-)
-
-lint:tidy:
-  <<: *test
-  artifacts:
-  script:
-    - ninja -C build_ci* tidy
-
 respdiff:basic:
-  <<: *test
-  dependencies:
+  <<: *after_build
+  stage: test
+  needs:
     - build-asan
   script:
     - ulimit -n "$(ulimit -Hn)" # applies only for kresd ATM
@@ -265,42 +252,17 @@ respdiff:basic:
       - results/*.png
       - results/respdiff.db/data.mdb*
       - ./*.info
-  tags:
-    - docker
-    - linux
-    - amd64
-
-root.hints:
-  <<: *test_nodep
-  only:
-    refs:
-      - /^release.*$/
-  script:
-    - scripts/update-root-hints.sh
-
-authors:
-  <<: *test_nodep
-  only:
-    refs:
-      - /^release.*$/
-  script:
-    - LC_ALL=en_US.UTF-8 scripts/update-authors.sh
 
 test:valgrind:
   <<: *test_flaky
-  when: delayed
-  start_in: '30 seconds'
   script:
     - ${MESON_TEST} --suite unit --suite config --no-suite snowflake --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
     - MESON_TESTTHREADS=1 ${MESON_TEST} --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" --suite snowflake
-# }}}
 
-# extended {{{
 pytests:
   <<: *test_flaky
-  dependencies:
+  needs:
     - build-asan
-  stage: extended  # use this stage to avoid clash with other resource-intensive jobs
   artifacts:
     when: always
     paths:
@@ -308,19 +270,25 @@ pytests:
       - tests/pytests/*.html
   script:
     - ${MESON_TEST} --suite pytests
+# }}}
 
-.respdiff:  &respdiff
-  stage: extended
-  dependencies: []
+# respdiff {{{
+.condor: &condor
+  <<: *common
+  needs:
+    - job: deckard
+      artifacts: false
+    - job: respdiff:basic
+      artifacts: false
   only:  # trigger job only in repos under our control
     - branches@knot/knot-resolver
     - branches@knot/security/knot-resolver
-  except:
-    refs:
-      - master@knot/knot-resolver
-      - master@knot/security/knot-resolver
-    variables:
-      - $SKIP_CI == "1"
+  tags:
+    - condor
+
+.respdiff:  &respdiff
+  <<: *condor
+  stage: respdiff
   script:
     - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPDIFF_FORCE -gt 0 || exit 0
     - test ! -f /var/tmp/respdiff-jobs/buffer/buffer_$RESPDIFF_TEST_stats.json || test $RESPDIFF_FORCE -gt 0 || ( echo "Reference unstable, try again in ~3h or use RESPDIFF_FORCE=1."; exit 1 )
@@ -348,8 +316,6 @@ pytests:
       - ./j*
       - ./*.png
       - ./*histogram/*
-  tags:
-    - respdiff
 
 fwd-tls6-kresd.udp6:
   <<: *respdiff
@@ -386,18 +352,12 @@ fwd-udp6-unbound.tls6:
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6
 
+# }}}
+
+# resperf {{{
 .resperf:  &resperf
-  stage: extended
-  dependencies: []
-  only:  # trigger job only in repos under our control
-    - branches@knot/knot-resolver
-    - branches@knot/security/knot-resolver
-  except:
-    refs:
-      - master@knot/knot-resolver
-      - master@knot/security/knot-resolver
-    variables:
-      - $SKIP_CI == "1"
+  <<: *condor
+  stage: resperf
   script:
     - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPERF_FORCE -gt 0 || exit 0
     - export LABEL=gl$(date +%s)
@@ -418,62 +378,21 @@ fwd-udp6-unbound.tls6:
     expire_in: 1 week
     paths:
       - ./j*
-  tags:
-    - respdiff
 
-resperf:fwd-tls6.udp-asan:
+rp:fwd-tls6.udp-asan:
   <<: *resperf
   variables:
     RESPERF_TEST: resperf.fwd-tls6.udp
 
-resperf:fwd-udp6.udp-asan:
+rp:fwd-udp6.udp-asan:
   <<: *resperf
   variables:
     RESPERF_TEST: resperf.fwd-udp6.udp
 
-resperf:iter.udp-asan:
+rp:iter.udp-asan:
   <<: *resperf
   variables:
     RESPERF_TEST: resperf.iter.udp
-
-.packagingtest: &packagingtest
-  stage: extended
-  only:
-    refs:
-      - nightly@knot/knot-resolver
-  dependencies: []
-  tags:
-    - dind
-  variables:
-    DISTRO: debian_10
-  script:
-    - pytest -r fEsxX tests/packaging -k $DISTRO
-
-packaging:centos_8:
-  <<: *packagingtest
-  variables:
-    DISTRO: centos_8
-
-packaging:centos_7:
-  <<: *packagingtest
-  variables:
-    DISTRO: centos_7
-
-packaging:fedora_31:
-  <<: *packagingtest
-  variables:
-    DISTRO: fedora_31
-
-packaging:fedora_32:
-  <<: *packagingtest
-  variables:
-    DISTRO: fedora_32
-
-packaging:leap_15.2:
-  <<: *packagingtest
-  variables:
-    DISTRO: leap_15.2
-
 # }}}
 
 # deploy {{{
@@ -481,12 +400,12 @@ packaging:leap_15.2:
 # (this is workaround for missing complex conditions for job limits in Gitlab)
 nightly:copy:
   stage: deploy
+  needs: []
   only:
     variables:
       - $CREATE_NIGHTLY == "1"
     refs:
       - master@knot/knot-resolver
-  dependencies: []
   script:
     - 'tmp_file=$(mktemp)'
     # delete nightly branch
@@ -506,13 +425,13 @@ obs:trigger: &obs_trigger
   only:
     variables:
       - $OBS_REPO
-  dependencies:
+  dependencies:  # wait for previous stages to finish
     - archive
   environment:
     name: OBS/$OBS_REPO
     url: https://build.opensuse.org/package/show/home:CZ-NIC:$OBS_REPO/knot-resolver
   tags:
-    - respdiff
+    - condor
   allow_failure: false  # required to make when: manual action blocking
   script:
     - scripts/make-distrofiles.sh
@@ -528,7 +447,7 @@ obs:release:
 
 obs:odvr:
   <<: *obs_trigger
-  stage: deploy-test  # last stage to ensure it doesn't block anything
+  stage: pkgtest  # last stage to ensure it doesn't block anything
   only:
     - tags
   variables:
@@ -536,20 +455,20 @@ obs:odvr:
   when: manual
 # }}}
 
-# deploy-test {{{
+# pkgtest {{{
 .deploytest: &deploytest
-  stage: deploy-test
+  stage: pkgtest
   only:
     variables:
       - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing$/
       - $CI_COMMIT_TAG
-  dependencies: []
+  dependencies: []  # wait for previous stages to finish
   variables:
     OBS_REPO: knot-resolver-latest
   when: delayed
   start_in: 3 minutes  # give OBS build some time
   tags:
-    - respdiff
+    - condor
 
 obs:build:all:
   <<: *deploytest
@@ -681,4 +600,42 @@ obs:ubuntu2004:x86_64:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: ubuntu2004
     DISTROTEST_REPO: xUbuntu_20.04
+
+.packagingtest: &packagingtest
+  stage: pkgtest
+  only:
+    refs:
+      - nightly@knot/knot-resolver
+  needs: []
+  tags:
+    - dind
+  variables:
+    DISTRO: debian_10
+  script:
+    - pytest -r fEsxX tests/packaging -k $DISTRO
+
+packaging:centos_8:
+  <<: *packagingtest
+  variables:
+    DISTRO: centos_8
+
+packaging:centos_7:
+  <<: *packagingtest
+  variables:
+    DISTRO: centos_7
+
+packaging:fedora_31:
+  <<: *packagingtest
+  variables:
+    DISTRO: fedora_31
+
+packaging:fedora_32:
+  <<: *packagingtest
+  variables:
+    DISTRO: fedora_32
+
+packaging:leap_15.2:
+  <<: *packagingtest
+  variables:
+    DISTRO: leap_15.2
 # }}}
