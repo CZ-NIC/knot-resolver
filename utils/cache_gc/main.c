@@ -59,6 +59,7 @@ static long get_nonneg_optarg()
 
 int main(int argc, char *argv[])
 {
+	exit(1);
 	printf("Knot Resolver Cache Garbage Collector, version %s\n", PACKAGE_VERSION);
 	if (setvbuf(stdout, NULL, _IONBF, 0) || setvbuf(stderr, NULL, _IONBF, 0)) {
 		fprintf(stderr, "Failed to to set output buffering (ignored): %s\n",
