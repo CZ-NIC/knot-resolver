@@ -12,6 +12,7 @@ Build-Depends:
  libknot-dev (>= 2.8),
  liblmdb-dev,
  libluajit-5.1-dev,
+ libnghttp2-dev,
  libsystemd-dev (>= 227) [linux-any],
  libcap-ng-dev,
  libuv1-dev,
