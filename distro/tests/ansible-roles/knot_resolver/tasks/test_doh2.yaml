@@ -15,6 +15,7 @@
   args:
     # disable warning about using curl - we know what we're doing
     warn: false
+  when: kdig_https is failed
 
 - name: doh2_test kdig localhost. A
   shell: |
