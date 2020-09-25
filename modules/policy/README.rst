@@ -267,6 +267,7 @@ Custom actions
    local ffi = require('ffi')
    local function fake_A_record(state, req)
        local answer = req:ensure_answer()
+       if answer == nil then return nil end
        local qry = req:current()
        if qry.stype ~= kres.type.A then
            return state
