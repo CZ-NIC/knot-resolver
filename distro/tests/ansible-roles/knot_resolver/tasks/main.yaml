@@ -26,7 +26,13 @@
 
     - include: test_kres_cache_gc.yaml
 
-    - name: Test DoH
+    - name: Test DoH (new implementation)
+      block:
+        - include: configure_doh2.yaml
+        - include: restart_kresd.yaml
+        - include: test_doh2.yaml
+
+    - name: Test DoH (legacy)
       block:
         - name: Install knot-resolver-module-http
           package:
