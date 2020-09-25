@@ -246,11 +246,11 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx);
 /**
  * Ensure that request->answer is usable, and return it (for convenience).
  *
- * It can not fail; FIXME: is it worth in the API to abort() instead of return NULL?
+ * It may return NULL, in which case it marks ->state with _FAIL and no answer will be sent.
  * Only use this when it's guaranteed that there will be no delay before sending it.
  * You don't need to call this in places where "resolver knows" that there will be no delay.
  */
-KR_EXPORT __attribute__((returns_nonnull))
+KR_EXPORT
 knot_pkt_t * kr_request_ensure_answer(struct kr_request *request);
 
 /**

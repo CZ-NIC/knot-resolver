@@ -13,14 +13,15 @@ static int refuse_nord_query(kr_layer_t *ctx)
 {
 	struct kr_request *req = ctx->req;
 	uint8_t rd = knot_wire_get_rd(req->qsource.packet->wire);
+	if (rd)
+		return ctx->state;
 
-	if (!rd) {
-		knot_pkt_t *answer = kr_request_ensure_answer(req);
-		knot_wire_set_rcode(answer->wire, KNOT_RCODE_REFUSED);
-		knot_wire_clear_ad(answer->wire);
-		ctx->state = KR_STATE_DONE;
-	}
-
+	knot_pkt_t *answer = kr_request_ensure_answer(req);
+	if (!answer)
+		return ctx->state;
+	knot_wire_set_rcode(answer->wire, KNOT_RCODE_REFUSED);
+	knot_wire_clear_ad(answer->wire);
+	ctx->state = KR_STATE_DONE;
 	return ctx->state;
 }
 
