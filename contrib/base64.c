@@ -1,4 +1,4 @@
-/*  Copyright (C) 2011-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2020 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -142,6 +142,7 @@ int32_t kr_base64_encode_alloc(const uint8_t  *in,
 	int32_t ret = kr_base64_encode(in, in_len, *out, out_len);
 	if (ret < 0) {
 		free(*out);
+		*out = NULL;
 	}
 
 	return ret;
@@ -203,8 +204,10 @@ int32_t kr_base64_decode(const uint8_t  *in,
 		switch (pad_len) {
 		case 0:
 			bin[2] = (c3 << 6) + c4;
+			// FALLTHROUGH
 		case 1:
 			bin[1] = (c2 << 4) + (c3 >> 2);
+			// FALLTHROUGH
 		case 2:
 			bin[0] = (c1 << 2) + (c2 >> 4);
 		}
@@ -250,6 +253,7 @@ int32_t kr_base64_decode_alloc(const uint8_t  *in,
 	int32_t ret = kr_base64_decode(in, in_len, *out, out_len);
 	if (ret < 0) {
 		free(*out);
+		*out = NULL;
 	}
 
 	return ret;
