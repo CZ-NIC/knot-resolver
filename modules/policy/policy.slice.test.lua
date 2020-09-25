@@ -40,6 +40,7 @@ local function sliceaction(index)
 
 		-- refuse query
 		local answer = req:ensure_answer()
+		if answer == nil then return nil end
 		answer:rcode(kres.rcode.REFUSED)
 		answer:ad(false)
 		return kres.DONE

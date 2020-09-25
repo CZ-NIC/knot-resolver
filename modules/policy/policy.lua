@@ -214,6 +214,7 @@ function policy.ANSWER(rtable, nodata)
 	return function(_, req)
 		local qry = req:current()
 		local answer = req:ensure_answer()
+		if answer == nil then return nil end
 		local data = rtable[qry.stype]
 
 		ffi.C.kr_pkt_make_auth_header(answer)
@@ -255,6 +256,7 @@ local dname_localhost = todname('localhost.')
 local function localhost(_, req)
 	local qry = req:current()
 	local answer = req:ensure_answer()
+	if answer == nil then return nil end
 	ffi.C.kr_pkt_make_auth_header(answer)
 
 	local is_exact = ffi.C.knot_dname_is_equal(qry.sname, dname_localhost)
@@ -287,6 +289,7 @@ local dname_rev4_localhost_apex = todname('127.in-addr.arpa');
 local function localhost_reversed(_, req)
 	local qry = req:current()
 	local answer = req:ensure_answer()
+	if answer == nil then return nil end
 
 	-- classify qry.sname:
 	local is_exact   -- exact dname for localhost
@@ -607,6 +610,7 @@ local function answer_clear(req)
 
 	-- Let's be defensive and clear the answer, too.
 	local pkt = req:ensure_answer()
+	if pkt == nil then return nil end
 	pkt:clear_payload()
 	return pkt
 end
@@ -619,6 +623,7 @@ function policy.DENY_MSG(msg)
 	return function (_, req)
 		-- Write authority information
 		local answer = answer_clear(req)
+		if answer == nil then return nil end
 		ffi.C.kr_pkt_make_auth_header(answer)
 		answer:rcode(kres.rcode.NXDOMAIN)
 		answer:begin(kres.section.AUTHORITY)
@@ -706,12 +711,14 @@ policy.DEBUG_CACHE_MISS = policy.DEBUG_IF(
 policy.DENY = policy.DENY_MSG() -- compatibility with < 2.0
 
 function policy.DROP(_, req)
-	answer_clear(req)
+	local answer = answer_clear(req)
+	if answer == nil then return nil end
 	return kres.FAIL
 end
 
 function policy.REFUSE(_, req)
 	local answer = answer_clear(req)
+	if answer == nil then return nil end
 	answer:rcode(kres.rcode.REFUSED)
 	answer:ad(false)
 	return kres.DONE
@@ -725,6 +732,7 @@ function policy.TC(state, req)
 	end
 
 	local answer = answer_clear(req)
+	if answer == nil then return nil end
 	answer:tc(1)
 	answer:ad(false)
 	return kres.DONE
