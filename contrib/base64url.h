@@ -76,7 +76,7 @@ int32_t kr_base64url_encode_alloc(const uint8_t  *in,
  * \retval KNOT_E*	if error.
  */
 int32_t kr_base64url_decode(const uint8_t  *in,
-                      const uint32_t in_len,
+                      uint32_t       in_len,
                       uint8_t        *out,
                       const uint32_t out_len);
 

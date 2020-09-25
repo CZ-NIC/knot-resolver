@@ -19,6 +19,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <ctype.h>
 
 /*! \brief Maximal length of binary input to Base64url encoding. */
 #define MAX_BIN_DATA_LEN	((INT32_MAX / 4) * 3)
@@ -73,7 +74,7 @@ static const uint8_t base64url_dec[256] = {
 	[ 34] = KO, ['M'] = 12, ['x'] = 49, [163] = KO, [206] = KO, [249] = KO,
 	[ 35] = KO, ['N'] = 13, ['y'] = 50, [164] = KO, [207] = KO, [250] = KO,
 	[ 36] = KO, ['O'] = 14, ['z'] = 51, [165] = KO, [208] = KO, [251] = KO,
-	[ 37] = KO, ['P'] = 15, [123] = KO, [166] = KO, [209] = KO, [252] = KO,
+	['%'] = KO, ['P'] = 15, [123] = KO, [166] = KO, [209] = KO, [252] = KO,
 	[ 38] = KO, ['Q'] = 16, [124] = KO, [167] = KO, [210] = KO, [253] = KO,
 	[ 39] = KO, ['R'] = 17, [125] = KO, [168] = KO, [211] = KO, [254] = KO,
 	[ 40] = KO, ['S'] = 18, [126] = KO, [169] = KO, [212] = KO, [255] = KO,
@@ -160,7 +161,7 @@ int32_t kr_base64url_encode_alloc(const uint8_t  *in,
 }
 
 int32_t kr_base64url_decode(const uint8_t  *in,
-                      const uint32_t in_len,
+                      uint32_t in_len,
                       uint8_t        *out,
                       const uint32_t out_len)
 {
@@ -168,6 +169,18 @@ int32_t kr_base64url_decode(const uint8_t  *in,
 	if (in == NULL || out == NULL) {
 		return KNOT_EINVAL;
 	}
+
+	// cut up to two "%3d" from the end of input
+	int pad3d = 0;
+	const uint8_t *end = in + in_len;
+	char *perc3d = "d3%d3%", *stop3d = perc3d + 6;
+	while (end != in && perc3d != stop3d && tolower(*--end) == *perc3d) {
+		if (*perc3d++ == '%') {
+			in_len -= 3;
+			pad3d++;
+		}
+	}
+
 	if (in_len > INT32_MAX || out_len < ((in_len + 3) / 4) * 3) {
 		return KNOT_ERANGE;
 	}
@@ -181,30 +194,32 @@ int32_t kr_base64url_decode(const uint8_t  *in,
 	while (in < stop) {
 		// Filling and transforming 4 Base64 chars.
 		c1 =                   base64url_dec[in[0]]     ;
-		c2 = (in + 1 < stop) ? base64url_dec[in[1]] : PD;
+		c2 =                   base64url_dec[in[1]]     ;
 		c3 = (in + 2 < stop) ? base64url_dec[in[2]] : PD;
 		c4 = (in + 3 < stop) ? base64url_dec[in[3]] : PD;
 
-		// Check 4. char if is bad or padding.
-		if (c4 >= PD) {
-			if (c4 == PD && pad_len == 0) {
+		// Check 1. and 2. chars if are not padding
+		if (c1 >= PD || c2 >= PD) {
+			return KNOT_BASE64_ECHAR;
+		}
+		// Check 3. char if is bad or padding.
+		else if (c3 >= PD) {
+			if (c3 == PD) {
+				pad_len = 2;
+			} else {
+				return KNOT_BASE64_ECHAR;
+			}
+		}
+		// Check 3. char if is bad or padding.
+		else if (c4 >= PD) {
+			if (c4 == PD) {
 				pad_len = 1;
 			} else {
 				return KNOT_BASE64_ECHAR;
 			}
 		}
 
-		// Check 3. char if is bad or padding.
-		if (c3 >= PD) {
-			if (c3 == PD && pad_len == 1) {
-				pad_len = 2;
-			} else {
-				return KNOT_BASE64_ECHAR;
-			}
-		}
-
-		// Check 1. and 2. chars if are not padding.
-		if (c2 >= PD || c1 >= PD) {
+		if (pad_len > 0 && in <= stop - 4) {
 			return KNOT_BASE64_ECHAR;
 		}
 
@@ -227,15 +242,19 @@ int32_t kr_base64url_decode(const uint8_t  *in,
 			break;
 		case 1:
 			bin += 2;
-			break;
+			goto end;
 		case 2:
 			bin += 1;
-			break;
+			goto end;
 		}
 
 		in += 4;
 	}
 
+end:
+	if (pad3d > pad_len) {
+		return KNOT_BASE64_ECHAR;
+	}
 	return (bin - out);
 }
 
