@@ -12,6 +12,7 @@ trust_anchors.remove('.')
 counter = 0
 local function counter_func (state, req)
         local answer = req:ensure_answer()
+        if answer == nil then return nil end
         local qry = req:current()
         if answer:qclass() == kres.class.IN
 		and qry.stype == kres.type.DNSKEY

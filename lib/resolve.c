@@ -820,16 +820,15 @@ knot_pkt_t * kr_request_ensure_answer(struct kr_request *request)
 		answer->opt_rr = knot_rrset_copy(request->ctx->downstream_opt_rr,
 						 &answer->mm);
 		if (!answer->opt_rr)
-			goto enomem;
+			goto enomem; // answer is on mempool, so "leak" is OK
 		if (knot_pkt_has_dnssec(qs_pkt))
 			knot_edns_set_do(answer->opt_rr);
 	}
 
 	return request->answer;
 enomem:
-	// Consequences of `return NULL` would be way too complicated to handle.
-	kr_log_error("ERROR: irrecoverable out of memory condition in %s\n", __func__);
-	abort();
+	request->state = KR_STATE_FAIL; // TODO: really combine with another flag?
+	return request->answer = NULL;
 }
 
 KR_PURE static bool kr_inaddr_equal(const struct sockaddr *a, const struct sockaddr *b)
@@ -1654,21 +1653,23 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 int kr_resolve_finish(struct kr_request *request, int state)
 {
 	request->state = state;
-	kr_request_ensure_answer(request);
-	/* Finalize answer and construct wire-buffer. */
-	ITERATE_LAYERS(request, NULL, answer_finalize);
-	answer_finalize(request);
+	/* Finalize answer and construct whole wire-format (unless dropping). */
+	knot_pkt_t *answer = kr_request_ensure_answer(request);
+	if (answer) {
+		ITERATE_LAYERS(request, NULL, answer_finalize);
+		answer_finalize(request);
 
-	/* Defensive style, in case someone has forgotten.
-	 * Beware: non-empty answers do make sense even with SERVFAIL case, etc. */
-	if (request->state != KR_STATE_DONE) {
-		uint8_t *wire = request->answer->wire;
-		switch (knot_wire_get_rcode(wire)) {
-		case KNOT_RCODE_NOERROR:
-		case KNOT_RCODE_NXDOMAIN:
-			knot_wire_clear_ad(wire);
-			knot_wire_clear_aa(wire);
-			knot_wire_set_rcode(wire, KNOT_RCODE_SERVFAIL);
+		/* Defensive style, in case someone has forgotten.
+		 * Beware: non-empty answers do make sense even with SERVFAIL case, etc. */
+		if (request->state != KR_STATE_DONE) {
+			uint8_t *wire = answer->wire;
+			switch (knot_wire_get_rcode(wire)) {
+			case KNOT_RCODE_NOERROR:
+			case KNOT_RCODE_NXDOMAIN:
+				knot_wire_clear_ad(wire);
+				knot_wire_clear_aa(wire);
+				knot_wire_set_rcode(wire, KNOT_RCODE_SERVFAIL);
+			}
 		}
 	}
 
@@ -1677,7 +1678,7 @@ int kr_resolve_finish(struct kr_request *request, int state)
 #ifndef NOVERBOSELOG
 	struct kr_rplan *rplan = &request->rplan;
 	struct kr_query *last = kr_rplan_last(rplan);
-	VERBOSE_MSG(last, "finished: %d, queries: %zu, mempool: %zu B\n",
+	VERBOSE_MSG(last, "finished in state: %d, queries: %zu, mempool: %zu B\n",
 	          request->state, rplan->resolved.len, (size_t) mp_total_size(request->pool.ctx));
 #endif
 
