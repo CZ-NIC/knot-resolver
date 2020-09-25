@@ -1,4 +1,5 @@
 # daemon: lua modules
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 config_tests += [
   ['ta', files('trust_anchors.test/ta.test.lua')],

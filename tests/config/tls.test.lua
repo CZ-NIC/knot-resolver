@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 local function test_session_config()
 	ok(net.tls_sticket_secret(),
 	   'net.tls_sticket_secret() to trigger key regeneration')

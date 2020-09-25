@@ -5,18 +5,7 @@
  * Initial Author: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
  *                 Ondřej Surý <ondrej@sury.org>
  *
- * This program is free software: you can redistribute it and/or modify it under
- * the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program.  If not, see <http://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include <gnutls/abstract.h>
@@ -293,7 +282,7 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 			kr_log_error("[tls] X.509 credentials are missing, and ephemeral credentials failed; no TLS\n");
 			return NULL;
 		}
-		kr_log_info("[tls] Using ephemeral TLS credentials:\n");
+		kr_log_info("[tls] Using ephemeral TLS credentials\n");
 		tls_credentials_log_pins(net->tls_credentials);
 	}
 
@@ -563,7 +552,7 @@ static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar
 	if (raw && outchar_len < TLS_SHA256_RAW_LEN) {
 		assert(false);
 		return kr_error(ENOSPC);
-		/* With !raw we have check inside base64_encode. */
+		/* With !raw we have check inside kr_base64_encode. */
 	}
 	gnutls_pubkey_t key;
 	int err = gnutls_pubkey_init(&key);
@@ -582,11 +571,11 @@ static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar
 	if (err != GNUTLS_E_SUCCESS || raw/*success*/)
 		goto leave;
 	/* Convert to non-raw. */
-	err = base64_encode((uint8_t *)raw_pin, sizeof(raw_pin),
+	err = kr_base64_encode((uint8_t *)raw_pin, sizeof(raw_pin),
 			    (uint8_t *)outchar, outchar_len);
 	if (err >= 0 && err < outchar_len) {
 		err = GNUTLS_E_SUCCESS;
-		outchar[err] = '\0'; /* base64_encode() doesn't do it */
+		outchar[err] = '\0'; /* kr_base64_encode() doesn't do it */
 	} else if (err >= 0) {
 		assert(false);
 		err = kr_error(ENOSPC); /* base64 fits but '\0' doesn't */
@@ -631,7 +620,7 @@ void tls_credentials_log_pins(struct tls_credentials *tls_credentials)
 #else
 void tls_credentials_log_pins(struct tls_credentials *tls_credentials)
 {
-	kr_log_error("[tls] could not calculate RFC 7858 OOB key-pin; GnuTLS 3.4.0+ required\n");
+	kr_log_verbose("[tls] could not calculate RFC 7858 OOB key-pin; GnuTLS 3.4.0+ required\n");
 }
 #endif
 

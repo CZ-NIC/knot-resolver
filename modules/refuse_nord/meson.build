@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # C module: refuse_nord
 
 integr_tests += [

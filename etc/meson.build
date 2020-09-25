@@ -1,4 +1,5 @@
 # etc
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 etc_files = []
 

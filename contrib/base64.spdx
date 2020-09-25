@@ -1,0 +1,10 @@
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: knotdns-base64
+DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-669dfa8c-3b50-425f-92fc-9b7ce18999f2
+
+PackageName: knotdns-base64
+PackageDownloadLocation: git+https://gitlab.labs.nic.cz/knot/knot-dns.git@2b3c828a4cb8d9595318552483d4947345426c30#src/libknot/internal/base64.c
+PackageOriginator: Organization: Knot DNS contributors
+PackageLicenseDeclared: GPL-3.0-or-later

@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 -- check prerequisites
 if not worker.bg_worker then
 	pass('skipping worker test because it doesnt support background worker')

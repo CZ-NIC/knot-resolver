@@ -1,0 +1,11 @@
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: bootstrap-theme
+DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-2794db89-37c2-415b-b1bd-d66b445c5202
+
+PackageName: bootstrap-theme
+PackageVersion: 3.3.6
+PackageDownloadLocation: git+https://github.com/twbs/bootstrap.git@81df608a40bf0629a1dc08e584849bb1e43e0b7a#dist/css/bootstrap-theme.min.css
+PackageOriginator: Organization: Twitter
+PackageLicenseDeclared: MIT

@@ -1,3 +1,5 @@
+.. SPDX-License-Identifier: GPL-3.0-or-later
+
 Cache
 =====
 
@@ -20,6 +22,10 @@ For personal and small office use-cases cache size around 100 MB is more than en
 For large deployments we recommend to run Knot Resolver on a dedicated machine,
 and to allocate 90% of machine's free memory for resolver's cache.
 
+.. note:: Choosing a cache size that can fit into RAM is important even if the
+   cache is stored on disk (default). Otherwise, the extra I/O caused by disk
+   access for missing pages can cause performance issues.
+
 For example, imagine you have a machine with 16 GB of memory.
 After machine restart you use command ``free -m`` to determine
 amount of free memory (without swap):
@@ -36,6 +42,14 @@ Now you can configure cache size to be 90% of the free memory 14 928 MB, i.e. 13
 
    -- 90 % of free memory after machine restart
    cache.size = 13453 * MB
+
+It is also possible to set the cache size based on the file system size. This is useful
+if you use a dedicated partition for cache (e.g. non-persistent tmpfs). It is recommended
+to leave some free space for special files, such as locks.:
+
+.. code-block:: lua
+
+   cache.size = cache.fssize() - 10*MB
 
 .. note:: The :ref:`garbage-collector` can be used to periodically trim the
    cache. It is enabled and configured by default when running kresd with
@@ -62,15 +76,14 @@ The cache content will be saved in memory, and thus have faster access
 and will be lost on power-off or reboot.
 
 
-.. note:: In most of the Unix-like systems ``/tmp`` and ``/var/run`` are commonly mounted to tmpfs.
-   While it is technically possible to move the cache to an existing
-   tmpfs filesystem, it is *not recommended*: The path to cache is specified in
-   multiple systemd units, and a shared tmpfs space could be used up by other
-   applications, leading to ``SIGBUS`` errors during runtime.
+.. note:: In most of the Unix-like systems ``/tmp`` and ``/var/run`` are
+   commonly mounted as tmpfs.  While it is technically possible to move the
+   cache to an existing tmpfs filesystem, it is *not recommended*, since the
+   path to cache is configured in multiple places.
 
-Mounting the cache directory as tmpfs_ is recommended approach.
-Make sure to use appropriate ``size=`` option and don't forget to adjust the
-size in the config file as well.
+Mounting the cache directory as tmpfs_ is the recommended approach.  Make sure
+to use appropriate ``size=`` option and don't forget to adjust the size in the
+config file as well.
 
 .. code-block:: none
 
@@ -79,8 +92,8 @@ size in the config file as well.
 
 .. code-block:: lua
 
-   # /etc/knot-resolver/config
-   cache.size = 2 * GB
+   -- /etc/knot-resolver/kresd.conf
+   cache.size = cache.fssize() - 10*MB
 
 .. _tmpfs: https://en.wikipedia.org/wiki/Tmpfs
 
@@ -166,6 +179,10 @@ Configuration reference
    Close the cache.
 
    .. note:: This may or may not clear the cache, depending on the cache backend.
+
+.. function:: cache.fssize()
+
+   :return: Partition size of cache storage.
 
 .. function:: cache.stats()
 

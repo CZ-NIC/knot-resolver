@@ -1,3 +1,4 @@
+; SPDX-License-Identifier: GPL-3.0-or-later
 	trust-anchor: "example. DNSKEY  257 3 7 AwEAAcUlFV1vhmqx6NSOUOq2R/dsR7Xm3upJ ( j7IommWSpJABVfW8Q0rOvXdM6kzt+TAu92L9 AbsUdblMFin8CVF3n4s= )"
 CONFIG_END
 

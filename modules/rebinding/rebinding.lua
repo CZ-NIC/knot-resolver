@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 local ffi = require('ffi')
 
 -- Protection from DNS rebinding attacks
@@ -113,7 +114,7 @@ function M.layer.consume(state, req, pkt)
 	--]]
 	if qry.parent == nil then refuse(req) end
 	if verbose() then
-		ffi.C.kr_log_qverbose_impl(qry, 'rebinding',
+		ffi.C.kr_log_q(qry, 'rebinding',
 		    'blocking blacklisted IP in RR \'%s\' received from IP %s\n',
 		    kres.rr2str(bad_rr),
 		    tostring(kres.sockaddr_t(req.upstream.addr)))

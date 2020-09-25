@@ -1,10 +1,10 @@
 <!DOCTYPE html>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ title }}</title>
 <script type="text/javascript">
 	var host = "{{ host }}";
-	var secure = {{ secure }};
 </script>
 <script src="jquery.js"></script>
 <script src="bootstrap.min.js"></script>
@@ -17,7 +17,7 @@
 <link rel="icon" type="image/ico" href="favicon.ico">
 <link href="kresd.css" rel="stylesheet">
 <link href="bootstrap.min.css" rel="stylesheet">
-<link href="selectize.bootstrap3.min.css" rel="stylesheet">
+<link href="selectize.bootstrap3.css" rel="stylesheet">
 <nav class="navbar navbar-inverse navbar-fixed-top">
 	<div class="container">
 		<div class="navbar-header">

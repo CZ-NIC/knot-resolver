@@ -1,17 +1,5 @@
 /*  Copyright (C) 2018 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include "lib/cache/impl.h"
@@ -305,7 +293,6 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	knot_wire_set_rcode(pkt->wire, real_rcode);
 
 	bool expiring = false; // TODO
-	VERBOSE_MSG(qry, "=> writing RRsets: ");
 	for (int i = 0; i < sizeof(ans.rrsets) / sizeof(ans.rrsets[0]); ++i) {
 		if (i == 1) knot_pkt_begin(pkt, KNOT_AUTHORITY);
 		if (!ans.rrsets[i].set.rr) continue;
@@ -315,10 +302,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 			assert(false);
 			return ctx->state;
 		}
-		kr_log_verbose(kr_rank_test(ans.rrsets[i].set.rank, KR_RANK_SECURE)
-				? "+" : "-");
 	}
-	kr_log_verbose("\n");
 
 	/* Finishing touches. */
 	struct kr_qflags * const qf = &qry->flags;

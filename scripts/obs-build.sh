@@ -1,5 +1,5 @@
 #!/bin/bash
-#
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Builds the checked out version in OBS repository
 
 set -o errexit -o nounset -o xtrace

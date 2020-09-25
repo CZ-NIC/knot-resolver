@@ -1,4 +1,5 @@
 # etc: config examples
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # Install config examples
 example_configs = [

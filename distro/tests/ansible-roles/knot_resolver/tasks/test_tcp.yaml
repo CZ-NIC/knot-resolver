@@ -1,4 +1,5 @@
 ---
+# SPDX-License-Identifier: GPL-3.0-or-later
 - name: tcp_test resolve nic.cz
   tags:
     - test

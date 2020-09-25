@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: CC0-1.0
 [Unit]
 Description=Knot Resolver daemon
 Documentation=man:kresd.systemd(7)
@@ -20,6 +21,7 @@ TimeoutStopSec=10s
 WatchdogSec=10s
 Restart=on-abnormal
 LimitNOFILE=524288
+Slice=system-kresd.slice
 
 [Install]
 WantedBy=kresd.target

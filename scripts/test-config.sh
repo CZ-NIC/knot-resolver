@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Utility script used by meson to run config tests post installation
 set -o nounset -o errexit
 

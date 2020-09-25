@@ -1,17 +1,5 @@
 /*  Copyright (C) 2015-2019 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include "daemon/bindings/impl.h"
@@ -456,7 +444,7 @@ static int tls_params2lua(lua_State *L, trie_t *params)
 		lua_createtable(L, e->pins.len, 0);
 		for (size_t i = 0; i < e->pins.len; ++i) {
 			uint8_t pin_base64[TLS_SHA256_BASE64_BUFLEN];
-			int err = base64_encode(e->pins.at[i], TLS_SHA256_RAW_LEN,
+			int err = kr_base64_encode(e->pins.at[i], TLS_SHA256_RAW_LEN,
 						pin_base64, sizeof(pin_base64));
 			if (err < 0) {
 				assert(false);
@@ -599,7 +587,7 @@ static int net_tls_client(lua_State *L)
 				free(pin_raw);
 				ERROR("%s", kr_strerror(ENOMEM));
 			}
-			int ret = base64_decode((const uint8_t *)pin, strlen(pin),
+			int ret = kr_base64_decode((const uint8_t *)pin, strlen(pin),
 						pin_raw, TLS_SHA256_RAW_LEN + 8);
 			if (ret < 0) {
 				ERROR("not a valid pin_sha256: '%s' (length %d), %s\n",
@@ -930,8 +918,6 @@ static int net_tls_handshake_timeout(lua_State *L)
 
 static int net_bpf_set(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-
 	if (lua_gettop(L) != 1 || !lua_isnumber(L, 1)) {
 		lua_error_p(L, "net.bpf_set(fd) takes one parameter:"
 				" the open file descriptor of a loaded BPF program");
@@ -939,6 +925,7 @@ static int net_bpf_set(lua_State *L)
 
 #if __linux__
 
+	struct engine *engine = engine_luaget(L);
 	struct network *net = &engine->net;
 	int progfd = lua_tointeger(L, 1);
 	if (progfd == 0) {
@@ -963,13 +950,12 @@ static int net_bpf_set(lua_State *L)
 
 static int net_bpf_clear(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-
 	if (lua_gettop(L) != 0)
 		lua_error_p(L, "net.bpf_clear() does not take any parameters");
 
 #if __linux__
 
+	struct engine *engine = engine_luaget(L);
 	struct network *net = &engine->net;
 	network_clear_bpf(net);
 

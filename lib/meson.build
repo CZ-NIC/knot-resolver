@@ -1,4 +1,5 @@
 # libkres
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 libkres_src = files([
   'cache/api.c',

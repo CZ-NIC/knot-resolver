@@ -1,17 +1,5 @@
 /*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include <string.h>
@@ -453,7 +441,9 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
 	val = 1; /* Accepts on/off */
 	#endif
 	if (setsockopt(fd, IPPROTO_TCP, TCP_FASTOPEN, &val, sizeof(val))) {
-		kr_log_error("[ io ] listen TCP (fastopen): %s\n", strerror(errno));
+		kr_log_error("[ io ] listen TCP (fastopen): %s%s\n", strerror(errno),
+			(errno != EPERM ? "" :
+			 ".  This may be caused by TCP Fast Open being disabled in the OS."));
 	}
 #endif
 

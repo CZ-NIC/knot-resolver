@@ -1,4 +1,5 @@
 ---
+# SPDX-License-Identifier: GPL-3.0-or-later
 - name: Add upstream package signing key
   get_url:
     url: https://gitlab.labs.nic.cz/knot/knot-resolver-release/raw/master/cznic-obs.gpg.asc

@@ -1,5 +1,6 @@
 # Maintainer:	Tomas Krizek <tomas.krizek@nic.cz>
 # Contributor:	Ondřej Surý <ondrej@sury.org>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 pkgname=knot-resolver
 pkgver=__VERSION__

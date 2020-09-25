@@ -1,4 +1,5 @@
 # LUA module: view
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 lua_mod_src += [
   files('view.lua'),

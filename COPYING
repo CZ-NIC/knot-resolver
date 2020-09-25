@@ -1,3 +1,11 @@
+Unless specifically indicated otherwise in a file or directory,
+files are licensed under GNU GPL license either version 3, or
+(at your option) any later version.
+
+SPDX-License-Identifier: GPL-3.0-or-later
+SPDX-URL: https://spdx.org/licenses/GPL-3.0-or-later.html
+License-Text:
+
                     GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
 

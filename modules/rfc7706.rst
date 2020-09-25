@@ -1,3 +1,5 @@
+.. SPDX-License-Identifier: GPL-3.0-or-later
+
 Root on loopback (RFC 7706)
 ---------------------------
 Knot Resolver developers think that literal implementation of :rfc:`7706`

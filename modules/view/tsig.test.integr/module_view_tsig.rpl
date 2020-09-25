@@ -1,3 +1,4 @@
+; SPDX-License-Identifier: GPL-3.0-or-later
 ; config options
 	stub-addr: 1.2.3.4
 CONFIG_END

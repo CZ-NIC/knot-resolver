@@ -5,7 +5,7 @@
 [![Documentation Status](https://readthedocs.org/projects/knot-resolver/badge/?version=latest)](https://readthedocs.org/projects/knot-resolver/?badge=latest)
 
 Knot Resolver is a caching full resolver implementation written in C and [LuaJIT][luajit], both a resolver library and a daemon. The core architecture is tiny and efficient, and provides a foundation and
-a state-machine like API for extensions. There are three modules built-in - *iterator*, *validator*, *cache*, and a few more are loaded by default. Most of the [rich features](https://knot-resolver.readthedocs.io/en/latest/modules.html) are written in Lua(JIT) and C. Batteries are included, but optional.
+a state-machine like API for extensions. There are three modules built-in - *iterator*, *validator*, *cache*, and a few more are loaded by default. Most of the [rich features](https://knot-resolver.readthedocs.io/en/latest/config-overview.html) are written in Lua(JIT) and C. Batteries are included, but optional.
 
 The LuaJIT modules, support DNS privacy and DNSSEC, and persistent cache with low memory footprint make it a great personal DNS resolver or a research tool to tap into DNS data. TL;DR it's the [OpenResty][openresty] of DNS.
 

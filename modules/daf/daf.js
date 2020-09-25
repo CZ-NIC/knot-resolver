@@ -1,4 +1,5 @@
-/* Filter grammar */
+/* Filter grammar
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 const dafg = {
 	key: {'qname': true, 'src': true, 'dst': true},
 	op: {'=': true, '~': true},

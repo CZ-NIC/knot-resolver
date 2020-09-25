@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 local M = {}
 M.layer = {}
 local ffi = require('ffi')

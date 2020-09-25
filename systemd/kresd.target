@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: CC0-1.0
 [Unit]
 Description=Knot Resolver daemons
 Documentation=man:kresd.systemd(7)

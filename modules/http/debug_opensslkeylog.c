@@ -4,7 +4,7 @@
  * Supports TLS 1.3 when used with OpenSSL 1.1.1.
  *
  * Copyright (C) 2014 Peter Wu <peter@lekensteyn.nl>
- * Licensed under the terms of GPLv3 (or any later version) at your choice.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * Usage:
  *  cc sslkeylog.c -shared -o libsslkeylog.so -fPIC -ldl

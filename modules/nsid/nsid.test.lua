@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 -- disable networking so we can get SERVFAIL immediatelly
 net.ipv4 = false
 net.ipv6 = false

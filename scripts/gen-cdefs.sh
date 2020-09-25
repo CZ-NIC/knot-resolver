@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 set -o pipefail -o errexit
 
 if [ "$2" != types ] && [ "$2" != functions ]; then

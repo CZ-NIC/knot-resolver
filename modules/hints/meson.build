@@ -1,4 +1,5 @@
 # C module: hints
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 hints_src = files([
   'hints.c',

@@ -1,17 +1,5 @@
 /*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include "kresconfig.h"
@@ -1535,6 +1523,18 @@ static int qr_task_step(struct qr_task *task,
 					   &sock_type, task->pktbuf);
 		if (unlikely(++task->iter_count > KR_ITER_LIMIT ||
 			     task->timeouts >= KR_TIMEOUT_LIMIT)) {
+
+			#ifndef NOVERBOSELOG
+			struct kr_rplan *rplan = &req->rplan;
+			struct kr_query *last  = kr_rplan_last(rplan);
+			if (task->iter_count > KR_ITER_LIMIT) {
+				VERBOSE_MSG(last, "canceling query due to exceeded iteration count limit of %d\n", KR_ITER_LIMIT);
+			}
+			if (task->timeouts >= KR_TIMEOUT_LIMIT) {
+				VERBOSE_MSG(last, "canceling query due to exceeded timeout retries limit of %d\n", KR_TIMEOUT_LIMIT);
+			}
+			#endif
+
 			return qr_task_finalize(task, KR_STATE_FAIL);
 		}
 	}
@@ -1848,26 +1848,20 @@ knot_pkt_t * worker_resolve_mk_pkt(const char *qname_str, uint16_t qtype, uint16
 	knot_pkt_put_question(pkt, qname, qclass, qtype);
 	knot_wire_set_rd(pkt->wire);
 	knot_wire_set_ad(pkt->wire);
-	if (options->DNSSEC_CD) {
-		knot_wire_set_cd(pkt->wire);
-	}
 
 	/* Add OPT RR */
-	knot_rrset_t *opt_rr = knot_rrset_copy(the_worker->engine->resolver.opt_rr, NULL);
-	if (!opt_rr) {
+	pkt->opt_rr = knot_rrset_copy(the_worker->engine->resolver.opt_rr, NULL);
+	if (!pkt->opt_rr) {
 		knot_pkt_free(pkt);
 		return NULL;
 	}
 	if (options->DNSSEC_WANT) {
-		knot_edns_set_do(opt_rr);
+		knot_edns_set_do(pkt->opt_rr);
 	}
-	if (knot_pkt_begin(pkt, KNOT_ADDITIONAL)
-	    || knot_pkt_put(pkt, KNOT_COMPR_HINT_NOCOMP, opt_rr, KNOT_PF_FREE)) {
-		knot_rrset_free(opt_rr, NULL);
-		knot_pkt_free(pkt);
-		return NULL;
+	if (options->DNSSEC_CD) {
+		knot_wire_set_cd(pkt->wire);
 	}
-	free(opt_rr); // ownership of the inside was handed over to pkt
+
 	return pkt;
 }
 

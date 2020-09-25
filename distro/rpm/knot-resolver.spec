@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 %global _hardened_build 1
 %{!?_pkgdocdir: %global _pkgdocdir %{_docdir}/%{name}}
 
@@ -132,7 +134,7 @@ Requires:       lua-mmdb
 
 %description module-http
 HTTP/2 module for Knot Resolver has multiple uses. It enables use of
-DNS-over-HTTP, can serve as API ednpoint for other modules or provide a web
+DNS-over-HTTP, can serve as API endpoint for other modules or provide a web
 interface for local visualization of the resolver cache and queries.
 %endif
 
@@ -238,9 +240,14 @@ if [ -f ${UPG_DIR}/.unfinished ] ; then
 fi
 %endif
 
-# in case service files are updated
-systemctl daemon-reload &>/dev/null ||:
-%systemd_post 'kresd@*.service'
+# 5.0.1 fix to force restart of kres-cache-gc.service, which was missing in systemd_postun_with_restart
+# TODO: remove once most users upgrade to 5.0.1+
+systemctl daemon-reload >/dev/null 2>&1 || :
+if [ $1 -ge 2 ] ; then
+        systemctl try-restart kres-cache-gc.service >/dev/null 2>&1 || :
+fi
+
+# systemd_post macro is not needed for anything (calls systemctl preset)
 %tmpfiles_create %{_tmpfilesdir}/knot-resolver.conf
 %if "x%{?fedora}" == "x"
 /sbin/ldconfig
@@ -250,7 +257,7 @@ systemctl daemon-reload &>/dev/null ||:
 %systemd_preun kres-cache-gc.service kresd.target
 
 %postun
-%systemd_postun_with_restart 'kresd@*.service'
+%systemd_postun_with_restart 'kresd@*.service' kres-cache-gc.service
 %if "x%{?fedora}" == "x"
 /sbin/ldconfig
 %endif

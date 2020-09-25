@@ -1,3 +1,36 @@
+Knot Resolver 5.x.y (2020-0m-0d)
+================================
+
+Improvements
+------------
+- cache garbage collector: reduce filesystem operations when idle (!946)
+- policy.DEBUG_ALWAYS and policy.DEBUG_IF for limited verbose logging (!957)
+
+Bugfixes
+--------
+- cache: missing filesystem support for pre-allocation is no longer fatal (#549)
+- lua: policy.rpz() no longer watches the file when watch is set to false (!954)
+- fix a strict aliasing problem that might've lead to "miscompilation" (!962)
+
+Incompatible changes
+--------------------
+- see upgrading guide: https://knot-resolver.readthedocs.io/en/stable/upgrading.html
+- minor changes in module API
+
+
+Knot Resolver 5.0.1 (2020-02-05)
+================================
+
+Bugfixes
+--------
+- systemd: use correct cache location for garbage collector (#543)
+
+Improvements
+------------
+- cache: add cache.fssize() lua function to configure entire free disk space on
+  dedicated cache partition (#524, !932)
+
+
 Knot Resolver 5.0.0 (2020-01-27)
 ================================
 

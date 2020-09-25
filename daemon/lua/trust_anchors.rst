@@ -1,3 +1,5 @@
+.. SPDX-License-Identifier: GPL-3.0-or-later
+
 .. warning:: Options in this section are intended only for expert users and
    normally should not be needed.
 

@@ -1,4 +1,5 @@
 ---
+# SPDX-License-Identifier: GPL-3.0-or-later
 - name: Add upstream repo(s)
   zypper_repository:
     repo: "{{ obs_repofile_url }}"

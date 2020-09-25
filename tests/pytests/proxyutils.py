@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 from contextlib import contextmanager
 import os
 import subprocess

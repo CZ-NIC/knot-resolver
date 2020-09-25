@@ -1,3 +1,4 @@
+; SPDX-License-Identifier: GPL-3.0-or-later
 .		86400	SOA	rootns. you.test. 2017071101 1800 900 604800 86400
 .		86400	NS	rootns.
 rootns.		86400	A	198.41.0.4

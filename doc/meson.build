@@ -1,4 +1,5 @@
 # documentation
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # man page
 man_config = configuration_data()

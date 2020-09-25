@@ -1,3 +1,4 @@
+; SPDX-License-Identifier: GPL-3.0-or-later
 ; config options
 ;	target-fetch-policy: "0 0 0 0 0"
 ;	module-config: "iterator"

@@ -1,4 +1,5 @@
 ## utils/cache_gc
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 cache_gc_src = files([
   'categories.c',

@@ -1,17 +1,5 @@
 /*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 /** @file iterate.c
@@ -1045,7 +1033,12 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		VERBOSE_MSG("<= malformed response\n");
 		return resolve_badmsg(pkt, req, query);
 	} else if (!is_paired_to_query(pkt, query)) {
-		VERBOSE_MSG("<= ignoring mismatching response\n");
+		WITH_VERBOSE(query) {
+			const char *ns_str =
+				req->upstream.addr ? kr_straddr(req->upstream.addr) : "(internal)";
+			VERBOSE_MSG("<= ignoring mismatching response from %s\n",
+					ns_str ? ns_str : "(kr_straddr failed)");
+		}
 		/* Force TCP, to work around authoritatives messing up question
 		 * without yielding to spoofed responses. */
 		query->flags.TCP = true;

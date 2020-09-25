@@ -4,7 +4,7 @@
 .\"
 .\" Copyright (c) 2018, CZ.NIC. All rights reserved.
 .\"
-.\" See COPYING for the license.
+.\" SPDX-License-Identifier: GPL-3.0-or-later
 .\"
 .\"
 .SH "NAME"

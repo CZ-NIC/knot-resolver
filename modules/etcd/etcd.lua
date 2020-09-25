@@ -1,4 +1,5 @@
 --- @module etcd
+-- SPDX-License-Identifier: GPL-3.0-or-later
 local etcd = {}
 
 -- @function update subtree configuration

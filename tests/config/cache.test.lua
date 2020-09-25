@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 -- test if cache module properties work
 local function test_properties()
 	is(type(cache), 'table', 'cache module is loaded')

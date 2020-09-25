@@ -1,4 +1,6 @@
 # Configuration options
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 option(
   'keyfile_default',
   type: 'string',

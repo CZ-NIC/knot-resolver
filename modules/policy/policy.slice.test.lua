@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 -- check lua-psl is available
 local has_psl = pcall(require, 'psl')
 if not has_psl then

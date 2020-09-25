@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: CC0-1.0
 -- vim:syntax=lua:set ts=4 sw=4:
 -- Config file example usable for ISP resolver
 -- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/
@@ -8,9 +9,7 @@ net.listen('::1', 53, { kind = 'dns'})
 net.listen('127.0.0.1', 853, { kind = 'tls' })
 net.listen('::1', 853, { kind = 'tls' })
 
--- Large cache size, so we don't need to flush often
--- This can be larger than available RAM, least frequently accessed
--- records will be paged out
+-- Refer to manual for optimal cache size
 cache.size = 4 * GB
 
 -- load modules

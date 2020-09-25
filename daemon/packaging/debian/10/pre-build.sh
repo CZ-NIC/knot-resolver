@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # add debian build repository
 apt-get update
 apt-get install -y wget gnupg apt-utils

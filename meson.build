@@ -1,8 +1,10 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 project(
   'knot-resolver',
   ['c', 'cpp'],
   license: 'GPLv3+',
-  version: '5.0.0',
+  version: '5.0.1',
   default_options: ['c_std=gnu11', 'b_ndebug=if-release'],
   meson_version: '>=0.46',
 )
@@ -87,6 +89,9 @@ message('--- optional dependencies ---')
 capng = dependency('libcap-ng', required: false)
 openssl = dependency('openssl', required: false)
 
+have_asprintf = meson.get_compiler('c').has_function('asprintf',
+  prefix: '#define _GNU_SOURCE\n#include <stdio.h>')
+
 ### sendmmsg
 has_sendmmsg = meson.get_compiler('c').has_function('sendmmsg',
   prefix: '#define _GNU_SOURCE\n#include <sys/socket.h>')
@@ -110,7 +115,17 @@ add_project_arguments(
   '-Wformat-security',
   '-Wtype-limits',
   '-Wshadow',
+  '-Werror=implicit-function-declaration', # Probably messed up includes; implicit functions are evil!
   '-fvisibility=hidden',
+  '-DHAVE_ASPRINTF=' + have_asprintf.to_int().to_string(),
+
+  # libuv handles have aliasing problems; see:
+  # https://github.com/libuv/libuv/pull/2588/files#diff-04c6e90faac2675aa89e2176d2eec7d8
+  # https://github.com/libuv/libuv/issues/1230#issuecomment-569030944
+  # Performance impact in our case seems OK:
+  # https://gitlab.labs.nic.cz/knot/knot-resolver/-/merge_requests/962#note_147407
+  '-fno-strict-aliasing',
+
   language: 'c',
 )
 

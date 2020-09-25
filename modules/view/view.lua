@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 local kres = require('kres')
 local ffi = require('ffi')
 local C = ffi.C

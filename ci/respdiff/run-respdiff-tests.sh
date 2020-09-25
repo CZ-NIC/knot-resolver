@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # $1 == udp/tcp/tls, it selects configuration file to use
 # respdiff scripts must be present in /var/opt/respdiff
 set -o errexit -o nounset -o xtrace

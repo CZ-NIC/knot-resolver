@@ -2,6 +2,8 @@
  *	UCW Library -- Generic allocators
  *
  *	(c) 2014 Martin Mares <mj@ucw.cz>
+ *	SPDX-License-Identifier: LGPL-2.1-or-later
+ *	Source: https://www.ucw.cz/libucw/
  */
 
 #ifndef _UCW_ALLOC_H

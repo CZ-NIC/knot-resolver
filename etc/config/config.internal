@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: CC0-1.0
 -- vim:syntax=lua:set ts=4 sw=4:
 -- Config file example usable for multi-user ISP resolver
 -- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/

@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 local kr_table_len = require('kluautil').kr_table_len
 
 local function test_env_no_listen()

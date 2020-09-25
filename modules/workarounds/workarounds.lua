@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 -- Load dependent module
 if not policy then modules.load('policy') end
 

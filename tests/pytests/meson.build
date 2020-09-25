@@ -1,4 +1,5 @@
 # tests: pytests
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # python 3 dependencies
 py3_deps += [

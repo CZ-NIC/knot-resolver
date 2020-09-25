@@ -1,4 +1,5 @@
 #!/bin/sh -e
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Create a distribution tarball, like 'make dist' from autotools.
 cd "$(git rev-parse --show-toplevel)"
 ver="$(git describe | sed 's/^v//')"

@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 local kres = require('kres')
 local ffi = require('ffi')
 
@@ -402,7 +403,7 @@ end
 function policy.rpz(action, path, watch)
 	local rules = rpz_parse(action, path)
 
-	if watch or true then
+	if watch ~= false then
 		local has_notify, notify  = pcall(require, 'cqueues.notify')
 		if has_notify then
 			local bit = require('bit')
@@ -526,6 +527,77 @@ function policy.DENY_MSG(msg)
 		return kres.DONE
 	end
 end
+
+local function free_cb(func)
+	func:free()
+end
+
+local debug_logline_cb = ffi.cast('trace_log_f', function (_, msg)
+	jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
+	-- msg typically ends with newline
+	io.write(ffi.string(msg))
+end)
+ffi.gc(debug_logline_cb, free_cb)
+
+local debug_logfinish_cb = ffi.cast('trace_callback_f', function (req)
+	jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
+	ffi.C.kr_log_req(req, 0, 0, 'dbg',
+		'following rrsets were marked as interesting:\n' ..
+		req:selected_tostring())
+	ffi.C.kr_log_req(req, 0, 0, 'dbg',
+		'answer packet:\n' ..
+		tostring(req.answer))
+end)
+ffi.gc(debug_logfinish_cb, free_cb)
+
+-- log request packet
+function policy.REQTRACE(_, req)
+	ffi.C.kr_log_req(req, 0, 0, 'dbg', 'request packet:\n%s',
+		tostring(req.qsource.packet))
+end
+
+function policy.DEBUG_ALWAYS(state, req)
+	policy.QTRACE(state, req)
+	req:trace_chain_callbacks(debug_logline_cb, debug_logfinish_cb)
+	policy.REQTRACE(state, req)
+end
+
+local debug_stashlog_cb = ffi.cast('trace_log_f', function (req, msg)
+	jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
+
+	-- stash messages for conditional logging in trace_finish
+	local stash = req:vars()['policy_debug_stash']
+	table.insert(stash, ffi.string(msg))
+end)
+ffi.gc(debug_stashlog_cb, free_cb)
+
+-- buffer verbose logs and print then only if test() returns a truthy value
+function policy.DEBUG_IF(test)
+	local debug_finish_cb = ffi.cast('trace_callback_f', function (cbreq)
+		jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
+		if test(cbreq) then
+			debug_logfinish_cb(cbreq)  -- unconditional version
+			local stash = cbreq:vars()['policy_debug_stash']
+			io.write(table.concat(stash, ''))
+		end
+	end)
+	ffi.gc(debug_finish_cb, function (func) func:free() end)
+
+	return function (state, req)
+		req:vars()['policy_debug_stash'] = {}
+		policy.QTRACE(state, req)
+		req:trace_chain_callbacks(debug_stashlog_cb, debug_finish_cb)
+		policy.REQTRACE(state, req)
+		return
+	end
+end
+
+policy.DEBUG_CACHE_MISS = policy.DEBUG_IF(
+	function(req)
+		return not req:all_from_cache()
+	end
+)
+
 policy.DENY = policy.DENY_MSG() -- compatibility with < 2.0
 
 function policy.DROP(_, _)

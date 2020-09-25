@@ -1,4 +1,5 @@
 # C module: edns_keepalive
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 edns_keepalive_src = files([
   'edns_keepalive.c',

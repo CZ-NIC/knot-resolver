@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # $1 = top source directory
 # $2 = coverage data directory path
 # $3 = output directory for *.info files

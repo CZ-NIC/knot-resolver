@@ -1,0 +1,11 @@
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: selectize.js
+DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-5ffbfb08-4009-4a41-bc96-16adb5f2b632
+
+PackageName: selectize.js
+PackageVersion: 0.12.6
+PackageDownloadLocation: git+https://github.com/selectize/selectize.js.git@eb0fca364f9bd6864ae197ea58c853f2717052a9#dist/
+PackageOriginator: Person: Jonathan Allard (jonathan@allard.io)
+PackageLicenseDeclared: Apache-2.0

@@ -1,4 +1,5 @@
 # modules
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 lua_mod_src = [  # add lua modules without separate meson.build
   files('detect_time_jump/detect_time_jump.lua'),
@@ -25,7 +26,7 @@ config_tests += [
   ['nsid', files('nsid/nsid.test.lua')],
   ['dns64', files('dns64/dns64.test.lua')],
   ['ta_update', files('ta_update/ta_update.test.lua'), ['snowflake']],
-  # ['prefill', files('prefill/prefill.test/prefill.test.lua')],
+  ['prefill', files('prefill/prefill.test/prefill.test.lua')],
 ]
 
 integr_tests += [

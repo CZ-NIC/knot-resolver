@@ -4,8 +4,8 @@
  *	(c) 1997--2012 Martin Mares <mj@ucw.cz>
  *	(c) 2006 Robert Spalek <robert@ucw.cz>
  *
- *	This software may be freely distributed and used according to the terms
- *	of the GNU Lesser General Public License.
+ *	SPDX-License-Identifier: LGPL-2.1-or-later
+ *	Source: https://www.ucw.cz/libucw/
  */
 
 #ifndef _UCW_CONFIG_H

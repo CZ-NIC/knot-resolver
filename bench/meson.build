@@ -1,4 +1,5 @@
 # bench
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 bench_lru_src = files([
   'bench_lru.c',

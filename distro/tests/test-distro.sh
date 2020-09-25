@@ -1,4 +1,5 @@
 #!/bin/bash -x
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # ./test-distro.sh {obs_repo} {distro}
 # Example usage: ./test-distro.sh knot-resolver-devel debian9

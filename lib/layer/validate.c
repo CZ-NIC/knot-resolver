@@ -1,17 +1,5 @@
 /*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include <assert.h>
@@ -137,8 +125,12 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 			kr_rank_set(&entry->rank, KR_RANK_SECURE);
 
 		} else if (kr_rank_test(rank_orig, KR_RANK_TRY)) {
-			log_bogus_rrsig(vctx, qry, rr,
-					"failed to validate non-authoritative data but continuing");
+			/* RFC 4035 section 2.2:
+			 * NS RRsets that appear at delegation points (...)
+			 * MUST NOT be signed */
+			if (vctx->rrs_counters.matching_name_type > 0)
+				log_bogus_rrsig(vctx, qry, rr,
+					"found unexpected signatures for non-authoritative data which failed to validate, continuing");
 			vctx->result = kr_ok();
 			kr_rank_set(&entry->rank, KR_RANK_TRY);
 			/* ^^ BOGUS would be more accurate, but it might change

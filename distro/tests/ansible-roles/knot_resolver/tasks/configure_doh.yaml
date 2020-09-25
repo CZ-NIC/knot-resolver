@@ -1,4 +1,5 @@
 ---
+# SPDX-License-Identifier: GPL-3.0-or-later
 - name: doh_config set up kresd.conf
   blockinfile:
     marker: -- {mark} ANSIBLE MANAGED BLOCK

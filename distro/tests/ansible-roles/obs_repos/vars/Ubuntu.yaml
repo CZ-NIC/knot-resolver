@@ -1,2 +1,3 @@
 ---
+# SPDX-License-Identifier: GPL-3.0-or-later
 obs_repo_version: "x{{ obs_distro }}_{{ ansible_distribution_version }}"

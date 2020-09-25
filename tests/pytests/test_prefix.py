@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """TCP Connection Management tests - prefix length
 
 RFC1035

@@ -1,4 +1,5 @@
-/* CC0 (Public domain) - see LICENSE file for details */
+/* SPDX-License-Identifier: CC0-1.0
+ * Source: https://ccodearchive.net/info/compiler.html */
 #ifndef CCAN_COMPILER_H
 #define CCAN_COMPILER_H
 #include "config.h"

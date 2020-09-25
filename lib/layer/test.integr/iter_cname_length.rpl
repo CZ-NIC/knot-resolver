@@ -1,4 +1,5 @@
 ; config options
+; SPDX-License-Identifier: GPL-3.0-or-later
 	stub-addr: 193.0.14.129 	# k.root-servers.net.
 CONFIG_END
 

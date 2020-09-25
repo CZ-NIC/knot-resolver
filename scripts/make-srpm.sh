@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Create a source rpm for Fedora/EPEL
 set -o errexit -o nounset -o xtrace
 

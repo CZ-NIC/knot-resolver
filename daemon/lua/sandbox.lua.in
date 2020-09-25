@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
+
 local debug = require('debug')
 local ffi = require('ffi')
 
@@ -74,6 +76,7 @@ worker.resolve = function (qname, qtype, qclass, options, finish, init)
 		panic('failure in worker.resolve(); probably invalid qname "%s"', qname)
 	end
 	local ret = worker.resolve_pkt(pkt, options, finish, init)
+	ffi.C.knot_rrset_free(pkt.opt_rr, nil);
 	ffi.C.knot_pkt_free(pkt);
 	return ret
 end
@@ -275,6 +278,24 @@ end
 modules_ffi_wrap_modcb = function (cb, kr_module_ud) -- this one isn't for layer
 	local kr_module = ffi.cast('struct kr_module **', kr_module_ud)[0]
 	return cb(kr_module)
+end
+
+-- Return filesystem size where the cache resides.
+cache.fssize = function ()
+	local path = cache.current_storage or '.'
+	-- As it is now, `path` may or may not include the lmdb:// prefix.
+	if string.sub(path, 1, 7) == 'lmdb://' then
+		path = string.sub(path, 8)
+	end
+	if #path == 0 then
+		path = '.'
+	end
+	local size = tonumber(ffi.C.kr_fssize(path))
+	if size < 0 then
+		panic('cache.fssize(): %s', ffi.string(ffi.C.knot_strerror(size)))
+	else
+		return size
+	end
 end
 
 cache.clear = function (name, exact_name, rr_type, chunk_size, callback, prev_state)

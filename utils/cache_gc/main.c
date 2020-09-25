@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 #include <assert.h>
 #include <signal.h>
 #include <stdio.h>
@@ -115,16 +116,21 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	int exit_code = 0;
+	kr_cache_gc_state_t *gc_state = NULL;
 	do {
-		int ret = kr_cache_gc(&cfg);
+		int ret = kr_cache_gc(&cfg, &gc_state);
 		// ENOENT: kresd may not be started yet or cleared the cache now
 		if (ret && ret != -ENOENT) {
 			printf("Error (%s)\n", knot_strerror(ret));
-			return 10;
+			exit_code = 10;
+			break;
 		}
 
 		usleep(cfg.gc_interval);
 	} while (cfg.gc_interval > 0 && !killed);
 
-	return 0;
+	kr_cache_gc_free_state(&gc_state);
+
+	return exit_code;
 }

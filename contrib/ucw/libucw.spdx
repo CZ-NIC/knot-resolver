@@ -1,0 +1,10 @@
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: libucw
+DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-c3d39e26-6b71-46d4-88ea-e52750932ff3
+
+PackageName: libucw
+PackageDownloadLocation: git://git.ucw.cz/libucw.git@f1bde7104b04d5254d1d1d7dcc8de790a43a416f#ucw/
+PackageOriginator: Organization: United Computer Wizards
+PackageLicenseDeclared: LGPL-2.1-or-later

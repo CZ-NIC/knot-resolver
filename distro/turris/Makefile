@@ -1,9 +1,5 @@
-#
 # Copyright (C) 2015-2019 CZ.NIC, z. s. p. o. (https://www.nic.cz/)
-#
-# This is free software, licensed under the GNU General Public License v2.
-# See /LICENSE for more information.
-#
+# SPDX-License-Identifier: GPL-2.0
 
 PKG_RELRO_FULL:=0
 

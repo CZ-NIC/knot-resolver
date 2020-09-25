@@ -1,4 +1,5 @@
 ---
+# SPDX-License-Identifier: GPL-3.0-or-later
 show_package_version: dpkg -s knot-resolver | grep '^Version'
 packages:
   - knot-resolver

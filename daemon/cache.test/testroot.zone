@@ -1,3 +1,4 @@
+; SPDX-License-Identifier: GPL-3.0-or-later
 ; File written on Wed Aug 15 09:23:14 2018
 ; dnssec_signzone version 9.13.0-dev
 .					      86400 IN SOA	rootns. you.test. 2017071101 1800 900 604800 86400

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 #pragma once
 
 #include <stdbool.h>
@@ -29,6 +30,12 @@ typedef struct {
 	bool dry_run;
 } kr_cache_gc_cfg_t;
 
-int kr_cache_gc(kr_cache_gc_cfg_t * cfg);
+/** State persisting across kr_cache_gc() invocations (opaque).
+ * NULL pointer represents a clean state. */
+typedef struct kr_cache_gc_state kr_cache_gc_state_t;
+
+/** Do one iteration of cache-size check and (if necessary) GC pass. */
+int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state);
+void kr_cache_gc_free_state(kr_cache_gc_state_t **state);
 
 #define KR_CACHE_GC_VERSION "0.2"

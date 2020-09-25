@@ -1,0 +1,10 @@
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: ccan-json
+DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-d9b4db4c-062f-4add-89b6-f603224f5a2c
+
+PackageName: json
+PackageDownloadLocation: git+https://github.com/aappleby/smhasher.git@73e075b203d9c76cd1e20d6c8907c2983d653f33#MurmurHash3.cpp
+PackageOriginator: Person: Austin Appleby (aappleby@gmail.com)
+PackageLicenseDeclared: CC0-1.0

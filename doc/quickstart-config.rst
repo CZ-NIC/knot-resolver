@@ -1,3 +1,5 @@
+.. SPDX-License-Identifier: GPL-3.0-or-later
+
 .. _quickstart-config:
 
 *************
@@ -64,7 +66,10 @@ This configuration will forward two listed domains to a DNS server with IP addre
     internalDomains = policy.todnames({'company.example', 'internal.example'})
 
     -- forward all queries belonging to domains in the list above to IP address '192.0.2.44'
-    policy.add(policy.suffix(policy.FORWARD({'192.0.2.44'}), internalDomains))
+    policy.add(policy.suffix(policy.FLAGS({'NO_CACHE'}), internalDomains))
+    policy.add(policy.suffix(policy.STUB({'192.0.2.44'}), internalDomains))
+
+See chapter :ref:`dns-graft` for more details.
 
 
 .. _ispresolver:

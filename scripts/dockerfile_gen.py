@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 '''
 Generate minimal Dockefile to build, install, run, and test kresd and modules.
 

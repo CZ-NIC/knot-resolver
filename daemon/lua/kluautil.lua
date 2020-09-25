@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
+
 local cqerrno = require('cqueues.errno')
 local kluautil = {}
 

@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 local basexx = require('basexx')
 local ffi = require('ffi')
 local condition = require('cqueues.condition')

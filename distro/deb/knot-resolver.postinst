@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 set -e
 
 # upgrade-4-to-5
@@ -23,7 +24,7 @@ if [ "$1" = "triggered" ]; then
         # use daemon-reload to load any unit changes
         systemctl daemon-reload || true
         # systemctl of the sub-services is the preferred method to restart
-        systemctl try-restart 'kresd@*.service' || true
+        systemctl try-restart 'kresd@*.service' kres-cache-gc.service || true
     fi
     exit 0
 fi
@@ -31,7 +32,7 @@ fi
 if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ] ; then
     systemctl daemon-reload || true
     systemd-tmpfiles --create /usr/lib/tmpfiles.d/knot-resolver.conf
-    systemctl try-restart 'kresd@*.service' || true
+    systemctl try-restart 'kresd@*.service' kres-cache-gc.service || true
 fi
 
 #DEBHELPER#

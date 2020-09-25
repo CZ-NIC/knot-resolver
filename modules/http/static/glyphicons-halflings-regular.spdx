@@ -1,0 +1,11 @@
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: bootstrap-glyphicons-halflings-regular
+DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-5fdae9d2-c79e-4242-8a82-0909ddd93ae3
+
+PackageName: bootstrap-glyphicons-halflings-regular
+PackageVersion: 3.3.6
+PackageDownloadLocation: git+https://github.com/twbs/bootstrap.git@81df608a40bf0629a1dc08e584849bb1e43e0b7a#dist/fonts/glyphicons-halflings-regular.woff2
+PackageOriginator: Organization: Twitter
+PackageLicenseDeclared: MIT

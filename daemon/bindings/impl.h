@@ -1,17 +1,5 @@
 /*  Copyright (C) 2015-2019 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #pragma once
@@ -20,6 +8,13 @@
 
 #include <lua.h>
 #include <lauxlib.h>
+/* It may happen that include files are messed up and we're hitting a header
+ * e.g. from Lua 5.2 or 5.3.  Header from 5.1 should work OK, and it's more difficult
+ * to differentiate from a luajit one. */
+#if LUA_VERSION_NUM != 501
+	#error "Incorrect Lua version in #include <lua.h> - LuaJIT compatible with Lua 5.1 is required"
+#endif
+
 
 /** Useful to stringify #defines into error strings. */
 #define STR(s) STRINGIFY_TOKEN(s)

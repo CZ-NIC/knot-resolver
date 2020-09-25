@@ -1,5 +1,5 @@
-/* Copyright (C) Knot Resolver contributors. Licensed under GNU GPLv3 or
- * (at your option) any later version. See COPYING for text of the license.
+/* Copyright (C) Knot Resolver contributors.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * This module responds to all queries without RD bit set with REFUSED. */
 

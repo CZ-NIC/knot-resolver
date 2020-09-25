@@ -1,0 +1,12 @@
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: jquery
+DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-d1bf4e73-cd79-434a-ba6c-834967690525
+
+PackageName: jquery
+PackageVersion: 2.1.4
+PackageDownloadLocation: https://code.jquery.com/jquery-2.1.4.min.js
+PackageChecksum: SHA256: f16ab224bb962910558715c82f58c10c3ed20f153ddfaa199029f141b5b0255c
+PackageOriginator: Organization: jQuery Foundation
+PackageLicenseDeclared: MIT

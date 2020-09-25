@@ -1,4 +1,5 @@
 # client
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 kresc_src = files([
   'kresc.c',

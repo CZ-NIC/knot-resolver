@@ -1,0 +1,11 @@
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: datamaps
+DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-b0f0e722-a8b4-4961-825d-7392f165a0be
+
+PackageName: datamaps
+PackageVersion: 0.3.7
+PackageDownloadLocation: git+https://github.com/markmarkoh/datamaps.git@37beb5995b8489906e070ec6002c7f7d84b17c7a/datamaps.world.min.js
+PackageOriginator: Person: Mark DiMarco (mark.dimarco@gmail.com)
+PackageLicenseDeclared: MIT

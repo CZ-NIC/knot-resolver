@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 -- shorten update interval
 ta_update.refresh_time = 0.5 * sec
 ta_update.hold_down_time = 1 * sec

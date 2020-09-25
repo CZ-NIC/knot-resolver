@@ -1,17 +1,5 @@
 /*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #pragma once
@@ -46,8 +34,10 @@ struct kr_request;
 
 /** @brief Callback for request events. */
 typedef void (*trace_callback_f)(struct kr_request *request);
-/** @brief Callback for request logging handler. */
-typedef void (*trace_log_f)(const struct kr_query *query, const char *source, const char *msg);
+/**
+ * @brief Callback for request logging handler.
+ * @param[in] msg Log message. Pointer is not valid after handler returns. */
+typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
 
 #define kr_log_info printf
 #define kr_log_error(...) fprintf(stderr, ## __VA_ARGS__)
@@ -60,30 +50,38 @@ KR_EXPORT extern bool kr_verbose_status;
 /** Set --verbose mode.  Not available if compiled with -DNOVERBOSELOG. */
 KR_EXPORT bool kr_verbose_set(bool status);
 
-/** Log a message if in --verbose mode. */
-KR_EXPORT KR_PRINTF(1)
-void kr_log_verbose(const char *fmt, ...);
-
-/** Utility for QRVERBOSE - use that instead. */
-KR_EXPORT KR_PRINTF(3)
-void kr_log_qverbose_impl(const struct kr_query *qry, const char *cls, const char *fmt, ...);
-
 /**
  * @brief Return true if the query has request log handler installed.
  */
-#define kr_log_trace_enabled(query) (__builtin_expect( \
-	(query) && (query)->request && (query)->request->trace_log, \
+#define kr_log_rtrace_enabled(req) (__builtin_expect( \
+	(req) && (req)->trace_log, \
+	false))
+
+#define kr_log_qtrace_enabled(qry) (__builtin_expect( \
+	(qry) && kr_log_rtrace_enabled(qry->request), \
 	false))
 
 /**
- * Log a message through the request log handler.
+ * Log a message through the request log handler or stdout.
+ * Caller is responsible for detecting verbose mode, use QRVERBOSE() macro.
+ * @param  qry_uid query ID to append to request ID, 0 means "no query"
+ * @param  indent level of indentation between [req.qry][source] and message
+ * @param  source message source
+ * @param  fmt message format
+ */
+void kr_log_req(const struct kr_request * const req, uint32_t qry_uid,
+		const unsigned int indent, const char *source, const char *fmt, ...)
+KR_EXPORT KR_PRINTF(5);
+
+/**
+ * Log a message through the request log handler or stdout.
+ * Caller is responsible for detecting verbose mode, use QRVERBOSE() macro.
  * @param  query current query
  * @param  source message source
  * @param  fmt message format
- * @return true if the message was logged
  */
-KR_EXPORT KR_PRINTF(3)
-bool kr_log_trace(const struct kr_query *query, const char *source, const char *fmt, ...);
+void kr_log_q(const struct kr_query *qry, const char *source, const char *fmt, ...)
+KR_EXPORT KR_PRINTF(3);
 
 #ifdef NOVERBOSELOG
 /* Efficient compile-time disabling of verbose messages. */
@@ -93,8 +91,8 @@ bool kr_log_trace(const struct kr_query *query, const char *source, const char *
 
 /** Block run in --verbose mode; optimized when not run. */
 #define VERBOSE_STATUS __builtin_expect(kr_verbose_status, false)
-#define WITH_VERBOSE(query) if(__builtin_expect(kr_verbose_status || kr_log_trace_enabled(query), false))
-#define kr_log_verbose if(VERBOSE_STATUS) kr_log_verbose
+#define WITH_VERBOSE(query) if(__builtin_expect(kr_verbose_status || kr_log_qtrace_enabled(query), false))
+#define kr_log_verbose if(VERBOSE_STATUS) printf
 
 #define KR_DNAME_GET_STR(dname_str, dname) \
 	char dname_str[KR_DNAME_STR_MAXLEN]; \
@@ -273,7 +271,7 @@ static inline bool kr_rand_coin(unsigned int nomin, unsigned int denomin)
 
 /** Memory reservation routine for knot_mm_t */
 KR_EXPORT
-int kr_memreserve(void *baton, char **mem, size_t elm_size, size_t want, size_t *have);
+int kr_memreserve(void *baton, void **mem, size_t elm_size, size_t want, size_t *have);
 
 /** @internal Fast packet reset. */
 KR_EXPORT
@@ -551,4 +549,8 @@ KR_EXPORT uint16_t kr_pkt_qtype(const knot_pkt_t *pkt);
 KR_EXPORT uint32_t kr_rrsig_sig_inception(const knot_rdata_t *rdata);
 KR_EXPORT uint32_t kr_rrsig_sig_expiration(const knot_rdata_t *rdata);
 KR_EXPORT uint16_t kr_rrsig_type_covered(const knot_rdata_t *rdata);
+
 KR_EXPORT time_t kr_file_mtime (const char* fname);
+/** Return filesystem size in bytes. */
+KR_EXPORT long long kr_fssize(const char *path);
+

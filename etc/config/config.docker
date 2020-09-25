@@ -1,36 +1,84 @@
+-- SPDX-License-Identifier: CC0-1.0
 -- vim:syntax=lua:set ts=4 sw=4:
 -- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/
+print('Knot Resolver ' .. package_version())
 
--- Listen on all interfaces (localhost would not work in Docker)
-net.listen('0.0.0.0', 53, { kind = 'dns' })
-net.listen('0.0.0.0', 853, { kind = 'tls' })
-net.listen('0.0.0.0', 443, { kind = 'doh' })
-net.listen('0.0.0.0', 8453, { kind = 'webmgmt' })
+function interactive_mode()
+	-- Listen on all interfaces (localhost would not work in Docker)
+	net.listen('0.0.0.0', 53, { kind = 'dns' })
+	net.listen('0.0.0.0', 853, { kind = 'tls' })
+	net.listen('0.0.0.0', 443, { kind = 'doh' })
+	net.listen('0.0.0.0', 8453, { kind = 'webmgmt' })
 
--- Load Useful modules
-modules = {
-	'stats',    -- Track internal statistics
-	'http',
-}
+	-- Load Useful modules
+	modules = {
+		'stats',    -- Track internal statistics
+		'http',
+	}
 
--- Smaller cache size
-cache.size = 10 * MB
+	-- Smaller cache size
+	cache.size = 10 * MB
 
-function print_help()
-	print('\nUsage\n'
-	   .. '=====\n'
-	   .. 'Run this container using command:\n'
-	   .. '$ docker run -Pti cznic/knot-resolver\n'
-	   .. '\n'
-	   .. 'Docker will map ports 53, 443, 853, and 8453 to some other numbers, see\n'
-	   .. '$ docker ps\n'
-	   .. '(column PORTS)\n'
-	   .. '53   -> DNS protocol over UDP and TCP\n'
-	   .. '443  -> DNS-over-HTTPS protocol\n'
-	   .. '853  -> DNS-over-TLS protocol\n'
-	   .. '8453 -> web interface\n'
-	   .. '\n'
-	   .. 'For verbose logging enter following command to prompt below:\n'
-	   .. 'verbose(true)\n')
+	function print_help()
+		print('\nUsage\n'
+		   .. '=====\n'
+		   .. 'Run this container using command:\n'
+		   .. '$ docker run -Pti cznic/knot-resolver\n'
+		   .. '\n'
+		   .. 'Docker will map ports 53, 443, 853, and 8453 to some other numbers, see\n'
+		   .. '$ docker ps\n'
+		   .. '(column PORTS)\n'
+		   .. '53   -> DNS protocol over UDP and TCP\n'
+		   .. '443  -> DNS-over-HTTPS protocol\n'
+		   .. '853  -> DNS-over-TLS protocol\n'
+		   .. '8453 -> web interface\n'
+		   .. '\n'
+		   .. 'For verbose logging enter following command to prompt below:\n'
+		   .. 'verbose(true)\n')
+	end
+	print_help()
 end
-print_help()
+
+function debug_mode(qname, qtype)
+	env.KRESD_NO_LISTEN = 1
+
+	-- limit noise in verbose logs
+	modules.unload('detect_time_skew')
+	modules.unload('priming')
+	modules.unload('ta_signal_query')
+	modules.unload('ta_update')
+
+
+	-- execute query right after start up and exit when the query is finished
+	event.after(0, function()
+		-- ultra verbose log
+		verbose(true)
+		policy.add(policy.all(policy.DEBUG_ALWAYS))
+		log('INFO: starting your DNS query for %s %s, verbose log follows', qname, kres.tostring.type[qtype])
+		resolve({
+			name = qname,
+			type = qtype,
+			finish = function(pkt)
+				-- delay exit after packet is finished
+				-- to prevent us from losing policy.DEBUG finish callback
+				event.after(1,
+					function()
+						os.exit()
+					end)
+				end
+		})
+	end)
+end
+
+local qname = os.getenv('QNAME')
+local qtype = os.getenv('QTYPE')
+if qname and qtype then
+	qtypenum = kres.type[qtype]
+	if not qtypenum then
+		log('ERROR: unsupported query type "%s", use TYPE12345 notation', qtype)
+		os.exit()
+	end
+	debug_mode(qname, qtypenum)
+else
+	interactive_mode()
+end

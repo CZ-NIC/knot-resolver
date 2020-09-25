@@ -1,3 +1,4 @@
+; SPDX-License-Identifier: GPL-3.0-or-later
 ; File written on Thu Aug 22 15:47:02 2019
 ; dnssec_signzone version 9.11.3-1ubuntu1.8-Ubuntu
 .			86400	IN SOA	rootns. you.test. (

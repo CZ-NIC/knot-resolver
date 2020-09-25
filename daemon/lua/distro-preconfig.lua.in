@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
 local id = os.getenv('SYSTEMD_INSTANCE')
 if not id then
 	warn('environment variable $SYSTEMD_INSTANCE not set')

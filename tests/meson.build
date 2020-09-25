@@ -1,4 +1,5 @@
 # tests
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ## unit tests
 build_unit_tests = false

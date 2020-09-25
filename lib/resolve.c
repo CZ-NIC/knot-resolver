@@ -1,17 +1,5 @@
 /*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include <ctype.h>
@@ -103,21 +91,22 @@ static int checkout_yield(kr_layer_t *ctx, knot_pkt_t *packet, struct sockaddr *
 static int answer_finalize_yield(kr_layer_t *ctx) { return kr_ok(); }
 
 /** @internal Macro for iterating module layers. */
-#define RESUME_LAYERS(from, r, qry, func, ...) do { \
-	(r)->current_query = (qry); \
+#define RESUME_LAYERS(from, r, qry, func, ...) \
+    (r)->current_query = (qry); \
 	for (size_t i = (from); i < (r)->ctx->modules->len; ++i) { \
-		const kr_layer_api_t *api = (r)->ctx->modules->at[i]->layer; \
-		if (api && api->func) { \
-			struct kr_layer layer = {.state = (r)->state, .api = api, .req = (r)}; \
-			(r)->state = api->func(&layer, ##__VA_ARGS__); \
-			if (unlikely((r)->state == KR_STATE_YIELD)) { \
-				func ## _yield(&layer, ##__VA_ARGS__); \
-				break; \
+		struct kr_module *mod = (r)->ctx->modules->at[i]; \
+		if (mod->layer) { \
+			struct kr_layer layer = {.state = (r)->state, .api = mod->layer, .req = (r)}; \
+			if (layer.api && layer.api->func) { \
+				(r)->state = layer.api->func(&layer, ##__VA_ARGS__); \
+				if ((r)->state == KR_STATE_YIELD) { \
+					func ## _yield(&layer, ##__VA_ARGS__); \
+					break; \
+				} \
 			} \
 		} \
 	} /* Invalidate current query. */ \
-	(r)->current_query = NULL; \
-} while (false)
+	(r)->current_query = NULL
 
 /** @internal Macro for starting module iteration. */
 #define ITERATE_LAYERS(req, qry, func, ...) RESUME_LAYERS(0, req, qry, func, ##__VA_ARGS__)
