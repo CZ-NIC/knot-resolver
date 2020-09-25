@@ -418,7 +418,13 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls, bool http)
 				proto.data = (unsigned char *)"h2";
 				proto.size = 2;
 			}
-			ret = gnutls_alpn_set_protocols(ctx->c.tls_session, &proto, 1, GNUTLS_ALPN_MANDATORY);
+			unsigned int flags = 0;
+#if GNUTLS_VERSION_NUMBER >= 0x030500
+			/* Mandatory ALPN means the protocol must match if and
+			 * only if ALPN extension is used by the client. */
+			flags |= GNUTLS_ALPN_MANDATORY;
+#endif
+			ret = gnutls_alpn_set_protocols(ctx->c.tls_session, &proto, 1, flags);
 			if (ret != GNUTLS_E_SUCCESS) {
 				session_close(s);
 				return;
