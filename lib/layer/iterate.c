@@ -474,11 +474,15 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	return result;
 }
 
-static void finalize_answer(knot_pkt_t *pkt, struct kr_request *req)
+static int finalize_answer(knot_pkt_t *pkt, struct kr_request *req)
 {
 	/* Finalize header */
 	knot_pkt_t *answer = kr_request_ensure_answer(req);
-	knot_wire_set_rcode(answer->wire, knot_wire_get_rcode(pkt->wire));
+	if (answer) {
+		knot_wire_set_rcode(answer->wire, knot_wire_get_rcode(pkt->wire));
+		req->state = KR_STATE_DONE;
+	}
+	return req->state;
 }
 
 static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, const knot_dname_t **cname_ret)
@@ -677,8 +681,7 @@ static int process_final(knot_pkt_t *pkt, struct kr_request *req,
 			array->at[last_idx] = entry;
 			entry->to_wire = true;
 		}
-		finalize_answer(pkt, req);
-		return KR_STATE_DONE;
+		return finalize_answer(pkt, req);
 	}
 	return kr_ok();
 }
@@ -801,7 +804,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		if (state != kr_ok()) {
 			return KR_STATE_FAIL;
 		}
-		finalize_answer(pkt, req);
+		return finalize_answer(pkt, req);
 	} else {
 		/* Answer for sub-query; DS, IP for NS etc.
 		 * It may contains NSEC \ NSEC3 records for
@@ -864,8 +867,7 @@ static int process_stub(knot_pkt_t *pkt, struct kr_request *req)
 		return KR_STATE_FAIL;
 	}
 
-	finalize_answer(pkt, req);
-	return KR_STATE_DONE;
+	return finalize_answer(pkt, req);
 }
 
 
@@ -903,6 +905,7 @@ static int begin(kr_layer_t *ctx)
 	    || (knot_rrtype_is_metatype(qry->stype)
 		    /* && qry->stype != KNOT_RRTYPE_ANY hmm ANY seems broken ATM */)) {
 		knot_pkt_t *ans = kr_request_ensure_answer(ctx->req);
+		if (!ans) return ctx->req->state;
 		knot_wire_set_rcode(ans->wire, KNOT_RCODE_NOTIMPL);
 		return KR_STATE_FAIL;
 	}
@@ -1103,7 +1106,8 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 rrarray_finalize:
-	/* Finish construction of libknot-format RRsets. */
+	/* Finish construction of libknot-format RRsets.
+	 * We do this even if dropping the answer, though it's probably useless. */
 	(void)0;
 	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
