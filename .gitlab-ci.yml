@@ -516,6 +516,10 @@ obs:build:all:
     expire_in: 1 week
     paths:
       - ./j*
+  retry:
+    max: 1
+    when:
+      - script_failure
 
 obs:centos7:x86_64:
   <<: *distrotest
