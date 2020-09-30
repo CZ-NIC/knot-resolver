@@ -438,7 +438,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls, bool http)
 	if (http) {
 		struct http_ctx *ctx = session_http_get_server_ctx(s);
 		if (!ctx) {
-			if (!tls) {  // TODO plain HTTP not supported yet
+			if (!tls) {  /* Plain HTTP is not supported. */
 				session_close(s);
 				return;
 			}
@@ -464,11 +464,6 @@ static void tls_accept(uv_stream_t *master, int status)
 	_tcp_accept(master, status, true, false);
 }
 
-static void http_accept(uv_stream_t *master, int status)
-{
-	_tcp_accept(master, status, false, true);
-}
-
 static void https_accept(uv_stream_t *master, int status)
 {
 	_tcp_accept(master, status, true, true);
@@ -478,11 +473,16 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
 {
 	uv_connection_cb connection;
 	if (has_tls && has_http) {
+#ifdef NGHTTP2_VERSION_NUM
 		connection = https_accept;
+#else
+		kr_log_error("[ io ] kresd was compiled without libnghttp2 support");
+		return kr_error(ENOPROTOOPT);
+#endif
 	} else if (has_tls) {
 		connection = tls_accept;
 	} else if (has_http) {
-		connection = http_accept;
+		return kr_error(EPROTONOSUPPORT);
 	} else {
 		connection = tcp_accept;
 	}
