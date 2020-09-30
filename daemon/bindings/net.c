@@ -117,7 +117,7 @@ static bool net_listen_addrs(lua_State *L, int port, bool tls, bool http, const 
 			flags.sock_type = SOCK_DGRAM;
 			ret = network_listen(net, str, port, flags);
 		}
-		if (!kind && ret == 0) { /* common for normal TCP and TLS */
+		if (!kind && ret == 0) { /* common for TCP, DoT and DoH (v2) */
 			flags.sock_type = SOCK_STREAM;
 			ret = network_listen(net, str, port, flags);
 		}
@@ -184,7 +184,7 @@ static int net_listen(lua_State *L)
 	}
 
 	bool tls = (port == KR_DNS_TLS_PORT);
-	bool http = (port == KR_DNS_HTTP_PORT);
+	bool http = false;
 	if (port == KR_DNS_DOH_PORT) {
 		http = tls = true;
 	}
