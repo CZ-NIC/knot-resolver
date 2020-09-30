@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 - name: Add upstream package signing key
   get_url:
-    url: https://gitlab.labs.nic.cz/knot/knot-resolver-release/raw/master/cznic-obs.gpg.asc
+    url: https://gitlab.nic.cz/knot/knot-resolver-release/raw/master/cznic-obs.gpg.asc
     dest: /etc/apt/trusted.gpg.d/cznic-obs.gpg.asc
+    mode: 0644
 
 - name: Add OBS repo(s)
   apt_repository:

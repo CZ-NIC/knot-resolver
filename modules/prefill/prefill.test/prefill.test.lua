@@ -36,25 +36,13 @@ ev = event.after(0, function () return 1 end)
 trust_anchors.remove('.')
 trust_anchors.add('.			IN DS 18213 7 2 A1D391053583A4BC597DB9588B296060FC55EAC80B3831CA371BA1FA AE997244')
 
-local function check_answer(desc, qname, qtype, expected_rcode)
-	qtype_str = kres.tostring.type[qtype]
-	callback = function(pkt)
-		same(pkt:rcode(), expected_rcode,
-		     desc .. ': expecting answer for query ' .. qname .. ' ' .. qtype_str
-		      .. ' with rcode ' .. kres.tostring.rcode[expected_rcode] .. ' got ' .. kres.tostring.rcode[pkt:rcode()])
-
-		ok((pkt:ancount() > 0) == (pkt:rcode() == kres.rcode.NOERROR),
-		   desc ..': checking number of answers for ' .. qname .. ' ' .. qtype_str)
-	end
-	resolve(qname, qtype, kres.class.IN, {}, callback)
-end
-
 -- do not attempt to contact outside world, operate only on cache
 net.ipv4 = false
 net.ipv6 = false
 -- do not listen, test is driven by config code
 env.KRESD_NO_LISTEN = true
 
+local check_answer = require('test_utils').check_answer
 
 local function import_valid_root_zone()
 	cache.clear()

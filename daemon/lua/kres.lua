@@ -766,6 +766,13 @@ ffi.metatype( kr_request_t, {
 			if req.current_query == nil then return nil end
 			return req.current_query
 		end,
+		-- returns the initial query that started the request
+		initial = function(req)
+			assert(ffi.istype(kr_request_t, req))
+			local rplan = C.kr_resolve_plan(req)
+			if rplan.initial == nil then return nil end
+			return rplan.initial
+		end,
 		-- Return last query on the resolution plan
 		last = function(req)
 			assert(ffi.istype(kr_request_t, req))
@@ -902,11 +909,21 @@ local function c_array_iter(t, i)
 end
 
 -- Metatype for a single ranked record array entry (one RRset)
+local function rank_tostring(rank)
+	local names = {}
+	for name, value in pairs(const_rank) do
+		if ffi.C.kr_rank_test(rank, value) then
+			table.insert(names, string.lower(name))
+		end
+	end
+	return string.format('0%.2o (%s)', rank, table.concat(names, ' '))
+end
+
 local ranked_rr_array_entry_t = ffi.typeof('ranked_rr_array_entry_t')
 ffi.metatype(ranked_rr_array_entry_t, {
 	__tostring = function(self)
-		return string.format('; ranked rrset to_wire %s, rank 0%.2o, cached %s, qry_uid %s, revalidations %s\n%s',
-		self.to_wire, self.rank, self.cached, self.qry_uid,
+		return string.format('; ranked rrset to_wire %s, rank %s, cached %s, qry_uid %s, revalidations %s\n%s',
+		self.to_wire, rank_tostring(self.rank), self.cached, self.qry_uid,
 		self.revalidation_cnt, string.format('%s', self.rr))
 	end
 })
@@ -1059,7 +1076,7 @@ kres = {
 		if ret ~= 1 then return nil end
 		return ffi.string(addr_buf, C.kr_family_len(family))
 	end,
-	context = function () return ffi.cast('struct kr_context *', __engine) end,
+	context = function () return ffi.C.the_worker.engine.resolver end,
 
 	knot_pkt_rr = knot_pkt_rr,
 }

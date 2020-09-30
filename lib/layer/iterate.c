@@ -374,7 +374,7 @@ static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 						qry->flags.FORWARD || referral);
 		int ret = kr_ranked_rrarray_add(&req->auth_selected, rr,
 						rank, to_wire, qry->uid, &req->pool);
-		if (ret != kr_ok()) {
+		if (ret < 0) {
 			return ret;
 		}
 	}
@@ -474,11 +474,15 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	return result;
 }
 
-static void finalize_answer(knot_pkt_t *pkt, struct kr_request *req)
+static int finalize_answer(knot_pkt_t *pkt, struct kr_request *req)
 {
 	/* Finalize header */
 	knot_pkt_t *answer = kr_request_ensure_answer(req);
-	knot_wire_set_rcode(answer->wire, knot_wire_get_rcode(pkt->wire));
+	if (answer) {
+		knot_wire_set_rcode(answer->wire, knot_wire_get_rcode(pkt->wire));
+		req->state = KR_STATE_DONE;
+	}
+	return req->state;
 }
 
 static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, const knot_dname_t **cname_ret)
@@ -498,6 +502,8 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 		/* CNAME was found at previous iteration, but records may not follow the correct order.
 		 * Try to find records for pending_cname owner from section start. */
 		cname = pending_cname;
+		size_t cname_answ_selected_i = -1;
+		bool cname_is_occluded = false; /* whether `cname` is in a DNAME's bailiwick */
 		pending_cname = NULL;
 		const int cname_labels = knot_dname_labels(cname, NULL);
 		for (unsigned i = 0; i < an->count; ++i) {
@@ -506,11 +512,31 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			/* Skip the RR if its owner+type doesn't interest us. */
 			const uint16_t type = kr_rrset_type_maysig(rr);
 			const bool type_OK = rr->type == query->stype || type == query->stype
-				|| type == KNOT_RRTYPE_CNAME || type == KNOT_RRTYPE_DNAME;
-				/* TODO: actually handle DNAMEs */
-			if (rr->rclass != KNOT_CLASS_IN || !type_OK
-			    || !knot_dname_is_equal(rr->owner, cname)
+						|| type == KNOT_RRTYPE_CNAME;
+			if (rr->rclass != KNOT_CLASS_IN
 			    || knot_dname_in_bailiwick(rr->owner, query->zone_cut.name) < 0) {
+				continue;
+			}
+			const bool all_OK = type_OK && knot_dname_is_equal(rr->owner, cname);
+
+			const bool to_wire = is_final && !referral;
+
+			if (!all_OK && type == KNOT_RRTYPE_DNAME
+					&& knot_dname_in_bailiwick(cname, rr->owner) >= 1) {
+				/* This DNAME (or RRSIGs) cover the current target (`cname`),
+				 * so it is interesting and will occlude its CNAME.
+				 * We rely on CNAME being sent along with DNAME
+				 * (mandatory unless YXDOMAIN). */
+				cname_is_occluded = true;
+				uint8_t rank = get_initial_rank(rr, query, true,
+						query->flags.FORWARD || referral);
+				int ret = kr_ranked_rrarray_add(&req->answ_selected, rr,
+						rank, to_wire, query->uid, &req->pool);
+				if (ret < 0) {
+					return KR_STATE_FAIL;
+				}
+			}
+			if (!all_OK) {
 				continue;
 			}
 
@@ -528,38 +554,37 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			}
 
 			/* Process records matching current SNAME */
-			int state = KR_STATE_FAIL;
-			bool to_wire = false;
-			if (is_final) {
-				/* if not referral, mark record to be written to final answer */
-				to_wire = !referral;
-			} else {
+			if (!is_final) {
 				int cnt_ = 0;
-				state = update_nsaddr(rr, query->parent, &cnt_);
+				int state = update_nsaddr(rr, query->parent, &cnt_);
 				if (state & KR_STATE_FAIL) {
 					return state;
 				}
 			}
 			uint8_t rank = get_initial_rank(rr, query, true,
 					query->flags.FORWARD || referral);
-			state = kr_ranked_rrarray_add(&req->answ_selected, rr,
-						      rank, to_wire, query->uid, &req->pool);
-			if (state != kr_ok()) {
+			int ret = kr_ranked_rrarray_add(&req->answ_selected, rr,
+						rank, to_wire, query->uid, &req->pool);
+			if (ret < 0) {
 				return KR_STATE_FAIL;
 			}
-			/* Jump to next CNAME target */
-			if ((query->stype == KNOT_RRTYPE_CNAME) || (rr->type != KNOT_RRTYPE_CNAME)) {
-				continue;
+			cname_answ_selected_i = ret;
+
+			/* Select the next CNAME target, but don't jump immediately.
+			 * There can be records for "old" cname (RRSIGs are interesting);
+			 * more importantly there might be a DNAME for `cname_is_occluded`. */
+			if (query->stype != KNOT_RRTYPE_CNAME && rr->type == KNOT_RRTYPE_CNAME) {
+				pending_cname = knot_cname_name(rr->rrs.rdata);
+				if (!pending_cname) {
+					break;
+				}
 			}
-			pending_cname = knot_cname_name(rr->rrs.rdata);
-			if (!pending_cname) {
-				break;
-			}
-			/* Don't use pending_cname immediately.
-			 * There are can be records for "old" cname. */
 		}
 		if (!pending_cname) {
 			break;
+		}
+		if (cname_is_occluded) {
+			req->answ_selected.at[cname_answ_selected_i]->dont_cache = true;
 		}
 		if (++(query->cname_depth) > KR_CNAME_CHAIN_LIMIT) {
 			VERBOSE_MSG("<= error: CNAME chain exceeded max length %d\n",
@@ -656,8 +681,7 @@ static int process_final(knot_pkt_t *pkt, struct kr_request *req,
 			array->at[last_idx] = entry;
 			entry->to_wire = true;
 		}
-		finalize_answer(pkt, req);
-		return KR_STATE_DONE;
+		return finalize_answer(pkt, req);
 	}
 	return kr_ok();
 }
@@ -780,7 +804,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		if (state != kr_ok()) {
 			return KR_STATE_FAIL;
 		}
-		finalize_answer(pkt, req);
+		return finalize_answer(pkt, req);
 	} else {
 		/* Answer for sub-query; DS, IP for NS etc.
 		 * It may contains NSEC \ NSEC3 records for
@@ -828,7 +852,7 @@ static int process_stub(knot_pkt_t *pkt, struct kr_request *req)
 		/* KR_RANK_AUTH: we don't have the records directly from
 		 * an authoritative source, but we do trust the server and it's
 		 * supposed to only send us authoritative records. */
-		if (err != kr_ok()) {
+		if (err < 0) {
 			return KR_STATE_FAIL;
 		}
 	}
@@ -843,12 +867,12 @@ static int process_stub(knot_pkt_t *pkt, struct kr_request *req)
 		return KR_STATE_FAIL;
 	}
 
-	finalize_answer(pkt, req);
-	return KR_STATE_DONE;
+	return finalize_answer(pkt, req);
 }
 
 
-/** Error handling, RFC1034 5.3.3, 4d. */
+/** Error handling, RFC1034 5.3.3, 4d.
+ * NOTE: returing this does not prevent further queries (by itself). */
 static int resolve_error(knot_pkt_t *pkt, struct kr_request *req)
 {
 	return KR_STATE_FAIL;
@@ -881,6 +905,7 @@ static int begin(kr_layer_t *ctx)
 	    || (knot_rrtype_is_metatype(qry->stype)
 		    /* && qry->stype != KNOT_RRTYPE_ANY hmm ANY seems broken ATM */)) {
 		knot_pkt_t *ans = kr_request_ensure_answer(ctx->req);
+		if (!ans) return ctx->req->state;
 		knot_wire_set_rcode(ans->wire, KNOT_RCODE_NOTIMPL);
 		return KR_STATE_FAIL;
 	}
@@ -965,36 +990,6 @@ static int resolve_badmsg(knot_pkt_t *pkt, struct kr_request *req, struct kr_que
 #endif
 }
 
-static int resolve_notimpl(knot_pkt_t *pkt, struct kr_request *req, struct kr_query *qry)
-{
-	if (qry->stype == KNOT_RRTYPE_RRSIG && qry->parent != NULL) {
-		/* RRSIG subquery have got NOTIMPL.
-		 * Possible scenario - same NS is autoritative for child and parent,
-		 * but child isn't signed.
-		 * We got delegation to parent,
-		 * then NS responded as NS for child zone.
-		 * Answer contained record been requested, but no RRSIGs,
-		 * Validator issued RRSIG query then. If qname is zone name,
-		 * we can get NOTIMPL. Ask for DS to find out security status.
-		 * TODO - maybe it would be better to do this in validator, when
-		 * RRSIG revalidation occurs.
-		 */
-		struct kr_rplan *rplan = &req->rplan;
-		struct kr_query *next = kr_rplan_push(rplan, qry->parent, qry->sname,
-						qry->sclass, KNOT_RRTYPE_DS);
-		if (!next) {
-			return KR_STATE_FAIL;
-		}
-		kr_zonecut_set(&next->zone_cut, qry->parent->zone_cut.name);
-		kr_zonecut_copy(&next->zone_cut, &qry->parent->zone_cut);
-		kr_zonecut_copy_trust(&next->zone_cut, &qry->parent->zone_cut);
-		next->flags.DNSSEC_WANT = true;
-		qry->flags.RESOLVED = true;
-		return KR_STATE_DONE;
-	}
-	return resolve_badmsg(pkt, req, qry);
-}
-
 /** Resolve input query or continue resolution with followups.
  *
  *  This roughly corresponds to RFC1034, 5.3.3 4a-d.
@@ -1030,7 +1025,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	} else
 #endif
 	if (pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
-		VERBOSE_MSG("<= malformed response\n");
+		VERBOSE_MSG("<= malformed response (parsed %d)\n", (int)pkt->parsed);
 		return resolve_badmsg(pkt, req, query);
 	} else if (!is_paired_to_query(pkt, query)) {
 		WITH_VERBOSE(query) {
@@ -1069,21 +1064,20 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	case KNOT_RCODE_NOERROR:
 	case KNOT_RCODE_NXDOMAIN:
 		break; /* OK */
+	case KNOT_RCODE_YXDOMAIN: /* Basically a successful answer; name just doesn't fit. */
+		knot_wire_set_rcode(req->answer->wire, KNOT_RCODE_YXDOMAIN);
+		break;
 	case KNOT_RCODE_REFUSED:
-	case KNOT_RCODE_SERVFAIL: {
+	case KNOT_RCODE_SERVFAIL:
 		if (query->flags.STUB) {
-			 /* Pass through in stub mode */
+			 /* just pass answer through if in stub mode */
 			break;
 		}
-		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		return KR_STATE_FAIL;
-	}
+		/* fall through */
 	case KNOT_RCODE_FORMERR:
-		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		return resolve_badmsg(pkt, req, query);
 	case KNOT_RCODE_NOTIMPL:
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		return resolve_notimpl(pkt, req, query);
+		return resolve_badmsg(pkt, req, query);
 	default:
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		return resolve_error(pkt, req);
@@ -1112,7 +1106,8 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 rrarray_finalize:
-	/* Finish construction of libknot-format RRsets. */
+	/* Finish construction of libknot-format RRsets.
+	 * We do this even if dropping the answer, though it's probably useless. */
 	(void)0;
 	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {

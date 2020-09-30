@@ -5,6 +5,6 @@ DocumentName: knotdns-trie
 DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-f99c0e11-6afb-46ce-af96-0955a83957bb
 
 PackageName: knotdns-trie
-PackageDownloadLocation: git+https://gitlab.labs.nic.cz/knot/knot-dns.git@68352fc969bc04aa4aa8203e113ce747d887f410#src/contrib/qp-trie/trie.c
+PackageDownloadLocation: git+https://gitlab.nic.cz/knot/knot-dns.git@68352fc969bc04aa4aa8203e113ce747d887f410#src/contrib/qp-trie/trie.c
 PackageOriginator: Organization: Knot DNS contributors
 PackageLicenseDeclared: GPL-3.0-or-later

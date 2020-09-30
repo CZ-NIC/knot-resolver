@@ -1,7 +1,7 @@
 # Knot Resolver
 
-[![Build Status](https://gitlab.labs.nic.cz/knot/knot-resolver/badges/nightly/pipeline.svg?x)](https://gitlab.labs.nic.cz/knot/knot-resolver/commits/nightly)
-[![Coverage Status](https://gitlab.labs.nic.cz/knot/knot-resolver/badges/nightly/coverage.svg?x)](https://knot.pages.labs.nic.cz/knot-resolver/)
+[![Build Status](https://gitlab.nic.cz/knot/knot-resolver/badges/nightly/pipeline.svg?x)](https://gitlab.nic.cz/knot/knot-resolver/commits/nightly)
+[![Coverage Status](https://gitlab.nic.cz/knot/knot-resolver/badges/nightly/coverage.svg?x)](https://knot.pages.nic.cz/knot-resolver/)
 [![Documentation Status](https://readthedocs.org/projects/knot-resolver/badge/?version=latest)](https://readthedocs.org/projects/knot-resolver/?badge=latest)
 
 Knot Resolver is a caching full resolver implementation written in C and [LuaJIT][luajit], both a resolver library and a daemon. The core architecture is tiny and efficient, and provides a foundation and
@@ -60,14 +60,14 @@ See the documentation at [knot-resolver.readthedocs.io][doc] for more options.
 [depends]: https://knot-resolver.readthedocs.io/en/stable/build.html
 [doc]: https://knot-resolver.readthedocs.io/en/stable/index.html
 [scaling]: https://knot-resolver.readthedocs.io/en/stable/systemd-multiinst.html
-[deckard]: https://gitlab.labs.nic.cz/knot/deckard
+[deckard]: https://gitlab.nic.cz/knot/deckard
 [luajit]: https://luajit.org/
 [libuv]: http://libuv.org
 [openresty]: https://openresty.org/
 
 ### Contacting us
 
-- [GitLab issues](https://gitlab.labs.nic.cz/knot/knot-resolver/issues) (you may authenticate via GitHub)
+- [GitLab issues](https://gitlab.nic.cz/knot/knot-resolver/issues) (you may authenticate via GitHub)
 - [mailing list](https://lists.nic.cz/cgi-bin/mailman/listinfo/knot-resolver-users)
 - [![Join the chat at https://gitter.im/CZ-NIC/knot-resolver](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/CZ-NIC/knot-resolver?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 

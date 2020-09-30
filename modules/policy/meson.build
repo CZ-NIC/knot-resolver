@@ -8,6 +8,7 @@ lua_mod_src += [
 config_tests += [
   ['policy', files('policy.test.lua')],
   ['policy.slice', files('policy.slice.test.lua')],
+  ['policy.rpz', files('policy.rpz.test.lua')],
 ]
 
 integr_tests += [

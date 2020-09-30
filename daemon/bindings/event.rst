@@ -25,7 +25,7 @@ For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
 
    :return: event id
 
-   Similar to :func:`event.after()`, periodically execute function after ``interval`` passes.
+   Execute function immediatelly and then periodically after each ``interval``.
 
    Example:
 

@@ -209,6 +209,39 @@ function policy.FLAGS(opts_set, opts_clear)
 	end
 end
 
+-- Create answer with passed arguments
+function policy.ANSWER(rtable, nodata)
+	return function(_, req)
+		local qry = req:current()
+		local answer = req:ensure_answer()
+		if answer == nil then return nil end
+		local data = rtable[qry.stype]
+
+		ffi.C.kr_pkt_make_auth_header(answer)
+
+		if data == nil then
+			if nodata == true then
+				answer:rcode(kres.rcode.NOERROR)
+				return kres.DONE
+			end
+		else
+			local ttl = data.ttl or 1
+
+			answer:rcode(kres.rcode.NOERROR)
+			answer:begin(kres.section.ANSWER)
+			if type(data.rdata) == 'table' then
+				for _, rdato in ipairs(data.rdata) do
+					answer:put(qry.sname, ttl, qry.sclass, qry.stype, rdato)
+				end
+			else
+				answer:put(qry.sname, ttl, qry.sclass, qry.stype, data.rdata)
+			end
+
+			return kres.DONE
+		end
+	end
+end
+
 local function mkauth_soa(answer, dname, mname)
 	if mname == nil then
 		mname = dname
@@ -223,6 +256,7 @@ local dname_localhost = todname('localhost.')
 local function localhost(_, req)
 	local qry = req:current()
 	local answer = req:ensure_answer()
+	if answer == nil then return nil end
 	ffi.C.kr_pkt_make_auth_header(answer)
 
 	local is_exact = ffi.C.knot_dname_is_equal(qry.sname, dname_localhost)
@@ -255,6 +289,7 @@ local dname_rev4_localhost_apex = todname('127.in-addr.arpa');
 local function localhost_reversed(_, req)
 	local qry = req:current()
 	local answer = req:ensure_answer()
+	if answer == nil then return nil end
 
 	-- classify qry.sname:
 	local is_exact   -- exact dname for localhost
@@ -351,14 +386,26 @@ end
 
 local function rpz_parse(action, path)
 	local rules = {}
+	local new_actions = {}
 	local action_map = {
 		-- RPZ Policy Actions
 		['\0'] = action,
-		['\1*\0'] = action, -- deviates from RPZ spec
+		['\1*\0'] = policy.ANSWER({}, true),
 		['\012rpz-passthru\0'] = policy.PASS, -- the grammar...
 		['\008rpz-drop\0'] = policy.DROP,
 		['\012rpz-tcp-only\0'] = policy.TC,
 		-- Policy triggers @NYI@
+	}
+	-- RR types to be skipped; boolean denoting whether to throw a warning even for RPZ apex.
+	local rrtype_bad = {
+		[kres.type.DNAME]  = true,
+		[kres.type.NS]     = false,
+		[kres.type.SOA]    = false,
+		[kres.type.DNSKEY] = true,
+		[kres.type.DS]     = true,
+		[kres.type.RRSIG]  = true,
+		[kres.type.NSEC]   = true,
+		[kres.type.NSEC3]  = true,
 	}
 	local parser = require('zonefile').new()
 	local ok, errstr = parser:open(path)
@@ -372,15 +419,61 @@ local function rpz_parse(action, path)
 		end
 		if not ok then break end
 
-		local name = ffi.string(parser.r_owner, parser.r_owner_length)
-		local name_action = ffi.string(parser.r_data, parser.r_data_length)
-		rules[name] = action_map[name_action]
-		-- Warn when NYI
-		if #name > 1 and not action_map[name_action] then
-			log('[poli] RPZ %s:%d: unsupported policy action', path, tonumber(parser.line_counter))
+		local full_name = ffi.gc(ffi.C.knot_dname_copy(parser.r_owner, nil), ffi.C.free)
+		local rdata = ffi.string(parser.r_data, parser.r_data_length)
+		ffi.C.knot_dname_to_lower(full_name)
+
+		local prefix_labels = ffi.C.knot_dname_in_bailiwick(full_name, parser.zone_origin)
+		if prefix_labels < 0 then
+			log('[poli] RPZ %s:%d: RR owner "%s" outside the zone (ignored)',
+				path, tonumber(parser.line_counter), kres.dname2str(full_name))
+			goto continue
 		end
+
+		local bytes = ffi.C.knot_dname_size(full_name) - ffi.C.knot_dname_size(parser.zone_origin)
+		local name = ffi.string(full_name, bytes) .. '\0'
+
+		if parser.r_type == kres.type.CNAME then
+			if action_map[rdata] then
+				rules[name] = action_map[rdata]
+			else
+				log('[poli] RPZ %s:%d: CNAME with custom target in RPZ is not supported yet (ignored)',
+					path, tonumber(parser.line_counter))
+			end
+		else
+			if #name then
+				local is_bad = rrtype_bad[parser.r_type]
+				if is_bad == true or (is_bad == false and prefix_labels ~= 0) then
+					log('[poli] RPZ %s:%d warning: RR type %s is not allowed in RPZ (ignored)',
+						path, tonumber(parser.line_counter), kres.tostring.type[parser.r_type])
+				elseif is_bad == nil then
+					if new_actions[name] == nil then new_actions[name] = {} end
+					local act = new_actions[name][parser.r_type]
+					if act == nil then
+						new_actions[name][parser.r_type] = { ttl=parser.r_ttl, rdata=rdata }
+					else -- mutiple RRs: no reordering or deduplication
+						if type(act.rdata) ~= 'table' then
+							act.rdata = { act.rdata }
+						end
+						table.insert(act.rdata, rdata)
+						if parser.r_ttl ~= act.ttl then -- be conservative
+							log('[poli] RPZ %s:%d warning: different TTLs in a set (minimum taken)',
+								path, tonumber(parser.line_counter))
+							act.ttl = math.min(act.ttl, parser.r_ttl)
+						end
+					end
+				else
+					assert(is_bad == false and prefix_labels == 0)
+				end
+			end
+		end
+
+		::continue::
 	end
 	collectgarbage()
+	for qname, rrsets in pairs(new_actions) do
+		rules[qname] = policy.ANSWER(rrsets, true)
+	end
 	return rules
 end
 
@@ -506,6 +599,22 @@ function policy.slice_randomize_psl(seed)
 	end
 end
 
+-- Prepare for making an answer from scratch.  (Return the packet for convenience.)
+local function answer_clear(req)
+	-- If we're in postrules, previous resolving might have chosen some RRs
+	-- for inclusion in the answer, so we need to avoid those.
+	-- *_selected arrays are in mempool, so explicit deallocation is not necessary.
+	req.answ_selected.len = 0
+	req.auth_selected.len = 0
+	req.add_selected.len = 0
+
+	-- Let's be defensive and clear the answer, too.
+	local pkt = req:ensure_answer()
+	if pkt == nil then return nil end
+	pkt:clear_payload()
+	return pkt
+end
+
 function policy.DENY_MSG(msg)
 	if msg and (type(msg) ~= 'string' or #msg >= 255) then
 		error('DENY_MSG: optional msg must be string shorter than 256 characters')
@@ -513,7 +622,8 @@ function policy.DENY_MSG(msg)
 
 	return function (_, req)
 		-- Write authority information
-		local answer = req:ensure_answer()
+		local answer = answer_clear(req)
+		if answer == nil then return nil end
 		ffi.C.kr_pkt_make_auth_header(answer)
 		answer:rcode(kres.rcode.NXDOMAIN)
 		answer:begin(kres.section.AUTHORITY)
@@ -600,26 +710,31 @@ policy.DEBUG_CACHE_MISS = policy.DEBUG_IF(
 
 policy.DENY = policy.DENY_MSG() -- compatibility with < 2.0
 
-function policy.DROP(_, _)
+function policy.DROP(_, req)
+	local answer = answer_clear(req)
+	if answer == nil then return nil end
 	return kres.FAIL
 end
 
 function policy.REFUSE(_, req)
-	local answer = req:ensure_answer()
+	local answer = answer_clear(req)
+	if answer == nil then return nil end
 	answer:rcode(kres.rcode.REFUSED)
 	answer:ad(false)
 	return kres.DONE
 end
 
 function policy.TC(state, req)
-	local answer = req:ensure_answer()
-	if answer.max_size ~= 65535 then
-		answer:tc(1) -- ^ Only UDP queries; TODO: consider using a better indicator
-		answer:ad(false)
-		return kres.DONE
-	else
+	-- Avoid non-UDP queries; vv TODO: consider using a better indicator
+	if req.answer.max_size == 65535 then
 		return state
 	end
+
+	local answer = answer_clear(req)
+	if answer == nil then return nil end
+	answer:tc(1)
+	answer:ad(false)
+	return kres.DONE
 end
 
 function policy.QTRACE(_, req)
@@ -863,7 +978,7 @@ policy.layer = {
 	begin = function(state, req)
 		-- Don't act on "finished" cases.
 		if bit.band(state, bit.bor(kres.FAIL, kres.DONE)) ~= 0 then return state end
-		local qry = req:current()
+		local qry = req:initial() -- same as :current() but more descriptive
 		return policy.evaluate(policy.rules, req, qry, state)
 			or (special_names_optim(req, qry.sname)
 					and policy.evaluate(policy.special_names, req, qry, state))
@@ -874,7 +989,7 @@ policy.layer = {
 		if #policy.postrules == 0 then return state end
 		-- Don't act on failed cases.
 		if bit.band(state, kres.FAIL) ~= 0 then return state end
-		return policy.evaluate(policy.postrules, req, req:current(), state) or state
+		return policy.evaluate(policy.postrules, req, req:initial(), state) or state
 	end
 }
 

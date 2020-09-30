@@ -58,51 +58,54 @@ end
 
 -- Evaluate TA status of a RR according to RFC5011.  The time is in seconds.
 local function ta_present(keyset, rr, hold_down_time)
-if rr.type == kres.type.DNSKEY and not C.kr_dnssec_key_ksk(rr.rdata) then
-	return false -- Ignore
-end
--- Attempt to extract key_tag
-local key_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
-if key_tag < 0 or key_tag > 65535 then
-	warn(string.format('[ta_update] ignoring invalid or unsupported RR: %s: %s',
-		kres.rr2str(rr), ffi.string(C.knot_strerror(key_tag))))
-	return false
-end
--- Find the key in current key set and check its status
-local now = os.time()
-local key_revoked = (rr.type == kres.type.DNSKEY) and C.kr_dnssec_key_revoked(rr.rdata)
-local ta = ta_find(keyset, rr)
-if ta then
-	-- Key reappears (KeyPres)
-	if ta.state == key_state.Missing then
-		ta.state = key_state.Valid
-		ta.timer = nil
+	if rr.type == kres.type.DNSKEY and not C.kr_dnssec_key_ksk(rr.rdata) then
+		return false -- Ignore
 	end
-	-- Key is revoked (RevBit)
-	if ta.state == key_state.Valid or ta.state == key_state.Missing then
-		if key_revoked then
-			ta.state = key_state.Revoked
-			ta.timer = now + hold_down_time
+	-- Attempt to extract key_tag
+	local key_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
+	if key_tag < 0 or key_tag > 65535 then
+		warn(string.format('[ta_update] ignoring invalid or unsupported RR: %s: %s',
+			kres.rr2str(rr), ffi.string(C.knot_strerror(key_tag))))
+		return false
+	end
+	-- Find the key in current key set and check its status
+	local now = os.time()
+	local key_revoked = (rr.type == kres.type.DNSKEY) and C.kr_dnssec_key_revoked(rr.rdata)
+	local ta = ta_find(keyset, rr)
+	if ta then
+		-- Key reappears (KeyPres)
+		if ta.state == key_state.Missing then
+			ta.state = key_state.Valid
+			ta.timer = nil
 		end
+		-- Key is revoked (RevBit)
+		if ta.state == key_state.Valid or ta.state == key_state.Missing then
+			if key_revoked then
+				ta.state = key_state.Revoked
+				ta.timer = now + hold_down_time
+			end
+		end
+		-- Remove hold-down timer expires (RemTime)
+		if ta.state == key_state.Revoked and os.difftime(ta.timer, now) <= 0 then
+			ta.state = key_state.Removed
+			ta.timer = nil
+		end
+		-- Add hold-down timer expires (AddTime)
+		if ta.state == key_state.AddPend and os.difftime(ta.timer, now) <= 0 then
+			ta.state = key_state.Valid
+			ta.timer = nil
+		end
+		if rr.state ~= key_state.Valid or verbose() then
+			log('[ta_update] key: ' .. key_tag .. ' state: '..ta.state)
+		end
+		return true
+	elseif not key_revoked then -- First time seen (NewKey)
+		rr.state = key_state.AddPend
+		rr.key_tag = key_tag
+		rr.timer = os.time() + hold_down_time
+		table.insert(keyset, rr)
+		return false
 	end
-	-- Remove hold-down timer expires (RemTime)
-	if ta.state == key_state.Revoked and os.difftime(ta.timer, now) <= 0 then
-		ta.state = key_state.Removed
-		ta.timer = nil
-	end
-	-- Add hold-down timer expires (AddTime)
-	if ta.state == key_state.AddPend and os.difftime(ta.timer, now) <= 0 then
-		ta.state = key_state.Valid
-		ta.timer = nil
-	end
-	if rr.state ~= key_state.Valid or verbose() then
-		log('[ta_update] key: ' .. key_tag .. ' state: '..ta.state)
-	end
-	return true
-elseif not key_revoked then -- First time seen (NewKey)
-	rr.key_tag = key_tag
-	return false
-end
 end
 
 -- TA is missing in the new key set.  The time is in seconds.

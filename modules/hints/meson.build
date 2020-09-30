@@ -17,3 +17,7 @@ hints_mod = shared_module(
   install: true,
   install_dir: modules_dir,
 )
+
+config_tests += [
+  ['hints', files('tests/hints.test.lua'), ['skip_asan']],
+]

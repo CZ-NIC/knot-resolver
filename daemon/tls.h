@@ -34,8 +34,8 @@
 /** Transport session (opaque). */
 struct session;
 
-struct tls_ctx_t;
-struct tls_client_ctx_t;
+struct tls_ctx;
+struct tls_client_ctx;
 struct tls_credentials {
 	int count;
 	char *tls_cert;
@@ -125,9 +125,9 @@ struct tls_common_ctx {
 	size_t write_queue_size;
 };
 
-struct tls_ctx_t {
+struct tls_ctx {
 	/*
-	 * Since pointer to tls_ctx_t needs to be casted
+	 * Since pointer to tls_ctx needs to be casted
 	 * to  tls_ctx_common in some functions,
 	 * this field must be always at first position
 	 */
@@ -135,9 +135,9 @@ struct tls_ctx_t {
 	struct tls_credentials *credentials;
 };
 
-struct tls_client_ctx_t {
+struct tls_client_ctx {
 	/*
-	 * Since pointer to tls_client_ctx_t needs to be casted
+	 * Since pointer to tls_client_ctx needs to be casted
 	 * to  tls_ctx_common in some functions,
 	 * this field must be always at first position
 	 */
@@ -146,13 +146,13 @@ struct tls_client_ctx_t {
 };
 
 /*! Create an empty TLS context in query context */
-struct tls_ctx_t* tls_new(struct worker_ctx *worker);
+struct tls_ctx* tls_new(struct worker_ctx *worker);
 
 /*! Close a TLS context (call gnutls_bye()) */
 void tls_close(struct tls_common_ctx *ctx);
 
 /*! Release a TLS context */
-void tls_free(struct tls_ctx_t* tls);
+void tls_free(struct tls_ctx* tls);
 
 /*! Push new data to TLS context for sending */
 int tls_write(uv_write_t *req, uv_handle_t* handle, knot_pkt_t * pkt, uv_write_cb cb);
@@ -189,17 +189,17 @@ int tls_set_hs_state(struct tls_common_ctx *ctx, tls_hs_state_t state);
 
 
 /*! Allocate new client TLS context */
-struct tls_client_ctx_t *tls_client_ctx_new(tls_client_param_t *entry,
+struct tls_client_ctx *tls_client_ctx_new(tls_client_param_t *entry,
 					    struct worker_ctx *worker);
 
 /*! Free client TLS context */
-void tls_client_ctx_free(struct tls_client_ctx_t *ctx);
+void tls_client_ctx_free(struct tls_client_ctx *ctx);
 
-int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
+int tls_client_connect_start(struct tls_client_ctx *client_ctx,
 			     struct session *session,
 			     tls_handshake_cb handshake_cb);
 
-int tls_client_ctx_set_session(struct tls_client_ctx_t *ctx, struct session *session);
+int tls_client_ctx_set_session(struct tls_client_ctx *ctx, struct session *session);
 
 
 /* Session tickets, server side.  Implementation in ./tls_session_ticket-srv.c */

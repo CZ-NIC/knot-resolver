@@ -1,0 +1,6 @@
+
+ERROR:test_packaging:Installing https://luarocks.org/cqueues-20190813.51-0.src.rock
+164 Error: Failed extracting rel-20190813.tar.gz
+
+Doesn't works on GitLab CI/CD, but works on localhost.
+gzip and tar packages are installed, all packages has same version as packages on localhost's docker container.

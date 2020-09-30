@@ -52,9 +52,6 @@ void engine_stop(struct engine *engine);
 int engine_register(struct engine *engine, const char *name, const char *precedence, const char* ref);
 int engine_unregister(struct engine *engine, const char *name);
 
-/** Return engine light userdata. */
-struct engine *engine_luaget(struct lua_State *L);
-
 /** Set/get the per engine hostname */
 char *engine_get_hostname(struct engine *engine);
 int engine_set_hostname(struct engine *engine, const char *hostname);

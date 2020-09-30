@@ -7,7 +7,6 @@
 #include "contrib/base64.h"
 #include "daemon/network.h"
 #include "daemon/tls.h"
-#include "daemon/worker.h"
 
 #include <stdlib.h>
 
@@ -89,10 +88,9 @@ static int net_list_add(const char *key, void *val, void *ext)
 /** List active endpoints. */
 static int net_list(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
 	lua_newtable(L);
 	lua_pushinteger(L, 1);
-	map_walk(&engine->net.endpoints, net_list_add, L);
+	map_walk(&the_worker->engine->net.endpoints, net_list_add, L);
 	lua_pop(L, 1);
 	return 1;
 }
@@ -114,23 +112,22 @@ static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind,
 	/* Case: string, representing a single address. */
 	const char *str = lua_tostring(L, -1);
 	if (str != NULL) {
+		struct network *net = &the_worker->engine->net;
 		const bool is_UNIX = str[0] == '/';
-		struct engine *engine = engine_luaget(L);
 		int ret = 0;
 		endpoint_flags_t flags = { .tls = tls, .freebind = freebind };
 		if (!kind && !flags.tls) { /* normal UDP */
 			flags.sock_type = SOCK_DGRAM;
-			ret = network_listen(&engine->net, str, port, -1, flags);
+			ret = network_listen(net, str, port, -1, flags);
 		}
 		if (!kind && ret == 0) { /* common for normal TCP and TLS */
 			flags.sock_type = SOCK_STREAM;
-			ret = network_listen(&engine->net, str, port, -1, flags);
+			ret = network_listen(net, str, port, -1, flags);
 		}
 		if (kind) {
 			flags.kind = strdup(kind);
 			flags.sock_type = SOCK_STREAM; /* TODO: allow to override this? */
-			ret = network_listen(&engine->net, str,
-						(is_UNIX ? 0 : port), -1, flags);
+			ret = network_listen(net, str, (is_UNIX ? 0 : port), -1, flags);
 		}
 		if (ret != 0) {
 			if (is_UNIX) {
@@ -246,8 +243,7 @@ static int net_close(lua_State *L)
 	if (!ok)
 		lua_error_p(L, "expected 'close(string addr, [number port])'");
 
-	struct network *net = &engine_luaget(L)->net;
-	int ret = network_close(net, addr, port);
+	int ret = network_close(&the_worker->engine->net, addr, port);
 	lua_pushboolean(L, ret == 0);
 	return 1;
 }
@@ -307,16 +303,30 @@ static int net_interfaces(lua_State *L)
 /** Set UDP maximum payload size. */
 static int net_bufsize(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	knot_rrset_t *opt_rr = engine->resolver.opt_rr;
-	if (!lua_isnumber(L, 1)) {
-		lua_pushinteger(L, knot_edns_get_payload(opt_rr));
-		return 1;
+	struct kr_context *ctx = &the_worker->engine->resolver;
+	const int argc = lua_gettop(L);
+	if (argc == 0) {
+		lua_pushinteger(L, knot_edns_get_payload(ctx->downstream_opt_rr));
+		lua_pushinteger(L, knot_edns_get_payload(ctx->upstream_opt_rr));
+		return 2;
 	}
-	int bufsize = lua_tointeger(L, 1);
-	if (bufsize < 512 || bufsize > UINT16_MAX)
-		lua_error_p(L, "bufsize must be within <512, " STR(UINT16_MAX) ">");
-	knot_edns_set_payload(opt_rr, (uint16_t) bufsize);
+
+	if (argc == 1) {
+		int bufsize = lua_tointeger(L, 1);
+		if (bufsize < 512 || bufsize > UINT16_MAX)
+			lua_error_p(L, "bufsize must be within <512, " STR(UINT16_MAX) ">");
+		knot_edns_set_payload(ctx->downstream_opt_rr, (uint16_t)bufsize);
+		knot_edns_set_payload(ctx->upstream_opt_rr, (uint16_t)bufsize);
+	} else if (argc == 2) {
+		int bufsize_downstream = lua_tointeger(L, 1);
+		int bufsize_upstream = lua_tointeger(L, 2);
+		if (bufsize_downstream < 512 || bufsize_upstream < 512
+		    || bufsize_downstream > UINT16_MAX || bufsize_upstream > UINT16_MAX) {
+			lua_error_p(L, "bufsize must be within <512, " STR(UINT16_MAX) ">");
+		}
+		knot_edns_set_payload(ctx->downstream_opt_rr, (uint16_t)bufsize_downstream);
+		knot_edns_set_payload(ctx->upstream_opt_rr, (uint16_t)bufsize_upstream);
+	}
 	return 0;
 }
 
@@ -341,11 +351,7 @@ static int net_pipeline(lua_State *L)
 
 static int net_tls(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	if (!engine) {
-		return 0;
-	}
-	struct network *net = &engine->net;
+	struct network *net = &the_worker->engine->net;
 	if (!net) {
 		return 0;
 	}
@@ -480,7 +486,7 @@ static int net_tls_client(lua_State *L)
 	/* TODO idea: allow starting the lua table with *multiple* IP targets,
 	 * meaning the authentication config should be applied to each.
 	 */
-	struct network *net = &engine_luaget(L)->net;
+	struct network *net = &the_worker->engine->net;
 	if (lua_gettop(L) == 0)
 		return tls_params2lua(L, net->tls_client_params);
 	/* Various basic sanity-checking. */
@@ -694,7 +700,7 @@ int net_tls_client_clear(lua_State *L)
 	if (!addr)
 		lua_error_p(L, "invalid IP address");
 	/* Do the actual removal. */
-	struct network *net = &engine_luaget(L)->net;
+	struct network *net = &the_worker->engine->net;
 	int r = tls_client_param_remove(net->tls_client_params, addr);
 	free_const(addr);
 	lua_error_maybe(L, r);
@@ -704,18 +710,18 @@ int net_tls_client_clear(lua_State *L)
 
 static int net_tls_padding(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
+	struct kr_context *ctx = &the_worker->engine->resolver;
 
 	/* Only return current padding. */
 	if (lua_gettop(L) == 0) {
-		if (engine->resolver.tls_padding < 0) {
+		if (ctx->tls_padding < 0) {
 			lua_pushboolean(L, true);
 			return 1;
-		} else if (engine->resolver.tls_padding == 0) {
+		} else if (ctx->tls_padding == 0) {
 			lua_pushboolean(L, false);
 			return 1;
 		}
-		lua_pushinteger(L, engine->resolver.tls_padding);
+		lua_pushinteger(L, ctx->tls_padding);
 		return 1;
 	}
 
@@ -726,15 +732,15 @@ static int net_tls_padding(lua_State *L)
 	if (lua_isboolean(L, 1)) {
 		bool x = lua_toboolean(L, 1);
 		if (x) {
-			engine->resolver.tls_padding = -1;
+			ctx->tls_padding = -1;
 		} else {
-			engine->resolver.tls_padding = 0;
+			ctx->tls_padding = 0;
 		}
 	} else if (lua_isnumber(L, 1)) {
 		int padding = lua_tointeger(L, 1);
 		if ((padding < 0) || (padding > MAX_TLS_PADDING))
 			lua_error_p(L, "%s", errstr);
-		engine->resolver.tls_padding = padding;
+		ctx->tls_padding = padding;
 	} else {
 		lua_error_p(L, "%s", errstr);
 	}
@@ -747,7 +753,7 @@ static int net_tls_padding(lua_State *L)
 
 static int net_tls_sticket_secret_string(lua_State *L)
 {
-	struct network *net = &engine_luaget(L)->net;
+	struct network *net = &the_worker->engine->net;
 
 	size_t secret_len;
 	const char *secret;
@@ -813,7 +819,7 @@ static int net_tls_sticket_secret_file(lua_State *L)
 	}
 	fclose(fp);
 
-	struct network *net = &engine_luaget(L)->net;
+	struct network *net = &the_worker->engine->net;
 
 	tls_session_ticket_ctx_destroy(net->tls_session_ticket_ctx);
 	net->tls_session_ticket_ctx =
@@ -902,17 +908,13 @@ static int net_update_timeout(lua_State *L, uint64_t *timeout, const char *name)
 
 static int net_tcp_in_idle(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	struct network *net = &engine->net;
-
+	struct network *net = &the_worker->engine->net;
 	return net_update_timeout(L, &net->tcp.in_idle_timeout, "net.tcp_in_idle");
 }
 
 static int net_tls_handshake_timeout(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	struct network *net = &engine->net;
-
+	struct network *net = &the_worker->engine->net;
 	return net_update_timeout(L, &net->tcp.tls_handshake_timeout, "net.tls_handshake_timeout");
 }
 
@@ -925,8 +927,6 @@ static int net_bpf_set(lua_State *L)
 
 #if __linux__
 
-	struct engine *engine = engine_luaget(L);
-	struct network *net = &engine->net;
 	int progfd = lua_tointeger(L, 1);
 	if (progfd == 0) {
 		/* conversion error despite that fact
@@ -936,7 +936,7 @@ static int net_bpf_set(lua_State *L)
 	}
 	lua_pop(L, 1);
 
-	if (network_set_bpf(net, progfd) == 0) {
+	if (network_set_bpf(&the_worker->engine->net, progfd) == 0) {
 		lua_error_p(L, "failed to attach BPF program to some networks: %s",
 				kr_strerror(errno));
 	}
@@ -955,9 +955,7 @@ static int net_bpf_clear(lua_State *L)
 
 #if __linux__
 
-	struct engine *engine = engine_luaget(L);
-	struct network *net = &engine->net;
-	network_clear_bpf(net);
+	network_clear_bpf(&the_worker->engine->net);
 
 	lua_pushboolean(L, 1);
 	return 1;
@@ -976,7 +974,7 @@ static int net_register_endpoint_kind(lua_State *L)
 	}
 	size_t kind_len;
 	const char *kind = lua_tolstring(L, 1, &kind_len);
-	struct network *net = &engine_luaget(L)->net;
+	struct network *net = &the_worker->engine->net;
 
 	/* Unregistering */
 	if (param_count == 1) {

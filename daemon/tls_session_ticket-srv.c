@@ -26,22 +26,18 @@
 
 /** Compile-time support for setting the secret. */
 /* This is not secure with TLS <= 1.2 but TLS 1.3 and secure configuration
- * is not available in GnuTLS yet. See https://gitlab.com/gnutls/gnutls/issues/477
-#ifndef TLS_SESSION_RESUMPTION_SYNC
-	#define TLS_SESSION_RESUMPTION_SYNC (GNUTLS_VERSION_NUMBER >= 0x030603)
+ * is not available in GnuTLS yet. See https://gitlab.com/gnutls/gnutls/issues/477 */
+#define TLS_SESSION_RESUMPTION_SYNC (GNUTLS_VERSION_NUMBER >= 0x030603)
+#if TLS_SESSION_RESUMPTION_SYNC
+	#define TST_HASH GNUTLS_DIG_SHA3_512
+#else
+	#define TST_HASH abort()
 #endif
-*/
 
 #if GNUTLS_VERSION_NUMBER < 0x030400
 	/* It's of little use anyway.  We may get the secret through lua,
 	 * which creates a copy outside of our control. */
 	#define gnutls_memset memset
-#endif
-
-#ifdef GNUTLS_DIG_SHA3_512
-	#define TST_HASH GNUTLS_DIG_SHA3_512
-#else
-	#define TST_HASH abort()
 #endif
 
 /** Fields are internal to tst_key_* functions. */

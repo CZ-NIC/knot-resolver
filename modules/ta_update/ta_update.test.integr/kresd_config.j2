@@ -20,6 +20,7 @@ if detect_time_skew then
         modules.unload('detect_time_skew')
 end
 
+policy.add(policy.suffix(policy.PASS, {todname('test.')}))
 _hint_root_file('hints')
 cache.size = 2*MB
 verbose(true)

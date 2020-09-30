@@ -208,6 +208,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 			if (knot_rrsig_type_covered(rdata_j) != covered->type) {
 				continue;
 			}
+			kr_rank_set(&vctx->rrs->at[i]->rank, KR_RANK_BOGUS); /* defensive style */
 			vctx->rrs_counters.matching_name_type++;
 			int retv = validate_rrsig_rr(&val_flgs, covered_labels, rdata_j,
 			                      keys->owner, key_rdata, keytag,
@@ -265,6 +266,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 
 			kr_dnssec_key_free(&created_key);
 			vctx->result = kr_ok();
+			kr_rank_set(&vctx->rrs->at[i]->rank, KR_RANK_SECURE); /* upgrade from bogus */
 			return vctx->result;
 		}
 	}

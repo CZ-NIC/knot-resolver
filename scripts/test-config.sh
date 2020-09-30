@@ -13,6 +13,7 @@ TEST_DIR="$(dirname ${TEST_FILE})"
 TMP_RUNDIR="$(mktemp -d)"
 
 function finish {
+    kill -s 9 $(jobs -p) || :
     rm -rf "${TMP_RUNDIR}"
 }
 trap finish EXIT

@@ -1,42 +1,13 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-// #define DEBUG 1
 
 #include "db.h"
 
-#include <lib/cache/impl.h>
-//#include <lib/defines.h>
+#include "lib/cache/cdb_lmdb.h"
+#include "lib/cache/impl.h"
 
-#include <ctype.h>		//DEBUG
+#include <ctype.h>
 #include <time.h>
 #include <sys/stat.h>
-
-//TODO: we rely on mirrors of these two structs not changing layout in knot-dns and knot-resolver!
-struct libknot_lmdb_env {
-	bool shared;
-	unsigned dbi;
-	void *env;
-	knot_mm_t *pool;
-};
-
-struct kres_lmdb_env {
-	size_t mapsize;
-	unsigned dbi;
-	void *env;
-	// sub-struct txn ommited
-};
-
-static knot_db_t *knot_db_t_kres2libknot(const knot_db_t * db)
-{
-	const struct kres_lmdb_env *kres_db = db;	// this is struct lmdb_env as in resolver/cdb_lmdb.c
-	struct libknot_lmdb_env *libknot_db = malloc(sizeof(*libknot_db));
-	if (libknot_db != NULL) {
-		libknot_db->shared = false;
-		libknot_db->pool = NULL;
-		libknot_db->env = kres_db->env;
-		libknot_db->dbi = kres_db->dbi;
-	}
-	return libknot_db;
-}
 
 int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db,
 		     knot_db_t ** libknot_db)
@@ -51,9 +22,7 @@ int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db,
 		return -ENOENT;
 	}
 
-	size_t cache_size = st.st_size;
-
-	struct kr_cdb_opts opts = { cache_path, cache_size };
+	struct kr_cdb_opts opts = { .path = cache_path, .maxsize = 0/*don't resize*/ };
 
 	int ret = kr_cache_open(kres_db, NULL, &opts, NULL);
 	if (ret || kres_db->db == NULL) {
@@ -61,12 +30,31 @@ int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db,
 		return -EINVAL;
 	}
 
-	*libknot_db = knot_db_t_kres2libknot(kres_db->db);
+	*libknot_db = kr_cdb_pt2knot_db_t(kres_db->db);
 	if (*libknot_db == NULL) {
 		printf("Out of memory.\n");
 		return -ENOMEM;
 	}
 
+	return 0;
+}
+
+int kr_gc_cache_check_health(struct kr_cache *kres_db, knot_db_t ** libknot_db)
+{
+	int ret = kr_cache_check_health(kres_db, 0);
+	if (ret == 0) {
+		return 0;
+	} else if (ret != 1) {
+		kr_gc_cache_close(kres_db, *libknot_db);
+		return ret;
+	}
+	/* Cache was reopen. */
+	free(*libknot_db);
+	*libknot_db = kr_cdb_pt2knot_db_t(kres_db->db);
+	if (*libknot_db == NULL) {
+		printf("Out of memory.\n");
+		return -ENOMEM;
+	}
 	return 0;
 }
 
@@ -132,7 +120,6 @@ static uint8_t entry_labels(knot_db_val_t * key, uint16_t rrtype)
 	return lab;
 }
 
-#ifdef DEBUG
 void debug_printbin(const char *str, unsigned int len)
 {
 	putchar('"');
@@ -145,7 +132,6 @@ void debug_printbin(const char *str, unsigned int len)
 	}
 	putchar('"');
 }
-#endif
 
 /** Return one entry_h reference from a cache DB value.  NULL if not consistent/suitable. */
 static const struct entry_h *val2entry(const knot_db_val_t val, uint16_t ktype)
@@ -166,13 +152,12 @@ static const struct entry_h *val2entry(const knot_db_val_t val, uint16_t ktype)
 	return NULL;
 }
 
-int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ctx)
+int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
+			kr_gc_iter_callback callback, void *ctx)
 {
-#ifdef DEBUG
 	unsigned int counter_iter = 0;
 	unsigned int counter_gc_consistent = 0;
 	unsigned int counter_kr_consistent = 0;
-#endif
 
 	knot_db_txn_t txn = { 0 };
 	knot_db_iter_t *it = NULL;
@@ -186,26 +171,30 @@ int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ct
 		return ret;
 	}
 
-	it = api->iter_begin(&txn, KNOT_DB_FIRST);
+	it = api->iter_begin(&txn, KNOT_DB_NOOP); // _FIRST is split for easier debugging
 	if (it == NULL) {
-		printf("Error iterationg database.\n");
+		printf("Error: failed to create an iterator.\n");
 		api->txn_abort(&txn);
 		return KNOT_ERROR;
 	}
+	it = api->iter_seek(it, NULL, KNOT_DB_FIRST);
+	if (it == NULL)
+		printf("Suspicious: completely empty LMDB at this moment?\n");
 
+	int txn_steps = 0;
 	while (it != NULL) {
 		knot_db_val_t key = { 0 }, val = { 0 };
 		ret = api->iter_key(it, &key);
-		if (key.len == 4 && memcmp("VERS", key.data, 4) == 0) {
+		if (ret == KNOT_EOK && key.len == 4 && memcmp("VERS", key.data, 4) == 0) {
 			/* skip DB metadata */
 			goto skip;
 		}
 		if (ret == KNOT_EOK) {
 			ret = api->iter_val(it, &val);
 		}
-#ifdef DEBUG
-		counter_iter++;
-#endif
+		if (ret != KNOT_EOK) {
+			goto error;
+		}
 
 		info.entry_size = key.len + val.len;
 		info.valid = false;
@@ -213,9 +202,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ct
 		    ret == KNOT_EOK ? kr_gc_key_consistent(key) : NULL;
 		const struct entry_h *entry = NULL;
 		if (entry_type != NULL) {
-#ifdef DEBUG
 			counter_gc_consistent++;
-#endif
 			entry = val2entry(val, *entry_type);
 		}
 		/* TODO: perhaps improve some details around here:
@@ -229,20 +216,22 @@ int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ct
 			info.expires_in = entry->time + entry->ttl - now;
 			info.no_labels = entry_labels(&key, *entry_type);
 		}
-#ifdef DEBUG
+		counter_iter++;
 		counter_kr_consistent += info.valid;
-		if (!entry_type || !entry) {	// don't log fully consistent entries
-			printf
-			    ("GC %sconsistent, KR %sconsistent, size %zu, key len %zu: ",
-			     entry_type ? "" : "in", entry ? "" : "IN",
-			     (key.len + val.len), key.len);
-			debug_printbin(key.data, key.len);
-			printf("\n");
+		if (VERBOSE_STATUS) {
+			if (!entry_type || !entry) {	// don't log fully consistent entries
+				printf
+				    ("GC %sconsistent, KR %sconsistent, size %zu, key len %zu: ",
+				     entry_type ? "" : "in", entry ? "" : "IN",
+				     (key.len + val.len), key.len);
+				debug_printbin(key.data, key.len);
+				printf("\n");
+			}
 		}
-#endif
 		ret = callback(&key, &info, ctx);
 
 		if (ret != KNOT_EOK) {
+		error:
 			printf("Error iterating database (%s).\n",
 			       knot_strerror(ret));
 			api->iter_finish(it);
@@ -250,14 +239,39 @@ int kr_gc_cache_iter(knot_db_t * knot_db, kr_gc_iter_callback callback, void *ct
 			return ret;
 		}
 
-skip:
-		it = api->iter_next(it);
+	skip:	// Advance to the next GC item.
+		if (++txn_steps < cfg->ro_txn_items || !cfg->ro_txn_items/*unlimited*/) {
+			it = api->iter_next(it);
+		} else {
+			/* The transaction has been too long; let's reopen it. */
+			txn_steps = 0;
+			uint8_t key_storage[key.len];
+			memcpy(key_storage, key.data, key.len);
+			key.data = key_storage;
+
+			api->iter_finish(it);
+			api->txn_abort(&txn);
+
+			ret = api->txn_begin(knot_db, &txn, KNOT_DB_RDONLY);
+			if (ret != KNOT_EOK) {
+				printf("Error restarting DB transaction (%s).\n",
+					knot_strerror(ret));
+				return ret;
+			}
+			it = api->iter_begin(&txn, KNOT_DB_NOOP);
+			if (it == NULL) {
+				printf("Error: failed to create an iterator.\n");
+				api->txn_abort(&txn);
+				return KNOT_ERROR;
+			}
+			it = api->iter_seek(it, &key, KNOT_DB_GEQ);
+			// NULL here means we'we reached the end
+		}
 	}
 
 	api->txn_abort(&txn);
-#ifdef DEBUG
-	printf("DEBUG: iterated %u items, gc consistent %u, kr consistent %u\n",
-	       counter_iter, counter_gc_consistent, counter_kr_consistent);
-#endif
+
+	kr_log_verbose("DEBUG: iterated %u items, gc consistent %u, kr consistent %u\n",
+		counter_iter, counter_gc_consistent, counter_kr_consistent);
 	return KNOT_EOK;
 }

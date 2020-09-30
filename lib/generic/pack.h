@@ -11,7 +11,7 @@
  * backed by an array.
  *
  * @note Maximum object size is 2^16 bytes, see  ::pack_objlen_t
- * @TODO If some mistake happens somewhere, the access may end up in an infinite loop.
+ * @todo If some mistake happens somewhere, the access may end up in an infinite loop.
  *       (equality comparison on pointers)
  *
  * # Example usage:

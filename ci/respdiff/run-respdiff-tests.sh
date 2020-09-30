@@ -7,7 +7,7 @@ set -o errexit -o nounset -o xtrace
 
 NDIFFREPRO=3
 
-wget -qO- https://gitlab.labs.nic.cz/knot/respdiff/snippets/238/raw?inline=false | head -n 5000 > /tmp/queries.txt
+wget -qO- https://gitlab.nic.cz/knot/respdiff/snippets/238/raw?inline=false | head -n 5000 > /tmp/queries.txt
 mkdir results
 rm -rf respdiff.db
 

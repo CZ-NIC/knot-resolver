@@ -19,15 +19,15 @@ notifications:
     email:
         on_success: never
         on_failure: never
-matrix:
+jobs:
     fast_finish: true
 env:
     global:
-        - KNOT_DNS_VERSION=2.9
+        - KNOT_DNS_VERSION=3.0
         - MALLOC_CHECK_=3
         - MALLOC_PERTURB_=223
 before_script:
-    - git clone -b ${KNOT_DNS_VERSION} https://gitlab.labs.nic.cz/knot/knot-dns.git
+    - git clone -b ${KNOT_DNS_VERSION} https://gitlab.nic.cz/knot/knot-dns.git
     - cd knot-dns
     - autoreconf -fi
     - ./configure --disable-static --disable-fastparser --disable-documentation --disable-daemon --disable-utilities --with-lmdb=no
@@ -40,4 +40,3 @@ script:
     - ${HOME}/.local/usr/sbin/kresd -h
     - ${HOME}/.local/usr/sbin/kresd -V
     - echo "quit()" | ${HOME}/.local/usr/sbin/kresd -a 127.0.0.1@53535 .
-sudo: false

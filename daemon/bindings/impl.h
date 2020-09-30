@@ -5,18 +5,18 @@
 #pragma once
 
 #include "daemon/engine.h"
+#include "daemon/worker.h" /* the_worker is often useful */
 
 #include <lua.h>
 #include <lauxlib.h>
 /* It may happen that include files are messed up and we're hitting a header
- * e.g. from Lua 5.2 or 5.3.  Header from 5.1 should work OK, and it's more difficult
- * to differentiate from a luajit one. */
-#if LUA_VERSION_NUM != 501
+ * e.g. from vanilla Lua.  Even 5.1 won't work due to missing luaL_traceback() in <lauxlib.h>. */
+#if (LUA_VERSION_NUM) != 501 || !defined(LUA_LJDIR)
 	#error "Incorrect Lua version in #include <lua.h> - LuaJIT compatible with Lua 5.1 is required"
 #endif
 
 
-/** Useful to stringify #defines into error strings. */
+/** Useful to stringify macros into error strings. */
 #define STR(s) STRINGIFY_TOKEN(s)
 #define STRINGIFY_TOKEN(s) #s
 

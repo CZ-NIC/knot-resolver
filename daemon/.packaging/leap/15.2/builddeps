@@ -1,0 +1,14 @@
+gcc
+gcc-c++
+lmdb-devel
+meson
+"pkgconfig(cmocka)"
+"pkgconfig(gnutls)"
+"pkgconfig(libedit)"
+"pkgconfig(libknot)"
+"pkgconfig(libzscanner)"
+"pkgconfig(libdnssec)"
+"pkgconfig(libsystemd)"
+"pkgconfig(libcap-ng)"
+"pkgconfig(libuv)"
+"pkgconfig(luajit)"

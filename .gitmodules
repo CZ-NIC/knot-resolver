@@ -1,9 +1,9 @@
 [submodule "tests/integration/deckard"]
 	path = tests/integration/deckard
-	url = https://gitlab.labs.nic.cz/knot/deckard.git
+	url = https://gitlab.nic.cz/knot/deckard.git
 [submodule "modules/policy/lua-aho-corasick"]
 	path = modules/policy/lua-aho-corasick
-	url = https://github.com/cloudflare/lua-aho-corasick.git
+	url = https://gitlab.nic.cz/knot/3rdparty/lua-aho-corasick.git
 [submodule "tests/config/tapered"]
 	path = tests/config/tapered
-	url = https://github.com/telemachus/tapered.git
+	url = https://gitlab.nic.cz/knot/3rdparty/lua-tapered.git

@@ -2,8 +2,8 @@
 {% raw %}
 modules.load('view < policy')
 
-view:addr('127.0.0.0/24', policy.suffix(policy.DENY_MSG("addr 127.0.0.0/24 matched com"),{"\3com\0"}))
-view:addr('127.0.0.0/24', policy.suffix(policy.DENY_MSG("addr 127.0.0.0/24 matched net"),{"\3net\0"}))
+view:addr('127.127.0.0/16', policy.suffix(policy.DENY_MSG("addr 127.127.0.0/16 matched com"),{"\3com\0"}))
+view:addr('127.127.0.0/16', policy.suffix(policy.DENY_MSG("addr 127.127.0.0/16 matched net"),{"\3net\0"}))
 policy.add(policy.all(policy.FORWARD('1.2.3.4')))
 
 -- make sure DNSSEC is turned off for tests

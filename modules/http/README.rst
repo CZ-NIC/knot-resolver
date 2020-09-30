@@ -152,17 +152,17 @@ Dependencies
        $ brew install openssl
        $ brew link openssl --force # Override system OpenSSL
 
-    Any other system can install from LuaRocks directly:
+    Some other systems can install from LuaRocks directly:
 
     .. code-block:: bash
 
-       $ luarocks install http
+       $ luarocks --lua-version 5.1 install http
 
 * (*optional*) `mmdblua <https://github.com/daurnimator/mmdblua>`_ available in LuaRocks
 
     .. code-block:: bash
 
-       $ luarocks install --server=https://luarocks.org/dev mmdblua
+       $ luarocks --lua-version 5.1 install --server=https://luarocks.org/dev mmdblua
        $ curl -O https://geolite.maxmind.com/download/geoip/database/GeoLite2-City.mmdb.gz
        $ gzip -d GeoLite2-City.mmdb.gz
 

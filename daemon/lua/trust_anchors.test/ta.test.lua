@@ -66,9 +66,20 @@ local function test_add_file()
 	   "Loaded KeyTag from root.keys")
 end
 
+local function test_nta()
+	assert(trust_anchors.keysets['\0'], 'root key must be there from previous tests')
+
+	trust_anchors.set_insecure({'example.com'})
+	is(trust_anchors.insecure[1], 'example.com', 'Add example.com to NTA list')
+	boom(trust_anchors.set_insecure, {{'.'}}, 'Got error when adding TA . to NTA list')
+	is(#trust_anchors.insecure, 1, 'Check one item in NTA list')
+	is(trust_anchors.insecure[1], 'example.com', 'Check previous NTA list')
+end
+
 return {
 	test_revoked_key,
 	test_remove,
 	test_add_file,
+	test_nta,
 }
 

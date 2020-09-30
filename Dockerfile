@@ -1,7 +1,7 @@
 # Intermediate container for Knot DNS build (not persistent)
 # SPDX-License-Identifier: GPL-3.0-or-later
 FROM debian:stable AS knot-dns-build
-ARG KNOT_DNS_VERSION=v2.9.0
+ARG KNOT_DNS_VERSION=v3.0.0
 
 # Build dependencies
 ENV KNOT_DNS_BUILD_DEPS git-core build-essential libtool autoconf pkg-config \
@@ -16,7 +16,7 @@ RUN apt-get update -qq && \
 	apt-get -y -qqq install -t stretch-backports meson
 
 # Install Knot DNS from sources
-RUN git clone -b $KNOT_DNS_VERSION --depth=1 https://gitlab.labs.nic.cz/knot/knot-dns.git /tmp/knot-dns && \
+RUN git clone -b $KNOT_DNS_VERSION --depth=1 https://gitlab.nic.cz/knot/knot-dns.git /tmp/knot-dns && \
 	cd /tmp/knot-dns && \
 	autoreconf -if && \
 	./configure --disable-static --disable-fastparser --disable-documentation \

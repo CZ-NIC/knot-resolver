@@ -2,7 +2,8 @@
 
 FROM debian:buster
 MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
-ARG KNOT_BRANCH=2.9
+ARG KNOT_BRANCH=3.0
+ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /root
 CMD ["/bin/bash"]
@@ -25,17 +26,23 @@ RUN pip3 install --upgrade pip
 RUN pip3 install pylint
 RUN pip3 install pep8
 RUN pip3 install pytest-xdist
-# tests/pytest dependencies
-RUN pip3 install dnspython jinja2 pytest pytest-html pytest-xdist
+# tests/pytest dependencies: skip over broken versions
+RUN pip3 install 'dnspython != 2.0.0' jinja2 'pytest != 6.0.0' pytest-html pytest-xdist
+
+# packet capture tools for Deckard
+RUN apt-get install --no-install-suggests --no-install-recommends -y -qqq tcpdump wireshark-common
+
+# Faketime for Deckard
+RUN apt-get install -y -qqq faketime
 
 # C dependencies for python-augeas
 RUN apt-get install -y -qqq libaugeas-dev libffi-dev
 # Python dependencies for Deckard
-RUN wget https://gitlab.labs.nic.cz/knot/deckard/raw/master/requirements.txt -O /tmp/deckard-req.txt
+RUN wget https://gitlab.nic.cz/knot/deckard/raw/master/requirements.txt -O /tmp/deckard-req.txt
 RUN pip3 install -r /tmp/deckard-req.txt
 
 # build and install latest version of Knot DNS
-RUN git clone --depth=1 --branch=$KNOT_BRANCH https://gitlab.labs.nic.cz/knot/knot-dns.git /tmp/knot
+RUN git clone --depth=1 --branch=$KNOT_BRANCH https://gitlab.nic.cz/knot/knot-dns.git /tmp/knot
 WORKDIR /tmp/knot
 RUN pwd
 RUN autoreconf -if
@@ -51,11 +58,11 @@ RUN wget https://github.com/LuaJIT/LuaJIT/raw/v2.1.0-beta3/src/lj.supp -O /lj.su
 
 # Lua lint for kresd CI
 RUN apt-get install luarocks -y -qqq
-RUN luarocks install luacheck
+RUN luarocks --lua-version 5.1 install luacheck
 
 # respdiff for kresd CI
 RUN apt-get install lmdb-utils -y -qqq
-RUN git clone --depth=1 https://gitlab.labs.nic.cz/knot/respdiff /var/opt/respdiff
+RUN git clone --depth=1 https://gitlab.nic.cz/knot/respdiff /var/opt/respdiff
 RUN pip3 install -r /var/opt/respdiff/requirements.txt
 
 # Python static analysis for respdiff
@@ -82,7 +89,7 @@ RUN apt-get install pdns-recursor -y -qqq
 
 # code coverage
 RUN apt-get install -y -qqq lcov
-RUN luarocks install luacov
+RUN luarocks --lua-version 5.1 install luacov
 
 # LuaJIT binary for stand-alone scripting
 RUN apt-get install -y -qqq luajit
@@ -105,3 +112,8 @@ RUN apt-get update -qq
 
 # packages from our knot-resolver-testing repo
 RUN apt-get install -y -qqq lua-http lua-psl
+
+# en_US.UTF-8 locale for scripts.update-authors.sh
+RUN apt-get install -y -qqq locales
+RUN sed -i "/en_US.UTF-8/ s/^#\(.*\)/\1/" /etc/locale.gen
+RUN locale-gen

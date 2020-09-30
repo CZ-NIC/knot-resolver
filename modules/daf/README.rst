@@ -18,42 +18,46 @@ Firewall rules are declarative and consist of filters and actions. Filters have 
     modules = { 'daf' }
 
     -- Block all queries with QNAME = example.com
-    daf.add 'qname = example.com deny'
+    daf.add('qname = example.com deny')
 
     -- Filters can be combined using AND/OR...
     -- Block all queries with QNAME match regex and coming from given subnet
-    daf.add 'qname ~ %w+.example.com AND src = 192.0.2.0/24 deny'
+    daf.add('qname ~ %w+.example.com AND src = 192.0.2.0/24 deny')
 
     -- We also can reroute addresses in response to alternate target
-    -- This reroutes 1.2.3.4 to localhost
-    daf.add 'src = 127.0.0.0/8 reroute 192.0.2.1-127.0.0.1'
+    -- This reroutes 192.0.2.1 to localhost
+    daf.add('src = 127.0.0.0/8 reroute 192.0.2.1-127.0.0.1')
 
     -- Subnets work too, this reroutes a whole subnet
     -- e.g. 192.0.2.55 to 127.0.0.55
-    daf.add 'src = 127.0.0.0/8 reroute 192.0.2.0/24-127.0.0.0'
+    daf.add('src = 127.0.0.0/8 reroute 192.0.2.0/24-127.0.0.0')
 
     -- This rewrites all A answers for 'example.com' from
     -- whatever the original address was to 127.0.0.2
-    daf.add 'src = 127.0.0.0/8 rewrite example.com A 127.0.0.2'
+    daf.add('src = 127.0.0.0/8 rewrite example.com A 127.0.0.2')
 
     -- Mirror queries matching given name to DNS logger
-    daf.add 'qname ~ %w+.example.com mirror 127.0.0.2'
-    daf.add 'qname ~ example-%d.com mirror 127.0.0.3@5353'
+    daf.add('qname ~ %w+.example.com mirror 127.0.0.2')
+    daf.add('qname ~ example-%d.com mirror 127.0.0.3@5353')
 
     -- Forward queries from subnet
-    daf.add 'src = 127.0.0.1/8 forward 127.0.0.1@5353'
+    daf.add('src = 127.0.0.1/8 forward 127.0.0.1@5353')
     -- Forward to multiple targets
-    daf.add 'src = 127.0.0.1/8 forward 127.0.0.1@5353,127.0.0.2@5353'
+    daf.add('src = 127.0.0.1/8 forward 127.0.0.1@5353,127.0.0.2@5353')
 
     -- Truncate queries based on destination IPs
-    daf.add 'dst = 192.0.2.51 truncate'
+    daf.add('dst = 192.0.2.51 truncate')
 
     -- Disable a rule
-    daf.disable 2
+    daf.disable(2)
     -- Enable a rule
-    daf.enable 2
+    daf.enable(2)
     -- Delete a rule
-    daf.del 2
+    daf.del(2)
+
+.. warning:: Only the first matching rule's action is executed.  Defining
+   additional actions for the same matching rule, e.g.  ``src = 127.0.0.1/8``,
+   will have no effect.
 
 If you're not sure what firewall rules are in effect, see ``daf.rules``:
 

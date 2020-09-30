@@ -34,7 +34,7 @@
 
 #include <lua.h>
 #include <uv.h>
-#if SYSTEMD_VERSION > 0
+#if ENABLE_LIBSYSTEMD
 #include <systemd/sd-daemon.h>
 #endif
 #include <libknot/error.h>
@@ -247,7 +247,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	default:
 		kr_log_error(
 			"[system] error: standard input is not a terminal or pipe; "
-			"use '-f 1' if you want non-interactive mode.  "
+			"use '-n' if you want non-interactive mode.  "
 			"Commands can be simply added to your configuration file or sent over the control socket.\n"
 			);
 		return EXIT_FAILURE;
@@ -277,7 +277,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	memcpy(&engine->ipc_set, ipc_set, sizeof(*ipc_set));
 
 	/* Notify supervisor. */
-#if SYSTEMD_VERSION > 0
+#if ENABLE_LIBSYSTEMD
 	sd_notify(0, "READY=1");
 #endif
 	/* Run event loop */
@@ -496,7 +496,11 @@ static int start_listening(struct network *net, flagged_fd_array_t *fds) {
 static void drop_capabilities(void)
 {
 #ifdef ENABLE_CAP_NG
-	/* Drop all capabilities. */
+	/* Drop all capabilities when running under non-root user. */
+	if (geteuid() == 0) {
+		kr_log_verbose("[system] running as root, no capabilities dropped\n");
+		return;
+	}
 	if (capng_have_capability(CAPNG_EFFECTIVE, CAP_SETPCAP)) {
 		capng_clear(CAPNG_SELECT_BOTH);
 
@@ -504,9 +508,12 @@ static void drop_capabilities(void)
 		if (capng_apply(CAPNG_SELECT_BOTH) < 0) {
 			kr_log_error("[system] failed to set process capabilities: %s\n",
 			          strerror(errno));
+		} else {
+			kr_log_verbose("[system] all capabilities dropped\n");
 		}
 	} else {
-		kr_log_info("[system] process not allowed to set capabilities, skipping\n");
+		/* If user() was called, the capabilities were already dropped along with SETPCAP. */
+		kr_log_verbose("[system] process not allowed to set capabilities, skipping\n");
 	}
 #endif /* ENABLE_CAP_NG */
 }
@@ -518,6 +525,10 @@ int main(int argc, char **argv)
 				strerror(errno));
 		fflush(stderr);
 	}
+	if (strcmp("linux", OPERATING_SYSTEM) != 0)
+		kr_log_info("[warn] Knot Resolver is tested on Linux, other platforms might exhibit bugs.\n"
+				"Please report issues to https://gitlab.nic.cz/knot/knot-resolver/issues/\n"
+				"Thank you for your time and interest!\n");
 
 	the_args = &the_args_value;
 	args_init(the_args);
@@ -598,8 +609,6 @@ int main(int argc, char **argv)
 		.ctx = mp_new (4096),
 		.alloc = (knot_mm_alloc_t) mp_alloc
 	};
-	/** Static to work around lua_pushlightuserdata() limitations.
-	 * TODO: convert to a proper singleton like worker, most likely. */
 	static struct engine engine;
 	ret = engine_init(&engine, &pool);
 	if (ret != 0) {

@@ -1,0 +1,13 @@
+gcc
+gcc-c++
+gnutls
+knot-libs
+knot-devel
+libcmocka-devel
+libedit-devel
+libcap-ng
+libuv-devel
+lmdb-devel
+luajit-devel
+meson
+systemd-devel

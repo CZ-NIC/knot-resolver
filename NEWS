@@ -1,21 +1,91 @@
-Knot Resolver 5.x.y (2020-0m-0d)
+Knot Resolver 5.2.0 (2020-1m-dd)
+================================
+
+- net: split the EDNS buffer size into upstream and downstream (!1026)
+
+
+Knot Resolver 5.1.3 (2020-09-08)
+================================
+
+Improvements
+------------
+- capabilities are no longer constrained when running as root (!1012)
+- cache: add percentage usage to cache.stats() (#580, !1025)
+- cache: add number of cache entries to cache.stats() (#510, !1028)
+- aarch64 support again, as some systems still didn't work (!1033)
+- support building against Knot DNS 3.0 (!1053)
+
+Bugfixes
+--------
+- tls: fix compilation to support net.tls_sticket_secret() (!1021)
+- validator: ignore bogus RRSIGs present in insecure domains (!1022, #587)
+- build if libsystemd version isn't detected as integer (#592, !1029)
+- validator: more robust reaction on missing RRSIGs (#390, !1020)
+- ta_update module: fix broken RFC5011 rollover (!1035)
+- garbage collector: avoid keeping multiple copies of cache (!1042)
+
+
+Knot Resolver 5.1.2 (2020-07-01)
+================================
+
+Bugfixes
+--------
+- hints module: NODATA answers also for non-address queries (!1005)
+- tls: send alert to peer if handshake fails (!1007)
+- cache: fix interaction between LMDB locks and preallocation (!1013)
+- cache garbage collector: fix flushing of messages to logs (!1009)
+- cache garbage collector: fix insufficient GC on 32-bit systems (!1009)
+- graphite module: do not block resolver on TCP failures (!1014)
+- policy.rpz various fixes (!1016): $ORIGIN issues,
+  precision of warnings, allow answering with multi-RR sets
+
+
+Knot Resolver 5.1.1 (2020-05-19)
+================================
+
+Security
+--------
+- fix CVE-2020-12667: mitigation for NXNSAttack DNS protocol vulnerability
+
+Bugfixes
+--------
+- control sockets: recognize newline as command boundary
+
+
+Knot Resolver 5.1.0 (2020-04-29)
 ================================
 
 Improvements
 ------------
 - cache garbage collector: reduce filesystem operations when idle (!946)
 - policy.DEBUG_ALWAYS and policy.DEBUG_IF for limited verbose logging (!957)
+- daemon: improve TCP query latency under heavy TCP load (!968)
+- add policy.ANSWER action (!964, #192)
+- policy.rpz support fake A/AAAA (!964, #194)
 
 Bugfixes
 --------
 - cache: missing filesystem support for pre-allocation is no longer fatal (#549)
 - lua: policy.rpz() no longer watches the file when watch is set to false (!954)
 - fix a strict aliasing problem that might've lead to "miscompilation" (!962)
+- fix handling of DNAMEs, especially signed ones (#234, !965)
+- lua resolve(): correctly include EDNS0 in the virtual packet (!963)
+  Custom modules might have been confused by that.
+- do not leak bogus data into SERVFAIL answers (#396)
+- improve random Lua number generator initialization (!979)
+- cache: fix CNAME caching when validation is disabled (#472, !974)
+- cache: fix CNAME caching in policy.STUB mode (!974)
+- prefill: fix crash caused by race condition with resolver startup (!983)
+- webmgmt: use javascript scheme detection for websockets' protocol (#546)
+- daf module: fix del(), deny(), drop(), tc(), pass() functions (#553, !966)
+- policy and daf modules: expose initial query when evaluating postrules (#556)
+- cache: fix some cases of caching answers over 4 KiB (!976)
+- docs: support sphinx 3.0.0+ (!978)
 
 Incompatible changes
 --------------------
-- see upgrading guide: https://knot-resolver.readthedocs.io/en/stable/upgrading.html
-- minor changes in module API
+- minor changes in module API; see upgrading guide:
+  https://knot-resolver.readthedocs.io/en/stable/upgrading.html
 
 
 Knot Resolver 5.0.1 (2020-02-05)

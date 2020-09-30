@@ -7,6 +7,10 @@
 API reference
 =============
 
+.. warning:: This section is generated with doxygen and breathe. Due to their
+   limitations, some symbols may be incorrectly described or missing entirely.
+   For exhaustive and accurate reference, refer to the header files instead.
+
 .. contents::
    :depth: 1
    :local:

@@ -481,9 +481,9 @@ int stats_init(struct kr_module *module)
 	if (array_reserve(data->upstreams.q, UPSTREAMS_COUNT) != 0) {
 		return kr_error(ENOMEM);
 	}
+	data->upstreams.q.len = UPSTREAMS_COUNT; /* signify we use the entries */
 	for (size_t i = 0; i < UPSTREAMS_COUNT; ++i) {
-		struct sockaddr *sa = (struct sockaddr *)&data->upstreams.q.at[i];
-		sa->sa_family = AF_UNSPEC;
+		data->upstreams.q.at[i].sin6_family = AF_UNSPEC;
 	}
 	return kr_ok();
 }

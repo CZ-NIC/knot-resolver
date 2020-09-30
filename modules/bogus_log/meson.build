@@ -14,3 +14,7 @@ bogus_log_mod = shared_module(
   install: true,
   install_dir: modules_dir,
 )
+
+integr_tests += [
+  ['bogus_log', join_paths(meson.current_source_dir(), 'test.integr')],
+]

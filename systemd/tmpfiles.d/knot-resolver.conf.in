@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: CC0-1.0
 # tmpfiles.d(5) directories for knot-resolver (kresd)
 #Type Path                            Mode UID           GID          Age Argument
-    d @run_dir@                       0750 @user@        @group@       -   -
-    d @systemd_work_dir@              0750 @user@        @group@       -   -
-    d @systemd_cache_dir@             0750 @user@        @group@       -   -
+    d @run_dir@                       0770 root          @group@       -   -
+    d @systemd_work_dir@              0770 root          @group@       -   -
+    d @systemd_cache_dir@             0770 root          @group@       -   -

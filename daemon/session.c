@@ -31,8 +31,8 @@ struct session {
 	uv_handle_t *handle;          /**< libuv handle for IO operations. */
 	uv_timer_t timeout;           /**< libuv handle for timer. */
 
-	struct tls_ctx_t *tls_ctx;    /**< server side tls-related data. */
-	struct tls_client_ctx_t *tls_client_ctx; /**< client side tls-related data. */
+	struct tls_ctx *tls_ctx;      /**< server side tls-related data. */
+	struct tls_client_ctx *tls_client_ctx;  /**< client side tls-related data. */
 
 	trie_t *tasks;                /**< list of tasks assotiated with given session. */
 	queue_t(struct qr_task *) waiting;  /**< list of tasks waiting for sending to upstream. */
@@ -259,22 +259,22 @@ struct sockaddr *session_get_sockname(struct session *session)
 	return &session->sockname.ip;
 }
 
-struct tls_ctx_t *session_tls_get_server_ctx(const struct session *session)
+struct tls_ctx *session_tls_get_server_ctx(const struct session *session)
 {
 	return session->tls_ctx;
 }
 
-void session_tls_set_server_ctx(struct session *session, struct tls_ctx_t *ctx)
+void session_tls_set_server_ctx(struct session *session, struct tls_ctx *ctx)
 {
 	session->tls_ctx = ctx;
 }
 
-struct tls_client_ctx_t *session_tls_get_client_ctx(const struct session *session)
+struct tls_client_ctx *session_tls_get_client_ctx(const struct session *session)
 {
 	return session->tls_client_ctx;
 }
 
-void session_tls_set_client_ctx(struct session *session, struct tls_client_ctx_t *ctx)
+void session_tls_set_client_ctx(struct session *session, struct tls_client_ctx *ctx)
 {
 	session->tls_client_ctx = ctx;
 }
@@ -333,9 +333,8 @@ struct session *session_new(uv_handle_t *handle, bool has_tls)
 		 * We still need to keep in mind to only touch the buffer
 		 * in this callback... */
 		assert(handle->loop->data);
-		struct worker_ctx *worker = handle->loop->data;
-		session->wire_buf = worker->wire_buf;
-		session->wire_buf_size = sizeof(worker->wire_buf);
+		session->wire_buf = the_worker->wire_buf;
+		session->wire_buf_size = sizeof(the_worker->wire_buf);
 	}
 
 	uv_timer_init(handle->loop, &session->timeout);
@@ -524,7 +523,7 @@ knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm)
 		session->wire_buf_end_idx = 0;
 		return NULL;
 	}
-	
+
 	if (session->wire_buf_start_idx > session->wire_buf_end_idx) {
 		session->sflags.wirebuf_error = true;
 		session->wire_buf_start_idx = 0;
@@ -536,7 +535,7 @@ knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm)
 	uint8_t *msg_start = &session->wire_buf[session->wire_buf_start_idx];
 	ssize_t wirebuf_msg_data_size = session->wire_buf_end_idx - session->wire_buf_start_idx;
 	uint16_t msg_size = 0;
-	
+
 	if (!handle) {
 		session->sflags.wirebuf_error = true;
 		return NULL;
@@ -639,7 +638,7 @@ int session_discard_packet(struct session *session, const knot_pkt_t *pkt)
 		session->wire_buf_start_idx += pkt_msg_size;
 	}
 	session->sflags.wirebuf_error = false;
-	
+
 	wirebuf_data_size = session->wire_buf_end_idx - session->wire_buf_start_idx;
 	if (wirebuf_data_size == 0) {
 		session_wirebuf_discard(session);
@@ -710,57 +709,62 @@ void session_unpoison(struct session *session)
 int session_wirebuf_process(struct session *session, const struct sockaddr *peer)
 {
 	int ret = 0;
-	if (session->wire_buf_start_idx == session->wire_buf_end_idx) {
+	if (session->wire_buf_start_idx == session->wire_buf_end_idx)
 		return ret;
-	}
-	struct worker_ctx *worker = session_get_handle(session)->loop->data;
+
 	size_t wirebuf_data_size = session->wire_buf_end_idx - session->wire_buf_start_idx;
-	uint32_t max_iterations = (wirebuf_data_size / (KNOT_WIRE_HEADER_SIZE + KNOT_WIRE_QUESTION_MIN_SIZE)) + 1;
-	knot_pkt_t *query = NULL;
-	while (((query = session_produce_packet(session, &worker->pkt_pool)) != NULL) &&
+	uint32_t max_iterations = (wirebuf_data_size /
+		(KNOT_WIRE_HEADER_SIZE + KNOT_WIRE_QUESTION_MIN_SIZE)) + 1;
+	knot_pkt_t *pkt = NULL;
+
+	while (((pkt = session_produce_packet(session, &the_worker->pkt_pool)) != NULL) &&
 	       (ret < max_iterations)) {
 		assert (!session_wirebuf_error(session));
-		int res = worker_submit(session, peer, NULL, NULL, NULL, query);
-		if (res != kr_error(EILSEQ)) {
-			/* Packet has been successfully parsed. */
+		int res = worker_submit(session, peer, NULL, NULL, NULL, pkt);
+		/* Errors from worker_submit() are intetionally *not* handled in order to
+		 * ensure the entire wire buffer is processed. */
+		if (res == kr_ok())
 			ret += 1;
-		}
-		if (session_discard_packet(session, query) < 0) {
+		if (session_discard_packet(session, pkt) < 0) {
 			/* Packet data isn't stored in memory as expected.
-			   something went wrong, normally should not happen. */
+			 * something went wrong, normally should not happen. */
 			break;
 		}
 	}
-	if (session_wirebuf_error(session)) {
+
+	/* worker_submit() may cause the session to close (e.g. due to IO
+	 * write error when the packet triggers an immediate answer). This is
+	 * an error state, as well as any wirebuf error. */
+	if (session->sflags.closing || session_wirebuf_error(session))
 		ret = -1;
-	}
+
 	return ret;
 }
 
-void session_kill_ioreq(struct session *s, struct qr_task *task)
+void session_kill_ioreq(struct session *session, struct qr_task *task)
 {
-	if (!s) {
+	if (!session) {
 		return;
 	}
-	assert(s->sflags.outgoing && s->handle);
-	if (s->sflags.closing) {
+	assert(session->sflags.outgoing && session->handle);
+	if (session->sflags.closing) {
 		return;
 	}
-	session_tasklist_del(s, task);
-	if (s->handle->type == UV_UDP) {
-		assert(session_tasklist_is_empty(s));
-		session_close(s);
+	session_tasklist_del(session, task);
+	if (session->handle->type == UV_UDP) {
+		assert(session_tasklist_is_empty(session));
+		session_close(session);
 		return;
 	}
 }
 
 /** Update timestamp */
-void session_touch(struct session *s)
+void session_touch(struct session *session)
 {
-	s->last_activity = kr_now();
+	session->last_activity = kr_now();
 }
 
-uint64_t session_last_activity(struct session *s)
+uint64_t session_last_activity(struct session *session)
 {
-	return s->last_activity;
+	return session->last_activity;
 }

@@ -4,14 +4,12 @@
 
 #include "daemon/bindings/impl.h"
 
-#include "daemon/worker.h"
 #include "daemon/zimport.h"
 
 /** @internal return cache, or throw lua error if not open */
-struct kr_cache * cache_assert_open(lua_State *L)
+static struct kr_cache * cache_assert_open(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	struct kr_cache *cache = &engine->resolver.cache;
+	struct kr_cache *cache = &the_worker->engine->resolver.cache;
 	assert(cache);
 	if (!cache || !kr_cache_is_open(cache))
 		lua_error_p(L, "no cache is open yet, use cache.open() or cache.size, etc.");
@@ -21,7 +19,7 @@ struct kr_cache * cache_assert_open(lua_State *L)
 /** Return available cached backends. */
 static int cache_backends(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
+	struct engine *engine = the_worker->engine;
 
 	lua_newtable(L);
 	for (unsigned i = 0; i < engine->backends.len; ++i) {
@@ -82,6 +80,8 @@ static int cache_stats(lua_State *L)
 	add_stat(open);
 	add_stat(close);
 	add_stat(count);
+	cache->stats.count_entries = cache->api->count(cache->db, &cache->stats);
+	add_stat(count_entries);
 	add_stat(clear);
 	add_stat(commit);
 	add_stat(read);
@@ -93,6 +93,10 @@ static int cache_stats(lua_State *L)
 	add_stat(match_miss);
 	add_stat(read_leq);
 	add_stat(read_leq_miss);
+	/* usage_percent statistics special case - double */
+	cache->stats.usage_percent = cache->api->usage_percent(cache->db);
+	lua_pushnumber(L, cache->stats.usage_percent);
+	lua_setfield(L, -2, "usage_percent");
 #undef add_stat
 
 	return 1;
@@ -169,7 +173,7 @@ static int cache_open(lua_State *L)
 		lua_error_p(L, "expected 'open(number max_size, string config = \"\")'");
 
 	/* Select cache storage backend */
-	struct engine *engine = engine_luaget(L);
+	struct engine *engine = the_worker->engine;
 
 	lua_Integer csize_lua = lua_tointeger(L, 1);
 	if (!(csize_lua >= 8192 && csize_lua < SIZE_MAX)) { /* min. is basically arbitrary */
@@ -199,6 +203,13 @@ static int cache_open(lua_State *L)
 		return luaL_error(L, "can't open cache path '%s'; working directory '%s'; %s",
 				  opts.path, cwd, kr_strerror(ret));
 	}
+	/* Let's check_health() every five seconds to avoid keeping old cache alive
+	 * even in case of not having any work to do. */
+	ret = kr_cache_check_health(&engine->resolver.cache, 5000);
+	if (ret != 0) {
+		kr_log_error("[cache] periodic health check failed (ignored): %s\n",
+				kr_strerror(ret));
+	}
 
 	/* Store current configuration */
 	lua_getglobal(L, "cache");
@@ -216,8 +227,7 @@ static int cache_open(lua_State *L)
 
 static int cache_close(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	struct kr_cache *cache = &engine->resolver.cache;
+	struct kr_cache *cache = &the_worker->engine->resolver.cache;
 	if (!kr_cache_is_open(cache)) {
 		return 0;
 	}
@@ -257,10 +267,10 @@ static int cache_clear_everything(lua_State *L)
 	lua_error_maybe(L, ret);
 
 	/* Clear reputation tables */
-	struct engine *engine = engine_luaget(L);
-	lru_reset(engine->resolver.cache_rtt);
-	lru_reset(engine->resolver.cache_rep);
-	lru_reset(engine->resolver.cache_cookie);
+	struct kr_context *ctx = &the_worker->engine->resolver;
+	lru_reset(ctx->cache_rtt);
+	lru_reset(ctx->cache_rep);
+	lru_reset(ctx->cache_cookie);
 	lua_pushboolean(L, true);
 	return 1;
 }
@@ -332,8 +342,7 @@ static int cache_get(lua_State *L)
  * in NS elections again. */
 static int cache_ns_tout(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	struct kr_context *ctx = &engine->resolver;
+	struct kr_context *ctx = &the_worker->engine->resolver;
 
 	/* Check parameters */
 	int n = lua_gettop(L);
