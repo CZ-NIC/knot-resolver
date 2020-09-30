@@ -10,7 +10,6 @@ kresd_src = files([
   'bindings/worker.c',
   'engine.c',
   'ffimodule.c',
-  'http.c',
   'io.c',
   'main.c',
   'network.c',
@@ -18,11 +17,14 @@ kresd_src = files([
   'tls.c',
   'tls_ephemeral_credentials.c',
   'tls_session_ticket-srv.c',
-  'http.c',
   'udp_queue.c',
   'worker.c',
   'zimport.c',
 ])
+if nghttp2.found()
+  kresd_src += files(['http.c'])
+endif
+
 c_src_lint += kresd_src
 
 config_tests += [
