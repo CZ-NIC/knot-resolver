@@ -287,7 +287,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		data = session_wirebuf_get_free_start(s);
 		data_len = consumed;
 	}
-#ifdef NGHTTP2_VERSION_NUM
+#ifdef ENABLE_DOH2
 	if (session_flags(s)->has_http) {
 		consumed = http_process_input_data(s, data, data_len);
 		if (consumed < 0) {
@@ -435,7 +435,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls, bool http)
 			session_tls_set_server_ctx(s, ctx);
 		}
 	}
-#ifdef NGHTTP2_VERSION_NUM
+#ifdef ENABLE_DOH2
 	if (http) {
 		struct http_ctx *ctx = session_http_get_server_ctx(s);
 		if (!ctx) {
@@ -475,7 +475,7 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
 {
 	uv_connection_cb connection;
 	if (has_tls && has_http) {
-#ifdef NGHTTP2_VERSION_NUM
+#ifdef ENABLE_DOH2
 		connection = https_accept;
 #else
 		kr_log_error("[ io ] kresd was compiled without libnghttp2 support");

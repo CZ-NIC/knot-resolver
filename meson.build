@@ -170,6 +170,7 @@ conf_data.set('ENABLE_LIBSYSTEMD', libsystemd.found() ? 1 : 0)
 conf_data.set('NOVERBOSELOG', not verbose_log)
 conf_data.set('ENABLE_SENDMMSG', sendmmsg.to_int())
 conf_data.set('ENABLE_CAP_NG', capng.found())
+conf_data.set('ENABLE_DOH2', nghttp2.found())
 
 kresconfig = configure_file(
   output: 'kresconfig.h',

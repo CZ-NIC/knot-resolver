@@ -7,6 +7,7 @@
  */
 
 #pragma once
+#ifdef ENABLE_DOH2
 
 #include <uv.h>
 #include <nghttp2/nghttp2.h>
@@ -14,7 +15,6 @@
 
 #include "lib/generic/queue.h"
 
-#ifdef NGHTTP2_VERSION_NUM
 /** Transport session (opaque). */
 struct session;
 
