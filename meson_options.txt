@@ -89,6 +89,18 @@ option(
   description: 'use sendmmsg syscall towards clients',
 )
 
+option(
+  'capng',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'auto',
+  description: 'use libcapng to drop capabilities for non-root users',
+)
+
 ## Systemd
 option(
   'systemd_files',

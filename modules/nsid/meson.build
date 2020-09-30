@@ -17,3 +17,7 @@ nsid_mod = shared_module(
   install: true,
   install_dir: modules_dir,
 )
+
+config_tests += [
+  ['nsid', files('nsid.test.lua')],
+]

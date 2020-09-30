@@ -12,11 +12,11 @@ Knot Resolver is written for UNIX-like systems using modern C standards.
 Beware that some 64-bit systems with LuaJIT 2.1 may be affected by
 `a problem <https://github.com/LuaJIT/LuaJIT/blob/v2.1/doc/status.html#L100>`_
 -- Linux on x86_64 is unaffected but `Linux on aarch64 is
-<https://gitlab.labs.nic.cz/knot/knot-resolver/issues/216>`_.
+<https://gitlab.nic.cz/knot/knot-resolver/issues/216>`_.
 
 .. code-block:: bash
 
-   $ git clone --recursive https://gitlab.labs.nic.cz/knot/knot-resolver.git
+   $ git clone --recursive https://gitlab.nic.cz/knot/knot-resolver.git
 
 Dependencies
 ------------
@@ -81,9 +81,9 @@ On reasonably new systems most of the dependencies can be resolved from packages
 here's an overview for several platforms.
 
 * **Debian/Ubuntu** - Current stable doesn't have new enough Meson
-  and libknot. Use repository above or build them yourself. Fresh list of dependencies can be found in `Debian control file in our repo <https://gitlab.labs.nic.cz/knot/knot-resolver/blob/master/distro/deb/control>`_, search for "Build-Depends".
+  and libknot. Use repository above or build them yourself. Fresh list of dependencies can be found in `Debian control file in our repo <https://gitlab.nic.cz/knot/knot-resolver/blob/master/distro/deb/control>`_, search for "Build-Depends".
 
-* **CentOS/Fedora/RHEL/openSUSE** - Fresh list of dependencies can be found in `RPM spec file in our repo <https://gitlab.labs.nic.cz/knot/knot-resolver/blob/master/distro/rpm/knot-resolver.spec>`_, search for "BuildRequires".
+* **CentOS/Fedora/RHEL/openSUSE** - Fresh list of dependencies can be found in `RPM spec file in our repo <https://gitlab.nic.cz/knot/knot-resolver/blob/master/distro/rpm/knot-resolver.spec>`_, search for "BuildRequires".
 
 * **FreeBSD** - when installing from ports, all dependencies will install
   automatically, corresponding to the selected options.
@@ -172,8 +172,7 @@ The following command runs all enabled tests. By default, only unit tests are en
 More comprehensive tests require you to install ``kresd`` into the configured
 prefix before running the test suite. They also have to be explicitly enabled
 by using either ``-Dconfig_tests=enabled`` for postinstall config tests, or
-``-Dextra_tests=enabled`` for all tests, including deckard tests. Please note
-the latter also requires ``-Dsendmmsg=disabled``.
+``-Dextra_tests=enabled`` for all tests, including deckard tests.
 
 .. code-block:: bash
 
@@ -285,17 +284,17 @@ For development, it's possible to build the container directly from your git tre
 .. _Docker images: https://hub.docker.com/r/cznic/knot-resolver
 .. _libuv: https://github.com/libuv/libuv
 .. _LuaJIT: http://luajit.org/luajit.html
-.. _Doxygen: https://www.stack.nl/~dimitri/doxygen/manual/index.html
+.. _Doxygen: https://www.doxygen.nl/manual/index.html
 .. _breathe: https://github.com/michaeljones/breathe
 .. _Sphinx: http://sphinx-doc.org/
 .. _sphinx_rtd_theme: https://pypi.python.org/pypi/sphinx_rtd_theme
 .. _pkg-config: https://www.freedesktop.org/wiki/Software/pkg-config/
-.. _libknot: https://gitlab.labs.nic.cz/knot/knot-dns
+.. _libknot: https://gitlab.nic.cz/knot/knot-dns
 .. _cmocka: https://cmocka.org/
 .. _lua-http: https://luarocks.org/modules/daurnimator/http
 .. _lua-cqueues: https://25thandclement.com/~william/projects/cqueues.html
 .. _boot2docker: http://boot2docker.io/
-.. _deckard: https://gitlab.labs.nic.cz/knot/deckard
+.. _deckard: https://gitlab.nic.cz/knot/deckard
 .. _libsystemd: https://www.freedesktop.org/wiki/Software/systemd/
 .. _dnstap: http://dnstap.info/
 .. _libprotobuf: https://developers.google.com/protocol-buffers/

@@ -210,6 +210,31 @@ char* kr_strcatdup(unsigned n, ...)
 	return result;
 }
 
+char * kr_absolutize_path(const char *dirname, const char *fname)
+{
+	assert(dirname && fname);
+	char *result;
+	int aret;
+	if (dirname[0] == '/') { // absolute path is easier
+		aret = asprintf(&result, "%s/%s", dirname, fname);
+	} else { // relative path, but don't resolve symlinks
+		char buf[PATH_MAX];
+		const char *cwd = getcwd(buf, sizeof(buf));
+		if (!cwd)
+			return NULL; // errno has been set already
+		if (strcmp(dirname, ".") == 0) {
+			// get rid of one common case of extraneous "./"
+			aret = asprintf(&result, "%s/%s", cwd, fname);
+		} else {
+			aret = asprintf(&result, "%s/%s/%s", cwd, dirname, fname);
+		}
+	}
+	if (aret > 0)
+		return result;
+	errno = -aret;
+	return NULL;
+}
+
 int kr_memreserve(void *baton, void **mem, size_t elm_size, size_t want, size_t *have)
 {
     if (*have >= want) {
@@ -755,7 +780,7 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 				abort();
 			}
 		}
-		return kr_ok();
+		return i;
 	}
 
 	/* No stashed rrset found, add */
@@ -768,6 +793,7 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 	if (!entry) {
 		return kr_error(ENOMEM);
 	}
+	memset(entry, 0, sizeof(*entry)); /* default all to zeros */
 
 	knot_rrset_t *rr_new = knot_rrset_new(rr->owner, rr->type, rr->rclass, rr->ttl, pool);
 	if (!rr_new) {
@@ -780,9 +806,6 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 	entry->qry_uid = qry_uid;
 	entry->rr = rr_new;
 	entry->rank = rank;
-	entry->revalidation_cnt = 0;
-	entry->cached = false;
-	entry->yielded = false;
 	entry->to_wire = to_wire;
 	entry->in_progress = true;
 	if (array_push(*array, entry) < 0) {
@@ -792,7 +815,9 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 		return kr_error(ENOMEM);
 	}
 
-	return to_wire_ensure_unique(array, array->len - 1);
+	ret = to_wire_ensure_unique(array, array->len - 1);
+	if (ret < 0) return ret;
+	return array->len - 1;
 }
 
 /** Comparator for qsort() on an array of knot_data_t pointers. */
@@ -1056,8 +1081,7 @@ char *kr_pkt_text(const knot_pkt_t *pkt)
 
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
-		if (sec->count == 0 || knot_pkt_rr(sec, 0)->type == KNOT_RRTYPE_OPT) {
-			/* OPT RRs are _supposed_ to be the last ^^, if they appear */
+		if (sec->count == 0) {
 			continue;
 		}
 

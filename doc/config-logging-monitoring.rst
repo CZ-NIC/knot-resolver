@@ -38,6 +38,7 @@ Additional monitoring and debugging methods are described below. If none of thes
 
    modules-bogus_log
    modules-stats
+   daemon-bindings-worker
    modules-nsid
    modules-http-trace
    modules-watchdog

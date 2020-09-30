@@ -4,7 +4,6 @@
 
 #include "daemon/bindings/impl.h"
 
-#include "daemon/worker.h"
 
 static inline double getseconds(uv_timeval_t *tv)
 {

@@ -2,7 +2,7 @@
 local utils = require('test_utils')
 
 -- setup resolver
-modules = { 'hints' }
+modules = { 'hints > iterate' }
 
 -- test for default configuration
 local function test_default()
@@ -31,7 +31,34 @@ local function test_custom()
 		'real IP address for a.root-servers.net. is correct')
 end
 
+-- test that setting an address hint works (TODO: and NXDOMAIN)
+local function test_nxdomain()
+	hints.config() -- clean start
+	hints.use_nodata(false)
+	hints['myname.lan'] = '192.0.2.1'
+	-- TODO: prefilling or some other way of getting NXDOMAIN (instead of SERVFAIL)
+	utils.check_answer('bad name gives NXDOMAIN',
+		'badname.lan', kres.type.A, kres.rcode.SERVFAIL)
+	utils.check_answer('another type gives NXDOMAIN',
+		'myname.lan', kres.type.AAAA, kres.rcode.SERVFAIL)
+	utils.check_answer('record itself is OK',
+		'myname.lan', kres.type.A, kres.rcode.NOERROR)
+end
+
+-- test that NODATA is correctly generated
+local function test_nodata()
+	hints.config() -- clean start
+	hints.use_nodata(true) -- default ATM but let's not depend on that
+	hints['myname.lan'] = '2001:db8::1'
+	utils.check_answer('another type gives NODATA',
+		'myname.lan', kres.type.MX, utils.NODATA)
+	utils.check_answer('record itself is OK',
+		'myname.lan', kres.type.AAAA, kres.rcode.NOERROR)
+end
+
 return {
 	test_default,
-	test_custom
+	test_custom,
+	test_nxdomain,
+	test_nodata,
 }

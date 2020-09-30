@@ -21,6 +21,7 @@
 #include "kresconfig.h"
 #include "daemon/engine.h"
 #include "daemon/ffimodule.h"
+#include "daemon/worker.h"
 #include "lib/nsrep.h"
 #include "lib/cache/api.h"
 #include "lib/defines.h"
@@ -43,9 +44,11 @@
 #endif
 
 /**@internal Maximum number of incomplete TCP connections in queue.
-* Default is from Redis and Apache. */
+* Default is from empirical testing - in our case, more isn't necessarily better.
+* See https://gitlab.nic.cz/knot/knot-resolver/-/merge_requests/968
+* */
 #ifndef TCP_BACKLOG_DEFAULT
-#define TCP_BACKLOG_DEFAULT 511
+#define TCP_BACKLOG_DEFAULT 128
 #endif
 
 /* Cleanup engine state every 5 minutes */
@@ -133,7 +136,7 @@ static int l_setuser(lua_State *L)
 /** Quit current executable. */
 static int l_quit(lua_State *L)
 {
-	engine_stop(engine_luaget(L));
+	engine_stop(the_worker->engine);
 	return 0;
 }
 
@@ -182,7 +185,7 @@ int engine_set_hostname(struct engine *engine, const char *hostname) {
 /** Return hostname. */
 static int l_hostname(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
+	struct engine *engine = the_worker->engine;
 	if (lua_gettop(L) == 0) {
 		lua_pushstring(L, engine_get_hostname(engine));
 		return 1;
@@ -207,8 +210,7 @@ static int l_package_version(lua_State *L)
 /** Load root hints from zonefile. */
 static int l_hint_root_file(lua_State *L)
 {
-	struct engine *engine = engine_luaget(L);
-	struct kr_context *ctx = &engine->resolver;
+	struct kr_context *ctx = &the_worker->engine->resolver;
 	const char *file = lua_tostring(L, 1);
 
 	const char *err = engine_hint_root_file(ctx, file);
@@ -381,7 +383,6 @@ static int l_map(lua_State *L)
 	if (lua_gettop(L) != 1 || !lua_isstring(L, 1))
 		lua_error_p(L, "map('string with a lua expression')");
 
-	struct engine *engine = engine_luaget(L);
 	const char *cmd = lua_tostring(L, 1);
 	uint32_t len = strlen(cmd);
 	lua_newtable(L);
@@ -392,8 +393,8 @@ static int l_map(lua_State *L)
 	lua_settop(L, ntop + 1); /* Push only one return value to table */
 	lua_rawseti(L, -2, 1);
 
-	for (size_t i = 0; i < engine->ipc_set.len; ++i) {
-		int fd = engine->ipc_set.at[i];
+	for (size_t i = 0; i < the_worker->engine->ipc_set.len; ++i) {
+		int fd = the_worker->engine->ipc_set.at[i];
 		/* Send command */
 		expr_checked(write(fd, &len, sizeof(len)) == sizeof(len));
 		expr_checked(write(fd, cmd, len) == len);
@@ -440,11 +441,13 @@ static int init_resolver(struct engine *engine)
 	engine->resolver.modules = &engine->modules;
 	engine->resolver.cache_rtt_tout_retry_interval = KR_NS_TIMEOUT_RETRY_INTERVAL;
 	/* Create OPT RR */
-	engine->resolver.opt_rr = mm_alloc(engine->pool, sizeof(knot_rrset_t));
-	if (!engine->resolver.opt_rr) {
+	engine->resolver.downstream_opt_rr = mm_alloc(engine->pool, sizeof(knot_rrset_t));
+	engine->resolver.upstream_opt_rr = mm_alloc(engine->pool, sizeof(knot_rrset_t));
+	if (!engine->resolver.downstream_opt_rr || !engine->resolver.upstream_opt_rr) {
 		return kr_error(ENOMEM);
 	}
-	knot_edns_init(engine->resolver.opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, engine->pool);
+	knot_edns_init(engine->resolver.downstream_opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, engine->pool);
+	knot_edns_init(engine->resolver.upstream_opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, engine->pool);
 	/* Use default TLS padding */
 	engine->resolver.tls_padding = -1;
 	/* Empty init; filled via ./lua/postconfig.lua */
@@ -496,8 +499,13 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "fromjson");
 	lua_pushcfunction(engine->L, l_map);
 	lua_setglobal(engine->L, "map");
-	lua_pushlightuserdata(engine->L, engine);
-	lua_setglobal(engine->L, "__engine");
+	/* Random number generator */
+	lua_getfield(engine->L, LUA_GLOBALSINDEX, "math");
+	lua_getfield(engine->L, -1, "randomseed");
+	lua_remove(engine->L, -2);
+	lua_Number seed = kr_rand_bytes(sizeof(lua_Number));
+	lua_pushnumber(engine->L, seed);
+	lua_call(engine->L, 1, 0);
 	return kr_ok();
 }
 
@@ -849,11 +857,3 @@ int engine_unregister(struct engine *engine, const char *name)
 	return kr_error(ENOENT);
 }
 
-struct engine *engine_luaget(lua_State *L)
-{
-	lua_getglobal(L, "__engine");
-	struct engine *engine = lua_touserdata(L, -1);
-	if (!engine) luaL_error(L, "internal error, empty engine pointer");
-	lua_pop(L, 1);
-	return engine;
-}

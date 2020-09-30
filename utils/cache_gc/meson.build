@@ -14,6 +14,7 @@ if build_utils
     'kres-cache-gc',
     cache_gc_src,
     dependencies: [
+      kresconfig_dep,
       contrib_dep,
       libkres_dep,
       libknot,
@@ -22,4 +23,9 @@ if build_utils
     install: true,
     install_dir: get_option('sbindir'),
   )
+
+integr_tests += [
+  ['gc_cache_overflow', join_paths(meson.current_source_dir(), 'test.integr')],
+]
+
 endif

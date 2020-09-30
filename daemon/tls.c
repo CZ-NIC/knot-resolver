@@ -253,6 +253,8 @@ static int tls_handshake(struct tls_common_ctx *ctx, tls_handshake_cb handshake_
 		kr_log_verbose("[%s] gnutls_handshake failed: %s (%d)\n",
 			     logstring,
 		             gnutls_strerror_name(err), err);
+		/* Notify the peer about handshake failure via an alert. */
+		gnutls_alert_send_appropriate(ctx->tls_session, err);
 		if (handshake_cb) {
 			handshake_cb(session, -1);
 		}
@@ -270,7 +272,7 @@ static int tls_handshake(struct tls_common_ctx *ctx, tls_handshake_cb handshake_
 }
 
 
-struct tls_ctx_t *tls_new(struct worker_ctx *worker)
+struct tls_ctx *tls_new(struct worker_ctx *worker)
 {
 	assert(worker != NULL);
 	assert(worker->engine != NULL);
@@ -309,7 +311,7 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 		}
 	}
 
-	struct tls_ctx_t *tls = calloc(1, sizeof(struct tls_ctx_t));
+	struct tls_ctx *tls = calloc(1, sizeof(struct tls_ctx));
 	if (tls == NULL) {
 		kr_log_error("[tls] failed to allocate TLS context\n");
 		return NULL;
@@ -367,7 +369,7 @@ void tls_close(struct tls_common_ctx *ctx)
 	}
 }
 
-void tls_free(struct tls_ctx_t *tls)
+void tls_free(struct tls_ctx *tls)
 {
 	if (!tls) {
 		return;
@@ -1013,7 +1015,7 @@ static int client_verify_certchain(gnutls_session_t tls_session, const char *hos
  */
 static int client_verify_certificate(gnutls_session_t tls_session)
 {
-	struct tls_client_ctx_t *ctx = gnutls_session_get_ptr(tls_session);
+	struct tls_client_ctx *ctx = gnutls_session_get_ptr(tls_session);
 	assert(ctx->params != NULL);
 
 	if (ctx->params->insecure) {
@@ -1041,10 +1043,10 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 		return client_verify_certchain(ctx->c.tls_session, ctx->params->hostname);
 }
 
-struct tls_client_ctx_t *tls_client_ctx_new(tls_client_param_t *entry,
+struct tls_client_ctx *tls_client_ctx_new(tls_client_param_t *entry,
 					    struct worker_ctx *worker)
 {
-	struct tls_client_ctx_t *ctx = calloc(1, sizeof (struct tls_client_ctx_t));
+	struct tls_client_ctx *ctx = calloc(1, sizeof (struct tls_client_ctx));
 	if (!ctx) {
 		return NULL;
 	}
@@ -1093,7 +1095,7 @@ struct tls_client_ctx_t *tls_client_ctx_new(tls_client_param_t *entry,
 	return ctx;
 }
 
-void tls_client_ctx_free(struct tls_client_ctx_t *ctx)
+void tls_client_ctx_free(struct tls_client_ctx *ctx)
 {
 	if (ctx == NULL) {
 		return;
@@ -1124,7 +1126,7 @@ int  tls_pull_timeout_func(gnutls_transport_ptr_t h, unsigned int ms)
 	return avail;
 }
 
-int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
+int tls_client_connect_start(struct tls_client_ctx *client_ctx,
 			     struct session *session,
 			     tls_handshake_cb handshake_cb)
 {
@@ -1174,7 +1176,7 @@ int tls_set_hs_state(struct tls_common_ctx *ctx, tls_hs_state_t state)
 	return kr_ok();
 }
 
-int tls_client_ctx_set_session(struct tls_client_ctx_t *ctx, struct session *session)
+int tls_client_ctx_set_session(struct tls_client_ctx *ctx, struct session *session)
 {
 	if (!ctx) {
 		return kr_error(EINVAL);

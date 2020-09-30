@@ -13,13 +13,21 @@ DNS-over-HTTP (DoH)
     and the DoH protocol in general.
   * For the time being it is recommended to run DoH endpoint
     on a separate machine which is not handling normal DNS operations.
-  * More information about controversies around the DoH can be found
-    in blog posts
+  * Read about perceived benefits and risks at
+    `Mozilla's DoH page <https://support.mozilla.org/en-US/kb/firefox-dns-over-https>`_.
+  * It is important to understand **limits of encrypting only DNS traffic**.
+    Relevant security analysis can be found in article
+    *Simran Patil and Nikita Borisov. 2019. What can you learn from an IP?*
+    See `slides <https://irtf.org/anrw/2019/slides-anrw19-final44.pdf>`_
+    or `the article itself <https://dl.acm.org/authorize?N687437>`_.
+  * Independent information about political controversies around the DoH
+    deployment by default can be found in blog posts
     `DNS Privacy at IETF 104 <http://www.potaroo.net/ispcol/2019-04/angst.html>`_
     and
     `More DOH <http://www.potaroo.net/ispcol/2019-04/moredoh.html>`_
-    by Geoff Huston.
-  * Knot Resolver developers do not endorse use of the DoH protocol.
+    by Geoff Huston
+    and `Centralised DoH is bad for Privacy, in 2019 and beyond <https://labs.ripe.net/Members/bert_hubert/centralised-doh-is-bad-for-privacy-in-2019-and-beyond>`_
+    by Bert Hubert.
 
 Following section compares several options for running a DoH capable server.
 Make sure you read through this chapter before exposing the DoH service to users.
@@ -103,18 +111,10 @@ HTTP proxy with DoH support
 
 Client configuration
 --------------------
-Most common client today is web browser Firefox. Relevant configuration is described e.g. in following
-`article <https://www.internetsociety.org/blog/2018/12/dns-privacy-support-in-mozilla-firefox/>`_.
-To use your own DoH server just change ``network.trr.uri`` configuration option
-to match URL of your DoH endpoint.
-
-More detailed description of configuration options in Firefox can be found
-in article
-`Inside Firefox’s DOH engine <https://daniel.haxx.se/blog/2018/06/03/inside-firefoxs-doh-engine/>`_
-by Daniel Stenberg.
+Most common client today is web browser Firefox, which requires manual configuration
+to use your own DNS resolver. Configuration options in Firefox are described at
+`Mozilla support site <https://support.mozilla.org/en-US/kb/firefox-dns-over-https#w_switching-providers>`_.
 
 .. warning::
 
-  Please note that Knot Resolver developers are not as enthusiastic
-  about DoH technology as author of the article linked above,
-  make sure you read :ref:`warnings at beginning of this section <mod-http-doh>`.
+  Make sure you read :ref:`warnings at beginning of this section <mod-http-doh>`.

@@ -46,6 +46,17 @@ bool kr_rank_check(uint8_t rank)
 	}
 }
 
+bool kr_rank_test(uint8_t rank, uint8_t kr_flag)
+{
+	assert(kr_rank_check(rank) && kr_rank_check(kr_flag));
+	if (kr_flag == KR_RANK_AUTH) {
+		return rank & KR_RANK_AUTH;
+	}
+	assert(!(kr_flag & KR_RANK_AUTH));
+	/* The rest are exclusive values - exactly one has to be set. */
+	return (rank & ~KR_RANK_AUTH) == kr_flag;
+}
+
 /** @internal Set @a yielded to all RRs with matching @a qry_uid. */
 static void set_yield(ranked_rr_array_t *array, const uint32_t qry_uid, const bool yielded)
 {
@@ -299,10 +310,10 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	return KR_STATE_PRODUCE;
 }
 
-static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
+static int ns_resolve_addr(struct kr_query *qry, struct kr_request *req)
 {
-	struct kr_rplan *rplan = &param->rplan;
-	struct kr_context *ctx = param->ctx;
+	struct kr_rplan *rplan = &req->rplan;
+	struct kr_context *ctx = req->ctx;
 
 
 	/* Start NS queries from root, to avoid certain cases
@@ -333,7 +344,9 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 			return kr_error(EAGAIN);
 		}
 		/* No IPv4 nor IPv6, flag server as unusable. */
-		VERBOSE_MSG(qry, "=> unresolvable NS address, bailing out\n");
+		++req->count_no_nsaddr;
+		VERBOSE_MSG(qry, "=> unresolvable NS address, bailing out (counter: %u)\n",
+				req->count_no_nsaddr);
 		qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
 		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
 		invalidate_ns(rplan, qry);
@@ -409,7 +422,7 @@ static int edns_erase_and_reserve(knot_pkt_t *pkt)
 
 static int edns_create(knot_pkt_t *pkt, const struct kr_request *req)
 {
-	pkt->opt_rr = knot_rrset_copy(req->ctx->opt_rr, &pkt->mm);
+	pkt->opt_rr = knot_rrset_copy(req->ctx->upstream_opt_rr, &pkt->mm);
 	size_t wire_size = knot_edns_wire_size(pkt->opt_rr);
 #if defined(ENABLE_COOKIES)
 	if (req->ctx->cookie_ctx.clnt.enabled ||
@@ -520,6 +533,9 @@ static int answer_padding(struct kr_request *request)
 static void answer_fail(struct kr_request *request)
 {
 	/* Note: OPT in SERVFAIL response is still useful for cookies/additional info. */
+	if (VERBOSE_STATUS || kr_log_rtrace_enabled(request))
+		kr_log_req(request, 0, 0, "resl",
+			"request failed, answering with empty SERVFAIL\n");
 	knot_pkt_t *answer = request->answer;
 	knot_rrset_t *opt_rr = answer->opt_rr; /* it gets NULLed below */
 	int ret = kr_pkt_clear_payload(answer);
@@ -605,7 +621,7 @@ static void answer_finalize(struct kr_request *request)
 		secure = false; /* don't trust forwarding for now */
 	}
 	if (last && (last->flags.DNSSEC_OPTOUT)) {
-		VERBOSE_MSG(NULL, "AD: opt-out\n");
+		VERBOSE_MSG(last, "insecure because of opt-out\n");
 		secure = false; /* the last answer is insecure due to opt-out */
 	}
 
@@ -765,48 +781,54 @@ knot_pkt_t * kr_request_ensure_answer(struct kr_request *request)
 	if (request->answer)
 		return request->answer;
 
-	assert(request->qsource.packet);
-	/* Find answer_max: limit on DNS wire length. */
-	size_t answer_max = KNOT_WIRE_MIN_PKTSIZE;
-	struct kr_request_qsource_flags *qsflags = &request->qsource.flags;
-	if (!request->qsource.addr || qsflags->tcp || qsflags->http) {
+	const knot_pkt_t *qs_pkt = request->qsource.packet;
+	assert(qs_pkt);
+	// Find answer_max: limit on DNS wire length.
+	size_t answer_max;
+	const struct kr_request_qsource_flags *qs_flags = &request->qsource.flags;
+	assert((qs_flags->tls || qs_flags->http) ? qs_flags->tcp : true);
+	if (!request->qsource.addr || qs_flags->tcp) {
+		// not on UDP
 		answer_max = KNOT_WIRE_MAX_PKTSIZE;
-	} else if (knot_pkt_has_edns(request->qsource.packet)) { /* EDNS */
-		answer_max = MAX(knot_edns_get_payload(request->qsource.packet->opt_rr),
-				 KNOT_WIRE_MIN_PKTSIZE);
+	} else if (knot_pkt_has_edns(qs_pkt)) {
+		// UDP with EDNS
+		answer_max = MIN(knot_edns_get_payload(qs_pkt->opt_rr),
+				 knot_edns_get_payload(request->ctx->downstream_opt_rr));
+		answer_max = MAX(answer_max, KNOT_WIRE_MIN_PKTSIZE);
+	} else {
+		// UDP without EDNS
+		answer_max = KNOT_WIRE_MIN_PKTSIZE;
 	}
-	// FIXME: configurability of the limit
 
-	/* Allocate the packet.  We don't assign it until the final success,
-	 * for easier error handling (and we assume mempool takes care of leaks). */
+	// Allocate the packet.
 	knot_pkt_t *answer = request->answer =
 		knot_pkt_new(NULL, answer_max, &request->pool);
-	if (!answer || knot_pkt_init_response(answer, request->qsource.packet) != 0)
+	if (!answer || knot_pkt_init_response(answer, qs_pkt) != 0) {
+		assert(!answer); // otherwise we messed something up
 		goto enomem;
+	}
 
-	uint8_t *wire = answer->wire;
-	knot_wire_clear_aa(wire);
+	uint8_t *wire = answer->wire; // much was done by knot_pkt_init_response()
 	knot_wire_set_ra(wire);
 	knot_wire_set_rcode(wire, KNOT_RCODE_NOERROR);
-	if (knot_wire_get_cd(request->qsource.packet->wire)) {
+	if (knot_wire_get_cd(qs_pkt->wire)) {
 		knot_wire_set_cd(wire);
 	}
 
-	/* Handle EDNS in the query */
-	if (knot_pkt_has_edns(request->qsource.packet)) {
-		answer->opt_rr = knot_rrset_copy(request->ctx->opt_rr, &answer->mm);
+	// Prepare EDNS if required.
+	if (knot_pkt_has_edns(qs_pkt)) {
+		answer->opt_rr = knot_rrset_copy(request->ctx->downstream_opt_rr,
+						 &answer->mm);
 		if (!answer->opt_rr)
-			goto enomem;
-		/* Set DO bit if set (DNSSEC requested). */
-		if (knot_pkt_has_dnssec(request->qsource.packet))
+			goto enomem; // answer is on mempool, so "leak" is OK
+		if (knot_pkt_has_dnssec(qs_pkt))
 			knot_edns_set_do(answer->opt_rr);
 	}
 
 	return request->answer;
 enomem:
-	/* Consequences of `return NULL` would be way too complicated to handle. */
-	kr_log_error("ERROR: irrecoverable out of memory condition in %s\n", __func__);
-	abort();
+	request->state = KR_STATE_FAIL; // TODO: really combine with another flag?
+	return request->answer = NULL;
 }
 
 KR_PURE static bool kr_inaddr_equal(const struct sockaddr *a, const struct sockaddr *b)
@@ -949,6 +971,23 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	if (request->state & KR_STATE_FAIL) {
 		invalidate_ns(rplan, qry);
 		qry->flags.RESOLVED = false;
+	}
+
+	/* For multiple errors in a row; invalidate_ns() is not enough. */
+	if (!qry->flags.CACHED) {
+		if (request->state & KR_STATE_FAIL) {
+			if (++request->count_fail_row > KR_CONSUME_FAIL_ROW_LIMIT) {
+				if (VERBOSE_STATUS || kr_log_rtrace_enabled(request)) {
+					kr_log_req(request, 0, 2, "resl",
+						"=> too many failures in a row, "
+						"bail out (mitigation for NXNSAttack "
+						"CVE-2020-12667)\n");
+				}
+				return KR_STATE_FAIL;
+			}
+		} else {
+			request->count_fail_row = 0;
+		}
 	}
 
 	/* Pop query if resolved. */
@@ -1195,6 +1234,7 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	if (qry->flags.DNSSEC_NODS) {
 		/* This is the next query iteration with minimized qname.
 		 * At previous iteration DS non-existance has been proven */
+		VERBOSE_MSG(qry, "<= DS doesn't exist, going insecure\n");
 		qry->flags.DNSSEC_NODS = false;
 		qry->flags.DNSSEC_WANT = false;
 		qry->flags.DNSSEC_INSECURE = true;
@@ -1410,6 +1450,11 @@ int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *t
 
 ns_election:
 
+	if (unlikely(request->count_no_nsaddr >= KR_COUNT_NO_NSADDR_LIMIT)) {
+		VERBOSE_MSG(qry, "=> too many unresolvable NSs, bail out "
+				"(mitigation for NXNSAttack CVE-2020-12667)\n");
+		return KR_STATE_FAIL;
+	}
 	/* If the query has already selected a NS and is waiting for IPv4/IPv6 record,
 	 * elect best address only, otherwise elect a completely new NS.
 	 */
@@ -1608,21 +1653,23 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 int kr_resolve_finish(struct kr_request *request, int state)
 {
 	request->state = state;
-	kr_request_ensure_answer(request);
-	/* Finalize answer and construct wire-buffer. */
-	ITERATE_LAYERS(request, NULL, answer_finalize);
-	answer_finalize(request);
+	/* Finalize answer and construct whole wire-format (unless dropping). */
+	knot_pkt_t *answer = kr_request_ensure_answer(request);
+	if (answer) {
+		ITERATE_LAYERS(request, NULL, answer_finalize);
+		answer_finalize(request);
 
-	/* Defensive style, in case someone has forgotten.
-	 * Beware: non-empty answers do make sense even with SERVFAIL case, etc. */
-	if (request->state != KR_STATE_DONE) {
-		uint8_t *wire = request->answer->wire;
-		switch (knot_wire_get_rcode(wire)) {
-		case KNOT_RCODE_NOERROR:
-		case KNOT_RCODE_NXDOMAIN:
-			knot_wire_clear_ad(wire);
-			knot_wire_clear_aa(wire);
-			knot_wire_set_rcode(wire, KNOT_RCODE_SERVFAIL);
+		/* Defensive style, in case someone has forgotten.
+		 * Beware: non-empty answers do make sense even with SERVFAIL case, etc. */
+		if (request->state != KR_STATE_DONE) {
+			uint8_t *wire = answer->wire;
+			switch (knot_wire_get_rcode(wire)) {
+			case KNOT_RCODE_NOERROR:
+			case KNOT_RCODE_NXDOMAIN:
+				knot_wire_clear_ad(wire);
+				knot_wire_clear_aa(wire);
+				knot_wire_set_rcode(wire, KNOT_RCODE_SERVFAIL);
+			}
 		}
 	}
 
@@ -1631,7 +1678,7 @@ int kr_resolve_finish(struct kr_request *request, int state)
 #ifndef NOVERBOSELOG
 	struct kr_rplan *rplan = &request->rplan;
 	struct kr_query *last = kr_rplan_last(rplan);
-	VERBOSE_MSG(last, "finished: %d, queries: %zu, mempool: %zu B\n",
+	VERBOSE_MSG(last, "finished in state: %d, queries: %zu, mempool: %zu B\n",
 	          request->state, rplan->resolved.len, (size_t) mp_total_size(request->pool.ctx));
 #endif
 

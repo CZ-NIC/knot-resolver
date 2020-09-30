@@ -1,0 +1,5 @@
+Start with `genkeyszones.sh` and generate DNSSEC keys + signed versions of `unsigned.db`.
+Then use `dns2rpl.py` to run Knot DNS server with signed zone
+and to generate RPL file from server's answers.
+
+See comments in script headers to further details.

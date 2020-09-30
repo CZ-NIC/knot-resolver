@@ -76,7 +76,6 @@ worker.resolve = function (qname, qtype, qclass, options, finish, init)
 		panic('failure in worker.resolve(); probably invalid qname "%s"', qname)
 	end
 	local ret = worker.resolve_pkt(pkt, options, finish, init)
-	ffi.C.knot_rrset_free(pkt.opt_rr, nil);
 	ffi.C.knot_pkt_free(pkt);
 	return ret
 end
@@ -200,7 +199,7 @@ function modules_create_table_for_c(kr_module_ud)
 					elseif arg ~= nil then
 						arg_conv = tostring(arg)
 					end
-					local ret_cstr = cb(__engine, kr_module, arg_conv)
+					local ret_cstr = cb(ffi.C.the_worker.engine, kr_module, arg_conv)
 					if ret_cstr == nil then
 						return nil
 					end
@@ -635,8 +634,11 @@ if has_cqueues then
 	end
 else
 	-- Disable asynchronous execution
-	local function disabled () error('cqueues are required for asynchronous execution') end
+	local function disabled ()
+		error('Lua library cqueues is required for asynchronous execution (luaJIT requires library for Lua 5.1)')
+	end
 	worker.sleep = disabled
 	worker.map = disabled
 	worker.coroutine = disabled
+	worker.bg_worker = setmetatable({}, { __index = disabled })
 end

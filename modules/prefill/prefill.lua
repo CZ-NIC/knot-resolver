@@ -142,10 +142,6 @@ function forward_references.fill_cache()
 	restart_timer(rz_cur_interval)
 end
 
-function prefill.init()
-	math.randomseed(os.time())
-end
-
 function prefill.deinit()
 	stop_timer()
 end

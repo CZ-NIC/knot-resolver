@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+programs:
+- name: kresd
+  binary: kresd
+  additional:
+    - -n
+  templates:
+    - lib/layer/validate.test.integr/kresd_config.j2
+  configs:
+    - config

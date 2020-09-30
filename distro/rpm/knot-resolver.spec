@@ -13,12 +13,12 @@ Version:        %{VERSION}
 Release:        1%{?dist}
 Summary:        Caching full DNS Resolver
 
-License:        GPLv3
+License:        GPL-3.0-or-later
 URL:            https://www.knot-resolver.cz/
 Source0:        knot-resolver_%{version}.orig.tar.xz
 
 # LuaJIT only on these arches
-%if 0%{?rhel}
+%if 0%{?rhel} == 7
 # RHEL 7 does not have aarch64 LuaJIT
 ExclusiveArch:	%{ix86} x86_64
 %else
@@ -54,7 +54,7 @@ Requires:       systemd
 Requires(post): systemd
 
 # Distro-dependent dependencies
-%if 0%{?rhel}
+%if 0%{?rhel} == 7
 BuildRequires:  lmdb-devel
 # Lua 5.1 version of the libraries have different package names
 Requires:       lua-basexx
@@ -62,7 +62,7 @@ Requires:       lua-psl
 Requires:       lua-http
 Requires(pre):  shadow-utils
 %endif
-%if 0%{?fedora}
+%if 0%{?fedora} || 0%{?rhel} > 7
 BuildRequires:  pkgconfig(lmdb)
 BuildRequires:  python3-sphinx
 Requires:       lua5.1-basexx
@@ -86,8 +86,9 @@ Requires(pre):  shadow
 
 %if "x%{?rhel}" == "x"
 # dependencies for doc package
-# NOTE: doc isn't possible to build on CentOS 7
-#       python2-sphinx is too old and python36-breathe is broken
+# NOTE: doc isn't possible to build on CentOS 7, 8
+#       python2-sphinx is too old and python36-breathe is broken on CentOS 7
+#       python3-breathe isn't available for CentOS 8 (yet? rhbz#1808766)
 BuildRequires:  doxygen
 BuildRequires:  python3-breathe
 BuildRequires:  python3-sphinx_rtd_theme
@@ -124,7 +125,7 @@ Documentation for Knot Resolver
 %package module-http
 Summary:        HTTP/2 module for Knot Resolver
 Requires:       %{name} = %{version}-%{release}
-%if 0%{?fedora}
+%if 0%{?fedora} || 0%{?rhel} > 7
 Requires:       lua5.1-http
 Requires:       lua5.1-mmdb
 %else
@@ -191,8 +192,8 @@ rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/http*.lua
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/prometheus.lua
 %endif
 
-# rename doc directory for centos, opensuse
-%if "x%{?fedora}" == "x"
+# rename doc directory for centos 7, opensuse
+%if 0%{?suse_version} || 0%{?rhel} == 7
 install -m 755 -d %{buildroot}/%{_pkgdocdir}
 mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 %endif
@@ -283,7 +284,7 @@ fi
 %{_tmpfilesdir}/knot-resolver.conf
 %ghost /run/%{name}
 %ghost %{_localstatedir}/cache/%{name}
-%attr(750,knot-resolver,knot-resolver) %dir %{_libdir}/%{name}
+%attr(770,root,knot-resolver) %dir %{_libdir}/%{name}
 %{_sbindir}/kresd
 %{_sbindir}/kresc
 %{_sbindir}/kres-cache-gc

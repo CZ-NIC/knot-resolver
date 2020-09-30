@@ -90,7 +90,7 @@ enum kr_rank {
 	KR_RANK_INDET = 4,   /**< Unable to determine whether it should be secure. */
 	KR_RANK_BOGUS,       /**< Ought to be secure but isn't. */
 	KR_RANK_MISMATCH,
-	KR_RANK_MISSING,     /**< Unable to obtain a good signature. */
+	KR_RANK_MISSING,     /**< No RRSIG found for that owner+type combination. */
 
 	/** Proven to be insecure, i.e. we have a chain of trust from TAs
 	 * that cryptographically denies the possibility of existence
@@ -110,16 +110,7 @@ enum kr_rank {
 bool kr_rank_check(uint8_t rank) KR_PURE;
 
 /** Test the presence of any flag/state in a rank, i.e. including KR_RANK_AUTH. */
-static inline bool kr_rank_test(uint8_t rank, uint8_t kr_flag)
-{
-	assert(kr_rank_check(rank) && kr_rank_check(kr_flag));
-	if (kr_flag == KR_RANK_AUTH) {
-		return rank & KR_RANK_AUTH;
-	}
-	assert(!(kr_flag & KR_RANK_AUTH));
-	/* The rest are exclusive values - exactly one has to be set. */
-	return (rank & ~KR_RANK_AUTH) == kr_flag;
-}
+bool kr_rank_test(uint8_t rank, uint8_t kr_flag) KR_PURE KR_EXPORT;
 
 /** Set the rank state. The _AUTH flag is kept as it was. */
 static inline void kr_rank_set(uint8_t *rank, uint8_t kr_flag)
@@ -145,7 +136,13 @@ typedef array_t(struct kr_module *) module_array_t;
 struct kr_context
 {
 	struct kr_qflags options;
-	knot_rrset_t *opt_rr;
+
+	/** Default EDNS towards *both* clients and upstream.
+	 * LATER: consider splitting the two, e.g. allow separately
+	 * configured limits for UDP packet size (say, LAN is under control). */
+	knot_rrset_t *downstream_opt_rr;
+	knot_rrset_t *upstream_opt_rr;
+
 	map_t trust_anchors;
 	map_t negative_anchors;
 	struct kr_zonecut root_hints;
@@ -165,8 +162,8 @@ struct kr_context
 /* Kept outside, because kres-gen.lua can't handle this depth
  * (and lines here were too long anyway). */
 struct kr_request_qsource_flags {
-	bool tcp:1; /**< true if the request is on TCP (or TLS); only meaningful if (dst_addr). */
-	bool tls:1; /**< true if the request is on TLS (or HTTPS); only meaningful if (dst_addr). */
+	bool tcp:1; /**< true if the request is not on UDP; only meaningful if (dst_addr). */
+	bool tls:1; /**< true if the request is encrypted; only meaningful if (dst_addr). */
 	bool http:1; /**< true if the request is on HTTP; only meaningful if (dst_addr). */
 };
 
@@ -222,6 +219,8 @@ struct kr_request {
 	int vars_ref; /**< Reference to per-request variable table. LUA_NOREF if not set. */
 	knot_mm_t pool;
 	unsigned int uid; /** for logging purposes only */
+	unsigned int count_no_nsaddr;
+	unsigned int count_fail_row;
 };
 
 /** Initializer for an array of *_selected. */
@@ -247,9 +246,9 @@ int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx);
  * Ensure that request->answer is usable, and return it (for convenience).
  *
  * Only use this when it's guaranteed that there will be no delay before sending it.
- * It can not fail (e.g. return NULL).
+ * It may return NULL, in which case no answer will be sent.
  */
-KR_EXPORT __attribute__((returns_nonnull))
+KR_EXPORT
 knot_pkt_t * kr_request_ensure_answer(struct kr_request *request);
 
 /**

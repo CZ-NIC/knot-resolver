@@ -1,5 +1,6 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 -- shorten update interval
+modules.load('ta_update')
 ta_update.refresh_time = 0.5 * sec
 ta_update.hold_down_time = 1 * sec
 sleep_time = 1.5
@@ -11,6 +12,7 @@ trust_anchors.remove('.')
 counter = 0
 local function counter_func (state, req)
         local answer = req:ensure_answer()
+        if answer == nil then return nil end
         local qry = req:current()
         if answer:qclass() == kres.class.IN
 		and qry.stype == kres.type.DNSKEY

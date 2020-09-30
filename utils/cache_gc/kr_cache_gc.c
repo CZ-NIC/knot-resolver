@@ -13,6 +13,8 @@
 #include <lib/cache/api.h>
 #include <lib/cache/impl.h>
 #include <lib/defines.h>
+#include "lib/cache/cdb_lmdb.h"
+#include "lib/utils.h"
 
 #include "kr_cache_gc.h"
 
@@ -160,50 +162,47 @@ void kr_cache_gc_free_state(kr_cache_gc_state_t **state)
 
 int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 {
+	// The whole function works in four "big phases":
+	//// 1. find out whether we should even do analysis and deletion.
 	assert(cfg && state);
-	if (!*state) { // Cache not open -> do that.
+	int ret;
+	// Ensure that we have open and "healthy" cache.
+	if (!*state) {
 		*state = calloc(1, sizeof(**state));
 		if (!*state) {
 			return KNOT_ENOMEM;
 		}
-		int ret = kr_gc_cache_open(cfg->cache_path, &(*state)->kres_db,
+		ret = kr_gc_cache_open(cfg->cache_path, &(*state)->kres_db,
 					   &(*state)->db);
-		if (ret) {
-			free(*state);
-			*state = NULL;
-			return ret;
-		}
+	} else { // To be sure, we guard against the file getting replaced.
+		ret = kr_gc_cache_check_health(&(*state)->kres_db, &(*state)->db);
+		// In particular, missing data.mdb gives us kr_error(ENOENT) == KNOT_ENOENT
+	}
+	if (ret) {
+		free(*state);
+		*state = NULL;
+		return ret;
 	}
 	knot_db_t *const db = (*state)->db; // frequently used shortcut
 
-	const size_t db_size = knot_db_lmdb_get_mapsize(db);
-	const size_t db_usage_abs = knot_db_lmdb_get_usage(db);
-	const double db_usage = (double)db_usage_abs / db_size * 100.0;
-#if 0				// Probably not worth it, better reduce the risk by checking more often.
-	if (db_usage > 90.0) {
-		free(*libknot_db);
-		kr_cache_close(kres_db);
-		cache_size += cache_size / 10;
-		opts.maxsize = cache_size;
-		goto open_kr_cache;
-	}
-#endif
+	const double db_usage = kr_cdb_lmdb()->usage_percent((*state)->kres_db.db);
 	const bool large_usage = db_usage >= cfg->cache_max_usage;
-	if (cfg->dry_run || large_usage) {	// don't print this on every size check
-		printf("Usage: %.2lf%% (%zu / %zu)\n", db_usage, db_usage_abs,
-		       db_size);
+	if (cfg->dry_run || large_usage || VERBOSE_STATUS) {	// don't print this on every size check
+		printf("Usage: %.2lf%%\n", db_usage);
 	}
 	if (cfg->dry_run || !large_usage) {
 		return KNOT_EOK;
 	}
 
+	//// 2. classify all cache items into categories
+	//      and compute which categories to delete.
 	gc_timer_t timer_analyze = { 0 }, timer_choose = { 0 }, timer_delete =
 	    { 0 }, timer_rw_txn = { 0 };
 
 	gc_timer_start(&timer_analyze);
 	ctx_compute_categories_t cats = { { 0 }
 	};
-	int ret = kr_gc_cache_iter(db, cb_compute_categories, &cats);
+	ret = kr_gc_cache_iter(db, cfg, cb_compute_categories, &cats);
 	if (ret != KNOT_EOK) {
 		kr_cache_gc_free_state(state);
 		return ret;
@@ -217,32 +216,33 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	for (int i = 0; i < CATEGORIES; ++i) {
 		cats_sumsize += cats.categories_sizes[i];
 	}
-	ssize_t amount_tofree = knot_db_lmdb_get_mapsize(db) * cfg->cache_to_be_freed
-	    * cats_sumsize / (100 * knot_db_lmdb_get_usage(db));
+	/* use less precise variant to avoid 32-bit overflow */
+	ssize_t amount_tofree = cats_sumsize / 100 * cfg->cache_to_be_freed;
 
-#ifdef DEBUG
-	printf("tofree: %zd\n", amount_tofree);
-	for (int i = 0; i < CATEGORIES; i++) {
-		if (cats.categories_sizes[i] > 0) {
-			printf("category %d size %zu\n", i,
-			       cats.categories_sizes[i]);
+	kr_log_verbose("tofree: %zd / %zd\n", amount_tofree, cats_sumsize);
+	if (VERBOSE_STATUS) {
+		for (int i = 0; i < CATEGORIES; i++) {
+			if (cats.categories_sizes[i] > 0) {
+				printf("category %.2d size %zu\n", i,
+				       cats.categories_sizes[i]);
+			}
 		}
 	}
-#endif
 
 	category_t limit_category = CATEGORIES;
 	while (limit_category > 0 && amount_tofree > 0) {
 		amount_tofree -= cats.categories_sizes[--limit_category];
 	}
 
-	printf("Cache analyzed in %.2lf secs, %zu records, limit category is %d.\n",
-	       gc_timer_end(&timer_analyze), cats.records, limit_category);
+	printf("Cache analyzed in %.0lf msecs, %zu records, limit category is %d.\n",
+	       gc_timer_end(&timer_analyze) * 1000, cats.records, limit_category);
 
+	//// 3. pass whole cache again to collect a list of keys that should be deleted.
 	gc_timer_start(&timer_choose);
 	ctx_delete_categories_t to_del = { 0 };
 	to_del.cfg_temp_keys_space = cfg->temp_keys_space;
 	to_del.limit_category = limit_category;
-	ret = kr_gc_cache_iter(db, cb_delete_categories, &to_del);
+	ret = kr_gc_cache_iter(db, cfg, cb_delete_categories, &to_del);
 	if (ret != KNOT_EOK) {
 		entry_dynarray_deep_free(&to_del.to_delete);
 		kr_cache_gc_free_state(state);
@@ -253,6 +253,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	     to_del.to_delete.size, ((double)to_del.used_space / 1048576.0),
 	     to_del.oversize_records);
 
+	//// 4. execute the planned deletions.
 	const knot_db_api_t *api = knot_db_lmdb_api();
 	knot_db_txn_t txn = { 0 };
 	size_t deleted_records = 0, already_gone = 0, rw_txn_count = 0;
@@ -281,7 +282,18 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 			break;
 		case KNOT_ENOENT:
 			already_gone++;
+			if (VERBOSE_STATUS) {
+				// kresd normally only inserts (or overwrites),
+				// so it's generally suspicious when a key goes missing.
+				printf("Record already gone (key len %zu): ", (*i)->len);
+				debug_printbin((*i)->data, (*i)->len);
+				printf("\n");
+			}
 			break;
+		case KNOT_ESPACE:
+			printf("Warning: out of space, bailing out to retry later.\n");
+			api->txn_abort(&txn);
+			goto finish;
 		default:
 			printf("Warning: skipping deletion because of error (%s)\n",
 			       knot_strerror(ret));
@@ -319,8 +331,8 @@ finish:
 	printf("Deleted %zu records (%zu already gone) types", deleted_records,
 	       already_gone);
 	rrtypelist_print(&deleted_rrtypes);
-	printf("It took %.2lf secs, %zu transactions (%s)\n\n",
-	       gc_timer_end(&timer_delete), rw_txn_count, knot_strerror(ret));
+	printf("It took %.0lf msecs, %zu transactions (%s)\n\n",
+	       gc_timer_end(&timer_delete) * 1000, rw_txn_count, knot_strerror(ret));
 
 	rrtype_dynarray_free(&deleted_rrtypes);
 	entry_dynarray_deep_free(&to_del.to_delete);

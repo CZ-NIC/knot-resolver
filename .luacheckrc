@@ -40,7 +40,6 @@ new_read_globals = {
 	'libknot_SONAME',
 	'libzscanner_SONAME',
 	'table_print',
-	'__engine',
 	'_ENV',
 }
 

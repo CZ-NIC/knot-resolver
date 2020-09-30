@@ -3,6 +3,9 @@
 -- Refer to manual: https://knot-resolver.readthedocs.io/en/stable/
 print('Knot Resolver ' .. package_version())
 
+-- Smaller cache size
+cache.size = 10 * MB
+
 function interactive_mode()
 	-- Listen on all interfaces (localhost would not work in Docker)
 	net.listen('0.0.0.0', 53, { kind = 'dns' })
@@ -15,9 +18,6 @@ function interactive_mode()
 		'stats',    -- Track internal statistics
 		'http',
 	}
-
-	-- Smaller cache size
-	cache.size = 10 * MB
 
 	function print_help()
 		print('\nUsage\n'
@@ -40,6 +40,10 @@ function interactive_mode()
 end
 
 function debug_mode(qname, qtype)
+	event.after(20*sec, function()
+		print('ERROR: timeout which cannot happen actually happened, exiting')
+		os.exit(1)
+	end)
 	env.KRESD_NO_LISTEN = 1
 
 	-- limit noise in verbose logs
@@ -48,21 +52,29 @@ function debug_mode(qname, qtype)
 	modules.unload('ta_signal_query')
 	modules.unload('ta_update')
 
+	-- always empty cache so this config works reliably outside Docker
+	cache.clear()
+
+	local cqueues = require('cqueues')
 
 	-- execute query right after start up and exit when the query is finished
 	event.after(0, function()
 		-- ultra verbose log
 		verbose(true)
 		policy.add(policy.all(policy.DEBUG_ALWAYS))
-		log('INFO: starting your DNS query for %s %s, verbose log follows', qname, kres.tostring.type[qtype])
+		log('INFO: starting DNS query for %s %s', qname, kres.tostring.type[qtype])
+		local starttime = cqueues.monotime()
 		resolve({
 			name = qname,
 			type = qtype,
+			options = {'DNSSEC_WANT'},
 			finish = function(pkt)
 				-- delay exit after packet is finished
 				-- to prevent us from losing policy.DEBUG finish callback
-				event.after(1,
+				event.after(1, -- milisecond
 					function()
+						local endtime = cqueues.monotime()
+						log('\nrequest finished in %f ms', (endtime - starttime) * 1000)
 						os.exit()
 					end)
 				end

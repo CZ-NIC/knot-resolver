@@ -69,19 +69,19 @@ KR_EXPORT bool kr_verbose_set(bool status);
  * @param  source message source
  * @param  fmt message format
  */
+KR_EXPORT KR_PRINTF(5)
 void kr_log_req(const struct kr_request * const req, uint32_t qry_uid,
-		const unsigned int indent, const char *source, const char *fmt, ...)
-KR_EXPORT KR_PRINTF(5);
+		const unsigned int indent, const char *source, const char *fmt, ...);
 
 /**
  * Log a message through the request log handler or stdout.
  * Caller is responsible for detecting verbose mode, use QRVERBOSE() macro.
- * @param  query current query
+ * @param  qry current query
  * @param  source message source
  * @param  fmt message format
  */
-void kr_log_q(const struct kr_query *qry, const char *source, const char *fmt, ...)
-KR_EXPORT KR_PRINTF(3);
+KR_EXPORT KR_PRINTF(3)
+void kr_log_q(const struct kr_query *qry, const char *source, const char *fmt, ...);
 
 #ifdef NOVERBOSELOG
 /* Efficient compile-time disabling of verbose messages. */
@@ -204,6 +204,7 @@ struct ranked_rr_array_entry {
 	bool to_wire : 1; /**< whether to be put into the answer */
 	bool expiring : 1; /**< low remaining TTL; see is_expiring; only used in cache ATM */
 	bool in_progress : 1; /**< build of RRset in progress, i.e. different format of RR data */
+	bool dont_cache : 1; /**< avoid caching; useful e.g. for generated data */
 	knot_rrset_t *rr;
 };
 typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
@@ -221,6 +222,11 @@ typedef array_t(ranked_rr_array_entry_t *) ranked_rr_array_t;
 /** Concatenate N strings. */
 KR_EXPORT
 char* kr_strcatdup(unsigned n, ...);
+
+/** Construct absolute file path, without resolving symlinks.
+ * \return malloc-ed string or NULL (+errno in that case) */
+KR_EXPORT
+char * kr_absolutize_path(const char *dirname, const char *fname);
 
 /** You probably want kr_rand_* convenience functions instead.
  * This is a buffered version of gnutls_rnd(GNUTLS_RND_NONCE, ..) */
@@ -366,10 +372,10 @@ KR_EXPORT
 int kr_straddr_subnet(void *dst, const char *addr);
 
 /** Splits ip address specified as "addr@port" or "addr#port" into addr and port.
- * \param instr[in] zero-terminated input, e.g. "192.0.2.1#12345\0"
- * \param ipaddr[out] working buffer for the port-less prefix of instr;
+ * \param[in]  instr zero-terminated input, e.g. "192.0.2.1#12345\0"
+ * \param[out] ipaddr working buffer for the port-less prefix of instr;
  *                    length >= INET6_ADDRSTRLEN + 1.
- * \param port[out] written in case it's specified in instr
+ * \param[out] port written in case it's specified in instr
  * \return error code
  * \note Typically you follow this by kr_straddr_socket().
  * \note Only internet addresses are supported, i.e. no AF_UNIX sockets.
@@ -420,6 +426,8 @@ int kr_rrkey(char *key, uint16_t class, const knot_dname_t *owner,
  *
  * To convert to standard RRs inside, you need to call _finalize() afterwards,
  * and the memory of rr->rrs.rdata has to remain until then.
+ *
+ * \return array index (>= 0) or error code (< 0)
  */
 KR_EXPORT
 int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
@@ -533,8 +541,8 @@ static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, bool add_wi
 
 /**
  * Difference between two calendar times specified as strings.
- * \param format[in] format for strptime
- * \param diff[out] result from C difftime(time1, time0)
+ * \param[in]  format format for strptime
+ * \param[out] diff result from C difftime(time1, time0)
  */
 KR_EXPORT
 const char *kr_strptime_diff(const char *format, const char *time1_str,

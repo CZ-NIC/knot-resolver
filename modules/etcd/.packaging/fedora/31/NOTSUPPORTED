@@ -1,0 +1,16 @@
+Error installing etcd using luarocks:
+
+
+
+Missing dependencies for process 1.9.0-1:
+   luarocks-fetch-gitrec >= 0.2 (not installed)
+
+process 1.9.0-1 depends on luarocks-fetch-gitrec >= 0.2 (not installed)
+Installing https://luarocks.org/luarocks-fetch-gitrec-0.2-1.src.rock
+
+No existing manifest. Attempting to rebuild...
+luarocks-fetch-gitrec 0.2-1 is now installed in /root/.luarocks (license: MIT)
+
+
+Error: Unknown protocol gitrec
+

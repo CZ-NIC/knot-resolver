@@ -37,18 +37,7 @@ ev = event.after(0, function () return 1 end)
 trust_anchors.remove('.')
 trust_anchors.add('. IN DS 48409 8 2 3D63A0C25BCE86621DE63636F11B35B908EFE8E9381E0E3E9DEFD89EA952C27D')
 
-local function check_answer(desc, qname, qtype, expected_rcode)
-	qtype_str = kres.tostring.type[qtype]
-	callback = function(pkt)
-		same(pkt:rcode(), expected_rcode,
-		     desc .. ': expecting answer for query ' .. qname .. ' ' .. qtype_str
-		      .. ' with rcode ' .. kres.tostring.rcode[expected_rcode])
-
-		ok((pkt:ancount() > 0) == (pkt:rcode() == kres.rcode.NOERROR),
-		   desc ..': checking number of answers for ' .. qname .. ' ' .. qtype_str)
-	end
-	resolve(qname, qtype, kres.class.IN, {}, callback)
-end
+local check_answer = require('test_utils').check_answer
 
 -- do not attempt to contact outside world, operate only on cache
 net.ipv4 = false
@@ -197,17 +186,29 @@ local function test_complete_flush()
 	is(cache.count(), 0, 'cache is empty after full clear')
 end
 
+local function test_cache_used(lower, upper)
+	return function()
+		local usage = cache.stats().usage_percent
+		ok(usage >= lower and usage <= upper, string.format('cache percentage usage is between <%d, %d>', lower, upper))
+	end
+end
+
 return {
+	test_cache_used(0, 1),
 	import_zone,
+	test_cache_used(11, 12),
 	test_exact_match_qtype,
 	test_exact_match_qname,
 	test_callback,
 	import_zone,
 	test_subtree,
+	test_cache_used(10, 11),
 	test_subtree_limit,
+	test_cache_used(5, 6),
 	test_apex,
 	import_zone,
 	test_root,
 	import_zone,
 	test_complete_flush,
+	test_cache_used(0, 1),
 }

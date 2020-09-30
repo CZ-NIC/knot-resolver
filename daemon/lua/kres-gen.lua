@@ -5,7 +5,6 @@ local ffi = require('ffi')
 
 typedef struct knot_dump_style knot_dump_style_t;
 extern const knot_dump_style_t KNOT_DUMP_STYLE_DEFAULT;
-typedef void knot_db_t;
 struct kr_cdb_api {};
 struct lru {};
 
@@ -44,15 +43,14 @@ typedef struct {
 	uint16_t pos;
 	uint16_t count;
 } knot_pktsection_t;
-struct knot_compr {
+typedef struct knot_compr {
 	uint8_t *wire;
 	knot_rrinfo_t *rrinfo;
 	struct {
 		uint16_t pos;
 		uint8_t labels;
 	} suffix;
-};
-typedef struct knot_compr knot_compr_t;
+} knot_compr_t;
 struct knot_pkt {
 	uint8_t *wire;
 	size_t size;
@@ -120,7 +118,7 @@ struct kr_qflags {
 	_Bool NO_NS_FOUND : 1;
 	_Bool PKT_IS_SANE : 1;
 };
-struct ranked_rr_array_entry {
+typedef struct ranked_rr_array_entry {
 	uint32_t qry_uid;
 	uint8_t rank;
 	uint8_t revalidation_cnt;
@@ -129,9 +127,9 @@ struct ranked_rr_array_entry {
 	_Bool to_wire : 1;
 	_Bool expiring : 1;
 	_Bool in_progress : 1;
+	_Bool dont_cache : 1;
 	knot_rrset_t *rr;
-};
-typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
+} ranked_rr_array_entry_t;
 typedef struct {
 	ranked_rr_array_entry_t **at;
 	size_t len;
@@ -153,6 +151,7 @@ typedef struct {
 struct kr_rplan {
 	kr_qarray_t pending;
 	kr_qarray_t resolved;
+	struct kr_query *initial;
 	struct kr_request *request;
 	knot_mm_t *pool;
 	uint32_t next_uid;
@@ -191,12 +190,16 @@ struct kr_request {
 	int vars_ref;
 	knot_mm_t pool;
 	unsigned int uid;
+	unsigned int count_no_nsaddr;
+	unsigned int count_fail_row;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
+typedef struct kr_cdb * kr_cdb_pt;
 struct kr_cdb_stats {
 	uint64_t open;
 	uint64_t close;
 	uint64_t count;
+	uint64_t count_entries;
 	uint64_t clear;
 	uint64_t commit;
 	uint64_t read;
@@ -208,26 +211,28 @@ struct kr_cdb_stats {
 	uint64_t match_miss;
 	uint64_t read_leq;
 	uint64_t read_leq_miss;
+	double usage_percent;
 };
+typedef struct uv_timer_s uv_timer_t;
 struct kr_cache {
-	knot_db_t *db;
+	kr_cdb_pt db;
 	const struct kr_cdb_api *api;
 	struct kr_cdb_stats stats;
 	uint32_t ttl_min;
 	uint32_t ttl_max;
 	struct timeval checkpoint_walltime;
 	uint64_t checkpoint_monotime;
+	uv_timer_t *health_timer;
 };
-struct kr_layer {
+typedef struct kr_layer {
 	int state;
 	struct kr_request *req;
 	const struct kr_layer_api *api;
 	knot_pkt_t *pkt;
 	struct sockaddr *dst;
 	_Bool is_stream;
-};
-typedef struct kr_layer kr_layer_t;
-struct kr_layer_api {
+} kr_layer_t;
+typedef struct kr_layer_api {
 	int (*begin)(kr_layer_t *);
 	int (*reset)(kr_layer_t *);
 	int (*finish)(kr_layer_t *);
@@ -237,8 +242,7 @@ struct kr_layer_api {
 	int (*answer_finalize)(kr_layer_t *);
 	void *data;
 	int cb_slots[];
-};
-typedef struct kr_layer_api kr_layer_api_t;
+} kr_layer_api_t;
 struct kr_prop {
 	kr_prop_cb *cb;
 	const char *name;
@@ -291,7 +295,8 @@ struct kr_query {
 };
 struct kr_context {
 	struct kr_qflags options;
-	knot_rrset_t *opt_rr;
+	knot_rrset_t *downstream_opt_rr;
+	knot_rrset_t *upstream_opt_rr;
 	map_t trust_anchors;
 	map_t negative_anchors;
 	struct kr_zonecut root_hints;
@@ -356,6 +361,7 @@ int kr_bitcmp(const char *, const char *, int);
 int kr_family_len(int);
 struct sockaddr *kr_straddr_socket(const char *, int, knot_mm_t *);
 int kr_straddr_split(const char *, char * restrict, uint16_t *);
+_Bool kr_rank_test(uint8_t, uint8_t);
 int kr_ranked_rrarray_add(ranked_rr_array_t *, const knot_rrset_t *, uint8_t, _Bool, uint32_t, knot_mm_t *);
 int kr_ranked_rrarray_finalize(ranked_rr_array_t *, uint32_t, knot_mm_t *);
 void kr_qflags_set(struct kr_qflags *, struct kr_qflags);
@@ -442,6 +448,15 @@ struct qr_task {
 int worker_resolve_exec(struct qr_task *, knot_pkt_t *);
 knot_pkt_t *worker_resolve_mk_pkt(const char *, uint16_t, uint16_t, const struct kr_qflags *);
 struct qr_task *worker_resolve_start(knot_pkt_t *, struct kr_qflags);
+struct engine {
+	struct kr_context resolver;
+	char _stub[];
+};
+struct worker_ctx {
+	struct engine *engine;
+	char _stub[];
+};
+struct worker_ctx *the_worker;
 typedef struct {
 	uint8_t bitmap[32];
 	uint8_t length;
@@ -468,7 +483,7 @@ typedef struct {
 } zs_loc_t;
 typedef enum {ZS_STATE_NONE, ZS_STATE_DATA, ZS_STATE_ERROR, ZS_STATE_INCLUDE, ZS_STATE_EOF, ZS_STATE_STOP} zs_state_t;
 typedef struct zs_scanner zs_scanner_t;
-struct zs_scanner {
+typedef struct zs_scanner {
 	int cs;
 	int top;
 	int stack[16];
@@ -530,7 +545,7 @@ struct zs_scanner {
 	uint16_t r_type;
 	uint32_t r_data_length;
 	uint8_t r_data[65535];
-};
+} zs_scanner_t;
 void zs_deinit(zs_scanner_t *);
 int zs_init(zs_scanner_t *, const char *, const uint16_t, const uint32_t);
 int zs_parse_record(zs_scanner_t *);

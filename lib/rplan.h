@@ -81,7 +81,8 @@ struct kr_query {
 	uint16_t sclass;
 	uint16_t id;
 	uint16_t reorder; /**< Seed to reorder (cached) RRs in answer or zero. */
-	struct kr_qflags flags, forward_flags;
+	struct kr_qflags flags;
+	struct kr_qflags forward_flags;
 	uint32_t secret;
 	uint32_t uid; /**< Query iteration number, unique within the kr_rplan. */
 	uint64_t creation_time_mono; /* The time of query's creation (milliseconds).
@@ -121,6 +122,8 @@ struct kr_rplan {
 					as the last is the next one to solve,
 					and they may be inter-dependent. */
 	kr_qarray_t resolved;       /**< List of resolved queries. */
+	struct kr_query *initial;   /**< The initial query (also in pending or resolved). */
+
 	struct kr_request *request; /**< Parent resolution request. */
 	knot_mm_t *pool;            /**< Temporary memory pool. */
 	uint32_t next_uid;          /**< Next value for kr_query::uid (incremental). */

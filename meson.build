@@ -4,7 +4,7 @@ project(
   'knot-resolver',
   ['c', 'cpp'],
   license: 'GPLv3+',
-  version: '5.0.1',
+  version: '5.1.3',
   default_options: ['c_std=gnu11', 'b_ndebug=if-release'],
   meson_version: '>=0.46',
 )
@@ -13,7 +13,7 @@ project(
 # Unity build
 if get_option('unity') != 'off'
   error('unity builds are not supported! ' +
-    'https://gitlab.labs.nic.cz/knot/knot-resolver/issues/460')
+    'https://gitlab.nic.cz/knot/knot-resolver/issues/460')
 endif
 
 
@@ -86,11 +86,15 @@ group = get_option('group')
 
 ## Optional dependencies
 message('--- optional dependencies ---')
-capng = dependency('libcap-ng', required: false)
 openssl = dependency('openssl', required: false)
 
 have_asprintf = meson.get_compiler('c').has_function('asprintf',
   prefix: '#define _GNU_SOURCE\n#include <stdio.h>')
+
+### capng
+# use empty name to disable the dependency, but still compile the dependent kresd
+capng_name = get_option('capng') == 'disabled' ? '' : 'libcap-ng'
+capng = dependency(capng_name, required: get_option('capng') == 'enabled')
 
 ### sendmmsg
 has_sendmmsg = meson.get_compiler('c').has_function('sendmmsg',
@@ -116,6 +120,7 @@ add_project_arguments(
   '-Wtype-limits',
   '-Wshadow',
   '-Werror=implicit-function-declaration', # Probably messed up includes; implicit functions are evil!
+  '-Werror=attributes',  # Missing cleanup attribute could lead to memory leaks.
   '-fvisibility=hidden',
   '-DHAVE_ASPRINTF=' + have_asprintf.to_int().to_string(),
 
@@ -123,7 +128,7 @@ add_project_arguments(
   # https://github.com/libuv/libuv/pull/2588/files#diff-04c6e90faac2675aa89e2176d2eec7d8
   # https://github.com/libuv/libuv/issues/1230#issuecomment-569030944
   # Performance impact in our case seems OK:
-  # https://gitlab.labs.nic.cz/knot/knot-resolver/-/merge_requests/962#note_147407
+  # https://gitlab.nic.cz/knot/knot-resolver/-/merge_requests/962#note_147407
   '-fno-strict-aliasing',
 
   language: 'c',
@@ -155,12 +160,12 @@ conf_data.set_quoted('PACKAGE_VERSION', meson.project_version())
 conf_data.set_quoted('LIBDIR', lib_dir)
 conf_data.set_quoted('ROOTHINTS', root_hints)
 conf_data.set_quoted('LIBEXT', libext)
+conf_data.set_quoted('OPERATING_SYSTEM', host_machine.system())
 conf_data.set_quoted('libzscanner_SONAME',
   libzscanner.get_pkgconfig_variable('soname'))
 conf_data.set_quoted('libknot_SONAME',
   libknot.get_pkgconfig_variable('soname'))
-conf_data.set('SYSTEMD_VERSION',
-  libsystemd.found() ? libsystemd.version().to_int() : -1)
+conf_data.set('ENABLE_LIBSYSTEMD', libsystemd.found() ? 1 : 0)
 conf_data.set('NOVERBOSELOG', not verbose_log)
 conf_data.set('ENABLE_SENDMMSG', sendmmsg.to_int())
 conf_data.set('ENABLE_CAP_NG', capng.found())
@@ -278,6 +283,7 @@ s_build_extra_tests = build_extra_tests ? 'enabled' : 'disabled'
 s_install_kresd_conf = install_kresd_conf ? 'enabled' : 'disabled'
 s_sendmmsg = sendmmsg ? 'enabled': 'disabled'
 s_openssl = openssl.found() ? 'present': 'missing'
+s_capng = capng.found() ? 'enabled': 'disabled'
 message('''
 
 ======================= SUMMARY =======================
@@ -313,6 +319,7 @@ message('''
     install_kresd_conf: @0@'''.format(s_install_kresd_conf) + '''
     sendmmsg:           @0@'''.format(s_sendmmsg) + '''
     openssl debug:      @0@'''.format(s_openssl) + '''
+    capng:              @0@'''.format(s_capng) + '''
 
 =======================================================
 

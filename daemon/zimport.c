@@ -470,7 +470,7 @@ static void zi_zone_process(uv_timer_t* handle)
 	}
 
 	if (z_import->rrset_sorted.len <= 0) {
-		VERBOSE_MSG(NULL, "zone is empty\n");
+		kr_log_error("[zimport] zone `%s` is empty\n", zone_name_str);
 		goto finish;
 	}
 
@@ -494,6 +494,15 @@ static void zi_zone_process(uv_timer_t* handle)
 	}
 	z_import->key = rr_key;
 
+	map_t *trust_anchors = &z_import->worker->engine->resolver.trust_anchors;
+	knot_rrset_t *rr_ta = kr_ta_get(trust_anchors, z_import->origin);
+	if (!rr_ta) {
+		kr_log_error("[zimport] error: TA for zone `%s` vanished, fail", zone_name_str);
+		failed = 1;
+		goto finish;
+	}
+	z_import->ta = rr_ta;
+
 	VERBOSE_MSG(NULL, "started: zone: '%s'\n", zone_name_str);
 
 	z_import->start_timestamp = kr_now();
@@ -508,7 +517,7 @@ static void zi_zone_process(uv_timer_t* handle)
 
 	int res = zi_rrset_import(z_import, rr_key);
 	if (res != 0) {
-		VERBOSE_MSG(NULL, "import failed: qname: '%s' type: '%s'\n",
+		kr_log_error("[zimport] import failed: qname: '%s' type: '%s'\n",
 			    kname_str, ktype_str);
 		failed = 1;
 		goto finish;
@@ -585,7 +594,7 @@ finish:
 	if (failed != 0) {
 		if (ns_imported == 0 && other_imported == 0) {
 			import_state = -1;
-			VERBOSE_MSG(NULL, "import failed; zone `%s` \n", zone_name_str);
+			kr_log_error("[zimport] import failed; zone `%s` \n", zone_name_str);
 		} else {
 			import_state = 1;
 		}
@@ -770,9 +779,7 @@ int zi_zone_import(struct zone_import_ctx *z_import,
 			/* Try to find TA for worker->z_import.origin. */
 			map_t *trust_anchors = &z_import->worker->engine->resolver.trust_anchors;
 			knot_rrset_t *rr = kr_ta_get(trust_anchors, z_import->origin);
-			if (rr) {
-				z_import->ta = rr;
-			} else {
+			if (!rr) {
 				/* For now - fail.
 				 * TODO - query DS and continue after answer had been obtained. */
 				KR_DNAME_GET_STR(zone_name_str, z_import->origin);

@@ -8,7 +8,7 @@
  * Both the head and tail of the queue can be accessed and pushed to,
  * but only the head can be popped from.
  *
- * @note The implementation uses a singly linked list of blocks
+ * @note The implementation uses a singly linked list of blocks ("chunks")
  * where each block stores an array of values (for better efficiency).
  *
  * Example usage:
@@ -142,25 +142,26 @@
 
 struct queue;
 /* Non-inline functions are exported to be usable from daemon. */
-void queue_init_impl(struct queue *q, size_t item_size);
-void queue_deinit_impl(struct queue *q);
-void * queue_push_impl(struct queue *q);
-void * queue_push_head_impl(struct queue *q);
+KR_EXPORT void queue_init_impl(struct queue *q, size_t item_size);
+KR_EXPORT void queue_deinit_impl(struct queue *q);
+KR_EXPORT void * queue_push_impl(struct queue *q);
+KR_EXPORT void * queue_push_head_impl(struct queue *q);
 
 struct queue_chunk;
 struct queue {
-	size_t len;
-	uint16_t chunk_cap, item_size;
-	struct queue_chunk *head, *tail;
+	size_t len; /**< the current number of items in queue */
+	uint16_t chunk_cap; /**< max. number of items in each chunk */
+	uint16_t item_size; /**< sizeof() each item */
+	struct queue_chunk *head, *tail; /*< first and last chunk (or NULLs) */
 };
 
 struct queue_chunk {
-	struct queue_chunk *next; /*< head -> ... -> tail */
+	struct queue_chunk *next; /*< *head -> ... -> *tail; each is non-empty */
 	int16_t begin, end, cap, pad_; /*< indices: zero is closest to head */
 	/*< We could fit into uint8_t for example, but the choice of (3+1)*2 bytes
 	 * is a compromise between wasting space and getting a good alignment.
 	 * In particular, queue_t(type*) will store the pointers on addresses
-	 * aligned to the pointer size, in both 64-bit and 32-bit platforms.
+	 * aligned to the pointer size, on both 64-bit and 32-bit platforms.
 	 */
 	char data[];
 	/**< The item data.  We use "char" to satisfy the C99+ aliasing rules.
@@ -175,9 +176,7 @@ static inline void * queue_head_impl(const struct queue *q)
 {
 	assert(q);
 	struct queue_chunk *h = q->head;
-	if (unlikely(!h))
-		return NULL;
-	assert(h->end > h->begin);
+	assert(h && h->end > h->begin);
 	return h->data + h->begin * q->item_size;
 }
 
@@ -185,9 +184,7 @@ static inline void * queue_tail_impl(const struct queue *q)
 {
 	assert(q);
 	struct queue_chunk *t = q->tail;
-	if (unlikely(!t))
-		return NULL;
-	assert(t->end > t->begin);
+	assert(t && t->end > t->begin);
 	return t->data + (t->end - 1) * q->item_size;
 }
 
@@ -198,6 +195,13 @@ static inline void queue_pop_impl(struct queue *q)
 	assert(h && h->end > h->begin);
 	if (h->end - h->begin == 1) {
 		/* removing the last element in the chunk */
+		assert((q->len == 1) == (q->head == q->tail));
+		if (q->len == 1) {
+			q->tail = NULL;
+			assert(!h->next);
+		} else {
+			assert(h->next);
+		}
 		q->head = h->next;
 		free(h);
 	} else {

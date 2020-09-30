@@ -1,0 +1,12 @@
+debhelper
+libcmocka-dev
+libedit-dev
+libgnutls28-dev
+libknot-dev
+liblmdb-dev
+luajit-5.1-dev
+libsystemd-dev
+libuv1-dev
+luajit
+pkg-config
+meson

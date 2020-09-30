@@ -4,6 +4,7 @@ local ffi = require('ffi')
 -- Protection from DNS rebinding attacks
 local kres = require('kres')
 local renumber = require('kres_modules.renumber')
+local policy = require('kres_modules.policy')
 
 local M = {}
 M.layer = {}
@@ -69,25 +70,16 @@ local function check_pkt(pkt)
 end
 
 local function refuse(req)
-	-- we are deleting packet in consume() phase so other modules
-	-- might have chosen some RRs from the original packet already
-	-- *_selected arrays are in mempool
-	-- so explicit deallocation is not necessary
-	req.answ_selected.len = 0
-	req.auth_selected.len = 0
-	req.add_selected.len = 0
-
-	-- construct brand new answer packet
+	policy.REFUSE(nil, req)
 	local pkt = req:ensure_answer()
-	pkt:clear_payload()
-	pkt:rcode(kres.rcode.REFUSED)
-	pkt:ad(false)
+	if pkt == nil then return nil end
 	pkt:aa(false)
 	pkt:begin(kres.section.ADDITIONAL)
 
 	local msg = 'blocked by DNS rebinding protection'
 	pkt:put('\11explanation\7invalid\0', 10800, pkt:qclass(), kres.type.TXT,
 	string.char(#msg) .. msg)
+	return kres.DONE
 end
 
 -- act on DNS queries which were not answered from cache
@@ -112,14 +104,16 @@ function M.layer.consume(state, req, pkt)
 		Typical example: NS address resolution -> only this NS won't be used
 		but others may still be OK (or we SERVFAIL due to no NS being usable).
 	--]]
-	if qry.parent == nil then refuse(req) end
+	if qry.parent == nil then
+		state = refuse(req)
+	end
 	if verbose() then
 		ffi.C.kr_log_q(qry, 'rebinding',
 		    'blocking blacklisted IP in RR \'%s\' received from IP %s\n',
 		    kres.rr2str(bad_rr),
 		    tostring(kres.sockaddr_t(req.upstream.addr)))
 	end
-	return kres.DONE
+	return state
 end
 
 return M

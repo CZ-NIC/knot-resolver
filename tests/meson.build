@@ -38,11 +38,7 @@ if build_extra_tests
   py3_deps = []
 
   subdir('pytests')
-  if not sendmmsg
-    subdir('integration')
-  else
-    warning('Integration tests do not work with sendmmsg, disable sendmmsg first!')
-  endif
+  subdir('integration')
 
   foreach py3_dep : py3_deps
     py3_import = run_command(python3, '-c', 'import @0@'.format(py3_dep[0]))

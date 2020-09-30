@@ -6,7 +6,11 @@ if not policy then modules.load('policy') end
 
 -- Actions
 local actions = {
-	pass = 1, deny = 2, drop = 3, tc = 4, truncate = 4,
+	pass = function() return policy.PASS end,
+	deny = function () return policy.DENY end,
+	drop = function() return policy.DROP end,
+	tc = function() return policy.TC end,
+	truncate = function() return policy.TC end,
 	forward = function (g)
 		local addrs = {}
 		local tok = g()
@@ -75,6 +79,9 @@ end
 local function parse_rule(g)
 	-- Allow action without filter
 	local tok = g()
+	if tok == nil then
+		error('empty rule is not allowed')
+	end
 	if not filters[tok:lower()] then
 		return tok, nil
 	end
@@ -137,9 +144,10 @@ local M = {
 
 -- @function Cleanup module
 function M.deinit()
-	if http and http.endpoints then
-		http.endpoints['/daf'] = nil
-		http.endpoints['/daf.js'] = nil
+	if http then
+		local endpoints = http.configs._builtin.webmgmt.endpoints
+		endpoints['/daf'] = nil
+		endpoints['/daf.js'] = nil
 		http.snippets['/daf'] = nil
 	end
 end
@@ -176,10 +184,10 @@ end
 
 -- @function Remove a rule
 function M.del(id)
-	for _, r in ipairs(M.rules) do
+	for key, r in ipairs(M.rules) do
 		if r.rule.id == id then
 			policy.del(id)
-			table.remove(M.rules, id)
+			table.remove(M.rules, key)
 			return true
 		end
 	end
@@ -213,9 +221,13 @@ function M.enable(id)
 end
 
 local function consensus(op, ...)
-	local ret = true
+	local ret = false
 	local results = map(string.format(op, ...))
-	for _, r in ipairs(results) do
+	for idx, r in ipairs(results) do
+		if idx == 1 then
+			-- non-empty table, init to true
+			ret = true
+		end
 		ret = ret and r
 	end
 	return ret
@@ -246,7 +258,7 @@ local function api(h, stream)
 		local path = h:get(':path')
 		local id = tonumber(path:match '/([^/]*)$')
 		if id then
-			if consensus('daf.del "%s"', id) then
+			if consensus('daf.del(%s)', id) then
 				return tojson(true)
 			end
 			return 404, '"No such rule"' -- Not found
@@ -323,12 +335,23 @@ local function publish(_, ws)
 	end
 end
 
+function M.init()
+	-- avoid ordering problem between HTTP and daf module
+	event.after(0, M.config)
+end
+
 -- @function Configure module
 function M.config()
-	if not http or not http.endpoints then return end
+	if not http then
+		if verbose() then
+			log('[daf ] HTTP API unavailable because HTTP module is not loaded, use modules.load("http")')
+		end
+		return
+	end
+	local endpoints = http.configs._builtin.webmgmt.endpoints
 	-- Export API and data publisher
-	http.endpoints['/daf.js'] = http.page('daf.js', 'daf')
-	http.endpoints['/daf'] = {'application/json', api, publish}
+	endpoints['/daf.js'] = http.page('daf.js', 'daf')
+	endpoints['/daf'] = {'application/json', api, publish}
 	-- Export snippet
 	http.snippets['/daf'] = {'Application Firewall', [[
 		<script type="text/javascript" src="daf.js"></script>

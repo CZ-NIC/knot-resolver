@@ -1,0 +1,6 @@
+
+ERROR:test_packaging:Installing https://luarocks.org/basexx-0.4.1-1.rockspec
+Error: Failed extracting v0.4.1.tar.gz
+
+Doesn't works on GitLab CI/CD, but works on localhost.
+gzip and tar packages are installed, all packages has same version as packages on localhost's docker container.
