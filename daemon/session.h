@@ -7,6 +7,7 @@
 #include <libknot/packet/pkt.h>
 
 #include <stdbool.h>
+#include <nghttp2/nghttp2.h>
 #include <uv.h>
 
 struct qr_task;
@@ -96,10 +97,12 @@ void session_tls_set_client_ctx(struct session *session, struct tls_client_ctx *
  *  server and client. */
 struct tls_common_ctx *session_tls_get_common_ctx(const struct session *session);
 
+#ifdef NGHTTP2_VERSION_NUM
 /** Get pointer to server-side http-related data. */
 struct http_ctx *session_http_get_server_ctx(const struct session *session);
 /** Set pointer to server-side http-related data. */
 void session_http_set_server_ctx(struct session *session, struct http_ctx *ctx);
+#endif
 
 /** Get pointer to underlying libuv handle for IO operations. */
 uv_handle_t *session_get_handle(struct session *session);

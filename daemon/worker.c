@@ -299,10 +299,12 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		req->qsource.flags.tls = session_flags(session)->has_tls;
 		req->qsource.flags.http = session_flags(session)->has_http;
 		req->qsource.stream_id = -1;
+#ifdef NGHTTP2_VERSION_NUM
 		if (req->qsource.flags.http) {
 			struct http_ctx *http_ctx = session_http_get_server_ctx(session);
 			req->qsource.stream_id = queue_head(http_ctx->streams);
 		}
+#endif
 		/* We need to store a copy of peer address. */
 		memcpy(&ctx->source.addr.ip, peer, kr_sockaddr_len(peer));
 		req->qsource.addr = &ctx->source.addr.ip;
@@ -615,9 +617,13 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 	/* Send using given protocol */
 	assert(!session_flags(session)->closing);
 	if (session_flags(session)->has_http) {
+#ifdef NGHTTP2_VERSION_NUM
 		uv_write_t *write_req = (uv_write_t *)ioreq;
 		write_req->data = task;
 		ret = http_write(write_req, handle, pkt, ctx->req.qsource.stream_id, &on_write);
+#else
+		ret = kr_error(ENOPROTOOPT);
+#endif
 	} else if (session_flags(session)->has_tls) {
 		uv_write_t *write_req = (uv_write_t *)ioreq;
 		write_req->data = task;
@@ -1604,7 +1610,11 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 
 	const bool is_query = (knot_wire_get_qr(pkt->wire) == 0);
 	const bool is_outgoing = session_flags(session)->outgoing;
-	struct http_ctx *http_ctx = session_http_get_server_ctx(session);
+
+	struct http_ctx *http_ctx = NULL;
+#ifdef NGHTTP2_VERSION_NUM
+	http_ctx = session_http_get_server_ctx(session);
+#endif
 
 	if (!is_outgoing && http_ctx && queue_len(http_ctx->streams) <= 0)
 		return kr_error(ENOENT);

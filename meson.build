@@ -29,7 +29,6 @@ if not lmdb.found()  # darwin workaround: missing pkgconfig
 endif
 gnutls = dependency('gnutls')
 luajit = dependency('luajit')
-nghttp2 = dependency('libnghttp2')
 # NOTE avoid using link_args for luajit due to a macOS issue
 # https://github.com/Homebrew/homebrew-core/issues/37169
 luajit_inc = luajit.partial_dependency(compile_args: true, includes: true)
@@ -87,6 +86,7 @@ group = get_option('group')
 
 ## Optional dependencies
 message('--- optional dependencies ---')
+nghttp2 = dependency('libnghttp2', required: false)
 openssl = dependency('openssl', required: false)
 
 have_asprintf = meson.get_compiler('c').has_function('asprintf',
@@ -285,6 +285,7 @@ s_install_kresd_conf = install_kresd_conf ? 'enabled' : 'disabled'
 s_sendmmsg = sendmmsg ? 'enabled': 'disabled'
 s_openssl = openssl.found() ? 'present': 'missing'
 s_capng = capng.found() ? 'enabled': 'disabled'
+s_doh2 = nghttp2.found() ? 'enabled': 'disabled'
 message('''
 
 ======================= SUMMARY =======================
@@ -321,6 +322,7 @@ message('''
     sendmmsg:           @0@'''.format(s_sendmmsg) + '''
     openssl debug:      @0@'''.format(s_openssl) + '''
     capng:              @0@'''.format(s_capng) + '''
+    doh2:               @0@'''.format(s_doh2) + '''
 
 =======================================================
 

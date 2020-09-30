@@ -14,6 +14,7 @@
 
 #include "lib/generic/queue.h"
 
+#ifdef NGHTTP2_VERSION_NUM
 /** Transport session (opaque). */
 struct session;
 
@@ -40,3 +41,4 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *buf, ssi
 int http_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t* pkt, int32_t stream_id,
 	       uv_write_cb on_write);
 void http_free(struct http_ctx *ctx);
+#endif
