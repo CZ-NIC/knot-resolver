@@ -663,7 +663,7 @@ int main(int argc, char **argv)
 	}
 	/* Start listening on AF_XDP sockets. */
 	for (size_t i = 0; i < the_args->addrs_xdp.len; ++i) {
-		int8_t xdp_queue;
+		int16_t xdp_queue;
 		char *addr = the_args->addrs_xdp.at[i];
 		char *colon = strchr(addr, ':');
 		if (colon) {

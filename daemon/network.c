@@ -430,7 +430,7 @@ int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags)
 }
 
 int network_listen(struct network *net, const char *addr, uint16_t port,
-		   int8_t xdp_queue, endpoint_flags_t flags)
+		   int16_t xdp_queue, endpoint_flags_t flags)
 {
 	if (net == NULL || addr == 0) {
 		assert(!EINVAL);

@@ -52,7 +52,7 @@ struct endpoint {
 	int fd;              /**< POSIX file-descriptor; always used. */
 	int family;          /**< AF_INET or AF_INET6 or AF_UNIX or AF_XDP(TODO: check) */
 	uint16_t port;       /**< TCP/UDP port.  Meaningless with AF_UNIX. */
-	int8_t xdp_queue;    /**< -1 or queue number of the interface for AF_XDP use. */
+	int16_t xdp_queue;   /**< -1 or queue number of the interface for AF_XDP use. */
 	bool engaged;        /**< to some module or internally */
 	endpoint_flags_t flags;
 };
@@ -99,7 +99,7 @@ void network_deinit(struct network *net);
  * \param xdp_queue == -1 or queue number of the interface for AF_XDP use.
  */
 int network_listen(struct network *net, const char *addr, uint16_t port,
-		   int8_t xdp_queue, endpoint_flags_t flags);
+		   int16_t xdp_queue, endpoint_flags_t flags);
 
 /** Start listenting on an open file-descriptor.
  * \note flags.sock_type isn't meaningful here.
