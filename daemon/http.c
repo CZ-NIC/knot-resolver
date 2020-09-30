@@ -6,9 +6,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <nghttp2/nghttp2.h>
-#include <uv.h>
-
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
