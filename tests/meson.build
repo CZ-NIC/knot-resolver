@@ -26,6 +26,14 @@ if build_config_tests
   if cqueues.returncode() != 0
     error('missing luajit package: cqueues')
   endif
+  basexx = run_command('luajit', '-l', 'basexx', '-e', 'os.exit(0)')  # luajit -l $(1) -e "os.exit(0)"
+  if basexx.returncode() != 0
+    error('missing luajit package: basexx')
+  endif
+  ffi = run_command('luajit', '-l', 'ffi', '-e', 'os.exit(0)')  # luajit -l $(1) -e "os.exit(0)"
+  if ffi.returncode() != 0
+    error('missing luajit package: ffi')
+  endif
   message('---------------------------------')
 
   subdir('config')
