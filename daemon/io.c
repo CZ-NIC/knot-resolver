@@ -322,6 +322,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	mp_flush(the_worker->pkt_pool.ctx);
 }
 
+#ifdef ENABLE_DOH2
 static ssize_t tls_send(const uint8_t *buf, const size_t len, struct session *session)
 {
 	struct tls_ctx *ctx = session_tls_get_server_ctx(session);
@@ -336,6 +337,7 @@ static ssize_t tls_send(const uint8_t *buf, const size_t len, struct session *se
 	}
 	return sent;
 }
+#endif
 
 static void _tcp_accept(uv_stream_t *master, int status, bool tls, bool http)
 {
@@ -466,10 +468,12 @@ static void tls_accept(uv_stream_t *master, int status)
 	_tcp_accept(master, status, true, false);
 }
 
+#ifdef ENABLE_DOH2
 static void https_accept(uv_stream_t *master, int status)
 {
 	_tcp_accept(master, status, true, true);
 }
+#endif
 
 int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bool has_tls, bool has_http)
 {
