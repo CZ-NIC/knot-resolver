@@ -497,11 +497,18 @@ static void https_accept(uv_stream_t *master, int status)
 int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bool has_tls, bool has_http)
 {
 	uv_connection_cb connection;
+
+	if (!handle) {
+		return kr_error(EINVAL);
+	}
+	int ret = uv_tcp_init(loop, handle);
+	if (ret) return ret;
+
 	if (has_tls && has_http) {
 #ifdef ENABLE_DOH2
 		connection = https_accept;
 #else
-		kr_log_error("[ io ] kresd was compiled without libnghttp2 support");
+		kr_log_error("[ io ] kresd was compiled without libnghttp2 support\n");
 		return kr_error(ENOPROTOOPT);
 #endif
 	} else if (has_tls) {
@@ -511,12 +518,6 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
 	} else {
 		connection = tcp_accept;
 	}
-
-	if (!handle) {
-		return kr_error(EINVAL);
-	}
-	int ret = uv_tcp_init(loop, handle);
-	if (ret) return ret;
 
 	ret = uv_tcp_open(handle, (uv_os_sock_t) fd);
 	if (ret) return ret;
