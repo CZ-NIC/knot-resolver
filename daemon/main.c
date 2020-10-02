@@ -254,16 +254,16 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	}
 
 	/* Control sockets or TTY */
-	uv_pipe_t pipe;
-	uv_pipe_init(loop, &pipe, 0);
-	pipe.data = args;
+	uv_pipe_t *pipe = malloc(sizeof(*pipe));
+	uv_pipe_init(loop, pipe, 0);
 	if (args->interactive) {
 		if (!args->quiet)
 			printf("[system] interactive mode\n> ");
-		uv_pipe_open(&pipe, 0);
-		uv_read_start((uv_stream_t*) &pipe, io_tty_alloc, io_tty_process_input);
-	} else if (args->control_fd != -1 && uv_pipe_open(&pipe, args->control_fd) == 0) {
-		uv_listen((uv_stream_t *) &pipe, 16, io_tty_accept);
+		pipe->data = io_tty_alloc_data();
+		uv_pipe_open(pipe, 0);
+		uv_read_start((uv_stream_t*)pipe, io_tty_alloc, io_tty_process_input);
+	} else if (args->control_fd != -1 && uv_pipe_open(pipe, args->control_fd) == 0) {
+		uv_listen((uv_stream_t *)pipe, 16, io_tty_accept);
 	}
 	/* Watch IPC pipes (or just assign them if leading the pgroup). */
 	if (!leader) {
@@ -282,7 +282,12 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 #endif
 	/* Run event loop */
 	uv_run(loop, UV_RUN_DEFAULT);
-	uv_close((uv_handle_t *)&pipe, NULL); /* Seems OK even on the stopped loop. */
+	/* Free pipe's data.  Seems OK even on the stopped loop.
+	 * In interactive case it may have been done in callbacks already (single leak). */
+	if (!args->interactive) {
+		uv_close((uv_handle_t *)pipe, NULL);
+		free(pipe);
+	}
 	return EXIT_SUCCESS;
 }
 
