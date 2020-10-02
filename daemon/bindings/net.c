@@ -208,6 +208,10 @@ static int net_listen(lua_State *L)
 			tls = http = true;
 		} else if (k) {
 			kind = k;
+			if (strcasecmp(k, "doh") == 0) {
+				kr_log_deprecate(
+					"kind=\"doh\" is an obsolete DoH implementation, use kind=\"doh2\" instead\n");
+			}
 		}
 	}
 
