@@ -246,32 +246,32 @@ else
 		same(pkt:nscount(), 1, desc .. ': AUTHORITY is present')
 	end
 
-        local function test_get_other_params_before_dns()
-                local desc = 'GET query with other parameters before dns is valid'
-                local req = req_templ:clone()
-                req.headers:upsert(':method', 'GET')
-                req.headers:upsert(':path',
+	local function test_get_other_params_before_dns()
+		local desc = 'GET query with other parameters before dns is valid'
+		local req = req_templ:clone()
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path',
 		'/doh?other=something&another=something&dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
-                check_ok(req, desc)
-        end
+		check_ok(req, desc)
+	end
 
-        local function test_get_other_params_after_dns()
-                local desc = 'GET query with other parameters after dns is valid'
-                local req = req_templ:clone()
-                req.headers:upsert(':method', 'GET')
-                req.headers:upsert(':path',
+	local function test_get_other_params_after_dns()
+		local desc = 'GET query with other parameters after dns is valid'
+		local req = req_templ:clone()
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path',
 		'/doh?dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB&other=something&another=something')
-                check_ok(req, desc)
-        end
+		check_ok(req, desc)
+	end
 
-        local function test_get_other_params()
-                local desc = 'GET query with other parameters than dns on both sides is valid'
-                local req = req_templ:clone()
-                req.headers:upsert(':method', 'GET')
-                req.headers:upsert(':path',
+	local function test_get_other_params()
+		local desc = 'GET query with other parameters than dns on both sides is valid'
+		local req = req_templ:clone()
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path',
 		'/doh?other=something&dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB&another=something')
-                check_ok(req, desc)
-        end
+		check_ok(req, desc)
+	end
 
 	-- test an invalid DNS query using GET
 		local function test_get_long_input()
@@ -289,25 +289,25 @@ else
 	end
 
 	local function test_get_unparseable()
-                local req = assert(req_templ:clone())
-                req.headers:upsert(':method', 'GET')
-                req.headers:upsert(':path', '/doh??dns=' .. basexx.to_url64(string.rep('\0', 1024)))
-                check_err(req, '400', 'unparseable GET finishes with 400')
-        end
+		local req = assert(req_templ:clone())
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path', '/doh??dns=' .. basexx.to_url64(string.rep('\0', 1024)))
+		check_err(req, '400', 'unparseable GET finishes with 400')
+	end
 
 	local function test_get_invalid_b64()
-                local req = assert(req_templ:clone())
-                req.headers:upsert(':method', 'GET')
-                req.headers:upsert(':path', '/doh?dns=thisisnotb64')
-                check_err(req, '400', 'GET with invalid base64 finishes with 400')
-        end
+		local req = assert(req_templ:clone())
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path', '/doh?dns=thisisnotb64')
+		check_err(req, '400', 'GET with invalid base64 finishes with 400')
+	end
 
 	local function test_get_invalid_chars()
-                local req = assert(req_templ:clone())
-                req.headers:upsert(':method', 'GET')
-                req.headers:upsert(':path', '/doh?dns=' .. basexx.to_url64(string.rep('\0', 200)) .. '@#$%?!')
-                check_err(req, '400', 'GET with invalid characters in b64 finishes with 400')
-        end
+		local req = assert(req_templ:clone())
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path', '/doh?dns=' .. basexx.to_url64(string.rep('\0', 200)) .. '@#$%?!')
+		check_err(req, '400', 'GET with invalid characters in b64 finishes with 400')
+	end
 
 	local function test_unsupp_method()
 		local req = assert(req_templ:clone())
