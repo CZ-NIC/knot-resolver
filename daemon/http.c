@@ -377,8 +377,8 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *buf,
 
 	ret = nghttp2_session_mem_recv(ctx->h2, buf, nread);
 	if (ret < 0) {
-		kr_log_error("[http] nghttp2_session_mem_recv failed: %s (%zd)\n",
-			     nghttp2_strerror(ret), ret);
+		kr_log_verbose("[http] nghttp2_session_mem_recv failed: %s (%zd)\n",
+			       nghttp2_strerror(ret), ret);
 		return kr_error(EIO);
 	}
 
