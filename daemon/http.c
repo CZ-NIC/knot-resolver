@@ -146,7 +146,10 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 		return 0;
 
 	beg += sizeof(key) - 1;
-	end = strchrnul(beg, '&');
+	end = strchr(beg, '&');
+	if (end == NULL)
+		end = beg + strlen(beg);
+
 	ctx->buf_pos = sizeof(uint16_t);  /* Reserve 2B for dnsmsg len. */
 	remaining = ctx->buf_size - ctx->submitted - ctx->buf_pos;
 	dest = ctx->buf + ctx->buf_pos;
