@@ -156,7 +156,7 @@ local function deserialize_lua(serial)
 	assert(type(serial) == 'string')
 	local deserial_func = loadstring('return ' .. serial)
 	if type(deserial_func) ~= 'function' then
-		panic('insput is not a valid Lua expression')
+		panic('input is not a valid Lua expression')
 	end
 	return deserial_func()
 end
