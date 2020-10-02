@@ -13,6 +13,8 @@
 #include "daemon/worker.h"
 #include "daemon/tls.h"
 #include "daemon/session.h"
+#include "contrib/cleanup.h"
+#include "lib/utils.h"
 
 #define negotiate_bufsize(func, handle, bufsize_want) do { \
     int bufsize = 0; (func)((handle), &bufsize); \
@@ -435,6 +437,19 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
 	return 0;
 }
 
+
+enum io_stream_mode {
+	io_mode_text = 0,
+	io_mode_binary = 1,
+};
+
+struct io_stream_data {
+	enum io_stream_mode mode;
+	size_t blen; ///< length of `buf`
+	char *buf;  ///< growing buffer residing on `pool` (mp_append_*)
+	knot_mm_t *pool;
+};
+
 /**
  * TTY control: process input and free() the buffer.
  *
@@ -444,114 +459,141 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
  */
 void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
-	char *commands = buf ? buf->base : NULL; /* To be free()d on return. */
+	auto_free char *commands = buf ? buf->base : NULL;
 
 	/* Set output streams */
 	FILE *out = stdout;
-	uv_os_fd_t stream_fd = 0;
+	uv_os_fd_t stream_fd = -1;
 	struct args *args = the_args;
-	if (uv_fileno((uv_handle_t *)stream, &stream_fd)) {
+	struct io_stream_data *data = (struct io_stream_data*) stream->data;
+	if (nread < 0 || uv_fileno((uv_handle_t *)stream, &stream_fd)) {
+		mp_delete(data->pool->ctx);
 		uv_close((uv_handle_t *)stream, (uv_close_cb) free);
-		free(commands);
+		return;
+	}
+	if (nread <= 0) {
 		return;
 	}
 	if (stream_fd != STDIN_FILENO) {
-		if (nread < 0) { /* Close if disconnected */
-			uv_close((uv_handle_t *)stream, (uv_close_cb) free);
-		}
-		if (nread <= 0) {
-			free(commands);
-			return;
-		}
 		uv_os_fd_t dup_fd = dup(stream_fd);
 		if (dup_fd >= 0) {
 			out = fdopen(dup_fd, "w");
 		}
 	}
 
-	char *cmd = NULL;
-	/* Execute */
-	if (stream && commands && nread > 0) {
-		/* Ensure commands is 0-terminated */
-		if (commands[nread - 1] == '\n') {
-			commands[nread - 1] = '\0';
-		} else {
-			if (nread >= buf->len) { /* only equality should be possible */
-				char *newbuf = realloc(commands, nread + 1);
-				if (!newbuf)
-					goto finish;
-				commands = newbuf;
-			}
-			commands[nread] = '\0';
-		}
+	/** The current single command and the remaining command(s). */
+	char *cmd, *cmd_next = NULL;
+	bool incomplete_cmd = false;
 
-		const char *delim = args->quiet ? "" : "> ";
-
-		/* No command, just new line */
-		if (nread == 1 && args->tty_binary_output == false && commands[nread-1] == '\0') {
-			if (stream_fd != STDIN_FILENO) {
-				fprintf(out, "%s", delim);
-			}
-			if (stream_fd == STDIN_FILENO || VERBOSE_STATUS) {
-				fprintf(stdout, "%s", delim);
-			}
-		}
-
-		cmd = strtok(commands, "\n");
-		while (cmd != NULL) {
-			/* Pseudo-command for switching to "binary output"; */
-			if (strcmp(cmd, "__binary") == 0) {
-				args->tty_binary_output = true;
-				cmd = strtok(NULL, "\n");
-				continue;
-			}
-
-			lua_State *L = the_worker->engine->L;
-			int ret = engine_cmd(L, cmd, false);
-			const char *message = "";
-			if (lua_gettop(L) > 0) {
-				message = lua_tostring(L, -1);
-			}
-
-			/* Simpler output in binary mode */
-			if (args->tty_binary_output) {
-				size_t len_s = strlen(message);
-				if (len_s > UINT32_MAX) {
-					cmd = strtok(NULL, "\n");
-					continue;
-				}
-				uint32_t len_n = htonl(len_s);
-				fwrite(&len_n, sizeof(len_n), 1, out);
-				fwrite(message, len_s, 1, out);
-				lua_settop(L, 0);
-				cmd = strtok(NULL, "\n");
-				continue;
-			}
-			/* Log to remote socket if connected */
-			if (stream_fd != STDIN_FILENO) {
-				if (VERBOSE_STATUS)
-					fprintf(stdout, "%s\n", cmd); /* Duplicate command to logs */
-				if (message)
-					fprintf(out, "%s", message); /* Duplicate output to sender */
-				if (message || !args->quiet)
-					fprintf(out, "\n");
-				fprintf(out, "%s", delim);
-			}
-			if (stream_fd == STDIN_FILENO || VERBOSE_STATUS) {
-				/* Log to standard streams */
-				FILE *fp_out = ret ? stderr : stdout;
-				if (message)
-					fprintf(fp_out, "%s", message);
-				if (message || !args->quiet)
-					fprintf(fp_out, "\n");
-				fprintf(fp_out, "%s", delim);
-			}
-			lua_settop(L, 0);
-			cmd = strtok(NULL, "\n");
-		}
+	if (!(stream && commands && nread > 0)) {
+		goto finish;
 	}
+	/* Execute */
+
+	if (commands[nread - 1] != '\n') {
+		incomplete_cmd = true;
+	}
+	/* Ensure commands is 0-terminated */
+	if (nread >= buf->len) { /* only equality should be possible */
+		char *newbuf = realloc(commands, nread + 1);
+		if (!newbuf)
+			goto finish;
+		commands = newbuf;
+	}
+	commands[nread] = '\0';
+
+	char *boundary = "\n\0";
+	cmd = strtok(commands, "\n");
+	/* strtok skip '\n' but we need process alone '\n' too */
+	if (commands[0] == '\n') {
+		cmd_next = cmd;
+		cmd = boundary;
+	} else {
+		cmd_next = strtok(NULL, "\n");
+	}
+
+	/** Moving pointer to end of buffer with incomplete command. */
+	char *pbuf = data->buf + data->blen;
+	lua_State *L = the_worker->engine->L;
+	while (cmd != NULL) {
+		/* Last command is incomplete - save it and execute later */
+		if (incomplete_cmd && cmd_next == NULL) {
+			pbuf = mp_append_string(data->pool->ctx, pbuf, cmd);
+			mp_append_char(data->pool->ctx, pbuf, '\0');
+			data->buf = mp_ptr(data->pool->ctx);
+			data->blen = data->blen + strlen(cmd);
+
+			/* There is new incomplete command */
+			if (commands[nread - 1] == '\n')
+				incomplete_cmd = false;
+			goto next_iter;
+		}
+
+		/* Process incomplete command from previously call */
+		if (data->blen > 0) {
+			if (commands[0] != '\n' && commands[0] != '\0') {
+				pbuf = mp_append_string(data->pool->ctx, pbuf, cmd);
+				mp_append_char(data->pool->ctx, pbuf, '\0');
+				data->buf = mp_ptr(data->pool->ctx);
+				cmd = data->buf;
+			} else {
+				cmd = data->buf;
+			}
+			data->blen = 0;
+			pbuf = data->buf;
+		}
+
+		/* Pseudo-command for switching to "binary output"; */
+		if (strcmp(cmd, "__binary") == 0) {
+			data->mode = io_mode_binary;
+			goto next_iter;
+		}
+
+		int ret = engine_cmd(L, cmd, false);
+		const char *message = "";
+		if (lua_gettop(L) > 0) {
+			message = lua_tostring(L, -1);
+		}
+
+		/* Simpler output in binary mode */
+		if (data->mode == io_mode_binary) {
+			size_t len_s = strlen(message);
+			if (len_s > UINT32_MAX) {
+				goto next_iter;
+			}
+			uint32_t len_n = htonl(len_s);
+			fwrite(&len_n, sizeof(len_n), 1, out);
+			fwrite(message, len_s, 1, out);
+			goto next_iter;
+		}
+
+		/* Log to remote socket if connected */
+		const char *delim = args->quiet ? "" : "> ";
+		if (stream_fd != STDIN_FILENO) {
+			if (VERBOSE_STATUS)
+				fprintf(stdout, "%s\n", cmd); /* Duplicate command to logs */
+			if (message)
+				fprintf(out, "%s", message); /* Duplicate output to sender */
+			if (message || !args->quiet)
+				fprintf(out, "\n");
+			fprintf(out, "%s", delim);
+		}
+		if (stream_fd == STDIN_FILENO || VERBOSE_STATUS) {
+			/* Log to standard streams */
+			FILE *fp_out = ret ? stderr : stdout;
+			if (message)
+				fprintf(fp_out, "%s", message);
+			if (message || !args->quiet)
+				fprintf(fp_out, "\n");
+			fprintf(fp_out, "%s", delim);
+		}
+	next_iter:
+		lua_settop(L, 0); /* not required in some cases but harmless */
+		cmd = cmd_next;
+		cmd_next = strtok(NULL, "\n");
+	}
+
 finish:
-	free(commands);
 	/* Close if redirected */
 	if (stream_fd != STDIN_FILENO) {
 		fclose(out);
@@ -564,14 +606,39 @@ void io_tty_alloc(uv_handle_t *handle, size_t suggested, uv_buf_t *buf)
 	buf->base = malloc(suggested);
 }
 
+struct io_stream_data *io_tty_alloc_data() {
+	knot_mm_t _pool = {
+		.ctx = mp_new(4096),
+		.alloc = (knot_mm_alloc_t) mp_alloc,
+	};
+	knot_mm_t *pool = mm_alloc(&_pool, sizeof(*pool));
+	if (!pool) {
+		return NULL;
+	}
+	memcpy(pool, &_pool, sizeof(*pool));
+
+	struct io_stream_data *data = mm_alloc(pool, sizeof(struct io_stream_data));
+
+	data->buf = mp_start(pool->ctx, 512);
+	data->mode = io_mode_text;
+	data->blen = 0;
+	data->pool = pool;
+
+	return data;
+}
+
 void io_tty_accept(uv_stream_t *master, int status)
 {
-	uv_tcp_t *client = malloc(sizeof(*client));
+	struct io_stream_data *data = io_tty_alloc_data();
+	/* We can't use any allocations after mp_start() and it's easier anyway. */
+	uv_pipe_t *client = malloc(sizeof(*client));
+	client->data = data;
+
 	struct args *args = the_args;
-	if (client) {
-		 uv_tcp_init(master->loop, client);
+	if (client && client->data) {
+		 uv_pipe_init(master->loop, client, 0);
 		 if (uv_accept(master, (uv_stream_t *)client) != 0) {
-			free(client);
+			mp_delete(data->pool->ctx);
 			return;
 		 }
 		 uv_read_start((uv_stream_t *)client, io_tty_alloc, io_tty_process_input);
