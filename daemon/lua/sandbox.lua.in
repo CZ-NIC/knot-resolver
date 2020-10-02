@@ -705,7 +705,7 @@ function map(cmd, format)
 				s:write('__binary\n')
 				recv = s:read(2)
 				if format == 'luaobj' then
-					s:write('require("krprint").serialize_lua('..cmd..')')
+					s:write('require("krprint").serialize_lua('..cmd..')\n')
 				else
 					s:write(cmd..'\n')
 				end
