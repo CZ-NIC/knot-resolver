@@ -16,10 +16,10 @@ local function serve_doh(h, stream)
 	if method == 'POST' then
 		input = stream:get_body_chars(1025, 2)  -- read timeout = KR_CONN_RTT_MAX
 	elseif method == 'GET' then
-		local input_b64 = string.match(h:get(':path'), '^/doh%?dns=([a-zA-Z0-9_-]+)$') or
-				string.match(h:get(':path'), '^/doh%?dns=([a-zA-Z0-9_-]+)&') or
-				string.match(h:get(':path'), '^/doh%?.*&dns=([a-zA-Z0-9_-]+)$') or
-				string.match(h:get(':path'), '^/doh%?.*&dns=([a-zA-Z0-9_-]+)&')
+		local input_b64 = string.match(h:get(':path'), '^/[^?]*%?dns=([a-zA-Z0-9_-]+)$') or
+				string.match(h:get(':path'), '^/[^?]*%?dns=([a-zA-Z0-9_-]+)&') or
+				string.match(h:get(':path'), '^/[^?]*%?.*&dns=([a-zA-Z0-9_-]+)$') or
+				string.match(h:get(':path'), '^/[^?]*%?.*&dns=([a-zA-Z0-9_-]+)&')
 		if not input_b64 then
 			return 400, 'base64url query not found'
 		end
@@ -116,6 +116,7 @@ end
 -- Export endpoints
 return {
 	endpoints = {
-		['/doh']   = {'text/plain', serve_doh, nil, nil, true},
+		['/doh'] = {'text/plain', serve_doh, nil, nil, true},
+		['/dns-query'] = {'text/plain', serve_doh, nil, nil, true},
 	}
 }
