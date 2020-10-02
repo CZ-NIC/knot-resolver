@@ -1,7 +1,10 @@
 Knot Resolver 5.2.0 (2020-1m-dd)
 ================================
 
+Improvements
+------------
 - net: split the EDNS buffer size into upstream and downstream (!1026)
+- lua-http doh: answer to /dns-query endpoint as well as /doh (!1069)
 
 
 Knot Resolver 5.1.3 (2020-09-08)
