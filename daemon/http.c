@@ -215,7 +215,7 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
  * We use a single DNS message buffer for the entire connection. Therefore, we
  * don't support interweaving DATA chunks from different streams. To successfully
  * parse multiple subsequent streams, each one must be fully received before
- * processing a new stream.
+ * processing a new stream. See https://gitlab.nic.cz/knot/knot-resolver/-/issues/619
  */
 static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t stream_id,
 				    const uint8_t *data, size_t len, void *user_data)
