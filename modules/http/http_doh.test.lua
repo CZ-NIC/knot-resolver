@@ -360,6 +360,24 @@ else
 		modules.unload('view')
 	end
 
+	local function test_dns_query_endpoint()
+		local desc = 'valid POST query which ends with SERVFAIL on /dns-query'
+		local request = require('http.request')
+		uri_templ = string.format('http://%s:%d/dns-query', host, port)
+		req = assert(request.new_from_uri(uri_templ))
+		req.headers:upsert('content-type', 'application/dns-message')
+		req.headers:upsert(':method', 'POST')
+		req:set_body(basexx.from_base64(  -- servfail.test. A
+			'FZUBAAABAAAAAAAACHNlcnZmYWlsBHRlc3QAAAEAAQ=='))
+		local headers, pkt = check_ok(req, desc)
+		if not (headers and pkt) then
+			return
+		end
+		-- uncacheable
+		same(headers:get('cache-control'), 'max-age=0', desc .. ': TTL 0')
+		same(pkt:rcode(), kres.rcode.SERVFAIL, desc .. ': rcode matches')
+	end
+
 --	not implemented
 --	local function test_post_unsupp_accept()
 --		local req = assert(req_templ:clone())
@@ -393,7 +411,8 @@ else
 		test_get_invalid_chars,
 		test_unsupp_method,
 		test_dstaddr,
-		test_srcaddr
+		test_srcaddr,
+		test_dns_query_endpoint,
 	}
 
 	return tests
