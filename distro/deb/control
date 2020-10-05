@@ -88,7 +88,7 @@ Depends:
  ${shlibs:Depends},
 Breaks:
  knot-resolver-module-tinyweb (<< 1.1.0~git20160713-1~),
-Description: HTTP/2 module for Knot Resolver
+Description: HTTP module for Knot Resolver
  The Knot Resolver is a caching full resolver implementation
  written in C and LuaJIT, including both a resolver library and a
  daemon. Modular architecture of the library keeps the core tiny and
