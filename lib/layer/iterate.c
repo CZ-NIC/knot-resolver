@@ -609,15 +609,17 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 		}
 		/* The validator still can't handle multiple zones in one answer,
 		 * so we only follow if a single label is replaced.
-		 * TODO: this still isn't 100%, as the target might have a NS+DS,
-		 * possibly leading to a SERVFAIL for the in-bailiwick name. */
+		 * Forwarding appears to be even more sensitive to this.
+		 * TODO: iteration can probably handle the remaining cases,
+		 * but overall it would be better to have a smarter validator
+		 * (and thus save roundtrips).*/
 		const int pending_labels = knot_dname_labels(pending_cname, NULL);
 		if (pending_labels != cname_labels) {
 			cname = pending_cname;
 			break;
 		}
-		if (knot_dname_matched_labels(pending_cname, cname) !=
-		    (cname_labels - 1)) {
+		if (knot_dname_matched_labels(pending_cname, cname) != cname_labels - 1
+		    || query->flags.FORWARD) {
 			cname = pending_cname;
 			break;
 		}
