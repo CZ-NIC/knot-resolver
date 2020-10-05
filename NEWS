@@ -23,6 +23,7 @@ Incompatible changes
 --------------------
 - minor changes in module API; see upgrading guide:
   https://knot-resolver.readthedocs.io/en/stable/upgrading.html
+- fix SERVFAIL while processing forwarded CNAME to a sibling zone (#614, !1070)
 
 
 Knot Resolver 5.1.3 (2020-09-08)
