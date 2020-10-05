@@ -3,8 +3,7 @@ programs:
 - name: kresd
   binary: kresd
   additional:
-    - -f
-    - "1"
+    - --noninteractive
   templates:
     - modules/view/tsig.test.integr/kresd_config.j2
     - tests/integration/hints_zone.j2
