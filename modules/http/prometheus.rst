@@ -5,6 +5,11 @@
 Prometheus metrics endpoint
 ---------------------------
 
+.. note:: These statistics are per-instance. When multiple kresd instances
+   bound to the same webmgmt port, any of them can answer the HTTP request,
+   which may lead to unexpected results.  Use graphite module to collect
+   statistics from multiple instances. For other possibilities, see `#620`_.
+
 The :ref:`HTTP module <mod-http>` exposes ``/metrics`` endpoint that serves metrics
 from :ref:`mod-stats` in Prometheus_ text format.
 You can use it as soon as HTTP module is configured:
@@ -43,3 +48,4 @@ You can also add custom metrics or rewrite existing metrics before they are retu
         end
 
 .. _Prometheus: https://prometheus.io
+.. _`#620`: https://gitlab.nic.cz/knot/knot-resolver/-/issues/620
