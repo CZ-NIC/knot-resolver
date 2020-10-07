@@ -16,7 +16,7 @@ static inline void _cleanup_free(char **p) {
 }
 #define auto_close __attribute__((cleanup(_cleanup_close)))
 static inline void _cleanup_close(int *p) {
-	if (*p > 0) close(*p);
+	if (*p != -1) close(*p);
 }
 #define auto_fclose __attribute__((cleanup(_cleanup_fclose)))
 static inline void _cleanup_fclose(FILE **p) {
