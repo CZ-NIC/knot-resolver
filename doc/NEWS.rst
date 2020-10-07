@@ -17,7 +17,7 @@ Major version
     * Manual upgrade steps might be necessary, please follow instructions in :ref:`Upgrading` section.
     * Major releases may contain significant changes including changes to configuration format.
     * We might release a new major also when an internal implementation details were changed significantly.
-      *May contain traces of nuts.*
+      *May contain traces of bugs.*
 
 Minor version
    * Configuration stays compatible with the previous version, except for undocumented or very obscure options.
