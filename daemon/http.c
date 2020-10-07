@@ -441,14 +441,12 @@ static int http_send_response(nghttp2_session *h2, char *size, size_t size_len,
 	ret = nghttp2_submit_response(h2, stream_id, hdrs, sizeof(hdrs)/sizeof(*hdrs), prov);
 	if (ret != 0) {
 		kr_log_verbose("[http] nghttp2_submit_response failed: %s\n", nghttp2_strerror(ret));
-		on_pkt_write(data, kr_error(EIO));
 		return kr_error(EIO);
 	}
 
 	ret = nghttp2_session_set_stream_user_data(h2, stream_id, (void*)data);
 	if (ret != 0) {
 		kr_log_verbose("[http] failed to set stream user data: %s\n", nghttp2_strerror(ret));
-		on_pkt_write(data, kr_error(EIO));
 		return kr_error(EIO);
 	}
 
