@@ -10,6 +10,28 @@ This section summarizes steps required when upgrading to newer Knot Resolver ver
 We advise users to also read :ref:`release_notes` for respective versions.
 Section *Module changes* is relevant only for users who develop or use third-party modules.
 
+Version numbering
+=================
+Version number format is ``major.minor.patch``.
+Leftmost number which was changed signalizes what to expect when upgrading:
+
+Major version
+    * Manual upgrade steps might be necessary, please follow instructions in Upgrading guide (this document).
+    * Major releases contain significant changes including changes to configuration format.
+    * We might release new major also when internal implementation details were changed significantly. *May contain nuts.*
+
+Minor version
+   * Configuration stays compatible with the previous version, except for undocumented or very obscure options.
+   * Users who use modules shipped as part of Knot Resolver distribution are expected to upgrade without manual steps.
+   * Incompatible changes in internal APIs are allowed in minor versions, i.e. users who develop or use custom modules
+     (i.e. modules not distributed together with Knot Resolver) need to double check their own code for incompatibilities.
+     Upgrading guide should contain hints for module authors.
+
+Patch version
+    * Everything should be compatible including API for modules.
+    * Custom modules might need to be recompiled, i.e. ABI compatibility is not guaranteed.
+
+
 Upcoming changes
 ================
 
