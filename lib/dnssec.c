@@ -193,14 +193,15 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 	}
 
 	for (uint16_t i = 0; i < vctx->rrs->len; ++i) {
-		/* Consider every RRSIG that matches owner and covers the class/type. */
+		/* Consider every RRSIG that matches and comes from the same query. */
 		const knot_rrset_t *rrsig = vctx->rrs->at[i]->rr;
-		if (rrsig->type != KNOT_RRTYPE_RRSIG) {
+		const bool ok = vctx->rrs->at[i]->qry_uid == vctx->qry_uid
+			&& rrsig->type == KNOT_RRTYPE_RRSIG
+			&& rrsig->rclass == covered->rclass
+			&& knot_dname_is_equal(rrsig->owner, covered->owner);
+		if (!ok)
 			continue;
-		}
-		if ((covered->rclass != rrsig->rclass) || !knot_dname_is_equal(covered->owner, rrsig->owner)) {
-			continue;
-		}
+
 		knot_rdata_t *rdata_j = rrsig->rrs.rdata;
 		for (uint16_t j = 0; j < rrsig->rrs.count; ++j, rdata_j = knot_rdataset_next(rdata_j)) {
 			int val_flgs = 0;
