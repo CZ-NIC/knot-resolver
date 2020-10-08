@@ -5,6 +5,7 @@ Improvements
 ------------
 - net: split the EDNS buffer size into upstream and downstream (!1026)
 - lua-http doh: answer to /dns-query endpoint as well as /doh (!1069)
+- improve resiliency against UDP fragmentation attacks (disable PMTUD) (!1061)
 
 Bugfixes
 --------
