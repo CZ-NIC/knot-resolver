@@ -21,7 +21,7 @@ Major version
 Minor version
    * Configuration stays compatible with the previous version, except for undocumented or very obscure options.
    * Upgrade should be seamless for users who use modules shipped as part of Knot Resolver distribution.
-   * Incompatible changes in internal APIs are allowed in minor versions, i.e. users who develop or use custom modules
+   * Incompatible changes in internal APIs are allowed in minor versions. Users who develop or use custom modules
      (i.e. modules not distributed together with Knot Resolver) need to double check their modules for incompatibilities.
      :ref:`Upgrading` section should contain hints for module authors.
 
