@@ -5,7 +5,7 @@
 pkgname=knot-resolver
 pkgver=__VERSION__
 pkgrel=1
-pkgdesc='full caching DNS resolver implementation'
+pkgdesc='caching DNSSEC-validating DNS resolver'
 url='https://www.knot-resolver.cz/'
 arch=('x86_64' 'armv7h')
 license=('GPL3')
@@ -15,7 +15,7 @@ install=install
 depends=(
     'dnssec-anchors'
     'gnutls'
-    'knot>=2.8'
+    'knot>=2.9'
     'libedit'
     'libuv'
     'lmdb'
