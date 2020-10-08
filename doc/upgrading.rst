@@ -10,6 +10,7 @@ This section summarizes steps required when upgrading to newer Knot Resolver ver
 We advise users to also read :ref:`release_notes` for respective versions.
 Section *Module changes* is relevant only for users who develop or use third-party modules.
 
+
 Upcoming changes
 ================
 
