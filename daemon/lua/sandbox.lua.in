@@ -694,7 +694,9 @@ function map(cmd, format)
 		end
 
 		if local_exec then
-			table.insert(results, eval_cmd(cmd, format == 'luaobj'))
+			local ret = eval_cmd(cmd, format == 'luaobj')
+			-- crop to a single return value similarly to original map()
+			table.insert(results, ret)
 		else
 			local s = socket.connect({ path = worker.control_path..file })
 			s:setmode('bn', 'bn')
