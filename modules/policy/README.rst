@@ -110,10 +110,10 @@ Following actions stop the policy matching on the query, i.e. other rules are no
 
    .. code-block:: lua
 
-    -- Whitelist 'www.badboy.cz'
-    policy.add(policy.pattern(policy.PASS, todname('www.badboy.cz.')))
-    -- Block all names below badboy.cz
-    policy.add(policy.suffix(policy.DENY, {todname('badboy.cz.')}))
+    -- Whitelist 'good.example.com'
+    policy.add(policy.pattern(policy.PASS, todname('good.example.com.')))
+    -- Block all names below example.com
+    policy.add(policy.suffix(policy.DENY, {todname('example.com.')}))
 
 .. py:attribute:: DENY
 
