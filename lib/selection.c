@@ -36,7 +36,7 @@ void *prefix_key(const uint8_t *ip, size_t len) {
 
 #undef PREFIX
 
-#define DEFAULT_TIMEOUT 400
+#define DEFAULT_TIMEOUT 800
 #define MAX_TIMEOUT 10000
 #define MAX_BACKOFF 5
 
