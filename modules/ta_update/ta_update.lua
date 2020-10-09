@@ -320,10 +320,6 @@ function ta_update.start(zname, managed)
 	if not keyset then
 		panic('[ta_update] TA must be configured first before tracking it')
 	end
-	if not keyset.managed then
-		warn('[ta_update] TA is configured as unmanaged; we recommended remove it and '
-			.. 'add it again as managed using trust_anchors.add_file()')
-	end
 	refresh_plan(keyset, 0, managed)
 end
 
