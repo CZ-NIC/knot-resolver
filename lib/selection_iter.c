@@ -14,7 +14,7 @@
 
 // To be held per query and locally
 struct iter_local_state {
-	trie_t *unresolved_names;
+	trie_t *names;
 	trie_t *addresses;
 	unsigned int generation; // Used to distinguish old and valid records in tries
 };
@@ -22,6 +22,8 @@ struct iter_local_state {
 // To be held per NS name and locally
 struct iter_name_state {
 	unsigned int generation;
+	bool a_resolved;
+	bool aaaa_resolved;
 };
 
 void iter_local_state_alloc(struct knot_mm *mm, void **local_state) {
@@ -79,10 +81,10 @@ void iter_update_state_from_rtt_cache(struct iter_local_state *local_state, stru
 
 
 void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct kr_zonecut *zonecut, struct knot_mm *mm) {
-	if (local_state->unresolved_names == NULL || local_state->addresses == NULL) {
+	if (local_state->names == NULL || local_state->addresses == NULL) {
 		// Local state initialization
 		memset(local_state, 0, sizeof(struct iter_local_state));
-		local_state->unresolved_names = trie_create(mm);
+		local_state->names = trie_create(mm);
 		local_state->addresses = trie_create(mm);
 	}
 
@@ -95,29 +97,37 @@ void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct
 		knot_dname_t *dname = (knot_dname_t *)trie_it_key(it, NULL);
 		pack_t *addresses = (pack_t *)*trie_it_val(it);
 
+		trie_val_t *val = trie_get_ins(local_state->names, (char *)dname, knot_dname_size(dname));
+		if (!*val) {
+			// that we encountered for the first time
+			*val = mm_alloc(mm, sizeof(struct iter_name_state));
+			memset(*val, 0, sizeof(struct iter_name_state));
+		}
+		struct iter_name_state *name_state = *(struct iter_name_state **)val;
+
 		if (addresses->len == 0) {
 			// Name with no address
-			trie_val_t *val = trie_get_ins(local_state->unresolved_names, (char *)dname, knot_dname_size(dname));
-			if (!*val) {
-				// that we encountered for the first time
-				*val = mm_alloc(mm, sizeof(struct iter_name_state));
-				memset(*val, 0, sizeof(struct iter_name_state));
-			}
-			(*(struct iter_name_state **)val)->generation = current_generation;
+			name_state->generation = current_generation;
 		} else {
 			// We have some addresses to work with, let's iterate over them
 			for(uint8_t *obj = pack_head(*addresses); obj != pack_tail(*addresses); obj = pack_obj_next(obj)) {
 				uint8_t *address = pack_obj_val(obj);
 				size_t address_len = pack_obj_len(obj);
-				trie_val_t *val = trie_get_ins(local_state->addresses, (char *)address, address_len);
-				if (!*val) {
+				trie_val_t *tval = trie_get_ins(local_state->addresses, (char *)address, address_len);
+				if (!*tval) {
 					// We have have not seen this address before.
-					*val = mm_alloc(mm, sizeof(struct address_state));
-					memset(*val, 0, sizeof(struct address_state));
+					*tval = mm_alloc(mm, sizeof(struct address_state));
+					memset(*tval, 0, sizeof(struct address_state));
 				}
-				struct address_state *address_state = (*(struct address_state **)val);
+				struct address_state *address_state = (*(struct address_state **)tval);
 				address_state->generation = current_generation;
 				address_state->name = dname;
+
+				if (address_len == sizeof(struct in_addr)) {
+					name_state->a_resolved = true;
+				} else if (address_len == sizeof(struct in6_addr)) {
+					name_state->aaaa_resolved = true;
+				}
 			}
 		}
 	}
@@ -153,10 +163,10 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 	trie_it_free(it);
 
 	int num_addresses = trie_weight(local_state->addresses);
-	int num_unresolved_names = trie_weight(local_state->unresolved_names);
+	int num_names = trie_weight(local_state->names);
 
 	struct choice choices[num_addresses]; // Some will get unused, oh well
-	knot_dname_t *unresolved_names[num_unresolved_names];
+	struct to_resolve unresolved_types[2*num_names];
 
 	int valid_addresses = 0;
 	for(it = trie_it_begin(local_state->addresses); !trie_it_finished(it); trie_it_next(it)) {
@@ -176,20 +186,25 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 
 	trie_it_free(it);
 
-	int to_resolve = 0;
-	for(it = trie_it_begin(local_state->unresolved_names); !trie_it_finished(it); trie_it_next(it)) {
+	int num_to_resolve = 0;
+	for(it = trie_it_begin(local_state->names); !trie_it_finished(it); trie_it_next(it)) {
 		struct iter_name_state *name_state = *(struct iter_name_state **)trie_it_val(it);
 		if (name_state->generation == local_state->generation) {
 			knot_dname_t *name = (knot_dname_t *)trie_it_key(it, NULL);
-			unresolved_names[to_resolve++] = name;
+			if (!name_state->a_resolved) {
+				unresolved_types[num_to_resolve++] = (struct to_resolve){name, KR_TRANSPORT_RESOLVE_A};
+			}
+			if (!name_state->aaaa_resolved) {
+				unresolved_types[num_to_resolve++] = (struct to_resolve){name, KR_TRANSPORT_RESOLVE_AAAA};
+			}
 		}
 	}
 
 	trie_it_free(it);
 
-	if (valid_addresses || to_resolve) {
+	if (valid_addresses || num_to_resolve) {
 		bool tcp = qry->flags.TCP | qry->server_selection.truncated;
-		*transport = choose_transport(choices, valid_addresses, unresolved_names, to_resolve, qry->server_selection.timeouts, mempool, tcp, NULL);
+		*transport = choose_transport(choices, valid_addresses, unresolved_types, num_to_resolve, qry->server_selection.timeouts, mempool, tcp, NULL);
 	} else {
 		*transport = NULL;
 	}
