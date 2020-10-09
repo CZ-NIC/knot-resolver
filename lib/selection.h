@@ -34,7 +34,22 @@ enum kr_selection_error {
 	KR_SELECTION_DNSSEC_ERROR,
 	KR_SELECTION_LAME_DELEGATION,
 
-	KR_SELECTION_NUMBER_OF_ERRORS /**< Leave this last, as it is use as array size. */
+	KR_SELECTION_NUMBER_OF_ERRORS /**< Leave this last, as it is used as array size. */
+};
+
+static const bool UNRECOVERABLE_ERRORS[] = {
+	[KR_SELECTION_TIMEOUT] = false,
+	[KR_SELECTION_TLS_HANDSHAKE_FAILED] = false,
+	[KR_SELECTION_TCP_CONNECT_FAILED] = false,
+	[KR_SELECTION_TCP_CONNECT_TIMEOUT] = false,
+	[KR_SELECTION_REFUSED] = true,
+	[KR_SELECTION_SERVFAIL] = true,
+	[KR_SELECTION_FORMERROR] = true,
+	[KR_SELECTION_NOTIMPL] = true,
+	[KR_SELECTION_OTHER_RCODE] = true,
+	[KR_SELECTION_TRUNCATED] = false,
+	[KR_SELECTION_DNSSEC_ERROR] = true,
+	[KR_SELECTION_LAME_DELEGATION] = true,
 };
 
 enum kr_transport_protocol {
@@ -128,6 +143,7 @@ struct address_state {
 
 	int forward_index;
 	int error_count;
+	int unrecoverable_errors;
 	int errors[KR_SELECTION_NUMBER_OF_ERRORS];
 };
 
