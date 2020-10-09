@@ -508,14 +508,8 @@ static int lockfile_get(const char *path)
 static int lockfile_release(const char *path, int fd)
 {
 	assert(path && fd > 0); // fd == 0 is surely a mistake, in our case at least
-	int err = 0;
-	// To avoid a race, we unlink it first.
-	if (unlink(path))
-		err = kr_error(errno);
-	// And we try to close it even on error.
-	if (close(fd) && !err)
-		err = kr_error(errno);
-	return err;
+	int err = close(fd);
+	return kr_error(errno);
 }
 
 static int cdb_clear(knot_db_t *db, struct kr_cdb_stats *stats)
