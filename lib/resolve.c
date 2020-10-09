@@ -1184,7 +1184,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 }
 
 
-int ns_resolve_addr(struct kr_query *qry, struct kr_request *param, struct kr_transport *transport)
+int ns_resolve_addr(struct kr_query *qry, struct kr_request *param, struct kr_transport *transport, uint16_t next_type)
 {
 	struct kr_rplan *rplan = &param->rplan;
 	struct kr_context *ctx = param->ctx;
@@ -1193,16 +1193,11 @@ int ns_resolve_addr(struct kr_query *qry, struct kr_request *param, struct kr_tr
 	/* Start NS queries from root, to avoid certain cases
 	 * where a NS drops out of cache and the rest is unavailable,
 	 * this would lead to dependency loop in current zone cut.
-	 * Prefer IPv6 and continue with IPv4 if not available.
 	 */
-	uint16_t next_type = 0;
-	if (!(qry->flags.AWAIT_IPV6) &&
-	    !(ctx->options.NO_IPV6)) {
-		next_type = KNOT_RRTYPE_AAAA;
+
+	if (next_type == KNOT_RRTYPE_AAAA) {
 		qry->flags.AWAIT_IPV6 = true;
-	} else if (!(qry->flags.AWAIT_IPV4) &&
-		   !(ctx->options.NO_IPV4)) {
-		next_type = KNOT_RRTYPE_A;
+	} else {
 		qry->flags.AWAIT_IPV4 = true;
 	}
 	/* Bail out if the query is already pending or dependency loop. */
@@ -1364,11 +1359,15 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 		return KR_STATE_PRODUCE;
 	}
 
-	if ((*transport)->protocol == KR_TRANSPORT_NOADDR) {
-		int ret = ns_resolve_addr(qry, qry->request, *transport);
+	if ((*transport)->protocol == KR_TRANSPORT_RESOLVE_A || (*transport)->protocol == KR_TRANSPORT_RESOLVE_AAAA) {
+		uint16_t type = (*transport)->protocol == KR_TRANSPORT_RESOLVE_A ? KNOT_RRTYPE_A : KNOT_RRTYPE_AAAA;
+		int ret = ns_resolve_addr(qry, qry->request, *transport, type);
 		if (ret) {
-			qry->flags.AWAIT_IPV4 = false;
-			qry->flags.AWAIT_IPV6 = false;
+			if (type == KNOT_RRTYPE_A) {
+				qry->flags.AWAIT_IPV4 = false;
+			} else {
+				qry->flags.AWAIT_IPV6 = false;
+			}
 		}
 		ITERATE_LAYERS(request, qry, reset);
 		return KR_STATE_PRODUCE;
