@@ -517,11 +517,14 @@ static int lockfile_get(const char *path)
 }
 
 /** Release and remove lockfile created by lockfile_get().  Return kr_error(). */
-static int lockfile_release(const char *path, int fd)
+static int lockfile_release(int fd)
 {
-	assert(path && fd > 0); // fd == 0 is surely a mistake, in our case at least
-	int err = close(fd);
-	return kr_error(errno);
+	assert(fd > 0); // fd == 0 is surely a mistake, in our case at least
+	if (close(fd)) {
+		return kr_error(errno);
+	} else {
+		return kr_ok();
+	}
 }
 
 static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
@@ -589,7 +592,7 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 	}
 
 	/* Environment updated, release lockfile. */
-	int lrerr = lockfile_release(lockfile, lockfile_fd);
+	int lrerr = lockfile_release(lockfile_fd);
 	if (lrerr) {
 		kr_log_error("[cache] failed to release ./krcachelock: %s\n",
 				kr_strerror(lrerr));
