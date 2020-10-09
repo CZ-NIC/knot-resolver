@@ -53,7 +53,8 @@ static const bool UNRECOVERABLE_ERRORS[] = {
 };
 
 enum kr_transport_protocol {
-	KR_TRANSPORT_NOADDR = 0, /**< Selected name with no address, it has to be resolved first.*/
+	KR_TRANSPORT_RESOLVE_A, /**< Selected name with no IPv4 address, it has to be resolved first.*/
+	KR_TRANSPORT_RESOLVE_AAAA, /**< Selected name with no IPv6 address, it has to be resolved first.*/
 	KR_TRANSPORT_UDP,
 	KR_TRANSPORT_TCP,
 	KR_TRANSPORT_TLS,
@@ -158,6 +159,17 @@ struct choice {
 };
 
 /**
+ * Array of these is description of names to be resolved (i.e. name without some address)
+ *
+ */
+struct to_resolve
+{
+	knot_dname_t *name;
+	enum kr_transport_protocol type;
+};
+
+
+/**
  * @brief Based on passed choices, choose the next transport.
  *
  * Common function to both implementations (iteration and forwarding).
@@ -172,7 +184,7 @@ struct choice {
  * @return Chosen transport or NULL when no choice is viable
  */
 struct kr_transport *choose_transport(struct choice choices[], int choices_len,
-                                      knot_dname_t *unresolved[], int unresolved_len,
+                                      struct to_resolve unresolved[], int unresolved_len,
                                       int timeouts, struct knot_mm *mempool, bool tcp,
                                       size_t *out_forward_index);
 

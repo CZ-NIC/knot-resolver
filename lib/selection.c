@@ -189,7 +189,7 @@ void shuffle_choices(struct choice choices[], int choices_len) {
 // Performs the actual selection (currently epsilon-greedy with epsilon = 0.05).
 struct kr_transport *choose_transport(struct choice choices[],
                                       int choices_len,
-                                      knot_dname_t **unresolved,
+                                      struct to_resolve *unresolved,
                                       int unresolved_len,
                                       int timeouts,
                                       struct knot_mm *mempool,
@@ -199,6 +199,8 @@ struct kr_transport *choose_transport(struct choice choices[],
 		// There is nothing to choose from :(
 		return NULL;
 	}
+
+	printf("choices %d, to_resolve %d\n", choices_len, unresolved_len);
 
 	struct kr_transport *transport = mm_alloc(mempool, sizeof(struct kr_transport));
 	memset(transport, 0, sizeof(struct kr_transport));
@@ -210,8 +212,8 @@ struct kr_transport *choose_transport(struct choice choices[],
 		if (index < unresolved_len) {
 			// We will resolve a new NS name
 			*transport = (struct kr_transport) {
-				.protocol = KR_TRANSPORT_NOADDR,
-				.name = unresolved[index]
+				.protocol = unresolved[index].type,
+				.name = unresolved[index].name
 			};
 			return transport;
 		} else {
@@ -227,9 +229,10 @@ struct kr_transport *choose_transport(struct choice choices[],
 
 	// Don't try the same server again when there are other choices to be explored
 	if (choices[choice].address_state->error_count && unresolved_len) {
+		int index = kr_rand_bytes(1) % unresolved_len;
 		*transport = (struct kr_transport) {
-			.protocol = KR_TRANSPORT_NOADDR,
-			.name = unresolved[kr_rand_bytes(1) % unresolved_len]
+			.name = unresolved[index].name,
+			.protocol = unresolved[index].type,
 		};
 		return transport;
 	}
