@@ -545,7 +545,7 @@ static int cdb_clear(knot_db_t *db, struct kr_cdb_stats *stats)
 		return lmdb_error(ret);
 	}
 	auto_free char *mdb_lockfile = kr_strcatdup(2, path, "/lock.mdb");
-	auto_free char *lockfile = kr_strcatdup(2, path, "/.cachelock");
+	auto_free char *lockfile = kr_strcatdup(2, path, "/krcachelock");
 	if (!mdb_lockfile || !lockfile) {
 		return kr_error(ENOMEM);
 	}
@@ -553,7 +553,7 @@ static int cdb_clear(knot_db_t *db, struct kr_cdb_stats *stats)
 	/* Find if we get a lock on lockfile. */
 	const int lockfile_fd = lockfile_get(lockfile);
 	if (lockfile_fd < 0) {
-		kr_log_error("[cache] clearing failed to get ./.cachelock (%s); retry later\n",
+		kr_log_error("[cache] clearing failed to get ./krcachelock (%s); retry later\n",
 				kr_strerror(lockfile_fd));
 		/* As we're out of space (almost certainly - mdb_drop didn't work),
 		 * we will retry on the next failing write operation. */
@@ -579,7 +579,7 @@ static int cdb_clear(knot_db_t *db, struct kr_cdb_stats *stats)
 	/* Environment updated, release lockfile. */
 	int lrerr = lockfile_release(lockfile, lockfile_fd);
 	if (lrerr) {
-		kr_log_error("[cache] failed to release ./.cachelock: %s\n",
+		kr_log_error("[cache] failed to release ./krcachelock: %s\n",
 				kr_strerror(lrerr));
 	}
 	return ret;
