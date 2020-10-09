@@ -1351,8 +1351,17 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 	qry->server_selection.choose_transport(qry, transport);
 
 	if (*transport == NULL) {
-		// There is no point in continuing.
-		return KR_STATE_FAIL;
+		/* Properly signal to serve_stale module. */
+		if (qry->flags.NO_NS_FOUND) {
+			ITERATE_LAYERS(request, qry, reset);
+			kr_rplan_pop(rplan, qry);
+		} else {
+			/* FIXME: This is probably quite inefficient:
+			* we go through the whole qr_task_step loop just because of the serve_stale
+			* module which might not even be loaded. */
+			qry->flags.NO_NS_FOUND = true;
+		}
+		return KR_STATE_PRODUCE;
 	}
 
 	if ((*transport)->protocol == KR_TRANSPORT_NOADDR) {
@@ -1364,6 +1373,8 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 		ITERATE_LAYERS(request, qry, reset);
 		return KR_STATE_PRODUCE;
 	}
+
+	qry->flags.SAFEMODE = qry->flags.SAFEMODE || (*transport)->safe_mode;
 
 	/* Randomize query case (if not in safe mode or turned off) */
 	qry->secret = (qry->flags.SAFEMODE || qry->flags.NO_0X20)

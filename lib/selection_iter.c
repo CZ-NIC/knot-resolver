@@ -163,7 +163,7 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 		size_t address_len;
 		uint8_t* address = (uint8_t *)trie_it_key(it, &address_len);
 		struct address_state *address_state = (struct address_state *)*trie_it_val(it);
-		if (address_state->generation == local_state->generation) {
+		if (address_state->generation == local_state->generation && !address_state->unrecoverable_errors) {
 			choices[valid_addresses] = (struct choice){
 				.address = address,
 				.address_len = address_len,

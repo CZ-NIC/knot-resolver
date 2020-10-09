@@ -359,6 +359,10 @@ void error(struct kr_query *qry, struct address_state *addr_state, const struct 
 		qry->server_selection.truncated = true;
 	}
 
+	if (UNRECOVERABLE_ERRORS[sel_error]) {
+		addr_state->unrecoverable_errors++;
+	}
+
 	addr_state->errors[sel_error]++;
 	addr_state->error_count++;
 
