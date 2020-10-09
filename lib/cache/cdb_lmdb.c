@@ -483,7 +483,7 @@ static int cdb_check_health(knot_db_t *db, struct kr_cdb_stats *stats)
 static int lockfile_get(const char *path)
 {
 	assert(path);
-	const int fd = open(path, O_CREAT|O_RDWR, S_IRUSR);
+	const int fd = open(path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
 	if (fd < 0)
 		return kr_error(errno);
 
