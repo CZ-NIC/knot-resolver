@@ -1323,8 +1323,14 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 	qry->server_selection.choose_transport(qry, transport);
 
 	if (*transport == NULL) {
-		// There is no point in continuing.
-		return KR_STATE_FAIL;
+		/* Properly signal to serve_stale module. */
+		if (qry->flags.NO_NS_FOUND) {
+			ITERATE_LAYERS(request, qry, reset);
+			kr_rplan_pop(rplan, qry);
+		} else {
+			qry->flags.NO_NS_FOUND = true;
+		}
+		return KR_STATE_PRODUCE;
 	}
 
 	if ((*transport)->protocol == KR_TRANSPORT_NOADDR) {
