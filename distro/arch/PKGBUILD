@@ -5,17 +5,14 @@
 pkgname=knot-resolver
 pkgver=__VERSION__
 pkgrel=1
-pkgdesc='caching DNSSEC-validating DNS resolver'
-url='https://www.knot-resolver.cz/'
+pkgdesc='Caching DNSSEC-validating DNS resolver'
 arch=('x86_64' 'armv7h')
+url='https://www.knot-resolver.cz/'
 license=('GPL3')
-backup=('etc/knot-resolver/kresd.conf')
-options=(debug strip)
-install=install
 depends=(
     'dnssec-anchors'
     'gnutls'
-    'knot>=2.9'
+    'knot'
     'libedit'
     'libuv'
     'lmdb'
@@ -23,44 +20,45 @@ depends=(
     'systemd'
     'libcap-ng'
 )
-optdepends=(
-    'lua51-basexx: experimental_dot_auth module',
-    'lua51-cqueues: http and dns64 module, policy.rpz() function',
-    'lua51-http: http and prefill modules, trust_anchors bootstrap',
-    'lua51-psl: policy.slice_randomize_psl() function',
-)
 makedepends=(
     'cmocka'
     'meson'
     'systemd-libs'
 )
-
+optdepends=(
+    'lua51-basexx: experimental_dot_auth module'
+    'lua51-cqueues: http and dns64 module, policy.rpz() function'
+    'lua51-http: http and prefill modules, trust_anchors bootstrap'
+    'lua51-psl: policy.slice_randomize_psl() function'
+)
+backup=('etc/knot-resolver/kresd.conf')
+options=(debug strip)
+install=install
 source=("knot-resolver_${pkgver}.orig.tar.xz")
-
 sha256sums=('SKIP')
 
 build() {
     cd "${srcdir}/${pkgname}-${pkgver}"
-    meson build_arch \
+    meson build \
         --buildtype=release \
         --prefix=/usr \
         --sbindir=bin \
-        -Dkeyfile_default=/etc/trusted-key.key \
-        -Dsystemd_files=enabled \
-        -Dclient=enabled \
-        -Dinstall_kresd_conf=enabled \
-        -Dunit_tests=enabled
-    ninja -C build_arch
+        -D keyfile_default=/etc/trusted-key.key \
+        -D systemd_files=enabled \
+        -D client=enabled \
+        -D install_kresd_conf=enabled \
+        -D unit_tests=enabled
+    ninja -C build
 }
 
 check() {
     cd "${srcdir}/${pkgname}-${pkgver}"
-    meson test -C build_arch
+    meson test -C build
 }
 
 package() {
     cd "${srcdir}/${pkgname}-${pkgver}"
-    DESTDIR=${pkgdir} ninja -C build_arch install
+    DESTDIR=${pkgdir} ninja -C build install
 
     # add kresd.target to multi-user.target.wants to support enabling kresd services
     install -d -m 0755 "${pkgdir}/usr/lib/systemd/system/multi-user.target.wants"
