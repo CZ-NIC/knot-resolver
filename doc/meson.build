@@ -27,6 +27,8 @@ if get_option('doc') == 'enabled'
   if not sphinx_build.found()
     sphinx_build = find_program('sphinx-build')
   endif
+  makeinfo = find_program('makeinfo', required: false)
+  install_info = find_program('install-info', required: false)
 
   # python dependencies: breathe, sphinx_rtd_theme
   python_breathe = run_command('python3', '-c', 'import breathe')
@@ -54,6 +56,11 @@ if get_option('doc') == 'enabled'
     join_paths(meson.current_source_dir(), 'html'),
     install_dir: doc_dir,
   )
+
+  if makeinfo.found() and install_info.found()
+    # install info docs
+    meson.add_install_script('../scripts/install-doc-info.sh')
+  endif
 endif
 
 make_doc = find_program('../scripts/make-doc.sh')
