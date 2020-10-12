@@ -19,12 +19,46 @@ struct iter_local_state {
 	unsigned int generation; // Used to distinguish old and valid records in tries
 };
 
+enum record_state {
+	RECORD_UNKNOWN,
+	RECORD_RESOLVED,
+	RECORD_TRIED
+};
+
 // To be held per NS name and locally
 struct iter_name_state {
 	unsigned int generation;
-	bool a_resolved;
-	bool aaaa_resolved;
+	enum record_state a_state;
+	enum record_state aaaa_state;
 };
+
+void update_name_state(struct kr_transport *transport, trie_t *names) {
+	if (!transport) {
+		return;
+	}
+
+	size_t name_len = knot_dname_size(transport->name);
+	trie_val_t *val = trie_get_try(names, (char *)transport->name, name_len);
+
+	if (!val) {
+		return;
+	}
+
+	struct iter_name_state *name_state = (struct iter_name_state *)*val;
+
+	switch (transport->protocol)
+	{
+	case KR_TRANSPORT_RESOLVE_A:
+		name_state->a_state = RECORD_TRIED;
+		return;
+	case KR_TRANSPORT_RESOLVE_AAAA:
+		name_state->aaaa_state = RECORD_TRIED;
+		return;
+	default:
+		return;
+	}
+
+}
 
 void iter_local_state_alloc(struct knot_mm *mm, void **local_state) {
 	*local_state = mm_alloc(mm, sizeof(struct iter_local_state));
@@ -104,15 +138,13 @@ void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct
 			memset(*val, 0, sizeof(struct iter_name_state));
 		}
 		struct iter_name_state *name_state = *(struct iter_name_state **)val;
+		name_state->generation = current_generation;
 
 		// Set addresses as unresolved as they might have fallen out of cache (TTL expired)
-		name_state->a_resolved = false;
-		name_state->aaaa_resolved = false;
+		name_state->a_state = name_state->a_state == RECORD_TRIED ? RECORD_TRIED : RECORD_UNKNOWN;
+		name_state->aaaa_state = name_state->aaaa_state == RECORD_TRIED ? RECORD_TRIED : RECORD_UNKNOWN;
 
-		if (addresses->len == 0) {
-			// Name with no address
-			name_state->generation = current_generation;
-		} else {
+		if (addresses->len > 0) {
 			// We have some addresses to work with, let's iterate over them
 			for(uint8_t *obj = pack_head(*addresses); obj != pack_tail(*addresses); obj = pack_obj_next(obj)) {
 				uint8_t *address = pack_obj_val(obj);
@@ -128,9 +160,9 @@ void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct
 				address_state->name = dname;
 
 				if (address_len == sizeof(struct in_addr)) {
-					name_state->a_resolved = true;
+					name_state->a_state = RECORD_RESOLVED;
 				} else if (address_len == sizeof(struct in6_addr)) {
-					name_state->aaaa_resolved = true;
+					name_state->aaaa_state = RECORD_RESOLVED;
 				}
 			}
 		}
@@ -185,7 +217,6 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 			};
 			valid_addresses++;
 		}
-
 	}
 
 	trie_it_free(it);
@@ -195,10 +226,10 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 		struct iter_name_state *name_state = *(struct iter_name_state **)trie_it_val(it);
 		if (name_state->generation == local_state->generation) {
 			knot_dname_t *name = (knot_dname_t *)trie_it_key(it, NULL);
-			if (!name_state->a_resolved) {
+			if (name_state->a_state == RECORD_UNKNOWN && !qry->flags.NO_IPV4) {
 				unresolved_types[num_to_resolve++] = (struct to_resolve){name, KR_TRANSPORT_RESOLVE_A};
 			}
-			if (!name_state->aaaa_resolved) {
+			if (name_state->aaaa_state == RECORD_UNKNOWN && !qry->flags.NO_IPV6) {
 				unresolved_types[num_to_resolve++] = (struct to_resolve){name, KR_TRANSPORT_RESOLVE_AAAA};
 			}
 		}
@@ -213,19 +244,23 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 		*transport = NULL;
 	}
 
+	update_name_state(*transport, local_state->names);
+
 	WITH_VERBOSE(qry) {
 		KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
 		if (*transport) {
 			KR_DNAME_GET_STR(ns_name, (*transport)->name);
 			const char *ns_str = kr_straddr(&(*transport)->address.ip);
-			if ((*transport)->protocol != KR_TRANSPORT_RESOLVE_A && (*transport)->protocol != KR_TRANSPORT_RESOLVE_AAAA) {
+			enum kr_transport_protocol proto = (*transport)->protocol;
+			if (proto != KR_TRANSPORT_RESOLVE_A && proto != KR_TRANSPORT_RESOLVE_AAAA) {
 				VERBOSE_MSG(qry,
 				"=> id: '%05u' choosing: '%s'@'%s' with timeout %u ms zone cut: '%s'\n",
 				qry->id, ns_name, ns_str ? ns_str : "", (*transport)->timeout, zonecut_str);
 			} else {
+				const char *ip_version = (proto == KR_TRANSPORT_RESOLVE_A) ? "A" : "AAAA";
 				VERBOSE_MSG(qry,
-				"=> id: '%05u' choosing to resolve: '%s' zone cut: '%s'\n",
-				qry->id, ns_name, zonecut_str);
+				"=> id: '%05u' choosing to resolve %s: '%s' zone cut: '%s'\n",
+				qry->id, ip_version, ns_name, zonecut_str);
 			}
 		} else {
 			 VERBOSE_MSG(qry,
