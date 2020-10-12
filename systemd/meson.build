@@ -42,16 +42,25 @@ if systemd_files == 'enabled'
   ## tmpfiles
   tmpfiles = configure_file(
     input: 'tmpfiles.d/knot-resolver.conf.in',
-    output: 'knot-resolver.conf',
+    output: 'knot-resolver.tmpfiles',
     configuration: systemd_config,
+  )
+  install_data(
+    tmpfiles,
+    rename: ['knot-resolver.conf'],
     install_dir: systemd_tmpfiles_dir,
   )
 
   ## sysusers
   sysusers = configure_file(
     input: 'sysusers.d/knot-resolver.conf.in',
-    output: 'knot-resolver.conf',
+    output: 'knot-resolver.sysusers',
     configuration: systemd_config,
+  )
+  install_data(
+    sysusers,
+    rename: ['knot-resolver.conf'],
     install_dir: systemd_sysusers_dir,
   )
+
 endif
