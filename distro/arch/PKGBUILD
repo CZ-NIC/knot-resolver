@@ -33,7 +33,6 @@ optdepends=(
 )
 backup=('etc/knot-resolver/kresd.conf')
 options=(debug strip)
-install=install
 source=("knot-resolver_${pkgver}.orig.tar.xz")
 sha256sums=('SKIP')
 
