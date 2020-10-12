@@ -185,6 +185,9 @@ ln -s ../kresd.target %{buildroot}%{_unitdir}/multi-user.target.wants/kresd.targ
 # remove modules with missing dependencies
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/etcd.lua
 
+# remove unused sysusers
+rm %{buildroot}%{_libdir}/sysusers.d/knot-resolver.conf
+
 %if 0%{?suse_version}
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/experimental_dot_auth.lua
 rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http
