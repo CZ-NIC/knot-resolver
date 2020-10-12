@@ -218,7 +218,7 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 		if (*transport) {
 			KR_DNAME_GET_STR(ns_name, (*transport)->name);
 			const char *ns_str = kr_straddr(&(*transport)->address.ip);
-			if ((*transport)->protocol) {
+			if ((*transport)->protocol != KR_TRANSPORT_RESOLVE_A && (*transport)->protocol != KR_TRANSPORT_RESOLVE_AAAA) {
 				VERBOSE_MSG(qry,
 				"=> id: '%05u' choosing: '%s'@'%s' with timeout %u ms zone cut: '%s'\n",
 				qry->id, ns_name, ns_str ? ns_str : "", (*transport)->timeout, zonecut_str);
