@@ -16,8 +16,10 @@ set -o errexit -o nounset
 rm -rf doc/html
 ${SPHINX} ${@} -b html -d doc/.doctrees doc doc/html
 
-if command -v makeinfo >/dev/null; then
+command -v makeinfo >/dev/null && command -v install-info >/dev/null
+if [ $? -ne 0 ]; then
     rm -rf doc/texinfo
     ${SPHINX} ${@} -b texinfo -d doc/.doctrees doc doc/texinfo
     make -C doc/texinfo info
+    make -C doc/texinfo infodir=.install install-info
 fi

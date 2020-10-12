@@ -59,7 +59,11 @@ if get_option('doc') == 'enabled'
 
   if makeinfo.found() and install_info.found()
     # install info docs
-    meson.add_install_script('../scripts/install-doc-info.sh')
+    install_subdir(
+      join_paths(meson.current_source_dir(), 'texinfo', '.install'),
+      strip_directory: true,
+      install_dir: info_dir,
+    )
   endif
 endif
 
