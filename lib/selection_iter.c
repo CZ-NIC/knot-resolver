@@ -105,6 +105,10 @@ void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct
 		}
 		struct iter_name_state *name_state = *(struct iter_name_state **)val;
 
+		// Set addresses as unresolved as they might have fallen out of cache (TTL expired)
+		name_state->a_resolved = false;
+		name_state->aaaa_resolved = false;
+
 		if (addresses->len == 0) {
 			// Name with no address
 			name_state->generation = current_generation;
