@@ -28,11 +28,12 @@ enum kr_selection_error {
 	KR_SELECTION_FORMERROR,
 	KR_SELECTION_NOTIMPL,
 	KR_SELECTION_OTHER_RCODE,
-	KR_SELECTION_TRUNCATED,
 
 	// DNS errors
+	KR_SELECTION_TRUNCATED,
 	KR_SELECTION_DNSSEC_ERROR,
 	KR_SELECTION_LAME_DELEGATION,
+	KR_SELECTION_BAD_CNAME, /**< Too long chain, or cycle. */
 
 	KR_SELECTION_NUMBER_OF_ERRORS /**< Leave this last, as it is used as array size. */
 };
@@ -50,6 +51,7 @@ static const bool UNRECOVERABLE_ERRORS[] = {
 	[KR_SELECTION_TRUNCATED] = false,
 	[KR_SELECTION_DNSSEC_ERROR] = true,
 	[KR_SELECTION_LAME_DELEGATION] = true,
+	[KR_SELECTION_BAD_CNAME] = true,
 };
 
 enum kr_transport_protocol {
