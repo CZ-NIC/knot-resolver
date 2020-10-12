@@ -632,10 +632,11 @@ static int process_referral_answer(knot_pkt_t *pkt, struct kr_request *req)
 {
 	const knot_dname_t *cname = NULL;
 	int state = unroll_cname(pkt, req, true, &cname);
+	struct kr_query *query = req->current_query;
 	if (state != kr_ok()) {
+		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_BAD_CNAME);
 		return KR_STATE_FAIL;
 	}
-	struct kr_query *query = req->current_query;
 	if (!(query->flags.CACHED)) {
 		/* If not cached (i.e. got from upstream)
 		 * make sure that this is not an authoritative answer
@@ -731,6 +732,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 	/* Process answer type */
 	int state = unroll_cname(pkt, req, false, &cname);
 	if (state != kr_ok()) {
+		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_BAD_CNAME);
 		return state;
 	}
 	/* Make sure that this is an authoritative answer (even with AA=0) for other layers */
@@ -761,6 +763,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			    q->stype == query->stype   &&
 			    knot_dname_is_equal(q->sname, cname)) {
 				VERBOSE_MSG("<= cname chain loop\n");
+				query->server_selection.error(query, req->upstream.transport, KR_SELECTION_BAD_CNAME);
 				return KR_STATE_FAIL;
 			}
 		}

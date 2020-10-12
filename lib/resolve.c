@@ -813,6 +813,10 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 		}
 	}
 
+	if (request->state & KR_STATE_FAIL) {
+		qry->flags.RESOLVED = false;
+	}
+
 	/* Pop query if resolved. */
 	if (request->state == KR_STATE_YIELD) {
 		return KR_STATE_PRODUCE; /* Requery */
