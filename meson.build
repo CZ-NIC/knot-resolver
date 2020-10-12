@@ -57,6 +57,7 @@ systemd_work_dir = join_paths(prefix, get_option('localstatedir'), 'lib', 'knot-
 systemd_cache_dir = join_paths(prefix, get_option('localstatedir'), 'cache', 'knot-resolver')
 systemd_unit_dir = join_paths(prefix, 'lib', 'systemd', 'system')
 systemd_tmpfiles_dir = join_paths(prefix, 'lib', 'tmpfiles.d')
+systemd_sysusers_dir = join_paths(prefix, 'lib', 'sysusers.d')
 mod_inc_dir = include_directories('.', 'contrib/')
 
 ## Trust anchors

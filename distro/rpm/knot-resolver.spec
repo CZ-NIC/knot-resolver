@@ -185,6 +185,9 @@ ln -s ../kresd.target %{buildroot}%{_unitdir}/multi-user.target.wants/kresd.targ
 # remove modules with missing dependencies
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/etcd.lua
 
+# remove unused sysusers
+rm %{buildroot}%{_prefix}/lib/sysusers.d/knot-resolver.conf
+
 %if 0%{?suse_version}
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/experimental_dot_auth.lua
 rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http
@@ -269,12 +272,12 @@ fi
 %doc %{_pkgdocdir}/AUTHORS
 %doc %{_pkgdocdir}/NEWS
 %doc %{_pkgdocdir}/examples
-%attr(755,root,knot-resolver) %dir %{_sysconfdir}/knot-resolver
-%attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/kresd.conf
-%attr(644,root,knot-resolver) %config(noreplace) %{_sysconfdir}/knot-resolver/root.hints
-%attr(644,root,knot-resolver) %{_sysconfdir}/knot-resolver/icann-ca.pem
-%attr(775,root,knot-resolver) %dir %{_sharedstatedir}/knot-resolver
-%attr(664,root,knot-resolver) %{_sharedstatedir}/knot-resolver/root.keys
+%dir %{_sysconfdir}/knot-resolver
+%config(noreplace) %{_sysconfdir}/knot-resolver/kresd.conf
+%config(noreplace) %{_sysconfdir}/knot-resolver/root.hints
+%{_sysconfdir}/knot-resolver/icann-ca.pem
+%attr(750,knot-resolver,knot-resolver) %dir %{_sharedstatedir}/knot-resolver
+%attr(640,knot-resolver,knot-resolver) %{_sharedstatedir}/knot-resolver/root.keys
 %{_unitdir}/kresd@.service
 %{_unitdir}/kres-cache-gc.service
 %{_unitdir}/kresd.target
@@ -284,7 +287,7 @@ fi
 %{_tmpfilesdir}/knot-resolver.conf
 %ghost /run/%{name}
 %ghost %{_localstatedir}/cache/%{name}
-%attr(770,root,knot-resolver) %dir %{_libdir}/%{name}
+%attr(750,knot-resolver,knot-resolver) %dir %{_libdir}/%{name}
 %{_sbindir}/kresd
 %{_sbindir}/kresc
 %{_sbindir}/kres-cache-gc
