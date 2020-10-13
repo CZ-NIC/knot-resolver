@@ -17,6 +17,18 @@ function kluautil.kr_table_len(t)
 	return len
 end
 
+-- pack varargs including nil arguments into a table
+function kluautil.kr_table_pack(...)
+	local tab = {...}
+	tab.n = select('#', ...)
+	return tab
+end
+
+-- unpack table produced by kr_table_pack and including nil values
+function kluautil.kr_table_unpack(tab)
+	return unpack(tab, 1, tab.n)
+end
+
 -- Fetch over HTTPS
 function kluautil.kr_https_fetch(url, out_file, ca_file)
 	local http_ok, http_request = pcall(require, 'http.request')
