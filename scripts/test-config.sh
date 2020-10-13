@@ -13,8 +13,13 @@ TEST_DIR="$(dirname ${TEST_FILE})"
 TMP_RUNDIR="$(mktemp -d)"
 
 function finish {
-    kill -s 9 $(jobs -p) || :
-    rm -rf "${TMP_RUNDIR}"
+	if [[ "$(jobs -p)" != "" ]]
+	then
+		echo "SIGKILLing leftover processes:"
+		jobs -l
+		kill -s SIGKILL $(jobs -p)
+	fi
+	rm -rf "${TMP_RUNDIR}"
 }
 trap finish EXIT
 
