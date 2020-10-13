@@ -48,7 +48,14 @@ enum kr_layer_state {
 /** Check that a kr_layer_state makes sense.  We're not very strict ATM. */
 static inline bool kr_state_consistent(enum kr_layer_state s)
 {
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wtautological-constant-out-of-range-compare"
+#endif
 	return s >= 0 && s < (1 << 5);
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 }
 
 /* Forward declarations. */

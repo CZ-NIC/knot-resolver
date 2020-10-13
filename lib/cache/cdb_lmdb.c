@@ -495,7 +495,7 @@ static int cdb_check_health(kr_cdb_pt db, struct kr_cdb_stats *stats)
 static int lockfile_get(const char *path)
 {
 	assert(path);
-	const int fd = open(path, O_CREAT|O_RDWR, S_IRUSR);
+	const int fd = open(path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
 	if (fd < 0)
 		return kr_error(errno);
 
@@ -517,17 +517,14 @@ static int lockfile_get(const char *path)
 }
 
 /** Release and remove lockfile created by lockfile_get().  Return kr_error(). */
-static int lockfile_release(const char *path, int fd)
+static int lockfile_release(int fd)
 {
-	assert(path && fd > 0); // fd == 0 is surely a mistake, in our case at least
-	int err = 0;
-	// To avoid a race, we unlink it first.
-	if (unlink(path))
-		err = kr_error(errno);
-	// And we try to close it even on error.
-	if (close(fd) && !err)
-		err = kr_error(errno);
-	return err;
+	assert(fd > 0); // fd == 0 is surely a mistake, in our case at least
+	if (close(fd)) {
+		return kr_error(errno);
+	} else {
+		return kr_ok();
+	}
 }
 
 static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
@@ -563,7 +560,7 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 		return lmdb_error(ret);
 	}
 	auto_free char *mdb_lockfile = kr_strcatdup(2, path, "/lock.mdb");
-	auto_free char *lockfile = kr_strcatdup(2, path, "/.cachelock");
+	auto_free char *lockfile = kr_strcatdup(2, path, "/krcachelock");
 	if (!mdb_lockfile || !lockfile) {
 		return kr_error(ENOMEM);
 	}
@@ -571,7 +568,7 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 	/* Find if we get a lock on lockfile. */
 	const int lockfile_fd = lockfile_get(lockfile);
 	if (lockfile_fd < 0) {
-		kr_log_error("[cache] clearing failed to get ./.cachelock (%s); retry later\n",
+		kr_log_error("[cache] clearing failed to get ./krcachelock (%s); retry later\n",
 				kr_strerror(lockfile_fd));
 		/* As we're out of space (almost certainly - mdb_drop didn't work),
 		 * we will retry on the next failing write operation. */
@@ -595,9 +592,9 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 	}
 
 	/* Environment updated, release lockfile. */
-	int lrerr = lockfile_release(lockfile, lockfile_fd);
+	int lrerr = lockfile_release(lockfile_fd);
 	if (lrerr) {
-		kr_log_error("[cache] failed to release ./.cachelock: %s\n",
+		kr_log_error("[cache] failed to release ./krcachelock: %s\n",
 				kr_strerror(lrerr));
 	}
 	return ret;

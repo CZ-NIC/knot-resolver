@@ -10,6 +10,7 @@ This section summarizes steps required when upgrading to newer Knot Resolver ver
 We advise users to also read :ref:`release_notes` for respective versions.
 Section *Module changes* is relevant only for users who develop or use third-party modules.
 
+
 Upcoming changes
 ================
 
@@ -29,7 +30,7 @@ newer versions when they are released.
 * DoH served with http module :ref:`DNS-over-HTTP (DoH) <mod-http-doh>` will be marked as legacy
   and won't receive any more bugfixes. A more reliable and scalable DoH module will be available
   instead. The new DoH module will only support HTTP/2 over TLS.
-* New releases since Octomer 2020 will contain changes for
+* New releases since October 2020 will contain changes for
   `DNS Flag Day 2020 <https://dnsflagday.net/2020/>`_. Please double-check your firewall,
   it has to allow DNS traffic on UDP and also TCP port 53.
 

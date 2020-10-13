@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: CC0-1.0
+# sysusers.d(5) file for knot-resolver (kresd)
+#Type Name       ID                  GECOS                       Home directory Shell
+u     @user@     -                   "Knot Resolver Daemon User"
+g     @group@

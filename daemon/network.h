@@ -1,4 +1,4 @@
-/*  Copyright (C) 2015-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2015-2020 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -25,6 +25,7 @@ struct session;
 typedef struct {
 	int sock_type;    /**< SOCK_DGRAM or SOCK_STREAM */
 	bool tls;         /**< only used for DoT, i.e. together with .kind == NULL and .tcp */
+	bool http;        /**< only used together with .kind == NULL and .tcp */
 	bool freebind;    /**< used for binding to non-local address */
 	const char *kind; /**< tag for other types: "control" or module-handled kinds */
 } endpoint_flags_t;

@@ -1,4 +1,4 @@
-/*  Copyright (C) 2015-2019 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2015-2020 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -22,6 +22,8 @@ static int net_list_add(const char *key, void *val, void *ext)
 
 		if (ep->flags.kind) {
 			lua_pushstring(L, ep->flags.kind);
+		} else if (ep->flags.http && ep->flags.tls) {
+			lua_pushliteral(L, "doh2");
 		} else if (ep->flags.tls) {
 			lua_pushliteral(L, "tls");
 		} else {
@@ -99,7 +101,7 @@ static int net_list(lua_State *L)
  * \note kind ownership is not transferred
  * FIXME: handle XDP, in some kind of syntax
  * \return success */
-static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind, bool freebind)
+static bool net_listen_addrs(lua_State *L, int port, bool tls, bool http, const char *kind, bool freebind)
 {
 	/* Case: table with 'addr' field; only follow that field directly. */
 	lua_getfield(L, -1, "addr");
@@ -115,12 +117,12 @@ static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind,
 		struct network *net = &the_worker->engine->net;
 		const bool is_UNIX = str[0] == '/';
 		int ret = 0;
-		endpoint_flags_t flags = { .tls = tls, .freebind = freebind };
+		endpoint_flags_t flags = { .tls = tls, .http = http, .freebind = freebind };
 		if (!kind && !flags.tls) { /* normal UDP */
 			flags.sock_type = SOCK_DGRAM;
 			ret = network_listen(net, str, port, -1, flags);
 		}
-		if (!kind && ret == 0) { /* common for normal TCP and TLS */
+		if (!kind && ret == 0) { /* common for TCP, DoT and DoH (v2) */
 			flags.sock_type = SOCK_STREAM;
 			ret = network_listen(net, str, port, -1, flags);
 		}
@@ -147,7 +149,7 @@ static bool net_listen_addrs(lua_State *L, int port, bool tls, const char *kind,
 		lua_error_p(L, "bad type for address");
 	lua_pushnil(L);
 	while (lua_next(L, -2)) {
-		if (!net_listen_addrs(L, port, tls, kind, freebind))
+		if (!net_listen_addrs(L, port, tls, http, kind, freebind))
 			return false;
 		lua_pop(L, 1);
 	}
@@ -187,6 +189,11 @@ static int net_listen(lua_State *L)
 	}
 
 	bool tls = (port == KR_DNS_TLS_PORT);
+	bool http = false;
+	if (port == KR_DNS_DOH_PORT) {
+		http = tls = true;
+	}
+
 	bool freebind = false;
 	const char *kind = NULL;
 	if (n > 2 && !lua_isnil(L, 3)) {
@@ -198,13 +205,18 @@ static int net_listen(lua_State *L)
 		lua_getfield(L, 3, "kind");
 		const char *k = lua_tostring(L, -1);
 		if (k && strcasecmp(k, "dns") == 0) {
-			tls = false;
-		} else
-		if (k && strcasecmp(k, "tls") == 0) {
+			tls = http = false;
+		} else if (k && strcasecmp(k, "tls") == 0) {
 			tls = true;
-		} else
-		if (k) {
+			http = false;
+		} else if (k && strcasecmp(k, "doh2") == 0) {
+			tls = http = true;
+		} else if (k) {
 			kind = k;
+			if (strcasecmp(k, "doh") == 0) {
+				kr_log_deprecate(
+					"kind=\"doh\" is an obsolete DoH implementation, use kind=\"doh2\" instead\n");
+			}
 		}
 	}
 
@@ -219,7 +231,7 @@ static int net_listen(lua_State *L)
 
 	/* Now focus on the first argument. */
 	lua_settop(L, 1);
-	if (!net_listen_addrs(L, port, tls, kind, freebind))
+	if (!net_listen_addrs(L, port, tls, http, kind, freebind))
 		lua_error_p(L, "net.listen() failed to bind");
 	lua_pushboolean(L, true);
 	return 1;

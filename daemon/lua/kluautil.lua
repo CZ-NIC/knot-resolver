@@ -5,6 +5,10 @@ local kluautil = {}
 
 -- Get length of table
 function kluautil.kr_table_len(t)
+	if type(t) ~= 'table' then
+		return nil
+	end
+
 	local len = 0
 	for _ in pairs(t) do
 		len = len + 1

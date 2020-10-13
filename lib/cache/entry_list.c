@@ -184,7 +184,7 @@ static int cache_write_or_clear(struct kr_cache *cache, const knot_db_val_t *key
 		abort();
 	case 0:
 		kr_log_info("[cache] overfull cache cleared\n");
-	case -EAGAIN: // fall-through; .cachelock race -> retry later
+	case -EAGAIN: // fall-through; krcachelock race -> retry later
 		return kr_error(ENOSPC);
 	}
 }

@@ -173,6 +173,7 @@ struct kr_request {
 		const knot_pkt_t *packet;
 		struct kr_request_qsource_flags flags;
 		size_t size;
+		int32_t stream_id;
 	} qsource;
 	struct {
 		unsigned int rtt;
@@ -397,6 +398,7 @@ uint32_t packet_ttl(const knot_pkt_t *, _Bool);
 typedef struct {
 	int sock_type;
 	_Bool tls;
+	_Bool http;
 	_Bool freebind;
 	const char *kind;
 } endpoint_flags_t;

@@ -1,21 +1,34 @@
 /*  Copyright (C) 2020 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
- *  SPDX-License-Identifier: GPL-3.0-or-later
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "base64.h"
+#include "contrib/base64url.h"
 #include "libknot/errcode.h"
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <ctype.h>
 
-/*! \brief Maximal length of binary input to Base64 encoding. */
+/*! \brief Maximal length of binary input to Base64url encoding. */
 #define MAX_BIN_DATA_LEN	((INT32_MAX / 4) * 3)
 
-/*! \brief Base64 padding character. */
-static const uint8_t base64_pad = '=';
+/*! \brief Base64url padding character. */
+static const uint8_t base64url_pad = '\0';
 /*! \brief Base64 alphabet. */
-static const uint8_t base64_enc[] =
-	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static const uint8_t base64url_enc[] =
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
 /*! \brief Indicates bad Base64 character. */
 #define KO	255
@@ -23,17 +36,17 @@ static const uint8_t base64_enc[] =
 #define PD	 64
 
 /*! \brief Transformation and validation table for decoding Base64. */
-static const uint8_t base64_dec[256] = {
-	[  0] = KO, ['+'] = 62, ['V'] = 21, [129] = KO, [172] = KO, [215] = KO,
+static const uint8_t base64url_dec[256] = {
+	[  0] = PD, [ 43] = KO, ['V'] = 21, [129] = KO, [172] = KO, [215] = KO,
 	[  1] = KO, [ 44] = KO, ['W'] = 22, [130] = KO, [173] = KO, [216] = KO,
-	[  2] = KO, [ 45] = KO, ['X'] = 23, [131] = KO, [174] = KO, [217] = KO,
+	[  2] = KO, ['-'] = 62, ['X'] = 23, [131] = KO, [174] = KO, [217] = KO,
 	[  3] = KO, [ 46] = KO, ['Y'] = 24, [132] = KO, [175] = KO, [218] = KO,
-	[  4] = KO, ['/'] = 63, ['Z'] = 25, [133] = KO, [176] = KO, [219] = KO,
+	[  4] = KO, [ 47] = KO, ['Z'] = 25, [133] = KO, [176] = KO, [219] = KO,
 	[  5] = KO, ['0'] = 52, [ 91] = KO, [134] = KO, [177] = KO, [220] = KO,
 	[  6] = KO, ['1'] = 53, [ 92] = KO, [135] = KO, [178] = KO, [221] = KO,
 	[  7] = KO, ['2'] = 54, [ 93] = KO, [136] = KO, [179] = KO, [222] = KO,
 	[  8] = KO, ['3'] = 55, [ 94] = KO, [137] = KO, [180] = KO, [223] = KO,
-	[  9] = KO, ['4'] = 56, [ 95] = KO, [138] = KO, [181] = KO, [224] = KO,
+	[  9] = KO, ['4'] = 56, ['_'] = 63, [138] = KO, [181] = KO, [224] = KO,
 	[ 10] = KO, ['5'] = 57, [ 96] = KO, [139] = KO, [182] = KO, [225] = KO,
 	[ 11] = KO, ['6'] = 58, ['a'] = 26, [140] = KO, [183] = KO, [226] = KO,
 	[ 12] = KO, ['7'] = 59, ['b'] = 27, [141] = KO, [184] = KO, [227] = KO,
@@ -42,7 +55,7 @@ static const uint8_t base64_dec[256] = {
 	[ 15] = KO, [ 58] = KO, ['e'] = 30, [144] = KO, [187] = KO, [230] = KO,
 	[ 16] = KO, [ 59] = KO, ['f'] = 31, [145] = KO, [188] = KO, [231] = KO,
 	[ 17] = KO, [ 60] = KO, ['g'] = 32, [146] = KO, [189] = KO, [232] = KO,
-	[ 18] = KO, ['='] = PD, ['h'] = 33, [147] = KO, [190] = KO, [233] = KO,
+	[ 18] = KO, [ 61] = KO, ['h'] = 33, [147] = KO, [190] = KO, [233] = KO,
 	[ 19] = KO, [ 62] = KO, ['i'] = 34, [148] = KO, [191] = KO, [234] = KO,
 	[ 20] = KO, [ 63] = KO, ['j'] = 35, [149] = KO, [192] = KO, [235] = KO,
 	[ 21] = KO, [ 64] = KO, ['k'] = 36, [150] = KO, [193] = KO, [236] = KO,
@@ -61,7 +74,7 @@ static const uint8_t base64_dec[256] = {
 	[ 34] = KO, ['M'] = 12, ['x'] = 49, [163] = KO, [206] = KO, [249] = KO,
 	[ 35] = KO, ['N'] = 13, ['y'] = 50, [164] = KO, [207] = KO, [250] = KO,
 	[ 36] = KO, ['O'] = 14, ['z'] = 51, [165] = KO, [208] = KO, [251] = KO,
-	[ 37] = KO, ['P'] = 15, [123] = KO, [166] = KO, [209] = KO, [252] = KO,
+	['%'] = KO, ['P'] = 15, [123] = KO, [166] = KO, [209] = KO, [252] = KO,
 	[ 38] = KO, ['Q'] = 16, [124] = KO, [167] = KO, [210] = KO, [253] = KO,
 	[ 39] = KO, ['R'] = 17, [125] = KO, [168] = KO, [211] = KO, [254] = KO,
 	[ 40] = KO, ['S'] = 18, [126] = KO, [169] = KO, [212] = KO, [255] = KO,
@@ -69,7 +82,7 @@ static const uint8_t base64_dec[256] = {
 	[ 42] = KO, ['U'] = 20, [128] = KO, [171] = KO, [214] = KO,
 };
 
-int32_t kr_base64_encode(const uint8_t  *in,
+int32_t kr_base64url_encode(const uint8_t  *in,
                       const uint32_t in_len,
                       uint8_t        *out,
                       const uint32_t out_len)
@@ -88,10 +101,10 @@ int32_t kr_base64_encode(const uint8_t  *in,
 
 	// Encoding loop takes 3 bytes and creates 4 characters.
 	while (in < stop) {
-		text[0] = base64_enc[in[0] >> 2];
-		text[1] = base64_enc[(in[0] & 0x03) << 4 | in[1] >> 4];
-		text[2] = base64_enc[(in[1] & 0x0F) << 2 | in[2] >> 6];
-		text[3] = base64_enc[in[2] & 0x3F];
+		text[0] = base64url_enc[in[0] >> 2];
+		text[1] = base64url_enc[(in[0] & 0x03) << 4 | in[1] >> 4];
+		text[2] = base64url_enc[(in[1] & 0x0F) << 2 | in[2] >> 6];
+		text[3] = base64url_enc[in[2] & 0x3F];
 		text += 4;
 		in += 3;
 	}
@@ -99,25 +112,24 @@ int32_t kr_base64_encode(const uint8_t  *in,
 	// Processing of padding, if any.
 	switch (rest_len) {
 	case 2:
-		text[0] = base64_enc[in[0] >> 2];
-		text[1] = base64_enc[(in[0] & 0x03) << 4 | in[1] >> 4];
-		text[2] = base64_enc[(in[1] & 0x0F) << 2];
-		text[3] = base64_pad;
-		text += 4;
+		text[0] = base64url_enc[in[0] >> 2];
+		text[1] = base64url_enc[(in[0] & 0x03) << 4 | in[1] >> 4];
+		text[2] = base64url_enc[(in[1] & 0x0F) << 2];
+		text[3] = base64url_pad;
+		text += 3;
 		break;
 	case 1:
-		text[0] = base64_enc[in[0] >> 2];
-		text[1] = base64_enc[(in[0] & 0x03) << 4];
-		text[2] = base64_pad;
-		text[3] = base64_pad;
-		text += 4;
+		text[0] = base64url_enc[in[0] >> 2];
+		text[1] = base64url_enc[(in[0] & 0x03) << 4];
+		text[2] = base64url_pad;
+		text[3] = base64url_pad;
+		text += 2;
 		break;
 	}
-
 	return (text - out);
 }
 
-int32_t kr_base64_encode_alloc(const uint8_t  *in,
+int32_t kr_base64url_encode_alloc(const uint8_t  *in,
                             const uint32_t in_len,
                             uint8_t        **out)
 {
@@ -139,7 +151,7 @@ int32_t kr_base64_encode_alloc(const uint8_t  *in,
 	}
 
 	// Encode data.
-	int32_t ret = kr_base64_encode(in, in_len, *out, out_len);
+	int32_t ret = kr_base64url_encode(in, in_len, *out, out_len);
 	if (ret < 0) {
 		free(*out);
 		*out = NULL;
@@ -148,8 +160,8 @@ int32_t kr_base64_encode_alloc(const uint8_t  *in,
 	return ret;
 }
 
-int32_t kr_base64_decode(const uint8_t  *in,
-                      const uint32_t in_len,
+int32_t kr_base64url_decode(const uint8_t  *in,
+                      uint32_t in_len,
                       uint8_t        *out,
                       const uint32_t out_len)
 {
@@ -157,11 +169,20 @@ int32_t kr_base64_decode(const uint8_t  *in,
 	if (in == NULL || out == NULL) {
 		return KNOT_EINVAL;
 	}
+
+	// cut up to two "%3d" from the end of input
+	int pad3d = 0;
+	const uint8_t *end = in + in_len;
+	char *perc3d = "d3%d3%", *stop3d = perc3d + 6;
+	while (end != in && perc3d != stop3d && tolower(*--end) == *perc3d) {
+		if (*perc3d++ == '%') {
+			in_len -= 3;
+			pad3d++;
+		}
+	}
+
 	if (in_len > INT32_MAX || out_len < ((in_len + 3) / 4) * 3) {
 		return KNOT_ERANGE;
-	}
-	if ((in_len % 4) != 0) {
-		return KNOT_BASE64_ESIZE;
 	}
 
 	const uint8_t	*stop = in + in_len;
@@ -172,31 +193,33 @@ int32_t kr_base64_decode(const uint8_t  *in,
 	// Decoding loop takes 4 characters and creates 3 bytes.
 	while (in < stop) {
 		// Filling and transforming 4 Base64 chars.
-		c1 = base64_dec[in[0]];
-		c2 = base64_dec[in[1]];
-		c3 = base64_dec[in[2]];
-		c4 = base64_dec[in[3]];
+		c1 =                   base64url_dec[in[0]]     ;
+		c2 =                   base64url_dec[in[1]]     ;
+		c3 = (in + 2 < stop) ? base64url_dec[in[2]] : PD;
+		c4 = (in + 3 < stop) ? base64url_dec[in[3]] : PD;
 
-		// Check 4. char if is bad or padding.
-		if (c4 >= PD) {
-			if (c4 == PD && pad_len == 0) {
+		// Check 1. and 2. chars if are not padding
+		if (c1 >= PD || c2 >= PD) {
+			return KNOT_BASE64_ECHAR;
+		}
+		// Check 3. char if is bad or padding.
+		else if (c3 >= PD) {
+			if (c3 == PD) {
+				pad_len = 2;
+			} else {
+				return KNOT_BASE64_ECHAR;
+			}
+		}
+		// Check 3. char if is bad or padding.
+		else if (c4 >= PD) {
+			if (c4 == PD) {
 				pad_len = 1;
 			} else {
 				return KNOT_BASE64_ECHAR;
 			}
 		}
 
-		// Check 3. char if is bad or padding.
-		if (c3 >= PD) {
-			if (c3 == PD && pad_len == 1) {
-				pad_len = 2;
-			} else {
-				return KNOT_BASE64_ECHAR;
-			}
-		}
-
-		// Check 1. and 2. chars if are not padding.
-		if (c2 >= PD || c1 >= PD) {
+		if (pad_len > 0 && in <= stop - 4) {
 			return KNOT_BASE64_ECHAR;
 		}
 
@@ -219,19 +242,23 @@ int32_t kr_base64_decode(const uint8_t  *in,
 			break;
 		case 1:
 			bin += 2;
-			break;
+			goto end;
 		case 2:
 			bin += 1;
-			break;
+			goto end;
 		}
 
 		in += 4;
 	}
 
+end:
+	if (pad3d > pad_len) {
+		return KNOT_BASE64_ECHAR;
+	}
 	return (bin - out);
 }
 
-int32_t kr_base64_decode_alloc(const uint8_t  *in,
+int32_t kr_base64url_decode_alloc(const uint8_t  *in,
                             const uint32_t in_len,
                             uint8_t        **out)
 {
@@ -250,7 +277,7 @@ int32_t kr_base64_decode_alloc(const uint8_t  *in,
 	}
 
 	// Decode data.
-	int32_t ret = kr_base64_decode(in, in_len, *out, out_len);
+	int32_t ret = kr_base64url_decode(in, in_len, *out, out_len);
 	if (ret < 0) {
 		free(*out);
 		*out = NULL;
