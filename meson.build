@@ -87,6 +87,7 @@ group = get_option('group')
 
 ## Optional dependencies
 message('--- optional dependencies ---')
+nghttp2 = dependency('libnghttp2', required: false)
 openssl = dependency('openssl', required: false)
 
 have_asprintf = meson.get_compiler('c').has_function('asprintf',
@@ -170,6 +171,7 @@ conf_data.set('ENABLE_LIBSYSTEMD', libsystemd.found() ? 1 : 0)
 conf_data.set('NOVERBOSELOG', not verbose_log)
 conf_data.set('ENABLE_SENDMMSG', sendmmsg.to_int())
 conf_data.set('ENABLE_CAP_NG', capng.found())
+conf_data.set('ENABLE_DOH2', nghttp2.found())
 
 kresconfig = configure_file(
   output: 'kresconfig.h',
@@ -285,6 +287,7 @@ s_install_kresd_conf = install_kresd_conf ? 'enabled' : 'disabled'
 s_sendmmsg = sendmmsg ? 'enabled': 'disabled'
 s_openssl = openssl.found() ? 'present': 'missing'
 s_capng = capng.found() ? 'enabled': 'disabled'
+s_doh2 = nghttp2.found() ? 'enabled': 'disabled'
 message('''
 
 ======================= SUMMARY =======================
@@ -321,6 +324,7 @@ message('''
     sendmmsg:           @0@'''.format(s_sendmmsg) + '''
     openssl debug:      @0@'''.format(s_openssl) + '''
     capng:              @0@'''.format(s_capng) + '''
+    doh2:               @0@'''.format(s_doh2) + '''
 
 =======================================================
 
