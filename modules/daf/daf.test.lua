@@ -6,6 +6,10 @@ net.ipv6 = false
 -- do not listen, test is driven by config code
 env.KRESD_NO_LISTEN = true
 
+local path = worker.cwd..'/control/'..worker.pid
+same(true, net.listen(path, nil, {kind = 'control'}),
+	'new control sockets were created so map() can work')
+
 modules.load('hints > iterate')
 modules.load('daf')
 
