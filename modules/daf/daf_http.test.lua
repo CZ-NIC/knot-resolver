@@ -5,6 +5,10 @@ if not has_http then
 	-- skipping daf module test because http its not installed
 	os.exit(77)
 else
+	local path = worker.cwd..'/control/'..worker.pid
+	same(true, net.listen(path, nil, {kind = 'control'}),
+		'new control sockets were created so map() can work')
+
 	local request = require('http.request')
 
 	modules.load('http')
