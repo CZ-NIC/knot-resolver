@@ -19,6 +19,7 @@ depends=(
     'luajit'
     'systemd'
     'libcap-ng'
+    'libnghttp2'
 )
 makedepends=(
     'cmocka'

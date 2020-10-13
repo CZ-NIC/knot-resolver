@@ -45,6 +45,7 @@ BuildRequires:  pkgconfig(libedit)
 BuildRequires:  pkgconfig(libknot) >= 2.8
 BuildRequires:  pkgconfig(libzscanner) >= 2.8
 BuildRequires:  pkgconfig(libdnssec) >= 2.8
+BuildRequires:  pkgconfig(libnghttp2)
 BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  pkgconfig(libcap-ng)
 BuildRequires:  pkgconfig(libuv)
@@ -123,7 +124,7 @@ Documentation for Knot Resolver
 
 %if "x%{?suse_version}" == "x"
 %package module-http
-Summary:        HTTP/2 module for Knot Resolver
+Summary:        HTTP module for Knot Resolver
 Requires:       %{name} = %{version}-%{release}
 %if 0%{?fedora} || 0%{?rhel} > 7
 Requires:       lua5.1-http
@@ -134,9 +135,10 @@ Requires:       lua-mmdb
 %endif
 
 %description module-http
-HTTP/2 module for Knot Resolver has multiple uses. It enables use of
-DNS-over-HTTP, can serve as API endpoint for other modules or provide a web
-interface for local visualization of the resolver cache and queries.
+HTTP module for Knot Resolver can serve as API endpoint for other modules or
+provide a web interface for local visualization of the resolver cache and
+queries. It can also serve DNS-over-HTTPS, but it is deprecated in favor of
+native C implementation, which doesn't require this package.
 %endif
 
 %prep

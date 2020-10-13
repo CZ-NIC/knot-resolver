@@ -1,4 +1,4 @@
-/*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2014-2020 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -21,7 +21,7 @@ int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags
 /** Initialize a UDP handle and start listening. */
 int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd);
 /** Initialize a TCP handle and start listening. */
-int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bool has_tls);
+int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bool has_tls, bool has_http);
 /** Initialize a pipe handle and start listening. */
 int io_listen_pipe(uv_loop_t *loop, uv_pipe_t *handle, int fd);
 
@@ -38,7 +38,7 @@ void tcp_timeout_trigger(uv_timer_t *timer);
  * \param family = AF_*
  * \param has_tls has meanings only when type is SOCK_STREAM */
 int io_create(uv_loop_t *loop, uv_handle_t *handle, int type,
-	      unsigned family, bool has_tls);
+	      unsigned family, bool has_tls, bool has_http);
 void io_deinit(uv_handle_t *handle);
 void io_free(uv_handle_t *handle);
 
