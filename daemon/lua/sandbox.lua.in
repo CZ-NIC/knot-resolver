@@ -668,10 +668,12 @@ function map(cmd, format)
 	local results = {}
 
 	format = format or 'luaobj'
-	if format ~= 'luaobj' and format ~= 'strings' then
-		warn('warning: Unknown map format. Used "luaobj".')
-		format = 'luaobj'
-	end
+	if (type(cmd) ~= 'string') then
+		panic('map() command must be a string') end
+	if (#cmd <= 0) then
+		panic('map() command must be non-empty') end
+	if (format ~= 'luaobj' and format ~= 'strings') then
+		panic('map() output format must be luaobj or strings') end
 
 	for _,v in pairs(net.list()) do
 		if (v['kind'] == 'control') and (v['transport']['family'] == 'unix') then
