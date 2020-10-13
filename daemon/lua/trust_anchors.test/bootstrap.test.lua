@@ -4,8 +4,8 @@ modules.load('ta_update')
 -- check prerequisites
 local has_http = pcall(require, 'kres_modules.http') and pcall(require, 'http.request')
 if not has_http then
-	pass('skipping bootstrap tests because http module is not not installed')
-	done()
+	-- skipping bootstrap tests because http module is not not installed
+	os.exit(77)
 end
 
 local cqueues = require("cqueues")

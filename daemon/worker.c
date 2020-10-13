@@ -1,4 +1,4 @@
-/*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2014-2020 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -26,6 +26,7 @@
 #include "daemon/io.h"
 #include "daemon/session.h"
 #include "daemon/tls.h"
+#include "daemon/http.h"
 #include "daemon/udp_queue.h"
 #include "daemon/zimport.h"
 #include "lib/layer.h"
@@ -128,7 +129,8 @@ struct worker_ctx *the_worker = NULL;
 /*! @internal Create a UDP/TCP handle for an outgoing AF_INET* connection.
  *  socktype is SOCK_* */
 static uv_handle_t *ioreq_spawn(struct worker_ctx *worker,
-				int socktype, sa_family_t family, bool has_tls)
+				int socktype, sa_family_t family, bool has_tls,
+				bool has_http)
 {
 	bool precond = (socktype == SOCK_DGRAM || socktype == SOCK_STREAM)
 			&& (family == AF_INET  || family == AF_INET6);
@@ -144,7 +146,7 @@ static uv_handle_t *ioreq_spawn(struct worker_ctx *worker,
 	if (!handle) {
 		return NULL;
 	}
-	int ret = io_create(worker->loop, handle, socktype, family, has_tls);
+	int ret = io_create(worker->loop, handle, socktype, family, has_tls, has_http);
 	if (ret) {
 		if (ret == UV_EMFILE) {
 			worker->too_many_open = true;
@@ -295,6 +297,14 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		req->qsource.dst_addr = session_get_sockname(session);
 		req->qsource.flags.tcp = session_get_handle(session)->type == UV_TCP;
 		req->qsource.flags.tls = session_flags(session)->has_tls;
+		req->qsource.flags.http = session_flags(session)->has_http;
+		req->qsource.stream_id = -1;
+#ifdef ENABLE_DOH2
+		if (req->qsource.flags.http) {
+			struct http_ctx *http_ctx = session_http_get_server_ctx(session);
+			req->qsource.stream_id = queue_head(http_ctx->streams);
+		}
+#endif
 		/* We need to store a copy of peer address. */
 		memcpy(&ctx->source.addr.ip, peer, kr_sockaddr_len(peer));
 		req->qsource.addr = &ctx->source.addr.ip;
@@ -592,7 +602,15 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 	struct worker_ctx *worker = ctx->worker;
 	/* Send using given protocol */
 	assert(!session_flags(session)->closing);
-	if (session_flags(session)->has_tls) {
+	if (session_flags(session)->has_http) {
+#ifdef ENABLE_DOH2
+		uv_write_t *write_req = (uv_write_t *)ioreq;
+		write_req->data = task;
+		ret = http_write(write_req, handle, pkt, ctx->req.qsource.stream_id, &on_write);
+#else
+		ret = kr_error(ENOPROTOOPT);
+#endif
+	} else if (session_flags(session)->has_tls) {
 		uv_write_t *write_req = (uv_write_t *)ioreq;
 		write_req->data = task;
 		ret = tls_write(write_req, handle, pkt, &on_write);
@@ -647,9 +665,18 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 			worker->rconcurrent_highwatermark = worker->stats.rconcurrent;
 			ret = kr_error(UV_EMFILE);
 		}
+
+		if (session_flags(session)->has_http)
+			worker->stats.err_http += 1;
+		else if (session_flags(session)->has_tls)
+			worker->stats.err_tls += 1;
+		else if (handle->type == UV_UDP)
+			worker->stats.err_udp += 1;
+		else
+			worker->stats.err_tcp += 1;
 	}
 
-	/* Update statistics */
+	/* Update outgoing query statistics */
 	if (session_flags(session)->outgoing && addr) {
 		if (session_flags(session)->has_tls)
 			worker->stats.tls += 1;
@@ -1020,7 +1047,7 @@ static uv_handle_t *retransmit(struct qr_task *task)
 		if (kr_resolve_checkout(&ctx->req, NULL, (struct sockaddr *)choice, SOCK_DGRAM, task->pktbuf) != 0) {
 			return ret;
 		}
-		ret = ioreq_spawn(ctx->worker, SOCK_DGRAM, choice->sin6_family, false);
+		ret = ioreq_spawn(ctx->worker, SOCK_DGRAM, choice->sin6_family, false, false);
 		if (!ret) {
 			return ret;
 		}
@@ -1303,8 +1330,9 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 		tls_client_ctx_free(tls_ctx);
 		return kr_error(EINVAL);
 	}
+	bool has_http = false;
 	bool has_tls = (tls_ctx != NULL);
-	uv_handle_t *client = ioreq_spawn(worker, SOCK_STREAM, addr->sa_family, has_tls);
+	uv_handle_t *client = ioreq_spawn(worker, SOCK_STREAM, addr->sa_family, has_tls, has_http);
 	if (!client) {
 		tls_client_ctx_free(tls_ctx);
 		free(conn);
@@ -1568,10 +1596,23 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 
 	const bool is_query = (knot_wire_get_qr(pkt->wire) == 0);
 	const bool is_outgoing = session_flags(session)->outgoing;
+
+	struct http_ctx *http_ctx = NULL;
+#ifdef ENABLE_DOH2
+	http_ctx = session_http_get_server_ctx(session);
+#endif
+
+	if (!is_outgoing && http_ctx && queue_len(http_ctx->streams) <= 0)
+		return kr_error(ENOENT);
+
 	/* Ignore badly formed queries. */
 	if ((ret != kr_ok() && ret != kr_error(EMSGSIZE)) ||
 	    (is_query == is_outgoing)) {
-		if (!is_outgoing) the_worker->stats.dropped += 1;
+		if (!is_outgoing) {
+			the_worker->stats.dropped += 1;
+			if (http_ctx)
+				queue_pop(http_ctx->streams);
+		}
 		return kr_error(EILSEQ);
 	}
 
@@ -1582,9 +1623,10 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 	if (!is_outgoing) { /* request from a client */
 		struct request_ctx *ctx = request_create(the_worker, session, peer,
 							 knot_wire_get_id(pkt->wire));
-		if (!ctx) {
+		if (http_ctx)
+			queue_pop(http_ctx->streams);
+		if (!ctx)
 			return kr_error(ENOMEM);
-		}
 
 		ret = request_start(ctx, pkt);
 		if (ret != 0) {
