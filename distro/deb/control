@@ -23,6 +23,7 @@ Build-Depends:
  python3-breathe,
  python3-sphinx,
  python3-sphinx-rtd-theme,
+ texinfo,
  libssl-dev,
 Homepage: https://www.knot-resolver.cz/
 

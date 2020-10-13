@@ -58,10 +58,11 @@ if get_option('doc') == 'enabled'
 
   if makeinfo.found()
     # install info docs
-    install_subdir(
-      join_paths(meson.current_source_dir(), 'texinfo'),
-      strip_directory: true,
-      exclude_files: ['Makefile', 'knot-resolver.texi'],
+    # FIXME: Sphinx < 2 doesn't create a separate directory for figures, while
+    #        a newer one does. To simplify packaging, figures for info pages are
+    #        compleltely omitted for now.
+    install_data(
+      join_paths(meson.current_source_dir(), 'texinfo', 'knot-resolver.info'),
       install_dir: info_dir,
     )
   endif
