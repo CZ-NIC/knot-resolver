@@ -50,7 +50,7 @@ Resolver:
    "cmocka_", "``unit tests``", "Unit testing framework."
    "Doxygen_", "``documentation``", "Generating API documentation."
    "Sphinx_ and sphinx_rtd_theme_", "``documentation``", "Building this
-   HTML/PDF documentation."
+   documentation."
    "Texinfo_", "``documentation``", "Generating this documentation in Info
    format."
    "breathe_", "``documentation``", "Exposing Doxygen API doc to Sphinx."
@@ -193,8 +193,8 @@ It's also possible to run only specific test suite or a test.
 
 .. _build-html-doc:
 
-HTML Documentation
-------------------
+Documentation
+-------------
 
 To check for documentation dependencies and allow its installation, use
 ``-Ddoc=enabled``. The documentation doesn't build automatically. Instead,
@@ -234,7 +234,7 @@ Recommended build options for packagers:
   prefix, other directories can be set in a similar fashion, see ``meson setup
   --help``
 * ``-Dsystemd_files=enabled`` for systemd unit files
-* ``-Ddoc=enabled`` for offline html documentation (see :ref:`build-html-doc`)
+* ``-Ddoc=enabled`` for offline documentation (see :ref:`build-html-doc`)
 * ``-Dinstall_kresd_conf=enabled`` to install default config file
 * ``-Dclient=enabled`` to force build of kresc
 * ``-Dunit_tests=enabled`` to force build of unit tests
