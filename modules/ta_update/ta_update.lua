@@ -200,8 +200,8 @@ local function update(keyset, new_keys)
 	return true
 end
 
-local function unmanagedkey_change()
-	warn('[ta_update] you need to update package with trust anchors before it breaks')
+local function unmanagedkey_change(file_name)
+	warn('[ta_update] you need to update package with trust anchors in "%s" before it breaks', file_name)
 end
 
 local function check_upstream(keyset, new_keys)
@@ -218,12 +218,12 @@ local function check_upstream(keyset, new_keys)
 
 		if not ta and not key_revoked then
 			-- I see new key
-			ta_update.cb_unmanagedkey_change()
+			ta_update.cb_unmanagedkey_change(keyset.filename)
 		end
 
 		if ta and key_revoked then
 			-- I see revoked key
-			ta_update.cb_unmanagedkey_change()
+			ta_update.cb_unmanagedkey_change(keyset.filename)
 		end
 
 		::continue::
@@ -242,15 +242,16 @@ local function check_upstream(keyset, new_keys)
 
 		if missing_rr then
 			-- There is missing key on disk
-			ta_update.cb_unmanagedkey_change()
+			ta_update.cb_unmanagedkey_change(keyset.filename)
 		end
 	end
 
 end
 
 -- Refresh the DNSKEYs from the packet, and return time to the next check.
-local function active_refresh(keyset, pkt, managed)
+local function active_refresh(keyset, pkt, req, managed)
 	local retry = true
+
 	if pkt:rcode() == kres.rcode.NOERROR then
 		local records = pkt:section(kres.section.ANSWER)
 		local new_keys = {}
@@ -267,8 +268,13 @@ local function active_refresh(keyset, pkt, managed)
 		end
 		retry = false
 	else
-		warn('[ta_update] active refresh failed for ' .. kres.dname2str(keyset.owner)
-			.. ' with rcode: ' .. pkt:rcode())
+		local qry = req:initial()
+		if qry.flags.DNSSEC_BOGUS == true then
+			warn('[ta_update] active refresh failed, update your trust anchors in "%s"', keyset.filename)
+		else
+			warn('[ta_update] active refresh failed for ' .. kres.dname2str(keyset.owner)
+				.. ' with rcode: ' .. pkt:rcode())
+		end
 	end
 	-- Calculate refresh/retry timer (RFC 5011, 2.3)
 	local min_ttl = retry and day or 15 * day
@@ -292,9 +298,9 @@ local function refresh_plan(keyset, delay, managed)
 	track_cfg.event = event.after(delay, function ()
 		log('[ta_update] refreshing TA for ' .. owner_str)
 		resolve(owner_str, kres.type.DNSKEY, kres.class.IN, 'NO_CACHE',
-		function (pkt)
+		function (pkt, req)
 			-- Schedule itself with updated timeout
-			local delay_new = active_refresh(keyset, pkt, managed)
+			local delay_new = active_refresh(keyset, pkt, req, managed)
 			delay_new = keyset.refresh_time or ta_update.refresh_time or delay_new
 			log('[ta_update] next refresh for ' .. owner_str .. ' in '
 				.. delay_new/hour .. ' hours')
