@@ -15,3 +15,9 @@ set -o errexit -o nounset
 
 rm -rf doc/html
 ${SPHINX} ${@} -b html -d doc/.doctrees doc doc/html
+
+if command -v makeinfo &>/dev/null; then
+    rm -rf doc/texinfo
+    ${SPHINX} ${@} -b texinfo -d doc/.doctrees doc doc/texinfo && \
+        make -C doc/texinfo info
+fi
