@@ -69,17 +69,17 @@ local function test_number()
 	test_de_serialization_autodesc(-math.huge)
 	test_de_serialization_autodesc(math.huge)
 	test_de_serialization_autodesc(tonumber('nan'))
-	for _=1,100 do  -- integers
+	for _=1,20 do  -- integers
 		test_de_serialization_autodesc(gen_number_int())
 	end
-	for _=1,100 do  -- floats
+	for _=1,20 do  -- floats
 		test_de_serialization_autodesc(gen_number_float())
 	end
 end
 
 local function test_string()
 	test_de_serialization('', 'empty string')
-	for _=1,100 do
+	for _=1,20 do
 		local str = gen_string(1024*10)
 		test_de_serialization(str, 'random string length ' .. #str)
 	end
@@ -135,7 +135,7 @@ local function gen_test_tables_supported(level)
 end
 
 function test_table_supported()
-	for i=1,100 do
+	for i=1,20 do
 		local t = gen_test_tables_supported()
 		test_de_serialization(t, 'random table no. ' .. i)
 	end
@@ -203,7 +203,7 @@ local function gen_test_tables_unsupported()
 end
 
 local function test_unsupported_table()
-	for i=1,100 do
+	for i=1,20 do
 		local t = gen_test_tables_unsupported()
 		test_unsupported(t, 'random unsupported table no. ' .. i)()
 	end
