@@ -241,7 +241,7 @@ local function check_upstream(keyset, new_keys)
 		end
 
 		if missing_rr then
-			-- There is missing key on disk
+			-- This key is missing in the new keyset
 			ta_update.cb_unmanagedkey_change(keyset.filename)
 		end
 	end
