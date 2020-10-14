@@ -446,8 +446,7 @@ modules.load('watchdog')
 -- Load keyfile_default
 trust_anchors.add_file('@keyfile_default@', @unmanaged@)
 
--- Interactive command evaluation
-function eval_cmd(line, raw)
+local function eval_cmd_compile(line, raw)
 	-- Compatibility sandbox code loading
 	local function load_code(code)
 	    if getfenv then -- Lua 5.1
@@ -461,6 +460,12 @@ function eval_cmd(line, raw)
 	if err then
 		chunk, err = load_code(line)
 	end
+	return chunk, err
+end
+
+-- Interactive command evaluation
+function eval_cmd(line, raw)
+	local chunk, err = eval_cmd_compile(line, raw)
 	if not err then
 		return chunk()
 	else
@@ -675,18 +680,25 @@ function map(cmd, format)
 	if (format ~= 'luaobj' and format ~= 'strings') then
 		panic('map() output format must be luaobj or strings') end
 
+	-- find out control socket paths
 	for _,v in pairs(net.list()) do
 		if (v['kind'] == 'control') and (v['transport']['family'] == 'unix') then
 			table.insert(local_sockets, string.match(v['transport']['path'], '^.*/([^/]+)$'))
 		end
 	end
-
 	local filetab = kluautil.list_dir(worker.control_path)
 	if next(filetab) == nil then
 		panic('no control sockets found in directory %s',
 			worker.control_path)
 	end
 
+	-- validate input command to detect typos early
+	local chunk, err = eval_cmd_compile(cmd, false)
+	if not chunk then
+		panic('failure when compiling map() command: %s', err)
+	end
+
+	-- finally execute it on all instances
 	for _,file in ipairs(filetab) do
 		local local_exec = false
 		for _,lsoc in ipairs(local_sockets) do
