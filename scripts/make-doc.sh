@@ -20,4 +20,6 @@ if command -v makeinfo &>/dev/null; then
     rm -rf doc/texinfo
     ${SPHINX} ${@} -b texinfo -d doc/.doctrees doc doc/texinfo && \
         make -C doc/texinfo info
+    mkdir doc/texinfo/.install
+    mv doc/texinfo/knot-resolver.info doc/texinfo/.install/
 fi
