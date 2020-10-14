@@ -659,6 +659,10 @@ function _map_luaobj_call_wrapper(cmd)
 	local ret = kluautil.kr_table_pack(xpcall(func, debug.traceback))
 	local ok, serial = pcall(krprint.serialize_lua, ret, 'error')
 	if not ok then
+		if verbose() then
+			log('failed to serialize map() response %s (%s)',
+				table_print(ret), serial)
+		end
 		return krprint.serialize_lua(
 			kluautil.kr_table_pack(false, "returned values cannot be serialized: "
 				.. serial))
@@ -749,6 +753,9 @@ function map(cmd, format)
 			assert(type(ret) == 'table', 'map() protocol error, '
 				.. 'table with results not retured by follower')
 			if (ret.n ~= 2) then
+				if verbose() then
+					log('got unsupported map() response: %s', table_print(ret))
+				end
 				panic('unexpected number of return values in map() response: '
 					.. 'only single return value is allowed, '
 					.. 'use kluautil.kr_table_pack() helper')
