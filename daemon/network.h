@@ -24,8 +24,8 @@ struct session;
 /** Ways to listen on a socket (which may exist already). */
 typedef struct {
 	int sock_type;    /**< SOCK_DGRAM or SOCK_STREAM */
-	bool tls;         /**< only used for DoT, i.e. together with .kind == NULL and .tcp */
-	bool http;        /**< only used together with .kind == NULL and .tcp */
+	bool tls;         /**< only used together with .kind == NULL and SOCK_STREAM */
+	bool http;        /**< DoH2, implies .tls (in current implementation) */
 	bool freebind;    /**< used for binding to non-local address */
 	const char *kind; /**< tag for other types: "control" or module-handled kinds */
 } endpoint_flags_t;

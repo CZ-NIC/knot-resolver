@@ -98,10 +98,10 @@ static int net_list(lua_State *L)
 }
 
 /** Listen on an address list represented by the top of lua stack.
- * \note kind ownership is not transferred
+ * \note flags.kind ownership is not transferred, and flags.sock_type doesn't make sense
  * FIXME: handle XDP, in some kind of syntax
  * \return success */
-static bool net_listen_addrs(lua_State *L, int port, bool tls, bool http, const char *kind, bool freebind)
+static bool net_listen_addrs(lua_State *L, int port, endpoint_flags_t flags)
 {
 	/* Case: table with 'addr' field; only follow that field directly. */
 	lua_getfield(L, -1, "addr");
@@ -117,17 +117,16 @@ static bool net_listen_addrs(lua_State *L, int port, bool tls, bool http, const 
 		struct network *net = &the_worker->engine->net;
 		const bool is_UNIX = str[0] == '/';
 		int ret = 0;
-		endpoint_flags_t flags = { .tls = tls, .http = http, .freebind = freebind };
-		if (!kind && !flags.tls) { /* normal UDP */
+		if (!flags.kind && !flags.tls) { /* normal UDP */
 			flags.sock_type = SOCK_DGRAM;
 			ret = network_listen(net, str, port, -1, flags);
 		}
-		if (!kind && ret == 0) { /* common for TCP, DoT and DoH (v2) */
+		if (!flags.kind && ret == 0) { /* common for TCP, DoT and DoH (v2) */
 			flags.sock_type = SOCK_STREAM;
 			ret = network_listen(net, str, port, -1, flags);
 		}
-		if (kind) {
-			flags.kind = strdup(kind);
+		if (flags.kind) {
+			flags.kind = strdup(flags.kind);
 			flags.sock_type = SOCK_STREAM; /* TODO: allow to override this? */
 			ret = network_listen(net, str, (is_UNIX ? 0 : port), -1, flags);
 		}
@@ -149,7 +148,7 @@ static bool net_listen_addrs(lua_State *L, int port, bool tls, bool http, const 
 		lua_error_p(L, "bad type for address");
 	lua_pushnil(L);
 	while (lua_next(L, -2)) {
-		if (!net_listen_addrs(L, port, tls, http, kind, freebind))
+		if (!net_listen_addrs(L, port, flags))
 			return false;
 		lua_pop(L, 1);
 	}
@@ -188,31 +187,32 @@ static int net_listen(lua_State *L)
 		}
 	}
 
-	bool tls = (port == KR_DNS_TLS_PORT);
-	bool http = false;
-	if (port == KR_DNS_DOH_PORT) {
-		http = tls = true;
+	endpoint_flags_t flags = { 0 };
+	if (port == KR_DNS_TLS_PORT) {
+		flags.tls = true;
+	} else if (port == KR_DNS_DOH_PORT) {
+		flags.http = flags.tls = true;
 	}
 
-	bool freebind = false;
-	const char *kind = NULL;
 	if (n > 2 && !lua_isnil(L, 3)) {
 		if (!lua_istable(L, 3))
 			lua_error_p(L, "wrong type of third parameter (table expected)");
-		tls = table_get_flag(L, 3, "tls", tls);
-		freebind = table_get_flag(L, 3, "freebind", tls);
+		flags.tls = table_get_flag(L, 3, "tls", flags.tls);
+		flags.freebind = table_get_flag(L, 3, "freebind", flags.tls);
 
 		lua_getfield(L, 3, "kind");
 		const char *k = lua_tostring(L, -1);
 		if (k && strcasecmp(k, "dns") == 0) {
-			tls = http = false;
+			flags.tls = flags.http = false;
+		} else if (k && strcasecmp(k, "xdp") == 0) {
+			flags.tls = flags.http = false;
 		} else if (k && strcasecmp(k, "tls") == 0) {
-			tls = true;
-			http = false;
+			flags.tls = true;
+			flags.http = false;
 		} else if (k && strcasecmp(k, "doh2") == 0) {
-			tls = http = true;
+			flags.tls = flags.http = true;
 		} else if (k) {
-			kind = k;
+			flags.kind = k;
 			if (strcasecmp(k, "doh") == 0) {
 				kr_log_deprecate(
 					"kind=\"doh\" is an obsolete DoH implementation, use kind=\"doh2\" instead\n");
@@ -222,16 +222,16 @@ static int net_listen(lua_State *L)
 
 	/* Memory management of `kind` string is difficult due to longjmp etc.
 	 * Pop will unreference the lua value, so we store it on C stack instead (!) */
-	const int kind_alen = kind ? strlen(kind) + 1 : 1 /* 0 length isn't C standard */;
+	const int kind_alen = flags.kind ? strlen(flags.kind) + 1 : 1 /* 0 length isn't C standard */;
 	char kind_buf[kind_alen];
-	if (kind) {
-		memcpy(kind_buf, kind, kind_alen);
-		kind = kind_buf;
+	if (flags.kind) {
+		memcpy(kind_buf, flags.kind, kind_alen);
+		flags.kind = kind_buf;
 	}
 
 	/* Now focus on the first argument. */
 	lua_settop(L, 1);
-	if (!net_listen_addrs(L, port, tls, http, kind, freebind))
+	if (!net_listen_addrs(L, port, flags))
 		lua_error_p(L, "net.listen() failed to bind");
 	lua_pushboolean(L, true);
 	return 1;
