@@ -191,6 +191,7 @@ function M.del(id)
 			return true
 		end
 	end
+	return nil
 end
 
 -- @function Find a rule
@@ -200,6 +201,7 @@ function M.get(id)
 			return r
 		end
 	end
+	return nil
 end
 
 -- @function Enable/disable a rule
@@ -210,6 +212,7 @@ function M.toggle(id, val)
 			return true
 		end
 	end
+	return nil
 end
 
 -- @function Enable/disable a rule
@@ -270,8 +273,9 @@ local function api(h, stream)
 		if query then
 			local ok, r = pcall(M.add, query)
 			if not ok then return 500, string.format('"%s"', r:match('/([^/]+)$')) end
-			-- Dispatch to all other workers
-			consensus('daf.add "%s"', query)
+			-- Dispatch to all other workers:
+			-- we ignore return values except error() because they are not serializable
+			consensus('daf.add "%s" and true', query)
 			return rule_info(r)
 		end
 		return 400
@@ -298,11 +302,15 @@ end
 
 local function getmatches()
 	local update = {}
-	for _, rules in ipairs(map 'daf.rules') do
-		for _, r in ipairs(rules) do
-			local id = tostring(r.rule.id)
-			-- Must have string keys for JSON object and not an array
-			update[id] = (update[id] or 0) + r.rule.count
+	-- Must have string keys for JSON object and not an array
+	local inst_counters = map('ret = {} '
+		.. 'for _, rule in ipairs(daf.rules) do '
+			.. 'ret[tostring(rule.rule.id)] = rule.rule.count '
+		.. 'end '
+		.. 'return ret')
+	for inst_idx=1, inst_counters.n do
+		for r_id, r_cnt in pairs(inst_counters[inst_idx]) do
+			update[r_id] = (update[r_id] or 0) + r_cnt
 		end
 	end
 	return update
