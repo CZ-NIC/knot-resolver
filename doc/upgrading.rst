@@ -33,6 +33,19 @@ newer versions when they are released.
   `DNS Flag Day 2020 <https://dnsflagday.net/2020/>`_. Please double-check your firewall,
   it has to allow DNS traffic on UDP and also TCP port 53.
 
+
+5.1 to 5.2
+==========
+
+Module changes
+--------------
+* Reply packet :c:type:`kr_request.answer`
+  `is not allocated <https://gitlab.nic.cz/knot/knot-resolver/-/merge_requests/985>`_
+  immediately when the request comes.
+  See the new :c:func:`kr_request_ensure_answer` function,
+  wrapped for lua as ``req:ensure_answer()``.
+
+
 5.0 to 5.1
 ==========
 
