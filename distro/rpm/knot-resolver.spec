@@ -335,7 +335,7 @@ fi
 %doc %{_pkgdocdir}/html
 %doc %{_datadir}/info/knot-resolver.info*
 %dir %{_datadir}/info/knot-resolver-figures
-%doc %{_datadir}/info/knot-resolver-figures/*
+%{_datadir}/info/knot-resolver-figures/*
 %endif
 
 %if "x%{?suse_version}" == "x"
