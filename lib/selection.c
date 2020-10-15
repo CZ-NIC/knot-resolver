@@ -206,7 +206,7 @@ struct kr_transport *choose_transport(struct choice choices[],
 	memset(transport, 0, sizeof(struct kr_transport));
 	int choice = 0;
 
-	if (kr_rand_coin(1, 20) || choices_len == 0) {
+	if (kr_rand_coin(1, 1) || choices_len == 0) {
 		// EXPLORE
 		int index = kr_rand_bytes(1) % (choices_len + unresolved_len);
 		if (index < unresolved_len) {
