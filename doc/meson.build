@@ -58,9 +58,6 @@ if get_option('doc') == 'enabled'
 
   if makeinfo.found()
     # install info docs
-    # FIXME: Sphinx < 2 doesn't create a separate directory for figures, while
-    #        a newer one does. To simplify packaging, figures for info pages are
-    #        compleltely omitted for now.
     install_subdir(
       join_paths(meson.current_source_dir(), 'texinfo', '.install'),
       strip_directory: true,
