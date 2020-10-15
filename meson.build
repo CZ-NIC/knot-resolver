@@ -47,6 +47,7 @@ endif
 prefix = get_option('prefix')
 data_dir = join_paths(prefix, get_option('datadir'), 'knot-resolver')
 doc_dir = join_paths(prefix, get_option('datadir'), 'doc', 'knot-resolver')
+info_dir = join_paths(prefix, get_option('datadir'), 'info')
 examples_dir = join_paths(doc_dir, 'examples')
 etc_dir = join_paths(prefix, get_option('sysconfdir'), 'knot-resolver')
 lib_dir = join_paths(prefix, get_option('libdir'), 'knot-resolver')
