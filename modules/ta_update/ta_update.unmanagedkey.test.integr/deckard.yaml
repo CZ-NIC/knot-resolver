@@ -5,7 +5,7 @@ programs:
   additional:
     - --noninteractive
   templates:
-    - modules/view/tsig.test.integr/kresd_config.j2
+    - modules/ta_update/ta_update.unmanagedkey.test.integr/kresd_config.j2
     - tests/integration/hints_zone.j2
   configs:
     - config
