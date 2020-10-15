@@ -357,6 +357,7 @@ static struct endpoint * endpoint_get(struct network *net, const char *addr,
 }
 
 /** \note pass (either sa != NULL xor ep.fd != -1) or XDP case (neither sa nor ep.fd)
+ *  \note in XDP case addr_str is interface name
  *  \note ownership of ep.flags.* is taken on success. */
 static int create_endpoint(struct network *net, const char *addr_str,
 				struct endpoint *ep, const struct sockaddr *sa)
@@ -373,6 +374,10 @@ static int create_endpoint(struct network *net, const char *addr_str,
 
 int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags)
 {
+	if (flags.xdp) {
+		assert(!EINVAL);
+		return kr_error(EINVAL);
+	}
 	/* Extract fd's socket type. */
 	socklen_t len = sizeof(flags.sock_type);
 	int ret = getsockopt(fd, SOL_SOCKET, SO_TYPE, &flags.sock_type, &len);
@@ -429,32 +434,62 @@ int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags)
 	return create_endpoint(net, addr_str, &ep, NULL);
 }
 
+/** Try selecting XDP queue automatically. */
+static int16_t xdp_queue_auto(void)
+{
+	if (the_args->forks) // easy case
+		return the_worker->id;
+	const char *inst_str = getenv("SYSTEMD_INSTANCE");
+	if (!inst_str)
+		return -1;
+	char *endp;
+	long inst = strtol(inst_str, &endp, 10);
+	if (!errno && *endp == '\0' && inst > 0 && inst < UINT16_MAX)
+		return inst - 1; // 1-based vs. 0-based indexing conventions
+	return -1;
+}
+
 int network_listen(struct network *net, const char *addr, uint16_t port,
 		   int16_t xdp_queue, endpoint_flags_t flags)
 {
-	if (net == NULL || addr == 0) {
+	if (net == NULL || addr == 0 || xdp_queue < -1) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
-	if (endpoint_get(net, addr, port, flags)) {
-		return kr_error(EADDRINUSE); /* Already listening */
-	}
 
-	/* Parse address, if not XDP. */
-	/* LATER: in XDP case we might like to support selecting interface by IP address. */
-	const struct sockaddr *sa = NULL;
-	if (xdp_queue < 0) {
-		sa = kr_straddr_socket(addr, port, NULL);
-		if (!sa) {
+	if (flags.xdp && xdp_queue < 0) {
+		xdp_queue = xdp_queue_auto();
+		if (xdp_queue < 0) {
 			return kr_error(EINVAL);
 		}
-	};
+	}
+
+	// Try parsing the address.
+	const struct sockaddr *sa = kr_straddr_socket(addr, port, NULL);
+	if (!sa && !flags.xdp) { // unusable address spec
+		return kr_error(EINVAL);
+	}
+	char ifname_buf[64];
+	if (sa && flags.xdp) { // auto-detection: address -> interface
+		int ret = knot_eth_name_from_addr((const struct sockaddr_storage *)sa,
+						  ifname_buf, sizeof(ifname_buf));
+		if (ret) {
+			free_const(sa);
+			return kr_error(ret);
+		}
+		addr = ifname_buf;
+	}
+	// XDP: if addr failed to parse as address, we assume it's an interface name.
+
+	if (endpoint_get(net, addr, port, flags)) {
+		return kr_error(EADDRINUSE); // Already listening
+	}
 
 	struct endpoint ep = { 0 };
 	ep.flags = flags;
 	ep.fd = -1;
 	ep.port = port;
-	ep.family = xdp_queue < 0 ? sa->sa_family : AF_XDP;
+	ep.family = flags.xdp ? AF_XDP : sa->sa_family;
 	ep.xdp_queue = xdp_queue;
 
 	int ret = create_endpoint(net, addr, &ep, sa);

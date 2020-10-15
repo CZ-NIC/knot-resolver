@@ -26,6 +26,7 @@ typedef struct {
 	int sock_type;    /**< SOCK_DGRAM or SOCK_STREAM */
 	bool tls;         /**< only used together with .kind == NULL and SOCK_STREAM */
 	bool http;        /**< DoH2, implies .tls (in current implementation) */
+	bool xdp;         /**< XDP is special (not a normal socket, in particular) */
 	bool freebind;    /**< used for binding to non-local address */
 	const char *kind; /**< tag for other types: "control" or module-handled kinds */
 } endpoint_flags_t;
@@ -51,7 +52,7 @@ struct endpoint {
 	 * NULL in case of endpoints that are to be handled by modules. */
 	uv_handle_t *handle;
 	int fd;              /**< POSIX file-descriptor; always used. */
-	int family;          /**< AF_INET or AF_INET6 or AF_UNIX or AF_XDP(TODO: check) */
+	int family;          /**< AF_INET or AF_INET6 or AF_UNIX or AF_XDP */
 	uint16_t port;       /**< TCP/UDP port.  Meaningless with AF_UNIX. */
 	int16_t xdp_queue;   /**< -1 or queue number of the interface for AF_XDP use. */
 	bool engaged;        /**< to some module or internally */
@@ -97,7 +98,7 @@ void network_deinit(struct network *net);
  *       nothing is done and kr_error(EADDRINUSE) is returned.
  * \note there's no short-hand to listen both on UDP and TCP.
  * \note ownership of flags.* is taken on success.  TODO: non-success?
- * \param xdp_queue == -1 or queue number of the interface for AF_XDP use.
+ * \param xdp_queue == -1 for auto-selection or non-XDP.
  */
 int network_listen(struct network *net, const char *addr, uint16_t port,
 		   int16_t xdp_queue, endpoint_flags_t flags);
