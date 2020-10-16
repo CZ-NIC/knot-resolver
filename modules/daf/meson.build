@@ -7,7 +7,7 @@ config_tests += [
 ]
 
 integr_tests += [
-  ['daf', join_paths(meson.current_source_dir(), 'test.integr')],
+  ['daf', meson.current_source_dir() / 'test.integr'],
 ]
 
 lua_mod_src += [
@@ -17,5 +17,5 @@ lua_mod_src += [
 # install daf.js
 install_data(
   'daf.js',
-  install_dir: join_paths(modules_dir, 'daf'),
+  install_dir: modules_dir / 'daf',
 )

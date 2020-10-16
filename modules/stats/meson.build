@@ -7,7 +7,7 @@ stats_src = files([
 c_src_lint += stats_src
 
 integr_tests += [
-  ['stats', join_paths(meson.current_source_dir(), 'test.integr')],
+  ['stats', meson.current_source_dir() / 'test.integr'],
 ]
 
 
