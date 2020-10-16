@@ -8,6 +8,10 @@ config_tests += [
   ['ta_bootstrap', files('trust_anchors.test/bootstrap.test.lua')],
 ]
 
+integr_tests += [
+  ['map', join_paths(meson.current_source_dir(), 'map.test.integr')],
+]
+
 lua_config = configuration_data()
 lua_config.set('keyfile_default', keyfile_default)
 lua_config.set('etc_dir', etc_dir)
