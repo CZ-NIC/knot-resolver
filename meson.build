@@ -45,26 +45,26 @@ endif
 
 ## Paths
 prefix = get_option('prefix')
-data_dir = join_paths(prefix, get_option('datadir'), 'knot-resolver')
-doc_dir = join_paths(prefix, get_option('datadir'), 'doc', 'knot-resolver')
-info_dir = join_paths(prefix, get_option('datadir'), 'info')
-examples_dir = join_paths(doc_dir, 'examples')
-etc_dir = join_paths(prefix, get_option('sysconfdir'), 'knot-resolver')
-lib_dir = join_paths(prefix, get_option('libdir'), 'knot-resolver')
-modules_dir = join_paths(lib_dir, 'kres_modules')
-sbin_dir = join_paths(prefix, get_option('sbindir'))
-run_dir = join_paths('/run', 'knot-resolver')
-systemd_work_dir = join_paths(prefix, get_option('localstatedir'), 'lib', 'knot-resolver')
-systemd_cache_dir = join_paths(prefix, get_option('localstatedir'), 'cache', 'knot-resolver')
-systemd_unit_dir = join_paths(prefix, 'lib', 'systemd', 'system')
-systemd_tmpfiles_dir = join_paths(prefix, 'lib', 'tmpfiles.d')
-systemd_sysusers_dir = join_paths(prefix, 'lib', 'sysusers.d')
+data_dir = prefix / get_option('datadir') / 'knot-resolver'
+doc_dir = prefix / get_option('datadir') / 'doc' / 'knot-resolver'
+info_dir = prefix / get_option('datadir') / 'info'
+examples_dir = doc_dir / 'examples'
+etc_dir = prefix / get_option('sysconfdir') / 'knot-resolver'
+lib_dir = prefix / get_option('libdir') / 'knot-resolver'
+modules_dir = lib_dir / 'kres_modules'
+sbin_dir = prefix / get_option('sbindir')
+run_dir = '/run' / 'knot-resolver'
+systemd_work_dir = prefix / get_option('localstatedir') / 'lib' / 'knot-resolver'
+systemd_cache_dir = prefix / get_option('localstatedir') / 'cache' / 'knot-resolver'
+systemd_unit_dir = prefix / 'lib' / 'systemd' / 'system'
+systemd_tmpfiles_dir = prefix / 'lib' / 'tmpfiles.d'
+systemd_sysusers_dir = prefix / 'lib' / 'sysusers.d'
 mod_inc_dir = include_directories('.', 'contrib/')
 
 ## Trust anchors
 managed_ta = get_option('managed_ta') == 'enabled'
-keyfile_default = join_paths(etc_dir, get_option('keyfile_default'))
-if keyfile_default == join_paths(etc_dir, 'root.keys')
+keyfile_default = etc_dir / get_option('keyfile_default')
+if keyfile_default == etc_dir / 'root.keys'
   managed_ta = managed_ta or get_option('managed_ta') == 'auto'
 endif
 install_root_keys = get_option('install_root_keys') == 'enabled'
@@ -74,8 +74,8 @@ endif
 
 
 ## Root hints
-root_hints = join_paths(etc_dir, get_option('root_hints'))
-if root_hints == join_paths(etc_dir, 'root.hints')
+root_hints = etc_dir / get_option('root_hints')
+if root_hints == etc_dir / 'root.hints'
   install_root_hints = true
 else
   install_root_hints = false
@@ -262,7 +262,7 @@ if flake8.found()
     command: [
       flake8,
       '--max-line-length=100',
-      join_paths(meson.source_root(), 'tests', 'pytests'),
+      meson.source_root() / 'tests' / 'pytests',
     ],
   )
 endif

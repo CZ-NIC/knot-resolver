@@ -32,7 +32,7 @@ config_tests += [
 ]
 
 integr_tests += [
-  ['cache_insert_ns', join_paths(meson.current_source_dir(), 'cache.test', 'insert_ns.test.integr')]
+  ['cache_insert_ns', meson.current_source_dir() / 'cache.test' / 'insert_ns.test.integr']
 ]
 
 kresd_deps = [
