@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+programs:
+- name: kresd3
+  binary: kresd
+  additional:
+    - --noninteractive
+  templates:
+    - daemon/lua/map.test.integr/kresd_config.j2
+    - tests/integration/hints_zone.j2
+    - tests/config/tapered/src/tapered.lua
+  configs:
+    - config
+    - hints
+    - tapered.lua
+- name: kresd2
+  binary: kresd
+  additional:
+    - --noninteractive
+  templates:
+    - daemon/lua/map.test.integr/kresd_config.j2
+    - tests/integration/hints_zone.j2
+    - tests/config/tapered/src/tapered.lua
+  configs:
+    - config
+    - hints
+    - tapered.lua
+- name: kresd1
+  binary: kresd
+  additional:
+    - --noninteractive
+  templates:
+    - daemon/lua/map.test.integr/kresd_config.j2
+    - tests/integration/hints_zone.j2
+    - tests/config/tapered/src/tapered.lua
+  configs:
+    - config
+    - hints
+    - tapered.lua
