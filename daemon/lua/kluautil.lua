@@ -1,6 +1,5 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 
-local cqerrno = require('cqueues.errno')
 local ffi = require('ffi')
 local kluautil = {}
 
@@ -53,6 +52,7 @@ function kluautil.kr_https_fetch(url, out_file, ca_file)
 	if not http_ok or not httptls_ok or not openssl_ok then
 		return nil, 'error: lua-http and luaossl libraries are missing (but required)'
 	end
+	local cqerrno = require('cqueues.errno')
 
 	assert(string.match(url, '^https://'))
 
