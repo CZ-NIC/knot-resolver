@@ -93,6 +93,7 @@ Requires(pre):  shadow
 BuildRequires:  doxygen
 BuildRequires:  python3-breathe
 BuildRequires:  python3-sphinx_rtd_theme
+BuildRequires:  texinfo
 %endif
 
 %description
@@ -332,6 +333,9 @@ fi
 %files doc
 %dir %{_pkgdocdir}
 %doc %{_pkgdocdir}/html
+%doc %{_datadir}/info/knot-resolver.info*
+%dir %{_datadir}/info/knot-resolver-figures
+%doc %{_datadir}/info/knot-resolver-figures/*
 %endif
 
 %if "x%{?suse_version}" == "x"
