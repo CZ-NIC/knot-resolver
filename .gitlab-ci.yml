@@ -85,7 +85,7 @@ archive:
 build:
   <<: *build
   script:
-    - meson build_ci --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled
+    - meson build_ci --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled --fatal-meson-warnings
     - ninja -C build_ci
     - ninja -C build_ci install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --no-suite snowflake

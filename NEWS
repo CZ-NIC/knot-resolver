@@ -1,6 +1,10 @@
 Knot Resolver 5.2.0 (2020-1m-dd)
 ================================
 
+Incompatible changes
+--------------------
+- build: meson >= 0.49 is required (!1082)
+
 Improvements
 ------------
 - net: split the EDNS buffer size into upstream and downstream (!1026)
