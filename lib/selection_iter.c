@@ -235,6 +235,11 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 		}
 	}
 
+	// . DNSKEY must be fetched from root hints, no A/AAAA resolution is possible.
+	if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
+		num_to_resolve = 0;
+	}
+
 	trie_it_free(it);
 
 	if (valid_addresses || num_to_resolve) {
