@@ -2,7 +2,7 @@
 # C module: refuse_nord
 
 integr_tests += [
-  ['refuse_nord', join_paths(meson.current_source_dir(), 'test.integr')],
+  ['refuse_nord', meson.current_source_dir() / 'test.integr'],
 ]
 
 refuse_nord_src = files([

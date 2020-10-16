@@ -12,9 +12,9 @@ config_tests += [
 ]
 
 integr_tests += [
-  ['policy', join_paths(meson.current_source_dir(), 'test.integr')],
-  ['policy.noipv6', join_paths(meson.current_source_dir(), 'noipv6.test.integr')],
-  ['policy.noipvx', join_paths(meson.current_source_dir(), 'noipvx.test.integr')],
+  ['policy', meson.current_source_dir() / 'test.integr'],
+  ['policy.noipv6', meson.current_source_dir() / 'noipv6.test.integr'],
+  ['policy.noipvx', meson.current_source_dir() / 'noipvx.test.integr'],
 ]
 
 # check git submodules were initialized

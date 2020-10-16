@@ -25,7 +25,7 @@ if build_utils
   )
 
 integr_tests += [
-  ['gc_cache_overflow', join_paths(meson.current_source_dir(), 'test.integr')],
+  ['gc_cache_overflow', meson.current_source_dir() / 'test.integr'],
 ]
 
 endif

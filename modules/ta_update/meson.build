@@ -6,8 +6,8 @@ config_tests += [
 ]
 
 integr_tests += [
-  ['ta_update', join_paths(meson.current_source_dir(), 'ta_update.test.integr')],
-  ['ta_update.unmanagedkey', join_paths(meson.current_source_dir(), 'ta_update.unmanagedkey.test.integr')],
+  ['ta_update', meson.current_source_dir() / 'ta_update.test.integr'],
+  ['ta_update.unmanagedkey', meson.current_source_dir() / 'ta_update.unmanagedkey.test.integr'],
 ]
 
 lua_mod_src += [
@@ -15,5 +15,5 @@ lua_mod_src += [
 ]
 
 install_data(
-  install_dir: join_paths(modules_dir, 'ta_update'),
+  install_dir: modules_dir / 'ta_update',
 )

@@ -41,7 +41,7 @@ install_subdir(
     'selectize.spdx',
     'topojson.spdx',
   ],
-  install_dir: join_paths(modules_dir, 'http'),
+  install_dir: modules_dir / 'http',
 )
 
 # auxiliary debug library for HTTP module

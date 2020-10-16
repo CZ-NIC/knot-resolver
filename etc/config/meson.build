@@ -21,7 +21,7 @@ install_data(
 # kresd.conf
 install_kresd_conf = get_option('install_kresd_conf') == 'enabled'
 if get_option('install_kresd_conf') == 'auto'
-  if run_command(['test', '-r', join_paths(etc_dir, 'kresd.conf')]).returncode() == 1
+  if run_command(['test', '-r', etc_dir / 'kresd.conf']).returncode() == 1
     install_kresd_conf = true
   endif
 endif
