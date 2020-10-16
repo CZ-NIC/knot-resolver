@@ -226,10 +226,12 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 		struct iter_name_state *name_state = *(struct iter_name_state **)trie_it_val(it);
 		if (name_state->generation == local_state->generation) {
 			knot_dname_t *name = (knot_dname_t *)trie_it_key(it, NULL);
-			if (name_state->a_state == RECORD_UNKNOWN && !qry->flags.NO_IPV4) {
+			bool a_in_rplan = kr_rplan_satisfies(qry->parent, name, KNOT_CLASS_IN, KNOT_RRTYPE_A);
+			bool aaaa_in_rplan = kr_rplan_satisfies(qry->parent, name, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
+			if (name_state->a_state == RECORD_UNKNOWN && !qry->flags.NO_IPV4 && !a_in_rplan) {
 				unresolved_types[num_to_resolve++] = (struct to_resolve){name, KR_TRANSPORT_RESOLVE_A};
 			}
-			if (name_state->aaaa_state == RECORD_UNKNOWN && !qry->flags.NO_IPV6) {
+			if (name_state->aaaa_state == RECORD_UNKNOWN && !qry->flags.NO_IPV6 && !aaaa_in_rplan) {
 				unresolved_types[num_to_resolve++] = (struct to_resolve){name, KR_TRANSPORT_RESOLVE_AAAA};
 			}
 		}
