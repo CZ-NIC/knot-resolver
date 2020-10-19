@@ -265,8 +265,8 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 			enum kr_transport_protocol proto = (*transport)->protocol;
 			if (proto != KR_TRANSPORT_RESOLVE_A && proto != KR_TRANSPORT_RESOLVE_AAAA) {
 				VERBOSE_MSG(qry,
-				"=> id: '%05u' choosing: '%s'@'%s' with timeout %u ms zone cut: '%s'\n",
-				qry->id, ns_name, ns_str ? ns_str : "", (*transport)->timeout, zonecut_str);
+				"=> id: '%05u' choosing: '%s'@'%s' with timeout %u ms zone cut: '%s'%s\n",
+				qry->id, ns_name, ns_str ? ns_str : "", (*transport)->timeout, zonecut_str, (*transport)->safe_mode ? " SAFEMODE" : "");
 			} else {
 				const char *ip_version = (proto == KR_TRANSPORT_RESOLVE_A) ? "A" : "AAAA";
 				VERBOSE_MSG(qry,

@@ -256,6 +256,7 @@ struct kr_transport *choose_transport(struct choice choices[],
 		.name = choices[choice].address_state->name,
 		.protocol = protocol,
 		.timeout = timeout,
+		.safe_mode = choices[choice].address_state->errors[KR_SELECTION_FORMERROR],
 	};
 
 
@@ -363,6 +364,10 @@ void error(struct kr_query *qry, struct address_state *addr_state, const struct 
 	}
 
 	if (UNRECOVERABLE_ERRORS[sel_error]) {
+		addr_state->unrecoverable_errors++;
+	}
+
+	if (sel_error == KR_SELECTION_FORMERROR && transport->safe_mode) {
 		addr_state->unrecoverable_errors++;
 	}
 
