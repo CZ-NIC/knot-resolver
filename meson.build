@@ -168,11 +168,11 @@ conf_data.set_quoted('libzscanner_SONAME',
   libzscanner.get_pkgconfig_variable('soname'))
 conf_data.set_quoted('libknot_SONAME',
   libknot.get_pkgconfig_variable('soname'))
-conf_data.set('ENABLE_LIBSYSTEMD', libsystemd.found() ? 1 : 0)
+conf_data.set('ENABLE_LIBSYSTEMD', libsystemd.found().to_int())
 conf_data.set('NOVERBOSELOG', not verbose_log)
 conf_data.set('ENABLE_SENDMMSG', sendmmsg.to_int())
-conf_data.set('ENABLE_CAP_NG', capng.found())
-conf_data.set('ENABLE_DOH2', nghttp2.found())
+conf_data.set('ENABLE_CAP_NG', capng.found().to_int())
+conf_data.set('ENABLE_DOH2', nghttp2.found().to_int())
 
 kresconfig = configure_file(
   output: 'kresconfig.h',
