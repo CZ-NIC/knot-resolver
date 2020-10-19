@@ -818,7 +818,12 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 
 	/* Do not finish with bogus answer. */
 	if (qry->flags.DNSSEC_BOGUS)  {
-		return KR_STATE_FAIL;
+		if (qry->flags.FORWARD || qry->flags.STUB) {
+			return KR_STATE_FAIL;
+		}
+		/* Other servers might not have broken DNSSEC. */
+		qry->flags.DNSSEC_BOGUS = false;
+		return KR_STATE_PRODUCE;
 	}
 
 	return kr_rplan_empty(&request->rplan) ? KR_STATE_DONE : KR_STATE_PRODUCE;

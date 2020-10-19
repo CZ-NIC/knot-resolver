@@ -17,6 +17,7 @@ struct iter_local_state {
 	trie_t *names;
 	trie_t *addresses;
 	unsigned int generation; // Used to distinguish old and valid records in tries
+	enum kr_selection_error last_error;
 };
 
 enum record_state {
@@ -249,6 +250,9 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 		*transport = choose_transport(choices, valid_addresses, unresolved_types, num_to_resolve, qry->server_selection.timeouts, mempool, tcp, NULL);
 	} else {
 		*transport = NULL;
+		if (local_state->last_error == KR_SELECTION_DNSSEC_ERROR) {
+			qry->flags.DNSSEC_BOGUS = true;
+		}
 	}
 
 	update_name_state(*transport, local_state->names);
@@ -286,6 +290,7 @@ void iter_error(struct kr_query *qry, const struct kr_transport *transport, enum
 	}
 	struct iter_local_state *local_state = qry->server_selection.local_state;
 	struct address_state *addr_state = get_address_state(local_state, transport);
+	local_state->last_error = sel_error;
 	error(qry, addr_state, transport, sel_error);
 }
 
