@@ -10,7 +10,6 @@
 #include <lauxlib.h>
 #include <libknot/packet/pkt.h>
 #include <libknot/descriptor.h>
-#include <libknot/xdp/xdp.h>
 #include <contrib/ucw/lib.h>
 #include <contrib/ucw/mempool.h>
 #include <contrib/wire.h>
@@ -21,6 +20,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <gnutls/gnutls.h>
+
+#if ENABLE_XDP
+	#include <libknot/xdp/xdp.h>
+#endif
 
 #include "daemon/bindings/api.h"
 #include "daemon/engine.h"
@@ -262,6 +265,7 @@ static int subreq_key(char *dst, knot_pkt_t *pkt)
 			knot_pkt_qtype(pkt), knot_pkt_qtype(pkt));
 }
 
+#if ENABLE_XDP
 static uint8_t *alloc_wire_cb(struct kr_request *req, uint16_t *maxlen)
 {
 	assert(maxlen);
@@ -284,6 +288,7 @@ static uint8_t *alloc_wire_cb(struct kr_request *req, uint16_t *maxlen)
 	memcpy(out.eth_to,   &ctx->source.eth_addrs[1], 6);
 	return out.payload.iov_base;
 }
+#endif
 
 /** Create and initialize a request_ctx (on a fresh mempool).
  *
@@ -321,10 +326,15 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	assert(!!eth_to == !!eth_from);
 	const bool is_xdp = eth_to != NULL;
 	if (is_xdp) {
+	#if ENABLE_XDP
 		assert(session);
 		memcpy(&ctx->source.eth_addrs[0], eth_to,   sizeof(ctx->source.eth_addrs[0]));
 		memcpy(&ctx->source.eth_addrs[1], eth_from, sizeof(ctx->source.eth_addrs[1]));
 		ctx->req.alloc_wire_cb = alloc_wire_cb;
+	#else
+		assert(!EINVAL);
+		return NULL;
+	#endif
 	}
 
 	struct kr_request *req = &ctx->req;
@@ -1235,7 +1245,8 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		assert(false);
 		ret = kr_error(EINVAL);
 
-	} else if (src_handle->type == UV_POLL) { // AF_XDP
+	} else if (src_handle->type == UV_POLL) {
+	#if ENABLE_XDP
 		knot_xdp_msg_t msg;
 		const struct sockaddr *ip_from = &ctx->source.dst_addr.ip;
 		const struct sockaddr *ip_to   = &ctx->source.addr.ip;
@@ -1250,6 +1261,10 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		ret = knot_xdp_send(xhd->socket, &msg, 1, &sent);
 		kr_log_verbose("[uxsk] pushed a packet, ret = %d\n", ret);
 		ret = qr_task_on_send(task, NULL/*doesn't matter for UDP*/, ret);
+	#else
+		assert(!EINVAL);
+		ret = kr_error(EINVAL);
+	#endif
 
 	} else if (src_handle->type == UV_UDP && ENABLE_SENDMMSG) {
 		int fd;

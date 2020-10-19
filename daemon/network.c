@@ -300,9 +300,13 @@ static int open_endpoint(struct network *net, const char *addr_str,
 	}
 
 	if (is_xdp) {
+	#if ENABLE_XDP
 		ep->handle = malloc(sizeof(uv_poll_t));
 		ret = !ep->handle ? ENOMEM
 			: io_listen_xdp(net->loop, ep, addr_str);
+	#else
+		ret = ESOCKTNOSUPPORT;
+	#endif
 		goto finish_ret;
 	} /* else */
 
@@ -469,8 +473,9 @@ int network_listen(struct network *net, const char *addr, uint16_t port,
 	if (!sa && !flags.xdp) { // unusable address spec
 		return kr_error(EINVAL);
 	}
-	char ifname_buf[64];
+	char ifname_buf[64] UNUSED;
 	if (sa && flags.xdp) { // auto-detection: address -> interface
+	#if ENABLE_XDP
 		int ret = knot_eth_name_from_addr((const struct sockaddr_storage *)sa,
 						  ifname_buf, sizeof(ifname_buf));
 		// even on success we don't want to pass `sa` on
@@ -480,6 +485,9 @@ int network_listen(struct network *net, const char *addr, uint16_t port,
 			return kr_error(ret);
 		}
 		addr = ifname_buf;
+	#else
+		return kr_error(ESOCKTNOSUPPORT);
+	#endif
 	}
 	// XDP: if addr failed to parse as address, we assume it's an interface name.
 

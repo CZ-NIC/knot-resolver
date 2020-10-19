@@ -110,6 +110,9 @@ else
   sendmmsg = get_option('sendmmsg') == 'enabled'
 endif
 
+### XDP: not configurable - we just check if libknot supports it
+xdp = meson.get_compiler('c').has_header('libknot/xdp/xdp.h')
+
 ### Systemd
 systemd_files = get_option('systemd_files')
 libsystemd = dependency('libsystemd', required: systemd_files == 'enabled')
@@ -171,6 +174,7 @@ conf_data.set_quoted('libknot_SONAME',
 conf_data.set('ENABLE_LIBSYSTEMD', libsystemd.found().to_int())
 conf_data.set('NOVERBOSELOG', not verbose_log)
 conf_data.set('ENABLE_SENDMMSG', sendmmsg.to_int())
+conf_data.set('ENABLE_XDP', xdp.to_int())
 conf_data.set('ENABLE_CAP_NG', capng.found().to_int())
 conf_data.set('ENABLE_DOH2', nghttp2.found().to_int())
 
@@ -286,6 +290,7 @@ s_build_config_tests = build_config_tests ? 'enabled' : 'disabled'
 s_build_extra_tests = build_extra_tests ? 'enabled' : 'disabled'
 s_install_kresd_conf = install_kresd_conf ? 'enabled' : 'disabled'
 s_sendmmsg = sendmmsg ? 'enabled': 'disabled'
+s_xdp = xdp ? 'enabled': 'disabled'
 s_openssl = openssl.found() ? 'present': 'missing'
 s_capng = capng.found() ? 'enabled': 'disabled'
 s_doh2 = nghttp2.found() ? 'enabled': 'disabled'
@@ -323,6 +328,7 @@ message('''
     group:              @0@'''.format(group) + '''
     install_kresd_conf: @0@'''.format(s_install_kresd_conf) + '''
     sendmmsg:           @0@'''.format(s_sendmmsg) + '''
+    XDP (in libknot):   @0@'''.format(s_xdp) + '''
     openssl debug:      @0@'''.format(s_openssl) + '''
     capng:              @0@'''.format(s_capng) + '''
     doh2:               @0@'''.format(s_doh2) + '''

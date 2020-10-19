@@ -2,14 +2,18 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include "daemon/io.h"
+
 #include <string.h>
 #include <libknot/errcode.h>
-#include <libknot/xdp/xdp.h>
 #include <contrib/ucw/lib.h>
 #include <contrib/ucw/mempool.h>
 #include <assert.h>
 
-#include "daemon/io.h"
+#if ENABLE_XDP
+	#include <libknot/xdp/xdp.h>
+#endif
+
 #include "daemon/network.h"
 #include "daemon/worker.h"
 #include "daemon/tls.h"
@@ -787,6 +791,7 @@ int io_listen_pipe(uv_loop_t *loop, uv_pipe_t *handle, int fd)
 	return 0;
 }
 
+#if ENABLE_XDP
 #define XDP_RX_BATCH_SIZE 64
 static void xdp_rx(uv_poll_t* handle, int status, int events)
 {
@@ -876,6 +881,7 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 	ret = uv_poll_start((uv_poll_t *)ep->handle, UV_READABLE, xdp_rx);
 	return ret;
 }
+#endif
 
 
 int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family, bool has_tls, bool has_http)
@@ -904,13 +910,17 @@ void io_deinit(uv_handle_t *handle)
 	}
 	if (handle->type != UV_POLL) {
 		session_free(handle->data);
-	} else { // XDP
+	} else {
+	#if ENABLE_XDP
 		xdp_handle_data_t *xhd = handle->data;
 		uv_check_stop(&xhd->tx_waker);
 		uv_close((uv_handle_t *)&xhd->tx_waker, NULL);
 		session_free(xhd->session);
 		knot_xdp_deinit(xhd->socket);
 		free(xhd);
+	#else
+		assert(false);
+	#endif
 	}
 }
 
