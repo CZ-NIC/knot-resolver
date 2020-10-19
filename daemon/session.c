@@ -36,7 +36,7 @@ struct session {
 	struct tls_ctx *tls_ctx;      /**< server side tls-related data. */
 	struct tls_client_ctx *tls_client_ctx;  /**< client side tls-related data. */
 
-#ifdef ENABLE_DOH2
+#if ENABLE_DOH2
 	struct http_ctx *http_ctx;  /**< server side http-related data. */
 #endif
 
@@ -89,7 +89,7 @@ void session_clear(struct session *session)
 	queue_deinit(session->waiting);
 	tls_free(session->tls_ctx);
 	tls_client_ctx_free(session->tls_client_ctx);
-#ifdef ENABLE_DOH2
+#if ENABLE_DOH2
 	http_free(session->http_ctx);
 #endif
 	memset(session, 0, sizeof(*session));
@@ -295,7 +295,7 @@ struct tls_common_ctx *session_tls_get_common_ctx(const struct session *session)
 	return tls_ctx;
 }
 
-#ifdef ENABLE_DOH2
+#if ENABLE_DOH2
 struct http_ctx *session_http_get_server_ctx(const struct session *session)
 {
 	return session->http_ctx;
@@ -337,7 +337,7 @@ struct session *session_new(uv_handle_t *handle, bool has_tls, bool has_http)
 			wire_buffer_size += TLS_CHUNK_SIZE;
 			session->sflags.has_tls = true;
 		}
-#ifdef ENABLE_DOH2
+#if ENABLE_DOH2
 		if (has_http) {
 			/* When decoding large packets,
 			 * HTTP/2 frames can be up to 16 KB by default. */
