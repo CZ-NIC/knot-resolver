@@ -1362,6 +1362,8 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 		return KR_STATE_PRODUCE;
 	}
 
+	qry->flags.SAFEMODE = (*transport)->safe_mode;
+
 	/* Randomize query case (if not in safe mode or turned off) */
 	qry->secret = (qry->flags.SAFEMODE || qry->flags.NO_0X20)
 			? 0 : kr_rand_bytes(sizeof(qry->secret));

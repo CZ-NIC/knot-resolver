@@ -47,7 +47,7 @@ static const bool UNRECOVERABLE_ERRORS[] = {
 	[KR_SELECTION_TCP_CONNECT_TIMEOUT] = false,
 	[KR_SELECTION_REFUSED] = true,
 	[KR_SELECTION_SERVFAIL] = true,
-	[KR_SELECTION_FORMERROR] = true,
+	[KR_SELECTION_FORMERROR] = false,
 	[KR_SELECTION_NOTIMPL] = true,
 	[KR_SELECTION_OTHER_RCODE] = true,
 	[KR_SELECTION_TRUNCATED] = false,
@@ -76,6 +76,7 @@ struct kr_transport {
 	unsigned timeout; /**< Timeout in ms to be set for UDP transmission. */
 	bool deduplicated; /**< True iff transport was set in worker.c:subreq_finalize,
                                 that means it may be different from the one originally chosen one.*/
+	bool safe_mode; /**< Turn on SAFEMODE for this transport */
 };
 
 /**
