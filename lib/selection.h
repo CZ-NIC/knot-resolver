@@ -16,6 +16,8 @@
  * See `kr_server_selection::error` for more details.
  */
 enum kr_selection_error {
+	KR_SELECTION_OK = 0,
+
 	// Network errors
 	KR_SELECTION_TIMEOUT,
 	KR_SELECTION_TLS_HANDSHAKE_FAILED,
