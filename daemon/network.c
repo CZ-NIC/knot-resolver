@@ -473,8 +473,10 @@ int network_listen(struct network *net, const char *addr, uint16_t port,
 	if (sa && flags.xdp) { // auto-detection: address -> interface
 		int ret = knot_eth_name_from_addr((const struct sockaddr_storage *)sa,
 						  ifname_buf, sizeof(ifname_buf));
+		// even on success we don't want to pass `sa` on
+		free_const(sa);
+		sa = NULL;
 		if (ret) {
-			free_const(sa);
 			return kr_error(ret);
 		}
 		addr = ifname_buf;
