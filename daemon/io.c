@@ -4,11 +4,12 @@
 
 #include "daemon/io.h"
 
-#include <string.h>
-#include <libknot/errcode.h>
+#include <assert.h>
 #include <contrib/ucw/lib.h>
 #include <contrib/ucw/mempool.h>
-#include <assert.h>
+#include <libknot/errcode.h>
+#include <string.h>
+#include <sys/resource.h>
 
 #if ENABLE_XDP
 	#include <libknot/xdp/xdp.h>
@@ -847,6 +848,16 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 	if (!ep || !ep->handle) {
 		return kr_error(EINVAL);
 	}
+
+	// RLIMIT_MEMLOCK often needs raising when operating on BPF
+	static int ret_limit = 1;
+	if (ret_limit == 1) {
+		struct rlimit no_limit = { RLIM_INFINITY, RLIM_INFINITY };
+		ret_limit = setrlimit(RLIMIT_MEMLOCK, &no_limit)
+			? kr_error(errno) : 0;
+	}
+	if (ret_limit) return ret_limit;
+
 	xdp_handle_data_t *xhd = malloc(sizeof(*xhd));
 	if (!xhd) return kr_error(ENOMEM);
 
