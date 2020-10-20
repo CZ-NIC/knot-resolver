@@ -36,7 +36,7 @@
 #define LRU_REP_SIZE (LRU_RTT_SIZE / 4) /**< NS reputation cache size */
 #endif
 #ifndef LRU_COOKIES_SIZE
-	#ifdef ENABLE_COOKIES
+	#if ENABLE_COOKIES
 	#define LRU_COOKIES_SIZE LRU_RTT_SIZE /**< DNS cookies cache size. */
 	#else
 	#define LRU_COOKIES_SIZE LRU_ASSOC /* simpler than guards everywhere */
