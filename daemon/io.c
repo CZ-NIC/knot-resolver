@@ -667,20 +667,24 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 		}
 
 		int ret = engine_cmd(L, cmd, false);
-		const char *message = "";
+		const char *message = NULL;
+		size_t len_s;
 		if (lua_gettop(L) > 0) {
-			message = lua_tostring(L, -1);
+			message = lua_tolstring(L, -1, &len_s);
 		}
 
 		/* Simpler output in binary mode */
 		if (data->mode == io_mode_binary) {
-			size_t len_s = strlen(message);
-			if (len_s > UINT32_MAX) {
-				goto next_iter;
+			/* Leader expects length field in all cases */
+			if (!message || len_s > UINT32_MAX) {
+				kr_log_error("[io] unrepresentable respose on control socket, "
+						"sending back empty block (command '%s')\n", cmd);
+				len_s = 0;
 			}
 			uint32_t len_n = htonl(len_s);
 			fwrite(&len_n, sizeof(len_n), 1, out);
-			fwrite(message, len_s, 1, out);
+			if (len_s > 0)
+				fwrite(message, len_s, 1, out);
 			goto next_iter;
 		}
 
