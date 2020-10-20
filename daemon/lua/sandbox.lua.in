@@ -744,6 +744,8 @@ function map(cmd, format)
 
 	if (type(cmd) ~= 'string') then
 		panic('map() command must be a string') end
+	if string.find(cmd, '\n', 1, true) then
+		panic('map() command cannot contain literal \\n, escape it with \\010') end
 	if (#cmd <= 0) then
 		panic('map() command must be non-empty') end
 	-- syntax check on input command to detect typos early
