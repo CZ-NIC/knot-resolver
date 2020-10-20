@@ -725,7 +725,8 @@ function policy.REFUSE(_, req)
 end
 
 function policy.TC(state, req)
-	-- Avoid non-UDP queries; vv TODO: consider using a better indicator
+	-- Avoid non-UDP queries
+	-- TODO: consider using a better indicator
 	if req.answer.max_size == 65535 then
 		return state
 	end
