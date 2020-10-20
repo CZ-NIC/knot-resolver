@@ -19,7 +19,7 @@ man_kresd = configure_file(
 install_man(man_kresd)
 
 
-# html documentation
+# html and info documentation
 if get_option('doc') == 'enabled'
   message('--- doc dependencies ---')
   doxygen = find_program('doxygen')
@@ -27,6 +27,7 @@ if get_option('doc') == 'enabled'
   if not sphinx_build.found()
     sphinx_build = find_program('sphinx-build')
   endif
+  makeinfo = find_program('makeinfo', required: false)
 
   # python dependencies: breathe, sphinx_rtd_theme
   python_breathe = run_command('python3', '-c', 'import breathe')
@@ -54,6 +55,15 @@ if get_option('doc') == 'enabled'
     join_paths(meson.current_source_dir(), 'html'),
     install_dir: doc_dir,
   )
+
+  if makeinfo.found()
+    # install info docs
+    install_subdir(
+      join_paths(meson.current_source_dir(), 'texinfo', '.install'),
+      strip_directory: true,
+      install_dir: info_dir,
+    )
+  endif
 endif
 
 make_doc = find_program('../scripts/make-doc.sh')

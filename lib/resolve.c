@@ -18,13 +18,13 @@
 #include "lib/layer/iterate.h"
 #include "lib/dnssec/ta.h"
 #include "lib/dnssec.h"
-#if defined(ENABLE_COOKIES)
+#if ENABLE_COOKIES
 #include "lib/cookies/control.h"
 #include "lib/cookies/helper.h"
 #include "lib/cookies/nonce.h"
 #else /* Define compatibility macros */
 #define KNOT_EDNS_OPTION_COOKIE 10
-#endif /* defined(ENABLE_COOKIES) */
+#endif /* ENABLE_COOKIES */
 
 #define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "resl",  __VA_ARGS__)
 
@@ -424,12 +424,12 @@ static int edns_create(knot_pkt_t *pkt, const struct kr_request *req)
 {
 	pkt->opt_rr = knot_rrset_copy(req->ctx->upstream_opt_rr, &pkt->mm);
 	size_t wire_size = knot_edns_wire_size(pkt->opt_rr);
-#if defined(ENABLE_COOKIES)
+#if ENABLE_COOKIES
 	if (req->ctx->cookie_ctx.clnt.enabled ||
 	    req->ctx->cookie_ctx.srvr.enabled) {
 		wire_size += KR_COOKIE_OPT_MAX_LEN;
 	}
-#endif /* defined(ENABLE_COOKIES) */
+#endif /* ENABLE_COOKIES */
 	if (req->qsource.flags.tls) {
 		if (req->ctx->tls_padding == -1)
 			/* FIXME: we do not know how to reserve space for the
@@ -1536,7 +1536,7 @@ ns_election:
 	return request->state;
 }
 
-#if defined(ENABLE_COOKIES)
+#if ENABLE_COOKIES
 /** Update DNS cookie data in packet. */
 static bool outbound_request_update_cookies(struct kr_request *req,
                                             const struct sockaddr *src,
@@ -1566,7 +1566,7 @@ static bool outbound_request_update_cookies(struct kr_request *req,
 
 	return true;
 }
-#endif /* defined(ENABLE_COOKIES) */
+#endif /* ENABLE_COOKIES */
 
 int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
                         struct sockaddr *dst, int type, knot_pkt_t *packet)
@@ -1585,7 +1585,7 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 	}
 	struct kr_query *qry = array_tail(rplan->pending);
 
-#if defined(ENABLE_COOKIES)
+#if ENABLE_COOKIES
 	/* Update DNS cookies in request. */
 	if (type == SOCK_DGRAM) { /* @todo: Add cookies also over TCP? */
 		/*
@@ -1597,7 +1597,7 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 			return kr_error(EINVAL);
 		}
 	}
-#endif /* defined(ENABLE_COOKIES) */
+#endif /* ENABLE_COOKIES */
 
 	int ret = query_finalize(request, qry, packet);
 	if (ret != 0) {

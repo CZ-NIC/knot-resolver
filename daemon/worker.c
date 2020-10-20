@@ -337,7 +337,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		req->qsource.flags.tls = session_flags(session)->has_tls;
 		req->qsource.flags.http = session_flags(session)->has_http;
 		req->qsource.stream_id = -1;
-#ifdef ENABLE_DOH2
+#if ENABLE_DOH2
 		if (req->qsource.flags.http) {
 			struct http_ctx *http_ctx = session_http_get_server_ctx(session);
 			req->qsource.stream_id = queue_head(http_ctx->streams);
@@ -644,7 +644,7 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 	/* Send using given protocol */
 	assert(!session_flags(session)->closing);
 	if (session_flags(session)->has_http) {
-#ifdef ENABLE_DOH2
+#if ENABLE_DOH2
 		uv_write_t *write_req = (uv_write_t *)ioreq;
 		write_req->data = task;
 		ret = http_write(write_req, handle, pkt, ctx->req.qsource.stream_id, &on_write);
@@ -1659,7 +1659,7 @@ int worker_submit(struct session *session,
 	const bool is_outgoing = session_flags(session)->outgoing;
 
 	struct http_ctx *http_ctx = NULL;
-#ifdef ENABLE_DOH2
+#if ENABLE_DOH2
 	http_ctx = session_http_get_server_ctx(session);
 #endif
 

@@ -307,7 +307,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		data = session_wirebuf_get_free_start(s);
 		data_len = consumed;
 	}
-#ifdef ENABLE_DOH2
+#if ENABLE_DOH2
 	if (session_flags(s)->has_http) {
 		consumed = http_process_input_data(s, data, data_len);
 		if (consumed < 0) {
@@ -342,7 +342,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	mp_flush(the_worker->pkt_pool.ctx);
 }
 
-#ifdef ENABLE_DOH2
+#if ENABLE_DOH2
 static ssize_t tls_send(const uint8_t *buf, const size_t len, struct session *session)
 {
 	struct tls_ctx *ctx = session_tls_get_server_ctx(session);
@@ -457,7 +457,7 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls, bool http)
 			session_tls_set_server_ctx(s, ctx);
 		}
 	}
-#ifdef ENABLE_DOH2
+#if ENABLE_DOH2
 	if (http) {
 		struct http_ctx *ctx = session_http_get_server_ctx(s);
 		if (!ctx) {
@@ -488,7 +488,7 @@ static void tls_accept(uv_stream_t *master, int status)
 	_tcp_accept(master, status, true, false);
 }
 
-#ifdef ENABLE_DOH2
+#if ENABLE_DOH2
 static void https_accept(uv_stream_t *master, int status)
 {
 	_tcp_accept(master, status, true, true);
@@ -506,7 +506,7 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
 	if (ret) return ret;
 
 	if (has_tls && has_http) {
-#ifdef ENABLE_DOH2
+#if ENABLE_DOH2
 		connection = https_accept;
 #else
 		kr_log_error("[ io ] kresd was compiled without libnghttp2 support\n");

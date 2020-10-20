@@ -15,7 +15,6 @@ lua_mod_src = [  # add lua modules without separate meson.build
   files('serve_stale/serve_stale.lua'),
   files('ta_sentinel/ta_sentinel.lua'),
   files('ta_signal_query/ta_signal_query.lua'),
-  files('ta_update/ta_update.lua'),
   files('watchdog/watchdog.lua'),
   files('workarounds/workarounds.lua'),
 ]
@@ -24,7 +23,6 @@ lua_mod_src = [  # add lua modules without separate meson.build
 config_tests += [
   ['predict', files('predict/predict.test.lua')],
   ['dns64', files('dns64/dns64.test.lua')],
-  ['ta_update', files('ta_update/ta_update.test.lua'), ['snowflake']],
   ['prefill', files('prefill/prefill.test/prefill.test.lua')],
 ]
 
@@ -33,7 +31,6 @@ integr_tests += [
   ['serve_stale', join_paths(meson.current_source_dir(), 'serve_stale', 'test.integr')],
   # NOTE: ta_update may pass in cases when it should fail due to race conditions
   # To ensure reliability, deckard should introduce a time wait
-  ['ta_update', join_paths(meson.current_source_dir(), 'ta_update', 'ta_update.test.integr')],
 ]
 
 
@@ -50,6 +47,7 @@ subdir('nsid')
 subdir('policy')
 subdir('refuse_nord')
 subdir('stats')
+subdir('ta_update')
 subdir('view')
 
 # install lua modules
