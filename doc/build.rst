@@ -50,7 +50,9 @@ Resolver:
    "cmocka_", "``unit tests``", "Unit testing framework."
    "Doxygen_", "``documentation``", "Generating API documentation."
    "Sphinx_ and sphinx_rtd_theme_", "``documentation``", "Building this
-   HTML/PDF documentation."
+   documentation."
+   "Texinfo_", "``documentation``", "Generating this documentation in Info
+   format."
    "breathe_", "``documentation``", "Exposing Doxygen API doc to Sphinx."
    "libsystemd_", "``daemon``", "Systemd watchdog support."
    "libprotobuf_ 3.0+", "``modules/dnstap``", "Protocol Buffers support for
@@ -191,8 +193,8 @@ It's also possible to run only specific test suite or a test.
 
 .. _build-html-doc:
 
-HTML Documentation
-------------------
+Documentation
+-------------
 
 To check for documentation dependencies and allow its installation, use
 ``-Ddoc=enabled``. The documentation doesn't build automatically. Instead,
@@ -232,7 +234,7 @@ Recommended build options for packagers:
   prefix, other directories can be set in a similar fashion, see ``meson setup
   --help``
 * ``-Dsystemd_files=enabled`` for systemd unit files
-* ``-Ddoc=enabled`` for offline html documentation (see :ref:`build-html-doc`)
+* ``-Ddoc=enabled`` for offline documentation (see :ref:`build-html-doc`)
 * ``-Dinstall_kresd_conf=enabled`` to install default config file
 * ``-Dclient=enabled`` to force build of kresc
 * ``-Dunit_tests=enabled`` to force build of unit tests
@@ -288,6 +290,7 @@ For development, it's possible to build the container directly from your git tre
 .. _breathe: https://github.com/michaeljones/breathe
 .. _Sphinx: http://sphinx-doc.org/
 .. _sphinx_rtd_theme: https://pypi.python.org/pypi/sphinx_rtd_theme
+.. _Texinfo: https://www.gnu.org/software/texinfo/
 .. _pkg-config: https://www.freedesktop.org/wiki/Software/pkg-config/
 .. _libknot: https://gitlab.nic.cz/knot/knot-dns
 .. _cmocka: https://cmocka.org/

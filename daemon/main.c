@@ -28,7 +28,7 @@
 #include <sys/resource.h>
 #include <unistd.h>
 
-#ifdef ENABLE_CAP_NG
+#if ENABLE_CAP_NG
 #include <cap-ng.h>
 #endif
 
@@ -495,7 +495,7 @@ static int start_listening(struct network *net, flagged_fd_array_t *fds) {
 /* Drop POSIX 1003.1e capabilities. */
 static void drop_capabilities(void)
 {
-#ifdef ENABLE_CAP_NG
+#if ENABLE_CAP_NG
 	/* Drop all capabilities when running under non-root user. */
 	if (geteuid() == 0) {
 		kr_log_verbose("[system] running as root, no capabilities dropped\n");

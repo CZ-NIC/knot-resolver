@@ -7,13 +7,13 @@
 #include <netinet/in.h>
 #include <stdint.h>
 
-#if defined(ENABLE_COOKIES)
+#if ENABLE_COOKIES
 #include <libknot/rrtype/opt.h>
 #include <libknot/rrtype/opt-cookie.h>
 #else
 #define KNOT_OPT_COOKIE_CLNT 8
 #define KNOT_OPT_COOKIE_SRVR_MAX 32
-#endif /* defined(ENABLE_COOKIES) */
+#endif /* ENABLE_COOKIES */
 
 #include "lib/defines.h"
 #include "lib/generic/lru.h"
