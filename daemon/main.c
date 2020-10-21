@@ -306,6 +306,7 @@ static void args_deinit(struct args *args)
 {
 	array_clear(args->addrs);
 	array_clear(args->addrs_tls);
+	array_clear(args->addrs_xdp);
 	for (int i = 0; i < args->fds.len; ++i)
 		free_const(args->fds.at[i].flags.kind);
 	array_clear(args->fds);
@@ -332,6 +333,7 @@ static int parse_args(int argc, char **argv, struct args *args)
 		{"tls",        required_argument, 0, 't'},
 		{"config",     required_argument, 0, 'c'},
 		{"forks",      required_argument, 0, 'f'},
+		{"xdp",        required_argument, 0, 'x'}, // TODO: temporary?
 		{"noninteractive",   no_argument, 0, 'n'},
 		{"verbose",          no_argument, 0, 'v'},
 		{"quiet",            no_argument, 0, 'q'},
@@ -340,7 +342,7 @@ static int parse_args(int argc, char **argv, struct args *args)
 		{"fd",         required_argument, 0, 'S'},
 		{0, 0, 0, 0}
 	};
-	while ((c = getopt_long(argc, argv, "a:t:c:f:nvqVhS:", opts, &li)) != -1) {
+	while ((c = getopt_long(argc, argv, "a:t:c:f:x:nvqVhS:", opts, &li)) != -1) {
 		switch (c)
 		{
 		case 'a':
@@ -368,6 +370,9 @@ static int parse_args(int argc, char **argv, struct args *args)
 			/* fall through */
 		case 'n':
 			args->interactive = false;
+			break;
+		case 'x':
+			array_push(args->addrs_xdp, optarg);
 			break;
 		case 'v':
 			kr_verbose_set(true);
@@ -552,27 +557,29 @@ int main(int argc, char **argv)
 	}
 
 	/* Select which config files to load and verify they are read-able. */
-	bool load_defaults = true;
-	size_t i = 0;
-	while (i < the_args->config.len) {
-		const char *config = the_args->config.at[i];
-		if (strcmp(config, "-") == 0) {
-			load_defaults = false;
-			array_del(the_args->config, i);
-			continue;  /* don't increment i */
-		} else if (access(config, R_OK) != 0) {
-			char cwd[PATH_MAX];
-			get_workdir(cwd, sizeof(cwd));
-			kr_log_error("[system] config '%s' (workdir '%s'): %s\n",
-				config, cwd, strerror(errno));
-			return EXIT_FAILURE;
+	{
+		bool load_defaults = true;
+		size_t i = 0;
+		while (i < the_args->config.len) {
+			const char *config = the_args->config.at[i];
+			if (strcmp(config, "-") == 0) {
+				load_defaults = false;
+				array_del(the_args->config, i);
+				continue;  /* don't increment i */
+			} else if (access(config, R_OK) != 0) {
+				char cwd[PATH_MAX];
+				get_workdir(cwd, sizeof(cwd));
+				kr_log_error("[system] config '%s' (workdir '%s'): %s\n",
+					config, cwd, strerror(errno));
+				return EXIT_FAILURE;
+			}
+			i++;
 		}
-		i++;
+		if (the_args->config.len == 0 && access("config", R_OK) == 0)
+			array_push(the_args->config, "config");
+		if (load_defaults)
+			array_push(the_args->config, LIBDIR "/postconfig.lua");
 	}
-	if (the_args->config.len == 0 && access("config", R_OK) == 0)
-		array_push(the_args->config, "config");
-	if (load_defaults)
-		array_push(the_args->config, LIBDIR "/postconfig.lua");
 
 	/* File-descriptor count limit: soft->hard. */
 	struct rlimit rlim;
@@ -659,6 +666,34 @@ int main(int argc, char **argv)
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
+	/* Start listening on AF_XDP sockets. */
+	for (size_t i = 0; i < the_args->addrs_xdp.len; ++i) {
+		int16_t xdp_queue = -1; // auto-select
+		char *addr = the_args->addrs_xdp.at[i];
+		char *separ = strchr(addr, '/'); // FIXME: using this separator, for now?
+		if (separ) {
+			char *endptr;
+			xdp_queue = strtol(separ + 1, &endptr, 10);
+			if (endptr == separ + 1 || endptr[0] != '\0') {
+				kr_log_error("[system] incorrect value passed to '-x/--xdp': %s\n",
+						addr);
+				ret = EXIT_FAILURE;
+				goto cleanup;
+			}
+			*separ = '\0'; // TODO: modifying argv[i][j] isn't very nice
+		}
+		endpoint_flags_t ep_flags = { 0 };
+		ep_flags.sock_type = SOCK_DGRAM;
+		ep_flags.xdp = true;
+
+		ret = network_listen(&engine.net, addr, KR_DNS_PORT, xdp_queue, ep_flags);
+		if (ret != 0) {
+			kr_log_error("[system] listen on --xdp=%s/%d failed: %s\n",
+					addr, (int)xdp_queue, knot_strerror(ret));
+			ret = EXIT_FAILURE;
+			goto cleanup;
+		}
+	}
 
 	ret = udp_queue_init_global(loop);
 	if (ret) {
@@ -674,7 +709,7 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	for (i = 0; i < the_args->config.len; ++i) {
+	for (int i = 0; i < the_args->config.len; ++i) {
 		const char *config = the_args->config.at[i];
 		if (engine_loadconf(&engine, config) != 0) {
 			ret = EXIT_FAILURE;

@@ -425,6 +425,7 @@ typedef struct {
 struct args {
 	addr_array_t addrs;
 	addr_array_t addrs_tls;
+	addr_array_t addrs_xdp;
 	flagged_fd_array_t fds;
 	int control_fd;
 	int forks;
