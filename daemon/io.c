@@ -797,11 +797,11 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 {
 	const int XDP_RX_BATCH_SIZE = 64;
 	if (status < 0) {
-		kr_log_error("[kxsk] poll status %d: %s\n", status, uv_strerror(status));
+		kr_log_error("[xdp] poll status %d: %s\n", status, uv_strerror(status));
 		return;
 	}
 	if (events != UV_READABLE) {
-		kr_log_error("[kxsk] poll unexpected events: %d\n", events);
+		kr_log_error("[xdp] poll unexpected events: %d\n", events);
 		return;
 	}
 
@@ -811,10 +811,10 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 	knot_xdp_msg_t msgs[XDP_RX_BATCH_SIZE];
 	int ret = knot_xdp_recv(xhd->socket, msgs, XDP_RX_BATCH_SIZE, &rcvd);
 	if (ret == KNOT_EOK) {
-		kr_log_verbose("[kxsk] poll triggered, processing a batch of %d packets\n",
+		kr_log_verbose("[xdp] poll triggered, processing a batch of %d packets\n",
 			(int)rcvd);
 	} else {
-		kr_log_error("[kxsk] knot_xdp_recv(): %d, %s\n", ret, knot_strerror(ret));
+		kr_log_error("[xdp] knot_xdp_recv(): %d, %s\n", ret, knot_strerror(ret));
 		//FIXME?
 	}
 	assert(rcvd <= XDP_RX_BATCH_SIZE);
@@ -829,7 +829,7 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 					(const struct sockaddr *)&msg->ip_to,
 					msg->eth_from, msg->eth_to, kpkt);
 		if (ret)
-			kr_log_verbose("[kxsk] worker_submit() == %d: %s\n", ret, kr_strerror(ret));
+			kr_log_verbose("[xdp] worker_submit() == %d: %s\n", ret, kr_strerror(ret));
 		mp_flush(the_worker->pkt_pool.ctx);
 	}
 	knot_xdp_recv_finish(xhd->socket, msgs, rcvd);
@@ -838,7 +838,7 @@ void xdp_tx_waker(uv_check_t* handle)
 {
 	int ret = knot_xdp_send_finish(handle->data);
 	if (ret != KNOT_EOK)
-		kr_log_error("[kxsk] check: ret = %d, %s\n", ret, knot_strerror(ret));
+		kr_log_error("[xdp] check: ret = %d, %s\n", ret, knot_strerror(ret));
 	knot_xdp_send_prepare(handle->data);
 	// LATER(opt.): it _might_ be better for performance to do these two steps
 	// at different points in time

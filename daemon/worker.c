@@ -1259,7 +1259,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		assert(xhd && xhd->socket && xhd->session == source_session);
 		uint32_t sent;
 		ret = knot_xdp_send(xhd->socket, &msg, 1, &sent);
-		kr_log_verbose("[uxsk] pushed a packet, ret = %d\n", ret);
+		kr_log_verbose("[xdp] pushed a packet, ret = %d\n", ret);
 		ret = qr_task_on_send(task, NULL/*doesn't matter for UDP*/, ret);
 	#else
 		assert(!EINVAL);
