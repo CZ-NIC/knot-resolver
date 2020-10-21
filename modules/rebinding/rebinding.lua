@@ -71,13 +71,15 @@ end
 
 local function refuse(req)
 	policy.REFUSE(nil, req)
-	local pkt = req.answer
+	local pkt = req:ensure_answer()
+	if pkt == nil then return nil end
 	pkt:aa(false)
 	pkt:begin(kres.section.ADDITIONAL)
 
 	local msg = 'blocked by DNS rebinding protection'
 	pkt:put('\11explanation\7invalid\0', 10800, pkt:qclass(), kres.type.TXT,
 	string.char(#msg) .. msg)
+	return kres.DONE
 end
 
 -- act on DNS queries which were not answered from cache
@@ -102,14 +104,16 @@ function M.layer.consume(state, req, pkt)
 		Typical example: NS address resolution -> only this NS won't be used
 		but others may still be OK (or we SERVFAIL due to no NS being usable).
 	--]]
-	if qry.parent == nil then refuse(req) end
+	if qry.parent == nil then
+		state = refuse(req)
+	end
 	if verbose() then
 		ffi.C.kr_log_q(qry, 'rebinding',
 		    'blocking blacklisted IP in RR \'%s\' received from IP %s\n',
 		    kres.rr2str(bad_rr),
 		    tostring(kres.sockaddr_t(req.upstream.addr)))
 	end
-	return kres.DONE
+	return state
 end
 
 return M

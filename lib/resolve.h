@@ -36,7 +36,7 @@
  * };
  *
  * // Setup and provide input query
- * int state = kr_resolve_begin(&req, ctx, final_answer);
+ * int state = kr_resolve_begin(&req, ctx);
  * state = kr_resolve_consume(&req, query);
  *
  * // Generate answer
@@ -179,7 +179,7 @@ struct kr_request_qsource_flags {
  */
 struct kr_request {
 	struct kr_context *ctx;
-	knot_pkt_t *answer;
+	knot_pkt_t *answer; /**< See kr_request_ensure_answer() */
 	struct kr_query *current_query;    /**< Current evaluated query. */
 	struct {
 		/** Address that originated the request. NULL for internal origin. */
@@ -234,16 +234,24 @@ struct kr_request {
 /**
  * Begin name resolution.
  *
- * @note Expects a request to have an initialized mempool, the "answer" packet will
- *       be kept during the resolution and will contain the final answer at the end.
+ * @note Expects a request to have an initialized mempool.
  *
  * @param request request state with initialized mempool
  * @param ctx     resolution context
- * @param answer  allocated packet for final answer
  * @return        CONSUME (expecting query)
  */
 KR_EXPORT
-int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx, knot_pkt_t *answer);
+int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx);
+
+/**
+ * Ensure that request->answer is usable, and return it (for convenience).
+ *
+ * It may return NULL, in which case it marks ->state with _FAIL and no answer will be sent.
+ * Only use this when it's guaranteed that there will be no delay before sending it.
+ * You don't need to call this in places where "resolver knows" that there will be no delay.
+ */
+KR_EXPORT
+knot_pkt_t * kr_request_ensure_answer(struct kr_request *request);
 
 /**
  * Consume input packet (may be either first query or answer to query originated from kr_resolve_produce())
