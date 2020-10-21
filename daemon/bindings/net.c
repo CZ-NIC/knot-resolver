@@ -26,6 +26,8 @@ static int net_list_add(const char *key, void *val, void *ext)
 			lua_pushliteral(L, "doh2");
 		} else if (ep->flags.tls) {
 			lua_pushliteral(L, "tls");
+		} else if (ep->flags.xdp) {
+			lua_pushliteral(L, "xdp");
 		} else {
 			lua_pushliteral(L, "dns");
 		}
@@ -43,6 +45,9 @@ static int net_list_add(const char *key, void *val, void *ext)
 		case AF_UNIX:
 			lua_pushliteral(L, "unix");
 			break;
+		case AF_XDP: // FIXME: handle properly
+			lua_pushliteral(L, "xdp");
+			break;
 		default:
 			lua_pushliteral(L, "invalid");
 			assert(!EINVAL);
@@ -50,17 +55,21 @@ static int net_list_add(const char *key, void *val, void *ext)
 		lua_setfield(L, -2, "family");
 
 		lua_pushstring(L, key);
-		if (ep->family != AF_UNIX) {
+		if (ep->family == AF_INET || ep->family == AF_INET6) {
 			lua_setfield(L, -2, "ip");
-		} else {
+			lua_pushboolean(L, ep->flags.freebind);
+			lua_setfield(L, -2, "freebind");
+		} else if (ep->family == AF_UNIX) {
 			lua_setfield(L, -2, "path");
+		} else if (ep->family == AF_XDP) {
+			lua_setfield(L, -2, "interface");
+			lua_pushinteger(L, ep->nic_queue);
+			lua_setfield(L, -2, "nic_queue");
 		}
 
 		if (ep->family != AF_UNIX) {
 			lua_pushinteger(L, ep->port);
 			lua_setfield(L, -2, "port");
-			lua_pushboolean(L, ep->flags.freebind);
-			lua_setfield(L, -2, "freebind");
 		}
 
 		if (ep->family == AF_UNIX) {
@@ -97,8 +106,10 @@ static int net_list(lua_State *L)
 /** Listen on an address list represented by the top of lua stack.
  * \note flags.kind ownership is not transferred, and flags.sock_type doesn't make sense
  * \return success */
-static bool net_listen_addrs(lua_State *L, int port, endpoint_flags_t flags)
+static bool net_listen_addrs(lua_State *L, int port, endpoint_flags_t flags, int16_t nic_queue)
 {
+	assert(flags.xdp || nic_queue == -1);
+
 	/* Case: table with 'addr' field; only follow that field directly. */
 	lua_getfield(L, -1, "addr");
 	if (!lua_isnil(L, -1)) {
@@ -111,24 +122,38 @@ static bool net_listen_addrs(lua_State *L, int port, endpoint_flags_t flags)
 	const char *str = lua_tostring(L, -1);
 	if (str != NULL) {
 		struct network *net = &the_worker->engine->net;
+		const bool is_UNIX = str[0] == '/';
 		int ret = 0;
-		if (!flags.kind && !flags.tls) { /* normal UDP */
+		if (!flags.kind && !flags.tls) { /* normal UDP or XDP */
 			flags.sock_type = SOCK_DGRAM;
-			ret = network_listen(net, str, port, flags);
+			ret = network_listen(net, str, port, nic_queue, flags);
 		}
-		if (!flags.kind && ret == 0) { /* common for TCP, DoT and DoH (v2) */
+		if (!flags.kind && !flags.xdp && ret == 0) { /* common for TCP, DoT and DoH (v2) */
 			flags.sock_type = SOCK_STREAM;
-			ret = network_listen(net, str, port, flags);
+			ret = network_listen(net, str, port, nic_queue, flags);
 		}
 		if (flags.kind) {
 			flags.kind = strdup(flags.kind);
 			flags.sock_type = SOCK_STREAM; /* TODO: allow to override this? */
-			ret = network_listen(net, str, port, flags);
+			ret = network_listen(net, str, (is_UNIX ? 0 : port), nic_queue, flags);
 		}
 		if (ret != 0) {
-			if (str[0] == '/') {
+			if (is_UNIX) {
 				kr_log_error("[system] bind to '%s' (UNIX): %s\n",
 						str, kr_strerror(ret));
+			} else if (flags.xdp) {
+				/* FIXME: it could fail for many different reasons
+				 * but they're rather difficult to distinguish here.
+				 * Consider logging directly from network_listen() ?
+				 * Also, nic_queue == -1 would better be logged as "default".
+				 *
+				 *  - iface/addr:
+				 *    * nonexistent name -> EINVAL
+				 *    * address matching multiple -> KNOT_ELIMIT ("exceeded limit")
+				 *  - permissions: EPERM
+				 */
+				kr_log_error("[system] failed to initialize XDP for '%s@%d' (nic_queue %d): %s\n",
+						str, port, nic_queue, knot_strerror(ret));
 			} else {
 				const char *stype = flags.sock_type == SOCK_DGRAM ? "UDP" : "TCP";
 				kr_log_error("[system] bind to '%s@%d' (%s): %s\n",
@@ -143,7 +168,7 @@ static bool net_listen_addrs(lua_State *L, int port, endpoint_flags_t flags)
 		lua_error_p(L, "bad type for address");
 	lua_pushnil(L);
 	while (lua_next(L, -2)) {
-		if (!net_listen_addrs(L, port, flags))
+		if (!net_listen_addrs(L, port, flags, nic_queue))
 			return false;
 		lua_pop(L, 1);
 	}
@@ -189,11 +214,20 @@ static int net_listen(lua_State *L)
 		flags.http = flags.tls = true;
 	}
 
+	int16_t nic_queue = -1;
 	if (n > 2 && !lua_isnil(L, 3)) {
 		if (!lua_istable(L, 3))
 			lua_error_p(L, "wrong type of third parameter (table expected)");
 		flags.tls = table_get_flag(L, 3, "tls", flags.tls);
 		flags.freebind = table_get_flag(L, 3, "freebind", flags.tls);
+
+		lua_getfield(L, 3, "nic_queue");
+		if (lua_isnumber(L, -1)) {
+			nic_queue = lua_tointeger(L, -1);
+			flags.xdp = true; // assume xdp = true; TODO: perhaps check instead?
+		} else if (!lua_isnil(L, -1)) {
+			lua_error_p(L, "wrong value of nic_queue (integer expected)");
+		}
 
 		lua_getfield(L, 3, "kind");
 		const char *k = lua_tostring(L, -1);
@@ -201,6 +235,7 @@ static int net_listen(lua_State *L)
 			flags.tls = flags.http = false;
 		} else if (k && strcasecmp(k, "xdp") == 0) {
 			flags.tls = flags.http = false;
+			flags.xdp = true;
 		} else if (k && strcasecmp(k, "tls") == 0) {
 			flags.tls = true;
 			flags.http = false;
@@ -226,7 +261,7 @@ static int net_listen(lua_State *L)
 
 	/* Now focus on the first argument. */
 	lua_settop(L, 1);
-	if (!net_listen_addrs(L, port, flags))
+	if (!net_listen_addrs(L, port, flags, nic_queue))
 		lua_error_p(L, "net.listen() failed to bind");
 	lua_pushboolean(L, true);
 	return 1;
