@@ -343,7 +343,7 @@ int check_request(kr_layer_t *ctx)
 		return ctx->state;
 	}
 
-	knot_pkt_t *answer = req->answer;
+	knot_pkt_t *answer = req->answer; // FIXME: see kr_request_ensure_answer()
 
 	if (ctx->state & (KR_STATE_DONE | KR_STATE_FAIL)) {
 		return ctx->state;

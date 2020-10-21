@@ -99,7 +99,8 @@ struct kr_layer_api {
 	int (*checkout)(kr_layer_t *ctx, knot_pkt_t *packet, struct sockaddr *dst, int type);
 
 	/** Finalises the answer.
-	 * Last chance to affect what will get into the answer, including EDNS.*/
+	 * Last chance to affect what will get into the answer, including EDNS.
+	 * Not called if the packet is being dropped. */
 	int (*answer_finalize)(kr_layer_t *ctx);
 
 	/** The C module can store anything in here. */

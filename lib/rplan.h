@@ -30,7 +30,7 @@ struct kr_qflags {
 	bool EXPIRING : 1;       /**< Query response is cached, but expiring. */
 	bool ALLOW_LOCAL : 1;    /**< Allow queries to local or private address ranges. */
 	bool DNSSEC_WANT : 1;    /**< Want DNSSEC secured answer; exception: +cd,
-				  * i.e. knot_wire_set_cd(request->answer->wire). */
+				  * i.e. knot_wire_get_cd(request->qsource.packet->wire) */
 	bool DNSSEC_BOGUS : 1;   /**< Query response is DNSSEC bogus. */
 	bool DNSSEC_INSECURE : 1;/**< Query response is DNSSEC insecure. */
 	bool DNSSEC_CD : 1;      /**< Instruction to set CD bit in request. */

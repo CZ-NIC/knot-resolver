@@ -12,7 +12,6 @@ function inc_cb()
 end
 
 function check_status(state, query)
-	local answer = query.request.answer
 	-- status was present for 10 days
 	if cb_counter > 0 then
 		return policy.DENY_MSG('check last answer')
