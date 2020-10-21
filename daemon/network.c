@@ -11,6 +11,7 @@
 
 #include <assert.h>
 #include <libgen.h>
+#include <net/if.h>
 #include <sys/un.h>
 #include <unistd.h>
 
@@ -123,7 +124,8 @@ static void endpoint_close_lua_cb(struct network *net, struct endpoint *ep)
 
 static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 {
-	bool control = ep->flags.kind && strcmp(ep->flags.kind, "control") == 0;
+	const bool is_control = ep->flags.kind && strcmp(ep->flags.kind, "control") == 0;
+	const bool is_xdp     = ep->family == AF_XDP;
 
 	if (ep->family == AF_UNIX) { /* The FS name would be left behind. */
 		/* Extract local address for this socket. */
@@ -138,7 +140,7 @@ static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 		}
 	}
 
-	if (ep->flags.kind && !control) {
+	if (ep->flags.kind && !is_control && !is_xdp) {
 		assert(!ep->handle);
 		/* Special lua-handled endpoint. */
 		if (ep->engaged) {
@@ -151,7 +153,7 @@ static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 		return;
 	}
 
-	free_const(ep->flags.kind); /* needed if (control) */
+	free_const(ep->flags.kind); /* needed if (is_control) */
 	assert(ep->handle);
 	if (force) { /* Force close if event loop isn't running. */
 		if (ep->fd >= 0) {
@@ -240,12 +242,18 @@ static int insert_endpoint(struct network *net, const char *addr, struct endpoin
 	return kr_ok();
 }
 
-/** Open endpoint protocols.  ep->flags were pre-set. */
-static int open_endpoint(struct network *net, struct endpoint *ep,
-			 const struct sockaddr *sa, const char *log_addr)
+/** Open endpoint protocols.  ep->flags were pre-set.
+ * \p addr_str is only used for logging or for XDP "address". */
+static int open_endpoint(struct network *net, const char *addr_str,
+			 struct endpoint *ep, const struct sockaddr *sa)
 {
-	bool control = ep->flags.kind && strcmp(ep->flags.kind, "control") == 0;
-	if ((sa != NULL) == (ep->fd != -1)) {
+	const bool is_control = ep->flags.kind && strcmp(ep->flags.kind, "control") == 0;
+	const bool is_xdp     = ep->family == AF_XDP;
+	bool ok = is_xdp
+		? sa == NULL && ep->fd == -1 && ep->nic_queue >= 0
+			&& ep->flags.sock_type == SOCK_DGRAM && !ep->flags.tls
+		: (sa != NULL) != (ep->fd != -1);
+	if (!ok) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
@@ -265,32 +273,45 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 		ep->fd = io_bind(sa, ep->flags.sock_type, &ep->flags);
 		if (ep->fd < 0) return ep->fd;
 	}
-	if (ep->flags.kind && !control) {
+	if (ep->flags.kind && !is_control && !is_xdp) {
 		/* This EP isn't to be managed internally after binding. */
-		return endpoint_open_lua_cb(net, ep, log_addr);
+		return endpoint_open_lua_cb(net, ep, addr_str);
 	} else {
 		ep->engaged = true;
-		/* .engaged seems not really meaningful with .kind == NULL, but... */
+		/* .engaged seems not really meaningful in this case, but... */
 	}
 
-	if (control) {
+	int ret;
+	if (is_control) {
 		uv_pipe_t *ep_handle = malloc(sizeof(uv_pipe_t));
 		ep->handle = (uv_handle_t *)ep_handle;
-		if (!ep->handle) {
-			return kr_error(ENOMEM);
-		}
-		return io_listen_pipe(net->loop, ep_handle, ep->fd);
+		ret = !ep->handle ? ENOMEM
+			: io_listen_pipe(net->loop, ep_handle, ep->fd);
+		goto finish_ret;
 	}
 
 	if (ep->family == AF_UNIX) {
 		/* Some parts of connection handling would need more work,
 		 * so let's support AF_UNIX only with .kind != NULL for now. */
 		kr_log_error("[system] AF_UNIX only supported with set { kind = '...' }\n");
-		return kr_error(EAFNOSUPPORT);
+		ret = EAFNOSUPPORT;
+		goto finish_ret;
 		/*
 		uv_pipe_t *ep_handle = malloc(sizeof(uv_pipe_t));
 		*/
 	}
+
+	if (is_xdp) {
+	#if ENABLE_XDP
+		uv_poll_t *ep_handle = malloc(sizeof(uv_poll_t));
+		ep->handle = (uv_handle_t *)ep_handle;
+		ret = !ep->handle ? ENOMEM
+			: io_listen_xdp(net->loop, ep, addr_str);
+	#else
+		ret = ESOCKTNOSUPPORT;
+	#endif
+		goto finish_ret;
+	} /* else */
 
 	if (ep->flags.sock_type == SOCK_DGRAM) {
 		if (ep->flags.tls) {
@@ -299,28 +320,33 @@ static int open_endpoint(struct network *net, struct endpoint *ep,
 		}
 		uv_udp_t *ep_handle = malloc(sizeof(uv_udp_t));
 		ep->handle = (uv_handle_t *)ep_handle;
-		if (!ep->handle) {
-			return kr_error(ENOMEM);
-		}
-		return io_listen_udp(net->loop, ep_handle, ep->fd);
+		ret = !ep->handle ? ENOMEM
+			: io_listen_udp(net->loop, ep_handle, ep->fd);
+		goto finish_ret;
 	} /* else */
 
 	if (ep->flags.sock_type == SOCK_STREAM) {
 		uv_tcp_t *ep_handle = malloc(sizeof(uv_tcp_t));
 		ep->handle = (uv_handle_t *)ep_handle;
-		if (!ep->handle) {
-			return kr_error(ENOMEM);
-		}
-		return io_listen_tcp(net->loop, ep_handle, ep->fd,
+		ret = !ep->handle ? ENOMEM
+			: io_listen_tcp(net->loop, ep_handle, ep->fd,
 					net->tcp_backlog, ep->flags.tls, ep->flags.http);
+		goto finish_ret;
 	} /* else */
 
 	assert(!EINVAL);
 	return kr_error(EINVAL);
+finish_ret:
+	if (!ret) return ret;
+	free(ep->handle);
+	ep->handle = NULL;
+	return kr_error(ret);
 }
 
 /** @internal Fetch a pointer to endpoint of given parameters (or NULL).
- * Beware that there might be multiple matches, though that's not common. */
+ * Beware that there might be multiple matches, though that's not common.
+ * The matching isn't really precise in the sense that it might not find
+ * and endpoint that would *collide* the passed one. */
 static struct endpoint * endpoint_get(struct network *net, const char *addr,
 					uint16_t port, endpoint_flags_t flags)
 {
@@ -337,12 +363,13 @@ static struct endpoint * endpoint_get(struct network *net, const char *addr,
 	return NULL;
 }
 
-/** \note pass either sa != NULL xor ep.fd != -1;
+/** \note pass (either sa != NULL xor ep.fd != -1) or XDP case (neither sa nor ep.fd)
+ *  \note in XDP case addr_str is interface name
  *  \note ownership of ep.flags.* is taken on success. */
 static int create_endpoint(struct network *net, const char *addr_str,
 				struct endpoint *ep, const struct sockaddr *sa)
 {
-	int ret = open_endpoint(net, ep, sa, addr_str);
+	int ret = open_endpoint(net, addr_str, ep, sa);
 	if (ret == 0) {
 		ret = insert_endpoint(net, addr_str, ep);
 	}
@@ -354,6 +381,10 @@ static int create_endpoint(struct network *net, const char *addr_str,
 
 int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags)
 {
+	if (flags.xdp) {
+		assert(!EINVAL);
+		return kr_error(EINVAL);
+	}
 	/* Extract fd's socket type. */
 	socklen_t len = sizeof(flags.sock_type);
 	int ret = getsockopt(fd, SOL_SOCKET, SO_TYPE, &flags.sock_type, &len);
@@ -410,29 +441,78 @@ int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags)
 	return create_endpoint(net, addr_str, &ep, NULL);
 }
 
-int network_listen(struct network *net, const char *addr, uint16_t port,
-		   endpoint_flags_t flags)
+/** Try selecting XDP queue automatically. */
+static int16_t nic_queue_auto(void)
 {
-	if (net == NULL || addr == 0 || port == 0) {
+	const char *inst_str = getenv("SYSTEMD_INSTANCE");
+	if (!inst_str)
+		return 0; // should work OK for simple (single-kresd) deployments
+	char *endp;
+	errno = 0; // strtol() is special in this respect
+	long inst = strtol(inst_str, &endp, 10);
+	if (!errno && *endp == '\0' && inst > 0 && inst < UINT16_MAX)
+		return inst - 1; // 1-based vs. 0-based indexing conventions
+	return -1;
+}
+
+int network_listen(struct network *net, const char *addr, uint16_t port,
+		   int16_t nic_queue, endpoint_flags_t flags)
+{
+	if (net == NULL || addr == 0 || nic_queue < -1) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
-	if (endpoint_get(net, addr, port, flags)) {
-		return kr_error(EADDRINUSE); /* Already listening */
+
+	if (flags.xdp && nic_queue < 0) {
+		nic_queue = nic_queue_auto();
+		if (nic_queue < 0) {
+			return kr_error(EINVAL);
+		}
 	}
 
-	/* Parse address. */
+	// Try parsing the address.
 	const struct sockaddr *sa = kr_straddr_socket(addr, port, NULL);
-	if (!sa) {
+	if (!sa && !flags.xdp) { // unusable address spec
 		return kr_error(EINVAL);
 	}
-	struct endpoint ep = {
-		.flags = flags,
-		.fd = -1,
-		.port = port,
-		.family = sa->sa_family,
-	};
+	char ifname_buf[64] UNUSED;
+	if (sa && flags.xdp) { // auto-detection: address -> interface
+	#if ENABLE_XDP
+		int ret = knot_eth_name_from_addr((const struct sockaddr_storage *)sa,
+						  ifname_buf, sizeof(ifname_buf));
+		// even on success we don't want to pass `sa` on
+		free_const(sa);
+		sa = NULL;
+		if (ret) {
+			return kr_error(ret);
+		}
+		addr = ifname_buf;
+	#else
+		return kr_error(ESOCKTNOSUPPORT);
+	#endif
+	}
+	// XDP: if addr failed to parse as address, we assume it's an interface name.
+
+	if (endpoint_get(net, addr, port, flags)) {
+		return kr_error(EADDRINUSE); // Already listening
+	}
+
+	struct endpoint ep = { 0 };
+	ep.flags = flags;
+	ep.fd = -1;
+	ep.port = port;
+	ep.family = flags.xdp ? AF_XDP : sa->sa_family;
+	ep.nic_queue = nic_queue;
+
 	int ret = create_endpoint(net, addr, &ep, sa);
+
+	// Error reporting: more precision.
+	if (ret == KNOT_EINVAL && !sa && flags.xdp && ENABLE_XDP) {
+		if (!if_nametoindex(addr) && errno == ENODEV) {
+			ret = kr_error(ENODEV);
+		}
+	}
+
 	free_const(sa);
 	return ret;
 }

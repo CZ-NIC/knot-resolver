@@ -109,6 +109,16 @@ Following configuration functions are useful mainly for scripting or :ref:`runti
               [protocol] => tcp
           }
       }
+      [4] => {
+          [kind] => xdp
+          [transport] => {
+              [family] => inet4+inet6
+              [interface] => eth2
+              [nic_queue] => 0
+              [port] => 53
+              [protocol] => udp
+          }
+      }
 
 .. function:: net.interfaces()
 
