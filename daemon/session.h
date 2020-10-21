@@ -23,12 +23,12 @@ struct session_flags {
 	bool wirebuf_error : 1; /**< True: last operation with wirebuf ended up with an error. */
 };
 
-/* Allocate new session for a libuv handle.
- * If handle->tyoe is UV_UDP, tls parameter will be ignored. */
+/** Allocate new session for a libuv handle.
+ * If handle->type isn't UV_TCP, has_* parameters will be ignored. */
 struct session *session_new(uv_handle_t *handle, bool has_tls, bool has_http);
-/* Clear and free given session. */
+/** Clear and free given session. */
 void session_free(struct session *session);
-/* Clear session. */
+/** Clear session. */
 void session_clear(struct session *session);
 /** Close session. */
 void session_close(struct session *session);

@@ -44,7 +44,7 @@
 	X(answer,aa) X(answer,tc) X(answer,rd) X(answer,ra) X(answer, ad) X(answer,cd) \
 	X(answer,edns0) X(answer,do) \
 	X(query,edns) X(query,dnssec) \
-	X(request,total) X(request,udp) X(request,tcp) \
+	X(request,total) X(request,udp) X(request,tcp) X(request,xdp) \
 	X(request,dot) X(request,doh) X(request,internal) \
 	X(const,end)
 
@@ -186,7 +186,7 @@ static int collect_transport(kr_layer_t *ctx)
 
 	/**
 	 * Count each transport only once,
-	 * i.e. DoT does not count as TCP.
+	 * i.e. DoT does not count as TCP and XDP does not count as UDP.
 	 */
 	if (req->qsource.flags.http)
 		stat_const_add(data, metric_request_doh, 1);
@@ -194,6 +194,8 @@ static int collect_transport(kr_layer_t *ctx)
 		stat_const_add(data, metric_request_dot, 1);
 	else if (req->qsource.flags.tcp)
 		stat_const_add(data, metric_request_tcp, 1);
+	else if (req->qsource.flags.xdp)
+		stat_const_add(data, metric_request_xdp, 1);
 	else
 		stat_const_add(data, metric_request_udp, 1);
 	return ctx->state;
