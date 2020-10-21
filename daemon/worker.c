@@ -22,6 +22,10 @@
 #include <unistd.h>
 #include <gnutls/gnutls.h>
 
+#if ENABLE_XDP
+	#include <libknot/xdp/xdp.h>
+#endif
+
 #include "daemon/bindings/api.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
@@ -56,15 +60,19 @@ struct request_ctx
 {
 	struct kr_request req;
 
-	struct {
-		/** Requestor's address; separate because of UDP session "sharing". */
-		union inaddr addr;
-		/** NULL if the request didn't come over network. */
-		struct session *session;
-	} source;
-
 	struct worker_ctx *worker;
 	struct qr_task *task;
+	struct {
+		/** NULL if the request didn't come over network. */
+		struct session *session;
+		/** Requestor's address; separate because of UDP session "sharing". */
+		union inaddr addr;
+		/** Local address.  For AF_XDP we couldn't use session's,
+		 * as the address might be different every time. */
+		union inaddr dst_addr;
+		/** MAC addresses - ours [0] and router's [1], in case of AF_XDP socket. */
+		uint8_t eth_addrs[2][6];
+	} source;
 };
 
 /** Query resolution task. */
@@ -258,14 +266,63 @@ static int subreq_key(char *dst, knot_pkt_t *pkt)
 			knot_pkt_qtype(pkt), knot_pkt_qtype(pkt));
 }
 
+#if ENABLE_XDP
+static uint8_t *alloc_wire_cb(struct kr_request *req, uint16_t *maxlen)
+{
+	assert(maxlen);
+	struct request_ctx *ctx = (struct request_ctx *)req;
+	/* We know it's an AF_XDP socket; otherwise this CB isn't assigned. */
+	uv_handle_t *handle = session_get_handle(ctx->source.session);
+	assert(handle->type == UV_POLL);
+	xdp_handle_data_t *xhd = handle->data;
+	knot_xdp_msg_t out;
+	int ret = knot_xdp_send_alloc(xhd->socket, ctx->source.addr.ip.sa_family == AF_INET6,
+					&out, NULL);
+	if (ret != KNOT_EOK) {
+		assert(ret == KNOT_ENOMEM);
+		*maxlen = 0;
+		return NULL;
+	}
+	*maxlen = MIN(*maxlen, out.payload.iov_len);
+	/* It's most convenient to fill the MAC addresses at this point. */
+	memcpy(out.eth_from, &ctx->source.eth_addrs[0], 6);
+	memcpy(out.eth_to,   &ctx->source.eth_addrs[1], 6);
+	return out.payload.iov_base;
+}
+static void free_wire(const struct request_ctx *ctx)
+{
+	assert(ctx->req.alloc_wire_cb == alloc_wire_cb);
+	knot_pkt_t *ans = ctx->req.answer;
+	if (unlikely(ans == NULL)) /* dropped */
+		return;
+	if (likely(ans->wire == NULL)) /* sent most likely */
+		return;
+	/* We know it's an AF_XDP socket; otherwise alloc_wire_cb isn't assigned. */
+	uv_handle_t *handle = session_get_handle(ctx->source.session);
+	assert(handle->type == UV_POLL);
+	xdp_handle_data_t *xhd = handle->data;
+	/* Freeing is done by sending an empty packet (the API won't really send it). */
+	knot_xdp_msg_t out;
+	out.payload.iov_base = ans->wire;
+	out.payload.iov_len = 0;
+	uint32_t sent;
+	int ret = knot_xdp_send(xhd->socket, &out, 1, &sent);
+	assert(ret == KNOT_EOK && sent == 0); (void)ret;
+	kr_log_verbose("[xdp] freed unsent buffer, ret = %d\n", ret);
+}
+#endif
+
 /** Create and initialize a request_ctx (on a fresh mempool).
  *
- * handle and addr point to the source of the request, and they are NULL
+ * session and addr point to the source of the request, and they are NULL
  * in case the request didn't come from network.
  */
 static struct request_ctx *request_create(struct worker_ctx *worker,
 					  struct session *session,
-					  const struct sockaddr *peer,
+					  const struct sockaddr *addr,
+					  const struct sockaddr *dst_addr,
+					  const uint8_t *eth_from,
+					  const uint8_t *eth_to,
 					  uint32_t uid)
 {
 	knot_mm_t pool = {
@@ -288,14 +345,26 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		assert(session_flags(session)->outgoing == false);
 	}
 	ctx->source.session = session;
+	assert(!!eth_to == !!eth_from);
+	const bool is_xdp = eth_to != NULL;
+	if (is_xdp) {
+	#if ENABLE_XDP
+		assert(session);
+		memcpy(&ctx->source.eth_addrs[0], eth_to,   sizeof(ctx->source.eth_addrs[0]));
+		memcpy(&ctx->source.eth_addrs[1], eth_from, sizeof(ctx->source.eth_addrs[1]));
+		ctx->req.alloc_wire_cb = alloc_wire_cb;
+	#else
+		assert(!EINVAL);
+		return NULL;
+	#endif
+	}
 
 	struct kr_request *req = &ctx->req;
 	req->pool = pool;
 	req->vars_ref = LUA_NOREF;
 	req->uid = uid;
+	req->qsource.flags.xdp = is_xdp;
 	if (session) {
-		/* We assume the session will be alive during the whole life of the request. */
-		req->qsource.dst_addr = session_get_sockname(session);
 		req->qsource.flags.tcp = session_get_handle(session)->type == UV_TCP;
 		req->qsource.flags.tls = session_flags(session)->has_tls;
 		req->qsource.flags.http = session_flags(session)->has_http;
@@ -307,8 +376,12 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		}
 #endif
 		/* We need to store a copy of peer address. */
-		memcpy(&ctx->source.addr.ip, peer, kr_sockaddr_len(peer));
+		memcpy(&ctx->source.addr.ip, addr, kr_sockaddr_len(addr));
 		req->qsource.addr = &ctx->source.addr.ip;
+		if (!dst_addr) /* We wouldn't have to copy in this case, but for consistency. */
+			dst_addr = session_get_sockname(session);
+		memcpy(&ctx->source.dst_addr.ip, dst_addr, kr_sockaddr_len(dst_addr));
+		req->qsource.dst_addr = &ctx->source.dst_addr.ip;
 	}
 
 	worker->stats.rconcurrent += 1;
@@ -366,6 +439,14 @@ static void request_free(struct request_ctx *ctx)
 		lua_rawseti(L, -2, 0);
 		lua_pop(L, 1);
 		ctx->req.vars_ref = LUA_NOREF;
+	}
+	/* Make sure to free XDP buffer in case it wasn't sent. */
+	if (ctx->req.alloc_wire_cb) {
+	#if ENABLE_XDP
+		free_wire(ctx);
+	#else
+		assert(!EINVAL);
+	#endif
 	}
 	/* Return mempool to ring or free it if it's full */
 	pool_release(worker, ctx->req.pool.ctx);
@@ -477,7 +558,7 @@ static void qr_task_complete(struct qr_task *task)
 }
 
 /* This is called when we send subrequest / answer */
-int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status)
+int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 {
 
 	if (task->finished) {
@@ -1164,6 +1245,52 @@ static bool subreq_enqueue(struct qr_task *task)
 	return true;
 }
 
+#if ENABLE_XDP
+static void xdp_tx_waker(uv_idle_t *handle)
+{
+	int ret = knot_xdp_send_finish(handle->data);
+	if (ret != KNOT_EAGAIN && ret != KNOT_EOK)
+		kr_log_error("[xdp] check: ret = %d, %s\n", ret, knot_strerror(ret));
+	/* Apparently some drivers need many explicit wake-up calls
+	 * even if we push no additional packets (in case they accumulated a lot) */
+	if (ret != KNOT_EAGAIN)
+		uv_idle_stop(handle);
+	knot_xdp_send_prepare(handle->data);
+	/* LATER(opt.): it _might_ be better for performance to do these two steps
+	 * at different points in time */
+}
+#endif
+/** Send an answer packet over XDP. */
+static int xdp_push(struct qr_task *task, const uv_handle_t *src_handle)
+{
+#if ENABLE_XDP
+	struct request_ctx *ctx = task->ctx;
+	if (unlikely(ctx->req.answer == NULL)) /* meant to be dropped */
+		return kr_ok();
+	knot_xdp_msg_t msg;
+	const struct sockaddr *ip_from = &ctx->source.dst_addr.ip;
+	const struct sockaddr *ip_to   = &ctx->source.addr.ip;
+	memcpy(&msg.ip_from, ip_from, kr_sockaddr_len(ip_from));
+	memcpy(&msg.ip_to,   ip_to,   kr_sockaddr_len(ip_to));
+	msg.payload.iov_base = ctx->req.answer->wire;
+	msg.payload.iov_len  = ctx->req.answer->size;
+
+	xdp_handle_data_t *xhd = src_handle->data;
+	assert(xhd && xhd->socket && xhd->session == ctx->source.session);
+	uint32_t sent;
+	int ret = knot_xdp_send(xhd->socket, &msg, 1, &sent);
+	ctx->req.answer->wire = NULL; /* it's been freed */
+
+	uv_idle_start(&xhd->tx_waker, xdp_tx_waker);
+	kr_log_verbose("[xdp] pushed a packet, ret = %d\n", ret);
+
+	return qr_task_on_send(task, src_handle, ret);
+#else
+	assert(!EINVAL);
+	return kr_error(EINVAL);
+#endif
+}
+
 static int qr_task_finalize(struct qr_task *task, int state)
 {
 	assert(task && task->leading == false);
@@ -1190,9 +1317,14 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	/* Send back answer */
 	int ret;
 	const uv_handle_t *src_handle = session_get_handle(source_session);
-	if (src_handle->type != UV_UDP && src_handle->type != UV_TCP) {
+	if (src_handle->type != UV_UDP && src_handle->type != UV_TCP
+				       && src_handle->type != UV_POLL) {
 		assert(false);
 		ret = kr_error(EINVAL);
+
+	} else if (src_handle->type == UV_POLL) {
+		ret = xdp_push(task, src_handle);
+
 	} else if (src_handle->type == UV_UDP && ENABLE_SENDMMSG) {
 		int fd;
 		ret = uv_fileno(src_handle, &fd);
@@ -1584,7 +1716,9 @@ static int parse_packet(knot_pkt_t *query)
 	return ret;
 }
 
-int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt_t *pkt)
+int worker_submit(struct session *session,
+		  const struct sockaddr *peer, const struct sockaddr *dst_addr,
+		  const uint8_t *eth_from, const uint8_t *eth_to, knot_pkt_t *pkt)
 {
 	if (!session || !pkt)
 		return kr_error(EINVAL);
@@ -1622,8 +1756,9 @@ int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt
 	struct qr_task *task = NULL;
 	const struct sockaddr *addr = NULL;
 	if (!is_outgoing) { /* request from a client */
-		struct request_ctx *ctx = request_create(the_worker, session, peer,
-							 knot_wire_get_id(pkt->wire));
+		struct request_ctx *ctx =
+			request_create(the_worker, session, peer, dst_addr,
+					eth_from, eth_to, knot_wire_get_id(pkt->wire));
 		if (http_ctx)
 			queue_pop(http_ctx->streams);
 		if (!ctx)
@@ -1863,7 +1998,8 @@ struct qr_task *worker_resolve_start(knot_pkt_t *query, struct kr_qflags options
 	}
 
 
-	struct request_ctx *ctx = request_create(worker, NULL, NULL, worker->next_request_uid);
+	struct request_ctx *ctx = request_create(worker, NULL, NULL, NULL, NULL, NULL,
+						 worker->next_request_uid);
 	if (!ctx) {
 		return NULL;
 	}
