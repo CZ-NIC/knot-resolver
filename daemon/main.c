@@ -333,7 +333,7 @@ static int parse_args(int argc, char **argv, struct args *args)
 		{"tls",        required_argument, 0, 't'},
 		{"config",     required_argument, 0, 'c'},
 		{"forks",      required_argument, 0, 'f'},
-		{"xsk",        required_argument, 0, 'x'}, // TODO: temporary?
+		{"xdp",        required_argument, 0, 'x'}, // TODO: temporary?
 		{"noninteractive",   no_argument, 0, 'n'},
 		{"verbose",          no_argument, 0, 'v'},
 		{"quiet",            no_argument, 0, 'q'},
