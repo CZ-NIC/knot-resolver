@@ -44,6 +44,9 @@ Built-in counters keep track of number of queries and answers matching specific 
 | request.doh      | external requests received over              |
 |                  | DNS-over-HTTP (:rfc:`8484`)                  |
 +------------------+----------------------------------------------+
+| request.xdp      | external requests received over plain UDP    |
+|                  | via an AF_XDP socket                         |
++------------------+----------------------------------------------+
 
 +----------------------------------------------------+
 | **Global answer counters**                         |
