@@ -16,6 +16,7 @@ typedef void *(*map_alloc_f)(void *, size_t);
 typedef void (*map_free_f)(void *baton, void *ptr);
 typedef void (*trace_log_f) (const struct kr_request *, const char *);
 typedef void (*trace_callback_f)(struct kr_request *);
+typedef uint8_t * (*alloc_wire_f)(struct kr_request *req, uint16_t *maxlen);
 typedef enum {KNOT_ANSWER, KNOT_AUTHORITY, KNOT_ADDITIONAL} knot_section_t;
 typedef struct {
 	uint16_t pos;
@@ -160,6 +161,7 @@ struct kr_request_qsource_flags {
 	_Bool tcp : 1;
 	_Bool tls : 1;
 	_Bool http : 1;
+	_Bool xdp : 1;
 };
 struct kr_request {
 	struct kr_context *ctx;
@@ -193,6 +195,7 @@ struct kr_request {
 	unsigned int uid;
 	unsigned int count_no_nsaddr;
 	unsigned int count_fail_row;
+	alloc_wire_f alloc_wire_cb;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
 typedef struct kr_cdb * kr_cdb_pt;
@@ -436,11 +439,14 @@ struct endpoint {
 	int fd;
 	int family;
 	uint16_t port;
+	int16_t xdp_queue;
 	_Bool engaged;
 	endpoint_flags_t flags;
 };
 struct request_ctx {
 	struct kr_request req;
+	struct worker_ctx *worker;
+	struct qr_task *task;
 	/* beware: hidden stub, to avoid hardcoding sockaddr lengths */
 };
 struct qr_task {
