@@ -24,7 +24,7 @@ struct session_flags {
 };
 
 /* Allocate new session for a libuv handle.
- * If handle->tyoe is UV_UDP, tls parameter will be ignored. */
+ * If handle->type isn't UV_TCP, has_tls parameter will be ignored. */
 struct session *session_new(uv_handle_t *handle, bool has_tls, bool has_http);
 /* Clear and free given session. */
 void session_free(struct session *session);

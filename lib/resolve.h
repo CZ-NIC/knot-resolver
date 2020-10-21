@@ -61,6 +61,21 @@
  */
 
 
+struct kr_request;
+/** Allocate buffer for answer's wire (*maxlen may get lowered).
+ *
+ * Motivation: XSK wire allocation is an overlap of library and daemon:
+ *  - it needs to be called from the library
+ *  - it needs to rely on some daemon's internals
+ *  - the library (currently) isn't allowed to directly use symbols from daemon
+ *    (contrary to modules)
+ * That makes separation difficult, e.g. some of our tests run without daemon.
+ *
+ * Note: after we obtain the wire, we're obliged to send it out.
+ * (So far there's no use case to allow cancelling at that point.)
+ */
+typedef uint8_t * (*alloc_wire_f)(struct kr_request *req, uint16_t *maxlen);
+
 /**
  * RRset rank - for cache and ranked_rr_*.
  *
@@ -165,6 +180,7 @@ struct kr_request_qsource_flags {
 	bool tcp:1; /**< true if the request is not on UDP; only meaningful if (dst_addr). */
 	bool tls:1; /**< true if the request is encrypted; only meaningful if (dst_addr). */
 	bool http:1; /**< true if the request is on HTTP; only meaningful if (dst_addr). */
+	bool xdp:1; /**< true if the request is on AF_XDP; only meaningful if (dst_addr). */
 };
 
 /**
@@ -219,9 +235,11 @@ struct kr_request {
 	trace_callback_f trace_finish; /**< Request finish tracepoint */
 	int vars_ref; /**< Reference to per-request variable table. LUA_NOREF if not set. */
 	knot_mm_t pool;
-	unsigned int uid; /** for logging purposes only */
+	unsigned int uid; /**< for logging purposes only */
 	unsigned int count_no_nsaddr;
 	unsigned int count_fail_row;
+	alloc_wire_f alloc_wire_cb; /**< CB to allocate answer wire (can be NULL). */
+	// FIXME: "dealloc" the umem wire in cases the answer isn't sent (if possible)
 };
 
 /** Initializer for an array of *_selected. */

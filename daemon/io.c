@@ -2,13 +2,19 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <string.h>
-#include <libknot/errcode.h>
+#include "daemon/io.h"
+
+#include <assert.h>
 #include <contrib/ucw/lib.h>
 #include <contrib/ucw/mempool.h>
-#include <assert.h>
+#include <libknot/errcode.h>
+#include <string.h>
+#include <sys/resource.h>
 
-#include "daemon/io.h"
+#if ENABLE_XDP
+	#include <libknot/xdp/xdp.h>
+#endif
+
 #include "daemon/network.h"
 #include "daemon/worker.h"
 #include "daemon/tls.h"
@@ -786,6 +792,109 @@ int io_listen_pipe(uv_loop_t *loop, uv_pipe_t *handle, int fd)
 	return 0;
 }
 
+#if ENABLE_XDP
+static void xdp_rx(uv_poll_t* handle, int status, int events)
+{
+	const int XDP_RX_BATCH_SIZE = 64;
+	if (status < 0) {
+		kr_log_error("[kxsk] poll status %d: %s\n", status, uv_strerror(status));
+		return;
+	}
+	if (events != UV_READABLE) {
+		kr_log_error("[kxsk] poll unexpected events: %d\n", events);
+		return;
+	}
+
+	xdp_handle_data_t *xhd = handle->data;
+	assert(xhd && xhd->session && xhd->socket);
+	uint32_t rcvd;
+	knot_xdp_msg_t msgs[XDP_RX_BATCH_SIZE];
+	int ret = knot_xdp_recv(xhd->socket, msgs, XDP_RX_BATCH_SIZE, &rcvd);
+	if (ret == KNOT_EOK) {
+		kr_log_verbose("[kxsk] poll triggered, processing a batch of %d packets\n",
+			(int)rcvd);
+	} else {
+		kr_log_error("[kxsk] knot_xdp_recv(): %d, %s\n", ret, knot_strerror(ret));
+		//FIXME?
+	}
+	assert(rcvd <= XDP_RX_BATCH_SIZE);
+	for (int i = 0; i < rcvd; ++i) {
+		const knot_xdp_msg_t *msg = &msgs[i];
+		assert(msg->payload.iov_len < 65536);
+		knot_pkt_t *kpkt = knot_pkt_new(msg->payload.iov_base, msg->payload.iov_len,
+						&the_worker->pkt_pool);
+		ret = kpkt == NULL ? kr_error(ENOMEM) :
+			worker_submit(xhd->session,
+					(const struct sockaddr *)&msg->ip_from,
+					(const struct sockaddr *)&msg->ip_to,
+					msg->eth_from, msg->eth_to, kpkt);
+		if (ret)
+			kr_log_verbose("[kxsk] worker_submit() == %d: %s\n", ret, kr_strerror(ret));
+		mp_flush(the_worker->pkt_pool.ctx);
+	}
+	knot_xdp_recv_finish(xhd->socket, msgs, rcvd);
+}
+void xdp_tx_waker(uv_check_t* handle)
+{
+	int ret = knot_xdp_send_finish(handle->data);
+	if (ret != KNOT_EOK)
+		kr_log_error("[kxsk] check: ret = %d, %s\n", ret, knot_strerror(ret));
+	knot_xdp_send_prepare(handle->data);
+	// LATER(opt.): it _might_ be better for performance to do these two steps
+	// at different points in time
+}
+int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
+{
+	if (!ep || !ep->handle) {
+		return kr_error(EINVAL);
+	}
+
+	// RLIMIT_MEMLOCK often needs raising when operating on BPF
+	static int ret_limit = 1;
+	if (ret_limit == 1) {
+		struct rlimit no_limit = { RLIM_INFINITY, RLIM_INFINITY };
+		ret_limit = setrlimit(RLIMIT_MEMLOCK, &no_limit)
+			? kr_error(errno) : 0;
+	}
+	if (ret_limit) return ret_limit;
+
+	xdp_handle_data_t *xhd = malloc(sizeof(*xhd));
+	if (!xhd) return kr_error(ENOMEM);
+
+	const int port = ep->port ? ep->port : KNOT_XDP_LISTEN_PORT_ALL;
+	xhd->socket = NULL; // needed for some reason
+	int ret = knot_xdp_init(&xhd->socket, ifname, ep->xdp_queue, port,
+				KNOT_XDP_LOAD_BPF_MAYBE);
+
+	if (!ret) ret = uv_check_init(loop, &xhd->tx_waker);
+	xhd->tx_waker.data = xhd->socket;
+	if (!ret) ret = uv_check_start(&xhd->tx_waker, xdp_tx_waker);
+	if (ret) {
+		free(xhd);
+		return kr_error(ret);
+	}
+	assert(xhd->socket);
+
+	ep->fd = knot_xdp_socket_fd(xhd->socket); // probably not useful
+	ret = uv_poll_init(loop, (uv_poll_t *)ep->handle, ep->fd);
+	if (ret) {
+		knot_xdp_deinit(xhd->socket);
+		free(xhd);
+		return kr_error(ret);
+	}
+
+	// beware: this sets poll_handle->data
+	xhd->session = session_new(ep->handle, false, false);
+	assert(!session_flags(xhd->session)->outgoing);
+	session_get_sockname(xhd->session)->sa_family = AF_XDP; // to have something in there
+
+	ep->handle->data = xhd;
+	ret = uv_poll_start((uv_poll_t *)ep->handle, UV_READABLE, xdp_rx);
+	return ret;
+}
+#endif
+
+
 int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family, bool has_tls, bool has_http)
 {
 	int ret = -1;
@@ -807,12 +916,22 @@ int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family, b
 
 void io_deinit(uv_handle_t *handle)
 {
-	if (!handle) {
+	if (!handle || !handle->data) {
 		return;
 	}
-	if (handle->data) {
+	if (handle->type != UV_POLL) {
 		session_free(handle->data);
-		handle->data = NULL;
+	} else {
+	#if ENABLE_XDP
+		xdp_handle_data_t *xhd = handle->data;
+		uv_check_stop(&xhd->tx_waker);
+		uv_close((uv_handle_t *)&xhd->tx_waker, NULL);
+		session_free(xhd->session);
+		knot_xdp_deinit(xhd->socket);
+		free(xhd);
+	#else
+		assert(false);
+	#endif
 	}
 }
 

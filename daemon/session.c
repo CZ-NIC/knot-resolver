@@ -23,8 +23,10 @@
 /* Per-socket (TCP or UDP) persistent structure.
  *
  * In particular note that for UDP clients it's just one session (per socket)
- * shared for all clients.  For TCP/TLS it's for the connection-specific socket,
+ * shared for all clients.  For TCP/TLS it's also for the connection-specific socket,
  * i.e one session per connection.
+ *
+ * LATER(optim.): the memory here is used a bit wastefully.
  */
 struct session {
 	struct session_flags sflags;  /**< miscellaneous flags. */
@@ -352,7 +354,7 @@ struct session *session_new(uv_handle_t *handle, bool has_tls, bool has_http)
 		}
 		session->wire_buf = wire_buf;
 		session->wire_buf_size = wire_buffer_size;
-	} else if (handle->type == UV_UDP) {
+	} else if (handle->type == UV_UDP || handle->type == UV_POLL/*XDP*/) {
 		/* We use the singleton buffer from worker for all UDP (!)
 		 * libuv documentation doesn't really guarantee this is OK,
 		 * but the implementation for unix systems does not hold
@@ -364,6 +366,7 @@ struct session *session_new(uv_handle_t *handle, bool has_tls, bool has_http)
 		assert(handle->loop->data);
 		session->wire_buf = the_worker->wire_buf;
 		session->wire_buf_size = sizeof(the_worker->wire_buf);
+		//FIXME: really for XDP as well?
 	}
 
 	uv_timer_init(handle->loop, &session->timeout);
@@ -749,7 +752,7 @@ int session_wirebuf_process(struct session *session, const struct sockaddr *peer
 	while (((pkt = session_produce_packet(session, &the_worker->pkt_pool)) != NULL) &&
 	       (ret < max_iterations)) {
 		assert (!session_wirebuf_error(session));
-		int res = worker_submit(session, peer, pkt);
+		int res = worker_submit(session, peer, NULL, NULL, NULL, pkt);
 		/* Errors from worker_submit() are intetionally *not* handled in order to
 		 * ensure the entire wire buffer is processed. */
 		if (res == kr_ok())

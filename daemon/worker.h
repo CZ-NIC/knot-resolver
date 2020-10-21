@@ -31,12 +31,15 @@ void worker_deinit(void);
 /**
  * Process an incoming packet (query from a client or answer from upstream).
  *
- * @param session  session the packet came from
- * @param peer     address the packet came from
- * @param pkt      the packet, or NULL on an error from the transport layer
+ * @param session  session the packet came from, or NULL (not from network)
+ * @param peer     address the packet came from, or NULL (not from network)
+ * @param eth_*    MAC addresses or NULL (for AF_XDP)
+ * @param pkt      the packet, or NULL (an error from the transport layer)
  * @return 0 or an error code
  */
-int worker_submit(struct session *session, const struct sockaddr *peer, knot_pkt_t *pkt);
+int worker_submit(struct session *session,
+		  const struct sockaddr *peer, const struct sockaddr *dst_addr,
+		  const uint8_t *eth_from, const uint8_t *eth_to, knot_pkt_t *pkt);
 
 /**
  * End current DNS/TCP session, this disassociates pending tasks from this session
