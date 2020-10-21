@@ -399,8 +399,9 @@ typedef struct {
 	int sock_type;
 	_Bool tls;
 	_Bool http;
-	const char *kind;
+	_Bool xdp;
 	_Bool freebind;
+	const char *kind;
 } endpoint_flags_t;
 typedef struct {
 	char **at;
