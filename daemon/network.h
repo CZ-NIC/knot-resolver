@@ -13,16 +13,22 @@
 #include <uv.h>
 #include <stdbool.h>
 
+#include <sys/socket.h>
+#ifndef AF_XDP
+#define AF_XDP 44
+#endif
 
 struct engine;
+struct session;
 
 /** Ways to listen on a socket (which may exist already). */
 typedef struct {
 	int sock_type;    /**< SOCK_DGRAM or SOCK_STREAM */
 	bool tls;         /**< only used together with .kind == NULL and SOCK_STREAM */
 	bool http;        /**< DoH2, implies .tls (in current implementation) */
-	const char *kind; /**< tag for other types: "control" or module-handled kinds */
+	bool xdp;         /**< XDP is special (not a normal socket, in particular) */
 	bool freebind;    /**< used for binding to non-local address */
+	const char *kind; /**< tag for other types: "control" or module-handled kinds */
 } endpoint_flags_t;
 
 static inline bool endpoint_flags_eq(endpoint_flags_t f1, endpoint_flags_t f2)
@@ -42,9 +48,11 @@ static inline bool endpoint_flags_eq(endpoint_flags_t f1, endpoint_flags_t f2)
  * ATM AF_UNIX is only supported with flags.kind != NULL
  */
 struct endpoint {
-	uv_handle_t *handle; /**< uv_udp_t or uv_tcp_t; NULL in case flags.kind != NULL */
+	/** uv_{udp,tcp,poll}_t (poll for XDP);
+	 * NULL in case of endpoints that are to be handled by modules. */
+	uv_handle_t *handle;
 	int fd;              /**< POSIX file-descriptor; always used. */
-	int family;          /**< AF_INET or AF_INET6 or AF_UNIX */
+	int family;          /**< AF_INET or AF_INET6 or AF_UNIX or AF_XDP */
 	uint16_t port;       /**< TCP/UDP port.  Meaningless with AF_UNIX. */
 	int16_t nic_queue;   /**< -1 or queue number of the interface for AF_XDP use. */
 	bool engaged;        /**< to some module or internally */
@@ -90,9 +98,12 @@ void network_deinit(struct network *net);
  *       nothing is done and kr_error(EADDRINUSE) is returned.
  * \note there's no short-hand to listen both on UDP and TCP.
  * \note ownership of flags.* is taken on success.  TODO: non-success?
+ * \param nic_queue == -1 for auto-selection or non-XDP.
+ * \note In XDP mode, addr may be also interface name, so kr_error(ENODEV)
+ *       is returned if some nonsense is passed
  */
 int network_listen(struct network *net, const char *addr, uint16_t port,
-		   endpoint_flags_t flags);
+		   int16_t nic_queue, endpoint_flags_t flags);
 
 /** Start listenting on an open file-descriptor.
  * \note flags.sock_type isn't meaningful here.

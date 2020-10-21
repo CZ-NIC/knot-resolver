@@ -10,6 +10,7 @@ local function count_sockets()
 		if socket.kind == 'control' then
 			control_socks = control_socks + 1
 		elseif (socket.kind == 'dns' or
+			socket.kind == 'xdp' or
 			socket.kind == 'tls' or
 			socket.kind == 'doh' or
 			socket.kind == 'doh2') then
