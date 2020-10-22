@@ -224,14 +224,10 @@ function M.enable(id)
 end
 
 local function consensus(op, ...)
-	local ret = false
 	local results = map(string.format(op, ...))
-	for idx, r in ipairs(results) do
-		if idx == 1 then
-			-- non-empty table, init to true
-			ret = true
-		end
-		ret = ret and r
+	local ret = results.n > 0  -- init to true for non-empty results
+	for idx=1, results.n do
+		ret = ret and results[idx]
 	end
 	return ret
 end
