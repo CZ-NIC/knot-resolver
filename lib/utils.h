@@ -5,6 +5,7 @@
 #pragma once
 
 #include <assert.h>
+#include <dirent.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <sys/socket.h>
