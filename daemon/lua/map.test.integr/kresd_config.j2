@@ -88,6 +88,7 @@ function boom_follower_and_leader(boom_expr, desc)
 end
 
 function tests()
+	-- add delay to each test to force scheduler to interleave tests and DNS queries
 	local test_delay = 20 / 1000 -- seconds
 	log('starting map() tests now')
 
@@ -123,9 +124,11 @@ function tests()
 	-- unsupported return type
 	boom_follower_and_leader(
 		'function() print("this cannot be serialized") end')
+	worker.sleep(test_delay)
 
 	tap.same({n = n_instances}, map('nil'),
 		'nil values are counted as returned')
+	worker.sleep(test_delay)
 
 	local exp = {n = n_instances}
 	for i=1,n_instances do
@@ -133,6 +136,7 @@ function tests()
 	end
 	local got = map('require("kluautil").kr_table_pack(nil, 2, nil)')
 	tap.same(got, exp, 'kr_table_pack handles nil values')
+	worker.sleep(test_delay)
 end
 
 local started = false
@@ -163,7 +167,7 @@ end
 -- i.e. this callback has to be called only after answer to Deckard was sent
 policy.add(policy.suffix(tests_done, {'\4done\0'}), true)
 
--- add delay to each query to force scheduler to give chance to other jobs
+-- add delay to each query to force scheduler to interleave tests and DNS queries
 policy.add(policy.all(
 	function()
 		local delay = 10  -- ms
