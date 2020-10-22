@@ -37,6 +37,7 @@
 /config.status
 /config.sub
 /configure
+/control
 /coverage
 /coverage.stats
 /daemon/kresd
@@ -55,12 +56,15 @@
 /ltmain.sh
 /missing
 /modules/dnstap/dnstap.pb-c.*
+/self.crt
+/self.key
 /stamp-h1
 /tags
 /tests/dnstap/src/dnstap-test/vendor/github.com/
 /tests/dnstap/src/github.com/
 /tests/pytests/*/tcproxy
 /tests/pytests/*/tlsproxy
+/tests/pytests/pytests.parallel.html
 /tests/test_array
 /tests/test_lru
 /tests/test_map
