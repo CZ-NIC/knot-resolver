@@ -738,6 +738,19 @@ local function map_send_recv(cmd, path)
 	return ret
 end
 
+-- internal use only
+-- Call cmd on each instance via control sockets.
+-- @param format - "luaobj" if individual results should be Lua objects
+--               - "strings" for eval_cmd output for each instance
+-- @returns table with results, one item per instance + key n=number of instances
+--          (order of return values is undefined)
+-- @throws Lua error if:
+--         - communication failed in the middle of trasaction
+--         - a result is not serializable
+--         - individual call throws an error
+--         - number of return values != 1 per instance per call
+--         - cmd execution state is undefined after an error
+-- Connection errors at the beginning are ignored to paper over leftover dead sockets.
 function map(cmd, format)
 	local local_sockets = {}
 	local results = {}
