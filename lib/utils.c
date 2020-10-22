@@ -1290,3 +1290,8 @@ long long kr_fssize(const char *path)
 	return buf.f_frsize * buf.f_blocks;
 }
 
+const char * kr_dirent_name(struct dirent *de)
+{
+	return de ? de->d_name : NULL;
+}
+

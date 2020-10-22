@@ -373,6 +373,7 @@ uint64_t kr_now();
 const char *kr_strptime_diff(const char *, const char *, const char *, double *);
 time_t kr_file_mtime(const char *);
 long long kr_fssize(const char *);
+const char *kr_dirent_name(struct dirent *);
 void lru_free_items_impl(struct lru *);
 struct lru *lru_create_impl(unsigned int, unsigned int, knot_mm_t *, knot_mm_t *);
 void *lru_get_impl(struct lru *, const char *, unsigned int, unsigned int, _Bool, _Bool *);

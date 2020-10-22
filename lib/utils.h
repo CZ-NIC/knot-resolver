@@ -561,4 +561,6 @@ KR_EXPORT uint16_t kr_rrsig_type_covered(const knot_rdata_t *rdata);
 KR_EXPORT time_t kr_file_mtime (const char* fname);
 /** Return filesystem size in bytes. */
 KR_EXPORT long long kr_fssize(const char *path);
+/** Simply return de->dname. (useful from Lua) */
+KR_EXPORT const char * kr_dirent_name(struct dirent *de);
 
