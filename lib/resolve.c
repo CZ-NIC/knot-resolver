@@ -1512,12 +1512,6 @@ ns_election:
 		return KR_STATE_PRODUCE;
 	}
 
-	/* Randomize query case (if not in safe mode or turned off) */
-	qry->secret = (qry->flags.SAFEMODE || qry->flags.NO_0X20)
-			? 0 : kr_rand_bytes(sizeof(qry->secret));
-	knot_dname_t *qname_raw = knot_pkt_qname(packet);
-	randomized_qname_case(qname_raw, qry->secret);
-
 	/*
 	 * Additional query is going to be finalized when calling
 	 * kr_resolve_checkout().
@@ -1525,6 +1519,13 @@ ns_election:
 	qry->timestamp_mono = kr_now();
 	*dst = &qry->ns.addr[0].ip;
 	*type = (qry->flags.TCP) ? SOCK_STREAM : SOCK_DGRAM;
+
+	/* Randomize query case (if not in safe mode or turned off or not UDP) */
+	qry->secret = (qry->flags.SAFEMODE || qry->flags.NO_0X20 || *type != SOCK_DGRAM)
+			? 0 : kr_rand_bytes(sizeof(qry->secret));
+	knot_dname_t *qname_raw = knot_pkt_qname(packet);
+	randomized_qname_case(qname_raw, qry->secret);
+
 	return request->state;
 }
 
