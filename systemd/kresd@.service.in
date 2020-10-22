@@ -13,6 +13,7 @@ Type=notify
 Environment="SYSTEMD_INSTANCE=%i"
 WorkingDirectory=@systemd_work_dir@
 ExecStart=@sbin_dir@/kresd -c @lib_dir@/distro-preconfig.lua -c @etc_dir@/kresd.conf -n
+ExecStopPost=/usr/bin/rm -f "@run_dir@/control/%i"
 User=@user@
 Group=@group@
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_SETPCAP
