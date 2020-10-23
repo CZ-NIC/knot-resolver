@@ -45,12 +45,14 @@ Users
 Configuration file
 ------------------
 
-* Statistics exporter :ref:`mod-graphite` now uses default prefix ``hostname() .. worker.id``
-  instead of bare :func:`hostname`. This prevents :ref:`systemd-multiple-instances` from sending
+* Statistics exporter :ref:`mod-graphite` now uses default prefix which combines
+  :func:`hostname()` and :envvar:`worker.id` instead of bare :func:`hostname()`.
+  This prevents :ref:`systemd-multiple-instances` from sending
   conflicting statistics to server. In case you want to continue in previous time series you
-  can manually configure Graphite configuration option ``prefix`` to the old values.
-  Beware that non-default values require careful :ref:`instance-specific-configuration` to avoid
-  conflicting names.
+  can manually set the old values using option ``prefix``
+  in :ref:`Graphite configuration <mod-graphite>`.
+  Beware that non-default values require careful
+  :ref:`instance-specific-configuration` to avoid conflicting names.
 
 * Lua variable :envvar:`worker.id` is now a string with either Systemd instance name or PID
   (instead of number). If your custom configuration uses :envvar:`worker.id` value please
