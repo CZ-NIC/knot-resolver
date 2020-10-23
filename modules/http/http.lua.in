@@ -347,10 +347,7 @@ end
 
 -- @function Init module
 function M.init()
-	-- collect and merge metrics only on leader
-	if worker.id == 0 then
-		worker.coroutine(prometheus.init)
-	end
+	worker.coroutine(prometheus.init)
 	net.register_endpoint_kind('doh', cb_socket)
 	net.register_endpoint_kind('webmgmt', cb_socket)
 end
