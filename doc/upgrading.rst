@@ -52,8 +52,8 @@ Configuration file
   Beware that non-default values require careful :ref:`instance-specific-configuration` to avoid
   conflicting names.
 
-* Lua variable `worker.id` is now a string with either Systemd instance name or PID
-  (instead of number). If your custom configuration relies on `worker.id` value please
+* Lua variable :envvar:`worker.id` is now a string with either Systemd instance name or PID
+  (instead of number). If your custom configuration uses :envvar:`worker.id` value please
   check your scripts.
 
 
