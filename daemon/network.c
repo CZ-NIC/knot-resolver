@@ -301,7 +301,8 @@ static int open_endpoint(struct network *net, const char *addr_str,
 
 	if (is_xdp) {
 	#if ENABLE_XDP
-		ep->handle = (uv_handle_t *)malloc(sizeof(uv_poll_t));
+		uv_poll_t *ep_handle = malloc(sizeof(uv_poll_t));
+		ep->handle = (uv_handle_t *)ep_handle;
 		ret = !ep->handle ? ENOMEM
 			: io_listen_xdp(net->loop, ep, addr_str);
 	#else
