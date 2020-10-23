@@ -726,7 +726,7 @@ end
 
 function policy.TC(state, req)
 	-- Avoid non-UDP queries
-	if req.qsource.flags.tcp then
+	if req.qsource.addr == nil or req.qsource.flags.tcp then
 		return state
 	end
 
