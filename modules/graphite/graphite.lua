@@ -3,7 +3,6 @@
 if not stats then modules.load('stats') end
 
 -- This is leader-only module
-if worker.id > 0 then return {} end
 local M = {}
 local socket = require("cqueues.socket")
 local proto_txt = {
@@ -42,16 +41,6 @@ end
 -- Create connected TCP socket
 local function make_tcp(host, port)
 	return make_socket(host, port, socket.SOCK_STREAM)
-end
-
-local function merge(results)
-	local t = {}
-	for _, result in ipairs(results) do
-		for k, v in pairs(result) do
-			t[k] = (t[k] or 0) + v
-		end
-	end
-	return t
 end
 
 -- Send the metrics in a table to multiple Graphite consumers
@@ -106,7 +95,7 @@ function M.init()
 	M.cli = {}
 	M.info = {}
 	M.interval = 5 * sec
-	M.prefix = 'kresd.' .. hostname()
+	M.prefix = string.format('kresd.%s.%s', hostname(), worker.id)
 	return 0
 end
 
@@ -120,10 +109,10 @@ function M.publish()
 	local now = os.time()
 	-- Publish built-in statistics
 	if not M.cli then error("no graphite server configured") end
-	publish_table(merge(map 'cache.stats()'), M.prefix..'.cache', now)
-	publish_table(merge(map 'worker.stats()'), M.prefix..'.worker', now)
+	publish_table(cache.stats(), M.prefix..'.cache', now)
+	publish_table(worker.stats(), M.prefix..'.worker', now)
 	-- Publish extended statistics if available
-	publish_table(merge(map 'stats.list()'), M.prefix, now)
+	publish_table(stats.list(), M.prefix, now)
 	return 0
 end
 
