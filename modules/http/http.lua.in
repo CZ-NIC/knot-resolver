@@ -347,7 +347,6 @@ end
 
 -- @function Init module
 function M.init()
-	worker.coroutine(prometheus.init)
 	net.register_endpoint_kind('doh', cb_socket)
 	net.register_endpoint_kind('webmgmt', cb_socket)
 end
@@ -357,7 +356,6 @@ function M.deinit()
 	for fd, _ in pairs(M.servers) do
 		remove_socket(fd)
 	end
-	prometheus.deinit()
 	tls_cert.ephemeral_state_destroy(M.ephem_state)
 	net.register_endpoint_kind('doh')
 	net.register_endpoint_kind('webmgmt')
