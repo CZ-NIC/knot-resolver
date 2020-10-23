@@ -64,12 +64,11 @@
 struct kr_request;
 /** Allocate buffer for answer's wire (*maxlen may get lowered).
  *
- * Motivation: XSK wire allocation is an overlap of library and daemon:
+ * Motivation: XDP wire allocation is an overlap of library and daemon:
  *  - it needs to be called from the library
  *  - it needs to rely on some daemon's internals
  *  - the library (currently) isn't allowed to directly use symbols from daemon
- *    (contrary to modules)
- * That makes separation difficult, e.g. some of our tests run without daemon.
+ *    (contrary to modules), e.g. some of our lib-using tests run without daemon
  *
  * Note: after we obtain the wire, we're obliged to send it out.
  * (So far there's no use case to allow cancelling at that point.)

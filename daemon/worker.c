@@ -382,6 +382,7 @@ static int request_start(struct request_ctx *ctx, knot_pkt_t *query)
 	if (!pkt) {
 		return kr_error(ENOMEM);
 	}
+
 	int ret = knot_pkt_copy(pkt, query);
 	if (ret != KNOT_EOK && ret != KNOT_ETRAIL) {
 		return kr_error(ENOMEM);

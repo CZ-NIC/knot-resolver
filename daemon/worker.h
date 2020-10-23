@@ -33,7 +33,7 @@ void worker_deinit(void);
  *
  * @param session  session the packet came from, or NULL (not from network)
  * @param peer     address the packet came from, or NULL (not from network)
- * @param eth_*    MAC addresses or NULL (for AF_XDP)
+ * @param eth_*    MAC addresses or NULL (they're useful for XDP)
  * @param pkt      the packet, or NULL (an error from the transport layer)
  * @return 0 or an error code
  */
