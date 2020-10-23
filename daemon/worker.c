@@ -10,6 +10,7 @@
 #include <lauxlib.h>
 #include <libknot/packet/pkt.h>
 #include <libknot/descriptor.h>
+#include <contrib/cleanup.h>
 #include <contrib/ucw/lib.h>
 #include <contrib/ucw/mempool.h>
 #include <contrib/wire.h>
@@ -2060,7 +2061,7 @@ void worker_deinit(void)
 	the_worker = NULL;
 }
 
-int worker_init(struct engine *engine, int worker_id, int worker_count)
+int worker_init(struct engine *engine, int worker_count)
 {
 	assert(engine && engine->L);
 	assert(the_worker == NULL);
@@ -2074,7 +2075,6 @@ int worker_init(struct engine *engine, int worker_id, int worker_count)
 	uv_loop_t *loop = uv_default_loop();
 	worker->loop = loop;
 
-	worker->id = worker_id;
 	worker->count = worker_count;
 
 	/* Register table for worker per-request variables */
@@ -2094,9 +2094,19 @@ int worker_init(struct engine *engine, int worker_id, int worker_count)
 
 	/* Set some worker.* fields in Lua */
 	lua_getglobal(engine->L, "worker");
-	lua_pushnumber(engine->L, worker_id);
+	pid_t pid = getpid();
+
+	auto_free char *pid_str = NULL;
+	const char *inst_name = getenv("SYSTEMD_INSTANCE");
+	if (inst_name) {
+		lua_pushstring(engine->L, inst_name);
+	} else {
+		assert(asprintf(&pid_str, "%ld", (long)pid) > 0);
+		lua_pushstring(engine->L, pid_str);
+	}
 	lua_setfield(engine->L, -2, "id");
-	lua_pushnumber(engine->L, getpid());
+
+	lua_pushnumber(engine->L, pid);
 	lua_setfield(engine->L, -2, "pid");
 	lua_pushnumber(engine->L, worker_count);
 	lua_setfield(engine->L, -2, "count");
