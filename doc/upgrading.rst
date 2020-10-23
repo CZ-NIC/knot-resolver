@@ -36,11 +36,18 @@ newer versions when they are released.
 ==========
 
 Users
-~~~~~
+-----
 
 * Users of :ref:`control-sockets` API need to terminate each command sent to resolver with newline
   character (ASCII ``\n``). Correct usage: ``cache.stats()\n``.
   Newline terminated commands are accepted by all resolver versions >= 1.0.0.
+
+Configuration file
+------------------
+
+* Lua variable :envvar:`worker.id` is now a string with either Systemd instance name or PID
+  (instead of number). If your custom configuration uses :envvar:`worker.id` value please
+  check your scripts.
 
 Module changes
 --------------

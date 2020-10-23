@@ -496,7 +496,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	/* Initialize the worker */
-	ret = worker_init(&engine, fork_id, the_args->forks);
+	ret = worker_init(&engine, the_args->forks);
 	if (ret != 0) {
 		kr_log_error("[system] failed to initialize worker: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;

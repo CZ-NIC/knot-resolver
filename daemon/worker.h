@@ -23,7 +23,7 @@ KR_EXPORT extern struct worker_ctx *the_worker;
 
 /** Create and initialize the worker.
  * \return error code (ENOMEM) */
-int worker_init(struct engine *engine, int worker_id, int worker_count);
+int worker_init(struct engine *engine, int worker_count);
 
 /** Destroy the worker (free memory). */
 void worker_deinit(void);
@@ -152,8 +152,7 @@ typedef array_t(struct qr_task *) qr_tasklist_t;
 struct worker_ctx {
 	struct engine *engine;
 	uv_loop_t *loop;
-	int id;
-	int count;
+	int count;  /** unreliable, does not count systemd instance, do not use */
 	int vars_table_ref;
 	unsigned tcp_pipeline_max;
 
