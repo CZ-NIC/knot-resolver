@@ -111,7 +111,7 @@ void worker_task_subreq_finalize(struct qr_task *task);
 bool worker_task_finished(struct qr_task *task);
 
 /** To be called after sending a DNS message.  It mainly deals with cleanups. */
-int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status);
+int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status);
 
 /** Various worker statistics.  Sync with wrk_stats() */
 struct worker_stats {

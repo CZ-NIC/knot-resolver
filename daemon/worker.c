@@ -288,6 +288,25 @@ static uint8_t *alloc_wire_cb(struct kr_request *req, uint16_t *maxlen)
 	memcpy(out.eth_to,   &ctx->source.eth_addrs[1], 6);
 	return out.payload.iov_base;
 }
+static void free_wire(const struct request_ctx *ctx)
+{
+	assert(ctx->req.alloc_wire_cb == alloc_wire_cb);
+	uint8_t *wire = ctx->req.answer->wire;
+	if (likely(wire == NULL)) /* sent most likely */
+		return;
+	/* We know it's an AF_XDP socket; otherwise alloc_wire_cb isn't assigned. */
+	uv_handle_t *handle = session_get_handle(ctx->source.session);
+	assert(handle->type == UV_POLL);
+	xdp_handle_data_t *xhd = handle->data;
+	/* Freeing is done by sending an empty packet (the API won't really send it). */
+	knot_xdp_msg_t out;
+	out.payload.iov_base = wire;
+	out.payload.iov_len = 0;
+	uint32_t sent;
+	int ret = knot_xdp_send(xhd->socket, &out, 1, &sent);
+	assert(ret == KNOT_EOK && sent == 0); (void)ret;
+	kr_log_verbose("[xdp] freed unsent buffer, ret = %d\n", ret);
+}
 #endif
 
 /** Create and initialize a request_ctx (on a fresh mempool).
@@ -418,6 +437,10 @@ static void request_free(struct request_ctx *ctx)
 		lua_pop(L, 1);
 		ctx->req.vars_ref = LUA_NOREF;
 	}
+	/* Make sure to free XDP buffer in case it wasn't sent. */
+	if (ctx->req.alloc_wire_cb) {
+		free_wire(ctx);
+	}
 	/* Return mempool to ring or free it if it's full */
 	pool_release(worker, ctx->req.pool.ctx);
 	/* @note The 'task' is invalidated from now on. */
@@ -528,7 +551,7 @@ static void qr_task_complete(struct qr_task *task)
 }
 
 /* This is called when we send subrequest / answer */
-int qr_task_on_send(struct qr_task *task, uv_handle_t *handle, int status)
+int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 {
 
 	if (task->finished) {
@@ -1260,8 +1283,9 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		assert(xhd && xhd->socket && xhd->session == source_session);
 		uint32_t sent;
 		ret = knot_xdp_send(xhd->socket, &msg, 1, &sent);
+		ctx->req.answer->wire = NULL; /* it's been freed */
 		kr_log_verbose("[xdp] pushed a packet, ret = %d\n", ret);
-		ret = qr_task_on_send(task, NULL/*doesn't matter for UDP*/, ret);
+		ret = qr_task_on_send(task, src_handle, ret);
 	#else
 		assert(!EINVAL);
 		ret = kr_error(EINVAL);

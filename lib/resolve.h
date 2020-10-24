@@ -238,7 +238,6 @@ struct kr_request {
 	unsigned int count_no_nsaddr;
 	unsigned int count_fail_row;
 	alloc_wire_f alloc_wire_cb; /**< CB to allocate answer wire (can be NULL). */
-	// FIXME: "dealloc" the umem wire in cases the answer isn't sent (if possible)
 };
 
 /** Initializer for an array of *_selected. */
