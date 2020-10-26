@@ -439,7 +439,11 @@ static void request_free(struct request_ctx *ctx)
 	}
 	/* Make sure to free XDP buffer in case it wasn't sent. */
 	if (ctx->req.alloc_wire_cb) {
+	#if ENABLE_XDP
 		free_wire(ctx);
+	#else
+		assert(!EINVAL);
+	#endif
 	}
 	/* Return mempool to ring or free it if it's full */
 	pool_release(worker, ctx->req.pool.ctx);
