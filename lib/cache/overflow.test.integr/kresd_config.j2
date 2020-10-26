@@ -35,7 +35,18 @@ policy.add(policy.all(policy.DEBUG_ALWAYS))
 cache.open(1*MB)
 
 {% endraw %}
+
+{% if DO_IP6 == "true" %}
+net.ipv6 = true
+{% else %}
+net.ipv6 = false
+{% endif %}
+
+{% if DO_IP4 == "true" %}
+net.ipv4 = true
+{% else %}
 net.ipv4 = false
+{% endif %}
 
 -- both instances listen on both addresses
 -- so queries get distributed between them randomly
