@@ -815,7 +815,8 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 			(int)rcvd);
 	} else {
 		kr_log_error("[xdp] knot_xdp_recv(): %d, %s\n", ret, knot_strerror(ret));
-		//FIXME?
+		assert(false); // ATM it can only be returned when called incorrectly
+		return;
 	}
 	assert(rcvd <= XDP_RX_BATCH_SIZE);
 	for (int i = 0; i < rcvd; ++i) {
