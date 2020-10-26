@@ -293,7 +293,8 @@ static int open_endpoint(struct network *net, const char *addr_str,
 		/* Some parts of connection handling would need more work,
 		 * so let's support AF_UNIX only with .kind != NULL for now. */
 		kr_log_error("[system] AF_UNIX only supported with set { kind = '...' }\n");
-		return kr_error(EAFNOSUPPORT);
+		ret = EAFNOSUPPORT;
+		goto finish_ret;
 		/*
 		uv_pipe_t *ep_handle = malloc(sizeof(uv_pipe_t));
 		*/
@@ -448,6 +449,7 @@ static int16_t xdp_queue_auto(void)
 	if (!inst_str)
 		return -1;
 	char *endp;
+	errno = 0; // strtol() is special in this respect
 	long inst = strtol(inst_str, &endp, 10);
 	if (!errno && *endp == '\0' && inst > 0 && inst < UINT16_MAX)
 		return inst - 1; // 1-based vs. 0-based indexing conventions
