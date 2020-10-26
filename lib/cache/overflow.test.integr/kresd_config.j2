@@ -5,6 +5,9 @@ trust_anchors.remove('.')
 trust_anchors.add_file('{{TAF}}')
 {% endfor %}
 
+modules.load("hints")
+hints.root({['{{ROOT_NAME}}'] = '{{ROOT_ADDR}}'})
+
 {% raw %}
 -- Disable RFC5011 TA update
 if ta_update then
@@ -32,6 +35,7 @@ policy.add(policy.all(policy.DEBUG_ALWAYS))
 cache.open(1*MB)
 
 {% endraw %}
+net.ipv4 = false
 
 -- both instances listen on both addresses
 -- so queries get distributed between them randomly
