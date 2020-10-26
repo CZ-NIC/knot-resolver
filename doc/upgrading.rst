@@ -36,7 +36,7 @@ newer versions when they are released.
 ==========
 
 Users
-~~~~~
+-----
 
 * Users of :ref:`control-sockets` API need to terminate each command sent to resolver with newline
   character (ASCII ``\n``). Correct usage: ``cache.stats()\n``.
