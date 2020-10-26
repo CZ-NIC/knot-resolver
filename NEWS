@@ -1,10 +1,6 @@
 Knot Resolver 5.2.0 (2020-1m-dd)
 ================================
 
-Incompatible changes
---------------------
-- build: meson >= 0.49 is required (!1082)
-
 Improvements
 ------------
 - lower default EDNS buffer size to 1232 (#538, #300, !920)
@@ -21,12 +17,16 @@ Bugfixes
 - fix emergency cache locking bug introduced in 5.1.3 (!1078)
 - migrate map() command to control sockets; fix systemd integration (!1000)
 - fix crash when sending back errors over control socket (!1000)
+- fix SERVFAIL while processing forwarded CNAME to a sibling zone (#614, !1070)
 
 Incompatible changes
 --------------------
-- minor changes in module API; see upgrading guide:
-  https://knot-resolver.readthedocs.io/en/stable/upgrading.html
-- fix SERVFAIL while processing forwarded CNAME to a sibling zone (#614, !1070)
+- see upgrading guide:
+  https://knot-resolver.readthedocs.io/en/stable/upgrading.html#to-5-2
+- minor changes in module API
+- control socket API commands have to be terminated by "\n"
+- graphite: default prefix now contains instance identifier (!1000)
+- build: meson >= 0.49 is required (!1082)
 
 
 Knot Resolver 5.1.3 (2020-09-08)
