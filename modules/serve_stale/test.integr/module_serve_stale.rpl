@@ -1,3 +1,4 @@
+do-ip6: no
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; config options
 	stub-addr: 193.0.14.129 	# K.ROOT-SERVERS.NET.
