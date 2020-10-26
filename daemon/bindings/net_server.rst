@@ -13,6 +13,7 @@ First you need to decide what service should be available on given IP address
   :header: "Protocol/service", "net.listen *kind*"
 
   "DNS (unencrypted UDP+TCP, :rfc:`1034`)","``dns``"
+  "DNS (unencrypted UDP, :ref:`using XDP Linux API <dns-over-xdp>`)","``xdp``"
   ":ref:`dns-over-tls`","``tls``"
   ":ref:`dns-over-https`","``doh2``"
   ":ref:`Web management <mod-http-built-in-services>`","``webmgmt``"
@@ -38,6 +39,7 @@ First you need to decide what service should be available on given IP address
   :header: "**Network protocol**", "**Configuration command**"
 
   "DNS (UDP+TCP, :rfc:`1034`)","``net.listen('192.0.2.123', 53)``"
+  "DNS (UDP, :ref:`using XDP <dns-over-xdp>`)","``net.listen('192.0.2.123', 53, { kind = 'xdp' })``"
   ":ref:`dns-over-tls`","``net.listen('192.0.2.123', 853, { kind = 'tls' })``"
   ":ref:`dns-over-https`","``net.listen('192.0.2.123', 443, { kind = 'doh2' })``"
   ":ref:`Web management <mod-http-built-in-services>`","``net.listen('192.0.2.123', 8453, { kind = 'webmgmt' })``"
@@ -50,6 +52,8 @@ Examples:
 
 	net.listen('::1')
 	net.listen(net.lo, 53)
+	net.listen('192.0.2.123', 53, { kind = 'xdp', nic_queue = 0 })
+	net.listen('eth0', 53, { kind = 'xdp' })
 	net.listen(net.eth0, 853, { kind = 'tls' })
 	net.listen('192.0.2.1', 53, { freebind = true })
 	net.listen({'127.0.0.1', '::1'}, 53, { kind = 'dns' })
@@ -148,4 +152,5 @@ Following configuration functions are useful mainly for scripting or :ref:`runti
    .. warning:: Please note that too large limit may have negative impact on performance and can lead to increased number of SERVFAIL answers.
 
 .. _`dnsproxy module`: https://www.knot-dns.cz/docs/2.7/html/modules.html#dnsproxy-tiny-dns-proxy
+
 
