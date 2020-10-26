@@ -7,8 +7,8 @@ local strerror = require('cqueues.errno').strerror
 local ctrl_sock_txt, ctrl_sock_bin, ctrl_sock_txt_longcmd, ctrl_sock_bin_longcmd
 local ctrl_sock_txt_partcmd, ctrl_sock_bin_partcmd
 
-local function onerr_fail(method, errno, stacklevel)
-	local errmsg = string.format('socket error: method %s err %d (%s)',
+local function onerr_fail(_, method, errno, stacklevel)
+	local errmsg = string.format('socket error: method %s error %d (%s)',
 					method, errno, strerror(errno))
 	fail(debug.traceback(errmsg, stacklevel))
 end
@@ -124,22 +124,22 @@ end
 local function test_close_uncomplete_cmd()
 	ctrl_sock_txt_partcmd:xwrite('worker.p')
 	ctrl_sock_txt_partcmd:close()
-	pass('close text socket with uncomplete command')
+	pass('close text socket with short incomplete command')
 
 	ctrl_sock_bin_partcmd:xwrite('worker.p')
 	ctrl_sock_bin_partcmd:close()
-	pass('close binary socket with long uncomplete command')
+	pass('close binary socket with short incomplete command')
 end
 
 
 local function test_close_during_transfer()
 	ctrl_sock_txt_longcmd:xwrite(string.rep('a', 1024*1024*10))
 	ctrl_sock_txt_longcmd:close()
-	pass('close text socket with long uncomplete command')
+	pass('close text socket with long incomplete command')
 
 	ctrl_sock_bin_longcmd:xwrite(string.rep('a', 1024*1024*10))
 	ctrl_sock_bin_longcmd:close()
-	pass('close binary socket with long uncomplete command')
+	pass('close binary socket with long incomplete command')
 end
 
 local tests = {
