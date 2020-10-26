@@ -122,7 +122,7 @@ local function test_binary_more_syscalls()
 	same(data, worker.pid..'\n', 'binary mode returns output in expected format')
 end
 
-local function test_close_uncomplete_cmd()
+local function test_close_incomplete_cmd()
 	ctrl_sock_txt_partcmd:xwrite('worker.p', nil, timeout)
 	ctrl_sock_txt_partcmd:close()
 	pass('close text socket with short incomplete command')
@@ -148,7 +148,7 @@ local tests = {
 	test_text_prompt, -- prompt after connect
 	test_text_single_command,
 	test_text_prompt, -- new prompt when command is finished
-	test_close_uncomplete_cmd,
+	test_close_incomplete_cmd,
 	test_close_during_transfer,
 	test_binary_more_syscalls,
 	test_text_single_command, -- command in text mode after execute commands in binary mode
