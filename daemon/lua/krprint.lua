@@ -85,15 +85,18 @@ function base_class.number(_, val)
 	end
 end
 
-function base_class.string(_, val)
+function base_class.char_is_printable(_, c)
+	-- ASCII (from space to ~) and not ' or \
+	return (c >= 0x20 and c < 0x7f)
+		and c ~= 0x27 and c ~= 0x5C
+end
+
+function base_class.string(self, val)
 	assert(type(val) == 'string')
-	val = tostring(val)
 	local chars = {'\''}
 	for i = 1, #val do
 		local c = string.byte(val, i)
-		-- ASCII (from space to ~) and not ' or \
-		if (c >= 0x20 and c < 0x7f)
-			and c ~= 0x27 and c ~= 0x5C then
+		if self:char_is_printable(c) then
 			table.insert(chars, string.char(c))
 		else
 			table.insert(chars, string.format('\\%03d', c))
@@ -243,6 +246,14 @@ function pprinter_class._fallback(self, val)
 		base_class._fallback(self, val)
 	end
 	return tostring(val)
+end
+
+function pprinter_class.char_is_printable(_, c)
+	-- ASCII (from space to ~) + tab or newline
+	-- and not ' or \
+	return ((c >= 0x20 and c < 0x7f)
+		or c == 0x09 or c == 0x0A)
+		and c ~= 0x27 and c ~= 0x5C
 end
 
 -- "function" is a Lua keyword so assignment below is workaround to create
