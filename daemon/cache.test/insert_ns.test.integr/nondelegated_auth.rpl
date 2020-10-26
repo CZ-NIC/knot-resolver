@@ -3,6 +3,7 @@
 ;	target-fetch-policy: "0 0 0 0 0"
 ;	name: "."
 	stub-addr: 193.0.14.129 	# K.ROOT-SERVERS.NET.
+	do-ip6: no
 CONFIG_END
 
 SCENARIO_BEGIN Delegation explicitly added into cache must be followed

@@ -8,6 +8,7 @@ trust_anchors.add_file('{{TAF}}')
 -- insert NS record pointing to a non-delegated DNS server
 cache.open(1*MB)
 cache.clear()
+trust_anchors.remove('.')
 
 local ffi = require('ffi')
 local c = kres.context().cache
@@ -52,6 +53,17 @@ verbose(true)
 
 net = { '{{SELF_ADDR}}' }
 
+{% if DO_IP6 == "true" %}
+net.ipv6 = true
+{% else %}
+net.ipv6 = false
+{% endif %}
+
+{% if DO_IP4 == "true" %}
+net.ipv4 = true
+{% else %}
+net.ipv4 = false
+{% endif %}
 
 {% if QMIN == "false" %}
 option('NO_MINIMIZE', true)

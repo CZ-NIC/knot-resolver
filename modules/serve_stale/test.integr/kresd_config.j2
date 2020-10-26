@@ -30,6 +30,18 @@ cache.size = 2*MB
 verbose(true)
 {% endraw %}
 
+{% if DO_IP6 == "true" %}
+net.ipv6 = true
+{% else %}
+net.ipv6 = false
+{% endif %}
+
+{% if DO_IP4 == "true" %}
+net.ipv4 = true
+{% else %}
+net.ipv4 = false
+{% endif %}
+
 net = { '{{SELF_ADDR}}' }
 
 
