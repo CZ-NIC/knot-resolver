@@ -704,7 +704,7 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 			FILE *fp_out = ret ? stderr : stdout;
 			if (message)
 				fprintf(fp_out, "%s", message);
-			if (message || !args->quiet)
+			if (message && !args->quiet)
 				fprintf(fp_out, "\n");
 			fprintf(fp_out, "%s", delim);
 		}
