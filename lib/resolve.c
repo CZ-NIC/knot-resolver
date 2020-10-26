@@ -1664,21 +1664,21 @@ int kr_resolve_finish(struct kr_request *request, int state)
 	/* Finalize answer and construct whole wire-format (unless dropping). */
 	knot_pkt_t *answer = kr_request_ensure_answer(request);
 	if (answer) {
-	ITERATE_LAYERS(request, NULL, answer_finalize);
-	answer_finalize(request);
+		ITERATE_LAYERS(request, NULL, answer_finalize);
+		answer_finalize(request);
 
-	/* Defensive style, in case someone has forgotten.
-	 * Beware: non-empty answers do make sense even with SERVFAIL case, etc. */
-	if (request->state != KR_STATE_DONE) {
+		/* Defensive style, in case someone has forgotten.
+		 * Beware: non-empty answers do make sense even with SERVFAIL case, etc. */
+		if (request->state != KR_STATE_DONE) {
 			uint8_t *wire = answer->wire;
-		switch (knot_wire_get_rcode(wire)) {
-		case KNOT_RCODE_NOERROR:
-		case KNOT_RCODE_NXDOMAIN:
-			knot_wire_clear_ad(wire);
-			knot_wire_clear_aa(wire);
-			knot_wire_set_rcode(wire, KNOT_RCODE_SERVFAIL);
+			switch (knot_wire_get_rcode(wire)) {
+			case KNOT_RCODE_NOERROR:
+			case KNOT_RCODE_NXDOMAIN:
+				knot_wire_clear_ad(wire);
+				knot_wire_clear_aa(wire);
+				knot_wire_set_rcode(wire, KNOT_RCODE_SERVFAIL);
+			}
 		}
-	}
 	}
 
 	ITERATE_LAYERS(request, NULL, finish);
