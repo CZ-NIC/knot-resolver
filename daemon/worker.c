@@ -2087,7 +2087,8 @@ int worker_init(struct engine *engine, int worker_count)
 	if (inst_name) {
 		lua_pushstring(engine->L, inst_name);
 	} else {
-		assert(asprintf(&pid_str, "%ld", (long)pid) > 0);
+		ret = asprintf(&pid_str, "%ld", (long)pid);
+		assert(ret > 0);
 		lua_pushstring(engine->L, pid_str);
 	}
 	lua_setfield(engine->L, -2, "id");
