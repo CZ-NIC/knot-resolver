@@ -45,7 +45,7 @@ struct session {
 	trie_t *tasks;                /**< list of tasks assotiated with given session. */
 	queue_t(struct qr_task *) waiting;  /**< list of tasks waiting for sending to upstream. */
 
-	uint8_t *wire_buf;            /**< Buffer for DNS message. */
+	uint8_t *wire_buf;            /**< Buffer for DNS message, except for XDP. */
 	ssize_t wire_buf_size;        /**< Buffer size. */
 	ssize_t wire_buf_start_idx;   /**< Data start offset in wire_buf. */
 	ssize_t wire_buf_end_idx;     /**< Data end offset in wire_buf. */
@@ -354,7 +354,7 @@ struct session *session_new(uv_handle_t *handle, bool has_tls, bool has_http)
 		}
 		session->wire_buf = wire_buf;
 		session->wire_buf_size = wire_buffer_size;
-	} else if (handle->type == UV_UDP || handle->type == UV_POLL/*XDP*/) {
+	} else if (handle->type == UV_UDP) {
 		/* We use the singleton buffer from worker for all UDP (!)
 		 * libuv documentation doesn't really guarantee this is OK,
 		 * but the implementation for unix systems does not hold
@@ -366,7 +366,11 @@ struct session *session_new(uv_handle_t *handle, bool has_tls, bool has_http)
 		assert(handle->loop->data);
 		session->wire_buf = the_worker->wire_buf;
 		session->wire_buf_size = sizeof(the_worker->wire_buf);
-		//FIXME: really for XDP as well?
+	} else {
+		assert(handle->type == UV_POLL/*XDP*/);
+		/* - wire_buf* are left zeroed, as they make no sense
+		 * - timer is unused but OK for simplicity (server-side sessions are few)
+		 */
 	}
 
 	uv_timer_init(handle->loop, &session->timeout);
