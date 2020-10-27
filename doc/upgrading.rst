@@ -24,9 +24,6 @@ newer versions when they are released.
 * DoH over HTTP/1 and unencrypted transports is still available in
   :ref:`legacy http module <mod-http-doh>` (``kind='doh'``).
   This module will not receive receive any more bugfixes and will be eventually removed.
-* New releases since October 2020 will contain changes for
-  `DNS Flag Day 2020 <https://dnsflagday.net/2020/>`_. Please double-check your firewall,
-  it has to allow DNS traffic on UDP and also TCP port 53.
 
 
 5.1 to 5.2
@@ -38,6 +35,10 @@ Users
 * Users of :ref:`control-sockets` API need to terminate each command sent to resolver with newline
   character (ASCII ``\n``). Correct usage: ``cache.stats()\n``.
   Newline terminated commands are accepted by all resolver versions >= 1.0.0.
+* `DNS Flag Day 2020 <https://dnsflagday.net/2020/>`_ is now effective and Knot Resolver uses
+  maximum size of UDP answer to 1232 bytes. Please double-check your firewall,
+  it has to allow DNS traffic on UDP and **also TCP** port 53.
+
 
 Configuration file
 ------------------
