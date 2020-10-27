@@ -3,8 +3,13 @@
 
 config_tests += [
   ['controlsock', files('controlsock.test.lua')],
+  ['krprint', files('krprint.test.lua')],
   ['ta', files('trust_anchors.test/ta.test.lua')],
   ['ta_bootstrap', files('trust_anchors.test/bootstrap.test.lua')],
+]
+
+integr_tests += [
+  ['map', join_paths(meson.current_source_dir(), 'map.test.integr')],
 ]
 
 lua_config = configuration_data()
@@ -45,6 +50,7 @@ lua_src = [
   trust_anchors,
   files('zonefile.lua'),
   files('kluautil.lua'),
+  files('krprint.lua'),
   distro_preconfig,
 ]
 

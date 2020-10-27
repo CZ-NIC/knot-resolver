@@ -1,6 +1,6 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 
-local cqerrno = require('cqueues.errno')
+local ffi = require('ffi')
 local kluautil = {}
 
 -- Get length of table
@@ -16,6 +16,26 @@ function kluautil.kr_table_len(t)
 	return len
 end
 
+-- pack varargs including nil arguments into a table
+function kluautil.kr_table_pack(...)
+	local tab = {...}
+	tab.n = select('#', ...)
+	return tab
+end
+
+-- unpack table produced by kr_table_pack and including nil values
+function kluautil.kr_table_unpack(tab)
+	return unpack(tab, 1, tab.n)
+end
+
+ffi.cdef([[
+	typedef struct __dirstream DIR;
+	DIR *opendir(const char *name);
+	struct dirent *readdir(DIR *dirp);
+	int closedir(DIR *dirp);
+	char *strerror(int errnum);
+]])
+
 -- Fetch over HTTPS
 function kluautil.kr_https_fetch(url, out_file, ca_file)
 	local http_ok, http_request = pcall(require, 'http.request')
@@ -25,6 +45,7 @@ function kluautil.kr_https_fetch(url, out_file, ca_file)
 	if not http_ok or not httptls_ok or not openssl_ok then
 		return nil, 'error: lua-http and luaossl libraries are missing (but required)'
 	end
+	local cqerrno = require('cqueues.errno')
 
 	assert(string.match(url, '^https://'))
 
@@ -62,9 +83,31 @@ function kluautil.kr_https_fetch(url, out_file, ca_file)
 		return nil, errmsg
 	end
 
-	out_file:seek("set", 0)
+	out_file:seek('set', 0)
 
 	return true
+end
+
+-- List directory
+function kluautil.list_dir (path)
+	local results = {}
+	local dir = ffi.C.opendir(path)
+	if dir == nil then
+		return results
+	end
+
+	local entry = ffi.C.readdir(dir)
+	while entry ~= nil do
+		local entry_name = ffi.string(ffi.C.kr_dirent_name(entry))
+		if entry_name ~= '.' and entry_name ~= '..' then
+			table.insert(results, entry_name)
+		end
+		entry = ffi.C.readdir(dir)
+	end
+
+	ffi.C.closedir(dir)
+
+	return results
 end
 
 return kluautil

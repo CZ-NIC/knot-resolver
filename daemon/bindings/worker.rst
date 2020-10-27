@@ -7,10 +7,14 @@ Worker is a service over event loop that tracks and schedules outstanding querie
 you can see the statistics or schedule new queries. It also contains information about
 specified worker count and process rank.
 
+.. envvar:: worker.id
+
+   Value from environment variable ``SYSTEMD_INSTANCE``,
+   or if it is not set, :envvar:`PID <worker.pid>` (string).
+
 .. envvar:: worker.pid
 
    Current worker process PID (number).
-
 
 .. function:: worker.stats()
 

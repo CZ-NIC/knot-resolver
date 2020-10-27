@@ -230,6 +230,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_strptime_diff
 	kr_file_mtime
 	kr_fssize
+	kr_dirent_name
 	lru_free_items_impl
 	lru_create_impl
 	lru_get_impl

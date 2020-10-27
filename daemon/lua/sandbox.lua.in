@@ -2,6 +2,8 @@
 
 local debug = require('debug')
 local ffi = require('ffi')
+local kluautil = require('kluautil')
+local krprint = require("krprint")
 
 -- Units
 kB = 1024
@@ -446,8 +448,7 @@ modules.load('watchdog')
 -- Load keyfile_default
 trust_anchors.add_file('@keyfile_default@', @unmanaged@)
 
--- Interactive command evaluation
-function eval_cmd(line, raw)
+local function eval_cmd_compile(line, raw)
 	-- Compatibility sandbox code loading
 	local function load_code(code)
 	    if getfenv then -- Lua 5.1
@@ -461,6 +462,12 @@ function eval_cmd(line, raw)
 	if err then
 		chunk, err = load_code(line)
 	end
+	return chunk, err
+end
+
+-- Interactive command evaluation
+function eval_cmd(line, raw)
+	local chunk, err = eval_cmd_compile(line, raw)
 	if not err then
 		return chunk()
 	else
@@ -641,4 +648,197 @@ else
 	worker.map = disabled
 	worker.coroutine = disabled
 	worker.bg_worker = setmetatable({}, { __index = disabled })
+end
+
+-- Global commands for map()
+
+-- must be public because it is called from eval_cmd()
+-- when map() commands are read from control socket
+function _map_luaobj_call_wrapper(cmd)
+	local func = eval_cmd_compile(cmd, true)
+	local ret = kluautil.kr_table_pack(xpcall(func, debug.traceback))
+	local ok, serial = pcall(krprint.serialize_lua, ret, 'error')
+	if not ok then
+		if verbose() then
+			log('failed to serialize map() response %s (%s)',
+				table_print(ret), serial)
+		end
+		return krprint.serialize_lua(
+			kluautil.kr_table_pack(false, "returned values cannot be serialized: "
+				.. serial))
+	else
+		return serial
+	end
+end
+
+local function _sock_errmsg(path, desc)
+	return string.format(
+		'map() error while communicating with %s: %s',
+		path, desc)
+end
+
+local function _sock_check(sock, call, params, path, desc)
+	local errprefix = _sock_errmsg(path, desc) .. ': '
+	local retvals = kluautil.kr_table_pack(pcall(call, unpack(params)))
+	local ok = retvals[1]
+	if not ok then
+		error(errprefix .. tostring(retvals[2]))
+	end
+	local rerr, werr = sock:error()
+	if rerr or werr then
+		error(string.format('%sread error %s; write error %s', errprefix, rerr, werr))
+	end
+	if retvals[2] == nil then
+		error(errprefix .. 'unexpected nil result')
+	end
+	return unpack(retvals, 2, retvals.n)
+end
+
+local function _sock_assert(condition, path, desc)
+	if not condition then
+		error(_sock_errmsg(path, desc))
+	end
+end
+
+local function map_send_recv(cmd, path)
+	local bit = require('bit')
+	local socket = require('cqueues.socket')
+	local s = socket.connect({ path = path })
+	s:setmaxerrs(0)
+	s:setmode('bn', 'bn')
+	local status, err = pcall(s.connect, s)
+	if not status then
+		log('map() error while connecting to control socket %s: '
+			.. '%s (ignoring this socket)', path, err)
+		return nil
+	end
+	local ret = _sock_check(s, s.write, {s, '__binary\n'}, path,
+		'write __binary')
+	_sock_assert(ret, path,
+		'write __binary result')
+	local recv = _sock_check(s, s.read, {s, 2}, path,
+		'read reply to __binary')
+	_sock_assert(recv and recv == '> ', path,
+		'unexpected reply to __binary')
+	_sock_check(s, s.write, {s, cmd..'\n'}, path,
+		'command write')
+	recv = _sock_check(s, s.read, {s, 4}, path,
+		'response length read')
+	_sock_assert(recv and #recv == 4, path,
+		'length of response length preambule does not match')
+	local len = tonumber(recv:byte(1))
+	for i=2,4 do
+		len = bit.bor(bit.lshift(len, 8), tonumber(recv:byte(i)))
+	end
+	ret = _sock_check(s, s.read, {s, len}, path,
+		'read response')
+	_sock_assert(ret and #ret == len, path,
+		'actual response length does not match length in preambule')
+	s:close()
+	return ret
+end
+
+-- internal use only
+-- Call cmd on each instance via control sockets.
+-- @param format - "luaobj" if individual results should be Lua objects
+--               - "strings" for eval_cmd output for each instance
+-- @returns table with results, one item per instance + key n=number of instances
+--          (order of return values is undefined)
+-- @throws Lua error if:
+--         - communication failed in the middle of trasaction
+--         - a result is not serializable
+--         - individual call throws an error
+--         - number of return values != 1 per instance per call
+--         - cmd execution state is undefined after an error
+-- Connection errors at the beginning are ignored to paper over leftover dead sockets.
+function map(cmd, format)
+	local local_sockets = {}
+	local results = {}
+
+	if (type(cmd) ~= 'string') then
+		panic('map() command must be a string') end
+	if string.find(cmd, '\n', 1, true) then
+		panic('map() command cannot contain literal \\n, escape it with \\010') end
+	if (#cmd <= 0) then
+		panic('map() command must be non-empty') end
+	-- syntax check on input command to detect typos early
+	local chunk, err = eval_cmd_compile(cmd, false)
+	if not chunk then
+		panic('failure when compiling map() command: %s', err)
+	end
+
+	format = format or 'luaobj'
+	if (format ~= 'luaobj' and format ~= 'strings') then
+		panic('map() output format must be luaobj or strings') end
+	if format == 'luaobj' then
+		cmd = '_map_luaobj_call_wrapper([=====[' .. cmd .. ']=====])'
+	end
+
+	-- find out control socket paths
+	for _,v in pairs(net.list()) do
+		if (v['kind'] == 'control') and (v['transport']['family'] == 'unix') then
+			table.insert(local_sockets, string.match(v['transport']['path'], '^.*/([^/]+)$'))
+		end
+	end
+	local filetab = kluautil.list_dir(worker.control_path)
+	if next(filetab) == nil then
+		panic('no control sockets found in directory %s',
+			worker.control_path)
+	end
+
+	local result_count = 0
+	-- finally execute it on all instances
+	for _, file in ipairs(filetab) do
+		local local_exec = false
+		for _, lsoc in ipairs(local_sockets) do
+			if file == lsoc then
+				local_exec = true
+			end
+		end
+		local path = worker.control_path..file
+		local path_name = (local_exec and 'this instance') or path
+		if verbose() then
+			log('executing map() on %s: command %s', path_name, cmd)
+		end
+		local ret
+		if local_exec then
+			ret = eval_cmd(cmd)
+		else
+			ret = map_send_recv(cmd, path)
+			-- skip dead sockets (leftovers from dead instances)
+			if ret == nil then
+				goto continue
+			end
+		end
+		result_count = result_count + 1
+		if format == 'luaobj' then
+			ret = krprint.deserialize_lua(ret)
+			-- ret is now table with xpcall results
+			assert(type(ret) == 'table', 'map() protocol error, '
+				.. 'table with results not retured by follower')
+			if (ret.n ~= 2) then
+				if verbose() then
+					log('got unsupported map() response: %s', table_print(ret))
+				end
+				panic('unexpected number of return values in map() response: '
+					.. 'only single return value is allowed, '
+					.. 'use kluautil.kr_table_pack() helper')
+			end
+			local ok, retval = ret[1], ret[2]
+			if ok == false then
+				panic('error when executing map() command on control socket %s: '
+					.. '%s. command execution state is now undefined!',
+					path, retval)
+			end
+			-- drop wrapper table and return only the actual return value
+			ret = retval
+		else
+			assert(type(ret) == 'string', 'map() protocol error, '
+				.. 'string not retured by follower')
+		end
+		results[result_count] = ret
+		::continue::
+	end
+	results.n = result_count
+	return results
 end
