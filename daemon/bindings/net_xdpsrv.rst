@@ -104,4 +104,7 @@ Limitations
 	ip link set dev <ETH> xdp off
 
 * Knot Resolver only supports using XDP towards clients currently (not towards upstreams).
+* When starting up an XDP socket you may get a harmless warning::
+
+	libbpf: Kernel error message: XDP program already attached
 
