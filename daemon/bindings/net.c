@@ -221,14 +221,6 @@ static int net_listen(lua_State *L)
 		flags.tls = table_get_flag(L, 3, "tls", flags.tls);
 		flags.freebind = table_get_flag(L, 3, "freebind", flags.tls);
 
-		lua_getfield(L, 3, "nic_queue");
-		if (lua_isnumber(L, -1)) {
-			nic_queue = lua_tointeger(L, -1);
-			flags.xdp = true; // assume xdp = true; TODO: perhaps check instead?
-		} else if (!lua_isnil(L, -1)) {
-			lua_error_p(L, "wrong value of nic_queue (integer expected)");
-		}
-
 		lua_getfield(L, 3, "kind");
 		const char *k = lua_tostring(L, -1);
 		if (k && strcasecmp(k, "dns") == 0) {
@@ -247,6 +239,17 @@ static int net_listen(lua_State *L)
 				kr_log_deprecate(
 					"kind=\"doh\" is an obsolete DoH implementation, use kind=\"doh2\" instead\n");
 			}
+		}
+
+		lua_getfield(L, 3, "nic_queue");
+		if (lua_isnumber(L, -1)) {
+			if (flags.xdp) {
+				nic_queue = lua_tointeger(L, -1);
+			} else {
+				lua_error_p(L, "nic_queue only supported with kind = 'xdp'");
+			}
+		} else if (!lua_isnil(L, -1)) {
+			lua_error_p(L, "wrong value of nic_queue (integer expected)");
 		}
 	}
 
