@@ -441,7 +441,7 @@ struct endpoint {
 	int fd;
 	int family;
 	uint16_t port;
-	int16_t xdp_queue;
+	int16_t nic_queue;
 	_Bool engaged;
 	endpoint_flags_t flags;
 };

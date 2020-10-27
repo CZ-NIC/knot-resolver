@@ -54,7 +54,7 @@ struct endpoint {
 	int fd;              /**< POSIX file-descriptor; always used. */
 	int family;          /**< AF_INET or AF_INET6 or AF_UNIX or AF_XDP */
 	uint16_t port;       /**< TCP/UDP port.  Meaningless with AF_UNIX. */
-	int16_t xdp_queue;   /**< -1 or queue number of the interface for AF_XDP use. */
+	int16_t nic_queue;   /**< -1 or queue number of the interface for AF_XDP use. */
 	bool engaged;        /**< to some module or internally */
 	endpoint_flags_t flags;
 };
