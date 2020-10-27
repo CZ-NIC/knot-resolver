@@ -98,10 +98,10 @@ void network_deinit(struct network *net);
  *       nothing is done and kr_error(EADDRINUSE) is returned.
  * \note there's no short-hand to listen both on UDP and TCP.
  * \note ownership of flags.* is taken on success.  TODO: non-success?
- * \param xdp_queue == -1 for auto-selection or non-XDP.
+ * \param nic_queue == -1 for auto-selection or non-XDP.
  */
 int network_listen(struct network *net, const char *addr, uint16_t port,
-		   int16_t xdp_queue, endpoint_flags_t flags);
+		   int16_t nic_queue, endpoint_flags_t flags);
 
 /** Start listenting on an open file-descriptor.
  * \note flags.sock_type isn't meaningful here.

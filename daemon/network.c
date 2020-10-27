@@ -249,7 +249,7 @@ static int open_endpoint(struct network *net, const char *addr_str,
 	const bool is_control = ep->flags.kind && strcmp(ep->flags.kind, "control") == 0;
 	const bool is_xdp     = ep->family == AF_XDP;
 	bool ok = is_xdp
-		? sa == NULL && ep->fd == -1 && ep->xdp_queue >= 0
+		? sa == NULL && ep->fd == -1 && ep->nic_queue >= 0
 			&& ep->flags.sock_type == SOCK_DGRAM && !ep->flags.tls
 		: (sa != NULL) != (ep->fd != -1);
 	if (!ok) {
@@ -441,7 +441,7 @@ int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags)
 }
 
 /** Try selecting XDP queue automatically. */
-static int16_t xdp_queue_auto(void)
+static int16_t nic_queue_auto(void)
 {
 	if (the_args->forks) // easy case
 		return the_worker->id;
@@ -457,16 +457,16 @@ static int16_t xdp_queue_auto(void)
 }
 
 int network_listen(struct network *net, const char *addr, uint16_t port,
-		   int16_t xdp_queue, endpoint_flags_t flags)
+		   int16_t nic_queue, endpoint_flags_t flags)
 {
-	if (net == NULL || addr == 0 || xdp_queue < -1) {
+	if (net == NULL || addr == 0 || nic_queue < -1) {
 		assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
 
-	if (flags.xdp && xdp_queue < 0) {
-		xdp_queue = xdp_queue_auto();
-		if (xdp_queue < 0) {
+	if (flags.xdp && nic_queue < 0) {
+		nic_queue = nic_queue_auto();
+		if (nic_queue < 0) {
 			return kr_error(EINVAL);
 		}
 	}
@@ -503,7 +503,7 @@ int network_listen(struct network *net, const char *addr, uint16_t port,
 	ep.fd = -1;
 	ep.port = port;
 	ep.family = flags.xdp ? AF_XDP : sa->sa_family;
-	ep.xdp_queue = xdp_queue;
+	ep.nic_queue = nic_queue;
 
 	int ret = create_endpoint(net, addr, &ep, sa);
 	free_const(sa);
