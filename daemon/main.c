@@ -42,97 +42,6 @@
 
 struct args the_args_value;  /** Static allocation for the_args singleton. */
 
-
-/* @internal AF_LOCAL reads may still be interrupted, loop it. */
-static bool ipc_readall(int fd, char *dst, size_t len)
-{
-	while (len > 0) {
-		int rb = read(fd, dst, len);
-		if (rb > 0) {
-			dst += rb;
-			len -= rb;
-		} else if (errno != EAGAIN && errno != EINTR) {
-			return false;
-		}
-	}
-	return true;
-}
-
-static void ipc_activity(uv_poll_t *handle, int status, int events)
-{
-	struct engine *engine = handle->data;
-	if (status != 0) {
-		kr_log_error("[system] ipc: %s\n", uv_strerror(status));
-		return;
-	}
-	/* Get file descriptor from handle */
-	uv_os_fd_t fd = 0;
-	(void) uv_fileno((uv_handle_t *)(handle), &fd);
-	/* Read expression from IPC pipe */
-	uint32_t len = 0;
-	auto_free char *rbuf = NULL;
-	if (!ipc_readall(fd, (char *)&len, sizeof(len))) {
-		goto failure;
-	}
-	if (len < UINT32_MAX) {
-		rbuf = malloc(len + 1);
-	} else {
-		errno = EINVAL;
-	}
-	if (!rbuf) {
-		goto failure;
-	}
-	if (!ipc_readall(fd, rbuf, len)) {
-		goto failure;
-	}
-	rbuf[len] = '\0';
-	/* Run expression */
-	const char *message = "";
-	int ret = engine_ipc(engine, rbuf);
-	if (ret > 0) {
-		message = lua_tostring(engine->L, -1);
-	}
-	/* Clear the Lua stack */
-	lua_settop(engine->L, 0);
-	/* Send response back */
-	len = strlen(message);
-	if (write(fd, &len, sizeof(len)) != sizeof(len) ||
-		write(fd, message, len) != len) {
-		goto failure;
-	}
-	return; /* success! */
-failure:
-	/* Note that if the piped command got read or written partially,
-	 * we would get out of sync and only receive rubbish now.
-	 * Therefore we prefer to stop IPC, but we try to continue with all else.
-	 */
-	kr_log_error("[system] stopping ipc because of: %s\n", strerror(errno));
-	uv_poll_stop(handle);
-	uv_close((uv_handle_t *)handle, (uv_close_cb)free);
-}
-
-static bool ipc_watch(uv_loop_t *loop, struct engine *engine, int fd)
-{
-	uv_poll_t *poller = malloc(sizeof(*poller));
-	if (!poller) {
-		return false;
-	}
-	int ret = uv_poll_init(loop, poller, fd);
-	if (ret != 0) {
-		free(poller);
-		return false;
-	}
-	poller->data = engine;
-	ret = uv_poll_start(poller, UV_READABLE, ipc_activity);
-	if (ret != 0) {
-		free(poller);
-		return false;
-	}
-	/* libuv sets O_NONBLOCK whether we want it or not */
-	(void) fcntl(fd, F_SETFD, fcntl(fd, F_GETFL) & ~O_NONBLOCK);
-	return true;
-}
-
 static void signal_handler(uv_signal_t *handle, int signum)
 {
 	uv_stop(uv_default_loop());
@@ -180,15 +89,10 @@ end:
  * Server operation.
  */
 
-static int fork_workers(fd_array_t *ipc_set, int forks)
+static int fork_workers(int forks)
 {
 	/* Fork subprocesses if requested */
 	while (--forks > 0) {
-		int sv[2] = {-1, -1};
-		if (socketpair(AF_LOCAL, SOCK_STREAM, 0, sv) < 0) {
-			perror("[system] socketpair");
-			return kr_error(errno);
-		}
 		int pid = fork();
 		if (pid < 0) {
 			perror("[system] fork");
@@ -197,16 +101,7 @@ static int fork_workers(fd_array_t *ipc_set, int forks)
 
 		/* Forked process */
 		if (pid == 0) {
-			array_clear(*ipc_set);
-			array_push(*ipc_set, sv[0]);
-			close(sv[1]);
 			return forks;
-		/* Parent process */
-		} else {
-			array_push(*ipc_set, sv[1]);
-			/* Do not share parent-end with other forks. */
-			(void) fcntl(sv[1], F_SETFD, FD_CLOEXEC);
-			close(sv[0]);
 		}
 	}
 	return 0;
@@ -234,7 +129,7 @@ static void help(int argc, char *argv[])
 }
 
 /** \return exit code for main()  */
-static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_set, bool leader, struct args *args)
+static int run_worker(uv_loop_t *loop, struct engine *engine, bool leader, struct args *args)
 {
 	/* Only some kinds of stdin work with uv_pipe_t.
 	 * Otherwise we would abort() from libuv e.g. with </dev/null */
@@ -265,16 +160,6 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, fd_array_t *ipc_se
 	} else if (args->control_fd != -1 && uv_pipe_open(pipe, args->control_fd) == 0) {
 		uv_listen((uv_stream_t *)pipe, 16, io_tty_accept);
 	}
-	/* Watch IPC pipes (or just assign them if leading the pgroup). */
-	if (!leader) {
-		for (size_t i = 0; i < ipc_set->len; ++i) {
-			if (!ipc_watch(loop, engine, ipc_set->at[i])) {
-				kr_log_error("[system] failed to create poller: %s\n", strerror(errno));
-				close(ipc_set->at[i]);
-			}
-		}
-	}
-	memcpy(&engine->ipc_set, ipc_set, sizeof(*ipc_set));
 
 	/* Notify supervisor. */
 #if ENABLE_LIBSYSTEMD
@@ -591,11 +476,8 @@ int main(int argc, char **argv)
 				(long)rlim.rlim_cur);
 	}
 
-	/* Connect forks with local socket */
-	fd_array_t ipc_set;
-	array_init(ipc_set);
 	/* Fork subprocesses if requested */
-	int fork_id = fork_workers(&ipc_set, the_args->forks);
+	int fork_id = fork_workers(the_args->forks);
 	if (fork_id < 0) {
 		return EXIT_FAILURE;
 	}
@@ -614,7 +496,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	/* Initialize the worker */
-	ret = worker_init(&engine, fork_id, the_args->forks);
+	ret = worker_init(&engine, the_args->forks);
 	if (ret != 0) {
 		kr_log_error("[system] failed to initialize worker: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;
@@ -696,7 +578,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Run the event loop */
-	ret = run_worker(loop, &engine, &ipc_set, fork_id == 0, the_args);
+	ret = run_worker(loop, &engine, fork_id == 0, the_args);
 
 cleanup:/* Cleanup. */
 	engine_deinit(&engine);

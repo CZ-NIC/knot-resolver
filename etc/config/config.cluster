@@ -20,8 +20,6 @@ modules = {
 	'hints > iterate', -- Load /etc/hosts and allow custom root hints
 	'stats',    -- Track internal statistics
 	graphite = { -- Send statistics to local InfluxDB
-		-- `worker.id` allows us to keep per-fork statistics
-		prefix = hostname()..worker.id,
 		-- Address of the Graphite/InfluxDB server
 		host = '192.168.1.2',
 	},

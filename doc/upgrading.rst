@@ -18,9 +18,6 @@ Following section provides information about selected changes in not-yet-release
 We advise users to prepare for these changes sooner rather than later to make it easier to upgrade to
 newer versions when they are released.
 
-* Users of :ref:`control-sockets` API need to terminate each command sent to resolver with newline
-  character (ASCII ``\n``). Correct usage: ``cache.stats()\n``.
-  Newline terminated commands are accepted by all resolver versions >= 1.0.0.
 * Human readable output from :ref:`control-sockets` is not stable and changes from time to time.
   Users who need machine readable output for scripts should use Lua function
   ``tojson()`` to convert Lua values into standard JSON format instead of attempting to parse
@@ -37,6 +34,28 @@ newer versions when they are released.
 
 5.1 to 5.2
 ==========
+
+Users
+-----
+
+* Users of :ref:`control-sockets` API need to terminate each command sent to resolver with newline
+  character (ASCII ``\n``). Correct usage: ``cache.stats()\n``.
+  Newline terminated commands are accepted by all resolver versions >= 1.0.0.
+
+Configuration file
+------------------
+
+* Statistics exporter :ref:`mod-graphite` now uses default prefix which combines
+  :func:`hostname()` and :envvar:`worker.id` instead of bare :func:`hostname()`.
+  This prevents :ref:`systemd-multiple-instances` from sending
+  conflicting statistics to server. In case you want to continue in previous time series you
+  can manually set the old values using option ``prefix``
+  in :ref:`Graphite configuration <mod-graphite>`.
+  Beware that non-default values require careful
+  :ref:`instance-specific-configuration` to avoid conflicting names.
+* Lua variable :envvar:`worker.id` is now a string with either Systemd instance name or PID
+  (instead of number). If your custom configuration uses :envvar:`worker.id` value please
+  check your scripts.
 
 Module changes
 --------------

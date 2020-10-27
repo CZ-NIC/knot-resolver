@@ -19,11 +19,11 @@ By default the module uses UDP so it doesn't guarantee the delivery, set ``tcp =
 
 	modules = {
 		graphite = {
-			prefix = hostname(), -- optional metric prefix
+			prefix = hostname() .. worker.id, -- optional metric prefix
 			host = '127.0.0.1',  -- graphite server address
 			port = 2003,         -- graphite server port
 			interval = 5 * sec,  -- publish interval
-			tcp = false          -- set to true if want TCP mode
+			tcp = false          -- set to true if you want TCP mode
 		}
 	}
 

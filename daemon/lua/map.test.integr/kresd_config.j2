@@ -1,0 +1,192 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
+log('my PID = %d', worker.pid)
+
+trust_anchors.remove('.')
+
+cache.size = 2*MB
+
+net = { '{{SELF_ADDR}}' }
+
+{% if QMIN == "false" %}
+option('NO_MINIMIZE', true)
+{% else %}
+option('NO_MINIMIZE', false)
+{% endif %}
+
+-- Self-checks on globals
+assert(help() ~= nil)
+assert(worker.id ~= nil)
+-- Self-checks on facilities
+assert(cache.count() == 0)
+assert(cache.stats() ~= nil)
+assert(cache.backends() ~= nil)
+assert(worker.stats() ~= nil)
+assert(net.interfaces() ~= nil)
+-- Self-checks on loaded stuff
+assert(#modules.list() > 0)
+-- Self-check timers
+ev = event.recurrent(1 * sec, function (ev) return 1 end)
+event.cancel(ev)
+
+local kluautil = require('kluautil')
+local tap = require('tapered')
+local checks_total = 16
+local n_instances = 3  -- must match deckard.yaml
+
+worker.control_path = worker.cwd .. '/../kresd3/control/'
+net.listen(worker.control_path .. worker.pid, nil, {kind = 'control'})
+assert(#net.list() >= 3)  -- UDP, TCP, control
+
+-- debug, kept for future use
+--log('%s', worker.control_path)
+--log('%s', table_print(net.list()))
+
+function wait_for_sockets()
+	log('waiting for control sockets')
+	local ffi = require('ffi')
+	local timeout = 5000 -- ms
+	local start_time = tonumber(ffi.C.kr_now())
+	local now
+	while true do
+		now = tonumber(ffi.C.kr_now())
+		if now > start_time + timeout then
+			log('timeout while waiting for control sockets to appear')
+			os.exit(3)
+		end
+		local pids = kluautil.list_dir(worker.control_path)
+		if #pids == n_instances then
+			-- debug, kept for future use
+			--log('got control sockets:')
+			--log(table_print(pids))
+			break
+		else
+			worker.sleep(0.1)
+		end
+	end
+	log('PIDs are visible now (waiting took %d ms)', now - start_time)
+end
+
+-- expression should throw Lua error:
+-- wrap it in a function which runs the expression on leader and follower
+-- separately so we can guarantee both cases are covered
+function boom_follower_and_leader(boom_expr, desc)
+	local variants = {leader = '~=', follower = '=='}
+	for name, operator in pairs(variants) do
+		-- beware, newline is not allowed in expr
+		local full_expr = string.format(
+			'if (worker.pid %s %s) then return true	'
+				.. 'else return %s end',
+			operator, worker.pid, boom_expr)
+		local full_desc = name .. ': '
+		if desc then
+			full_desc = full_desc .. desc .. ' (' .. boom_expr .. ')'
+		else
+			full_desc = full_desc .. boom_expr
+		end
+		tap.boom(map, {full_expr}, full_desc)
+	end
+end
+
+function tests()
+	-- add delay to each test to force scheduler to interleave tests and DNS queries
+	local test_delay = 20 / 1000 -- seconds
+	log('starting map() tests now')
+
+	tap.boom(map, {'1 ++ 1'}, 'syntax error in command is detected')
+	worker.sleep(test_delay)
+
+	-- array of integers
+	local pids = map('worker.pid')
+	tap.same(pids.n, n_instances, 'all pids were obtained')
+	table.sort(pids)
+	worker.sleep(test_delay)
+
+	-- expression produces array of integers
+	local pids_plus_one = map('worker.pid + 1')
+	tap.same(pids_plus_one.n, n_instances, 'all pids were obtained')
+	table.sort(pids_plus_one)
+	for idx=1,n_instances do
+		tap.same(pids[idx] + 1, pids_plus_one[idx],
+			'increment expression worked')
+	end
+	worker.sleep(test_delay)
+
+	-- error detection
+	boom_follower_and_leader('error("explosion")')
+	worker.sleep(test_delay)
+
+	-- unsupported number of return values
+	boom_follower_and_leader('1, 2')
+	worker.sleep(test_delay)
+	boom_follower_and_leader('unpack({})')
+	worker.sleep(test_delay)
+
+	-- unsupported return type
+	boom_follower_and_leader(
+		'function() print("this cannot be serialized") end')
+	worker.sleep(test_delay)
+
+	tap.same({n = n_instances}, map('nil'),
+		'nil values are counted as returned')
+	worker.sleep(test_delay)
+
+	local exp = {n = n_instances}
+	for i=1,n_instances do
+		table.insert(exp, {nil, 2, nil, n=3})
+	end
+	local got = map('require("kluautil").kr_table_pack(nil, 2, nil)')
+	tap.same(got, exp, 'kr_table_pack handles nil values')
+	worker.sleep(test_delay)
+end
+
+local started = false
+function tests_start()
+	-- just in case, duplicates should not happen
+	if started then
+		log('huh? duplicate test invocation ignored, a retrasmit?')
+		return
+	end
+	started = true
+	log('start query triggered, scheduling tests')
+
+	-- DNS queries and map() commands must be serviced while sleep is running
+	worker.coroutine(function() worker.sleep(3600) end)
+
+	worker.coroutine(tests)
+end
+-- Deckard query will trigger tests
+policy.add(policy.suffix(tests_start, {'\5start\0'}))
+
+function tests_done()
+	print('final query triggered')
+	event.after(0, function()
+		tap.done(checks_total)
+	end)
+end
+-- Deckard query will execute tap.done() which will call os.exit()
+-- i.e. this callback has to be called only after answer to Deckard was sent
+policy.add(policy.suffix(tests_done, {'\4done\0'}), true)
+
+-- add delay to each query to force scheduler to interleave tests and DNS queries
+policy.add(policy.all(
+	function()
+		local delay = 10  -- ms
+		log('packet delayed by %d ms', delay)
+		worker.sleep(delay / 1000)
+	end))
+
+wait_for_sockets()
+
+{% if DAEMON_NAME == "kresd1" %}
+
+-- forward to Deckard test server
+policy.add(policy.all(policy.FORWARD('192.0.2.1')))
+
+{% else %}
+
+-- forward to next kresd instance in chain
+{# find out IP address of kresd instance with lower number,
+   i.e. kresd2 forwards to kresd1 #}
+policy.add(policy.all(policy.FORWARD('{{ PROGRAMS[ "kresd" ~ (DAEMON_NAME[-1]|int() - 1)]["address"] }}')))
+
+{% endif %}
