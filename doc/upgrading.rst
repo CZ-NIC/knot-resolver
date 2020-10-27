@@ -18,15 +18,12 @@ Following section provides information about selected changes in not-yet-release
 We advise users to prepare for these changes sooner rather than later to make it easier to upgrade to
 newer versions when they are released.
 
-* Human readable output from :ref:`control-sockets` is not stable and changes from time to time.
-  Users who need machine readable output for scripts should use Lua function
-  ``tojson()`` to convert Lua values into standard JSON format instead of attempting to parse
-  the human readable output. For example API call ``tojson(cache.stats())\n`` will return JSON string
-  with ``cache.stats()`` results represented as dictionary.
-  Function ``tojson()`` is available in all resolver versions >= 1.0.0.
-* DoH served with http module :ref:`DNS-over-HTTP (DoH) <mod-http-doh>` will be marked as legacy
-  and won't receive any more bugfixes. A more reliable and scalable DoH module will be available
-  instead. The new DoH module will only support HTTP/2 over TLS.
+* Going forward DNS-over-HTTP (DoH) will be supported only over HTTP/2 with TLS.
+  This limitation allows us to provide a new :ref:`more reliable and scalable implementation
+  of DoH <dns-over-https>` (``kind='doh2'``).
+* DoH over HTTP/1 and unencrypted transports is still available in
+  :ref:`legacy http module <mod-http-doh>` (``kind='doh'``).
+  This module will not receive receive any more bugfixes and will be eventually removed.
 * New releases since October 2020 will contain changes for
   `DNS Flag Day 2020 <https://dnsflagday.net/2020/>`_. Please double-check your firewall,
   it has to allow DNS traffic on UDP and also TCP port 53.
