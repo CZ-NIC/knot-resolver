@@ -46,7 +46,12 @@ function base_class._fallback(self, val)
 	elseif self.on_unrepresentable == 'error' then
 		local key_path_msg
 		if #self.tab_key_path > 0 then
-			local key_path = '[' .. table.concat(self.tab_key_path, '][') .. ']'
+			local str_key_path = {}
+			for _, key in ipairs(self.tab_key_path) do
+				table.insert(str_key_path,
+					string.format('%s %s', type(key), self:string(tostring(key))))
+			end
+			local key_path = '[' .. table.concat(str_key_path, '][') .. ']'
 			key_path_msg = string.format(' (found at [%s])', key_path)
 		else
 			key_path_msg = ''
@@ -192,8 +197,8 @@ function base_class.table(self, tab)
 			item = item .. string.format('%s%s%s,', indent, note, valexpr)
 		else
 			local errmsg = string.format('cannot print %s = %s (%s)',
-				tostring(idx),
-				tostring(val),
+				self:string(tostring(idx)),
+				self:string(tostring(val)),
 				table.concat(errors, ', '))
 			if self.on_unrepresentable == 'error' then
 				error(errmsg, 0)
