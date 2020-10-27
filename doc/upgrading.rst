@@ -24,6 +24,13 @@ newer versions when they are released.
 * DoH over HTTP/1 and unencrypted transports is still available in
   :ref:`legacy http module <mod-http-doh>` (``kind='doh'``).
   This module will not receive receive any more bugfixes and will be eventually removed.
+* Command line option ``--forks`` (``-f``) `is deprecated and will be eventually removed
+  <https://gitlab.nic.cz/knot/knot-resolver/-/issues/631>`_.
+  Preferred way to manage :ref:`systemd-multiple-instances` is to use a process manager,
+  e.g. systemd_ or supervisord_.
+
+.. _`systemd`: https://systemd.io/
+.. _`supervisord`: http://supervisord.org/
 
 
 5.1 to 5.2
