@@ -52,7 +52,7 @@ Examples:
 
 	net.listen('::1')
 	net.listen(net.lo, 53)
-	net.listen('192.0.2.123', 53, { kind = 'xdp', xdp_queue = 0 })
+	net.listen('192.0.2.123', 53, { kind = 'xdp', nic_queue = 0 })
 	net.listen('eth0', 53, { kind = 'xdp' })
 	net.listen(net.eth0, 853, { kind = 'tls' })
 	net.listen('192.0.2.1', 53, { freebind = true })

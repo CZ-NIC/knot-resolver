@@ -59,7 +59,7 @@ Modification of ``/etc/knot-resolver/kresd.conf`` may be quite simple:
 
 .. code-block:: lua
 
-	net.listen('eth0', 53, { kind = 'xdp', xdp_queue = 0 })
+	net.listen('eth0', 53, { kind = 'xdp', nic_queue = 0 })
 	net.listen('192.0.2.1', 53, { kind = 'dns' })
 
 Note that you want to also keep the vanilla DNS line to service TCP
@@ -68,7 +68,7 @@ XDP listening is in principle done on whole network interfaces
 and the target addresses of incoming packets aren't checked in any way,
 but you are still allowed to specify interface by an address (if it's unambiguous).
 
-The default ``xdp_queue`` value is tailored for the usual naming convention:
+The default ``nic_queue`` value is tailored for the usual naming convention:
 ``kresd@1.service``, ``kresd@2.service``, ...
 
 Optimizations
