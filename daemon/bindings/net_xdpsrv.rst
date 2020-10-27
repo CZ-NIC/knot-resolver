@@ -18,6 +18,7 @@ and some drivers can even directly use the user-space buffers for reading and wr
 
 .. TODO perhaps some hint/link about how significant speedup one might get? (link to some talk video?)
 
+
 Prerequisites
 ^^^^^^^^^^^^^
 .. this is mostly copied from knot-dns doc/operations.rst
@@ -32,6 +33,7 @@ Prerequisites
   * Intel series 700 (driver `i40e`), maximum number of channels per interface is 64.
   * Intel series 500 (driver `ixgbe`), maximum number of channels per interface is 64.
     The number of CPUs available has to be at most 64!
+
 
 Set up
 ^^^^^^
@@ -61,21 +63,33 @@ With XDP this is more important than with vanilla UDP, as we only support one in
 per queue and unclaimed queues will fall back to vanilla UDP.
 Ideally you can set these numbers as high as the number of CPUs that you want kresd to use.
 
-Modification of ``/etc/knot-resolver/kresd.conf`` may be quite simple:
+Modification of ``/etc/knot-resolver/kresd.conf`` may often be quite simple, for example:
 
 .. code-block:: lua
 
-	net.listen('eth0', 53, { kind = 'xdp', nic_queue = 0 })
-	net.listen('192.0.2.1', 53, { kind = 'dns' })
+	net.listen('eth2', 53, { kind = 'xdp' })
+	net.listen('203.0.113.53', 53, { kind = 'dns' })
 
 Note that you want to also keep the vanilla DNS line to service TCP
 and possibly any fallback UDP (e.g. from unclaimed queues).
-XDP listening is in principle done on whole network interfaces
+XDP listening is in principle done on queues of whole network interfaces
 and the target addresses of incoming packets aren't checked in any way,
-but you are still allowed to specify interface by an address (if it's unambiguous).
+but you are still allowed to specify interface by an address
+(if it's unambiguous at that moment):
 
-The default ``nic_queue`` value is tailored for the usual naming convention:
+.. code-block:: lua
+
+	net.listen('203.0.113.53', 53, { kind = 'xdp' })
+	net.listen('203.0.113.53', 53, { kind = 'dns' })
+
+The default selection of queues is tailored for the usual naming convention:
 ``kresd@1.service``, ``kresd@2.service``, ...
+but you can still specify them explicitly, e.g. the default is effectively the same as:
+
+.. code-block:: lua
+
+	net.listen('eth2', 53, { kind = 'xdp', nic_queue = env.SYSTEMD_INSTANCE - 1 })
+
 
 Optimizations
 ^^^^^^^^^^^^^
@@ -92,6 +106,7 @@ Some helpful commands:
 	renice -n 19 -p $(pgrep '^ksoftirqd/[0-9]*$')
 
 .. TODO CPU affinities?  `CPUAffinity=%i` in systemd unit sounds good.
+
 
 .. _dns-over-xdp_limitations:
 
