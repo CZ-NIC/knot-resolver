@@ -57,16 +57,12 @@ static int net_list_add(const char *key, void *val, void *ext)
 		lua_pushstring(L, key);
 		if (ep->family == AF_INET || ep->family == AF_INET6) {
 			lua_setfield(L, -2, "ip");
-
 			lua_pushboolean(L, ep->flags.freebind);
 			lua_setfield(L, -2, "freebind");
-		}
-		if (ep->family == AF_UNIX) {
+		} else if (ep->family == AF_UNIX) {
 			lua_setfield(L, -2, "path");
-		}
-		if (ep->family == AF_XDP) {
+		} else if (ep->family == AF_XDP) {
 			lua_setfield(L, -2, "interface");
-
 			lua_pushinteger(L, ep->xdp_queue);
 			lua_setfield(L, -2, "xdp_queue");
 		}
