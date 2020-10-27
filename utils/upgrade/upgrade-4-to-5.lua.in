@@ -5,7 +5,7 @@ local out = upg_dir..'/kresd.conf.net'
 local sockets = {
 	{ file='kresd.socket', kind='dns' },
 	{ file='kresd-tls.socket', kind='tls' },
-	{ file='kresd-doh.socket', kind='doh' },
+	{ file='kresd-doh.socket', kind='doh2' },
 	{ file='kresd-webmgmt.socket', kind='webmgmt' },
 }
 
