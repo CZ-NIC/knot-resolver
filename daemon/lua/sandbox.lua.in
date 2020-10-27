@@ -3,7 +3,7 @@
 local debug = require('debug')
 local ffi = require('ffi')
 local kluautil = require('kluautil')
-local krprint = require("krprint")
+local krprint = require('krprint')
 
 -- Units
 kB = 1024
