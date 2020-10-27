@@ -668,12 +668,12 @@ int main(int argc, char **argv)
 	}
 	/* Start listening on AF_XDP sockets. */
 	for (size_t i = 0; i < the_args->addrs_xdp.len; ++i) {
-		int16_t xdp_queue = -1; // auto-select
+		int16_t nic_queue = -1; // auto-select
 		char *addr = the_args->addrs_xdp.at[i];
 		char *separ = strchr(addr, '/'); // FIXME: using this separator, for now?
 		if (separ) {
 			char *endptr;
-			xdp_queue = strtol(separ + 1, &endptr, 10);
+			nic_queue = strtol(separ + 1, &endptr, 10);
 			if (endptr == separ + 1 || endptr[0] != '\0') {
 				kr_log_error("[system] incorrect value passed to '-x/--xdp': %s\n",
 						addr);
@@ -686,10 +686,10 @@ int main(int argc, char **argv)
 		ep_flags.sock_type = SOCK_DGRAM;
 		ep_flags.xdp = true;
 
-		ret = network_listen(&engine.net, addr, KR_DNS_PORT, xdp_queue, ep_flags);
+		ret = network_listen(&engine.net, addr, KR_DNS_PORT, nic_queue, ep_flags);
 		if (ret != 0) {
 			kr_log_error("[system] listen on --xdp=%s/%d failed: %s\n",
-					addr, (int)xdp_queue, knot_strerror(ret));
+					addr, (int)nic_queue, knot_strerror(ret));
 			ret = EXIT_FAILURE;
 			goto cleanup;
 		}
