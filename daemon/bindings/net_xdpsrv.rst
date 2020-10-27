@@ -10,6 +10,12 @@ especially with some network drivers that implement good support.
 The basic idea is that for selected packets the Linux networking stack is bypassed,
 and some drivers can even directly use the user-space buffers for reading and writing.
 
+.. warning::
+   Bypassing the network stack has significant implications, such as bypassing the firewall
+   and monitoring solutions.
+   Make sure you're familiar with the trade-offs before using this feature.
+   Read more in :ref:`dns-over-xdp_limitations`.
+
 .. TODO perhaps some hint/link about how significant speedup one might get? (link to some talk video?)
 
 Prerequisites
@@ -86,6 +92,8 @@ Some helpful commands:
 	renice -n 19 -p $(pgrep '^ksoftirqd/[0-9]*$')
 
 .. TODO CPU affinities?  `CPUAffinity=%i` in systemd unit sounds good.
+
+.. _dns-over-xdp_limitations:
 
 Limitations
 ^^^^^^^^^^^

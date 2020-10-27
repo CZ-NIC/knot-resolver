@@ -41,7 +41,6 @@ Server (communication with clients)
    :maxdepth: 2
 
    daemon-bindings-net_server
-   daemon-bindings-net_xdpsrv
    daemon-bindings-net_tlssrv
    modules-http
 
