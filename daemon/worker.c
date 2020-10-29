@@ -1243,6 +1243,32 @@ static bool subreq_enqueue(struct qr_task *task)
 	return true;
 }
 
+/** Send an answer packet over XDP. */
+static int xdp_push(struct qr_task *task, const uv_handle_t *src_handle)
+{
+#if ENABLE_XDP
+	struct request_ctx *ctx = task->ctx;
+	knot_xdp_msg_t msg;
+	const struct sockaddr *ip_from = &ctx->source.dst_addr.ip;
+	const struct sockaddr *ip_to   = &ctx->source.addr.ip;
+	memcpy(&msg.ip_from, ip_from, kr_sockaddr_len(ip_from));
+	memcpy(&msg.ip_to,   ip_to,   kr_sockaddr_len(ip_to));
+	msg.payload.iov_base = ctx->req.answer->wire;
+	msg.payload.iov_len  = ctx->req.answer->size;
+
+	xdp_handle_data_t *xhd = src_handle->data;
+	assert(xhd && xhd->socket && xhd->session == ctx->source.session);
+	uint32_t sent;
+	int ret = knot_xdp_send(xhd->socket, &msg, 1, &sent);
+	ctx->req.answer->wire = NULL; /* it's been freed */
+	kr_log_verbose("[xdp] pushed a packet, ret = %d\n", ret);
+	return qr_task_on_send(task, src_handle, ret);
+#else
+	assert(!EINVAL);
+	return kr_error(EINVAL);
+#endif
+}
+
 static int qr_task_finalize(struct qr_task *task, int state)
 {
 	assert(task && task->leading == false);
@@ -1275,26 +1301,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		ret = kr_error(EINVAL);
 
 	} else if (src_handle->type == UV_POLL) {
-	#if ENABLE_XDP
-		knot_xdp_msg_t msg;
-		const struct sockaddr *ip_from = &ctx->source.dst_addr.ip;
-		const struct sockaddr *ip_to   = &ctx->source.addr.ip;
-		memcpy(&msg.ip_from, ip_from, kr_sockaddr_len(ip_from));
-		memcpy(&msg.ip_to,   ip_to,   kr_sockaddr_len(ip_to));
-		msg.payload.iov_base = ctx->req.answer->wire;
-		msg.payload.iov_len  = ctx->req.answer->size;
-
-		xdp_handle_data_t *xhd = src_handle->data;
-		assert(xhd && xhd->socket && xhd->session == source_session);
-		uint32_t sent;
-		ret = knot_xdp_send(xhd->socket, &msg, 1, &sent);
-		ctx->req.answer->wire = NULL; /* it's been freed */
-		kr_log_verbose("[xdp] pushed a packet, ret = %d\n", ret);
-		ret = qr_task_on_send(task, src_handle, ret);
-	#else
-		assert(!EINVAL);
-		ret = kr_error(EINVAL);
-	#endif
+		ret = xdp_push(task, src_handle);
 
 	} else if (src_handle->type == UV_UDP && ENABLE_SENDMMSG) {
 		int fd;

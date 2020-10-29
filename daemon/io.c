@@ -825,14 +825,17 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 	assert(rcvd <= XDP_RX_BATCH_SIZE);
 	for (int i = 0; i < rcvd; ++i) {
 		const knot_xdp_msg_t *msg = &msgs[i];
-		assert(msg->payload.iov_len < 65536);
+		assert(msg->payload.iov_len <= KNOT_WIRE_MAX_PKTSIZE);
 		knot_pkt_t *kpkt = knot_pkt_new(msg->payload.iov_base, msg->payload.iov_len,
 						&the_worker->pkt_pool);
-		ret = kpkt == NULL ? kr_error(ENOMEM) :
-			worker_submit(xhd->session,
+		if (kpkt == NULL) {
+			ret = kr_error(ENOMEM);
+		} else {
+			ret = worker_submit(xhd->session,
 					(const struct sockaddr *)&msg->ip_from,
 					(const struct sockaddr *)&msg->ip_to,
 					msg->eth_from, msg->eth_to, kpkt);
+		}
 		if (ret)
 			kr_log_verbose("[xdp] worker_submit() == %d: %s\n", ret, kr_strerror(ret));
 		mp_flush(the_worker->pkt_pool.ctx);
