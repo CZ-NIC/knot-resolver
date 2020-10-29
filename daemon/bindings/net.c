@@ -122,7 +122,7 @@ static bool net_listen_addrs(lua_State *L, int port, endpoint_flags_t flags, int
 	const char *str = lua_tostring(L, -1);
 	if (str != NULL) {
 		struct network *net = &the_worker->engine->net;
-		const bool is_UNIX = str[0] == '/';
+		const bool is_unix = str[0] == '/';
 		int ret = 0;
 		if (!flags.kind && !flags.tls) { /* normal UDP or XDP */
 			flags.sock_type = SOCK_DGRAM;
@@ -135,10 +135,10 @@ static bool net_listen_addrs(lua_State *L, int port, endpoint_flags_t flags, int
 		if (flags.kind) {
 			flags.kind = strdup(flags.kind);
 			flags.sock_type = SOCK_STREAM; /* TODO: allow to override this? */
-			ret = network_listen(net, str, (is_UNIX ? 0 : port), nic_queue, flags);
+			ret = network_listen(net, str, (is_unix ? 0 : port), nic_queue, flags);
 		}
 		if (ret != 0) {
-			if (is_UNIX) {
+			if (is_unix) {
 				kr_log_error("[system] bind to '%s' (UNIX): %s\n",
 						str, kr_strerror(ret));
 			} else if (flags.xdp) {
