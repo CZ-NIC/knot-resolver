@@ -42,11 +42,11 @@ static int net_list_add(const char *key, void *val, void *ext)
 		case AF_INET6:
 			lua_pushliteral(L, "inet6");
 			break;
+		case AF_XDP:
+			lua_pushliteral(L, "inet4+inet6"); // both UDP ports at once
+			break;
 		case AF_UNIX:
 			lua_pushliteral(L, "unix");
-			break;
-		case AF_XDP: // FIXME: handle properly
-			lua_pushliteral(L, "xdp");
 			break;
 		default:
 			lua_pushliteral(L, "invalid");
