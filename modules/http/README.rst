@@ -129,9 +129,9 @@ Major drawback is that current browsers won't do HTTP/2 over insecure connection
 Legacy DNS-over-HTTPS (DoH)
 ---------------------------
 
-.. warning:: The DoH implementation using ``http`` module is deprecated. It has
-   known performance and stability issues that won't be fixed. Use
-   :ref:`dns-over-https` instead.
+.. warning:: The legacy DoH implementation using ``http`` module (``kind='doh'``)
+   is deprecated. It has known performance and stability issues that won't be fixed.
+   Use new :ref:`dns-over-https` implementation instead.
 
 This was an experimental implementation of :rfc:`8484`. It was configured using
 ``doh`` kind in :func:`net.listen`. Its configuration (such as certificates)
