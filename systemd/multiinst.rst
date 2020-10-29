@@ -93,7 +93,7 @@ individual services for classic DNS, DoT and DoH from each other.
    elseif string.match(systemd_instance, '^tls') then
    	net.listen('127.0.0.1', 853, { kind = 'tls' })
    elseif string.match(systemd_instance, '^doh') then
-   	net.listen('127.0.0.1', 443, { kind = 'doh' })
+   	net.listen('127.0.0.1', 443, { kind = 'doh2' })
    else
    	panic("Use kresd@dns*, kresd@tls* or kresd@doh* instance names")
    end
