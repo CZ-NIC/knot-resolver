@@ -52,14 +52,14 @@ Examples:
 
 	net.listen('::1')
 	net.listen(net.lo, 53)
-	net.listen('192.0.2.123', 53, { kind = 'xdp', nic_queue = 0 })
-	net.listen('eth0', 53, { kind = 'xdp' })
 	net.listen(net.eth0, 853, { kind = 'tls' })
 	net.listen('192.0.2.1', 53, { freebind = true })
 	net.listen({'127.0.0.1', '::1'}, 53, { kind = 'dns' })
 	net.listen('::', 443, { kind = 'doh2' })
 	net.listen('::', 8453, { kind = 'webmgmt' }) -- see http module
 	net.listen('/tmp/kresd-socket', nil, { kind = 'webmgmt' }) -- http module supports AF_UNIX
+	net.listen('eth0', 53, { kind = 'xdp' })
+	net.listen('192.0.2.123', 53, { kind = 'xdp', nic_queue = 0 })
 
 .. warning:: On machines with multiple IP addresses avoid listening on wildcards
         ``0.0.0.0`` or ``::``. Knot Resolver could answer from different IP

@@ -45,7 +45,7 @@ Execute command
 
 .. code-block:: bash
 
-	systemctl edit kresd@.service #FIXME: verify
+	systemctl edit kresd@.service
 
 And insert these lines:
 
@@ -101,8 +101,8 @@ Some helpful commands:
 
 	ethtool -N <interface> rx-flow-hash udp4 sdfn
 	ethtool -N <interface> rx-flow-hash udp6 sdfn
-	ethtool -L <interface> combined <?>
-	ethtool -G <interface> rx <?> tx <?>
+	ethtool -L <interface> combined <queue-number>
+	ethtool -G <interface> rx <ring-size> tx <ring-size>
 	renice -n 19 -p $(pgrep '^ksoftirqd/[0-9]*$')
 
 .. TODO CPU affinities?  `CPUAffinity=%i` in systemd unit sounds good.
@@ -124,7 +124,7 @@ Limitations
 * DNS over XDP traffic is not visible to common system tools (e.g. firewall, tcpdump etc.).
 * BPF filter is not automatically unloaded from the network device. Manual filter unload::
 
-	ip link set dev <ETH> xdp off
+	ip link set dev <interface> xdp off
 
 * Knot Resolver only supports using XDP towards clients currently (not towards upstreams).
 * When starting up an XDP socket you may get a harmless warning::
