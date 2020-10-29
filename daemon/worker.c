@@ -70,7 +70,7 @@ struct request_ctx
 		/** Local address.  For AF_XDP we couldn't use session's,
 		 * as the address might be different every time. */
 		union inaddr dst_addr;
-		/** MAC addresses - ours and client's, in case of AF_XDP socket. */
+		/** MAC addresses - ours [0] and router's [1], in case of AF_XDP socket. */
 		uint8_t eth_addrs[2][6];
 	} source;
 };
