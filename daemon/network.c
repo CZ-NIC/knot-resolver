@@ -445,7 +445,7 @@ static int16_t nic_queue_auto(void)
 {
 	const char *inst_str = getenv("SYSTEMD_INSTANCE");
 	if (!inst_str)
-		return -1;
+		return 0; // should work OK for simple (single-kresd) deployments
 	char *endp;
 	errno = 0; // strtol() is special in this respect
 	long inst = strtol(inst_str, &endp, 10);
