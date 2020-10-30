@@ -48,6 +48,7 @@ kresd_deps = [
   libsystemd,
   capng,
   nghttp2,
+  libbpf,
 ]
 
 

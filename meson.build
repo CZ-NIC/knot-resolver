@@ -112,6 +112,7 @@ endif
 
 ### XDP: not configurable - we just check if libknot supports it
 xdp = meson.get_compiler('c').has_header('libknot/xdp/xdp.h')
+libbpf = dependency('libbpf', required: false) # FIXME: conditionalize correctly on xdp
 
 ### Systemd
 systemd_files = get_option('systemd_files')

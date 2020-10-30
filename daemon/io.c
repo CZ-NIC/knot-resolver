@@ -13,6 +13,10 @@
 
 #if ENABLE_XDP
 	#include <libknot/xdp/xdp.h>
+
+	#include <bpf/libbpf.h>
+	#include <linux/if_link.h>
+	#include <net/if.h>
 #endif
 
 #include "daemon/network.h"
@@ -851,6 +855,38 @@ void xdp_tx_waker(uv_check_t* handle)
 	// LATER(opt.): it _might_ be better for performance to do these two steps
 	// at different points in time
 }
+/// Warn if the XDP program is running in emulated mode (XDP_SKB)
+static void xdp_warn_mode(const char *ifname)
+{
+	assert(ifname);
+	unsigned if_index = if_nametoindex(ifname);
+	if (!if_index) {
+		kr_log_info("[xdp] warning: interface %s, unexpected error: %s\n",
+				ifname, strerror(errno));
+		return;
+	}
+	struct xdp_link_info info;
+	int ret = bpf_get_link_xdp_info(if_index, &info, sizeof(info), 0);
+	if (ret) {
+		kr_log_info("[xdp] warning: interface %s, unexpected BPF error: %s\n",
+				ifname, strerror(abs(ret)));
+		return;
+	}
+
+	switch (info.attach_mode) {
+	case XDP_ATTACHED_DRV: // driver implementation of XDP - that's our target
+	case XDP_ATTACHED_HW:  // HW implementation - rare, untested by us, hopefully OK
+		return;
+	case XDP_ATTACHED_SKB: // emulated XDP - the fallback for "unsupported devices"
+		kr_log_info("[xdp] warning: interface %s running only with XDP emulation\n",
+				ifname);
+		return;
+	default:
+		kr_log_info("[xdp] warning: interface %s running in unexpected XDP mode %d\n",
+				ifname, (int)info.attach_mode);
+		return;
+	}
+}
 int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 {
 	if (!ep || !ep->handle) {
@@ -873,6 +909,7 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 	xhd->socket = NULL; // needed for some reason
 	int ret = knot_xdp_init(&xhd->socket, ifname, ep->nic_queue, port,
 				KNOT_XDP_LOAD_BPF_MAYBE);
+	if (!ret) xdp_warn_mode(ifname);
 
 	if (!ret) ret = uv_check_init(loop, &xhd->tx_waker);
 	xhd->tx_waker.data = xhd->socket;
