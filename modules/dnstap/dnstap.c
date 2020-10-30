@@ -136,9 +136,11 @@ static int dnstap_log(kr_layer_t *ctx) {
 
 	if (dnstap_dt->log_resp_pkt) {
 		const knot_pkt_t *rpkt = req->answer;
-		m.response_message.len = rpkt->size;
-		m.response_message.data = (uint8_t *)rpkt->wire;
-		m.has_response_message = true;
+		m.has_response_message = rpkt != NULL;
+		if (rpkt != NULL) {
+			m.response_message.len = rpkt->size;
+			m.response_message.data = (uint8_t *)rpkt->wire;
+		}
 	}
 
 	/* set query time to the timestamp of the first kr_query

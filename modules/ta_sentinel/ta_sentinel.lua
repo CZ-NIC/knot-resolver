@@ -4,6 +4,7 @@ M.layer = {}
 local ffi = require('ffi')
 
 function M.layer.finish(state, req, pkt)
+	if pkt.wire == nil then return end
 	-- fast filter by the length of the first QNAME label
 	if pkt.wire[5] == 0 then return state end -- QDCOUNT % 256 == 0, in case we produced that
 	local label_len = pkt.wire[12]
