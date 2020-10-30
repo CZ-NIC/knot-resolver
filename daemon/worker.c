@@ -279,7 +279,7 @@ static uint8_t *alloc_wire_cb(struct kr_request *req, uint16_t *maxlen)
 	int ret = knot_xdp_send_alloc(xhd->socket, ctx->source.addr.ip.sa_family == AF_INET6,
 					&out, NULL);
 	if (ret != KNOT_EOK) {
-		assert(!ret);
+		assert(ret == KNOT_ENOMEM);
 		*maxlen = 0;
 		return NULL;
 	}
@@ -1248,6 +1248,8 @@ static int xdp_push(struct qr_task *task, const uv_handle_t *src_handle)
 {
 #if ENABLE_XDP
 	struct request_ctx *ctx = task->ctx;
+	if (unlikely(ctx->req.answer == NULL)) /* meant to be dropped */
+		return kr_ok();
 	knot_xdp_msg_t msg;
 	const struct sockaddr *ip_from = &ctx->source.dst_addr.ip;
 	const struct sockaddr *ip_to   = &ctx->source.addr.ip;
