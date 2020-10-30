@@ -229,7 +229,7 @@ static int net_listen(lua_State *L)
 		if (!lua_istable(L, 3))
 			lua_error_p(L, "wrong type of third parameter (table expected)");
 		flags.tls = table_get_flag(L, 3, "tls", flags.tls);
-		flags.freebind = table_get_flag(L, 3, "freebind", flags.tls);
+		flags.freebind = table_get_flag(L, 3, "freebind", false);
 
 		lua_getfield(L, 3, "kind");
 		const char *k = lua_tostring(L, -1);
