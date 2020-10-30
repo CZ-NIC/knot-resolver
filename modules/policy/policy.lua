@@ -654,9 +654,14 @@ local debug_logfinish_cb = ffi.cast('trace_callback_f', function (req)
 	ffi.C.kr_log_req(req, 0, 0, 'dbg',
 		'following rrsets were marked as interesting:\n' ..
 		req:selected_tostring())
-	ffi.C.kr_log_req(req, 0, 0, 'dbg',
-		'answer packet:\n' ..
-		tostring(req.answer))
+	if req.answer ~= nil then
+		ffi.C.kr_log_req(req, 0, 0, 'dbg',
+			'answer packet:\n' ..
+			tostring(req.answer))
+	else
+		ffi.C.kr_log_req(req, 0, 0, 'dbg',
+			'answer packet DROPPED\n')
+	end
 end)
 ffi.gc(debug_logfinish_cb, free_cb)
 

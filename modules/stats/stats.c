@@ -118,7 +118,7 @@ static inline int collect_key(char *key, const knot_dname_t *name, uint16_t type
 	return key_len + sizeof(type);
 }
 
-static void collect_sample(struct stat_data *data, struct kr_rplan *rplan, knot_pkt_t *pkt)
+static void collect_sample(struct stat_data *data, struct kr_rplan *rplan)
 {
 	/* Sample key = {[2] type, [1-255] owner} */
 	char key[sizeof(uint16_t) + KNOT_DNAME_MAXLEN];
@@ -208,9 +208,14 @@ static int collect(kr_layer_t *ctx)
 	struct kr_rplan *rplan = &param->rplan;
 	struct stat_data *data = module->data;
 
+	collect_sample(data, rplan);
+	if (!param->answer) {
+		/* The answer is being dropped.  TODO: perhaps add some stat for this? */
+		return ctx->state;
+	}
+
 	/* Collect data on final answer */
 	collect_answer(data, param->answer);
-	collect_sample(data, rplan, param->answer);
 	/* Count cached and unresolved */
 	if (rplan->resolved.len > 0) {
 		/* Histogram of answer latency. */
