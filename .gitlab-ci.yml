@@ -553,12 +553,12 @@ obs:debian10:x86_64:
     DISTROTEST_NAME: debian10
     DISTROTEST_REPO: Debian_10
 
-obs:fedora31:x86_64:
+obs:fedora33:x86_64:
   <<: *distrotest
   variables:
     OBS_REPO: knot-resolver-latest
-    DISTROTEST_NAME: fedora31
-    DISTROTEST_REPO: Fedora_31
+    DISTROTEST_NAME: fedora33
+    DISTROTEST_REPO: Fedora_33
 
 obs:fedora32:x86_64:
   <<: *distrotest
@@ -592,19 +592,19 @@ obs:ubuntu1804:x86_64:
     DISTROTEST_NAME: ubuntu1804
     DISTROTEST_REPO: xUbuntu_18.04
 
-obs:ubuntu1910:x86_64:
-  <<: *distrotest
-  variables:
-    OBS_REPO: knot-resolver-latest
-    DISTROTEST_NAME: ubuntu1910
-    DISTROTEST_REPO: xUbuntu_19.10
-
 obs:ubuntu2004:x86_64:
   <<: *distrotest
   variables:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: ubuntu2004
     DISTROTEST_REPO: xUbuntu_20.04
+
+obs:ubuntu2010:x86_64:
+  <<: *distrotest
+  variables:
+    OBS_REPO: knot-resolver-latest
+    DISTROTEST_NAME: ubuntu2010
+    DISTROTEST_REPO: xUbuntu_20.10
 
 .packagingtest: &packagingtest
   stage: pkgtest
