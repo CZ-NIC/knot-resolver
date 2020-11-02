@@ -476,102 +476,23 @@ function eval_cmd(line, raw)
 end
 
 -- Pretty printing
-
-local function funcsign(f)
--- thanks to AnandA777 from StackOverflow! Function funcsign is adapted version of
--- https://stackoverflow.com/questions/51095022/inspect-function-signature-in-lua-5-1
-	assert(type(f) == 'function', "bad argument #1 to 'funcsign' (function expected)")
-	local debuginfo = debug.getinfo(f)
-	if debuginfo.what == 'C' then  -- names N/A
-		return '(?)'
+local pprint = require('krprint').pprint
+function table_print(...)
+	local strs = {}
+	local nargs = select('#', ...)
+	if nargs == 0 then
+		return nil
 	end
-
-	local func_args = {}
-	pcall(function()
-		local oldhook
-		local delay = 2
-		local function hook()
-			delay = delay - 1
-			if delay == 0 then  -- call this only for the introspected function
-				-- stack depth 2 is the introspected function
-				for i = 1, debuginfo.nparams do
-					local k = debug.getlocal(2, i)
-					table.insert(func_args, k)
-				end
-				if debuginfo.isvararg then
-					table.insert(func_args, "...")
-				end
-				debug.sethook(oldhook)
-				error('aborting the call to introspected function')
-			end
-		end
-		oldhook = debug.sethook(hook, "c")  -- invoke hook() on function call
-		f(unpack({}))  -- huh?
-	end)
-	return "(" .. table.concat(func_args, ", ") .. ")"
-end
-
-function table_print (tt, indent, done)
-	done = done or {}
-	indent = indent or 0
-	local result = ""
-	-- Ordered for-iterator for tables with tostring-able keys.
-	local function ordered_iter(unordered_tt)
-		local keys = {}
-		for k in pairs(unordered_tt) do
-			table.insert(keys, k)
-		end
-		table.sort(keys, function (a, b) return tostring(a) < tostring(b) end)
-		local i = 0
-		return function()
-			i = i + 1
-			if keys[i] then
-				return keys[i], unordered_tt[keys[i]]
-			end
-		end
-	end
-	-- Convert to printable string (escape unprintable)
-	local function printable(value)
-		value = tostring(value)
-		local bytes = {}
-		for i = 1, #value do
-			local c = string.byte(value, i)
-			if c >= 0x20 and c < 0x7f then table.insert(bytes, string.char(c))
-			else                           table.insert(bytes, '\\'..tostring(c))
-			end
-			if i > 80 then table.insert(bytes, '...') break end
-		end
-		return table.concat(bytes)
-	end
-	if type(tt) == "table" then
-		for key, value in ordered_iter(tt) do
-			result = result .. string.rep (" ", indent)
-			if type (value) == "table" and not done [value] then
-				done [value] = true
-				result = result .. string.format("[%s] => {\n", printable (key))
-				result = result .. table_print (value, indent + 4, done)
-				result = result .. string.rep (" ", indent)
-				result = result .. "}\n"
-			elseif type (value) == "function" then
-				result = result .. string.format("[%s] => function %s%s: %s\n",
-				         tostring(key), tostring(key), funcsign(value),
-					 string.sub(tostring(value), 11))
-			else
-				result = result .. string.format("[%s] => %s\n",
-				         tostring (key), printable(value))
-			end
-		end
-	else  -- not a table
-		local tt_str
-		if type(tt) == "function" then
-			tt_str = string.format("function%s: %s\n", funcsign(tt),
-						string.sub(tostring(tt), 11))
+	for n=1,nargs do
+		local arg = select(n, ...)
+		local arg_str = pprint(arg)
+		if nargs > 1 then
+			table.insert(strs, string.format("%s\t-- result # %d", arg_str, n))
 		else
-			tt_str = tostring(tt)
+			table.insert(strs, arg_str)
 		end
-		result = result .. tt_str .. "\n"
 	end
-	return result
+	return table.concat(strs, '\n')
 end
 
 -- This extends the worker module to allow asynchronous execution of functions and nonblocking I/O.
@@ -811,9 +732,20 @@ function map(cmd, format)
 			end
 		end
 		result_count = result_count + 1
+		-- return value is output from eval_cmd
+		-- i.e. string including "quotes" and Lua escaping in between
+		assert(type(ret) == 'string', 'map() protocol error, '
+			.. 'string not retured by follower')
+		assert(#ret >= 2 and
+			string.sub(ret, 1, 1) == "'"
+			and string.sub(ret, -1, -1) == "'",
+			'map() protocol error, value returned by follower does '
+			.. 'not look like a string')
+		-- deserialize string: remove "quotes" and de-escape bytes
+		ret = krprint.deserialize_lua(ret)
 		if format == 'luaobj' then
+			-- ret should be table with xpcall results serialized into string
 			ret = krprint.deserialize_lua(ret)
-			-- ret is now table with xpcall results
 			assert(type(ret) == 'table', 'map() protocol error, '
 				.. 'table with results not retured by follower')
 			if (ret.n ~= 2) then
@@ -832,9 +764,6 @@ function map(cmd, format)
 			end
 			-- drop wrapper table and return only the actual return value
 			ret = retval
-		else
-			assert(type(ret) == 'string', 'map() protocol error, '
-				.. 'string not retured by follower')
 		end
 		results[result_count] = ret
 		::continue::
