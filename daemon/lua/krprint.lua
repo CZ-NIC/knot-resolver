@@ -6,9 +6,10 @@ local base_class = {
 -- shared constructor: use as serializer_class:new()
 function base_class.new(class, on_unrepresentable)
 	on_unrepresentable = on_unrepresentable or 'comment'
-	if not (on_unrepresentable == 'comment'
-		or on_unrepresentable == 'error') then
-		error('unsupported val2expr on_unrepresentable option ' .. tostring(on_unrepresentable))
+	if on_unrepresentable ~= 'comment'
+		and on_unrepresentable ~= 'error' then
+		error('unsupported val2expr on_unrepresentable option '
+			.. tostring(on_unrepresentable))
 	end
 	local inst = {}
 	inst.on_unrepresentable = on_unrepresentable
