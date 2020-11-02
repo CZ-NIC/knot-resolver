@@ -421,7 +421,7 @@ static int interact()
 				return 1;
 			}
 			printf("%s", msg);
-			if (msg_len == 0 || msg[msg_len - 1] != '\n') {
+			if (msg_len > 0 && msg[msg_len - 1] != '\n') {
 				printf("\n");
 			}
 			if (hist_file) {

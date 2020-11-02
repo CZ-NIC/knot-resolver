@@ -1,27 +1,26 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
-
-local serializer_class = {
-	__inst_mt = {}
+local base_class = {
+	cur_indent = 0,
 }
--- class instances with following metatable inherit all class members
-serializer_class.__inst_mt.__index = serializer_class
 
--- constructor
-function serializer_class.new(on_unrepresentable)
+-- shared constructor: use as serializer_class:new()
+function base_class.new(class, on_unrepresentable)
 	on_unrepresentable = on_unrepresentable or 'comment'
-	if not (on_unrepresentable == 'comment'
-		or on_unrepresentable == 'error') then
-		error('unsupported val2expr on_unrepresentable option ' .. tostring(on_unrepresentable))
+	if on_unrepresentable ~= 'comment'
+		and on_unrepresentable ~= 'error' then
+		error('unsupported val2expr on_unrepresentable option '
+			.. tostring(on_unrepresentable))
 	end
 	local inst = {}
 	inst.on_unrepresentable = on_unrepresentable
 	inst.done = {}
-	setmetatable(inst, serializer_class.__inst_mt)
+	inst.tab_key_path = {}
+	setmetatable(inst, class.__inst_mt)
 	return inst
 end
 
 -- format comment with leading/ending whitespace if needed
-local function format_note(note, ws_prefix, ws_suffix)
+function base_class.format_note(_, note, ws_prefix, ws_suffix)
 	if note == nil then
 		return ''
 	else
@@ -30,32 +29,56 @@ local function format_note(note, ws_prefix, ws_suffix)
 	end
 end
 
-local function static_serializer(val, on_unrepresentable)
-	local inst = serializer_class.new(on_unrepresentable)
-	local expr, note = inst:val2expr(val)
-	return string.format('%s%s', format_note(note, nil, ' '), expr)
+function base_class.indent_head(self)
+	return string.rep(' ', self.cur_indent)
 end
 
-function serializer_class.val2expr(self, val)
+function base_class.indent_inc(self)
+	self.cur_indent = self.cur_indent + self.indent_step
+end
+
+function base_class.indent_dec(self)
+	self.cur_indent = self.cur_indent - self.indent_step
+end
+
+function base_class._fallback(self, val)
+	if self.on_unrepresentable == 'comment' then
+		return 'nil', string.format('missing %s', val)
+	elseif self.on_unrepresentable == 'error' then
+		local key_path_msg
+		if #self.tab_key_path > 0 then
+			local str_key_path = {}
+			for _, key in ipairs(self.tab_key_path) do
+				table.insert(str_key_path,
+					string.format('%s %s', type(key), self:string(tostring(key))))
+			end
+			local key_path = '[' .. table.concat(str_key_path, '][') .. ']'
+			key_path_msg = string.format(' (found at [%s])', key_path)
+		else
+			key_path_msg = ''
+		end
+		error(string.format('cannot serialize type %s%s', type(val), key_path_msg), 2)
+	end
+end
+
+function base_class.val2expr(self, val)
 	local val_type = type(val)
 	local val_repr = self[val_type]
 	if val_repr then
 		return val_repr(self, val)
-	else  -- function, thread, userdata
-		if self.on_unrepresentable == 'comment' then
-			return 'nil', string.format('missing %s', val)
-		elseif self.on_unrepresentable == 'error' then
-			error(string.format('cannot print %s', val_type), 2)
-		end
+	else
+		return self:_fallback(val)
 	end
 end
 
-serializer_class['nil'] = function(_, val)
+-- "nil" is a Lua keyword so assignment below is workaround to create
+-- function base_class.nil(self, val)
+base_class['nil'] = function(_, val)
 	assert(type(val) == 'nil')
 	return 'nil'
 end
 
-function serializer_class.number(_, val)
+function base_class.number(_, val)
 	assert(type(val) == 'number')
 	if val == math.huge then
 		return 'math.huge'
@@ -68,15 +91,18 @@ function serializer_class.number(_, val)
 	end
 end
 
-function serializer_class.string(_, val)
+function base_class.char_is_printable(_, c)
+	-- ASCII (from space to ~) and not ' or \
+	return (c >= 0x20 and c < 0x7f)
+		and c ~= 0x27 and c ~= 0x5C
+end
+
+function base_class.string(self, val)
 	assert(type(val) == 'string')
-	val = tostring(val)
 	local chars = {'\''}
 	for i = 1, #val do
 		local c = string.byte(val, i)
-		-- ASCII (from space to ~) and not ' or \
-		if (c >= 0x20 and c < 0x7f)
-			and c ~= 0x27 and c ~= 0x5C then
+		if self:char_is_printable(c) then
 			table.insert(chars, string.char(c))
 		else
 			table.insert(chars, string.format('\\%03d', c))
@@ -86,12 +112,37 @@ function serializer_class.string(_, val)
 	return table.concat(chars)
 end
 
-function serializer_class.boolean(_, val)
+function base_class.boolean(_, val)
 	assert(type(val) == 'boolean')
 	return tostring(val)
 end
 
-function serializer_class.table(self, tab)
+local function ordered_iter(unordered_tt)
+	local keys = {}
+	for k in pairs(unordered_tt) do
+		table.insert(keys, k)
+	end
+	table.sort(keys,
+		function (a, b)
+			if type(a) ~= type(b) then
+				return type(a) < type(b)
+			end
+			if type(a) == 'number' then
+				return a < b
+			else
+				return tostring(a) < tostring(b)
+			end
+		end)
+	local i = 0
+	return function()
+		i = i + 1
+		if keys[i] ~= nil then
+			return keys[i], unordered_tt[keys[i]]
+		end
+	end
+end
+
+function base_class.table(self, tab)
 	assert(type(tab) == 'table')
 	if self.done[tab] then
 		error('cyclic reference', 0)
@@ -100,9 +151,13 @@ function serializer_class.table(self, tab)
 
 	local items = {'{'}
 	local previdx = 0
-	for idx, val in pairs(tab) do
+	self:indent_inc()
+	for idx, val in ordered_iter(tab) do
 		local errors, valok, valexpr, valnote, idxok, idxexpr, idxnote
 		errors = {}
+		-- push current index onto key path stack to make it available to sub-printers
+		table.insert(self.tab_key_path, idx)
+
 		valok, valexpr, valnote = pcall(self.val2expr, self, val)
 		if not valok then
 			table.insert(errors, string.format('value: %s', valexpr))
@@ -127,29 +182,135 @@ function serializer_class.table(self, tab)
 			end
 		end
 
+		local item = ''
 		if #errors == 0 then
 			-- finally serialize one [key=]?value expression
+			local indent = self:indent_head()
+			local note
 			if addidx then
-				table.insert(items,
-					string.format('%s[%s]', format_note(idxnote, nil, ' '), idxexpr))
-				table.insert(items, '=')
+				note = self:format_note(idxnote, nil, self.key_val_sep)
+				item = string.format('%s%s[%s]%s=%s',
+					indent, note,
+					idxexpr, self.key_val_sep, self.key_val_sep)
+				indent = ''
 			end
-			table.insert(items, string.format('%s%s,', format_note(valnote, nil, ' '), valexpr))
+			note = self:format_note(valnote, nil, self.item_sep)
+			item = item .. string.format('%s%s%s,', indent, note, valexpr)
 		else
-			local errmsg = string.format('%s = %s (%s)',
-				tostring(idx),
-				tostring(val),
+			local errmsg = string.format('cannot print %s = %s (%s)',
+				self:string(tostring(idx)),
+				self:string(tostring(val)),
 				table.concat(errors, ', '))
 			if self.on_unrepresentable == 'error' then
 				error(errmsg, 0)
 			else
 				errmsg = string.format('--[[ missing %s ]]', errmsg)
-				table.insert(items, errmsg)
+				item = errmsg
 			end
 		end
+		table.insert(items, item)
+		table.remove(self.tab_key_path) -- pop current index from key path stack
 	end  -- one key+value
-	table.insert(items, '}')
-	return table.concat(items, ' '), string.format('%s follows', tab)
+	self:indent_dec()
+	table.insert(items, self:indent_head() .. '}')
+	return table.concat(items, self.item_sep), string.format('%s follows', tab)
+end
+
+-- machine readable variant, cannot represent all types and repeated references to a table
+local serializer_class = {
+	indent_step = 0,
+	item_sep = ' ',
+	key_val_sep = ' ',
+	__inst_mt = {}
+}
+-- inhertance form base class (for :new())
+setmetatable(serializer_class, { __index = base_class })
+-- class instances with following metatable inherit all class members
+serializer_class.__inst_mt.__index = serializer_class
+
+local function static_serializer(val, on_unrepresentable)
+	local inst = serializer_class:new(on_unrepresentable)
+	local expr, note = inst:val2expr(val)
+	return string.format('%s%s', inst:format_note(note, nil, inst.item_sep), expr)
+	end
+
+-- human friendly variant, not stable and not intended for machine consumption
+local pprinter_class = {
+	indent_step = 4,
+	item_sep = '\n',
+	key_val_sep = ' ',
+	__inst_mt = {},
+}
+
+-- should be always empty because pretty-printer has fallback for all types
+function pprinter_class.format_note()
+	return ''
+end
+
+function pprinter_class._fallback(self, val)
+	if self.on_unrepresentable == 'error' then
+		base_class._fallback(self, val)
+	end
+	return tostring(val)
+end
+
+function pprinter_class.char_is_printable(_, c)
+	-- ASCII (from space to ~) + tab or newline
+	-- and not ' or \
+	return ((c >= 0x20 and c < 0x7f)
+		or c == 0x09 or c == 0x0A)
+		and c ~= 0x27 and c ~= 0x5C
+end
+
+-- "function" is a Lua keyword so assignment below is workaround to create
+-- function pprinter_class.function(self, f)
+pprinter_class['function'] = function(self, f)
+-- thanks to AnandA777 from StackOverflow! Function funcsign is adapted version of
+-- https://stackoverflow.com/questions/51095022/inspect-function-signature-in-lua-5-1
+	assert(type(f) == 'function', "bad argument #1 to 'funcsign' (function expected)")
+	local debuginfo = debug.getinfo(f)
+	local func_args = {}
+	local args_str
+	if debuginfo.what == 'C' then  -- names N/A
+		args_str = '(?)'
+		goto add_name
+	end
+
+	pcall(function()
+		local oldhook
+		local delay = 2
+		local function hook()
+			delay = delay - 1
+			if delay == 0 then  -- call this only for the introspected function
+				-- stack depth 2 is the introspected function
+				for i = 1, debuginfo.nparams do
+					local k = debug.getlocal(2, i)
+					table.insert(func_args, k)
+				end
+				if debuginfo.isvararg then
+					table.insert(func_args, "...")
+				end
+				debug.sethook(oldhook)
+				error('aborting the call to introspected function')
+			end
+		end
+		oldhook = debug.sethook(hook, "c")  -- invoke hook() on function call
+		f(unpack({}))  -- huh?
+	end)
+	args_str = "(" .. table.concat(func_args, ", ") .. ")"
+	::add_name::
+	local name
+	if #self.tab_key_path > 0 then
+		name = string.format('function %s', self.tab_key_path[#self.tab_key_path])
+	else
+		name = 'function '
+	end
+	return string.format('%s%s: %s', name, args_str, string.sub(tostring(f), 11))
+end
+
+-- default tostring method is better suited for human-intended output
+function pprinter_class.number(_, number)
+	return tostring(number)
 end
 
 local function deserialize_lua(serial)
@@ -161,9 +322,19 @@ local function deserialize_lua(serial)
 	return deserial_func()
 end
 
+setmetatable(pprinter_class, { __index = base_class })
+pprinter_class.__inst_mt.__index = pprinter_class
+
+local function static_pprint(val, on_unrepresentable)
+	local inst = pprinter_class:new(on_unrepresentable)
+	local expr, note = inst:val2expr(val)
+	return string.format('%s%s', inst:format_note(note, nil, inst.item_sep), expr)
+end
+
 local M = {
 	serialize_lua = static_serializer,
-	deserialize_lua = deserialize_lua
+	deserialize_lua = deserialize_lua,
+	pprint = static_pprint
 }
 
 return M

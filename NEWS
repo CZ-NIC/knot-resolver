@@ -10,6 +10,7 @@ Improvements
 - improve resiliency against UDP fragmentation attacks (disable PMTUD) (!1061)
 - ta_update: warn if there are differences between statically configured
   keys and upstream (#251, !1051)
+- human readable output in interactive mode was improved
 - doc: generate info page (!1079)
 
 Bugfixes

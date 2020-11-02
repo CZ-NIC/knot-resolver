@@ -27,8 +27,8 @@ local function test_globals()
 	same(option('REORDER_RR', false), false, 'generic option call')
 	boom(option, {'REORDER_RR', 'potato'}, 'generic option call argument check')
 	boom(option, {'MARS_VACATION', false}, 'generic option check name')
-	same(table_print('crabdiary'), 'crabdiary\n', 'table print works')
-	same(table_print({fakepizza=1}), '[fakepizza] => 1\n', 'table print works on tables')
+	same(table_print('crabdiary'), "'crabdiary'", 'table print works')
+	same(table_print({fakepizza=1}), "{\n    ['fakepizza'] = 1,\n}", 'table print works on tables')
 end
 
 -- test if dns library functions work
