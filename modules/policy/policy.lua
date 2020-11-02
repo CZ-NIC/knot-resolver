@@ -654,7 +654,7 @@ local debug_logfinish_cb = ffi.cast('trace_callback_f', function (req)
 	ffi.C.kr_log_req(req, 0, 0, 'dbg',
 		'following rrsets were marked as interesting:\n' ..
 		req:selected_tostring())
-	if req.answer.wire ~= nil then
+	if req.answer ~= nil then
 		ffi.C.kr_log_req(req, 0, 0, 'dbg',
 			'answer packet:\n' ..
 			tostring(req.answer))
