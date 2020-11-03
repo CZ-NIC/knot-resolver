@@ -53,6 +53,6 @@ int io_stop_read(uv_handle_t *handle);
 typedef struct {
 	struct knot_xdp_socket *socket;
 	struct session *session;
-	uv_check_t tx_waker;
+	uv_idle_t tx_waker;
 } xdp_handle_data_t;
 

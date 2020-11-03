@@ -1243,6 +1243,21 @@ static bool subreq_enqueue(struct qr_task *task)
 	return true;
 }
 
+#if ENABLE_XDP
+static void xdp_tx_waker(uv_idle_t *handle)
+{
+	int ret = knot_xdp_send_finish(handle->data);
+	if (ret != KNOT_EAGAIN && ret != KNOT_EOK)
+		kr_log_error("[xdp] check: ret = %d, %s\n", ret, knot_strerror(ret));
+	/* Apparently some drivers need many explicit wake-up calls
+	 * even if we push no additional packets (in case they accumulated a lot) */
+	if (ret != KNOT_EAGAIN)
+		uv_idle_stop(handle);
+	knot_xdp_send_prepare(handle->data);
+	/* LATER(opt.): it _might_ be better for performance to do these two steps
+	 * at different points in time */
+}
+#endif
 /** Send an answer packet over XDP. */
 static int xdp_push(struct qr_task *task, const uv_handle_t *src_handle)
 {
@@ -1263,7 +1278,10 @@ static int xdp_push(struct qr_task *task, const uv_handle_t *src_handle)
 	uint32_t sent;
 	int ret = knot_xdp_send(xhd->socket, &msg, 1, &sent);
 	ctx->req.answer->wire = NULL; /* it's been freed */
+
+	uv_idle_start(&xhd->tx_waker, xdp_tx_waker);
 	kr_log_verbose("[xdp] pushed a packet, ret = %d\n", ret);
+
 	return qr_task_on_send(task, src_handle, ret);
 #else
 	assert(!EINVAL);

@@ -842,15 +842,6 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 	}
 	knot_xdp_recv_finish(xhd->socket, msgs, rcvd);
 }
-void xdp_tx_waker(uv_check_t* handle)
-{
-	int ret = knot_xdp_send_finish(handle->data);
-	if (ret != KNOT_EOK)
-		kr_log_error("[xdp] check: ret = %d, %s\n", ret, knot_strerror(ret));
-	knot_xdp_send_prepare(handle->data);
-	// LATER(opt.): it _might_ be better for performance to do these two steps
-	// at different points in time
-}
 int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 {
 	if (!ep || !ep->handle) {
@@ -874,14 +865,13 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 	int ret = knot_xdp_init(&xhd->socket, ifname, ep->nic_queue, port,
 				KNOT_XDP_LOAD_BPF_MAYBE);
 
-	if (!ret) ret = uv_check_init(loop, &xhd->tx_waker);
-	xhd->tx_waker.data = xhd->socket;
-	if (!ret) ret = uv_check_start(&xhd->tx_waker, xdp_tx_waker);
+	if (!ret) ret = uv_idle_init(loop, &xhd->tx_waker);
 	if (ret) {
 		free(xhd);
 		return kr_error(ret);
 	}
 	assert(xhd->socket);
+	xhd->tx_waker.data = xhd->socket;
 
 	ep->fd = knot_xdp_socket_fd(xhd->socket); // probably not useful
 	ret = uv_poll_init(loop, (uv_poll_t *)ep->handle, ep->fd);
@@ -932,7 +922,7 @@ void io_deinit(uv_handle_t *handle)
 	} else {
 	#if ENABLE_XDP
 		xdp_handle_data_t *xhd = handle->data;
-		uv_check_stop(&xhd->tx_waker);
+		uv_idle_stop(&xhd->tx_waker);
 		uv_close((uv_handle_t *)&xhd->tx_waker, NULL);
 		session_free(xhd->session);
 		knot_xdp_deinit(xhd->socket);
