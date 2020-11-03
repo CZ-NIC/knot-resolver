@@ -1265,8 +1265,6 @@ static int xdp_push(struct qr_task *task, const uv_handle_t *src_handle)
 {
 #if ENABLE_XDP
 	struct request_ctx *ctx = task->ctx;
-	if (unlikely(ctx->req.answer == NULL)) /* meant to be dropped */
-		return kr_ok();
 	knot_xdp_msg_t msg;
 	const struct sockaddr *ip_from = &ctx->source.dst_addr.ip;
 	const struct sockaddr *ip_to   = &ctx->source.addr.ip;
@@ -1305,6 +1303,11 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	if (source_session == NULL) {
 		(void) qr_task_on_send(task, NULL, kr_error(EIO));
 		return state == KR_STATE_DONE ? kr_ok() : kr_error(EIO);
+	}
+
+	if (unlikely(ctx->req.answer == NULL)) { /* meant to be dropped */
+		(void) qr_task_on_send(task, NULL, kr_ok());
+		return kr_ok();
 	}
 
 	if (session_flags(source_session)->closing ||
