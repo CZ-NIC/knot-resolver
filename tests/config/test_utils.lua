@@ -63,6 +63,7 @@ function M.check_answer(desc, qname, qtype, expected_rcode, expected_rdata)
 
 	local done = false
 	local callback = function(pkt)
+		ok(pkt, 'answer not dropped')
 		same(pkt:rcode(), wire_rcode,
 		     desc .. ': expecting answer for query ' .. qname .. ' ' .. qtype_str
 		      .. ' with rcode ' .. kres.tostring.rcode[wire_rcode])
