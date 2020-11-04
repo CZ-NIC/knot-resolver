@@ -1303,8 +1303,10 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		return state == KR_STATE_DONE ? kr_ok() : kr_error(EIO);
 	}
 
-	if (unlikely(ctx->req.answer == NULL)) /* meant to be dropped */
+	if (unlikely(ctx->req.answer == NULL)) { /* meant to be dropped */
+		(void) qr_task_on_send(task, NULL, kr_ok());
 		return kr_ok();
+	}
 
 	if (session_flags(source_session)->closing ||
 	    ctx->source.addr.ip.sa_family == AF_UNSPEC)
