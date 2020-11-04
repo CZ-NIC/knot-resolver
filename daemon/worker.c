@@ -292,8 +292,10 @@ static uint8_t *alloc_wire_cb(struct kr_request *req, uint16_t *maxlen)
 static void free_wire(const struct request_ctx *ctx)
 {
 	assert(ctx->req.alloc_wire_cb == alloc_wire_cb);
-	uint8_t *wire = ctx->req.answer->wire;
-	if (likely(wire == NULL)) /* sent most likely */
+	knot_pkt_t *ans = ctx->req.answer;
+	if (unlikely(ans == NULL)) /* dropped */
+		return;
+	if (likely(ans->wire == NULL)) /* sent most likely */
 		return;
 	/* We know it's an AF_XDP socket; otherwise alloc_wire_cb isn't assigned. */
 	uv_handle_t *handle = session_get_handle(ctx->source.session);
@@ -301,7 +303,7 @@ static void free_wire(const struct request_ctx *ctx)
 	xdp_handle_data_t *xhd = handle->data;
 	/* Freeing is done by sending an empty packet (the API won't really send it). */
 	knot_xdp_msg_t out;
-	out.payload.iov_base = wire;
+	out.payload.iov_base = ans->wire;
 	out.payload.iov_len = 0;
 	uint32_t sent;
 	int ret = knot_xdp_send(xhd->socket, &out, 1, &sent);
