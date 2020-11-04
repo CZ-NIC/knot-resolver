@@ -32,13 +32,18 @@ end
 local function check_answer(logbuf)
 	return function (pkt, req)
 		req.trace_log:free()
-		if pkt:rcode() == kres.rcode.NOERROR or pkt:rcode() == kres.rcode.NXDOMAIN then
+		if pkt ~= nil and (pkt:rcode() == kres.rcode.NOERROR
+							or pkt:rcode() == kres.rcode.NXDOMAIN) then
 			private.ok_callback()
 			return
 		end
 		log('[watchdog] watchdog query returned unexpected answer! query verbose log:')
 		log(table.concat(logbuf, ''))
-		log('[watchdog] problematic answer:\n%s', pkt)
+		if pkt ~= nil then
+			log('[watchdog] problematic answer:\n%s', pkt)
+		else
+			log('[watchdog] answer was dropped')
+		end
 		-- failure! quit immediatelly to allow process supervisor to restart us
 		private.fail_callback()
 	end
