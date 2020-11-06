@@ -219,7 +219,7 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 		    name_str, type_str,
 		    qry->request ? qry->request->uid : 0, qry->uid);
 	}
-	kr_rplan_log(rplan, duplicate ? "push DUP" : "push");
+	kr_rplan_log(qry, rplan, duplicate ? "push DUP" : "push");
 	return qry;
 }
 
@@ -248,7 +248,7 @@ int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry)
 			break;
 		}
 	}
-	kr_rplan_log(rplan, "pop");
+	kr_rplan_log(qry, rplan, "pop");
 	return KNOT_EOK;
 }
 
@@ -298,26 +298,36 @@ struct kr_query *kr_rplan_find_resolved(struct kr_rplan *rplan, struct kr_query 
 }
 
 #include "contrib/ucw/mempool.h"
+#include <inttypes.h>
+
+static char *append_qry_str(struct mempool *mp, char *inmsg, struct kr_query *q, char *format) {
+	KR_DNAME_GET_STR(name_str, q->sname);
+	KR_RRTYPE_GET_STR(type_str, q->stype);
+	return mp_printf_append(mp, inmsg, format, name_str, type_str, q->uid);
+}
+
 KR_EXPORT
-void kr_rplan_log(struct kr_rplan *rplan, const char *prefix) {
+void kr_rplan_log(struct kr_query *qry, struct kr_rplan *rplan, const char *prefix) {
 	struct mempool *mp = mp_new(512);
 
-	char *msg = mp_printf(mp, "[%s] pending %zd", prefix, rplan->pending.len);
+	char *msg = mp_printf(mp, "[qry tree] ");
+	for (struct kr_query *q = qry; q != NULL; q = q->parent) {
+		msg = append_qry_str(mp, msg, q, "%s %s (%" PRIu32 ") <- ");
+	}
+	kr_log_q(qry, "rplan", "%s\n", msg);
+
+	msg = mp_printf(mp, "[%s] pending %zd", prefix, rplan->pending.len);
 	for (int i = rplan->pending.len - 1; rplan->pending.len > 0 && i >= 0; i--) {
 		struct kr_query *q = rplan->pending.at[i];
-		KR_DNAME_GET_STR(name_str, q->sname);
-		KR_RRTYPE_GET_STR(type_str, q->stype);
-		msg = mp_printf_append(mp, msg, "; %s %s", name_str, type_str);
+		msg = append_qry_str(mp, msg, q, "; %s %s (%" PRIu32 ")");
 	}
 	msg = mp_printf_append(mp, msg, " | resolved %zd", rplan->resolved.len);
 	for (int i = 0; i < rplan->resolved.len; ++i) {
 		struct kr_query *q = rplan->resolved.at[i];
-		KR_DNAME_GET_STR(name_str, q->sname);
-		KR_RRTYPE_GET_STR(type_str, q->stype);
-		msg = mp_printf_append(mp, msg, "; %s %s", name_str, type_str);
+		msg = append_qry_str(mp, msg, q, "; %s %s (%" PRIu32 ")");
 	}
 	/* caller is responsible for detecting verbose mode, use QRVERBOSE() macro */
-	kr_log_req(rplan->request, 0, 0, "rplan", "%s\n", msg);
+	kr_log_q(qry, "rplan", "%s\n", msg);
 
 	mp_delete(mp);
 }
