@@ -18,6 +18,7 @@ struct iter_local_state {
 	trie_t *addresses;
 	unsigned int generation; // Used to distinguish old and valid records in tries
 	enum kr_selection_error last_error;
+	unsigned int no_ns_addr_count;
 };
 
 enum record_state {
@@ -255,6 +256,15 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 		}
 	}
 
+	bool nxnsattack_mitigation = false;
+	enum kr_transport_protocol proto = *transport ? (*transport)->protocol : -1;
+	if (proto == KR_TRANSPORT_RESOLVE_A || proto == KR_TRANSPORT_RESOLVE_AAAA) {
+		if (++local_state->no_ns_addr_count > KR_COUNT_NO_NSADDR_LIMIT) {
+			*transport = NULL;
+			nxnsattack_mitigation = true;
+		}
+	}
+
 	update_name_state(*transport, local_state->names);
 
 	WITH_VERBOSE(qry) {
@@ -262,7 +272,6 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 		if (*transport) {
 			KR_DNAME_GET_STR(ns_name, (*transport)->name);
 			const char *ns_str = kr_straddr(&(*transport)->address.ip);
-			enum kr_transport_protocol proto = (*transport)->protocol;
 			if (proto != KR_TRANSPORT_RESOLVE_A && proto != KR_TRANSPORT_RESOLVE_AAAA) {
 				VERBOSE_MSG(qry,
 				"=> id: '%05u' choosing: '%s'@'%s' with timeout %u ms zone cut: '%s'%s\n",
@@ -275,8 +284,8 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 			}
 		} else {
 			 VERBOSE_MSG(qry,
-			"=> id: '%05u' no suitable transport, zone cut: '%s'\n",
-			qry->id, zonecut_str);
+			"=> id: '%05u' no suitable transport, zone cut: '%s'%s\n",
+			qry->id, zonecut_str, nxnsattack_mitigation ? " (stopped due to mitigation for NXNSAttack CVE-2020-12667)" : "");
 		}
 	}
 }

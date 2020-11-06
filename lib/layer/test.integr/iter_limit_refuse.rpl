@@ -1,3 +1,4 @@
+do-ip6: no
 ; config options
 ;server:
 	stub-addr: 193.0.14.129 	# K.ROOT-SERVERS.NET.
@@ -7,7 +8,7 @@ SCENARIO_BEGIN Outrageous number of auth servers return REFUSED. Simulates NXNSA
 
 ; K.ROOT-SERVERS.NET.
 RANGE_BEGIN 0 100
-	ADDRESS 193.0.14.129 
+	ADDRESS 193.0.14.129
 ENTRY_BEGIN
 MATCH opcode qtype qname
 ADJUST copy_id
