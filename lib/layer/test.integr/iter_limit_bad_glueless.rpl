@@ -1,3 +1,4 @@
+do-ip6: no
 ; config options
 ;	target-fetch-policy: "0 0 0 0 0"
 ;	name: "."
