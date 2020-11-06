@@ -218,3 +218,6 @@ struct kr_query *kr_rplan_last(struct kr_rplan *rplan);
 KR_EXPORT KR_PURE
 struct kr_query *kr_rplan_find_resolved(struct kr_rplan *rplan, struct kr_query *parent,
                                const knot_dname_t *name, uint16_t cls, uint16_t type);
+
+KR_EXPORT
+void kr_rplan_log(struct kr_rplan *rplan, const char *prefix);

@@ -202,6 +202,7 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 	if (rplan == NULL || name == NULL) {
 		return NULL;
 	}
+	bool duplicate = kr_rplan_satisfies(rplan->resolved.len > 0 ? rplan->resolved.at[rplan->resolved.len - 1] : NULL, name, cls, type) || kr_rplan_satisfies(rplan->pending.len > 0 ? rplan->pending.at[rplan->pending.len - 1] : NULL, name, cls, type);
 
 	struct kr_query *qry = kr_rplan_push_query(rplan, parent, name);
 	if (qry == NULL) {
@@ -218,6 +219,7 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 		    name_str, type_str,
 		    qry->request ? qry->request->uid : 0, qry->uid);
 	}
+	kr_rplan_log(rplan, duplicate ? "push DUP" : "push");
 	return qry;
 }
 
@@ -246,6 +248,7 @@ int kr_rplan_pop(struct kr_rplan *rplan, struct kr_query *qry)
 			break;
 		}
 	}
+	kr_rplan_log(rplan, "pop");
 	return KNOT_EOK;
 }
 
@@ -294,4 +297,28 @@ struct kr_query *kr_rplan_find_resolved(struct kr_rplan *rplan, struct kr_query 
 	return ret;
 }
 
+#include "contrib/ucw/mempool.h"
+KR_EXPORT
+void kr_rplan_log(struct kr_rplan *rplan, const char *prefix) {
+	struct mempool *mp = mp_new(512);
+
+	char *msg = mp_printf(mp, "[%s] pending %zd", prefix, rplan->pending.len);
+	for (int i = rplan->pending.len - 1; rplan->pending.len > 0 && i >= 0; i--) {
+		struct kr_query *q = rplan->pending.at[i];
+		KR_DNAME_GET_STR(name_str, q->sname);
+		KR_RRTYPE_GET_STR(type_str, q->stype);
+		msg = mp_printf_append(mp, msg, "; %s %s", name_str, type_str);
+	}
+	msg = mp_printf_append(mp, msg, " | resolved %zd", rplan->resolved.len);
+	for (int i = 0; i < rplan->resolved.len; ++i) {
+		struct kr_query *q = rplan->resolved.at[i];
+		KR_DNAME_GET_STR(name_str, q->sname);
+		KR_RRTYPE_GET_STR(type_str, q->stype);
+		msg = mp_printf_append(mp, msg, "; %s %s", name_str, type_str);
+	}
+	/* caller is responsible for detecting verbose mode, use QRVERBOSE() macro */
+	kr_log_req(rplan->request, 0, 0, "rplan", "%s\n", msg);
+
+	mp_delete(mp);
+}
 #undef VERBOSE_MSG
