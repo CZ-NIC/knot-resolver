@@ -1356,13 +1356,19 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 	if (*transport == NULL) {
 		/* Properly signal to serve_stale module. */
 		if (qry->flags.NO_NS_FOUND) {
-			ITERATE_LAYERS(request, qry, reset);
-			kr_rplan_pop(rplan, qry);
+			printf("Failed serve_stale.\n");
+			if (qry->flags.NONAUTH) {
+				ITERATE_LAYERS(request, qry, reset);
+				kr_rplan_pop(rplan, qry);
+			} else {
+				return KR_STATE_FAIL;
+			}
 		} else {
 			/* FIXME: This is probably quite inefficient:
 			* we go through the whole qr_task_step loop just because of the serve_stale
 			* module which might not even be loaded. */
 			qry->flags.NO_NS_FOUND = true;
+			printf("Trying serve_stale.\n");
 		}
 		return KR_STATE_PRODUCE;
 	}
