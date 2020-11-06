@@ -202,7 +202,7 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 	if (rplan == NULL || name == NULL) {
 		return NULL;
 	}
-	bool duplicate = kr_rplan_satisfies(rplan->resolved.len > 0 ? rplan->resolved.at[rplan->resolved.len - 1] : NULL, name, cls, type) || kr_rplan_satisfies(rplan->pending.len > 0 ? rplan->pending.at[rplan->pending.len - 1] : NULL, name, cls, type);
+	bool duplicate = kr_rplan_find_resolved(rplan, NULL, name, cls, type) || kr_rplan_satisfies(rplan->pending.len > 0 ? rplan->pending.at[rplan->pending.len - 1] : NULL, name, cls, type);
 
 	struct kr_query *qry = kr_rplan_push_query(rplan, parent, name);
 	if (qry == NULL) {
