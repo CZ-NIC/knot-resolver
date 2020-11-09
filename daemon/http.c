@@ -16,6 +16,8 @@
 #include "daemon/http.h"
 #include "daemon/worker.h"
 #include "daemon/session.h"
+#include "lib/layer/iterate.h" /* kr_response_classify */
+#include "lib/cache/util.h"
 
 #include "contrib/base64url.h"
 
@@ -37,6 +39,7 @@ struct http_data {
 	uint8_t *buf;
 	size_t len;
 	size_t pos;
+	uint32_t ttl;
 	uv_write_cb on_write;
 	uv_write_t *req;
 };
@@ -427,15 +430,26 @@ static ssize_t read_callback(nghttp2_session *h2, int32_t stream_id, uint8_t *bu
  *
  * Data isn't guaranteed to be sent immediately due to underlying HTTP/2 flow control.
  */
-static int http_send_response(nghttp2_session *h2, char *size, size_t size_len,
-			      int32_t stream_id, nghttp2_data_provider *prov)
+static int http_send_response(nghttp2_session *h2, int32_t stream_id,
+			      nghttp2_data_provider *prov)
 {
-	int ret;
 	struct http_data *data = (struct http_data*)prov->source.ptr;
+	int ret;
+	const char *directive_max_age = "max-age=";
+	char size[MAX_DECIMAL_LENGTH(data->len)] = { 0 };
+	char max_age[MAX_DECIMAL_LENGTH(data->ttl)+sizeof(directive_max_age)] = { 0 };
+	int size_len;
+	int max_age_len;
+
+	size_len = snprintf(size, MAX_DECIMAL_LENGTH(data->len), "%zu", data->len);
+	max_age_len = snprintf(max_age, MAX_DECIMAL_LENGTH(data->ttl)+sizeof(directive_max_age),
+				"%s%u", directive_max_age, data->ttl);
+
 	nghttp2_nv hdrs[] = {
 		MAKE_STATIC_NV(":status", "200"),
 		MAKE_STATIC_NV("content-type", "application/dns-message"),
-		MAKE_NV("content-length", 14, size, size_len)
+		MAKE_NV("content-length", 14, size, size_len),
+		MAKE_NV("cache-control", 13, max_age, max_age_len),
 	};
 
 	ret = nghttp2_submit_response(h2, stream_id, hdrs, sizeof(hdrs)/sizeof(*hdrs), prov);
@@ -465,12 +479,9 @@ static int http_send_response(nghttp2_session *h2, char *size, size_t size_len,
 static int http_write_pkt(nghttp2_session *h2, knot_pkt_t *pkt, int32_t stream_id,
 			  uv_write_t *req, uv_write_cb on_write)
 {
-	char size[MAX_DECIMAL_LENGTH(pkt->size)] = { 0 };
-	int size_len;
 	struct http_data *data;
 	nghttp2_data_provider prov;
-
-	size_len = snprintf(size, MAX_DECIMAL_LENGTH(pkt->size), "%zu", pkt->size);
+	const bool is_negative = kr_response_classify(pkt) & (PKT_NODATA|PKT_NXDOMAIN);
 
 	data = malloc(sizeof(struct http_data));
 	if (!data)
@@ -481,11 +492,12 @@ static int http_write_pkt(nghttp2_session *h2, knot_pkt_t *pkt, int32_t stream_i
 	data->pos = 0;
 	data->on_write = on_write;
 	data->req = req;
+	data->ttl = packet_ttl(pkt, is_negative);
 
 	prov.source.ptr = data;
 	prov.read_callback = read_callback;
 
-	return http_send_response(h2, size, size_len, stream_id, &prov);
+	return http_send_response(h2, stream_id, &prov);
 }
 
 /*
