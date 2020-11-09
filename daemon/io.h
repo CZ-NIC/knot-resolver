@@ -42,7 +42,6 @@ void tcp_timeout_trigger(uv_timer_t *timer);
  * \param has_tls has meanings only when type is SOCK_STREAM */
 int io_create(uv_loop_t *loop, uv_handle_t *handle, int type,
 	      unsigned family, bool has_tls, bool has_http);
-void io_deinit(uv_handle_t *handle);
 void io_free(uv_handle_t *handle);
 
 int io_start_read(uv_handle_t *handle);
