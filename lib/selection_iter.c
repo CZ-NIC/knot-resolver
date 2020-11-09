@@ -16,6 +16,7 @@
 struct iter_local_state {
 	trie_t *names;
 	trie_t *addresses;
+	knot_dname_t *zonecut;
 	unsigned int generation; // Used to distinguish old and valid records in tries
 	enum kr_selection_error last_error;
 	unsigned int no_ns_addr_count;
@@ -117,14 +118,21 @@ void iter_update_state_from_rtt_cache(struct iter_local_state *local_state, stru
 
 
 void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct kr_zonecut *zonecut, struct knot_mm *mm) {
+	bool zcut_changed = false;
 	if (local_state->names == NULL || local_state->addresses == NULL) {
 		// Local state initialization
 		memset(local_state, 0, sizeof(struct iter_local_state));
 		local_state->names = trie_create(mm);
 		local_state->addresses = trie_create(mm);
+	} else {
+		zcut_changed = zonecut_changed(zonecut->name, local_state->zonecut);
 	}
-
+	local_state->zonecut = zonecut->name;
 	local_state->generation++;
+
+	if (zcut_changed) {
+		local_state->no_ns_addr_count = 0;
+	}
 
 	trie_it_t *it;
 	unsigned int current_generation = local_state->generation;
@@ -142,9 +150,11 @@ void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct
 		struct iter_name_state *name_state = *(struct iter_name_state **)val;
 		name_state->generation = current_generation;
 
-		// Set addresses as unresolved as they might have fallen out of cache (TTL expired)
-		name_state->a_state = name_state->a_state == RECORD_TRIED ? RECORD_TRIED : RECORD_UNKNOWN;
-		name_state->aaaa_state = name_state->aaaa_state == RECORD_TRIED ? RECORD_TRIED : RECORD_UNKNOWN;
+		if (zcut_changed) {
+			// Set addresses as unresolved as they might have fallen out of cache (TTL expired)
+			name_state->a_state = RECORD_UNKNOWN;
+			name_state->aaaa_state = RECORD_UNKNOWN;
+		}
 
 		if (addresses->len > 0) {
 			// We have some addresses to work with, let's iterate over them
