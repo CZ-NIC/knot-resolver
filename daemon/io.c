@@ -912,7 +912,7 @@ int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family, b
 	return ret;
 }
 
-void io_deinit(uv_handle_t *handle)
+static void io_deinit(uv_handle_t *handle)
 {
 	if (!handle || !handle->data) {
 		return;

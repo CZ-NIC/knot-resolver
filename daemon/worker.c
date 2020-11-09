@@ -184,8 +184,7 @@ static uv_handle_t *ioreq_spawn(struct worker_ctx *worker,
 	}
 
 	if (ret != 0) {
-		io_deinit(handle);
-		free(handle);
+		io_free(handle);
 		return NULL;
 	}
 
