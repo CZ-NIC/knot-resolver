@@ -34,6 +34,7 @@ local function gen_varying_ttls(_, req)
 	-- shorter TTL than all other RRs
 	answer:begin(kres.section.AUTHORITY)
 	answer:put('\4test\0', 300, answer:qclass(), kres.type.SOA,
+		-- ns.test. nobody.invalid. 1 3600 1200 604800 10800
 		'\2ns\4test\0\6nobody\7invalid\0\0\0\0\1\0\0\14\16\0\0\4\176\0\9\58\128\0\0\42\48')
 	return kres.DONE
 end
@@ -115,7 +116,7 @@ else
 			return
 		end
 		-- uncacheable
-		-- same(headers:get('cache-control'), 'max-age=0', desc .. ': TTL 0')  TODO: implement
+		same(headers:get('cache-control'), 'max-age=0', desc .. ': TTL 0')
 		same(pkt:rcode(), kres.rcode.SERVFAIL, desc .. ': rcode matches')
 	end
 
@@ -130,7 +131,7 @@ else
 			return
 		end
 		-- HTTP TTL is minimum from all RRs in the answer
-		-- same(headers:get('cache-control'), 'max-age=300', desc .. ': TTL 900')  TODO: implement
+		same(headers:get('cache-control'), 'max-age=300', desc .. ': TTL 900')
 		same(pkt:rcode(), kres.rcode.NOERROR, desc .. ': rcode matches')
 		same(pkt:ancount(), 3, desc .. ': ANSWER is present')
 		same(pkt:nscount(), 1, desc .. ': AUTHORITY is present')
@@ -147,7 +148,7 @@ else
 		if not (headers and pkt) then
 			return
 		end
-		-- same(headers:get('cache-control'), 'max-age=10800', desc .. ': TTL 10800')  TODO: implement
+		same(headers:get('cache-control'), 'max-age=10800', desc .. ': TTL 10800')
 		same(pkt:rcode(), kres.rcode.NXDOMAIN, desc .. ': rcode matches')
 		same(pkt:nscount(), 1, desc .. ': AUTHORITY is present')
 	end
@@ -208,7 +209,7 @@ else
 			return
 		end
 		-- uncacheable
-		-- same(headers:get('cache-control'), 'max-age=0', desc .. ': TTL 0')  TODO: implement
+		same(headers:get('cache-control'), 'max-age=0', desc .. ': TTL 0')
 		same(pkt:rcode(), kres.rcode.SERVFAIL, desc .. ': rcode matches')
 	end
 
@@ -223,7 +224,7 @@ else
 			return
 		end
 		-- HTTP TTL is minimum from all RRs in the answer
-		-- same(headers:get('cache-control'), 'max-age=300', desc .. ': TTL 900')  TODO: implement
+		same(headers:get('cache-control'), 'max-age=300', desc .. ': TTL 900')
 		same(pkt:rcode(), kres.rcode.NOERROR, desc .. ': rcode matches')
 		same(pkt:ancount(), 3, desc .. ': ANSWER is present')
 		same(pkt:nscount(), 1, desc .. ': AUTHORITY is present')
@@ -240,7 +241,7 @@ else
 		if not (headers and pkt) then
 			return
 		end
-		-- same(headers:get('cache-control'), 'max-age=10800', desc .. ': TTL 10800')  TODO: implement
+		same(headers:get('cache-control'), 'max-age=10800', desc .. ': TTL 10800')
 		same(pkt:rcode(), kres.rcode.NXDOMAIN, desc .. ': rcode matches')
 		same(pkt:nscount(), 1, desc .. ': AUTHORITY is present')
 	end
