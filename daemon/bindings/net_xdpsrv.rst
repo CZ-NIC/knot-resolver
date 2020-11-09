@@ -30,8 +30,8 @@ Prerequisites
   otherwise the performance gains will be much lower.
   Successfully tested cards:
 
-  * Intel series 700 (driver `i40e`), maximum number of channels per interface is 64.
-  * Intel series 500 (driver `ixgbe`), maximum number of channels per interface is 64.
+  * Intel series 700 (driver `i40e`), maximum number of queues per interface is 64.
+  * Intel series 500 (driver `ixgbe`), maximum number of queues per interface is 64.
     The number of CPUs available has to be at most 64!
 
 
