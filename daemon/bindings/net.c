@@ -137,30 +137,40 @@ static bool net_listen_addrs(lua_State *L, int port, endpoint_flags_t flags, int
 			flags.sock_type = SOCK_STREAM; /* TODO: allow to override this? */
 			ret = network_listen(net, str, (is_unix ? 0 : port), nic_queue, flags);
 		}
-		if (ret != 0) {
-			if (is_unix) {
-				kr_log_error("[system] bind to '%s' (UNIX): %s\n",
-						str, kr_strerror(ret));
-			} else if (flags.xdp) {
-				/* FIXME: it could fail for many different reasons
-				 * but they're rather difficult to distinguish here.
-				 * Consider logging directly from network_listen() ?
-				 * Also, nic_queue == -1 would better be logged as "default".
-				 *
-				 *  - iface/addr:
-				 *    * nonexistent name -> EINVAL
-				 *    * address matching multiple -> KNOT_ELIMIT ("exceeded limit")
-				 *  - permissions: EPERM
-				 */
-				kr_log_error("[system] failed to initialize XDP for '%s@%d' (nic_queue %d): %s\n",
-						str, port, nic_queue, knot_strerror(ret));
-			} else {
-				const char *stype = flags.sock_type == SOCK_DGRAM ? "UDP" : "TCP";
-				kr_log_error("[system] bind to '%s@%d' (%s): %s\n",
-						str, port, stype, kr_strerror(ret));
+		if (ret == 0) return true; /* success */
+
+		if (is_unix) {
+			kr_log_error("[system] bind to '%s' (UNIX): %s\n",
+					str, kr_strerror(ret));
+		} else if (flags.xdp) {
+			const char *err_str = knot_strerror(ret);
+			if (ret == KNOT_ELIMIT) {
+				if ((strcmp(str, "::") == 0 || strcmp(str, "0.0.0.0") == 0)) {
+					err_str = "wildcard addresses not supported with XDP";
+				} else {
+					err_str = "address matched multiple network interfaces";
+				}
+			} else if (ret == kr_error(ENODEV)) {
+				err_str = "invalid address or interface name";
 			}
+			/* Notable OK strerror: KNOT_EPERM Operation not permitted */
+
+			if (nic_queue == -1) {
+				kr_log_error("[system] failed to initialize XDP for '%s@%d'"
+						" (nic_queue = <auto>): %s\n",
+						str, port, err_str);
+			} else {
+				kr_log_error("[system] failed to initialize XDP for '%s@%d'"
+						" (nic_queue = %d): %s\n",
+						str, port, nic_queue, err_str);
+			}
+
+		} else {
+			const char *stype = flags.sock_type == SOCK_DGRAM ? "UDP" : "TCP";
+			kr_log_error("[system] bind to '%s@%d' (%s): %s\n",
+					str, port, stype, kr_strerror(ret));
 		}
-		return ret == 0;
+		return false; /* failure */
 	}
 
 	/* Last case: table where all entries are added recursively. */

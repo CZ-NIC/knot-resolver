@@ -99,6 +99,8 @@ void network_deinit(struct network *net);
  * \note there's no short-hand to listen both on UDP and TCP.
  * \note ownership of flags.* is taken on success.  TODO: non-success?
  * \param nic_queue == -1 for auto-selection or non-XDP.
+ * \note In XDP mode, addr may be also interface name, so kr_error(ENODEV)
+ *       is returned if some nonsense is passed
  */
 int network_listen(struct network *net, const char *addr, uint16_t port,
 		   int16_t nic_queue, endpoint_flags_t flags);

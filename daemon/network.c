@@ -11,6 +11,7 @@
 
 #include <assert.h>
 #include <libgen.h>
+#include <net/if.h>
 #include <sys/un.h>
 #include <unistd.h>
 
@@ -504,6 +505,14 @@ int network_listen(struct network *net, const char *addr, uint16_t port,
 	ep.nic_queue = nic_queue;
 
 	int ret = create_endpoint(net, addr, &ep, sa);
+
+	// Error reporting: more precision.
+	if (ret == KNOT_EINVAL && !sa && flags.xdp && ENABLE_XDP) {
+		if (!if_nametoindex(addr) && errno == ENODEV) {
+			ret = kr_error(ENODEV);
+		}
+	}
+
 	free_const(sa);
 	return ret;
 }
