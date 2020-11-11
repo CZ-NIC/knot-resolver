@@ -252,7 +252,7 @@ end
 local function active_refresh(keyset, pkt, req, managed)
 	local retry = true
 
-	if pkt:rcode() == kres.rcode.NOERROR then
+	if pkt ~= nil and pkt:rcode() == kres.rcode.NOERROR then
 		local records = pkt:section(kres.section.ANSWER)
 		local new_keys = {}
 		for _, rr in ipairs(records) do
@@ -271,6 +271,8 @@ local function active_refresh(keyset, pkt, req, managed)
 		local qry = req:initial()
 		if qry.flags.DNSSEC_BOGUS == true then
 			warn('[ta_update] active refresh failed, update your trust anchors in "%s"', keyset.filename)
+		elseif pkt == nil then
+			warn('[ta_update] active refresh failed, answer was dropped')
 		else
 			warn('[ta_update] active refresh failed for ' .. kres.dname2str(keyset.owner)
 				.. ' with rcode: ' .. pkt:rcode())

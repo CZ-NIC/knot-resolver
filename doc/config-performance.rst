@@ -32,4 +32,5 @@ impact than cache settings and number of instances.
    modules-rfc7706
    modules-priming
    modules-edns_keepalive
+   daemon-bindings-net_xdpsrv
 
