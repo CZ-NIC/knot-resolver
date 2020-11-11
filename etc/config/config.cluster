@@ -11,6 +11,8 @@ net.listen('127.0.0.1', 53, { kind = 'dns' })
 net.listen('::1', 53, { kind = 'dns'})
 net.listen('127.0.0.1', 853, { kind = 'tls' })
 net.listen('::1', 853, { kind = 'tls' })
+net.listen('127.0.0.1', 443, { kind = 'doh2' })
+net.listen('::1', 443, { kind = 'doh2'})
 
 -- Refer to manual for optimal cache size
 cache.size = 16 * GB

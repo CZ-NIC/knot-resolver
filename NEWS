@@ -3,6 +3,8 @@ Knot Resolver 5.2.0 (2020-1m-dd)
 
 Improvements
 ------------
+- doh2: add native C module for DNS-over-HTTPS (#600, !997)
+- xdp: add server-side XDP support for higher UDP performance (#533, !1083)
 - lower default EDNS buffer size to 1232 bytes (#538, #300, !920);
   see https://dnsflagday.net/2020/
 - net: split the EDNS buffer size into upstream and downstream (!1026)
@@ -12,6 +14,7 @@ Improvements
   keys and upstream (#251, !1051)
 - human readable output in interactive mode was improved
 - doc: generate info page (!1079)
+- packaging: improve sysusers and tmpfiles support (!1080)
 
 Bugfixes
 --------
