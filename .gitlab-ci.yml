@@ -139,6 +139,14 @@ authors:
   script:
     - LC_ALL=en_US.UTF-8 scripts/update-authors.sh
 
+news:
+  <<: *sanity
+  only:
+    refs:
+      - /^release.*$/
+  script:
+    - head -n 1 NEWS | grep -q $(date +%Y-%m-%d)
+
 deckard_commit:
   <<: *sanity
   script:
