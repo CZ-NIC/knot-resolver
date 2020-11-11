@@ -5,8 +5,10 @@
 -- Network interface configuration
 net.listen('127.0.0.1', 53, { kind = 'dns' })
 net.listen('127.0.0.1', 853, { kind = 'tls' })
+--net.listen('127.0.0.1', 443, { kind = 'doh2' })
 net.listen('::1', 53, { kind = 'dns', freebind = true })
 net.listen('::1', 853, { kind = 'tls', freebind = true })
+--net.listen('::1', 443, { kind = 'doh2' })
 
 -- Load useful modules
 modules = {
