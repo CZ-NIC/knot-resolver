@@ -5,23 +5,27 @@
 XDP for higher UDP performance
 ------------------------------
 
+.. warning::
+   As of version 5.2.0, XDP support in Knot Resolver is considered
+   experimental. The impact on overall throughput and performance may not
+   always be beneficial.
+
 Using XDP allows significant speedup of UDP packet processing in recent Linux kernels,
 especially with some network drivers that implement good support.
 The basic idea is that for selected packets the Linux networking stack is bypassed,
 and some drivers can even directly use the user-space buffers for reading and writing.
+
+.. TODO perhaps some hint/link about how significant speedup one might get? (link to some talk video?)
+
+Prerequisites
+^^^^^^^^^^^^^
+.. this is mostly copied from knot-dns doc/operations.rst
 
 .. warning::
    Bypassing the network stack has significant implications, such as bypassing the firewall
    and monitoring solutions.
    Make sure you're familiar with the trade-offs before using this feature.
    Read more in :ref:`dns-over-xdp_limitations`.
-
-.. TODO perhaps some hint/link about how significant speedup one might get? (link to some talk video?)
-
-
-Prerequisites
-^^^^^^^^^^^^^
-.. this is mostly copied from knot-dns doc/operations.rst
 
 * Linux kernel 4.18+ (5.x+ is recommended for optimal performance) compiled with
   the `CONFIG_XDP_SOCKETS=y` option. XDP isn't supported in other operating systems.
