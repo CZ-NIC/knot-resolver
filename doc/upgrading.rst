@@ -18,12 +18,6 @@ Following section provides information about selected changes in not-yet-release
 We advise users to prepare for these changes sooner rather than later to make it easier to upgrade to
 newer versions when they are released.
 
-* Going forward DNS-over-HTTP (DoH) will be supported only over HTTP/2 with TLS.
-  This limitation allows us to provide a new :ref:`more reliable and scalable implementation
-  of DoH <dns-over-https>` (``kind='doh2'``).
-* DoH over HTTP/1 and unencrypted transports is still available in
-  :ref:`legacy http module <mod-http-doh>` (``kind='doh'``).
-  This module will not receive receive any more bugfixes and will be eventually removed.
 * Command line option ``--forks`` (``-f``) `is deprecated and will be eventually removed
   <https://gitlab.nic.cz/knot/knot-resolver/-/issues/631>`_.
   Preferred way to manage :ref:`systemd-multiple-instances` is to use a process manager,
@@ -39,6 +33,12 @@ newer versions when they are released.
 Users
 -----
 
+* Going forward DNS-over-HTTP (DoH) will be supported only over HTTP/2 with TLS.
+  This limitation allows us to provide a new :ref:`more reliable and scalable implementation
+  of DoH <dns-over-https>` (``kind='doh2'``).
+* DoH over HTTP/1 and unencrypted transports is still available in
+  :ref:`legacy http module <mod-http-doh>` (``kind='doh'``).
+  This module will not receive receive any more bugfixes and will be eventually removed.
 * Users of :ref:`control-sockets` API need to terminate each command sent to resolver with newline
   character (ASCII ``\n``). Correct usage: ``cache.stats()\n``.
   Newline terminated commands are accepted by all resolver versions >= 1.0.0.
