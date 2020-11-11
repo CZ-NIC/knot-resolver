@@ -26,8 +26,9 @@ Prerequisites
 * Linux kernel 4.18+ (5.x+ is recommended for optimal performance) compiled with
   the `CONFIG_XDP_SOCKETS=y` option. XDP isn't supported in other operating systems.
 * libknot compiled with XDP support
-* A multiqueue network card with native XDP support is highly recommended,
-  otherwise the performance gains will be much lower.
+* **A multiqueue network card with native XDP support is highly recommended**,
+  otherwise the performance gain will be much lower and you may encounter
+  issues due to XDP emulation.
   Successfully tested cards:
 
   * Intel series 700 (driver `i40e`), maximum number of queues per interface is 64.
