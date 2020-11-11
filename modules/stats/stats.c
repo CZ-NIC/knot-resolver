@@ -44,7 +44,7 @@
 	X(answer,aa) X(answer,tc) X(answer,rd) X(answer,ra) X(answer, ad) X(answer,cd) \
 	X(answer,edns0) X(answer,do) \
 	X(query,edns) X(query,dnssec) \
-	X(request,total) X(request,udp) X(request,tcp) \
+	X(request,total) X(request,udp) X(request,tcp) X(request,xdp) \
 	X(request,dot) X(request,doh) X(request,internal) \
 	X(const,end)
 
@@ -118,7 +118,7 @@ static inline int collect_key(char *key, const knot_dname_t *name, uint16_t type
 	return key_len + sizeof(type);
 }
 
-static void collect_sample(struct stat_data *data, struct kr_rplan *rplan, knot_pkt_t *pkt)
+static void collect_sample(struct stat_data *data, struct kr_rplan *rplan)
 {
 	/* Sample key = {[2] type, [1-255] owner} */
 	char key[sizeof(uint16_t) + KNOT_DNAME_MAXLEN];
@@ -186,7 +186,7 @@ static int collect_transport(kr_layer_t *ctx)
 
 	/**
 	 * Count each transport only once,
-	 * i.e. DoT does not count as TCP.
+	 * i.e. DoT does not count as TCP and XDP does not count as UDP.
 	 */
 	if (req->qsource.flags.http)
 		stat_const_add(data, metric_request_doh, 1);
@@ -194,6 +194,8 @@ static int collect_transport(kr_layer_t *ctx)
 		stat_const_add(data, metric_request_dot, 1);
 	else if (req->qsource.flags.tcp)
 		stat_const_add(data, metric_request_tcp, 1);
+	else if (req->qsource.flags.xdp)
+		stat_const_add(data, metric_request_xdp, 1);
 	else
 		stat_const_add(data, metric_request_udp, 1);
 	return ctx->state;
@@ -206,9 +208,14 @@ static int collect(kr_layer_t *ctx)
 	struct kr_rplan *rplan = &param->rplan;
 	struct stat_data *data = module->data;
 
+	collect_sample(data, rplan);
+	if (!param->answer) {
+		/* The answer is being dropped.  TODO: perhaps add some stat for this? */
+		return ctx->state;
+	}
+
 	/* Collect data on final answer */
 	collect_answer(data, param->answer);
-	collect_sample(data, rplan, param->answer);
 	/* Count cached and unresolved */
 	if (rplan->resolved.len > 0) {
 		/* Histogram of answer latency. */

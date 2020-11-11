@@ -24,6 +24,9 @@ int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd);
 int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bool has_tls, bool has_http);
 /** Initialize a pipe handle and start listening. */
 int io_listen_pipe(uv_loop_t *loop, uv_pipe_t *handle, int fd);
+/** Initialize a poll handle (ep->handle) and start listening over AF_XDP on ifname.
+ * Sets ep->session. */
+int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname);
 
 /** Control socket / TTY - related functions. */
 void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
@@ -39,8 +42,16 @@ void tcp_timeout_trigger(uv_timer_t *timer);
  * \param has_tls has meanings only when type is SOCK_STREAM */
 int io_create(uv_loop_t *loop, uv_handle_t *handle, int type,
 	      unsigned family, bool has_tls, bool has_http);
-void io_deinit(uv_handle_t *handle);
 void io_free(uv_handle_t *handle);
 
 int io_start_read(uv_handle_t *handle);
 int io_stop_read(uv_handle_t *handle);
+
+/** When uv_handle_t::type == UV_POLL, ::data points to this malloc-ed helper.
+ * (Other cases store a direct struct session pointer in ::data.) */
+typedef struct {
+	struct knot_xdp_socket *socket;
+	struct session *session;
+	uv_idle_t tx_waker;
+} xdp_handle_data_t;
+

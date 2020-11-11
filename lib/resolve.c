@@ -784,7 +784,7 @@ knot_pkt_t * kr_request_ensure_answer(struct kr_request *request)
 	const knot_pkt_t *qs_pkt = request->qsource.packet;
 	assert(qs_pkt);
 	// Find answer_max: limit on DNS wire length.
-	size_t answer_max;
+	uint16_t answer_max;
 	const struct kr_request_qsource_flags *qs_flags = &request->qsource.flags;
 	assert((qs_flags->tls || qs_flags->http) ? qs_flags->tcp : true);
 	if (!request->qsource.addr || qs_flags->tcp) {
@@ -801,14 +801,22 @@ knot_pkt_t * kr_request_ensure_answer(struct kr_request *request)
 	}
 
 	// Allocate the packet.
+	uint8_t *wire = NULL;
+	if (request->alloc_wire_cb) {
+		wire = request->alloc_wire_cb(request, &answer_max);
+		if (!wire)
+			goto enomem;
+	}
 	knot_pkt_t *answer = request->answer =
-		knot_pkt_new(NULL, answer_max, &request->pool);
+		knot_pkt_new(wire, answer_max, &request->pool);
 	if (!answer || knot_pkt_init_response(answer, qs_pkt) != 0) {
 		assert(!answer); // otherwise we messed something up
 		goto enomem;
 	}
+	if (!wire)
+		wire = answer->wire;
 
-	uint8_t *wire = answer->wire; // much was done by knot_pkt_init_response()
+	// Much was done by knot_pkt_init_response()
 	knot_wire_set_ra(wire);
 	knot_wire_set_rcode(wire, KNOT_RCODE_NOERROR);
 	if (knot_wire_get_cd(qs_pkt->wire)) {
