@@ -21,10 +21,12 @@ if detect_time_skew then
 end
 
 policy.add(policy.suffix(policy.PASS, {todname('test.')}))
-_hint_root_file('hints')
 cache.size = 2*MB
 verbose(true)
 {% endraw %}
+
+modules.load('hints')
+hints.root({['{{ROOT_NAME}}'] = '{{ROOT_ADDR}}'})
 
 net = { '{{SELF_ADDR}}' }
 
