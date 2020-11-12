@@ -13,6 +13,7 @@
 
 #if ENABLE_XDP
 	#include <libknot/xdp/xdp.h>
+	#include <net/if.h>
 #endif
 
 #include "daemon/network.h"
@@ -842,6 +843,29 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 	}
 	knot_xdp_recv_finish(xhd->socket, msgs, rcvd);
 }
+/// Warn if the XDP program is running in emulated mode (XDP_SKB)
+static void xdp_warn_mode(const char *ifname)
+{
+	assert(ifname);
+	const unsigned if_index = if_nametoindex(ifname);
+	if (!if_index) {
+		kr_log_info("[xdp] warning: interface %s, unexpected error: %s\n",
+				ifname, strerror(errno));
+		return;
+	}
+	switch (knot_eth_xdp_mode(if_index)) {
+	case KNOT_XDP_MODE_FULL:
+		return;
+	case KNOT_XDP_MODE_EMUL:
+		kr_log_info("[xdp] warning: interface %s running only with XDP emulation\n",
+				ifname);
+		return;
+	case KNOT_XDP_MODE_NONE: // enum warnings from compiler
+		break;
+	}
+	kr_log_info("[xdp] warning: interface %s running in unexpected XDP mode\n",
+			ifname);
+}
 int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 {
 	if (!ep || !ep->handle) {
@@ -864,6 +888,7 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 	xhd->socket = NULL; // needed for some reason
 	int ret = knot_xdp_init(&xhd->socket, ifname, ep->nic_queue, port,
 				KNOT_XDP_LOAD_BPF_MAYBE);
+	if (!ret) xdp_warn_mode(ifname);
 
 	if (!ret) ret = uv_idle_init(loop, &xhd->tx_waker);
 	if (ret) {
