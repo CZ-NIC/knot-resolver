@@ -2,6 +2,7 @@ stub-addr: 2001:503:ba3e::2:30
 trust-anchor: . IN DS 1867 8 2 EBF6C553C9DDABFB3522DFD4E62A857D9E00E373686C3479064B46BF6E43AC5E
 val-override-date: 20170701000000
 query-minimization: off
+stub-name: rootns.
 CONFIG_END
 
 SCENARIO_BEGIN Successfull RFC 5011 KSK roll-over simulator for 2017
