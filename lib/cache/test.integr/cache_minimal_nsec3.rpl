@@ -2,6 +2,7 @@
 	trust-anchor: ". IN DS 20326 8 2 E06D44B80B8F1D39A95C0B0D7C65D08458E880409BBC683457104237C7F8EC8D"
 	val-override-date: 20190625160934
 	stub-addr: 2001:503:ba3e::2:30
+	do-ip4: no
 CONFIG_END
 
 SCENARIO_BEGIN Test that minimal NSEC3 range does not trigger agressive cache (workaround for buggy auths, optimization to improve cache hit rate on correct auths using black lies)
