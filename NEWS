@@ -1,6 +1,10 @@
 Knot Resolver X.Y.X (yyyy-mm-dd)
 ================================
 
+Bugfixes
+--------
+- fix map() command on 32-bit platforms; regressed in 5.2.0 (!1093)
+
 
 Knot Resolver 5.2.0 (2020-11-11)
 ================================
