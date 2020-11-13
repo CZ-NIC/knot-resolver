@@ -130,8 +130,8 @@ end
 
 local function gen_test_tables_supported(level)
 	level = level or 1
-	local max_level = 10
-	local max_items_per_table = 30
+	local max_level = 5
+	local max_items_per_table = 20
 	local t = {}
 	for _=1, math.random(0, max_items_per_table) do
 		local val_as_table = (level <= max_level) and math.random() < 0.1
@@ -178,7 +178,7 @@ local function random_modify_table(t, always, generator)
 end
 
 local function test_table_supported()
-	for i=1,20 do
+	for i=1,10 do
 		local t = gen_test_tables_supported()
 		test_de_serialization(t, 'random table no. ' .. i)
 		assert(random_modify_table(t, true, gen_marker))
@@ -236,7 +236,7 @@ local function gen_test_tables_unsupported()
 end
 
 local function test_unsupported_table()
-	for i=1,20 do
+	for i=1,10 do
 		local t = gen_test_tables_unsupported()
 		test_unsupported(t, 'random unsupported table no. ' .. i)()
 		assert(random_modify_table(t, true, gen_marker))
