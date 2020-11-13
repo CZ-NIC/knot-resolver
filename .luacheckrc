@@ -20,6 +20,7 @@ new_read_globals = {
 	'user',
 	'verbose',
 	'worker',
+	'kluautil_list_dir',
 	-- Sandbox declarations
 	'kB',
 	'MB',

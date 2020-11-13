@@ -1,6 +1,5 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 
-local ffi = require('ffi')
 local kluautil = {}
 
 -- Get length of table
