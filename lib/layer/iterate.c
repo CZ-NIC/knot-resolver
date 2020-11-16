@@ -973,6 +973,24 @@ static int prepare_query(kr_layer_t *ctx, knot_pkt_t *pkt)
 	return KR_STATE_CONSUME;
 }
 
+static bool satisfied_by_additional(const struct kr_query *qry)
+{
+	const bool prereq = !qry->flags.STUB && !qry->flags.FORWARD && qry->flags.NONAUTH;
+	if (!prereq)
+		return false;
+	const struct kr_request *req = qry->request;
+	for (ssize_t i = req->add_selected.len - 1; i >= 0; --i) {
+		ranked_rr_array_entry_t *entry = req->add_selected.at[i];
+		if (entry->qry_uid != qry->uid)
+			break;
+		if (entry->rr->type == qry->stype
+		    && knot_dname_is_equal(entry->rr->owner, qry->sname)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 static int resolve_badmsg(knot_pkt_t *pkt, struct kr_request *req, struct kr_query *query)
 {
 
@@ -1103,7 +1121,19 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		break;
 	case KR_STATE_DONE: /* Referral */
 		state = process_referral_answer(pkt,req);
-		VERBOSE_MSG("<= referral response, follow\n");
+		if (satisfied_by_additional(query)) { /* This is a little hacky.
+			 * We found sufficient information in ADDITIONAL section
+			 * and it was selected for caching in this CONSUME round.
+			 * To make iterator accept the record in a simple way,
+			 * we trigger another cache *reading* attempt
+			 * for the subsequent PRODUCE round.
+			 */
+			assert(query->flags.NONAUTH);
+			query->flags.CACHE_TRIED = false;
+			VERBOSE_MSG("<= referral response, but cache should stop us short now\n");
+		} else {
+			VERBOSE_MSG("<= referral response, follow\n");
+		}
 		break;
 	default:
 		break;
