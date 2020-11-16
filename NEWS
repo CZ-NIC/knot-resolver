@@ -1,6 +1,10 @@
 Knot Resolver X.Y.X (yyyy-mm-dd)
 ================================
 
+Improvements
+------------
+- be more consistent in using parent-side records (!1097)
+
 Bugfixes
 --------
 - fix map() command on 32-bit platforms; regressed in 5.2.0 (!1093)
