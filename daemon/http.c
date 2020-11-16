@@ -166,7 +166,6 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 	}
 
 	ctx->buf_pos += ret;
-	ctx->incomplete_stream = stream_id;
 	queue_push(ctx->streams, stream_id);
 	return 0;
 }
@@ -175,6 +174,34 @@ static void refuse_stream(nghttp2_session *h2, int32_t stream_id)
 {
 	nghttp2_submit_rst_stream(
 		h2, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
+}
+
+/*
+ * Save stream id from first header's frame.
+ *
+ * We don't support interweaving from different streams. To successfully parse
+ * multiple subsequent streams, each one must be fully received before processing
+ * a new stream.
+ */
+static int begin_headers_callback(nghttp2_session *h2, const nghttp2_frame *frame,
+				 void *user_data)
+{
+	struct http_ctx *ctx = (struct http_ctx *)user_data;
+	int32_t stream_id = frame->hd.stream_id;
+
+	if (frame->hd.type != NGHTTP2_HEADERS ||
+		frame->headers.cat != NGHTTP2_HCAT_REQUEST) {
+		return 0;
+	}
+
+	if (ctx->incomplete_stream != -1) {
+		kr_log_verbose(
+			"[http] stream %d incomplete, refusing\n", ctx->incomplete_stream);
+		refuse_stream(h2, stream_id);
+	} else {
+		ctx->incomplete_stream = stream_id;
+	}
+	return 0;
 }
 
 /*
@@ -193,22 +220,36 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	int32_t stream_id = frame->hd.stream_id;
 
-	/* If the HEADERS don't have END_STREAM set, there are some DATA frames,
-	 * which implies POST method.  Skip header processing for POST. */
-	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) == 0)
-		return 0;
 
-	if (!strcasecmp(":path", (const char *)name)) {
-		if (ctx->incomplete_stream != -1) {
-			kr_log_verbose(
-				"[http] stream %d incomplete, refusing\n", ctx->incomplete_stream);
-			refuse_stream(h2, stream_id);
-			return 0;
-		}
+	switch (frame->hd.type) {
+		case NGHTTP2_HEADERS:
+			if (ctx->incomplete_stream != stream_id) {
+				kr_log_verbose(
+					"[http] stream %d incomplete, refusing\n", ctx->incomplete_stream);
+				refuse_stream(h2, stream_id);
+				break;
+			}
 
-		if (process_uri_path(ctx, (const char*)value, stream_id) < 0)
-			refuse_stream(h2, stream_id);
+			if (!strcasecmp(":path", (const char *)name) && ctx->current_method == HTTP_METHOD_GET) {
+				ctx->uri_path = malloc(sizeof(ctx->uri_path) * valuelen+1);
+				if (!ctx->uri_path)
+					return kr_error(ENOMEM);
+				memcpy(ctx->uri_path, value, valuelen);
+				ctx->uri_path[valuelen] = '\0';
+			}
+
+			if (!strcasecmp(":method", (const char *)name)) {
+				if (!strcasecmp("get", (const char *)value)) {
+					ctx->current_method = HTTP_METHOD_GET;
+				} else if (!strcasecmp("post", (const char *)value)) {
+					ctx->current_method = HTTP_METHOD_POST;
+				} else {
+					ctx->current_method = HTTP_METHOD_NONE;
+				}
+			}
+			break;
 	}
+
 	return 0;
 }
 
@@ -227,26 +268,28 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	ssize_t remaining;
 	ssize_t required;
 
-	if (ctx->incomplete_stream != -1 && ctx->incomplete_stream != stream_id) {
+	if (ctx->incomplete_stream != stream_id) {
 		kr_log_verbose(
 			"[http] stream %d incomplete, refusing\n",
 			ctx->incomplete_stream);
 		refuse_stream(h2, stream_id);
+		ctx->incomplete_stream = -1;
 		return 0;
 	}
 
 	remaining = ctx->buf_size - ctx->submitted - ctx->buf_pos;
 	required = len;
-	if (ctx->incomplete_stream == -1)
+	/* First data chunk of the new stream */
+	if (queue_len(ctx->streams) == 0 || queue_tail(ctx->streams) != ctx->incomplete_stream)
 		required += sizeof(uint16_t);
 
 	if (required > remaining) {
 		kr_log_error("[http] insufficient space in buffer\n");
+		ctx->incomplete_stream = -1;
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 	}
 
-	if (ctx->incomplete_stream == -1) {
-		ctx->incomplete_stream = stream_id;
+	if (queue_len(ctx->streams) == 0 || queue_tail(ctx->streams) != ctx->incomplete_stream) {
 		ctx->buf_pos = sizeof(uint16_t);  /* Reserve 2B for dnsmsg len. */
 		queue_push(ctx->streams, stream_id);
 	}
@@ -272,7 +315,17 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 	assert(stream_id != -1);
 
 	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) && ctx->incomplete_stream == stream_id) {
+		if (frame->hd.type == NGHTTP2_HEADERS) {
+			if (process_uri_path(ctx, ctx->uri_path, stream_id) < 0) {
+				free(ctx->uri_path);
+				ctx->uri_path = NULL;
+				refuse_stream(h2, stream_id);
+			}
+			free(ctx->uri_path);
+			ctx->uri_path = NULL;
+		}
 		ctx->incomplete_stream = -1;
+		ctx->current_method = HTTP_METHOD_NONE;
 
 		len = ctx->buf_pos - sizeof(uint16_t);
 		if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
@@ -336,6 +389,7 @@ struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
 	nghttp2_session_callbacks_set_send_callback(callbacks, send_callback);
 	nghttp2_session_callbacks_set_send_data_callback(callbacks, send_data_callback);
 	nghttp2_session_callbacks_set_on_header_callback(callbacks, header_callback);
+	nghttp2_session_callbacks_set_on_begin_headers_callback(callbacks, begin_headers_callback);
 	nghttp2_session_callbacks_set_on_data_chunk_recv_callback(
 		callbacks, data_chunk_recv_callback);
 	nghttp2_session_callbacks_set_on_frame_recv_callback(
@@ -352,6 +406,8 @@ struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
 	queue_init(ctx->streams);
 	ctx->incomplete_stream = -1;
 	ctx->submitted = 0;
+	ctx->current_method = HTTP_METHOD_NONE;
+	ctx->uri_path = NULL;
 
 	nghttp2_session_server_new(&ctx->h2, callbacks, ctx);
 	nghttp2_submit_settings(ctx->h2, NGHTTP2_FLAG_NONE,
@@ -437,13 +493,13 @@ static int http_send_response(nghttp2_session *h2, int32_t stream_id,
 	int ret;
 	const char *directive_max_age = "max-age=";
 	char size[MAX_DECIMAL_LENGTH(data->len)] = { 0 };
-	char max_age[MAX_DECIMAL_LENGTH(data->ttl)+sizeof(directive_max_age)] = { 0 };
+	int max_age_len = MAX_DECIMAL_LENGTH(data->ttl) + strlen(directive_max_age);
+	char max_age[max_age_len];
 	int size_len;
-	int max_age_len;
 
+	memset( max_age, 0, max_age_len*sizeof(char) );
 	size_len = snprintf(size, MAX_DECIMAL_LENGTH(data->len), "%zu", data->len);
-	max_age_len = snprintf(max_age, MAX_DECIMAL_LENGTH(data->ttl)+sizeof(directive_max_age),
-				"%s%u", directive_max_age, data->ttl);
+	max_age_len = snprintf(max_age, max_age_len, "%s%u", directive_max_age, data->ttl);
 
 	nghttp2_nv hdrs[] = {
 		MAKE_STATIC_NV(":status", "200"),
