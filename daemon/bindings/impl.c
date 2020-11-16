@@ -2,6 +2,7 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <dirent.h>
 #include <lua.h>
 #include <lauxlib.h>
 #include <string.h>
@@ -29,6 +30,29 @@ const char * lua_table_checkindices(lua_State *L, const char *keys[])
 	return NULL;
 }
 
+/** Return table listing filenames in a given directory (ls -A). */
+static int kluautil_list_dir(lua_State *L)
+{
+	lua_newtable(L); // empty table even on errors
+
+	const char *path = lua_tolstring(L, 1, NULL);
+	if (!path) return 1;
+	DIR *dir = opendir(path);
+	if (!dir) return 1;
+
+	struct dirent *entry;
+	int lua_i = 1;
+	while ((entry = readdir(dir)) != NULL) {
+		if (strcmp(entry->d_name, ".") && strcmp(entry->d_name, "..")) {
+			lua_pushstring(L, entry->d_name);
+			lua_rawseti(L, -2, lua_i++);
+		}
+	}
+
+	closedir(dir);
+	return 1;
+}
+
 
 /* Each of these just creates the correspondingly named lua table of functions. */
 int kr_bindings_cache   (lua_State *L); /* ./cache.c   */
@@ -44,6 +68,9 @@ void kr_bindings_register(lua_State *L)
 	kr_bindings_modules(L);
 	kr_bindings_net(L);
 	kr_bindings_worker(L);
+
+	/* Finally some lua utils *written in C*, not really a binding. */
+	lua_register(L, "kluautil_list_dir", kluautil_list_dir);
 }
 
 void lua_error_p(lua_State *L, const char *fmt, ...)

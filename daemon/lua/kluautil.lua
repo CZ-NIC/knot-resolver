@@ -1,6 +1,5 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 
-local ffi = require('ffi')
 local kluautil = {}
 
 -- Get length of table
@@ -27,14 +26,6 @@ end
 function kluautil.kr_table_unpack(tab)
 	return unpack(tab, 1, tab.n)
 end
-
-ffi.cdef([[
-	typedef struct __dirstream DIR;
-	DIR *opendir(const char *name);
-	struct dirent *readdir(DIR *dirp);
-	int closedir(DIR *dirp);
-	char *strerror(int errnum);
-]])
 
 -- Fetch over HTTPS
 function kluautil.kr_https_fetch(url, out_file, ca_file)
@@ -88,26 +79,6 @@ function kluautil.kr_https_fetch(url, out_file, ca_file)
 	return true
 end
 
--- List directory
-function kluautil.list_dir (path)
-	local results = {}
-	local dir = ffi.C.opendir(path)
-	if dir == nil then
-		return results
-	end
-
-	local entry = ffi.C.readdir(dir)
-	while entry ~= nil do
-		local entry_name = ffi.string(ffi.C.kr_dirent_name(entry))
-		if entry_name ~= '.' and entry_name ~= '..' then
-			table.insert(results, entry_name)
-		end
-		entry = ffi.C.readdir(dir)
-	end
-
-	ffi.C.closedir(dir)
-
-	return results
-end
+kluautil.list_dir = kluautil_list_dir
 
 return kluautil
