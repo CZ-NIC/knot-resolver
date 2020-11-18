@@ -1,0 +1,10 @@
+Please report security issues that require encryption to both of the following
+e-mail addresses.
+
+vladimir.cunat@nic.cz
+tomas.krizek@nic.cz
+
+You can obtain our PGP keys from:
+https://secure.nic.cz/files/knot-resolver/kresd-keyblock.asc
+
+More info: https://www.knot-resolver.cz/contact
