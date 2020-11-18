@@ -10,8 +10,18 @@ keys=(
 outfile="kresd-keyblock.asc"
 url="https://secure.nic.cz/files/knot-resolver/kresd-keyblock.asc"
 
-# obtain keys from keys.openpgp.org
 keyring="$(mktemp -d)"
+keyring_import="$(mktemp -d)"
+published="$(mktemp)"
+
+cleanup() {
+    rm -rf "${keyring}"
+    rm -rf "${keyring_import}"
+    rm -rf "${published}"
+}
+trap cleanup EXIT
+
+# obtain keys from keys.openpgp.org
 gpg --homedir "${keyring}" -q --keyserver keys.openpgp.org --recv-keys "${keys[@]}"
 
 # export minimal size keys with just the necessary signatures
@@ -19,12 +29,10 @@ rm -f "${outfile}"
 gpg --homedir "${keyring}" -q --export --export-options export-minimal --armor --output "${outfile}" "${keys[@]}"
 
 # display keys after import
-keyring_import="$(mktemp -d)"
 gpg --homedir "${keyring_import}" -q --import "${outfile}"
 gpg --homedir "${keyring_import}" -k
 echo "Created: ${outfile}"
 
 # check if update of secure.nic.cz keyblock might be needed
-published="$(mktemp)"
 curl -sfo "${published}" "${url}"
 diff -q "${outfile}" "${published}" &>/dev/null || echo "Generated keyblock differs from ${url}"
