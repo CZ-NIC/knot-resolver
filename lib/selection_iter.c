@@ -10,7 +10,7 @@
 #include "lib/zonecut.h"
 #include "lib/resolve.h"
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "nsrep",  __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "slct",  __VA_ARGS__)
 
 // To be held per query and locally
 struct iter_local_state {
@@ -93,7 +93,7 @@ bool zonecut_changed(knot_dname_t *new, knot_dname_t *old) {
 	return knot_dname_cmp(old, new);
 }
 
-void iter_update_state_from_rtt_cache(struct iter_local_state *local_state, struct kr_cache *cache) {
+void update_state_from_rtt_cache(struct iter_local_state *local_state, struct kr_cache *cache) {
 	trie_it_t *it;
 	for(it = trie_it_begin(local_state->addresses); !trie_it_finished(it); trie_it_next(it)) {
 		size_t address_len;
@@ -110,14 +110,14 @@ void iter_update_state_from_rtt_cache(struct iter_local_state *local_state, stru
 		bytes_to_ip(address, address_len, &addr);
 		const char *ns_str = kr_straddr(&addr.ip);
 		if (VERBOSE_STATUS) {
-			printf("[nsrep] rtt of %s is %d, variance is %d\n", ns_str, address_state->rtt_state.srtt, address_state->rtt_state.variance);
+			printf("[slct] rtt of %s is %d, variance is %d\n", ns_str, address_state->rtt_state.srtt, address_state->rtt_state.variance);
 		}
 	}
 	trie_it_free(it);
 }
 
 
-void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct kr_zonecut *zonecut, struct knot_mm *mm) {
+void update_state_from_zonecut(struct iter_local_state *local_state, struct kr_zonecut *zonecut, struct knot_mm *mm) {
 	bool zcut_changed = false;
 	if (local_state->names == NULL || local_state->addresses == NULL) {
 		// Local state initialization
@@ -143,7 +143,7 @@ void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct
 
 		trie_val_t *val = trie_get_ins(local_state->names, (char *)dname, knot_dname_size(dname));
 		if (!*val) {
-			// that we encountered for the first time
+			// We encountered this address for the first time
 			*val = mm_alloc(mm, sizeof(struct iter_name_state));
 			memset(*val, 0, sizeof(struct iter_name_state));
 		}
@@ -151,7 +151,7 @@ void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct
 		name_state->generation = current_generation;
 
 		if (zcut_changed) {
-			// Set addresses as unresolved as they might have fallen out of cache (TTL expired)
+			// Set name as unresolved as they might have fallen out of cache (TTL expired)
 			name_state->a_state = RECORD_UNKNOWN;
 			name_state->aaaa_state = RECORD_UNKNOWN;
 		}
@@ -183,13 +183,8 @@ void iter_update_state_from_zonecut(struct iter_local_state *local_state, struct
 	trie_it_free(it);
 }
 
-void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport) {
-	struct knot_mm *mempool = qry->request->rplan.pool;
-	struct iter_local_state *local_state = (struct iter_local_state *)qry->server_selection.local_state;
-
-	iter_update_state_from_zonecut(local_state, &qry->zone_cut, mempool);
-	iter_update_state_from_rtt_cache(local_state, &qry->request->ctx->cache);
-
+// Loop over trie of addresses and update per-address properties
+void update_address_states(struct iter_local_state *local_state, struct kr_query *qry) {
 	trie_it_t *it;
 	for(it = trie_it_begin(local_state->addresses); !trie_it_finished(it); trie_it_next(it)) {
 		size_t address_len;
@@ -209,62 +204,85 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 		check_network_settings(address_state, address_len, qry->flags.NO_IPV4, qry->flags.NO_IPV6);
 	}
 	trie_it_free(it);
+}
 
-	int num_addresses = trie_weight(local_state->addresses);
-	int num_names = trie_weight(local_state->names);
-
-	struct choice choices[num_addresses]; // Some will get unused, oh well
-	struct to_resolve unresolved_types[2*num_names];
-
-	int valid_addresses = 0;
+int get_valid_addresses(struct iter_local_state *local_state, struct choice choices[]) {
+	unsigned count = 0;
+	trie_it_t *it;
 	for(it = trie_it_begin(local_state->addresses); !trie_it_finished(it); trie_it_next(it)) {
 		size_t address_len;
 		uint8_t* address = (uint8_t *)trie_it_key(it, &address_len);
 		struct address_state *address_state = (struct address_state *)*trie_it_val(it);
 		if (address_state->generation == local_state->generation && !address_state->unrecoverable_errors) {
-			choices[valid_addresses] = (struct choice){
+			choices[count] = (struct choice){
 				.address = address,
 				.address_len = address_len,
 				.address_state = address_state,
 			};
-			valid_addresses++;
+			count++;
 		}
 	}
-
 	trie_it_free(it);
+	return count;
+}
 
-	int num_to_resolve = 0;
+int get_resolvable_names(struct iter_local_state *local_state, struct to_resolve resolvable[], struct kr_query *qry) {
+	// . DNSKEY must be fetched from root hints, no A/AAAA resolution is possible.
+	if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
+		return 0;
+	}
+
+	unsigned count = 0;
+	trie_it_t *it;
 	for(it = trie_it_begin(local_state->names); !trie_it_finished(it); trie_it_next(it)) {
 		struct iter_name_state *name_state = *(struct iter_name_state **)trie_it_val(it);
 		if (name_state->generation == local_state->generation) {
 			knot_dname_t *name = (knot_dname_t *)trie_it_key(it, NULL);
+			// Here are the `iter_ns_badip` dragons:
 			bool a_in_rplan = kr_rplan_satisfies(qry, name, KNOT_CLASS_IN, KNOT_RRTYPE_A);
 			bool aaaa_in_rplan = kr_rplan_satisfies(qry, name, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
 			if (name_state->a_state == RECORD_UNKNOWN && !qry->flags.NO_IPV4 && !a_in_rplan) {
-				unresolved_types[num_to_resolve++] = (struct to_resolve){name, KR_TRANSPORT_RESOLVE_A};
+				resolvable[count++] = (struct to_resolve){name, KR_TRANSPORT_RESOLVE_A};
 			}
 			if (name_state->aaaa_state == RECORD_UNKNOWN && !qry->flags.NO_IPV6 && !aaaa_in_rplan) {
-				unresolved_types[num_to_resolve++] = (struct to_resolve){name, KR_TRANSPORT_RESOLVE_AAAA};
+				resolvable[count++] = (struct to_resolve){name, KR_TRANSPORT_RESOLVE_AAAA};
 			}
 		}
 	}
-
-	// . DNSKEY must be fetched from root hints, no A/AAAA resolution is possible.
-	if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
-		num_to_resolve = 0;
-	}
-
 	trie_it_free(it);
+	return count;
+}
 
-	if (valid_addresses || num_to_resolve) {
+void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport) {
+	struct knot_mm *mempool = qry->request->rplan.pool;
+	struct iter_local_state *local_state = (struct iter_local_state *)qry->server_selection.local_state;
+
+	update_state_from_zonecut(local_state, &qry->zone_cut, mempool);
+	update_state_from_rtt_cache(local_state, &qry->request->ctx->cache);
+
+	update_address_states(local_state, qry);
+
+	struct choice choices[trie_weight(local_state->addresses)];
+	struct to_resolve resolvable[trie_weight(local_state->names)];
+
+	// Filter valid addresses and names from the tries
+	int choices_len = get_valid_addresses(local_state, choices);
+	int resolvable_len = get_resolvable_names(local_state, resolvable, qry);
+
+	if (choices_len || resolvable_len) {
 		bool tcp = qry->flags.TCP | qry->server_selection.truncated;
-		*transport = choose_transport(choices, valid_addresses, unresolved_types, num_to_resolve, qry->server_selection.timeouts, mempool, tcp, NULL);
+		*transport = choose_transport(choices, choices_len, resolvable, resolvable_len, qry->server_selection.timeouts, mempool, tcp, NULL);
 	} else {
 		*transport = NULL;
+		// Last selected server had broken DNSSEC and now we have no more servers to ask
+		// we signal this to the rest of resolver by setting DNSSEC_BOGUS flag
 		if (local_state->last_error == KR_SELECTION_DNSSEC_ERROR) {
 			qry->flags.DNSSEC_BOGUS = true;
 		}
 	}
+
+	// Take a note if we tried resolving this name, so we don't try it again
+	update_name_state(*transport, local_state->names);
 
 	bool nxnsattack_mitigation = false;
 	enum kr_transport_protocol proto = *transport ? (*transport)->protocol : -1;
@@ -274,8 +292,6 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 			nxnsattack_mitigation = true;
 		}
 	}
-
-	update_name_state(*transport, local_state->names);
 
 	WITH_VERBOSE(qry) {
 		KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);

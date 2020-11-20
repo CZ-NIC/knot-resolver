@@ -5,13 +5,13 @@
 #include "lib/selection_forward.h"
 #include "lib/resolve.h"
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "nsrep",  __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "slct",  __VA_ARGS__)
 
 struct forward_local_state {
 	union inaddr *targets;
 	size_t target_num;
 	struct address_state *addr_states;
-	size_t last_choice_index;
+	size_t last_choice_index; /**< Index of last choice in the targets array, used for error reporting. */
 };
 
 void forward_local_state_alloc(struct knot_mm *mm, void **local_state, struct kr_request *req) {
