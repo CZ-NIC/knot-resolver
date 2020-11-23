@@ -458,25 +458,6 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 		VERBOSE_MSG("<= loaded %d glue addresses\n", glue_cnt);
 	}
 
-	/* FIXME: Dirty trick, messes up with cache, probably. */
-	if (qry->flags.NONAUTH) {
-		/* This a NS name resolution, in order to be parent-centric, we accept glue
-		   we get along the way as our final answer, if it matches our original query.
-		   This is done by rebuilding the answer packet from scratch. */
-		const knot_pktsection_t *additional = knot_pkt_section(pkt, KNOT_ADDITIONAL);
-		for (unsigned i = 0; i < additional->count; ++i) {
-			const knot_rrset_t *rr = knot_pkt_rr(additional, i);
-			if (!knot_dname_cmp(rr->owner, qry->sname) && rr->type == qry->stype) {
-				knot_rrset_t *tmp = knot_rrset_copy(rr, &pkt->mm);
-				knot_pkt_clear(pkt);
-				knot_pkt_put_question(pkt, qry->sname, qry->sclass, qry->stype);
-				knot_pkt_begin(pkt, KNOT_ANSWER);
-				knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, tmp, KNOT_PF_FREE);
-				result = KR_STATE_CONSUME;
-			}
-		}
-	}
-
 
 	if ((qry->flags.DNSSEC_WANT) && (result == KR_STATE_CONSUME)) {
 		if (knot_wire_get_aa(pkt->wire) == 0 &&
