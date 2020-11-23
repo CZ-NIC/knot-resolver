@@ -27,8 +27,8 @@ config_tests += [
 ]
 
 integr_tests += [
-  ['rebinding', join_paths(meson.current_source_dir(), 'rebinding', 'test.integr')],
-  ['serve_stale', join_paths(meson.current_source_dir(), 'serve_stale', 'test.integr')],
+  ['rebinding', meson.current_source_dir() / 'rebinding' / 'test.integr'],
+  ['serve_stale', meson.current_source_dir() / 'serve_stale' / 'test.integr'],
   # NOTE: ta_update may pass in cases when it should fail due to race conditions
   # To ensure reliability, deckard should introduce a time wait
 ]

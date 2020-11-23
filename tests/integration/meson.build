@@ -41,7 +41,7 @@ test(
 
 deckard_run = find_program('deckard/run.sh')
 foreach integr_test : integr_tests
-  deckard_config_path = join_paths(integr_test[1], 'deckard.yaml')
+  deckard_config_path = integr_test[1] / 'deckard.yaml'
   test(
     'integration.' + integr_test[0],
     deckard_run,
