@@ -40,22 +40,6 @@ enum kr_selection_error {
 	KR_SELECTION_NUMBER_OF_ERRORS /**< Leave this last, as it is used as array size. */
 };
 
-static const bool UNRECOVERABLE_ERRORS[] = {
-	[KR_SELECTION_TIMEOUT] = false,
-	[KR_SELECTION_TLS_HANDSHAKE_FAILED] = false,
-	[KR_SELECTION_TCP_CONNECT_FAILED] = false,
-	[KR_SELECTION_TCP_CONNECT_TIMEOUT] = false,
-	[KR_SELECTION_REFUSED] = true,
-	[KR_SELECTION_SERVFAIL] = true,
-	[KR_SELECTION_FORMERROR] = false,
-	[KR_SELECTION_NOTIMPL] = true,
-	[KR_SELECTION_OTHER_RCODE] = true,
-	[KR_SELECTION_TRUNCATED] = false,
-	[KR_SELECTION_DNSSEC_ERROR] = true,
-	[KR_SELECTION_LAME_DELEGATION] = true,
-	[KR_SELECTION_BAD_CNAME] = true,
-};
-
 enum kr_transport_protocol {
 	KR_TRANSPORT_RESOLVE_A, /**< Selected name with no IPv4 address, it has to be resolved first.*/
 	KR_TRANSPORT_RESOLVE_AAAA, /**< Selected name with no IPv6 address, it has to be resolved first.*/
@@ -110,7 +94,7 @@ struct kr_server_selection
 };
 
 /**
- * Initialize the server selection API for @p qry.
+ * @brief Initialize the server selection API for @p qry.
  *
  * The implementation is to be chosen based on qry->flags.
  */
@@ -119,7 +103,7 @@ void kr_server_selection_init(struct kr_query *qry);
 
 
 /**
- * Add forwarding target to request.
+ * @brief Add forwarding target to request.
  *
  * This is exposed to Lua in order to add forwarding targets to request.
  * These are then shared by all the queries in said request.
@@ -137,7 +121,7 @@ struct rtt_state {
 };
 
 /**
- * To be held per IP address and locally "inside" query.
+ * @brief To be held per IP address and locally "inside" query.
  */
 struct address_state {
 	unsigned int generation;
@@ -154,7 +138,7 @@ struct address_state {
 };
 
 /**
- * Array of these is one of inputs for the actual selection algorithm (`choose_transport`)
+ * @brief Array of these is one of inputs for the actual selection algorithm (`choose_transport`)
  */
 struct choice {
 	uint8_t *address;
@@ -164,8 +148,7 @@ struct choice {
 };
 
 /**
- * Array of these is description of names to be resolved (i.e. name without some address)
- *
+ * @brief Array of these is description of names to be resolved (i.e. name without some address)
  */
 struct to_resolve
 {
@@ -194,19 +177,19 @@ struct kr_transport *choose_transport(struct choice choices[], int choices_len,
                                       size_t *out_forward_index);
 
 /**
- * @brief Common part of RTT feedback mechanism. Notes RTT to global cache.
+ * Common part of RTT feedback mechanism. Notes RTT to global cache.
  */
 void update_rtt(struct kr_query *qry, struct address_state *addr_state,
                 const struct kr_transport *transport, unsigned rtt);
 
 /**
- * @brief Common part of error feedback mechanism.
+ * Common part of error feedback mechanism.
  */
 void error(struct kr_query *qry, struct address_state *addr_state,
            const struct kr_transport *transport, enum kr_selection_error sel_error);
 
 /**
- * @brief Get RTT state from cache. Returns `default_rtt_state` on unknown addresses.
+ * Get RTT state from cache. Returns `default_rtt_state` on unknown addresses.
  */
 struct rtt_state get_rtt_state(const uint8_t *ip, size_t len, struct kr_cache *cache);
 
@@ -222,12 +205,25 @@ void bytes_to_ip(uint8_t *bytes, size_t len, union inaddr *dst);
  */
 uint8_t* ip_to_bytes(const union inaddr *src, size_t len);
 
-
-
+/**
+ * Check if IP address is TLS capable.
+ * 
+ * @p req has to have the selection_context properly initiazed.
+ */
 void check_tls_capable(struct address_state *address_state, struct kr_request *req,
                        struct sockaddr *address);
+
+/**
+ * Check if there is a existing TCP connection to this address.
+ * 
+ * @p req has to have the selection_context properly initiazed.
+ */
 void check_tcp_connections(struct address_state *address_state, struct kr_request *req,
                            struct sockaddr *address);
+
+/**
+ * Check whether the IP version of this address is enabled.
+ */
 void check_network_settings(struct address_state *address_state, size_t address_len,
                             bool no_ipv4, bool no_ipv6);
 

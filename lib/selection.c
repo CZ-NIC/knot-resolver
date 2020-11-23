@@ -14,7 +14,7 @@
 
 #include "lib/utils.h"
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "nsrep",  __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "slct",  __VA_ARGS__)
 
 /** @internal Macro to set address structure. */
 #define ADDR_SET(sa, family, addr, len, port) do {\
@@ -22,6 +22,11 @@
 		sa ## _family = (family); \
 	sa ## _port = htons(port); \
 } while (0)
+
+#define DEFAULT_TIMEOUT 800
+#define MAX_TIMEOUT 10000
+#define MAX_BACKOFF 5
+#define MINIMAL_TIMEOUT_ADDITION 20
 
 /* Simple cache interface follows */
 
@@ -36,11 +41,7 @@ void *prefix_key(const uint8_t *ip, size_t len) {
 
 #undef PREFIX
 
-#define DEFAULT_TIMEOUT 800
-#define MAX_TIMEOUT 10000
-#define MAX_BACKOFF 5
-
-const struct rtt_state default_rtt_state = {0, DEFAULT_TIMEOUT/4, 0};
+static const struct rtt_state default_rtt_state = {0, DEFAULT_TIMEOUT/4, 0};
 
 struct rtt_state get_rtt_state(const uint8_t *ip, size_t len, struct kr_cache *cache) {
 	struct rtt_state state;
@@ -77,8 +78,6 @@ int put_rtt_state(const uint8_t *ip, size_t len, struct rtt_state state, struct 
 	return ret;
 }
 
-/* IP helper functions */
-
 void bytes_to_ip(uint8_t *bytes, size_t len, union inaddr *dst) {
 	switch(len) {
 	case sizeof(struct in_addr):
@@ -92,7 +91,7 @@ void bytes_to_ip(uint8_t *bytes, size_t len, union inaddr *dst) {
 	}
 }
 
-uint8_t* ip_to_bytes(const union inaddr *src, size_t len) {
+uint8_t *ip_to_bytes(const union inaddr *src, size_t len) {
 	switch(len) {
 	case sizeof(struct in_addr):
 		return (uint8_t *)&src->ip4.sin_addr;
@@ -106,8 +105,6 @@ uint8_t* ip_to_bytes(const union inaddr *src, size_t len) {
 bool no_rtt_info(struct rtt_state s) {
 	return s.srtt == 0 && s.consecutive_timeouts == 0;
 }
-
-#define MINIMAL_TIMEOUT_ADDITION 20
 
 unsigned back_off_timeout(uint32_t to, int pow) {
 	if (pow > MAX_BACKOFF) {
@@ -152,7 +149,7 @@ void check_tcp_connections(struct address_state *address_state, struct kr_reques
 
 void check_network_settings(struct address_state *address_state, size_t address_len, bool no_ipv4, bool no_ipv6) {
 	if (no_ipv4 && address_len == sizeof(struct in_addr)) {
-				address_state->generation = -1; // Invalidate due to IPv4 being disabled in flags
+		address_state->generation = -1; // Invalidate due to IPv4 being disabled in flags
 	}
 	if (no_ipv6 && address_len == sizeof(struct in6_addr)) {
 		address_state->generation = -1; // Invalidate due to IPv6 being disabled in flags
@@ -164,32 +161,33 @@ int cmp_choices(const void *a, const void *b) {
 	struct choice *b_ = (struct choice *) b;
 
 	int diff;
+	// Address with no rtt information is better than address with some information 
 	if ((diff = no_rtt_info(b_->address_state->rtt_state) - no_rtt_info(a_->address_state->rtt_state))) {
 		return diff;
 	}
+	// Address with less errors is better
 	if ((diff = a_->address_state->error_count - b_->address_state->error_count)) {
 		return diff;
 	}
+	// Address with smaller expected timeout is better
 	if ((diff = calc_timeout(a_->address_state->rtt_state) - calc_timeout(b_->address_state->rtt_state))) {
 		return diff;
 	}
 	return 0;
 }
 
+// Fisher-Yates shuffle of the choices
 void shuffle_choices(struct choice choices[], int choices_len) {
-	struct choice tmp;
 	for (int i = choices_len - 1; i > 0; i--) {
 		int j = kr_rand_bytes(1) % (i+1);
-		tmp = choices[i];
-		choices[i] = choices[j];
-		choices[j] = tmp;
+		SWAP(choices+i, choices+j);
 	}
 }
 
 // Performs the actual selection (currently epsilon-greedy with epsilon = 0.05).
 struct kr_transport *choose_transport(struct choice choices[],
                                       int choices_len,
-                                      struct to_resolve *unresolved,
+                                      struct to_resolve unresolved[],
                                       int unresolved_len,
                                       int timeouts,
                                       struct knot_mm *mempool,
@@ -200,14 +198,12 @@ struct kr_transport *choose_transport(struct choice choices[],
 		return NULL;
 	}
 
-	printf("choices %d, to_resolve %d\n", choices_len, unresolved_len);
-
 	struct kr_transport *transport = mm_alloc(mempool, sizeof(struct kr_transport));
 	memset(transport, 0, sizeof(struct kr_transport));
+	
 	int choice = 0;
-
 	if (kr_rand_coin(1, 20) || choices_len == 0) {
-		// EXPLORE
+		// "EXPLORE": randomly choose some option (including resolution of some new name)
 		int index = kr_rand_bytes(1) % (choices_len + unresolved_len);
 		if (index < unresolved_len) {
 			// We will resolve a new NS name
@@ -220,8 +216,9 @@ struct kr_transport *choose_transport(struct choice choices[],
 			choice = index - unresolved_len;
 		}
 	} else {
-		// EXPLOIT
+		// "EXPLOIT": choose a resolved address which is seems the best right now
 		shuffle_choices(choices, choices_len);
+		// If there are some addresses with no rtt_info we try them first (see cmp_choices)
 		qsort(choices, choices_len, sizeof(struct choice), cmp_choices);
 		choice = 0;
 	}
@@ -334,7 +331,7 @@ void cache_timeout(const struct kr_transport *transport, struct address_state *a
 	struct rtt_state old_state = addr_state->rtt_state;
 	struct rtt_state cur_state = get_rtt_state(address, transport->address_len, cache);
 
-	// We can lose some update from other process here, but at least timeout count can't blow up
+	// We could lose some update from some other process by doing this, but at least timeout count can't blow up
 	if (cur_state.consecutive_timeouts == old_state.consecutive_timeouts) {
 		cur_state.consecutive_timeouts++;
 		put_rtt_state(address, transport->address_len, cur_state, cache);
@@ -353,8 +350,8 @@ void error(struct kr_query *qry, struct address_state *addr_state, const struct 
 
 	if (sel_error == KR_SELECTION_TIMEOUT) {
 		qry->server_selection.timeouts++;
+		// Make sure the query was chosen by this query
 		if (!transport->deduplicated) {
-			// Make sure the query was chosen by this query
 			cache_timeout(transport, addr_state, &qry->request->ctx->cache);
 		}
 	}
@@ -385,8 +382,6 @@ void error(struct kr_query *qry, struct address_state *addr_state, const struct 
 			qry->id, ns_name, ns_str ? ns_str : "", zonecut_str, sel_error);
 	}
 }
-
-
 
 void kr_server_selection_init(struct kr_query *qry) {
 	struct knot_mm *mempool = &qry->request->pool;
