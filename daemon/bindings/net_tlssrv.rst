@@ -76,7 +76,10 @@ by a trusted CA. This is done using function :c:func:`net.tls()`.
 
 .. function:: net.tls([cert_path], [key_path])
 
-   Get/set path to a server TLS certificate and private key for DoT and DoH.
+   When called with path arguments, the function loads the server TLS
+   certificate and private key for DoT and DoH.
+
+   When called without arguments, the command returns the currently configured paths.
 
    Example output:
 
@@ -85,6 +88,11 @@ by a trusted CA. This is done using function :c:func:`net.tls()`.
       > net.tls("/etc/knot-resolver/server-cert.pem", "/etc/knot-resolver/server-key.pem")
       > net.tls()  -- print configured paths
       ("/etc/knot-resolver/server-cert.pem", "/etc/knot-resolver/server-key.pem")
+
+   .. tip:: The certificate files aren't automatically reloaded on change. If
+      you update the certificate files, e.g. using ACME, you have to either
+      restart the service(s) or call this function again using
+      :ref:`control-sockets`.
 
 .. function:: net.tls_sticket_secret([string with pre-shared secret])
 
