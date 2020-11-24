@@ -22,8 +22,8 @@ Control sockets
 ---------------
 Control socket acts like "an interactive configuration file" so all actions
 available in configuration file can be executed interactively using the control
-socket. One possible use-case is reconfiguring Resolver instances from another
-program, e.g. a maintenance script.
+socket. One possible use-case is reconfiguring the resolver instances from
+another program, e.g. a maintenance script.
 
 .. note:: Each instance of Knot Resolver exposes its own control socket. Take
    that into account when scripting deployments with
@@ -32,12 +32,10 @@ program, e.g. a maintenance script.
 When Knot Resolver is started using Systemd (see section
 :ref:`quickstart-startup`) it creates a control socket in path
 ``/run/knot-resolver/control/$ID``. Connection to the socket can
-be made from command line using e.g. ``netcat`` or ``socat``:
+be made from command line using e.g. ``socat``:
 
 .. code-block:: bash
 
-   $ nc -U /run/knot-resolver/control/1
-   or
    $ socat - UNIX-CONNECT:/run/knot-resolver/control/1
 
 When successfully connected to a socket, the command line should change to
@@ -60,6 +58,78 @@ outputs.
 Control sockets are also a way to enumerate and test running instances, the
 list of sockets corresponds to the list of processes, and you can test the
 process for liveliness by connecting to the UNIX socket.
+
+.. function:: map(lua_snippet)
+
+   Executes the provided string as lua code on every running resolver instance
+   and returns the results as a table.
+
+   Key ``n`` is always present in the returned table and specifies the total
+   number of instances the command was executed on. The table also contains
+   results from each instance accessible through keys ``1`` to ``n``
+   (inclusive). If any instance returns ``nil``, it is not explicitly part of
+   the table, but you can detect it by iterating through ``1`` to ``n``.
+
+   .. code-block:: lua
+
+      > map('worker.id')  -- return an ID of every active instance
+      {
+          '2',
+          '1',
+          ['n'] = 2,
+      }
+      > map('worker.id == "1" or nil')  -- example of `nil` return value
+      {
+          [2] = true,
+          ['n'] = 2,
+      }
+
+   The order of instances isn't guaranteed or stable. When you need to identify
+   the instances, you may use ``kluautil.kr_table_pack()`` function to return multiple
+   values as a table. It uses similar semantics with ``n`` as described above
+   to allow ``nil`` values.
+
+   .. code-block:: lua
+
+      > map('require("kluautil").kr_table_pack(worker.id, stats.get("answer.total"))')
+      {
+          {
+              '2',
+              42,
+              ['n'] = 2,
+          },
+          {
+              '1',
+              69,
+              ['n'] = 2,
+          },
+          ['n'] = 2,
+      }
+
+   If the command fails on any instance, an error is returned and the execution
+   is in an undefined state (the command might not have been executed on all
+   instances). When using the ``map()`` function to execute any code that might
+   fail, your code should be wrapped in `pcall()
+   <https://www.lua.org/manual/5.1/manual.html#pdf-pcall>`_ to avoid this
+   issue.
+
+   .. code-block:: lua
+
+      > map('require("kluautil").kr_table_pack(pcall(net.tls, "cert.pem", "key.pem"))')
+      {
+          {
+              true,  -- function suceeded
+              true,  -- function return value(s)
+              ['n'] = 2,
+          },
+          {
+              false,  -- function failed
+              'error occured...',  -- the returned error message
+              ['n'] = 2,
+          },
+          ['n'] = 2,
+      }
+
 
 Lua scripts
 -----------
