@@ -405,6 +405,7 @@ static void drop_capabilities(void)
 
 int main(int argc, char **argv)
 {
+	exit(1);
 	if (setvbuf(stdout, NULL, _IONBF, 0) || setvbuf(stderr, NULL, _IONBF, 0)) {
 		kr_log_error("[system] failed to to set output buffering (ignored): %s\n",
 				strerror(errno));
