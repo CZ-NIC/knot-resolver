@@ -16,6 +16,10 @@ DoT and DoH (encrypted DNS)
 DoT and DoH encrypt DNS traffic with Transport Layer Security (TLS) protocol
 and thus protects DNS traffic from certain types of attacks.
 
+You can learn more about DoT and DoH and their implementation in Knot Resolver
+in `this article
+<https://en.blog.nic.cz/2020/11/25/encrypted-dns-in-knot-resolver-dot-and-doh/>`_.
+
 .. _dns-over-tls:
 
 DNS-over-TLS (DoT)
@@ -36,7 +40,7 @@ DNS-over-HTTPS (DoH)
    and has fewer dependencies. Make sure to use ``doh2`` kind in
    :func:`net.listen()` to select this implementation.
 
-.. warning:: Independent information about political controversies around the
+.. tip:: Independent information about political controversies around the
    DoH deployment by default can be found in blog posts `DNS Privacy at IETF
    104 <http://www.potaroo.net/ispcol/2019-04/angst.html>`_ and `More DOH
    <http://www.potaroo.net/ispcol/2019-04/moredoh.html>`_ by Geoff Huston and
