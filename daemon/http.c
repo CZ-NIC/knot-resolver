@@ -226,7 +226,7 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 			return NGHTTP2_ERR_CALLBACK_FAILURE;
 		}
 
-		if (!strcasecmp(":path", (const char *)name) && ctx->current_method == HTTP_METHOD_GET) {
+		if (!strcasecmp(":path", (const char *)name)) {
 			ctx->uri_path = malloc(sizeof(*ctx->uri_path) * (valuelen + 1));
 			if (!ctx->uri_path)
 				return kr_error(ENOMEM);
