@@ -104,11 +104,9 @@ build:darwin:
   <<: *nodep
   stage: build
   when: delayed
-  start_in: 20 minutes  # give the build in Travis CI time to finish
-    # ^^ Travis takes around 20m recently and the CI script waits for 15m,
-    #    and it gets ran a bit later due to the previous phase(s).
+  start_in: 1 minutes  # allow some time for mirrorring, job creation
   script:
-    - ci/travis.py ${CI_COMMIT_REF_NAME}
+    - ci/gh_actions.py ${CI_COMMIT_REF_NAME} ${CI_COMMIT_SHA}
 
 docker:
   <<: *nodep
