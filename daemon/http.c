@@ -209,9 +209,6 @@ static int begin_headers_callback(nghttp2_session *h2, const nghttp2_frame *fram
  *
  * In DoH, GET requests contain the base64url-encoded query in dns variable present in path.
  * This variable is parsed from :path pseudoheader.
- *
- * Since we don't need any headers for POST request, avoid processing them entirely to
- * avoid potential issues if dns variable would be present in path.
  */
 static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 			   const uint8_t *name, size_t namelen, const uint8_t *value,
@@ -221,33 +218,31 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 	int32_t stream_id = frame->hd.stream_id;
 
 
-	switch (frame->hd.type) {
-		case NGHTTP2_HEADERS:
-			if (ctx->incomplete_stream != stream_id) {
-				kr_log_verbose(
-					"[http] stream %d incomplete, refusing\n", ctx->incomplete_stream);
-				refuse_stream(h2, stream_id);
-				break;
-			}
+	if (frame->hd.type == NGHTTP2_HEADERS) {
+		if (ctx->incomplete_stream != stream_id) {
+			kr_log_verbose(
+				"[http] stream %d incomplete, refusing\n", ctx->incomplete_stream);
+			refuse_stream(h2, stream_id);
+			return 0;
+		}
 
-			if (!strcasecmp(":path", (const char *)name) && ctx->current_method == HTTP_METHOD_GET) {
-				ctx->uri_path = malloc(sizeof(ctx->uri_path) * valuelen+1);
-				if (!ctx->uri_path)
-					return kr_error(ENOMEM);
-				memcpy(ctx->uri_path, value, valuelen);
-				ctx->uri_path[valuelen] = '\0';
-			}
+		if (!strcasecmp(":path", (const char *)name) && ctx->current_method == HTTP_METHOD_GET) {
+			ctx->uri_path = malloc(sizeof(*ctx->uri_path) * (valuelen + 1));
+			if (!ctx->uri_path)
+				return kr_error(ENOMEM);
+			memcpy(ctx->uri_path, value, valuelen);
+			ctx->uri_path[valuelen] = '\0';
+		}
 
-			if (!strcasecmp(":method", (const char *)name)) {
-				if (!strcasecmp("get", (const char *)value)) {
-					ctx->current_method = HTTP_METHOD_GET;
-				} else if (!strcasecmp("post", (const char *)value)) {
-					ctx->current_method = HTTP_METHOD_POST;
-				} else {
-					ctx->current_method = HTTP_METHOD_NONE;
-				}
+		if (!strcasecmp(":method", (const char *)name)) {
+			if (!strcasecmp("get", (const char *)value)) {
+				ctx->current_method = HTTP_METHOD_GET;
+			} else if (!strcasecmp("post", (const char *)value)) {
+				ctx->current_method = HTTP_METHOD_POST;
+			} else {
+				ctx->current_method = HTTP_METHOD_NONE;
 			}
-			break;
+		}
 	}
 
 	return 0;
@@ -267,6 +262,7 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	ssize_t remaining;
 	ssize_t required;
+	bool is_first = queue_len(ctx->streams) == 0 || queue_tail(ctx->streams) != ctx->incomplete_stream;
 
 	if (ctx->incomplete_stream != stream_id) {
 		kr_log_verbose(
@@ -280,7 +276,7 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	remaining = ctx->buf_size - ctx->submitted - ctx->buf_pos;
 	required = len;
 	/* First data chunk of the new stream */
-	if (queue_len(ctx->streams) == 0 || queue_tail(ctx->streams) != ctx->incomplete_stream)
+	if (is_first)
 		required += sizeof(uint16_t);
 
 	if (required > remaining) {
@@ -289,7 +285,7 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 	}
 
-	if (queue_len(ctx->streams) == 0 || queue_tail(ctx->streams) != ctx->incomplete_stream) {
+	if (is_first) {
 		ctx->buf_pos = sizeof(uint16_t);  /* Reserve 2B for dnsmsg len. */
 		queue_push(ctx->streams, stream_id);
 	}
@@ -315,10 +311,8 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 	assert(stream_id != -1);
 
 	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) && ctx->incomplete_stream == stream_id) {
-		if (frame->hd.type == NGHTTP2_HEADERS) {
+		if (ctx->current_method == HTTP_METHOD_GET) {
 			if (process_uri_path(ctx, ctx->uri_path, stream_id) < 0) {
-				free(ctx->uri_path);
-				ctx->uri_path = NULL;
 				refuse_stream(h2, stream_id);
 			}
 			free(ctx->uri_path);
@@ -497,7 +491,7 @@ static int http_send_response(nghttp2_session *h2, int32_t stream_id,
 	char max_age[max_age_len];
 	int size_len;
 
-	memset( max_age, 0, max_age_len*sizeof(char) );
+	memset(max_age, 0, max_age_len * sizeof(*max_age));
 	size_len = snprintf(size, MAX_DECIMAL_LENGTH(data->len), "%zu", data->len);
 	max_age_len = snprintf(max_age, max_age_len, "%s%u", directive_max_age, data->ttl);
 
