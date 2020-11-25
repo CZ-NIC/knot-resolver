@@ -30,7 +30,7 @@ if build_dnstap
       protoc_c,
       '--c_out=' + meson.current_build_dir(),
       '--proto_path', meson.current_source_dir(),
-      join_paths([meson.current_source_dir(), 'dnstap.proto']),
+      meson.current_source_dir() / 'dnstap.proto',
     ],
     output: [
       'dnstap.pb-c.h',

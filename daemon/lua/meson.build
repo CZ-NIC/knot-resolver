@@ -9,7 +9,7 @@ config_tests += [
 ]
 
 integr_tests += [
-  ['map', join_paths(meson.current_source_dir(), 'map.test.integr')],
+  ['map', meson.current_source_dir() / 'map.test.integr'],
 ]
 
 lua_config = configuration_data()

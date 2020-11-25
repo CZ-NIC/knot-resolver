@@ -52,14 +52,14 @@ if get_option('doc') == 'enabled'
 
   # install html docs
   install_subdir(
-    join_paths(meson.current_source_dir(), 'html'),
+    meson.current_source_dir() / 'html',
     install_dir: doc_dir,
   )
 
   if makeinfo.found()
     # install info docs
     install_subdir(
-      join_paths(meson.current_source_dir(), 'texinfo', '.install'),
+      meson.current_source_dir() / 'texinfo' / '.install',
       strip_directory: true,
       install_dir: info_dir,
     )

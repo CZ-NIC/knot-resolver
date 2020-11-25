@@ -16,5 +16,5 @@ bogus_log_mod = shared_module(
 )
 
 integr_tests += [
-  ['bogus_log', join_paths(meson.current_source_dir(), 'test.integr')],
+  ['bogus_log', meson.current_source_dir() / 'test.integr'],
 ]
