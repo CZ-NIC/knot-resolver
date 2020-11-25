@@ -1,0 +1,55 @@
+name: macOS
+
+on: push
+
+jobs:
+  build-test:
+    name: Build, run unit tests and basic sanity check for macOS
+    runs-on: macOS-latest
+
+    steps:
+      - name: Checkout resolver code
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - name: Install dependecies from brew
+        run:
+          brew install cmocka luajit libuv lmdb meson nghttp2 automake libtool
+
+      - name: Install libknot from sources
+        run: |
+          git clone -b ${KNOT_DNS_VERSION} https://gitlab.nic.cz/knot/knot-dns.git
+          cd knot-dns
+          autoreconf -fi
+          ./configure --disable-static --disable-fastparser --disable-documentation --disable-daemon --disable-utilities --with-lmdb=no
+          make -j2 install
+          cd ..
+        env:
+          MALLOC_CHECK_: 3
+          MALLOC_PERTURB_: 223
+          KNOT_DNS_VERSION: '3.0'
+
+      - name: Build resolver
+        env:
+          MALLOC_CHECK_: 3
+          MALLOC_PERTURB_: 223
+        run: |
+          meson build_darwin --default-library=static --buildtype=debugoptimized --prefix=${HOME}/.local/usr -Dc_args='-fno-omit-frame-pointer'
+          ninja -C build_darwin -v install
+          meson test -C build_darwin --suite unit
+          ${HOME}/.local/usr/sbin/kresd -h
+          ${HOME}/.local/usr/sbin/kresd -V
+          echo "quit()" | ${HOME}/.local/usr/sbin/kresd -a 127.0.0.1@53535 .
+
+
+#        - KNOT_DNS_VERSION=3.0
+#        - MALLOC_CHECK_=3
+#        - MALLOC_PERTURB_=223
+#before_script:
+#    - git clone -b ${KNOT_DNS_VERSION} https://gitlab.nic.cz/knot/knot-dns.git
+#    - cd knot-dns
+#    - autoreconf -fi
+#    - ./configure --disable-static --disable-fastparser --disable-documentation --disable-daemon --disable-utilities --with-lmdb=no
+#    - make -j2 install
+#    - cd ..
