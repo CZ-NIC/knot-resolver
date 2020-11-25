@@ -223,7 +223,7 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 			kr_log_verbose(
 				"[http] stream %d incomplete, refusing\n", ctx->incomplete_stream);
 			refuse_stream(h2, stream_id);
-			return 0;
+			return NGHTTP2_ERR_CALLBACK_FAILURE;
 		}
 
 		if (!strcasecmp(":path", (const char *)name) && ctx->current_method == HTTP_METHOD_GET) {
@@ -270,7 +270,7 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 			ctx->incomplete_stream);
 		refuse_stream(h2, stream_id);
 		ctx->incomplete_stream = -1;
-		return 0;
+		return NGHTTP2_ERR_CALLBACK_FAILURE;
 	}
 
 	remaining = ctx->buf_size - ctx->submitted - ctx->buf_pos;
