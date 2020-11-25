@@ -100,7 +100,7 @@ build-asan:
       # TODO skip_asan: all three of these disappear locally when using gcc 9.1 (except some leaks)
     - ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite unit --suite config --no-suite skip_asan --no-suite snowflake
 
-build:darwin:
+build:macOS:
   <<: *nodep
   stage: build
   when: delayed

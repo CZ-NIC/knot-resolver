@@ -27,7 +27,6 @@ while time.time() < end_time:
         pass  # not created yet?
     elif response.status_code == 200:
         data = json.loads(response.content.decode('utf-8'))
-        state = data['workflow_runs']['state']
         try:
             run = data['workflow_runs'][0]
             conclusion = run['conclusion']
