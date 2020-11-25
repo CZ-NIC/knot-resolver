@@ -849,11 +849,13 @@ static void xdp_warn_mode(const char *ifname)
 	assert(ifname);
 	const unsigned if_index = if_nametoindex(ifname);
 	if (!if_index) {
-		kr_log_info("[xdp] warning: interface %s, unexpected error: %s\n",
+		kr_log_info("[xdp] warning: interface %s, unexpected error when converting its name: %s\n",
 				ifname, strerror(errno));
 		return;
 	}
-	switch (knot_eth_xdp_mode(if_index)) {
+
+	const knot_xdp_mode_t mode = knot_eth_xdp_mode(if_index);
+	switch (mode) {
 	case KNOT_XDP_MODE_FULL:
 		return;
 	case KNOT_XDP_MODE_EMUL:
@@ -863,8 +865,8 @@ static void xdp_warn_mode(const char *ifname)
 	case KNOT_XDP_MODE_NONE: // enum warnings from compiler
 		break;
 	}
-	kr_log_info("[xdp] warning: interface %s running in unexpected XDP mode\n",
-			ifname);
+	kr_log_info("[xdp] warning: interface %s running in unexpected XDP mode %d\n",
+			ifname, (int)mode);
 }
 int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 {
