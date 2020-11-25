@@ -16,6 +16,10 @@ DoT and DoH (encrypted DNS)
 DoT and DoH encrypt DNS traffic with Transport Layer Security (TLS) protocol
 and thus protects DNS traffic from certain types of attacks.
 
+You can learn more about DoT and DoH and their implementation in Knot Resolver
+in `this article
+<https://en.blog.nic.cz/2020/11/25/encrypted-dns-in-knot-resolver-dot-and-doh/>`_.
+
 .. _dns-over-tls:
 
 DNS-over-TLS (DoT)
@@ -36,7 +40,7 @@ DNS-over-HTTPS (DoH)
    and has fewer dependencies. Make sure to use ``doh2`` kind in
    :func:`net.listen()` to select this implementation.
 
-.. warning:: Independent information about political controversies around the
+.. tip:: Independent information about political controversies around the
    DoH deployment by default can be found in blog posts `DNS Privacy at IETF
    104 <http://www.potaroo.net/ispcol/2019-04/angst.html>`_ and `More DOH
    <http://www.potaroo.net/ispcol/2019-04/moredoh.html>`_ by Geoff Huston and
@@ -76,7 +80,10 @@ by a trusted CA. This is done using function :c:func:`net.tls()`.
 
 .. function:: net.tls([cert_path], [key_path])
 
-   Get/set path to a server TLS certificate and private key for DoT and DoH.
+   When called with path arguments, the function loads the server TLS
+   certificate and private key for DoT and DoH.
+
+   When called without arguments, the command returns the currently configured paths.
 
    Example output:
 
@@ -85,6 +92,11 @@ by a trusted CA. This is done using function :c:func:`net.tls()`.
       > net.tls("/etc/knot-resolver/server-cert.pem", "/etc/knot-resolver/server-key.pem")
       > net.tls()  -- print configured paths
       ("/etc/knot-resolver/server-cert.pem", "/etc/knot-resolver/server-key.pem")
+
+   .. tip:: The certificate files aren't automatically reloaded on change. If
+      you update the certificate files, e.g. using ACME, you have to either
+      restart the service(s) or call this function again using
+      :ref:`control-sockets`.
 
 .. function:: net.tls_sticket_secret([string with pre-shared secret])
 
