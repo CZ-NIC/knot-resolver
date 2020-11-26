@@ -218,30 +218,31 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 	int32_t stream_id = frame->hd.stream_id;
 
 
-	if (frame->hd.type == NGHTTP2_HEADERS) {
-		if (ctx->incomplete_stream != stream_id) {
-			kr_log_verbose(
-				"[http] stream %d incomplete, refusing\n", ctx->incomplete_stream);
-			refuse_stream(h2, stream_id);
-			return NGHTTP2_ERR_CALLBACK_FAILURE;
-		}
+	if (frame->hd.type != NGHTTP2_HEADERS)
+		return 0;
 
-		if (!strcasecmp(":path", (const char *)name)) {
-			ctx->uri_path = malloc(sizeof(*ctx->uri_path) * (valuelen + 1));
-			if (!ctx->uri_path)
-				return kr_error(ENOMEM);
-			memcpy(ctx->uri_path, value, valuelen);
-			ctx->uri_path[valuelen] = '\0';
-		}
+	if (ctx->incomplete_stream != stream_id) {
+		kr_log_verbose(
+			"[http] stream %d incomplete, refusing\n", ctx->incomplete_stream);
+		refuse_stream(h2, stream_id);
+		return 0;
+	}
 
-		if (!strcasecmp(":method", (const char *)name)) {
-			if (!strcasecmp("get", (const char *)value)) {
-				ctx->current_method = HTTP_METHOD_GET;
-			} else if (!strcasecmp("post", (const char *)value)) {
-				ctx->current_method = HTTP_METHOD_POST;
-			} else {
-				ctx->current_method = HTTP_METHOD_NONE;
-			}
+	if (!strcasecmp(":path", (const char *)name)) {
+		ctx->uri_path = malloc(sizeof(*ctx->uri_path) * (valuelen + 1));
+		if (!ctx->uri_path)
+			return kr_error(ENOMEM);
+		memcpy(ctx->uri_path, value, valuelen);
+		ctx->uri_path[valuelen] = '\0';
+	}
+
+	if (!strcasecmp(":method", (const char *)name)) {
+		if (!strcasecmp("get", (const char *)value)) {
+			ctx->current_method = HTTP_METHOD_GET;
+		} else if (!strcasecmp("post", (const char *)value)) {
+			ctx->current_method = HTTP_METHOD_POST;
+		} else {
+			ctx->current_method = HTTP_METHOD_NONE;
 		}
 	}
 
@@ -270,7 +271,7 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 			ctx->incomplete_stream);
 		refuse_stream(h2, stream_id);
 		ctx->incomplete_stream = -1;
-		return NGHTTP2_ERR_CALLBACK_FAILURE;
+		return 0;
 	}
 
 	remaining = ctx->buf_size - ctx->submitted - ctx->buf_pos;
