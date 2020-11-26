@@ -238,9 +238,14 @@ int get_resolvable_names(struct iter_local_state *local_state, struct to_resolve
 		struct iter_name_state *name_state = *(struct iter_name_state **)trie_it_val(it);
 		if (name_state->generation == local_state->generation) {
 			knot_dname_t *name = (knot_dname_t *)trie_it_key(it, NULL);
-			// Here are the `iter_ns_badip` dragons:
-			bool a_in_rplan = kr_rplan_satisfies(qry, name, KNOT_CLASS_IN, KNOT_RRTYPE_A);
-			bool aaaa_in_rplan = kr_rplan_satisfies(qry, name, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
+			/* FIXME: kr_rplan_satisfies(qry,…) should have been here, but this leads to failures on 
+			 * iter_ns_badip.rpl, this is because the test requires the resolver to switch to parent
+			 * side after a record in cache expires. Only way to do this in the current zonecut setup is
+			 * to requery the same query twice in the row. So we have to allow that and only check the 
+			 * rplan from parent upwards.
+			 */
+			bool a_in_rplan = kr_rplan_satisfies(qry->parent, name, KNOT_CLASS_IN, KNOT_RRTYPE_A);
+			bool aaaa_in_rplan = kr_rplan_satisfies(qry->parent, name, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
 			if (name_state->a_state == RECORD_UNKNOWN && !qry->flags.NO_IPV4 && !a_in_rplan) {
 				resolvable[count++] = (struct to_resolve){name, KR_TRANSPORT_RESOLVE_A};
 			}
