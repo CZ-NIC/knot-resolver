@@ -26,6 +26,12 @@ typedef ssize_t(*http_send_callback)(const uint8_t *buffer,
 
 typedef queue_t(int32_t) queue_int32_t;
 
+typedef enum {
+	HTTP_METHOD_NONE = 0,
+	HTTP_METHOD_GET = 1,
+	HTTP_METHOD_POST = 2,
+} http_method_t;
+
 struct http_ctx {
 	struct nghttp2_session *h2;
 	http_send_callback send_cb;
@@ -33,6 +39,8 @@ struct http_ctx {
 	queue_int32_t streams;  /* IDs of streams present in the buffer. */
 	int32_t incomplete_stream;
 	ssize_t submitted;
+	http_method_t current_method;
+	char *uri_path;
 	uint8_t *buf;  /* Part of the wire_buf that belongs to current HTTP/2 stream. */
 	ssize_t buf_pos;
 	ssize_t buf_size;
