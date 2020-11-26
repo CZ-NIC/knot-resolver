@@ -24,13 +24,6 @@ typedef void (*map_free_f)(void *baton, void *ptr);
 typedef void (*trace_log_f) (const struct kr_request *, const char *);
 typedef void (*trace_callback_f)(struct kr_request *);
 typedef uint8_t * (*alloc_wire_f)(struct kr_request *req, uint16_t *maxlen);
-typedef enum {KNOT_ANSWER, KNOT_AUTHORITY, KNOT_ADDITIONAL} knot_section_t;
-typedef struct {
-	uint16_t pos;
-	uint16_t flags;
-	uint16_t compress_ptr[16];
-} knot_rrinfo_t;
-typedef unsigned char knot_dname_t;
 typedef bool (*addr_info_f)(struct sockaddr*);
 typedef void (*async_resolution_f)(knot_dname_t*, enum knot_rr_type);
 typedef struct {
@@ -202,6 +195,7 @@ struct kr_request {
 	trace_callback_f trace_finish;
 	int vars_ref;
 	knot_mm_t pool;
+	unsigned int uid;
 	struct {
 		addr_info_f is_tls_capable;
 		addr_info_f is_tcp_connected;
@@ -210,7 +204,6 @@ struct kr_request {
 		union inaddr *forwarding_targets;
 		size_t forward_targets_num;
 	} selection_context;
-	unsigned int uid;
 	unsigned int count_no_nsaddr;
 	unsigned int count_fail_row;
 	alloc_wire_f alloc_wire_cb;
