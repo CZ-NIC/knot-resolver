@@ -213,10 +213,12 @@ static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, bool in_bailiwic
 
 			if ((rr->type == KNOT_RRTYPE_A) &&
 			    (req->ctx->options.NO_IPV4)) {
+				QVERBOSE_MSG(qry, "<= skipping IPv4 glue due to network settings\n");
 				continue;
 			}
 			if ((rr->type == KNOT_RRTYPE_AAAA) &&
 			    (req->ctx->options.NO_IPV6)) {
+				QVERBOSE_MSG(qry, "<= skipping IPv6 glue due to network settings\n");
 				continue;
 			}
 			(void) update_nsaddr(rr, req->current_query, glue_cnt);
