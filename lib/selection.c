@@ -178,9 +178,12 @@ int cmp_choices(const void *a, const void *b) {
 
 // Fisher-Yates shuffle of the choices
 void shuffle_choices(struct choice choices[], int choices_len) {
+	struct choice tmp;
 	for (int i = choices_len - 1; i > 0; i--) {
 		int j = kr_rand_bytes(1) % (i+1);
-		SWAP(choices+i, choices+j);
+		tmp = choices[i];
+		choices[i] = choices[j];
+		choices[j] = tmp;
 	}
 }
 
