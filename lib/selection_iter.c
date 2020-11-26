@@ -143,7 +143,7 @@ void update_state_from_zonecut(struct iter_local_state *local_state, struct kr_z
 
 		trie_val_t *val = trie_get_ins(local_state->names, (char *)dname, knot_dname_size(dname));
 		if (!*val) {
-			// We encountered this address for the first time
+			// We encountered this name for the first time
 			*val = mm_alloc(mm, sizeof(struct iter_name_state));
 			memset(*val, 0, sizeof(struct iter_name_state));
 		}
