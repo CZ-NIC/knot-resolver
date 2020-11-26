@@ -263,7 +263,7 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 	update_address_states(local_state, qry);
 
 	struct choice choices[trie_weight(local_state->addresses)];
-	struct to_resolve resolvable[trie_weight(local_state->names)];
+	struct to_resolve resolvable[2*trie_weight(local_state->names)];
 
 	// Filter valid addresses and names from the tries
 	int choices_len = get_valid_addresses(local_state, choices);
