@@ -112,13 +112,14 @@ bool no_rtt_info(struct rtt_state s) {
 
 unsigned back_off_timeout(uint32_t to, int pow) {
 	if (pow > MAX_BACKOFF) {
-		return to *= 1 << MAX_BACKOFF;
+		to *= 1 << MAX_BACKOFF;
 	} else {
-		return to * (1 << pow);
+		to *= (1 << pow);
 	}
 	if (to > MAX_TIMEOUT) {
-		return MAX_TIMEOUT;
+		to = MAX_TIMEOUT;
 	}
+	return to;
 }
 
 // This is verbatim (minus the default timeout value and minimal variance) RFC2988, sec. 2
