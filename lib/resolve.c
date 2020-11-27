@@ -110,11 +110,8 @@ static int answer_finalize_yield(kr_layer_t *ctx) { return kr_ok(); }
 		if (mod->layer) { \
 			struct kr_layer layer = {.state = (r)->state, .api = mod->layer, .req = (r)}; \
 			if (layer.api && layer.api->func) { \
-				/*printf("%s %s\n", STRINGIFY(func), (mod->name));*/ \
 				(r)->state = layer.api->func(&layer, ##__VA_ARGS__); \
-				/*printf("%s %s %x\n", STRINGIFY(func), (mod->name), (r->state));*/ \
 				if ((r)->state == KR_STATE_YIELD) { \
-					/*printf("%s_yield %s\n", STRINGIFY(func), (mod->name));*/ \
 					func ## _yield(&layer, ##__VA_ARGS__); \
 					break; \
 				} \
