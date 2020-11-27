@@ -132,6 +132,71 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 }
 
 /*
+ * Provide data from buffer to HTTP/2 library.
+ *
+ * To avoid copying the packet wire buffer, we use NGHTTP2_DATA_FLAG_NO_COPY
+ * and take care of sending entire DATA frames ourselves with nghttp2_send_data_callback.
+ *
+ * See https://www.nghttp2.org/documentation/types.html#c.nghttp2_data_source_read_callback
+ */
+static ssize_t read_callback(nghttp2_session *h2, int32_t stream_id, uint8_t *buf,
+			     size_t length, uint32_t *data_flags,
+			     nghttp2_data_source *source, void *user_data)
+{
+	struct http_data *data;
+	size_t avail;
+	size_t send;
+
+	data = (struct http_data*)source->ptr;
+	avail = data->len - data->pos;
+	send = MIN(avail, length);
+
+	if (avail == send)
+		*data_flags |= NGHTTP2_DATA_FLAG_EOF;
+
+	*data_flags |= NGHTTP2_DATA_FLAG_NO_COPY;
+	return send;
+}
+
+static int send_err_status(nghttp2_session *h2, int32_t stream_id, int status, char *status_msg)
+{
+	int ret;
+	int status_len;
+	char status_str[MAX_DECIMAL_LENGTH(status)] = { 0 };
+	nghttp2_data_provider prov;
+
+	prov.source.ptr = NULL;
+	prov.read_callback = NULL;
+
+	status_len = snprintf(status_str, MAX_DECIMAL_LENGTH(status), "%u", status);
+	nghttp2_nv hdrs_err[] = {
+		MAKE_NV(":status", 7, status_str, status_len),
+	};
+
+	if (status_msg) {
+		struct http_data *data = malloc(sizeof(struct http_data));
+		if (!data)
+			return kr_error(ENOMEM);
+
+		data->buf = (uint8_t *)status_msg;
+		data->len = strlen(status_msg);
+		data->pos = 0;
+		data->on_write = NULL;
+		data->req = NULL;
+		data->ttl = 0;
+
+		prov.source.ptr = data;
+		prov.read_callback = read_callback;
+	}
+
+	ret = nghttp2_submit_response(h2, stream_id, hdrs_err, sizeof(hdrs_err)/sizeof(*hdrs_err), &prov);
+	if (ret != 0)
+		return kr_error(EIO);
+
+	return 0;
+}
+
+/*
  * Check endpoint and uri path
  */
 static int check_uri(const char* uri_path)
@@ -197,22 +262,23 @@ static int check_uri(const char* uri_path)
 	return 0;
 }
 
+
 /*
  * Process a query from URI path if there's base64url encoded dns variable.
  */
-static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stream_id)
+static int process_uri_path(nghttp2_session *h2, struct http_ctx *ctx, int32_t stream_id)
 {
-	if (!ctx || !path)
+	if (!ctx || !ctx->uri_path)
 		return kr_error(EINVAL);
 
 	static const char key[] = "dns=";
-	char *beg = strstr(path, key);
+	char *beg = strstr(ctx->uri_path, key);
 	char *end;
 	size_t remaining;
 	ssize_t ret;
 	uint8_t *dest;
 
-	if (!beg)  /* No dns variable in path. */
+	if (!beg)  /* No dns variable in ctx->uri_path. */
 		return 0;
 
 	beg += sizeof(key) - 1;
@@ -227,8 +293,12 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 	ret = kr_base64url_decode((uint8_t*)beg, end - beg, dest, remaining);
 	if (ret < 0) {
 		ctx->buf_pos = 0;
-		kr_log_verbose("[http] base64url decode failed %s\n",
-			       strerror(ret));
+		kr_log_verbose("[http] base64url decode failed %s\n", strerror(ret));
+		if (ret == KNOT_ERANGE) {
+			send_err_status(h2, stream_id, 414, NULL);
+		} else {
+			send_err_status(h2, stream_id, 400, NULL);
+		}
 		return ret;
 	}
 
@@ -317,6 +387,14 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 		}
 	}
 
+	if (!strcasecmp("content-type", (const char *)name)) {
+		ctx->content_type = malloc(sizeof(ctx->content_type) * valuelen+1);
+		if (!ctx->content_type)
+			return kr_error(ENOMEM);
+		memcpy(ctx->content_type, value, valuelen);
+		ctx->content_type[valuelen] = '\0';
+	}
+
 	return 0;
 }
 
@@ -382,10 +460,27 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 	int32_t stream_id = frame->hd.stream_id;
 	assert(stream_id != -1);
 
+	if (stream_id == 0)
+		return 0;
+
+	if (ctx->current_method == HTTP_METHOD_NONE) {
+		kr_log_verbose("[http] unsupported HTTP method\n");
+		send_err_status(h2, stream_id, 405, "only HTTP POST and GET are supported\n");
+		return 0;
+	}
+
+	if (ctx->content_type && strcasecmp("application/dns-message", (const char *)ctx->content_type)) {
+		kr_log_verbose("[http] unsupported content-type %s\n", ctx->content_type);
+		send_err_status(h2, stream_id, 415, "only Content-Type: application/dns-message is supported\n");
+		return 0;
+	}
+
 	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) && ctx->incomplete_stream == stream_id) {
 		if (ctx->current_method == HTTP_METHOD_GET) {
-			if (process_uri_path(ctx, ctx->uri_path, stream_id) < 0) {
-				refuse_stream(h2, stream_id);
+			if (process_uri_path(h2, ctx, stream_id) < 0) {
+				free(ctx->uri_path);
+				ctx->uri_path = NULL;
+				return 0;
 			}
 			free(ctx->uri_path);
 			ctx->uri_path = NULL;
@@ -397,6 +492,11 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 		if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
 			kr_log_verbose("[http] invalid dnsmsg size: %zd B\n", len);
 			return NGHTTP2_ERR_CALLBACK_FAILURE;
+		}
+
+		if (len < 12) {
+			send_err_status(h2, stream_id, 400, "input too short");
+			return 0;
 		}
 
 		knot_wire_write_u16(ctx->buf, len);
@@ -474,6 +574,7 @@ struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
 	ctx->submitted = 0;
 	ctx->current_method = HTTP_METHOD_NONE;
 	ctx->uri_path = NULL;
+	ctx->content_type = NULL;
 
 	nghttp2_session_server_new(&ctx->h2, callbacks, ctx);
 	nghttp2_submit_settings(ctx->h2, NGHTTP2_FLAG_NONE,
@@ -521,41 +622,15 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *buf,
 }
 
 /*
- * Provide data from buffer to HTTP/2 library.
- *
- * To avoid copying the packet wire buffer, we use NGHTTP2_DATA_FLAG_NO_COPY
- * and take care of sending entire DATA frames ourselves with nghttp2_send_data_callback.
- *
- * See https://www.nghttp2.org/documentation/types.html#c.nghttp2_data_source_read_callback
- */
-static ssize_t read_callback(nghttp2_session *h2, int32_t stream_id, uint8_t *buf,
-			     size_t length, uint32_t *data_flags,
-			     nghttp2_data_source *source, void *user_data)
-{
-	struct http_data *data;
-	size_t avail;
-	size_t send;
-
-	data = (struct http_data*)source->ptr;
-	avail = data->len - data->pos;
-	send = MIN(avail, length);
-
-	if (avail == send)
-		*data_flags |= NGHTTP2_DATA_FLAG_EOF;
-
-	*data_flags |= NGHTTP2_DATA_FLAG_NO_COPY;
-	return send;
-}
-
-/*
  * Send dns response provided by the HTTTP/2 data provider.
  *
  * Data isn't guaranteed to be sent immediately due to underlying HTTP/2 flow control.
  */
-static int http_send_response(nghttp2_session *h2, int32_t stream_id,
+static int http_send_response(struct http_ctx *ctx, int32_t stream_id,
 			      nghttp2_data_provider *prov)
 {
 	struct http_data *data = (struct http_data*)prov->source.ptr;
+	nghttp2_session *h2 = ctx->h2;
 	int ret;
 	const char *directive_max_age = "max-age=";
 	char size[MAX_DECIMAL_LENGTH(data->len)] = { 0 };
@@ -598,7 +673,7 @@ static int http_send_response(nghttp2_session *h2, int32_t stream_id,
 /*
  * Send HTTP/2 stream data created from packet's wire buffer.
  */
-static int http_write_pkt(nghttp2_session *h2, knot_pkt_t *pkt, int32_t stream_id,
+static int http_write_pkt(struct http_ctx *ctx, knot_pkt_t *pkt, int32_t stream_id,
 			  uv_write_t *req, uv_write_cb on_write)
 {
 	struct http_data *data;
@@ -619,7 +694,7 @@ static int http_write_pkt(nghttp2_session *h2, knot_pkt_t *pkt, int32_t stream_i
 	prov.source.ptr = data;
 	prov.read_callback = read_callback;
 
-	return http_send_response(h2, stream_id, &prov);
+	return http_send_response(ctx, stream_id, &prov);
 }
 
 /*
@@ -646,7 +721,7 @@ int http_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, int32_t st
 	if (!ctx || !ctx->h2)
 		return kr_error(EINVAL);
 
-	ret = http_write_pkt(ctx->h2, pkt, stream_id, req, on_write);
+	ret = http_write_pkt(ctx, pkt, stream_id, req, on_write);
 	if (ret < 0)
 		return ret;
 
