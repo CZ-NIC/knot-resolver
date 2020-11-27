@@ -41,9 +41,11 @@ struct http_ctx {
 	ssize_t submitted;
 	http_method_t current_method;
 	char *uri_path;
+	char *content_type;
 	uint8_t *buf;  /* Part of the wire_buf that belongs to current HTTP/2 stream. */
 	ssize_t buf_pos;
 	ssize_t buf_size;
+	int status; /* http status code */
 };
 
 #if ENABLE_DOH2
