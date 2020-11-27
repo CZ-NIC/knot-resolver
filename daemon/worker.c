@@ -993,6 +993,9 @@ static void on_connect(uv_connect_t *req, int status)
 		worker_del_tcp_waiting(worker, peer);
 		struct qr_task *task = session_waitinglist_get(session);
 		if (task && status != UV_ETIMEDOUT) {
+			/* Penalize upstream.
+			* In case of UV_ETIMEDOUT upstream has been
+			* already penalized in on_tcp_connect_timeout() */
 			struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
 			qry->server_selection.error(qry, task->transport, KR_SELECTION_TCP_CONNECT_FAILED);
 		}
