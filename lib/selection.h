@@ -101,7 +101,6 @@ struct kr_server_selection
 KR_EXPORT
 void kr_server_selection_init(struct kr_query *qry);
 
-
 /**
  * @brief Add forwarding target to request.
  *
