@@ -221,7 +221,7 @@ void check_tcp_connections(struct address_state *address_state, struct kr_reques
                            struct sockaddr *address);
 
 /**
- * Check whether the IP version of this address is enabled.
+ * Invalidate address if the respective IP version is disabled.
  */
 void check_network_settings(struct address_state *address_state, size_t address_len,
                             bool no_ipv4, bool no_ipv6);
