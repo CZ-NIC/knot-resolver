@@ -8,7 +8,7 @@
 #define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "slct",  __VA_ARGS__)
 
 struct forward_local_state {
-	union inaddr *targets;
+	union inaddr targets[];
 	size_t target_num;
 	struct address_state *addr_states;
 	size_t last_choice_index; /**< Index of last choice in the targets array, used for error reporting. */
