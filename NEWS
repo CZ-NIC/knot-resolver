@@ -3,6 +3,7 @@ Knot Resolver 5.3.1 (2021-03-dd)
 
 Improvements
 ------------
+- doh2: send HTTP error status codes (#618, !1102)
 - policy.STUB: try to avoid TCP (compared to 5.3.0; !1155)
 
 Bugfixes
