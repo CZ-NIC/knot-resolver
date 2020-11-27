@@ -18,6 +18,7 @@ Bugfixes
 - doh2: fix memory leak (!1117)
 - policy.ANSWER: minor fixes, mainly around NODATA answers (!1129)
 - http, watchdog modules: fix stability problems (!1136)
+- doh2: send HTTP error status code (#618, !1102)
 
 Incompatible changes
 --------------------
