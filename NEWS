@@ -15,6 +15,7 @@ Bugfixes
 - view: fail config if bad subnet is specified (!1112)
 - doh2: fix memory leak (!1117)
 - policy.ANSWER: minor fixes, mainly around NODATA answers (!1129)
+- doh2: send HTTP error status code (#618, !1102)
 
 Incompatible changes
 --------------------
