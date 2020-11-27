@@ -1226,11 +1226,6 @@ int ns_resolve_addr(struct kr_query *qry, struct kr_request *param, struct kr_tr
 	 * this would lead to dependency loop in current zone cut.
 	 */
 
-	if (next_type == KNOT_RRTYPE_AAAA) {
-		qry->flags.AWAIT_IPV6 = true;
-	} else {
-		qry->flags.AWAIT_IPV4 = true;
-	}
 	/* Bail out if the query is already pending or dependency loop. */
 	if (!next_type || kr_rplan_satisfies(qry->parent, transport->name, KNOT_CLASS_IN, next_type)) {
 		/* Fall back to SBELT if root server query fails. */
@@ -1264,6 +1259,14 @@ int ns_resolve_addr(struct kr_query *qry, struct kr_request *param, struct kr_tr
 		}
 	} else {
 		next->flags.AWAIT_CUT = true;
+	}
+
+	if (ret == 0) {
+		if (next_type == KNOT_RRTYPE_AAAA) {
+			qry->flags.AWAIT_IPV6 = true;
+		} else {
+			qry->flags.AWAIT_IPV4 = true;
+		}	
 	}
 
 	return ret;
@@ -1392,14 +1395,7 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 
 	if ((*transport)->protocol == KR_TRANSPORT_RESOLVE_A || (*transport)->protocol == KR_TRANSPORT_RESOLVE_AAAA) {
 		uint16_t type = (*transport)->protocol == KR_TRANSPORT_RESOLVE_A ? KNOT_RRTYPE_A : KNOT_RRTYPE_AAAA;
-		int ret = ns_resolve_addr(qry, qry->request, *transport, type);
-		if (ret) {
-			if (type == KNOT_RRTYPE_A) {
-				qry->flags.AWAIT_IPV4 = false;
-			} else {
-				qry->flags.AWAIT_IPV6 = false;
-			}
-		}
+		ns_resolve_addr(qry, qry->request, *transport, type);
 		ITERATE_LAYERS(request, qry, reset);
 		return KR_STATE_PRODUCE;
 	}
