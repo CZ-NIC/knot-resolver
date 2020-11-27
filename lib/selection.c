@@ -41,7 +41,11 @@ void *prefix_key(const uint8_t *ip, size_t len) {
 
 #undef PREFIX
 
-static const struct rtt_state default_rtt_state = {0, DEFAULT_TIMEOUT/4, 0};
+/* First value of timeout will be calculated as SRTT+4*DEFAULT_TIMEOUT by calc_timeout(),
+ * so it'll be equal to DEFAULT_TIMEOUT. */
+static const struct rtt_state default_rtt_state = {.srtt = 0,
+						   .variance = DEFAULT_TIMEOUT/4,
+						   .consecutive_timeouts = 0};
 
 struct rtt_state get_rtt_state(const uint8_t *ip, size_t len, struct kr_cache *cache) {
 	struct rtt_state state;
