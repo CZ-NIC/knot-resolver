@@ -311,8 +311,6 @@ static int edns_put(knot_pkt_t *pkt, bool reclaim)
 	return knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, pkt->opt_rr, KNOT_PF_FREE);
 }
 
-
-
 /** Removes last EDNS OPT RR written to the packet. */
 static int edns_erase_and_reserve(knot_pkt_t *pkt)
 {
