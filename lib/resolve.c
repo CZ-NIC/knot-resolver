@@ -835,7 +835,7 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 					kr_log_req(request, 0, 2, "resl",
 						"=> too many failures in a row, "
 						"bail out (mitigation for NXNSAttack "
-						"CVE-2020-12667)");
+						"CVE-2020-12667)\n");
 				}
 				return KR_STATE_FAIL;
 			}
