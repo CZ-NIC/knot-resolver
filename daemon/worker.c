@@ -83,11 +83,8 @@ struct qr_task
 	qr_tasklist_t waiting;
 	struct session *pending[MAX_PENDING];
 	uint16_t pending_count;
-	// uint16_t addrlist_count;
-	// uint16_t addrlist_turn;
 	uint16_t timeouts;
 	uint16_t iter_count;
-	// struct sockaddr *addrlist;
 	uint32_t refs;
 	bool finished : 1;
 	bool leading  : 1;
