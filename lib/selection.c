@@ -122,13 +122,13 @@ unsigned back_off_timeout(uint32_t to, int pow) {
 	return to;
 }
 
-// This is verbatim (minus the default timeout value and minimal variance) RFC2988, sec. 2
+// This is verbatim (minus the default timeout value and minimal variance) RFC6298, sec. 2
 unsigned calc_timeout(struct rtt_state state) {
 	int32_t timeout = state.srtt + MAX(4 * state.variance, MINIMAL_TIMEOUT_ADDITION);
 	return back_off_timeout(timeout, state.consecutive_timeouts);
 }
 
-// This is verbatim RFC2988, sec. 2
+// This is verbatim RFC6298, sec. 2
 struct rtt_state calc_rtt_state(struct rtt_state old, unsigned new_rtt) {
 	if (no_rtt_info(old)) {
 		return (struct rtt_state){new_rtt, new_rtt/2, 0};
