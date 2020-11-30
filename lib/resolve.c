@@ -1227,7 +1227,7 @@ int ns_resolve_addr(struct kr_query *qry, struct kr_request *param, struct kr_tr
 	 */
 
 	/* Bail out if the query is already pending or dependency loop. */
-	if (!next_type || kr_rplan_satisfies(qry->parent, transport->name, KNOT_CLASS_IN, next_type)) {
+	if (!next_type || kr_rplan_satisfies(qry->parent, transport->ns_name, KNOT_CLASS_IN, next_type)) {
 		/* Fall back to SBELT if root server query fails. */
 		if (!next_type && qry->zone_cut.name[0] == '\0') {
 			VERBOSE_MSG(qry, "=> fallback to root hints\n");
@@ -1237,12 +1237,12 @@ int ns_resolve_addr(struct kr_query *qry, struct kr_request *param, struct kr_tr
 		}
 		/* No IPv4 nor IPv6, flag server as unusable. */
 		VERBOSE_MSG(qry, "=> unresolvable NS address, bailing out\n");
-		kr_zonecut_del_all(&qry->zone_cut, transport->name);
+		kr_zonecut_del_all(&qry->zone_cut, transport->ns_name);
 		return kr_error(EHOSTUNREACH);
 	}
 	/* Push new query to the resolution plan */
 	struct kr_query *next =
-		kr_rplan_push(rplan, qry, transport->name, KNOT_CLASS_IN, next_type);
+		kr_rplan_push(rplan, qry, transport->ns_name, KNOT_CLASS_IN, next_type);
 	if (!next) {
 		return kr_error(ENOMEM);
 	}
@@ -1526,7 +1526,7 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 	WITH_VERBOSE(qry) {
 
 	KR_DNAME_GET_STR(qname_str, knot_pkt_qname(packet));
-	KR_DNAME_GET_STR(ns_name, transport->name);
+	KR_DNAME_GET_STR(ns_name, transport->ns_name);
 	KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
 	KR_RRTYPE_GET_STR(type_str, knot_pkt_qtype(packet));
 	const char *ns_str = kr_straddr(&transport->address.ip);

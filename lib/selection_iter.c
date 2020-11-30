@@ -40,8 +40,8 @@ void update_name_state(struct kr_transport *transport, trie_t *names) {
 		return;
 	}
 
-	size_t name_len = knot_dname_size(transport->name);
-	trie_val_t *val = trie_get_try(names, (char *)transport->name, name_len);
+	size_t name_len = knot_dname_size(transport->ns_name);
+	trie_val_t *val = trie_get_try(names, (char *)transport->ns_name, name_len);
 
 	if (!val) {
 		return;
@@ -169,7 +169,7 @@ void update_state_from_zonecut(struct iter_local_state *local_state, struct kr_z
 				}
 				struct address_state *address_state = (*(struct address_state **)tval);
 				address_state->generation = current_generation;
-				address_state->name = dname;
+				address_state->ns_name = dname;
 
 				if (address_len == sizeof(struct in_addr)) {
 					name_state->a_state = RECORD_RESOLVED;
@@ -301,7 +301,7 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 	WITH_VERBOSE(qry) {
 		KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
 		if (*transport) {
-			KR_DNAME_GET_STR(ns_name, (*transport)->name);
+			KR_DNAME_GET_STR(ns_name, (*transport)->ns_name);
 			const char *ns_str = kr_straddr(&(*transport)->address.ip);
 			if (proto != KR_TRANSPORT_RESOLVE_A && proto != KR_TRANSPORT_RESOLVE_AAAA) {
 				VERBOSE_MSG(qry,

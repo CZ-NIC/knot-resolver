@@ -53,7 +53,7 @@ enum kr_transport_protocol {
  * Output of the selection algorithm.
  */
 struct kr_transport {
-	knot_dname_t *name; /**< Set to "." for forwarding targets.*/
+	knot_dname_t *ns_name; /**< Set to "." for forwarding targets.*/
 	union inaddr address;
 	size_t address_len;
 	enum kr_transport_protocol protocol;
@@ -125,7 +125,7 @@ struct rtt_state {
 struct address_state {
 	unsigned int generation;
 	struct rtt_state rtt_state;
-	knot_dname_t *name;
+	knot_dname_t *ns_name;
 	bool tls_capable : 1;
 	bool tcp_waiting : 1;
 	bool tcp_connected : 1;

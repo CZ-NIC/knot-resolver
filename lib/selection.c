@@ -217,7 +217,7 @@ struct kr_transport *choose_transport(struct choice choices[],
 			// We will resolve a new NS name
 			*transport = (struct kr_transport) {
 				.protocol = unresolved[index].type,
-				.name = unresolved[index].name
+				.ns_name = unresolved[index].name
 			};
 			return transport;
 		} else {
@@ -236,7 +236,7 @@ struct kr_transport *choose_transport(struct choice choices[],
 	if (choices[choice].address_state->error_count && unresolved_len) {
 		int index = kr_rand_bytes(1) % unresolved_len;
 		*transport = (struct kr_transport) {
-			.name = unresolved[index].name,
+			.ns_name = unresolved[index].name,
 			.protocol = unresolved[index].type,
 		};
 		return transport;
@@ -258,7 +258,7 @@ struct kr_transport *choose_transport(struct choice choices[],
 	}
 
 	*transport = (struct kr_transport) {
-		.name = choices[choice].address_state->name,
+		.ns_name = choices[choice].address_state->ns_name,
 		.protocol = protocol,
 		.timeout = timeout,
 		.safe_mode = choices[choice].address_state->errors[KR_SELECTION_FORMERROR],
@@ -319,7 +319,7 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state, const st
 
 	WITH_VERBOSE(qry) {
 
-	KR_DNAME_GET_STR(ns_name, transport->name);
+	KR_DNAME_GET_STR(ns_name, transport->ns_name);
 	KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
 	const char *ns_str = kr_straddr(&transport->address.ip);
 
@@ -381,7 +381,7 @@ void error(struct kr_query *qry, struct address_state *addr_state, const struct 
 
 	WITH_VERBOSE(qry) {
 
-	KR_DNAME_GET_STR(ns_name, transport->name);
+	KR_DNAME_GET_STR(ns_name, transport->ns_name);
 	KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
 	const char *ns_str = kr_straddr(&transport->address.ip);
 
