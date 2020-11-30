@@ -323,7 +323,7 @@ struct kr_context {
 	char _stub[];
 };
 struct kr_transport {
-	knot_dname_t *name;
+	knot_dname_t *ns_name;
 	/* beware: hidden stub, to avoid hardcoding sockaddr lengths */
 };
 const char *knot_strerror(int);
