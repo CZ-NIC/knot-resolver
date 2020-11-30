@@ -315,6 +315,8 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state, const st
 	struct kr_cache *cache = &qry->request->ctx->cache;
 
 	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
+	/* This construct is a bit racy since the global state may change between `get_rtt_state` and `put_rtt_state`
+	 * but we don't care that much since it is rare and we only risk slightly suboptimal transport choice. */
 	struct rtt_state cur_rtt_state = get_rtt_state(address, transport->address_len, cache);
 	struct rtt_state new_rtt_state = calc_rtt_state(cur_rtt_state, rtt);
 	put_rtt_state(address, transport->address_len, new_rtt_state, cache);
