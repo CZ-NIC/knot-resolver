@@ -278,9 +278,7 @@ struct kr_server_selection {
 	void (*success)(struct kr_query *, const struct kr_transport *);
 	void (*update_rtt)(struct kr_query *, const struct kr_transport *, unsigned int);
 	void (*error)(struct kr_query *, const struct kr_transport *, enum kr_selection_error);
-	int timeouts;
-	_Bool truncated;
-	void *local_state;
+	struct local_state *local_state;
 };
 kr_layer_t kr_layer_t_static;
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
