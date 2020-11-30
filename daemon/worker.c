@@ -324,18 +324,6 @@ static inline bool is_tcp_waiting(struct sockaddr *address) {
 	return worker_find_tcp_waiting(the_worker, address);
 }
 
-void async_ns_resolution(knot_dname_t *name, enum knot_rr_type type) {
-	struct kr_qflags flags;
-	memset(&flags, 0, sizeof(struct kr_qflags));
-	flags.IS_ASYNC_NS = true;
-	knot_pkt_t* pkt = worker_resolve_mk_pkt_dname(name, type, KNOT_CLASS_IN, &flags);
-	struct qr_task *task = worker_resolve_start(pkt, flags);
-	if (task) {
-		worker_resolve_exec(task, pkt);
-	}
-	free(pkt);
-}
-
 /** Create and initialize a request_ctx (on a fresh mempool).
  *
  * session and addr point to the source of the request, and they are NULL
@@ -411,7 +399,6 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	req->selection_context.is_tls_capable = is_tls_capable;
 	req->selection_context.is_tcp_connected = is_tcp_connected;
 	req->selection_context.is_tcp_waiting = is_tcp_waiting;
-	req->selection_context.async_ns_resolution = async_ns_resolution;
 
 	worker->stats.rconcurrent += 1;
 
