@@ -153,7 +153,7 @@ struct choice {
 struct to_resolve
 {
 	knot_dname_t *name;
-	enum kr_transport_protocol type;
+	enum kr_transport_protocol type; /**< Either KR_TRANSPORT_RESOLVE_A or KR_TRANSPORT_RESOLVE_AAAA is valid here.*/
 };
 
 
