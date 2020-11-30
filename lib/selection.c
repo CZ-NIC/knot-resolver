@@ -369,7 +369,13 @@ void error(struct kr_query *qry, struct address_state *addr_state, const struct 
 	}
 
 	if (sel_error == KR_SELECTION_TRUNCATED) {
-		qry->server_selection.truncated = true;
+		if (qry->server_selection.truncated) {
+			/* Second TRUNCATED means we got TRUNCATED over TCP.
+			 * This transport is therefore broken. */
+			addr_state->unrecoverable_errors++;
+		} else {
+			qry->server_selection.truncated = true;
+		}
 	}
 
 	if (UNRECOVERABLE_ERRORS[sel_error]) {
