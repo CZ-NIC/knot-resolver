@@ -198,9 +198,10 @@ void update_address_states(struct iter_local_state *local_state, struct kr_query
 			// Only look at valid addresses.
 			continue;
 		}
-
 		check_tls_capable(address_state, qry->request, &tmp_address.ip);
+		/* TODO: uncomment this once we actually use the information it collects
 		check_tcp_connections(address_state, qry->request, &tmp_address.ip);
+		*/
 		check_network_settings(address_state, address_len, qry->flags.NO_IPV4, qry->flags.NO_IPV6);
 	}
 	trie_it_free(it);

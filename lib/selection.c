@@ -147,10 +147,12 @@ void check_tls_capable(struct address_state *address_state, struct kr_request *r
 	address_state->tls_capable = req->selection_context.is_tls_capable ? req->selection_context.is_tls_capable(address) : false;
 }
 
+/* TODO: uncomment this once we actually use the information it collects.
 void check_tcp_connections(struct address_state *address_state, struct kr_request *req, struct sockaddr *address) {
 	address_state->tcp_connected = req->selection_context.is_tcp_connected ? req->selection_context.is_tcp_connected(address) : false;
 	address_state->tcp_waiting = req->selection_context.is_tcp_waiting ? req->selection_context.is_tcp_waiting(address) : false;
 }
+*/
 
 void check_network_settings(struct address_state *address_state, size_t address_len, bool no_ipv4, bool no_ipv6) {
 	if (no_ipv4 && address_len == sizeof(struct in_addr)) {

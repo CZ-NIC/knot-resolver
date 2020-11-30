@@ -127,9 +127,10 @@ struct address_state {
 	struct rtt_state rtt_state;
 	knot_dname_t *ns_name;
 	bool tls_capable : 1;
+	/* TODO: uncomment these once we actually use this information in selection
 	bool tcp_waiting : 1;
 	bool tcp_connected : 1;
-
+	*/
 	int forward_index;
 	int error_count;
 	int unrecoverable_errors;
@@ -212,6 +213,8 @@ uint8_t* ip_to_bytes(const union inaddr *src, size_t len);
 void check_tls_capable(struct address_state *address_state, struct kr_request *req,
                        struct sockaddr *address);
 
+#if 0
+/* TODO: uncomment these once we actually use the information they collect. */
 /**
  * Check if there is a existing TCP connection to this address.
  * 
@@ -219,6 +222,7 @@ void check_tls_capable(struct address_state *address_state, struct kr_request *r
  */
 void check_tcp_connections(struct address_state *address_state, struct kr_request *req,
                            struct sockaddr *address);
+#endif
 
 /**
  * Invalidate address if the respective IP version is disabled.

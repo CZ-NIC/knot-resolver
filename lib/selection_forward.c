@@ -52,7 +52,9 @@ void forward_choose_transport(struct kr_query *qry, struct kr_transport **transp
 		struct address_state *addr_state = &local_state->addr_states[i];
 		addr_state->ns_name = (knot_dname_t *)"";
 		check_tls_capable(addr_state, qry->request, &address->ip);
+		/* TODO: uncomment this once we actually use the information it collects
 		check_tcp_connections(addr_state, qry->request, &address->ip);
+		*/
 		check_network_settings(addr_state, addr_len, qry->flags.NO_IPV4, qry->flags.NO_IPV6);
 
 		if(addr_state->generation == -1) {
