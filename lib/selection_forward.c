@@ -60,7 +60,7 @@ void forward_choose_transport(struct kr_query *qry, struct kr_transport **transp
 		if(addr_state->generation == -1) {
 			continue;
 		}
-		addr_state->forward_index = i;
+		addr_state->choice_array_index = i;
 
 		addr_state->rtt_state = get_rtt_state(ip_to_bytes(address, addr_len), addr_len, &qry->request->ctx->cache);
 		const char *ns_str = kr_straddr(&address->ip);

@@ -131,7 +131,7 @@ struct address_state {
 	bool tcp_waiting : 1;
 	bool tcp_connected : 1;
 	*/
-	int forward_index;
+	int choice_array_index;
 	int error_count;
 	int unrecoverable_errors;
 	int errors[KR_SELECTION_NUMBER_OF_ERRORS];
@@ -168,13 +168,13 @@ struct to_resolve
  * @param timeouts Number of timeouts that occured in this query (used for exponential backoff)
  * @param mempool Memory context of current request
  * @param tcp Force TCP as transport protocol
- * @param out_forward_index Used to indentify the transport when forwarding
+ * @param[out] choice_index Optinally index of the chosen transport in the @p choices array is stored here.
  * @return Chosen transport or NULL when no choice is viable
  */
 struct kr_transport *choose_transport(struct choice choices[], int choices_len,
                                       struct to_resolve unresolved[], int unresolved_len,
                                       int timeouts, struct knot_mm *mempool, bool tcp,
-                                      size_t *out_forward_index);
+                                      size_t *choice_index);
 
 /**
  * Common part of RTT feedback mechanism. Notes RTT to global cache.

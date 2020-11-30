@@ -202,7 +202,7 @@ struct kr_transport *choose_transport(struct choice choices[],
                                       int timeouts,
                                       struct knot_mm *mempool,
                                       bool tcp,
-                                      size_t *out_forward_index) {
+                                      size_t *choice_index) {
 	if (!choices_len && !unresolved_len) {
 		// There is nothing to choose from :(
 		return NULL;
@@ -299,8 +299,8 @@ struct kr_transport *choose_transport(struct choice choices[],
 		break;
 	}
 
-	if (out_forward_index) {
-		*out_forward_index = choices[choice].address_state->forward_index;
+	if (choice_index) {
+		*choice_index = choices[choice].address_state->choice_array_index;
 	}
 
 	return transport;
