@@ -244,10 +244,12 @@ struct kr_transport *choose_transport(struct choice choices[],
 		return transport;
 	}
 
-	unsigned timeout = calc_timeout(choices[choice].address_state->rtt_state);
+	unsigned timeout;
 	if (no_rtt_info(choices[choice].address_state->rtt_state)) {
 		// Exponential back-off when retrying after timeout and choosing an unknown server
-		timeout = back_off_timeout(timeout, timeouts);
+		timeout = back_off_timeout(DEFAULT_TIMEOUT, timeouts);
+	} else {
+		timeout = calc_timeout(choices[choice].address_state->rtt_state);
 	}
 
 	enum kr_transport_protocol protocol;
