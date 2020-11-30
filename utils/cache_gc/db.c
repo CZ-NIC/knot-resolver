@@ -128,7 +128,7 @@ void debug_printbin(const char *str, unsigned int len)
 		if (isprint(c))
 			putchar(c);
 		else
-			printf("`%02x`", c);
+			printf("`%02hhx`", c);
 	}
 	putchar('"');
 }
