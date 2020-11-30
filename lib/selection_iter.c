@@ -261,7 +261,7 @@ int get_resolvable_names(struct iter_local_state *local_state, struct to_resolve
 
 void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport) {
 	struct knot_mm *mempool = qry->request->rplan.pool;
-	struct iter_local_state *local_state = (struct iter_local_state *)qry->server_selection.local_state;
+	struct iter_local_state *local_state = (struct iter_local_state *)qry->server_selection.local_state->private;
 
 	update_state_from_zonecut(local_state, &qry->zone_cut, mempool);
 	update_state_from_rtt_cache(local_state, &qry->request->ctx->cache);
@@ -276,8 +276,8 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 	int resolvable_len = get_resolvable_names(local_state, resolvable, qry);
 
 	if (choices_len || resolvable_len) {
-		bool tcp = qry->flags.TCP | qry->server_selection.truncated;
-		*transport = choose_transport(choices, choices_len, resolvable, resolvable_len, qry->server_selection.timeouts, mempool, tcp, NULL);
+		bool tcp = qry->flags.TCP | qry->server_selection.local_state->truncated;
+		*transport = choose_transport(choices, choices_len, resolvable, resolvable_len, qry->server_selection.local_state->timeouts, mempool, tcp, NULL);
 	} else {
 		*transport = NULL;
 		// Last selected server had broken DNSSEC and now we have no more servers to ask
@@ -329,7 +329,7 @@ void iter_error(struct kr_query *qry, const struct kr_transport *transport, enum
 	if (!qry->server_selection.initialized) {
 		return;
 	}
-	struct iter_local_state *local_state = qry->server_selection.local_state;
+	struct iter_local_state *local_state = qry->server_selection.local_state->private;
 	struct address_state *addr_state = get_address_state(local_state, transport);
 	local_state->last_error = sel_error;
 	error(qry, addr_state, transport, sel_error);
@@ -339,7 +339,7 @@ void iter_update_rtt(struct kr_query *qry, const struct kr_transport *transport,
 	if (!qry->server_selection.initialized) {
 		return;
 	}
-	struct iter_local_state *local_state = qry->server_selection.local_state;
+	struct iter_local_state *local_state = qry->server_selection.local_state->private;
 	struct address_state *addr_state = get_address_state(local_state, transport);
 	update_rtt(qry, addr_state, transport, rtt);
 }

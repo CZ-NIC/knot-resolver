@@ -28,7 +28,7 @@ void forward_local_state_alloc(struct knot_mm *mm, void **local_state, struct kr
 }
 
 void forward_choose_transport(struct kr_query *qry, struct kr_transport **transport) {
-	struct forward_local_state *local_state = qry->server_selection.local_state;
+	struct forward_local_state *local_state = qry->server_selection.local_state->private;
 	struct choice choices[local_state->target_num];
 	int valid = 0;
 
@@ -76,8 +76,8 @@ void forward_choose_transport(struct kr_query *qry, struct kr_transport **transp
 		};
 	}
 
-	bool tcp = qry->flags.TCP | qry->server_selection.truncated;
-	*transport = choose_transport(choices, valid, NULL, 0, qry->server_selection.timeouts, &qry->request->pool, tcp, &local_state->last_choice_index);
+	bool tcp = qry->flags.TCP | qry->server_selection.local_state->truncated;
+	*transport = choose_transport(choices, valid, NULL, 0, qry->server_selection.local_state->timeouts, &qry->request->pool, tcp, &local_state->last_choice_index);
 	if (*transport) {
 		// Set static timeout for forwarding
 		(*transport)->timeout = 2000;
@@ -91,7 +91,7 @@ void forward_error(struct kr_query *qry, const struct kr_transport *transport, e
 	if (!qry->server_selection.initialized) {
 		return;
 	}
-	struct forward_local_state *local_state = qry->server_selection.local_state;
+	struct forward_local_state *local_state = qry->server_selection.local_state->private;
 	struct address_state *addr_state = &local_state->addr_states[local_state->last_choice_index];
 	error(qry, addr_state, transport, sel_error);
 }
@@ -105,7 +105,7 @@ void forward_update_rtt(struct kr_query *qry, const struct kr_transport *transpo
 		return;
 	}
 
-	struct forward_local_state *local_state = qry->server_selection.local_state;
+	struct forward_local_state *local_state = qry->server_selection.local_state->private;
 	struct address_state *addr_state = &local_state->addr_states[local_state->last_choice_index];
 
 	update_rtt(qry, addr_state, transport, rtt);

@@ -63,6 +63,12 @@ struct kr_transport {
 	bool safe_mode; /**< Turn on SAFEMODE for this transport */
 };
 
+struct local_state {
+	int timeouts; /**< Number of timeouts that occured resolving this query.*/
+	bool truncated; /**< Query was truncated, switch to TCP. */
+	void *private; /**< Inner state of the implementation.*/
+};
+
 /**
  * Specifies a API for selecting transports and giving feedback on the choices.
  *
@@ -88,9 +94,7 @@ struct kr_server_selection
 	/// Report back error encourtered with the chosen transport. See `enum kr_selection`
 	void (*error)(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error error);
 
-	int timeouts; /**< Number of timeouts that occured resolving this query.*/
-	bool truncated; /**< Query was truncated, switch to TCP. */
-	void *local_state; /**< Inner state of the implementation.*/
+	struct local_state *local_state;
 };
 
 /**

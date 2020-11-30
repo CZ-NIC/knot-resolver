@@ -361,7 +361,7 @@ void error(struct kr_query *qry, struct address_state *addr_state, const struct 
 	}
 
 	if (sel_error == KR_SELECTION_QUERY_TIMEOUT) {
-		qry->server_selection.timeouts++;
+		qry->server_selection.local_state->timeouts++;
 		// Make sure the query was chosen by this query
 		if (!transport->deduplicated) {
 			cache_timeout(transport, addr_state, &qry->request->ctx->cache);
@@ -369,12 +369,12 @@ void error(struct kr_query *qry, struct address_state *addr_state, const struct 
 	}
 
 	if (sel_error == KR_SELECTION_TRUNCATED) {
-		if (qry->server_selection.truncated) {
+		if (qry->server_selection.local_state->truncated) {
 			/* Second TRUNCATED means we got TRUNCATED over TCP.
 			 * This transport is therefore broken. */
 			addr_state->unrecoverable_errors++;
 		} else {
-			qry->server_selection.truncated = true;
+			qry->server_selection.local_state->truncated = true;
 		}
 	}
 
@@ -410,9 +410,9 @@ void kr_server_selection_init(struct kr_query *qry) {
 			.success = forward_success,
 			.update_rtt = forward_update_rtt,
 			.error = forward_error,
-			.local_state = NULL,
+			.local_state = mm_alloc(mempool, sizeof(struct local_state)),
 		};
-		forward_local_state_alloc(mempool, &qry->server_selection.local_state, qry->request);
+		forward_local_state_alloc(mempool, qry->server_selection.local_state->private, qry->request);
 	} else {
 		qry->server_selection = (struct kr_server_selection){
 			.initialized = true,
@@ -420,9 +420,9 @@ void kr_server_selection_init(struct kr_query *qry) {
 			.success = iter_success,
 			.update_rtt = iter_update_rtt,
 			.error = iter_error,
-			.local_state = NULL,
+			.local_state = mm_alloc(mempool, sizeof(struct local_state)),
 		};
-		iter_local_state_alloc(mempool, &qry->server_selection.local_state);
+		iter_local_state_alloc(mempool, qry->server_selection.local_state->private);
 	}
 }
 
