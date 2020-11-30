@@ -322,9 +322,6 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 	}
 }
 
-void iter_success(struct kr_query *qry, const struct kr_transport *transport) {
-}
-
 void iter_error(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error sel_error) {
 	if (!qry->server_selection.initialized) {
 		return;

@@ -411,7 +411,6 @@ void kr_server_selection_init(struct kr_query *qry) {
 		qry->server_selection = (struct kr_server_selection){
 			.initialized = true,
 			.choose_transport = forward_choose_transport,
-			.success = forward_success,
 			.update_rtt = forward_update_rtt,
 			.error = forward_error,
 			.local_state = mm_alloc(mempool, sizeof(struct local_state)),
@@ -421,7 +420,6 @@ void kr_server_selection_init(struct kr_query *qry) {
 		qry->server_selection = (struct kr_server_selection){
 			.initialized = true,
 			.choose_transport = iter_choose_transport,
-			.success = iter_success,
 			.update_rtt = iter_update_rtt,
 			.error = iter_error,
 			.local_state = mm_alloc(mempool, sizeof(struct local_state)),

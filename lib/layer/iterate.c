@@ -1132,9 +1132,6 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (query->server_selection.initialized) {
 		if (selection_error != -1) {
 			query->server_selection.error(query, req->upstream.transport, selection_error);
-		} else {
-			// Is this even true? Is this neccesary?
-			query->server_selection.success(query, req->upstream.transport);
 		}
 	}
 

@@ -87,8 +87,6 @@ struct kr_server_selection
 	 * @param transport to be filled with pointer to the chosen transport or NULL on failure
 	 */
 	void (*choose_transport)(struct kr_query *qry, struct kr_transport **transport);
-	/// To be called when all went OK
-	void (*success)(struct kr_query *qry, const struct kr_transport *transport);
 	/// Report back the RTT of network operation for transport in ms.
 	void (*update_rtt)(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt);
 	/// Report back error encourtered with the chosen transport. See `enum kr_selection`
