@@ -195,6 +195,13 @@ static int send_err_status(nghttp2_session *h2, int32_t stream_id, int status, c
 	return 0;
 }
 
+static int error_handler_callback(nghttp2_session *session, int lib_error_code, const char *msg, size_t len, void *user_data)
+{
+	//kr_log_verbose("[http] nghttp2 error: %s\n", msg);
+	printf("[http] nghttp2 error: %s\n", msg);
+
+	return 0;
+}
 
 /*
  * Process a query from URI path if there's base64url encoded dns variable.
@@ -491,6 +498,7 @@ struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
 		callbacks, on_frame_recv_callback);
 	nghttp2_session_callbacks_set_on_stream_close_callback(
 		callbacks, on_stream_close_callback);
+	nghttp2_session_callbacks_set_error_callback2(callbacks, error_handler_callback);
 
 	ctx = calloc(1UL, sizeof(struct http_ctx));
 	if (!ctx)

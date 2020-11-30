@@ -66,7 +66,8 @@ end
 local function check_err(req, exp_status, desc)
 	local headers, errmsg, errno = req:go(8)  -- randomly chosen timeout by tkrizek
 	if errno then
-		nok(errmsg, desc .. ': ' .. errmsg)
+		print(errno)
+		nok(errmsg, desc .. ': ' .. table_print(errmsg))
 		return
 	end
 	local got_status = headers:get(':status')
@@ -175,12 +176,12 @@ else
 		check_err(req, '400', 'too short POST finishes with 400')
 	end
 
---	local function test_post_long_input()
---		local req = assert(req_templ:clone())
---		req.headers:upsert(':method', 'POST')
---		req:set_body(string.rep('s', 1025))  -- > DNS msg over UDP
---		check_err(req, '413', 'too long POST finishes with 413')
---	end
+	local function test_post_long_input()
+		local req = assert(req_templ:clone())
+		req.headers:upsert(':method', 'POST')
+		req:set_body(string.rep('s', 16385))  -- > DNS msg over KNOT_WIRE_MAX_PKTSIZE
+		check_err(req, '413', 'too long POST finishes with 413')
+	end
 --
 --	local function test_post_unparseable_input()
 --		local req = assert(req_templ:clone())
@@ -371,7 +372,7 @@ else
 		test_post_nxdomain,
 		test_huge_answer,
 		test_post_short_input,
-		--test_post_long_input,
+		test_post_long_input,
 		--test_post_unparseable_input,
 		test_post_unsupp_type,
 		test_get_servfail,
