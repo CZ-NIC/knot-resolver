@@ -360,7 +360,7 @@ void error(struct kr_query *qry, struct address_state *addr_state, const struct 
 		assert(0);
 	}
 
-	if (sel_error == KR_SELECTION_TIMEOUT) {
+	if (sel_error == KR_SELECTION_QUERY_TIMEOUT) {
 		qry->server_selection.timeouts++;
 		// Make sure the query was chosen by this query
 		if (!transport->deduplicated) {

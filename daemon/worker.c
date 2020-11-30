@@ -1096,7 +1096,7 @@ static void on_udp_timeout(uv_timer_t *timer)
 
 	if (task->leading && task->pending_count > 0) {
 		struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
-		qry->server_selection.error(qry, task->transport, KR_SELECTION_TIMEOUT);
+		qry->server_selection.error(qry, task->transport, KR_SELECTION_QUERY_TIMEOUT);
 	}
 
 	task->timeouts += 1;

@@ -11,7 +11,7 @@
  * If one of the errors set to true is encountered, there is no point in asking this server again.
  */
 static const bool UNRECOVERABLE_ERRORS[] = {
-	[KR_SELECTION_TIMEOUT] = false,
+	[KR_SELECTION_QUERY_TIMEOUT] = false,
 	[KR_SELECTION_TLS_HANDSHAKE_FAILED] = false,
 	[KR_SELECTION_TCP_CONNECT_FAILED] = false,
 	[KR_SELECTION_TCP_CONNECT_TIMEOUT] = false,
