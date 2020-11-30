@@ -17,7 +17,7 @@ struct iter_local_state {
 	trie_t *names;
 	trie_t *addresses;
 	knot_dname_t *zonecut;
-	unsigned int generation; // Used to distinguish old and valid records in tries
+	unsigned int generation; /**<< Used to distinguish old and valid records in tries. */
 	enum kr_selection_error last_error;
 	unsigned int no_ns_addr_count;
 };

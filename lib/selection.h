@@ -123,7 +123,7 @@ struct rtt_state {
  * @brief To be held per IP address and locally "inside" query.
  */
 struct address_state {
-	unsigned int generation;
+	unsigned int generation; /**<< Used to distinguish old and valid records in local_state. */
 	struct rtt_state rtt_state;
 	knot_dname_t *ns_name;
 	bool tls_capable : 1;
