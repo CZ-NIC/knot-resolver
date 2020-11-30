@@ -75,7 +75,7 @@ struct kr_server_selection
 	/**
 	 * Puts a pointer to next transport of @p qry to @p transport .
 	 *
-	 * Allocates new kr_transport, chooses transport to be used for this query.
+	 * Allocates new kr_transport in request's mempool, chooses transport to be used for this query.
 	 * Selection may fail, so @p transport can be set to NULL.
 	 *
 	 * @param transport to be filled with pointer to the chosen transport or NULL on failure
