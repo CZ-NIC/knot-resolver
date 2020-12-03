@@ -81,6 +81,8 @@ void forward_choose_transport(struct kr_query *qry, struct kr_transport **transp
 	if (*transport) {
 		// Set static timeout for forwarding
 		(*transport)->timeout = 2000;
+		// We need to propagate this to flags since it's used in other parts of the resolver (e.g. logging and stats)
+		qry->flags.TCP = tcp;
 	}
 }
 
