@@ -16,6 +16,8 @@
 
 #define DEBUG_MSG(fmt, ...) kr_log_verbose("[dnstap] " fmt, ##__VA_ARGS__);
 #define CFG_SOCK_PATH "socket_path"
+#define CFG_LOG_CLIENT_PKT "client"
+#define CFG_LOG_REQ_PKT "log_requests"
 #define CFG_LOG_RESP_PKT "log_responses"
 #define DEFAULT_SOCK_PATH "/tmp/dnstap.sock"
 #define DNSTAP_CONTENT_TYPE "protobuf:dnstap.Dnstap"
@@ -26,6 +28,7 @@
 
 /* Internal data structure */
 struct dnstap_data {
+	bool log_req_pkt;
 	bool log_resp_pkt;
 	struct fstrm_iothr *iothread;
 	struct fstrm_iothr_queue *ioq;
@@ -82,6 +85,10 @@ static int dnstap_log(kr_layer_t *ctx) {
 	const struct kr_rplan *rplan = &req->rplan;
 	const struct dnstap_data *dnstap_dt = module->data;
 
+	if (!req->qsource.addr) {
+		return ctx->state;
+	}
+
 	/* check if we have a valid iothread */
 	if (!dnstap_dt->iothread || !dnstap_dt->ioq) {
 		DEBUG_MSG("dnstap_dt->iothread or dnstap_dt->ioq is NULL\n");
@@ -98,8 +105,12 @@ static int dnstap_log(kr_layer_t *ctx) {
 	memset(&m, 0, sizeof(m));
 
 	m.base.descriptor = &dnstap__message__descriptor;
-	/* Only handling response */
-	m.type = DNSTAP__MESSAGE__TYPE__RESOLVER_RESPONSE;
+	if (dnstap_dt->log_req_pkt && !dnstap_dt->log_resp_pkt) {
+		m.type = DNSTAP__MESSAGE__TYPE__CLIENT_QUERY;
+	}
+	else {
+		m.type = DNSTAP__MESSAGE__TYPE__CLIENT_RESPONSE;
+	}
 
 	if (req->qsource.addr) {
 		set_address(req->qsource.addr,
@@ -131,6 +142,15 @@ static int dnstap_log(kr_layer_t *ctx) {
 				m.socket_family = DNSTAP__SOCKET_FAMILY__INET6;
 				m.has_socket_family = true;
 				break;
+		}
+	}
+
+	if (dnstap_dt->log_req_pkt) {
+		const knot_pkt_t *qpkt = req->qsource.packet;
+		m.has_query_message = qpkt != NULL;
+		if (qpkt != NULL) {
+			m.query_message.len = qpkt->size;
+			m.query_message.data = (uint8_t *)qpkt->wire;
 		}
 	}
 
@@ -318,11 +338,26 @@ int dnstap_config(struct kr_module *module, const char *conf) {
 			sock_path = strndup(DEFAULT_SOCK_PATH, PATH_MAX);
 		}
 
-		/* logRespPkt key */
-		node = json_find_member(root_node, CFG_LOG_RESP_PKT);
+		node = json_find_member(root_node, CFG_LOG_CLIENT_PKT);
 		if (node) {
-			data->log_resp_pkt = find_bool(node);
+			JsonNode *subnode;
+			/* logRespPkt key */
+			subnode = json_find_member(node, CFG_LOG_RESP_PKT);
+			if (subnode) {
+				data->log_resp_pkt = find_bool(subnode);
+			} else {
+				data->log_resp_pkt = false;
+			}
+
+			/* logReqPkt key */
+			subnode = json_find_member(node, CFG_LOG_REQ_PKT);
+			if (subnode) {
+				data->log_req_pkt = find_bool(subnode);
+			} else {
+				data->log_req_pkt = false;
+			}
 		} else {
+			data->log_req_pkt = false;
 			data->log_resp_pkt = false;
 		}
 
