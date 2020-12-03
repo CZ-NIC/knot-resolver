@@ -275,7 +275,6 @@ struct kr_module {
 struct kr_server_selection {
 	_Bool initialized;
 	void (*choose_transport)(struct kr_query *, struct kr_transport **);
-	void (*success)(struct kr_query *, const struct kr_transport *);
 	void (*update_rtt)(struct kr_query *, const struct kr_transport *, unsigned int);
 	void (*error)(struct kr_query *, const struct kr_transport *, enum kr_selection_error);
 	struct local_state *local_state;
