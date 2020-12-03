@@ -105,8 +105,12 @@ static int dnstap_log(kr_layer_t *ctx) {
 	memset(&m, 0, sizeof(m));
 
 	m.base.descriptor = &dnstap__message__descriptor;
-	/* Only handling response */
-	m.type = DNSTAP__MESSAGE__TYPE__RESOLVER_RESPONSE;
+	if (dnstap_dt->log_req_pkt && !dnstap_dt->log_resp_pkt) {
+		m.type = DNSTAP__MESSAGE__TYPE__CLIENT_QUERY;
+	}
+	else {
+		m.type = DNSTAP__MESSAGE__TYPE__CLIENT_RESPONSE;
+	}
 
 	if (req->qsource.addr) {
 		set_address(req->qsource.addr,
