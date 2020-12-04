@@ -7,6 +7,8 @@
 
 #define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "slct",  __VA_ARGS__)
 
+#define FORWARDING_TIMEOUT 2000
+
 struct forward_local_state {
 	union inaddr *targets;
 	size_t target_num;
@@ -79,8 +81,10 @@ void forward_choose_transport(struct kr_query *qry, struct kr_transport **transp
 	bool tcp = qry->flags.TCP | qry->server_selection.local_state->truncated;
 	*transport = select_transport(choices, valid, NULL, 0, qry->server_selection.local_state->timeouts, &qry->request->pool, tcp, &local_state->last_choice_index);
 	if (*transport) {
-		// Set static timeout for forwarding
-		(*transport)->timeout = 2000;
+		/* Set static timeout for forwarding; there is no point in this being dynamic since the RTT
+		 * of a packet to forwarding target says nothing about the network RTT of said target, since
+		 * it is doing resolution upstream. */
+		(*transport)->timeout = FORWARDING_TIMEOUT;
 		// We need to propagate this to flags since it's used in other parts of the resolver (e.g. logging and stats)
 		qry->flags.TCP = tcp;
 	}
