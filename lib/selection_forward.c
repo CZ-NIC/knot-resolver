@@ -11,7 +11,7 @@
 
 struct forward_local_state {
 	union inaddr *targets;
-	size_t target_num;
+	size_t targets_count;
 	struct address_state *addr_states;
 	size_t last_choice_index; /**< Index of last choice in the targets array, used for error reporting. */
 };
@@ -23,18 +23,18 @@ void forward_local_state_alloc(struct knot_mm *mm, void **local_state, struct kr
 
 	struct forward_local_state *forward_state = (struct forward_local_state *)*local_state;
 	forward_state->targets = req->selection_context.forwarding_targets;
-	forward_state->target_num = req->selection_context.forward_targets_num;
+	forward_state->targets_count = req->selection_context.forward_targets_count;
 
-	forward_state->addr_states = mm_alloc(mm, sizeof(struct address_state) * forward_state->target_num);
-	memset(forward_state->addr_states, 0, sizeof(struct address_state) * forward_state->target_num);
+	forward_state->addr_states = mm_alloc(mm, sizeof(struct address_state) * forward_state->targets_count);
+	memset(forward_state->addr_states, 0, sizeof(struct address_state) * forward_state->targets_count);
 }
 
 void forward_choose_transport(struct kr_query *qry, struct kr_transport **transport) {
 	struct forward_local_state *local_state = qry->server_selection.local_state->private;
-	struct choice choices[local_state->target_num];
+	struct choice choices[local_state->targets_count];
 	int valid = 0;
 
-	for (int i = 0; i < local_state->target_num; i++) {
+	for (int i = 0; i < local_state->targets_count; i++) {
 		union inaddr *address = &local_state->targets[i];
 		size_t addr_len;
 		uint16_t port;

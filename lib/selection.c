@@ -440,7 +440,7 @@ void kr_server_selection_init(struct kr_query *qry) {
 
 int kr_forward_add_target(struct kr_request *req, size_t index, const struct sockaddr *sock) {
 	if (!req->selection_context.forwarding_targets) {
-		req->selection_context.forwarding_targets = mm_alloc(&req->pool, req->selection_context.forward_targets_num * sizeof(union inaddr));
+		req->selection_context.forwarding_targets = mm_alloc(&req->pool, req->selection_context.forward_targets_count * sizeof(union inaddr));
 	}
 
 	switch (sock->sa_family) {
