@@ -228,7 +228,8 @@ int get_valid_addresses(struct iter_local_state *local_state, struct choice choi
 }
 
 int get_resolvable_names(struct iter_local_state *local_state, struct to_resolve resolvable[], struct kr_query *qry) {
-	// . DNSKEY must be fetched from root hints, no A/AAAA resolution is possible.
+	/* Further resolution is not possible until we get `. DNSKEY` record;
+	 * we have to choose one of the known addresses here. */
 	if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
 		return 0;
 	}
