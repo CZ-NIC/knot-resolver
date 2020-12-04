@@ -235,9 +235,11 @@ struct kr_transport *select_transport(struct choice choices[],
 		choice = 0;
 	}
 
+	struct choice *chosen = &choices[choice];
+
 
 	// Don't try the same server again when there are other choices to be explored
-	if (choices[choice].address_state->error_count && unresolved_len) {
+	if (chosen->address_state->error_count && unresolved_len) {
 		int index = kr_rand_bytes(1) % unresolved_len;
 		*transport = (struct kr_transport) {
 			.ns_name = unresolved[index].name,
@@ -247,15 +249,15 @@ struct kr_transport *select_transport(struct choice choices[],
 	}
 
 	unsigned timeout;
-	if (no_rtt_info(choices[choice].address_state->rtt_state)) {
+	if (no_rtt_info(chosen->address_state->rtt_state)) {
 		// Exponential back-off when retrying after timeout and choosing an unknown server
 		timeout = back_off_timeout(DEFAULT_TIMEOUT, timeouts);
 	} else {
-		timeout = calc_timeout(choices[choice].address_state->rtt_state);
+		timeout = calc_timeout(chosen->address_state->rtt_state);
 	}
 
 	enum kr_transport_protocol protocol;
-	if (choices[choice].address_state->tls_capable) {
+	if (chosen->address_state->tls_capable) {
 		protocol = KR_TRANSPORT_TLS;
 	} else if (tcp) {
 		protocol = KR_TRANSPORT_TCP;
@@ -264,15 +266,15 @@ struct kr_transport *select_transport(struct choice choices[],
 	}
 
 	*transport = (struct kr_transport) {
-		.ns_name = choices[choice].address_state->ns_name,
+		.ns_name = chosen->address_state->ns_name,
 		.protocol = protocol,
 		.timeout = timeout,
-		.safe_mode = choices[choice].address_state->errors[KR_SELECTION_FORMERROR],
+		.safe_mode = chosen->address_state->errors[KR_SELECTION_FORMERROR],
 	};
 
 
 	int port;
-	if (!(port = choices[choice].port)) {
+	if (!(port = chosen->port)) {
 		switch (transport->protocol)
 		{
 		case KR_TRANSPORT_TLS:
@@ -288,15 +290,15 @@ struct kr_transport *select_transport(struct choice choices[],
 		}
 	}
 
-	switch (choices[choice].address_len)
+	switch (chosen->address_len)
 	{
 	case sizeof(struct in_addr):
-		ADDR_SET(transport->address.ip4.sin, AF_INET, choices[choice].address, choices[choice].address_len, port);
-		transport->address_len = choices[choice].address_len;
+		ADDR_SET(transport->address.ip4.sin, AF_INET, chosen->address, chosen->address_len, port);
+		transport->address_len = chosen->address_len;
 		break;
 	case sizeof(struct in6_addr):
-		ADDR_SET(transport->address.ip6.sin6, AF_INET6, choices[choice].address, choices[choice].address_len, port);
-		transport->address_len = choices[choice].address_len;
+		ADDR_SET(transport->address.ip6.sin6, AF_INET6, chosen->address, chosen->address_len, port);
+		transport->address_len = chosen->address_len;
 		break;
 	default:
 		assert(0);
@@ -304,7 +306,7 @@ struct kr_transport *select_transport(struct choice choices[],
 	}
 
 	if (choice_index) {
-		*choice_index = choices[choice].address_state->choice_array_index;
+		*choice_index = chosen->address_state->choice_array_index;
 	}
 
 	return transport;
