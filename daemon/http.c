@@ -148,7 +148,7 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 	ssize_t endpoint_len;
 	uint8_t *dest;
 
-	if (!beg || (beg-1 != query_mark && *(beg-1) != '&'))  /* No dns variable in path. */
+	if (!beg || (beg-1 > query_mark && *(beg-1) != '&'))  /* No dns variable in path. */
 		return 0;
 
 	ret = -1;
