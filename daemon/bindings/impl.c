@@ -76,7 +76,7 @@ void kr_bindings_register(lua_State *L)
 void lua_error_p(lua_State *L, const char *fmt, ...)
 {
 	/* Add a stack trace and throw the result as a lua error. */
-	luaL_traceback(L, L, "error occured here (config filename:lineno is at the bottom, if config is involved):", 0);
+	luaL_traceback(L, L, "error occurred here (config filename:lineno is at the bottom, if config is involved):", 0);
 	/* Push formatted custom message, prepended with "ERROR: ". */
 	lua_pushliteral(L, "\nERROR: ");
 	{
