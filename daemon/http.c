@@ -139,14 +139,31 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 		return kr_error(EINVAL);
 
 	static const char key[] = "dns=";
-	char *beg = strstr(path, key);
+	static const char *endpoins[] = {"dns-query", "doh"};
+	char *query_mark = strstr(path, "?");
+	char *beg = strstr(query_mark, key);
 	char *end;
 	size_t remaining;
 	ssize_t ret;
+	ssize_t endpoint_len;
 	uint8_t *dest;
 
-	if (!beg)  /* No dns variable in path. */
+	if (!beg || (beg-1 != query_mark && *(beg-1) != '&'))  /* No dns variable in path. */
 		return 0;
+
+	ret = -1;
+	endpoint_len = query_mark - path - 1;
+	for(int i = 0; i < sizeof(endpoins)/sizeof(*endpoins); i++)
+	{
+		if (strlen(endpoins[i]) != endpoint_len)
+			continue;
+		ret = strncmp(path + 1, endpoins[i], strlen(endpoins[i]));
+		if (!ret)
+			break;
+	}
+
+	if (ret)
+		return -1;
 
 	beg += sizeof(key) - 1;
 	end = strchr(beg, '&');
