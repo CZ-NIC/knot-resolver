@@ -230,7 +230,9 @@ struct kr_transport *select_transport(struct choice choices[],
 	} else {
 		// "EXPLOIT": choose a resolved address which is seems the best right now
 		shuffle_choices(choices, choices_len);
-		// If there are some addresses with no rtt_info we try them first (see cmp_choices)
+		/* If there are some addresses with no rtt_info we try them first (see cmp_choices).
+		 * So unknown servers are chosen *before* the best know server. This ensures that
+		 * every option is tried before going back to some that was tried before. */
 		qsort(choices, choices_len, sizeof(struct choice), cmp_choices);
 		choice = 0;
 	}
