@@ -19,7 +19,7 @@ day = 24 * hour
 
 -- Logging
 function panic(fmt, ...)
-        print(debug.traceback('error occured here (config filename:lineno is '
+        print(debug.traceback('error occurred here (config filename:lineno is '
                 .. 'at the bottom, if config is involved):', 2))
         error(string.format('ERROR: '.. fmt, ...), 0)
 end

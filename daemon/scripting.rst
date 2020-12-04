@@ -124,7 +124,7 @@ process for liveliness by connecting to the UNIX socket.
           },
           {
               false,  -- function failed
-              'error occured...',  -- the returned error message
+              'error occurred...',  -- the returned error message
               ['n'] = 2,
           },
           ['n'] = 2,
