@@ -237,7 +237,6 @@ struct kr_transport *select_transport(struct choice choices[],
 
 	struct choice *chosen = &choices[choice];
 
-
 	// Don't try the same server again when there are other choices to be explored
 	if (chosen->address_state->error_count && unresolved_len) {
 		int index = kr_rand_bytes(1) % unresolved_len;
