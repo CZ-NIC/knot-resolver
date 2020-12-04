@@ -35,34 +35,6 @@ struct iter_name_state {
 	enum record_state aaaa_state;
 };
 
-void update_name_state(struct kr_transport *transport, trie_t *names) {
-	if (!transport) {
-		return;
-	}
-
-	size_t name_len = knot_dname_size(transport->ns_name);
-	trie_val_t *val = trie_get_try(names, (char *)transport->ns_name, name_len);
-
-	if (!val) {
-		return;
-	}
-
-	struct iter_name_state *name_state = (struct iter_name_state *)*val;
-
-	switch (transport->protocol)
-	{
-	case KR_TRANSPORT_RESOLVE_A:
-		name_state->a_state = RECORD_TRIED;
-		return;
-	case KR_TRANSPORT_RESOLVE_AAAA:
-		name_state->aaaa_state = RECORD_TRIED;
-		return;
-	default:
-		return;
-	}
-
-}
-
 void iter_local_state_alloc(struct knot_mm *mm, void **local_state) {
 	*local_state = mm_alloc(mm, sizeof(struct iter_local_state));
 	memset(*local_state, 0, sizeof(struct iter_local_state));
@@ -260,6 +232,27 @@ int get_resolvable_names(struct iter_local_state *local_state, struct to_resolve
 	return count;
 }
 
+void update_name_state(knot_dname_t *name, enum kr_transport_protocol type, trie_t *names) {
+	size_t name_len = knot_dname_size(name);
+	trie_val_t *val = trie_get_try(names, (char *)name, name_len);
+
+	if (!val) {
+		return;
+	}
+
+	struct iter_name_state *name_state = (struct iter_name_state *)*val;
+	switch (type)
+	{
+	case KR_TRANSPORT_RESOLVE_A:
+		name_state->a_state = RECORD_TRIED;
+		break;
+	case KR_TRANSPORT_RESOLVE_AAAA:
+		name_state->aaaa_state = RECORD_TRIED;
+	default:
+		assert(0);
+	}
+}
+
 void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport) {
 	struct knot_mm *mempool = qry->request->rplan.pool;
 	struct iter_local_state *local_state = (struct iter_local_state *)qry->server_selection.local_state->private;
@@ -282,6 +275,16 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 		if (*transport) {
 			// We need to propagate this to flags since it's used in other parts of the resolver (e.g. logging and stats)
 			qry->flags.TCP = tcp;
+
+			// Note that we tried resolving this name to not try it again.
+			switch ((*transport)->protocol)
+			{
+			case KR_TRANSPORT_RESOLVE_A:
+			case KR_TRANSPORT_RESOLVE_AAAA:
+				update_name_state((*transport)->ns_name, (*transport)->protocol, local_state->names);
+			default:
+				break;
+			}
 		}
 	} else {
 		*transport = NULL;
@@ -291,9 +294,6 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 			qry->flags.DNSSEC_BOGUS = true;
 		}
 	}
-
-	// Take a note if we tried resolving this name, so we don't try it again
-	update_name_state(*transport, local_state->names);
 
 	bool nxnsattack_mitigation = false;
 	enum kr_transport_protocol proto = *transport ? (*transport)->protocol : -1;
