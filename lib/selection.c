@@ -47,6 +47,8 @@ static const struct rtt_state default_rtt_state = {.srtt = 0,
 						   .variance = DEFAULT_TIMEOUT/4,
 						   .consecutive_timeouts = 0};
 
+/* Note that this opens a cace transaction, which is usually closed by calling `put_rtt_state`
+ * i.e. callee is responsible for the closing (e.g. calling kr_cache_commit). */
 struct rtt_state get_rtt_state(const uint8_t *ip, size_t len, struct kr_cache *cache) {
 	struct rtt_state state;
 	knot_db_val_t value;
@@ -350,6 +352,9 @@ void cache_timeout(const struct kr_transport *transport, struct address_state *a
 	if (cur_state.consecutive_timeouts == old_state.consecutive_timeouts) {
 		cur_state.consecutive_timeouts++;
 		put_rtt_state(address, transport->address_len, cur_state, cache);
+	} else {
+		// Since `get_rtt_state` opens a cache transaction, we have to end it
+		kr_cache_commit(cache);
 	}
 }
 
