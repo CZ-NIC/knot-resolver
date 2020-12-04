@@ -77,7 +77,7 @@ void forward_choose_transport(struct kr_query *qry, struct kr_transport **transp
 	}
 
 	bool tcp = qry->flags.TCP | qry->server_selection.local_state->truncated;
-	*transport = choose_transport(choices, valid, NULL, 0, qry->server_selection.local_state->timeouts, &qry->request->pool, tcp, &local_state->last_choice_index);
+	*transport = select_transport(choices, valid, NULL, 0, qry->server_selection.local_state->timeouts, &qry->request->pool, tcp, &local_state->last_choice_index);
 	if (*transport) {
 		// Set static timeout for forwarding
 		(*transport)->timeout = 2000;

@@ -140,13 +140,13 @@ struct address_state {
 };
 
 /**
- * @brief Array of these is one of inputs for the actual selection algorithm (`choose_transport`)
+ * @brief Array of these is one of inputs for the actual selection algorithm (`select_transport`)
  */
 struct choice {
 	uint8_t *address;
 	size_t address_len;
 	struct address_state *address_state;
-	uint16_t port; /**< used to overwrite the port number; if zero, `choose_transport` determines it*/
+	uint16_t port; /**< used to overwrite the port number; if zero, `select_transport` determines it*/
 };
 
 /**
@@ -173,7 +173,7 @@ struct to_resolve
  * @param[out] choice_index Optinally index of the chosen transport in the @p choices array is stored here.
  * @return Chosen transport or NULL when no choice is viable
  */
-struct kr_transport *choose_transport(struct choice choices[], int choices_len,
+struct kr_transport *select_transport(struct choice choices[], int choices_len,
                                       struct to_resolve unresolved[], int unresolved_len,
                                       int timeouts, struct knot_mm *mempool, bool tcp,
                                       size_t *choice_index);

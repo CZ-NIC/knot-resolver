@@ -195,7 +195,7 @@ void shuffle_choices(struct choice choices[], int choices_len) {
 }
 
 // Performs the actual selection (currently epsilon-greedy with epsilon = 0.05).
-struct kr_transport *choose_transport(struct choice choices[],
+struct kr_transport *select_transport(struct choice choices[],
                                       int choices_len,
                                       struct to_resolve unresolved[],
                                       int unresolved_len,

@@ -277,7 +277,7 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 
 	if (choices_len || resolvable_len) {
 		bool tcp = qry->flags.TCP | qry->server_selection.local_state->truncated;
-		*transport = choose_transport(choices, choices_len, resolvable, resolvable_len, qry->server_selection.local_state->timeouts, mempool, tcp, NULL);
+		*transport = select_transport(choices, choices_len, resolvable, resolvable_len, qry->server_selection.local_state->timeouts, mempool, tcp, NULL);
 		if (*transport) {
 			// We need to propagate this to flags since it's used in other parts of the resolver (e.g. logging and stats)
 			qry->flags.TCP = tcp;
