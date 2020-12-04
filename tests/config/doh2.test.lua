@@ -96,7 +96,7 @@ else
 	local function start_server()
 		local request = require('http.request')
 		local ssl_ctx = require('openssl.ssl.context')
-		uri_templ = string.format('https://%s:%d/dns_query', host, port)
+		uri_templ = string.format('https://%s:%d/dns-query', host, port)
 		req_templ = assert(request.new_from_uri(uri_templ))
 		req_templ.headers:upsert('content-type', 'application/dns-message')
 		req_templ.ctx = ssl_ctx.new()
