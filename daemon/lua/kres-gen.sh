@@ -80,7 +80,6 @@ typedef void (*trace_log_f) (const struct kr_request *, const char *);
 typedef void (*trace_callback_f)(struct kr_request *);
 typedef uint8_t * (*alloc_wire_f)(struct kr_request *req, uint16_t *maxlen);
 typedef bool (*addr_info_f)(struct sockaddr*);
-typedef void (*async_resolution_f)(knot_dname_t*, enum knot_rr_type);
 "
 
 genResType() {
