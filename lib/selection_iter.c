@@ -248,6 +248,7 @@ void update_name_state(knot_dname_t *name, enum kr_transport_protocol type, trie
 		break;
 	case KR_TRANSPORT_RESOLVE_AAAA:
 		name_state->aaaa_state = RECORD_TRIED;
+		break;
 	default:
 		assert(0);
 	}
