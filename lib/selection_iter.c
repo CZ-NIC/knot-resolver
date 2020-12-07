@@ -65,22 +65,6 @@ bool zonecut_changed(knot_dname_t *new, knot_dname_t *old) {
 	return knot_dname_cmp(old, new);
 }
 
-// Fetch per-address information from various sources
-void update_address_state(struct address_state *state, uint8_t *address, size_t address_len, struct kr_query *qry) {
-	union inaddr tmp_address;
-	bytes_to_ip(address, address_len, &tmp_address);
-	check_tls_capable(state, qry->request, &tmp_address.ip);
-	/* TODO: uncomment this once we actually use the information it collects
-	check_tcp_connections(address_state, qry->request, &tmp_address.ip);
-	*/
-	check_network_settings(state, address_len, qry->flags.NO_IPV4, qry->flags.NO_IPV6);
-	state->rtt_state = get_rtt_state(address, address_len, &qry->request->ctx->cache);
-	const char *ns_str = kr_straddr(&tmp_address.ip);
-	if (VERBOSE_STATUS) {
-		printf("[slct] rtt of %s is %d, variance is %d\n", ns_str, state->rtt_state.srtt, state->rtt_state.variance);
-	}
-}
-
 void unpack_state_from_zonecut(struct iter_local_state *local_state, struct kr_query *qry) {
 	struct kr_zonecut *zonecut = &qry->zone_cut;
 	struct knot_mm *mm = &qry->request->pool;

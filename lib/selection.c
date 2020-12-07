@@ -145,23 +145,52 @@ struct rtt_state calc_rtt_state(struct rtt_state old, unsigned new_rtt) {
 	return ret;
 }
 
+/**
+ * @internal Check if IP address is TLS capable.
+ * 
+ * @p req has to have the selection_context properly initiazed.
+ */
 void check_tls_capable(struct address_state *address_state, struct kr_request *req, struct sockaddr *address) {
 	address_state->tls_capable = req->selection_context.is_tls_capable ? req->selection_context.is_tls_capable(address) : false;
 }
 
-/* TODO: uncomment this once we actually use the information it collects.
+#if 0
+/* TODO: uncomment these once we actually use the information it collects. */
+/**
+ * Check if there is a existing TCP connection to this address.
+ * 
+ * @p req has to have the selection_context properly initiazed.
+ */
 void check_tcp_connections(struct address_state *address_state, struct kr_request *req, struct sockaddr *address) {
 	address_state->tcp_connected = req->selection_context.is_tcp_connected ? req->selection_context.is_tcp_connected(address) : false;
 	address_state->tcp_waiting = req->selection_context.is_tcp_waiting ? req->selection_context.is_tcp_waiting(address) : false;
 }
-*/
+#endif
 
+/**
+ * @internal Invalidate address if the respective IP version is disabled.
+ */
 void check_network_settings(struct address_state *address_state, size_t address_len, bool no_ipv4, bool no_ipv6) {
 	if (no_ipv4 && address_len == sizeof(struct in_addr)) {
 		address_state->generation = -1; // Invalidate due to IPv4 being disabled in flags
 	}
 	if (no_ipv6 && address_len == sizeof(struct in6_addr)) {
 		address_state->generation = -1; // Invalidate due to IPv6 being disabled in flags
+	}
+}
+
+void update_address_state(struct address_state *state, uint8_t *address, size_t address_len, struct kr_query *qry) {
+	union inaddr tmp_address;
+	bytes_to_ip(address, address_len, &tmp_address);
+	check_tls_capable(state, qry->request, &tmp_address.ip);
+	/* TODO: uncomment this once we actually use the information it collects
+	check_tcp_connections(address_state, qry->request, &tmp_address.ip);
+	*/
+	check_network_settings(state, address_len, qry->flags.NO_IPV4, qry->flags.NO_IPV6);
+	state->rtt_state = get_rtt_state(address, address_len, &qry->request->ctx->cache);
+	const char *ns_str = kr_straddr(&tmp_address.ip);
+	if (VERBOSE_STATUS) {
+		printf("[slct] rtt of %s is %d, variance is %d\n", ns_str, state->rtt_state.srtt, state->rtt_state.variance);
 	}
 }
 

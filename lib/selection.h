@@ -208,28 +208,7 @@ void bytes_to_ip(uint8_t *bytes, size_t len, union inaddr *dst);
 uint8_t* ip_to_bytes(const union inaddr *src, size_t len);
 
 /**
- * Check if IP address is TLS capable.
- * 
- * @p req has to have the selection_context properly initiazed.
+ * @internal Fetch per-address information from various sources.
  */
-void check_tls_capable(struct address_state *address_state, struct kr_request *req,
-                       struct sockaddr *address);
-
-#if 0
-/* TODO: uncomment these once we actually use the information they collect. */
-/**
- * Check if there is a existing TCP connection to this address.
- * 
- * @p req has to have the selection_context properly initiazed.
- */
-void check_tcp_connections(struct address_state *address_state, struct kr_request *req,
-                           struct sockaddr *address);
-#endif
-
-/**
- * Invalidate address if the respective IP version is disabled.
- */
-void check_network_settings(struct address_state *address_state, size_t address_len,
-                            bool no_ipv4, bool no_ipv6);
-
-
+void update_address_state(struct address_state *state, uint8_t *address, size_t address_len,
+			  struct kr_query *qry);

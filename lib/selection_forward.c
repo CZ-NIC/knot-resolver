@@ -53,18 +53,14 @@ void forward_choose_transport(struct kr_query *qry, struct kr_transport **transp
 
 		struct address_state *addr_state = &local_state->addr_states[i];
 		addr_state->ns_name = (knot_dname_t *)"";
-		check_tls_capable(addr_state, qry->request, &address->ip);
-		/* TODO: uncomment this once we actually use the information it collects
-		check_tcp_connections(addr_state, qry->request, &address->ip);
-		*/
-		check_network_settings(addr_state, addr_len, qry->flags.NO_IPV4, qry->flags.NO_IPV6);
+
+		update_address_state(addr_state, ip_to_bytes(address, addr_len), addr_len, qry);
 
 		if(addr_state->generation == -1) {
 			continue;
 		}
 		addr_state->choice_array_index = i;
 
-		addr_state->rtt_state = get_rtt_state(ip_to_bytes(address, addr_len), addr_len, &qry->request->ctx->cache);
 		const char *ns_str = kr_straddr(&address->ip);
 		if (VERBOSE_STATUS) {
 			printf("[nsrep] rtt of %s is %d, variance is %d\n", ns_str, addr_state->rtt_state.srtt, addr_state->rtt_state.variance);
