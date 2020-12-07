@@ -198,8 +198,7 @@ struct kr_request {
 		addr_info_f is_tls_capable;
 		addr_info_f is_tcp_connected;
 		addr_info_f is_tcp_waiting;
-		union inaddr *forwarding_targets;
-		size_t forward_targets_count;
+		inaddr_array_t forwarding_targets;
 	} selection_context;
 	unsigned int count_no_nsaddr;
 	unsigned int count_fail_row;
