@@ -126,6 +126,7 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_prop
 	struct kr_module
 	struct kr_server_selection
+	inaddr_array_t
 EOF
 
 # a static variable; the line might not be simple to generate
