@@ -65,31 +65,26 @@ bool zonecut_changed(knot_dname_t *new, knot_dname_t *old) {
 	return knot_dname_cmp(old, new);
 }
 
-void update_state_from_rtt_cache(struct iter_local_state *local_state, struct kr_cache *cache) {
-	trie_it_t *it;
-	for(it = trie_it_begin(local_state->addresses); !trie_it_finished(it); trie_it_next(it)) {
-		size_t address_len;
-		uint8_t *address = (uint8_t *)trie_it_key(it, &address_len);
-		struct address_state *address_state = (struct address_state *)*trie_it_val(it);
-
-		if (address_state->generation != local_state->generation) {
-			// Only look at valid addresses.
-			continue;
-		}
-
-		address_state->rtt_state = get_rtt_state(address, address_len, cache);
-		union inaddr addr;
-		bytes_to_ip(address, address_len, &addr);
-		const char *ns_str = kr_straddr(&addr.ip);
-		if (VERBOSE_STATUS) {
-			printf("[slct] rtt of %s is %d, variance is %d\n", ns_str, address_state->rtt_state.srtt, address_state->rtt_state.variance);
-		}
+// Fetch per-address information from various sources
+void update_address_state(struct address_state *state, uint8_t *address, size_t address_len, struct kr_query *qry) {
+	union inaddr tmp_address;
+	bytes_to_ip(address, address_len, &tmp_address);
+	check_tls_capable(state, qry->request, &tmp_address.ip);
+	/* TODO: uncomment this once we actually use the information it collects
+	check_tcp_connections(address_state, qry->request, &tmp_address.ip);
+	*/
+	check_network_settings(state, address_len, qry->flags.NO_IPV4, qry->flags.NO_IPV6);
+	state->rtt_state = get_rtt_state(address, address_len, &qry->request->ctx->cache);
+	const char *ns_str = kr_straddr(&tmp_address.ip);
+	if (VERBOSE_STATUS) {
+		printf("[slct] rtt of %s is %d, variance is %d\n", ns_str, state->rtt_state.srtt, state->rtt_state.variance);
 	}
-	trie_it_free(it);
 }
 
+void unpack_state_from_zonecut(struct iter_local_state *local_state, struct kr_query *qry) {
+	struct kr_zonecut *zonecut = &qry->zone_cut;
+	struct knot_mm *mm = &qry->request->pool;
 
-void update_state_from_zonecut(struct iter_local_state *local_state, struct kr_zonecut *zonecut, struct knot_mm *mm) {
 	bool zcut_changed = false;
 	if (local_state->names == NULL || local_state->addresses == NULL) {
 		// Local state initialization
@@ -148,34 +143,11 @@ void update_state_from_zonecut(struct iter_local_state *local_state, struct kr_z
 				} else if (address_len == sizeof(struct in6_addr)) {
 					name_state->aaaa_state = RECORD_RESOLVED;
 				}
+				update_address_state(address_state, address, address_len, qry);
 			}
 		}
 	}
 
-	trie_it_free(it);
-}
-
-// Loop over trie of addresses and update per-address properties
-void update_address_states(struct iter_local_state *local_state, struct kr_query *qry) {
-	trie_it_t *it;
-	for(it = trie_it_begin(local_state->addresses); !trie_it_finished(it); trie_it_next(it)) {
-		size_t address_len;
-		uint8_t* address = (uint8_t *)trie_it_key(it, &address_len);
-
-		union inaddr tmp_address;
-		bytes_to_ip(address, address_len, &tmp_address);
-
-		struct address_state *address_state = (struct address_state *)*trie_it_val(it);
-		if (address_state->generation != local_state->generation) {
-			// Only look at valid addresses.
-			continue;
-		}
-		check_tls_capable(address_state, qry->request, &tmp_address.ip);
-		/* TODO: uncomment this once we actually use the information it collects
-		check_tcp_connections(address_state, qry->request, &tmp_address.ip);
-		*/
-		check_network_settings(address_state, address_len, qry->flags.NO_IPV4, qry->flags.NO_IPV6);
-	}
 	trie_it_free(it);
 }
 
@@ -255,13 +227,10 @@ void update_name_state(knot_dname_t *name, enum kr_transport_protocol type, trie
 }
 
 void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport) {
-	struct knot_mm *mempool = qry->request->rplan.pool;
+	struct knot_mm *mempool = &qry->request->pool;
 	struct iter_local_state *local_state = (struct iter_local_state *)qry->server_selection.local_state->private;
 
-	update_state_from_zonecut(local_state, &qry->zone_cut, mempool);
-	update_state_from_rtt_cache(local_state, &qry->request->ctx->cache);
-
-	update_address_states(local_state, qry);
+	unpack_state_from_zonecut(local_state, qry);
 
 	struct choice choices[trie_weight(local_state->addresses)];
 	struct to_resolve resolvable[2*trie_weight(local_state->names)];
