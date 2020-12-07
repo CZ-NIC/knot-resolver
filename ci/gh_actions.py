@@ -32,8 +32,9 @@ while time.time() < end_time:
             conclusion = run['conclusion']
             html_url = run['html_url']
             commit_sha = run['head_sha']
-        except KeyError:
-            pass
+        except (KeyError, IndexError):
+            time.sleep(POLL_DELAY)
+            continue
 
         if commit_sha != sys.argv[2]:
             exit("Fetched invalid GH Action: commit mismatch. Re-run or push again?")
