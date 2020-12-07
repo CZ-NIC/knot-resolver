@@ -78,10 +78,9 @@ end
 
 -- Override the list of nameservers (forwarders)
 local function set_nslist(req, list)
-	req.selection_context.forward_targets_count = #list
 	local ns_i = 0
 	for _, ns in ipairs(list) do
-		if ffi.C.kr_forward_add_target(req, ns_i, ns) == 0 then
+		if ffi.C.kr_forward_add_target(req, ns) == 0 then
 			ns_i = ns_i + 1
 		end
 	end

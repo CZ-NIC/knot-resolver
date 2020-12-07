@@ -10,23 +10,22 @@
 #define FORWARDING_TIMEOUT 2000
 
 struct forward_local_state {
-	union inaddr *targets;
+	inaddr_array_t *targets;
 	size_t targets_count;
 	struct address_state *addr_states;
 	size_t last_choice_index; /**< Index of last choice in the targets array, used for error reporting. */
 };
 
 void forward_local_state_alloc(struct knot_mm *mm, void **local_state, struct kr_request *req) {
-	assert(req->selection_context.forwarding_targets);
+	assert(req->selection_context.forwarding_targets.at);
 	*local_state = mm_alloc(mm, sizeof(struct forward_local_state));
 	memset(*local_state, 0, sizeof(struct forward_local_state));
 
 	struct forward_local_state *forward_state = (struct forward_local_state *)*local_state;
-	forward_state->targets = req->selection_context.forwarding_targets;
-	forward_state->targets_count = req->selection_context.forward_targets_count;
+	forward_state->targets = &req->selection_context.forwarding_targets;
 
-	forward_state->addr_states = mm_alloc(mm, sizeof(struct address_state) * forward_state->targets_count);
-	memset(forward_state->addr_states, 0, sizeof(struct address_state) * forward_state->targets_count);
+	forward_state->addr_states = mm_alloc(mm, sizeof(struct address_state) * forward_state->targets->len);
+	memset(forward_state->addr_states, 0, sizeof(struct address_state) * forward_state->targets->len);
 }
 
 void forward_choose_transport(struct kr_query *qry, struct kr_transport **transport) {
@@ -35,7 +34,7 @@ void forward_choose_transport(struct kr_query *qry, struct kr_transport **transp
 	int valid = 0;
 
 	for (int i = 0; i < local_state->targets_count; i++) {
-		union inaddr *address = &local_state->targets[i];
+		union inaddr *address = &local_state->targets->at[i];
 		size_t addr_len;
 		uint16_t port;
 		switch (address->ip.sa_family) {

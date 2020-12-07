@@ -110,7 +110,7 @@ void kr_server_selection_init(struct kr_query *qry);
  * These are then shared by all the queries in said request.
  */
 KR_EXPORT
-int kr_forward_add_target(struct kr_request *req, size_t index, const struct sockaddr *sock);
+int kr_forward_add_target(struct kr_request *req, const struct sockaddr *sock);
 
 /**
  * To be held per IP address in the global LMDB cache

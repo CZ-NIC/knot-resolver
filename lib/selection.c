@@ -467,22 +467,29 @@ void kr_server_selection_init(struct kr_query *qry) {
 	}
 }
 
-int kr_forward_add_target(struct kr_request *req, size_t index, const struct sockaddr *sock) {
-	if (!req->selection_context.forwarding_targets) {
-		req->selection_context.forwarding_targets = mm_alloc(&req->pool, req->selection_context.forward_targets_count * sizeof(union inaddr));
+int kr_forward_add_target(struct kr_request *req, const struct sockaddr *sock) {
+	if (req->selection_context.forwarding_targets.at) {
+		return kr_error(EINVAL);
 	}
+
+	union inaddr address;
 
 	switch (sock->sa_family) {
-		case AF_INET:
-			req->selection_context.forwarding_targets[index].ip4 = *(const struct sockaddr_in *)sock;
-			break;
-		case AF_INET6:
-			req->selection_context.forwarding_targets[index].ip6 = *(const struct sockaddr_in6 *)sock;
-			break;
-		default:
+	case AF_INET:
+		if (req->options.NO_IPV4)
+			return kr_error(EINVAL);	
+		address.ip4 = *(const struct sockaddr_in *)sock;
+		break;
+	case AF_INET6:
+		if (req->options.NO_IPV6)
 			return kr_error(EINVAL);
+		address.ip6 = *(const struct sockaddr_in6 *)sock;
+		break;
+	default:
+		return kr_error(EINVAL);
 	}
-
+	
+	array_push_mm(req->selection_context.forwarding_targets, address, kr_memreserve, &req->pool);
 	return kr_ok();
 }
 
