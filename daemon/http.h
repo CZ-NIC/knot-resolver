@@ -45,7 +45,6 @@ struct http_ctx {
 	uint8_t *buf;  /* Part of the wire_buf that belongs to current HTTP/2 stream. */
 	ssize_t buf_pos;
 	ssize_t buf_size;
-	int status; /* http status code */
 };
 
 #if ENABLE_DOH2
