@@ -1,10 +1,15 @@
-Knot Resolver X.Y.X (yyyy-mm-dd)
+Knot Resolver 5.2.1 (2020-12-09)
 ================================
+
+Improvements
+------------
+- doh2: send Cache-Control header with TTL (#617, !1095)
 
 Bugfixes
 --------
 - fix map() command on 32-bit platforms; regressed in 5.2.0 (!1093)
 - doh2: restrict endpoints to doh and dns-query (#636, !1104)
+- renumber: map to correct subnet when using multiple rules (!1107)
 
 
 Knot Resolver 5.2.0 (2020-11-11)
