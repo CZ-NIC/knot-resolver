@@ -158,7 +158,14 @@ static ssize_t read_callback(nghttp2_session *h2, int32_t stream_id, uint8_t *bu
 	return send;
 }
 
-static int send_err_status(nghttp2_session *h2, int32_t stream_id, int status, char *status_msg)
+/*
+ * Send http error status code.
+ *
+ * status_msg is optional and define error message. Only statically allocated
+ * strings can be passed throught status_msg, (because ownership isn't transferred, they'll
+ * never be freed, yet must remain valid for undetermined period of time).
+ */
+static int send_err_status(nghttp2_session *h2, int32_t stream_id, int status, const char *const status_msg)
 {
 	int ret;
 	int status_len;
@@ -266,7 +273,7 @@ static int check_uri(const char* uri_path)
 /*
  * Process a query from URI path if there's base64url encoded dns variable.
  */
-static int process_uri_path(nghttp2_session *h2, struct http_ctx *ctx, int32_t stream_id)
+static int process_uri_path(struct http_ctx *ctx, int32_t stream_id)
 {
 	if (!ctx || !ctx->uri_path)
 		return kr_error(EINVAL);
@@ -295,9 +302,9 @@ static int process_uri_path(nghttp2_session *h2, struct http_ctx *ctx, int32_t s
 		ctx->buf_pos = 0;
 		kr_log_verbose("[http] base64url decode failed %s\n", strerror(ret));
 		if (ret == KNOT_ERANGE) {
-			send_err_status(h2, stream_id, 414, NULL);
+			send_err_status(ctx->h2, stream_id, 414, NULL);
 		} else {
-			send_err_status(h2, stream_id, 400, NULL);
+			send_err_status(ctx->h2, stream_id, 400, NULL);
 		}
 		return ret;
 	}
@@ -388,7 +395,7 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 	}
 
 	if (!strcasecmp("content-type", (const char *)name)) {
-		ctx->content_type = malloc(sizeof(ctx->content_type) * valuelen+1);
+		ctx->content_type = malloc(sizeof(*ctx->content_type) * valuelen+1);
 		if (!ctx->content_type)
 			return kr_error(ENOMEM);
 		memcpy(ctx->content_type, value, valuelen);
@@ -477,7 +484,7 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 
 	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) && ctx->incomplete_stream == stream_id) {
 		if (ctx->current_method == HTTP_METHOD_GET) {
-			if (process_uri_path(h2, ctx, stream_id) < 0) {
+			if (process_uri_path(ctx, stream_id) < 0) {
 				free(ctx->uri_path);
 				ctx->uri_path = NULL;
 				return 0;
@@ -487,6 +494,10 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 		}
 		ctx->incomplete_stream = -1;
 		ctx->current_method = HTTP_METHOD_NONE;
+		if (ctx->content_type) {
+			free(ctx->content_type);
+			ctx->content_type = NULL;
+		}
 
 		len = ctx->buf_pos - sizeof(uint16_t);
 		if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
@@ -495,7 +506,7 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 		}
 
 		if (len < 12) {
-			send_err_status(h2, stream_id, 400, "input too short");
+			send_err_status(h2, stream_id, 400, "input too short\n");
 			return 0;
 		}
 
@@ -626,11 +637,10 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *buf,
  *
  * Data isn't guaranteed to be sent immediately due to underlying HTTP/2 flow control.
  */
-static int http_send_response(struct http_ctx *ctx, int32_t stream_id,
+static int http_send_response(nghttp2_session *h2, int32_t stream_id,
 			      nghttp2_data_provider *prov)
 {
 	struct http_data *data = (struct http_data*)prov->source.ptr;
-	nghttp2_session *h2 = ctx->h2;
 	int ret;
 	const char *directive_max_age = "max-age=";
 	char size[MAX_DECIMAL_LENGTH(data->len)] = { 0 };
@@ -694,7 +704,7 @@ static int http_write_pkt(struct http_ctx *ctx, knot_pkt_t *pkt, int32_t stream_
 	prov.source.ptr = data;
 	prov.read_callback = read_callback;
 
-	return http_send_response(ctx, stream_id, &prov);
+	return http_send_response(ctx->h2, stream_id, &prov);
 }
 
 /*
