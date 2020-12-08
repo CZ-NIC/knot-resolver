@@ -11,8 +11,8 @@
 #include <stdlib.h>
 
 #define auto_free __attribute__((cleanup(_cleanup_free)))
-static inline void _cleanup_free(char **p) {
-	free(*p);
+static inline void _cleanup_free(const void *p) {
+	free(*(char **)p);
 }
 #define auto_close __attribute__((cleanup(_cleanup_close)))
 static inline void _cleanup_close(int *p) {
