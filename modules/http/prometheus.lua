@@ -102,7 +102,29 @@ local function serve_prometheus()
 	local latency = {}
 	local counter = '# TYPE %s counter\n%s %f'
 	for k,v in pairs(slist) do
-		k = select(1, k:gsub('%.', '_'))
+		-- Transform Graphite tags into Prometheus labels
+		-- See: https://gitlab.nic.cz/knot/knot-resolver/-/issues/650
+		local k_index, k_len, k_tag = 0, #k, 0
+		k = select(1, k:gsub('.', function (c)
+			k_index = k_index + 1
+			if k_tag == 0 then
+				if c == '.' then return '_' end
+				if c == ';' then k_tag = 1; return '{' end
+			elseif k_tag == 1 then
+				if k_index == k_len then
+					if c == '=' then return '=""}'
+					else return c .. '"}' end
+				end
+				if c == '=' then k_tag = 2; return '="' end
+			elseif k_tag == 2 then
+				if k_index == k_len then
+					if c == ';' then return '"}'
+					else return c .. '"}' end
+				end
+				if c == ';' then k_tag = 1; return '",' end
+			end
+			return nil
+		end))
 		-- Aggregate histograms
 		local band = k:match('answer_([%d]+)ms')
 		if band then
@@ -112,7 +134,8 @@ local function serve_prometheus()
 		-- Counter as a fallback
 		else
 			local key = M.namespace .. k
-			table.insert(render, string.format(counter, key, key, v))
+			local metric, label = key:match('^([^{]+)(.*)$')
+			table.insert(render, string.format(counter, metric, metric .. label, v))
 		end
 	end
 	-- Fill in latency histogram
