@@ -95,6 +95,35 @@ local function stream_stats(_, ws)
 	end
 end
 
+-- Transform metrics from Graphite to Prometheus format
+-- See: https://gitlab.nic.cz/knot/knot-resolver/-/issues/650
+-- E.g.:
+--  worker.ipv4 -> worker_ipv4
+--  answer.blocked;stype=A -> answer_blocked{stype="A"}
+local function get_metric(key)
+	local key_index, key_len, key_tag = 0, #key, 0
+	return select(1, key:gsub('.', function (c)
+		key_index = key_index + 1
+		if key_tag == 0 then
+			if c == '.' then return '_' end
+			if c == ';' then key_tag = 1; return '{' end
+		elseif key_tag == 1 then
+			if key_index == key_len then
+				if c == '=' then return '=""}'
+				else return c .. '"}' end
+			end
+			if c == '=' then key_tag = 2; return '="' end
+		elseif key_tag == 2 then
+			if key_index == key_len then
+				if c == ';' then return '"}'
+				else return c .. '"}' end
+			end
+			if c == ';' then key_tag = 1; return '",' end
+		end
+		return nil
+	end))
+end
+
 -- Render stats in Prometheus text format
 local function serve_prometheus()
 	-- First aggregate metrics list and print counters
@@ -102,7 +131,7 @@ local function serve_prometheus()
 	local latency = {}
 	local counter = '# TYPE %s counter\n%s %f'
 	for k,v in pairs(slist) do
-		k = select(1, k:gsub('%.', '_'))
+		k = get_metric(k)
 		-- Aggregate histograms
 		local band = k:match('answer_([%d]+)ms')
 		if band then
@@ -112,7 +141,8 @@ local function serve_prometheus()
 		-- Counter as a fallback
 		else
 			local key = M.namespace .. k
-			table.insert(render, string.format(counter, key, key, v))
+			local name, label = key:match('^([^{]+)(.*)$')
+			table.insert(render, string.format(counter, name, name .. label, v))
 		end
 	end
 	-- Fill in latency histogram
