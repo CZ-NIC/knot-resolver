@@ -338,7 +338,7 @@ Forwarding over TLS protocol (DNS-over-TLS)
 -------------------------------------------
 .. function:: TLS_FORWARD( { {ip_address, authentication}, [...] } )
 
-   Same as :func:`FORWARD` but send query over DNS-over-TLS protocol (encrypted).
+   Same as :func:`policy.FORWARD` but send query over DNS-over-TLS protocol (encrypted).
    Each target IP address needs explicit configuration how to validate
    TLS certificate so each IP address is configured by pair:
    ``{ip_address, authentication}``. See sections below for more details.
@@ -346,7 +346,7 @@ Forwarding over TLS protocol (DNS-over-TLS)
 
 Policy :func:`policy.TLS_FORWARD` allows you to forward queries using `Transport Layer Security`_ protocol, which hides the content of your queries from an attacker observing the network traffic. Further details about this protocol can be found in :rfc:`7858` and `IETF draft dprive-dtls-and-tls-profiles`_.
 
-Queries affected by `TLS_FORWARD` policy will always be resolved over TLS connection. Knot Resolver does not implement fallback to non-TLS connection, so if TLS connection cannot be established or authenticated according to the configuration, the resolution will fail.
+Queries affected by :func:`policy.TLS_FORWARD` will always be resolved over TLS connection. Knot Resolver does not implement fallback to non-TLS connection, so if TLS connection cannot be established or authenticated according to the configuration, the resolution will fail.
 
 To test this feature you need to either :ref:`configure Knot Resolver as DNS-over-TLS server <tls-server-config>`, or pick some public DNS-over-TLS server. Please see `DNS Privacy Project`_ homepage for list of public servers.
 
@@ -532,7 +532,7 @@ The easiest work-around is to disable reading from cache for grafted domains.
         'internal.example.com.',
         '2.0.192.in-addr.arpa.'  -- this applies to reverse DNS tree as well
         })
-   -- Beware: the rule order is important, as STUB is not a chain action.
+   -- Beware: the rule order is important, as policy.STUB is not a chain action.
    policy.add(policy.suffix(policy.FLAGS({'NO_CACHE'}),   extraTrees))
    policy.add(policy.suffix(policy.STUB({'2001:db8::1'}), extraTrees))
 

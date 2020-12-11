@@ -14,7 +14,7 @@ Main use-cases are:
 Forwarding implementation in Knot Resolver has following properties:
 
   - Answers from *upstream* servers are cached.
-  - Answers from *upstream* servers are locally DNSSEC-validated, unless ``policy.STUB`` is used.
+  - Answers from *upstream* servers are locally DNSSEC-validated, unless :func:`policy.STUB` is used.
   - Resolver automatically selects which IP address from given set of IP addresses will be used (based on performance characteristics).
   - Forwarding can use either unencrypted DNS protocol, or :ref:`tls-forwarding`.
 
