@@ -13,11 +13,11 @@ This module can block, rewrite, or alter inbound queries based on user-defined p
 
 Each policy *rule* has two parts: a *filter* and an *action*. A *filter* selects which queries will be affected by the policy, and *action* which modifies queries matching the associated filter.
 
-Typically a rule is defined as follows: ``filter(action(action parameters), filter parameters)``. For example, a filter can be ``suffix`` which matches queries whose suffix part is in specified set, and one of possible actions is ``DENY``, which denies resolution. These are combined together into ``policy.suffix(policy.DENY, {todname('badguy.example.')})``. The rule is effective when it is added into rule table using ``policy.add()``, please see examples below.
+Typically a rule is defined as follows: ``filter(action(action parameters), filter parameters)``. For example, a filter can be ``suffix`` which matches queries whose suffix part is in specified set, and one of possible actions is :any:`policy.DENY`, which denies resolution. These are combined together into ``policy.suffix(policy.DENY, {todname('badguy.example.')})``. The rule is effective when it is added into rule table using ``policy.add()``, please see examples below.
 
 This module is enabled by default because it implements mandatory :rfc:`6761` logic.
 When no rule applies to a query, built-in rules for `special-use <https://www.iana.org/assignments/special-use-domain-names/special-use-domain-names.xhtml>`_ and `locally-served <http://www.iana.org/assignments/locally-served-dns-zones>`_ domain names are applied.
-These rules can be overriden by action :func:`policy.PASS`.  For debugging purposes you can also add ``modules.unload('policy')`` to your config to unload the module.
+These rules can be overriden by action :any:`policy.PASS`.  For debugging purposes you can also add ``modules.unload('policy')`` to your config to unload the module.
 
 
 Filters
@@ -80,7 +80,7 @@ It is also possible to define custom filter function with any name.
    end
 
 This custom filter can be used as any other built-in filter.
-For example this applies our custom filter and executes action :func:`policy.DENY` on all queries of type `HINFO`:
+For example this applies our custom filter and executes action :any:`policy.DENY` on all queries of type `HINFO`:
 
 .. code-block:: lua
 
@@ -221,7 +221,7 @@ Following actions act on request and then processing continue until first non-ch
 
 .. py:data:: DEBUG_CACHE_MISS
 
-   Enable extra verbose logging but print logs only for requests which required information which was not available locally (i.e. requests which forced resolver to communicate over network). Intended usage is for debugging problems with remote servers. This action typically produces less logs than :func:`policy.DEBUG_ALWAYS` but all caveats from :func:`policy.DEBUG_IF` apply as well.
+   Enable extra verbose logging but print logs only for requests which required information which was not available locally (i.e. requests which forced resolver to communicate over network). Intended usage is for debugging problems with remote servers. This action typically produces less logs than :any:`policy.DEBUG_ALWAYS` but all caveats from :func:`policy.DEBUG_IF` apply as well.
 
    .. code-block:: lua
 
@@ -338,7 +338,7 @@ Forwarding over TLS protocol (DNS-over-TLS)
 -------------------------------------------
 .. function:: TLS_FORWARD( { {ip_address, authentication}, [...] } )
 
-   Same as :func:`FORWARD` but send query over DNS-over-TLS protocol (encrypted).
+   Same as :func:`policy.FORWARD` but send query over DNS-over-TLS protocol (encrypted).
    Each target IP address needs explicit configuration how to validate
    TLS certificate so each IP address is configured by pair:
    ``{ip_address, authentication}``. See sections below for more details.
@@ -346,7 +346,7 @@ Forwarding over TLS protocol (DNS-over-TLS)
 
 Policy :func:`policy.TLS_FORWARD` allows you to forward queries using `Transport Layer Security`_ protocol, which hides the content of your queries from an attacker observing the network traffic. Further details about this protocol can be found in :rfc:`7858` and `IETF draft dprive-dtls-and-tls-profiles`_.
 
-Queries affected by `TLS_FORWARD` policy will always be resolved over TLS connection. Knot Resolver does not implement fallback to non-TLS connection, so if TLS connection cannot be established or authenticated according to the configuration, the resolution will fail.
+Queries affected by :func:`policy.TLS_FORWARD` will always be resolved over TLS connection. Knot Resolver does not implement fallback to non-TLS connection, so if TLS connection cannot be established or authenticated according to the configuration, the resolution will fail.
 
 To test this feature you need to either :ref:`configure Knot Resolver as DNS-over-TLS server <tls-server-config>`, or pick some public DNS-over-TLS server. Please see `DNS Privacy Project`_ homepage for list of public servers.
 
@@ -532,7 +532,7 @@ The easiest work-around is to disable reading from cache for grafted domains.
         'internal.example.com.',
         '2.0.192.in-addr.arpa.'  -- this applies to reverse DNS tree as well
         })
-   -- Beware: the rule order is important, as STUB is not a chain action.
+   -- Beware: the rule order is important, as policy.STUB is not a chain action.
    policy.add(policy.suffix(policy.FLAGS({'NO_CACHE'}),   extraTrees))
    policy.add(policy.suffix(policy.STUB({'2001:db8::1'}), extraTrees))
 
@@ -567,20 +567,20 @@ Response policy zones
   .. csv-table::
    :header: "RPZ Right Hand Side", "Knot Resolver Action", "BIND Compatibility"
 
-   "``.``", "``action`` is used", "compatible if ``action`` is :func:`policy.DENY`"
+   "``.``", "``action`` is used", "compatible if ``action`` is :any:`policy.DENY`"
    "``*.``", ":func:`policy.ANSWER`", "yes"
-   "``rpz-passthru.``", ":func:`policy.PASS`", "yes"
-   "``rpz-tcp-only.``", ":func:`policy.TC`", "yes"
-   "``rpz-drop.``", ":func:`policy.DROP`", "no [#]_"
+   "``rpz-passthru.``", ":any:`policy.PASS`", "yes"
+   "``rpz-tcp-only.``", ":any:`policy.TC`", "yes"
+   "``rpz-drop.``", ":any:`policy.DROP`", "no [#]_"
    "fake A/AAAA", ":func:`policy.ANSWER`", "yes"
    "fake CNAME", "not supported", "no"
 
-  .. [#] Our :func:`policy.DROP` returns *SERVFAIL* answer (for historical reasons).
+  .. [#] Our :any:`policy.DROP` returns *SERVFAIL* answer (for historical reasons).
 
 
 .. function:: rpz(action, path, [watch = true])
 
-  :param action: the default action for match in the zone; typically you want :func:`policy.DENY`
+  :param action: the default action for match in the zone; typically you want :any:`policy.DENY`
   :param path: path to zone file
   :param watch: boolean, if true, the file will be reloaded on file change
 
