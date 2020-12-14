@@ -52,7 +52,7 @@ Example configuration
 	view:addr('192.168.1.0/24', policy.rpz(policy.PASS, 'whitelist.rpz'))
 	-- Do not try this - it will pollute cache and surprise you!
 	-- view:addr('10.0.0.0/8', policy.all(policy.FORWARD('2001:DB8::1')))
-	-- Drop everything that hasn't matched
+	-- Drop all IPv4 that hasn't matched
 	view:addr('0.0.0.0/0', policy.all(policy.DROP))
 
 Rule order
@@ -75,15 +75,15 @@ Properties
 
 .. function:: view:addr(subnet, rule)
 
-  :param subnet: client subnet, i.e. ``10.0.0.1``
-  :param rule: added rule, i.e. ``policy.pattern(policy.DENY, '[0-9]+\2cz')``
+  :param subnet: client subnet, e.g. ``10.0.0.1``
+  :param rule: added rule, e.g. ``policy.pattern(policy.DENY, '[0-9]+\2cz')``
 
   Apply rule to clients in given subnet.
 
 .. function:: view:tsig(key, rule)
 
-  :param key: client TSIG key domain name, i.e. ``\5mykey``
-  :param rule: added rule, i.e. ``policy.pattern(policy.DENY, '[0-9]+\2cz')``
+  :param key: client TSIG key domain name, e.g. ``\5mykey``
+  :param rule: added rule, e.g. ``policy.pattern(policy.DENY, '[0-9]+\2cz')``
 
   Apply rule to clients with given TSIG key.
 

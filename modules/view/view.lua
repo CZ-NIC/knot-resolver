@@ -24,6 +24,9 @@ function view.addr(_, subnet, rules, dst)
 	local subnet_cd = ffi.new('char[16]')
 	local family = C.kr_straddr_family(subnet)
 	local bitlen = C.kr_straddr_subnet(subnet_cd, subnet)
+	if bitlen < 0 then
+		error(string.format('failed to parse subnet %s', subnet))
+	end
 	local t = {family, subnet_cd, bitlen, rules}
 	table.insert(dst and view.dst or view.src, t)
 	return t
