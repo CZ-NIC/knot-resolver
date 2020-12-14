@@ -137,6 +137,11 @@ typedef struct {
 	size_t len;
 	size_t cap;
 } ranked_rr_array_t;
+typedef struct {
+	union inaddr *at;
+	size_t len;
+	size_t cap;
+} inaddr_array_t;
 struct kr_zonecut {
 	knot_dname_t *name;
 	knot_rrset_t *key;

@@ -109,6 +109,7 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_qflags
 	ranked_rr_array_entry_t
 	ranked_rr_array_t
+	inaddr_array_t
 	struct kr_zonecut
 	kr_qarray_t
 	struct kr_rplan
@@ -126,7 +127,6 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_prop
 	struct kr_module
 	struct kr_server_selection
-	inaddr_array_t
 EOF
 
 # a static variable; the line might not be simple to generate
