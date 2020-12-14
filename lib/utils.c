@@ -536,7 +536,7 @@ int kr_straddr_subnet(void *dst, const char *addr)
 	}
 	/* Parse address */
 	int ret = inet_pton(family, addr_str, dst);
-	if (ret < 0) {
+	if (ret != 1) {
 		return kr_error(EILSEQ);
 	}
 
@@ -577,7 +577,7 @@ int kr_straddr_join(const char *addr, uint16_t port, char *buf, size_t *buflen)
 
 	struct sockaddr_storage ss;
 	int family = kr_straddr_family(addr);
-	if (family == kr_error(EINVAL) || !inet_pton(family, addr, &ss)) {
+	if (family == kr_error(EINVAL) || inet_pton(family, addr, &ss) != 1) {
 		return kr_error(EINVAL);
 	}
 
