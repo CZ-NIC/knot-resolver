@@ -16,6 +16,8 @@
 
 #define DEBUG_MSG(fmt, ...) kr_log_verbose("[dnstap] " fmt, ##__VA_ARGS__);
 #define CFG_SOCK_PATH "socket_path"
+#define CFG_IDENTITY_STRING "identity"
+#define CFG_VERSION_STRING "version"
 #define CFG_LOG_CLIENT_PKT "client"
 #define CFG_LOG_REQ_PKT "log_requests"
 #define CFG_LOG_RESP_PKT "log_responses"
@@ -28,6 +30,10 @@
 
 /* Internal data structure */
 struct dnstap_data {
+	char *identity;
+	size_t identity_len;
+	char *version;
+	size_t version_len;
 	bool log_req_pkt;
 	bool log_resp_pkt;
 	struct fstrm_iothr *iothread;
@@ -200,6 +206,18 @@ static int dnstap_log(kr_layer_t *ctx) {
 	dnstap.type = DNSTAP__DNSTAP__TYPE__MESSAGE;
 	dnstap.message = (Dnstap__Message *)&m;
 
+	if (dnstap_dt->identity) {
+		dnstap.identity.data = (uint8_t*)dnstap_dt->identity;
+		dnstap.identity.len = dnstap_dt->identity_len;
+		dnstap.has_identity = true;
+	}
+
+	if (dnstap_dt->version) {
+		dnstap.version.data = (uint8_t*)dnstap_dt->version;
+		dnstap.version.len = dnstap_dt->version_len;
+		dnstap.has_version = true;
+	}
+
 	/* Pack the message */
 	uint8_t *frame = NULL;
 	size_t size = 0;
@@ -246,6 +264,14 @@ int dnstap_deinit(struct kr_module *module) {
 	struct dnstap_data *data = module->data;
 	/* Free allocated memory */
 	if (data) {
+		if (data->identity) {
+			free(data->identity);
+		}
+
+		if (data->version) {
+			free(data->version);
+		}
+
 		fstrm_iothr_destroy(&data->iothread);
 		DEBUG_MSG("fstrm iothread destroyed\n");
 		free(data);
@@ -336,6 +362,26 @@ int dnstap_config(struct kr_module *module, const char *conf) {
 		node = json_find_member(root_node, CFG_SOCK_PATH);
 		if (!node || find_string(node, &sock_path, PATH_MAX) != kr_ok()) {
 			sock_path = strndup(DEFAULT_SOCK_PATH, PATH_MAX);
+		}
+
+		/* identity string key */
+		node = json_find_member(root_node, CFG_IDENTITY_STRING);
+		if (!node || find_string(node, &data->identity, KR_EDNS_PAYLOAD) != kr_ok()) {
+			data->identity = NULL;
+			data->identity_len = 0;
+		} else {
+			data->identity_len = strlen(data->identity);
+		}
+
+		/* version string key */
+		node = json_find_member(root_node, CFG_VERSION_STRING);
+		if (!node || find_string(node, &data->version, KR_EDNS_PAYLOAD) != kr_ok()) {
+			data->version = strdup("Knot Resolver " PACKAGE_VERSION);
+			if (data->version) {
+				data->version_len = strlen(data->version);
+			}
+		} else {
+			data->version_len = strlen(data->version);
 		}
 
 		node = json_find_member(root_node, CFG_LOG_CLIENT_PKT);
