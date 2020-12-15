@@ -468,7 +468,7 @@ void kr_server_selection_init(struct kr_query *qry) {
 }
 
 int kr_forward_add_target(struct kr_request *req, const struct sockaddr *sock) {
-	if (req->selection_context.forwarding_targets.at) {
+	if (!req->selection_context.forwarding_targets.at) {
 		return kr_error(EINVAL);
 	}
 
