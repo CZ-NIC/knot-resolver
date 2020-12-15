@@ -332,7 +332,9 @@ Actions :func:`policy.FORWARD`, :func:`policy.TLS_FORWARD` and :func:`policy.STU
           policy.STUB('192.0.2.1@5353'),
           {todname('1.168.192.in-addr.arpa')}))
 
-.. note:: Forwarding targets must support `EDNS <https://en.wikipedia.org/wiki/Extension_mechanisms_for_DNS>` and `0x20 randomization <https://tools.ietf.org/html/draft-vixie-dnsext-dns0x20-00>`.
+.. note:: Forwarding targets must support
+   `EDNS <https://en.wikipedia.org/wiki/Extension_mechanisms_for_DNS>`_ and
+   `0x20 randomization <https://tools.ietf.org/html/draft-vixie-dnsext-dns0x20-00>`_.
 
 
 .. _tls-forwarding:
