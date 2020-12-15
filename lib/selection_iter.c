@@ -217,6 +217,7 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 	unpack_state_from_zonecut(local_state, qry);
 
 	struct choice choices[trie_weight(local_state->addresses)];
+	// We may try to resolve A and AAAA record for each name, so therefore 2*trie_weight(…) is here.
 	struct to_resolve resolvable[2*trie_weight(local_state->names)];
 
 	// Filter valid addresses and names from the tries
