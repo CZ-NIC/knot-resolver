@@ -188,10 +188,13 @@ void update_address_state(struct address_state *state, uint8_t *address, size_t 
 	*/
 	check_network_settings(state, address_len, qry->flags.NO_IPV4, qry->flags.NO_IPV6);
 	state->rtt_state = get_rtt_state(address, address_len, &qry->request->ctx->cache);
-	const char *ns_str = kr_straddr(&tmp_address.ip);
-	if (VERBOSE_STATUS) {
-		printf("[slct] rtt of %s is %d, variance is %d\n", ns_str, state->rtt_state.srtt, state->rtt_state.variance);
+	#ifdef SELECTION_CHOICE_LOGGING
+	// This is sometimes useful for debugging, but usually too verbose
+	WITH_VERBOSE(qry) {
+		const char *ns_str = kr_straddr(&tmp_address.ip);
+		VERBOSE_MSG(qry, "rtt of %s is %d, variance is %d\n", ns_str, state->rtt_state.srtt, state->rtt_state.variance);
 	}
+	#endif
 }
 
 int cmp_choices(const void *a, const void *b) {

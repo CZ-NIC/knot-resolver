@@ -59,11 +59,6 @@ void forward_choose_transport(struct kr_query *qry, struct kr_transport **transp
 		}
 		addr_state->choice_array_index = i;
 
-		const char *ns_str = kr_straddr(&address->ip);
-		if (VERBOSE_STATUS) {
-			printf("[nsrep] rtt of %s is %d, variance is %d\n", ns_str, addr_state->rtt_state.srtt, addr_state->rtt_state.variance);
-		}
-
 		choices[valid++] = (struct choice){
 			.address = ip_to_bytes(address, addr_len),
 			.address_len = addr_len,
