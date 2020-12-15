@@ -13,8 +13,10 @@ The unix socket and the socket reader must be present before starting resolver i
 
 Tunables:
 
-* ``socket_path``: the the unix socket file where dnstap messages will be sent
-* ``client/log_requests``: if ``true`` requests from downstream in wire format will be logged
+* ``socket_path``: the unix socket file where dnstap messages will be sent
+* ``identity``: identity string as typically returned by an "NSID" (RFC 5001) query, empty by default
+* ``version``: version string of the resolver
+* ``client/log_queries``: if ``true`` queries from downstream in wire format will be logged
 * ``client/log_responses``: if ``true`` responses to downstream in wire format will be logged
 
 .. code-block:: lua
@@ -22,8 +24,10 @@ Tunables:
     modules = {
         dnstap = {
             socket_path = "/tmp/dnstap.sock",
+            identity = "",
+            version = "Knot Resolver major.minor.patch",
             client = {
-                log_requests = true,
+                log_queries = true,
                 log_responses = true
             }
         }
