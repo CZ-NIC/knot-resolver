@@ -255,7 +255,10 @@ if [ $1 -ge 2 ] ; then
 fi
 
 # systemd_post macro is not needed for anything (calls systemctl preset)
+%if 0%{?suse_version} || 0%{?rhel} == 7
+# tmpfiles is only needed (and present) for systemd<235
 %tmpfiles_create %{_tmpfilesdir}/knot-resolver.conf
+%endif
 %if "x%{?fedora}" == "x"
 /sbin/ldconfig
 %endif
@@ -287,7 +290,9 @@ fi
 %dir %{_unitdir}/multi-user.target.wants
 %{_unitdir}/multi-user.target.wants/kresd.target
 %{_mandir}/man7/kresd.systemd.7.gz
+%if 0%{?suse_version} || 0%{?rhel} == 7
 %{_tmpfilesdir}/knot-resolver.conf
+%endif
 %ghost /run/%{name}
 %ghost %{_localstatedir}/cache/%{name}
 %attr(750,knot-resolver,knot-resolver) %dir %{_libdir}/%{name}
