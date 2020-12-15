@@ -175,7 +175,7 @@ static int parse_addr_str(union inaddr *sa, const char *addr)
 	memset(sa, 0, sizeof(*sa));
 	sa->ip.sa_family = family;
 	char *addr_bytes = (/*const*/char *)kr_inaddr(&sa->ip);
-	if (inet_pton(family, addr, addr_bytes) < 1) {
+	if (inet_pton(family, addr, addr_bytes) != 1) {
 		return kr_error(EILSEQ);
 	}
 	return 0;
