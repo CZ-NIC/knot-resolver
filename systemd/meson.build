@@ -12,7 +12,21 @@ systemd_config.set('etc_dir', etc_dir)
 systemd_config.set('run_dir', run_dir)
 systemd_config.set('lib_dir', lib_dir)
 
+extra_service_directives = []
+
 if systemd_files == 'enabled'
+  # detect systemd version for {State,Cache}Directory= support
+  if libsystemd.version().version_compare('>=235')
+    extra_service_directives += [
+      'StateDirectory=knot-resolver',
+      'StateDirectoryMode=0770',
+      'CacheDirectory=knot-resolver',
+      'CacheDirectoryMode=0770',
+    ]
+  endif
+
+  systemd_config.set('extra_service_directives', '\n'.join(extra_service_directives))
+
   ## unit files
   kresd_service = configure_file(
     input: 'kresd@.service.in',

@@ -1,3 +1,10 @@
+Knot Resolver 5.3.0 (2021-mm-dd)
+================================
+
+Improvements
+------------
+- systemd: use special directives instead of tmpfiles (!1113)
+
 Knot Resolver 5.2.1 (2020-12-09)
 ================================
 
