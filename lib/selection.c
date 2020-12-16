@@ -28,6 +28,10 @@
 #define MAX_BACKOFF 5
 #define MINIMAL_TIMEOUT_ADDITION 20
 
+// Define ε for ε-greedy algorithm (see select_transport) as ε=EPSILON_NOMIN/EPSILON_DENOM
+#define EPSILON_NOMIN 1
+#define EPSILON_DENOM 20
+
 /* Simple cache interface follows */
 
 #define KEY_PREFIX 'S'
@@ -246,7 +250,7 @@ struct kr_transport *select_transport(struct choice choices[],
 	memset(transport, 0, sizeof(struct kr_transport));
 	
 	int choice = 0;
-	if (kr_rand_coin(1, 20) || choices_len == 0) {
+	if (kr_rand_coin(EPSILON_NOMIN, EPSILON_DENOM) || choices_len == 0) {
 		// "EXPLORE": randomly choose some option (including resolution of some new name)
 		int index = kr_rand_bytes(1) % (choices_len + unresolved_len);
 		if (index < unresolved_len) {
