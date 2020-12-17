@@ -5,30 +5,39 @@
 #include "lib/selection_forward.h"
 #include "lib/resolve.h"
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "slct",  __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "slct", __VA_ARGS__)
 
 #define FORWARDING_TIMEOUT 2000
 
 struct forward_local_state {
 	inaddr_array_t *targets;
 	struct address_state *addr_states;
-	size_t last_choice_index; /**< Index of last choice in the targets array, used for error reporting. */
+	/** Index of last choice in the targets array, used for error reporting. */
+	size_t last_choice_index;
 };
 
-void forward_local_state_alloc(struct knot_mm *mm, void **local_state, struct kr_request *req) {
+void forward_local_state_alloc(struct knot_mm *mm, void **local_state,
+			       struct kr_request *req)
+{
 	assert(req->selection_context.forwarding_targets.at);
 	*local_state = mm_alloc(mm, sizeof(struct forward_local_state));
 	memset(*local_state, 0, sizeof(struct forward_local_state));
 
-	struct forward_local_state *forward_state = (struct forward_local_state *)*local_state;
+	struct forward_local_state *forward_state =
+		(struct forward_local_state *)*local_state;
 	forward_state->targets = &req->selection_context.forwarding_targets;
 
-	forward_state->addr_states = mm_alloc(mm, sizeof(struct address_state) * forward_state->targets->len);
-	memset(forward_state->addr_states, 0, sizeof(struct address_state) * forward_state->targets->len);
+	forward_state->addr_states = mm_alloc(
+		mm, sizeof(struct address_state) * forward_state->targets->len);
+	memset(forward_state->addr_states, 0,
+	       sizeof(struct address_state) * forward_state->targets->len);
 }
 
-void forward_choose_transport(struct kr_query *qry, struct kr_transport **transport) {
-	struct forward_local_state *local_state = qry->server_selection.local_state->private;
+void forward_choose_transport(struct kr_query *qry,
+			      struct kr_transport **transport)
+{
+	struct forward_local_state *local_state =
+		qry->server_selection.local_state->private;
 	struct choice choices[local_state->targets->len];
 	int valid = 0;
 
@@ -37,24 +46,25 @@ void forward_choose_transport(struct kr_query *qry, struct kr_transport **transp
 		size_t addr_len;
 		uint16_t port;
 		switch (address->ip.sa_family) {
-			case AF_INET:
-				port = ntohs(address->ip4.sin_port);
-				addr_len = sizeof(struct in_addr);
-				break;
-			case AF_INET6:
-				port = ntohs(address->ip6.sin6_port);
-				addr_len = sizeof(struct in6_addr);
-				break;
-			default:
-				assert(0);
+		case AF_INET:
+			port = ntohs(address->ip4.sin_port);
+			addr_len = sizeof(struct in_addr);
+			break;
+		case AF_INET6:
+			port = ntohs(address->ip6.sin6_port);
+			addr_len = sizeof(struct in6_addr);
+			break;
+		default:
+			assert(0);
 		}
 
 		struct address_state *addr_state = &local_state->addr_states[i];
 		addr_state->ns_name = (knot_dname_t *)"";
 
-		update_address_state(addr_state, ip_to_bytes(address, addr_len), addr_len, qry);
+		update_address_state(addr_state, ip_to_bytes(address, addr_len),
+				     addr_len, qry);
 
-		if(addr_state->generation == -1) {
+		if (addr_state->generation == -1) {
 			continue;
 		}
 		addr_state->choice_array_index = i;
@@ -67,28 +77,41 @@ void forward_choose_transport(struct kr_query *qry, struct kr_transport **transp
 		};
 	}
 
-	bool tcp = qry->flags.TCP | qry->server_selection.local_state->truncated;
-	*transport = select_transport(choices, valid, NULL, 0, qry->server_selection.local_state->timeouts, &qry->request->pool, tcp, &local_state->last_choice_index);
+	bool tcp =
+		qry->flags.TCP | qry->server_selection.local_state->truncated;
+	*transport =
+		select_transport(choices, valid, NULL, 0,
+				 qry->server_selection.local_state->timeouts,
+				 &qry->request->pool, tcp,
+				 &local_state->last_choice_index);
 	if (*transport) {
-		/* Set static timeout for forwarding; there is no point in this being dynamic since the RTT
-		 * of a packet to forwarding target says nothing about the network RTT of said target, since
+		/* Set static timeout for forwarding; there is no point in this
+		 * being dynamic since the RTT of a packet to forwarding target
+		 * says nothing about the network RTT of said target, since
 		 * it is doing resolution upstream. */
 		(*transport)->timeout = FORWARDING_TIMEOUT;
-		// We need to propagate this to flags since it's used in other parts of the resolver (e.g. logging and stats)
+		/* We need to propagate this to flags since it's used in other
+		 * parts of the resolver (e.g. logging and stats). */
 		qry->flags.TCP = tcp;
 	}
 }
 
-void forward_error(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error sel_error) {
+void forward_error(struct kr_query *qry, const struct kr_transport *transport,
+		   enum kr_selection_error sel_error)
+{
 	if (!qry->server_selection.initialized) {
 		return;
 	}
-	struct forward_local_state *local_state = qry->server_selection.local_state->private;
-	struct address_state *addr_state = &local_state->addr_states[local_state->last_choice_index];
+	struct forward_local_state *local_state =
+		qry->server_selection.local_state->private;
+	struct address_state *addr_state =
+		&local_state->addr_states[local_state->last_choice_index];
 	error(qry, addr_state, transport, sel_error);
 }
 
-void forward_update_rtt(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt) {
+void forward_update_rtt(struct kr_query *qry,
+			const struct kr_transport *transport, unsigned rtt)
+{
 	if (!qry->server_selection.initialized) {
 		return;
 	}
@@ -97,8 +120,10 @@ void forward_update_rtt(struct kr_query *qry, const struct kr_transport *transpo
 		return;
 	}
 
-	struct forward_local_state *local_state = qry->server_selection.local_state->private;
-	struct address_state *addr_state = &local_state->addr_states[local_state->last_choice_index];
+	struct forward_local_state *local_state =
+		qry->server_selection.local_state->private;
+	struct address_state *addr_state =
+		&local_state->addr_states[local_state->last_choice_index];
 
 	update_rtt(qry, addr_state, transport, rtt);
 }
