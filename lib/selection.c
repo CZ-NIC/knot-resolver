@@ -30,7 +30,7 @@
 
 // Define ε for ε-greedy algorithm (see select_transport) as ε=EPSILON_NOMIN/EPSILON_DENOM
 #define EPSILON_NOMIN 1
-#define EPSILON_DENOM 10
+#define EPSILON_DENOM 40
 
 /* Simple cache interface follows */
 
