@@ -39,19 +39,22 @@ enum kr_selection_error {
 	KR_SELECTION_TRUNCATED,
 	KR_SELECTION_DNSSEC_ERROR,
 	KR_SELECTION_LAME_DELEGATION,
-	KR_SELECTION_BAD_CNAME, /**< Too long chain, or cycle. */
+	/** Too long chain, or cycle. */
+	KR_SELECTION_BAD_CNAME,
 
-	KR_SELECTION_NUMBER_OF_ERRORS /**< Leave this last, as it is used as array size. */
+	/** Leave this last, as it is used as array size. */
+	KR_SELECTION_NUMBER_OF_ERRORS 
 };
 
 enum kr_transport_protocol {
-	KR_TRANSPORT_RESOLVE_A, /**< Selected name with no IPv4 address, it has to be resolved first.*/
-	KR_TRANSPORT_RESOLVE_AAAA, /**< Selected name with no IPv6 address, it has to be resolved first.*/
+	/** Selected name with no IPv4 address, it has to be resolved first. */
+	KR_TRANSPORT_RESOLVE_A,
+	/** Selected name with no IPv6 address, it has to be resolved first. */
+	KR_TRANSPORT_RESOLVE_AAAA,
 	KR_TRANSPORT_UDP,
 	KR_TRANSPORT_TCP,
 	KR_TRANSPORT_TLS,
 };
-
 
 /**
  * Output of the selection algorithm.
@@ -62,8 +65,9 @@ struct kr_transport {
 	size_t address_len;
 	enum kr_transport_protocol protocol;
 	unsigned timeout; /**< Timeout in ms to be set for UDP transmission. */
-	bool deduplicated; /**< True iff transport was set in worker.c:subreq_finalize,
-                                that means it may be different from the one originally chosen one.*/
+	/** True iff transport was set in worker.c:subreq_finalize,
+	 * that means it may be different from the one originally chosen one.*/
+	bool deduplicated;
 	bool safe_mode; /**< Turn on SAFEMODE for this transport */
 };
 
@@ -79,8 +83,7 @@ struct local_state {
  * The function pointers are to be used throughout resolver when some information about
  * the transport is obtained. E.g. RTT in `worker.c` or RCODE in `iterate.c`,…
  */
-struct kr_server_selection
-{
+struct kr_server_selection {
 	bool initialized;
 	/**
 	 * Puts a pointer to next transport of @p qry to @p transport .
@@ -90,11 +93,15 @@ struct kr_server_selection
 	 *
 	 * @param transport to be filled with pointer to the chosen transport or NULL on failure
 	 */
-	void (*choose_transport)(struct kr_query *qry, struct kr_transport **transport);
-	/// Report back the RTT of network operation for transport in ms.
-	void (*update_rtt)(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt);
-	/// Report back error encourtered with the chosen transport. See `enum kr_selection`
-	void (*error)(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error error);
+	void (*choose_transport)(struct kr_query *qry,
+				 struct kr_transport **transport);
+	/** Report back the RTT of network operation for transport in ms. */
+	void (*update_rtt)(struct kr_query *qry,
+			   const struct kr_transport *transport, unsigned rtt);
+	/** Report back error encourtered with the chosen transport. See `enum kr_selection` */
+	void (*error)(struct kr_query *qry,
+		      const struct kr_transport *transport,
+		      enum kr_selection_error error);
 
 	struct local_state *local_state;
 };
@@ -123,14 +130,16 @@ struct rtt_state {
 	int32_t srtt;
 	int32_t variance;
 	int32_t consecutive_timeouts;
-	uint64_t dead_since; /**< Timestamp of pronouncing this IP bad based on KR_NS_TIMEOUT_ROW_DEAD */
+	/** Timestamp of pronouncing this IP bad based on KR_NS_TIMEOUT_ROW_DEAD */
+	uint64_t dead_since;
 };
 
 /**
  * @brief To be held per IP address and locally "inside" query.
  */
 struct address_state {
-	unsigned int generation; /**<< Used to distinguish old and valid records in local_state. */
+	/** Used to distinguish old and valid records in local_state. */
+	unsigned int generation;
 	struct rtt_state rtt_state;
 	knot_dname_t *ns_name;
 	bool tls_capable : 1;
@@ -151,18 +160,19 @@ struct choice {
 	uint8_t *address;
 	size_t address_len;
 	struct address_state *address_state;
-	uint16_t port; /**< used to overwrite the port number; if zero, `select_transport` determines it*/
+	/** used to overwrite the port number;
+	 * if zero, `select_transport` determines it. */
+	uint16_t port;
 };
 
 /**
  * @brief Array of these is description of names to be resolved (i.e. name without some address)
  */
-struct to_resolve
-{
+struct to_resolve {
 	knot_dname_t *name;
-	enum kr_transport_protocol type; /**< Either KR_TRANSPORT_RESOLVE_A or KR_TRANSPORT_RESOLVE_AAAA is valid here.*/
+	/** Either KR_TRANSPORT_RESOLVE_A or KR_TRANSPORT_RESOLVE_AAAA is valid here. */
+	enum kr_transport_protocol type;
 };
-
 
 /**
  * @brief Based on passed choices, choose the next transport.
@@ -179,28 +189,32 @@ struct to_resolve
  * @return Chosen transport or NULL when no choice is viable
  */
 struct kr_transport *select_transport(struct choice choices[], int choices_len,
-                                      struct to_resolve unresolved[], int unresolved_len,
-                                      int timeouts, struct knot_mm *mempool, bool tcp,
-                                      size_t *choice_index);
+				      struct to_resolve unresolved[],
+				      int unresolved_len, int timeouts,
+				      struct knot_mm *mempool, bool tcp,
+				      size_t *choice_index);
 
 /**
  * Common part of RTT feedback mechanism. Notes RTT to global cache.
  */
 void update_rtt(struct kr_query *qry, struct address_state *addr_state,
-                const struct kr_transport *transport, unsigned rtt);
+		const struct kr_transport *transport, unsigned rtt);
 
 /**
  * Common part of error feedback mechanism.
  */
 void error(struct kr_query *qry, struct address_state *addr_state,
-           const struct kr_transport *transport, enum kr_selection_error sel_error);
+	   const struct kr_transport *transport,
+	   enum kr_selection_error sel_error);
 
 /**
  * Get RTT state from cache. Returns `default_rtt_state` on unknown addresses.
  */
-struct rtt_state get_rtt_state(const uint8_t *ip, size_t len, struct kr_cache *cache);
+struct rtt_state get_rtt_state(const uint8_t *ip, size_t len,
+			       struct kr_cache *cache);
 
-int put_rtt_state(const uint8_t *ip, size_t len, struct rtt_state state, struct kr_cache *cache);
+int put_rtt_state(const uint8_t *ip, size_t len, struct rtt_state state,
+		  struct kr_cache *cache);
 
 /**
  * @internal Helper function for conversion between different IP representations.
@@ -210,10 +224,10 @@ void bytes_to_ip(uint8_t *bytes, size_t len, union inaddr *dst);
 /**
  * @internal Helper function for conversion between different IP representations.
  */
-uint8_t* ip_to_bytes(const union inaddr *src, size_t len);
+uint8_t *ip_to_bytes(const union inaddr *src, size_t len);
 
 /**
  * @internal Fetch per-address information from various sources.
  */
-void update_address_state(struct address_state *state, uint8_t *address, size_t address_len,
-			  struct kr_query *qry);
+void update_address_state(struct address_state *state, uint8_t *address,
+			  size_t address_len, struct kr_query *qry);

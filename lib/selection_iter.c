@@ -10,23 +10,20 @@
 #include "lib/zonecut.h"
 #include "lib/resolve.h"
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "slct",  __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "slct", __VA_ARGS__)
 
 // To be held per query and locally
 struct iter_local_state {
 	trie_t *names;
 	trie_t *addresses;
 	knot_dname_t *zonecut;
-	unsigned int generation; /**<< Used to distinguish old and valid records in tries. */
+	/** Used to distinguish old and valid records in tries. */
+	unsigned int generation;
 	enum kr_selection_error last_error;
 	unsigned int no_ns_addr_count;
 };
 
-enum record_state {
-	RECORD_UNKNOWN,
-	RECORD_RESOLVED,
-	RECORD_TRIED
-};
+enum record_state { RECORD_UNKNOWN, RECORD_RESOLVED, RECORD_TRIED };
 
 // To be held per NS name and locally
 struct iter_name_state {
@@ -35,24 +32,29 @@ struct iter_name_state {
 	enum record_state aaaa_state;
 };
 
-void iter_local_state_alloc(struct knot_mm *mm, void **local_state) {
+void iter_local_state_alloc(struct knot_mm *mm, void **local_state)
+{
 	*local_state = mm_alloc(mm, sizeof(struct iter_local_state));
 	memset(*local_state, 0, sizeof(struct iter_local_state));
 }
 
-struct address_state *get_address_state(struct iter_local_state *local_state, const struct kr_transport *transport) {
+struct address_state *get_address_state(struct iter_local_state *local_state,
+					const struct kr_transport *transport)
+{
 	if (!transport) {
 		return NULL;
 	}
 
 	trie_t *addresses = local_state->addresses;
-	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
+	uint8_t *address =
+		ip_to_bytes(&transport->address, transport->address_len);
 
-	trie_val_t *address_state = trie_get_try(addresses, (char *)address, transport->address_len);
+	trie_val_t *address_state = trie_get_try(addresses, (char *)address,
+						 transport->address_len);
 
 	if (!address_state) {
 		if (transport->deduplicated) {
-			// Transport was chosen by a different query
+			/* Transport was chosen by a different query. */
 			return NULL;
 		}
 
@@ -61,17 +63,20 @@ struct address_state *get_address_state(struct iter_local_state *local_state, co
 	return (struct address_state *)*address_state;
 }
 
-bool zonecut_changed(knot_dname_t *new, knot_dname_t *old) {
+bool zonecut_changed(knot_dname_t *new, knot_dname_t *old)
+{
 	return knot_dname_cmp(old, new);
 }
 
-void unpack_state_from_zonecut(struct iter_local_state *local_state, struct kr_query *qry) {
+void unpack_state_from_zonecut(struct iter_local_state *local_state,
+			       struct kr_query *qry)
+{
 	struct kr_zonecut *zonecut = &qry->zone_cut;
 	struct knot_mm *mm = &qry->request->pool;
 
 	bool zcut_changed = false;
 	if (local_state->names == NULL || local_state->addresses == NULL) {
-		// Local state initialization
+		/* Local state initialization. */
 		memset(local_state, 0, sizeof(struct iter_local_state));
 		local_state->names = trie_create(mm);
 		local_state->addresses = trie_create(mm);
@@ -88,13 +93,14 @@ void unpack_state_from_zonecut(struct iter_local_state *local_state, struct kr_q
 	trie_it_t *it;
 	unsigned int current_generation = local_state->generation;
 
-	for(it = trie_it_begin(zonecut->nsset); !trie_it_finished(it); trie_it_next(it)) {
+	for (it = trie_it_begin(zonecut->nsset); !trie_it_finished(it); trie_it_next(it)) {
 		knot_dname_t *dname = (knot_dname_t *)trie_it_key(it, NULL);
 		pack_t *addresses = (pack_t *)*trie_it_val(it);
 
-		trie_val_t *val = trie_get_ins(local_state->names, (char *)dname, knot_dname_size(dname));
+		trie_val_t *val = trie_get_ins(local_state->names, (char *)dname,
+					       knot_dname_size(dname));
 		if (!*val) {
-			// We encountered this name for the first time
+			/* We encountered this name for the first time. */
 			*val = mm_alloc(mm, sizeof(struct iter_name_state));
 			memset(*val, 0, sizeof(struct iter_name_state));
 		}
@@ -102,47 +108,57 @@ void unpack_state_from_zonecut(struct iter_local_state *local_state, struct kr_q
 		name_state->generation = current_generation;
 
 		if (zcut_changed) {
-			// Set name as unresolved as they might have fallen out of cache (TTL expired)
+			/* Set name as unresolved as they might have fallen out
+			 * of cache (TTL expired). */
 			name_state->a_state = RECORD_UNKNOWN;
 			name_state->aaaa_state = RECORD_UNKNOWN;
 		}
+		
+		if (addresses->len == 0) {
+			continue;
+		}
 
-		if (addresses->len > 0) {
-			// We have some addresses to work with, let's iterate over them
-			for(uint8_t *obj = pack_head(*addresses); obj != pack_tail(*addresses); obj = pack_obj_next(obj)) {
-				uint8_t *address = pack_obj_val(obj);
-				size_t address_len = pack_obj_len(obj);
-				trie_val_t *tval = trie_get_ins(local_state->addresses, (char *)address, address_len);
-				if (!*tval) {
-					// We have have not seen this address before.
-					*tval = mm_alloc(mm, sizeof(struct address_state));
-					memset(*tval, 0, sizeof(struct address_state));
-				}
-				struct address_state *address_state = (*(struct address_state **)tval);
-				address_state->generation = current_generation;
-				address_state->ns_name = dname;
-
-				if (address_len == sizeof(struct in_addr)) {
-					name_state->a_state = RECORD_RESOLVED;
-				} else if (address_len == sizeof(struct in6_addr)) {
-					name_state->aaaa_state = RECORD_RESOLVED;
-				}
-				update_address_state(address_state, address, address_len, qry);
+		/* We have some addresses to work with, let's iterate over them. */
+		for (uint8_t *obj = pack_head(*addresses); obj != pack_tail(*addresses);
+		     obj = pack_obj_next(obj)) {
+			uint8_t *address = pack_obj_val(obj);
+			size_t address_len = pack_obj_len(obj);
+			trie_val_t *tval = trie_get_ins(local_state->addresses,
+							(char *)address,
+							address_len);
+			if (!*tval) {
+				/* We have have not seen this address before. */
+				*tval = mm_alloc(mm, sizeof(struct address_state));
+				memset(*tval, 0, sizeof(struct address_state));
 			}
+			struct address_state *address_state = (*(struct address_state **)tval);
+			address_state->generation = current_generation;
+			address_state->ns_name = dname;
+
+			if (address_len == sizeof(struct in_addr)) {
+				name_state->a_state = RECORD_RESOLVED;
+			} else if (address_len == sizeof(struct in6_addr)) {
+				name_state->aaaa_state = RECORD_RESOLVED;
+			}
+			update_address_state(address_state, address, address_len, qry);
 		}
 	}
-
 	trie_it_free(it);
 }
 
-int get_valid_addresses(struct iter_local_state *local_state, struct choice choices[]) {
+int get_valid_addresses(struct iter_local_state *local_state,
+			struct choice choices[])
+{
 	unsigned count = 0;
 	trie_it_t *it;
-	for(it = trie_it_begin(local_state->addresses); !trie_it_finished(it); trie_it_next(it)) {
+	for (it = trie_it_begin(local_state->addresses); !trie_it_finished(it);
+	     trie_it_next(it)) {
 		size_t address_len;
-		uint8_t* address = (uint8_t *)trie_it_key(it, &address_len);
-		struct address_state *address_state = (struct address_state *)*trie_it_val(it);
-		if (address_state->generation == local_state->generation && !address_state->unrecoverable_errors) {
+		uint8_t *address = (uint8_t *)trie_it_key(it, &address_len);
+		struct address_state *address_state =
+			(struct address_state *)*trie_it_val(it);
+		if (address_state->generation == local_state->generation &&
+		    !address_state->unrecoverable_errors) {
 			choices[count] = (struct choice){
 				.address = address,
 				.address_len = address_len,
@@ -155,7 +171,9 @@ int get_valid_addresses(struct iter_local_state *local_state, struct choice choi
 	return count;
 }
 
-int get_resolvable_names(struct iter_local_state *local_state, struct to_resolve resolvable[], struct kr_query *qry) {
+int get_resolvable_names(struct iter_local_state *local_state,
+			 struct to_resolve resolvable[], struct kr_query *qry)
+{
 	/* Further resolution is not possible until we get `. DNSKEY` record;
 	 * we have to choose one of the known addresses here. */
 	if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
@@ -164,8 +182,10 @@ int get_resolvable_names(struct iter_local_state *local_state, struct to_resolve
 
 	unsigned count = 0;
 	trie_it_t *it;
-	for(it = trie_it_begin(local_state->names); !trie_it_finished(it); trie_it_next(it)) {
-		struct iter_name_state *name_state = *(struct iter_name_state **)trie_it_val(it);
+	for (it = trie_it_begin(local_state->names); !trie_it_finished(it);
+	     trie_it_next(it)) {
+		struct iter_name_state *name_state =
+			*(struct iter_name_state **)trie_it_val(it);
 		if (name_state->generation == local_state->generation) {
 			knot_dname_t *name = (knot_dname_t *)trie_it_key(it, NULL);
 			/* FIXME: kr_rplan_satisfies(qry,…) should have been here, but this leads to failures on 
@@ -174,13 +194,26 @@ int get_resolvable_names(struct iter_local_state *local_state, struct to_resolve
 			 * to requery the same query twice in the row. So we have to allow that and only check the 
 			 * rplan from parent upwards.
 			 */
-			bool a_in_rplan = kr_rplan_satisfies(qry->parent, name, KNOT_CLASS_IN, KNOT_RRTYPE_A);
-			bool aaaa_in_rplan = kr_rplan_satisfies(qry->parent, name, KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
-			if (name_state->a_state == RECORD_UNKNOWN && !qry->flags.NO_IPV4 && !a_in_rplan) {
-				resolvable[count++] = (struct to_resolve){name, KR_TRANSPORT_RESOLVE_A};
+			bool a_in_rplan = kr_rplan_satisfies(qry->parent, name,
+							     KNOT_CLASS_IN,
+							     KNOT_RRTYPE_A);
+			bool aaaa_in_rplan =
+				kr_rplan_satisfies(qry->parent, name,
+						   KNOT_CLASS_IN,
+						   KNOT_RRTYPE_AAAA);
+
+			if (name_state->a_state == RECORD_UNKNOWN &&
+			    !qry->flags.NO_IPV4 && !a_in_rplan) {
+				resolvable[count++] = (struct to_resolve){
+					name, KR_TRANSPORT_RESOLVE_A
+				};
 			}
-			if (name_state->aaaa_state == RECORD_UNKNOWN && !qry->flags.NO_IPV6 && !aaaa_in_rplan) {
-				resolvable[count++] = (struct to_resolve){name, KR_TRANSPORT_RESOLVE_AAAA};
+
+			if (name_state->aaaa_state == RECORD_UNKNOWN &&
+			    !qry->flags.NO_IPV6 && !aaaa_in_rplan) {
+				resolvable[count++] = (struct to_resolve){
+					name, KR_TRANSPORT_RESOLVE_AAAA
+				};
 			}
 		}
 	}
@@ -188,7 +221,9 @@ int get_resolvable_names(struct iter_local_state *local_state, struct to_resolve
 	return count;
 }
 
-void update_name_state(knot_dname_t *name, enum kr_transport_protocol type, trie_t *names) {
+void update_name_state(knot_dname_t *name, enum kr_transport_protocol type,
+		       trie_t *names)
+{
 	size_t name_len = knot_dname_size(name);
 	trie_val_t *val = trie_get_try(names, (char *)name, name_len);
 
@@ -197,8 +232,7 @@ void update_name_state(knot_dname_t *name, enum kr_transport_protocol type, trie
 	}
 
 	struct iter_name_state *name_state = (struct iter_name_state *)*val;
-	switch (type)
-	{
+	switch (type) {
 	case KR_TRANSPORT_RESOLVE_A:
 		name_state->a_state = RECORD_TRIED;
 		break;
@@ -210,48 +244,61 @@ void update_name_state(knot_dname_t *name, enum kr_transport_protocol type, trie
 	}
 }
 
-void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport) {
+void iter_choose_transport(struct kr_query *qry,
+			   struct kr_transport **transport)
+{
 	struct knot_mm *mempool = &qry->request->pool;
-	struct iter_local_state *local_state = (struct iter_local_state *)qry->server_selection.local_state->private;
+	struct iter_local_state *local_state =
+		(struct iter_local_state *)
+			qry->server_selection.local_state->private;
 
 	unpack_state_from_zonecut(local_state, qry);
 
 	struct choice choices[trie_weight(local_state->addresses)];
-	// We may try to resolve A and AAAA record for each name, so therefore 2*trie_weight(…) is here.
-	struct to_resolve resolvable[2*trie_weight(local_state->names)];
+	/* We may try to resolve A and AAAA record for each name, so therefore
+	 * 2*trie_weight(…) is here. */
+	struct to_resolve resolvable[2 * trie_weight(local_state->names)];
 
 	// Filter valid addresses and names from the tries
 	int choices_len = get_valid_addresses(local_state, choices);
 	int resolvable_len = get_resolvable_names(local_state, resolvable, qry);
 
 	if (choices_len || resolvable_len) {
-		bool tcp = qry->flags.TCP | qry->server_selection.local_state->truncated;
-		*transport = select_transport(choices, choices_len, resolvable, resolvable_len, qry->server_selection.local_state->timeouts, mempool, tcp, NULL);
+		bool tcp = qry->flags.TCP |
+			   qry->server_selection.local_state->truncated;
+		*transport = select_transport(
+			choices, choices_len, resolvable, resolvable_len,
+			qry->server_selection.local_state->timeouts, mempool,
+			tcp, NULL);
 		if (*transport) {
-			// We need to propagate this to flags since it's used in other parts of the resolver (e.g. logging and stats)
+			/* We need to propagate this to flags since it's used in
+			 * other parts of the resolver. */
 			qry->flags.TCP = tcp;
 
-			// Note that we tried resolving this name to not try it again.
-			switch ((*transport)->protocol)
-			{
+			/* Note that we tried resolving this name to not try it again. */
+			switch ((*transport)->protocol) {
 			case KR_TRANSPORT_RESOLVE_A:
 			case KR_TRANSPORT_RESOLVE_AAAA:
-				update_name_state((*transport)->ns_name, (*transport)->protocol, local_state->names);
+				update_name_state((*transport)->ns_name,
+						  (*transport)->protocol,
+						  local_state->names);
 			default:
 				break;
 			}
 		}
 	} else {
 		*transport = NULL;
-		// Last selected server had broken DNSSEC and now we have no more servers to ask
-		// we signal this to the rest of resolver by setting DNSSEC_BOGUS flag
+		/* Last selected server had broken DNSSEC and now we have no more
+		 * servers to ask. We signal this to the rest of resolver by
+		 * setting DNSSEC_BOGUS flag. */
 		if (local_state->last_error == KR_SELECTION_DNSSEC_ERROR) {
 			qry->flags.DNSSEC_BOGUS = true;
 		}
 	}
 
 	bool nxnsattack_mitigation = false;
-	enum kr_transport_protocol proto = *transport ? (*transport)->protocol : -1;
+	enum kr_transport_protocol proto =
+		*transport ? (*transport)->protocol : -1;
 	if (proto == KR_TRANSPORT_RESOLVE_A || proto == KR_TRANSPORT_RESOLVE_AAAA) {
 		if (++local_state->no_ns_addr_count > KR_COUNT_NO_NSADDR_LIMIT) {
 			*transport = NULL;
@@ -259,30 +306,37 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 		}
 	}
 
-	WITH_VERBOSE(qry) {
-		KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
-		if (*transport) {
-			KR_DNAME_GET_STR(ns_name, (*transport)->ns_name);
-			const char *ns_str = kr_straddr(&(*transport)->address.ip);
-			if (proto != KR_TRANSPORT_RESOLVE_A && proto != KR_TRANSPORT_RESOLVE_AAAA) {
-				VERBOSE_MSG(qry,
-				"=> id: '%05u' choosing: '%s'@'%s' with timeout %u ms zone cut: '%s'%s\n",
-				qry->id, ns_name, ns_str ? ns_str : "", (*transport)->timeout, zonecut_str, (*transport)->safe_mode ? " SAFEMODE" : "");
-			} else {
-				const char *ip_version = (proto == KR_TRANSPORT_RESOLVE_A) ? "A" : "AAAA";
-				VERBOSE_MSG(qry,
-				"=> id: '%05u' choosing to resolve %s: '%s' zone cut: '%s'\n",
-				qry->id, ip_version, ns_name, zonecut_str);
-			}
-		} else {
-			 VERBOSE_MSG(qry,
-			"=> id: '%05u' no suitable transport, zone cut: '%s'%s\n",
-			qry->id, zonecut_str, nxnsattack_mitigation ? " (stopped due to mitigation for NXNSAttack CVE-2020-12667)" : "");
+	WITH_VERBOSE(qry)
+	{
+	KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
+	if (*transport) {
+		KR_DNAME_GET_STR(ns_name, (*transport)->ns_name);
+		const char *ns_str = kr_straddr(&(*transport)->address.ip);
+		const char *ip_version;
+		switch (proto)
+		{
+		case KR_TRANSPORT_RESOLVE_A:
+		case KR_TRANSPORT_RESOLVE_AAAA:
+			VERBOSE_MSG(qry, "=> id: '%05u' choosing: '%s'@'%s' with timeout %u ms zone cut: '%s'%s\n",
+				    qry->id, ns_name, ns_str ? ns_str : "", (*transport)->timeout, zonecut_str,
+				    (*transport)->safe_mode ? " SAFEMODE" : "");
+			break;
+		default:
+			ip_version = (proto == KR_TRANSPORT_RESOLVE_A) ? "A" : "AAAA";
+			VERBOSE_MSG(qry, "=> id: '%05u' choosing to resolve %s: '%s' zone cut: '%s'\n",
+				    qry->id, ip_version, ns_name, zonecut_str);
+			break;
 		}
+	} else {
+		VERBOSE_MSG(qry, "=> id: '%05u' no suitable transport, zone cut: '%s'%s\n",
+			qry->id, zonecut_str, nxnsattack_mitigation ? " (stopped due to mitigation for NXNSAttack CVE-2020-12667)" : "");
+	}
 	}
 }
 
-void iter_error(struct kr_query *qry, const struct kr_transport *transport, enum kr_selection_error sel_error) {
+void iter_error(struct kr_query *qry, const struct kr_transport *transport,
+		enum kr_selection_error sel_error)
+{
 	if (!qry->server_selection.initialized) {
 		return;
 	}
@@ -292,7 +346,9 @@ void iter_error(struct kr_query *qry, const struct kr_transport *transport, enum
 	error(qry, addr_state, transport, sel_error);
 }
 
-void iter_update_rtt(struct kr_query *qry, const struct kr_transport *transport, unsigned rtt) {
+void iter_update_rtt(struct kr_query *qry, const struct kr_transport *transport,
+		     unsigned rtt)
+{
 	if (!qry->server_selection.initialized) {
 		return;
 	}
