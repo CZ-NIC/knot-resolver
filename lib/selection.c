@@ -49,7 +49,8 @@ void *prefix_key(const uint8_t *ip, size_t len) {
  * so it'll be equal to DEFAULT_TIMEOUT. */
 static const struct rtt_state default_rtt_state = {.srtt = 0,
 						   .variance = DEFAULT_TIMEOUT/4,
-						   .consecutive_timeouts = 0};
+						   .consecutive_timeouts = 0,
+						   .dead_since = 0};
 
 /* Note that this opens a cace transaction, which is usually closed by calling `put_rtt_state`
  * i.e. callee is responsible for the closing (e.g. calling kr_cache_commit). */
@@ -150,6 +151,15 @@ struct rtt_state calc_rtt_state(struct rtt_state old, unsigned new_rtt) {
 }
 
 /**
+ * @internal Invalidate addresses which should be considered dead
+ */
+void invalidate_dead_upstream(struct address_state *state, unsigned int retry_timeout) {
+	if (kr_now() - state->rtt_state.dead_since < retry_timeout) {
+		state->generation = -1;
+	}
+}
+
+/**
  * @internal Check if IP address is TLS capable.
  * 
  * @p req has to have the selection_context properly initiazed.
@@ -192,6 +202,7 @@ void update_address_state(struct address_state *state, uint8_t *address, size_t 
 	*/
 	check_network_settings(state, address_len, qry->flags.NO_IPV4, qry->flags.NO_IPV6);
 	state->rtt_state = get_rtt_state(address, address_len, &qry->request->ctx->cache);
+	invalidate_dead_upstream(state, qry->request->ctx->cache_rtt_tout_retry_interval);
 	#ifdef SELECTION_CHOICE_LOGGING
 	// This is sometimes useful for debugging, but usually too verbose
 	WITH_VERBOSE(qry) {
@@ -389,7 +400,9 @@ void cache_timeout(const struct kr_transport *transport, struct address_state *a
 
 	// We could lose some update from some other process by doing this, but at least timeout count can't blow up
 	if (cur_state.consecutive_timeouts == old_state.consecutive_timeouts) {
-		cur_state.consecutive_timeouts++;
+		if (++cur_state.consecutive_timeouts >= KR_NS_TIMEOUT_ROW_DEAD) {
+			cur_state.dead_since = kr_now();
+		}
 		put_rtt_state(address, transport->address_len, cur_state, cache);
 	} else {
 		// Since `get_rtt_state` opens a cache transaction, we have to end it

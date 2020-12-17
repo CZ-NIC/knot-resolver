@@ -11,6 +11,10 @@
 
 #include "lib/cache/api.h"
 
+/* After KR_NS_TIMEOUT_ROW_DEAD consecutive timeouts, we consider the upstream IP dead for KR_NS_TIMEOUT_RETRY_INTERVAL ms */
+#define KR_NS_TIMEOUT_ROW_DEAD 4
+#define KR_NS_TIMEOUT_RETRY_INTERVAL 1000
+
 /**
  * These errors are to be reported as feedback to server selection.
  * See `kr_server_selection::error` for more details.
@@ -119,6 +123,7 @@ struct rtt_state {
 	int32_t srtt;
 	int32_t variance;
 	int32_t consecutive_timeouts;
+	uint64_t dead_since; /**< Timestamp of pronouncing this IP bad based on KR_NS_TIMEOUT_ROW_DEAD */
 };
 
 /**
