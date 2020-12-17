@@ -383,6 +383,7 @@ static int init_resolver(struct engine *engine)
 	engine->resolver.negative_anchors = map_make(NULL);
 	engine->resolver.pool = engine->pool;
 	engine->resolver.modules = &engine->modules;
+	engine->resolver.cache_rtt_tout_retry_interval = KR_NS_TIMEOUT_RETRY_INTERVAL;
 	/* Create OPT RR */
 	engine->resolver.downstream_opt_rr = mm_alloc(engine->pool, sizeof(knot_rrset_t));
 	engine->resolver.upstream_opt_rr = mm_alloc(engine->pool, sizeof(knot_rrset_t));
