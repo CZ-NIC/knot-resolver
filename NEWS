@@ -1,6 +1,10 @@
 Knot Resolver 5.2.2 (2021-0m-dd)
 ================================
 
+Improvements
+------------
+- more consistency in using parent-side records for NS addresses (!1097)
+
 Bugfixes
 --------
 - view: fail config if bad subnet is specified (!1112)
