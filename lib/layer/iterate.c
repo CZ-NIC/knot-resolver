@@ -260,6 +260,7 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 		     && knot_dname_in_bailiwick(qry->sname, rr->owner)  >= 0;
 	if (!ok) {
 		VERBOSE_MSG("<= authority: ns outside bailiwick\n");
+		qry->server_selection.error(qry, req->upstream.transport, KR_SELECTION_LAME_DELEGATION);
 #ifdef STRICT_MODE
 		return KR_STATE_FAIL;
 #else
