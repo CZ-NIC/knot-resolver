@@ -189,7 +189,7 @@ int get_resolvable_names(struct iter_local_state *local_state,
 		if (name_state->generation == local_state->generation) {
 			knot_dname_t *name = (knot_dname_t *)trie_it_key(it, NULL);
 			if (qry->stype == KNOT_RRTYPE_DNSKEY &&
-			    knot_dname_in_bailiwick(name, qry->sname)) {
+			    knot_dname_in_bailiwick(qry->sname, name) > 0) {
 				/* Resolving `domain. DNSKEY` can't trigger the
 				 * resolution of `sub.domain. A/AAAA` since it
 				 * will cause a cycle. */
