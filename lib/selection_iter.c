@@ -318,14 +318,14 @@ void iter_choose_transport(struct kr_query *qry,
 		{
 		case KR_TRANSPORT_RESOLVE_A:
 		case KR_TRANSPORT_RESOLVE_AAAA:
-			VERBOSE_MSG(qry, "=> id: '%05u' choosing: '%s'@'%s' with timeout %u ms zone cut: '%s'%s\n",
-				    qry->id, ns_name, ns_str ? ns_str : "", (*transport)->timeout, zonecut_str,
-				    (*transport)->safe_mode ? " SAFEMODE" : "");
-			break;
-		default:
 			ip_version = (proto == KR_TRANSPORT_RESOLVE_A) ? "A" : "AAAA";
 			VERBOSE_MSG(qry, "=> id: '%05u' choosing to resolve %s: '%s' zone cut: '%s'\n",
 				    qry->id, ip_version, ns_name, zonecut_str);
+			break;
+		default:
+			VERBOSE_MSG(qry, "=> id: '%05u' choosing: '%s'@'%s' with timeout %u ms zone cut: '%s'%s\n",
+				    qry->id, ns_name, ns_str ? ns_str : "", (*transport)->timeout, zonecut_str,
+				    (*transport)->safe_mode ? " SAFEMODE" : "");
 			break;
 		}
 	} else {
