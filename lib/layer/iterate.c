@@ -1047,6 +1047,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 #endif
 	if (pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
 		VERBOSE_MSG("<= malformed response (parsed %d)\n", (int)pkt->parsed);
+		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_INVALID_DATA);
 		return resolve_badmsg(pkt, req, query);
 	} else if (!is_paired_to_query(pkt, query)) {
 		WITH_VERBOSE(query) {
@@ -1055,6 +1056,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 			VERBOSE_MSG("<= ignoring mismatching response from %s\n",
 					ns_str ? ns_str : "(kr_straddr failed)");
 		}
+		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_INVALID_DATA);
 		/* Force TCP, to work around authoritatives messing up question
 		 * without yielding to spoofed responses. */
 		query->flags.TCP = true;
