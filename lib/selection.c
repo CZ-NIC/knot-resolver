@@ -498,27 +498,29 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		}
 	}
 
-	if (sel_error == KR_SELECTION_TRUNCATED) {
-		if (qry->server_selection.local_state->truncated) {
+	if (sel_error == KR_SELECTION_TRUNCATED &&
+	    !qry->server_selection.local_state->truncated) {
+		/* Don't punish the server that told us to switch to TCP. */
+		qry->server_selection.local_state->truncated = true;
+	} else {
+		if (sel_error == KR_SELECTION_TRUNCATED) {
 			/* Second TRUNCATED means we got TRUNCATED over TCP.
 			 * This transport is therefore broken. */
 			addr_state->unrecoverable_errors++;
-		} else {
-			qry->server_selection.local_state->truncated = true;
 		}
+
+		if (UNRECOVERABLE_ERRORS[sel_error]) {
+			addr_state->unrecoverable_errors++;
+		}
+
+		if (sel_error == KR_SELECTION_FORMERROR && transport->safe_mode) {
+			addr_state->unrecoverable_errors++;
+		}
+
+		addr_state->errors[sel_error]++;
+		addr_state->error_count++;
 	}
-
-	if (UNRECOVERABLE_ERRORS[sel_error]) {
-		addr_state->unrecoverable_errors++;
-	}
-
-	if (sel_error == KR_SELECTION_FORMERROR && transport->safe_mode) {
-		addr_state->unrecoverable_errors++;
-	}
-
-	addr_state->errors[sel_error]++;
-	addr_state->error_count++;
-
+	
 	WITH_VERBOSE(qry)
 	{
 	KR_DNAME_GET_STR(ns_name, transport->ns_name);
