@@ -14,8 +14,6 @@
 
 #include "lib/utils.h"
 
-#define SELECTION_CHOICE_LOGGING
-
 #define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "slct", __VA_ARGS__)
 
 /** @internal Macro to set address structure. */
@@ -522,9 +520,7 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		addr_state->errors[sel_error]++;
 		addr_state->error_count++;
 	}
-
 	
-
 	WITH_VERBOSE(qry)
 	{
 	KR_DNAME_GET_STR(ns_name, transport->ns_name);
