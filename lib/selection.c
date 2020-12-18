@@ -28,6 +28,11 @@
 #define MAX_BACKOFF 5
 #define MINIMAL_TIMEOUT_ADDITION 20
 
+/* After TCP_TIMEOUT_THRESHOLD timeouts one transport, we'll switch to TCP. */
+#define TCP_TIMEOUT_THRESHOLD 2
+/* If the expected RTT is over TCP_RTT_THRESHOLD we switch to TCP instead. */
+#define TCP_RTT_THRESHOLD 2000
+
 /* Define ε for ε-greedy algorithm (see select_transport)
  * as ε=EPSILON_NOMIN/EPSILON_DENOM */
 #define EPSILON_NOMIN 1
@@ -351,7 +356,9 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 	enum kr_transport_protocol protocol;
 	if (chosen->address_state->tls_capable) {
 		protocol = KR_TRANSPORT_TLS;
-	} else if (tcp) {
+	} else if (tcp ||
+		   chosen->address_state->errors[KR_SELECTION_QUERY_TIMEOUT] >= TCP_TIMEOUT_THRESHOLD ||
+		   timeout > TCP_RTT_THRESHOLD) {
 		protocol = KR_TRANSPORT_TCP;
 	} else {
 		protocol = KR_TRANSPORT_UDP;

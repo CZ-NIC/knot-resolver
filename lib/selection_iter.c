@@ -271,17 +271,20 @@ void iter_choose_transport(struct kr_query *qry,
 			qry->server_selection.local_state->timeouts, mempool,
 			tcp, NULL);
 		if (*transport) {
-			/* We need to propagate this to flags since it's used in
-			 * other parts of the resolver. */
-			qry->flags.TCP = tcp;
-
-			/* Note that we tried resolving this name to not try it again. */
 			switch ((*transport)->protocol) {
 			case KR_TRANSPORT_RESOLVE_A:
 			case KR_TRANSPORT_RESOLVE_AAAA:
+				/* Note that we tried resolving this name to not try it again. */
 				update_name_state((*transport)->ns_name,
 						  (*transport)->protocol,
 						  local_state->names);
+				break;
+			case KR_TRANSPORT_TLS:
+			case KR_TRANSPORT_TCP:
+				/* We need to propagate this to flags since it's used in
+				 * other parts of the resolver. */
+				qry->flags.TCP = true;
+				break;
 			default:
 				break;
 			}
