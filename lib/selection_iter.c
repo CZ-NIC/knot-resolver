@@ -188,6 +188,14 @@ int get_resolvable_names(struct iter_local_state *local_state,
 			*(struct iter_name_state **)trie_it_val(it);
 		if (name_state->generation == local_state->generation) {
 			knot_dname_t *name = (knot_dname_t *)trie_it_key(it, NULL);
+			if (qry->stype == KNOT_RRTYPE_DNSKEY &&
+			    knot_dname_in_bailiwick(name, qry->sname)) {
+				/* Resolving `domain. DNSKEY` can't trigger the
+				 * resolution of `sub.domain. A/AAAA` since it
+				 * will cause a cycle. */
+				continue;
+			}
+
 			/* FIXME: kr_rplan_satisfies(qry,…) should have been here, but this leads to failures on 
 			 * iter_ns_badip.rpl, this is because the test requires the resolver to switch to parent
 			 * side after a record in cache expires. Only way to do this in the current zonecut setup is
