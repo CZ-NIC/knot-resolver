@@ -1045,6 +1045,9 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return resolve_badmsg(pkt, req, query);
 	} else
 #endif
+	/* LATER: Query minimization, 0x20 randomization, EDNS… should really be
+	 * set and managed by selection.c and SAFEMODE should be split and
+	 * removed altogether because it's doing many things at once. */
 	if (pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
 		VERBOSE_MSG("<= malformed response (parsed %d)\n", (int)pkt->parsed);
 		return resolve_badmsg(pkt, req, query);
