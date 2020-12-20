@@ -999,10 +999,8 @@ static int resolve_badmsg(knot_pkt_t *pkt, struct kr_request *req, struct kr_que
 	/* Work around broken auths/load balancers */
 	if (query->flags.SAFEMODE) {
 		return resolve_error(pkt, req);
-	} else if (query->flags.NO_MINIMIZE) {
-		query->flags.SAFEMODE = true;
-		return KR_STATE_DONE;
 	} else {
+		query->flags.SAFEMODE = true;
 		query->flags.NO_MINIMIZE = true;
 		return KR_STATE_DONE;
 	}
@@ -1045,6 +1043,9 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return resolve_badmsg(pkt, req, query);
 	} else
 #endif
+	/* LATER: Query minimization, 0x20 randomization, EDNS… should really be
+	 * set and managed by selection.c and SAFEMODE should be split and
+	 * removed altogether because it's doing many things at once. */
 	if (pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
 		VERBOSE_MSG("<= malformed response (parsed %d)\n", (int)pkt->parsed);
 		return resolve_badmsg(pkt, req, query);
