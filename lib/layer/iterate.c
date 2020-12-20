@@ -1060,7 +1060,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 		/* Force TCP, to work around authoritatives messing up question
 		 * without yielding to spoofed responses. */
-		query->flags.TCP = true;
+		// query->flags.TCP = true;
 		return resolve_badmsg(pkt, req, query);
 	} else if (knot_wire_get_tc(pkt->wire)) {
 		VERBOSE_MSG("<= truncated response, failover to TCP\n");
