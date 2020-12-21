@@ -499,13 +499,12 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 	}
 
 	if (sel_error == KR_SELECTION_TRUNCATED &&
-	    !qry->server_selection.local_state->truncated) {
+	    !transport->protocol == KR_TRANSPORT_UDP) {
 		/* Don't punish the server that told us to switch to TCP. */
 		qry->server_selection.local_state->truncated = true;
 	} else {
 		if (sel_error == KR_SELECTION_TRUNCATED) {
-			/* Second TRUNCATED means we got TRUNCATED over TCP.
-			 * This transport is therefore broken. */
+			/* TRUNCATED over TCP/TLS, upstream is broken. */
 			addr_state->unrecoverable_errors++;
 		}
 
