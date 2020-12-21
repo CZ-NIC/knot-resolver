@@ -1215,7 +1215,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 }
 
 
-int ns_resolve_addr(struct kr_query *qry, struct kr_request *param, struct kr_transport *transport, uint16_t next_type)
+static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param, struct kr_transport *transport, uint16_t next_type)
 {
 	struct kr_rplan *rplan = &param->rplan;
 	struct kr_context *ctx = param->ctx;
