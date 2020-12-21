@@ -499,7 +499,7 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 	}
 
 	if (sel_error == KR_SELECTION_TRUNCATED &&
-	    !transport->protocol == KR_TRANSPORT_UDP) {
+	    transport->protocol == KR_TRANSPORT_UDP) {
 		/* Don't punish the server that told us to switch to TCP. */
 		qry->server_selection.local_state->truncated = true;
 	} else {
