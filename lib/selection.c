@@ -477,13 +477,10 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 	   const struct kr_transport *transport,
 	   enum kr_selection_error sel_error)
 {
+	assert(sel_error >= KR_SELECTION_OK && sel_error < KR_SELECTION_NUMBER_OF_ERRORS);
 	if (!transport || !addr_state) {
 		/* Answers from cache have NULL transport, ignore them. */
 		return;
-	}
-
-	if (sel_error >= KR_SELECTION_NUMBER_OF_ERRORS) {
-		assert(0);
 	}
 
 	if (sel_error == KR_SELECTION_QUERY_TIMEOUT) {
@@ -534,17 +531,17 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 void kr_server_selection_init(struct kr_query *qry)
 {
 	struct knot_mm *mempool = &qry->request->pool;
+	struct local_state *local_state = mm_alloc(mempool, sizeof(struct local_state));
+	memset(local_state, 0, sizeof(struct local_state));
+
 	if (qry->flags.FORWARD || qry->flags.STUB) {
 		qry->server_selection = (struct kr_server_selection){
 			.initialized = true,
 			.choose_transport = forward_choose_transport,
 			.update_rtt = forward_update_rtt,
 			.error = forward_error,
-			.local_state =
-				mm_alloc(mempool, sizeof(struct local_state)),
+			.local_state = local_state,
 		};
-		memset(qry->server_selection.local_state, 0,
-		       sizeof(struct local_state));
 		forward_local_state_alloc(
 			mempool, &qry->server_selection.local_state->private,
 			qry->request);
@@ -554,11 +551,8 @@ void kr_server_selection_init(struct kr_query *qry)
 			.choose_transport = iter_choose_transport,
 			.update_rtt = iter_update_rtt,
 			.error = iter_error,
-			.local_state =
-				mm_alloc(mempool, sizeof(struct local_state)),
+			.local_state = local_state,
 		};
-		memset(qry->server_selection.local_state, 0,
-		       sizeof(struct local_state));
 		iter_local_state_alloc(
 			mempool, &qry->server_selection.local_state->private);
 	}

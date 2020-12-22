@@ -43,7 +43,7 @@ enum kr_selection_error {
 	KR_SELECTION_BAD_CNAME,
 
 	/** Leave this last, as it is used as array size. */
-	KR_SELECTION_NUMBER_OF_ERRORS 
+	KR_SELECTION_NUMBER_OF_ERRORS
 };
 
 enum kr_transport_protocol {
