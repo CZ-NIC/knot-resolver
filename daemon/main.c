@@ -485,10 +485,8 @@ int main(int argc, char **argv)
 	kr_crypto_init();
 
 	/* Create a server engine. */
-	knot_mm_t pool = {
-		.ctx = mp_new (4096),
-		.alloc = (knot_mm_alloc_t) mp_alloc
-	};
+	knot_mm_t pool;
+	mm_ctx_mempool(&pool, MM_DEFAULT_BLKSIZE);
 	static struct engine engine;
 	ret = engine_init(&engine, &pool);
 	if (ret != 0) {
