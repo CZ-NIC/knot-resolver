@@ -275,8 +275,8 @@ static uint8_t *alloc_wire_cb(struct kr_request *req, uint16_t *maxlen)
 	assert(handle->type == UV_POLL);
 	xdp_handle_data_t *xhd = handle->data;
 	knot_xdp_msg_t out;
-	int ret = knot_xdp_send_alloc(xhd->socket, ctx->source.addr.ip.sa_family == AF_INET6,
-					&out, NULL);
+	knot_xdp_flags_t flg = ctx->source.addr.ip.sa_family == AF_INET6 ? KNOT_XDP_IPV6 : 0;
+	int ret = knot_xdp_send_alloc(xhd->socket, flg, &out);
 	if (ret != KNOT_EOK) {
 		assert(ret == KNOT_ENOMEM);
 		*maxlen = 0;
