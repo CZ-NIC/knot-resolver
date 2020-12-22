@@ -808,7 +808,11 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 	assert(xhd && xhd->session && xhd->socket);
 	uint32_t rcvd;
 	knot_xdp_msg_t msgs[XDP_RX_BATCH_SIZE];
-	int ret = knot_xdp_recv(xhd->socket, msgs, XDP_RX_BATCH_SIZE, &rcvd);
+	int ret = knot_xdp_recv(xhd->socket, msgs, XDP_RX_BATCH_SIZE, &rcvd
+			#if KNOT_VERSION_HEX >= 0x030100
+			, NULL
+			#endif
+			);
 	if (ret == KNOT_EOK) {
 		kr_log_verbose("[xdp] poll triggered, processing a batch of %d packets\n",
 			(int)rcvd);
@@ -880,7 +884,12 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 	xdp_handle_data_t *xhd = malloc(sizeof(*xhd));
 	if (!xhd) return kr_error(ENOMEM);
 
-	const int port = ep->port ? ep->port : KNOT_XDP_LISTEN_PORT_ALL;
+	const int port = ep->port ? ep->port : // all ports otherwise
+			#if KNOT_VERSION_HEX >= 0x030100
+				(KNOT_XDP_LISTEN_PORT_PASS | 0);
+			#else
+				KNOT_XDP_LISTEN_PORT_ALL;
+			#endif
 	xhd->socket = NULL; // needed for some reason
 	int ret = knot_xdp_init(&xhd->socket, ifname, ep->nic_queue, port,
 				KNOT_XDP_LOAD_BPF_MAYBE);
