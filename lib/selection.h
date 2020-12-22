@@ -6,7 +6,8 @@
 
 /**
  * @file selection.h
- * Provides server selection API (see `kr_server_selection`) and functions common to both implementations.
+ * Provides server selection API (see `kr_server_selection`)
+ * and functions common to both implementations.
  */
 
 #include "lib/cache/api.h"
@@ -43,7 +44,7 @@ enum kr_selection_error {
 	KR_SELECTION_BAD_CNAME,
 
 	/** Leave this last, as it is used as array size. */
-	KR_SELECTION_NUMBER_OF_ERRORS 
+	KR_SELECTION_NUMBER_OF_ERRORS
 };
 
 enum kr_transport_protocol {
@@ -123,12 +124,18 @@ void kr_server_selection_init(struct kr_query *qry);
 KR_EXPORT
 int kr_forward_add_target(struct kr_request *req, const struct sockaddr *sock);
 
+
+
+
+
+/* Below are internal parts shared by ./selection_{forward,iter}.c */
+
 /**
  * To be held per IP address in the global LMDB cache
  */
 struct rtt_state {
-	int32_t srtt;
-	int32_t variance;
+	int32_t srtt; /**< Smoothed RTT, i.e. an estimate of round-trip time. */
+	int32_t variance; /**< An estimate of RTT's standard derivation (not variance). */
 	int32_t consecutive_timeouts;
 	/** Timestamp of pronouncing this IP bad based on KR_NS_TIMEOUT_ROW_DEAD */
 	uint64_t dead_since;
@@ -138,7 +145,7 @@ struct rtt_state {
  * @brief To be held per IP address and locally "inside" query.
  */
 struct address_state {
-	/** Used to distinguish old and valid records in local_state. */
+	/** Used to distinguish old and valid records in local_state; -1 means unusable IP. */
 	unsigned int generation;
 	struct rtt_state rtt_state;
 	knot_dname_t *ns_name;
@@ -185,8 +192,8 @@ struct to_resolve {
  * @param timeouts Number of timeouts that occured in this query (used for exponential backoff)
  * @param mempool Memory context of current request
  * @param tcp Force TCP as transport protocol
- * @param[out] choice_index Optinally index of the chosen transport in the @p choices array is stored here.
- * @return Chosen transport or NULL when no choice is viable
+ * @param[out] choice_index Optionally index of the chosen transport in the @p choices array.
+ * @return Chosen transport (on mempool) or NULL when no choice is viable
  */
 struct kr_transport *select_transport(struct choice choices[], int choices_len,
 				      struct to_resolve unresolved[],

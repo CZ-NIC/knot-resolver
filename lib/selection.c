@@ -31,6 +31,27 @@
 #define EPSILON_NOMIN 1
 #define EPSILON_DENOM 20
 
+/**
+ * If one of the errors set to true is encountered,
+ * there is no point in asking this server again.
+ */
+static const bool UNRECOVERABLE_ERRORS[] = {
+	[KR_SELECTION_QUERY_TIMEOUT] = false,
+	[KR_SELECTION_TLS_HANDSHAKE_FAILED] = false,
+	[KR_SELECTION_TCP_CONNECT_FAILED] = false,
+	[KR_SELECTION_TCP_CONNECT_TIMEOUT] = false,
+	[KR_SELECTION_REFUSED] = true,
+	[KR_SELECTION_SERVFAIL] = true,
+	[KR_SELECTION_FORMERROR] = false,
+	[KR_SELECTION_NOTIMPL] = true,
+	[KR_SELECTION_OTHER_RCODE] = true,
+	[KR_SELECTION_TRUNCATED] = false,
+	[KR_SELECTION_DNSSEC_ERROR] = true,
+	[KR_SELECTION_LAME_DELEGATION] = true,
+	[KR_SELECTION_BAD_CNAME] = true,
+};
+
+
 /* Simple cache interface follows */
 
 static knot_db_val_t cache_key(const uint8_t *ip, size_t len)
@@ -51,8 +72,7 @@ static knot_db_val_t cache_key(const uint8_t *ip, size_t len)
 /* First value of timeout will be calculated as SRTT+4*DEFAULT_TIMEOUT
  * by calc_timeout(), so it'll be equal to DEFAULT_TIMEOUT. */
 static const struct rtt_state default_rtt_state = { .srtt = 0,
-						    .variance =
-							    DEFAULT_TIMEOUT / 4,
+						    .variance = DEFAULT_TIMEOUT / 4,
 						    .consecutive_timeouts = 0,
 						    .dead_since = 0 };
 
@@ -143,8 +163,7 @@ static unsigned back_off_timeout(uint32_t to, int pow)
  * RFC6298, sec. 2. */
 static unsigned calc_timeout(struct rtt_state state)
 {
-	int32_t timeout =
-		state.srtt + MAX(4 * state.variance, MINIMAL_TIMEOUT_ADDITION);
+	int32_t timeout = state.srtt + MAX(4 * state.variance, MINIMAL_TIMEOUT_ADDITION);
 	return back_off_timeout(timeout, state.consecutive_timeouts);
 }
 
@@ -255,8 +274,8 @@ void update_address_state(struct address_state *state, uint8_t *address,
 
 static int cmp_choices(const void *a, const void *b)
 {
-	struct choice *a_ = (struct choice *)a;
-	struct choice *b_ = (struct choice *)b;
+	const struct choice *a_ = a;
+	const struct choice *b_ = b;
 
 	int diff;
 	/* Address with no RTT information is better than address
@@ -302,8 +321,7 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 		return NULL;
 	}
 
-	struct kr_transport *transport =
-		mm_alloc(mempool, sizeof(struct kr_transport));
+	struct kr_transport *transport = mm_alloc(mempool, sizeof(struct kr_transport));
 	memset(transport, 0, sizeof(struct kr_transport));
 
 	int choice = 0;
@@ -370,12 +388,11 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 		.ns_name = chosen->address_state->ns_name,
 		.protocol = protocol,
 		.timeout = timeout,
-		.safe_mode =
-			chosen->address_state->errors[KR_SELECTION_FORMERROR],
+		.safe_mode = chosen->address_state->errors[KR_SELECTION_FORMERROR],
 	};
 
-	int port;
-	if (!(port = chosen->port)) {
+	int port = chosen->port;
+	if (!port) {
 		switch (transport->protocol) {
 		case KR_TRANSPORT_TLS:
 			port = KR_DNS_TLS_PORT;
@@ -410,8 +427,7 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state,
 
 	struct kr_cache *cache = &qry->request->ctx->cache;
 
-	uint8_t *address =
-		ip_to_bytes(&transport->address, transport->address_len);
+	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
 	/* This construct is a bit racy since the global state may change
 	 * between calls to `get_rtt_state` and `put_rtt_state`  but we don't
 	 * care that much since it is rare and we only risk slightly suboptimal
@@ -429,7 +445,8 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state,
 
 	VERBOSE_MSG(
 		qry,
-		"=> id: '%05u' updating: '%s'@'%s' zone cut: '%s' with rtt %u to srtt: %d and variance: %d \n",
+		"=> id: '%05u' updating: '%s'@'%s' zone cut: '%s'"
+		" with rtt %u to srtt: %d and variance: %d \n",
 		qry->id, ns_name, ns_str ? ns_str : "", zonecut_str,
 		rtt, new_rtt_state.srtt, new_rtt_state.variance);
 	}
@@ -444,8 +461,7 @@ static void cache_timeout(const struct kr_transport *transport,
 		return;
 	}
 
-	uint8_t *address =
-		ip_to_bytes(&transport->address, transport->address_len);
+	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
 	struct rtt_state old_state = addr_state->rtt_state;
 	struct rtt_state cur_state =
 		get_rtt_state(address, transport->address_len, cache);
@@ -457,8 +473,7 @@ static void cache_timeout(const struct kr_transport *transport,
 		    KR_NS_TIMEOUT_ROW_DEAD) {
 			cur_state.dead_since = kr_now();
 		}
-		put_rtt_state(address, transport->address_len, cur_state,
-			      cache);
+		put_rtt_state(address, transport->address_len, cur_state, cache);
 	} else {
 		/* `get_rtt_state` opens a cache transaction, we have to end it. */
 		kr_cache_commit(cache);
@@ -469,13 +484,10 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 	   const struct kr_transport *transport,
 	   enum kr_selection_error sel_error)
 {
+	assert(sel_error >= KR_SELECTION_OK && sel_error < KR_SELECTION_NUMBER_OF_ERRORS);
 	if (!transport || !addr_state) {
 		/* Answers from cache have NULL transport, ignore them. */
 		return;
-	}
-
-	if (sel_error >= KR_SELECTION_NUMBER_OF_ERRORS) {
-		assert(0);
 	}
 
 	if (sel_error == KR_SELECTION_QUERY_TIMEOUT) {
@@ -526,17 +538,17 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 void kr_server_selection_init(struct kr_query *qry)
 {
 	struct knot_mm *mempool = &qry->request->pool;
+	struct local_state *local_state = mm_alloc(mempool, sizeof(struct local_state));
+	memset(local_state, 0, sizeof(struct local_state));
+
 	if (qry->flags.FORWARD || qry->flags.STUB) {
 		qry->server_selection = (struct kr_server_selection){
 			.initialized = true,
 			.choose_transport = forward_choose_transport,
 			.update_rtt = forward_update_rtt,
 			.error = forward_error,
-			.local_state =
-				mm_alloc(mempool, sizeof(struct local_state)),
+			.local_state = local_state,
 		};
-		memset(qry->server_selection.local_state, 0,
-		       sizeof(struct local_state));
 		forward_local_state_alloc(
 			mempool, &qry->server_selection.local_state->private,
 			qry->request);
@@ -546,11 +558,8 @@ void kr_server_selection_init(struct kr_query *qry)
 			.choose_transport = iter_choose_transport,
 			.update_rtt = iter_update_rtt,
 			.error = iter_error,
-			.local_state =
-				mm_alloc(mempool, sizeof(struct local_state)),
+			.local_state = local_state,
 		};
-		memset(qry->server_selection.local_state, 0,
-		       sizeof(struct local_state));
 		iter_local_state_alloc(
 			mempool, &qry->server_selection.local_state->private);
 	}

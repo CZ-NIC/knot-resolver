@@ -12,10 +12,10 @@
 
 #define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "slct", __VA_ARGS__)
 
-// To be held per query and locally
+/// To be held per query and locally.  Allocations are in the kr_request's mempool.
 struct iter_local_state {
-	trie_t *names;
-	trie_t *addresses;
+	trie_t *names; /// knot_dname_t -> struct iter_name_state *
+	trie_t *addresses; /// IP address -> struct address_state *
 	knot_dname_t *zonecut;
 	/** Used to distinguish old and valid records in tries. */
 	unsigned int generation;
@@ -45,27 +45,15 @@ static struct address_state *get_address_state(struct iter_local_state *local_st
 		return NULL;
 	}
 
-	trie_t *addresses = local_state->addresses;
-	uint8_t *address =
-		ip_to_bytes(&transport->address, transport->address_len);
-
-	trie_val_t *address_state = trie_get_try(addresses, (char *)address,
+	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
+	trie_val_t *address_state = trie_get_try(local_state->addresses, (char *)address,
 						 transport->address_len);
-
 	if (!address_state) {
-		if (transport->deduplicated) {
-			/* Transport was chosen by a different query. */
-			return NULL;
-		}
-
-		assert(0);
+		assert(transport->deduplicated);
+		/* Transport was chosen by a different query. */
+		return NULL;
 	}
-	return (struct address_state *)*address_state;
-}
-
-static bool zonecut_changed(knot_dname_t *new, knot_dname_t *old)
-{
-	return knot_dname_cmp(old, new);
+	return *address_state;
 }
 
 static void unpack_state_from_zonecut(struct iter_local_state *local_state,
@@ -81,7 +69,7 @@ static void unpack_state_from_zonecut(struct iter_local_state *local_state,
 		local_state->names = trie_create(mm);
 		local_state->addresses = trie_create(mm);
 	} else {
-		zcut_changed = zonecut_changed(zonecut->name, local_state->zonecut);
+		zcut_changed = !knot_dname_is_equal(zonecut->name, local_state->zonecut);
 	}
 	local_state->zonecut = zonecut->name;
 	local_state->generation++;
@@ -91,11 +79,11 @@ static void unpack_state_from_zonecut(struct iter_local_state *local_state,
 	}
 
 	trie_it_t *it;
-	unsigned int current_generation = local_state->generation;
+	const unsigned int current_generation = local_state->generation;
 
 	for (it = trie_it_begin(zonecut->nsset); !trie_it_finished(it); trie_it_next(it)) {
 		knot_dname_t *dname = (knot_dname_t *)trie_it_key(it, NULL);
-		pack_t *addresses = (pack_t *)*trie_it_val(it);
+		pack_t *addresses = *trie_it_val(it);
 
 		trie_val_t *val = trie_get_ins(local_state->names, (char *)dname,
 					       knot_dname_size(dname));
@@ -104,7 +92,7 @@ static void unpack_state_from_zonecut(struct iter_local_state *local_state,
 			*val = mm_alloc(mm, sizeof(struct iter_name_state));
 			memset(*val, 0, sizeof(struct iter_name_state));
 		}
-		struct iter_name_state *name_state = *(struct iter_name_state **)val;
+		struct iter_name_state *name_state = *val;
 		name_state->generation = current_generation;
 
 		if (zcut_changed) {
@@ -114,11 +102,7 @@ static void unpack_state_from_zonecut(struct iter_local_state *local_state,
 			name_state->aaaa_state = RECORD_UNKNOWN;
 		}
 		
-		if (addresses->len == 0) {
-			continue;
-		}
-
-		/* We have some addresses to work with, let's iterate over them. */
+		/* Iterate over all addresses of this NS (if any). */
 		for (uint8_t *obj = pack_head(*addresses); obj != pack_tail(*addresses);
 		     obj = pack_obj_next(obj)) {
 			uint8_t *address = pack_obj_val(obj);
@@ -131,7 +115,7 @@ static void unpack_state_from_zonecut(struct iter_local_state *local_state,
 				*tval = mm_alloc(mm, sizeof(struct address_state));
 				memset(*tval, 0, sizeof(struct address_state));
 			}
-			struct address_state *address_state = (*(struct address_state **)tval);
+			struct address_state *address_state = *tval;
 			address_state->generation = current_generation;
 			address_state->ns_name = dname;
 
@@ -155,8 +139,7 @@ static int get_valid_addresses(struct iter_local_state *local_state,
 	     trie_it_next(it)) {
 		size_t address_len;
 		uint8_t *address = (uint8_t *)trie_it_key(it, &address_len);
-		struct address_state *address_state =
-			(struct address_state *)*trie_it_val(it);
+		struct address_state *address_state = *trie_it_val(it);
 		if (address_state->generation == local_state->generation &&
 		    !address_state->unrecoverable_errors) {
 			choices[count] = (struct choice){
@@ -184,45 +167,42 @@ static int get_resolvable_names(struct iter_local_state *local_state,
 	trie_it_t *it;
 	for (it = trie_it_begin(local_state->names); !trie_it_finished(it);
 	     trie_it_next(it)) {
-		struct iter_name_state *name_state =
-			*(struct iter_name_state **)trie_it_val(it);
-		if (name_state->generation == local_state->generation) {
-			knot_dname_t *name = (knot_dname_t *)trie_it_key(it, NULL);
-			if (qry->stype == KNOT_RRTYPE_DNSKEY &&
-			    knot_dname_in_bailiwick(name, qry->sname) > 0) {
-				/* Resolving `domain. DNSKEY` can't trigger the
-				 * resolution of `sub.domain. A/AAAA` since it
-				 * will cause a cycle. */
-				continue;
-			}
+		struct iter_name_state *name_state = *trie_it_val(it);
+		if (name_state->generation != local_state->generation)
+			continue;
 
-			/* FIXME: kr_rplan_satisfies(qry,…) should have been here, but this leads to failures on 
-			 * iter_ns_badip.rpl, this is because the test requires the resolver to switch to parent
-			 * side after a record in cache expires. Only way to do this in the current zonecut setup is
-			 * to requery the same query twice in the row. So we have to allow that and only check the 
-			 * rplan from parent upwards.
-			 */
-			bool a_in_rplan = kr_rplan_satisfies(qry->parent, name,
-							     KNOT_CLASS_IN,
-							     KNOT_RRTYPE_A);
-			bool aaaa_in_rplan =
-				kr_rplan_satisfies(qry->parent, name,
-						   KNOT_CLASS_IN,
-						   KNOT_RRTYPE_AAAA);
+		knot_dname_t *name = (knot_dname_t *)trie_it_key(it, NULL);
+		if (qry->stype == KNOT_RRTYPE_DNSKEY &&
+		    knot_dname_in_bailiwick(name, qry->sname) > 0) {
+			/* Resolving `domain. DNSKEY` can't trigger the
+			 * resolution of `sub.domain. A/AAAA` since it
+			 * will cause a cycle. */
+			continue;
+		}
 
-			if (name_state->a_state == RECORD_UNKNOWN &&
-			    !qry->flags.NO_IPV4 && !a_in_rplan) {
-				resolvable[count++] = (struct to_resolve){
-					name, KR_TRANSPORT_RESOLVE_A
-				};
-			}
+		/* FIXME: kr_rplan_satisfies(qry,…) should have been here, but this leads to failures on
+		 * iter_ns_badip.rpl, this is because the test requires the resolver to switch to parent
+		 * side after a record in cache expires. Only way to do this in the current zonecut setup is
+		 * to requery the same query twice in the row. So we have to allow that and only check the
+		 * rplan from parent upwards.
+		 */
+		bool a_in_rplan = kr_rplan_satisfies(qry->parent, name,
+						     KNOT_CLASS_IN, KNOT_RRTYPE_A);
+		bool aaaa_in_rplan = kr_rplan_satisfies(qry->parent, name,
+							KNOT_CLASS_IN, KNOT_RRTYPE_AAAA);
 
-			if (name_state->aaaa_state == RECORD_UNKNOWN &&
-			    !qry->flags.NO_IPV6 && !aaaa_in_rplan) {
-				resolvable[count++] = (struct to_resolve){
-					name, KR_TRANSPORT_RESOLVE_AAAA
-				};
-			}
+		if (name_state->a_state == RECORD_UNKNOWN &&
+		    !qry->flags.NO_IPV4 && !a_in_rplan) {
+			resolvable[count++] = (struct to_resolve){
+				name, KR_TRANSPORT_RESOLVE_A
+			};
+		}
+
+		if (name_state->aaaa_state == RECORD_UNKNOWN &&
+		    !qry->flags.NO_IPV6 && !aaaa_in_rplan) {
+			resolvable[count++] = (struct to_resolve){
+				name, KR_TRANSPORT_RESOLVE_AAAA
+			};
 		}
 	}
 	trie_it_free(it);
@@ -252,8 +232,7 @@ static void update_name_state(knot_dname_t *name, enum kr_transport_protocol typ
 	}
 }
 
-void iter_choose_transport(struct kr_query *qry,
-			   struct kr_transport **transport)
+void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport)
 {
 	struct knot_mm *mempool = &qry->request->pool;
 	struct iter_local_state *local_state =
@@ -272,8 +251,7 @@ void iter_choose_transport(struct kr_query *qry,
 	int resolvable_len = get_resolvable_names(local_state, resolvable, qry);
 
 	if (choices_len || resolvable_len) {
-		bool tcp = qry->flags.TCP |
-			   qry->server_selection.local_state->truncated;
+		bool tcp = qry->flags.TCP || qry->server_selection.local_state->truncated;
 		*transport = select_transport(
 			choices, choices_len, resolvable, resolvable_len,
 			qry->server_selection.local_state->timeouts, mempool,
@@ -308,7 +286,7 @@ void iter_choose_transport(struct kr_query *qry,
 	}
 
 	bool nxnsattack_mitigation = false;
-	enum kr_transport_protocol proto =
+	const enum kr_transport_protocol proto =
 		*transport ? (*transport)->protocol : -1;
 	if (proto == KR_TRANSPORT_RESOLVE_A || proto == KR_TRANSPORT_RESOLVE_AAAA) {
 		if (++local_state->no_ns_addr_count > KR_COUNT_NO_NSADDR_LIMIT) {
@@ -333,14 +311,18 @@ void iter_choose_transport(struct kr_query *qry,
 				    qry->id, ip_version, ns_name, zonecut_str);
 			break;
 		default:
-			VERBOSE_MSG(qry, "=> id: '%05u' choosing: '%s'@'%s' with timeout %u ms zone cut: '%s'%s\n",
-				    qry->id, ns_name, ns_str ? ns_str : "", (*transport)->timeout, zonecut_str,
+			VERBOSE_MSG(qry, "=> id: '%05u' choosing: '%s'@'%s'"
+				    " with timeout %u ms zone cut: '%s'%s\n",
+				    qry->id, ns_name, ns_str ? ns_str : "",
+				    (*transport)->timeout, zonecut_str,
 				    (*transport)->safe_mode ? " SAFEMODE" : "");
 			break;
 		}
 	} else {
+		const char *nxns_msg = nxnsattack_mitigation
+			? " (stopped due to mitigation for NXNSAttack CVE-2020-12667)" : "";
 		VERBOSE_MSG(qry, "=> id: '%05u' no suitable transport, zone cut: '%s'%s\n",
-			qry->id, zonecut_str, nxnsattack_mitigation ? " (stopped due to mitigation for NXNSAttack CVE-2020-12667)" : "");
+			    qry->id, zonecut_str, nxns_msg );
 	}
 	}
 }

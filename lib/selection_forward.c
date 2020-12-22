@@ -23,14 +23,12 @@ void forward_local_state_alloc(struct knot_mm *mm, void **local_state,
 	*local_state = mm_alloc(mm, sizeof(struct forward_local_state));
 	memset(*local_state, 0, sizeof(struct forward_local_state));
 
-	struct forward_local_state *forward_state =
-		(struct forward_local_state *)*local_state;
+	struct forward_local_state *forward_state = *local_state;
 	forward_state->targets = &req->selection_context.forwarding_targets;
 
-	forward_state->addr_states = mm_alloc(
-		mm, sizeof(struct address_state) * forward_state->targets->len);
-	memset(forward_state->addr_states, 0,
-	       sizeof(struct address_state) * forward_state->targets->len);
+	size_t as_bytes = sizeof(struct address_state) * forward_state->targets->len;
+	forward_state->addr_states = mm_alloc(mm, as_bytes);
+	memset(forward_state->addr_states, 0, as_bytes);
 }
 
 void forward_choose_transport(struct kr_query *qry,
@@ -77,8 +75,7 @@ void forward_choose_transport(struct kr_query *qry,
 		};
 	}
 
-	bool tcp =
-		qry->flags.TCP | qry->server_selection.local_state->truncated;
+	bool tcp = qry->flags.TCP || qry->server_selection.local_state->truncated;
 	*transport =
 		select_transport(choices, valid, NULL, 0,
 				 qry->server_selection.local_state->timeouts,
