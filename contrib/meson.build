@@ -6,6 +6,7 @@ contrib_src = files([
   'ccan/json/json.c',
   'ucw/mempool.c',
   'ucw/mempool-fmt.c',
+  'mempattern.c',
   'murmurhash3/murmurhash3.c',
   'base32hex.c',
   'base64.c',
