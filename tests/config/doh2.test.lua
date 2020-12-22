@@ -173,21 +173,8 @@ else
 		req.headers:upsert(':method', 'POST')
 		req:set_body(string.rep('0', 11))  -- 11 bytes < DNS msg header
 		check_err(req, '400', 'too short POST finishes with 400')
+		test_post_noerror()
 	end
-
---	local function test_post_long_input()
---		local req = assert(req_templ:clone())
---		req.headers:upsert(':method', 'POST')
---		req:set_body(string.rep('s', 1025))  -- > DNS msg over UDP
---		check_err(req, '413', 'too long POST finishes with 413')
---	end
---
---	local function test_post_unparseable_input()
---		local req = assert(req_templ:clone())
---		req.headers:upsert(':method', 'POST')
---		req:set_body(string.rep('\0', 1024))  -- garbage
---		check_err(req, '400', 'unparseable DNS message finishes with 400')
---	end
 
 	local function test_post_unsupp_type()
 		local req = assert(req_templ:clone())
@@ -195,6 +182,21 @@ else
 		req.headers:upsert('content-type', 'application/dns+json')
 		req:set_body(string.rep('\0', 12))  -- valid message
 		check_err(req, '415', 'unsupported request content type finishes with 415')
+		test_post_noerror()
+	end
+
+	local function test_get_right_endpoints()
+		local desc = 'GET query with "doh" endpoint'
+		local req = req_templ:clone()
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path', '/doh?dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
+		check_ok(req, desc)
+
+		desc = 'GET query with "dns-query" endpoint'
+		req = req_templ:clone()
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path', '/dns-query?dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
+		check_ok(req, desc)
 	end
 
 	-- test a valid DNS query using GET
@@ -273,33 +275,43 @@ else
 		check_ok(req, desc)
 	end
 
---	-- test an invalid DNS query using GET
---	local function test_get_long_input()
---		local req = assert(req_templ:clone())
---		req.headers:upsert(':method', 'GET')
---		req.headers:upsert(':path', '/doh?dns=' .. basexx.to_url64(string.rep('\0', 1030)))
---		check_err(req, '414', 'too long GET finishes with 414')
---	end
---
---	local function test_get_no_dns_param()
---		local req = assert(req_templ:clone())
---		req.headers:upsert(':method', 'GET')
---		req.headers:upsert(':path', '/doh?notdns=' .. basexx.to_url64(string.rep('\0', 1024)))
---		check_err(req, '400', 'GET without dns paramter finishes with 400')
---	end
---
---	local function test_get_unparseable()
---		local req = assert(req_templ:clone())
---		req.headers:upsert(':method', 'GET')
---		req.headers:upsert(':path', '/doh??dns=' .. basexx.to_url64(string.rep('\0', 1024)))
---		check_err(req, '400', 'unparseable GET finishes with 400')
---	end
+	-- test an invalid DNS query using GET
+	local function test_get_wrong_endpoints()
+		local req = req_templ:clone()
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path', '/bad?dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
+		check_err(req, '400', 'wrong "bad" endpoint finishes with 400')
+		test_get_other_params()
+
+		req = req_templ:clone()
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path', '/dns?dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
+		check_err(req, '400', 'wrong "dns" endpoint finishes with 400')
+		test_get_other_params()
+	end
+
+	local function test_get_no_dns_param()
+		local req = assert(req_templ:clone())
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path', '/doh?notdns=' .. basexx.to_url64(string.rep('\0', 1024)))
+		check_err(req, '400', 'GET without dns parameter finishes with 400')
+		test_get_other_params()
+	end
+
+	local function test_get_unparseable()
+		local req = assert(req_templ:clone())
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path', '/doh??dns=' .. basexx.to_url64(string.rep('\0', 1024)))
+		check_err(req, '400', 'unparseable GET finishes with 400')
+		test_get_other_params()
+	end
 
 	local function test_get_invalid_b64()
 		local req = assert(req_templ:clone())
 		req.headers:upsert(':method', 'GET')
 		req.headers:upsert(':path', '/doh?dns=thisisnotb64')
 		check_err(req, '400', 'GET with invalid base64 finishes with 400')
+		test_get_other_params()
 	end
 
 	local function test_get_invalid_chars()
@@ -307,12 +319,30 @@ else
 		req.headers:upsert(':method', 'GET')
 		req.headers:upsert(':path', '/doh?dns=' .. basexx.to_url64(string.rep('\0', 200)) .. '@#$%?!')
 		check_err(req, '400', 'GET with invalid characters in b64 finishes with 400')
+		test_get_other_params()
+	end
+
+	local function test_get_two_ampersands()
+		local req = req_templ:clone()
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path',
+		'/doh?other=something&&dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
+		check_err(req, '400', 'GET with two ampersands finishes with 400')
+		test_get_other_params()
+
+		req = req_templ:clone()
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path',
+		'/doh?other=something&&nodns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
+		check_err(req, '400', 'GET with two ampersands finishes with 400')
+		test_get_other_params()
 	end
 
 	local function test_unsupp_method()
 		local req = assert(req_templ:clone())
 		req.headers:upsert(':method', 'PUT')
 		check_err(req, '405', 'unsupported method finishes with 405')
+		test_get_other_params()
 	end
 
 	local function test_dstaddr()
@@ -353,17 +383,7 @@ else
 		modules.unload('view')
 	end
 
---	not implemented
---	local function test_post_unsupp_accept()
---		local req = assert(req_templ:clone())
---		req.headers:upsert(':method', 'POST')
---		req.headers:upsert('accept', 'application/dns+json')
---		req:set_body(string.rep('\0', 12))  -- valid message
---		check_err(req, '406', 'unsupported Accept type finishes with 406')
---	end
-
 	-- plan tests
-	-- TODO: implement (some) of the error status codes
 	local tests = {
 		start_server,
 		test_post_servfail,
@@ -371,20 +391,20 @@ else
 		test_post_nxdomain,
 		test_huge_answer,
 		test_post_short_input,
-		--test_post_long_input,
-		--test_post_unparseable_input,
 		test_post_unsupp_type,
+		test_get_right_endpoints,
 		test_get_servfail,
 		test_get_noerror,
 		test_get_nxdomain,
 		test_get_other_params_before_dns,
 		test_get_other_params_after_dns,
 		test_get_other_params,
-		--test_get_long_input,
-		--test_get_no_dns_param,
-		--test_get_unparseable,
+		test_get_wrong_endpoints,
+		test_get_no_dns_param,
+		test_get_unparseable,
 		test_get_invalid_b64,
 		test_get_invalid_chars,
+		test_get_two_ampersands,
 		test_unsupp_method,
 		test_dstaddr,
 		test_srcaddr
