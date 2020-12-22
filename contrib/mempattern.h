@@ -78,3 +78,6 @@ static inline void mm_ctx_init_aligned(knot_mm_t *mm, size_t alignment)
 	mm->free = free;
 }
 
+/*! \brief New memory pool context, allocated on itself. */
+KR_EXPORT knot_mm_t * mm_ctx_mempool2(size_t chunk_size);
+
