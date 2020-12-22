@@ -111,33 +111,8 @@ void kr_log_q(const struct kr_query *qry, const char *source, const char *fmt, .
 #define static_assert(cond, msg)
 #endif
 
-/** @cond Memory alloc routines: extension of ./contrib/mempattern.h */
-
-/** Readability: avoid const-casts in code. */
-static inline void free_const(const void *what)
-{
-	free((void *)what);
-}
-
 // Use this for alocations with mm.
 // Use mm_alloc for alocations into mempool
-/** posix_memalign() wrapper. */
-void *mm_malloc_aligned(void *ctx, size_t n);
-
-/** Initialize mm with malloc+free with higher alignment (a power of two). */
-static inline void mm_ctx_init_aligned(knot_mm_t *mm, size_t alignment)
-{
-	assert(__builtin_popcount(alignment) == 1);
-	mm->ctx = (uint8_t *)NULL + alignment; /*< roundabout to satisfy linters */
-	/* posix_memalign() doesn't allow alignment < sizeof(void*),
-	 * and there's no point in using it for small values anyway,
-	 * as plain malloc() guarantees at least max_align_t.
-	 * Nitpick: we might use that type when assuming C11. */
-	mm->alloc = alignment > sizeof(void*) ? mm_malloc_aligned : mm_malloc;
-	mm->free = free;
-}
-
-/* @endcond */
 
 /** A strcmp() variant directly usable for qsort() on an array of strings. */
 static inline int strcmp_p(const void *p1, const void *p2)
