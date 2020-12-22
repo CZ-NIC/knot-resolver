@@ -735,16 +735,10 @@ void io_tty_alloc(uv_handle_t *handle, size_t suggested, uv_buf_t *buf)
 }
 
 struct io_stream_data *io_tty_alloc_data() {
-	knot_mm_t _pool = {
-		.ctx = mp_new(4096),
-		.alloc = (knot_mm_alloc_t) mp_alloc,
-	};
-	knot_mm_t *pool = mm_alloc(&_pool, sizeof(*pool));
+	knot_mm_t *pool = mm_ctx_mempool2(MM_DEFAULT_BLKSIZE);
 	if (!pool) {
 		return NULL;
 	}
-	memcpy(pool, &_pool, sizeof(*pool));
-
 	struct io_stream_data *data = mm_alloc(pool, sizeof(struct io_stream_data));
 
 	data->buf = mp_start(pool->ctx, 512);

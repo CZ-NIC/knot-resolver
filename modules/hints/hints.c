@@ -619,17 +619,10 @@ int hints_init(struct kr_module *module)
 	};
 	module->props = props;
 
-	/* Create pool and copy itself */
-	knot_mm_t _pool = {
-		.ctx = mp_new(4096),
-		.alloc = (knot_mm_alloc_t) mp_alloc
-	};
-	knot_mm_t *pool = mm_alloc(&_pool, sizeof(*pool));
+	knot_mm_t *pool = mm_ctx_mempool2(MM_DEFAULT_BLKSIZE);
 	if (!pool) {
 		return kr_error(ENOMEM);
 	}
-	memcpy(pool, &_pool, sizeof(*pool));
-
 	struct hints_data *data = mm_alloc(pool, sizeof(struct hints_data));
 	if (!data) {
 		mp_delete(pool->ctx);
