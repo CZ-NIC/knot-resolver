@@ -22,6 +22,8 @@
 
 #include <libknot/mm_ctx.h>
 #include "lib/defines.h"
+#include <assert.h>
+#include <stdint.h>
 
 /*! \brief Default memory block size. */
 #define MM_DEFAULT_BLKSIZE 4096
@@ -48,6 +50,30 @@ void mm_ctx_init(knot_mm_t *mm);
 /*! \brief Memory pool context. */
 void mm_ctx_mempool(knot_mm_t *mm, size_t chunk_size);
 
-/*! \brief Simple malloc wrapper.  Not exposed in knot's mempattern. */
+
+/* API in addition to Knot's mempattern. */
+
+/*! \brief Simple malloc wrapper.  */
 void *mm_malloc(void *ctx, size_t n);
+
+/*! \brief Readability: avoid const-casts in code. */
+static inline void free_const(const void *what)
+{
+	free((void *)what);
+}
+
+/*! \brief posix_memalign() wrapper. */
+void *mm_malloc_aligned(void *ctx, size_t n);
+
+/*! \brief Initialize mm with malloc+free with specified alignment (a power of two). */
+static inline void mm_ctx_init_aligned(knot_mm_t *mm, size_t alignment)
+{
+	assert(__builtin_popcount(alignment) == 1);
+	mm->ctx = (uint8_t *)NULL + alignment; /*< roundabout to satisfy linters */
+	/* posix_memalign() doesn't allow alignment < sizeof(void*),
+	 * and there's no point in using it for small values anyway,
+	 * as plain malloc() guarantees at least max_align_t. */
+	mm->alloc = alignment > sizeof(max_align_t) ? mm_malloc_aligned : mm_malloc;
+	mm->free = free;
+}
 
