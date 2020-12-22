@@ -136,3 +136,16 @@ void *mm_malloc_aligned(void *ctx, size_t n)
 	}
 }
 
+knot_mm_t * mm_ctx_mempool2(size_t chunk_size)
+{
+	knot_mm_t pool_tmp;
+	mm_ctx_mempool(&pool_tmp, chunk_size);
+	knot_mm_t *pool = mm_alloc(&pool_tmp, sizeof(*pool));
+	if (!pool) {
+		mp_delete(pool_tmp.ctx);
+		return NULL;
+	}
+	memcpy(pool, &pool_tmp, sizeof(*pool));
+	return pool;
+}
+
