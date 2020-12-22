@@ -39,19 +39,6 @@
 /* Logging & debugging */
 bool kr_verbose_status = false;
 
-void *mm_malloc_aligned(void *ctx, size_t n)
-{
-	size_t alignment = (size_t)ctx;
-	void *res;
-	int err = posix_memalign(&res, alignment, n);
-	if (err == 0) {
-		return res;
-	} else {
-		assert(err == -1 && errno == ENOMEM);
-		return NULL;
-	}
-}
-
 /*
  * Macros.
  */
