@@ -10,7 +10,7 @@ Improvements
 Bugfixes
 --------
 - view: fail config if bad subnet is specified (!1112)
-
+- doh2: send HTTP error status code (#618, !1102)
 
 Knot Resolver 5.2.1 (2020-12-09)
 ================================

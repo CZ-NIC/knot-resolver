@@ -272,7 +272,7 @@ static int set_error_status(struct http_ctx *ctx, int32_t stream_id, int status,
 
 	int idx = http_status_get_idx(ctx, stream_id);
 	struct http_stream_status *stat = http_status_get(ctx, idx);
-	if (stat && stat->err_status == status && status == 200)
+	if (stat && stat->err_status != 200)
 		return idx;
 
 	// add new item to array
@@ -329,7 +329,7 @@ static void http_status_reinit(struct http_ctx *ctx)
 /*
  * Check endpoint and uri path
  */
-static int check_uri(const char* uri_path)
+static int check_uri(struct http_ctx *ctx, int32_t stream_id, const char* uri_path)
 {
 	static const char key[] = "dns=";
 	static const char *delim = "&";
@@ -338,6 +338,7 @@ static int check_uri(const char* uri_path)
 	char *end_prev;
 	ssize_t endpoint_len;
 	ssize_t ret;
+	int rc;
 
 	if (!uri_path)
 		return kr_error(EINVAL);
@@ -365,8 +366,10 @@ static int check_uri(const char* uri_path)
 			break;
 	}
 
-	if (ret) /* no endpoint found */
-		return -1;
+	if (ret) { /* no endpoint found */
+		rc = set_error_status(ctx, stream_id, 400, "missing endpoint");
+		return rc < 0 ? rc : kr_error(EINVAL);
+	}
 	if (endpoint_len == strlen(path) - 1) /* done for POST method */
 		return 0;
 
@@ -377,15 +380,17 @@ static int check_uri(const char* uri_path)
 			if (!strncmp(beg, key, 4)) { /* dns variable in path found */
 				break;
 			}
-			end_prev = beg + strlen(beg);
+			end_prev = beg + strlen(beg) - 1;
 			beg = strtok(NULL, delim);
-			if (beg-1 != end_prev) { /* detect && */
-				return -1;
+			if (beg && beg-1 != end_prev+1) { /* detect && */
+				rc = set_error_status(ctx, stream_id, 400, "invalid uri path");
+				return rc < 0 ? rc : kr_error(EINVAL);
 			}
 		}
 
 		if (!beg) { /* no dns variable in path */
-			return -1;
+			rc = set_error_status(ctx, stream_id, 400, "'dns' key in path not found");
+			return rc < 0 ? rc : kr_error(EINVAL);
 		}
 	}
 
@@ -399,7 +404,7 @@ static int check_uri(const char* uri_path)
 static int process_uri_path(struct http_ctx *ctx, int32_t stream_id)
 {
 	if (!ctx || !ctx->uri_path)
-		return kr_error(EINVAL);
+		return set_error_status(ctx, stream_id, 400, "invalid uri path");
 
 	static const char key[] = "dns=";
 	char *beg = strstr(ctx->uri_path, key);
@@ -491,16 +496,17 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 	}
 
 	if (!strcasecmp(":path", (const char *)name)) {
-		int rc = check_uri((const char *)value);
+		int rc = check_uri(ctx, stream_id, (const char *)value);
 		if (rc < 0) {
-			return rc;
+			if (rc == kr_error(ENOMEM))
+				return NGHTTP2_ERR_CALLBACK_FAILURE;
+		} else {
+			ctx->uri_path = malloc(sizeof(*ctx->uri_path) * (valuelen + 1));
+			if (!ctx->uri_path)
+				return NGHTTP2_ERR_CALLBACK_FAILURE;
+			memcpy(ctx->uri_path, value, valuelen);
+			ctx->uri_path[valuelen] = '\0';
 		}
-
-		ctx->uri_path = malloc(sizeof(*ctx->uri_path) * (valuelen + 1));
-		if (!ctx->uri_path)
-			return NGHTTP2_ERR_CALLBACK_FAILURE;
-		memcpy(ctx->uri_path, value, valuelen);
-		ctx->uri_path[valuelen] = '\0';
 	}
 
 	if (!strcasecmp(":method", (const char *)name)) {
