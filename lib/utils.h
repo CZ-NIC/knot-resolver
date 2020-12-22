@@ -23,8 +23,9 @@
 #include <uv.h>
 
 #include "kresconfig.h"
-#include "lib/generic/array.h"
+#include "contrib/mempattern.h"
 #include "lib/defines.h"
+#include "lib/generic/array.h"
 
 struct kr_query;
 struct kr_request;
@@ -110,7 +111,7 @@ void kr_log_q(const struct kr_query *qry, const char *source, const char *fmt, .
 #define static_assert(cond, msg)
 #endif
 
-/** @cond Memory alloc routines */
+/** @cond Memory alloc routines: extension of ./contrib/mempattern.h */
 
 /** Readability: avoid const-casts in code. */
 static inline void free_const(const void *what)
@@ -119,37 +120,9 @@ static inline void free_const(const void *what)
 }
 
 // Use this for alocations with mm.
-static inline void *mm_alloc(knot_mm_t *mm, size_t size)
-{
-	if (mm) return mm->alloc(mm->ctx, size);
-	else return malloc(size);
-}
-static inline void mm_free(knot_mm_t *mm, const void *what)
-{
-	if (mm) {
-		if (mm->free)
-			mm->free((void *)what);
-	}
-	else free_const(what);
-}
-
-/** Realloc implementation using memory context. */
-KR_EXPORT
-void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t prev_size);
-
-/** Trivial malloc() wrapper. */
 // Use mm_alloc for alocations into mempool
-void *mm_malloc(void *ctx, size_t n);
 /** posix_memalign() wrapper. */
 void *mm_malloc_aligned(void *ctx, size_t n);
-
-/** Initialize mm with standard malloc+free. */
-static inline void mm_ctx_init(knot_mm_t *mm)
-{
-	mm->ctx = NULL;
-	mm->alloc = mm_malloc;
-	mm->free = free;
-}
 
 /** Initialize mm with malloc+free with higher alignment (a power of two). */
 static inline void mm_ctx_init_aligned(knot_mm_t *mm, size_t alignment)
