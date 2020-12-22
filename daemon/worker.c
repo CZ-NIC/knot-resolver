@@ -2111,8 +2111,7 @@ static int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
 		return kr_error(ENOMEM);
 	}
 
-	worker->pkt_pool.ctx = mp_new (4 * sizeof(knot_pkt_t));
-	worker->pkt_pool.alloc = (knot_mm_alloc_t) mp_alloc;
+	mm_ctx_mempool(&worker->pkt_pool, 4 * sizeof(knot_pkt_t));
 
 	return kr_ok();
 }
