@@ -127,12 +127,12 @@ uint8_t *ip_to_bytes(const union inaddr *src, size_t len)
 	}
 }
 
-bool no_rtt_info(struct rtt_state s)
+static bool no_rtt_info(struct rtt_state s)
 {
 	return s.srtt == 0 && s.consecutive_timeouts == 0;
 }
 
-unsigned back_off_timeout(uint32_t to, int pow)
+static unsigned back_off_timeout(uint32_t to, int pow)
 {
 	if (pow > MAX_BACKOFF) {
 		to *= 1 << MAX_BACKOFF;
@@ -147,7 +147,7 @@ unsigned back_off_timeout(uint32_t to, int pow)
 
 /* This is verbatim (minus the default timeout value and minimal variance)
  * RFC6298, sec. 2. */
-unsigned calc_timeout(struct rtt_state state)
+static unsigned calc_timeout(struct rtt_state state)
 {
 	int32_t timeout =
 		state.srtt + MAX(4 * state.variance, MINIMAL_TIMEOUT_ADDITION);
@@ -155,7 +155,7 @@ unsigned calc_timeout(struct rtt_state state)
 }
 
 /* This is verbatim RFC6298, sec. 2. */
-struct rtt_state calc_rtt_state(struct rtt_state old, unsigned new_rtt)
+static struct rtt_state calc_rtt_state(struct rtt_state old, unsigned new_rtt)
 {
 	if (no_rtt_info(old)) {
 		return (struct rtt_state){ new_rtt, new_rtt / 2, 0 };
@@ -174,8 +174,8 @@ struct rtt_state calc_rtt_state(struct rtt_state old, unsigned new_rtt)
 /**
  * @internal Invalidate addresses which should be considered dead
  */
-void invalidate_dead_upstream(struct address_state *state,
-			      unsigned int retry_timeout)
+static void invalidate_dead_upstream(struct address_state *state,
+				     unsigned int retry_timeout)
 {
 	struct rtt_state *rs = &state->rtt_state;
 	if (rs->consecutive_timeouts >= KR_NS_TIMEOUT_ROW_DEAD) {
@@ -196,11 +196,11 @@ void invalidate_dead_upstream(struct address_state *state,
 
 /**
  * @internal Check if IP address is TLS capable.
- * 
+ *
  * @p req has to have the selection_context properly initiazed.
  */
-void check_tls_capable(struct address_state *address_state,
-		       struct kr_request *req, struct sockaddr *address)
+static void check_tls_capable(struct address_state *address_state,
+			      struct kr_request *req, struct sockaddr *address)
 {
 	address_state->tls_capable =
 		req->selection_context.is_tls_capable ?
@@ -224,8 +224,8 @@ void check_tcp_connections(struct address_state *address_state, struct kr_reques
 /**
  * @internal Invalidate address if the respective IP version is disabled.
  */
-void check_network_settings(struct address_state *address_state,
-			    size_t address_len, bool no_ipv4, bool no_ipv6)
+static void check_network_settings(struct address_state *address_state,
+				   size_t address_len, bool no_ipv4, bool no_ipv6)
 {
 	if (no_ipv4 && address_len == sizeof(struct in_addr)) {
 		address_state->generation = -1;
@@ -261,7 +261,7 @@ void update_address_state(struct address_state *state, uint8_t *address,
 #endif
 }
 
-int cmp_choices(const void *a, const void *b)
+static int cmp_choices(const void *a, const void *b)
 {
 	struct choice *a_ = (struct choice *)a;
 	struct choice *b_ = (struct choice *)b;
@@ -287,7 +287,7 @@ int cmp_choices(const void *a, const void *b)
 }
 
 /* Fisher-Yates shuffle of the choices */
-void shuffle_choices(struct choice choices[], int choices_len)
+static void shuffle_choices(struct choice choices[], int choices_len)
 {
 	struct choice tmp;
 	for (int i = choices_len - 1; i > 0; i--) {
@@ -443,8 +443,8 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state,
 	}
 }
 
-void cache_timeout(const struct kr_transport *transport,
-		   struct address_state *addr_state, struct kr_cache *cache)
+static void cache_timeout(const struct kr_transport *transport,
+			  struct address_state *addr_state, struct kr_cache *cache)
 {
 	if (transport->deduplicated) {
 		/* Transport was chosen by a different query, that one will

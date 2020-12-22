@@ -38,8 +38,8 @@ void iter_local_state_alloc(struct knot_mm *mm, void **local_state)
 	memset(*local_state, 0, sizeof(struct iter_local_state));
 }
 
-struct address_state *get_address_state(struct iter_local_state *local_state,
-					const struct kr_transport *transport)
+static struct address_state *get_address_state(struct iter_local_state *local_state,
+						const struct kr_transport *transport)
 {
 	if (!transport) {
 		return NULL;
@@ -63,13 +63,13 @@ struct address_state *get_address_state(struct iter_local_state *local_state,
 	return (struct address_state *)*address_state;
 }
 
-bool zonecut_changed(knot_dname_t *new, knot_dname_t *old)
+static bool zonecut_changed(knot_dname_t *new, knot_dname_t *old)
 {
 	return knot_dname_cmp(old, new);
 }
 
-void unpack_state_from_zonecut(struct iter_local_state *local_state,
-			       struct kr_query *qry)
+static void unpack_state_from_zonecut(struct iter_local_state *local_state,
+				      struct kr_query *qry)
 {
 	struct kr_zonecut *zonecut = &qry->zone_cut;
 	struct knot_mm *mm = &qry->request->pool;
@@ -146,8 +146,8 @@ void unpack_state_from_zonecut(struct iter_local_state *local_state,
 	trie_it_free(it);
 }
 
-int get_valid_addresses(struct iter_local_state *local_state,
-			struct choice choices[])
+static int get_valid_addresses(struct iter_local_state *local_state,
+				struct choice choices[])
 {
 	unsigned count = 0;
 	trie_it_t *it;
@@ -171,8 +171,8 @@ int get_valid_addresses(struct iter_local_state *local_state,
 	return count;
 }
 
-int get_resolvable_names(struct iter_local_state *local_state,
-			 struct to_resolve resolvable[], struct kr_query *qry)
+static int get_resolvable_names(struct iter_local_state *local_state,
+				struct to_resolve resolvable[], struct kr_query *qry)
 {
 	/* Further resolution is not possible until we get `. DNSKEY` record;
 	 * we have to choose one of the known addresses here. */
@@ -229,8 +229,8 @@ int get_resolvable_names(struct iter_local_state *local_state,
 	return count;
 }
 
-void update_name_state(knot_dname_t *name, enum kr_transport_protocol type,
-		       trie_t *names)
+static void update_name_state(knot_dname_t *name, enum kr_transport_protocol type,
+			      trie_t *names)
 {
 	size_t name_len = knot_dname_size(name);
 	trie_val_t *val = trie_get_try(names, (char *)name, name_len);
