@@ -24,7 +24,7 @@ static void mm_nofree(void *p)
 	/* nop */
 }
 
-void *mm_malloc(void *ctx, size_t n)
+static void *mm_malloc(void *ctx, size_t n)
 {
 	(void)ctx;
 	return malloc(n);
