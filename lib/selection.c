@@ -40,17 +40,20 @@
 
 /* Simple cache interface follows */
 
-#define KEY_PREFIX 'S'
-
-void *prefix_key(const uint8_t *ip, size_t len)
+static knot_db_val_t cache_key(const uint8_t *ip, size_t len)
 {
-	void *key = malloc(len + 1);
-	*(char *)key = KEY_PREFIX;
-	memcpy((uint8_t *)key + 1, ip, len);
+	// CACHE_KEY_DEF: '\0' + 'S' + raw IP
+	const size_t key_len = len + 2;
+	uint8_t *key_data = malloc(key_len);
+	key_data[0] = '\0';
+	key_data[1] = 'S';
+	memcpy(key_data + 2, ip, len);
+	knot_db_val_t key = {
+		.len = key_len,
+		.data = key_data,
+	};
 	return key;
 }
-
-#undef PREFIX
 
 /* First value of timeout will be calculated as SRTT+4*DEFAULT_TIMEOUT
  * by calc_timeout(), so it'll be equal to DEFAULT_TIMEOUT. */
@@ -60,9 +63,6 @@ static const struct rtt_state default_rtt_state = { .srtt = 0,
 						    .consecutive_timeouts = 0,
 						    .dead_since = 0 };
 
-/* Note that this opens a cace transaction, which is usually closed by calling
- * `put_rtt_state` i.e. callee is responsible for its closing
- * (e.g. calling kr_cache_commit). */
 struct rtt_state get_rtt_state(const uint8_t *ip, size_t len,
 			       struct kr_cache *cache)
 {
@@ -70,9 +70,8 @@ struct rtt_state get_rtt_state(const uint8_t *ip, size_t len,
 	knot_db_val_t value;
 	knot_db_t *db = cache->db;
 	struct kr_cdb_stats *stats = &cache->stats;
-	uint8_t *prefixed_ip = prefix_key(ip, len);
 
-	knot_db_val_t key = { .len = len + 1, .data = prefixed_ip };
+	knot_db_val_t key = cache_key(ip, len);
 
 	if (cache->api->read(db, stats, &key, &value, 1)) {
 		state = default_rtt_state;
@@ -81,7 +80,7 @@ struct rtt_state get_rtt_state(const uint8_t *ip, size_t len,
 		state = *(struct rtt_state *)value.data;
 	}
 
-	free(prefixed_ip);
+	free(key.data);
 	return state;
 }
 
@@ -90,16 +89,15 @@ int put_rtt_state(const uint8_t *ip, size_t len, struct rtt_state state,
 {
 	knot_db_t *db = cache->db;
 	struct kr_cdb_stats *stats = &cache->stats;
-	uint8_t *prefixed_ip = prefix_key(ip, len);
 
-	knot_db_val_t key = { .len = len + 1, .data = prefixed_ip };
+	knot_db_val_t key = cache_key(ip, len);
 	knot_db_val_t value = { .len = sizeof(struct rtt_state),
 				.data = &state };
 
 	int ret = cache->api->write(db, stats, &key, &value, 1);
 	cache->api->commit(db, stats);
 
-	free(prefixed_ip);
+	free(key.data);
 	return ret;
 }
 

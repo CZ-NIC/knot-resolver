@@ -209,6 +209,10 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 
 /**
  * Get RTT state from cache. Returns `default_rtt_state` on unknown addresses.
+ *
+ * Note that this opens a cache transaction which is usually closed by calling
+ * `put_rtt_state`, i.e. callee is responsible for its closing
+ * (e.g. calling kr_cache_commit).
  */
 struct rtt_state get_rtt_state(const uint8_t *ip, size_t len,
 			       struct kr_cache *cache);
