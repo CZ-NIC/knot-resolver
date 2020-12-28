@@ -75,8 +75,10 @@ struct rtt_state get_rtt_state(const uint8_t *ip, size_t len,
 
 	if (cache->api->read(db, stats, &key, &value, 1)) {
 		state = default_rtt_state;
+	} else if (value.len != sizeof(struct rtt_state)) {
+		assert(false); // shouldn't happen but let's be more robust
+		state = default_rtt_state;
 	} else {
-		assert(value.len == sizeof(struct rtt_state));
 		state = *(struct rtt_state *)value.data;
 	}
 
