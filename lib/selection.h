@@ -223,7 +223,7 @@ int put_rtt_state(const uint8_t *ip, size_t len, struct rtt_state state,
 /**
  * @internal Helper function for conversion between different IP representations.
  */
-void bytes_to_ip(uint8_t *bytes, size_t len, union inaddr *dst);
+void bytes_to_ip(uint8_t *bytes, size_t len, uint16_t port, union inaddr *dst);
 
 /**
  * @internal Helper function for conversion between different IP representations.
