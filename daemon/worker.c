@@ -422,6 +422,7 @@ static int request_start(struct request_ctx *ctx, knot_pkt_t *query)
 	return kr_ok();
 }
 
+
 static void request_free(struct request_ctx *ctx)
 {
 	struct worker_ctx *worker = ctx->worker;
