@@ -134,15 +134,9 @@ static bool no_rtt_info(struct rtt_state s)
 
 static unsigned back_off_timeout(uint32_t to, int pow)
 {
-	if (pow > MAX_BACKOFF) {
-		to *= 1 << MAX_BACKOFF;
-	} else {
-		to *= (1 << pow);
-	}
-	if (to > MAX_TIMEOUT) {
-		to = MAX_TIMEOUT;
-	}
-	return to;
+	pow = MIN(pow, MAX_BACKOFF);
+	to <<= pow;
+	return MIN(to, MAX_TIMEOUT);
 }
 
 /* This is verbatim (minus the default timeout value and minimal variance)
@@ -161,12 +155,10 @@ static struct rtt_state calc_rtt_state(struct rtt_state old, unsigned new_rtt)
 		return (struct rtt_state){ new_rtt, new_rtt / 2, 0 };
 	}
 
-	struct rtt_state ret;
-
-	ret.srtt = (int32_t)(0.75 * old.srtt + 0.25 * new_rtt);
-	ret.variance = (int32_t)(0.875 * old.variance +
-				 0.125 * abs(old.srtt - (int32_t)new_rtt));
-	ret.consecutive_timeouts = 0;
+	struct rtt_state ret = { 0 };
+	ret.variance = (3 * old.variance + abs(old.srtt - (int32_t)new_rtt)
+			+ 2/*rounding*/) / 4;
+	ret.srtt = (7 * old.srtt + new_rtt + 4/*rounding*/) / 8;
 
 	return ret;
 }
