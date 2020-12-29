@@ -16,13 +16,6 @@
 
 #define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "slct", __VA_ARGS__)
 
-/** @internal Macro to set address structure. */
-#define ADDR_SET(sa, family, addr, len, port) do {\
-		memcpy(&sa ## _addr, (addr), (len)); \
-		sa ## _family = (family); \
-	sa ## _port = htons(port); \
-} while (0)
-
 #define DEFAULT_TIMEOUT 800
 #define MAX_TIMEOUT 10000
 #define MAX_BACKOFF 5
@@ -103,14 +96,18 @@ int put_rtt_state(const uint8_t *ip, size_t len, struct rtt_state state,
 	return ret;
 }
 
-void bytes_to_ip(uint8_t *bytes, size_t len, union inaddr *dst)
+void bytes_to_ip(uint8_t *bytes, size_t len, uint16_t port, union inaddr *dst)
 {
 	switch (len) {
 	case sizeof(struct in_addr):
-		ADDR_SET(dst->ip4.sin, AF_INET, bytes, len, 0);
+		dst->ip4.sin_family = AF_INET;
+		memcpy(&dst->ip4.sin_addr, bytes, len);
+		dst->ip4.sin_port = htons(port);
 		break;
 	case sizeof(struct in6_addr):
-		ADDR_SET(dst->ip6.sin6, AF_INET6, bytes, len, 0);
+		dst->ip6.sin6_family = AF_INET6;
+		memcpy(&dst->ip6.sin6_addr, bytes, len);
+		dst->ip6.sin6_port = htons(port);
 		break;
 	default:
 		assert(0);
@@ -126,6 +123,7 @@ uint8_t *ip_to_bytes(const union inaddr *src, size_t len)
 		return (uint8_t *)&src->ip6.sin6_addr;
 	default:
 		assert(0);
+		return NULL;
 	}
 }
 
@@ -241,7 +239,7 @@ void update_address_state(struct address_state *state, uint8_t *address,
 			  size_t address_len, struct kr_query *qry)
 {
 	union inaddr tmp_address;
-	bytes_to_ip(address, address_len, &tmp_address);
+	bytes_to_ip(address, address_len, 0, &tmp_address);
 	check_tls_capable(state, qry->request, &tmp_address.ip);
 	/* TODO: uncomment this once we actually use the information it collects
 	check_tcp_connections(address_state, qry->request, &tmp_address.ip);
@@ -400,21 +398,8 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 		}
 	}
 
-	switch (chosen->address_len) {
-	case sizeof(struct in_addr):
-		ADDR_SET(transport->address.ip4.sin, AF_INET, chosen->address,
-			 chosen->address_len, port);
-		transport->address_len = chosen->address_len;
-		break;
-	case sizeof(struct in6_addr):
-		ADDR_SET(transport->address.ip6.sin6, AF_INET6, chosen->address,
-			 chosen->address_len, port);
-		transport->address_len = chosen->address_len;
-		break;
-	default:
-		assert(0);
-		break;
-	}
+	bytes_to_ip(chosen->address, chosen->address_len, port, &transport->address);
+	transport->address_len = chosen->address_len;
 
 	if (choice_index) {
 		*choice_index = chosen->address_state->choice_array_index;
