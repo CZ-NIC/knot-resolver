@@ -179,8 +179,20 @@ struct rtt_state calc_rtt_state(struct rtt_state old, unsigned new_rtt)
 void invalidate_dead_upstream(struct address_state *state,
 			      unsigned int retry_timeout)
 {
-	if (kr_now() - state->rtt_state.dead_since < retry_timeout) {
-		state->generation = -1;
+	struct rtt_state *rs = &state->rtt_state;
+	if (rs->consecutive_timeouts >= KR_NS_TIMEOUT_ROW_DEAD) {
+		uint64_t now = kr_now();
+		if (now < rs->dead_since) {
+			// broken continuity of timestamp (reboot, different machine, etc.)
+			*rs = default_rtt_state;
+		} else if (now < rs->dead_since + retry_timeout) {
+			// period when we don't want to use the address
+			state->generation = -1;
+		} else {
+			assert(now >= rs->dead_since + retry_timeout);
+			// we allow to retry the server now
+			// TODO: perhaps tweak *rs?
+		}
 	}
 }
 
