@@ -55,6 +55,9 @@ Firewall rules are declarative and consist of filters and actions. Filters have 
     -- Delete a rule
     daf.del(2)
 
+    -- Delete all rules and start from scratch
+    daf.clear()
+
 .. warning:: Only the first matching rule's action is executed.  Defining
    additional actions for the same matching rule, e.g.  ``src = 127.0.0.1/8``,
    will have no effect.
