@@ -5,6 +5,7 @@ Improvements
 ------------
 - more consistency in using parent-side records for NS addresses (!1097)
 - better algorithm for choosing nameservers (!1030)
+- daf module: add daf.clear() (!1114)
 
 Bugfixes
 --------
