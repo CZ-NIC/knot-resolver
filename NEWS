@@ -1,9 +1,10 @@
-Knot Resolver 5.2.2 (2021-0m-dd)
+Knot Resolver 5.3.0 (2021-0m-dd)
 ================================
 
 Improvements
 ------------
 - more consistency in using parent-side records for NS addresses (!1097)
+- better algorithm for choosing nameservers (!1030)
 
 Bugfixes
 --------
