@@ -1,4 +1,5 @@
 stub-addr: 2001:503:ba3e::2:30
+stub-name: rootns.
 trust-anchor: . IN DS 63640 8 2 00EBC5520847A812819359F554C1701C9BDA488A6111BBC4ACC47A32980C1FB8
 val-override-date: 20170701000000
 query-minimization: off

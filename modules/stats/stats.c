@@ -147,7 +147,7 @@ static int collect_rtt(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
-	if (qry->flags.CACHED || !req->upstream.addr) {
+	if (qry->flags.CACHED || !req->upstream.transport) {
 		return ctx->state;
 	}
 
@@ -158,11 +158,11 @@ static int collect_rtt(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Socket address is encoded into sockaddr_in6 struct that
 	 * unions with sockaddr_in and differ in sa_family */
 	struct sockaddr_in6 *e = &data->upstreams.q.at[data->upstreams.head];
-	const struct sockaddr *src = req->upstream.addr;
-	switch (src->sa_family) {
-	case AF_INET:  memcpy(e, src, sizeof(struct sockaddr_in)); break;
-	case AF_INET6: memcpy(e, src, sizeof(struct sockaddr_in6)); break;
-	default: return ctx->state;
+	const union inaddr *src = &req->upstream.transport->address;
+	switch (src->ip.sa_family) {
+		case AF_INET:  memcpy(e, &src->ip4, sizeof(src->ip4)); break;
+		case AF_INET6: memcpy(e, &src->ip6, sizeof(src->ip6)); break;
+		default: return ctx->state;
 	}
 	/* Replace port number with the RTT information (cap is UINT16_MAX milliseconds) */
 	e->sin6_rtt = req->upstream.rtt;
