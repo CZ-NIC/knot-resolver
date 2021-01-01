@@ -194,6 +194,15 @@ function M.del(id)
 	return nil
 end
 
+-- @function Remove all rules
+function M.clear()
+	for key, r in ipairs(M.rules) do
+		policy.del(id)
+		table.remove(M.rules, key)
+	end
+	return true
+end
+
 -- @function Find a rule
 function M.get(id)
 	for _, r in ipairs(M.rules) do
