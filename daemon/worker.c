@@ -343,13 +343,11 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	};
 
 	/* Create request context */
-	struct request_ctx *ctx = mm_alloc(&pool, sizeof(*ctx));
+	struct request_ctx *ctx = mm_calloc(&pool, 1, sizeof(*ctx));
 	if (!ctx) {
 		pool_release(worker, pool.ctx);
 		return NULL;
 	}
-
-	memset(ctx, 0, sizeof(*ctx));
 
 	/* TODO Relocate pool to struct request */
 	ctx->worker = worker;
@@ -484,11 +482,10 @@ static struct qr_task *qr_task_create(struct request_ctx *ctx)
 	}
 
 	/* Create resolution task */
-	struct qr_task *task = mm_alloc(&ctx->req.pool, sizeof(*task));
+	struct qr_task *task = mm_calloc(&ctx->req.pool, 1, sizeof(*task));
 	if (!task) {
 		return NULL;
 	}
-	memset(task, 0, sizeof(*task)); /* avoid accidentally unintialized fields */
 
 	/* Create packet buffers for answer and subrequests */
 	knot_pkt_t *pktbuf = knot_pkt_new(NULL, pktbuf_max, &ctx->req.pool);

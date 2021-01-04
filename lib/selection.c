@@ -321,8 +321,7 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 		return NULL;
 	}
 
-	struct kr_transport *transport = mm_alloc(mempool, sizeof(struct kr_transport));
-	memset(transport, 0, sizeof(struct kr_transport));
+	struct kr_transport *transport = mm_calloc(mempool, 1, sizeof(*transport));
 
 	int choice = 0;
 	if (kr_rand_coin(EPSILON_NOMIN, EPSILON_DENOM) || choices_len == 0) {
@@ -552,8 +551,7 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 void kr_server_selection_init(struct kr_query *qry)
 {
 	struct knot_mm *mempool = &qry->request->pool;
-	struct local_state *local_state = mm_alloc(mempool, sizeof(struct local_state));
-	memset(local_state, 0, sizeof(struct local_state));
+	struct local_state *local_state = mm_calloc(mempool, 1, sizeof(*local_state));
 
 	if (qry->flags.FORWARD || qry->flags.STUB) {
 		qry->server_selection = (struct kr_server_selection){

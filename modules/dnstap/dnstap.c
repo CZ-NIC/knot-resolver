@@ -256,11 +256,10 @@ int dnstap_init(struct kr_module *module) {
 	module->layer = &layer;
 
 	/* allocated memory for internal data */
-	struct dnstap_data *data = malloc(sizeof(*data));
+	struct dnstap_data *data = calloc(1, sizeof(*data));
 	if (!data) {
 		return kr_error(ENOMEM);
 	}
-	memset(data, 0, sizeof(*data));
 
 	/* save pointer to internal struct in module for future reference */
 	module->data = data;

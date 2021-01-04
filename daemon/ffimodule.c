@@ -257,9 +257,8 @@ static kr_layer_api_t *l_ffi_layer_create(lua_State *L, struct kr_module *module
 	 * reserve slots after it for references to Lua callbacks. */
 	const size_t api_length = offsetof(kr_layer_api_t, cb_slots)
 				+ (SLOT_count * sizeof(module->layer->cb_slots[0]));
-	kr_layer_api_t *api = malloc(api_length);
+	kr_layer_api_t *api = calloc(1, api_length);
 	if (api) {
-		memset(api, 0, api_length);
 		LAYER_REGISTER(L, api, begin);
 		LAYER_REGISTER(L, api, finish);
 		LAYER_REGISTER(L, api, consume);
