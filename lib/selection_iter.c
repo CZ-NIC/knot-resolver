@@ -124,7 +124,9 @@ static void unpack_state_from_zonecut(struct iter_local_state *local_state,
 			} else if (address_len == sizeof(struct in6_addr)) {
 				name_state->aaaa_state = RECORD_RESOLVED;
 			}
-			update_address_state(address_state, address, address_len, qry);
+			union inaddr tmp_address;
+			bytes_to_ip(address, address_len, 0, &tmp_address);
+			update_address_state(address_state, &tmp_address, address_len, qry);
 		}
 	}
 	trie_it_free(it);
@@ -143,10 +145,23 @@ static int get_valid_addresses(struct iter_local_state *local_state,
 		if (address_state->generation == local_state->generation &&
 		    !address_state->unrecoverable_errors) {
 			choices[count] = (struct choice){
-				.address = address,
 				.address_len = address_len,
 				.address_state = address_state,
 			};
+			union inaddr tmp_address;
+			bytes_to_ip(address, address_len, 0, &tmp_address);
+			switch (address_len)
+			{
+			case sizeof(struct in_addr):
+				choices[count].address.ip4 = tmp_address.ip4;
+				break;
+			case sizeof(struct in6_addr):
+				choices[count].address.ip6 = tmp_address.ip6;
+				break;
+			default:
+				assert(0);
+				break;
+			}
 			count++;
 		}
 	}
