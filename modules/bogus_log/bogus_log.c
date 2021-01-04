@@ -112,11 +112,10 @@ int bogus_log_init(struct kr_module *module)
 	};
 	module->props = props;
 
-	struct stat_data *data = malloc(sizeof(*data));
+	struct stat_data *data = calloc(1, sizeof(*data));
 	if (!data) {
 		return kr_error(ENOMEM);
 	}
-	memset(data, 0, sizeof(*data));
 	module->data = data;
 	lru_create(&data->frequent, FREQUENT_COUNT, NULL, NULL);
 	return kr_ok();

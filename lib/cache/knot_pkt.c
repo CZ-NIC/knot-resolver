@@ -48,11 +48,10 @@ static int pkt_alloc_space(knot_pkt_t *pkt, int count)
 	}
 	/* Allocate pkt->rr_info to be certain, but just leave it zeroed. */
 	mm_free(&pkt->mm, pkt->rr_info);
-	pkt->rr_info = mm_alloc(&pkt->mm, sizeof(pkt->rr_info[0]) * pkt->rrset_allocd);
+	pkt->rr_info = mm_calloc(&pkt->mm, pkt->rrset_allocd, sizeof(pkt->rr_info[0]));
 	if (!pkt->rr_info) {
 		return kr_error(ENOMEM);
 	}
-	memset(pkt->rr_info, 0, sizeof(pkt->rr_info[0]) * pkt->rrset_allocd);
 	return kr_ok();
 }
 
