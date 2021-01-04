@@ -126,7 +126,11 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 	}
 
 	if (req->qsource.dst_addr) {
-		if (req->qsource.flags.tcp) {
+		if (req->qsource.flags.http) {
+			m.socket_protocol = DNSTAP__SOCKET_PROTOCOL__DOH;
+		} else if (req->qsource.flags.tls) {
+			m.socket_protocol = DNSTAP__SOCKET_PROTOCOL__DOT;
+		} else if (req->qsource.flags.tcp) {
 			m.socket_protocol = DNSTAP__SOCKET_PROTOCOL__TCP;
 		} else {
 			m.socket_protocol = DNSTAP__SOCKET_PROTOCOL__UDP;

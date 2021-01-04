@@ -49,11 +49,12 @@ enum SocketFamily {
     INET6 = 2;  // IPv6 (RFC 2460)
 }
 
-// SocketProtocol: the transport protocol of a socket. This specifies how to
-// interpret "transport port" fields.
+// SocketProtocol: the protocol used to transport a DNS message.
 enum SocketProtocol {
-    UDP = 1;    // User Datagram Protocol (RFC 768)
-    TCP = 2;    // Transmission Control Protocol (RFC 793)
+    UDP = 1;    // DNS over UDP transport (RFC 1035 section 4.2.1)
+    TCP = 2;    // DNS over TCP transport (RFC 1035 section 4.2.2)
+    DOT = 3;    // DNS over TLS (RFC 7858)
+    DOH = 4;    // DNS over HTTPS (RFC 8484)
 }
 
 // Message: a wire-format (RFC 1035 section 4) DNS message and associated
@@ -159,6 +160,16 @@ message Message {
         // TOOL_RESPONSE is a DNS response message received by a DNS software
         // tool from a DNS server, from the perspective of the tool.
         TOOL_RESPONSE = 12;
+
+        // UPDATE_QUERY is a DNS update query message received from a resolver
+        // by an authoritative name server, from the perspective of the
+        // authoritative name server.
+        UPDATE_QUERY = 13;
+
+        // UPDATE_RESPONSE is a DNS update response message sent from an
+        // authoritative name server to a resolver, from the perspective of the
+        // authoritative name server.
+        UPDATE_RESPONSE = 14;
     }
 
     // One of the Type values described above.
