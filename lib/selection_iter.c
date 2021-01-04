@@ -34,8 +34,7 @@ struct iter_name_state {
 
 void iter_local_state_alloc(struct knot_mm *mm, void **local_state)
 {
-	*local_state = mm_alloc(mm, sizeof(struct iter_local_state));
-	memset(*local_state, 0, sizeof(struct iter_local_state));
+	*local_state = mm_calloc(mm, 1, sizeof(struct iter_local_state));
 }
 
 static struct address_state *get_address_state(struct iter_local_state *local_state,
@@ -89,8 +88,7 @@ static void unpack_state_from_zonecut(struct iter_local_state *local_state,
 					       knot_dname_size(dname));
 		if (!*val) {
 			/* We encountered this name for the first time. */
-			*val = mm_alloc(mm, sizeof(struct iter_name_state));
-			memset(*val, 0, sizeof(struct iter_name_state));
+			*val = mm_calloc(mm, 1, sizeof(struct iter_name_state));
 		}
 		struct iter_name_state *name_state = *val;
 		name_state->generation = current_generation;
@@ -112,8 +110,7 @@ static void unpack_state_from_zonecut(struct iter_local_state *local_state,
 							address_len);
 			if (!*tval) {
 				/* We have have not seen this address before. */
-				*tval = mm_alloc(mm, sizeof(struct address_state));
-				memset(*tval, 0, sizeof(struct address_state));
+				*tval = mm_calloc(mm, 1, sizeof(struct address_state));
 			}
 			struct address_state *address_state = *tval;
 			address_state->generation = current_generation;

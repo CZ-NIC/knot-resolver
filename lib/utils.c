@@ -752,11 +752,10 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 		return kr_error(ret);
 	}
 
-	ranked_rr_array_entry_t *entry = mm_alloc(pool, sizeof(ranked_rr_array_entry_t));
+	ranked_rr_array_entry_t *entry = mm_calloc(pool, 1, sizeof(ranked_rr_array_entry_t));
 	if (!entry) {
 		return kr_error(ENOMEM);
 	}
-	memset(entry, 0, sizeof(*entry)); /* default all to zeros */
 
 	knot_rrset_t *rr_new = knot_rrset_new(rr->owner, rr->type, rr->rclass, rr->ttl, pool);
 	if (!rr_new) {
