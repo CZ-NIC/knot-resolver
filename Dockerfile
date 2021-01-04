@@ -8,7 +8,7 @@ ENV KNOT_DNS_BUILD_DEPS git-core build-essential libtool autoconf pkg-config \
 	libgnutls28-dev	libprotobuf-dev libprotobuf-c-dev libfstrm-dev
 ENV KNOT_RESOLVER_BUILD_DEPS build-essential pkg-config bsdmainutils liblmdb-dev \
 	libluajit-5.1-dev libuv1-dev libprotobuf-dev libprotobuf-c-dev \
-	libfstrm-dev luajit lua-http libssl-dev libnghttp2-dev
+	libfstrm-dev luajit lua-http libssl-dev libnghttp2-dev protobuf-c-compiler
 ENV BUILDENV_DEPS ${KNOT_DNS_BUILD_DEPS} ${KNOT_RESOLVER_BUILD_DEPS}
 RUN echo "deb http://deb.debian.org/debian stretch-backports main" > /etc/apt/sources.list.d/backports.list
 RUN apt-get update -qq && \
@@ -38,11 +38,12 @@ FROM debian:stable-slim AS runtime
 ENV KNOT_DNS_RUNTIME_DEPS libgnutls30
 ENV KNOT_RESOLVER_RUNTIME_DEPS liblmdb0 luajit libluajit-5.1-2 libuv1 lua-http libnghttp2-14
 ENV KNOT_RESOLVER_RUNTIME_DEPS_HTTP lua-http lua-mmdb
-ENV KNOT_RESOLVER_RUNTIME_DEPS_EXTRA libfstrm0 lua-cqueues
+ENV KNOT_RESOLVER_RUNTIME_DEPS_EXTRA lua-cqueues
+ENV KNOT_RESOLVER_RUNTIME_DEPS_DNSTAP libfstrm0 libprotobuf-c1
 ENV KNOT_RESOLVER_RUNTIME_DEPS_SSL ca-certificates
 ENV RUNTIME_DEPS ${KNOT_DNS_RUNTIME_DEPS} ${KNOT_RESOLVER_RUNTIME_DEPS} \
     ${KNOT_RESOLVER_RUNTIME_DEPS_HTTP} ${KNOT_RESOLVER_RUNTIME_DEPS_EXTRA} \
-    ${KNOT_RESOLVER_RUNTIME_DEPS_SSL}
+    ${KNOT_RESOLVER_RUNTIME_DEPS_SSL} ${KNOT_RESOLVER_RUNTIME_DEPS_DNSTAP}
 RUN apt-get update -qq && \
 	apt-get install -y -qqq ${RUNTIME_DEPS} && \
 	apt-get clean && \
