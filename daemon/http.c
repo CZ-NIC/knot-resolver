@@ -417,6 +417,8 @@ static void on_pkt_write(struct http_data *data, int status)
 		return;
 
 	data->on_write(data->req, status);
+
+	free(data);
 }
 
 /*
