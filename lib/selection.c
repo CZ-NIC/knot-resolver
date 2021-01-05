@@ -417,6 +417,7 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 		transport->address.ip6.sin6_port = htons(port);
 		break;
 	default:
+		assert(0);
 		break;
 	}
 
