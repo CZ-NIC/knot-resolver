@@ -44,7 +44,7 @@ if build_dnstap
   test('dnstap',
     find_program('./dnstap/src/dnstap-test/run.sh'),
     args: [ sbin_dir / 'kresd' ],
-    suite: [ 'postinstall' ],
+    suite: [ 'postinstall', 'config' ],
     timeout: 120, # it may need to fetch go packages, etc.
   )
 endif
