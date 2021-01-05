@@ -39,6 +39,16 @@ if build_config_tests
   subdir('config')
 endif
 
+## dnstap tests
+if build_dnstap and build_config_tests
+  test('config.dnstap',
+    find_program('./dnstap/src/dnstap-test/run.sh'),
+    args: [ sbin_dir / 'kresd' ],
+    suite: [ 'postinstall', 'config', 'skip_valgrind' ],
+    timeout: 120, # it may need to fetch go packages, etc.
+  )
+endif
+
 ## extra tests
 if build_extra_tests
   message('--- extra_tests dependencies ---')

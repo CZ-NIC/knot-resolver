@@ -17,13 +17,9 @@ import (
 	"time"
 )
 
-const (
-	kresdWorkDir = "/tmp/"
-)
-
 var (
 	kresdArgs = []string{
-		"-f1",
+		"-n",
 		"-v",
 		"-q",
 	}
@@ -35,18 +31,25 @@ func qnameFromFrame(b []byte) (string, error) {
 	if err := proto.Unmarshal(b, dt); err != nil {
 		return name, err
 	}
+
+	var msg_raw []byte
 	m := dt.Message
-	if *m.Type != dnstap.Message_CLIENT_RESPONSE {
-		return name, fmt.Errorf("incorrect message type")
+	if *m.Type == dnstap.Message_CLIENT_QUERY {
+		msg_raw = m.QueryMessage
+	} else if *m.Type == dnstap.Message_CLIENT_RESPONSE {
+		msg_raw = m.ResponseMessage
+	} else {
+		return name, fmt.Errorf("incorrect message type: %v", *m.Type)
 	}
-	if m.ResponseMessage == nil {
+
+	if msg_raw == nil {
 		return name, fmt.Errorf("no message payload")
 	}
-	if err := dns.IsMsg(m.ResponseMessage); err != nil {
+	if err := dns.IsMsg(msg_raw); err != nil {
 		return name, err
 	}
 	var msg dns.Msg
-	if err := msg.Unpack(m.ResponseMessage); err != nil {
+	if err := msg.Unpack(msg_raw); err != nil {
 		return name, err
 	}
 	if len(msg.Question) < 1 {
@@ -74,7 +77,6 @@ func listenOn() (net.Addr, *os.File, error) {
 func runKresd(ctx context.Context, path, configFile string, grace time.Duration) (chan bool, error) {
 	ch := make(chan bool)
 	kresdArgs = append(kresdArgs, "-c"+configFile)
-	kresdArgs = append(kresdArgs, kresdWorkDir)
 	// we have 1 object in ExtraFiles with index 0
 	// child fd will be 3 + i = 3
 	kresdArgs = append(kresdArgs, "-S3")
@@ -144,8 +146,8 @@ func runKresd(ctx context.Context, path, configFile string, grace time.Duration)
 
 func main() {
 	var (
-		unixSocket = flag.String("u", "/tmp/dnstap.sock", "dnstap socket")
-		kresdPath  = flag.String("cmd", "daemon/kresd", "kresd path")
+		unixSocket = flag.String("u", "dnstap.sock", "dnstap socket")
+		kresdPath  = flag.String("cmd", "kresd", "kresd path")
 		configFile = flag.String("c", "config", "config file")
 		qnames     = flag.String("q", ".", "list of comma separated zones")
 		grace      = flag.String("g", "1s", "Time to wait for daemon start")
@@ -218,21 +220,22 @@ func main() {
 				log.Printf("Response: %v", resp)
 			}
 
-			// Check dnstap output
-			o := <-output
-			if *debug {
-				log.Printf("raw dnstap:%v", o)
+			for range "QR" { // Checking Query and Response is the same ATM
+				o := <-output
+				if *debug {
+					log.Printf("raw dnstap:%v", o)
+				}
+				dtName, err := qnameFromFrame(o)
+				if err != nil {
+					log.Printf("%v\n", err)
+					os.Exit(1)
+				}
+				if fqdn != dtName {
+					log.Printf("expected %v got %v", fqdn, dtName)
+					os.Exit(1) // Test failed
+				}
+				log.Printf("matched qname: %v", dtName)
 			}
-			dtName, err := qnameFromFrame(o)
-			if err != nil {
-				log.Printf("%v\n", err)
-				os.Exit(1)
-			}
-			if fqdn != dtName {
-				log.Printf("expected %v got %v", fqdn, dtName)
-				os.Exit(1) // Test failed
-			}
-			log.Printf("matched qname: %v", dtName)
 		}
 		cancel() // Send signal to close daemon
 	}()
