@@ -5,7 +5,8 @@ on: push
 jobs:
   build-test:
     name: Build & unit tests & sanity check
-    runs-on: macOS-latest
+    # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#github-hosted-runners
+    runs-on: [ macOS-latest, macos-11.0 ]
 
     steps:
       - name: Checkout resolver code

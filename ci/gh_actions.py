@@ -28,10 +28,11 @@ while time.time() < end_time:
     elif response.status_code == 200:
         data = json.loads(response.content.decode('utf-8'))
         try:
-            run = data['workflow_runs'][0]
-            conclusion = run['conclusion']
-            html_url = run['html_url']
-            commit_sha = run['head_sha']
+            for i in range(0, 1): # two runs ATM
+                run = data['workflow_runs'][i]
+                conclusion = run['conclusion']
+                html_url = run['html_url']
+                commit_sha = run['head_sha']
         except (KeyError, IndexError):
             time.sleep(POLL_DELAY)
             continue
