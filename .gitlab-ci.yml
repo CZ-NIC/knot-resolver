@@ -89,6 +89,7 @@ build:
     - ninja -C build_ci
     - ninja -C build_ci install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --no-suite snowflake
+    - rm -rf build_ci/tests/dnstap # avoid in artifacts; it's big and probably not useful
 
 build-asan:
   <<: *build
@@ -275,7 +276,7 @@ respdiff:basic:
 test:valgrind:
   <<: *test_flaky
   script:
-    - ${MESON_TEST} --suite unit --suite config --no-suite snowflake --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
+    - ${MESON_TEST} --suite unit --suite config --no-suite snowflake --no-suite skip_valgrind --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
     - MESON_TESTTHREADS=1 ${MESON_TEST} --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" --suite snowflake
 
 pytests:
