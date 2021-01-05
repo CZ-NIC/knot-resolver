@@ -118,3 +118,10 @@ RUN apt-get install -y -qqq lua-http lua-psl
 RUN apt-get install -y -qqq locales
 RUN sed -i "/en_US.UTF-8/ s/^#\(.*\)/\1/" /etc/locale.gen
 RUN locale-gen
+
+# SonarCloud scanner
+RUN wget -O /var/opt/wrapper.zip https://sonarcloud.io/static/cpp/build-wrapper-linux-x86.zip
+RUN wget -O /var/opt/scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.4.0.2170-linux.zip
+RUN unzip -d /var/opt /var/opt/wrapper.zip
+RUN unzip -d /var/opt /var/opt/scanner.zip
+ENV PATH "$PATH:/var/opt/build-wrapper-linux-x86:/var/opt/sonar-scanner-cli-4.4.0.2170-linux/bin"
