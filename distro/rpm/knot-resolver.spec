@@ -54,6 +54,13 @@ BuildRequires:  pkgconfig(luajit) >= 2.0
 Requires:       systemd
 Requires(post): systemd
 
+# dnstap module dependencies
+# SUSE is missing protoc-c protobuf compiler
+%if "x%{?suse_version}" == "x"
+BuildRequires:  pkgconfig(libfstrm)
+BuildRequires:  pkgconfig(libprotobuf-c)
+%endif
+
 # Distro-dependent dependencies
 %if 0%{?rhel} == 7
 BuildRequires:  lmdb-devel
@@ -124,6 +131,17 @@ Documentation for Knot Resolver
 %endif
 
 %if "x%{?suse_version}" == "x"
+%package module-dnstap
+Summary:        dnstap module for Knot Resolver
+Requires:       %{name} = %{version}-%{release}
+
+%description module-dnstap
+dnstap module for Knot Resolver supports logging DNS responses to a unix socket
+in dnstap format using fstrm framing library.  This logging is useful if you
+need effectivelly log all DNS traffic.
+%endif
+
+%if "x%{?suse_version}" == "x"
 %package module-http
 Summary:        HTTP module for Knot Resolver
 Requires:       %{name} = %{version}-%{release}
@@ -158,6 +176,7 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
 %endif
     -Dsystemd_files=enabled \
     -Dclient=enabled \
+    -Ddnstap=enabled \
     -Dunit_tests=enabled \
     -Dmanaged_ta=enabled \
     -Dkeyfile_default="%{_sharedstatedir}/knot-resolver/root.keys" \
@@ -299,7 +318,12 @@ fi
 %{_libdir}/knot-resolver/*.so
 %{_libdir}/knot-resolver/*.lua
 %dir %{_libdir}/knot-resolver/kres_modules
-%{_libdir}/knot-resolver/kres_modules/*.so
+%{_libdir}/knot-resolver/kres_modules/bogus_log.so
+%{_libdir}/knot-resolver/kres_modules/edns_keepalive.so
+%{_libdir}/knot-resolver/kres_modules/hints.so
+%{_libdir}/knot-resolver/kres_modules/nsid.so
+%{_libdir}/knot-resolver/kres_modules/refuse_nord.so
+%{_libdir}/knot-resolver/kres_modules/stats.so
 %{_libdir}/knot-resolver/kres_modules/daf
 %{_libdir}/knot-resolver/kres_modules/daf.lua
 %{_libdir}/knot-resolver/kres_modules/detect_time_jump.lua
@@ -337,6 +361,9 @@ fi
 %dir %{_datadir}/info/knot-resolver-figures
 %doc %{_datadir}/info/knot-resolver-figures/*
 %endif
+
+%files module-dnstap
+%{_libdir}/knot-resolver/kres_modules/dnstap.so
 
 %if "x%{?suse_version}" == "x"
 %files module-http
