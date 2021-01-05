@@ -123,6 +123,15 @@ Requires:       %{name} = %{version}-%{release}
 Documentation for Knot Resolver
 %endif
 
+%package module-dnstap
+Summary:        dnstap module for Knot Resolver
+Requires:       %{name} = %{version}-%{release}
+
+%description module-dnstap
+dnstap module for Knot Resolver supports logging DNS responses to a unix socket
+in dnstap format using fstrm framing library.  This logging is useful if you
+need effectivelly log all DNS traffic.
+
 %if "x%{?suse_version}" == "x"
 %package module-http
 Summary:        HTTP module for Knot Resolver
@@ -337,6 +346,9 @@ fi
 %dir %{_datadir}/info/knot-resolver-figures
 %doc %{_datadir}/info/knot-resolver-figures/*
 %endif
+
+%files module-http
+%{_libdir}/knot-resolver/kres_modules/dnstap.so
 
 %if "x%{?suse_version}" == "x"
 %files module-http
