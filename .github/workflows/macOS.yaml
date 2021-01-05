@@ -5,8 +5,12 @@ on: push
 jobs:
   build-test:
     name: Build & unit tests & sanity check
-    # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#github-hosted-runners
-    runs-on: [ macOS-latest, macos-11.0 ]
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+        matrix:
+            # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#github-hosted-runners
+            os: [ macos-latest, macos-11.0 ]
 
     steps:
       - name: Checkout resolver code
