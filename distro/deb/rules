@@ -27,6 +27,7 @@ override_dh_auto_build:
 		-Ddoc=enabled \
 		-Dsystemd_files=enabled \
 		-Dclient=enabled \
+		-Ddnstap=enabled \
 		-Dkeyfile_default=/usr/share/dns/root.key \
 		-Droot_hints=/usr/share/dns/root.hints \
 		-Dinstall_kresd_conf=enabled \
