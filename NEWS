@@ -10,6 +10,7 @@ Improvements
 Bugfixes
 --------
 - view: fail config if bad subnet is specified (!1112)
+- doh2: fix memory leak (!1117)
 
 
 Knot Resolver 5.2.1 (2020-12-09)
