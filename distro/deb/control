@@ -74,6 +74,23 @@ Description: Debug symbols for Knot Resolver
  This package provides the debug symbols for Knot Resolver needed
  for properly debugging errors in Knot Resolver with gdb.
 
+Package: knot-resolver-module-dnstap
+Architecture: all
+Depends:
+ knot-resolver (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Description: dnstap module for Knot Resolver
+ The Knot Resolver is a caching full resolver implementation
+ written in C and LuaJIT, including both a resolver library and a
+ daemon. Modular architecture of the library keeps the core tiny and
+ efficient, and provides a state-machine like API for
+ extensions. There are three built-in modules - iterator, cache,
+ validator, and many external.
+ .
+ This package contains dnstap module for logging DNS responses
+ to a unix socket in dnstap format.
+
 Package: knot-resolver-module-http
 Architecture: all
 Depends:
