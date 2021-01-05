@@ -56,13 +56,11 @@
 /libtool
 /ltmain.sh
 /missing
-/modules/dnstap/dnstap.pb-c.*
+/modules/dnstap/dnstap.pb-c.d
 /self.crt
 /self.key
 /stamp-h1
 /tags
-/tests/dnstap/src/dnstap-test/vendor/github.com/
-/tests/dnstap/src/github.com/
 /tests/pytests/*/tcproxy
 /tests/pytests/*/tlsproxy
 /tests/pytests/pytests.parallel.html

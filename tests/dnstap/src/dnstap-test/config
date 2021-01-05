@@ -1,10 +1,10 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
-verbose(true)
 modules = {
 	'hints',
 	dnstap = {
-		socket_path = "/tmp/dnstap.sock",
+		socket_path = "dnstap.sock",
 		client = {
+			log_queries = true,
 			log_responses = true,
 		}
 	}
