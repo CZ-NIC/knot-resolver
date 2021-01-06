@@ -595,7 +595,7 @@ int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 		// start the timer
 		struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
 		assert(qry != NULL);
-
+		(void)qry;
 		size_t timeout = task->transport->timeout;
 		int ret = session_timer_start(s, on_udp_timeout, timeout, 0);
 		/* Start next step with timeout, fatal if can't start a timer. */
@@ -1641,13 +1641,12 @@ static int qr_task_step(struct qr_task *task,
 	{
 	case KR_TRANSPORT_UDP:
 		return udp_task_step(task, packet_source, packet);
-		break;
 	case KR_TRANSPORT_TCP: // fall through
 	case KR_TRANSPORT_TLS:
 		return tcp_task_step(task, packet_source, packet);
 	default:
 		assert(0);
-		break;
+		return kr_error(EINVAL);
 	}
 }
 
