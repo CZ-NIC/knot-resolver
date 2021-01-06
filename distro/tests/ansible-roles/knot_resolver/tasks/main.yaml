@@ -46,6 +46,15 @@
         - include: test_doh.yaml
       when: distro in ["Fedora", "Debian", "CentOS"] or (distro == "Ubuntu" and ansible_distribution_major_version|int >= 18)
 
+    - name: Test dnstap module
+      block:
+        - name: Install knot-resolver-module-dnstap
+          package:
+            name: knot-resolver-module-dnstap
+            state: latest
+        - include: configure_dnstap.yaml
+        - include: restart_kresd.yaml
+
   always:
 
     - name: Get installed package version
