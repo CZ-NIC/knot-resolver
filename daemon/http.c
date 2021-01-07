@@ -362,7 +362,7 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 		queue_push(ctx->streams, stream_id);
 	}
 
-	memcpy(ctx->buf + ctx->buf_pos, data, len);
+	memmove(ctx->buf + ctx->buf_pos, data, len);
 	ctx->buf_pos += len;
 	return 0;
 }
