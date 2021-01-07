@@ -122,6 +122,18 @@ docker:
   after_script:  # remove dangling images to avoid running out of disk space
     - docker rmi ${DOCKER_IMAGE_NAME}
     - docker rmi $(docker images -f "dangling=true" -q)
+
+sonarcloud:
+  <<: *nodep
+  stage: build
+  except: null
+  only:
+    - tags
+    - master@knot/knot-resolver
+  script:
+    - meson build_sonarcloud --default-library=static --prefix=$PREFIX
+    - build-wrapper-linux-x86-64 --out-dir bw-output ninja -C build_sonarcloud
+    - sonar-scanner -Dsonar.organization=cz-nic -Dsonar.projectKey=CZ-NIC_knot-resolver -Dsonar.sources=.  -Dsonar.cfamily.build-wrapper-output=bw-output -Dsonar.host.url=https://sonarcloud.io
 # }}}
 
 # sanity {{{
