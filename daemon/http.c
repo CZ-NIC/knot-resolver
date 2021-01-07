@@ -387,11 +387,11 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 			if (process_uri_path(ctx, ctx->uri_path, stream_id) < 0) {
 				refuse_stream(h2, stream_id);
 			}
-			free(ctx->uri_path);
-			ctx->uri_path = NULL;
 		}
 		ctx->incomplete_stream = -1;
 		ctx->current_method = HTTP_METHOD_NONE;
+		free(ctx->uri_path);
+		ctx->uri_path = NULL;
 
 		len = ctx->buf_pos - sizeof(uint16_t);
 		if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
