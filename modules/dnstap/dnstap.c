@@ -187,7 +187,7 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 			m.has_response_message = rpkt != NULL;
 			if (rpkt != NULL) {
 				m.response_message.len = rpkt->size;
-				m.response_message.data = (uint8_t *)rpkt->wire;
+				m.response_message.data = rpkt->wire;
 			}
 		}
 
@@ -201,7 +201,7 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 	/* Create a dnstap Message */
 	Dnstap__Dnstap dnstap = DNSTAP__DNSTAP__INIT;
 	dnstap.type = DNSTAP__DNSTAP__TYPE__MESSAGE;
-	dnstap.message = (Dnstap__Message *)&m;
+	dnstap.message = &m;
 
 	if (dnstap_dt->identity) {
 		dnstap.identity.data = (uint8_t*)dnstap_dt->identity;
