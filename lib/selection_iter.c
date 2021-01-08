@@ -148,20 +148,7 @@ static int get_valid_addresses(struct iter_local_state *local_state,
 				.address_len = address_len,
 				.address_state = address_state,
 			};
-			union inaddr tmp_address;
-			bytes_to_ip(address, address_len, 0, &tmp_address);
-			switch (address_len)
-			{
-			case sizeof(struct in_addr):
-				choices[count].address.ip4 = tmp_address.ip4;
-				break;
-			case sizeof(struct in6_addr):
-				choices[count].address.ip6 = tmp_address.ip6;
-				break;
-			default:
-				assert(0);
-				break;
-			}
+			bytes_to_ip(address, address_len, 0, &choices[count].address);
 			count++;
 		}
 	}

@@ -125,6 +125,7 @@ void bytes_to_ip(uint8_t *bytes, size_t len, uint16_t port, union inaddr *dst)
 		dst->ip4.sin_port = htons(port);
 		break;
 	case sizeof(struct in6_addr):
+		memset(&dst->ip6, 0, sizeof(dst->ip6)); // avoid uninit surprises
 		dst->ip6.sin6_family = AF_INET6;
 		memcpy(&dst->ip6.sin6_addr, bytes, len);
 		dst->ip6.sin6_port = htons(port);
@@ -402,7 +403,7 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 			break;
 		default:
 			assert(0);
-			break;
+			return NULL;
 		}
 	}
 
@@ -418,7 +419,7 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 		break;
 	default:
 		assert(0);
-		break;
+		return NULL;
 	}
 
 	transport->address_len = chosen->address_len;
