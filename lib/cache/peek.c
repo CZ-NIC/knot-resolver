@@ -106,9 +106,10 @@ static uint8_t get_lowest_rank(const struct kr_query *qry, const knot_dname_t *n
 
 
 /** Almost whole .produce phase for the cache module.
- * \note we don't transition to KR_STATE_FAIL even in case of "unexpected errors".
+ * \note we don't transition to KR_STATE_FAIL even in case of "unexpected errors";
+ *       we don't even change ctx->state to other values (e.g. on success).
  */
-int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
+void peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
@@ -118,7 +119,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	int ret = kr_dname_lf(k->buf, qry->sname, false);
 	if (unlikely(ret)) {
 		assert(false);
-		return ctx->state;
+		return;
 	}
 
 	const uint8_t lowest_rank = get_lowest_rank(qry, qry->sname, qry->stype);
@@ -137,9 +138,9 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (ret && ret != -abs(ENOENT)) {
 		VERBOSE_MSG(qry, "=> exact hit error: %d %s\n", ret, kr_strerror(ret));
 		assert(false);
-		return ctx->state;
+		return;
 	} else if (!ret) {
-		return KR_STATE_DONE;
+		return;
 	}
 
 	/**** 1b. otherwise, find the longest prefix zone/xNAME (with OK time+rank). [...] */
@@ -147,14 +148,14 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	ret = kr_dname_lf(k->buf, k->zname, false); /* LATER(optim.): probably remove */
 	if (unlikely(ret)) {
 		assert(false);
-		return ctx->state;
+		return;
 	}
 	entry_list_t el;
 	ret = closest_NS(cache, k, el, qry, false, qry->stype == KNOT_RRTYPE_DS);
 	if (ret) {
 		assert(ret == kr_error(ENOENT));
 		if (ret != kr_error(ENOENT) || !el[0].len) {
-			return ctx->state;
+			return;
 		}
 	}
 	switch (k->type) {
@@ -163,9 +164,9 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		assert(v.data && v.len);
 		const int32_t new_ttl = get_new_ttl(v.data, qry, qry->sname,
 						KNOT_RRTYPE_CNAME, qry->timestamp.tv_sec);
-		ret = answer_simple_hit(ctx, pkt, KNOT_RRTYPE_CNAME, v.data,
-					knot_db_val_bound(v), new_ttl);
-		return ret == kr_ok() ? KR_STATE_DONE : ctx->state;
+		answer_simple_hit(ctx, pkt, KNOT_RRTYPE_CNAME, v.data,
+				  knot_db_val_bound(v), new_ttl);
+		return;
 		}
 	case KNOT_RRTYPE_DNAME: {
 		const knot_db_val_t v = el[EL_DNAME];
@@ -173,9 +174,9 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		/* TTL: for simplicity, we just ask for TTL of the generated CNAME. */
 		const int32_t new_ttl = get_new_ttl(v.data, qry, qry->sname,
 						KNOT_RRTYPE_CNAME, qry->timestamp.tv_sec);
-		ret = answer_dname_hit(ctx, pkt, k->zname, v.data,
-					knot_db_val_bound(v), new_ttl);
-		return ret == kr_ok() ? KR_STATE_DONE : ctx->state;
+		answer_dname_hit(ctx, pkt, k->zname, v.data,
+				 knot_db_val_bound(v), new_ttl);
+		return;
 		}
 	}
 
@@ -191,12 +192,12 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 #if 0
 	if (!eh) { /* fall back to root hints? */
 		ret = kr_zonecut_set_sbelt(req->ctx, &qry->zone_cut);
-		if (ret) return ctx->state;
+		if (ret) return;
 		assert(!qry->zone_cut.parent);
 
 		//VERBOSE_MSG(qry, "=> using root hints\n");
 		//qry->flags.AWAIT_CUT = false;
-		return ctx->state;
+		return;
 	}
 
 	/* Now `eh` points to the closest NS record that we've found,
@@ -204,7 +205,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 * a negative proof or we may query upstream from that point. */
 	kr_zonecut_set(&qry->zone_cut, k->zname);
 	ret = kr_make_query(qry, pkt); // TODO: probably not yet - qname minimization
-	if (ret) return ctx->state;
+	if (ret) return;
 #endif
 
 	/** Structure for collecting multiple NSEC* + RRSIG records,
@@ -238,10 +239,10 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 					lowest_rank, qry, cache);
 		nsec_p_cleanup(&ans.nsec_p);
 		if (!ret) break;
-		if (ret < 0) return ctx->state;
+		if (ret < 0) return;
 	cont:
 		/* Otherwise we try another nsec_p, if available. */
-		if (++i == ENTRY_APEX_NSECS_CNT) return ctx->state;
+		if (++i == ENTRY_APEX_NSECS_CNT) return;
 		/* clear possible partial answers in `ans` (no need to deallocate) */
 		ans.rcode = 0;
 		memset(&ans.rrsets, 0, sizeof(ans.rrsets));
@@ -259,7 +260,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		if (ret || !(eh = entry_h_consistent_E(val, KNOT_RRTYPE_SOA))) {
 			assert(ret); /* only want to catch `eh` failures */
 			VERBOSE_MSG(qry, "=> SOA missed\n");
-			return ctx->state;
+			return;
 		}
 		/* Check if the record is OK. */
 		int32_t new_ttl = get_new_ttl(eh, qry, k->zname, KNOT_RRTYPE_SOA,
@@ -268,12 +269,12 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 			VERBOSE_MSG(qry, "=> SOA unfit %s: rank 0%.2o, new TTL %d\n",
 					(eh->is_packet ? "packet" : "RR"),
 					eh->rank, new_ttl);
-			return ctx->state;
+			return;
 		}
 		/* Add the SOA into the answer. */
 		ret = entry2answer(&ans, AR_SOA, eh, knot_db_val_bound(val),
 				   k->zname, KNOT_RRTYPE_SOA, new_ttl);
-		if (ret) return ctx->state;
+		if (ret) return;
 	}
 
 	/* Find our target RCODE. */
@@ -291,14 +292,14 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	case 0: /* i.e. nothing was found */
 		/* LATER(optim.): zone cut? */
 		VERBOSE_MSG(qry, "=> cache miss\n");
-		return ctx->state;
+		return;
 	}
 
 	if (pkt_renew(pkt, qry->sname, qry->stype)
 	    || knot_pkt_begin(pkt, KNOT_ANSWER)
 	   ) {
 		assert(false);
-		return ctx->state;
+		return;
 	}
 	knot_wire_set_rcode(pkt->wire, real_rcode);
 
@@ -310,7 +311,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		ret = pkt_append(pkt, &ans.rrsets[i], ans.rrsets[i].set.rank);
 		if (ret) {
 			assert(false);
-			return ctx->state;
+			return;
 		}
 	}
 
@@ -320,7 +321,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	qf->CACHED = true;
 	qf->NO_MINIMIZE = true;
 
-	return KR_STATE_DONE;
+	return;
 }
 
 /**
