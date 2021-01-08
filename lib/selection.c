@@ -125,6 +125,7 @@ void bytes_to_ip(uint8_t *bytes, size_t len, uint16_t port, union inaddr *dst)
 		dst->ip4.sin_port = htons(port);
 		break;
 	case sizeof(struct in6_addr):
+		memset(&dst->ip6, 0, sizeof(dst->ip6)); // avoid uninit surprises
 		dst->ip6.sin6_family = AF_INET6;
 		memcpy(&dst->ip6.sin6_addr, bytes, len);
 		dst->ip6.sin6_port = htons(port);
@@ -246,19 +247,18 @@ static void check_network_settings(struct address_state *address_state,
 	}
 }
 
-void update_address_state(struct address_state *state, uint8_t *address,
+void update_address_state(struct address_state *state, union inaddr *address,
 			  size_t address_len, struct kr_query *qry)
 {
-	union inaddr tmp_address;
-	bytes_to_ip(address, address_len, 0, &tmp_address);
-	check_tls_capable(state, qry->request, &tmp_address.ip);
+	check_tls_capable(state, qry->request, &address->ip);
 	/* TODO: uncomment this once we actually use the information it collects
 	check_tcp_connections(address_state, qry->request, &tmp_address.ip);
 	*/
 	check_network_settings(state, address_len, qry->flags.NO_IPV4,
 			       qry->flags.NO_IPV6);
 	state->rtt_state =
-		get_rtt_state(address, address_len, &qry->request->ctx->cache);
+		get_rtt_state(ip_to_bytes(address, address_len),
+		              address_len, &qry->request->ctx->cache);
 	invalidate_dead_upstream(
 		state, qry->request->ctx->cache_rtt_tout_retry_interval);
 #ifdef SELECTION_CHOICE_LOGGING
@@ -403,11 +403,25 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 			break;
 		default:
 			assert(0);
-			break;
+			return NULL;
 		}
 	}
 
-	bytes_to_ip(chosen->address, chosen->address_len, port, &transport->address);
+	switch (chosen->address_len)
+	{
+	case sizeof(struct in_addr):
+		transport->address.ip4 = chosen->address.ip4;
+		transport->address.ip4.sin_port = htons(port);
+		break;
+	case sizeof(struct in6_addr):
+		transport->address.ip6 = chosen->address.ip6;
+		transport->address.ip6.sin6_port = htons(port);
+		break;
+	default:
+		assert(0);
+		return NULL;
+	}
+
 	transport->address_len = chosen->address_len;
 
 	if (choice_index) {
