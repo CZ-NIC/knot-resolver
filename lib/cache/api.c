@@ -325,7 +325,7 @@ knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type)
 
 
 /** The inside for cache_peek(); implementation separated to ./peek.c */
-int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt);
+void peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt);
 /** function for .produce phase */
 int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
@@ -353,9 +353,9 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 	}
 
-	int ret = peek_nosync(ctx, pkt);
+	peek_nosync(ctx, pkt);
 	kr_cache_commit(&req->ctx->cache);
-	return ret;
+	return ctx->state;
 }
 
 
