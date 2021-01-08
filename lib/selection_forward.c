@@ -59,8 +59,7 @@ void forward_choose_transport(struct kr_query *qry,
 		struct address_state *addr_state = &local_state->addr_states[i];
 		addr_state->ns_name = (knot_dname_t *)"";
 
-		update_address_state(addr_state, ip_to_bytes(address, addr_len),
-				     addr_len, qry);
+		update_address_state(addr_state, address, addr_len, qry);
 
 		if (addr_state->generation == -1) {
 			continue;
@@ -68,7 +67,7 @@ void forward_choose_transport(struct kr_query *qry,
 		addr_state->choice_array_index = i;
 
 		choices[valid++] = (struct choice){
-			.address = ip_to_bytes(address, addr_len),
+			.address = *address,
 			.address_len = addr_len,
 			.address_state = addr_state,
 			.port = port,

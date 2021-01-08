@@ -164,7 +164,7 @@ struct address_state {
  * @brief Array of these is one of inputs for the actual selection algorithm (`select_transport`)
  */
 struct choice {
-	uint8_t *address;
+	union inaddr address;
 	size_t address_len;
 	struct address_state *address_state;
 	/** used to overwrite the port number;
@@ -240,5 +240,5 @@ uint8_t *ip_to_bytes(const union inaddr *src, size_t len);
 /**
  * @internal Fetch per-address information from various sources.
  */
-void update_address_state(struct address_state *state, uint8_t *address,
+void update_address_state(struct address_state *state, union inaddr *address,
 			  size_t address_len, struct kr_query *qry);
