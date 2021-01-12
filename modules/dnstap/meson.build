@@ -32,6 +32,7 @@ if build_dnstap
       '--proto_path', meson.current_source_dir(),
       meson.current_source_dir() / 'dnstap.proto',
     ],
+    input: [ 'dnstap.proto' ],
     output: [
       'dnstap.pb-c.h',
       'dnstap.pb-c.c',
