@@ -18,5 +18,6 @@ go install $DNSTAP_TEST
 CONFIG=./config
 ZONES="fake1.localdomain,fake2.localdomain,fake3.localdomain"
 TIMEOUT=60s
-$GOPATH/bin/$DNSTAP_TEST -c $CONFIG -cmd $KRESD_CMD -q $ZONES -t $TIMEOUT -d
+GRACE=5s
+$GOPATH/bin/$DNSTAP_TEST -c $CONFIG -cmd $KRESD_CMD -q $ZONES -t $TIMEOUT -g $GRACE -d
 
