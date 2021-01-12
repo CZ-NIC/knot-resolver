@@ -40,8 +40,8 @@ if build_config_tests
 endif
 
 ## dnstap tests
-if build_dnstap
-  test('dnstap',
+if build_dnstap and build_config_tests
+  test('config.dnstap',
     find_program('./dnstap/src/dnstap-test/run.sh'),
     args: [ sbin_dir / 'kresd' ],
     suite: [ 'postinstall', 'config' ],
