@@ -1,0 +1,5 @@
+usr/share/javascript/bootstrap/css/bootstrap-theme.min.css usr/lib/knot-resolver/kres_modules/http/bootstrap-theme.min.css
+usr/share/javascript/bootstrap/css/bootstrap.min.css usr/lib/knot-resolver/kres_modules/http/bootstrap.min.css
+usr/share/javascript/bootstrap/js/bootstrap.min.js usr/lib/knot-resolver/kres_modules/http/bootstrap.min.js
+usr/share/javascript/d3/d3.min.js usr/lib/knot-resolver/kres_modules/http/d3.js
+usr/share/javascript/jquery/jquery.min.js usr/lib/knot-resolver/kres_modules/http/jquery.js

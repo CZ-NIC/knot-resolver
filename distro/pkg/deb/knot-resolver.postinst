@@ -1,0 +1,38 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+set -e
+
+# upgrade-4-to-5
+export UPG_DIR=/var/lib/knot-resolver/.upgrade-4-to-5
+if [ -f ${UPG_DIR}/.unfinished ] ; then
+       rm -f ${UPG_DIR}/.unfinished
+       kresd -c /usr/lib/knot-resolver/upgrade-4-to-5.lua >/dev/null 2>/dev/null
+       echo "\n   !!! WARNING !!!"
+       echo "Knot Resolver configuration file requires manual upgrade.\n"
+       cat ${UPG_DIR}/kresd.conf.net 2>/dev/null
+fi
+
+if [ "$1" = "configure" ]; then
+    adduser --quiet --system --group --no-create-home --home /var/cache/knot-resolver knot-resolver
+fi
+
+# Restart any running kresd instances if the root key is updated.
+# Note: if knot-resolver upstream watches this file and reloads it
+# upon a change, we can and should remove this trigger.
+if [ "$1" = "triggered" ]; then
+    if [ "$2" = "/usr/share/dns/root.key" ]; then
+        # use daemon-reload to load any unit changes
+        systemctl daemon-reload || true
+        # systemctl of the sub-services is the preferred method to restart
+        systemctl try-restart 'kresd@*.service' kres-cache-gc.service || true
+    fi
+    exit 0
+fi
+
+if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ] ; then
+    systemctl daemon-reload || true
+    systemd-tmpfiles --create /usr/lib/tmpfiles.d/knot-resolver.conf
+    systemctl try-restart 'kresd@*.service' kres-cache-gc.service || true
+fi
+
+#DEBHELPER#

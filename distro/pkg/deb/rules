@@ -1,0 +1,49 @@
+#!/usr/bin/make -f
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# see FEATURE AREAS in dpkg-buildflags(1)
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all,-pie
+
+# see ENVIRONMENT in dpkg-buildflags(1)
+# package maintainers to append CFLAGS
+export DEB_CFLAGS_MAINT_APPEND  = -Wall -pedantic -fno-omit-frame-pointer
+# package maintainers to append LDFLAGS
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
+
+# see EXAMPLES in dpkg-buildflags(1) and read /usr/share/dpkg/*
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/default.mk
+
+export ARCH=$(DEB_HOST_GNU_CPU)
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	meson build_deb \
+		--buildtype=plain \
+		--prefix=/usr \
+		--libdir=lib \
+		-Ddoc=enabled \
+		-Dsystemd_files=enabled \
+		-Dclient=enabled \
+		-Dkeyfile_default=/usr/share/dns/root.key \
+		-Droot_hints=/usr/share/dns/root.hints \
+		-Dinstall_kresd_conf=enabled \
+		-Dunit_tests=enabled \
+		-Dc_args="$${CFLAGS}" \
+		-Dc_link_args="$${LDFLAGS}"
+	ninja -v -C build_deb
+	ninja -v -C build_deb doc
+
+override_dh_auto_install:
+	DESTDIR="${PWD}/debian/tmp" ninja -v -C build_deb install
+
+override_dh_auto_test:
+	meson test -C build_deb
+
+override_dh_missing:
+	dh_missing --fail-missing
+
+override_dh_strip:
+	dh_strip --dbg-package=knot-resolver-dbg

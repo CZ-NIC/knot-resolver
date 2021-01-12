@@ -1,0 +1,7 @@
+usr/lib/knot-resolver/kres_modules/http*.lua
+usr/lib/knot-resolver/kres_modules/prometheus.lua
+usr/lib/knot-resolver/kres_modules/http/*.css
+usr/lib/knot-resolver/kres_modules/http/*.ico
+usr/lib/knot-resolver/kres_modules/http/*.js
+usr/lib/knot-resolver/kres_modules/http/*.tpl
+usr/lib/knot-resolver/kres_modules/http/*.woff2

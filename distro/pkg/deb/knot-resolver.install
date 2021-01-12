@@ -1,0 +1,32 @@
+etc/knot-resolver/kresd.conf
+usr/lib/systemd/system/kresd@.service lib/systemd/system/
+usr/lib/systemd/system/kres-cache-gc.service lib/systemd/system/
+usr/lib/systemd/system/kresd.target lib/systemd/system/
+usr/lib/*.so.*
+usr/lib/tmpfiles.d/knot-resolver.conf
+usr/lib/knot-resolver/*.so
+usr/lib/knot-resolver/*.lua
+usr/lib/knot-resolver/kres_modules/*.so
+usr/lib/knot-resolver/kres_modules/daf.lua
+usr/lib/knot-resolver/kres_modules/daf/*
+usr/lib/knot-resolver/kres_modules/detect_time_jump.lua
+usr/lib/knot-resolver/kres_modules/detect_time_skew.lua
+usr/lib/knot-resolver/kres_modules/dns64.lua
+usr/lib/knot-resolver/kres_modules/experimental_dot_auth.lua
+usr/lib/knot-resolver/kres_modules/graphite.lua
+usr/lib/knot-resolver/kres_modules/policy.lua
+usr/lib/knot-resolver/kres_modules/predict.lua
+usr/lib/knot-resolver/kres_modules/prefill.lua
+usr/lib/knot-resolver/kres_modules/priming.lua
+usr/lib/knot-resolver/kres_modules/rebinding.lua
+usr/lib/knot-resolver/kres_modules/renumber.lua
+usr/lib/knot-resolver/kres_modules/serve_stale.lua
+usr/lib/knot-resolver/kres_modules/ta_sentinel.lua
+usr/lib/knot-resolver/kres_modules/ta_signal_query.lua
+usr/lib/knot-resolver/kres_modules/ta_update.lua
+usr/lib/knot-resolver/kres_modules/view.lua
+usr/lib/knot-resolver/kres_modules/watchdog.lua
+usr/lib/knot-resolver/kres_modules/workarounds.lua
+usr/sbin/kresc
+usr/sbin/kresd
+usr/sbin/kres-cache-gc
