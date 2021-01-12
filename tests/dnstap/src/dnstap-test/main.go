@@ -36,7 +36,7 @@ func qnameFromFrame(b []byte) (string, error) {
 		return name, err
 	}
 	m := dt.Message
-	if *m.Type != dnstap.Message_RESOLVER_RESPONSE {
+	if *m.Type != dnstap.Message_CLIENT_RESPONSE {
 		return name, fmt.Errorf("incorrect message type")
 	}
 	if m.ResponseMessage == nil {

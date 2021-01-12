@@ -4,7 +4,9 @@ modules = {
 	'hints',
 	dnstap = {
 		socket_path = "/tmp/dnstap.sock",
-		log_responses = true,
+		client = {
+			log_responses = true,
+		}
 	}
 }
 hints['fake1.localdomain'] = '1.2.3.4'

@@ -43,7 +43,7 @@ static int kluautil_list_dir(lua_State *L)
 	struct dirent *entry;
 	int lua_i = 1;
 	while ((entry = readdir(dir)) != NULL) {
-		if (strcmp(entry->d_name, ".") && strcmp(entry->d_name, "..")) {
+		if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
 			lua_pushstring(L, entry->d_name);
 			lua_rawseti(L, -2, lua_i++);
 		}
