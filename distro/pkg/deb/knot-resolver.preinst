@@ -1,0 +1,26 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+set -e
+
+# upgrade-4-to-5
+if [ -f /lib/systemd/system/kresd.socket ] ; then
+       export UPG_DIR=/var/lib/knot-resolver/.upgrade-4-to-5
+       mkdir -p ${UPG_DIR}
+       touch ${UPG_DIR}/.unfinished
+
+       for sock in kresd.socket kresd-tls.socket ; do
+               if systemctl is-enabled ${sock} 2>/dev/null | grep -qv masked ; then
+                       systemctl show ${sock} -p Listen > ${UPG_DIR}/${sock}
+                       case "$(systemctl show ${sock} -p BindIPv6Only)" in
+                       *ipv6-only)
+                               touch ${UPG_DIR}/${sock}.v6only
+                               ;;
+                       *default)
+                               if cat /proc/sys/net/ipv6/bindv6only | grep -q 1 ; then
+                                       touch ${UPG_DIR}/${sock}.v6only
+                               fi
+                               ;;
+                       esac
+               fi
+       done
+fi

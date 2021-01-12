@@ -1,0 +1,7 @@
+usr/lib/knot-resolver/kres_modules/http/LICENSE
+usr/lib/knot-resolver/kres_modules/etcd.lua
+debian/tmp/usr/share/doc/knot-resolver/html/.buildinfo
+usr/include/libkres/*.h
+usr/lib/*.so
+usr/lib/pkgconfig/libkres.pc
+usr/lib/sysusers.d/knot-resolver.conf

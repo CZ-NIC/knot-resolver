@@ -1,0 +1,11 @@
+Document: knot-resolver
+Title: Knot Resolver documentation
+Author: CZ.NIC labs
+Abstract: Documentation for the Knot Resolver,
+ including building from source, using the library,
+ and configuration and operation of the daemon.
+Section: Network/Communication
+
+Format: HTML
+Index: /usr/share/doc/knot-resolver/html/index.html
+Files: /usr/share/doc/knot-resolver/html/*.html
