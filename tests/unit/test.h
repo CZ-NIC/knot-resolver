@@ -85,7 +85,7 @@ static inline void test_randstr(char* dst, size_t len)
  */
 static inline void test_random_rr(knot_rrset_t *rr, uint32_t ttl)
 {
-	static uint8_t owner_buf[KNOT_DNAME_MAXLEN];
+	static uint8_t owner_buf[KNOT_DNAME_MAXLEN] = { 0 };
 	static uint8_t rdata_buf[65535];
 	knot_rdata_t *rdata = (knot_rdata_t *)rdata_buf;
 
@@ -93,7 +93,6 @@ static inline void test_random_rr(knot_rrset_t *rr, uint32_t ttl)
 	uint8_t tmp_buf[KNOT_DNAME_MAXLEN];
 
 	/* Create random label. */
-	memset(owner_buf, 0, sizeof(owner_buf));
 	uint8_t label_len = num % KNOT_DNAME_MAXLABELLEN;
 	owner_buf[0] = label_len;
 	test_randstr((char *)(owner_buf + 1), label_len);
