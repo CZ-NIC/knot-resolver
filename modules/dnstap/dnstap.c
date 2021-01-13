@@ -16,6 +16,10 @@
 
 #define DEBUG_MSG(fmt, ...) kr_log_verbose("[dnstap] " fmt, ##__VA_ARGS__);
 #define CFG_SOCK_PATH "socket_path"
+#define CFG_IDENTITY_STRING "identity"
+#define CFG_VERSION_STRING "version"
+#define CFG_LOG_CLIENT_PKT "client"
+#define CFG_LOG_QR_PKT "log_queries"
 #define CFG_LOG_RESP_PKT "log_responses"
 #define DEFAULT_SOCK_PATH "/tmp/dnstap.sock"
 #define DNSTAP_CONTENT_TYPE "protobuf:dnstap.Dnstap"
@@ -24,8 +28,22 @@
 #define auto_destroy_uopts __attribute__((cleanup(fstrm_unix_writer_options_destroy)))
 #define auto_destroy_wopts __attribute__((cleanup(fstrm_writer_options_destroy)))
 
+/*
+ * Internal processing phase
+ * Distinguishes whether query or response should be processed
+ */
+enum dnstap_log_phase {
+	CLIENT_QUERY_PHASE = 0,
+	CLIENT_RESPONSE_PHASE,
+};
+
 /* Internal data structure */
 struct dnstap_data {
+	char *identity;
+	size_t identity_len;
+	char *version;
+	size_t version_len;
+	bool log_qr_pkt;
 	bool log_resp_pkt;
 	struct fstrm_iothr *iothread;
 	struct fstrm_iothr_queue *ioq;
@@ -75,12 +93,16 @@ static void set_address(const struct sockaddr *sockaddr,
 	*has_port = true;
 }
 
-/* dnstap_log prepares dnstap message and sent it to fstrm */
-static int dnstap_log(kr_layer_t *ctx) {
+/* dnstap_log prepares dnstap message and sends it to fstrm */
+static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 	const struct kr_request *req = ctx->req;
 	const struct kr_module *module = ctx->api->data;
 	const struct kr_rplan *rplan = &req->rplan;
 	const struct dnstap_data *dnstap_dt = module->data;
+
+	if (!req->qsource.addr) {
+		return ctx->state;
+	}
 
 	/* check if we have a valid iothread */
 	if (!dnstap_dt->iothread || !dnstap_dt->ioq) {
@@ -88,18 +110,12 @@ static int dnstap_log(kr_layer_t *ctx) {
 		return kr_error(EFAULT);
 	}
 
-	/* current time */
-	struct timeval now;
-	gettimeofday(&now, NULL);
-
 	/* Create dnstap message */
 	Dnstap__Message m;
 
 	memset(&m, 0, sizeof(m));
 
 	m.base.descriptor = &dnstap__message__descriptor;
-	/* Only handling response */
-	m.type = DNSTAP__MESSAGE__TYPE__RESOLVER_RESPONSE;
 
 	if (req->qsource.addr) {
 		set_address(req->qsource.addr,
@@ -110,7 +126,11 @@ static int dnstap_log(kr_layer_t *ctx) {
 	}
 
 	if (req->qsource.dst_addr) {
-		if (req->qsource.flags.tcp) {
+		if (req->qsource.flags.http) {
+			m.socket_protocol = DNSTAP__SOCKET_PROTOCOL__DOH;
+		} else if (req->qsource.flags.tls) {
+			m.socket_protocol = DNSTAP__SOCKET_PROTOCOL__DOT;
+		} else if (req->qsource.flags.tcp) {
 			m.socket_protocol = DNSTAP__SOCKET_PROTOCOL__TCP;
 		} else {
 			m.socket_protocol = DNSTAP__SOCKET_PROTOCOL__UDP;
@@ -134,51 +154,66 @@ static int dnstap_log(kr_layer_t *ctx) {
 		}
 	}
 
-	if (dnstap_dt->log_resp_pkt) {
-		const knot_pkt_t *rpkt = req->answer;
-		m.has_response_message = rpkt != NULL;
-		if (rpkt != NULL) {
-			m.response_message.len = rpkt->size;
-			m.response_message.data = (uint8_t *)rpkt->wire;
-		}
-	}
+	if (phase == CLIENT_QUERY_PHASE) {
+		m.type = DNSTAP__MESSAGE__TYPE__CLIENT_QUERY;
 
-	/* set query time to the timestamp of the first kr_query
-	 * set response time to now
-	 */
-	if (rplan->resolved.len > 0) {
-		struct kr_query *first = rplan->resolved.at[0];
-
-		m.query_time_sec = first->timestamp.tv_sec;
-		m.has_query_time_sec = true;
-		m.query_time_nsec = first->timestamp.tv_usec * 1000;
-		m.has_query_time_nsec = true;
-	}
-
-	/* Response time */
-	m.response_time_sec = now.tv_sec;
-	m.has_response_time_sec = true;
-	m.response_time_nsec = now.tv_usec * 1000;
-	m.has_response_time_nsec = true;
-
-	/* Query Zone */
-	if (rplan->resolved.len > 0) {
-		struct kr_query *last = array_tail(rplan->resolved);
-		/* Only add query_zone when not answered from cache */
-		if (!(last->flags.CACHED)) {
-			const knot_dname_t *zone_cut_name = last->zone_cut.name;
-			if (zone_cut_name != NULL) {
-				m.query_zone.data = (uint8_t *)zone_cut_name;
-				m.query_zone.len = knot_dname_size(zone_cut_name);
-				m.has_query_zone = true;
+		if (dnstap_dt->log_qr_pkt) {
+			const knot_pkt_t *qpkt = req->qsource.packet;
+			m.has_query_message = qpkt != NULL;
+			if (qpkt != NULL) {
+				m.query_message.len = qpkt->size;
+				m.query_message.data = (uint8_t *)qpkt->wire;
 			}
 		}
+
+		/* set query time to the timestamp of the first kr_query */
+		if (rplan->initial) {
+			struct kr_query *first = rplan->initial;
+
+			m.query_time_sec = first->timestamp.tv_sec;
+			m.has_query_time_sec = true;
+			m.query_time_nsec = first->timestamp.tv_usec * 1000;
+			m.has_query_time_nsec = true;
+		}
+	} else if (phase == CLIENT_RESPONSE_PHASE) {
+		m.type = DNSTAP__MESSAGE__TYPE__CLIENT_RESPONSE;
+
+		/* current time */
+		struct timeval now;
+		gettimeofday(&now, NULL);
+
+		if (dnstap_dt->log_resp_pkt) {
+			const knot_pkt_t *rpkt = req->answer;
+			m.has_response_message = rpkt != NULL;
+			if (rpkt != NULL) {
+				m.response_message.len = rpkt->size;
+				m.response_message.data = rpkt->wire;
+			}
+		}
+
+		/* Set response time to now */
+		m.response_time_sec = now.tv_sec;
+		m.has_response_time_sec = true;
+		m.response_time_nsec = now.tv_usec * 1000;
+		m.has_response_time_nsec = true;
 	}
 
 	/* Create a dnstap Message */
 	Dnstap__Dnstap dnstap = DNSTAP__DNSTAP__INIT;
 	dnstap.type = DNSTAP__DNSTAP__TYPE__MESSAGE;
-	dnstap.message = (Dnstap__Message *)&m;
+	dnstap.message = &m;
+
+	if (dnstap_dt->identity) {
+		dnstap.identity.data = (uint8_t*)dnstap_dt->identity;
+		dnstap.identity.len = dnstap_dt->identity_len;
+		dnstap.has_identity = true;
+	}
+
+	if (dnstap_dt->version) {
+		dnstap.version.data = (uint8_t*)dnstap_dt->version;
+		dnstap.version.len = dnstap_dt->version_len;
+		dnstap.has_version = true;
+	}
 
 	/* Pack the message */
 	uint8_t *frame = NULL;
@@ -200,10 +235,21 @@ static int dnstap_log(kr_layer_t *ctx) {
 	return ctx->state;
 }
 
+/* dnstap_log_query prepares dnstap CLIENT_QUERY message and sends it to fstrm */
+static int dnstap_log_query(kr_layer_t *ctx) {
+	return dnstap_log(ctx, CLIENT_QUERY_PHASE);
+}
+
+/* dnstap_log_response prepares dnstap CLIENT_RESPONSE message and sends it to fstrm */
+static int dnstap_log_response(kr_layer_t *ctx) {
+	return dnstap_log(ctx, CLIENT_RESPONSE_PHASE);
+}
+
 KR_EXPORT
 int dnstap_init(struct kr_module *module) {
 	static kr_layer_api_t layer = {
-		.finish = &dnstap_log,
+		.begin = &dnstap_log_query,
+		.finish = &dnstap_log_response,
 	};
 	/* Store module reference */
 	layer.data = module;
@@ -226,6 +272,9 @@ int dnstap_deinit(struct kr_module *module) {
 	struct dnstap_data *data = module->data;
 	/* Free allocated memory */
 	if (data) {
+		free(data->identity);
+		free(data->version);
+
 		fstrm_iothr_destroy(&data->iothread);
 		DEBUG_MSG("fstrm iothread destroyed\n");
 		free(data);
@@ -318,11 +367,46 @@ int dnstap_config(struct kr_module *module, const char *conf) {
 			sock_path = strndup(DEFAULT_SOCK_PATH, PATH_MAX);
 		}
 
-		/* logRespPkt key */
-		node = json_find_member(root_node, CFG_LOG_RESP_PKT);
-		if (node) {
-			data->log_resp_pkt = find_bool(node);
+		/* identity string key */
+		node = json_find_member(root_node, CFG_IDENTITY_STRING);
+		if (!node || find_string(node, &data->identity, KR_EDNS_PAYLOAD) != kr_ok()) {
+			data->identity = NULL;
+			data->identity_len = 0;
 		} else {
+			data->identity_len = strlen(data->identity);
+		}
+
+		/* version string key */
+		node = json_find_member(root_node, CFG_VERSION_STRING);
+		if (!node || find_string(node, &data->version, KR_EDNS_PAYLOAD) != kr_ok()) {
+			data->version = strdup("Knot Resolver " PACKAGE_VERSION);
+			if (data->version) {
+				data->version_len = strlen(data->version);
+			}
+		} else {
+			data->version_len = strlen(data->version);
+		}
+
+		node = json_find_member(root_node, CFG_LOG_CLIENT_PKT);
+		if (node) {
+			JsonNode *subnode;
+			/* logRespPkt key */
+			subnode = json_find_member(node, CFG_LOG_RESP_PKT);
+			if (subnode) {
+				data->log_resp_pkt = find_bool(subnode);
+			} else {
+				data->log_resp_pkt = false;
+			}
+
+			/* logQrPkt key */
+			subnode = json_find_member(node, CFG_LOG_QR_PKT);
+			if (subnode) {
+				data->log_qr_pkt = find_bool(subnode);
+			} else {
+				data->log_qr_pkt = false;
+			}
+		} else {
+			data->log_qr_pkt = false;
 			data->log_resp_pkt = false;
 		}
 

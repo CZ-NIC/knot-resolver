@@ -30,6 +30,15 @@ newer versions when they are released.
 .. _`supervisord`: http://supervisord.org/
 
 
+5.2 to 5.3
+==========
+
+Configuration file
+------------------
+
+* Module ``dnstap``: option ``log_responses`` has been moved inside a new ``client`` section. Refer to the configuration example in :ref:`mod-dnstap`.
+
+
 5.1 to 5.2
 ==========
 

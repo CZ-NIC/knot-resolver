@@ -6,11 +6,17 @@ Improvements
 - more consistency in using parent-side records for NS addresses (!1097)
 - better algorithm for choosing nameservers (!1030)
 - daf module: add daf.clear() (!1114)
+- dnstap module: more features and don't log internal requests (!1103)
 
 Bugfixes
 --------
 - view: fail config if bad subnet is specified (!1112)
 - doh2: fix memory leak (!1117)
+
+Incompatible changes
+--------------------
+- dnstap module: `log_responses` option gets nested under `client`;
+  see new docs for config example (!1103)
 
 
 Knot Resolver 5.2.1 (2020-12-09)
