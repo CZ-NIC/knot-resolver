@@ -79,7 +79,7 @@ static int RRSET_IS_ALREADY_IMPORTED = 1;
  * @return pointer to zone import context or NULL. */
 static zone_import_ctx_t *zi_ctx_alloc()
 {
-	return (zone_import_ctx_t *)malloc(sizeof(zone_import_ctx_t));
+	return calloc(1, sizeof(zone_import_ctx_t));
 }
 
 /** @internal Free zone import context. */
@@ -140,7 +140,6 @@ zone_import_ctx_t *zi_allocate(struct worker_ctx *worker,
 		zi_ctx_free(z_import);
 		return NULL;
 	}
-	memset(z_import, 0, sizeof(*z_import));
 	z_import->pool.ctx = mp;
 	z_import->worker = worker;
 	int ret = zi_reset(z_import, 0);
@@ -347,8 +346,7 @@ static int zi_rrset_import(zone_import_ctx_t *z_import, knot_rrset_t *rr)
 	knot_pkt_put_question(answer, dname, rrclass, rrtype);
 	knot_pkt_begin(answer, KNOT_ANSWER);
 
-	struct kr_qflags options;
-	memset(&options, 0, sizeof(options));
+	struct kr_qflags options = { 0 };
 	options.DNSSEC_WANT = true;
 	options.NO_MINIMIZE = true;
 

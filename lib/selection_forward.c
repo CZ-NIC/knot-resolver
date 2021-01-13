@@ -20,15 +20,13 @@ void forward_local_state_alloc(struct knot_mm *mm, void **local_state,
 			       struct kr_request *req)
 {
 	assert(req->selection_context.forwarding_targets.at);
-	*local_state = mm_alloc(mm, sizeof(struct forward_local_state));
-	memset(*local_state, 0, sizeof(struct forward_local_state));
+	*local_state = mm_calloc(mm, 1, sizeof(struct forward_local_state));
 
 	struct forward_local_state *forward_state = *local_state;
 	forward_state->targets = &req->selection_context.forwarding_targets;
 
-	size_t as_bytes = sizeof(struct address_state) * forward_state->targets->len;
-	forward_state->addr_states = mm_alloc(mm, as_bytes);
-	memset(forward_state->addr_states, 0, as_bytes);
+	forward_state->addr_states = mm_calloc(mm, forward_state->targets->len,
+						sizeof(struct address_state));
 }
 
 void forward_choose_transport(struct kr_query *qry,

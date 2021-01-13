@@ -473,11 +473,10 @@ int stats_init(struct kr_module *module)
 	};
 	module->props = props;
 
-	struct stat_data *data = malloc(sizeof(*data));
+	struct stat_data *data = calloc(1, sizeof(*data));
 	if (!data) {
 		return kr_error(ENOMEM);
 	}
-	memset(data, 0, sizeof(*data));
 	data->map = map_make(NULL);
 	module->data = data;
 	lru_create(&data->queries.frequent, FREQUENT_COUNT, NULL, NULL);

@@ -119,7 +119,7 @@ KR_EXPORT struct lru * lru_create_impl(uint max_slots, uint val_alignment,
 			mm_ctx_init_aligned(&mm_array_default, alignof(struct lru));
 		mm_array = &mm_array_default;
 	}
-	assert(mm_array->alloc != mm_malloc && mm_array->alloc != (knot_mm_alloc_t)mp_alloc);
+	assert(mm_array->alloc && mm_array->alloc != (knot_mm_alloc_t)mp_alloc);
 
 	size_t size = offsetof(struct lru, groups[group_count]);
 	struct lru *lru = mm_alloc(mm_array, size);

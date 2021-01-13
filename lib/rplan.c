@@ -69,12 +69,11 @@ void kr_qflags_clear(struct kr_qflags *fl1, struct kr_qflags fl2)
 
 static struct kr_query *query_create(knot_mm_t *pool, const knot_dname_t *name, uint32_t uid)
 {
-	struct kr_query *qry = mm_alloc(pool, sizeof(struct kr_query));
+	struct kr_query *qry = mm_calloc(pool, 1, sizeof(*qry));
 	if (qry == NULL) {
 		return NULL;
 	}
 
-	memset(qry, 0, sizeof(struct kr_query));
 	if (name != NULL) {
 		qry->sname = knot_dname_copy(name, pool);
 		if (qry->sname == NULL) {

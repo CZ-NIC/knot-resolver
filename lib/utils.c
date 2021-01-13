@@ -39,43 +39,6 @@
 /* Logging & debugging */
 bool kr_verbose_status = false;
 
-void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t prev_size)
-{
-	if (mm) {
-		void *p = mm->alloc(mm->ctx, size);
-		if (p == NULL) {
-			return NULL;
-		} else {
-			if (what) {
-				memcpy(p, what,
-				       prev_size < size ? prev_size : size);
-			}
-			mm_free(mm, what);
-			return p;
-		}
-	} else {
-		return realloc(what, size);
-	}
-}
-
-void *mm_malloc(void *ctx, size_t n)
-{
-	(void)ctx;
-	return malloc(n);
-}
-void *mm_malloc_aligned(void *ctx, size_t n)
-{
-	size_t alignment = (size_t)ctx;
-	void *res;
-	int err = posix_memalign(&res, alignment, n);
-	if (err == 0) {
-		return res;
-	} else {
-		assert(err == -1 && errno == ENOMEM);
-		return NULL;
-	}
-}
-
 /*
  * Macros.
  */
@@ -789,11 +752,10 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 		return kr_error(ret);
 	}
 
-	ranked_rr_array_entry_t *entry = mm_alloc(pool, sizeof(ranked_rr_array_entry_t));
+	ranked_rr_array_entry_t *entry = mm_calloc(pool, 1, sizeof(*entry));
 	if (!entry) {
 		return kr_error(ENOMEM);
 	}
-	memset(entry, 0, sizeof(*entry)); /* default all to zeros */
 
 	knot_rrset_t *rr_new = knot_rrset_new(rr->owner, rr->type, rr->rclass, rr->ttl, pool);
 	if (!rr_new) {
