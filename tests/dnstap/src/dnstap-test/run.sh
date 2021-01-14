@@ -12,7 +12,7 @@ if [ -z "$GITLAB_CI" ]; then
 	# some packages may be missing on the system right now
 	go get github.com/{FiloSottile/gvt,cloudflare/dns,dnstap/golang-dnstap}
 else
-	export GOPATH=$HOME/go #default; we don't care in scratch container
+	export GOPATH=/root/go #default; we don't care in scratch container
 fi
 DTAP=$GOPATH/src/$DNSTAP_TEST
 rm -f $DTAP && ln -s $(realpath ..)/$DNSTAP_TEST $DTAP
