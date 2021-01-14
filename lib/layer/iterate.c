@@ -873,14 +873,6 @@ static int process_stub(knot_pkt_t *pkt, struct kr_request *req)
 	return finalize_answer(pkt, req);
 }
 
-
-/** Error handling, RFC1034 5.3.3, 4d.
- * NOTE: returing this does not prevent further queries (by itself). */
-static int resolve_error(knot_pkt_t *pkt, struct kr_request *req)
-{
-	return KR_STATE_FAIL;
-}
-
 /* State-less single resolution iteration step, not needed. */
 static int reset(kr_layer_t *ctx)  { return KR_STATE_PRODUCE; }
 
@@ -992,23 +984,6 @@ static bool satisfied_by_additional(const struct kr_query *qry)
 	return false;
 }
 
-static int resolve_badmsg(knot_pkt_t *pkt, struct kr_request *req, struct kr_query *query)
-{
-
-#ifndef STRICT_MODE
-	/* Work around broken auths/load balancers */
-	if (query->flags.SAFEMODE) {
-		return resolve_error(pkt, req);
-	} else {
-		query->flags.SAFEMODE = true;
-		query->flags.NO_MINIMIZE = true;
-		return KR_STATE_DONE;
-	}
-#else
-		return resolve_error(pkt, req);
-#endif
-}
-
 /** Resolve input query or continue resolution with followups.
  *
  *  This roughly corresponds to RFC1034, 5.3.3 4a-d.
@@ -1040,15 +1015,13 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 #ifdef STRICT_MODE
 	if (pkt->parsed < pkt->size) {
 		VERBOSE_MSG("<= pkt contains excessive data\n");
-		return resolve_badmsg(pkt, req, query);
+		return KR_STATE_FAIL;
 	} else
 #endif
-	/* LATER: Query minimization, 0x20 randomization, EDNS… should really be
-	 * set and managed by selection.c and SAFEMODE should be split and
-	 * removed altogether because it's doing many things at once. */
 	if (pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
 		VERBOSE_MSG("<= malformed response (parsed %d)\n", (int)pkt->parsed);
-		return resolve_badmsg(pkt, req, query);
+		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_MALFORMED);
+		return KR_STATE_FAIL;
 	} else if (!is_paired_to_query(pkt, query)) {
 		WITH_VERBOSE(query) {
 			const char *ns_str =
@@ -1056,10 +1029,8 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 			VERBOSE_MSG("<= ignoring mismatching response from %s\n",
 					ns_str ? ns_str : "(kr_straddr failed)");
 		}
-		/* Force TCP, to work around authoritatives messing up question
-		 * without yielding to spoofed responses. */
-		query->flags.TCP = true;
-		return resolve_badmsg(pkt, req, query);
+		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_MISMATCHED);
+		return KR_STATE_FAIL;
 	} else if (knot_wire_get_tc(pkt->wire)) {
 		VERBOSE_MSG("<= truncated response, failover to TCP\n");
 		if (query) {
@@ -1067,7 +1038,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 			if (req->upstream.transport->protocol != KR_TRANSPORT_UDP) {
 				VERBOSE_MSG("<= TC=1 with TCP, bailing out\n");
 				query->server_selection.error(query, req->upstream.transport, KR_SELECTION_TRUNCATED);
-				return resolve_error(pkt, req);
+				return KR_STATE_FAIL;
 			}
 			query->server_selection.error(query, req->upstream.transport, KR_SELECTION_TRUNCATED);
 		}
@@ -1084,7 +1055,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	// We can't return directly from the switch because we have to give feedback to server selection first
 	int ret = 0;
-	int selection_error = -1;
+	int selection_error = KR_SELECTION_OK;
 
 	/* Check response code. */
 	switch(knot_wire_get_rcode(pkt->wire)) {
@@ -1092,8 +1063,9 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	case KNOT_RCODE_NXDOMAIN:
 		break; /* OK */
 	case KNOT_RCODE_YXDOMAIN: /* Basically a successful answer; name just doesn't fit. */
-		if (!kr_request_ensure_answer(req))
-			return req->state;
+		if (!kr_request_ensure_answer(req)) {
+			ret = req->state;
+		}
 		knot_wire_set_rcode(req->answer->wire, KNOT_RCODE_YXDOMAIN);
 		break;
 	case KNOT_RCODE_REFUSED:
@@ -1101,41 +1073,37 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 			 /* just pass answer through if in stub mode */
 			break;
 		}
+		ret = KR_STATE_FAIL;
 		selection_error = KR_SELECTION_REFUSED;
-		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		ret = resolve_badmsg(pkt, req, query);
 		break;
 	case KNOT_RCODE_SERVFAIL:
 		if (query->flags.STUB) {
 			 /* just pass answer through if in stub mode */
 			break;
 		}
+		ret = KR_STATE_FAIL;
 		selection_error = KR_SELECTION_SERVFAIL;
-		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		ret = resolve_badmsg(pkt, req, query);
 		break;
 	case KNOT_RCODE_FORMERR:
+		ret = KR_STATE_FAIL;
 		selection_error = KR_SELECTION_FORMERROR;
-		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		ret = resolve_badmsg(pkt, req, query);
 		break;
 	case KNOT_RCODE_NOTIMPL:
+		ret = KR_STATE_FAIL;
 		selection_error = KR_SELECTION_NOTIMPL;
-		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		ret = resolve_badmsg(pkt, req, query);
 		break;
 	default:
+		ret = KR_STATE_FAIL;
 		selection_error = KR_SELECTION_OTHER_RCODE;
-		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
-		ret = resolve_error(pkt, req);
 		break;
 	}
 
-	if (query->server_selection.initialized && selection_error != -1) {
+	if (query->server_selection.initialized) {
 		query->server_selection.error(query, req->upstream.transport, selection_error);
 	}
 
 	if (ret) {
+		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		return ret;
 	}
 
