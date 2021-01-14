@@ -140,7 +140,7 @@ static int get_valid_addresses(struct iter_local_state *local_state,
 		uint8_t *address = (uint8_t *)trie_it_key(it, &address_len);
 		struct address_state *address_state = *trie_it_val(it);
 		if (address_state->generation == local_state->generation &&
-		    !address_state->unrecoverable_errors) {
+		    !address_state->broken) {
 			choices[count] = (struct choice){
 				.address_len = address_len,
 				.address_state = address_state,
@@ -311,10 +311,9 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 			break;
 		default:
 			VERBOSE_MSG(qry, "=> id: '%05u' choosing: '%s'@'%s'"
-				    " with timeout %u ms zone cut: '%s'%s\n",
+				    " with timeout %u ms zone cut: '%s'\n",
 				    qry->id, ns_name, ns_str ? ns_str : "",
-				    (*transport)->timeout, zonecut_str,
-				    (*transport)->safe_mode ? " SAFEMODE" : "");
+				    (*transport)->timeout, zonecut_str);
 			break;
 		}
 	} else {
