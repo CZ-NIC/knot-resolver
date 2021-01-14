@@ -231,7 +231,7 @@ void update_address_state(struct address_state *state, union inaddr *address,
 {
 	check_tls_capable(state, qry->request, &address->ip);
 	/* TODO: uncomment this once we actually use the information it collects
-	check_tcp_connections(address_state, qry->request, &tmp_address.ip);
+	check_tcp_connections(address_state, qry->request, &address->ip);
 	*/
 	check_network_settings(state, address_len, qry->flags.NO_IPV4,
 			       qry->flags.NO_IPV6);
@@ -244,7 +244,7 @@ void update_address_state(struct address_state *state, union inaddr *address,
 	// This is sometimes useful for debugging, but usually too verbose
 	WITH_VERBOSE(qry)
 	{
-		const char *ns_str = kr_straddr(&tmp_address.ip);
+		const char *ns_str = kr_straddr(&address->ip);
 		VERBOSE_MSG(qry, "rtt of %s is %d, variance is %d\n", ns_str,
 			    state->rtt_state.srtt, state->rtt_state.variance);
 	}
