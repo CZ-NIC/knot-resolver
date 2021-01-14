@@ -366,7 +366,6 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 		.ns_name = chosen->address_state->ns_name,
 		.protocol = protocol,
 		.timeout = timeout,
-		.no_0x20 = chosen->address_state->no_0x20,
 	};
 
 	int port = chosen->port;
@@ -498,13 +497,12 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		} else {
 			qry->flags.NO_EDNS = true;
 		}
-	case KR_SELECTION_MALFORMED:
 		break;
 	case KR_SELECTION_MISMATCHED:
-		if (transport->no_0x20) {
+		if (qry->flags.NO_0X20) {
 			addr_state->broken = true;
 		} else {
-			addr_state->no_0x20 = true;
+			qry->flags.NO_0X20 = true;
 		}
 		break;
 	case KR_SELECTION_TRUNCATED:
@@ -521,6 +519,7 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 	case KR_SELECTION_DNSSEC_ERROR:
 	case KR_SELECTION_LAME_DELEGATION:
 	case KR_SELECTION_BAD_CNAME:
+	case KR_SELECTION_MALFORMED:
 		/* These errors are fatal, no point in trying this server again. */
 		addr_state->broken = true;
 		break;

@@ -72,7 +72,6 @@ struct kr_transport {
 	/** True iff transport was set in worker.c:subreq_finalize,
 	 * that means it may be different from the one originally chosen one.*/
 	bool deduplicated;
-	bool no_0x20; /**< Turn off case randomization for this transport */
 };
 
 struct local_state {

@@ -1401,8 +1401,7 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 	}
 
 	/* Randomize query case (if not in not turned off) */
-	qry->secret = (qry->flags.NO_0X20 || (*transport)->no_0x20)
-		      ? 0 : kr_rand_bytes(sizeof(qry->secret));
+	qry->secret = qry->flags.NO_0X20 ? 0 : kr_rand_bytes(sizeof(qry->secret));
 	knot_dname_t *qname_raw = knot_pkt_qname(packet);
 	randomized_qname_case(qname_raw, qry->secret);
 
