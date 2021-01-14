@@ -476,7 +476,6 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 	   const struct kr_transport *transport,
 	   enum kr_selection_error sel_error)
 {
-	assert(sel_error >= KR_SELECTION_OK && sel_error < KR_SELECTION_NUMBER_OF_ERRORS);
 	if (!transport || !addr_state) {
 		/* Answers from cache have NULL transport, ignore them. */
 		return;

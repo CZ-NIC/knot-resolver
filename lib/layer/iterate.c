@@ -1061,13 +1061,13 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	switch(knot_wire_get_rcode(pkt->wire)) {
 	case KNOT_RCODE_NOERROR:
 	case KNOT_RCODE_NXDOMAIN:
-		ret = KR_STATE_CONSUME;
+		ret = 0;
 		break; /* OK */
 	case KNOT_RCODE_YXDOMAIN: /* Basically a successful answer; name just doesn't fit. */
 		if (!kr_request_ensure_answer(req))
 			ret = req->state;
 		knot_wire_set_rcode(req->answer->wire, KNOT_RCODE_YXDOMAIN);
-		ret = KR_STATE_CONSUME;
+		ret = 0;
 		break;
 	case KNOT_RCODE_REFUSED:
 		if (query->flags.STUB) {
