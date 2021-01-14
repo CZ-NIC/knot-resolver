@@ -13,5 +13,5 @@ order of records in DNS answers sent by resolver:
    :return: The (new) value of the option
 
    If set, resolver will vary the order of resource records within RR sets.
-   It is disabled by default.
+   It is enabled by default since 5.3.0.
 
