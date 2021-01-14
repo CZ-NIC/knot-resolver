@@ -149,6 +149,7 @@ typedef array_t(struct kr_module *) module_array_t;
  */
 struct kr_context
 {
+	/** Default kr_request flags.  For startup defaults see init_resolver() */
 	struct kr_qflags options;
 
 	/** Default EDNS towards *both* clients and upstream.
