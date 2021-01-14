@@ -377,26 +377,30 @@ static int l_fromjson(lua_State *L)
 
 static int init_resolver(struct engine *engine)
 {
-	/* Note: it had been zored by engine_init(). */
+	/* Note: whole *engine had been zeroed by engine_init(). */
+	struct kr_context * const ctx = &engine->resolver;
+	/* Default options (request flags). */
+	ctx->options.REORDER_RR = true;
+
 	/* Open resolution context */
-	engine->resolver.trust_anchors = map_make(NULL);
-	engine->resolver.negative_anchors = map_make(NULL);
-	engine->resolver.pool = engine->pool;
-	engine->resolver.modules = &engine->modules;
-	engine->resolver.cache_rtt_tout_retry_interval = KR_NS_TIMEOUT_RETRY_INTERVAL;
+	ctx->trust_anchors = map_make(NULL);
+	ctx->negative_anchors = map_make(NULL);
+	ctx->pool = engine->pool;
+	ctx->modules = &engine->modules;
+	ctx->cache_rtt_tout_retry_interval = KR_NS_TIMEOUT_RETRY_INTERVAL;
 	/* Create OPT RR */
-	engine->resolver.downstream_opt_rr = mm_alloc(engine->pool, sizeof(knot_rrset_t));
-	engine->resolver.upstream_opt_rr = mm_alloc(engine->pool, sizeof(knot_rrset_t));
-	if (!engine->resolver.downstream_opt_rr || !engine->resolver.upstream_opt_rr) {
+	ctx->downstream_opt_rr = mm_alloc(engine->pool, sizeof(knot_rrset_t));
+	ctx->upstream_opt_rr = mm_alloc(engine->pool, sizeof(knot_rrset_t));
+	if (!ctx->downstream_opt_rr || !ctx->upstream_opt_rr) {
 		return kr_error(ENOMEM);
 	}
-	knot_edns_init(engine->resolver.downstream_opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, engine->pool);
-	knot_edns_init(engine->resolver.upstream_opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, engine->pool);
+	knot_edns_init(ctx->downstream_opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, engine->pool);
+	knot_edns_init(ctx->upstream_opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, engine->pool);
 	/* Use default TLS padding */
-	engine->resolver.tls_padding = -1;
+	ctx->tls_padding = -1;
 	/* Empty init; filled via ./lua/postconfig.lua */
-	kr_zonecut_init(&engine->resolver.root_hints, (const uint8_t *)"", engine->pool);
-	lru_create(&engine->resolver.cache_cookie, LRU_COOKIES_SIZE, NULL, NULL);
+	kr_zonecut_init(&ctx->root_hints, (const uint8_t *)"", engine->pool);
+	lru_create(&ctx->cache_cookie, LRU_COOKIES_SIZE, NULL, NULL);
 
 	/* Load basic modules */
 	engine_register(engine, "iterate", NULL, NULL);
