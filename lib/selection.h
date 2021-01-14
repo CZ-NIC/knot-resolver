@@ -37,10 +37,13 @@ enum kr_selection_error {
 	KR_SELECTION_OTHER_RCODE,
 
 	// DNS errors
+	KR_SELECTION_MALFORMED,
+	/** Name or type mismatch. */
+	KR_SELECTION_MISMATCHED,
 	KR_SELECTION_TRUNCATED,
 	KR_SELECTION_DNSSEC_ERROR,
 	KR_SELECTION_LAME_DELEGATION,
-	/** Too long chain, or cycle. */
+	/** Too long chain, or a cycle. */
 	KR_SELECTION_BAD_CNAME,
 
 	/** Leave this last, as it is used as array size. */
@@ -69,7 +72,6 @@ struct kr_transport {
 	/** True iff transport was set in worker.c:subreq_finalize,
 	 * that means it may be different from the one originally chosen one.*/
 	bool deduplicated;
-	bool safe_mode; /**< Turn on SAFEMODE for this transport */
 };
 
 struct local_state {
@@ -156,7 +158,8 @@ struct address_state {
 	*/
 	int choice_array_index;
 	int error_count;
-	int unrecoverable_errors;
+	bool broken;
+	bool no_0x20; /**< Turn off case randomization for this address. */
 	int errors[KR_SELECTION_NUMBER_OF_ERRORS];
 };
 
