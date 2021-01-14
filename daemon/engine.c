@@ -379,6 +379,9 @@ static int init_resolver(struct engine *engine)
 {
 	/* Note: whole *engine had been zeroed by engine_init(). */
 	struct kr_context * const ctx = &engine->resolver;
+	/* Default options (request flags). */
+	ctx->options.REORDER_RR = true;
+
 	/* Open resolution context */
 	ctx->trust_anchors = map_make(NULL);
 	ctx->negative_anchors = map_make(NULL);
