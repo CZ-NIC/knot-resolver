@@ -2,6 +2,7 @@
 set -e
 KRESD_CMD=$1
 MESON_BUILD_ROOT=$(pwd)
+mkdir -p tests/dnstap
 export GOPATH=$MESON_BUILD_ROOT/tests/dnstap
 cd "$(dirname $0)"
 DNSTAP_TEST=dnstap-test
