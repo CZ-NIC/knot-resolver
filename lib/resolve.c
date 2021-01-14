@@ -600,7 +600,7 @@ static void answer_finalize(struct kr_request *request)
 static int query_finalize(struct kr_request *request, struct kr_query *qry, knot_pkt_t *pkt)
 {
 	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
-	if (qry->flags.SAFEMODE)
+	if (qry->flags.NO_EDNS)
 		return kr_ok();
 	/* Remove any EDNS records from any previous iteration. */
 	int ret = edns_erase_and_reserve(pkt);
@@ -1400,11 +1400,9 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 		return KR_STATE_PRODUCE;
 	}
 
-	qry->flags.SAFEMODE = qry->flags.SAFEMODE || (*transport)->safe_mode;
-
-	/* Randomize query case (if not in safe mode or turned off) */
-	qry->secret = (qry->flags.SAFEMODE || qry->flags.NO_0X20)
-			? 0 : kr_rand_bytes(sizeof(qry->secret));
+	/* Randomize query case (if not in not turned off) */
+	qry->secret = (qry->flags.NO_0X20 || (*transport)->no_0x20)
+		      ? 0 : kr_rand_bytes(sizeof(qry->secret));
 	knot_dname_t *qname_raw = knot_pkt_qname(packet);
 	randomized_qname_case(qname_raw, qry->secret);
 
@@ -1516,7 +1514,7 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 	}
 
 	/* Write down OPT unless in safemode */
-	if (!(qry->flags.SAFEMODE)) {
+	if (!(qry->flags.NO_EDNS)) {
 		ret = edns_put(packet, true);
 		if (ret != 0) {
 			return kr_error(EINVAL);
