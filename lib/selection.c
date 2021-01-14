@@ -508,6 +508,8 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 	case KR_SELECTION_TRUNCATED:
 		if (transport->protocol == KR_TRANSPORT_UDP) {
 			qry->server_selection.local_state->truncated = true;
+			/* TC=1 over UDP is not an error, so we compensate. */
+			addr_state->error_count--;
 		} else {
 			addr_state->broken = true;
 		}
@@ -533,7 +535,7 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		break;
 	}
 
-	addr_state->error_count++; // ?
+	addr_state->error_count++;
 	addr_state->errors[sel_error]++;
 	
 	WITH_VERBOSE(qry)

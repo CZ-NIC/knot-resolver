@@ -1054,7 +1054,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 #endif
 
 	// We can't return directly from the switch because we have to give feedback to server selection first
-	int ret = KR_STATE_DONE;
+	int ret = KR_STATE_FAIL;
 	int selection_error = KR_SELECTION_OK;
 
 	/* Check response code. */
