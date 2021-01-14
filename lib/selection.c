@@ -31,6 +31,29 @@
 #define EPSILON_NOMIN 1
 #define EPSILON_DENOM 20
 
+static const char *kr_selection_error_names[] = {
+	[KR_SELECTION_OK] = "OK",
+	[KR_SELECTION_QUERY_TIMEOUT] = "QUERY_TIMEOUT",
+	[KR_SELECTION_TLS_HANDSHAKE_FAILED] = "TLS_HANDSHAKE_FAILED",
+	[KR_SELECTION_TCP_CONNECT_FAILED] = "TCP_CONNECT_FAILED",
+	[KR_SELECTION_TCP_CONNECT_TIMEOUT] = "TCP_CONNECT_TIMEOUT",
+	[KR_SELECTION_REFUSED] = "REFUSED",
+	[KR_SELECTION_SERVFAIL] = "SERVFAIL",
+	[KR_SELECTION_FORMERROR] = "FORMERROR",
+	[KR_SELECTION_NOTIMPL] = "NOTIMPL",
+	[KR_SELECTION_OTHER_RCODE] = "OTHER_CODE",
+	[KR_SELECTION_MALFORMED] = "MALFORMED",
+	[KR_SELECTION_MISMATCHED] = "MISMATCHED",
+	[KR_SELECTION_TRUNCATED] = "TRUNCATED",
+	[KR_SELECTION_DNSSEC_ERROR] = "DNSSEC_ERROR",
+	[KR_SELECTION_LAME_DELEGATION] = "LAME_DELEGATION",
+	[KR_SELECTION_BAD_CNAME] = "BAD_CNAME",
+};
+
+static const char *kr_selection_error_str(enum kr_selection_error err) {
+	return err < KR_SELECTION_NUMBER_OF_ERRORS ? kr_selection_error_names[err] : NULL;
+}
+
 /* Simple cache interface follows */
 
 static knot_db_val_t cache_key(const uint8_t *ip, size_t len)
@@ -548,12 +571,13 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 	KR_DNAME_GET_STR(ns_name, transport->ns_name);
 	KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
 	const char *ns_str = kr_straddr(&transport->address.ip);
+	const char *err_str = kr_selection_error_str(sel_error);
 
 	VERBOSE_MSG(
 		qry,
-		"=> id: '%05u' noting selection error: '%s'@'%s' zone cut: '%s' error no.:%d\n",
+		"=> id: '%05u' noting selection error: '%s'@'%s' zone cut: '%s' error: %d %s\n",
 		qry->id, ns_name, ns_str ? ns_str : "", zonecut_str,
-		sel_error);
+		sel_error, err_str ? err_str : "??");
 	}
 }
 
