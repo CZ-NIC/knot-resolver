@@ -47,6 +47,9 @@ if build_extra_tests
 
   subdir('pytests')
   subdir('integration')
+  if build_dnstap
+    subdir('dnstap')
+  endif
 
   foreach py3_dep : py3_deps
     py3_import = run_command(python3, '-c', 'import @0@'.format(py3_dep[0]))
