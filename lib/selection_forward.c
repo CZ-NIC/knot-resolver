@@ -52,6 +52,8 @@ void forward_choose_transport(struct kr_query *qry,
 			break;
 		default:
 			assert(0);
+			*transport = NULL;
+			return;
 		}
 
 		struct address_state *addr_state = &local_state->addr_states[i];
