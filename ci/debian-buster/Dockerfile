@@ -15,7 +15,18 @@ RUN apt-get update -qq
 # RUN apt-get upgrade -y -qqq
 
 # Knot and Knot Resolver dependecies
-RUN apt-get install -y -qqq git make cmake pkg-config build-essential bsdmainutils libtool autoconf liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev libidn11-dev protobuf-c-compiler libfstrm-dev libuv1-dev libcmocka-dev libluajit-5.1-dev lua-http meson libssl-dev libnghttp2-dev libelf-dev
+RUN apt-get install -y -qqq git make cmake pkg-config meson \
+	build-essential bsdmainutils libtool autoconf libcmocka-dev \
+	liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev \
+	libelf-dev libidn11-dev libuv1-dev \
+	libluajit-5.1-dev lua-http libssl-dev libnghttp2-dev
+
+# Build and testing deps for Resolver's dnstap module (go stuff is just for testing)
+RUN apt-get install -y -qqq \
+	protobuf-c-compiler libprotobuf-c-dev libfstrm-dev \
+	golang-any
+RUN bash -c "go get github.com/{FiloSottile/gvt,cloudflare/dns,dnstap/golang-dnstap}"
+
 # documentation dependecies
 RUN apt-get install -y -qqq doxygen python3-sphinx python3-breathe python3-sphinx-rtd-theme
 
@@ -125,3 +136,8 @@ RUN wget -O /var/opt/scanner.zip https://binaries.sonarsource.com/Distribution/s
 RUN unzip -d /var/opt /var/opt/wrapper.zip
 RUN unzip -d /var/opt /var/opt/scanner.zip
 ENV PATH "$PATH:/var/opt/build-wrapper-linux-x86:/var/opt/sonar-scanner-4.4.0.2170-linux/bin"
+
+# let's get newer meson from backports
+RUN echo 'deb http://deb.debian.org/debian buster-backports main' > /etc/apt/sources.list.d/backports.list
+RUN apt-get update -qq
+RUN apt-get -t buster-backports install -y -qqq meson
