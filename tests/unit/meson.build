@@ -29,5 +29,6 @@ foreach unit_test : unit_tests
     'unit.' + unit_test[0],
     exec_test,
     suite: 'unit',
+    kwargs: meson.version() < '0.52' ? {} : { 'priority': -5 }, # they take very short time
   )
 endforeach
