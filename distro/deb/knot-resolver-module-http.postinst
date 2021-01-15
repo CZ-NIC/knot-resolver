@@ -1,7 +1,0 @@
-#!/bin/sh
-# SPDX-License-Identifier: GPL-3.0-or-later
-set -e
-
-if [ "$1" = "configure" ]; then
-    systemctl daemon-reload || true
-fi

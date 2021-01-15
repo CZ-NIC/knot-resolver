@@ -1,0 +1,10 @@
+---
+# SPDX-License-Identifier: GPL-3.0-or-later
+- name: dnstap_config set up kresd.conf
+  blockinfile:
+    marker: -- {mark} ANSIBLE MANAGED BLOCK
+    block: |
+      modules.load('dnstap')
+      assert(dnstap)
+    path: /etc/knot-resolver/kresd.conf
+    insertbefore: BOF
