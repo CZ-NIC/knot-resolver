@@ -52,7 +52,7 @@ struct http_ctx {
 	ssize_t buf_pos;
 	ssize_t buf_size;
 	array_t(struct http_stream_status*) stream_status;
-	int current_stream_index;
+	struct http_stream_status *current_stream;
 };
 
 #if ENABLE_DOH2
