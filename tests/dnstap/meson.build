@@ -5,5 +5,6 @@ test('dnstap',
   args: [ sbin_dir / 'kresd' ],
   suite: [ 'postinstall', 'dnstap' ],
   timeout: 120, # it may need to fetch go packages, etc.
+  kwargs: meson.version() < '0.52' ? {} : { 'priority': 5 }, # takes relatively long time
 )
 
