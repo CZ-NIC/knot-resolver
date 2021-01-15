@@ -136,3 +136,8 @@ RUN wget -O /var/opt/scanner.zip https://binaries.sonarsource.com/Distribution/s
 RUN unzip -d /var/opt /var/opt/wrapper.zip
 RUN unzip -d /var/opt /var/opt/scanner.zip
 ENV PATH "$PATH:/var/opt/build-wrapper-linux-x86:/var/opt/sonar-scanner-4.4.0.2170-linux/bin"
+
+# let's get newer meson from backports
+RUN echo 'deb http://deb.debian.org/debian buster-backports main' > /etc/apt/sources.list.d/backports.list
+RUN apt-get update -qq
+RUN apt-get -t buster-backports install -y -qqq meson
