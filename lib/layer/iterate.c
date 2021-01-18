@@ -1054,20 +1054,17 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 #endif
 
 	// We can't return directly from the switch because we have to give feedback to server selection first
-	int ret = KR_STATE_FAIL;
+	int ret = 0;
 	int selection_error = KR_SELECTION_OK;
 
 	/* Check response code. */
 	switch(knot_wire_get_rcode(pkt->wire)) {
 	case KNOT_RCODE_NOERROR:
 	case KNOT_RCODE_NXDOMAIN:
-		ret = 0;
 		break; /* OK */
 	case KNOT_RCODE_YXDOMAIN: /* Basically a successful answer; name just doesn't fit. */
 		if (!kr_request_ensure_answer(req)) {
 			ret = req->state;
-		} else {
-			ret = 0;
 		}
 		knot_wire_set_rcode(req->answer->wire, KNOT_RCODE_YXDOMAIN);
 		break;
@@ -1076,6 +1073,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 			 /* just pass answer through if in stub mode */
 			break;
 		}
+		ret = KR_STATE_FAIL;
 		selection_error = KR_SELECTION_REFUSED;
 		break;
 	case KNOT_RCODE_SERVFAIL:
@@ -1083,15 +1081,19 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 			 /* just pass answer through if in stub mode */
 			break;
 		}
+		ret = KR_STATE_FAIL;
 		selection_error = KR_SELECTION_SERVFAIL;
 		break;
 	case KNOT_RCODE_FORMERR:
+		ret = KR_STATE_FAIL;
 		selection_error = KR_SELECTION_FORMERROR;
 		break;
 	case KNOT_RCODE_NOTIMPL:
+		ret = KR_STATE_FAIL;
 		selection_error = KR_SELECTION_NOTIMPL;
 		break;
 	default:
+		ret = KR_STATE_FAIL;
 		selection_error = KR_SELECTION_OTHER_RCODE;
 		break;
 	}
