@@ -200,7 +200,7 @@ lint:scan-build:
     paths:
       - build_ci*/meson-logs/scanbuild
   script:
-    - export SCANBUILD="scan-build --status-bugs -no-failure-reports $(./scripts/get-scanbuild-args.sh)"
+    - export SCANBUILD="$(realpath ./scripts/run-scanbuild-with-args.sh)"
     - ninja -C build_ci* scan-build || true
     - test "$(ls build_ci*/meson-logs/scanbuild/*/report-*.html | wc -l)" = 23 # we have this many errors ATM :-)
 
