@@ -15,7 +15,7 @@ set -o errexit -o nounset
 # alpha.deadcode.UnreachableCode # false positives/flags sanity checks depending on implementation details
 # alpha.security.MallocOverflow # not smart enough to infer max values from data types
 
-cat <<-EOF
+exec scan-build --status-bugs -no-failure-reports \
 -disable-checker  unix.Malloc \
 -enable-checker   alpha.core.BoolAssignment \
 -enable-checker   alpha.core.CallAndMessageUnInitRefArg \
@@ -49,4 +49,4 @@ cat <<-EOF
 -enable-checker   valist.CopyToSelf \
 -enable-checker   valist.Uninitialized \
 -enable-checker   valist.Unterminated
-EOF
+
