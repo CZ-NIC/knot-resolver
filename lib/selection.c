@@ -524,12 +524,8 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 	case KR_SELECTION_MISMATCHED:
 		if (qry->flags.NO_0X20 && qry->flags.TCP) {
 			addr_state->broken = true;
-		} else if (qry->flags.NO_0X20) {
-			/* Second question mismatch, final chance for the query
-			 * over TCP. */
-			qry->flags.TCP = true;
 		} else {
-			/* First question mismatch, turn off case randomization. */
+			qry->flags.TCP = true;
 			qry->flags.NO_0X20 = true;
 		}
 		break;
