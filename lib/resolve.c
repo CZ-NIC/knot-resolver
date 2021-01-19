@@ -1388,13 +1388,14 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 		if (qry->flags.NO_NS_FOUND) {
 			ITERATE_LAYERS(request, qry, reset);
 			kr_rplan_pop(rplan, qry);
+			return KR_STATE_FAIL;
 		} else {
 			/* FIXME: This is probably quite inefficient:
 			* we go through the whole qr_task_step loop just because of the serve_stale
 			* module which might not even be loaded. */
 			qry->flags.NO_NS_FOUND = true;
+			return KR_STATE_PRODUCE;
 		}
-		return KR_STATE_PRODUCE;
 	}
 
 	if ((*transport)->protocol == KR_TRANSPORT_RESOLVE_A || (*transport)->protocol == KR_TRANSPORT_RESOLVE_AAAA) {
