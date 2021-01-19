@@ -205,9 +205,7 @@ static int send_err_status(struct http_ctx *ctx, int32_t stream_id)
 	int ret;
 	int status_len;
 	nghttp2_data_provider prov;
-	struct http_stream_status *stat = NULL;
-
-	stat = http_status_get(ctx, stream_id);
+	struct http_stream_status *stat = http_status_get(ctx, stream_id);
 	assert(stat);
 	if (stat->err_status == 200) {
 		http_status_remove(ctx, stat);
@@ -285,13 +283,14 @@ static struct http_stream_status * set_error_status(struct http_ctx *ctx, int32_
 		return stat;
 	}
 
-	stat->err_msg = realloc(stat->err_msg, sizeof(*stat->err_msg) * (strlen(status_msg) + 1));
+	stat->err_msg = realloc(stat->err_msg, sizeof(*stat->err_msg) * (strlen(status_msg) + 2));
 	if (!stat->err_msg) {
 		return stat;
 	}
 
 	memcpy(stat->err_msg, status_msg, strlen(status_msg));
-	stat->err_msg[strlen(status_msg)] = '\0';
+	stat->err_msg[strlen(status_msg)] = '\n';
+	stat->err_msg[strlen(status_msg)+1] = '\0';
 
 	return stat;
 }
@@ -376,6 +375,11 @@ static int check_uri(struct http_ctx *ctx, int32_t stream_id, const char* uri_pa
 			stat = set_error_status(ctx, stream_id, 400, "'dns' key in path not found");
 			return stat ? kr_error(EINVAL) : kr_error(ENOMEM);
 		}
+	} else {
+		if (!beg) { /* no dns variable in path */
+			stat = set_error_status(ctx, stream_id, 400, "'dns' key in path not found");
+			return stat ? kr_error(EINVAL) : kr_error(ENOMEM);
+		}
 	}
 
 	return 0;
@@ -396,12 +400,13 @@ static int process_uri_path(struct http_ctx *ctx, int32_t stream_id)
 
 	if (!ctx || !ctx->uri_path) {
 		stat = set_error_status(ctx, stream_id, 400, "invalid uri path");
-		return stat ? 0 : kr_error(ENOMEM);
 	}
 
 	beg = strstr(ctx->uri_path, key);
-	if (!beg)  /* No dns variable in ctx->uri_path. */
-		return 0;
+	if (!beg) {  /* No dns variable in ctx->uri_path. */
+		stat = set_error_status(ctx, stream_id, 400, "'dns' key in path not found");
+		return stat ? 0 : kr_error(ENOMEM);
+	}
 
 	beg += sizeof(key) - 1;
 	end = strchr(beg, '&');
@@ -605,34 +610,36 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM)) {
 		struct http_stream_status *stat = ctx->current_stream;
 		if (ctx->incomplete_stream == stream_id) {
-			if (ctx->current_method == HTTP_METHOD_GET) {
-				if (process_uri_path(ctx, stream_id) < 0) {
-					http_status_reinit(ctx);
-					return NGHTTP2_ERR_CALLBACK_FAILURE;
-				}
-				free(ctx->uri_path);
-				ctx->uri_path = NULL;
-			}
-
-			if (ctx->buf_pos) {
-				len = ctx->buf_pos - sizeof(uint16_t);
-				if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
-					kr_log_verbose("[http] invalid dnsmsg size: %zd B\n", len);
-					http_status_reinit(ctx);
-					return NGHTTP2_ERR_CALLBACK_FAILURE;
-				}
-
-				if (len < 12) {
-					if (!set_error_status(ctx, stream_id, 400, "input too short\n")) {
+			if (stat->err_status == 200) {
+				if (ctx->current_method == HTTP_METHOD_GET) {
+					if (process_uri_path(ctx, stream_id) < 0) {
 						http_status_reinit(ctx);
 						return NGHTTP2_ERR_CALLBACK_FAILURE;
 					}
+					free(ctx->uri_path);
+					ctx->uri_path = NULL;
 				}
 
-				if (stat->err_status == 200) {
-					knot_wire_write_u16(ctx->buf, len);
-					ctx->submitted += ctx->buf_pos;
-					ctx->buf += ctx->buf_pos;
+				if (ctx->buf_pos) {
+					len = ctx->buf_pos - sizeof(uint16_t);
+					if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
+						kr_log_verbose("[http] invalid dnsmsg size: %zd B\n", len);
+						http_status_reinit(ctx);
+						return NGHTTP2_ERR_CALLBACK_FAILURE;
+					}
+
+					if (len < 12) {
+						if (!set_error_status(ctx, stream_id, 400, "input too short\n")) {
+							http_status_reinit(ctx);
+							return NGHTTP2_ERR_CALLBACK_FAILURE;
+						}
+					}
+
+					if (stat->err_status == 200) {
+						knot_wire_write_u16(ctx->buf, len);
+						ctx->submitted += ctx->buf_pos;
+						ctx->buf += ctx->buf_pos;
+					}
 				}
 			}
 
