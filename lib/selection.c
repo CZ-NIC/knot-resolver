@@ -539,6 +539,11 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		}
 		break;
 	case KR_SELECTION_REFUSED:
+		if (qry->flags.NO_MINIMIZE) {
+			addr_state->broken = true;
+		} else {
+			qry->flags.NO_MINIMIZE = true;
+		}
 	case KR_SELECTION_SERVFAIL:
 	case KR_SELECTION_NOTIMPL:
 	case KR_SELECTION_OTHER_RCODE:
