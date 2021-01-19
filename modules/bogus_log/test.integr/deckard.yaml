@@ -1,11 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 programs:
 - name: kresd
-  binary: rr
+  binary: kresd
   additional:
-    - kresd
     - --noninteractive
-    - -v
   templates:
     - modules/bogus_log/test.integr/kresd_config.j2
     - tests/integration/hints_zone.j2
