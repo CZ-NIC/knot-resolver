@@ -832,6 +832,10 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 						"bail out (mitigation for NXNSAttack "
 						"CVE-2020-12667)\n");
 				}
+				if (!qry->flags.NO_NS_FOUND) {
+					qry->flags.NO_NS_FOUND = true;
+					return KR_STATE_PRODUCE;
+				}
 				return KR_STATE_FAIL;
 			}
 		} else {
