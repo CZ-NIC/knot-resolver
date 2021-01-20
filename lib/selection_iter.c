@@ -277,8 +277,11 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 			/* We need to propagate this to flags since it's used in
 			 * other parts of the resolver. */
 			qry->flags.TCP = true;
+		case KR_TRANSPORT_UDP: /* fall through */
+			local_state->no_ns_addr_count = 0;
 			break;
 		default:
+			assert(0);
 			break;
 		}
 	}
