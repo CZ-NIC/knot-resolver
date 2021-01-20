@@ -1236,7 +1236,6 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param, struc
 		if (!next_type && qry->zone_cut.name[0] == '\0') {
 			VERBOSE_MSG(qry, "=> fallback to root hints\n");
 			kr_zonecut_set_sbelt(ctx, &qry->zone_cut);
-			qry->flags.NO_THROTTLE = true; /* Pick even bad SBELT servers */
 			return kr_error(EAGAIN);
 		}
 		/* No IPv4 nor IPv6, flag server as unusable. */
@@ -1259,7 +1258,6 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param, struc
 		if (ret == 0) { /* Copy TA and key since it's the same cut to avoid lookup. */
 			kr_zonecut_copy_trust(&next->zone_cut, &qry->zone_cut);
 			kr_zonecut_set_sbelt(ctx, &qry->zone_cut); /* Add SBELT to parent in case query fails. */
-			qry->flags.NO_THROTTLE = true; /* Pick even bad SBELT servers */
 		}
 	} else {
 		next->flags.AWAIT_CUT = true;
@@ -1377,7 +1375,6 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 		/* Root DNSKEY must be fetched from the hints to avoid chicken and egg problem. */
 		if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
 			kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);
-			qry->flags.NO_THROTTLE = true; /* Pick even bad SBELT servers */
 		}
 	}
 

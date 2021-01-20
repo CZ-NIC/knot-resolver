@@ -84,7 +84,6 @@ typedef struct {
 typedef struct trie trie_t;
 struct kr_qflags {
 	_Bool NO_MINIMIZE : 1;
-	_Bool NO_THROTTLE : 1;
 	_Bool NO_IPV6 : 1;
 	_Bool NO_IPV4 : 1;
 	_Bool TCP : 1;
