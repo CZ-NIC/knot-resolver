@@ -261,16 +261,7 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 	if (!ok) {
 		VERBOSE_MSG("<= authority: ns outside bailiwick\n");
 		qry->server_selection.error(qry, req->upstream.transport, KR_SELECTION_LAME_DELEGATION);
-#ifdef STRICT_MODE
 		return KR_STATE_FAIL;
-#else
-		/* Workaround: ignore out-of-bailiwick NSs for authoritative answers,
-		 * but fail for referrals. This is important to detect lame answers. */
-		if (knot_pkt_section(pkt, KNOT_ANSWER)->count == 0) {
-			state = KR_STATE_FAIL;
-		}
-		return state;
-#endif
 	}
 
 	/* Update zone cut name */
