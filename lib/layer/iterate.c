@@ -1013,15 +1013,12 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Check for packet processing errors first.
 	 * Note - we *MUST* check if it has at least a QUESTION,
 	 * otherwise it would crash on accessing QNAME. */
-#ifdef STRICT_MODE
 	if (pkt->parsed < pkt->size) {
 		VERBOSE_MSG("<= pkt contains excessive data\n");
 		return KR_STATE_FAIL;
-	} else
-#endif
-	if (pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
+	} else if (pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
 		if (pkt->parsed == KNOT_WIRE_HEADER_SIZE && knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_FORMERR) {
-			/* This is a special case where we get valid header with FORMERR and nothing else.
+			/* This is a special case where we get valid header with FORMERROR and nothing else.
 			 * This happens on some authoritatives which don't support EDNS and don't
 			 * bother copying the SECTION QUESTION. */
 			query->server_selection.error(query, req->upstream.transport, KR_SELECTION_FORMERR);
