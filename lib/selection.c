@@ -546,10 +546,12 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 			qry->flags.NO_MINIMIZE = true;
 		}
 		break;
+	case KR_SELECTION_LAME_DELEGATION:
+		qry->server_selection.local_state->force_resolve = true;
+		break;
 	case KR_SELECTION_NOTIMPL:
 	case KR_SELECTION_OTHER_RCODE:
 	case KR_SELECTION_DNSSEC_ERROR:
-	case KR_SELECTION_LAME_DELEGATION:
 	case KR_SELECTION_BAD_CNAME:
 	case KR_SELECTION_MALFORMED:
 		/* These errors are fatal, no point in trying this server again. */
