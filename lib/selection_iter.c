@@ -249,6 +249,11 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 	int choices_len = get_valid_addresses(local_state, choices);
 	int resolvable_len = get_resolvable_names(local_state, resolvable, qry);
 
+	if (qry->server_selection.local_state->force_resolve && resolvable_len) {
+		choices_len = 0;
+		qry->server_selection.local_state->force_resolve = false;
+	}
+
 	bool tcp = qry->flags.TCP || qry->server_selection.local_state->truncated;
 	*transport = select_transport(choices, choices_len, resolvable, resolvable_len,
 				      qry->server_selection.local_state->timeouts,

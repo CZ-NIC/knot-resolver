@@ -549,10 +549,20 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 			qry->flags.NO_MINIMIZE = true;
 		}
 		break;
+	case KR_SELECTION_LAME_DELEGATION:
+		if (qry->flags.NO_MINIMIZE) {
+			/* Lame delegations are weird, they breed more lame delegations on broken
+			* zones since trying another server from the same set usualy doesn't help.
+			* We force resolution of another NS name in hope of getting somewhere. */
+			qry->server_selection.local_state->force_resolve = true;
+			addr_state->broken = true;
+		} else {
+			qry->flags.NO_MINIMIZE = true;
+		}
+		break;
 	case KR_SELECTION_NOTIMPL:
 	case KR_SELECTION_OTHER_RCODE:
 	case KR_SELECTION_DNSSEC_ERROR:
-	case KR_SELECTION_LAME_DELEGATION:
 	case KR_SELECTION_BAD_CNAME:
 	case KR_SELECTION_MALFORMED:
 		/* These errors are fatal, no point in trying this server again. */
