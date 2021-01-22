@@ -1278,7 +1278,11 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	}
 	struct request_ctx *ctx = task->ctx;
 	struct session *source_session = ctx->source.session;
-	kr_resolve_finish(&ctx->req, state);
+	if (state == KR_STATE_CONSUME) {
+		kr_resolve_consume(&ctx->req, &task->transport, NULL);
+	} else {
+		kr_resolve_finish(&ctx->req, state);
+	}
 
 	task->finished = true;
 	if (source_session == NULL) {

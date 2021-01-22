@@ -489,7 +489,7 @@ int session_tasklist_finalize_expired(struct session *session)
 			 * so run worker_task_subreq_finalize() to ensure retrying
 			 * for all the followers. */
 			worker_task_subreq_finalize(task);
-			worker_task_finalize(task, KR_STATE_FAIL);
+			worker_task_finalize(task, KR_STATE_CONSUME);
 		}
 		if (res == KNOT_EOK) {
 			worker_task_unref(task);
