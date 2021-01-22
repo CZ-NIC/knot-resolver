@@ -1599,7 +1599,7 @@ static int qr_task_step(struct qr_task *task,
 	}
 
 	// Report network RTT back to server selection
-	if (task->send_time && task->recv_time) {
+	if (packet && task->send_time && task->recv_time) {
 		struct kr_query *qry = array_tail(req->rplan.pending);
 		qry->server_selection.update_rtt(qry, task->transport, task->recv_time - task->send_time);
 	}
