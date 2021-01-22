@@ -146,7 +146,7 @@ struct worker_stats {
 #define MAX_PENDING 4
 
 /** Maximum response time from TCP upstream, milliseconds */
-#define MAX_TCP_INACTIVITY (KR_RESOLVE_TIME_LIMIT + KR_CONN_RTT_MAX)
+#define MAX_TCP_INACTIVITY KR_CONN_RTT_MAX
 
 #ifndef RECVMMSG_BATCH /* see check_bufsize() */
 #define RECVMMSG_BATCH 1
