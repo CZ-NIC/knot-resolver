@@ -549,11 +549,15 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		}
 		break;
 	case KR_SELECTION_LAME_DELEGATION:
-		/* Lame delegations are weird, they breed more lame delegations on broken
-		 * zones since trying another server from the same set usualy doesn't help.
-		 * We force resolution of another NS name in hope of getting somewhere. */
-		qry->server_selection.local_state->force_resolve = true;
-		addr_state->broken = true;
+		if (qry->flags.NO_MINIMIZE) {
+			/* Lame delegations are weird, they breed more lame delegations on broken
+			* zones since trying another server from the same set usualy doesn't help.
+			* We force resolution of another NS name in hope of getting somewhere. */
+			qry->server_selection.local_state->force_resolve = true;
+			addr_state->broken = true;
+		} else {
+			qry->flags.NO_MINIMIZE = true;
+		}
 		break;
 	case KR_SELECTION_NOTIMPL:
 	case KR_SELECTION_OTHER_RCODE:
