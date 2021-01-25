@@ -77,6 +77,8 @@ struct kr_transport {
 struct local_state {
 	int timeouts; /**< Number of timeouts that occured resolving this query.*/
 	bool truncated; /**< Query was truncated, switch to TCP. */
+	/** Force resolution of a new NS name (if possible)
+	 * Done by selection.c:error in some cases. */
 	bool force_resolve;
 	void *private; /**< Inner state of the implementation.*/
 };
