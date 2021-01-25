@@ -540,10 +540,11 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		break;
 	case KR_SELECTION_REFUSED:
 	case KR_SELECTION_SERVFAIL:
-		if (qry->flags.NO_MINIMIZE && qry->flags.NO_0X20) {
+		if (qry->flags.NO_MINIMIZE && qry->flags.NO_0X20 && qry->flags.TCP) {
 			addr_state->broken = true;
 		} else if (qry->flags.NO_MINIMIZE) {
 			qry->flags.NO_0X20 = true;
+			qry->flags.TCP = true;
 		} else {
 			qry->flags.NO_MINIMIZE = true;
 		}
