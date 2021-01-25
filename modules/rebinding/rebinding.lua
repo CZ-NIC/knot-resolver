@@ -109,9 +109,7 @@ function M.layer.consume(state, req, pkt)
 	end
 	if verbose() then
 		ffi.C.kr_log_q(qry, 'rebinding',
-		    'blocking blacklisted IP in RR \'%s\' received from IP %s\n',
-		    kres.rr2str(bad_rr),
-		    tostring(kres.sockaddr_t(req.upstream.addr)))
+		    'blocking blacklisted IP in RR \'%s\'\n', kres.rr2str(bad_rr))
 	end
 	return state
 end
