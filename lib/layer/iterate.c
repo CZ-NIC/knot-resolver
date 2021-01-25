@@ -98,7 +98,7 @@ static bool is_authoritative(const knot_pkt_t *answer, struct kr_query *query)
 	}
 
 #ifndef STRICT_MODE
-	/* Last resort to work around broken auths, if the zone cut is at/parent of the QNAME. */
+	/* Last resort to work around broken auths, if the zone cut is at the QNAME. */
 	if (knot_dname_is_equal(query->zone_cut.name, knot_pkt_qname(answer))) {
 		return true;
 	}
