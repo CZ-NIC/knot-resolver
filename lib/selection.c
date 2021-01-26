@@ -31,27 +31,30 @@
 #define EPSILON_NOMIN 1
 #define EPSILON_DENOM 20
 
-static const char *kr_selection_error_names[] = {
-	[KR_SELECTION_OK] = "OK",
-	[KR_SELECTION_QUERY_TIMEOUT] = "QUERY_TIMEOUT",
-	[KR_SELECTION_TLS_HANDSHAKE_FAILED] = "TLS_HANDSHAKE_FAILED",
-	[KR_SELECTION_TCP_CONNECT_FAILED] = "TCP_CONNECT_FAILED",
-	[KR_SELECTION_TCP_CONNECT_TIMEOUT] = "TCP_CONNECT_TIMEOUT",
-	[KR_SELECTION_REFUSED] = "REFUSED",
-	[KR_SELECTION_SERVFAIL] = "SERVFAIL",
-	[KR_SELECTION_FORMERROR] = "FORMERROR",
-	[KR_SELECTION_NOTIMPL] = "NOTIMPL",
-	[KR_SELECTION_OTHER_RCODE] = "OTHER_RCODE",
-	[KR_SELECTION_MALFORMED] = "MALFORMED",
-	[KR_SELECTION_MISMATCHED] = "MISMATCHED",
-	[KR_SELECTION_TRUNCATED] = "TRUNCATED",
-	[KR_SELECTION_DNSSEC_ERROR] = "DNSSEC_ERROR",
-	[KR_SELECTION_LAME_DELEGATION] = "LAME_DELEGATION",
-	[KR_SELECTION_BAD_CNAME] = "BAD_CNAME",
-};
-
 static const char *kr_selection_error_str(enum kr_selection_error err) {
-	return err < KR_SELECTION_NUMBER_OF_ERRORS ? kr_selection_error_names[err] : NULL;
+	switch (err) {
+	#define X(ENAME) case KR_SELECTION_ ## ENAME: return #ENAME
+		X(OK);
+		X(QUERY_TIMEOUT);
+		X(TLS_HANDSHAKE_FAILED);
+		X(TCP_CONNECT_FAILED);
+		X(TCP_CONNECT_TIMEOUT);
+		X(REFUSED);
+		X(SERVFAIL);
+		X(FORMERROR);
+		X(NOTIMPL);
+		X(OTHER_RCODE);
+		X(MALFORMED);
+		X(MISMATCHED);
+		X(TRUNCATED);
+		X(DNSSEC_ERROR);
+		X(LAME_DELEGATION);
+		X(BAD_CNAME);
+		case KR_SELECTION_NUMBER_OF_ERRORS: break; // not a valid code
+	#undef X
+	}
+	assert(false); // we want to define all; compiler helps by -Wswitch (no default:)
+	return NULL;
 }
 
 /* Simple cache interface follows */
