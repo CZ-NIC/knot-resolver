@@ -92,7 +92,7 @@ struct kr_qflags {
 	_Bool AWAIT_IPV4 : 1;
 	_Bool AWAIT_IPV6 : 1;
 	_Bool AWAIT_CUT : 1;
-	_Bool SAFEMODE : 1;
+	_Bool NO_EDNS : 1;
 	_Bool CACHED : 1;
 	_Bool NO_CACHE : 1;
 	_Bool EXPIRING : 1;

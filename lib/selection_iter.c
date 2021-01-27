@@ -140,7 +140,7 @@ static int get_valid_addresses(struct iter_local_state *local_state,
 		uint8_t *address = (uint8_t *)trie_it_key(it, &address_len);
 		struct address_state *address_state = *trie_it_val(it);
 		if (address_state->generation == local_state->generation &&
-		    !address_state->unrecoverable_errors) {
+		    !address_state->broken) {
 			choices[count] = (struct choice){
 				.address_len = address_len,
 				.address_state = address_state,
@@ -249,49 +249,48 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 	int choices_len = get_valid_addresses(local_state, choices);
 	int resolvable_len = get_resolvable_names(local_state, resolvable, qry);
 
-	if (choices_len || resolvable_len) {
-		bool tcp = qry->flags.TCP || qry->server_selection.local_state->truncated;
-		*transport = select_transport(
-			choices, choices_len, resolvable, resolvable_len,
-			qry->server_selection.local_state->timeouts, mempool,
-			tcp, NULL);
-		if (*transport) {
-			switch ((*transport)->protocol) {
-			case KR_TRANSPORT_RESOLVE_A:
-			case KR_TRANSPORT_RESOLVE_AAAA:
-				/* Note that we tried resolving this name to not try it again. */
-				update_name_state((*transport)->ns_name,
-						  (*transport)->protocol,
-						  local_state->names);
-				break;
-			case KR_TRANSPORT_TLS:
-			case KR_TRANSPORT_TCP:
-				/* We need to propagate this to flags since it's used in
-				 * other parts of the resolver. */
-				qry->flags.TCP = true;
-				break;
-			default:
+	if (qry->server_selection.local_state->force_resolve && resolvable_len) {
+		choices_len = 0;
+		qry->server_selection.local_state->force_resolve = false;
+	}
+
+	bool tcp = qry->flags.TCP || qry->server_selection.local_state->truncated;
+	*transport = select_transport(choices, choices_len, resolvable, resolvable_len,
+				      qry->server_selection.local_state->timeouts,
+				      mempool, tcp, NULL);
+	bool nxnsattack_mitigation = false;
+
+	if (*transport) {
+		switch ((*transport)->protocol) {
+		case KR_TRANSPORT_RESOLVE_A:
+		case KR_TRANSPORT_RESOLVE_AAAA:
+			if (++local_state->no_ns_addr_count > KR_COUNT_NO_NSADDR_LIMIT) {
+				*transport = NULL;
+				nxnsattack_mitigation = true;
 				break;
 			}
-		}
-	} else {
-		*transport = NULL;
-		/* Last selected server had broken DNSSEC and now we have no more
-		 * servers to ask. We signal this to the rest of resolver by
-		 * setting DNSSEC_BOGUS flag. */
-		if (local_state->last_error == KR_SELECTION_DNSSEC_ERROR) {
-			qry->flags.DNSSEC_BOGUS = true;
+			/* Note that we tried resolving this name to not try it again. */
+			update_name_state((*transport)->ns_name, (*transport)->protocol, local_state->names);
+			break;
+		case KR_TRANSPORT_TLS:
+		case KR_TRANSPORT_TCP:
+			/* We need to propagate this to flags since it's used in
+			 * other parts of the resolver. */
+			qry->flags.TCP = true;
+		case KR_TRANSPORT_UDP: /* fall through */
+			local_state->no_ns_addr_count = 0;
+			break;
+		default:
+			assert(0);
+			break;
 		}
 	}
 
-	bool nxnsattack_mitigation = false;
-	const enum kr_transport_protocol proto =
-		*transport ? (*transport)->protocol : -1;
-	if (proto == KR_TRANSPORT_RESOLVE_A || proto == KR_TRANSPORT_RESOLVE_AAAA) {
-		if (++local_state->no_ns_addr_count > KR_COUNT_NO_NSADDR_LIMIT) {
-			*transport = NULL;
-			nxnsattack_mitigation = true;
-		}
+	if (*transport == NULL && local_state->last_error == KR_SELECTION_DNSSEC_ERROR) {
+		/* Last selected server had broken DNSSEC and now we have no more
+		* servers to ask. We signal this to the rest of resolver by
+		* setting DNSSEC_BOGUS flag. */
+		qry->flags.DNSSEC_BOGUS = true;
 	}
 
 	WITH_VERBOSE(qry)
@@ -299,6 +298,7 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 	KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
 	if (*transport) {
 		KR_DNAME_GET_STR(ns_name, (*transport)->ns_name);
+		const enum kr_transport_protocol proto = *transport ? (*transport)->protocol : -1;
 		const char *ns_str = kr_straddr(&(*transport)->address.ip);
 		const char *ip_version;
 		switch (proto)
@@ -311,10 +311,9 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 			break;
 		default:
 			VERBOSE_MSG(qry, "=> id: '%05u' choosing: '%s'@'%s'"
-				    " with timeout %u ms zone cut: '%s'%s\n",
+				    " with timeout %u ms zone cut: '%s'\n",
 				    qry->id, ns_name, ns_str ? ns_str : "",
-				    (*transport)->timeout, zonecut_str,
-				    (*transport)->safe_mode ? " SAFEMODE" : "");
+				    (*transport)->timeout, zonecut_str);
 			break;
 		}
 	} else {

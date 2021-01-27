@@ -31,26 +31,31 @@
 #define EPSILON_NOMIN 1
 #define EPSILON_DENOM 20
 
-/**
- * If one of the errors set to true is encountered,
- * there is no point in asking this server again.
- */
-static const bool UNRECOVERABLE_ERRORS[] = {
-	[KR_SELECTION_QUERY_TIMEOUT] = false,
-	[KR_SELECTION_TLS_HANDSHAKE_FAILED] = false,
-	[KR_SELECTION_TCP_CONNECT_FAILED] = false,
-	[KR_SELECTION_TCP_CONNECT_TIMEOUT] = false,
-	[KR_SELECTION_REFUSED] = true,
-	[KR_SELECTION_SERVFAIL] = true,
-	[KR_SELECTION_FORMERROR] = false,
-	[KR_SELECTION_NOTIMPL] = true,
-	[KR_SELECTION_OTHER_RCODE] = true,
-	[KR_SELECTION_TRUNCATED] = false,
-	[KR_SELECTION_DNSSEC_ERROR] = true,
-	[KR_SELECTION_LAME_DELEGATION] = true,
-	[KR_SELECTION_BAD_CNAME] = true,
-};
-
+static const char *kr_selection_error_str(enum kr_selection_error err) {
+	switch (err) {
+	#define X(ENAME) case KR_SELECTION_ ## ENAME: return #ENAME
+		X(OK);
+		X(QUERY_TIMEOUT);
+		X(TLS_HANDSHAKE_FAILED);
+		X(TCP_CONNECT_FAILED);
+		X(TCP_CONNECT_TIMEOUT);
+		X(REFUSED);
+		X(SERVFAIL);
+		X(FORMERROR);
+		X(NOTIMPL);
+		X(OTHER_RCODE);
+		X(MALFORMED);
+		X(MISMATCHED);
+		X(TRUNCATED);
+		X(DNSSEC_ERROR);
+		X(LAME_DELEGATION);
+		X(BAD_CNAME);
+		case KR_SELECTION_NUMBER_OF_ERRORS: break; // not a valid code
+	#undef X
+	}
+	assert(false); // we want to define all; compiler helps by -Wswitch (no default:)
+	return NULL;
+}
 
 /* Simple cache interface follows */
 
@@ -69,7 +74,7 @@ static knot_db_val_t cache_key(const uint8_t *ip, size_t len)
 	return key;
 }
 
-/* First value of timeout will be calculated as SRTT+4*DEFAULT_TIMEOUT
+/* First value of timeout will be calculated as SRTT+4*VARIANCE
  * by calc_timeout(), so it'll be equal to DEFAULT_TIMEOUT. */
 static const struct rtt_state default_rtt_state = { .srtt = 0,
 						    .variance = DEFAULT_TIMEOUT / 4,
@@ -252,7 +257,7 @@ void update_address_state(struct address_state *state, union inaddr *address,
 {
 	check_tls_capable(state, qry->request, &address->ip);
 	/* TODO: uncomment this once we actually use the information it collects
-	check_tcp_connections(address_state, qry->request, &tmp_address.ip);
+	check_tcp_connections(address_state, qry->request, &address->ip);
 	*/
 	check_network_settings(state, address_len, qry->flags.NO_IPV4,
 			       qry->flags.NO_IPV6);
@@ -265,7 +270,7 @@ void update_address_state(struct address_state *state, union inaddr *address,
 	// This is sometimes useful for debugging, but usually too verbose
 	WITH_VERBOSE(qry)
 	{
-		const char *ns_str = kr_straddr(&tmp_address.ip);
+		const char *ns_str = kr_straddr(&address->ip);
 		VERBOSE_MSG(qry, "rtt of %s is %d, variance is %d\n", ns_str,
 			    state->rtt_state.srtt, state->rtt_state.variance);
 	}
@@ -387,7 +392,6 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 		.ns_name = chosen->address_state->ns_name,
 		.protocol = protocol,
 		.timeout = timeout,
-		.safe_mode = chosen->address_state->errors[KR_SELECTION_FORMERROR],
 	};
 
 	int port = chosen->port;
@@ -497,54 +501,101 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 	   const struct kr_transport *transport,
 	   enum kr_selection_error sel_error)
 {
-	assert(sel_error >= KR_SELECTION_OK && sel_error < KR_SELECTION_NUMBER_OF_ERRORS);
 	if (!transport || !addr_state) {
 		/* Answers from cache have NULL transport, ignore them. */
 		return;
 	}
 
-	if (sel_error == KR_SELECTION_QUERY_TIMEOUT) {
+	switch (sel_error) {
+	case KR_SELECTION_OK:
+		return;
+	case KR_SELECTION_QUERY_TIMEOUT:
 		qry->server_selection.local_state->timeouts++;
-		// Make sure the query was chosen by this query
+		/* Make sure the query was chosen by this query. */
 		if (!transport->deduplicated) {
 			cache_timeout(transport, addr_state,
 				      &qry->request->ctx->cache);
 		}
+		break;
+	case KR_SELECTION_FORMERROR:
+		if (qry->flags.NO_EDNS) {
+			addr_state->broken = true;
+		} else {
+			qry->flags.NO_EDNS = true;
+		}
+		break;
+	case KR_SELECTION_MISMATCHED:
+		if (qry->flags.NO_0X20 && qry->flags.TCP) {
+			addr_state->broken = true;
+		} else {
+			qry->flags.TCP = true;
+			qry->flags.NO_0X20 = true;
+		}
+		break;
+	case KR_SELECTION_TRUNCATED:
+		if (transport->protocol == KR_TRANSPORT_UDP) {
+			qry->server_selection.local_state->truncated = true;
+			/* TC=1 over UDP is not an error, so we compensate. */
+			addr_state->error_count--;
+		} else {
+			addr_state->broken = true;
+		}
+		break;
+	case KR_SELECTION_REFUSED:
+	case KR_SELECTION_SERVFAIL:
+		if (qry->flags.NO_MINIMIZE && qry->flags.NO_0X20 && qry->flags.TCP) {
+			addr_state->broken = true;
+		} else if (qry->flags.NO_MINIMIZE) {
+			qry->flags.NO_0X20 = true;
+			qry->flags.TCP = true;
+		} else {
+			qry->flags.NO_MINIMIZE = true;
+		}
+		break;
+	case KR_SELECTION_LAME_DELEGATION:
+		if (qry->flags.NO_MINIMIZE) {
+			/* Lame delegations are weird, they breed more lame delegations on broken
+			* zones since trying another server from the same set usualy doesn't help.
+			* We force resolution of another NS name in hope of getting somewhere. */
+			qry->server_selection.local_state->force_resolve = true;
+			addr_state->broken = true;
+		} else {
+			qry->flags.NO_MINIMIZE = true;
+		}
+		break;
+	case KR_SELECTION_NOTIMPL:
+	case KR_SELECTION_OTHER_RCODE:
+	case KR_SELECTION_DNSSEC_ERROR:
+	case KR_SELECTION_BAD_CNAME:
+	case KR_SELECTION_MALFORMED:
+		/* These errors are fatal, no point in trying this server again. */
+		addr_state->broken = true;
+		break;
+	case KR_SELECTION_TLS_HANDSHAKE_FAILED:
+	case KR_SELECTION_TCP_CONNECT_FAILED:
+	case KR_SELECTION_TCP_CONNECT_TIMEOUT:
+		/* These might get resolved by retrying. */
+		break;
+	default:
+		assert(0);
+		break;
 	}
 
-	if (sel_error == KR_SELECTION_TRUNCATED &&
-	    transport->protocol == KR_TRANSPORT_UDP) {
-		/* Don't punish the server that told us to switch to TCP. */
-		qry->server_selection.local_state->truncated = true;
-	} else {
-		if (sel_error == KR_SELECTION_TRUNCATED) {
-			/* TRUNCATED over TCP/TLS, upstream is broken. */
-			addr_state->unrecoverable_errors++;
-		}
-
-		if (UNRECOVERABLE_ERRORS[sel_error]) {
-			addr_state->unrecoverable_errors++;
-		}
-
-		if (sel_error == KR_SELECTION_FORMERROR && transport->safe_mode) {
-			addr_state->unrecoverable_errors++;
-		}
-
-		addr_state->errors[sel_error]++;
-		addr_state->error_count++;
-	}
+	addr_state->error_count++;
+	addr_state->errors[sel_error]++;
 	
 	WITH_VERBOSE(qry)
 	{
 	KR_DNAME_GET_STR(ns_name, transport->ns_name);
 	KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
 	const char *ns_str = kr_straddr(&transport->address.ip);
+	const char *err_str = kr_selection_error_str(sel_error);
 
 	VERBOSE_MSG(
 		qry,
-		"=> id: '%05u' noting selection error: '%s'@'%s' zone cut: '%s' error no.:%d\n",
+		"=> id: '%05u' noting selection error: '%s'@'%s' zone cut: '%s' error: %d %s\n",
 		qry->id, ns_name, ns_str ? ns_str : "", zonecut_str,
-		sel_error);
+		sel_error, err_str ? err_str : "??");
 	}
 }
 
