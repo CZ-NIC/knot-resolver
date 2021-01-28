@@ -200,25 +200,40 @@ function policy.FLAGS(opts_set, opts_clear)
 	end
 end
 
+local function mkauth_soa(answer, dname, mname, ttl)
+	if mname == nil then
+		mname = dname
+	end
+	return answer:put(dname, ttl or 10800, answer:qclass(), kres.type.SOA,
+		mname .. '\6nobody\7invalid\0\0\0\0\1\0\0\14\16\0\0\4\176\0\9\58\128\0\0\42\48')
+end
+
 -- Create answer with passed arguments
 function policy.ANSWER(rtable, nodata)
 	return function(_, req)
 		local qry = req:current()
+		local data = rtable[qry.stype]
+		if data == nil and nodata ~= true then
+			return nil
+		end
+		-- now we're certain we want to generate an answer
+
 		local answer = req:ensure_answer()
 		if answer == nil then return nil end
-		local data = rtable[qry.stype]
-
 		ffi.C.kr_pkt_make_auth_header(answer)
+		local ttl = (data or {}).ttl or 1
+		answer:rcode(kres.rcode.NOERROR)
 
-		if data == nil then
-			if nodata == true then
-				answer:rcode(kres.rcode.NOERROR)
-				return kres.DONE
+		if data == nil then -- want NODATA, i.e. just a SOA
+			answer:begin(kres.section.AUTHORITY)
+			local soa = rtable[kres.type.SOA]
+			if soa ~= nil then
+				answer:put(qry.sname, soa.ttl or ttl, qry.sclass, kres.type.SOA,
+							soa.rdata[1] or soa.rdata)
+			else
+				mkauth_soa(answer, kres.dname2wire(qry.sname), nil, ttl)
 			end
 		else
-			local ttl = data.ttl or 1
-
-			answer:rcode(kres.rcode.NOERROR)
 			answer:begin(kres.section.ANSWER)
 			if type(data.rdata) == 'table' then
 				for _, rdato in ipairs(data.rdata) do
@@ -227,18 +242,9 @@ function policy.ANSWER(rtable, nodata)
 			else
 				answer:put(qry.sname, ttl, qry.sclass, qry.stype, data.rdata)
 			end
-
-			return kres.DONE
 		end
+		return kres.DONE
 	end
-end
-
-local function mkauth_soa(answer, dname, mname)
-	if mname == nil then
-		mname = dname
-	end
-	return answer:put(dname, 10800, answer:qclass(), kres.type.SOA,
-		mname .. '\6nobody\7invalid\0\0\0\0\1\0\0\14\16\0\0\4\176\0\9\58\128\0\0\42\48')
 end
 
 local dname_localhost = todname('localhost.')
