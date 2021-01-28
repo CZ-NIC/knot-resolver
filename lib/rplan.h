@@ -15,7 +15,6 @@
 /** Query flags */
 struct kr_qflags {
 	bool NO_MINIMIZE : 1;    /**< Don't minimize QNAME. */
-	bool NO_THROTTLE : 1;    /**< No query/slow NS throttling. */
 	bool NO_IPV6 : 1;        /**< Disable IPv6 */
 	bool NO_IPV4 : 1;        /**< Disable IPv4 */
 	bool TCP : 1;            /**< Use TCP for this query. */

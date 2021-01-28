@@ -432,10 +432,6 @@ static int request_start(struct request_ctx *ctx, knot_pkt_t *query)
 	struct engine *engine = worker->engine;
 	kr_resolve_begin(req, &engine->resolver);
 	worker->stats.queries += 1;
-	/* Throttle outbound queries only when high pressure */
-	if (worker->stats.concurrent < QUERY_RATE_THRESHOLD) {
-		req->options.NO_THROTTLE = true;
-	}
 	return kr_ok();
 }
 
