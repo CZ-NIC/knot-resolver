@@ -1094,7 +1094,11 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		break;
 	case KNOT_RCODE_FORMERR:
 		ret = KR_STATE_FAIL;
-		selection_error = KR_SELECTION_FORMERR;
+		if (knot_pkt_has_edns(pkt)) {
+			selection_error = KR_SELECTION_FORMERR_EDNS;
+		} else {
+			selection_error = KR_SELECTION_FORMERR;
+		}
 		break;
 	case KNOT_RCODE_NOTIMPL:
 		ret = KR_STATE_FAIL;
