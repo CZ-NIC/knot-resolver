@@ -1021,10 +1021,10 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 #endif
 	if (pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
 		if (pkt->parsed == KNOT_WIRE_HEADER_SIZE && knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_FORMERR) {
-			/* This is a special case where we get valid header with FORMERROR and nothing else.
+			/* This is a special case where we get valid header with FORMERR and nothing else.
 			 * This happens on some authoritatives which don't support EDNS and don't
 			 * bother copying the SECTION QUESTION. */
-			query->server_selection.error(query, req->upstream.transport, KR_SELECTION_FORMERROR);
+			query->server_selection.error(query, req->upstream.transport, KR_SELECTION_FORMERR);
 			return KR_STATE_FAIL;
 		}
 		VERBOSE_MSG("<= malformed response (parsed %d)\n", (int)pkt->parsed);
@@ -1094,7 +1094,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		break;
 	case KNOT_RCODE_FORMERR:
 		ret = KR_STATE_FAIL;
-		selection_error = KR_SELECTION_FORMERROR;
+		selection_error = KR_SELECTION_FORMERR;
 		break;
 	case KNOT_RCODE_NOTIMPL:
 		ret = KR_STATE_FAIL;
