@@ -42,6 +42,7 @@ static const char *kr_selection_error_str(enum kr_selection_error err) {
 		X(REFUSED);
 		X(SERVFAIL);
 		X(FORMERR);
+		X(FORMERR_EDNS);
 		X(NOTIMPL);
 		X(OTHER_RCODE);
 		X(MALFORMED);
@@ -523,6 +524,9 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		} else {
 			qry->flags.NO_EDNS = true;
 		}
+		break;
+	case KR_SELECTION_FORMERR_EDNS:
+		addr_state->broken = true;
 		break;
 	case KR_SELECTION_MISMATCHED:
 		if (qry->flags.NO_0X20 && qry->flags.TCP) {
