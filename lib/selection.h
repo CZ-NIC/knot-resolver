@@ -32,7 +32,8 @@ enum kr_selection_error {
 	// RCODEs
 	KR_SELECTION_REFUSED,
 	KR_SELECTION_SERVFAIL,
-	KR_SELECTION_FORMERROR,
+	KR_SELECTION_FORMERR,      /// inside an answer without an OPT record
+	KR_SELECTION_FORMERR_EDNS, /// with an OPT record
 	KR_SELECTION_NOTIMPL,
 	KR_SELECTION_OTHER_RCODE,
 

@@ -41,7 +41,8 @@ static const char *kr_selection_error_str(enum kr_selection_error err) {
 		X(TCP_CONNECT_TIMEOUT);
 		X(REFUSED);
 		X(SERVFAIL);
-		X(FORMERROR);
+		X(FORMERR);
+		X(FORMERR_EDNS);
 		X(NOTIMPL);
 		X(OTHER_RCODE);
 		X(MALFORMED);
@@ -517,12 +518,15 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 				      &qry->request->ctx->cache);
 		}
 		break;
-	case KR_SELECTION_FORMERROR:
+	case KR_SELECTION_FORMERR:
 		if (qry->flags.NO_EDNS) {
 			addr_state->broken = true;
 		} else {
 			qry->flags.NO_EDNS = true;
 		}
+		break;
+	case KR_SELECTION_FORMERR_EDNS:
+		addr_state->broken = true;
 		break;
 	case KR_SELECTION_MISMATCHED:
 		if (qry->flags.NO_0X20 && qry->flags.TCP) {
