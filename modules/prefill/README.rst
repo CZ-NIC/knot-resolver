@@ -13,14 +13,14 @@ Example configuration is:
 
 .. code-block:: lua
 
-	modules.load('prefill')
-	prefill.config({
-              ['.'] = {
-                      url = 'https://www.internic.net/domain/root.zone',
-                      interval = 86400  -- seconds
-                      ca_file = '/etc/pki/tls/certs/ca-bundle.crt', -- optional
-              }
-        })
+    modules.load('prefill')
+    prefill.config({
+        ['.'] = {
+            url = 'https://www.internic.net/domain/root.zone',
+            interval = 86400, -- seconds
+            ca_file = '/etc/pki/tls/certs/ca-bundle.crt', -- optional
+        }
+    })
 
 This configuration downloads the zone file from URL `https://www.internic.net/domain/root.zone` and imports it into the cache every 86400 seconds (1 day). The HTTPS connection is authenticated using a CA certificate from file `/etc/pki/tls/certs/ca-bundle.crt` and signed zone content is validated using DNSSEC.
 
