@@ -388,15 +388,12 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 		return result;
 	}
 
+	/* One could _CONSUME if pkt has AA flag set here, but many authoritative
+	 * servers are broken, so we employ several workarounds. */
+
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 
-#ifdef STRICT_MODE
-	/* AA, terminate resolution chain. */
-	if (knot_wire_get_aa(pkt->wire)) {
-		return KR_STATE_CONSUME;
-	}
-#else
 	/* Work around servers sending back CNAME with different delegation and no AA. */
 	if (an->count > 0 && ns->count > 0) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, 0);
@@ -411,7 +408,7 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 			return KR_STATE_CONSUME;
 		}
 	}
-#endif
+
 	/* Remember current bailiwick for NS processing. */
 	const knot_dname_t *current_zone_cut = qry->zone_cut.name;
 	bool ns_record_exists = false;
