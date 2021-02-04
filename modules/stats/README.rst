@@ -173,12 +173,18 @@ Module reference
 
 Return nominal value of given metric.
 
-.. function:: stats.set(key, val)
-
-  :param string key:  i.e. ``"answer.total"``
-  :param number val:  i.e. ``5``
+.. function:: stats.set('key val')
 
 Set nominal value of given metric.
+
+Example:
+
+.. code-block:: lua
+
+   stats.set('answer.total 5')
+   -- or syntactic sugar
+   stats['answer.total'] = 5
+
 
 .. function:: stats.list([prefix])
 
