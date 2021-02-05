@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# fail early
+set -e
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/_env.sh
+
+aggregate_rv=0
+function check_rv {
+	if test "$1" -eq 0; then
+		echo -e "  ${green}OK${reset}"
+	fi
+	aggregate_rv=$(( $aggregate_rv + $1 ))
+}
+
+
+# stop failing early, because we wouldn't do anything else than fail
+set +e
+
+# check code with pylint
+echo -e "${yellow}Linting using pylint...${reset}"
+pylint knot_resolver_manager
+check_rv $?
+echo
+
+# check code with flake8
+echo -e "${yellow}Linting using flake8...${reset}"
+flake8 knot_resolver_manager
+check_rv $?
+echo
+
+# check types with pyright
+echo -e "${yellow}Type checking using pyright...${reset}"
+node_modules/.bin/pyright knot_resolver_manager
+check_rv $?
+echo
+
+# exit with the aggregate return value
+exit $aggregate_rv
