@@ -49,7 +49,7 @@ Temporary solution to build a wheel/sdist - just call `poetry build`. The result
 
 ### What all those dev dependencies for?
 
-Short answer - mainly for managing other dependencies. By using dependency management systems within the project, anyone can start developing after installing just a few core tools. Everything else will be handled automagically. The main concept behind it is that there should be nothing that can be run only in CI, not on dev machines.
+Short answer - mainly for managing other dependencies. By using dependency management systems within the project, anyone can start developing after installing just a few core tools. Everything else will be handled automagically. The main concept behind it is that there should be nothing that can be run only in CI.
 
 * core dependencies which you have to install manually
   * pyenv
