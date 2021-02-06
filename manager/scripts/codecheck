@@ -19,6 +19,12 @@ function check_rv {
 # stop failing early, because we wouldn't do anything else than fail
 set +e
 
+# check formatting using black
+echo -e "${yellow}Checking formatting using black...${reset}"
+black knot_resolver_manager tests --check --diff
+check_rv $?
+echo
+
 # check code with pylint
 echo -e "${yellow}Linting using pylint...${reset}"
 pylint knot_resolver_manager
@@ -36,6 +42,13 @@ echo -e "${yellow}Type checking using pyright...${reset}"
 node_modules/.bin/pyright knot_resolver_manager
 check_rv $?
 echo
+
+# fancy messages at the end :)
+if test "$aggregate_rv" -eq "0"; then
+	echo -e "${green}Everything looks great!${reset} 🥳🎉🥰"
+else
+	echo -e "${red}That's not great. Could you please fix that?${reset} 😲😟"
+fi
 
 # exit with the aggregate return value
 exit $aggregate_rv
