@@ -14,17 +14,47 @@ dbus-next = "^0.2.2"
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
 pylint = "^2.6.0"
-poethepoet = "^0.9.0"
 pytest-cov = "^2.11.1"
 flake8 = "^3.8.4"
 black = "^20.8b1"
+tox = "^3.21.4"
+tox-pyenv = "^1.1.0"
+poethepoet = "^0.9.0"
 
 [tool.poe.tasks]
 run = { cmd = "python -m knot_resolver_manager", help = "Run the manager" }
 test = { cmd = "pytest --cov=knot_resolver_manager", help = "Run tests" }
 check = { cmd = "scripts/codecheck", help = "Run static code analysis" }
 fixdeps = { shell = "poetry install; yarn install", help = "Install/update dependencies according to configuration files"}
-format-all = { cmd = "black knot_resolver_manager tests", help = "Reformat all code using black. Dangerous!" }
+clean = """
+  rm -rf .coverage
+         .mypy_cache
+         .pytest_cache
+         ./**/__pycache__
+         dist
+         .tox
+"""
+tox = { cmd = "tox", help = "Run tests in tox" }
+
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+isolated_build = True
+envlist = py36, py37, py38
+
+[tox:.package]
+# note tox will use the same python version as under what tox is installed to package
+# so unless this is python 3 you can require a given python version for the packaging
+# environment via the basepython key
+basepython = python3
+
+[testenv]
+deps = poetry
+commands =
+    poetry install -v
+    ./poe test
+"""
 
 
 # pylint configuration copied from apkg (https://gitlab.nic.cz/packaging/apkg/-/blob/master/pylintrc)
