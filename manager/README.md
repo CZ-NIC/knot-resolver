@@ -76,9 +76,9 @@ Short answer - mainly for managing other dependencies. By using dependency manag
 
 We would like to use a type checker. As of writing this, there are 4 possible options:
 
-* [mypy](http://mypy-lang.org/) - oldest, slowest, reports correct code as broken, no advanced features, written in Python, works
+* [mypy](http://mypy-lang.org/) - oldest, reports correct code as broken, no advanced features, written in Python, works
 * [pytype](https://github.com/google/pytype) - supports type inference, written in Python, does not work in Python 3.9, Python versions > 3.7 are not yet supported
 * [pyre](https://pyre-check.org/) - supports type inference, contains security focused static analysis tool, written in Python, does not work in Python 3.6
-* [pyright](https://github.com/Microsoft/pyright) - not that advanced as pyre and pytype, written in TypeScript, faster than mypy, great integration with VSCode, works regardless of current Python version
+* [pyright](https://github.com/Microsoft/pyright) - not that advanced as pyre and pytype, reports correct code as broken, basic type inference when no typehints are provided, written in TypeScript, great integration with VSCode, works regardless of current Python version
 
 ... and that's how we ended up with JS in a Python project.
