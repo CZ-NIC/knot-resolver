@@ -8,7 +8,7 @@ Forwarding
 Main use-cases are:
 
   - Building a tree structure of DNS resolvers to improve performance (by improving cache hit rate).
-  - Accessing domains which are not available using recursion (e.g. if internal company servers return different anusers than public ones).
+  - Accessing domains which are not available using recursion (e.g. if internal company servers return different answers than public ones).
   - Forwarding through a central DNS traffic filter.
 
 Forwarding implementation in Knot Resolver has following properties:
