@@ -999,10 +999,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Check for packet processing errors first.
 	 * Note - we *MUST* check if it has at least a QUESTION,
 	 * otherwise it would crash on accessing QNAME. */
-	if (pkt->parsed < pkt->size) {
-		VERBOSE_MSG("<= pkt contains excessive data\n");
-		return KR_STATE_FAIL;
-	} else if (pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
+	if (pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
 		if (pkt->parsed == KNOT_WIRE_HEADER_SIZE && knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_FORMERR) {
 			/* This is a special case where we get valid header with FORMERR and nothing else.
 			 * This happens on some authoritatives which don't support EDNS and don't
@@ -1100,6 +1097,12 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (ret) {
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		return ret;
+	}
+
+	if (pkt->parsed < pkt->size) {
+		VERBOSE_MSG("<= ignoring packet due to containing excessive data (%zu bytes)\n",
+				pkt->size - pkt->parsed);
+		return KR_STATE_FAIL;
 	}
 
 	int state;
