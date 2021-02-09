@@ -37,7 +37,7 @@ If you don't want to be writing the `./` prefix, you can install [PoeThePoet](ht
 
 ### Contributing
 
-Before commiting, please ensure that both `poe check` and `poe test` pass.
+Before commiting, please ensure that both `poe check` and `poe test` pass. Those commands are both run on the CI and if they don't pass, CI fails.
 
 ### Packaging
 
