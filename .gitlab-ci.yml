@@ -127,9 +127,9 @@ sonarcloud:
   <<: *nodep
   stage: build
   except: null
-  only:
-    - tags
-    - master@knot/knot-resolver
+  #only:
+  #  - tags
+  #  - master@knot/knot-resolver
   script:
     - meson build_sonarcloud --default-library=static --prefix=$PREFIX
     - build-wrapper-linux-x86-64 --out-dir bw-output ninja -C build_sonarcloud
