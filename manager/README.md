@@ -11,14 +11,20 @@ Install these tools:
 * [Poetry](https://python-poetry.org/docs/#installation)
 * [Yarn](https://yarnpkg.com/) (See FAQ for why do we need JS in Python project) or NPM
 
-The actual development environment can be setup using these commands:
+The actual fully-featured development environment can be setup using these commands:
 
 ```sh
-pyenv install
+pyenv install 3.6.12 3.7.9 3.8.7 3.9.1
 poetry env use $(pyenv which python)
 poetry install
-yarn install # or npm install
+yarn install # or "npm install"
 ```
+
+With this environment, everything else should just work. You can run the same checks the CI runs, all commands listed bellow should pass.
+
+### Minimal development environment
+
+The only global tools that are strictly required are `Python` and `pip` (or other way to install PyPI packages). You can have a look at the `pyproject.toml` file, manually install all other dependencies that you need and be done with that. All `poe` commands (see bellow) can be run manually too, see their definition in `pyproject.toml`. We can't however guarantee, that there won't be any errors.
 
 ### Common tasks and interactions with the project
 

@@ -1,0 +1,56 @@
+stages:
+  - check
+
+image: debian:latest
+
+# FIXME - use custom Docker image, so that we don't rebuild it all every single time
+lint:
+  image: debian:latest
+  stage: check
+  variables:
+    # Python by default uses ascii encoding, which does not work, because source files are in UTF-8. Here is a potential solution, but for newer Python https://www.python.org/dev/peps/pep-0540/
+    LC_ALL: C.UTF-8
+
+  # this job uses messy tricks to install dependencies quickly, if something goes wrong, it should kill itself reasonably fast
+  timeout: 5 minutes
+  
+  # FIXME cache does not seem to have any effect when running locally, it might be the same in CI
+  cache:
+    key: "always-the-same-cache"
+    paths:
+      - node_modules/
+      # FIXME caching these would help, but gitlab refuses to cache anything outside of project's directory
+      #- /root/.pyenv/  
+      #- /root/.poetry/
+      #- /root/.nvm/
+      #- /var/cache/
+    policy: pull-push
+  script:
+    # pyenv setup deps
+    - apt-get update && apt-get install --no-install-recommends --no-install-suggests -y build-essential git ca-certificates
+    # python build deps
+    - apt-get update && apt-get install --no-install-recommends --no-install-suggests -y make build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
+    # Yarn and NodeJS
+    - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.37.2/install.sh | bash
+    - export NVM_DIR="$HOME/.nvm"
+    - \[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+    - \[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+    - nvm install --lts node
+    - nvm use node
+    - nvm install-latest-npm
+    # install pyenv
+    - unset PYENV_ROOT
+    - curl -L https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer | bash
+    - export PATH="$HOME/.pyenv/bin:$PATH"
+    - eval "$(pyenv init -)"
+    - eval "$(pyenv virtualenv-init -)"
+    # install python via pyenv
+    - pyenv install
+    - pyenv global 3.6.12
+    # install poetry
+    - curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
+    - export PATH="$HOME/.poetry/bin:$PATH"
+    # run the actual tests
+    - poetry install
+    - npm install
+    - ./poe check
