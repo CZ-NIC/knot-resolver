@@ -12,7 +12,7 @@ lint:
     LC_ALL: C.UTF-8
 
   # this job uses messy tricks to install dependencies quickly, if something goes wrong, it should kill itself reasonably fast
-  timeout: 5 minutes
+  timeout: 7 minutes
   
   # FIXME cache does not seem to have any effect when running locally, it might be the same in CI
   cache:
