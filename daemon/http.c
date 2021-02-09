@@ -147,6 +147,11 @@ static ssize_t read_callback(nghttp2_session *h2, int32_t stream_id, uint8_t *bu
 	size_t avail;
 	size_t send;
 
+	if (!source->ptr) {
+		*data_flags |= NGHTTP2_DATA_FLAG_EOF;
+		return 0;
+	}
+
 	data = (struct http_data*)source->ptr;
 	avail = data->len - data->pos;
 	send = MIN(avail, length);
@@ -187,13 +192,10 @@ static int http_status_remove(struct http_ctx *ctx, struct http_stream_status * 
 	if (!stat)
 		return 0;
 
-	//assert(array_del(ctx->stream_status, idx) == 0);
-	// TODO
-	ctx->stream_status.len -= 1;
+	int idx = (stat - *(ctx->stream_status.at))/sizeof(*stat);
 	if (stat->err_msg)
 		free(stat->err_msg);
-	stat = ctx->stream_status.at[ctx->stream_status.len];
-	//free(stat);
+	assert(array_del(ctx->stream_status, idx) == 0);
 	return 0;
 }
 
@@ -213,7 +215,7 @@ static int send_err_status(struct http_ctx *ctx, int32_t stream_id)
 	}
 
 	prov.source.ptr = NULL;
-	prov.read_callback = NULL;
+	prov.read_callback = read_callback;
 
 	char status_str[MAX_DECIMAL_LENGTH(stat->err_status)] = { 0 };
 	status_len = snprintf(status_str, MAX_DECIMAL_LENGTH(stat->err_status), "%u", stat->err_status);
@@ -232,16 +234,17 @@ static int send_err_status(struct http_ctx *ctx, int32_t stream_id)
 		data->on_write = NULL;
 		data->req = NULL;
 		data->ttl = 0;
-
 		prov.source.ptr = data;
-		prov.read_callback = read_callback;
 	}
 
 	ret = nghttp2_submit_response(ctx->h2, stream_id, hdrs_err, sizeof(hdrs_err)/sizeof(*hdrs_err), &prov);
 	if (ret != 0)
 		return kr_error(EIO);
 
-	http_status_remove(ctx, stat);
+	//http_status_remove(ctx, stat); // TODO
+
+	if (queue_len(ctx->streams) != 0)
+		queue_pop(ctx->streams);
 
 	return 0;
 }
@@ -298,15 +301,25 @@ static struct http_stream_status * set_error_status(struct http_ctx *ctx, int32_
 /*
  * Reinit temporaly data of current stream
  */
-static void http_status_reinit(struct http_ctx *ctx)
+static void http_status_reinit(struct http_ctx *ctx, int stream_id)
 {
 	ctx->incomplete_stream = -1;
 	ctx->current_method = HTTP_METHOD_NONE;
 	ctx->current_stream = NULL;
+	ctx->buf_pos = 0;
 	if (ctx->content_type) {
 		free(ctx->content_type);
 		ctx->content_type = NULL;
 	}
+}
+
+static void http_status_reinit_error(struct http_ctx *ctx, int stream_id)
+{
+
+	if (ctx->current_method == HTTP_METHOD_POST)
+		queue_pop(ctx->streams);
+
+	http_status_reinit(ctx, stream_id);
 }
 
 /*
@@ -458,8 +471,8 @@ static int begin_headers_callback(nghttp2_session *h2, const nghttp2_frame *fram
 		if (!set_error_status(ctx, stream_id, 501, "incomplete stream"))
 			return NGHTTP2_ERR_CALLBACK_FAILURE;
 	} else {
-		ctx->incomplete_stream = stream_id;
 		ctx->current_stream = set_error_status(ctx, stream_id, 200, NULL);
+		ctx->incomplete_stream = stream_id;
 	}
 	return 0;
 }
@@ -557,7 +570,7 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	if (required > remaining) {
 		kr_log_error("[http] insufficient space in buffer\n");
 		if (!set_error_status(ctx, stream_id, 413, NULL)) {
-			http_status_reinit(ctx);
+			http_status_reinit_error(ctx, stream_id);
 			return NGHTTP2_ERR_CALLBACK_FAILURE;
 		}
 		return 0;
@@ -594,7 +607,7 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 	if (ctx->current_method == HTTP_METHOD_NONE) {
 		kr_log_verbose("[http] unsupported HTTP method\n");
 		if (!set_error_status(ctx, stream_id, 405, "only HTTP POST and GET are supported\n")) {
-			http_status_reinit(ctx);
+			http_status_reinit_error(ctx, stream_id);
 			return NGHTTP2_ERR_CALLBACK_FAILURE;
 		}
 	}
@@ -602,7 +615,7 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 	if (ctx->content_type && strcasecmp("application/dns-message", (const char *)ctx->content_type)) {
 		kr_log_verbose("[http] unsupported content-type %s\n", ctx->content_type);
 		if (!set_error_status(ctx, stream_id, 415, "only Content-Type: application/dns-message is supported\n")) {
-			http_status_reinit(ctx);
+			http_status_reinit_error(ctx, stream_id);
 			return NGHTTP2_ERR_CALLBACK_FAILURE;
 		}
 	}
@@ -613,7 +626,7 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 			if (stat->err_status == 200) {
 				if (ctx->current_method == HTTP_METHOD_GET) {
 					if (process_uri_path(ctx, stream_id) < 0) {
-						http_status_reinit(ctx);
+						http_status_reinit_error(ctx, stream_id);
 						return NGHTTP2_ERR_CALLBACK_FAILURE;
 					}
 					free(ctx->uri_path);
@@ -624,13 +637,13 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 					len = ctx->buf_pos - sizeof(uint16_t);
 					if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
 						kr_log_verbose("[http] invalid dnsmsg size: %zd B\n", len);
-						http_status_reinit(ctx);
+						http_status_reinit_error(ctx, stream_id);
 						return NGHTTP2_ERR_CALLBACK_FAILURE;
 					}
 
 					if (len < 12) {
 						if (!set_error_status(ctx, stream_id, 400, "input too short\n")) {
-							http_status_reinit(ctx);
+							http_status_reinit_error(ctx, stream_id);
 							return NGHTTP2_ERR_CALLBACK_FAILURE;
 						}
 					}
@@ -644,15 +657,18 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 			}
 
 			if (stat->err_status != 200) {
-				if (send_err_status(ctx, stream_id) < 0)
+				if (send_err_status(ctx, stream_id) < 0) {
+					http_status_reinit_error(ctx, stream_id);
 					return NGHTTP2_ERR_CALLBACK_FAILURE;
+				}
 			}
 
-			http_status_reinit(ctx);
+			http_status_reinit(ctx, stream_id);
 			ctx->buf_pos = 0;
 		} else {
 			/* send error for non-processed stream */
 			if (send_err_status(ctx, stream_id) < 0) {
+				http_status_reinit_error(ctx, stream_id);
 				return NGHTTP2_ERR_CALLBACK_FAILURE;
 			}
 		}
@@ -891,9 +907,9 @@ void http_free(struct http_ctx *ctx)
 	if (!ctx)
 		return;
 
-	// TODO
-//	while(ctx->stream_status.len)
-//		http_status_remove(ctx, 0);
+	while(ctx->stream_status.len)
+		http_status_remove(ctx, ctx->stream_status.at[0]);
+	array_clear(ctx->stream_status);
 
 	queue_deinit(ctx->streams);
 	nghttp2_session_del(ctx->h2);
