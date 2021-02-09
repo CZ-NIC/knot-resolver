@@ -133,7 +133,10 @@ sonarcloud:
   script:
     - meson build_sonarcloud --default-library=static --prefix=$PREFIX
     - build-wrapper-linux-x86-64 --out-dir bw-output ninja -C build_sonarcloud
-    - sonar-scanner -Dsonar.organization=cz-nic -Dsonar.projectKey=CZ-NIC_knot-resolver -Dsonar.sources=.  -Dsonar.cfamily.build-wrapper-output=bw-output -Dsonar.host.url=https://sonarcloud.io
+    - sonar-scanner -Dsonar.organization=cz-nic -Dsonar.projectKey=CZ-NIC_knot-resolver \
+        -Dsonar.sources=. -Dsonar.cfamily.build-wrapper-output=bw-output \
+        -Dsonar.host.url=https://sonarcloud.io \
+        -Dsonar.projectVersion="$(git describe)"
 # }}}
 
 # sanity {{{
