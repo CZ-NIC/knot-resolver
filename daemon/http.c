@@ -147,6 +147,11 @@ static ssize_t read_callback(nghttp2_session *h2, int32_t stream_id, uint8_t *bu
 	size_t avail;
 	size_t send;
 
+	if (!source->ptr) {
+		*data_flags |= NGHTTP2_DATA_FLAG_EOF;
+		return 0;
+	}
+
 	data = (struct http_data*)source->ptr;
 	avail = data->len - data->pos;
 	send = MIN(avail, length);
@@ -210,7 +215,7 @@ static int send_err_status(struct http_ctx *ctx, int32_t stream_id)
 	}
 
 	prov.source.ptr = NULL;
-	prov.read_callback = NULL;
+	prov.read_callback = read_callback;
 
 	char status_str[MAX_DECIMAL_LENGTH(stat->err_status)] = { 0 };
 	status_len = snprintf(status_str, MAX_DECIMAL_LENGTH(stat->err_status), "%u", stat->err_status);
@@ -229,9 +234,7 @@ static int send_err_status(struct http_ctx *ctx, int32_t stream_id)
 		data->on_write = NULL;
 		data->req = NULL;
 		data->ttl = 0;
-
 		prov.source.ptr = data;
-		prov.read_callback = read_callback;
 	}
 
 	ret = nghttp2_submit_response(ctx->h2, stream_id, hdrs_err, sizeof(hdrs_err)/sizeof(*hdrs_err), &prov);
@@ -427,7 +430,7 @@ static int process_uri_path(struct http_ctx *ctx, int32_t stream_id)
 	remaining = ctx->buf_size - ctx->submitted - ctx->buf_pos;
 	dest = ctx->buf + ctx->buf_pos;
 
-	ret = kr_base64url_decode((uint8_t*)beg, end - beg, dest, remaining); // TODO: repair test_get_invalid_b64
+	ret = kr_base64url_decode((uint8_t*)beg, end - beg, dest, remaining);
 	if (ret < 0) {
 		ctx->buf_pos = 0;
 		kr_log_verbose("[http] base64url decode failed %s\n", strerror(ret));
