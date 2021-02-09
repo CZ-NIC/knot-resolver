@@ -11,16 +11,21 @@ Install these tools:
 * [Poetry](https://python-poetry.org/docs/#installation)
 * [Yarn](https://yarnpkg.com/) (See FAQ for why do we need JS in Python project) or NPM
 
-The actual fully-featured development environment can be setup using these commands:
+Be careful, that you need the latest version of Poetry. The setup was tested with Poetry version 1.1.4. Due to it's ability to switch between Python versions, it has to be installed separately to work correctly. Make sure to follow [the latest setup guide](https://python-poetry.org/docs/#installation).
+
+After installing the tools above, the actual fully-featured development environment can be setup using these commands:
 
 ```sh
-pyenv install 3.6.12 3.7.9 3.8.7 3.9.1
+pyenv install 3.6.12
+pyenv install 3.7.9
+pyenv install 3.8.7
+pyenv install 3.9.1
 poetry env use $(pyenv which python)
 poetry install
 yarn install # or "npm install"
 ```
 
-With this environment, everything else should just work. You can run the same checks the CI runs, all commands listed bellow should pass.
+With this environment, **everything else should just work**. You can run the same checks the CI runs, all commands listed bellow should pass.
 
 ### Minimal development environment
 
@@ -32,7 +37,7 @@ After setting up the environment, you should be able to interract with the proje
 
 * `poe run` - runs the manager from the source
 * `poe test` - unit tests
-* `poe tox` - unit tests in all supported Python versions
+* `poe tox` - unit tests in all supported Python versions (must not be run outside of virtualenv, otherwise it fails to find multiple versions of Python)
 * `poe check` - static code analysis
 * `poe fixdeps` - update installed dependencies according to the project's configuration
 * `poe clean` - cleanup the repository from unwanted files
