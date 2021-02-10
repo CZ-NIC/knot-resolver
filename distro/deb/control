@@ -10,7 +10,7 @@ Build-Depends:
  libedit-dev,
  libfstrm-dev,
  libgnutls28-dev,
- libknot-dev (>= 2.8),
+ libknot-dev (>= 2.9),
  liblmdb-dev,
  libluajit-5.1-dev,
  libnghttp2-dev,

@@ -322,7 +322,7 @@ static addrset_info_t fetch_addr(pack_t *addrs, const knot_dname_t *ns, uint16_t
 
 	/* Reserve memory in *addrs.  Implementation detail:
 	 * pack_t cares for lengths, so we don't store those in the data. */
-	const size_t pack_extra_size = knot_rdataset_size(&cached_rr.rrs)
+	const size_t pack_extra_size = cached_rr.rrs.size
 		- cached_rr.rrs.count * offsetof(knot_rdata_t, len);
 	int ret = pack_reserve_mm(*addrs, cached_rr.rrs.count, pack_extra_size,
 				  kr_memreserve, mm_pool);

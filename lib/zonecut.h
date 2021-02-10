@@ -10,14 +10,6 @@
 #include "lib/generic/trie.h"
 
 
-/* TMP: compatibility for using libknot 2.8 API with 2.9. */
-#if KNOT_VERSION_HEX >= 0x020900
-static inline size_t knot_rdataset_size(const knot_rdataset_t *rrs)
-{
-	return rrs->size;
-}
-#endif
-
 struct kr_rplan;
 struct kr_context;
 
@@ -127,7 +119,7 @@ int kr_zonecut_del_all(struct kr_zonecut *cut, const knot_dname_t *ns);
  *
  * @note This can be used for membership test, a non-null pack is returned
  *       if the nameserver name exists.
- * 
+ *
  * @param  cut
  * @param  ns    name server name
  * @return       pack of addresses or NULL
