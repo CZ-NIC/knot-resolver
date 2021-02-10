@@ -83,13 +83,17 @@ Short answer - mainly for managing other dependencies. By using dependency manag
   * tox - testing automation
   * tox-pyenv - plugin for tox that makes use of pyenv provided Python binaries
 
+### Why Poetry? Why should I learn a new tool?
+
+This blog post explains it nicely - https://muttdata.ai/blog/2020/08/21/a-poetic-apology.html.
+
 ### Why do we need JavaScript in Python project?
 
-We would like to use a type checker. As of writing this, there are 4 possible options:
+We would like to use a type checker. As of writing this, there are 4 possible options (I was aware of):
 
 * [mypy](http://mypy-lang.org/) - oldest, reports correct code as broken, no advanced features, written in Python, works
 * [pytype](https://github.com/google/pytype) - supports type inference, written in Python, does not work in Python 3.9, Python versions > 3.7 are not yet supported
 * [pyre](https://pyre-check.org/) - supports type inference, contains security focused static analysis tool, written in Python, does not work in Python 3.6
 * [pyright](https://github.com/Microsoft/pyright) - not that advanced as pyre and pytype, reports correct code as broken, basic type inference when no typehints are provided, written in TypeScript, great integration with VSCode, works regardless of current Python version
 
-... and that's how we ended up with JS in a Python project.
+Type inference is really handy when it comes to libraries without type hints or when you use internal functions without specifiing their types. This is why we use pyright instead of the more classical approach with mypy.
