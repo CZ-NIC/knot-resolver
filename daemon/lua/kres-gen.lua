@@ -14,6 +14,15 @@ typedef struct {
 	uint16_t compress_ptr[16];
 } knot_rrinfo_t;
 typedef unsigned char knot_dname_t;
+typedef struct {
+	uint16_t len;
+	uint8_t data[];
+} knot_rdata_t;
+typedef struct {
+	uint16_t count;
+	uint32_t size;
+	knot_rdata_t *rdata;
+} knot_rdataset_t;
 
 typedef struct knot_mm {
 	void *ctx, *alloc, *free;

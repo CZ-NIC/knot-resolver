@@ -824,19 +824,16 @@ int kr_ranked_rrarray_finalize(ranked_rr_array_t *array, uint32_t qry_uid, knot_
 				}
 			}
 			/* Prepare rdataset, except rdata contents. */
-			int size_sum = 0;
+			knot_rdataset_t *rds = &stashed->rr->rrs;
+			rds->size = 0;
 			for (int i = 0; i < ra->len; ++i) {
 				if (ra->at[i]) {
-					size_sum += knot_rdata_size(ra->at[i]->len);
+					rds->size += knot_rdata_size(ra->at[i]->len);
 				}
 			}
-			knot_rdataset_t *rds = &stashed->rr->rrs;
 			rds->count = ra->len - dup_count;
-			#if KNOT_VERSION_HEX >= 0x020900
-				rds->size = size_sum;
-			#endif
-			if (size_sum) {
-				rds->rdata = mm_alloc(pool, size_sum);
+			if (rds->size) {
+				rds->rdata = mm_alloc(pool, rds->size);
 				if (!rds->rdata) {
 					return kr_error(ENOMEM);
 				}
@@ -846,13 +843,13 @@ int kr_ranked_rrarray_finalize(ranked_rr_array_t *array, uint32_t qry_uid, knot_
 			/* Everything is ready; now just copy all the rdata. */
 			uint8_t *raw_it = (uint8_t *)rds->rdata;
 			for (int i = 0; i < ra->len; ++i) {
-				if (ra->at[i] && size_sum/*linters*/) {
+				if (ra->at[i] && rds->size/*linters*/) {
 					const int size = knot_rdata_size(ra->at[i]->len);
 					memcpy(raw_it, ra->at[i], size);
 					raw_it += size;
 				}
 			}
-			assert(raw_it == (uint8_t *)rds->rdata + size_sum);
+			assert(raw_it == (uint8_t *)rds->rdata + rds->size);
 		}
 		stashed->in_progress = false;
 	}
