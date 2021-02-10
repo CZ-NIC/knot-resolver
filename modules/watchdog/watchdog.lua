@@ -23,6 +23,7 @@ end
 local function add_tracer(logbuf)
 	return function (req)
 		local function qrylogger(_, msg)
+			jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
 			table.insert(logbuf, ffi.string(msg))
 		end
 		req.trace_log = ffi.cast('trace_log_f', qrylogger)
