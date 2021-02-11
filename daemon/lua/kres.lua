@@ -47,19 +47,9 @@ struct sockaddr {
     uint8_t _stub[]; /* Do not touch */
 };
 
-/* Knot DNS */
 struct knot_error {
 	int code;
 };
-typedef struct {
-	uint16_t len;
-	uint8_t data[];
-} knot_rdata_t;
-typedef struct {
-	uint16_t count;
-	uint32_t size;
-	knot_rdata_t *rdata;
-} knot_rdataset_t;
 
 /*
  * libc APIs
