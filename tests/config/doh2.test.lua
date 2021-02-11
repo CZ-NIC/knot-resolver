@@ -1,13 +1,25 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 local basexx = require('basexx')
 local ffi = require('ffi')
+local monotime = require('cqueues').monotime
+
+-- check prerequisites
+local timeout = 8 -- randomly chosen timeout by tkrizek
+local bound, port
+local host = '127.0.0.1'
+for _  = 1,10 do
+	port = math.random(30000, 39999)
+	bound = pcall(net.listen, host, port, { kind = 'doh2'})
+	if bound then
+		break
+	end
+end
 
 local function gen_huge_answer(_, req)
 	local answer = req:ensure_answer()
 	ffi.C.kr_pkt_make_auth_header(answer)
 
 	answer:rcode(kres.rcode.NOERROR)
-
 	-- 64k answer
 	answer:begin(kres.section.ANSWER)
 	answer:put('\4test\0', 300, answer:qclass(), kres.type.URI,
@@ -49,16 +61,214 @@ function parse_pkt(input, desc)
 	return pkt
 end
 
--- check prerequisites
-local bound, port
-local host = '127.0.0.1'
-for _  = 1,10 do
-	port = math.random(30000, 39999)
-	bound = pcall(net.listen, host, port, { kind = 'doh2'})
-	if bound then
-		break
-	end
+local function non_final_status(status)
+	return status:sub(1, 1) == "1" and status ~= "101"
 end
+
+local function request_set_body(req, body)
+	req['body'] = body
+end
+
+local function connection_connect(req)
+	local client = require('http.client')
+	local err, errno
+	req['deadline'] = req['timeout'] and (monotime()+req['timeout'])
+
+	connection, err, errno = client.connect({
+		host = host;
+		port = port;
+		tls = true;
+		ctx = req['ctx'];
+		version = 2;
+		h2_settings = { ENABLE_PUSH = false; };
+	}, req['deadline'] and req['deadline']-monotime())
+	if connection == nil then
+		print('Connection error ' .. err .. ': ' .. errno)
+		return false
+	end
+	-- Close the connection (and free resources) when done
+	connection:onidle(connection.close)
+	req['connection'] = connection
+
+	return req
+end
+
+local function connection_init(time)
+	local http_util = require('http.util')
+	local ssl_ctx = require('openssl.ssl.context')
+	local headers = require('http.headers').new()
+	local request = {}
+
+	headers:append(':method', 'GET')
+	headers:upsert(':authority', http_util.to_authority(host, port, 'wss'))
+	headers:upsert(':path', '/dns-query')
+	headers:upsert(':scheme', 'https')
+	headers:upsert('user-agent', 'doh2.test.lua')
+	headers:upsert('content-type', 'application/dns-message')
+	request['headers'] = headers;
+
+	local ctx = ssl_ctx.new()
+	ctx:setVerify(ssl_ctx.VERIFY_NONE)
+	request['ctx'] = ctx;
+	request['timeout'] = time
+
+	request = connection_connect(request)
+
+	request['stream1'], err, errno = request['connection']:new_stream()
+	if request['stream1'] == nil then
+		return nil, err, errno
+	end
+	request['stream2'], err, errno = request['connection']:new_stream()
+	if request['stream2'] == nil then
+		return nil, err, errno
+	end
+
+	return request
+end
+
+local function set_headers_from_body(headers, body)
+	local length
+
+	if type(body) == "string" then
+		length = #body
+	end
+	if length then
+		headers:upsert("content-length", string.format("%d", #body))
+	end
+	if not length or length > 1024 then
+		headers:append("expect", "100-continue")
+	end
+
+	return headers
+end
+
+local function send_data(req, stream_name, method, body)
+	local pass, err, errno
+	local new_headers = set_headers_from_body(req['headers'], body)
+	local stream = req[stream_name]
+
+	new_headers:upsert(':method', method)
+	do -- Write outgoing headers
+		pass, err, errno = stream:write_headers(new_headers, body == nil, req['deadline'] and req['deadline']-monotime())
+		if not pass then
+			stream:shutdown()
+			return nil, err, errno
+		end
+	end
+
+	if body then
+		pass, err, errno = stream:write_body_from_string(body, req['deadline'] and req['deadline']-monotime())
+		if not pass then
+			stream:shutdown()
+			return nil, err, errno
+		end
+	end
+
+	return pass, err, errno
+end
+
+local function read_data(req, stream)
+	local headers
+	repeat
+		local err, errno
+		headers, err, errno = stream:get_headers(req['deadline'] and (req['deadline']-monotime()))
+		if headers == nil then
+			stream:shutdown()
+			if err == nil then
+				return nil, ce.strerror(ce.EPIPE), ce.EPIPE
+			end
+			return nil, err, errno
+		end
+	until not non_final_status(headers:get(":status"))
+
+	return headers, stream
+end
+
+local function send_and_check_ok(req, method, desc)
+	local pass, headers, stream, stream_check
+
+	-- main request
+	pass = send_data(req, 'stream1', method, req['body'])
+	if not pass then
+		return nil, nil
+	end
+	headers, stream, errno = read_data(req, req['stream1'])
+	if errno then
+		local errmsg = stream
+		nok(errmsg, desc .. ': ' .. errmsg)
+		return nil, nil
+	end
+	same(tonumber(headers:get(':status')), 200, desc .. ': status 200')
+	same(headers:get('content-type'), 'application/dns-message', desc .. ': content-type')
+	local answ_headers = headers
+
+	-- test request - noerror.test. A
+	req['headers']:upsert('content-type', 'application/dns-message')
+	if method == 'GET' then
+		req.headers:upsert(':path', '/dns-query?dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
+	end
+	pass = send_data(req, 'stream2', method, method == 'POST' and basexx.from_base64(
+		'vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB') or nil) -- noerror.test. A
+	if not pass then
+		return nil, nil
+	end
+	headers, stream_check, errno = read_data(req, req['stream2'])
+	if errno then
+		local errmsg = stream_check
+		nok(errmsg, desc .. ': ' .. errmsg)
+		return nil, nil
+	end
+	same(tonumber(headers:get(':status')), 200, desc .. ' (test second stream): status 200')
+	same(headers:get('content-type'), 'application/dns-message', desc .. ' (test second stream): content-type')
+
+	local body = assert(stream:get_body_as_string())
+	local pkt = parse_pkt(body, desc)
+
+	return answ_headers, pkt
+end
+
+local function send_and_check_err(req, method, exp_status, desc)
+	local pass, headers, stream, stream_check
+
+	-- main request
+	pass = send_data(req, 'stream1', method, req['body'])
+	if not pass then
+		return
+	end
+
+	headers, stream, errno = read_data(req, req['stream1'])
+	if errno then
+		local errmsg = stream
+		nok(errmsg, desc .. ': ' .. errmsg)
+		return
+	end
+	local status = tonumber(headers:get(':status'))
+	same(status, exp_status, desc .. ': get ' .. status)
+
+	-- test request
+	req['headers']:upsert('content-type', 'application/dns-message')
+	if method ~= 'GET' and method ~= 'POST' then
+		method = 'GET'
+	end
+	if method == 'GET' then
+		req.headers:upsert(':path', '/dns-query?dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
+	end
+	pass  = send_data(req, 'stream2', method, method == 'POST' and basexx.from_base64(
+		'vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB') or nil) -- noerror.test. A
+	if not pass then
+		return
+	end
+	headers, stream_check, errno = read_data(req, req['stream2'])
+	if errno then
+		local errmsg = stream_check
+		nok(errmsg, desc .. ': ' .. errmsg)
+		return
+	end
+	same(tonumber(headers:get(':status')), 200, desc .. ': second stream: status 200 (exp. 200)')
+	same(headers:get('content-type'), 'application/dns-message', desc .. ': second stream: content-type')
+
+end
+
 
 if not bound then
 	-- skipping doh2 tests (failure to bind may be caused by missing support during build)
@@ -68,216 +278,6 @@ else
 	policy.add(policy.suffix(policy.DENY, policy.todnames({'nxdomain.test.'})))
 	policy.add(policy.suffix(gen_varying_ttls, policy.todnames({'noerror.test.'})))
 
-	local function non_final_status(status)
-		return status:sub(1, 1) == "1" and status ~= "101"
-	end
-
-	local function request_set_body(req, body)
-		req['body'] = body
-	end
-
-	function connection_init(timeout)
-		local http_util = require('http.util')
-		local ssl_ctx = require('openssl.ssl.context')
-		local headers = require('http.headers').new()
-		local request = {}
-
-		headers:append(':method', 'GET')
-		headers:upsert(':authority', http_util.to_authority(host, port, 'wss'))
-		headers:upsert(':path', '/dns-query')
-		headers:upsert(':scheme', 'https')
-		headers:upsert('user-agent', 'doh2.test.lua')
-		headers:upsert('content-type', 'application/dns-message')
-		request['headers'] = headers;
-
-		local ctx = ssl_ctx.new()
-		ctx:setVerify(ssl_ctx.VERIFY_NONE)
-		request['ctx'] = ctx;
-		request['timeout'] = timeout
-
-		request = connection_connect(request)
-
-		request['stream1'], err, errno = request['connection']:new_stream()
-		if request['stream1'] == nil then
-			return nil, err, errno
-		end
-		request['stream2'], err, errno = request['connection']:new_stream()
-		if request['stream2'] == nil then
-			return nil, err, errno
-		end
-
-		return request
-	end
-
-	function connection_connect(req)
-		local monotime = require "cqueues".monotime
-		local deadline = timeout and (monotime()+timeout)
-
-		local client = require "http.client"
-		local err, errno
-		connection, err, errno = client.connect({
-			host = host;
-			port = port;
-			tls = true;
-			ctx = req['ctx'];
-			version = 2;
-			h2_settings = { ENABLE_PUSH = false; };
-		}, deadline and deadline-monotime())
-		if connection == nil then
-			print('Connection error: ' .. err)
-			return false
-		end
-		-- Close the connection (and free resources) when done
-		connection:onidle(connection.close)
-		req['connection'] = connection
-
-		return req
-	end
-
-	local function set_headers_from_body(headers, body)
-		local length
-
-		if type(body) == "string" then
-			length = #body
-		end
-		if length then
-			headers:upsert("content-length", string.format("%d", #body))
-		end
-		if not length or length > 1024 then
-			headers:append("expect", "100-continue")
-		end
-
-		return headers
-	end
-
-	local function send_data(req, stream_name, method, body)
-		local ok, err, errno
-		local new_headers = set_headers_from_body(req['headers'], body)
-		new_headers:upsert(':method', method)
-		local stream = req[stream_name]
-
-		do -- Write outgoing headers
-			ok, err, errno = stream:write_headers(new_headers, body == nil, deadline and deadline-monotime())
-			if not ok then
-				stream:shutdown()
-				return nil, err, errno
-			end
-		end
-
-		if body then
-			ok, err, errno = stream:write_body_from_string(body, deadline and deadline-monotime())	
-			if not ok then
-				stream:shutdown()
-				return nil, err, errno
-			end
-		end
-
-		return ok, err, errno
-	end
-
-	local function read_data(stream)
-		local headers
-		repeat
-			local err, errno
-			headers, err, errno = stream:get_headers(deadline and (deadline-monotime()))
-			if headers == nil then
-				stream:shutdown()
-				if err == nil then
-					return nil, ce.strerror(ce.EPIPE), ce.EPIPE
-				end
-				return nil, err, errno
-			end
-		until not non_final_status(headers:get(":status"))
-
-		return headers, stream
-	end
-
-	local function send_and_check_ok(req, method, desc)
-		local ok, err, errno, headers, stream
-
-		-- main request
-		ok, err, errno = send_data(req, 'stream1', method, req['body'])
-		if not ok then
-			return nil, nil
-		end
-
-		headers, stream, errno = read_data(req['stream1'])
-		if errno then
-			local errmsg = stream
-			nok(errmsg, desc .. ': ' .. errmsg)
-			return
-		end
-		same(tonumber(headers:get(':status')), 200, desc .. ': status 200')
-		same(headers:get('content-type'), 'application/dns-message', desc .. ': content-type')
-		local answ_headers = headers
-
-		-- test request - noerror.test. A
-		req['headers']:upsert('content-type', 'application/dns-message')
-		if method == 'GET' then
-			req.headers:upsert(':path', '/dns-query?dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
-		end
-		ok, err, errno = send_data(req, 'stream2', method, method == 'POST' and basexx.from_base64( 
-			'vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB') or nil) -- noerror.test. A
-		if not ok then
-			return nil, nil
-		end
-		local stream2
-		headers, stream2, errno = read_data(req['stream2'])
-		if errno then
-			local errmsg = stream
-			nok(errmsg, desc .. ': ' .. errmsg)
-			return
-		end
-		same(tonumber(headers:get(':status')), 200, desc .. ' (test second stream): status 200')
-		same(headers:get('content-type'), 'application/dns-message', desc .. ' (test second stream): content-type')
-
-		local body = assert(stream:get_body_as_string())
-		local pkt = parse_pkt(body, desc)
-
-		return answ_headers, pkt
-	end
-
-	local function send_and_check_err(req, method, exp_status, desc)
-		-- main request
-		ok, err, errno = send_data(req, 'stream1', method, req['body'])
-		if not ok then
-			return nil, nil
-		end
-
-		headers, stream, errno = read_data(req['stream1'])
-		if errno then
-			local errmsg = stream
-			nok(errmsg, desc .. ': ' .. errmsg)
-			return
-		end
-		local status = tonumber(headers:get(':status'))
-		same(status, exp_status, desc .. ': get ' .. status)
-
-		-- test request
-		req['headers']:upsert('content-type', 'application/dns-message')
-		if method == 'GET' then
-			req.headers:upsert(':path', '/dns-query?dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
-		end
-		ok, err, errno = send_data(req, 'stream2', method, method == 'POST' and basexx.from_base64( 
-			'vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB') or nil) -- noerror.test. A
-		if not ok then
-			return nil, nil
-		end
-		local stream2
-		headers, stream2, errno = read_data(req['stream2'])
-		if errno then
-			local errmsg = stream
-			nok(errmsg, desc .. ': ' .. errmsg)
-			return
-		end
-		same(tonumber(headers:get(':status')), 200, desc .. ': second stream: status 200 (exp. 200)')
-		same(headers:get('content-type'), 'application/dns-message', desc .. ': second stream: content-type')
-
-	end
-
-
-	local req_templ, uri_templ
-	local timeout = 8
 
 	-- test a valid DNS query using POST
 	local function test_post_servfail()
@@ -498,11 +498,10 @@ else
 		end
 		policy.add(policy.suffix(check_dstaddr, policy.todnames({'dstaddr.test'})))
 		local desc = 'valid POST query has server address available in request'
-		local req = req_templ:clone()
-		req.headers:upsert(':method', 'POST')
-		req:set_body(basexx.from_base64(  -- dstaddr.test. A
+		local req = connection_init(timeout)
+		request_set_body(req, basexx.from_base64(  -- dstaddr.test. A
 			'FnkBAAABAAAAAAAAB2RzdGFkZHIEdGVzdAAAAQAB'))
-		check_ok(req, desc)
+		send_and_check_ok(req, 'POST', desc)
 		ok(triggered, 'dstaddr policy was triggered')
 	end
 
@@ -515,11 +514,10 @@ else
 		view:addr('::/0', policy_refuse)
 
 		local desc = 'valid POST query has source address available in request'
-		local req = req_templ:clone()
-		req.headers:upsert(':method', 'POST')
-		req:set_body(basexx.from_base64(  -- srcaddr.test.knot-resolver.cz TXT
+		local req = connection_init(timeout)
+		request_set_body(req, basexx.from_base64(  -- srcaddr.test.knot-resolver.cz TXT
 			'QNQBAAABAAAAAAAAB3NyY2FkZHIEdGVzdA1rbm90LXJlc29sdmVyAmN6AAAQAAE'))
-		local _, pkt = check_ok(req, desc)
+		local _, pkt = send_and_check_ok(req, 'POST', desc)
 		same(pkt:rcode(), kres.rcode.REFUSED, desc .. ': view module caught it')
 
 		modules.unload('view')
@@ -527,28 +525,28 @@ else
 
 	-- plan tests
 	local tests = {
---		test_post_servfail,
---		test_post_noerror,
---		test_post_nxdomain,
---		test_huge_answer,
---		test_post_short_input,
---		test_post_unsupp_type,
---		test_get_right_endpoints,
---		test_get_servfail,
---		test_get_noerror,
---		test_get_nxdomain,
---		test_get_other_params_before_dns,
---		test_get_other_params_after_dns,
---		test_get_other_params,
---		test_get_wrong_endpoints,
+		test_post_servfail,
+		test_post_noerror,
+		test_post_nxdomain,
+		test_huge_answer,
+		test_post_short_input,
+		test_post_unsupp_type,
+		test_get_right_endpoints,
+		test_get_servfail,
+		test_get_noerror,
+		test_get_nxdomain,
+		test_get_other_params_before_dns,
+		test_get_other_params_after_dns,
+		test_get_other_params,
+		test_get_wrong_endpoints,
 		test_get_no_dns_param,
---		test_get_unparseable,
---		test_get_invalid_b64,
+		test_get_unparseable,
+		test_get_invalid_b64,
 		test_get_invalid_chars,
---		test_get_two_ampersands,
---		test_unsupp_method,
---		test_dstaddr,
---		test_srcaddr
+		test_get_two_ampersands,
+		test_unsupp_method,
+		test_dstaddr,
+		test_srcaddr
 	}
 
 	return tests
