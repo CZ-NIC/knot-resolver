@@ -165,7 +165,7 @@ else
 		end
 
 		if body then
-			ok, err, errno = stream:write_body_from_string(body, deadline and deadline-monotime())	
+			ok, err, errno = stream:write_body_from_string(body, deadline and deadline-monotime())
 			if not ok then
 				stream:shutdown()
 				return nil, err, errno
@@ -216,7 +216,7 @@ else
 		if method == 'GET' then
 			req.headers:upsert(':path', '/dns-query?dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
 		end
-		ok, err, errno = send_data(req, 'stream2', method, method == 'POST' and basexx.from_base64( 
+		ok, err, errno = send_data(req, 'stream2', method, method == 'POST' and basexx.from_base64(
 			'vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB') or nil) -- noerror.test. A
 		if not ok then
 			return nil, nil
@@ -238,6 +238,8 @@ else
 	end
 
 	local function send_and_check_err(req, method, exp_status, desc)
+		local ok, err, errno, headers, stream
+
 		-- main request
 		ok, err, errno = send_data(req, 'stream1', method, req['body'])
 		if not ok then
@@ -258,7 +260,7 @@ else
 		if method == 'GET' then
 			req.headers:upsert(':path', '/dns-query?dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
 		end
-		ok, err, errno = send_data(req, 'stream2', method, method == 'POST' and basexx.from_base64( 
+		ok, err, errno = send_data(req, 'stream2', method, method == 'POST' and basexx.from_base64(
 			'vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB') or nil) -- noerror.test. A
 		if not ok then
 			return nil, nil
