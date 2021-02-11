@@ -23,6 +23,7 @@ local function serve_trace(h, _)
 	-- Create logging handler callback
 	local buffer = {}
 	local buffer_log_cb = ffi.cast('trace_log_f', function (_, msg)
+		jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
 		table.insert(buffer, ffi.string(msg))
 	end)
 
@@ -32,6 +33,7 @@ local function serve_trace(h, _)
 	local cond = condition.new()
 	local waiting, done = false, false
 	local finish_cb = ffi.cast('trace_callback_f', function (req)
+		jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
 		table.insert(buffer, req:selected_tostring())
 		if waiting then
 			cond:signal()
