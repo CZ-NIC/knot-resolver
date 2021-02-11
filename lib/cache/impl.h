@@ -292,7 +292,7 @@ int32_t get_new_ttl(const struct entry_h *entry, const struct kr_query *qry,
 /** Compute size of serialized rdataset.  NULL is accepted as empty set. */
 static inline int rdataset_dematerialize_size(const knot_rdataset_t *rds)
 {
-	return KR_CACHE_RR_COUNT_SIZE + (rds == NULL ? 0 : knot_rdataset_size(rds));
+	return KR_CACHE_RR_COUNT_SIZE + (rds == NULL ? 0 : rds->size);
 }
 
 /** Analyze the length of a dematerialized rdataset.

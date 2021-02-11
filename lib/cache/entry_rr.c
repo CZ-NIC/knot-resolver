@@ -24,9 +24,8 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
 	memcpy(data, &rr_count, sizeof(rr_count));
 	data += sizeof(rr_count);
 	if (rr_count) {
-		size_t size = knot_rdataset_size(rds);
-		memcpy(data, rds->rdata, size);
-		data += size;
+		memcpy(data, rds->rdata, rds->size);
+		data += rds->size;
 	}
 	//VERBOSE_MSG(NULL, "dematerialized to %d B\n", (int)(data - data0));
 	(void)data;
@@ -45,12 +44,9 @@ static int rdataset_materialize(knot_rdataset_t * restrict rds, const uint8_t * 
 	const uint8_t *d = data; /* iterates over the cache data */
 	/* First sum up the sizes for wire format length. */
 	/* TODO: we might overrun here already, but we need to trust cache anyway...*/
-	const uint32_t rds_size = rdataset_dematerialized_size(d, &rds->count);
+	rds->size = rdataset_dematerialized_size(d, &rds->count);
 	d += KR_CACHE_RR_COUNT_SIZE;
-	#if KNOT_VERSION_HEX >= 0x020900
-		rds->size = rds_size;
-	#endif
-	if (d + rds_size > data_bound) {
+	if (d + rds->size > data_bound) {
 		VERBOSE_MSG(NULL, "materialize: EILSEQ!\n");
 		return kr_error(EILSEQ);
 	}
@@ -58,12 +54,12 @@ static int rdataset_materialize(knot_rdataset_t * restrict rds, const uint8_t * 
 		rds->rdata = NULL;
 		return d - data;
 	}
-	rds->rdata = mm_alloc(pool, rds_size);
+	rds->rdata = mm_alloc(pool, rds->size);
 	if (!rds->rdata) {
 		return kr_error(ENOMEM);
 	}
-	memcpy(rds->rdata, d, rds_size);
-	d += rds_size;
+	memcpy(rds->rdata, d, rds->size);
+	d += rds->size;
 	//VERBOSE_MSG(NULL, "materialized from %d B\n", (int)(d - data));
 	return d - data;
 }
