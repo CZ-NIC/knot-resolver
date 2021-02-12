@@ -72,13 +72,36 @@ struct {
 static void udp_queue_send(int fd)
 {
 	udp_queue_t *const q = state.udp_queues[fd];
-	if (!q->len) return;
-	int sent_len = sendmmsg(fd, q->msgvec, q->len, 0);
-	/* ATM we don't really do anything about failures. */
-	int err = sent_len < 0 ? errno : EAGAIN /* unknown error, really */;
-	for (int i = 0; i < q->len; ++i) {
-		qr_task_on_send(q->items[i].task, NULL, i < sent_len ? 0 : err);
-		worker_task_unref(q->items[i].task);
+	const uv_handle_t * const uv_h = NULL; // TODO: get a real value?
+	for (int i = 0; i < q->len;) { // send from `i` onwards
+		int len_done = sendmmsg(fd, q->msgvec + i, q->len - i, 0);
+		(void)likely(len_done == q->len - i);
+
+		if (len_done < 0) { // the first failed already
+			if (errno == EINTR) // standard syscall restart
+				continue;
+			if (errno == EAGAIN || errno == EWOULDBLOCK || errno == ENOBUFS) {
+				// Temporary overload.  ATM we don't add yet another
+				// layer of buffering, so we give up on the whole batch.
+				for (; i < q->len; ++i) {
+					qr_task_on_send(q->items[i].task, uv_h,
+							kr_error(ENOBUFS));
+					worker_task_unref(q->items[i].task);
+				}
+				break;
+			}
+			// otherwise we fail this single packet and retry the rest
+			qr_task_on_send(q->items[i].task, uv_h, kr_error(errno));
+			worker_task_unref(q->items[i].task);
+			++i;
+		} else
+		// These packets succeeded.  If any packet remains,
+		// the error code was lost by OS, so we retry (keep `i` pointing to it).
+		while (len_done > 0) {
+			qr_task_on_send(q->items[i].task, uv_h, kr_ok());
+			worker_task_unref(q->items[i].task);
+			++i, --len_done;
+		}
 	}
 	q->len = 0;
 }

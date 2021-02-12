@@ -1,3 +1,11 @@
+Knot Resolver 5.3.1 (2021-0m-dd)
+================================
+
+Improvements
+------------
+- try harder to deliver UDP replies when syscall errors happen (!1144)
+
+
 Knot Resolver 5.3.0 (2021-02-25)
 ================================
 
