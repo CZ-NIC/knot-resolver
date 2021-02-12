@@ -693,7 +693,7 @@ function policy.DEBUG_IF(test)
 			io.write(table.concat(stash, ''))
 		end
 	end)
-	ffi.gc(debug_finish_cb, function (func) func:free() end)
+	ffi.gc(debug_finish_cb, free_cb)
 
 	return function (state, req)
 		req:vars()['policy_debug_stash'] = {}
