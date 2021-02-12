@@ -1283,12 +1283,13 @@ static int qr_task_finalize(struct qr_task *task, int state)
 
 	task->finished = true;
 	if (source_session == NULL) {
-		(void) qr_task_on_send(task, NULL, kr_error(EIO));
+		(void)qr_task_on_send(task, NULL/*src_handle*/, kr_error(EIO));
 		return state == KR_STATE_DONE ? kr_ok() : kr_error(EIO);
 	}
 
+	const uv_handle_t *src_handle = session_get_handle(source_session);
 	if (unlikely(ctx->req.answer == NULL)) { /* meant to be dropped */
-		(void) qr_task_on_send(task, NULL, kr_ok());
+		(void)qr_task_on_send(task, src_handle, kr_ok());
 		return kr_ok();
 	}
 
@@ -1301,7 +1302,6 @@ static int qr_task_finalize(struct qr_task *task, int state)
 
 	/* Send back answer */
 	int ret;
-	const uv_handle_t *src_handle = session_get_handle(source_session);
 	if (src_handle->type != UV_UDP && src_handle->type != UV_TCP
 				       && src_handle->type != UV_POLL) {
 		assert(false);
@@ -1322,7 +1322,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	}
 
 	if (ret != kr_ok()) {
-		(void) qr_task_on_send(task, NULL, kr_error(EIO));
+		(void)qr_task_on_send(task, src_handle, kr_error(EIO));
 		/* Since source session is erroneous detach all tasks. */
 		while (!session_tasklist_is_empty(source_session)) {
 			struct qr_task *t = session_tasklist_del_first(source_session, false);

@@ -72,7 +72,13 @@ struct {
 static void udp_queue_send(int fd)
 {
 	udp_queue_t *const q = state.udp_queues[fd];
-	const uv_handle_t * const uv_h = NULL; // TODO: get a real value?
+	if (!q->len) return;
+	// whole queue shares `fd`, so the UV handle is the same as well
+	struct request_ctx *ctx = worker_task_get_request(q->items[0].task);
+	const uv_handle_t * const uv_h =
+		session_get_handle(worker_request_get_source_session(ctx));
+	assert(uv_h);
+
 	for (int i = 0; i < q->len;) { // send from `i` onwards
 		int len_done = sendmmsg(fd, q->msgvec + i, q->len - i, 0);
 		(void)likely(len_done == q->len - i);
