@@ -38,6 +38,10 @@ Configuration file
 
 * Module ``dnstap``: option ``log_responses`` has been moved inside a new ``client`` section. Refer to the configuration example in :ref:`mod-dnstap`.
 
+Packagers & Developers
+----------------------
+
+* Knot DNS >= 2.9 is required.
 
 5.1 to 5.2
 ==========
