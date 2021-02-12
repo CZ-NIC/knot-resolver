@@ -76,19 +76,6 @@ static void udp_queue_send(int fd)
 	int sent_len = sendmmsg(fd, q->msgvec, q->len, 0);
 	/* ATM we don't really do anything about failures. */
 	int err = sent_len < 0 ? errno : EAGAIN /* unknown error, really */;
-	if (unlikely(sent_len != q->len)) {
-		if (err != EWOULDBLOCK) {
-			kr_log_error("ERROR: udp sendmmsg() sent %d / %d; %s\n",
-					sent_len, q->len, strerror(err));
-		} else {
-			const uint64_t stamp_now = kr_now();
-			static uint64_t stamp_last = 0;
-			if (stamp_now > stamp_last + 60*1000) {
-				kr_log_info("WARNING: dropped UDP reply packet(s) due to network overload (reported at most once per minute)\n");
-				stamp_last = stamp_now;
-			}
-		}
-	}
 	for (int i = 0; i < q->len; ++i) {
 		qr_task_on_send(q->items[i].task, NULL, i < sent_len ? 0 : err);
 		worker_task_unref(q->items[i].task);
