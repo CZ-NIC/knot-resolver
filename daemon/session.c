@@ -260,6 +260,31 @@ struct session_flags *session_flags(struct session *session)
 	return &session->sflags;
 }
 
+const char *session_type_str(struct session *session)
+{
+	if (!session || !session->handle) {
+		assert(!EINVAL);
+		return "ERROR";
+	}
+	switch (session->handle->type) {
+	default:
+		assert(!EINVAL);
+		return "ERROR";
+	case UV_UDP:
+		return "UDP";
+	case UV_POLL:
+		return "XDP";
+	case UV_TCP:
+		if (session->sflags.has_http) {
+			return "DoH";
+		} else if (session->sflags.has_tls) {
+			return "DoT";
+		} else {
+			return "TCP";
+		}
+	}
+}
+
 struct sockaddr *session_get_peer(struct session *session)
 {
 	return &session->peer.ip;

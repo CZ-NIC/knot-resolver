@@ -80,6 +80,8 @@ int session_tasklist_finalize_expired(struct session *session);
 bool session_is_empty(const struct session *session);
 /** Get pointer to session flags */
 struct session_flags *session_flags(struct session *session);
+/** Get the type of session as string (UDP, TCP, DoT, DoH, XDP). */
+const char *session_type_str(struct session *session);
 /** Get pointer to peer address. */
 struct sockaddr *session_get_peer(struct session *session);
 /** Get pointer to sockname (address of our end, not meaningful for UDP downstream). */

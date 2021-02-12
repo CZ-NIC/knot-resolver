@@ -587,11 +587,22 @@ int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 	struct session* s = handle->data;
 	assert(s);
 
+	struct kr_request *req = &task->ctx->req;
+	struct kr_query *qry = array_tail(req->rplan.pending);
+	const bool is_verbose = VERBOSE_STATUS || kr_log_rtrace_enabled(req);
+	if (is_verbose && !session_flags(s)->outgoing) {
+		// we're after finish phase, so policy.DEBUG_IF cases will lose this line
+		kr_log_req(req, 0, 0, "wrkr", "sending reply over %s: %s\n",
+				session_type_str(s), kr_strerror(status));
+	} else if (is_verbose && session_flags(s)->outgoing && status) {
+		VERBOSE_MSG(qry, "sending query over %s: %s\n",
+				session_type_str(s), kr_strerror(status));
+	}
+
 	if (handle->type == UV_UDP && session_flags(s)->outgoing) {
 		// This should ensure that we are only dealing with our question to upstream
 		assert(!knot_wire_get_qr(task->pktbuf->wire));
 		// start the timer
-		struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
 		assert(qry != NULL);
 		(void)qry;
 		size_t timeout = task->transport->timeout;
