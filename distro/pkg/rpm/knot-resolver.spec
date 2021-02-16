@@ -4,12 +4,11 @@
 %{!?_pkgdocdir: %global _pkgdocdir %{_docdir}/%{name}}
 
 %define GPG_CHECK 0
-%define VERSION __VERSION__
 %define repodir %{_builddir}/%{name}-%{version}
 %define NINJA ninja-build
 
 Name:           knot-resolver
-Version:        %{VERSION}
+Version:        {{ version }}
 Release:        cznic.1%{?dist}
 Summary:        Caching full DNS Resolver
 
