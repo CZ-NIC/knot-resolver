@@ -57,6 +57,7 @@
 /ltmain.sh
 /missing
 /modules/dnstap/dnstap.pb-c.d
+/pkg
 /self.crt
 /self.key
 /stamp-h1
