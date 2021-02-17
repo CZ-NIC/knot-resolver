@@ -381,8 +381,7 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 	enum kr_transport_protocol protocol;
 	if (chosen->address_state->tls_capable) {
 		protocol = KR_TRANSPORT_TLS;
-	} else if (tcp ||
-		   chosen->address_state->errors[KR_SELECTION_QUERY_TIMEOUT] >= TCP_TIMEOUT_THRESHOLD) {
+	} else if (tcp) {
 		protocol = KR_TRANSPORT_TCP;
 	} else {
 		protocol = KR_TRANSPORT_UDP;
@@ -528,10 +527,10 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		addr_state->broken = true;
 		break;
 	case KR_SELECTION_MISMATCHED:
-		if (qry->flags.NO_0X20 && qry->flags.TCP) {
+		if (qry->flags.NO_0X20) { // && qry->flags.TCP) {
 			addr_state->broken = true;
 		} else {
-			qry->flags.TCP = true;
+			// qry->flags.TCP = true;
 			qry->flags.NO_0X20 = true;
 		}
 		break;
@@ -546,11 +545,11 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		break;
 	case KR_SELECTION_REFUSED:
 	case KR_SELECTION_SERVFAIL:
-		if (qry->flags.NO_MINIMIZE && qry->flags.NO_0X20 && qry->flags.TCP) {
+		if (qry->flags.NO_MINIMIZE && qry->flags.NO_0X20) { // && qry->flags.TCP) {
 			addr_state->broken = true;
 		} else if (qry->flags.NO_MINIMIZE) {
 			qry->flags.NO_0X20 = true;
-			qry->flags.TCP = true;
+			// qry->flags.TCP = true;
 		} else {
 			qry->flags.NO_MINIMIZE = true;
 		}
