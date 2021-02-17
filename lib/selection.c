@@ -553,9 +553,9 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		} else if (qry->flags.NO_MINIMIZE) {
 			qry->flags.NO_0X20 = true;
 			qry->flags.TCP = true;
+			qry->server_selection.local_state->dont_resolve = true;
 		} else {
 			qry->flags.NO_MINIMIZE = true;
-			qry->server_selection.local_state->dont_resolve = true;
 		}
 		break;
 	case KR_SELECTION_LAME_DELEGATION:
