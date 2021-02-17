@@ -230,7 +230,7 @@ static void check_tls_capable(struct address_state *address_state,
 /* TODO: uncomment these once we actually use the information it collects. */
 /**
  * Check if there is a existing TCP connection to this address.
- * 
+ *
  * @p req has to have the selection_context properly initiazed.
  */
 void check_tcp_connections(struct address_state *address_state, struct kr_request *req, struct sockaddr *address) {
@@ -382,8 +382,7 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 	if (chosen->address_state->tls_capable) {
 		protocol = KR_TRANSPORT_TLS;
 	} else if (tcp ||
-		   chosen->address_state->errors[KR_SELECTION_QUERY_TIMEOUT] >= TCP_TIMEOUT_THRESHOLD ||
-		   timeout > TCP_RTT_THRESHOLD) {
+		   chosen->address_state->errors[KR_SELECTION_QUERY_TIMEOUT] >= TCP_TIMEOUT_THRESHOLD) {
 		protocol = KR_TRANSPORT_TCP;
 	} else {
 		protocol = KR_TRANSPORT_UDP;
@@ -587,7 +586,7 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 
 	addr_state->error_count++;
 	addr_state->errors[sel_error]++;
-	
+
 	WITH_VERBOSE(qry)
 	{
 	KR_DNAME_GET_STR(ns_name, transport->ns_name);
