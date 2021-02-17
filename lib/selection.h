@@ -81,6 +81,8 @@ struct local_state {
 	/** Force resolution of a new NS name (if possible)
 	 * Done by selection.c:error in some cases. */
 	bool force_resolve;
+	/** Disable resolution of new NS name for the next attempt. */
+	bool dont_resolve;
 	void *private; /**< Inner state of the implementation.*/
 };
 

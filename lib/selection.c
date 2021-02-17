@@ -230,7 +230,7 @@ static void check_tls_capable(struct address_state *address_state,
 /* TODO: uncomment these once we actually use the information it collects. */
 /**
  * Check if there is a existing TCP connection to this address.
- * 
+ *
  * @p req has to have the selection_context properly initiazed.
  */
 void check_tcp_connections(struct address_state *address_state, struct kr_request *req, struct sockaddr *address) {
@@ -534,6 +534,7 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		} else {
 			qry->flags.TCP = true;
 			qry->flags.NO_0X20 = true;
+			qry->server_selection.local_state->dont_resolve = true;
 		}
 		break;
 	case KR_SELECTION_TRUNCATED:
@@ -587,7 +588,7 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 
 	addr_state->error_count++;
 	addr_state->errors[sel_error]++;
-	
+
 	WITH_VERBOSE(qry)
 	{
 	KR_DNAME_GET_STR(ns_name, transport->ns_name);

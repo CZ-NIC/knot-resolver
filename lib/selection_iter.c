@@ -99,7 +99,7 @@ static void unpack_state_from_zonecut(struct iter_local_state *local_state,
 			name_state->a_state = RECORD_UNKNOWN;
 			name_state->aaaa_state = RECORD_UNKNOWN;
 		}
-		
+
 		/* Iterate over all addresses of this NS (if any). */
 		for (uint8_t *obj = pack_head(*addresses); obj != pack_tail(*addresses);
 		     obj = pack_obj_next(obj)) {
@@ -252,6 +252,11 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 	if (qry->server_selection.local_state->force_resolve && resolvable_len) {
 		choices_len = 0;
 		qry->server_selection.local_state->force_resolve = false;
+	}
+
+	if (qry->server_selection.local_state->dont_resolve && choices_len) {
+		resolvable_len = 0;
+		qry->server_selection.local_state->dont_resolve = false;
 	}
 
 	bool tcp = qry->flags.TCP || qry->server_selection.local_state->truncated;
