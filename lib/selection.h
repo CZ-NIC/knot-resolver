@@ -81,6 +81,8 @@ struct local_state {
 	/** Force resolution of a new NS name (if possible)
 	 * Done by selection.c:error in some cases. */
 	bool force_resolve;
+	/** Used to work around auths with broken TCP. */
+	bool force_udp;
 	void *private; /**< Inner state of the implementation.*/
 };
 
