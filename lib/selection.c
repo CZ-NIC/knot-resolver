@@ -230,7 +230,7 @@ static void check_tls_capable(struct address_state *address_state,
 /* TODO: uncomment these once we actually use the information it collects. */
 /**
  * Check if there is a existing TCP connection to this address.
- * 
+ *
  * @p req has to have the selection_context properly initiazed.
  */
 void check_tcp_connections(struct address_state *address_state, struct kr_request *req, struct sockaddr *address) {
@@ -567,6 +567,11 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 			qry->flags.NO_MINIMIZE = true;
 		}
 		break;
+	case KR_SELECTION_TCP_CONNECT_FAILED:
+	case KR_SELECTION_TCP_CONNECT_TIMEOUT:
+		qry->server_selection.local_state->force_udp = true;
+		qry->flags.NO_0X20 = false;
+		break;
 	case KR_SELECTION_NOTIMPL:
 	case KR_SELECTION_OTHER_RCODE:
 	case KR_SELECTION_DNSSEC_ERROR:
@@ -576,8 +581,6 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		addr_state->broken = true;
 		break;
 	case KR_SELECTION_TLS_HANDSHAKE_FAILED:
-	case KR_SELECTION_TCP_CONNECT_FAILED:
-	case KR_SELECTION_TCP_CONNECT_TIMEOUT:
 		/* These might get resolved by retrying. */
 		break;
 	default:
@@ -587,7 +590,7 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 
 	addr_state->error_count++;
 	addr_state->errors[sel_error]++;
-	
+
 	WITH_VERBOSE(qry)
 	{
 	KR_DNAME_GET_STR(ns_name, transport->ns_name);
