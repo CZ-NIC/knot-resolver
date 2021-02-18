@@ -382,8 +382,7 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 	if (chosen->address_state->tls_capable) {
 		protocol = KR_TRANSPORT_TLS;
 	} else if (tcp ||
-		   chosen->address_state->errors[KR_SELECTION_QUERY_TIMEOUT] >= TCP_TIMEOUT_THRESHOLD ||
-		   timeout > TCP_RTT_THRESHOLD) {
+		   chosen->address_state->errors[KR_SELECTION_QUERY_TIMEOUT] >= TCP_TIMEOUT_THRESHOLD) {
 		protocol = KR_TRANSPORT_TCP;
 	} else {
 		protocol = KR_TRANSPORT_UDP;
