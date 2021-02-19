@@ -418,6 +418,7 @@ static int process_uri_path(struct http_ctx *ctx, int32_t stream_id)
 
 	if (!ctx || !ctx->uri_path) {
 		stat = set_error_status(ctx, stream_id, 400, "invalid uri path");
+		return stat ? 0 : kr_error(ENOMEM);
 	}
 
 	beg = strstr(ctx->uri_path, key);
@@ -606,7 +607,7 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 	int32_t stream_id = frame->hd.stream_id;
 	assert(stream_id != -1);
 
-	if (stream_id == 0)
+	if (stream_id == 0 || ctx == NULL)
 		return 0;
 
 	if (ctx->current_method == HTTP_METHOD_NONE) {
@@ -625,7 +626,7 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 		}
 	}
 
-	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM)) {
+	if (frame && (frame->hd.flags & NGHTTP2_FLAG_END_STREAM)) {
 		struct http_stream_status *stat = ctx->current_stream;
 		if (ctx->incomplete_stream == stream_id) {
 			if (stat->err_status == 200) {
