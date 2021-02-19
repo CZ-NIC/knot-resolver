@@ -16,7 +16,7 @@
 
 #define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "slct", __VA_ARGS__)
 
-#define DEFAULT_TIMEOUT 800
+#define DEFAULT_TIMEOUT 400
 #define MAX_TIMEOUT 10000
 #define MAX_BACKOFF 5
 #define MINIMAL_TIMEOUT_ADDITION 20
