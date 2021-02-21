@@ -2,27 +2,30 @@ stages:
   - build
   - check
 
-image: $CI_REGISTRY/knot/knot-resolver-manager/ci/devenv:latest
+image: $CI_REGISTRY/knot/knot-resolver-manager/devenv:latest
 
-build:
-  image: docker:19.03.12
-  stage: build
-  services:
-    - docker:19.03.12-dind
-  variables:
-    IMAGE_TAG: $CI_REGISTRY/knot/knot-resolver-manager/ci/devenv:latest
-  script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build -t $IMAGE_TAG ci/devenv
-    - docker push $IMAGE_TAG
+# Ideally, the CI would build it's own container and use it afterwards. This workflow should be supported,
+# at least according to the GitLab documentation:
+# https://gitlab.nic.cz/help/user/packages/container_registry/index#container-registry-examples-with-gitlab-cicd
+# Sadly, it does not work on our infrastructure. I did not however test it thoroughly and/or consulted it with
+# anyone else. So it might be fixable. For now, let's leave the config here and we might fix it in the future.
+#
+# build:
+#   image: docker:19.03.12
+#   stage: build
+#   services:
+#     - docker:19.03.12-dind
+#   variables:
+#     IMAGE_TAG: $CI_REGISTRY/knot/knot-resolver-manager/ci/devenv:latest
+#   script:
+#     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+#     - docker build -t $IMAGE_TAG ci/devenv
+#     - docker push $IMAGE_TAG
 
 # FIXME - use custom Docker image, so that we don't rebuild it all every single time
 lint:
   image: debian:latest
   stage: check
-  variables:
-    # Python by default uses ascii encoding, which does not work, because source files are in UTF-8. Here is a potential solution, but for newer Python https://www.python.org/dev/peps/pep-0540/
-    LC_ALL: C.UTF-8
 
   cache:
     key: "check:always-the-same-cache"
