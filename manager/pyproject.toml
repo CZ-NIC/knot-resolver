@@ -10,6 +10,7 @@ authors = [
 python = "^3.6.12"
 aiohttp = "^3.6.12"
 strictyaml = "^1.3.2"
+dbus-python = "^1.2.16"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
@@ -70,7 +71,9 @@ disable= [
     "no-self-use",
     "raise-missing-from",
     "too-few-public-methods",
-    "unused-import",  # checked by flake8
+    "unused-import",  # checked by flake8,
+    "bad-continuation", # conflicts with black
+    "consider-using-in", # pyright can't see through in expressions
 ]
 
 [tool.pylint.SIMILARITIES]
