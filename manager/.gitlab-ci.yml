@@ -24,7 +24,6 @@ image: $CI_REGISTRY/knot/knot-resolver-manager/devenv:latest
 
 # FIXME - use custom Docker image, so that we don't rebuild it all every single time
 lint:
-  image: debian:latest
   stage: check
 
   cache:
