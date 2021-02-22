@@ -10,7 +10,6 @@ authors = [
 python = "^3.6.12"
 aiohttp = "^3.6.12"
 strictyaml = "^1.3.2"
-dbus-python = "^1.2.16"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
