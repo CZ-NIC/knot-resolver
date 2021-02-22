@@ -2,7 +2,7 @@ stages:
   - build
   - check
 
-image: $CI_REGISTRY/knot/knot-resolver-manager/devenv:latest
+image: registry.nic.cz/knot/knot-resolver-manager/devenv:latest
 
 # Ideally, the CI would build it's own container and use it afterwards. This workflow should be supported,
 # at least according to the GitLab documentation:
@@ -33,6 +33,7 @@ lint:
     policy: pull-push
   script:
     # run the actual tests
+    - poetry env use $(pyenv which python)
     - poetry install
     - npm install
     - ./poe check
