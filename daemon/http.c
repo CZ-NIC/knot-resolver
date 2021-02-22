@@ -197,10 +197,10 @@ static int http_status_remove(struct http_ctx *ctx, struct http_stream_status * 
 	if (!stat)
 		return 0;
 
-	int idx = (stat->ref - ctx->stream_status.at)/sizeof(stat);
-	if (stat->err_msg)
-		free(stat->err_msg);
+	free(stat->err_msg);
+	stat->err_msg = NULL;
 
+	int idx = (stat->ref - ctx->stream_status.at)/sizeof(struct http_stream_status*);
 	int ret = array_del(ctx->stream_status, idx);
 	assert(ret == 0);
 
