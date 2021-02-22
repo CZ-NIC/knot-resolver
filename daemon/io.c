@@ -70,6 +70,8 @@ static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* 
 void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	const struct sockaddr *addr, unsigned flags)
 {
+       uint16_t id = buf->len >= 2 ? (((unsigned char)buf->base[0])<<8) + (unsigned char)buf->base[1] : 0;
+       printf("udp_recv: recieved ID %d, %x\n", id, id);
 	struct session *s = handle->data;
 	if (session_flags(s)->closing || nread <= 0 || addr->sa_family == AF_UNSPEC)
 		return;
