@@ -37,9 +37,10 @@ RUN pyenv install 3.9.1
 
 # install poetry
 USER root
-RUN apt-get update && apt-get install --no-install-recommends --no-install-suggests -y python3
+RUN apt-get update && apt-get install --no-install-recommends --no-install-suggests -y python3 python3-distutils-extra
 USER user
 
 RUN curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python3 -
-# Poetry installer manages to change the PATH somehow, so we do not need this
-# ENV PATH="/home/user/.poetry/bin:$PATH"
+ENV PATH="/home/user/.poetry/bin:$PATH"
+# force Poetry to run under python3
+RUN sed -i 's/env python/env python3/' .poetry/bin/poetry
