@@ -1361,7 +1361,7 @@ static int udp_task_step(struct qr_task *task,
 	/* Announce and start subrequest.
 	 * @note Only UDP can lead I/O as it doesn't touch 'task->pktbuf' for reassembly.
 	 */
-	subreq_lead(task);
+	// subreq_lead(task);
 
 	return kr_ok();
 }
