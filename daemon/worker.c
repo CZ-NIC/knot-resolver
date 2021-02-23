@@ -1348,9 +1348,9 @@ static int udp_task_step(struct qr_task *task,
 			 const struct sockaddr *packet_source, knot_pkt_t *packet)
 {
 	/* If there is already outgoing query, enqueue to it. */
-	if (subreq_enqueue(task)) {
-		return kr_ok(); /* Will be notified when outgoing query finishes. */
-	}
+	// if (subreq_enqueue(task)) {
+	// 	return kr_ok(); /* Will be notified when outgoing query finishes. */
+	// }
 	/* Start transmitting */
 	uv_handle_t *handle = transmit(task);
 	if (handle == NULL) {
