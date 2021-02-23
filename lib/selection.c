@@ -331,7 +331,16 @@ static void shuffle_choices(struct choice choices[], int choices_len)
 static void balance_ip_versions(struct choice choices[], int choices_len)
 {
 	size_t versions[2] = {sizeof(struct in_addr), sizeof(struct in6_addr)};
-	size_t version_len = versions[kr_rand_coin(1,2)];
+	static int chosen_version = 0;
+	if (chosen_version == 0) {
+		chosen_version = kr_rand_coin(1,2)+1;
+	} else if (chosen_version == 1) {
+		chosen_version = 2;
+	} else if (chosen_version == 2) {
+		chosen_version = 1;
+	}
+
+	int version_len = versions[chosen_version - 1];
 
 	for (int i = 0; i < choices_len; i++) {
 		if (!no_rtt_info(choices[i].address_state->rtt_state)) {
