@@ -65,7 +65,7 @@ static const char *kr_selection_error_str(enum kr_selection_error err) {
  * timeouts on $NO6_PREFIX_COUNT different IPv6 prefixes since the last IPv6 success.
  */
 
-#define NO6_PREFIX_COUNT 6
+#define NO6_PREFIX_COUNT 4
 #define NO6_PREFIX_BYTES (32/8)
 static struct {
 	int len_used;
