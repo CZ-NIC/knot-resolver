@@ -58,6 +58,62 @@ static const char *kr_selection_error_str(enum kr_selection_error err) {
 	return NULL;
 }
 
+#define NO6_LRU_LEN 6
+#define NO6_PREFIX_BYTES (56/8)
+static struct {
+	struct {
+		uint64_t stamp; /// last timeout
+		uint8_t addr_prefix[NO6_PREFIX_BYTES];
+	} lru [NO6_LRU_LEN];
+} no6_est = { 0 };
+
+static void no6_timeouted(const struct kr_query *qry, const uint8_t *addr)
+{
+	const uint64_t now = kr_now();
+
+	// If we have the address already, just update its stamp.
+	for (int i = 0; i < NO6_LRU_LEN; ++i) {
+		if (no6_est.lru[i].stamp // i.e. non-empty entry
+		    && memcmp(addr, no6_est.lru[i].addr_prefix, NO6_PREFIX_BYTES) == 0) {
+			no6_est.lru[i].stamp = now;
+			VERBOSE_MSG(qry, "NO6: timeouted, updated stamp, i=%d\n", i);
+			return;
+		}
+	}
+
+	// Find an oldest entry and replace it.  (empty is naturally oldest)
+	int oldest_i = NO6_LRU_LEN - 1;
+	for (int i = 0; i < NO6_LRU_LEN - 1; ++i) {
+		if (no6_est.lru[i].stamp < no6_est.lru[oldest_i].stamp)
+			oldest_i = i;
+	}
+	if (no6_est.lru[oldest_i].stamp) {
+		VERBOSE_MSG(qry, "NO6: timeouted, replaced,      i=%d\n", oldest_i);
+	} else {
+		VERBOSE_MSG(qry, "NO6: timeouted, inserted,      i=%d\n", oldest_i);
+	}
+	no6_est.lru[oldest_i].stamp = now;
+	memcpy(no6_est.lru[oldest_i].addr_prefix, addr, NO6_PREFIX_BYTES);
+}
+
+static void no6_success(const struct kr_query *qry)
+{
+	memset(&no6_est, 0, sizeof(no6_est));
+	// LATER(opt.): perhaps just a flag and do zeroing during no6_timouted() afterwards
+	VERBOSE_MSG(qry, "NO6: success\n");
+}
+
+static bool no6_is_bad(void)
+{
+	// LATER(opt.): flag again
+	for (int i = 0; i < NO6_LRU_LEN - 1; ++i) {
+		if (!no6_est.lru[i].stamp)
+			return false;
+	}
+	return true;
+}
+
+
 /* Simple cache interface follows */
 
 static knot_db_val_t cache_key(const uint8_t *ip, size_t len)
@@ -300,6 +356,12 @@ static int cmp_choices(const void *a, const void *b)
 		    calc_timeout(b_->address_state->rtt_state))) {
 		return diff;
 	}
+	/* IPv4 is better if we have no address-specific info
+	 * and IPv6 appears to be generally broken. */
+	diff = (int)a_->address_len - (int)b_->address_len;
+	if (no_rtt_info(a_->address_state->rtt_state) && diff && no6_is_bad()) {
+		return diff;
+	}
 	return 0;
 }
 
@@ -355,6 +417,12 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 		 * is tried before going back to some that was tried before. */
 		qsort(choices, choices_len, sizeof(struct choice), cmp_choices);
 		choice = 0;
+
+		if (no6_is_bad()) {
+			VERBOSE_MSG(NULL, "NO6: is KO\n");
+		} else {
+			VERBOSE_MSG(NULL, "NO6: is OK\n");
+		}
 	}
 
 	struct choice *chosen = &choices[choice];
@@ -442,7 +510,6 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state,
 		/* Answers from cache have NULL transport, ignore them. */
 		return;
 	}
-
 	struct kr_cache *cache = &qry->request->ctx->cache;
 
 	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
@@ -454,6 +521,9 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state,
 		get_rtt_state(address, transport->address_len, cache);
 	struct rtt_state new_rtt_state = calc_rtt_state(cur_rtt_state, rtt);
 	put_rtt_state(address, transport->address_len, new_rtt_state, cache);
+
+	if (transport->address_len == sizeof(struct in6_addr))
+		no6_success(qry);
 
 	WITH_VERBOSE(qry)
 	{
@@ -470,7 +540,7 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state,
 	}
 }
 
-static void cache_timeout(const struct kr_transport *transport,
+static void cache_timeout(const struct kr_query *qry, const struct kr_transport *transport,
 			  struct address_state *addr_state, struct kr_cache *cache)
 {
 	if (transport->deduplicated) {
@@ -480,6 +550,9 @@ static void cache_timeout(const struct kr_transport *transport,
 	}
 
 	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
+	if (transport->address_len == sizeof(struct in6_addr))
+		no6_timeouted(qry, address);
+
 	struct rtt_state old_state = addr_state->rtt_state;
 	struct rtt_state cur_state =
 		get_rtt_state(address, transport->address_len, cache);
@@ -514,7 +587,7 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		qry->server_selection.local_state->timeouts++;
 		/* Make sure the query was chosen by this query. */
 		if (!transport->deduplicated) {
-			cache_timeout(transport, addr_state,
+			cache_timeout(qry, transport, addr_state,
 				      &qry->request->ctx->cache);
 		}
 		break;
