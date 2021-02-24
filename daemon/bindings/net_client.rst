@@ -8,7 +8,7 @@ i.e. communication between the resolver itself and other DNS servers.
 
 IPv4 and IPv6 protocols are used by default. For performance reasons it is
 recommended to explicitly disable protocols which are not available
-on your system.
+on your system, though the impact of IPv6 outage is lowered since release 5.3.0.
 
 .. envvar:: net.ipv4 = true|false
 
