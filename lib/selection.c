@@ -65,7 +65,7 @@ static struct {
 		uint64_t stamp; /// last timeout
 		uint8_t addr_prefix[NO6_PREFIX_BYTES];
 	} lru [NO6_LRU_LEN];
-} no6_est = { 0 };
+} no6_est; // it's zero-initialized
 
 static void no6_timeouted(const struct kr_query *qry, const uint8_t *addr)
 {
@@ -340,6 +340,11 @@ static int cmp_choices(const void *a, const void *b)
 	const struct choice *b_ = b;
 
 	int diff;
+	/* Prefer IPv4 if IPv6 appears to be generally broken. */
+	diff = (int)a_->address_len - (int)b_->address_len;
+	if (diff && no6_is_bad()) {
+		return diff;
+	}
 	/* Address with no RTT information is better than address
 	 * with some information. */
 	if ((diff = no_rtt_info(b_->address_state->rtt_state) -
@@ -354,12 +359,6 @@ static int cmp_choices(const void *a, const void *b)
 	/* Address with smaller expected timeout is better. */
 	if ((diff = calc_timeout(a_->address_state->rtt_state) -
 		    calc_timeout(b_->address_state->rtt_state))) {
-		return diff;
-	}
-	/* IPv4 is better if we have no address-specific info
-	 * and IPv6 appears to be generally broken. */
-	diff = (int)a_->address_len - (int)b_->address_len;
-	if (no_rtt_info(a_->address_state->rtt_state) && diff && no6_is_bad()) {
 		return diff;
 	}
 	return 0;
