@@ -58,59 +58,49 @@ static const char *kr_selection_error_str(enum kr_selection_error err) {
 	return NULL;
 }
 
-#define NO6_LRU_LEN 6
+
+/* Simple detection of IPv6 being broken.
+ *
+ * We follow all IPv6 timeouts and successes.  Consider it broken iff we've had
+ * timeouts on $NO6_PREFIX_COUNT different IPv6 prefixes since the last IPv6 success.
+ */
+
+#define NO6_PREFIX_COUNT 6
 #define NO6_PREFIX_BYTES (56/8)
 static struct {
-	struct {
-		uint64_t stamp; /// last timeout
-		uint8_t addr_prefix[NO6_PREFIX_BYTES];
-	} lru [NO6_LRU_LEN];
-} no6_est; // it's zero-initialized
+	int len_used;
+	uint8_t addr_prefixes[NO6_PREFIX_COUNT][NO6_PREFIX_BYTES];
+} no6_est = { .len_used = 0 };
+
+static inline bool no6_is_bad(void)
+{
+	return no6_est.len_used == NO6_PREFIX_COUNT;
+}
 
 static void no6_timeouted(const struct kr_query *qry, const uint8_t *addr)
 {
-	const uint64_t now = kr_now();
-
-	// If we have the address already, just update its stamp.
-	for (int i = 0; i < NO6_LRU_LEN; ++i) {
-		if (no6_est.lru[i].stamp // i.e. non-empty entry
-		    && memcmp(addr, no6_est.lru[i].addr_prefix, NO6_PREFIX_BYTES) == 0) {
-			no6_est.lru[i].stamp = now;
-			VERBOSE_MSG(qry, "NO6: timeouted, updated stamp, i=%d\n", i);
+	if (no6_is_bad()) { // we can't get worse
+		VERBOSE_MSG(qry, "NO6: timeouted, but bad already\n");
+		return;
+	}
+	// If we have the address already, do nothing.
+	for (int i = 0; i < no6_est.len_used; ++i) {
+		if (memcmp(addr, no6_est.addr_prefixes[i], NO6_PREFIX_BYTES) == 0) {
+			VERBOSE_MSG(qry, "NO6: timeouted, repeated prefix, timeouts %d/%d\n",
+					no6_est.len_used, (int)NO6_PREFIX_COUNT);
 			return;
 		}
 	}
-
-	// Find an oldest entry and replace it.  (empty is naturally oldest)
-	int oldest_i = NO6_LRU_LEN - 1;
-	for (int i = 0; i < NO6_LRU_LEN - 1; ++i) {
-		if (no6_est.lru[i].stamp < no6_est.lru[oldest_i].stamp)
-			oldest_i = i;
-	}
-	if (no6_est.lru[oldest_i].stamp) {
-		VERBOSE_MSG(qry, "NO6: timeouted, replaced,      i=%d\n", oldest_i);
-	} else {
-		VERBOSE_MSG(qry, "NO6: timeouted, inserted,      i=%d\n", oldest_i);
-	}
-	no6_est.lru[oldest_i].stamp = now;
-	memcpy(no6_est.lru[oldest_i].addr_prefix, addr, NO6_PREFIX_BYTES);
+	// Append!
+	memcpy(no6_est.addr_prefixes[no6_est.len_used++], addr, NO6_PREFIX_BYTES);
+	VERBOSE_MSG(qry, "NO6: timeouted, appended, timeouts %d/%d\n",
+			no6_est.len_used, (int)NO6_PREFIX_COUNT);
 }
 
-static void no6_success(const struct kr_query *qry)
+static inline void no6_success(const struct kr_query *qry)
 {
-	memset(&no6_est, 0, sizeof(no6_est));
-	// LATER(opt.): perhaps just a flag and do zeroing during no6_timouted() afterwards
+	no6_est.len_used = 0;
 	VERBOSE_MSG(qry, "NO6: success\n");
-}
-
-static bool no6_is_bad(void)
-{
-	// LATER(opt.): flag again
-	for (int i = 0; i < NO6_LRU_LEN - 1; ++i) {
-		if (!no6_est.lru[i].stamp)
-			return false;
-	}
-	return true;
 }
 
 
@@ -418,9 +408,9 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 		choice = 0;
 
 		if (no6_is_bad()) {
-			VERBOSE_MSG(NULL, "NO6: is KO\n");
+			VERBOSE_MSG(NULL, "NO6: is KO [exploit]\n");
 		} else {
-			VERBOSE_MSG(NULL, "NO6: is OK\n");
+			VERBOSE_MSG(NULL, "NO6: is OK [exploit]\n");
 		}
 	}
 
@@ -509,6 +499,7 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state,
 		/* Answers from cache have NULL transport, ignore them. */
 		return;
 	}
+
 	struct kr_cache *cache = &qry->request->ctx->cache;
 
 	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
