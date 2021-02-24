@@ -3,6 +3,9 @@ from uuid import uuid4
 from typing import List, Optional
 from strictyaml.representation import YAML
 
+from . import compat
+from . import systemd
+
 
 class Kresd:
     def __init__(self, kresd_id: Optional[str] = None):
@@ -16,13 +19,15 @@ class Kresd:
         raise NotImplementedError()
 
     async def start(self):
-        raise NotImplementedError()
+        await compat.asyncio_to_thread(systemd.start_unit, f"kresd@{self._id}.service")
 
     async def stop(self):
-        raise NotImplementedError()
+        await compat.asyncio_to_thread(systemd.stop_unit, f"kresd@{self._id}.service")
 
     async def restart(self):
-        raise NotImplementedError()
+        await compat.asyncio_to_thread(
+            systemd.restart_unit, f"kresd@{self._id}.service"
+        )
 
     def mark_for_restart(self):
         self._needs_restart = True
@@ -50,7 +55,12 @@ class KresdManager:
         await kresd.stop()
 
     async def _collect_already_running_children(self):
-        raise NotImplementedError()
+        units = await compat.asyncio_to_thread(systemd.list_units)
+        for unit in units:
+            u: str = unit
+            if u.startswith("kresd@") and u.endswith(".service"):
+                iden = u.replace("kresd@", "").replace(".service", "")
+                self._children.append(Kresd(kresd_id=iden))
 
     async def _rolling_restart(self):
         for kresd in self._children:

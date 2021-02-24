@@ -1,15 +1,51 @@
 from typing import List, Union
-import dbus
 from typing_extensions import Literal
+
+from pydbus import SystemBus
+from gi.repository import GLib
+
+# ugly global result variable, but this module will be used once in a every
+# process, so we should get away with it
+#
+# Used to storing result state of systemd's jobs
+result_state = None
+
+
+class SystemdException(Exception):
+    pass
 
 
 def _create_manager_interface():
-    bus = dbus.SystemBus()
-    systemd = bus.get_object("org.freedesktop.systemd1", "/org/freedesktop/systemd1")
+    bus = SystemBus()
+    systemd = bus.get(".systemd1")
+    return systemd
 
-    manager = dbus.Interface(systemd, "org.freedesktop.systemd1.Manager")
 
-    return manager
+def _wait_for_job_completion(systemd, job):
+    global result_state
+
+    loop = GLib.MainLoop()
+    systemd.JobRemoved.connect(_wait_for_job_completion_handler(loop, job))
+    result_state = None
+    loop.run()
+
+    if result_state != "done":
+        raise SystemdException(
+            f"Job completed with state '{result_state}' instead of expected 'done'"
+        )
+
+
+def _wait_for_job_completion_handler(loop, job_path):
+    def event_hander(_job_id, path, _unit, state):
+        global result_state
+
+        # if the job is no longer queued, stop the loop
+        if path == job_path:
+            result_state = state
+            loop.quit()
+        # otherwise do nothing
+
+    return event_hander
 
 
 def get_unit_file_state(
@@ -24,9 +60,22 @@ def list_units() -> List[str]:
     return [str(u[0]) for u in _create_manager_interface().ListUnits()]
 
 
-def list_jobs():
-    return _create_manager_interface().ListJobs()
-
-
 def restart_unit(unit_name: str):
-    return _create_manager_interface().RestartUnit(unit_name, "fail")
+    systemd = _create_manager_interface()
+    job = systemd.RestartUnit(unit_name, "fail")
+
+    _wait_for_job_completion(systemd, job)
+
+
+def start_unit(unit_name: str):
+    systemd = _create_manager_interface()
+    job = systemd.StartUnit(unit_name, "fail")
+
+    _wait_for_job_completion(systemd, job)
+
+
+def stop_unit(unit_name: str):
+    systemd = _create_manager_interface()
+    job = systemd.StopUnit(unit_name, "fail")
+
+    _wait_for_job_completion(systemd, job)
