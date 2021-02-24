@@ -107,8 +107,11 @@ static void no6_timeouted(const struct kr_query *qry, const uint8_t *addr)
 
 static inline void no6_success(const struct kr_query *qry)
 {
+	if (no6_est.len_used) {
+		VERBOSE_MSG(qry, "NO6: success, zeroing %d/%d\n",
+				no6_est.len_used, (int)NO6_PREFIX_COUNT);
+	}
 	no6_est.len_used = 0;
-	VERBOSE_MSG(qry, "NO6: success\n");
 }
 
 
@@ -415,11 +418,8 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 		qsort(choices, choices_len, sizeof(struct choice), cmp_choices);
 		choice = 0;
 
-		if (no6_is_bad()) {
+		if (no6_is_bad())
 			VERBOSE_MSG(NULL, "NO6: is KO [exploit]\n");
-		} else {
-			VERBOSE_MSG(NULL, "NO6: is OK [exploit]\n");
-		}
 	}
 
 	struct choice *chosen = &choices[choice];
