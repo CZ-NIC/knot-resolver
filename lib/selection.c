@@ -62,11 +62,19 @@ static const char *kr_selection_error_str(enum kr_selection_error err) {
 /* Simple detection of IPv6 being broken.
  *
  * We follow all IPv6 timeouts and successes.  Consider it broken iff we've had
- * timeouts on $NO6_PREFIX_COUNT different IPv6 prefixes since the last IPv6 success.
+ * timeouts on several different IPv6 prefixes since the last IPv6 success.
+ * Note: unlike the rtt_state, this happens only per-process (for simplicity).
+ *
+ * ## NO6_PREFIX_* choice
+ *   For our practical use we choose primarily based on root and typical TLD servers.
+ *   Looking at *.{root,gtld}-servers.net, we have 7/26 AAAAs in 2001:500:00**::
+ *   but adding one more byte makes these completely unique, so we choose /48.
+ *   As distribution to ASs seems to be on shorter prefixes (RIPE: /32 -- /24?),
+ *   we wait for several distinct prefixes.
  */
 
 #define NO6_PREFIX_COUNT 6
-#define NO6_PREFIX_BYTES (56/8)
+#define NO6_PREFIX_BYTES (48/8)
 static struct {
 	int len_used;
 	uint8_t addr_prefixes[NO6_PREFIX_COUNT][NO6_PREFIX_BYTES];
