@@ -22,15 +22,17 @@ image: registry.nic.cz/knot/knot-resolver-manager/devenv:latest
 #     - docker build -t $IMAGE_TAG ci/devenv
 #     - docker push $IMAGE_TAG
 
-# FIXME - use custom Docker image, so that we don't rebuild it all every single time
+
+# agressively cache Poetry's and NPM's data
+cache:
+  key: "always-the-same-cache"
+  paths:
+    - node_modules/
+    - .venv/
+  policy: pull-push
+
 lint:
   stage: check
-
-  cache:
-    key: "check:always-the-same-cache"
-    paths:
-      - node_modules/
-    policy: pull-push
   script:
     # run the actual tests
     - poetry env use $(pyenv which python)

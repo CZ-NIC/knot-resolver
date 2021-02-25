@@ -44,3 +44,11 @@ RUN curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-
 ENV PATH="/home/user/.poetry/bin:$PATH"
 # force Poetry to run under python3
 RUN sed -i 's/env python/env python3/' .poetry/bin/poetry
+# force Poetry to use local .venv/ directory that we can cache
+ENV POETRY_VIRTUALENVS_IN_PROJECT=true
+
+
+# install additional project dependencies
+USER root
+RUN apt-get update && apt-get install --no-install-recommends --no-install-suggests -y libcairo2-dev libglib2.0-0 libgirepository1.0-dev
+USER user
