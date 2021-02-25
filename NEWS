@@ -1,13 +1,15 @@
-Knot Resolver 5.3.0 (2021-0m-dd)
+Knot Resolver 5.3.0 (2021-02-25)
 ================================
 
 Improvements
 ------------
 - more consistency in using parent-side records for NS addresses (!1097)
-- better algorithm for choosing nameservers (!1030, !1126, !1143)
+- better algorithm for choosing nameservers (!1030, !1126, !1140, !1141, !1143)
 - daf module: add daf.clear() (!1114)
 - dnstap module: more features and don't log internal requests (!1103)
-- randomize record order by default, i.e. reorder_RR(true) (!1123)
+- dnstap module: include in upstream packages and Docker image (!1110, !1118)
+- randomize record order by default, i.e. reorder_RR(true) (!1124)
+- prometheus module: transform graphite tags into prometheus labels (!1109)
 - avoid excessive logging of UDP replies with sendmmsg (!1138)
 
 Bugfixes
@@ -15,11 +17,13 @@ Bugfixes
 - view: fail config if bad subnet is specified (!1112)
 - doh2: fix memory leak (!1117)
 - policy.ANSWER: minor fixes, mainly around NODATA answers (!1129)
+- http, watchdog modules: fix stability problems (!1136)
 
 Incompatible changes
 --------------------
 - dnstap module: `log_responses` option gets nested under `client`;
   see new docs for config example (!1103)
+- libknot >= 2.9 is required
 
 
 Knot Resolver 5.2.1 (2020-12-09)
