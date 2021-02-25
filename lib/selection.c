@@ -377,6 +377,46 @@ static void shuffle_choices(struct choice choices[], int choices_len)
 	}
 }
 
+/**
+ * @internal Balance the choice of IPv4/IPv6 servers when RTT cache is clear.
+ *
+ * On clear RTT and in the presence of miscunfigured IP protocol version (e.g. net.ipv6 enabled
+ * but IPv6 doesn't work), resolver might waste a lot of time and packets trying to query
+ * nameservers using the broken protocol.
+ *
+ * We choose the protocol first and if there is some candidate server with unknown RTT and using
+ * the chosen protocol, we swap it to the front and it is used for the transport.
+ *
+ * If there is none, tough luck, we still want to try all the candidates before going back trying
+ * some again.
+ */
+static void balance_ip_versions(struct choice choices[], int choices_len)
+{
+	size_t versions[2] = {sizeof(struct in_addr), sizeof(struct in6_addr)};
+	static int chosen_version = 0;
+	if (chosen_version == 0) {
+		chosen_version = kr_rand_coin(1,2)+1;
+	} else if (chosen_version == 1) {
+		chosen_version = 2;
+	} else if (chosen_version == 2) {
+		chosen_version = 1;
+	}
+
+	int version_len = versions[chosen_version - 1];
+
+	for (int i = 0; i < choices_len; i++) {
+		if (!no_rtt_info(choices[i].address_state->rtt_state)) {
+			return;
+		}
+		if (choices[i].address_len == version_len) {
+			struct choice tmp = choices[0];
+			choices[0] = choices[i];
+			choices[i] = tmp;
+			return;
+		}
+	}
+}
+
 /* Performs the actual selection (currently variation on epsilon-greedy). */
 struct kr_transport *select_transport(struct choice choices[], int choices_len,
 				      struct to_resolve unresolved[],
@@ -416,6 +456,7 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 		 * *before* the best know server. This ensures that every option
 		 * is tried before going back to some that was tried before. */
 		qsort(choices, choices_len, sizeof(struct choice), cmp_choices);
+		balance_ip_versions(choices, choices_len);
 		choice = 0;
 
 		if (no6_is_bad())
