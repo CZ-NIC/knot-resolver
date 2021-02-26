@@ -822,7 +822,7 @@ ffi.metatype( kr_request_t, {
 			local log_wrapper
 			if req.trace_log == nil then
 				req.trace_log = new_log
-			else
+			elseif new_log ~= nil then
 				local old_log = req.trace_log
 				log_wrapper = ffi.cast('trace_log_f',
 				function(cbreq, msg)
