@@ -670,7 +670,9 @@ end
 
 function policy.DEBUG_ALWAYS(state, req)
 	policy.QTRACE(state, req)
-	req:trace_chain_callbacks(debug_logline_cb, debug_logfinish_cb)
+	local logline_maybe = nil -- verbose() is immediate and cheaper than callback
+	if not verbose() then logline_maybe = debug_logline_cb end
+	req:trace_chain_callbacks(logline_maybe, debug_logfinish_cb)
 	policy.REQTRACE(state, req)
 end
 
@@ -683,11 +685,11 @@ local debug_stashlog_cb = ffi.cast('trace_log_f', function (req, msg)
 end)
 ffi.gc(debug_stashlog_cb, free_cb)
 
--- buffer verbose logs and print then only if test() returns a truthy value
+-- buffer verbose logs and print then if test() returns a truthy value (or in verbose mode)
 function policy.DEBUG_IF(test)
 	local debug_finish_cb = ffi.cast('trace_callback_f', function (cbreq)
 		jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
-		if test(cbreq) then
+		if verbose() or test(cbreq) then
 			debug_logfinish_cb(cbreq)  -- unconditional version
 			local stash = cbreq:vars()['policy_debug_stash']
 			io.write(table.concat(stash, ''))
@@ -698,7 +700,9 @@ function policy.DEBUG_IF(test)
 	return function (state, req)
 		req:vars()['policy_debug_stash'] = {}
 		policy.QTRACE(state, req)
-		req:trace_chain_callbacks(debug_stashlog_cb, debug_finish_cb)
+		local logline_maybe = nil -- verbose() is immediate and cheaper than callback
+		if not verbose() then logline_maybe = debug_logline_cb end
+		req:trace_chain_callbacks(logline_maybe, debug_finish_cb)
 		policy.REQTRACE(state, req)
 		return
 	end

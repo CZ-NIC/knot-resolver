@@ -238,6 +238,7 @@ Following actions act on request and then processing continue until first non-ch
    .. warning:: Verbose logging has significant performance impact on resolver and might also overload you logging system because one request can easily generate tens of kilobytes of logs. Always use appropriate `Filters`_ to limit number of requests triggering this action to a minimum!
 
    .. note:: ``test_function`` is evaluated only when request is finished. As a result verbose logs for all requests must be collected until request is finished because it is not possible to know beforehand how ``test_function`` at the end evaluates given request. When a request is finalized logs are either printed or thrown away.
+     In globally-set verbose mode those lines get printed regardless of the test function and immediately.
 
    Example usage which gathers verbose logs for all requests in subtree ``dnssec-failed.org.`` and prints verbose logs for all requests finished with states different than ``kres.DONE`` (most importantly ``kres.FAIL``, see :c:type:`kr_layer_state`).
 
