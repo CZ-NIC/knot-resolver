@@ -5,12 +5,30 @@
 Prefetching records
 ===================
 
-The module refreshes records that are about to expire when they're used (having less than 1% of original TTL).
-This improves latency for frequently used records, as they are fetched in advance.
+The module spawns asynchronous internal requests to get fresh versions of some records.
+It can utilize two independent mechanisms: expiring records and actual prediction.
 
-It is also able to learn usage patterns and repetitive queries that the server makes. For example, if
-it makes a query every day at 18:00, the resolver expects that it is needed by that time and prefetches it
-ahead of time. This is helpful to minimize the perceived latency and keeps the cache hot.
+Expiring records
+----------------
+
+This mechanism is always active when the predict module is loaded and it is not configurable.
+
+If resolver answers with records that are about to expire, they get refreshed. (see :c:func:`is_expiring`)
+That improves latency for records which get frequently queried, relatively to their TTL.
+
+Prediction
+----------
+
+The predict module can also learn usage patterns and repetitive queries,
+though this mechanism is basically a prototype.
+
+For example, if it makes a query every day at 18:00,
+the resolver expects that it is needed by that time and prefetches it ahead of time.
+This is helpful to minimize the perceived latency and keeps the cache hot.
+
+You can disable prediction by configuring ``period = 0``.
+Otherwise it will load the required :ref:`stats <mod-stats>` module if not present,
+and it will use its :func:`stats.frequent` table and clear it periodically.
 
 .. tip:: The tracking window and period length determine memory requirements. If you have a server with relatively fast query turnover, keep the period low (hour for start) and shorter tracking window (5 minutes). For personal slower resolver, keep the tracking window longer (i.e. 30 minutes) and period longer (a day), as the habitual queries occur daily. Experiment to get the best results.
 
@@ -26,12 +44,7 @@ Example configuration
 		}
 	}
 
-Defaults are 15 minutes window, 6 hours period.
-
-.. tip:: Use period 0 to turn off prediction and just do prefetching of expiring records.
-    That works even without the :ref:`stats <mod-stats>` module.
-
-.. note:: Otherwise this module requires :ref:`stats <mod-stats>` module and loads it if not present.
+Defaults are as above: 15 minutes window, 6 hours period.
 
 Exported metrics
 ----------------
