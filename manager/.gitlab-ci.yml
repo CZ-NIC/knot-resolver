@@ -1,5 +1,5 @@
 stages:
-  - build
+  - image
   - check
 
 image: registry.nic.cz/knot/knot-resolver-manager/devenv:latest
@@ -10,17 +10,20 @@ image: registry.nic.cz/knot/knot-resolver-manager/devenv:latest
 # Sadly, it does not work on our infrastructure. I did not however test it thoroughly and/or consulted it with
 # anyone else. So it might be fixable. For now, let's leave the config here and we might fix it in the future.
 #
-# build:
-#   image: docker:19.03.12
-#   stage: build
-#   services:
-#     - docker:19.03.12-dind
-#   variables:
-#     IMAGE_TAG: $CI_REGISTRY/knot/knot-resolver-manager/ci/devenv:latest
-#   script:
-#     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-#     - docker build -t $IMAGE_TAG ci/devenv
-#     - docker push $IMAGE_TAG
+build:
+  image: docker:20-dind
+  stage: image
+  when: manual
+  tags:
+    - dind
+  variables:
+    IMAGE_TAG: $CI_REGISTRY/knot/knot-resolver-manager/devenv:latest
+  before_script:
+    - docker info
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $IMAGE_TAG ci/devenv
+    - docker push $IMAGE_TAG
 
 
 # agressively cache Poetry's and NPM's data
