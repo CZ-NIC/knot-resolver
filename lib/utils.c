@@ -38,6 +38,7 @@
 
 /* Logging & debugging */
 bool kr_verbose_status = false;
+bool kr_assert_fatal = false;
 
 /*
  * Macros.

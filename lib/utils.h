@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <dirent.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -44,6 +45,11 @@ typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
 #define kr_log_info printf
 #define kr_log_error(...) fprintf(stderr, ## __VA_ARGS__)
 #define kr_log_deprecate(...) fprintf(stderr, "deprecation WARNING: " __VA_ARGS__)
+#define kr_log_assert(cond) do { \
+	if (!__builtin_expect(cond, true)) { \
+		kr_log_error("assertion failed in %s@%s:%d\n", __func__, __FILE__, __LINE__); \
+		if (__builtin_expect(kr_assert_fatal, false)) abort(); \
+	}} while (0)
 
 /* Always export these, but override direct calls by macros conditionally. */
 /** Whether in --verbose mode.  Only use this for reading. */
@@ -51,6 +57,9 @@ KR_EXPORT extern bool kr_verbose_status;
 
 /** Set --verbose mode.  Not available if compiled with -DNOVERBOSELOG. */
 KR_EXPORT bool kr_verbose_set(bool status);
+
+/** Whether kr_log_assert() checks should result in SIGABRT. */
+KR_EXPORT extern bool kr_assert_fatal;
 
 /**
  * @brief Return true if the query has request log handler installed.
