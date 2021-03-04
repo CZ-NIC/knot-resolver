@@ -176,7 +176,7 @@ static struct http_stream_status * http_status_get(struct http_ctx *ctx, int32_t
 	assert(ctx);
 	struct http_stream_status *stat = NULL;
 
-	if (stream_id == ctx->incomplete_stream)
+	if (ctx->current_stream && ctx->current_stream->stream_id == stream_id)
 		return ctx->current_stream;
 
 
@@ -199,9 +199,12 @@ static int http_status_remove(struct http_ctx *ctx, struct http_stream_status * 
 	free(stat->err_msg);
 	stat->err_msg = NULL;
 
-	int idx = (stat->ref - ctx->stream_status.at)/sizeof(struct http_stream_status*);
-	int ret = array_del(ctx->stream_status, idx);
-	assert(ret == 0);
+	size_t idx;
+	for (idx = 0; idx < ctx->stream_status.len; ++idx) {
+		if (stat->stream_id == ctx->stream_status.at[idx]->stream_id) {
+			array_del(ctx->stream_status, idx);
+		}
+	}
 
 	return 0;
 }
@@ -215,7 +218,9 @@ static int send_err_status(struct http_ctx *ctx, int32_t stream_id)
 	int status_len;
 	nghttp2_data_provider prov;
 	struct http_stream_status *stat = http_status_get(ctx, stream_id);
-	assert(stat);
+
+	if(!stat)
+		return kr_error(EINVAL);
 
 	prov.source.ptr = NULL;
 	prov.read_callback = read_callback;
@@ -251,9 +256,9 @@ static int send_err_status(struct http_ctx *ctx, int32_t stream_id)
 }
 
 /*
- * Set error status for particural stream_id and return array index or error
+ * Set error status for particular stream_id and return stream status or NULL on fail.
  *
- * status_msg is optional and define error message.
+ * status_msg is optional and defines error message.
  */
 static struct http_stream_status * set_error_status(struct http_ctx *ctx, int32_t stream_id, int status, const char *const status_msg)
 {
@@ -275,8 +280,6 @@ static struct http_stream_status * set_error_status(struct http_ctx *ctx, int32_
 		}
 
 		stat->err_msg = NULL;
-		// get reference to new iten in array
-		stat->ref = &ctx->stream_status.at[ctx->stream_status.len - 1];
 	}
 	stat->stream_id = stream_id;
 	stat->err_status = status;
@@ -307,10 +310,13 @@ static struct http_stream_status * set_error_status(struct http_ctx *ctx, int32_
  */
 static void http_status_reinit(struct http_ctx *ctx, int stream_id)
 {
-	ctx->incomplete_stream = -1;
 	ctx->current_method = HTTP_METHOD_NONE;
 	ctx->current_stream = NULL;
 	ctx->buf_pos = 0;
+	if (ctx->uri_path) {
+		free(ctx->uri_path);
+		ctx->uri_path = NULL;
+	}
 	if (ctx->content_type) {
 		free(ctx->content_type);
 		ctx->content_type = NULL;
@@ -470,14 +476,13 @@ static int begin_headers_callback(nghttp2_session *h2, const nghttp2_frame *fram
 		return 0;
 	}
 
-	if (ctx->incomplete_stream != -1) {
+	if (ctx->current_stream != NULL) {
 		kr_log_verbose(
-			"[http] stream %d incomplete\n", ctx->incomplete_stream);
+			"[http] stream %d incomplete\n", ctx->current_stream->stream_id);
 		if (!set_error_status(ctx, stream_id, 501, "incomplete stream"))
 			return NGHTTP2_ERR_CALLBACK_FAILURE;
 	} else {
 		ctx->current_stream = set_error_status(ctx, stream_id, 200, NULL);
-		ctx->incomplete_stream = stream_id;
 	}
 	return 0;
 }
@@ -498,9 +503,9 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 	if (frame->hd.type != NGHTTP2_HEADERS)
 		return 0;
 
-	if (ctx->incomplete_stream != stream_id) {
+	if (ctx->current_stream->stream_id != stream_id) {
 		kr_log_verbose(
-			"[http] stream %d incomplete\n", ctx->incomplete_stream);
+			"[http] stream %d incomplete\n", ctx->current_stream->stream_id);
 		if (!set_error_status(ctx, stream_id, 501, "incomplete stream"))
 			return NGHTTP2_ERR_CALLBACK_FAILURE;
 		return 0;
@@ -555,12 +560,12 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	ssize_t remaining;
 	ssize_t required;
-	bool is_first = queue_len(ctx->streams) == 0 || queue_tail(ctx->streams) != ctx->incomplete_stream;
+	bool is_first = queue_len(ctx->streams) == 0 || queue_tail(ctx->streams) != ctx->current_stream->stream_id;
 
-	if (ctx->incomplete_stream != stream_id) {
+	if (ctx->current_stream->stream_id != stream_id) {
 		kr_log_verbose(
 			"[http] stream %d incomplete\n",
-			ctx->incomplete_stream);
+			ctx->current_stream->stream_id);
 		if (!set_error_status(ctx, stream_id, 501, "incomplete stream"))
 			return NGHTTP2_ERR_CALLBACK_FAILURE;
 		return 0;
@@ -625,9 +630,9 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 		}
 	}
 
-	if (frame && (frame->hd.flags & NGHTTP2_FLAG_END_STREAM)) {
+	if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) {
 		struct http_stream_status *stat = ctx->current_stream;
-		if (ctx->incomplete_stream == stream_id) {
+		if (ctx->current_stream->stream_id == stream_id) {
 			if (stat->err_status == 200) {
 				if (ctx->current_method == HTTP_METHOD_GET) {
 					if (process_uri_path(ctx, stream_id) < 0) {
@@ -635,8 +640,6 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 						return NGHTTP2_ERR_CALLBACK_FAILURE;
 					}
 				}
-				free(ctx->uri_path);
-				ctx->uri_path = NULL;
 
 				if (ctx->buf_pos) {
 					len = ctx->buf_pos - sizeof(uint16_t);
@@ -746,7 +749,6 @@ struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
 	ctx->send_cb = send_cb;
 	ctx->session = session;
 	queue_init(ctx->streams);
-	ctx->incomplete_stream = -1;
 	ctx->current_stream = NULL;
 	ctx->submitted = 0;
 	ctx->current_method = HTTP_METHOD_NONE;
