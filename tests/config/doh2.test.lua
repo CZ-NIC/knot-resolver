@@ -100,7 +100,7 @@ local function connection_init(time)
 	local request = {}
 
 	headers:append(':method', 'GET')
-	headers:upsert(':authority', http_util.to_authority(host, port, 'wss'))
+	headers:upsert(':authority', http_util.to_authority(host, port, 'https'))
 	headers:upsert(':path', '/dns-query')
 	headers:upsert(':scheme', 'https')
 	headers:upsert('user-agent', 'doh2.test.lua')
