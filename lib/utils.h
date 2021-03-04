@@ -64,7 +64,7 @@ typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
 			else_expr;                                            \
 		}                                                             \
 	} while (0)
-#define kr_assume(cond) kr_assume((cond), return kr_error(EINVAL))
+#define kr_assume(cond) kr_assume_else((cond), return kr_error(EINVAL))
 
 /* Always export these, but override direct calls by macros conditionally. */
 /** Whether in --verbose mode.  Only use this for reading. */
