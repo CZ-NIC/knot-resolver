@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/resource.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #if ENABLE_CAP_NG
@@ -44,8 +45,20 @@ struct args the_args_value;  /** Static allocation for the_args singleton. */
 
 static void signal_handler(uv_signal_t *handle, int signum)
 {
-	uv_stop(uv_default_loop());
-	uv_signal_stop(handle);
+	switch (signum) {
+	case SIGINT:  /* Fallthrough. */
+	case SIGTERM:
+		uv_stop(uv_default_loop());
+		uv_signal_stop(handle);
+		break;
+	case SIGCHLD:
+		/* Wait for all dead processes. */
+		while (waitpid(-1, NULL, WNOHANG) > 0);
+		break;
+	default:
+		kr_log_error("unhandled signal: %d\n", signum);
+		break;
+	}
 }
 
 /** SIGBUS -> attempt to remove the overflowing cache file and abort. */
@@ -502,11 +515,13 @@ int main(int argc, char **argv)
 
 	uv_loop_t *loop = uv_default_loop();
 	/* Catch some signals. */
-	uv_signal_t sigint, sigterm;
+	static uv_signal_t sigint, sigterm, sigchld;
 	if (true) ret = uv_signal_init(loop, &sigint);
 	if (!ret) ret = uv_signal_init(loop, &sigterm);
+	if (!ret) ret = uv_signal_init(loop, &sigchld);
 	if (!ret) ret = uv_signal_start(&sigint, signal_handler, SIGINT);
 	if (!ret) ret = uv_signal_start(&sigterm, signal_handler, SIGTERM);
+	if (!ret) ret = uv_signal_start(&sigchld, signal_handler, SIGCHLD);
 	/* Block SIGPIPE; see https://github.com/libuv/libuv/issues/45 */
 	if (!ret && signal(SIGPIPE, SIG_IGN) == SIG_ERR) ret = errno;
 	if (!ret) {

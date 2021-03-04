@@ -48,7 +48,7 @@ typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
 #define kr_log_assert(cond) do { \
 	if (!__builtin_expect(cond, true)) { \
 		kr_log_error("assertion failed in %s@%s:%d\n", __func__, __FILE__, __LINE__); \
-		if (__builtin_expect(kr_assert_fatal, false)) abort(); \
+		if (__builtin_expect(kr_debug_assert, false) && fork() == 0) abort(); \
 	}} while (0)
 
 /* Always export these, but override direct calls by macros conditionally. */
@@ -58,8 +58,8 @@ KR_EXPORT extern bool kr_verbose_status;
 /** Set --verbose mode.  Not available if compiled with -DNOVERBOSELOG. */
 KR_EXPORT bool kr_verbose_set(bool status);
 
-/** Whether kr_log_assert() checks should result in SIGABRT. */
-KR_EXPORT extern bool kr_assert_fatal;
+/** Whether kr_log_assert() checks should result fork and abort. */
+KR_EXPORT extern bool kr_debug_assert;
 
 /**
  * @brief Return true if the query has request log handler installed.
