@@ -1,4 +1,4 @@
-/*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2014-2021 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -176,7 +176,7 @@ char* kr_strcatdup(unsigned n, ...)
 
 char * kr_absolutize_path(const char *dirname, const char *fname)
 {
-	assert(dirname && fname);
+	kr_assume_else(dirname && fname, return NULL);
 	char *result;
 	int aret;
 	if (dirname[0] == '/') { // absolute path is easier
@@ -230,7 +230,7 @@ static int pkt_recycle(knot_pkt_t *pkt, bool keep_question)
 	if (keep_question) {
 		base_size += knot_pkt_question_size(pkt);
 	}
-	assert(base_size <= sizeof(buf));
+	kr_assume(base_size <= sizeof(buf));
 	memcpy(buf, pkt->wire, base_size);
 
 	/* Clear the packet and its auxiliary structures */
@@ -281,7 +281,7 @@ int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
 
 void kr_pkt_make_auth_header(knot_pkt_t *pkt)
 {
-	assert(pkt && pkt->wire);
+	kr_assume_else(pkt && pkt->wire, return);
 	knot_wire_clear_ad(pkt->wire);
 	knot_wire_set_aa(pkt->wire);
 }
@@ -470,8 +470,7 @@ struct sockaddr * kr_straddr_socket(const char *addr, int port, knot_mm_t *pool)
 		return (struct sockaddr *)res;
 	}
 	default:
-		assert(!EINVAL);
-		return NULL;
+		kr_assume_else(false, return NULL);
 	}
 }
 
@@ -510,7 +509,7 @@ int kr_straddr_subnet(void *dst, const char *addr)
 int kr_straddr_split(const char *instr, char ipaddr[static restrict (INET6_ADDRSTRLEN + 1)],
 		     uint16_t *port)
 {
-	assert(instr && ipaddr && port);
+	kr_assume(instr && ipaddr && port);
 	/* Find where port number starts. */
 	const char *p_start = strchr(instr, '@');
 	if (!p_start)
@@ -574,7 +573,7 @@ int kr_bitcmp(const char *a, const char *b, int bits)
 		return 1;
 	}
 
-	assert((a && b && bits >= 0)  ||  bits == 0);
+	kr_assume((a && b && bits >= 0)  ||  bits == 0);
 	/* Compare part byte-divisible part. */
 	const size_t chunk = bits / 8;
 	int ret = memcmp(a, b, chunk);
@@ -642,11 +641,7 @@ static inline bool rrsets_match(const knot_rrset_t *rr1, const knot_rrset_t *rr2
  */
 static int to_wire_ensure_unique(ranked_rr_array_t *array, size_t index)
 {
-	bool ok = array && index < array->len;
-	if (!ok) {
-		assert(false);
-		return kr_error(EINVAL);
-	}
+	kr_assume(array && index < array->len);
 
 	const struct ranked_rr_array_entry *e0 = array->at[index];
 	if (!e0->to_wire) {
@@ -695,12 +690,9 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 			continue;
 		}
 		/* Found the entry to merge with.  Check consistency and merge. */
-		bool ok = stashed->rank == rank && !stashed->cached && stashed->in_progress;
-		if (!ok) {
-			assert(false);
-			return kr_error(EEXIST);
-		}
-		/* assert(rr->rrs.count == 1); */
+		kr_assume_else(stashed->rank == rank && !stashed->cached && stashed->in_progress,
+			       return kr_error(EEXIST));
+		kr_assume_else(rr->rrs.count == 1, (void)0);
 		/* ^^ shouldn't be a problem for this function, but it's probably a bug */
 
 		/* It may happen that an RRset is first considered useful
@@ -764,7 +756,7 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 		return kr_error(ENOMEM);
 	}
 	rr_new->rrs = rr->rrs;
-	assert(rr_new->additional == NULL);
+	kr_assume(rr_new->additional == NULL);
 
 	entry->qry_uid = qry_uid;
 	entry->rr = rr_new;
@@ -850,7 +842,7 @@ int kr_ranked_rrarray_finalize(ranked_rr_array_t *array, uint32_t qry_uid, knot_
 					raw_it += size;
 				}
 			}
-			assert(raw_it == (uint8_t *)rds->rdata + rds->size);
+			kr_assume(raw_it == (uint8_t *)rds->rdata + rds->size);
 		}
 		stashed->in_progress = false;
 	}
@@ -1092,10 +1084,10 @@ void kr_uv_free_cb(uv_handle_t* handle)
 
 const char *kr_strptime_diff(const char *format, const char *time1_str,
 		             const char *time0_str, double *diff) {
-	assert(format != NULL);
-	assert(time1_str != NULL);
-	assert(time0_str != NULL);
-	assert(diff != NULL);
+	kr_assume_else(format != NULL, return NULL);
+	kr_assume_else(time1_str != NULL, return NULL);
+	kr_assume_else(time0_str != NULL, return NULL);
+	kr_assume_else(diff != NULL, return NULL);
 
 	struct tm time1_tm;
 	time_t time1_u;
@@ -1125,11 +1117,7 @@ const char *kr_strptime_diff(const char *format, const char *time1_str,
 int knot_dname_lf2wire(knot_dname_t * const dst, uint8_t len, const uint8_t *lf)
 {
 	knot_dname_t *d = dst; /* moving "cursor" as we write it out */
-	bool ok = d && (len == 0 || lf);
-	if (!ok) {
-		assert(false);
-		return kr_error(EINVAL);
-	}
+	kr_assume(d && (len == 0 || lf));
 	/* we allow the final zero byte to be omitted */
 	if (!len) {
 		goto finish;
@@ -1146,7 +1134,7 @@ int knot_dname_lf2wire(knot_dname_t * const dst, uint8_t len, const uint8_t *lf)
 			--i;
 		const int label_start = i + 1; /* index of the first byte of the current label */
 		const int label_len = label_end - label_start;
-		assert(label_len >= 0);
+		kr_assume_else(label_len >= 0, (void)0);
 		if (label_len > 63 || label_len <= 0)
 			return kr_error(EILSEQ);
 		/* write the label */
@@ -1200,7 +1188,7 @@ void kr_rnd_buffered(void *data, uint size)
 void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 			uint16_t type, uint16_t rclass, uint32_t ttl)
 {
-	assert(rrset);
+	kr_assume_else(rrset != NULL, return);
 	knot_rrset_init(rrset, owner, type, rclass, ttl);
 }
 uint16_t kr_pkt_has_dnssec(const knot_pkt_t *pkt)
