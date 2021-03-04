@@ -590,7 +590,6 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	kr_log_assert(false);
 	/* Run the event loop */
 	ret = run_worker(loop, &engine, fork_id == 0, the_args);
 
