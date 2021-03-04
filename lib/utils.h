@@ -44,12 +44,27 @@ typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
 
 #define kr_log_info printf
 #define kr_log_error(...) fprintf(stderr, ## __VA_ARGS__)
+#define kr_log_critical(...) kr_log_error(__VA_ARGS__)
 #define kr_log_deprecate(...) fprintf(stderr, "deprecation WARNING: " __VA_ARGS__)
-#define kr_log_assert(cond) do { \
-	if (!__builtin_expect(cond, true)) { \
-		kr_log_error("assertion failed in %s@%s:%d\n", __func__, __FILE__, __LINE__); \
-		if (__builtin_expect(kr_debug_assert, false) && fork() == 0) abort(); \
-	}} while (0)
+
+#define kr_require(cond)                                                      \
+	do {                                                                  \
+		if (!__builtin_expect((cond), true)) {                        \
+			kr_log_critical("requirement failed in %s@%s:%d\n",   \
+				__func__, __FILE__, __LINE__);                \
+			abort();                                              \
+		}                                                             \
+	} while (0)
+#define kr_assume_else(cond, else_expr)                                       \
+	do {                                                                  \
+		if (!__builtin_expect((cond), true)) {                        \
+			kr_log_error("assumption failed in %s@%s:%d\n",       \
+				__func__, __FILE__, __LINE__);                \
+			if (kr_debug_assumption && fork() == 0) abort();      \
+			else_expr;                                            \
+		}                                                             \
+	} while (0)
+#define kr_assume(cond) kr_assume((cond), return kr_error(EINVAL))
 
 /* Always export these, but override direct calls by macros conditionally. */
 /** Whether in --verbose mode.  Only use this for reading. */
@@ -58,8 +73,8 @@ KR_EXPORT extern bool kr_verbose_status;
 /** Set --verbose mode.  Not available if compiled with -DNOVERBOSELOG. */
 KR_EXPORT bool kr_verbose_set(bool status);
 
-/** Whether kr_log_assert() checks should result fork and abort. */
-KR_EXPORT extern bool kr_debug_assert;
+/** Whether kr_assume() checks should result fork and abort. */
+KR_EXPORT extern bool kr_debug_assumption;
 
 /**
  * @brief Return true if the query has request log handler installed.
