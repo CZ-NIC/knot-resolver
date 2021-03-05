@@ -47,21 +47,27 @@ typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
 #define kr_log_critical(...) kr_log_error(__VA_ARGS__)
 #define kr_log_deprecate(...) fprintf(stderr, "deprecation WARNING: " __VA_ARGS__)
 
+/** assert() but always, regardless of -DNDEBUG.  See also kr_assume(). */
 #define kr_require(expression) if (!(expression)) \
 		kr_fail(true, #expression, __func__, __FILE__, __LINE__)
+
+/** Check an assumption that's recoverable.  Return the expression.
+ *
+ * If the check fails, optionally fork()+abort() to generate coredump
+ * and continue running in parent process.  Return value must be handled to
+ * ensure safe recovery from error.  Use kr_require() for unrecoverable checks.
+ */
 #define kr_assume(expression) kr_assume_func((expression), #expression,       \
 					     __func__, __FILE__, __LINE__)
 
 /** Whether kr_assume() checks should result fork and abort. */
 KR_EXPORT extern bool kr_debug_assumption;
 
+/** Use kr_require() and kr_assume() instead of directly this function. */
 KR_EXPORT KR_COLD void kr_fail(bool is_fatal, const char* expr, const char *func,
 				const char *file, int line);
 
-/** If result isn't true, then optionally fork()+abort() to generate coredump
- * and continue running in parent process. Return value must be handled to
- * ensure safe recovery from error. For unrecoverable errors, use kr_require().
- */
+/** Use kr_require() and kr_assume() instead of directly this function. */
 __attribute__ ((warn_unused_result))
 static inline bool kr_assume_func(bool result, const char *expr, const char *func,
 				  const char *file, int line)
