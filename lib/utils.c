@@ -40,6 +40,15 @@
 bool kr_verbose_status = false;
 bool kr_debug_assumption = true;
 
+void kr_fail(bool is_fatal, const char *expr, const char *func, const char *file, int line)
+{
+	kr_log_error("%s \"%s\" failed in %s@%s:%d\n",
+			(is_fatal ? "requirement" : "assumption"),
+			expr, func, file, line);
+	if (is_fatal || (kr_debug_assumption && fork() == 0))
+		abort();
+}
+
 /*
  * Macros.
  */
