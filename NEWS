@@ -1,9 +1,9 @@
-Knot Resolver 5.3.0 (2021-0m-dd)
+Knot Resolver 5.y.z (2021-0m-dd)
 ================================
 
-Bugfixes
---------
-- doh2: send HTTP error status code (#618, !1102)
+Improvements
+------------
+- doh2: send HTTP error status codes (#618, !1102)
 
 
 Knot Resolver 5.3.0 (2021-02-25)
