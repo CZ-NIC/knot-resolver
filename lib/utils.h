@@ -46,31 +46,27 @@ typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
 #define kr_log_critical(...) kr_log_error(__VA_ARGS__)
 #define kr_log_deprecate(...) fprintf(stderr, "deprecation WARNING: " __VA_ARGS__)
 
-#define kr_require(expression)                                                \
-	((!__builtin_expect((bool)(expression), true))                        \
-	? (kr_log_critical("requirement \"%s\" failed in %s@%s:%d\n",         \
-			   #expression, __func__, __FILE__, __LINE__),        \
-	   abort())                                                           \
-	: true)
+#define kr_require(expression) if (!(expression)) \
+		kr_fail(true, #expression, __func__, __FILE__, __LINE__)
 #define kr_assume(expression) kr_assume_func((expression), #expression,       \
 					     __func__, __FILE__, __LINE__)
 
 /** Whether kr_assume() checks should result fork and abort. */
 KR_EXPORT extern bool kr_debug_assumption;
 
+KR_EXPORT KR_COLD void kr_fail(bool is_fatal, const char* expr, const char *func,
+				const char *file, int line);
+
 /** If result isn't true, then optionally fork()+abort() to generate coredump
  * and continue running in parent process. Return value must be handled to
  * ensure safe recovery from error. For unrecoverable errors, use kr_require().
  */
 __attribute__ ((warn_unused_result))
-static inline bool kr_assume_func(bool result, const char* expr, const char *func,
+static inline bool kr_assume_func(bool result, const char *expr, const char *func,
 				  const char *file, int line)
 {
-	if (!__builtin_expect(result, true)) {
-		kr_log_error("assumption \"%s\" failed in %s@%s:%d\n",
-			     expr, func, file, line);
-		if (kr_debug_assumption && fork() == 0) abort();
-	}
+	if (!result)
+		kr_fail(false, expr, func, file, line);
 	return result;
 }
 
