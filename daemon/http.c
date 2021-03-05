@@ -203,6 +203,8 @@ static int http_status_remove(struct http_ctx *ctx, struct http_stream_status * 
 	for (idx = 0; idx < ctx->stream_status.len; ++idx) {
 		if (stat->stream_id == ctx->stream_status.at[idx]->stream_id) {
 			array_del(ctx->stream_status, idx);
+			free(stat);
+			break;
 		}
 	}
 
@@ -560,6 +562,7 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	ssize_t remaining;
 	ssize_t required;
+	assert(ctx->current_stream);
 	bool is_first = queue_len(ctx->streams) == 0 || queue_tail(ctx->streams) != ctx->current_stream->stream_id;
 
 	if (ctx->current_stream->stream_id != stream_id) {
@@ -632,7 +635,8 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 
 	if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) {
 		struct http_stream_status *stat = ctx->current_stream;
-		if (ctx->current_stream->stream_id == stream_id) {
+		assert(stat);
+		if (stat->stream_id == stream_id) {
 			if (stat->err_status == 200) {
 				if (ctx->current_method == HTTP_METHOD_GET) {
 					if (process_uri_path(ctx, stream_id) < 0) {
