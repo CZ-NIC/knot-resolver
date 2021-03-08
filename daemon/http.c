@@ -95,9 +95,6 @@ static int send_padding(struct http_ctx *ctx, uint8_t padlen)
 	return 0;
 }
 
-static int http_status_remove(struct http_ctx *ctx, struct http_stream_status * stat);
-static struct http_stream_status * http_status_get(struct http_ctx *ctx, int32_t stream_id);
-
 /*
  * Write entire DATA frame to underlying transport layer.
  *
@@ -131,7 +128,7 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 	if (ret < 0)
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 
-	//http_status_remove(ctx, http_status_get(ctx, frame->hd.stream_id));
+	trie_del(ctx->stream_status, (char *)&frame->hd.stream_id, sizeof(frame->hd.stream_id), NULL);
 
 	return 0;
 }
@@ -169,49 +166,6 @@ static ssize_t read_callback(nghttp2_session *h2, int32_t stream_id, uint8_t *bu
 }
 
 /*
- * Get pointer to stream status.
- */
-static struct http_stream_status * http_status_get(struct http_ctx *ctx, int32_t stream_id)
-{
-	assert(ctx);
-	struct http_stream_status *stat = NULL;
-
-	if (ctx->current_stream && ctx->current_stream->stream_id == stream_id)
-		return ctx->current_stream;
-
-
-	for (size_t idx = 0; idx < ctx->stream_status.len; ++idx) {
-		stat = ctx->stream_status.at[idx];
-		if (stat->stream_id == stream_id)
-			return stat;
-	}
-	return NULL;
-}
-
-/*
- * Remove error stream status from list
- */
-static int http_status_remove(struct http_ctx *ctx, struct http_stream_status * stat)
-{
-	if (!stat)
-		return 0;
-
-	free(stat->err_msg);
-	stat->err_msg = NULL;
-
-	size_t idx;
-	for (idx = 0; idx < ctx->stream_status.len; ++idx) {
-		if (stat->stream_id == ctx->stream_status.at[idx]->stream_id) {
-			array_del(ctx->stream_status, idx);
-			free(stat);
-			break;
-		}
-	}
-
-	return 0;
-}
-
-/*
  * Send http error status code.
  */
 static int send_err_status(struct http_ctx *ctx, int32_t stream_id)
@@ -219,10 +173,11 @@ static int send_err_status(struct http_ctx *ctx, int32_t stream_id)
 	int ret;
 	int status_len;
 	nghttp2_data_provider prov;
-	struct http_stream_status *stat = http_status_get(ctx, stream_id);
+	trie_val_t *val = trie_get_try(ctx->stream_status, (char *)&stream_id, sizeof(stream_id));
 
-	if(!stat)
+	if (!val || !*val)
 		return kr_error(EINVAL);
+	struct http_stream_status *stat = *val;
 
 	prov.source.ptr = NULL;
 	prov.read_callback = read_callback;
@@ -265,7 +220,8 @@ static int send_err_status(struct http_ctx *ctx, int32_t stream_id)
 static struct http_stream_status * set_error_status(struct http_ctx *ctx, int32_t stream_id, int status, const char *const status_msg)
 {
 
-	struct http_stream_status *stat = http_status_get(ctx, stream_id);
+	trie_val_t *val = trie_get_ins(ctx->stream_status, (char *)&stream_id, sizeof(stream_id));
+	struct http_stream_status *stat = *val;
 	if (stat && stat->err_status != 200)
 		return stat;
 
@@ -275,12 +231,7 @@ static struct http_stream_status * set_error_status(struct http_ctx *ctx, int32_
 		if (!stat)
 			return NULL;
 
-		// push to end of array
-		if (array_push(ctx->stream_status, stat) < 0) {
-			free(stat);
-			return NULL;
-		}
-
+		*val = stat;
 		stat->err_msg = NULL;
 	}
 	stat->stream_id = stream_id;
@@ -758,7 +709,7 @@ struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
 	ctx->current_method = HTTP_METHOD_NONE;
 	ctx->uri_path = NULL;
 	ctx->content_type = NULL;
-	array_init(ctx->stream_status);
+	ctx->stream_status = trie_create(NULL);
 
 
 	nghttp2_session_server_new(&ctx->h2, callbacks, ctx);
@@ -920,9 +871,7 @@ void http_free(struct http_ctx *ctx)
 	if (!ctx)
 		return;
 
-	while(ctx->stream_status.len)
-		http_status_remove(ctx, ctx->stream_status.at[0]);
-	array_clear(ctx->stream_status);
+	trie_free(ctx->stream_status);  // TODO free elements?
 
 	queue_deinit(ctx->streams);
 	nghttp2_session_del(ctx->h2);
