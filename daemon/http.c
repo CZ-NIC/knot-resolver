@@ -131,7 +131,7 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 	if (ret < 0)
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 
-	http_status_remove(ctx, http_status_get(ctx, frame->hd.stream_id));
+	//http_status_remove(ctx, http_status_get(ctx, frame->hd.stream_id));
 
 	return 0;
 }
