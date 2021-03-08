@@ -216,6 +216,11 @@ static int send_err_status(struct http_ctx *ctx, int32_t stream_id)
 		data->req = NULL;
 		data->ttl = 0;
 		prov.source.ptr = data;
+
+		/* data will be freed in callback. */
+		ret = nghttp2_session_set_stream_user_data(ctx->h2, stream_id, (void*)data);
+		if (ret != 0)
+			return kr_error(EIO);
 	}
 
 	ret = nghttp2_submit_response(ctx->h2, stream_id, hdrs_err, sizeof(hdrs_err)/sizeof(*hdrs_err), &prov);
@@ -661,10 +666,11 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
  */
 static void on_pkt_write(struct http_data *data, int status)
 {
-	if (!data || !data->req || !data->on_write)
+	if (!data)
 		return;
 
-	data->on_write(data->req, status);
+	if (data->req && data->on_write)
+		data->on_write(data->req, status);
 
 	free(data);
 }
