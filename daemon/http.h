@@ -51,7 +51,7 @@ struct http_ctx {
 	uint8_t *buf;  /* Part of the wire_buf that belongs to current HTTP/2 stream. */
 	ssize_t buf_pos;
 	ssize_t buf_size;
-	array_t(struct http_stream_status*) stream_status;
+	trie_t *stream_status;
 	struct http_stream_status *current_stream;
 };
 
