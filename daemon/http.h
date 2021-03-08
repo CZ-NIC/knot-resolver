@@ -36,7 +36,6 @@ struct http_stream_status {
 	int32_t stream_id;
 	int err_status;
 	char *err_msg;
-	struct http_stream_status **ref;
 };
 
 struct http_ctx {
