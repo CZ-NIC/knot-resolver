@@ -124,7 +124,6 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 	struct http_data *data;
 	int ret;
 	struct http_ctx *ctx;
-	struct http_stream_status *stat;
 
 	ctx = (struct http_ctx *)user_data;
 	data = (struct http_data*)source->ptr;
@@ -146,11 +145,6 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 	ret = send_padding(ctx, (uint8_t)frame->data.padlen);
 	if (ret < 0)
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
-
-	ret = trie_del(ctx->stream_status, (char *)&frame->hd.stream_id,
-		       sizeof(frame->hd.stream_id), (trie_val_t *)&stat);
-	assert(ret == 0);
-	http_stream_status_free(stat);
 
 	return 0;
 }
@@ -690,11 +684,18 @@ static void on_pkt_write(struct http_data *data, int status)
 static int on_stream_close_callback(nghttp2_session *h2, int32_t stream_id,
 				    uint32_t error_code, void *user_data)
 {
+	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	struct http_data *data;
+	struct http_stream_status *stat;
+	int ret;
 
 	data = nghttp2_session_get_stream_user_data(h2, stream_id);
 	if (data)
 		on_pkt_write(data, error_code == 0 ? 0 : kr_error(EIO));
+
+	ret = trie_del(ctx->stream_status, (char *)&stream_id, sizeof(stream_id), (trie_val_t *)&stat);
+	if (ret == 0)
+		http_stream_status_free(stat);
 
 	return 0;
 }
