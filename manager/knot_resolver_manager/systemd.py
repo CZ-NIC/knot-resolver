@@ -1,6 +1,6 @@
+from threading import Thread
 from typing import List, Union
 from typing_extensions import Literal
-from threading import Thread
 
 from pydbus import SystemBus
 from gi.repository import GLib
@@ -35,7 +35,7 @@ def _wait_for_job_completion(systemd, job):
             raise SystemdException(
                 f"Job completed with state '{result_state}' instead of expected 'done'"
             )
-    
+
     thread = Thread(target=event_loop_isolation_thread)
     thread.start()
     thread.join()
