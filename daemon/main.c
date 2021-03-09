@@ -509,7 +509,7 @@ int main(int argc, char **argv)
 
 	uv_loop_t *loop = uv_default_loop();
 	/* Catch some signals. */
-	static uv_signal_t sigint, sigterm, sigchld;
+	uv_signal_t sigint, sigterm, sigchld;
 	if (true) ret = uv_signal_init(loop, &sigint);
 	if (!ret) ret = uv_signal_init(loop, &sigterm);
 	if (!ret) ret = uv_signal_init(loop, &sigchld);
