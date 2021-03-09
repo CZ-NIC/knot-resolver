@@ -1,12 +1,10 @@
-import asyncio
-import signal
 from aiohttp import web
 from knot_resolver_manager.kresd_manager import KresdManager
 
 from . import confmodel
-from . import compat
 
-_SOCKET_PATH = '/tmp/manager.sock'
+_SOCKET_PATH = "/tmp/manager.sock"
+
 
 async def hello(_request: web.Request) -> web.Response:
     return web.Response(text="Hello, world")
@@ -25,8 +23,10 @@ def main():
     # initialize KresdManager
     manager = KresdManager()
     app["kresd_manager"] = manager
+
     async def init_manager(app):
-        await app['kresd_manager'].load_system_state()
+        await app["kresd_manager"].load_system_state()
+
     app.on_startup.append(init_manager)
 
     # configure routing
