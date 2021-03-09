@@ -1,5 +1,6 @@
 from typing import List, Union
 from typing_extensions import Literal
+from threading import Thread
 
 from pydbus import SystemBus
 from gi.repository import GLib
@@ -22,17 +23,22 @@ def _create_manager_interface():
 
 
 def _wait_for_job_completion(systemd, job):
-    global result_state
+    def event_loop_isolation_thread():
+        global result_state
 
-    loop = GLib.MainLoop()
-    systemd.JobRemoved.connect(_wait_for_job_completion_handler(loop, job))
-    result_state = None
-    loop.run()
+        loop = GLib.MainLoop()
+        systemd.JobRemoved.connect(_wait_for_job_completion_handler(loop, job))
+        result_state = None
+        loop.run()
 
-    if result_state != "done":
-        raise SystemdException(
-            f"Job completed with state '{result_state}' instead of expected 'done'"
-        )
+        if result_state != "done":
+            raise SystemdException(
+                f"Job completed with state '{result_state}' instead of expected 'done'"
+            )
+    
+    thread = Thread(target=event_loop_isolation_thread)
+    thread.start()
+    thread.join()
 
 
 def _wait_for_job_completion_handler(loop, job_path):
