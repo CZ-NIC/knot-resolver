@@ -1,7 +1,7 @@
 import subprocess
 import signal
 import uuid
-from typing import Optional, List, BinaryIO
+from typing import Optional, List, BinaryIO, Dict
 import shutil
 import tarfile
 import os
@@ -11,7 +11,7 @@ import requests
 import hashlib
 
 from _hashlib import HASH as Hash
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Union
 
 
@@ -143,10 +143,25 @@ class PodmanServiceManager:
         # create hashfile for future caching
         self._create_hashfile(context_dir, current_hash)
 
-    def _api_create_container(self, image: str) -> str:
+    def _api_create_container(
+        self, image: str, bind_mount_ro: Dict[PurePath, PurePath] = {}
+    ) -> str:
         response = requests.post(
             self._create_url("libpod/containers/create"),
-            json={"image": image, "remove": True, "systemd": "true"},
+            json={
+                "image": image,
+                "remove": True,
+                "systemd": "true",
+                "mounts": [
+                    {
+                        "destination": str(destination),
+                        "options": ["ro"],
+                        "source": str(source),
+                        "type": "bind",
+                    }
+                    for source, destination in bind_mount_ro.items()
+                ],
+            },
         )
         response.raise_for_status()
         return response.json()["Id"]
@@ -192,9 +207,11 @@ class PodmanServiceManager:
         )
         response.raise_for_status()
 
-    def start_temporary_and_wait(self, image: str, command: List[str]) -> int:
+    def start_temporary_and_wait(
+        self, image: str, command: List[str], bind_mount_ro: Dict[PurePath, PurePath] = {}
+    ) -> int:
         # start the container
-        container_id = self._api_create_container(image)
+        container_id = self._api_create_container(image, bind_mount_ro)
         self._api_start_container(container_id)
 
         # the container is booting, let's give it some time
@@ -222,9 +239,13 @@ class Colors:
     RESET = "\033[0m"
 
 
+def _get_git_root() -> PurePath:
+    result = subprocess.run("git rev-parse --show-toplevel", shell=True, capture_output=True)
+    return PurePath(str(result.stdout, encoding='utf8').strip())
+
 class TestRunner:
     _TEST_DIRECTORY = "tests"
-    _TEST_ENTRYPOINT = ["/test"]
+    _TEST_ENTRYPOINT = ["/test/run"]
 
     @staticmethod
     def _list_tests() -> List[Path]:
@@ -248,7 +269,12 @@ class TestRunner:
                 manager.build_image(test_path, image)
                 print("\tRunning...")
                 exit_code = manager.start_temporary_and_wait(
-                    image, TestRunner._TEST_ENTRYPOINT
+                    image,
+                    TestRunner._TEST_ENTRYPOINT,
+                    bind_mount_ro={
+                        _get_git_root(): PurePath('/repo'),
+                        test_path.absolute(): '/test'
+                    }
                 )
                 if exit_code == 0:
                     print(f"\t{Colors.GREEN}Test succeeded{Colors.RESET}")

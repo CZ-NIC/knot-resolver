@@ -6,6 +6,4 @@ RUN useradd -m -s /bin/bash dev
 RUN echo "dev:password" | chpasswd
 RUN usermod -a -G sudo dev
 
-COPY test /test
-
 CMD ["/sbin/init"]
