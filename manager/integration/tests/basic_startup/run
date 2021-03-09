@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# fail early
+set -e
+
+cd /test
+echo "Starting manager..."
+cp knot-manager.service /etc/systemd/system
+systemctl daemon-reload
+systemctl start knot-manager.service
+
+
+echo -e "lua_config: \"\"\nnum_workers: 4" | curl -X POST --unix-socket /tmp/manager.sock localhost/config -f --data-binary @-
+
+# assert that any kresd process is running
+systemctl status | grep kresd
