@@ -165,6 +165,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, bool leader, struc
 #if ENABLE_LIBSYSTEMD
 	sd_notify(0, "READY=1");
 #endif
+	assert(false);
 	/* Run event loop */
 	uv_run(loop, UV_RUN_DEFAULT);
 	/* Free pipe's data.  Seems OK even on the stopped loop.
