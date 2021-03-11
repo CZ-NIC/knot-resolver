@@ -1,9 +1,13 @@
-Knot Resolver 5.y.z (2021-0m-dd)
+Knot Resolver 5.3.1 (2021-03-dd)
 ================================
 
 Improvements
 ------------
 - doh2: send HTTP error status codes (#618, !1102)
+
+Bugfixes
+--------
+- dnstap module: don't break request resolution on dnstap errors (!1147)
 
 
 Knot Resolver 5.3.0 (2021-02-25)
