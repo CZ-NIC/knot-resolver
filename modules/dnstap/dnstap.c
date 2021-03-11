@@ -93,7 +93,10 @@ static void set_address(const struct sockaddr *sockaddr,
 	*has_port = true;
 }
 
-/* dnstap_log prepares dnstap message and sends it to fstrm */
+/* dnstap_log prepares dnstap message and sends it to fstrm
+ *
+ * Return codes are kr_error(E*) and unused for now.
+ */
 static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 	const struct kr_request *req = ctx->req;
 	const struct kr_module *module = ctx->api->data;
@@ -101,7 +104,7 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 	const struct dnstap_data *dnstap_dt = module->data;
 
 	if (!req->qsource.addr) {
-		return ctx->state;
+		return kr_ok();
 	}
 
 	/* check if we have a valid iothread */
@@ -232,17 +235,19 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 		return kr_error(EBUSY);
 	}
 
-	return ctx->state;
+	return kr_ok();
 }
 
 /* dnstap_log_query prepares dnstap CLIENT_QUERY message and sends it to fstrm */
 static int dnstap_log_query(kr_layer_t *ctx) {
-	return dnstap_log(ctx, CLIENT_QUERY_PHASE);
+	dnstap_log(ctx, CLIENT_QUERY_PHASE);
+	return ctx->state;
 }
 
 /* dnstap_log_response prepares dnstap CLIENT_RESPONSE message and sends it to fstrm */
 static int dnstap_log_response(kr_layer_t *ctx) {
-	return dnstap_log(ctx, CLIENT_RESPONSE_PHASE);
+	dnstap_log(ctx, CLIENT_RESPONSE_PHASE);
+	return ctx->state;
 }
 
 KR_EXPORT
