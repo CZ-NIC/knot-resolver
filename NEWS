@@ -1,3 +1,11 @@
+Knot Resolver 5.3.1 (2021-03-dd)
+================================
+
+Bugfixes
+--------
+- dnstap module: don't break request resolution on dnstap errors (!1147)
+
+
 Knot Resolver 5.3.0 (2021-02-25)
 ================================
 
