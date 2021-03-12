@@ -304,6 +304,8 @@ static void http_status_reinit_error(struct http_ctx *ctx, int stream_id)
 		queue_pop(ctx->streams);
 
 	http_status_reinit(ctx, stream_id);
+
+	nghttp2_submit_rst_stream(ctx->h2, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
 }
 
 /*
