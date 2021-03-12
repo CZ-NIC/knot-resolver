@@ -1,4 +1,4 @@
-FROM debian:latest
+FROM docker.io/debian:latest
 
 ENV LC_ALL=C.UTF-8
 

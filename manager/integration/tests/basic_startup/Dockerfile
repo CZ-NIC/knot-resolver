@@ -1,4 +1,4 @@
-FROM debian:latest
+FROM docker.io/debian:latest
 
 ENV LC_ALL=C.UTF-8
 
@@ -33,5 +33,6 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
 
 # install test dependencies
 RUN apt-get update && apt-get install --no-install-recommends --no-install-suggests -y curl
+RUN pip3 install requests requests-unixsocket
 
 CMD ["/bin/systemd"]

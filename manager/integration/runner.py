@@ -9,6 +9,8 @@ import time
 import sys
 import requests
 import hashlib
+import click
+import json
 
 from _hashlib import HASH as Hash
 from pathlib import Path, PurePath
@@ -99,9 +101,12 @@ class PodmanServiceManager:
 
     def _api_build_container(self, image_name: str, data: BinaryIO):
         response = requests.post(
-            self._create_url("libpod/build"), params=[("t", image_name)], data=data
+            self._create_url("libpod/build"), params=[("t", image_name)], data=data, stream=True
         )
         response.raise_for_status()
+
+        for line in response.iter_lines():
+            print(f"\t\t{json.loads(str(line, 'utf8'))['stream'].rstrip()}")
 
     def _read_and_remove_hashfile(self, context_dir: Path) -> Optional[str]:
         hashfile: Path = context_dir / PodmanServiceManager._HASHFILE_NAME
@@ -190,9 +195,12 @@ class PodmanServiceManager:
 
     def _api_start_exec(self, exec_id):
         response = requests.post(
-            self._create_url(f"libpod/exec/{exec_id}/start"), json={}
+            self._create_url(f"libpod/exec/{exec_id}/start"), json={}, stream=True
         )
         response.raise_for_status()
+
+        for line in response.iter_lines():
+            print(f"\t\t{str(line, 'utf8').rstrip()}")
 
     def _api_get_exec_exit_code(self, exec_id) -> int:
         response = requests.get(self._create_url(f"libpod/exec/{exec_id}/json"))
@@ -208,7 +216,7 @@ class PodmanServiceManager:
         response.raise_for_status()
 
     def start_temporary_and_wait(
-        self, image: str, command: List[str], bind_mount_ro: Dict[PurePath, PurePath] = {}
+        self, image: str, command: List[str], bind_mount_ro: Dict[PurePath, PurePath] = {}, wait_interactively: bool = False
     ) -> int:
         # start the container
         container_id = self._api_create_container(image, bind_mount_ro)
@@ -221,6 +229,11 @@ class PodmanServiceManager:
         exec_id = self._api_create_exec(container_id, command)
         self._api_start_exec(exec_id)
         test_exit_code = self._api_get_exec_exit_code(exec_id)
+
+        if wait_interactively:
+            print(f"\tExit code is {test_exit_code}")
+            print("\tPress [ENTER] to continue...")
+            input()
 
         # issue shutdown command to the container
         exec_id = self._api_create_exec(container_id, ["systemctl", "poweroff"])
@@ -240,7 +253,7 @@ class Colors:
 
 
 def _get_git_root() -> PurePath:
-    result = subprocess.run("git rev-parse --show-toplevel", shell=True, capture_output=True)
+    result = subprocess.run("git rev-parse --show-toplevel", shell=True, stdout=subprocess.PIPE)
     return PurePath(str(result.stdout, encoding='utf8').strip())
 
 class TestRunner:
@@ -259,10 +272,18 @@ class TestRunner:
         ]
 
     @staticmethod
-    def run():
+    @click.command()
+    @click.argument('tests', nargs=-1)
+    @click.option("-w", "--wait", help="Do not stop the test container immediately, wait for confirmation.", default=False, is_flag=True)
+    def run(tests: List[str] = [], wait: bool = False):
         with PodmanService() as manager:
             for test_path in TestRunner._list_tests():
                 test_name = test_path.absolute().name
+
+                if len(tests) != 0 and test_name not in tests:
+                    print(f"Skipping test {Colors.YELLOW}{test_name}{Colors.RESET}")
+                    continue
+
                 print(f"Running test {Colors.YELLOW}{test_name}{Colors.RESET}")
                 image = "knot_test_" + test_name
                 print("\tBuilding...")
@@ -274,7 +295,8 @@ class TestRunner:
                     bind_mount_ro={
                         _get_git_root(): PurePath('/repo'),
                         test_path.absolute(): '/test'
-                    }
+                    },
+                    wait_interactively=wait
                 )
                 if exit_code == 0:
                     print(f"\t{Colors.GREEN}Test succeeded{Colors.RESET}")
