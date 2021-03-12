@@ -101,7 +101,10 @@ class PodmanServiceManager:
 
     def _api_build_container(self, image_name: str, data: BinaryIO):
         response = requests.post(
-            self._create_url("libpod/build"), params=[("t", image_name)], data=data, stream=True
+            self._create_url("libpod/build"),
+            params=[("t", image_name)],
+            data=data,
+            stream=True,
         )
         response.raise_for_status()
 
@@ -216,7 +219,11 @@ class PodmanServiceManager:
         response.raise_for_status()
 
     def start_temporary_and_wait(
-        self, image: str, command: List[str], bind_mount_ro: Dict[PurePath, PurePath] = {}, wait_interactively: bool = False
+        self,
+        image: str,
+        command: List[str],
+        bind_mount_ro: Dict[PurePath, PurePath] = {},
+        inspect_failed: bool = False,
     ) -> int:
         # start the container
         container_id = self._api_create_container(image, bind_mount_ro)
@@ -230,10 +237,23 @@ class PodmanServiceManager:
         self._api_start_exec(exec_id)
         test_exit_code = self._api_get_exec_exit_code(exec_id)
 
-        if wait_interactively:
-            print(f"\tExit code is {test_exit_code}")
-            print("\tPress [ENTER] to continue...")
-            input()
+        if inspect_failed and test_exit_code != 0:
+            command = f"podman exec -ti {container_id[:8]} bash"
+            print(
+                f"\t{Colors.RED}Test failed with exit code {test_exit_code}{Colors.RESET}"
+            )
+            print(
+                f"\t{Colors.YELLOW}Interactive inspection enabled - launching shell!{Colors.RESET}"
+            )
+            print(f"\t\t{Colors.YELLOW}{command}{Colors.RESET}")
+            print(
+                f"\t{Colors.YELLOW}====== Stop the shell to continue testing ======={Colors.RESET}"
+            )
+            _ = subprocess.call(command, shell=True)
+            print(
+                f"\t{Colors.YELLOW}========= Interactive inspection ended =========={Colors.RESET}"
+            )
+            print(f"\t{Colors.YELLOW}Testing continues...{Colors.RESET}")
 
         # issue shutdown command to the container
         exec_id = self._api_create_exec(container_id, ["systemctl", "poweroff"])
@@ -253,8 +273,11 @@ class Colors:
 
 
 def _get_git_root() -> PurePath:
-    result = subprocess.run("git rev-parse --show-toplevel", shell=True, stdout=subprocess.PIPE)
-    return PurePath(str(result.stdout, encoding='utf8').strip())
+    result = subprocess.run(
+        "git rev-parse --show-toplevel", shell=True, stdout=subprocess.PIPE
+    )
+    return PurePath(str(result.stdout, encoding="utf8").strip())
+
 
 class TestRunner:
     _TEST_DIRECTORY = "tests"
@@ -273,12 +296,18 @@ class TestRunner:
 
     @staticmethod
     @click.command()
-    @click.argument('tests', nargs=-1)
-    @click.option("-w", "--wait", help="Do not stop the test container immediately, wait for confirmation.", default=False, is_flag=True)
-    def run(tests: List[str] = [], wait: bool = False):
+    @click.argument("tests", nargs=-1)
+    @click.option(
+        "-i",
+        "--inspect-failed",
+        help="When a test fails, launch an interactive shell in it before termination.",
+        default=False,
+        is_flag=True,
+    )
+    def run(tests: List[str] = [], inspect_failed: bool = False):
         """Run TESTS
 
-        If no TESTS are specified, runs them all.        
+        If no TESTS are specified, runs them all.
         """
         with PodmanService() as manager:
             for test_path in TestRunner._list_tests():
@@ -297,10 +326,10 @@ class TestRunner:
                     image,
                     TestRunner._TEST_ENTRYPOINT,
                     bind_mount_ro={
-                        _get_git_root(): PurePath('/repo'),
-                        test_path.absolute(): '/test'
+                        _get_git_root(): PurePath("/repo"),
+                        test_path.absolute(): "/test",
                     },
-                    wait_interactively=wait
+                    inspect_failed=inspect_failed,
                 )
                 if exit_code == 0:
                     print(f"\t{Colors.GREEN}Test succeeded{Colors.RESET}")
