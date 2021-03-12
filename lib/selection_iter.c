@@ -261,6 +261,13 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 	bool nxnsattack_mitigation = false;
 
 	if (*transport) {
+		if ((*transport)->protocol == KR_TRANSPORT_TCP &&
+		    !qry->server_selection.local_state->truncated &&
+		    qry->server_selection.local_state->force_udp) {
+			// Last chance on broken TCP.
+			(*transport)->protocol = KR_TRANSPORT_UDP;
+		}
+
 		switch ((*transport)->protocol) {
 		case KR_TRANSPORT_RESOLVE_A:
 		case KR_TRANSPORT_RESOLVE_AAAA:
@@ -283,14 +290,6 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 		default:
 			assert(0);
 			break;
-		}
-
-		if (*transport &&
-		    (*transport)->protocol==KR_TRANSPORT_TCP &&
-		    !qry->server_selection.local_state->truncated &&
-		    qry->server_selection.local_state->force_udp) {
-			// Last chance on broken TCP.
-			(*transport)->protocol = KR_TRANSPORT_UDP;
 		}
 	}
 
