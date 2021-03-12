@@ -1,4 +1,4 @@
-FROM debian:buster
+FROM docker.io/debian:buster
 
 RUN apt-get update && apt-get install -y systemd sudo
 
