@@ -536,10 +536,9 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	ssize_t remaining;
 	ssize_t required;
-	assert(ctx->current_stream);
 	bool is_first = queue_len(ctx->streams) == 0 || queue_tail(ctx->streams) != ctx->current_stream->stream_id;
 
-	if (ctx->current_stream->stream_id != stream_id) {
+	if (ctx->current_stream == NULL || ctx->current_stream->stream_id != stream_id) {
 		kr_log_verbose(
 			"[http] stream %d incomplete\n",
 			ctx->current_stream->stream_id);
