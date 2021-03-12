@@ -276,6 +276,10 @@ class TestRunner:
     @click.argument('tests', nargs=-1)
     @click.option("-w", "--wait", help="Do not stop the test container immediately, wait for confirmation.", default=False, is_flag=True)
     def run(tests: List[str] = [], wait: bool = False):
+        """Run TESTS
+
+        If no TESTS are specified, runs them all.        
+        """
         with PodmanService() as manager:
             for test_path in TestRunner._list_tests():
                 test_name = test_path.absolute().name
