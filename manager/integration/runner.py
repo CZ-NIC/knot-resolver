@@ -368,4 +368,7 @@ class TestRunner:
 
 
 if __name__ == "__main__":
+    # before running anything, set correct CWD
+    os.chdir(_get_git_root() / "integration")
+    # run the tests
     TestRunner.run()
