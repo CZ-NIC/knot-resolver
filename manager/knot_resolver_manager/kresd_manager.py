@@ -78,8 +78,8 @@ class KresdManager:
 
     async def _write_config(self, config: YAML):
         # FIXME: this code is blocking!!!
-        with open("/etc/knot-resolver/kresd.conf", 'w') as f:
-            f.write(config['lua_config'].text)
+        with open("/etc/knot-resolver/kresd.conf", "w") as f:
+            f.write(config["lua_config"].text)
 
     async def apply_config(self, config: YAML):
         async with self._children_lock:
