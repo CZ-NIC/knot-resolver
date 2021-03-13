@@ -59,9 +59,12 @@ class PodmanService:
         self._process: Optional[subprocess.Popen] = None
 
     def __enter__(self):
+        env = os.environ.copy()
+        env["BUILDAH_LAYERS"] = "true"
+
         # run with --log-level=info or --log-level=debug for debugging
         self._process = subprocess.Popen(
-            "podman system service tcp:localhost:13579 --time=0", shell=True
+            "podman system service tcp:localhost:13579 --time=0", shell=True, env=env
         )
         time.sleep(0.5)  # required to prevent connection failures
         return PodmanServiceManager("http://localhost:13579")
@@ -102,14 +105,26 @@ class PodmanServiceManager:
     def _api_build_container(self, image_name: str, data: BinaryIO):
         response = requests.post(
             self._create_url("libpod/build"),
-            params=[("t", image_name)],
+            params=[
+                ("t", image_name),
+                ("rm", "false"),
+                ("squash", "false"),
+                ("nocache", "false"),
+                ("cache-from", image_name),
+                ("forcerm", "false"),
+                ("layers", "true"),
+                ("debilita", "prd"),
+            ],
             data=data,
             stream=True,
         )
         response.raise_for_status()
 
+        # forward output
         for line in response.iter_lines():
-            print(f"\t\t{json.loads(str(line, 'utf8'))['stream'].rstrip()}")
+            line = json.loads(str(line, "utf8"))["stream"].rstrip()
+            for real_line in line.splitlines(keepends=False):
+                print(f"\t\t{real_line}")
 
     def _read_and_remove_hashfile(self, context_dir: Path) -> Optional[str]:
         hashfile: Path = context_dir / PodmanServiceManager._HASHFILE_NAME
@@ -127,28 +142,41 @@ class PodmanServiceManager:
             f.write(hash_)
 
     def build_image(self, context_dir: Path, image: str):
+        # For some weird reason, creating containers using API does not use cache.
+        #
+        # # create tar archive out of the context_dir (weird, but there is no other way to specify context)
+        # tar = Path("/tmp/context.tar.gz")
+        # PodmanServiceManager._create_tar_achive(context_dir, tar)
+        # try:
+        #     # send the API request
+        #     with open(tar, "rb") as f:
+        #         self._api_build_container(image, f)
+
+        # finally:
+        #     # cleanup the tar file
+        #     tar.unlink()
+
+        current_hash = DirectoryHash.md5_file(context_dir / "Dockerfile")
         old_hash = self._read_and_remove_hashfile(context_dir)
-        current_hash = DirectoryHash.md5_dir(context_dir) + "_" + image
-        if old_hash == current_hash:
-            # no rebuild required
-            self._create_hashfile(context_dir, current_hash)
-            print("\tSkipping container build")
-            return
 
-        # create tar archive out of the context_dir (weird, but there is no other way to specify context)
-        tar = Path("/tmp/context.tar.gz")
-        PodmanServiceManager._create_tar_achive(context_dir, tar)
-        try:
-            # send the API request
-            with open(tar, "rb") as f:
-                self._api_build_container(image, f)
+        if current_hash == old_hash:
+            print("\t\tSkipping container build - no changes")
+        else:
+            command = f"podman build -t {image} ."
+            cmd = subprocess.Popen(
+                command,
+                shell=True,
+                cwd=str(context_dir.absolute()),
+                stdout=subprocess.PIPE,
+            )
+            while cmd.poll() is None:
+                for line in cmd.stdout.readlines():
+                    line = str(line, "utf8").rstrip()
+                    print(f"\t\t{line}")
+            assert (
+                cmd.returncode == 0
+            ), f"Container build ended with exit code {cmd.returncode}"
 
-        finally:
-            # cleanup the tar file
-            # tar.unlink()
-            pass
-
-        # create hashfile for future caching
         self._create_hashfile(context_dir, current_hash)
 
     def _api_create_container(

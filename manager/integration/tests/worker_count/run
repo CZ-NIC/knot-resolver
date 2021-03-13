@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# fail early
+set -e
+
+cd /test
+echo "Starting manager..."
+cp knot-resolver.service /etc/systemd/system
+systemctl daemon-reload
+systemctl start knot-resolver.service
+
+# give it time to start
+sleep 1
+
+python3 run_test.py

@@ -1,0 +1,12 @@
+[Unit]
+Description=Knot Resolver Manager
+Requires=dbus
+After=dbus
+
+[Service]
+WorkingDirectory=/repo
+ExecStart=/usr/bin/python3 -m knot_resolver_manager
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target

@@ -24,6 +24,6 @@ The tool launches a Podman subprocess which exposes a HTTP API. This API is then
 
 For each directory in `tests/`, the testing tool builds the container, starts it, exec's `/test/run` and observes its result. After that, it issues `systemctl poweroff` and waits until the container turns itself off.
 
-Because building the container is slow (even with Podman's caching), we skip it if it's not needed. The testing tool creates a `.contentshash` file within each test directory, which contains a hash of all content. The container is rebuilt only when the hash changes (or the file is missing).
+Because building the container is slow and spams the output unnecessarly, we skip it if it's not needed. The testing tool creates a `.contentshash` file within each test directory, which contains a hash of the Dockerfile. The container is rebuilt only when the hash changes (or the file is missing).
 
 
