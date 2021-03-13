@@ -10,6 +10,7 @@ Install these tools:
 * [pyenv](https://github.com/pyenv/pyenv#installation) (can be installed using distro's package manager)
 * [Poetry](https://python-poetry.org/docs/#installation) (Note: do not install the package via pip, follow instructions in Poetry's official documentation)
 * [Yarn](https://yarnpkg.com/) (See FAQ for why do we need JS in Python project) or NPM
+* [Podman](https://podman.io/getting-started/installation) configured to work [without root](https://github.com/containers/podman/blob/master/docs/tutorials/rootless_tutorial.md)
 
 Be careful, that you need the latest version of Poetry. The setup was tested with Poetry version 1.1.4. Due to it's ability to switch between Python versions, it has to be installed separately to work correctly. Make sure to follow [the latest setup guide](https://python-poetry.org/docs/#installation).
 
@@ -41,6 +42,7 @@ After setting up the environment, you should be able to interract with the proje
 * `poe check` - static code analysis
 * `poe fixdeps` - update installed dependencies according to the project's configuration
 * `poe clean` - cleanup the repository from unwanted files
+* `poe integration` - run the integration tests
 
 All possible commands can be listed by running the `poe` command without arguments. The definition of these commands can be found in the `pyproject.toml` file.
 
