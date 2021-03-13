@@ -40,6 +40,7 @@ clean = """
          .tox
 """
 tox = { cmd = "tox", help = "Run tests in tox" }
+integration = {cmd = "python integration/runner.py", help = "Run integration tests" }
 
 
 [tool.tox]
