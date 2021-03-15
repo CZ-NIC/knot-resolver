@@ -562,10 +562,6 @@ obs:centos8:x86_64:
 
 obs:debian9:x86_64:
   <<: *distrotest
-  only:
-    variables:
-      - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing|knot-resolver-odvr$/
-      - $CI_COMMIT_TAG
   variables:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: debian9
@@ -573,6 +569,10 @@ obs:debian9:x86_64:
 
 obs:debian10:x86_64:
   <<: *distrotest
+  only:
+    variables:
+      - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing|knot-resolver-odvr$/
+      - $CI_COMMIT_TAG
   variables:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: debian10
@@ -608,10 +608,6 @@ obs:ubuntu1604:x86_64:
 
 obs:ubuntu1804:x86_64:
   <<: *distrotest
-  only:
-    variables:
-      - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing|knot-resolver-odvr$/
-      - $CI_COMMIT_TAG
   variables:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: ubuntu1804
@@ -619,6 +615,10 @@ obs:ubuntu1804:x86_64:
 
 obs:ubuntu2004:x86_64:
   <<: *distrotest
+  only:
+    variables:
+      - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing|knot-resolver-odvr$/
+      - $CI_COMMIT_TAG
   variables:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: ubuntu2004
