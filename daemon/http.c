@@ -6,7 +6,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <assert.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -57,8 +56,8 @@ static void http_stream_status_free(struct http_stream_status *stat)
 
 static int status_free(trie_val_t *stat, void *null)
 {
-	assert(stat);
-	http_stream_status_free(*stat);
+	if (stat)  // TODO use kr_assume()
+		http_stream_status_free(*stat);
 	return 0;
 }
 
@@ -140,7 +139,8 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 	if (ret < 0)
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 	data->pos += length;
-	assert(data->pos <= data->len);
+	if (data->pos > data->len)  // TODO use kr_assume()
+		return NGHTTP2_ERR_CALLBACK_FAILURE;
 
 	ret = send_padding(ctx, (uint8_t)frame->data.padlen);
 	if (ret < 0)
@@ -585,9 +585,8 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	ssize_t len;
 	int32_t stream_id = frame->hd.stream_id;
-	assert(stream_id != -1);
 
-	if (stream_id == 0 || ctx == NULL)
+	if (stream_id <= 0 || ctx == NULL)
 		return 0;
 
 	if (ctx->current_method == HTTP_METHOD_NONE) {
@@ -608,8 +607,7 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 
 	if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) {
 		struct http_stream_status *stat = ctx->current_stream;
-		assert(stat);
-		if (stat->stream_id == stream_id) {
+		if (stat && stat->stream_id == stream_id) {
 			if (stat->err_status == 200) {
 				if (ctx->current_method == HTTP_METHOD_GET) {
 					if (process_uri_path(ctx, stream_id) < 0) {
@@ -763,7 +761,8 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *buf,
 
 	if (!ctx->h2)
 		return kr_error(ENOSYS);
-	assert(ctx->session == session);
+	if (ctx->session != session)  // TODO use kr_assume()
+		return kr_error(EINVAL);
 
 	ctx->submitted = 0;
 	ctx->buf = session_wirebuf_get_free_start(session);
