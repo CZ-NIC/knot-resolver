@@ -277,8 +277,8 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 		case KNOT_EOK:
 			deleted_records++;
 			const uint16_t *entry_type = kr_gc_key_consistent(**i);
-			assert(entry_type != NULL);
-			rrtypelist_add(&deleted_rrtypes, *entry_type);
+			if (entry_type != NULL) // some "inconsistent" entries are OK
+				rrtypelist_add(&deleted_rrtypes, *entry_type);
 			break;
 		case KNOT_ENOENT:
 			already_gone++;

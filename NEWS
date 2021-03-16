@@ -8,6 +8,7 @@ Improvements
 Bugfixes
 --------
 - dnstap module: don't break request resolution on dnstap errors (!1147)
+- cache garbage collector: fix crashes introduced in 5.3.0 (!1153)
 
 
 Knot Resolver 5.3.0 (2021-02-25)
