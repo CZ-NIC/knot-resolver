@@ -265,6 +265,7 @@ respdiff:basic:
     - ulimit -n "$(ulimit -Hn)" # applies only for kresd ATM
     - ./ci/respdiff/start-resolvers.sh
     - ./ci/respdiff/run-respdiff-tests.sh udp
+    - $PREFIX/sbin/kres-cache-gc -c . -u 0  # simple GC sanity check
     - cat results/respdiff.txt
     - echo 'test if mismatch rate < 1.0 %'
     - grep -q '^target disagrees.*0\.[0-9][0-9] %' results/respdiff.txt
