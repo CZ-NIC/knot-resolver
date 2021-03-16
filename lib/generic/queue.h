@@ -54,6 +54,7 @@
 #pragma once
 
 #include "lib/defines.h"
+#include "lib/utils.h"
 #include "contrib/ucw/lib.h"
 #include <assert.h>
 #include <stdbool.h>

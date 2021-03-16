@@ -322,28 +322,29 @@ static struct fstrm_writer* dnstap_unix_writer(const char *path) {
 	return writer;
 }
 
-/* find_string 
+/* find_string
  * create a new string from json
  * *var is set to pointer of new string
  * node must of type JSON_STRING
  * new string can be at most len bytes
  */
 static int find_string(const JsonNode *node, char **val, size_t len) {
-	if (!node || !node->key) {
+	if (!node || !node->key)
 		return kr_error(EINVAL);
-	}
-	assert(node->tag == JSON_STRING);
+	if (!kr_assume(node->tag == JSON_STRING))
+		return kr_error(EINVAL);
 	*val = strndup(node->string_, len);
-	assert(*val != NULL);
+	if (!kr_assume(*val != NULL))
+		return kr_error(EFAULT);
 	return kr_ok();
 }
 
 /* find_bool returns bool from json */
 static bool find_bool(const JsonNode *node) {
-	if (!node || !node->key) {
+	if (!node || !node->key)
 		return false;
-	}
-	assert(node->tag == JSON_BOOL);
+	if (!kr_assume(node->tag == JSON_BOOL))
+		return false;
 	return node->bool_;
 }
 

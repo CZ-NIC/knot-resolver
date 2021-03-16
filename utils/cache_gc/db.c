@@ -88,7 +88,7 @@ const uint16_t *kr_gc_key_consistent(knot_db_val_t key)
 	switch (kd[i]) {
 	case 'E':
 		if (i + 1 + sizeof(uint16_t) > key.len) {
-			assert(!EINVAL);
+			(void)!kr_assume(!EINVAL);
 			return NULL;
 		}
 		return (uint16_t *) & kd[i + 1];
