@@ -18,7 +18,7 @@
 
 #define DEFAULT_TIMEOUT 400
 #define MAX_TIMEOUT 10000
-#define EXPLORE_TIMEOUT_COEFFICENT 2
+#define EXPLORE_TIMEOUT_COEFFICIENT 2
 #define MAX_BACKOFF 5
 #define MINIMAL_TIMEOUT_ADDITION 20
 
@@ -444,15 +444,15 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 	} else {
 		timeout = calc_timeout(chosen->address_state->rtt_state);
 		if (explore) {
-			/* When trying a random server, we cap the timeout to EXPLORE_TIMEOUT_COEFFICENT
+			/* When trying a random server, we cap the timeout to EXPLORE_TIMEOUT_COEFFICIENT
 			 * times the timeout for the best server. This is done so we don't spend
 			 * unreasonable amounts of time probing really bad servers while still
 			 * checking once in a while for e.g. big network change etc.
 			 * We also note this capping was done and don't punish the bad server
 			 * further if it fails to answer in the capped timeout. */
 			unsigned best_timeout = calc_timeout(best->address_state->rtt_state);
-			if (timeout > EXPLORE_TIMEOUT_COEFFICENT * best_timeout) {
-				timeout = EXPLORE_TIMEOUT_COEFFICENT * best_timeout;
+			if (timeout > best_timeout * EXPLORE_TIMEOUT_COEFFICIENT) {
+				timeout = best_timeout * EXPLORE_TIMEOUT_COEFFICIENT;
 				transport->timeout_capped = true;
 			}
 		}
