@@ -70,6 +70,12 @@ struct kr_transport {
 	size_t address_len;
 	enum kr_transport_protocol protocol;
 	unsigned timeout; /**< Timeout in ms to be set for UDP transmission. */
+	/** Timeout was capped to a maximum value base on the other candidates
+	 * when choosing this transport. The timeout therefore can be much lower
+	 * than what we expect it to be. We basically probe the server for a sudden
+	 * network change but we expect it to timeout in most cases. We have to keep
+	 * this in mind when noting the timeout in cache. */
+	bool timeout_capped;
 	/** True iff transport was set in worker.c:subreq_finalize,
 	 * that means it may be different from the one originally chosen one.*/
 	bool deduplicated;
