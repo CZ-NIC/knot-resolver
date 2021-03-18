@@ -401,9 +401,9 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 	qsort(choices, choices_len, sizeof(struct choice), cmp_choices);
 	struct choice *best = &choices[0];
 	struct choice *chosen;
-	bool explore;
 
-	if ((explore = kr_rand_coin(EPSILON_NOMIN, EPSILON_DENOM)) || choices_len == 0) {
+	const bool explore = choices_len == 0 || kr_rand_coin(EPSILON_NOMIN, EPSILON_DENOM);
+	if (explore) {
 		/* "EXPLORE":
 		 * randomly choose some option
 		 * (including resolution of some new name). */
