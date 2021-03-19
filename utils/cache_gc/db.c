@@ -78,10 +78,8 @@ const uint16_t *kr_gc_key_consistent(knot_db_val_t key)
 	} else {
 		/* find the first double zero in the key */
 		for (i = 2; kd[i - 1] || kd[i - 2]; ++i) {
-			if (i >= key.len) {
-				// TODO: assert(!EINVAL) -> kr_assume()
+			if (!kr_assume(i < key.len))
 				return NULL;
-			}
 		}
 	}
 	// the next character can be used for classification
@@ -99,7 +97,7 @@ const uint16_t *kr_gc_key_consistent(knot_db_val_t key)
 	case 'S': // the rtt_state entries are considered inconsistent, at least for now
 		return NULL;
 	default:
-		assert(!EINVAL);
+		(void)!kr_assume(!EINVAL);
 		return NULL;
 	}
 }
