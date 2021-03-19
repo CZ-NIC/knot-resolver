@@ -2,7 +2,6 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <assert.h>
 #include <stdlib.h>
 
 #include <libknot/descriptor.h>
@@ -20,9 +19,8 @@
 
 int kr_nsec_children_in_zone_check(const uint8_t *bm, uint16_t bm_size)
 {
-	if (!bm) {
+	if (!bm)
 		return kr_error(EINVAL);
-	}
 	const bool parent_side =
 		dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_DNAME)
 		|| (dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_NS)
@@ -42,33 +40,29 @@ int kr_nsec_children_in_zone_check(const uint8_t *bm, uint16_t bm_size)
  */
 static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 {
-	assert(nsec && sname);
-	if (knot_dname_cmp(sname, nsec->owner) <= 0) {
+	if (!kr_assume(nsec && sname))
+		return kr_error(EINVAL);
+	if (knot_dname_cmp(sname, nsec->owner) <= 0)
 		return abs(ENOENT); /* 'sname' before 'owner', so can't be covered */
-	}
 
 	/* If NSEC 'owner' >= 'next', it means that there is nothing after 'owner' */
 	/* We have to lower-case it with libknot >= 2.7; see also RFC 6840 5.1. */
 	knot_dname_t next[KNOT_DNAME_MAXLEN];
 	int ret = knot_dname_to_wire(next, knot_nsec_next(nsec->rrs.rdata), sizeof(next));
-	if (ret < 0) {
-		assert(!ret);
+	if (!kr_assume(ret >= 0))
 		return kr_error(ret);
-	}
 	knot_dname_to_lower(next);
 
 	const bool is_last_nsec = knot_dname_cmp(nsec->owner, next) >= 0;
 	const bool in_range = is_last_nsec || knot_dname_cmp(sname, next) < 0;
-	if (!in_range) {
+	if (!in_range)
 		return abs(ENOENT);
-	}
 	/* Before returning kr_ok(), we have to check a special case:
 	 * sname might be under delegation from owner and thus
 	 * not in the zone of this NSEC at all.
 	 */
-	if (knot_dname_in_bailiwick(sname, nsec->owner) <= 0) {
+	if (knot_dname_in_bailiwick(sname, nsec->owner) <= 0)
 		return kr_ok();
-	}
 	const uint8_t *bm = knot_nsec_bitmap(nsec->rrs.rdata);
 	uint16_t bm_size = knot_nsec_bitmap_len(nsec->rrs.rdata);
 
@@ -117,13 +111,13 @@ static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 static int name_error_response_check_rr(int *flags, const knot_rrset_t *nsec,
                                         const knot_dname_t *name)
 {
-	assert(flags && nsec && name);
+	if (!kr_assume(flags && nsec && name))
+		return kr_error(EINVAL);
 
-	if (nsec_covers(nsec, name) == 0) {
+	if (nsec_covers(nsec, name) == 0)
 		*flags |= FLG_NOEXIST_RRSET;
-	}
 
-	/* Try to find parent wildcard that is proved by this NSEC. */ 
+	/* Try to find parent wildcard that is proved by this NSEC. */
 	uint8_t namebuf[KNOT_DNAME_MAXLEN];
 	int ret = knot_dname_to_wire(namebuf, name, sizeof(namebuf));
 	if (ret < 0)
@@ -132,9 +126,8 @@ static int name_error_response_check_rr(int *flags, const knot_rrset_t *nsec,
 	while (ptr[0]) {
 		/* Remove leftmost label and replace it with '\1*'. */
 		ptr = (uint8_t *) knot_wire_next_label(ptr, NULL);
-		if (!ptr) {
+		if (!ptr)
 			return kr_error(EINVAL);
-		}
 		*(--ptr) = '*';
 		*(--ptr) = 1;
 		/* True if this wildcard provably doesn't exist. */
@@ -153,20 +146,17 @@ int kr_nsec_name_error_response_check(const knot_pkt_t *pkt, knot_section_t sect
                                       const knot_dname_t *sname)
 {
 	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
-	if (!sec || !sname) {
+	if (!sec || !sname)
 		return kr_error(EINVAL);
-	}
 
 	int flags = 0;
 	for (unsigned i = 0; i < sec->count; ++i) {
 		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
-		if (rrset->type != KNOT_RRTYPE_NSEC) {
+		if (rrset->type != KNOT_RRTYPE_NSEC)
 			continue;
-		}
 		int ret = name_error_response_check_rr(&flags, rrset, sname);
-		if (ret != 0) {
+		if (ret != 0)
 			return ret;
-		}
 	}
 
 	return kr_nsec_existence_denied(flags) ? kr_ok() : kr_error(ENOENT);
@@ -181,7 +171,8 @@ int kr_nsec_name_error_response_check(const knot_pkt_t *pkt, knot_section_t sect
  */
 static int coverign_rrsig_labels(const knot_rrset_t *nsec, const knot_pktsection_t *sec)
 {
-	assert(nsec && sec);
+	if (!kr_assume(nsec && sec))
+		return kr_error(EINVAL);
 
 	int ret = kr_error(ENOENT);
 
@@ -195,9 +186,8 @@ static int coverign_rrsig_labels(const knot_rrset_t *nsec, const knot_pktsection
 		knot_rdata_t *rdata_j = rrset->rrs.rdata;
 		for (uint16_t j = 0; j < rrset->rrs.count;
 				++j, rdata_j = knot_rdataset_next(rdata_j)) {
-			if (knot_rrsig_type_covered(rdata_j) != KNOT_RRTYPE_NSEC) {
+			if (knot_rrsig_type_covered(rdata_j) != KNOT_RRTYPE_NSEC)
 				continue;
-			}
 
 			if (ret < 0) {
 				ret = knot_rrsig_labels(rdata_j);
@@ -216,12 +206,10 @@ static int coverign_rrsig_labels(const knot_rrset_t *nsec, const knot_pktsection
 int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t type, const knot_dname_t *owner)
 {
 	const int NO_PROOF = abs(ENOENT);
-	if (!bm || !owner) {
+	if (!bm || !owner)
 		return kr_error(EINVAL);
-	}
-	if (dnssec_nsec_bitmap_contains(bm, bm_size, type)) {
+	if (dnssec_nsec_bitmap_contains(bm, bm_size, type))
 		return NO_PROOF;
-	}
 
 	if (type != KNOT_RRTYPE_CNAME
 	    && dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_CNAME)) {
@@ -236,9 +224,8 @@ int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t ty
 		 * See RFC4035 5.2, next-to-last paragraph.
 		 * This doesn't apply for root DS as it doesn't exist in DNS hierarchy.
 		 */
-		if (owner[0] != '\0' && dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_SOA)) {
+		if (owner[0] != '\0' && dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_SOA))
 			return NO_PROOF;
-		}
 		break;
 	case KNOT_RRTYPE_CNAME:
 		/* Exception from the `default` rule.  It's perhaps disputable,
@@ -270,14 +257,14 @@ int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t ty
 static int no_data_response_check_rrtype(int *flags, const knot_rrset_t *nsec,
                                          uint16_t type)
 {
-	assert(flags && nsec);
+	if (!kr_assume(flags && nsec))
+		return kr_error(EINVAL);
 
 	const uint8_t *bm = knot_nsec_bitmap(nsec->rrs.rdata);
 	uint16_t bm_size = knot_nsec_bitmap_len(nsec->rrs.rdata);
 	int ret = kr_nsec_bitmap_nodata_check(bm, bm_size, type, nsec->owner);
-	if (ret == kr_ok()) {
+	if (ret == kr_ok())
 		*flags |= FLG_NOEXIST_RRTYPE;
-	}
 	return ret <= 0 ? ret : kr_ok();
 }
 
@@ -291,20 +278,18 @@ static int no_data_response_check_rrtype(int *flags, const knot_rrset_t *nsec,
 static int no_data_wildcard_existence_check(int *flags, const knot_rrset_t *nsec,
                                             const knot_pktsection_t *sec)
 {
-	assert(flags && nsec && sec);
+	if (!kr_assume(flags && nsec && sec))
+		return kr_error(EINVAL);
 
 	int rrsig_labels = coverign_rrsig_labels(nsec, sec);
-	if (rrsig_labels < 0) {
+	if (rrsig_labels < 0)
 		return rrsig_labels;
-	}
 	int nsec_labels = knot_dname_labels(nsec->owner, NULL);
-	if (nsec_labels < 0) {
+	if (nsec_labels < 0)
 		return nsec_labels;
-	}
 
-	if (rrsig_labels == nsec_labels) {
+	if (rrsig_labels == nsec_labels)
 		*flags |= FLG_NOEXIST_WILDCARD;
-	}
 
 	return kr_ok();
 }
@@ -321,19 +306,16 @@ static int no_data_wildcard_existence_check(int *flags, const knot_rrset_t *nsec
 static int wildcard_match_check(const knot_pkt_t *pkt, const knot_pktsection_t *sec,
 				const knot_dname_t *sname, uint16_t stype)
 {
-	if (!sec || !sname) {
+	if (!sec || !sname)
 		return kr_error(EINVAL);
-	}
 
 	int flags = 0;
 	for (unsigned i = 0; i < sec->count; ++i) {
 		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
-		if (rrset->type != KNOT_RRTYPE_NSEC) {
+		if (rrset->type != KNOT_RRTYPE_NSEC)
 			continue;
-		}
-		if (!knot_dname_is_wildcard(rrset->owner)) {
+		if (!knot_dname_is_wildcard(rrset->owner))
 			continue;
-		}
 		if (!knot_dname_is_equal(rrset->owner, sname)) {
 			int wcard_labels = knot_dname_labels(rrset->owner, NULL);
 			int common_labels = knot_dname_matched_labels(rrset->owner, sname);
@@ -345,9 +327,8 @@ static int wildcard_match_check(const knot_pkt_t *pkt, const knot_pktsection_t *
 			}
 		}
 		int ret = no_data_response_check_rrtype(&flags, rrset, stype);
-		if (ret != 0) {
+		if (ret != 0)
 			return ret;
-		}
 	}
 	return (flags & FLG_NOEXIST_RRTYPE) ? kr_ok() : kr_error(ENOENT);
 }
@@ -356,21 +337,18 @@ int kr_nsec_no_data_response_check(const knot_pkt_t *pkt, knot_section_t section
                                    const knot_dname_t *sname, uint16_t stype)
 {
 	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
-	if (!sec || !sname) {
+	if (!sec || !sname)
 		return kr_error(EINVAL);
-	}
 
 	int flags = 0;
 	for (unsigned i = 0; i < sec->count; ++i) {
 		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
-		if (rrset->type != KNOT_RRTYPE_NSEC) {
+		if (rrset->type != KNOT_RRTYPE_NSEC)
 			continue;
-		}
 		if (knot_dname_is_equal(rrset->owner, sname)) {
 			int ret = no_data_response_check_rrtype(&flags, rrset, stype);
-			if (ret != 0) {
+			if (ret != 0)
 				return ret;
-			}
 		}
 	}
 
@@ -381,18 +359,15 @@ int kr_nsec_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_t
                                            const knot_dname_t *sname)
 {
 	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
-	if (!sec || !sname) {
+	if (!sec || !sname)
 		return kr_error(EINVAL);
-	}
 
 	for (unsigned i = 0; i < sec->count; ++i) {
 		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
-		if (rrset->type != KNOT_RRTYPE_NSEC) {
+		if (rrset->type != KNOT_RRTYPE_NSEC)
 			continue;
-		}
-		if (nsec_covers(rrset, sname) == 0) {
+		if (nsec_covers(rrset, sname) == 0)
 			return kr_ok();
-		}
 	}
 
 	return kr_error(ENOENT);
@@ -402,16 +377,14 @@ int kr_nsec_existence_denial(const knot_pkt_t *pkt, knot_section_t section_id,
                              const knot_dname_t *sname, uint16_t stype)
 {
 	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
-	if (!sec || !sname) {
+	if (!sec || !sname)
 		return kr_error(EINVAL);
-	}
 
 	int flags = 0;
 	for (unsigned i = 0; i < sec->count; ++i) {
 		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
-		if (rrset->type != KNOT_RRTYPE_NSEC) {
+		if (rrset->type != KNOT_RRTYPE_NSEC)
 			continue;
-		}
 		/* NSEC proves that name exists, but has no data (RFC4035 4.9, 1) */
 		if (knot_dname_is_equal(rrset->owner, sname)) {
 			no_data_response_check_rrtype(&flags, rrset, stype);
@@ -444,26 +417,21 @@ int kr_nsec_ref_to_unsigned(const knot_pkt_t *pkt)
 {
 	int nsec_found = 0;
 	const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_AUTHORITY);
-	if (!sec) {
+	if (!sec)
 		return kr_error(EINVAL);
-	}
 	for (unsigned i = 0; i < sec->count; ++i) {
 		const knot_rrset_t *ns = knot_pkt_rr(sec, i);
-		if (ns->type == KNOT_RRTYPE_DS) {
+		if (ns->type == KNOT_RRTYPE_DS)
 			return kr_error(EEXIST);
-		}
-		if (ns->type != KNOT_RRTYPE_NS) {
+		if (ns->type != KNOT_RRTYPE_NS)
 			continue;
-		}
 		nsec_found = 0;
 		for (unsigned j = 0; j < sec->count; ++j) {
 			const knot_rrset_t *nsec = knot_pkt_rr(sec, j);
-			if (nsec->type == KNOT_RRTYPE_DS) {
+			if (nsec->type == KNOT_RRTYPE_DS)
 				return kr_error(EEXIST);
-			}
-			if (nsec->type != KNOT_RRTYPE_NSEC) {
+			if (nsec->type != KNOT_RRTYPE_NSEC)
 				continue;
-			}
 			/* nsec found
 			 * check if owner name matches the delegation name
 			 */
@@ -474,9 +442,8 @@ int kr_nsec_ref_to_unsigned(const knot_pkt_t *pkt)
 			nsec_found = 1;
 			const uint8_t *bm = knot_nsec_bitmap(nsec->rrs.rdata);
 			uint16_t bm_size = knot_nsec_bitmap_len(nsec->rrs.rdata);
-			if (!bm) {
+			if (!bm)
 				return kr_error(EINVAL);
-			}
 			if (dnssec_nsec_bitmap_contains(bm, bm_size,
 							  KNOT_RRTYPE_NS) &&
 			    !dnssec_nsec_bitmap_contains(bm, bm_size,
@@ -508,18 +475,14 @@ int kr_nsec_matches_name_and_type(const knot_rrset_t *nsec,
 	/* It's not secure enough to just check a single bit for (some) other types,
 	 * but we don't (currently) only use this API for NS.  See RFC 6840 sec. 4.
 	 */
-	if (type != KNOT_RRTYPE_NS || !nsec || !name) {
-		assert(!EINVAL);
+	if (!kr_assume(type == KNOT_RRTYPE_NS && nsec && name))
 		return kr_error(EINVAL);
-	}
-	if (!knot_dname_is_equal(nsec->owner, name)) {
+	if (!knot_dname_is_equal(nsec->owner, name))
 		return kr_error(ENOENT);
-	}
 	const uint8_t *bm = knot_nsec_bitmap(nsec->rrs.rdata);
 	uint16_t bm_size = knot_nsec_bitmap_len(nsec->rrs.rdata);
-	if (!bm) {
+	if (!bm)
 		return kr_error(EINVAL);
-	}
 	if (dnssec_nsec_bitmap_contains(bm, bm_size, type)) {
 		return kr_ok();
 	} else {
