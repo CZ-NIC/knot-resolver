@@ -85,6 +85,7 @@ static int l_help(lua_State *L)
 		"modules\n    modules configuration\n"
 		"kres\n    resolver services\n"
 		"trust_anchors\n    configure trust anchors\n"
+		"debugging\n    debugging configuration\n"
 		;
 	lua_pushstring(L, help_str);
 	return 1;

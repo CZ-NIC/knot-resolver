@@ -299,7 +299,11 @@ struct kr_server_selection {
 	void (*error)(struct kr_query *, const struct kr_transport *, enum kr_selection_error);
 	struct local_state *local_state;
 };
+
 kr_layer_t kr_layer_t_static;
+_Bool kr_dbg_assumption_abort;
+_Bool kr_dbg_assumption_fork;
+
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
 				const struct kr_query *qry);
 
