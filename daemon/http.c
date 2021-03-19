@@ -321,6 +321,8 @@ static void http_status_reinit(struct http_ctx *ctx, int stream_id)
 		free(ctx->content_type);
 		ctx->content_type = NULL;
 	}
+	ctx->headers = NULL;
+	ctx->headers_pool = NULL;
 }
 
 static void http_status_reinit_error(struct http_ctx *ctx, int stream_id)
@@ -484,6 +486,10 @@ static int begin_headers_callback(nghttp2_session *h2, const nghttp2_frame *fram
 	} else {
 		ctx->current_stream = set_error_status(ctx, stream_id, 200, NULL);
 	}
+
+
+	ctx->headers_pool = mm_ctx_mempool2(MM_DEFAULT_BLKSIZE);
+	ctx->headers = mm_calloc(&ctx->headers_pool, num_of_headers, sizeof(char*));
 	return 0;
 }
 
@@ -510,6 +516,9 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 			return NGHTTP2_ERR_CALLBACK_FAILURE;
 		return 0;
 	}
+
+
+	// TODO: alloc and store headers to ctx->headers array
 
 	if (!strcasecmp(":path", (const char *)name)) {
 		int rc = check_uri(ctx, stream_id, (const char *)value);
@@ -755,7 +764,8 @@ struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
 	ctx->uri_path = NULL;
 	ctx->content_type = NULL;
 	array_init(ctx->stream_status);
-
+	ctx->headers_pool = NULL;
+	ctx->headers = NULL;
 
 	nghttp2_session_server_new(&ctx->h2, callbacks, ctx);
 	nghttp2_submit_settings(ctx->h2, NGHTTP2_FLAG_NONE,

@@ -210,6 +210,7 @@ struct kr_request {
 		struct kr_request_qsource_flags flags; /**< See definition above. */
 		size_t size; /**< query packet size */
 		int32_t stream_id; /**< HTTP/2 stream ID for DoH requests */
+		char **headers;
 	} qsource;
 	struct {
 		unsigned rtt;                  /**< Current upstream RTT */
@@ -237,6 +238,7 @@ struct kr_request {
 	trace_callback_f trace_finish; /**< Request finish tracepoint */
 	int vars_ref; /**< Reference to per-request variable table. LUA_NOREF if not set. */
 	knot_mm_t pool;
+	knot_mm_t pool_headers;
 	unsigned int uid; /**< for logging purposes only */
 	struct {
 		addr_info_f is_tls_capable;

@@ -386,8 +386,10 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		req->qsource.stream_id = -1;
 #if ENABLE_DOH2
 		if (req->qsource.flags.http) {
+			req->pool_headers = http_ctx->headers_pool;
 			struct http_ctx *http_ctx = session_http_get_server_ctx(session);
 			req->qsource.stream_id = queue_head(http_ctx->streams);
+			req->qsource.headers = http_ctx->headers;
 		}
 #endif
 		/* We need to store a copy of peer address. */
@@ -469,6 +471,7 @@ static void request_free(struct request_ctx *ctx)
 	pool_release(worker, ctx->req.pool.ctx);
 	/* @note The 'task' is invalidated from now on. */
 	worker->stats.rconcurrent -= 1;
+	// TODO: release pool_headers
 }
 
 static struct qr_task *qr_task_create(struct request_ctx *ctx)
