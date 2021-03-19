@@ -111,6 +111,12 @@ static int answer_finalize_yield(kr_layer_t *ctx) { return kr_ok(); }
 			struct kr_layer layer = {.state = (r)->state, .api = mod->layer, .req = (r)}; \
 			if (layer.api && layer.api->func) { \
 				(r)->state = layer.api->func(&layer, ##__VA_ARGS__); \
+				/* It's an easy mistake to return error code, for example. */ \
+				/* (though we could allow such an overload later) */ \
+				if (unlikely(!kr_state_consistent((r)->state))) { \
+					assert(!EINVAL); \
+					(r)->state = KR_STATE_FAIL; \
+				} else \
 				if ((r)->state == KR_STATE_YIELD) { \
 					func ## _yield(&layer, ##__VA_ARGS__); \
 					break; \
