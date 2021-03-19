@@ -142,3 +142,25 @@ def test_chained_classes():
     assert _schema_eq(
         CompoundClass.STRICTYAML_SCHEMA, Map({"c": Map({"field": Int()})})
     )
+
+
+def test_combined_with_dataclass():
+    from dataclasses import dataclass
+
+    @dataclass
+    @dataclasses_strictyaml_schema
+    class TestClass:
+        field: int
+
+    assert _schema_eq(TestClass.STRICTYAML_SCHEMA, Map({"field": Int()}))
+
+
+def test_combined_with_dataclass2():
+    from dataclasses import dataclass
+
+    @dataclasses_strictyaml_schema
+    @dataclass
+    class TestClass:
+        field: int
+
+    assert _schema_eq(TestClass.STRICTYAML_SCHEMA, Map({"field": Int()}))
