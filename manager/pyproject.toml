@@ -28,7 +28,7 @@ click = "^7.1.2"
 
 [tool.poe.tasks]
 run = { cmd = "python -m knot_resolver_manager", help = "Run the manager" }
-test = { cmd = "pytest --cov=knot_resolver_manager tests/", help = "Run tests" }
+test = { cmd = "pytest --cov=knot_resolver_manager --show-capture=all tests/", help = "Run tests" }
 check = { cmd = "scripts/codecheck", help = "Run static code analysis" }
 fixdeps = { shell = "poetry install; yarn install", help = "Install/update dependencies according to configuration files"}
 clean = """
