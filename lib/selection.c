@@ -18,6 +18,7 @@
 
 #define DEFAULT_TIMEOUT 400
 #define MAX_TIMEOUT 10000
+#define EXPLORE_TIMEOUT_COEFFICIENT 2
 #define MAX_BACKOFF 5
 #define MINIMAL_TIMEOUT_ADDITION 20
 
@@ -391,8 +392,18 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 
 	struct kr_transport *transport = mm_calloc(mempool, 1, sizeof(*transport));
 
-	int choice = 0;
-	if (kr_rand_coin(EPSILON_NOMIN, EPSILON_DENOM) || choices_len == 0) {
+	/* Shuffle, so we choose fairly between choices with same attributes. */
+	shuffle_choices(choices, choices_len);
+	/* If there are some addresses with no rtt_info we try them
+	 * first (see cmp_choices). So unknown servers are chosen
+	 * *before* the best know server. This ensures that every option
+	 * is tried before going back to some that was tried before. */
+	qsort(choices, choices_len, sizeof(struct choice), cmp_choices);
+	struct choice *best = &choices[0];
+	struct choice *chosen;
+
+	const bool explore = choices_len == 0 || kr_rand_coin(EPSILON_NOMIN, EPSILON_DENOM);
+	if (explore) {
 		/* "EXPLORE":
 		 * randomly choose some option
 		 * (including resolution of some new name). */
@@ -405,24 +416,15 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 			};
 			return transport;
 		} else {
-			choice = index - unresolved_len;
+			chosen = &choices[index - unresolved_len];
 		}
 	} else {
 		/* "EXPLOIT":
 		 * choose a resolved address which seems best right now. */
-		shuffle_choices(choices, choices_len);
-		/* If there are some addresses with no rtt_info we try them
-		 * first (see cmp_choices). So unknown servers are chosen
-		 * *before* the best know server. This ensures that every option
-		 * is tried before going back to some that was tried before. */
-		qsort(choices, choices_len, sizeof(struct choice), cmp_choices);
-		choice = 0;
-
+		chosen = best;
 		if (no6_is_bad())
 			VERBOSE_MSG(NULL, "NO6: is KO [exploit]\n");
 	}
-
-	struct choice *chosen = &choices[choice];
 
 	/* Don't try the same server again when there are other choices to be explored */
 	if (chosen->address_state->error_count && unresolved_len) {
@@ -441,6 +443,19 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 		timeout = back_off_timeout(DEFAULT_TIMEOUT, timeouts);
 	} else {
 		timeout = calc_timeout(chosen->address_state->rtt_state);
+		if (explore) {
+			/* When trying a random server, we cap the timeout to EXPLORE_TIMEOUT_COEFFICIENT
+			 * times the timeout for the best server. This is done so we don't spend
+			 * unreasonable amounts of time probing really bad servers while still
+			 * checking once in a while for e.g. big network change etc.
+			 * We also note this capping was done and don't punish the bad server
+			 * further if it fails to answer in the capped timeout. */
+			unsigned best_timeout = calc_timeout(best->address_state->rtt_state);
+			if (timeout > best_timeout * EXPLORE_TIMEOUT_COEFFICIENT) {
+				timeout = best_timeout * EXPLORE_TIMEOUT_COEFFICIENT;
+				transport->timeout_capped = true;
+			}
+		}
 	}
 
 	enum kr_transport_protocol protocol;
@@ -583,8 +598,9 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		return;
 	case KR_SELECTION_QUERY_TIMEOUT:
 		qry->server_selection.local_state->timeouts++;
-		/* Make sure the query was chosen by this query. */
-		if (!transport->deduplicated) {
+		/* Make sure that the query was chosen by this query and timeout wasn't capped
+		 * (see kr_transport::timeout_capped for details). */
+		if (!transport->deduplicated && !transport->timeout_capped) {
 			cache_timeout(qry, transport, addr_state,
 				      &qry->request->ctx->cache);
 		}
