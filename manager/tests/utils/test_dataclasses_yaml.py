@@ -1,6 +1,7 @@
-from knot_resolver_manager.utils import dataclasses_strictyaml_schema
-from typing import List, Dict, Tuple
+from knot_resolver_manager.utils import dataclass_strictyaml_schema
+from typing import List, Dict, Optional, Tuple
 from strictyaml import Map, Str, EmptyDict, Int, Float, Seq, MapPattern, FixedSeq
+import strictyaml
 import pytest
 
 
@@ -12,7 +13,7 @@ def _schema_eq(schema1, schema2) -> bool:
 
 
 def test_empty_class():
-    @dataclasses_strictyaml_schema
+    @dataclass_strictyaml_schema
     class TestClass:
         pass
 
@@ -20,7 +21,7 @@ def test_empty_class():
 
 
 def test_int_field():
-    @dataclasses_strictyaml_schema
+    @dataclass_strictyaml_schema
     class TestClass:
         field: int
 
@@ -28,7 +29,7 @@ def test_int_field():
 
 
 def test_string_field():
-    @dataclasses_strictyaml_schema
+    @dataclass_strictyaml_schema
     class TestClass:
         field: str
 
@@ -36,7 +37,7 @@ def test_string_field():
 
 
 def test_float_field():
-    @dataclasses_strictyaml_schema
+    @dataclass_strictyaml_schema
     class TestClass:
         field: float
 
@@ -44,7 +45,7 @@ def test_float_field():
 
 
 def test_multiple_fields():
-    @dataclasses_strictyaml_schema
+    @dataclass_strictyaml_schema
     class TestClass:
         field1: str
         field2: int
@@ -57,7 +58,7 @@ def test_multiple_fields():
 
 
 def test_list_field():
-    @dataclasses_strictyaml_schema
+    @dataclass_strictyaml_schema
     class TestClass:
         field: List[str]
 
@@ -65,7 +66,7 @@ def test_list_field():
 
 
 def test_dict_field():
-    @dataclasses_strictyaml_schema
+    @dataclass_strictyaml_schema
     class TestClass:
         field: Dict[str, int]
 
@@ -74,8 +75,18 @@ def test_dict_field():
     )
 
 
+def test_optional_field():
+    @dataclass_strictyaml_schema
+    class TestClass:
+        field: Optional[int]
+
+    assert _schema_eq(
+        TestClass.STRICTYAML_SCHEMA, Map({"field": strictyaml.Optional(Int())})
+    )
+
+
 def test_nested_dict_list():
-    @dataclasses_strictyaml_schema
+    @dataclass_strictyaml_schema
     class TestClass:
         field: Dict[str, List[int]]
 
@@ -90,7 +101,7 @@ def test_nested_dict_key_list():
     List can't be a dict key, so this should fail
     """
 
-    @dataclasses_strictyaml_schema
+    @dataclass_strictyaml_schema
     class TestClass:
         field: Dict[List[int], List[int]]
 
@@ -100,7 +111,7 @@ def test_nested_dict_key_list():
 
 
 def test_nested_list():
-    @dataclasses_strictyaml_schema
+    @dataclass_strictyaml_schema
     class TestClass:
         field: List[List[List[List[int]]]]
 
@@ -110,7 +121,7 @@ def test_nested_list():
 
 
 def test_tuple_field():
-    @dataclasses_strictyaml_schema
+    @dataclass_strictyaml_schema
     class TestClass:
         field: Tuple[str, int]
 
@@ -120,7 +131,7 @@ def test_tuple_field():
 
 
 def test_nested_tuple():
-    @dataclasses_strictyaml_schema
+    @dataclass_strictyaml_schema
     class TestClass:
         field: Tuple[str, Dict[str, int], List[List[int]]]
 
@@ -131,11 +142,11 @@ def test_nested_tuple():
 
 
 def test_chained_classes():
-    @dataclasses_strictyaml_schema
+    @dataclass_strictyaml_schema
     class TestClass:
         field: int
 
-    @dataclasses_strictyaml_schema
+    @dataclass_strictyaml_schema
     class CompoundClass:
         c: TestClass
 
@@ -148,7 +159,7 @@ def test_combined_with_dataclass():
     from dataclasses import dataclass
 
     @dataclass
-    @dataclasses_strictyaml_schema
+    @dataclass_strictyaml_schema
     class TestClass:
         field: int
 
@@ -158,7 +169,7 @@ def test_combined_with_dataclass():
 def test_combined_with_dataclass2():
     from dataclasses import dataclass
 
-    @dataclasses_strictyaml_schema
+    @dataclass_strictyaml_schema
     @dataclass
     class TestClass:
         field: int

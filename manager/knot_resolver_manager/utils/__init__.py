@@ -1,4 +1,4 @@
-from .dataclasses_yaml import dataclasses_strictyaml_schema
+from .dataclasses_yaml import dataclass_strictyaml_schema
 
 
-__all__ = ["dataclasses_strictyaml_schema"]
+__all__ = ["dataclass_strictyaml_schema"]
