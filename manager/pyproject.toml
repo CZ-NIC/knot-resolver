@@ -30,6 +30,7 @@ click = "^7.1.2"
 run = { cmd = "python -m knot_resolver_manager", help = "Run the manager" }
 test = { cmd = "pytest --cov=knot_resolver_manager --show-capture=all tests/", help = "Run tests" }
 check = { cmd = "scripts/codecheck", help = "Run static code analysis" }
+format = { cmd = "poetry run black knot_resolver_manager", help = "Run 'Black' code formater" }
 fixdeps = { shell = "poetry install; yarn install", help = "Install/update dependencies according to configuration files"}
 clean = """
   rm -rf .coverage
@@ -61,7 +62,6 @@ commands =
     poetry install -v
     ./poe test
 """
-
 
 # pylint configuration copied from apkg (https://gitlab.nic.cz/packaging/apkg/-/blob/master/pylintrc)
 [tool.pylint."MESSAGES CONTROL"]
