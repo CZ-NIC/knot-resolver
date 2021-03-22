@@ -160,7 +160,6 @@ def _yamlobj_to_dataclass(cls, obj: YAML):
                 kwargs[name] = [
                     _yamlobj_to_dataclass(args[0], val)
                     for val in obj[name]
-                    if print(args[0], val) is None
                 ]
 
             # Tuple
