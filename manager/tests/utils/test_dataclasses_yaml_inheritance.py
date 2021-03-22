@@ -99,3 +99,30 @@ def test_nested_compount_types2():
     obj = TestClass.from_yaml(yaml)
 
     assert obj.o is None
+
+
+def test_real_failing_dummy_confdata():
+    @dataclass
+    class ConfData(StrictyamlParser):
+        num_workers: int = 1
+        lua_config: Optional[str] = None
+
+        async def validate(self) -> bool:
+            if self.num_workers < 0:
+                raise Exception("Number of workers must be non-negative")
+
+            return True
+
+    # prepare the payload
+    lua_config = "dummy"
+    config = f"""
+num_workers: 4
+lua_config: |
+  { lua_config }"""
+
+    data = ConfData.from_yaml(config)
+
+    assert type(data.num_workers) == int
+    assert data.num_workers == 4
+    assert type(data.lua_config) == str
+    assert data.lua_config == "dummy"
