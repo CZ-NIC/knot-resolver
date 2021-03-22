@@ -5,6 +5,7 @@ from strictyaml.representation import YAML
 
 from . import compat
 from . import systemd
+from .datamodel import ConfData
 
 
 class Kresd:
@@ -76,13 +77,13 @@ class KresdManager:
         while len(self._children) < n:
             await self._spawn_new_child()
 
-    async def _write_config(self, config: YAML):
+    async def _write_config(self, config: ConfData):
         # FIXME: this code is blocking!!!
         with open("/etc/knot-resolver/kresd.conf", "w") as f:
-            f.write(config["lua_config"].text)
+            f.write(config.lua_config)
 
-    async def apply_config(self, config: YAML):
+    async def apply_config(self, config: ConfData):
         async with self._children_lock:
             await self._write_config(config)
-            await self._ensure_number_of_children(config["num_workers"])
+            await self._ensure_number_of_children(config.num_workers)
             await self._rolling_restart()

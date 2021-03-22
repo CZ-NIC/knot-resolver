@@ -2,6 +2,8 @@ from strictyaml import Map, Str, Int
 from strictyaml.parser import load
 from strictyaml.representation import YAML
 
+from .datamodel import ConfData
+
 
 _CONFIG_SCHEMA = Map({"lua_config": Str(), "num_workers": Int()})
 
@@ -37,8 +39,7 @@ async def _validate_config(config):
         raise ConfigValidationException("Number of workers must be non-negative")
 
 
-async def parse(textual_config: str) -> YAML:
-    schema = _get_config_schema()
-    conf = load(textual_config, schema)
-    await _validate_config(conf)
+async def parse(yaml: str) -> ConfData:
+    conf = ConfData.from_yaml(yaml)
+    await conf.validate()
     return conf

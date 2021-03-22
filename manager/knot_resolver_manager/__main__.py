@@ -1,7 +1,7 @@
 from aiohttp import web
 from knot_resolver_manager.kresd_manager import KresdManager
 
-from . import confmodel
+from . import configuration
 
 _SOCKET_PATH = "/tmp/manager.sock"
 
@@ -11,7 +11,7 @@ async def hello(_request: web.Request) -> web.Response:
 
 
 async def apply_config(request: web.Request) -> web.Response:
-    config = await confmodel.parse(await request.text())
+    config = await configuration.parse(await request.text())
     manager: KresdManager = request.app["kresd_manager"]
     await manager.apply_config(config)
     return web.Response(text="OK")
