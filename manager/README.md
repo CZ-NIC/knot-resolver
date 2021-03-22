@@ -40,6 +40,7 @@ After setting up the environment, you should be able to interract with the proje
 * `poe test` - unit tests
 * `poe tox` - unit tests in all supported Python versions (must not be run outside of virtualenv, otherwise it fails to find multiple versions of Python)
 * `poe check` - static code analysis
+* `poe format` - runs code formater
 * `poe fixdeps` - update installed dependencies according to the project's configuration
 * `poe clean` - cleanup the repository from unwanted files
 * `poe integration` - run the integration tests
