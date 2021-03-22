@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple, Type, TypeVar, Union
+from typing import Any, List, Dict, Tuple, Type, TypeVar, Union
 from strictyaml import (
     Map,
     Str,
@@ -109,76 +109,56 @@ def dataclass_strictyaml_schema(cls):
     return cls
 
 
-def _yamlobj_to_dataclass(cls, obj: YAML):
-    # primitive values recursion helper
-    if cls in (str, int, float):
+def _yamlobj_to_dataclass(cls, obj: YAML) -> Any:
+    # native values recursion helper
+    if cls in (int, float):
         return cls(obj)
+    if cls == str:
+        return str(obj.text)
+    # compount types
+    if (
+        hasattr(cls, "__origin__")
+        and hasattr(cls, "__args__")
+        and getattr(cls, "__origin__") in (Union, Dict, List, Tuple)
+    ):
+        origin = getattr(cls, "__origin__")
+        args = getattr(cls, "__args__")
 
-    # assert that no other weird class gets here
-    assert hasattr(cls, _SCHEMA_FIELD_NAME)
+        # Optional[T]
+        if origin == Union and len(args) == 2 and args[1] == NoneType:
+            return _yamlobj_to_dataclass(args[0], obj) if obj is not None else None
+
+        # Dict[K, V]
+        elif origin == Dict and len(args) == 2:
+            return {
+                _yamlobj_to_dataclass(args[0], key): _yamlobj_to_dataclass(args[1], val)
+                for key, val in obj.items()
+            }
+
+        # List[T]
+        elif origin == List and len(args) == 1:
+            return [_yamlobj_to_dataclass(args[0], val) for val in obj]
+
+        # Tuple
+        elif origin == Tuple:
+            return tuple(_yamlobj_to_dataclass(typ, val) for typ, val in zip(args, obj))
+
+    # ^ that's full list of native types
+    # the remaining code handles cases when cls is a dataclasses
+
+    # assert that no weird class without schema gets here
+    if not hasattr(cls, _SCHEMA_FIELD_NAME):
+        raise Exception(
+            f"{str(cls)} does not have a schema field and is not primitive - don't know how to parse. "
+            + "Did you forget to add @dataclass_strictyaml_schema to nested dataclass?"
+        )
 
     anot = cls.__dict__.get("__annotations__", {})
-
     kwargs = {}
     for name, python_type in anot.items():
-        # another dataclass
-        if hasattr(python_type, _SCHEMA_FIELD_NAME):
-            kwargs[name] = _yamlobj_to_dataclass(python_type, obj[name])
-
-        # string
-        elif python_type == str:
-            kwargs[name] = obj[name].text
-
-        # numbers
-        elif python_type in (int, float):
-            kwargs[name] = obj[name]
-
-        # compound generic types
-        elif (
-            hasattr(python_type, "__origin__")
-            and hasattr(python_type, "__args__")
-            and getattr(python_type, "__origin__") in (Union, Dict, List, Tuple)
-        ):
-            origin = getattr(python_type, "__origin__")
-            args = getattr(python_type, "__args__")
-
-            # Optional[T]
-            if origin == Union and len(args) == 2 and args[1] == NoneType:
-                kwargs[name] = obj[name] if name in obj else None
-
-            # Dict[K, V]
-            elif origin == Dict and len(args) == 2:
-                kwargs[name] = {
-                    _yamlobj_to_dataclass(args[0], key): _yamlobj_to_dataclass(
-                        args[1], val
-                    )
-                    for key, val in obj[name].items()
-                }
-
-            # List[T]
-            elif origin == List and len(args) == 1:
-                kwargs[name] = [
-                    _yamlobj_to_dataclass(args[0], val) for val in obj[name]
-                ]
-
-            # Tuple
-            elif origin == Tuple:
-                kwargs[name] = tuple(
-                    _yamlobj_to_dataclass(typ, val) for typ, val in zip(args, obj[name])
-                )
-
-            # unsupported compound type
-            else:
-                raise StrictYAMLValueMappingError(
-                    f"Failed to map compound map field {name} <{python_type}> into {cls}"
-                )
-
-        # unsupported type
-        else:
-            raise StrictYAMLValueMappingError(
-                f"Failed to map field {name} <{python_type}> into {cls}"
-            )
-
+        kwargs[name] = _yamlobj_to_dataclass(
+            python_type, obj[name] if name in obj else None
+        )
     return cls(**kwargs)
 
 
