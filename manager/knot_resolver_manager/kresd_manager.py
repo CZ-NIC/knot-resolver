@@ -1,7 +1,6 @@
 import asyncio
 from uuid import uuid4
 from typing import List, Optional
-from strictyaml.representation import YAML
 
 from . import compat
 from . import systemd
@@ -79,8 +78,9 @@ class KresdManager:
 
     async def _write_config(self, config: ConfData):
         # FIXME: this code is blocking!!!
-        with open("/etc/knot-resolver/kresd.conf", "w") as f:
-            f.write(config.lua_config)
+        if config.lua_config is not None:
+            with open("/etc/knot-resolver/kresd.conf", "w") as f:
+                f.write(config.lua_config)
 
     async def apply_config(self, config: ConfData):
         async with self._children_lock:
