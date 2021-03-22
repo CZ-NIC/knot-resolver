@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple, Union
+from typing import List, Dict, Tuple, Type, TypeVar, Union
 from strictyaml import (
     Map,
     Str,
@@ -158,8 +158,7 @@ def _yamlobj_to_dataclass(cls, obj: YAML):
             # List[T]
             elif origin == List and len(args) == 1:
                 kwargs[name] = [
-                    _yamlobj_to_dataclass(args[0], val)
-                    for val in obj[name]
+                    _yamlobj_to_dataclass(args[0], val) for val in obj[name]
                 ]
 
             # Tuple
@@ -183,15 +182,28 @@ def _yamlobj_to_dataclass(cls, obj: YAML):
     return cls(**kwargs)
 
 
+def _from_yaml(cls, text: str):
+    schema = getattr(cls, _SCHEMA_FIELD_NAME)
+
+    yamlobj = load(text, schema)
+    return _yamlobj_to_dataclass(cls, yamlobj)
+
+
 def dataclass_strictyaml(cls):
     if not hasattr(cls, _SCHEMA_FIELD_NAME):
         cls = dataclass_strictyaml_schema(cls)
 
-    def from_yaml(text: str) -> cls:
-        schema = getattr(cls, _SCHEMA_FIELD_NAME)
-
-        yamlobj = load(text, schema)
-        return _yamlobj_to_dataclass(cls, yamlobj)
-
-    setattr(cls, "from_yaml", from_yaml)
+    setattr(cls, "from_yaml", classmethod(_from_yaml))
     return cls
+
+
+_T = TypeVar("_T", bound="StrictyamlParser")
+
+
+class StrictyamlParser:
+    @classmethod
+    def from_yaml(cls: Type[_T], text: str) -> _T:
+        if not hasattr(cls, _SCHEMA_FIELD_NAME):
+            dataclass_strictyaml_schema(cls)
+
+        return _from_yaml(cls, text)
