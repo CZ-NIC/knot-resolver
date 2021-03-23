@@ -67,6 +67,11 @@ class PodmanService:
             "podman system service tcp:localhost:13579 --time=0", shell=True, env=env
         )
         time.sleep(0.5)  # required to prevent connection failures
+
+        # check that it is really running
+        if self._process.poll() is not None:
+            raise Exception(f"Failed to start the podman service, it exited early with exit code {self._process.returncode}")
+
         return PodmanServiceManager("http://localhost:13579")
 
     def __exit__(self, ex_type, ex_value, ex_traceback):
@@ -76,7 +81,7 @@ class PodmanService:
         time.sleep(0.5)  # fixes interleaved stacktraces with podman's output
 
         if failed_while_running:
-            raise Exception("Failed to properly start the podman service", ex_value)
+            raise Exception("Podman has probably unexpectedly stopped. Can't terminate it properly.", ex_value)
 
 
 class PodmanServiceManager:
