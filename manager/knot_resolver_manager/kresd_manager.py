@@ -19,13 +19,13 @@ class Kresd:
         raise NotImplementedError()
 
     async def start(self):
-        await compat.asyncio_to_thread(systemd.start_unit, f"kresd@{self._id}.service")
+        await compat.asyncio.to_thread(systemd.start_unit, f"kresd@{self._id}.service")
 
     async def stop(self):
-        await compat.asyncio_to_thread(systemd.stop_unit, f"kresd@{self._id}.service")
+        await compat.asyncio.to_thread(systemd.stop_unit, f"kresd@{self._id}.service")
 
     async def restart(self):
-        await compat.asyncio_to_thread(
+        await compat.asyncio.to_thread(
             systemd.restart_unit, f"kresd@{self._id}.service"
         )
 
@@ -55,7 +55,7 @@ class KresdManager:
         await kresd.stop()
 
     async def _collect_already_running_children(self):
-        units = await compat.asyncio_to_thread(systemd.list_units)
+        units = await compat.asyncio.to_thread(systemd.list_units)
         for unit in units:
             u: str = unit
             if u.startswith("kresd@") and u.endswith(".service"):
