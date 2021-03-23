@@ -91,7 +91,7 @@ void forward_choose_transport(struct kr_query *qry,
 			(*transport)->protocol = KR_TRANSPORT_UDP;
 		/* We need to propagate this to flags since it's used in other
 		 * parts of the resolver (e.g. logging and stats). */
-		qry->flags.TCP = tcp;
+		qry->flags.TCP = (*transport)->protocol != KR_TRANSPORT_UDP;
 	}
 }
 
