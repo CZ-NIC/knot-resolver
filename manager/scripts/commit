@@ -11,6 +11,9 @@ source $src_dir/_env.sh
 # run code check
 poe check
 
+# run unit tests
+poe test
+
 # run integration tests
 poe integration
 
