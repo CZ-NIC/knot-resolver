@@ -3,7 +3,8 @@ name = "knot-resolver-manager"
 version = "0.1.0"
 description = "A central management tool for multiple instances of Knot Resolver"
 authors = [
-	"Vašek Šraier <git@vakabus.cz>"
+    "Vašek Šraier <git@vakabus.cz>",
+    "Aleš Mrázek <ales.mrazek@nic.cz>"
 ]
 
 [tool.poetry.dependencies]
@@ -12,6 +13,7 @@ aiohttp = "^3.6.12"
 strictyaml = "^1.3.2"
 pydbus = "^0.6.0"
 PyGObject = "^3.38.0"
+Jinja2 = "^2.11.3"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
