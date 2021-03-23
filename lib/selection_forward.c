@@ -86,6 +86,9 @@ void forward_choose_transport(struct kr_query *qry,
 		 * says nothing about the network RTT of said target, since
 		 * it is doing resolution upstream. */
 		(*transport)->timeout = FORWARDING_TIMEOUT;
+		/* Try to avoid TCP in STUB case.  It seems better for common use cases. */
+		if (qry->flags.STUB && !tcp && (*transport)->protocol == KR_TRANSPORT_TCP)
+			(*transport)->protocol = KR_TRANSPORT_UDP;
 		/* We need to propagate this to flags since it's used in other
 		 * parts of the resolver (e.g. logging and stats). */
 		qry->flags.TCP = tcp;
