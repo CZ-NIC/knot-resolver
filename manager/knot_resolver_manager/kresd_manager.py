@@ -4,6 +4,7 @@ from typing import List, Optional
 
 from . import compat
 from . import systemd
+from . import configuration
 from .datamodel import ConfData
 
 
@@ -78,9 +79,9 @@ class KresdManager:
 
     async def _write_config(self, config: ConfData):
         # FIXME: this code is blocking!!!
-        if config.lua_config is not None:
-            with open("/etc/knot-resolver/kresd.conf", "w") as f:
-                f.write(config.lua_config)
+        lua_config = await configuration.render_lua(config)
+        with open("/etc/knot-resolver/kresd.conf", "w") as f:
+            f.write(lua_config)
 
     async def apply_config(self, config: ConfData):
         async with self._children_lock:

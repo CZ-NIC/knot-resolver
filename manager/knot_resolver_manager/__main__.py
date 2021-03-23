@@ -11,7 +11,7 @@ async def hello(_request: web.Request) -> web.Response:
 
 
 async def apply_config(request: web.Request) -> web.Response:
-    config = await configuration.parse(await request.text())
+    config = await configuration.parse_yaml(await request.text())
     manager: KresdManager = request.app["kresd_manager"]
     await manager.apply_config(config)
     return web.Response(text="OK")
