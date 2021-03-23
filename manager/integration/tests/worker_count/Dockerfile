@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
 RUN apt-get update && apt-get install --no-install-recommends --no-install-suggests -y python3-setuptools
 
 ## python libraries
-RUN pip3 install aiohttp strictyaml pydbus PyGObject
+RUN pip3 install aiohttp strictyaml pydbus PyGObject jinja2
 
 ## systemd
 RUN apt-get update && apt-get install --no-install-recommends --no-install-suggests -y systemd
