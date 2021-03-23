@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# fail early
+set -e
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/_env.sh
+
+
+# run code check
+poe check
+
+# run integration tests
+poe integration
+
+# invoke commit
+git commit $@

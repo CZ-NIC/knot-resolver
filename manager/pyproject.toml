@@ -34,6 +34,7 @@ test = { cmd = "pytest --cov=knot_resolver_manager --show-capture=all tests/", h
 check = { cmd = "scripts/codecheck", help = "Run static code analysis" }
 format = { cmd = "poetry run black knot_resolver_manager/ tests/", help = "Run 'Black' code formater" }
 fixdeps = { shell = "poetry install; yarn install", help = "Install/update dependencies according to configuration files"}
+commit = { shell = "scripts/commit", help = "Invoke every single check before commiting" }
 clean = """
   rm -rf .coverage
          .mypy_cache
