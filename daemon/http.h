@@ -53,6 +53,7 @@ struct http_ctx {
 	ssize_t buf_size;
 	trie_t *stream_status;
 	struct http_stream_status *current_stream;
+	knot_mm_t *pool;
 };
 
 #if ENABLE_DOH2

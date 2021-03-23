@@ -20,6 +20,7 @@
 
 #include "contrib/cleanup.h"
 #include "contrib/base64url.h"
+#include "contrib/ucw/mempool.h"
 
 #define MAKE_NV(K, KS, V, VS) \
 	{ (uint8_t *)(K), (uint8_t *)(V), (KS), (VS), NGHTTP2_NV_FLAG_NONE }
@@ -44,20 +45,20 @@ struct http_data {
 	uv_write_t *req;
 };
 
-static void http_stream_status_free(struct http_stream_status *stat)
+static void http_stream_status_free(knot_mm_t *pool, struct http_stream_status *stat)
 {
 	if (!stat)
 		return;
 
-	free(stat->err_msg);
+	mm_free(pool, stat->err_msg);
 	stat->err_msg = NULL;
-	free(stat);
+	mm_free(pool, stat);
 }
 
-static int status_free(trie_val_t *stat, void *null)
+static int status_free(trie_val_t *stat, void *pool)
 {
 	if (stat)  // TODO use kr_assume()
-		http_stream_status_free(*stat);
+		http_stream_status_free((knot_mm_t*) pool, *stat);
 	return 0;
 }
 
@@ -248,7 +249,7 @@ static struct http_stream_status * set_error_status(struct http_ctx *ctx, int32_
 
 	// add new item to array
 	if (!stat) {
-		stat = malloc(sizeof(*stat));
+		stat = mm_alloc(ctx->pool, sizeof(*stat));
 		if (!stat)
 			return NULL;
 
@@ -258,16 +259,15 @@ static struct http_stream_status * set_error_status(struct http_ctx *ctx, int32_
 	stat->stream_id = stream_id;
 	stat->err_status = status;
 
-	if (!status_msg) {
-		if (stat->err_msg) { // remove previous message
-			free(stat->err_msg);
-			stat->err_msg = NULL;
-		}
-
-		return stat;
+	if (stat->err_msg) { // remove previous message
+		mm_free(ctx->pool, stat->err_msg);
+		stat->err_msg = NULL;
 	}
 
-	stat->err_msg = realloc(stat->err_msg, sizeof(*stat->err_msg) * (strlen(status_msg) + 2));
+	if (!status_msg)
+		return stat;
+
+	stat->err_msg = mm_alloc(ctx->pool, sizeof(*stat->err_msg) * (strlen(status_msg) + 2)); // TODO: free
 	if (!stat->err_msg) {
 		return stat;
 	}
@@ -288,11 +288,11 @@ static void http_status_reinit(struct http_ctx *ctx, int stream_id)
 	ctx->current_stream = NULL;
 	ctx->buf_pos = 0;
 	if (ctx->uri_path) {
-		free(ctx->uri_path);
+		mm_free(ctx->pool, ctx->uri_path);
 		ctx->uri_path = NULL;
 	}
 	if (ctx->content_type) {
-		free(ctx->content_type);
+		mm_free(ctx->pool, ctx->content_type);
 		ctx->content_type = NULL;
 	}
 }
@@ -325,7 +325,7 @@ static int check_uri(struct http_ctx *ctx, int32_t stream_id, const char* uri_pa
 	if (!uri_path)
 		return kr_error(EINVAL);
 
-	auto_free char *path = malloc(sizeof(*path) * (strlen(uri_path) + 1));
+	char *path = mm_alloc(ctx->pool, sizeof(*path) * (strlen(uri_path) + 1));
 	if (!path)
 		return kr_error(ENOMEM);
 
@@ -350,10 +350,12 @@ static int check_uri(struct http_ctx *ctx, int32_t stream_id, const char* uri_pa
 
 	if (ret) { /* no endpoint found */
 		stat = set_error_status(ctx, stream_id, 400, "missing endpoint");
-		return stat ? kr_error(EINVAL) : kr_error(ENOMEM);
+		goto free_path;
 	}
-	if (endpoint_len == strlen(path) - 1) /* done for POST method */
+	if (endpoint_len == strlen(path) - 1) { /* done for POST method */
+		mm_free(ctx->pool, path);
 		return 0;
+	}
 
 	/* go over key:value pair */
 	beg = strtok(query_mark + 1, delim);
@@ -366,22 +368,26 @@ static int check_uri(struct http_ctx *ctx, int32_t stream_id, const char* uri_pa
 			beg = strtok(NULL, delim);
 			if (beg && beg-1 != end_prev+1) { /* detect && */
 				stat = set_error_status(ctx, stream_id, 400, "invalid uri path");
-				return stat ? kr_error(EINVAL) : kr_error(ENOMEM);
+				goto free_path;
 			}
 		}
 
 		if (!beg) { /* no dns variable in path */
 			stat = set_error_status(ctx, stream_id, 400, "'dns' key in path not found");
-			return stat ? kr_error(EINVAL) : kr_error(ENOMEM);
+			goto free_path;
 		}
 	} else {
 		if (!beg) { /* no dns variable in path */
 			stat = set_error_status(ctx, stream_id, 400, "'dns' key in path not found");
-			return stat ? kr_error(EINVAL) : kr_error(ENOMEM);
+			goto free_path;
 		}
 	}
 
 	return 0;
+
+free_path:
+	mm_free(ctx->pool, path);
+	return stat ? kr_error(EINVAL) : kr_error(ENOMEM);
 }
 
 
@@ -493,7 +499,7 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 			if (rc == kr_error(ENOMEM))
 				return NGHTTP2_ERR_CALLBACK_FAILURE;
 		} else {
-			ctx->uri_path = malloc(sizeof(*ctx->uri_path) * (valuelen + 1));
+			ctx->uri_path = mm_alloc(ctx->pool, sizeof(*ctx->uri_path) * (valuelen + 1));
 			if (!ctx->uri_path)
 				return NGHTTP2_ERR_CALLBACK_FAILURE;
 			memcpy(ctx->uri_path, value, valuelen);
@@ -512,7 +518,7 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 	}
 
 	if (!strcasecmp("content-type", (const char *)name)) {
-		ctx->content_type = malloc(sizeof(*ctx->content_type) * valuelen+1);
+		ctx->content_type = mm_alloc(ctx->pool, sizeof(*ctx->content_type) * valuelen+1);
 		if (!ctx->content_type)
 			return NGHTTP2_ERR_CALLBACK_FAILURE;
 		memcpy(ctx->content_type, value, valuelen);
@@ -694,7 +700,7 @@ static int on_stream_close_callback(nghttp2_session *h2, int32_t stream_id,
 
 	ret = trie_del(ctx->stream_status, (char *)&stream_id, sizeof(stream_id), (trie_val_t *)&stat);
 	if (ret == 0)
-		http_stream_status_free(stat);
+		http_stream_status_free(ctx->pool, stat);
 
 	return 0;
 }
@@ -725,10 +731,12 @@ struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
 	nghttp2_session_callbacks_set_on_stream_close_callback(
 		callbacks, on_stream_close_callback);
 
-	ctx = calloc(1UL, sizeof(struct http_ctx));
+	knot_mm_t *pool = mm_ctx_mempool2(MM_DEFAULT_BLKSIZE);
+	ctx = mm_calloc(pool, 1UL, sizeof(struct http_ctx));
 	if (!ctx)
 		goto finish;
 
+	ctx->pool = pool;
 	ctx->send_cb = send_cb;
 	ctx->session = session;
 	queue_init(ctx->streams);
@@ -900,11 +908,10 @@ void http_free(struct http_ctx *ctx)
 	if (!ctx)
 		return;
 
-	trie_apply(ctx->stream_status, status_free, NULL);
+	trie_apply(ctx->stream_status, status_free, ctx->pool);
 	trie_free(ctx->stream_status);
 
 	queue_deinit(ctx->streams);
 	nghttp2_session_del(ctx->h2);
-	free(ctx->content_type);
-	free(ctx);
+	mp_delete(ctx->pool->ctx);
 }
