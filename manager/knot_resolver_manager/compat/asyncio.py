@@ -7,7 +7,7 @@ import functools
 from typing import Awaitable, Coroutine
 
 
-def asyncio_to_thread(func, *args, **kwargs) -> Awaitable:
+def to_thread(func, *args, **kwargs) -> Awaitable:
     # version 3.9 and higher, call directly
     if sys.version_info.major >= 3 and sys.version_info.minor >= 9:
         return asyncio.to_thread(func, *args, **kwargs)
@@ -19,7 +19,7 @@ def asyncio_to_thread(func, *args, **kwargs) -> Awaitable:
         return loop.run_in_executor(None, pfunc)
 
 
-def asyncio_create_task(coro: Coroutine, name=None) -> Future:
+def create_task(coro: Coroutine, name=None) -> Future:
     # version 3.8 and higher, call directly
     if sys.version_info.major >= 3 and sys.version_info.minor >= 8:
         return asyncio.create_task(coro, name=name)
@@ -33,7 +33,7 @@ def asyncio_create_task(coro: Coroutine, name=None) -> Future:
         return asyncio.ensure_future(coro)
 
 
-def asyncio_run(coro: Coroutine, debug=None) -> Awaitable:
+def run(coro: Coroutine, debug=None) -> Awaitable:
     # ideally copy-paste of this:
     # https://github.com/python/cpython/blob/3.9/Lib/asyncio/runners.py#L8
 

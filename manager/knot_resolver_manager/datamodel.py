@@ -1,6 +1,6 @@
-from dataclasses import dataclass
 from typing import Optional
 
+from .compat.dataclasses import dataclass
 from .utils import StrictyamlParser
 
 
