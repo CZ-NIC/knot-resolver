@@ -499,7 +499,7 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 			   const knot_dname_t *name, const struct kr_query *qry,
 			   bool * restrict secured)
 {
-	if (!kr_assume(ctx && cut && name))  // TODO testing is needed if kr_assume() is ok
+	if (!ctx || !cut || !name)
 		return kr_error(EINVAL);
 	/* I'm not sure whether the caller always passes a clean state;
 	 * mixing doesn't seem to make sense in any case, so let's clear it.
