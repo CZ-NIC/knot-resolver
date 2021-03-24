@@ -64,7 +64,8 @@ int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank)
 	/* write both sets */
 	const knot_rdataset_t *rdss[2] = { &rrset->set.rr->rrs, &rrset->sig_rds };
 	for (int i = 0; i < rrset_cnt; ++i) {
-		assert(rdss[i]->count);
+		if (!kr_assume(rdss[i]->count))
+			return kr_error(EINVAL);
 		/* allocate rank */
 		uint8_t *rr_rank = mm_alloc(&pkt->mm, sizeof(*rr_rank));
 		if (!rr_rank) return kr_error(ENOMEM);
