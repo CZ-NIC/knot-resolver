@@ -76,20 +76,17 @@ int kr_gc_key_consistent(knot_db_val_t key)
 	} else {
 		/* find the first double zero in the key */
 		for (i = 2; kd[i - 1] || kd[i - 2]; ++i) {
-			if (i >= key.len) {
-				// TODO: assert(!EINVAL) -> kr_assume()
+			if (!kr_assume(i < key.len))
 				return kr_error(EINVAL);
-			}
 		}
 	}
 	// the next character can be used for classification
 	switch (kd[i]) {
 	case 'E':
-		if (i + 1 + sizeof(uint16_t) > key.len) {
-			assert(!EINVAL);
-			return kr_error(EINVAL);
-		}
+		(void)0; // C can't have a variable definition following a label
 		uint16_t type;
+		if (!kr_assume(i + 1 + sizeof(type) <= key.len))
+			return kr_error(EINVAL);
 		memcpy(&type, kd + i + 1, sizeof(type));
 		return type;
 	case '1':
@@ -99,7 +96,7 @@ int kr_gc_key_consistent(knot_db_val_t key)
 	case 'S': // the rtt_state entries are considered inconsistent, at least for now
 		return -1;
 	default:
-		assert(!EINVAL);
+		(void)!kr_assume(!EINVAL);
 		return kr_error(EINVAL);
 	}
 }
