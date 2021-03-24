@@ -16,10 +16,8 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
 	 * (request sizes one byte longer and shift iff on an odd address). */
 	//if ((size_t)data & 1) VERBOSE_MSG(NULL, "dematerialize: odd address\n");
 	//const uint8_t *data0 = data;
-	if (!data) {
-		assert(data);
+	if (!kr_assume(data))
 		return kr_error(EINVAL);
-	}
 	const uint16_t rr_count = rds ? rds->count : 0;
 	memcpy(data, &rr_count, sizeof(rr_count));
 	data += sizeof(rr_count);
@@ -38,9 +36,10 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
 static int rdataset_materialize(knot_rdataset_t * restrict rds, const uint8_t * const data,
 				const uint8_t *data_bound, knot_mm_t *pool)
 {
-	assert(rds && data && data_bound && data_bound > data && !rds->rdata
-		/*&& !((size_t)data & 1)*/);
-	assert(pool); /* not required, but that's our current usage; guard leaks */
+	if (!kr_assume(rds && data && data_bound && data_bound > data && !rds->rdata
+		       /*&& !((size_t)data & 1)*/))
+		return kr_error(EINVAL);
+	(void)!kr_assume(pool); /* not required, but that's our current usage; guard leaks */
 	const uint8_t *d = data; /* iterates over the cache data */
 	/* First sum up the sizes for wire format length. */
 	/* TODO: we might overrun here already, but we need to trust cache anyway...*/
@@ -77,21 +76,16 @@ int entry2answer(struct answer *ans, int id,
 		const knot_dname_t *owner, uint16_t type, uint32_t new_ttl)
 {
 	/* We assume it's zeroed.  Do basic sanity check. */
-	if (ans->rrsets[id].set.rr || ans->rrsets[id].sig_rds.rdata
+	const bool not_ok = (ans->rrsets[id].set.rr || ans->rrsets[id].sig_rds.rdata
 	    || (type == KNOT_RRTYPE_NSEC  &&  ans->nsec_p.raw)
-	    || (type == KNOT_RRTYPE_NSEC3 && !ans->nsec_p.raw)
-	   )
-	{
-		assert(false);
+	    || (type == KNOT_RRTYPE_NSEC3 && !ans->nsec_p.raw));
+	if (!kr_assume(!not_ok))
 		return kr_error(EINVAL);
-	}
 	/* Materialize the base RRset. */
 	knot_rrset_t *rr = ans->rrsets[id].set.rr
 		= knot_rrset_new(owner, type, KNOT_CLASS_IN, new_ttl, ans->mm);
-	if (!rr) {
-		assert(!ENOMEM);
+	if (!kr_assume(rr))
 		return kr_error(ENOMEM);
-	}
 	int ret = rdataset_materialize(&rr->rrs, eh->data, eh_bound, ans->mm);
 	if (ret < 0) goto fail;
 	size_t data_off = ret;
@@ -108,14 +102,14 @@ int entry2answer(struct answer *ans, int id,
 		if (unused_bytes) {
 			kr_log_error("[cach] entry2answer ERROR: unused bytes: %d\n",
 					unused_bytes);
-			assert(!EILSEQ);
+			(void)!kr_assume(!EILSEQ);
 			ret = kr_error(EILSEQ);
 			goto fail; /* to be on the safe side */
 		}
 	}
 	return kr_ok();
 fail:
-	assert(/*false*/!ret);
+	(void)!kr_assume(!ret);
 	/* Cleanup the item that we might've (partially) written to. */
 	knot_rrset_free(ans->rrsets[id].set.rr, ans->mm);
 	knot_rdataset_clear(&ans->rrsets[id].sig_rds, ans->mm);
