@@ -150,6 +150,7 @@ int kr_forward_add_target(struct kr_request *req, const struct sockaddr *sock);
 struct rtt_state {
 	int32_t srtt; /**< Smoothed RTT, i.e. an estimate of round-trip time. */
 	int32_t variance; /**< An estimate of RTT's standard derivation (not variance). */
+	/** Note: some TCP and TLS failures are also considered as timeouts. */
 	int32_t consecutive_timeouts;
 	/** Timestamp of pronouncing this IP bad based on KR_NS_TIMEOUT_ROW_DEAD */
 	uint64_t dead_since;
