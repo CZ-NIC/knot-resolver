@@ -49,8 +49,8 @@ static int net_list_add(const char *key, void *val, void *ext)
 			lua_pushliteral(L, "unix");
 			break;
 		default:
+			(void)!kr_assume(false);
 			lua_pushliteral(L, "invalid");
-			assert(!EINVAL);
 		}
 		lua_setfield(L, -2, "family");
 
@@ -79,7 +79,7 @@ static int net_list_add(const char *key, void *val, void *ext)
 		} else if (ep->flags.sock_type == SOCK_DGRAM) {
 			lua_pushliteral(L, "udp");
 		} else {
-			assert(!EINVAL);
+			(void)!kr_assume(false);
 			lua_pushliteral(L, "invalid");
 		}
 		lua_setfield(L, -2, "protocol");
@@ -108,7 +108,8 @@ static int net_list(lua_State *L)
  * \return success */
 static bool net_listen_addrs(lua_State *L, int port, endpoint_flags_t flags, int16_t nic_queue)
 {
-	assert(flags.xdp || nic_queue == -1);
+	if (!kr_assume(flags.xdp || nic_queue == -1))
+		return false;
 
 	/* Case: table with 'addr' field; only follow that field directly. */
 	lua_getfield(L, -1, "addr");
@@ -509,27 +510,23 @@ static int tls_params2lua(lua_State *L, trie_t *params)
 		} else if (ia_len == 2 + sizeof(struct in6_addr)) {
 			af = AF_INET6;
 		}
-		if (!key || af == AF_UNSPEC) {
-			assert(false);
+		if (!kr_assume(key && af != AF_UNSPEC))
 			lua_error_p(L, "internal error: bad IP address");
-		}
 		uint16_t port;
 		memcpy(&port, key, sizeof(port));
 		port = ntohs(port);
 		const char *ia = key + sizeof(port);
 		char str[INET6_ADDRSTRLEN + 1 + 5 + 1];
 		size_t len = sizeof(str);
-		if (kr_ntop_str(af, ia, port, str, &len) != kr_ok()) {
-			assert(false);
+		if (!kr_assume(kr_ntop_str(af, ia, port, str, &len) == kr_ok()))
 			lua_error_p(L, "internal error: bad IP address conversion");
-		}
 		/* ...and push it as [1]. */
 		lua_pushinteger(L, 1);
 		lua_pushlstring(L, str, len - 1 /* len includes '\0' */);
 		lua_settable(L, -3);
 
 		const tls_client_param_t *e = *trie_it_val(it);
-		if (!e)
+		if (!kr_assume(e))
 			lua_error_p(L, "internal problem - NULL entry for %s", str);
 
 		/* .hostname = */
@@ -556,12 +553,10 @@ static int tls_params2lua(lua_State *L, trie_t *params)
 			uint8_t pin_base64[TLS_SHA256_BASE64_BUFLEN];
 			int err = kr_base64_encode(e->pins.at[i], TLS_SHA256_RAW_LEN,
 						pin_base64, sizeof(pin_base64));
-			if (err < 0) {
-				assert(false);
+			if (!kr_assume(err >= 0))
 				lua_error_p(L,
 					"internal problem when converting pin_sha256: %s",
 					kr_strerror(err));
-			}
 			lua_pushinteger(L, i + 1);
 			lua_pushlstring(L, (const char *)pin_base64, err);
 				/* pin_base64 isn't 0-terminated     ^^^ */
@@ -692,8 +687,7 @@ static int net_tls_client(lua_State *L)
 				ERROR("pin_sha256 is not a string");
 			uint8_t *pin_raw = malloc(TLS_SHA256_RAW_LEN);
 			/* Push the string early to simplify error processing. */
-			if (!pin_raw || array_push(newcfg->pins, pin_raw) < 0) {
-				assert(false);
+			if (!kr_assume(pin_raw && array_push(newcfg->pins, pin_raw) >= 0)) {
 				free(pin_raw);
 				ERROR("%s", kr_strerror(ENOMEM));
 			}
@@ -949,10 +943,8 @@ static int net_outgoing(lua_State *L, int family)
 			lua_pushnil(L);
 			return 1;
 		}
-		if (addr->ip.sa_family != family) {
-			assert(false);
+		if (!kr_assume(addr->ip.sa_family == family))
 			lua_error_p(L, "bad address family");
-		}
 		char addr_buf[INET6_ADDRSTRLEN];
 		int err;
 		if (family == AF_INET)
@@ -1089,10 +1081,9 @@ static int net_register_endpoint_kind(lua_State *L)
 			return 0;
 		}
 		lua_error_p(L, "attempt to unregister unknown kind '%s'\n", kind);
-	} /* else */
+	} /* else -> param_count == 2 */
 
 	/* Registering */
-	assert(param_count == 2);
 	if (!lua_isfunction(L, 2)) {
 		lua_error_p(L, "second parameter: expected function but got %s\n",
 				lua_typename(L, lua_type(L, 2)));
