@@ -420,7 +420,7 @@ static int write_extra_ranked_records(const ranked_rr_array_t *arr, uint16_t reo
 /** @internal Add an EDNS padding RR into the answer if requested and required. */
 static int answer_padding(struct kr_request *request)
 {
-	if (kr_assume(request && request->answer && request->ctx))
+	if (!kr_assume(request && request->answer && request->ctx))
 		return kr_error(EINVAL);
 	if (!request->qsource.flags.tls) {
 		/* Not meaningful to pad without encryption. */
