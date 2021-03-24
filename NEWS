@@ -9,6 +9,7 @@ Bugfixes
 --------
 - dnstap module: don't break request resolution on dnstap errors (!1147)
 - cache garbage collector: fix crashes introduced in 5.3.0 (!1153)
+- policy.TLS_FORWARD: better avoid dead addresses (#671, !1156)
 
 
 Knot Resolver 5.3.0 (2021-02-25)
