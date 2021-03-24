@@ -51,7 +51,6 @@
 
 #pragma once
 
-#include <assert.h>
 #include <stdalign.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -233,7 +232,7 @@ static inline void lru_reset_impl(struct lru *lru)
 /** @internal See lru_capacity. */
 static inline uint lru_capacity_impl(struct lru *lru)
 {
-	assert(lru);
+	kr_require(lru);
 	return (1 << lru->log_groups) * LRU_ASSOC;
 }
 
