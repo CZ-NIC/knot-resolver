@@ -59,18 +59,13 @@ static void nsec_p_cleanup(struct nsec_p *nsec_p)
  * \return error code, e.g. kr_error(ESTALE) */
 static int nsec_p_ttl(knot_db_val_t entry, const uint32_t timestamp, int32_t *new_ttl)
 {
-	if (!entry.data) {
-		assert(!EINVAL);
+	if (!kr_assume(entry.data))
 		return kr_error(EINVAL);
-	}
 	uint32_t stamp;
-	if (!entry.len) {
+	if (!entry.len)
 		return kr_error(ENOENT);
-	}
-	if (entry.len < sizeof(stamp)) {
-		assert(!EILSEQ);
+	if (!kr_assume(entry.len >= sizeof(stamp)))
 		return kr_error(EILSEQ);
-	}
 	memcpy(&stamp, entry.data, sizeof(stamp));
 	int32_t newttl = stamp - timestamp;
 	if (new_ttl) *new_ttl = newttl;
@@ -116,10 +111,8 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	struct key k_storage, *k = &k_storage;
 	int ret = kr_dname_lf(k->buf, qry->sname, false);
-	if (unlikely(ret)) {
-		assert(false);
+	if (!kr_assume(ret == 0))
 		return ctx->state;
-	}
 
 	const uint8_t lowest_rank = get_lowest_rank(qry, qry->sname, qry->stype);
 
@@ -134,33 +127,30 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 			ret = found_exact_hit(ctx, pkt, val, lowest_rank);
 		}
 	}
-	if (ret && ret != -abs(ENOENT)) {
-		VERBOSE_MSG(qry, "=> exact hit error: %d %s\n", ret, kr_strerror(ret));
-		assert(false);
-		return ctx->state;
-	} else if (!ret) {
+	if (!ret) {
 		return KR_STATE_DONE;
+	} else if (!kr_assume(ret == kr_error(ENOENT))) {
+		VERBOSE_MSG(qry, "=> exact hit error: %d %s\n", ret, kr_strerror(ret));
+		return ctx->state;
 	}
 
 	/**** 1b. otherwise, find the longest prefix zone/xNAME (with OK time+rank). [...] */
 	k->zname = qry->sname;
 	ret = kr_dname_lf(k->buf, k->zname, false); /* LATER(optim.): probably remove */
-	if (unlikely(ret)) {
-		assert(false);
+	if (!kr_assume(ret == 0))
 		return ctx->state;
-	}
 	entry_list_t el;
 	ret = closest_NS(cache, k, el, qry, false, qry->stype == KNOT_RRTYPE_DS);
 	if (ret) {
-		assert(ret == kr_error(ENOENT));
-		if (ret != kr_error(ENOENT) || !el[0].len) {
+		if (!kr_assume(ret == kr_error(ENOENT)) || !el[0].len) {
 			return ctx->state;
 		}
 	}
 	switch (k->type) {
 	case KNOT_RRTYPE_CNAME: {
 		const knot_db_val_t v = el[EL_CNAME];
-		assert(v.data && v.len);
+		if (!kr_assume(v.data && v.len))
+			return ctx->state;
 		const int32_t new_ttl = get_new_ttl(v.data, qry, qry->sname,
 						KNOT_RRTYPE_CNAME, qry->timestamp.tv_sec);
 		ret = answer_simple_hit(ctx, pkt, KNOT_RRTYPE_CNAME, v.data,
@@ -169,7 +159,8 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	case KNOT_RRTYPE_DNAME: {
 		const knot_db_val_t v = el[EL_DNAME];
-		assert(v.data && v.len);
+		if (!kr_assume(v.data && v.len))
+			return ctx->state;
 		/* TTL: for simplicity, we just ask for TTL of the generated CNAME. */
 		const int32_t new_ttl = get_new_ttl(v.data, qry, qry->sname,
 						KNOT_RRTYPE_CNAME, qry->timestamp.tv_sec);
@@ -192,7 +183,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (!eh) { /* fall back to root hints? */
 		ret = kr_zonecut_set_sbelt(req->ctx, &qry->zone_cut);
 		if (ret) return ctx->state;
-		assert(!qry->zone_cut.parent);
+		(void)!kr_assume(!qry->zone_cut.parent);
 
 		//VERBOSE_MSG(qry, "=> using root hints\n");
 		//qry->flags.AWAIT_CUT = false;
@@ -257,7 +248,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		ret = cache_op(cache, read, &key, &val, 1);
 		const struct entry_h *eh;
 		if (ret || !(eh = entry_h_consistent_E(val, KNOT_RRTYPE_SOA))) {
-			assert(ret); /* only want to catch `eh` failures */
+			(void)!kr_assume(ret); /* only want to catch `eh` failures */
 			VERBOSE_MSG(qry, "=> SOA missed\n");
 			return ctx->state;
 		}
@@ -287,7 +278,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		real_rcode = KNOT_RCODE_NXDOMAIN;
 		break;
 	default:
-		assert(false);
+		(void)!kr_assume(false);
 	case 0: /* i.e. nothing was found */
 		/* LATER(optim.): zone cut? */
 		VERBOSE_MSG(qry, "=> cache miss\n");
@@ -297,7 +288,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (pkt_renew(pkt, qry->sname, qry->stype)
 	    || knot_pkt_begin(pkt, KNOT_ANSWER)
 	   ) {
-		assert(false);
+		(void)!kr_assume(false);
 		return ctx->state;
 	}
 	knot_wire_set_rcode(pkt->wire, real_rcode);
@@ -308,10 +299,8 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		if (!ans.rrsets[i].set.rr) continue;
 		expiring = expiring || ans.rrsets[i].set.expiring;
 		ret = pkt_append(pkt, &ans.rrsets[i], ans.rrsets[i].set.rank);
-		if (ret) {
-			assert(false);
+		if (!kr_assume(ret == 0))
 			return ctx->state;
-		}
 	}
 
 	/* Finishing touches. */
@@ -357,10 +346,8 @@ static int peek_encloser(
 	}
 
 	/* We should have either a match or a cover at this point. */
-	if (ans->rcode != PKT_NODATA && ans->rcode != PKT_NXDOMAIN) {
-		assert(false);
+	if (!kr_assume(ans->rcode == PKT_NODATA || ans->rcode == PKT_NXDOMAIN))
 		return kr_error(EINVAL);
-	}
 	const bool ncloser_covered = ans->rcode == PKT_NXDOMAIN;
 
 	/** Name of the closest (provable) encloser. */
@@ -375,13 +362,13 @@ static int peek_encloser(
 		int ret = nsec1_src_synth(k, ans, clencl_name,
 					  cover_low_kwz, cover_hi_kwz, qry, cache);
 		if (ret == AR_SOA) return 0;
-		assert(ret <= 0);
+		(void)!kr_assume(ret <= 0);
 		if (ret) return ret;
 
 	} else if (ncloser_covered && ans->nsec_p.raw && !clencl_is_tentative) {
 		int ret = nsec3_src_synth(k, ans, clencl_name, qry, cache);
 		if (ret == AR_SOA) return 0;
-		assert(ret <= 0);
+		(void)!kr_assume(ret <= 0);
 		if (ret) return ret;
 
 	} /* else (!ncloser_covered) so no wildcard checks needed,
@@ -393,18 +380,15 @@ static int peek_encloser(
 		return kr_ok(); /* decrease indentation */
 	/* Construct key for exact qry->stype + source of synthesis. */
 	int ret = kr_dname_lf(k->buf, clencl_name, true);
-	if (ret) {
-		assert(!ret);
+	if (!kr_assume(ret == 0))
 		return kr_error(ret);
-	}
 	const uint16_t types[] = { qry->stype, KNOT_RRTYPE_CNAME };
 	for (int i = 0; i < (2 - (qry->stype == KNOT_RRTYPE_CNAME)); ++i) {
 		ret = try_wild(k, ans, clencl_name, types[i],
 				lowest_rank, qry, cache);
 		if (ret == kr_ok()) {
 			return kr_ok();
-		} else if (ret != -ABS(ENOENT) && ret != -ABS(ESTALE)) {
-			assert(false);
+		} else if (!kr_assume(ret == kr_error(ENOENT) || ret == kr_error(ESTALE))) {
 			return kr_error(ret);
 		}
 		/* else continue */
@@ -412,7 +396,7 @@ static int peek_encloser(
 	/* Neither attempt succeeded, but the NSEC* proofs were found,
 	 * so skip trying other parameters, as it seems very unlikely
 	 * to turn out differently than by the same wildcard search. */
-	return -ABS(ENOENT);
+	return kr_error(ENOENT);
 }
 
 static void answer_simple_qflags(struct kr_qflags *qf, const struct entry_h *eh,
@@ -429,7 +413,7 @@ static void answer_simple_qflags(struct kr_qflags *qf, const struct entry_h *eh,
 }
 
 #define CHECK_RET(ret) do { \
-	if ((ret) < 0) { assert(false); return kr_error((ret)); } \
+	if (!kr_assume((ret) >= 0)) return kr_error((ret)); \
 } while (false)
 
 static int answer_simple_hit(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
@@ -529,12 +513,10 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 	int ret = entry_h_seek(&val, qry->stype);
 	if (ret) return ret;
 	const struct entry_h *eh = entry_h_consistent_E(val, qry->stype);
-	if (!eh) {
-		assert(false);
+	if (!kr_assume(eh))
 		return kr_error(ENOENT);
 		// LATER: recovery in case of error, perhaps via removing the entry?
 		// LATER(optim): pehaps optimize the zone cut search
-	}
 
 	int32_t new_ttl = get_new_ttl(eh, qry, qry->sname, qry->stype,
 					qry->timestamp.tv_sec);
@@ -574,11 +556,9 @@ static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clenc
 		ret = entry_h_seek(&val, type);
 	}
 	if (ret) {
-		if (ret != -ABS(ENOENT)) {
+		if (!kr_assume(ret == kr_error(ENOENT)))
 			VERBOSE_MSG(qry, "=> wildcard: hit error %d %s\n",
 					ret, strerror(abs(ret)));
-			assert(false);
-		}
 		WITH_VERBOSE(qry) {
 			auto_free char *clencl_str = kr_dname_text(clencl_name),
 				*type_str = kr_rrtype_text(type);
@@ -589,18 +569,16 @@ static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	}
 	/* Check if the record is OK. */
 	const struct entry_h *eh = entry_h_consistent_E(val, type);
-	if (!eh) {
-		assert(false);
+	if (!kr_assume(eh))
 		return kr_error(ret);
 		// LATER: recovery in case of error, perhaps via removing the entry?
-	}
 	int32_t new_ttl = get_new_ttl(eh, qry, qry->sname, type, qry->timestamp.tv_sec);
 		/* ^^ here we use the *expanded* wildcard name */
 	if (new_ttl < 0 || eh->rank < lowest_rank || eh->is_packet) {
 		/* Wildcard record with stale TTL, bad rank or packet.  */
 		VERBOSE_MSG(qry, "=> wildcard: skipping %s, rank 0%.2o, new TTL %d\n",
 				eh->is_packet ? "packet" : "RR", eh->rank, new_ttl);
-		return -ABS(ESTALE);
+		return kr_error(ESTALE);
 	}
 	/* Add the RR into the answer. */
 	ret = entry2answer(ans, AR_ANSWER, eh, knot_db_val_bound(val),
@@ -615,10 +593,8 @@ static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clenc
 int kr_cache_closest_apex(struct kr_cache *cache, const knot_dname_t *name, bool is_DS,
 			  knot_dname_t ** apex)
 {
-	if (!cache || !cache->db || !name || !apex || *apex) {
-		assert(!EINVAL);
+	if (!kr_assume(cache && cache->db && name && apex && *apex == NULL))
 		return kr_error(EINVAL);
-	}
 	struct key k_storage, *k = &k_storage;
 	int ret = kr_dname_lf(k->buf, name, false);
 	if (ret)
@@ -674,9 +650,8 @@ static int closest_NS(struct kr_cache *cache, struct key *k, entry_list_t el,
 		knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_NS);
 		knot_db_val_t val;
 		int ret = cache_op(cache, read, &key, &val, 1);
-		if (ret == -abs(ENOENT)) goto next_label;
-		if (ret) {
-			assert(!ret);
+		if (ret == kr_error(ENOENT)) goto next_label;
+		if (!kr_assume(ret == 0)) {
 			if (need_zero) memset(el, 0, sizeof(entry_list_t));
 			return kr_error(ret);
 		}
@@ -684,10 +659,8 @@ static int closest_NS(struct kr_cache *cache, struct key *k, entry_list_t el,
 		/* Check consistency, find any type;
 		 * using `goto` for shortening by another label. */
 		ret = entry_list_parse(val, el);
-		if (ret) {
-			assert(!ret); // do something about it?
+		if (!kr_assume(ret == 0)) // do something about it?
 			goto next_label;
-		}
 		need_zero = false;
 		/* More types are possible; try in order.
 		 * For non-fatal failures just "continue;" to try the next type. */
@@ -724,7 +697,7 @@ static int closest_NS(struct kr_cache *cache, struct key *k, entry_list_t el,
 			/* We miss root NS in cache, but let's at least assume it exists. */
 			k->type = KNOT_RRTYPE_NS;
 			k->zlf_len = zlf_len;
-			assert(zlf_len == 0);
+			(void)!kr_assume(zlf_len == 0);
 			if (need_zero) memset(el, 0, sizeof(entry_list_t));
 			return kr_error(ENOENT);
 		}
@@ -768,9 +741,8 @@ static int check_NS_entry(struct key *k, const knot_db_val_t entry, const int i,
 		type = EL2RRTYPE(i);
 		/* Find the entry for the type, check positivity, TTL */
 		const struct entry_h *eh = entry_h_consistent_E(entry, type);
-		if (!eh) {
+		if (!kr_assume(eh)) {
 			VERBOSE_MSG(qry, "=> EH not consistent\n");
-			assert(false);
 			return kr_error(EILSEQ);
 		}
 		const int32_t log_new_ttl = get_new_ttl(eh, qry, k->zname, type, timestamp);
