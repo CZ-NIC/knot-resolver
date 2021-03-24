@@ -27,6 +27,7 @@ prospector = {extras = ["with_mypy", "with_bandit"], version = "^1.3.1"}
 requests = "^2.25.1"
 requests-unixsocket = "^0.2.0"
 click = "^7.1.2"
+toml = "^0.10.2"
 
 [tool.poe.tasks]
 run = { cmd = "python -m knot_resolver_manager", help = "Run the manager" }
@@ -35,6 +36,7 @@ check = { cmd = "scripts/codecheck", help = "Run static code analysis" }
 format = { cmd = "poetry run black knot_resolver_manager/ tests/", help = "Run 'Black' code formater" }
 fixdeps = { shell = "poetry install; yarn install", help = "Install/update dependencies according to configuration files"}
 commit = { shell = "scripts/commit", help = "Invoke every single check before commiting" }
+build-containers = { shell = "scripts/build-containers", help = "Build all containers" }
 clean = """
   rm -rf .coverage
          .mypy_cache

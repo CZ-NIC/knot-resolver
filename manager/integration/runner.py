@@ -11,6 +11,7 @@ import requests
 import hashlib
 import click
 import json
+import toml
 
 from _hashlib import HASH as Hash
 from pathlib import Path, PurePath
@@ -312,6 +313,42 @@ def _get_git_root() -> PurePath:
     return PurePath(str(result.stdout, encoding="utf8").strip())
 
 
+class Test:
+    _CONFIG_FILE = "test.toml"
+
+    def __init__(self, path: Path):
+        with open(path / Test._CONFIG_FILE, 'r') as f:
+            config = toml.load(f)
+
+        self._mounts = {}
+        gitroot: Path = _get_git_root()
+        for dst, src in config["mount"].items():
+            # note that we flip the meaning around to match podman's api
+            src = gitroot / src
+            dst = gitroot / dst
+            self._mounts[src] = dst
+        
+        self.name = str(path.absolute().name)
+        self._cmd = [ str(x) for x in config["cmd"] ]
+        self._image = str(config["image"])
+
+    
+    def run(self, manager: PodmanServiceManager, inspect_failed=False):
+        print(f"Running test {Colors.YELLOW}{self.name}{Colors.RESET}")
+        print("\tRunning...")
+        exit_code = manager.start_temporary_and_wait(
+            self._image,
+            self._cmd,
+            bind_mount_ro=self._mounts,
+            inspect_failed=inspect_failed,
+        )
+        if exit_code == 0:
+            print(f"\t{Colors.GREEN}Test succeeded{Colors.RESET}")
+        else:
+            print(
+                f"\t{Colors.RED}Test failed with exit code {exit_code}{Colors.RESET}"
+            )
+
 class TestRunner:
     _TEST_DIRECTORY = "tests"
     _TEST_ENTRYPOINT = ["/test/run"]
@@ -342,34 +379,22 @@ class TestRunner:
 
         If no TESTS are specified, runs them all.
         """
+
+        # Temporary hack
+        # build all test containers
+        ret = subprocess.call("poe build-containers", shell=True)
+        assert ret == 0
+
+        # Run the tests
         with PodmanService() as manager:
             for test_path in TestRunner._list_tests():
-                test_name = test_path.absolute().name
+                test = Test(test_path)
 
-                if len(tests) != 0 and test_name not in tests:
-                    print(f"Skipping test {Colors.YELLOW}{test_name}{Colors.RESET}")
+                if len(tests) != 0 and test.name not in tests:
+                    print(f"Skipping test {Colors.YELLOW}{test.name}{Colors.RESET}")
                     continue
 
-                print(f"Running test {Colors.YELLOW}{test_name}{Colors.RESET}")
-                image = "knot_test_" + test_name
-                print("\tBuilding...")
-                manager.build_image(test_path, image)
-                print("\tRunning...")
-                exit_code = manager.start_temporary_and_wait(
-                    image,
-                    TestRunner._TEST_ENTRYPOINT,
-                    bind_mount_ro={
-                        _get_git_root(): PurePath("/repo"),
-                        test_path.absolute(): "/test",
-                    },
-                    inspect_failed=inspect_failed,
-                )
-                if exit_code == 0:
-                    print(f"\t{Colors.GREEN}Test succeeded{Colors.RESET}")
-                else:
-                    print(
-                        f"\t{Colors.RED}Test failed with exit code {exit_code}{Colors.RESET}"
-                    )
+                test.run(manager)
 
 
 if __name__ == "__main__":
