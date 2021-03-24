@@ -23,8 +23,8 @@
 	queue_push(q, 3);
 	queue_push(q, 4);
 	queue_pop(q);
-	assert(queue_head(q) == 2);
-	assert(queue_tail(q) == 4);
+	kr_require(queue_head(q) == 2);
+	kr_require(queue_tail(q) == 4);
 
 	// you may iterate
 	typedef queue_it_t(int) queue_it_int_t;
@@ -32,11 +32,11 @@
 	     queue_it_next(it)) {
 		++queue_it_val(it);
 	}
-	assert(queue_tail(q) == 5);
+	kr_require(queue_tail(q) == 5);
 
 	queue_push_head(q, 0);
 	++queue_tail(q);
-	assert(queue_tail(q) == 6);
+	kr_require(queue_tail(q) == 6);
 	// free it up
 	queue_deinit(q);
 
@@ -56,7 +56,6 @@
 #include "lib/defines.h"
 #include "lib/utils.h"
 #include "contrib/ucw/lib.h"
-#include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -175,33 +174,33 @@ struct queue_chunk {
 
 static inline void * queue_head_impl(const struct queue *q)
 {
-	assert(q);
+	kr_require(q);
 	struct queue_chunk *h = q->head;
-	assert(h && h->end > h->begin);
+	kr_require(h && h->end > h->begin);
 	return h->data + h->begin * q->item_size;
 }
 
 static inline void * queue_tail_impl(const struct queue *q)
 {
-	assert(q);
+	kr_require(q);
 	struct queue_chunk *t = q->tail;
-	assert(t && t->end > t->begin);
+	kr_require(t && t->end > t->begin);
 	return t->data + (t->end - 1) * q->item_size;
 }
 
 static inline void queue_pop_impl(struct queue *q)
 {
-	assert(q);
+	kr_require(q);
 	struct queue_chunk *h = q->head;
-	assert(h && h->end > h->begin);
+	kr_require(h && h->end > h->begin);
 	if (h->end - h->begin == 1) {
 		/* removing the last element in the chunk */
-		assert((q->len == 1) == (q->head == q->tail));
+		kr_require((q->len == 1) == (q->head == q->tail));
 		if (q->len == 1) {
 			q->tail = NULL;
-			assert(!h->next);
+			kr_require(!h->next);
 		} else {
-			assert(h->next);
+			kr_require(h->next);
 		}
 		q->head = h->next;
 		free(h);
@@ -219,7 +218,7 @@ struct queue_it {
 
 static inline struct queue_it queue_it_begin_impl(struct queue *q)
 {
-	assert(q);
+	kr_require(q);
 	return (struct queue_it){
 		.chunk = q->head,
 		.pos = q->head ? q->head->begin : -1,
@@ -234,13 +233,13 @@ static inline bool queue_it_finished_impl(struct queue_it *it)
 
 static inline void * queue_it_val_impl(struct queue_it *it)
 {
-	assert(!queue_it_finished_impl(it));
+	kr_require(!queue_it_finished_impl(it));
 	return it->chunk->data + it->pos * it->item_size;
 }
 
 static inline void queue_it_next_impl(struct queue_it *it)
 {
-	assert(!queue_it_finished_impl(it));
+	kr_require(!queue_it_finished_impl(it));
 	++(it->pos);
 	if (it->pos < it->chunk->end)
 		return;
