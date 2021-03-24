@@ -36,7 +36,8 @@ static void *load_symbol(void *lib, const char *prefix, const char *name)
 
 static int load_library(struct kr_module *module, const char *name, const char *path)
 {
-	assert(module && name && path);
+	if (!kr_assume(module && name && path))
+		return kr_error(EINVAL);
 	/* Absolute or relative path (then only library search path is used). */
 	auto_free char *lib_path = kr_strcatdup(4, path, "/", name, LIBEXT);
 	if (lib_path == NULL) {
