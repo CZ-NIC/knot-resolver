@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# fail early
+set -e
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/_env.sh
+
+# build all containers
+poe container-build
+
+echo The debug server will be listening on port localhost:5678
+echo Use VSCode remote attach feature to connect to the debugger server
+echo The manager will start after you connect
+echo ----------------------------------------
+
+poe container-run -p 5678 -- knot-manager:dev python -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m knot_resolver_manager

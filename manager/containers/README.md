@@ -4,4 +4,10 @@ All containers build configurations evolve from the `dev` container. If you want
 
 ## Naming
 
-All containers defined here are named `knot-manager`. The directory name is the container's tag.
+All containers defined here are named `knot-manager`. The directory name is the container's tag. So, for example - `knot-manager:dev` is the reference development container.
+
+## Building
+
+```sh
+for tag in 
+```

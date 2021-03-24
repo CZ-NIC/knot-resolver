@@ -54,6 +54,9 @@ RUN apt-get update \
   && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
   && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
+# Create knot-resolver-manager systemd service
+COPY ./config/knot-resolver-manager.service /etc/systemd/system
+
 # Copy only requirements, to cache them in docker layer
 # no poetry.lock, because here we have a different python version
 COPY ./pyproject.toml ./yarn.lock ./package.json /code/

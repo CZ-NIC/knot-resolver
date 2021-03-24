@@ -5,9 +5,7 @@ set -e
 
 cd /test
 echo "Starting manager..."
-cp knot-resolver.service /etc/systemd/system
-systemctl daemon-reload
-systemctl start knot-resolver.service
+systemctl start knot-resolver-manager.service
 
 # give it time to start
 sleep 1
