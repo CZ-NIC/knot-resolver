@@ -1,0 +1,5 @@
+image = "knot-manager:debian"
+cmd = ["/test/run"]
+
+[mount]
+"/test" = "integration/tests/basic_startup"

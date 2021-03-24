@@ -4,7 +4,7 @@ Requires=dbus
 After=dbus
 
 [Service]
-WorkingDirectory=/repo
+WorkingDirectory=/code
 ExecStart=/usr/bin/python3 -m knot_resolver_manager
 KillSignal=SIGINT
 
