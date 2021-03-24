@@ -56,7 +56,7 @@ static void http_stream_status_free(struct http_stream_status *stat)
 
 static int status_free(trie_val_t *stat, void *null)
 {
-	if (stat)  // TODO use kr_assume()
+	if (kr_assume(stat))
 		http_stream_status_free(*stat);
 	return 0;
 }
@@ -139,7 +139,7 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 	if (ret < 0)
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 	data->pos += length;
-	if (data->pos > data->len)  // TODO use kr_assume()
+	if (!kr_assume(data->pos <= data->len))
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 
 	ret = send_padding(ctx, (uint8_t)frame->data.padlen);
@@ -761,7 +761,7 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *buf,
 
 	if (!ctx->h2)
 		return kr_error(ENOSYS);
-	if (ctx->session != session)  // TODO use kr_assume()
+	if (!kr_assume(ctx->session == session))
 		return kr_error(EINVAL);
 
 	ctx->submitted = 0;
