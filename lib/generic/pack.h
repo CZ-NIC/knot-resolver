@@ -141,7 +141,7 @@ static inline uint8_t *pack_last(pack_t pack)
   */
 static inline int pack_obj_push(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
 {
-	if (!kr_assume(pack && obj)
+	if (!kr_assume(pack && obj))
 		return kr_error(EINVAL);
 	size_t packed_len = len + sizeof(len);
 	if (pack->len + packed_len > pack->cap)
