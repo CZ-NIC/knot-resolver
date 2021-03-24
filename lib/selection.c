@@ -596,6 +596,14 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 	switch (sel_error) {
 	case KR_SELECTION_OK:
 		return;
+	case KR_SELECTION_TCP_CONNECT_FAILED:
+	case KR_SELECTION_TCP_CONNECT_TIMEOUT:
+		qry->server_selection.local_state->force_udp = true;
+		qry->flags.NO_0X20 = false;
+		/* Connection and handshake failures have properties similar
+		 * to UDP timeouts, so we handle them (almost) the same way. */
+		/* fall-through */
+	case KR_SELECTION_TLS_HANDSHAKE_FAILED:
 	case KR_SELECTION_QUERY_TIMEOUT:
 		qry->server_selection.local_state->timeouts++;
 		/* Make sure that the query was chosen by this query and timeout wasn't capped
@@ -654,11 +662,6 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 			qry->flags.NO_MINIMIZE = true;
 		}
 		break;
-	case KR_SELECTION_TCP_CONNECT_FAILED:
-	case KR_SELECTION_TCP_CONNECT_TIMEOUT:
-		qry->server_selection.local_state->force_udp = true;
-		qry->flags.NO_0X20 = false;
-		break;
 	case KR_SELECTION_NOTIMPL:
 	case KR_SELECTION_OTHER_RCODE:
 	case KR_SELECTION_DNSSEC_ERROR:
@@ -666,9 +669,6 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 	case KR_SELECTION_MALFORMED:
 		/* These errors are fatal, no point in trying this server again. */
 		addr_state->broken = true;
-		break;
-	case KR_SELECTION_TLS_HANDSHAKE_FAILED:
-		/* These might get resolved by retrying. */
 		break;
 	default:
 		assert(0);
