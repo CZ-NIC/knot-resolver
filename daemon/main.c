@@ -19,13 +19,13 @@
 #include "lib/resolve.h"
 
 #include <arpa/inet.h>
-#include <assert.h>
 #include <getopt.h>
 #include <libgen.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/resource.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #if ENABLE_CAP_NG
@@ -44,8 +44,20 @@ struct args the_args_value;  /** Static allocation for the_args singleton. */
 
 static void signal_handler(uv_signal_t *handle, int signum)
 {
-	uv_stop(uv_default_loop());
-	uv_signal_stop(handle);
+	switch (signum) {
+	case SIGINT:  /* Fallthrough. */
+	case SIGTERM:
+		uv_stop(uv_default_loop());
+		uv_signal_stop(handle);
+		break;
+	case SIGCHLD:
+		/* Wait for all dead processes. */
+		while (waitpid(-1, NULL, WNOHANG) > 0);
+		break;
+	default:
+		kr_log_error("unhandled signal: %d\n", signum);
+		break;
+	}
 }
 
 /** SIGBUS -> attempt to remove the overflowing cache file and abort. */
@@ -197,14 +209,6 @@ static void args_deinit(struct args *args)
 	array_clear(args->config);
 }
 
-static long strtol_10(const char *s)
-{
-	if (!s) abort();
-	/* ^^ This shouldn't ever happen.  When getopt_long() returns an option
-	 * character that has a mandatory parameter, optarg can't be NULL. */
-	return strtol(s, NULL, 10);
-}
-
 /** Process arguments into struct args.
  * @return >=0 if main() should be exited immediately.
  */
@@ -229,17 +233,20 @@ static int parse_args(int argc, char **argv, struct args *args)
 		switch (c)
 		{
 		case 'a':
+			kr_require(optarg);
 			array_push(args->addrs, optarg);
 			break;
 		case 't':
+			kr_require(optarg);
 			array_push(args->addrs_tls, optarg);
 			break;
 		case 'c':
-			assert(optarg != NULL);
+			kr_require(optarg);
 			array_push(args->config, optarg);
 			break;
 		case 'f':
-			args->forks = strtol_10(optarg);
+			kr_require(optarg);
+			args->forks = strtol(optarg, NULL, 10);
 			if (args->forks == 1) {
 				kr_log_deprecate("use --noninteractive instead of --forks=1\n");
 			} else {
@@ -274,7 +281,7 @@ static int parse_args(int argc, char **argv, struct args *args)
 			help(argc, argv);
 			return EXIT_FAILURE;
 		case 'S':
-			(void)0;
+			kr_require(optarg);
 			flagged_fd_t ffd = { 0 };
 			char *endptr;
 			ffd.fd = strtol(optarg, &endptr, 10);
@@ -502,11 +509,13 @@ int main(int argc, char **argv)
 
 	uv_loop_t *loop = uv_default_loop();
 	/* Catch some signals. */
-	uv_signal_t sigint, sigterm;
+	uv_signal_t sigint, sigterm, sigchld;
 	if (true) ret = uv_signal_init(loop, &sigint);
 	if (!ret) ret = uv_signal_init(loop, &sigterm);
+	if (!ret) ret = uv_signal_init(loop, &sigchld);
 	if (!ret) ret = uv_signal_start(&sigint, signal_handler, SIGINT);
 	if (!ret) ret = uv_signal_start(&sigterm, signal_handler, SIGTERM);
+	if (!ret) ret = uv_signal_start(&sigchld, signal_handler, SIGCHLD);
 	/* Block SIGPIPE; see https://github.com/libuv/libuv/issues/45 */
 	if (!ret && signal(SIGPIPE, SIG_IGN) == SIG_ERR) ret = errno;
 	if (!ret) {
