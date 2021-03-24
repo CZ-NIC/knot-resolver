@@ -382,7 +382,7 @@ class TestRunner:
 
         # Temporary hack
         # build all test containers
-        ret = subprocess.call("poe build-containers", shell=True)
+        ret = subprocess.call("poe container-build", shell=True)
         assert ret == 0
 
         # Run the tests
