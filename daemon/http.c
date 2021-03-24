@@ -122,7 +122,8 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 	if (ret < 0)
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 	data->pos += length;
-	assert(data->pos <= data->len);
+	if (!kr_assume(data->pos <= data->len))
+		return NGHTTP2_ERR_CALLBACK_FAILURE;
 
 	ret = send_padding(ctx, (uint8_t)frame->data.padlen);
 	if (ret < 0)
@@ -498,7 +499,8 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *buf,
 
 	if (!ctx->h2)
 		return kr_error(ENOSYS);
-	assert(ctx->session == session);
+	if (!kr_assume(ctx->session == session))
+		return kr_error(EINVAL);
 
 	ctx->submitted = 0;
 	ctx->buf = session_wirebuf_get_free_start(session);
