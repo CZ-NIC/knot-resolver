@@ -1,10 +1,9 @@
-/*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2014-2021 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #pragma once
 
-#include <assert.h>
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -338,7 +337,7 @@ int kr_ntop_str(int family, const void *src, uint16_t port, char *buf, size_t *b
  */
 static inline char *kr_straddr(const struct sockaddr *addr)
 {
-	assert(addr != NULL);
+	if (!kr_assume(addr)) return NULL;
 	/* We are the sinle-threaded application */
 	static char str[INET6_ADDRSTRLEN + 1 + 5 + 1];
 	size_t len = sizeof(str);
@@ -481,7 +480,7 @@ char *kr_module_call(struct kr_context *ctx, const char *module, const char *pro
 /** Return the (covered) type of an nonempty RRset. */
 static inline uint16_t kr_rrset_type_maysig(const knot_rrset_t *rr)
 {
-	assert(rr && rr->rrs.count && rr->rrs.rdata);
+	kr_require(rr && rr->rrs.count && rr->rrs.rdata);
 	uint16_t type = rr->type;
 	if (type == KNOT_RRTYPE_RRSIG)
 		type = knot_rrsig_type_covered(rr->rrs.rdata);
@@ -519,7 +518,8 @@ static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, bool add_wi
 		return kr_error(EINVAL);
 	}
 	int len = right_aligned_dname_start[0];
-	assert(right_aligned_dname_start + 1 + len - KNOT_DNAME_MAXLEN == right_aligned_dst);
+	if (!kr_assume(right_aligned_dname_start + 1 + len - KNOT_DNAME_MAXLEN == right_aligned_dst))
+		return kr_error(EINVAL);
 	memcpy(dst + 1, right_aligned_dname_start + 1, len);
 	if (add_wildcard) {
 		if (len + 2 > KNOT_DNAME_MAXLEN)
