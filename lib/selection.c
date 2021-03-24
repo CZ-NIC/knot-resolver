@@ -55,7 +55,7 @@ static const char *kr_selection_error_str(enum kr_selection_error err) {
 		case KR_SELECTION_NUMBER_OF_ERRORS: break; // not a valid code
 	#undef X
 	}
-	assert(false); // we want to define all; compiler helps by -Wswitch (no default:)
+	(void)!kr_assume(false); // we want to define all; compiler helps by -Wswitch (no default:)
 	return NULL;
 }
 
@@ -152,8 +152,8 @@ struct rtt_state get_rtt_state(const uint8_t *ip, size_t len,
 
 	if (cache->api->read(db, stats, &key, &value, 1)) {
 		state = default_rtt_state;
-	} else if (value.len != sizeof(struct rtt_state)) {
-		assert(false); // shouldn't happen but let's be more robust
+	} else if (!kr_assume(value.len == sizeof(struct rtt_state))) {
+		// shouldn't happen but let's be more robust
 		state = default_rtt_state;
 	} else {
 		state = *(struct rtt_state *)value.data;
@@ -195,7 +195,7 @@ void bytes_to_ip(uint8_t *bytes, size_t len, uint16_t port, union inaddr *dst)
 		dst->ip6.sin6_port = htons(port);
 		break;
 	default:
-		assert(0);
+		(void)!kr_assume(false);
 	}
 }
 
@@ -207,7 +207,7 @@ uint8_t *ip_to_bytes(const union inaddr *src, size_t len)
 	case sizeof(struct in6_addr):
 		return (uint8_t *)&src->ip6.sin6_addr;
 	default:
-		assert(0);
+		(void)!kr_assume(false);
 		return NULL;
 	}
 }
@@ -263,7 +263,7 @@ static void invalidate_dead_upstream(struct address_state *state,
 			// period when we don't want to use the address
 			state->generation = -1;
 		} else {
-			assert(now >= rs->dead_since + retry_timeout);
+			(void)!kr_assume(now >= rs->dead_since + retry_timeout);
 			// we allow to retry the server now
 			// TODO: perhaps tweak *rs?
 		}
@@ -486,7 +486,7 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 			port = KR_DNS_PORT;
 			break;
 		default:
-			assert(0);
+			(void)!kr_assume(false);
 			return NULL;
 		}
 	}
@@ -502,7 +502,7 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 		transport->address.ip6.sin6_port = htons(port);
 		break;
 	default:
-		assert(0);
+		(void)!kr_assume(false);
 		return NULL;
 	}
 
@@ -671,7 +671,7 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		/* These might get resolved by retrying. */
 		break;
 	default:
-		assert(0);
+		(void)!kr_assume(false);
 		break;
 	}
 
