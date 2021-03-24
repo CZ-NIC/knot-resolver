@@ -19,7 +19,6 @@
 #include "lib/resolve.h"
 
 #include <arpa/inet.h>
-#include <assert.h>
 #include <getopt.h>
 #include <libgen.h>
 #include <signal.h>
@@ -210,14 +209,6 @@ static void args_deinit(struct args *args)
 	array_clear(args->config);
 }
 
-static long strtol_10(const char *s)
-{
-	if (!s) abort();
-	/* ^^ This shouldn't ever happen.  When getopt_long() returns an option
-	 * character that has a mandatory parameter, optarg can't be NULL. */
-	return strtol(s, NULL, 10);
-}
-
 /** Process arguments into struct args.
  * @return >=0 if main() should be exited immediately.
  */
@@ -242,17 +233,20 @@ static int parse_args(int argc, char **argv, struct args *args)
 		switch (c)
 		{
 		case 'a':
+			kr_require(optarg);
 			array_push(args->addrs, optarg);
 			break;
 		case 't':
+			kr_require(optarg);
 			array_push(args->addrs_tls, optarg);
 			break;
 		case 'c':
-			assert(optarg != NULL);
+			kr_require(optarg);
 			array_push(args->config, optarg);
 			break;
 		case 'f':
-			args->forks = strtol_10(optarg);
+			kr_require(optarg);
+			args->forks = strtol(optarg, NULL, 10);
 			if (args->forks == 1) {
 				kr_log_deprecate("use --noninteractive instead of --forks=1\n");
 			} else {
@@ -287,7 +281,7 @@ static int parse_args(int argc, char **argv, struct args *args)
 			help(argc, argv);
 			return EXIT_FAILURE;
 		case 'S':
-			(void)0;
+			kr_require(optarg);
 			flagged_fd_t ffd = { 0 };
 			char *endptr;
 			ffd.fd = strtol(optarg, &endptr, 10);
