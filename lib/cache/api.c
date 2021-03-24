@@ -2,7 +2,6 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <sys/stat.h>
@@ -110,15 +109,12 @@ static int assert_right_version(struct kr_cache *cache)
 
 int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct kr_cdb_opts *opts, knot_mm_t *mm)
 {
-	if (!cache) {
-		assert(cache);
+	if (!kr_assume(cache))
 		return kr_error(EINVAL);
-	}
 	memset(cache, 0, sizeof(*cache));
 	/* Open cache */
-	if (!api) {
+	if (!api)
 		api = kr_cdb_lmdb();
-	}
 	cache->api = api;
 	int ret = cache->api->open(&cache->db, &cache->stats, opts, mm);
 	if (ret == 0) {
@@ -137,10 +133,10 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 	}
 
 	char *fpath = kr_absolutize_path(opts->path, "data.mdb");
-	if (fpath) {
+	if (kr_assume(fpath)) {
 		kr_cache_emergency_file_to_remove = fpath;
 	} else {
-		assert(false); /* non-critical, but still */
+		/* non-critical, but still */
 		fpath = "<ENOMEM>";
 	}
 
@@ -151,9 +147,8 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 			"  To reduce the size you need to remove the file '%s' by hand.\n",
 			maxsize, opts->maxsize, fpath);
 	}
-	if (ret != 0) {
+	if (ret != 0)
 		return ret;
-	}
 	cache->ttl_min = KR_CACHE_DEFAULT_TTL_MIN;
 	cache->ttl_max = KR_CACHE_DEFAULT_TTL_MAX;
 	kr_cache_make_checkpoint(cache);
@@ -302,10 +297,11 @@ static bool check_rrtype(uint16_t type, const struct kr_query *qry/*logging*/)
 /** Like key_exact_type() but omits a couple checks not holding for pkt cache. */
 knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type)
 {
-	assert(check_rrtype(type, NULL));
+	if (!kr_assume(check_rrtype(type, NULL)))
+		return (knot_db_val_t){ NULL, 0 };
 	switch (type) {
 	case KNOT_RRTYPE_RRSIG: /* no RRSIG query caching, at least for now */
-		assert(false);
+		(void)!kr_assume(false);
 		return (knot_db_val_t){ NULL, 0 };
 	/* xNAME lumped into NS. */
 	case KNOT_RRTYPE_CNAME:
@@ -397,10 +393,8 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Stash individual records. */
 	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	trie_t *nsec_pmap = trie_create(&req->pool);
-	if (!nsec_pmap) {
-		assert(!ENOMEM);
+	if (!kr_assume(nsec_pmap))
 		goto finally;
-	}
 	for (int psec = KNOT_ANSWER; psec <= KNOT_ADDITIONAL; ++psec) {
 		ranked_rr_array_t *arr = selected[psec];
 		/* uncached entries are located at the end */
@@ -448,16 +442,12 @@ finally:
 /** Preliminary checks before stash_rrset().  Don't call if returns <= 0. */
 static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qry/*logs*/)
 {
-	if (!rr || rr->rclass != KNOT_CLASS_IN) {
-		assert(!EINVAL);
+	if (!kr_assume(rr && rr->rclass == KNOT_CLASS_IN))
 		return kr_error(EINVAL);
-	}
-	if (!check_rrtype(rr->type, qry)) {
+	if (!check_rrtype(rr->type, qry))
 		return kr_ok();
-	}
-	if (!check_dname_for_lf(rr->owner, qry)) {
+	if (!check_dname_for_lf(rr->owner, qry))
 		return kr_ok();
-	}
 	return 1/*proceed*/;
 }
 
@@ -524,12 +514,8 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		VERBOSE_MSG(qry, "=> skipping NSEC3 with too many iterations\n");
 		return kr_ok();
 	}
-
-	assert(stash_rrset_precond(rr, qry) > 0);
-	if (!cache) {
-		assert(!EINVAL);
+	if (!kr_assume(cache && stash_rrset_precond(rr, qry) > 0))
 		return kr_error(EINVAL);
-	}
 
 	int ret = kr_ok();
 	if (rrset_has_min_range_or_weird(rr, qry))
@@ -557,8 +543,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		/* Skip any NSEC*s that aren't validated or are suspicious. */
 		if (!kr_rank_test(rank, KR_RANK_SECURE) || rr->rrs.count != 1)
 			goto return_needs_pkt;
-		if (!rr_sigs || !rr_sigs->rrs.count || !rr_sigs->rrs.rdata) {
-			assert(!EINVAL);
+		if (!kr_assume(rr_sigs && rr_sigs->rrs.count && rr_sigs->rrs.rdata)) {
 			ret = kr_error(EINVAL);
 			goto return_needs_pkt;
 		}
@@ -568,13 +553,13 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 
 		void **npp = nsec_pmap == NULL ? NULL
 			: trie_get_ins(nsec_pmap, (const char *)signer, signer_size);
-		assert(!nsec_pmap || (npp && ENOMEM));
+		kr_require(!nsec_pmap || (npp && ENOMEM));
 		if (rr->type == KNOT_RRTYPE_NSEC) {
 			key = key_NSEC1(k, encloser, wild_labels);
 			break;
 		}
 
-		assert(rr->type == KNOT_RRTYPE_NSEC3);
+		kr_require(rr->type == KNOT_RRTYPE_NSEC3);
 		const knot_rdata_t * const rdata = rr->rrs.rdata;
 		if (rdata->len <= 4) {
 			ret = kr_error(EILSEQ); /*< data from outside; less trust */
@@ -588,26 +573,22 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		key = key_NSEC3(k, encloser, nsec_p_mkHash(rdata->data));
 		if (npp && !*npp) {
 			*npp = mm_alloc(&qry->request->pool, np_dlen);
-			if (!*npp) {
-				assert(!ENOMEM);
+			if (!kr_assume(*npp))
 				break;
-			}
 			memcpy(*npp, rdata->data, np_dlen);
 		}
 		break;
 	default:
 		ret = kr_dname_lf(k->buf, encloser, wild_labels);
-		if (ret) {
-			assert(!ret);
+		if (!kr_assume(ret == 0))
 			goto return_needs_pkt;
-		}
 		key = key_exact_type(k, rr->type);
 	}
 
 	/* Compute in-cache size for the new data. */
 	const knot_rdataset_t *rds_sigs = rr_sigs ? &rr_sigs->rrs : NULL;
 	const int rr_ssize = rdataset_dematerialize_size(&rr->rrs);
-	assert(rr_ssize == to_even(rr_ssize));
+	kr_require(rr_ssize == to_even(rr_ssize));
 	knot_db_val_t val_new_entry = {
 		.data = NULL,
 		.len = offsetof(struct entry_h, data) + rr_ssize
@@ -618,7 +599,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	ret = entry_h_splice(&val_new_entry, rank, key, k->type, rr->type,
 				rr->owner, qry, cache, timestamp);
 	if (ret) return kr_ok(); /* some aren't really errors */
-	assert(val_new_entry.data);
+	kr_require(val_new_entry.data);
 
 	const uint32_t ttl = rr->ttl;
 	/* FIXME: consider TTLs and expirations of RRSIGs as well, just in case. */
@@ -635,9 +616,9 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		eh->time = 0;
 		eh->ttl = 0;
 		eh->rank = 0;
-		assert(false);
+		kr_require(false);
 	}
-	assert(entry_h_consistent_E(val_new_entry, rr->type));
+	kr_require(entry_h_consistent_E(val_new_entry, rr->type));
 
 	#if 0 /* Occasionally useful when debugging some kinds of changes. */
 	{
@@ -645,7 +626,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	knot_db_val_t val = { NULL, 0 };
 	ret = cache_op(cache, read, &key, &val, 1);
 	if (ret != kr_error(ENOENT)) { // ENOENT might happen in some edge case, I guess
-		assert(!ret);
+		(void)!kr_assume(!ret);
 		entry_list_t el;
 		entry_list_parse(val, el);
 	}
@@ -694,7 +675,7 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 		/* TODO: ATM we assume that some properties are the same
 		 * for all RRSIGs in the set (esp. label count). */
 		ranked_rr_array_entry_t *e = arr->at[j];
-		assert(!e->in_progress);
+		kr_require(!e->in_progress);
 		bool ok = e->qry_uid == qry->uid && !e->cached
 			&& e->rr->type == KNOT_RRTYPE_RRSIG
 			&& knot_rrsig_type_covered(e->rr->rrs.rdata) == rr->type
@@ -991,9 +972,8 @@ static void health_timer_cb(uv_timer_t *health_timer)
 
 int kr_cache_check_health(struct kr_cache *cache, int interval)
 {
-	if (interval == 0) {
+	if (interval == 0)
 		return cache_op(cache, check_health);
-	}
 	if (interval < 0) {
 		if (!cache->health_timer)
 			return kr_ok(); // tolerate stopping a "stopped" timer
@@ -1003,13 +983,12 @@ int kr_cache_check_health(struct kr_cache *cache, int interval)
 		return kr_ok();
 	}
 
-	assert(interval > 0);
 	if (!cache->health_timer) {
 		/* We avoid depending on daemon's symbols by using uv_default_loop. */
 		cache->health_timer = malloc(sizeof(*cache->health_timer));
 		if (!cache->health_timer) return kr_error(ENOMEM);
 		uv_loop_t *loop = uv_default_loop();
-		assert(loop);
+		kr_require(loop);
 		int ret = uv_timer_init(loop, cache->health_timer);
 		if (ret) {
 			free(cache->health_timer);
@@ -1018,7 +997,7 @@ int kr_cache_check_health(struct kr_cache *cache, int interval)
 		}
 		cache->health_timer->data = cache;
 	}
-	assert(cache->health_timer->data);
+	(void)!kr_assume(cache->health_timer->data);
 	return kr_error(uv_timer_start(cache->health_timer, health_timer_cb, interval, interval));
 }
 
