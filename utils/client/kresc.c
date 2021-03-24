@@ -2,7 +2,6 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 #include <arpa/inet.h>
-#include <assert.h>
 #include <contrib/ccan/asprintf/asprintf.h>
 #include <editline/readline.h>
 #include <errno.h>
@@ -325,10 +324,8 @@ static int init_tty(const char *path)
 //! Run a command on the daemon; return the answer or NULL on failure, puts answer length to out_len.
 static char *run_cmd(const char *cmd, size_t * out_len)
 {
-	if (!g_tty || !cmd) {
-		assert(false);
+	if (!g_tty || !cmd)
 		return NULL;
-	}
 	if (fprintf(g_tty, "%s", cmd) < 0 || fflush(g_tty))
 		return NULL;
 	uint32_t len;
