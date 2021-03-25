@@ -43,9 +43,11 @@ bool kr_dbg_assumption_fork = DBG_ASSUMPTION_FORK;
 
 void kr_fail(bool is_fatal, const char *expr, const char *func, const char *file, int line)
 {
-	kr_log_error("%s \"%s\" failed in %s@%s:%d\n",
-			(is_fatal ? "requirement" : "assumption"),
-			expr, func, file, line);
+	if (is_fatal)
+		kr_log_critical("requirement \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
+	else
+		kr_log_error("assumption \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
+
 	if (is_fatal || (kr_dbg_assumption_abort && !kr_dbg_assumption_fork))
 		abort();
 	else if (kr_dbg_assumption_abort && kr_dbg_assumption_fork)
