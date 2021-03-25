@@ -16,7 +16,6 @@
  */
 
 #include <sys/time.h>
-#include <assert.h>
 #include <arpa/inet.h>
 
 #include <contrib/cleanup.h>
@@ -306,7 +305,7 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 			continue;
 		}
 		int ret = kr_zonecut_add(cut, ns_name, NULL, 0);
-		assert(!ret); (void)ret;
+		(void)!kr_assume(!ret);
 
 		/* Choose when to use glue records. */
 		const bool in_bailiwick =
@@ -388,7 +387,8 @@ static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 {
 	struct kr_query *qry = req->current_query;
-	assert(!(qry->flags.STUB));
+	if (!kr_assume(!(qry->flags.STUB)))
+		return KR_STATE_FAIL;
 
 	int result = KR_STATE_CONSUME;
 	if (qry->flags.FORWARD) {
@@ -491,7 +491,8 @@ static int finalize_answer(knot_pkt_t *pkt, struct kr_request *req)
 static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, const knot_dname_t **cname_ret)
 {
 	struct kr_query *query = req->current_query;
-	assert(!(query->flags.STUB));
+	if (!kr_assume(!(query->flags.STUB)))
+		return KR_STATE_FAIL;
 	/* Process answer type */
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	const knot_dname_t *cname = NULL;
@@ -846,7 +847,8 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 static int process_stub(knot_pkt_t *pkt, struct kr_request *req)
 {
 	struct kr_query *query = req->current_query;
-	assert(query->flags.STUB);
+	if (!kr_assume(query->flags.STUB))
+		return KR_STATE_FAIL;
 	/* Pick all answer RRs. */
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	for (unsigned i = 0; i < an->count; ++i) {
@@ -940,7 +942,8 @@ int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 
 static int prepare_query(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
-	assert(pkt && ctx);
+	if (!kr_assume(pkt && ctx))
+		return KR_STATE_FAIL;
 	struct kr_request *req = ctx->req;
 	struct kr_query *query = req->current_query;
 	if (!query || ctx->state & (KR_STATE_DONE|KR_STATE_FAIL)) {
@@ -991,7 +994,8 @@ static bool satisfied_by_additional(const struct kr_query *qry)
  */
 static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
-	assert(pkt && ctx);
+	if (!kr_assume(pkt && ctx))
+		return KR_STATE_FAIL;
 	struct kr_request *req = ctx->req;
 	struct kr_query *query = req->current_query;
 	if (!query) {
@@ -1142,7 +1146,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 			 * we trigger another cache *reading* attempt
 			 * for the subsequent PRODUCE round.
 			 */
-			assert(query->flags.NONAUTH);
+			(void)!kr_assume(query->flags.NONAUTH);
 			query->flags.CACHE_TRIED = false;
 			VERBOSE_MSG("<= referral response, but cache should stop us short now\n");
 		} else {
