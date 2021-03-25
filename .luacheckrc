@@ -38,6 +38,7 @@ new_read_globals = {
 	'reorder_RR',
 	'option',
 	'env',
+	'debugging',
 	'kres',
 	'libknot_SONAME',
 	'libzscanner_SONAME',

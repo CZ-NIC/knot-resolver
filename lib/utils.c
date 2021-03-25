@@ -38,7 +38,8 @@
 
 /* Logging & debugging */
 bool kr_verbose_status = false;
-bool kr_debug_assumption = true;
+bool kr_dbg_assumption_abort = DBG_ASSUMPTION_ABORT;
+bool kr_dbg_assumption_fork = DBG_ASSUMPTION_FORK;
 
 void kr_fail(bool is_fatal, const char *expr, const char *func, const char *file, int line)
 {
@@ -47,8 +48,10 @@ void kr_fail(bool is_fatal, const char *expr, const char *func, const char *file
 	else
 		kr_log_error("assumption \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
 
-	if (is_fatal || kr_debug_assumption)
+	if (is_fatal || (kr_dbg_assumption_abort && !kr_dbg_assumption_fork))
 		abort();
+	else if (kr_dbg_assumption_abort && kr_dbg_assumption_fork)
+		fork() == 0 ? abort() : (void)0;
 }
 
 /*
