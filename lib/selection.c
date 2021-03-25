@@ -672,7 +672,7 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		break;
 	default:
 		(void)!kr_assume(false);
-		break;
+		return;
 	}
 
 	addr_state->error_count++;
