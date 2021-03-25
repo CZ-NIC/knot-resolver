@@ -67,6 +67,7 @@ stages:
       - .local
       - build_ci*
       - build_dist/meson-dist/*.tar.xz
+  allow_failure: true
 
 archive:
   <<: *build
@@ -99,6 +100,7 @@ build-asan:
       # TODO _leaks: not sure what exactly is wrong in leak detection on config tests
       # TODO skip_asan: all three of these disappear locally when using gcc 9.1 (except some leaks)
     - ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite skip_asan --no-suite snowflake
+  allow_failure: true
 
 build:macOS:
   <<: *nodep
@@ -255,6 +257,7 @@ deckard:
     TMPDIR: $CI_PROJECT_DIR
   script:
     - ${MESON_TEST} --suite integration
+  allow_failure: true
 
 respdiff:basic:
   <<: *after_build
@@ -279,6 +282,7 @@ respdiff:basic:
       - results/*.png
       - results/respdiff.db/data.mdb*
       - ./*.info
+  allow_failure: true
 
 test:valgrind:
   <<: *test_flaky

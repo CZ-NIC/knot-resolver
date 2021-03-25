@@ -5,7 +5,7 @@ project(
   ['c', 'cpp'],
   license: 'GPLv3+',
   version: '5.3.0',
-  default_options: ['c_std=gnu11', 'b_ndebug=if-release'],
+  default_options: ['c_std=gnu11', 'b_ndebug=false'],
   meson_version: '>=0.49',
 )
 
@@ -178,6 +178,8 @@ conf_data.set('ENABLE_SENDMMSG', sendmmsg.to_int())
 conf_data.set('ENABLE_XDP', xdp.to_int())
 conf_data.set('ENABLE_CAP_NG', capng.found().to_int())
 conf_data.set('ENABLE_DOH2', nghttp2.found().to_int())
+conf_data.set('DBG_ASSUMPTION_ABORT', get_option('debug').to_int())
+conf_data.set('DBG_ASSUMPTION_FORK', (not get_option('debug')).to_int())
 
 kresconfig = configure_file(
   output: 'kresconfig.h',
