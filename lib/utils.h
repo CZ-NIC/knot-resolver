@@ -60,8 +60,16 @@ typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
 #define kr_assume(expression) kr_assume_func((expression), #expression,       \
 					     __func__, __FILE__, __LINE__)
 
-/** Whether kr_assume() checks should result fork and abort. */
-KR_EXPORT extern bool kr_debug_assumption;
+/** Whether kr_assume() checks should abort. */
+KR_EXPORT extern bool kr_dbg_assumption_abort;
+
+/** Whether kr_assume() should fork the process before issuing abort (if configured).
+ *
+ * This can be useful for debugging rare edge-cases in production. When both
+ * kr_debug_assumption_abort and kr_debug_assumption_fork are set to true, it is
+ * possible to both obtain a coredump (from forked child) and recover from the
+ * non-fatal error in the parent process. */
+KR_EXPORT extern bool kr_dbg_assumption_fork;
 
 /** Use kr_require() and kr_assume() instead of directly this function. */
 KR_EXPORT KR_COLD void kr_fail(bool is_fatal, const char* expr, const char *func,

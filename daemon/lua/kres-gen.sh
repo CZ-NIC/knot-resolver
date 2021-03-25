@@ -197,6 +197,8 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 # Utils
 	kr_log_req
 	kr_log_q
+	kr_dbg_assumption_abort
+	kr_dbg_assumption_fork
 	kr_make_query
 	kr_pkt_make_auth_header
 	kr_pkt_put
