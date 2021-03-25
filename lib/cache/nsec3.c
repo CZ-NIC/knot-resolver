@@ -10,6 +10,7 @@
 
 #include "contrib/base32hex.h"
 #include "lib/dnssec/nsec.h"
+#include "lib/dnssec/nsec3.h"
 #include "lib/layer/iterate.h"
 
 #include <libknot/rrtype/nsec3.h>
@@ -88,6 +89,11 @@ static knot_db_val_t key_NSEC3_name(struct key *k, const knot_dname_t *name,
 		.data = (uint8_t *)/*const-cast*/name,
 	};
 
+	if (nsec_p->libknot.iterations > KR_NSEC3_MAX_ITERATIONS) {
+		/* This is mainly defensive; it shouldn't happen thanks to downgrades. */
+		assert(false);
+		return VAL_EMPTY;
+	}
 	#if 0 // LATER(optim.): this requires a patched libdnssec - tries to realloc()
 	dnssec_binary_t hash = {
 		.size = KR_CACHE_KEY_MAXLEN - val.len,
