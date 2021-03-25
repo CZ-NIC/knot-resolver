@@ -45,8 +45,10 @@ void kr_fail(bool is_fatal, const char *expr, const char *func, const char *file
 	kr_log_error("%s \"%s\" failed in %s@%s:%d\n",
 			(is_fatal ? "requirement" : "assumption"),
 			expr, func, file, line);
-	if (is_fatal || kr_debug_assumption)
+	if (is_fatal || kr_debug_assumption) {
+		assert(false);
 		abort();
+	}
 }
 
 /*
