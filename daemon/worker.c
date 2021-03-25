@@ -260,8 +260,7 @@ static inline void pool_release(struct worker_ctx *worker, struct mempool *mp)
 static const size_t SUBREQ_KEY_LEN = KR_RRKEY_LEN;
 static int subreq_key(char *dst, knot_pkt_t *pkt)
 {
-	if (!kr_assume(pkt))
-		return kr_error(EINVAL);
+	kr_require(pkt);
 	return kr_rrkey(dst, knot_pkt_qclass(pkt), knot_pkt_qname(pkt),
 			knot_pkt_qtype(pkt), knot_pkt_qtype(pkt));
 }
