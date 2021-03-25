@@ -109,7 +109,42 @@ static bool cname_matches_dname(const knot_rrset_t *rr_cn, const knot_rrset_t *r
 		 * to avoid any possible over-read in cn_target. */
 }
 
-static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_query *qry,
+static void mark_insecure_parents(const struct kr_query *qry);
+static void rank_records(struct kr_query *qry, bool any_rank, enum kr_rank rank_to_set,
+			 const knot_dname_t *bailiwick);
+
+static bool maybe_downgrade_nsec3(const ranked_rr_array_entry_t *e, struct kr_query *qry,
+				  const kr_rrset_validation_ctx_t *vctx)
+{
+	bool required_conditions =
+		e->rr->type == KNOT_RRTYPE_NSEC3
+		&& kr_rank_test(e->rank, KR_RANK_SECURE)
+		// extra careful: avoid downgrade if SNAME isn't in bailiwick of signer
+		&& knot_dname_in_bailiwick(qry->sname, vctx->zone_name) >= 0;
+	if (!required_conditions)
+		return false;
+
+	const knot_rdataset_t *rrs = &e->rr->rrs;
+	knot_rdata_t *rd = rrs->rdata;
+	for (int j = 0; j < rrs->count; ++j, rd = knot_rdataset_next(rd)) {
+		if (knot_nsec3_iters(rd) > KR_NSEC3_MAX_ITERATIONS)
+			goto do_downgrade;
+	}
+	return false;
+
+do_downgrade: // we do this deep inside calls because of having signer name available
+	VERBOSE_MSG(qry, "<= DNSSEC downgraded due to NSEC3 iterations %d > %d\n",
+			(int)knot_nsec3_iters(rd), (int)KR_NSEC3_MAX_ITERATIONS);
+	qry->flags.DNSSEC_WANT = false;
+	qry->flags.DNSSEC_INSECURE = true;
+	rank_records(qry, true, KR_RANK_INSECURE, vctx->zone_name);
+	mark_insecure_parents(qry);
+	return true;
+}
+
+#define KNOT_EDOWNGRADED (KNOT_ERROR_MIN - 1)
+
+static int validate_section(kr_rrset_validation_ctx_t *vctx, struct kr_query *qry,
 			    knot_mm_t *pool)
 {
 	if (!vctx) {
@@ -169,6 +204,10 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, const struct kr_que
 
 		if (validation_result == kr_ok()) {
 			kr_rank_set(&entry->rank, KR_RANK_SECURE);
+
+			/* Downgrade zone to insecure if certain NSEC3 record occurs. */
+			if (unlikely(maybe_downgrade_nsec3(entry, qry, vctx)))
+				return kr_error(KNOT_EDOWNGRADED);
 
 		} else if (kr_rank_test(rank_orig, KR_RANK_TRY)) {
 			/* RFC 4035 section 2.2:
@@ -835,15 +874,14 @@ static int check_signer(kr_layer_t *ctx, knot_pkt_t *pkt)
 }
 
 /** Change ranks of RRs from this single iteration:
- * _INITIAL or _TRY or _MISSING -> rank_to_set.
+ * _INITIAL or _TRY or _MISSING -> rank_to_set.  Or any rank, if any_rank == true.
  *
  * Optionally do this only in a `bailiwick` (if not NULL).
  * Iterator shouldn't have selected such records, but we check to be sure. */
-static void rank_records(kr_layer_t *ctx, enum kr_rank rank_to_set,
+static void rank_records(struct kr_query *qry, bool any_rank, enum kr_rank rank_to_set,
 			 const knot_dname_t *bailiwick)
 {
-	struct kr_request *req	   = ctx->req;
-	struct kr_query *qry	   = req->current_query;
+	struct kr_request *req = qry->request;
 	ranked_rr_array_t *ptrs[2] = { &req->answ_selected, &req->auth_selected };
 	for (size_t i = 0; i < 2; ++i) {
 		ranked_rr_array_t *arr = ptrs[i];
@@ -931,9 +969,8 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* Pass-through if user doesn't want secure answer or stub. */
-	/* @todo: Validating stub resolver mode. */
 	if (qry->flags.STUB) {
-		rank_records(ctx, KR_RANK_OMIT, NULL);
+		rank_records(qry, false, KR_RANK_OMIT, NULL);
 		return ctx->state;
 	}
 	uint8_t pkt_rcode = knot_wire_get_rcode(pkt->wire);
@@ -954,7 +991,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (!(qry->flags.DNSSEC_WANT)) {
 		const bool is_insec = qry->flags.CACHED && qry->flags.DNSSEC_INSECURE;
 		if ((qry->flags.DNSSEC_INSECURE)) {
-			rank_records(ctx, KR_RANK_INSECURE, qry->zone_cut.name);
+			rank_records(qry, true, KR_RANK_INSECURE, qry->zone_cut.name);
 		}
 		if (is_insec && qry->parent != NULL) {
 			/* We have got insecure answer from cache.
@@ -976,7 +1013,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (knot_wire_get_cd(req->qsource.packet->wire)) {
 		check_wildcard(ctx);
 		wildcard_adjust_to_wire(req, qry);
-		rank_records(ctx, KR_RANK_OMIT, NULL);
+		rank_records(qry, false, KR_RANK_OMIT, NULL);
 		return ctx->state;
 	}
 	/* Answer for RRSIG may not set DO=1, but all records MUST still validate. */
@@ -1021,7 +1058,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			/* ^ the message is a bit imprecise to avoid being too verbose */
 			qry->flags.DNSSEC_WANT = false;
 			qry->flags.DNSSEC_INSECURE = true;
-			rank_records(ctx, KR_RANK_INSECURE, qry->zone_cut.name);
+			rank_records(qry, true, KR_RANK_INSECURE, qry->zone_cut.name);
 			mark_insecure_parents(qry);
 			return KR_STATE_DONE;
 		}
@@ -1042,7 +1079,9 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 * TTLs of RRsets may get lowered. */
 	if (!(qry->flags.CACHED)) {
 		ret = validate_records(req, pkt, req->rplan.pool, has_nsec3);
-		if (ret != 0) {
+		if (ret == KNOT_EDOWNGRADED) {
+			return KR_STATE_DONE;
+		} else if (ret != 0) {
 			/* something exceptional - no DNS key, empty pointers etc
 			 * normally it shoudn't happen */
 			VERBOSE_MSG(qry, "<= couldn't validate RRSIGs\n");
