@@ -426,6 +426,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 /** More initialization, related to the particular incoming query/packet. */
 static int request_start(struct request_ctx *ctx, knot_pkt_t *query)
 {
+	(void)!kr_assume(false);
 	if (!kr_assume(query && ctx))
 		return kr_error(EINVAL);
 
