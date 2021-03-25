@@ -1037,6 +1037,33 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 
+	/* Validate all records, fail as bogus if it doesn't match.
+	 * Do not revalidate data from cache, as it's already trusted.
+	 * TTLs of RRsets may get lowered. */
+	if (!(qry->flags.CACHED)) {
+		ret = validate_records(req, pkt, req->rplan.pool, has_nsec3);
+		if (ret != 0) {
+			/* something exceptional - no DNS key, empty pointers etc
+			 * normally it shoudn't happen */
+			VERBOSE_MSG(qry, "<= couldn't validate RRSIGs\n");
+			qry->flags.DNSSEC_BOGUS = true;
+			return KR_STATE_FAIL;
+		}
+		/* check validation state and spawn subrequests */
+		if (!req->answ_validated) {
+			ret = check_validation_result(ctx, pkt, &req->answ_selected);
+			if (ret != KR_STATE_DONE) {
+				return ret;
+			}
+		}
+		if (!req->auth_validated) {
+			ret = check_validation_result(ctx, pkt, &req->auth_selected);
+			if (ret != KR_STATE_DONE) {
+				return ret;
+			}
+		}
+	}
+
 	/* Validate non-existence proof if not positive answer.
 	 * In case of CNAME, iterator scheduled a sibling query for the target,
 	 * so we just drop the negative piece of information and don't try to prove it.
@@ -1091,33 +1118,6 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 					qry->flags.DNSSEC_BOGUS = true;
 					return KR_STATE_FAIL;
 				}
-			}
-		}
-	}
-
-	/* Validate all records, fail as bogus if it doesn't match.
-	 * Do not revalidate data from cache, as it's already trusted.
-	 * TTLs of RRsets may get lowered. */
-	if (!(qry->flags.CACHED)) {
-		ret = validate_records(req, pkt, req->rplan.pool, has_nsec3);
-		if (ret != 0) {
-			/* something exceptional - no DNS key, empty pointers etc
-			 * normally it shoudn't happen */
-			VERBOSE_MSG(qry, "<= couldn't validate RRSIGs\n");
-			qry->flags.DNSSEC_BOGUS = true;
-			return KR_STATE_FAIL;
-		}
-		/* check validation state and spawn subrequests */
-		if (!req->answ_validated) {
-			ret = check_validation_result(ctx, pkt, &req->answ_selected);
-			if (ret != KR_STATE_DONE) {
-				return ret;
-			}
-		}
-		if (!req->auth_validated) {
-			ret = check_validation_result(ctx, pkt, &req->auth_selected);
-			if (ret != KR_STATE_DONE) {
-				return ret;
 			}
 		}
 	}
