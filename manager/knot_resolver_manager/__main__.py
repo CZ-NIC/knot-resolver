@@ -5,7 +5,7 @@ import sys
 from aiohttp import web
 import click
 
-from .kresd_manager import KresdManager
+from .kres_manager import KresManager
 from .utils import ignore_exceptions
 from . import configuration
 
@@ -19,7 +19,7 @@ async def hello(_request: web.Request) -> web.Response:
 
 async def apply_config(request: web.Request) -> web.Response:
     config = await configuration.parse_yaml(await request.text())
-    manager: KresdManager = request.app["kresd_manager"]
+    manager: KresManager = request.app["kres_manager"]
     await manager.apply_config(config)
     return web.Response(text="OK")
 
@@ -34,12 +34,12 @@ def main(listen: Optional[str]):
 
     app = web.Application()
 
-    # initialize KresdManager
-    manager = KresdManager()
-    app["kresd_manager"] = manager
+    # initialize KresManager
+    manager = KresManager()
+    app["kres_manager"] = manager
 
     async def init_manager(app):
-        await app["kresd_manager"].load_system_state()
+        await app["kres_manager"].load_system_state()
 
     app.on_startup.append(init_manager)
 
