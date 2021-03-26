@@ -302,7 +302,7 @@ Actions :func:`policy.FORWARD`, :func:`policy.TLS_FORWARD` and :func:`policy.STU
 .. function:: FORWARD(ip_address)
               FORWARD({ ip_address, [ip_address, ...] })
 
-   Forward cache-miss queries to specified IP addresses via DNS-over-UDP, DNSSEC validate received answers and cache them. Target IP addresses are expected to be DNS resolvers.
+   Forward cache-miss queries to specified IP addresses (without encryption), DNSSEC validate received answers and cache them. Target IP addresses are expected to be DNS resolvers.
 
    .. code-block:: lua
 
@@ -320,7 +320,7 @@ Actions :func:`policy.FORWARD`, :func:`policy.TLS_FORWARD` and :func:`policy.STU
    Similar to :func:`policy.FORWARD` but *without* attempting DNSSEC validation.
    Each request may be either answered from cache or simply sent to one of the IPs with proxying back the answer.
 
-   This mode supports only DNS-over-UDP and should be used only for `Replacing part of the DNS tree`_.
+   This mode does not support encryption and should be used only for `Replacing part of the DNS tree`_.
    Use :func:`policy.FORWARD` mode if possible.
 
    .. code-block:: lua
