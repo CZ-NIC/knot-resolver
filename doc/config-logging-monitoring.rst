@@ -47,3 +47,4 @@ Additional monitoring and debugging methods are described below. If none of thes
    modules-ta_signal_query
    modules-detect_time_skew
    modules-detect_time_jump
+   config-debugging
