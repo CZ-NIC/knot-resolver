@@ -73,7 +73,7 @@ RUN poetry --version \
   # and install the dependencies
   && poetry install --no-dev --no-interaction --no-ansi
 
-# Copy the remaining code
-COPY . /code
+# Here, we would copy the remaining code if we wanted to permanently keep it in the container. We don't do that, we use read-only bind mounts
+# COPY . /code
 
 CMD ["/bin/systemd"]
