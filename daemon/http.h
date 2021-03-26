@@ -32,6 +32,13 @@ typedef enum {
 	HTTP_METHOD_POST = 2,
 } http_method_t;
 
+struct http_stream {
+	int32_t stream_id;
+	int err_status;
+	char *err_msg;
+	uint8_t *buf;
+};
+
 struct http_stream_status {
 	int32_t stream_id;
 	int err_status;
@@ -52,8 +59,9 @@ struct http_ctx {
 	ssize_t buf_pos;
 	ssize_t buf_size;
 	trie_t *stream_status;
-	struct http_stream_status *current_stream;
+	struct http_stream *current_stream;
 	knot_mm_t *pool;
+	trie_t *streams2;
 };
 
 #if ENABLE_DOH2
