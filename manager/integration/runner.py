@@ -1,21 +1,20 @@
-import subprocess
-import signal
-import uuid
-from typing import Optional, List, BinaryIO, Dict
-import shutil
-import tarfile
-import os
-import time
-import sys
-import requests
 import hashlib
-import click
 import json
-import toml
-
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import tarfile
+import time
+import uuid
 from _hashlib import HASH as Hash
 from pathlib import Path, PurePath
-from typing import Union
+from typing import BinaryIO, Dict, List, Optional, Union
+
+import click
+import requests
+import toml
 
 
 class DirectoryHash:

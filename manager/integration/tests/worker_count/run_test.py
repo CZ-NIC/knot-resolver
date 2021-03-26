@@ -1,10 +1,11 @@
 
 
 
-import requests
-import requests_unixsocket
 import subprocess
 import time
+
+import requests
+import requests_unixsocket
 
 # patch requests library so that it supports unix socket
 requests_unixsocket.monkeypatch()

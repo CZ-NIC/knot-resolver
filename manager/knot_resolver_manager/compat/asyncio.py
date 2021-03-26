@@ -1,13 +1,25 @@
-# pylint: disable=E1101
+# We disable pylint checks, because it can't find methods in newer Python versions.
+#
+# pylint: disable=no-member
 
-from asyncio.futures import Future
-import sys
+# We disable pyright checks because it can't find method that don't exist in this Python version
+# so the reported error is correct, but due to the version checking conditions, it never happens
+#
+# pyright: reportUnknownMemberType=false
+# pyright: reportUnknownVariableType=false
+# pyright: reportGeneralTypeIssues=false
+
 import asyncio
 import functools
-from typing import Awaitable, Coroutine
+import sys
+from typing import Any, Awaitable, Callable, Coroutine, Optional, TypeVar
+
+from knot_resolver_manager.utils.types import NoneType
+
+T = TypeVar("T")
 
 
-def to_thread(func, *args, **kwargs) -> Awaitable:
+def to_thread(func: Callable[..., T], *args: Any, **kwargs: Any) -> Awaitable[T]:
     # version 3.9 and higher, call directly
     if sys.version_info.major >= 3 and sys.version_info.minor >= 9:
         return asyncio.to_thread(func, *args, **kwargs)
@@ -19,7 +31,7 @@ def to_thread(func, *args, **kwargs) -> Awaitable:
         return loop.run_in_executor(None, pfunc)
 
 
-def create_task(coro: Coroutine, name=None) -> Future:
+def create_task(coro: Coroutine[Any, T, NoneType], name: Optional[str] = None) -> Awaitable[T]:
     # version 3.8 and higher, call directly
     if sys.version_info.major >= 3 and sys.version_info.minor >= 8:
         return asyncio.create_task(coro, name=name)
@@ -33,7 +45,7 @@ def create_task(coro: Coroutine, name=None) -> Future:
         return asyncio.ensure_future(coro)
 
 
-def run(coro: Coroutine, debug=None) -> Awaitable:
+def run(coro: Coroutine[Any, T, NoneType], debug: Optional[bool] = None) -> Awaitable[T]:
     # ideally copy-paste of this:
     # https://github.com/python/cpython/blob/3.9/Lib/asyncio/runners.py#L8
 

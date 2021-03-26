@@ -36,7 +36,7 @@ run = { cmd = "scripts/run", help = "Run the manager" }
 run-debug = { cmd = "scripts/run-debug", help = "Run the manager under debugger" }
 test = { cmd = "pytest --cov=knot_resolver_manager --show-capture=all tests/", help = "Run tests" }
 check = { cmd = "scripts/codecheck", help = "Run static code analysis" }
-format = { cmd = "poetry run black knot_resolver_manager/ tests/", help = "Run 'Black' code formater" }
+format = { shell = "poetry run black knot_resolver_manager/ tests/; isort -rc .", help = "Run code formatter" }
 fixdeps = { shell = "poetry install; yarn install", help = "Install/update dependencies according to configuration files"}
 commit = { shell = "scripts/commit", help = "Invoke every single check before commiting" }
 container-build = { cmd = "scripts/container-build", help = "Build containers (no arguments = all, otherwise arguments are tags that should be built)" }
@@ -52,6 +52,18 @@ clean = """
 tox = { cmd = "tox", help = "Run tests in tox" }
 integration = {cmd = "python integration/runner.py", help = "Run integration tests" }
 
+
+[tool.black]
+line-length = 120
+target_version = ['py38']
+include = '\.py$'
+
+[tool.isort]
+line_length=120                # corresponds to -w  flag
+multi_line_output=3            # corresponds to -m  flag
+include_trailing_comma=true    # corresponds to -tc flag
+skip_glob = '^((?!py$).)*$'    # isort all Python files
+float_to_top=true
 
 [tool.tox]
 legacy_tox_ini = """

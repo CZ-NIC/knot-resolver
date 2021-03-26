@@ -1,17 +1,7 @@
-from typing import Any, List, Dict, Tuple, Type, TypeVar, Union
-from strictyaml import (
-    Map,
-    Str,
-    EmptyDict,
-    Int,
-    Float,
-    Seq,
-    MapPattern,
-    FixedSeq,
-    load,
-    YAML,
-)
+from typing import Any, Dict, List, Tuple, Type, TypeVar, Union
+
 import strictyaml
+from strictyaml import YAML, EmptyDict, FixedSeq, Float, Int, Map, MapPattern, Seq, Str, load
 
 
 class _DummyType:
@@ -74,9 +64,7 @@ def _get_strictyaml_type(python_type):
 
     # error handlers for non existent primitive types
     elif python_type not in _TYPE_MAP:
-        raise StrictYAMLSchemaGenerationError(
-            f"Type {python_type} is not supported for YAML schema generation"
-        )
+        raise StrictYAMLSchemaGenerationError(f"Type {python_type} is not supported for YAML schema generation")
 
     # remaining primitive and untyped types
     else:
@@ -131,8 +119,7 @@ def _yamlobj_to_dataclass(cls, obj: YAML) -> Any:
         # Dict[K, V]
         elif origin == Dict and len(args) == 2:
             return {
-                _yamlobj_to_dataclass(args[0], key): _yamlobj_to_dataclass(args[1], val)
-                for key, val in obj.items()
+                _yamlobj_to_dataclass(args[0], key): _yamlobj_to_dataclass(args[1], val) for key, val in obj.items()
             }
 
         # List[T]
@@ -156,9 +143,7 @@ def _yamlobj_to_dataclass(cls, obj: YAML) -> Any:
     anot = cls.__dict__.get("__annotations__", {})
     kwargs = {}
     for name, python_type in anot.items():
-        kwargs[name] = _yamlobj_to_dataclass(
-            python_type, obj[name] if name in obj else None
-        )
+        kwargs[name] = _yamlobj_to_dataclass(python_type, obj[name] if name in obj else None)
     return cls(**kwargs)
 
 

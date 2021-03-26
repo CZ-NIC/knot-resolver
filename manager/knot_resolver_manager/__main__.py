@@ -1,13 +1,13 @@
-from typing import Optional
-from pathlib import Path
 import sys
+from pathlib import Path
+from typing import Optional
 
-from aiohttp import web
 import click
+from aiohttp import web
 
 from .kres_manager import KresManager
-from .utils import ignore_exceptions
 from . import configuration
+from .utils import ignore_exceptions
 
 # when changing this, change the help message in main()
 _SOCKET_PATH = "/tmp/manager.sock"
@@ -38,7 +38,7 @@ def main(listen: Optional[str]):
     manager = KresManager()
     app["kres_manager"] = manager
 
-    async def init_manager(app):
+    async def init_manager(app: web.Application):
         await app["kres_manager"].load_system_state()
 
     app.on_startup.append(init_manager)

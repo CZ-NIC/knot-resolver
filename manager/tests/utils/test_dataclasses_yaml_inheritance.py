@@ -1,13 +1,12 @@
-from knot_resolver_manager.utils.dataclasses_yaml import (
-    StrictyamlParser,
-    dataclass_strictyaml,
-)
-from knot_resolver_manager.utils import dataclass_strictyaml_schema
-from typing import List, Dict, Optional, Tuple
-from strictyaml import Map, Str, EmptyDict, Int, Float, Seq, MapPattern, FixedSeq
-import strictyaml
-import pytest
 from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
+
+import pytest
+import strictyaml
+from strictyaml import EmptyDict, FixedSeq, Float, Int, Map, MapPattern, Seq, Str
+
+from knot_resolver_manager.utils import dataclass_strictyaml_schema
+from knot_resolver_manager.utils.dataclasses_yaml import StrictyamlParser, dataclass_strictyaml
 
 
 def test_parsing_primitive():

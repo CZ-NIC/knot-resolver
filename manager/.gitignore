@@ -8,3 +8,4 @@ package-lock.json
 .pytype
 dist/
 .tox/
+.vscode/
