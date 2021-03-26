@@ -1,0 +1,8 @@
+{
+  "include": [
+    "knot_resolver_manager"
+  ],
+  "exclude": [
+    "knot_resolver_manager/compat/asyncio.py"
+  ]
+}

@@ -394,7 +394,7 @@ class TestRunner:
                     print(f"Skipping test {Colors.YELLOW}{test.name}{Colors.RESET}")
                     continue
 
-                test.run(manager)
+                test.run(manager, inspect_failed)
 
 
 if __name__ == "__main__":

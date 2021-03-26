@@ -3,3 +3,4 @@ cmd = ["/test/run"]
 
 [mount]
 "/test" = "integration/tests/basic_startup"
+"/code" = "."

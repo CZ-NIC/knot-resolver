@@ -14,6 +14,7 @@ strictyaml = "^1.3.2"
 pydbus = "^0.6.0"
 PyGObject = "^3.38.0"
 Jinja2 = "^2.11.3"
+click = "^7.1.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
@@ -31,14 +32,14 @@ toml = "^0.10.2"
 debugpy = "^1.2.1"
 
 [tool.poe.tasks]
-run = { cmd = "python -m knot_resolver_manager", help = "Run the manager" }
+run = { cmd = "scripts/run", help = "Run the manager" }
 run-debug = { cmd = "scripts/run-debug", help = "Run the manager under debugger" }
 test = { cmd = "pytest --cov=knot_resolver_manager --show-capture=all tests/", help = "Run tests" }
 check = { cmd = "scripts/codecheck", help = "Run static code analysis" }
 format = { cmd = "poetry run black knot_resolver_manager/ tests/", help = "Run 'Black' code formater" }
 fixdeps = { shell = "poetry install; yarn install", help = "Install/update dependencies according to configuration files"}
 commit = { shell = "scripts/commit", help = "Invoke every single check before commiting" }
-container-build = { cmd = "scripts/container-buildall", help = "Build all containers" }
+container-build = { cmd = "scripts/container-build", help = "Build containers (no arguments = all, otherwise arguments are tags that should be built)" }
 container-run = { cmd = "scripts/container-run.py", help = "Run a container" }
 clean = """
   rm -rf .coverage
