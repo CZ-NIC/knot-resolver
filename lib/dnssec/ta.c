@@ -133,14 +133,13 @@ int kr_ta_covers(map_t *trust_anchors, const knot_dname_t *name)
 bool kr_ta_covers_qry(struct kr_context *ctx, const knot_dname_t *name,
 		      const uint16_t type)
 {
-	assert(ctx && name);
+	if (!kr_assume(ctx && name))
+		return false;
 	if (type == KNOT_RRTYPE_DS && name[0] != '\0') {
 		/* DS is parent-side record, so the parent name needs to be covered. */
 		name = knot_wire_next_label(name, NULL);
-		if (!name) {
-			assert(false);
+		if (!kr_assume(name))
 			return false;
-		}
 	}
 	return kr_ta_covers(&ctx->trust_anchors, name)
 		&& !kr_ta_covers(&ctx->negative_anchors, name);
