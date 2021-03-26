@@ -34,7 +34,7 @@ class Kresd:
         self._needs_restart = True
 
 
-class KresdManager:
+class KresManager:
     def __init__(self):
         self._children: List[Kresd] = []
         self._children_lock = asyncio.Lock()
