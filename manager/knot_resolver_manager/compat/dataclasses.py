@@ -9,5 +9,4 @@ the option to do it transparently, without changing anything else.
 
 from dataclasses import dataclass
 
-
 __all__ = ["dataclass"]

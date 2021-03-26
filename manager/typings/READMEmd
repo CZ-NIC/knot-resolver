@@ -1,0 +1,8 @@
+# Type stubs
+
+See (pyright documentation)[https://github.com/microsoft/pyright/blob/master/docs/type-stubs.md]
+
+Generate stubs using this command (replacing `jinja2` for an appropriate package):
+```
+poetry run yarn pyright --createstub jinja2
+```

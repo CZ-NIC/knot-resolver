@@ -1,9 +1,12 @@
-from threading import Thread
-from typing import List, Union
-from typing_extensions import Literal
+# pyright: reportUnknownMemberType=false
+# pyright: reportMissingTypeStubs=false
 
-from pydbus import SystemBus
+from threading import Thread
+from typing import Any, List, Union
+
 from gi.repository import GLib
+from pydbus import SystemBus
+from typing_extensions import Literal
 
 # ugly global result variable, but this module will be used once in a every
 # process, so we should get away with it
@@ -16,33 +19,31 @@ class SystemdException(Exception):
     pass
 
 
-def _create_manager_interface():
-    bus = SystemBus()
+def _create_manager_interface() -> Any:
+    bus: Any = SystemBus()
     systemd = bus.get(".systemd1")
     return systemd
 
 
-def _wait_for_job_completion(systemd, job):
+def _wait_for_job_completion(systemd: Any, job: Any):
     def event_loop_isolation_thread():
         global result_state
 
-        loop = GLib.MainLoop()
+        loop: Any = GLib.MainLoop()
         systemd.JobRemoved.connect(_wait_for_job_completion_handler(loop, job))
         result_state = None
         loop.run()
 
         if result_state != "done":
-            raise SystemdException(
-                f"Job completed with state '{result_state}' instead of expected 'done'"
-            )
+            raise SystemdException(f"Job completed with state '{result_state}' instead of expected 'done'")
 
     thread = Thread(target=event_loop_isolation_thread)
     thread.start()
     thread.join()
 
 
-def _wait_for_job_completion_handler(loop, job_path):
-    def event_hander(_job_id, path, _unit, state):
+def _wait_for_job_completion_handler(loop: Any, job_path: Any) -> Any:
+    def event_hander(_job_id: Any, path: Any, _unit: Any, state: Any):
         global result_state
 
         # if the job is no longer queued, stop the loop

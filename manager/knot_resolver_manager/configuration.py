@@ -1,5 +1,6 @@
 from typing import Text
-from jinja2 import Environment
+
+from jinja2 import Environment, Template
 
 from .datamodel import ConfData
 
@@ -10,7 +11,7 @@ _LUA_TEMPLATE_STR = """
 """
 
 _ENV = Environment(enable_async=True)
-_LUA_TEMPLATE = _ENV.from_string(_LUA_TEMPLATE_STR)
+_LUA_TEMPLATE: Template = _ENV.from_string(_LUA_TEMPLATE_STR)
 
 
 async def render_lua(config: ConfData) -> Text:

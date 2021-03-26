@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
 import subprocess
-from typing import Dict, List, Optional
-import click
+import sys
 import time
 from pathlib import Path, PurePath
-import sys
+from typing import Dict, List, Optional
+
+import click
 
 PODMAN_EXECUTABLE = "/usr/bin/podman"
 

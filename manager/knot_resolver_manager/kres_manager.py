@@ -1,10 +1,8 @@
 import asyncio
-from uuid import uuid4
 from typing import List, Optional
+from uuid import uuid4
 
-from . import compat
-from . import systemd
-from . import configuration
+from . import compat, configuration, systemd
 from .datamodel import ConfData
 
 
@@ -26,9 +24,7 @@ class Kresd:
         await compat.asyncio.to_thread(systemd.stop_unit, f"kresd@{self._id}.service")
 
     async def restart(self):
-        await compat.asyncio.to_thread(
-            systemd.restart_unit, f"kresd@{self._id}.service"
-        )
+        await compat.asyncio.to_thread(systemd.restart_unit, f"kresd@{self._id}.service")
 
     def mark_for_restart(self):
         self._needs_restart = True

@@ -1,10 +1,12 @@
-from knot_resolver_manager.utils.dataclasses_yaml import dataclass_strictyaml
-from knot_resolver_manager.utils import dataclass_strictyaml_schema
-from typing import List, Dict, Optional, Tuple
-from strictyaml import Map, Str, EmptyDict, Int, Float, Seq, MapPattern, FixedSeq
-import strictyaml
-import pytest
 from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
+
+import pytest
+import strictyaml
+from strictyaml import EmptyDict, FixedSeq, Float, Int, Map, MapPattern, Seq, Str
+
+from knot_resolver_manager.utils import dataclass_strictyaml_schema
+from knot_resolver_manager.utils.dataclasses_yaml import dataclass_strictyaml
 
 
 def _schema_eq(schema1, schema2) -> bool:
@@ -72,9 +74,7 @@ def test_dict_field():
     class TestClass:
         field: Dict[str, int]
 
-    assert _schema_eq(
-        TestClass.STRICTYAML_SCHEMA, Map({"field": MapPattern(Str(), Int())})
-    )
+    assert _schema_eq(TestClass.STRICTYAML_SCHEMA, Map({"field": MapPattern(Str(), Int())}))
 
 
 def test_optional_field():
@@ -82,9 +82,7 @@ def test_optional_field():
     class TestClass:
         field: Optional[int]
 
-    assert _schema_eq(
-        TestClass.STRICTYAML_SCHEMA, Map({strictyaml.Optional("field"): Int()})
-    )
+    assert _schema_eq(TestClass.STRICTYAML_SCHEMA, Map({strictyaml.Optional("field"): Int()}))
 
 
 def test_nested_dict_list():
@@ -92,9 +90,7 @@ def test_nested_dict_list():
     class TestClass:
         field: Dict[str, List[int]]
 
-    assert _schema_eq(
-        TestClass.STRICTYAML_SCHEMA, Map({"field": MapPattern(Str(), Seq(Int()))})
-    )
+    assert _schema_eq(TestClass.STRICTYAML_SCHEMA, Map({"field": MapPattern(Str(), Seq(Int()))}))
 
 
 @pytest.mark.xfail(strict=True)
@@ -107,9 +103,7 @@ def test_nested_dict_key_list():
     class TestClass:
         field: Dict[List[int], List[int]]
 
-    assert _schema_eq(
-        TestClass.STRICTYAML_SCHEMA, Map({"field": MapPattern(Seq(Int()), Seq(Int()))})
-    )
+    assert _schema_eq(TestClass.STRICTYAML_SCHEMA, Map({"field": MapPattern(Seq(Int()), Seq(Int()))}))
 
 
 def test_nested_list():
@@ -117,9 +111,7 @@ def test_nested_list():
     class TestClass:
         field: List[List[List[List[int]]]]
 
-    assert _schema_eq(
-        TestClass.STRICTYAML_SCHEMA, Map({"field": Seq(Seq(Seq(Seq(Int()))))})
-    )
+    assert _schema_eq(TestClass.STRICTYAML_SCHEMA, Map({"field": Seq(Seq(Seq(Seq(Int()))))}))
 
 
 def test_tuple_field():
@@ -127,9 +119,7 @@ def test_tuple_field():
     class TestClass:
         field: Tuple[str, int]
 
-    assert _schema_eq(
-        TestClass.STRICTYAML_SCHEMA, Map({"field": FixedSeq([Str(), Int()])})
-    )
+    assert _schema_eq(TestClass.STRICTYAML_SCHEMA, Map({"field": FixedSeq([Str(), Int()])}))
 
 
 def test_nested_tuple():
@@ -152,9 +142,7 @@ def test_chained_classes():
     class CompoundClass:
         c: TestClass
 
-    assert _schema_eq(
-        CompoundClass.STRICTYAML_SCHEMA, Map({"c": Map({"field": Int()})})
-    )
+    assert _schema_eq(CompoundClass.STRICTYAML_SCHEMA, Map({"c": Map({"field": Int()})}))
 
 
 def test_combined_with_dataclass():

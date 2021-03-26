@@ -1,0 +1,1 @@
+NoneType = type(None)
