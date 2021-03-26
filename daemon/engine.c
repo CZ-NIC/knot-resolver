@@ -85,6 +85,7 @@ static int l_help(lua_State *L)
 		"modules\n    modules configuration\n"
 		"kres\n    resolver services\n"
 		"trust_anchors\n    configure trust anchors\n"
+		"debugging\n    debugging configuration\n"
 		;
 	lua_pushstring(L, help_str);
 	return 1;
@@ -472,10 +473,14 @@ static void init_measurement(struct engine *engine)
 		"})\n"
 		"jit.off()\n", statspath
 	);
-	assert(ret > 0); (void)ret;
+	if (!kr_assume(ret > 0))
+		return;
 
 	ret = luaL_loadstring(engine->L, snippet);
-	assert(ret == 0);
+	if (!kr_assume(ret == 0)) {
+		free(snippet);
+		return;
+	}
 	lua_call(engine->L, 0, 0);
 	free(snippet);
 }
@@ -557,13 +562,8 @@ static void engine_unload(struct engine *engine, struct kr_module *module)
 
 void engine_deinit(struct engine *engine)
 {
-	if (engine == NULL) {
+	if (!engine || !kr_assume(engine->L))
 		return;
-	}
-	if (!engine->L) {
-		assert(false);
-		return;
-	}
 	/* Only close sockets and services; no need to clean up mempool. */
 
 	/* Network deinit is split up.  We first need to stop listening,
@@ -627,7 +627,8 @@ int engine_load_sandbox(struct engine *engine)
 
 int engine_loadconf(struct engine *engine, const char *config_path)
 {
-	assert(config_path != NULL);
+	if (!kr_assume(config_path))
+		return kr_error(EINVAL);
 
 	char cwd[PATH_MAX];
 	get_workdir(cwd, sizeof(cwd));
@@ -674,10 +675,8 @@ static size_t module_find(module_array_t *mod_list, const char *name)
 
 int engine_register(struct engine *engine, const char *name, const char *precedence, const char* ref)
 {
-	if (engine == NULL || name == NULL) {
-		assert(!EINVAL);
+	if (!kr_assume(engine && name))
 		return kr_error(EINVAL);
-	}
 	/* Make sure module is unloaded */
 	(void) engine_unregister(engine, name);
 	/* Find the index of referenced module. */
@@ -716,11 +715,10 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 		} else {
 			ret = engine_pcall(L, 1);
 		}
-		if (ret) {
+		if (!kr_assume(ret == 0)) {  /* probably not critical, but weird */
 			kr_log_error("[system] internal error when loading C module %s: %s\n",
 					module->name, lua_tostring(L, -1));
 			lua_pop(L, 1);
-			assert(false); /* probably not critical, but weird */
 		}
 
 	} else if (ret == kr_error(ENOENT)) {
