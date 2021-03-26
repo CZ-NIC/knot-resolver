@@ -131,13 +131,13 @@ setmetatable(env, {
 
 debugging = {}
 setmetatable(debugging, {
-	__index = function(t, k)
+	__index = function(_, k)
 		if k == 'assumption_abort' then return ffi.C.kr_dbg_assumption_abort
 		elseif k == 'assumption_fork' then return ffi.C.kr_dbg_assumption_fork
 		else panic('invalid debugging option: ' .. tostring(k))
 		end
 	end,
-	__newindex = function(t, k, v)
+	__newindex = function(_, k, v)
 		if k == 'assumption_abort' then ffi.C.kr_dbg_assumption_abort = v
 		elseif k == 'assumption_fork' then ffi.C.kr_dbg_assumption_fork = v
 		else panic('invalid debugging option: ' .. tostring(k))
@@ -422,7 +422,10 @@ setmetatable(cache, {
 
 -- Make sandboxed environment
 local function make_sandbox(defined)
-	local __protected = { worker = true, env = true, debugging = true, modules = true, cache = true, net = true, trust_anchors = true }
+	local __protected = {
+		worker = true, env = true, debugging = true, modules = true,
+		cache = true, net = true, trust_anchors = true
+	}
 
 	-- Compute and export the list of top-level names (hidden otherwise)
 	local nl = ""
