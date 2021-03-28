@@ -5,8 +5,8 @@
 /**
  * @file pack.h
  * @brief A length-prefixed list of objects, also an array list.
- * 
- * Each object is prefixed by item length, unlike array this structure 
+ *
+ * Each object is prefixed by item length, unlike array this structure
  * permits variable-length data. It is also equivallent to forward-only list
  * backed by an array.
  *
@@ -22,7 +22,7 @@
  *
  *      // Reserve 2 objects, 6 bytes total
  *      pack_reserve(pack, 2, 4 + 2);
- * 
+ *
  *      // Push 2 objects
  *      pack_obj_push(pack, U8("jedi"), 4)
  *      pack_obj_push(pack, U8("\xbe\xef"), 2);
@@ -108,36 +108,30 @@ static inline pack_objlen_t pack_obj_len(uint8_t *it)
 /** Return packed object value. */
 static inline uint8_t *pack_obj_val(uint8_t *it)
 {
-	if (it == NULL) {
-		assert(it);
+	if (!kr_assume(it))
 		return NULL;
-	}
 	return it + sizeof(pack_objlen_t);
 }
 
 /** Return pointer to next packed object. */
 static inline uint8_t *pack_obj_next(uint8_t *it)
 {
-	if (it == NULL) {
-		assert(it);
+	if (!kr_assume(it))
 		return NULL;
-	}
 	return pack_obj_val(it) + pack_obj_len(it);
 }
 
 /** Return pointer to the last packed object. */
 static inline uint8_t *pack_last(pack_t pack)
 {
-	if (pack.len == 0) {
+	if (pack.len == 0)
 		return NULL;
-	}
 	uint8_t *it = pack_head(pack);
 	uint8_t *tail = pack_tail(pack);
 	while (true) {
 		uint8_t *next = pack_obj_next(it);
-		if (next == tail) {
+		if (next == tail)
 			return it;
-		}
 		it = next;
 	}
 }
@@ -147,14 +141,11 @@ static inline uint8_t *pack_last(pack_t pack)
   */
 static inline int pack_obj_push(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
 {
-	if (pack == NULL || obj == NULL) {
-		assert(false);
+	if (!kr_assume(pack && obj))
 		return kr_error(EINVAL);
-	}
 	size_t packed_len = len + sizeof(len);
-	if (pack->len + packed_len > pack->cap) {
+	if (pack->len + packed_len > pack->cap)
 		return kr_error(ENOSPC);
-	}
 
 	uint8_t *endp = pack->at + pack->len;
 	memcpy(endp, (char *)&len, sizeof(len));
@@ -168,20 +159,17 @@ static inline int pack_obj_push(pack_t *pack, const uint8_t *obj, pack_objlen_t 
   */
 static inline uint8_t *pack_obj_find(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
 {
-		if (pack == NULL || obj == NULL) {
-			assert(obj != NULL);
-			return NULL;
-		}
-		uint8_t *endp = pack_tail(*pack);
-		uint8_t *it = pack_head(*pack);
-		while (it != endp) {
-			uint8_t *val = pack_obj_val(it);
-			if (pack_obj_len(it) == len && memcmp(obj, val, len) == 0) {
-				return it;
-			}
-			it = pack_obj_next(it);
-		}
+	if (!pack || !kr_assume(obj))
 		return NULL;
+	uint8_t *endp = pack_tail(*pack);
+	uint8_t *it = pack_head(*pack);
+	while (it != endp) {
+		uint8_t *val = pack_obj_val(it);
+		if (pack_obj_len(it) == len && memcmp(obj, val, len) == 0)
+			return it;
+		it = pack_obj_next(it);
+	}
+	return NULL;
 }
 
 /** Delete object from the pack
@@ -189,10 +177,8 @@ static inline uint8_t *pack_obj_find(pack_t *pack, const uint8_t *obj, pack_objl
   */
 static inline int pack_obj_del(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
 {
-	if (pack == NULL || obj == NULL) {
-		assert(obj != NULL);
+	if (!pack || !kr_assume(obj))
 		return kr_error(EINVAL);
-	}
 	uint8_t *endp = pack_tail(*pack);
 	uint8_t *it = pack_obj_find(pack, obj, len);
 	if (it) {
@@ -208,10 +194,8 @@ static inline int pack_obj_del(pack_t *pack, const uint8_t *obj, pack_objlen_t l
  * @return kr_error(ENOMEM) on allocation failure. */
 static inline int pack_clone(pack_t **dst, const pack_t *src, knot_mm_t *pool)
 {
-	if (!dst || !src) {
-		assert(false);
+	if (!kr_assume(dst && src))
 		return kr_error(EINVAL);
-	}
 	/* Get a valid pack_t. */
 	if (!*dst) {
 		*dst = mm_alloc(pool, sizeof(pack_t));
