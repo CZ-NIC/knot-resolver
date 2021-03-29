@@ -1,3 +1,11 @@
+Knot Resolver 5.y.z (2021-mm-dd)
+================================
+
+Improvements
+------------
+- cache: improve handling write errors from LMDB (!1159)
+
+
 Knot Resolver 5.3.1 (2021-03-31)
 ================================
 
