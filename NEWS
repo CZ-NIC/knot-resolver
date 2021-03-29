@@ -5,6 +5,7 @@ Improvements
 ------------
 - policy.STUB: try to avoid TCP (compared to 5.3.0; !1155)
 - validator: downgrade NSEC3 records with too many iterations (>150; !1160)
+- cache: improve handling write errors from LMDB (!1159)
 
 Bugfixes
 --------
