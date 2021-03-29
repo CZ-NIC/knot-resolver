@@ -676,7 +676,7 @@ six = ">=1.5"
 name = "pyyaml"
 version = "5.4.1"
 description = "YAML parser and emitter for Python"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*"
 
@@ -954,7 +954,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=1.2.3)", "pytest-flake8", "pyt
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.6.12"
-content-hash = "84b5fb8bb68a208f7a3b4027815766c8c6c2e82681789eacacf5838199b14a3d"
+content-hash = "86ff57487d2a60351c49574b934a11e534d183a148094b08aa456b80fb32efdc"
 
 [metadata.files]
 aiohttp = [

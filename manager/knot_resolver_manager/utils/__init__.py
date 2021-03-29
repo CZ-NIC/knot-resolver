@@ -1,6 +1,6 @@
 from typing import Any, Callable, Optional, Type, TypeVar
 
-from . import types
+from .dataclasses_nested import dataclass_nested
 from .dataclasses_yaml import StrictyamlParser, dataclass_strictyaml, dataclass_strictyaml_schema
 
 T = TypeVar("T")
@@ -24,4 +24,11 @@ def ignore_exceptions(
     return decorator
 
 
-__all__ = ["dataclass_strictyaml_schema", "dataclass_strictyaml", "StrictyamlParser", "ignore_exceptions", "types"]
+__all__ = [
+    "dataclass_strictyaml_schema",
+    "dataclass_strictyaml",
+    "StrictyamlParser",
+    "ignore_exceptions",
+    "dataclass_nested",
+    "types",
+]

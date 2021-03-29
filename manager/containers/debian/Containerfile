@@ -57,6 +57,9 @@ RUN apt-get update \
 # Create knot-resolver-manager systemd service
 COPY ./config/knot-resolver-manager.service /etc/systemd/system
 
+# Copy knot-resolver-manager YAML configuration file
+COPY ./config/kres-manager.yaml /etc/knot-resolver/
+
 # Copy only requirements, to cache them in docker layer
 # no poetry.lock, because here we have a different python version
 COPY ./pyproject.toml ./yarn.lock ./package.json /code/

@@ -5,8 +5,9 @@ from typing import Optional
 import click
 from aiohttp import web
 
-from .kres_manager import KresManager
 from . import configuration
+from .datamodel import KresConfig
+from .kres_manager import KresManager
 from .utils import ignore_exceptions
 
 # when changing this, change the help message in main()
@@ -18,7 +19,7 @@ async def hello(_request: web.Request) -> web.Response:
 
 
 async def apply_config(request: web.Request) -> web.Response:
-    config = await configuration.parse_yaml(await request.text())
+    config: KresConfig = await configuration.parse_json(await request.text())
     manager: KresManager = request.app["kres_manager"]
     await manager.apply_config(config)
     return web.Response(text="OK")
@@ -26,7 +27,8 @@ async def apply_config(request: web.Request) -> web.Response:
 
 @click.command()
 @click.argument("listen", type=str, nargs=1, required=False, default=None)
-def main(listen: Optional[str]):
+@click.option("--config", "-c", type=str, nargs=1, required=False, default=None)
+def main(listen: Optional[str], config: Optional[str]):
     """Knot Resolver Manager
 
     [listen] ... numeric port or a path for a Unix domain socket, default is \"/tmp/manager.sock\"

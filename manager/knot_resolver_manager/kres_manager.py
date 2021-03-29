@@ -3,7 +3,7 @@ from typing import List, Optional
 from uuid import uuid4
 
 from . import compat, configuration, systemd
-from .datamodel import ConfData
+from .datamodel import KresConfig
 
 
 class Kresd:
@@ -73,14 +73,14 @@ class KresManager:
         while len(self._children) < n:
             await self._spawn_new_child()
 
-    async def _write_config(self, config: ConfData):
+    async def _write_config(self, config: KresConfig):
         # FIXME: this code is blocking!!!
         lua_config = await configuration.render_lua(config)
         with open("/etc/knot-resolver/kresd.conf", "w") as f:
             f.write(lua_config)
 
-    async def apply_config(self, config: ConfData):
+    async def apply_config(self, config: KresConfig):
         async with self._children_lock:
             await self._write_config(config)
-            await self._ensure_number_of_children(config.num_workers)
+            await self._ensure_number_of_children(config.server.instances)
             await self._rolling_restart()

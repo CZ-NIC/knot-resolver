@@ -5,7 +5,7 @@ After=dbus
 
 [Service]
 WorkingDirectory=/code
-ExecStart=/usr/bin/python3 -m knot_resolver_manager
+ExecStart=/usr/bin/python3 -m knot_resolver_manager --config=/etc/knot-resolver/kres-manager.yaml
 KillSignal=SIGINT
 
 [Install]
