@@ -1,6 +1,10 @@
 Knot Resolver 5.3.2 (2021-0m-dd)
 ================================
 
+Improvements
+------------
+- cache: improve handling write errors from LMDB (!1159)
+
 Bugfixes
 --------
 - dnstap module: fix repeated configuration (!1168)
