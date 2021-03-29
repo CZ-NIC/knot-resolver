@@ -1,20 +1,35 @@
-from typing import Optional
+from typing import List, Union
 
-from .compat.dataclasses import dataclass
-from .utils import StrictyamlParser
+from .utils import dataclass_nested
 
 
-class ConfDataValidationException(Exception):
+class DataValidationError(Exception):
     pass
 
 
-@dataclass
-class ConfData(StrictyamlParser):
-    num_workers: int = 1
-    lua_config: Optional[str] = None
+@dataclass_nested
+class ServerConfig:
+    instances: int = 1
 
-    async def validate(self) -> bool:
-        if self.num_workers < 0:
-            raise ConfDataValidationException("Number of workers must be non-negative")
+    async def validate(self):
+        if self.instances < 0:
+            raise DataValidationError("Number of workers must be non-negative")
 
-        return True
+
+@dataclass_nested
+class LuaConfig:
+    script: Union[str, List[str], None] = None
+
+    def __post_init__(self):
+        # Concatenate array to single string
+        if isinstance(self.script, List):
+            self.script = "\n".join(self.script)
+
+
+@dataclass_nested
+class KresConfig:
+    server: ServerConfig = ServerConfig()
+    lua: LuaConfig = LuaConfig()
+
+    async def validate(self):
+        await self.server.validate()

@@ -7,6 +7,6 @@ the option to do it transparently, without changing anything else.
 """
 
 
-from dataclasses import dataclass
+from dataclasses import dataclass, is_dataclass
 
-__all__ = ["dataclass"]
+__all__ = ["dataclass", "is_dataclass"]

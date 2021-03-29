@@ -15,6 +15,7 @@ pydbus = "^0.6.0"
 PyGObject = "^3.38.0"
 Jinja2 = "^2.11.3"
 click = "^7.1.2"
+PyYAML = "^5.4.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
