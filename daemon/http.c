@@ -1,4 +1,5 @@
 /*
+ *
  * Copyright (C) 2020 CZ.NIC, z.s.p.o
  *
  * Initial Author: Jan Hák <jan.hak@nic.cz>
@@ -417,7 +418,6 @@ static void on_pkt_write(struct http_data *data, int status)
 		return;
 
 	data->on_write(data->req, status);
-
 	free(data);
 }
 
@@ -576,21 +576,26 @@ static int http_send_response(nghttp2_session *h2, int32_t stream_id,
 		MAKE_NV("cache-control", 13, max_age, max_age_len),
 	};
 
-	ret = nghttp2_submit_response(h2, stream_id, hdrs, sizeof(hdrs)/sizeof(*hdrs), prov);
-	if (ret != 0) {
-		kr_log_verbose("[http] nghttp2_submit_response failed: %s\n", nghttp2_strerror(ret));
-		return kr_error(EIO);
-	}
-
 	ret = nghttp2_session_set_stream_user_data(h2, stream_id, (void*)data);
 	if (ret != 0) {
 		kr_log_verbose("[http] failed to set stream user data: %s\n", nghttp2_strerror(ret));
+		free(data);
+		return kr_error(EIO);
+	}
+
+	ret = nghttp2_submit_response(h2, stream_id, hdrs, sizeof(hdrs)/sizeof(*hdrs), prov);
+	if (ret != 0) {
+		kr_log_verbose("[http] nghttp2_submit_response failed: %s\n", nghttp2_strerror(ret));
+		nghttp2_session_set_stream_user_data(h2, stream_id, NULL);  // just in case
+		free(data);
 		return kr_error(EIO);
 	}
 
 	ret = nghttp2_session_send(h2);
 	if(ret < 0) {
 		kr_log_verbose("[http] nghttp2_session_send failed: %s\n", nghttp2_strerror(ret));
+		nghttp2_session_set_stream_user_data(h2, stream_id, NULL);  // just in case
+		free(data);
 		return kr_error(EIO);
 	}
 
@@ -599,6 +604,10 @@ static int http_send_response(nghttp2_session *h2, int32_t stream_id,
 
 /*
  * Send HTTP/2 stream data created from packet's wire buffer.
+ *
+ * If this function returns an error, the on_write() callback isn't (and
+ * musn't be!) called, since such errors are handled in an upper layer - in
+ * qr_task_step() in daemon/worker.
  */
 static int http_write_pkt(nghttp2_session *h2, knot_pkt_t *pkt, int32_t stream_id,
 			  uv_write_t *req, uv_write_cb on_write)
