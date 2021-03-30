@@ -6,6 +6,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <assert.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,24 +44,6 @@ struct http_data {
 	uv_write_cb on_write;
 	uv_write_t *req;
 };
-
-static void http_stream_status_free(struct http_stream_status *stat)
-{
-	if (!stat)
-		return;
-
-	free(stat->err_msg);
-	stat->err_msg = NULL;
-	free(stat);
-}
-
-static int status_free(trie_val_t *stat, void *null)
-{
-	if (stat)  // TODO use kr_assume()
-		http_stream_status_free(*stat);
-	return 0;
-}
-
 
 /*
  * Write HTTP/2 protocol data to underlying transport layer.
@@ -139,8 +122,7 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 	if (ret < 0)
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 	data->pos += length;
-	if (data->pos > data->len)  // TODO use kr_assume()
-		return NGHTTP2_ERR_CALLBACK_FAILURE;
+	assert(data->pos <= data->len);
 
 	ret = send_padding(ctx, (uint8_t)frame->data.padlen);
 	if (ret < 0)
@@ -150,168 +132,9 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 }
 
 /*
- * Provide data from buffer to HTTP/2 library.
- *
- * To avoid copying the packet wire buffer, we use NGHTTP2_DATA_FLAG_NO_COPY
- * and take care of sending entire DATA frames ourselves with nghttp2_send_data_callback.
- *
- * See https://www.nghttp2.org/documentation/types.html#c.nghttp2_data_source_read_callback
- */
-static ssize_t read_callback(nghttp2_session *h2, int32_t stream_id, uint8_t *buf,
-			     size_t length, uint32_t *data_flags,
-			     nghttp2_data_source *source, void *user_data)
-{
-	struct http_data *data;
-	size_t avail;
-	size_t send;
-
-	if (!source->ptr) {
-		*data_flags |= NGHTTP2_DATA_FLAG_EOF;
-		return 0;
-	}
-
-	data = (struct http_data*)source->ptr;
-	avail = data->len - data->pos;
-	send = MIN(avail, length);
-
-	if (avail == send)
-		*data_flags |= NGHTTP2_DATA_FLAG_EOF;
-
-	*data_flags |= NGHTTP2_DATA_FLAG_NO_COPY;
-	return send;
-}
-
-/*
- * Send http error status code.
- */
-static int send_err_status(struct http_ctx *ctx, int32_t stream_id)
-{
-	int ret;
-	int status_len;
-	nghttp2_data_provider prov;
-	trie_val_t *stat_p = trie_get_try(ctx->stream_status, (char *)&stream_id, sizeof(stream_id));
-
-	if (!stat_p || !*stat_p)
-		return kr_error(EINVAL);
-	struct http_stream_status *stat = *stat_p;
-
-	prov.source.ptr = NULL;
-	prov.read_callback = read_callback;
-
-	char status_str[MAX_DECIMAL_LENGTH(stat->err_status)] = { 0 };
-	status_len = snprintf(status_str, MAX_DECIMAL_LENGTH(stat->err_status), "%u", stat->err_status);
-	nghttp2_nv hdrs_err[] = {
-		MAKE_NV(":status", 7, status_str, status_len),
-	};
-
-	if (stat->err_msg) {
-		struct http_data *data = malloc(sizeof(struct http_data));
-		if (!data)
-			return kr_error(ENOMEM);
-
-		data->buf = (uint8_t *)stat->err_msg;
-		data->len = strlen(stat->err_msg);
-		data->pos = 0;
-		data->on_write = NULL;
-		data->req = NULL;
-		data->ttl = 0;
-		prov.source.ptr = data;
-
-		/* data will be freed in callback. */
-		ret = nghttp2_session_set_stream_user_data(ctx->h2, stream_id, (void*)data);
-		if (ret != 0)
-			return kr_error(EIO);
-	}
-
-	ret = nghttp2_submit_response(ctx->h2, stream_id, hdrs_err, sizeof(hdrs_err)/sizeof(*hdrs_err), &prov);
-	if (ret != 0)
-		return kr_error(EIO);
-
-	if (queue_len(ctx->streams) != 0)
-		queue_pop(ctx->streams);
-
-	return 0;
-}
-
-/*
- * Set error status for particular stream_id and return stream status or NULL on fail.
- *
- * status_msg is optional and defines error message.
- */
-static struct http_stream_status * set_error_status(struct http_ctx *ctx, int32_t stream_id, int status, const char *const status_msg)
-{
-
-	trie_val_t *stat_p = trie_get_ins(ctx->stream_status, (char *)&stream_id, sizeof(stream_id));
-	struct http_stream_status *stat = *stat_p;
-	if (stat && stat->err_status != 200)
-		return stat;
-
-	// add new item to array
-	if (!stat) {
-		stat = malloc(sizeof(*stat));
-		if (!stat)
-			return NULL;
-
-		*stat_p = stat;
-		stat->err_msg = NULL;
-	}
-	stat->stream_id = stream_id;
-	stat->err_status = status;
-
-	if (!status_msg) {
-		if (stat->err_msg) { // remove previous message
-			free(stat->err_msg);
-			stat->err_msg = NULL;
-		}
-
-		return stat;
-	}
-
-	stat->err_msg = realloc(stat->err_msg, sizeof(*stat->err_msg) * (strlen(status_msg) + 2));
-	if (!stat->err_msg) {
-		return stat;
-	}
-
-	memcpy(stat->err_msg, status_msg, strlen(status_msg));
-	stat->err_msg[strlen(status_msg)] = '\n';
-	stat->err_msg[strlen(status_msg)+1] = '\0';
-
-	return stat;
-}
-
-/*
- * Reinit temporaly data of current stream
- */
-static void http_status_reinit(struct http_ctx *ctx, int stream_id)
-{
-	ctx->current_method = HTTP_METHOD_NONE;
-	ctx->current_stream = NULL;
-	ctx->buf_pos = 0;
-	if (ctx->uri_path) {
-		free(ctx->uri_path);
-		ctx->uri_path = NULL;
-	}
-	if (ctx->content_type) {
-		free(ctx->content_type);
-		ctx->content_type = NULL;
-	}
-}
-
-static void http_status_reinit_error(struct http_ctx *ctx, int stream_id)
-{
-
-	if (ctx->current_method == HTTP_METHOD_POST)
-		queue_pop(ctx->streams);
-
-	http_status_reinit(ctx, stream_id);
-
-	nghttp2_submit_rst_stream(ctx->h2, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
-}
-
-/*
  * Check endpoint and uri path
  */
-static int check_uri(struct http_ctx *ctx, int32_t stream_id, const char* uri_path)
+static int check_uri(const char* uri_path)
 {
 	static const char key[] = "dns=";
 	static const char *delim = "&";
@@ -320,7 +143,6 @@ static int check_uri(struct http_ctx *ctx, int32_t stream_id, const char* uri_pa
 	char *end_prev;
 	ssize_t endpoint_len;
 	ssize_t ret;
-	struct http_stream_status *stat;
 
 	if (!uri_path)
 		return kr_error(EINVAL);
@@ -348,10 +170,8 @@ static int check_uri(struct http_ctx *ctx, int32_t stream_id, const char* uri_pa
 			break;
 	}
 
-	if (ret) { /* no endpoint found */
-		stat = set_error_status(ctx, stream_id, 400, "missing endpoint");
-		return stat ? kr_error(EINVAL) : kr_error(ENOMEM);
-	}
+	if (ret) /* no endpoint found */
+		return -1;
 	if (endpoint_len == strlen(path) - 1) /* done for POST method */
 		return 0;
 
@@ -362,51 +182,38 @@ static int check_uri(struct http_ctx *ctx, int32_t stream_id, const char* uri_pa
 			if (!strncmp(beg, key, 4)) { /* dns variable in path found */
 				break;
 			}
-			end_prev = beg + strlen(beg) - 1;
+			end_prev = beg + strlen(beg);
 			beg = strtok(NULL, delim);
-			if (beg && beg-1 != end_prev+1) { /* detect && */
-				stat = set_error_status(ctx, stream_id, 400, "invalid uri path");
-				return stat ? kr_error(EINVAL) : kr_error(ENOMEM);
+			if (beg-1 != end_prev) { /* detect && */
+				return -1;
 			}
 		}
 
 		if (!beg) { /* no dns variable in path */
-			stat = set_error_status(ctx, stream_id, 400, "'dns' key in path not found");
-			return stat ? kr_error(EINVAL) : kr_error(ENOMEM);
-		}
-	} else {
-		if (!beg) { /* no dns variable in path */
-			stat = set_error_status(ctx, stream_id, 400, "'dns' key in path not found");
-			return stat ? kr_error(EINVAL) : kr_error(ENOMEM);
+			return -1;
 		}
 	}
 
 	return 0;
 }
 
-
 /*
  * Process a query from URI path if there's base64url encoded dns variable.
  */
-static int process_uri_path(struct http_ctx *ctx, int32_t stream_id)
+static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stream_id)
 {
+	if (!ctx || !path)
+		return kr_error(EINVAL);
+
 	static const char key[] = "dns=";
-	char *beg, *end;
+	char *beg = strstr(path, key);
+	char *end;
 	size_t remaining;
 	ssize_t ret;
 	uint8_t *dest;
-	struct http_stream_status *stat;
 
-	if (!ctx || !ctx->uri_path) {
-		stat = set_error_status(ctx, stream_id, 400, "invalid uri path");
-		return stat ? 0 : kr_error(ENOMEM);
-	}
-
-	beg = strstr(ctx->uri_path, key);
-	if (!beg) {  /* No dns variable in ctx->uri_path. */
-		stat = set_error_status(ctx, stream_id, 400, "'dns' key in path not found");
-		return stat ? 0 : kr_error(ENOMEM);
-	}
+	if (!beg)  /* No dns variable in path. */
+		return 0;
 
 	beg += sizeof(key) - 1;
 	end = strchr(beg, '&');
@@ -420,18 +227,20 @@ static int process_uri_path(struct http_ctx *ctx, int32_t stream_id)
 	ret = kr_base64url_decode((uint8_t*)beg, end - beg, dest, remaining);
 	if (ret < 0) {
 		ctx->buf_pos = 0;
-		kr_log_verbose("[http] base64url decode failed %s\n", strerror(ret));
-		if (ret == KNOT_ERANGE) {
-			stat = set_error_status(ctx, stream_id, 414, NULL);// ? ;
-		} else {
-			stat = set_error_status(ctx, stream_id, 400, NULL);
-		}
-		return stat ? 0 : kr_error(ENOMEM);
+		kr_log_verbose("[http] base64url decode failed %s\n",
+			       strerror(ret));
+		return ret;
 	}
 
 	ctx->buf_pos += ret;
 	queue_push(ctx->streams, stream_id);
 	return 0;
+}
+
+static void refuse_stream(nghttp2_session *h2, int32_t stream_id)
+{
+	nghttp2_submit_rst_stream(
+		h2, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
 }
 
 /*
@@ -452,13 +261,12 @@ static int begin_headers_callback(nghttp2_session *h2, const nghttp2_frame *fram
 		return 0;
 	}
 
-	if (ctx->current_stream != NULL) {
+	if (ctx->incomplete_stream != -1) {
 		kr_log_verbose(
-			"[http] stream %d incomplete\n", ctx->current_stream->stream_id);
-		if (!set_error_status(ctx, stream_id, 501, "incomplete stream"))
-			return NGHTTP2_ERR_CALLBACK_FAILURE;
+			"[http] stream %d incomplete, refusing\n", ctx->incomplete_stream);
+		refuse_stream(h2, stream_id);
 	} else {
-		ctx->current_stream = set_error_status(ctx, stream_id, 200, NULL);
+		ctx->incomplete_stream = stream_id;
 	}
 	return 0;
 }
@@ -479,26 +287,24 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 	if (frame->hd.type != NGHTTP2_HEADERS)
 		return 0;
 
-	if (ctx->current_stream->stream_id != stream_id) {
+	if (ctx->incomplete_stream != stream_id) {
 		kr_log_verbose(
-			"[http] stream %d incomplete\n", ctx->current_stream->stream_id);
-		if (!set_error_status(ctx, stream_id, 501, "incomplete stream"))
-			return NGHTTP2_ERR_CALLBACK_FAILURE;
+			"[http] stream %d incomplete, refusing\n", ctx->incomplete_stream);
+		refuse_stream(h2, stream_id);
 		return 0;
 	}
 
 	if (!strcasecmp(":path", (const char *)name)) {
-		int rc = check_uri(ctx, stream_id, (const char *)value);
-		if (rc < 0) {
-			if (rc == kr_error(ENOMEM))
-				return NGHTTP2_ERR_CALLBACK_FAILURE;
-		} else {
-			ctx->uri_path = malloc(sizeof(*ctx->uri_path) * (valuelen + 1));
-			if (!ctx->uri_path)
-				return NGHTTP2_ERR_CALLBACK_FAILURE;
-			memcpy(ctx->uri_path, value, valuelen);
-			ctx->uri_path[valuelen] = '\0';
+		if (check_uri((const char *)value) < 0) {
+			refuse_stream(h2, stream_id);
+			return 0;
 		}
+
+		ctx->uri_path = malloc(sizeof(*ctx->uri_path) * (valuelen + 1));
+		if (!ctx->uri_path)
+			return kr_error(ENOMEM);
+		memcpy(ctx->uri_path, value, valuelen);
+		ctx->uri_path[valuelen] = '\0';
 	}
 
 	if (!strcasecmp(":method", (const char *)name)) {
@@ -509,14 +315,6 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 		} else {
 			ctx->current_method = HTTP_METHOD_NONE;
 		}
-	}
-
-	if (!strcasecmp("content-type", (const char *)name)) {
-		ctx->content_type = malloc(sizeof(*ctx->content_type) * valuelen+1);
-		if (!ctx->content_type)
-			return NGHTTP2_ERR_CALLBACK_FAILURE;
-		memcpy(ctx->content_type, value, valuelen);
-		ctx->content_type[valuelen] = '\0';
 	}
 
 	return 0;
@@ -536,30 +334,27 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	ssize_t remaining;
 	ssize_t required;
-	bool is_first;
+	bool is_first = queue_len(ctx->streams) == 0 || queue_tail(ctx->streams) != ctx->incomplete_stream;
 
-	if (ctx->current_stream == NULL || ctx->current_stream->stream_id != stream_id) {
-		kr_log_verbose("[http] incomplete stream\n");
-		if (!set_error_status(ctx, stream_id, 501, "incomplete stream"))
-			return NGHTTP2_ERR_CALLBACK_FAILURE;
+	if (ctx->incomplete_stream != stream_id) {
+		kr_log_verbose(
+			"[http] stream %d incomplete, refusing\n",
+			ctx->incomplete_stream);
+		refuse_stream(h2, stream_id);
+		ctx->incomplete_stream = -1;
 		return 0;
 	}
 
 	remaining = ctx->buf_size - ctx->submitted - ctx->buf_pos;
 	required = len;
-
-	is_first = queue_len(ctx->streams) == 0 || queue_tail(ctx->streams) != ctx->current_stream->stream_id;
 	/* First data chunk of the new stream */
 	if (is_first)
 		required += sizeof(uint16_t);
 
 	if (required > remaining) {
 		kr_log_error("[http] insufficient space in buffer\n");
-		if (!set_error_status(ctx, stream_id, 413, NULL)) {
-			http_status_reinit_error(ctx, stream_id);
-			return NGHTTP2_ERR_CALLBACK_FAILURE;
-		}
-		return 0;
+		ctx->incomplete_stream = -1;
+		return NGHTTP2_ERR_CALLBACK_FAILURE;
 	}
 
 	if (is_first) {
@@ -585,76 +380,29 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	ssize_t len;
 	int32_t stream_id = frame->hd.stream_id;
+	assert(stream_id != -1);
 
-	if (stream_id <= 0 || ctx == NULL)
-		return 0;
+	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) && ctx->incomplete_stream == stream_id) {
+		if (ctx->current_method == HTTP_METHOD_GET) {
+			if (process_uri_path(ctx, ctx->uri_path, stream_id) < 0) {
+				refuse_stream(h2, stream_id);
+			}
+		}
+		ctx->incomplete_stream = -1;
+		ctx->current_method = HTTP_METHOD_NONE;
+		free(ctx->uri_path);
+		ctx->uri_path = NULL;
 
-	if (ctx->current_method == HTTP_METHOD_NONE) {
-		kr_log_verbose("[http] unsupported HTTP method\n");
-		if (!set_error_status(ctx, stream_id, 405, "only HTTP POST and GET are supported\n")) {
-			http_status_reinit_error(ctx, stream_id);
+		len = ctx->buf_pos - sizeof(uint16_t);
+		if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
+			kr_log_verbose("[http] invalid dnsmsg size: %zd B\n", len);
 			return NGHTTP2_ERR_CALLBACK_FAILURE;
 		}
-	}
 
-	if (ctx->content_type && strcasecmp("application/dns-message", (const char *)ctx->content_type)) {
-		kr_log_verbose("[http] unsupported content-type %s\n", ctx->content_type);
-		if (!set_error_status(ctx, stream_id, 415, "only Content-Type: application/dns-message is supported\n")) {
-			http_status_reinit_error(ctx, stream_id);
-			return NGHTTP2_ERR_CALLBACK_FAILURE;
-		}
-	}
-
-	if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) {
-		struct http_stream_status *stat = ctx->current_stream;
-		if (stat && stat->stream_id == stream_id) {
-			if (stat->err_status == 200) {
-				if (ctx->current_method == HTTP_METHOD_GET) {
-					if (process_uri_path(ctx, stream_id) < 0) {
-						http_status_reinit_error(ctx, stream_id);
-						return NGHTTP2_ERR_CALLBACK_FAILURE;
-					}
-				}
-
-				if (ctx->buf_pos) {
-					len = ctx->buf_pos - sizeof(uint16_t);
-					if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
-						kr_log_verbose("[http] invalid dnsmsg size: %zd B\n", len);
-						http_status_reinit_error(ctx, stream_id);
-						return NGHTTP2_ERR_CALLBACK_FAILURE;
-					}
-
-					if (len < 12) {
-						if (!set_error_status(ctx, stream_id, 400, "input too short\n")) {
-							http_status_reinit_error(ctx, stream_id);
-							return NGHTTP2_ERR_CALLBACK_FAILURE;
-						}
-					}
-
-					if (stat->err_status == 200) {
-						knot_wire_write_u16(ctx->buf, len);
-						ctx->submitted += ctx->buf_pos;
-						ctx->buf += ctx->buf_pos;
-					}
-				}
-			}
-
-			if (stat->err_status != 200) {
-				if (send_err_status(ctx, stream_id) < 0) {
-					http_status_reinit_error(ctx, stream_id);
-					return NGHTTP2_ERR_CALLBACK_FAILURE;
-				}
-			}
-
-			http_status_reinit(ctx, stream_id);
-			ctx->buf_pos = 0;
-		} else {
-			/* send error for non-processed stream */
-			if (send_err_status(ctx, stream_id) < 0) {
-				http_status_reinit_error(ctx, stream_id);
-				return NGHTTP2_ERR_CALLBACK_FAILURE;
-			}
-		}
+		knot_wire_write_u16(ctx->buf, len);
+		ctx->submitted += ctx->buf_pos;
+		ctx->buf += ctx->buf_pos;
+		ctx->buf_pos = 0;
 	}
 
 	return 0;
@@ -665,11 +413,10 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
  */
 static void on_pkt_write(struct http_data *data, int status)
 {
-	if (!data)
+	if (!data || !data->req || !data->on_write)
 		return;
 
-	if (data->req && data->on_write)
-		data->on_write(data->req, status);
+	data->on_write(data->req, status);
 
 	free(data);
 }
@@ -683,18 +430,11 @@ static void on_pkt_write(struct http_data *data, int status)
 static int on_stream_close_callback(nghttp2_session *h2, int32_t stream_id,
 				    uint32_t error_code, void *user_data)
 {
-	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	struct http_data *data;
-	struct http_stream_status *stat;
-	int ret;
 
 	data = nghttp2_session_get_stream_user_data(h2, stream_id);
 	if (data)
 		on_pkt_write(data, error_code == 0 ? 0 : kr_error(EIO));
-
-	ret = trie_del(ctx->stream_status, (char *)&stream_id, sizeof(stream_id), (trie_val_t *)&stat);
-	if (ret == 0)
-		http_stream_status_free(stat);
 
 	return 0;
 }
@@ -732,13 +472,10 @@ struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
 	ctx->send_cb = send_cb;
 	ctx->session = session;
 	queue_init(ctx->streams);
-	ctx->current_stream = NULL;
+	ctx->incomplete_stream = -1;
 	ctx->submitted = 0;
 	ctx->current_method = HTTP_METHOD_NONE;
 	ctx->uri_path = NULL;
-	ctx->content_type = NULL;
-	ctx->stream_status = trie_create(NULL);
-
 
 	nghttp2_session_server_new(&ctx->h2, callbacks, ctx);
 	nghttp2_submit_settings(ctx->h2, NGHTTP2_FLAG_NONE,
@@ -761,8 +498,7 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *buf,
 
 	if (!ctx->h2)
 		return kr_error(ENOSYS);
-	if (ctx->session != session)  // TODO use kr_assume()
-		return kr_error(EINVAL);
+	assert(ctx->session == session);
 
 	ctx->submitted = 0;
 	ctx->buf = session_wirebuf_get_free_start(session);
@@ -784,6 +520,33 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *buf,
 	}
 
 	return ctx->submitted;
+}
+
+/*
+ * Provide data from buffer to HTTP/2 library.
+ *
+ * To avoid copying the packet wire buffer, we use NGHTTP2_DATA_FLAG_NO_COPY
+ * and take care of sending entire DATA frames ourselves with nghttp2_send_data_callback.
+ *
+ * See https://www.nghttp2.org/documentation/types.html#c.nghttp2_data_source_read_callback
+ */
+static ssize_t read_callback(nghttp2_session *h2, int32_t stream_id, uint8_t *buf,
+			     size_t length, uint32_t *data_flags,
+			     nghttp2_data_source *source, void *user_data)
+{
+	struct http_data *data;
+	size_t avail;
+	size_t send;
+
+	data = (struct http_data*)source->ptr;
+	avail = data->len - data->pos;
+	send = MIN(avail, length);
+
+	if (avail == send)
+		*data_flags |= NGHTTP2_DATA_FLAG_EOF;
+
+	*data_flags |= NGHTTP2_DATA_FLAG_NO_COPY;
+	return send;
 }
 
 /*
@@ -900,11 +663,7 @@ void http_free(struct http_ctx *ctx)
 	if (!ctx)
 		return;
 
-	trie_apply(ctx->stream_status, status_free, NULL);
-	trie_free(ctx->stream_status);
-
 	queue_deinit(ctx->streams);
 	nghttp2_session_del(ctx->h2);
-	free(ctx->content_type);
 	free(ctx);
 }
