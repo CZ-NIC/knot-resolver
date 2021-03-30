@@ -963,6 +963,7 @@ static int prepare_query(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	query->uid = req->rplan.next_uid;
 	req->rplan.next_uid += 1;
+	query->flags.CACHED = false; // in case it got left from earlier (unknown edge case)
 
 	return KR_STATE_CONSUME;
 }

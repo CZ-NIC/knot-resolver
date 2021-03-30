@@ -166,16 +166,42 @@ int entry_h_seek(knot_db_val_t *val, uint16_t type)
 static int cache_write_or_clear(struct kr_cache *cache, const knot_db_val_t *key,
 				knot_db_val_t *val, const struct kr_query *qry)
 {
+	static uint64_t ignoring_errors_until = 0; /// zero or a timestamp
 	int ret = cache_op(cache, write, key, val, 1);
-	if (!ret) return kr_ok();
+	if (!ret) {
+		ignoring_errors_until = 0;
+		return kr_ok();
+	}
+	VERBOSE_MSG(qry, "=> failed backend write, ret = %d\n", ret);
 
-	if (ret != kr_error(ENOSPC)) { /* failing a write isn't too bad */
-		VERBOSE_MSG(qry, "=> failed backend write, ret = %d\n", ret);
-		return kr_error(ret);
+	if (ret == kr_error(ENOSPC) && cache->api->usage_percent(cache->db) > 90) {
+		// Cache seems overfull.  Maybe kres-cache-gc service doesn't work.
+		goto recovery;
 	}
 
-	/* Cache is overfull.  Using kres-cache-gc service should prevent this.
-	 * As a fallback, try clearing it. */
+	/* If we get ENOSPC with usage < 90% (especially just above 80% when GC fires),
+	 * it most likely isn't real overfull state but some LMDB bug related
+	 * to transactions.  Upstream seems unlikely to address it:
+	   https://lists.openldap.org/hyperkitty/list/openldap-technical@openldap.org/thread/QHOTE2Y3WZ6E7J27OOKI44P344ETUOSF/
+	 *
+	 * In real life we see all processes getting a LMDB failure
+	 * but it should recover after the transactions get reopened.
+	 *
+	 * Fortunately the kresd cache can afford to be slightly lossy,
+	 * so we ignore this and other errors for a short while.
+	 */
+	const uint64_t now = kr_now();
+	if (!ignoring_errors_until) { // First error after a success.
+		kr_log_info("[cache] LMDB refusing writes (ignored for 5-9s): %s\n",
+				kr_strerror(ret));
+		ignoring_errors_until = now + 5000 + kr_rand_bytes(2)/16;
+		return kr_error(ret);
+	}
+	if (now < ignoring_errors_until)
+		return kr_error(ret);
+	// We've lost patience with cache writes not working continuously.
+
+recovery: // Try to recover by clearing cache.
 	ret = kr_cache_clear(cache);
 	switch (ret) {
 	default:
@@ -183,7 +209,8 @@ static int cache_write_or_clear(struct kr_cache *cache, const knot_db_val_t *key
 				kr_strerror(ret));
 		abort();
 	case 0:
-		kr_log_info("[cache] overfull cache cleared\n");
+		kr_log_info("[cache] stuck cache cleared\n");
+		ignoring_errors_until = 0;
 	case -EAGAIN: // fall-through; krcachelock race -> retry later
 		return kr_error(ENOSPC);
 	}

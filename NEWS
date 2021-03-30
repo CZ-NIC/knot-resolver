@@ -4,6 +4,7 @@ Knot Resolver 5.3.1 (2021-03-dd)
 Improvements
 ------------
 - policy.STUB: try to avoid TCP (compared to 5.3.0; !1155)
+- cache: improve handling write errors from LMDB (!1159)
 
 Bugfixes
 --------
