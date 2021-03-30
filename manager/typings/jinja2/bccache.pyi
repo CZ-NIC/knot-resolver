@@ -87,6 +87,3 @@ class MemcachedBytecodeCache(BytecodeCache):
     
     def dump_bytecode(self, bucket):
         ...
-    
-
-

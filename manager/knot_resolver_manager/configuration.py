@@ -1,7 +1,5 @@
-import json
 from typing import Text
 
-import yaml
 from jinja2 import Environment, Template
 
 from .datamodel import KresConfig
@@ -20,20 +18,6 @@ async def render_lua(config: KresConfig) -> Text:
     return await _LUA_TEMPLATE.render_async(cfg=config)
 
 
-async def parse_yaml(yaml_str: str) -> KresConfig:
-    data = yaml.safe_load(yaml_str)
-    config = KresConfig(**data)
-    await config.validate()
-    return config
-
-
-async def parse_json(json_str: str) -> KresConfig:
-    data = json.loads(json_str)
-    config: KresConfig = KresConfig(**data)
-    await config.validate()
-    return config
-
-
 async def load_file(path: str) -> KresConfig:
     try:
         with open(path, "r") as file:
@@ -41,4 +25,4 @@ async def load_file(path: str) -> KresConfig:
     except FileNotFoundError:
         # return defaults
         return KresConfig()
-    return parse_yaml(yaml_str)
+    return KresConfig.from_yaml(yaml_str)

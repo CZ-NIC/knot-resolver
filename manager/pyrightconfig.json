@@ -2,8 +2,6 @@
   "include": [
     "knot_resolver_manager"
   ],
-  "exclude": [
-    "knot_resolver_manager/utils/dataclasses_yaml.py"
-  ],
+  "exclude": [],
   "typeCheckingMode": "strict"
 }

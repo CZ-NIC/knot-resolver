@@ -1,21 +1,18 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-import pytest
-import strictyaml
-from strictyaml import EmptyDict, FixedSeq, Float, Int, Map, MapPattern, Seq, Str
-
-from knot_resolver_manager.utils import dataclass_strictyaml_schema
-from knot_resolver_manager.utils.dataclasses_yaml import StrictyamlParser, dataclass_strictyaml
+from knot_resolver_manager.utils.dataclasses_parservalidator import DataclassParserValidatorMixin
 
 
 def test_parsing_primitive():
     @dataclass
-    @dataclass_strictyaml
-    class TestClass:
+    class TestClass(DataclassParserValidatorMixin):
         i: int
         s: str
         f: float
+
+        def validate(self):
+            pass
 
     yaml = """i: 5
 s: "test"
@@ -30,13 +27,18 @@ f: 3.14"""
 
 def test_parsing_nested():
     @dataclass
-    @dataclass_strictyaml_schema
-    class Lower:
+    class Lower(DataclassParserValidatorMixin):
         i: int
 
+        def validate(self):
+            pass
+
     @dataclass
-    class Upper(StrictyamlParser):
+    class Upper(DataclassParserValidatorMixin):
         l: Lower
+
+        def validate(self):
+            pass
 
     yaml = """l:
   i: 5"""
@@ -47,11 +49,14 @@ def test_parsing_nested():
 
 def test_simple_compount_types():
     @dataclass
-    class TestClass(StrictyamlParser):
+    class TestClass(DataclassParserValidatorMixin):
         l: List[int]
         d: Dict[str, str]
         t: Tuple[str, int]
         o: Optional[int]
+
+        def validate(self):
+            pass
 
     yaml = """l:
   - 1
@@ -76,8 +81,11 @@ t:
 
 def test_nested_compount_types():
     @dataclass
-    class TestClass(StrictyamlParser):
+    class TestClass(DataclassParserValidatorMixin):
         o: Optional[Dict[str, str]]
+
+        def validate(self):
+            pass
 
     yaml = """o:
   key: val"""
@@ -89,9 +97,12 @@ def test_nested_compount_types():
 
 def test_nested_compount_types2():
     @dataclass
-    class TestClass(StrictyamlParser):
+    class TestClass(DataclassParserValidatorMixin):
         i: int
         o: Optional[Dict[str, str]]
+
+        def validate(self):
+            pass
 
     yaml = "i: 5"
 
@@ -102,15 +113,13 @@ def test_nested_compount_types2():
 
 def test_real_failing_dummy_confdata():
     @dataclass
-    class ConfData(StrictyamlParser):
+    class ConfData(DataclassParserValidatorMixin):
         num_workers: int = 1
         lua_config: Optional[str] = None
 
-        async def validate(self) -> bool:
+        def validate(self):
             if self.num_workers < 0:
                 raise Exception("Number of workers must be non-negative")
-
-            return True
 
     # prepare the payload
     lua_config = "dummy"

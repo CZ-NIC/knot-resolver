@@ -20,6 +20,3 @@ class NodeTransformer(NodeVisitor):
     
     def visit_list(self, node, *args, **kwargs):
         ...
-    
-
-

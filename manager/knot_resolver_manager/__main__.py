@@ -5,7 +5,6 @@ from typing import Optional
 import click
 from aiohttp import web
 
-from . import configuration
 from .datamodel import KresConfig
 from .kres_manager import KresManager
 from .utils import ignore_exceptions
@@ -19,7 +18,7 @@ async def hello(_request: web.Request) -> web.Response:
 
 
 async def apply_config(request: web.Request) -> web.Response:
-    config: KresConfig = await configuration.parse_json(await request.text())
+    config = KresConfig.from_json(await request.text())
     manager: KresManager = request.app["kres_manager"]
     await manager.apply_config(config)
     return web.Response(text="OK")
@@ -41,7 +40,11 @@ def main(listen: Optional[str], config: Optional[str]):
     app["kres_manager"] = manager
 
     async def init_manager(app: web.Application):
-        await app["kres_manager"].load_system_state()
+        manager = app["kres_manager"]
+        await manager.load_system_state()
+        if config is not None:
+            # TODO Use config loaded from the file system
+            pass
 
     app.on_startup.append(init_manager)
 
