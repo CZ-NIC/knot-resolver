@@ -1,35 +1,41 @@
-from typing import List, Union
+from typing import List, Optional
 
-from .utils import dataclass_nested
+from knot_resolver_manager.utils.dataclasses_parservalidator import DataclassParserValidatorMixin
+
+from .compat.dataclasses import dataclass
 
 
 class DataValidationError(Exception):
     pass
 
 
-@dataclass_nested
-class ServerConfig:
+@dataclass
+class ServerConfig(DataclassParserValidatorMixin):
     instances: int = 1
 
-    async def validate(self):
+    def validate(self):
         if self.instances < 0:
             raise DataValidationError("Number of workers must be non-negative")
 
 
-@dataclass_nested
-class LuaConfig:
-    script: Union[str, List[str], None] = None
+@dataclass
+class LuaConfig(DataclassParserValidatorMixin):
+    script_list: Optional[List[str]] = None
+    script: Optional[str] = None
 
     def __post_init__(self):
         # Concatenate array to single string
-        if isinstance(self.script, List):
-            self.script = "\n".join(self.script)
+        if self.script_list is not None:
+            self.script = "\n".join(self.script_list)
+
+    def validate(self):
+        assert self.script_list is not None or self.script is not None
 
 
-@dataclass_nested
-class KresConfig:
+@dataclass
+class KresConfig(DataclassParserValidatorMixin):
     server: ServerConfig = ServerConfig()
     lua: LuaConfig = LuaConfig()
 
-    async def validate(self):
-        await self.server.validate()
+    def validate(self):
+        pass

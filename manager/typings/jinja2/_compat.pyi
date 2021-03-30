@@ -34,4 +34,3 @@ encode_filename: Any
 get_next: Any
 def with_metaclass(meta, *bases):
     ...
-

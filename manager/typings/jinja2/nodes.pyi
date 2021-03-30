@@ -452,5 +452,3 @@ class EvalContextModifier(Stmt):
 class ScopedEvalContextModifier(EvalContextModifier):
     fields: Any
     ...
-
-

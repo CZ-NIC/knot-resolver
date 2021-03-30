@@ -175,6 +175,3 @@ class Lexer:
     
     def tokeniter(self, source, name, filename: Optional[Any] = ..., state: Optional[Any] = ...):
         ...
-    
-
-

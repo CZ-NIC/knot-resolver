@@ -42,4 +42,3 @@ xid_start: str
 xid_continue: str
 def allexcept(*args):
     ...
-

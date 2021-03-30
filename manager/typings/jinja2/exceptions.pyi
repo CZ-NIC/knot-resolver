@@ -62,5 +62,3 @@ class SecurityError(TemplateRuntimeError):
 
 class FilterArgumentError(TemplateRuntimeError):
     ...
-
-
