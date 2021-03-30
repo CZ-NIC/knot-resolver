@@ -6,6 +6,18 @@
 
 #include <libknot/packet/pkt.h>
 
+/** High numbers in NSEC3 iterations don't really help security
+ *
+ * ...so we avoid doing all the work.  The value is a current compromise;
+ * zones shooting over get downgraded to insecure status.
+ *
+ * Original restriction wasn't that strict:
+   https://datatracker.ietf.org/doc/html/rfc5155#section-10.3
+ * but there is discussion about officially lowering the limits:
+   https://tools.ietf.org/id/draft-hardaker-dnsop-nsec3-guidance-02.html#section-2.3
+ */
+#define KR_NSEC3_MAX_ITERATIONS 150
+
 /**
  * Name error response check (RFC5155 7.2.2).
  * @note No RRSIGs are validated.

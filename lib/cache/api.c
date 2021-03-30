@@ -23,6 +23,7 @@
 #include "lib/cache/api.h"
 #include "lib/cache/cdb_lmdb.h"
 #include "lib/defines.h"
+#include "lib/dnssec/nsec3.h"
 #include "lib/generic/trie.h"
 #include "lib/resolve.h"
 #include "lib/rplan.h"
@@ -40,7 +41,7 @@
 
 
 /** Cache version */
-static const uint16_t CACHE_VERSION = 5;
+static const uint16_t CACHE_VERSION = 6;
 /** Key size */
 #define KEY_HSIZE (sizeof(uint8_t) + sizeof(uint16_t))
 #define KEY_SIZE (KEY_HSIZE + KNOT_DNAME_MAXLEN)
@@ -514,6 +515,13 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		}
 		return kr_ok();
 	}
+	if (rr->type == KNOT_RRTYPE_NSEC3 && rr->rrs.count
+	    && knot_nsec3_iters(rr->rrs.rdata) > KR_NSEC3_MAX_ITERATIONS) {
+		/* This shouldn't happen often, thanks to downgrades during validation. */
+		VERBOSE_MSG(qry, "=> skipping NSEC3 with too many iterations\n");
+		return kr_ok();
+	}
+
 	assert(stash_rrset_precond(rr, qry) > 0);
 	if (!cache) {
 		assert(!EINVAL);

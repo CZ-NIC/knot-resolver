@@ -69,6 +69,10 @@ static int hash_name(dnssec_binary_t *hash, const dnssec_nsec3_params_t *params,
 	assert(hash && params);
 	if (!name)
 		return kr_error(EINVAL);
+	if (params->iterations > KR_NSEC3_MAX_ITERATIONS) {
+		assert(false); // This if is mainly defensive; it shouldn't happen.
+		return kr_error(EINVAL);
+	}
 
 	dnssec_binary_t dname = {
 		.size = knot_dname_size(name),
