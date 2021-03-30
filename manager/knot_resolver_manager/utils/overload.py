@@ -12,7 +12,7 @@ class OverloadedFunctionException(Exception):
 
 class Overloaded(Generic[T]):
     def __init__(self):
-        self._vtable: Dict[Tuple[Any], Callable[..., T]] = {}
+        self._vtable: Dict[Tuple[Any, ...], Callable[..., T]] = {}
 
     @staticmethod
     def _create_signatures(*types: Any) -> List[Any]:
