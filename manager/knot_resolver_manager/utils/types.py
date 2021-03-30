@@ -11,15 +11,15 @@ def is_optional(tp: Any) -> bool:
 
 
 def is_dict(tp: Any) -> bool:
-    return getattr(tp, "__origin__", None) == Dict
+    return getattr(tp, "__origin__", None) in (Dict, dict)
 
 
 def is_list(tp: Any) -> bool:
-    return getattr(tp, "__origin__", None) == List
+    return getattr(tp, "__origin__", None) in (List, list)
 
 
 def is_tuple(tp: Any) -> bool:
-    return getattr(tp, "__origin__", None) == Tuple
+    return getattr(tp, "__origin__", None) in (Tuple, tuple)
 
 
 def is_union(tp: Any) -> bool:
