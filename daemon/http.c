@@ -304,8 +304,6 @@ static void http_status_reinit_error(struct http_ctx *ctx, int stream_id)
 		queue_pop(ctx->streams);
 
 	http_status_reinit(ctx, stream_id);
-
-	nghttp2_submit_rst_stream(ctx->h2, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
 }
 
 /*
@@ -536,10 +534,13 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	ssize_t remaining;
 	ssize_t required;
-	bool is_first;
+	assert(ctx->current_stream);
+	bool is_first = queue_len(ctx->streams) == 0 || queue_tail(ctx->streams) != ctx->current_stream->stream_id;
 
-	if (ctx->current_stream == NULL || ctx->current_stream->stream_id != stream_id) {
-		kr_log_verbose("[http] incomplete stream\n");
+	if (ctx->current_stream->stream_id != stream_id) {
+		kr_log_verbose(
+			"[http] stream %d incomplete\n",
+			ctx->current_stream->stream_id);
 		if (!set_error_status(ctx, stream_id, 501, "incomplete stream"))
 			return NGHTTP2_ERR_CALLBACK_FAILURE;
 		return 0;
@@ -547,8 +548,6 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 
 	remaining = ctx->buf_size - ctx->submitted - ctx->buf_pos;
 	required = len;
-
-	is_first = queue_len(ctx->streams) == 0 || queue_tail(ctx->streams) != ctx->current_stream->stream_id;
 	/* First data chunk of the new stream */
 	if (is_first)
 		required += sizeof(uint16_t);
