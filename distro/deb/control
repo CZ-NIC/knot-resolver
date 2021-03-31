@@ -20,7 +20,7 @@ Build-Depends:
  libuv1-dev,
  luajit,
  pkg-config,
- meson (>= 0.46),
+ meson (>= 0.49),
  doxygen,
  protobuf-c-compiler,
  python3-breathe,

@@ -30,7 +30,7 @@ The following dependencies are needed to build and run Knot Resolver:
    :header: "Requirement", "Notes"
 
    "ninja", "*build only*"
-   "meson >= 0.46", "*build only* [#]_"
+   "meson >= 0.49", "*build only* [#]_"
    "C and C++ compiler", "*build only* [#]_"
    "`pkg-config`_", "*build only* [#]_"
    "libknot_ 2.9+", "Knot DNS libraries"
@@ -64,7 +64,7 @@ Resolver:
    "`clang-tidy`_", "``lint-c``", "Syntax and static analysis checker for C."
    "luacov_", "``check-config``", "Code coverage analysis for Lua modules."
 
-.. [#] If ``meson >= 0.46`` isn't available for your distro, check backports
+.. [#] If ``meson >= 0.49`` isn't available for your distro, check backports
    repository or use python pip to install it.
 .. [#] Requires ``__attribute__((cleanup))`` and ``-MMD -MP`` for
    dependency file generation. We test GCC and Clang, and ICC is likely to work as well.
