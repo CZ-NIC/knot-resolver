@@ -243,6 +243,15 @@ static void refuse_stream(nghttp2_session *h2, int32_t stream_id)
 		h2, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
 }
 
+/* Return the http ctx into a pristine state in which no stream is being processed. */
+static void http_cleanup_stream(struct http_ctx *ctx)
+{
+	ctx->incomplete_stream = -1;
+	ctx->current_method = HTTP_METHOD_NONE;
+	free(ctx->uri_path);
+	ctx->uri_path = NULL;
+}
+
 /*
  * Save stream id from first header's frame.
  *
@@ -388,10 +397,7 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 				refuse_stream(h2, stream_id);
 			}
 		}
-		ctx->incomplete_stream = -1;
-		ctx->current_method = HTTP_METHOD_NONE;
-		free(ctx->uri_path);
-		ctx->uri_path = NULL;
+		http_cleanup_stream(ctx);
 
 		len = ctx->buf_pos - sizeof(uint16_t);
 		if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
@@ -431,6 +437,12 @@ static int on_stream_close_callback(nghttp2_session *h2, int32_t stream_id,
 				    uint32_t error_code, void *user_data)
 {
 	struct http_data *data;
+	struct http_ctx *ctx = (struct http_ctx *)user_data;
+
+	/* Ensure connection state is cleaned up in case the stream gets
+	 * unexpectedly closed, e.g. by PROTOCOL_ERROR issued from nghttp2. */
+	if (ctx->incomplete_stream == stream_id)
+		http_cleanup_stream(ctx);
 
 	data = nghttp2_session_get_stream_user_data(h2, stream_id);
 	if (data)
