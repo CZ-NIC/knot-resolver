@@ -1,5 +1,9 @@
 server:
-  instances: 4
+  instances: 1
+
+dns64:
+  prefix: "64:ff9b::/96"
+
 lua:
   script: |
     """

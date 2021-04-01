@@ -3,6 +3,7 @@ from typing import List, Optional
 from knot_resolver_manager.utils.dataclasses_parservalidator import DataclassParserValidatorMixin
 
 from .compat.dataclasses import dataclass
+from .datamodel_types import IPV6_PREFIX_96
 
 
 class DataValidationError(Exception):
@@ -14,8 +15,17 @@ class ServerConfig(DataclassParserValidatorMixin):
     instances: int = 1
 
     def validate(self):
-        if self.instances < 0:
-            raise DataValidationError("Number of workers must be non-negative")
+        if not 0 < self.instances <= 256:
+            raise DataValidationError("number of kresd 'instances' must be in range 1..256")
+
+
+@dataclass
+class Dns64Config(DataclassParserValidatorMixin):
+    prefix: str = "64:ff9b::"
+
+    def validate(self):
+        if not bool(IPV6_PREFIX_96.match(self.prefix)):
+            raise DataValidationError("'dns64.prefix' must be valid IPv6 address and '/96' CIDR")
 
 
 @dataclass
@@ -35,7 +45,11 @@ class LuaConfig(DataclassParserValidatorMixin):
 @dataclass
 class KresConfig(DataclassParserValidatorMixin):
     server: ServerConfig = ServerConfig()
+    dns64: Optional[Dns64Config] = None
     lua: LuaConfig = LuaConfig()
 
     def validate(self):
-        pass
+        self.server.validate()
+        if self.dns64 is not None:
+            self.dns64.validate()
+        self.lua.validate()

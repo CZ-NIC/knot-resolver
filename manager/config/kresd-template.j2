@@ -1,4 +1,10 @@
--- script from 'Lua' configuration section
-{% if cfg.lua.script -%}
+modules = {
+{%- if cfg.dns64 %}
+    dns64 = '{{ cfg.dns64.prefix }}' }   -- dns64
+{%- endif %}
+}
+
+-- lua
+{%- if cfg.lua.script %}
 {{ cfg.lua.script }}
-{% endif -%}
+{%- endif %}

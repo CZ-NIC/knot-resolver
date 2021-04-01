@@ -5,9 +5,16 @@ from jinja2 import Environment, Template
 from .datamodel import KresConfig
 
 _LUA_TEMPLATE_STR = """
-{% if lua_config -%}
+modules = {
+{%- if cfg.dns64 %}
+    dns64 = '{{ cfg.dns64.prefix }}' }   -- dns64
+{%- endif %}
+}
+
+-- lua
+{%- if cfg.lua.script %}
 {{ cfg.lua.script }}
-{% endif -%}
+{%- endif %}
 """
 
 _ENV = Environment(enable_async=True)
