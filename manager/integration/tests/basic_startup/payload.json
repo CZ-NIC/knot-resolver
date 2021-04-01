@@ -2,6 +2,9 @@
   "server": {
     "instances": 1
   },
+  "dns64": {
+    "prefix": "64:ff9b::/96"
+  },
   "lua": {
     "script_list": [
       "-- SPDX-License-Identifier: CC0-1.0",
@@ -13,10 +16,11 @@
       "net.listen('::1', 53, { kind = 'dns', freebind = true })",
       "net.listen('::1', 853, { kind = 'tls', freebind = true })",
       "--net.listen('::1', 443, { kind = 'doh2' })",
-      "-- Load useful modules","modules = {",
-      "'hints > iterate',  -- Load /etc/hosts and allow custom root hints",
-      "'stats',            -- Track internal statistics",
-      "'predict',          -- Prefetch expiring/frequent records",
+      "-- Load useful modules",
+      "modules = {",
+      "    'hints > iterate',  -- Load /etc/hosts and allow custom root hints",
+      "    'stats',            -- Track internal statistics",
+      "    'predict',          -- Prefetch expiring/frequent records",
       "}",
       "-- Cache size",
       "cache.size = 100 * MB"
