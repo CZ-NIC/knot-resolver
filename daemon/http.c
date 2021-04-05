@@ -275,6 +275,7 @@ static int begin_headers_callback(nghttp2_session *h2, const nghttp2_frame *fram
 			"[http] stream %d incomplete, refusing\n", ctx->incomplete_stream);
 		refuse_stream(h2, stream_id);
 	} else {
+		http_cleanup_stream(ctx);  // Free any leftover data and ensure pristine state
 		ctx->incomplete_stream = stream_id;
 	}
 	return 0;
@@ -675,6 +676,7 @@ void http_free(struct http_ctx *ctx)
 	if (!ctx)
 		return;
 
+	http_cleanup_stream(ctx);
 	queue_deinit(ctx->streams);
 	nghttp2_session_del(ctx->h2);
 	free(ctx);
