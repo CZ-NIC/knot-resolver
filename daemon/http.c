@@ -233,7 +233,12 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 	}
 
 	ctx->buf_pos += ret;
-	queue_push(ctx->streams, stream_id);
+
+	struct http_stream stream = {
+		.id = stream_id,
+		.headers = ctx->headers
+	};
+	queue_push(ctx->streams, stream);
 	return 0;
 }
 
@@ -241,6 +246,24 @@ static void refuse_stream(nghttp2_session *h2, int32_t stream_id)
 {
 	nghttp2_submit_rst_stream(
 		h2, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
+}
+
+/* Return the http ctx into a pristine state in which no stream is being processed. */
+static void http_cleanup_stream(struct http_ctx *ctx)
+{
+	ctx->incomplete_stream = -1;
+	ctx->current_method = HTTP_METHOD_NONE;
+	free(ctx->uri_path);
+	ctx->uri_path = NULL;
+	if (ctx->headers != NULL) {
+		for (int i = 0; i < ctx->headers->len; i++) {
+			free(ctx->headers->at[i].name);
+			free(ctx->headers->at[i].value);
+		}
+		array_clear(*ctx->headers);
+		free(ctx->headers);
+		ctx->headers = NULL;
+	}
 }
 
 /*
@@ -266,7 +289,10 @@ static int begin_headers_callback(nghttp2_session *h2, const nghttp2_frame *fram
 			"[http] stream %d incomplete, refusing\n", ctx->incomplete_stream);
 		refuse_stream(h2, stream_id);
 	} else {
+		http_cleanup_stream(ctx);  // Free any leftover data and ensure pristine state
 		ctx->incomplete_stream = stream_id;
+		ctx->headers = malloc(sizeof(kr_http_header_array_t));
+		array_init(*ctx->headers);
 	}
 	return 0;
 }
@@ -293,6 +319,16 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 		refuse_stream(h2, stream_id);
 		return 0;
 	}
+
+	/* Store header: TODO only selected. */
+	kr_http_header_array_entry_t header;
+	header.name = malloc(sizeof(*name) * (namelen + 1));
+	memcpy(header.name, name, namelen);
+	header.name[namelen] = '\0';
+	header.value = malloc(sizeof(*value) * (valuelen + 1));
+	memcpy(header.value, value, valuelen);
+	header.value[valuelen] = '\0';
+	array_push(*ctx->headers, header);
 
 	if (!strcasecmp(":path", (const char *)name)) {
 		if (check_uri((const char *)value) < 0) {
@@ -334,7 +370,7 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	ssize_t remaining;
 	ssize_t required;
-	bool is_first = queue_len(ctx->streams) == 0 || queue_tail(ctx->streams) != ctx->incomplete_stream;
+	bool is_first = queue_len(ctx->streams) == 0 || queue_tail(ctx->streams).id != ctx->incomplete_stream;
 
 	if (ctx->incomplete_stream != stream_id) {
 		kr_log_verbose(
@@ -359,7 +395,11 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 
 	if (is_first) {
 		ctx->buf_pos = sizeof(uint16_t);  /* Reserve 2B for dnsmsg len. */
-		queue_push(ctx->streams, stream_id);
+		struct http_stream stream = {
+			.id = stream_id,
+			.headers = ctx->headers
+		};
+		queue_push(ctx->streams, stream);
 	}
 
 	memmove(ctx->buf + ctx->buf_pos, data, len);
@@ -388,10 +428,8 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 				refuse_stream(h2, stream_id);
 			}
 		}
-		ctx->incomplete_stream = -1;
-		ctx->current_method = HTTP_METHOD_NONE;
-		free(ctx->uri_path);
-		ctx->uri_path = NULL;
+		ctx->headers = NULL;  // Success -> transfer ownership to stream (waiting in wirebuffer)
+		http_cleanup_stream(ctx);
 
 		len = ctx->buf_pos - sizeof(uint16_t);
 		if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
@@ -422,7 +460,7 @@ static void on_pkt_write(struct http_data *data, int status)
 }
 
 /*
- * Cleanup for closed steams.
+ * Cleanup for closed streams.
  *
  * If any stream_user_data was set, call the on_write callback to allow
  * freeing of the underlying data structure.
@@ -431,6 +469,12 @@ static int on_stream_close_callback(nghttp2_session *h2, int32_t stream_id,
 				    uint32_t error_code, void *user_data)
 {
 	struct http_data *data;
+	struct http_ctx *ctx = (struct http_ctx *)user_data;
+
+	/* Ensure connection state is cleaned up in case the stream gets
+	 * unexpectedly closed, e.g. by PROTOCOL_ERROR issued from nghttp2. */
+	if (ctx->incomplete_stream == stream_id)
+		http_cleanup_stream(ctx);
 
 	data = nghttp2_session_get_stream_user_data(h2, stream_id);
 	if (data)
@@ -663,6 +707,8 @@ void http_free(struct http_ctx *ctx)
 	if (!ctx)
 		return;
 
+	http_cleanup_stream(ctx);
+	// TODO: queue_pop and check/free all headers (ownership may not have been transferred)
 	queue_deinit(ctx->streams);
 	nghttp2_session_del(ctx->h2);
 	free(ctx);
