@@ -387,7 +387,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 #if ENABLE_DOH2
 		if (req->qsource.flags.http) {
 			struct http_ctx *http_ctx = session_http_get_server_ctx(session);
-			req->qsource.stream_id = queue_head(http_ctx->streams);
+			req->qsource.stream_id = queue_head(http_ctx->streams).id;
 		}
 #endif
 		/* We need to store a copy of peer address. */

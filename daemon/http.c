@@ -233,7 +233,11 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 	}
 
 	ctx->buf_pos += ret;
-	queue_push(ctx->streams, stream_id);
+
+	struct http_stream stream = {
+		.id = stream_id
+	};
+	queue_push(ctx->streams, stream);
 	return 0;
 }
 
@@ -344,7 +348,7 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	ssize_t remaining;
 	ssize_t required;
-	bool is_first = queue_len(ctx->streams) == 0 || queue_tail(ctx->streams) != ctx->incomplete_stream;
+	bool is_first = queue_len(ctx->streams) == 0 || queue_tail(ctx->streams).id != ctx->incomplete_stream;
 
 	if (ctx->incomplete_stream != stream_id) {
 		kr_log_verbose(
@@ -369,7 +373,10 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 
 	if (is_first) {
 		ctx->buf_pos = sizeof(uint16_t);  /* Reserve 2B for dnsmsg len. */
-		queue_push(ctx->streams, stream_id);
+		struct http_stream stream = {
+			.id = stream_id
+		};
+		queue_push(ctx->streams, stream);
 	}
 
 	memmove(ctx->buf + ctx->buf_pos, data, len);
@@ -429,7 +436,7 @@ static void on_pkt_write(struct http_data *data, int status)
 }
 
 /*
- * Cleanup for closed steams.
+ * Cleanup for closed streams.
  *
  * If any stream_user_data was set, call the on_write callback to allow
  * freeing of the underlying data structure.
