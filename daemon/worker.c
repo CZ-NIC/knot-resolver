@@ -383,10 +383,17 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		req->qsource.flags.tls = session_flags(session)->has_tls;
 		req->qsource.flags.http = session_flags(session)->has_http;
 		req->qsource.stream_id = -1;
+		req->qsource.headers = NULL;
 #if ENABLE_DOH2
 		if (req->qsource.flags.http) {
 			struct http_ctx *http_ctx = session_http_get_server_ctx(session);
-			req->qsource.stream_id = queue_head(http_ctx->streams).id;
+			struct http_stream stream = queue_head(http_ctx->streams);
+			req->qsource.stream_id = stream.id;
+			/* Take ownership of HTTP headers. */
+			if (stream.headers) {
+				req->qsource.headers = stream.headers;
+				stream.headers = NULL;
+			}
 		}
 #endif
 		/* We need to store a copy of peer address. */
@@ -455,6 +462,15 @@ static void request_free(struct request_ctx *ctx)
 		lua_rawseti(L, -2, 0);
 		lua_pop(L, 1);
 		ctx->req.vars_ref = LUA_NOREF;
+	}
+	/* Free HTTP/2 headers for DoH requests. */
+	if (ctx->req.qsource.headers) {  // TODO maybe refactor elsewhere into function
+		for(int i = 0; i < ctx->req.qsource.headers->len; i++) {
+			free(ctx->req.qsource.headers->at[i].name);
+			free(ctx->req.qsource.headers->at[i].value);
+		}
+		array_clear(*ctx->req.qsource.headers);
+		free(ctx->req.qsource.headers);
 	}
 	/* Make sure to free XDP buffer in case it wasn't sent. */
 	if (ctx->req.alloc_wire_cb) {

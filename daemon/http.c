@@ -236,7 +236,8 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 	ctx->buf_pos += ret;
 
 	struct http_stream stream = {
-		.id = stream_id
+		.id = stream_id,
+		.headers = ctx->headers
 	};
 	queue_push(ctx->streams, stream);
 	return 0;
@@ -255,6 +256,15 @@ static void http_cleanup_stream(struct http_ctx *ctx)
 	ctx->current_method = HTTP_METHOD_NONE;
 	free(ctx->uri_path);
 	ctx->uri_path = NULL;
+	if (ctx->headers != NULL) {
+		for (int i = 0; i < ctx->headers->len; i++) {
+			free(ctx->headers->at[i].name);
+			free(ctx->headers->at[i].value);
+		}
+		array_clear(*ctx->headers);
+		free(ctx->headers);
+		ctx->headers = NULL;
+	}
 }
 
 /*
@@ -282,6 +292,8 @@ static int begin_headers_callback(nghttp2_session *h2, const nghttp2_frame *fram
 	} else {
 		http_cleanup_stream(ctx);  // Free any leftover data and ensure pristine state
 		ctx->incomplete_stream = stream_id;
+		ctx->headers = malloc(sizeof(kr_http_header_array_t));
+		array_init(*ctx->headers);
 	}
 	return 0;
 }
@@ -308,6 +320,16 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 		refuse_stream(h2, stream_id);
 		return 0;
 	}
+
+	/* Store header: TODO only selected. */
+	kr_http_header_array_entry_t header;
+	header.name = malloc(sizeof(*header.name) * (namelen + 1));
+	memcpy(header.name, name, namelen);
+	header.name[namelen] = '\0';
+	header.value = malloc(sizeof(*header.value) * (valuelen + 1));
+	memcpy(header.value, value, valuelen);
+	header.value[valuelen] = '\0';
+	array_push(*ctx->headers, header);
 
 	if (!strcasecmp(":path", (const char *)name)) {
 		if (check_uri((const char *)value) < 0) {
@@ -375,7 +397,8 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	if (is_first) {
 		ctx->buf_pos = sizeof(uint16_t);  /* Reserve 2B for dnsmsg len. */
 		struct http_stream stream = {
-			.id = stream_id
+			.id = stream_id,
+			.headers = ctx->headers
 		};
 		queue_push(ctx->streams, stream);
 	}
@@ -406,6 +429,7 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 				refuse_stream(h2, stream_id);
 			}
 		}
+		ctx->headers = NULL;  // Success -> transfer ownership to stream (waiting in wirebuffer)
 		http_cleanup_stream(ctx);
 
 		len = ctx->buf_pos - sizeof(uint16_t);
@@ -699,6 +723,7 @@ void http_free(struct http_ctx *ctx)
 		return;
 
 	http_cleanup_stream(ctx);
+	// TODO: queue_pop and check/free all headers (ownership may not have been transferred)
 	queue_deinit(ctx->streams);
 	nghttp2_session_del(ctx->h2);
 	free(ctx);

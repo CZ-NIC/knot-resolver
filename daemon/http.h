@@ -26,7 +26,7 @@ typedef ssize_t(*http_send_callback)(const uint8_t *buffer,
 
 struct http_stream {
 	int32_t id;
-	trie_t *headers;
+	kr_http_header_array_t *headers;
 };
 
 typedef queue_t(struct http_stream) queue_http_stream;
@@ -46,6 +46,7 @@ struct http_ctx {
 	ssize_t submitted;
 	http_method_t current_method;
 	char *uri_path;
+	kr_http_header_array_t *headers;
 	uint8_t *buf;  /* Part of the wire_buf that belongs to current HTTP/2 stream. */
 	ssize_t buf_pos;
 	ssize_t buf_size;
