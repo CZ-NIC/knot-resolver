@@ -146,8 +146,8 @@ typedef struct {
 	size_t cap;
 } ranked_rr_array_t;
 typedef struct kr_http_header_array_entry {
-	char* name;
-	char* value;
+	char *name;
+	char *value;
 } kr_http_header_array_entry_t;
 typedef struct {
 	kr_http_header_array_entry_t *at;
