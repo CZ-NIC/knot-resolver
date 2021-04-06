@@ -4,7 +4,7 @@
 
 #include <assert.h>
 
-#include "contrib/wire.h"
+#include <libknot/wire.h>
 #include "lib/cookies/nonce.h"
 
 uint16_t kr_nonce_write_wire(uint8_t *buf, uint16_t buf_len,
@@ -14,8 +14,8 @@ uint16_t kr_nonce_write_wire(uint8_t *buf, uint16_t buf_len,
 		return 0;
 	}
 
-	wire_write_u32(buf, input->rand);
-	wire_write_u32(buf + sizeof(uint32_t), input->time);
+	knot_wire_write_u32(buf, input->rand);
+	knot_wire_write_u32(buf + sizeof(uint32_t), input->time);
 	buf_len = 2 * sizeof(uint32_t);
 
 	return buf_len;

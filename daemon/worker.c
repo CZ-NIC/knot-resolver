@@ -13,7 +13,6 @@
 #include <contrib/cleanup.h>
 #include <contrib/ucw/lib.h>
 #include <contrib/ucw/mempool.h>
-#include <contrib/wire.h>
 #if defined(__GLIBC__) && defined(_GNU_SOURCE)
 #include <malloc.h>
 #endif
