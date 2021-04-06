@@ -322,10 +322,10 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 
 	/* Store header: TODO only selected. */
 	kr_http_header_array_entry_t header;
-	header.name = malloc(sizeof(*name) * (namelen + 1));
+	header.name = (char *)malloc(sizeof(*name) * (namelen + 1));
 	memcpy(header.name, name, namelen);
 	header.name[namelen] = '\0';
-	header.value = malloc(sizeof(*value) * (valuelen + 1));
+	header.value = (char *)malloc(sizeof(*value) * (valuelen + 1));
 	memcpy(header.value, value, valuelen);
 	header.value[valuelen] = '\0';
 	array_push(*ctx->headers, header);
