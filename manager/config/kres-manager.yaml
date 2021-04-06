@@ -4,6 +4,9 @@ server:
 dns64:
   prefix: "64:ff9b::/96"
 
+logging:
+  level: 4
+
 lua:
   script: |
     """
