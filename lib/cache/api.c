@@ -471,12 +471,14 @@ static bool rrset_has_min_range_or_weird(const knot_rrset_t *rr, const struct kr
 	}
 	bool ret; /**< NOT used for the weird cases */
 	if (rr->type == KNOT_RRTYPE_NSEC) {
-		/* NSEC: name -> \000.name
-		 * Note: we have to lower-case it; the reasons are better explained
-		 * on other knot_nsec_next() call sites. */
 		knot_dname_t next[KNOT_DNAME_MAXLEN];
 		if (knot_dname_to_wire(next, knot_nsec_next(rr->rrs.rdata), sizeof(next)) < 0)
 			return true; /*< weird */
+		if (!check_dname_for_lf(next, qry) || !check_dname_for_lf(rr->owner, qry))
+			return true; /*< probably minimal, and problematic for our NSEC cache */
+		/* NSEC: name -> \000.name (e.g. foobar.CloudFlare.net)
+		 * Note: we have to lower-case it; the reasons are better explained
+		 * on other knot_nsec_next() call sites. */
 		knot_dname_to_lower(next);
 		ret = next[0] == '\1' && next[1] == '\0'
 			&& knot_dname_is_equal(next + 2, rr->owner);
