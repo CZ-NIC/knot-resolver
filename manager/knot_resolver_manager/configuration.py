@@ -11,6 +11,11 @@ modules = {
 {%- endif %}
 }
 
+{%- if ( cfg.logging.level > 3 ) %}
+-- logging level
+verbose(true)
+{%- endif %}
+
 -- lua
 {%- if cfg.lua.script %}
 {{ cfg.lua.script }}
