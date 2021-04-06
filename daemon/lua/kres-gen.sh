@@ -109,6 +109,8 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_qflags
 	ranked_rr_array_entry_t
 	ranked_rr_array_t
+	kr_http_header_array_entry_t
+	kr_http_header_array_t
 	inaddr_array_t
 	struct kr_zonecut
 	kr_qarray_t
