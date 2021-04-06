@@ -132,7 +132,9 @@ static bool is_valid_addr(const uint8_t *addr, size_t len)
 {
 	if (len == sizeof(struct in_addr)) {
 		/* Filter ANY and 127.0.0.0/8 */
-		uint32_t ip_host = ntohl(*(const uint32_t *)(addr));
+		uint32_t ip_host; /* Memcpy is safe for unaligned case (on non-x86) */
+		memcpy(&ip_host, addr, sizeof(ip_host));
+		ip_host = ntohl(ip_host);
 		if (ip_host == 0 || (ip_host & 0xff000000) == 0x7f000000) {
 			return false;
 		}

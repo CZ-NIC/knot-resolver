@@ -155,8 +155,8 @@ struct rtt_state get_rtt_state(const uint8_t *ip, size_t len,
 	} else if (value.len != sizeof(struct rtt_state)) {
 		assert(false); // shouldn't happen but let's be more robust
 		state = default_rtt_state;
-	} else {
-		state = *(struct rtt_state *)value.data;
+	} else { // memcpy is safe for unaligned case (on non-x86)
+		memcpy(&state, value.data, sizeof(state));
 	}
 
 	free(key.data);

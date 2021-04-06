@@ -197,8 +197,14 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 	/* We know it starts before sname, so let's check the other end.
 	 * 1. construct the key for the next name - kwz_hi. */
 	/* it's *full* name ATM */
-	const knot_rdata_t *next = (const knot_rdata_t *)
-				(eh->data + KR_CACHE_RR_COUNT_SIZE);
+	/* Technical complication: memcpy is safe for unaligned case (on non-x86) */
+	__typeof__(((knot_rdata_t *)NULL)->len) next_len;
+	const uint8_t *next_data;
+	{	/* next points to knot_rdata_t but possibly unaligned */
+		const uint8_t *next = eh->data + KR_CACHE_RR_COUNT_SIZE;
+		memcpy(&next_len, next + offsetof(knot_rdata_t, len), sizeof(next_len));
+		next_data = next + offsetof(knot_rdata_t, data);
+	}
 	if (KR_CACHE_RR_COUNT_SIZE != 2 || get_uint16(eh->data) == 0) {
 		assert(false);
 		return "ERROR";
@@ -220,8 +226,8 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 		/* Lower-case chs; see also RFC 6840 5.1.
 		 * LATER(optim.): we do lots of copying etc. */
 		knot_dname_t lower_buf[KNOT_DNAME_MAXLEN];
-		ret = knot_dname_to_wire(lower_buf, next->data,
-					 MIN(next->len, KNOT_DNAME_MAXLEN));
+		ret = knot_dname_to_wire(lower_buf, next_data,
+					 MIN(next_len, KNOT_DNAME_MAXLEN));
 		if (ret < 0) { /* _ESPACE */
 			return "range search found record with incorrect contents";
 		}
