@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# fail early
+set -e
+
+cd /test
+echo "Starting manager..."
+systemctl start knot-resolver-manager.service
+
+# give it time to start
+sleep 1
+
+# start kresd instances and verify, that it works
+python3 run_test.py
+
+# kill the manager and start it again
+systemctl kill --signal=SIGKILL knot-resolver-manager.service
+systemctl start knot-resolver-manager.service
+
+# wait for proper startup
+sleep 1
+
+# run the same test again testing, that instances can start and that the count is correct
+# because there should be kresd instances left after the first run, this tests that the initialization of the manager properly finds them
+python3 run_test.py
+
+
+
