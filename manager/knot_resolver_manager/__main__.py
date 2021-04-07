@@ -11,15 +11,23 @@ from .utils import ignore_exceptions
 
 # when changing this, change the help message in main()
 _SOCKET_PATH = "/tmp/manager.sock"
+_MANAGER = "kres_manager"
 
 
-async def hello(_request: web.Request) -> web.Response:
-    return web.Response(text="Hello, world")
+async def index(_request: web.Request) -> web.Response:
+    return web.Response(text="Knot Resolver Manager is running! The configuration endpoint is at /config")
 
 
 async def apply_config(request: web.Request) -> web.Response:
+    manager: KresManager = request.app[_MANAGER]
+    if manager is None:
+        # handle the case when the manager is not yet initialized
+        return web.Response(
+            status=503, headers={"Retry-After": "3"}, text="Knot Resolver Manager is not yet fully initialized"
+        )
+
+    # process the request
     config = KresConfig.from_json(await request.text())
-    manager: KresManager = request.app["kres_manager"]
     await manager.apply_config(config)
     return web.Response(text="OK")
 
@@ -36,12 +44,11 @@ def main(listen: Optional[str], config: Optional[str]):
     app = web.Application()
 
     # initialize KresManager
-    manager = KresManager()
-    app["kres_manager"] = manager
+    app[_MANAGER] = None
 
     async def init_manager(app: web.Application):
-        manager = app["kres_manager"]
-        await manager.load_system_state()
+        manager = await KresManager.create()
+        app[_MANAGER] = manager
         if config is not None:
             # TODO Use config loaded from the file system
             pass
@@ -49,7 +56,7 @@ def main(listen: Optional[str], config: Optional[str]):
     app.on_startup.append(init_manager)
 
     # configure routing
-    app.add_routes([web.get("/", hello), web.post("/config", apply_config)])
+    app.add_routes([web.get("/", index), web.post("/config", apply_config)])
 
     # run forever, listen at the appropriate place
     maybe_port = ignore_exceptions(None, ValueError, TypeError)(int)(listen)

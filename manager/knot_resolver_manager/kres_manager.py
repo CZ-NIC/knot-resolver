@@ -1,46 +1,41 @@
 import asyncio
-from typing import List, Optional
-from uuid import uuid4
+from typing import Any, List, Type
 
-from . import compat, configuration, systemd
+from knot_resolver_manager.kresd_controller import BaseKresdController, get_best_controller_implementation
+
+from . import configuration
 from .datamodel import KresConfig
 
 
-class Kresd:
-    def __init__(self, kresd_id: Optional[str] = None):
-        self._lock = asyncio.Lock()
-        self._id: str = kresd_id or str(uuid4())
-
-        # if we got existing id, mark for restart
-        self._needs_restart: bool = id is not None
-
-    async def is_running(self) -> bool:
-        raise NotImplementedError()
-
-    async def start(self):
-        await compat.asyncio.to_thread(systemd.start_unit, f"kresd@{self._id}.service")
-
-    async def stop(self):
-        await compat.asyncio.to_thread(systemd.stop_unit, f"kresd@{self._id}.service")
-
-    async def restart(self):
-        await compat.asyncio.to_thread(systemd.restart_unit, f"kresd@{self._id}.service")
-
-    def mark_for_restart(self):
-        self._needs_restart = True
-
-
 class KresManager:
+    """
+    Core of the whole operation. Orchestrates individual instances under some
+    service manager like systemd.
+
+    Instantiate with `KresManager.create()`, not with the usual constructor!
+    """
+
+    @classmethod
+    async def create(cls: Type["KresManager"], *args: Any, **kwargs: Any) -> "KresManager":
+        obj = cls()
+        await obj._async_init(*args, **kwargs)  # pylint: disable=protected-access
+        return obj
+
+    async def _async_init(self):
+        self._controller = await get_best_controller_implementation()
+        await self.load_system_state()
+
     def __init__(self):
-        self._children: List[Kresd] = []
+        self._children: List[BaseKresdController] = []
         self._children_lock = asyncio.Lock()
+        self._controller: Type[BaseKresdController]
 
     async def load_system_state(self):
         async with self._children_lock:
             await self._collect_already_running_children()
 
     async def _spawn_new_child(self):
-        kresd = Kresd()
+        kresd = self._controller()
         await kresd.start()
         self._children.append(kresd)
 
@@ -52,12 +47,7 @@ class KresManager:
         await kresd.stop()
 
     async def _collect_already_running_children(self):
-        units = await compat.asyncio.to_thread(systemd.list_units)
-        for unit in units:
-            u: str = unit
-            if u.startswith("kresd@") and u.endswith(".service"):
-                iden = u.replace("kresd@", "").replace(".service", "")
-                self._children.append(Kresd(kresd_id=iden))
+        self._children.extend(await self._controller.get_all_running_instances())
 
     async def _rolling_restart(self):
         for kresd in self._children:
