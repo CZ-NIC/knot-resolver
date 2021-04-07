@@ -1,0 +1,58 @@
+#!/bin/bash
+
+# fail early
+set -e
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/_env.sh
+
+
+echo -e "${yellow}This script will overwrite your existing VSCode configuration in the .vscode directory${reset}"
+echo -e "${red}Should we proceed? [yN]${reset}"
+read confirmation
+if test "$confirmation" = "y" -o "$confirmation" = "Y"; then
+    echo -e "${green}OK, changing your VSCode configuration${reset}"
+else
+    echo -e "${red}Aborting${reset}"
+    exit 1
+fi
+
+
+mkdir -p .vscode
+
+# settings.json
+cat > .vscode/settings.json <<EOF
+{
+    "python.pythonPath": "$(poetry env info -p)",
+    "python.venvPath": "~/.cache/pypoetry/virtualenvs"
+}
+EOF
+
+
+# launch.json
+cat > .vscode/launch.json <<EOF
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Remote Attach",
+            "type": "python",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5678
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",
+                    "remoteRoot": "."
+                }
+            ]
+        }
+    ]
+}
+EOF
