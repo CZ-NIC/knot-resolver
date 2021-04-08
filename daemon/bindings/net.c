@@ -462,7 +462,7 @@ static int net_doh_headers(lua_State *L)
 
 	/* Clear existing headers. */
 	for (i = 0; i < headers->len; i++)
-		free(headers->at[i]);
+		free((void *)headers->at[i]);
 	array_clear(*headers);
 
 	if (lua_istable(L, 1)) {

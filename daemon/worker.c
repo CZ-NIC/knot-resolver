@@ -2152,7 +2152,7 @@ void worker_deinit(void)
 	worker->subreq_out = NULL;
 
 	for (int i = 0; i < worker->doh_qry_headers.len; i++)
-		free(worker->doh_qry_headers.at[i]);
+		free((void *)worker->doh_qry_headers.at[i]);
 	array_clear(worker->doh_qry_headers);
 
 	reclaim_mp_freelist(&worker->pool_mp);
