@@ -31,6 +31,8 @@
 /* Use same maximum as for tcp_pipeline_max. */
 #define HTTP_MAX_CONCURRENT_STREAMS UINT16_MAX
 
+#define HTTP_MAX_HEADER_IN_SIZE 1024
+
 #define HTTP_FRAME_HDLEN 9
 #define HTTP_FRAME_PADLEN 1
 
@@ -320,15 +322,33 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 		return 0;
 	}
 
-	/* Store header: TODO only selected. */
-	kr_http_header_array_entry_t header;
-	header.name = malloc(sizeof(*header.name) * (namelen + 1));
-	memcpy(header.name, name, namelen);
-	header.name[namelen] = '\0';
-	header.value = malloc(sizeof(*header.value) * (valuelen + 1));
-	memcpy(header.value, value, valuelen);
-	header.value[valuelen] = '\0';
-	array_push(*ctx->headers, header);
+	/* Store chosen headers to pass them to kr_request. */
+	for (int i = 0; i < the_worker->doh_headers_in.len; i++) {
+		if (!strcasecmp(the_worker->doh_headers_in.at[i], (const char *)name)) {
+			kr_http_header_array_entry_t header;
+
+			/* Limit maximum value size to reduce attack surface. */
+			if (valuelen > HTTP_MAX_HEADER_IN_SIZE) {
+				kr_log_verbose(
+					"[http] stream %d: header too large (%ld B), refused\n",
+					stream_id, valuelen);
+				refuse_stream(h2, stream_id);
+				return 0;
+			}
+
+			/* Copy the user-provided header name to keep the original case. */
+			header.name = malloc(sizeof(*header.name) * (namelen + 1));
+			memcpy(header.name, the_worker->doh_headers_in.at[i], namelen);
+			header.name[namelen] = '\0';
+
+			header.value = malloc(sizeof(*header.value) * (valuelen + 1));
+			memcpy(header.value, value, valuelen);
+			header.value[valuelen] = '\0';
+
+			array_push(*ctx->headers, header);
+			break;
+		}
+	}
 
 	if (!strcasecmp(":path", (const char *)name)) {
 		if (check_uri((const char *)value) < 0) {
