@@ -2153,7 +2153,7 @@ void worker_deinit(void)
 	trie_free(worker->subreq_out);
 	worker->subreq_out = NULL;
 
-	for (i = 0; i < worker->doh_headers_in.len; i++)
+	for (int i = 0; i < worker->doh_headers_in.len; i++)
 		free(worker->doh_headers_in.at[i]);
 	array_clear(worker->doh_headers_in);
 
