@@ -18,7 +18,7 @@ systemctl kill --signal=SIGKILL knot-resolver-manager.service
 systemctl start knot-resolver-manager.service
 
 # wait for proper startup
-sleep 1
+sleep 1.5
 
 # run the same test again testing, that instances can start and that the count is correct
 # because there should be kresd instances left after the first run, this tests that the initialization of the manager properly finds them
