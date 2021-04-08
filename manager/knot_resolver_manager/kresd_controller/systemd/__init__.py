@@ -1,9 +1,12 @@
+import logging
 from typing import Iterable, List
 
 from knot_resolver_manager import compat
 from knot_resolver_manager.kresd_controller.base import BaseKresdController
 
 from . import dbus_api as systemd
+
+logger = logging.getLogger(__name__)
 
 
 class SystemdKresdController(BaseKresdController):
@@ -21,8 +24,12 @@ class SystemdKresdController(BaseKresdController):
 
     @staticmethod
     async def is_controller_available() -> bool:
-        # TODO: implement a proper check
-        return True
+        try:
+            _ = await compat.asyncio.to_thread(systemd.list_units)
+            return True
+        except BaseException:  # we want every possible exception to be caught
+            logger.warning("systemd DBus API backend failed to initialize", exc_info=True)
+            return False
 
     @staticmethod
     async def get_all_running_instances() -> Iterable["BaseKresdController"]:
