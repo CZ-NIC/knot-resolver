@@ -197,7 +197,7 @@ struct kr_request {
 		struct kr_request_qsource_flags flags;
 		size_t size;
 		int32_t stream_id;
-		kr_http_header_array_t *headers;
+		kr_http_header_array_t headers;
 	} qsource;
 	struct {
 		unsigned int rtt;

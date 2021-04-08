@@ -210,7 +210,7 @@ struct kr_request {
 		struct kr_request_qsource_flags flags; /**< See definition above. */
 		size_t size; /**< query packet size */
 		int32_t stream_id; /**< HTTP/2 stream ID for DoH requests */
-		kr_http_header_array_t *headers;  /**< HTTP/2 headers for DoH requests */
+		kr_http_header_array_t headers;  /**< HTTP/2 headers for DoH requests */
 	} qsource;
 	struct {
 		unsigned rtt;                  /**< Current upstream RTT */
