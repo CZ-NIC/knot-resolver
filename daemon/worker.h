@@ -158,6 +158,9 @@ typedef array_t(struct mempool *) mp_freelist_t;
 /** List of query resolution tasks. */
 typedef array_t(struct qr_task *) qr_tasklist_t;
 
+/** List of HTTP header names. */
+typedef array_t(const char *) doh_headerlist_t;
+
 /** \details Worker state is meant to persist during the whole life of daemon. */
 struct worker_ctx {
 	struct engine *engine;
@@ -186,6 +189,9 @@ struct worker_ctx {
 	mp_freelist_t pool_mp;
 	knot_mm_t pkt_pool;
 	unsigned int next_request_uid;
+
+	/* HTTP Headers for DoH. */
+	doh_headerlist_t doh_qry_headers;
 };
 
 /** @endcond */
