@@ -15,12 +15,11 @@
 #include <libknot/rrset.h>
 #include <libknot/rrtype/rrsig.h>
 #include <libknot/rrtype/ds.h>
+#include <libknot/wire.h>
 
 #include "lib/defines.h"
 #include "lib/utils.h"
 #include "lib/dnssec/signature.h"
-
-#include "contrib/wire.h"
 
 static int authenticate_ds(const dnssec_key_t *key, dnssec_binary_t *ds_rdata, uint8_t digest_type)
 {
@@ -208,7 +207,7 @@ static int sign_ctx_add_records(dnssec_sign_ctx_t *ctx, const knot_rrset_t *cove
 			sizeof(uint16_t) + /* class */
 			sizeof(uint32_t);  /* OrigTTL */
 		const uint8_t *rdatalen_ptr = beginp + rdatalen_offset;
-		const uint16_t rdata_size = wire_read_u16(rdatalen_ptr);
+		const uint16_t rdata_size = knot_wire_read_u16(rdatalen_ptr);
 		const size_t rr_size = rdatalen_offset +
 			sizeof(uint16_t) + /* RDATA length */
 			rdata_size;        /* RDATA */
