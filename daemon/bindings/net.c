@@ -435,10 +435,10 @@ static int net_tls(lua_State *L)
 	return 1;
 }
 
-/** Select HTTP headers to subscribe to for incoming DoH requests. */
-static int net_doh_headers_in(lua_State *L)
+/** Configure HTTP headers for DoH requests. */
+static int net_doh_headers(lua_State *L)
 {
-	doh_headerlist_t *headers = &the_worker->doh_headers_in;
+	doh_headerlist_t *headers = &the_worker->doh_qry_headers;
 	int i;
 	const char *name;
 
@@ -455,10 +455,10 @@ static int net_doh_headers_in(lua_State *L)
 	}
 
 	if (lua_gettop(L) != 1)
-		lua_error_p(L, "net.doh_headers_in() takes one parameter (string or table)");
+		lua_error_p(L, "net.doh_headers() takes one parameter (string or table)");
 
 	if (!lua_istable(L, 1) && !lua_isstring(L, 1))
-		lua_error_p(L, "net.doh_headers_in() argument must be string or table");
+		lua_error_p(L, "net.doh_headers() argument must be string or table");
 
 	/* Clear existing headers. */
 	for (i = 0; i < headers->len; i++)
@@ -472,7 +472,7 @@ static int net_doh_headers_in(lua_State *L)
 			if (lua_isnil(L, -1))  /* missing value - end iteration */
 				break;
 			if (!lua_isstring(L, -1))
-				lua_error_p(L, "net.doh_headers_in() argument table can only contain strings");
+				lua_error_p(L, "net.doh_headers() argument table can only contain strings");
 			name = lua_tostring(L, -1);
 			array_push(*headers, strdup(name));
 		}
@@ -1132,7 +1132,7 @@ int kr_bindings_net(lua_State *L)
 		{ "bpf_set",      net_bpf_set },
 		{ "bpf_clear",    net_bpf_clear },
 		{ "register_endpoint_kind", net_register_endpoint_kind },
-		{ "doh_headers_in", net_doh_headers_in },
+		{ "doh_headers", net_doh_headers },
 		{ NULL, NULL }
 	};
 	luaL_register(L, "net", lib);

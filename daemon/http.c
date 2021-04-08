@@ -323,8 +323,8 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 	}
 
 	/* Store chosen headers to pass them to kr_request. */
-	for (int i = 0; i < the_worker->doh_headers_in.len; i++) {
-		if (!strcasecmp(the_worker->doh_headers_in.at[i], (const char *)name)) {
+	for (int i = 0; i < the_worker->doh_qry_headers.len; i++) {
+		if (!strcasecmp(the_worker->doh_qry_headers.at[i], (const char *)name)) {
 			kr_http_header_array_entry_t header;
 
 			/* Limit maximum value size to reduce attack surface. */
@@ -338,7 +338,7 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 
 			/* Copy the user-provided header name to keep the original case. */
 			header.name = malloc(sizeof(*header.name) * (namelen + 1));
-			memcpy(header.name, the_worker->doh_headers_in.at[i], namelen);
+			memcpy(header.name, the_worker->doh_qry_headers.at[i], namelen);
 			header.name[namelen] = '\0';
 
 			header.value = malloc(sizeof(*header.value) * (valuelen + 1));

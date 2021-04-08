@@ -2151,9 +2151,9 @@ void worker_deinit(void)
 	trie_free(worker->subreq_out);
 	worker->subreq_out = NULL;
 
-	for (int i = 0; i < worker->doh_headers_in.len; i++)
-		free(worker->doh_headers_in.at[i]);
-	array_clear(worker->doh_headers_in);
+	for (int i = 0; i < worker->doh_qry_headers.len; i++)
+		free(worker->doh_qry_headers.at[i]);
+	array_clear(worker->doh_qry_headers);
 
 	reclaim_mp_freelist(&worker->pool_mp);
 	mp_delete(worker->pkt_pool.ctx);
@@ -2189,7 +2189,7 @@ int worker_init(struct engine *engine, int worker_count)
 	worker->out_addr4.sin_family = AF_UNSPEC;
 	worker->out_addr6.sin6_family = AF_UNSPEC;
 
-	array_init(worker->doh_headers_in);
+	array_init(worker->doh_qry_headers);
 
 	int ret = worker_reserve(worker, MP_FREELIST_SIZE);
 	if (ret) return ret;
