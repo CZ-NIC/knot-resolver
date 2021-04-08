@@ -88,8 +88,8 @@ static knot_db_val_t key_NSEC3_name(struct key *k, const knot_dname_t *name,
 	};
 
 	if (nsec_p->libknot.iterations > KR_NSEC3_MAX_ITERATIONS) {
+	if (!kr_assume(nsec_p->libknot.iterations <= KR_NSEC3_MAX_ITERATIONS)) {
 		/* This is mainly defensive; it shouldn't happen thanks to downgrades. */
-		assert(false);
 		return VAL_EMPTY;
 	}
 	#if 0 // LATER(optim.): this requires a patched libdnssec - tries to realloc()
