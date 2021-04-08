@@ -2153,6 +2153,10 @@ void worker_deinit(void)
 	trie_free(worker->subreq_out);
 	worker->subreq_out = NULL;
 
+	for (i = 0; i < worker->doh_headers_in.len; i++)
+		free(worker->doh_headers_in.at[i]);
+	array_clear(worker->doh_headers_in);
+
 	reclaim_mp_freelist(&worker->pool_mp);
 	mp_delete(worker->pkt_pool.ctx);
 	worker->pkt_pool.ctx = NULL;
@@ -2186,6 +2190,8 @@ int worker_init(struct engine *engine, int worker_count)
 	worker->tcp_pipeline_max = MAX_PIPELINED;
 	worker->out_addr4.sin_family = AF_UNSPEC;
 	worker->out_addr6.sin6_family = AF_UNSPEC;
+
+	array_init(worker->doh_headers_in);
 
 	int ret = worker_reserve(worker, MP_FREELIST_SIZE);
 	if (ret) return ret;
