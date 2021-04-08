@@ -70,8 +70,8 @@ static int hash_name(dnssec_binary_t *hash, const dnssec_nsec3_params_t *params,
 		return kr_error(EINVAL);
 	if (!name)
 		return kr_error(EINVAL);
-	if (params->iterations > KR_NSEC3_MAX_ITERATIONS) {
-		assert(false); // This if is mainly defensive; it shouldn't happen.
+	if (!kr_assume(params->iterations <= KR_NSEC3_MAX_ITERATIONS)) {
+		/* This if is mainly defensive; it shouldn't happen. */
 		return kr_error(EINVAL);
 	}
 
