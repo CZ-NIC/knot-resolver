@@ -271,18 +271,22 @@ int dnstap_init(struct kr_module *module) {
 	return kr_ok();
 }
 
-KR_EXPORT
-int dnstap_deinit(struct kr_module *module) {
+/** Clear, i.e. get to state as after the first dnstap_init(). */
+static void dnstap_clear(struct kr_module *module) {
 	struct dnstap_data *data = module->data;
-	/* Free allocated memory */
 	if (data) {
 		free(data->identity);
 		free(data->version);
 
 		fstrm_iothr_destroy(&data->iothread);
 		DEBUG_MSG("fstrm iothread destroyed\n");
-		free(data);
 	}
+}
+
+KR_EXPORT
+int dnstap_deinit(struct kr_module *module) {
+	dnstap_clear(module);
+	free(module->data);
 	return kr_ok();
 }
 
@@ -350,6 +354,7 @@ static bool find_bool(const JsonNode *node) {
 /* parse config */
 KR_EXPORT
 int dnstap_config(struct kr_module *module, const char *conf) {
+	dnstap_clear(module);
 	struct dnstap_data *data = module->data;
 	auto_free char *sock_path = NULL;
 
