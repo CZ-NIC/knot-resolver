@@ -190,7 +190,7 @@ struct worker_ctx {
 	unsigned int next_request_uid;
 
 	/* HTTP Headers for DoH. */
-	doh_headerlist_t doh_headers_in;
+	doh_headerlist_t doh_qry_headers;
 };
 
 /** @endcond */
