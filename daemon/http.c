@@ -7,7 +7,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <assert.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -392,7 +391,8 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	ssize_t len;
 	int32_t stream_id = frame->hd.stream_id;
-	assert(stream_id != -1);
+	if(!kr_assume(stream_id != -1))
+		return NGHTTP2_ERR_CALLBACK_FAILURE;
 
 	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) && ctx->incomplete_stream == stream_id) {
 		if (ctx->current_method == HTTP_METHOD_GET) {
