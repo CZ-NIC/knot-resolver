@@ -34,6 +34,66 @@ int kr_nsec_children_in_zone_check(const uint8_t *bm, uint16_t bm_size)
 	 */
 }
 
+/* This block of functions implements a "safe" version of knot_dname_cmp(),
+ * until that one handles in-label zero bytes correctly. */
+static int lf_cmp(const uint8_t *lf1, const uint8_t *lf2)
+{
+	/* Compare common part. */
+	uint8_t common = lf1[0];
+	if (common > lf2[0]) {
+		common = lf2[0];
+	}
+	int ret = memcmp(lf1 + 1, lf2 + 1, common);
+	if (ret != 0) {
+		return ret;
+	}
+
+	/* If they match, compare lengths. */
+	if (lf1[0] < lf2[0]) {
+		return -1;
+	} else if (lf1[0] > lf2[0]) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+static void dname_reverse(const knot_dname_t *src, size_t src_len, knot_dname_t *dst)
+{
+	knot_dname_t *idx = dst + src_len - 1;
+	assert(src[src_len - 1] == '\0');
+	*idx = '\0';
+
+	while (*src) {
+		uint16_t len = *src + 1;
+		idx -= len;
+		memcpy(idx, src, len);
+		src += len;
+	}
+	assert(idx == dst);
+}
+static int dname_cmp(const knot_dname_t *d1, const knot_dname_t *d2)
+{
+	size_t d1_len = knot_dname_size(d1);
+	size_t d2_len = knot_dname_size(d2);
+
+	knot_dname_t d1_rev_arr[d1_len], d2_rev_arr[d2_len];
+	const knot_dname_t *d1_rev = d1_rev_arr, *d2_rev = d2_rev_arr;
+
+	dname_reverse(d1, d1_len, d1_rev_arr);
+	dname_reverse(d2, d2_len, d2_rev_arr);
+
+	int res = 0;
+	while (res == 0 && d1_rev != NULL) {
+		res = lf_cmp(d1_rev, d2_rev);
+		d1_rev = knot_wire_next_label(d1_rev, NULL);
+		d2_rev = knot_wire_next_label(d2_rev, NULL);
+	}
+
+	assert(res != 0 || d2_rev == NULL);
+	return res;
+}
+
+
 /**
  * Check whether the NSEC RR proves that there is no closer match for <SNAME, SCLASS>.
  * @param nsec  NSEC RRSet.
@@ -43,7 +103,7 @@ int kr_nsec_children_in_zone_check(const uint8_t *bm, uint16_t bm_size)
 static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 {
 	assert(nsec && sname);
-	if (knot_dname_cmp(sname, nsec->owner) <= 0) {
+	if (dname_cmp(sname, nsec->owner) <= 0) {
 		return abs(ENOENT); /* 'sname' before 'owner', so can't be covered */
 	}
 
@@ -57,8 +117,8 @@ static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 	}
 	knot_dname_to_lower(next);
 
-	const bool is_last_nsec = knot_dname_cmp(nsec->owner, next) >= 0;
-	const bool in_range = is_last_nsec || knot_dname_cmp(sname, next) < 0;
+	const bool is_last_nsec = dname_cmp(nsec->owner, next) >= 0;
+	const bool in_range = is_last_nsec || dname_cmp(sname, next) < 0;
 	if (!in_range) {
 		return abs(ENOENT);
 	}
