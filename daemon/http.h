@@ -32,6 +32,12 @@ typedef enum {
 	HTTP_METHOD_POST = 2,
 } http_method_t;
 
+struct http_stream_status {
+	int32_t stream_id;
+	int err_status;
+	char *err_msg;
+};
+
 struct http_ctx {
 	struct nghttp2_session *h2;
 	http_send_callback send_cb;
@@ -41,9 +47,12 @@ struct http_ctx {
 	ssize_t submitted;
 	http_method_t current_method;
 	char *uri_path;
+	char *content_type;
 	uint8_t *buf;  /* Part of the wire_buf that belongs to current HTTP/2 stream. */
 	ssize_t buf_pos;
 	ssize_t buf_size;
+	trie_t *stream_status;
+	struct http_stream_status *current_stream;
 };
 
 #if ENABLE_DOH2
