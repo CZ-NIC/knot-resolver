@@ -50,9 +50,10 @@ def is_none_type(tp: Any) -> bool:
 
 
 class _LiteralEnum:
-    def __getitem__(self, args: Tuple[Union[str,int,bytes], ...]) -> Any:
+    def __getitem__(self, args: Tuple[Union[str, int, bytes], ...]) -> Any:
         lits = tuple(Literal[x] for x in args)
         return Union[lits]  # pyright: reportGeneralTypeIssues=false
+
 
 LiteralEnum = _LiteralEnum()
 

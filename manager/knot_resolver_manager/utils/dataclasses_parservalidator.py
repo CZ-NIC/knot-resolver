@@ -22,6 +22,8 @@ class ValidationException(Exception):
 
 
 def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> Any:
+    # pylint: disable=too-many-branches,too-many-locals
+
     # default values
     if obj is None and use_default:
         return default
@@ -32,7 +34,7 @@ def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> A
             return None
         else:
             raise ValidationException(f"Expected None, found {obj}")
-    
+
     # Union[*variants] (handles Optional[T] due to the way the typing system works)
     elif is_union(cls):
         variants = get_generic_type_arguments(cls)
@@ -41,7 +43,7 @@ def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> A
                 return _from_dictlike_obj(v, obj, ..., False)
             except ValidationException:
                 pass
-        raise ValidationException("Union {cls} could not be parsed - parsing of all variants failed")
+        raise ValidationException(f"Union {cls} could not be parsed - parsing of all variants failed")
 
     # after this, there is no place for a None object
     elif obj is None:
@@ -52,7 +54,7 @@ def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> A
         try:
             return cls(obj)
         except ValueError as e:
-            raise ValidationException("Failed to parse primitive type {cls}, value {obj}", e)
+            raise ValidationException(f"Failed to parse primitive type {cls}, value {obj}", e)
 
     # Literal[T]
     elif is_literal(cls):
@@ -60,7 +62,7 @@ def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> A
         if obj == expected:
             return obj
         else:
-            raise ValidationException("Literal {cls} is not matched with the value {obj}")
+            raise ValidationException(f"Literal {cls} is not matched with the value {obj}")
 
     # Dict[K,V]
     elif is_dict(cls):
@@ -71,7 +73,9 @@ def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> A
                 for key, val in obj.items()
             }
         except AttributeError as e:
-            raise ValidationException(f"Expected dict-like object, but failed to access its .items() method. Value was {obj}")
+            raise ValidationException(
+                f"Expected dict-like object, but failed to access its .items() method. Value was {obj}", e
+            )
 
     # List[T]
     elif is_list(cls):
