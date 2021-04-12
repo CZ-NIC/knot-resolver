@@ -39,6 +39,7 @@ int kr_nsec3_name_error_response_check(const knot_pkt_t *pkt, knot_section_t sec
  *                     KNOT_ERANGE - NSEC3 RR that covers a wildcard
  *                     has been found, but has opt-out flag set;
  *                     otherwise - error.
+ * Records over KR_NSEC3_MAX_ITERATIONS are skipped, so you probably get kr_error(ENOENT).
  */
 int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
                                             const knot_dname_t *sname, int trim_to_next);
