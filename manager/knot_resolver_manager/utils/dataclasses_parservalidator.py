@@ -6,11 +6,12 @@ import yaml
 from knot_resolver_manager.utils.types import (
     get_generic_type_argument,
     get_generic_type_arguments,
-    get_optional_inner_type,
     is_dict,
     is_list,
-    is_optional,
+    is_literal,
+    is_none_type,
     is_tuple,
+    is_union,
 )
 
 from ..compat.dataclasses import is_dataclass
@@ -25,24 +26,52 @@ def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> A
     if obj is None and use_default:
         return default
 
-    # primitive types
-    if cls in (int, float, str):
-        return cls(obj)
-
-    # Optional[T]
-    if is_optional(cls):
+    # NoneType
+    elif is_none_type(cls):
         if obj is None:
             return None
         else:
-            return _from_dictlike_obj(get_optional_inner_type(cls), obj, ..., False)
+            raise ValidationException(f"Expected None, found {obj}")
+    
+    # Union[*variants] (handles Optional[T] due to the way the typing system works)
+    elif is_union(cls):
+        variants = get_generic_type_arguments(cls)
+        for v in variants:
+            try:
+                return _from_dictlike_obj(v, obj, ..., False)
+            except ValidationException:
+                pass
+        raise ValidationException("Union {cls} could not be parsed - parsing of all variants failed")
+
+    # after this, there is no place for a None object
+    elif obj is None:
+        raise ValidationException(f"Unexpected None value for type {cls}")
+
+    # primitive types
+    if cls in (int, float, str):
+        try:
+            return cls(obj)
+        except ValueError as e:
+            raise ValidationException("Failed to parse primitive type {cls}, value {obj}", e)
+
+    # Literal[T]
+    elif is_literal(cls):
+        expected = get_generic_type_argument(cls)
+        if obj == expected:
+            return obj
+        else:
+            raise ValidationException("Literal {cls} is not matched with the value {obj}")
 
     # Dict[K,V]
     elif is_dict(cls):
         key_type, val_type = get_generic_type_arguments(cls)
-        return {
-            _from_dictlike_obj(key_type, key, ..., False): _from_dictlike_obj(val_type, val, ..., False)
-            for key, val in obj.items()
-        }
+        try:
+            return {
+                _from_dictlike_obj(key_type, key, ..., False): _from_dictlike_obj(val_type, val, ..., False)
+                for key, val in obj.items()
+            }
+        except AttributeError as e:
+            raise ValidationException(f"Expected dict-like object, but failed to access its .items() method. Value was {obj}")
 
     # List[T]
     elif is_list(cls):

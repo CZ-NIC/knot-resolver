@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
+from typing_extensions import Literal
+
 NoneType = type(None)
 
 
@@ -23,8 +25,12 @@ def is_tuple(tp: Any) -> bool:
 
 
 def is_union(tp: Any) -> bool:
-    """Returns False if it is Union but looks like Optional"""
-    return not is_optional(tp) and getattr(tp, "__origin__", None) == Union
+    """ Returns true even for optional types, because they are just a Union[T, NoneType] """
+    return getattr(tp, "__origin__", None) == Union
+
+
+def is_literal(tp: Any) -> bool:
+    return getattr(tp, "__origin__", None) == Literal
 
 
 def get_generic_type_arguments(tp: Any) -> List[Any]:
@@ -37,6 +43,18 @@ def get_generic_type_argument(tp: Any) -> Any:
     args = get_generic_type_arguments(tp)
     assert len(args) == 1
     return args[0]
+
+
+def is_none_type(tp: Any) -> bool:
+    return tp is None or tp == NoneType
+
+
+class _LiteralEnum:
+    def __getitem__(self, args: Tuple[Union[str,int,bytes], ...]) -> Any:
+        lits = tuple(Literal[x] for x in args)
+        return Union[lits]  # pyright: reportGeneralTypeIssues=false
+
+LiteralEnum = _LiteralEnum()
 
 
 T = TypeVar("T")
