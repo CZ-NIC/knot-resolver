@@ -596,6 +596,11 @@ int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_
 		if (rrset->type != KNOT_RRTYPE_NSEC3) {
 			continue;
 		}
+		/* Avoid hashing with too many iterations;
+		 * on "normal packets" we shouldn't get to this point. */
+		if (knot_nsec3_iters(rrset->rrs.rdata) > KR_NSEC3_MAX_ITERATIONS) {
+			continue;
+		}
 		int ret = covers_name(&flags, rrset, sname);
 		if (ret != 0) {
 			return ret;

@@ -9,6 +9,7 @@ Bugfixes
 --------
 - dnstap module: fix repeated configuration (!1168)
 - validator: fix SERVFAIL for some rare dynamic proofs (!1166)
+- validator: fix 5.3.1 regression on over-limit NSEC3 edge case (!1169)
 
 
 Knot Resolver 5.3.1 (2021-03-31)
