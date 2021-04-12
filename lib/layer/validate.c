@@ -247,8 +247,8 @@ static int validate_records(struct kr_request *req, knot_pkt_t *answer, knot_mm_
 
 	kr_rrset_validation_ctx_t vctx = {
 		.pkt		= answer,
-		.rrs		= &req->answ_selected,
-		.section_id	= KNOT_ANSWER,
+		.rrs		= &req->auth_selected,
+		.section_id	= KNOT_AUTHORITY,
 		.keys		= qry->zone_cut.key,
 		.zone_name	= qry->zone_cut.name,
 		.timestamp	= qry->timestamp.tv_sec,
@@ -261,25 +261,25 @@ static int validate_records(struct kr_request *req, knot_pkt_t *answer, knot_mm_
 	};
 
 	int ret = validate_section(&vctx, qry, pool);
+	req->auth_validated = (vctx.err_cnt == 0);
+	if (ret != kr_ok()) {
+		return ret;
+	}
+
+	uint32_t an_flags = vctx.flags;
+	vctx.rrs	  = &req->answ_selected;
+	vctx.section_id   = KNOT_ANSWER;
+	vctx.flags	  = 0;
+	vctx.err_cnt	  = 0;
+	vctx.result	  = 0;
+
+	ret = validate_section(&vctx, qry, pool);
 	if (vctx.err_cnt && vctx.err_cnt == vctx.cname_norrsig_cnt) {
 		VERBOSE_MSG(qry, ">< all validation errors are missing RRSIGs on CNAMES, trying again in hope for DNAMEs\n");
 		vctx.err_cnt = vctx.cname_norrsig_cnt = vctx.result = 0;
 		ret = validate_section(&vctx, qry, pool);
 	}
 	req->answ_validated = (vctx.err_cnt == 0);
-	if (ret != kr_ok()) {
-		return ret;
-	}
-
-	uint32_t an_flags = vctx.flags;
-	vctx.rrs	  = &req->auth_selected;
-	vctx.section_id   = KNOT_AUTHORITY;
-	vctx.flags	  = 0;
-	vctx.err_cnt	  = 0;
-	vctx.result	  = 0;
-
-	ret = validate_section(&vctx, qry, pool);
-	req->auth_validated = (vctx.err_cnt == 0);
 	if (ret != kr_ok()) {
 		return ret;
 	}
