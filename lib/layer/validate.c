@@ -894,7 +894,8 @@ static void rank_records(struct kr_query *qry, bool any_rank, enum kr_rank rank_
 								 bailiwick) < 0) {
 				continue;
 			}
-			if (kr_rank_test(entry->rank, KR_RANK_INITIAL)
+			if (any_rank
+			    || kr_rank_test(entry->rank, KR_RANK_INITIAL)
 			    || kr_rank_test(entry->rank, KR_RANK_TRY)
 			    || kr_rank_test(entry->rank, KR_RANK_MISSING)) {
 				kr_rank_set(&entry->rank, rank_to_set);
