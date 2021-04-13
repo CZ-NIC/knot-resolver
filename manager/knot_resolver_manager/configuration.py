@@ -6,8 +6,11 @@ from .datamodel import KresConfig
 
 _LUA_TEMPLATE_STR = """
 modules = {
+    'hints > iterate',   -- Load /etc/hosts and allow custom root hints",
+    'stats',             -- Track internal statistics",
+    'predict',           -- Prefetch expiring/frequent records",
 {%- if cfg.dns64 %}
-    dns64 = '{{ cfg.dns64.prefix }}' }   -- dns64
+    dns64 = '{{ cfg.dns64.prefix }}', -- dns64
 {%- endif %}
 }
 

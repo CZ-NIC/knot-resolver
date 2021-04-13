@@ -2,7 +2,7 @@ server:
   instances: 1
 
 dns64:
-  prefix: "64:ff9b::/96"
+  prefix: "64:ff9b::"
 
 logging:
   level: 4
@@ -10,24 +10,10 @@ logging:
 lua:
   script: |
     """
-    -- SPDX-License-Identifier: CC0-1.0
-    -- vim:syntax=lua:set ts=4 sw=4:
-    -- Refer to manual: https://knot-resolver.readthedocs.org/en/stable/
-
-    -- Network interface configuration
     net.listen('127.0.0.1', 53, { kind = 'dns' })
     net.listen('127.0.0.1', 853, { kind = 'tls' })
-    --net.listen('127.0.0.1', 443, { kind = 'doh2' })
     net.listen('::1', 53, { kind = 'dns', freebind = true })
     net.listen('::1', 853, { kind = 'tls', freebind = true })
-    --net.listen('::1', 443, { kind = 'doh2' })
-
-    -- Load useful modules
-    modules = {
-      'hints > iterate',  -- Load /etc/hosts and allow custom root hints
-      'stats',            -- Track internal statistics
-      'predict',          -- Prefetch expiring/frequent records
-    }
 
     -- Cache size
     cache.size = 100 * MB
