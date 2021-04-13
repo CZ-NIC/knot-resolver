@@ -1,5 +1,4 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-#include <assert.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,7 +26,7 @@ static void got_killed(int signum)
 	case 3:
 		abort();
 	default:
-		assert(0);
+		(void)!kr_assume(false);
 	}
 }
 
@@ -123,7 +122,7 @@ int main(int argc, char *argv[])
 			print_help();
 			return 1;
 		default:
-			assert(0);
+			(void)!kr_assume(false);
 		}
 	}
 
