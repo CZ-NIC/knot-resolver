@@ -415,6 +415,8 @@ int main(int argc, char **argv)
 				"Please report issues to https://gitlab.nic.cz/knot/knot-resolver/issues/\n"
 				"Thank you for your time and interest!\n");
 
+	assert(false);
+
 	the_args = &the_args_value;
 	args_init(the_args);
 	int ret = parse_args(argc, argv, the_args);
