@@ -14,7 +14,3 @@ python3 send_request.py
 
 # assert that any kresd process is running
 systemctl status | grep kresd
-
-# see the rendered Lua configuration
-echo "Lua config in '/etc/knot-resolver/kresd.conf':"
-cat /etc/knot-resolver/kresd.conf
