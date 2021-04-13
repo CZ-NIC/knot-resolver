@@ -2,8 +2,6 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <assert.h>
-
 #include "contrib/wire.h"
 #include "lib/cookies/nonce.h"
 
