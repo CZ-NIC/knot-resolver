@@ -36,11 +36,10 @@ uint32_t hash(const char* data, size_t len_)
     //----------
     // body
 
-    int i;
-    for(i = -nblocks; i; i++)
+    for(int i = 0; i < nblocks; ++i)
     {
         uint32_t k1;
-        memcpy(&k1, data + nblocks * 4 + i * sizeof(k1), sizeof(k1));
+        memcpy(&k1, data + i * sizeof(k1), sizeof(k1));
 
         k1 *= c1;
         k1 = rotl32(k1, 15);
