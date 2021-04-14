@@ -17,7 +17,6 @@
 #include <libknot/rrtype/rrsig.h>
 
 #include "contrib/cleanup.h"
-#include "contrib/wire.h"
 #include "lib/defines.h"
 #include "lib/dnssec/nsec.h"
 #include "lib/dnssec/nsec3.h"
@@ -341,18 +340,18 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
 
 bool kr_dnssec_key_zsk(const uint8_t *dnskey_rdata)
 {
-	return wire_read_u16(dnskey_rdata) & 0x0100;
+	return knot_wire_read_u16(dnskey_rdata) & 0x0100;
 }
 
 bool kr_dnssec_key_ksk(const uint8_t *dnskey_rdata)
 {
-	return wire_read_u16(dnskey_rdata) & 0x0001;
+	return knot_wire_read_u16(dnskey_rdata) & 0x0001;
 }
 
 /** Return true if the DNSKEY is revoked. */
 bool kr_dnssec_key_revoked(const uint8_t *dnskey_rdata)
 {
-	return wire_read_u16(dnskey_rdata) & 0x0080;
+	return knot_wire_read_u16(dnskey_rdata) & 0x0080;
 }
 
 int kr_dnssec_key_tag(uint16_t rrtype, const uint8_t *rdata, size_t rdlen)
@@ -361,7 +360,7 @@ int kr_dnssec_key_tag(uint16_t rrtype, const uint8_t *rdata, size_t rdlen)
 		return kr_error(EINVAL);
 	}
 	if (rrtype == KNOT_RRTYPE_DS) {
-		return wire_read_u16(rdata);
+		return knot_wire_read_u16(rdata);
 	} else if (rrtype == KNOT_RRTYPE_DNSKEY) {
 		struct dseckey *key = NULL;
 		int ret = kr_dnssec_key_from_rdata(&key, NULL, rdata, rdlen);
