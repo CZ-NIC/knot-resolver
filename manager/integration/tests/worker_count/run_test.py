@@ -22,6 +22,11 @@ def set_workers(num: int):
 	r = requests.post('http+unix://%2Ftmp%2Fmanager.sock/config', data=PAYLOAD_F(num))
 	r.raise_for_status()
 
+def set_workers_auto():
+	# send the config
+	r = requests.post('http+unix://%2Ftmp%2Fmanager.sock/config', data=PAYLOAD_F("\"auto\""))
+	r.raise_for_status()
+
 def count_running() -> int:
 	cmd = subprocess.run("ps aux | grep kresd | grep -v grep", shell=True, stdout=subprocess.PIPE)
 	return len(str(cmd.stdout, 'utf8').strip().split("\n"))
@@ -44,3 +49,10 @@ set_workers(4)
 time.sleep(2)
 count = count_running()
 assert count == 4, f"Unexpected number of kresd instances is running - {count}"
+
+print("Setting instances configuration to 'auto'")
+set_workers_auto()
+time.sleep(2)
+count = count_running()
+print(f"  - number of instances running is {count}")
+assert count != 1, f"Unexpected number of kresd instances is running - {count}"

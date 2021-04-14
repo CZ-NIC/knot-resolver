@@ -72,5 +72,5 @@ class KresManager:
     async def apply_config(self, config: KresConfig):
         async with self._children_lock:
             await self._write_config(config)
-            await self._ensure_number_of_children(config.server.instances)
+            await self._ensure_number_of_children(config.server.instances_num)
             await self._rolling_restart()
