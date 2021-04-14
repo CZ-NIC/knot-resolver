@@ -465,21 +465,24 @@ static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qr
  * Also include some abnormal RR cases; qry is just for logging. */
 static bool rrset_has_min_range_or_weird(const knot_rrset_t *rr, const struct kr_query *qry)
 {
-	if (!rr->rrs.count) {
-		assert(!EINVAL);
-		return true; /*< weird */
+	if (rr->rrs.count != 1) {
+		assert(rr->rrs.count > 0);
+		if (rr->type == KNOT_RRTYPE_NSEC || rr->type == KNOT_RRTYPE_NSEC3
+				|| rr->rrs.count == 0) {
+			return true; /*< weird */
+		}
 	}
 	bool ret; /**< NOT used for the weird cases */
 	if (rr->type == KNOT_RRTYPE_NSEC) {
-		/* NSEC: name -> \000.name
-		 * Note: we have to lower-case it; the reasons are better explained
-		 * on other knot_nsec_next() call sites. */
-		knot_dname_t next[KNOT_DNAME_MAXLEN];
-		if (knot_dname_to_wire(next, knot_nsec_next(rr->rrs.rdata), sizeof(next)) < 0)
-			return true; /*< weird */
-		knot_dname_to_lower(next);
-		ret = next[0] == '\1' && next[1] == '\0'
-			&& knot_dname_is_equal(next + 2, rr->owner);
+		if (!check_dname_for_lf(rr->owner, qry))
+			return true; /*< weird, probably filtered even before this point */
+		ret = !check_dname_for_lf(knot_nsec_next(rr->rrs.rdata), qry);
+		/* ^^ Zero inside the next-name label means it's probably a minimal range,
+		 * and anyway it's problematic for our aggressive cache (comparisons).
+		 * Real-life examples covered:
+		 *   NSEC: name -> \000.name (e.g. typical foobar.CloudFlare.net)
+		 *   NSEC: name -> name\000 (CloudFlare on delegations)
+		 */
 	} else if (rr->type == KNOT_RRTYPE_NSEC3) {
 		if (knot_nsec3_next_len(rr->rrs.rdata) != NSEC3_HASH_LEN
 		    || *rr->owner != NSEC3_HASH_TXT_LEN) {
