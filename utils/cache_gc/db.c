@@ -64,10 +64,8 @@ void kr_gc_cache_close(struct kr_cache *kres_db, knot_db_t * knot_db)
 	kr_cache_close(kres_db);
 }
 
-const uint16_t *kr_gc_key_consistent(knot_db_val_t key)
+int kr_gc_key_consistent(knot_db_val_t key)
 {
-	const static uint16_t NSEC1 = KNOT_RRTYPE_NSEC;
-	const static uint16_t NSEC3 = KNOT_RRTYPE_NSEC3;
 	const uint8_t *kd = key.data;
 	ssize_t i;
 	/* CACHE_KEY_DEF */
@@ -80,7 +78,7 @@ const uint16_t *kr_gc_key_consistent(knot_db_val_t key)
 		for (i = 2; kd[i - 1] || kd[i - 2]; ++i) {
 			if (i >= key.len) {
 				// TODO: assert(!EINVAL) -> kr_assume()
-				return NULL;
+				return kr_error(EINVAL);
 			}
 		}
 	}
@@ -89,18 +87,20 @@ const uint16_t *kr_gc_key_consistent(knot_db_val_t key)
 	case 'E':
 		if (i + 1 + sizeof(uint16_t) > key.len) {
 			assert(!EINVAL);
-			return NULL;
+			return kr_error(EINVAL);
 		}
-		return (uint16_t *) & kd[i + 1];
+		uint16_t type;
+		memcpy(&type, kd + i + 1, sizeof(type));
+		return type;
 	case '1':
-		return &NSEC1;
+		return KNOT_RRTYPE_NSEC;
 	case '3':
-		return &NSEC3;
+		return KNOT_RRTYPE_NSEC3;
 	case 'S': // the rtt_state entries are considered inconsistent, at least for now
-		return NULL;
+		return -1;
 	default:
 		assert(!EINVAL);
-		return NULL;
+		return kr_error(EINVAL);
 	}
 }
 
@@ -203,12 +203,11 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 
 		info.entry_size = key.len + val.len;
 		info.valid = false;
-		const uint16_t *entry_type =
-		    ret == KNOT_EOK ? kr_gc_key_consistent(key) : NULL;
+		const int entry_type = ret == KNOT_EOK ? kr_gc_key_consistent(key) : -1;
 		const struct entry_h *entry = NULL;
-		if (entry_type != NULL) {
+		if (entry_type >= 0) {
 			counter_gc_consistent++;
-			entry = val2entry(val, *entry_type);
+			entry = val2entry(val, entry_type);
 		}
 		/* TODO: perhaps improve some details around here:
 		 *  - rtt_state entries are considered gc_inconsistent;
@@ -219,9 +218,9 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 		 *    here as kr_inconsistent */
 		if (entry != NULL) {
 			info.valid = true;
-			info.rrtype = *entry_type;
+			info.rrtype = entry_type;
 			info.expires_in = entry->time + entry->ttl - now;
-			info.no_labels = entry_labels(&key, *entry_type);
+			info.no_labels = entry_labels(&key, entry_type);
 		}
 		counter_iter++;
 		counter_kr_consistent += info.valid;

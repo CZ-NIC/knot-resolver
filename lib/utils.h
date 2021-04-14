@@ -201,7 +201,7 @@ static inline uint64_t kr_rand_bytes(unsigned int size)
 	 * Alternatively we could waste more rnd bytes, but that seemed worse. */
 	result = 0;
 	for (unsigned int i = 0; i < size; ++ i) {
-		result |= ((size_t)data[i]) << (i * 8);
+		result |= ((uint64_t)data[i]) << (i * 8);
 	}
 	return result;
 }
