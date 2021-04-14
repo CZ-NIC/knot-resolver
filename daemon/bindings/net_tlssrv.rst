@@ -91,7 +91,8 @@ by a trusted CA. This is done using function :c:func:`net.tls()`.
 
       > net.tls("/etc/knot-resolver/server-cert.pem", "/etc/knot-resolver/server-key.pem")
       > net.tls()  -- print configured paths
-      ("/etc/knot-resolver/server-cert.pem", "/etc/knot-resolver/server-key.pem")
+      [cert_file] => '/etc/knot-resolver/server-cert.pem'
+      [key_file] => '/etc/knot-resolver/server-key.pem'
 
    .. tip:: The certificate files aren't automatically reloaded on change. If
       you update the certificate files, e.g. using ACME, you have to either
