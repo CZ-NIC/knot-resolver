@@ -332,9 +332,10 @@ Actions :func:`policy.FORWARD`, :func:`policy.TLS_FORWARD` and :func:`policy.STU
           policy.STUB('192.0.2.1@5353'),
           {todname('1.168.192.in-addr.arpa')}))
 
-.. note:: Forwarding targets must support
+.. note:: By default, forwarding targets must support
    `EDNS <https://en.wikipedia.org/wiki/Extension_mechanisms_for_DNS>`_ and
    `0x20 randomization <https://tools.ietf.org/html/draft-vixie-dnsext-dns0x20-00>`_.
+   See example in `Replacing part of the DNS tree`_.
 
 
 .. _tls-forwarding:
@@ -538,7 +539,11 @@ The easiest work-around is to disable reading from cache for grafted domains.
         '2.0.192.in-addr.arpa.'  -- this applies to reverse DNS tree as well
         })
    -- Beware: the rule order is important, as policy.STUB is not a chain action.
-   policy.add(policy.suffix(policy.FLAGS({'NO_CACHE'}),   extraTrees))
+   -- Flags: for "dumb" targets disabling EDNS can help (below) as DNSSEC isn't
+   -- validated anyway; in some of those cases adding 'NO_0X20' can also help,
+   -- though it also lowers defenses against off-path attacks on communication
+   -- between the two servers.
+   policy.add(policy.suffix(policy.FLAGS({'NO_CACHE', 'NO_EDNS'}), extraTrees))
    policy.add(policy.suffix(policy.STUB({'2001:db8::1'}), extraTrees))
 
 Response policy zones
