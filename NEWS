@@ -9,6 +9,7 @@ Bugfixes
 --------
 - dnstap module: fix repeated configuration (!1168)
 - validator: fix SERVFAIL for some rare dynamic proofs (!1166)
+- fix SIGBUS on uncommon ARM machines (unaligned access; !1167, #426)
 
 
 Knot Resolver 5.3.1 (2021-03-31)

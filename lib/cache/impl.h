@@ -45,7 +45,10 @@ struct entry_h {
 	bool has_optout : 1;	/**< Only for packets; persisted DNSSEC_OPTOUT. */
 	uint8_t _pad;		/**< We need even alignment for data now. */
 	uint8_t data[];
-};
+/* Well, we don't really need packing or alignment changes,
+ * but due to LMDB the whole structure may not be stored at an aligned address,
+ * and we need compilers (for non-x86) to know it to avoid SIGBUS (test: UBSAN). */
+} __attribute__ ((packed,aligned(1)));
 struct entry_apex;
 
 /** Check basic consistency of entry_h for 'E' entries, not looking into ->data.
@@ -303,10 +306,13 @@ static inline int rdataset_dematerialized_size(const uint8_t *data, uint16_t *rd
 	assert(sizeof(count) == KR_CACHE_RR_COUNT_SIZE);
 	memcpy(&count, data, sizeof(count));
 	const uint8_t *rdata = data + sizeof(count);
-	if (rdataset_count)
-		*rdataset_count = count;
-	for (int i = 0; i < count; ++i)
-		rdata += knot_rdata_size(((knot_rdata_t *)rdata)->len);
+	if (rdataset_count) // memcpy is safe for unaligned case (on non-x86)
+		memcpy(rdataset_count, &count, sizeof(count));
+	for (int i = 0; i < count; ++i) {
+		__typeof__(((knot_rdata_t *)NULL)->len) len; // memcpy as above
+		memcpy(&len, rdata + offsetof(knot_rdata_t, len), sizeof(len));
+		rdata += knot_rdata_size(len);
+	}
 	return rdata - (data + sizeof(count));
 }
 
