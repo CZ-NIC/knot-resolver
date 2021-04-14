@@ -97,13 +97,6 @@ static bool is_authoritative(const knot_pkt_t *answer, struct kr_query *query)
 		}
 	}
 
-#ifndef STRICT_MODE
-	/* Last resort to work around broken auths, if the zone cut is at the QNAME. */
-	if (knot_dname_is_equal(query->zone_cut.name, knot_pkt_qname(answer))) {
-		return true;
-	}
-#endif
-
 	/* Some authoritative servers are hopelessly broken, allow lame answers in permissive mode. */
 	if (query->flags.PERMISSIVE) {
 		return true;
@@ -261,16 +254,12 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 	if (!ok) {
 		VERBOSE_MSG("<= authority: ns outside bailiwick\n");
 		qry->server_selection.error(qry, req->upstream.transport, KR_SELECTION_LAME_DELEGATION);
-#ifdef STRICT_MODE
-		return KR_STATE_FAIL;
-#else
 		/* Workaround: ignore out-of-bailiwick NSs for authoritative answers,
 		 * but fail for referrals. This is important to detect lame answers. */
 		if (knot_pkt_section(pkt, KNOT_ANSWER)->count == 0) {
 			state = KR_STATE_FAIL;
 		}
 		return state;
-#endif
 	}
 
 	/* Update zone cut name */
@@ -395,15 +384,12 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 		return result;
 	}
 
+	/* One could _CONSUME if pkt has AA flag set here, but many authoritative
+	 * servers are broken, so we employ several workarounds. */
+
 	const knot_pktsection_t *ns = knot_pkt_section(pkt, KNOT_AUTHORITY);
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 
-#ifdef STRICT_MODE
-	/* AA, terminate resolution chain. */
-	if (knot_wire_get_aa(pkt->wire)) {
-		return KR_STATE_CONSUME;
-	}
-#else
 	/* Work around servers sending back CNAME with different delegation and no AA. */
 	if (an->count > 0 && ns->count > 0) {
 		const knot_rrset_t *rr = knot_pkt_rr(an, 0);
@@ -418,7 +404,7 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 			return KR_STATE_CONSUME;
 		}
 	}
-#endif
+
 	/* Remember current bailiwick for NS processing. */
 	const knot_dname_t *current_zone_cut = qry->zone_cut.name;
 	bool ns_record_exists = false;
@@ -1014,12 +1000,6 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Check for packet processing errors first.
 	 * Note - we *MUST* check if it has at least a QUESTION,
 	 * otherwise it would crash on accessing QNAME. */
-#ifdef STRICT_MODE
-	if (pkt->parsed < pkt->size) {
-		VERBOSE_MSG("<= pkt contains excessive data\n");
-		return KR_STATE_FAIL;
-	} else
-#endif
 	if (pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
 		if (pkt->parsed == KNOT_WIRE_HEADER_SIZE && knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_FORMERR) {
 			/* This is a special case where we get valid header with FORMERR and nothing else.
@@ -1118,6 +1098,12 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (ret) {
 		VERBOSE_MSG("<= rcode: %s\n", rcode ? rcode->name : "??");
 		return ret;
+	}
+
+	if (pkt->parsed < pkt->size) {
+		VERBOSE_MSG("<= ignoring packet due to containing excessive data (%zu bytes)\n",
+				pkt->size - pkt->parsed);
+		return KR_STATE_FAIL;
 	}
 
 	int state;
