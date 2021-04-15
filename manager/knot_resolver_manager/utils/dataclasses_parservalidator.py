@@ -22,7 +22,10 @@ class ValidationException(Exception):
 
 
 def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> Any:
-    # pylint: disable=too-many-branches,too-many-locals
+    # Disabling these checks, because I think it's much more readable as a single function
+    # and it's not that large at this point. If it got larger, then we should definitely split
+    # it
+    # pylint: disable=too-many-branches,too-many-locals,too-many-statements
 
     # default values
     if obj is None and use_default:
@@ -49,20 +52,43 @@ def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> A
     elif obj is None:
         raise ValidationException(f"Unexpected None value for type {cls}")
 
-    # floats and ints
-    elif cls in (int, float):
-        # special case checking, that we won't cast a string or any other object into a number
-        if isinstance(obj, (int, float)):
-            return cls(obj)
+    # int
+    elif cls == int:
+        # we don't want to make an int out of anything else than other int
+        if isinstance(obj, int):
+            return int(obj)
         else:
-            raise ValidationException(f"Expected {cls}, found {type(obj)}")
-    
+            raise ValidationException(f"Expected int, found {type(obj)}")
+
     # str
     elif cls == str:
         # we are willing to cast any primitive value to string, but no compound values are allowed
-        if not isinstance(obj, (str, float, int)):
-            raise ValidationException(f"Expected str (or number that would be cast to string), but found type {type(obj)}")
-        return str(obj)
+        if isinstance(obj, (str, float, int)):
+            return str(obj)
+        elif isinstance(obj, bool):
+            raise ValidationException(
+                "Expected str, found bool. Be careful, that YAML parsers consider even"
+                ' "no" and "yes" as a bool. Search for the Norway Problem for more'
+                " details. And please use quotes explicitly."
+            )
+        else:
+            raise ValidationException(
+                f"Expected str (or number that would be cast to string), but found type {type(obj)}"
+            )
+
+    # bool
+    elif cls == bool:
+        if isinstance(obj, bool):
+            return obj
+        else:
+            raise ValidationException(f"Expected bool, found {type(obj)}")
+
+    # float
+    elif cls == float:
+        raise NotImplementedError(
+            "Floating point values are not supported in the parser validator."
+            " Please implement them and be careful with type coercions"
+        )
 
     # Literal[T]
     elif is_literal(cls):
