@@ -39,8 +39,18 @@ stages:
     - linux
     - amd64
 
+.meson_testlog: &meson_testlog
+  artifacts:
+    when: always
+    paths:
+        - build_ci*/meson-logs/testlog.junit.xml
+    reports:
+      junit:
+        - build_ci*/meson-logs/testlog.junit.xml
+
 .after_build: &after_build
   <<: *common
+  <<: *meson_testlog
   needs:
     - build
   before_script:
