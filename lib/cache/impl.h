@@ -341,7 +341,7 @@ enum {
 /** Materialize RRset + RRSIGs into ans->rrsets[id].
  * LATER(optim.): it's slightly wasteful that we allocate knot_rrset_t for the packet
  *
- * \return error code.  They are all bad conditions and "guarded" by assert.
+ * \return error code.  They are all bad conditions and "guarded" by kr_assume().
  */
 int entry2answer(struct answer *ans, int id,
 		const struct entry_h *eh, const uint8_t *eh_bound,
