@@ -5,6 +5,7 @@ net.ipv6 = false
 
 -- test for nsid.name() interface
 local function test_nsid_name()
+	same(1, 2, 'just fail')
 	if nsid then
 		modules.unload('nsid')
 	end
