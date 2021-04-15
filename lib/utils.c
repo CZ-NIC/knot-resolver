@@ -57,7 +57,13 @@ void kr_fail(bool is_fatal, const char *expr, const char *func, const char *file
 	const uint64_t now = kr_now();
 	if (now < limited_until)
 		return;
-	limited_until = now + kr_dbg_assumption_fork; // works even for negative values
+	if (kr_dbg_assumption_fork > 0) {
+		// Add jitter +- 25%; in other words: 75% + uniform(0,50%).
+		// Motivation: if a persistent problem starts happening, desynchronize
+		// coredumps from different instances as they're not cheap.
+		limited_until = now + kr_dbg_assumption_fork * 3 / 4
+			+ kr_dbg_assumption_fork * kr_rand_bytes(1) / 256 / 2;
+	}
 	if (fork() == 0)
 		abort();
 }
