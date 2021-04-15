@@ -50,7 +50,6 @@ stages:
 
 .after_build: &after_build
   <<: *common
-  <<: *meson_testlog
   needs:
     - build
   before_script:
@@ -70,6 +69,7 @@ stages:
 # build {{{
 .build: &build
   <<: *common
+  <<: *meson_testlog
   stage: build
   artifacts:
     when: always
