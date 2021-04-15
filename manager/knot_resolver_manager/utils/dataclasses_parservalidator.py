@@ -49,12 +49,20 @@ def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> A
     elif obj is None:
         raise ValidationException(f"Unexpected None value for type {cls}")
 
-    # primitive types
-    if cls in (int, float, str):
-        try:
+    # floats and ints
+    elif cls in (int, float):
+        # special case checking, that we won't cast a string or any other object into a number
+        if isinstance(obj, (int, float)):
             return cls(obj)
-        except ValueError as e:
-            raise ValidationException(f"Failed to parse primitive type {cls}, value {obj}", e)
+        else:
+            raise ValidationException(f"Expected {cls}, found {type(obj)}")
+    
+    # str
+    elif cls == str:
+        # we are willing to cast any primitive value to string, but no compound values are allowed
+        if not isinstance(obj, (str, float, int)):
+            raise ValidationException(f"Expected str (or number that would be cast to string), but found type {type(obj)}")
+        return str(obj)
 
     # Literal[T]
     elif is_literal(cls):
