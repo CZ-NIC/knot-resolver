@@ -9,6 +9,6 @@ from .types import IPV6_PREFIX_96
 class Dns64Config(DataclassParserValidatorMixin):
     prefix: str = "64:ff9b::"
 
-    def validate(self):
+    def _validate(self):
         if not bool(IPV6_PREFIX_96.match(self.prefix)):
             raise DataValidationError("'dns64.prefix' must be valid IPv6 /96 prefix")

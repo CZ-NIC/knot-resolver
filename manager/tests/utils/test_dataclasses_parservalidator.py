@@ -10,7 +10,7 @@ def test_parsing_primitive():
         i: int
         s: str
 
-        def validate(self):
+        def _validate(self):
             pass
 
     yaml = """i: 5
@@ -28,14 +28,14 @@ def test_parsing_nested():
     class Lower(DataclassParserValidatorMixin):
         i: int
 
-        def validate(self):
+        def _validate(self):
             pass
 
     @dataclass
     class Upper(DataclassParserValidatorMixin):
         l: Lower
 
-        def validate(self):
+        def _validate(self):
             pass
 
     yaml = """l:
@@ -53,7 +53,7 @@ def test_simple_compount_types():
         t: Tuple[str, int]
         o: Optional[int]
 
-        def validate(self):
+        def _validate(self):
             pass
 
     yaml = """l:
@@ -82,7 +82,7 @@ def test_nested_compount_types():
     class TestClass(DataclassParserValidatorMixin):
         o: Optional[Dict[str, str]]
 
-        def validate(self):
+        def _validate(self):
             pass
 
     yaml = """o:
@@ -99,7 +99,7 @@ def test_nested_compount_types2():
         i: int
         o: Optional[Dict[str, str]]
 
-        def validate(self):
+        def _validate(self):
             pass
 
     yaml = "i: 5"
@@ -115,7 +115,7 @@ def test_real_failing_dummy_confdata():
         num_workers: int = 1
         lua_config: Optional[str] = None
 
-        def validate(self):
+        def _validate(self):
             if self.num_workers < 0:
                 raise Exception("Number of workers must be non-negative")
 

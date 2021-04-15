@@ -27,6 +27,6 @@ class ServerConfig(DataclassParserValidatorMixin):
                 # TODO: do better logging
                 print("cannot get number of CPUs")
 
-    def validate(self):
+    def _validate(self):
         if not 0 < self.instances_num <= 256:
             raise DataValidationError("number of kresd instances must be in range 1..256")

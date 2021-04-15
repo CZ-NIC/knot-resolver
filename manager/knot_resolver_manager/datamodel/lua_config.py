@@ -14,5 +14,5 @@ class LuaConfig(DataclassParserValidatorMixin):
         if self.script_list is not None:
             self.script = "\n".join(self.script_list)
 
-    def validate(self):
+    def _validate(self):
         assert self.script_list is not None or self.script is not None

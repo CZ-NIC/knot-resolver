@@ -27,16 +27,5 @@ class KresConfig(DataclassParserValidatorMixin):
     logging: LoggingConfig = LoggingConfig()
     lua: LuaConfig = LuaConfig()
 
-    def validate(self):
-        self.server.validate()
-        self.options.validate()
-        if self.network is not None:
-            self.network.validate()
-        self.static_hints.validate()
-        if self.dnssec is not None:
-            self.dnssec.validate()
-        self.cache.validate()
-        if self.dns64 is not None:
-            self.dns64.validate()
-        self.logging.validate()
-        self.lua.validate()
+    def _validate(self):
+        pass
