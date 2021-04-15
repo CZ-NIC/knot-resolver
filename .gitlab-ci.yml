@@ -302,6 +302,10 @@ pytests:
     paths:
       - build_ci*/meson-logs/testlog*.txt
       - tests/pytests/*.html
+      - tests/pytests/*.junit.xml
+    artifacts:
+      reports: # Can't have multiple junit XMLs?
+        junit: tests/pytests/pytests.parallel.junit.xml
   script:
     - ${MESON_TEST} --suite pytests
 # }}}
