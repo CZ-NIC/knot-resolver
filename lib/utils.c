@@ -39,7 +39,7 @@
 /* Logging & debugging */
 bool kr_verbose_status = false;
 bool kr_dbg_assumption_abort = DBG_ASSUMPTION_ABORT;
-bool kr_dbg_assumption_fork = DBG_ASSUMPTION_FORK;
+int kr_dbg_assumption_fork = DBG_ASSUMPTION_FORK;
 
 void kr_fail(bool is_fatal, const char *expr, const char *func, const char *file, int line)
 {
@@ -50,8 +50,22 @@ void kr_fail(bool is_fatal, const char *expr, const char *func, const char *file
 
 	if (is_fatal || (kr_dbg_assumption_abort && !kr_dbg_assumption_fork))
 		abort();
-	else if (kr_dbg_assumption_abort && kr_dbg_assumption_fork)
-		fork() == 0 ? abort() : (void)0;
+	else if (!kr_dbg_assumption_abort || !kr_dbg_assumption_fork)
+		return;
+	// We want to fork and abort the child, unless rate-limited.
+	static uint64_t limited_until = 0;
+	const uint64_t now = kr_now();
+	if (now < limited_until)
+		return;
+	if (kr_dbg_assumption_fork > 0) {
+		// Add jitter +- 25%; in other words: 75% + uniform(0,50%).
+		// Motivation: if a persistent problem starts happening, desynchronize
+		// coredumps from different instances as they're not cheap.
+		limited_until = now + kr_dbg_assumption_fork * 3 / 4
+			+ kr_dbg_assumption_fork * kr_rand_bytes(1) / 256 / 2;
+	}
+	if (fork() == 0)
+		abort();
 }
 
 /*
