@@ -71,7 +71,8 @@ KR_EXPORT extern bool kr_dbg_assumption_abort;
  * non-fatal error in the parent process.
  *
  * == 0 (false): no forking
- * > 0: minimum delay between forks (in milliseconds, each instance separately)
+ * > 0: minimum delay between forks
+ *      (in milliseconds, each instance separately, randomized +-25%)
  * < 0: no rate-limiting (not recommended)
  */
 KR_EXPORT extern int kr_dbg_assumption_fork;
