@@ -69,6 +69,8 @@ stages:
       - build_dist/meson-dist/*.tar.xz
     reports:
       junit: build_ci*/meson-logs/testlog.junit.xml
+  after_script:
+    - ci/fix-meson-junit.sh build_ci*/meson-logs/testlog.junit.xml
 
 archive:
   <<: *build
