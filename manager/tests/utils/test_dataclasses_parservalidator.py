@@ -9,20 +9,18 @@ def test_parsing_primitive():
     class TestClass(DataclassParserValidatorMixin):
         i: int
         s: str
-        f: float
 
         def validate(self):
             pass
 
     yaml = """i: 5
 s: "test"
-f: 3.14"""
+"""
 
     obj = TestClass.from_yaml(yaml)
 
     assert obj.i == 5
     assert obj.s == "test"
-    assert obj.f == 3.14
 
 
 def test_parsing_nested():
