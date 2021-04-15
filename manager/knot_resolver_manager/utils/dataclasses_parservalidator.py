@@ -148,7 +148,7 @@ _T = TypeVar("_T", bound="DataclassParserValidatorMixin")
 
 
 class DataclassParserValidatorMixin:
-    def validate_recursive(self) -> None:
+    def validate(self) -> None:
         for field_name in dir(self):
             # skip internal fields
             if field_name.startswith("_"):
@@ -160,23 +160,23 @@ class DataclassParserValidatorMixin:
                     raise ValidationException(
                         f"Nested dataclass in the field {field_name} does not include the ParserValidatorMixin"
                     )
-                field.validate_recursive()
+                field.validate()
 
-        self.validate()
+        self._validate()
 
-    def validate(self) -> None:
+    def _validate(self) -> None:
         raise NotImplementedError(f"Validation function is not implemented in class {type(self).__name__}")
 
     @classmethod
     def from_yaml(cls: Type[_T], text: str, default: _T = ..., use_default: bool = False) -> _T:
         data = yaml.safe_load(text)
         config: _T = _from_dictlike_obj(cls, data, default, use_default)
-        config.validate_recursive()
+        config.validate()
         return config
 
     @classmethod
     def from_json(cls: Type[_T], text: str, default: _T = ..., use_default: bool = False) -> _T:
         data = json.loads(text)
         config: _T = _from_dictlike_obj(cls, data, default, use_default)
-        config.validate_recursive()
+        config.validate()
         return config

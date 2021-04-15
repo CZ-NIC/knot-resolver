@@ -4,5 +4,5 @@ from knot_resolver_manager.utils.dataclasses_parservalidator import DataclassPar
 
 @dataclass
 class NetworkConfig(DataclassParserValidatorMixin):
-    def validate(self):
+    def _validate(self):
         pass
