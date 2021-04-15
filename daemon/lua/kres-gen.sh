@@ -133,7 +133,7 @@ EOF
 printf "
 kr_layer_t kr_layer_t_static;
 _Bool kr_dbg_assumption_abort;
-_Bool kr_dbg_assumption_fork;
+int kr_dbg_assumption_fork;
 "
 
 printf "
