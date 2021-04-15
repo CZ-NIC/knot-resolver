@@ -39,15 +39,6 @@ stages:
     - linux
     - amd64
 
-.meson_testlog: &meson_testlog
-  artifacts:
-    when: always
-    paths:
-        - build_ci*/meson-logs/testlog.junit.xml
-    reports:
-      junit:
-        - build_ci*/meson-logs/testlog.junit.xml
-
 .after_build: &after_build
   <<: *common
   needs:
@@ -99,6 +90,9 @@ build:
     - ninja -C build_ci
     - ninja -C build_ci install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
+  artifacts:
+    reports:
+      junit: build_ci/meson-logs/testlog.junit.xml
 
 build-asan:
   <<: *build
@@ -110,6 +104,9 @@ build-asan:
       # TODO _leaks: not sure what exactly is wrong in leak detection on config tests
       # TODO skip_asan: all three of these disappear locally when using gcc 9.1 (except some leaks)
     - ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite skip_asan --no-suite snowflake
+  artifacts:
+    reports:
+      junit: build_ci_asan/meson-logs/testlog.junit.xml
 
 build:macOS:
   <<: *nodep
