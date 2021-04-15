@@ -126,6 +126,10 @@ def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> A
         anot = cls.__dict__.get("__annotations__", {})
         kwargs = {}
         for name, python_type in anot.items():
+            # skip internal fields
+            if name.startswith("_"):
+                continue
+
             value = obj[name] if name in obj else None
             use_default = hasattr(cls, name)
             default = getattr(cls, name, ...)
