@@ -109,6 +109,7 @@ def test_slow_lorris(kresd_sock, query_before):
     end_time = time.time() + utils.MAX_TIMEOUT
 
     with utils.expect_kresd_close():
+        assert(0)
         for i in range(len(buff)):
             b = buff[i:i+1]
             kresd_sock.send(b)
