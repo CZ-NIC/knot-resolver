@@ -60,7 +60,6 @@ stages:
 # build {{{
 .build: &build
   <<: *common
-  <<: *meson_testlog
   stage: build
   artifacts:
     when: always
