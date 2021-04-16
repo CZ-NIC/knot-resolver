@@ -49,9 +49,13 @@ stages:
     - rm build_ci*/meson-logs/testlog*.txt  # start with clean testlog
   artifacts:
     when: always
+    # The deckard-specific parts are a little messy, but they're hard to separate in YAML.
     paths:
       - build_ci*/meson-logs/testlog*.txt
       - tmpdeckard*
+      - build_ci*/meson-logs/integration.deckard.junit.xml
+    reports:
+      junit: build_ci*/meson-logs/integration.deckard.junit.xml
 
 .nodep: &nodep
   <<: *common
