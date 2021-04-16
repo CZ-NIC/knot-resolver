@@ -49,9 +49,13 @@ stages:
     - rm build_ci*/meson-logs/testlog*.txt  # start with clean testlog
   artifacts:
     when: always
+    # The deckard-specific parts are a little messy, but they're hard to separate in YAML.
     paths:
       - build_ci*/meson-logs/testlog*.txt
       - tmpdeckard*
+      - build_ci*/meson-logs/integration.deckard.junit.xml
+    reports:
+      junit: build_ci*/meson-logs/integration.deckard.junit.xml
 
 .nodep: &nodep
   <<: *common
@@ -67,6 +71,10 @@ stages:
       - .local
       - build_ci*
       - build_dist/meson-dist/*.tar.xz
+    reports:
+      junit: build_ci*/meson-logs/testlog.junit.xml
+  after_script:
+    - ci/fix-meson-junit.sh build_ci*/meson-logs/testlog.junit.xml
 
 archive:
   <<: *build
@@ -296,6 +304,9 @@ pytests:
     paths:
       - build_ci*/meson-logs/testlog*.txt
       - tests/pytests/*.html
+      - tests/pytests/*.junit.xml
+    reports: # Can't have multiple junit XMLs?
+      junit: tests/pytests/pytests.parallel.junit.xml
   script:
     - ${MESON_TEST} --suite pytests
 # }}}
