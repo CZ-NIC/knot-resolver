@@ -8,6 +8,7 @@
 
 #include <stdbool.h>
 #include <uv.h>
+#include "lib/defines.h"
 
 struct qr_task;
 struct worker_ctx;
@@ -104,6 +105,7 @@ void session_http_set_server_ctx(struct session *session, struct http_ctx *ctx);
 #endif
 
 /** Get pointer to underlying libuv handle for IO operations. */
+KR_EXPORT
 uv_handle_t *session_get_handle(struct session *session);
 struct session *session_get(uv_handle_t *h);
 
