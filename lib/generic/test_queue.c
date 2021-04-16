@@ -11,7 +11,6 @@ typedef queue_it_t(int) queue_int_it_t;
 
 static void test_int(void **state_)
 {
-	assert_int_equal(1, 2);
 	queue_int_t q;
 	queue_init(q);
 
