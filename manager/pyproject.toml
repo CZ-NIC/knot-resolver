@@ -103,6 +103,7 @@ disable= [
     "bad-continuation", # conflicts with black
     "consider-using-in", # pyright can't see through in expressions,
     "too-many-return-statements", # would prevent us from using recursive tree traversals
+    "logging-fstring-interpolation", # see https://github.com/PyCQA/pylint/issues/1788
 ]
 
 [tool.pylint.SIMILARITIES]

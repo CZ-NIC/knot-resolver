@@ -3,6 +3,7 @@ from typing import Iterable, List
 
 from knot_resolver_manager import compat
 from knot_resolver_manager.kresd_controller.base import BaseKresdController
+from knot_resolver_manager.utils.async_utils import call
 
 from . import dbus_api as systemd
 
@@ -24,11 +25,17 @@ class SystemdKresdController(BaseKresdController):
 
     @staticmethod
     async def is_controller_available() -> bool:
+        # try to run systemctl (should be quite fast)
+        ret = await call("systemctl status", shell=True, discard_output=True)
+        if ret != 0:
+            return False
+
+        # if that passes, try to list units
         try:
             _ = await compat.asyncio.to_thread(systemd.list_units)
             return True
         except BaseException:  # we want every possible exception to be caught
-            logger.warning("systemd DBus API backend failed to initialize", exc_info=True)
+            logger.warning("systemd DBus API backend failed to initialize")
             return False
 
     @staticmethod

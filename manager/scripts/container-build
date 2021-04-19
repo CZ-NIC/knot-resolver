@@ -17,5 +17,7 @@ fi
 
 # build all configured containers
 for tag in $containers; do
+    echo -e "Building ${yellow}knot-manager:${tag}${reset}${bright_black}"
     podman build -t "knot-manager:$tag" -f "containers/$tag/Containerfile" .
+    echo -e "${reset}Build finished"
 done

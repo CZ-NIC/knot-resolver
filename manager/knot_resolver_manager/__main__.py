@@ -1,5 +1,7 @@
+import logging
 import sys
 from pathlib import Path
+from time import time
 from typing import Optional
 
 import click
@@ -12,6 +14,9 @@ from .utils import ignore_exceptions
 # when changing this, change the help message in main()
 _SOCKET_PATH = "/tmp/manager.sock"
 _MANAGER = "kres_manager"
+
+
+logger = logging.getLogger(__name__)
 
 
 async def index(_request: web.Request) -> web.Response:
@@ -40,6 +45,7 @@ def main(listen: Optional[str], config: Optional[str]):
 
     [listen] ... numeric port or a path for a Unix domain socket, default is \"/tmp/manager.sock\"
     """
+    start_time = time()
 
     app = web.Application()
 
@@ -52,6 +58,8 @@ def main(listen: Optional[str], config: Optional[str]):
         if config is not None:
             # TODO Use config loaded from the file system
             pass
+        end_time = time()
+        logger.info(f"Manager fully initialized after {end_time - start_time} seconds")
 
     app.on_startup.append(init_manager)
 

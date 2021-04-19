@@ -1,4 +1,4 @@
-image = "knot-manager:debian"
+images = ["knot-manager:debian", "knot-manager:debian-supervisord"]
 cmd = ["/test/run"]
 
 [mount]

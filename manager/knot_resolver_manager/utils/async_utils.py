@@ -1,3 +1,4 @@
+import asyncio
 import os
 import time
 from asyncio import create_subprocess_exec, create_subprocess_shell
@@ -7,20 +8,27 @@ from typing import List, Union
 from knot_resolver_manager.compat.asyncio import to_thread
 
 
-async def call(cmd: Union[str, bytes, List[str], List[bytes]], shell: bool = False) -> int:
+async def call(
+    cmd: Union[str, bytes, List[str], List[bytes]], shell: bool = False, discard_output: bool = False
+) -> int:
     """
     custom async alternative to subprocess.call()
     """
+    kwargs = {}
+    if discard_output:
+        kwargs["stdout"] = asyncio.subprocess.DEVNULL
+        kwargs["stderr"] = asyncio.subprocess.DEVNULL
+
     if shell:
         if isinstance(cmd, list):
             raise RuntimeError("can't use list of arguments with shell=True")
-        proc = await create_subprocess_shell(cmd)
+        proc = await create_subprocess_shell(cmd, **kwargs)
     else:
         if not isinstance(cmd, list):
             raise RuntimeError(
                 "Please use list of arguments, not a single string. It will prevent ambiguity when parsing"
             )
-        proc = await create_subprocess_exec(*cmd)
+        proc = await create_subprocess_exec(*cmd, **kwargs)
 
     return await proc.wait()
 
