@@ -1,0 +1,11 @@
+[supervisord]
+unix_http_server = {{ config.unix_http_server }}
+
+{% for id in config.instances -%}
+
+[program:{{ id }}]
+directory=/var/lib/knot-resolver
+command=/usr/sbin/kresd -c /usr/lib/knot-resolver/distro-preconfig.lua -c /etc/knot-resolver/kresd.conf -n
+environment=SYSTEMD_INSTANCE={{ id }}
+
+{% endfor %}

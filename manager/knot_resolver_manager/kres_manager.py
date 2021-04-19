@@ -23,6 +23,7 @@ class KresManager:
 
     async def _async_init(self):
         self._controller = await get_best_controller_implementation()
+        await self._controller.initialize_controller()
         await self.load_system_state()
 
     def __init__(self):

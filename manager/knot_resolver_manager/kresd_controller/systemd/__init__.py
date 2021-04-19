@@ -41,3 +41,7 @@ class SystemdKresdController(BaseKresdController):
                 iden = u.replace("kresd@", "").replace(".service", "")
                 res.append(SystemdKresdController(kresd_id=iden))
         return res
+
+    @staticmethod
+    async def initialize_controller() -> None:
+        pass

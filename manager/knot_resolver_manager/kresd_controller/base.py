@@ -32,3 +32,7 @@ class BaseKresdController:
     @staticmethod
     async def get_all_running_instances() -> Iterable["BaseKresdController"]:
         raise NotImplementedError()
+
+    @staticmethod
+    async def initialize_controller() -> None:
+        raise NotImplementedError()
