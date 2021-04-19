@@ -7,12 +7,19 @@
  */
 
 #include "lib/module.h"
+#include "modules/dnstap/dnstap.pb-c.h"
+
+#include "contrib/cleanup.h"
+#include "daemon/session.h"
+#include "daemon/worker.h"
 #include "lib/layer.h"
 #include "lib/resolve.h"
-#include "modules/dnstap/dnstap.pb-c.h"
+
 #include <ccan/json/json.h>
 #include <fstrm.h>
-#include "contrib/cleanup.h"
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <uv.h>
 
 #define DEBUG_MSG(fmt, ...) kr_log_verbose("[dnstap] " fmt, ##__VA_ARGS__);
 #define CFG_SOCK_PATH "socket_path"
@@ -21,6 +28,7 @@
 #define CFG_LOG_CLIENT_PKT "client"
 #define CFG_LOG_QR_PKT "log_queries"
 #define CFG_LOG_RESP_PKT "log_responses"
+#define CFG_LOG_TCP_RTT "log_tcp_rtt"
 #define DEFAULT_SOCK_PATH "/tmp/dnstap.sock"
 #define DNSTAP_CONTENT_TYPE "protobuf:dnstap.Dnstap"
 #define DNSTAP_INITIAL_BUF_SIZE         256
@@ -45,6 +53,7 @@ struct dnstap_data {
 	size_t version_len;
 	bool log_qr_pkt;
 	bool log_resp_pkt;
+	bool log_tcp_rtt;
 	struct fstrm_iothr *iothread;
 	struct fstrm_iothr_queue *ioq;
 };
@@ -93,6 +102,31 @@ static void set_address(const struct sockaddr *sockaddr,
 	*has_port = true;
 }
 
+#ifndef HAS_TCP_INFO
+	/* TCP RTT: not portable; not sure where else it might work. */
+	#define HAS_TCP_INFO __linux__
+#endif
+#if HAS_TCP_INFO
+/** Fill a tcp_info or return kr_error(). */
+static int get_tcp_info(const struct kr_request *req, struct tcp_info *info)
+{
+	assert(req && info);
+	if (!req->qsource.dst_addr || !req->qsource.flags.tcp) /* not TCP-based */
+		return -abs(ENOENT);
+	/* First obtain the file-descriptor. */
+	uv_handle_t *h = session_get_handle(worker_request_get_source_session(req));
+	uv_os_fd_t fd;
+	int ret = uv_fileno(h, &fd);
+	if (ret)
+		return kr_error(ret);
+
+	socklen_t tcp_info_length = sizeof(*info);
+	if (getsockopt(fd, SOL_TCP, TCP_INFO, info, &tcp_info_length))
+		return kr_error(errno);
+	return kr_ok();
+}
+#endif
+
 /* dnstap_log prepares dnstap message and sends it to fstrm
  *
  * Return codes are kr_error(E*) and unused for now.
@@ -115,6 +149,9 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 
 	/* Create dnstap message */
 	Dnstap__Message m;
+	Dnstap__Dnstap dnstap = DNSTAP__DNSTAP__INIT;
+	dnstap.type = DNSTAP__DNSTAP__TYPE__MESSAGE;
+	dnstap.message = &m;
 
 	memset(&m, 0, sizeof(m));
 
@@ -157,6 +194,7 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 		}
 	}
 
+	char dnstap_extra_buf[24];
 	if (phase == CLIENT_QUERY_PHASE) {
 		m.type = DNSTAP__MESSAGE__TYPE__CLIENT_QUERY;
 
@@ -178,6 +216,20 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 			m.query_time_nsec = first->timestamp.tv_usec * 1000;
 			m.has_query_time_nsec = true;
 		}
+#if HAS_TCP_INFO
+		struct tcp_info ti = { 0 };
+		if (dnstap_dt->log_tcp_rtt && get_tcp_info(req, &ti) == kr_ok()) {
+			int len = snprintf(dnstap_extra_buf, sizeof(dnstap_extra_buf),
+						"rtt=%u\n", (unsigned)ti.tcpi_rtt);
+			if (len < sizeof(dnstap_extra_buf)) {
+				dnstap.extra.data = (uint8_t *)dnstap_extra_buf;
+				dnstap.extra.len = len;
+				dnstap.has_extra = true;
+			}
+		}
+#else
+		(void)dnstap_extra_buf;
+#endif
 	} else if (phase == CLIENT_RESPONSE_PHASE) {
 		m.type = DNSTAP__MESSAGE__TYPE__CLIENT_RESPONSE;
 
@@ -200,11 +252,6 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 		m.response_time_nsec = now.tv_usec * 1000;
 		m.has_response_time_nsec = true;
 	}
-
-	/* Create a dnstap Message */
-	Dnstap__Dnstap dnstap = DNSTAP__DNSTAP__INIT;
-	dnstap.type = DNSTAP__DNSTAP__TYPE__MESSAGE;
-	dnstap.message = &m;
 
 	if (dnstap_dt->identity) {
 		dnstap.identity.data = (uint8_t*)dnstap_dt->identity;
@@ -414,9 +461,17 @@ int dnstap_config(struct kr_module *module, const char *conf) {
 			} else {
 				data->log_qr_pkt = false;
 			}
+
+			subnode = json_find_member(node, CFG_LOG_TCP_RTT);
+			if (subnode) {
+				data->log_tcp_rtt = find_bool(subnode);
+			} else {
+				data->log_tcp_rtt = false;
+			}
 		} else {
 			data->log_qr_pkt = false;
 			data->log_resp_pkt = false;
+			data->log_tcp_rtt = false;
 		}
 
 		/* clean up json, we don't need it no more */

@@ -2056,14 +2056,11 @@ struct request_ctx *worker_task_get_request(struct qr_task *task)
 	return task->ctx;
 }
 
-struct session *worker_request_get_source_session(struct request_ctx *ctx)
+struct session *worker_request_get_source_session(const struct kr_request *req)
 {
-	return ctx->source.session;
-}
-
-void worker_request_set_source_session(struct request_ctx *ctx, struct session *session)
-{
-	ctx->source.session = session;
+	static_assert(offsetof(struct request_ctx, req) == 0,
+			"Bad struct request_ctx definition.");
+	return ((struct request_ctx *)req)->source.session;
 }
 
 uint16_t worker_task_pkt_get_msgid(struct qr_task *task)

@@ -107,9 +107,8 @@ knot_pkt_t *worker_task_get_pktbuf(const struct qr_task *task);
 
 struct request_ctx *worker_task_get_request(struct qr_task *task);
 
-struct session *worker_request_get_source_session(struct request_ctx *);
-
-void worker_request_set_source_session(struct request_ctx *, struct session *session);
+/** Note: source session is NULL in case the request hasn't come over network. */
+KR_EXPORT struct session *worker_request_get_source_session(const struct kr_request *req);
 
 uint16_t worker_task_pkt_get_msgid(struct qr_task *task);
 void worker_task_pkt_set_msgid(struct qr_task *task, uint16_t msgid);
