@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class SupervisordKresdController(BaseKresdController):
-    _config = SupervisordConfig()
+    _config = SupervisordConfig([])
 
     async def is_running(self) -> bool:
         return self.id in SupervisordKresdController._config.instances

@@ -1,5 +1,19 @@
 [supervisord]
-unix_http_server = {{ config.unix_http_server }}
+pidfile = {{ config.pid_file }}
+directory = /tmp
+nodaemon = false
+logfile = /tmp/supervisord.log
+logfile_maxbytes = 50MB
+user=root
+
+[unix_http_server]
+file = {{ config.unix_http_server }}
+
+[supervisorctl]
+serverurl = unix://{{ config.unix_http_server }}
+
+[rpcinterface:supervisor]
+supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
 
 {% for id in config.instances -%}
 

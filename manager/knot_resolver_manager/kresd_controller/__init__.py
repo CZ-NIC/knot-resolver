@@ -2,10 +2,11 @@ import asyncio
 from typing import Type
 
 from knot_resolver_manager.kresd_controller.base import BaseKresdController
+from knot_resolver_manager.kresd_controller.supervisord import SupervisordKresdController
 from knot_resolver_manager.kresd_controller.systemd import SystemdKresdController
 
 # In this tuple, every supported controller should be listed. In the order of preference (preferred first)
-_registered_controllers = (SystemdKresdController,)
+_registered_controllers = (SystemdKresdController, SupervisordKresdController)
 
 
 async def get_best_controller_implementation() -> Type[BaseKresdController]:
