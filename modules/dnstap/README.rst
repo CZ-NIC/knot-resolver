@@ -19,6 +19,12 @@ Tunables:
 * ``client.log_queries``: if ``true`` queries from downstream in wire format will be logged
 * ``client.log_responses``: if ``true`` responses to downstream in wire format will be logged
 
+.. Very non-standard and it seems unlikely that others want to collect the RTT.
+.. * ``client.log_tcp_rtt``: if ``true`` and on Linux,
+        add "extra" field with "rtt=12345\n",
+        signifying kernel's current estimate of RTT micro-seconds for the non-UDP connection
+        (alongside every arrived DNS message).
+
 .. code-block:: lua
 
     modules = {
