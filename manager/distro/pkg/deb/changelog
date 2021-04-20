@@ -1,0 +1,5 @@
+knot-resolver-manager ({{ version }}-cznic.{{ release }}) unstable; urgency=medium
+
+  * new upstream version {{ version }}
+
+ -- Jakub Ružička <jakub.ruzicka@nic.cz>  Tue, 20 Apr 2020 16:20:00 +0100
