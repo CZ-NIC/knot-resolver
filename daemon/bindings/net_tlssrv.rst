@@ -68,8 +68,8 @@ additional considerations for TLS 1.2 required by HTTP/2 are not implemented
 
 .. _dot-doh-config-options:
 
-Configuration options
-^^^^^^^^^^^^^^^^^^^^^
+Configuration options for DoT and DoH
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. note:: These settings affect both DNS-over-TLS and DNS-over-HTTPS (except
    the legacy implementation).
@@ -138,3 +138,26 @@ by a trusted CA. This is done using function :c:func:`net.tls()`.
    answer will have size of a multiple of 64 (64, 128, 192, ...).  If
    set to `false` (or a number < 2), it will disable padding entirely.
 
+Configuration options for DoH
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. function:: net.doh_headers([string or table of strings])
+
+   Selects the headers to be exposed. These headers and their values are
+   available in ``request.qsource.headers``. Comparison
+   is case-insensitive and pseudo-headers are supported as well.
+
+   The following snippet can be used in the lua module to access headers
+   ``:method`` and ``user-agent``:
+
+   .. code-block:: lua
+
+      net.doh_headers({':method', 'user-agent'})
+
+      ...
+
+      for i = 1, tonumber(req.qsource.headers.len) do
+        local name = ffi.string(req.qsource.headers.at[i - 1].name)
+        local value = ffi.string(req.qsource.headers.at[i - 1].value)
+        print(name, value)
+      end
