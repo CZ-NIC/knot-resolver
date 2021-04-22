@@ -1,14 +1,10 @@
 #!/bin/bash
 # create dev archive from current repo HEAD
-set -o errexit -o nounset
 
-cd "$(dirname ${0})/.."
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/_env.sh
 
-if ! command -v poetry &> /dev/null
-then
-    echo "poetry is required to create archive: pip install poetry"
-    exit 1
-fi
 
 set -o xtrace
 
