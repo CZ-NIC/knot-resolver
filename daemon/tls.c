@@ -1058,6 +1058,9 @@ struct tls_client_ctx *tls_client_ctx_new(tls_client_param_t *entry,
 #ifdef GNUTLS_ENABLE_FALSE_START
 			     | GNUTLS_ENABLE_FALSE_START
 #endif
+#if GNUTLS_VERSION_NUMBER >= 0x030605
+			     | GNUTLS_AUTO_REAUTH | GNUTLS_POST_HANDSHAKE_AUTH
+#endif
 	;
 	int ret = gnutls_init(&ctx->c.tls_session,  flags);
 	if (ret != GNUTLS_E_SUCCESS) {
