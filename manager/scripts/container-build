@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# fail early
-set -e
-
 # ensure consistent behaviour
 src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/_env.sh

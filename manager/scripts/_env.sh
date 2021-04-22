@@ -1,5 +1,5 @@
 # fail on errors
-set -e
+set -o errexit -o nounset
 
 # define color codes
 red="\033[0;31m"
