@@ -1,0 +1,24 @@
+Source: knot-resolver-manager
+Section: python
+Priority: optional
+Maintainer: Jakub Ružička <jakub.ruzicka@nic.cz>
+Build-Depends:
+ debhelper,
+ dh-python,
+ python3,
+Homepage: https://gitlab.nic.cz/knot/knot-resolver-manager
+
+Package: python3-knot-resolver-manager
+Architecture: all
+Depends:
+ python3-aiohttp,
+ python3-click,
+ python3-gi,
+ python3-pydbus,
+ python3-yaml,
+ ${misc:Depends},
+ ${python3:Depends},
+Recommends:
+ knot-resolver
+Provides: knot-resolver-manager
+Description: Knot Resolver Manager
