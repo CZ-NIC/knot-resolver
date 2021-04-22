@@ -23,7 +23,7 @@ pyenv install 3.8.7
 pyenv install 3.9.1
 poetry env use $(pyenv which python)
 poetry install
-yarn install # or "npm install"
+npm install # or "yarn install"
 ```
 
 With this environment, **everything else should just work**. You can run the same checks the CI runs, all commands listed bellow should pass.

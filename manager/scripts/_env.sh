@@ -1,5 +1,5 @@
 # fail on errors
-set -o errexit -o nounset
+set -o errexit
 
 # define color codes
 red="\033[0;31m"
@@ -17,7 +17,7 @@ fi
 cd $gitroot
 
 # ensure consistent environment with virtualenv
-if test -z "$VIRTUAL_ENV"; then
+if test -z "$VIRTUAL_ENV" -a "$CI" != "true"; then
 	echo -e "${yellow}You are NOT running the script within the project's virtual environment.${reset}"
 	echo -e "Do you want to continue regardless? [yN]"
 	read cont
@@ -26,3 +26,9 @@ if test -z "$VIRTUAL_ENV"; then
 		exit 1
 	fi
 fi
+
+# update PATH with node_modules
+PATH="$PATH:$gitroot/node_modules/.bin"
+
+# fail even on unbound variables
+set -o nounset
