@@ -1,0 +1,4 @@
+[project]
+name = "knot-resolver-manager"
+# needed for make-archive
+make_archive_script = "scripts/make-dev-archive.sh"
