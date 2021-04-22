@@ -52,7 +52,6 @@ RUN apt-get update \
   && echo "deb https://deb.nodesource.com/$NODE_VERSION $(lsb_release -s -c) main" | tee /etc/apt/sources.list.d/nodesource.list \
   && echo "deb-src https://deb.nodesource.com/$NODE_VERSION $(lsb_release -s -c) main" | tee -a /etc/apt/sources.list.d/nodesource.list \
   && apt-get update && apt-get install --no-install-recommends --no-install-suggests -y nodejs \
-  && npm install -g yarn \
   # Installing `poetry` package manager:
   # https://github.com/python-poetry/poetry
   && curl -sSL 'https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py' | python \
@@ -70,7 +69,7 @@ COPY ./config/knot-resolver-manager.service /etc/systemd/system
 COPY ./config/kres-manager.yaml /etc/knot-resolver
 
 # Copy only requirements, to cache them in docker layer
-COPY ./poetry.lock ./pyproject.toml ./yarn.lock ./package.json /code/
+COPY ./poetry.lock ./pyproject.toml ./package.json /code/
 
 WORKDIR /code
 
@@ -79,7 +78,8 @@ RUN echo "Running in $KNOT_ENV" \
   && poetry install \
     $(if [ "$KNOT_ENV" != 'dev' ]; then echo '--no-dev'; fi) \
     --no-interaction --no-ansi \
-  && if test "$KNOT_ENV" = "dev"; then yarn install; fi
+  && if test "$KNOT_ENV" = "dev"; then \
+   npm install -g $(python -c "import json; print(*(k for k in json.loads(open('package.json').read())['dependencies']))"); fi
 
 # Here, we would copy the remaining code if we wanted to permanently keep it in the container. We don't do that, we use read-only bind mounts
 # COPY . /code

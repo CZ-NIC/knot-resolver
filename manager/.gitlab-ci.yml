@@ -13,7 +13,6 @@ image: registry.nic.cz/knot/knot-resolver-manager/devenv:latest
 build:
   image: docker:20-dind
   stage: image
-  when: manual
   tags:
     - dind
   variables:
@@ -22,23 +21,16 @@ build:
     - docker info
   script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build -t $IMAGE_TAG ci/devenv
+    - docker build -t $IMAGE_TAG -f containers/dev/Containerfile .
     - docker push $IMAGE_TAG
 
-
-# agressively cache Poetry's and NPM's data
-cache:
-  key: "always-the-same-cache"
-  paths:
-    - node_modules/
-    - .venv/
-  policy: pull-push
 
 lint:
   stage: check
   script:
-    # run the actual tests
-    - poetry env use $(pyenv which python)
-    - poetry install
-    - npm install
-    - ./poe check
+    - poe check
+
+test:
+  stage: check
+  script:
+    - poe test
