@@ -58,7 +58,7 @@ static int lf_cmp(const uint8_t *lf1, const uint8_t *lf2)
 static void dname_reverse(const knot_dname_t *src, size_t src_len, knot_dname_t *dst)
 {
 	knot_dname_t *idx = dst + src_len - 1;
-	assert(src[src_len - 1] == '\0');
+	kr_require(src[src_len - 1] == '\0');
 	*idx = '\0';
 
 	while (*src) {
@@ -67,7 +67,7 @@ static void dname_reverse(const knot_dname_t *src, size_t src_len, knot_dname_t 
 		memcpy(idx, src, len);
 		src += len;
 	}
-	assert(idx == dst);
+	kr_require(idx == dst);
 }
 static int dname_cmp(const knot_dname_t *d1, const knot_dname_t *d2)
 {
@@ -87,7 +87,7 @@ static int dname_cmp(const knot_dname_t *d1, const knot_dname_t *d2)
 		d2_rev = knot_wire_next_label(d2_rev, NULL);
 	}
 
-	assert(res != 0 || d2_rev == NULL);
+	kr_require(res != 0 || d2_rev == NULL);
 	return res;
 }
 
