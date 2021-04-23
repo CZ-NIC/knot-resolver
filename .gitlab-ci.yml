@@ -165,9 +165,10 @@ news:
   script:
     - head -n 1 NEWS | grep -q $(date +%Y-%m-%d)
 
-deckard_commit:
+trivial_checks: # aggregated to save some processing
   <<: *sanity
   script:
+    - ci/no_assert_check.sh
     - ci/deckard_commit_check.sh
 
 doc:
