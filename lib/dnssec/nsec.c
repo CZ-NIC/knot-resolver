@@ -102,7 +102,7 @@ static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 {
 	if (!kr_assume(nsec && sname))
 		return kr_error(EINVAL);
-	if (dname_cmp(sname, nsec->owner) <= 0) {
+	if (dname_cmp(sname, nsec->owner) <= 0)
 		return abs(ENOENT); /* 'sname' before 'owner', so can't be covered */
 
 	/* If NSEC 'owner' >= 'next', it means that there is nothing after 'owner' */
@@ -115,7 +115,7 @@ static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 
 	const bool is_last_nsec = dname_cmp(nsec->owner, next) >= 0;
 	const bool in_range = is_last_nsec || dname_cmp(sname, next) < 0;
-	if (!in_range) {
+	if (!in_range)
 		return abs(ENOENT);
 	/* Before returning kr_ok(), we have to check a special case:
 	 * sname might be under delegation from owner and thus
