@@ -110,7 +110,8 @@ static void set_address(const struct sockaddr *sockaddr,
 /** Fill a tcp_info or return kr_error(). */
 static int get_tcp_info(const struct kr_request *req, struct tcp_info *info)
 {
-	assert(req && info);
+	if(!kr_assume(req && info))
+		return kr_error(EINVAL);
 	if (!req->qsource.dst_addr || !req->qsource.flags.tcp) /* not TCP-based */
 		return -abs(ENOENT);
 	/* First obtain the file-descriptor. */
