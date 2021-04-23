@@ -41,6 +41,7 @@ test(
     '-d',
     '--html', 'pytests.parallel.html',
     '--self-contained-html',
+    '--junitxml=pytests.parallel.junit.xml',
     '-n', '24',
     '-v',
   ],
@@ -60,6 +61,7 @@ test(
   python3,
   args: [
     '-m', 'pytest',
+    '--junitxml=pytests.single.junit.xml',
     '-ra',
     '--capture=no',
     'conn_flood.py',
