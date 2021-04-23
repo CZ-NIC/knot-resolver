@@ -456,7 +456,7 @@ static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qr
 static bool rrset_has_min_range_or_weird(const knot_rrset_t *rr, const struct kr_query *qry)
 {
 	if (rr->rrs.count != 1) {
-		assert(rr->rrs.count > 0);
+		(void)!kr_assume(rr->rrs.count > 0);
 		if (rr->type == KNOT_RRTYPE_NSEC || rr->type == KNOT_RRTYPE_NSEC3
 				|| rr->rrs.count == 0) {
 			return true; /*< weird */
