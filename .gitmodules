@@ -7,3 +7,6 @@
 [submodule "tests/config/tapered"]
 	path = tests/config/tapered
 	url = https://gitlab.nic.cz/knot/3rdparty/lua-tapered.git
+[submodule "contrib/libmdbx"]
+	path = subprojects/libmdbx
+	url = https://github.com/erthink/libmdbx
