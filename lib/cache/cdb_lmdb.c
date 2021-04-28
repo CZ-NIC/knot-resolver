@@ -10,7 +10,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <lmdb.h>
+//#include <lmdb.h>
+#include <mdbx.h>
 
 #include "contrib/cleanup.h"
 #include "contrib/ucw/lib.h"
@@ -24,6 +25,55 @@
 /* Defines */
 #define LMDB_DIR_MODE   0770
 #define LMDB_FILE_MODE  0660
+
+
+#define MDB_env MDBX_env
+#define mdb_env_create mdbx_env_create
+#define MDB_SUCCESS 0
+#define MDB_WRITEMAP MDBX_WRITEMAP
+#define MDB_MAPASYNC MDBX_UTTERLY_NOSYNC
+#define MDB_NOTLS MDBX_NOTLS
+#define mdb_env_open mdbx_env_open
+#define mdb_filehandle_t mdbx_filehandle_t
+#define mdb_env_get_fd mdbx_env_get_fd
+#define MDB_txn MDBX_txn
+#define MDB_RDWR MDBX_TXN_READWRITE
+#define mdb_txn_begin mdbx_txn_begin
+#define mdb_dbi_open mdbx_dbi_open
+#define MDB_dbi MDBX_dbi
+#define mdb_txn_commit mdbx_txn_commit
+#define mdb_env_close mdbx_env_close
+// Avoid mdbx_env_sync() as it uses some macro magic.
+#define mdb_env_sync(env, force) mdbx_env_sync_ex((env), (force), false)
+#define mdb_dbi_close mdbx_dbi_close
+#define MDB_cursor MDBX_cursor
+#define MDB_NOTFOUND MDBX_NOTFOUND
+#define MDB_MAP_FULL MDBX_MAP_FULL
+#define MDB_TXN_FULL MDBX_TXN_FULL
+#define mdb_strerror mdbx_strerror
+// Different field names as well; see val_mdb2knot().
+#define MDB_val MDBX_val
+// TODO: can be improved
+#define mdb_env_set_mapsize mdbx_env_set_mapsize
+#define MDB_RDONLY MDBX_TXN_RDONLY
+#define mdb_txn_renew mdbx_txn_renew
+#define MDB_READERS_FULL MDBX_READERS_FULL
+#define mdb_reader_check mdbx_reader_check
+#define mdb_txn_reset mdbx_txn_reset
+#define mdb_cursor_renew mdbx_cursor_renew
+#define mdb_cursor_open mdbx_cursor_open
+#define mdb_cursor_close mdbx_cursor_close
+#define mdb_cursor_get mdbx_cursor_get
+#define MDB_SET_RANGE MDBX_SET_RANGE
+#define mdb_txn_abort mdbx_txn_abort
+#define MDB_PREV MDBX_PREV
+#define MDB_NEXT MDBX_NEXT
+#define mdb_env_get_path mdbx_env_get_path
+#define mdb_del mdbx_del
+#define MDB_RESERVE MDBX_RESERVE
+#define mdb_put mdbx_put
+#define mdb_get mdbx_get
+#define mdb_drop mdbx_drop
 
 /* TODO: we rely on mirrors of these two structs not changing layout
  * in libknot and knot resolver! */
@@ -96,13 +146,16 @@ static int lmdb_error(int error)
 /** Conversion between knot and lmdb structs for values. */
 static inline knot_db_val_t val_mdb2knot(MDB_val v)
 {
-	return (knot_db_val_t){ .len = v.mv_size, .data = v.mv_data };
+	//return (knot_db_val_t){ .len = v.mv_size, .data = v.mv_data };
+	return (knot_db_val_t){ .len = v.iov_len, .data = v.iov_base };
 }
 static inline MDB_val val_knot2mdb(knot_db_val_t v)
 {
-	return (MDB_val){ .mv_size = v.len, .mv_data = v.data };
+	//return (MDB_val){ .mv_size = v.len, .mv_data = v.data };
+	return (MDB_val){ .iov_len = v.len, .iov_base = v.data };
 }
 
+#if 0
 /** Refresh mapsize value from file, including env->mapsize.
  * It's much lighter than reopen_env(). */
 static int refresh_mapsize(struct lmdb_env *env)
@@ -123,6 +176,7 @@ static int refresh_mapsize(struct lmdb_env *env)
 	}
 	return kr_ok();
 }
+#endif
 
 #define FLAG_RENEW (2*MDB_RDONLY)
 /** mdb_txn_begin or _renew + handle retries in some situations
@@ -148,12 +202,15 @@ retry:
 		ret = mdb_txn_begin(env->env, NULL, flag, txn);
 	}
 
+#if 0
 	if (unlikely(ret == MDB_MAP_RESIZED)) {
 		kr_log_info("[cache] detected size increased by another process\n");
 		ret = refresh_mapsize(env);
 		if (ret == 0)
 			goto retry;
-	} else if (unlikely(ret == MDB_READERS_FULL)) {
+	} else
+#endif
+	if (unlikely(ret == MDB_READERS_FULL)) {
 		int cleared;
 		ret = mdb_reader_check(env->env, &cleared);
 		if (ret == MDB_SUCCESS)
@@ -185,7 +242,7 @@ static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 			env->txn.ro_active = false;
 			env->txn.ro_curs_active = false;
 		}
-		int ret = txn_get_noresize(env, 0/*RW*/, &env->txn.rw);
+		int ret = txn_get_noresize(env, MDB_RDWR, &env->txn.rw);
 		if (ret == MDB_SUCCESS) {
 			*txn = env->txn.rw;
 			assert(*txn);
@@ -350,16 +407,18 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	env->st_ino = st.st_ino;
 	env->st_size = st.st_size;
 
+#if 0
 	/* Get the real mapsize.  Shrinking can be restricted, etc.
 	 * Unfortunately this is only reliable when not setting the size explicitly. */
 	if (!size_requested) {
 		ret = refresh_mapsize(env);
 		if (ret) goto error_sys;
 	}
+#endif
 
 	/* Open the database. */
 	MDB_txn *txn = NULL;
-	ret = mdb_txn_begin(env->env, NULL, 0, &txn);
+	ret = mdb_txn_begin(env->env, NULL, MDB_RDWR, &txn);
 	if (ret != MDB_SUCCESS) goto error_mdb;
 
 	ret = mdb_dbi_open(txn, NULL, 0, &env->dbi);
@@ -652,8 +711,7 @@ static int cdb_write(struct lmdb_env *env, MDB_txn **txn, const knot_db_val_t *k
 	}
 
 	/* Update the result. */
-	val->data = _val.mv_data;
-	val->len = _val.mv_size;
+	*val = val_mdb2knot(_val);
 	return kr_ok();
 }
 
@@ -690,9 +748,8 @@ static int cdb_remove(kr_cdb_pt db, struct kr_cdb_stats *stats,
 
 	for (int i = 0; ret == kr_ok() && i < maxcount; ++i) {
 		MDB_val _key = val_knot2mdb(keys[i]);
-		MDB_val val = { 0, NULL };
 		stats->remove++;
-		ret = lmdb_error(mdb_del(txn, env->dbi, &_key, &val));
+		ret = lmdb_error(mdb_del(txn, env->dbi, &_key, NULL));
 		if (ret == kr_ok())
 			deleted++;
 		else if (ret == KNOT_ENOENT) {
@@ -726,7 +783,7 @@ static int cdb_match(kr_cdb_pt db, struct kr_cdb_stats *stats,
 	}
 
 	MDB_val cur_key = val_knot2mdb(*key);
-	MDB_val cur_val = { 0, NULL };
+	MDB_val cur_val = { 0 };
 	stats->match++;
 	ret = mdb_cursor_get(cur, &cur_key, &cur_val, MDB_SET_RANGE);
 	if (ret != MDB_SUCCESS) {
@@ -776,13 +833,13 @@ static int cdb_read_leq(kr_cdb_pt db, struct kr_cdb_stats *stats,
 	if (ret) return ret;
 
 	MDB_val key2_m = val_knot2mdb(*key);
-	MDB_val val2_m = { 0, NULL };
+	MDB_val val2_m = { 0 };
 	stats->read_leq++;
 	ret = mdb_cursor_get(curs, &key2_m, &val2_m, MDB_SET_RANGE);
 	if (ret) goto failure;
 	/* test for equality //:unlikely */
-	if (key2_m.mv_size == key->len
-	    && memcmp(key2_m.mv_data, key->data, key->len) == 0) {
+	const knot_db_val_t key2_k = val_mdb2knot(key2_m);
+	if (key2_k.len == key->len && memcmp(key2_k.data, key->data, key->len) == 0) {
 		ret = 0; /* equality */
 		goto success;
 	}

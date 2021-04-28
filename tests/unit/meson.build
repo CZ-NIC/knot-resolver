@@ -22,7 +22,7 @@ foreach unit_test : unit_tests
       contrib_dep,
       libkres_dep,
       cmocka,
-      lmdb,
+      lmdb, #FIXME
     ],
   )
   test(
