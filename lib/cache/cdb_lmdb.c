@@ -124,6 +124,18 @@ static int refresh_mapsize(struct lmdb_env *env)
 	return kr_ok();
 }
 
+static void clear_stale_readers(struct lmdb_env *env)
+{
+	int cleared;
+	int ret = mdb_reader_check(env->env, &cleared);
+	if (ret != MDB_SUCCESS) {
+		kr_log_error("[cache] failed to clear stale reader locks: "
+				"LMDB error %d %s\n", ret, mdb_strerror(ret));
+	} else if (cleared != 0) {
+		kr_log_info("[cache] cleared %d stale reader locks\n", cleared);
+	}
+}
+
 #define FLAG_RENEW (2*MDB_RDONLY)
 /** mdb_txn_begin or _renew + handle retries in some situations
  *
@@ -154,13 +166,7 @@ retry:
 		if (ret == 0)
 			goto retry;
 	} else if (unlikely(ret == MDB_READERS_FULL)) {
-		int cleared;
-		ret = mdb_reader_check(env->env, &cleared);
-		if (ret == MDB_SUCCESS)
-			kr_log_info("[cache] cleared %d stale reader locks\n", cleared);
-		else
-			kr_log_error("[cache] failed to clear stale reader locks: "
-					"LMDB error %d %s\n", ret, mdb_strerror(ret));
+		clear_stale_readers(env);
 		goto retry;
 	}
 	return ret;
@@ -388,6 +394,11 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	stats->commit++;
 	ret = mdb_txn_commit(txn);
 	if (ret != MDB_SUCCESS) goto error_mdb;
+
+	/* Stale RO transactions could have been left behind by a cashing process
+	 * (e.g. one whose termination lead to spawning the current one).
+	 * According to docs they might hold onto some space until we clear them. */
+	clear_stale_readers(env);
 
 	return kr_ok();
 
