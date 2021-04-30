@@ -22,6 +22,8 @@ prepare_deckard = find_program('../../scripts/test-integration-prepare.sh')
 deckard_env = environment()
 deckard_env.prepend('PATH', sbin_dir)
 
+junitxml_prefix = '--junitxml=' + meson.build_root() + '/meson-logs'
+
 deckard_kresd_run = find_program('deckard/kresd_run.sh')
 test(
   'integration.deckard',
@@ -30,6 +32,7 @@ test(
   args: [
     '-n', 'auto',
     '-Wignore::DeprecationWarning',
+    junitxml_prefix + '/integration.deckard.junit.xml',
   ],
   suite: [
     'postinstall',
@@ -51,6 +54,7 @@ foreach integr_test : integr_tests
       '-Wignore::DeprecationWarning',
       '--config=@0@'.format(deckard_config_path),
       '--scenarios=@0@'.format(integr_test[1]),
+      junitxml_prefix + '/integration.' + integr_test[0] + '.junit.xml',
     ],
     suite: [
       'postinstall',
