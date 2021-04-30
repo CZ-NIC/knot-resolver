@@ -62,7 +62,6 @@ static inline int u16tostr(uint8_t *dst, uint16_t num)
 /*
  * Cleanup callbacks.
  */
-
 static void kres_gnutls_log(int level, const char *message)
 {
 	kr_log_verbose("[gnutls] (%d) %s", level, message);
