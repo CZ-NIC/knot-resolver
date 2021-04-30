@@ -26,6 +26,7 @@
 #include "contrib/mempattern.h"
 #include "lib/defines.h"
 #include "lib/generic/array.h"
+#include "lib/log.h"
 
 struct kr_query;
 struct kr_request;
@@ -40,11 +41,6 @@ typedef void (*trace_callback_f)(struct kr_request *request);
  * @brief Callback for request logging handler.
  * @param[in] msg Log message. Pointer is not valid after handler returns. */
 typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
-
-#define kr_log_info printf
-#define kr_log_error(...) fprintf(stderr, ## __VA_ARGS__)
-#define kr_log_critical(...) kr_log_error(__VA_ARGS__)
-#define kr_log_deprecate(...) fprintf(stderr, "deprecation WARNING: " __VA_ARGS__)
 
 /** Assert() but always, regardless of -DNDEBUG.  See also kr_assert(). */
 #define kr_require(expression) do { if (!(expression)) { \
