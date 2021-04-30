@@ -5,6 +5,9 @@
 Debugging a single request
 ==========================
 
+.. tip:: Policies :data:`policy.DEBUG_CACHE_MISS` and :func:`policy.DEBUG_IF` can also be used to
+         debug specific requests.
+
 The :ref:`http module <mod-http>` provides ``/trace`` endpoint which allows to trace various
 aspects of the request execution. The basic mode allows you to resolve a query
 and trace verbose logs for it (and messages received):
