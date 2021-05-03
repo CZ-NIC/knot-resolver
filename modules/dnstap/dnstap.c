@@ -409,7 +409,7 @@ int dnstap_config(struct kr_module *module, const char *conf) {
 
 	/* Empty conf passed, set default */
 	if (!conf || strlen(conf) < 1) {
-		sock_path = strndup(DEFAULT_SOCK_PATH, PATH_MAX);
+		sock_path = strdup(DEFAULT_SOCK_PATH);
 	} else {
 
 		JsonNode *root_node = json_decode(conf);
@@ -422,7 +422,7 @@ int dnstap_config(struct kr_module *module, const char *conf) {
 		/* dnstapPath key */
 		node = json_find_member(root_node, CFG_SOCK_PATH);
 		if (!node || find_string(node, &sock_path, PATH_MAX) != kr_ok()) {
-			sock_path = strndup(DEFAULT_SOCK_PATH, PATH_MAX);
+			sock_path = strdup(DEFAULT_SOCK_PATH);
 		}
 
 		/* identity string key */
