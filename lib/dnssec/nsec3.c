@@ -596,6 +596,13 @@ int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_
 		if (rrset->type != KNOT_RRTYPE_NSEC3) {
 			continue;
 		}
+		if (knot_nsec3_iters(rrset->rrs.rdata) > KR_NSEC3_MAX_ITERATIONS) {
+			/* Avoid hashing with too many iterations.
+			 * If we get here, the `sname` wildcard probably ends up bogus,
+			 * but it gets downgraded to KR_RANK_INSECURE when validator
+			 * gets to verifying one of these over-limit NSEC3 RRs. */
+			continue;
+		}
 		int ret = covers_name(&flags, rrset, sname);
 		if (ret != 0) {
 			return ret;

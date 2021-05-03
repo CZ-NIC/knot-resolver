@@ -1,6 +1,11 @@
 Knot Resolver 5.3.2 (2021-0m-dd)
 ================================
 
+Security
+--------
+- validator: fix 5.3.1 regression on over-limit NSEC3 edge case (!1169)
+  Assertion might be triggered by query/answer, potentially DoS.
+
 Improvements
 ------------
 - cache: improve handling write errors from LMDB (!1159)
