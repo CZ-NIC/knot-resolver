@@ -5,11 +5,11 @@
 
 Vagrant.configure(2) do |config|
 
-    # TODO: switch to generic/ubuntu2010 when available (has libvirt box)
-    config.vm.box = "ubuntu/groovy64"
+    # TODO: switch to generic/ubuntu2104 when available (has libvirt box)
+    config.vm.box = "ubuntu/hirsute64"
     config.vm.synced_folder ".", "/vagrant", disabled: true
 
-    config.vm.define "ubuntu2010_knot-resolver"  do |machine|
+    config.vm.define "ubuntu2104_knot-resolver"  do |machine|
         machine.vm.provision "ansible" do |ansible|
             ansible.playbook = "../knot-resolver-pkgtest.yaml"
             ansible.extra_vars = {
