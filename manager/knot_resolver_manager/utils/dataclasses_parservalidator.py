@@ -18,6 +18,7 @@ from knot_resolver_manager.utils.types import (
 
 from ..compat.dataclasses import is_dataclass
 
+
 class ValidationException(Exception):
     pass
 
@@ -146,37 +147,40 @@ def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> A
 
 
 # custom hook for 'json.loads()' to detect duplicate keys in data
-# source: https://stackoverflow.com/questions/14902299/json-loads-allows-duplicate-keys-in-a-dictionary-overwriting-the-first-value
+# source: https://stackoverflow.com/q/14902299/12858520
 def json_raise_duplicates(pairs: List[Tuple[Any, Any]]) -> Optional[Any]:
-    dict_out: Dict[Any,Any] = {}
+    dict_out: Dict[Any, Any] = {}
     for key, val in pairs:
         if key in dict_out:
             raise ValidationException(f"duplicate key detected: {key}")
-        else:
-            dict_out[key] = val
+        dict_out[key] = val
     return dict_out
 
 
 # custom loader for 'yaml.load()' to detect duplicate keys in data
 # source: https://gist.github.com/pypt/94d747fe5180851196eb
 class RaiseDuplicatesLoader(yaml.SafeLoader):
-    def construct_mapping(self: yaml.SafeLoader, node: Union[MappingNode, Any], deep: bool=False) -> Dict[Any,Any]:
+    def construct_mapping(self, node: Union[MappingNode, Any], deep: bool = False) -> Dict[Any, Any]:
         if not isinstance(node, MappingNode):
-            raise ConstructorError(None, None,
-                    "expected a mapping node, but found %s" % node.id,
-                    node.start_mark)
-        mapping: Dict[Any,Any] = {}
+            raise ConstructorError(None, None, f"expected a mapping node, but found {node.id}", node.start_mark)
+        mapping: Dict[Any, Any] = {}
         for key_node, value_node in node.value:
-            key = self.construct_object(key_node, deep=deep)    # type: ignore
+            key = self.construct_object(key_node, deep=deep)  # type: ignore
+            # we need to check, that the key object can be used in a hash table
             try:
-                hash(key)   # type: ignore
+                _ = hash(key)  # type: ignore
             except TypeError as exc:
-                raise ConstructorError("while constructing a mapping", node.start_mark,
-                       "found unacceptable key (%s)" % exc, key_node.start_mark)
+                raise ConstructorError(
+                    "while constructing a mapping",
+                    node.start_mark,
+                    f"found unacceptable key ({exc})",
+                    key_node.start_mark,
+                )
+
             # check for duplicate keys
             if key in mapping:
                 raise ValidationException(f"duplicate key detected: {key_node.start_mark}")
-            value = self.construct_object(value_node, deep=deep)    # type: ignore
+            value = self.construct_object(value_node, deep=deep)  # type: ignore
             mapping[key] = value
         return mapping
 
@@ -206,7 +210,9 @@ class DataclassParserValidatorMixin:
 
     @classmethod
     def from_yaml(cls: Type[_T], text: str, default: _T = ..., use_default: bool = False) -> _T:
-        data = yaml.load(text, Loader=RaiseDuplicatesLoader)    # type: ignore
+        # RaiseDuplicatesLoader extends yaml.SafeLoader, so this should be safe
+        # https://python.land/data-processing/python-yaml#PyYAML_safe_load_vs_load
+        data = yaml.load(text, Loader=RaiseDuplicatesLoader)  # type: ignore
         config: _T = _from_dictlike_obj(cls, data, default, use_default)
         config.validate()
         return config
