@@ -157,8 +157,8 @@ static const struct entry_h *val2entry(const knot_db_val_t val, uint16_t ktype)
 	return NULL;
 }
 
-int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
-			kr_gc_iter_callback callback, void *ctx)
+int kr_gc_cache_iter(const knot_db_api_t * api, knot_db_t * knot_db,
+		const  kr_cache_gc_cfg_t *cfg, kr_gc_iter_callback callback, void *ctx)
 {
 	unsigned int counter_iter = 0;
 	unsigned int counter_gc_consistent = 0;
@@ -166,7 +166,6 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 
 	knot_db_txn_t txn = { 0 };
 	knot_db_iter_t *it = NULL;
-	const knot_db_api_t *api = knot_db_lmdb_api();
 	gc_record_info_t info = { 0 };
 	int64_t now = time(NULL);
 

@@ -194,6 +194,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 		return KNOT_EOK;
 	}
 
+	const knot_db_api_t *api = kr_cdb_pt2knot_db_api_t((*state)->kres_db.db);
 	//// 2. classify all cache items into categories
 	//      and compute which categories to delete.
 	gc_timer_t timer_analyze = { 0 }, timer_choose = { 0 }, timer_delete =
@@ -202,7 +203,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	gc_timer_start(&timer_analyze);
 	ctx_compute_categories_t cats = { { 0 }
 	};
-	ret = kr_gc_cache_iter(db, cfg, cb_compute_categories, &cats);
+	ret = kr_gc_cache_iter(api, db, cfg, cb_compute_categories, &cats);
 	if (ret != KNOT_EOK) {
 		kr_cache_gc_free_state(state);
 		return ret;
@@ -242,7 +243,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	ctx_delete_categories_t to_del = { 0 };
 	to_del.cfg_temp_keys_space = cfg->temp_keys_space;
 	to_del.limit_category = limit_category;
-	ret = kr_gc_cache_iter(db, cfg, cb_delete_categories, &to_del);
+	ret = kr_gc_cache_iter(api, db, cfg, cb_delete_categories, &to_del);
 	if (ret != KNOT_EOK) {
 		entry_dynarray_deep_free(&to_del.to_delete);
 		kr_cache_gc_free_state(state);
@@ -254,7 +255,6 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	     to_del.oversize_records);
 
 	//// 4. execute the planned deletions.
-	const knot_db_api_t *api = knot_db_lmdb_api();
 	knot_db_txn_t txn = { 0 };
 	size_t deleted_records = 0, already_gone = 0, rw_txn_count = 0;
 

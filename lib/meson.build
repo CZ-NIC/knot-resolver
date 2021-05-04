@@ -3,6 +3,7 @@
 
 libkres_src = files([
   'cache/api.c',
+  'cache/cdb_compat.c',
   'cache/cdb_lmdb.c',
   'cache/entry_list.c',
   'cache/entry_pkt.c',
@@ -37,6 +38,7 @@ c_src_lint += libkres_src
 libkres_headers = files([
   'cache/api.h',
   'cache/cdb_api.h',
+  'cache/cdb_compat.h',
   'cache/cdb_lmdb.h',
   'cache/impl.h',
   'defines.h',

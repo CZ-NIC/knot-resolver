@@ -18,8 +18,8 @@ void kr_gc_cache_close(struct kr_cache *kres_db, knot_db_t * knot_db);
 typedef int (*kr_gc_iter_callback)(const knot_db_val_t * key,
 				   gc_record_info_t * info, void *ctx);
 
-int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
-			kr_gc_iter_callback callback, void *ctx);
+int kr_gc_cache_iter(const knot_db_api_t * api, knot_db_t * knot_db,
+		const  kr_cache_gc_cfg_t *cfg, kr_gc_iter_callback callback, void *ctx);
 
 /** Return RR type corresponding to the key or negative error code.
  *
