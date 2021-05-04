@@ -23,16 +23,31 @@ libknot = dependency('libknot', version: knot_version)
 libdnssec = dependency('libdnssec', version: knot_version)
 libzscanner = dependency('libzscanner', version: knot_version)
 libuv = dependency('libuv', version: '>=1.7')
-#FIXME
-lmdb = dependency('lmdb', required: false)
-if not lmdb.found()  # darwin workaround: missing pkgconfig
-  lmdb = meson.get_compiler('c').find_library('lmdb')
-endif
 gnutls = dependency('gnutls')
 luajit = dependency('luajit')
 # NOTE avoid using link_args for luajit due to a macOS issue
 # https://github.com/Homebrew/homebrew-core/issues/37169
 luajit_inc = luajit.partial_dependency(compile_args: true, includes: true)
+
+if get_option('cache_backend') == 'lmdb'
+  lmdb = dependency('lmdb', required: false)
+  if not lmdb.found()  # darwin workaround: missing pkgconfig
+	lmdb = meson.get_compiler('c').find_library('lmdb')
+  endif
+  cache_backend_dep = lmdb
+  add_project_arguments('-DKR_USE_MDBX=0', language : 'c')
+elif get_option('cache_backend') == 'mdbx'
+  cmake = import('cmake')
+  mdbx_opt = cmake.subproject_options()
+  mdbx_opt.add_cmake_defines({
+    'MDBX_BUILD_SHARED_LIBRARY': false,
+    'MDBX_BUILD_CXX': false,
+  })
+  libmdbx_proj = cmake.subproject('libmdbx', options: mdbx_opt)
+  cache_backend_dep = libmdbx_proj.dependency('mdbx-static')
+  add_project_arguments('-DKR_USE_MDBX=1', language : 'c')
+endif
+
 message('------------------------------')
 
 

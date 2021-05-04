@@ -27,8 +27,3 @@ contrib_dep = declare_dependency(
   link_with: contrib_lib,
 )
 
-
-cmake = import('cmake')
-libmdbx_proj = cmake.subproject('libmdbx')
-libmdbx = libmdbx_proj.dependency('mdbx-static')
-

@@ -10,8 +10,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-//#include <lmdb.h>
-#include <mdbx.h>
 
 #include "contrib/cleanup.h"
 #include "contrib/ucw/lib.h"
@@ -26,54 +24,68 @@
 #define LMDB_DIR_MODE   0770
 #define LMDB_FILE_MODE  0660
 
+#if KR_USE_MDBX
+	#include <mdbx.h>
+	// FIXME: investigate mysterious constant-sized memleaks
+#else
+	#include <lmdb.h>
+#endif
 
-#define MDB_env MDBX_env
-#define mdb_env_create mdbx_env_create
-#define MDB_SUCCESS 0
-#define MDB_WRITEMAP MDBX_WRITEMAP
-#define MDB_MAPASYNC MDBX_UTTERLY_NOSYNC
-#define MDB_NOTLS MDBX_NOTLS
-#define mdb_env_open mdbx_env_open
-#define mdb_filehandle_t mdbx_filehandle_t
-#define mdb_env_get_fd mdbx_env_get_fd
-#define MDB_txn MDBX_txn
-#define MDB_RDWR MDBX_TXN_READWRITE
-#define mdb_txn_begin mdbx_txn_begin
-#define mdb_dbi_open mdbx_dbi_open
-#define MDB_dbi MDBX_dbi
-#define mdb_txn_commit mdbx_txn_commit
-#define mdb_env_close mdbx_env_close
-// Avoid mdbx_env_sync() as it uses some macro magic.
-#define mdb_env_sync(env, force) mdbx_env_sync_ex((env), (force), false)
-#define mdb_dbi_close mdbx_dbi_close
-#define MDB_cursor MDBX_cursor
-#define MDB_NOTFOUND MDBX_NOTFOUND
-#define MDB_MAP_FULL MDBX_MAP_FULL
-#define MDB_TXN_FULL MDBX_TXN_FULL
-#define mdb_strerror mdbx_strerror
-// Different field names as well; see val_mdb2knot().
-#define MDB_val MDBX_val
-// TODO: can be improved
-#define mdb_env_set_mapsize mdbx_env_set_mapsize
-#define MDB_RDONLY MDBX_TXN_RDONLY
-#define mdb_txn_renew mdbx_txn_renew
-#define MDB_READERS_FULL MDBX_READERS_FULL
-#define mdb_reader_check mdbx_reader_check
-#define mdb_txn_reset mdbx_txn_reset
-#define mdb_cursor_renew mdbx_cursor_renew
-#define mdb_cursor_open mdbx_cursor_open
-#define mdb_cursor_close mdbx_cursor_close
-#define mdb_cursor_get mdbx_cursor_get
-#define MDB_SET_RANGE MDBX_SET_RANGE
-#define mdb_txn_abort mdbx_txn_abort
-#define MDB_PREV MDBX_PREV
-#define MDB_NEXT MDBX_NEXT
-#define mdb_env_get_path mdbx_env_get_path
-#define mdb_del mdbx_del
-#define MDB_RESERVE MDBX_RESERVE
-#define mdb_put mdbx_put
-#define mdb_get mdbx_get
-#define mdb_drop mdbx_drop
+#if KR_USE_MDBX
+	#define MDB_env MDBX_env
+	#define mdb_env_create mdbx_env_create
+	#define MDB_SUCCESS 0
+	#define MDB_WRITEMAP MDBX_WRITEMAP
+	#define MDB_MAPASYNC MDBX_UTTERLY_NOSYNC
+	#define MDB_NOTLS MDBX_NOTLS
+	#define mdb_env_open mdbx_env_open
+	#define mdb_filehandle_t mdbx_filehandle_t
+	#define mdb_env_get_fd mdbx_env_get_fd
+	#define MDB_txn MDBX_txn
+	#define mdb_txn_begin mdbx_txn_begin
+	#define mdb_dbi_open mdbx_dbi_open
+	#define MDB_dbi MDBX_dbi
+	#define mdb_txn_commit mdbx_txn_commit
+	#define mdb_env_close mdbx_env_close
+	// Avoid mdbx_env_sync() as it uses some macro magic.
+	#define mdb_env_sync(env, force) mdbx_env_sync_ex((env), (force), false)
+	#define mdb_dbi_close mdbx_dbi_close
+	#define MDB_cursor MDBX_cursor
+	#define MDB_NOTFOUND MDBX_NOTFOUND
+	#define MDB_MAP_FULL MDBX_MAP_FULL
+	#define MDB_TXN_FULL MDBX_TXN_FULL
+	#define mdb_strerror mdbx_strerror
+	// Different field names as well; see val_mdb2knot().
+	#define MDB_val MDBX_val
+	// TODO: can be improved
+	#define mdb_env_set_mapsize mdbx_env_set_mapsize
+	#define MDB_RDONLY MDBX_TXN_RDONLY
+	#define mdb_txn_renew mdbx_txn_renew
+	#define MDB_READERS_FULL MDBX_READERS_FULL
+	#define mdb_reader_check mdbx_reader_check
+	#define mdb_txn_reset mdbx_txn_reset
+	#define mdb_cursor_renew mdbx_cursor_renew
+	#define mdb_cursor_open mdbx_cursor_open
+	#define mdb_cursor_close mdbx_cursor_close
+	#define mdb_cursor_get mdbx_cursor_get
+	#define MDB_SET_RANGE MDBX_SET_RANGE
+	#define mdb_txn_abort mdbx_txn_abort
+	#define MDB_PREV MDBX_PREV
+	#define MDB_NEXT MDBX_NEXT
+	#define mdb_env_get_path mdbx_env_get_path
+	#define mdb_del mdbx_del
+	#define MDB_RESERVE MDBX_RESERVE
+	#define mdb_put mdbx_put
+	#define mdb_get mdbx_get
+	#define mdb_drop mdbx_drop
+	// just an extra field at the end
+	#define MDB_stat MDBX_stat
+	#define MDB_RDWR MDBX_TXN_READWRITE
+	#define MDB_DATANAME MDBX_DATANAME
+#else
+	#define MDB_RDWR 0
+	#define MDB_DATANAME "/data.mdb"
+#endif
 
 /* TODO: we rely on mirrors of these two structs not changing layout
  * in libknot and knot resolver! */
@@ -146,16 +158,26 @@ static int lmdb_error(int error)
 /** Conversion between knot and lmdb structs for values. */
 static inline knot_db_val_t val_mdb2knot(MDB_val v)
 {
-	//return (knot_db_val_t){ .len = v.mv_size, .data = v.mv_data };
-	return (knot_db_val_t){ .len = v.iov_len, .data = v.iov_base };
+	return (knot_db_val_t){
+	#if KR_USE_MDBX
+		.len = v.iov_len, .data = v.iov_base
+	#else
+		.len = v.mv_size, .data = v.mv_data
+	#endif
+	};
 }
 static inline MDB_val val_knot2mdb(knot_db_val_t v)
 {
-	//return (MDB_val){ .mv_size = v.len, .mv_data = v.data };
-	return (MDB_val){ .iov_len = v.len, .iov_base = v.data };
+	return (MDB_val){
+	#if KR_USE_MDBX
+		.iov_len = v.len, .iov_base = v.data
+	#else
+		.mv_size = v.len, .mv_data = v.data
+	#endif
+	};
 }
 
-#if 0
+#if !KR_USE_MDBX
 /** Refresh mapsize value from file, including env->mapsize.
  * It's much lighter than reopen_env(). */
 static int refresh_mapsize(struct lmdb_env *env)
@@ -202,7 +224,7 @@ retry:
 		ret = mdb_txn_begin(env->env, NULL, flag, txn);
 	}
 
-#if 0
+#if !KR_USE_MDBX
 	if (unlikely(ret == MDB_MAP_RESIZED)) {
 		kr_log_info("[cache] detected size increased by another process\n");
 		ret = refresh_mapsize(env);
@@ -367,7 +389,7 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	ret = mdb_env_create(&env->env);
 	if (ret != MDB_SUCCESS) return lmdb_error(ret);
 
-	env->mdb_data_path = kr_absolutize_path(path, "data.mdb");
+	env->mdb_data_path = kr_absolutize_path(path, MDB_DATANAME);
 	if (!env->mdb_data_path) {
 		ret = ENOMEM;
 		goto error_sys;
@@ -407,7 +429,7 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	env->st_ino = st.st_ino;
 	env->st_size = st.st_size;
 
-#if 0
+#if !KR_USE_MDBX
 	/* Get the real mapsize.  Shrinking can be restricted, etc.
 	 * Unfortunately this is only reliable when not setting the size explicitly. */
 	if (!size_requested) {
@@ -499,7 +521,11 @@ static int cdb_count(kr_cdb_pt db, struct kr_cdb_stats *stats)
 
 	MDB_stat stat;
 	stats->count++;
+#if KR_USE_MDBX
+	ret = mdbx_env_stat_ex(env->env, txn, &stat, sizeof(stat));
+#else
 	ret = mdb_stat(txn, env->dbi, &stat);
+#endif
 
 	if (ret == MDB_SUCCESS) {
 		return stat.ms_entries;
@@ -546,7 +572,12 @@ static int cdb_check_health(kr_cdb_pt db, struct kr_cdb_stats *stats)
 			": file size %zu -> file size %zu\n",
 			env->mdb_data_path, (size_t)env->st_size, (size_t)st.st_size);
 	env->st_size = st.st_size; // avoid retrying in cycle even if we fail
+	// FIXME?
+#if KR_USE_MDBX
+	return kr_ok();
+#else
 	return refresh_mapsize(env);
+#endif
 }
 
 /** Obtain exclusive (advisory) lock by creating a file, returning FD or negative kr_error().
@@ -796,13 +827,15 @@ static int cdb_match(kr_cdb_pt db, struct kr_cdb_stats *stats,
 
 	int results = 0;
 	while (ret == MDB_SUCCESS) {
+		const knot_db_val_t cur_key_k = val_mdb2knot(cur_key);
 		/* Retrieve current key and compare with prefix */
-		if (cur_key.mv_size < key->len || memcmp(cur_key.mv_data, key->data, key->len) != 0) {
+		if (cur_key_k.len < key->len
+		    || memcmp(cur_key_k.data, key->data, key->len) != 0) {
 			break;
 		}
 		/* Add to result set */
 		if (results < maxcount) {
-			keyval[results][0] = val_mdb2knot(cur_key);
+			keyval[results][0] = cur_key_k;
 			keyval[results][1] = val_mdb2knot(cur_val);
 			++results;
 		} else {
@@ -882,7 +915,10 @@ static size_t cdb_get_maxsize(kr_cdb_pt db)
 /** Conversion between knot and lmdb structs. */
 knot_db_t *kr_cdb_pt2knot_db_t(kr_cdb_pt db)
 {
-	/* this is struct lmdb_env as in resolver/cdb_lmdb.c */
+#if KR_USE_MDBX
+	#pragma GCC warning "FIXME: we can't convert mdbx to libknot_lmdb_env; GC needs rewriting"
+	abort();
+#endif
 	const struct lmdb_env *kres_db = db2env(db);
 	struct libknot_lmdb_env *libknot_db = malloc(sizeof(*libknot_db));
 	if (libknot_db != NULL) {

@@ -210,3 +210,14 @@ option(
   value: 'auto',
   description: 'cmocka unit tests',
 )
+
+option(
+  'cache_backend',
+  type: 'combo',
+  choices: [
+    'lmdb',
+    'mdbx',
+  ],
+  value: 'lmdb',
+  description: 'cache backend to use; mdbx is experimental',
+)
