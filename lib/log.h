@@ -18,6 +18,8 @@ typedef enum {
 
 KR_EXPORT KR_PRINTF(2) void kr_log_fmt(log_level_t level, const char *fmt, ...);
 KR_EXPORT extern log_level_t kr_log_level;
+KR_EXPORT int kr_log_level_set(log_level_t level);
+KR_EXPORT log_level_t kr_log_level_get(void);
 void kr_log_init(log_level_t level);
 
 #define kr_log_debug(fmt, ...) kr_log_fmt(LOG_DEBUG, fmt, ## __VA_ARGS__)
