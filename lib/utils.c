@@ -31,11 +31,7 @@
 #include <sys/statvfs.h>
 #include <sys/un.h>
 
-/* Always compile-in log symbols, even if disabled. */
-#undef kr_verbose_status
-
 /* Logging & debugging */
-bool kr_verbose_status = false;
 bool kr_dbg_assertion_abort = DBG_ASSERTION_ABORT;
 int kr_dbg_assertion_fork = DBG_ASSERTION_FORK;
 
@@ -68,7 +64,6 @@ void kr_fail(bool is_fatal, const char *expr, const char *func, const char *file
 recover:
 	errno = errno_orig;
 }
-
 
 /*
  * Macros.
