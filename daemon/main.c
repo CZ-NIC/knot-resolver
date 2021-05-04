@@ -256,10 +256,7 @@ static int parse_args(int argc, char **argv, struct args *args)
 			args->interactive = false;
 			break;
 		case 'v':
-			kr_verbose_set(true);
-#ifdef NOVERBOSELOG
-			kr_log_info("--verbose flag has no effect due to compilation with -DNOVERBOSELOG.\n");
-#endif
+			kr_log_level_set(LOG_DEBUG);
 			break;
 		case 'q':
 			args->quiet = true;

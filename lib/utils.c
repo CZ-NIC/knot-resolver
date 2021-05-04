@@ -14,7 +14,6 @@
 #include "lib/selection.h"
 #include "lib/resolve.h"
 
-#include <gnutls/gnutls.h>
 #include <libknot/descriptor.h>
 #include <libknot/dname.h>
 #include <libknot/rrset-dump.h>
@@ -34,10 +33,10 @@
 
 /* Always compile-in log symbols, even if disabled. */
 #undef kr_verbose_status
-#undef kr_verbose_set
 
 /* Logging & debugging */
 bool kr_verbose_status = false;
+
 
 /*
  * Macros.
@@ -62,26 +61,6 @@ static inline int u16tostr(uint8_t *dst, uint16_t num)
 /*
  * Cleanup callbacks.
  */
-static void kres_gnutls_log(int level, const char *message)
-{
-	kr_log_verbose("[gnutls] (%d) %s", level, message);
-}
-
-bool kr_verbose_set(bool status)
-{
-#ifndef NOVERBOSELOG
-	kr_verbose_status = status;
-
-	/* gnutls logs messages related to our TLS and also libdnssec,
-	 * and the logging is set up in a global way only */
-	if (status) {
-		gnutls_global_set_log_function(kres_gnutls_log);
-	}
-	gnutls_global_set_log_level(status ? 5 : 0);
-#endif
-	return kr_verbose_status;
-}
-
 static void kr_vlog_req(
 	const struct kr_request * const req, uint32_t qry_uid,
 	const unsigned int indent, const char *source, const char *fmt,

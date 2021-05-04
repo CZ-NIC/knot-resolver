@@ -46,9 +46,6 @@ typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
 /** Whether in --verbose mode.  Only use this for reading. */
 KR_EXPORT extern bool kr_verbose_status;
 
-/** Set --verbose mode.  Not available if compiled with -DNOVERBOSELOG. */
-KR_EXPORT bool kr_verbose_set(bool status);
-
 /**
  * @brief Return true if the query has request log handler installed.
  */
