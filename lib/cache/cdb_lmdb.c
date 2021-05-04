@@ -82,6 +82,8 @@
 	#define MDB_stat MDBX_stat
 	#define MDB_RDWR MDBX_TXN_READWRITE
 	#define MDB_DATANAME MDBX_DATANAME
+	#define mdb_env_info(env, info) \
+		mdbx_env_info_ex((env), NULL, (info), sizeof(MDBX_envinfo))
 #else
 	#define MDB_RDWR 0
 	#define MDB_DATANAME "/data.mdb"
@@ -177,20 +179,33 @@ static inline MDB_val val_knot2mdb(knot_db_val_t v)
 	};
 }
 
-#if !KR_USE_MDBX
 /** Refresh mapsize value from file, including env->mapsize.
  * It's much lighter than reopen_env(). */
 static int refresh_mapsize(struct lmdb_env *env)
 {
 	int ret = cdb_commit(env2db(env), NULL);
+#if KR_USE_MDBX
+	// recommended way in docs for mdbx_env_set_geometry()
+	if (!ret) ret = lmdb_error(mdbx_env_sync_ex(env->env, true, false));
+#else
 	if (!ret) ret = lmdb_error(mdb_env_set_mapsize(env->env, 0));
+#endif
 	if (ret) return ret;
 
+#if KR_USE_MDBX
+	MDBX_envinfo info;
+#else
 	MDB_envinfo info;
+#endif
 	ret = lmdb_error(mdb_env_info(env->env, &info));
 	if (ret) return ret;
 
-	env->mapsize = info.me_mapsize;
+	env->mapsize = info.
+		#if KR_USE_MDBX
+			mi_mapsize;
+		#else
+			me_mapsize;
+		#endif
 	if (env->mapsize != env->st_size) {
 		kr_log_info("[cache] suspicious size of cache file '%s'"
 				": file size %zu != LMDB map size %zu\n",
@@ -198,7 +213,6 @@ static int refresh_mapsize(struct lmdb_env *env)
 	}
 	return kr_ok();
 }
-#endif
 
 #define FLAG_RENEW (2*MDB_RDONLY)
 /** mdb_txn_begin or _renew + handle retries in some situations
@@ -224,7 +238,7 @@ retry:
 		ret = mdb_txn_begin(env->env, NULL, flag, txn);
 	}
 
-#if !KR_USE_MDBX
+#if !KR_USE_MDBX // mdbx should handle this transparently
 	if (unlikely(ret == MDB_MAP_RESIZED)) {
 		kr_log_info("[cache] detected size increased by another process\n");
 		ret = refresh_mapsize(env);
@@ -429,14 +443,12 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	env->st_ino = st.st_ino;
 	env->st_size = st.st_size;
 
-#if !KR_USE_MDBX
 	/* Get the real mapsize.  Shrinking can be restricted, etc.
 	 * Unfortunately this is only reliable when not setting the size explicitly. */
 	if (!size_requested) {
 		ret = refresh_mapsize(env);
 		if (ret) goto error_sys;
 	}
-#endif
 
 	/* Open the database. */
 	MDB_txn *txn = NULL;
@@ -572,12 +584,7 @@ static int cdb_check_health(kr_cdb_pt db, struct kr_cdb_stats *stats)
 			": file size %zu -> file size %zu\n",
 			env->mdb_data_path, (size_t)env->st_size, (size_t)st.st_size);
 	env->st_size = st.st_size; // avoid retrying in cycle even if we fail
-	// FIXME?
-#if KR_USE_MDBX
-	return kr_ok();
-#else
 	return refresh_mapsize(env);
-#endif
 }
 
 /** Obtain exclusive (advisory) lock by creating a file, returning FD or negative kr_error().
