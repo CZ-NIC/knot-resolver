@@ -144,13 +144,11 @@ static int l_quit(lua_State *L)
 /** Toggle verbose mode. */
 static int l_verbose(lua_State *L)
 {
-	log_level_t level = LOG_ERR;
-	if ((lua_isboolean(L, 1) && lua_toboolean(L, 1) == true) ||
-			(lua_isnumber(L, 1) && lua_tointeger(L, 1) == LOG_DEBUG)) {
-		level = LOG_DEBUG;
+	if (lua_isboolean(L, 1) || lua_isnumber(L, 1)) {
+		kr_log_level_set(lua_toboolean(L, 1) == true ? LOG_DEBUG : LOG_DEFAULT_LEVEL);
 	}
 
-	lua_pushboolean(L, kr_log_level_set(level) == LOG_DEBUG);
+	lua_pushboolean(L, kr_log_level_get() == LOG_DEBUG);
 	return 1;
 }
 

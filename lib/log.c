@@ -12,7 +12,7 @@ void kr_log_fmt(log_level_t level, const char *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
-	if (level <= kr_log_level)
+	if (KR_LOG_LEVEL_IS(level))
 		vfprintf(stdout, fmt, args);
 	va_end(args);
 }
@@ -31,10 +31,11 @@ int kr_log_level_set(log_level_t level)
 
 	/* gnutls logs messages related to our TLS and also libdnssec,
 	 * and the logging is set up in a global way only */
-	if (kr_log_level >= LOG_DEBUG) {
+	if (KR_LOG_LEVEL_IS(LOG_DEBUG)) {
 		gnutls_global_set_log_function(kres_gnutls_log);
 	}
-	gnutls_global_set_log_level(level);
+
+	gnutls_global_set_log_level(kr_log_level_get() == LOG_DEBUG ? 5 : 0);
 
 	return kr_log_level;
 
