@@ -30,3 +30,5 @@ void kr_log_init(log_level_t level);
 #define kr_log_fatal(fmt, ...) kr_log_fmt(LOG_CRIT, fmt, ## __VA_ARGS__)
 
 #define kr_log_deprecate(fmt, ...) kr_log_fmt(LOG_WARNING, "deprecation WARNING: " fmt, ## __VA_ARGS__)
+
+#define KR_LOG_LEVEL_IS(exp) ((kr_log_level >= exp) ? true : false)

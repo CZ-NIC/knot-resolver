@@ -31,13 +31,6 @@
 #include <sys/statvfs.h>
 #include <sys/un.h>
 
-/* Always compile-in log symbols, even if disabled. */
-#undef kr_verbose_status
-
-/* Logging & debugging */
-bool kr_verbose_status = false;
-
-
 /*
  * Macros.
  */

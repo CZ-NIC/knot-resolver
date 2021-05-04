@@ -42,10 +42,6 @@ typedef void (*trace_callback_f)(struct kr_request *request);
  * @param[in] msg Log message. Pointer is not valid after handler returns. */
 typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
 
-/* Always export these, but override direct calls by macros conditionally. */
-/** Whether in --verbose mode.  Only use this for reading. */
-KR_EXPORT extern bool kr_verbose_status;
-
 /**
  * @brief Return true if the query has request log handler installed.
  */
@@ -79,15 +75,9 @@ void kr_log_req(const struct kr_request * const req, uint32_t qry_uid,
 KR_EXPORT KR_PRINTF(3)
 void kr_log_q(const struct kr_query *qry, const char *source, const char *fmt, ...);
 
-#ifdef NOVERBOSELOG
-/* Efficient compile-time disabling of verbose messages. */
-#define kr_verbose_status false
-#define kr_verbose_set(x)
-#endif
-
 /** Block run in --verbose mode; optimized when not run. */
-#define VERBOSE_STATUS __builtin_expect(kr_verbose_status, false)
-#define WITH_VERBOSE(query) if(__builtin_expect(kr_verbose_status || kr_log_qtrace_enabled(query), false))
+#define VERBOSE_STATUS __builtin_expect(KR_LOG_LEVEL_IS(LOG_DEBUG), false)
+#define WITH_VERBOSE(query) if(__builtin_expect(KR_LOG_LEVEL_IS(LOG_DEBUG) || kr_log_qtrace_enabled(query), false))
 #define kr_log_verbose if(VERBOSE_STATUS) printf
 
 #define KR_DNAME_GET_STR(dname_str, dname) \
