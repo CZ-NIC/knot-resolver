@@ -904,19 +904,35 @@ failure:
 	return lmdb_error(ret);
 }
 
-static double cdb_usage_percent(kr_cdb_pt db)
-{
-	knot_db_t *kdb = kr_cdb_pt2knot_db_t(db);
-	const size_t db_size = knot_db_lmdb_get_mapsize(kdb);
-	const size_t db_usage_abs = knot_db_lmdb_get_usage(kdb);
-	const double db_usage = (double)db_usage_abs / db_size * 100.0;
-	free(kdb);
-	return db_usage;
-}
-
 static size_t cdb_get_maxsize(kr_cdb_pt db)
 {
 	return db2env(db)->mapsize;
+}
+
+static double cdb_usage_percent(kr_cdb_pt db)
+{
+	const double ERROR = 0.0; // LATER: we might do errors differently
+	struct lmdb_env *env = db2env(db);
+	if (refresh_mapsize(env) != kr_ok())
+		return ERROR;
+
+	MDB_txn *txn = NULL;
+	if (txn_get(env, &txn, true) != kr_ok())
+		return ERROR;
+	MDB_stat st;
+#if KR_USE_MDBX
+	int ret = mdbx_env_stat_ex(env->env, txn, &st, sizeof(st));
+#else
+	int ret = mdb_stat(txn, env->dbi, &st);
+#endif
+	txn_free_ro(env); // not really needed, but let's keep the API simpler
+	if (ret != MDB_SUCCESS)
+		return ERROR;
+
+	// "algorithm" copied from knot_db_lmdb_get_usage()
+	const size_t db_usage_abs = st.ms_psize
+		* (st.ms_branch_pages + st.ms_leaf_pages + st.ms_overflow_pages);
+	return (double)db_usage_abs / cdb_get_maxsize(db) * 100.0;
 }
 
 /** Conversion between knot and lmdb structs. */
