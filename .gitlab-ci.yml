@@ -32,6 +32,7 @@ stages:
     refs:
       - master@knot/knot-resolver
       - master@knot/security/knot-resolver
+      - tags
     variables:
       - $SKIP_CI == "1"
   tags:
@@ -255,7 +256,6 @@ root.hints:
 deckard:
   <<: *test_flaky
   only:  # trigger job only in repos under our control (privileged runner required)
-    - tags
     - branches@knot/knot-resolver
     - branches@knot/security/knot-resolver
   tags:
