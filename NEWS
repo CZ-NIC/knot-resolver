@@ -1,4 +1,4 @@
-Knot Resolver 5.3.2 (2021-0m-dd)
+Knot Resolver 5.3.2 (2021-05-05)
 ================================
 
 Security
@@ -9,6 +9,7 @@ Security
 Improvements
 ------------
 - cache: improve handling write errors from LMDB (!1159)
+- doh2: improve handling of stream errors (!1164)
 
 Bugfixes
 --------
@@ -16,6 +17,7 @@ Bugfixes
 - validator: fix SERVFAIL for some rare dynamic proofs (!1166)
 - fix SIGBUS on uncommon ARM machines (unaligned access; !1167, #426)
 - cache: better resilience on abnormal termination/restarts (!1172)
+- doh2: fix memleak on stream write failures (!1161)
 
 
 Knot Resolver 5.3.1 (2021-03-31)
