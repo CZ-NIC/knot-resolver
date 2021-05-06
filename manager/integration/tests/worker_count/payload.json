@@ -2,14 +2,7 @@
   "server": {
     "instances": %s
   },
-  "lua": {
-    "script_list": [
-      "net.listen('127.0.0.1', 53, { kind = 'dns' })",
-      "net.listen('127.0.0.1', 853, { kind = 'tls' })",
-      "net.listen('::1', 53, { kind = 'dns', freebind = true })",
-      "net.listen('::1', 853, { kind = 'tls', freebind = true })",
-      "-- Cache size",
-      "cache.size = 100 * MB"
-    ]
+  "logging": {
+    "level": 7
   }
 }

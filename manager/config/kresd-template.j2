@@ -1,18 +1,41 @@
+{% if cfg.server.hostname %}
+-- server.hostname
+hostname('{{ cfg.server.hostname }}')
+{% endif %}
+
+-- network.interfaces
+{% for item in cfg.network.interfaces %}
+net.listen('{{ item.get_address() }}', {{ item.get_port() if item.get_port() else 'nil' }}, {
+    kind = '{{ item.kind if item.kind != 'dot' else 'tls' }}',
+    freebind = {{ 'true' if item.freebind else 'false'}}
+})
+{% endfor %}
+
+-- network.edns-buffer-size
+net.bufsize({{ cfg.network.edns_buffer_size.get_downstream() }}, {{ cfg.network.edns_buffer_size.get_upstream() }})
+
+-- modules
 modules = {
     'hints > iterate',   -- Load /etc/hosts and allow custom root hints",
     'stats',             -- Track internal statistics",
-    'predict',           -- Prefetch expiring/frequent records",
-{%- if cfg.dns64 %}
+{% if cfg.options.prediction %}
+    predict = {          -- Prefetch expiring/frequent records"
+        window = {{ cfg.options.prediction.get_window() }},
+        period = {{ cfg.options.prediction.period }}
+    },
+{% endif %}
+{% if cfg.dns64 %}
     dns64 = '{{ cfg.dns64.prefix }}', -- dns64
-{%- endif %}
+{% endif %}
 }
 
-{%- if ( cfg.logging.level > 3 ) %}
--- logging level
-verbose(true)
-{%- endif %}
+-- cache
+cache.open({{ cfg.cache.get_size_max() }}, 'lmdb://{{ cfg.cache.storage }}')
 
+-- logging level
+verbose({{ 'true' if cfg.logging.level > 3 else 'false'}})
+
+{% if cfg.lua.script %}
 -- lua
-{%- if cfg.lua.script %}
 {{ cfg.lua.script }}
-{%- endif %}
+{% endif %}
