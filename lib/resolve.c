@@ -931,7 +931,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	const knot_dname_t *start_name = qry->sname;
 	if ((qry->flags.AWAIT_CUT) && !resume) {
 		qry->flags.AWAIT_CUT = false;
-		const knot_dname_t *longest_ta = kr_ta_get_longest_name(trust_anchors, qry->sname);
+		const knot_dname_t *longest_ta = kr_ta_closest(request->ctx, qry->sname, qry->stype);
 		if (longest_ta) {
 			start_name = longest_ta;
 			qry->zone_cut.name = knot_dname_copy(start_name, qry->zone_cut.pool);
@@ -1087,10 +1087,11 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 {
 	struct kr_rplan *rplan = &request->rplan;
 	map_t *trust_anchors = &request->ctx->trust_anchors;
-	map_t *negative_anchors = &request->ctx->negative_anchors;
 
-	/* Disable DNSSEC if it enters NTA. */
-	if (kr_ta_get(negative_anchors, qry->zone_cut.name)){
+	const knot_dname_t *const ta_closest =
+		kr_ta_closest(request->ctx, qry->zone_cut.name, KNOT_RRTYPE_NS);
+	/* Disable DNSSEC if it's entered an NTA. */
+	if (!ta_closest) {
 		VERBOSE_MSG(qry, ">< negative TA, going insecure\n");
 		qry->flags.DNSSEC_WANT = false;
 		qry->flags.DNSSEC_INSECURE = true;
@@ -1105,13 +1106,11 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	}
 	/* Enable DNSSEC if entering a new (or different) island of trust,
 	 * and update the TA RRset if required. */
-	bool want_secured = (qry->flags.DNSSEC_WANT) &&
-			    !knot_wire_get_cd(request->qsource.packet->wire);
-	knot_rrset_t *ta_rr = kr_ta_get(trust_anchors, qry->zone_cut.name);
-	if (!knot_wire_get_cd(request->qsource.packet->wire) && ta_rr) {
+	const bool has_cd = knot_wire_get_cd(request->qsource.packet->wire);
+	knot_rrset_t *ta_rr = !ta_closest ? NULL :
+		kr_ta_get(trust_anchors, qry->zone_cut.name);
+	if (!has_cd && ta_rr) {
 		qry->flags.DNSSEC_WANT = true;
-		want_secured = true;
-
 		if (qry->zone_cut.trust_anchor == NULL
 		    || !knot_dname_is_equal(qry->zone_cut.trust_anchor->owner, qry->zone_cut.name)) {
 			mm_free(qry->zone_cut.pool, qry->zone_cut.trust_anchor);
@@ -1128,6 +1127,7 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	const bool has_ta = (qry->zone_cut.trust_anchor != NULL);
 	const knot_dname_t *ta_name = (has_ta ? qry->zone_cut.trust_anchor->owner : NULL);
 	const bool refetch_ta = !has_ta || !knot_dname_is_equal(qry->zone_cut.name, ta_name);
+	const bool want_secured = qry->flags.DNSSEC_WANT && !has_cd;
 	if (want_secured && refetch_ta) {
 		/* @todo we could fetch the information from the parent cut, but we don't remember that now */
 		struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.name, qry->sclass, KNOT_RRTYPE_DS);
