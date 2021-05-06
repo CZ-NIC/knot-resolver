@@ -21,20 +21,6 @@ knot_rrset_t *kr_ta_get(map_t *trust_anchors, const knot_dname_t *name)
 	return map_get(trust_anchors, (const char *)name);
 }
 
-const knot_dname_t *kr_ta_get_longest_name(map_t *trust_anchors, const knot_dname_t *name)
-{
-	while(name) {
-		if (kr_ta_get(trust_anchors, name)) {
-			return name;
-		}
-		if (name[0] == '\0') {
-			break;
-		}
-		name = knot_wire_next_label(name, NULL);
-	}
-	return NULL;
-}
-
 const knot_dname_t * kr_ta_closest(const struct kr_context *ctx, const knot_dname_t *name,
 				   const uint16_t type)
 {

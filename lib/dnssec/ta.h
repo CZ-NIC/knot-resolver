@@ -71,13 +71,3 @@ int kr_ta_del(map_t *trust_anchors, const knot_dname_t *name);
 KR_EXPORT
 void kr_ta_clear(map_t *trust_anchors);
 
-/**
- * Return TA with the longest name that covers given name.
- * @param trust_anchors trust store
- * @param name name of the TA
- * @return pointer to name or NULL.
-	   if not NULL, points inside the name parameter.
- */
-KR_EXPORT
-const knot_dname_t *kr_ta_get_longest_name(map_t *trust_anchors, const knot_dname_t *name);
-
