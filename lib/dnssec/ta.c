@@ -35,6 +35,27 @@ const knot_dname_t *kr_ta_get_longest_name(map_t *trust_anchors, const knot_dnam
 	return NULL;
 }
 
+const knot_dname_t * kr_ta_closest(const struct kr_context *ctx, const knot_dname_t *name,
+				   const uint16_t type)
+{
+	assert(ctx && name);
+	if (type == KNOT_RRTYPE_DS && name[0] != '\0') {
+		/* DS is parent-side record, so the parent name needs to be covered. */
+		name = knot_wire_next_label(name, NULL);
+	}
+	while (name) {
+		struct kr_context *ctx_nc = (struct kr_context *)/*const-cast*/ctx;
+		if (kr_ta_get(&ctx_nc->trust_anchors, name)) {
+			return name;
+		}
+		if (kr_ta_get(&ctx_nc->negative_anchors, name)) {
+			return NULL;
+		}
+		name = knot_wire_next_label(name, NULL);
+	}
+	return NULL;
+}
+
 /* @internal Create DS from DNSKEY, caller MUST free dst if successful. */
 static int dnskey2ds(dnssec_binary_t *dst, const knot_dname_t *owner, const uint8_t *rdata, uint16_t rdlen)
 {
@@ -128,22 +149,6 @@ int kr_ta_covers(map_t *trust_anchors, const knot_dname_t *name)
 		name = knot_wire_next_label(name, NULL);
 	}
 	return false;
-}
-
-bool kr_ta_covers_qry(struct kr_context *ctx, const knot_dname_t *name,
-		      const uint16_t type)
-{
-	assert(ctx && name);
-	if (type == KNOT_RRTYPE_DS && name[0] != '\0') {
-		/* DS is parent-side record, so the parent name needs to be covered. */
-		name = knot_wire_next_label(name, NULL);
-		if (!name) {
-			assert(false);
-			return false;
-		}
-	}
-	return kr_ta_covers(&ctx->trust_anchors, name)
-		&& !kr_ta_covers(&ctx->negative_anchors, name);
 }
 
 /* Delete record data */
