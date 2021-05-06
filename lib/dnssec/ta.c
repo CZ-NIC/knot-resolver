@@ -137,20 +137,6 @@ int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,
 	}
 }
 
-int kr_ta_covers(map_t *trust_anchors, const knot_dname_t *name)
-{
-	while(name) {
-		if (kr_ta_get(trust_anchors, name)) {
-			return true;
-		}
-		if (name[0] == '\0') {
-			return false;
-		}
-		name = knot_wire_next_label(name, NULL);
-	}
-	return false;
-}
-
 /* Delete record data */
 static int del_record(const char *k, void *v, void *ext)
 {
