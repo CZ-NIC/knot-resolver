@@ -42,12 +42,28 @@ KR_EXPORT KR_PURE
 int kr_ta_covers(map_t *trust_anchors, const knot_dname_t *name);
 
 struct kr_context;
+
 /**
- * A wrapper around kr_ta_covers that is aware of negative TA and types.
+ * Return pointer to the name of the closest positive trust anchor or NULL.
+ *
+ * Closest means covering the root.  Closer negative anchor results into NULL.
+ * @param type serves as a shorthand because DS needs to start one level higher.
  */
-KR_EXPORT KR_PURE
+KR_PURE
+const knot_dname_t * kr_ta_closest(const struct kr_context *ctx, const knot_dname_t *name,
+				   const uint16_t type);
+
+/**
+ * A trivial wrapper around kr_ta_closest
+ *
+ * TODO: drop it?  The name doesn't feel very suitable either.
+ */
+static inline
 bool kr_ta_covers_qry(struct kr_context *ctx, const knot_dname_t *name,
-		      const uint16_t type);
+		      const uint16_t type)
+{
+	return kr_ta_closest(ctx, name, type) != NULL;
+}
 
 /**
  * Remove TA from trust store.
