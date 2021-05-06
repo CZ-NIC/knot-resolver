@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "lib/defines.h"
 #include "lib/generic/map.h"
 #include <libknot/rrset.h>
 
