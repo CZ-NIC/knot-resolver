@@ -1,21 +1,31 @@
 {
-  "server": {
-    "instances": 4
+  "network": {
+    "interfaces": [
+      {
+        "listen": "127.0.0.1"
+      },
+      {
+        "listen": "127.0.0.1",
+        "kind": "dot"
+      },
+      {
+        "listen": "::1",
+        "feebind": true
+      },
+      {
+        "listen": "::1",
+        "kind": "dot",
+        "feebind": true
+      }
+    ],
+    "edns_buffer_size": {
+      "downstream": "4K"
+    }
   },
-  "dns64": {
-    "prefix": "64:ff9b::"
+  "options": {
+    "prediction": true
   },
-  "logging": {
-    "level": 4
-  },
-  "lua": {
-    "script": [
-      "net.listen('127.0.0.1', 53, { kind = 'dns' })",
-      "net.listen('127.0.0.1', 853, { kind = 'tls' })",
-      "net.listen('::1', 53, { kind = 'dns', freebind = true })",
-      "net.listen('::1', 853, { kind = 'tls', freebind = true })",
-      "-- Cache size",
-      "cache.size = 100 * MB"
-    ]
+  "cache": {
+    "size_max": "100M"
   }
 }

@@ -1,21 +1,41 @@
 {
   "server": {
-    "instances": 1
+    "hostname": "knot-resolver-manager",
+    "instances": 2,
+    "use_cache_gc": false
   },
-  "dns64": {
-    "prefix": "64:ff9b::"
+  "network": {
+    "interfaces": [
+      {
+        "listen": "127.0.0.1"
+      },
+      {
+        "listen": "::1",
+        "freebind": true
+      },
+      {
+        "listen": "127.0.0.1",
+        "kind": "dot"
+      },
+      {
+        "listen": "::1",
+        "kind": "dot",
+        "freebind": true
+      }
+    ],
+    "edns_buffer_size": {
+      "downstream": "4K"
+    }
+  },
+  "options": {
+    "prediction": true
+  },
+  "dnssec": false,
+  "dns64": true,
+  "cache": {
+    "size_max": "10M"
   },
   "logging": {
-    "level": 4
-  },
-  "lua": {
-    "script_list": [
-      "net.listen('127.0.0.1', 53, { kind = 'dns' })",
-      "net.listen('127.0.0.1', 853, { kind = 'tls' })",
-      "net.listen('::1', 53, { kind = 'dns', freebind = true })",
-      "net.listen('::1', 853, { kind = 'tls', freebind = true })",
-      "-- Cache size",
-      "cache.size = 100 * MB"
-    ]
+    "level": 7
   }
 }
