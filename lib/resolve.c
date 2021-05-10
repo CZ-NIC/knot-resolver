@@ -1087,11 +1087,10 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 {
 	struct kr_rplan *rplan = &request->rplan;
 	map_t *trust_anchors = &request->ctx->trust_anchors;
+	map_t *negative_anchors = &request->ctx->negative_anchors;
 
-	const knot_dname_t *const ta_closest =
-		kr_ta_closest(request->ctx, qry->zone_cut.name, KNOT_RRTYPE_NS);
-	/* Disable DNSSEC if it's entered an NTA. */
-	if (!ta_closest) {
+	/* Disable DNSSEC if it enters NTA. */
+	if (kr_ta_get(negative_anchors, qry->zone_cut.name)){
 		VERBOSE_MSG(qry, ">< negative TA, going insecure\n");
 		qry->flags.DNSSEC_WANT = false;
 		qry->flags.DNSSEC_INSECURE = true;
@@ -1107,8 +1106,7 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	/* Enable DNSSEC if entering a new (or different) island of trust,
 	 * and update the TA RRset if required. */
 	const bool has_cd = knot_wire_get_cd(request->qsource.packet->wire);
-	knot_rrset_t *ta_rr = !ta_closest ? NULL :
-		kr_ta_get(trust_anchors, qry->zone_cut.name);
+	knot_rrset_t *ta_rr = kr_ta_get(trust_anchors, qry->zone_cut.name);
 	if (!has_cd && ta_rr) {
 		qry->flags.DNSSEC_WANT = true;
 		if (qry->zone_cut.trust_anchor == NULL
