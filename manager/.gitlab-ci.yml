@@ -4,12 +4,7 @@ stages:
 
 image: registry.nic.cz/knot/knot-resolver-manager/devenv:latest
 
-# Ideally, the CI would build it's own container and use it afterwards. This workflow should be supported,
-# at least according to the GitLab documentation:
-# https://gitlab.nic.cz/help/user/packages/container_registry/index#container-registry-examples-with-gitlab-cicd
-# Sadly, it does not work on our infrastructure. I did not however test it thoroughly and/or consulted it with
-# anyone else. So it might be fixable. For now, let's leave the config here and we might fix it in the future.
-#
+
 build:
   image: docker:20-dind
   stage: image
