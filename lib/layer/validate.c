@@ -16,6 +16,7 @@
 
 #include "lib/dnssec/nsec.h"
 #include "lib/dnssec/nsec3.h"
+#include "lib/dnssec/ta.h"
 #include "lib/dnssec.h"
 #include "lib/layer.h"
 #include "lib/resolve.h"
@@ -167,6 +168,13 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, struct kr_query *qr
 		if (kr_rank_test(entry->rank, KR_RANK_OMIT)
 		    || kr_rank_test(entry->rank, KR_RANK_SECURE)) {
 			continue; /* these are already OK */
+		}
+
+		if (!knot_dname_is_equal(qry->zone_cut.name, rr->owner)/*optim.*/
+		    && !kr_ta_covers_qry(qry->request->ctx, rr->owner, rr->type)) {
+			/* We have NTA "between" our (perceived) zone cut and the RR. */
+			kr_rank_set(&entry->rank, KR_RANK_INSECURE);
+			continue;
 		}
 
 		if (rr->type == KNOT_RRTYPE_RRSIG) {
