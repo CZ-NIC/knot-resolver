@@ -108,7 +108,8 @@ enum kr_rank {
 
 	/** Proven to be insecure, i.e. we have a chain of trust from TAs
 	 * that cryptographically denies the possibility of existence
-	 * of a positive chain of trust from the TAs to the record. */
+	 * of a positive chain of trust from the TAs to the record.
+	 * Or it may be covered by a closer negative TA. */
 	KR_RANK_INSECURE = 8,
 
 	/** Authoritative data flag; the chain of authority was "verified".
