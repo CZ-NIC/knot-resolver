@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "lib/defines.h"
 #include "lib/generic/map.h"
 #include <libknot/rrset.h>
 
@@ -30,23 +31,29 @@ KR_EXPORT
 int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,
                uint32_t ttl, const uint8_t *rdata, uint16_t rdlen);
 
-/**
- * Return true if the name is below/at any TA in the store.
- * This can be useful to check if it's possible to validate a name beforehand.
- * @param  trust_anchors trust store
- * @param  name          name of the TA
- * @return boolean
- */
-KR_EXPORT KR_PURE
-int kr_ta_covers(map_t *trust_anchors, const knot_dname_t *name);
-
 struct kr_context;
+
 /**
- * A wrapper around kr_ta_covers that is aware of negative TA and types.
+ * Return pointer to the name of the closest positive trust anchor or NULL.
+ *
+ * "Closest" means on path towards root.  Closer negative anchor results into NULL.
+ * @param type serves as a shorthand because DS needs to start one level higher.
  */
-KR_EXPORT KR_PURE
+KR_PURE
+const knot_dname_t * kr_ta_closest(const struct kr_context *ctx, const knot_dname_t *name,
+				   const uint16_t type);
+
+/**
+ * A trivial wrapper around kr_ta_closest
+ *
+ * TODO: drop it?  The name doesn't feel very suitable either.
+ */
+static inline
 bool kr_ta_covers_qry(struct kr_context *ctx, const knot_dname_t *name,
-		      const uint16_t type);
+		      const uint16_t type)
+{
+	return kr_ta_closest(ctx, name, type) != NULL;
+}
 
 /**
  * Remove TA from trust store.
@@ -64,12 +71,3 @@ int kr_ta_del(map_t *trust_anchors, const knot_dname_t *name);
 KR_EXPORT
 void kr_ta_clear(map_t *trust_anchors);
 
-/**
- * Return TA with the longest name that covers given name.
- * @param trust_anchors trust store
- * @param name name of the TA
- * @return pointer to name or NULL.
-	   if not NULL, points inside the name parameter.
- */
-KR_EXPORT
-const knot_dname_t *kr_ta_get_longest_name(map_t *trust_anchors, const knot_dname_t *name);
