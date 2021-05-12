@@ -76,9 +76,9 @@ int entry2answer(struct answer *ans, int id,
 		const knot_dname_t *owner, uint16_t type, uint32_t new_ttl)
 {
 	/* We assume it's zeroed.  Do basic sanity check. */
-	const bool not_ok = (ans->rrsets[id].set.rr || ans->rrsets[id].sig_rds.rdata
+	const bool not_ok = ans->rrsets[id].set.rr || ans->rrsets[id].sig_rds.rdata
 	    || (type == KNOT_RRTYPE_NSEC  &&  ans->nsec_p.raw)
-	    || (type == KNOT_RRTYPE_NSEC3 && !ans->nsec_p.raw));
+	    || (type == KNOT_RRTYPE_NSEC3 && !ans->nsec_p.raw);
 	if (!kr_assume(!not_ok))
 		return kr_error(EINVAL);
 	/* Materialize the base RRset. */
@@ -87,7 +87,7 @@ int entry2answer(struct answer *ans, int id,
 	if (!kr_assume(rr))
 		return kr_error(ENOMEM);
 	int ret = rdataset_materialize(&rr->rrs, eh->data, eh_bound, ans->mm);
-	if (ret < 0) goto fail;
+	if (!kr_assume(ret >= 0)) goto fail;
 	size_t data_off = ret;
 	ans->rrsets[id].set.rank = eh->rank;
 	ans->rrsets[id].set.expiring = is_expiring(eh->ttl, new_ttl);
@@ -96,20 +96,18 @@ int entry2answer(struct answer *ans, int id,
 	if (want_rrsigs) {
 		ret = rdataset_materialize(&ans->rrsets[id].sig_rds, eh->data + data_off,
 					   eh_bound, ans->mm);
-		if (ret < 0) goto fail;
+		if (!kr_assume(ret >= 0)) goto fail;
 		/* Sanity check: we consumed exactly all data. */
 		int unused_bytes = eh_bound - (uint8_t *)eh->data - data_off - ret;
-		if (unused_bytes) {
+		if (!kr_assume(unused_bytes == 0)) {
 			kr_log_error("[cach] entry2answer ERROR: unused bytes: %d\n",
 					unused_bytes);
-			(void)!kr_assume(!EILSEQ);
 			ret = kr_error(EILSEQ);
 			goto fail; /* to be on the safe side */
 		}
 	}
 	return kr_ok();
 fail:
-	(void)!kr_assume(!ret);
 	/* Cleanup the item that we might've (partially) written to. */
 	knot_rrset_free(ans->rrsets[id].set.rr, ans->mm);
 	knot_rdataset_clear(&ans->rrsets[id].sig_rds, ans->mm);
