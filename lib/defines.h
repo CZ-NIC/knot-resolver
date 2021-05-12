@@ -26,10 +26,7 @@
 #define KR_PRINTF(n)
 #endif
 
-#ifndef uint /* Redefining typedef is a C11 feature. */
 typedef unsigned int uint;
-#define uint uint
-#endif
 
 /*
  * Error codes.
@@ -40,6 +37,9 @@ static inline int KR_COLD kr_error(int x) {
     return x <= 0 ? x : -x;
 }
 #define kr_strerror(x) strerror(abs(x))
+
+// We require C11 but want to avoid including <assert.h> so we alias it ourselves.
+#define static_assert _Static_assert
 
 /*
  * Connection limits.
