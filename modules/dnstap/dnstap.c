@@ -387,7 +387,7 @@ static int find_string(const JsonNode *node, char **val, size_t len) {
 		return kr_error(EINVAL);
 	*val = strndup(node->string_, len);
 	if (!kr_assume(*val != NULL))
-		return kr_error(EFAULT);
+		return kr_error(errno);
 	return kr_ok();
 }
 
