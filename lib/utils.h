@@ -47,9 +47,10 @@ typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
 #define kr_log_deprecate(...) fprintf(stderr, "deprecation WARNING: " __VA_ARGS__)
 
 /** Assert() but always, regardless of -DNDEBUG.  See also kr_assume(). */
-#define kr_require(expression) if (!(expression)) \
-		kr_fail(true, #expression, __func__, __FILE__, __LINE__), \
-		__builtin_unreachable() /* aid code analysis */
+#define kr_require(expression) do { if (!(expression)) { \
+		kr_fail(true, #expression, __func__, __FILE__, __LINE__); \
+		__builtin_unreachable(); /* aid code analysis */ \
+	} } while (false)
 
 /** Check an assumption that's recoverable.  Return the expression.
  *
