@@ -154,11 +154,6 @@ void kr_log_q(const struct kr_query *qry, const char *source, const char *fmt, .
 	knot_rrtype_to_string((rrtype), rrtype_str, sizeof(rrtype_str)); \
 	rrtype_str[sizeof(rrtype_str) - 1] = 0;
 
-/* C11 compatibility, but without any implementation so far. */
-#ifndef static_assert
-#define static_assert(cond, msg)
-#endif
-
 // Use this for alocations with mm.
 // Use mm_alloc for alocations into mempool
 

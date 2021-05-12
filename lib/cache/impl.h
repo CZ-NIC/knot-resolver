@@ -303,7 +303,8 @@ static inline int rdataset_dematerialize_size(const knot_rdataset_t *rds)
 static inline int rdataset_dematerialized_size(const uint8_t *data, uint16_t *rdataset_count)
 {
 	uint16_t count;
-	kr_require(sizeof(count) == KR_CACHE_RR_COUNT_SIZE);
+	static_assert(sizeof(count) == KR_CACHE_RR_COUNT_SIZE,
+			"Unexpected KR_CACHE_RR_COUNT_SIZE.");
 	memcpy(&count, data, sizeof(count));
 	const uint8_t *rdata = data + sizeof(count);
 	if (rdataset_count) // memcpy is safe for unaligned case (on non-x86)
