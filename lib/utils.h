@@ -57,6 +57,7 @@ typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
  * If the check fails, optionally fork()+abort() to generate coredump
  * and continue running in parent process.  Return value must be handled to
  * ensure safe recovery from error.  Use kr_require() for unrecoverable checks.
+ * The errno variable is not mangled, e.g. you can: if (!kr_assume(...)) return errno;
  */
 #define kr_assume(expression) kr_assume_func((expression), #expression,       \
 					     __func__, __FILE__, __LINE__)

@@ -43,6 +43,7 @@ int kr_dbg_assumption_fork = DBG_ASSUMPTION_FORK;
 
 void kr_fail(bool is_fatal, const char *expr, const char *func, const char *file, int line)
 {
+	const int errno_orig = errno;
 	if (is_fatal)
 		kr_log_critical("requirement \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
 	else
@@ -51,12 +52,12 @@ void kr_fail(bool is_fatal, const char *expr, const char *func, const char *file
 	if (is_fatal || (kr_dbg_assumption_abort && !kr_dbg_assumption_fork))
 		abort();
 	else if (!kr_dbg_assumption_abort || !kr_dbg_assumption_fork)
-		return;
+		goto recover;
 	// We want to fork and abort the child, unless rate-limited.
 	static uint64_t limited_until = 0;
 	const uint64_t now = kr_now();
 	if (now < limited_until)
-		return;
+		goto recover;
 	if (kr_dbg_assumption_fork > 0) {
 		// Add jitter +- 25%; in other words: 75% + uniform(0,50%).
 		// Motivation: if a persistent problem starts happening, desynchronize
@@ -66,6 +67,8 @@ void kr_fail(bool is_fatal, const char *expr, const char *func, const char *file
 	}
 	if (fork() == 0)
 		abort();
+recover:
+	errno = errno_orig;
 }
 
 /*
