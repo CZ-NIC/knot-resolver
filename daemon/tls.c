@@ -14,7 +14,6 @@
 #include <gnutls/x509.h>
 #include <uv.h>
 
-#include <assert.h>
 #include <errno.h>
 #include <stdlib.h>
 
@@ -70,7 +69,10 @@ static int kres_gnutls_set_priority(gnutls_session_t session) {
 static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 {
 	struct tls_common_ctx *t = (struct tls_common_ctx *)h;
-	assert(t != NULL);
+	if (!kr_assume(t)) {
+		errno = EFAULT;
+		return -1;
+	}
 
 	ssize_t	avail = t->nread - t->consumed;
 	DEBUG_MSG("[%s] pull wanted: %zu available: %zu\n",
@@ -88,11 +90,12 @@ static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 
 static void on_write_complete(uv_write_t *req, int status)
 {
-	assert(req->data != NULL);
+	if (!kr_assume(req->data))
+		return;
 	struct async_write_ctx *async_ctx = (struct async_write_ctx *)req->data;
 	struct tls_common_ctx *t = async_ctx->t;
-	assert(t->write_queue_size);
-	t->write_queue_size -= 1;
+	if (kr_assume(t->write_queue_size))
+		t->write_queue_size -= 1;
 	free(req->data);
 }
 
@@ -104,8 +107,7 @@ static bool stream_queue_is_empty(struct tls_common_ctx *t)
 static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * iov, int iovcnt)
 {
 	struct tls_common_ctx *t = (struct tls_common_ctx *)h;
-
-	if (t == NULL) {
+	if (!kr_assume(t)) {
 		errno = EFAULT;
 		return -1;
 	}
@@ -114,9 +116,15 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 		return 0;
 	}
 
-	assert(t->session);
+	if (!kr_assume(t->session)) {
+		errno = EFAULT;
+		return -1;
+	}
 	uv_stream_t *handle = (uv_stream_t *)session_get_handle(t->session);
-	assert(handle && handle->type == UV_TCP);
+	if (!kr_assume(handle && handle->type == UV_TCP)) {
+		errno = EFAULT;
+		return -1;
+	}
 
 	/*
 	 * This is a little bit complicated. There are two different writes:
@@ -278,8 +286,8 @@ static int tls_handshake(struct tls_common_ctx *ctx, tls_handshake_cb handshake_
 
 struct tls_ctx *tls_new(struct worker_ctx *worker)
 {
-	assert(worker != NULL);
-	assert(worker->engine != NULL);
+	if (!kr_assume(worker && worker->engine))
+		return NULL;
 
 	struct network *net = &worker->engine->net;
 	if (!net->tls_credentials) {
@@ -357,11 +365,8 @@ struct tls_ctx *tls_new(struct worker_ctx *worker)
 
 void tls_close(struct tls_common_ctx *ctx)
 {
-	if (ctx == NULL || ctx->tls_session == NULL) {
+	if (ctx == NULL || ctx->tls_session == NULL || !kr_assume(ctx->session))
 		return;
-	}
-
-	assert(ctx->session);
 
 	if (ctx->handshake_state == TLS_HS_DONE) {
 		const struct sockaddr *peer = session_get_peer(ctx->session);
@@ -398,8 +403,8 @@ int tls_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, uv_write_cb
 	struct session *s = handle->data;
 	struct tls_common_ctx *tls_ctx = session_tls_get_common_ctx(s);
 
-	assert (tls_ctx);
-	assert (session_flags(s)->outgoing == tls_ctx->client_side);
+	if (!kr_assume(tls_ctx && session_flags(s)->outgoing == tls_ctx->client_side))
+		return kr_error(EINVAL);
 
 	const uint16_t pkt_size = htons(pkt->size);
 	const char *logstring = tls_ctx->client_side ? client_logstring : server_logstring;
@@ -447,13 +452,11 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
 		return kr_error(ENOSYS);
 	}
 
-	assert(tls_p->session == s);
-	const bool ok = tls_p->recv_buf == buf && nread <= sizeof(tls_p->recv_buf);
-	if (!ok) {
-		assert(false);
-		/* don't risk overflowing the buffer if we have a mistake somewhere */
+	if (!kr_assume(tls_p->session == s))
 		return kr_error(EINVAL);
-	}
+	const bool ok = tls_p->recv_buf == buf && nread <= sizeof(tls_p->recv_buf);
+	if (!kr_assume(ok)) /* don't risk overflowing the buffer if we have a mistake somewhere */
+		return kr_error(EINVAL);
 
 	const char *logstring = tls_p->client_side ? client_logstring : server_logstring;
 
@@ -555,8 +558,7 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
  * \return error code */
 static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar_len, bool raw)
 {
-	if (raw && outchar_len < TLS_SHA256_RAW_LEN) {
-		assert(false);
+	if (!kr_assume(!raw || outchar_len >= TLS_SHA256_RAW_LEN)) {
 		return kr_error(ENOSPC);
 		/* With !raw we have check inside kr_base64_encode. */
 	}
@@ -582,8 +584,7 @@ static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar
 	if (err >= 0 && err < outchar_len) {
 		err = GNUTLS_E_SUCCESS;
 		outchar[err] = '\0'; /* kr_base64_encode() doesn't do it */
-	} else if (err >= 0) {
-		assert(false);
+	} else if (!kr_assume(err < 0)) {
 		err = kr_error(ENOSPC); /* base64 fits but '\0' doesn't */
 		outchar[outchar_len - 1] = '\0';
 	}
@@ -775,8 +776,7 @@ void tls_credentials_free(struct tls_credentials *tls_credentials) {
 
 void tls_client_param_unref(tls_client_param_t *entry)
 {
-	if (!entry) return;
-	assert(entry->refs); /* Well, we'd only leak memory. */
+	if (!entry || !kr_assume(entry->refs)) return;
 	--(entry->refs);
 	if (entry->refs) return;
 
@@ -806,7 +806,8 @@ void tls_client_param_unref(tls_client_param_t *entry)
 }
 static int param_free(void **param, void *null)
 {
-	assert(param && *param);
+	if (!kr_assume(param && *param))
+		return -1;
 	tls_client_param_unref(*param);
 	return 0;
 }
@@ -820,10 +821,8 @@ void tls_client_params_free(tls_client_params_t *params)
 tls_client_param_t * tls_client_param_new()
 {
 	tls_client_param_t *e = calloc(1, sizeof(*e));
-	if (!e) {
-		assert(!ENOMEM);
+	if (!kr_assume(e))
 		return NULL;
-	}
 	/* Note: those array_t don't need further initialization. */
 	e->refs = 1;
 	int ret = gnutls_certificate_allocate_credentials(&e->credentials);
@@ -861,22 +860,21 @@ static bool construct_key(const union inaddr *addr, uint32_t *len, char *key)
 		*len = sizeof(addr->ip6.sin6_port) + sizeof(addr->ip6.sin6_addr);
 		return true;
 	default:
-		assert(!EINVAL);
+		(void)!kr_assume(!EINVAL);
 		return false;
 	}
 }
 tls_client_param_t ** tls_client_param_getptr(tls_client_params_t **params,
 				const struct sockaddr *addr, bool do_insert)
 {
-	assert(params && addr);
+	if (!kr_assume(params && addr))
+		return NULL;
 	/* We accept NULL for empty map; ensure the map exists if needed. */
 	if (!*params) {
 		if (!do_insert) return NULL;
 		*params = trie_create(NULL);
-		if (!*params) {
-			assert(!ENOMEM);
+		if (!kr_assume(*params))
 			return NULL;
-		}
 	}
 	/* Construct the key. */
 	const union inaddr *ia = (const union inaddr *)addr;
@@ -913,7 +911,8 @@ static int client_verify_pin(const unsigned int cert_list_size,
 				const gnutls_datum_t *cert_list,
 				tls_client_param_t *params)
 {
-	assert(params->pins.len > 0);
+	if (!kr_assume(params->pins.len > 0))
+		return GNUTLS_E_CERTIFICATE_ERROR;
 #if TLS_CAN_USE_PINS
 	for (int i = 0; i < cert_list_size; i++) {
 		gnutls_x509_crt_t cert;
@@ -966,7 +965,7 @@ static int client_verify_pin(const unsigned int cert_list_size,
 
 #else /* TLS_CAN_USE_PINS */
 	kr_log_error("[tls_client] internal inconsistency: TLS_CAN_USE_PINS\n");
-	assert(false);
+	(void)!kr_assume(false);
 	return GNUTLS_E_CERTIFICATE_ERROR;
 #endif
 }
@@ -979,9 +978,8 @@ static int client_verify_pin(const unsigned int cert_list_size,
  */
 static int client_verify_certchain(gnutls_session_t tls_session, const char *hostname)
 {
-	if (!hostname) {
+	if (!kr_assume(hostname)) {
 		kr_log_error("[tls_client] internal config inconsistency: no hostname set\n");
-		assert(false);
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
 
@@ -1020,7 +1018,8 @@ static int client_verify_certchain(gnutls_session_t tls_session, const char *hos
 static int client_verify_certificate(gnutls_session_t tls_session)
 {
 	struct tls_client_ctx *ctx = gnutls_session_get_ptr(tls_session);
-	assert(ctx->params != NULL);
+	if (!kr_assume(ctx->params))
+		return GNUTLS_E_CERTIFICATE_ERROR;
 
 	if (ctx->params->insecure) {
 		return GNUTLS_E_SUCCESS;
@@ -1119,8 +1118,11 @@ void tls_client_ctx_free(struct tls_client_ctx *ctx)
 int  tls_pull_timeout_func(gnutls_transport_ptr_t h, unsigned int ms)
 {
 	struct tls_common_ctx *t = (struct tls_common_ctx *)h;
-	assert(t != NULL);
-	ssize_t	avail = t->nread - t->consumed;
+	if (!kr_assume(t)) {
+		errno = EFAULT;
+		return -1;
+	}
+	ssize_t avail = t->nread - t->consumed;
 	DEBUG_MSG("[%s] timeout check: available: %zu\n",
 		  t->client_side ? "tls_client" : "tls", avail);
 	if (avail <= 0) {
@@ -1134,11 +1136,11 @@ int tls_client_connect_start(struct tls_client_ctx *client_ctx,
 			     struct session *session,
 			     tls_handshake_cb handshake_cb)
 {
-	if (session == NULL || client_ctx == NULL) {
+	if (session == NULL || client_ctx == NULL)
 		return kr_error(EINVAL);
-	}
 
-	assert(session_flags(session)->outgoing && session_get_handle(session)->type == UV_TCP);
+	if (!kr_assume(session_flags(session)->outgoing && session_get_handle(session)->type == UV_TCP))
+		return kr_error(EINVAL);
 
 	struct tls_common_ctx *ctx = &client_ctx->c;
 
