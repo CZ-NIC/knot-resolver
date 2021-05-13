@@ -5,22 +5,27 @@
 #pragma once
 
 #include <stdarg.h>
+#include <syslog.h>
 #include "lib/defines.h"
 
-typedef enum {
-	LOG_CRIT = 0,
-	LOG_ERR,
-	LOG_WARNING,
-	LOG_NOTICE,
-	LOG_INFO,
-	LOG_DEBUG
-} log_level_t;
+typedef int log_level_t;
 
-KR_EXPORT KR_PRINTF(2) void kr_log_fmt(log_level_t level, const char *fmt, ...);
-KR_EXPORT extern log_level_t kr_log_level;
-KR_EXPORT int kr_log_level_set(log_level_t level);
-KR_EXPORT log_level_t kr_log_level_get(void);
-void kr_log_init(log_level_t level);
+typedef enum {
+	LOG_TARGET_SYSLOG = 0,
+	LOG_TARGET_STDERR = 1,
+	LOG_TARGET_STDOUT = 2,
+} log_target_t;
+
+KR_EXPORT
+extern log_level_t kr_log_level;
+extern log_target_t kr_log_target;
+KR_EXPORT KR_PRINTF(2)
+void kr_log_fmt(log_level_t level, const char *fmt, ...);
+KR_EXPORT
+int kr_log_level_set(log_level_t level);
+KR_EXPORT
+log_level_t kr_log_level_get(void);
+void kr_log_init(log_level_t level, log_target_t target);
 
 #define kr_log_debug(fmt, ...) kr_log_fmt(LOG_DEBUG, fmt, ## __VA_ARGS__)
 #define kr_log_info(fmt, ...) kr_log_fmt(LOG_INFO, fmt, ## __VA_ARGS__)
