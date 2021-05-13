@@ -18,19 +18,17 @@ static int dname_wire_reconstruct(knot_dname_t *buf, const struct key *k,
 {
 	/* Reconstruct from key: first the ending, then zone name. */
 	int ret = knot_dname_lf2wire(buf, kwz.len, kwz.data);
-	if (ret < 0) {
+	if (!kr_assume(ret >= 0)) {
 		VERBOSE_MSG(NULL, "=> NSEC: LF2wire ret = %d\n", ret);
-		assert(false);
 		return ret;
 	}
 		/* The last written byte is the zero label for root -> overwrite. */
 	knot_dname_t *zone_start = buf + ret - 1;
-	assert(*zone_start == '\0');
+	if (!kr_assume(*zone_start == '\0'))
+		return kr_error(EFAULT);
 	ret = knot_dname_to_wire(zone_start, k->zname, KNOT_DNAME_MAXLEN - kwz.len);
-	if (ret != k->zlf_len + 1) {
-		assert(false);
+	if (!kr_assume(ret == k->zlf_len + 1))
 		return ret < 0 ? ret : kr_error(EILSEQ);
-	}
 	return kr_ok();
 }
 
@@ -42,18 +40,14 @@ knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name, bool add_wildca
 	int ret;
 	const bool ok = k && name
 		&& !(ret = kr_dname_lf(k->buf, name, add_wildcard));
-	if (!ok) {
-		assert(false);
+	if (!kr_assume(ok))
 		return (knot_db_val_t){ NULL, 0 };
-	}
 
 	uint8_t *begin = k->buf + 1 + k->zlf_len; /* one byte after zone's zero */
 	uint8_t *end = k->buf + 1 + k->buf[0]; /* we don't use the final zero in key,
 						* but move it anyway */
-	if (end < begin) {
-		assert(false);
+	if (!kr_assume(end >= begin))
 		return (knot_db_val_t){ NULL, 0 };
-	}
 	int key_len;
 	if (end > begin) {
 		memmove(begin + 2, begin, end - begin);
@@ -90,7 +84,7 @@ knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name, bool add_wildca
  */
 static int kwz_between(knot_db_val_t k1, knot_db_val_t k2, knot_db_val_t k4)
 {
-	assert(k2.data && k4.data);
+	kr_require(k2.data && k4.data);
 	/* CACHE_KEY_DEF; we need to beware of one key being a prefix of another */
 	int ret_maybe; /**< result, assuming we confirm k2 < k4 */
 	if (k1.data) {
@@ -135,18 +129,15 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 {
 	/* Do the cache operation. */
 	const size_t nwz_off = key_nwz_off(k);
-	if (!key.data || key.len < nwz_off) {
-		assert(false);
+	if (!kr_assume(key.data && key.len >= nwz_off))
 		return "range search ERROR";
-	}
 	knot_db_val_t key_nsec = key;
 	knot_db_val_t val = { NULL, 0 };
 	int ret = cache_op(cache, read_leq, &key_nsec, &val);
 	if (ret < 0) {
-		if (ret == kr_error(ENOENT)) {
+		if (kr_assume(ret == kr_error(ENOENT))) {
 			return "range search miss";
 		} else {
-			assert(false);
 			return "range search ERROR";
 		}
 	}
@@ -205,10 +196,8 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 		memcpy(&next_len, next + offsetof(knot_rdata_t, len), sizeof(next_len));
 		next_data = next + offsetof(knot_rdata_t, data);
 	}
-	if (KR_CACHE_RR_COUNT_SIZE != 2 || get_uint16(eh->data) == 0) {
-		assert(false);
-		return "ERROR";
-		/* TODO: more checks? */
+	if (!kr_assume(KR_CACHE_RR_COUNT_SIZE == 2 && get_uint16(eh->data) != 0)) {
+		return "ERROR"; /* TODO: more checks? */
 	}
 	/*
 	WITH_VERBOSE {
@@ -218,10 +207,9 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 	*/
 	knot_dname_t ch_buf[KNOT_DNAME_MAXLEN];
 	knot_dname_t *chs = kwz_high ? kwz_high->data : ch_buf;
-	if (!chs) {
-		assert(false);
+	if (!kr_assume(chs))
 		return "EINVAL";
-	}
+
 	{
 		/* Lower-case chs; see also RFC 6840 5.1.
 		 * LATER(optim.): we do lots of copying etc. */
@@ -234,21 +222,22 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 		knot_dname_to_lower(lower_buf);
 		ret = kr_dname_lf(chs, lower_buf, false);
 	}
-	if (ret) {
-		assert(false);
+
+	if (!kr_assume(ret == 0))
 		return "ERROR";
-	}
 	knot_db_val_t kwz_hi = { /* skip the zone name */
 		.data = chs + 1 + k->zlf_len,
 		.len = chs[0] - k->zlf_len,
 	};
-	assert((ssize_t)(kwz_hi.len) >= 0);
+	if (!kr_assume((ssize_t)(kwz_hi.len) >= 0))
+		return "ERROR";
 	/* 2. do the actual range check. */
 	const knot_db_val_t kwz_sname = {
 		.data = (void *)/*const-cast*/(k->buf + 1 + nwz_off),
 		.len = k->buf[0] - k->zlf_len,
 	};
-	assert((ssize_t)(kwz_sname.len) >= 0);
+	if (!kr_assume((ssize_t)(kwz_sname.len) >= 0))
+		return "ERROR";
 	bool covers = /* we know for sure that the low end is before kwz_sname */
 		3 == kwz_between((knot_db_val_t){ NULL, 0 }, kwz_sname, kwz_hi);
 	if (!covers) {
@@ -270,11 +259,9 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 	/* Basic sanity check. */
 	const bool ok = k && ans && clencl_labels && cover_low_kwz && cover_hi_kwz
 			&& qry && cache;
-	if (!ok) {
-		assert(!EINVAL);
+	if (!kr_assume(ok))
 		return kr_error(EINVAL);
-	}
-	
+
 	/* Find a previous-or-equal name+NSEC in cache covering the QNAME,
 	 * checking TTL etc. */
 	knot_db_val_t key = key_NSEC1(k, qry->sname, false);
@@ -310,7 +297,8 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 	const knot_rrset_t *nsec_rr = ans->rrsets[AR_NSEC].set.rr;
 	const uint8_t *bm = knot_nsec_bitmap(nsec_rr->rrs.rdata);
 	uint16_t bm_size = knot_nsec_bitmap_len(nsec_rr->rrs.rdata);
-	assert(bm);
+	if (!kr_assume(bm))
+		return kr_error(EFAULT);
 
 	if (exact_match) {
 		if (kr_nsec_bitmap_nodata_check(bm, bm_size, qry->stype, nsec_rr->owner) != 0) {
@@ -351,10 +339,8 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 	 */
 	knot_dname_t next[KNOT_DNAME_MAXLEN];
 	int ret = knot_dname_to_wire(next, knot_nsec_next(nsec_rr->rrs.rdata), sizeof(next));
-	if (ret < 0) {
-		assert(!ret);
+	if (!kr_assume(ret >= 0))
 		return kr_error(ret);
-	}
 	knot_dname_to_lower(next);
 	*clencl_labels = MAX(
 		nsec_matched,
@@ -394,16 +380,15 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	/* Construct key for the source of synthesis. */
 	knot_db_val_t key = key_NSEC1(k, clencl_name, true);
 	const size_t nwz_off = key_nwz_off(k);
-	if (!key.data || key.len < nwz_off) {
-		assert(false);
+	if (!kr_assume(key.data && key.len >= nwz_off))
 		return kr_error(1);
-	}
 	/* Check if our sname-covering NSEC also covers/matches SS. */
 	knot_db_val_t kwz = {
 		.data = (uint8_t *)key.data + nwz_off,
 		.len = key.len - nwz_off,
 	};
-	assert((ssize_t)(kwz.len) >= 0);
+	if (!kr_assume((ssize_t)(kwz.len) >= 0))
+		return kr_error(EINVAL);
 	const int cmp = kwz_between(cover_low_kwz, kwz, cover_hi_kwz);
 	if (nonexistence_ok(cmp, ans->rrsets[AR_NSEC].set.rr)) {
 		VERBOSE_MSG(qry, "=> NSEC wildcard: covered by the same RR\n");
@@ -436,16 +421,16 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 		nsec_rr = ans->rrsets[AR_WILD].set.rr;
 	}
 
-	assert(nsec_rr);
+	if (!kr_assume(nsec_rr))
+		return kr_error(EFAULT);
 	const uint32_t new_ttl_log =
 		kr_verbose_status ? nsec_rr->ttl : -1;
 	const uint8_t *bm = knot_nsec_bitmap(nsec_rr->rrs.rdata);
 	uint16_t bm_size = knot_nsec_bitmap_len(nsec_rr->rrs.rdata);
 	int ret;
 	struct answer_rrset * const arw = &ans->rrsets[AR_WILD];
-	if (!bm) {
-		assert(false);
-		ret = kr_error(1);
+	if (!kr_assume(bm)) {
+		ret = kr_error(EFAULT);
 		goto clean_wild;
 	}
 	if (!exact_match) {

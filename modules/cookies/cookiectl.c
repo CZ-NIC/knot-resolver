@@ -2,7 +2,6 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <assert.h>
 #include <ccan/json/json.h>
 #include <ctype.h>
 #include <libknot/rrtype/opt-cookie.h>
@@ -46,7 +45,8 @@ static void kr_cookie_ctx_init(struct kr_cookie_ctx *ctx)
  */
 static bool enabled_ok(const JsonNode *node)
 {
-	assert(node);
+	if (!kr_assume(node))
+		return false;
 
 	return node->tag == JSON_BOOL;
 }
@@ -58,7 +58,8 @@ static bool enabled_ok(const JsonNode *node)
  */
 static bool secret_ok(const JsonNode *node)
 {
-	assert(node);
+	if (!kr_assume(node))
+		return false;
 
 	if (node->tag != JSON_STRING) {
 		return false;
@@ -186,9 +187,11 @@ static int hexbyte2int(const char *hexstr)
 	}
 
 	dhi = hexchar2val(dhi);
-	assert(dhi != -1);
+	if (!kr_assume(dhi != -1))
+		return -1;
 	dlo = hexchar2val(dlo);
-	assert(dlo != -1);
+	if (!kr_assume(dlo != -1))
+		return -1;
 
 	return (dhi << 4) | dlo;
 }
@@ -206,9 +209,11 @@ static int int2hexbyte(char *tgt, int i)
 	}
 
 	int ilo = hexval2char(i & 0x0f);
-	assert(ilo != -1);
+	if (!kr_assume(ilo != -1))
+		return -1;
 	int ihi = hexval2char((i >> 4) & 0x0f);
-	assert(ihi != -1);
+	if (!kr_assume(ihi != -1))
+		return -1;
 
 	tgt[0] = ihi;
 	tgt[1] = ilo;
@@ -244,7 +249,10 @@ static struct kr_cookie_secret *new_sq_from_hexstr(const char *hexstr)
 			free(sq);
 			return NULL;
 		}
-		assert(0x00 <= num && num <= 0xff);
+		if (!kr_assume(0x00 <= num && num <= 0xff)) {
+			free(sq);
+			return NULL;
+		}
 		*data = num;
 		++data;
 	}
@@ -275,7 +283,8 @@ static struct kr_cookie_secret *create_secret(const JsonNode *node)
  */
 static bool configuration_node_ok(const JsonNode *node)
 {
-	assert(node);
+	if (!kr_assume(node))
+		return false;
 
 	if (!node->key) {
 		/* All top most nodes must have names. */
@@ -331,7 +340,8 @@ static char *new_hexstr_from_sq(const struct kr_cookie_secret *sq)
 static bool read_secret(JsonNode *root, const char *node_name,
                         const struct kr_cookie_secret *secret)
 {
-	assert(root && node_name && secret);
+	if (!kr_assume(root && node_name && secret))
+		return false;
 
 	char *secret_str = new_hexstr_from_sq(secret);
 	if (!secret_str) {
@@ -353,7 +363,8 @@ static bool read_secret(JsonNode *root, const char *node_name,
 static bool read_available_hashes(JsonNode *root, const char *root_name,
                                   const knot_lookup_t table[])
 {
-	assert(root && root_name && table);
+	if (!kr_assume(root && root_name && table))
+		return false;
 
 	JsonNode *array = json_mkarray();
 	if (!array) {
@@ -388,7 +399,8 @@ static bool is_modified(const struct kr_cookie_comp *running,
                         struct kr_cookie_secret *secr,
                         const knot_lookup_t *alg_lookup)
 {
-	assert(running);
+	if (!kr_assume(running))
+		return false;
 
 	if (alg_lookup && alg_lookup->id >= 0) {
 		if (running->alg_id != alg_lookup->id) {
@@ -397,7 +409,8 @@ static bool is_modified(const struct kr_cookie_comp *running,
 	}
 
 	if (secr) {
-		assert(secr->size > 0);
+		if (!kr_assume(secr->size > 0))
+			return false;
 		if (running->secr->size != secr->size ||
 		    0 != memcmp(running->secr->data, secr->data,
 		                running->secr->size)) {
@@ -414,7 +427,8 @@ static bool is_modified(const struct kr_cookie_comp *running,
 static bool obtain_secret(JsonNode *root_node, struct kr_cookie_secret **secret,
                           const char *name)
 {
-	assert(secret && name);
+	if (!kr_assume(secret && name))
+		return false;
 
 	const JsonNode *node;
 	if ((node = json_find_member(root_node, name)) != NULL) {
@@ -434,8 +448,8 @@ static void update_running(struct kr_cookie_settings *running,
                            struct kr_cookie_secret **secret,
                            const knot_lookup_t *alg_lookup)
 {
-	assert(running && secret);
-	assert(*secret || alg_lookup);
+	if (!kr_assume(running && secret) || !kr_assume(*secret || alg_lookup))
+		return;
 
 	running->recent.alg_id = -1;
 	free(running->recent.secr);
@@ -443,7 +457,8 @@ static void update_running(struct kr_cookie_settings *running,
 
 	running->recent.alg_id = running->current.alg_id;
 	if (alg_lookup) {
-		assert(alg_lookup->id >= 0);
+		if (!kr_assume(alg_lookup->id >= 0))
+			return;
 		running->current.alg_id = alg_lookup->id;
 	}
 
@@ -468,14 +483,15 @@ static void apply_changes(struct kr_cookie_settings *running,
                           const knot_lookup_t *alg_lookup,
                           const JsonNode *enabled)
 {
-	assert(running && secret);
+	if (!kr_assume(running && secret))
+		return;
 
 	if (is_modified(&running->current, *secret, alg_lookup)) {
 		update_running(running, secret, alg_lookup);
 	}
 
 	if (enabled) {
-		assert(enabled->tag == JSON_BOOL);
+		(void)!kr_assume(enabled->tag == JSON_BOOL);
 		running->enabled = enabled->bool_;
 	}
 }
@@ -492,7 +508,8 @@ static void apply_changes(struct kr_cookie_settings *running,
  */
 static bool config_apply_json(struct kr_cookie_ctx *ctx, JsonNode *root_node)
 {
-	assert(ctx && root_node);
+	if (!kr_assume(ctx && root_node))
+		return;
 
 	/*
 	 * These must be allocated before actual change. Allocation failure
