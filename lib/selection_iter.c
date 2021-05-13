@@ -48,7 +48,7 @@ static struct address_state *get_address_state(struct iter_local_state *local_st
 	trie_val_t *address_state = trie_get_try(local_state->addresses, (char *)address,
 						 transport->address_len);
 	if (!address_state) {
-		assert(transport->deduplicated);
+		(void)!kr_assume(transport->deduplicated);
 		/* Transport was chosen by a different query. */
 		return NULL;
 	}
@@ -227,7 +227,7 @@ static void update_name_state(knot_dname_t *name, enum kr_transport_protocol typ
 		name_state->aaaa_state = RECORD_TRIED;
 		break;
 	default:
-		assert(0);
+		(void)!kr_assume(false);
 	}
 }
 
@@ -281,7 +281,7 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 			local_state->no_ns_addr_count = 0;
 			break;
 		default:
-			assert(0);
+			(void)!kr_assume(false);
 			break;
 		}
 

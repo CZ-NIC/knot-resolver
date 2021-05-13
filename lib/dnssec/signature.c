@@ -3,7 +3,6 @@
  */
 
 #include <arpa/inet.h>
-#include <assert.h>
 #include <string.h>
 
 #include <libdnssec/error.h>
@@ -26,9 +25,8 @@ static int authenticate_ds(const dnssec_key_t *key, dnssec_binary_t *ds_rdata, u
 	/* Compute DS RDATA from the DNSKEY. */
 	dnssec_binary_t computed_ds = { 0, };
 	int ret = dnssec_key_create_ds(key, digest_type, &computed_ds);
-	if (ret != DNSSEC_EOK) {
+	if (ret != DNSSEC_EOK)
 		goto fail;
-	}
 
 	/* DS records contain algorithm, key tag and the digest.
 	 * Therefore the comparison of the two DS is sufficient.
@@ -44,10 +42,10 @@ fail:
 
 int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
 {
-	assert(ref && key);
-	if (ref->type != KNOT_RRTYPE_DS) {
+	if (!kr_assume(ref && key))
 		return kr_error(EINVAL);
-	}
+	if (ref->type != KNOT_RRTYPE_DS)
+		return kr_error(EINVAL);
 
 	/* Try all possible DS records */
 	int ret = 0;
@@ -58,9 +56,8 @@ int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
 			.data = rd->data
 		};
 		ret = authenticate_ds(key, &ds_rdata, knot_ds_digest_type(rd));
-		if (ret == 0) { /* Found a good DS */
+		if (ret == 0) /* Found a good DS */
 			return kr_ok();
-		}
 		rd = knot_rdataset_next(rd);
 	}
 
@@ -76,7 +73,8 @@ int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
  */
 static int adjust_wire_ttl(uint8_t *wire, size_t wire_size, uint32_t new_ttl)
 {
-	assert(wire);
+	if (!kr_assume(wire))
+		return kr_error(EINVAL);
 	static_assert(sizeof(uint16_t) == 2, "uint16_t must be exactly 2 bytes");
 	static_assert(sizeof(uint32_t) == 4, "uint32_t) must be exactly 4 bytes");
 	uint16_t rdlen;
@@ -89,9 +87,8 @@ static int adjust_wire_ttl(uint8_t *wire, size_t wire_size, uint32_t new_ttl)
 	/* RR wire format in RFC1035 3.2.1 */
 	while(i < wire_size) {
 		ret = knot_dname_size(wire + i);
-		if (ret < 0) {
+		if (ret < 0)
 			return ret;
-		}
 		i += ret + 4;
 		memcpy(wire + i, &new_ttl, sizeof(uint32_t));
 		i += sizeof(uint32_t);
@@ -100,7 +97,8 @@ static int adjust_wire_ttl(uint8_t *wire, size_t wire_size, uint32_t new_ttl)
 		rdlen = ntohs(rdlen);
 		i += sizeof(uint16_t) + rdlen;
 
-		assert(i <= wire_size);
+		if (!kr_assume(i <= wire_size))
+			return kr_error(EINVAL);
 	}
 
 	return kr_ok();
@@ -119,8 +117,8 @@ static int adjust_wire_ttl(uint8_t *wire, size_t wire_size, uint32_t new_ttl)
 #define RRSIG_RDATA_SIGNER_OFFSET 18
 static int sign_ctx_add_self(dnssec_sign_ctx_t *ctx, const uint8_t *rdata)
 {
-	assert(ctx);
-	assert(rdata);
+	if (!kr_assume(ctx && rdata))
+		return kr_error(EINVAL);
 
 	int result;
 
@@ -132,9 +130,8 @@ static int sign_ctx_add_self(dnssec_sign_ctx_t *ctx, const uint8_t *rdata)
 	};
 
 	result = dnssec_sign_add(ctx, &header);
-	if (result != DNSSEC_EOK) {
+	if (result != DNSSEC_EOK)
 		return result;
-	}
 
 	// signer name
 
@@ -163,22 +160,19 @@ static int sign_ctx_add_self(dnssec_sign_ctx_t *ctx, const uint8_t *rdata)
 static int sign_ctx_add_records(dnssec_sign_ctx_t *ctx, const knot_rrset_t *covered,
                                 uint32_t orig_ttl, int trim_labels)
 {
-	if (!ctx || !covered || trim_labels < 0) {
+	if (!ctx || !covered || trim_labels < 0)
 		return kr_error(EINVAL);
-	}
 
 	// huge block of rrsets can be optionally created
 	static uint8_t wire_buffer[KNOT_WIRE_MAX_PKTSIZE];
 	int written = knot_rrset_to_wire(covered, wire_buffer, sizeof(wire_buffer), NULL);
-	if (written < 0) {
+	if (written < 0)
 		return written;
-	}
 
 	/* Set original ttl. */
 	int ret = adjust_wire_ttl(wire_buffer, written, orig_ttl);
-	if (ret != 0) {
+	if (ret != 0)
 		return ret;
-	}
 
 	if (!trim_labels) {
 		const dnssec_binary_t wire_binary = {
@@ -196,9 +190,11 @@ static int sign_ctx_add_records(dnssec_sign_ctx_t *ctx, const knot_rrset_t *cove
 	for (uint16_t i = 0; i < covered->rrs.count; ++i) {
 		/* RR(i) = name | type | class | OrigTTL | RDATA length | RDATA */
 		for (int j = 0; j < trim_labels; ++j) {
-			assert(beginp[0]);
+			if (!kr_assume(beginp[0]))
+				return kr_error(EINVAL);
 			beginp = (uint8_t *) knot_wire_next_label(beginp, NULL);
-			assert(beginp != NULL);
+			if (!kr_assume(beginp))
+				return kr_error(EFAULT);
 		}
 		*(--beginp) = '*';
 		*(--beginp) = 1;
@@ -216,9 +212,8 @@ static int sign_ctx_add_records(dnssec_sign_ctx_t *ctx, const knot_rrset_t *cove
 			.data = beginp
 		};
 		ret = dnssec_sign_add(ctx, &wire_binary);
-		if (ret != 0) {
+		if (ret != 0)
 			break;
-		}
 		beginp += rr_size;
 	}
 	return ret;
@@ -243,9 +238,8 @@ static int sign_ctx_add_data(dnssec_sign_ctx_t *ctx, const uint8_t *rrsig_rdata,
                              const knot_rrset_t *covered, uint32_t orig_ttl, int trim_labels)
 {
 	int result = sign_ctx_add_self(ctx, rrsig_rdata);
-	if (result != KNOT_EOK) {
+	if (result != KNOT_EOK)
 		return result;
-	}
 
 	return sign_ctx_add_records(ctx, covered, orig_ttl, trim_labels);
 }
@@ -254,9 +248,8 @@ int kr_check_signature(const knot_rdata_t *rrsig,
                        const dnssec_key_t *key, const knot_rrset_t *covered,
                        int trim_labels)
 {
-	if (!rrsig || !key || !dnssec_key_can_verify(key)) {
+	if (!rrsig || !key || !dnssec_key_can_verify(key))
 		return kr_error(EINVAL);
-	}
 
 	int ret = 0;
 	dnssec_sign_ctx_t *sign_ctx = NULL;
