@@ -2,19 +2,62 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include "kresconfig.h"
+
 #include <stdio.h>
 #include <gnutls/gnutls.h>
 #include "lib/log.h"
 
+#if ENABLE_LIBSYSTEMD
+#include <stdlib.h>
+#include <systemd/sd-daemon.h>
+#include <systemd/sd-journal.h>
+#endif
+
 log_level_t kr_log_level = LOG_CRIT;
+log_target_t kr_log_target = LOG_TARGET_STDOUT;
+#if ENABLE_LIBSYSTEMD
+int use_journal = 0;
+#endif
 
 void kr_log_fmt(log_level_t level, const char *fmt, ...)
 {
 	va_list args;
-	va_start(args, fmt);
-	if (KR_LOG_LEVEL_IS(level))
-		vfprintf(stdout, fmt, args);
-	va_end(args);
+
+	if (kr_log_target == LOG_TARGET_SYSLOG) {
+		va_start(args, fmt);
+#if ENABLE_LIBSYSTEMD
+		if (use_journal) {
+			char *code_line = NULL;
+			if (asprintf(&code_line, "%d", __LINE__) == -1) {
+				sd_journal_printv(level, fmt, args);
+			} else {
+				sd_journal_printv_with_location(level,
+						__FILE__, code_line, __func__,
+						fmt, args);
+				free(code_line);
+			}
+		} else
+#endif
+		{
+			vsyslog(level, fmt, args);
+		}
+		va_end(args);
+	} else {
+		if (!KR_LOG_LEVEL_IS(level))
+			return;
+
+		FILE *stream;
+		switch(kr_log_target) {
+		case LOG_TARGET_STDOUT: stream = stdout; break;
+		case LOG_TARGET_STDERR: stream = stderr; break;
+		default: stream = stdout; break;
+		}
+
+		va_start(args, fmt);
+		vfprintf(stream, fmt, args);
+		va_end(args);
+	}
 }
 
 static void kres_gnutls_log(int level, const char *message)
@@ -28,6 +71,7 @@ int kr_log_level_set(log_level_t level)
 		return kr_log_level;
 
 	kr_log_level = level;
+	setlogmask(LOG_UPTO(kr_log_level));
 
 	/* gnutls logs messages related to our TLS and also libdnssec,
 	 * and the logging is set up in a global way only */
@@ -45,8 +89,15 @@ log_level_t kr_log_level_get(void)
 	return kr_log_level;
 }
 
-void kr_log_init(log_level_t level)
+void kr_log_init(log_level_t level, log_target_t target)
 {
 	kr_log_level = level;
+	kr_log_target = target;
+
+#if ENABLE_LIBSYSTEMD
+	use_journal = sd_booted();
+#endif
+	openlog(NULL, LOG_PID, LOG_DAEMON);
+	setlogmask(LOG_UPTO(kr_log_level));
 }
 
