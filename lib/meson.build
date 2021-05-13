@@ -101,6 +101,7 @@ libkres_lib = library('kres',
     libdnssec,
     gnutls,
     luajit,
+    libsystemd,
   ],
   install: true,
 )
