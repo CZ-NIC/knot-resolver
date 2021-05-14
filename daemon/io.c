@@ -824,7 +824,7 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 	kr_require(rcvd <= XDP_RX_BATCH_SIZE);
 	for (int i = 0; i < rcvd; ++i) {
 		const knot_xdp_msg_t *msg = &msgs[i];
-		kr_require(msg->payload.iov_len <= KNOT_WIRE_MAX_PKTSIZE);  // TODO maybe kr_assume()?
+		kr_require(msg->payload.iov_len <= KNOT_WIRE_MAX_PKTSIZE);
 		knot_pkt_t *kpkt = knot_pkt_new(msg->payload.iov_base, msg->payload.iov_len,
 						&the_worker->pkt_pool);
 		if (kpkt == NULL) {
