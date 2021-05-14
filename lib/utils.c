@@ -207,7 +207,10 @@ char* kr_strcatdup(unsigned n, ...)
 
 char * kr_absolutize_path(const char *dirname, const char *fname)
 {
-	if (!kr_assume(dirname && fname)) return NULL;
+	if (!kr_assume(dirname && fname)) {
+		errno = EINVAL;
+		return NULL;
+	}
 	char *result;
 	int aret;
 	if (dirname[0] == '/') { // absolute path is easier
@@ -605,7 +608,7 @@ int kr_bitcmp(const char *a, const char *b, int bits)
 		return 1;
 	}
 
-	if (!kr_assume((a && b && bits >= 0)  ||  bits == 0)) return kr_error(EINVAL);
+	kr_require((a && b && bits >= 0)  ||  bits == 0);
 	/* Compare part byte-divisible part. */
 	const size_t chunk = bits / 8;
 	int ret = memcmp(a, b, chunk);
@@ -724,7 +727,7 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 		/* Found the entry to merge with.  Check consistency and merge. */
 		if (!kr_assume(stashed->rank == rank && !stashed->cached && stashed->in_progress))
 			return kr_error(EEXIST);
-		//(void)!kr_assume(rr->rrs.count == 1);
+		(void)!kr_assume(rr->rrs.count == 1);
 		/* ^^ shouldn't be a problem for this function, but it's probably a bug */
 
 		/* It may happen that an RRset is first considered useful
