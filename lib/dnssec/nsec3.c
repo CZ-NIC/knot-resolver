@@ -15,6 +15,7 @@
 #include "lib/defines.h"
 #include "lib/dnssec/nsec.h"
 #include "lib/dnssec/nsec3.h"
+#include "lib/utils.h"
 
 #define OPT_OUT_BIT 0x01
 
