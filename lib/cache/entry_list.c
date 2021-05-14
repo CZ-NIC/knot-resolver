@@ -98,7 +98,8 @@ int entry_list_parse(const knot_db_val_t val, entry_list_t list)
 		list[i].len = len;
 		it += to_even(len);
 	}
-	kr_require(it == it_bound);  // TODO maybe kr_assume?
+	if (!kr_assume(it == it_bound)) /* better not use it; might be "damaged" */
+		return kr_error(EILSEQ);
 	return kr_ok();
 }
 
