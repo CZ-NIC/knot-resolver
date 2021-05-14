@@ -9,15 +9,14 @@
 
 #include "lib/cache/impl.h"
 
-int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
+void rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
 {
 	/* FIXME: either give up on even alignment and thus direct usability
 	 * of rdatasets as they are in lmdb, or align inside cdb_* functions
 	 * (request sizes one byte longer and shift iff on an odd address). */
 	//if ((size_t)data & 1) VERBOSE_MSG(NULL, "dematerialize: odd address\n");
 	//const uint8_t *data0 = data;
-	if (!kr_assume(data))
-		return kr_error(EINVAL);
+	kr_require(data);
 	const uint16_t rr_count = rds ? rds->count : 0;
 	memcpy(data, &rr_count, sizeof(rr_count));
 	data += sizeof(rr_count);
@@ -26,8 +25,6 @@ int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
 		data += rds->size;
 	}
 	//VERBOSE_MSG(NULL, "dematerialized to %d B\n", (int)(data - data0));
-	(void)data;
-	return kr_ok();
 }
 
 /** Materialize a knot_rdataset_t from cache with given TTL.
