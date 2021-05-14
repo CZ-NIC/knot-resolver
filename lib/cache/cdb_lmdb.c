@@ -2,7 +2,6 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
 */
 
-#include <assert.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -145,14 +144,14 @@ static void clear_stale_readers(struct lmdb_env *env)
  */
 static int txn_get_noresize(struct lmdb_env *env, unsigned int flag, MDB_txn **txn)
 {
-	assert(!env->txn.rw && (!env->txn.ro || !env->txn.ro_active));
+	if (!kr_assume(!env->txn.rw && (!env->txn.ro || !env->txn.ro_active)))
+		return kr_error(1);
 	int attempts = 0;
 	int ret;
 retry:
 	/* Do a few attempts in case we encounter multiple issues at once. */
-	if (++attempts > 2) {
+	if (++attempts > 2)
 		return kr_error(1);
-	}
 
 	if (flag == FLAG_RENEW) {
 		ret = mdb_txn_renew(*txn);
@@ -175,7 +174,8 @@ retry:
 /** Obtain a transaction.  (they're cached in env->txn) */
 static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 {
-	assert(env && txn);
+	if (!kr_assume(env && txn))
+		return kr_error(EINVAL);
 	if (env->txn.rw) {
 		/* Reuse the *open* RW txn even if only reading is requested.
 		 * We leave the management of this to the cdb_commit command.
@@ -194,7 +194,7 @@ static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 		int ret = txn_get_noresize(env, 0/*RW*/, &env->txn.rw);
 		if (ret == MDB_SUCCESS) {
 			*txn = env->txn.rw;
-			assert(*txn);
+			(void)!kr_assume(*txn);
 		}
 		return lmdb_error(ret);
 	}
@@ -211,7 +211,7 @@ static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 	}
 	env->txn.ro_active = true;
 	*txn = env->txn.ro;
-	assert(*txn);
+	(void)!kr_assume(*txn);
 	return kr_ok();
 }
 
@@ -234,10 +234,10 @@ static int cdb_commit(kr_cdb_pt db, struct kr_cdb_stats *stats)
 /** Obtain a read-only cursor (and a read-only transaction). */
 static int txn_curs_get(struct lmdb_env *env, MDB_cursor **curs, struct kr_cdb_stats *stats)
 {
-	assert(env && curs);
-	if (env->txn.ro_curs_active) {
+	if (!kr_assume(env && curs))
+		return kr_error(EINVAL);
+	if (env->txn.ro_curs_active)
 		goto success;
-	}
 	/* Only in a read-only txn; TODO: it's a bit messy/coupled */
 	if (env->txn.rw) {
 		int ret = cdb_commit(env2db(env), stats);
@@ -255,10 +255,10 @@ static int txn_curs_get(struct lmdb_env *env, MDB_cursor **curs, struct kr_cdb_s
 	if (ret) return lmdb_error(ret);
 	env->txn.ro_curs_active = true;
 success:
-	assert(env->txn.ro_curs_active && env->txn.ro && env->txn.ro_active
-		&& !env->txn.rw);
+	(void)!kr_assume(env->txn.ro_curs_active && env->txn.ro && env->txn.ro_active
+			 && !env->txn.rw);
 	*curs = env->txn.ro_curs;
-	assert(*curs);
+	(void)!kr_assume(*curs);
 	return kr_ok();
 }
 
@@ -291,7 +291,8 @@ static void txn_abort(struct lmdb_env *env)
 /*! \brief Close the database. */
 static void cdb_close_env(struct lmdb_env *env, struct kr_cdb_stats *stats)
 {
-	assert(env && env->env);
+	if (!kr_assume(env && env->env))
+		return;
 
 	/* Get rid of any transactions. */
 	txn_free_ro(env);
@@ -505,7 +506,8 @@ static int cdb_check_health(kr_cdb_pt db, struct kr_cdb_stats *stats)
  * The lock is auto-released by OS in case the process finishes in any way (file remains). */
 static int lockfile_get(const char *path)
 {
-	assert(path);
+	if (!kr_assume(path))
+		return kr_error(EINVAL);
 	const int fd = open(path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
 	if (fd < 0)
 		return kr_error(errno);
@@ -530,7 +532,8 @@ static int lockfile_get(const char *path)
 /** Release and remove lockfile created by lockfile_get().  Return kr_error(). */
 static int lockfile_release(int fd)
 {
-	assert(fd > 0); // fd == 0 is surely a mistake, in our case at least
+	if (!kr_assume(fd > 0)) // fd == 0 is surely a mistake, in our case at least
+		return kr_error(EINVAL);
 	if (close(fd)) {
 		return kr_error(errno);
 	} else {
@@ -780,7 +783,8 @@ static int cdb_match(kr_cdb_pt db, struct kr_cdb_stats *stats,
 static int cdb_read_leq(kr_cdb_pt db, struct kr_cdb_stats *stats,
 		knot_db_val_t *key, knot_db_val_t *val)
 {
-	assert(db && key && key->data && val);
+	if (!kr_assume(db && key && key->data && val))
+		return kr_error(EINVAL);
 	struct lmdb_env *env = db2env(db);
 	MDB_cursor *curs = NULL;
 	int ret = txn_curs_get(env, &curs, stats);

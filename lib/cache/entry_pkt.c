@@ -81,7 +81,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 			/* All bad cases should be filtered above,
 			 * at least the same way as pktcache in kresd 1.5.x. */
 			kr_rank_set(&rank, KR_RANK_SECURE);
-		} else assert(false);
+		} else (void)!kr_assume(false);
 	}
 
 	const uint16_t pkt_type = knot_pkt_qtype(pkt);
@@ -101,7 +101,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	int ret = kr_dname_lf(k->buf, owner, false);
 	if (ret) {
 		/* A server might (incorrectly) reply with QDCOUNT=0. */
-		assert(owner == NULL);
+		(void)!kr_assume(owner == NULL);
 		return;
 	}
 	key = key_exact_type_maypkt(k, pkt_type);
@@ -116,8 +116,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	struct kr_cache *cache = &req->ctx->cache;
 	ret = entry_h_splice(&val_new_entry, rank, key, k->type, pkt_type,
 				owner, qry, cache, qry->timestamp.tv_sec);
-	if (ret) return; /* some aren't really errors */
-	assert(val_new_entry.data);
+	if (ret || !kr_assume(val_new_entry.data)) return; /* some aren't really errors */
 	struct entry_h *eh = val_new_entry.data;
 	memset(eh, 0, offsetof(struct entry_h, data));
 	eh->time = qry->timestamp.tv_sec;
@@ -158,7 +157,7 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 		pkt->compr.wire = pkt->wire;
 		/* TODO: ^^ nicer way how to replace knot_pkt_t::wire ? */
 	}
-	assert(pkt->max_size >= pkt_len);
+	kr_require(pkt->max_size >= pkt_len);
 
 	/* Copy answer and reparse it, but keep the original message id. */
 	knot_pkt_clear(pkt);
@@ -169,15 +168,13 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 		return kr_error(ENOENT);
 		/* LATER(opt): try harder to avoid stashing such packets */
 	}
-	if (ret != KNOT_EOK) {
-		assert(!ret);
+	if (!kr_assume(ret == KNOT_EOK))
 		return kr_error(ret);
-	}
 	knot_wire_set_id(pkt->wire, msgid);
 
 	/* Add rank into the additional field. */
 	for (size_t i = 0; i < pkt->rrset_count; ++i) {
-		assert(!pkt->rr[i].additional);
+		(void)!kr_assume(!pkt->rr[i].additional);
 		uint8_t *rr_rank = mm_alloc(&pkt->mm, sizeof(*rr_rank));
 		if (!rr_rank) {
 			return kr_error(ENOMEM);

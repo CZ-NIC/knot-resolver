@@ -129,8 +129,12 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_server_selection
 EOF
 
-# a static variable; the line might not be simple to generate
-printf "kr_layer_t kr_layer_t_static;"
+# static variables; these lines might not be simple to generate
+printf "
+kr_layer_t kr_layer_t_static;
+_Bool kr_dbg_assumption_abort;
+int kr_dbg_assumption_fork;
+"
 
 printf "
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
