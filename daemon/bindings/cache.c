@@ -286,7 +286,7 @@ static void cache_dump(lua_State *L, knot_db_val_t keyval[])
 	}
 
 	ret = !knot_dname_to_str(name, dname, sizeof(name));
-	if (!kr_assume(ret)) return;
+	if (!kr_assume(!ret)) return;
 
 	/* If name typemap doesn't exist yet, create it */
 	lua_getfield(L, -1, name);
@@ -366,8 +366,8 @@ static int cache_ns_tout(lua_State *L)
 static void cache_zone_import_cb(int state, void *param)
 {
 	(void)state;
-	struct worker_ctx *worker = (struct worker_ctx *)param;
-	if (!kr_assume(worker) || !kr_assume(worker->z_import)) return;
+	struct worker_ctx *worker = param;
+	if (!kr_assume(worker && worker->z_import)) return;
 	zi_free(worker->z_import);
 	worker->z_import = NULL;
 }
