@@ -389,7 +389,7 @@ static int pick_authority(knot_pkt_t *pkt, struct kr_request *req, bool to_wire)
 static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 {
 	struct kr_query *qry = req->current_query;
-	if (!kr_assume(!(qry->flags.STUB)))
+	if (!kr_assume(!qry->flags.STUB))
 		return KR_STATE_FAIL;
 
 	int result = KR_STATE_CONSUME;
@@ -493,7 +493,7 @@ static int finalize_answer(knot_pkt_t *pkt, struct kr_request *req)
 static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, const knot_dname_t **cname_ret)
 {
 	struct kr_query *query = req->current_query;
-	if (!kr_assume(!(query->flags.STUB)))
+	if (!kr_assume(!query->flags.STUB))
 		return KR_STATE_FAIL;
 	/* Process answer type */
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
