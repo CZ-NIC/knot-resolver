@@ -381,7 +381,8 @@ int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags)
 	int ret = getsockopt(fd, SOL_SOCKET, SO_TYPE, &flags.sock_type, &len);
 	if (ret != 0)
 		return kr_error(errno);
-	if (!kr_assume(!(flags.sock_type == SOCK_DGRAM && !flags.kind && flags.tls)))
+	const bool is_dtls = flags.sock_type == SOCK_DGRAM && !flags.kind && flags.tls;
+	if (!kr_assume(!is_dtls))
 		return kr_error(EINVAL);  /* Perhaps DTLS some day. */
 	if (flags.sock_type != SOCK_DGRAM && flags.sock_type != SOCK_STREAM)
 		return kr_error(EBADF);
