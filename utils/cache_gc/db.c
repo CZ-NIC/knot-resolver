@@ -83,11 +83,10 @@ int kr_gc_key_consistent(knot_db_val_t key)
 	// the next character can be used for classification
 	switch (kd[i]) {
 	case 'E':
-		if (i + 1 + sizeof(uint16_t) > key.len) {
-			(void)!kr_assume(!EINVAL);
-			return kr_error(EINVAL);
-		}
+		(void)0; // C can't have a variable definition following a label
 		uint16_t type;
+		if (!kr_assume(i + 1 + sizeof(type) <= key.len))
+			return kr_error(EINVAL);
 		memcpy(&type, kd + i + 1, sizeof(type));
 		return type;
 	case '1':
