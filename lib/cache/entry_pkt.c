@@ -116,8 +116,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	struct kr_cache *cache = &req->ctx->cache;
 	ret = entry_h_splice(&val_new_entry, rank, key, k->type, pkt_type,
 				owner, qry, cache, qry->timestamp.tv_sec);
-	if (ret) return; /* some aren't really errors */
-	(void)!kr_assume(val_new_entry.data);
+	if (ret || !kr_assume(val_new_entry.data)) return; /* some aren't really errors */
 	struct entry_h *eh = val_new_entry.data;
 	memset(eh, 0, offsetof(struct entry_h, data));
 	eh->time = qry->timestamp.tv_sec;
