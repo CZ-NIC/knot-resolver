@@ -1,12 +1,12 @@
-/*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2014-2021 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #pragma once
 
-#include <assert.h>
 #include <dirent.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -43,7 +43,55 @@ typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
 
 #define kr_log_info printf
 #define kr_log_error(...) fprintf(stderr, ## __VA_ARGS__)
+#define kr_log_critical(...) kr_log_error(__VA_ARGS__)
 #define kr_log_deprecate(...) fprintf(stderr, "deprecation WARNING: " __VA_ARGS__)
+
+/** Assert() but always, regardless of -DNDEBUG.  See also kr_assume(). */
+#define kr_require(expression) do { if (!(expression)) { \
+		kr_fail(true, #expression, __func__, __FILE__, __LINE__); \
+		__builtin_unreachable(); /* aid code analysis */ \
+	} } while (false)
+
+/** Check an assumption that's recoverable.  Return the expression.
+ *
+ * If the check fails, optionally fork()+abort() to generate coredump
+ * and continue running in parent process.  Return value must be handled to
+ * ensure safe recovery from error.  Use kr_require() for unrecoverable checks.
+ * The errno variable is not mangled, e.g. you can: if (!kr_assume(...)) return errno;
+ */
+#define kr_assume(expression) kr_assume_func((expression), #expression,       \
+					     __func__, __FILE__, __LINE__)
+
+/** Whether kr_assume() checks should abort. */
+KR_EXPORT extern bool kr_dbg_assumption_abort;
+
+/** How often kr_assume() should fork the process before issuing abort (if configured).
+ *
+ * This can be useful for debugging rare edge-cases in production.
+ * if (kr_debug_assumption_abort && kr_debug_assumption_fork), it is
+ * possible to both obtain a coredump (from forked child) and recover from the
+ * non-fatal error in the parent process.
+ *
+ * == 0 (false): no forking
+ * > 0: minimum delay between forks
+ *      (in milliseconds, each instance separately, randomized +-25%)
+ * < 0: no rate-limiting (not recommended)
+ */
+KR_EXPORT extern int kr_dbg_assumption_fork;
+
+/** Use kr_require() and kr_assume() instead of directly this function. */
+KR_EXPORT KR_COLD void kr_fail(bool is_fatal, const char* expr, const char *func,
+				const char *file, int line);
+
+/** Use kr_require() and kr_assume() instead of directly this function. */
+__attribute__ ((warn_unused_result))
+static inline bool kr_assume_func(bool result, const char *expr, const char *func,
+				  const char *file, int line)
+{
+	if (!result)
+		kr_fail(false, expr, func, file, line);
+	return result;
+}
 
 /* Always export these, but override direct calls by macros conditionally. */
 /** Whether in --verbose mode.  Only use this for reading. */
@@ -105,11 +153,6 @@ void kr_log_q(const struct kr_query *qry, const char *source, const char *fmt, .
 	char rrtype_str[KR_RRTYPE_STR_MAXLEN]; \
 	knot_rrtype_to_string((rrtype), rrtype_str, sizeof(rrtype_str)); \
 	rrtype_str[sizeof(rrtype_str) - 1] = 0;
-
-/* C11 compatibility, but without any implementation so far. */
-#ifndef static_assert
-#define static_assert(cond, msg)
-#endif
 
 // Use this for alocations with mm.
 // Use mm_alloc for alocations into mempool
@@ -296,7 +339,7 @@ int kr_ntop_str(int family, const void *src, uint16_t port, char *buf, size_t *b
  */
 static inline char *kr_straddr(const struct sockaddr *addr)
 {
-	assert(addr != NULL);
+	if (!kr_assume(addr)) return NULL;
 	/* We are the sinle-threaded application */
 	static char str[INET6_ADDRSTRLEN + 1 + 5 + 1];
 	size_t len = sizeof(str);
@@ -439,7 +482,7 @@ char *kr_module_call(struct kr_context *ctx, const char *module, const char *pro
 /** Return the (covered) type of an nonempty RRset. */
 static inline uint16_t kr_rrset_type_maysig(const knot_rrset_t *rr)
 {
-	assert(rr && rr->rrs.count && rr->rrs.rdata);
+	kr_require(rr && rr->rrs.count && rr->rrs.rdata);
 	uint16_t type = rr->type;
 	if (type == KNOT_RRTYPE_RRSIG)
 		type = knot_rrsig_type_covered(rr->rrs.rdata);
@@ -477,7 +520,8 @@ static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, bool add_wi
 		return kr_error(EINVAL);
 	}
 	int len = right_aligned_dname_start[0];
-	assert(right_aligned_dname_start + 1 + len - KNOT_DNAME_MAXLEN == right_aligned_dst);
+	if (!kr_assume(right_aligned_dname_start + 1 + len - KNOT_DNAME_MAXLEN == right_aligned_dst))
+		return kr_error(EINVAL);
 	memcpy(dst + 1, right_aligned_dname_start + 1, len);
 	if (add_wildcard) {
 		if (len + 2 > KNOT_DNAME_MAXLEN)
