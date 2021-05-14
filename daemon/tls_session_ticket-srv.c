@@ -176,8 +176,9 @@ static void tst_key_check(uv_timer_t *timer, bool force_update)
 	 * for gnutls_session_ticket_enable_server() doesn't say. */
 	int err = tst_key_update(stst, epoch, force_update);
 	if (err) {
-		kr_log_error("[tls] session ticket: failed rotation, err = %d\n", err);
-		if (!kr_assume(err == kr_error(EINVAL)))
+		kr_log_error("[tls] session ticket: failed rotation, %s\n",
+				kr_strerror(err));
+		if (!kr_assume(err != kr_error(EINVAL)))
 			return;
 	}
 	/* Reschedule. */
@@ -193,7 +194,8 @@ static void tst_key_check(uv_timer_t *timer, bool force_update)
 			(uint64_t)epoch, remain_ms);
 	err = uv_timer_start(timer, &tst_timer_callback, remain_ms, 0);
 	if (!kr_assume(err == 0)) {
-		kr_log_error("[tls] session ticket: failed to schedule, err = %d\n", err);
+		kr_log_error("[tls] session ticket: failed to schedule, %s\n",
+				uv_strerror(err));
 		return;
 	}
 }
