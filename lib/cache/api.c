@@ -551,9 +551,12 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		const int signer_size = knot_dname_size(signer);
 		k->zlf_len = signer_size - 1;
 
-		void **npp = nsec_pmap == NULL ? NULL
-			: trie_get_ins(nsec_pmap, (const char *)signer, signer_size);
-		kr_require(!nsec_pmap || (npp && ENOMEM));
+		void **npp = NULL;
+		if (nsec_pmap) {
+			npp = trie_get_ins(nsec_pmap, (const char *)signer, signer_size);
+			if (!kr_assume(npp))
+				return kr_error(ENOMEM);
+		}
 		if (rr->type == KNOT_RRTYPE_NSEC) {
 			key = key_NSEC1(k, encloser, wild_labels);
 			break;
@@ -588,7 +591,8 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	/* Compute in-cache size for the new data. */
 	const knot_rdataset_t *rds_sigs = rr_sigs ? &rr_sigs->rrs : NULL;
 	const int rr_ssize = rdataset_dematerialize_size(&rr->rrs);
-	kr_require(rr_ssize == to_even(rr_ssize));
+	if (!kr_assume(rr_ssize == to_even(rr_ssize)))
+		return kr_error(EINVAL);
 	knot_db_val_t val_new_entry = {
 		.data = NULL,
 		.len = offsetof(struct entry_h, data) + rr_ssize
@@ -599,7 +603,8 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	ret = entry_h_splice(&val_new_entry, rank, key, k->type, rr->type,
 				rr->owner, qry, cache, timestamp);
 	if (ret) return kr_ok(); /* some aren't really errors */
-	kr_require(val_new_entry.data);
+	if (!kr_assume(val_new_entry.data))
+		return kr_error(EFAULT);
 
 	const uint32_t ttl = rr->ttl;
 	/* FIXME: consider TTLs and expirations of RRSIGs as well, just in case. */
@@ -612,7 +617,8 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	eh->rank = rank;
 	rdataset_dematerialize(&rr->rrs, eh->data);
 	rdataset_dematerialize(rds_sigs, eh->data + rr_ssize);
-	kr_require(entry_h_consistent_E(val_new_entry, rr->type));
+	if (!kr_assume(entry_h_consistent_E(val_new_entry, rr->type)))
+		return kr_error(EINVAL);
 
 	#if 0 /* Occasionally useful when debugging some kinds of changes. */
 	{
@@ -669,7 +675,8 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 		/* TODO: ATM we assume that some properties are the same
 		 * for all RRSIGs in the set (esp. label count). */
 		ranked_rr_array_entry_t *e = arr->at[j];
-		kr_require(!e->in_progress);
+		if (!kr_assume(!e->in_progress))
+			return kr_error(EINVAL);
 		bool ok = e->qry_uid == qry->uid && !e->cached
 			&& e->rr->type == KNOT_RRTYPE_RRSIG
 			&& knot_rrsig_type_covered(e->rr->rrs.rdata) == rr->type
