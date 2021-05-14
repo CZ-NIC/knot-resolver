@@ -142,8 +142,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	entry_list_t el;
 	ret = closest_NS(cache, k, el, qry, false, qry->stype == KNOT_RRTYPE_DS);
 	if (ret) {
-		(void)!kr_assume(ret == kr_error(ENOENT));
-		if (ret != kr_error(ENOENT) || !el[0].len) {
+		if (!kr_assume(ret == kr_error(ENOENT)) || !el[0].len) {
 			return ctx->state;
 		}
 	}
