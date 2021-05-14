@@ -6,9 +6,6 @@
 
 #include <libknot/packet/pkt.h>
 
-#include "lib/utils.h"
-
-
 /**
  * Check bitmap that child names are contained in the same zone.
  * @note see RFC6840 4.1.
