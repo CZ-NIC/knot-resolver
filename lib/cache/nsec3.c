@@ -21,10 +21,7 @@ static const knot_db_val_t VAL_EMPTY = { NULL, 0 };
 static knot_db_val_t key_NSEC3_common(struct key *k, const knot_dname_t *zname,
 					const nsec_p_hash_t nsec_p_hash)
 {
-	int ret;
-	const bool ok = k && zname
-		&& !(ret = kr_dname_lf(k->buf, zname, false));
-	if (!kr_assume(ok))
+	if (!kr_assume(k && zname && !kr_dname_lf(k->buf, zname, false)))
 		return VAL_EMPTY;
 
 	/* CACHE_KEY_DEF: key == zone's dname_lf + '\0' + '3' + nsec_p hash (4B)
