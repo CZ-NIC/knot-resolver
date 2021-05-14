@@ -144,7 +144,8 @@ static void clear_stale_readers(struct lmdb_env *env)
  */
 static int txn_get_noresize(struct lmdb_env *env, unsigned int flag, MDB_txn **txn)
 {
-	kr_require(!env->txn.rw && (!env->txn.ro || !env->txn.ro_active));  // TODO: couldn't decipher the meaning
+	if (!kr_assume(!env->txn.rw && (!env->txn.ro || !env->txn.ro_active)))
+		return kr_error(1);
 	int attempts = 0;
 	int ret;
 retry:
