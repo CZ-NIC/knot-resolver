@@ -706,12 +706,12 @@ knot_pkt_t *kr_request_ensure_answer(struct kr_request *request)
 
 	const knot_pkt_t *qs_pkt = request->qsource.packet;
 	if (!kr_assume(qs_pkt))
-		return NULL;
+		goto fail;
 	// Find answer_max: limit on DNS wire length.
 	uint16_t answer_max;
 	const struct kr_request_qsource_flags *qs_flags = &request->qsource.flags;
 	if (!kr_assume((qs_flags->tls || qs_flags->http) ? qs_flags->tcp : true))
-		return NULL;
+		goto fail;
 	if (!request->qsource.addr || qs_flags->tcp) {
 		// not on UDP
 		answer_max = KNOT_WIRE_MAX_PKTSIZE;
@@ -760,6 +760,7 @@ knot_pkt_t *kr_request_ensure_answer(struct kr_request *request)
 
 	return request->answer;
 enomem:
+fail:
 	request->state = KR_STATE_FAIL; // TODO: really combine with another flag?
 	return request->answer = NULL;
 }
