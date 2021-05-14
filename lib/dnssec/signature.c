@@ -76,7 +76,7 @@ static int adjust_wire_ttl(uint8_t *wire, size_t wire_size, uint32_t new_ttl)
 	if (!kr_assume(wire))
 		return kr_error(EINVAL);
 	static_assert(sizeof(uint16_t) == 2, "uint16_t must be exactly 2 bytes");
-	static_assert(sizeof(uint32_t) == 4, "uint32_t) must be exactly 4 bytes");
+	static_assert(sizeof(uint32_t) == 4, "uint32_t must be exactly 4 bytes");
 	uint16_t rdlen;
 
 	int ret;
