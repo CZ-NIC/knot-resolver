@@ -610,14 +610,8 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	eh->time = timestamp;
 	eh->ttl  = MAX(MIN(ttl, cache->ttl_max), cache->ttl_min);
 	eh->rank = rank;
-	if (rdataset_dematerialize(&rr->rrs, eh->data)
-	    || rdataset_dematerialize(rds_sigs, eh->data + rr_ssize)) {
-		/* minimize the damage from incomplete write; TODO: better */
-		eh->time = 0;
-		eh->ttl = 0;
-		eh->rank = 0;
-		kr_require(false);
-	}
+	rdataset_dematerialize(&rr->rrs, eh->data);
+	rdataset_dematerialize(rds_sigs, eh->data + rr_ssize);
 	kr_require(entry_h_consistent_E(val_new_entry, rr->type));
 
 	#if 0 /* Occasionally useful when debugging some kinds of changes. */
