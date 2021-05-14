@@ -433,8 +433,7 @@ typedef struct trie_it {
 /*! \brief Create a node stack containing just the root (or empty). */
 static void ns_init(nstack_t *ns, trie_t *tbl)
 {
-	if (!kr_assume(tbl))
-		return;
+	kr_require(tbl);
 	ns->stack = ns->stack_init;
 	ns->alen = sizeof(ns->stack_init) / sizeof(ns->stack_init[0]);
 	if (tbl->weight) {
