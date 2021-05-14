@@ -38,7 +38,8 @@ static inline int KR_COLD kr_error(int x) {
 }
 #define kr_strerror(x) strerror(abs(x))
 
-// We require C11 but want to avoid including <assert.h> so we alias it ourselves.
+/* We require C11 but want to avoid including the standard assertion header
+ * so we alias it ourselves. */
 #define static_assert _Static_assert
 
 /*
