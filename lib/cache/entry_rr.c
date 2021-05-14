@@ -25,6 +25,7 @@ void rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
 		data += rds->size;
 	}
 	//VERBOSE_MSG(NULL, "dematerialized to %d B\n", (int)(data - data0));
+	(void)data; // silence analyzers
 }
 
 /** Materialize a knot_rdataset_t from cache with given TTL.
