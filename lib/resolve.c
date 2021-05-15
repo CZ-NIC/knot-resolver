@@ -224,7 +224,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 		qry->flags.DNSSEC_WANT = false;
 		qry->flags.DNSSEC_INSECURE = true;
 		VERBOSE_MSG(qry, "=> going insecure because parent query is insecure\n");
-	} else if (kr_ta_covers_qry(req->ctx, qry->zone_cut.name, KNOT_RRTYPE_NS)) {
+	} else if (kr_ta_closest(req->ctx, qry->zone_cut.name, KNOT_RRTYPE_NS)) {
 		qry->flags.DNSSEC_WANT = true;
 	} else {
 		qry->flags.DNSSEC_WANT = false;
@@ -265,7 +265,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	/* Zonecut name can change, check it again
 	 * to prevent unnecessary DS & DNSKEY queries */
 	if (!(qry->flags.DNSSEC_INSECURE) &&
-	    kr_ta_covers_qry(req->ctx, cut_found.name, KNOT_RRTYPE_NS)) {
+	    kr_ta_closest(req->ctx, cut_found.name, KNOT_RRTYPE_NS)) {
 		qry->flags.DNSSEC_WANT = true;
 	} else {
 		qry->flags.DNSSEC_WANT = false;
@@ -683,7 +683,7 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 		qry->flags.AWAIT_CUT = true;
 		/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
 		if ((knot_wire_get_ad(packet->wire) || knot_pkt_has_dnssec(packet)) &&
-		    kr_ta_covers_qry(request->ctx, qry->sname, qtype)) {
+		    kr_ta_closest(request->ctx, qry->sname, qtype)) {
 			qry->flags.DNSSEC_WANT = true;
 		}
 	}

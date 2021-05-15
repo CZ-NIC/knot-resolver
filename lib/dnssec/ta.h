@@ -44,18 +44,6 @@ const knot_dname_t * kr_ta_closest(const struct kr_context *ctx, const knot_dnam
 				   const uint16_t type);
 
 /**
- * A trivial wrapper around kr_ta_closest
- *
- * TODO: drop it?  The name doesn't feel very suitable either.
- */
-static inline
-bool kr_ta_covers_qry(struct kr_context *ctx, const knot_dname_t *name,
-		      const uint16_t type)
-{
-	return kr_ta_closest(ctx, name, type) != NULL;
-}
-
-/**
  * Remove TA from trust store.
  * @param  trust_anchors trust store
  * @param  name          name of the TA

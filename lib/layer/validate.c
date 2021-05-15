@@ -171,7 +171,7 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, struct kr_query *qr
 		}
 
 		if (!knot_dname_is_equal(qry->zone_cut.name, rr->owner)/*optim.*/
-		    && !kr_ta_covers_qry(qry->request->ctx, rr->owner, rr->type)) {
+		    && !kr_ta_closest(qry->request->ctx, rr->owner, rr->type)) {
 			/* We have NTA "between" our (perceived) zone cut and the RR. */
 			kr_rank_set(&entry->rank, KR_RANK_INSECURE);
 			continue;
