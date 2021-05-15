@@ -791,7 +791,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		next->cname_parent = query;
 		/* Want DNSSEC if and only if it's posible to secure
 		 * this name (i.e. iff it is covered by a TA) */
-		if (kr_ta_covers_qry(req->ctx, cname, query->stype)) {
+		if (kr_ta_closest(req->ctx, cname, query->stype)) {
 			next->flags.DNSSEC_WANT = true;
 		} else {
 			next->flags.DNSSEC_WANT = false;
