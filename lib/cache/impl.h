@@ -355,9 +355,12 @@ int entry2answer(struct answer *ans, int id,
 int pkt_renew(knot_pkt_t *pkt, const knot_dname_t *name, uint16_t type);
 
 /** Append RRset + its RRSIGs into the current section (*shallow* copy), with given rank.
+ *
  * \note it works with empty set as well (skipped)
  * \note pkt->wire is not updated in any way
  * \note KNOT_CLASS_IN is assumed
+ * \note Whole RRsets are put into the pseudo-packet;
+ *       normal parsed packets would only contain single-RR sets.
  */
 int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank);
 
