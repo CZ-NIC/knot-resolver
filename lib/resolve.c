@@ -224,7 +224,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 		qry->flags.DNSSEC_WANT = false;
 		qry->flags.DNSSEC_INSECURE = true;
 		VERBOSE_MSG(qry, "=> going insecure because parent query is insecure\n");
-	} else if (kr_ta_covers_qry(req->ctx, qry->zone_cut.name, KNOT_RRTYPE_NS)) {
+	} else if (kr_ta_closest(req->ctx, qry->zone_cut.name, KNOT_RRTYPE_NS)) {
 		qry->flags.DNSSEC_WANT = true;
 	} else {
 		qry->flags.DNSSEC_WANT = false;
@@ -265,7 +265,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	/* Zonecut name can change, check it again
 	 * to prevent unnecessary DS & DNSKEY queries */
 	if (!(qry->flags.DNSSEC_INSECURE) &&
-	    kr_ta_covers_qry(req->ctx, cut_found.name, KNOT_RRTYPE_NS)) {
+	    kr_ta_closest(req->ctx, cut_found.name, KNOT_RRTYPE_NS)) {
 		qry->flags.DNSSEC_WANT = true;
 	} else {
 		qry->flags.DNSSEC_WANT = false;
@@ -683,7 +683,7 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 		qry->flags.AWAIT_CUT = true;
 		/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
 		if ((knot_wire_get_ad(packet->wire) || knot_pkt_has_dnssec(packet)) &&
-		    kr_ta_covers_qry(request->ctx, qry->sname, qtype)) {
+		    kr_ta_closest(request->ctx, qry->sname, qtype)) {
 			qry->flags.DNSSEC_WANT = true;
 		}
 	}
@@ -931,7 +931,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	const knot_dname_t *start_name = qry->sname;
 	if ((qry->flags.AWAIT_CUT) && !resume) {
 		qry->flags.AWAIT_CUT = false;
-		const knot_dname_t *longest_ta = kr_ta_get_longest_name(trust_anchors, qry->sname);
+		const knot_dname_t *longest_ta = kr_ta_closest(request->ctx, qry->sname, qry->stype);
 		if (longest_ta) {
 			start_name = longest_ta;
 			qry->zone_cut.name = knot_dname_copy(start_name, qry->zone_cut.pool);
@@ -1105,13 +1105,10 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	}
 	/* Enable DNSSEC if entering a new (or different) island of trust,
 	 * and update the TA RRset if required. */
-	bool want_secured = (qry->flags.DNSSEC_WANT) &&
-			    !knot_wire_get_cd(request->qsource.packet->wire);
+	const bool has_cd = knot_wire_get_cd(request->qsource.packet->wire);
 	knot_rrset_t *ta_rr = kr_ta_get(trust_anchors, qry->zone_cut.name);
-	if (!knot_wire_get_cd(request->qsource.packet->wire) && ta_rr) {
+	if (!has_cd && ta_rr) {
 		qry->flags.DNSSEC_WANT = true;
-		want_secured = true;
-
 		if (qry->zone_cut.trust_anchor == NULL
 		    || !knot_dname_is_equal(qry->zone_cut.trust_anchor->owner, qry->zone_cut.name)) {
 			mm_free(qry->zone_cut.pool, qry->zone_cut.trust_anchor);
@@ -1128,6 +1125,7 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	const bool has_ta = (qry->zone_cut.trust_anchor != NULL);
 	const knot_dname_t *ta_name = (has_ta ? qry->zone_cut.trust_anchor->owner : NULL);
 	const bool refetch_ta = !has_ta || !knot_dname_is_equal(qry->zone_cut.name, ta_name);
+	const bool want_secured = qry->flags.DNSSEC_WANT && !has_cd;
 	if (want_secured && refetch_ta) {
 		/* @todo we could fetch the information from the parent cut, but we don't remember that now */
 		struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.name, qry->sclass, KNOT_RRTYPE_DS);

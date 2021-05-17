@@ -95,7 +95,7 @@ static uint8_t get_lowest_rank(const struct kr_query *qry, const knot_dname_t *n
 	} else if (!allow_unverified) {
 		/* Records not present under any TA don't have their security
 		 * verified at all, so we also accept low ranks in that case. */
-		const bool ta_covers = kr_ta_covers_qry(qry->request->ctx, name, type);
+		const bool ta_covers = kr_ta_closest(qry->request->ctx, name, type);
 		/* ^ TODO: performance?  TODO: stype - call sites */
 		if (ta_covers) {
 			return KR_RANK_INSECURE | KR_RANK_AUTH;
