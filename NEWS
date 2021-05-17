@@ -8,12 +8,14 @@ Improvements
 Bugfixes
 --------
 - trust_anchors.set_insecure: improve precision (#673, !1177)
+<<<<<<< HEAD
 - plug memory leaks related to TCP (!1182)
 
 Incompatible changes
 --------------------
 - legacy DoH implementation configuration in net.listen() was renamed from
   kind="doh" to kind="doh_legacy" (!1180)
+- policy.FLAGS: fix not applying properly in edge cases (!1179)
 
 
 Knot Resolver 5.3.2 (2021-05-05)
