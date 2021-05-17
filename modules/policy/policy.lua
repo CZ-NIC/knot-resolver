@@ -193,9 +193,13 @@ end
 -- Set and clear some query flags
 function policy.FLAGS(opts_set, opts_clear)
 	return function(_, req)
+		-- We assume to be running in the begin phase, so to truly apply
+		-- to the whole request we need to change both kr_request and kr_query.
 		local qry = req:current()
-		ffi.C.kr_qflags_set  (qry.flags, kres.mk_qflags(opts_set   or {}))
-		ffi.C.kr_qflags_clear(qry.flags, kres.mk_qflags(opts_clear or {}))
+		for _, flags in pairs({qry.flags, req.options}) do
+			ffi.C.kr_qflags_set  (flags, kres.mk_qflags(opts_set   or {}))
+			ffi.C.kr_qflags_clear(flags, kres.mk_qflags(opts_clear or {}))
+		end
 		return nil -- chain rule
 	end
 end
