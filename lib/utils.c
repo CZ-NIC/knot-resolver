@@ -706,8 +706,10 @@ typedef array_t(knot_rdata_t *) rdata_array_t;
 int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 			  uint8_t rank, bool to_wire, uint32_t qry_uid, knot_mm_t *pool)
 {
-	/* rr always has one record per rrset
-	 * check if another rrset with the same
+	/* Check input consistency, but RRsets from cache can be larger,
+	 * and they're not so nicely detectable here. */
+	(void)!kr_assume(rr->rrs.count == 1 || (rr->additional && rr->rrs.count >= 1));
+	/* Check if another rrset with the same
 	 * rclass/type/owner combination exists within current query
 	 * and merge if needed */
 	for (ssize_t i = array->len - 1; i >= 0; --i) {
@@ -727,8 +729,6 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 		/* Found the entry to merge with.  Check consistency and merge. */
 		if (!kr_assume(stashed->rank == rank && !stashed->cached && stashed->in_progress))
 			return kr_error(EEXIST);
-		//(void)!kr_assume(rr->rrs.count == 1);
-		/* ^^ shouldn't be a problem for this function, but it's probably a bug */
 
 		/* It may happen that an RRset is first considered useful
 		 * (to_wire = false, e.g. due to being part of glue),
