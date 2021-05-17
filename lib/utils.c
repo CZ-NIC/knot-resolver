@@ -706,9 +706,9 @@ typedef array_t(knot_rdata_t *) rdata_array_t;
 int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 			  uint8_t rank, bool to_wire, uint32_t qry_uid, knot_mm_t *pool)
 {
-	/* Check input consistency, but RRsets from cache can be larger,
-	 * and they're not so nicely detectable here. */
-	(void)!kr_assume(rr->rrs.count == 1 || (rr->additional && rr->rrs.count >= 1));
+	/* From normal packet parser we always get RRs one by one,
+	 * but cache and prefil modules (also) feed us larger RRsets. */
+	(void)!kr_assume(rr->rrs.count >= 1);
 	/* Check if another rrset with the same
 	 * rclass/type/owner combination exists within current query
 	 * and merge if needed */
