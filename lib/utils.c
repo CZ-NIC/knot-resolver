@@ -727,7 +727,7 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 		/* Found the entry to merge with.  Check consistency and merge. */
 		if (!kr_assume(stashed->rank == rank && !stashed->cached && stashed->in_progress))
 			return kr_error(EEXIST);
-		(void)!kr_assume(rr->rrs.count == 1);
+		//(void)!kr_assume(rr->rrs.count == 1);
 		/* ^^ shouldn't be a problem for this function, but it's probably a bug */
 
 		/* It may happen that an RRset is first considered useful
