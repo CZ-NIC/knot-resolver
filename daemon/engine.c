@@ -74,6 +74,7 @@ static int l_help(lua_State *L)
 		"package_version()\n    return package version\n"
 		"user(name[, group])\n    change process user (and group)\n"
 		"verbose(true|false)\n    toggle verbose mode\n"
+		"set_log_level\n	logging level (crit, err, warning, notice, info or debug)\n"
 		"option(opt[, new_val])\n    get/set server option\n"
 		"mode(strict|normal|permissive)\n    set resolver strictness level\n"
 		"reorder_RR([true|false])\n    set/get reordering of RRs within RRsets\n"
@@ -150,6 +151,26 @@ static int l_verbose(lua_State *L)
 
 	lua_pushboolean(L, kr_log_level_get() == LOG_DEBUG);
 	return 1;
+}
+
+static int l_set_log_level(lua_State *L)
+{
+	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
+		lua_error_p(L, "takes one string parameter");
+		return 0;
+	}
+
+	log_level_t lvl = kr_log_name2level(lua_tostring(L, 1));
+
+	lua_pushinteger(L, kr_log_level_set(lvl));
+	return 1;
+}
+
+static int l_get_log_level(lua_State *L)
+{
+	printf("%s\n", kr_log_level2name(kr_log_level_get()));
+
+	return 0;
 }
 
 char *engine_get_hostname(struct engine *engine) {
@@ -432,6 +453,10 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "package_version");
 	lua_pushcfunction(engine->L, l_verbose);
 	lua_setglobal(engine->L, "verbose");
+	lua_pushcfunction(engine->L, l_set_log_level);
+	lua_setglobal(engine->L, "set_log_level");
+	lua_pushcfunction(engine->L, l_get_log_level);
+	lua_setglobal(engine->L, "get_log_level");
 	lua_pushcfunction(engine->L, l_setuser);
 	lua_setglobal(engine->L, "user");
 	lua_pushcfunction(engine->L, l_hint_root_file);
