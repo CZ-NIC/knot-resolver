@@ -144,7 +144,7 @@ static int l_quit(lua_State *L)
 /** Toggle verbose mode. */
 static int l_verbose(lua_State *L)
 {
-	log_level_t level = LOG_ERR;
+	log_level_t level = LOG_DEFAULT_LEVEL;
 	if ((lua_isboolean(L, 1) && lua_toboolean(L, 1) == true) ||
 			(lua_isnumber(L, 1) && lua_tointeger(L, 1) == LOG_DEBUG)) {
 		level = LOG_DEBUG;
@@ -152,6 +152,29 @@ static int l_verbose(lua_State *L)
 
 	lua_pushboolean(L, kr_log_level_set(level) == LOG_DEBUG);
 	return 1;
+}
+
+static int l_set_log_level(lua_State *L)
+{
+	if(lua_gettop(L) == 0) {
+		printf("levels: crit, err, warning, notice, info, debug\n");
+		return 0;
+	}
+
+	if (lua_gettop(L) != 1 || !lua_isstring(L, 1))
+		lua_error_p(L, "takes one parameter, type set_log_level() for help.");
+
+	log_level_t lvl = kr_log_name2level(lua_tostring(L, 1));
+
+	lua_pushinteger(L, kr_log_level_set(lvl));
+	return 1;
+}
+
+static int l_get_log_level(lua_State *L)
+{
+	printf("%s\n", kr_log_level2name(kr_log_level_get()));
+
+	return 0;
 }
 
 char *engine_get_hostname(struct engine *engine) {
@@ -434,6 +457,10 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "package_version");
 	lua_pushcfunction(engine->L, l_verbose);
 	lua_setglobal(engine->L, "verbose");
+	lua_pushcfunction(engine->L, l_set_log_level);
+	lua_setglobal(engine->L, "set_log_level");
+	lua_pushcfunction(engine->L, l_get_log_level);
+	lua_setglobal(engine->L, "get_log_level");
 	lua_pushcfunction(engine->L, l_setuser);
 	lua_setglobal(engine->L, "user");
 	lua_pushcfunction(engine->L, l_hint_root_file);
