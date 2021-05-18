@@ -18,7 +18,19 @@ int use_journal = 0;
 
 log_level_t kr_log_level = LOG_CRIT;
 log_target_t kr_log_target = LOG_TARGET_STDOUT;
-
+#ifndef SYSLOG_NAMES
+syslog_code_t prioritynames[] = {
+	{ "alert",	LOG_ALERT },
+	{ "crit",	LOG_CRIT },
+	{ "debug",	LOG_DEBUG },
+	{ "emerg",	LOG_EMERG },
+	{ "err",	LOG_ERR },
+	{ "info",	LOG_INFO },
+	{ "notice",	LOG_NOTICE },
+	{ "warning",	LOG_WARNING },
+	{ NULL,		-1 },
+};
+#endif
 
 void kr_log_fmt(log_level_t level, const char *fmt, ...)
 {
@@ -65,6 +77,28 @@ static void kres_gnutls_log(int level, const char *message)
 	kr_log_debug("[gnutls] (%d) %s", level, message);
 }
 
+char *kr_log_get_level_name(log_level_t level)
+{
+	for (int i = 0; prioritynames[i].c_name; ++i)
+	{
+		if (prioritynames[i].c_val == level)
+			return prioritynames[i].c_name;
+	}
+
+	return NULL;
+}
+
+log_level_t kr_log_name2level(const char *name)
+{
+	for (int i = 0; prioritynames[i].c_name; ++i)
+	{
+		if (strcmp(prioritynames[i].c_name, name) == 0)
+			return prioritynames[i].c_val;
+	}
+
+	return -1;
+}
+
 int kr_log_level_set(log_level_t level)
 {
 	if (level < LOG_CRIT || level > LOG_DEBUG)
@@ -91,13 +125,12 @@ log_level_t kr_log_level_get(void)
 
 void kr_log_init(log_level_t level, log_target_t target)
 {
-	kr_log_level = level;
 	kr_log_target = target;
 
 #if ENABLE_LIBSYSTEMD
 	use_journal = sd_booted();
 #endif
 	openlog(NULL, LOG_PID, LOG_DAEMON);
-	setlogmask(LOG_UPTO(kr_log_level));
+	kr_log_level_set(level);
 }
 
