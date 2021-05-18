@@ -8,6 +8,9 @@
 #include <syslog.h>
 #include "lib/defines.h"
 
+
+#define LOG_DEFAULT_LEVEL	LOG_WARNING
+
 typedef int log_level_t;
 
 typedef enum {
@@ -28,6 +31,10 @@ KR_EXPORT
 log_level_t kr_log_level_get(void);
 KR_EXPORT
 void kr_log_init(log_level_t level, log_target_t target);
+KR_EXPORT
+char *kr_log_level2name(log_level_t level);
+KR_EXPORT
+log_level_t kr_log_name2level(const char *name);
 
 #define kr_log_debug(fmt, ...) kr_log_fmt(LOG_DEBUG, fmt, ## __VA_ARGS__)
 #define kr_log_info(fmt, ...) kr_log_fmt(LOG_INFO, fmt, ## __VA_ARGS__)
@@ -39,3 +46,14 @@ void kr_log_init(log_level_t level, log_target_t target);
 #define kr_log_deprecate(fmt, ...) kr_log_fmt(LOG_WARNING, "deprecation WARNING: " fmt, ## __VA_ARGS__)
 
 #define KR_LOG_LEVEL_IS(exp) ((kr_log_level >= exp) ? true : false)
+
+
+#ifndef SYSLOG_NAMES
+typedef struct _code {
+	char	*c_name;
+	int	c_val;
+} syslog_code_t;
+
+KR_EXPORT
+extern syslog_code_t prioritynames[];
+#endif
