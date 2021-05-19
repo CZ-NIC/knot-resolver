@@ -218,6 +218,6 @@ option(
     'lmdb',
     'mdbx',
   ],
-  value: 'lmdb',
+  value: 'mdbx', # FIXME: switch back default before branch merge
   description: 'cache backend to use; mdbx is experimental',
 )

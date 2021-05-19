@@ -167,7 +167,7 @@ retry:
 			goto retry;
 	} else
 #endif
-	if (unlikely(ret == MDB_READERS_FULL)) {
+	 if (unlikely(ret == MDB_READERS_FULL)) {
 		int cleared;
 		ret = mdb_reader_check(env->env, &cleared);
 		if (ret == MDB_SUCCESS)
@@ -843,6 +843,7 @@ static double cdb_usage_percent(kr_cdb_pt db)
 	MDB_stat st;
 #if KR_USE_MDBX
 	int ret = mdbx_env_stat_ex(env->env, txn, &st, sizeof(st));
+	//FIXME: for MDBX the counts somehow don't work after deletion (via GC); it mostly grows
 #else
 	int ret = mdb_stat(txn, env->dbi, &st);
 #endif
