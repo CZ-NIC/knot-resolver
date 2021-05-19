@@ -25,6 +25,8 @@
 #define LMDB_DIR_MODE   0770
 #define LMDB_FILE_MODE  0660
 
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations" //TODO later, maybe
+
 
 /* TODO: we rely on mirrors of these two structs not changing layout
  * in libknot and knot resolver! */
@@ -80,6 +82,10 @@ static int cdb_commit(kr_cdb_pt db, struct kr_cdb_stats *stats);
 static int lmdb_error(int error)
 {
 	switch (error) {
+#if KR_USE_MDBX
+	// not interested in differentiating this one, for now at least
+	case MDBX_RESULT_TRUE:
+#endif
 	case MDB_SUCCESS:
 		return kr_ok();
 	case MDB_NOTFOUND:

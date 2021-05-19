@@ -19,6 +19,7 @@ if build_utils
       libkres_dep,
       libknot,
       luajit_inc,
+      cache_backend_dep,
     ],
     install: true,
     install_dir: get_option('sbindir'),
