@@ -551,7 +551,7 @@ centos-8:pkgbuild:
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-8
   script:
     - dnf install -y rpm-build python3-pip epel-release
-    - sed -i 's/enabled=0/enabled=1/' /etc/yum.repos.d/CentOS-PowerTools.repo
+    - sed -i 's/enabled=0/enabled=1/' /etc/yum.repos.d/CentOS-Linux-PowerTools.repo
     - *apkgbuild
 
 # }}}
