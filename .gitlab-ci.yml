@@ -513,28 +513,36 @@ obs:odvr:
     paths:
       - pkg/
 
-.rpmpkgbuild: &rpmpkgbuild
+.fedpkgbuild: &fedpkgbuild
   <<: *pkgbuild
   script:
-    - yum install -y rpm-build python3-pip
+    - dnf install -y rpm-build python3-pip
     - pip3 install -U apkg
     - apkg build-dep -y
     - apkg build
 
 fedora-33:pkgbuild:
-  <<: *rpmpkgbuild
+  <<: *fedpkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-33
 
 fedora-34:pkgbuild:
-  <<: *rpmpkgbuild
+  <<: *fedpkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-34
 
+.elpkgbuild: &elpkgbuild
+  <<: *pkgbuild
+  script:
+    - yum install -y rpm-build python3-pip epel-release
+    - pip3 install -U apkg
+    - apkg build-dep -y
+    - apkg build
+
 centos-7:pkgbuild:
-  <<: *rpmpkgbuild
+  <<: *elpkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-7
 
 centos-8:pkgbuild:
-  <<: *rpmpkgbuild
+  <<: *elpkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-8
 
 # }}}
