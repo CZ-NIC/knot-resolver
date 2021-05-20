@@ -25,6 +25,7 @@ stages:
   - respdiff
   - resperf
   - deploy
+  - pkgbuild
   - pkgtest
 
 .common: &common
@@ -494,6 +495,50 @@ obs:odvr:
   when: manual
 # }}}
 
+# pkgbuild {{{
+.pkgbuild: &pkgbuild
+  <<: *common
+  stage: pkgbuild
+  tags:
+    - lxc
+    - amd64
+  needs:
+    - build
+  before_script:
+    - git config --global user.name CI
+    - git config --global user.email ci@nic
+  artifacts:
+    when: always
+    expire_in: '1 day'
+    paths:
+      - pkg/
+
+.rpmpkgbuild: &rpmpkgbuild
+  <<: *pkgbuild
+  script:
+    - yum install -y rpm-build python3-pip
+    - pip3 install -U apkg
+    - apkg build-dep -y
+    - apkg build
+
+fedora-33:pkgbuild:
+  <<: *rpmpkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-33
+
+fedora-34:pkgbuild:
+  <<: *rpmpkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-34
+
+centos-7:pkgbuild:
+  <<: *rpmpkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-7
+
+centos-8:pkgbuild:
+  <<: *rpmpkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-8
+
+# }}}
+
 # pkgtest {{{
 .deploytest: &deploytest
   stage: pkgtest
@@ -674,4 +719,19 @@ packaging:leap_15.2:
   <<: *packagingtest
   variables:
     DISTRO: leap_15.2
+
+fedora-34:pkgtest:
+  <<: *common
+  stage: pkgtest
+  tags:
+    - lxc
+    - amd64
+  needs:
+    - fedora-34:pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-34
+  before_script:
+    - dnf install -y python3-pip
+    - pip3 install -U apkg
+  script:
+    - dnf install pkg/pkgs/fedora-34/*.rpm
 # }}}
