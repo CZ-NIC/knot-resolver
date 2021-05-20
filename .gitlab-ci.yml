@@ -552,6 +552,7 @@ centos-8:pkgbuild:
   script:
     - dnf install -y rpm-build python3-pip epel-release
     - sed -i 's/enabled=0/enabled=1/' /etc/yum.repos.d/CentOS-Linux-PowerTools.repo
+    - sed -i 's/enabled=0/enabled=1/' /etc/yum.repos.d/CentOS-Linux-Devel.repo
     - *apkgbuild
 
 # }}}
@@ -750,5 +751,5 @@ fedora-34:pkgtest:
     - dnf install -y python3-pip
     - pip3 install -U apkg
   script:
-    - dnf install pkg/pkgs/fedora-34/*.rpm
+    - dnf install $(ls pkg/pkgs/fedora-34/*.rpm)
 # }}}
