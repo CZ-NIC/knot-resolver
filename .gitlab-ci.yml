@@ -513,37 +513,46 @@ obs:odvr:
     paths:
       - pkg/
 
-.fedpkgbuild: &fedpkgbuild
-  <<: *pkgbuild
-  script:
-    - dnf install -y rpm-build python3-pip
-    - pip3 install -U apkg
-    - apkg build-dep -y
-    - apkg build
+.apkgbuild: &apkgbuild
+  - pip3 install -U apkg
+  - apkg build-dep -y
+  - apkg build
 
 fedora-33:pkgbuild:
-  <<: *fedpkgbuild
+  <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-33
+  script:
+    - dnf install -y rpm-build python3-pip
+    - *apkgbuild
 
 fedora-34:pkgbuild:
-  <<: *fedpkgbuild
+  <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-34
+  script:
+    - dnf install -y rpm-build python3-pip
+    - *apkgbuild
 
 .elpkgbuild: &elpkgbuild
   <<: *pkgbuild
   script:
-    - yum install -y rpm-build python3-pip epel-release
     - pip3 install -U apkg
     - apkg build-dep -y
     - apkg build
 
 centos-7:pkgbuild:
-  <<: *elpkgbuild
+  <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-7
+  script:
+    - yum install -y rpm-build python3-pip epel-release
+    - *apkgbuild
 
 centos-8:pkgbuild:
-  <<: *elpkgbuild
+  <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-8
+  script:
+    - dnf install -y rpm-build python3-pip epel-release
+    - sed -i 's/enabled=0/enabled=1/' /etc/yum.repos.d/CentOS-PowerTools.repo
+    - *apkgbuild
 
 # }}}
 
