@@ -258,9 +258,8 @@ static int del(knot_db_txn_t *txn, knot_db_val_t *key)
 {
 	struct lmdb_env *env = txn->db;
 	MDB_val db_key = val_knot2mdb(*key);
-	MDB_val data = { 0 };
 
-	int ret = mdb_del(txn->txn, env->dbi, &db_key, &data);
+	int ret = mdb_del(txn->txn, env->dbi, &db_key, NULL);
 	if (ret != MDB_SUCCESS) {
 		return lmdb_error_to_knot(ret);
 	}
