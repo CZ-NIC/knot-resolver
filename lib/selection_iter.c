@@ -127,6 +127,7 @@ static void unpack_state_from_zonecut(struct iter_local_state *local_state,
 		}
 	}
 	trie_it_free(it);
+	kr_cache_commit(&qry->request->ctx->cache);
 }
 
 static int get_valid_addresses(struct iter_local_state *local_state,
