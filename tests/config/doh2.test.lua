@@ -353,6 +353,79 @@ else
 		modules.unload('view')
 	end
 
+	local function test_headers()
+		local get_desc = nil
+
+		local function check_headers_zero_len(state, req)
+			same(tonumber(req.qsource.headers.len), 0, get_desc())
+			return state
+		end
+
+		local function check_headers_value(state, req)
+			local value = ffi.string(req.qsource.headers.at[0].value)
+			same(value, 'lua test config.doh2', get_desc())
+			return state
+		end
+
+		local function check_headers_more_values(state, req)
+			local checked = 0
+			for i = 1, tonumber(req.qsource.headers.len) do
+				local name = ffi.string(req.qsource.headers.at[i - 1].name)
+				local value = ffi.string(req.qsource.headers.at[i - 1].value)
+				if (name == 'user-agent') then
+					same(value, 'lua test config.doh2', get_desc() .. ' - user-agent')
+					checked = checked + 1
+				elseif (name == ':scheme') then
+					same(value, 'https', get_desc() .. ' - :scheme')
+					checked = checked + 1
+				end
+			end
+
+			same(checked, 2, get_desc() .. ' - two checked')
+			return state
+		end
+
+		local req = req_templ:clone()
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path', '/doh?dns='  -- headers.test. A
+			.. 'AAABAAABAAAAAAAAB2hlYWRlcnMEdGVzdAAAAQAB')
+		req.headers:upsert('user-agent', 'lua test config.doh2')
+		req.headers:upsert(':scheme', 'https')
+
+		get_desc = function() return 'exposed HTTP headers: no headers' end
+		rule_desc = policy.add(policy.all(check_headers_zero_len))
+		check_ok(req, get_desc())
+		get_desc = function() return 'exposed HTTP headers: empty string' end
+		net.doh_headers('')
+		check_ok(req, get_desc())
+		get_desc = function() return 'exposed HTTP headers: empty table' end
+		net.doh_headers({''})
+		check_ok(req, get_desc())
+		policy.del(rule_desc.id)
+
+		get_desc = function() return 'exposed HTTP headers: take just one string parameter' end
+		boom(net.doh_headers, {'user-agent', ':method'}, get_desc())
+		get_desc = function() return 'exposed HTTP headers: take just one table parameter' end
+		boom(net.doh_headers, {{'user-agent'}, {':method'}}, get_desc())
+
+		get_desc = function() return 'exposed HTTP headers: take one header - as string' end
+		net.doh_headers('user-agent')
+		rule_desc = policy.add(policy.all(check_headers_value))
+		check_ok(req, get_desc())
+		get_desc = function() return 'exposed HTTP headers: take one header - as table' end
+		net.doh_headers({ 'user-agent' })
+		check_ok(req, get_desc())
+		policy.del(rule_desc.id)
+
+		get_desc = function() return 'exposed HTTP headers: take more headers' end
+		net.doh_headers({ ':method', 'user-agent', ':path', ':scheme' })
+		rule_desc = policy.add(policy.all(check_headers_more_values))
+		check_ok(req, get_desc())
+		policy.del(rule_desc.id)
+
+
+	end
+
 --	not implemented
 --	local function test_post_unsupp_accept()
 --		local req = assert(req_templ:clone())
@@ -387,7 +460,8 @@ else
 		--test_get_invalid_chars,
 		--test_unsupp_method,
 		test_dstaddr,
-		test_srcaddr
+		test_srcaddr,
+		test_headers
 	}
 
 	return tests
