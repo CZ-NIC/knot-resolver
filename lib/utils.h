@@ -170,6 +170,14 @@ typedef struct ranked_rr_array_entry ranked_rr_array_entry_t;
 typedef array_t(ranked_rr_array_entry_t *) ranked_rr_array_t;
 /* @endcond */
 
+typedef struct kr_http_header_array_entry {
+	char* name;
+	char* value;
+} kr_http_header_array_entry_t;
+
+/** Array of HTTP headers for DoH. */
+typedef array_t(kr_http_header_array_entry_t) kr_http_header_array_t;
+
 /** Concatenate N strings. */
 KR_EXPORT
 char* kr_strcatdup(unsigned n, ...);

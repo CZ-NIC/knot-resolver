@@ -378,6 +378,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	req->vars_ref = LUA_NOREF;
 	req->uid = uid;
 	req->qsource.flags.xdp = is_xdp;
+	array_init(req->qsource.headers);
 	if (session) {
 		req->qsource.flags.tcp = session_get_handle(session)->type == UV_TCP;
 		req->qsource.flags.tls = session_flags(session)->has_tls;
@@ -386,7 +387,13 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 #if ENABLE_DOH2
 		if (req->qsource.flags.http) {
 			struct http_ctx *http_ctx = session_http_get_server_ctx(session);
-			req->qsource.stream_id = queue_head(http_ctx->streams);
+			struct http_stream stream = queue_head(http_ctx->streams);
+			req->qsource.stream_id = stream.id;
+			if (stream.headers) {
+				req->qsource.headers = *stream.headers;
+				free(stream.headers);
+				stream.headers = NULL;
+			}
 		}
 #endif
 		/* We need to store a copy of peer address. */
@@ -456,6 +463,13 @@ static void request_free(struct request_ctx *ctx)
 		lua_pop(L, 1);
 		ctx->req.vars_ref = LUA_NOREF;
 	}
+	/* Free HTTP/2 headers for DoH requests. */
+	for(int i = 0; i < ctx->req.qsource.headers.len; i++) {
+		free(ctx->req.qsource.headers.at[i].name);
+		free(ctx->req.qsource.headers.at[i].value);
+	}
+	array_clear(ctx->req.qsource.headers);
+
 	/* Make sure to free XDP buffer in case it wasn't sent. */
 	if (ctx->req.alloc_wire_cb) {
 	#if ENABLE_XDP
@@ -2133,6 +2147,10 @@ void worker_deinit(void)
 	trie_free(worker->subreq_out);
 	worker->subreq_out = NULL;
 
+	for (int i = 0; i < worker->doh_qry_headers.len; i++)
+		free((void *)worker->doh_qry_headers.at[i]);
+	array_clear(worker->doh_qry_headers);
+
 	reclaim_mp_freelist(&worker->pool_mp);
 	mp_delete(worker->pkt_pool.ctx);
 	worker->pkt_pool.ctx = NULL;
@@ -2166,6 +2184,8 @@ int worker_init(struct engine *engine, int worker_count)
 	worker->tcp_pipeline_max = MAX_PIPELINED;
 	worker->out_addr4.sin_family = AF_UNSPEC;
 	worker->out_addr6.sin6_family = AF_UNSPEC;
+
+	array_init(worker->doh_qry_headers);
 
 	int ret = worker_reserve(worker, MP_FREELIST_SIZE);
 	if (ret) return ret;
