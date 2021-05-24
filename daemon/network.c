@@ -45,11 +45,11 @@ static int endpoint_open_lua_cb(struct network *net, struct endpoint *ep,
 	void **pp = trie_get_try(net->endpoint_kinds, ep->flags.kind,
 				strlen(ep->flags.kind));
 	if (!pp && net->missing_kind_is_error) {
-		kr_log_error("error: network socket kind '%s' not handled when opening '%s",
+		kr_log_error(LOG_GRP_NETWORK, "[network] error: network socket kind '%s' not handled when opening '%s",
 				ep->flags.kind, log_addr);
 		if (ep->family != AF_UNIX)
-			kr_log_error("#%d", ep->port);
-		kr_log_error("'\n");
+			kr_log_error(LOG_GRP_NETWORK, "#%d", ep->port);
+		kr_log_error(LOG_GRP_NETWORK, "'\n");
 		return kr_error(ENOENT);
 	}
 	if (!pp) return kr_ok();
@@ -65,7 +65,7 @@ static int endpoint_open_lua_cb(struct network *net, struct endpoint *ep,
 		lua_pushfstring(L, "%s#%d", log_addr, ep->port);
 	}
 	if (lua_pcall(L, 3, 0, 0)) {
-		kr_log_error("error opening %s: %s\n", log_addr, lua_tostring(L, -1));
+		kr_log_error(LOG_GRP_NETWORK, "[network] error opening %s: %s\n", log_addr, lua_tostring(L, -1));
 		return kr_error(ENOSYS); /* TODO: better value? */
 	}
 	ep->engaged = true;
@@ -105,7 +105,7 @@ static void endpoint_close_lua_cb(struct network *net, struct endpoint *ep)
 	void **pp = trie_get_try(net->endpoint_kinds, ep->flags.kind,
 				strlen(ep->flags.kind));
 	if (!pp && net->missing_kind_is_error) {
-		kr_log_error("internal error: missing kind '%s' in endpoint registry\n",
+		kr_log_error(LOG_GRP_NETWORK, "[network] internal error: missing kind '%s' in endpoint registry\n",
 				ep->flags.kind);
 		return;
 	}
@@ -117,7 +117,7 @@ static void endpoint_close_lua_cb(struct network *net, struct endpoint *ep)
 	lua_pushpointer(L, ep);
 	lua_pushstring(L, "FIXME:endpoint-identifier");
 	if (lua_pcall(L, 3, 0, 0)) {
-		kr_log_error("failed to close FIXME:endpoint-identifier: %s\n",
+		kr_log_error(LOG_GRP_NETWORK, "[nework] failed to close FIXME:endpoint-identifier: %s\n",
 				lua_tostring(L, -1));
 	}
 }
@@ -134,7 +134,7 @@ static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 		socklen_t addr_len = sizeof(sa);
 		if (getsockname(ep->fd, (struct sockaddr *)&sa, &addr_len)
 		    || unlink(sa.sun_path)) {
-			kr_log_error("error (ignored) when closing unix socket (fd = %d): %s\n",
+			kr_log_error(LOG_GRP_NETWORK, "[network] error (ignored) when closing unix socket (fd = %d): %s\n",
 					ep->fd, strerror(errno));
 			return;
 		}
@@ -293,7 +293,7 @@ static int open_endpoint(struct network *net, const char *addr_str,
 	if (ep->family == AF_UNIX) {
 		/* Some parts of connection handling would need more work,
 		 * so let's support AF_UNIX only with .kind != NULL for now. */
-		kr_log_error("[system] AF_UNIX only supported with set { kind = '...' }\n");
+		kr_log_error(LOG_GRP_NETWORK, "[network] AF_UNIX only supported with set { kind = '...' }\n");
 		ret = EAFNOSUPPORT;
 		goto finish_ret;
 		/*
@@ -560,9 +560,9 @@ void network_new_hostname(struct network *net, struct engine *engine)
 		if (newcreds) {
 			tls_credentials_release(net->tls_credentials);
 			net->tls_credentials = newcreds;
-			kr_log_info("[tls] Updated ephemeral X.509 cert with new hostname\n");
+			kr_log_info(LOG_GRP_TLS, "[tls] Updated ephemeral X.509 cert with new hostname\n");
 		} else {
-			kr_log_error("[tls] Failed to update ephemeral X.509 cert with new hostname, using existing one\n");
+			kr_log_error(LOG_GRP_TLS, "[tls] Failed to update ephemeral X.509 cert with new hostname, using existing one\n");
 		}
 	}
 }
@@ -599,7 +599,7 @@ int network_set_bpf(struct network *net, int bpf_fd)
 		return 0;
 	}
 #else
-	kr_log_error("[network] SO_ATTACH_BPF socket option doesn't supported\n");
+	kr_log_error(LOG_GRP_NETWORK, "[network] SO_ATTACH_BPF socket option doesn't supported\n");
 	(void)net;
 	(void)bpf_fd;
 	return 0;
@@ -621,7 +621,7 @@ static int clear_bpf_cb(const char *key, void *val, void *ext)
 		assert(sockfd != -1);
 
 		if (setsockopt(sockfd, SOL_SOCKET, SO_DETACH_BPF, NULL, 0) != 0) {
-			kr_log_error("[network] failed to clear SO_DETACH_BPF socket option\n");
+			kr_log_error(LOG_GRP_NETWORK, "[network] failed to clear SO_DETACH_BPF socket option\n");
 		}
 		/* Proceed even if setsockopt() failed,
 		 * as we want to process all opened sockets. */
@@ -635,7 +635,7 @@ void network_clear_bpf(struct network *net)
 #ifdef SO_DETACH_BPF
 	map_walk(&net->endpoints, clear_bpf_cb, NULL);
 #else
-	kr_log_error("[network] SO_DETACH_BPF socket option doesn't supported\n");
+	kr_log_error(LOG_GRP_NETWORK, "[network] SO_DETACH_BPF socket option doesn't supported\n");
 	(void)net;
 #endif
 }

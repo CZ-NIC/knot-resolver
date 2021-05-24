@@ -66,7 +66,7 @@ static int l_ffi_modcb(lua_State *L, struct kr_module *module)
 	lua_pushpointer(L, module);
 	if (lua_pcall(L, 2, 0, 0) == 0)
 		return kr_ok();
-	kr_log_error("error: %s\n", lua_tostring(L, -1));
+	kr_log_error(LOG_GRP_SYSTEM, "[system] error: %s\n", lua_tostring(L, -1));
 	lua_pop(L, 1);
 	return kr_error(1);
 }
@@ -117,12 +117,12 @@ static int l_ffi_call_layer(kr_layer_t *ctx, int slot_ix)
 	int state = ctx->req->state;
 	if (ret) { /* Exception or another lua problem. */
 		state = KR_STATE_FAIL;
-		kr_log_error("error: %s\n", lua_tostring(L, -1));
+		kr_log_error(LOG_GRP_SYSTEM, "[system] error: %s\n", lua_tostring(L, -1));
 
 	} else if (lua_isnumber(L, -1)) { /* Explicitly returned state. */
 		state = lua_tointeger(L, -1);
 		if (!kr_state_consistent(state)) {
-			kr_log_error("error: nonsense state returned from lua module layer: %d\n",
+			kr_log_error(LOG_GRP_SYSTEM, "[system] error: nonsense state returned from lua module layer: %d\n",
 					state);
 			state = KR_STATE_FAIL;
 		}
@@ -137,7 +137,7 @@ static int l_ffi_call_layer(kr_layer_t *ctx, int slot_ix)
 
 	} else { /* Nonsense returned. */
 		state = KR_STATE_FAIL;
-		kr_log_error("error: nonsense returned from lua module layer: %s\n",
+		kr_log_error(LOG_GRP_SYSTEM, "[system] error: nonsense returned from lua module layer: %s\n",
 				lua_tostring(L, -1));
 		/* Unfortunately we can't easily get name of the module/function here. */
 	}
@@ -279,7 +279,7 @@ int ffimodule_register_lua(struct engine *engine, struct kr_module *module, cons
 	lua_getglobal(L, "require");
 	lua_pushfstring(L, "kres_modules.%s", name);
 	if (lua_pcall(L, 1, LUA_MULTRET, 0) != 0) {
-		kr_log_error("error: %s\n", lua_tostring(L, -1));
+		kr_log_error(LOG_GRP_SYSTEM, "[system] error: %s\n", lua_tostring(L, -1));
 		lua_pop(L, 1);
 		return kr_error(ENOENT);
 	}

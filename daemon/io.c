@@ -164,8 +164,8 @@ int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags
 		int omit = IP_PMTUDISC_OMIT;
 		if (type == SOCK_DGRAM && addr->sa_family == AF_INET
 		    && setsockopt(fd, IPPROTO_IP, IP_MTU_DISCOVER, &omit, sizeof(omit))) {
-			kr_log_error(
-				"[ io ] failed to disable Path MTU discovery for %s UDP: %s\n",
+			kr_log_error(LOG_GRP_IO, "[ io ]"
+				"failed to disable Path MTU discovery for %s UDP: %s\n",
 				kr_straddr(addr), strerror(errno));
 		}
 #endif
@@ -198,7 +198,7 @@ int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
 	int socklen = sizeof(union inaddr);
 	ret = uv_udp_getsockname(handle, session_get_sockname(s), &socklen);
 	if (ret) {
-		kr_log_error("ERROR: getsockname failed: %s\n", uv_strerror(ret));
+		kr_log_error(LOG_GRP_IO, "[ io ] ERROR: getsockname failed: %s\n", uv_strerror(ret));
 		abort(); /* It might be nontrivial not to leak something here. */
 	}
 
@@ -515,7 +515,7 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
 #if ENABLE_DOH2
 		connection = https_accept;
 #else
-		kr_log_error("[ io ] kresd was compiled without libnghttp2 support\n");
+		kr_log_error(LOG_GRP_IO, "[ io ] kresd was compiled without libnghttp2 support\n");
 		return kr_error(ENOPROTOOPT);
 #endif
 	} else if (has_tls) {
@@ -534,7 +534,7 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
 #ifdef TCP_DEFER_ACCEPT
 	val = KR_CONN_RTT_MAX/1000;
 	if (setsockopt(fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &val, sizeof(val))) {
-		kr_log_error("[ io ] listen TCP (defer_accept): %s\n", strerror(errno));
+		kr_log_error(LOG_GRP_IO, "[ io ] listen TCP (defer_accept): %s\n", strerror(errno));
 	}
 #endif
 
@@ -551,7 +551,7 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
 	val = 1; /* Accepts on/off */
 	#endif
 	if (setsockopt(fd, IPPROTO_TCP, TCP_FASTOPEN, &val, sizeof(val))) {
-		kr_log_error("[ io ] listen TCP (fastopen): %s%s\n", strerror(errno),
+		kr_log_error(LOG_GRP_IO, "[ io ] listen TCP (fastopen): %s%s\n", strerror(errno),
 			(errno != EPERM ? "" :
 			 ".  This may be caused by TCP Fast Open being disabled in the OS."));
 	}
@@ -684,7 +684,7 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 		if (data->mode == io_mode_binary) {
 			/* Leader expects length field in all cases */
 			if (!message || len_s > UINT32_MAX) {
-				kr_log_error("[io] unrepresentable respose on control socket, "
+				kr_log_error(LOG_GRP_IO, "[ io ] unrepresentable respose on control socket, "
 						"sending back empty block (command '%s')\n", cmd);
 				len_s = 0;
 			}
@@ -796,11 +796,11 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 {
 	const int XDP_RX_BATCH_SIZE = 64;
 	if (status < 0) {
-		kr_log_error("[xdp] poll status %d: %s\n", status, uv_strerror(status));
+		kr_log_error(LOG_GRP_XDP, "[xdp] poll status %d: %s\n", status, uv_strerror(status));
 		return;
 	}
 	if (events != UV_READABLE) {
-		kr_log_error("[xdp] poll unexpected events: %d\n", events);
+		kr_log_error(LOG_GRP_XDP, "[xdp] poll unexpected events: %d\n", events);
 		return;
 	}
 
@@ -817,7 +817,7 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 		kr_log_verbose("[xdp] poll triggered, processing a batch of %d packets\n",
 			(int)rcvd);
 	} else {
-		kr_log_error("[xdp] knot_xdp_recv(): %d, %s\n", ret, knot_strerror(ret));
+		kr_log_error(LOG_GRP_XDP, "[xdp] knot_xdp_recv(): %d, %s\n", ret, knot_strerror(ret));
 		assert(false); // ATM it can only be returned when called incorrectly
 		return;
 	}
@@ -847,7 +847,7 @@ static void xdp_warn_mode(const char *ifname)
 	assert(ifname);
 	const unsigned if_index = if_nametoindex(ifname);
 	if (!if_index) {
-		kr_log_info("[xdp] warning: interface %s, unexpected error when converting its name: %s\n",
+		kr_log_warning(LOG_GRP_XDP, "[xdp] warning: interface %s, unexpected error when converting its name: %s\n",
 				ifname, strerror(errno));
 		return;
 	}
@@ -857,13 +857,13 @@ static void xdp_warn_mode(const char *ifname)
 	case KNOT_XDP_MODE_FULL:
 		return;
 	case KNOT_XDP_MODE_EMUL:
-		kr_log_info("[xdp] warning: interface %s running only with XDP emulation\n",
+		kr_log_warning(LOG_GRP_XDP, "[xdp] warning: interface %s running only with XDP emulation\n",
 				ifname);
 		return;
 	case KNOT_XDP_MODE_NONE: // enum warnings from compiler
 		break;
 	}
-	kr_log_info("[xdp] warning: interface %s running in unexpected XDP mode %d\n",
+	kr_log_warning(LOG_GRP_XDP, "[xdp] warning: interface %s running in unexpected XDP mode %d\n",
 			ifname, (int)mode);
 }
 int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
