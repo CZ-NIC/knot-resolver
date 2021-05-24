@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 class SupervisordKresdController(BaseKresdController):
-    _config = SupervisordConfig([])
+    # ignore the type issue bellow. It's valid, but the type-checker does not understand dataclasses
+    _config = SupervisordConfig(instances=[])  # type: ignore
 
     async def is_running(self) -> bool:
         return self.id in SupervisordKresdController._config.instances
