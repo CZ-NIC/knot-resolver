@@ -12,7 +12,7 @@ from knot_resolver_manager.utils.async_utils import call, readfile, wait_for_pro
 
 CONFIG_FILE = "/tmp/knot-resolver-manager-supervisord.conf"
 PID_FILE = "/tmp/knot-resolver-manager-supervisord.pid"
-SERVER_SOCK = "/tmp/knot-resolver-manager-supervisord.sock"  # created pseudorandomly from ASCII codes for K.R.M:SU
+SERVER_SOCK = "/tmp/knot-resolver-manager-supervisord.sock"
 
 
 @dataclass

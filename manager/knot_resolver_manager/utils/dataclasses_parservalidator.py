@@ -189,6 +189,12 @@ _T = TypeVar("_T", bound="DataclassParserValidatorMixin")
 
 
 class DataclassParserValidatorMixin:
+    def __init__(self, *args: Any, **kwargs: Any):
+        """
+        This constructor is useless except for typechecking. It makes sure that the dataclasses can be created with
+        any arguments whatsoever.
+        """
+
     def validate(self) -> None:
         for field_name in dir(self):
             # skip internal fields
