@@ -1,4 +1,4 @@
-FROM knot-manager:debian
+FROM registry.nic.cz/knot/knot-resolver-manager/knot-manager:debian
 
 # Remove systemd
 # RUN apt-get remove -y systemd
