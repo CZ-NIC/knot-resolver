@@ -39,7 +39,7 @@ run-debug = { cmd = "scripts/run-debug", help = "Run the manager under debugger"
 test = { cmd = "pytest --cov=knot_resolver_manager --show-capture=all tests/", help = "Run tests" }
 check = { cmd = "scripts/codecheck", help = "Run static code analysis" }
 format = { shell = "poetry run black knot_resolver_manager/ tests/; isort -rc .", help = "Run code formatter" }
-fixdeps = { shell = "poetry install; npm install", help = "Install/update dependencies according to configuration files"}
+fixdeps = { shell = "poetry install; npm install; npm update", help = "Install/update dependencies according to configuration files"}
 commit = { shell = "scripts/commit", help = "Invoke every single check before commiting" }
 container = { cmd = "scripts/container.py", help = "Manage containers" }
 clean = """
