@@ -2,7 +2,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, TypeVar
+from typing import Dict, List, NoReturn, TypeVar
 
 import click
 import toml
@@ -51,11 +51,12 @@ class Test:
         self._images = [ str(img) for img in config["images"]]
 
     
-    def run(self, inspect_failed: bool =False):
+    def run(self, inspect_failed: bool =False) -> bool:
+        success = True
         for image in self._images:
             print(f"Running test {Colors.YELLOW}{self.name}{Colors.RESET} within container {Colors.YELLOW}{image}{Colors.RESET}")
             print(f"----------------------------{Colors.BRIGHT_BLACK}")
-            cmd: List[str] = ["../scripts/container-run.py"] + (["-i"] if inspect_failed else []) + flatten([["-m", f"{k}:{v}"] for k,v in self._mounts.items()]) + [image] + self._cmd
+            cmd: List[str] = ["../scripts/container.py", "run"] + (["-i"] if inspect_failed else []) + flatten([["-m", f"{k}:{v}"] for k,v in self._mounts.items()]) + [image] + self._cmd
 
             # run and relay output
             exit_code = subprocess.call(cmd)
@@ -66,6 +67,8 @@ class Test:
                 print(
                     f"{Colors.RED}Test failed with exit code {exit_code}{Colors.RESET}"
                 )
+            success = success and exit_code == 0
+        return success
 
 class TestRunner:
     _TEST_DIRECTORY = "tests"
@@ -99,7 +102,7 @@ class TestRunner:
         default=False,
         is_flag=True,
     )
-    def run(tests: List[str] = [], inspect_failed: bool = False, no_build: bool = False):
+    def run(tests: List[str] = [], inspect_failed: bool = False, no_build: bool = False) -> NoReturn:
         """Run TESTS
 
         If no TESTS are specified, runs them all.
@@ -107,10 +110,11 @@ class TestRunner:
 
         # build all test containers
         if not no_build:
-            ret = subprocess.call("poe container-build", shell=True)
+            ret = subprocess.call("poe container build", shell=True)
             assert ret == 0
 
         # Run the tests
+        success = True
         for test_path in TestRunner._list_tests():
             test = Test(test_path)
 
@@ -118,7 +122,13 @@ class TestRunner:
                 print(f"Skipping test {Colors.YELLOW}{test.name}{Colors.RESET}")
                 continue
 
-            test.run(inspect_failed)
+            res = test.run(inspect_failed)
+            success = success and res
+        
+        if not success:
+            sys.exit(1)
+        else:
+            sys.exit(0)
 
 
 if __name__ == "__main__":
