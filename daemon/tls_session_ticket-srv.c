@@ -85,7 +85,7 @@ static tst_ctx_t * tst_key_create(const char *secret, size_t secret_len, uv_loop
 	}
 	#if !TLS_SESSION_RESUMPTION_SYNC
 		if (secret_len) {
-			kr_log_error("[tls] session ticket: secrets were not enabled at compile-time (your GnuTLS version is not supported)\n");
+			kr_log_error(LOG_GRP_TLS, "[tls] session ticket: secrets were not enabled at compile-time (your GnuTLS version is not supported)\n");
 			return NULL; /* ENOTSUP */
 		}
 	#endif
@@ -173,7 +173,7 @@ static void tst_key_check(uv_timer_t *timer, bool force_update)
 	/* Compute the current epoch. */
 	struct timeval now;
 	if (gettimeofday(&now, NULL)) {
-		kr_log_error("[tls] session ticket: gettimeofday failed, %s\n",
+		kr_log_error(LOG_GRP_TLS, "[tls] session ticket: gettimeofday failed, %s\n",
 				strerror(errno));
 		return;
 	}
@@ -185,7 +185,7 @@ static void tst_key_check(uv_timer_t *timer, bool force_update)
 	int err = tst_key_update(stst, epoch, force_update);
 	if (err) {
 		assert(err != kr_error(EINVAL));
-		kr_log_error("[tls] session ticket: failed rotation, err = %d\n", err);
+		kr_log_error(LOG_GRP_TLS, "[tls] session ticket: failed rotation, err = %d\n", err);
 	}
 	/* Reschedule. */
 	const time_t tv_sec_next = (epoch + 1) * TST_KEY_LIFETIME;
@@ -200,7 +200,7 @@ static void tst_key_check(uv_timer_t *timer, bool force_update)
 	err = uv_timer_start(timer, &tst_timer_callback, remain_ms, 0);
 	if (err) {
 		assert(false);
-		kr_log_error("[tls] session ticket: failed to schedule, err = %d\n", err);
+		kr_log_error(LOG_GRP_TLS, "[tls] session ticket: failed to schedule, err = %d\n", err);
 	}
 }
 
@@ -215,7 +215,7 @@ void tls_session_ticket_enable(struct tls_session_ticket_ctx *ctx, gnutls_sessio
 	};
 	int err = gnutls_session_ticket_enable_server(session, &gd);
 	if (err) {
-		kr_log_error("[tls] failed to enable session tickets: %s (%d)\n",
+		kr_log_error(LOG_GRP_TLS, "[tls] failed to enable session tickets: %s (%d)\n",
 				gnutls_strerror_name(err), err);
 		/* but continue without tickets */
 	}
