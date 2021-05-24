@@ -41,8 +41,7 @@ check = { cmd = "scripts/codecheck", help = "Run static code analysis" }
 format = { shell = "poetry run black knot_resolver_manager/ tests/; isort -rc .", help = "Run code formatter" }
 fixdeps = { shell = "poetry install; npm install", help = "Install/update dependencies according to configuration files"}
 commit = { shell = "scripts/commit", help = "Invoke every single check before commiting" }
-container-build = { cmd = "scripts/container-build", help = "Build containers (no arguments = all, otherwise arguments are tags that should be built)" }
-container-run = { cmd = "scripts/container-run.py", help = "Run a container" }
+container = { cmd = "scripts/container.py", help = "Manage containers" }
 clean = """
   rm -rf .coverage
          .mypy_cache

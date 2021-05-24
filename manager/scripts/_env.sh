@@ -17,7 +17,7 @@ fi
 cd $gitroot
 
 # ensure consistent environment with virtualenv
-if test -z "$VIRTUAL_ENV" -a "$CI" != "true"; then
+if test -z "$VIRTUAL_ENV" -a "$CI" != "true" -a -z "$KNOT_ENV"; then
 	echo -e "${yellow}You are NOT running the script within the project's virtual environment.${reset}"
 	echo -e "Do you want to continue regardless? [yN]"
 	read cont
