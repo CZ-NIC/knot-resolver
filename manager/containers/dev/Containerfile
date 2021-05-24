@@ -47,7 +47,7 @@ RUN apt-get update \
   && dpkg -i knot-resolver-release.deb \
   && rm knot-resolver-release.deb \
   && apt-get update && apt-get install -y --no-install-recommends knot-resolver \
-  # Installing Yarn and NodeJS
+  # Installing NodeJS
   && curl -sSL https://deb.nodesource.com/gpgkey/nodesource.gpg.key | apt-key add - \
   && echo "deb https://deb.nodesource.com/$NODE_VERSION $(lsb_release -s -c) main" | tee /etc/apt/sources.list.d/nodesource.list \
   && echo "deb-src https://deb.nodesource.com/$NODE_VERSION $(lsb_release -s -c) main" | tee -a /etc/apt/sources.list.d/nodesource.list \

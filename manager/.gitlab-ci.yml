@@ -2,23 +2,33 @@ stages:
   - image
   - check
 
-image: registry.nic.cz/knot/knot-resolver-manager/devenv:latest
-
+default:
+  image: registry.nic.cz/knot/knot-resolver-manager/knot-manager:ci
+  before_script:
+    # make sure Poetry is in $PATH
+    - source $HOME/.poetry/env
+    # there is already a pyproject.toml with installed dependencies in the root
+    # it has its own virtualenv and we want to use that env in a different directory
+    # so let's create a new one and replace it by the already existing one
+    # we don't care about destroying the environment in process, because it's going to be discarded anyway
+    - poetry env use $(which python3.6); ourpath=$(poetry env info -p); upperpath=$( (cd ..; poetry env info -p) ); rm -rf "$ourpath"; cp -a "$upperpath" "$ourpath"; mv /poetry.lock .
+    # the virtualenv we recycled might have beed slightly out of date. Let's quickly update it
+    - poetry install
+    # fix podman; see https://gitlab.nic.cz/labs/lxc-gitlab-runner#nesting-with-podman
+    - unset TMPDIR
+  tags:
+    - lxc
+    - amd64
 
 build:
-  image: docker:20-dind
   stage: image
-  tags:
-    - dind
-  variables:
-    IMAGE_TAG: $CI_REGISTRY/knot/knot-resolver-manager/devenv:latest
-  before_script:
-    - docker info
   script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build -t $IMAGE_TAG -f containers/dev/Containerfile .
-    - docker push $IMAGE_TAG
-
+    - poe container build --ci-login --push
+  only:
+    changes:
+      - pyproject.toml
+      - package.json
+      - containers/**/*
 
 lint:
   stage: check
@@ -29,3 +39,13 @@ test:
   stage: check
   script:
     - poe test
+    - poetry run coverage xml
+  artifacts:
+    reports:
+      cobertura: coverage.xml
+
+integration:
+  stage: check
+  script:
+    - poe container pull
+    - poe integration -n

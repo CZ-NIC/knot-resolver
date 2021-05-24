@@ -10,3 +10,4 @@ dist/
 .tox/
 .vscode/
 /pkg
+.podman-cache/
