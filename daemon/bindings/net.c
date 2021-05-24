@@ -141,7 +141,7 @@ static bool net_listen_addrs(lua_State *L, int port, endpoint_flags_t flags, int
 		if (ret == 0) return true; /* success */
 
 		if (is_unix) {
-			kr_log_error("[system] bind to '%s' (UNIX): %s\n",
+			kr_log_error(LOG_GRP_NETWORK, "[network] bind to '%s' (UNIX): %s\n",
 					str, kr_strerror(ret));
 		} else if (flags.xdp) {
 			const char *err_str = knot_strerror(ret);
@@ -157,18 +157,18 @@ static bool net_listen_addrs(lua_State *L, int port, endpoint_flags_t flags, int
 			/* Notable OK strerror: KNOT_EPERM Operation not permitted */
 
 			if (nic_queue == -1) {
-				kr_log_error("[system] failed to initialize XDP for '%s@%d'"
+				kr_log_error(LOG_GRP_NETWORK, "[network] failed to initialize XDP for '%s@%d'"
 						" (nic_queue = <auto>): %s\n",
 						str, port, err_str);
 			} else {
-				kr_log_error("[system] failed to initialize XDP for '%s@%d'"
+				kr_log_error(LOG_GRP_NETWORK, "[network] failed to initialize XDP for '%s@%d'"
 						" (nic_queue = %d): %s\n",
 						str, port, nic_queue, err_str);
 			}
 
 		} else {
 			const char *stype = flags.sock_type == SOCK_DGRAM ? "UDP" : "TCP";
-			kr_log_error("[system] bind to '%s@%d' (%s): %s\n",
+			kr_log_error(LOG_GRP_NETWORK, "[network] bind to '%s@%d' (%s): %s\n",
 					str, port, stype, kr_strerror(ret));
 		}
 		return false; /* failure */
@@ -775,7 +775,7 @@ static int net_tls_client(lua_State *L)
 		ok_ca = memcmp(newcfg->pins.at[i], oldcfg->pins.at[i], TLS_SHA256_RAW_LEN) == 0;
 	const bool ok_insecure = newcfg->insecure == oldcfg->insecure;
 	if (!(ok_h && ok_ca && ok_pins && ok_insecure)) {
-		kr_log_info("[tls_client] "
+		kr_log_warning(LOG_GRP_TLSCLIENT, "[tls_client] "
 			"warning: re-defining TLS authentication parameters for %s\n",
 			addr_str);
 	}
