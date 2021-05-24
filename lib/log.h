@@ -11,42 +11,75 @@
 
 #define LOG_DEFAULT_LEVEL	LOG_WARNING
 
-typedef int log_level_t;
+/* Targets */
 
+typedef int log_level_t;
 typedef enum {
 	LOG_TARGET_SYSLOG = 0,
 	LOG_TARGET_STDERR = 1,
 	LOG_TARGET_STDOUT = 2,
 } log_target_t;
 
+/* Groups */
+
+typedef uint32_t log_groups_t;
+
+/* Don't forget add name to log_group_names[] (log.c) */
+#define LOG_GRP_SYSTEM		(1 << 1)
+#define LOG_GRP_CACHE		(1 << 2)
+#define LOG_GRP_IO		(1 << 3)
+#define LOG_GRP_NETWORK		(1 << 4)
+#define LOG_GRP_TA		(1 << 5)
+#define LOG_GRP_TLS		(1 << 6)
+#define LOG_GRP_GNUTLS		(1 << 7)
+#define LOG_GRP_TLSCLIENT	(1 << 8)
+#define LOG_GRP_XDP		(1 << 9)
+#define LOG_GRP_ZIMPORT		(1 << 10)
+#define LOG_GRP_ZSCANNER	(1 << 11)
+#define LOG_GRP_DOH		(1 << 12)
+#define LOG_GRP_DNSSEC		(1 << 13)
+#define LOG_GRP_HINT		(1 << 14)
+
+KR_EXPORT
+extern log_groups_t kr_log_groups;
+KR_EXPORT
+void kr_log_add_group(log_groups_t mask);
+KR_EXPORT
+void kr_log_del_group(log_groups_t mask);
+
+/* Log */
+
 KR_EXPORT
 extern log_level_t kr_log_level;
 KR_EXPORT
 extern log_target_t kr_log_target;
-KR_EXPORT KR_PRINTF(2)
-void kr_log_fmt(log_level_t level, const char *fmt, ...);
+KR_EXPORT KR_PRINTF(3)
+void kr_log_fmt(log_groups_t group, log_level_t level, const char *fmt, ...);
 KR_EXPORT
 int kr_log_level_set(log_level_t level);
 KR_EXPORT
 log_level_t kr_log_level_get(void);
 KR_EXPORT
 void kr_log_init(log_level_t level, log_target_t target);
+
+#define kr_log_debug(grp, fmt, ...) kr_log_fmt(grp, LOG_DEBUG, fmt, ## __VA_ARGS__)
+#define kr_log_info(grp, fmt, ...) kr_log_fmt(grp, LOG_INFO, fmt, ## __VA_ARGS__)
+#define kr_log_notice(grp, fmt, ...) kr_log_fmt(grp, LOG_NOTICE, fmt, ## __VA_ARGS__)
+#define kr_log_warning(grp, fmt, ...) kr_log_fmt(grp, LOG_WARNING, fmt, ## __VA_ARGS__)
+#define kr_log_error(grp, fmt, ...) kr_log_fmt(grp, LOG_ERR, fmt, ## __VA_ARGS__)
+#define kr_log_fatal(grp, fmt, ...) kr_log_fmt(grp, LOG_CRIT, fmt, ## __VA_ARGS__)
+
+#define kr_log_deprecate(grp, fmt, ...) kr_log_fmt(grp, LOG_WARNING, "deprecation WARNING: " fmt, ## __VA_ARGS__)
+
+#define KR_LOG_LEVEL_IS(exp) ((kr_log_level >= (exp)) ? true : false)
+
+
+/* Syslog */
+
 KR_EXPORT
 char *kr_log_level2name(log_level_t level);
 KR_EXPORT
 log_level_t kr_log_name2level(const char *name);
-
-#define kr_log_debug(fmt, ...) kr_log_fmt(LOG_DEBUG, fmt, ## __VA_ARGS__)
-#define kr_log_info(fmt, ...) kr_log_fmt(LOG_INFO, fmt, ## __VA_ARGS__)
-#define kr_log_notice(fmt, ...) kr_log_fmt(LOG_NOTICE, fmt, ## __VA_ARGS__)
-#define kr_log_warning(fmt, ...) kr_log_fmt(LOG_WARNING, fmt, ## __VA_ARGS__)
-#define kr_log_error(fmt, ...) kr_log_fmt(LOG_ERR, fmt, ## __VA_ARGS__)
-#define kr_log_fatal(fmt, ...) kr_log_fmt(LOG_CRIT, fmt, ## __VA_ARGS__)
-
-#define kr_log_deprecate(fmt, ...) kr_log_fmt(LOG_WARNING, "deprecation WARNING: " fmt, ## __VA_ARGS__)
-
-#define KR_LOG_LEVEL_IS(exp) ((kr_log_level >= (exp)) ? true : false)
-
 
 #ifndef SYSLOG_NAMES
 typedef struct _code {

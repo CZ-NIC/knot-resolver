@@ -18,6 +18,8 @@ int use_journal = 0;
 
 log_level_t kr_log_level = LOG_CRIT;
 log_target_t kr_log_target = LOG_TARGET_STDOUT;
+log_groups_t kr_log_groups = 0;
+
 #ifndef SYSLOG_NAMES
 syslog_code_t prioritynames[] = {
 	{ "alert",	LOG_ALERT },
@@ -32,11 +34,19 @@ syslog_code_t prioritynames[] = {
 };
 #endif
 
-void kr_log_fmt(log_level_t level, const char *fmt, ...)
+int group_is_set(log_groups_t group)
+{
+	return kr_log_groups & (group);
+}
+
+void kr_log_fmt(log_groups_t group, log_level_t level, const char *fmt, ...)
 {
 	va_list args;
 
 	if (kr_log_target == LOG_TARGET_SYSLOG) {
+		if (group_is_set(group))
+			setlogmask(LOG_UPTO(LOG_DEBUG));
+
 		va_start(args, fmt);
 #if ENABLE_LIBSYSTEMD
 		if (use_journal) {
@@ -56,8 +66,11 @@ void kr_log_fmt(log_level_t level, const char *fmt, ...)
 		vsyslog(level, fmt, args);
 #endif
 		va_end(args);
+
+		if (group_is_set(group))
+			setlogmask(LOG_UPTO(kr_log_level));
 	} else {
-		if (!KR_LOG_LEVEL_IS(level))
+		if (!(KR_LOG_LEVEL_IS(level) || group_is_set(group)))
 			return;
 
 		FILE *stream;
@@ -75,7 +88,7 @@ void kr_log_fmt(log_level_t level, const char *fmt, ...)
 
 static void kres_gnutls_log(int level, const char *message)
 {
-	kr_log_debug("[gnutls] (%d) %s", level, message);
+	kr_log_debug(LOG_GRP_GNUTLS, "[gnutls] (%d) %s", level, message);
 }
 
 char *kr_log_level2name(log_level_t level)
@@ -125,9 +138,20 @@ log_level_t kr_log_level_get(void)
 	return kr_log_level;
 }
 
+void kr_log_add_group(log_groups_t mask)
+{
+       kr_log_groups |= mask;
+}
+
+void kr_log_del_group(log_groups_t mask)
+{
+       kr_log_groups &= (~mask);
+}
+
 void kr_log_init(log_level_t level, log_target_t target)
 {
 	kr_log_target = target;
+	kr_log_groups = 0;
 
 #if ENABLE_LIBSYSTEMD
 	use_journal = sd_booted();

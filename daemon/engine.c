@@ -742,7 +742,7 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 			ret = engine_pcall(L, 1);
 		}
 		if (kr_fails_assert(ret == 0)) {  /* probably not critical, but weird */
-			kr_log_error("[system] internal error when loading C module %s: %s\n",
+			kr_log_error(LOG_GRP_SYSTEM, "[system] internal error when loading C module %s: %s\n",
 					module->name, lua_tostring(L, -1));
 			lua_pop(L, 1);
 		}
@@ -751,12 +751,12 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 		/* No luck with C module, so try to load and .init() lua module. */
 		ret = ffimodule_register_lua(engine, module, name);
 		if (ret != 0) {
-			kr_log_error("[system] failed to load module '%s'\n", name);
+			kr_log_error(LOG_GRP_SYSTEM, "[system] failed to load module '%s'\n", name);
 		}
 
 	} else if (ret == kr_error(ENOTSUP)) {
 		/* Print a more helpful message when module is linked against an old resolver ABI. */
-		kr_log_error("[system] module '%s' links to unsupported ABI, please rebuild it\n", name);
+		kr_log_error(LOG_GRP_SYSTEM, "[system] module '%s' links to unsupported ABI, please rebuild it\n", name);
 	}
 
 	if (ret != 0) {
