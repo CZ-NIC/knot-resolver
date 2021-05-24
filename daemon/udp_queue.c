@@ -101,7 +101,7 @@ int udp_queue_init_global(uv_loop_t *loop)
 void udp_queue_push(int fd, struct kr_request *req, struct qr_task *task)
 {
 	if (fd < 0) {
-		kr_log_error("ERROR: called udp_queue_push(fd = %d, ...)\n", fd);
+		kr_log_error(LOG_GRP_SYSTEM, "ERROR: called udp_queue_push(fd = %d, ...)\n", fd);
 		abort();
 	}
 	worker_task_ref(task);

@@ -1157,7 +1157,7 @@ static void rnd_noerror(void *data, uint size)
 {
 	int ret = gnutls_rnd(GNUTLS_RND_NONCE, data, size);
 	if (ret) {
-		kr_log_error("gnutls_rnd(): %s\n", gnutls_strerror(ret));
+		kr_log_error(LOG_GRP_TLS, "gnutls_rnd(): %s\n", gnutls_strerror(ret));
 		abort();
 	}
 }
