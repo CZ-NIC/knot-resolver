@@ -11,3 +11,4 @@ dist/
 .vscode/
 /pkg
 .podman-cache/
+docs/_build/*
