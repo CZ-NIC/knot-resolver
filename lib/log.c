@@ -39,9 +39,13 @@ int group_is_set(log_groups_t group)
 	return kr_log_groups & (group);
 }
 
-void kr_log_fmt(log_groups_t group, log_level_t level, const char *fmt, ...)
+void kr_log_fmt(log_groups_t group, log_level_t level, const char *file,
+		const char *line, const char *func, const char *fmt, ...)
 {
 	va_list args;
+
+	if (!(KR_LOG_LEVEL_IS(level) || group_is_set(group)))
+		return;
 
 	if (kr_log_target == LOG_TARGET_SYSLOG) {
 		if (group_is_set(group))
@@ -50,15 +54,7 @@ void kr_log_fmt(log_groups_t group, log_level_t level, const char *fmt, ...)
 		va_start(args, fmt);
 #if ENABLE_LIBSYSTEMD
 		if (use_journal) {
-			char *code_line = NULL;
-			if (asprintf(&code_line, "%d", __LINE__) == -1) {
-				sd_journal_printv(level, fmt, args);
-			} else {
-				sd_journal_printv_with_location(level,
-						__FILE__, code_line, __func__,
-						fmt, args);
-				free(code_line);
-			}
+			sd_journal_printv_with_location(level, file, line, func, fmt, args);
 		} else {
 			vsyslog(level, fmt, args);
 		}
@@ -70,8 +66,6 @@ void kr_log_fmt(log_groups_t group, log_level_t level, const char *fmt, ...)
 		if (group_is_set(group))
 			setlogmask(LOG_UPTO(kr_log_level));
 	} else {
-		if (!(KR_LOG_LEVEL_IS(level) || group_is_set(group)))
-			return;
 
 		FILE *stream;
 		switch(kr_log_target) {
@@ -123,7 +117,7 @@ int kr_log_level_set(log_level_t level)
 
 	/* gnutls logs messages related to our TLS and also libdnssec,
 	 * and the logging is set up in a global way only */
-	if (KR_LOG_LEVEL_IS(LOG_DEBUG)) {
+	if (KR_LOG_LEVEL_IS(LOG_DEBUG) || group_is_set(LOG_GRP_TLS) || group_is_set(LOG_GRP_TLSCLIENT)) {
 		gnutls_global_set_log_function(kres_gnutls_log);
 	}
 
