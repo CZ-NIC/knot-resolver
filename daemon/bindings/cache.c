@@ -10,8 +10,7 @@
 static struct kr_cache * cache_assert_open(lua_State *L)
 {
 	struct kr_cache *cache = &the_worker->engine->resolver.cache;
-	assert(cache);
-	if (!cache || !kr_cache_is_open(cache))
+	if (kr_fails_assert(cache) || !kr_cache_is_open(cache))
 		lua_error_p(L, "no cache is open yet, use cache.open() or cache.size, etc.");
 	return cache;
 }
@@ -287,8 +286,7 @@ static void cache_dump(lua_State *L, knot_db_val_t keyval[])
 	}
 
 	ret = !knot_dname_to_str(name, dname, sizeof(name));
-	assert(!ret);
-	if (ret) return;
+	if (kr_fails_assert(!ret)) return;
 
 	/* If name typemap doesn't exist yet, create it */
 	lua_getfield(L, -1, name);
@@ -367,10 +365,9 @@ static int cache_ns_tout(lua_State *L)
  * Deallocates zone import context. */
 static void cache_zone_import_cb(int state, void *param)
 {
-	assert (param);
 	(void)state;
-	struct worker_ctx *worker = (struct worker_ctx *)param;
-	assert (worker->z_import);
+	struct worker_ctx *worker = param;
+	if (kr_fails_assert(worker && worker->z_import)) return;
 	zi_free(worker->z_import);
 	worker->z_import = NULL;
 }

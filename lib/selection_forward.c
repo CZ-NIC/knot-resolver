@@ -19,7 +19,7 @@ struct forward_local_state {
 void forward_local_state_alloc(struct knot_mm *mm, void **local_state,
 			       struct kr_request *req)
 {
-	assert(req->selection_context.forwarding_targets.at);
+	kr_require(req->selection_context.forwarding_targets.at);
 	*local_state = mm_calloc(mm, 1, sizeof(struct forward_local_state));
 
 	struct forward_local_state *forward_state = *local_state;
@@ -51,7 +51,7 @@ void forward_choose_transport(struct kr_query *qry,
 			addr_len = sizeof(struct in6_addr);
 			break;
 		default:
-			assert(0);
+			kr_assert(false);
 			*transport = NULL;
 			return;
 		}

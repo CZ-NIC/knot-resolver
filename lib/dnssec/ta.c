@@ -24,7 +24,7 @@ knot_rrset_t *kr_ta_get(map_t *trust_anchors, const knot_dname_t *name)
 const knot_dname_t * kr_ta_closest(const struct kr_context *ctx, const knot_dname_t *name,
 				   const uint16_t type)
 {
-	assert(ctx && name);
+	kr_require(ctx && name);
 	if (type == KNOT_RRTYPE_DS && name[0] != '\0') {
 		/* DS is parent-side record, so the parent name needs to be covered. */
 		name = knot_wire_next_label(name, NULL);

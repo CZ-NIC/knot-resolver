@@ -21,7 +21,8 @@ void queue_init_impl(struct queue *q, size_t item_size)
 
 void queue_deinit_impl(struct queue *q)
 {
-	assert(q);
+	if (kr_fails_assert(q))
+		return;
 	struct queue_chunk *p = q->head;
 	while (p != NULL) {
 		struct queue_chunk *pf = p;
@@ -48,10 +49,10 @@ static struct queue_chunk * queue_chunk_new(const struct queue *q)
 /* Return pointer to the space for the new element. */
 void * queue_push_impl(struct queue *q)
 {
-	assert(q);
+	kr_require(q);
 	struct queue_chunk *t = q->tail; // shorthand
 	if (unlikely(!t)) {
-		assert(!q->head && !q->len);
+		kr_require(!q->head && !q->len);
 		q->head = q->tail = t = queue_chunk_new(q);
 	} else
 	if (t->end == t->cap) {
@@ -63,12 +64,12 @@ void * queue_push_impl(struct queue *q)
 			t->begin = 0;
 		} else {
 			/* Let's grow the tail by another chunk. */
-			assert(!t->next);
+			kr_require(!t->next);
 			t->next = queue_chunk_new(q);
 			t = q->tail = t->next;
 		}
 	}
-	assert(t->end < t->cap);
+	kr_require(t->end < t->cap);
 	++(q->len);
 	++(t->end);
 	return t->data + q->item_size * (t->end - 1);
@@ -80,10 +81,10 @@ void * queue_push_head_impl(struct queue *q)
 	/* When we have choice, we optimize for further _push_head,
 	 * i.e. when shifting or allocating a chunk,
 	 * we store items on the tail-end of the chunk. */
-	assert(q);
+	kr_require(q);
 	struct queue_chunk *h = q->head; // shorthand
 	if (unlikely(!h)) {
-		assert(!q->tail && !q->len);
+		kr_require(!q->tail && !q->len);
 		h = q->head = q->tail = queue_chunk_new(q);
 		h->begin = h->end = h->cap;
 	} else
@@ -104,7 +105,7 @@ void * queue_push_head_impl(struct queue *q)
 			h->begin = h->end = h->cap;
 		}
 	}
-	assert(h->begin > 0);
+	kr_require(h->begin > 0);
 	--(h->begin);
 	++(q->len);
 	return h->data + q->item_size * h->begin;

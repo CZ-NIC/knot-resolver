@@ -2,7 +2,6 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <assert.h>
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -73,16 +72,12 @@ static bool tst_key_invariants(void)
 static tst_ctx_t * tst_key_create(const char *secret, size_t secret_len, uv_loop_t *loop)
 {
 	const size_t hash_len = sizeof(time_t) + secret_len;
-	if (secret_len &&
-	    (!secret || hash_len > UINT16_MAX || hash_len < secret_len)) {
-		assert(!EINVAL);
+	if (kr_fails_assert(!secret_len || (secret && hash_len >= secret_len && hash_len <= UINT16_MAX))) {
 		return NULL;
 		/* reasonable secret_len is best enforced in config API */
 	}
-	if (!tst_key_invariants()) {
-		assert(!EFAULT);
+	if (kr_fails_assert(tst_key_invariants()))
 		return NULL;
-	}
 	#if !TLS_SESSION_RESUMPTION_SYNC
 		if (secret_len) {
 			kr_log_error("[tls] session ticket: secrets were not enabled at compile-time (your GnuTLS version is not supported)\n");
@@ -112,10 +107,8 @@ static int tst_key_get_random(tst_ctx_t *ctx)
 	gnutls_datum_t key_tmp = { NULL, 0 };
 	int err = gnutls_session_ticket_key_generate(&key_tmp);
 	if (err) return kr_error(err);
-	if (key_tmp.size != SESSION_KEY_SIZE) {
-		assert(!EFAULT);
+	if (kr_fails_assert(key_tmp.size == SESSION_KEY_SIZE))
 		return kr_error(EFAULT);
-	}
 	memcpy(ctx->key, key_tmp.data, SESSION_KEY_SIZE);
 	gnutls_memset(key_tmp.data, 0, SESSION_KEY_SIZE);
 	free(key_tmp.data);
@@ -125,10 +118,8 @@ static int tst_key_get_random(tst_ctx_t *ctx)
 /** Recompute the session ticket key, if epoch has changed or forced. */
 static int tst_key_update(tst_ctx_t *ctx, time_t epoch, bool force_update)
 {
-	if (!ctx || ctx->hash_len < sizeof(epoch)) {
-		assert(!EINVAL);
+	if (kr_fails_assert(ctx && ctx->hash_len >= sizeof(epoch)))
 		return kr_error(EINVAL);
-	}
 	/* documented limitation: time_t and endianess must match
 	 * on instances sharing a secret */
 	if (!force_update && memcmp(ctx->hash_data, &epoch, sizeof(epoch)) == 0) {
@@ -141,7 +132,7 @@ static int tst_key_update(tst_ctx_t *ctx, time_t epoch, bool force_update)
 	}
 	/* Otherwise, deterministic variant of secret rotation, if supported. */
 	#if !TLS_SESSION_RESUMPTION_SYNC
-		assert(false);
+		kr_assert(!ENOTSUP);
 		return kr_error(ENOTSUP);
 	#else
 		int err = gnutls_hash_fast(TST_HASH, ctx->hash_data,
@@ -153,9 +144,11 @@ static int tst_key_update(tst_ctx_t *ctx, time_t epoch, bool force_update)
 /** Free all resources of the key (securely). */
 static void tst_key_destroy(uv_handle_t *timer)
 {
-	assert(timer);
+	if (kr_fails_assert(timer))
+		return;
 	tst_ctx_t *ctx = timer->data;
-	assert(ctx);
+	if (kr_fails_assert(ctx))
+		return;
 	gnutls_memset(ctx, 0, offsetof(tst_ctx_t, hash_data) + ctx->hash_len);
 	free(ctx);
 }
@@ -184,8 +177,10 @@ static void tst_key_check(uv_timer_t *timer, bool force_update)
 	 * for gnutls_session_ticket_enable_server() doesn't say. */
 	int err = tst_key_update(stst, epoch, force_update);
 	if (err) {
-		assert(err != kr_error(EINVAL));
-		kr_log_error("[tls] session ticket: failed rotation, err = %d\n", err);
+		kr_log_error("[tls] session ticket: failed rotation, %s\n",
+				kr_strerror(err));
+		if (kr_fails_assert(err != kr_error(EINVAL)))
+			return;
 	}
 	/* Reschedule. */
 	const time_t tv_sec_next = (epoch + 1) * TST_KEY_LIFETIME;
@@ -193,14 +188,16 @@ static void tst_key_check(uv_timer_t *timer, bool force_update)
 	const uint64_t remain_ms = (tv_sec_next - now.tv_sec - 1) * (uint64_t)1000
 				 + ms_until_second + 1;
 	/* ^ +1 because we don't want to wake up half a millisecond before the epoch! */
-	assert(remain_ms < (TST_KEY_LIFETIME + 1 /*rounding tolerance*/) * 1000);
+	if (kr_fails_assert(remain_ms < (TST_KEY_LIFETIME + 1 /*rounding tolerance*/) * 1000))
+		return;
 	kr_log_verbose("[tls] session ticket: epoch %"PRIu64
 			", scheduling rotation check in %"PRIu64" ms\n",
 			(uint64_t)epoch, remain_ms);
 	err = uv_timer_start(timer, &tst_timer_callback, remain_ms, 0);
-	if (err) {
-		assert(false);
-		kr_log_error("[tls] session ticket: failed to schedule, err = %d\n", err);
+	if (kr_fails_assert(err == 0)) {
+		kr_log_error("[tls] session ticket: failed to schedule, %s\n",
+				uv_strerror(err));
+		return;
 	}
 }
 
@@ -208,7 +205,8 @@ static void tst_key_check(uv_timer_t *timer, bool force_update)
 
 void tls_session_ticket_enable(struct tls_session_ticket_ctx *ctx, gnutls_session_t session)
 {
-	assert(ctx && session);
+	if (kr_fails_assert(ctx && session))
+		return;
 	const gnutls_datum_t gd = {
 		.size = SESSION_KEY_SIZE,
 		.data = ctx->key,
@@ -224,9 +222,10 @@ void tls_session_ticket_enable(struct tls_session_ticket_ctx *ctx, gnutls_sessio
 tst_ctx_t * tls_session_ticket_ctx_create(uv_loop_t *loop, const char *secret,
 					  size_t secret_len)
 {
-	assert(loop && (!secret_len || secret));
+	if (kr_fails_assert(loop && (!secret_len || secret)))
+		return NULL;
 	#if GNUTLS_VERSION_NUMBER < 0x030500
-		/* We would need different SESSION_KEY_SIZE; avoid assert. */
+		/* We would need different SESSION_KEY_SIZE; avoid an error. */
 		return NULL;
 	#endif
 	tst_ctx_t *ctx = tst_key_create(secret, secret_len, loop);

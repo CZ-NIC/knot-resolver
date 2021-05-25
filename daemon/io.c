@@ -4,7 +4,6 @@
 
 #include "daemon/io.h"
 
-#include <assert.h>
 #include <contrib/ucw/lib.h>
 #include <contrib/ucw/mempool.h>
 #include <libknot/errcode.h>
@@ -76,7 +75,8 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 
 	if (session_flags(s)->outgoing) {
 		const struct sockaddr *peer = session_get_peer(s);
-		assert(peer->sa_family != AF_UNSPEC);
+		if (kr_fails_assert(peer->sa_family != AF_UNSPEC))
+			return;
 		if (kr_sockaddr_cmp(peer, addr) != 0) {
 			kr_log_verbose("[io] <= ignoring UDP from unexpected address '%s'\n",
 					kr_straddr(addr));
@@ -85,7 +85,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	}
 	ssize_t consumed = session_wirebuf_consume(s, (const uint8_t *)buf->base,
 						   nread);
-	assert(consumed == nread); (void)consumed;
+	kr_assert(consumed == nread);
 	session_wirebuf_process(s, addr);
 	session_wirebuf_discard(s);
 	mp_flush(the_worker->pkt_pool.ctx);
@@ -192,7 +192,7 @@ int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
 	check_bufsize(h);
 	/* Handle is already created, just create context. */
 	struct session *s = session_new(h, false, false);
-	assert(s);
+	kr_require(s);
 	session_flags(s)->outgoing = false;
 
 	int socklen = sizeof(union inaddr);
@@ -209,7 +209,8 @@ void tcp_timeout_trigger(uv_timer_t *timer)
 {
 	struct session *s = timer->data;
 
-	assert(!session_flags(s)->closing);
+	if (kr_fails_assert(!session_flags(s)->closing))
+		return;
 
 	if (!session_tasklist_is_empty(s)) {
 		int finalized = session_tasklist_finalize_expired(s);
@@ -265,8 +266,8 @@ void tcp_timeout_trigger(uv_timer_t *timer)
 static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 {
 	struct session *s = handle->data;
-	assert(s && session_get_handle(s) == (uv_handle_t *)handle &&
-	       handle->type == UV_TCP);
+	if (kr_fails_assert(s && session_get_handle(s) == (uv_handle_t *)handle && handle->type == UV_TCP))
+		return;
 
 	if (session_flags(s)->closing) {
 		return;
@@ -337,7 +338,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	/* data points to start of the free space in session wire buffer.
 	   Simple increase internal counter. */
 	consumed = session_wirebuf_consume(s, data, data_len);
-	assert(consumed == data_len);
+	kr_assert(consumed == data_len);
 
 	int ret = session_wirebuf_process(s, session_get_peer(s));
 	if (ret < 0) {
@@ -353,7 +354,7 @@ static ssize_t tls_send(const uint8_t *buf, const size_t len, struct session *se
 {
 	struct tls_ctx *ctx = session_tls_get_server_ctx(session);
 	ssize_t sent = 0;
-	assert(ctx);
+	kr_require(ctx);
 
 	sent = gnutls_record_send(ctx->c.tls_session, buf, len);
 	if (sent < 0) {
@@ -392,8 +393,8 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls, bool http)
 
 	/* struct session was allocated \ borrowed from memory pool. */
 	struct session *s = client->data;
-	assert(session_flags(s)->outgoing == false);
-	assert(session_flags(s)->has_tls == tls);
+	kr_require(session_flags(s)->outgoing == false);
+	kr_require(session_flags(s)->has_tls == tls);
 
 	if (uv_accept(master, (uv_stream_t *)client) != 0) {
 		/* close session, close underlying uv handles and
@@ -805,7 +806,7 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 	}
 
 	xdp_handle_data_t *xhd = handle->data;
-	assert(xhd && xhd->session && xhd->socket);
+	kr_require(xhd && xhd->session && xhd->socket);
 	uint32_t rcvd;
 	knot_xdp_msg_t msgs[XDP_RX_BATCH_SIZE];
 	int ret = knot_xdp_recv(xhd->socket, msgs, XDP_RX_BATCH_SIZE, &rcvd
@@ -813,18 +814,16 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 			, NULL
 			#endif
 			);
-	if (ret == KNOT_EOK) {
-		kr_log_verbose("[xdp] poll triggered, processing a batch of %d packets\n",
-			(int)rcvd);
-	} else {
+	if (kr_fails_assert(ret == KNOT_EOK)) {
+		/* ATM other error codes can only be returned when called incorrectly */
 		kr_log_error("[xdp] knot_xdp_recv(): %d, %s\n", ret, knot_strerror(ret));
-		assert(false); // ATM it can only be returned when called incorrectly
 		return;
 	}
-	assert(rcvd <= XDP_RX_BATCH_SIZE);
+	kr_log_verbose("[xdp] poll triggered, processing a batch of %d packets\n", (int)rcvd);
+	kr_require(rcvd <= XDP_RX_BATCH_SIZE);
 	for (int i = 0; i < rcvd; ++i) {
 		const knot_xdp_msg_t *msg = &msgs[i];
-		assert(msg->payload.iov_len <= KNOT_WIRE_MAX_PKTSIZE);
+		kr_require(msg->payload.iov_len <= KNOT_WIRE_MAX_PKTSIZE);
 		knot_pkt_t *kpkt = knot_pkt_new(msg->payload.iov_base, msg->payload.iov_len,
 						&the_worker->pkt_pool);
 		if (kpkt == NULL) {
@@ -844,7 +843,9 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 /// Warn if the XDP program is running in emulated mode (XDP_SKB)
 static void xdp_warn_mode(const char *ifname)
 {
-	assert(ifname);
+	if (kr_fails_assert(ifname))
+		return;
+
 	const unsigned if_index = if_nametoindex(ifname);
 	if (!if_index) {
 		kr_log_info("[xdp] warning: interface %s, unexpected error when converting its name: %s\n",
@@ -896,11 +897,10 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 	if (!ret) xdp_warn_mode(ifname);
 
 	if (!ret) ret = uv_idle_init(loop, &xhd->tx_waker);
-	if (ret) {
+	if (ret || kr_fails_assert(xhd->socket)) {
 		free(xhd);
-		return kr_error(ret);
+		return ret == 0 ? kr_error(EINVAL) : kr_error(ret);
 	}
-	assert(xhd->socket);
 	xhd->tx_waker.data = xhd->socket;
 
 	ep->fd = knot_xdp_socket_fd(xhd->socket); // probably not useful
@@ -913,7 +913,7 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 
 	// beware: this sets poll_handle->data
 	xhd->session = session_new(ep->handle, false, false);
-	assert(!session_flags(xhd->session)->outgoing);
+	kr_require(!session_flags(xhd->session)->outgoing);
 	session_get_sockname(xhd->session)->sa_family = AF_XDP; // to have something in there
 
 	ep->handle->data = xhd;
@@ -958,7 +958,7 @@ static void io_deinit(uv_handle_t *handle)
 		knot_xdp_deinit(xhd->socket);
 		free(xhd);
 	#else
-		assert(false);
+		kr_assert(false);
 	#endif
 	}
 }
@@ -977,7 +977,7 @@ int io_start_read(uv_handle_t *handle)
 	case UV_TCP:
 		return uv_read_start((uv_stream_t *)handle, &handle_getbuf, &tcp_recv);
 	default:
-		assert(!EINVAL);
+		kr_assert(false);
 		return kr_error(EINVAL);
 	}
 }
