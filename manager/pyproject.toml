@@ -32,10 +32,13 @@ click = "^7.1.2"
 toml = "^0.10.2"
 debugpy = "^1.2.1"
 apkg = { git = "https://gitlab.nic.cz/packaging/apkg.git", branch = "master" }
+Sphinx = "^4.0.2"
+sphinx-rtd-theme = "^0.5.2"
 
 [tool.poe.tasks]
 run = { cmd = "scripts/run", help = "Run the manager" }
 run-debug = { cmd = "scripts/run-debug", help = "Run the manager under debugger" }
+docs = { cmd = "sphinx-build -M html docs docs/_build", help = "Create HTML documentation" }
 test = { cmd = "pytest --cov=knot_resolver_manager --show-capture=all tests/", help = "Run tests" }
 check = { cmd = "scripts/codecheck", help = "Run static code analysis" }
 format = { shell = "poetry run black knot_resolver_manager/ tests/; isort -rc .", help = "Run code formatter" }

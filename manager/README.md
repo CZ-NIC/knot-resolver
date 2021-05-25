@@ -37,6 +37,7 @@ The only global tools that are strictly required are `Python` and `pip` (or othe
 After setting up the environment, you should be able to interract with the project by using the `./poe` script. Common actions are:
 
 * `poe run` - runs the manager from the source
+* `poe docs` - creates HTML documentation
 * `poe test` - unit tests
 * `poe tox` - unit tests in all supported Python versions (must not be run outside of virtualenv, otherwise it fails to find multiple versions of Python)
 * `poe check` - static code analysis
