@@ -51,8 +51,9 @@ KR_EXPORT
 extern log_level_t kr_log_level;
 KR_EXPORT
 extern log_target_t kr_log_target;
-KR_EXPORT KR_PRINTF(3)
-void kr_log_fmt(log_groups_t group, log_level_t level, const char *fmt, ...);
+KR_EXPORT KR_PRINTF(6)
+void kr_log_fmt(log_groups_t group, log_level_t level, const char *file, const char *line,
+		const char *func, const char *fmt, ...);
 KR_EXPORT
 int kr_log_level_set(log_level_t level);
 KR_EXPORT
@@ -60,14 +61,25 @@ log_level_t kr_log_level_get(void);
 KR_EXPORT
 void kr_log_init(log_level_t level, log_target_t target);
 
-#define kr_log_debug(grp, fmt, ...) kr_log_fmt(grp, LOG_DEBUG, fmt, ## __VA_ARGS__)
-#define kr_log_info(grp, fmt, ...) kr_log_fmt(grp, LOG_INFO, fmt, ## __VA_ARGS__)
-#define kr_log_notice(grp, fmt, ...) kr_log_fmt(grp, LOG_NOTICE, fmt, ## __VA_ARGS__)
-#define kr_log_warning(grp, fmt, ...) kr_log_fmt(grp, LOG_WARNING, fmt, ## __VA_ARGS__)
-#define kr_log_error(grp, fmt, ...) kr_log_fmt(grp, LOG_ERR, fmt, ## __VA_ARGS__)
-#define kr_log_fatal(grp, fmt, ...) kr_log_fmt(grp, LOG_CRIT, fmt, ## __VA_ARGS__)
+#define TO_STR_A(x) #x
+#define TO_STR(x) TO_STR_A(x)
+#define SD_JOURNAL_METADATA "CODE_FILE=" __FILE__, "CODE_LINE=" TO_STR(__LINE__), ""
 
-#define kr_log_deprecate(grp, fmt, ...) kr_log_fmt(grp, LOG_WARNING, "deprecation WARNING: " fmt, ## __VA_ARGS__)
+#define kr_log_debug(grp, fmt, ...) \
+	kr_log_fmt(grp, LOG_DEBUG, SD_JOURNAL_METADATA, fmt, ## __VA_ARGS__)
+#define kr_log_info(grp, fmt, ...) \
+	kr_log_fmt(grp, LOG_INFO, SD_JOURNAL_METADATA, fmt, ## __VA_ARGS__)
+#define kr_log_notice(grp, fmt, ...) \
+	kr_log_fmt(grp, LOG_NOTICE, SD_JOURNAL_METADATA, fmt, ## __VA_ARGS__)
+#define kr_log_warning(grp, fmt, ...) \
+	kr_log_fmt(grp, LOG_WARNING, SD_JOURNAL_METADATA, fmt, ## __VA_ARGS__)
+#define kr_log_error(grp, fmt, ...) \
+	kr_log_fmt(grp, LOG_ERR, SD_JOURNAL_METADATA, fmt, ## __VA_ARGS__)
+#define kr_log_fatal(grp, fmt, ...) \
+	kr_log_fmt(grp, LOG_CRIT, SD_JOURNAL_METADATA, fmt, ## __VA_ARGS__)
+
+#define kr_log_deprecate(grp, fmt, ...) \
+	kr_log_fmt(grp, LOG_WARNING,SD_JOURNAL_METADATA, "deprecation WARNING: " fmt, ## __VA_ARGS__)
 
 #define KR_LOG_LEVEL_IS(exp) ((kr_log_level >= exp) ? true : false)
 
