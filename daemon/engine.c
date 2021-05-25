@@ -473,11 +473,11 @@ static void init_measurement(struct engine *engine)
 		"})\n"
 		"jit.off()\n", statspath
 	);
-	if (!kr_assume(ret > 0))
+	if (kr_fails_assert(ret > 0))
 		return;
 
 	ret = luaL_loadstring(engine->L, snippet);
-	if (!kr_assume(ret == 0)) {
+	if (kr_fails_assert(ret == 0)) {
 		free(snippet);
 		return;
 	}
@@ -562,7 +562,7 @@ static void engine_unload(struct engine *engine, struct kr_module *module)
 
 void engine_deinit(struct engine *engine)
 {
-	if (!engine || !kr_assume(engine->L))
+	if (!engine || kr_fails_assert(engine->L))
 		return;
 	/* Only close sockets and services; no need to clean up mempool. */
 
@@ -627,7 +627,7 @@ int engine_load_sandbox(struct engine *engine)
 
 int engine_loadconf(struct engine *engine, const char *config_path)
 {
-	if (!kr_assume(config_path))
+	if (kr_fails_assert(config_path))
 		return kr_error(EINVAL);
 
 	char cwd[PATH_MAX];
@@ -675,7 +675,7 @@ static size_t module_find(module_array_t *mod_list, const char *name)
 
 int engine_register(struct engine *engine, const char *name, const char *precedence, const char* ref)
 {
-	if (!kr_assume(engine && name))
+	if (kr_fails_assert(engine && name))
 		return kr_error(EINVAL);
 	/* Make sure module is unloaded */
 	(void) engine_unregister(engine, name);
@@ -715,7 +715,7 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 		} else {
 			ret = engine_pcall(L, 1);
 		}
-		if (!kr_assume(ret == 0)) {  /* probably not critical, but weird */
+		if (kr_fails_assert(ret == 0)) {  /* probably not critical, but weird */
 			kr_log_error("[system] internal error when loading C module %s: %s\n",
 					module->name, lua_tostring(L, -1));
 			lua_pop(L, 1);

@@ -110,7 +110,7 @@ static void set_address(const struct sockaddr *sockaddr,
 /** Fill a tcp_info or return kr_error(). */
 static int get_tcp_info(const struct kr_request *req, struct tcp_info *info)
 {
-	if(!kr_assume(req && info))
+	if(kr_fails_assert(req && info))
 		return kr_error(EINVAL);
 	if (!req->qsource.dst_addr || !req->qsource.flags.tcp) /* not TCP-based */
 		return -abs(ENOENT);
@@ -383,10 +383,10 @@ static struct fstrm_writer* dnstap_unix_writer(const char *path) {
 static int find_string(const JsonNode *node, char **val, size_t len) {
 	if (!node || !node->key)
 		return kr_error(EINVAL);
-	if (!kr_assume(node->tag == JSON_STRING))
+	if (kr_fails_assert(node->tag == JSON_STRING))
 		return kr_error(EINVAL);
 	*val = strndup(node->string_, len);
-	if (!kr_assume(*val != NULL))
+	if (kr_fails_assert(*val != NULL))
 		return kr_error(errno);
 	return kr_ok();
 }
@@ -395,7 +395,7 @@ static int find_string(const JsonNode *node, char **val, size_t len) {
 static bool find_bool(const JsonNode *node) {
 	if (!node || !node->key)
 		return false;
-	if (!kr_assume(node->tag == JSON_BOOL))
+	if (kr_fails_assert(node->tag == JSON_BOOL))
 		return false;
 	return node->bool_;
 }

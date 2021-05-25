@@ -167,12 +167,12 @@ int session_tasklist_add(struct session *session, struct qr_task *task)
 		key_len = sizeof(char *);
 	}
 	trie_val_t *v = trie_get_ins(t, key, key_len);
-	if (!kr_assume(v))
+	if (kr_fails_assert(v))
 		return kr_error(ENOMEM);
 	if (*v == NULL) {
 		*v = task;
 		worker_task_ref(task);
-	} else if (!kr_assume(*v == task)) {
+	} else if (kr_fails_assert(*v == task)) {
 		return kr_error(EINVAL);
 	}
 	return kr_ok();
@@ -221,7 +221,7 @@ struct qr_task *session_tasklist_del_first(struct session *session, bool deref)
 }
 struct qr_task* session_tasklist_del_msgid(const struct session *session, uint16_t msg_id)
 {
-	if (!kr_assume(session->sflags.outgoing))
+	if (kr_fails_assert(session->sflags.outgoing))
 		return NULL;
 	trie_t *t = session->tasks;
 	struct qr_task *ret = NULL;
@@ -240,7 +240,7 @@ struct qr_task* session_tasklist_del_msgid(const struct session *session, uint16
 
 struct qr_task* session_tasklist_find_msgid(const struct session *session, uint16_t msg_id)
 {
-	if (!kr_assume(session->sflags.outgoing))
+	if (kr_fails_assert(session->sflags.outgoing))
 		return NULL;
 	trie_t *t = session->tasks;
 	struct qr_task *ret = NULL;
@@ -363,7 +363,7 @@ struct session *session_new(uv_handle_t *handle, bool has_tls, bool has_http)
 		session->wire_buf = the_worker->wire_buf;
 		session->wire_buf_size = sizeof(the_worker->wire_buf);
 	} else {
-		(void)!kr_assume(handle->type == UV_POLL/*XDP*/);
+		kr_assert(handle->type == UV_POLL/*XDP*/);
 		/* - wire_buf* are left zeroed, as they make no sense
 		 * - timer is unused but OK for simplicity (server-side sessions are few)
 		 */
@@ -503,7 +503,7 @@ int session_timer_start(struct session *session, uv_timer_cb cb,
 			uint64_t timeout, uint64_t repeat)
 {
 	uv_timer_t *timer = &session->timeout;
-	if (!kr_assume(timer->data == session))
+	if (kr_fails_assert(timer->data == session))
 		return kr_error(EINVAL);
 	int ret = uv_timer_start(timer, cb, timeout, repeat);
 	if (ret != 0) {
@@ -628,7 +628,7 @@ int session_discard_packet(struct session *session, const knot_pkt_t *pkt)
 		return kr_error(EINVAL);
 	} else if (handle->type == UV_TCP) {
 		/* wire_buf contains TCP DNS message. */
-		if (!kr_assume(wirebuf_data_size >= 2)) {
+		if (kr_fails_assert(wirebuf_data_size >= 2)) {
 			/* TCP message length field isn't in buffer, must not happen. */
 			session->wire_buf_start_idx = 0;
 			session->wire_buf_end_idx = 0;
@@ -636,7 +636,7 @@ int session_discard_packet(struct session *session, const knot_pkt_t *pkt)
 		}
 		wirebuf_msg_size = knot_wire_read_u16(wirebuf_msg_start);
 		wirebuf_msg_start += 2;
-		if (!kr_assume(wirebuf_msg_size + 2 <= wirebuf_data_size)) {
+		if (kr_fails_assert(wirebuf_msg_size + 2 <= wirebuf_data_size)) {
 			/* TCP message length field is greater then
 			 * number of bytes in buffer, must not happen. */
 			session->wire_buf_start_idx = 0;
@@ -645,7 +645,7 @@ int session_discard_packet(struct session *session, const knot_pkt_t *pkt)
 		}
 	}
 
-	if (!kr_assume(wirebuf_msg_start == pkt_msg_start)) {
+	if (kr_fails_assert(wirebuf_msg_start == pkt_msg_start)) {
 		/* packet wirebuf must be located at the beginning
 		 * of the session wirebuf, must not happen. */
 		session->wire_buf_start_idx = 0;
@@ -653,7 +653,7 @@ int session_discard_packet(struct session *session, const knot_pkt_t *pkt)
 		return kr_error(EINVAL);
 	}
 
-	if (!kr_assume(wirebuf_msg_size >= pkt_msg_size)) {
+	if (kr_fails_assert(wirebuf_msg_size >= pkt_msg_size)) {
 		/* Message length field is lesser then packet size,
 		 * must not happen. */
 		session->wire_buf_start_idx = 0;
@@ -748,7 +748,7 @@ int session_wirebuf_process(struct session *session, const struct sockaddr *peer
 
 	while (((pkt = session_produce_packet(session, &the_worker->pkt_pool)) != NULL) &&
 	       (ret < max_iterations)) {
-		if (!kr_assume(!session_wirebuf_error(session)))
+		if (kr_fails_assert(!session_wirebuf_error(session)))
 			return -1;
 		int res = worker_submit(session, peer, NULL, NULL, NULL, pkt);
 		/* Errors from worker_submit() are intetionally *not* handled in order to
@@ -775,7 +775,7 @@ void session_kill_ioreq(struct session *session, struct qr_task *task)
 {
 	if (!session || session->sflags.closing)
 		return;
-	if (!kr_assume(session->sflags.outgoing && session->handle))
+	if (kr_fails_assert(session->sflags.outgoing && session->handle))
 		return;
 	session_tasklist_del(session, task);
 	if (session->handle->type == UV_UDP) {

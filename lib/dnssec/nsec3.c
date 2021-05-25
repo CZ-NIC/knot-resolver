@@ -34,11 +34,11 @@
  */
 static int nsec3_parameters(dnssec_nsec3_params_t *params, const knot_rrset_t *nsec3)
 {
-	if (!kr_assume(params && nsec3))
+	if (kr_fails_assert(params && nsec3))
 		return kr_error(EINVAL);
 
 	const knot_rdata_t *rr = knot_rdataset_at(&nsec3->rrs, 0);
-	if (!kr_assume(rr))
+	if (kr_fails_assert(rr))
 		return kr_error(EINVAL);
 
 	/* Every NSEC3 RR contains data from NSEC3PARAMS. */
@@ -67,11 +67,11 @@ static int nsec3_parameters(dnssec_nsec3_params_t *params, const knot_rrset_t *n
 static int hash_name(dnssec_binary_t *hash, const dnssec_nsec3_params_t *params,
                      const knot_dname_t *name)
 {
-	if (!kr_assume(hash && params))
+	if (kr_fails_assert(hash && params))
 		return kr_error(EINVAL);
 	if (!name)
 		return kr_error(EINVAL);
-	if (!kr_assume(params->iterations <= KR_NSEC3_MAX_ITERATIONS)) {
+	if (kr_fails_assert(params->iterations <= KR_NSEC3_MAX_ITERATIONS)) {
 		/* This if is mainly defensive; it shouldn't happen. */
 		return kr_error(EINVAL);
 	}
@@ -98,7 +98,7 @@ static int hash_name(dnssec_binary_t *hash, const dnssec_nsec3_params_t *params,
  */
 static int read_owner_hash(dnssec_binary_t *hash, size_t max_hash_size, const knot_rrset_t *nsec3)
 {
-	if (!kr_assume(hash && nsec3 && hash->data))
+	if (kr_fails_assert(hash && nsec3 && hash->data))
 		return kr_error(EINVAL);
 
 	int32_t ret = base32hex_decode(nsec3->owner + 1, nsec3->owner[0], hash->data, max_hash_size);
@@ -121,7 +121,7 @@ static int read_owner_hash(dnssec_binary_t *hash, size_t max_hash_size, const kn
 static int closest_encloser_match(int *flags, const knot_rrset_t *nsec3,
                                   const knot_dname_t *name, unsigned *skipped)
 {
-	if (!kr_assume(flags && nsec3 && name && skipped))
+	if (kr_fails_assert(flags && nsec3 && name && skipped))
 		return kr_error(EINVAL);
 
 	uint8_t hash_data[MAX_HASH_BYTES] = {0, };
@@ -185,7 +185,7 @@ fail:
  */
 static int covers_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_t *name)
 {
-	if (!kr_assume(flags && nsec3 && name))
+	if (kr_fails_assert(flags && nsec3 && name))
 		return kr_error(EINVAL);
 
 	uint8_t hash_data[MAX_HASH_BYTES] = { 0, };
@@ -286,7 +286,7 @@ static bool has_optout(const knot_rrset_t *nsec3)
  */
 static int matches_name(const knot_rrset_t *nsec3, const knot_dname_t *name)
 {
-	if (!kr_assume(nsec3 && name))
+	if (kr_fails_assert(nsec3 && name))
 		return kr_error(EINVAL);
 
 	uint8_t hash_data[MAX_HASH_BYTES] = { 0, };
@@ -331,7 +331,7 @@ fail:
  */
 static int prepend_asterisk(uint8_t *tgt, size_t maxlen, const knot_dname_t *name)
 {
-	if (!kr_assume(maxlen >= 3))
+	if (kr_fails_assert(maxlen >= 3))
 		return kr_error(EINVAL);
 	memcpy(tgt, "\1*", 3);
 	return knot_dname_to_wire(tgt + 2, name, maxlen - 2);
@@ -390,7 +390,7 @@ static int closest_encloser_proof(const knot_pkt_t *pkt,
 		--skipped;
 		next_closer = sname;
 		for (unsigned j = 0; j < skipped; ++j) {
-			if (!kr_assume(next_closer[0]))
+			if (kr_fails_assert(next_closer[0]))
 				return kr_error(EINVAL);
 			next_closer = knot_wire_next_label(next_closer, NULL);
 		}
@@ -555,7 +555,7 @@ int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_
 
 	/* Compute the next closer name. */
 	for (int i = 0; i < trim_to_next; ++i) {
-		if (!kr_assume(sname[0]))
+		if (kr_fails_assert(sname[0]))
 			return kr_error(EINVAL);
 		sname = knot_wire_next_label(sname, NULL);
 	}
@@ -603,7 +603,7 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
 	if (ret != 0)
 		return ret;
 
-	if (!kr_assume(encloser_name && covering_next_nsec3))
+	if (kr_fails_assert(encloser_name && covering_next_nsec3))
 		return kr_error(EFAULT);
 	ret = matches_closest_encloser_wildcard(pkt, section_id,
 	                                         encloser_name, stype);
@@ -713,7 +713,7 @@ int kr_nsec3_matches_name_and_type(const knot_rrset_t *nsec3,
 	/* It's not secure enough to just check a single bit for (some) other types,
 	 * but we don't (currently) only use this API for NS.  See RFC 6840 sec. 4.
 	 */
-	if (!kr_assume(type == KNOT_RRTYPE_NS))
+	if (kr_fails_assert(type == KNOT_RRTYPE_NS))
 		return kr_error(EINVAL);
 	int ret = matches_name(nsec3, name);
 	if (ret)

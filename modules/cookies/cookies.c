@@ -17,7 +17,7 @@ static char *cookies_config(void *env, struct kr_module *module,
                             const char *args)
 {
 	struct kr_cookie_ctx *cookie_ctx = module->data;
-	if (!kr_assume(cookie_ctx))
+	if (kr_fails_assert(cookie_ctx))
 		return NULL;
 
 	/* Apply configuration, if any. */

@@ -134,8 +134,8 @@ EOF
 # static variables; these lines might not be simple to generate
 printf "
 kr_layer_t kr_layer_t_static;
-_Bool kr_dbg_assumption_abort;
-int kr_dbg_assumption_fork;
+_Bool kr_dbg_assertion_abort;
+int kr_dbg_assertion_fork;
 "
 
 printf "

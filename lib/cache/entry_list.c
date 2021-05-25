@@ -15,7 +15,7 @@ static int entry_h_len(knot_db_val_t val);
 
 void entry_list_memcpy(struct entry_apex *ea, entry_list_t list)
 {
-	if (!kr_assume(ea))
+	if (kr_fails_assert(ea))
 		return;
 	memset(ea, 0, offsetof(struct entry_apex, data));
 	ea->has_ns	= list[EL_NS	].len;
@@ -39,7 +39,7 @@ void entry_list_memcpy(struct entry_apex *ea, entry_list_t list)
 
 int entry_list_parse(const knot_db_val_t val, entry_list_t list)
 {
-	if (!kr_assume(val.data && val.len && list))
+	if (kr_fails_assert(val.data && val.len && list))
 		return kr_error(EINVAL);
 	/* Parse the apex itself (nsec parameters). */
 	const struct entry_apex *ea = entry_apex_consistent(val);
@@ -82,23 +82,23 @@ int entry_list_parse(const knot_db_val_t val, entry_list_t list)
 		case EL_CNAME:	has_type = ea->has_cname;	break;
 		case EL_DNAME:	has_type = ea->has_dname;	break;
 		default:
-			(void)!kr_assume(!EINVAL);
+			kr_assert(!EINVAL);
 			return kr_error(EINVAL); /* something very bad */
 		}
 		if (!has_type) {
 			list[i].len = 0;
 			continue;
 		}
-		if (!kr_assume(it < it_bound))
+		if (kr_fails_assert(it < it_bound))
 			return kr_error(EILSEQ);
 		const int len = entry_h_len(
 			(knot_db_val_t){ .data = (void *)it, .len = it_bound - it });
-		if (!kr_assume(len >= 0))
+		if (kr_fails_assert(len >= 0))
 			return kr_error(len);
 		list[i].len = len;
 		it += to_even(len);
 	}
-	if (!kr_assume(it == it_bound)) /* better not use it; might be "damaged" */
+	if (kr_fails_assert(it == it_bound)) /* better not use it; might be "damaged" */
 		return kr_error(EILSEQ);
 	return kr_ok();
 }
@@ -118,7 +118,7 @@ static int entry_h_len(const knot_db_val_t val)
 		int sets = 2;
 		while (sets-- > 0) {
 			d += KR_CACHE_RR_COUNT_SIZE + rdataset_dematerialized_size(d, NULL);
-			if (!kr_assume(d <= data_bound))
+			if (kr_fails_assert(d <= data_bound))
 				return kr_error(EILSEQ);
 		}
 	} else { /* A "packet" (opaque ATM). */
@@ -127,7 +127,7 @@ static int entry_h_len(const knot_db_val_t val)
 		memcpy(&len, d, sizeof(len));
 		d += 2 + to_even(len);
 	}
-	if (!kr_assume(d <= data_bound))
+	if (kr_fails_assert(d <= data_bound))
 		return kr_error(EILSEQ);
 	return d - (uint8_t *)val.data;
 }
@@ -218,7 +218,7 @@ int entry_h_splice(
 	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp)
 {
 	//TODO: another review, perhaps incuding the API
-	if (!kr_assume(val_new_entry && val_new_entry->len > 0))
+	if (kr_fails_assert(val_new_entry && val_new_entry->len > 0))
 		return kr_error(EINVAL);
 
 	int i_type;

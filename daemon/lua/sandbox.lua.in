@@ -132,14 +132,14 @@ setmetatable(env, {
 debugging = {}
 setmetatable(debugging, {
 	__index = function(_, k)
-		if k == 'assumption_abort' then return ffi.C.kr_dbg_assumption_abort
-		elseif k == 'assumption_fork' then return ffi.C.kr_dbg_assumption_fork
+		if k == 'assertion_abort' then return ffi.C.kr_dbg_assertion_abort
+		elseif k == 'assertion_fork' then return ffi.C.kr_dbg_assertion_fork
 		else panic('invalid debugging option: ' .. tostring(k))
 		end
 	end,
 	__newindex = function(_, k, v)
-		if k == 'assumption_abort' then ffi.C.kr_dbg_assumption_abort = v
-		elseif k == 'assumption_fork' then ffi.C.kr_dbg_assumption_fork = v
+		if k == 'assertion_abort' then ffi.C.kr_dbg_assertion_abort = v
+		elseif k == 'assertion_fork' then ffi.C.kr_dbg_assertion_fork = v
 		else panic('invalid debugging option: ' .. tostring(k))
 		end
 	end

@@ -178,11 +178,11 @@ conf_data.set('ENABLE_SENDMMSG', sendmmsg.to_int())
 conf_data.set('ENABLE_XDP', xdp.to_int())
 conf_data.set('ENABLE_CAP_NG', capng.found().to_int())
 conf_data.set('ENABLE_DOH2', nghttp2.found().to_int())
-conf_data.set('DBG_ASSUMPTION_ABORT', get_option('debug').to_int())
+conf_data.set('DBG_ASSERTION_ABORT', get_option('debug').to_int())
 if get_option('debug')
-  conf_data.set('DBG_ASSUMPTION_FORK', '0')
+  conf_data.set('DBG_ASSERTION_FORK', '0')
 else
-  conf_data.set('DBG_ASSUMPTION_FORK', '(5 * 60 * 1000) /* five minutes */')
+  conf_data.set('DBG_ASSERTION_FORK', '(5 * 60 * 1000) /* five minutes */')
 endif
 
 kresconfig = configure_file(

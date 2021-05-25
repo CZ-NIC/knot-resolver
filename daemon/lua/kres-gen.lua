@@ -301,8 +301,8 @@ struct kr_server_selection {
 };
 
 kr_layer_t kr_layer_t_static;
-_Bool kr_dbg_assumption_abort;
-int kr_dbg_assumption_fork;
+_Bool kr_dbg_assertion_abort;
+int kr_dbg_assertion_fork;
 
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
 				const struct kr_query *qry);

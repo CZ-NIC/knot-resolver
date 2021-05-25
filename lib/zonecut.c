@@ -57,7 +57,7 @@ int kr_zonecut_init(struct kr_zonecut *cut, const knot_dname_t *name, knot_mm_t 
 /** Completely free a pack_t. */
 static inline void free_addr_set(pack_t *pack, knot_mm_t *pool)
 {
-	if (!kr_assume(pack)) {
+	if (kr_fails_assert(pack)) {
 		/* promised we don't store NULL packs */
 		return;
 	}
@@ -163,12 +163,12 @@ int kr_zonecut_copy_trust(struct kr_zonecut *dst, const struct kr_zonecut *src)
 
 int kr_zonecut_add(struct kr_zonecut *cut, const knot_dname_t *ns, const void *data, int len)
 {
-	if (!kr_assume(cut && ns && cut->nsset && (!data || len > 0)))
+	if (kr_fails_assert(cut && ns && cut->nsset && (!data || len > 0)))
 		return kr_error(EINVAL);
 	/* Disabled; add_reverse_pair() misuses this for domain name in rdata. */
 	if (false && data && len != sizeof(struct in_addr)
 		  && len != sizeof(struct in6_addr)) {
-		(void)!kr_assume(!EINVAL);
+		kr_assert(!EINVAL);
 		return kr_error(EINVAL);
 	}
 
@@ -216,7 +216,7 @@ int kr_zonecut_del(struct kr_zonecut *cut, const knot_dname_t *ns, const void *d
 	if (pack->len == 0) {
 		free_addr_set(pack, cut->pool);
 		ret = trie_del(cut->nsset, (const char *)ns, knot_dname_size(ns), NULL);
-		if (!kr_assume(ret == 0)) /* only KNOT_ENOENT and that *can't* happen */
+		if (kr_fails_assert(ret == 0)) /* only KNOT_ENOENT and that *can't* happen */
 			return kr_error(ret);
 		return kr_ok();
 	}
@@ -235,7 +235,7 @@ int kr_zonecut_del_all(struct kr_zonecut *cut, const knot_dname_t *ns)
 	int ret = trie_del(cut->nsset, (const char *)ns, knot_dname_size(ns),
 			   (trie_val_t *)&pack);
 	if (ret) { /* deletion failed */
-		(void)!kr_assume(ret == KNOT_ENOENT);
+		kr_assert(ret == KNOT_ENOENT);
 		return kr_error(ENOENT);
 	}
 	free_addr_set(pack, cut->pool);
@@ -261,7 +261,7 @@ static int has_address(trie_val_t *v, void *baton_)
 
 bool kr_zonecut_is_empty(struct kr_zonecut *cut)
 {
-	if (!kr_assume(cut && cut->nsset))
+	if (kr_fails_assert(cut && cut->nsset))
 		return true;
 	return !trie_apply(cut->nsset, has_address, NULL);
 }
@@ -295,7 +295,7 @@ static addrset_info_t fetch_addr(pack_t *addrs, const knot_dname_t *ns, uint16_t
 		rdlen = 16;
 		break;
 	default:
-		(void)!kr_assume(!EINVAL);
+		kr_assert(!EINVAL);
 		return AI_UNKNOWN;
 	}
 
@@ -337,7 +337,7 @@ static addrset_info_t fetch_addr(pack_t *addrs, const knot_dname_t *ns, uint16_t
 		++usable_cnt;
 
 		ret = pack_obj_push(addrs, rd->data, rd->len);
-		(void)!kr_assume(!ret); /* didn't fit because of incorrectly reserved memory */
+		kr_assert(!ret); /* didn't fit because of incorrectly reserved memory */
 		/* LATER: for now we lose quite some information here,
 		 * as keeping it would need substantial changes on other places,
 		 * and it turned out to be premature optimization (most likely).
@@ -394,7 +394,7 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 		pack_t **pack = (pack_t **)trie_get_ins(cut->nsset,
 					(const char *)ns_name, ns_size);
 		if (!pack) return kr_error(ENOMEM);
-		(void)!kr_assume(!*pack); /* not critical, really */
+		kr_assert(!*pack); /* not critical, really */
 		*pack = mm_alloc(cut->pool, sizeof(pack_t));
 		if (!*pack) return kr_error(ENOMEM);
 		pack_init(**pack);
@@ -460,7 +460,7 @@ static int fetch_secure_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 	const knot_dname_t *owner, uint16_t type, knot_mm_t *pool,
 	const struct kr_query *qry)
 {
-	if (!kr_assume(rr))
+	if (kr_fails_assert(rr))
 		return kr_error(EINVAL);
 	/* peek, check rank and TTL */
 	struct kr_cache_p peek;

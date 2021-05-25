@@ -56,14 +56,14 @@ static int srvr_sockaddr_cc_check(const struct sockaddr *srvr_sa,
                                   const uint8_t *cc, uint16_t cc_len,
                                   const struct kr_cookie_settings *clnt_sett)
 {
-	if (!kr_assume(cc && cc_len > 0 && clnt_sett))
+	if (kr_fails_assert(cc && cc_len > 0 && clnt_sett))
 		return -2;
 
 	if (!srvr_sa) {
 		return -2;
 	}
 
-	if (!kr_assume(clnt_sett->current.secr))
+	if (kr_fails_assert(clnt_sett->current.secr))
 		return -2;
 
 	/* The address must correspond with the client cookie. */
@@ -108,7 +108,7 @@ static int srvr_sockaddr_cc_check(const struct sockaddr *srvr_sa,
 static const uint8_t *get_cookie_opt(kr_cookie_lru_t *cache,
                                      const struct sockaddr *sa)
 {
-	if (!kr_assume(cache && sa))
+	if (kr_fails_assert(cache && sa))
 		return NULL;
 
 	const uint8_t *cached_cookie_opt = kr_cookie_lru_get(cache, sa);
@@ -134,7 +134,7 @@ static const uint8_t *get_cookie_opt(kr_cookie_lru_t *cache,
 static bool is_cookie_cached(kr_cookie_lru_t *cache, const struct sockaddr *sa,
                              const uint8_t *cookie_opt)
 {
-	if (!kr_assume(cache && sa && cookie_opt))
+	if (kr_fails_assert(cache && sa && cookie_opt))
 		return false;
 
 	const uint8_t *cached_opt = get_cookie_opt(cache, sa);
@@ -162,7 +162,7 @@ static bool check_cookie_content_and_cache(const struct kr_cookie_settings *clnt
                                            uint8_t *pkt_cookie_opt,
                                            kr_cookie_lru_t *cache)
 {
-	if (!kr_assume(clnt_sett && req && pkt_cookie_opt && cache))
+	if (kr_fails_assert(clnt_sett && req && pkt_cookie_opt && cache))
 		return false;
 
 	const uint8_t *pkt_cookie_data = knot_edns_opt_get_data(pkt_cookie_opt);
@@ -180,7 +180,7 @@ static bool check_cookie_content_and_cache(const struct kr_cookie_settings *clnt
 		          "got malformed DNS cookie or server cookie missing");
 		return false;
 	}
-	if (!kr_assume(pkt_cc_len == KNOT_OPT_COOKIE_CLNT))
+	if (kr_fails_assert(pkt_cc_len == KNOT_OPT_COOKIE_CLNT))
 		return false;
 
 	/* Check server address against received client cookie. */
@@ -191,7 +191,7 @@ static bool check_cookie_content_and_cache(const struct kr_cookie_settings *clnt
 		VERBOSE_MSG(NULL, "%s\n", "could not match received cookie");
 		return false;
 	}
-	if (!kr_assume(srvr_sockaddr))
+	if (kr_fails_assert(srvr_sockaddr))
 		return false;
 
 	/* Don't cache received cookies that don't match the current secret. */
@@ -307,7 +307,7 @@ static inline uint8_t *req_cookie_option(struct kr_request *req)
 static int invalid_sc_status(int state, bool sc_present, bool ignore_badcookie,
                              const struct kr_request *req, knot_pkt_t *answer)
 {
-	if (!kr_assume(req && answer))
+	if (kr_fails_assert(req && answer))
 		return KR_STATE_FAIL;
 
 	const knot_pkt_t *pkt = req->qsource.packet;

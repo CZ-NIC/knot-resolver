@@ -166,7 +166,7 @@ static struct kr_query *kr_rplan_push_query(struct kr_rplan *rplan,
 	qry->reorder = qry->flags.REORDER_RR ? kr_rand_bytes(sizeof(qry->reorder)) : 0;
 
 
-	(void)!kr_assume((rplan->pending.len == 0 && rplan->resolved.len == 0)
+	kr_assert((rplan->pending.len == 0 && rplan->resolved.len == 0)
 			 == (rplan->initial == NULL));
 	if (rplan->initial == NULL) {
 		rplan->initial = qry;

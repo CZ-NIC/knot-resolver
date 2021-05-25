@@ -21,7 +21,7 @@ void queue_init_impl(struct queue *q, size_t item_size)
 
 void queue_deinit_impl(struct queue *q)
 {
-	if (!kr_assume(q))
+	if (kr_fails_assert(q))
 		return;
 	struct queue_chunk *p = q->head;
 	while (p != NULL) {

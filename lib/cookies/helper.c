@@ -15,7 +15,7 @@
 static const uint8_t *peek_and_check_cc(kr_cookie_lru_t *cache, const void *sa,
                                         const uint8_t *cc, uint16_t cc_len)
 {
-	if (!kr_assume(cache && sa && cc && cc_len))
+	if (kr_fails_assert(cache && sa && cc && cc_len))
 		return NULL;
 
 	const uint8_t *cached_opt = kr_cookie_lru_get(cache, sa);
@@ -38,7 +38,7 @@ static const uint8_t *peek_and_check_cc(kr_cookie_lru_t *cache, const void *sa,
 static int opt_rr_put_cookie(knot_rrset_t *opt_rr, uint8_t *data,
                              uint16_t data_len, knot_mm_t *mm)
 {
-	if (!kr_assume(opt_rr && data && data_len > 0))
+	if (kr_fails_assert(opt_rr && data && data_len > 0))
 		return kr_error(EINVAL);
 
 	const uint8_t *cc = NULL, *sc = NULL;
@@ -48,7 +48,7 @@ static int opt_rr_put_cookie(knot_rrset_t *opt_rr, uint8_t *data,
 	                                     &sc, &sc_len);
 	if (ret != KNOT_EOK)
 		return kr_error(EINVAL);
-	if (!kr_assume(data_len == cc_len + sc_len))
+	if (kr_fails_assert(data_len == cc_len + sc_len))
 		return kr_error(EINVAL);
 
 	uint16_t cookies_size = data_len;
@@ -58,14 +58,14 @@ static int opt_rr_put_cookie(knot_rrset_t *opt_rr, uint8_t *data,
 	                                      cookies_size, &cookies_data, mm);
 	if (ret != KNOT_EOK)
 		return kr_error(EINVAL);
-	if (!kr_assume(cookies_data))
+	if (kr_fails_assert(cookies_data))
 		return kr_error(EINVAL);
 
 	cookies_size = knot_edns_opt_cookie_write(cc, cc_len, sc, sc_len,
 	                                          cookies_data, cookies_size);
 	if (cookies_size == 0)
 		return kr_error(EINVAL);
-	if (!kr_assume(cookies_size == data_len))
+	if (kr_fails_assert(cookies_size == data_len))
 		return kr_error(EINVAL);
 
 	return kr_ok();
@@ -76,7 +76,7 @@ static int opt_rr_put_cookie(knot_rrset_t *opt_rr, uint8_t *data,
  */
 static int opt_rr_put_cookie_opt(knot_rrset_t *opt_rr, uint8_t *option, knot_mm_t *mm)
 {
-	if (!kr_assume(opt_rr && option))
+	if (kr_fails_assert(opt_rr && option))
 		return kr_error(EINVAL);
 
 	uint16_t opt_code = knot_edns_opt_get_code(option);
@@ -121,7 +121,7 @@ int kr_request_put_cookie(const struct kr_cookie_comp *clnt_comp,
 	const struct knot_cc_alg *cc_alg = kr_cc_alg_get(clnt_comp->alg_id);
 	if (!cc_alg)
 		return kr_error(EINVAL);
-	if (!kr_assume(cc_alg->gen_func))
+	if (kr_fails_assert(cc_alg->gen_func))
 		return kr_error(EINVAL);
 	cc_len = cc_alg->gen_func(&input, cc, cc_len);
 	if (cc_len != KNOT_OPT_COOKIE_CLNT)
@@ -185,7 +185,7 @@ int kr_answer_write_cookie(struct knot_sc_input *sc_input,
 	                                          &pkt->mm);
 	if (ret != KNOT_EOK)
 		return kr_error(ENOMEM);
-	if (!kr_assume(cookie))
+	if (kr_fails_assert(cookie))
 		return kr_error(EFAULT);
 
 	/*

@@ -26,7 +26,7 @@ static void got_killed(int signum)
 	case 3:
 		abort();
 	default:
-		(void)!kr_assume(false);
+		kr_assert(false);
 	}
 }
 
@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
 			print_help();
 			return 1;
 		default:
-			(void)!kr_assume(false);
+			kr_assert(false);
 		}
 	}
 

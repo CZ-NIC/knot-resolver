@@ -265,7 +265,7 @@ void trie_free(trie_t *tbl)
 
 void trie_clear(trie_t *tbl)
 {
-	if (!kr_assume(tbl))
+	if (kr_fails_assert(tbl))
 		return;
 	if (!tbl->weight)
 		return;
@@ -447,7 +447,7 @@ static void ns_init(nstack_t *ns, trie_t *tbl)
 /*! \brief Free inside of the stack, i.e. not the passed pointer itself. */
 static void ns_cleanup(nstack_t *ns)
 {
-	if (!kr_assume(ns && ns->stack))
+	if (kr_fails_assert(ns && ns->stack))
 		return;
 	if (likely(ns->stack == ns->stack_init))
 		return;
@@ -752,7 +752,7 @@ static int mk_leaf(node_t *leaf, const char *key, uint32_t len, knot_mm_t *mm)
 
 trie_val_t* trie_get_ins(trie_t *tbl, const char *key, uint32_t len)
 {
-	if (!kr_assume(tbl))
+	if (kr_fails_assert(tbl))
 		return NULL;
 	// First leaf in an empty tbl?
 	if (unlikely(!tbl->weight)) {
@@ -846,7 +846,7 @@ int trie_apply(trie_t *tbl, int (*f)(trie_val_t *, void *), void *d)
 /* These are all thin wrappers around static Tns* functions. */
 trie_it_t* trie_it_begin(trie_t *tbl)
 {
-	if (!kr_assume(tbl))
+	if (kr_fails_assert(tbl))
 		return NULL;
 	trie_it_t *it = malloc(sizeof(nstack_t));
 	if (!it)

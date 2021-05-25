@@ -144,7 +144,7 @@ static void clear_stale_readers(struct lmdb_env *env)
  */
 static int txn_get_noresize(struct lmdb_env *env, unsigned int flag, MDB_txn **txn)
 {
-	if (!kr_assume(!env->txn.rw && (!env->txn.ro || !env->txn.ro_active)))
+	if (kr_fails_assert(!env->txn.rw && (!env->txn.ro || !env->txn.ro_active)))
 		return kr_error(1);
 	int attempts = 0;
 	int ret;
@@ -174,7 +174,7 @@ retry:
 /** Obtain a transaction.  (they're cached in env->txn) */
 static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 {
-	if (!kr_assume(env && txn))
+	if (kr_fails_assert(env && txn))
 		return kr_error(EINVAL);
 	if (env->txn.rw) {
 		/* Reuse the *open* RW txn even if only reading is requested.
@@ -194,7 +194,7 @@ static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 		int ret = txn_get_noresize(env, 0/*RW*/, &env->txn.rw);
 		if (ret == MDB_SUCCESS) {
 			*txn = env->txn.rw;
-			(void)!kr_assume(*txn);
+			kr_assert(*txn);
 		}
 		return lmdb_error(ret);
 	}
@@ -211,7 +211,7 @@ static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 	}
 	env->txn.ro_active = true;
 	*txn = env->txn.ro;
-	(void)!kr_assume(*txn);
+	kr_assert(*txn);
 	return kr_ok();
 }
 
@@ -234,7 +234,7 @@ static int cdb_commit(kr_cdb_pt db, struct kr_cdb_stats *stats)
 /** Obtain a read-only cursor (and a read-only transaction). */
 static int txn_curs_get(struct lmdb_env *env, MDB_cursor **curs, struct kr_cdb_stats *stats)
 {
-	if (!kr_assume(env && curs))
+	if (kr_fails_assert(env && curs))
 		return kr_error(EINVAL);
 	if (env->txn.ro_curs_active)
 		goto success;
@@ -255,10 +255,10 @@ static int txn_curs_get(struct lmdb_env *env, MDB_cursor **curs, struct kr_cdb_s
 	if (ret) return lmdb_error(ret);
 	env->txn.ro_curs_active = true;
 success:
-	(void)!kr_assume(env->txn.ro_curs_active && env->txn.ro && env->txn.ro_active
+	kr_assert(env->txn.ro_curs_active && env->txn.ro && env->txn.ro_active
 			 && !env->txn.rw);
 	*curs = env->txn.ro_curs;
-	(void)!kr_assume(*curs);
+	kr_assert(*curs);
 	return kr_ok();
 }
 
@@ -291,7 +291,7 @@ static void txn_abort(struct lmdb_env *env)
 /*! \brief Close the database. */
 static void cdb_close_env(struct lmdb_env *env, struct kr_cdb_stats *stats)
 {
-	if (!kr_assume(env && env->env))
+	if (kr_fails_assert(env && env->env))
 		return;
 
 	/* Get rid of any transactions. */
@@ -506,7 +506,7 @@ static int cdb_check_health(kr_cdb_pt db, struct kr_cdb_stats *stats)
  * The lock is auto-released by OS in case the process finishes in any way (file remains). */
 static int lockfile_get(const char *path)
 {
-	if (!kr_assume(path))
+	if (kr_fails_assert(path))
 		return kr_error(EINVAL);
 	const int fd = open(path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
 	if (fd < 0)
@@ -532,7 +532,7 @@ static int lockfile_get(const char *path)
 /** Release and remove lockfile created by lockfile_get().  Return kr_error(). */
 static int lockfile_release(int fd)
 {
-	if (!kr_assume(fd > 0)) // fd == 0 is surely a mistake, in our case at least
+	if (kr_fails_assert(fd > 0)) // fd == 0 is surely a mistake, in our case at least
 		return kr_error(EINVAL);
 	if (close(fd)) {
 		return kr_error(errno);
@@ -783,7 +783,7 @@ static int cdb_match(kr_cdb_pt db, struct kr_cdb_stats *stats,
 static int cdb_read_leq(kr_cdb_pt db, struct kr_cdb_stats *stats,
 		knot_db_val_t *key, knot_db_val_t *val)
 {
-	if (!kr_assume(db && key && key->data && val))
+	if (kr_fails_assert(db && key && key->data && val))
 		return kr_error(EINVAL);
 	struct lmdb_env *env = db2env(db);
 	MDB_cursor *curs = NULL;

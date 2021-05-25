@@ -108,7 +108,7 @@ static inline pack_objlen_t pack_obj_len(uint8_t *it)
 /** Return packed object value. */
 static inline uint8_t *pack_obj_val(uint8_t *it)
 {
-	if (!kr_assume(it))
+	if (kr_fails_assert(it))
 		return NULL;
 	return it + sizeof(pack_objlen_t);
 }
@@ -116,7 +116,7 @@ static inline uint8_t *pack_obj_val(uint8_t *it)
 /** Return pointer to next packed object. */
 static inline uint8_t *pack_obj_next(uint8_t *it)
 {
-	if (!kr_assume(it))
+	if (kr_fails_assert(it))
 		return NULL;
 	return pack_obj_val(it) + pack_obj_len(it);
 }
@@ -141,7 +141,7 @@ static inline uint8_t *pack_last(pack_t pack)
   */
 static inline int pack_obj_push(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
 {
-	if (!kr_assume(pack && obj))
+	if (kr_fails_assert(pack && obj))
 		return kr_error(EINVAL);
 	size_t packed_len = len + sizeof(len);
 	if (pack->len + packed_len > pack->cap)
@@ -159,7 +159,7 @@ static inline int pack_obj_push(pack_t *pack, const uint8_t *obj, pack_objlen_t 
   */
 static inline uint8_t *pack_obj_find(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
 {
-	if (!pack || !kr_assume(obj))
+	if (!pack || kr_fails_assert(obj))
 		return NULL;
 	uint8_t *endp = pack_tail(*pack);
 	uint8_t *it = pack_head(*pack);
@@ -177,7 +177,7 @@ static inline uint8_t *pack_obj_find(pack_t *pack, const uint8_t *obj, pack_objl
   */
 static inline int pack_obj_del(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
 {
-	if (!pack || !kr_assume(obj))
+	if (!pack || kr_fails_assert(obj))
 		return kr_error(EINVAL);
 	uint8_t *endp = pack_tail(*pack);
 	uint8_t *it = pack_obj_find(pack, obj, len);
@@ -194,7 +194,7 @@ static inline int pack_obj_del(pack_t *pack, const uint8_t *obj, pack_objlen_t l
  * @return kr_error(ENOMEM) on allocation failure. */
 static inline int pack_clone(pack_t **dst, const pack_t *src, knot_mm_t *pool)
 {
-	if (!kr_assume(dst && src))
+	if (kr_fails_assert(dst && src))
 		return kr_error(EINVAL);
 	/* Get a valid pack_t. */
 	if (!*dst) {

@@ -46,29 +46,36 @@ typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
 #define kr_log_critical(...) kr_log_error(__VA_ARGS__)
 #define kr_log_deprecate(...) fprintf(stderr, "deprecation WARNING: " __VA_ARGS__)
 
-/** Assert() but always, regardless of -DNDEBUG.  See also kr_assume(). */
+/** Assert() but always, regardless of -DNDEBUG.  See also kr_assert(). */
 #define kr_require(expression) do { if (!(expression)) { \
 		kr_fail(true, #expression, __func__, __FILE__, __LINE__); \
 		__builtin_unreachable(); /* aid code analysis */ \
 	} } while (false)
 
-/** Check an assumption that's recoverable.  Return the expression.
+/** Check an assertion that's recoverable. Return the true if it fails and needs handling.
  *
  * If the check fails, optionally fork()+abort() to generate coredump
  * and continue running in parent process.  Return value must be handled to
  * ensure safe recovery from error.  Use kr_require() for unrecoverable checks.
- * The errno variable is not mangled, e.g. you can: if (!kr_assume(...)) return errno;
+ * The errno variable is not mangled, e.g. you can: if (kr_fails_assert(...)) return errno;
  */
-#define kr_assume(expression) kr_assume_func((expression), #expression,       \
-					     __func__, __FILE__, __LINE__)
+#define kr_fails_assert(expression) !kr_assert_func((expression), #expression, \
+						   __func__, __FILE__, __LINE__)
 
-/** Whether kr_assume() checks should abort. */
-KR_EXPORT extern bool kr_dbg_assumption_abort;
+/** Kresd assertion without a return value.
+ *
+ * These can be turned on or off, for mandatory unrecoverable checks, use kr_require().
+ * For recoverable checks, use kr_fails_assert().
+ * */
+#define kr_assert(expression) (void)!kr_fails_assert((expression))
 
-/** How often kr_assume() should fork the process before issuing abort (if configured).
+/** Whether kr_assert() and kr_fails_assert() checks should abort. */
+KR_EXPORT extern bool kr_dbg_assertion_abort;
+
+/** How often kr_asert() should fork the process before issuing abort (if configured).
  *
  * This can be useful for debugging rare edge-cases in production.
- * if (kr_debug_assumption_abort && kr_debug_assumption_fork), it is
+ * if (kr_debug_assertion_abort && kr_debug_assertion_fork), it is
  * possible to both obtain a coredump (from forked child) and recover from the
  * non-fatal error in the parent process.
  *
@@ -77,15 +84,15 @@ KR_EXPORT extern bool kr_dbg_assumption_abort;
  *      (in milliseconds, each instance separately, randomized +-25%)
  * < 0: no rate-limiting (not recommended)
  */
-KR_EXPORT extern int kr_dbg_assumption_fork;
+KR_EXPORT extern int kr_dbg_assertion_fork;
 
-/** Use kr_require() and kr_assume() instead of directly this function. */
+/** Use kr_require(), kr_assert() or kr_fails_assert() instead of directly this function. */
 KR_EXPORT KR_COLD void kr_fail(bool is_fatal, const char* expr, const char *func,
 				const char *file, int line);
 
-/** Use kr_require() and kr_assume() instead of directly this function. */
+/** Use kr_require(), kr_assert() or kr_fails_assert() instead of directly this function. */
 __attribute__ ((warn_unused_result))
-static inline bool kr_assume_func(bool result, const char *expr, const char *func,
+static inline bool kr_assert_func(bool result, const char *expr, const char *func,
 				  const char *file, int line)
 {
 	if (!result)
@@ -347,7 +354,7 @@ int kr_ntop_str(int family, const void *src, uint16_t port, char *buf, size_t *b
  */
 static inline char *kr_straddr(const struct sockaddr *addr)
 {
-	if (!kr_assume(addr)) return NULL;
+	if (kr_fails_assert(addr)) return NULL;
 	/* We are the sinle-threaded application */
 	static char str[INET6_ADDRSTRLEN + 1 + 5 + 1];
 	size_t len = sizeof(str);
@@ -528,7 +535,7 @@ static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, bool add_wi
 		return kr_error(EINVAL);
 	}
 	int len = right_aligned_dname_start[0];
-	if (!kr_assume(right_aligned_dname_start + 1 + len - KNOT_DNAME_MAXLEN == right_aligned_dst))
+	if (kr_fails_assert(right_aligned_dname_start + 1 + len - KNOT_DNAME_MAXLEN == right_aligned_dst))
 		return kr_error(EINVAL);
 	memcpy(dst + 1, right_aligned_dname_start + 1, len);
 	if (add_wildcard) {

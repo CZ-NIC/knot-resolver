@@ -124,7 +124,7 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 	if (ret < 0)
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 	data->pos += length;
-	if (!kr_assume(data->pos <= data->len))
+	if (kr_fails_assert(data->pos <= data->len))
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 
 	ret = send_padding(ctx, (uint8_t)frame->data.padlen);
@@ -441,7 +441,7 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
 	ssize_t len;
 	int32_t stream_id = frame->hd.stream_id;
-	if(!kr_assume(stream_id != -1))
+	if(kr_fails_assert(stream_id != -1))
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 
 	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) && ctx->incomplete_stream == stream_id) {
@@ -563,7 +563,7 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *buf,
 
 	if (!ctx->h2)
 		return kr_error(ENOSYS);
-	if (!kr_assume(ctx->session == session))
+	if (kr_fails_assert(ctx->session == session))
 		return kr_error(EINVAL);
 
 	ctx->submitted = 0;

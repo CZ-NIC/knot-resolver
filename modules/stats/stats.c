@@ -132,7 +132,7 @@ static void collect_sample(struct stat_data *data, struct kr_rplan *rplan)
 		 * TODO: redesign the sampling approach. */
 		if (kr_rand_coin(1, FREQUENT_PSAMPLE)) {
 			int key_len = collect_key(key, qry->sname, qry->stype);
-			if (!kr_assume(key_len >= 0))
+			if (kr_fails_assert(key_len >= 0))
 				continue;
 			unsigned *count = lru_get_new(data->queries.frequent, key, key_len, NULL);
 			if (count)

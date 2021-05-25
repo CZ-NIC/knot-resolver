@@ -236,7 +236,7 @@ static int zi_rrset_find_put(struct zone_import_ctx *z_import,
 static int zi_rrset_put(struct zone_import_ctx *z_import, knot_pkt_t *pkt,
 			knot_rrset_t *rr)
 {
-	if (!kr_assume(rr && rr->type != KNOT_RRTYPE_RRSIG))
+	if (kr_fails_assert(rr && rr->type != KNOT_RRTYPE_RRSIG))
 		return -1;
 	int err = knot_pkt_put(pkt, 0, rr, 0);
 	if (err != KNOT_EOK) {
@@ -454,7 +454,7 @@ static void zi_zone_process(uv_timer_t* handle)
 	size_t ns_imported = 0;
 	size_t other_imported = 0;
 
-	if (!kr_assume(z_import->worker)) {
+	if (kr_fails_assert(z_import->worker)) {
 		failed = 1;
 		goto finish;
 	}
@@ -728,7 +728,7 @@ int zi_zone_import(struct zone_import_ctx *z_import,
 		   const char *zone_file, const char *origin,
 		   uint16_t rclass, uint32_t ttl)
 {
-	if (!kr_assume(z_import && z_import->worker && zone_file))
+	if (kr_fails_assert(z_import && z_import->worker && zone_file))
 		return -1;
 
 	zs_scanner_t *s = malloc(sizeof(zs_scanner_t));

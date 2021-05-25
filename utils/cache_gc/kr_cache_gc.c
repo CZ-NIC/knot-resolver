@@ -151,7 +151,7 @@ struct kr_cache_gc_state {
 
 void kr_cache_gc_free_state(kr_cache_gc_state_t **state)
 {
-	if (!kr_assume(state))
+	if (kr_fails_assert(state))
 		return;
 	if (!*state) { // not open
 		return;
@@ -165,7 +165,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 {
 	// The whole function works in four "big phases":
 	//// 1. find out whether we should even do analysis and deletion.
-	if (!kr_assume(cfg && state))
+	if (kr_fails_assert(cfg && state))
 		return KNOT_EINVAL;
 	int ret;
 	// Ensure that we have open and "healthy" cache.

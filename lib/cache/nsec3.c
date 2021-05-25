@@ -21,7 +21,7 @@ static const knot_db_val_t VAL_EMPTY = { NULL, 0 };
 static knot_db_val_t key_NSEC3_common(struct key *k, const knot_dname_t *zname,
 					const nsec_p_hash_t nsec_p_hash)
 {
-	if (!kr_assume(k && zname && !kr_dname_lf(k->buf, zname, false)))
+	if (kr_fails_assert(k && zname && !kr_dname_lf(k->buf, zname, false)))
 		return VAL_EMPTY;
 
 	/* CACHE_KEY_DEF: key == zone's dname_lf + '\0' + '3' + nsec_p hash (4B)
@@ -84,7 +84,7 @@ static knot_db_val_t key_NSEC3_name(struct key *k, const knot_dname_t *name,
 		.data = (uint8_t *)/*const-cast*/name,
 	};
 
-	if (!kr_assume(nsec_p->libknot.iterations <= KR_NSEC3_MAX_ITERATIONS)) {
+	if (kr_fails_assert(nsec_p->libknot.iterations <= KR_NSEC3_MAX_ITERATIONS)) {
 		/* This is mainly defensive; it shouldn't happen thanks to downgrades. */
 		return VAL_EMPTY;
 	}
@@ -95,14 +95,14 @@ static knot_db_val_t key_NSEC3_name(struct key *k, const knot_dname_t *name,
 	};
 	int ret = dnssec_nsec3_hash(&dname, &nsec_p->libknot, &hash);
 	if (ret != DNSSEC_EOK) return VAL_EMPTY;
-	if (!kr_assume(hash.size == NSEC3_HASH_LEN))
+	if (kr_fails_assert(hash.size == NSEC3_HASH_LEN))
 		return VAL_EMPTY;
 
 	#else
 	dnssec_binary_t hash = { .size = 0, .data = NULL };
 	int ret = dnssec_nsec3_hash(&dname, &nsec_p->libknot, &hash);
 	if (ret != DNSSEC_EOK) return VAL_EMPTY;
-	if (!kr_assume(hash.size == NSEC3_HASH_LEN && hash.data))
+	if (kr_fails_assert(hash.size == NSEC3_HASH_LEN && hash.data))
 		return VAL_EMPTY;
 	memcpy(knot_db_val_bound(val), hash.data, NSEC3_HASH_LEN);
 	free(hash.data);
@@ -136,7 +136,7 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 {
 	/* Do the cache operation. */
 	const size_t hash_off = key_nsec3_hash_off(k);
-	if (!kr_assume(key.data && key.len >= hash_off))
+	if (kr_fails_assert(key.data && key.len >= hash_off))
 		return "range search ERROR";
 	knot_db_val_t key_found = key;
 	knot_db_val_t val = { NULL, 0 };
@@ -145,10 +145,10 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 		 * would probably be slightly more efficient with LMDB,
 		 * but the code complexity would grow considerably. */
 	if (ret < 0) {
-		if (kr_assume(ret == kr_error(ENOENT))) {
-			return "range search miss";
-		} else {
+		if (kr_fails_assert(ret == kr_error(ENOENT))) {
 			return "range search ERROR";
+		} else {
+			return "range search miss";
 		}
 	}
 	if (value) {
@@ -199,7 +199,7 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 	}
 	/* We know it starts before sname, so let's check the other end.
 	 * A. find the next hash and check its length. */
-	if (!kr_assume(KR_CACHE_RR_COUNT_SIZE == 2 && get_uint16(eh->data) != 0))
+	if (kr_fails_assert(KR_CACHE_RR_COUNT_SIZE == 2 && get_uint16(eh->data) != 0))
 		return "ERROR"; /* TODO: more checks?  Also, `next` computation is kinda messy. */
 	const uint8_t *hash_next = nsec_p_raw + nsec_p_len
 				 + sizeof(uint8_t) /* hash length from rfc5155 */;
@@ -227,7 +227,7 @@ static void key_NSEC3_hash2text(const knot_db_val_t key, char *text)
 			/* CACHE_KEY_DEF ^^ */
 	int len = base32hex_encode(hash_raw, NSEC3_HASH_LEN, (uint8_t *)text,
 				   NSEC3_HASH_TXT_LEN);
-	(void)!kr_assume(len == NSEC3_HASH_TXT_LEN);
+	kr_assert(len == NSEC3_HASH_TXT_LEN);
 	text[NSEC3_HASH_TXT_LEN] = '\0';
 }
 
@@ -237,7 +237,7 @@ static int dname_wire_reconstruct(knot_dname_t *buf, const knot_dname_t *zname,
 				  const uint8_t *hash_raw)
 {
 	int len = base32hex_encode(hash_raw, NSEC3_HASH_LEN, buf + 1, NSEC3_HASH_TXT_LEN);
-	if (!kr_assume(len == NSEC3_HASH_TXT_LEN))
+	if (kr_fails_assert(len == NSEC3_HASH_TXT_LEN))
 		return kr_error(EINVAL);
 	buf[0] = len;
 	int ret = knot_dname_to_wire(buf + 1 + len, zname, KNOT_DNAME_MAXLEN - 1 - len);
@@ -259,7 +259,7 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 	/* Basic sanity check. */
 	const bool ok = k && k->zname && ans && clencl_labels
 			&& qry && cache;
-	if (!kr_assume(ok))
+	if (kr_fails_assert(ok))
 		return kr_error(EINVAL);
 
 	/*** Find the closest encloser - cycle: name starting at sname,
@@ -351,7 +351,7 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 		const knot_rrset_t *nsec_rr = ans->rrsets[ans_id].set.rr;
 		const uint8_t *bm = knot_nsec3_bitmap(nsec_rr->rrs.rdata);
 		uint16_t bm_size = knot_nsec3_bitmap_len(nsec_rr->rrs.rdata);
-		if (!kr_assume(bm))
+		if (kr_fails_assert(bm))
 			return kr_error(EFAULT);
 		if (name_labels == sname_labels) {
 			if (kr_nsec_bitmap_nodata_check(bm, bm_size, qry->stype,
@@ -369,7 +369,7 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 
 		} /* else */
 
-		if (!kr_assume(name_labels + 1 == last_nxproven_labels))
+		if (kr_fails_assert(name_labels + 1 == last_nxproven_labels))
 			return kr_error(EINVAL);
 		if (kr_nsec_children_in_zone_check(bm, bm_size) != 0) {
 			VERBOSE_MSG(qry,
@@ -461,7 +461,7 @@ int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	/* The wildcard exists.  Find if it's NODATA - check type bitmap. */
 	const uint8_t *bm = knot_nsec3_bitmap(nsec_rr->rrs.rdata);
 	uint16_t bm_size = knot_nsec3_bitmap_len(nsec_rr->rrs.rdata);
-	if (!kr_assume(bm))
+	if (kr_fails_assert(bm))
 		return kr_error(EFAULT);
 	if (kr_nsec_bitmap_nodata_check(bm, bm_size, qry->stype, nsec_rr->owner) == 0) {
 		/* NODATA proven; just need to add SOA+RRSIG later */

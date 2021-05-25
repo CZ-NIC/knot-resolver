@@ -42,7 +42,7 @@ fail:
 
 int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
 {
-	if (!kr_assume(ref && key))
+	if (kr_fails_assert(ref && key))
 		return kr_error(EINVAL);
 	if (ref->type != KNOT_RRTYPE_DS)
 		return kr_error(EINVAL);
@@ -73,7 +73,7 @@ int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
  */
 static int adjust_wire_ttl(uint8_t *wire, size_t wire_size, uint32_t new_ttl)
 {
-	if (!kr_assume(wire))
+	if (kr_fails_assert(wire))
 		return kr_error(EINVAL);
 	static_assert(sizeof(uint16_t) == 2, "uint16_t must be exactly 2 bytes");
 	static_assert(sizeof(uint32_t) == 4, "uint32_t must be exactly 4 bytes");
@@ -97,7 +97,7 @@ static int adjust_wire_ttl(uint8_t *wire, size_t wire_size, uint32_t new_ttl)
 		rdlen = ntohs(rdlen);
 		i += sizeof(uint16_t) + rdlen;
 
-		if (!kr_assume(i <= wire_size))
+		if (kr_fails_assert(i <= wire_size))
 			return kr_error(EINVAL);
 	}
 
@@ -117,7 +117,7 @@ static int adjust_wire_ttl(uint8_t *wire, size_t wire_size, uint32_t new_ttl)
 #define RRSIG_RDATA_SIGNER_OFFSET 18
 static int sign_ctx_add_self(dnssec_sign_ctx_t *ctx, const uint8_t *rdata)
 {
-	if (!kr_assume(ctx && rdata))
+	if (kr_fails_assert(ctx && rdata))
 		return kr_error(EINVAL);
 
 	int result;
@@ -190,10 +190,10 @@ static int sign_ctx_add_records(dnssec_sign_ctx_t *ctx, const knot_rrset_t *cove
 	for (uint16_t i = 0; i < covered->rrs.count; ++i) {
 		/* RR(i) = name | type | class | OrigTTL | RDATA length | RDATA */
 		for (int j = 0; j < trim_labels; ++j) {
-			if (!kr_assume(beginp[0]))
+			if (kr_fails_assert(beginp[0]))
 				return kr_error(EINVAL);
 			beginp = (uint8_t *) knot_wire_next_label(beginp, NULL);
-			if (!kr_assume(beginp))
+			if (kr_fails_assert(beginp))
 				return kr_error(EFAULT);
 		}
 		*(--beginp) = '*';

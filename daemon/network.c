@@ -35,7 +35,7 @@ static int endpoint_open_lua_cb(struct network *net, struct endpoint *ep,
 				const char *log_addr)
 {
 	const bool ok = ep->flags.kind && !ep->handle && !ep->engaged && ep->fd != -1;
-	if (!kr_assume(ok))
+	if (kr_fails_assert(ok))
 		return kr_error(EINVAL);
 	/* First find callback in the endpoint registry. */
 	lua_State *L = the_worker->engine->L;
@@ -138,7 +138,7 @@ static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 	}
 
 	if (ep->flags.kind && !is_control && !is_xdp) {
-		(void)!kr_assume(!ep->handle);
+		kr_assert(!ep->handle);
 		/* Special lua-handled endpoint. */
 		if (ep->engaged) {
 			endpoint_close_lua_cb(net, ep);
@@ -250,7 +250,7 @@ static int open_endpoint(struct network *net, const char *addr_str,
 		? sa == NULL && ep->fd == -1 && ep->nic_queue >= 0
 			&& ep->flags.sock_type == SOCK_DGRAM && !ep->flags.tls
 		: (sa != NULL) != (ep->fd != -1);
-	if (!kr_assume(ok))
+	if (kr_fails_assert(ok))
 		return kr_error(EINVAL);
 	if (ep->handle) {
 		return kr_error(EEXIST);
@@ -309,7 +309,7 @@ static int open_endpoint(struct network *net, const char *addr_str,
 	} /* else */
 
 	if (ep->flags.sock_type == SOCK_DGRAM) {
-		if (!kr_assume(!ep->flags.tls))
+		if (kr_fails_assert(!ep->flags.tls))
 			return kr_error(EINVAL);
 		uv_udp_t *ep_handle = malloc(sizeof(uv_udp_t));
 		ep->handle = (uv_handle_t *)ep_handle;
@@ -327,7 +327,7 @@ static int open_endpoint(struct network *net, const char *addr_str,
 		goto finish_ret;
 	} /* else */
 
-	(void)!kr_assume(false);
+	kr_assert(false);
 	return kr_error(EINVAL);
 finish_ret:
 	if (!ret) return ret;
@@ -374,7 +374,7 @@ static int create_endpoint(struct network *net, const char *addr_str,
 
 int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags)
 {
-	if (!kr_assume(!flags.xdp))
+	if (kr_fails_assert(!flags.xdp))
 		return kr_error(EINVAL);
 	/* Extract fd's socket type. */
 	socklen_t len = sizeof(flags.sock_type);
@@ -382,7 +382,7 @@ int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags)
 	if (ret != 0)
 		return kr_error(errno);
 	const bool is_dtls = flags.sock_type == SOCK_DGRAM && !flags.kind && flags.tls;
-	if (!kr_assume(!is_dtls))
+	if (kr_fails_assert(!is_dtls))
 		return kr_error(EINVAL);  /* Perhaps DTLS some day. */
 	if (flags.sock_type != SOCK_DGRAM && flags.sock_type != SOCK_STREAM)
 		return kr_error(EBADF);
@@ -445,7 +445,7 @@ static int16_t nic_queue_auto(void)
 int network_listen(struct network *net, const char *addr, uint16_t port,
 		   int16_t nic_queue, endpoint_flags_t flags)
 {
-	if (!kr_assume(net != NULL && addr != 0 && nic_queue >= -1))
+	if (kr_fails_assert(net != NULL && addr != 0 && nic_queue >= -1))
 		return kr_error(EINVAL);
 
 	if (flags.xdp && nic_queue < 0) {
@@ -557,7 +557,7 @@ static int set_bpf_cb(const char *key, void *val, void *ext)
 {
 	endpoint_array_t *endpoints = (endpoint_array_t *)val;
 	int *bpffd = (int *)ext;
-	if (!kr_assume(endpoints && bpffd))
+	if (kr_fails_assert(endpoints && bpffd))
 		return kr_error(EINVAL);
 
 	for (size_t i = 0; i < endpoints->len; i++) {
@@ -596,7 +596,7 @@ int network_set_bpf(struct network *net, int bpf_fd)
 static int clear_bpf_cb(const char *key, void *val, void *ext)
 {
 	endpoint_array_t *endpoints = (endpoint_array_t *)val;
-	if (!kr_assume(endpoints))
+	if (kr_fails_assert(endpoints))
 		return kr_error(EINVAL);
 
 	for (size_t i = 0; i < endpoints->len; i++) {

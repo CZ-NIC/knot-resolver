@@ -21,7 +21,7 @@
 static inline void update_hash(struct hmac_sha256_ctx *ctx,
                                const struct sockaddr *sa)
 {
-	if (!kr_assume(ctx && sa))
+	if (kr_fails_assert(ctx && sa))
 		return;
 
 	int addr_len = kr_inaddr_len(sa);

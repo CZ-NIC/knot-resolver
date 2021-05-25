@@ -199,7 +199,7 @@ static const knot_dname_t * raw_addr2reverse(const uint8_t *raw_addr, int family
 			ssize_t free_space = reverse_addr + sizeof(reverse_addr) - ra_it;
 			int written = snprintf(ra_it, free_space, "%x.%x.",
 						raw_addr[i] & 0x0f, raw_addr[i] >> 4);
-			if (!kr_assume(written < free_space))
+			if (kr_fails_assert(written < free_space))
 				return NULL;
 			ra_it += written;
 		}
@@ -461,7 +461,7 @@ static char* pack_hints(struct kr_zonecut *hints);
 static char* hint_get(void *env, struct kr_module *module, const char *args)
 {
 	struct kr_zonecut *hints = &((struct hints_data *) module->data)->hints;
-	if (!kr_assume(hints))
+	if (kr_fails_assert(hints))
 		return NULL;
 
 	if (!args) {

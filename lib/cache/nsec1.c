@@ -18,16 +18,16 @@ static int dname_wire_reconstruct(knot_dname_t *buf, const struct key *k,
 {
 	/* Reconstruct from key: first the ending, then zone name. */
 	int ret = knot_dname_lf2wire(buf, kwz.len, kwz.data);
-	if (!kr_assume(ret >= 0)) {
+	if (kr_fails_assert(ret >= 0)) {
 		VERBOSE_MSG(NULL, "=> NSEC: LF2wire ret = %d\n", ret);
 		return ret;
 	}
 		/* The last written byte is the zero label for root -> overwrite. */
 	knot_dname_t *zone_start = buf + ret - 1;
-	if (!kr_assume(*zone_start == '\0'))
+	if (kr_fails_assert(*zone_start == '\0'))
 		return kr_error(EFAULT);
 	ret = knot_dname_to_wire(zone_start, k->zname, KNOT_DNAME_MAXLEN - kwz.len);
-	if (!kr_assume(ret == k->zlf_len + 1))
+	if (kr_fails_assert(ret == k->zlf_len + 1))
 		return ret < 0 ? ret : kr_error(EILSEQ);
 	return kr_ok();
 }
@@ -40,13 +40,13 @@ knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name, bool add_wildca
 	int ret;
 	const bool ok = k && name
 		&& !(ret = kr_dname_lf(k->buf, name, add_wildcard));
-	if (!kr_assume(ok))
+	if (kr_fails_assert(ok))
 		return (knot_db_val_t){ NULL, 0 };
 
 	uint8_t *begin = k->buf + 1 + k->zlf_len; /* one byte after zone's zero */
 	uint8_t *end = k->buf + 1 + k->buf[0]; /* we don't use the final zero in key,
 						* but move it anyway */
-	if (!kr_assume(end >= begin))
+	if (kr_fails_assert(end >= begin))
 		return (knot_db_val_t){ NULL, 0 };
 	int key_len;
 	if (end > begin) {
@@ -129,16 +129,16 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 {
 	/* Do the cache operation. */
 	const size_t nwz_off = key_nwz_off(k);
-	if (!kr_assume(key.data && key.len >= nwz_off))
+	if (kr_fails_assert(key.data && key.len >= nwz_off))
 		return "range search ERROR";
 	knot_db_val_t key_nsec = key;
 	knot_db_val_t val = { NULL, 0 };
 	int ret = cache_op(cache, read_leq, &key_nsec, &val);
 	if (ret < 0) {
-		if (kr_assume(ret == kr_error(ENOENT))) {
-			return "range search miss";
-		} else {
+		if (kr_fails_assert(ret == kr_error(ENOENT))) {
 			return "range search ERROR";
+		} else {
+			return "range search miss";
 		}
 	}
 	if (value) {
@@ -196,7 +196,7 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 		memcpy(&next_len, next + offsetof(knot_rdata_t, len), sizeof(next_len));
 		next_data = next + offsetof(knot_rdata_t, data);
 	}
-	if (!kr_assume(KR_CACHE_RR_COUNT_SIZE == 2 && get_uint16(eh->data) != 0)) {
+	if (kr_fails_assert(KR_CACHE_RR_COUNT_SIZE == 2 && get_uint16(eh->data) != 0)) {
 		return "ERROR"; /* TODO: more checks? */
 	}
 	/*
@@ -207,7 +207,7 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 	*/
 	knot_dname_t ch_buf[KNOT_DNAME_MAXLEN];
 	knot_dname_t *chs = kwz_high ? kwz_high->data : ch_buf;
-	if (!kr_assume(chs))
+	if (kr_fails_assert(chs))
 		return "EINVAL";
 
 	{
@@ -223,20 +223,20 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 		ret = kr_dname_lf(chs, lower_buf, false);
 	}
 
-	if (!kr_assume(ret == 0))
+	if (kr_fails_assert(ret == 0))
 		return "ERROR";
 	knot_db_val_t kwz_hi = { /* skip the zone name */
 		.data = chs + 1 + k->zlf_len,
 		.len = chs[0] - k->zlf_len,
 	};
-	if (!kr_assume((ssize_t)(kwz_hi.len) >= 0))
+	if (kr_fails_assert((ssize_t)(kwz_hi.len) >= 0))
 		return "ERROR";
 	/* 2. do the actual range check. */
 	const knot_db_val_t kwz_sname = {
 		.data = (void *)/*const-cast*/(k->buf + 1 + nwz_off),
 		.len = k->buf[0] - k->zlf_len,
 	};
-	if (!kr_assume((ssize_t)(kwz_sname.len) >= 0))
+	if (kr_fails_assert((ssize_t)(kwz_sname.len) >= 0))
 		return "ERROR";
 	bool covers = /* we know for sure that the low end is before kwz_sname */
 		3 == kwz_between((knot_db_val_t){ NULL, 0 }, kwz_sname, kwz_hi);
@@ -259,7 +259,7 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 	/* Basic sanity check. */
 	const bool ok = k && ans && clencl_labels && cover_low_kwz && cover_hi_kwz
 			&& qry && cache;
-	if (!kr_assume(ok))
+	if (kr_fails_assert(ok))
 		return kr_error(EINVAL);
 
 	/* Find a previous-or-equal name+NSEC in cache covering the QNAME,
@@ -297,7 +297,7 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 	const knot_rrset_t *nsec_rr = ans->rrsets[AR_NSEC].set.rr;
 	const uint8_t *bm = knot_nsec_bitmap(nsec_rr->rrs.rdata);
 	uint16_t bm_size = knot_nsec_bitmap_len(nsec_rr->rrs.rdata);
-	if (!kr_assume(bm))
+	if (kr_fails_assert(bm))
 		return kr_error(EFAULT);
 
 	if (exact_match) {
@@ -339,7 +339,7 @@ int nsec1_encloser(struct key *k, struct answer *ans,
 	 */
 	knot_dname_t next[KNOT_DNAME_MAXLEN];
 	int ret = knot_dname_to_wire(next, knot_nsec_next(nsec_rr->rrs.rdata), sizeof(next));
-	if (!kr_assume(ret >= 0))
+	if (kr_fails_assert(ret >= 0))
 		return kr_error(ret);
 	knot_dname_to_lower(next);
 	*clencl_labels = MAX(
@@ -380,14 +380,14 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	/* Construct key for the source of synthesis. */
 	knot_db_val_t key = key_NSEC1(k, clencl_name, true);
 	const size_t nwz_off = key_nwz_off(k);
-	if (!kr_assume(key.data && key.len >= nwz_off))
+	if (kr_fails_assert(key.data && key.len >= nwz_off))
 		return kr_error(1);
 	/* Check if our sname-covering NSEC also covers/matches SS. */
 	knot_db_val_t kwz = {
 		.data = (uint8_t *)key.data + nwz_off,
 		.len = key.len - nwz_off,
 	};
-	if (!kr_assume((ssize_t)(kwz.len) >= 0))
+	if (kr_fails_assert((ssize_t)(kwz.len) >= 0))
 		return kr_error(EINVAL);
 	const int cmp = kwz_between(cover_low_kwz, kwz, cover_hi_kwz);
 	if (nonexistence_ok(cmp, ans->rrsets[AR_NSEC].set.rr)) {
@@ -421,7 +421,7 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 		nsec_rr = ans->rrsets[AR_WILD].set.rr;
 	}
 
-	if (!kr_assume(nsec_rr))
+	if (kr_fails_assert(nsec_rr))
 		return kr_error(EFAULT);
 	const uint32_t new_ttl_log =
 		kr_verbose_status ? nsec_rr->ttl : -1;
@@ -429,7 +429,7 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	uint16_t bm_size = knot_nsec_bitmap_len(nsec_rr->rrs.rdata);
 	int ret;
 	struct answer_rrset * const arw = &ans->rrsets[AR_WILD];
-	if (!kr_assume(bm)) {
+	if (kr_fails_assert(bm)) {
 		ret = kr_error(EFAULT);
 		goto clean_wild;
 	}

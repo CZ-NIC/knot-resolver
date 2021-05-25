@@ -58,7 +58,7 @@ static void * item_val(const struct lru *lru, struct lru_item *it)
 /** @internal Free each item. */
 KR_EXPORT void lru_free_items_impl(struct lru *lru)
 {
-	if (!kr_assume(lru))
+	if (kr_fails_assert(lru))
 		return;
 	for (size_t i = 0; i < (1 << (size_t)lru->log_groups); ++i) {
 		lru_group_t *g = &lru->groups[i];
@@ -70,7 +70,7 @@ KR_EXPORT void lru_free_items_impl(struct lru *lru)
 /** @internal See lru_apply. */
 KR_EXPORT void lru_apply_impl(struct lru *lru, lru_apply_fun f, void *baton)
 {
-	if (!kr_assume(lru && f))
+	if (kr_fails_assert(lru && f))
 		return;
 	for (size_t i = 0; i < (1 << (size_t)lru->log_groups); ++i) {
 		lru_group_t *g = &lru->groups[i];
@@ -88,7 +88,7 @@ KR_EXPORT void lru_apply_impl(struct lru *lru, lru_apply_fun f, void *baton)
 				g->hashes[j] = 0;
 				break;
 			default:
-				(void)!kr_assume(ret == LRU_APPLY_DO_NOTHING);
+				kr_assert(ret == LRU_APPLY_DO_NOTHING);
 			}
 		}
 	}
@@ -98,7 +98,7 @@ KR_EXPORT void lru_apply_impl(struct lru *lru, lru_apply_fun f, void *baton)
 KR_EXPORT struct lru * lru_create_impl(uint max_slots, uint val_alignment,
 					knot_mm_t *mm_array, knot_mm_t *mm)
 {
-	if (!kr_assume(max_slots && __builtin_popcount(val_alignment) == 1))
+	if (kr_fails_assert(max_slots && __builtin_popcount(val_alignment) == 1))
 		return NULL;
 	// let lru->log_groups = ceil(log2(max_slots / (float) assoc))
 	//   without trying for efficiency
@@ -107,7 +107,7 @@ KR_EXPORT struct lru * lru_create_impl(uint max_slots, uint val_alignment,
 	for (uint s = group_count - 1; s; s /= 2)
 		++log_groups;
 	group_count = 1 << log_groups;
-	if (!kr_assume(max_slots <= group_count * LRU_ASSOC && group_count * LRU_ASSOC < 2 * max_slots))
+	if (kr_fails_assert(max_slots <= group_count * LRU_ASSOC && group_count * LRU_ASSOC < 2 * max_slots))
 		return NULL;
 
 	/* Get a sufficiently aligning mm_array if NULL is passed. */
@@ -117,7 +117,7 @@ KR_EXPORT struct lru * lru_create_impl(uint max_slots, uint val_alignment,
 			mm_ctx_init_aligned(&mm_array_default, alignof(struct lru));
 		mm_array = &mm_array_default;
 	}
-	if (!kr_assume(mm_array->alloc && mm_array->alloc != (knot_mm_alloc_t)mp_alloc))
+	if (kr_fails_assert(mm_array->alloc && mm_array->alloc != (knot_mm_alloc_t)mp_alloc))
 		return NULL;
 
 	size_t size = offsetof(struct lru, groups[group_count]);
@@ -162,7 +162,7 @@ KR_EXPORT void * lru_get_impl(struct lru *lru, const char *key, uint key_len,
 {
 	bool ok = lru && (key || !key_len) && key_len <= UINT16_MAX
 		   && (!do_insert || val_len <= UINT16_MAX);
-	if (!kr_assume(ok))
+	if (kr_fails_assert(ok))
 		return NULL; // reasonable fallback when not debugging
 	bool is_new_entry = false;
 	// find the right group
@@ -218,7 +218,7 @@ KR_EXPORT void * lru_get_impl(struct lru *lru, const char *key, uint key_len,
 		group_dec_counts(g);
 	return NULL;
 insert: // insert into position i (incl. key)
-	if (!kr_assume(i < LRU_ASSOC))
+	if (kr_fails_assert(i < LRU_ASSOC))
 		return NULL;
 	g->hashes[i] = khash_top;
 	it = g->items[i];
@@ -238,7 +238,7 @@ insert: // insert into position i (incl. key)
 	memset(item_val(lru, it), 0, val_len); // clear the value
 	is_new_entry = true;
 found: // key and hash OK on g->items[i]; now update stamps
-	if (!kr_assume(i < LRU_ASSOC))
+	if (kr_fails_assert(i < LRU_ASSOC))
 		return NULL;
 	group_inc_count(g, i);
 	if (is_new) {

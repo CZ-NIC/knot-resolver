@@ -129,7 +129,7 @@ static int l_ffi_call_layer(kr_layer_t *ctx, int slot_ix)
 
 	} else if (lua_isnil(L, -1)) { /* Don't change state. */
 
-	} else if (!kr_assume(!lua_isthread(L, -1))) { /* Continuations */
+	} else if (kr_fails_assert(!lua_isthread(L, -1))) { /* Continuations */
 		/* TODO: unused, possibly in a bad shape.  Meant KR_STATE_YIELD? */
 		if (l_ffi_defer(lua_tothread(L, -1)) != 0)
 			state = KR_STATE_FAIL;

@@ -48,12 +48,12 @@ bool kr_rank_check(uint8_t rank)
 
 bool kr_rank_test(uint8_t rank, uint8_t kr_flag)
 {
-	if (!kr_assume(kr_rank_check(rank) && kr_rank_check(kr_flag)))
+	if (kr_fails_assert(kr_rank_check(rank) && kr_rank_check(kr_flag)))
 		return false;
 	if (kr_flag == KR_RANK_AUTH) {
 		return rank & KR_RANK_AUTH;
 	}
-	if (!kr_assume(!(kr_flag & KR_RANK_AUTH)))
+	if (kr_fails_assert(!(kr_flag & KR_RANK_AUTH)))
 		return false;
 	/* The rest are exclusive values - exactly one has to be set. */
 	return (rank & ~KR_RANK_AUTH) == kr_flag;
@@ -114,7 +114,7 @@ static int answer_finalize_yield(kr_layer_t *ctx) { return kr_ok(); }
 				(r)->state = layer.api->func(&layer, ##__VA_ARGS__); \
 				/* It's an easy mistake to return error code, for example. */ \
 				/* (though we could allow such an overload later) */ \
-				if (!kr_assume(kr_state_consistent((r)->state))) { \
+				if (kr_fails_assert(kr_state_consistent((r)->state))) { \
 					(r)->state = KR_STATE_FAIL; \
 				} else \
 				if ((r)->state == KR_STATE_YIELD) { \
@@ -152,7 +152,7 @@ static void randomized_qname_case(knot_dname_t * restrict qname, uint32_t secret
 {
 	if (secret == 0)
 		return;
-	if (!kr_assume(qname))
+	if (kr_fails_assert(qname))
 		return;
 	const int len = knot_dname_size(qname) - 2; /* Skip first, last label. First is length, last is always root */
 	for (int i = 0; i < len; ++i) {
@@ -196,7 +196,7 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 			kr_make_query(qry, pkt);
 			break;
 		}
-		(void)!kr_assume(target[0]);
+		kr_assert(target[0]);
 		target = knot_wire_next_label(target, NULL);
 	}
 	kr_cache_commit(cache);
@@ -313,7 +313,7 @@ static int edns_put(knot_pkt_t *pkt, bool reclaim)
 		}
 	}
 	/* Write to packet. */
-	if (!kr_assume(pkt->current == KNOT_ADDITIONAL))
+	if (kr_fails_assert(pkt->current == KNOT_ADDITIONAL))
 		return kr_error(EINVAL);
 	return knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, pkt->opt_rr, KNOT_PF_FREE);
 }
@@ -384,7 +384,7 @@ static int write_extra_ranked_records(const ranked_rr_array_t *arr, uint16_t reo
 
 	for (size_t i = 0; i < arr->len; ++i) {
 		ranked_rr_array_entry_t * entry = arr->at[i];
-		(void)!kr_assume(!entry->in_progress);
+		kr_assert(!entry->in_progress);
 		if (!entry->to_wire) {
 			continue;
 		}
@@ -420,7 +420,7 @@ static int write_extra_ranked_records(const ranked_rr_array_t *arr, uint16_t reo
 /** @internal Add an EDNS padding RR into the answer if requested and required. */
 static int answer_padding(struct kr_request *request)
 {
-	if (!kr_assume(request && request->answer && request->ctx))
+	if (kr_fails_assert(request && request->answer && request->ctx))
 		return kr_error(EINVAL);
 	if (!request->qsource.flags.tls) {
 		/* Not meaningful to pad without encryption. */
@@ -500,7 +500,7 @@ static void answer_finalize(struct kr_request *request)
 		for (int psec = KNOT_ANSWER; psec <= KNOT_ADDITIONAL; ++psec) {
 			const ranked_rr_array_t *arr = selected[psec];
 			for (ssize_t i = 0; i < arr->len; ++i) {
-				if (!kr_assume(!arr->at[i]->to_wire)) {
+				if (kr_fails_assert(!arr->at[i]->to_wire)) {
 					answer_fail(request);
 					return;
 				}
@@ -705,12 +705,12 @@ knot_pkt_t *kr_request_ensure_answer(struct kr_request *request)
 		return request->answer;
 
 	const knot_pkt_t *qs_pkt = request->qsource.packet;
-	if (!kr_assume(qs_pkt))
+	if (kr_fails_assert(qs_pkt))
 		goto fail;
 	// Find answer_max: limit on DNS wire length.
 	uint16_t answer_max;
 	const struct kr_request_qsource_flags *qs_flags = &request->qsource.flags;
-	if (!kr_assume((qs_flags->tls || qs_flags->http) ? qs_flags->tcp : true))
+	if (kr_fails_assert((qs_flags->tls || qs_flags->http) ? qs_flags->tcp : true))
 		goto fail;
 	if (!request->qsource.addr || qs_flags->tcp) {
 		// not on UDP
@@ -735,7 +735,7 @@ knot_pkt_t *kr_request_ensure_answer(struct kr_request *request)
 	knot_pkt_t *answer = request->answer =
 		knot_pkt_new(wire, answer_max, &request->pool);
 	if (!answer || knot_pkt_init_response(answer, qs_pkt) != 0) {
-		(void)!kr_assume(!answer); // otherwise we messed something up
+		kr_assert(!answer); // otherwise we messed something up
 		goto enomem;
 	}
 	if (!wire)
@@ -912,7 +912,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		return KR_STATE_PRODUCE;
 	}
 
-	if (!kr_assume(qry->flags.FORWARD))
+	if (kr_fails_assert(qry->flags.FORWARD))
 		return KR_STATE_FAIL;
 
 	if (!trust_anchors) {
@@ -1427,7 +1427,7 @@ static bool outbound_request_update_cookies(struct kr_request *req,
                                             const struct sockaddr *src,
                                             const struct sockaddr *dst)
 {
-	if (!kr_assume(req))
+	if (kr_fails_assert(req))
 		return false;
 
 	/* RFC7873 4.1 strongly requires server address. */
@@ -1504,7 +1504,7 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 		type = SOCK_STREAM;
 		break;
 	default:
-		(void)!kr_assume(false);
+		kr_assert(false);
 	}
 	int state = request->state;
 	ITERATE_LAYERS(request, qry, checkout, packet, &transport->address.ip, type);

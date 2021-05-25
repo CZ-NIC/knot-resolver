@@ -152,7 +152,7 @@ static inline knot_db_val_t key_exact_type(struct key *k, uint16_t type)
 	/* Sanity check: forbidden types represented in other way(s). */
 	case KNOT_RRTYPE_NSEC:
 	case KNOT_RRTYPE_NSEC3:
-		(void)!kr_assume(false);
+		kr_assert(false);
 		return (knot_db_val_t){ NULL, 0 };
 	}
 	return key_exact_type_maypkt(k, type);
@@ -199,7 +199,7 @@ static inline uint16_t EL2RRTYPE(enum EL i)
 	case EL_NS:	return KNOT_RRTYPE_NS;
 	case EL_CNAME:	return KNOT_RRTYPE_CNAME;
 	case EL_DNAME:	return KNOT_RRTYPE_DNAME;
-	default:	(void)!kr_assume(false);  return 0;
+	default:	kr_assert(false);  return 0;
 	}
 }
 
@@ -342,7 +342,7 @@ enum {
 /** Materialize RRset + RRSIGs into ans->rrsets[id].
  * LATER(optim.): it's slightly wasteful that we allocate knot_rrset_t for the packet
  *
- * \return error code.  They are all bad conditions and "guarded" by kr_assume().
+ * \return error code.  They are all bad conditions and "guarded" by kresd's assertions.
  */
 int entry2answer(struct answer *ans, int id,
 		const struct entry_h *eh, const uint8_t *eh_bound,

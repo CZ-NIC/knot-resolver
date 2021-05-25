@@ -109,7 +109,7 @@ static int assert_right_version(struct kr_cache *cache)
 
 int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct kr_cdb_opts *opts, knot_mm_t *mm)
 {
-	if (!kr_assume(cache))
+	if (kr_fails_assert(cache))
 		return kr_error(EINVAL);
 	memset(cache, 0, sizeof(*cache));
 	/* Open cache */
@@ -133,11 +133,11 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 	}
 
 	char *fpath = kr_absolutize_path(opts->path, "data.mdb");
-	if (kr_assume(fpath)) {
-		kr_cache_emergency_file_to_remove = fpath;
-	} else {
+	if (kr_fails_assert(fpath)) {
 		/* non-critical, but still */
 		fpath = "<ENOMEM>";
+	} else {
+		kr_cache_emergency_file_to_remove = fpath;
 	}
 
 	if (ret == 0 && opts->maxsize) {
@@ -297,11 +297,11 @@ static bool check_rrtype(uint16_t type, const struct kr_query *qry/*logging*/)
 /** Like key_exact_type() but omits a couple checks not holding for pkt cache. */
 knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type)
 {
-	if (!kr_assume(check_rrtype(type, NULL)))
+	if (kr_fails_assert(check_rrtype(type, NULL)))
 		return (knot_db_val_t){ NULL, 0 };
 	switch (type) {
 	case KNOT_RRTYPE_RRSIG: /* no RRSIG query caching, at least for now */
-		(void)!kr_assume(false);
+		kr_assert(false);
 		return (knot_db_val_t){ NULL, 0 };
 	/* xNAME lumped into NS. */
 	case KNOT_RRTYPE_CNAME:
@@ -393,7 +393,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Stash individual records. */
 	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	trie_t *nsec_pmap = trie_create(&req->pool);
-	if (!kr_assume(nsec_pmap))
+	if (kr_fails_assert(nsec_pmap))
 		goto finally;
 	for (int psec = KNOT_ANSWER; psec <= KNOT_ADDITIONAL; ++psec) {
 		ranked_rr_array_t *arr = selected[psec];
@@ -442,7 +442,7 @@ finally:
 /** Preliminary checks before stash_rrset().  Don't call if returns <= 0. */
 static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qry/*logs*/)
 {
-	if (!kr_assume(rr && rr->rclass == KNOT_CLASS_IN))
+	if (kr_fails_assert(rr && rr->rclass == KNOT_CLASS_IN))
 		return kr_error(EINVAL);
 	if (!check_rrtype(rr->type, qry))
 		return kr_ok();
@@ -456,7 +456,7 @@ static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qr
 static bool rrset_has_min_range_or_weird(const knot_rrset_t *rr, const struct kr_query *qry)
 {
 	if (rr->rrs.count != 1) {
-		(void)!kr_assume(rr->rrs.count > 0);
+		kr_assert(rr->rrs.count > 0);
 		if (rr->type == KNOT_RRTYPE_NSEC || rr->type == KNOT_RRTYPE_NSEC3
 				|| rr->rrs.count == 0) {
 			return true; /*< weird */
@@ -514,7 +514,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		VERBOSE_MSG(qry, "=> skipping NSEC3 with too many iterations\n");
 		return kr_ok();
 	}
-	if (!kr_assume(cache && stash_rrset_precond(rr, qry) > 0))
+	if (kr_fails_assert(cache && stash_rrset_precond(rr, qry) > 0))
 		return kr_error(EINVAL);
 
 	int ret = kr_ok();
@@ -543,7 +543,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		/* Skip any NSEC*s that aren't validated or are suspicious. */
 		if (!kr_rank_test(rank, KR_RANK_SECURE) || rr->rrs.count != 1)
 			goto return_needs_pkt;
-		if (!kr_assume(rr_sigs && rr_sigs->rrs.count && rr_sigs->rrs.rdata)) {
+		if (kr_fails_assert(rr_sigs && rr_sigs->rrs.count && rr_sigs->rrs.rdata)) {
 			ret = kr_error(EINVAL);
 			goto return_needs_pkt;
 		}
@@ -554,7 +554,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		void **npp = NULL;
 		if (nsec_pmap) {
 			npp = trie_get_ins(nsec_pmap, (const char *)signer, signer_size);
-			if (!kr_assume(npp))
+			if (kr_fails_assert(npp))
 				return kr_error(ENOMEM);
 		}
 		if (rr->type == KNOT_RRTYPE_NSEC) {
@@ -576,14 +576,14 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		key = key_NSEC3(k, encloser, nsec_p_mkHash(rdata->data));
 		if (npp && !*npp) {
 			*npp = mm_alloc(&qry->request->pool, np_dlen);
-			if (!kr_assume(*npp))
+			if (kr_fails_assert(*npp))
 				break;
 			memcpy(*npp, rdata->data, np_dlen);
 		}
 		break;
 	default:
 		ret = kr_dname_lf(k->buf, encloser, wild_labels);
-		if (!kr_assume(ret == 0))
+		if (kr_fails_assert(ret == 0))
 			goto return_needs_pkt;
 		key = key_exact_type(k, rr->type);
 	}
@@ -591,7 +591,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	/* Compute in-cache size for the new data. */
 	const knot_rdataset_t *rds_sigs = rr_sigs ? &rr_sigs->rrs : NULL;
 	const int rr_ssize = rdataset_dematerialize_size(&rr->rrs);
-	if (!kr_assume(rr_ssize == to_even(rr_ssize)))
+	if (kr_fails_assert(rr_ssize == to_even(rr_ssize)))
 		return kr_error(EINVAL);
 	knot_db_val_t val_new_entry = {
 		.data = NULL,
@@ -603,7 +603,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	ret = entry_h_splice(&val_new_entry, rank, key, k->type, rr->type,
 				rr->owner, qry, cache, timestamp);
 	if (ret) return kr_ok(); /* some aren't really errors */
-	if (!kr_assume(val_new_entry.data))
+	if (kr_fails_assert(val_new_entry.data))
 		return kr_error(EFAULT);
 
 	const uint32_t ttl = rr->ttl;
@@ -617,7 +617,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	eh->rank = rank;
 	rdataset_dematerialize(&rr->rrs, eh->data);
 	rdataset_dematerialize(rds_sigs, eh->data + rr_ssize);
-	if (!kr_assume(entry_h_consistent_E(val_new_entry, rr->type)))
+	if (kr_fails_assert(entry_h_consistent_E(val_new_entry, rr->type)))
 		return kr_error(EINVAL);
 
 	#if 0 /* Occasionally useful when debugging some kinds of changes. */
@@ -626,7 +626,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	knot_db_val_t val = { NULL, 0 };
 	ret = cache_op(cache, read, &key, &val, 1);
 	if (ret != kr_error(ENOENT)) { // ENOENT might happen in some edge case, I guess
-		(void)!kr_assume(!ret);
+		kr_assert(!ret);
 		entry_list_t el;
 		entry_list_parse(val, el);
 	}
@@ -675,7 +675,7 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 		/* TODO: ATM we assume that some properties are the same
 		 * for all RRSIGs in the set (esp. label count). */
 		ranked_rr_array_entry_t *e = arr->at[j];
-		if (!kr_assume(!e->in_progress))
+		if (kr_fails_assert(!e->in_progress))
 			return kr_error(EINVAL);
 		bool ok = e->qry_uid == qry->uid && !e->cached
 			&& e->rr->type == KNOT_RRTYPE_RRSIG
@@ -998,7 +998,7 @@ int kr_cache_check_health(struct kr_cache *cache, int interval)
 		}
 		cache->health_timer->data = cache;
 	}
-	(void)!kr_assume(cache->health_timer->data);
+	kr_assert(cache->health_timer->data);
 	return kr_error(uv_timer_start(cache->health_timer, health_timer_cb, interval, interval));
 }
 

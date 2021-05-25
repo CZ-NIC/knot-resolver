@@ -101,7 +101,7 @@ static int dname_cmp(const knot_dname_t *d1, const knot_dname_t *d2)
  */
 static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 {
-	if (!kr_assume(nsec && sname))
+	if (kr_fails_assert(nsec && sname))
 		return kr_error(EINVAL);
 	if (dname_cmp(sname, nsec->owner) <= 0)
 		return abs(ENOENT); /* 'sname' before 'owner', so can't be covered */
@@ -110,7 +110,7 @@ static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 	/* We have to lower-case it with libknot >= 2.7; see also RFC 6840 5.1. */
 	knot_dname_t next[KNOT_DNAME_MAXLEN];
 	int ret = knot_dname_to_wire(next, knot_nsec_next(nsec->rrs.rdata), sizeof(next));
-	if (!kr_assume(ret >= 0))
+	if (kr_fails_assert(ret >= 0))
 		return kr_error(ret);
 	knot_dname_to_lower(next);
 
@@ -172,7 +172,7 @@ static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 static int name_error_response_check_rr(int *flags, const knot_rrset_t *nsec,
                                         const knot_dname_t *name)
 {
-	if (!kr_assume(flags && nsec && name))
+	if (kr_fails_assert(flags && nsec && name))
 		return kr_error(EINVAL);
 
 	if (nsec_covers(nsec, name) == 0)
@@ -232,7 +232,7 @@ int kr_nsec_name_error_response_check(const knot_pkt_t *pkt, knot_section_t sect
  */
 static int coverign_rrsig_labels(const knot_rrset_t *nsec, const knot_pktsection_t *sec)
 {
-	if (!kr_assume(nsec && sec))
+	if (kr_fails_assert(nsec && sec))
 		return kr_error(EINVAL);
 
 	int ret = kr_error(ENOENT);
@@ -318,7 +318,7 @@ int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t ty
 static int no_data_response_check_rrtype(int *flags, const knot_rrset_t *nsec,
                                          uint16_t type)
 {
-	if (!kr_assume(flags && nsec))
+	if (kr_fails_assert(flags && nsec))
 		return kr_error(EINVAL);
 
 	const uint8_t *bm = knot_nsec_bitmap(nsec->rrs.rdata);
@@ -339,7 +339,7 @@ static int no_data_response_check_rrtype(int *flags, const knot_rrset_t *nsec,
 static int no_data_wildcard_existence_check(int *flags, const knot_rrset_t *nsec,
                                             const knot_pktsection_t *sec)
 {
-	if (!kr_assume(flags && nsec && sec))
+	if (kr_fails_assert(flags && nsec && sec))
 		return kr_error(EINVAL);
 
 	int rrsig_labels = coverign_rrsig_labels(nsec, sec);
@@ -536,7 +536,7 @@ int kr_nsec_matches_name_and_type(const knot_rrset_t *nsec,
 	/* It's not secure enough to just check a single bit for (some) other types,
 	 * but we don't (currently) only use this API for NS.  See RFC 6840 sec. 4.
 	 */
-	if (!kr_assume(type == KNOT_RRTYPE_NS && nsec && name))
+	if (kr_fails_assert(type == KNOT_RRTYPE_NS && nsec && name))
 		return kr_error(EINVAL);
 	if (!knot_dname_is_equal(nsec->owner, name))
 		return kr_error(ENOENT);

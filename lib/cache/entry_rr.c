@@ -34,10 +34,10 @@ void rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
 static int rdataset_materialize(knot_rdataset_t * restrict rds, const uint8_t * const data,
 				const uint8_t *data_bound, knot_mm_t *pool)
 {
-	if (!kr_assume(rds && data && data_bound && data_bound > data && !rds->rdata
+	if (kr_fails_assert(rds && data && data_bound && data_bound > data && !rds->rdata
 		       /*&& !((size_t)data & 1)*/))
 		return kr_error(EINVAL);
-	(void)!kr_assume(pool); /* not required, but that's our current usage; guard leaks */
+	kr_assert(pool); /* not required, but that's our current usage; guard leaks */
 	const uint8_t *d = data; /* iterates over the cache data */
 	/* First sum up the sizes for wire format length. */
 	/* TODO: we might overrun here already, but we need to trust cache anyway...*/
@@ -77,15 +77,15 @@ int entry2answer(struct answer *ans, int id,
 	const bool not_ok = ans->rrsets[id].set.rr || ans->rrsets[id].sig_rds.rdata
 	    || (type == KNOT_RRTYPE_NSEC  &&  ans->nsec_p.raw)
 	    || (type == KNOT_RRTYPE_NSEC3 && !ans->nsec_p.raw);
-	if (!kr_assume(!not_ok))
+	if (kr_fails_assert(!not_ok))
 		return kr_error(EINVAL);
 	/* Materialize the base RRset. */
 	knot_rrset_t *rr = ans->rrsets[id].set.rr
 		= knot_rrset_new(owner, type, KNOT_CLASS_IN, new_ttl, ans->mm);
-	if (!kr_assume(rr))
+	if (kr_fails_assert(rr))
 		return kr_error(ENOMEM);
 	int ret = rdataset_materialize(&rr->rrs, eh->data, eh_bound, ans->mm);
-	if (!kr_assume(ret >= 0)) goto fail;
+	if (kr_fails_assert(ret >= 0)) goto fail;
 	size_t data_off = ret;
 	ans->rrsets[id].set.rank = eh->rank;
 	ans->rrsets[id].set.expiring = is_expiring(eh->ttl, new_ttl);
@@ -94,10 +94,10 @@ int entry2answer(struct answer *ans, int id,
 	if (want_rrsigs) {
 		ret = rdataset_materialize(&ans->rrsets[id].sig_rds, eh->data + data_off,
 					   eh_bound, ans->mm);
-		if (!kr_assume(ret >= 0)) goto fail;
+		if (kr_fails_assert(ret >= 0)) goto fail;
 		/* Sanity check: we consumed exactly all data. */
 		int unused_bytes = eh_bound - (uint8_t *)eh->data - data_off - ret;
-		if (!kr_assume(unused_bytes == 0)) {
+		if (kr_fails_assert(unused_bytes == 0)) {
 			kr_log_error("[cach] entry2answer ERROR: unused bytes: %d\n",
 					unused_bytes);
 			ret = kr_error(EILSEQ);

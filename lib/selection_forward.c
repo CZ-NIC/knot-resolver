@@ -51,7 +51,7 @@ void forward_choose_transport(struct kr_query *qry,
 			addr_len = sizeof(struct in6_addr);
 			break;
 		default:
-			(void)!kr_assume(false);
+			kr_assert(false);
 			*transport = NULL;
 			return;
 		}

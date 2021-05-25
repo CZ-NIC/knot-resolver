@@ -133,7 +133,7 @@ void udp_queue_push(int fd, struct kr_request *req, struct qr_task *task)
 	++(q->len);
 
 	if (q->len >= UDP_QUEUE_LEN) {
-		(void)!kr_assume(q->len == UDP_QUEUE_LEN);
+		kr_assert(q->len == UDP_QUEUE_LEN);
 		udp_queue_send(fd);
 		/* We don't need to search state.waiting_fds;
 		 * anyway, it's more efficient to let the hook do that. */
