@@ -4,6 +4,7 @@ Knot Resolver 5.x.y (2021-0m-dd)
 Bugfixes
 --------
 - trust_anchors.set_insecure: improve precision (#673, !1177)
+- policy.FLAGS: fix not applying properly in edge cases (!1179)
 
 
 Knot Resolver 5.3.2 (2021-05-05)
