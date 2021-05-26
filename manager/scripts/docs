@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/_env.sh
+
+# create HTML documentation
+sphinx-build -M html docs docs/_build
