@@ -11,8 +11,8 @@ default:
     # it has its own virtualenv and we want to use that env in a different directory
     # so let's create a new one and replace it by the already existing one
     # we don't care about destroying the environment in process, because it's going to be discarded anyway
-    - poetry env use $(which python3.6); ourpath=$(poetry env info -p); upperpath=$( (cd ..; poetry env info -p) ); rm -rf "$ourpath"; cp -a "$upperpath" "$ourpath"; mv /poetry.lock .
-    # the virtualenv we recycled might have beed slightly out of date. Let's quickly update it
+    - poetry env use $(which python3.6); ourpath=$(poetry env info -p); upperpath=$( (cd ..; poetry env info -p) ); rm -rf "$ourpath"; cp -a "$upperpath" "$ourpath"
+    # the virtualenv we recycled might be slightly out of date. Let's quickly update it
     - poetry install
     # fix podman; see https://gitlab.nic.cz/labs/lxc-gitlab-runner#nesting-with-podman
     - unset TMPDIR
