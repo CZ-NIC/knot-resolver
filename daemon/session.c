@@ -2,8 +2,6 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <assert.h>
-
 #include <libknot/packet/pkt.h>
 
 #include "lib/defines.h"
@@ -56,7 +54,7 @@ struct session {
 static void on_session_close(uv_handle_t *handle)
 {
 	struct session *session = handle->data;
-	assert(session->handle == handle); (void)session;
+	kr_require(session->handle == handle);
 	io_free(handle);
 }
 
@@ -64,8 +62,8 @@ static void on_session_timer_close(uv_handle_t *timer)
 {
 	struct session *session = timer->data;
 	uv_handle_t *handle = session->handle;
-	assert(handle && handle->data == session);
-	assert (session->sflags.outgoing || handle->type == UV_TCP);
+	kr_require(handle && handle->data == session);
+	kr_require(session->sflags.outgoing || handle->type == UV_TCP);
 	if (!uv_is_closing(handle)) {
 		uv_close(handle, on_session_close);
 	}
@@ -74,7 +72,6 @@ static void on_session_timer_close(uv_handle_t *timer)
 void session_free(struct session *session)
 {
 	if (session) {
-		assert(session_is_empty(session));
 		session_clear(session);
 		free(session);
 	}
@@ -82,7 +79,7 @@ void session_free(struct session *session)
 
 void session_clear(struct session *session)
 {
-	assert(session_is_empty(session));
+	kr_require(session_is_empty(session));
 	if (session->handle && session->handle->type == UV_TCP) {
 		free(session->wire_buf);
 	}
@@ -99,7 +96,7 @@ void session_clear(struct session *session)
 
 void session_close(struct session *session)
 {
-	assert(session_is_empty(session));
+	kr_require(session_is_empty(session));
 	if (session->sflags.closing) {
 		return;
 	}
@@ -170,15 +167,12 @@ int session_tasklist_add(struct session *session, struct qr_task *task)
 		key_len = sizeof(char *);
 	}
 	trie_val_t *v = trie_get_ins(t, key, key_len);
-	if (unlikely(!v)) {
-		assert(false);
+	if (kr_fails_assert(v))
 		return kr_error(ENOMEM);
-	}
 	if (*v == NULL) {
 		*v = task;
 		worker_task_ref(task);
-	} else if (*v != task) {
-		assert(false);
+	} else if (kr_fails_assert(*v == task)) {
 		return kr_error(EINVAL);
 	}
 	return kr_ok();
@@ -202,7 +196,7 @@ int session_tasklist_del(struct session *session, struct qr_task *task)
 	}
 	int ret = trie_del(t, key, key_len, &val);
 	if (ret == kr_ok()) {
-		assert(val == task);
+		kr_require(val == task);
 		worker_task_unref(val);
 	}
 	return ret;
@@ -227,8 +221,9 @@ struct qr_task *session_tasklist_del_first(struct session *session, bool deref)
 }
 struct qr_task* session_tasklist_del_msgid(const struct session *session, uint16_t msg_id)
 {
+	if (kr_fails_assert(session->sflags.outgoing))
+		return NULL;
 	trie_t *t = session->tasks;
-	assert(session->sflags.outgoing);
 	struct qr_task *ret = NULL;
 	const char *key = (const char *)&msg_id;
 	size_t key_len = sizeof(msg_id);
@@ -245,8 +240,9 @@ struct qr_task* session_tasklist_del_msgid(const struct session *session, uint16
 
 struct qr_task* session_tasklist_find_msgid(const struct session *session, uint16_t msg_id)
 {
+	if (kr_fails_assert(session->sflags.outgoing))
+		return NULL;
 	trie_t *t = session->tasks;
-	assert(session->sflags.outgoing);
 	struct qr_task *ret = NULL;
 	trie_val_t *val = trie_get_try(t, (char *)&msg_id, sizeof(msg_id));
 	if (val) {
@@ -363,11 +359,11 @@ struct session *session_new(uv_handle_t *handle, bool has_tls, bool has_http)
 		 * the callback, whatever the result of the operation.
 		 * We still need to keep in mind to only touch the buffer
 		 * in this callback... */
-		assert(handle->loop->data);
+		kr_require(the_worker);
 		session->wire_buf = the_worker->wire_buf;
 		session->wire_buf_size = sizeof(the_worker->wire_buf);
 	} else {
-		assert(handle->type == UV_POLL/*XDP*/);
+		kr_assert(handle->type == UV_POLL/*XDP*/);
 		/* - wire_buf* are left zeroed, as they make no sense
 		 * - timer is unused but OK for simplicity (server-side sessions are few)
 		 */
@@ -444,7 +440,7 @@ void session_tasklist_finalize(struct session *session, int status)
 {
 	while (session_tasklist_get_len(session) > 0) {
 		struct qr_task *t = session_tasklist_del_first(session, false);
-		assert(worker_task_numrefs(t) > 0);
+		kr_require(worker_task_numrefs(t) > 0);
 		worker_task_finalize(t, status);
 		worker_task_unref(t);
 	}
@@ -507,7 +503,8 @@ int session_timer_start(struct session *session, uv_timer_cb cb,
 			uint64_t timeout, uint64_t repeat)
 {
 	uv_timer_t *timer = &session->timeout;
-	assert(timer->data == session);
+	if (kr_fails_assert(timer->data == session))
+		return kr_error(EINVAL);
 	int ret = uv_timer_start(timer, cb, timeout, repeat);
 	if (ret != 0) {
 		uv_timer_stop(timer);
@@ -631,38 +628,34 @@ int session_discard_packet(struct session *session, const knot_pkt_t *pkt)
 		return kr_error(EINVAL);
 	} else if (handle->type == UV_TCP) {
 		/* wire_buf contains TCP DNS message. */
-		if (wirebuf_data_size < 2) {
+		if (kr_fails_assert(wirebuf_data_size >= 2)) {
 			/* TCP message length field isn't in buffer, must not happen. */
-			assert(0);
 			session->wire_buf_start_idx = 0;
 			session->wire_buf_end_idx = 0;
 			return kr_error(EINVAL);
 		}
 		wirebuf_msg_size = knot_wire_read_u16(wirebuf_msg_start);
 		wirebuf_msg_start += 2;
-		if (wirebuf_msg_size + 2 > wirebuf_data_size) {
+		if (kr_fails_assert(wirebuf_msg_size + 2 <= wirebuf_data_size)) {
 			/* TCP message length field is greater then
 			 * number of bytes in buffer, must not happen. */
-			assert(0);
 			session->wire_buf_start_idx = 0;
 			session->wire_buf_end_idx = 0;
 			return kr_error(EINVAL);
 		}
 	}
 
-	if (wirebuf_msg_start != pkt_msg_start) {
+	if (kr_fails_assert(wirebuf_msg_start == pkt_msg_start)) {
 		/* packet wirebuf must be located at the beginning
 		 * of the session wirebuf, must not happen. */
-		assert(0);
 		session->wire_buf_start_idx = 0;
 		session->wire_buf_end_idx = 0;
 		return kr_error(EINVAL);
 	}
 
-	if (wirebuf_msg_size < pkt_msg_size) {
+	if (kr_fails_assert(wirebuf_msg_size >= pkt_msg_size)) {
 		/* Message length field is lesser then packet size,
 		 * must not happen. */
-		assert(0);
 		session->wire_buf_start_idx = 0;
 		session->wire_buf_end_idx = 0;
 		return kr_error(EINVAL);
@@ -755,7 +748,8 @@ int session_wirebuf_process(struct session *session, const struct sockaddr *peer
 
 	while (((pkt = session_produce_packet(session, &the_worker->pkt_pool)) != NULL) &&
 	       (ret < max_iterations)) {
-		assert (!session_wirebuf_error(session));
+		if (kr_fails_assert(!session_wirebuf_error(session)))
+			return -1;
 		int res = worker_submit(session, peer, NULL, NULL, NULL, pkt);
 		/* Errors from worker_submit() are intetionally *not* handled in order to
 		 * ensure the entire wire buffer is processed. */
@@ -779,16 +773,12 @@ int session_wirebuf_process(struct session *session, const struct sockaddr *peer
 
 void session_kill_ioreq(struct session *session, struct qr_task *task)
 {
-	if (!session) {
+	if (!session || session->sflags.closing)
 		return;
-	}
-	assert(session->sflags.outgoing && session->handle);
-	if (session->sflags.closing) {
+	if (kr_fails_assert(session->sflags.outgoing && session->handle))
 		return;
-	}
 	session_tasklist_del(session, task);
 	if (session->handle->type == UV_UDP) {
-		assert(session_tasklist_is_empty(session));
 		session_close(session);
 		return;
 	}

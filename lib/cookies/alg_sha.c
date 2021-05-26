@@ -2,7 +2,6 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <assert.h>
 #include <nettle/hmac.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -22,7 +21,8 @@
 static inline void update_hash(struct hmac_sha256_ctx *ctx,
                                const struct sockaddr *sa)
 {
-	assert(ctx && sa);
+	if (kr_fails_assert(ctx && sa))
+		return;
 
 	int addr_len = kr_inaddr_len(sa);
 	const uint8_t *addr = (uint8_t *)kr_inaddr(sa);

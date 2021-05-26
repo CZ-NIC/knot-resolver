@@ -236,8 +236,8 @@ static int zi_rrset_find_put(struct zone_import_ctx *z_import,
 static int zi_rrset_put(struct zone_import_ctx *z_import, knot_pkt_t *pkt,
 			knot_rrset_t *rr)
 {
-	assert(rr);
-	assert(rr->type != KNOT_RRTYPE_RRSIG);
+	if (kr_fails_assert(rr && rr->type != KNOT_RRTYPE_RRSIG))
+		return -1;
 	int err = knot_pkt_put(pkt, 0, rr, 0);
 	if (err != KNOT_EOK) {
 		return -1;
@@ -450,11 +450,14 @@ static void zi_zone_process(uv_timer_t* handle)
 {
 	zone_import_ctx_t *z_import = (zone_import_ctx_t *)handle->data;
 
-	assert(z_import->worker);
-
 	size_t failed = 0;
 	size_t ns_imported = 0;
 	size_t other_imported = 0;
+
+	if (kr_fails_assert(z_import->worker)) {
+		failed = 1;
+		goto finish;
+	}
 
 	/* At the moment import of root zone only is supported.
 	 * Check the name of the parsed zone.
@@ -725,9 +728,8 @@ int zi_zone_import(struct zone_import_ctx *z_import,
 		   const char *zone_file, const char *origin,
 		   uint16_t rclass, uint32_t ttl)
 {
-	assert (z_import != NULL && "[zimport] empty <z_import> parameter");
-	assert (z_import->worker != NULL && "[zimport] invalid <z_import> parameter\n");
-	assert (zone_file != NULL && "[zimport] empty <zone_file> parameter\n");
+	if (kr_fails_assert(z_import && z_import->worker && zone_file))
+		return -1;
 
 	zs_scanner_t *s = malloc(sizeof(zs_scanner_t));
 	if (s == NULL) {

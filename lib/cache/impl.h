@@ -93,7 +93,7 @@ static const int NSEC_P_MAXLEN = sizeof(uint32_t) + 5 + 255; // TODO: remove??
 typedef uint32_t nsec_p_hash_t;
 static inline nsec_p_hash_t nsec_p_mkHash(const uint8_t *nsec_p)
 {
-	assert(nsec_p && !(KNOT_NSEC3_FLAG_OPT_OUT & nsec_p[1]));
+	kr_require(nsec_p && !(KNOT_NSEC3_FLAG_OPT_OUT & nsec_p[1]));
 	return hash((const char *)nsec_p, nsec_p_rdlen(nsec_p));
 }
 
@@ -152,7 +152,7 @@ static inline knot_db_val_t key_exact_type(struct key *k, uint16_t type)
 	/* Sanity check: forbidden types represented in other way(s). */
 	case KNOT_RRTYPE_NSEC:
 	case KNOT_RRTYPE_NSEC3:
-		assert(false);
+		kr_assert(false);
 		return (knot_db_val_t){ NULL, 0 };
 	}
 	return key_exact_type_maypkt(k, type);
@@ -199,7 +199,7 @@ static inline uint16_t EL2RRTYPE(enum EL i)
 	case EL_NS:	return KNOT_RRTYPE_NS;
 	case EL_CNAME:	return KNOT_RRTYPE_CNAME;
 	case EL_DNAME:	return KNOT_RRTYPE_DNAME;
-	default:	assert(false);  return 0;
+	default:	kr_assert(false);  return 0;
 	}
 }
 
@@ -303,7 +303,8 @@ static inline int rdataset_dematerialize_size(const knot_rdataset_t *rds)
 static inline int rdataset_dematerialized_size(const uint8_t *data, uint16_t *rdataset_count)
 {
 	uint16_t count;
-	assert(sizeof(count) == KR_CACHE_RR_COUNT_SIZE);
+	static_assert(sizeof(count) == KR_CACHE_RR_COUNT_SIZE,
+			"Unexpected KR_CACHE_RR_COUNT_SIZE.");
 	memcpy(&count, data, sizeof(count));
 	const uint8_t *rdata = data + sizeof(count);
 	if (rdataset_count) // memcpy is safe for unaligned case (on non-x86)
@@ -316,8 +317,8 @@ static inline int rdataset_dematerialized_size(const uint8_t *data, uint16_t *rd
 	return rdata - (data + sizeof(count));
 }
 
-/** Serialize an rdataset. */
-int rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data);
+/** Serialize an rdataset.  It may be NULL as short-hand for empty. */
+void rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data);
 
 
 /** Partially constructed answer when gathering RRsets from cache. */
@@ -341,7 +342,7 @@ enum {
 /** Materialize RRset + RRSIGs into ans->rrsets[id].
  * LATER(optim.): it's slightly wasteful that we allocate knot_rrset_t for the packet
  *
- * \return error code.  They are all bad conditions and "guarded" by assert.
+ * \return error code.  They are all bad conditions and "guarded" by kresd's assertions.
  */
 int entry2answer(struct answer *ans, int id,
 		const struct entry_h *eh, const uint8_t *eh_bound,
@@ -354,9 +355,12 @@ int entry2answer(struct answer *ans, int id,
 int pkt_renew(knot_pkt_t *pkt, const knot_dname_t *name, uint16_t type);
 
 /** Append RRset + its RRSIGs into the current section (*shallow* copy), with given rank.
+ *
  * \note it works with empty set as well (skipped)
  * \note pkt->wire is not updated in any way
  * \note KNOT_CLASS_IN is assumed
+ * \note Whole RRsets are put into the pseudo-packet;
+ *       normal parsed packets would only contain single-RR sets.
  */
 int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank);
 

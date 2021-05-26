@@ -2,7 +2,6 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <assert.h>
 #include <libdnssec/binary.h>
 #include <libdnssec/crypto.h>
 #include <libdnssec/error.h>
@@ -278,7 +277,8 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 
 bool kr_ds_algo_support(const knot_rrset_t *ta)
 {
-	assert(ta && ta->type == KNOT_RRTYPE_DS && ta->rclass == KNOT_CLASS_IN);
+	if (kr_fails_assert(ta && ta->type == KNOT_RRTYPE_DS && ta->rclass == KNOT_CLASS_IN))
+		return false;
 	/* Check if at least one DS has a usable algorithm pair. */
 	knot_rdata_t *rdata_i = ta->rrs.rdata;
 	for (uint16_t i = 0; i < ta->rrs.count;
@@ -298,10 +298,8 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
 
 	const bool ok = pkt && keys && ta && ta->rrs.count && ta->rrs.rdata
 			&& ta->type == KNOT_RRTYPE_DS;
-	if (!ok) {
-		assert(false);
+	if (kr_fails_assert(ok))
 		return kr_error(EINVAL);
-	}
 
 	/* RFC4035 5.2, bullet 1
 	 * The supplied DS record has been authenticated.
@@ -312,14 +310,12 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
 		/* RFC4035 5.3.1, bullet 8 */ /* ZSK */
 		/* LATER(optim.): more efficient way to iterate than _at() */
 		knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, i);
-		if (!kr_dnssec_key_zsk(krr->data) || kr_dnssec_key_revoked(krr->data)) {
+		if (!kr_dnssec_key_zsk(krr->data) || kr_dnssec_key_revoked(krr->data))
 			continue;
-		}
-		
+
 		struct dseckey *key = NULL;
-		if (kr_dnssec_key_from_rdata(&key, keys->owner, krr->data, krr->len) != 0) {
+		if (kr_dnssec_key_from_rdata(&key, keys->owner, krr->data, krr->len) != 0)
 			continue;
-		}
 		if (kr_authenticate_referral(ta, (dnssec_key_t *) key) != 0) {
 			kr_dnssec_key_free(&key);
 			continue;
@@ -329,7 +325,7 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
 			continue;
 		}
 		kr_dnssec_key_free(&key);
-		assert (vctx->result == 0);
+		kr_assert(vctx->result == 0);
 		return vctx->result;
 	}
 
@@ -439,7 +435,8 @@ int kr_dnssec_key_from_rdata(struct dseckey **key, const knot_dname_t *kown, con
 
 void kr_dnssec_key_free(struct dseckey **key)
 {
-	assert(key);
+	if (kr_fails_assert(key))
+		return;
 
 	dnssec_key_free((dnssec_key_t *) *key);
 	*key = NULL;
@@ -451,7 +448,8 @@ int kr_dnssec_matches_name_and_type(const ranked_rr_array_t *rrs, uint32_t qry_u
 	int ret = kr_error(ENOENT);
 	for (size_t i = 0; i < rrs->len; ++i) {
 		const ranked_rr_array_entry_t *entry = rrs->at[i];
-		assert(!entry->in_progress);
+		if (kr_fails_assert(!entry->in_progress))
+			return kr_error(EINVAL);
 		const knot_rrset_t *nsec = entry->rr;
 		if (entry->qry_uid != qry_uid || entry->yielded) {
 			continue;

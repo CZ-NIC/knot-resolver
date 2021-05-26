@@ -129,6 +129,22 @@ setmetatable(env, {
 	__index = function (_, k) return os.getenv(k) end
 })
 
+debugging = {}
+setmetatable(debugging, {
+	__index = function(_, k)
+		if k == 'assertion_abort' then return ffi.C.kr_dbg_assertion_abort
+		elseif k == 'assertion_fork' then return ffi.C.kr_dbg_assertion_fork
+		else panic('invalid debugging option: ' .. tostring(k))
+		end
+	end,
+	__newindex = function(_, k, v)
+		if k == 'assertion_abort' then ffi.C.kr_dbg_assertion_abort = v
+		elseif k == 'assertion_fork' then ffi.C.kr_dbg_assertion_fork = v
+		else panic('invalid debugging option: ' .. tostring(k))
+		end
+	end
+})
+
 -- Quick access to interfaces
 -- `net.<iface>` => `net.interfaces()[iface]`
 -- `net = {addr1, ..}` => `net.listen(name, addr1)`
@@ -406,7 +422,10 @@ setmetatable(cache, {
 
 -- Make sandboxed environment
 local function make_sandbox(defined)
-	local __protected = { worker = true, env = true, modules = true, cache = true, net = true, trust_anchors = true }
+	local __protected = {
+		worker = true, env = true, debugging = true, modules = true,
+		cache = true, net = true, trust_anchors = true
+	}
 
 	-- Compute and export the list of top-level names (hidden otherwise)
 	local nl = ""

@@ -1,4 +1,4 @@
-/*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2014-2021 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -38,6 +38,38 @@
 
 /* Logging & debugging */
 bool kr_verbose_status = false;
+bool kr_dbg_assertion_abort = DBG_ASSERTION_ABORT;
+int kr_dbg_assertion_fork = DBG_ASSERTION_FORK;
+
+void kr_fail(bool is_fatal, const char *expr, const char *func, const char *file, int line)
+{
+	const int errno_orig = errno;
+	if (is_fatal)
+		kr_log_critical("requirement \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
+	else
+		kr_log_error("assertion \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
+
+	if (is_fatal || (kr_dbg_assertion_abort && !kr_dbg_assertion_fork))
+		abort();
+	else if (!kr_dbg_assertion_abort || !kr_dbg_assertion_fork)
+		goto recover;
+	// We want to fork and abort the child, unless rate-limited.
+	static uint64_t limited_until = 0;
+	const uint64_t now = kr_now();
+	if (now < limited_until)
+		goto recover;
+	if (kr_dbg_assertion_fork > 0) {
+		// Add jitter +- 25%; in other words: 75% + uniform(0,50%).
+		// Motivation: if a persistent problem starts happening, desynchronize
+		// coredumps from different instances as they're not cheap.
+		limited_until = now + kr_dbg_assertion_fork * 3 / 4
+			+ kr_dbg_assertion_fork * kr_rand_bytes(1) / 256 / 2;
+	}
+	if (fork() == 0)
+		abort();
+recover:
+	errno = errno_orig;
+}
 
 /*
  * Macros.
@@ -175,7 +207,10 @@ char* kr_strcatdup(unsigned n, ...)
 
 char * kr_absolutize_path(const char *dirname, const char *fname)
 {
-	assert(dirname && fname);
+	if (kr_fails_assert(dirname && fname)) {
+		errno = EINVAL;
+		return NULL;
+	}
 	char *result;
 	int aret;
 	if (dirname[0] == '/') { // absolute path is easier
@@ -229,7 +264,7 @@ static int pkt_recycle(knot_pkt_t *pkt, bool keep_question)
 	if (keep_question) {
 		base_size += knot_pkt_question_size(pkt);
 	}
-	assert(base_size <= sizeof(buf));
+	if (kr_fails_assert(base_size <= sizeof(buf))) return kr_error(EINVAL);
 	memcpy(buf, pkt->wire, base_size);
 
 	/* Clear the packet and its auxiliary structures */
@@ -280,7 +315,7 @@ int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
 
 void kr_pkt_make_auth_header(knot_pkt_t *pkt)
 {
-	assert(pkt && pkt->wire);
+	if (kr_fails_assert(pkt && pkt->wire)) return;
 	knot_wire_clear_ad(pkt->wire);
 	knot_wire_set_aa(pkt->wire);
 }
@@ -469,7 +504,7 @@ struct sockaddr * kr_straddr_socket(const char *addr, int port, knot_mm_t *pool)
 		return (struct sockaddr *)res;
 	}
 	default:
-		assert(!EINVAL);
+		kr_assert(false);
 		return NULL;
 	}
 }
@@ -509,7 +544,7 @@ int kr_straddr_subnet(void *dst, const char *addr)
 int kr_straddr_split(const char *instr, char ipaddr[static restrict (INET6_ADDRSTRLEN + 1)],
 		     uint16_t *port)
 {
-	assert(instr && ipaddr && port);
+	if (kr_fails_assert(instr && ipaddr && port)) return kr_error(EINVAL);
 	/* Find where port number starts. */
 	const char *p_start = strchr(instr, '@');
 	if (!p_start)
@@ -573,7 +608,7 @@ int kr_bitcmp(const char *a, const char *b, int bits)
 		return 1;
 	}
 
-	assert((a && b && bits >= 0)  ||  bits == 0);
+	kr_require((a && b && bits >= 0)  ||  bits == 0);
 	/* Compare part byte-divisible part. */
 	const size_t chunk = bits / 8;
 	int ret = memcmp(a, b, chunk);
@@ -641,11 +676,7 @@ static inline bool rrsets_match(const knot_rrset_t *rr1, const knot_rrset_t *rr2
  */
 static int to_wire_ensure_unique(ranked_rr_array_t *array, size_t index)
 {
-	bool ok = array && index < array->len;
-	if (!ok) {
-		assert(false);
-		return kr_error(EINVAL);
-	}
+	if (kr_fails_assert(array && index < array->len)) return kr_error(EINVAL);
 
 	const struct ranked_rr_array_entry *e0 = array->at[index];
 	if (!e0->to_wire) {
@@ -675,8 +706,10 @@ typedef array_t(knot_rdata_t *) rdata_array_t;
 int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 			  uint8_t rank, bool to_wire, uint32_t qry_uid, knot_mm_t *pool)
 {
-	/* rr always has one record per rrset
-	 * check if another rrset with the same
+	/* From normal packet parser we always get RRs one by one,
+	 * but cache and prefil modules (also) feed us larger RRsets. */
+	kr_assert(rr->rrs.count >= 1);
+	/* Check if another rrset with the same
 	 * rclass/type/owner combination exists within current query
 	 * and merge if needed */
 	for (ssize_t i = array->len - 1; i >= 0; --i) {
@@ -694,13 +727,8 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 			continue;
 		}
 		/* Found the entry to merge with.  Check consistency and merge. */
-		bool ok = stashed->rank == rank && !stashed->cached && stashed->in_progress;
-		if (!ok) {
-			assert(false);
+		if (kr_fails_assert(stashed->rank == rank && !stashed->cached && stashed->in_progress))
 			return kr_error(EEXIST);
-		}
-		/* assert(rr->rrs.count == 1); */
-		/* ^^ shouldn't be a problem for this function, but it's probably a bug */
 
 		/* It may happen that an RRset is first considered useful
 		 * (to_wire = false, e.g. due to being part of glue),
@@ -724,9 +752,7 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 			knot_rdata_t *r_it = stashed->rr->rrs.rdata;
 			for (int ri = 0; ri < stashed->rr->rrs.count;
 					++ri, r_it = knot_rdataset_next(r_it)) {
-				if (array_push(*ra, r_it) < 0) {
-					abort();
-				}
+				kr_require(array_push(*ra, r_it) >= 0);
 			}
 		} else {
 			int ret = array_reserve_mm(*ra, ra->len + rr->rrs.count,
@@ -739,9 +765,7 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 		knot_rdata_t *r_it = rr->rrs.rdata;
 		for (int ri = 0; ri < rr->rrs.count;
 				++ri, r_it = knot_rdataset_next(r_it)) {
-			if (array_push(*ra, r_it) < 0) {
-				abort();
-			}
+			kr_require(array_push(*ra, r_it) >= 0);
 		}
 		return i;
 	}
@@ -763,7 +787,7 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 		return kr_error(ENOMEM);
 	}
 	rr_new->rrs = rr->rrs;
-	assert(rr_new->additional == NULL);
+	if (kr_fails_assert(rr_new->additional == NULL)) return kr_error(EINVAL);
 
 	entry->qry_uid = qry_uid;
 	entry->rr = rr_new;
@@ -849,7 +873,8 @@ int kr_ranked_rrarray_finalize(ranked_rr_array_t *array, uint32_t qry_uid, knot_
 					raw_it += size;
 				}
 			}
-			assert(raw_it == (uint8_t *)rds->rdata + rds->size);
+			if (kr_fails_assert(raw_it == (uint8_t *)rds->rdata + rds->size))
+				return kr_error(EINVAL);
 		}
 		stashed->in_progress = false;
 	}
@@ -1091,10 +1116,7 @@ void kr_uv_free_cb(uv_handle_t* handle)
 
 const char *kr_strptime_diff(const char *format, const char *time1_str,
 		             const char *time0_str, double *diff) {
-	assert(format != NULL);
-	assert(time1_str != NULL);
-	assert(time0_str != NULL);
-	assert(diff != NULL);
+	if (kr_fails_assert(format && time1_str && time0_str && diff)) return NULL;
 
 	struct tm time1_tm;
 	time_t time1_u;
@@ -1124,11 +1146,7 @@ const char *kr_strptime_diff(const char *format, const char *time1_str,
 int knot_dname_lf2wire(knot_dname_t * const dst, uint8_t len, const uint8_t *lf)
 {
 	knot_dname_t *d = dst; /* moving "cursor" as we write it out */
-	bool ok = d && (len == 0 || lf);
-	if (!ok) {
-		assert(false);
-		return kr_error(EINVAL);
-	}
+	if (kr_fails_assert(d && (len == 0 || lf))) return kr_error(EINVAL);
 	/* we allow the final zero byte to be omitted */
 	if (!len) {
 		goto finish;
@@ -1145,7 +1163,7 @@ int knot_dname_lf2wire(knot_dname_t * const dst, uint8_t len, const uint8_t *lf)
 			--i;
 		const int label_start = i + 1; /* index of the first byte of the current label */
 		const int label_len = label_end - label_start;
-		assert(label_len >= 0);
+		kr_assert(label_len >= 0);
 		if (label_len > 63 || label_len <= 0)
 			return kr_error(EILSEQ);
 		/* write the label */
@@ -1199,7 +1217,7 @@ void kr_rnd_buffered(void *data, uint size)
 void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 			uint16_t type, uint16_t rclass, uint32_t ttl)
 {
-	assert(rrset);
+	if (kr_fails_assert(rrset)) return;
 	knot_rrset_init(rrset, owner, type, rclass, ttl);
 }
 uint16_t kr_pkt_has_dnssec(const knot_pkt_t *pkt)
