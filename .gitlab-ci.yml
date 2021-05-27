@@ -520,7 +520,7 @@ obs:odvr:
 
 .pkgbuilddebrepo: &pkgbuilddebrepo
   - apt-get update
-  - apt-get install -y curl
+  - apt-get install -y curl gnupg2
   - echo "deb http://download.opensuse.org/repositories/home:/CZ-NIC:/$OBS_REPO/$DISTROTEST_REPO/ /" > /etc/apt/sources.list.d/obs.list
   - curl -fsSL "https://download.opensuse.org/repositories/home:CZ-NIC:$OBS_REPO/$DISTROTEST_REPO/Release.key" | gpg --dearmor > /etc/apt/trusted.gpg.d/obs.gpg
 
@@ -562,12 +562,52 @@ opensuse-15.2:pkgbuild:
     - zypper install -y rpm-build python3-pip
     - *apkgbuild
 
+ubuntu-18.04:pkgbuild:
+  <<: *pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-18.04
+  variables:
+    OBS_REPO: knot-resolver-build
+    DISTROTEST_REPO: xUbuntu_18.04
+  script:
+    - *pkgbuilddebrepo
+    - *apkgbuild
+
 ubuntu-20.04:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-20.04
   variables:
     OBS_REPO: knot-resolver-build
     DISTROTEST_REPO: xUbuntu_20.04
+  script:
+    - *pkgbuilddebrepo
+    - *apkgbuild
+
+ubuntu-21.04:pkgbuild:
+  <<: *pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-21.04
+  variables:
+    OBS_REPO: knot-resolver-build
+    DISTROTEST_REPO: xUbuntu_21.04
+  script:
+    - *pkgbuilddebrepo
+    - *apkgbuild
+
+debian-9:pkgbuild:
+  <<: *pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-9
+  variables:
+    OBS_REPO: knot-resolver-build
+    DISTROTEST_REPO: Debian_9.0
+  script:
+    - *pkgbuilddebrepo
+    - *apkgbuild
+
+debian-10:pkgbuild:
+  <<: *pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-10
+  variables:
+    OBS_REPO: knot-resolver-build
+    DISTROTEST_REPO: Debian_10
   script:
     - *pkgbuilddebrepo
     - *apkgbuild
