@@ -518,6 +518,12 @@ obs:odvr:
   - apkg build-dep -y
   - apkg build
 
+.pkgbuilddebrepo: &pkgbuilddebrepo
+  - apt-get update
+  - apt-get install -y curl
+  - echo "deb http://download.opensuse.org/repositories/home:/CZ-NIC:/$OBS_REPO/$DISTROTEST_REPO/ /" > /etc/apt/sources.list.d/obs.list
+  - curl -fsSL "https://download.opensuse.org/repositories/home:CZ-NIC:$OBS_REPO/$DISTROTEST_REPO/Release.key" | gpg --dearmor > /etc/apt/trusted.gpg.d/obs.gpg
+
 fedora-33:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-33
@@ -552,7 +558,18 @@ opensuse-15.2:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/opensuse-15.2
   script:
+    - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.2/home:CZ-NIC:knot-resolver-build.repo
     - zypper install -y rpm-build python3-pip
+    - *apkgbuild
+
+ubuntu-20.04:pkgbuild:
+  <<: *pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-20.04
+  variables:
+    OBS_REPO: knot-resolver-build
+    DISTROTEST_REPO: xUbuntu_20.04
+  script:
+    - *pkgbuilddebrepo
     - *apkgbuild
 
 # }}}
