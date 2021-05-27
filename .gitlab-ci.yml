@@ -523,6 +523,7 @@ obs:odvr:
   - apt-get install -y curl gnupg2 python3-pip devscripts
   - echo "deb http://download.opensuse.org/repositories/home:/CZ-NIC:/$OBS_REPO/$DISTROTEST_REPO/ /" > /etc/apt/sources.list.d/obs.list
   - curl -fsSL "https://download.opensuse.org/repositories/home:CZ-NIC:$OBS_REPO/$DISTROTEST_REPO/Release.key" | gpg --dearmor > /etc/apt/trusted.gpg.d/obs.gpg
+  - apt-get update
 
 fedora-33:pkgbuild:
   <<: *pkgbuild
