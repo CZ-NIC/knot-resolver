@@ -520,7 +520,7 @@ obs:odvr:
 
 .pkgbuilddebrepo: &pkgbuilddebrepo
   - apt-get update
-  - apt-get install -y curl gnupg2
+  - apt-get install -y curl gnupg2 python3-pip devscripts
   - echo "deb http://download.opensuse.org/repositories/home:/CZ-NIC:/$OBS_REPO/$DISTROTEST_REPO/ /" > /etc/apt/sources.list.d/obs.list
   - curl -fsSL "https://download.opensuse.org/repositories/home:CZ-NIC:$OBS_REPO/$DISTROTEST_REPO/Release.key" | gpg --dearmor > /etc/apt/trusted.gpg.d/obs.gpg
 
@@ -541,6 +541,8 @@ fedora-34:pkgbuild:
 centos-7:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-7
+  variables:
+    LC_ALL: en_US.utf8
   script:
     - yum install -y rpm-build python3-pip epel-release
     - *apkgbuild
