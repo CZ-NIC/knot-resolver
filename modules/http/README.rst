@@ -24,7 +24,7 @@ and unlimited number of "used-defined kinds" can be added in configuration.
 +--------------+---------------------------------------------------------------------------------+
 | webmgmt      | :ref:`built-in web management <mod-http-built-in-services>` APIs (includes DoH) |
 +--------------+---------------------------------------------------------------------------------+
-| doh          | :ref:`mod-http-doh`                                                             |
+| doh_legacy   | :ref:`mod-http-doh`                                                             |
 +--------------+---------------------------------------------------------------------------------+
 
 Each network address and port combination can be configured to expose
@@ -100,7 +100,7 @@ kind of endpoint, e.g. to enforce TLS and use custom certificate only for DoH:
 		tls = true,
 		cert = '/etc/knot-resolver/mycert.crt',
 		key  = '/etc/knot-resolver/mykey.key',
-	}, 'doh')
+	}, 'doh_legacy')
 
 The format of both certificate and key is expected to be PEM, e.g. equivalent to
 the outputs of following:
@@ -129,13 +129,13 @@ Major drawback is that current browsers won't do HTTP/2 over insecure connection
 Legacy DNS-over-HTTPS (DoH)
 ---------------------------
 
-.. warning:: The legacy DoH implementation using ``http`` module (``kind='doh'``)
+.. warning:: The legacy DoH implementation using ``http`` module (``kind='doh_legacy'``)
    is deprecated. It has known performance and stability issues that won't be fixed.
    Use new :ref:`dns-over-https` implementation instead.
 
-This was an experimental implementation of :rfc:`8484`. It was configured using
-``doh`` kind in :func:`net.listen`. Its configuration (such as certificates)
-took place in ``http.config()``.
+This was an experimental implementation of :rfc:`8484`. It can be configured using
+``doh_legacy`` kind in :func:`net.listen`. Its configuration (such as certificates)
+takes place in ``http.config()``.
 
 Queries were served on ``/doh`` and ``/dns-query`` endpoints.
 

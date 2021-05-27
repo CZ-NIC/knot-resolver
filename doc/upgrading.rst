@@ -18,9 +18,6 @@ Following section provides information about selected changes in not-yet-release
 We advise users to prepare for these changes sooner rather than later to make it easier to upgrade to
 newer versions when they are released.
 
-* Going forward DNS-over-HTTP (DoH) will be supported only over HTTP/2 with TLS.
-  This limitation allows us to provide a new :ref:`more reliable and scalable implementation
-  of DoH <dns-over-https>` (``kind='doh2'``).
 * Command line option ``--forks`` (``-f``) `is deprecated and will be eventually removed
   <https://gitlab.nic.cz/knot/knot-resolver/-/issues/631>`_.
   Preferred way to manage :ref:`systemd-multiple-instances` is to use a process manager,
@@ -29,6 +26,13 @@ newer versions when they are released.
 .. _`systemd`: https://systemd.io/
 .. _`supervisord`: http://supervisord.org/
 
+5.3 to 5.4
+==========
+
+Configuration file
+------------------
+
+* ``kind='doh'`` in :func:`net.listen` was renamed to ``kind='doh_legacy'``. It is recommended to switch to the new DoH implementation with ``kind='doh2'``.
 
 5.2 to 5.3
 ==========

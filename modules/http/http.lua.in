@@ -52,7 +52,7 @@ end
 M.configs._all = {}
 
 -- DoH
-M.configs._builtin.doh = {}
+M.configs._builtin.doh_legacy = {}
 
 -- management endpoint
 M.configs._builtin.webmgmt = {}
@@ -121,7 +121,7 @@ local function serve_root()
 end
 
 -- Export HTTP service endpoints
-M.configs._builtin.doh.endpoints = {}
+M.configs._builtin.doh_legacy.endpoints = {}
 M.configs._builtin.webmgmt.endpoints = {}
 local mgmt_endpoints = M.configs._builtin.webmgmt.endpoints
 
@@ -146,11 +146,11 @@ for k, v in pairs(http_trace.endpoints) do
 end
 M.trace = http_trace
 
-M.configs._builtin.doh.endpoints = {}
+M.configs._builtin.doh_legacy.endpoints = {}
 local http_doh = require('kres_modules.http_doh')
 for k, v in pairs(http_doh.endpoints) do
 	mgmt_endpoints[k] = v
-	M.configs._builtin.doh.endpoints[k] = v
+	M.configs._builtin.doh_legacy.endpoints[k] = v
 end
 M.doh = http_doh
 
@@ -347,7 +347,7 @@ end
 
 -- @function Init module
 function M.init()
-	net.register_endpoint_kind('doh', cb_socket)
+	net.register_endpoint_kind('doh_legacy', cb_socket)
 	net.register_endpoint_kind('webmgmt', cb_socket)
 end
 
@@ -357,12 +357,12 @@ function M.deinit()
 		remove_socket(fd)
 	end
 	tls_cert.ephemeral_state_destroy(M.ephem_state)
-	net.register_endpoint_kind('doh')
+	net.register_endpoint_kind('doh_legacy')
 	net.register_endpoint_kind('webmgmt')
 end
 
 -- @function Configure module, i.e. store new configuration template
--- kind = socket type (doh/webmgmt)
+-- kind = socket type (doh_legacy/webmgmt)
 function M.config(conf, kind)
 	if conf == nil and kind == nil then
 		-- default module config, nothing to do

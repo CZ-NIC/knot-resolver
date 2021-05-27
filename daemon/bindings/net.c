@@ -246,9 +246,11 @@ static int net_listen(lua_State *L)
 			flags.tls = flags.http = true;
 		} else if (k) {
 			flags.kind = k;
-			if (strcasecmp(k, "doh") == 0) {
+			if (strcasecmp(k, "doh_legacy") == 0) {
 				kr_log_deprecate(
-					"kind=\"doh\" is an obsolete DoH implementation, use kind=\"doh2\" instead\n");
+					"kind=\"doh_legacy\" is an obsolete DoH implementation, use kind=\"doh2\" instead\n");
+			} else if (strcasecmp(k, "doh") == 0) {
+				lua_error_p(L, "kind=\"doh\" was renamed to kind=\"doh_legacy\", switch to the new implementation with kind=\"doh2\" or update your config");
 			}
 		}
 
