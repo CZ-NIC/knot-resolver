@@ -85,11 +85,11 @@ else
 	modules.load('http')
 	http.config({
 		tls = false,
-	}, 'doh')
+	}, 'doh_legacy')
 
 	local bound
 	for _ = 1,1000 do
-		bound, _err = pcall(net.listen, '127.0.0.1', math.random(30000, 39999), { kind = 'doh' })
+		bound, _err = pcall(net.listen, '127.0.0.1', math.random(30000, 39999), { kind = 'doh_legacy' })
 		if bound then
 			break
 		end

@@ -12,7 +12,7 @@ local function count_sockets()
 		elseif (socket.kind == 'dns' or
 			socket.kind == 'xdp' or
 			socket.kind == 'tls' or
-			socket.kind == 'doh' or
+			socket.kind == 'doh_legacy' or
 			socket.kind == 'doh2') then
 			dns_socks = dns_socks + 1
 		end

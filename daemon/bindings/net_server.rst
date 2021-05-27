@@ -18,7 +18,7 @@ First you need to decide what service should be available on given IP address
   ":ref:`dns-over-https`","``doh2``"
   ":ref:`Web management <mod-http-built-in-services>`","``webmgmt``"
   ":ref:`Control socket <control-sockets>`","``control``"
-  ":ref:`mod-http-doh`","``doh``"
+  ":ref:`mod-http-doh`","``doh_legacy``"
 
 .. note:: By default, **unencrypted DNS and DNS-over-TLS** are configured to **listen
    on localhost**.
