@@ -579,6 +579,12 @@ int main(int argc, char **argv)
 	ret = run_worker(loop, &engine, fork_id == 0, the_args);
 
 cleanup:/* Cleanup. */
+	for (int j=0; j<1<<20; j++) {
+		if (the_worker->tasks[j] && the_worker->tasks[j]->refs) {
+			printf("%p\n", the_worker->tasks[j]);
+		}
+	}
+	printf("bye!");
 	engine_deinit(&engine);
 	worker_deinit();
 	if (loop != NULL) {

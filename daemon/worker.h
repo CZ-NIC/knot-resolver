@@ -158,6 +158,26 @@ typedef array_t(struct mempool *) mp_freelist_t;
 /** List of query resolution tasks. */
 typedef array_t(struct qr_task *) qr_tasklist_t;
 
+/** Query resolution task. */
+struct qr_task
+{
+	struct request_ctx *ctx;
+	knot_pkt_t *pktbuf;
+	qr_tasklist_t waiting;
+	struct session *pending[MAX_PENDING];
+	uint16_t pending_count;
+	uint16_t timeouts;
+	uint16_t iter_count;
+	uint32_t refs;
+	bool finished : 1;
+	bool leading  : 1;
+	uint64_t creation_time;
+	uint64_t send_time;
+	uint64_t recv_time;
+	struct kr_transport *transport;
+};
+
+
 /** \details Worker state is meant to persist during the whole life of daemon. */
 struct worker_ctx {
 	struct engine *engine;
@@ -186,6 +206,9 @@ struct worker_ctx {
 	mp_freelist_t pool_mp;
 	knot_mm_t pkt_pool;
 	unsigned int next_request_uid;
+
+	struct qr_task *tasks[1<<20];
+	int task_index;
 };
 
 /** @endcond */

@@ -37,7 +37,6 @@
 #include "lib/layer.h"
 #include "lib/utils.h"
 
-
 /* Magic defaults for the worker. */
 #ifndef MP_FREELIST_SIZE
 # ifdef __clang_analyzer__
@@ -74,26 +73,6 @@ struct request_ctx
 		uint8_t eth_addrs[2][6];
 	} source;
 };
-
-/** Query resolution task. */
-struct qr_task
-{
-	struct request_ctx *ctx;
-	knot_pkt_t *pktbuf;
-	qr_tasklist_t waiting;
-	struct session *pending[MAX_PENDING];
-	uint16_t pending_count;
-	uint16_t timeouts;
-	uint16_t iter_count;
-	uint32_t refs;
-	bool finished : 1;
-	bool leading  : 1;
-	uint64_t creation_time;
-	uint64_t send_time;
-	uint64_t recv_time;
-	struct kr_transport *transport;
-};
-
 
 /* Convenience macros */
 #define qr_task_ref(task) \
@@ -506,6 +485,9 @@ static struct qr_task *qr_task_create(struct request_ctx *ctx)
 	qr_task_ref(task);
 	task->creation_time = kr_now();
 	ctx->worker->stats.concurrent += 1;
+	the_worker->tasks[the_worker->task_index] = task;
+	the_worker->task_index++;
+	the_worker->task_index %= 1<<20;
 	return task;
 }
 
