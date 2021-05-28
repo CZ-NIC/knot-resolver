@@ -13,7 +13,6 @@
 
 /* Targets */
 
-typedef int log_level_t;
 typedef enum {
 	LOG_TARGET_SYSLOG = 0,
 	LOG_TARGET_STDERR = 1,
@@ -23,6 +22,10 @@ typedef enum {
 /* Groups */
 
 typedef uint32_t log_groups_t;
+typedef struct {
+	char		*g_name;
+	log_groups_t	g_val;
+} log_group_names_t;
 
 #define LOG_GRP_SYSTEM		(1 << 1)
 #define LOG_GRP_CACHE		(1 << 2)
@@ -41,11 +44,19 @@ typedef uint32_t log_groups_t;
 KR_EXPORT
 extern log_groups_t kr_log_groups;
 KR_EXPORT
+int group_is_set(log_groups_t group);
+KR_EXPORT
 void kr_log_add_group(log_groups_t mask);
 KR_EXPORT
 void kr_log_del_group(log_groups_t mask);
+KR_EXPORT
+char *kr_log_grp2name(log_groups_t group);
+KR_EXPORT
+log_groups_t kr_log_name2grp(const char *name);
 
 /* Log */
+
+typedef int log_level_t;
 
 KR_EXPORT
 extern log_level_t kr_log_level;
