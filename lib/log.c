@@ -20,6 +20,24 @@ log_level_t kr_log_level = LOG_CRIT;
 log_target_t kr_log_target = LOG_TARGET_STDOUT;
 log_groups_t kr_log_groups = 0;
 
+log_group_names_t log_group_names[] = {
+	{ "system",	LOG_GRP_SYSTEM },
+	{ "cache",	LOG_GRP_CACHE },
+	{ "io",		LOG_GRP_IO },
+	{ "network",	LOG_GRP_NETWORK },
+	{ "ta",		LOG_GRP_TA },
+	{ "tls",	LOG_GRP_TLS },
+	{ "gnutls",	LOG_GRP_GNUTLS },
+	{ "tlsclient",	LOG_GRP_TLSCLIENT },
+	{ "xdp",	LOG_GRP_XDP },
+	{ "zimport",	LOG_GRP_ZIMPORT },
+	{ "zscanner",	LOG_GRP_ZSCANNER },
+	{ "doh",	LOG_GRP_DOH },
+	{ "dnssec",	LOG_GRP_DNSSEC },
+	{ "hint",	LOG_GRP_HINT },
+	{ NULL,		-1 },
+};
+
 #ifndef SYSLOG_NAMES
 syslog_code_t prioritynames[] = {
 	{ "alert",	LOG_ALERT },
@@ -106,6 +124,33 @@ log_level_t kr_log_name2level(const char *name)
 
 	return -1;
 }
+
+char *kr_log_grp2name(log_groups_t group)
+{
+	for (int i = 0; log_group_names[i].g_val != -1; ++i)
+	{
+		if (log_group_names[i].g_val == group)
+			return log_group_names[i].g_name;
+	}
+
+	return NULL;
+}
+
+log_groups_t kr_log_name2grp(const char *name)
+{
+	if (!name)
+		return 0;
+
+	for (int i = 0; log_group_names[i].g_name; ++i)
+	{
+		if (strcmp(log_group_names[i].g_name, name) == 0)
+			return log_group_names[i].g_val;
+	}
+
+	return 0;
+}
+
+
 
 int kr_log_level_set(log_level_t level)
 {
