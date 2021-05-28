@@ -177,6 +177,63 @@ static int l_get_log_level(lua_State *L)
 	return 0;
 }
 
+static int handle_log_groups(lua_State *L, void (*action)(log_groups_t grp))
+{
+	if(lua_gettop(L) == 0) {
+		int grp_b = 1;
+		char *grp_name = kr_log_grp2name(1 << grp_b);
+		printf("groups: \n\t");
+		while (grp_name) {
+			printf("%s%s, ", group_is_set(1 << grp_b) ? "*":"", grp_name);
+			if (grp_b%8 == 0)
+				printf("\n\t");
+			++grp_b;
+			grp_name = kr_log_grp2name(1 << grp_b);
+		}
+		printf("\n* = groups logged in debug level\n");
+		return 0;
+	}
+
+	if (lua_gettop(L) != 1 || (!lua_isstring(L, 1) && !lua_istable(L, 1)))
+		lua_error_p(L, "takes string or table of strings, type add_log_group() for help.");
+
+	if (lua_isstring(L, 1)) {
+		log_groups_t grp = kr_log_name2grp(lua_tostring(L, 1));
+		if (grp == 0)
+			lua_error_p(L, "unknown group, type add_log_group() for help.");
+		action(grp);
+	}
+
+	if (lua_istable(L, 1)) {
+		int idx = 1;
+		log_groups_t grp;
+		lua_pushnil(L);
+		while (lua_next(L, 1) != 0) {
+			if (!lua_isstring(L, -1))
+				lua_error_p(L, "wrong value at index %d, must be string", idx);
+			grp = kr_log_name2grp(lua_tostring(L, -1));
+			if (grp == 0)
+				lua_error_p(L, "unknown group \"%s\", type add_log_group() for help.", lua_tostring(L, -1));
+
+			action(grp);
+			++idx;
+			lua_pop(L, 1);
+		}
+	}
+
+	return 0;
+}
+
+static int l_add_log_group(lua_State *L)
+{
+	return handle_log_groups(L, kr_log_add_group);
+}
+
+static int l_del_log_group(lua_State *L)
+{
+	return handle_log_groups(L, kr_log_del_group);
+}
+
 char *engine_get_hostname(struct engine *engine) {
 	static char hostname_str[KNOT_DNAME_MAXLEN];
 	if (!engine) {
@@ -461,6 +518,10 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "set_log_level");
 	lua_pushcfunction(engine->L, l_get_log_level);
 	lua_setglobal(engine->L, "get_log_level");
+	lua_pushcfunction(engine->L, l_add_log_group);
+	lua_setglobal(engine->L, "add_log_group");
+	lua_pushcfunction(engine->L, l_del_log_group);
+	lua_setglobal(engine->L, "del_log_group");
 	lua_pushcfunction(engine->L, l_setuser);
 	lua_setglobal(engine->L, "user");
 	lua_pushcfunction(engine->L, l_hint_root_file);
