@@ -403,6 +403,11 @@ static void drop_capabilities(void)
 #endif /* ENABLE_CAP_NG */
 }
 
+int print_task(const char *t, void *p, void *pp) {
+	printf("%p\n", t);
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	if (setvbuf(stdout, NULL, _IONBF, 0) || setvbuf(stderr, NULL, _IONBF, 0)) {
@@ -579,11 +584,7 @@ int main(int argc, char **argv)
 	ret = run_worker(loop, &engine, fork_id == 0, the_args);
 
 cleanup:/* Cleanup. */
-	for (int j=0; j<1<<20; j++) {
-		if (the_worker->tasks[j] && the_worker->tasks[j]->refs) {
-			printf("%p\n", the_worker->tasks[j]);
-		}
-	}
+	set_walk(&the_worker->tasks, print_task, NULL);
 	printf("bye!");
 	engine_deinit(&engine);
 	worker_deinit();

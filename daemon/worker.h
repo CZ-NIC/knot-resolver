@@ -7,6 +7,7 @@
 #include "daemon/engine.h"
 #include "lib/generic/array.h"
 #include "lib/generic/map.h"
+#include "lib/generic/set.h"
 
 
 /** Query resolution task (opaque). */
@@ -207,8 +208,7 @@ struct worker_ctx {
 	knot_mm_t pkt_pool;
 	unsigned int next_request_uid;
 
-	struct qr_task *tasks[1<<20];
-	int task_index;
+	set_t tasks;
 };
 
 /** @endcond */

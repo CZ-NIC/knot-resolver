@@ -485,15 +485,18 @@ static struct qr_task *qr_task_create(struct request_ctx *ctx)
 	qr_task_ref(task);
 	task->creation_time = kr_now();
 	ctx->worker->stats.concurrent += 1;
-	the_worker->tasks[the_worker->task_index] = task;
-	the_worker->task_index++;
-	the_worker->task_index %= 1<<20;
+	char addr[9] = {0};
+	memcpy(addr, &task, 8);
+	set_add(&the_worker->tasks, addr);
 	return task;
 }
 
 /* This is called when the task refcount is zero, free memory. */
 static void qr_task_free(struct qr_task *task)
 {
+	char addr[9] = {0};
+	memcpy(addr, &task, 8);
+	set_del(&the_worker->tasks, addr);
 	struct request_ctx *ctx = task->ctx;
 
 	assert(ctx);
