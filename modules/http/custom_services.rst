@@ -9,7 +9,7 @@ This chapter describes how to create custom HTTP services inside Knot Resolver.
 Please read HTTP module basics in chapter :ref:`mod-http` before continuing.
 
 Each network address+protocol+port combination configured using :func:`net.listen`
-is associated with *kind* of endpoint, e.g. ``doh`` or ``webmgmt``.
+is associated with *kind* of endpoint, e.g. ``doh_legacy`` or ``webmgmt``.
 
 Each of these *kind* names is associated with table of HTTP endpoints,
 and the default table can be replaced using ``http.config()`` configuration call
