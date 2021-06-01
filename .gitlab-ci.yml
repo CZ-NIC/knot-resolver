@@ -32,6 +32,7 @@ stages:
     refs:
       - master@knot/knot-resolver
       - master@knot/security/knot-resolver
+      - tags
     variables:
       - $SKIP_CI == "1"
   tags:
@@ -173,9 +174,10 @@ news:
   script:
     - head -n 1 NEWS | grep -q $(date +%Y-%m-%d)
 
-deckard_commit:
+trivial_checks: # aggregated to save some processing
   <<: *sanity
   script:
+    - ci/no_assert_check.sh
     - ci/deckard_commit_check.sh
 
 doc:
@@ -255,7 +257,6 @@ root.hints:
 deckard:
   <<: *test_flaky
   only:  # trigger job only in repos under our control (privileged runner required)
-    - tags
     - branches@knot/knot-resolver
     - branches@knot/security/knot-resolver
   tags:

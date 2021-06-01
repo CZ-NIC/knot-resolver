@@ -2,8 +2,6 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <assert.h>
-
 #include "daemon/engine.h"
 #include "lib/layer.h"
 #include "modules/cookies/cookiectl.h"
@@ -19,7 +17,8 @@ static char *cookies_config(void *env, struct kr_module *module,
                             const char *args)
 {
 	struct kr_cookie_ctx *cookie_ctx = module->data;
-	assert(cookie_ctx);
+	if (kr_fails_assert(cookie_ctx))
+		return NULL;
 
 	/* Apply configuration, if any. */
 	config_apply(cookie_ctx, args);

@@ -101,7 +101,7 @@ static int l_ffi_call_layer(kr_layer_t *ctx, int slot_ix)
 {
 	const int wrap_slot = l_ffi_wrap_slots[slot_ix];
 	const int cb_slot = ctx->api->cb_slots[slot_ix];
-	assert(wrap_slot > 0 && cb_slot > 0);
+	kr_require(wrap_slot > 0 && cb_slot > 0);
 	lua_State *L = the_worker->engine->L;
 	lua_rawgeti(L, LUA_REGISTRYINDEX, wrap_slot);
 	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_slot);
@@ -129,9 +129,8 @@ static int l_ffi_call_layer(kr_layer_t *ctx, int slot_ix)
 
 	} else if (lua_isnil(L, -1)) { /* Don't change state. */
 
-	} else if (lua_isthread(L, -1)) { /* Continuations */
+	} else if (kr_fails_assert(!lua_isthread(L, -1))) { /* Continuations */
 		/* TODO: unused, possibly in a bad shape.  Meant KR_STATE_YIELD? */
-		assert(!ENOTSUP);
 		if (l_ffi_defer(lua_tothread(L, -1)) != 0)
 			state = KR_STATE_FAIL;
 

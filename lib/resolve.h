@@ -108,7 +108,8 @@ enum kr_rank {
 
 	/** Proven to be insecure, i.e. we have a chain of trust from TAs
 	 * that cryptographically denies the possibility of existence
-	 * of a positive chain of trust from the TAs to the record. */
+	 * of a positive chain of trust from the TAs to the record.
+	 * Or it may be covered by a closer negative TA. */
 	KR_RANK_INSECURE = 8,
 
 	/** Authoritative data flag; the chain of authority was "verified".
@@ -129,8 +130,10 @@ bool kr_rank_test(uint8_t rank, uint8_t kr_flag) KR_PURE KR_EXPORT;
 /** Set the rank state. The _AUTH flag is kept as it was. */
 static inline void kr_rank_set(uint8_t *rank, uint8_t kr_flag)
 {
-	assert(rank && kr_rank_check(*rank));
-	assert(kr_rank_check(kr_flag) && !(kr_flag & KR_RANK_AUTH));
+	if (kr_fails_assert(rank && kr_rank_check(*rank)))
+		return;
+	if (kr_fails_assert(kr_rank_check(kr_flag) && !(kr_flag & KR_RANK_AUTH)))
+		return;
 	*rank = kr_flag | (*rank & KR_RANK_AUTH);
 }
 
@@ -210,6 +213,7 @@ struct kr_request {
 		struct kr_request_qsource_flags flags; /**< See definition above. */
 		size_t size; /**< query packet size */
 		int32_t stream_id; /**< HTTP/2 stream ID for DoH requests */
+		kr_http_header_array_t headers;  /**< HTTP/2 headers for DoH requests */
 	} qsource;
 	struct {
 		unsigned rtt;                  /**< Current upstream RTT */

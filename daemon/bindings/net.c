@@ -49,8 +49,8 @@ static int net_list_add(const char *key, void *val, void *ext)
 			lua_pushliteral(L, "unix");
 			break;
 		default:
+			kr_assert(false);
 			lua_pushliteral(L, "invalid");
-			assert(!EINVAL);
 		}
 		lua_setfield(L, -2, "family");
 
@@ -79,7 +79,7 @@ static int net_list_add(const char *key, void *val, void *ext)
 		} else if (ep->flags.sock_type == SOCK_DGRAM) {
 			lua_pushliteral(L, "udp");
 		} else {
-			assert(!EINVAL);
+			kr_assert(false);
 			lua_pushliteral(L, "invalid");
 		}
 		lua_setfield(L, -2, "protocol");
@@ -108,7 +108,8 @@ static int net_list(lua_State *L)
  * \return success */
 static bool net_listen_addrs(lua_State *L, int port, endpoint_flags_t flags, int16_t nic_queue)
 {
-	assert(flags.xdp || nic_queue == -1);
+	if (kr_fails_assert(flags.xdp || nic_queue == -1))
+		return false;
 
 	/* Case: table with 'addr' field; only follow that field directly. */
 	lua_getfield(L, -1, "addr");
@@ -435,6 +436,55 @@ static int net_tls(lua_State *L)
 	return 1;
 }
 
+/** Configure HTTP headers for DoH requests. */
+static int net_doh_headers(lua_State *L)
+{
+	doh_headerlist_t *headers = &the_worker->doh_qry_headers;
+	int i;
+	const char *name;
+
+	/* Only return current configuration. */
+	if (lua_gettop(L) == 0) {
+		lua_newtable(L);
+		for (i = 0; i < headers->len; i++) {
+			lua_pushinteger(L, i + 1);
+			name = headers->at[i];
+			lua_pushlstring(L, name, strlen(name));
+			lua_settable(L, -3);
+		}
+		return 1;
+	}
+
+	if (lua_gettop(L) != 1)
+		lua_error_p(L, "net.doh_headers() takes one parameter (string or table)");
+
+	if (!lua_istable(L, 1) && !lua_isstring(L, 1))
+		lua_error_p(L, "net.doh_headers() argument must be string or table");
+
+	/* Clear existing headers. */
+	for (i = 0; i < headers->len; i++)
+		free((void *)headers->at[i]);
+	array_clear(*headers);
+
+	if (lua_istable(L, 1)) {
+		for (i = 1; !lua_isnil(L, -1); i++) {
+			lua_pushinteger(L, i);
+			lua_gettable(L, 1);
+			if (lua_isnil(L, -1))  /* missing value - end iteration */
+				break;
+			if (!lua_isstring(L, -1))
+				lua_error_p(L, "net.doh_headers() argument table can only contain strings");
+			name = lua_tostring(L, -1);
+			array_push(*headers, strdup(name));
+		}
+	} else if (lua_isstring(L, 1)) {
+		name = lua_tostring(L, 1);
+		array_push(*headers, strdup(name));
+	}
+
+	return 0;
+}
+
 /** Return a lua table with TLS authentication parameters.
  * The format is the same as passed to policy.TLS_FORWARD();
  * more precisely, it's in a compatible canonical form. */
@@ -460,27 +510,23 @@ static int tls_params2lua(lua_State *L, trie_t *params)
 		} else if (ia_len == 2 + sizeof(struct in6_addr)) {
 			af = AF_INET6;
 		}
-		if (!key || af == AF_UNSPEC) {
-			assert(false);
+		if (kr_fails_assert(key && af != AF_UNSPEC))
 			lua_error_p(L, "internal error: bad IP address");
-		}
 		uint16_t port;
 		memcpy(&port, key, sizeof(port));
 		port = ntohs(port);
 		const char *ia = key + sizeof(port);
 		char str[INET6_ADDRSTRLEN + 1 + 5 + 1];
 		size_t len = sizeof(str);
-		if (kr_ntop_str(af, ia, port, str, &len) != kr_ok()) {
-			assert(false);
+		if (kr_fails_assert(kr_ntop_str(af, ia, port, str, &len) == kr_ok()))
 			lua_error_p(L, "internal error: bad IP address conversion");
-		}
 		/* ...and push it as [1]. */
 		lua_pushinteger(L, 1);
 		lua_pushlstring(L, str, len - 1 /* len includes '\0' */);
 		lua_settable(L, -3);
 
 		const tls_client_param_t *e = *trie_it_val(it);
-		if (!e)
+		if (kr_fails_assert(e))
 			lua_error_p(L, "internal problem - NULL entry for %s", str);
 
 		/* .hostname = */
@@ -507,12 +553,10 @@ static int tls_params2lua(lua_State *L, trie_t *params)
 			uint8_t pin_base64[TLS_SHA256_BASE64_BUFLEN];
 			int err = kr_base64_encode(e->pins.at[i], TLS_SHA256_RAW_LEN,
 						pin_base64, sizeof(pin_base64));
-			if (err < 0) {
-				assert(false);
+			if (kr_fails_assert(err >= 0))
 				lua_error_p(L,
 					"internal problem when converting pin_sha256: %s",
 					kr_strerror(err));
-			}
 			lua_pushinteger(L, i + 1);
 			lua_pushlstring(L, (const char *)pin_base64, err);
 				/* pin_base64 isn't 0-terminated     ^^^ */
@@ -643,8 +687,7 @@ static int net_tls_client(lua_State *L)
 				ERROR("pin_sha256 is not a string");
 			uint8_t *pin_raw = malloc(TLS_SHA256_RAW_LEN);
 			/* Push the string early to simplify error processing. */
-			if (!pin_raw || array_push(newcfg->pins, pin_raw) < 0) {
-				assert(false);
+			if (kr_fails_assert(pin_raw && array_push(newcfg->pins, pin_raw) >= 0)) {
 				free(pin_raw);
 				ERROR("%s", kr_strerror(ENOMEM));
 			}
@@ -900,10 +943,8 @@ static int net_outgoing(lua_State *L, int family)
 			lua_pushnil(L);
 			return 1;
 		}
-		if (addr->ip.sa_family != family) {
-			assert(false);
+		if (kr_fails_assert(addr->ip.sa_family == family))
 			lua_error_p(L, "bad address family");
-		}
 		char addr_buf[INET6_ADDRSTRLEN];
 		int err;
 		if (family == AF_INET)
@@ -1040,10 +1081,9 @@ static int net_register_endpoint_kind(lua_State *L)
 			return 0;
 		}
 		lua_error_p(L, "attempt to unregister unknown kind '%s'\n", kind);
-	} /* else */
+	} /* else -> param_count == 2 */
 
 	/* Registering */
-	assert(param_count == 2);
 	if (!lua_isfunction(L, 2)) {
 		lua_error_p(L, "second parameter: expected function but got %s\n",
 				lua_typename(L, lua_type(L, 2)));
@@ -1083,6 +1123,7 @@ int kr_bindings_net(lua_State *L)
 		{ "bpf_set",      net_bpf_set },
 		{ "bpf_clear",    net_bpf_clear },
 		{ "register_endpoint_kind", net_register_endpoint_kind },
+		{ "doh_headers", net_doh_headers },
 		{ NULL, NULL }
 	};
 	luaL_register(L, "net", lib);

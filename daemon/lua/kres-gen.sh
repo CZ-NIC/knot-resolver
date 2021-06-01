@@ -109,6 +109,8 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_qflags
 	ranked_rr_array_entry_t
 	ranked_rr_array_t
+	kr_http_header_array_entry_t
+	kr_http_header_array_t
 	inaddr_array_t
 	struct kr_zonecut
 	kr_qarray_t
@@ -129,8 +131,12 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_server_selection
 EOF
 
-# a static variable; the line might not be simple to generate
-printf "kr_layer_t kr_layer_t_static;"
+# static variables; these lines might not be simple to generate
+printf "
+kr_layer_t kr_layer_t_static;
+_Bool kr_dbg_assertion_abort;
+int kr_dbg_assertion_fork;
+"
 
 printf "
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,

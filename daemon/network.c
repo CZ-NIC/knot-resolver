@@ -9,7 +9,6 @@
 #include "daemon/tls.h"
 #include "daemon/worker.h"
 
-#include <assert.h>
 #include <libgen.h>
 #include <net/if.h>
 #include <sys/un.h>
@@ -36,10 +35,8 @@ static int endpoint_open_lua_cb(struct network *net, struct endpoint *ep,
 				const char *log_addr)
 {
 	const bool ok = ep->flags.kind && !ep->handle && !ep->engaged && ep->fd != -1;
-	if (!ok) {
-		assert(!EINVAL);
+	if (kr_fails_assert(ok))
 		return kr_error(EINVAL);
-	}
 	/* First find callback in the endpoint registry. */
 	lua_State *L = the_worker->engine->L;
 	void **pp = trie_get_try(net->endpoint_kinds, ep->flags.kind,
@@ -141,7 +138,7 @@ static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 	}
 
 	if (ep->flags.kind && !is_control && !is_xdp) {
-		assert(!ep->handle);
+		kr_assert(!ep->handle);
 		/* Special lua-handled endpoint. */
 		if (ep->engaged) {
 			endpoint_close_lua_cb(net, ep);
@@ -154,7 +151,7 @@ static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 	}
 
 	free_const(ep->flags.kind); /* needed if (is_control) */
-	assert(ep->handle);
+	kr_require(ep->handle);
 	if (force) { /* Force close if event loop isn't running. */
 		if (ep->fd >= 0) {
 			close(ep->fd);
@@ -253,10 +250,8 @@ static int open_endpoint(struct network *net, const char *addr_str,
 		? sa == NULL && ep->fd == -1 && ep->nic_queue >= 0
 			&& ep->flags.sock_type == SOCK_DGRAM && !ep->flags.tls
 		: (sa != NULL) != (ep->fd != -1);
-	if (!ok) {
-		assert(!EINVAL);
+	if (kr_fails_assert(ok))
 		return kr_error(EINVAL);
-	}
 	if (ep->handle) {
 		return kr_error(EEXIST);
 	}
@@ -314,10 +309,8 @@ static int open_endpoint(struct network *net, const char *addr_str,
 	} /* else */
 
 	if (ep->flags.sock_type == SOCK_DGRAM) {
-		if (ep->flags.tls) {
-			assert(!EINVAL);
+		if (kr_fails_assert(!ep->flags.tls))
 			return kr_error(EINVAL);
-		}
 		uv_udp_t *ep_handle = malloc(sizeof(uv_udp_t));
 		ep->handle = (uv_handle_t *)ep_handle;
 		ret = !ep->handle ? ENOMEM
@@ -334,7 +327,7 @@ static int open_endpoint(struct network *net, const char *addr_str,
 		goto finish_ret;
 	} /* else */
 
-	assert(!EINVAL);
+	kr_assert(false);
 	return kr_error(EINVAL);
 finish_ret:
 	if (!ret) return ret;
@@ -381,31 +374,25 @@ static int create_endpoint(struct network *net, const char *addr_str,
 
 int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags)
 {
-	if (flags.xdp) {
-		assert(!EINVAL);
+	if (kr_fails_assert(!flags.xdp))
 		return kr_error(EINVAL);
-	}
 	/* Extract fd's socket type. */
 	socklen_t len = sizeof(flags.sock_type);
 	int ret = getsockopt(fd, SOL_SOCKET, SO_TYPE, &flags.sock_type, &len);
-	if (ret != 0) {
+	if (ret != 0)
 		return kr_error(errno);
-	}
-	if (flags.sock_type == SOCK_DGRAM && !flags.kind && flags.tls) {
-		assert(!EINVAL); /* Perhaps DTLS some day. */
-		return kr_error(EINVAL);
-	}
-	if (flags.sock_type != SOCK_DGRAM && flags.sock_type != SOCK_STREAM) {
+	const bool is_dtls = flags.sock_type == SOCK_DGRAM && !flags.kind && flags.tls;
+	if (kr_fails_assert(!is_dtls))
+		return kr_error(EINVAL);  /* Perhaps DTLS some day. */
+	if (flags.sock_type != SOCK_DGRAM && flags.sock_type != SOCK_STREAM)
 		return kr_error(EBADF);
-	}
 
 	/* Extract local address for this socket. */
 	struct sockaddr_storage ss = { .ss_family = AF_UNSPEC };
 	socklen_t addr_len = sizeof(ss);
 	ret = getsockname(fd, (struct sockaddr *)&ss, &addr_len);
-	if (ret != 0) {
+	if (ret != 0)
 		return kr_error(errno);
-	}
 
 	struct endpoint ep = {
 		.flags = flags,
@@ -458,10 +445,8 @@ static int16_t nic_queue_auto(void)
 int network_listen(struct network *net, const char *addr, uint16_t port,
 		   int16_t nic_queue, endpoint_flags_t flags)
 {
-	if (net == NULL || addr == 0 || nic_queue < -1) {
-		assert(!EINVAL);
+	if (kr_fails_assert(net != NULL && addr != 0 && nic_queue >= -1))
 		return kr_error(EINVAL);
-	}
 
 	if (flags.xdp && nic_queue < 0) {
 		nic_queue = nic_queue_auto();
@@ -571,16 +556,16 @@ void network_new_hostname(struct network *net, struct engine *engine)
 static int set_bpf_cb(const char *key, void *val, void *ext)
 {
 	endpoint_array_t *endpoints = (endpoint_array_t *)val;
-	assert(endpoints != NULL);
 	int *bpffd = (int *)ext;
-	assert(bpffd != NULL);
+	if (kr_fails_assert(endpoints && bpffd))
+		return kr_error(EINVAL);
 
 	for (size_t i = 0; i < endpoints->len; i++) {
 		struct endpoint *endpoint = &endpoints->at[i];
 		uv_os_fd_t sockfd = -1;
 		if (endpoint->handle != NULL)
 			uv_fileno(endpoint->handle, &sockfd);
-		assert(sockfd != -1);
+		kr_require(sockfd != -1);
 
 		if (setsockopt(sockfd, SOL_SOCKET, SO_ATTACH_BPF, bpffd, sizeof(int)) != 0) {
 			return 1; /* return error (and stop iterating over net->endpoints) */
@@ -611,14 +596,15 @@ int network_set_bpf(struct network *net, int bpf_fd)
 static int clear_bpf_cb(const char *key, void *val, void *ext)
 {
 	endpoint_array_t *endpoints = (endpoint_array_t *)val;
-	assert(endpoints != NULL);
+	if (kr_fails_assert(endpoints))
+		return kr_error(EINVAL);
 
 	for (size_t i = 0; i < endpoints->len; i++) {
 		struct endpoint *endpoint = &endpoints->at[i];
 		uv_os_fd_t sockfd = -1;
 		if (endpoint->handle != NULL)
 			uv_fileno(endpoint->handle, &sockfd);
-		assert(sockfd != -1);
+		kr_require(sockfd != -1);
 
 		if (setsockopt(sockfd, SOL_SOCKET, SO_DETACH_BPF, NULL, 0) != 0) {
 			kr_log_error("[network] failed to clear SO_DETACH_BPF socket option\n");

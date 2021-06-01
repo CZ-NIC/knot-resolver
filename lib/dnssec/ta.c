@@ -21,14 +21,21 @@ knot_rrset_t *kr_ta_get(map_t *trust_anchors, const knot_dname_t *name)
 	return map_get(trust_anchors, (const char *)name);
 }
 
-const knot_dname_t *kr_ta_get_longest_name(map_t *trust_anchors, const knot_dname_t *name)
+const knot_dname_t * kr_ta_closest(const struct kr_context *ctx, const knot_dname_t *name,
+				   const uint16_t type)
 {
-	while(name) {
-		if (kr_ta_get(trust_anchors, name)) {
+	kr_require(ctx && name);
+	if (type == KNOT_RRTYPE_DS && name[0] != '\0') {
+		/* DS is parent-side record, so the parent name needs to be covered. */
+		name = knot_wire_next_label(name, NULL);
+	}
+	while (name) {
+		struct kr_context *ctx_nc = (struct kr_context *)/*const-cast*/ctx;
+		if (kr_ta_get(&ctx_nc->trust_anchors, name)) {
 			return name;
 		}
-		if (name[0] == '\0') {
-			break;
+		if (kr_ta_get(&ctx_nc->negative_anchors, name)) {
+			return NULL;
 		}
 		name = knot_wire_next_label(name, NULL);
 	}
@@ -114,36 +121,6 @@ int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,
 	} else { /* Invalid type for TA */
 		return kr_error(EINVAL);
 	}
-}
-
-int kr_ta_covers(map_t *trust_anchors, const knot_dname_t *name)
-{
-	while(name) {
-		if (kr_ta_get(trust_anchors, name)) {
-			return true;
-		}
-		if (name[0] == '\0') {
-			return false;
-		}
-		name = knot_wire_next_label(name, NULL);
-	}
-	return false;
-}
-
-bool kr_ta_covers_qry(struct kr_context *ctx, const knot_dname_t *name,
-		      const uint16_t type)
-{
-	assert(ctx && name);
-	if (type == KNOT_RRTYPE_DS && name[0] != '\0') {
-		/* DS is parent-side record, so the parent name needs to be covered. */
-		name = knot_wire_next_label(name, NULL);
-		if (!name) {
-			assert(false);
-			return false;
-		}
-	}
-	return kr_ta_covers(&ctx->trust_anchors, name)
-		&& !kr_ta_covers(&ctx->negative_anchors, name);
 }
 
 /* Delete record data */

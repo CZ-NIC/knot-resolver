@@ -145,6 +145,15 @@ typedef struct {
 	size_t len;
 	size_t cap;
 } ranked_rr_array_t;
+typedef struct kr_http_header_array_entry {
+	char *name;
+	char *value;
+} kr_http_header_array_entry_t;
+typedef struct {
+	kr_http_header_array_entry_t *at;
+	size_t len;
+	size_t cap;
+} kr_http_header_array_t;
 typedef struct {
 	union inaddr *at;
 	size_t len;
@@ -188,6 +197,7 @@ struct kr_request {
 		struct kr_request_qsource_flags flags;
 		size_t size;
 		int32_t stream_id;
+		kr_http_header_array_t headers;
 	} qsource;
 	struct {
 		unsigned int rtt;
@@ -289,7 +299,11 @@ struct kr_server_selection {
 	void (*error)(struct kr_query *, const struct kr_transport *, enum kr_selection_error);
 	struct local_state *local_state;
 };
+
 kr_layer_t kr_layer_t_static;
+_Bool kr_dbg_assertion_abort;
+int kr_dbg_assertion_fork;
+
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
 				const struct kr_query *qry);
 

@@ -6,7 +6,6 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <fcntl.h>
-#include <assert.h>
 #include <arpa/inet.h>
 #include <libknot/rrtype/rdname.h>
 #include <libknot/descriptor.h>
@@ -49,11 +48,13 @@ bool kr_rank_check(uint8_t rank)
 
 bool kr_rank_test(uint8_t rank, uint8_t kr_flag)
 {
-	assert(kr_rank_check(rank) && kr_rank_check(kr_flag));
+	if (kr_fails_assert(kr_rank_check(rank) && kr_rank_check(kr_flag)))
+		return false;
 	if (kr_flag == KR_RANK_AUTH) {
 		return rank & KR_RANK_AUTH;
 	}
-	assert(!(kr_flag & KR_RANK_AUTH));
+	if (kr_fails_assert(!(kr_flag & KR_RANK_AUTH)))
+		return false;
 	/* The rest are exclusive values - exactly one has to be set. */
 	return (rank & ~KR_RANK_AUTH) == kr_flag;
 }
@@ -113,8 +114,7 @@ static int answer_finalize_yield(kr_layer_t *ctx) { return kr_ok(); }
 				(r)->state = layer.api->func(&layer, ##__VA_ARGS__); \
 				/* It's an easy mistake to return error code, for example. */ \
 				/* (though we could allow such an overload later) */ \
-				if (unlikely(!kr_state_consistent((r)->state))) { \
-					assert(!EINVAL); \
+				if (kr_fails_assert(kr_state_consistent((r)->state))) { \
 					(r)->state = KR_STATE_FAIL; \
 				} else \
 				if ((r)->state == KR_STATE_YIELD) { \
@@ -150,10 +150,10 @@ KR_CONST static inline bool isletter(unsigned chr)
  */
 static void randomized_qname_case(knot_dname_t * restrict qname, uint32_t secret)
 {
-	if (secret == 0) {
+	if (secret == 0)
 		return;
-	}
-	assert(qname);
+	if (kr_fails_assert(qname))
+		return;
 	const int len = knot_dname_size(qname) - 2; /* Skip first, last label. First is length, last is always root */
 	for (int i = 0; i < len; ++i) {
 		/* Note: this relies on the fact that correct label lengths
@@ -196,7 +196,7 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 			kr_make_query(qry, pkt);
 			break;
 		}
-		assert(target[0]);
+		kr_assert(target[0]);
 		target = knot_wire_next_label(target, NULL);
 	}
 	kr_cache_commit(cache);
@@ -224,7 +224,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 		qry->flags.DNSSEC_WANT = false;
 		qry->flags.DNSSEC_INSECURE = true;
 		VERBOSE_MSG(qry, "=> going insecure because parent query is insecure\n");
-	} else if (kr_ta_covers_qry(req->ctx, qry->zone_cut.name, KNOT_RRTYPE_NS)) {
+	} else if (kr_ta_closest(req->ctx, qry->zone_cut.name, KNOT_RRTYPE_NS)) {
 		qry->flags.DNSSEC_WANT = true;
 	} else {
 		qry->flags.DNSSEC_WANT = false;
@@ -265,7 +265,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	/* Zonecut name can change, check it again
 	 * to prevent unnecessary DS & DNSKEY queries */
 	if (!(qry->flags.DNSSEC_INSECURE) &&
-	    kr_ta_covers_qry(req->ctx, cut_found.name, KNOT_RRTYPE_NS)) {
+	    kr_ta_closest(req->ctx, cut_found.name, KNOT_RRTYPE_NS)) {
 		qry->flags.DNSSEC_WANT = true;
 	} else {
 		qry->flags.DNSSEC_WANT = false;
@@ -313,7 +313,8 @@ static int edns_put(knot_pkt_t *pkt, bool reclaim)
 		}
 	}
 	/* Write to packet. */
-	assert(pkt->current == KNOT_ADDITIONAL);
+	if (kr_fails_assert(pkt->current == KNOT_ADDITIONAL))
+		return kr_error(EINVAL);
 	return knot_pkt_put(pkt, KNOT_COMPR_HINT_NONE, pkt->opt_rr, KNOT_PF_FREE);
 }
 
@@ -383,7 +384,7 @@ static int write_extra_ranked_records(const ranked_rr_array_t *arr, uint16_t reo
 
 	for (size_t i = 0; i < arr->len; ++i) {
 		ranked_rr_array_entry_t * entry = arr->at[i];
-		assert(!entry->in_progress);
+		kr_assert(!entry->in_progress);
 		if (!entry->to_wire) {
 			continue;
 		}
@@ -419,10 +420,8 @@ static int write_extra_ranked_records(const ranked_rr_array_t *arr, uint16_t reo
 /** @internal Add an EDNS padding RR into the answer if requested and required. */
 static int answer_padding(struct kr_request *request)
 {
-	if (!request || !request->answer || !request->ctx) {
-		assert(false);
+	if (kr_fails_assert(request && request->answer && request->ctx))
 		return kr_error(EINVAL);
-	}
 	if (!request->qsource.flags.tls) {
 		/* Not meaningful to pad without encryption. */
 		return kr_ok();
@@ -501,8 +500,7 @@ static void answer_finalize(struct kr_request *request)
 		for (int psec = KNOT_ANSWER; psec <= KNOT_ADDITIONAL; ++psec) {
 			const ranked_rr_array_t *arr = selected[psec];
 			for (ssize_t i = 0; i < arr->len; ++i) {
-				if (unlikely(arr->at[i]->to_wire)) {
-					assert(false);
+				if (kr_fails_assert(!arr->at[i]->to_wire)) {
 					answer_fail(request);
 					return;
 				}
@@ -683,7 +681,7 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 		qry->flags.AWAIT_CUT = true;
 		/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
 		if ((knot_wire_get_ad(packet->wire) || knot_pkt_has_dnssec(packet)) &&
-		    kr_ta_covers_qry(request->ctx, qry->sname, qtype)) {
+		    kr_ta_closest(request->ctx, qry->sname, qtype)) {
 			qry->flags.DNSSEC_WANT = true;
 		}
 	}
@@ -707,11 +705,13 @@ knot_pkt_t *kr_request_ensure_answer(struct kr_request *request)
 		return request->answer;
 
 	const knot_pkt_t *qs_pkt = request->qsource.packet;
-	assert(qs_pkt);
+	if (kr_fails_assert(qs_pkt))
+		goto fail;
 	// Find answer_max: limit on DNS wire length.
 	uint16_t answer_max;
 	const struct kr_request_qsource_flags *qs_flags = &request->qsource.flags;
-	assert((qs_flags->tls || qs_flags->http) ? qs_flags->tcp : true);
+	if (kr_fails_assert((qs_flags->tls || qs_flags->http) ? qs_flags->tcp : true))
+		goto fail;
 	if (!request->qsource.addr || qs_flags->tcp) {
 		// not on UDP
 		answer_max = KNOT_WIRE_MAX_PKTSIZE;
@@ -735,7 +735,7 @@ knot_pkt_t *kr_request_ensure_answer(struct kr_request *request)
 	knot_pkt_t *answer = request->answer =
 		knot_pkt_new(wire, answer_max, &request->pool);
 	if (!answer || knot_pkt_init_response(answer, qs_pkt) != 0) {
-		assert(!answer); // otherwise we messed something up
+		kr_assert(!answer); // otherwise we messed something up
 		goto enomem;
 	}
 	if (!wire)
@@ -760,6 +760,7 @@ knot_pkt_t *kr_request_ensure_answer(struct kr_request *request)
 
 	return request->answer;
 enomem:
+fail:
 	request->state = KR_STATE_FAIL; // TODO: really combine with another flag?
 	return request->answer = NULL;
 }
@@ -911,7 +912,8 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		return KR_STATE_PRODUCE;
 	}
 
-	assert(qry->flags.FORWARD);
+	if (kr_fails_assert(qry->flags.FORWARD))
+		return KR_STATE_FAIL;
 
 	if (!trust_anchors) {
 		qry->flags.AWAIT_CUT = false;
@@ -931,7 +933,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	const knot_dname_t *start_name = qry->sname;
 	if ((qry->flags.AWAIT_CUT) && !resume) {
 		qry->flags.AWAIT_CUT = false;
-		const knot_dname_t *longest_ta = kr_ta_get_longest_name(trust_anchors, qry->sname);
+		const knot_dname_t *longest_ta = kr_ta_closest(request->ctx, qry->sname, qry->stype);
 		if (longest_ta) {
 			start_name = longest_ta;
 			qry->zone_cut.name = knot_dname_copy(start_name, qry->zone_cut.pool);
@@ -1105,13 +1107,10 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	}
 	/* Enable DNSSEC if entering a new (or different) island of trust,
 	 * and update the TA RRset if required. */
-	bool want_secured = (qry->flags.DNSSEC_WANT) &&
-			    !knot_wire_get_cd(request->qsource.packet->wire);
+	const bool has_cd = knot_wire_get_cd(request->qsource.packet->wire);
 	knot_rrset_t *ta_rr = kr_ta_get(trust_anchors, qry->zone_cut.name);
-	if (!knot_wire_get_cd(request->qsource.packet->wire) && ta_rr) {
+	if (!has_cd && ta_rr) {
 		qry->flags.DNSSEC_WANT = true;
-		want_secured = true;
-
 		if (qry->zone_cut.trust_anchor == NULL
 		    || !knot_dname_is_equal(qry->zone_cut.trust_anchor->owner, qry->zone_cut.name)) {
 			mm_free(qry->zone_cut.pool, qry->zone_cut.trust_anchor);
@@ -1128,6 +1127,7 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	const bool has_ta = (qry->zone_cut.trust_anchor != NULL);
 	const knot_dname_t *ta_name = (has_ta ? qry->zone_cut.trust_anchor->owner : NULL);
 	const bool refetch_ta = !has_ta || !knot_dname_is_equal(qry->zone_cut.name, ta_name);
+	const bool want_secured = qry->flags.DNSSEC_WANT && !has_cd;
 	if (want_secured && refetch_ta) {
 		/* @todo we could fetch the information from the parent cut, but we don't remember that now */
 		struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.name, qry->sclass, KNOT_RRTYPE_DS);
@@ -1274,7 +1274,7 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param, struc
 			qry->flags.AWAIT_IPV6 = true;
 		} else {
 			qry->flags.AWAIT_IPV4 = true;
-		}	
+		}
 	}
 
 	return ret;
@@ -1427,19 +1427,18 @@ static bool outbound_request_update_cookies(struct kr_request *req,
                                             const struct sockaddr *src,
                                             const struct sockaddr *dst)
 {
-	assert(req);
+	if (kr_fails_assert(req))
+		return false;
 
 	/* RFC7873 4.1 strongly requires server address. */
-	if (!dst) {
+	if (!dst)
 		return false;
-	}
 
 	struct kr_cookie_settings *clnt_sett = &req->ctx->cookie_ctx.clnt;
 
 	/* Cookies disabled or packet has no EDNS section. */
-	if (!clnt_sett->enabled) {
+	if (!clnt_sett->enabled)
 		return true;
-	}
 
 	/*
 	 * RFC7873 4.1 recommends using also the client address. The matter is
@@ -1505,7 +1504,7 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 		type = SOCK_STREAM;
 		break;
 	default:
-		assert(0);
+		kr_assert(false);
 	}
 	int state = request->state;
 	ITERATE_LAYERS(request, qry, checkout, packet, &transport->address.ip, type);
