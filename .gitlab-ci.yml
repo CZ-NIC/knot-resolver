@@ -437,8 +437,6 @@ pkgtest:
   trigger:
     include: ci/pkgtest.yaml
     strategy: depend
-  variables:
-    LC_ALL: en_US.UTF-8
   needs:
     - build
   except:
