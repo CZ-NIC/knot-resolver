@@ -124,12 +124,47 @@ debian-10:pkgbuild:
     - lxc
     - amd64
 
+fedora-33:pkgtest:
+  <<: *pkgtest
+  needs:
+    - fedora-33:pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-33
+  script:
+    - dnf install -y knot-utils findutils
+    - dnf install -y $(find pkg/pkgs -name '*.rpm')
+    - systemctl start kresd@1
+    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+
 fedora-34:pkgtest:
   <<: *pkgtest
   needs:
     - fedora-34:pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-34
   script:
+    - dnf install -y knot-utils findutils
+    - dnf install -y $(find pkg/pkgs -name '*.rpm')
+    - systemctl start kresd@1
+    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+
+centos-7:pkgtest:
+  <<: *pkgtest
+  needs:
+    - centos-7:pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-7
+  script:
+    - yum install -y epel-release
+    - yum install -y knot-utils findutils
+    - yum install -y $(find pkg/pkgs -name '*.rpm')
+    - systemctl start kresd@1
+    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+
+centos-8:pkgtest:
+  <<: *pkgtest
+  needs:
+    - centos-8:pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-8
+  script:
+    - dnf install -y epel-release
     - dnf install -y knot-utils findutils
     - dnf install -y $(find pkg/pkgs -name '*.rpm')
     - systemctl start kresd@1
