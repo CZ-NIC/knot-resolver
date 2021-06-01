@@ -495,16 +495,20 @@ obs:odvr:
 # }}}
 
 # pkgtest {{{
-pkgtest-pipeline:
-  <<: *common
+pkgtest:
   stage: pkgtest
   trigger:
     include: ci/pkgtest.yaml
     strategy: depend
   needs:
     - build
-  dependencies: []
-  tags: []
+  except:
+    refs:
+      - master@knot/knot-resolver
+      - master@knot/security/knot-resolver
+      - tags
+    variables:
+      - $SKIP_CI == "1"
 
 .deploytest: &deploytest
   stage: pkgtest
