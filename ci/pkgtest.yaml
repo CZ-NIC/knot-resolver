@@ -1,6 +1,6 @@
 variables:
   DEBIAN_FRONTEND: noninteractive
-  LC_ALL: C.UTF-8
+  LC_ALL: en_US.utf8
   GIT_SUBMODULE_STRATEGY: recursive
   GIT_STRATEGY: clone # sometimes unclean submodule dirs otherwise
 
@@ -52,8 +52,6 @@ fedora-34:pkgbuild:
 centos-7:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-7
-  variables:
-    LC_ALL: en_US.utf8
   script:
     - yum install -y rpm-build python3-pip epel-release
     - *apkgbuild
@@ -118,15 +116,22 @@ debian-10:pkgbuild:
 # }}}
 
 # pkgtest {{{
-fedora-34:pkgtest:
+.pkgtest: &pkgtest
   stage: pkgtest
+  before_script:
+    - pip3 install -U apkg
   tags:
     - lxc
     - amd64
+
+fedora-34:pkgtest:
+  <<: *pkgtest
   needs:
     - fedora-34:pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-34
   script:
-    - dnf install $(ls pkg/pkgs/fedora-34/)
+    - dnf install -y knot-utils findutils
+    - dnf install -y $(find pkg/pkgs -name '*.rpm')
     - systemctl start kresd@1
+    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
 # }}}
