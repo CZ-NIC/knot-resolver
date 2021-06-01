@@ -496,6 +496,21 @@ obs:odvr:
 # }}}
 
 # pkgtest {{{
+pkgtest:
+  stage: pkgtest
+  trigger:
+    include: ci/pkgtest.yaml
+    strategy: depend
+  needs:
+    - build
+  except:
+    refs:
+      - master@knot/knot-resolver
+      - master@knot/security/knot-resolver
+      - tags
+    variables:
+      - $SKIP_CI == "1"
+
 .deploytest: &deploytest
   stage: pkgtest
   only:
@@ -675,4 +690,5 @@ packaging:leap_15.2:
   <<: *packagingtest
   variables:
     DISTRO: leap_15.2
+
 # }}}
