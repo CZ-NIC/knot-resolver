@@ -22,12 +22,17 @@ stages:
   - apkg build-dep -y
   - apkg build
 
-.pkgbuilddebrepo: &pkgbuilddebrepo
+.pkgdebrepo: &pkgdebrepo
   - apt-get update
-  - apt-get install -y curl gnupg2 python3-pip devscripts
+  - apt-get install -y curl gnupg2
   - echo "deb http://download.opensuse.org/repositories/home:/CZ-NIC:/$OBS_REPO/$DISTROTEST_REPO/ /" > /etc/apt/sources.list.d/obs.list
   - curl -fsSL "https://download.opensuse.org/repositories/home:CZ-NIC:$OBS_REPO/$DISTROTEST_REPO/Release.key" | gpg --dearmor > /etc/apt/trusted.gpg.d/obs.gpg
   - apt-get update
+
+.debpkgbuild: &debpkgbuild
+  - *pkgdebrepo
+  - apt-get install -y python3-pip devscripts
+  - *apkgbuild
 
 fedora-33:pkgbuild:
   <<: *pkgbuild
@@ -54,15 +59,6 @@ centos-7:pkgbuild:
     - yum install -y rpm-build python3-pip epel-release
     - *apkgbuild
 
-centos-8:pkgbuild:
-  <<: *pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-8
-  script:
-    - dnf install -y rpm-build python3-pip epel-release
-    - sed -i 's/enabled=0/enabled=1/' /etc/yum.repos.d/CentOS-Linux-PowerTools.repo
-    - sed -i 's/enabled=0/enabled=1/' /etc/yum.repos.d/CentOS-Linux-Devel.repo
-    - *apkgbuild
-
 opensuse-15.2:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/opensuse-15.2
@@ -78,8 +74,7 @@ ubuntu-18.04:pkgbuild:
     OBS_REPO: knot-resolver-build
     DISTROTEST_REPO: xUbuntu_18.04
   script:
-    - *pkgbuilddebrepo
-    - *apkgbuild
+    - *debpkgbuild
 
 ubuntu-20.04:pkgbuild:
   <<: *pkgbuild
@@ -88,8 +83,7 @@ ubuntu-20.04:pkgbuild:
     OBS_REPO: knot-resolver-build
     DISTROTEST_REPO: xUbuntu_20.04
   script:
-    - *pkgbuilddebrepo
-    - *apkgbuild
+    - *debpkgbuild
 
 ubuntu-21.04:pkgbuild:
   <<: *pkgbuild
@@ -98,8 +92,7 @@ ubuntu-21.04:pkgbuild:
     OBS_REPO: knot-resolver-build
     DISTROTEST_REPO: xUbuntu_21.04
   script:
-    - *pkgbuilddebrepo
-    - *apkgbuild
+    - *debpkgbuild
 
 debian-10:pkgbuild:
   <<: *pkgbuild
@@ -108,8 +101,7 @@ debian-10:pkgbuild:
     OBS_REPO: knot-resolver-build
     DISTROTEST_REPO: Debian_10
   script:
-    - *pkgbuilddebrepo
-    - *apkgbuild
+    - *debpkgbuild
 
 # }}}
 
@@ -156,17 +148,31 @@ centos-7:pkgtest:
     - systemctl start kresd@1
     - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
 
-centos-8:pkgtest:
+opensuse-15.2:pkgtest:
   <<: *pkgtest
   needs:
-    - centos-8:pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-8
+    - opensuse-15.2:pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/opensuse-15.2
   script:
-    - dnf install -y epel-release
-    - dnf install -y knot-utils findutils
-    - dnf install -y $(find pkg/pkgs -name '*.rpm')
+    - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.2/home:CZ-NIC:knot-resolver-build.repo
+    - zypper install knot-utils
+    - zypper install -y $(find pkg/pkgs -name '*.rpm')
     - systemctl start kresd@1
     - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
 
+debian-10:pkgtest:
+  <<: *pkgtest
+  needs:
+    - debian-10:pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-10
+  variables:
+    OBS_REPO: knot-resolver-build
+    DISTROTEST_REPO: Debian_10
+  script:
+    - *pkgdebrepo
+    - apt-get install -y knot-dnsutils
+    - apt-get install -y $(find pkg/pkgs -name '*.deb')
+    - systemctl start kresd@1
+    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
 
 # }}}
