@@ -495,7 +495,7 @@ obs:odvr:
 # }}}
 
 # pkgtest {{{
-pkgtest:
+pkgtest-pipeline:
   <<: *common
   stage: pkgtest
   trigger:
