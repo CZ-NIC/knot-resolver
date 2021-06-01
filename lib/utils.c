@@ -14,7 +14,6 @@
 #include "lib/selection.h"
 #include "lib/resolve.h"
 
-#include <gnutls/gnutls.h>
 #include <libknot/descriptor.h>
 #include <libknot/dname.h>
 #include <libknot/rrset-dump.h>
@@ -32,12 +31,7 @@
 #include <sys/statvfs.h>
 #include <sys/un.h>
 
-/* Always compile-in log symbols, even if disabled. */
-#undef kr_verbose_status
-#undef kr_verbose_set
-
 /* Logging & debugging */
-bool kr_verbose_status = false;
 bool kr_dbg_assertion_abort = DBG_ASSERTION_ABORT;
 int kr_dbg_assertion_fork = DBG_ASSERTION_FORK;
 
@@ -45,9 +39,9 @@ void kr_fail(bool is_fatal, const char *expr, const char *func, const char *file
 {
 	const int errno_orig = errno;
 	if (is_fatal)
-		kr_log_critical("requirement \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
+		kr_log_fatal(LOG_GRP_SYSTEM, "requirement \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
 	else
-		kr_log_error("assertion \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
+		kr_log_error(LOG_GRP_SYSTEM, "assertion \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
 
 	if (is_fatal || (kr_dbg_assertion_abort && !kr_dbg_assertion_fork))
 		abort();
@@ -94,27 +88,6 @@ static inline int u16tostr(uint8_t *dst, uint16_t num)
 /*
  * Cleanup callbacks.
  */
-
-static void kres_gnutls_log(int level, const char *message)
-{
-	kr_log_verbose("[gnutls] (%d) %s", level, message);
-}
-
-bool kr_verbose_set(bool status)
-{
-#ifndef NOVERBOSELOG
-	kr_verbose_status = status;
-
-	/* gnutls logs messages related to our TLS and also libdnssec,
-	 * and the logging is set up in a global way only */
-	if (status) {
-		gnutls_global_set_log_function(kres_gnutls_log);
-	}
-	gnutls_global_set_log_level(status ? 5 : 0);
-#endif
-	return kr_verbose_status;
-}
-
 static void kr_vlog_req(
 	const struct kr_request * const req, uint32_t qry_uid,
 	const unsigned int indent, const char *source, const char *fmt,
@@ -1184,7 +1157,7 @@ static void rnd_noerror(void *data, uint size)
 {
 	int ret = gnutls_rnd(GNUTLS_RND_NONCE, data, size);
 	if (ret) {
-		kr_log_error("gnutls_rnd(): %s\n", gnutls_strerror(ret));
+		kr_log_error(LOG_GRP_TLS, "gnutls_rnd(): %s\n", gnutls_strerror(ret));
 		abort();
 	}
 }
