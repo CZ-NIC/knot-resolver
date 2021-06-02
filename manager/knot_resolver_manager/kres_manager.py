@@ -5,7 +5,6 @@ from knot_resolver_manager.constants import KRESD_CONFIG_FILE
 from knot_resolver_manager.kresd_controller import BaseKresdController, get_best_controller_implementation
 from knot_resolver_manager.utils.async_utils import writefile
 
-from . import configuration
 from .datamodel import KresConfig
 
 
@@ -67,7 +66,7 @@ class KresManager:
             await self._spawn_new_child()
 
     async def _write_config(self, config: KresConfig):
-        lua_config = await configuration.render_lua(config)
+        lua_config = config.render_lua()
         await writefile(KRESD_CONFIG_FILE, lua_config)
 
     async def apply_config(self, config: KresConfig):
