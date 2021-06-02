@@ -19,12 +19,12 @@ PAYLOAD_F = lambda num: PAYLOAD % num
 
 def set_workers(num: int):
 	# send the config
-	r = requests.post('http+unix://%2Ftmp%2Fmanager.sock/config', data=PAYLOAD_F(num))
+	r = requests.post('http+unix://%2Fetc%2Fknot-resolver%2Fmanager.sock/config', data=PAYLOAD_F(num))
 	r.raise_for_status()
 
 def set_workers_auto():
 	# send the config
-	r = requests.post('http+unix://%2Ftmp%2Fmanager.sock/config', data=PAYLOAD_F("\"auto\""))
+	r = requests.post('http+unix://%2Fetc%2Fknot-resolver%2Fmanager.sock/config', data=PAYLOAD_F("\"auto\""))
 	r.raise_for_status()
 
 def count_running() -> int:
