@@ -1,5 +1,6 @@
 import logging
 import sys
+from http import HTTPStatus
 from pathlib import Path
 from time import time
 from typing import Optional
@@ -9,6 +10,7 @@ from aiohttp import web
 
 from knot_resolver_manager.constants import LISTEN_SOCKET_PATH, MANAGER_CONFIG_FILE
 from knot_resolver_manager.utils.async_utils import readfile
+from knot_resolver_manager.utils.dataclasses_parservalidator import ValidationException
 
 from .datamodel import KresConfig
 from .kres_manager import KresManager
@@ -32,10 +34,32 @@ async def apply_config(request: web.Request) -> web.Response:
             status=503, headers={"Retry-After": "3"}, text="Knot Resolver Manager is not yet fully initialized"
         )
 
-    # process the request
-    config = KresConfig.from_json(await request.text())
+    # parse the incoming data
+    try:
+        # JSON or not-set
+        #
+        # aiohttp docs https://docs.aiohttp.org/en/stable/web_reference.html#aiohttp.web.BaseRequest.content_type:
+        #
+        # "Returns value is 'application/octet-stream' if no Content-Type header present in HTTP headers according to
+        #  RFC 2616"
+        if request.content_type == "application/json" or request.content_type == "application/octet-stream":
+            config = KresConfig.from_json(await request.text())
+        elif "yaml" in request.content_type:
+            config = KresConfig.from_yaml(await request.text())
+        else:
+            return web.Response(
+                text="Unsupported content-type header. Use application/json or text/x-yaml",
+                status=HTTPStatus.BAD_REQUEST,
+            )
+    except ValidationException as e:
+        logger.error("Failed to parse configuration in API request", exc_info=True)
+        return web.Response(text=f"Schema validation failed: {e}")
+
+    # apply config
     await manager.apply_config(config)
-    return web.Response(text="OK")
+
+    # return success
+    return web.Response()
 
 
 @click.command()
