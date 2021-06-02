@@ -7,12 +7,13 @@ from typing import Optional
 import click
 from aiohttp import web
 
+from knot_resolver_manager.constants import LISTEN_SOCKET_PATH, MANAGER_CONFIG_FILE
+from knot_resolver_manager.utils.async_utils import readfile
+
 from .datamodel import KresConfig
 from .kres_manager import KresManager
 from .utils import ignore_exceptions
 
-# when changing this, change the help message in main()
-_SOCKET_PATH = "/tmp/manager.sock"
 _MANAGER = "kres_manager"
 
 
@@ -39,12 +40,22 @@ async def apply_config(request: web.Request) -> web.Response:
 
 @click.command()
 @click.argument("listen", type=str, nargs=1, required=False, default=None)
-@click.option("--config", "-c", type=str, nargs=1, required=False, default=None)
+@click.option(
+    "--config",
+    "-c",
+    type=str,
+    nargs=1,
+    required=False,
+    default=None,
+    help="Overrides default config location at '" + str(MANAGER_CONFIG_FILE) + "'",
+)
 def main(listen: Optional[str], config: Optional[str]):
     """Knot Resolver Manager
 
     [listen] ... numeric port or a path for a Unix domain socket, default is \"/tmp/manager.sock\"
     """
+    config_path = Path(config) if config is not None else MANAGER_CONFIG_FILE
+
     start_time = time()
 
     app = web.Application()
@@ -53,11 +64,26 @@ def main(listen: Optional[str], config: Optional[str]):
     app[_MANAGER] = None
 
     async def init_manager(app: web.Application):
+        """
+        Called asynchronously when the application initializes.
+        """
+        # Create KresManager. This will perform autodetection of available service managers and
+        # select the most appropriate to use
         manager = await KresManager.create()
         app[_MANAGER] = manager
-        if config is not None:
-            # TODO Use config loaded from the file system
-            pass
+
+        # Initial static configuration of the manager
+        # optional step, could be skipped
+        if config_path is not None:
+            if not config_path.exists():
+                logger.warning(
+                    "Manager is configured to load config file at %s on startup, but the file does not exist.",
+                    config_path,
+                )
+            else:
+                initial_config = KresConfig.from_yaml(await readfile(config_path))
+                await manager.apply_config(initial_config)
+
         end_time = time()
         logger.info(f"Manager fully initialized after {end_time - start_time} seconds")
 
@@ -69,7 +95,7 @@ def main(listen: Optional[str], config: Optional[str]):
     # run forever, listen at the appropriate place
     maybe_port = ignore_exceptions(None, ValueError, TypeError)(int)(listen)
     if listen is None:
-        web.run_app(app, path=_SOCKET_PATH)
+        web.run_app(app, path=str(LISTEN_SOCKET_PATH))
     elif maybe_port is not None:
         web.run_app(app, port=maybe_port)
     elif Path(listen).parent.exists():

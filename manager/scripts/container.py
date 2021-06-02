@@ -1,14 +1,15 @@
 #!/usr/bin/env python
 
+import atexit
 import subprocess
 import sys
 import time
+from os import environ
 from pathlib import Path
 from typing import Dict, List, NoReturn, Optional
-from os import environ
-import atexit
 
 import click
+
 
 def _get_git_root() -> Path:
     result = subprocess.run(
