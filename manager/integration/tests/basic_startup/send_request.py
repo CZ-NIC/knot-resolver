@@ -12,5 +12,5 @@ with open(PAYLOAD_PATH, "r") as file:
 	PAYLOAD = file.read()
 
 # send the config
-r = requests.post('http+unix://%2Ftmp%2Fmanager.sock/config', data=PAYLOAD)
+r = requests.post('http+unix://%2Fetc%2Fknot-resolver%2Fmanager.sock/config', data=PAYLOAD)
 r.raise_for_status()

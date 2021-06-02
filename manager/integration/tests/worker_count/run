@@ -8,6 +8,6 @@ echo "Starting manager..."
 systemctl start knot-resolver-manager.service
 
 # give it time to start
-while [ ! -e /tmp/manager.sock ]; do sleep 0.5; done
+while [ ! -e /etc/knot-resolver/manager.sock ]; do sleep 0.5; done
 
 python3 run_test.py

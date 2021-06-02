@@ -1,7 +1,9 @@
 import asyncio
 from typing import Any, List, Type
 
+from knot_resolver_manager.constants import KRESD_CONFIG_FILE
 from knot_resolver_manager.kresd_controller import BaseKresdController, get_best_controller_implementation
+from knot_resolver_manager.utils.async_utils import writefile
 
 from . import configuration
 from .datamodel import KresConfig
@@ -65,10 +67,8 @@ class KresManager:
             await self._spawn_new_child()
 
     async def _write_config(self, config: KresConfig):
-        # FIXME: this code is blocking!!!
         lua_config = await configuration.render_lua(config)
-        with open("/etc/knot-resolver/kresd.conf", "w") as f:
-            f.write(lua_config)
+        await writefile(KRESD_CONFIG_FILE, lua_config)
 
     async def apply_config(self, config: KresConfig):
         async with self._children_lock:
