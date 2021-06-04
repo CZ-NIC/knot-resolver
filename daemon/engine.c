@@ -146,7 +146,7 @@ static int l_verbose(lua_State *L)
 {
 	log_level_t level = LOG_DEFAULT_LEVEL;
 	if ((lua_isboolean(L, 1) && lua_toboolean(L, 1) == true) ||
-			(lua_isnumber(L, 1) && lua_tointeger(L, 1) == LOG_DEBUG)) {
+			lua_isnumber(L, 1)) {
 		level = LOG_DEBUG;
 	}
 

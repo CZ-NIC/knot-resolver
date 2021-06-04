@@ -163,7 +163,8 @@ int kr_log_level_set(log_level_t level)
 	if (KR_LOG_LEVEL_IS(LOG_DEBUG) || group_is_set(LOG_GRP_TLS) || group_is_set(LOG_GRP_TLSCLIENT)) {
 		gnutls_global_set_log_function(kres_gnutls_log);
 	}
-	gnutls_global_set_log_level(level);
+
+	gnutls_global_set_log_level(kr_log_level_get() == LOG_DEBUG ? 5 : 0);
 
 	return kr_log_level;
 
