@@ -92,7 +92,7 @@ void kr_log_init(log_level_t level, log_target_t target);
 #define kr_log_deprecate(grp, fmt, ...) \
 	kr_log_fmt(grp, LOG_WARNING,SD_JOURNAL_METADATA, "deprecation WARNING: " fmt, ## __VA_ARGS__)
 
-#define KR_LOG_LEVEL_IS(exp) ((kr_log_level >= exp) ? true : false)
+#define KR_LOG_LEVEL_IS(exp) ((kr_log_level >= (exp)) ? true : false)
 
 
 /* Syslog */
