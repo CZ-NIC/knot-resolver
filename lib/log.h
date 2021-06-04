@@ -33,13 +33,14 @@ typedef struct {
 #define LOG_GRP_NETWORK		(1 << 4)
 #define LOG_GRP_TA		(1 << 5)
 #define LOG_GRP_TLS		(1 << 6)
-#define LOG_GRP_TLSCLIENT	(1 << 7)
-#define LOG_GRP_XDP		(1 << 8)
-#define LOG_GRP_ZIMPORT		(1 << 9)
-#define LOG_GRP_ZSCANNER	(1 << 10)
-#define LOG_GRP_DOH		(1 << 11)
-#define LOG_GRP_DNSSEC		(1 << 12)
-#define LOG_GRP_HINT		(1 << 13)
+#define LOG_GRP_GNUTLS		(1 << 7)
+#define LOG_GRP_TLSCLIENT	(1 << 8)
+#define LOG_GRP_XDP		(1 << 9)
+#define LOG_GRP_ZIMPORT		(1 << 10)
+#define LOG_GRP_ZSCANNER	(1 << 11)
+#define LOG_GRP_DOH		(1 << 12)
+#define LOG_GRP_DNSSEC		(1 << 13)
+#define LOG_GRP_HINT		(1 << 14)
 
 KR_EXPORT
 extern log_groups_t kr_log_groups;
