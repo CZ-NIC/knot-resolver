@@ -23,7 +23,7 @@ stages:
   - sanity
   - test
   - respdiff
-  - resperf
+  - extended
   - deploy
   - pkgtest
 
@@ -392,12 +392,9 @@ fwd-udp6-unbound.tls6:
   variables:
     RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6
 
-# }}}
-
-# resperf {{{
 .resperf:  &resperf
   <<: *condor
-  stage: resperf
+  stage: respdiff
   script:
     - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPERF_FORCE -gt 0 || exit 0
     - export LABEL=gl$(date +%s)
@@ -433,6 +430,23 @@ rp:iter.udp-asan:
   <<: *resperf
   variables:
     RESPERF_TEST: resperf.iter.udp
+# }}}
+
+# extended {{{
+pkgtest:
+  stage: extended
+  trigger:
+    include: ci/pkgtest.yaml
+    strategy: depend
+  needs:
+    - build
+  except:
+    refs:
+      - master@knot/knot-resolver
+      - master@knot/security/knot-resolver
+      - tags
+    variables:
+      - $SKIP_CI == "1"
 # }}}
 
 # deploy {{{
@@ -675,4 +689,5 @@ packaging:leap_15.2:
   <<: *packagingtest
   variables:
     DISTRO: leap_15.2
+
 # }}}

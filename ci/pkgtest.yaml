@@ -1,0 +1,212 @@
+stages:
+  - pkgbuild
+  - pkgtest
+
+# pkgbuild {{{
+.pkgbuild: &pkgbuild
+  stage: pkgbuild
+  tags:
+    - lxc
+    - amd64
+  before_script:
+    - git config --global user.name CI
+    - git config --global user.email ci@nic
+  artifacts:
+    when: always
+    expire_in: '1 day'
+    paths:
+      - pkg/
+
+.apkgbuild: &apkgbuild
+  - pip3 install -U apkg
+  - apkg build-dep -y
+  - apkg build
+
+.pkgdebrepo: &pkgdebrepo
+  - apt-get update
+  - apt-get install -y curl gnupg2
+  - echo "deb http://download.opensuse.org/repositories/home:/CZ-NIC:/$OBS_REPO/$DISTROTEST_REPO/ /" > /etc/apt/sources.list.d/obs.list
+  - curl -fsSL "https://download.opensuse.org/repositories/home:CZ-NIC:$OBS_REPO/$DISTROTEST_REPO/Release.key" | gpg --dearmor > /etc/apt/trusted.gpg.d/obs.gpg
+  - apt-get update
+
+.debpkgbuild: &debpkgbuild
+  - *pkgdebrepo
+  - apt-get install -y python3-pip devscripts
+  - *apkgbuild
+
+centos-7:pkgbuild:
+  <<: *pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-7
+  before_script:
+    - export LC_ALL=en_US.UTF-8
+    - git config --global user.name CI
+    - git config --global user.email ci@nic
+  script:
+    - yum install -y rpm-build python3-pip epel-release
+    - *apkgbuild
+
+debian-10:pkgbuild:
+  <<: *pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-10
+  variables:
+    OBS_REPO: knot-resolver-build
+    DISTROTEST_REPO: Debian_10
+  script:
+    - *debpkgbuild
+
+fedora-33:pkgbuild:
+  <<: *pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-33
+  script:
+    - dnf install -y rpm-build python3-pip
+    - *apkgbuild
+
+fedora-34:pkgbuild:
+  <<: *pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-34
+  script:
+    - dnf install -y rpm-build python3-pip
+    - *apkgbuild
+
+opensuse-15.2:pkgbuild:
+  <<: *pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/opensuse-15.2
+  script:
+    - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.2/home:CZ-NIC:knot-resolver-build.repo
+    - zypper install -y rpm-build python3-pip
+    - *apkgbuild
+
+ubuntu-18.04:pkgbuild:
+  <<: *pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-18.04
+  variables:
+    OBS_REPO: knot-resolver-build
+    DISTROTEST_REPO: xUbuntu_18.04
+  script:
+    - *debpkgbuild
+
+ubuntu-20.04:pkgbuild:
+  <<: *pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-20.04
+  variables:
+    OBS_REPO: knot-resolver-build
+    DISTROTEST_REPO: xUbuntu_20.04
+  script:
+    - *debpkgbuild
+
+ubuntu-21.04:pkgbuild:
+  <<: *pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-21.04
+  variables:
+    OBS_REPO: knot-resolver-build
+    DISTROTEST_REPO: xUbuntu_21.04
+  script:
+    - *debpkgbuild
+# }}}
+
+# pkgtest {{{
+.pkgtest: &pkgtest
+  stage: pkgtest
+  tags:
+    - lxc
+    - amd64
+
+.debpkgtest: &debpkgtest
+  - *pkgdebrepo
+  - apt-get install -y knot-dnsutils
+  - apt-get install -y $(find ./pkg/pkgs -name '*.deb' | grep -v module)
+  - systemctl start kresd@1
+  - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+
+centos-7:pkgtest:
+  <<: *pkgtest
+  needs:
+    - centos-7:pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-7
+  before_script:
+    - export LC_ALL=en_US.UTF-8
+  script:
+    - yum install -y epel-release
+    - yum install -y knot-utils findutils
+    - yum install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module)
+    - systemctl start kresd@1
+    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+
+debian-10:pkgtest:
+  <<: *pkgtest
+  needs:
+    - debian-10:pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-10
+  variables:
+    OBS_REPO: knot-resolver-build
+    DISTROTEST_REPO: Debian_10
+  script:
+    - *debpkgtest
+
+fedora-33:pkgtest:
+  <<: *pkgtest
+  needs:
+    - fedora-33:pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-33
+  script:
+    - dnf install -y knot-utils findutils
+    - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module)
+    - systemctl start kresd@1
+    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+
+fedora-34:pkgtest:
+  <<: *pkgtest
+  needs:
+    - fedora-34:pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-34
+  script:
+    - dnf install -y knot-utils findutils
+    - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module)
+    - systemctl start kresd@1
+    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+
+opensuse-15.2:pkgtest:
+  <<: *pkgtest
+  needs:
+    - opensuse-15.2:pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/opensuse-15.2
+  script:
+    - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.2/home:CZ-NIC:knot-resolver-build.repo
+    - zypper install -y knot-utils
+    - zypper install --allow-unsigned-rpm -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module)
+    - systemctl start kresd@1
+    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+
+ubuntu-18.04:pkgtest:
+  <<: *pkgtest
+  needs:
+    - ubuntu-18.04:pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-18.04
+  variables:
+    OBS_REPO: knot-resolver-build
+    DISTROTEST_REPO: xUbuntu_18.04
+  script:
+    - *debpkgtest
+
+ubuntu-20.04:pkgtest:
+  <<: *pkgtest
+  needs:
+    - ubuntu-20.04:pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-20.04
+  variables:
+    OBS_REPO: knot-resolver-build
+    DISTROTEST_REPO: xUbuntu_20.04
+  script:
+    - *debpkgtest
+
+ubuntu-21.04:pkgtest:
+  <<: *pkgtest
+  needs:
+    - ubuntu-21.04:pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-21.04
+  variables:
+    OBS_REPO: knot-resolver-build
+    DISTROTEST_REPO: xUbuntu_21.04
+  script:
+    - *debpkgtest
+# }}}
