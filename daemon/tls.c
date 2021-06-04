@@ -618,7 +618,7 @@ void tls_credentials_log_pins(struct tls_credentials *tls_credentials)
 				kr_log_error(LOG_GRP_TLS, "[tls] could not calculate RFC 7858 OOB key-pin from cert %d (%d) %s\n",
 						i, err, gnutls_strerror_name(err));
 			} else {
-				kr_log_info(LOG_GRP_TLS, "[ŧls] RFC 7858 OOB key-pin (%d): pin-sha256=\"%s\"\n",
+				kr_log_info(LOG_GRP_TLS, "[tls] RFC 7858 OOB key-pin (%d): pin-sha256=\"%s\"\n",
 						i, pin);
 			}
 			gnutls_x509_crt_deinit(certs[i]);
@@ -663,7 +663,7 @@ static time_t _get_end_entity_expiration(gnutls_certificate_credentials_t creds)
 		goto done;
 	}
 	if ((err = gnutls_x509_crt_import(cert, &data, GNUTLS_X509_FMT_DER)) != GNUTLS_E_SUCCESS) {
-		kr_log_error(LOG_GRP_TLS, "[ŧls] failed to construct cert while checking expiration: (%d) %s\n",
+		kr_log_error(LOG_GRP_TLS, "[tls] failed to construct cert while checking expiration: (%d) %s\n",
 			     err, gnutls_strerror_name(err));
 		goto done;
 	}
@@ -961,7 +961,7 @@ static int client_verify_pin(const unsigned int cert_list_size,
 				params->pins.len);
 	}
 
-	kr_log_error(LOG_GRP_TLSCLIENT, "[ŧls_client] no pin matched: %zu pins * %d certificates\n",
+	kr_log_error(LOG_GRP_TLSCLIENT, "[tls_client] no pin matched: %zu pins * %d certificates\n",
 			params->pins.len, cert_list_size);
 	return GNUTLS_E_CERTIFICATE_ERROR;
 
@@ -1029,7 +1029,7 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 
 	gnutls_certificate_type_t cert_type = gnutls_certificate_type_get(tls_session);
 	if (cert_type != GNUTLS_CRT_X509) {
-		kr_log_error(LOG_GRP_TLSCLIENT, "[ŧls_client] invalid certificate type %i has been received\n",
+		kr_log_error(LOG_GRP_TLSCLIENT, "[tls_client] invalid certificate type %i has been received\n",
 			     cert_type);
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
