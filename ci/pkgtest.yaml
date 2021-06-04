@@ -114,7 +114,7 @@ ubuntu-21.04:pkgbuild:
 .debpkgtest: &debpkgtest
   - *pkgdebrepo
   - apt-get install -y knot-dnsutils
-  - apt-get install -y $(find ./pkg/pkgs -name '*.deb')
+  - apt-get install -y $(find ./pkg/pkgs -name '*.deb' | grep -v module)
   - systemctl start kresd@1
   - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
 
@@ -128,7 +128,7 @@ centos-7:pkgtest:
   script:
     - yum install -y epel-release
     - yum install -y knot-utils findutils
-    - yum install -y $(find ./pkg/pkgs -name '*.rpm')
+    - yum install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module)
     - systemctl start kresd@1
     - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
 
@@ -150,7 +150,7 @@ fedora-33:pkgtest:
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-33
   script:
     - dnf install -y knot-utils findutils
-    - dnf install -y $(find ./pkg/pkgs -name '*.rpm')
+    - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module)
     - systemctl start kresd@1
     - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
 
@@ -161,7 +161,7 @@ fedora-34:pkgtest:
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-34
   script:
     - dnf install -y knot-utils findutils
-    - dnf install -y $(find ./pkg/pkgs -name '*.rpm')
+    - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module)
     - systemctl start kresd@1
     - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
 
@@ -173,7 +173,7 @@ opensuse-15.2:pkgtest:
   script:
     - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.2/home:CZ-NIC:knot-resolver-build.repo
     - zypper install -y knot-utils
-    - zypper install -y $(find ./pkg/pkgs -name '*.rpm')
+    - zypper install --allow-unsigned-rpm -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module)
     - systemctl start kresd@1
     - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
 
