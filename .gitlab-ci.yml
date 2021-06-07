@@ -16,7 +16,7 @@ variables:
   MESON_TEST: meson test -C build_ci* -t 4 --print-errorlogs
   PREFIX: $CI_PROJECT_DIR/.local
 
-image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
+image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-$KNOT_VERSION
 
 stages:
   - build
