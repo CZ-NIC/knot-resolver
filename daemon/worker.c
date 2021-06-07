@@ -637,7 +637,7 @@ int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 			session_tasklist_del(s, task);
 
 		if (status != 0 && session_flags(s)->outgoing) {
-			qr_task_step(task, NULL, NULL);
+			qr_task_step(task, &task->transport->address.ip, NULL);
 			// TODO: the whole session would better be be killed, probably
 		}
 
