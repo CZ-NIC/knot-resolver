@@ -84,12 +84,7 @@ archive:
     EMAIL: 'ci@nic'
   except: null
   script:
-    - >
-      if [[ -z "${CI_COMMIT_TAG}" ]]; then
-        ./scripts/make-dev-archive.sh
-      else
-        meson build_dist; ninja -C build_dist dist
-      fi
+    - apkg make-archive
 
 build:
   <<: *build
