@@ -5,9 +5,9 @@ src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/_env.sh
 
 # build dev container
-poe container-build dev
+poe container build dev
 
 echo Knot Manager API is accessible on http://localhost:9000
 echo -------------------------------------------------------
 
-poe container-run --code -p 9000 -- knot-manager:dev python -m knot_resolver_manager 9000
+poe container run --code -p 9000 -- knot-manager:dev python -m knot_resolver_manager 9000

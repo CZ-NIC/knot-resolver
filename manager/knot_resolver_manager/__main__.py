@@ -1,65 +1,13 @@
 import logging
-import sys
-from http import HTTPStatus
 from pathlib import Path
-from time import time
-from typing import Optional
+from typing import List, Optional, Tuple
 
 import click
-from aiohttp import web
 
+from knot_resolver_manager import compat
 from knot_resolver_manager.constants import LISTEN_SOCKET_PATH, MANAGER_CONFIG_FILE
-from knot_resolver_manager.utils.async_utils import readfile
-from knot_resolver_manager.utils.dataclasses_parservalidator import ValidationException
-
-from .datamodel import KresConfig
-from .kres_manager import KresManager
-from .utils import ignore_exceptions
-
-_MANAGER = "kres_manager"
-
-
-logger = logging.getLogger(__name__)
-
-
-async def index(_request: web.Request) -> web.Response:
-    return web.Response(text="Knot Resolver Manager is running! The configuration endpoint is at /config")
-
-
-async def apply_config(request: web.Request) -> web.Response:
-    manager: KresManager = request.app[_MANAGER]
-    if manager is None:
-        # handle the case when the manager is not yet initialized
-        return web.Response(
-            status=503, headers={"Retry-After": "3"}, text="Knot Resolver Manager is not yet fully initialized"
-        )
-
-    # parse the incoming data
-    try:
-        # JSON or not-set
-        #
-        # aiohttp docs https://docs.aiohttp.org/en/stable/web_reference.html#aiohttp.web.BaseRequest.content_type:
-        #
-        # "Returns value is 'application/octet-stream' if no Content-Type header present in HTTP headers according to
-        #  RFC 2616"
-        if request.content_type == "application/json" or request.content_type == "application/octet-stream":
-            config = KresConfig.from_json(await request.text())
-        elif "yaml" in request.content_type:
-            config = KresConfig.from_yaml(await request.text())
-        else:
-            return web.Response(
-                text="Unsupported content-type header. Use application/json or text/x-yaml",
-                status=HTTPStatus.BAD_REQUEST,
-            )
-    except ValidationException as e:
-        logger.error("Failed to parse configuration in API request", exc_info=True)
-        return web.Response(text=f"Schema validation failed: {e}")
-
-    # apply config
-    await manager.apply_config(config)
-
-    # return success
-    return web.Response()
+from knot_resolver_manager.server import start_server
+from knot_resolver_manager.utils import ignore_exceptions
 
 
 @click.command()
@@ -74,63 +22,31 @@ async def apply_config(request: web.Request) -> web.Response:
     help="Overrides default config location at '" + str(MANAGER_CONFIG_FILE) + "'",
 )
 def main(listen: Optional[str], config: Optional[str]):
+    # pylint: disable=expression-not-assigned
+
     """Knot Resolver Manager
 
-    [listen] ... numeric port or a path for a Unix domain socket, default is \"/tmp/manager.sock\"
-    """
-    config_path = Path(config) if config is not None else MANAGER_CONFIG_FILE
+    [listen] ... numeric port or a path for a Unix domain socket, default is """ + str(
+        MANAGER_CONFIG_FILE
+    )
 
-    start_time = time()
+    tcp: List[Tuple[str, int]] = []
+    unix: List[Path] = []
 
-    app = web.Application()
-
-    # initialize KresManager
-    app[_MANAGER] = None
-
-    async def init_manager(app: web.Application):
-        """
-        Called asynchronously when the application initializes.
-        """
-        # Create KresManager. This will perform autodetection of available service managers and
-        # select the most appropriate to use
-        manager = await KresManager.create()
-        app[_MANAGER] = manager
-
-        # Initial static configuration of the manager
-        # optional step, could be skipped
-        if config_path is not None:
-            if not config_path.exists():
-                logger.warning(
-                    "Manager is configured to load config file at %s on startup, but the file does not exist.",
-                    config_path,
-                )
-            else:
-                initial_config = KresConfig.from_yaml(await readfile(config_path))
-                await manager.apply_config(initial_config)
-
-        end_time = time()
-        logger.info(f"Manager fully initialized after {end_time - start_time} seconds")
-
-    app.on_startup.append(init_manager)
-
-    # configure routing
-    app.add_routes([web.get("/", index), web.post("/config", apply_config)])
-
-    # run forever, listen at the appropriate place
-    maybe_port = ignore_exceptions(None, ValueError, TypeError)(int)(listen)
     if listen is None:
-        web.run_app(app, path=str(LISTEN_SOCKET_PATH))
-    elif maybe_port is not None:
-        web.run_app(app, port=maybe_port)
-    elif Path(listen).parent.exists():
-        web.run_app(app, path=listen)
+        unix.append(LISTEN_SOCKET_PATH)
     else:
-        print(
-            "Failed to parse LISTEN argument. Not an integer, not a valid path to a file in an existing directory.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        port = ignore_exceptions(None, ValueError)(int)(listen)
+        if port is not None:
+            tcp.append(("localhost", port))
+        else:
+            unix.append(Path(listen))
+
+    config_path = MANAGER_CONFIG_FILE if config is None else Path(config)
+
+    compat.asyncio.run(start_server(tcp=tcp, unix=unix, config_path=config_path))
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     main()  # pylint: disable=no-value-for-parameter

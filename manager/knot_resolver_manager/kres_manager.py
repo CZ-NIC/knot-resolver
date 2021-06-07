@@ -74,3 +74,6 @@ class KresManager:
             await self._write_config(config)
             await self._ensure_number_of_children(config.server.get_instances())
             await self._rolling_restart()
+
+    async def stop(self):
+        await self._ensure_number_of_children(0)
