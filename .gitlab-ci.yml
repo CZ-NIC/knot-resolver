@@ -16,7 +16,7 @@ variables:
   MESON_TEST: meson test -C build_ci* -t 4 --print-errorlogs
   PREFIX: $CI_PROJECT_DIR/.local
 
-image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
+image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-$KNOT_VERSION
 
 stages:
   - build
@@ -177,6 +177,8 @@ trivial_checks: # aggregated to save some processing
 
 doc:
   <<: *sanity
+  # TODO migrate doc to debian-11
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
   script:
     - meson build_doc -Ddoc=enabled
     - ninja -C build_doc doc-strict
@@ -187,6 +189,8 @@ doc:
 
 lint:other:
   <<: *sanity
+  # TODO migrate lint to debian-11
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
   script:
     - meson build_ci_lint &>/dev/null
     - ninja -C build_ci* pylint
@@ -195,6 +199,10 @@ lint:other:
 
 lint:pedantic:
   <<: *after_build
+  # TODO migrate lint to debian-11
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
+  before_script:
+  # -- end TODO
   stage: sanity
   script:
     - meson build_pedantic_gcc -Dwerror=true -Dc_args='-Wpedantic' -Dextra_tests=enabled
@@ -206,6 +214,10 @@ lint:pedantic:
 
 lint:scan-build:
   <<: *after_build
+  # TODO migrate lint to debian-11
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
+  before_script:
+  # -- end TODO
   stage: sanity
   artifacts:
     when: on_failure
@@ -219,6 +231,10 @@ lint:scan-build:
 
 lint:tidy:
   <<: *after_build
+  # TODO migrate lint to debian-11
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
+  before_script:
+  # -- end TODO
   stage: sanity
   script:
     - ninja -C build_ci* tidy
