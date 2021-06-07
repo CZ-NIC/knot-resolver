@@ -42,6 +42,21 @@ typedef struct {
 #define LOG_GRP_DNSSEC		(1 << 13)
 #define LOG_GRP_HINT		(1 << 14)
 
+#define LOG_GRP_SYSTEM_TAG "[system] "
+#define LOG_GRP_CACHE_TAG "[cache] "
+#define LOG_GRP_IO_TAG "[io] "
+#define LOG_GRP_NETWORK_TAG "[network] "
+#define LOG_GRP_TA_TAG "[ta] "
+#define LOG_GRP_TLS_TAG "[tls] "
+#define LOG_GRP_GNUTLS_TAG "[gnutls] "
+#define LOG_GRP_TLSCLIENT_TAG "[tlsclient] "
+#define LOG_GRP_XDP_TAG "[xdp] "
+#define LOG_GRP_ZIMPORT_TAG "[zimport] "
+#define LOG_GRP_ZSCANNER_TAG "[zscanner] "
+#define LOG_GRP_DOH_TAG "[doh] "
+#define LOG_GRP_DNSSEC_TAG "[dnssec] "
+#define LOG_GRP_HINT_TAG "[hint] "
+
 KR_EXPORT
 extern log_groups_t kr_log_groups;
 KR_EXPORT
@@ -78,20 +93,20 @@ void kr_log_init(log_level_t level, log_target_t target);
 #define SD_JOURNAL_METADATA "CODE_FILE=" __FILE__, "CODE_LINE=" TO_STR(__LINE__), ""
 
 #define kr_log_debug(grp, fmt, ...) \
-	kr_log_fmt(grp, LOG_DEBUG, SD_JOURNAL_METADATA, fmt, ## __VA_ARGS__)
+	kr_log_fmt(grp, LOG_DEBUG, SD_JOURNAL_METADATA, grp ## _TAG fmt, ## __VA_ARGS__)
 #define kr_log_info(grp, fmt, ...) \
-	kr_log_fmt(grp, LOG_INFO, SD_JOURNAL_METADATA, fmt, ## __VA_ARGS__)
+	kr_log_fmt(grp, LOG_INFO, SD_JOURNAL_METADATA, grp ## _TAG fmt, ## __VA_ARGS__)
 #define kr_log_notice(grp, fmt, ...) \
-	kr_log_fmt(grp, LOG_NOTICE, SD_JOURNAL_METADATA, fmt, ## __VA_ARGS__)
+	kr_log_fmt(grp, LOG_NOTICE, SD_JOURNAL_METADATA, grp ## _TAG fmt, ## __VA_ARGS__)
 #define kr_log_warning(grp, fmt, ...) \
-	kr_log_fmt(grp, LOG_WARNING, SD_JOURNAL_METADATA, fmt, ## __VA_ARGS__)
+	kr_log_fmt(grp, LOG_WARNING, SD_JOURNAL_METADATA, grp ## _TAG fmt, ## __VA_ARGS__)
 #define kr_log_error(grp, fmt, ...) \
-	kr_log_fmt(grp, LOG_ERR, SD_JOURNAL_METADATA, fmt, ## __VA_ARGS__)
+	kr_log_fmt(grp, LOG_ERR, SD_JOURNAL_METADATA, grp ## _TAG fmt, ## __VA_ARGS__)
 #define kr_log_fatal(grp, fmt, ...) \
-	kr_log_fmt(grp, LOG_CRIT, SD_JOURNAL_METADATA, fmt, ## __VA_ARGS__)
+	kr_log_fmt(grp, LOG_CRIT, SD_JOURNAL_METADATA, grp ## _TAG fmt, ## __VA_ARGS__)
 
 #define kr_log_deprecate(grp, fmt, ...) \
-	kr_log_fmt(grp, LOG_WARNING,SD_JOURNAL_METADATA, "deprecation WARNING: " fmt, ## __VA_ARGS__)
+	kr_log_fmt(grp, LOG_WARNING, SD_JOURNAL_METADATA, "deprecation WARNING: " grp ## _TAG fmt, ## __VA_ARGS__)
 
 #define KR_LOG_LEVEL_IS(exp) ((kr_log_level >= (exp)) ? true : false)
 
