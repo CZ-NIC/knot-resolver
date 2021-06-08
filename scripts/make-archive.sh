@@ -5,26 +5,28 @@ set -o errexit -o nounset -o xtrace
 
 cd "$(dirname ${0})/.."
 
-# devel version
-GIT_HASH=$(git rev-parse --short HEAD )
-TIMESTAMP=$(date -u +'%s' 2>/dev/null)
-
 # make sure we don't accidentally add / overwrite forgotten changes in git
 (git diff-index --quiet HEAD && git diff-index --cached --quiet HEAD) || \
     (echo 'git index has uncommited changes!'; exit 1)
 
-# modify and commit meson.build
-sed -i "s/^\(\s*version\s*:\s*'\)\([^']\+\)\('.*\)/\1\2.$TIMESTAMP.$GIT_HASH\3/" meson.build
+if ! git describe --tags --exact-match; then
+    # devel version
+    GIT_HASH=$(git rev-parse --short HEAD )
+    TIMESTAMP=$(date -u +'%s' 2>/dev/null)
 
-: changed version in meson.build, changes must be commited to git
-git add meson.build
-git commit -m 'DROP: devel version archive'
+    # modify and commit meson.build
+    sed -i "s/^\(\s*version\s*:\s*'\)\([^']\+\)\('.*\)/\1\2.$TIMESTAMP.$GIT_HASH\3/" meson.build
 
-cleanup() {
-    # undo commit
-    git reset --hard HEAD^ >/dev/null
-}
-trap cleanup EXIT
+    : changed version in meson.build, changes must be commited to git
+    git add meson.build
+    git commit -m 'DROP: devel version archive'
+
+    cleanup() {
+        # undo commit
+        git reset --hard HEAD^ >/dev/null
+    }
+    trap cleanup EXIT
+fi
 
 # create tarball
 rm -rf build_dist ||:

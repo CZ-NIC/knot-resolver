@@ -1,11 +1,14 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-
+#
+# Push packaging files to OBS
+#
 # Example usage:
-# 1. place tarball to be released in git root dir
-# 2. scripts/make-distrofiles.sh
-# 3. scripts/build-in-obs.sh knot-resolver-latest
+# 1. ./scripts/make-obs.sh
+# 2. ./scripts/build-in-obs.sh knot-resolver-latest
 set -o errexit -o nounset -o xtrace
+
+pkgdir='pkg/obs'
 
 project=home:CZ-NIC:$1
 package=knot-resolver
@@ -23,9 +26,7 @@ fi
 osc co "${project}" "${package}"
 pushd "${project}/${package}"
 osc del * ||:
-cp -L ../../*.orig.tar.xz ../../*.debian.tar.xz ../../*.dsc ./
-cp -rL ../../distro/rpm/* ./
-cp -rL ../../distro/arch/* ./
+cp -r ${pkgdir}/* ./
 osc addremove
 osc ci -n
 popd

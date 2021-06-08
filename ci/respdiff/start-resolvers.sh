@@ -5,7 +5,7 @@ service unbound start && service unbound status;
 # dig @localhost -p 53535
 
 #run bind
-service bind9 start && service bind9 status;
+service named start && service named status;
 # dig @localhost -p 53533
 
 #run kresd
