@@ -13,7 +13,7 @@ if [[ $(git status --porcelain | wc -l) -ne 0 ]]; then
 fi
 
 # Create tarball
-scripts/make-dev-archive.sh
+scripts/make-archive.sh
 
 # Submit to OBS
 scripts/make-distrofiles.sh -s
