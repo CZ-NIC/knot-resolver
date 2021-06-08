@@ -495,8 +495,12 @@ obs:trigger: &obs_trigger
     name: OBS/$OBS_REPO
     url: https://build.opensuse.org/package/show/home:CZ-NIC:$OBS_REPO/knot-resolver
   tags:
-    - condor
+    - docker
+    - linux
+    - amd64
   allow_failure: false  # required to make when: manual action blocking
+  before_script:
+    - echo -e "[general]\napiurl = https://api.opensuse.org\n\n[https://api.opensuse.org]\nuser = CZ-NIC-automation\npass = $OBS_PASSWORD" > ~/.oscrc
   script:
     - scripts/make-obs.sh
     - echo y | scripts/build-in-obs.sh $OBS_REPO
@@ -541,6 +545,8 @@ obs:build:all:
       - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing|knot-resolver-odvr$/
       - $CI_COMMIT_TAG
   allow_failure: true
+  before_script:
+    - echo -e "[general]\napiurl = https://api.opensuse.org\n\n[https://api.opensuse.org]\nuser = CZ-NIC-automation\npass = $OBS_PASSWORD" > ~/.oscrc
   script:
     - "osc results home:CZ-NIC:$OBS_REPO knot-resolver -w"
     - version=$(sed 's/^v//' <(git describe --exact-match HEAD || git rev-parse --short HEAD) )
@@ -555,6 +561,8 @@ obs:build:all:
 
 .distrotest: &distrotest
   <<: *deploytest
+  before_script:
+    - echo -e "[general]\napiurl = https://api.opensuse.org\n\n[https://api.opensuse.org]\nuser = CZ-NIC-automation\npass = $OBS_PASSWORD" > ~/.oscrc
   script:
     - "osc results home:CZ-NIC:$OBS_REPO knot-resolver -a x86_64 -r $DISTROTEST_REPO -w"
     - >
