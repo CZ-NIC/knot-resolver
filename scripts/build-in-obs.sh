@@ -26,7 +26,7 @@ fi
 osc co "${project}" "${package}"
 pushd "${project}/${package}"
 osc del * ||:
-cp -r ${pkgdir}/* ./
+cp -r ../../${pkgdir}/* ./
 osc addremove
 osc ci -n
 popd
