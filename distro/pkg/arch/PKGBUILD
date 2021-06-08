@@ -4,7 +4,7 @@
 
 pkgname=knot-resolver
 pkgver={{ version }}
-pkgrel=1
+pkgrel={{ release }}
 pkgdesc='Caching DNSSEC-validating DNS resolver'
 arch=('x86_64' 'armv7h')
 url='https://www.knot-resolver.cz/'
