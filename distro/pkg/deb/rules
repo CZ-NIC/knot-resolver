@@ -40,6 +40,10 @@ override_dh_auto_build:
 	dh_auto_build
 	dh_auto_build -- doc
 
+# skip dh_auto_install and use classic .install files instead to split files
+# into multiple packages
+override_dh_auto_install:
+
 override_dh_installinit:
 	dh_installinit -pknot-resolver --name=kresd --no-start
 
