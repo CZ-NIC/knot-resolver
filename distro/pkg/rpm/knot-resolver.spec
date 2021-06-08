@@ -9,7 +9,7 @@
 
 Name:           knot-resolver
 Version:        {{ version }}
-Release:        cznic.1%{?dist}
+Release:        cznic.{{ release }}%{?dist}
 Summary:        Caching full DNS Resolver
 
 License:        GPL-3.0-or-later
