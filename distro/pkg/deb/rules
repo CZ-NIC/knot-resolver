@@ -19,32 +19,39 @@ export ARCH=$(DEB_HOST_GNU_CPU)
 %:
 	dh $@
 
-override_dh_auto_build:
-	meson build_deb \
+override_dh_auto_configure:
+	dh_auto_configure -- \
 		--buildtype=plain \
 		--prefix=/usr \
 		--libdir=lib \
-		-Ddoc=enabled \
-		-Dsystemd_files=enabled \
-		-Dclient=enabled \
-		-Ddnstap=enabled \
 		-Dkeyfile_default=/usr/share/dns/root.key \
 		-Droot_hints=/usr/share/dns/root.hints \
 		-Dinstall_kresd_conf=enabled \
+		-Dsystemd_files=enabled \
+		-Dclient=enabled \
+		-Dutils=enabled \
+		-Ddoc=enabled \
+		-Ddnstap=enabled \
 		-Dunit_tests=enabled \
 		-Dc_args="$${CFLAGS}" \
 		-Dc_link_args="$${LDFLAGS}"
-	ninja -v -C build_deb
-	ninja -v -C build_deb doc
 
+override_dh_auto_build:
+	dh_auto_build
+	dh_auto_build -- doc
+
+# skip dh_auto_install and use classic .install files instead to split files
+# into multiple packages
 override_dh_auto_install:
-	DESTDIR="${PWD}/debian/tmp" ninja -v -C build_deb install
 
-override_dh_auto_test:
-	meson test -C build_deb
+override_dh_installinit:
+	dh_installinit -pknot-resolver --name=kresd --no-start
 
 override_dh_missing:
 	dh_missing --fail-missing
 
 override_dh_strip:
 	dh_strip --dbg-package=knot-resolver-dbg
+
+override_dh_installchangelogs:
+	dh_installchangelogs NEWS
