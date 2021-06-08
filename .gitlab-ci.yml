@@ -200,6 +200,8 @@ lint:pedantic:
   <<: *after_build
   # TODO migrate lint to debian-11
   image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
+  before_script:
+  # -- end TODO
   stage: sanity
   script:
     - meson build_pedantic_gcc -Dwerror=true -Dc_args='-Wpedantic' -Dextra_tests=enabled
@@ -213,6 +215,8 @@ lint:scan-build:
   <<: *after_build
   # TODO migrate lint to debian-11
   image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
+  before_script:
+  # -- end TODO
   stage: sanity
   artifacts:
     when: on_failure
@@ -228,6 +232,8 @@ lint:tidy:
   <<: *after_build
   # TODO migrate lint to debian-11
   image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
+  before_script:
+  # -- end TODO
   stage: sanity
   script:
     - ninja -C build_ci* tidy
