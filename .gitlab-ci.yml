@@ -498,7 +498,7 @@ obs:trigger: &obs_trigger
     - condor
   allow_failure: false  # required to make when: manual action blocking
   script:
-    - scripts/make-distrofiles.sh
+    - scripts/make-obs.sh
     - echo y | scripts/build-in-obs.sh $OBS_REPO
 
 obs:release:
