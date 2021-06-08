@@ -15,6 +15,8 @@ variables:
   LIBKRES_NAME: libkres
   MESON_TEST: meson test -C build_ci* -t 4 --print-errorlogs
   PREFIX: $CI_PROJECT_DIR/.local
+  GIT_COMMITER_NAME: 'ci'
+  EMAIL: 'ci@nic'
 
 image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-$KNOT_VERSION
 
@@ -71,7 +73,7 @@ stages:
     paths:
       - .local
       - build_ci*
-      - build_dist/meson-dist/*.tar.xz
+      - pkg
     reports:
       junit: build_ci*/meson-logs/testlog.junit.xml
   after_script:
@@ -79,9 +81,6 @@ stages:
 
 archive:
   <<: *build
-  variables:
-    GIT_COMMITER_NAME: 'ci'
-    EMAIL: 'ci@nic'
   except: null
   script:
     - apkg make-archive
