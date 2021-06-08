@@ -23,7 +23,7 @@ RUN apt-get install -y -qqq git make cmake pkg-config meson \
 RUN apt-get install -y -qqq \
 	protobuf-c-compiler libprotobuf-c-dev libfstrm-dev \
 	golang-any
-RUN bash -c "go get github.com/{FiloSottile/gvt,cloudflare/dns,dnstap/golang-dnstap}"
+RUN bash -c "go get github.com/{FiloSottile/gvt,cloudflare/dns,dnstap/golang-dnstap,golang/protobuf/proto}"
 
 # documentation dependecies
 RUN apt-get install -y -qqq doxygen python3-sphinx python3-breathe python3-sphinx-rtd-theme
