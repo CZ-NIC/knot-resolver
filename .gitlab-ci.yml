@@ -176,6 +176,8 @@ deckard_commit:
 
 doc:
   <<: *sanity
+  # TODO migrate doc to debian-11
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
   script:
     - meson build_doc -Ddoc=enabled
     - ninja -C build_doc doc-strict
