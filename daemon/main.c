@@ -422,7 +422,7 @@ int main(int argc, char **argv)
 
 	the_args = &the_args_value;
 	args_init(the_args);
-	kr_log_init(LOG_DEFAULT_LEVEL, LOG_TARGET_SYSLOG);
+	kr_log_init(LOG_DEFAULT_LEVEL, LOG_TARGET_STDOUT);
 	int ret = parse_args(argc, argv, the_args);
 	if (ret >= 0) goto cleanup_args;
 
