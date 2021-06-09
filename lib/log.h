@@ -27,6 +27,7 @@ typedef struct {
 	log_groups_t	g_val;
 } log_group_names_t;
 
+/* Don't forget add name to log_group_names[] (log.c) */
 #define LOG_GRP_SYSTEM		(1 << 1)
 #define LOG_GRP_CACHE		(1 << 2)
 #define LOG_GRP_IO		(1 << 3)
