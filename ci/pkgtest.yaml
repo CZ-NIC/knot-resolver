@@ -45,12 +45,30 @@ centos-7:pkgbuild:
     - yum install -y rpm-build python3-pip epel-release
     - *apkgbuild
 
+debian-9:pkgbuild:
+  <<: *pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-9
+  variables:
+    OBS_REPO: knot-resolver-build
+    DISTROTEST_REPO: Debian_10
+  script:
+    - *debpkgbuild
+
 debian-10:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-10
   variables:
     OBS_REPO: knot-resolver-build
     DISTROTEST_REPO: Debian_10
+  script:
+    - *debpkgbuild
+
+debian-11:pkgbuild:
+  <<: *pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-11
+  variables:
+    OBS_REPO: knot-resolver-build
+    DISTROTEST_REPO: Debian_11
   script:
     - *debpkgbuild
 
