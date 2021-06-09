@@ -175,28 +175,13 @@ static int l_get_log_level(lua_State *L)
 
 static int handle_log_groups(lua_State *L, void (*action)(log_groups_t grp))
 {
-	if(lua_gettop(L) == 0) {
-		int grp_b = 1;
-		char *grp_name = kr_log_grp2name(1 << grp_b);
-		printf("groups: \n\t");
-		while (grp_name) {
-			printf("%s%s, ", group_is_set(1 << grp_b) ? "*":"", grp_name);
-			if (grp_b%8 == 0)
-				printf("\n\t");
-			++grp_b;
-			grp_name = kr_log_grp2name(1 << grp_b);
-		}
-		printf("\n* = groups logged in debug level\n");
-		return 0;
-	}
-
 	if (lua_gettop(L) != 1 || (!lua_isstring(L, 1) && !lua_istable(L, 1)))
-		lua_error_p(L, "takes string or table of strings, type add_log_group() for help.");
+		lua_error_p(L, "takes string or table of strings");
 
 	if (lua_isstring(L, 1)) {
 		log_groups_t grp = kr_log_name2grp(lua_tostring(L, 1));
 		if (grp == 0)
-			lua_error_p(L, "unknown group, type add_log_group() for help.");
+			lua_error_p(L, "unknown group");
 		action(grp);
 	}
 
