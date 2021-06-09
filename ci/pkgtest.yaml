@@ -18,7 +18,8 @@ stages:
       - pkg/
 
 .apkgbuild: &apkgbuild
-  - pip3 install -U apkg
+  - pip3 install git+https://gitlab.nic.cz/packaging/apkg.git@env-pwd
+  # - pip3 install -U apkg  # TODO use this again once apkg releases
   - apkg build-dep -y
   - apkg build
 
