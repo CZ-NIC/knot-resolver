@@ -1,12 +1,15 @@
-Welcome to knot-resolver-manager's documentation!
-=================================================
+=====================
+Knot Resolver Manager
+=====================
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+    :maxdepth: 2
+    :caption: Manager:
 
+    getting-started
+    configuration
 
-
+==================
 Indices and tables
 ==================
 
