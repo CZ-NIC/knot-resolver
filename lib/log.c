@@ -27,6 +27,7 @@ log_group_names_t log_group_names[] = {
 	{ "network",	LOG_GRP_NETWORK },
 	{ "ta",		LOG_GRP_TA },
 	{ "tls",	LOG_GRP_TLS },
+	{ "gnutls",	LOG_GRP_GNUTLS },
 	{ "tlsclient",	LOG_GRP_TLSCLIENT },
 	{ "xdp",	LOG_GRP_XDP },
 	{ "zimport",	LOG_GRP_ZIMPORT },
