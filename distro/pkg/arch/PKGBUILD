@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 pkgname=knot-resolver
-pkgver=__VERSION__
-pkgrel=1
+pkgver={{ version }}
+pkgrel={{ release }}
 pkgdesc='Caching DNSSEC-validating DNS resolver'
 arch=('x86_64' 'armv7h')
 url='https://www.knot-resolver.cz/'
@@ -34,7 +34,7 @@ optdepends=(
 )
 backup=('etc/knot-resolver/kresd.conf')
 options=(debug strip)
-source=("knot-resolver_${pkgver}.orig.tar.xz")
+source=("knot-resolver-${pkgver}.tar.xz")
 sha256sums=('SKIP')
 
 build() {
