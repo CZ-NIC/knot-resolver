@@ -1,4 +1,4 @@
-knot-resolver (__VERSION__-cznic.1) unstable; urgency=medium
+knot-resolver ({{ version }}-cznic.{{ release }}) unstable; urgency=medium
 
   * move changelog to OBS
   * see NEWS or https://knot-resolver.cz
