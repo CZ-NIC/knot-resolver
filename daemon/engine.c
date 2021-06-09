@@ -215,6 +215,24 @@ static int l_del_log_group(lua_State *L)
 	return handle_log_groups(L, kr_log_del_group);
 }
 
+static int l_list_log_group(lua_State *L)
+{
+	int grp_b = 1;
+	char *grp_name = kr_log_grp2name(1 << grp_b);
+
+	printf("groups: \n\t");
+	while (grp_name) {
+		printf("%s%s, ", group_is_set(1 << grp_b) ? "*":"", grp_name);
+		if (grp_b%8 == 0)
+			printf("\n\t");
+		++grp_b;
+		grp_name = kr_log_grp2name(1 << grp_b);
+	}
+	printf("\n* = groups logged in debug level\n");
+
+	return 0;
+}
+
 char *engine_get_hostname(struct engine *engine) {
 	static char hostname_str[KNOT_DNAME_MAXLEN];
 	if (!engine) {
@@ -503,6 +521,8 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "add_log_group");
 	lua_pushcfunction(engine->L, l_del_log_group);
 	lua_setglobal(engine->L, "del_log_group");
+	lua_pushcfunction(engine->L, l_list_log_group);
+	lua_setglobal(engine->L, "list_log_group");
 	lua_pushcfunction(engine->L, l_setuser);
 	lua_setglobal(engine->L, "user");
 	lua_pushcfunction(engine->L, l_hint_root_file);
