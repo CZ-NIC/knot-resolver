@@ -603,8 +603,10 @@ int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 	}
 
 	if (handle->type == UV_TCP) {
-		if (status != 0)
-			session_tasklist_del(s, task);
+		if (status != 0) { // session probably not usable anymore; typically: ECONNRESET
+			worker_end_tcp(s);
+			return status;
+		}
 
 		if (session_flags(s)->outgoing || session_flags(s)->closing)
 			return status;
