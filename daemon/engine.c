@@ -74,6 +74,7 @@ static int l_help(lua_State *L)
 		"package_version()\n    return package version\n"
 		"user(name[, group])\n    change process user (and group)\n"
 		"verbose(true|false)\n    toggle verbose mode\n"
+		"set_log_level\n	logging level (crit, err, warning, notice, info or debug)\n"
 		"option(opt[, new_val])\n    get/set server option\n"
 		"mode(strict|normal|permissive)\n    set resolver strictness level\n"
 		"reorder_RR([true|false])\n    set/get reordering of RRs within RRsets\n"
@@ -154,13 +155,10 @@ static int l_verbose(lua_State *L)
 
 static int l_set_log_level(lua_State *L)
 {
-	if(lua_gettop(L) == 0) {
-		printf("levels: crit, err, warning, notice, info, debug\n");
+	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
+		lua_error_p(L, "takes one string parameter");
 		return 0;
 	}
-
-	if (lua_gettop(L) != 1 || !lua_isstring(L, 1))
-		lua_error_p(L, "takes one parameter, type set_log_level() for help.");
 
 	log_level_t lvl = kr_log_name2level(lua_tostring(L, 1));
 
