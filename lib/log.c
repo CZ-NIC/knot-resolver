@@ -73,11 +73,12 @@ void kr_log_fmt(log_groups_t group, log_level_t level, const char *file,
 #if ENABLE_LIBSYSTEMD
 		if (use_journal) {
 			sd_journal_printv_with_location(level, file, line, func, fmt, args);
-		} else
-#endif
-		{
+		} else {
 			vsyslog(level, fmt, args);
 		}
+#else
+		vsyslog(level, fmt, args);
+#endif
 		va_end(args);
 
 		if (group_is_set(group))
