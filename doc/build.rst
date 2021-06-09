@@ -220,7 +220,7 @@ It's also possible to make a development snapshot tarball:
 
 .. code-block:: bash
 
-   $ ./scripts/make-dev-archive.sh
+   $ ./scripts/make-archive.sh
 
 .. _packaging:
 

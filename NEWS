@@ -1,6 +1,10 @@
 Knot Resolver 5.x.y (2021-0m-dd)
 ================================
 
+Improvements
+------------
+- support apkg tool for packaging workflow (!1178)
+
 Bugfixes
 --------
 - trust_anchors.set_insecure: improve precision (#673, !1177)

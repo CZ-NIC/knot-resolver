@@ -1,0 +1,12 @@
+[project]
+name = "knot-resolver"
+# needed for make-archive
+make_archive_script = "scripts/make-archive.sh"
+
+[upstream]
+# needed for get-archive
+archive_url = "https://secure.nic.cz/files/knot-resolver/knot-resolver-{{ version }}.tar.xz"
+signature_url = "https://secure.nic.cz/files/knot-resolver/knot-resolver-{{ version }}.tar.xz.asc"
+
+[apkg]
+compat = 1

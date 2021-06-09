@@ -4,18 +4,17 @@
 %{!?_pkgdocdir: %global _pkgdocdir %{_docdir}/%{name}}
 
 %define GPG_CHECK 0
-%define VERSION __VERSION__
 %define repodir %{_builddir}/%{name}-%{version}
 %define NINJA ninja-build
 
 Name:           knot-resolver
-Version:        %{VERSION}
-Release:        cznic.1%{?dist}
+Version:        {{ version }}
+Release:        cznic.{{ release }}%{?dist}
 Summary:        Caching full DNS Resolver
 
 License:        GPL-3.0-or-later
 URL:            https://www.knot-resolver.cz/
-Source0:        knot-resolver_%{version}.orig.tar.xz
+Source0:        knot-resolver-%{version}.tar.xz
 
 # LuaJIT only on these arches
 %if 0%{?rhel} == 7
