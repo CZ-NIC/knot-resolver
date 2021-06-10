@@ -25,7 +25,6 @@ stages:
   - sanity
   - test
   - respdiff
-  - extended
   - deploy
   - pkgtest
 
@@ -306,6 +305,21 @@ test:valgrind:
     - ${MESON_TEST} --suite unit --suite config --no-suite snowflake --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
     - MESON_TESTTHREADS=1 ${MESON_TEST} --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" --suite snowflake
 
+pkgtest:
+  stage: test
+  trigger:
+    include: ci/pkgtest.yaml
+    strategy: depend
+  needs:
+    - build
+  except:
+    refs:
+      - master@knot/knot-resolver
+      - master@knot/security/knot-resolver
+      - tags
+    variables:
+      - $SKIP_CI == "1"
+
 pytests:
   <<: *test_flaky
   needs:
@@ -440,23 +454,6 @@ rp:iter.udp-asan:
   <<: *resperf
   variables:
     RESPERF_TEST: resperf.iter.udp
-# }}}
-
-# extended {{{
-pkgtest:
-  stage: extended
-  trigger:
-    include: ci/pkgtest.yaml
-    strategy: depend
-  needs:
-    - build
-  except:
-    refs:
-      - master@knot/knot-resolver
-      - master@knot/security/knot-resolver
-      - tags
-    variables:
-      - $SKIP_CI == "1"
 # }}}
 
 # deploy {{{
