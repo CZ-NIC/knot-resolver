@@ -82,7 +82,6 @@ else
 endif
 
 ## Additional options
-verbose_log = get_option('verbose_log') == 'enabled' or get_option('verbose_log') == 'auto'
 user = get_option('user')
 group = get_option('group')
 
@@ -173,7 +172,6 @@ conf_data.set_quoted('libzscanner_SONAME',
 conf_data.set_quoted('libknot_SONAME',
   libknot.get_pkgconfig_variable('soname'))
 conf_data.set('ENABLE_LIBSYSTEMD', libsystemd.found().to_int())
-conf_data.set('NOVERBOSELOG', not verbose_log)
 conf_data.set('ENABLE_SENDMMSG', sendmmsg.to_int())
 conf_data.set('ENABLE_XDP', xdp.to_int())
 conf_data.set('ENABLE_CAP_NG', capng.found().to_int())

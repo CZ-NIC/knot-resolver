@@ -1064,9 +1064,9 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 * The most important part is to check for spoofing: is_paired_to_query() */
 	query->flags.PKT_IS_SANE = true;
 
-#ifndef NOVERBOSELOG
-	const knot_lookup_t *rcode = knot_lookup_by_id(knot_rcode_names, knot_wire_get_rcode(pkt->wire));
-#endif
+	const knot_lookup_t *rcode = NULL;
+	if (KR_LOG_LEVEL_IS(LOG_DEBUG))
+		rcode = knot_lookup_by_id(knot_rcode_names, knot_wire_get_rcode(pkt->wire));
 
 	// We can't return directly from the switch because we have to give feedback to server selection first
 	int ret = 0;

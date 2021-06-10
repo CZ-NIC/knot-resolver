@@ -1637,7 +1637,6 @@ static int qr_task_step(struct qr_task *task,
 		if (unlikely(++task->iter_count > KR_ITER_LIMIT ||
 			     task->timeouts >= KR_TIMEOUT_LIMIT)) {
 
-			#ifndef NOVERBOSELOG
 			struct kr_rplan *rplan = &req->rplan;
 			struct kr_query *last = kr_rplan_last(rplan);
 			if (task->iter_count > KR_ITER_LIMIT) {
@@ -1646,7 +1645,6 @@ static int qr_task_step(struct qr_task *task,
 			if (task->timeouts >= KR_TIMEOUT_LIMIT) {
 				VERBOSE_MSG(last, "canceling query due to exceeded timeout retries limit of %d\n", KR_TIMEOUT_LIMIT);
 			}
-			#endif
 
 			return qr_task_finalize(task, KR_STATE_FAIL);
 		}
