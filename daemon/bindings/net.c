@@ -247,8 +247,7 @@ static int net_listen(lua_State *L)
 		} else if (k) {
 			flags.kind = k;
 			if (strcasecmp(k, "doh") == 0) {
-				kr_log_deprecate(
-					"kind=\"doh\" is an obsolete DoH implementation, use kind=\"doh2\" instead\n");
+				lua_error_p(L, "kind=\"doh\" was renamed to kind=\"doh_legacy\", switch to the new implementation with kind=\"doh2\" or update your config");
 			}
 		}
 
