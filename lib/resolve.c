@@ -1570,12 +1570,10 @@ int kr_resolve_finish(struct kr_request *request, int state)
 
 	ITERATE_LAYERS(request, NULL, finish);
 
-#ifndef NOVERBOSELOG
 	struct kr_rplan *rplan = &request->rplan;
 	struct kr_query *last = kr_rplan_last(rplan);
 	VERBOSE_MSG(last, "finished in state: %d, queries: %zu, mempool: %zu B\n",
-	          request->state, rplan->resolved.len, (size_t) mp_total_size(request->pool.ctx));
-#endif
+		  request->state, rplan->resolved.len, (size_t) mp_total_size(request->pool.ctx));
 
 	/* Trace request finish */
 	if (request->trace_finish) {
