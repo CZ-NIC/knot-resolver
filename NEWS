@@ -4,6 +4,7 @@ Knot Resolver 5.x.y (2021-0m-dd)
 Bugfixes
 --------
 - trust_anchors.set_insecure: improve precision (#673, !1177)
+- plug memory leaks related to TCP (!1182)
 
 Incompatible changes
 --------------------
