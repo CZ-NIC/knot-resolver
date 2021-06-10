@@ -34,6 +34,11 @@ Configuration file
 
 * ``kind='doh'`` in :func:`net.listen` was renamed to ``kind='doh_legacy'``. It is recommended to switch to the new DoH implementation with ``kind='doh2'``.
 
+Packagers & Developers
+----------------------
+
+* meson option ``verbose_log`` was removed.
+
 5.2 to 5.3
 ==========
 
