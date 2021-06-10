@@ -5,7 +5,7 @@ project(
   ['c', 'cpp'],
   license: 'GPLv3+',
   version: '5.3.2',
-  default_options: ['c_std=gnu11', 'b_ndebug=false'],
+  default_options: ['c_std=gnu11', 'b_ndebug=true'],
   meson_version: '>=0.49',
 )
 
