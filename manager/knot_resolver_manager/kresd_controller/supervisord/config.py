@@ -32,7 +32,6 @@ async def _create_config_file(config: SupervisordConfig):
 async def start_supervisord(config: SupervisordConfig):
     await _create_config_file(config)
     await call(f'supervisord --configuration="{CONFIG_FILE}"', shell=True)
-    sleep(1)
 
 
 async def stop_supervisord():
