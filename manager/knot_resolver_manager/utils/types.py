@@ -7,7 +7,7 @@ NoneType = type(None)
 
 def is_optional(tp: Any) -> bool:
     origin = getattr(tp, "__origin__", None)
-    args = getattr(tp, "__args__", [])
+    args = get_generic_type_arguments(tp)
 
     return origin == Union and len(args) == 2 and args[1] == NoneType
 
@@ -34,7 +34,8 @@ def is_literal(tp: Any) -> bool:
 
 
 def get_generic_type_arguments(tp: Any) -> List[Any]:
-    return list(getattr(tp, "__args__", []))
+    default: List[Any] = []
+    return getattr(tp, "__args__", default)
 
 
 def get_generic_type_argument(tp: Any) -> Any:

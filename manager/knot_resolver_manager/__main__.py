@@ -7,7 +7,7 @@ import click
 from knot_resolver_manager import compat
 from knot_resolver_manager.constants import LISTEN_SOCKET_PATH, MANAGER_CONFIG_FILE
 from knot_resolver_manager.server import start_server
-from knot_resolver_manager.utils import ignore_exceptions
+from knot_resolver_manager.utils import ignore_exceptions_optional
 
 
 @click.command()
@@ -36,7 +36,7 @@ def main(listen: Optional[str], config: Optional[str]):
     if listen is None:
         unix.append(LISTEN_SOCKET_PATH)
     else:
-        port = ignore_exceptions(None, ValueError)(int)(listen)
+        port = ignore_exceptions_optional(int, None, ValueError)(int)(listen)
         if port is not None:
             tcp.append(("localhost", port))
         else:
