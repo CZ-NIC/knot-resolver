@@ -2,7 +2,6 @@ import os.path
 import signal
 from os import kill
 from pathlib import Path
-from time import sleep
 from typing import List
 
 from jinja2 import Template
