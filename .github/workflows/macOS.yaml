@@ -5,7 +5,7 @@ on: push
 jobs:
   build-test:
     name: Build & unit tests & sanity check
-    runs-on: macOS-latest
+    runs-on: [ macOS-10.15, macOS-11 ]
 
     steps:
       - name: Checkout resolver code
