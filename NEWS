@@ -8,6 +8,7 @@ Improvements
 Bugfixes
 --------
 - trust_anchors.set_insecure: improve precision (#673, !1177)
+- policy.FLAGS: fix not applying properly in edge cases (!1179)
 
 Incompatible changes
 --------------------
