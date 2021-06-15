@@ -6,7 +6,9 @@
 
 #include <stdio.h>
 #include <gnutls/gnutls.h>
+#include "contrib/ucw/mempool.h"
 #include "lib/log.h"
+#include "lib/resolve.h"
 
 #if ENABLE_LIBSYSTEMD
 #include <stdlib.h>
@@ -20,21 +22,23 @@ log_level_t kr_log_level = LOG_CRIT;
 log_target_t kr_log_target = LOG_TARGET_STDOUT;
 log_groups_t kr_log_groups = 0;
 
+#define GRP_NAME_ITEM(grp) { grp ## _TAG, grp }
+
 log_group_names_t log_group_names[] = {
-	{ "system",	LOG_GRP_SYSTEM },
-	{ "cache",	LOG_GRP_CACHE },
-	{ "io",		LOG_GRP_IO },
-	{ "network",	LOG_GRP_NETWORK },
-	{ "ta",		LOG_GRP_TA },
-	{ "tls",	LOG_GRP_TLS },
-	{ "gnutls",	LOG_GRP_GNUTLS },
-	{ "tlsclient",	LOG_GRP_TLSCLIENT },
-	{ "xdp",	LOG_GRP_XDP },
-	{ "zimport",	LOG_GRP_ZIMPORT },
-	{ "zscanner",	LOG_GRP_ZSCANNER },
-	{ "doh",	LOG_GRP_DOH },
-	{ "dnssec",	LOG_GRP_DNSSEC },
-	{ "hint",	LOG_GRP_HINT },
+	GRP_NAME_ITEM(LOG_GRP_SYSTEM),
+	GRP_NAME_ITEM(LOG_GRP_CACHE),
+	GRP_NAME_ITEM(LOG_GRP_IO),
+	GRP_NAME_ITEM(LOG_GRP_NETWORK),
+	GRP_NAME_ITEM(LOG_GRP_TA),
+	GRP_NAME_ITEM(LOG_GRP_TLS),
+	GRP_NAME_ITEM(LOG_GRP_GNUTLS),
+	GRP_NAME_ITEM(LOG_GRP_TLSCLIENT),
+	GRP_NAME_ITEM(LOG_GRP_XDP),
+	GRP_NAME_ITEM(LOG_GRP_ZIMPORT),
+	GRP_NAME_ITEM(LOG_GRP_ZSCANNER),
+	GRP_NAME_ITEM(LOG_GRP_DOH),
+	GRP_NAME_ITEM(LOG_GRP_DNSSEC),
+	GRP_NAME_ITEM(LOG_GRP_HINT),
 	{ NULL,		-1 },
 };
 
@@ -197,5 +201,57 @@ void kr_log_init(log_level_t level, log_target_t target)
 #endif
 	openlog(NULL, LOG_PID, LOG_DAEMON);
 	kr_log_level_set(level);
+}
+
+
+/*
+ * Cleanup callbacks.
+ */
+static void kr_vlog_req(
+	const struct kr_request * const req, uint32_t qry_uid,
+	const unsigned int indent, log_groups_t group, const char *tag, const char *fmt,
+	va_list args)
+{
+	if (!group_is_set(group))
+		return; // skip alloc and string copy
+
+	struct mempool *mp = mp_new(512);
+
+	const uint32_t req_uid = req ? req->uid : 0;
+	char *msg = mp_printf(mp, "[%05u.%02u] %*s",
+				req_uid, qry_uid, indent, "");
+
+	msg = mp_vprintf_append(mp, msg, fmt, args);
+
+	if (kr_log_rtrace_enabled(req))
+		req->trace_log(req, msg);
+	else
+		kr_log_fmt(group, LOG_DEBUG, SD_JOURNAL_METADATA, "[%s]%s", tag, msg);
+
+	mp_delete(mp);
+}
+
+void kr_log_req1(const struct kr_request * const req, uint32_t qry_uid,
+		const unsigned int indent, log_groups_t group, const char *tag, const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	kr_vlog_req(req, qry_uid, indent, group, tag, fmt, args);
+	va_end(args);
+}
+
+void kr_log_q1(const struct kr_query * const qry,
+		log_groups_t group, const char *tag, const char *fmt, ...)
+{
+	unsigned ind = 0;
+	for (const struct kr_query *q = qry; q; q = q->parent)
+		ind += 2;
+	const uint32_t qry_uid = qry ? qry->uid : 0;
+	const struct kr_request *req = qry ? qry->request : NULL;
+
+	va_list args;
+	va_start(args, fmt);
+	kr_vlog_req(req, qry_uid, ind, group, tag, fmt, args);
+	va_end(args);
 }
 

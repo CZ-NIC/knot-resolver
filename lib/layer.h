@@ -13,10 +13,10 @@
  * \param _cls	identifying string, typically of length exactly four (padded)
  * \param ...	printf-compatible list of parameters
  */
-#define QRVERBOSE(_query, _cls, ...) do { \
+#define QRVERBOSE(_query, grp, ...) do { \
 	const struct kr_query *_qry = (_query); \
 	if (VERBOSE_STATUS || kr_log_qtrace_enabled(_qry)) { \
-		kr_log_q(_qry, (_cls), __VA_ARGS__); \
+		kr_log_q1(_qry, grp, grp ## _TAG, ##  __VA_ARGS__); \
 	}  \
 } while (false)
 

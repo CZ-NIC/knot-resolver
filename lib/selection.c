@@ -14,7 +14,7 @@
 
 #include "lib/utils.h"
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "slct", __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), LOG_GRP_SELECTION, __VA_ARGS__)
 
 #define DEFAULT_TIMEOUT 400
 #define MAX_TIMEOUT 10000
