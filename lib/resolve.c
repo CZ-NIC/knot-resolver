@@ -26,7 +26,7 @@
 #define KNOT_EDNS_OPTION_COOKIE 10
 #endif /* ENABLE_COOKIES */
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "resl",  __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), LOG_GRP_RESOLVER,  __VA_ARGS__)
 
 bool kr_rank_check(uint8_t rank)
 {
@@ -458,7 +458,7 @@ static void answer_fail(struct kr_request *request)
 {
 	/* Note: OPT in SERVFAIL response is still useful for cookies/additional info. */
 	if (VERBOSE_STATUS || kr_log_rtrace_enabled(request))
-		kr_log_req(request, 0, 0, "resl",
+		kr_log_req(request, 0, 0, LOG_GRP_RESOLVER,
 			"request failed, answering with empty SERVFAIL\n");
 	knot_pkt_t *answer = request->answer;
 	knot_rrset_t *opt_rr = answer->opt_rr; /* it gets NULLed below */
@@ -834,7 +834,7 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 		if (request->state & KR_STATE_FAIL) {
 			if (++request->count_fail_row > KR_CONSUME_FAIL_ROW_LIMIT) {
 				if (VERBOSE_STATUS || kr_log_rtrace_enabled(request)) {
-					kr_log_req(request, 0, 2, "resl",
+					kr_log_req(request, 0, 2, LOG_GRP_RESOLVER,
 						"=> too many failures in a row, "
 						"bail out (mitigation for NXNSAttack "
 						"CVE-2020-12667)\n");

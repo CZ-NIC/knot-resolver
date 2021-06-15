@@ -10,7 +10,7 @@
 #include "lib/zonecut.h"
 #include "lib/resolve.h"
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "slct", __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), LOG_GRP_SELECTION, __VA_ARGS__)
 
 /// To be held per query and locally.  Allocations are in the kr_request's mempool.
 struct iter_local_state {
