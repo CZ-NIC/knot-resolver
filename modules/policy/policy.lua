@@ -652,15 +652,17 @@ ffi.gc(debug_logline_cb, free_cb)
 
 local debug_logfinish_cb = ffi.cast('trace_callback_f', function (req)
 	jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
-	ffi.C.kr_log_req(req, 0, 0, 'dbg',
+	local LOG_GRP_POLICY= bit.lshift(1, 25)
+	local LOG_GRP_POLICY_TAG="policy"
+	ffi.C.kr_log_req1(req, 0, 0, LOG_GRP_POLICY, LOG_GRP_POLICY_TAG,
 		'following rrsets were marked as interesting:\n' ..
 		req:selected_tostring())
 	if req.answer ~= nil then
-		ffi.C.kr_log_req(req, 0, 0, 'dbg',
+		ffi.C.kr_log_req1(req, 0, 0, LOG_GRP_POLICY, LOG_GRP_POLICY_TAG,
 			'answer packet:\n' ..
 			tostring(req.answer))
 	else
-		ffi.C.kr_log_req(req, 0, 0, 'dbg',
+		ffi.C.kr_log_req1(req, 0, 0, LOG_GRP_POLICY, LOG_GRP_POLICY_TAG,
 			'answer packet DROPPED\n')
 	end
 end)
@@ -668,7 +670,10 @@ ffi.gc(debug_logfinish_cb, free_cb)
 
 -- log request packet
 function policy.REQTRACE(_, req)
-	ffi.C.kr_log_req(req, 0, 0, 'dbg', 'request packet:\n%s',
+	local LOG_GRP_POLICY= bit.lshift(1, 25)
+	local LOG_GRP_POLICY_TAG="policy"
+	ffi.C.kr_log_req1(req, 0, 0, LOG_GRP_POLICY, LOG_GRP_POLICY_TAG,
+		'request packet:\n%s',
 		tostring(req.qsource.packet))
 end
 
