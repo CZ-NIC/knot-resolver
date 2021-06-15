@@ -299,6 +299,7 @@ struct kr_server_selection {
 	void (*error)(struct kr_query *, const struct kr_transport *, enum kr_selection_error);
 	struct local_state *local_state;
 };
+typedef unsigned int log_groups_t;
 
 kr_layer_t kr_layer_t_static;
 _Bool kr_dbg_assertion_abort;
@@ -376,8 +377,8 @@ int kr_rplan_pop(struct kr_rplan *, struct kr_query *);
 struct kr_query *kr_rplan_resolved(struct kr_rplan *);
 struct kr_query *kr_rplan_last(struct kr_rplan *);
 int kr_forward_add_target(struct kr_request *, const struct sockaddr *);
-void kr_log_req(const struct kr_request * const, uint32_t, const unsigned int, const char *, const char *, ...);
-void kr_log_q(const struct kr_query * const, const char *, const char *, ...);
+void kr_log_req1(const struct kr_request * const, uint32_t, const unsigned int, log_groups_t, const char *, const char *, ...);
+void kr_log_q1(const struct kr_query * const, log_groups_t, const char *, const char *, ...);
 int kr_make_query(struct kr_query *, knot_pkt_t *);
 void kr_pkt_make_auth_header(knot_pkt_t *);
 int kr_pkt_put(knot_pkt_t *, const knot_dname_t *, uint32_t, uint16_t, uint16_t, const uint8_t *, uint16_t);

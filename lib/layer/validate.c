@@ -25,7 +25,7 @@
 #include "lib/module.h"
 #include "lib/selection.h"
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "vldr", __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, LOG_GRP_VALIDATOR, __VA_ARGS__)
 
 #define MAX_REVALIDATION_CNT 2
 
@@ -583,7 +583,7 @@ static const knot_dname_t *find_first_signer(ranked_rr_array_t *arr, struct kr_q
 			return signame;
 		} else {
 			/* otherwise it's some nonsense, so we skip it */
-			kr_log_q(qry, "vldr", "protocol violation: "
+			kr_log_q(qry, LOG_GRP_VALIDATOR, "protocol violation: "
 					"out-of-bailwick RRSIG signer, skipping\n");
 		}
 	}
