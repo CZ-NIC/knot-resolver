@@ -254,6 +254,9 @@ uint8_t *ip_to_bytes(const union inaddr *src, size_t len);
 
 /**
  * @internal Fetch per-address information from various sources.
+ *
+ * Note that this opens a RO cache transaction; the callee is responsible
+ * for its closing not too long afterwards (e.g. calling kr_cache_commit).
  */
 void update_address_state(struct address_state *state, union inaddr *address,
 			  size_t address_len, struct kr_query *qry);
