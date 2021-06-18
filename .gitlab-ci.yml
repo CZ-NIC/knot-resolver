@@ -590,6 +590,7 @@ obs:centos7:x86_64:
 
 obs:centos8:x86_64:
   <<: *distrotest
+  allow_failure: true
   variables:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: centos8
