@@ -104,7 +104,7 @@ void kr_log_fmt(log_groups_t group, log_level_t level, const char *file,
 
 static void kres_gnutls_log(int level, const char *message)
 {
-	kr_log_debug(LOG_GRP_GNUTLS, "[gnutls] (%d) %s", level, message);
+	kr_log_debug(LOG_GRP_GNUTLS, "(%d) %s", level, message);
 }
 
 char *kr_log_level2name(log_level_t level)
