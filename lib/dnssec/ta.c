@@ -58,14 +58,14 @@ static int dnskey2ds(dnssec_binary_t *dst, const knot_dname_t *owner, const uint
 	const bool flags_ok = kr_dnssec_key_zsk(rdata) && !kr_dnssec_key_revoked(rdata);
 	if (!flags_ok) {
 		auto_free char *owner_str = kr_dname_text(owner);
-		kr_log_error(LOG_GRP_TA, "refusing to trust %s DNSKEY because of flags %d\n",
+		kr_log_error(TA, "refusing to trust %s DNSKEY because of flags %d\n",
 			owner_str, dnssec_key_get_flags(key));
 		ret = kr_error(EILSEQ);
 		goto cleanup;
 	} else if (!kr_dnssec_key_ksk(rdata)) {
 		auto_free char *owner_str = kr_dname_text(owner);
 		int flags = dnssec_key_get_flags(key);
-		kr_log_warning(LOG_GRP_TA, "warning: %s DNSKEY is missing the SEP bit; "
+		kr_log_warning(TA, "warning: %s DNSKEY is missing the SEP bit; "
 			"flags %d instead of %d\n",
 			owner_str, flags, flags + 1/*a little ugly*/);
 	}

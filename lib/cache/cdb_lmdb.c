@@ -87,7 +87,7 @@ static int lmdb_error(int error)
 	case MDB_TXN_FULL:
 		return kr_error(ENOSPC);
 	default:
-		kr_log_error(LOG_GRP_CACHE, "LMDB error: %s\n", mdb_strerror(error));
+		kr_log_error(CACHE, "LMDB error: %s\n", mdb_strerror(error));
 		return kr_error(error);
 	}
 }
@@ -116,7 +116,7 @@ static int refresh_mapsize(struct lmdb_env *env)
 
 	env->mapsize = info.me_mapsize;
 	if (env->mapsize != env->st_size) {
-		kr_log_info(LOG_GRP_CACHE, "suspicious size of cache file '%s'"
+		kr_log_info(CACHE, "suspicious size of cache file '%s'"
 				": file size %zu != LMDB map size %zu\n",
 				env->mdb_data_path, (size_t)env->st_size, env->mapsize);
 	}
@@ -128,10 +128,10 @@ static void clear_stale_readers(struct lmdb_env *env)
 	int cleared;
 	int ret = mdb_reader_check(env->env, &cleared);
 	if (ret != MDB_SUCCESS) {
-		kr_log_error(LOG_GRP_CACHE, "failed to clear stale reader locks: "
+		kr_log_error(CACHE, "failed to clear stale reader locks: "
 				"LMDB error %d %s\n", ret, mdb_strerror(ret));
 	} else if (cleared != 0) {
-		kr_log_info(LOG_GRP_CACHE, "cleared %d stale reader locks\n", cleared);
+		kr_log_info(CACHE, "cleared %d stale reader locks\n", cleared);
 	}
 }
 
@@ -160,7 +160,7 @@ retry:
 	}
 
 	if (unlikely(ret == MDB_MAP_RESIZED)) {
-		kr_log_info(LOG_GRP_CACHE, "detected size increased by another process\n");
+		kr_log_info(CACHE, "detected size increased by another process\n");
 		ret = refresh_mapsize(env);
 		if (ret == 0)
 			goto retry;
@@ -384,7 +384,7 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	if (ret == EINVAL) {
 		/* POSIX says this can happen when the feature isn't supported by the FS.
 		 * We haven't seen this happen on Linux+glibc but it was reported on FreeBSD.*/
-		kr_log_info(LOG_GRP_CACHE, "space pre-allocation failed and ignored; "
+		kr_log_info(CACHE, "space pre-allocation failed and ignored; "
 				"your (file)system probably doesn't support it.\n");
 	} else if (ret != 0) {
 		mdb_txn_abort(txn);
@@ -495,7 +495,7 @@ static int cdb_check_health(kr_cdb_pt db, struct kr_cdb_stats *stats)
 	 * contrary to methods based on mdb_env_info(). */
 	if (st.st_size == env->st_size)
 		return kr_ok();
-	kr_log_info(LOG_GRP_CACHE, "detected size change (by another instance?) of file '%s'"
+	kr_log_info(CACHE, "detected size change (by another instance?) of file '%s'"
 			": file size %zu -> file size %zu\n",
 			env->mdb_data_path, (size_t)env->st_size, (size_t)st.st_size);
 	env->st_size = st.st_size; // avoid retrying in cycle even if we fail
@@ -558,7 +558,7 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 				return ret;
 			}
 		}
-		kr_log_info(LOG_GRP_CACHE, "clearing error, falling back\n");
+		kr_log_info(CACHE, "clearing error, falling back\n");
 	}
 	/* Fallback: we'll remove the database files and reopen.
 	 * Other instances can continue to use the removed lmdb,
@@ -582,7 +582,7 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 	/* Find if we get a lock on lockfile. */
 	const int lockfile_fd = lockfile_get(lockfile);
 	if (lockfile_fd < 0) {
-		kr_log_error(LOG_GRP_CACHE, "clearing failed to get ./krcachelock (%s); retry later\n",
+		kr_log_error(CACHE, "clearing failed to get ./krcachelock (%s); retry later\n",
 				kr_strerror(lockfile_fd));
 		/* As we're out of space (almost certainly - mdb_drop didn't work),
 		 * we will retry on the next failing write operation. */
@@ -608,7 +608,7 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 	/* Environment updated, release lockfile. */
 	int lrerr = lockfile_release(lockfile_fd);
 	if (lrerr) {
-		kr_log_error(LOG_GRP_CACHE, "failed to release ./krcachelock: %s\n",
+		kr_log_error(CACHE, "failed to release ./krcachelock: %s\n",
 				kr_strerror(lrerr));
 	}
 	return ret;
