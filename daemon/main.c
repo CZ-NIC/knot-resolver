@@ -149,7 +149,7 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, bool leader, struc
 	case UV_NAMED_PIPE:	/* echo 'quit()' | kresd ... */
 		break;
 	default:
-		kr_log_error(LOG_GRP_SYSTEM, "[system] "
+		kr_log_error(LOG_GRP_SYSTEM,
 			"error: standard input is not a terminal or pipe; "
 			"use '-n' if you want non-interactive mode.  "
 			"Commands can be simply added to your configuration file or sent over the control socket.\n"
@@ -349,7 +349,7 @@ static int bind_sockets(addr_array_t *addrs, bool tls, flagged_fd_array_t *fds)
 		}
 		free(sa);
 		if (ret != 0) {
-			kr_log_error(LOG_GRP_NETWORK, "[network] bind to '%s'%s: %s\n",
+			kr_log_error(LOG_GRP_NETWORK, "bind to '%s'%s: %s\n",
 				addrs->at[i], tls ? " (TLS)" : "", kr_strerror(ret));
 			has_error = true;
 		}
@@ -368,7 +368,7 @@ static int start_listening(struct network *net, flagged_fd_array_t *fds) {
 			/* TODO: try logging address@port.  It's not too important,
 			 * because typical problems happen during binding already.
 			 * (invalid address, permission denied) */
-			kr_log_error(LOG_GRP_NETWORK, "[network] listen on fd=%d: %s\n",
+			kr_log_error(LOG_GRP_NETWORK, "listen on fd=%d: %s\n",
 					ffd->fd, kr_strerror(ret));
 			/* Continue printing all of these before exiting. */
 		} else {
@@ -392,7 +392,7 @@ static void drop_capabilities(void)
 
 		/* Apply. */
 		if (capng_apply(CAPNG_SELECT_BOTH) < 0) {
-			kr_log_error(LOG_GRP_SYSTEM, "[system] failed to set process capabilities: %s\n",
+			kr_log_error(LOG_GRP_SYSTEM, "failed to set process capabilities: %s\n",
 			          strerror(errno));
 		} else {
 			kr_log_verbose("[system] all capabilities dropped\n");
@@ -407,7 +407,7 @@ static void drop_capabilities(void)
 int main(int argc, char **argv)
 {
 	if (setvbuf(stdout, NULL, _IONBF, 0) || setvbuf(stderr, NULL, _IONBF, 0)) {
-		kr_log_error(LOG_GRP_SYSTEM, "[system] failed to to set output buffering (ignored): %s\n",
+		kr_log_error(LOG_GRP_SYSTEM, "failed to to set output buffering (ignored): %s\n",
 				strerror(errno));
 		fflush(stderr);
 	}
@@ -432,7 +432,7 @@ int main(int argc, char **argv)
 		/* FIXME: access isn't a good way if we start as root and drop privileges later */
 		if (access(the_args->rundir, W_OK) != 0
 		    || chdir(the_args->rundir) != 0) {
-			kr_log_error(LOG_GRP_SYSTEM, "[system] rundir '%s': %s\n",
+			kr_log_error(LOG_GRP_SYSTEM, "rundir '%s': %s\n",
 					the_args->rundir, strerror(errno));
 			return EXIT_FAILURE;
 		}
@@ -450,7 +450,7 @@ int main(int argc, char **argv)
 		} else if (access(config, R_OK) != 0) {
 			char cwd[PATH_MAX];
 			get_workdir(cwd, sizeof(cwd));
-			kr_log_error(LOG_GRP_SYSTEM, "[system] config '%s' (workdir '%s'): %s\n",
+			kr_log_error(LOG_GRP_SYSTEM, "config '%s' (workdir '%s'): %s\n",
 				config, cwd, strerror(errno));
 			return EXIT_FAILURE;
 		}
@@ -471,10 +471,10 @@ int main(int argc, char **argv)
 		ret = setrlimit(RLIMIT_NOFILE, &rlim);
 	}
 	if (ret) {
-		kr_log_error(LOG_GRP_SYSTEM, "[system] failed to get or set file-descriptor limit: %s\n",
+		kr_log_error(LOG_GRP_SYSTEM, "failed to get or set file-descriptor limit: %s\n",
 				strerror(errno));
 	} else if (rlim.rlim_cur < 512*1024) {
-		kr_log_warning(LOG_GRP_SYSTEM, "[system] warning: hard limit for number of file-descriptors is only %ld but recommended value is 524288\n",
+		kr_log_warning(LOG_GRP_SYSTEM, "warning: hard limit for number of file-descriptors is only %ld but recommended value is 524288\n",
 				(long)rlim.rlim_cur);
 	}
 
@@ -492,13 +492,13 @@ int main(int argc, char **argv)
 	static struct engine engine;
 	ret = engine_init(&engine, &pool);
 	if (ret != 0) {
-		kr_log_error(LOG_GRP_SYSTEM, "[system] failed to initialize engine: %s\n", kr_strerror(ret));
+		kr_log_error(LOG_GRP_SYSTEM, "failed to initialize engine: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;
 	}
 	/* Initialize the worker */
 	ret = worker_init(&engine, the_args->forks);
 	if (ret != 0) {
-		kr_log_error(LOG_GRP_SYSTEM, "[system] failed to initialize worker: %s\n", kr_strerror(ret));
+		kr_log_error(LOG_GRP_SYSTEM, "failed to initialize worker: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;
 	}
 
@@ -525,7 +525,7 @@ int main(int argc, char **argv)
 		}
 	}
 	if (ret) {
-		kr_log_error(LOG_GRP_SYSTEM, "[system] failed to set up signal handlers: %s\n",
+		kr_log_error(LOG_GRP_SYSTEM, "failed to set up signal handlers: %s\n",
 				strerror(abs(errno)));
 		ret = EXIT_FAILURE;
 		goto cleanup;
@@ -534,7 +534,7 @@ int main(int argc, char **argv)
 	 * (of the usual type) may skew results, e.g. epoll_pwait() taking lots of time. */
 	ret = uv_loop_configure(loop, UV_LOOP_BLOCK_SIGNAL, SIGPROF);
 	if (ret) {
-		kr_log_info(LOG_GRP_SYSTEM, "[system] failed to block SIGPROF in event loop, ignoring: %s\n",
+		kr_log_info(LOG_GRP_SYSTEM, "failed to block SIGPROF in event loop, ignoring: %s\n",
 				uv_strerror(ret));
 	}
 
@@ -546,7 +546,7 @@ int main(int argc, char **argv)
 
 	ret = udp_queue_init_global(loop);
 	if (ret) {
-		kr_log_error(LOG_GRP_SYSTEM, "[system] failed to initialize UDP queue: %s\n",
+		kr_log_error(LOG_GRP_SYSTEM, "failed to initialize UDP queue: %s\n",
 				kr_strerror(ret));
 		ret = EXIT_FAILURE;
 		goto cleanup;
