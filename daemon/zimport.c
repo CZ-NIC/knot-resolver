@@ -465,14 +465,14 @@ static void zi_zone_process(uv_timer_t* handle)
 	KR_DNAME_GET_STR(zone_name_str, z_import->origin);
 
 	if (strcmp(".", zone_name_str) != 0) {
-		kr_log_error(LOG_GRP_ZIMPORT, "[zimport] unexpected zone name `%s` (root zone expected), fail\n",
+		kr_log_error(LOG_GRP_ZIMPORT, "unexpected zone name `%s` (root zone expected), fail\n",
 			     zone_name_str);
 		failed = 1;
 		goto finish;
 	}
 
 	if (z_import->rrset_sorted.len <= 0) {
-		kr_log_error(LOG_GRP_ZIMPORT, "[zimport] zone `%s` is empty\n", zone_name_str);
+		kr_log_error(LOG_GRP_ZIMPORT, "zone `%s` is empty\n", zone_name_str);
 		goto finish;
 	}
 
@@ -490,7 +490,7 @@ static void zi_zone_process(uv_timer_t* handle)
 	knot_rrset_t *rr_key = map_get(&z_import->rrset_indexed, key);
 	if (!rr_key) {
 		/* DNSKEY MUST be here. If not found - fail. */
-		kr_log_error(LOG_GRP_ZIMPORT, "[zimport] DNSKEY not found for `%s`, fail\n", zone_name_str);
+		kr_log_error(LOG_GRP_ZIMPORT, "DNSKEY not found for `%s`, fail\n", zone_name_str);
 		failed = 1;
 		goto finish;
 	}
@@ -499,7 +499,7 @@ static void zi_zone_process(uv_timer_t* handle)
 	map_t *trust_anchors = &z_import->worker->engine->resolver.trust_anchors;
 	knot_rrset_t *rr_ta = kr_ta_get(trust_anchors, z_import->origin);
 	if (!rr_ta) {
-		kr_log_error(LOG_GRP_ZIMPORT, "[zimport] error: TA for zone `%s` vanished, fail", zone_name_str);
+		kr_log_error(LOG_GRP_ZIMPORT, "error: TA for zone `%s` vanished, fail", zone_name_str);
 		failed = 1;
 		goto finish;
 	}
@@ -596,7 +596,7 @@ finish:
 	if (failed != 0) {
 		if (ns_imported == 0 && other_imported == 0) {
 			import_state = -1;
-			kr_log_error(LOG_GRP_ZIMPORT, "[zimport] import failed; zone `%s` \n", zone_name_str);
+			kr_log_error(LOG_GRP_ZIMPORT, "import failed; zone `%s` \n", zone_name_str);
 		} else {
 			import_state = 1;
 		}
@@ -615,13 +615,13 @@ static int zi_record_store(zs_scanner_t *s)
 {
 	if (s->r_data_length > UINT16_MAX) {
 		/* Due to knot_rrset_add_rdata(..., const uint16_t size, ...); */
-		kr_log_error(LOG_GRP_ZSCANNER, "[zscanner] line %"PRIu64": rdata is too long\n",
+		kr_log_error(LOG_GRP_ZSCANNER, "line %"PRIu64": rdata is too long\n",
 				s->line_counter);
 		return -1;
 	}
 
 	if (knot_dname_size(s->r_owner) != strlen((const char *)(s->r_owner)) + 1) {
-		kr_log_error(LOG_GRP_ZSCANNER, "[zscanner] line %"PRIu64
+		kr_log_error(LOG_GRP_ZSCANNER, "line %"PRIu64
 				": owner name contains zero byte, skip\n",
 				s->line_counter);
 		return 0;
@@ -632,14 +632,14 @@ static int zi_record_store(zs_scanner_t *s)
 	knot_rrset_t *new_rr = knot_rrset_new(s->r_owner, s->r_type, s->r_class,
 					      s->r_ttl, &z_import->pool);
 	if (!new_rr) {
-		kr_log_error(LOG_GRP_ZSCANNER, "[zscanner] line %"PRIu64": error creating rrset\n",
+		kr_log_error(LOG_GRP_ZSCANNER, "line %"PRIu64": error creating rrset\n",
 				s->line_counter);
 		return -1;
 	}
 	int res = knot_rrset_add_rdata(new_rr, s->r_data, s->r_data_length,
 				       &z_import->pool);
 	if (res != KNOT_EOK) {
-		kr_log_error(LOG_GRP_ZSCANNER, "[zscanner] line %"PRIu64": error adding rdata to rrset\n",
+		kr_log_error(LOG_GRP_ZSCANNER, "line %"PRIu64": error adding rdata to rrset\n",
 				s->line_counter);
 		return -1;
 	}
@@ -653,7 +653,7 @@ static int zi_record_store(zs_scanner_t *s)
 	res = kr_rrkey(key, new_rr->rclass, new_rr->owner, new_rr->type,
 		       additional_key_field);
 	if (res <= 0) {
-		kr_log_error(LOG_GRP_ZSCANNER, "[zscanner] line %"PRIu64": error constructing rrkey\n",
+		kr_log_error(LOG_GRP_ZSCANNER, "line %"PRIu64": error constructing rrkey\n",
 				s->line_counter);
 		return -1;
 	}
@@ -666,7 +666,7 @@ static int zi_record_store(zs_scanner_t *s)
 		res = map_set(&z_import->rrset_indexed, key, new_rr);
 	}
 	if (res != 0) {
-		kr_log_error(LOG_GRP_ZSCANNER, "[zscanner] line %"PRIu64": error saving parsed rrset\n",
+		kr_log_error(LOG_GRP_ZSCANNER, "line %"PRIu64": error saving parsed rrset\n",
 				s->line_counter);
 		return -1;
 	}
@@ -692,29 +692,29 @@ static int zi_state_parsing(zs_scanner_t *s)
 			}
 			break;
 		case ZS_STATE_ERROR:
-			kr_log_error(LOG_GRP_ZSCANNER, "[zscanner] line: %"PRIu64
+			kr_log_error(LOG_GRP_ZSCANNER, "line: %"PRIu64
 				     ": parse error; code: %i ('%s')\n",
 				     s->line_counter, s->error.code,
 				     zs_strerror(s->error.code));
 			return -1;
 		case ZS_STATE_INCLUDE:
-			kr_log_error(LOG_GRP_ZSCANNER, "[zscanner] line: %"PRIu64
+			kr_log_error(LOG_GRP_ZSCANNER, "line: %"PRIu64
 				     ": INCLUDE is not supported\n",
 				     s->line_counter);
 			return -1;
 		case ZS_STATE_EOF:
 		case ZS_STATE_STOP:
 			if (empty) {
-				kr_log_error(LOG_GRP_ZIMPORT, "[zimport] empty zone file\n");
+				kr_log_error(LOG_GRP_ZIMPORT, "empty zone file\n");
 				return -1;
 			}
 			if (!((zone_import_ctx_t *) s->process.data)->origin) {
-				kr_log_error(LOG_GRP_ZIMPORT, "[zimport] zone file doesn't contain SOA record\n");
+				kr_log_error(LOG_GRP_ZIMPORT, "zone file doesn't contain SOA record\n");
 				return -1;
 			}
 			return (s->error.counter == 0) ? 0 : -1;
 		default:
-			kr_log_error(LOG_GRP_ZSCANNER, "[zimport] line: %"PRIu64
+			kr_log_error(LOG_GRP_ZSCANNER, "line: %"PRIu64
 				     ": unexpected parse state: %i\n",
 				     s->line_counter, s->state);
 			return -1;
@@ -733,7 +733,7 @@ int zi_zone_import(struct zone_import_ctx *z_import,
 
 	zs_scanner_t *s = malloc(sizeof(zs_scanner_t));
 	if (s == NULL) {
-		kr_log_error(LOG_GRP_ZSCANNER, "[zscanner] error creating instance of zone scanner (malloc() fails)\n");
+		kr_log_error(LOG_GRP_ZSCANNER, "error creating instance of zone scanner (malloc() fails)\n");
 		return -1;
 	}
 
@@ -741,7 +741,7 @@ int zi_zone_import(struct zone_import_ctx *z_import,
 	 * so don't print error code as it meaningless. */
 	int res = zs_init(s, origin, rclass, ttl);
 	if (res != 0) {
-		kr_log_error(LOG_GRP_ZSCANNER, "[zscanner] error initializing zone scanner instance, error: %i (%s)\n",
+		kr_log_error(LOG_GRP_ZSCANNER, "error initializing zone scanner instance, error: %i (%s)\n",
 			     s->error.code, zs_strerror(s->error.code));
 		free(s);
 		return -1;
@@ -749,7 +749,7 @@ int zi_zone_import(struct zone_import_ctx *z_import,
 
 	res = zs_set_input_file(s, zone_file);
 	if (res != 0) {
-		kr_log_error(LOG_GRP_ZSCANNER, "[zscanner] error opening zone file `%s`, error: %i (%s)\n",
+		kr_log_error(LOG_GRP_ZSCANNER, "error opening zone file `%s`, error: %i (%s)\n",
 			     zone_file, s->error.code, zs_strerror(s->error.code));
 		zs_deinit(s);
 		free(s);
@@ -760,7 +760,7 @@ int zi_zone_import(struct zone_import_ctx *z_import,
 	 * Parsing as well error processing will be performed in zi_state_parsing().
 	 * Store pointer to zone import context for further use. */
 	if (zs_set_processing(s, NULL, NULL, (void *)z_import) != 0) {
-		kr_log_error(LOG_GRP_ZSCANNER, "[zscanner] zs_set_processing() failed for zone file `%s`, "
+		kr_log_error(LOG_GRP_ZSCANNER, "zs_set_processing() failed for zone file `%s`, "
 				"error: %i (%s)\n",
 				zone_file, s->error.code, zs_strerror(s->error.code));
 		zs_deinit(s);
@@ -784,7 +784,7 @@ int zi_zone_import(struct zone_import_ctx *z_import,
 				/* For now - fail.
 				 * TODO - query DS and continue after answer had been obtained. */
 				KR_DNAME_GET_STR(zone_name_str, z_import->origin);
-				kr_log_error(LOG_GRP_ZIMPORT, "[zimport] no TA found for `%s`, fail\n", zone_name_str);
+				kr_log_error(LOG_GRP_ZIMPORT, "no TA found for `%s`, fail\n", zone_name_str);
 				ret = 1;
 			}
 			elapsed = kr_now() - z_import->start_timestamp;
@@ -795,7 +795,7 @@ int zi_zone_import(struct zone_import_ctx *z_import,
 	free(s);
 
 	if (ret != 0) {
-		kr_log_error(LOG_GRP_ZSCANNER, "[zscanner] error parsing zone file `%s`\n", zone_file);
+		kr_log_error(LOG_GRP_ZSCANNER, "error parsing zone file `%s`\n", zone_file);
 		z_import->started = false;
 		return ret;
 	}
