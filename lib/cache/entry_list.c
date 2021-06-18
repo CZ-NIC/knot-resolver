@@ -185,7 +185,7 @@ static int cache_write_or_clear(struct kr_cache *cache, const knot_db_val_t *key
 	 */
 	const uint64_t now = kr_now();
 	if (!ignoring_errors_until) { // First error after a success.
-		kr_log_info(LOG_GRP_CACHE, "[cache] LMDB refusing writes (ignored for 5-9s): %s\n",
+		kr_log_info(LOG_GRP_CACHE, "LMDB refusing writes (ignored for 5-9s): %s\n",
 				kr_strerror(ret));
 		ignoring_errors_until = now + 5000 + kr_rand_bytes(2)/16;
 		return kr_error(ret);
@@ -202,7 +202,7 @@ recovery: // Try to recover by clearing cache.
 				kr_strerror(ret));
 		abort();
 	case 0:
-		kr_log_info(LOG_GRP_CACHE, "[cache] stuck cache cleared\n");
+		kr_log_info(LOG_GRP_CACHE, "stuck cache cleared\n");
 		ignoring_errors_until = 0;
 	case -EAGAIN: // fall-through; krcachelock race -> retry later
 		return kr_error(ENOSPC);
