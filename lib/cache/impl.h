@@ -409,7 +409,7 @@ int nsec3_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 
 
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), LOG_GRP_CACHE,  ## __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), CACHE,  ## __VA_ARGS__)
 
 /** Shorthand for operations on cache backend */
 #define cache_op(cache, op, ...) (cache)->api->op((cache)->db, &(cache)->stats, ## __VA_ARGS__)
