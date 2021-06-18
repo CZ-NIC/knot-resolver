@@ -633,8 +633,22 @@ int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 	}
 
 	if (handle->type == UV_TCP) {
-		if (status != 0)
-			session_tasklist_del(s, task);
+		if (status != 0) { // session probably not usable anymore; typically: ECONNRESET
+			if (VERBOSE_STATUS) {
+				const char *peer_str = NULL;
+				if (!session_flags(s)->outgoing) {
+					peer_str = "hidden"; // avoid logging downstream IPs
+				} else if (task->transport) {
+					peer_str = kr_straddr(&task->transport->address.ip);
+				}
+				if (!peer_str)
+					peer_str = "unknown"; // probably shouldn't happen
+				kr_log_verbose( "[wrkr]=> disconnected from '%s': %s\n",
+						peer_str, uv_strerror(status));
+			}
+			worker_end_tcp(s);
+			return status;
+		}
 
 		if (session_flags(s)->outgoing || session_flags(s)->closing)
 			return status;

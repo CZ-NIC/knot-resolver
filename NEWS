@@ -8,6 +8,7 @@ Improvements
 Bugfixes
 --------
 - trust_anchors.set_insecure: improve precision (#673, !1177)
+- plug memory leaks related to TCP (!1182)
 
 Incompatible changes
 --------------------
