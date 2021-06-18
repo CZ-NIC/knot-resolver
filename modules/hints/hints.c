@@ -25,8 +25,8 @@
 #include <math.h>
 
 /* Defaults */
-#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, LOG_GRP_HINT,  __VA_ARGS__)
-#define ERR_MSG(...) kr_log_error(LOG_GRP_HINT, "[     ]" __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, HINT,  __VA_ARGS__)
+#define ERR_MSG(...) kr_log_error(HINT, "[     ]" __VA_ARGS__)
 
 struct hints_data {
 	struct kr_zonecut hints;

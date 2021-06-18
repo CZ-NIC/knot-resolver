@@ -51,7 +51,7 @@
 #define MAX_PIPELINED 100
 #endif
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, LOG_GRP_WORKER, __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, WORKER, __VA_ARGS__)
 
 /** Client request state. */
 struct request_ctx
@@ -1262,7 +1262,7 @@ static void xdp_tx_waker(uv_idle_t *handle)
 {
 	int ret = knot_xdp_send_finish(handle->data);
 	if (ret != KNOT_EAGAIN && ret != KNOT_EOK)
-		kr_log_error(LOG_GRP_XDP, "check: ret = %d, %s\n", ret, knot_strerror(ret));
+		kr_log_error(XDP, "check: ret = %d, %s\n", ret, knot_strerror(ret));
 	/* Apparently some drivers need many explicit wake-up calls
 	 * even if we push no additional packets (in case they accumulated a lot) */
 	if (ret != KNOT_EAGAIN)

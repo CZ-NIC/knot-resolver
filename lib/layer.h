@@ -16,7 +16,7 @@
 #define QRVERBOSE(_query, grp, ...) do { \
 	const struct kr_query *_qry = (_query); \
 	if (VERBOSE_STATUS || kr_log_qtrace_enabled(_qry)) { \
-		kr_log_q1(_qry, grp, grp ## _TAG, ##  __VA_ARGS__); \
+		kr_log_q1(_qry, LOG_GRP_ ## grp, LOG_GRP_ ## grp ## _TAG, ##  __VA_ARGS__); \
 	}  \
 } while (false)
 
