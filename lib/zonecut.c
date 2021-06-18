@@ -15,7 +15,7 @@
 #include <libknot/packet/wire.h>
 #include <libknot/rrtype/rdname.h>
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, LOG_GRP_ZCUT, __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, ZCUT, __VA_ARGS__)
 
 /** Information for one NS name + address type. */
 typedef enum {

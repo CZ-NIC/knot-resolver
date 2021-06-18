@@ -39,9 +39,9 @@ void kr_fail(bool is_fatal, const char *expr, const char *func, const char *file
 {
 	const int errno_orig = errno;
 	if (is_fatal)
-		kr_log_fatal(LOG_GRP_SYSTEM, "requirement \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
+		kr_log_fatal(SYSTEM, "requirement \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
 	else
-		kr_log_error(LOG_GRP_SYSTEM, "assertion \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
+		kr_log_error(SYSTEM, "assertion \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
 
 	if (is_fatal || (kr_dbg_assertion_abort && !kr_dbg_assertion_fork))
 		abort();
@@ -768,7 +768,7 @@ int kr_ranked_rrarray_finalize(ranked_rr_array_t *array, uint32_t qry_uid, knot_
 				if (knot_rdata_cmp(ra->at[i], ra->at[i + 1]) == 0) {
 					ra->at[i] = NULL;
 					++dup_count;
-					QRVERBOSE(NULL, LOG_GRP_ITERATOR, "deleted duplicate RR\n");
+					QRVERBOSE(NULL, ITERATOR, "deleted duplicate RR\n");
 				}
 			}
 			/* Prepare rdataset, except rdata contents. */
@@ -1108,7 +1108,7 @@ static void rnd_noerror(void *data, uint size)
 {
 	int ret = gnutls_rnd(GNUTLS_RND_NONCE, data, size);
 	if (ret) {
-		kr_log_error(LOG_GRP_TLS, "gnutls_rnd(): %s\n", gnutls_strerror(ret));
+		kr_log_error(TLS, "gnutls_rnd(): %s\n", gnutls_strerror(ret));
 		abort();
 	}
 }
