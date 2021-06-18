@@ -117,20 +117,27 @@ void kr_log_init(log_level_t level, log_target_t target);
 #define SD_JOURNAL_METADATA "CODE_FILE=" __FILE__, "CODE_LINE=" TO_STR(__LINE__), ""
 
 #define kr_log_debug(grp, fmt, ...) \
-	kr_log_fmt(grp, LOG_DEBUG, SD_JOURNAL_METADATA, "[" grp ## _TAG "] " fmt, ## __VA_ARGS__)
+	kr_log_fmt(LOG_GRP_ ## grp, LOG_DEBUG, SD_JOURNAL_METADATA, \
+			"[" LOG_GRP_ ## grp ## _TAG "] " fmt, ## __VA_ARGS__)
 #define kr_log_info(grp, fmt, ...) \
-	kr_log_fmt(grp, LOG_INFO, SD_JOURNAL_METADATA, "[" grp ## _TAG "] " fmt, ## __VA_ARGS__)
+	kr_log_fmt(LOG_GRP_ ## grp, LOG_INFO, SD_JOURNAL_METADATA, \
+			"[" LOG_GRP_ ## grp ## _TAG "] " fmt, ## __VA_ARGS__)
 #define kr_log_notice(grp, fmt, ...) \
-	kr_log_fmt(grp, LOG_NOTICE, SD_JOURNAL_METADATA, "[" grp ## _TAG "] " fmt, ## __VA_ARGS__)
+	kr_log_fmt(LOG_GRP_ ## grp, LOG_NOTICE, SD_JOURNAL_METADATA, \
+			"[" LOG_GRP_ ## grp ## _TAG "] " fmt, ## __VA_ARGS__)
 #define kr_log_warning(grp, fmt, ...) \
-	kr_log_fmt(grp, LOG_WARNING, SD_JOURNAL_METADATA, "[" grp ## _TAG "] " fmt, ## __VA_ARGS__)
+	kr_log_fmt(LOG_GRP_ ## grp, LOG_WARNING, SD_JOURNAL_METADATA, \
+			"[" LOG_GRP_ ## grp ## _TAG "] " fmt, ## __VA_ARGS__)
 #define kr_log_error(grp, fmt, ...) \
-	kr_log_fmt(grp, LOG_ERR, SD_JOURNAL_METADATA, "[" grp ## _TAG "] " fmt, ## __VA_ARGS__)
+	kr_log_fmt(LOG_GRP_ ## grp, LOG_ERR, SD_JOURNAL_METADATA, \
+			"[" LOG_GRP_ ## grp ## _TAG "] " fmt, ## __VA_ARGS__)
 #define kr_log_fatal(grp, fmt, ...) \
-	kr_log_fmt(grp, LOG_CRIT, SD_JOURNAL_METADATA, "[" grp ## _TAG "] " fmt, ## __VA_ARGS__)
+	kr_log_fmt(LOG_GRP_ ## grp, LOG_CRIT, SD_JOURNAL_METADATA, \
+			"[" LOG_GRP_ ## grp ## _TAG "] " fmt, ## __VA_ARGS__)
 
 #define kr_log_deprecate(grp, fmt, ...) \
-	kr_log_fmt(grp, LOG_WARNING,SD_JOURNAL_METADATA, "[" grp ## _TAG "] deprecation WARNING: " fmt, ## __VA_ARGS__)
+	kr_log_fmt(LOG_GRP_ ## grp, LOG_WARNING,SD_JOURNAL_METADATA, \
+			"[" LOG_GRP_ ## grp ## _TAG "] deprecation WARNING: " fmt, ## __VA_ARGS__)
 
 #define KR_LOG_LEVEL_IS(exp) ((kr_log_level >= (exp)) ? true : false)
 
@@ -167,7 +174,7 @@ struct kr_query;
  * @param  fmt message format
  */
 #define kr_log_req(req, qry_id, indent, grp, fmt, ...) \
-       kr_log_req1(req, qry_id, indent, grp, grp ## _TAG, fmt, ## __VA_ARGS__)
+       kr_log_req1(req, qry_id, indent, LOG_GRP_ ## grp, LOG_GRP_ ## grp ## _TAG, fmt, ## __VA_ARGS__)
 KR_EXPORT KR_PRINTF(6)
 void kr_log_req1(const struct kr_request * const req, uint32_t qry_uid,
 		const unsigned int indent, log_groups_t group, const char *tag, const char *fmt, ...);
@@ -179,7 +186,7 @@ void kr_log_req1(const struct kr_request * const req, uint32_t qry_uid,
  * @param  source message source
  * @param  fmt message format
  */
-#define kr_log_q(qry, grp, fmt, ...) kr_log_q1(qry, grp, grp ## _TAG, fmt, ## __VA_ARGS__)
+#define kr_log_q(qry, grp, fmt, ...) kr_log_q1(qry, LOG_GRP_ ## grp, LOG_GRP_ ## grp ## _TAG, fmt, ## __VA_ARGS__)
 KR_EXPORT KR_PRINTF(4)
 void kr_log_q1(const struct kr_query *qry, log_groups_t group, const char *tag, const char *fmt, ...);
 

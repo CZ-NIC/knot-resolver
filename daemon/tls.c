@@ -60,7 +60,7 @@ static int kres_gnutls_set_priority(gnutls_session_t session) {
 	const char *errpos = NULL;
 	int err = gnutls_priority_set_direct(session, priorities, &errpos);
 	if (err != GNUTLS_E_SUCCESS) {
-		kr_log_error(LOG_GRP_TLS, "setting priority '%s' failed at character %zd (...'%s') with %s (%d)\n",
+		kr_log_error(TLS, "setting priority '%s' failed at character %zd (...'%s') with %s (%d)\n",
 			     priorities, errpos - priorities, errpos, gnutls_strerror_name(err), err);
 	}
 	return err;
@@ -295,10 +295,10 @@ struct tls_ctx *tls_new(struct worker_ctx *worker)
 	if (!net->tls_credentials) {
 		net->tls_credentials = tls_get_ephemeral_credentials(worker->engine);
 		if (!net->tls_credentials) {
-			kr_log_error(LOG_GRP_TLS, "X.509 credentials are missing, and ephemeral credentials failed; no TLS\n");
+			kr_log_error(TLS, "X.509 credentials are missing, and ephemeral credentials failed; no TLS\n");
 			return NULL;
 		}
-		kr_log_info(LOG_GRP_TLS, "Using ephemeral TLS credentials\n");
+		kr_log_info(TLS, "Using ephemeral TLS credentials\n");
 		tls_credentials_log_pins(net->tls_credentials);
 	}
 
@@ -311,15 +311,15 @@ struct tls_ctx *tls_new(struct worker_ctx *worker)
 				if (newcreds) {
 					tls_credentials_release(net->tls_credentials);
 					net->tls_credentials = newcreds;
-					kr_log_info(LOG_GRP_TLS, "Renewed expiring ephemeral X.509 cert\n");
+					kr_log_info(TLS, "Renewed expiring ephemeral X.509 cert\n");
 				} else {
-					kr_log_error(LOG_GRP_TLS, "Failed to renew expiring ephemeral X.509 cert, using existing one\n");
+					kr_log_error(TLS, "Failed to renew expiring ephemeral X.509 cert, using existing one\n");
 				}
 			}
 		} else {
 			/* non-ephemeral cert: warn once when certificate expires */
 			if (now >= net->tls_credentials->valid_until) {
-				kr_log_error(LOG_GRP_TLS, "X.509 certificate has expired!\n");
+				kr_log_error(TLS, "X.509 certificate has expired!\n");
 				net->tls_credentials->valid_until = GNUTLS_X509_NO_WELL_DEFINED_EXPIRATION;
 			}
 		}
@@ -327,13 +327,13 @@ struct tls_ctx *tls_new(struct worker_ctx *worker)
 
 	struct tls_ctx *tls = calloc(1, sizeof(struct tls_ctx));
 	if (tls == NULL) {
-		kr_log_error(LOG_GRP_TLS, "failed to allocate TLS context\n");
+		kr_log_error(TLS, "failed to allocate TLS context\n");
 		return NULL;
 	}
 
 	int err = gnutls_init(&tls->c.tls_session, GNUTLS_SERVER | GNUTLS_NONBLOCK);
 	if (err != GNUTLS_E_SUCCESS) {
-		kr_log_error(LOG_GRP_TLS, "gnutls_init(): %s (%d)\n", gnutls_strerror_name(err), err);
+		kr_log_error(TLS, "gnutls_init(): %s (%d)\n", gnutls_strerror_name(err), err);
 		tls_free(tls);
 		return NULL;
 	}
@@ -341,7 +341,7 @@ struct tls_ctx *tls_new(struct worker_ctx *worker)
 	err = gnutls_credentials_set(tls->c.tls_session, GNUTLS_CRD_CERTIFICATE,
 				     tls->credentials->credentials);
 	if (err != GNUTLS_E_SUCCESS) {
-		kr_log_error(LOG_GRP_TLS, "gnutls_credentials_set(): %s (%d)\n", gnutls_strerror_name(err), err);
+		kr_log_error(TLS, "gnutls_credentials_set(): %s (%d)\n", gnutls_strerror_name(err), err);
 		tls_free(tls);
 		return NULL;
 	}
@@ -435,7 +435,7 @@ int tls_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, uv_write_cb
 	}
 
 	if (ret != submitted) {
-		kr_log_error(LOG_GRP_TLS, "[%s] gnutls_record_uncork didn't send all data (%d of %zd)\n",
+		kr_log_error(TLS, "[%s] gnutls_record_uncork didn't send all data (%d of %zd)\n",
 		             logstring, ret, submitted);
 		return kr_error(EIO);
 	}
@@ -605,7 +605,7 @@ void tls_credentials_log_pins(struct tls_credentials *tls_credentials)
 							index, &certs, &cert_count);
 		if (err != GNUTLS_E_SUCCESS) {
 			if (err != GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE) {
-				kr_log_error(LOG_GRP_TLS, "could not get X.509 certificates (%d) %s\n",
+				kr_log_error(TLS, "could not get X.509 certificates (%d) %s\n",
 						err, gnutls_strerror_name(err));
 			}
 			return;
@@ -615,10 +615,10 @@ void tls_credentials_log_pins(struct tls_credentials *tls_credentials)
 			char pin[TLS_SHA256_BASE64_BUFLEN] = { 0 };
 			err = get_oob_key_pin(certs[i], pin, sizeof(pin), false);
 			if (err != GNUTLS_E_SUCCESS) {
-				kr_log_error(LOG_GRP_TLS, "could not calculate RFC 7858 OOB key-pin from cert %d (%d) %s\n",
+				kr_log_error(TLS, "could not calculate RFC 7858 OOB key-pin from cert %d (%d) %s\n",
 						i, err, gnutls_strerror_name(err));
 			} else {
-				kr_log_info(LOG_GRP_TLS, "RFC 7858 OOB key-pin (%d): pin-sha256=\"%s\"\n",
+				kr_log_info(TLS, "RFC 7858 OOB key-pin (%d): pin-sha256=\"%s\"\n",
 						i, pin);
 			}
 			gnutls_x509_crt_deinit(certs[i]);
@@ -653,17 +653,17 @@ static time_t _get_end_entity_expiration(gnutls_certificate_credentials_t creds)
 	time_t ret = GNUTLS_X509_NO_WELL_DEFINED_EXPIRATION;
 
 	if ((err = gnutls_certificate_get_crt_raw(creds, 0, 0, &data)) != GNUTLS_E_SUCCESS) {
-		kr_log_error(LOG_GRP_TLS, "failed to get cert to check expiration: (%d) %s\n",
+		kr_log_error(TLS, "failed to get cert to check expiration: (%d) %s\n",
 			     err, gnutls_strerror_name(err));
 		goto done;
 	}
 	if ((err = gnutls_x509_crt_init(&cert)) != GNUTLS_E_SUCCESS) {
-		kr_log_error(LOG_GRP_TLS, "failed to initialize cert: (%d) %s\n",
+		kr_log_error(TLS, "failed to initialize cert: (%d) %s\n",
 			     err, gnutls_strerror_name(err));
 		goto done;
 	}
 	if ((err = gnutls_x509_crt_import(cert, &data, GNUTLS_X509_FMT_DER)) != GNUTLS_E_SUCCESS) {
-		kr_log_error(LOG_GRP_TLS, "failed to construct cert while checking expiration: (%d) %s\n",
+		kr_log_error(TLS, "failed to construct cert while checking expiration: (%d) %s\n",
 			     err, gnutls_strerror_name(err));
 		goto done;
 	}
@@ -689,14 +689,14 @@ int tls_certificate_set(struct network *net, const char *tls_cert, const char *t
 
 	int err = 0;
 	if ((err = gnutls_certificate_allocate_credentials(&tls_credentials->credentials)) != GNUTLS_E_SUCCESS) {
-		kr_log_error(LOG_GRP_TLS, "gnutls_certificate_allocate_credentials() failed: (%d) %s\n",
+		kr_log_error(TLS, "gnutls_certificate_allocate_credentials() failed: (%d) %s\n",
 			     err, gnutls_strerror_name(err));
 		tls_credentials_free(tls_credentials);
 		return kr_error(ENOMEM);
 	}
 	if ((err = gnutls_certificate_set_x509_system_trust(tls_credentials->credentials)) < 0) {
 		if (err != GNUTLS_E_UNIMPLEMENTED_FEATURE) {
-			kr_log_warning(LOG_GRP_TLS, "warning: gnutls_certificate_set_x509_system_trust() failed: (%d) %s\n",
+			kr_log_warning(TLS, "warning: gnutls_certificate_set_x509_system_trust() failed: (%d) %s\n",
 				     err, gnutls_strerror_name(err));
 			tls_credentials_free(tls_credentials);
 			return err;
@@ -712,7 +712,7 @@ int tls_certificate_set(struct network *net, const char *tls_cert, const char *t
 	if ((err = gnutls_certificate_set_x509_key_file(tls_credentials->credentials,
 							tls_cert, tls_key, GNUTLS_X509_FMT_PEM)) != GNUTLS_E_SUCCESS) {
 		tls_credentials_free(tls_credentials);
-		kr_log_error(LOG_GRP_TLS, "gnutls_certificate_set_x509_key_file(%s,%s) failed: %d (%s)\n",
+		kr_log_error(TLS, "gnutls_certificate_set_x509_key_file(%s,%s) failed: %d (%s)\n",
 			     tls_cert, tls_key, err, gnutls_strerror_name(err));
 		return kr_error(EINVAL);
 	}
@@ -829,7 +829,7 @@ tls_client_param_t * tls_client_param_new()
 	e->refs = 1;
 	int ret = gnutls_certificate_allocate_credentials(&e->credentials);
 	if (ret != GNUTLS_E_SUCCESS) {
-		kr_log_error(LOG_GRP_TLSCLIENT, "error: gnutls_certificate_allocate_credentials() fails (%s)\n",
+		kr_log_error(TLSCLIENT, "error: gnutls_certificate_allocate_credentials() fails (%s)\n",
 			     gnutls_strerror_name(ret));
 		free(e);
 		return NULL;
@@ -961,12 +961,12 @@ static int client_verify_pin(const unsigned int cert_list_size,
 				params->pins.len);
 	}
 
-	kr_log_error(LOG_GRP_TLSCLIENT, "no pin matched: %zu pins * %d certificates\n",
+	kr_log_error(TLSCLIENT, "no pin matched: %zu pins * %d certificates\n",
 			params->pins.len, cert_list_size);
 	return GNUTLS_E_CERTIFICATE_ERROR;
 
 #else /* TLS_CAN_USE_PINS */
-	kr_log_error(LOG_GRP_TLSCLIENT, "internal inconsistency: TLS_CAN_USE_PINS\n");
+	kr_log_error(TLSCLIENT, "internal inconsistency: TLS_CAN_USE_PINS\n");
 	kr_assert(false);
 	return GNUTLS_E_CERTIFICATE_ERROR;
 #endif
@@ -981,7 +981,7 @@ static int client_verify_pin(const unsigned int cert_list_size,
 static int client_verify_certchain(gnutls_session_t tls_session, const char *hostname)
 {
 	if (kr_fails_assert(hostname)) {
-		kr_log_error(LOG_GRP_TLSCLIENT, "internal config inconsistency: no hostname set\n");
+		kr_log_error(TLSCLIENT, "internal config inconsistency: no hostname set\n");
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
 
@@ -996,16 +996,16 @@ static int client_verify_certchain(gnutls_session_t tls_session, const char *hos
 		ret = gnutls_certificate_verification_status_print(
 			status, gnutls_certificate_type_get(tls_session), &msg, 0);
 		if (ret == GNUTLS_E_SUCCESS) {
-			kr_log_error(LOG_GRP_TLSCLIENT, "failed to verify peer certificate: "
+			kr_log_error(TLSCLIENT, "failed to verify peer certificate: "
 					"%s\n", msg.data);
 			gnutls_free(msg.data);
 		} else {
-			kr_log_error(LOG_GRP_TLSCLIENT, "failed to verify peer certificate: "
+			kr_log_error(TLSCLIENT, "failed to verify peer certificate: "
 					"unable to print reason: %s (%s)\n",
 					gnutls_strerror(ret), gnutls_strerror_name(ret));
 		} /* gnutls_certificate_verification_status_print end */
 	} else {
-		kr_log_error(LOG_GRP_TLSCLIENT, "failed to verify peer certificate: "
+		kr_log_error(TLSCLIENT, "failed to verify peer certificate: "
 			     "gnutls_certificate_verify_peers3 error: %s (%s)\n",
 			     gnutls_strerror(ret), gnutls_strerror_name(ret));
 	} /* gnutls_certificate_verify_peers3 end */
@@ -1029,7 +1029,7 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 
 	gnutls_certificate_type_t cert_type = gnutls_certificate_type_get(tls_session);
 	if (cert_type != GNUTLS_CRT_X509) {
-		kr_log_error(LOG_GRP_TLSCLIENT, "invalid certificate type %i has been received\n",
+		kr_log_error(TLSCLIENT, "invalid certificate type %i has been received\n",
 			     cert_type);
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
@@ -1037,7 +1037,7 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 	const gnutls_datum_t *cert_list =
 		gnutls_certificate_get_peers(tls_session, &cert_list_size);
 	if (cert_list == NULL || cert_list_size == 0) {
-		kr_log_error(LOG_GRP_TLSCLIENT, "empty certificate list\n");
+		kr_log_error(TLSCLIENT, "empty certificate list\n");
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
 

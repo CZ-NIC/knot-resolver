@@ -201,7 +201,7 @@ static inline uint64_t kr_rand_bytes(unsigned int size)
 {
 	uint64_t result;
 	if (size <= 0 || size > sizeof(result)) {
-		kr_log_error(LOG_GRP_SYSTEM, "kr_rand_bytes(): EINVAL\n");
+		kr_log_error(SYSTEM, "kr_rand_bytes(): EINVAL\n");
 		abort();
 	}
 	uint8_t data[sizeof(result)];
