@@ -81,7 +81,7 @@ static int assert_right_version(struct kr_cache *cache)
 		 * Recreate cache and write version key. */
 		ret = cache_op(cache, count);
 		if (ret != 0) { /* Log for non-empty cache to limit noise on fresh start. */
-			kr_log_info(LOG_GRP_CACHE, "[cache] incompatible cache database detected, purging\n");
+			kr_log_info(LOG_GRP_CACHE, "incompatible cache database detected, purging\n");
 			if (oldret) {
 				kr_log_verbose("[cache] reading version returned: %d\n", oldret);
 			} else if (val.len != sizeof(CACHE_VERSION)) {
@@ -143,7 +143,7 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 	if (ret == 0 && opts->maxsize) {
 		size_t maxsize = cache->api->get_maxsize(cache->db);
 		if (maxsize > opts->maxsize) kr_log_warning(LOG_GRP_CACHE,
-			"[cache] Warning: real cache size is %zu instead of the requested %zu bytes."
+			"Warning: real cache size is %zu instead of the requested %zu bytes."
 			"  To reduce the size you need to remove the file '%s' by hand.\n",
 			maxsize, opts->maxsize, fpath);
 	}
@@ -690,7 +690,7 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 	ssize_t written = stash_rrset(cache, qry, rr, rr_sigs, qry->timestamp.tv_sec,
 					entry->rank, nsec_pmap, needs_pkt);
 	if (written < 0) {
-		kr_log_error(LOG_GRP_CACHE, "[%05u.%02u][cach] stash failed, ret = %d\n", qry->request->uid,
+		kr_log_error(LOG_GRP_CACHE, "[%05u.%02u] stash failed, ret = %d\n", qry->request->uid,
 			     qry->uid, ret);
 		return (int) written;
 	}

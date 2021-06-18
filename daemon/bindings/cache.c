@@ -206,7 +206,7 @@ static int cache_open(lua_State *L)
 	 * even in case of not having any work to do. */
 	ret = kr_cache_check_health(&engine->resolver.cache, 5000);
 	if (ret != 0) {
-		kr_log_error(LOG_GRP_CACHE, "[cache] periodic health check failed (ignored): %s\n",
+		kr_log_error(LOG_GRP_CACHE, "periodic health check failed (ignored): %s\n",
 				kr_strerror(ret));
 	}
 
