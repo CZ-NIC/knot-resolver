@@ -53,7 +53,7 @@ void forward_choose_transport(struct kr_query *qry,
 		default:
 			kr_assert(false);
 			*transport = NULL;
-			return;
+			goto cleanup;
 		}
 
 		struct address_state *addr_state = &local_state->addr_states[i];
@@ -94,6 +94,8 @@ void forward_choose_transport(struct kr_query *qry,
 		qry->flags.TCP = (*transport)->protocol == KR_TRANSPORT_TCP
 			      || (*transport)->protocol == KR_TRANSPORT_TLS;
 	}
+cleanup:
+	kr_cache_commit(&qry->request->ctx->cache);
 }
 
 void forward_error(struct kr_query *qry, const struct kr_transport *transport,
