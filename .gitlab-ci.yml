@@ -92,6 +92,28 @@ build:
     - ninja -C build_ci install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
 
+build:armhf:
+  <<: *build
+  tags:
+    - armhf
+    - shell
+  script:
+    - meson build_ci --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled
+    - ninja -C build_ci_armhf
+    - ninja -C build_ci_armhf install >/dev/null
+    - ${MESON_TEST} --suite unit --suite config --no-suite snowflake --no-suite y2k38
+
+build:arm64:
+  <<: *build
+  tags:
+    - arm64
+    - shell
+  script:
+    - meson build_ci --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled
+    - ninja -C build_ci_arm64
+    - ninja -C build_ci_arm64 install >/dev/null
+    - ${MESON_TEST} --suite unit --suite config --no-suite snowflake
+
 build-asan:
   <<: *build
   script:
