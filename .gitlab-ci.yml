@@ -101,7 +101,7 @@ build:armhf:
     - meson build_ci --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled
     - ninja -C build_ci_armhf
     - ninja -C build_ci_armhf install >/dev/null
-    - ${MESON_TEST} --suite unit --suite config --no-suite snowflake --no-suite y2k38
+    - MESON_TESTTHREADS=1 ${MESON_TEST} --suite unit --suite config --no-suite snowflake --no-suite y2k38
 
 build:arm64:
   <<: *build
@@ -112,7 +112,7 @@ build:arm64:
     - meson build_ci --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled
     - ninja -C build_ci_arm64
     - ninja -C build_ci_arm64 install >/dev/null
-    - ${MESON_TEST} --suite unit --suite config --no-suite snowflake
+    - MESON_TESTTHREADS=1 ${MESON_TEST} --suite unit --suite config --no-suite snowflake
 
 build-asan:
   <<: *build
@@ -123,7 +123,7 @@ build-asan:
     - ninja -C build_ci_asan install >/dev/null
       # TODO _leaks: not sure what exactly is wrong in leak detection on config tests
       # TODO skip_asan: all three of these disappear locally when using gcc 9.1 (except some leaks)
-    - ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite skip_asan --no-suite snowflake
+    - MESON_TESTTHREADS=1 ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite skip_asan --no-suite snowflake
 
 build:macOS:
   <<: *nodep
