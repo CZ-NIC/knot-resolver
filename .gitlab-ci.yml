@@ -101,7 +101,7 @@ build:armhf:
     - meson build_ci --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled
     - ninja -C build_ci
     - ninja -C build_ci install >/dev/null
-    - ${MESON_TEST} --suite unit --suite config --no-suite snowflake
+    - ${MESON_TEST} --suite unit --suite config --no-suite snowflake --no-suite y2k38
 
 build:arm64:
   <<: *build

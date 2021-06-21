@@ -5,7 +5,7 @@ config_tests += [
   ['controlsock', files('controlsock.test.lua')],
   ['krprint', files('krprint.test.lua')],
   ['ta', files('trust_anchors.test/ta.test.lua')],
-  ['ta_bootstrap', files('trust_anchors.test/bootstrap.test.lua')],
+  ['ta_bootstrap', files('trust_anchors.test/bootstrap.test.lua'), ['y2k38']],
 ]
 
 integr_tests += [
