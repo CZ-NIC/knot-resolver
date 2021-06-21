@@ -331,7 +331,7 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 			/* Limit maximum value size to reduce attack surface. */
 			if (valuelen > HTTP_MAX_HEADER_IN_SIZE) {
 				kr_log_verbose(
-					"[http] stream %d: header too large (%ld B), refused\n",
+					"[http] stream %d: header too large (%zu B), refused\n",
 					stream_id, valuelen);
 				refuse_stream(h2, stream_id);
 				return 0;
