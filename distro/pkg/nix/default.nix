@@ -1,6 +1,13 @@
-with import <nixpkgs> {};
-let extraFeatures = true; in #more testing
-
+{ lib, stdenv, fetchurl
+# native deps.
+, runCommand, pkg-config, meson, ninja, makeWrapper
+# build+runtime deps.
+, knot-dns, luajitPackages, libuv, gnutls, lmdb
+, systemd, libcap_ng, dns-root-data, nghttp2 # optionals, in principle
+# test-only deps.
+, cmocka, which, cacert
+, extraFeatures ? false /* catch-all if defaults aren't enough */
+}:
 let # un-indented, over the whole file
 
 result = if extraFeatures then wrapped-full else unwrapped;
@@ -12,7 +19,10 @@ unwrapped = stdenv.mkDerivation rec {
   pname = "knot-resolver";
   version = "{{ version }}";
 
-  src = ./knot-resolver-{{ version }}.tar.xz;
+  src = fetchurl {
+    url = "https://secure.nic.cz/files/knot-resolver/${pname}-${version}.tar.xz";
+    sha256 = "{{ src_hash }}";
+  };
 
   outputs = [ "out" "dev" ];
 
