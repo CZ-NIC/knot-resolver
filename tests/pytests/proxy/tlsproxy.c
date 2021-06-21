@@ -25,7 +25,7 @@ void help(char *argv[], struct args *a)
 	       " -t, --cert=[path]      Path to certificate file (default: %s).\n"
 	       " -k, --key=[path]       Path to key file (default: %s).\n"
 	       " -c, --close=[N]        Close connection to client after\n"
-	       "                        every N ms (default: %li).\n"
+	       "                        every N ms (default: %" PRIu64 ").\n"
 	       " -f, --fail=[N]         Delay every Nth incoming connection by 10 sec,\n"
 	       "                        0 disables delaying (default: 0).\n"
 	       " -r, --rehandshake      Do TLS rehandshake after every 8 bytes\n"
