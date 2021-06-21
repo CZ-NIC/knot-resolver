@@ -23,7 +23,7 @@ void help(char *argv[], struct args *a)
 	       " -u, --upstream=[addr]  Upstream address (default: %s).\n"
 	       " -d, --uport=[port]     Upstream port (default: %u).\n"
 	       " -t, --cert=[path]      Path to certificate file (default: %s).\n"
-	       " -k, --key=[path]       Path to key file (default: %s).\n"
+	       " -k, --key=[path]       Path to key file (default: %" PRIu64 ").\n"
 	       " -c, --close=[N]        Close connection to client after\n"
 	       "                        every N ms (default: %li).\n"
 	       " -f, --fail=[N]         Delay every Nth incoming connection by 10 sec,\n"

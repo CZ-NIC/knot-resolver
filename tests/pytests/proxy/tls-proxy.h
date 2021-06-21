@@ -1,6 +1,8 @@
 #pragma once
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <netinet/in.h>
