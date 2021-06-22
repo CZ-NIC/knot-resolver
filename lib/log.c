@@ -212,9 +212,6 @@ static void kr_vlog_req(
 	const unsigned int indent, log_groups_t group, const char *tag, const char *fmt,
 	va_list args)
 {
-	if (!(KR_LOG_LEVEL_IS(LOG_DEBUG) || group_is_set(group)))
-		return; // skip alloc and string copy
-
 	struct mempool *mp = mp_new(512);
 
 	const uint32_t req_uid = req ? req->uid : 0;
