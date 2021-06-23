@@ -105,6 +105,14 @@ opensuse-15.3:pkgbuild:
     - zypper install -y rpm-build python3-pip
     - *apkgbuild
 
+rocky-8:pkgbuild:
+  <<: *pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/rocky-8
+  script:
+    - dnf install -y rpm-build python3-pip epel-release dnf-plugins-core
+    - dnf config-manager --set-enabled powertools
+    - *apkgbuild
+
 ubuntu-18.04:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-18.04
@@ -256,6 +264,18 @@ opensuse-15.3:pkgtest:
     - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.3/home:CZ-NIC:knot-resolver-build.repo
     - zypper install -y knot-utils
     - zypper install --allow-unsigned-rpm -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module)
+    - systemctl start kresd@1
+    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+
+rocky-8:pkgtest:
+  <<: *pkgtest
+  needs:
+    - rocky-8:pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/rocky-8
+  script:
+    - dnf install -y epel-release
+    - dnf install -y knot-utils findutils
+    - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module)
     - systemctl start kresd@1
     - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
 
