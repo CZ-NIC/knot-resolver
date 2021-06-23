@@ -18,7 +18,8 @@ stages:
       - pkg/
 
 .apkgbuild: &apkgbuild
-  - pip3 install -U apkg
+  # - pip3 install -U apkg
+  - pip3 install -U git+https://gitlab.nic.cz/packaging/apkg.git@master  # TODO drop
   - apkg build-dep -y
   - apkg build
 
