@@ -107,6 +107,7 @@ rocky-8:pkgbuild:
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/rocky-8
   script:
     - dnf install -y rpm-build python3-pip epel-release dnf-plugins-core
+    - pip3 install -U git+https://gitlab.nic.cz/packaging/apkg.git@master  # TODO drop
     - dnf config-manager --set-enabled powertools
     - *apkgbuild
 
