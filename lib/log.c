@@ -39,6 +39,27 @@ log_group_names_t log_group_names[] = {
 	GRP_NAME_ITEM(LOG_GRP_DOH),
 	GRP_NAME_ITEM(LOG_GRP_DNSSEC),
 	GRP_NAME_ITEM(LOG_GRP_HINT),
+	GRP_NAME_ITEM(LOG_GRP_ITERATOR),
+	GRP_NAME_ITEM(LOG_GRP_VALIDATOR),
+	GRP_NAME_ITEM(LOG_GRP_RESOLVER),
+	GRP_NAME_ITEM(LOG_GRP_SELECTION),
+	GRP_NAME_ITEM(LOG_GRP_ZCUT),
+	GRP_NAME_ITEM(LOG_GRP_COOKIES),
+	GRP_NAME_ITEM(LOG_GRP_STATISTICS),
+	GRP_NAME_ITEM(LOG_GRP_REBIND),
+	GRP_NAME_ITEM(LOG_GRP_WORKER),
+	GRP_NAME_ITEM(LOG_GRP_POLICY),
+	GRP_NAME_ITEM(LOG_GRP_TASENTINEL),
+	GRP_NAME_ITEM(LOG_GRP_TASIGNALING),
+	GRP_NAME_ITEM(LOG_GRP_TAUPDATE),
+	GRP_NAME_ITEM(LOG_GRP_DAF),
+	GRP_NAME_ITEM(LOG_GRP_DETECTTIMEJUMP),
+	GRP_NAME_ITEM(LOG_GRP_DETECTTIMESKEW),
+	GRP_NAME_ITEM(LOG_GRP_GRAPHITE),
+	GRP_NAME_ITEM(LOG_GRP_PREFILL),
+	GRP_NAME_ITEM(LOG_GRP_PRIMING),
+	GRP_NAME_ITEM(LOG_GRP_SRVSTALE),
+	GRP_NAME_ITEM(LOG_GRP_WATCHDOG),
 	{ NULL,		-1 },
 };
 
@@ -58,7 +79,7 @@ syslog_code_t prioritynames[] = {
 
 int group_is_set(log_groups_t group)
 {
-	return kr_log_groups & (group);
+	return kr_log_groups & (1U << group);
 }
 
 void kr_log_fmt(log_groups_t group, log_level_t level, const char *file,
@@ -181,14 +202,14 @@ log_level_t kr_log_level_get(void)
 	return kr_log_level;
 }
 
-void kr_log_add_group(log_groups_t mask)
+void kr_log_add_group(log_groups_t group)
 {
-       kr_log_groups |= mask;
+       kr_log_groups |= (1U << group);
 }
 
-void kr_log_del_group(log_groups_t mask)
+void kr_log_del_group(log_groups_t group)
 {
-       kr_log_groups &= (~mask);
+       kr_log_groups &= (~(1U << group));
 }
 
 void kr_log_init(log_level_t level, log_target_t target)

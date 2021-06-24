@@ -15,7 +15,7 @@ local function sd_signal_ok()
 end
 
 function private.fail_callback()
-	log('[watchdog] ABORTING resolver, supervisor is expected to restart it')
+	log_error(ffi.C.LOG_GRP_WATCHDOG, 'ABORTING resolver, supervisor is expected to restart it')
 	ffi.C.abort()
 end
 
@@ -38,12 +38,12 @@ local function check_answer(logbuf)
 			private.ok_callback()
 			return
 		end
-		log('[watchdog] watchdog query returned unexpected answer! query verbose log:')
-		log(table.concat(logbuf, ''))
+		log_info(ffi.C.LOG_GRP_WATCHDOG, 'watchdog query returned unexpected answer! query verbose log:')
+		log_info(ffi.C.LOG_GRP_WATCHDOG, table.concat(logbuf, ''))
 		if pkt ~= nil then
-			log('[watchdog] problematic answer:\n%s', pkt)
+			log_info(ffi.C.LOG_GRP_WATCHDOG, 'problematic answer:\n%s', pkt)
 		else
-			log('[watchdog] answer was dropped')
+			log_info(ffi.C.LOG_GRP_WATCHDOG, 'answer was dropped')
 		end
 		-- failure! quit immediatelly to allow process supervisor to restart us
 		private.fail_callback()
@@ -55,9 +55,7 @@ local function timer()
 	local logbuf = {}
 	-- fire watchdog query
 	if private.qname and private.qtype then
-		if verbose() then
-			log('[watchdog] starting watchdog query %s %s', private.qname, private.qtype)
-		end
+		log_info(ffi.C.LOG_GRP_WATCHDOG, 'starting watchdog query %s %s', private.qname, private.qtype)
 		resolve(private.qname,
 			private.qtype,
 			kres.class.IN,
@@ -99,9 +97,7 @@ function watchdog.init()
 	local timeoutptr = ffi.new('uint64_t[1]')
 	local systemd_present, ret = pcall(function() return ffi.C.sd_watchdog_enabled(0, timeoutptr) end)
 	if not systemd_present then
-		if verbose() then
-			log('[watchdog] systemd library not detected')
-		end
+		log_info(ffi.C.LOG_GRP_WATCHDOG, 'systemd library not detected')
 		return
 	end
 	private.ok_callback = sd_signal_ok
@@ -109,22 +105,18 @@ function watchdog.init()
 		error('[watchdog] %s', ffi.string(ffi.C.knot_strerror(math.abs(ret))))
 		return
 	elseif ret == 0 then
-		if verbose() then
-			log('[watchdog] disabled in systemd (WatchdogSec= not specified)')
-		end
+		log_info(ffi.C.LOG_GRP_WATCHDOG, 'disabled in systemd (WatchdogSec= not specified)')
 		return
 	end
 	local timeout = tonumber(timeoutptr[0]) / 1000  -- convert to ms
 	local interval = timeout / 2  -- halve interval to make sure we are never late
 	if interval < 1 then
-		log('[watchdog] error: WatchdogSec= must be at least 2ms! (got %d usec)',
+		log_error(ffi.C.LOG_GRP_WATCHDOG, 'error: WatchdogSec= must be at least 2ms! (got %d usec)',
 			tonumber(timeoutptr[0]))
 	end
 	watchdog.config({ interval = interval })
-	if verbose() then
-		log('[watchdog] systemd watchdog enabled (check interval: %s ms, timeout: %s ms)',
-			private.interval, timeout)
-	end
+	log_info(ffi.C.LOG_GRP_WATCHDOG, 'systemd watchdog enabled (check interval: %s ms, timeout: %s ms)',
+		private.interval, timeout)
 end
 
 function watchdog.deinit()
