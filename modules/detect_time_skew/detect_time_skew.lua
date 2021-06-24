@@ -10,7 +10,7 @@ local event_id = nil
 -- luacheck: no unused args
 local function check_time_callback(pkt, req)
 	if pkt == nil or pkt:rcode() ~= kres.rcode.NOERROR then
-		warn("[detect_time_skew] cannot resolve '.' NS")
+		log_warn(ffi.C.DETECTTIMESKEW, "cannot resolve '.' NS")
 		return nil
 	end
 	local seen_rrsigs = 0
@@ -42,20 +42,18 @@ local function check_time_callback(pkt, req)
 		end
 	end
 	if seen_rrsigs == 0 then
-		if verbose() then
-			log("[detect_time_skew] No RRSIGs received! "..
-			    "You really should configure DNSSEC trust anchor for the root.")
-		end
+		log_info(ffi.C.DETECTTIMESKEW, "No RRSIGs received! "..
+		     "You really should configure DNSSEC trust anchor for the root.")
 	elseif valid_rrsigs == 0 then
-		warn("[detect_time_skew] Local system time %q seems to be at "..
+		log_warn(ffi.C.DETECTTIMESKEW, "Local system time %q seems to be at "..
 		     "least %u seconds in the %s. DNSSEC signatures for '.' NS "..
 		     "are not valid %s. Please check your system clock!",
 		     os.date("%c", now),
 		     math.abs(time_diff),
 		     time_diff > 0 and "future" or "past",
 		     time_diff > 0 and "yet" or "anymore")
-	elseif verbose() then
-		log("[detect_time_skew] Local system time %q is within "..
+	else
+		log_info(ffi.C.DETECTTIMESKEW, "Local system time %q is within "..
 		    "RRSIG validity interval <%q,%q>.", os.date("%c", now),
 		    os.date("%c", inception), os.date("%c", expiration))
 	end
