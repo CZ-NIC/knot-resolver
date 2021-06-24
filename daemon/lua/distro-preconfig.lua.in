@@ -1,14 +1,15 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
+local ffi = require('ffi')
 local id = os.getenv('SYSTEMD_INSTANCE')
 if not id then
-	warn('environment variable $SYSTEMD_INSTANCE not set')
+	log_warn(ffi.C.LOG_GRP_SYSTEM, 'environment variable $SYSTEMD_INSTANCE not set')
 else
 	-- Bind to control socket in run_dir
 	worker.control_path = '@run_dir@/control/'
 	local path = worker.control_path..id
 	local ok, err = pcall(net.listen, path, nil, { kind = 'control' })
 	if not ok then
-		warn('bind to '..path..' failed '..err)
+		log_warn(ffi.C.LOG_GRP_NETWORK, 'bind to '..path..' failed '..err)
 	end
 end
 

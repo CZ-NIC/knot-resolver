@@ -299,7 +299,9 @@ struct kr_server_selection {
 	void (*error)(struct kr_query *, const struct kr_transport *, enum kr_selection_error);
 	struct local_state *local_state;
 };
-typedef unsigned int log_groups_t;
+typedef unsigned long log_groups_t;
+typedef int log_level_t;
+enum kr_log_groups_type {LOG_GRP_SYSTEM = 1, LOG_GRP_CACHE, LOG_GRP_IO, LOG_GRP_NETWORK, LOG_GRP_TA, LOG_GRP_TLS, LOG_GRP_GNUTLS, LOG_GRP_TLSCLIENT, LOG_GRP_XDP, LOG_GRP_ZIMPORT, LOG_GRP_ZSCANNER, LOG_GRP_DOH, LOG_GRP_DNSSEC, LOG_GRP_HINT, LOG_GRP_PLAN, LOG_GRP_ITERATOR, LOG_GRP_VALIDATOR, LOG_GRP_RESOLVER, LOG_GRP_SELECTION, LOG_GRP_ZCUT, LOG_GRP_COOKIES, LOG_GRP_STATISTICS, LOG_GRP_REBIND, LOG_GRP_WORKER, LOG_GRP_POLICY, LOG_GRP_TASENTINEL, LOG_GRP_TASIGNALING, LOG_GRP_TAUPDATE, LOG_GRP_DAF, LOG_GRP_DETECTTIMEJUMP, LOG_GRP_DETECTTIMESKEW, LOG_GRP_GRAPHITE, LOG_GRP_PREFILL, LOG_GRP_PRIMING, LOG_GRP_SRVSTALE, LOG_GRP_WATCHDOG};
 
 kr_layer_t kr_layer_t_static;
 _Bool kr_dbg_assertion_abort;
@@ -379,6 +381,8 @@ struct kr_query *kr_rplan_last(struct kr_rplan *);
 int kr_forward_add_target(struct kr_request *, const struct sockaddr *);
 void kr_log_req1(const struct kr_request * const, uint32_t, const unsigned int, log_groups_t, const char *, const char *, ...);
 void kr_log_q1(const struct kr_query * const, log_groups_t, const char *, const char *, ...);
+char *kr_log_grp2name(log_groups_t);
+void kr_log_fmt(log_groups_t, log_level_t, const char *, const char *, const char *, const char *, ...);
 int kr_make_query(struct kr_query *, knot_pkt_t *);
 void kr_pkt_make_auth_header(knot_pkt_t *);
 int kr_pkt_put(knot_pkt_t *, const knot_dname_t *, uint32_t, uint16_t, uint16_t, const uint8_t *, uint16_t);
