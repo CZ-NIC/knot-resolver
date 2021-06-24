@@ -18,7 +18,8 @@ stages:
       - pkg/
 
 .apkgbuild: &apkgbuild
-  - pip3 install -U apkg
+  # - pip3 install -U apkg
+  - pip3 install -U git+https://gitlab.nic.cz/packaging/apkg.git@master  # TODO drop
   - apkg build-dep -y
   - apkg build
 
@@ -102,6 +103,14 @@ opensuse-15.3:pkgbuild:
     - zypper install -y rpm-build python3-pip
     - *apkgbuild
 
+rocky-8:pkgbuild:
+  <<: *pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/rocky-8
+  script:
+    - dnf install -y rpm-build python3-pip epel-release dnf-plugins-core
+    - dnf config-manager --set-enabled powertools
+    - *apkgbuild
+
 ubuntu-18.04:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-18.04
@@ -140,7 +149,7 @@ ubuntu-21.04:pkgbuild:
 .debpkgtest: &debpkgtest
   - *pkgdebrepo
   - apt-get install -y knot-dnsutils
-  - apt-get install -y $(find ./pkg/pkgs -name '*.deb' | grep -v module)
+  - apt-get install -y $(find ./pkg/pkgs -name '*.deb' | grep -v module | grep -v debug | grep -v devel)
   - systemctl start kresd@1
   - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
 
@@ -154,7 +163,7 @@ centos-7:pkgtest:
   script:
     - yum install -y epel-release
     - yum install -y knot-utils findutils
-    - yum install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module)
+    - yum install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
     - systemctl start kresd@1
     - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
 
@@ -198,7 +207,7 @@ fedora-33:pkgtest:
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-33
   script:
     - dnf install -y knot-utils findutils
-    - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module)
+    - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
     - systemctl start kresd@1
     - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
 
@@ -209,7 +218,7 @@ fedora-34:pkgtest:
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-34
   script:
     - dnf install -y knot-utils findutils
-    - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module)
+    - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
     - systemctl start kresd@1
     - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
 
@@ -221,7 +230,7 @@ opensuse-15.2:pkgtest:
   script:
     - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.2/home:CZ-NIC:knot-resolver-build.repo
     - zypper install -y knot-utils
-    - zypper install --allow-unsigned-rpm -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module)
+    - zypper install --allow-unsigned-rpm -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
     - systemctl start kresd@1
     - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
 
@@ -233,7 +242,19 @@ opensuse-15.3:pkgtest:
   script:
     - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.3/home:CZ-NIC:knot-resolver-build.repo
     - zypper install -y knot-utils
-    - zypper install --allow-unsigned-rpm -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module)
+    - zypper install --allow-unsigned-rpm -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
+    - systemctl start kresd@1
+    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+
+rocky-8:pkgtest:
+  <<: *pkgtest
+  needs:
+    - rocky-8:pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/rocky-8
+  script:
+    - dnf install -y epel-release
+    - dnf install -y knot-utils findutils
+    - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
     - systemctl start kresd@1
     - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
 
