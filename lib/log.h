@@ -27,32 +27,37 @@ typedef struct {
 	log_groups_t	g_val;
 } log_group_names_t;
 
-/* Don't forget add *_TAG below and log_group_names[] item (log.c) */
-#define LOG_GRP_SYSTEM		(1 << 1)
-#define LOG_GRP_CACHE		(1 << 2)
-#define LOG_GRP_IO		(1 << 3)
-#define LOG_GRP_NETWORK		(1 << 4)
-#define LOG_GRP_TA		(1 << 5)
-#define LOG_GRP_TLS		(1 << 6)
-#define LOG_GRP_GNUTLS		(1 << 7)
-#define LOG_GRP_TLSCLIENT	(1 << 8)
-#define LOG_GRP_XDP		(1 << 9)
-#define LOG_GRP_ZIMPORT		(1 << 10)
-#define LOG_GRP_ZSCANNER	(1 << 11)
-#define LOG_GRP_DOH		(1 << 12)
-#define LOG_GRP_DNSSEC		(1 << 13)
-#define LOG_GRP_HINT		(1 << 14)
-#define LOG_GRP_PLAN		(1 << 15)
-#define LOG_GRP_ITERATOR	(1 << 16)
-#define LOG_GRP_VALIDATOR	(1 << 17)
-#define LOG_GRP_RESOLVER	(1 << 18)
-#define LOG_GRP_SELECTION	(1 << 19)
-#define LOG_GRP_ZCUT		(1 << 20)
-#define LOG_GRP_COOKIES		(1 << 21)
-#define LOG_GRP_STATISTICS	(1 << 22)
-#define LOG_GRP_REBIND		(1 << 23)
-#define LOG_GRP_WORKER		(1 << 24)
-#define LOG_GRP_POLICY		(1 << 25)
+/* Don't forget add *_TAG below, log_group_names[] item (log.c) and generate
+ * new kres-gen.lua */
+enum kr_log_groups_type {
+	LOG_GRP_SYSTEM		= (1 << 1),
+	LOG_GRP_CACHE		= (1 << 2),
+	LOG_GRP_IO		= (1 << 3),
+	LOG_GRP_NETWORK		= (1 << 4),
+	LOG_GRP_TA		= (1 << 5),
+	LOG_GRP_TLS		= (1 << 6),
+	LOG_GRP_GNUTLS		= (1 << 7),
+	LOG_GRP_TLSCLIENT	= (1 << 8),
+	LOG_GRP_XDP		= (1 << 9),
+	LOG_GRP_ZIMPORT		= (1 << 10),
+	LOG_GRP_ZSCANNER	= (1 << 11),
+	LOG_GRP_DOH		= (1 << 12),
+	LOG_GRP_DNSSEC		= (1 << 13),
+	LOG_GRP_HINT		= (1 << 14),
+	LOG_GRP_PLAN		= (1 << 15),
+	LOG_GRP_ITERATOR	= (1 << 16),
+	LOG_GRP_VALIDATOR	= (1 << 17),
+	LOG_GRP_RESOLVER	= (1 << 18),
+	LOG_GRP_SELECTION	= (1 << 19),
+	LOG_GRP_ZCUT		= (1 << 20),
+	LOG_GRP_COOKIES		= (1 << 21),
+	LOG_GRP_STATISTICS	= (1 << 22),
+	LOG_GRP_REBIND		= (1 << 23),
+	LOG_GRP_WORKER		= (1 << 24),
+	LOG_GRP_POLICY		= (1 << 25),
+	LOG_GRP_MODULE		= (1 << 26),
+};
+
 
 #define LOG_GRP_SYSTEM_TAG	"system"
 #define LOG_GRP_CACHE_TAG	"cache "
@@ -79,6 +84,7 @@ typedef struct {
 #define LOG_GRP_REBIND_TAG	"rebind"
 #define LOG_GRP_WORKER_TAG	"worker"
 #define LOG_GRP_POLICY_TAG	"policy"
+#define LOG_GRP_MODULE_TAG	"module"
 
 
 KR_EXPORT
