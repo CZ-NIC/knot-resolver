@@ -1,5 +1,7 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 
+local ffi = require('ffi')
+
 -- Load dependent modules
 if not view then modules.load('view') end
 if not policy then modules.load('policy') end
@@ -356,9 +358,8 @@ end
 -- @function Configure module
 function M.config()
 	if not http then
-		if verbose() then
-			log('[daf ] HTTP API unavailable because HTTP module is not loaded, use modules.load("http")')
-		end
+		log_warn(ffi.C.LOG_GRP_DAF,
+			'HTTP API unavailable because HTTP module is not loaded, use modules.load("http")')
 		return
 	end
 	local endpoints = http.configs._builtin.webmgmt.endpoints

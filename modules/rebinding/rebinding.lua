@@ -107,12 +107,8 @@ function M.layer.consume(state, req, pkt)
 	if qry.parent == nil then
 		state = refuse(req)
 	end
-	if verbose() then
-		local LOG_GRP_REBIND= bit.lshift(1, 23)
-		local LOG_GRP_REBIND_TAG="rebind"
-		ffi.C.kr_log_q1(qry, LOG_GRP_REBIND, LOG_GRP_REBIND_TAG,
-		    'blocking blacklisted IP in RR \'%s\'\n', kres.rr2str(bad_rr))
-	end
+	log_qry(qry, ffi.C.LOG_GRP_REBIND,
+		'blocking blacklisted IP in RR \'%s\'\n', kres.rr2str(bad_rr))
 	return state
 end
 

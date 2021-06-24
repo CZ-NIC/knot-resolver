@@ -21,74 +21,99 @@ typedef enum {
 
 /* Groups */
 
-typedef uint32_t log_groups_t;
+typedef uint64_t log_groups_t;
 typedef struct {
 	char		*g_name;
 	log_groups_t	g_val;
 } log_group_names_t;
 
-/* Don't forget add *_TAG below and log_group_names[] item (log.c) */
-#define LOG_GRP_SYSTEM		(1 << 1)
-#define LOG_GRP_CACHE		(1 << 2)
-#define LOG_GRP_IO		(1 << 3)
-#define LOG_GRP_NETWORK		(1 << 4)
-#define LOG_GRP_TA		(1 << 5)
-#define LOG_GRP_TLS		(1 << 6)
-#define LOG_GRP_GNUTLS		(1 << 7)
-#define LOG_GRP_TLSCLIENT	(1 << 8)
-#define LOG_GRP_XDP		(1 << 9)
-#define LOG_GRP_ZIMPORT		(1 << 10)
-#define LOG_GRP_ZSCANNER	(1 << 11)
-#define LOG_GRP_DOH		(1 << 12)
-#define LOG_GRP_DNSSEC		(1 << 13)
-#define LOG_GRP_HINT		(1 << 14)
-#define LOG_GRP_PLAN		(1 << 15)
-#define LOG_GRP_ITERATOR	(1 << 16)
-#define LOG_GRP_VALIDATOR	(1 << 17)
-#define LOG_GRP_RESOLVER	(1 << 18)
-#define LOG_GRP_SELECTION	(1 << 19)
-#define LOG_GRP_ZCUT		(1 << 20)
-#define LOG_GRP_COOKIES		(1 << 21)
-#define LOG_GRP_STATISTICS	(1 << 22)
-#define LOG_GRP_REBIND		(1 << 23)
-#define LOG_GRP_WORKER		(1 << 24)
-#define LOG_GRP_POLICY		(1 << 25)
+/* Don't forget add *_TAG below, log_group_names[] item (log.c) and generate
+ * new kres-gen.lua */
+enum kr_log_groups_type {
+	LOG_GRP_SYSTEM = 1,
+	LOG_GRP_CACHE,
+	LOG_GRP_IO,
+	LOG_GRP_NETWORK,
+	LOG_GRP_TA,
+	LOG_GRP_TLS,
+	LOG_GRP_GNUTLS,
+	LOG_GRP_TLSCLIENT,
+	LOG_GRP_XDP,
+	LOG_GRP_ZIMPORT,
+	LOG_GRP_ZSCANNER,
+	LOG_GRP_DOH,
+	LOG_GRP_DNSSEC,
+	LOG_GRP_HINT,
+	LOG_GRP_PLAN,
+	LOG_GRP_ITERATOR,
+	LOG_GRP_VALIDATOR,
+	LOG_GRP_RESOLVER,
+	LOG_GRP_SELECTION,
+	LOG_GRP_ZCUT,
+	LOG_GRP_COOKIES,
+	LOG_GRP_STATISTICS,
+	LOG_GRP_REBIND,
+	LOG_GRP_WORKER,
+	LOG_GRP_POLICY,
+	LOG_GRP_TASENTINEL,
+	LOG_GRP_TASIGNALING,
+	LOG_GRP_TAUPDATE,
+	LOG_GRP_DAF,
+	LOG_GRP_DETECTTIMEJUMP,
+	LOG_GRP_DETECTTIMESKEW,
+	LOG_GRP_GRAPHITE,
+	LOG_GRP_PREFILL,
+	LOG_GRP_PRIMING,
+	LOG_GRP_SRVSTALE,
+	LOG_GRP_WATCHDOG,
+};
 
-#define LOG_GRP_SYSTEM_TAG	"system"
-#define LOG_GRP_CACHE_TAG	"cache "
-#define LOG_GRP_IO_TAG		"io    "
-#define LOG_GRP_NETWORK_TAG	"net   "
-#define LOG_GRP_TA_TAG		"ta    "
-#define LOG_GRP_TLS_TAG		"tls   "
-#define LOG_GRP_GNUTLS_TAG	"gnutls"
-#define LOG_GRP_TLSCLIENT_TAG	"tls_cl"
-#define LOG_GRP_XDP_TAG		"xdp   "
-#define LOG_GRP_ZIMPORT_TAG	"zimprt"
-#define LOG_GRP_ZSCANNER_TAG	"zscann"
-#define LOG_GRP_DOH_TAG		"doh   "
-#define LOG_GRP_DNSSEC_TAG	"dnssec"
-#define LOG_GRP_HINT_TAG	"hint  "
-#define LOG_GRP_PLAN_TAG	"plan  "
-#define LOG_GRP_ITERATOR_TAG	"iterat"
-#define LOG_GRP_VALIDATOR_TAG	"valdtr"
-#define LOG_GRP_RESOLVER_TAG	"resolv"
-#define LOG_GRP_SELECTION_TAG	"select"
-#define LOG_GRP_ZCUT_TAG	"zoncut"
-#define LOG_GRP_COOKIES_TAG	"cookie"
-#define LOG_GRP_STATISTICS_TAG	"statis"
-#define LOG_GRP_REBIND_TAG	"rebind"
-#define LOG_GRP_WORKER_TAG	"worker"
-#define LOG_GRP_POLICY_TAG	"policy"
 
+#define LOG_GRP_SYSTEM_TAG		"system"
+#define LOG_GRP_CACHE_TAG		"cache "
+#define LOG_GRP_IO_TAG			"io    "
+#define LOG_GRP_NETWORK_TAG		"net   "
+#define LOG_GRP_TA_TAG			"ta    "
+#define LOG_GRP_TLS_TAG			"tls   "
+#define LOG_GRP_GNUTLS_TAG		"gnutls"
+#define LOG_GRP_TLSCLIENT_TAG		"tls_cl"
+#define LOG_GRP_XDP_TAG			"xdp   "
+#define LOG_GRP_ZIMPORT_TAG		"zimprt"
+#define LOG_GRP_ZSCANNER_TAG		"zscann"
+#define LOG_GRP_DOH_TAG			"doh   "
+#define LOG_GRP_DNSSEC_TAG		"dnssec"
+#define LOG_GRP_HINT_TAG		"hint  "
+#define LOG_GRP_PLAN_TAG		"plan  "
+#define LOG_GRP_ITERATOR_TAG		"iterat"
+#define LOG_GRP_VALIDATOR_TAG		"valdtr"
+#define LOG_GRP_RESOLVER_TAG		"resolv"
+#define LOG_GRP_SELECTION_TAG		"select"
+#define LOG_GRP_ZCUT_TAG		"zoncut"
+#define LOG_GRP_COOKIES_TAG		"cookie"
+#define LOG_GRP_STATISTICS_TAG		"statis"
+#define LOG_GRP_REBIND_TAG		"rebind"
+#define LOG_GRP_WORKER_TAG		"worker"
+#define LOG_GRP_POLICY_TAG		"policy"
+#define LOG_GRP_TASENTINEL_TAG		"tasent"
+#define LOG_GRP_TASIGNALING_TAG		"tasign"
+#define LOG_GRP_TAUPDATE_TAG		"taupd "
+#define LOG_GRP_DAF_TAG			"daf   "
+#define LOG_GRP_DETECTTIMEJUMP_TAG	"timejm"
+#define LOG_GRP_DETECTTIMESKEW_TAG	"timesk"
+#define LOG_GRP_GRAPHITE_TAG		"graphi"
+#define LOG_GRP_PREFILL_TAG		"prefil"
+#define LOG_GRP_PRIMING_TAG		"primin"
+#define LOG_GRP_SRVSTALE_TAG		"srvstl"
+#define LOG_GRP_WATCHDOG_TAG		"wtchdg"
 
 KR_EXPORT
 extern log_groups_t kr_log_groups;
 KR_EXPORT
 int group_is_set(log_groups_t group);
 KR_EXPORT
-void kr_log_add_group(log_groups_t mask);
+void kr_log_add_group(log_groups_t group);
 KR_EXPORT
-void kr_log_del_group(log_groups_t mask);
+void kr_log_del_group(log_groups_t group);
 KR_EXPORT
 char *kr_log_grp2name(log_groups_t group);
 KR_EXPORT

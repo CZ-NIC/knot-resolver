@@ -139,6 +139,8 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_module
 	struct kr_server_selection
 	log_groups_t
+	log_level_t
+	enum kr_log_groups_type
 EOF
 
 # static variables; these lines might not be simple to generate
@@ -213,6 +215,8 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 # Utils
 	kr_log_req1
 	kr_log_q1
+	kr_log_grp2name
+	kr_log_fmt
 	kr_make_query
 	kr_pkt_make_auth_header
 	kr_pkt_put
