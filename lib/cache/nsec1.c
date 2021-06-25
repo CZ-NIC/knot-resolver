@@ -424,7 +424,7 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 	if (kr_fails_assert(nsec_rr))
 		return kr_error(EFAULT);
 	const uint32_t new_ttl_log =
-		kr_verbose_status ? nsec_rr->ttl : -1;
+		KR_LOG_LEVEL_IS(LOG_DEBUG) ? nsec_rr->ttl : -1;
 	const uint8_t *bm = knot_nsec_bitmap(nsec_rr->rrs.rdata);
 	uint16_t bm_size = knot_nsec_bitmap_len(nsec_rr->rrs.rdata);
 	int ret;
