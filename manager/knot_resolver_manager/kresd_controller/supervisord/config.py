@@ -1,12 +1,14 @@
+import configparser
 import os.path
 import signal
 from os import kill
 from pathlib import Path
-from typing import List
+from typing import List, Set, Tuple
 
 from jinja2 import Template
 
 from knot_resolver_manager.compat.dataclasses import dataclass
+from knot_resolver_manager.kresd_controller.interface import Subprocess, SubprocessType
 from knot_resolver_manager.utils.async_utils import call, readfile, wait_for_process_termination, writefile
 
 CONFIG_FILE = "/tmp/knot-resolver-manager-supervisord.conf"
@@ -16,7 +18,7 @@ SERVER_SOCK = "/tmp/knot-resolver-manager-supervisord.sock"
 
 @dataclass
 class SupervisordConfig:
-    instances: List[str]
+    instances: Set[Subprocess]
     unix_http_server: str = SERVER_SOCK
     pid_file: str = PID_FILE
 
@@ -66,11 +68,23 @@ async def is_supervisord_running() -> bool:
         return False
 
 
-async def list_ids_from_existing_config() -> List[str]:
+def create_id(type_name: SubprocessType, id_: str) -> str:
+    return f"{type_name.name}_{id_}"
+
+
+def parse_id(id_: str) -> Tuple[SubprocessType, str]:
+    tp, id_ = id_.split("_", maxsplit=1)
+    return (SubprocessType[tp], id_)
+
+
+async def list_ids_from_existing_config() -> List[Tuple[SubprocessType, str]]:
     config = await readfile(CONFIG_FILE)
-    res: List[str] = []
-    for line in config.splitlines():
-        if line.startswith("[program:"):
-            id_ = line.replace("[program:", "").replace("]", "").strip()
-            res.append(id_)
+    cp = configparser.ConfigParser()
+    cp.read_string(config)
+
+    res: List[Tuple[SubprocessType, str]] = []
+    for section in cp.sections():
+        if section.startswith("program:"):
+            program_id = section.replace("program:", "")
+            res.append(parse_id(program_id))
     return res

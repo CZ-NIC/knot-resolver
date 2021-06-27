@@ -15,11 +15,28 @@ serverurl = unix://{{ config.unix_http_server }}
 [rpcinterface:supervisor]
 supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
 
-{% for id in config.instances -%}
 
-[program:{{ id }}]
+
+
+{% for instance in config.instances %}
+
+[program:{{ instance.id }}]
+
+{%- if instance.type.name == "KRESD" %}
+
 directory=/var/lib/knot-resolver
 command=/usr/sbin/kresd -c /usr/lib/knot-resolver/distro-preconfig.lua -c /etc/knot-resolver/kresd.conf -n
-environment=SYSTEMD_INSTANCE={{ id }}
+environment=SYSTEMD_INSTANCE={{ instance.id }}
+{%- elif instance.type.name == "GC" %}
 
-{% endfor %}
+directory=/var/lib/knot-resolver
+command=/usr/sbin/kres-cache-gc -c /var/cache/knot-resolver -d 1000
+
+{%- else %}
+
+{# other subprocess types are not implemented, fail #}
+{{ 0 / 0 }}
+
+{% endif %}
+
+{%- endfor -%}

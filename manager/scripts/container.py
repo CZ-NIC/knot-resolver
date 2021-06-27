@@ -33,7 +33,7 @@ def _start_detached(
         f"--volume={str(src)}:{str(dst)}:O"
         for src, dst in ro_mounts.items()
     ]
-    command = ["podman", "run", "--rm", "-d", *options, image]
+    command = ["podman", "run", "--rm", "-d", "--security-opt=seccomp=unconfined", *options, image]
     proc = subprocess.run(
         command, shell=False, executable=PODMAN_EXECUTABLE, stdout=subprocess.PIPE
     )
@@ -101,7 +101,7 @@ def _full_name_from_tag(tag: str) -> str:
 
 
 def _build(tag: str):
-    command = ["podman", "build", "-f", str(GIT_ROOT / "containers" / tag / "Containerfile"), "-t", _full_name_from_tag(tag), str(GIT_ROOT)]
+    command = ["podman", "build", "--security-opt=seccomp=unconfined", "-f", str(GIT_ROOT / "containers" / tag / "Containerfile"), "-t", _full_name_from_tag(tag), str(GIT_ROOT)]
     ret = subprocess.call(command, shell=False, executable=PODMAN_EXECUTABLE)
     assert ret == 0
 
