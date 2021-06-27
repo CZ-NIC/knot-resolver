@@ -50,6 +50,14 @@ def is_none_type(tp: Any) -> bool:
     return tp is None or tp == NoneType
 
 
+def get_attr_type(obj: Any, attr_name: str) -> Any:
+    assert hasattr(obj, attr_name)
+    assert hasattr(obj, "__annotations__")
+    annot = getattr(type(obj), "__annotations__")
+    assert attr_name in annot
+    return annot[attr_name]
+
+
 class _LiteralEnum:
     def __getitem__(self, args: Tuple[Union[str, int, bytes], ...]) -> Any:
         lits = tuple(Literal[x] for x in args)

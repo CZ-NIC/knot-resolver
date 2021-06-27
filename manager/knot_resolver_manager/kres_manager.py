@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, List, Type
+from typing import Any, List, Optional, Type
 from uuid import uuid4
 
 from knot_resolver_manager.constants import KRESD_CONFIG_FILE
@@ -31,11 +31,12 @@ class KresManager:
 
     def __init__(self):
         self._children: List[Subprocess] = []
-        self._children_lock = asyncio.Lock()
+        self._manager_lock = asyncio.Lock()
         self._controller: SubprocessController
+        self._last_used_config: Optional[KresConfig] = None
 
     async def load_system_state(self):
-        async with self._children_lock:
+        async with self._manager_lock:
             await self._collect_already_running_children()
 
     async def _spawn_new_child(self):
@@ -72,10 +73,14 @@ class KresManager:
         await writefile(KRESD_CONFIG_FILE, lua_config)
 
     async def apply_config(self, config: KresConfig):
-        async with self._children_lock:
+        async with self._manager_lock:
             await self._write_config(config)
+            self._last_used_config = config
             await self._ensure_number_of_children(config.server.get_instances())
             await self._rolling_restart()
 
     async def stop(self):
         await self._ensure_number_of_children(0)
+
+    def get_last_used_config(self) -> Optional[KresConfig]:
+        return self._last_used_config

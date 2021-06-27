@@ -28,7 +28,7 @@ python-versions = "*"
 
 [[package]]
 name = "apkg"
-version = "0.1.1.dev1+g08244e6"
+version = "0.1.1.dev4+g8adc3eb"
 description = "cross-distro upstream packaging automation tool"
 category = "dev"
 optional = false
@@ -50,7 +50,7 @@ toml = "*"
 type = "git"
 url = "https://gitlab.nic.cz/packaging/apkg.git"
 reference = "master"
-resolved_reference = "08244e6e0b5842931a5ab27ba976c50e66d887d7"
+resolved_reference = "8adc3eb13d73dccf535c46e54aba632ffe20dbd8"
 
 [[package]]
 name = "appdirs"
@@ -191,7 +191,7 @@ python-versions = "*"
 name = "certifi"
 version = "2020.12.5"
 description = "Python package for providing Mozilla's CA Bundle."
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -852,7 +852,7 @@ python-versions = "*"
 name = "requests"
 version = "2.25.1"
 description = "Python HTTP for Humans."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
@@ -1162,7 +1162,7 @@ python-versions = "*"
 name = "urllib3"
 version = "1.26.4"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, <4"
 
@@ -1243,7 +1243,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=1.2.3)", "pytest-flake8", "pyt
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.6.12"
-content-hash = "32f7e392d56071f55fff1d440f2c90327b26caa637e91d93601dce19fcd48a8e"
+content-hash = "d9de1979aaeaee5d2774e7dbf67436c73f6ef2e3080ccb64c0c382f38cee5a1e"
 
 [metadata.files]
 aiohttp = [

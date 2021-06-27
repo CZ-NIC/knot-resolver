@@ -11,7 +11,7 @@ from aiohttp.web import middleware
 
 from knot_resolver_manager.constants import MANAGER_CONFIG_FILE
 from knot_resolver_manager.utils.async_utils import readfile
-from knot_resolver_manager.utils.dataclasses_parservalidator import ValidationException
+from knot_resolver_manager.utils.dataclasses_parservalidator import Format, ValidationException
 
 from .datamodel import KresConfig
 from .kres_manager import KresManager
@@ -34,6 +34,8 @@ async def _apply_config(request: web.Request) -> web.Response:
     Route handler for changing resolver configuration
     """
 
+    document_path = request.match_info["path"]
+
     manager: KresManager = get_kres_manager(request.app)
     if manager is None:
         # handle the case when the manager is not yet initialized
@@ -42,22 +44,9 @@ async def _apply_config(request: web.Request) -> web.Response:
         )
 
     # parse the incoming data
-
-    # JSON or not-set
-    #
-    # aiohttp docs https://docs.aiohttp.org/en/stable/web_reference.html#aiohttp.web.BaseRequest.content_type:
-    #
-    # "Returns value is 'application/octet-stream' if no Content-Type header present in HTTP headers according to
-    #  RFC 2616"
-    if request.content_type == "application/json" or request.content_type == "application/octet-stream":
-        config = KresConfig.from_json(await request.text())
-    elif "yaml" in request.content_type:
-        config = KresConfig.from_yaml(await request.text())
-    else:
-        return web.Response(
-            text="Unsupported content-type header. Use application/json or text/x-yaml",
-            status=HTTPStatus.BAD_REQUEST,
-        )
+    last: KresConfig = manager.get_last_used_config() or KresConfig()
+    fmt = Format.from_mime_type(request.content_type)
+    config = last.copy_with_changed_subtree(fmt, document_path, await request.text())
 
     # apply config
     await manager.apply_config(config)
@@ -92,7 +81,7 @@ async def error_handler(request: web.Request, handler: Any):
 
 
 def setup_routes(app: web.Application):
-    app.add_routes([web.get("/", _index), web.post("/config", _apply_config), web.post("/stop", _stop)])
+    app.add_routes([web.get("/", _index), web.post(r"/config{path:.*}", _apply_config), web.post("/stop", _stop)])
 
 
 def stop_server(app: web.Application):
