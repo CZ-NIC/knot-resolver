@@ -33,6 +33,7 @@ toml = "^0.10.2"
 debugpy = "^1.2.1"
 apkg = { git = "https://gitlab.nic.cz/packaging/apkg.git", branch = "master" }
 Sphinx = "^4.0.2"
+supervisor = "^4.2.2"
 
 [tool.poe.tasks]
 run = { cmd = "scripts/run", help = "Run the manager" }

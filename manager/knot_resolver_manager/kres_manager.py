@@ -1,8 +1,10 @@
 import asyncio
 from typing import Any, List, Type
+from uuid import uuid4
 
 from knot_resolver_manager.constants import KRESD_CONFIG_FILE
-from knot_resolver_manager.kresd_controller import BaseKresdController, get_best_controller_implementation
+from knot_resolver_manager.kresd_controller import get_best_controller_implementation
+from knot_resolver_manager.kresd_controller.interface import Subprocess, SubprocessController, SubprocessType
 from knot_resolver_manager.utils.async_utils import writefile
 
 from .datamodel import KresConfig
@@ -28,18 +30,18 @@ class KresManager:
         await self.load_system_state()
 
     def __init__(self):
-        self._children: List[BaseKresdController] = []
+        self._children: List[Subprocess] = []
         self._children_lock = asyncio.Lock()
-        self._controller: Type[BaseKresdController]
+        self._controller: SubprocessController
 
     async def load_system_state(self):
         async with self._children_lock:
             await self._collect_already_running_children()
 
     async def _spawn_new_child(self):
-        kresd = self._controller()
-        await kresd.start()
-        self._children.append(kresd)
+        subprocess = await self._controller.create_subprocess(SubprocessType.KRESD, str(uuid4()))
+        await subprocess.start()
+        self._children.append(subprocess)
 
     async def _stop_a_child(self):
         if len(self._children) == 0:

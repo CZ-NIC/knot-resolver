@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import sys
 from http import HTTPStatus
 from pathlib import Path
 from time import time
@@ -118,24 +119,28 @@ async def start_server(tcp: List[Tuple[str, int]], unix: List[Path], config_path
         """
         Called asynchronously when the application initializes.
         """
-        # Create KresManager. This will perform autodetection of available service managers and
-        # select the most appropriate to use
-        manager = await KresManager.create()
-        app[_MANAGER] = manager
+        try:
+            # Create KresManager. This will perform autodetection of available service managers and
+            # select the most appropriate to use
+            manager = await KresManager.create()
+            app[_MANAGER] = manager
 
-        # Initial static configuration of the manager
-        # optional step, could be skipped
-        if config_path is not None:
-            if not config_path.exists():
-                logger.warning(
-                    "Manager is configured to load config file at %s on startup, but the file does not exist.",
-                    config_path,
-                )
-            else:
-                initial_config = KresConfig.from_yaml(await readfile(config_path))
-                await manager.apply_config(initial_config)
+            # Initial static configuration of the manager
+            # optional step, could be skipped
+            if config_path is not None:
+                if not config_path.exists():
+                    logger.warning(
+                        "Manager is configured to load config file at %s on startup, but the file does not exist.",
+                        config_path,
+                    )
+                else:
+                    initial_config = KresConfig.from_yaml(await readfile(config_path))
+                    await manager.apply_config(initial_config)
 
-        logger.info("Process manager initialized...")
+            logger.info("Process manager initialized...")
+        except BaseException:
+            logger.error("Manager initialization failed... Shutting down!", exc_info=True)
+            sys.exit(1)
 
     app.on_startup.append(init_manager)
 

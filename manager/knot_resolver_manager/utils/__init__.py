@@ -1,4 +1,4 @@
-from typing import Any, Callable, Optional, Type, TypeVar
+from typing import Any, Callable, Iterable, Optional, Type, TypeVar
 
 from .dataclasses_parservalidator import DataclassParserValidatorMixin, ValidationException
 from .overload import Overloaded
@@ -39,6 +39,17 @@ def ignore_exceptions(
     default: T, *exceptions: Type[BaseException]
 ) -> Callable[[Callable[..., Optional[T]]], Callable[..., Optional[T]]]:
     return ignore_exceptions_optional(type(default), default, *exceptions)
+
+
+def foldl(oper: Callable[[T, T], T], default: T, arr: Iterable[T]) -> T:
+    val = default
+    for x in arr:
+        val = oper(val, x)
+    return val
+
+
+def contains_element_matching(cond: Callable[[T], bool], arr: Iterable[T]) -> bool:
+    return foldl(lambda x, y: x or y, False, map(cond, arr))
 
 
 __all__ = [

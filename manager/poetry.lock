@@ -28,8 +28,8 @@ python-versions = "*"
 
 [[package]]
 name = "apkg"
-version = "0.0.5.dev8+g272a73b"
-description = "minimalist cross-distro packaging automation tool"
+version = "0.1.1.dev1+g08244e6"
+description = "cross-distro upstream packaging automation tool"
 category = "dev"
 optional = false
 python-versions = "*"
@@ -38,8 +38,8 @@ develop = false
 [package.dependencies]
 blessings = "*"
 cached-property = "*"
+click = "*"
 distro = "*"
-docopt = "*"
 htmllistparse = "*"
 jinja2 = "*"
 packaging = "*"
@@ -50,7 +50,7 @@ toml = "*"
 type = "git"
 url = "https://gitlab.nic.cz/packaging/apkg.git"
 reference = "master"
-resolved_reference = "272a73b7aab7cadf6d4fd2bb06a351145d88920b"
+resolved_reference = "08244e6e0b5842931a5ab27ba976c50e66d887d7"
 
 [[package]]
 name = "appdirs"
@@ -258,14 +258,6 @@ python-versions = "*"
 name = "distro"
 version = "1.5.0"
 description = "Distro - an OS platform information API"
-category = "dev"
-optional = false
-python-versions = "*"
-
-[[package]]
-name = "docopt"
-version = "0.6.2"
-description = "Pythonic argument parser, that will make you smile"
 category = "dev"
 optional = false
 python-versions = "*"
@@ -1090,6 +1082,17 @@ python-dateutil = ">=2.6.0"
 "ruamel.yaml" = ">=0.14.2"
 
 [[package]]
+name = "supervisor"
+version = "4.2.2"
+description = "A system for controlling process state under UNIX"
+category = "dev"
+optional = false
+python-versions = "*"
+
+[package.extras]
+testing = ["pytest", "pytest-cov"]
+
+[[package]]
 name = "toml"
 version = "0.10.2"
 description = "Python Library for Tom's Obvious, Minimal Language"
@@ -1240,7 +1243,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=1.2.3)", "pytest-flake8", "pyt
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.6.12"
-content-hash = "ab70f3d6702baa7a8567eea9d58e0b5c9650e5c6b1c786309604dbabe8d44af6"
+content-hash = "32f7e392d56071f55fff1d440f2c90327b26caa637e91d93601dce19fcd48a8e"
 
 [metadata.files]
 aiohttp = [
@@ -1469,9 +1472,6 @@ distlib = [
 distro = [
     {file = "distro-1.5.0-py2.py3-none-any.whl", hash = "sha256:df74eed763e18d10d0da624258524ae80486432cd17392d9c3d96f5e83cd2799"},
     {file = "distro-1.5.0.tar.gz", hash = "sha256:0e58756ae38fbd8fc3020d54badb8eae17c5b9dcbed388b17bb55b8a5928df92"},
-]
-docopt = [
-    {file = "docopt-0.6.2.tar.gz", hash = "sha256:49b3a825280bd66b3aa83585ef59c4a8c82f2c8a522dbe754a8bc8d08c85c491"},
 ]
 docutils = [
     {file = "docutils-0.17.1-py2.py3-none-any.whl", hash = "sha256:cf316c8370a737a022b72b56874f6602acf974a37a9fba42ec2876387549fc61"},
@@ -1972,6 +1972,10 @@ stevedore = [
 ]
 strictyaml = [
     {file = "strictyaml-1.4.0.tar.gz", hash = "sha256:9f4e5814f96e17e82044a7dbbb8a0976048f2841b073e8114c2a2c025e7f81b9"},
+]
+supervisor = [
+    {file = "supervisor-4.2.2-py2.py3-none-any.whl", hash = "sha256:4adf63c8f18cf42313171ce06a73c9ae2c5e88ef27c2bb0de3b8405368595c04"},
+    {file = "supervisor-4.2.2.tar.gz", hash = "sha256:5b2b8882ec8a3c3733cce6965cc098b6d80b417f21229ab90b18fe551d619f90"},
 ]
 toml = [
     {file = "toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b"},
