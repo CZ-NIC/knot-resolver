@@ -1,4 +1,4 @@
-from knot_resolver_manager.utils import containsElementMatching, foldl
+from knot_resolver_manager.utils import contains_element_matching, foldl
 
 
 def test_foldl():
@@ -11,5 +11,5 @@ def test_foldl():
 def test_containsElementMatching():
     lst = list(range(10))
 
-    assert containsElementMatching(lambda e: e == 5, lst)
-    assert not containsElementMatching(lambda e: e == 11, lst)
+    assert contains_element_matching(lambda e: e == 5, lst)
+    assert not contains_element_matching(lambda e: e == 11, lst)
