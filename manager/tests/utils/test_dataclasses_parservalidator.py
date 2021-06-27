@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-from knot_resolver_manager.utils.dataclasses_parservalidator import DataclassParserValidatorMixin
+from knot_resolver_manager.utils.dataclasses_parservalidator import DataclassParserValidatorMixin, Format
 
 
 def test_parsing_primitive():
@@ -132,3 +132,39 @@ lua_config: |
     assert data.num_workers == 4
     assert type(data.lua_config) == str
     assert data.lua_config == "dummy"
+
+
+def test_partial_mutations():
+    @dataclass
+    class Inner(DataclassParserValidatorMixin):
+        number: int
+
+        def _validate(self):
+            pass
+
+    @dataclass
+    class ConfData(DataclassParserValidatorMixin):
+        num_workers: int = 1
+        lua_config: Optional[str] = None
+        inner: Inner = Inner(5)
+
+        def _validate(self):
+            if self.num_workers < 0:
+                raise Exception("Number of workers must be non-negative")
+
+    data = ConfData(5, "something", Inner(10))
+
+    x = data.copy_with_changed_subtree(Format.JSON, "/lua_config", '"new_value"')
+    assert x.lua_config == "new_value"
+    assert x.num_workers == 5
+    assert x.inner.number == 10
+
+    x = data.copy_with_changed_subtree(Format.JSON, "/inner", '{"number": 55}')
+    assert x.lua_config == "something"
+    assert x.num_workers == 5
+    assert x.inner.number == 55
+
+    x = data.copy_with_changed_subtree(Format.JSON, "/", '{"inner": {"number": 55}}')
+    assert x.lua_config is None
+    assert x.num_workers == 1
+    assert x.inner.number == 55

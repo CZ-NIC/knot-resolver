@@ -1,4 +1,7 @@
+import copy
 import json
+import re
+from enum import Enum, auto
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 import yaml
@@ -6,6 +9,7 @@ from yaml.constructor import ConstructorError
 from yaml.nodes import MappingNode
 
 from knot_resolver_manager.utils.types import (
+    get_attr_type,
     get_generic_type_argument,
     get_generic_type_arguments,
     is_dict,
@@ -188,6 +192,35 @@ class RaiseDuplicatesLoader(yaml.SafeLoader):
 _T = TypeVar("_T", bound="DataclassParserValidatorMixin")
 
 
+_SUBTREE_MUTATION_PATH_PATTERN = re.compile(r"^(/[^/]+)*/?$")
+
+
+class Format(Enum):
+    YAML = auto()
+    JSON = auto()
+
+    def parse_to_dict(self, text: str) -> Any:
+        if self is Format.YAML:
+            # RaiseDuplicatesLoader extends yaml.SafeLoader, so this should be safe
+            # https://python.land/data-processing/python-yaml#PyYAML_safe_load_vs_load
+            return yaml.load(text, Loader=RaiseDuplicatesLoader)  # type: ignore
+        elif self is Format.JSON:
+            return json.loads(text, object_pairs_hook=json_raise_duplicates)
+        else:
+            raise NotImplementedError(f"Parsing of format '{self}' is not implemented")
+
+    @staticmethod
+    def from_mime_type(mime_type: str) -> "Format":
+        formats = {
+            "application/json": Format.JSON,
+            "application/octet-stream": Format.JSON,  # default in aiohttp
+            "text/vnd.yaml": Format.YAML,
+        }
+        if mime_type not in formats:
+            raise ValidationException("Unsupported MIME type")
+        return formats[mime_type]
+
+
 class DataclassParserValidatorMixin:
     def __init__(self, *args: Any, **kwargs: Any):
         """
@@ -215,17 +248,60 @@ class DataclassParserValidatorMixin:
         raise NotImplementedError(f"Validation function is not implemented in class {type(self).__name__}")
 
     @classmethod
-    def from_yaml(cls: Type[_T], text: str, default: _T = ..., use_default: bool = False) -> _T:
-        # RaiseDuplicatesLoader extends yaml.SafeLoader, so this should be safe
-        # https://python.land/data-processing/python-yaml#PyYAML_safe_load_vs_load
-        data = yaml.load(text, Loader=RaiseDuplicatesLoader)  # type: ignore
-        config: _T = _from_dictlike_obj(cls, data, default, use_default)
+    def parse_from(cls: Type[_T], fmt: Format, text: str):
+        data = fmt.parse_to_dict(text)
+        config: _T = _from_dictlike_obj(cls, data, ..., False)
         config.validate()
         return config
 
     @classmethod
-    def from_json(cls: Type[_T], text: str, default: _T = ..., use_default: bool = False) -> _T:
-        data = json.loads(text, object_pairs_hook=json_raise_duplicates)
-        config: _T = _from_dictlike_obj(cls, data, default, use_default)
-        config.validate()
-        return config
+    def from_yaml(cls: Type[_T], text: str) -> _T:
+        return cls.parse_from(Format.YAML, text)
+
+    @classmethod
+    def from_json(cls: Type[_T], text: str) -> _T:
+        return cls.parse_from(Format.JSON, text)
+
+    def copy_with_changed_subtree(self: _T, fmt: Format, path: str, text: str) -> _T:
+        cls = self.__class__
+
+        # prepare and validate the path object
+        path = path[:-1] if path.endswith("/") else path
+        if re.match(_SUBTREE_MUTATION_PATH_PATTERN, path) is None:
+            raise ValidationException("Provided object path for mutation is invalid.")
+        path = path[1:] if path.startswith("/") else path
+
+        # now, the path variable should contain '/' separated field names
+
+        # check if we should mutate whole object
+        if path == "":
+            return cls.parse_from(fmt, text)
+
+        # find the subtree we will replace in a copy of the original object
+        to_mutate = copy.deepcopy(self)
+        obj = to_mutate
+        parent = None
+        for segment in path.split("/"):
+            if segment == "":
+                raise ValidationException(f"Unexpectedly empty segment in path '{path}'")
+            elif segment.startswith("_"):
+                raise ValidationException("No, changing internal fields (starting with _) is not allowed. Nice try.")
+            elif hasattr(obj, segment):
+                parent = obj
+                obj = getattr(parent, segment)
+            else:
+                raise ValidationException(
+                    f"Path segment '{segment}' does not match any field on the provided parent object"
+                )
+        assert parent is not None
+
+        # assign the subtree
+        last_name = path.split("/")[-1]
+        data = fmt.parse_to_dict(text)
+        tp = get_attr_type(parent, last_name)
+        parsed_value = _from_dictlike_obj(tp, data, ..., False)
+        setattr(parent, last_name, parsed_value)
+
+        to_mutate.validate()
+
+        return to_mutate

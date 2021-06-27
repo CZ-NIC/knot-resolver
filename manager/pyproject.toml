@@ -16,6 +16,7 @@ PyGObject = "^3.38.0"
 Jinja2 = "^2.11.3"
 click = "^7.1.2"
 PyYAML = "^5.4.1"
+requests = "^2.25.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
@@ -45,6 +46,7 @@ format = { shell = "poetry run black knot_resolver_manager/ tests/; isort -rc ."
 fixdeps = { shell = "poetry install; npm install; npm update", help = "Install/update dependencies according to configuration files"}
 commit = { shell = "scripts/commit", help = "Invoke every single check before commiting" }
 container = { cmd = "scripts/container.py", help = "Manage containers" }
+client = { script = "knot_resolver_manager.client.__main__:main", help="Run Managers API client CLI" }
 clean = """
   rm -rf .coverage
          .mypy_cache
@@ -107,6 +109,7 @@ disable= [
     "consider-using-in", # pyright can't see through in expressions,
     "too-many-return-statements", # would prevent us from using recursive tree traversals
     "logging-fstring-interpolation", # see https://github.com/PyCQA/pylint/issues/1788
+    "no-else-raise", # not helpful for readability, when we want explicit branches
 ]
 
 [tool.pylint.SIMILARITIES]
