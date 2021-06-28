@@ -57,6 +57,14 @@ class SubprocessController:
         """
         raise NotImplementedError()
 
+    async def shutdown_controller(self) -> None:
+        """
+        Called when the manager is gracefully shutting down. Allows us to stop
+        the service manager process or simply cleanup, so that we don't reuse
+        the same resources in a new run.
+        """
+        raise NotImplementedError()
+
     async def create_subprocess(self, subprocess_type: SubprocessType, id_hint: str) -> Subprocess:
         """
         Return a Subprocess object which can be operated on. The subprocess is not

@@ -1,9 +1,10 @@
 import asyncio
 import os
+import pkgutil
 import time
 from asyncio import create_subprocess_exec, create_subprocess_shell
 from pathlib import PurePath
-from typing import List, Union
+from typing import List, Optional, Union
 
 from knot_resolver_manager.compat.asyncio import to_thread
 
@@ -76,3 +77,7 @@ async def wait_for_process_termination(pid: int, sleep_sec: float = 0):
                 break
 
     await to_thread(wait_sync, pid, sleep_sec)
+
+
+async def read_resource(package: str, filename: str) -> Optional[bytes]:
+    return await to_thread(pkgutil.get_data, package, filename)

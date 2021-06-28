@@ -1,6 +1,8 @@
 import logging
-from typing import Iterable, Set
+from asyncio.futures import Future
+from typing import Any, Iterable, Set
 
+from knot_resolver_manager.compat.asyncio import create_task
 from knot_resolver_manager.kresd_controller.interface import Subprocess, SubprocessController, SubprocessType
 
 from .config import (
@@ -11,7 +13,9 @@ from .config import (
     list_ids_from_existing_config,
     restart,
     start_supervisord,
+    stop_supervisord,
     update_config,
+    watchdog,
 )
 
 logger = logging.getLogger(__name__)
@@ -47,6 +51,7 @@ class SupervisordSubprocess(Subprocess):
 class SupervisordSubprocessController(SubprocessController):
     def __init__(self):
         self._running_instances: Set[SupervisordSubprocess] = set()
+        self._watchdog_task: "Future[Any]"
 
     def __str__(self):
         return type(self).__name__
@@ -78,6 +83,11 @@ class SupervisordSubprocessController(SubprocessController):
         if not await is_supervisord_running():
             config = self._create_config()
             await start_supervisord(config)
+        self._watchdog_task = create_task(watchdog())
+
+    async def shutdown_controller(self) -> None:
+        self._watchdog_task.cancel()
+        await stop_supervisord()
 
     async def start_subprocess(self, subprocess: SupervisordSubprocess):
         assert subprocess not in self._running_instances

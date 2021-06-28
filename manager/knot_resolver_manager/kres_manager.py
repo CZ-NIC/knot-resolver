@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, List, Optional, Type
+from typing import List, Optional, Type
 from uuid import uuid4
 
 from knot_resolver_manager.constants import KRESD_CONFIG_FILE
@@ -19,9 +19,9 @@ class KresManager:
     """
 
     @classmethod
-    async def create(cls: Type["KresManager"], *args: Any, **kwargs: Any) -> "KresManager":
+    async def create(cls: Type["KresManager"]) -> "KresManager":
         obj = cls()
-        await obj._async_init(*args, **kwargs)  # pylint: disable=protected-access
+        await obj._async_init()  # pylint: disable=protected-access
         return obj
 
     async def _async_init(self):
@@ -80,7 +80,9 @@ class KresManager:
             await self._rolling_restart()
 
     async def stop(self):
-        await self._ensure_number_of_children(0)
+        async with self._manager_lock:
+            await self._ensure_number_of_children(0)
+            await self._controller.shutdown_controller()
 
     def get_last_used_config(self) -> Optional[KresConfig]:
         return self._last_used_config

@@ -1,0 +1,12 @@
+network:
+    interfaces:
+      - listen: 127.0.0.1@5353
+    edns_buffer_size:
+        downstream: 4K
+options:
+    prediction: true
+cache:
+    storage: .
+    size_max: 100M
+logging:
+    level: 5
