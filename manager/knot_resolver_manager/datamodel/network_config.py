@@ -17,13 +17,14 @@ class InterfacesConfig(DataclassParserValidatorMixin):
     def __post_init__(self):
         # split 'address@port'
         if "@" in self.listen:
-            tmp = self.listen.split("@", maxsplit=1)
-            self._address = tmp[0]
-            self._port = int(tmp[1])
-        # if port number not specified
-        self._address = self.listen
-        # set port number based on 'kind'
-        self._port = self._kind_port_map.get(self.kind)
+            address, port = self.listen.split("@", maxsplit=1)
+            self._address = address
+            self._port = int(port)
+        else:
+            # if port number not specified
+            self._address = self.listen
+            # set port number based on 'kind'
+            self._port = self._kind_port_map.get(self.kind)
 
     def get_address(self) -> Optional[str]:
         return self._address

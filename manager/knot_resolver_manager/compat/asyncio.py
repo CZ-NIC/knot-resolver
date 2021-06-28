@@ -11,10 +11,14 @@
 
 import asyncio
 import functools
+import logging
 import sys
+from asyncio.futures import Future
 from typing import Any, Awaitable, Callable, Coroutine, Optional, TypeVar
 
 from knot_resolver_manager.utils.types import NoneType
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
@@ -28,10 +32,17 @@ def to_thread(func: Callable[..., T], *args: Any, **kwargs: Any) -> Awaitable[T]
     else:
         loop = asyncio.get_event_loop()
         pfunc = functools.partial(func, *args, **kwargs)
-        return loop.run_in_executor(None, pfunc)
+
+        def exc_catcher():
+            try:
+                return pfunc()
+            except BaseException:
+                logger.error("Task in thread failed...", exc_info=True)
+
+        return loop.run_in_executor(None, exc_catcher)
 
 
-def create_task(coro: Coroutine[Any, T, NoneType], name: Optional[str] = None) -> Awaitable[T]:
+def create_task(coro: Coroutine[Any, T, NoneType], name: Optional[str] = None) -> "Future[T]":
     # version 3.8 and higher, call directly
     if sys.version_info.major >= 3 and sys.version_info.minor >= 8:
         return asyncio.create_task(coro, name=name)

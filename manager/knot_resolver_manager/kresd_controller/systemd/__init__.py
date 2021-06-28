@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Iterable, List
 
 from knot_resolver_manager import compat
@@ -67,6 +68,13 @@ class SystemdSubprocessController(SubprocessController):
                 logger.info("Systemd (%s) accessible, but no 'kresd@.service' unit detected.", self._systemd_type)
                 return False
 
+            if self._systemd_type == systemd.SystemdType.SYSTEM and os.geteuid() != 0:
+                logger.info(
+                    "Systemd (%s) looks functional, but we are not running as root. Assuming not enough privileges",
+                    self._systemd_type,
+                )
+                return False
+
             return True
         except BaseException:  # we want every possible exception to be caught
             logger.warning("Communicating with systemd DBus API failed", exc_info=True)
@@ -83,6 +91,9 @@ class SystemdSubprocessController(SubprocessController):
         return res
 
     async def initialize_controller(self) -> None:
+        pass
+
+    async def shutdown_controller(self) -> None:
         pass
 
     async def create_subprocess(self, subprocess_type: SubprocessType, id_hint: str) -> Subprocess:

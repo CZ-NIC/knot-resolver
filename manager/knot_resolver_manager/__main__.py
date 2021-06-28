@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 import click
 
 from knot_resolver_manager import compat
-from knot_resolver_manager.constants import LISTEN_SOCKET_PATH, MANAGER_CONFIG_FILE
+from knot_resolver_manager.constants import LISTEN_SOCKET_PATH, LOG_LEVEL, MANAGER_CONFIG_FILE
 from knot_resolver_manager.server import start_server
 from knot_resolver_manager.utils import ignore_exceptions_optional
 
@@ -48,5 +48,5 @@ def main(listen: Optional[str], config: Optional[str]):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=LOG_LEVEL)
     main()  # pylint: disable=no-value-for-parameter
