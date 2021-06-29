@@ -71,7 +71,7 @@ function tls_cert.ephemeral_state_maintain(ephem_state, certfile, keyfile)
 		s.server.ctx = ephem_state.ctx
 		s.config.ctx = ephem_state.ctx -- not required, but let's keep it synchonized
 	end
-	log('[http] created new ephemeral TLS certificate')
+	log_info(ffi.C.DOH, 'created new ephemeral TLS certificate')
 	local _, expiry_stamp = certs[1]:getLifetime()
 	local wait_msec = 1000 * math.max(1, expiry_stamp - os.time() - 3 * 24 * 3600)
 	if not ephem_state.timer_id then
@@ -173,7 +173,7 @@ function tls_cert.new_tls_context(certs, key)
 		assert(ctx:setCertificateChain(chain))
 	elseif not warned_old_luaossl then
 		-- old luaossl version -> only final cert sent to clients
-		warn('[http] Warning: need luaossl >= 20181207 to support sending intermediary certificate to clients')
+		log_warn(ffi.C.DOH, 'Warning: need luaossl >= 20181207 to support sending intermediary certificate to clients')
 		warned_old_luaossl = true
 	end
 	return ctx

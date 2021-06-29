@@ -32,9 +32,7 @@ function M.layer.finish(state, req, pkt)
 	if not keytag then return state end
 
 	if req.rank ~= ffi.C.KR_RANK_SECURE or req.answer:cd() then
-		if verbose() then
-			log('[ta_sentinel] name+type OK but not AD+CD conditions')
-		end
+		log_info(ffi.C.TASENTINEL, 'name+type OK but not AD+CD conditions')
 		return state
 	end
 
@@ -45,9 +43,7 @@ function M.layer.finish(state, req, pkt)
 	if keytag < 0 or keytag > 0xffff then
 		return state end -- invalid keytag?!, exit
 
-	if verbose() then
-		log('[ta_sentinel] key tag: ' .. keytag .. ', sentinel: ' .. tostring(sentype))
-	end
+	log_info(ffi.C.TASENTINEL, 'key tag: ' .. keytag .. ', sentinel: ' .. tostring(sentype))
 
 	local found = false
 	local ds_set = ffi.C.kr_ta_get(kres.context().trust_anchors, '\0')
@@ -62,15 +58,13 @@ function M.layer.finish(state, req, pkt)
 			end
 		end
 	end
-	if verbose() then
-		log('[ta_sentinel] matching trusted TA found: ' .. tostring(found))
-		if not found then -- print matching TAs in *other* states than Valid
-			for i = 1, #(trust_anchors.keysets['\0'] or {}) do
-				local key = trust_anchors.keysets['\0'][i]
-				if key.key_tag == keytag and key.state ~= 'Valid' then
-					log('[ta_sentinel] matching UNtrusted TA found in state: '
-						.. key.state)
-				end
+	log_info(ffi.C.TASENTINEL, 'matching trusted TA found: ' .. tostring(found))
+	if not found then -- print matching TAs in *other* states than Valid
+		for i = 1, #(trust_anchors.keysets['\0'] or {}) do
+			local key = trust_anchors.keysets['\0'][i]
+			if key.key_tag == keytag and key.state ~= 'Valid' then
+				log_info(ffi.C.TASENTINEL, 'matching UNtrusted TA found in state: '
+					.. key.state)
 			end
 		end
 	end

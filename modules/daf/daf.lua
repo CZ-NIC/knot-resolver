@@ -357,7 +357,7 @@ end
 function M.config()
 	if not http then
 		if verbose() then
-			log('[daf ] HTTP API unavailable because HTTP module is not loaded, use modules.load("http")')
+			log_error(ffi.C.DAF, 'HTTP API unavailable because HTTP module is not loaded, use modules.load("http")')
 		end
 		return
 	end

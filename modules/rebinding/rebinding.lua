@@ -108,7 +108,7 @@ function M.layer.consume(state, req, pkt)
 		state = refuse(req)
 	end
 	if verbose() then
-		ffi.C.kr_log_q(qry, 'rebinding',
+		log_qry(qry, ffi.C.LOG_GRP_REBIND,
 		    'blocking blacklisted IP in RR \'%s\'\n', kres.rr2str(bad_rr))
 	end
 	return state

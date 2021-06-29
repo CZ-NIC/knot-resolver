@@ -100,7 +100,7 @@ local function generate_ds(keydigests)
 		if keydigest_is_valid(fields['validFrom'], fields['validUntil']) then
 			rrset = rrset .. '\n' .. rr
 		else
-			log('[ ta ] skipping trust anchor "%s" ' ..
+			log_info(ffi.C.TA, 'skipping trust anchor "%s" ' ..
 				'because it is outside of validity range', rr)
 		end
 	end
@@ -303,7 +303,7 @@ local function keyset_publish(keyset)
 		end
 	end
 	if count == 0 then
-		warn('[ ta ] ERROR: no anchors are trusted for ' ..
+		log_error(ffi.C.TA, 'ERROR: no anchors are trusted for ' ..
 			kres.dname2str(keyset.owner) .. ' !')
 	end
 	return count > 0 and not has_error
@@ -328,7 +328,7 @@ local function add_file(path, unmanaged)
 				"[ ta ] keyfile '%s' doesn't exist and root key is already installed, "
 				.. "cannot bootstrap; provide a path to valid file with keys", path))
 		end
-		log("[ ta ] keyfile '%s': doesn't exist, bootstrapping", path);
+		log_info(ffi.C.TA, "keyfile '%s': doesn't exist, bootstrapping", path);
 		local rrstr, msg = bootstrap(trust_anchors.bootstrap_url, trust_anchors.bootstrap_ca)
 		if not rrstr then
 			msg = msg .. '\n'
@@ -352,7 +352,7 @@ local function add_file(path, unmanaged)
 	local owner_str = kres.dname2str(owner)
 	local keyset_orig = trust_anchors.keysets[owner]
 	if keyset_orig then
-		warn('[ ta ] warning: overriding previously set trust anchors for ' .. owner_str)
+		log_warn(ffi.C.TA, 'warning: overriding previously set trust anchors for ' .. owner_str)
 		if keyset_orig.managed and ta_update then
 			ta_update.stop(owner)
 		end
@@ -361,7 +361,7 @@ local function add_file(path, unmanaged)
 
 	-- Replace the TA store used for validation
 	if keyset_publish(keyset) and verbose() then
-		log('[ ta ] installed trust anchors for domain ' .. owner_str .. ' are:\n'
+		log_info(ffi.C.TA, 'installed trust anchors for domain ' .. owner_str .. ' are:\n'
 			.. trust_anchors.summary(owner))
 	end
 	-- TODO: if failed and for root, try to rebootstrap?
@@ -447,7 +447,7 @@ trust_anchors = {
 					panic('[ ta ] it is impossible to add an unmanaged TA for zone '
 						.. owner_str .. ' which already has a managed TA')
 				end
-				warn('[ ta ] warning: extending previously set trust anchors for '
+				log_warn(ffi.C.TA, 'warning: extending previously set trust anchors for '
 						.. owner_str)
 				for _, ta in ipairs(keyset) do
 					table.insert(keyset_orig, ta)
@@ -463,7 +463,7 @@ trust_anchors = {
 			trust_anchors.keysets[owner] = keyset
 
 		end
-		if verbose() or err then log('New TA state:\n' .. trust_anchors.summary()) end
+		log_info(ffi.C.TA, 'New TA state:\n' .. trust_anchors.summary())
 		if err then
 			panic('[ ta ] .add() failed: ' .. err)
 		end

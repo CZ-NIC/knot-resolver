@@ -79,7 +79,7 @@ local function download(url, fname)
 			fname, errmsg))
 	end
 
-	log("[prefill] downloading root zone to file %s ...", fname)
+	log_info(ffi.C.PREFILL, "downloading root zone to file %s ...", fname)
 	rcode, errmsg = kluautil.kr_https_fetch(url, file, rz_ca_file)
 	if rcode == nil then
 		error(string.format("[prefill] fetch of `%s` failed: %s", url, errmsg))
@@ -93,7 +93,7 @@ local function import(fname)
 	if res.code == 1 then -- no TA found, wait
 		error("[prefill] no trust anchor found for root zone, import aborted")
 	elseif res.code == 0 then
-		log("[prefill] root zone successfully parsed, import started")
+		log_info(ffi.C.PREFILL, "root zone successfully parsed, import started")
 	else
 		error(string.format("[prefill] root zone import failed (%s)", res.msg))
 	end
@@ -103,14 +103,14 @@ function forward_references.fill_cache()
 	local file_ttl = get_file_ttl(rz_local_fname)
 
 	if file_ttl > rz_interval_threshold then
-		log("[prefill] root zone file valid for %s, reusing data from disk",
+		log_info(ffi.C.PREFILL, "root zone file valid for %s, reusing data from disk",
 			display_delay(file_ttl))
 	else
 		local ok, errmsg = pcall(download, rz_url, rz_local_fname)
 		if not ok then
 			rz_cur_interval = rz_https_fail_interval
 						- math.random(rz_interval_randomizator_limit)
-			log("[prefill] cannot download new zone (%s), "
+			log_info(ffi.C.PREFILL, "cannot download new zone (%s), "
 				.. "will retry root zone download in %s",
 				errmsg, display_delay(rz_cur_interval))
 			restart_timer(rz_cur_interval)
@@ -130,13 +130,13 @@ function forward_references.fill_cache()
 			rz_cur_interval = rz_import_error_interval
 				- math.random(rz_interval_randomizator_limit)
 		end
-		log("[prefill] root zone import failed (%s), retry in %s",
+		log_info(ffi.C.PREFILL, "root zone import failed (%s), retry in %s",
 			errmsg, display_delay(rz_cur_interval))
 	else
 		-- re-download before TTL expires
 		rz_cur_interval = (file_ttl - rz_interval_threshold
 					- math.random(rz_interval_randomizator_limit))
-		log("[prefill] root zone refresh in %s",
+		log_info(ffi.C.PREFILL, "root zone refresh in %s",
 			display_delay(rz_cur_interval))
 	end
 	restart_timer(rz_cur_interval)
