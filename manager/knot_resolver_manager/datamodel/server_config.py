@@ -1,12 +1,32 @@
+import logging
 import os
 from typing import Optional, Union
 
 from typing_extensions import Literal
 
 from knot_resolver_manager.compat.dataclasses import dataclass
+from knot_resolver_manager.datamodel.errors import DataValidationError
 from knot_resolver_manager.utils.dataclasses_parservalidator import DataclassParserValidatorMixin
 
-from .errors import DataValidationError
+logger = logging.getLogger(__name__)
+
+
+def _cpu_count() -> int:
+    try:
+        return len(os.sched_getaffinity(0))
+    except (NotImplementedError, AttributeError):
+        logger.warning(
+            "The number of usable CPUs could not be determined using 'os.sched_getaffinity()'."
+            "Attempting to get the number of system CPUs using 'os.cpu_count()'"
+        )
+        cpus = os.cpu_count()
+        if cpus is None:
+            raise DataValidationError(
+                "The number of available CPUs to automatically set the number of running"
+                "'kresd' workers could not be determined."
+                "The number can be specified manually in 'server:instances' configuration option."
+            )
+        return cpus
 
 
 @dataclass
@@ -20,12 +40,7 @@ class ServerConfig(DataclassParserValidatorMixin):
         if isinstance(self.instances, int):
             self._instances = self.instances
         elif self.instances == "auto":
-            cpu_count = os.cpu_count()
-            if cpu_count is not None:
-                self._instances = cpu_count
-            else:
-                # TODO: do better logging
-                print("cannot find number of system available CPUs")
+            self._instances = _cpu_count()
 
     def get_instances(self) -> int:
         return self._instances
