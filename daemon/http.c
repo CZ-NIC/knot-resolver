@@ -250,6 +250,18 @@ static void refuse_stream(nghttp2_session *h2, int32_t stream_id)
 		h2, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
 }
 
+static void free_headers(kr_http_header_array_t *headers)
+{
+	if (headers == NULL)
+		return;
+
+	for (int i = 0; i < headers->len; i++) {
+		free(headers->at[i].name);
+		free(headers->at[i].value);
+	}
+	array_clear(*headers);
+	free(headers);
+}
 /* Return the http ctx into a pristine state in which no stream is being processed. */
 static void http_cleanup_stream(struct http_ctx *ctx)
 {
@@ -257,15 +269,8 @@ static void http_cleanup_stream(struct http_ctx *ctx)
 	ctx->current_method = HTTP_METHOD_NONE;
 	free(ctx->uri_path);
 	ctx->uri_path = NULL;
-	if (ctx->headers != NULL) {
-		for (int i = 0; i < ctx->headers->len; i++) {
-			free(ctx->headers->at[i].name);
-			free(ctx->headers->at[i].value);
-		}
-		array_clear(*ctx->headers);
-		free(ctx->headers);
-		ctx->headers = NULL;
-	}
+	free_headers(ctx->headers);
+	ctx->headers = NULL;
 }
 
 /*
