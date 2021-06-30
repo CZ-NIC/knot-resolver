@@ -8,6 +8,7 @@ import yaml
 from yaml.constructor import ConstructorError
 from yaml.nodes import MappingNode
 
+from knot_resolver_manager.exceptions import SchemaValidationException
 from knot_resolver_manager.utils.types import (
     get_attr_type,
     get_generic_type_argument,
@@ -21,10 +22,6 @@ from knot_resolver_manager.utils.types import (
 )
 
 from ..compat.dataclasses import is_dataclass
-
-
-class ValidationException(Exception):
-    pass
 
 
 def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> Any:
@@ -42,7 +39,7 @@ def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> A
         if obj is None:
             return None
         else:
-            raise ValidationException(f"Expected None, found {obj}")
+            raise SchemaValidationException(f"Expected None, found {obj}")
 
     # Union[*variants] (handles Optional[T] due to the way the typing system works)
     elif is_union(cls):
@@ -50,13 +47,13 @@ def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> A
         for v in variants:
             try:
                 return _from_dictlike_obj(v, obj, ..., False)
-            except ValidationException:
+            except SchemaValidationException:
                 pass
-        raise ValidationException(f"Union {cls} could not be parsed - parsing of all variants failed")
+        raise SchemaValidationException(f"Union {cls} could not be parsed - parsing of all variants failed")
 
     # after this, there is no place for a None object
     elif obj is None:
-        raise ValidationException(f"Unexpected None value for type {cls}")
+        raise SchemaValidationException(f"Unexpected None value for type {cls}")
 
     # int
     elif cls == int:
@@ -64,7 +61,7 @@ def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> A
         if isinstance(obj, int):
             return int(obj)
         else:
-            raise ValidationException(f"Expected int, found {type(obj)}")
+            raise SchemaValidationException(f"Expected int, found {type(obj)}")
 
     # str
     elif cls == str:
@@ -72,13 +69,13 @@ def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> A
         if isinstance(obj, (str, float, int)):
             return str(obj)
         elif isinstance(obj, bool):
-            raise ValidationException(
+            raise SchemaValidationException(
                 "Expected str, found bool. Be careful, that YAML parsers consider even"
                 ' "no" and "yes" as a bool. Search for the Norway Problem for more'
                 " details. And please use quotes explicitly."
             )
         else:
-            raise ValidationException(
+            raise SchemaValidationException(
                 f"Expected str (or number that would be cast to string), but found type {type(obj)}"
             )
 
@@ -87,7 +84,7 @@ def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> A
         if isinstance(obj, bool):
             return obj
         else:
-            raise ValidationException(f"Expected bool, found {type(obj)}")
+            raise SchemaValidationException(f"Expected bool, found {type(obj)}")
 
     # float
     elif cls == float:
@@ -102,7 +99,7 @@ def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> A
         if obj == expected:
             return obj
         else:
-            raise ValidationException(f"Literal {cls} is not matched with the value {obj}")
+            raise SchemaValidationException(f"Literal {cls} is not matched with the value {obj}")
 
     # Dict[K,V]
     elif is_dict(cls):
@@ -113,7 +110,7 @@ def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> A
                 for key, val in obj.items()
             }
         except AttributeError as e:
-            raise ValidationException(
+            raise SchemaValidationException(
                 f"Expected dict-like object, but failed to access its .items() method. Value was {obj}", e
             )
 
@@ -144,7 +141,7 @@ def _from_dictlike_obj(cls: Any, obj: Any, default: Any, use_default: bool) -> A
 
     # default error handler
     else:
-        raise ValidationException(
+        raise SchemaValidationException(
             f"Type {cls} cannot be parsed. This is a implementation error. "
             "Please fix your types in the dataclass or improve the parser/validator."
         )
@@ -156,7 +153,7 @@ def json_raise_duplicates(pairs: List[Tuple[Any, Any]]) -> Optional[Any]:
     dict_out: Dict[Any, Any] = {}
     for key, val in pairs:
         if key in dict_out:
-            raise ValidationException(f"duplicate key detected: {key}")
+            raise SchemaValidationException(f"duplicate key detected: {key}")
         dict_out[key] = val
     return dict_out
 
@@ -183,7 +180,7 @@ class RaiseDuplicatesLoader(yaml.SafeLoader):
 
             # check for duplicate keys
             if key in mapping:
-                raise ValidationException(f"duplicate key detected: {key_node.start_mark}")
+                raise SchemaValidationException(f"duplicate key detected: {key_node.start_mark}")
             value = self.construct_object(value_node, deep=deep)  # type: ignore
             mapping[key] = value
         return mapping
@@ -217,7 +214,7 @@ class Format(Enum):
             "text/vnd.yaml": Format.YAML,
         }
         if mime_type not in formats:
-            raise ValidationException("Unsupported MIME type")
+            raise SchemaValidationException("Unsupported MIME type")
         return formats[mime_type]
 
 
@@ -237,7 +234,7 @@ class DataclassParserValidatorMixin:
             field = getattr(self, field_name)
             if is_dataclass(field):
                 if not isinstance(field, DataclassParserValidatorMixin):
-                    raise ValidationException(
+                    raise SchemaValidationException(
                         f"Nested dataclass in the field {field_name} does not include the ParserValidatorMixin"
                     )
                 field.validate()
@@ -268,7 +265,7 @@ class DataclassParserValidatorMixin:
         # prepare and validate the path object
         path = path[:-1] if path.endswith("/") else path
         if re.match(_SUBTREE_MUTATION_PATH_PATTERN, path) is None:
-            raise ValidationException("Provided object path for mutation is invalid.")
+            raise SchemaValidationException("Provided object path for mutation is invalid.")
         path = path[1:] if path.startswith("/") else path
 
         # now, the path variable should contain '/' separated field names
@@ -283,14 +280,16 @@ class DataclassParserValidatorMixin:
         parent = None
         for segment in path.split("/"):
             if segment == "":
-                raise ValidationException(f"Unexpectedly empty segment in path '{path}'")
+                raise SchemaValidationException(f"Unexpectedly empty segment in path '{path}'")
             elif segment.startswith("_"):
-                raise ValidationException("No, changing internal fields (starting with _) is not allowed. Nice try.")
+                raise SchemaValidationException(
+                    "No, changing internal fields (starting with _) is not allowed. Nice try."
+                )
             elif hasattr(obj, segment):
                 parent = obj
                 obj = getattr(parent, segment)
             else:
-                raise ValidationException(
+                raise SchemaValidationException(
                     f"Path segment '{segment}' does not match any field on the provided parent object"
                 )
         assert parent is not None

@@ -1,6 +1,6 @@
 from typing import Any, Callable, Iterable, Optional, Type, TypeVar
 
-from .dataclasses_parservalidator import DataclassParserValidatorMixin, ValidationException
+from .dataclasses_parservalidator import DataclassParserValidatorMixin
 from .overload import Overloaded
 
 T = TypeVar("T")
@@ -57,6 +57,5 @@ __all__ = [
     "ignore_exceptions",
     "types",
     "DataclassParserValidatorMixin",
-    "ValidationException",
     "Overloaded",
 ]

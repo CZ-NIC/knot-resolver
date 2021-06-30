@@ -10,3 +10,5 @@ cache:
     size_max: 100M
 logging:
     level: 5
+server:
+    instances: 1

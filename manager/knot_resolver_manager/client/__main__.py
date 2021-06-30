@@ -1,3 +1,5 @@
+import sys
+
 import click
 
 from knot_resolver_manager.client import KnotManagerClient
@@ -33,6 +35,17 @@ def stop(ctx: click.Context):
 def workers(ctx: click.Context, instances: int):
     client = KnotManagerClient(ctx.obj[BASE_URL])
     client.set_num_workers(instances)
+
+
+@main.command(help="Wait for manager initialization")
+@click.pass_context
+def wait(ctx: click.Context):
+    client = KnotManagerClient(ctx.obj[BASE_URL])
+    try:
+        client.wait_for_initialization()
+    except TimeoutError as e:
+        click.echo(f"ERR: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

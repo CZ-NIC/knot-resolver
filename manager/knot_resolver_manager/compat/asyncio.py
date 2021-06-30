@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-def to_thread(func: Callable[..., T], *args: Any, **kwargs: Any) -> Awaitable[T]:
+async def to_thread(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
     # version 3.9 and higher, call directly
     if sys.version_info.major >= 3 and sys.version_info.minor >= 9:
         return asyncio.to_thread(func, *args, **kwargs)
@@ -32,14 +32,22 @@ def to_thread(func: Callable[..., T], *args: Any, **kwargs: Any) -> Awaitable[T]
     else:
         loop = asyncio.get_event_loop()
         pfunc = functools.partial(func, *args, **kwargs)
+        exc: Optional[BaseException] = None
 
         def exc_catcher():
+            nonlocal exc
+
             try:
                 return pfunc()
-            except BaseException:
+            except BaseException as e:
                 logger.error("Task in thread failed...", exc_info=True)
+                exc = e
 
-        return loop.run_in_executor(None, exc_catcher)
+        res = await loop.run_in_executor(None, exc_catcher)
+        # propagate exception in this thread
+        if exc is not None:
+            raise exc
+        return res
 
 
 def create_task(coro: Coroutine[Any, T, NoneType], name: Optional[str] = None) -> "Future[T]":

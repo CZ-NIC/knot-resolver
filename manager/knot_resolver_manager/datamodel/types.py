@@ -1,6 +1,6 @@
 import re
 
-from .errors import DataValidationError
+from knot_resolver_manager.exceptions import DataValidationException
 
 RE_IPV6_PREFIX_96 = re.compile(r"^([0-9A-Fa-f]{1,4}:){2}:$")
 
@@ -20,7 +20,7 @@ class TimeUnits:
         if searched:
             value, unit = searched.groups()
             return int(value) * TimeUnits._map.get(unit, 1)
-        raise DataValidationError(f"failed to parse: {time_str}")
+        raise DataValidationException(f"failed to parse: {time_str}")
 
 
 class SizeUnits:
@@ -38,4 +38,4 @@ class SizeUnits:
         if searched:
             value, unit = searched.groups()
             return int(value) * SizeUnits._map.get(unit, 1)
-        raise DataValidationError(f"failed to parse: {size_str}")
+        raise DataValidationException(f"failed to parse: {size_str}")

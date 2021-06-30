@@ -1,13 +1,18 @@
 import asyncio
+import logging
+from subprocess import SubprocessError
 from typing import List, Optional, Type
 from uuid import uuid4
 
 from knot_resolver_manager.constants import KRESD_CONFIG_FILE
+from knot_resolver_manager.exceptions import ValidationException
 from knot_resolver_manager.kresd_controller import get_best_controller_implementation
 from knot_resolver_manager.kresd_controller.interface import Subprocess, SubprocessController, SubprocessType
 from knot_resolver_manager.utils.async_utils import writefile
 
 from .datamodel import KresConfig
+
+logger = logging.getLogger(__name__)
 
 
 class KresManager:
@@ -74,7 +79,20 @@ class KresManager:
 
     async def apply_config(self, config: KresConfig):
         async with self._manager_lock:
+            logger.debug("Writing new config to file...")
             await self._write_config(config)
+
+            logger.debug("Testing the new config with a canary process")
+            try:
+                await self._spawn_new_child()
+            except SubprocessError:
+                logger.error("kresd with the new config failed to start, rejecting config")
+                last = self.get_last_used_config()
+                if last is not None:
+                    await self._write_config(last)
+                raise ValidationException("Canary kresd instance failed. Config is invalid.")
+
+            logger.debug("Canary process test passed, Applying new config to all workers")
             self._last_used_config = config
             await self._ensure_number_of_children(config.server.get_instances())
             await self._rolling_restart()

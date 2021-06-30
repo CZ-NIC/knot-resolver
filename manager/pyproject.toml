@@ -42,7 +42,7 @@ run-debug = { cmd = "scripts/run-debug", help = "Run the manager under debugger"
 docs = { cmd = "scripts/docs", help = "Create HTML documentation" }
 test = { cmd = "pytest --cov=knot_resolver_manager --show-capture=all tests/", help = "Run tests" }
 check = { cmd = "scripts/codecheck", help = "Run static code analysis" }
-format = { shell = "poetry run black knot_resolver_manager/ tests/; isort -rc .", help = "Run code formatter" }
+format = { shell = "poetry run black knot_resolver_manager/ tests/ integration/; isort -rc .", help = "Run code formatter" }
 fixdeps = { shell = "poetry install; npm install; npm update", help = "Install/update dependencies according to configuration files"}
 commit = { shell = "scripts/commit", help = "Invoke every single check before commiting" }
 container = { cmd = "scripts/container.py", help = "Manage containers" }
@@ -110,6 +110,7 @@ disable= [
     "too-many-return-statements", # would prevent us from using recursive tree traversals
     "logging-fstring-interpolation", # see https://github.com/PyCQA/pylint/issues/1788
     "no-else-raise", # not helpful for readability, when we want explicit branches
+    "raising-bad-type", # handled by type checker
 ]
 
 [tool.pylint.SIMILARITIES]
