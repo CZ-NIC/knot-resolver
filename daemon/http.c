@@ -175,6 +175,10 @@ static int check_uri(const char* uri_path)
 
 	if (ret) /* no endpoint found */
 		return -1;
+
+	/* FIXME This also passes for GET when no variables are provided.
+	 * Fixing it doesn't seem straightforward, since :method may not be
+	 * known by the time check_uri() is called... */
 	if (endpoint_len == strlen(path) - 1) /* done for POST method */
 		return 0;
 
@@ -216,7 +220,7 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 	uint8_t *dest;
 
 	if (!beg)  /* No dns variable in path. */
-		return 0;
+		return -1;
 
 	beg += sizeof(key) - 1;
 	end = strchr(beg, '&');
@@ -451,6 +455,7 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 		if (ctx->current_method == HTTP_METHOD_GET) {
 			if (process_uri_path(ctx, ctx->uri_path, stream_id) < 0) {
 				refuse_stream(h2, stream_id);
+				return 0;  /* End processing - don't submit to wirebuffer. */
 			}
 		}
 		ctx->headers = NULL;  // Success -> transfer ownership to stream (waiting in wirebuffer)
