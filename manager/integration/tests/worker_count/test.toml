@@ -1,6 +1,0 @@
-images = ["knot-manager:debian"]
-cmd = ["/test/run"]
-
-[mount]
-"/test" = "integration/tests/worker_count"
-"/code" = "."

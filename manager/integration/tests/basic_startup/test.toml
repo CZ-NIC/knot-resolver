@@ -1,6 +1,0 @@
-images = ["knot-manager:debian", "knot-manager:debian-supervisord"]
-cmd = ["/test/run"]
-
-[mount]
-"/test" = "integration/tests/basic_startup"
-"/code" = "."

@@ -1,3 +1,9 @@
+"""
+This file contains autodetection logic for available subprocess controllers. Because we have to catch errors
+from imports, you can not see a simple list, but it's more complicated.
+"""
+# pylint: disable=import-outside-toplevel
+
 import asyncio
 import logging
 from typing import List
@@ -13,28 +19,36 @@ It is filled dynamically based on available modules that do not fail to import.
 _registered_controllers: List[SubprocessController] = []
 
 
-# supervisord
-try:
-    from knot_resolver_manager.kresd_controller.supervisord import SupervisordSubprocessController
+def try_supervisord():
+    """
+    Attempt to load supervisord controllers.
+    """
+    try:
+        from knot_resolver_manager.kresd_controller.supervisord import SupervisordSubprocessController
 
-    _registered_controllers.append(SupervisordSubprocessController())
-except ImportError:
-    logger.info("Failed to import modules related to supervisord service manager")
+        _registered_controllers.append(SupervisordSubprocessController())
+    except ImportError:
+        logger.info("Failed to import modules related to supervisord service manager")
 
 
-# systemd
-try:
-    from knot_resolver_manager.kresd_controller.systemd import SystemdSubprocessController
-    from knot_resolver_manager.kresd_controller.systemd.dbus_api import SystemdType
+def try_systemd():
+    """
+    Attempt to load systemd controllers.
+    """
+    try:
+        from knot_resolver_manager.kresd_controller.systemd import SystemdSubprocessController, SystemdPersistanceType
 
-    _registered_controllers.extend(
-        [
-            SystemdSubprocessController(SystemdType.SYSTEM),
-            SystemdSubprocessController(SystemdType.SESSION),
-        ]
-    )
-except ImportError:
-    logger.info("Failed to import modules related to systemd service manager")
+        from knot_resolver_manager.kresd_controller.systemd.dbus_api import SystemdType
+
+        _registered_controllers.extend(
+            [
+                SystemdSubprocessController(SystemdType.SYSTEM),
+                SystemdSubprocessController(SystemdType.SESSION),
+                SystemdSubprocessController(SystemdType.SESSION, SystemdPersistanceType.TRANSIENT),
+            ]
+        )
+    except ImportError:
+        logger.info("Failed to import modules related to systemd service manager")
 
 
 async def get_best_controller_implementation() -> SubprocessController:
@@ -55,3 +69,8 @@ async def get_best_controller_implementation() -> SubprocessController:
 
     # or fail
     raise LookupError("Can't find any available service manager!")
+
+
+# run the imports on module load
+try_systemd()
+try_supervisord()

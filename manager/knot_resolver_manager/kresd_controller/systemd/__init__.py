@@ -1,5 +1,6 @@
 import logging
 import os
+from enum import Enum, auto
 from typing import Iterable, List
 
 from knot_resolver_manager import compat
@@ -11,15 +12,33 @@ from . import dbus_api as systemd
 logger = logging.getLogger(__name__)
 
 
+class SystemdPersistanceType(Enum):
+    PERSISTENT = auto()
+    TRANSIENT = auto()
+
+
 class SystemdSubprocess(Subprocess):
-    def __init__(self, type_: SubprocessType, id_: str, systemd_type: systemd.SystemdType):
+    def __init__(
+        self,
+        type_: SubprocessType,
+        id_: str,
+        systemd_type: systemd.SystemdType,
+        persistance_type: SystemdPersistanceType = SystemdPersistanceType.PERSISTENT,
+    ):
         self._type = type_
         self._id = id_
         self._systemd_type = systemd_type
+        self._persistance_type = persistance_type
 
     @property
     def id(self):
-        return self._id
+        if self._type is SubprocessType.GC:
+            return "kres-cache-gc.service"
+        else:
+            sep = {SystemdPersistanceType.PERSISTENT: "@", SystemdPersistanceType.TRANSIENT: "_"}[
+                self._persistance_type
+            ]
+            return f"kresd{sep}{self._id}.service"
 
     @property
     def type(self):
@@ -29,22 +48,33 @@ class SystemdSubprocess(Subprocess):
         raise NotImplementedError()
 
     async def start(self):
-        await compat.asyncio.to_thread(systemd.start_unit, self._systemd_type, f"kresd@{self.id}.service")
+        if self._persistance_type is SystemdPersistanceType.PERSISTENT:
+            await compat.asyncio.to_thread(systemd.start_unit, self._systemd_type, self.id)
+        elif self._persistance_type is SystemdPersistanceType.TRANSIENT:
+            await compat.asyncio.to_thread(systemd.start_transient_unit, self._systemd_type, self.id, self._type)
 
     async def stop(self):
-        await compat.asyncio.to_thread(systemd.stop_unit, self._systemd_type, f"kresd@{self.id}.service")
+        await compat.asyncio.to_thread(systemd.stop_unit, self._systemd_type, self.id)
 
     async def restart(self):
-        await compat.asyncio.to_thread(systemd.restart_unit, self._systemd_type, f"kresd@{self.id}.service")
+        await compat.asyncio.to_thread(systemd.restart_unit, self._systemd_type, self.id)
 
 
 class SystemdSubprocessController(SubprocessController):
-    def __init__(self, systemd_type: systemd.SystemdType):
+    def __init__(
+        self,
+        systemd_type: systemd.SystemdType,
+        persistance_type: SystemdPersistanceType = SystemdPersistanceType.PERSISTENT,
+    ):
         self._systemd_type = systemd_type
+        self._persistance_type = persistance_type
 
     def __str__(self):
         if self._systemd_type == systemd.SystemdType.SESSION:
-            return "SystemdController(SESSION)"
+            if self._persistance_type is SystemdPersistanceType.TRANSIENT:
+                return "SystemdController(SESSION, TRANSIENT)"
+            else:
+                return "SystemdController(SESSION)"
         elif self._systemd_type == systemd.SystemdType.SYSTEM:
             return "SystemdController(SYSTEM)"
         else:
@@ -60,15 +90,14 @@ class SystemdSubprocessController(SubprocessController):
             )
             return False
 
-        # if that passes, try to list units
         try:
-            if not compat.asyncio.to_thread(
-                systemd.has_some_exec_start_commands, self._systemd_type, "kresd@1.service"
+            if self._persistance_type is SystemdPersistanceType.PERSISTENT and not await compat.asyncio.to_thread(
+                systemd.can_load_unit, self._systemd_type, "kresd@1.service"
             ):
                 logger.info("Systemd (%s) accessible, but no 'kresd@.service' unit detected.", self._systemd_type)
                 return False
 
-            if self._systemd_type == systemd.SystemdType.SYSTEM and os.geteuid() != 0:
+            if self._systemd_type is systemd.SystemdType.SYSTEM and os.geteuid() != 0:
                 logger.info(
                     "Systemd (%s) looks functional, but we are not running as root. Assuming not enough privileges",
                     self._systemd_type,
@@ -85,9 +114,12 @@ class SystemdSubprocessController(SubprocessController):
         units = await compat.asyncio.to_thread(systemd.list_units, self._systemd_type)
         for unit in units:
             u: str = unit
-            if u.startswith("kresd@") and u.endswith(".service"):
-                iden = u.replace("kresd@", "").replace(".service", "")
-                res.append(SystemdSubprocess(SubprocessType.KRESD, iden, self._systemd_type))
+            if u.startswith("kresd") and u.endswith(".service"):
+                iden = u.replace("kresd", "")[1:].replace(".service", "")
+                persistance_type = SystemdPersistanceType.PERSISTENT if "@" in u else SystemdPersistanceType.TRANSIENT
+                res.append(SystemdSubprocess(SubprocessType.KRESD, iden, self._systemd_type, persistance_type))
+            elif u == "kres-cache-gc.service":
+                res.append(SystemdSubprocess(SubprocessType.GC, "", self._systemd_type))
         return res
 
     async def initialize_controller(self) -> None:
@@ -97,4 +129,4 @@ class SystemdSubprocessController(SubprocessController):
         pass
 
     async def create_subprocess(self, subprocess_type: SubprocessType, id_hint: str) -> Subprocess:
-        return SystemdSubprocess(subprocess_type, id_hint, self._systemd_type)
+        return SystemdSubprocess(subprocess_type, id_hint, self._systemd_type, self._persistance_type)

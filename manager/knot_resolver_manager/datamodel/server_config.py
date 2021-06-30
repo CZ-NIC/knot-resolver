@@ -5,7 +5,7 @@ from typing import Optional, Union
 from typing_extensions import Literal
 
 from knot_resolver_manager.compat.dataclasses import dataclass
-from knot_resolver_manager.datamodel.errors import DataValidationError
+from knot_resolver_manager.exceptions import DataValidationException
 from knot_resolver_manager.utils.dataclasses_parservalidator import DataclassParserValidatorMixin
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ def _cpu_count() -> int:
         )
         cpus = os.cpu_count()
         if cpus is None:
-            raise DataValidationError(
+            raise DataValidationException(
                 "The number of available CPUs to automatically set the number of running"
                 "'kresd' workers could not be determined."
                 "The number can be specified manually in 'server:instances' configuration option."
@@ -43,8 +43,19 @@ class ServerConfig(DataclassParserValidatorMixin):
             self._instances = _cpu_count()
 
     def get_instances(self) -> int:
-        return self._instances
+        # FIXME: this is a hack to make the partial updates working without a second data structure
+        # this will be unnecessary in near future
+        if isinstance(self.instances, int):
+            return self.instances
+        elif self.instances == "auto":
+            cpu_count = os.cpu_count()
+            if cpu_count is not None:
+                return cpu_count
+            else:
+                raise RuntimeError("cannot find number of system available CPUs")
+        else:
+            return 0
 
     def _validate(self):
         if not 0 < self._instances <= 256:
-            raise DataValidationError("number of kresd instances must be in range 1..256")
+            raise DataValidationException("number of kresd instances must be in range 1..256")

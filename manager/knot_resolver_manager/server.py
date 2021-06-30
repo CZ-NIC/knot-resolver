@@ -1,17 +1,20 @@
 import asyncio
 import logging
 import sys
+from functools import partial
 from http import HTTPStatus
 from pathlib import Path
 from time import time
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Union
 
 from aiohttp import web
 from aiohttp.web import middleware
+from aiohttp.web_response import json_response
 
 from knot_resolver_manager.constants import MANAGER_CONFIG_FILE
+from knot_resolver_manager.exceptions import ValidationException
 from knot_resolver_manager.utils.async_utils import readfile
-from knot_resolver_manager.utils.dataclasses_parservalidator import Format, ValidationException
+from knot_resolver_manager.utils.dataclasses_parservalidator import Format
 
 from .datamodel import KresConfig
 from .kres_manager import KresManager
@@ -22,11 +25,16 @@ _SHUTDOWN_EVENT = "shutdown-event"
 logger = logging.getLogger(__name__)
 
 
-async def _index(_request: web.Request) -> web.Response:
+async def _index(request: web.Request) -> web.Response:
     """
     Dummy index handler to indicate that the server is indeed running...
     """
-    return web.Response(text="Knot Resolver Manager is running! The configuration endpoint is at /config")
+    return json_response(
+        {
+            "msg": "Knot Resolver Manager is running! The configuration endpoint is at /config",
+            "status": "RUNNING" if get_kres_manager(request.app) is not None else "INITIALIZING",
+        }
+    )
 
 
 async def _apply_config(request: web.Request) -> web.Response:
@@ -77,7 +85,7 @@ async def error_handler(request: web.Request, handler: Any):
         return await handler(request)
     except ValidationException as e:
         logger.error("Failed to parse given data in API request", exc_info=True)
-        return web.Response(text=f"Schema validation failed: {e}", status=HTTPStatus.BAD_REQUEST)
+        return web.Response(text=f"Data validation failed: {e}", status=HTTPStatus.BAD_REQUEST)
 
 
 def setup_routes(app: web.Application):
@@ -96,7 +104,55 @@ def get_kres_manager(app: web.Application) -> KresManager:
     return app[_MANAGER]
 
 
-async def start_server(tcp: List[Tuple[str, int]], unix: List[Path], config_path: Path = MANAGER_CONFIG_FILE):
+class _DefaultSentinel:
+    pass
+
+
+_DEFAULT_SENTINEL = _DefaultSentinel()
+
+
+async def _init_manager(config: Union[None, Path, KresConfig, _DefaultSentinel], app: web.Application):
+    """
+    Called asynchronously when the application initializes.
+    """
+    try:
+        # Create KresManager. This will perform autodetection of available service managers and
+        # select the most appropriate to use
+        manager = await KresManager.create()
+        app[_MANAGER] = manager
+
+        # Initial configuration of the manager
+        if config is None:
+            # do nothing, there won't be any initial config
+            pass
+        if isinstance(config, _DefaultSentinel):
+            # use default
+            config = MANAGER_CONFIG_FILE
+        if isinstance(config, Path):
+            if not config.exists():
+                logger.error(
+                    "Manager is configured to load config file at %s on startup, but the file does not exist.",
+                    config,
+                )
+                sys.exit(1)
+            else:
+                logger.info("Loading initial configuration from %s", config)
+                config = KresConfig.from_yaml(await readfile(config))
+        if isinstance(config, KresConfig):
+            await manager.apply_config(config)
+            logger.info("Initial configuration applied...")
+
+        logger.info("Process manager initialized...")
+    except BaseException:
+        logger.error("Manager initialization failed... Shutting down!", exc_info=True)
+        sys.exit(1)
+
+
+async def start_server(
+    tcp: List[Tuple[str, int]],
+    unix: List[Path],
+    config: Union[None, Path, KresConfig, _DefaultSentinel] = _DEFAULT_SENTINEL,
+):
     start_time = time()
 
     app = web.Application(middlewares=[error_handler])
@@ -104,34 +160,7 @@ async def start_server(tcp: List[Tuple[str, int]], unix: List[Path], config_path
     app[_MANAGER] = None
     app[_SHUTDOWN_EVENT] = asyncio.Event()
 
-    async def init_manager(app: web.Application):
-        """
-        Called asynchronously when the application initializes.
-        """
-        try:
-            # Create KresManager. This will perform autodetection of available service managers and
-            # select the most appropriate to use
-            manager = await KresManager.create()
-            app[_MANAGER] = manager
-
-            # Initial static configuration of the manager
-            # optional step, could be skipped
-            if config_path is not None:
-                if not config_path.exists():
-                    logger.warning(
-                        "Manager is configured to load config file at %s on startup, but the file does not exist.",
-                        config_path,
-                    )
-                else:
-                    initial_config = KresConfig.from_yaml(await readfile(config_path))
-                    await manager.apply_config(initial_config)
-
-            logger.info("Process manager initialized...")
-        except BaseException:
-            logger.error("Manager initialization failed... Shutting down!", exc_info=True)
-            sys.exit(1)
-
-    app.on_startup.append(init_manager)
+    app.on_startup.append(partial(_init_manager, config))
 
     # configure routing
     setup_routes(app)

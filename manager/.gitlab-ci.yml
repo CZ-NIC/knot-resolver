@@ -1,5 +1,4 @@
 stages:
-  - image
   - check
 
 default:
@@ -20,16 +19,6 @@ default:
     - lxc
     - amd64
 
-build:
-  stage: image
-  script:
-    - poe container build --ci-login --push
-  only:
-    changes:
-      - pyproject.toml
-      - package.json
-      - containers/**/*
-
 lint:
   stage: check
   script:
@@ -47,5 +36,4 @@ test:
 integration:
   stage: check
   script:
-    - poe container pull
-    - poe integration -n
+    - poe integration

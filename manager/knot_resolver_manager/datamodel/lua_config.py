@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 from knot_resolver_manager.compat.dataclasses import dataclass
-from knot_resolver_manager.datamodel.errors import DataValidationError
+from knot_resolver_manager.exceptions import DataValidationException
 from knot_resolver_manager.utils.dataclasses_parservalidator import DataclassParserValidatorMixin
 
 
@@ -17,4 +17,4 @@ class LuaConfig(DataclassParserValidatorMixin):
 
     def _validate(self):
         if self.script is None:
-            raise DataValidationError("Lua script not specified")
+            raise DataValidationException("Lua script not specified")
