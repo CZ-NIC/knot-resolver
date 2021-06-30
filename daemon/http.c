@@ -435,6 +435,32 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	return 0;
 }
 
+static int submit_to_wirebuffer(struct http_ctx *ctx)
+{
+	int ret = -1;
+	ssize_t len;
+
+	len = ctx->buf_pos - sizeof(uint16_t);
+	if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
+		kr_log_debug(HTTP, "invalid dnsmsg size: %zd B\n", len);
+		ret = -1;
+		goto cleanup;
+	}
+
+	/* Transfer ownership to stream (waiting in wirebuffer) */
+	ctx->headers = NULL;
+
+	/* Submit data to wirebuffer. */
+	knot_wire_write_u16(ctx->buf, len);
+	ctx->submitted += ctx->buf_pos;
+	ctx->buf += ctx->buf_pos;
+	ctx->buf_pos = 0;
+	ret = 0;
+cleanup:
+	http_cleanup_stream(ctx);
+	return ret;
+}
+
 /*
  * Finalize existing buffer upon receiving the last frame in the stream.
  *
@@ -446,7 +472,6 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *frame, void *user_data)
 {
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
-	ssize_t len;
 	int32_t stream_id = frame->hd.stream_id;
 	if(kr_fails_assert(stream_id != -1))
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
@@ -458,19 +483,9 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 				return 0;  /* End processing - don't submit to wirebuffer. */
 			}
 		}
-		ctx->headers = NULL;  // Success -> transfer ownership to stream (waiting in wirebuffer)
-		http_cleanup_stream(ctx);
 
-		len = ctx->buf_pos - sizeof(uint16_t);
-		if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
-			kr_log_debug(DOH, "invalid dnsmsg size: %zd B\n", len);
+		if (submit_to_wirebuffer(ctx) < 0)
 			return NGHTTP2_ERR_CALLBACK_FAILURE;
-		}
-
-		knot_wire_write_u16(ctx->buf, len);
-		ctx->submitted += ctx->buf_pos;
-		ctx->buf += ctx->buf_pos;
-		ctx->buf_pos = 0;
 	}
 
 	return 0;
