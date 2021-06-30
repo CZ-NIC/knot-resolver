@@ -749,8 +749,15 @@ void http_free(struct http_ctx *ctx)
 	if (!ctx)
 		return;
 
+	/* Clean up any headers whose ownership may not have been transferred. */
+	while (queue_len(ctx->streams) > 0) {
+		struct http_stream stream = queue_head(ctx->streams);
+		free_headers(stream.headers);
+		if (stream.headers == ctx->headers)
+			ctx->headers = NULL;  // to prevent double-free
+		queue_pop(ctx->streams);
+	}
 	http_cleanup_stream(ctx);
-	// TODO: queue_pop and check/free all headers (ownership may not have been transferred)
 	queue_deinit(ctx->streams);
 	nghttp2_session_del(ctx->h2);
 	free(ctx);
