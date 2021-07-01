@@ -51,7 +51,7 @@
 #define MAX_PIPELINED 100
 #endif
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "wrkr", __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, WORKER, __VA_ARGS__)
 
 /** Client request state. */
 struct request_ctx
@@ -1276,7 +1276,7 @@ static void xdp_tx_waker(uv_idle_t *handle)
 {
 	int ret = knot_xdp_send_finish(handle->data);
 	if (ret != KNOT_EAGAIN && ret != KNOT_EOK)
-		kr_log_error("[xdp] check: ret = %d, %s\n", ret, knot_strerror(ret));
+		kr_log_error(XDP, "check: ret = %d, %s\n", ret, knot_strerror(ret));
 	/* Apparently some drivers need many explicit wake-up calls
 	 * even if we push no additional packets (in case they accumulated a lot) */
 	if (ret != KNOT_EAGAIN)
@@ -1651,7 +1651,6 @@ static int qr_task_step(struct qr_task *task,
 		if (unlikely(++task->iter_count > KR_ITER_LIMIT ||
 			     task->timeouts >= KR_TIMEOUT_LIMIT)) {
 
-			#ifndef NOVERBOSELOG
 			struct kr_rplan *rplan = &req->rplan;
 			struct kr_query *last = kr_rplan_last(rplan);
 			if (task->iter_count > KR_ITER_LIMIT) {
@@ -1660,7 +1659,6 @@ static int qr_task_step(struct qr_task *task,
 			if (task->timeouts >= KR_TIMEOUT_LIMIT) {
 				VERBOSE_MSG(last, "canceling query due to exceeded timeout retries limit of %d\n", KR_TIMEOUT_LIMIT);
 			}
-			#endif
 
 			return qr_task_finalize(task, KR_STATE_FAIL);
 		}

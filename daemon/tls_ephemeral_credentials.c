@@ -63,12 +63,12 @@ static gnutls_x509_privkey_t get_ephemeral_privkey ()
 	 * with a shared cache don't both create the same privkey: */
 	lock = _lock_filename(EPHEMERAL_PRIVKEY_FILENAME ".lock");
 	if (_lock_is_invalid(lock)) {
-		kr_log_error("[tls] unable to lock lockfile " EPHEMERAL_PRIVKEY_FILENAME ".lock\n");
+		kr_log_error(TLS, "unable to lock lockfile " EPHEMERAL_PRIVKEY_FILENAME ".lock\n");
 		goto done;
 	}
 	
 	if ((err = gnutls_x509_privkey_init (&privkey)) < 0) {
-		kr_log_error("[tls] gnutls_x509_privkey_init() failed: %d (%s)\n",
+		kr_log_error(TLS, "gnutls_x509_privkey_init() failed: %d (%s)\n",
 			     err, gnutls_strerror_name(err));
 		goto done;
 	}
@@ -81,22 +81,22 @@ static gnutls_x509_privkey_t get_ephemeral_privkey ()
 		struct stat stat;
 		ssize_t bytes_read;
 		if (fstat(datafd, &stat)) {
-			kr_log_error("[tls] unable to stat ephemeral private key " EPHEMERAL_PRIVKEY_FILENAME "\n");
+			kr_log_error(TLS, "unable to stat ephemeral private key " EPHEMERAL_PRIVKEY_FILENAME "\n");
 			goto bad_data;
 		}
 		data.data = gnutls_malloc(stat.st_size);
 		if (data.data == NULL) {
-			kr_log_error("[tls] unable to allocate memory for reading ephemeral private key\n");
+			kr_log_error(TLS, "unable to allocate memory for reading ephemeral private key\n");
 			goto bad_data;
 		}
 		data.size = stat.st_size;
 		bytes_read = read(datafd, data.data, stat.st_size);
 		if (bytes_read != stat.st_size) {
-			kr_log_error("[tls] unable to read ephemeral private key\n");
+			kr_log_error(TLS, "unable to read ephemeral private key\n");
 			goto bad_data;
 		}
 		if ((err = gnutls_x509_privkey_import (privkey, &data, GNUTLS_X509_FMT_PEM)) < 0) {
-			kr_log_error("[tls] gnutls_x509_privkey_import() failed: %d (%s)\n",
+			kr_log_error(TLS, "gnutls_x509_privkey_import() failed: %d (%s)\n",
 				     err, gnutls_strerror_name(err));
 			/* goto bad_data; */
 		bad_data:
@@ -115,25 +115,25 @@ static gnutls_x509_privkey_t get_ephemeral_privkey ()
 #else
 		if ((err = gnutls_x509_privkey_generate(privkey, GNUTLS_PK_RSA, gnutls_sec_param_to_pk_bits(GNUTLS_PK_RSA, GNUTLS_SEC_PARAM_MEDIUM), 0)) < 0) {
 #endif
-			kr_log_error("[tls] gnutls_x509_privkey_init() failed: %d (%s)\n",
+			kr_log_error(TLS, "gnutls_x509_privkey_init() failed: %d (%s)\n",
 				     err, gnutls_strerror_name(err));
 			gnutls_x509_privkey_deinit(privkey);
 			goto done;
 		}
 		/* ... and save */
-		kr_log_info("[tls] Stashing ephemeral private key in " EPHEMERAL_PRIVKEY_FILENAME "\n");
+		kr_log_info(TLS, "Stashing ephemeral private key in " EPHEMERAL_PRIVKEY_FILENAME "\n");
 		if ((err = gnutls_x509_privkey_export2(privkey, GNUTLS_X509_FMT_PEM, &data)) < 0) {
-			kr_log_error("[tls] gnutls_x509_privkey_export2() failed: %d (%s), not storing\n",
+			kr_log_error(TLS, "gnutls_x509_privkey_export2() failed: %d (%s), not storing\n",
 				     err, gnutls_strerror_name(err));
 		} else {
 			datafd = open(EPHEMERAL_PRIVKEY_FILENAME, O_WRONLY|O_CREAT, 0600);
 			if (datafd == -1) {
-				kr_log_error("[tls] failed to open " EPHEMERAL_PRIVKEY_FILENAME " to store the ephemeral key\n");
+				kr_log_error(TLS, "failed to open " EPHEMERAL_PRIVKEY_FILENAME " to store the ephemeral key\n");
 			} else {
 				ssize_t bytes_written;
 				bytes_written = write(datafd, data.data, data.size);
 				if (bytes_written != data.size)
-					kr_log_error("[tls] failed to write %d octets to "
+					kr_log_error(TLS, "failed to write %d octets to "
 						     EPHEMERAL_PRIVKEY_FILENAME
 						     " (%zd written)\n",
 						     data.size, bytes_written);
@@ -164,7 +164,7 @@ static gnutls_x509_crt_t get_ephemeral_cert(gnutls_x509_privkey_t privkey, const
 
 #define gtx(fn, ...)							\
 	if ((err = fn ( __VA_ARGS__ )) != GNUTLS_E_SUCCESS) {		\
-		kr_log_error("[tls] " #fn "() failed: %d (%s)\n",	\
+		kr_log_error(TLS, #fn "() failed: %d (%s)\n",	\
 			     err, gnutls_strerror_name(err));		\
 		goto bad; }
 
@@ -199,20 +199,20 @@ struct tls_credentials * tls_get_ephemeral_credentials(struct engine *engine)
 
 	creds = calloc(1, sizeof(*creds));
 	if (!creds) {
-		kr_log_error("[tls] failed to allocate memory for ephemeral credentials\n");
+		kr_log_error(TLS, "failed to allocate memory for ephemeral credentials\n");
 		return NULL;
 	}
 	if ((err = gnutls_certificate_allocate_credentials(&(creds->credentials))) < 0) {
-		kr_log_error("[tls] failed to allocate memory for ephemeral credentials\n");
+		kr_log_error(TLS, "failed to allocate memory for ephemeral credentials\n");
 		goto failure;
 	}
 
 	creds->valid_until = now + EPHEMERAL_CERT_EXPIRATION_SECONDS;
 	creds->ephemeral_servicename = strdup(engine_get_hostname(engine));
 	if (creds->ephemeral_servicename == NULL) {
-		kr_log_error("[tls] could not get server's hostname, using '" INVALID_HOSTNAME "' instead\n");
+		kr_log_error(TLS, "could not get server's hostname, using '" INVALID_HOSTNAME "' instead\n");
 		if ((creds->ephemeral_servicename = strdup(INVALID_HOSTNAME)) == NULL) {
-			kr_log_error("[tls] failed to allocate memory for ephemeral credentials\n");
+			kr_log_error(TLS, "failed to allocate memory for ephemeral credentials\n");
 			goto failure;
 		}
 	}		
@@ -223,7 +223,7 @@ struct tls_credentials * tls_get_ephemeral_credentials(struct engine *engine)
 		goto failure;
 	}
 	if ((err = gnutls_certificate_set_x509_key(creds->credentials, &cert, 1, privkey)) < 0) {
-		kr_log_error("[tls] failed to set up ephemeral credentials\n");
+		kr_log_error(TLS, "failed to set up ephemeral credentials\n");
 		goto failure;
 	}
 	gnutls_x509_privkey_deinit(privkey);

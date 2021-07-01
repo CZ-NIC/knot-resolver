@@ -409,7 +409,7 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 		required += sizeof(uint16_t);
 
 	if (required > remaining) {
-		kr_log_error("[http] insufficient space in buffer\n");
+		kr_log_error(DOH, "insufficient space in buffer\n");
 		ctx->incomplete_stream = -1;
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 	}

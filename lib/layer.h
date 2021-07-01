@@ -8,21 +8,17 @@
 #include "lib/defines.h"
 #include "lib/utils.h"
 
-#ifdef NOVERBOSELOG
-	#define QRVERBOSE(query, cls, ...)
-#else
-	/** Print a debug message related to resolution.
-	 * \param _query	associated kr_query, may be NULL
-	 * \param _cls	identifying string, typically of length exactly four (padded)
-	 * \param ...	printf-compatible list of parameters
-	 */
-	#define QRVERBOSE(_query, _cls, ...) do { \
-		const struct kr_query *_qry = (_query); \
-		if (VERBOSE_STATUS || kr_log_qtrace_enabled(_qry)) { \
-			kr_log_q(_qry, (_cls), __VA_ARGS__); \
-		}  \
-	} while (false)
-#endif
+/** Print a debug message related to resolution.
+ * \param _query	associated kr_query, may be NULL
+ * \param _cls	identifying string, typically of length exactly four (padded)
+ * \param ...	printf-compatible list of parameters
+ */
+#define QRVERBOSE(_query, grp, ...) do { \
+	const struct kr_query *_qry = (_query); \
+	if (VERBOSE_STATUS || kr_log_qtrace_enabled(_qry)) { \
+		kr_log_q(_query, grp, ##  __VA_ARGS__); \
+	}  \
+} while (false)
 
 /** Layer processing states.  Only one value at a time (but see TODO).
  *

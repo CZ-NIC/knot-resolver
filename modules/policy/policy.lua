@@ -416,7 +416,7 @@ local function rpz_parse(action, path)
 	while true do
 		ok, errstr = parser:parse()
 		if errstr then
-			log('[poli] RPZ %s:%d: %s', path, tonumber(parser.line_counter), errstr)
+			log_info(ffi.C.LOG_GRP_POLICY, 'RPZ %s:%d: %s', path, tonumber(parser.line_counter), errstr)
 		end
 		if not ok then break end
 
@@ -426,7 +426,7 @@ local function rpz_parse(action, path)
 
 		local prefix_labels = ffi.C.knot_dname_in_bailiwick(full_name, parser.zone_origin)
 		if prefix_labels < 0 then
-			log('[poli] RPZ %s:%d: RR owner "%s" outside the zone (ignored)',
+			log_info(ffi.C.LOG_GRP_POLICY, 'RPZ %s:%d: RR owner "%s" outside the zone (ignored)',
 				path, tonumber(parser.line_counter), kres.dname2str(full_name))
 			goto continue
 		end
@@ -438,14 +438,14 @@ local function rpz_parse(action, path)
 			if action_map[rdata] then
 				rules[name] = action_map[rdata]
 			else
-				log('[poli] RPZ %s:%d: CNAME with custom target in RPZ is not supported yet (ignored)',
+				log_info(ffi.C.LOG_GRP_POLICY, 'RPZ %s:%d: CNAME with custom target in RPZ is not supported yet (ignored)',
 					path, tonumber(parser.line_counter))
 			end
 		else
 			if #name then
 				local is_bad = rrtype_bad[parser.r_type]
 				if is_bad == true or (is_bad == false and prefix_labels ~= 0) then
-					log('[poli] RPZ %s:%d warning: RR type %s is not allowed in RPZ (ignored)',
+					log_warn(ffi.C.LOG_GRP_POLICY, 'RPZ %s:%d warning: RR type %s is not allowed in RPZ (ignored)',
 						path, tonumber(parser.line_counter), kres.tostring.type[parser.r_type])
 				elseif is_bad == nil then
 					if new_actions[name] == nil then new_actions[name] = {} end
@@ -458,7 +458,7 @@ local function rpz_parse(action, path)
 						end
 						table.insert(act.rdata, rdata)
 						if parser.r_ttl ~= act.ttl then -- be conservative
-							log('[poli] RPZ %s:%d warning: different TTLs in a set (minimum taken)',
+							log_warn(ffi.C.LOG_GRP_POLICY, 'RPZ %s:%d warning: different TTLs in a set (minimum taken)',
 								path, tonumber(parser.line_counter))
 							act.ttl = math.min(act.ttl, parser.r_ttl)
 						end
@@ -512,17 +512,15 @@ function policy.rpz(action, path, watch)
 					-- Watcher will also fire for changes to the directory itself
 					if name == file then
 						-- If the file changes then reparse and replace the existing ruleset
-						if verbose() then
-							log('[poli] RPZ reloading: ' .. name)
-						end
+						log_info(ffi.C.LOG_GRP_POLICY, 'RPZ reloading: ' .. name)
 						rules = rpz_parse(action, path)
 					end
 				end
 			end)
 		elseif watch then -- explicitly requested and failed
 			error('[poli] lua-cqueues required to watch and reload RPZ file')
-		elseif verbose() then
-			log('[poli] lua-cqueues required to watch and reload RPZ file, continuing without watching')
+		else
+			log_info(ffi.C.LOG_GRP_POLICY, 'lua-cqueues required to watch and reload RPZ file, continuing without watching')
 		end
 	end
 
@@ -646,21 +644,20 @@ end
 local debug_logline_cb = ffi.cast('trace_log_f', function (_, msg)
 	jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
 	-- msg typically ends with newline
-	io.write(ffi.string(msg))
+	log_debug(ffi.C.LOG_GRP_POLICY, "%s", msg)
 end)
 ffi.gc(debug_logline_cb, free_cb)
 
 local debug_logfinish_cb = ffi.cast('trace_callback_f', function (req)
 	jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
-	ffi.C.kr_log_req(req, 0, 0, 'dbg',
+	log_req(req, 0, 0, ffi.C.LOG_GRP_POLICY,
 		'following rrsets were marked as interesting:\n' ..
 		req:selected_tostring())
 	if req.answer ~= nil then
-		ffi.C.kr_log_req(req, 0, 0, 'dbg',
-			'answer packet:\n' ..
-			tostring(req.answer))
+		log_req(req, 0, 0, ffi.C.LOG_GRP_POLICY,
+			'answer packet:\n' .. tostring(req.answer))
 	else
-		ffi.C.kr_log_req(req, 0, 0, 'dbg',
+		log_req(req, 0, 0, ffi.C.LOG_GRP_POLICY,
 			'answer packet DROPPED\n')
 	end
 end)
@@ -668,7 +665,8 @@ ffi.gc(debug_logfinish_cb, free_cb)
 
 -- log request packet
 function policy.REQTRACE(_, req)
-	ffi.C.kr_log_req(req, 0, 0, 'dbg', 'request packet:\n%s',
+	log_req(req, 0, 0, ffi.C.LOG_GRP_POLICY,
+		'request packet:\n%s',
 		tostring(req.qsource.packet))
 end
 
