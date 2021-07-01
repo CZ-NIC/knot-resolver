@@ -29,6 +29,7 @@ stages:
   - pkgtest
 
 .common: &common
+  when: manual
   except:
     refs:
       - master@knot/knot-resolver
@@ -306,12 +307,11 @@ test:valgrind:
     - MESON_TESTTHREADS=1 ${MESON_TEST} --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" --suite snowflake
 
 pkgtest:
-  stage: test
+  # FIXME: revert
+  stage: build
   trigger:
     include: ci/pkgtest.yaml
     strategy: depend
-  needs:
-    - build
   except:
     refs:
       - master@knot/knot-resolver

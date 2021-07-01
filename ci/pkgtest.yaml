@@ -144,6 +144,7 @@ nixos-unstable:pkgbuild:
 
   variables:
     NIX_PATH: nixpkgs=https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz
+  before_script:
   script:
     #TODO: improve this?  Submitting into NixPkgs would simplify this.
     - nix-instantiate -I apkg=https://gitlab.nic.cz/packaging/apkg/-/archive/nix-tmp/apkg-nix-tmp.tar.gz -E 'import <apkg/pkg/srcpkgs/nixos-21.05/apkg-0.1.1.dev6+g12ae2a2-1/top-level.nix>' | xargs nix build
