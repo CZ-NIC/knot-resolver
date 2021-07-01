@@ -312,8 +312,10 @@ pkgtest:
   trigger:
     include: ci/pkgtest.yaml
     strategy: depend
+  # FIXME: revert
   needs:
-    # FIXME: revert
+    - archive
+  dependencies:
     - archive
   except:
     refs:
