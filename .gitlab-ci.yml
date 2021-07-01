@@ -311,8 +311,6 @@ pkgtest:
   trigger:
     include: ci/pkgtest.yaml
     strategy: depend
-  needs:
-    #- build
   except:
     refs:
       - master@knot/knot-resolver
