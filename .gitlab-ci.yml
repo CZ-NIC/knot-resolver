@@ -29,6 +29,9 @@ stages:
   - pkgtest
 
 .common: &common
+  #FIXME: TMP
+  when: manual
+
   except:
     refs:
       - master@knot/knot-resolver
@@ -311,7 +314,7 @@ pkgtest:
     include: ci/pkgtest.yaml
     strategy: depend
   needs:
-    - build
+    #- build
   except:
     refs:
       - master@knot/knot-resolver

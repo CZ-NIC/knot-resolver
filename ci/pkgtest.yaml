@@ -5,6 +5,8 @@ stages:
 # pkgbuild {{{
 .pkgbuild: &pkgbuild
   stage: pkgbuild
+  #FIXME: TMP
+  when: manual
   tags:
     - lxc
     - amd64
@@ -128,6 +130,22 @@ ubuntu-21.04:pkgbuild:
     DISTROTEST_REPO: xUbuntu_21.04
   script:
     - *debpkgbuild
+
+nixos-unstable:pkgbuild:
+  <<: *pkgbuild
+  # We do NOT use LXC, for now at least.
+  tags:
+    - docker
+    - linux
+    - amd64
+  image: registry.hub.docker.com/r/nixos/nix
+
+  variables:
+    NIX_PATH: nixpkgs=https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz
+  script:
+    #TODO: improve this?  Submitting into NixPkgs would simplify this.
+    - nix-instantiate -I apkg=https://gitlab.nic.cz/packaging/apkg/-/archive/nix-tmp/apkg-nix-tmp.tar.gz -E 'import <apkg/pkg/srcpkgs/nixos-21.05/apkg-0.1.1.dev6+g12ae2a2-1/top-level.nix>' | xargs nix build
+    - ./result/bin/apkg build
 # }}}
 
 # pkgtest {{{
