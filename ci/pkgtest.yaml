@@ -134,9 +134,12 @@ ubuntu-21.04:pkgbuild:
 
 
 
+variables:
+  KNOT_VERSION: '3.0'
 
 .common: &common
   when: manual
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-$KNOT_VERSION
   except:
     refs:
       - master@knot/knot-resolver
