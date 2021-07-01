@@ -5,6 +5,8 @@ stages:
 # pkgbuild {{{
 .pkgbuild: &pkgbuild
   stage: pkgbuild
+  #FIXME: TMP
+  when: manual
   tags:
     - lxc
     - amd64
@@ -138,7 +140,7 @@ nixos-unstable:pkgbuild:
     - docker
     - linux
     - amd64
-  image: registry.hub.docker.com/r/nixos/nix
+  image: nixos/nix
 
   variables:
     NIX_PATH: nixpkgs=https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz
