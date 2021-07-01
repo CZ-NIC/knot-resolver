@@ -11,6 +11,9 @@ stages:
   before_script:
     - git config --global user.name CI
     - git config --global user.email ci@nic
+  needs: # https://gitlab.nic.cz/help/ci/yaml/README.md#artifact-downloads-to-child-pipelines
+    - pipeline: $PARENT_PIPELINE_ID
+      job: archive
   artifacts:
     when: always
     expire_in: '1 day'
