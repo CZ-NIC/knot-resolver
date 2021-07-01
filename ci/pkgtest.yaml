@@ -1,4 +1,5 @@
 stages:
+  - tmp
   - pkgbuild
   - pkgtest
 
@@ -150,7 +151,7 @@ ubuntu-21.04:pkgbuild:
 
 .build: &build
   <<: *common
-  stage: build
+  stage: tmp
   artifacts:
     when: always
     paths:
