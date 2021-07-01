@@ -16,13 +16,13 @@ local function check_time()
 	local actual_timeshift = os.time() * 1000 - tonumber(ffi.C.kr_now())
 	local jump_backward = cache_timeshift - actual_timeshift
 	if jump_backward > mod.threshold then
-		log("Detected backwards time jump, clearing cache.\n" ..
+		log_info(ffi.C.LOG_GRP_DETECTTIMEJUMP, "Detected backwards time jump, clearing cache.\n" ..
 		"But what does that mean? It means your future hasn't been written yet."
 		)
 		cache.clear()
 	elseif -jump_backward > mod.threshold then
 		-- On Linux 4.17+ this shouldn't happen anymore: https://lwn.net/Articles/751482/
-		log("Detected forward time jump.  (Suspend-resume, possibly.)")
+		log_info(ffi.C.LOG_GRP_DETECTTIMEJUMP, "Detected forward time jump.  (Suspend-resume, possibly.)")
 		cache.checkpoint(true)
 	end
 end
