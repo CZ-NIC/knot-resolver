@@ -131,6 +131,25 @@ ubuntu-21.04:pkgbuild:
     DISTROTEST_REPO: xUbuntu_21.04
   script:
     - *debpkgbuild
+
+nixos-unstable:pkgbuild:
+  <<: *pkgbuild
+  # We do NOT use LXC, for now at least.
+  tags:
+    - docker
+    - linux
+    - amd64
+  image: nixos/nix
+
+  variables:
+    NIX_PATH: nixpkgs=https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz
+  before_script:
+  script:
+    #TODO: improve this?  Submitting apkg into NixPkgs would simplify this.
+    - apkg=$(nix-instantiate -I apkg=https://gitlab.nic.cz/packaging/apkg/-/archive/nix-tmp/apkg-nix-tmp.tar.gz -E 'import <apkg/pkg/srcpkgs/nixos-21.05/apkg-0.1.1.dev6+g12ae2a2-1/top-level.nix>' | xargs nix-store --realize -Q)/bin/apkg
+    # the image auto-detects as alpine distro
+    - $apkg install -d nix
+    - kresd --version
 # }}}
 
 # pkgtest {{{
