@@ -14,7 +14,6 @@
 #include "lib/selection.h"
 #include "lib/resolve.h"
 
-#include <gnutls/gnutls.h>
 #include <libknot/descriptor.h>
 #include <libknot/dname.h>
 #include <libknot/rrset-dump.h>
@@ -32,12 +31,7 @@
 #include <sys/statvfs.h>
 #include <sys/un.h>
 
-/* Always compile-in log symbols, even if disabled. */
-#undef kr_verbose_status
-#undef kr_verbose_set
-
 /* Logging & debugging */
-bool kr_verbose_status = false;
 bool kr_dbg_assertion_abort = DBG_ASSERTION_ABORT;
 int kr_dbg_assertion_fork = DBG_ASSERTION_FORK;
 
@@ -45,9 +39,9 @@ void kr_fail(bool is_fatal, const char *expr, const char *func, const char *file
 {
 	const int errno_orig = errno;
 	if (is_fatal)
-		kr_log_critical("requirement \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
+		kr_log_fatal(SYSTEM, "requirement \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
 	else
-		kr_log_error("assertion \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
+		kr_log_error(SYSTEM, "assertion \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
 
 	if (is_fatal || (kr_dbg_assertion_abort && !kr_dbg_assertion_fork))
 		abort();
@@ -89,76 +83,6 @@ static inline int u16tostr(uint8_t *dst, uint16_t num)
 		tmp = (tmp & 0x0fffffff) * 10;
 	}
 	return 5;
-}
-
-/*
- * Cleanup callbacks.
- */
-
-static void kres_gnutls_log(int level, const char *message)
-{
-	kr_log_verbose("[gnutls] (%d) %s", level, message);
-}
-
-bool kr_verbose_set(bool status)
-{
-#ifndef NOVERBOSELOG
-	kr_verbose_status = status;
-
-	/* gnutls logs messages related to our TLS and also libdnssec,
-	 * and the logging is set up in a global way only */
-	if (status) {
-		gnutls_global_set_log_function(kres_gnutls_log);
-	}
-	gnutls_global_set_log_level(status ? 5 : 0);
-#endif
-	return kr_verbose_status;
-}
-
-static void kr_vlog_req(
-	const struct kr_request * const req, uint32_t qry_uid,
-	const unsigned int indent, const char *source, const char *fmt,
-	va_list args)
-{
-	struct mempool *mp = mp_new(512);
-
-	const uint32_t req_uid = req ? req->uid : 0;
-	char *msg = mp_printf(mp, "[%05u.%02u][%-4s] %*s",
-				req_uid, qry_uid, source, indent, "");
-
-	msg = mp_vprintf_append(mp, msg, fmt, args);
-
-	if (kr_log_rtrace_enabled(req))
-		req->trace_log(req, msg);
-	else
-		/* caller is responsible for detecting verbose mode, use QRVERBOSE() macro */
-		printf("%s", msg);
-
-	mp_delete(mp);
-}
-
-void kr_log_req(const struct kr_request * const req, uint32_t qry_uid,
-		const unsigned int indent, const char *source, const char *fmt, ...)
-{
-	va_list args;
-	va_start(args, fmt);
-	kr_vlog_req(req, qry_uid, indent, source, fmt, args);
-	va_end(args);
-}
-
-void kr_log_q(const struct kr_query * const qry,
-		const char *source, const char *fmt, ...)
-{
-	unsigned ind = 0;
-	for (const struct kr_query *q = qry; q; q = q->parent)
-		ind += 2;
-	const uint32_t qry_uid = qry ? qry->uid : 0;
-	const struct kr_request *req = qry ? qry->request : NULL;
-
-	va_list args;
-	va_start(args, fmt);
-	kr_vlog_req(req, qry_uid, ind, source, fmt, args);
-	va_end(args);
 }
 
 char* kr_strcatdup(unsigned n, ...)
@@ -844,7 +768,7 @@ int kr_ranked_rrarray_finalize(ranked_rr_array_t *array, uint32_t qry_uid, knot_
 				if (knot_rdata_cmp(ra->at[i], ra->at[i + 1]) == 0) {
 					ra->at[i] = NULL;
 					++dup_count;
-					QRVERBOSE(NULL, "iter", "deleted duplicate RR\n");
+					QRVERBOSE(NULL, ITERATOR, "deleted duplicate RR\n");
 				}
 			}
 			/* Prepare rdataset, except rdata contents. */
@@ -1184,7 +1108,7 @@ static void rnd_noerror(void *data, uint size)
 {
 	int ret = gnutls_rnd(GNUTLS_RND_NONCE, data, size);
 	if (ret) {
-		kr_log_error("gnutls_rnd(): %s\n", gnutls_strerror(ret));
+		kr_log_error(TLS, "gnutls_rnd(): %s\n", gnutls_strerror(ret));
 		abort();
 	}
 }

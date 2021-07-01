@@ -69,7 +69,7 @@ static inline int execute_callback(lua_State *L, int argc)
 {
 	int ret = engine_pcall(L, argc);
 	if (ret != 0) {
-		kr_log_error("error: %s\n", lua_tostring(L, -1));
+		kr_log_error(SYSTEM, "error: %s\n", lua_tostring(L, -1));
 	}
 	/* Clear the stack, there may be event a/o enything returned */
 	lua_settop(L, 0);
