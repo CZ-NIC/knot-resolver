@@ -312,6 +312,8 @@ pkgtest:
   trigger:
     include: ci/pkgtest.yaml
     strategy: depend
+  variables:
+    PARENT_PIPELINE_ID: $CI_PIPELINE_ID
   needs:
     - archive
   except:

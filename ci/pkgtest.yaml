@@ -14,6 +14,9 @@ stages:
   before_script:
     - git config --global user.name CI
     - git config --global user.email ci@nic
+  needs:
+    - pipeline: $PARENT_PIPELINE_ID
+      job: archive
   artifacts:
     when: always
     expire_in: '1 day'
@@ -132,48 +135,6 @@ ubuntu-21.04:pkgbuild:
   script:
     - *debpkgbuild
 
-
-
-variables:
-  KNOT_VERSION: '3.0'
-
-.common: &common
-  when: manual
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-$KNOT_VERSION
-  except:
-    refs:
-      - master@knot/knot-resolver
-      - master@knot/security/knot-resolver
-      - tags
-    variables:
-      - $SKIP_CI == "1"
-  tags:
-    - docker
-    - linux
-    - amd64
-
-.build: &build
-  <<: *common
-  stage: tmp
-  artifacts:
-    when: always
-    paths:
-      - .local
-      - build_ci*
-      - pkg
-    reports:
-      junit: build_ci*/meson-logs/testlog.junit.xml
-  after_script:
-    - ci/fix-meson-junit.sh build_ci*/meson-logs/testlog.junit.xml
-
-archive_again:
-  <<: *build
-  when: always
-  except: null
-  script:
-    - apkg make-archive
-
-
 nixos-unstable:pkgbuild:
   <<: *pkgbuild
   # FIXME: tmp
@@ -188,10 +149,6 @@ nixos-unstable:pkgbuild:
   variables:
     NIX_PATH: nixpkgs=https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz
   before_script:
-
-  # FIXME: https://gitlab.nic.cz/knot/knot-resolver/-/merge_requests/1187#note_218753
-  needs:
-    - archive_again
   script:
     - ls -lR pkg/
     #TODO: improve this?  Submitting into NixPkgs would simplify this.
