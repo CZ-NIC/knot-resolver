@@ -133,6 +133,8 @@ ubuntu-21.04:pkgbuild:
 
 nixos-unstable:pkgbuild:
   <<: *pkgbuild
+  # FIXME: tmp
+  when: always
   # We do NOT use LXC, for now at least.
   tags:
     - docker
