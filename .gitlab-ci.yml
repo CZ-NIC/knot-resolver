@@ -29,9 +29,6 @@ stages:
   - pkgtest
 
 .common: &common
-  #FIXME: TMP
-  when: manual
-
   except:
     refs:
       - master@knot/knot-resolver
