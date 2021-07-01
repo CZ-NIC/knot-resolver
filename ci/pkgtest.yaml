@@ -197,7 +197,8 @@ nixos-unstable:pkgbuild:
     #TODO: improve this?  Submitting into NixPkgs would simplify this.
     - apkg=$(nix-instantiate -I apkg=https://gitlab.nic.cz/packaging/apkg/-/archive/nix-tmp/apkg-nix-tmp.tar.gz -E 'import <apkg/pkg/srcpkgs/nixos-21.05/apkg-0.1.1.dev6+g12ae2a2-1/top-level.nix>' | xargs nix-store --realize -Q)/bin/apkg
     # the image auto-detects as alpine distro
-    - $apkg build -d nix
+    - $apkg install -d nix
+    - kresd --version
 # }}}
 
 # pkgtest {{{
