@@ -98,7 +98,7 @@ int entry2answer(struct answer *ans, int id,
 		/* Sanity check: we consumed exactly all data. */
 		int unused_bytes = eh_bound - (uint8_t *)eh->data - data_off - ret;
 		if (kr_fails_assert(unused_bytes == 0)) {
-			kr_log_error("[cach] entry2answer ERROR: unused bytes: %d\n",
+			kr_log_error(CACHE, "entry2answer ERROR: unused bytes: %d\n",
 					unused_bytes);
 			ret = kr_error(EILSEQ);
 			goto fail; /* to be on the safe side */

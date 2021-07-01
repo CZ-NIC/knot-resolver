@@ -39,13 +39,11 @@ M.configs._builtin._all = {
 }
 -- log errors but do not throw
 M.configs._builtin._all.onerror = function(myserver, context, op, err, errno) -- luacheck: ignore 212
-	local msg = '[http] ' .. op .. ' on ' .. tostring(context) .. ' failed'
+	local msg = op .. ' on ' .. tostring(context) .. ' failed'
 	if err then
 		msg = msg .. ': ' .. tostring(err)
 	end
-	if verbose() then
-		log(msg)
-	end
+	log_info(ffi.C.LOG_GRP_DOH, msg)
 end
 
 -- M.config() without explicit "kind" modifies this
@@ -226,10 +224,8 @@ local function route(endpoints)
 		-- Upgrade connection to WebSocket
 		local ws = http_websocket.new_from_stream(stream, h)
 		if ws then
-			if verbose() then
-				log('[http] %s %s HTTP/%d web socket open',
-					m, path, connection.version)
-			end
+			log_info(ffi.C.LOG_GRP_DOH, '%s %s HTTP/%d web socket open',
+				m, path, connection.version)
 			assert(ws:accept { protocols = {'json'} })
 			-- Continue streaming results to client
 			local ep = endpoints[path]
@@ -238,19 +234,15 @@ local function route(endpoints)
 				cb(h, ws)
 			end
 			ws:close()
-			if verbose() then
-				log('[http] %s %s HTTP/%d web socket closed',
-					m, path, connection.version)
-			end
+			log_info(ffi.C.LOG_GRP_DOH, '%s %s HTTP/%d web socket closed',
+				m, path, connection.version)
 			return
 		else
 			local ok, err, reason = http_util.yieldable_pcall(serve, endpoints, h, stream)
 			if not ok or err then
 				err = err or '500'
-				if verbose() then
-					log('[http] %s %s HTTTP/%d %s %s',
-						m, path, connection.version, err, reason or '')
-				end
+				log_info(ffi.C.LOG_GRP_DOH, '%s %s HTTTP/%d %s %s',
+					m, path, connection.version, err, reason or '')
 				-- Method is not supported
 				local hsend = http_headers.new()
 				hsend:append(':status', err)
@@ -260,10 +252,9 @@ local function route(endpoints)
 				else
 					assert(stream:write_headers(hsend, true))
 				end
-			else if verbose() then
-				log('[http] %s %s HTTP/%d 200',
+			else
+				log_info(ffi.C.LOG_GRP_DOH, '%s %s HTTP/%d 200',
 					m, path, connection.version)
-				end
 			end
 
 		end
