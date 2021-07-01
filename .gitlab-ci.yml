@@ -88,7 +88,6 @@ archive:
 
 build:
   <<: *build
-  when: always
   script:
     - meson build_ci --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled
     - ninja -C build_ci
@@ -314,7 +313,7 @@ pkgtest:
     include: ci/pkgtest.yaml
     strategy: depend
   needs:
-    - build
+    - archive
   except:
     refs:
       - master@knot/knot-resolver
