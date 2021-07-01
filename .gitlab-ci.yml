@@ -310,6 +310,7 @@ test:valgrind:
 
 pkgtest:
   stage: test
+  when: always
   trigger:
     include: ci/pkgtest.yaml
     strategy: depend
