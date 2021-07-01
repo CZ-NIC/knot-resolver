@@ -5,8 +5,6 @@ stages:
 # pkgbuild {{{
 .pkgbuild: &pkgbuild
   stage: pkgbuild
-  #FIXME: TMP
-  when: manual
   tags:
     - lxc
     - amd64
