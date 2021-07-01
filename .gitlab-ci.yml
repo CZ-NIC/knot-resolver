@@ -81,6 +81,7 @@ stages:
 
 archive:
   <<: *build
+  when: always
   except: null
   script:
     - apkg make-archive
@@ -307,11 +308,13 @@ test:valgrind:
     - MESON_TESTTHREADS=1 ${MESON_TEST} --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" --suite snowflake
 
 pkgtest:
-  # FIXME: revert
-  stage: build
+  stage: test
   trigger:
     include: ci/pkgtest.yaml
     strategy: depend
+  needs:
+    # FIXME: revert
+    - archive
   except:
     refs:
       - master@knot/knot-resolver
