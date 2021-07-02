@@ -1,5 +1,6 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
-log('my PID = %d', worker.pid)
+local ffi = require('ffi')
+log_info(ffi.C.LOG_GRP_TESTS, 'my PID = %d', worker.pid)
 
 trust_anchors.remove('.')
 
@@ -38,32 +39,32 @@ net.listen(worker.control_path .. worker.pid, nil, {kind = 'control'})
 assert(#net.list() >= 3)  -- UDP, TCP, control
 
 -- debug, kept for future use
---log('%s', worker.control_path)
---log('%s', table_print(net.list()))
+--set_log_level("debug")
+log_debug(ffi.C.LOG_GRP_TESTS, '%s', worker.control_path)
+log_debug(ffi.C.LOG_GRP_TESTS, '%s', table_print(net.list()))
 
 function wait_for_sockets()
-	log('waiting for control sockets')
-	local ffi = require('ffi')
+	log_info(ffi.C.LOG_GRP_TESTS, 'waiting for control sockets')
 	local timeout = 5000 -- ms
 	local start_time = tonumber(ffi.C.kr_now())
 	local now
 	while true do
 		now = tonumber(ffi.C.kr_now())
 		if now > start_time + timeout then
-			log('timeout while waiting for control sockets to appear')
+			log_info(ffi.C.LOG_GRP_TESTS, 'timeout while waiting for control sockets to appear')
 			os.exit(3)
 		end
 		local pids = kluautil.list_dir(worker.control_path)
 		if #pids == n_instances then
 			-- debug, kept for future use
-			--log('got control sockets:')
-			--log(table_print(pids))
+			log_debug(ffi.C.LOG_GRP_TESTS, 'got control sockets:')
+			log_debug(ffi.C.LOG_GRP_TESTS, table_print(pids))
 			break
 		else
 			worker.sleep(0.1)
 		end
 	end
-	log('PIDs are visible now (waiting took %d ms)', now - start_time)
+	log_info(ffi.C.LOG_GRP_TESTS, 'PIDs are visible now (waiting took %d ms)', now - start_time)
 end
 
 -- expression should throw Lua error:
@@ -90,7 +91,7 @@ end
 function tests()
 	-- add delay to each test to force scheduler to interleave tests and DNS queries
 	local test_delay = 20 / 1000 -- seconds
-	log('starting map() tests now')
+	log_info(ffi.C.LOG_GRP_TESTS, 'starting map() tests now')
 
 	tap.boom(map, {'1 ++ 1'}, 'syntax error in command is detected')
 	worker.sleep(test_delay)
@@ -143,11 +144,11 @@ local started = false
 function tests_start()
 	-- just in case, duplicates should not happen
 	if started then
-		log('huh? duplicate test invocation ignored, a retrasmit?')
+		log_info(ffi.C.LOG_GRP_TESTS, 'huh? duplicate test invocation ignored, a retrasmit?')
 		return
 	end
 	started = true
-	log('start query triggered, scheduling tests')
+	log_info(ffi.C.LOG_GRP_TESTS, 'start query triggered, scheduling tests')
 
 	-- DNS queries and map() commands must be serviced while sleep is running
 	worker.coroutine(function() worker.sleep(3600) end)
@@ -171,7 +172,7 @@ policy.add(policy.suffix(tests_done, {'\4done\0'}), true)
 policy.add(policy.all(
 	function()
 		local delay = 10  -- ms
-		log('packet delayed by %d ms', delay)
+		log_info(ffi.C.LOG_GRP_TESTS, 'packet delayed by %d ms', delay)
 		worker.sleep(delay / 1000)
 	end))
 

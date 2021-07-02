@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
 			cfg.dry_run = true;
 			break;
 		case 'v':
-			kr_verbose_set(true);
+			kr_log_level_set(LOG_DEBUG);
 			break;
 		case ':':
 		case '?':

@@ -2,6 +2,7 @@
 -- Module implementing RFC 8145 section 5
 -- Signaling Trust Anchor Knowledge in DNS using Key Tag Query
 local kres = require('kres')
+local ffi = require('ffi')
 
 local M = {}
 M.layer = {}
@@ -39,9 +40,7 @@ local function send_ta_query(domain)
 	local keyset = trust_anchors.keysets[domain]
 	local qname = prepare_query_name(keyset, domain)
 	if qname ~= nil then
-		if verbose() then
-			log("[ta_signal_query] signalling query trigered: %s", qname)
-		end
+		log_info(ffi.C.LOG_GRP_TASIGNALING, "signalling query trigered: %s", qname)
 		-- asynchronous query
 		-- we do not care about result or from where it was obtained
 		event.after(0, function ()

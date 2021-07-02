@@ -74,6 +74,7 @@ static int l_help(lua_State *L)
 		"package_version()\n    return package version\n"
 		"user(name[, group])\n    change process user (and group)\n"
 		"verbose(true|false)\n    toggle verbose mode\n"
+		"set_log_level\n	logging level (crit, err, warning, notice, info or debug)\n"
 		"option(opt[, new_val])\n    get/set server option\n"
 		"mode(strict|normal|permissive)\n    set resolver strictness level\n"
 		"reorder_RR([true|false])\n    set/get reordering of RRs within RRsets\n"
@@ -145,10 +146,91 @@ static int l_quit(lua_State *L)
 static int l_verbose(lua_State *L)
 {
 	if (lua_isboolean(L, 1) || lua_isnumber(L, 1)) {
-		kr_verbose_set(lua_toboolean(L, 1));
+		kr_log_level_set(lua_toboolean(L, 1) == true ? LOG_DEBUG : LOG_DEFAULT_LEVEL);
 	}
-	lua_pushboolean(L, kr_verbose_status);
+
+	lua_pushboolean(L, kr_log_level_get() == LOG_DEBUG);
 	return 1;
+}
+
+static int l_set_log_level(lua_State *L)
+{
+	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
+		lua_error_p(L, "takes one string parameter");
+		return 0;
+	}
+
+	log_level_t lvl = kr_log_name2level(lua_tostring(L, 1));
+
+	lua_pushinteger(L, kr_log_level_set(lvl));
+	return 1;
+}
+
+static int l_get_log_level(lua_State *L)
+{
+	printf("%s\n", kr_log_level2name(kr_log_level_get()));
+
+	return 0;
+}
+
+static int handle_log_groups(lua_State *L, void (*action)(log_groups_t grp))
+{
+	if (lua_gettop(L) != 1 || (!lua_isstring(L, 1) && !lua_istable(L, 1)))
+		lua_error_p(L, "takes string or table of strings");
+
+	if (lua_isstring(L, 1)) {
+		log_groups_t grp = kr_log_name2grp(lua_tostring(L, 1));
+		if (grp == 0)
+			lua_error_p(L, "unknown group");
+		action(grp);
+	}
+
+	if (lua_istable(L, 1)) {
+		int idx = 1;
+		log_groups_t grp;
+		lua_pushnil(L);
+		while (lua_next(L, 1) != 0) {
+			if (!lua_isstring(L, -1))
+				lua_error_p(L, "wrong value at index %d, must be string", idx);
+			grp = kr_log_name2grp(lua_tostring(L, -1));
+			if (grp == 0)
+				lua_error_p(L, "unknown group \"%s\", type add_log_group() for help.", lua_tostring(L, -1));
+
+			action(grp);
+			++idx;
+			lua_pop(L, 1);
+		}
+	}
+
+	return 0;
+}
+
+static int l_add_log_group(lua_State *L)
+{
+	return handle_log_groups(L, kr_log_add_group);
+}
+
+static int l_del_log_group(lua_State *L)
+{
+	return handle_log_groups(L, kr_log_del_group);
+}
+
+static int l_list_log_group(lua_State *L)
+{
+	int grp_b = 1;
+	char *grp_name = kr_log_grp2name(1 << grp_b);
+
+	printf("groups: \n\t");
+	while (grp_name) {
+		printf("%s%s, ", group_is_set(1 << grp_b) ? "*":"", grp_name);
+		if (grp_b%8 == 0)
+			printf("\n\t");
+		++grp_b;
+		grp_name = kr_log_grp2name(1 << grp_b);
+	}
+	printf("\n* = groups logged in debug level\n");
+
+	return 0;
 }
 
 char *engine_get_hostname(struct engine *engine) {
@@ -431,6 +513,16 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "package_version");
 	lua_pushcfunction(engine->L, l_verbose);
 	lua_setglobal(engine->L, "verbose");
+	lua_pushcfunction(engine->L, l_set_log_level);
+	lua_setglobal(engine->L, "set_log_level");
+	lua_pushcfunction(engine->L, l_get_log_level);
+	lua_setglobal(engine->L, "get_log_level");
+	lua_pushcfunction(engine->L, l_add_log_group);
+	lua_setglobal(engine->L, "add_log_group");
+	lua_pushcfunction(engine->L, l_del_log_group);
+	lua_setglobal(engine->L, "del_log_group");
+	lua_pushcfunction(engine->L, l_list_log_group);
+	lua_setglobal(engine->L, "list_log_group");
 	lua_pushcfunction(engine->L, l_setuser);
 	lua_setglobal(engine->L, "user");
 	lua_pushcfunction(engine->L, l_hint_root_file);
@@ -617,7 +709,7 @@ int engine_load_sandbox(struct engine *engine)
 	/* Init environment */
 	int ret = luaL_dofile(engine->L, LIBDIR "/sandbox.lua");
 	if (ret != 0) {
-		fprintf(stderr, "[system] error %s\n", lua_tostring(engine->L, -1));
+		kr_log_error(SYSTEM, "error %s\n", lua_tostring(engine->L, -1));
 		lua_pop(engine->L, 1);
 		return kr_error(ENOEXEC);
 	}
@@ -632,11 +724,11 @@ int engine_loadconf(struct engine *engine, const char *config_path)
 
 	char cwd[PATH_MAX];
 	get_workdir(cwd, sizeof(cwd));
-	kr_log_verbose("[system] loading config '%s' (workdir '%s')\n", config_path, cwd);
+	kr_log_debug(SYSTEM, "loading config '%s' (workdir '%s')\n", config_path, cwd);
 
 	int ret = luaL_dofile(engine->L, config_path);
 	if (ret != 0) {
-		fprintf(stderr, "[system] error while loading config: "
+		kr_log_error(SYSTEM, "error while loading config: "
 			"%s (workdir '%s')\n", lua_tostring(engine->L, -1), cwd);
 		lua_pop(engine->L, 1);
 	}
@@ -716,7 +808,7 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 			ret = engine_pcall(L, 1);
 		}
 		if (kr_fails_assert(ret == 0)) {  /* probably not critical, but weird */
-			kr_log_error("[system] internal error when loading C module %s: %s\n",
+			kr_log_error(SYSTEM, "internal error when loading C module %s: %s\n",
 					module->name, lua_tostring(L, -1));
 			lua_pop(L, 1);
 		}
@@ -725,12 +817,12 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 		/* No luck with C module, so try to load and .init() lua module. */
 		ret = ffimodule_register_lua(engine, module, name);
 		if (ret != 0) {
-			kr_log_error("[system] failed to load module '%s'\n", name);
+			kr_log_error(SYSTEM, "failed to load module '%s'\n", name);
 		}
 
 	} else if (ret == kr_error(ENOTSUP)) {
 		/* Print a more helpful message when module is linked against an old resolver ABI. */
-		kr_log_error("[system] module '%s' links to unsupported ABI, please rebuild it\n", name);
+		kr_log_error(SYSTEM, "module '%s' links to unsupported ABI, please rebuild it\n", name);
 	}
 
 	if (ret != 0) {

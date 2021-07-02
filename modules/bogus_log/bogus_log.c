@@ -38,7 +38,7 @@ static int consume(kr_layer_t *ctx, knot_pkt_t *pkt)
 	auto_free char *qname_text = kr_dname_text(knot_pkt_qname(pkt));
 	auto_free char *qtype_text = kr_rrtype_text(knot_pkt_qtype(pkt));
 
-	kr_log_error("DNSSEC validation failure %s %s\n", qname_text, qtype_text);
+	kr_log_error(DNSSEC, "DNSSEC validation failure %s %s\n", qname_text, qtype_text);
 
 	/* log of most frequent bogus queries */
 	uint16_t type = knot_pkt_qtype(pkt);
