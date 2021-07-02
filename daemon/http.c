@@ -255,7 +255,7 @@ static void refuse_stream(nghttp2_session *h2, int32_t stream_id)
 		h2, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
 }
 
-static void free_headers(kr_http_header_array_t *headers)
+void http_free_headers(kr_http_header_array_t *headers)
 {
 	if (headers == NULL)
 		return;
@@ -274,7 +274,7 @@ static void http_cleanup_stream(struct http_ctx *ctx)
 	ctx->current_method = HTTP_METHOD_NONE;
 	free(ctx->uri_path);
 	ctx->uri_path = NULL;
-	free_headers(ctx->headers);
+	http_free_headers(ctx->headers);
 	ctx->headers = NULL;
 }
 
@@ -772,7 +772,7 @@ void http_free(struct http_ctx *ctx)
 	/* Clean up any headers whose ownership may not have been transferred. */
 	while (queue_len(ctx->streams) > 0) {
 		struct http_stream stream = queue_head(ctx->streams);
-		free_headers(stream.headers);
+		http_free_headers(stream.headers);
 		if (stream.headers == ctx->headers)
 			ctx->headers = NULL;  // to prevent double-free
 		queue_pop(ctx->streams);
