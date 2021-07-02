@@ -365,6 +365,7 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 			return 0;
 		}
 
+		kr_assert(ctx->uri_path == NULL);
 		ctx->uri_path = malloc(sizeof(*ctx->uri_path) * (valuelen + 1));
 		if (!ctx->uri_path)
 			return kr_error(ENOMEM);
