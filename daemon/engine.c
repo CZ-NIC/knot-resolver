@@ -724,7 +724,7 @@ int engine_loadconf(struct engine *engine, const char *config_path)
 
 	char cwd[PATH_MAX];
 	get_workdir(cwd, sizeof(cwd));
-	kr_log_verbose("[system] loading config '%s' (workdir '%s')\n", config_path, cwd);
+	kr_log_debug(SYSTEM, "loading config '%s' (workdir '%s')\n", config_path, cwd);
 
 	int ret = luaL_dofile(engine->L, config_path);
 	if (ret != 0) {

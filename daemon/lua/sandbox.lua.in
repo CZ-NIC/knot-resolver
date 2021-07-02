@@ -31,8 +31,8 @@ local function curr_file() return debug.getinfo(4,'S').source end
 local function curr_line() return debug.getinfo(4,'l').currentline end
 
 local function log_fmt(grp, level, fmt, ...)
-	ffi.C.kr_log_fmt(grp, level, "CODE_FILE="..curr_file(), "CODE_LINE="..curr_line(), "",
-			"[%s]" .. fmt, ffi.C.kr_log_grp2name(grp), ...)
+	ffi.C.kr_log_fmt(grp, level, 'CODE_FILE='..curr_file(), 'CODE_LINE='..curr_line(), '',
+			'[%s] ' .. fmt .. '\n', ffi.C.kr_log_grp2name(grp), ...)
 end
 
 function log_req(req, qry_uid, indent, grp, fmt, ...)

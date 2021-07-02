@@ -653,8 +653,7 @@ static int net_tls_client(lua_State *L)
 					ca_file, gnutls_strerror_name(ret),
 					gnutls_strerror(ret));
 			} else {
-				kr_log_verbose(
-					"[tls_client] imported %d certs from file '%s'\n",
+				kr_log_debug(TLSCLIENT, "imported %d certs from file '%s'\n",
 					ret, ca_file);
 			}
 
@@ -731,8 +730,7 @@ static int net_tls_client(lua_State *L)
 			ERROR("failed to use system CA certificate store: %s",
 				ret ? gnutls_strerror(ret) : kr_strerror(ENOENT));
 		} else {
-			kr_log_verbose(
-				"[tls_client] imported %d certs from system store\n",
+			kr_log_debug(TLSCLIENT, "imported %d certs from system store\n",
 				ret);
 		}
 	}

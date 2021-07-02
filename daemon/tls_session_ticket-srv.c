@@ -190,7 +190,7 @@ static void tst_key_check(uv_timer_t *timer, bool force_update)
 	/* ^ +1 because we don't want to wake up half a millisecond before the epoch! */
 	if (kr_fails_assert(remain_ms < (TST_KEY_LIFETIME + 1 /*rounding tolerance*/) * 1000))
 		return;
-	kr_log_verbose("[tls] session ticket: epoch %"PRIu64
+	kr_log_debug(TLS, "session ticket: epoch %"PRIu64
 			", scheduling rotation check in %"PRIu64" ms\n",
 			(uint64_t)epoch, remain_ms);
 	err = uv_timer_start(timer, &tst_timer_callback, remain_ms, 0);

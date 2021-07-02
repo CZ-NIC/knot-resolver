@@ -66,6 +66,8 @@ enum kr_log_groups_type {
 	LOG_GRP_PRIMING,
 	LOG_GRP_SRVSTALE,
 	LOG_GRP_WATCHDOG,
+	LOG_GRP_NSID,
+	LOG_GRP_DNSTAP,
 	LOG_GRP_TESTS,
 };
 
@@ -106,6 +108,8 @@ enum kr_log_groups_type {
 #define LOG_GRP_PRIMING_TAG		"primin"
 #define LOG_GRP_SRVSTALE_TAG		"srvstl"
 #define LOG_GRP_WATCHDOG_TAG		"wtchdg"
+#define LOG_GRP_NSID_TAG		"nsid  "
+#define LOG_GRP_DNSTAP_TAG		"dnstap"
 #define LOG_GRP_TESTS_TAG		"tests "
 
 KR_EXPORT
@@ -220,4 +224,4 @@ void kr_log_q1(const struct kr_query *qry, log_groups_t group, const char *tag, 
 /** Block run in --verbose mode; optimized when not run. */
 #define VERBOSE_STATUS __builtin_expect(KR_LOG_LEVEL_IS(LOG_DEBUG), false) // TODO vyhodit
 #define WITH_VERBOSE(query) if(__builtin_expect(KR_LOG_LEVEL_IS(LOG_DEBUG) || kr_log_qtrace_enabled(query), false))
-#define kr_log_verbose if(VERBOSE_STATUS) printf
+

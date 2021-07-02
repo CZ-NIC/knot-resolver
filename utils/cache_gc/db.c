@@ -274,7 +274,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 
 	api->txn_abort(&txn);
 
-	kr_log_verbose("DEBUG: iterated %u items, gc consistent %u, kr consistent %u\n",
+	kr_log_debug(CACHE, "iterated %u items, gc consistent %u, kr consistent %u\n",
 		counter_iter, counter_gc_consistent, counter_kr_consistent);
 	return KNOT_EOK;
 }

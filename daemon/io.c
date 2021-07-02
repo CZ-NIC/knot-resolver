@@ -79,7 +79,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		if (kr_fails_assert(peer->sa_family != AF_UNSPEC))
 			return;
 		if (kr_sockaddr_cmp(peer, addr) != 0) {
-			kr_log_verbose("[io] <= ignoring UDP from unexpected address '%s'\n",
+			kr_log_debug(IO, "<= ignoring UDP from unexpected address '%s'\n",
 					kr_straddr(addr));
 			return;
 		}
@@ -253,7 +253,7 @@ void tcp_timeout_trigger(uv_timer_t *timer)
 		} else {
 			struct sockaddr *peer = session_get_peer(s);
 			char *peer_str = kr_straddr(peer);
-			kr_log_verbose("[io] => closing connection to '%s'\n",
+			kr_log_debug(IO, "=> closing connection to '%s'\n",
 				       peer_str ? peer_str : "");
 			if (session_flags(s)->outgoing) {
 				worker_del_tcp_waiting(the_worker, peer);
@@ -284,7 +284,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		if (KR_LOG_LEVEL_IS(LOG_DEBUG)) {
 			struct sockaddr *peer = session_get_peer(s);
 			char *peer_str = kr_straddr(peer);
-			kr_log_verbose("[io] => connection to '%s' closed by peer (%s)\n",
+			kr_log_debug(IO, "=> connection to '%s' closed by peer (%s)\n",
 				       peer_str ? peer_str : "",
 				       uv_strerror(nread));
 		}
@@ -303,7 +303,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 			if (KR_LOG_LEVEL_IS(LOG_DEBUG)) {
 				struct sockaddr *peer = session_get_peer(s);
 				char *peer_str = kr_straddr(peer);
-				kr_log_verbose("[io] => connection to '%s': "
+				kr_log_debug(IO, "=> connection to '%s': "
 					       "error processing TLS data, close\n",
 					       peer_str ? peer_str : "");
 			}
@@ -322,7 +322,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 			if (KR_LOG_LEVEL_IS(LOG_DEBUG)) {
 				struct sockaddr *peer = session_get_peer(s);
 				char *peer_str = kr_straddr(peer);
-				kr_log_verbose("[io] => connection to '%s': "
+				kr_log_debug(IO, "=> connection to '%s': "
 				       "error processing HTTP data, close\n",
 				       peer_str ? peer_str : "");
 			}
@@ -359,7 +359,7 @@ static ssize_t tls_send(const uint8_t *buf, const size_t len, struct session *se
 
 	sent = gnutls_record_send(ctx->c.tls_session, buf, len);
 	if (sent < 0) {
-		kr_log_verbose("[http] gnutls_record_send failed: %s (%zd)\n",
+		kr_log_debug(DOH, "gnutls_record_send failed: %s (%zd)\n",
 			       gnutls_strerror_name(sent), sent);
 		return kr_error(EIO);
 	}
@@ -821,7 +821,7 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 		kr_log_error(XDP, "knot_xdp_recv(): %d, %s\n", ret, knot_strerror(ret));
 		return;
 	}
-	kr_log_verbose("poll triggered, processing a batch of %d packets\n", (int)rcvd);
+	kr_log_debug(XDP, "poll triggered, processing a batch of %d packets\n", (int)rcvd);
 	kr_require(rcvd <= XDP_RX_BATCH_SIZE);
 	for (int i = 0; i < rcvd; ++i) {
 		const knot_xdp_msg_t *msg = &msgs[i];
@@ -837,7 +837,7 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 					msg->eth_from, msg->eth_to, kpkt);
 		}
 		if (ret)
-			kr_log_verbose("[xdp] worker_submit() == %d: %s\n", ret, kr_strerror(ret));
+			kr_log_debug(XDP, "worker_submit() == %d: %s\n", ret, kr_strerror(ret));
 		mp_flush(the_worker->pkt_pool.ctx);
 	}
 	knot_xdp_recv_finish(xhd->socket, msgs, rcvd);
