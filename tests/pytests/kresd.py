@@ -296,7 +296,7 @@ def make_port(ip=None, ip6=None):
 
 
 KRESD_LOG_STARTUP_MSGID = re.compile(r'^\[[^]]+\]\[{}.*'.format(KRESD_STARTUP_MSGID))
-KRESD_LOG_IO_CLOSE = re.compile(r'^\[io\].*closed by peer.*')
+KRESD_LOG_IO_CLOSE = re.compile(r'^\[io    \].*closed by peer.*')
 
 
 @contextmanager
