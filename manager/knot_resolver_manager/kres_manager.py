@@ -24,13 +24,16 @@ class KresManager:
     """
 
     @classmethod
-    async def create(cls: Type["KresManager"]) -> "KresManager":
+    async def create(cls: Type["KresManager"], controller: Optional[SubprocessController]) -> "KresManager":
         obj = cls()
-        await obj._async_init()  # pylint: disable=protected-access
+        await obj._async_init(controller)  # pylint: disable=protected-access
         return obj
 
-    async def _async_init(self):
-        self._controller = await get_best_controller_implementation()
+    async def _async_init(self, selected_controller: Optional[SubprocessController]):
+        if selected_controller is None:
+            self._controller = await get_best_controller_implementation()
+        else:
+            self._controller = selected_controller
         await self._controller.initialize_controller()
         await self.load_system_state()
 

@@ -21,7 +21,7 @@ mkdir -p .vscode
 # settings.json
 cat > .vscode/settings.json <<EOF
 {
-    "python.pythonPath": "$(poetry env info -p)",
+    "python.defaultInterpreterPath": "$(poetry env info -p)",
     "python.venvPath": "~/.cache/pypoetry/virtualenvs"
 }
 EOF
@@ -45,7 +45,7 @@ cat > .vscode/launch.json <<EOF
             },
             "pathMappings": [
                 {
-                    "localRoot": "${workspaceFolder}",
+                    "localRoot": "\${workspaceFolder}",
                     "remoteRoot": "."
                 }
             ]
