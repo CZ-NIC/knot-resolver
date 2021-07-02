@@ -312,6 +312,8 @@ pkgtest:
     strategy: depend
   needs:
     - build
+  variables: # https://gitlab.nic.cz/help/ci/yaml/README.md#artifact-downloads-to-child-pipelines
+    PARENT_PIPELINE_ID: $CI_PIPELINE_ID
   except:
     refs:
       - master@knot/knot-resolver
