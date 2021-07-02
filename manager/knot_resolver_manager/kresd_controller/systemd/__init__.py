@@ -72,11 +72,11 @@ class SystemdSubprocessController(SubprocessController):
     def __str__(self):
         if self._systemd_type == systemd.SystemdType.SESSION:
             if self._persistance_type is SystemdPersistanceType.TRANSIENT:
-                return "SystemdController(SESSION, TRANSIENT)"
+                return "systemd-session-transient"
             else:
-                return "SystemdController(SESSION)"
+                return "systemd-session"
         elif self._systemd_type == systemd.SystemdType.SYSTEM:
-            return "SystemdController(SYSTEM)"
+            return "systemd"
         else:
             raise NotImplementedError("unknown systemd type")
 

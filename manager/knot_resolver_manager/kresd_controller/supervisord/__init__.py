@@ -54,7 +54,7 @@ class SupervisordSubprocessController(SubprocessController):
         self._watchdog_task: "Future[Any]"
 
     def __str__(self):
-        return type(self).__name__
+        return "supervisord"
 
     def should_be_running(self, subprocess: SupervisordSubprocess):
         return subprocess in self._running_instances

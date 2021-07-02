@@ -5,7 +5,7 @@ from functools import partial
 from http import HTTPStatus
 from pathlib import Path
 from time import time
-from typing import Any, List, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 
 from aiohttp import web
 from aiohttp.web import middleware
@@ -13,6 +13,8 @@ from aiohttp.web_response import json_response
 
 from knot_resolver_manager.constants import MANAGER_CONFIG_FILE
 from knot_resolver_manager.exceptions import ValidationException
+from knot_resolver_manager.kresd_controller import get_controller_by_name
+from knot_resolver_manager.kresd_controller.interface import SubprocessController
 from knot_resolver_manager.utils.async_utils import readfile
 from knot_resolver_manager.utils.dataclasses_parservalidator import Format
 
@@ -111,14 +113,23 @@ class _DefaultSentinel:
 _DEFAULT_SENTINEL = _DefaultSentinel()
 
 
-async def _init_manager(config: Union[None, Path, KresConfig, _DefaultSentinel], app: web.Application):
+async def _init_manager(
+    config: Union[None, Path, KresConfig, _DefaultSentinel],
+    subprocess_controller_name: Optional[str],
+    app: web.Application,
+):
     """
     Called asynchronously when the application initializes.
     """
     try:
+        # if configured, create a subprocess controller manually
+        controller: Optional[SubprocessController] = None
+        if subprocess_controller_name is not None:
+            controller = await get_controller_by_name(subprocess_controller_name)
+
         # Create KresManager. This will perform autodetection of available service managers and
-        # select the most appropriate to use
-        manager = await KresManager.create()
+        # select the most appropriate to use (or use the one configured directly)
+        manager = await KresManager.create(controller)
         app[_MANAGER] = manager
 
         # Initial configuration of the manager
@@ -152,6 +163,7 @@ async def start_server(
     tcp: List[Tuple[str, int]],
     unix: List[Path],
     config: Union[None, Path, KresConfig, _DefaultSentinel] = _DEFAULT_SENTINEL,
+    subprocess_controller_name: Optional[str] = None,
 ):
     start_time = time()
 
@@ -160,7 +172,7 @@ async def start_server(
     app[_MANAGER] = None
     app[_SHUTDOWN_EVENT] = asyncio.Event()
 
-    app.on_startup.append(partial(_init_manager, config))
+    app.on_startup.append(partial(_init_manager, config, subprocess_controller_name))
 
     # configure routing
     setup_routes(app)

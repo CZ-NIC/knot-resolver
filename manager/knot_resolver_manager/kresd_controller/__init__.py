@@ -6,7 +6,7 @@ from imports, you can not see a simple list, but it's more complicated.
 
 import asyncio
 import logging
-from typing import List
+from typing import List, Optional
 
 from knot_resolver_manager.kresd_controller.interface import SubprocessController
 
@@ -69,6 +69,36 @@ async def get_best_controller_implementation() -> SubprocessController:
 
     # or fail
     raise LookupError("Can't find any available service manager!")
+
+
+def list_controller_names() -> List[str]:
+    """
+    Returns a list of names of registered controllers. The listed controllers are not necessarly functional.
+    """
+
+    return [str(controller) for controller in sorted(_registered_controllers, key=str)]
+
+
+async def get_controller_by_name(name: str) -> SubprocessController:
+    logger.debug("Subprocess controller selected manualy by the user, testing feasibility...")
+
+    controller: Optional[SubprocessController] = None
+    for c in sorted(_registered_controllers, key=str):
+        if str(c).startswith(name):
+            if str(c) != name:
+                logger.debug("Assuming '%s' is a shortcut for '%s'", name, str(c))
+            controller = c
+            break
+
+    if controller is None:
+        logger.error("Subprocess controller with name '%s' was not found", name)
+        raise LookupError(f"No subprocess controller named '{name}' found")
+
+    if await controller.is_controller_available():
+        logger.info("Selected controller '%s'", str(controller))
+        return controller
+    else:
+        raise LookupError("The selected subprocess controller is not available for use on this system.")
 
 
 # run the imports on module load

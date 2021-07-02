@@ -7,4 +7,4 @@ source $src_dir/_env.sh
 echo Knot Manager API is accessible on http://localhost:5000
 echo -------------------------------------------------------
 
-poetry run python -m knot_resolver_manager 5000 # -c config/kres-manager.yaml
+poetry run python -m knot_resolver_manager 5000 $@
