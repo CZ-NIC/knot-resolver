@@ -66,6 +66,7 @@ enum kr_log_groups_type {
 	LOG_GRP_PRIMING,
 	LOG_GRP_SRVSTALE,
 	LOG_GRP_WATCHDOG,
+	LOG_GRP_TESTS,
 };
 
 
@@ -105,6 +106,7 @@ enum kr_log_groups_type {
 #define LOG_GRP_PRIMING_TAG		"primin"
 #define LOG_GRP_SRVSTALE_TAG		"srvstl"
 #define LOG_GRP_WATCHDOG_TAG		"wtchdg"
+#define LOG_GRP_TESTS_TAG		"tests "
 
 KR_EXPORT
 extern log_groups_t kr_log_groups;

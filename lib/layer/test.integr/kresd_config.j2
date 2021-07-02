@@ -1,11 +1,13 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 
+local ffi = require('ffi')
+
 -- hook for iter_refuse_toomany.rpl
 local function check_max_number_of_upstream_queries(maxcnt)
 	return function (state, req)
 		local vals = worker.stats()
 		local upstream_packets = vals.ipv4 + vals.ipv6
-		log('%d packets sent to upstream', upstream_packets)
+		log_info(ffi.C.LOG_GRP_TESTS, '%d packets sent to upstream', upstream_packets)
 		local answ_f
 		if upstream_packets > maxcnt then  -- . + com. + ????
 			answ_f = policy.ANSWER(
