@@ -224,8 +224,8 @@ local function route(endpoints)
 		-- Upgrade connection to WebSocket
 		local ws = http_websocket.new_from_stream(stream, h)
 		if ws then
-			log_info(ffi.C.LOG_GRP_DOH, '%s %s HTTP/%d web socket open',
-				m, path, connection.version)
+			log_info(ffi.C.LOG_GRP_DOH, '%s %s HTTP/%s web socket open',
+				m, path, tostring(connection.version))
 			assert(ws:accept { protocols = {'json'} })
 			-- Continue streaming results to client
 			local ep = endpoints[path]
@@ -234,15 +234,15 @@ local function route(endpoints)
 				cb(h, ws)
 			end
 			ws:close()
-			log_info(ffi.C.LOG_GRP_DOH, '%s %s HTTP/%d web socket closed',
-				m, path, connection.version)
+			log_info(ffi.C.LOG_GRP_DOH, '%s %s HTTP/%s web socket closed',
+				m, path, tostring(connection.version))
 			return
 		else
 			local ok, err, reason = http_util.yieldable_pcall(serve, endpoints, h, stream)
 			if not ok or err then
 				err = err or '500'
-				log_info(ffi.C.LOG_GRP_DOH, '%s %s HTTTP/%d %s %s',
-					m, path, connection.version, err, reason or '')
+				log_info(ffi.C.LOG_GRP_DOH, '%s %s HTTTP/%s %s %s',
+					m, path, tostring(connection.version), err, reason or '')
 				-- Method is not supported
 				local hsend = http_headers.new()
 				hsend:append(':status', err)
@@ -253,8 +253,8 @@ local function route(endpoints)
 					assert(stream:write_headers(hsend, true))
 				end
 			else
-				log_info(ffi.C.LOG_GRP_DOH, '%s %s HTTP/%d 200',
-					m, path, connection.version)
+				log_info(ffi.C.LOG_GRP_DOH, '%s %s HTTP/%s 200',
+					m, path, tostring(connection.version))
 			end
 
 		end
