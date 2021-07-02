@@ -1,11 +1,13 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
+local ffi = require('ffi')
+
 {% raw %}
 modules.load('stats')
 
 FWD_TARGET = policy.FORWARD('192.0.2.1')
 
 function check_stats(got)
-	log('checking if stat values match expected values:')
+	log_info(ffi.C.LOG_GRP_TESTS, 'checking if stat values match expected values:')
 	local expected = {
 		['answer.cd'] = 2,
 		['answer.cached'] = 1,
@@ -27,7 +29,8 @@ function check_stats(got)
 	local ok = true
 	for key, expval in pairs(expected) do
 		if got[key] ~= expval then
-			log('ERROR: stats key ' .. key
+			log_info(ffi.C.LOG_GRP_TESTS,
+			    'ERROR: stats key ' .. key
 			    .. ' has unexpected value'
 			    .. ' (expected ' .. tostring(expval)
 			    .. ' got ' .. tostring(got[key] .. ')'))
@@ -35,7 +38,7 @@ function check_stats(got)
 		end
 	end
 	if ok then
-		log('no problem found')
+		log_info(ffi.C.LOG_GRP_TESTS, 'no problem found')
 		return FWD_TARGET
 	else
 		return policy.DENY_MSG('Stats test failure')
@@ -44,7 +47,7 @@ end
 
 function reply_result(state, req)
 	local got = stats.list()
-	log('current stats.list() values:')
+	log_info(ffi.C.LOG_GRP_TESTS, 'current stats.list() values:')
 	print(table_print(got))
 	local result = check_stats(got)
 	return result(state, req)

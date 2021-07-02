@@ -80,7 +80,7 @@ static tst_ctx_t * tst_key_create(const char *secret, size_t secret_len, uv_loop
 		return NULL;
 	#if !TLS_SESSION_RESUMPTION_SYNC
 		if (secret_len) {
-			kr_log_error("[tls] session ticket: secrets were not enabled at compile-time (your GnuTLS version is not supported)\n");
+			kr_log_error(TLS, "session ticket: secrets were not enabled at compile-time (your GnuTLS version is not supported)\n");
 			return NULL; /* ENOTSUP */
 		}
 	#endif
@@ -166,7 +166,7 @@ static void tst_key_check(uv_timer_t *timer, bool force_update)
 	/* Compute the current epoch. */
 	struct timeval now;
 	if (gettimeofday(&now, NULL)) {
-		kr_log_error("[tls] session ticket: gettimeofday failed, %s\n",
+		kr_log_error(TLS, "session ticket: gettimeofday failed, %s\n",
 				strerror(errno));
 		return;
 	}
@@ -177,7 +177,7 @@ static void tst_key_check(uv_timer_t *timer, bool force_update)
 	 * for gnutls_session_ticket_enable_server() doesn't say. */
 	int err = tst_key_update(stst, epoch, force_update);
 	if (err) {
-		kr_log_error("[tls] session ticket: failed rotation, %s\n",
+		kr_log_error(TLS, "session ticket: failed rotation, %s\n",
 				kr_strerror(err));
 		if (kr_fails_assert(err != kr_error(EINVAL)))
 			return;
@@ -190,12 +190,12 @@ static void tst_key_check(uv_timer_t *timer, bool force_update)
 	/* ^ +1 because we don't want to wake up half a millisecond before the epoch! */
 	if (kr_fails_assert(remain_ms < (TST_KEY_LIFETIME + 1 /*rounding tolerance*/) * 1000))
 		return;
-	kr_log_verbose("[tls] session ticket: epoch %"PRIu64
+	kr_log_debug(TLS, "session ticket: epoch %"PRIu64
 			", scheduling rotation check in %"PRIu64" ms\n",
 			(uint64_t)epoch, remain_ms);
 	err = uv_timer_start(timer, &tst_timer_callback, remain_ms, 0);
 	if (kr_fails_assert(err == 0)) {
-		kr_log_error("[tls] session ticket: failed to schedule, %s\n",
+		kr_log_error(TLS, "session ticket: failed to schedule, %s\n",
 				uv_strerror(err));
 		return;
 	}
@@ -213,7 +213,7 @@ void tls_session_ticket_enable(struct tls_session_ticket_ctx *ctx, gnutls_sessio
 	};
 	int err = gnutls_session_ticket_enable_server(session, &gd);
 	if (err) {
-		kr_log_error("[tls] failed to enable session tickets: %s (%d)\n",
+		kr_log_error(TLS, "failed to enable session tickets: %s (%d)\n",
 				gnutls_strerror_name(err), err);
 		/* but continue without tickets */
 	}

@@ -221,7 +221,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	/* use less precise variant to avoid 32-bit overflow */
 	ssize_t amount_tofree = cats_sumsize / 100 * cfg->cache_to_be_freed;
 
-	kr_log_verbose("tofree: %zd / %zd\n", amount_tofree, cats_sumsize);
+	kr_log_debug(CACHE, "tofree: %zd / %zd\n", amount_tofree, cats_sumsize);
 	if (VERBOSE_STATUS) {
 		for (int i = 0; i < CATEGORIES; i++) {
 			if (cats.categories_sizes[i] > 0) {

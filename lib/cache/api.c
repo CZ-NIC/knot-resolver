@@ -81,15 +81,15 @@ static int assert_right_version(struct kr_cache *cache)
 		 * Recreate cache and write version key. */
 		ret = cache_op(cache, count);
 		if (ret != 0) { /* Log for non-empty cache to limit noise on fresh start. */
-			kr_log_info("[cache] incompatible cache database detected, purging\n");
+			kr_log_info(CACHE, "incompatible cache database detected, purging\n");
 			if (oldret) {
-				kr_log_verbose("[cache] reading version returned: %d\n", oldret);
+				kr_log_debug(CACHE, "reading version returned: %d\n", oldret);
 			} else if (val.len != sizeof(CACHE_VERSION)) {
-				kr_log_verbose("[cache] version has bad length: %d\n", (int)val.len);
+				kr_log_debug(CACHE, "version has bad length: %d\n", (int)val.len);
 			} else {
 				uint16_t ver;
 				memcpy(&ver, val.data, sizeof(ver));
-				kr_log_verbose("[cache] version has bad value: %d instead of %d\n",
+				kr_log_debug(CACHE, "version has bad value: %d instead of %d\n",
 					(int)ver, (int)CACHE_VERSION);
 			}
 		}
@@ -142,8 +142,8 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 
 	if (ret == 0 && opts->maxsize) {
 		size_t maxsize = cache->api->get_maxsize(cache->db);
-		if (maxsize > opts->maxsize) kr_log_info(
-			"[cache] Warning: real cache size is %zu instead of the requested %zu bytes."
+		if (maxsize > opts->maxsize) kr_log_warning(CACHE,
+			"Warning: real cache size is %zu instead of the requested %zu bytes."
 			"  To reduce the size you need to remove the file '%s' by hand.\n",
 			maxsize, opts->maxsize, fpath);
 	}
@@ -690,7 +690,7 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 	ssize_t written = stash_rrset(cache, qry, rr, rr_sigs, qry->timestamp.tv_sec,
 					entry->rank, nsec_pmap, needs_pkt);
 	if (written < 0) {
-		kr_log_error("[%05u.%02u][cach] stash failed, ret = %d\n", qry->request->uid,
+		kr_log_error(CACHE, "[%05u.%02u] stash failed, ret = %d\n", qry->request->uid,
 			     qry->uid, ret);
 		return (int) written;
 	}

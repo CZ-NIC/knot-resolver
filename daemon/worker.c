@@ -51,7 +51,7 @@
 #define MAX_PIPELINED 100
 #endif
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "wrkr", __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, WORKER, __VA_ARGS__)
 
 /** Client request state. */
 struct request_ctx
@@ -142,7 +142,7 @@ static uv_handle_t *ioreq_spawn(struct worker_ctx *worker,
 	bool precond = (socktype == SOCK_DGRAM || socktype == SOCK_STREAM)
 			&& (family == AF_INET  || family == AF_INET6);
 	if (kr_fails_assert(precond)) {
-		kr_log_verbose("[work] ioreq_spawn: pre-condition failed\n");
+		kr_log_debug(WORKER, "ioreq_spawn: pre-condition failed\n");
 		return NULL;
 	}
 
@@ -316,7 +316,7 @@ static void free_wire(const struct request_ctx *ctx)
 	uint32_t sent;
 	int ret = knot_xdp_send(xhd->socket, &out, 1, &sent);
 	kr_assert(ret == KNOT_EOK && sent == 0);
-	kr_log_verbose("[xdp] freed unsent buffer, ret = %d\n", ret);
+	kr_log_debug(XDP, "freed unsent buffer, ret = %d\n", ret);
 }
 #endif
 /* Helper functions for transport selection */
@@ -643,7 +643,7 @@ int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 				}
 				if (!peer_str)
 					peer_str = "unknown"; // probably shouldn't happen
-				kr_log_verbose( "[wrkr]=> disconnected from '%s': %s\n",
+				kr_log_debug(WORKER, "=> disconnected from '%s': %s\n",
 						peer_str, uv_strerror(status));
 			}
 			worker_end_tcp(s);
@@ -868,9 +868,9 @@ static int session_tls_hs_cb(struct session *session, int status)
 	tls_client_param_t *tls_params = tls_client_ctx->params;
 	gnutls_session_t tls_session = tls_client_ctx->c.tls_session;
 	if (gnutls_session_is_resumed(tls_session) != 0) {
-		kr_log_verbose("[tls_client] TLS session has resumed\n");
+		kr_log_debug(TLSCLIENT, "TLS session has resumed\n");
 	} else {
-		kr_log_verbose("[tls_client] TLS session has not resumed\n");
+		kr_log_debug(TLSCLIENT, "TLS session has not resumed\n");
 		/* session wasn't resumed, delete old session data ... */
 		if (tls_params->session_data.data != NULL) {
 			gnutls_free(tls_params->session_data.data);
@@ -986,7 +986,7 @@ static void on_connect(uv_connect_t *req, int status)
 		 * it's timeouted session. */
 		if (VERBOSE_STATUS) {
 			const char *peer_str = kr_straddr(peer);
-			kr_log_verbose( "[wrkr]=> connected to '%s', but session "
+			kr_log_debug(WORKER, "=> connected to '%s', but session "
 					"is already timeouted, close\n",
 					peer_str ? peer_str : "");
 		}
@@ -1003,7 +1003,7 @@ static void on_connect(uv_connect_t *req, int status)
 		 * to reconnect to upstream after unsuccessful attempt. */
 		if (VERBOSE_STATUS) {
 			const char *peer_str = kr_straddr(peer);
-			kr_log_verbose( "[wrkr]=> connected to '%s', but peer "
+			kr_log_debug(WORKER, "=> connected to '%s', but peer "
 					"is already connected, close\n",
 					peer_str ? peer_str : "");
 		}
@@ -1016,7 +1016,7 @@ static void on_connect(uv_connect_t *req, int status)
 	if (status != 0) {
 		if (VERBOSE_STATUS) {
 			const char *peer_str = kr_straddr(peer);
-			kr_log_verbose( "[wrkr]=> connection to '%s' failed (%s), flagged as 'bad'\n",
+			kr_log_debug(WORKER, "=> connection to '%s' failed (%s), flagged as 'bad'\n",
 					peer_str ? peer_str : "", uv_strerror(status));
 		}
 		worker_del_tcp_waiting(worker, peer);
@@ -1049,7 +1049,7 @@ static void on_connect(uv_connect_t *req, int status)
 
 	if (VERBOSE_STATUS) {
 		const char *peer_str = kr_straddr(peer);
-		kr_log_verbose( "[wrkr]=> connected to '%s'\n", peer_str ? peer_str : "");
+		kr_log_debug(WORKER, "=> connected to '%s'\n", peer_str ? peer_str : "");
 	}
 
 	session_flags(session)->connected = true;
@@ -1276,7 +1276,7 @@ static void xdp_tx_waker(uv_idle_t *handle)
 {
 	int ret = knot_xdp_send_finish(handle->data);
 	if (ret != KNOT_EAGAIN && ret != KNOT_EOK)
-		kr_log_error("[xdp] check: ret = %d, %s\n", ret, knot_strerror(ret));
+		kr_log_error(XDP, "check: ret = %d, %s\n", ret, knot_strerror(ret));
 	/* Apparently some drivers need many explicit wake-up calls
 	 * even if we push no additional packets (in case they accumulated a lot) */
 	if (ret != KNOT_EAGAIN)
@@ -1308,7 +1308,7 @@ static int xdp_push(struct qr_task *task, const uv_handle_t *src_handle)
 	ctx->req.answer->wire = NULL; /* it's been freed */
 
 	uv_idle_start(&xhd->tx_waker, xdp_tx_waker);
-	kr_log_verbose("[xdp] pushed a packet, ret = %d\n", ret);
+	kr_log_debug(XDP, "pushed a packet, ret = %d\n", ret);
 
 	return qr_task_on_send(task, src_handle, ret);
 #else
@@ -1651,7 +1651,6 @@ static int qr_task_step(struct qr_task *task,
 		if (unlikely(++task->iter_count > KR_ITER_LIMIT ||
 			     task->timeouts >= KR_TIMEOUT_LIMIT)) {
 
-			#ifndef NOVERBOSELOG
 			struct kr_rplan *rplan = &req->rplan;
 			struct kr_query *last = kr_rplan_last(rplan);
 			if (task->iter_count > KR_ITER_LIMIT) {
@@ -1660,7 +1659,6 @@ static int qr_task_step(struct qr_task *task,
 			if (task->timeouts >= KR_TIMEOUT_LIMIT) {
 				VERBOSE_MSG(last, "canceling query due to exceeded timeout retries limit of %d\n", KR_TIMEOUT_LIMIT);
 			}
-			#endif
 
 			return qr_task_finalize(task, KR_STATE_FAIL);
 		}
