@@ -384,7 +384,7 @@ static void drop_capabilities(void)
 #if ENABLE_CAP_NG
 	/* Drop all capabilities when running under non-root user. */
 	if (geteuid() == 0) {
-		kr_log_verbose("[system] running as root, no capabilities dropped\n");
+		kr_log_debug(SYSTEM, "running as root, no capabilities dropped\n");
 		return;
 	}
 	if (capng_have_capability(CAPNG_EFFECTIVE, CAP_SETPCAP)) {
@@ -395,11 +395,11 @@ static void drop_capabilities(void)
 			kr_log_error(SYSTEM, "failed to set process capabilities: %s\n",
 			          strerror(errno));
 		} else {
-			kr_log_verbose("[system] all capabilities dropped\n");
+			kr_log_debug(SYSTEM, "all capabilities dropped\n");
 		}
 	} else {
 		/* If user() was called, the capabilities were already dropped along with SETPCAP. */
-		kr_log_verbose("[system] process not allowed to set capabilities, skipping\n");
+		kr_log_debug(SYSTEM, "process not allowed to set capabilities, skipping\n");
 	}
 #endif /* ENABLE_CAP_NG */
 }
@@ -465,7 +465,7 @@ int main(int argc, char **argv)
 	struct rlimit rlim;
 	ret = getrlimit(RLIMIT_NOFILE, &rlim);
 	if (ret == 0 && rlim.rlim_cur != rlim.rlim_max) {
-		kr_log_verbose("[system] increasing file-descriptor limit: %ld -> %ld\n",
+		kr_log_debug(SYSTEM, "increasing file-descriptor limit: %ld -> %ld\n",
 				(long)rlim.rlim_cur, (long)rlim.rlim_max);
 		rlim.rlim_cur = rlim.rlim_max;
 		ret = setrlimit(RLIMIT_NOFILE, &rlim);

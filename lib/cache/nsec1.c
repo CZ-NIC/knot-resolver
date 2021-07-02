@@ -66,7 +66,7 @@ knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name, bool add_wildca
 	/*
 	VERBOSE_MSG(NULL, "<> key_NSEC1; name: ");
 	kr_dname_print(name, add_wildcard ? "*." : "" , " ");
-	kr_log_verbose("(zone name LF length: %d; total key length: %d)\n",
+	kr_log_debug(CACHE, "(zone name LF length: %d; total key length: %d)\n",
 			k->zlf_len, key_len);
 	*/
 

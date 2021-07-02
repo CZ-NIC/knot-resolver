@@ -486,7 +486,7 @@ static int cdb_check_health(kr_cdb_pt db, struct kr_cdb_stats *stats)
 	}
 
 	if (st.st_dev != env->st_dev || st.st_ino != env->st_ino) {
-		kr_log_verbose("[cache] cache file has been replaced, reopening\n");
+		kr_log_debug(CACHE, "cache file has been replaced, reopening\n");
 		int ret = reopen_env(env, stats, 0); // we accept mapsize from the new file
 		return ret == 0 ? 1 : ret;
 	}
@@ -598,7 +598,7 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 			ret = kr_ok();
 		// else pass some other error
 	} else {
-		kr_log_verbose("[cache] clear: identical files, unlinking\n");
+		kr_log_debug(CACHE, "clear: identical files, unlinking\n");
 		// coverity[toctou]
 		unlink(env->mdb_data_path);
 		unlink(mdb_lockfile);
