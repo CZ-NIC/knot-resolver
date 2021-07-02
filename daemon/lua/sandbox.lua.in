@@ -18,16 +18,51 @@ hour = 60 * minute
 day = 24 * hour
 
 -- Logging
+
+-- from syslog.h
+LOG_CRIT	= 2
+LOG_ERR		= 3
+LOG_WARNING	= 4
+LOG_NOTICE	= 5
+LOG_INFO	= 6
+LOG_DEBUG	= 7
+
+local function curr_file() return debug.getinfo(4,'S').source end
+local function curr_line() return debug.getinfo(4,'l').currentline end
+
+local function log_fmt(grp, level, fmt, ...)
+	ffi.C.kr_log_fmt(grp, level, "CODE_FILE="..curr_file(), "CODE_LINE="..curr_line(), "",
+			"[%s]" .. fmt, ffi.C.kr_log_grp2name(grp), ...)
+end
+
+function log_req(req, qry_uid, indent, grp, fmt, ...)
+	ffi.C.kr_log_req1(req, qry_uid, indent, grp, ffi.C.kr_log_grp2name(grp), fmt, ...)
+end
+
+function log_qry(qry, grp, fmt, ...)
+	ffi.C.kr_log_q1(qry, grp, ffi.C.kr_log_grp2name(grp), fmt, ...)
+end
+
 function panic(fmt, ...)
         print(debug.traceback('error occurred here (config filename:lineno is '
                 .. 'at the bottom, if config is involved):', 2))
         error(string.format('ERROR: '.. fmt, ...), 0)
 end
-function warn(fmt, ...)
-        io.stderr:write(string.format(fmt..'\n', ...))
+
+function log_error(grp, fmt, ...)
+	log_fmt(grp, LOG_ERR, fmt, ...)
 end
-function log(fmt, ...)
-        print(string.format(fmt, ...))
+
+function log_warn(grp, fmt, ...)
+	log_fmt(grp, LOG_WARNING, fmt..'n', ...)
+end
+
+function log_info(grp, fmt, ...)
+	log_fmt(grp, LOG_INFO, fmt, ...)
+end
+
+function log_debug(grp, fmt, ...)
+	log_fmt(grp, LOG_DEBUG, fmt, ...)
 end
 
 -- Resolver bindings
@@ -388,7 +423,7 @@ cache.clear = function (name, exact_name, rr_type, chunk_size, callback, prev_st
 						cache.clear(cbname, cbexact_name, cbrr_type, cbchunk_size, cbself, cbrettable)
 					end)
 			elseif cbrettable.round > 1 then
-				log('[cache] asynchonous cache.clear(\'' .. cbname .. '\', '
+				log_info(ffi.C.LOG_GRP_CACHE, 'asynchonous cache.clear(\'' .. cbname .. '\', '
 				    .. tostring(cbexact_name) .. ') finished')
 			end
 			return cbrettable
@@ -530,7 +565,7 @@ if has_cqueues then
 		work = function (self)
 			local ok, err, _, co = self.cq:step(0)
 			if not ok then
-				warn('[%s] error: %s %s', self.name or 'worker', err, debug.traceback(co))
+				log_warn(ffi.C.LOG_GRP_SYSTEM, '%s error: %s %s', self.name or 'worker', err, debug.traceback(co))
 			end
 			-- Reschedule timeout or create new one
 			local timeout = self.cq:timeout()
@@ -599,10 +634,8 @@ function _map_luaobj_call_wrapper(cmd)
 	local ret = kluautil.kr_table_pack(xpcall(func, debug.traceback))
 	local ok, serial = pcall(krprint.serialize_lua, ret, 'error')
 	if not ok then
-		if verbose() then
-			log('failed to serialize map() response %s (%s)',
-				table_print(ret), serial)
-		end
+		log_error(ffi.C.LOG_GRP_SYSTEM, 'failed to serialize map() response %s (%s)',
+			table_print(ret), serial)
 		return krprint.serialize_lua(
 			kluautil.kr_table_pack(false, "returned values cannot be serialized: "
 				.. serial))
@@ -648,7 +681,7 @@ local function map_send_recv(cmd, path)
 	s:setmode('bn', 'bn')
 	local status, err = pcall(s.connect, s)
 	if not status then
-		log('map() error while connecting to control socket %s: '
+		log_error(ffi.C.LOG_GRP_NETWORK, 'map() error while connecting to control socket %s: '
 			.. '%s (ignoring this socket)', path, err)
 		return nil
 	end
@@ -737,9 +770,7 @@ function map(cmd, format)
 		end
 		local path = worker.control_path..file
 		local path_name = (local_exec and 'this instance') or path
-		if verbose() then
-			log('executing map() on %s: command %s', path_name, cmd)
-		end
+		log_info(ffi.C.LOG_GRP_SYSTEM, 'executing map() on %s: command %s', path_name, cmd)
 		local ret
 		if local_exec then
 			ret = eval_cmd(cmd)
@@ -768,9 +799,7 @@ function map(cmd, format)
 			assert(type(ret) == 'table', 'map() protocol error, '
 				.. 'table with results not retured by follower')
 			if (ret.n ~= 2) then
-				if verbose() then
-					log('got unsupported map() response: %s', table_print(ret))
-				end
+				log_error(ffi.C.LOG_GRP_SYSTEM, 'got unsupported map() response: %s', table_print(ret))
 				panic('unexpected number of return values in map() response: '
 					.. 'only single return value is allowed, '
 					.. 'use kluautil.kr_table_pack() helper')
