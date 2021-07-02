@@ -1,4 +1,6 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
+local ffi = require('ffi')
+
 {% for TAF in TRUST_ANCHOR_FILES %}
 trust_anchors.add_file('{{TAF}}')
 {% endfor %}
@@ -7,7 +9,7 @@ trust_anchors.add_file('{{TAF}}')
 modules.load('bogus_log')
 
 function check_stats(got)
-	log('checking if bogus_log.frequent values match expected values:')
+	log_info(ffi.C.LOG_GRP_TESTS, 'checking if bogus_log.frequent values match expected values:')
 	local expected = {
 		[1] = {
 			['type'] = 'DNSKEY',
@@ -18,17 +20,17 @@ function check_stats(got)
 	print(table_print(expected))
 
 	if table_print(expected) == table_print(got) then
-		log('no problem found')
+		log_info(ffi.C.LOG_GRP_TESTS, 'no problem found')
 		return policy.DENY_MSG('Ok')
 	else
-		log('mismatch!')
+		log_info(ffi.C.LOG_GRP_TESTS, 'mismatch!')
 		return policy.DENY_MSG('bogus_log.frequent mismatch, see logs')
 	end
 end
 
 function reply_result(state, req)
 	local got = bogus_log.frequent()
-	log('current bogus_log.frequent() values:')
+	print('current bogus_log.frequent() values:')
 	print(table_print(got))
 	local result = check_stats(got)
 	return result(state, req)

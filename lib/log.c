@@ -60,6 +60,7 @@ log_group_names_t log_group_names[] = {
 	GRP_NAME_ITEM(LOG_GRP_PRIMING),
 	GRP_NAME_ITEM(LOG_GRP_SRVSTALE),
 	GRP_NAME_ITEM(LOG_GRP_WATCHDOG),
+	GRP_NAME_ITEM(LOG_GRP_TESTS),
 	{ NULL,		-1 },
 };
 
