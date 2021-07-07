@@ -80,7 +80,7 @@ syslog_code_t prioritynames[] = {
 };
 #endif
 
-int group_is_set(log_groups_t group)
+int kr_log_group_is_set(log_groups_t group)
 {
 	return kr_log_groups & (1ULL << group);
 }
@@ -90,11 +90,11 @@ void kr_log_fmt(log_groups_t group, log_level_t level, const char *file,
 {
 	va_list args;
 
-	if (!(KR_LOG_LEVEL_IS(level) || group_is_set(group)))
+	if (!(KR_LOG_LEVEL_IS(level) || kr_log_group_is_set(group)))
 		return;
 
 	if (kr_log_target == LOG_TARGET_SYSLOG) {
-		if (group_is_set(group))
+		if (kr_log_group_is_set(group))
 			setlogmask(LOG_UPTO(LOG_DEBUG));
 
 		va_start(args, fmt);
@@ -109,7 +109,7 @@ void kr_log_fmt(log_groups_t group, log_level_t level, const char *file,
 #endif
 		va_end(args);
 
-		if (group_is_set(group))
+		if (kr_log_group_is_set(group))
 			setlogmask(LOG_UPTO(kr_log_level));
 	} else {
 
@@ -192,7 +192,7 @@ int kr_log_level_set(log_level_t level)
 
 	/* gnutls logs messages related to our TLS and also libdnssec,
 	 * and the logging is set up in a global way only */
-	if (KR_LOG_LEVEL_IS(LOG_DEBUG) || group_is_set(LOG_GRP_TLS) || group_is_set(LOG_GRP_TLSCLIENT)) {
+	if (KR_LOG_LEVEL_IS(LOG_DEBUG) || kr_log_group_is_set(LOG_GRP_TLS) || kr_log_group_is_set(LOG_GRP_TLSCLIENT)) {
 		gnutls_global_set_log_function(kres_gnutls_log);
 	}
 
