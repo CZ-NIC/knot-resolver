@@ -161,16 +161,16 @@ static int l_set_log_level(lua_State *L)
 	}
 
 	log_level_t lvl = kr_log_name2level(lua_tostring(L, 1));
+	lvl = kr_log_level_set(lvl);
 
-	lua_pushinteger(L, kr_log_level_set(lvl));
+	lua_pushstring(L, kr_log_level2name(lvl));
 	return 1;
 }
 
 static int l_get_log_level(lua_State *L)
 {
-	printf("%s\n", kr_log_level2name(kr_log_level_get()));
-
-	return 0;
+	lua_pushstring(L, kr_log_level2name(kr_log_level_get()));
+	return 1;
 }
 
 static int handle_log_groups(lua_State *L, void (*action)(log_groups_t grp))
