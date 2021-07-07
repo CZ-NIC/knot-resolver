@@ -115,7 +115,7 @@ enum kr_log_groups_type {
 KR_EXPORT
 extern log_groups_t kr_log_groups;
 KR_EXPORT
-int group_is_set(log_groups_t group);
+int kr_log_group_is_set(log_groups_t group);
 KR_EXPORT
 void kr_log_add_group(log_groups_t group);
 KR_EXPORT
