@@ -9,7 +9,7 @@
 #include "lib/defines.h"
 
 
-#define LOG_DEFAULT_LEVEL	LOG_WARNING
+#define LOG_DEFAULT_LEVEL	LOG_NOTICE
 
 /* Targets */
 
