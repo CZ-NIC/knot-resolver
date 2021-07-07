@@ -182,8 +182,10 @@ log_groups_t kr_log_name2grp(const char *name)
 
 int kr_log_level_set(log_level_t level)
 {
-	if (level < LOG_CRIT || level > LOG_DEBUG)
+	if (level < LOG_CRIT || level > LOG_DEBUG) {
+		kr_log_warning(SYSTEM, "invalid log level\n");
 		return kr_log_level;
+	}
 
 	kr_log_level = level;
 	setlogmask(LOG_UPTO(kr_log_level));
