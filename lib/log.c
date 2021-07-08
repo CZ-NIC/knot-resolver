@@ -187,6 +187,18 @@ log_groups_t kr_log_name2grp(const char *name)
 
 
 
+static void kr_gnutls_log_level_set()
+{
+	/* gnutls logs messages related to our TLS and also libdnssec,
+	 * and the logging is set up in a global way only */
+	if (KR_LOG_LEVEL_IS(LOG_DEBUG) || kr_log_group_is_set(LOG_GRP_GNUTLS)) {
+		gnutls_global_set_log_function(kres_gnutls_log);
+		gnutls_global_set_log_level(LOG_GNUTLS_LEVEL);
+	} else {
+		gnutls_global_set_log_level(0);
+	}
+}
+
 int kr_log_level_set(log_level_t level)
 {
 	if (level < LOG_CRIT || level > LOG_DEBUG) {
@@ -197,13 +209,7 @@ int kr_log_level_set(log_level_t level)
 	kr_log_level = level;
 	setlogmask(LOG_UPTO(kr_log_level));
 
-	/* gnutls logs messages related to our TLS and also libdnssec,
-	 * and the logging is set up in a global way only */
-	if (KR_LOG_LEVEL_IS(LOG_DEBUG) || kr_log_group_is_set(LOG_GRP_TLS) || kr_log_group_is_set(LOG_GRP_TLSCLIENT)) {
-		gnutls_global_set_log_function(kres_gnutls_log);
-	}
-
-	gnutls_global_set_log_level(kr_log_level_get() == LOG_DEBUG ? 5 : 0);
+	kr_gnutls_log_level_set();
 
 	return kr_log_level;
 
@@ -216,12 +222,16 @@ log_level_t kr_log_level_get(void)
 
 void kr_log_add_group(log_groups_t group)
 {
-       kr_log_groups |= (1ULL << group);
+	kr_log_groups |= (1ULL << group);
+	if (group == LOG_GRP_GNUTLS)
+		kr_gnutls_log_level_set();
 }
 
 void kr_log_del_group(log_groups_t group)
 {
-       kr_log_groups &= (~(1ULL << group));
+	kr_log_groups &= (~(1ULL << group));
+	if (group == LOG_GRP_GNUTLS)
+		kr_gnutls_log_level_set();
 }
 
 void kr_log_init(log_level_t level, log_target_t target)
