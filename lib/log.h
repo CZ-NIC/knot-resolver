@@ -30,7 +30,7 @@ typedef struct {
 /* Don't forget add *_TAG below, log_group_names[] item (log.c) and generate
  * new kres-gen.lua */
 enum kr_log_groups_type {
-	LOG_GRP_SYSTEM = 1,
+	LOG_GRP_SYSTEM = 1,  /* Must be first in enum. */
 	LOG_GRP_CACHE,
 	LOG_GRP_IO,
 	LOG_GRP_NETWORK,
@@ -118,7 +118,7 @@ enum kr_log_groups_type {
 KR_EXPORT
 extern log_groups_t kr_log_groups;
 KR_EXPORT
-int kr_log_group_is_set(log_groups_t group);
+log_groups_t kr_log_group_is_set(log_groups_t group);
 KR_EXPORT
 void kr_log_add_group(log_groups_t group);
 KR_EXPORT

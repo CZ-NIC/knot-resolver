@@ -81,7 +81,7 @@ syslog_code_t prioritynames[] = {
 };
 #endif
 
-int kr_log_group_is_set(log_groups_t group)
+log_groups_t kr_log_group_is_set(log_groups_t group)
 {
 	return kr_log_groups & (1ULL << group);
 }
@@ -145,6 +145,9 @@ char *kr_log_level2name(log_level_t level)
 
 log_level_t kr_log_name2level(const char *name)
 {
+	if (kr_fails_assert(name))
+		return -1;
+
 	for (int i = 0; prioritynames[i].c_name; ++i)
 	{
 		if (strcmp(prioritynames[i].c_name, name) == 0)
@@ -167,7 +170,7 @@ char *kr_log_grp2name(log_groups_t group)
 
 log_groups_t kr_log_name2grp(const char *name)
 {
-	if (!name)
+	if (kr_fails_assert(name))
 		return 0;
 
 	for (int i = 0; log_group_names[i].g_name; ++i)

@@ -217,17 +217,17 @@ static int l_del_log_group(lua_State *L)
 
 static int l_get_log_group(lua_State *L)
 {
-	int grp = 1;
-	char *name = kr_log_grp2name(grp);
+	char* name;
 
 	lua_newtable(L);
-	while (name) {
+	for (int grp = LOG_GRP_SYSTEM; grp <= LOG_GRP_DEVEL; grp++) {
+		name = kr_log_grp2name(grp);
+		if (kr_fails_assert(name))
+			continue;
 		if (kr_log_group_is_set(grp)) {
 			lua_pushboolean(L, true);
 			lua_setfield(L, -2, name);
 		}
-		++grp;
-		name = kr_log_grp2name(grp);
 	}
 
 	return 1;
