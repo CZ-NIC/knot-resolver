@@ -249,7 +249,7 @@ static void kr_vlog_req(
 	if (kr_log_rtrace_enabled(req))
 		req->trace_log(req, msg);
 	else
-		kr_log_fmt(group, LOG_DEBUG, SD_JOURNAL_METADATA, "[%s]%s", tag, msg);
+		kr_log_fmt(group, LOG_DEBUG, SD_JOURNAL_METADATA, "[%-6s]%s", tag, msg);
 
 	mp_delete(mp);
 }
