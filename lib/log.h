@@ -73,20 +73,20 @@ enum kr_log_groups_type {
 
 
 #define LOG_GRP_SYSTEM_TAG		"system"
-#define LOG_GRP_CACHE_TAG		"cache "
-#define LOG_GRP_IO_TAG			"io    "
-#define LOG_GRP_NETWORK_TAG		"net   "
-#define LOG_GRP_TA_TAG			"ta    "
-#define LOG_GRP_TLS_TAG			"tls   "
+#define LOG_GRP_CACHE_TAG		"cache"
+#define LOG_GRP_IO_TAG			"io"
+#define LOG_GRP_NETWORK_TAG		"net"
+#define LOG_GRP_TA_TAG			"ta"
+#define LOG_GRP_TLS_TAG			"tls"
 #define LOG_GRP_GNUTLS_TAG		"gnutls"
 #define LOG_GRP_TLSCLIENT_TAG		"tls_cl"
-#define LOG_GRP_XDP_TAG			"xdp   "
+#define LOG_GRP_XDP_TAG			"xdp"
 #define LOG_GRP_ZIMPORT_TAG		"zimprt"
 #define LOG_GRP_ZSCANNER_TAG		"zscann"
-#define LOG_GRP_DOH_TAG			"doh   "
+#define LOG_GRP_DOH_TAG			"doh"
 #define LOG_GRP_DNSSEC_TAG		"dnssec"
-#define LOG_GRP_HINT_TAG		"hint  "
-#define LOG_GRP_PLAN_TAG		"plan  "
+#define LOG_GRP_HINT_TAG		"hint"
+#define LOG_GRP_PLAN_TAG		"plan"
 #define LOG_GRP_ITERATOR_TAG		"iterat"
 #define LOG_GRP_VALIDATOR_TAG		"valdtr"
 #define LOG_GRP_RESOLVER_TAG		"resolv"
@@ -99,8 +99,8 @@ enum kr_log_groups_type {
 #define LOG_GRP_POLICY_TAG		"policy"
 #define LOG_GRP_TASENTINEL_TAG		"tasent"
 #define LOG_GRP_TASIGNALING_TAG		"tasign"
-#define LOG_GRP_TAUPDATE_TAG		"taupd "
-#define LOG_GRP_DAF_TAG			"daf   "
+#define LOG_GRP_TAUPDATE_TAG		"taupd"
+#define LOG_GRP_DAF_TAG			"daf"
 #define LOG_GRP_DETECTTIMEJUMP_TAG	"timejm"
 #define LOG_GRP_DETECTTIMESKEW_TAG	"timesk"
 #define LOG_GRP_GRAPHITE_TAG		"graphi"
@@ -108,9 +108,9 @@ enum kr_log_groups_type {
 #define LOG_GRP_PRIMING_TAG		"primin"
 #define LOG_GRP_SRVSTALE_TAG		"srvstl"
 #define LOG_GRP_WATCHDOG_TAG		"wtchdg"
-#define LOG_GRP_NSID_TAG		"nsid  "
+#define LOG_GRP_NSID_TAG		"nsid"
 #define LOG_GRP_DNSTAP_TAG		"dnstap"
-#define LOG_GRP_TESTS_TAG		"tests "
+#define LOG_GRP_TESTS_TAG		"tests"
 
 KR_EXPORT
 extern log_groups_t kr_log_groups;
@@ -149,26 +149,26 @@ void kr_log_init(log_level_t level, log_target_t target);
 
 #define kr_log_debug(grp, fmt, ...) \
 	kr_log_fmt(LOG_GRP_ ## grp, LOG_DEBUG, SD_JOURNAL_METADATA, \
-			"[" LOG_GRP_ ## grp ## _TAG "] " fmt, ## __VA_ARGS__)
+			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
 #define kr_log_info(grp, fmt, ...) \
 	kr_log_fmt(LOG_GRP_ ## grp, LOG_INFO, SD_JOURNAL_METADATA, \
-			"[" LOG_GRP_ ## grp ## _TAG "] " fmt, ## __VA_ARGS__)
+			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
 #define kr_log_notice(grp, fmt, ...) \
 	kr_log_fmt(LOG_GRP_ ## grp, LOG_NOTICE, SD_JOURNAL_METADATA, \
-			"[" LOG_GRP_ ## grp ## _TAG "] " fmt, ## __VA_ARGS__)
+			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
 #define kr_log_warning(grp, fmt, ...) \
 	kr_log_fmt(LOG_GRP_ ## grp, LOG_WARNING, SD_JOURNAL_METADATA, \
-			"[" LOG_GRP_ ## grp ## _TAG "] " fmt, ## __VA_ARGS__)
+			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
 #define kr_log_error(grp, fmt, ...) \
 	kr_log_fmt(LOG_GRP_ ## grp, LOG_ERR, SD_JOURNAL_METADATA, \
-			"[" LOG_GRP_ ## grp ## _TAG "] " fmt, ## __VA_ARGS__)
+			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
 #define kr_log_fatal(grp, fmt, ...) \
 	kr_log_fmt(LOG_GRP_ ## grp, LOG_CRIT, SD_JOURNAL_METADATA, \
-			"[" LOG_GRP_ ## grp ## _TAG "] " fmt, ## __VA_ARGS__)
+			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
 
 #define kr_log_deprecate(grp, fmt, ...) \
 	kr_log_fmt(LOG_GRP_ ## grp, LOG_WARNING,SD_JOURNAL_METADATA, \
-			"[" LOG_GRP_ ## grp ## _TAG "] deprecation WARNING: " fmt, ## __VA_ARGS__)
+			"[%-6s] deprecation WARNING: " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
 
 #define KR_LOG_LEVEL_IS(exp) ((kr_log_level >= (exp)) ? true : false)
 
