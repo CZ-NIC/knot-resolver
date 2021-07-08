@@ -193,7 +193,7 @@ local function update(keyset, new_keys)
 		-- TODO: try to rebootstrap if for root?
 		return false
 	else
-		log_info(ffi.C.LOG_GRP_TAUPDATE, 'refreshed trust anchors for domain ' .. kres.dname2str(keyset.owner) .. ' are:\n'
+		log_debug(ffi.C.LOG_GRP_TAUPDATE, 'refreshed trust anchors for domain ' .. kres.dname2str(keyset.owner) .. ' are:\n'
 			.. trust_anchors.summary(keyset.owner))
 	end
 
