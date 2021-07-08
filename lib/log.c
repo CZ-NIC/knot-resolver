@@ -63,6 +63,7 @@ log_group_names_t log_group_names[] = {
 	GRP_NAME_ITEM(LOG_GRP_NSID),
 	GRP_NAME_ITEM(LOG_GRP_DNSTAP),
 	GRP_NAME_ITEM(LOG_GRP_TESTS),
+	GRP_NAME_ITEM(LOG_GRP_DEVEL),
 	{ NULL,		-1 },
 };
 
