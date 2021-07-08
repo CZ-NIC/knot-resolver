@@ -43,7 +43,7 @@ M.configs._builtin._all.onerror = function(myserver, context, op, err, errno) --
 	if err then
 		msg = msg .. ': ' .. tostring(err)
 	end
-	log_info(ffi.C.LOG_GRP_DOH, msg)
+	log_info(ffi.C.LOG_GRP_HTTP, msg)
 end
 
 -- M.config() without explicit "kind" modifies this
@@ -224,7 +224,7 @@ local function route(endpoints)
 		-- Upgrade connection to WebSocket
 		local ws = http_websocket.new_from_stream(stream, h)
 		if ws then
-			log_info(ffi.C.LOG_GRP_DOH, '%s %s HTTP/%s web socket open',
+			log_info(ffi.C.LOG_GRP_HTTP, '%s %s HTTP/%s web socket open',
 				m, path, tostring(connection.version))
 			assert(ws:accept { protocols = {'json'} })
 			-- Continue streaming results to client
@@ -234,14 +234,14 @@ local function route(endpoints)
 				cb(h, ws)
 			end
 			ws:close()
-			log_info(ffi.C.LOG_GRP_DOH, '%s %s HTTP/%s web socket closed',
+			log_info(ffi.C.LOG_GRP_HTTP, '%s %s HTTP/%s web socket closed',
 				m, path, tostring(connection.version))
 			return
 		else
 			local ok, err, reason = http_util.yieldable_pcall(serve, endpoints, h, stream)
 			if not ok or err then
 				err = err or '500'
-				log_info(ffi.C.LOG_GRP_DOH, '%s %s HTTTP/%s %s %s',
+				log_info(ffi.C.LOG_GRP_HTTP, '%s %s HTTTP/%s %s %s',
 					m, path, tostring(connection.version), err, reason or '')
 				-- Method is not supported
 				local hsend = http_headers.new()
@@ -253,7 +253,7 @@ local function route(endpoints)
 					assert(stream:write_headers(hsend, true))
 				end
 			else
-				log_info(ffi.C.LOG_GRP_DOH, '%s %s HTTP/%s 200',
+				log_info(ffi.C.LOG_GRP_HTTP, '%s %s HTTP/%s 200',
 					m, path, tostring(connection.version))
 			end
 
