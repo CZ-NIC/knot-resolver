@@ -10,6 +10,7 @@
 
 
 #define LOG_DEFAULT_LEVEL	LOG_NOTICE
+#define LOG_GNUTLS_LEVEL	5
 
 /* Targets */
 
