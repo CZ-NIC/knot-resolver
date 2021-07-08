@@ -70,6 +70,7 @@ enum kr_log_groups_type {
 	LOG_GRP_DNSTAP,
 	LOG_GRP_TESTS,
 	LOG_GRP_DOTAUTH,
+	LOG_GRP_HTTP,
 	/* ^^ Add new log groups above ^^. */
 	LOG_GRP_DEVEL,  /* Must be last entry in enum! */
 };
@@ -115,6 +116,7 @@ enum kr_log_groups_type {
 #define LOG_GRP_DNSTAP_TAG		"dnstap"
 #define LOG_GRP_TESTS_TAG		"tests"
 #define LOG_GRP_DOTAUTH_TAG		"dotaut"
+#define LOG_GRP_HTTP_TAG		"http"
 #define LOG_GRP_DEVEL_TAG		"devel"
 
 KR_EXPORT
