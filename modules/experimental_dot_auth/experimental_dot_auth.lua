@@ -72,14 +72,14 @@ end
 function M.layer.consume(state, _, pkt)
 	-- Only successful answers
 	if state == kres.FAIL then return state end
-	-- log_debug(ffi.C.DOT, "%s", pkt:tostring())
+	-- log_debug(ffi.C.LOG_GRP_DOTAUTH, "%s", pkt:tostring())
 	local authority = pkt:section(kres.section.AUTHORITY)
 	local additional = pkt:section(kres.section.ADDITIONAL)
 	for _, rr in ipairs(authority) do
-		--log_debug(ffi.C.DOT, "%d %s", rr.type, kres.dname2str(rr.rdata))
+		--log_debug(ffi.C.LOG_GRP_DOTAUTH, "%d %s", rr.type, kres.dname2str(rr.rdata))
 		if rr.type == kres.type.NS then
 			local name = kres.dname2str(rr.rdata):upper()
-			-- log_debug(ffi.C.DOT, "NS %d", name:len())
+			-- log_debug(ffi.C.LOG_GRP_DOTAUTH, "NS %d", name:len())
 			if name:len() > 56 and str.starts(name, "DOT-") then
 				local k = basexx.to_base64(
 					basexx.from_base32(
@@ -107,7 +107,7 @@ function M.layer.consume(state, _, pkt)
 								C.inet_ntop(AF_INET6, ns_addr.sin6_addr, addrbuf, INET6_ADDRSTRLEN)
 							end
               net.tls_client(ffi.string(addrbuf).."@853", {k})
-							log_info(ffi.C.LOG_GRP_DOT, "Adding %s IP %s %s", name_add, ffi.string(addrbuf).."@853", k)
+							log_info(ffi.C.LOG_GRP_DOTAUTH, "Adding %s IP %s %s", name_add, ffi.string(addrbuf).."@853", k)
 						end
 					end
 				end
