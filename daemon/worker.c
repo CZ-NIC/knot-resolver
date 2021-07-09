@@ -1736,8 +1736,11 @@ int worker_submit(struct session *session,
 	    (is_query == is_outgoing)) {
 		if (!is_outgoing) {
 			the_worker->stats.dropped += 1;
-			if (http_ctx)
+			if (http_ctx) {
+				struct http_stream stream = queue_head(http_ctx->streams);
+				http_free_headers(stream.headers);
 				queue_pop(http_ctx->streams);
+			}
 		}
 		return kr_error(EILSEQ);
 	}

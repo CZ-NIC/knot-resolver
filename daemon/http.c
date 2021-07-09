@@ -175,6 +175,10 @@ static int check_uri(const char* uri_path)
 
 	if (ret) /* no endpoint found */
 		return -1;
+
+	/* FIXME This also passes for GET when no variables are provided.
+	 * Fixing it doesn't seem straightforward, since :method may not be
+	 * known by the time check_uri() is called... */
 	if (endpoint_len == strlen(path) - 1) /* done for POST method */
 		return 0;
 
@@ -216,7 +220,7 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 	uint8_t *dest;
 
 	if (!beg)  /* No dns variable in path. */
-		return 0;
+		return -1;
 
 	beg += sizeof(key) - 1;
 	end = strchr(beg, '&');
@@ -251,6 +255,18 @@ static void refuse_stream(nghttp2_session *h2, int32_t stream_id)
 		h2, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
 }
 
+void http_free_headers(kr_http_header_array_t *headers)
+{
+	if (headers == NULL)
+		return;
+
+	for (int i = 0; i < headers->len; i++) {
+		free(headers->at[i].name);
+		free(headers->at[i].value);
+	}
+	array_clear(*headers);
+	free(headers);
+}
 /* Return the http ctx into a pristine state in which no stream is being processed. */
 static void http_cleanup_stream(struct http_ctx *ctx)
 {
@@ -258,15 +274,8 @@ static void http_cleanup_stream(struct http_ctx *ctx)
 	ctx->current_method = HTTP_METHOD_NONE;
 	free(ctx->uri_path);
 	ctx->uri_path = NULL;
-	if (ctx->headers != NULL) {
-		for (int i = 0; i < ctx->headers->len; i++) {
-			free(ctx->headers->at[i].name);
-			free(ctx->headers->at[i].value);
-		}
-		array_clear(*ctx->headers);
-		free(ctx->headers);
-		ctx->headers = NULL;
-	}
+	http_free_headers(ctx->headers);
+	ctx->headers = NULL;
 }
 
 /*
@@ -357,6 +366,7 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 			return 0;
 		}
 
+		kr_assert(ctx->uri_path == NULL);
 		ctx->uri_path = malloc(sizeof(*ctx->uri_path) * (valuelen + 1));
 		if (!ctx->uri_path)
 			return kr_error(ENOMEM);
@@ -428,6 +438,32 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	return 0;
 }
 
+static int submit_to_wirebuffer(struct http_ctx *ctx)
+{
+	int ret = -1;
+	ssize_t len;
+
+	len = ctx->buf_pos - sizeof(uint16_t);
+	if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
+		kr_log_verbose("[http] invalid dnsmsg size: %zd B\n", len);
+		ret = -1;
+		goto cleanup;
+	}
+
+	/* Transfer ownership to stream (waiting in wirebuffer) */
+	ctx->headers = NULL;
+
+	/* Submit data to wirebuffer. */
+	knot_wire_write_u16(ctx->buf, len);
+	ctx->submitted += ctx->buf_pos;
+	ctx->buf += ctx->buf_pos;
+	ctx->buf_pos = 0;
+	ret = 0;
+cleanup:
+	http_cleanup_stream(ctx);
+	return ret;
+}
+
 /*
  * Finalize existing buffer upon receiving the last frame in the stream.
  *
@@ -439,7 +475,6 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *frame, void *user_data)
 {
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
-	ssize_t len;
 	int32_t stream_id = frame->hd.stream_id;
 	if(kr_fails_assert(stream_id != -1))
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
@@ -448,21 +483,12 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 		if (ctx->current_method == HTTP_METHOD_GET) {
 			if (process_uri_path(ctx, ctx->uri_path, stream_id) < 0) {
 				refuse_stream(h2, stream_id);
+				return 0;  /* End processing - don't submit to wirebuffer. */
 			}
 		}
-		ctx->headers = NULL;  // Success -> transfer ownership to stream (waiting in wirebuffer)
-		http_cleanup_stream(ctx);
 
-		len = ctx->buf_pos - sizeof(uint16_t);
-		if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
-			kr_log_verbose("[http] invalid dnsmsg size: %zd B\n", len);
+		if (submit_to_wirebuffer(ctx) < 0)
 			return NGHTTP2_ERR_CALLBACK_FAILURE;
-		}
-
-		knot_wire_write_u16(ctx->buf, len);
-		ctx->submitted += ctx->buf_pos;
-		ctx->buf += ctx->buf_pos;
-		ctx->buf_pos = 0;
 	}
 
 	return 0;
@@ -744,8 +770,15 @@ void http_free(struct http_ctx *ctx)
 	if (!ctx)
 		return;
 
+	/* Clean up any headers whose ownership may not have been transferred. */
+	while (queue_len(ctx->streams) > 0) {
+		struct http_stream stream = queue_head(ctx->streams);
+		http_free_headers(stream.headers);
+		if (stream.headers == ctx->headers)
+			ctx->headers = NULL;  // to prevent double-free
+		queue_pop(ctx->streams);
+	}
 	http_cleanup_stream(ctx);
-	// TODO: queue_pop and check/free all headers (ownership may not have been transferred)
 	queue_deinit(ctx->streams);
 	nghttp2_session_del(ctx->h2);
 	free(ctx);
