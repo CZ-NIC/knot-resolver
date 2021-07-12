@@ -138,9 +138,8 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_prop
 	struct kr_module
 	struct kr_server_selection
-	log_groups_t
 	log_level_t
-	enum kr_log_groups_type
+	enum kr_log_group
 EOF
 
 # static variables; these lines might not be simple to generate

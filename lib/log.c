@@ -20,7 +20,11 @@ int use_journal = 0;
 
 log_level_t kr_log_level = LOG_CRIT;
 log_target_t kr_log_target = LOG_TARGET_STDOUT;
-log_groups_t kr_log_groups = 0;
+
+/** Set of log-groups that are on debug level.  It's a bitmap over 1 << enum kr_log_group. */
+static uint64_t kr_log_groups = 0;
+
+static_assert(LOG_GRP_DEVEL <= 8 * sizeof(kr_log_groups), "Too many log groups.");
 
 #define GRP_NAME_ITEM(grp) { grp ## _TAG, grp }
 
@@ -84,12 +88,12 @@ syslog_code_t prioritynames[] = {
 };
 #endif
 
-log_groups_t kr_log_group_is_set(log_groups_t group)
+bool kr_log_group_is_set(enum kr_log_group group)
 {
 	return kr_log_groups & (1ULL << group);
 }
 
-void kr_log_fmt(log_groups_t group, log_level_t level, const char *file,
+void kr_log_fmt(enum kr_log_group group, log_level_t level, const char *file,
 		const char *line, const char *func, const char *fmt, ...)
 {
 	va_list args;
@@ -160,7 +164,7 @@ log_level_t kr_log_name2level(const char *name)
 	return -1;
 }
 
-char *kr_log_grp2name(log_groups_t group)
+const char *kr_log_grp2name(enum kr_log_group group)
 {
 	for (int i = 0; log_group_names[i].g_val != -1; ++i)
 	{
@@ -171,7 +175,7 @@ char *kr_log_grp2name(log_groups_t group)
 	return NULL;
 }
 
-log_groups_t kr_log_name2grp(const char *name)
+enum kr_log_group kr_log_name2grp(const char *name)
 {
 	if (kr_fails_assert(name))
 		return 0;
@@ -220,14 +224,14 @@ log_level_t kr_log_level_get(void)
 	return kr_log_level;
 }
 
-void kr_log_add_group(log_groups_t group)
+void kr_log_add_group(enum kr_log_group group)
 {
 	kr_log_groups |= (1ULL << group);
 	if (group == LOG_GRP_GNUTLS)
 		kr_gnutls_log_level_set();
 }
 
-void kr_log_del_group(log_groups_t group)
+void kr_log_del_group(enum kr_log_group group)
 {
 	kr_log_groups &= (~(1ULL << group));
 	if (group == LOG_GRP_GNUTLS)
@@ -252,7 +256,7 @@ void kr_log_init(log_level_t level, log_target_t target)
  */
 static void kr_vlog_req(
 	const struct kr_request * const req, uint32_t qry_uid,
-	const unsigned int indent, log_groups_t group, const char *tag, const char *fmt,
+	const unsigned int indent, enum kr_log_group group, const char *tag, const char *fmt,
 	va_list args)
 {
 	struct mempool *mp = mp_new(512);
@@ -272,7 +276,7 @@ static void kr_vlog_req(
 }
 
 void kr_log_req1(const struct kr_request * const req, uint32_t qry_uid,
-		const unsigned int indent, log_groups_t group, const char *tag, const char *fmt, ...)
+		const unsigned int indent, enum kr_log_group group, const char *tag, const char *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
@@ -281,7 +285,7 @@ void kr_log_req1(const struct kr_request * const req, uint32_t qry_uid,
 }
 
 void kr_log_q1(const struct kr_query * const qry,
-		log_groups_t group, const char *tag, const char *fmt, ...)
+		enum kr_log_group group, const char *tag, const char *fmt, ...)
 {
 	unsigned ind = 0;
 	for (const struct kr_query *q = qry; q; q = q->parent)
