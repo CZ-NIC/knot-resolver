@@ -675,14 +675,14 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 			goto next_iter;
 		}
 
-		int ret = engine_cmd(L, cmd, false);
+		const bool cmd_failed = engine_cmd(L, cmd, false);
 		const char *message = NULL;
 		size_t len_s;
 		if (lua_gettop(L) > 0) {
 			message = lua_tolstring(L, -1, &len_s);
 		}
 
-		/* Simpler output in binary mode */
+		/* Send back the output, either in "binary" or normal mode. */
 		if (data->mode == io_mode_binary) {
 			/* Leader expects length field in all cases */
 			if (!message || len_s > UINT32_MAX) {
@@ -694,28 +694,24 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 			fwrite(&len_n, sizeof(len_n), 1, out);
 			if (len_s > 0)
 				fwrite(message, len_s, 1, out);
-			goto next_iter;
-		}
-
-		/* Log to remote socket if connected */
-		const char *delim = args->quiet ? "" : "> ";
-		if (stream_fd != STDIN_FILENO) {
-			if (VERBOSE_STATUS)
-				fprintf(stdout, "%s\n", cmd); /* Duplicate command to logs */
+		} else {
 			if (message)
-				fprintf(out, "%s", message); /* Duplicate output to sender */
+				fprintf(out, "%s", message);
 			if (message || !args->quiet)
 				fprintf(out, "\n");
-			fprintf(out, "%s", delim);
+			if (!args->quiet)
+				fprintf(out, "> ");
 		}
-		if (stream_fd == STDIN_FILENO || VERBOSE_STATUS) {
-			/* Log to standard streams */
-			FILE *fp_out = ret ? stderr : stdout;
+
+		/* Duplicate command and output to logs */
+		if (cmd_failed) {
+			kr_log_warning(CONTROL, "> %s\n", cmd);
 			if (message)
-				fprintf(fp_out, "%s", message);
-			if (message && !args->quiet)
-				fprintf(fp_out, "\n");
-			fprintf(fp_out, "%s", delim);
+				kr_log_warning(CONTROL, "%s\n", message);
+		} else {
+			kr_log_debug(CONTROL, "> %s\n", cmd);
+			if (message)
+				kr_log_debug(CONTROL, "%s\n", message);
 		}
 	next_iter:
 		lua_settop(L, 0); /* not required in some cases but harmless */

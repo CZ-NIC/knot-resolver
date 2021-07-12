@@ -66,6 +66,7 @@ enum kr_log_group {
 	LOG_GRP_TESTS,
 	LOG_GRP_DOTAUTH,
 	LOG_GRP_HTTP,
+	LOG_GRP_CONTROL,
 	/* ^^ Add new log groups above ^^. */
 	LOG_GRP_DEVEL,  /* Must be last entry in enum! */
 };
@@ -116,6 +117,7 @@ typedef struct {
 #define LOG_GRP_TESTS_TAG		"tests"
 #define LOG_GRP_DOTAUTH_TAG		"dotaut"
 #define LOG_GRP_HTTP_TAG		"http"
+#define LOG_GRP_CONTROL_TAG		"contrl"
 #define LOG_GRP_DEVEL_TAG		"devel"
 
 KR_EXPORT

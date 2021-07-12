@@ -161,10 +161,8 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, bool leader, struc
 	uv_pipe_t *pipe = malloc(sizeof(*pipe));
 	uv_pipe_init(loop, pipe, 0);
 	if (args->interactive) {
-		if (!args->quiet) {
-			kr_log_notice(SYSTEM, "interactive mode\n");
-			printf("> ");
-		}
+		if (!args->quiet)
+			printf("Interactive mode:\n" "> ");
 		pipe->data = io_tty_alloc_data();
 		uv_pipe_open(pipe, 0);
 		uv_read_start((uv_stream_t*)pipe, io_tty_alloc, io_tty_process_input);
