@@ -287,6 +287,7 @@ void kr_log_req1(const struct kr_request * const req, uint32_t qry_uid,
 void kr_log_q1(const struct kr_query * const qry,
 		enum kr_log_group group, const char *tag, const char *fmt, ...)
 {
+	// TODO(optim.): early return if there's nothing to do
 	unsigned ind = 0;
 	for (const struct kr_query *q = qry; q; q = q->parent)
 		ind += 2;
