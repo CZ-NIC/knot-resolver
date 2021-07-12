@@ -281,15 +281,25 @@ void kr_log_req1(const struct kr_request * const req, uint32_t qry_uid,
 	va_end(args);
 }
 
+bool kr_log_is_debug_fun(enum kr_log_group group, const struct kr_request *req)
+{
+	return kr_log_rtrace_enabled(req)
+		|| kr_log_group_is_set(group)
+		|| KR_LOG_LEVEL_IS(LOG_DEBUG);
+}
+
 void kr_log_q1(const struct kr_query * const qry,
 		enum kr_log_group group, const char *tag, const char *fmt, ...)
 {
-	// TODO(optim.): early return if there's nothing to do
+	// Optimize: this is probably quite a hot path.
+	const struct kr_request *req = likely(qry != NULL) ? qry->request : NULL;
+	if (likely(!kr_log_is_debug_fun(group, req)))
+		return;
+
 	unsigned ind = 0;
 	for (const struct kr_query *q = qry; q; q = q->parent)
 		ind += 2;
 	const uint32_t qry_uid = qry ? qry->uid : 0;
-	const struct kr_request *req = qry ? qry->request : NULL;
 
 	va_list args;
 	va_start(args, fmt);
