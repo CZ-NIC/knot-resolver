@@ -22,15 +22,9 @@ typedef enum {
 
 /* Groups */
 
-typedef uint64_t log_groups_t;
-typedef struct {
-	char		*g_name;
-	log_groups_t	g_val;
-} log_group_names_t;
-
 /* Don't forget add *_TAG below, log_group_names[] item (log.c) and generate
  * new kres-gen.lua */
-enum kr_log_groups_type {
+enum kr_log_group {
 	LOG_GRP_SYSTEM = 1,  /* Must be first in enum. */
 	LOG_GRP_CACHE,
 	LOG_GRP_IO,
@@ -76,6 +70,10 @@ enum kr_log_groups_type {
 	LOG_GRP_DEVEL,  /* Must be last entry in enum! */
 };
 
+typedef struct {
+	const char		*g_name;
+	enum kr_log_group	g_val;
+} log_group_names_t;
 
 #define LOG_GRP_SYSTEM_TAG		"system"
 #define LOG_GRP_CACHE_TAG		"cache"
@@ -121,17 +119,15 @@ enum kr_log_groups_type {
 #define LOG_GRP_DEVEL_TAG		"devel"
 
 KR_EXPORT
-extern log_groups_t kr_log_groups;
+bool kr_log_group_is_set(enum kr_log_group group);
 KR_EXPORT
-log_groups_t kr_log_group_is_set(log_groups_t group);
+void kr_log_add_group(enum kr_log_group group);
 KR_EXPORT
-void kr_log_add_group(log_groups_t group);
+void kr_log_del_group(enum kr_log_group group);
 KR_EXPORT
-void kr_log_del_group(log_groups_t group);
+const char *kr_log_grp2name(enum kr_log_group group);
 KR_EXPORT
-char *kr_log_grp2name(log_groups_t group);
-KR_EXPORT
-log_groups_t kr_log_name2grp(const char *name);
+enum kr_log_group kr_log_name2grp(const char *name);
 
 /* Log */
 
@@ -142,7 +138,7 @@ extern log_level_t kr_log_level;
 KR_EXPORT
 extern log_target_t kr_log_target;
 KR_EXPORT KR_PRINTF(6)
-void kr_log_fmt(log_groups_t group, log_level_t level, const char *file, const char *line,
+void kr_log_fmt(enum kr_log_group group, log_level_t level, const char *file, const char *line,
 		const char *func, const char *fmt, ...);
 KR_EXPORT
 int kr_log_level_set(log_level_t level);
@@ -216,7 +212,7 @@ struct kr_query;
        kr_log_req1(req, qry_id, indent, LOG_GRP_ ## grp, LOG_GRP_ ## grp ## _TAG, fmt, ## __VA_ARGS__)
 KR_EXPORT KR_PRINTF(6)
 void kr_log_req1(const struct kr_request * const req, uint32_t qry_uid,
-		const unsigned int indent, log_groups_t group, const char *tag, const char *fmt, ...);
+		const unsigned int indent, enum kr_log_group group, const char *tag, const char *fmt, ...);
 
 /**
  * Log a message through the request log handler or stdout.
@@ -227,7 +223,7 @@ void kr_log_req1(const struct kr_request * const req, uint32_t qry_uid,
  */
 #define kr_log_q(qry, grp, fmt, ...) kr_log_q1(qry, LOG_GRP_ ## grp, LOG_GRP_ ## grp ## _TAG, fmt, ## __VA_ARGS__)
 KR_EXPORT KR_PRINTF(4)
-void kr_log_q1(const struct kr_query *qry, log_groups_t group, const char *tag, const char *fmt, ...);
+void kr_log_q1(const struct kr_query *qry, enum kr_log_group group, const char *tag, const char *fmt, ...);
 
 /** Block run in --verbose mode; optimized when not run. */
 #define VERBOSE_STATUS __builtin_expect(KR_LOG_LEVEL_IS(LOG_DEBUG), false) // TODO vyhodit

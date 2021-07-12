@@ -173,13 +173,13 @@ static int l_get_log_level(lua_State *L)
 	return 1;
 }
 
-static int handle_log_groups(lua_State *L, void (*action)(log_groups_t grp))
+static int handle_log_groups(lua_State *L, void (*action)(enum kr_log_group grp))
 {
 	if (lua_gettop(L) != 1 || (!lua_isstring(L, 1) && !lua_istable(L, 1)))
 		lua_error_p(L, "takes string or table of strings");
 
 	if (lua_isstring(L, 1)) {
-		log_groups_t grp = kr_log_name2grp(lua_tostring(L, 1));
+		enum kr_log_group grp = kr_log_name2grp(lua_tostring(L, 1));
 		if (grp == 0)
 			lua_error_p(L, "unknown group \"%s\"", lua_tostring(L, -1));
 		action(grp);
@@ -187,12 +187,11 @@ static int handle_log_groups(lua_State *L, void (*action)(log_groups_t grp))
 
 	if (lua_istable(L, 1)) {
 		int idx = 1;
-		log_groups_t grp;
 		lua_pushnil(L);
 		while (lua_next(L, 1) != 0) {
 			if (!lua_isstring(L, -1))
 				lua_error_p(L, "wrong value at index %d, must be string", idx);
-			grp = kr_log_name2grp(lua_tostring(L, -1));
+			enum kr_log_group grp = kr_log_name2grp(lua_tostring(L, -1));
 			if (grp == 0)
 				lua_error_p(L, "unknown group \"%s\"", lua_tostring(L, -1));
 
@@ -217,11 +216,9 @@ static int l_del_log_groups(lua_State *L)
 
 static int l_get_log_groups(lua_State *L)
 {
-	char* name;
-
 	lua_newtable(L);
 	for (int grp = LOG_GRP_SYSTEM; grp <= LOG_GRP_DEVEL; grp++) {
-		name = kr_log_grp2name(grp);
+		const char *name = kr_log_grp2name(grp);
 		if (kr_fails_assert(name))
 			continue;
 		if (kr_log_group_is_set(grp)) {
