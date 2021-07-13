@@ -9,6 +9,10 @@
 #include "daemon/tls.h"
 #include "daemon/worker.h"
 
+#if ENABLE_XDP
+	#include <libknot/xdp/eth.h>
+#endif
+
 #include <libgen.h>
 #include <net/if.h>
 #include <sys/un.h>
