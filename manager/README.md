@@ -4,15 +4,14 @@
 
 ### Reproducible development environment
 
-Because we want to support multiple versions of Python with one codebase, we develop against the oldest supported version and then check in our CI that it works for newer Python versions.
+Because we want to support multiple versions of Python with one codebase, we develop against the oldest supported version and then check in our CI that it works for newer Python versions. In your distro, there might be a Python runtime of a different version than what we target. We therefore attempt to isolate everything from the system we are running on.
 
 Install these tools:
-* [pyenv](https://github.com/pyenv/pyenv#installation) (can be installed using distro's package manager)
-* [Poetry](https://python-poetry.org/docs/#installation) (Note: do not install the package via pip, follow instructions in Poetry's official documentation)
-* [Yarn](https://yarnpkg.com/) (See FAQ for why do we need JS in Python project) or NPM
-* [Podman](https://podman.io/getting-started/installation) configured to work [without root](https://github.com/containers/podman/blob/master/docs/tutorials/rootless_tutorial.md)
+* [pyenv](https://github.com/pyenv/pyenv#installation) - a tool for switching between Python versions without affecting the system (can be installed using distro's package manager)
+* [Poetry](https://python-poetry.org/docs/#installation) - dependency management (note: do not install the package via pip, follow instructions in Poetry's official documentation)
+* NodeJS+NPM - used for our type-checker, version packaged in your distro should work just fine
 
-Be careful, that you need the latest version of Poetry. The setup was tested with Poetry version 1.1.4. Due to it's ability to switch between Python versions, it has to be installed separately to work correctly. Make sure to follow [the latest setup guide](https://python-poetry.org/docs/#installation).
+Be careful, that you need the latest version of Poetry. The setup was tested with Poetry version 1.1.7. Due to it's ability to switch between Python versions, it has to be installed separately to work correctly. Make sure to follow [the latest setup guide](https://python-poetry.org/docs/#installation).
 
 After installing the tools above, the actual fully-featured development environment can be setup using these commands:
 
@@ -23,10 +22,10 @@ pyenv install 3.8.7
 pyenv install 3.9.1
 poetry env use $(pyenv which python)
 poetry install
-npm install # or "yarn install"
+npm install
 ```
 
-With this environment, **everything else should just work**. You can run the same checks the CI runs, all commands listed bellow should pass.
+With this environment, **everything else should just work**. You can run the same checks the CI runs, all commands listed bellow should pass. If something fails and you did all the steps above, please [open a new issue](https://gitlab.nic.cz/knot/knot-resolver-manager/-/issues/new).
 
 ### Minimal development environment
 
@@ -34,7 +33,7 @@ The only global tools that are strictly required are `Python` and `pip` (or othe
 
 ### Common tasks and interactions with the project
 
-After setting up the environment, you should be able to interract with the project by using the `./poe` script. Common actions are:
+After setting up the environment, you should be able to interract with the project by using `./poe` script. Common actions are:
 
 * `poe run` - runs the manager from the source
 * `poe docs` - creates HTML documentation
@@ -55,6 +54,8 @@ If you don't want to be writing the `./` prefix, you can install [PoeThePoet](ht
 Before commiting, please ensure that both `poe check` and `poe test` pass. Those commands are both run on the CI and if they don't pass, CI fails.
 
 ### Packaging
+
+This project uses [`apkg`](https://gitlab.nic.cz/packaging/apkg) for packaging. See [`distro/README.md`](distro/README.md) for packaging specific instructions.
 
 Not yet properly implemented. Ideal situation would be a command like `poe package` which would create all possible packages.
 
