@@ -31,3 +31,7 @@ int kr_gc_key_consistent(knot_db_val_t key);
 /** Printf a *binary* string in a human-readable way. */
 void debug_printbin(const char *str, unsigned int len);
 
+/** Block run in --verbose mode; optimized when not run. */
+#define VERBOSE_STATUS __builtin_expect(KR_LOG_LEVEL_IS(LOG_DEBUG), false)
+/* TODO: replace when solving GC logging properly */
+

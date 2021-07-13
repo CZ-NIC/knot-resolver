@@ -457,7 +457,7 @@ static int answer_padding(struct kr_request *request)
 static void answer_fail(struct kr_request *request)
 {
 	/* Note: OPT in SERVFAIL response is still useful for cookies/additional info. */
-	if (VERBOSE_STATUS || kr_log_rtrace_enabled(request))
+	if (kr_log_is_debug(RESOLVER, request))
 		kr_log_req(request, 0, 0, RESOLVER,
 			"request failed, answering with empty SERVFAIL\n");
 	knot_pkt_t *answer = request->answer;
@@ -769,9 +769,7 @@ static bool resolution_time_exceeded(struct kr_query *qry, uint64_t now)
 {
 	uint64_t resolving_time = now - qry->creation_time_mono;
 	if (resolving_time > KR_RESOLVE_TIME_LIMIT) {
-		WITH_VERBOSE(qry) {
-			VERBOSE_MSG(qry, "query resolution time limit exceeded\n");
-		}
+		VERBOSE_MSG(qry, "query resolution time limit exceeded\n");
 		return true;
 	}
 	return false;
@@ -833,7 +831,7 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 	if (!qry->flags.CACHED) {
 		if (request->state & KR_STATE_FAIL) {
 			if (++request->count_fail_row > KR_CONSUME_FAIL_ROW_LIMIT) {
-				if (VERBOSE_STATUS || kr_log_rtrace_enabled(request)) {
+				if (kr_log_is_debug(RESOLVER, request)) {
 					kr_log_req(request, 0, 2, RESOLVER,
 						"=> too many failures in a row, "
 						"bail out (mitigation for NXNSAttack "
@@ -1040,9 +1038,9 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	    kr_ta_get(trust_anchors, wanted_name)) {
 		qry->flags.DNSSEC_WANT = true;
 		want_secured = true;
-		WITH_VERBOSE(qry) {
-		KR_DNAME_GET_STR(qname_str, wanted_name);
-		VERBOSE_MSG(qry, ">< TA: '%s'\n", qname_str);
+		if (kr_log_is_debug_qry(RESOLVER, qry)) {
+			KR_DNAME_GET_STR(qname_str, wanted_name);
+			VERBOSE_MSG(qry, ">< TA: '%s'\n", qname_str);
 		}
 	}
 
@@ -1116,9 +1114,9 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 			mm_free(qry->zone_cut.pool, qry->zone_cut.trust_anchor);
 			qry->zone_cut.trust_anchor = knot_rrset_copy(ta_rr, qry->zone_cut.pool);
 
-			WITH_VERBOSE(qry) {
-			KR_DNAME_GET_STR(qname_str, ta_rr->owner);
-			VERBOSE_MSG(qry, ">< TA: '%s'\n", qname_str);
+			if (kr_log_is_debug_qry(RESOLVER, qry)) {
+				KR_DNAME_GET_STR(qname_str, ta_rr->owner);
+				VERBOSE_MSG(qry, ">< TA: '%s'\n", qname_str);
 			}
 		}
 	}
@@ -1527,15 +1525,14 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 		}
 	}
 
-	WITH_VERBOSE(qry) {
+	if (kr_log_is_debug_qry(RESOLVER, qry)) {
+		KR_DNAME_GET_STR(qname_str, knot_pkt_qname(packet));
+		KR_DNAME_GET_STR(ns_name, transport->ns_name);
+		KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
+		KR_RRTYPE_GET_STR(type_str, knot_pkt_qtype(packet));
+		const char *ns_str = kr_straddr(&transport->address.ip);
 
-	KR_DNAME_GET_STR(qname_str, knot_pkt_qname(packet));
-	KR_DNAME_GET_STR(ns_name, transport->ns_name);
-	KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
-	KR_RRTYPE_GET_STR(type_str, knot_pkt_qtype(packet));
-	const char *ns_str = kr_straddr(&transport->address.ip);
-
-	VERBOSE_MSG(qry,
+		VERBOSE_MSG(qry,
 			"=> id: '%05u' querying: '%s'@'%s' zone cut: '%s' "
 			"qname: '%s' qtype: '%s' proto: '%s'\n",
 			qry->id, ns_name, ns_str ? ns_str : "", zonecut_str,

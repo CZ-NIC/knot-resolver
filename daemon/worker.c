@@ -634,7 +634,8 @@ int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 
 	if (handle->type == UV_TCP) {
 		if (status != 0) { // session probably not usable anymore; typically: ECONNRESET
-			if (VERBOSE_STATUS) {
+			const struct kr_request *req = &task->ctx->req;
+			if (kr_log_is_debug(WORKER, req)) {
 				const char *peer_str = NULL;
 				if (!session_flags(s)->outgoing) {
 					peer_str = "hidden"; // avoid logging downstream IPs
@@ -643,7 +644,8 @@ int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 				}
 				if (!peer_str)
 					peer_str = "unknown"; // probably shouldn't happen
-				kr_log_debug(WORKER, "=> disconnected from '%s': %s\n",
+				kr_log_req(req, 0, 0, WORKER,
+						"=> disconnected from '%s': %s\n",
 						peer_str, uv_strerror(status));
 			}
 			worker_end_tcp(s);
@@ -976,6 +978,8 @@ static void on_connect(uv_connect_t *req, int status)
 		return;
 	}
 
+	const bool log_debug = kr_log_is_debug(WORKER, NULL);
+
 	/* Check if the connection is in the waiting list.
 	 * If no, most likely this is timeouted connection
 	 * which was removed from waiting list by
@@ -984,7 +988,7 @@ static void on_connect(uv_connect_t *req, int status)
 	if (!s || s != session) {
 		/* session isn't on the waiting list.
 		 * it's timeouted session. */
-		if (VERBOSE_STATUS) {
+		if (log_debug) {
 			const char *peer_str = kr_straddr(peer);
 			kr_log_debug(WORKER, "=> connected to '%s', but session "
 					"is already timeouted, close\n",
@@ -1001,7 +1005,7 @@ static void on_connect(uv_connect_t *req, int status)
 		/* session already in the connected list.
 		 * Something went wrong, it can be due to races when kresd has tried
 		 * to reconnect to upstream after unsuccessful attempt. */
-		if (VERBOSE_STATUS) {
+		if (log_debug) {
 			const char *peer_str = kr_straddr(peer);
 			kr_log_debug(WORKER, "=> connected to '%s', but peer "
 					"is already connected, close\n",
@@ -1014,7 +1018,7 @@ static void on_connect(uv_connect_t *req, int status)
 	}
 
 	if (status != 0) {
-		if (VERBOSE_STATUS) {
+		if (log_debug) {
 			const char *peer_str = kr_straddr(peer);
 			kr_log_debug(WORKER, "=> connection to '%s' failed (%s), flagged as 'bad'\n",
 					peer_str ? peer_str : "", uv_strerror(status));
@@ -1047,7 +1051,7 @@ static void on_connect(uv_connect_t *req, int status)
 		}
 	}
 
-	if (VERBOSE_STATUS) {
+	if (log_debug) {
 		const char *peer_str = kr_straddr(peer);
 		kr_log_debug(WORKER, "=> connected to '%s'\n", peer_str ? peer_str : "");
 	}
@@ -1102,7 +1106,7 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 	}
 
 	struct kr_query *qry = task_get_last_pending_query(task);
-	WITH_VERBOSE (qry) {
+	if (kr_log_is_debug_qry(WORKER, qry)) {
 		const char *peer_str = kr_straddr(peer);
 		VERBOSE_MSG(qry, "=> connection to '%s' failed (internal timeout)\n",
 			    peer_str ? peer_str : "");
@@ -1522,7 +1526,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	}
 
 	struct kr_query *qry = task_get_last_pending_query(task);
-	WITH_VERBOSE (qry) {
+	if (kr_log_is_debug_qry(WORKER, qry)) {
 		const char *peer_str = kr_straddr(peer);
 		VERBOSE_MSG(qry, "=> connecting to: '%s'\n", peer_str ? peer_str : "");
 	}

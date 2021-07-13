@@ -68,7 +68,7 @@ static bool pkt_has_type(const knot_pkt_t *pkt, uint16_t type)
 
 static void log_bogus_rrsig(kr_rrset_validation_ctx_t *vctx,
 			    const knot_rrset_t *rr, const char *msg) {
-	WITH_VERBOSE(vctx->log_qry) {
+	if (kr_log_is_debug_qry(VALIDATOR, vctx->log_qry)) {
 		auto_free char *name_text = kr_dname_text(rr->owner);
 		auto_free char *type_text = kr_rrtype_text(rr->type);
 		VERBOSE_MSG(vctx->log_qry, ">< %s: %s %s "

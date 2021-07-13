@@ -227,10 +227,6 @@ void kr_log_req1(const struct kr_request * const req, uint32_t qry_uid,
 KR_EXPORT KR_PRINTF(4)
 void kr_log_q1(const struct kr_query *qry, enum kr_log_group group, const char *tag, const char *fmt, ...);
 
-/** Block run in --verbose mode; optimized when not run. */
-#define VERBOSE_STATUS __builtin_expect(KR_LOG_LEVEL_IS(LOG_DEBUG), false) // TODO vyhodit
-#define WITH_VERBOSE(query) if(__builtin_expect(KR_LOG_LEVEL_IS(LOG_DEBUG) || kr_log_qtrace_enabled(query), false))
-
 /** Return whether a particular log group in a request is in debug/verbose mode.
  *
  * Typically you use this as condition to compute some data to be logged,
