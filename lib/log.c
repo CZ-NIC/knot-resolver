@@ -251,6 +251,11 @@ void kr_log_init(log_level_t level, log_target_t target)
 	kr_log_level_set(level);
 }
 
+static inline bool req_has_trace_log(const struct kr_request *req)
+{
+	return unlikely(req && req->trace_log);
+}
+
 static void kr_vlog_req(
 	const struct kr_request * const req, uint32_t qry_uid,
 	const unsigned int indent, enum kr_log_group group, const char *tag, const char *fmt,
@@ -264,7 +269,7 @@ static void kr_vlog_req(
 
 	msg = mp_vprintf_append(mp, msg, fmt, args);
 
-	if (kr_log_rtrace_enabled(req))
+	if (req_has_trace_log(req))
 		req->trace_log(req, msg);
 
 	kr_log_fmt(group, LOG_DEBUG, SD_JOURNAL_METADATA, "[%-6s]%s", tag, msg);
@@ -283,7 +288,7 @@ void kr_log_req1(const struct kr_request * const req, uint32_t qry_uid,
 
 bool kr_log_is_debug_fun(enum kr_log_group group, const struct kr_request *req)
 {
-	return kr_log_rtrace_enabled(req)
+	return req_has_trace_log(req)
 		|| kr_log_group_is_set(group)
 		|| KR_LOG_LEVEL_IS(LOG_DEBUG);
 }

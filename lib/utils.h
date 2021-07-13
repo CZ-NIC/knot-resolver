@@ -94,17 +94,6 @@ static inline bool kr_assert_func(bool result, const char *expr, const char *fun
 	return result;
 }
 
-/**
- * @brief Return true if the query has request log handler installed.
- */
-#define kr_log_rtrace_enabled(req) (__builtin_expect( \
-	(req) && (req)->trace_log, \
-	false))
-
-#define kr_log_qtrace_enabled(qry) (__builtin_expect( \
-	(qry) && kr_log_rtrace_enabled(qry->request), \
-	false))
-
 #define KR_DNAME_GET_STR(dname_str, dname) \
 	char dname_str[KR_DNAME_STR_MAXLEN]; \
 	knot_dname_to_str(dname_str, (dname), sizeof(dname_str)); \
