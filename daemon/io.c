@@ -281,7 +281,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	}
 
 	if (nread < 0 || !buf->base) {
-		if (KR_LOG_LEVEL_IS(LOG_DEBUG)) {
+		if (kr_log_is_debug(IO, NULL)) {
 			struct sockaddr *peer = session_get_peer(s);
 			char *peer_str = kr_straddr(peer);
 			kr_log_debug(IO, "=> connection to '%s' closed by peer (%s)\n",
@@ -300,7 +300,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		   Decode data free space in session wire buffer. */
 		consumed = tls_process_input_data(s, (const uint8_t *)buf->base, nread);
 		if (consumed < 0) {
-			if (KR_LOG_LEVEL_IS(LOG_DEBUG)) {
+			if (kr_log_is_debug(IO, NULL)) {
 				struct sockaddr *peer = session_get_peer(s);
 				char *peer_str = kr_straddr(peer);
 				kr_log_debug(IO, "=> connection to '%s': "
@@ -319,7 +319,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	if (session_flags(s)->has_http) {
 		consumed = http_process_input_data(s, data, data_len);
 		if (consumed < 0) {
-			if (KR_LOG_LEVEL_IS(LOG_DEBUG)) {
+			if (kr_log_is_debug(IO, NULL)) {
 				struct sockaddr *peer = session_get_peer(s);
 				char *peer_str = kr_straddr(peer);
 				kr_log_debug(IO, "=> connection to '%s': "

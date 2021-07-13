@@ -275,10 +275,10 @@ int32_t kr_cache_ttl(const struct kr_cache_p *peek, const struct kr_query *qry,
 static bool check_dname_for_lf(const knot_dname_t *n, const struct kr_query *qry/*logging*/)
 {
 	const bool ret = knot_dname_size(n) == strlen((const char *)n) + 1;
-	if (!ret) { WITH_VERBOSE(qry) {
+	if (!ret && kr_log_is_debug_qry(CACHE, qry)) {
 		auto_free char *n_str = kr_dname_text(n);
 		VERBOSE_MSG(qry, "=> skipping zero-containing name %s\n", n_str);
-	} }
+	}
 	return ret;
 }
 
@@ -287,10 +287,10 @@ static bool check_rrtype(uint16_t type, const struct kr_query *qry/*logging*/)
 {
 	const bool ret = !knot_rrtype_is_metatype(type)
 			&& type != KNOT_RRTYPE_RRSIG;
-	if (!ret) { WITH_VERBOSE(qry) {
+	if (!ret && kr_log_is_debug_qry(CACHE, qry)) {
 		auto_free char *type_str = kr_rrtype_text(type);
 		VERBOSE_MSG(qry, "=> skipping RR type %s\n", type_str);
-	} }
+	}
 	return ret;
 }
 
@@ -841,7 +841,7 @@ int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16
 			struct kr_cache_p *peek)
 {	/* Just wrap with extra verbose logging. */
 	const int ret = peek_exact_real(cache, name, type, peek);
-	if (false && VERBOSE_STATUS) { /* too noisy for usual --verbose */
+	if (false && kr_log_is_debug(CACHE, NULL)) { /* too noisy for usual --verbose */
 		auto_free char *type_str = kr_rrtype_text(type),
 			*name_str = kr_dname_text(name);
 		const char *result_str = (ret == kr_ok() ? "hit" :

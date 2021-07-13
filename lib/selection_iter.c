@@ -303,7 +303,7 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 		qry->flags.DNSSEC_BOGUS = true;
 	}
 
-	WITH_VERBOSE(qry)
+	if (kr_log_is_debug_qry(SELECTION, qry))
 	{
 	KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
 	if (*transport) {

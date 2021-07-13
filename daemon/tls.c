@@ -926,7 +926,7 @@ static int client_verify_pin(const unsigned int cert_list_size,
 		}
 
 	#ifdef DEBUG
-		if (VERBOSE_STATUS) {
+		if (kr_log_is_debug(TLS, NULL)) {
 			char pin_base64[TLS_SHA256_BASE64_BUFLEN];
 			/* DEBUG: additionally compute and print the base64 pin.
 			 * Not very efficient, but that's OK for DEBUG. */

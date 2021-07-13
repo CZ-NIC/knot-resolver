@@ -34,6 +34,7 @@
 
 #define VERBOSE_MSG(...) QRVERBOSE(req->current_query, ITERATOR, __VA_ARGS__)
 #define QVERBOSE_MSG(qry, ...) QRVERBOSE(qry, ITERATOR, __VA_ARGS__)
+#define WITH_VERBOSE(qry) if (kr_log_is_debug_qry(ITERATOR, (qry)))
 
 /* Iterator often walks through packet section, this is an abstraction. */
 typedef int (*rr_callback_t)(const knot_rrset_t *, unsigned, struct kr_request *);
@@ -1064,9 +1065,8 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	 * The most important part is to check for spoofing: is_paired_to_query() */
 	query->flags.PKT_IS_SANE = true;
 
-	const knot_lookup_t *rcode = NULL;
-	if (KR_LOG_LEVEL_IS(LOG_DEBUG))
-		rcode = knot_lookup_by_id(knot_rcode_names, knot_wire_get_rcode(pkt->wire));
+	const knot_lookup_t *rcode = // just for logging but cheaper than a condition
+		knot_lookup_by_id(knot_rcode_names, knot_wire_get_rcode(pkt->wire));
 
 	// We can't return directly from the switch because we have to give feedback to server selection first
 	int ret = 0;

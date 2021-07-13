@@ -251,7 +251,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 			const uint32_t ttl_max = MIN(knot_rrsig_original_ttl(rdata_j),
 					knot_rrsig_sig_expiration(rdata_j) - timestamp);
 			if (unlikely(covered->ttl > ttl_max)) {
-				if (VERBOSE_STATUS) {
+				if (kr_log_is_debug_qry(VALIDATOR, vctx->log_qry)) {
 					auto_free char
 						*name_str = kr_dname_text(covered->owner),
 						*type_str = kr_rrtype_text(covered->type);

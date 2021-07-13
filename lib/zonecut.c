@@ -406,7 +406,7 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 		infos[1] = fetch_addr(*pack, ns_name, KNOT_RRTYPE_AAAA, cut->pool, qry);
 
 		#if 0 /* rather unlikely to be useful unless changing some zcut code */
-		WITH_VERBOSE(qry) {
+		if (kr_log_is_debug_qry(ZCUT, qry)) {
 			auto_free char *ns_name_txt = kr_dname_text(ns_name);
 			VERBOSE_MSG(qry, "NS %s infos: %d, %d\n",
 					ns_name_txt, (int)infos[0], (int)infos[1]);
@@ -444,11 +444,11 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 		all_bad = all_bad && infos[0] <= AI_LAST_BAD && infos[1] <= AI_LAST_BAD;
 	}
 
-	if (all_bad) { WITH_VERBOSE(qry) {
+	if (all_bad && kr_log_is_debug_qry(ZCUT, qry)) {
 		auto_free char *name_txt = kr_dname_text(name);
 		VERBOSE_MSG(qry, "cut %s: all NSs bad, count = %d\n",
 				name_txt, (int)ns_rds.count);
-	} }
+	}
 	knot_rdataset_clear(&ns_rds, cut->pool);
 	return all_bad ? ELOOP : kr_ok();
 }
@@ -532,7 +532,7 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 						label, KNOT_RRTYPE_DNSKEY, cut->pool, qry);
 			}
 			update_cut_name(cut, label);
-			WITH_VERBOSE(qry) {
+			if (kr_log_is_debug_qry(ZCUT, qry)) {
 				auto_free char *label_str = kr_dname_text(label);
 				VERBOSE_MSG(qry,
 					"found cut: %s (rank 0%.2o return codes: DS %d, DNSKEY %d)\n",
