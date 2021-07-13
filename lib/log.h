@@ -236,7 +236,7 @@ void kr_log_q1(const struct kr_query *qry, enum kr_log_group group, const char *
  */
 #define kr_log_is_debug(grp, req) \
 	__builtin_expect(kr_log_is_debug_fun(LOG_GRP_ ## grp, (req)), false)
-#define kr_log_is_debug_qry(grp, qry) kr_log_is_debug(grp, (qry)->request)
+#define kr_log_is_debug_qry(grp, qry) kr_log_is_debug(grp, (qry) ? (qry)->request : NULL)
 KR_EXPORT
 bool kr_log_is_debug_fun(enum kr_log_group group, const struct kr_request *req);
 
