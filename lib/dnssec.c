@@ -255,7 +255,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 					auto_free char
 						*name_str = kr_dname_text(covered->owner),
 						*type_str = kr_rrtype_text(covered->type);
-					QRVERBOSE(NULL, VALIDATOR,
+					QRVERBOSE(vctx->log_qry, VALIDATOR,
 						"trimming TTL of %s %s: %d -> %d\n",
 						name_str, type_str,
 						(int)covered->ttl, (int)ttl_max);
