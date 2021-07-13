@@ -47,7 +47,8 @@ build() {
         -D systemd_files=enabled \
         -D client=enabled \
         -D install_kresd_conf=enabled \
-        -D unit_tests=enabled
+        -D unit_tests=enabled \
+        -D config_tests=enabled
     ninja -C build
 }
 
