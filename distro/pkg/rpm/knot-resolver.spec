@@ -179,6 +179,7 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
     -Ddnstap=enabled \
 %endif
     -Dunit_tests=enabled \
+    -Dconfig_tests=enabled \
     -Dmanaged_ta=enabled \
     -Dkeyfile_default="%{_sharedstatedir}/knot-resolver/root.keys" \
     -Dinstall_root_keys=enabled \
