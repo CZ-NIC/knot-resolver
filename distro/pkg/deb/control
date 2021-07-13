@@ -18,6 +18,8 @@ Build-Depends:
  libsystemd-dev (>= 227) [linux-any],
  libcap-ng-dev,
  libuv1-dev,
+ lua-basexx,
+ lua-cqueues,
  luajit,
  pkg-config,
  meson (>= 0.49),
