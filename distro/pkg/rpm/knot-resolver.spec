@@ -63,6 +63,8 @@ BuildRequires:  pkgconfig(libprotobuf-c)
 # Distro-dependent dependencies
 %if 0%{?rhel} == 7
 BuildRequires:  lmdb-devel
+BuildRequires:  lua-basexx
+BuildRequires:  lua-cqueues
 # Lua 5.1 version of the libraries have different package names
 Requires:       lua-basexx
 Requires:       lua-psl
@@ -72,6 +74,10 @@ Requires(pre):  shadow-utils
 %if 0%{?fedora} || 0%{?rhel} > 7
 BuildRequires:  pkgconfig(lmdb)
 BuildRequires:  python3-sphinx
+# config tests dependencies
+BuildRequires:  lua5.1-basexx
+BuildRequires:  lua5.1-cqueues
+
 Requires:       lua5.1-basexx
 Requires:       lua5.1-cqueues
 Requires:       lua5.1-http
@@ -179,6 +185,7 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
     -Ddnstap=enabled \
 %endif
     -Dunit_tests=enabled \
+    -Dconfig_tests=enabled \
     -Dmanaged_ta=enabled \
     -Dkeyfile_default="%{_sharedstatedir}/knot-resolver/root.keys" \
     -Dinstall_root_keys=enabled \
