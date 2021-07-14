@@ -95,7 +95,7 @@ local function ta_present(keyset, rr, hold_down_time)
 			ta.state = key_state.Valid
 			ta.timer = nil
 		end
-		if rr.state ~= key_state.Valid or verbose() then
+		if rr.state ~= key_state.Valid then
 			log_info(ffi.C.LOG_GRP_TAUPDATE, 'key: ' .. key_tag .. ' state: '..ta.state)
 		end
 		return true

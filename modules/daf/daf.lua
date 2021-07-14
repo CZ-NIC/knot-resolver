@@ -358,9 +358,8 @@ end
 -- @function Configure module
 function M.config()
 	if not http then
-		if verbose() then
-			log_error(ffi.C.LOG_GRP_DAF, 'HTTP API unavailable because HTTP module is not loaded, use modules.load("http")')
-		end
+		log_warn(ffi.C.LOG_GRP_DAF,
+			'HTTP API unavailable because HTTP module is not loaded, use modules.load("http")')
 		return
 	end
 	local endpoints = http.configs._builtin.webmgmt.endpoints

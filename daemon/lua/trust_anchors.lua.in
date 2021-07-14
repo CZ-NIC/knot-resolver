@@ -360,7 +360,7 @@ local function add_file(path, unmanaged)
 	trust_anchors.keysets[owner] = keyset
 
 	-- Replace the TA store used for validation
-	if keyset_publish(keyset) and verbose() then
+	if keyset_publish(keyset) then
 		log_info(ffi.C.LOG_GRP_TA, 'installed trust anchors for domain ' .. owner_str .. ' are:\n'
 			.. trust_anchors.summary(owner))
 	end
