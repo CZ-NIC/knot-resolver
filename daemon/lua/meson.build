@@ -42,36 +42,37 @@ run_target(  # run manually to re-generate kres-gen.lua
   command: find_program('./kres-gen.sh'),
 )
 
-## A simple config test: check that sizes of some structures match
-## in C and pre-generated lua bindings.
-## The point is that regeneration is quite expensive in time and dependencies,
-## but this basic sanity check could be ran always.
-types_to_check = {
-  'time_t' : '#include <sys/time.h>',
-  'struct timeval' : '#include <sys/time.h>',
-  'zs_scanner_t' : '#include <libzscanner/scanner.h>',
-  'knot_pkt_t' : '#include <libknot/packet/pkt.h>',
-}
-# Construct the lua tester as a meson string.
-kres_gen_test_luastr = '''
-  dofile('@0@')
-  local ffi = require('ffi')
-'''.format(meson.current_source_dir() / 'kres-gen.lua')
-foreach tname, tinclude: types_to_check
-  kres_gen_test_luastr += '''
-    assert(ffi.sizeof(ffi.typeof('@0@')) == @1@,
-      'Lua binding for C type ' .. '@0@' .. ' has incorrect size: '
-      .. ffi.sizeof(ffi.typeof('@0@'))
-    )
-  '''.format(tname, meson.get_compiler('c').sizeof(tname, prefix : tinclude))
-endforeach
-# Now feed it directly into luajit.
-kres_gen_test = run_command(find_program('luajit'), '-e', kres_gen_test_luastr)
-if kres_gen_test.returncode() != 0
-  error('if you use released Knot* versions, please contact us: https://www.knot-resolver.cz/contact/\n'
-      + kres_gen_test.stderr().strip())
+# A simple config test: check that sizes of some structures match
+# in C and pre-generated lua bindings.
+# The point is that regeneration is quite expensive in time and dependencies,
+# but this basic sanity check could be ran always.
+if get_option('kres_gen_test')
+  types_to_check = {
+	'time_t' : '#include <sys/time.h>',
+	'struct timeval' : '#include <sys/time.h>',
+	'zs_scanner_t' : '#include <libzscanner/scanner.h>',
+	'knot_pkt_t' : '#include <libknot/packet/pkt.h>',
+  }
+  # Construct the lua tester as a meson string.
+  kres_gen_test_luastr = '''
+	dofile('@0@')
+	local ffi = require('ffi')
+  '''.format(meson.current_source_dir() / 'kres-gen.lua')
+  foreach tname, tinclude: types_to_check
+	kres_gen_test_luastr += '''
+	  assert(ffi.sizeof(ffi.typeof('@0@')) == @1@,
+		'Lua binding for C type ' .. '@0@' .. ' has incorrect size: '
+		.. ffi.sizeof(ffi.typeof('@0@'))
+	  )
+	'''.format(tname, meson.get_compiler('c').sizeof(tname, prefix : tinclude))
+  endforeach
+  # Now feed it directly into luajit.
+  kres_gen_test = run_command(find_program('luajit'), '-e', kres_gen_test_luastr)
+  if kres_gen_test.returncode() != 0
+	error('if you use released Knot* versions, please contact us: https://www.knot-resolver.cz/contact/\n'
+		+ kres_gen_test.stderr().strip())
+  endif
 endif
-
 
 lua_src = [
   files('postconfig.lua'),
