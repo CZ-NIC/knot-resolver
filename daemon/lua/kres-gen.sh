@@ -1,10 +1,11 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# Run with "ninja kres-gen" to re-generate kres-gen.lua
+# Run with "ninja kres-gen" to re-generate $1
 set -o pipefail -o errexit -o nounset
 
 cd "$(dirname ${0})"
+OUTNAME="$1"
 CDEFS="../../scripts/gen-cdefs.sh"
 LIBKRES="${MESON_BUILD_ROOT}/lib/libkres.so"
 KRESD="${MESON_BUILD_ROOT}/daemon/kresd"
@@ -20,17 +21,17 @@ do
 		&& exit 1
 done
 
-# Write to kres-gen.lua instead of stdout
-mv kres-gen.lua{,.bak} ||:
+# Write to "$OUTNAME" instead of stdout
+mv "$OUTNAME"{,.bak} ||:
 exec 5<&1-  # move stdout into FD 5
-exec 1<>kres-gen.lua  # replace stdout with file
+exec 1<>"$OUTNAME"  # replace stdout with file
 
 restore() {
-    exec 1>&-  # close stdout redirected into kres-gen.lua
+    exec 1>&-  # close stdout redirected into "$OUTNAME"
     exec 1<&5-  # restore original stdout
-    mv -v kres-gen.lua{,.fail} ||:
-    mv -v kres-gen.lua{.bak,} ||:
-    (>&2 echo "Failed to re-generate kres-gen.lua! Missing debugsymbols? Missing shared library?")
+    mv -v "$OUTNAME"{,.fail} ||:
+    mv -v "$OUTNAME"{.bak,} ||:
+    (>&2 echo "Failed to re-generate $OUTNAME! Missing debugsymbols? Missing shared library?")
 }
 trap restore ERR INT TERM
 
@@ -332,7 +333,7 @@ EOF
 
 printf "]]\n"
 
-rm kres-gen.lua.bak ||:
-(>&2 echo "Successfully re-generated ${PWD}/kres-gen.lua")
+rm "$OUTNAME".bak ||:
+(>&2 echo "Successfully re-generated ${PWD}/$OUTNAME")
 
 exit 0

@@ -37,9 +37,19 @@ distro_preconfig = configure_file(
   configuration: lua_config,
 )
 
+# Unfortunately the different ABI implies different contents of 'kres-gen.lua'.
+kres_gen_fname = (libknot.version().version_compare('>= 3.1')
+                 ? 'kres-gen-31.lua' : 'kres-gen-29.lua')
+
+kres_gen_lua = configure_file(
+  input: kres_gen_fname,
+  output: 'kres-gen.lua',
+  copy: true,
+)
+
 run_target(  # run manually to re-generate kres-gen.lua
   'kres-gen',
-  command: find_program('./kres-gen.sh'),
+  command: [ find_program('./kres-gen.sh'), kres_gen_fname ],
 )
 
 # A simple config test: check that sizes of some structures match
@@ -57,7 +67,7 @@ if get_option('kres_gen_test')
   kres_gen_test_luastr = '''
 	dofile('@0@')
 	local ffi = require('ffi')
-  '''.format(meson.current_source_dir() / 'kres-gen.lua')
+  '''.format(meson.current_source_dir() / kres_gen_fname)
   foreach tname, tinclude: types_to_check
 	kres_gen_test_luastr += '''
 	  assert(ffi.sizeof(ffi.typeof('@0@')) == @1@,
@@ -77,7 +87,7 @@ endif
 lua_src = [
   files('postconfig.lua'),
   files('kres.lua'),
-  files('kres-gen.lua'),
+  files(kres_gen_fname),
   sandbox,
   trust_anchors,
   files('zonefile.lua'),
