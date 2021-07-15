@@ -47,8 +47,8 @@ run_target(  # run manually to re-generate kres-gen.lua
 ## The point is that regeneration is quite expensive in time and dependencies,
 ## but this basic sanity check could be ran always.
 types_to_check = {
-  'time_t' : '#include <sys/types.h>',
-  'struct timeval' : '#include <sys/types.h>',
+  'time_t' : '#include <sys/time.h>',
+  'struct timeval' : '#include <sys/time.h>',
   'zs_scanner_t' : '#include <libzscanner/scanner.h>',
   'knot_pkt_t' : '#include <libknot/packet/pkt.h>',
 }
