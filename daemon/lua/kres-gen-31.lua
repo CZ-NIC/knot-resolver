@@ -514,6 +514,12 @@ struct worker_ctx {
 };
 struct worker_ctx *the_worker;
 typedef struct {
+	uint8_t *params_position;
+	uint8_t *mandatory_position;
+	uint8_t *param_position;
+	int32_t last_key;
+} zs_svcb_t;
+typedef struct {
 	uint8_t bitmap[32];
 	uint8_t length;
 } zs_win_t;

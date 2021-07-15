@@ -75,7 +75,7 @@ ignore = {
 
 -- Sandbox can set global variables
 files['**/daemon/lua'].ignore = {'111', '121', '122'}
-files['**/daemon/lua/kres-gen.lua'].ignore = {'631'} -- Allow overly long lines
+files['**/daemon/lua/kres-gen-*.lua'].ignore = {'631'} -- Allow overly long lines
 -- Tests and scripts can use global variables
 files['scripts'].ignore = {'111', '112', '113'}
 files['tests'].ignore = {'111', '112', '113'}

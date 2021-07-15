@@ -313,6 +313,9 @@ echo "struct worker_ctx *the_worker;"
 
 
 ## libzscanner API for ./zonefile.lua
+if pkg-config libknot --atleast-version=3.1; then
+	echo "zs_svcb_t" | ${CDEFS} libzscanner types
+fi
 ${CDEFS} libzscanner types <<-EOF
 	zs_win_t
 	zs_apl_t
