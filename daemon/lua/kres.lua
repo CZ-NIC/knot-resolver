@@ -36,12 +36,6 @@ ffi.cdef[[
  * Data structures
  */
 
-/* stdlib */
-typedef long time_t;
-struct timeval {
-	time_t tv_sec;
-	time_t tv_usec;
-};
 struct sockaddr {
     uint16_t sa_family;
     uint8_t _stub[]; /* Do not touch */
