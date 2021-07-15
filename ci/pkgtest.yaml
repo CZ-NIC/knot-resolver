@@ -173,6 +173,12 @@ nixos-unstable:pkgbuild:
   - apt-get install -y $(find ./pkg/pkgs -name '*.deb' | grep -v module | grep -v debug | grep -v devel)
   - systemctl start kresd@1
   - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+  # pkgtest over, now let's add additional packages and run config tests
+  - pip3 install -U apkg
+  - apkg build-dep -y
+  - apt-get install -y lua-basexx lua-cqueues  # additional test deps
+  - meson build_test --default-library=static -Dconfig_tests=enabled
+  - meson test -C build_test --suite config
 
 centos-7:pkgtest:
   <<: *pkgtest
