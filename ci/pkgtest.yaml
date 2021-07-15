@@ -173,6 +173,9 @@ nixos-unstable:pkgbuild:
   - apt-get install -y $(find ./pkg/pkgs -name '*.deb' | grep -v module | grep -v debug | grep -v devel)
   - systemctl start kresd@1
   - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+  - apkg build-dep
+  - meson build_test --default-library=static -Dconfig_tests=enabled
+  - meson test -C build_test --suite config
 
 centos-7:pkgtest:
   <<: *pkgtest
