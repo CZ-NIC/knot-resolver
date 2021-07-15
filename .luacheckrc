@@ -61,10 +61,11 @@ for _, v in ipairs(new_read_globals) do
 	table.insert(new_globals, v)
 end
 
--- Ignore test files
 exclude_files = {
 	'modules/policy/lua-aho-corasick', -- Vendored
 	'tests/config/tapered',
+	'build*/**', -- build outputs
+	'pkg/**', -- packaging outputs
 }
 
 -- Ignore some pedantic checks
