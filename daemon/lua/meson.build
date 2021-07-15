@@ -87,7 +87,7 @@ endif
 lua_src = [
   files('postconfig.lua'),
   files('kres.lua'),
-  files(kres_gen_fname),
+  kres_gen_lua,
   sandbox,
   trust_anchors,
   files('zonefile.lua'),
