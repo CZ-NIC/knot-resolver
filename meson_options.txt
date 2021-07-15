@@ -176,6 +176,13 @@ option(
 )
 
 option(
+  'kres_gen_test',
+  type: 'boolean',
+  value: true,
+  description: 'run kres_gen_test: a simple sanity check for our lua bindings',
+)
+
+option(
   'config_tests',
   type: 'combo',
   choices: [
