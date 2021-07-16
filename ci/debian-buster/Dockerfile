@@ -18,14 +18,16 @@ RUN apt-get update -qq
 RUN apt-get install -y -qqq git make cmake pkg-config meson \
 	build-essential bsdmainutils libtool autoconf libcmocka-dev \
 	liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev \
-	libelf-dev libidn11-dev libuv1-dev \
+	libelf-dev libmnl-dev libidn11-dev libuv1-dev \
 	libluajit-5.1-dev lua-http libssl-dev libnghttp2-dev
 
 # Build and testing deps for Resolver's dnstap module (go stuff is just for testing)
 RUN apt-get install -y -qqq \
 	protobuf-c-compiler libprotobuf-c-dev libfstrm-dev \
 	golang-any
-RUN bash -c "go get github.com/{FiloSottile/gvt,cloudflare/dns,dnstap/golang-dnstap}"
+# Some stuff won't work on buster:
+# package crypto/ed25519: unrecognized import path "crypto/ed25519"
+#RUN bash -c "go get github.com/{FiloSottile/gvt,cloudflare/dns,dnstap/golang-dnstap}"
 
 # documentation dependecies
 RUN apt-get install -y -qqq doxygen python3-sphinx python3-breathe python3-sphinx-rtd-theme

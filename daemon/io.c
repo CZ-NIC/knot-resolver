@@ -11,6 +11,7 @@
 #include <sys/resource.h>
 
 #if ENABLE_XDP
+	#include <libknot/xdp/eth.h>
 	#include <libknot/xdp/xdp.h>
 	#include <net/if.h>
 #endif
