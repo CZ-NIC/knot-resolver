@@ -259,13 +259,18 @@ lint:tidy:
   script:
     - ninja -C build_ci* tidy
 
-kres-gen:
+.kres-gen: &kres-gen
   <<: *sanity
   script:
-    - meson build_ci_lib --prefix=$PREFIX
+    - meson build_ci_lib --prefix=$PREFIX -Dkres_gen_test=false
     - ninja -C build_ci_lib daemon/kresd
     - ninja -C build_ci_lib kres-gen
     - git diff --quiet || (git diff; exit 1)
+kres-gen-default:
+  <<: *kres-gen
+kres-gen-master:
+  <<: *kres-gen
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-master
 
 root.hints:
   <<: *sanity
