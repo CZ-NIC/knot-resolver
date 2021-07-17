@@ -38,7 +38,8 @@ class KresManager:
         await self.load_system_state()
 
     def __init__(self):
-        self._children: List[Subprocess] = []
+        self._workers: List[Subprocess] = []
+        self._gc: Optional[Subprocess] = None
         self._manager_lock = asyncio.Lock()
         self._controller: SubprocessController
         self._last_used_config: Optional[KresConfig] = None
@@ -47,34 +48,47 @@ class KresManager:
         async with self._manager_lock:
             await self._collect_already_running_children()
 
-    async def _spawn_new_child(self):
+    async def _spawn_new_worker(self):
         subprocess = await self._controller.create_subprocess(SubprocessType.KRESD, str(uuid4()))
         await subprocess.start()
-        self._children.append(subprocess)
+        self._workers.append(subprocess)
 
-    async def _stop_a_child(self):
-        if len(self._children) == 0:
+    async def _stop_a_worker(self):
+        if len(self._workers) == 0:
             raise IndexError("Can't stop a kresd when there are no running")
 
-        kresd = self._children.pop()
+        kresd = self._workers.pop()
         await kresd.stop()
 
     async def _collect_already_running_children(self):
-        self._children.extend(await self._controller.get_all_running_instances())
+        self._workers.extend(await self._controller.get_all_running_instances())
 
     async def _rolling_restart(self):
-        for kresd in self._children:
+        for kresd in self._workers:
             await kresd.restart()
             await asyncio.sleep(1)
 
     async def _ensure_number_of_children(self, n: int):
         # kill children that are not needed
-        while len(self._children) > n:
-            await self._stop_a_child()
+        while len(self._workers) > n:
+            await self._stop_a_worker()
 
         # spawn new children if needed
-        while len(self._children) < n:
-            await self._spawn_new_child()
+        while len(self._workers) < n:
+            await self._spawn_new_worker()
+    
+    def _is_gc_running(self) -> bool:
+        return self._gc is not None
+    
+    async def _start_gc(self):
+        subprocess = await self._controller.create_subprocess(SubprocessType.GC, "gc")
+        await subprocess.start()
+        self._gc = subprocess
+    
+    async def _stop_gc(self):
+        assert self._gc is not None
+        await self._gc.stop()
+        self._gc = None
 
     async def _write_config(self, config: KresConfig):
         lua_config = config.render_lua()
@@ -87,7 +101,7 @@ class KresManager:
 
             logger.debug("Testing the new config with a canary process")
             try:
-                await self._spawn_new_child()
+                await self._spawn_new_worker()
             except SubprocessError:
                 logger.error("kresd with the new config failed to start, rejecting config")
                 last = self.get_last_used_config()
@@ -99,6 +113,14 @@ class KresManager:
             self._last_used_config = config
             await self._ensure_number_of_children(config.server.get_instances())
             await self._rolling_restart()
+
+            if self._is_gc_running() != config.server.use_cache_gc:
+                if config.server.use_cache_gc:
+                    logger.debug("Starting cache GC")
+                    await self._start_gc()
+                else:
+                    logger.debug("Stopping cache GC")
+                    await self._stop_gc()
 
     async def stop(self):
         async with self._manager_lock:
