@@ -131,7 +131,7 @@ def list_fatal_subprocesses_ids() -> List[str]:
     return [pr["name"] for pr in processes if pr["statename"] == "FATAL"]
 
 
-def create_id(type_name: SubprocessType, id_: str) -> str:
+def create_id(type_name: SubprocessType, id_: object) -> str:
     return f"{type_name.name}_{id_}"
 
 

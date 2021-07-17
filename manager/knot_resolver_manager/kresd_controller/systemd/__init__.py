@@ -21,7 +21,7 @@ class SystemdSubprocess(Subprocess):
     def __init__(
         self,
         type_: SubprocessType,
-        id_: str,
+        id_: object,
         systemd_type: systemd.SystemdType,
         persistance_type: SystemdPersistanceType = SystemdPersistanceType.PERSISTENT,
     ):
@@ -128,5 +128,5 @@ class SystemdSubprocessController(SubprocessController):
     async def shutdown_controller(self) -> None:
         pass
 
-    async def create_subprocess(self, subprocess_type: SubprocessType, id_hint: str) -> Subprocess:
+    async def create_subprocess(self, subprocess_type: SubprocessType, id_hint: object) -> Subprocess:
         return SystemdSubprocess(subprocess_type, id_hint, self._systemd_type, self._persistance_type)
