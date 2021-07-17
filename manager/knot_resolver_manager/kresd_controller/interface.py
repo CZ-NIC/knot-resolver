@@ -65,7 +65,7 @@ class SubprocessController:
         """
         raise NotImplementedError()
 
-    async def create_subprocess(self, subprocess_type: SubprocessType, id_hint: str) -> Subprocess:
+    async def create_subprocess(self, subprocess_type: SubprocessType, id_hint: object) -> Subprocess:
         """
         Return a Subprocess object which can be operated on. The subprocess is not
         started or in any way active after this call. That has to be performaed manually

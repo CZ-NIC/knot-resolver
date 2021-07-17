@@ -22,9 +22,9 @@ logger = logging.getLogger(__name__)
 
 
 class SupervisordSubprocess(Subprocess):
-    def __init__(self, controller: "SupervisordSubprocessController", id_: str, type_: SubprocessType):
+    def __init__(self, controller: "SupervisordSubprocessController", id_: object, type_: SubprocessType):
         self._controller: "SupervisordSubprocessController" = controller
-        self._id: str = id_
+        self._id = id_
         self._type: SubprocessType = type_
 
     @property
@@ -103,5 +103,5 @@ class SupervisordSubprocessController(SubprocessController):
         assert subprocess in self._running_instances
         await restart(subprocess.id)
 
-    async def create_subprocess(self, subprocess_type: SubprocessType, id_hint: str) -> Subprocess:
+    async def create_subprocess(self, subprocess_type: SubprocessType, id_hint: object) -> Subprocess:
         return SupervisordSubprocess(self, id_hint, subprocess_type)

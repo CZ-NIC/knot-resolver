@@ -1,8 +1,9 @@
 import asyncio
+import itertools
 import logging
+import weakref
 from subprocess import SubprocessError
-from typing import List, Optional, Set, Type
-from uuid import uuid4
+from typing import List, Optional, Type
 
 from knot_resolver_manager.constants import KRESD_CONFIG_FILE
 from knot_resolver_manager.exceptions import ValidationException
@@ -15,14 +16,43 @@ from .datamodel import KresConfig
 logger = logging.getLogger(__name__)
 
 
+class _PrettyID:
+    """
+    ID object. Effectively only a wrapper around an int, so that the references
+    behave normally (bypassing integer interning and other optimizations)
+    """
+
+    def __init__(self, n: int):
+        self._id = n
+
+    def __str__(self):
+        return str(self._id)
+
+    def __hash__(self) -> int:
+        return self._id
+
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, _PrettyID) and self._id == o._id
+
+
 class _PrettyIDAllocator:
+    """
+    Pretty numeric ID allocator. Keeps weak refences to the IDs it has
+    allocated. The IDs get recycled once the previously allocated ID
+    objects get garbage collected
+    """
+
     def __init__(self):
-        self._used: Set[int] = set()
+        self._used: "weakref.WeakSet[_PrettyID]" = weakref.WeakSet()
 
-    def free(self, n: int):
-        assert n in self._used
-        self._used.remove(n)
+    def alloc(self) -> _PrettyID:
+        for i in itertools.count(start=1):
+            val = _PrettyID(i)
+            if val not in self._used:
+                self._used.add(val)
+                return val
 
+        raise RuntimeError("Reached an end of an infinite loop. How?")
 
 
 class KresManager:
@@ -53,13 +83,14 @@ class KresManager:
         self._manager_lock = asyncio.Lock()
         self._controller: SubprocessController
         self._last_used_config: Optional[KresConfig] = None
+        self._id_allocator = _PrettyIDAllocator()
 
     async def load_system_state(self):
         async with self._manager_lock:
             await self._collect_already_running_children()
 
     async def _spawn_new_worker(self):
-        subprocess = await self._controller.create_subprocess(SubprocessType.KRESD, str(uuid4()))
+        subprocess = await self._controller.create_subprocess(SubprocessType.KRESD, self._id_allocator.alloc())
         await subprocess.start()
         self._workers.append(subprocess)
 
@@ -71,7 +102,14 @@ class KresManager:
         await kresd.stop()
 
     async def _collect_already_running_children(self):
-        self._workers.extend(await self._controller.get_all_running_instances())
+        for subp in await self._controller.get_all_running_instances():
+            if subp.type == SubprocessType.KRESD:
+                self._workers.append(subp)
+            elif subp.type == SubprocessType.GC:
+                assert self._gc is None
+                self._gc = subp
+            else:
+                raise RuntimeError("unexpected subprocess type")
 
     async def _rolling_restart(self):
         for kresd in self._workers:
