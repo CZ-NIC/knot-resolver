@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from subprocess import SubprocessError
-from typing import List, Optional, Type
+from typing import List, Optional, Set, Type
 from uuid import uuid4
 
 from knot_resolver_manager.constants import KRESD_CONFIG_FILE
@@ -13,6 +13,16 @@ from knot_resolver_manager.utils.async_utils import writefile
 from .datamodel import KresConfig
 
 logger = logging.getLogger(__name__)
+
+
+class _PrettyIDAllocator:
+    def __init__(self):
+        self._used: Set[int] = set()
+
+    def free(self, n: int):
+        assert n in self._used
+        self._used.remove(n)
+
 
 
 class KresManager:
@@ -76,15 +86,15 @@ class KresManager:
         # spawn new children if needed
         while len(self._workers) < n:
             await self._spawn_new_worker()
-    
+
     def _is_gc_running(self) -> bool:
         return self._gc is not None
-    
+
     async def _start_gc(self):
         subprocess = await self._controller.create_subprocess(SubprocessType.GC, "gc")
         await subprocess.start()
         self._gc = subprocess
-    
+
     async def _stop_gc(self):
         assert self._gc is not None
         await self._gc.stop()
