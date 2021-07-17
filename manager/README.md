@@ -57,10 +57,6 @@ Before commiting, please ensure that both `poe check` and `poe test` pass. Those
 
 This project uses [`apkg`](https://gitlab.nic.cz/packaging/apkg) for packaging. See [`distro/README.md`](distro/README.md) for packaging specific instructions.
 
-Not yet properly implemented. Ideal situation would be a command like `poe package` which would create all possible packages.
-
-Temporary solution to build a wheel/sdist - just call `poetry build`. The result will be in the `dist/` directory.
-
 ## FAQ
 
 ### What all those dev dependencies for?
