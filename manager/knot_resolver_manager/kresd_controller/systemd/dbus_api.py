@@ -13,6 +13,7 @@ from typing_extensions import Literal
 from knot_resolver_manager.constants import KRES_CACHE_DIR, KRESD_CONFIG_FILE, RUNTIME_DIR
 from knot_resolver_manager.exceptions import SubprocessControllerException
 from knot_resolver_manager.kresd_controller.interface import SubprocessType
+from knot_resolver_manager.utils.async_utils import BlockingEventDispatcher
 
 
 class SystemdType(Enum):
@@ -192,3 +193,21 @@ def can_load_unit(type_: SystemdType, unit_name: str) -> bool:
     except Exception:
         # if this fails in any way, we can assume that the unit is not properly loaded
         return False
+
+
+class UnitRemovedEventDispatcher(BlockingEventDispatcher[str]):
+    def __init__(self, type_: SystemdType) -> None:
+        super().__init__(name="UnitRemovedEventDispatcher")
+        self._systemd = _create_manager_proxy(type_)
+        self._loop: Any = GLib.MainLoop()
+
+    def _handler(self, name: str, _unit: Any):
+        self.dispatch_event(name)
+
+    def run(self) -> None:
+        self._systemd.UnitRemoved.connect(self._handler)
+        self._loop.run()
+
+    def stop(self) -> None:
+        if self.is_alive():
+            self._loop.quit()
