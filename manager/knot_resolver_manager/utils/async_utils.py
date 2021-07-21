@@ -4,8 +4,7 @@ import pkgutil
 import time
 from asyncio import create_subprocess_exec, create_subprocess_shell
 from pathlib import PurePath
-from threading import Thread
-from typing import Generic, List, Optional, TypeVar, Union
+from typing import List, Optional, Union
 
 from knot_resolver_manager.compat.asyncio import to_thread
 
@@ -82,27 +81,3 @@ async def wait_for_process_termination(pid: int, sleep_sec: float = 0):
 
 async def read_resource(package: str, filename: str) -> Optional[bytes]:
     return await to_thread(pkgutil.get_data, package, filename)
-
-
-T = TypeVar("T")
-
-
-class BlockingEventDispatcher(Thread, Generic[T]):
-    def __init__(self, name: str = "blocking_event_dispatcher") -> None:
-        super().__init__(name=name, daemon=True)
-        # warning: the asyncio queue is not thread safe
-        self._removed_unit_names: "asyncio.Queue[T]" = asyncio.Queue()
-        self._main_event_loop = asyncio.get_event_loop()
-
-    def dispatch_event(self, event: T):
-        """
-        Method to dispatch events from the blocking thread
-        """
-
-        async def add_to_queue():
-            await self._removed_unit_names.put(event)
-
-        self._main_event_loop.call_soon_threadsafe(add_to_queue)
-
-    async def next_event(self) -> T:
-        return await self._removed_unit_names.get()
