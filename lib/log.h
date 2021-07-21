@@ -67,6 +67,7 @@ enum kr_log_group {
 	LOG_GRP_DOTAUTH,
 	LOG_GRP_HTTP,
 	LOG_GRP_CONTROL,
+	LOG_GRP_MODULE,
 	/* ^^ Add new log groups above ^^. */
 	LOG_GRP_DEVEL,  /* Must be last entry in enum! */
 };
@@ -118,6 +119,7 @@ typedef struct {
 #define LOG_GRP_DOTAUTH_TAG		"dotaut"
 #define LOG_GRP_HTTP_TAG		"http"
 #define LOG_GRP_CONTROL_TAG		"contrl"
+#define LOG_GRP_MODULE_TAG		"module"
 #define LOG_GRP_DEVEL_TAG		"devel"
 
 KR_EXPORT
@@ -175,6 +177,10 @@ void kr_log_init(log_level_t level, log_target_t target);
 #define kr_log_deprecate(grp, fmt, ...) \
 	kr_log_fmt(LOG_GRP_ ## grp, LOG_WARNING,SD_JOURNAL_METADATA, \
 			"[%-6s] deprecation WARNING: " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
+#define kr_log(fmt, ...) \
+	kr_log_fmt(LOG_GRP_MODULE, LOG_INFO, SD_JOURNAL_METADATA, \
+			"[%-6s] " fmt, LOG_GRP_MODULE_TAG, ## __VA_ARGS__)
+
 
 #define KR_LOG_LEVEL_IS(exp) ((kr_log_level >= (exp)) ? true : false)
 

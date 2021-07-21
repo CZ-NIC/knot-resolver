@@ -32,6 +32,7 @@ new_read_globals = {
 	'hour',
 	'day',
 	'panic',
+	'log'
 	'log_error',
 	'log_warn',
 	'log_info',
