@@ -65,6 +65,10 @@ function log_debug(grp, fmt, ...)
 	log_fmt(grp, LOG_DEBUG, fmt, ...)
 end
 
+function log(fmt, ...)
+	log_info(ffi.C.LOG_GRP_MODULE, fmt, ...)
+end
+
 -- Resolver bindings
 kres = require('kres')
 if rawget(kres, 'str2dname') ~= nil then
