@@ -145,6 +145,8 @@ static int l_quit(lua_State *L)
 /** Toggle verbose mode. */
 static int l_verbose(lua_State *L)
 {
+	kr_log_deprecate(SYSTEM, "use set_log_level() instead of verbose()\n");
+
 	if (lua_isboolean(L, 1) || lua_isnumber(L, 1)) {
 		kr_log_level_set(lua_toboolean(L, 1) == true ? LOG_DEBUG : LOG_DEFAULT_LEVEL);
 	}
