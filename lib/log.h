@@ -8,9 +8,8 @@
 #include <syslog.h>
 #include "lib/defines.h"
 
-
-#define LOG_DEFAULT_LEVEL	LOG_NOTICE
-#define LOG_GNUTLS_LEVEL	5
+#define LOG_DEFAULT_LEVEL	LOG_NOTICE /**< Default level  is ``notice``. */
+#define LOG_GNUTLS_LEVEL	5 /**< GnuTLS level is 5. */
 
 /* Targets */
 
@@ -77,50 +76,55 @@ typedef struct {
 	enum kr_log_group	g_val;
 } log_group_names_t;
 
-#define LOG_GRP_SYSTEM_TAG		"system"
-#define LOG_GRP_CACHE_TAG		"cache"
-#define LOG_GRP_IO_TAG			"io"
-#define LOG_GRP_NETWORK_TAG		"net"
-#define LOG_GRP_TA_TAG			"ta"
-#define LOG_GRP_TLS_TAG			"tls"
-#define LOG_GRP_GNUTLS_TAG		"gnutls"
-#define LOG_GRP_TLSCLIENT_TAG		"tls_cl"
-#define LOG_GRP_XDP_TAG			"xdp"
-#define LOG_GRP_ZIMPORT_TAG		"zimprt"
-#define LOG_GRP_ZSCANNER_TAG		"zscann"
-#define LOG_GRP_DOH_TAG			"doh"
-#define LOG_GRP_DNSSEC_TAG		"dnssec"
-#define LOG_GRP_HINT_TAG		"hint"
-#define LOG_GRP_PLAN_TAG		"plan"
-#define LOG_GRP_ITERATOR_TAG		"iterat"
-#define LOG_GRP_VALIDATOR_TAG		"valdtr"
-#define LOG_GRP_RESOLVER_TAG		"resolv"
-#define LOG_GRP_SELECTION_TAG		"select"
-#define LOG_GRP_ZCUT_TAG		"zoncut"
-#define LOG_GRP_COOKIES_TAG		"cookie"
-#define LOG_GRP_STATISTICS_TAG		"statis"
-#define LOG_GRP_REBIND_TAG		"rebind"
-#define LOG_GRP_WORKER_TAG		"worker"
-#define LOG_GRP_POLICY_TAG		"policy"
-#define LOG_GRP_TASENTINEL_TAG		"tasent"
-#define LOG_GRP_TASIGNALING_TAG		"tasign"
-#define LOG_GRP_TAUPDATE_TAG		"taupd"
-#define LOG_GRP_DAF_TAG			"daf"
-#define LOG_GRP_DETECTTIMEJUMP_TAG	"timejm"
-#define LOG_GRP_DETECTTIMESKEW_TAG	"timesk"
-#define LOG_GRP_GRAPHITE_TAG		"graphi"
-#define LOG_GRP_PREFILL_TAG		"prefil"
-#define LOG_GRP_PRIMING_TAG		"primin"
-#define LOG_GRP_SRVSTALE_TAG		"srvstl"
-#define LOG_GRP_WATCHDOG_TAG		"wtchdg"
-#define LOG_GRP_NSID_TAG		"nsid"
-#define LOG_GRP_DNSTAP_TAG		"dnstap"
-#define LOG_GRP_TESTS_TAG		"tests"
-#define LOG_GRP_DOTAUTH_TAG		"dotaut"
-#define LOG_GRP_HTTP_TAG		"http"
-#define LOG_GRP_CONTROL_TAG		"contrl"
-#define LOG_GRP_MODULE_TAG		"module"
-#define LOG_GRP_DEVEL_TAG		"devel"
+/**
+ * @name Group names
+ */
+///@{
+#define LOG_GRP_SYSTEM_TAG		"system"	/**< ``system``: operations related to system */
+#define LOG_GRP_CACHE_TAG		"cache"		/**< ``cache``: operations related to cache */
+#define LOG_GRP_IO_TAG			"io"		/**< ``io``: operations related to io */
+#define LOG_GRP_NETWORK_TAG		"net"		/**< ``net``: operations related to network */
+#define LOG_GRP_TA_TAG			"ta"		/**< ``ta``: operations related to trush anchors */
+#define LOG_GRP_TLS_TAG			"tls"		/**< ``tls``: operations related to TLS */
+#define LOG_GRP_GNUTLS_TAG		"gnutls"	/**< ``gnutls``: operations related to GnuTLS */
+#define LOG_GRP_TLSCLIENT_TAG		"tls_cl"	/**< ``tls_cl``: operations related to TLS client */
+#define LOG_GRP_XDP_TAG			"xdp"		/**< ``xdp``: operations related to XDP */
+#define LOG_GRP_ZIMPORT_TAG		"zimprt"	/**< ``zimprt``: operations related to zimport */
+#define LOG_GRP_ZSCANNER_TAG		"zscann"	/**< ``zscann``: operations related to zscanner */
+#define LOG_GRP_DOH_TAG			"doh"		/**< ``doh``: operations related to DoH */
+#define LOG_GRP_DNSSEC_TAG		"dnssec"	/**< ``dnssec``: operations related to DNSSEC */
+#define LOG_GRP_HINT_TAG		"hint"		/**< ``hint``: operations related to static hints */
+#define LOG_GRP_PLAN_TAG		"plan"		/**< ``plan``: operations related to resolution plan */
+#define LOG_GRP_ITERATOR_TAG		"iterat"	/**< ``iterat``: operations related to iterate layer */
+#define LOG_GRP_VALIDATOR_TAG		"valdtr"	/**< ``valdtr``: operations related to validate layer */
+#define LOG_GRP_RESOLVER_TAG		"resolv"	/**< ``resolv``: operations related to resolving */
+#define LOG_GRP_SELECTION_TAG		"select"	/**< ``select``: operations related to server selection */
+#define LOG_GRP_ZCUT_TAG		"zoncut"	/**< ``zonecut``: operations related to zone cut */
+#define LOG_GRP_COOKIES_TAG		"cookie"	/**< ``cookie``: operations related to cookies */
+#define LOG_GRP_STATISTICS_TAG		"statis"	/**< ``statis``: operations related to statistics */
+#define LOG_GRP_REBIND_TAG		"rebind"	/**< ``rebind``: operations related to rebinding */
+#define LOG_GRP_WORKER_TAG		"worker"	/**< ``worker``: operations related to worker layer */
+#define LOG_GRP_POLICY_TAG		"policy"	/**< ``policy``: operations related to policy */
+#define LOG_GRP_TASENTINEL_TAG		"tasent"	/**< ``tasent``: operations related to TA sentinel */
+#define LOG_GRP_TASIGNALING_TAG		"tasign"	/**< ``tasign``: operations related to TA signal query */
+#define LOG_GRP_TAUPDATE_TAG		"taupd"		/**< ``taupd``: operations related to TA update */
+#define LOG_GRP_DAF_TAG			"daf"		/**< ``daf``: operations related to DAF */
+#define LOG_GRP_DETECTTIMEJUMP_TAG	"timejm"	/**< ``timejm``: operations related to time jump */
+#define LOG_GRP_DETECTTIMESKEW_TAG	"timesk"	/**< ``timesk``: operations related to time skew */
+#define LOG_GRP_GRAPHITE_TAG		"graphi"	/**< ``graphi``: operations related to graphite */
+#define LOG_GRP_PREFILL_TAG		"prefil"	/**< ``prefil``: operations related to prefill */
+#define LOG_GRP_PRIMING_TAG		"primin"	/**< ``primin``: operations related to priming */
+#define LOG_GRP_SRVSTALE_TAG		"srvstl"	/**< ``srvstl``: operations related to serve stale */
+#define LOG_GRP_WATCHDOG_TAG		"wtchdg"	/**< ``wtchdg``: operations related to watchdog */
+#define LOG_GRP_NSID_TAG		"nsid"		/**< ``nsid``: operations related to NSID */
+#define LOG_GRP_DNSTAP_TAG		"dnstap"	/**< ``dnstap``: operations related to dnstap */
+#define LOG_GRP_TESTS_TAG		"tests"		/**< ``tests``: operations related to tests  */
+#define LOG_GRP_DOTAUTH_TAG		"dotaut"	/**< ``dotaut``: operations related to DoH authorization */
+#define LOG_GRP_HTTP_TAG		"http"		/**< ``http``: operations related to http */
+#define LOG_GRP_CONTROL_TAG		"contrl"	/**< ``contrl``: operations related to TTY control */
+#define LOG_GRP_MODULE_TAG		"module"	/**< ``module``: For logging in user-defined modules */
+#define LOG_GRP_DEVEL_TAG		"devel"		/**< ``devel``: For development purposes */
+///@}
 
 KR_EXPORT
 bool kr_log_group_is_set(enum kr_log_group group);
@@ -155,6 +159,14 @@ void kr_log_init(log_level_t level, log_target_t target);
 #define TO_STR(x) TO_STR_A(x)
 #define SD_JOURNAL_METADATA "CODE_FILE=" __FILE__, "CODE_LINE=" TO_STR(__LINE__), ""
 
+/**
+ * Logging function for user modules. Uses group LOG_GRP_MODULE and ``info`` level.
+ * @param fmt Format string
+ */
+#define kr_log(fmt, ...) \
+	kr_log_fmt(LOG_GRP_MODULE, LOG_INFO, SD_JOURNAL_METADATA, \
+			"[%-6s] " fmt, LOG_GRP_MODULE_TAG, ## __VA_ARGS__)
+
 #define kr_log_debug(grp, fmt, ...) \
 	kr_log_fmt(LOG_GRP_ ## grp, LOG_DEBUG, SD_JOURNAL_METADATA, \
 			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
@@ -177,10 +189,6 @@ void kr_log_init(log_level_t level, log_target_t target);
 #define kr_log_deprecate(grp, fmt, ...) \
 	kr_log_fmt(LOG_GRP_ ## grp, LOG_WARNING,SD_JOURNAL_METADATA, \
 			"[%-6s] deprecation WARNING: " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
-#define kr_log(fmt, ...) \
-	kr_log_fmt(LOG_GRP_MODULE, LOG_INFO, SD_JOURNAL_METADATA, \
-			"[%-6s] " fmt, LOG_GRP_MODULE_TAG, ## __VA_ARGS__)
-
 
 #define KR_LOG_LEVEL_IS(exp) ((kr_log_level >= (exp)) ? true : false)
 
