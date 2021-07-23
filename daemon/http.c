@@ -423,6 +423,13 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	}
 
 	if (is_first) {
+		/* FIXME: reserving the 2B length should be done elsewhere,
+		 * ideally for both POST and GET at the same time. The right
+		 * place would probably be after receiving HEADERS frame in
+		 * on_frame_recv()
+		 *
+		 * queue_push() should be moved: see FIXME in
+		 * submit_to_wirebuffer() */
 		ctx->buf_pos = sizeof(uint16_t);  /* Reserve 2B for dnsmsg len. */
 		struct http_stream stream = {
 			.id = stream_id,
@@ -441,15 +448,25 @@ static int submit_to_wirebuffer(struct http_ctx *ctx)
 	int ret = -1;
 	ssize_t len;
 
+	/* Transfer ownership to stream (waiting in wirebuffer) */
+	/* FIXME: technically, transferring memory ownership should happen
+	 * along with queue_push(ctx->streams) to avoid confusion of who owns
+	 * what and when. Pushing to queue should be done AFTER we sucessfully
+	 * finish this function. On error, we'd clean up and not push anything.
+	 * However, queue's content is now also used to detect first DATA frame
+	 * in stream, so it needs to be refactored first.
+	 *
+	 * For now, we assume memory is transferred even on error and the
+	 * headers themselves get cleaned up during http_free() which is
+	 * triggered after the error when session is closed.  */
+	ctx->headers = NULL;
+
 	len = ctx->buf_pos - sizeof(uint16_t);
 	if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
 		kr_log_debug(DOH, "[%p] invalid dnsmsg size: %zd B\n", (void *)ctx->h2, len);
 		ret = -1;
 		goto cleanup;
 	}
-
-	/* Transfer ownership to stream (waiting in wirebuffer) */
-	ctx->headers = NULL;
 
 	/* Submit data to wirebuffer. */
 	knot_wire_write_u16(ctx->buf, len);
@@ -593,6 +610,12 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *buf,
 	if (kr_fails_assert(ctx->session == session))
 		return kr_error(EINVAL);
 
+	/* FIXME It is possible for the TLS/HTTP processing to be cut off at
+	 * any point, waiting for more data. If we're using POST which is split
+	 * into multiple DATA frames and such a stream is in the middle of
+	 * processing, resetting buf_pos will corrupt its contents (and the
+	 * query will be ignored).  This may also be problematic in other
+	 * cases.  */
 	ctx->submitted = 0;
 	ctx->buf = session_wirebuf_get_free_start(session);
 	ctx->buf_pos = 0;
