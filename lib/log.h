@@ -80,18 +80,21 @@ typedef struct {
  * @name Group names
  */
 ///@{
-#define LOG_GRP_SYSTEM_TAG		"system"	/**< ``system``: operations related to system */
+#define LOG_GRP_SYSTEM_TAG		"system"	/**< ``system``: catch-all log for generic messages*/
 #define LOG_GRP_CACHE_TAG		"cache"		/**< ``cache``: operations related to cache */
-#define LOG_GRP_IO_TAG			"io"		/**< ``io``: operations related to io */
-#define LOG_GRP_NETWORK_TAG		"net"		/**< ``net``: operations related to network */
-#define LOG_GRP_TA_TAG			"ta"		/**< ``ta``: operations related to trush anchors */
-#define LOG_GRP_TLS_TAG			"tls"		/**< ``tls``: operations related to TLS */
-#define LOG_GRP_GNUTLS_TAG		"gnutls"	/**< ``gnutls``: operations related to GnuTLS */
-#define LOG_GRP_TLSCLIENT_TAG		"tls_cl"	/**< ``tls_cl``: operations related to TLS client */
+#define LOG_GRP_IO_TAG			"io"		/**< ``io``: input/output operations */
+#define LOG_GRP_NETWORK_TAG		"net"		/**< ``net``: network configuration and operation */
+#define LOG_GRP_TA_TAG			"ta"		/**< ``ta``: basic log for trust anchors (TA) */
+#define LOG_GRP_TASENTINEL_TAG		"tasent"	/**< ``tasent``: TA sentinel */
+#define LOG_GRP_TASIGNALING_TAG		"tasign"	/**< ``tasign``: TA signal query */
+#define LOG_GRP_TAUPDATE_TAG		"taupd"		/**< ``taupd``: TA update */
+#define LOG_GRP_TLS_TAG			"tls"		/**< ``tls``: TLS encryption layer */
+#define LOG_GRP_GNUTLS_TAG		"gnutls"	/**< ``gnutls``: low-level logs from GnuTLS */
+#define LOG_GRP_TLSCLIENT_TAG		"tls_cl"	/**< ``tls_cl``: TLS client messagess (used for TLS forwarding) */
 #define LOG_GRP_XDP_TAG			"xdp"		/**< ``xdp``: operations related to XDP */
 #define LOG_GRP_ZIMPORT_TAG		"zimprt"	/**< ``zimprt``: operations related to zimport */
 #define LOG_GRP_ZSCANNER_TAG		"zscann"	/**< ``zscann``: operations related to zscanner */
-#define LOG_GRP_DOH_TAG			"doh"		/**< ``doh``: operations related to DoH */
+#define LOG_GRP_DOH_TAG			"doh"		/**< ``doh``: DNS-over-HTTPS logger (doh2 implementation) */
 #define LOG_GRP_DNSSEC_TAG		"dnssec"	/**< ``dnssec``: operations related to DNSSEC */
 #define LOG_GRP_HINT_TAG		"hint"		/**< ``hint``: operations related to static hints */
 #define LOG_GRP_PLAN_TAG		"plan"		/**< ``plan``: operations related to resolution plan */
@@ -105,10 +108,7 @@ typedef struct {
 #define LOG_GRP_REBIND_TAG		"rebind"	/**< ``rebind``: operations related to rebinding */
 #define LOG_GRP_WORKER_TAG		"worker"	/**< ``worker``: operations related to worker layer */
 #define LOG_GRP_POLICY_TAG		"policy"	/**< ``policy``: operations related to policy */
-#define LOG_GRP_TASENTINEL_TAG		"tasent"	/**< ``tasent``: operations related to TA sentinel */
-#define LOG_GRP_TASIGNALING_TAG		"tasign"	/**< ``tasign``: operations related to TA signal query */
-#define LOG_GRP_TAUPDATE_TAG		"taupd"		/**< ``taupd``: operations related to TA update */
-#define LOG_GRP_DAF_TAG			"daf"		/**< ``daf``: operations related to DAF */
+#define LOG_GRP_DAF_TAG			"daf"		/**< ``daf``: operations related to DAF module */
 #define LOG_GRP_DETECTTIMEJUMP_TAG	"timejm"	/**< ``timejm``: operations related to time jump */
 #define LOG_GRP_DETECTTIMESKEW_TAG	"timesk"	/**< ``timesk``: operations related to time skew */
 #define LOG_GRP_GRAPHITE_TAG		"graphi"	/**< ``graphi``: operations related to graphite */
@@ -119,11 +119,11 @@ typedef struct {
 #define LOG_GRP_NSID_TAG		"nsid"		/**< ``nsid``: operations related to NSID */
 #define LOG_GRP_DNSTAP_TAG		"dnstap"	/**< ``dnstap``: operations related to dnstap */
 #define LOG_GRP_TESTS_TAG		"tests"		/**< ``tests``: operations related to tests  */
-#define LOG_GRP_DOTAUTH_TAG		"dotaut"	/**< ``dotaut``: operations related to DoH authorization */
-#define LOG_GRP_HTTP_TAG		"http"		/**< ``http``: operations related to http */
-#define LOG_GRP_CONTROL_TAG		"contrl"	/**< ``contrl``: operations related to TTY control */
-#define LOG_GRP_MODULE_TAG		"module"	/**< ``module``: For logging in user-defined modules */
-#define LOG_GRP_DEVEL_TAG		"devel"		/**< ``devel``: For development purposes */
+#define LOG_GRP_DOTAUTH_TAG		"dotaut"	/**< ``dotaut``: DNS-over-TLS against authoritative servers */
+#define LOG_GRP_HTTP_TAG		"http"		/**< ``http``: http module, its web interface and legacy DNS-over-HTTPS */
+#define LOG_GRP_CONTROL_TAG		"contrl"	/**< ``contrl``: TTY control sockets*/
+#define LOG_GRP_MODULE_TAG		"module"	/**< ``module``: suitable for user-defined modules */
+#define LOG_GRP_DEVEL_TAG		"devel"		/**< ``devel``: for development purposes */
 ///@}
 
 KR_EXPORT
