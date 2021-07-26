@@ -182,7 +182,7 @@ void kr_log_init(log_level_t level, log_target_t target);
 #define kr_log_error(grp, fmt, ...) \
 	kr_log_fmt(LOG_GRP_ ## grp, LOG_ERR, SD_JOURNAL_METADATA, \
 			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
-#define kr_log_fatal(grp, fmt, ...) \
+#define kr_log_crit(grp, fmt, ...) \
 	kr_log_fmt(LOG_GRP_ ## grp, LOG_CRIT, SD_JOURNAL_METADATA, \
 			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
 

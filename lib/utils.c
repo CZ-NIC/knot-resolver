@@ -39,7 +39,7 @@ void kr_fail(bool is_fatal, const char *expr, const char *func, const char *file
 {
 	const int errno_orig = errno;
 	if (is_fatal)
-		kr_log_fatal(SYSTEM, "requirement \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
+		kr_log_crit(SYSTEM, "requirement \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
 	else
 		kr_log_error(SYSTEM, "assertion \"%s\" failed in %s@%s:%d\n", expr, func, file, line);
 
