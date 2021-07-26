@@ -27,6 +27,7 @@
 #include "lib/defines.h"
 #include "lib/cache/cdb_lmdb.h"
 #include "lib/dnssec/ta.h"
+#include "lib/log.h"
 
 /* Magic defaults for the engine. */
 #ifndef LRU_RTT_SIZE
@@ -173,6 +174,41 @@ static int l_get_log_level(lua_State *L)
 {
 	lua_pushstring(L, kr_log_level2name(kr_log_level_get()));
 	return 1;
+}
+
+static int l_set_log_target(lua_State *L)
+{
+	const int params = lua_gettop(L);
+	if (params > 1)
+		goto bad_call;
+	// set
+	if (params == 1) {
+		const char *t_str = lua_tostring(L, 1);
+		if (!t_str)
+			goto bad_call;
+		kr_log_target_t t;
+		if (strcmp(t_str, "syslog") == 0) {
+			t = LOG_TARGET_SYSLOG;
+		} else if (strcmp(t_str, "stdout") == 0) {
+			t = LOG_TARGET_STDOUT;
+		} else if (strcmp(t_str, "stderr") == 0) {
+			t = LOG_TARGET_STDERR;
+		} else {
+			lua_error_p(L, "unknown log target '%s'", t_str);
+		}
+		kr_log_target_set(t);
+	}
+	// get
+	const char *t_str = NULL;
+	switch (kr_log_target) {
+		case LOG_TARGET_SYSLOG: t_str = "syslog"; break;
+		case LOG_TARGET_STDERR: t_str = "stderr"; break;
+		case LOG_TARGET_STDOUT: t_str = "stdout"; break;
+	} // -Wswitch-enum
+	lua_pushstring(L, t_str);
+	return 1;
+bad_call:
+	lua_error_p(L, "takes one string parameter or nothing");
 }
 
 static int handle_log_groups(lua_State *L, void (*action)(enum kr_log_group grp))
@@ -516,6 +552,8 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "set_log_level");
 	lua_pushcfunction(engine->L, l_get_log_level);
 	lua_setglobal(engine->L, "get_log_level");
+	lua_pushcfunction(engine->L, l_set_log_target);
+	lua_setglobal(engine->L, "set_log_target");
 	lua_pushcfunction(engine->L, l_add_log_groups);
 	lua_setglobal(engine->L, "add_log_groups");
 	lua_pushcfunction(engine->L, l_del_log_groups);

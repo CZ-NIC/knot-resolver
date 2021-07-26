@@ -4,9 +4,7 @@
 Logging, monitoring, diagnostics
 ********************************
 
-Knot Resolver logs to standard outputs, which is then captured by supervisor
-and sent to logging system for further processing.
-To read logs use commands usual for your distribution.
+To read service logs use commands usual for your distribution.
 E.g. on distributions using systemd-journald use command ``journalctl -u kresd@* -f``.
 
 Knot Resolver supports 6 logging levels - ``crit``, ``err``, ``warning``,
@@ -47,6 +45,16 @@ set by :func:`set_log_level`.
   :return: string Current logging level.
 
   Show current logging level.
+
+.. py:function:: set_log_target(target)
+
+  :param: String ``'syslog'``, ``'stderr'``, ``'stdout'``
+  :return: string Current logging target.
+
+     Knot Resolver logs to standard error stream by default,
+     but typical systemd units change that to ``'syslog'``.
+     That setting logs directly through systemd's facilities
+     (if available) to preserve more meta-data.
 
 .. py:function:: get_log_groups()
 

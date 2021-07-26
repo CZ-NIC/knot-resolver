@@ -19,8 +19,8 @@ bool use_journal = false;
 #define use_journal false
 #endif
 
-kr_log_level_t kr_log_level = LOG_CRIT;
-kr_log_target_t kr_log_target = LOG_TARGET_STDOUT;
+kr_log_level_t kr_log_level = LOG_DEFAULT_LEVEL;
+kr_log_target_t kr_log_target = LOG_TARGET_DEFAULT;
 
 /** Set of log-groups that are on debug level.  It's a bitmap over 1 << enum kr_log_group. */
 static uint64_t kr_log_groups = 0;
@@ -127,12 +127,11 @@ void kr_log_fmt(enum kr_log_group group, kr_log_level_t level, const char *file,
 		if (kr_log_group_is_set(group))
 			setlogmask(LOG_UPTO(kr_log_level));
 	} else {
-
 		FILE *stream;
 		switch(kr_log_target) {
 		case LOG_TARGET_STDOUT: stream = stdout; break;
+		default: kr_assert(false); // fall through
 		case LOG_TARGET_STDERR: stream = stderr; break;
-		default: stream = stdout; break;
 		}
 
 		va_start(args, fmt);
@@ -245,16 +244,22 @@ void kr_log_del_group(enum kr_log_group group)
 		kr_gnutls_log_level_set();
 }
 
-void kr_log_init(kr_log_level_t level, kr_log_target_t target)
+void kr_log_target_set(kr_log_target_t target)
 {
 	kr_log_target = target;
-	kr_log_groups = 0;
+	if (target != LOG_TARGET_SYSLOG)
+		return;
 
+	int ret = 0;
 #if ENABLE_LIBSYSTEMD
-	use_journal = sd_booted();
+	ret = sd_booted();
+	use_journal = ret > 0;
 #endif
-	openlog(NULL, LOG_PID, LOG_DAEMON);
-	kr_log_level_set(level);
+	if (!use_journal)
+		openlog(NULL, LOG_PID, LOG_DAEMON);
+	if (ret < 0)
+		kr_log_error(SYSTEM, "failed test for systemd presence: %s\n",
+				strerror(abs(ret)));
 }
 
 static inline bool req_has_trace_log(const struct kr_request *req)

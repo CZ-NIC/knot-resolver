@@ -95,7 +95,7 @@ class Kresd(ContextDecorator):
         self.logfile = open(self.logfile_path, 'w')
         self.process = subprocess.Popen(
             ['kresd', '-c', self.config_path, '-n', self.workdir],
-            stdout=self.logfile, env=os.environ.copy())
+            stderr=self.logfile, env=os.environ.copy())
 
         try:
             self._wait_for_tcp_port()  # wait for ports to be up and responding

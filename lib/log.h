@@ -17,6 +17,8 @@ typedef enum {
 	LOG_TARGET_SYSLOG = 0,
 	LOG_TARGET_STDERR = 1,
 	LOG_TARGET_STDOUT = 2,
+	/* The default also applies *before* configuration changes it. */
+	LOG_TARGET_DEFAULT = LOG_TARGET_STDERR,
 } kr_log_target_t;
 
 /* Groups */
@@ -148,7 +150,7 @@ int kr_log_level_set(kr_log_level_t level);
 KR_EXPORT
 kr_log_level_t kr_log_level_get(void);
 KR_EXPORT
-void kr_log_init(kr_log_level_t level, kr_log_target_t target);
+void kr_log_target_set(kr_log_target_t target);
 
 #define TO_STR_A(x) #x
 #define TO_STR(x) TO_STR_A(x)
