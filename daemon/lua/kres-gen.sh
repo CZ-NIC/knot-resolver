@@ -138,7 +138,7 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_prop
 	struct kr_module
 	struct kr_server_selection
-	log_level_t
+	kr_log_level_t
 	enum kr_log_group
 EOF
 

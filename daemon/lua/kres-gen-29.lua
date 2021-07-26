@@ -306,7 +306,7 @@ struct kr_server_selection {
 	void (*error)(struct kr_query *, const struct kr_transport *, enum kr_selection_error);
 	struct local_state *local_state;
 };
-typedef int log_level_t;
+typedef int kr_log_level_t;
 enum kr_log_group {LOG_GRP_SYSTEM = 1, LOG_GRP_CACHE, LOG_GRP_IO, LOG_GRP_NETWORK, LOG_GRP_TA, LOG_GRP_TLS, LOG_GRP_GNUTLS, LOG_GRP_TLSCLIENT, LOG_GRP_XDP, LOG_GRP_ZIMPORT, LOG_GRP_ZSCANNER, LOG_GRP_DOH, LOG_GRP_DNSSEC, LOG_GRP_HINT, LOG_GRP_PLAN, LOG_GRP_ITERATOR, LOG_GRP_VALIDATOR, LOG_GRP_RESOLVER, LOG_GRP_SELECTION, LOG_GRP_ZCUT, LOG_GRP_COOKIES, LOG_GRP_STATISTICS, LOG_GRP_REBIND, LOG_GRP_WORKER, LOG_GRP_POLICY, LOG_GRP_TASENTINEL, LOG_GRP_TASIGNALING, LOG_GRP_TAUPDATE, LOG_GRP_DAF, LOG_GRP_DETECTTIMEJUMP, LOG_GRP_DETECTTIMESKEW, LOG_GRP_GRAPHITE, LOG_GRP_PREFILL, LOG_GRP_PRIMING, LOG_GRP_SRVSTALE, LOG_GRP_WATCHDOG, LOG_GRP_NSID, LOG_GRP_DNSTAP, LOG_GRP_TESTS, LOG_GRP_DOTAUTH, LOG_GRP_HTTP, LOG_GRP_CONTROL, LOG_GRP_MODULE, LOG_GRP_DEVEL};
 
 kr_layer_t kr_layer_t_static;
@@ -388,7 +388,7 @@ int kr_forward_add_target(struct kr_request *, const struct sockaddr *);
 void kr_log_req1(const struct kr_request * const, uint32_t, const unsigned int, enum kr_log_group, const char *, const char *, ...);
 void kr_log_q1(const struct kr_query * const, enum kr_log_group, const char *, const char *, ...);
 const char *kr_log_grp2name(enum kr_log_group);
-void kr_log_fmt(enum kr_log_group, log_level_t, const char *, const char *, const char *, const char *, ...);
+void kr_log_fmt(enum kr_log_group, kr_log_level_t, const char *, const char *, const char *, const char *, ...);
 int kr_make_query(struct kr_query *, knot_pkt_t *);
 void kr_pkt_make_auth_header(knot_pkt_t *);
 int kr_pkt_put(knot_pkt_t *, const knot_dname_t *, uint32_t, uint16_t, uint16_t, const uint8_t *, uint16_t);
