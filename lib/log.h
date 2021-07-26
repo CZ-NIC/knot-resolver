@@ -17,7 +17,7 @@ typedef enum {
 	LOG_TARGET_SYSLOG = 0,
 	LOG_TARGET_STDERR = 1,
 	LOG_TARGET_STDOUT = 2,
-} log_target_t;
+} kr_log_target_t;
 
 /* Groups */
 
@@ -70,11 +70,6 @@ enum kr_log_group {
 	/* ^^ Add new log groups above ^^. */
 	LOG_GRP_DEVEL,  /* Must be last entry in enum! */
 };
-
-typedef struct {
-	const char		*g_name;
-	enum kr_log_group	g_val;
-} log_group_names_t;
 
 /**
  * @name Group names
@@ -139,21 +134,21 @@ enum kr_log_group kr_log_name2grp(const char *name);
 
 /* Log */
 
-typedef int log_level_t;
+typedef int kr_log_level_t;
 
 KR_EXPORT
-extern log_level_t kr_log_level;
+extern kr_log_level_t kr_log_level;
 KR_EXPORT
-extern log_target_t kr_log_target;
+extern kr_log_target_t kr_log_target;
 KR_EXPORT KR_PRINTF(6)
-void kr_log_fmt(enum kr_log_group group, log_level_t level, const char *file, const char *line,
+void kr_log_fmt(enum kr_log_group group, kr_log_level_t level, const char *file, const char *line,
 		const char *func, const char *fmt, ...);
 KR_EXPORT
-int kr_log_level_set(log_level_t level);
+int kr_log_level_set(kr_log_level_t level);
 KR_EXPORT
-log_level_t kr_log_level_get(void);
+kr_log_level_t kr_log_level_get(void);
 KR_EXPORT
-void kr_log_init(log_level_t level, log_target_t target);
+void kr_log_init(kr_log_level_t level, kr_log_target_t target);
 
 #define TO_STR_A(x) #x
 #define TO_STR(x) TO_STR_A(x)
@@ -196,9 +191,9 @@ void kr_log_init(log_level_t level, log_target_t target);
 /* Syslog */
 
 KR_EXPORT
-char *kr_log_level2name(log_level_t level);
+char *kr_log_level2name(kr_log_level_t level);
 KR_EXPORT
-log_level_t kr_log_name2level(const char *name);
+kr_log_level_t kr_log_name2level(const char *name);
 
 #ifndef SYSLOG_NAMES
 typedef struct _code {

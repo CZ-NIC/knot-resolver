@@ -18,13 +18,19 @@
 int use_journal = 0;
 #endif
 
-log_level_t kr_log_level = LOG_CRIT;
-log_target_t kr_log_target = LOG_TARGET_STDOUT;
+kr_log_level_t kr_log_level = LOG_CRIT;
+kr_log_target_t kr_log_target = LOG_TARGET_STDOUT;
 
 /** Set of log-groups that are on debug level.  It's a bitmap over 1 << enum kr_log_group. */
 static uint64_t kr_log_groups = 0;
 
 static_assert(LOG_GRP_DEVEL <= 8 * sizeof(kr_log_groups), "Too many log groups.");
+
+
+typedef struct {
+	const char		*g_name;
+	enum kr_log_group	g_val;
+} log_group_names_t;
 
 #define GRP_NAME_ITEM(grp) { grp ## _TAG, grp }
 
@@ -95,7 +101,7 @@ bool kr_log_group_is_set(enum kr_log_group group)
 	return kr_log_groups & (1ULL << group);
 }
 
-void kr_log_fmt(enum kr_log_group group, log_level_t level, const char *file,
+void kr_log_fmt(enum kr_log_group group, kr_log_level_t level, const char *file,
 		const char *line, const char *func, const char *fmt, ...)
 {
 	va_list args;
@@ -141,7 +147,7 @@ static void kres_gnutls_log(int level, const char *message)
 	kr_log_debug(GNUTLS, "(%d) %s", level, message);
 }
 
-char *kr_log_level2name(log_level_t level)
+char *kr_log_level2name(kr_log_level_t level)
 {
 	for (int i = 0; prioritynames[i].c_name; ++i)
 	{
@@ -152,7 +158,7 @@ char *kr_log_level2name(log_level_t level)
 	return NULL;
 }
 
-log_level_t kr_log_name2level(const char *name)
+kr_log_level_t kr_log_name2level(const char *name)
 {
 	if (kr_fails_assert(name))
 		return -1;
@@ -205,7 +211,7 @@ static void kr_gnutls_log_level_set()
 	}
 }
 
-int kr_log_level_set(log_level_t level)
+int kr_log_level_set(kr_log_level_t level)
 {
 	if (level < LOG_CRIT || level > LOG_DEBUG) {
 		kr_log_warning(SYSTEM, "invalid log level\n");
@@ -221,7 +227,7 @@ int kr_log_level_set(log_level_t level)
 
 }
 
-log_level_t kr_log_level_get(void)
+kr_log_level_t kr_log_level_get(void)
 {
 	return kr_log_level;
 }
@@ -240,7 +246,7 @@ void kr_log_del_group(enum kr_log_group group)
 		kr_gnutls_log_level_set();
 }
 
-void kr_log_init(log_level_t level, log_target_t target)
+void kr_log_init(kr_log_level_t level, kr_log_target_t target)
 {
 	kr_log_target = target;
 	kr_log_groups = 0;
