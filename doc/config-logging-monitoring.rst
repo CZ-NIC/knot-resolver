@@ -9,7 +9,7 @@ and sent to logging system for further processing.
 To read logs use commands usual for your distribution.
 E.g. on distributions using systemd-journald use command ``journalctl -u kresd@* -f``.
 
-Knot Resolver supports 6 logging levels - ``fatal``, ``error``, ``warning``,
+Knot Resolver supports 6 logging levels - ``crit``, ``err``, ``warning``,
 ``notice``, ``info``, ``debug``. All levels with the same meaning as is defined
 in ``syslog.h``. It is possible change logging level using
 :func:`set_log_level` function.
@@ -25,22 +25,22 @@ are logged by default, but you can enable ``debug`` level for some groups using
 :func:`add_log_groups` function. Other groups are logged to the log level
 set by :func:`set_log_level`.
 
-.. py:function:: verbose([true | false])
-
-   :param: ``true`` enable ``debug`` level, ``false`` switch to default level (``notice``).
-   :return: boolean ``true`` when ``debug`` level is enabled.
-
-   Toggle between ``debug`` and ``notice`` log level. Use only for debugging purposes.
-   On busy systems vebose logging can produce several MB of logs per
-   second and will slow down operation.
-
 .. py:function:: set_log_level(level)
 
-  :param: String ``'fatal'``, ``'error'``, ``'warning'``, ``'notice'``,
+  :param: String ``'crit'``, ``'err'``, ``'warning'``, ``'notice'``,
    ``'info'`` or ``'debug'``.
   :return: string Current logging level.
 
   Set global logging level.
+
+  .. py:function:: verbose([true | false])
+
+     :param: ``true`` enable ``debug`` level, ``false`` switch to default level (``notice``).
+     :return: boolean ``true`` when ``debug`` level is enabled.
+
+     Toggle between ``debug`` and ``notice`` log level. Use only for debugging purposes.
+     On busy systems vebose logging can produce several MB of logs per
+     second and will slow down operation.
 
 .. py:function:: get_log_level()
 
