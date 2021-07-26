@@ -8,8 +8,16 @@
 // libknot includes
 #include <libknot/libknot.h>
 
+// dynarray is inside libknot since 3.1, but it's differently named
+#ifdef knot_dynarray_declare
+	#define dynarray_declare knot_dynarray_declare
+	#define dynarray_define  knot_dynarray_define
+	#define dynarray_foreach knot_dynarray_foreach
+#else
+	#include <contrib/dynarray.h>
+#endif
+
 // resolver includes
-#include <contrib/dynarray.h>
 #include <lib/cache/api.h>
 #include <lib/cache/impl.h>
 #include <lib/defines.h>
