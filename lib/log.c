@@ -14,8 +14,9 @@
 #include <stdlib.h>
 #include <systemd/sd-daemon.h>
 #include <systemd/sd-journal.h>
-
-int use_journal = 0;
+bool use_journal = false;
+#else
+#define use_journal false
 #endif
 
 kr_log_level_t kr_log_level = LOG_CRIT;
@@ -114,15 +115,13 @@ void kr_log_fmt(enum kr_log_group group, kr_log_level_t level, const char *file,
 			setlogmask(LOG_UPTO(LOG_DEBUG));
 
 		va_start(args, fmt);
-#if ENABLE_LIBSYSTEMD
 		if (use_journal) {
+		#if ENABLE_LIBSYSTEMD
 			sd_journal_printv_with_location(level, file, line, func, fmt, args);
+		#endif
 		} else {
 			vsyslog(level, fmt, args);
 		}
-#else
-		vsyslog(level, fmt, args);
-#endif
 		va_end(args);
 
 		if (kr_log_group_is_set(group))
