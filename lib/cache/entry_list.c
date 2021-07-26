@@ -198,7 +198,7 @@ recovery: // Try to recover by clearing cache.
 	ret = kr_cache_clear(cache);
 	switch (ret) {
 	default:
-		kr_log_fatal(CACHE, "CRITICAL: clearing cache failed: %s; fatal error, aborting\n",
+		kr_log_crit(CACHE, "CRITICAL: clearing cache failed: %s; fatal error, aborting\n",
 				kr_strerror(ret));
 		abort();
 	case 0:
