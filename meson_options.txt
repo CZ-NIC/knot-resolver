@@ -52,18 +52,6 @@ option(
 )
 
 option(
-  'verbose_log',
-  type: 'combo',
-  choices: [
-    'auto',
-    'enabled',
-    'disabled',
-  ],
-  value: 'auto',
-  description: 'support verbose logging',
-)
-
-option(
   'user',
   type: 'string',
   value: 'knot-resolver',
