@@ -203,7 +203,8 @@ Following actions act on request and then processing continue until first non-ch
 
 .. py:attribute:: QTRACE
 
-   Pretty-print DNS response packets from authoritative servers into the verbose log for the query and its sub-queries.  It's useful for debugging weird DNS servers. Verbose logging must be enabled using :func:`verbose` for this policy to be effective.
+   Pretty-print DNS response packets from authoritative servers into debug logs for the query and its sub-queries.  It's useful for debugging weird DNS servers.
+   Note that debug-level logs are off by default; see :func:`set_log_level`.
 
    .. code-block:: lua
 
@@ -213,7 +214,9 @@ Following actions act on request and then processing continue until first non-ch
 
 .. py:attribute:: REQTRACE
 
-   Pretty-print DNS requests from clients into the verbose log. It's useful for debugging weird DNS clients. Verbose logging must be enabled using :func:`verbose` for this policy to be effective. It makes most sense together with :ref:`mod-view`.
+   Pretty-print DNS requests from clients into the verbose log. It's useful for debugging weird DNS clients.
+   Debug-level logging must be enabled for this policy to be effective; see :func:`set_log_level`.
+   It makes most sense together with :ref:`mod-view`.
 
 .. py:attribute:: DEBUG_ALWAYS
 
@@ -231,15 +234,15 @@ Following actions act on request and then processing continue until first non-ch
 
 .. py:function:: DEBUG_IF(test_function)
 
-   :param test_function: Function with single argument of type :c:type:`kr_request` which returns ``true`` if verbose logs for a given request should be printed and ``false`` otherwise.
+   :param test_function: Function with single argument of type :c:type:`kr_request` which returns ``true`` if debug logs for a given request should be generated and ``false`` otherwise.
 
    Enable extra verbose logging but print logs only for requests which match condition specified by ``test_function``. This allows to fine-tune which requests should be printed.
 
-   .. warning:: Verbose logging has significant performance impact on resolver and might also overload you logging system because one request can easily generate tens of kilobytes of logs. Always use appropriate `Filters`_ to limit number of requests triggering this action to a minimum!
+   .. warning:: Logging on debug level has significant performance impact on resolver and might also overload you logging system because one request can easily generate tens of kilobytes of logs. Always use appropriate `Filters`_ to limit number of requests triggering this action to a minimum!
 
-   .. note:: ``test_function`` is evaluated only when request is finished. As a result verbose logs for all requests must be collected until request is finished because it is not possible to know beforehand how ``test_function`` at the end evaluates given request. When a request is finalized logs are either printed or thrown away.
+   .. note:: ``test_function`` is evaluated only when request is finished. As a result debug logs for all requests must be collected until request is finished because it is not possible to know beforehand how ``test_function`` at the end evaluates given request. When a request is finalized logs are either printed or thrown away.
 
-   Example usage which gathers verbose logs for all requests in subtree ``dnssec-failed.org.`` and prints verbose logs for all requests finished with states different than ``kres.DONE`` (most importantly ``kres.FAIL``, see :c:type:`kr_layer_state`).
+   Example usage which gathers verbose logs for all requests in subtree ``dnssec-failed.org.`` and prints debug logs for all requests finished with states different than ``kres.DONE`` (most importantly ``kres.FAIL``, see :c:type:`kr_layer_state`).
 
    .. code-block:: lua
 

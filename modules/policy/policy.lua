@@ -681,7 +681,7 @@ local debug_stashlog_cb = ffi.cast('trace_log_f', function (req, msg)
 end)
 ffi.gc(debug_stashlog_cb, free_cb)
 
--- buffer verbose logs and print then only if test() returns a truthy value
+-- buffer debug logs and print then only if test() returns a truthy value
 function policy.DEBUG_IF(test)
 	local debug_finish_cb = ffi.cast('trace_callback_f', function (cbreq)
 		jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed

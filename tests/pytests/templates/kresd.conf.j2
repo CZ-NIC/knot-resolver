@@ -4,7 +4,7 @@ modules = {
     'policy > iterate',
 }
 
-verbose({{ 'true' if kresd.verbose else 'false' }})
+set_log_level({{ 'debug' if kresd.verbose else 'notice' }})
 
 {% if kresd.ip %}
 net.listen('{{ kresd.ip }}', {{ kresd.port }})

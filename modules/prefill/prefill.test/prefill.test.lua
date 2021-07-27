@@ -14,7 +14,7 @@ end
 policy.add(policy.suffix(policy.PASS, {todname('test.')}))
 
 cache.size = 2*MB
--- verbose(true)
+-- set_log_level('debug')
 
 -- Self-checks on globals
 assert(help() ~= nil)

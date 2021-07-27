@@ -130,7 +130,7 @@ static void help(int argc, char *argv[])
 	       " -c, --config=[path]    Config file path (relative to [rundir]) (default: config).\n"
 	       " -n, --noninteractive   Don't start the read-eval-print loop for stdin+stdout.\n"
 	       " -q, --quiet            No command prompt in interactive mode.\n"
-	       " -v, --verbose          Run in verbose mode.\n"
+	       " -v, --verbose          Increase logging to debug level.\n"
 	       " -V, --version        Print version of the server.\n"
 	       " -h, --help           Print help and usage.\n"
 	       "Options:\n"

@@ -36,7 +36,7 @@ function interactive_mode()
 		   .. '8453 -> web interface\n'
 		   .. '\n'
 		   .. 'For verbose logging enter following command to prompt below:\n'
-		   .. 'verbose(true)\n')
+		   .. 'set_log_level("debug")\n')
 	end
 	print_help()
 end
@@ -62,7 +62,7 @@ function debug_mode(qname, qtype)
 	-- execute query right after start up and exit when the query is finished
 	event.after(0, function()
 		-- ultra verbose log
-		verbose(true)
+		set_log_level('debug')
 		policy.add(policy.all(policy.DEBUG_ALWAYS))
 		log_debug(ffi.C.LOG_GRP_RESOLVER, 'starting DNS query for %s %s', qname, kres.tostring.type[qtype])
 		local starttime = cqueues.monotime()

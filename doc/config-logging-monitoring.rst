@@ -14,8 +14,7 @@ in ``syslog.h``. It is possible change logging level using
 
 Logging level ``notice`` is set after start by default,
 so logs from Knot Resolver should contain only couple lines a day.
-For debugging purposes it is possible to enable very verbose logging using
-:func:`verbose` function.
+For debugging purposes it is possible to use the very verbose ``debug`` level.
 
 In addition to levels, logging is also divided into the
 :ref:`groups <config_log_groups>`. All groups
@@ -32,6 +31,9 @@ set by :func:`set_log_level`.
   Set global logging level.
 
   .. py:function:: verbose([true | false])
+
+     .. deprecated:: 5.4.0
+        Use :func:`set_log_level` instead.
 
      :param: ``true`` enable ``debug`` level, ``false`` switch to default level (``notice``).
      :return: boolean ``true`` when ``debug`` level is enabled.
