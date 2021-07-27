@@ -220,8 +220,6 @@ void kr_log_level_set(kr_log_level_t level)
 	setlogmask(LOG_UPTO(kr_log_level));
 
 	kr_gnutls_log_level_set();
-
-	return;
 }
 
 void kr_log_group_add(enum kr_log_group group)
