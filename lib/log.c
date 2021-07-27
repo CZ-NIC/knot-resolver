@@ -247,7 +247,7 @@ void kr_log_del_group(enum kr_log_group group)
 void kr_log_target_set(kr_log_target_t target)
 {
 	kr_log_target = target;
-	if (target != LOG_SYSLOG)
+	if (target != LOG_TARGET_SYSLOG)
 		return;
 
 	int ret = 0;
