@@ -18,8 +18,8 @@ For debugging purposes it is possible to use the very verbose ``debug`` level.
 
 In addition to levels, logging is also divided into the
 :ref:`groups <config_log_groups>`. All groups
-are logged by default, but you can enable ``debug`` level for some groups using
-:func:`add_log_groups` function. Other groups are logged to the log level
+are logged by default, but you can enable ``debug`` level for selected groups using
+:func:`log_groups` function. Other groups are logged to the log level
 set by :func:`log_level`.
 
 .. py:function:: log_level([level])
@@ -47,29 +47,24 @@ set by :func:`log_level`.
   :param: string ``'syslog'``, ``'stderr'``, ``'stdout'``
   :return: string Current logging target.
 
-     Knot Resolver logs to standard error stream by default,
-     but typical systemd units change that to ``'syslog'``.
-     That setting logs directly through systemd's facilities
-     (if available) to preserve more meta-data.
+   Knot Resolver logs to standard error stream by default,
+   but typical systemd units change that to ``'syslog'``.
+   That setting logs directly through systemd's facilities
+   (if available) to preserve more meta-data.
 
-.. py:function:: get_log_groups()
+.. py:function:: log_groups([table])
 
-  :return: table :ref:`Groups <config_log_groups>` switched to ``debug`` level.
+  :param: table of string(s) representing ref:`log groups <config_log_groups>`
+  :return: table of string with currently set log groups
 
-  Get :ref:`groups <config_log_groups>` switched to ``debug`` level.
+  Use to turn-on debug logging for the selected groups regardless of the global
+  log level. Calling with no argument lists the currently active log groups. To
+  remove all log groups, call the function with an empty table.
 
-.. py:function:: add_log_groups([string | table])
-
-  :param: :ref:`Groups <config_log_groups>` to switch to ``debug`` level.
-
-  Set debug level for selected :ref:`groups <config_log_groups>`.
-
-.. py:function:: del_log_groups([string | table])
-
-  :param: :ref:`Groups <config_log_groups>` switched to global logging level.
-
-  Switch selected :ref:`groups <config_log_groups>` to logging level set
-  by :func:`log_level`.
+  .. code-block:: lua
+     log_groups({'io', 'tls'}  -- turn on debug logging for io and tls groups
+     log_groups()              -- list active log groups
+     log_groups({})            -- remove all log groups
 
 It is also possible to enable ``debug`` logging level for *a single request*, see chapter :ref:`mod-http-trace`.
 

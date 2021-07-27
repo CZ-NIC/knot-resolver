@@ -126,9 +126,9 @@ enum kr_log_group {
 KR_EXPORT
 bool kr_log_group_is_set(enum kr_log_group group);
 KR_EXPORT
-void kr_log_add_group(enum kr_log_group group);
+void kr_log_group_add(enum kr_log_group group);
 KR_EXPORT
-void kr_log_del_group(enum kr_log_group group);
+void kr_log_group_reset();
 KR_EXPORT
 const char *kr_log_grp2name(enum kr_log_group group);
 KR_EXPORT

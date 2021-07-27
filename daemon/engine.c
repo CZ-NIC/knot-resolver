@@ -74,8 +74,9 @@ static int l_help(lua_State *L)
 		"hostname()\n    hostname\n"
 		"package_version()\n    return package version\n"
 		"user(name[, group])\n    change process user (and group)\n"
-		"log_level(level)\n	logging level (crit, err, warning, notice, info or debug)\n"
-		"log_target(target)\n	logging target (syslog, stderr, stdout)\n"
+		"log_level(level)\n    logging level (crit, err, warning, notice, info or debug)\n"
+		"log_target(target)\n    logging target (syslog, stderr, stdout)\n"
+		"log_groups(groups)\n    turn on debug log for selected groups\n"
 		"option(opt[, new_val])\n    get/set server option\n"
 		"mode(strict|normal|permissive)\n    set resolver strictness level\n"
 		"reorder_RR([true|false])\n    set/get reordering of RRs within RRsets\n"
@@ -212,61 +213,48 @@ bad_call:
 	lua_error_p(L, "takes one string parameter or nothing");
 }
 
-static int handle_log_groups(lua_State *L, void (*action)(enum kr_log_group grp))
+static int l_log_groups(lua_State *L)
 {
-	if (lua_gettop(L) != 1 || (!lua_isstring(L, 1) && !lua_istable(L, 1)))
-		lua_error_p(L, "takes string or table of strings");
+	const int params = lua_gettop(L);
+	if (params > 1)
+		goto bad_call;
+	if (params == 1) {  // set
+		if (!lua_istable(L, 1))
+			goto bad_call;
+		kr_log_group_reset();
 
-	if (lua_isstring(L, 1)) {
-		enum kr_log_group grp = kr_log_name2grp(lua_tostring(L, 1));
-		if (grp == 0)
-			lua_error_p(L, "unknown group \"%s\"", lua_tostring(L, -1));
-		action(grp);
-	}
-
-	if (lua_istable(L, 1)) {
 		int idx = 1;
 		lua_pushnil(L);
 		while (lua_next(L, 1) != 0) {
-			if (!lua_isstring(L, -1))
-				lua_error_p(L, "wrong value at index %d, must be string", idx);
-			enum kr_log_group grp = kr_log_name2grp(lua_tostring(L, -1));
+			const char *grp_str = lua_tostring(L, -1);
+			if (!grp_str)
+				goto bad_call;
+			enum kr_log_group grp = kr_log_name2grp(grp_str);
 			if (grp == 0)
-				lua_error_p(L, "unknown group \"%s\"", lua_tostring(L, -1));
+				lua_error_p(L, "unknown log group '%s'", lua_tostring(L, -1));
 
-			action(grp);
+			kr_log_group_add(grp);
 			++idx;
 			lua_pop(L, 1);
 		}
 	}
-
-	return 0;
-}
-
-static int l_add_log_groups(lua_State *L)
-{
-	return handle_log_groups(L, kr_log_add_group);
-}
-
-static int l_del_log_groups(lua_State *L)
-{
-	return handle_log_groups(L, kr_log_del_group);
-}
-
-static int l_get_log_groups(lua_State *L)
-{
+	// get
 	lua_newtable(L);
+	int i = 1;
 	for (int grp = LOG_GRP_SYSTEM; grp <= LOG_GRP_DEVEL; grp++) {
 		const char *name = kr_log_grp2name(grp);
 		if (kr_fails_assert(name))
 			continue;
 		if (kr_log_group_is_set(grp)) {
-			lua_pushboolean(L, true);
-			lua_setfield(L, -2, name);
+			lua_pushinteger(L, i);
+			lua_pushstring(L, name);
+			lua_settable(L, -3);
+			i++;
 		}
 	}
-
 	return 1;
+bad_call:
+	lua_error_p(L, "takes a table of string groups as parameter or nothing");
 }
 
 char *engine_get_hostname(struct engine *engine) {
@@ -553,12 +541,8 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "log_level");
 	lua_pushcfunction(engine->L, l_log_target);
 	lua_setglobal(engine->L, "log_target");
-	lua_pushcfunction(engine->L, l_add_log_groups);
-	lua_setglobal(engine->L, "add_log_groups");
-	lua_pushcfunction(engine->L, l_del_log_groups);
-	lua_setglobal(engine->L, "del_log_groups");
-	lua_pushcfunction(engine->L, l_get_log_groups);
-	lua_setglobal(engine->L, "get_log_groups");
+	lua_pushcfunction(engine->L, l_log_groups);
+	lua_setglobal(engine->L, "log_groups");
 	lua_pushcfunction(engine->L, l_setuser);
 	lua_setglobal(engine->L, "user");
 	lua_pushcfunction(engine->L, l_hint_root_file);
