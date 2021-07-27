@@ -1,5 +1,5 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
-set_log_target('syslog') -- assume running as OS service
+log_target('syslog') -- assume running as OS service
 
 local ffi = require('ffi')
 local id = os.getenv('SYSTEMD_INSTANCE')

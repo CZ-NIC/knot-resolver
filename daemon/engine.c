@@ -75,6 +75,7 @@ static int l_help(lua_State *L)
 		"package_version()\n    return package version\n"
 		"user(name[, group])\n    change process user (and group)\n"
 		"log_level(level)\n	logging level (crit, err, warning, notice, info or debug)\n"
+		"log_target(target)\n	logging target (syslog, stderr, stdout)\n"
 		"option(opt[, new_val])\n    get/set server option\n"
 		"mode(strict|normal|permissive)\n    set resolver strictness level\n"
 		"reorder_RR([true|false])\n    set/get reordering of RRs within RRsets\n"
@@ -176,7 +177,7 @@ bad_call:
 	lua_error_p(L, "takes one string parameter or nothing");
 }
 
-static int l_set_log_target(lua_State *L)
+static int l_log_target(lua_State *L)
 {
 	const int params = lua_gettop(L);
 	if (params > 1)
@@ -201,9 +202,9 @@ static int l_set_log_target(lua_State *L)
 	// get
 	const char *t_str = NULL;
 	switch (kr_log_target) {
-		case LOG_TARGET_SYSLOG: t_str = "syslog"; break;
-		case LOG_TARGET_STDERR: t_str = "stderr"; break;
-		case LOG_TARGET_STDOUT: t_str = "stdout"; break;
+	case LOG_TARGET_SYSLOG: t_str = "syslog"; break;
+	case LOG_TARGET_STDERR: t_str = "stderr"; break;
+	case LOG_TARGET_STDOUT: t_str = "stdout"; break;
 	} // -Wswitch-enum
 	lua_pushstring(L, t_str);
 	return 1;
@@ -550,8 +551,8 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "verbose");
 	lua_pushcfunction(engine->L, l_log_level);
 	lua_setglobal(engine->L, "log_level");
-	lua_pushcfunction(engine->L, l_set_log_target);
-	lua_setglobal(engine->L, "set_log_target");
+	lua_pushcfunction(engine->L, l_log_target);
+	lua_setglobal(engine->L, "log_target");
 	lua_pushcfunction(engine->L, l_add_log_groups);
 	lua_setglobal(engine->L, "add_log_groups");
 	lua_pushcfunction(engine->L, l_del_log_groups);
