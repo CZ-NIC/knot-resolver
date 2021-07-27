@@ -224,17 +224,18 @@ void kr_log_level_set(kr_log_level_t level)
 	return;
 }
 
-void kr_log_add_group(enum kr_log_group group)
+void kr_log_group_add(enum kr_log_group group)
 {
 	kr_log_groups |= (1ULL << group);
 	if (group == LOG_GRP_GNUTLS)
 		kr_gnutls_log_level_set();
 }
 
-void kr_log_del_group(enum kr_log_group group)
+void kr_log_group_reset()
 {
-	kr_log_groups &= (~(1ULL << group));
-	if (group == LOG_GRP_GNUTLS)
+	bool had_gnutls = kr_log_group_is_set(LOG_GRP_GNUTLS);
+	kr_log_groups = 0;
+	if (had_gnutls)
 		kr_gnutls_log_level_set();
 }
 
