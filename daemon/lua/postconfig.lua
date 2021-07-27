@@ -30,7 +30,7 @@ if n_control_socks == 0 and not env.KRESD_NO_LISTEN then
 	local path = worker.control_path..worker.pid
 	local ok, err = pcall(net.listen, path, nil, { kind = 'control' })
 	if not ok then
-		log_warn(C.NETWORK, 'bind to '..path..' failed '..err)
+		log_warn(C.LOG_GRP_NETWORK, 'bind to '..path..' failed '..err)
 	end
 end
 
