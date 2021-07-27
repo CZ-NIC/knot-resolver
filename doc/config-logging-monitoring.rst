@@ -42,9 +42,9 @@ set by :func:`log_level`.
      On busy systems vebose logging can produce several MB of logs per
      second and will slow down operation.
 
-.. py:function:: set_log_target(target)
+.. py:function:: log_target(target)
 
-  :param: String ``'syslog'``, ``'stderr'``, ``'stdout'``
+  :param: string ``'syslog'``, ``'stderr'``, ``'stdout'``
   :return: string Current logging target.
 
      Knot Resolver logs to standard error stream by default,
