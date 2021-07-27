@@ -62,6 +62,7 @@ set by :func:`log_level`.
   remove all log groups, call the function with an empty table.
 
   .. code-block:: lua
+
      log_groups({'io', 'tls'}  -- turn on debug logging for io and tls groups
      log_groups()              -- list active log groups
      log_groups({})            -- remove all log groups
