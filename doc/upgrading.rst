@@ -38,6 +38,11 @@ Configuration file
 * :func:`verbose` is deprecated. In case you want to change logging level,
   there is new function :func:`log_level`.
 
+Packagers & Developers
+----------------------
+
+* meson option ``verbose_log`` was removed.
+
 5.2 to 5.3
 ==========
 
