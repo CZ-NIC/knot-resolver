@@ -50,10 +50,10 @@ set a new one.  There are some basic commands to start with.
 
 
 The *direct output* of commands sent over socket is captured and sent back,
-while also printed to the daemon standard outputs (in :func:`verbose` mode).
-This gives you an immediate response on the outcome of your command.  Error or
-debug logs aren't captured, but you can find them in the daemon standard
-outputs.
+which gives you an immediate response on the outcome of your command.
+The commands and their output are also logged in ``contrl`` group,
+on ``debug`` level if successful or ``warning`` level if failed
+(see around :func:`set_log_level`).
 
 Control sockets are also a way to enumerate and test running instances, the
 list of sockets corresponds to the list of processes, and you can test the
