@@ -74,7 +74,6 @@ static int l_help(lua_State *L)
 		"hostname()\n    hostname\n"
 		"package_version()\n    return package version\n"
 		"user(name[, group])\n    change process user (and group)\n"
-		"verbose(true|false)\n    toggle verbose mode\n"
 		"set_log_level\n	logging level (crit, err, warning, notice, info or debug)\n"
 		"option(opt[, new_val])\n    get/set server option\n"
 		"mode(strict|normal|permissive)\n    set resolver strictness level\n"

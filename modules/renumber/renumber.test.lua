@@ -73,7 +73,7 @@ policy.add(policy.all(policy.DEBUG_ALWAYS))
 policy.add(policy.suffix(policy.PASS, {todname('test.')}))
 prepare_cache()
 
-verbose(true)
+set_log_level('debug')
 modules.load('renumber < cache')
 renumber.config({
 	-- Source subnet, destination subnet

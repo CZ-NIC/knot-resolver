@@ -38,7 +38,7 @@ local function check_answer(logbuf)
 			private.ok_callback()
 			return
 		end
-		log_info(ffi.C.LOG_GRP_WATCHDOG, 'watchdog query returned unexpected answer! query verbose log:')
+		log_info(ffi.C.LOG_GRP_WATCHDOG, 'watchdog query returned unexpected answer! query log:')
 		log_info(ffi.C.LOG_GRP_WATCHDOG, table.concat(logbuf, ''))
 		if pkt ~= nil then
 			log_info(ffi.C.LOG_GRP_WATCHDOG, 'problematic answer:\n%s', pkt)
