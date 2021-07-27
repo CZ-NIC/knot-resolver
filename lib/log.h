@@ -146,9 +146,7 @@ KR_EXPORT KR_PRINTF(6)
 void kr_log_fmt(enum kr_log_group group, kr_log_level_t level, const char *file, const char *line,
 		const char *func, const char *fmt, ...);
 KR_EXPORT
-int kr_log_level_set(kr_log_level_t level);
-KR_EXPORT
-kr_log_level_t kr_log_level_get(void);
+void kr_log_level_set(kr_log_level_t level);
 KR_EXPORT
 void kr_log_target_set(kr_log_target_t target);
 

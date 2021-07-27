@@ -34,7 +34,7 @@ policy.add(policy.suffix(policy.PASS, {todname('test.')}))
 
 _hint_root_file('hints')
 cache.size = 2*MB
-set_log_level('debug')
+log_level('debug')
 {% endraw %}
 
 net = { '{{SELF_ADDR}}' }

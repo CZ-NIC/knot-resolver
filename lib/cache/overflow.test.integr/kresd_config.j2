@@ -29,7 +29,7 @@ if detect_time_skew then
         modules.unload('detect_time_skew')
 end
 
-set_log_level('debug')
+log_level('debug')
 policy.add(policy.all(policy.DEBUG_ALWAYS))
 
 cache.open(1*MB)

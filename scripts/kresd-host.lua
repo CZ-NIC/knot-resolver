@@ -50,7 +50,7 @@ k = 1 while k <= #arg do
 		verbose = true
 	elseif v == '-d' then
 		verbose = true
-		table.insert(config, 'set_log_level("debug")')
+		table.insert(config, 'log_level("debug")')
 	elseif v == '-4' then
 		table.insert(config, 'net.ipv6 = false')
 	elseif v == '-6' then

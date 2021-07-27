@@ -74,7 +74,7 @@ static int l_help(lua_State *L)
 		"hostname()\n    hostname\n"
 		"package_version()\n    return package version\n"
 		"user(name[, group])\n    change process user (and group)\n"
-		"set_log_level\n	logging level (crit, err, warning, notice, info or debug)\n"
+		"log_level(level)\n	logging level (crit, err, warning, notice, info or debug)\n"
 		"option(opt[, new_val])\n    get/set server option\n"
 		"mode(strict|normal|permissive)\n    set resolver strictness level\n"
 		"reorder_RR([true|false])\n    set/get reordering of RRs within RRsets\n"
@@ -145,34 +145,35 @@ static int l_quit(lua_State *L)
 /** Toggle verbose mode. */
 static int l_verbose(lua_State *L)
 {
-	kr_log_deprecate(SYSTEM, "use set_log_level() instead of verbose()\n");
+	kr_log_deprecate(SYSTEM, "use log_level() instead of verbose()\n");
 
 	if (lua_isboolean(L, 1) || lua_isnumber(L, 1)) {
 		kr_log_level_set(lua_toboolean(L, 1) == true ? LOG_DEBUG : LOG_DEFAULT_LEVEL);
 	}
 
-	lua_pushboolean(L, kr_log_level_get() == LOG_DEBUG);
+	lua_pushboolean(L, kr_log_level == LOG_DEBUG);
 	return 1;
 }
 
-static int l_set_log_level(lua_State *L)
+static int l_log_level(lua_State *L)
 {
-	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
-		lua_error_p(L, "takes one string parameter");
-		return 0;
+	const int params = lua_gettop(L);
+	if (params > 1) {
+		goto bad_call;
+	} else if (params == 1) {  // set
+		const char *lvl_str = lua_tostring(L, 1);
+		if (!lvl_str)
+			goto bad_call;
+		kr_log_level_t lvl = kr_log_name2level(lvl_str);
+		if (lvl < 0)
+			lua_error_p(L, "unknown log level '%s'", lvl_str);
+		kr_log_level_set(lvl);
 	}
-
-	kr_log_level_t lvl = kr_log_name2level(lua_tostring(L, 1));
-	lvl = kr_log_level_set(lvl);
-
-	lua_pushstring(L, kr_log_level2name(lvl));
+	// get
+	lua_pushstring(L, kr_log_level2name(kr_log_level));
 	return 1;
-}
-
-static int l_get_log_level(lua_State *L)
-{
-	lua_pushstring(L, kr_log_level2name(kr_log_level_get()));
-	return 1;
+bad_call:
+	lua_error_p(L, "takes one string parameter or nothing");
 }
 
 static int l_set_log_target(lua_State *L)
@@ -547,10 +548,8 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "package_version");
 	lua_pushcfunction(engine->L, l_verbose);
 	lua_setglobal(engine->L, "verbose");
-	lua_pushcfunction(engine->L, l_set_log_level);
-	lua_setglobal(engine->L, "set_log_level");
-	lua_pushcfunction(engine->L, l_get_log_level);
-	lua_setglobal(engine->L, "get_log_level");
+	lua_pushcfunction(engine->L, l_log_level);
+	lua_setglobal(engine->L, "log_level");
 	lua_pushcfunction(engine->L, l_set_log_target);
 	lua_setglobal(engine->L, "set_log_target");
 	lua_pushcfunction(engine->L, l_add_log_groups);
