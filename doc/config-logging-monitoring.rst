@@ -10,7 +10,7 @@ E.g. on distributions using systemd-journald use command ``journalctl -u kresd@*
 Knot Resolver supports 6 logging levels - ``crit``, ``err``, ``warning``,
 ``notice``, ``info``, ``debug``. All levels with the same meaning as is defined
 in ``syslog.h``. It is possible change logging level using
-:func:`set_log_level` function.
+:func:`log_level` function.
 
 Logging level ``notice`` is set after start by default,
 so logs from Knot Resolver should contain only couple lines a day.
@@ -20,20 +20,20 @@ In addition to levels, logging is also divided into the
 :ref:`groups <config_log_groups>`. All groups
 are logged by default, but you can enable ``debug`` level for some groups using
 :func:`add_log_groups` function. Other groups are logged to the log level
-set by :func:`set_log_level`.
+set by :func:`log_level`.
 
-.. py:function:: set_log_level(level)
+.. py:function:: log_level([level])
 
-  :param: String ``'crit'``, ``'err'``, ``'warning'``, ``'notice'``,
-   ``'info'`` or ``'debug'``.
+  :param: string ``'crit'``, ``'err'``, ``'warning'``, ``'notice'``,
+   ``'info'`` or ``'debug'``
   :return: string Current logging level.
 
-  Set global logging level.
+  Pass a string to set the global logging level.
 
   .. py:function:: verbose([true | false])
 
      .. deprecated:: 5.4.0
-        Use :func:`set_log_level` instead.
+        Use :func:`log_level` instead.
 
      :param: ``true`` enable ``debug`` level, ``false`` switch to default level (``notice``).
      :return: boolean ``true`` when ``debug`` level is enabled.
@@ -41,12 +41,6 @@ set by :func:`set_log_level`.
      Toggle between ``debug`` and ``notice`` log level. Use only for debugging purposes.
      On busy systems vebose logging can produce several MB of logs per
      second and will slow down operation.
-
-.. py:function:: get_log_level()
-
-  :return: string Current logging level.
-
-  Show current logging level.
 
 .. py:function:: set_log_target(target)
 
@@ -75,7 +69,7 @@ set by :func:`set_log_level`.
   :param: :ref:`Groups <config_log_groups>` switched to global logging level.
 
   Switch selected :ref:`groups <config_log_groups>` to logging level set
-  by :func:`set_log_level`.
+  by :func:`log_level`.
 
 It is also possible to enable ``debug`` logging level for *a single request*, see chapter :ref:`mod-http-trace`.
 

@@ -209,11 +209,11 @@ static void kr_gnutls_log_level_set()
 	}
 }
 
-int kr_log_level_set(kr_log_level_t level)
+void kr_log_level_set(kr_log_level_t level)
 {
 	if (level < LOG_CRIT || level > LOG_DEBUG) {
 		kr_log_warning(SYSTEM, "invalid log level\n");
-		return kr_log_level;
+		return;
 	}
 
 	kr_log_level = level;
@@ -221,13 +221,7 @@ int kr_log_level_set(kr_log_level_t level)
 
 	kr_gnutls_log_level_set();
 
-	return kr_log_level;
-
-}
-
-kr_log_level_t kr_log_level_get(void)
-{
-	return kr_log_level;
+	return;
 }
 
 void kr_log_add_group(enum kr_log_group group)

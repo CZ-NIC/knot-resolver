@@ -39,7 +39,7 @@ net.listen(worker.control_path .. worker.pid, nil, {kind = 'control'})
 assert(#net.list() >= 3)  -- UDP, TCP, control
 
 -- debug, kept for future use
---set_log_level("debug")
+--log_level("debug")
 log_debug(ffi.C.LOG_GRP_TESTS, '%s', worker.control_path)
 log_debug(ffi.C.LOG_GRP_TESTS, '%s', table_print(net.list()))
 

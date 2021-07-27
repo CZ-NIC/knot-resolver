@@ -204,7 +204,7 @@ Following actions act on request and then processing continue until first non-ch
 .. py:attribute:: QTRACE
 
    Pretty-print DNS response packets from authoritative servers into debug logs for the query and its sub-queries.  It's useful for debugging weird DNS servers.
-   Note that debug-level logs are off by default; see :func:`set_log_level`.
+   Note that debug-level logs are off by default; see :func:`log_level`.
 
    .. code-block:: lua
 
@@ -215,7 +215,7 @@ Following actions act on request and then processing continue until first non-ch
 .. py:attribute:: REQTRACE
 
    Pretty-print DNS requests from clients into the verbose log. It's useful for debugging weird DNS clients.
-   Debug-level logging must be enabled for this policy to be effective; see :func:`set_log_level`.
+   Debug-level logging must be enabled for this policy to be effective; see :func:`log_level`.
    It makes most sense together with :ref:`mod-view`.
 
 .. py:attribute:: DEBUG_ALWAYS

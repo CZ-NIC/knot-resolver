@@ -53,7 +53,7 @@ The *direct output* of commands sent over socket is captured and sent back,
 which gives you an immediate response on the outcome of your command.
 The commands and their output are also logged in ``contrl`` group,
 on ``debug`` level if successful or ``warning`` level if failed
-(see around :func:`set_log_level`).
+(see around :func:`log_level`).
 
 Control sockets are also a way to enumerate and test running instances, the
 list of sockets corresponds to the list of processes, and you can test the

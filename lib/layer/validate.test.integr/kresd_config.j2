@@ -27,7 +27,7 @@ if detect_time_skew then
 end
 
 cache.size = 2*MB
-set_log_level('debug')
+log_level('debug')
 policy.add(policy.all(policy.DEBUG_ALWAYS))
 policy.add(policy.all(policy.FORWARD('8.8.8.8')))
 {% endraw %}
