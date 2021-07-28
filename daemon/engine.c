@@ -240,13 +240,16 @@ static int l_log_groups(lua_State *L)
 	}
 	// get
 	lua_newtable(L);
+	int i = 1;
 	for (int grp = LOG_GRP_SYSTEM; grp <= LOG_GRP_DEVEL; grp++) {
 		const char *name = kr_log_grp2name(grp);
 		if (kr_fails_assert(name))
 			continue;
 		if (kr_log_group_is_set(grp)) {
-			lua_pushboolean(L, true);
-			lua_setfield(L, -2, name);
+			lua_pushinteger(L, i);
+			lua_pushstring(L, name);
+			lua_settable(L, -3);
+			i++;
 		}
 	}
 	return 1;
