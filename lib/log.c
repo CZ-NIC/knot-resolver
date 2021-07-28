@@ -4,6 +4,7 @@
 
 #include "kresconfig.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <gnutls/gnutls.h>
 #include "contrib/ucw/mempool.h"

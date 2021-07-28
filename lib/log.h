@@ -4,11 +4,9 @@
 
 #pragma once
 
-#include <stdarg.h>
 #include <syslog.h>
 #include "lib/defines.h"
 
-#define LOG_DEFAULT_LEVEL	LOG_NOTICE /**< Default level  is ``notice``. */
 #define LOG_GNUTLS_LEVEL	5 /**< GnuTLS level is 5. */
 
 /* Targets */
@@ -20,6 +18,15 @@ typedef enum {
 	/* The default also applies *before* configuration changes it. */
 	LOG_TARGET_DEFAULT = LOG_TARGET_STDERR,
 } kr_log_target_t;
+
+/** Current logging target.  Read only, please. */
+KR_EXPORT extern
+kr_log_target_t kr_log_target;
+
+/** Set the current logging target. */
+KR_EXPORT
+void kr_log_target_set(kr_log_target_t target);
+
 
 /* Groups */
 
@@ -135,25 +142,69 @@ const char *kr_log_grp2name(enum kr_log_group group);
 KR_EXPORT
 enum kr_log_group kr_log_name2grp(const char *name);
 
-/* Log */
+
+/* Levels */
 
 typedef int kr_log_level_t;
 
-KR_EXPORT
-extern kr_log_level_t kr_log_level;
-KR_EXPORT
-extern kr_log_target_t kr_log_target;
-KR_EXPORT KR_PRINTF(6)
-void kr_log_fmt(enum kr_log_group group, kr_log_level_t level, const char *file, const char *line,
-		const char *func, const char *fmt, ...);
+/** Current logging level.  Read only, please. */
+KR_EXPORT extern
+kr_log_level_t kr_log_level;
+
+/** Set the current logging level. */
 KR_EXPORT
 void kr_log_level_set(kr_log_level_t level);
+
 KR_EXPORT
-void kr_log_target_set(kr_log_target_t target);
+const char *kr_log_level2name(kr_log_level_t level);
 
-#define KR_LOG_SJM_STR(x) #x
-#define SD_JOURNAL_METADATA "CODE_FILE=" __FILE__, "CODE_LINE=" KR_LOG_SJM_STR(__LINE__), ""
+/** Return negative on error. */
+KR_EXPORT
+kr_log_level_t kr_log_name2level(const char *name);
 
+#define KR_LOG_LEVEL_IS(exp) ((kr_log_level >= (exp)) ? true : false)
+
+/**
+ * @name Logging levels
+ *
+ * We stick very close to POSIX syslog.h
+ */
+/// @{
+
+/** Debugging message.  Can be very verbose.
+ * The level is most often used through VERBOSE_MSG. */
+#define kr_log_debug(grp, fmt, ...) \
+	kr_log_fmt(LOG_GRP_ ## grp, LOG_DEBUG, SD_JOURNAL_METADATA, \
+			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
+
+#define kr_log_info(grp, fmt, ...) \
+	kr_log_fmt(LOG_GRP_ ## grp, LOG_INFO, SD_JOURNAL_METADATA, \
+			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
+
+#define kr_log_warning(grp, fmt, ...) \
+	kr_log_fmt(LOG_GRP_ ## grp, LOG_WARNING, SD_JOURNAL_METADATA, \
+			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
+
+#define kr_log_notice(grp, fmt, ...) \
+	kr_log_fmt(LOG_GRP_ ## grp, LOG_NOTICE, SD_JOURNAL_METADATA, \
+			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
+
+/** Levels less severe than ``notice`` are not logged by default. */
+#define LOG_DEFAULT_LEVEL	LOG_NOTICE
+
+/** Significant error.  The process continues, except for configuration errors during startup. */
+#define kr_log_error(grp, fmt, ...) \
+	kr_log_fmt(LOG_GRP_ ## grp, LOG_ERR, SD_JOURNAL_METADATA, \
+			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
+
+/** Critical condition.  The process dies.  Bad configuration should not cause this. */
+#define kr_log_crit(grp, fmt, ...) \
+	kr_log_fmt(LOG_GRP_ ## grp, LOG_CRIT, SD_JOURNAL_METADATA, \
+			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
+
+#define kr_log_deprecate(grp, fmt, ...) \
+	kr_log_fmt(LOG_GRP_ ## grp, LOG_WARNING, SD_JOURNAL_METADATA, \
+			"[%-6s] deprecation WARNING: " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
 
 /**
  * Logging function for user modules. Uses group LOG_GRP_MODULE and ``info`` level.
@@ -163,52 +214,18 @@ void kr_log_target_set(kr_log_target_t target);
 	kr_log_fmt(LOG_GRP_MODULE, LOG_INFO, SD_JOURNAL_METADATA, \
 			"[%-6s] " fmt, LOG_GRP_MODULE_TAG, ## __VA_ARGS__)
 
-#define kr_log_debug(grp, fmt, ...) \
-	kr_log_fmt(LOG_GRP_ ## grp, LOG_DEBUG, SD_JOURNAL_METADATA, \
-			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
-#define kr_log_info(grp, fmt, ...) \
-	kr_log_fmt(LOG_GRP_ ## grp, LOG_INFO, SD_JOURNAL_METADATA, \
-			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
-#define kr_log_notice(grp, fmt, ...) \
-	kr_log_fmt(LOG_GRP_ ## grp, LOG_NOTICE, SD_JOURNAL_METADATA, \
-			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
-#define kr_log_warning(grp, fmt, ...) \
-	kr_log_fmt(LOG_GRP_ ## grp, LOG_WARNING, SD_JOURNAL_METADATA, \
-			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
-#define kr_log_error(grp, fmt, ...) \
-	kr_log_fmt(LOG_GRP_ ## grp, LOG_ERR, SD_JOURNAL_METADATA, \
-			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
-#define kr_log_crit(grp, fmt, ...) \
-	kr_log_fmt(LOG_GRP_ ## grp, LOG_CRIT, SD_JOURNAL_METADATA, \
-			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
-
-#define kr_log_deprecate(grp, fmt, ...) \
-	kr_log_fmt(LOG_GRP_ ## grp, LOG_WARNING,SD_JOURNAL_METADATA, \
-			"[%-6s] deprecation WARNING: " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
-
-#define KR_LOG_LEVEL_IS(exp) ((kr_log_level >= (exp)) ? true : false)
-
-
-/* Syslog */
-
-KR_EXPORT
-const char *kr_log_level2name(kr_log_level_t level);
-KR_EXPORT
-kr_log_level_t kr_log_name2level(const char *name);
-
-
-/* Misc. */
+/// @}
 
 struct kr_request;
 struct kr_query;
 
 /**
- * Log a message through the request log handler or stdout.
- * Caller is responsible for detecting verbose mode, use QRVERBOSE() macro.
+ * Log a debug-level message from a kr_request.  Typically we call kr_log_q() instead.
+ *
  * @param  qry_uid query ID to append to request ID, 0 means "no query"
- * @param  indent level of indentation between [req.qry][source] and message
- * @param  source message source
- * @param  fmt message format
+ * @param  indent level of indentation between [group ][req.qry] and message
+ * @param  grp GROUP_NAME (without the LOG_GRP_ prefix)
+ * @param  fmt printf-like format string
  */
 #define kr_log_req(req, qry_id, indent, grp, fmt, ...) \
        kr_log_req1(req, qry_id, indent, LOG_GRP_ ## grp, LOG_GRP_ ## grp ## _TAG, fmt, ## __VA_ARGS__)
@@ -217,17 +234,18 @@ void kr_log_req1(const struct kr_request * const req, uint32_t qry_uid,
 		const unsigned int indent, enum kr_log_group group, const char *tag, const char *fmt, ...);
 
 /**
- * Log a message through the request log handler or stdout.
- * Caller is responsible for detecting verbose mode, use QRVERBOSE() macro.
+ * Log a debug-level message from a kr_query.
+ *
  * @param  qry current query
- * @param  source message source
- * @param  fmt message format
+ * @param  grp GROUP_NAME (without the LOG_GRP_ prefix)
+ * @param  fmt printf-like format string
  */
 #define kr_log_q(qry, grp, fmt, ...) kr_log_q1(qry, LOG_GRP_ ## grp, LOG_GRP_ ## grp ## _TAG, fmt, ## __VA_ARGS__)
 KR_EXPORT KR_PRINTF(4)
 void kr_log_q1(const struct kr_query *qry, enum kr_log_group group, const char *tag, const char *fmt, ...);
 
-/** Return whether a particular log group in a request is in debug/verbose mode.
+/**
+ * Return whether a particular log group in a request is in debug/verbose mode.
  *
  * Typically you use this as condition to compute some data to be logged,
  * in case that's considered too expensive to do unless it really gets logged.
@@ -239,4 +257,14 @@ void kr_log_q1(const struct kr_query *qry, enum kr_log_group group, const char *
 #define kr_log_is_debug_qry(grp, qry) kr_log_is_debug(grp, (qry) ? (qry)->request : NULL)
 KR_EXPORT
 bool kr_log_is_debug_fun(enum kr_log_group group, const struct kr_request *req);
+
+
+/* Helpers "internal" to log.* */
+
+KR_EXPORT KR_PRINTF(6)
+void kr_log_fmt(enum kr_log_group group, kr_log_level_t level, const char *file, const char *line,
+		const char *func, const char *fmt, ...);
+
+#define KR_LOG_SJM_STR(x) #x
+#define SD_JOURNAL_METADATA "CODE_FILE=" __FILE__, "CODE_LINE=" KR_LOG_SJM_STR(__LINE__), ""
 
