@@ -83,20 +83,6 @@ log_group_names_t log_group_names[] = {
 	{ NULL,		-1 },
 };
 
-#ifndef SYSLOG_NAMES
-syslog_code_t prioritynames[] = {
-	{ "alert",	LOG_ALERT },
-	{ "crit",	LOG_CRIT },
-	{ "debug",	LOG_DEBUG },
-	{ "emerg",	LOG_EMERG },
-	{ "err",	LOG_ERR },
-	{ "info",	LOG_INFO },
-	{ "notice",	LOG_NOTICE },
-	{ "warning",	LOG_WARNING },
-	{ NULL,		-1 },
-};
-#endif
-
 bool kr_log_group_is_set(enum kr_log_group group)
 {
 	return kr_log_groups & (1ULL << group);
@@ -145,12 +131,29 @@ static void kres_gnutls_log(int level, const char *message)
 	kr_log_debug(GNUTLS, "(%d) %s", level, message);
 }
 
-char *kr_log_level2name(kr_log_level_t level)
+
+struct log_level_name {
+	const char *name;
+	kr_log_level_t level;
+};
+const struct log_level_name level_names[] = {
+	{ "alert",	LOG_ALERT },
+	{ "crit",	LOG_CRIT },
+	{ "debug",	LOG_DEBUG },
+	{ "emerg",	LOG_EMERG },
+	{ "err",	LOG_ERR },
+	{ "info",	LOG_INFO },
+	{ "notice",	LOG_NOTICE },
+	{ "warning",	LOG_WARNING },
+	{ NULL,		-1 },
+};
+
+const char *kr_log_level2name(kr_log_level_t level)
 {
-	for (int i = 0; prioritynames[i].c_name; ++i)
+	for (int i = 0; level_names[i].name; ++i)
 	{
-		if (prioritynames[i].c_val == level)
-			return prioritynames[i].c_name;
+		if (level_names[i].level == level)
+			return level_names[i].name;
 	}
 
 	return NULL;
@@ -161,10 +164,10 @@ kr_log_level_t kr_log_name2level(const char *name)
 	if (kr_fails_assert(name))
 		return -1;
 
-	for (int i = 0; prioritynames[i].c_name; ++i)
+	for (int i = 0; level_names[i].name; ++i)
 	{
-		if (strcmp(prioritynames[i].c_name, name) == 0)
-			return prioritynames[i].c_val;
+		if (strcmp(level_names[i].name, name) == 0)
+			return level_names[i].level;
 	}
 
 	return -1;

@@ -191,19 +191,9 @@ void kr_log_target_set(kr_log_target_t target);
 /* Syslog */
 
 KR_EXPORT
-char *kr_log_level2name(kr_log_level_t level);
+const char *kr_log_level2name(kr_log_level_t level);
 KR_EXPORT
 kr_log_level_t kr_log_name2level(const char *name);
-
-#ifndef SYSLOG_NAMES
-typedef struct _code {
-	char	*c_name;
-	int	c_val;
-} syslog_code_t;
-
-KR_EXPORT
-extern syslog_code_t prioritynames[];
-#endif
 
 
 /* Misc. */
