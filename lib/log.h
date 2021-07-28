@@ -26,6 +26,7 @@ typedef enum {
 /* Don't forget add *_TAG below, log_group_names[] item (log.c) and generate
  * new kres-gen.lua */
 enum kr_log_group {
+	LOG_GRP_UNKNOWN = -1,
 	LOG_GRP_SYSTEM = 1,  /* Must be first in enum. */
 	LOG_GRP_CACHE,
 	LOG_GRP_IO,

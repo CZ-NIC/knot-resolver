@@ -35,7 +35,7 @@ typedef struct {
 
 #define GRP_NAME_ITEM(grp) { grp ## _TAG, grp }
 
-log_group_names_t log_group_names[] = {
+const log_group_names_t log_group_names[] = {
 	GRP_NAME_ITEM(LOG_GRP_SYSTEM),
 	GRP_NAME_ITEM(LOG_GRP_CACHE),
 	GRP_NAME_ITEM(LOG_GRP_IO),
@@ -80,7 +80,7 @@ log_group_names_t log_group_names[] = {
 	GRP_NAME_ITEM(LOG_GRP_CONTROL),
 	GRP_NAME_ITEM(LOG_GRP_MODULE),
 	GRP_NAME_ITEM(LOG_GRP_DEVEL),
-	{ NULL,		-1 },
+	{ NULL, LOG_GRP_UNKNOWN },
 };
 
 bool kr_log_group_is_set(enum kr_log_group group)
@@ -162,7 +162,7 @@ const char *kr_log_level2name(kr_log_level_t level)
 kr_log_level_t kr_log_name2level(const char *name)
 {
 	if (kr_fails_assert(name))
-		return -1;
+		return LOG_GRP_UNKNOWN;
 
 	for (int i = 0; level_names[i].name; ++i)
 	{
@@ -170,12 +170,12 @@ kr_log_level_t kr_log_name2level(const char *name)
 			return level_names[i].level;
 	}
 
-	return -1;
+	return LOG_GRP_UNKNOWN;
 }
 
 const char *kr_log_grp2name(enum kr_log_group group)
 {
-	for (int i = 0; log_group_names[i].g_val != -1; ++i)
+	for (int i = 0; log_group_names[i].g_name; ++i)
 	{
 		if (log_group_names[i].g_val == group)
 			return log_group_names[i].g_name;
@@ -187,7 +187,7 @@ const char *kr_log_grp2name(enum kr_log_group group)
 enum kr_log_group kr_log_name2grp(const char *name)
 {
 	if (kr_fails_assert(name))
-		return 0;
+		return -1;
 
 	for (int i = 0; log_group_names[i].g_name; ++i)
 	{
@@ -195,7 +195,7 @@ enum kr_log_group kr_log_name2grp(const char *name)
 			return log_group_names[i].g_val;
 	}
 
-	return 0;
+	return -1;
 }
 
 
