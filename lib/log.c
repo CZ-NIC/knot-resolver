@@ -35,7 +35,7 @@ typedef struct {
 
 #define GRP_NAME_ITEM(grp) { grp ## _TAG, grp }
 
-log_group_names_t log_group_names[] = {
+const log_group_names_t log_group_names[] = {
 	GRP_NAME_ITEM(LOG_GRP_SYSTEM),
 	GRP_NAME_ITEM(LOG_GRP_CACHE),
 	GRP_NAME_ITEM(LOG_GRP_IO),
