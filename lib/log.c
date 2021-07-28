@@ -162,7 +162,7 @@ const char *kr_log_level2name(kr_log_level_t level)
 kr_log_level_t kr_log_name2level(const char *name)
 {
 	if (kr_fails_assert(name))
-		return -1;
+		return LOG_GRP_UNKNOWN;
 
 	for (int i = 0; level_names[i].name; ++i)
 	{
@@ -170,12 +170,12 @@ kr_log_level_t kr_log_name2level(const char *name)
 			return level_names[i].level;
 	}
 
-	return -1;
+	return LOG_GRP_UNKNOWN;
 }
 
 const char *kr_log_grp2name(enum kr_log_group group)
 {
-	for (int i = 0; log_group_names[i].g_val != -1; ++i)
+	for (int i = 0; log_group_names[i].g_name; ++i)
 	{
 		if (log_group_names[i].g_val == group)
 			return log_group_names[i].g_name;
