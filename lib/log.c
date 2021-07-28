@@ -80,7 +80,7 @@ const log_group_names_t log_group_names[] = {
 	GRP_NAME_ITEM(LOG_GRP_CONTROL),
 	GRP_NAME_ITEM(LOG_GRP_MODULE),
 	GRP_NAME_ITEM(LOG_GRP_DEVEL),
-	{ NULL,		-1 },
+	{ NULL, LOG_GRP_UNKNOWN },
 };
 
 bool kr_log_group_is_set(enum kr_log_group group)
