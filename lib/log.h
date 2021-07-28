@@ -150,9 +150,9 @@ void kr_log_level_set(kr_log_level_t level);
 KR_EXPORT
 void kr_log_target_set(kr_log_target_t target);
 
-#define TO_STR_A(x) #x
-#define TO_STR(x) TO_STR_A(x)
-#define SD_JOURNAL_METADATA "CODE_FILE=" __FILE__, "CODE_LINE=" TO_STR(__LINE__), ""
+#define KR_LOG_SJM_STR(x) #x
+#define SD_JOURNAL_METADATA "CODE_FILE=" __FILE__, "CODE_LINE=" KR_LOG_SJM_STR(__LINE__), ""
+
 
 /**
  * Logging function for user modules. Uses group LOG_GRP_MODULE and ``info`` level.
