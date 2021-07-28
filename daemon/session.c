@@ -503,18 +503,24 @@ int session_timer_start(struct session *session, uv_timer_cb cb,
 			uint64_t timeout, uint64_t repeat)
 {
 	uv_timer_t *timer = &session->timeout;
+	// Session might be closing and get here e.g. through a late on_send callback.
+	const bool is_closing = uv_is_closing((uv_handle_t *)timer);
+	if (is_closing || kr_fails_assert(is_closing == session->sflags.closing))
+		return kr_error(EINVAL);
+
 	if (kr_fails_assert(timer->data == session))
 		return kr_error(EINVAL);
 	int ret = uv_timer_start(timer, cb, timeout, repeat);
 	if (ret != 0) {
 		uv_timer_stop(timer);
-		return kr_error(ENOMEM);
+		return kr_error(ret);
 	}
-	return 0;
+	return kr_ok();
 }
 
 int session_timer_restart(struct session *session)
 {
+	kr_require(!uv_is_closing((uv_handle_t *)&session->timeout));
 	return uv_timer_again(&session->timeout);
 }
 
