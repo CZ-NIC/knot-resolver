@@ -1,10 +1,13 @@
-Knot Resolver 5.x.y (2021-0m-dd)
+Knot Resolver 5.4.0 (2021-07-29)
 ================================
 
 Improvements
 ------------
+- fine grained logging and syslog support (!1181)
+- expose HTTP headers for processing DoH requests (!1165)
+- improve assertion mechanism for debugging (!1146)
 - support apkg tool for packaging workflow (!1178)
-- fine grained logging (!1181)
+- support Knot DNS 3.1 (!1192, !1194)
 
 Bugfixes
 --------
@@ -15,9 +18,10 @@ Bugfixes
 
 Incompatible changes
 --------------------
+- see upgrading guide:
+  https://knot-resolver.readthedocs.io/en/stable/upgrading.html#to-5-4
 - legacy DoH implementation configuration in net.listen() was renamed from
   kind="doh" to kind="doh_legacy" (!1180)
-- verbose() is deprecated (!1181)
 
 
 Knot Resolver 5.3.2 (2021-05-05)
