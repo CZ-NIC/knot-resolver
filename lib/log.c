@@ -187,7 +187,7 @@ const char *kr_log_grp2name(enum kr_log_group group)
 enum kr_log_group kr_log_name2grp(const char *name)
 {
 	if (kr_fails_assert(name))
-		return 0;
+		return -1;
 
 	for (int i = 0; log_group_names[i].g_name; ++i)
 	{
@@ -195,7 +195,7 @@ enum kr_log_group kr_log_name2grp(const char *name)
 			return log_group_names[i].g_val;
 	}
 
-	return 0;
+	return -1;
 }
 
 

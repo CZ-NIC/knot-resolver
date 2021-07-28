@@ -230,7 +230,7 @@ static int l_log_groups(lua_State *L)
 			if (!grp_str)
 				goto bad_call;
 			enum kr_log_group grp = kr_log_name2grp(grp_str);
-			if (grp == 0)
+			if (grp < 0)
 				lua_error_p(L, "unknown log group '%s'", lua_tostring(L, -1));
 
 			kr_log_group_add(grp);
