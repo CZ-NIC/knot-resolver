@@ -43,6 +43,13 @@ Packagers & Developers
 
 * meson option ``verbose_log`` was removed.
 
+Module changes
+--------------
+
+* lua function ``warn()`` was removed, use ``log_warn()`` instead. The new function takes a log group number as the first argument.
+* C functions ``kr_log_req()`` and ``kr_log_q()`` were replaced by ``kr_log_req1()`` and ``kr_log_q1()`` respectively. The new function have slightly different API.
+
+
 5.2 to 5.3
 ==========
 
