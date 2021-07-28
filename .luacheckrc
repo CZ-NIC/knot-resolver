@@ -18,7 +18,6 @@ new_read_globals = {
 	'todname',
 	'tojson',
 	'user',
-	'verbose',
 	'worker',
 	'kluautil_list_dir',
 	-- Sandbox declarations
