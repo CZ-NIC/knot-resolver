@@ -35,7 +35,7 @@ Configuration file
 ------------------
 
 * ``kind='doh'`` in :func:`net.listen` was renamed to ``kind='doh_legacy'``. It is recommended to switch to the new DoH implementation with ``kind='doh2'``.
-* :func:`verbose` is deprecated. In case you want to change logging level,
+* :func:`verbose` has been deprecated. In case you want to change logging level,
   there is new function :func:`log_level`.
 
 Packagers & Developers
