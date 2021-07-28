@@ -10,6 +10,7 @@ Bugfixes
 - trust_anchors.set_insecure: improve precision (#673, !1177)
 - plug memory leaks related to TCP (!1182)
 - policy.FLAGS: fix not applying properly in edge cases (!1179)
+- fix a crash with older libuv inside timer processing (!1195)
 
 Incompatible changes
 --------------------
