@@ -21,7 +21,7 @@
 #include <sys/socket.h>
 #include <uv.h>
 
-#define DEBUG_MSG(fmt, ...) kr_log_verbose("[dnstap] " fmt, ##__VA_ARGS__);
+#define DEBUG_MSG(fmt, ...) kr_log_debug(DNSTAP, fmt, ##__VA_ARGS__);
 #define CFG_SOCK_PATH "socket_path"
 #define CFG_IDENTITY_STRING "identity"
 #define CFG_VERSION_STRING "version"

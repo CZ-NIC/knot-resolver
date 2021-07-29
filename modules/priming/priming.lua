@@ -44,7 +44,7 @@ end
 local function address_callback(pkt, req)
 	if pkt == nil or pkt:rcode() ~= kres.rcode.NOERROR then
 		pkt = req.qsource.packet
-		warn("[priming] cannot resolve address '%s', type: %d", kres.dname2str(pkt:qname()), pkt:qtype())
+		log_warn(ffi.C.LOG_GRP_PRIMING, "cannot resolve address '%s', type: %d", kres.dname2str(pkt:qname()), pkt:qtype())
 	else
 		local section = pkt:rrsets(kres.section.ANSWER)
 		for i = 1, #section do
@@ -64,13 +64,12 @@ local function address_callback(pkt, req)
 	internal.to_resolve = internal.to_resolve - 1
 	if internal.to_resolve == 0 then
 		if count_addresses(internal.nsset) == 0 then
-			warn("[priming] cannot resolve any root server address, next priming query in %d seconds", priming.retry_time / sec)
+			log_warn(ffi.C.LOG_GRP_PRIMING, "cannot resolve any root server address, \
+				next priming query in %d seconds", priming.retry_time / sec)
 			internal.event = event.after(priming.retry_time, internal.prime)
 		else
 			publish_hints(internal.nsset)
-			if verbose() then
-				log("[priming] triggered priming query, next in %d seconds", internal.min_ttl)
-			end
+			log_info(ffi.C.LOG_GRP_PRIMING, "triggered priming query, next in %d seconds", internal.min_ttl)
 			internal.event = event.after(internal.min_ttl * sec, internal.prime)
 		end
 	end
@@ -82,7 +81,7 @@ end
 -- luacheck: no unused args
 local function priming_callback(pkt, req)
 	if pkt == nil or pkt:rcode() ~= kres.rcode.NOERROR then
-		warn("[priming] cannot resolve '.' NS, next priming query in %d seconds", priming.retry_time / sec)
+		log_warn(ffi.C.LOG_GRP_PRIMING, "cannot resolve '.' NS, next priming query in %d seconds", priming.retry_time / sec)
 		internal.event = event.after(priming.retry_time, internal.prime)
 		return nil
 	end

@@ -9,7 +9,7 @@ Using query policies
 --------------------
 
 Query policies :any:`policy.DEBUG_ALWAYS`, :any:`policy.DEBUG_CACHE_MISS` or
-:any:`policy.DEBUG_IF` can be used to enable verbose logging for selected
+:any:`policy.DEBUG_IF` can be used to enable debug-level logging for selected
 subdomains or queries matching specific conditions. Please refer to their
 documentation for usage.
 
@@ -18,7 +18,7 @@ Using HTTP module
 
 The :ref:`http module <mod-http>` provides ``/trace`` endpoint which allows to trace various
 aspects of the request execution. The basic mode allows you to resolve a query
-and trace verbose logs for it (and messages received):
+and trace debug-level logs for it (and messages received):
 
 .. code-block:: bash
 

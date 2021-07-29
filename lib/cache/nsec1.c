@@ -66,7 +66,7 @@ knot_db_val_t key_NSEC1(struct key *k, const knot_dname_t *name, bool add_wildca
 	/*
 	VERBOSE_MSG(NULL, "<> key_NSEC1; name: ");
 	kr_dname_print(name, add_wildcard ? "*." : "" , " ");
-	kr_log_verbose("(zone name LF length: %d; total key length: %d)\n",
+	kr_log_debug(CACHE, "(zone name LF length: %d; total key length: %d)\n",
 			k->zlf_len, key_len);
 	*/
 
@@ -423,8 +423,6 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 
 	if (kr_fails_assert(nsec_rr))
 		return kr_error(EFAULT);
-	const uint32_t new_ttl_log =
-		kr_verbose_status ? nsec_rr->ttl : -1;
 	const uint8_t *bm = knot_nsec_bitmap(nsec_rr->rrs.rdata);
 	uint16_t bm_size = knot_nsec_bitmap_len(nsec_rr->rrs.rdata);
 	int ret;
@@ -451,7 +449,7 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 			auto_free char *owner_str = kr_dname_text(nsec_rr->owner),
 				*next_str = kr_dname_text(knot_nsec_next(nsec_rr->rrs.rdata));
 			VERBOSE_MSG(qry, "=> NSEC wildcard: covered by: %s -> %s, new TTL %d\n",
-					owner_str, next_str, new_ttl_log);
+					owner_str, next_str, nsec_rr->ttl);
 		}
 		return AR_SOA;
 	}
@@ -464,7 +462,7 @@ int nsec1_src_synth(struct key *k, struct answer *ans, const knot_dname_t *clenc
 			if (arw->set.rr) {
 				auto_free char *owner_str = kr_dname_text(nsec_rr->owner);
 				VERBOSE_MSG(qry, "%s: %s, new TTL %d\n",
-						msg_start, owner_str, new_ttl_log);
+						msg_start, owner_str, nsec_rr->ttl);
 			} else {
 				/* don't repeat the RR if it's the same */
 				VERBOSE_MSG(qry, "%s, by the same RR\n", msg_start);

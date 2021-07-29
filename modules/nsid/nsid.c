@@ -38,7 +38,7 @@ static int nsid_finalize(kr_layer_t *ctx) {
 	/* Check violation of https://tools.ietf.org/html/rfc5001#section-2.1:
 	 * The resolver MUST NOT include any NSID payload data in the query */
 	if (knot_edns_opt_get_length(req_nsid) != 0)
-		kr_log_verbose("[%05u.  ][nsid] FORMERR: NSID option in query "
+		kr_log_debug(NSID, "[%05u.  ] FORMERR: NSID option in query "
 			       "must not contain payload, continuing\n", req->uid);
 		/* FIXME: actually change RCODE in answer to FORMERR? */
 
@@ -50,7 +50,7 @@ static int nsid_finalize(kr_layer_t *ctx) {
 				 config->local_nsid_len, config->local_nsid,
 				 &req->pool) != KNOT_EOK) {
 		/* something went wrong and there is no way to salvage content of OPT RRset */
-		kr_log_verbose("[%05u.  ][nsid] unable to add NSID option\n", req->uid);
+		kr_log_debug(NSID, "[%05u.  ] unable to add NSID option\n", req->uid);
 		knot_rrset_clear(req->answer->opt_rr, &req->pool);
 	}
 

@@ -210,7 +210,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	for (int i = 0; ;) {
 		int32_t log_new_ttl = -123456789; /* visually recognizable value */
 		ret = nsec_p_ttl(el[i], qry->timestamp.tv_sec, &log_new_ttl);
-		if (!ret || VERBOSE_STATUS) {
+		if (!ret || kr_log_is_debug_qry(CACHE, qry)) {
 			nsec_p_init(&ans.nsec_p, el[i], !ret);
 		}
 		if (ret) {

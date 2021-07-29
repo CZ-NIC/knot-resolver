@@ -50,10 +50,10 @@ set a new one.  There are some basic commands to start with.
 
 
 The *direct output* of commands sent over socket is captured and sent back,
-while also printed to the daemon standard outputs (in :func:`verbose` mode).
-This gives you an immediate response on the outcome of your command.  Error or
-debug logs aren't captured, but you can find them in the daemon standard
-outputs.
+which gives you an immediate response on the outcome of your command.
+The commands and their output are also logged in ``contrl`` group,
+on ``debug`` level if successful or ``warning`` level if failed
+(see around :func:`log_level`).
 
 Control sockets are also a way to enumerate and test running instances, the
 list of sockets corresponds to the list of processes, and you can test the
@@ -320,11 +320,12 @@ anonymous function:
 
 .. code-block:: lua
 
+   local ffi = require('ffi')
    modules.load('stats')
 
    -- log statistics every second
    local stat_id = event.recurrent(1 * second, function(evid)
-        log(table_print(stats.list()))
+        log_info(ffi.C.LOG_GRP_STATISTICS, table_print(stats.list()))
    end)
 
    -- stop printing statistics after first minute
@@ -342,6 +343,7 @@ function, which provides persistent variable called ``previous``.
 
 .. code-block:: lua
 
+   local ffi = require('ffi')
    modules.load('stats')
 
    -- make a closure, encapsulating counter
@@ -353,7 +355,7 @@ function, which provides persistent variable called ``previous``.
            local total_increment = now['answer.total'] - previous['answer.total']
            local slow_increment = now['answer.slow'] - previous['answer.slow']
            if slow_increment / total_increment > 0.05 then
-               log('WARNING! More than 5 %% of queries was slow!')
+               log_warn(ffi.C.LOG_GRP_STATISTICS, 'WARNING! More than 5 %% of queries was slow!')
            end
            previous = now  -- store current value in closure
         end

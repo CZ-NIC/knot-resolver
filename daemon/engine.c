@@ -27,6 +27,7 @@
 #include "lib/defines.h"
 #include "lib/cache/cdb_lmdb.h"
 #include "lib/dnssec/ta.h"
+#include "lib/log.h"
 
 /* Magic defaults for the engine. */
 #ifndef LRU_RTT_SIZE
@@ -73,7 +74,9 @@ static int l_help(lua_State *L)
 		"hostname()\n    hostname\n"
 		"package_version()\n    return package version\n"
 		"user(name[, group])\n    change process user (and group)\n"
-		"verbose(true|false)\n    toggle verbose mode\n"
+		"log_level(level)\n    logging level (crit, err, warning, notice, info or debug)\n"
+		"log_target(target)\n    logging target (syslog, stderr, stdout)\n"
+		"log_groups(groups)\n    turn on debug log for selected groups\n"
 		"option(opt[, new_val])\n    get/set server option\n"
 		"mode(strict|normal|permissive)\n    set resolver strictness level\n"
 		"reorder_RR([true|false])\n    set/get reordering of RRs within RRsets\n"
@@ -144,11 +147,114 @@ static int l_quit(lua_State *L)
 /** Toggle verbose mode. */
 static int l_verbose(lua_State *L)
 {
+	kr_log_deprecate(SYSTEM, "use log_level() instead of verbose()\n");
+
 	if (lua_isboolean(L, 1) || lua_isnumber(L, 1)) {
-		kr_verbose_set(lua_toboolean(L, 1));
+		kr_log_level_set(lua_toboolean(L, 1) == true ? LOG_DEBUG : LOG_DEFAULT_LEVEL);
 	}
-	lua_pushboolean(L, kr_verbose_status);
+
+	lua_pushboolean(L, kr_log_level == LOG_DEBUG);
 	return 1;
+}
+
+static int l_log_level(lua_State *L)
+{
+	const int params = lua_gettop(L);
+	if (params > 1) {
+		goto bad_call;
+	} else if (params == 1) {  // set
+		const char *lvl_str = lua_tostring(L, 1);
+		if (!lvl_str)
+			goto bad_call;
+		kr_log_level_t lvl = kr_log_name2level(lvl_str);
+		if (lvl < 0)
+			lua_error_p(L, "unknown log level '%s'", lvl_str);
+		kr_log_level_set(lvl);
+	}
+	// get
+	lua_pushstring(L, kr_log_level2name(kr_log_level));
+	return 1;
+bad_call:
+	lua_error_p(L, "takes one string parameter or nothing");
+}
+
+static int l_log_target(lua_State *L)
+{
+	const int params = lua_gettop(L);
+	if (params > 1)
+		goto bad_call;
+	// set
+	if (params == 1) {
+		const char *t_str = lua_tostring(L, 1);
+		if (!t_str)
+			goto bad_call;
+		kr_log_target_t t;
+		if (strcmp(t_str, "syslog") == 0) {
+			t = LOG_TARGET_SYSLOG;
+		} else if (strcmp(t_str, "stdout") == 0) {
+			t = LOG_TARGET_STDOUT;
+		} else if (strcmp(t_str, "stderr") == 0) {
+			t = LOG_TARGET_STDERR;
+		} else {
+			lua_error_p(L, "unknown log target '%s'", t_str);
+		}
+		kr_log_target_set(t);
+	}
+	// get
+	const char *t_str = NULL;
+	switch (kr_log_target) {
+	case LOG_TARGET_SYSLOG: t_str = "syslog"; break;
+	case LOG_TARGET_STDERR: t_str = "stderr"; break;
+	case LOG_TARGET_STDOUT: t_str = "stdout"; break;
+	} // -Wswitch-enum
+	lua_pushstring(L, t_str);
+	return 1;
+bad_call:
+	lua_error_p(L, "takes one string parameter or nothing");
+}
+
+static int l_log_groups(lua_State *L)
+{
+	const int params = lua_gettop(L);
+	if (params > 1)
+		goto bad_call;
+	if (params == 1) {  // set
+		if (!lua_istable(L, 1))
+			goto bad_call;
+		kr_log_group_reset();
+
+		int idx = 1;
+		lua_pushnil(L);
+		while (lua_next(L, 1) != 0) {
+			const char *grp_str = lua_tostring(L, -1);
+			if (!grp_str)
+				goto bad_call;
+			enum kr_log_group grp = kr_log_name2grp(grp_str);
+			if (grp < 0)
+				lua_error_p(L, "unknown log group '%s'", lua_tostring(L, -1));
+
+			kr_log_group_add(grp);
+			++idx;
+			lua_pop(L, 1);
+		}
+	}
+	// get
+	lua_newtable(L);
+	int i = 1;
+	for (int grp = LOG_GRP_SYSTEM; grp <= LOG_GRP_DEVEL; grp++) {
+		const char *name = kr_log_grp2name(grp);
+		if (kr_fails_assert(name))
+			continue;
+		if (kr_log_group_is_set(grp)) {
+			lua_pushinteger(L, i);
+			lua_pushstring(L, name);
+			lua_settable(L, -3);
+			i++;
+		}
+	}
+	return 1;
+bad_call:
+	lua_error_p(L, "takes a table of string groups as parameter or nothing");
 }
 
 char *engine_get_hostname(struct engine *engine) {
@@ -431,6 +537,12 @@ static int init_state(struct engine *engine)
 	lua_setglobal(engine->L, "package_version");
 	lua_pushcfunction(engine->L, l_verbose);
 	lua_setglobal(engine->L, "verbose");
+	lua_pushcfunction(engine->L, l_log_level);
+	lua_setglobal(engine->L, "log_level");
+	lua_pushcfunction(engine->L, l_log_target);
+	lua_setglobal(engine->L, "log_target");
+	lua_pushcfunction(engine->L, l_log_groups);
+	lua_setglobal(engine->L, "log_groups");
 	lua_pushcfunction(engine->L, l_setuser);
 	lua_setglobal(engine->L, "user");
 	lua_pushcfunction(engine->L, l_hint_root_file);
@@ -617,7 +729,7 @@ int engine_load_sandbox(struct engine *engine)
 	/* Init environment */
 	int ret = luaL_dofile(engine->L, LIBDIR "/sandbox.lua");
 	if (ret != 0) {
-		fprintf(stderr, "[system] error %s\n", lua_tostring(engine->L, -1));
+		kr_log_error(SYSTEM, "error %s\n", lua_tostring(engine->L, -1));
 		lua_pop(engine->L, 1);
 		return kr_error(ENOEXEC);
 	}
@@ -632,11 +744,11 @@ int engine_loadconf(struct engine *engine, const char *config_path)
 
 	char cwd[PATH_MAX];
 	get_workdir(cwd, sizeof(cwd));
-	kr_log_verbose("[system] loading config '%s' (workdir '%s')\n", config_path, cwd);
+	kr_log_debug(SYSTEM, "loading config '%s' (workdir '%s')\n", config_path, cwd);
 
 	int ret = luaL_dofile(engine->L, config_path);
 	if (ret != 0) {
-		fprintf(stderr, "[system] error while loading config: "
+		kr_log_error(SYSTEM, "error while loading config: "
 			"%s (workdir '%s')\n", lua_tostring(engine->L, -1), cwd);
 		lua_pop(engine->L, 1);
 	}
@@ -716,7 +828,7 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 			ret = engine_pcall(L, 1);
 		}
 		if (kr_fails_assert(ret == 0)) {  /* probably not critical, but weird */
-			kr_log_error("[system] internal error when loading C module %s: %s\n",
+			kr_log_error(SYSTEM, "internal error when loading C module %s: %s\n",
 					module->name, lua_tostring(L, -1));
 			lua_pop(L, 1);
 		}
@@ -725,12 +837,12 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 		/* No luck with C module, so try to load and .init() lua module. */
 		ret = ffimodule_register_lua(engine, module, name);
 		if (ret != 0) {
-			kr_log_error("[system] failed to load module '%s'\n", name);
+			kr_log_error(SYSTEM, "failed to load module '%s'\n", name);
 		}
 
 	} else if (ret == kr_error(ENOTSUP)) {
 		/* Print a more helpful message when module is linked against an old resolver ABI. */
-		kr_log_error("[system] module '%s' links to unsupported ABI, please rebuild it\n", name);
+		kr_log_error(SYSTEM, "module '%s' links to unsupported ABI, please rebuild it\n", name);
 	}
 
 	if (ret != 0) {

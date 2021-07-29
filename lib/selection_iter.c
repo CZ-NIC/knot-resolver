@@ -10,7 +10,7 @@
 #include "lib/zonecut.h"
 #include "lib/resolve.h"
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "slct", __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), SELECTION, __VA_ARGS__)
 
 /// To be held per query and locally.  Allocations are in the kr_request's mempool.
 struct iter_local_state {
@@ -303,7 +303,7 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 		qry->flags.DNSSEC_BOGUS = true;
 	}
 
-	WITH_VERBOSE(qry)
+	if (kr_log_is_debug_qry(SELECTION, qry))
 	{
 	KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
 	if (*transport) {

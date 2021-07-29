@@ -151,7 +151,7 @@ The HTTP module has several built-in services to use.
 
  "``/stats``", "Statistics/metrics", "Exported :ref:`metrics <mod-stats-list>` from :ref:`mod-stats` in JSON format."
  "``/metrics``", "Prometheus metrics", "Exported metrics for Prometheus_."
- "``/trace/:name/:type``", "Tracking", ":ref:`Trace resolution <mod-http-trace>` of a DNS query and return the verbose logs."
+ "``/trace/:name/:type``", "Tracking", ":ref:`Trace resolution <mod-http-trace>` of a DNS query and return its debug-level logs."
  "``/doh``", "Legacy DNS-over-HTTPS", ":rfc:`8484` endpoint, see :ref:`mod-http-doh`."
  "``/dns-query``", "Legacy DNS-over-HTTPS", ":rfc:`8484` endpoint, see :ref:`mod-http-doh`."
 
