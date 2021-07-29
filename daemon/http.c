@@ -175,6 +175,10 @@ static int check_uri(const char* uri_path)
 
 	if (ret) /* no endpoint found */
 		return -1;
+
+	/* FIXME This also passes for GET when no variables are provided.
+	 * Fixing it doesn't seem straightforward, since :method may not be
+	 * known by the time check_uri() is called... */
 	if (endpoint_len == strlen(path) - 1) /* done for POST method */
 		return 0;
 
@@ -216,7 +220,7 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 	uint8_t *dest;
 
 	if (!beg)  /* No dns variable in path. */
-		return 0;
+		return -1;
 
 	beg += sizeof(key) - 1;
 	end = strchr(beg, '&');
@@ -230,7 +234,7 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 	ret = kr_base64url_decode((uint8_t*)beg, end - beg, dest, remaining);
 	if (ret < 0) {
 		ctx->buf_pos = 0;
-		kr_log_debug(DOH, "base64url decode failed %s\n", strerror(ret));
+		kr_log_debug(DOH, "[%p] base64url decode failed %s\n", (void *)ctx->h2, strerror(ret));
 		return ret;
 	}
 
@@ -250,6 +254,18 @@ static void refuse_stream(nghttp2_session *h2, int32_t stream_id)
 		h2, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_REFUSED_STREAM);
 }
 
+void http_free_headers(kr_http_header_array_t *headers)
+{
+	if (headers == NULL)
+		return;
+
+	for (int i = 0; i < headers->len; i++) {
+		free(headers->at[i].name);
+		free(headers->at[i].value);
+	}
+	array_clear(*headers);
+	free(headers);
+}
 /* Return the http ctx into a pristine state in which no stream is being processed. */
 static void http_cleanup_stream(struct http_ctx *ctx)
 {
@@ -257,15 +273,8 @@ static void http_cleanup_stream(struct http_ctx *ctx)
 	ctx->current_method = HTTP_METHOD_NONE;
 	free(ctx->uri_path);
 	ctx->uri_path = NULL;
-	if (ctx->headers != NULL) {
-		for (int i = 0; i < ctx->headers->len; i++) {
-			free(ctx->headers->at[i].name);
-			free(ctx->headers->at[i].value);
-		}
-		array_clear(*ctx->headers);
-		free(ctx->headers);
-		ctx->headers = NULL;
-	}
+	http_free_headers(ctx->headers);
+	ctx->headers = NULL;
 }
 
 /*
@@ -287,8 +296,8 @@ static int begin_headers_callback(nghttp2_session *h2, const nghttp2_frame *fram
 	}
 
 	if (ctx->incomplete_stream != -1) {
-		kr_log_debug(DOH, "stream %d incomplete, refusing\n",
-				ctx->incomplete_stream);
+		kr_log_debug(DOH, "[%p] stream %d incomplete, refusing (begin_headers_callback)\n",
+				(void *)h2, ctx->incomplete_stream);
 		refuse_stream(h2, stream_id);
 	} else {
 		http_cleanup_stream(ctx);  // Free any leftover data and ensure pristine state
@@ -316,8 +325,8 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 		return 0;
 
 	if (ctx->incomplete_stream != stream_id) {
-		kr_log_debug(DOH, "stream %d incomplete, refusing\n",
-				ctx->incomplete_stream);
+		kr_log_debug(DOH, "[%p] stream %d incomplete, refusing (header_callback)\n",
+				(void *)h2, ctx->incomplete_stream);
 		refuse_stream(h2, stream_id);
 		return 0;
 	}
@@ -330,8 +339,8 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 			/* Limit maximum value size to reduce attack surface. */
 			if (valuelen > HTTP_MAX_HEADER_IN_SIZE) {
 				kr_log_debug(DOH,
-					"stream %d: header too large (%zu B), refused\n",
-					stream_id, valuelen);
+					"[%p] stream %d: header too large (%zu B), refused\n",
+					(void *)h2, stream_id, valuelen);
 				refuse_stream(h2, stream_id);
 				return 0;
 			}
@@ -356,6 +365,7 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 			return 0;
 		}
 
+		kr_assert(ctx->uri_path == NULL);
 		ctx->uri_path = malloc(sizeof(*ctx->uri_path) * (valuelen + 1));
 		if (!ctx->uri_path)
 			return kr_error(ENOMEM);
@@ -393,8 +403,8 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	bool is_first = queue_len(ctx->streams) == 0 || queue_tail(ctx->streams).id != ctx->incomplete_stream;
 
 	if (ctx->incomplete_stream != stream_id) {
-		kr_log_debug(DOH, "stream %d incomplete, refusing\n",
-			ctx->incomplete_stream);
+		kr_log_debug(DOH, "[%p] stream %d incomplete, refusing (data_chunk_recv_callback)\n",
+			(void *)h2, ctx->incomplete_stream);
 		refuse_stream(h2, stream_id);
 		ctx->incomplete_stream = -1;
 		return 0;
@@ -407,12 +417,19 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 		required += sizeof(uint16_t);
 
 	if (required > remaining) {
-		kr_log_error(DOH, "insufficient space in buffer\n");
+		kr_log_error(DOH, "[%p] insufficient space in buffer\n", (void *)h2);
 		ctx->incomplete_stream = -1;
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 	}
 
 	if (is_first) {
+		/* FIXME: reserving the 2B length should be done elsewhere,
+		 * ideally for both POST and GET at the same time. The right
+		 * place would probably be after receiving HEADERS frame in
+		 * on_frame_recv()
+		 *
+		 * queue_push() should be moved: see FIXME in
+		 * submit_to_wirebuffer() */
 		ctx->buf_pos = sizeof(uint16_t);  /* Reserve 2B for dnsmsg len. */
 		struct http_stream stream = {
 			.id = stream_id,
@@ -426,6 +443,42 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	return 0;
 }
 
+static int submit_to_wirebuffer(struct http_ctx *ctx)
+{
+	int ret = -1;
+	ssize_t len;
+
+	/* Transfer ownership to stream (waiting in wirebuffer) */
+	/* FIXME: technically, transferring memory ownership should happen
+	 * along with queue_push(ctx->streams) to avoid confusion of who owns
+	 * what and when. Pushing to queue should be done AFTER we sucessfully
+	 * finish this function. On error, we'd clean up and not push anything.
+	 * However, queue's content is now also used to detect first DATA frame
+	 * in stream, so it needs to be refactored first.
+	 *
+	 * For now, we assume memory is transferred even on error and the
+	 * headers themselves get cleaned up during http_free() which is
+	 * triggered after the error when session is closed.  */
+	ctx->headers = NULL;
+
+	len = ctx->buf_pos - sizeof(uint16_t);
+	if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
+		kr_log_debug(DOH, "[%p] invalid dnsmsg size: %zd B\n", (void *)ctx->h2, len);
+		ret = -1;
+		goto cleanup;
+	}
+
+	/* Submit data to wirebuffer. */
+	knot_wire_write_u16(ctx->buf, len);
+	ctx->submitted += ctx->buf_pos;
+	ctx->buf += ctx->buf_pos;
+	ctx->buf_pos = 0;
+	ret = 0;
+cleanup:
+	http_cleanup_stream(ctx);
+	return ret;
+}
+
 /*
  * Finalize existing buffer upon receiving the last frame in the stream.
  *
@@ -437,7 +490,6 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *frame, void *user_data)
 {
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
-	ssize_t len;
 	int32_t stream_id = frame->hd.stream_id;
 	if(kr_fails_assert(stream_id != -1))
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
@@ -446,21 +498,12 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 		if (ctx->current_method == HTTP_METHOD_GET) {
 			if (process_uri_path(ctx, ctx->uri_path, stream_id) < 0) {
 				refuse_stream(h2, stream_id);
+				return 0;  /* End processing - don't submit to wirebuffer. */
 			}
 		}
-		ctx->headers = NULL;  // Success -> transfer ownership to stream (waiting in wirebuffer)
-		http_cleanup_stream(ctx);
 
-		len = ctx->buf_pos - sizeof(uint16_t);
-		if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
-			kr_log_debug(DOH, "invalid dnsmsg size: %zd B\n", len);
+		if (submit_to_wirebuffer(ctx) < 0)
 			return NGHTTP2_ERR_CALLBACK_FAILURE;
-		}
-
-		knot_wire_write_u16(ctx->buf, len);
-		ctx->submitted += ctx->buf_pos;
-		ctx->buf += ctx->buf_pos;
-		ctx->buf_pos = 0;
 	}
 
 	return 0;
@@ -543,6 +586,9 @@ struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
 	nghttp2_session_server_new(&ctx->h2, callbacks, ctx);
 	nghttp2_submit_settings(ctx->h2, NGHTTP2_FLAG_NONE,
 		iv, sizeof(iv)/sizeof(*iv));
+
+	struct sockaddr *peer = session_get_peer(session);
+	kr_log_debug(DOH, "[%p] h2 session created for %s\n", (void *)ctx->h2, kr_straddr(peer));
 finish:
 	nghttp2_session_callbacks_del(callbacks);
 	return ctx;
@@ -564,6 +610,12 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *buf,
 	if (kr_fails_assert(ctx->session == session))
 		return kr_error(EINVAL);
 
+	/* FIXME It is possible for the TLS/HTTP processing to be cut off at
+	 * any point, waiting for more data. If we're using POST which is split
+	 * into multiple DATA frames and such a stream is in the middle of
+	 * processing, resetting buf_pos will corrupt its contents (and the
+	 * query will be ignored).  This may also be problematic in other
+	 * cases.  */
 	ctx->submitted = 0;
 	ctx->buf = session_wirebuf_get_free_start(session);
 	ctx->buf_pos = 0;
@@ -571,15 +623,15 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *buf,
 
 	ret = nghttp2_session_mem_recv(ctx->h2, buf, nread);
 	if (ret < 0) {
-		kr_log_debug(DOH, "nghttp2_session_mem_recv failed: %s (%zd)\n",
-			       nghttp2_strerror(ret), ret);
+		kr_log_debug(DOH, "[%p] nghttp2_session_mem_recv failed: %s (%zd)\n",
+			     (void *)ctx->h2, nghttp2_strerror(ret), ret);
 		return kr_error(EIO);
 	}
 
 	ret = nghttp2_session_send(ctx->h2);
 	if (ret < 0) {
-		kr_log_debug(DOH, "nghttp2_session_send failed: %s (%zd)\n",
-			     nghttp2_strerror(ret), ret);
+		kr_log_debug(DOH, "[%p] nghttp2_session_send failed: %s (%zd)\n",
+			     (void *)ctx->h2, nghttp2_strerror(ret), ret);
 		return kr_error(EIO);
 	}
 
@@ -642,14 +694,14 @@ static int http_send_response(nghttp2_session *h2, int32_t stream_id,
 
 	ret = nghttp2_session_set_stream_user_data(h2, stream_id, (void*)data);
 	if (ret != 0) {
-		kr_log_debug(DOH, "failed to set stream user data: %s\n", nghttp2_strerror(ret));
+		kr_log_debug(DOH, "[%p] failed to set stream user data: %s\n", (void *)h2, nghttp2_strerror(ret));
 		free(data);
 		return kr_error(EIO);
 	}
 
 	ret = nghttp2_submit_response(h2, stream_id, hdrs, sizeof(hdrs)/sizeof(*hdrs), prov);
 	if (ret != 0) {
-		kr_log_debug(DOH, "nghttp2_submit_response failed: %s\n", nghttp2_strerror(ret));
+		kr_log_debug(DOH, "[%p] nghttp2_submit_response failed: %s\n", (void *)h2, nghttp2_strerror(ret));
 		nghttp2_session_set_stream_user_data(h2, stream_id, NULL);  // just in case
 		free(data);
 		return kr_error(EIO);
@@ -657,7 +709,7 @@ static int http_send_response(nghttp2_session *h2, int32_t stream_id,
 
 	ret = nghttp2_session_send(h2);
 	if(ret < 0) {
-		kr_log_debug(DOH, "nghttp2_session_send failed: %s\n", nghttp2_strerror(ret));
+		kr_log_debug(DOH, "[%p] nghttp2_session_send failed: %s\n", (void *)h2, nghttp2_strerror(ret));
 
 		/* At this point, there was an error in some nghttp2 callback. The on_pkt_write()
 		 * callback which also calls free(data) may or may not have been called. Therefore,
@@ -742,8 +794,20 @@ void http_free(struct http_ctx *ctx)
 	if (!ctx)
 		return;
 
+	kr_log_debug(DOH, "[%p] h2 session freed\n", (void *)ctx->h2);
+
+	/* Clean up any headers whose ownership may not have been transferred.
+	 * This may happen when connection is abruptly ended (e.g. due to errors while
+	 * processing HTTP stream. */
+	while (queue_len(ctx->streams) > 0) {
+		struct http_stream stream = queue_head(ctx->streams);
+		http_free_headers(stream.headers);
+		if (stream.headers == ctx->headers)
+			ctx->headers = NULL;  // to prevent double-free
+		queue_pop(ctx->streams);
+	}
+
 	http_cleanup_stream(ctx);
-	// TODO: queue_pop and check/free all headers (ownership may not have been transferred)
 	queue_deinit(ctx->streams);
 	nghttp2_session_del(ctx->h2);
 	free(ctx);
