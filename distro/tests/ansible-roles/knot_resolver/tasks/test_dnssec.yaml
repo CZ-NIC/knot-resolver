@@ -10,6 +10,6 @@
 - name: dnssec_test rhybar.cz. returns SERVFAIL
   tags:
     - test
-  shell: kdig @127.0.0.1 rhybar.cz.
+  shell: kdig +timeout=16 @127.0.0.1 rhybar.cz.
   register: res
   failed_when: '"status: SERVFAIL" not in res.stdout'
