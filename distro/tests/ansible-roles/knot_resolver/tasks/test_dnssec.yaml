@@ -1,15 +1,15 @@
 ---
 # SPDX-License-Identifier: GPL-3.0-or-later
-- name: dnssec_test bogussig.bad-dnssec.wb.sidnlabs.nl. +cd returns NOERROR
+- name: dnssec_test rhybar.cz. +cd returns NOERROR
   tags:
     - test
-  shell: kdig +cd @127.0.0.1 bogussig.bad-dnssec.wb.sidnlabs.nl.
+  shell: kdig +cd @127.0.0.1 rhybar.cz.
   register: res
   failed_when: '"status: NOERROR" not in res.stdout'
 
-- name: dnssec_test bogussig.bad-dnssec.wb.sidnlabs.nl. returns SERVFAIL
+- name: dnssec_test rhybar.cz. returns SERVFAIL
   tags:
     - test
-  shell: kdig @127.0.0.1 bogussig.bad-dnssec.wb.sidnlabs.nl.
+  shell: kdig @127.0.0.1 rhybar.cz.
   register: res
   failed_when: '"status: SERVFAIL" not in res.stdout'
