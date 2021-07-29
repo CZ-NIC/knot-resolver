@@ -95,7 +95,7 @@ class Kresd(ContextDecorator):
         self.logfile = open(self.logfile_path, 'w')
         self.process = subprocess.Popen(
             ['kresd', '-c', self.config_path, '-n', self.workdir],
-            stdout=self.logfile, env=os.environ.copy())
+            stderr=self.logfile, env=os.environ.copy())
 
         try:
             self._wait_for_tcp_port()  # wait for ports to be up and responding
@@ -295,8 +295,8 @@ def make_port(ip=None, ip6=None):
     raise RuntimeError("No available port found!")
 
 
-KRESD_LOG_STARTUP_MSGID = re.compile(r'^\[{}.*'.format(KRESD_STARTUP_MSGID))
-KRESD_LOG_IO_CLOSE = re.compile(r'^\[io\].*closed by peer.*')
+KRESD_LOG_STARTUP_MSGID = re.compile(r'^\[[^]]+\]\[{}.*'.format(KRESD_STARTUP_MSGID))
+KRESD_LOG_IO_CLOSE = re.compile(r'^\[io    \].*closed by peer.*')
 
 
 @contextmanager

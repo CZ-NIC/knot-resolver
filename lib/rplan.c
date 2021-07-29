@@ -11,7 +11,7 @@
 #include "lib/defines.h"
 #include "lib/layer.h"
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "plan",  __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, PLAN,  __VA_ARGS__)
 
 inline static unsigned char chars_or(const unsigned char a, const unsigned char b)
 {
@@ -188,10 +188,8 @@ struct kr_query *kr_rplan_push_empty(struct kr_rplan *rplan, struct kr_query *pa
 		return NULL;
 	}
 
-	WITH_VERBOSE(qry) {
 	VERBOSE_MSG(qry, "plan '%s' type '%s'  uid [%05u.%02u]\n", "", "",
 		    qry->request ? qry->request->uid : 0, qry->uid);
-	}
 	return qry;
 }
 
@@ -210,12 +208,12 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 	qry->sclass = cls;
 	qry->stype = type;
 
-	WITH_VERBOSE(qry) {
-	KR_DNAME_GET_STR(name_str, name);
-	KR_RRTYPE_GET_STR(type_str, type);
-	VERBOSE_MSG(parent, "plan '%s' type '%s' uid [%05u.%02u]\n",
-		    name_str, type_str,
-		    qry->request ? qry->request->uid : 0, qry->uid);
+	if (kr_log_is_debug_qry(PLAN, qry)) {
+		KR_DNAME_GET_STR(name_str, name);
+		KR_RRTYPE_GET_STR(type_str, type);
+		VERBOSE_MSG(parent, "plan '%s' type '%s' uid [%05u.%02u]\n",
+			    name_str, type_str,
+			    qry->request ? qry->request->uid : 0, qry->uid);
 	}
 	return qry;
 }
