@@ -32,15 +32,17 @@ local function curr_line() return debug.getinfo(4,'l').currentline end
 
 local function log_fmt(grp, level, fmt, ...)
 	ffi.C.kr_log_fmt(grp, level, 'CODE_FILE='..curr_file(), 'CODE_LINE='..curr_line(), '',
-			'[%-6s] ' .. fmt .. '\n', ffi.C.kr_log_grp2name(grp), ...)
+			'[%-6s] %s\n', ffi.C.kr_log_grp2name(grp), string.format(fmt, ...))
 end
 
 function log_req(req, qry_uid, indent, grp, fmt, ...)
-	ffi.C.kr_log_req1(req, qry_uid, indent, grp, ffi.C.kr_log_grp2name(grp), fmt, ...)
+	ffi.C.kr_log_req1(req, qry_uid, indent, grp, ffi.C.kr_log_grp2name(grp),
+		'%s\n', string.format(fmt, ...))
 end
 
 function log_qry(qry, grp, fmt, ...)
-	ffi.C.kr_log_q1(qry, grp, ffi.C.kr_log_grp2name(grp), fmt, ...)
+	ffi.C.kr_log_q1(qry, grp, ffi.C.kr_log_grp2name(grp),
+		'%s\n', string.format(fmt, ...))
 end
 
 function panic(fmt, ...)
