@@ -6,6 +6,8 @@ print('Knot Resolver ' .. package_version())
 -- Smaller cache size
 cache.size = 10 * MB
 
+local ffi = require('ffi')
+
 function interactive_mode()
 	-- Listen on all interfaces (localhost would not work in Docker)
 	net.listen('0.0.0.0', 53, { kind = 'dns' })
@@ -34,7 +36,7 @@ function interactive_mode()
 		   .. '8453 -> web interface\n'
 		   .. '\n'
 		   .. 'For verbose logging enter following command to prompt below:\n'
-		   .. 'verbose(true)\n')
+		   .. 'log_level("debug")\n')
 	end
 	print_help()
 end
@@ -60,9 +62,9 @@ function debug_mode(qname, qtype)
 	-- execute query right after start up and exit when the query is finished
 	event.after(0, function()
 		-- ultra verbose log
-		verbose(true)
+		log_level('debug')
 		policy.add(policy.all(policy.DEBUG_ALWAYS))
-		log('INFO: starting DNS query for %s %s', qname, kres.tostring.type[qtype])
+		log_debug(ffi.C.LOG_GRP_RESOLVER, 'starting DNS query for %s %s', qname, kres.tostring.type[qtype])
 		local starttime = cqueues.monotime()
 		resolve({
 			name = qname,
@@ -74,7 +76,7 @@ function debug_mode(qname, qtype)
 				event.after(1, -- milisecond
 					function()
 						local endtime = cqueues.monotime()
-						log('\nrequest finished in %f ms', (endtime - starttime) * 1000)
+						log_debug(ffi.C.LOG_GRP_RESOLVER, '\nrequest finished in %f ms', (endtime - starttime) * 1000)
 						os.exit()
 					end)
 				end
@@ -87,7 +89,7 @@ local qtype = os.getenv('QTYPE')
 if qname and qtype then
 	qtypenum = kres.type[qtype]
 	if not qtypenum then
-		log('ERROR: unsupported query type "%s", use TYPE12345 notation', qtype)
+		log_error(ffi.C.LOG_GRP_RESOLVER, 'ERROR: unsupported query type "%s", use TYPE12345 notation', qtype)
 		os.exit()
 	end
 	debug_mode(qname, qtypenum)

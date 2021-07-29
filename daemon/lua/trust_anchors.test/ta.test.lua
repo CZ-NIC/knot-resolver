@@ -6,9 +6,9 @@ local ffi = require('ffi')
 
 -- count warning messages
 warn_msg = {}
-overriding_msg="[ ta ] warning: overriding previously set trust anchors for ."
+overriding_msg="warning: overriding previously set trust anchors for ."
 warn_msg[overriding_msg] = 0
-function warn(fmt, ...)
+function log_warn(grp, fmt, ...) --luacheck: no unused args
 	msg = string.format(fmt, ...)
 	if warn_msg[msg] ~= nil then
 		warn_msg[msg] = warn_msg[msg] + 1

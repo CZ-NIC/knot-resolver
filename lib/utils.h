@@ -26,9 +26,8 @@
 #include "contrib/mempattern.h"
 #include "lib/defines.h"
 #include "lib/generic/array.h"
+#include "lib/log.h"
 
-struct kr_query;
-struct kr_request;
 
 /*
  * Logging and debugging.
@@ -40,11 +39,6 @@ typedef void (*trace_callback_f)(struct kr_request *request);
  * @brief Callback for request logging handler.
  * @param[in] msg Log message. Pointer is not valid after handler returns. */
 typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
-
-#define kr_log_info printf
-#define kr_log_error(...) fprintf(stderr, ## __VA_ARGS__)
-#define kr_log_critical(...) kr_log_error(__VA_ARGS__)
-#define kr_log_deprecate(...) fprintf(stderr, "deprecation WARNING: " __VA_ARGS__)
 
 /** Assert() but always, regardless of -DNDEBUG.  See also kr_assert(). */
 #define kr_require(expression) do { if (!(expression)) { \
@@ -99,57 +93,6 @@ static inline bool kr_assert_func(bool result, const char *expr, const char *fun
 		kr_fail(false, expr, func, file, line);
 	return result;
 }
-
-/* Always export these, but override direct calls by macros conditionally. */
-/** Whether in --verbose mode.  Only use this for reading. */
-KR_EXPORT extern bool kr_verbose_status;
-
-/** Set --verbose mode.  Not available if compiled with -DNOVERBOSELOG. */
-KR_EXPORT bool kr_verbose_set(bool status);
-
-/**
- * @brief Return true if the query has request log handler installed.
- */
-#define kr_log_rtrace_enabled(req) (__builtin_expect( \
-	(req) && (req)->trace_log, \
-	false))
-
-#define kr_log_qtrace_enabled(qry) (__builtin_expect( \
-	(qry) && kr_log_rtrace_enabled(qry->request), \
-	false))
-
-/**
- * Log a message through the request log handler or stdout.
- * Caller is responsible for detecting verbose mode, use QRVERBOSE() macro.
- * @param  qry_uid query ID to append to request ID, 0 means "no query"
- * @param  indent level of indentation between [req.qry][source] and message
- * @param  source message source
- * @param  fmt message format
- */
-KR_EXPORT KR_PRINTF(5)
-void kr_log_req(const struct kr_request * const req, uint32_t qry_uid,
-		const unsigned int indent, const char *source, const char *fmt, ...);
-
-/**
- * Log a message through the request log handler or stdout.
- * Caller is responsible for detecting verbose mode, use QRVERBOSE() macro.
- * @param  qry current query
- * @param  source message source
- * @param  fmt message format
- */
-KR_EXPORT KR_PRINTF(3)
-void kr_log_q(const struct kr_query *qry, const char *source, const char *fmt, ...);
-
-#ifdef NOVERBOSELOG
-/* Efficient compile-time disabling of verbose messages. */
-#define kr_verbose_status false
-#define kr_verbose_set(x)
-#endif
-
-/** Block run in --verbose mode; optimized when not run. */
-#define VERBOSE_STATUS __builtin_expect(kr_verbose_status, false)
-#define WITH_VERBOSE(query) if(__builtin_expect(kr_verbose_status || kr_log_qtrace_enabled(query), false))
-#define kr_log_verbose if(VERBOSE_STATUS) printf
 
 #define KR_DNAME_GET_STR(dname_str, dname) \
 	char dname_str[KR_DNAME_STR_MAXLEN]; \
@@ -247,7 +190,7 @@ static inline uint64_t kr_rand_bytes(unsigned int size)
 {
 	uint64_t result;
 	if (size <= 0 || size > sizeof(result)) {
-		kr_log_error("kr_rand_bytes(): EINVAL\n");
+		kr_log_error(SYSTEM, "kr_rand_bytes(): EINVAL\n");
 		abort();
 	}
 	uint8_t data[sizeof(result)];

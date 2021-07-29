@@ -711,14 +711,14 @@ ffi.metatype( kr_query_t, {
 local function void_xpcall_log_tb(func, req, msg)
 	local ok, err = xpcall(func, debug.traceback, req, msg)
 	if not ok then
-		log('error: callback %s req %s msg %s stack traceback:\n%s', func, req, msg, err)
+		log_error(ffi.C.LOG_GRP_SYSTEM, 'callback %s req %s msg %s stack traceback:\n%s', func, req, msg, err)
 	end
 end
 
 local function void_xpcall_finish_tb(func, req)
 	local ok, err = xpcall(func, debug.traceback, req)
 	if not ok then
-		log('error: callback %s req %s stack traceback:\n%s', func, req, err)
+		log_error(ffi.C.LOG_GRP_SYSTEM, 'callback %s req %s stack traceback:\n%s', func, req, err)
 	end
 end
 

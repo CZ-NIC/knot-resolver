@@ -62,18 +62,31 @@ The **interactive prompt** is denoted by ``>``, so all examples starting with ``
         > -- this is a comment entered into interactive prompt
         > -- comments have no effect here
         > -- the next line shows a command entered interactivelly and its output
-        > verbose()
-        false
-        > -- the previous line without > character is output from verbose() command
+        > log_level()
+        'notice'
+        > -- the previous line without > character is output from log_level() command
 
 Following example demontrates how to interactivelly list all currently loaded modules, and includes multi-line output:
 
 .. code-block:: lua
 
         > modules.list()
-        [1] => iterate
-        [2] => validate
-        [3] => cache
+        {
+            'iterate',
+            'validate',
+            'cache',
+            'ta_update',
+            'ta_signal_query',
+            'policy',
+            'priming',
+            'detect_time_skew',
+            'detect_time_jump',
+            'ta_sentinel',
+            'edns_keepalive',
+            'refuse_nord',
+            'watchdog',
+        }
+
 
 Before we dive into configuring features, let us explain modularization basics.
 

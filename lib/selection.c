@@ -14,7 +14,7 @@
 
 #include "lib/utils.h"
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), "slct", __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), SELECTION, __VA_ARGS__)
 
 #define DEFAULT_TIMEOUT 400
 #define MAX_TIMEOUT 10000
@@ -327,8 +327,7 @@ void update_address_state(struct address_state *state, union inaddr *address,
 		state, qry->request->ctx->cache_rtt_tout_retry_interval);
 #ifdef SELECTION_CHOICE_LOGGING
 	// This is sometimes useful for debugging, but usually too verbose
-	WITH_VERBOSE(qry)
-	{
+	if (kr_log_is_debug_qry(SELECTION, qry)) {
 		const char *ns_str = kr_straddr(&address->ip);
 		VERBOSE_MSG(qry, "rtt of %s is %d, variance is %d\n", ns_str,
 			    state->rtt_state.srtt, state->rtt_state.variance);
@@ -538,18 +537,17 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state,
 	if (transport->address_len == sizeof(struct in6_addr))
 		no6_success(qry);
 
-	WITH_VERBOSE(qry)
-	{
-	KR_DNAME_GET_STR(ns_name, transport->ns_name);
-	KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
-	const char *ns_str = kr_straddr(&transport->address.ip);
+	if (kr_log_is_debug_qry(SELECTION, qry)) {
+		KR_DNAME_GET_STR(ns_name, transport->ns_name);
+		KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
+		const char *ns_str = kr_straddr(&transport->address.ip);
 
-	VERBOSE_MSG(
-		qry,
-		"=> id: '%05u' updating: '%s'@'%s' zone cut: '%s'"
-		" with rtt %u to srtt: %d and variance: %d \n",
-		qry->id, ns_name, ns_str ? ns_str : "", zonecut_str,
-		rtt, new_rtt_state.srtt, new_rtt_state.variance);
+		VERBOSE_MSG(
+			qry,
+			"=> id: '%05u' updating: '%s'@'%s' zone cut: '%s'"
+			" with rtt %u to srtt: %d and variance: %d \n",
+			qry->id, ns_name, ns_str ? ns_str : "", zonecut_str,
+			rtt, new_rtt_state.srtt, new_rtt_state.variance);
 	}
 }
 
@@ -678,18 +676,18 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 	addr_state->error_count++;
 	addr_state->errors[sel_error]++;
 
-	WITH_VERBOSE(qry)
-	{
-	KR_DNAME_GET_STR(ns_name, transport->ns_name);
-	KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
-	const char *ns_str = kr_straddr(&transport->address.ip);
-	const char *err_str = kr_selection_error_str(sel_error);
+	if (kr_log_is_debug_qry(SELECTION, qry)) {
+		KR_DNAME_GET_STR(ns_name, transport->ns_name);
+		KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
+		const char *ns_str = kr_straddr(&transport->address.ip);
+		const char *err_str = kr_selection_error_str(sel_error);
 
-	VERBOSE_MSG(
-		qry,
-		"=> id: '%05u' noting selection error: '%s'@'%s' zone cut: '%s' error: %d %s\n",
-		qry->id, ns_name, ns_str ? ns_str : "", zonecut_str,
-		sel_error, err_str ? err_str : "??");
+		VERBOSE_MSG(
+			qry,
+			"=> id: '%05u' noting selection error: '%s'@'%s'"
+			" zone cut: '%s' error: %d %s\n",
+			qry->id, ns_name, ns_str ? ns_str : "",
+			zonecut_str, sel_error, err_str ? err_str : "??");
 	}
 }
 
