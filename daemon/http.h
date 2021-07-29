@@ -58,4 +58,5 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *buf, ssi
 int http_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t* pkt, int32_t stream_id,
 	       uv_write_cb on_write);
 void http_free(struct http_ctx *ctx);
+void http_free_headers(kr_http_header_array_t *headers);
 #endif
