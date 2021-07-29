@@ -99,7 +99,7 @@ the HTTP response code or send headers and body yourself.
 		-- Get request method and deal with it properly
 		local m = h:get(':method')
 		local path = h:get(':path')
-		log('[service] method %s path %s', m, path)
+		log('method %s path %s', m, path)
 		-- Return table, response code will be '200 OK'
 		if m == 'GET' then
 			return {key = path, value = value}

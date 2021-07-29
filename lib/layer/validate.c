@@ -25,7 +25,7 @@
 #include "lib/module.h"
 #include "lib/selection.h"
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, "vldr", __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, VALIDATOR, __VA_ARGS__)
 
 #define MAX_REVALIDATION_CNT 2
 
@@ -66,12 +66,12 @@ static bool pkt_has_type(const knot_pkt_t *pkt, uint16_t type)
 	return section_has_type(knot_pkt_section(pkt, KNOT_ADDITIONAL), type);
 }
 
-static void log_bogus_rrsig(kr_rrset_validation_ctx_t *vctx, const struct kr_query *qry,
+static void log_bogus_rrsig(kr_rrset_validation_ctx_t *vctx,
 			    const knot_rrset_t *rr, const char *msg) {
-	WITH_VERBOSE(qry) {
+	if (kr_log_is_debug_qry(VALIDATOR, vctx->log_qry)) {
 		auto_free char *name_text = kr_dname_text(rr->owner);
 		auto_free char *type_text = kr_rrtype_text(rr->type);
-		VERBOSE_MSG(qry, ">< %s: %s %s "
+		VERBOSE_MSG(vctx->log_qry, ">< %s: %s %s "
 			    "(%u matching RRSIGs, %u expired, %u not yet valid, "
 			    "%u invalid signer, %u invalid label count, %u invalid key, "
 			    "%u invalid crypto, %u invalid NSEC)\n",
@@ -222,7 +222,7 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, struct kr_query *qr
 			 * NS RRsets that appear at delegation points (...)
 			 * MUST NOT be signed */
 			if (vctx->rrs_counters.matching_name_type > 0)
-				log_bogus_rrsig(vctx, qry, rr,
+				log_bogus_rrsig(vctx, rr,
 					"found unexpected signatures for non-authoritative data which failed to validate, continuing");
 			vctx->result = kr_ok();
 			kr_rank_set(&entry->rank, KR_RANK_TRY);
@@ -235,11 +235,11 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, struct kr_query *qr
 			/* no RRSIGs found */
 			kr_rank_set(&entry->rank, KR_RANK_MISSING);
 			vctx->err_cnt += 1;
-			log_bogus_rrsig(vctx, qry, rr, "no valid RRSIGs found");
+			log_bogus_rrsig(vctx, rr, "no valid RRSIGs found");
 		} else {
 			kr_rank_set(&entry->rank, KR_RANK_BOGUS);
 			vctx->err_cnt += 1;
-			log_bogus_rrsig(vctx, qry, rr, "bogus signatures");
+			log_bogus_rrsig(vctx, rr, "bogus signatures");
 		}
 	}
 	return kr_ok();
@@ -265,7 +265,8 @@ static int validate_records(struct kr_request *req, knot_pkt_t *answer, knot_mm_
 		.flags		= 0,
 		.err_cnt	= 0,
 		.cname_norrsig_cnt = 0,
-		.result		= 0
+		.result		= 0,
+		.log_qry	= qry,
 	};
 
 	int ret = validate_section(&vctx, qry, pool);
@@ -350,13 +351,14 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 			.qry_uid	= qry->uid,
 			.has_nsec3	= has_nsec3,
 			.flags		= 0,
-			.result		= 0
+			.result		= 0,
+			.log_qry	= qry,
 		};
 		int ret = kr_dnskeys_trusted(&vctx, qry->zone_cut.trust_anchor);
 		if (ret != 0) {
 			if (ret != kr_error(DNSSEC_INVALID_DS_ALGORITHM) &&
 			    ret != kr_error(EAGAIN)) {
-				log_bogus_rrsig(&vctx, qry, qry->zone_cut.key, "bogus key");
+				log_bogus_rrsig(&vctx, qry->zone_cut.key, "bogus key");
 			}
 			knot_rrset_free(qry->zone_cut.key, qry->zone_cut.pool);
 			qry->zone_cut.key = NULL;
@@ -583,7 +585,7 @@ static const knot_dname_t *find_first_signer(ranked_rr_array_t *arr, struct kr_q
 			return signame;
 		} else {
 			/* otherwise it's some nonsense, so we skip it */
-			kr_log_q(qry, "vldr", "protocol violation: "
+			kr_log_q(qry, VALIDATOR, "protocol violation: "
 					"out-of-bailwick RRSIG signer, skipping\n");
 		}
 	}

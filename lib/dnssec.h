@@ -47,6 +47,7 @@ struct kr_rrset_validation_ctx {
 	uint32_t err_cnt;		/*!< Output - Number of validation failures. */
 	uint32_t cname_norrsig_cnt;	/*!< Output - Number of CNAMEs missing RRSIGs. */
 	int result;			/*!< Output - 0 or error code. */
+	const struct kr_query *log_qry; /*!< The query; just for logging purposes. */
 	struct {
 		unsigned int matching_name_type;	/*!< Name + type matches */
 		unsigned int expired;

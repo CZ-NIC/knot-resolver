@@ -41,7 +41,7 @@ struct kr_qflags {
 	bool BADCOOKIE_AGAIN : 1;/**< Query again because bad cookie returned. */
 	bool CNAME : 1;          /**< Query response contains CNAME in answer section. */
 	bool REORDER_RR : 1;     /**< Reorder cached RRs. */
-	bool TRACE : 1;          /**< Also log answers if --verbose. */
+	bool TRACE : 1;          /**< Also log answers on debug level. */
 	bool NO_0X20 : 1;        /**< Disable query case randomization . */
 	bool DNSSEC_NODS : 1;    /**< DS non-existance is proven */
 	bool DNSSEC_OPTOUT : 1;  /**< Closest encloser proof has optout */

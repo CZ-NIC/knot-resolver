@@ -20,9 +20,11 @@ modules = {
     'stats'
 }
 
+local ffi = require('ffi')
+
 -- log statistics every second
 local stat_id = event.recurrent(1 * second, function(evid)
-    log(table_print(stats.list()))
+    log_info(ffi.C.LOG_GRP_STATISTICS, table_print(stats.list()))
 end)
 
 -- stop printing statistics after first minute
@@ -42,7 +44,7 @@ function speed_monitor()
                 local slow_increment = now['answer.slow'] - previous['answer.slow']
                 -- if percentage of slow answers is bigger than 5%, print warning
                 if slow_increment / total_increment > 0.05 then
-                        log('WARNING! More than 5 %% of queries was slow!')
+                        log_warn(ffi.C.LOG_GRP_STATISTICS, 'WARNING! More than 5 %% of queries was slow!')
                 end
                 previous = now
          end

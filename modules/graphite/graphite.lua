@@ -4,6 +4,7 @@ if not stats then modules.load('stats') end
 
 -- This is leader-only module
 local M = {}
+local ffi = require("ffi")
 local socket = require("cqueues.socket")
 local proto_txt = {
 	[socket.SOCK_DGRAM] = 'udp',
@@ -26,7 +27,7 @@ local function make_socket(host, port, stype)
 	end
 
 	if not status then
-		log('[graphite] connecting: %s@%d %s reason: %s',
+		log_info(ffi.C.LOG_GRP_GRAPHITE, 'connecting: %s@%d %s reason: %s',
 			host, port, proto_txt[stype], err)
 		return status, err
 	end
@@ -73,7 +74,7 @@ local function publish_table(metrics, prefix, now)
 					if tcp and host.seen + 2 * M.interval / 1000 <= now then
 						local sock_type = (host.tcp and socket.SOCK_STREAM)
 									or socket.SOCK_DGRAM
-						log('[graphite] reconnecting: %s@%d %s reason: %s',
+						log_info(ffi.C.LOG_GRP_GRAPHITE, 'reconnecting: %s@%d %s reason: %s',
 							  host.addr, host.port, proto_txt[sock_type], err)
 						s = make_tcp(host.addr, host.port)
 						if s then

@@ -108,8 +108,7 @@ Daemon will refrain from entering into read-eval-print loop for stdin+stdout.
 Daemon will refrain from printing the command prompt.
 .TP
 .B \-v\fR, \fB\-\-verbose
-Increase verbosity. If given multiple times, more information is logged.
-This is in addition to the verbosity (if any) from the config file.
+Increase logging to debug level.
 .TP
 .B \-h
 Show short commandline option help.

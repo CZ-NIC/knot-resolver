@@ -22,6 +22,8 @@ newer versions when they are released.
   <https://gitlab.nic.cz/knot/knot-resolver/-/issues/631>`_.
   Preferred way to manage :ref:`systemd-multiple-instances` is to use a process manager,
   e.g. systemd_ or supervisord_.
+* Function :func:`verbose` is deprecated and will be eventually removed.
+  Prefered way to change logging level is use to :func:`log_level`.
 
 .. _`systemd`: https://systemd.io/
 .. _`supervisord`: http://supervisord.org/
@@ -33,6 +35,20 @@ Configuration file
 ------------------
 
 * ``kind='doh'`` in :func:`net.listen` was renamed to ``kind='doh_legacy'``. It is recommended to switch to the new DoH implementation with ``kind='doh2'``.
+* :func:`verbose` is deprecated. In case you want to change logging level,
+  there is new function :func:`log_level`.
+
+Packagers & Developers
+----------------------
+
+* meson option ``verbose_log`` was removed.
+
+Module changes
+--------------
+
+* lua function ``warn()`` was removed, use ``log_warn()`` instead. The new function takes a log group number as the first argument.
+* C functions ``kr_log_req()`` and ``kr_log_q()`` were replaced by ``kr_log_req1()`` and ``kr_log_q1()`` respectively. The new function have slightly different API.
+
 
 5.2 to 5.3
 ==========

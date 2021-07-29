@@ -16,7 +16,7 @@ local tracked_tas = {}  -- zone name (wire) => {event = number}
 local function ta_find(keyset, rr)
 	local rr_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
 	if rr_tag < 0 or rr_tag > 65535 then
-		warn(string.format('[ta_update] ignoring invalid or unsupported RR: %s: %s',
+		log_warn(ffi.C.LOG_GRP_TAUPDATE, string.format('ignoring invalid or unsupported RR: %s: %s',
 			kres.rr2str(rr), ffi.string(C.knot_strerror(rr_tag))))
 		return nil
 	end
@@ -24,7 +24,7 @@ local function ta_find(keyset, rr)
 		-- Match key owner and content
 		local ta_tag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
 		if ta_tag < 0 or ta_tag > 65535 then
-			warn(string.format('[ta_update] ignoring invalid or unsupported RR: %s: %s',
+			log_warn(ffi.C.LOG_GRP_TAUPDATE, string.format('[ta_update] ignoring invalid or unsupported RR: %s: %s',
 				kres.rr2str(ta), ffi.string(C.knot_strerror(ta_tag))))
 		else
 			if ta.owner == rr.owner then
@@ -64,7 +64,7 @@ local function ta_present(keyset, rr, hold_down_time)
 	-- Attempt to extract key_tag
 	local key_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
 	if key_tag < 0 or key_tag > 65535 then
-		warn(string.format('[ta_update] ignoring invalid or unsupported RR: %s: %s',
+		log_warn(ffi.C.LOG_GRP_TAUPDATE, string.format('[ta_update] ignoring invalid or unsupported RR: %s: %s',
 			kres.rr2str(rr), ffi.string(C.knot_strerror(key_tag))))
 		return false
 	end
@@ -95,8 +95,8 @@ local function ta_present(keyset, rr, hold_down_time)
 			ta.state = key_state.Valid
 			ta.timer = nil
 		end
-		if rr.state ~= key_state.Valid or verbose() then
-			log('[ta_update] key: ' .. key_tag .. ' state: '..ta.state)
+		if rr.state ~= key_state.Valid then
+			log_info(ffi.C.LOG_GRP_TAUPDATE, 'key: ' .. key_tag .. ' state: '..ta.state)
 		end
 		return true
 	elseif not key_revoked then -- First time seen (NewKey)
@@ -114,7 +114,7 @@ local function ta_missing(ta, hold_down_time)
 	local keep_ta = true
 	local key_tag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
 	if key_tag < 0 or key_tag > 65535 then
-		warn(string.format('[ta_update] ignoring invalid or unsupported RR: %s: %s',
+		log_warn(ffi.C.LOG_GRP_TAUPDATE, string.format('[ta_update] ignoring invalid or unsupported RR: %s: %s',
 			kres.rr2str(ta), ffi.string(C.knot_strerror(key_tag))))
 		key_tag = ''
 	end
@@ -125,15 +125,15 @@ local function ta_missing(ta, hold_down_time)
 	-- Remove key that is missing for too long
 	elseif ta.state == key_state.Missing and os.difftime(ta.timer, os.time()) <= 0 then
 		ta.state = key_state.Removed
-		log('[ta_update] key: '..key_tag..' removed because missing for too long')
+		log_info(ffi.C.LOG_GRP_TAUPDATE, 'key: '..key_tag..' removed because missing for too long')
 		keep_ta = false
 
 	-- Purge pending key
 	elseif ta.state == key_state.AddPend then
-		log('[ta_update] key: '..key_tag..' purging')
+		log_info(ffi.C.LOG_GRP_TAUPDATE, 'key: '..key_tag..' purging')
 		keep_ta = false
 	end
-	log('[ta_update] key: '..key_tag..' state: '..ta.state)
+	log_info(ffi.C.LOG_GRP_TAUPDATE, 'key: '..key_tag..' state: '..ta.state)
 	return keep_ta
 end
 
@@ -192,8 +192,8 @@ local function update(keyset, new_keys)
 	if not trust_anchors.keyset_publish(keyset) then
 		-- TODO: try to rebootstrap if for root?
 		return false
-	elseif verbose() then
-		log('[ta_update] refreshed trust anchors for domain ' .. kres.dname2str(keyset.owner) .. ' are:\n'
+	else
+		log_debug(ffi.C.LOG_GRP_TAUPDATE, 'refreshed trust anchors for domain ' .. kres.dname2str(keyset.owner) .. ' are:\n'
 			.. trust_anchors.summary(keyset.owner))
 	end
 
@@ -201,7 +201,7 @@ local function update(keyset, new_keys)
 end
 
 local function unmanagedkey_change(file_name)
-	warn('[ta_update] you need to update package with trust anchors in "%s" before it breaks', file_name)
+	log_warn(ffi.C.LOG_GRP_TAUPDATE, 'you need to update package with trust anchors in "%s" before it breaks', file_name)
 end
 
 local function check_upstream(keyset, new_keys)
@@ -270,11 +270,11 @@ local function active_refresh(keyset, pkt, req, managed)
 	else
 		local qry = req:initial()
 		if qry.flags.DNSSEC_BOGUS == true then
-			warn('[ta_update] active refresh failed, update your trust anchors in "%s"', keyset.filename)
+			log_warn(ffi.C.LOG_GRP_TAUPDATE, 'active refresh failed, update your trust anchors in "%s"', keyset.filename)
 		elseif pkt == nil then
-			warn('[ta_update] active refresh failed, answer was dropped')
+			log_warn(ffi.C.LOG_GRP_TAUPDATE, 'active refresh failed, answer was dropped')
 		else
-			warn('[ta_update] active refresh failed for ' .. kres.dname2str(keyset.owner)
+			log_warn(ffi.C.LOG_GRP_TAUPDATE, 'active refresh failed for ' .. kres.dname2str(keyset.owner)
 				.. ' with rcode: ' .. pkt:rcode())
 		end
 	end
@@ -298,13 +298,13 @@ local function refresh_plan(keyset, delay, managed)
 		event.cancel(track_cfg.event)
 	end
 	track_cfg.event = event.after(delay, function ()
-		log('[ta_update] refreshing TA for ' .. owner_str)
+		log_info(ffi.C.LOG_GRP_TAUPDATE, 'refreshing TA for ' .. owner_str)
 		resolve(owner_str, kres.type.DNSKEY, kres.class.IN, 'NO_CACHE',
 		function (pkt, req)
 			-- Schedule itself with updated timeout
 			local delay_new = active_refresh(keyset, pkt, req, managed)
 			delay_new = keyset.refresh_time or ta_update.refresh_time or delay_new
-			log('[ta_update] next refresh for ' .. owner_str .. ' in '
+			log_info(ffi.C.LOG_GRP_TAUPDATE, 'next refresh for ' .. owner_str .. ' in '
 				.. delay_new/hour .. ' hours')
 			refresh_plan(keyset, delay_new, managed)
 		end)
