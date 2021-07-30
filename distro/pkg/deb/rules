@@ -15,6 +15,11 @@ DPKG_EXPORT_BUILDFLAGS = 1
 include /usr/share/dpkg/default.mk
 
 export ARCH=$(DEB_HOST_GNU_CPU)
+ifneq (,$(findstring arm64,$(DEB_TARGET_ARCH)))
+	CONFIG_TESTS=disabled
+else
+	CONFIG_TESTS=enabled
+endif
 
 %:
 	dh $@
@@ -32,6 +37,7 @@ override_dh_auto_build:
 		-Droot_hints=/usr/share/dns/root.hints \
 		-Dinstall_kresd_conf=enabled \
 		-Dunit_tests=enabled \
+		-Dconfig_tests=$(CONFIG_TESTS) \
 		-Dc_args="$${CFLAGS}" \
 		-Dc_link_args="$${LDFLAGS}"
 	ninja -v -C build_deb
