@@ -19,9 +19,19 @@ Missing parts of the RFC:
 ]]
 
 -- Config
-function M.config (confstr)
-	M.proxy = kres.str2ip(confstr or '64:ff9b::')
+function M.config(conf)
+	if type(conf) ~= 'table' then
+		conf = { prefix = conf }
+	end
+	M.proxy = kres.str2ip(conf.prefix or '64:ff9b::')
 	if M.proxy == nil then error('[dns64] "'..confstr..'" is not a valid address') end
+
+	-- Force overwriting the answer even if AAAA records exist.
+	-- Inefficient implementation for now: it still asks upstream for AAAA.
+	M.force = conf.force or false
+	if type(M.force) ~= 'boolean' then
+		error('[dns64] invalid .force parameter: ' .. tostring(conf.force))
+	end
 end
 
 -- Layers
@@ -38,7 +48,7 @@ function M.layer.consume(state, req, pkt)
 	local answer = pkt:section(kres.section.ANSWER)
 
 	-- Observe final AAAA NODATA responses to the current SNAME.
-	local is_nodata = pkt:rcode() == kres.rcode.NOERROR and #answer == 0
+	local is_nodata = pkt:rcode() == kres.rcode.NOERROR and (#answer == 0 or M.force)
 	if pkt:qtype() == kres.type.AAAA and is_nodata and pkt:qname() == qry:name()
 			and qry.flags.RESOLVED and not qry.flags.CNAME and qry.parent == nil then
 		-- Start a *marked* corresponding A sub-query.
