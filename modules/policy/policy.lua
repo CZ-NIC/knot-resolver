@@ -2,6 +2,8 @@
 local kres = require('kres')
 local ffi = require('ffi')
 
+local LOG_GRP_POLICY_TAG = ffi.string(ffi.C.kr_log_grp2name(ffi.C.LOG_GRP_POLICY))
+
 local todname = kres.str2dname -- not available during module load otherwise
 
 -- Counter of unique rules
@@ -643,31 +645,39 @@ end
 
 local debug_logline_cb = ffi.cast('trace_log_f', function (_, msg)
 	jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
-	-- msg typically ends with newline
-	log_debug(ffi.C.LOG_GRP_POLICY, "%s", msg)
+	ffi.C.kr_log_fmt(
+		ffi.C.LOG_GRP_POLICY, -- but [group] tag remains original in the string
+		LOG_NOTICE, -- elevated; TODO: really?  Also note interaction with group.
+		'CODE_FILE=policy.lua', 'CODE_LINE=', 'CODE_FUNC=policy.DEBUG_ALWAYS', -- no meaningful locations
+		'%s', msg) -- msg should end with newline already
 end)
 ffi.gc(debug_logline_cb, free_cb)
 
+-- LOG_NOTICE without log_trace and without code locations
+local function log_notrace(req, fmt, ...)
+	ffi.C.kr_log_fmt(ffi.C.LOG_GRP_POLICY, LOG_NOTICE,
+		'CODE_FILE=policy.lua', 'CODE_LINE=', 'CODE_FUNC=', -- no meaningful locations
+		'%s', string.format( -- convert in lua, as integers in C varargs would pass as double
+			'[%-6s][%05u.00] ' .. fmt,
+			LOG_GRP_POLICY_TAG, req.uid, ...)
+	)
+end
+
 local debug_logfinish_cb = ffi.cast('trace_callback_f', function (req)
 	jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
-	log_req(req, 0, 0, ffi.C.LOG_GRP_POLICY,
-		'following rrsets were marked as interesting:\n' ..
-		req:selected_tostring())
+	log_notrace(req, 'following rrsets were marked as interesting:\n%s\n',
+		req:selected_tostring(LOG_GRP_POLICY_TAG))
 	if req.answer ~= nil then
-		log_req(req, 0, 0, ffi.C.LOG_GRP_POLICY,
-			'answer packet:\n' .. tostring(req.answer))
+		log_notrace(req, 'answer packet:\n%s\n', req.answer)
 	else
-		log_req(req, 0, 0, ffi.C.LOG_GRP_POLICY,
-			'answer packet DROPPED\n')
+		log_notrace(req, 'answer packet DROPPED\n')
 	end
 end)
 ffi.gc(debug_logfinish_cb, free_cb)
 
 -- log request packet
 function policy.REQTRACE(_, req)
-	log_req(req, 0, 0, ffi.C.LOG_GRP_POLICY,
-		'request packet:\n%s',
-		tostring(req.qsource.packet))
+	log_notrace(req, 'request packet:\n%s', req.qsource.packet)
 end
 
 function policy.DEBUG_ALWAYS(state, req)
@@ -692,7 +702,7 @@ function policy.DEBUG_IF(test)
 		if test(cbreq) then
 			debug_logfinish_cb(cbreq)  -- unconditional version
 			local stash = cbreq:vars()['policy_debug_stash']
-			io.write(table.concat(stash, ''))
+			log_notrace(cbreq, '%s', table.concat(stash, ''))
 		end
 	end)
 	ffi.gc(debug_finish_cb, function (func) func:free() end)
