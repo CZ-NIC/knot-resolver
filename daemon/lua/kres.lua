@@ -789,19 +789,20 @@ ffi.metatype( kr_request_t, {
 			assert(ffi.istype(kr_request_t, req))
 			return C.kr_rplan_pop(C.kr_resolve_plan(req), qry)
 		end,
-		selected_tostring = function(req)
+		selected_tostring = function(req, tag)
+			tag = tag or ''
 			assert(ffi.istype(kr_request_t, req))
 			local buf = {}
 			if #req.answ_selected ~= 0 then
-				table.insert(buf, string.format('[%05d.00][dbg ] selected rrsets from answer sections:\n', req.uid))
+				table.insert(buf, string.format('[%-6s][%05d.00] selected rrsets from answer sections:\n', tag, req.uid))
 				table.insert(buf, tostring(req.answ_selected))
 			end
 			if #req.auth_selected ~= 0 then
-				table.insert(buf, string.format('[%05d.00][dbg ] selected rrsets from authority sections:\n', req.uid))
+				table.insert(buf, string.format('[%-6s][%05d.00] selected rrsets from authority sections:\n', tag, req.uid))
 				table.insert(buf, tostring(req.auth_selected))
 			end
 			if #req.add_selected ~= 0 then
-				table.insert(buf, string.format('[%05d.00][dbg ] selected rrsets from additional sections:\n', req.uid))
+				table.insert(buf, string.format('[%-6s][%05d.00] selected rrsets from additional sections:\n', tag, req.uid))
 				table.insert(buf, tostring(req.add_selected))
 			end
 			return table.concat(buf, '')
