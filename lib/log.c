@@ -272,15 +272,15 @@ static void kr_vlog_req(
 	struct mempool *mp = mp_new(512);
 
 	const uint32_t req_uid = req ? req->uid : 0;
-	char *msg = mp_printf(mp, "[%05u.%02u] %*s",
-				req_uid, qry_uid, indent, "");
+	char *msg = mp_printf(mp, "[%-6s][%05u.%02u] %*s",
+				tag, req_uid, qry_uid, indent, "");
 
 	msg = mp_vprintf_append(mp, msg, fmt, args);
 
 	if (req_has_trace_log(req))
 		req->trace_log(req, msg);
 
-	kr_log_fmt(group, LOG_DEBUG, SD_JOURNAL_METADATA, "[%-6s]%s", tag, msg);
+	kr_log_fmt(group, LOG_DEBUG, SD_JOURNAL_METADATA, "%s", msg);
 
 	mp_delete(mp);
 }
