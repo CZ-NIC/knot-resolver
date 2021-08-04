@@ -261,6 +261,11 @@ bool kr_log_is_debug_fun(enum kr_log_group group, const struct kr_request *req);
 
 /* Helpers "internal" to log.* */
 
+/** @internal
+ *
+ * If you don't have location, pass ("CODE_FILE=", "CODE_LINE=", "CODE_FUNC=")
+ * Others than systemd don't utilize these metadata.
+ */
 KR_EXPORT KR_PRINTF(6)
 void kr_log_fmt(enum kr_log_group group, kr_log_level_t level, const char *file, const char *line,
 		const char *func, const char *fmt, ...);
