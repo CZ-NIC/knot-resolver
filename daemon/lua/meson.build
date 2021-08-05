@@ -56,8 +56,9 @@ run_target(  # run manually to re-generate kres-gen.lua
 # A simple config test: check that sizes of some structures match
 # in C and pre-generated lua bindings.
 # The point is that regeneration is quite expensive in time and dependencies,
-# but this basic sanity check could be ran always.
-if get_option('kres_gen_test')
+# but this basic sanity check could be ran always, except for cross compilation,
+# as we *run* luajit to find out the real sizes.
+if get_option('kres_gen_test') and not meson.is_cross_build()
   types_to_check = {
     'time_t' : '#include <sys/time.h>',
     'struct timeval' : '#include <sys/time.h>',
