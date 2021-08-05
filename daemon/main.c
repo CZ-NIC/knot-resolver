@@ -265,7 +265,7 @@ static int parse_args(int argc, char **argv, struct args *args)
 			args->quiet = true;
 			break;
 		case 'V':
-			kr_log_info(SYSTEM, "%s, version %s\n", "Knot Resolver", PACKAGE_VERSION);
+			printf("Knot Resolver, version %s\n", PACKAGE_VERSION);
 			return EXIT_SUCCESS;
 		case 'h':
 		case '?':
