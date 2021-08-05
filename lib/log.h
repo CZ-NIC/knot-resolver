@@ -181,16 +181,16 @@ kr_log_level_t kr_log_name2level(const char *name);
 	kr_log_fmt(LOG_GRP_ ## grp, LOG_INFO, SD_JOURNAL_METADATA, \
 			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
 
-#define kr_log_warning(grp, fmt, ...) \
-	kr_log_fmt(LOG_GRP_ ## grp, LOG_WARNING, SD_JOURNAL_METADATA, \
-			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
-
 #define kr_log_notice(grp, fmt, ...) \
 	kr_log_fmt(LOG_GRP_ ## grp, LOG_NOTICE, SD_JOURNAL_METADATA, \
 			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
 
 /** Levels less severe than ``notice`` are not logged by default. */
 #define LOG_DEFAULT_LEVEL	LOG_NOTICE
+
+#define kr_log_warning(grp, fmt, ...) \
+	kr_log_fmt(LOG_GRP_ ## grp, LOG_WARNING, SD_JOURNAL_METADATA, \
+			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
 
 /** Significant error.  The process continues, except for configuration errors during startup. */
 #define kr_log_error(grp, fmt, ...) \
