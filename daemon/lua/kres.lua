@@ -391,7 +391,7 @@ ffi.metatype( knot_rrset_t, {
 			if rr:rdcount() > 0 then
 				local ret
 				if i ~= nil then
-					ret = knot.knot_rrset_txt_dump_data(rr, i, rrset_buf, rrset_buflen, knot.KNOT_DUMP_STYLE_DEFAULT)
+					ret = knot.knot_rrset_txt_dump_data(rr, i, rrset_buf, rrset_buflen, C.KR_DUMP_STYLE_DEFAULT)
 				else
 					ret = -1
 				end
@@ -408,7 +408,7 @@ ffi.metatype( knot_rrset_t, {
 			local size = ffi.new('size_t[1]', { bufsize }) -- one size_t = bufsize
 
 			local ret = knot.knot_rrset_txt_dump(rr, dump, size,
-							style or knot.KNOT_DUMP_STYLE_DEFAULT)
+							style or C.KR_DUMP_STYLE_DEFAULT)
 			local result = nil
 			if ret >= 0 then
 				result = ffi.string(dump[0], ret)
@@ -424,7 +424,7 @@ ffi.metatype( knot_rrset_t, {
 			ffi.gc(dump, C.free)
 
 			local ret = knot.knot_rrset_txt_dump_data(rr, i, dump, 1024,
-							knot.KNOT_DUMP_STYLE_DEFAULT)
+							C.KR_DUMP_STYLE_DEFAULT)
 			if ret >= 0 then
 				local out = {}
 				out.owner = dname2str(rr:owner())
