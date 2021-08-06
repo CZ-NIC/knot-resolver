@@ -67,6 +67,11 @@ set by :func:`log_level`.
      log_groups()              -- list active log groups
      log_groups({})            -- remove all log groups
 
+  .. note::
+
+    The ``rdebug`` group is always turned on.
+    It's only used on requests explicitly marked by a :ref:`policy action <mod-policy-actions>`.
+
 It is also possible to enable ``debug`` logging level for *a single request*, see chapter :ref:`mod-http-trace`.
 
 Less verbose logging for DNSSEC validation errors can be enabled using :ref:`mod-bogus_log` module.

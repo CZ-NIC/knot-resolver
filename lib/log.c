@@ -238,6 +238,7 @@ void kr_log_group_reset()
 {
 	bool had_gnutls = kr_log_group_is_set(LOG_GRP_GNUTLS);
 	kr_log_groups = 0;
+	kr_log_group_add(LOG_GRP_RDEBUG);
 	if (had_gnutls)
 		kr_gnutls_log_level_set();
 }
