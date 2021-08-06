@@ -3,6 +3,7 @@ local kres = require('kres')
 local ffi = require('ffi')
 
 local LOG_GRP_POLICY_TAG = ffi.string(ffi.C.kr_log_grp2name(ffi.C.LOG_GRP_POLICY))
+local LOG_GRP_RDEBUG_TAG = ffi.string(ffi.C.kr_log_grp2name(ffi.C.LOG_GRP_RDEBUG))
 
 local todname = kres.str2dname -- not available during module load otherwise
 
@@ -646,27 +647,27 @@ end
 local debug_logline_cb = ffi.cast('trace_log_f', function (_, msg)
 	jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
 	ffi.C.kr_log_fmt(
-		ffi.C.LOG_GRP_POLICY, -- but [group] tag remains original in the string
-		LOG_NOTICE, -- elevated; TODO: really?  Also note interaction with group.
+		ffi.C.LOG_GRP_RDEBUG, -- but [group] tag remains original in the string
+		LOG_DEBUG,
 		'CODE_FILE=policy.lua', 'CODE_LINE=', 'CODE_FUNC=policy.DEBUG_ALWAYS', -- no meaningful locations
-		'%s', msg) -- msg should end with newline already
+		'[%-6s]%s', LOG_GRP_RDEBUG_TAG, msg) -- msg should end with newline already
 end)
 ffi.gc(debug_logline_cb, free_cb)
 
--- LOG_NOTICE without log_trace and without code locations
+-- LOG_DEBUG without log_trace and without code locations
 local function log_notrace(req, fmt, ...)
-	ffi.C.kr_log_fmt(ffi.C.LOG_GRP_POLICY, LOG_NOTICE,
+	ffi.C.kr_log_fmt(ffi.C.LOG_GRP_RDEBUG, LOG_DEBUG,
 		'CODE_FILE=policy.lua', 'CODE_LINE=', 'CODE_FUNC=', -- no meaningful locations
 		'%s', string.format( -- convert in lua, as integers in C varargs would pass as double
-			'[%-6s][%05u.00] ' .. fmt,
-			LOG_GRP_POLICY_TAG, req.uid, ...)
+			'[%-6s][%-6s][%05u.00] ' .. fmt,
+			LOG_GRP_RDEBUG_TAG, LOG_GRP_POLICY_TAG, req.uid, ...)
 	)
 end
 
 local debug_logfinish_cb = ffi.cast('trace_callback_f', function (req)
 	jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
 	log_notrace(req, 'following rrsets were marked as interesting:\n%s\n',
-		req:selected_tostring(LOG_GRP_POLICY_TAG))
+		req:selected_tostring())
 	if req.answer ~= nil then
 		log_notrace(req, 'answer packet:\n%s\n', req.answer)
 	else
@@ -701,8 +702,13 @@ function policy.DEBUG_IF(test)
 		jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
 		if test(cbreq) then
 			debug_logfinish_cb(cbreq)  -- unconditional version
+
 			local stash = cbreq:vars()['policy_debug_stash']
-			log_notrace(cbreq, '%s', table.concat(stash, ''))
+			for _, line in ipairs(stash) do -- don't want one huge entry
+				ffi.C.kr_log_fmt(ffi.C.LOG_GRP_POLICY, LOG_DEBUG,
+					'CODE_FILE=policy.lua', 'CODE_LINE=', 'CODE_FUNC=', -- no meaningful locations
+					'[%-6s]%s', LOG_GRP_RDEBUG_TAG, line)
+			end
 		end
 	end)
 	ffi.gc(debug_finish_cb, function (func) func:free() end)

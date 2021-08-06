@@ -77,6 +77,7 @@ enum kr_log_group {
 	LOG_GRP_HTTP,
 	LOG_GRP_CONTROL,
 	LOG_GRP_MODULE,
+	LOG_GRP_RDEBUG,
 	/* ^^ Add new log groups above ^^. */
 	LOG_GRP_DEVEL,  /* Must be last entry in enum! */
 };
@@ -128,6 +129,7 @@ enum kr_log_group {
 #define LOG_GRP_HTTP_TAG		"http"		/**< ``http``: http module, its web interface and legacy DNS-over-HTTPS */
 #define LOG_GRP_CONTROL_TAG		"contrl"	/**< ``contrl``: TTY control sockets*/
 #define LOG_GRP_MODULE_TAG		"module"	/**< ``module``: suitable for user-defined modules */
+#define LOG_GRP_RDEBUG_TAG		"rdebug"	/**< ``rdebug``: per-request debugging; see policy module */
 #define LOG_GRP_DEVEL_TAG		"devel"		/**< ``devel``: for development purposes */
 ///@}
 
