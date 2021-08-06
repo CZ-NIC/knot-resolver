@@ -11,7 +11,7 @@ struct timeval {
 };
 
 typedef struct knot_dump_style knot_dump_style_t;
-extern const knot_dump_style_t KNOT_DUMP_STYLE_DEFAULT;
+extern const knot_dump_style_t KR_DUMP_STYLE_DEFAULT;
 struct kr_cdb_api {};
 struct lru {};
 typedef enum {KNOT_ANSWER, KNOT_AUTHORITY, KNOT_ADDITIONAL} knot_section_t;
