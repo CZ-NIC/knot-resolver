@@ -242,6 +242,8 @@ static int l_log_groups(lua_State *L)
 	lua_newtable(L);
 	int i = 1;
 	for (int grp = LOG_GRP_SYSTEM; grp <= LOG_GRP_DEVEL; grp++) {
+		if (grp == LOG_GRP_RDEBUG)
+			continue;
 		const char *name = kr_log_grp2name(grp);
 		if (kr_fails_assert(name))
 			continue;
