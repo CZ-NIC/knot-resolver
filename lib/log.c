@@ -81,6 +81,7 @@ const log_group_names_t log_group_names[] = {
 	GRP_NAME_ITEM(LOG_GRP_CONTROL),
 	GRP_NAME_ITEM(LOG_GRP_MODULE),
 	GRP_NAME_ITEM(LOG_GRP_DEVEL),
+	GRP_NAME_ITEM(LOG_GRP_REQDBG),
 	{ NULL, LOG_GRP_UNKNOWN },
 };
 
@@ -237,6 +238,7 @@ void kr_log_group_reset()
 {
 	bool had_gnutls = kr_log_group_is_set(LOG_GRP_GNUTLS);
 	kr_log_groups = 0;
+	kr_log_group_add(LOG_GRP_REQDBG);
 	if (had_gnutls)
 		kr_gnutls_log_level_set();
 }
