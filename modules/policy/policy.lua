@@ -705,7 +705,7 @@ function policy.DEBUG_IF(test)
 
 			local stash = cbreq:vars()['policy_debug_stash']
 			for _, line in ipairs(stash) do -- don't want one huge entry
-				ffi.C.kr_log_fmt(ffi.C.LOG_GRP_POLICY, LOG_DEBUG,
+				ffi.C.kr_log_fmt(ffi.C.LOG_GRP_REQDBG, LOG_DEBUG,
 					'CODE_FILE=policy.lua', 'CODE_LINE=', 'CODE_FUNC=', -- no meaningful locations
 					'[%-6s]%s', LOG_GRP_REQDBG_TAG, line)
 			end
