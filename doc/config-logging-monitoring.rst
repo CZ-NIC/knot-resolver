@@ -14,13 +14,19 @@ in ``syslog.h``. It is possible change logging level using
 
 Logging level ``notice`` is set after start by default,
 so logs from Knot Resolver should contain only couple lines a day.
-For debugging purposes it is possible to use the very verbose ``debug`` level.
+For debugging purposes it is possible to use the very verbose ``debug`` level,
+but that is generally not usable unless restricted in some way (see below).
 
 In addition to levels, logging is also divided into the
 :ref:`groups <config_log_groups>`. All groups
 are logged by default, but you can enable ``debug`` level for selected groups using
 :func:`log_groups` function. Other groups are logged to the log level
 set by :func:`log_level`.
+
+It is also possible to enable ``debug`` logging level for particular requests,
+with :ref:`policies <mod-policy-logging>` or as :ref:`an HTTP service <mod-http-trace>`.
+
+Less verbose logging for DNSSEC validation errors can be enabled by using :ref:`mod-bogus_log` module.
 
 .. py:function:: log_level([level])
 
@@ -66,10 +72,6 @@ set by :func:`log_level`.
      log_groups({'io', 'tls'}  -- turn on debug logging for io and tls groups
      log_groups()              -- list active log groups
      log_groups({})            -- remove all log groups
-
-It is also possible to enable ``debug`` logging level for *a single request*, see chapter :ref:`mod-http-trace`.
-
-Less verbose logging for DNSSEC validation errors can be enabled using :ref:`mod-bogus_log` module.
 
 Various statistics for monitoring purposes are available in :ref:`mod-stats` module, including export to central systems like Graphite, Metronome, InfluxDB, or Prometheus format.
 
