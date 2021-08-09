@@ -1010,6 +1010,10 @@ char *kr_pkt_text(const knot_pkt_t *pkt)
 	return result;
 }
 
+const knot_dump_style_t KR_DUMP_STYLE_DEFAULT = { /* almost all = false, */
+	.show_ttl = true,
+};
+
 char *kr_rrset_text(const knot_rrset_t *rr)
 {
 	if (!rr) {
@@ -1019,7 +1023,7 @@ char *kr_rrset_text(const knot_rrset_t *rr)
 	/* Note: knot_rrset_txt_dump will double the size until the rrset fits */
 	size_t bufsize = 128;
 	char *buf = malloc(bufsize);
-	int ret = knot_rrset_txt_dump(rr, &buf, &bufsize, &KNOT_DUMP_STYLE_DEFAULT);
+	int ret = knot_rrset_txt_dump(rr, &buf, &bufsize, &KR_DUMP_STYLE_DEFAULT);
 	if (ret < 0) {
 		free(buf);
 		return NULL;

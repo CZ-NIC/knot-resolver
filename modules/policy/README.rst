@@ -201,49 +201,54 @@ Following actions act on request and then processing continue until first non-ch
 
    Set and/or clear some flags for the query.  There can be multiple flags to set/clear.  You can just pass a single flag name (string) or a set of names. Flag names correspond to :c:type:`kr_qflags` structure.  Use only if you know what you are doing.
 
-.. py:attribute:: QTRACE
 
-   Pretty-print DNS response packets from authoritative servers into debug logs for the query and its sub-queries.  It's useful for debugging weird DNS servers.
-   Note that debug-level logs are off by default; see :func:`log_level`.
+.. _mod-policy-logging:
 
-   .. code-block:: lua
+Actions for extra logging
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
-      -- log answers from all authoritative servers involved in resolving
-      -- requests for example.net. and its subdomains
-      policy.add(policy.suffix(policy.QTRACE, policy.todnames({'example.net'})))
+These are also "chain" actions, i.e. they don't stop processing the policy rule list.
+Similarly to other actions, they apply during whole processing of the client's request,
+i.e. including any sub-queries.
 
-.. py:attribute:: REQTRACE
+The log lines from these policy actions are tagged by extra ``[reqdbg]`` prefix,
+and they are produced regardless of your :func:`log_level()` setting.
+They are marked as ``debug`` level, so e.g. with journalctl command you can use ``-p info`` to skip them.
 
-   Pretty-print DNS requests from clients into the verbose log. It's useful for debugging weird DNS clients.
-   Debug-level logging must be enabled for this policy to be effective; see :func:`log_level`.
-   It makes most sense together with :ref:`mod-view` (enabling per-client)
-   and probably with verbose logging those request (e.g. ``DEBUG_ALWAYS``).
+.. warning::  Beware of producing too much logs.
+
+   These actions are not suitable for use on a large fraction of resolver's requests.
+   The extra logs have significant performance impact and might also overload your logging system
+   (or get rate-limited by it).
+   You can use `Filters`_ to further limit on which requests this happens.
 
 .. py:attribute:: DEBUG_ALWAYS
 
-   Enable extra verbose logging for all requests, including cache hits. See caveats for :func:`policy.DEBUG_IF`.
-
-.. py:data:: DEBUG_CACHE_MISS
-
-   Enable extra verbose logging but print logs only for requests which required information which was not available locally (i.e. requests which forced resolver to communicate over network). Intended usage is for debugging problems with remote servers. This action typically produces less logs than :any:`policy.DEBUG_ALWAYS` but all caveats from :func:`policy.DEBUG_IF` apply as well.
+   Print debug-level logging for this request.
+   That also includes messages from client (:any:`REQTRACE`), upstream servers (:any:`QTRACE`), and stats about interesting records at the end.
 
    .. code-block:: lua
 
-      policy.add(policy.suffix(
-          policy.DEBUG_CACHE_MISS,
-          policy.todnames({'example.com.'})))
+      -- debug requests that ask for flaky.example.net or below
+      policy.add(policy.suffix(policy.DEBUG_ALWAYS,
+          policy.todnames({'flaky.example.net'})))
+
+.. py:attribute:: DEBUG_CACHE_MISS
+
+   Same as :any:`DEBUG_ALWAYS` but only if the request required information which was not available locally, i.e. requests which forced resolver to ask upstream server(s).
+   Intended usage is for debugging problems with remote servers.
 
 .. py:function:: DEBUG_IF(test_function)
 
-   :param test_function: Function with single argument of type :c:type:`kr_request` which returns ``true`` if debug logs for a given request should be generated and ``false`` otherwise.
+   :param test_function: Function with single argument of type :c:type:`kr_request` which returns ``true`` if debug logs for that request should be generated and ``false`` otherwise.
 
-   Enable extra verbose logging but print logs only for requests which match condition specified by ``test_function``. This allows to fine-tune which requests should be printed.
+   Same as :any:`DEBUG_ALWAYS` but only logs if the test_function says so.
 
-   .. warning:: Logging on debug level has significant performance impact on resolver and might also overload you logging system because one request can easily generate tens of kilobytes of logs. Always use appropriate `Filters`_ to limit number of requests triggering this action to a minimum!
+   .. note:: ``test_function`` is evaluated only when request is finished.
+        As a result all debug logs this request must be collected,
+        and at the end they get either printed or thrown away.
 
-   .. note:: ``test_function`` is evaluated only when request is finished. As a result debug logs for all requests must be collected until request is finished because it is not possible to know beforehand how ``test_function`` at the end evaluates given request. When a request is finalized logs are either printed or thrown away.
-
-   Example usage which gathers verbose logs for all requests in subtree ``dnssec-failed.org.`` and prints debug logs for all requests finished with states different than ``kres.DONE`` (most importantly ``kres.FAIL``, see :c:type:`kr_layer_state`).
+   Example usage which gathers verbose logs for all requests in subtree ``dnssec-failed.org.`` and prints debug logs for those finishing in a different state than ``kres.DONE`` (most importantly ``kres.FAIL``, see :c:type:`kr_layer_state`).
 
    .. code-block:: lua
 
@@ -252,6 +257,21 @@ Following actions act on request and then processing continue until first non-ch
                               return (req.state ~= kres.DONE)
                           end),
           policy.todnames({'dnssec-failed.org.'})))
+
+.. py:attribute:: QTRACE
+
+   Pretty-print DNS responses from upstream servers (or cache) into logs.
+   It's useful for debugging weird DNS servers.
+
+   If you do not use ``QTRACE`` in combination with ``DEBUG*``,
+   you additionally need either ``log_groups({'iterat'})`` (possibly with other groups)
+   or ``log_level('debug')`` to see the output in logs.
+
+.. py:attribute:: REQTRACE
+
+   Pretty-print DNS requests from clients into the verbose log. It's useful for debugging weird DNS clients.
+   It makes most sense together with :ref:`mod-view` (enabling per-client)
+   and probably with verbose logging those request (e.g. use :any:`DEBUG_ALWAYS` instead).
 
 
 Custom actions
