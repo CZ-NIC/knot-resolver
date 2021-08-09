@@ -265,7 +265,7 @@ static int parse_args(int argc, char **argv, struct args *args)
 			args->quiet = true;
 			break;
 		case 'V':
-			kr_log_info(SYSTEM, "%s, version %s\n", "Knot Resolver", PACKAGE_VERSION);
+			printf("Knot Resolver, version %s\n", PACKAGE_VERSION);
 			return EXIT_SUCCESS;
 		case 'h':
 		case '?':
@@ -406,6 +406,7 @@ static void drop_capabilities(void)
 
 int main(int argc, char **argv)
 {
+	kr_log_group_reset();
 	if (setvbuf(stdout, NULL, _IONBF, 0) || setvbuf(stderr, NULL, _IONBF, 0)) {
 		kr_log_error(SYSTEM, "failed to to set output buffering (ignored): %s\n",
 				strerror(errno));
