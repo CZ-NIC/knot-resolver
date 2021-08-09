@@ -134,6 +134,10 @@ local const_type = {
 	CDNSKEY    =  60,
 	OPENPGPKEY =  61,
 	CSYNC      =  62,
+	ZONEMD     =  63,
+	SVCB       =  64,
+	HTTPS      =  65,
+
 	SPF        =  99,
 	UINFO      = 100,
 	UID        = 101,
