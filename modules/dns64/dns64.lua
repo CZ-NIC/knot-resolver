@@ -14,8 +14,6 @@ Missing parts of the RFC:
 
 	TODO: support different prefix lengths, defaulting to /96 if not specified
 	https://tools.ietf.org/html/rfc6052#section-2.2
-
-	PTR queries aren't supported (MUST), sec. 5.3.1.2
 ]]
 
 -- Config
@@ -27,6 +25,16 @@ function M.config(conf)
 	if M.proxy == nil or #M.proxy ~= 16 then
 		error(string.format('[dns64] %q is not a valid IPv6 address', conf.prefix), 2)
 	end
+
+	M.rev_ttl = conf.rev_ttl or 60
+	M.rev_suffix = kres.str2dname(M.proxy
+		:sub(1, 96/8)
+		-- hexdump, reverse, intersperse by dots
+		:gsub('.', function (ch) return string.format('%02x', string.byte(ch)) end)
+		:reverse()
+		:gsub('.', '%1.')
+		.. 'ip6.arpa.'
+	)
 end
 
 -- Layers
@@ -103,6 +111,68 @@ function M.layer.consume(state, req, pkt)
 		end
 	end
 	ffi.C.kr_ranked_rrarray_finalize(req.answ_selected, qry.uid, req.pool);
+end
+
+local function hexchar2int(char)
+	if char >= string.byte('0') and char <= string.byte('9') then
+		return char - string.byte('0')
+	elseif char >= string.byte('a') and char <= string.byte('f') then
+		return 10 + char - string.byte('a')
+	else
+		return nil
+	end
+end
+
+-- Map the reverse subtree by generating CNAMEs; similarly to the hints module.
+--
+-- RFC 6147.5.3.1.2 says we SHOULD only generate CNAME if it points to data,
+-- but I can't see what's wrong with a CNAME to an NXDOMAIN/NODATA
+-- Reimplementation idea: as-if we had a DNAME in policy/cache?
+function M.layer.produce(_, req, pkt)
+	local qry = req.current_query
+	local sname = qry.sname
+	if ffi.C.knot_dname_in_bailiwick(sname, M.rev_suffix) < 0
+		then return end
+	-- Update packet question if it was minimized.
+	qry.flags.NO_MINIMIZE = true
+	if not ffi.C.knot_dname_is_equal(pkt.wire + 12, sname) then
+		if not pkt:recycle() or not pkt:question(sname, qry.sclass, qry.stype)
+			then return end
+	end
+
+	-- Generate a CNAME iff the full address is queried; otherwise leave NODATA.
+	local labels_missing = 16*2 + 2 - ffi.C.knot_dname_labels(sname, nil)
+	if labels_missing == 0 then
+		-- Transforming v6 labels (hex) to v4 ones (decimal) isn't trivial:
+		local l = sname
+		local v4name = ''
+		for _ = 1, 4 do -- append one IPv4 label at a time into v4name
+			local v4lab = 0
+			for i = 0, 1 do
+				if l[0] ~= 1 then return end
+				local ch = hexchar2int(l[1])
+				if not ch then return end
+				v4lab = v4lab + ch * 16^i
+				l = l + 2
+			end
+			v4lab = tostring(v4lab)
+			v4name = v4name .. string.char(#v4lab) .. v4lab
+		end
+		v4name = v4name .. '\7in-addr\4arpa\0'
+		if not pkt:put(sname, M.rev_ttl, kres.class.IN, kres.type.CNAME, v4name)
+			then return end
+	end
+
+	-- Simple finishing touches.
+	if labels_missing < 0 then -- and use NXDOMAIN for too long queries
+		pkt:rcode(kres.rcode.NXDOMAIN)
+	else
+		pkt:rcode(kres.rcode.NOERROR)
+	end
+	pkt.parsed = pkt.size;
+	pkt:aa(true)
+	pkt:qr(true)
+	qry.flags.CACHED = true
 end
 
 return M
