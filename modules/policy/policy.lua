@@ -647,7 +647,7 @@ end
 local debug_logline_cb = ffi.cast('trace_log_f', function (_, msg)
 	jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
 	ffi.C.kr_log_fmt(
-		ffi.C.LOG_GRP_REQDBG, -- but [group] tag remains original in the string
+		ffi.C.LOG_GRP_REQDBG, -- but the original [group] tag also remains in the string
 		LOG_DEBUG,
 		'CODE_FILE=policy.lua', 'CODE_LINE=', 'CODE_FUNC=policy.DEBUG_ALWAYS', -- no meaningful locations
 		'[%-6s]%s', LOG_GRP_REQDBG_TAG, msg) -- msg should end with newline already
