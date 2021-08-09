@@ -10,7 +10,7 @@ Building from sources
 
 Knot Resolver is written for UNIX-like systems using modern C standards.
 Beware that some 64-bit systems with LuaJIT 2.1 may be affected by
-`a problem <https://github.com/LuaJIT/LuaJIT/blob/v2.1/doc/status.html#L100>`_
+`a problem <https://github.com/LuaJIT/LuaJIT/blob/v2.1.0-beta3/doc/status.html#L100>`_
 -- Linux on x86_64 is unaffected but `Linux on aarch64 is
 <https://gitlab.nic.cz/knot/knot-resolver/issues/216>`_.
 
@@ -42,11 +42,16 @@ The following dependencies are needed to build and run Knot Resolver:
 There are also *optional* packages that enable specific functionality in Knot
 Resolver:
 
+.. TODO cqueues is really used on multiple places, sometimes indirectly
+
 .. csv-table::
    :header: "Optional", "Needed for", "Notes"
 
+   "nghttp2_", "``daemon``", "DNS over HTTPS support."
+   "libsystemd_", "``daemon``", "Systemd watchdog support."
+   "`libcap-ng`_", "``daemon``", "Linux capabilities: support dropping them."
    "`lua-http`_", "``modules/http``", "HTTP/2 client/server for Lua."
-   "`lua-cqueues`_", "``modules/graphite``", "Send statistics over the Graphite protocol."
+   "`lua-cqueues`_", "some lua modules", ""
    "cmocka_", "``unit tests``", "Unit testing framework."
    "Doxygen_", "``documentation``", "Generating API documentation."
    "Sphinx_ and sphinx_rtd_theme_", "``documentation``", "Building this
@@ -54,7 +59,6 @@ Resolver:
    "Texinfo_", "``documentation``", "Generating this documentation in Info
    format."
    "breathe_", "``documentation``", "Exposing Doxygen API doc to Sphinx."
-   "libsystemd_", "``daemon``", "Systemd watchdog support."
    "libprotobuf_ 3.0+", "``modules/dnstap``", "Protocol Buffers support for
    dnstap_."
    "`libprotobuf-c`_ 1.0+", "``modules/dnstap``", "C bindings for Protobuf."
@@ -283,7 +287,6 @@ For development, it's possible to build the container directly from your git tre
    $ docker build -t knot-resolver .
 
 
-.. _Docker images: https://hub.docker.com/r/cznic/knot-resolver
 .. _libuv: https://github.com/libuv/libuv
 .. _LuaJIT: http://luajit.org/luajit.html
 .. _Doxygen: https://www.doxygen.nl/manual/index.html
@@ -296,9 +299,10 @@ For development, it's possible to build the container directly from your git tre
 .. _cmocka: https://cmocka.org/
 .. _lua-http: https://luarocks.org/modules/daurnimator/http
 .. _lua-cqueues: https://25thandclement.com/~william/projects/cqueues.html
-.. _boot2docker: http://boot2docker.io/
 .. _deckard: https://gitlab.nic.cz/knot/deckard
+.. _nghttp2: https://nghttp2.org/
 .. _libsystemd: https://www.freedesktop.org/wiki/Software/systemd/
+.. _`libcap-ng`: https://people.redhat.com/sgrubb/libcap-ng/
 .. _dnstap: http://dnstap.info/
 .. _libprotobuf: https://developers.google.com/protocol-buffers/
 .. _libprotobuf-c: https://github.com/protobuf-c/protobuf-c/wiki

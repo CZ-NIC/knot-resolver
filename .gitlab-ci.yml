@@ -127,6 +127,9 @@ build-asan:
 
 build:macOS:
   <<: *nodep
+  except:
+    refs:
+      - branches@knot/security/knot-resolver
   stage: build
   when: delayed
   start_in: 1 minutes  # allow some time for mirrorring, job creation
