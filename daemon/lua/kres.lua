@@ -395,7 +395,7 @@ ffi.metatype( knot_rrset_t, {
 			if rr:rdcount() > 0 then
 				local ret
 				if i ~= nil then
-					ret = knot.knot_rrset_txt_dump_data(rr, i, rrset_buf, rrset_buflen, knot.KNOT_DUMP_STYLE_DEFAULT)
+					ret = knot.knot_rrset_txt_dump_data(rr, i, rrset_buf, rrset_buflen, C.KR_DUMP_STYLE_DEFAULT)
 				else
 					ret = -1
 				end
@@ -412,7 +412,7 @@ ffi.metatype( knot_rrset_t, {
 			local size = ffi.new('size_t[1]', { bufsize }) -- one size_t = bufsize
 
 			local ret = knot.knot_rrset_txt_dump(rr, dump, size,
-							style or knot.KNOT_DUMP_STYLE_DEFAULT)
+							style or C.KR_DUMP_STYLE_DEFAULT)
 			local result = nil
 			if ret >= 0 then
 				result = ffi.string(dump[0], ret)
@@ -428,7 +428,7 @@ ffi.metatype( knot_rrset_t, {
 			ffi.gc(dump, C.free)
 
 			local ret = knot.knot_rrset_txt_dump_data(rr, i, dump, 1024,
-							knot.KNOT_DUMP_STYLE_DEFAULT)
+							C.KR_DUMP_STYLE_DEFAULT)
 			if ret >= 0 then
 				local out = {}
 				out.owner = dname2str(rr:owner())
@@ -797,15 +797,15 @@ ffi.metatype( kr_request_t, {
 			assert(ffi.istype(kr_request_t, req))
 			local buf = {}
 			if #req.answ_selected ~= 0 then
-				table.insert(buf, string.format('[%05d.00][dbg ] selected rrsets from answer sections:\n', req.uid))
+				table.insert(buf, ';; selected from ANSWER sections:\n')
 				table.insert(buf, tostring(req.answ_selected))
 			end
 			if #req.auth_selected ~= 0 then
-				table.insert(buf, string.format('[%05d.00][dbg ] selected rrsets from authority sections:\n', req.uid))
+				table.insert(buf, ';; selected from AUTHORITY sections:\n')
 				table.insert(buf, tostring(req.auth_selected))
 			end
 			if #req.add_selected ~= 0 then
-				table.insert(buf, string.format('[%05d.00][dbg ] selected rrsets from additional sections:\n', req.uid))
+				table.insert(buf, ';; selected from ADDITIONAL sections:\n')
 				table.insert(buf, tostring(req.add_selected))
 			end
 			return table.concat(buf, '')
