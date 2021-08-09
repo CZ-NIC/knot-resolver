@@ -4,6 +4,8 @@ Knot Resolver 5.4.1 (2021-0m-dd)
 Bugfixes
 --------
 - fix build without doh2 support (!1197)
+- policy logging FIXME
+- fix -v/--version (?)
 
 
 Knot Resolver 5.4.0 (2021-07-29)

@@ -5,7 +5,7 @@
 DNSSEC validation failure logging
 =================================
 
-This module adds error message for each DNSSEC validation failure.
+This module logs a message for each DNSSEC validation failure (on ``notice`` :func:`level <log_level>`).
 It is meant to provide hint to operators which queries should be
 investigated using diagnostic tools like DNSViz_.
 
@@ -19,7 +19,7 @@ Example of error message logged by this module:
 
 .. code-block:: none
 
-        DNSSEC validation failure dnssec-failed.org. DNSKEY
+        [dnssec] validation failure: dnssec-failed.org. DNSKEY
 
 .. _DNSViz: http://dnsviz.net/
 
@@ -28,15 +28,17 @@ List of most frequent queries which fail as DNSSEC bogus can be obtained at run-
 .. code-block:: lua
 
       > bogus_log.frequent()
-      [1] => {
-          [type] => DNSKEY
-          [count] => 1
-          [name] => dnssec-failed.org.
-      }
-      [2] => {
-          [type] => DNSKEY
-          [count] => 13
-          [name] => rhybar.cz.
+      {
+          {
+              ['count'] = 1,
+              ['name'] = 'dnssec-failed.org.',
+              ['type'] = 'DNSKEY',
+          },
+          {
+              ['count'] = 13,
+              ['name'] = 'rhybar.cz.',
+              ['type'] = 'DNSKEY',
+          },
       }
 
 Please note that in future this module might be replaced
