@@ -225,7 +225,7 @@ They are marked as ``debug`` level, so e.g. with journalctl command you can use 
 .. py:attribute:: DEBUG_ALWAYS
 
    Print debug-level logging for this request.
-   That also includes messages from client (:any:`QTRACE`), upstream servers (:any:`REQTRACE`), and stats about interesting records at the end.
+   That also includes messages from client (:any:`REQTRACE`), upstream servers (:any:`QTRACE`), and stats about interesting records at the end.
 
    .. code-block:: lua
 
@@ -262,6 +262,10 @@ They are marked as ``debug`` level, so e.g. with journalctl command you can use 
 
    Pretty-print DNS responses from upstream servers (or cache) into logs.
    It's useful for debugging weird DNS servers.
+
+   If you do not use ``QTRACE`` in combination with ``DEBUG*``,
+   you additionally need either ``log_groups({'iterat'})`` (possibly with other groups)
+   or ``log_level('debug')`` to see the output in logs.
 
 .. py:attribute:: REQTRACE
 
