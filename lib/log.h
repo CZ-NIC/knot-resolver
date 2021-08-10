@@ -77,8 +77,9 @@ enum kr_log_group {
 	LOG_GRP_HTTP,
 	LOG_GRP_CONTROL,
 	LOG_GRP_MODULE,
+	LOG_GRP_DEVEL,
 	/* ^^ Add new log groups above ^^. */
-	LOG_GRP_DEVEL,  /* Must be last entry in enum! */
+	LOG_GRP_REQDBG, /* Must be first non-displayed entry in enum! */
 };
 
 /**
@@ -129,6 +130,7 @@ enum kr_log_group {
 #define LOG_GRP_CONTROL_TAG		"contrl"	/**< ``contrl``: TTY control sockets*/
 #define LOG_GRP_MODULE_TAG		"module"	/**< ``module``: suitable for user-defined modules */
 #define LOG_GRP_DEVEL_TAG		"devel"		/**< ``devel``: for development purposes */
+#define LOG_GRP_REQDBG_TAG		"reqdbg"	/**< ``reqdbg``: debug logs enabled by policy actions */
 ///@}
 
 KR_EXPORT
@@ -181,16 +183,16 @@ kr_log_level_t kr_log_name2level(const char *name);
 	kr_log_fmt(LOG_GRP_ ## grp, LOG_INFO, SD_JOURNAL_METADATA, \
 			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
 
-#define kr_log_warning(grp, fmt, ...) \
-	kr_log_fmt(LOG_GRP_ ## grp, LOG_WARNING, SD_JOURNAL_METADATA, \
-			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
-
 #define kr_log_notice(grp, fmt, ...) \
 	kr_log_fmt(LOG_GRP_ ## grp, LOG_NOTICE, SD_JOURNAL_METADATA, \
 			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
 
 /** Levels less severe than ``notice`` are not logged by default. */
 #define LOG_DEFAULT_LEVEL	LOG_NOTICE
+
+#define kr_log_warning(grp, fmt, ...) \
+	kr_log_fmt(LOG_GRP_ ## grp, LOG_WARNING, SD_JOURNAL_METADATA, \
+			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
 
 /** Significant error.  The process continues, except for configuration errors during startup. */
 #define kr_log_error(grp, fmt, ...) \
@@ -261,6 +263,11 @@ bool kr_log_is_debug_fun(enum kr_log_group group, const struct kr_request *req);
 
 /* Helpers "internal" to log.* */
 
+/** @internal
+ *
+ * If you don't have location, pass ("CODE_FILE=", "CODE_LINE=", "CODE_FUNC=")
+ * Others than systemd don't utilize these metadata.
+ */
 KR_EXPORT KR_PRINTF(6)
 void kr_log_fmt(enum kr_log_group group, kr_log_level_t level, const char *file, const char *line,
 		const char *func, const char *fmt, ...);
