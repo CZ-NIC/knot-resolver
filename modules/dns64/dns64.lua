@@ -1,7 +1,8 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 -- Module interface
 local ffi = require('ffi')
-local M = {}
+local C = ffi.C
+local M = { layer = { } }
 local addr_buf = ffi.new('char[16]')
 
 --[[
@@ -9,8 +10,6 @@ Missing parts of the RFC:
 	> The implementation SHOULD support mapping of separate IPv4 address
 	> ranges to separate IPv6 prefixes for AAAA record synthesis.  This
 	> allows handling of special use IPv4 addresses [RFC5735].
-
-	Also the exclusion prefixes are not implemented, sec. 5.1.4 (MUST).
 
 	TODO: support different prefix lengths, defaulting to /96 if not specified
 	https://tools.ietf.org/html/rfc6052#section-2.2
@@ -35,10 +34,53 @@ function M.config(conf)
 		:gsub('.', '%1.')
 		.. 'ip6.arpa.'
 	)
+
+	-- RFC 6147.5.1.4
+	M.exclude_subnets = {}
+	if conf.exclude_subnets ~= nil and type(conf.exclude_subnets) ~= 'table' then
+		error('[dns64] .exclude_subnets is not a table')
+	end
+	for _, subnet_cfg in ipairs(conf.exclude_subnets or { '::ffff/96' }) do
+		local subnet = {}
+		subnet.prefix = ffi.new('char[16]')
+		subnet.bitlen = C.kr_straddr_subnet(subnet.prefix, tostring(subnet_cfg))
+		if subnet.bitlen < 0 or not string.find(subnet_cfg, ':', 1, true) then
+			error(string.format('[dns64] failed to parse IPv6 subnet: %q', subnet_cfg))
+		end
+		table.insert(M.exclude_subnets, subnet)
+	end
 end
 
--- Layers
-M.layer = { }
+-- Filter the AAAA records from the last ANSWER, return iff it's NODATA afterwards.
+-- Currently the implementation is lazy and kills it all if any AAAA is excluded.
+local function do_exclude_prefixes(qry)
+	local rrsel = qry.request.answ_selected
+	for i = 0, tonumber(rrsel.len) - 1 do
+		local rr_e = rrsel.at[i] -- struct ranked_rr_array_entry
+		if rr_e.qry_uid ~= qry.uid or rr_e.rr.type ~= kres.type.AAAA or not rr_e.to_wire
+			then goto next_rrset end
+		-- Found answer AAAA RRset
+		for _, subnet in ipairs(M.exclude_subnets) do
+			for j = 0, rr_e.rr:rdcount() - 1 do
+				local rd = rr_e.rr:rdata_pt(j)
+				if rd.len == 16 and C.kr_bitcmp(subnet.prefix, rd.data, subnet.bitlen) == 0 then
+					-- We can't use this RR.  TODO: and we're lazy,
+					-- so we kill the whole RRset instead of filtering.
+					rr_e.to_wire = false
+					return true
+				end
+			end
+		end
+		-- We can use the answer -> return false
+		-- We use a nonsensical if to fool the parser; is return adjacent to a label forbidden?
+		if true then return false end
+
+		::next_rrset::
+	end
+	-- No RRset found, it was probably NODATA.
+	return true
+end
+
 function M.layer.consume(state, req, pkt)
 	if state == kres.FAIL then return state end
 	local qry = req:current()
@@ -47,13 +89,11 @@ function M.layer.consume(state, req, pkt)
 			or pkt:qclass() ~= kres.class.IN or req.qsource.packet:cd() then
 		return state
 	end
-	-- Synthetic AAAA from marked A responses
-	local answer = pkt:section(kres.section.ANSWER)
 
 	-- Observe final AAAA NODATA responses to the current SNAME.
-	local is_nodata = pkt:rcode() == kres.rcode.NOERROR and #answer == 0
-	if pkt:qtype() == kres.type.AAAA and is_nodata and pkt:qname() == qry:name()
-			and qry.flags.RESOLVED and not qry.flags.CNAME and qry.parent == nil then
+	if pkt:qtype() == kres.type.AAAA and pkt:qname() == qry:name()
+			and qry.flags.RESOLVED and not qry.flags.CNAME and qry.parent == nil
+			and pkt:rcode() == kres.rcode.NOERROR and do_exclude_prefixes(qry) then
 		-- Start a *marked* corresponding A sub-query.
 		local extraFlags = kres.mk_qflags({})
 		extraFlags.DNSSEC_WANT = qry.flags.DNSSEC_WANT
