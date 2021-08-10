@@ -134,6 +134,7 @@ struct kr_qflags {
 	_Bool CACHE_TRIED : 1;
 	_Bool NO_NS_FOUND : 1;
 	_Bool PKT_IS_SANE : 1;
+	_Bool DNS64_DISABLE : 1;
 };
 typedef struct ranked_rr_array_entry {
 	uint32_t qry_uid;
