@@ -19,9 +19,14 @@ Missing parts of the RFC:
 ]]
 
 -- Config
-function M.config (confstr)
-	M.proxy = kres.str2ip(confstr or '64:ff9b::')
-	if M.proxy == nil then error('[dns64] "'..confstr..'" is not a valid address') end
+function M.config(conf)
+	if type(conf) ~= 'table' then
+		conf = { prefix = conf }
+	end
+	M.proxy = kres.str2ip(tostring(conf.prefix or '64:ff9b::'))
+	if M.proxy == nil or #M.proxy ~= 16 then
+		error(string.format('[dns64] %q is not a valid IPv6 address', conf.prefix), 2)
+	end
 end
 
 -- Layers
