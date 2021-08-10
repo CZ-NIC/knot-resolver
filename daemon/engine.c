@@ -241,7 +241,7 @@ static int l_log_groups(lua_State *L)
 	// get
 	lua_newtable(L);
 	int i = 1;
-	for (int grp = LOG_GRP_SYSTEM; grp <= LOG_GRP_DEVEL; grp++) {
+	for (enum kr_log_group grp = LOG_GRP_SYSTEM; grp < LOG_GRP_REQDBG; grp++) {
 		const char *name = kr_log_grp2name(grp);
 		if (kr_fails_assert(name))
 			continue;

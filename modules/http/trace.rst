@@ -10,8 +10,8 @@ Using query policies
 
 Query policies :any:`policy.DEBUG_ALWAYS`, :any:`policy.DEBUG_CACHE_MISS` or
 :any:`policy.DEBUG_IF` can be used to enable debug-level logging for selected
-subdomains or queries matching specific conditions. Please refer to their
-documentation for usage.
+subdomains or queries matching specific conditions. Please refer to
+:ref:`mod-policy-logging` for more information.
 
 Using HTTP module
 -----------------
