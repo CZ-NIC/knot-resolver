@@ -4,6 +4,7 @@ Knot Resolver 5.4.1 (2021-0m-dd)
 Improvements
 ------------
 - dns64 module: also map the reverse (PTR) subtree (#478, !1201)
+- dns64 module: allow disabling based on client address (#368, !1201)
 
 Bugfixes
 --------

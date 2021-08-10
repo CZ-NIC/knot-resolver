@@ -43,7 +43,7 @@ function M.layer.consume(state, req, pkt)
 	if state == kres.FAIL then return state end
 	local qry = req:current()
 	-- Observe only final answers in IN class where request has no CD flag.
-	if M.proxy == nil or not qry.flags.RESOLVED
+	if M.proxy == nil or not qry.flags.RESOLVED or qry.flags.DNS64_DISABLE
 			or pkt:qclass() ~= kres.class.IN or req.qsource.packet:cd() then
 		return state
 	end
@@ -131,7 +131,7 @@ end
 function M.layer.produce(state, req, pkt)
 	local qry = req.current_query
 	local sname = qry.sname
-	if ffi.C.knot_dname_in_bailiwick(sname, M.rev_suffix) < 0
+	if ffi.C.knot_dname_in_bailiwick(sname, M.rev_suffix) < 0 or qry.flags.DNS64_DISABLE
 		then return end
 	-- Update packet question if it was minimized.
 	qry.flags.NO_MINIMIZE = true
