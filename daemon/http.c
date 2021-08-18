@@ -566,7 +566,8 @@ struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
 		{ NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, HTTP_MAX_CONCURRENT_STREAMS }
 	};
 
-	nghttp2_session_callbacks_new(&callbacks);
+	if (nghttp2_session_callbacks_new(&callbacks) < 0)
+		return ctx;
 	nghttp2_session_callbacks_set_send_callback(callbacks, send_callback);
 	nghttp2_session_callbacks_set_send_data_callback(callbacks, send_data_callback);
 	nghttp2_session_callbacks_set_on_header_callback(callbacks, header_callback);
