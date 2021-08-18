@@ -529,24 +529,21 @@ static int stream_write_data_free_err(trie_val_t *val, void *null)
 
 /*
  * Cleanup for closed streams.
- *
- * If any stream_user_data was set, call the on_write callback to allow
- * freeing of the underlying data structure.
  */
 static int on_stream_close_callback(nghttp2_session *h2, int32_t stream_id,
 				    uint32_t error_code, void *user_data)
 {
 	struct http_data *data;
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
+	int ret;
 
 	/* Ensure connection state is cleaned up in case the stream gets
 	 * unexpectedly closed, e.g. by PROTOCOL_ERROR issued from nghttp2. */
 	if (ctx->incomplete_stream == stream_id)
 		http_cleanup_stream(ctx);
 
-	trie_del(ctx->stream_write_data, (char *)&stream_id, sizeof(stream_id), NULL);
-	data = nghttp2_session_get_stream_user_data(h2, stream_id);
-	if (data)
+	ret = trie_del(ctx->stream_write_data, (char *)&stream_id, sizeof(stream_id), (trie_val_t*)&data);
+	if (ret == kr_ok() && data)
 		on_pkt_write(data, error_code == 0 ? 0 : kr_error(EIO));
 
 	return 0;
@@ -702,17 +699,9 @@ static int http_send_response(struct http_ctx *ctx, int32_t stream_id,
 		MAKE_NV("cache-control", 13, max_age, max_age_len),
 	};
 
-	ret = nghttp2_session_set_stream_user_data(h2, stream_id, (void*)data);
-	if (ret != 0) {
-		kr_log_debug(DOH, "[%p] failed to set stream user data: %s\n", (void *)h2, nghttp2_strerror(ret));
-		free(data);
-		return kr_error(EIO);
-	}
-
 	ret = nghttp2_submit_response(h2, stream_id, hdrs, sizeof(hdrs)/sizeof(*hdrs), prov);
 	if (ret != 0) {
 		kr_log_debug(DOH, "[%p] nghttp2_submit_response failed: %s\n", (void *)h2, nghttp2_strerror(ret));
-		nghttp2_session_set_stream_user_data(h2, stream_id, NULL);  // just in case
 		free(data);
 		return kr_error(EIO);
 	}
