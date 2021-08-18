@@ -1,19 +1,18 @@
 # Intermediate container for Knot DNS build (not persistent)
 # SPDX-License-Identifier: GPL-3.0-or-later
-FROM debian:stable AS knot-dns-build
-ARG KNOT_DNS_VERSION=v3.0.5
+FROM debian:11 AS knot-dns-build
+ARG KNOT_DNS_VERSION=v3.1.1
 
 # Build dependencies
 ENV KNOT_DNS_BUILD_DEPS git-core build-essential libtool autoconf pkg-config \
 	libgnutls28-dev	libprotobuf-dev libprotobuf-c-dev libfstrm-dev
 ENV KNOT_RESOLVER_BUILD_DEPS build-essential pkg-config bsdmainutils liblmdb-dev \
 	libluajit-5.1-dev libuv1-dev libprotobuf-dev libprotobuf-c-dev \
-	libfstrm-dev luajit lua-http libssl-dev libnghttp2-dev protobuf-c-compiler
+	libfstrm-dev luajit lua-http libssl-dev libnghttp2-dev protobuf-c-compiler \
+	meson
 ENV BUILDENV_DEPS ${KNOT_DNS_BUILD_DEPS} ${KNOT_RESOLVER_BUILD_DEPS}
-RUN echo "deb http://deb.debian.org/debian stretch-backports main" > /etc/apt/sources.list.d/backports.list
 RUN apt-get update -qq && \
-	apt-get -y -qqq install ${BUILDENV_DEPS} && \
-	apt-get -y -qqq install -t stretch-backports meson
+       apt-get -y -qqq install ${BUILDENV_DEPS}
 
 # Install Knot DNS from sources
 RUN git clone -b $KNOT_DNS_VERSION --depth=1 https://gitlab.nic.cz/knot/knot-dns.git /tmp/knot-dns && \
@@ -32,7 +31,7 @@ RUN mkdir -p /tmp/root/usr/local/include /tmp/root/usr/local/lib /tmp/root/usr/l
 
 
 # Intermediate container with runtime dependencies
-FROM debian:stable-slim AS runtime
+FROM debian:11-slim AS runtime
 
 # Install runtime dependencies
 ENV KNOT_DNS_RUNTIME_DEPS libgnutls30
