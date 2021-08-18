@@ -42,6 +42,7 @@ struct http_ctx {
 	http_send_callback send_cb;
 	struct session *session;
 	queue_http_stream streams;  /* Streams present in the wire buffer. */
+	trie_t *stream_write_data;  /* Dictionary of stream data that needs to be freed after write. */
 	int32_t incomplete_stream;
 	ssize_t submitted;
 	http_method_t current_method;

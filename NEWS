@@ -5,6 +5,7 @@ Bugfixes
 --------
 - fix build without doh2 support after 5.4.0 (!1197)
 - fix policy.DEBUG* logging and -V/--version after 5.4.0 (!1199)
+- doh2: ensure memory from unsent streams is freed (!1202)
 
 
 Knot Resolver 5.4.0 (2021-07-29)
