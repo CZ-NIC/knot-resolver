@@ -646,6 +646,13 @@ obs:debian10:x86_64:
     DISTROTEST_NAME: debian10
     DISTROTEST_REPO: Debian_10
 
+obs:debian11:x86_64:
+  <<: *distrotest
+  variables:
+    OBS_REPO: knot-resolver-latest
+    DISTROTEST_NAME: debian11
+    DISTROTEST_REPO: Debian_11
+
 obs:fedora33:x86_64:
   <<: *distrotest
   variables:

@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+
+Vagrant.configure(2) do |config|
+
+    config.vm.box = "generic/debian11"
+    config.vm.synced_folder ".", "/vagrant", disabled: true
+
+    config.vm.define "debian11_knot-resolver"  do |machine|
+        machine.vm.provision "ansible" do |ansible|
+            ansible.playbook = "../knot-resolver-pkgtest.yaml"
+        end
+    end
+
+    config.vm.provider :libvirt do |libvirt|
+      libvirt.cpus = 1
+      libvirt.memory = 1024
+    end
+
+    config.vm.provider :virtualbox do |vbox|
+      vbox.cpus = 1
+      vbox.memory = 1024
+    end
+
+end
