@@ -1,5 +1,9 @@
-Knot Resolver 5.4.1 (2021-0m-dd)
+Knot Resolver 5.4.1 (2021-08-19)
 ================================
+
+Improvements
+------------
+- docker: base image on Debian 11 (!1203)
 
 Bugfixes
 --------
