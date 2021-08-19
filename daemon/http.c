@@ -521,25 +521,29 @@ static void on_pkt_write(struct http_data *data, int status)
 	free(data);
 }
 
+static int stream_write_data_free_err(trie_val_t *val, void *null)
+{
+	on_pkt_write(*val, kr_error(EIO));
+	return 0;
+}
+
 /*
  * Cleanup for closed streams.
- *
- * If any stream_user_data was set, call the on_write callback to allow
- * freeing of the underlying data structure.
  */
 static int on_stream_close_callback(nghttp2_session *h2, int32_t stream_id,
 				    uint32_t error_code, void *user_data)
 {
 	struct http_data *data;
 	struct http_ctx *ctx = (struct http_ctx *)user_data;
+	int ret;
 
 	/* Ensure connection state is cleaned up in case the stream gets
 	 * unexpectedly closed, e.g. by PROTOCOL_ERROR issued from nghttp2. */
 	if (ctx->incomplete_stream == stream_id)
 		http_cleanup_stream(ctx);
 
-	data = nghttp2_session_get_stream_user_data(h2, stream_id);
-	if (data)
+	ret = trie_del(ctx->stream_write_data, (char *)&stream_id, sizeof(stream_id), (trie_val_t*)&data);
+	if (ret == kr_ok() && data)
 		on_pkt_write(data, error_code == 0 ? 0 : kr_error(EIO));
 
 	return 0;
@@ -559,7 +563,8 @@ struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
 		{ NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, HTTP_MAX_CONCURRENT_STREAMS }
 	};
 
-	nghttp2_session_callbacks_new(&callbacks);
+	if (nghttp2_session_callbacks_new(&callbacks) < 0)
+		return ctx;
 	nghttp2_session_callbacks_set_send_callback(callbacks, send_callback);
 	nghttp2_session_callbacks_set_send_data_callback(callbacks, send_data_callback);
 	nghttp2_session_callbacks_set_on_header_callback(callbacks, header_callback);
@@ -578,6 +583,7 @@ struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
 	ctx->send_cb = send_cb;
 	ctx->session = session;
 	queue_init(ctx->streams);
+	ctx->stream_write_data = trie_create(NULL);
 	ctx->incomplete_stream = -1;
 	ctx->submitted = 0;
 	ctx->current_method = HTTP_METHOD_NONE;
@@ -670,9 +676,10 @@ static ssize_t read_callback(nghttp2_session *h2, int32_t stream_id, uint8_t *bu
  *
  * Data isn't guaranteed to be sent immediately due to underlying HTTP/2 flow control.
  */
-static int http_send_response(nghttp2_session *h2, int32_t stream_id,
+static int http_send_response(struct http_ctx *ctx, int32_t stream_id,
 			      nghttp2_data_provider *prov)
 {
+	nghttp2_session *h2 = ctx->h2;
 	struct http_data *data = (struct http_data*)prov->source.ptr;
 	int ret;
 	const char *directive_max_age = "max-age=";
@@ -692,21 +699,23 @@ static int http_send_response(nghttp2_session *h2, int32_t stream_id,
 		MAKE_NV("cache-control", 13, max_age, max_age_len),
 	};
 
-	ret = nghttp2_session_set_stream_user_data(h2, stream_id, (void*)data);
-	if (ret != 0) {
-		kr_log_debug(DOH, "[%p] failed to set stream user data: %s\n", (void *)h2, nghttp2_strerror(ret));
-		free(data);
-		return kr_error(EIO);
-	}
-
 	ret = nghttp2_submit_response(h2, stream_id, hdrs, sizeof(hdrs)/sizeof(*hdrs), prov);
 	if (ret != 0) {
 		kr_log_debug(DOH, "[%p] nghttp2_submit_response failed: %s\n", (void *)h2, nghttp2_strerror(ret));
-		nghttp2_session_set_stream_user_data(h2, stream_id, NULL);  // just in case
 		free(data);
 		return kr_error(EIO);
 	}
 
+	/* Keep reference to data, since we need to free it later on.
+	 * Due to HTTP/2 flow control, this stream data may be sent at a later point, or not at all.
+	 */
+	trie_val_t *stream_data_p = trie_get_ins(ctx->stream_write_data, (char *)&stream_id, sizeof(stream_id));
+	if (kr_fails_assert(stream_data_p)) {
+		kr_log_debug(DOH, "[%p] failed to insert to stream_write_data\n", (void *)h2);
+		free(data);
+		return kr_error(EIO);
+	}
+	*stream_data_p = data;
 	ret = nghttp2_session_send(h2);
 	if(ret < 0) {
 		kr_log_debug(DOH, "[%p] nghttp2_session_send failed: %s\n", (void *)h2, nghttp2_strerror(ret));
@@ -731,7 +740,7 @@ static int http_send_response(nghttp2_session *h2, int32_t stream_id,
  * musn't be!) called, since such errors are handled in an upper layer - in
  * qr_task_step() in daemon/worker.
  */
-static int http_write_pkt(nghttp2_session *h2, knot_pkt_t *pkt, int32_t stream_id,
+static int http_write_pkt(struct http_ctx *ctx, knot_pkt_t *pkt, int32_t stream_id,
 			  uv_write_t *req, uv_write_cb on_write)
 {
 	struct http_data *data;
@@ -752,7 +761,7 @@ static int http_write_pkt(nghttp2_session *h2, knot_pkt_t *pkt, int32_t stream_i
 	prov.source.ptr = data;
 	prov.read_callback = read_callback;
 
-	return http_send_response(h2, stream_id, &prov);
+	return http_send_response(ctx, stream_id, &prov);
 }
 
 /*
@@ -779,7 +788,7 @@ int http_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, int32_t st
 	if (!ctx || !ctx->h2)
 		return kr_error(EINVAL);
 
-	ret = http_write_pkt(ctx->h2, pkt, stream_id, req, on_write);
+	ret = http_write_pkt(ctx, pkt, stream_id, req, on_write);
 	if (ret < 0)
 		return ret;
 
@@ -806,6 +815,9 @@ void http_free(struct http_ctx *ctx)
 			ctx->headers = NULL;  // to prevent double-free
 		queue_pop(ctx->streams);
 	}
+
+	trie_apply(ctx->stream_write_data, stream_write_data_free_err, NULL);
+	trie_free(ctx->stream_write_data);
 
 	http_cleanup_stream(ctx);
 	queue_deinit(ctx->streams);

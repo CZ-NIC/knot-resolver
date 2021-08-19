@@ -83,14 +83,14 @@ void session_clear(struct session *session)
 	if (session->handle && session->handle->type == UV_TCP) {
 		free(session->wire_buf);
 	}
+#if ENABLE_DOH2
+	http_free(session->http_ctx);
+#endif
 	trie_clear(session->tasks);
 	trie_free(session->tasks);
 	queue_deinit(session->waiting);
 	tls_free(session->tls_ctx);
 	tls_client_ctx_free(session->tls_client_ctx);
-#if ENABLE_DOH2
-	http_free(session->http_ctx);
-#endif
 	memset(session, 0, sizeof(*session));
 }
 
