@@ -195,7 +195,7 @@ int session_tasklist_del(struct session *session, struct qr_task *task)
 		key_len = sizeof(char *);
 	}
 	int ret = trie_del(t, key, key_len, &val);
-	if (ret == kr_ok()) {
+	if (ret == KNOT_EOK) {
 		kr_require(val == task);
 		worker_task_unref(val);
 	}
@@ -212,7 +212,7 @@ struct qr_task *session_tasklist_del_first(struct session *session, bool deref)
 {
 	trie_val_t val = NULL;
 	int res = trie_del_first(session->tasks, NULL, NULL, &val);
-	if (res != kr_ok()) {
+	if (res != KNOT_EOK) {
 		val = NULL;
 	} else if (deref) {
 		worker_task_unref(val);
@@ -229,7 +229,7 @@ struct qr_task* session_tasklist_del_msgid(const struct session *session, uint16
 	size_t key_len = sizeof(msg_id);
 	trie_val_t val;
 	int res = trie_del(t, key, key_len, &val);
-	if (res == kr_ok()) {
+	if (res == KNOT_EOK) {
 		if (worker_task_numrefs(val) > 1) {
 			ret = val;
 		}
