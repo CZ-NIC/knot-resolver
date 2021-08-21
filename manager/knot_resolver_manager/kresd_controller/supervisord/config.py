@@ -1,9 +1,7 @@
-import asyncio
 import configparser
 import logging
 import os
 import signal
-import sys
 from os import kill
 from pathlib import Path
 from typing import Any, List, Optional, Set, Tuple
@@ -12,7 +10,6 @@ from xmlrpc.client import ServerProxy
 import supervisor.xmlrpc
 from jinja2 import Template
 
-from knot_resolver_manager.compat.asyncio import to_thread
 from knot_resolver_manager.compat.dataclasses import dataclass
 from knot_resolver_manager.constants import (
     GC_EXECUTABLE,
@@ -27,7 +24,12 @@ from knot_resolver_manager.constants import (
     SUPERVISORD_SOCK,
     SUPERVISORD_SUBPROCESS_LOG_DIR,
 )
-from knot_resolver_manager.kresd_controller.interface import Subprocess, SubprocessType
+from knot_resolver_manager.kresd_controller.interface import (
+    Subprocess,
+    SubprocessInfo,
+    SubprocessStatus,
+    SubprocessType,
+)
 from knot_resolver_manager.utils.async_utils import (
     call,
     read_resource,
@@ -122,13 +124,28 @@ async def is_supervisord_running() -> bool:
         return True
 
 
-def list_fatal_subprocesses_ids() -> List[str]:
+def list_subprocesses() -> List[SubprocessInfo]:
     proxy = ServerProxy(
         "http://127.0.0.1",
         transport=supervisor.xmlrpc.SupervisorTransport(None, None, serverurl="unix://" + str(SUPERVISORD_SOCK)),
     )
     processes: Any = proxy.supervisor.getAllProcessInfo()
-    return [pr["name"] for pr in processes if pr["statename"] == "FATAL"]
+
+    def convert(proc: Any) -> SubprocessInfo:
+        conversion_tbl = {
+            "FATAL": SubprocessStatus.FAILED,
+            "EXITED": SubprocessStatus.FAILED,
+            "RUNNING": SubprocessStatus.RUNNING,
+        }
+
+        if proc["statename"] in conversion_tbl:
+            status = conversion_tbl[proc["statename"]]
+        else:
+            status = SubprocessStatus.UNKNOWN
+
+        return SubprocessInfo(id=proc["name"], status=status)
+
+    return [convert(pr) for pr in processes]
 
 
 def create_id(type_name: SubprocessType, id_: object) -> str:
@@ -151,39 +168,3 @@ async def list_ids_from_existing_config() -> List[Tuple[SubprocessType, str]]:
             program_id = section.replace("program:", "")
             res.append(parse_id(program_id))
     return res
-
-
-async def watchdog() -> None:
-    while True:
-        # the sleep is split into two, because is very likely a problem will occur
-        # just after start
-        await asyncio.sleep(10)
-
-        logger.debug("Watchdog running and checking system's sanity")
-
-        # check that supervisord is running fine
-        if not await is_supervisord_running():
-            logger.error(
-                "Supervisord is not running! It might have crashed, it might "
-                "have been stopped. This behavior is unexpected and we can't "
-                "really tell what's happening right now. The safest option is "
-                "to terminate... Sorry and bye!"
-            )
-            sys.exit(1)
-
-        # check that there are no subprocesses in FATAL state
-        fatals = await to_thread(list_fatal_subprocesses_ids)
-        if len(fatals) != 0:
-            logger.error(
-                "Some kresd instances are in a FATAL state. The configuration "
-                "provided was probably invalid and passed the validation. You "
-                "might find it helpful to look at logfiles for ids %s."
-                "Sadly, there is no safer way forward than a simple suicide.",
-                fatals,
-            )
-            logger.info("Killing supervisord")
-            await stop_supervisord()
-            logger.info("So Long, and Thanks for All the Fish")
-            sys.exit(1)
-
-        await asyncio.sleep(WATCHDOG_INTERVAL - 10)

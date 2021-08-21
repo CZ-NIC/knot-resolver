@@ -1,6 +1,6 @@
 """
 This file contains autodetection logic for available subprocess controllers. Because we have to catch errors
-from imports, you can not see a simple list, but it's more complicated.
+from imports, they are located in functions which are invoked at the end of this file.
 """
 # pylint: disable=import-outside-toplevel
 

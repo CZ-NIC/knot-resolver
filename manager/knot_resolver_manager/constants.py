@@ -31,3 +31,8 @@ SUPERVISORD_SUBPROCESS_LOG_DIR.mkdir(exist_ok=True)
 MANAGER_CONFIG_FILE = CONFIGURATION_DIR / "config.yml"
 
 LISTEN_SOCKET_PATH = RUNTIME_DIR / "manager.sock"
+
+"""
+Used in KresdManager. It's a number of seconds in between system health checks.
+"""
+WATCHDOG_INTERVAL: float = 5
