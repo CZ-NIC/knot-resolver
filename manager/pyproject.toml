@@ -111,6 +111,7 @@ disable= [
     "logging-fstring-interpolation", # see https://github.com/PyCQA/pylint/issues/1788
     "no-else-raise", # not helpful for readability, when we want explicit branches
     "raising-bad-type", # handled by type checker
+    "too-many-arguments",  # sure, but how can we change the signatures to take less arguments? artificially create objects with arguments? That's stupid...
 ]
 
 [tool.pylint.SIMILARITIES]
