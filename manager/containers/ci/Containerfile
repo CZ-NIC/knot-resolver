@@ -19,6 +19,7 @@ ENV POETRY_NO_INTERACTION=1 \
   PYTHONHASHSEED=random \
   PYTHONDONTWRITEBYTECODE=1
 
+RUN dnf install -y knot-resolver procps-ng
 
 # How does this work?
 # ===================
@@ -39,7 +40,7 @@ ENV POETRY_NO_INTERACTION=1 \
 # We do not have to install the dependencies every single time. They are cached in the container itself and 
 # we can rebuild it only when it's definition or the list of dependencies changes.
 
-COPY pyproject.toml package.json .
+COPY pyproject.toml poetry.lock package.json .
 RUN source $HOME/.poetry/env \
   && poetry config --list \
   && poetry env use $(which python3.6) \

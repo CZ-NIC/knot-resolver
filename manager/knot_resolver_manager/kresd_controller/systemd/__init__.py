@@ -4,7 +4,15 @@ from enum import Enum, auto
 from typing import Iterable, List
 
 from knot_resolver_manager import compat
-from knot_resolver_manager.kresd_controller.interface import Subprocess, SubprocessController, SubprocessType
+from knot_resolver_manager.compat.asyncio import to_thread
+from knot_resolver_manager.kres_id import KresID, alloc, alloc_from_string
+from knot_resolver_manager.kresd_controller.interface import (
+    Subprocess,
+    SubprocessController,
+    SubprocessInfo,
+    SubprocessStatus,
+    SubprocessType,
+)
 from knot_resolver_manager.utils.async_utils import call
 
 from . import dbus_api as systemd
@@ -21,12 +29,12 @@ class SystemdSubprocess(Subprocess):
     def __init__(
         self,
         type_: SubprocessType,
-        id_: object,
+        id_: KresID,
         systemd_type: systemd.SystemdType,
         persistance_type: SystemdPersistanceType = SystemdPersistanceType.PERSISTENT,
     ):
         self._type = type_
-        self._id = id_
+        self._id: KresID = id_
         self._systemd_type = systemd_type
         self._persistance_type = persistance_type
 
@@ -40,12 +48,21 @@ class SystemdSubprocess(Subprocess):
             ]
             return f"kresd{sep}{self._id}.service"
 
+    @staticmethod
+    def id_could_be_ours(unit_name: str) -> bool:
+        is_ours = unit_name == "kres-cache-gc.service"
+        is_ours |= unit_name.startswith("kresd") and unit_name.endswith(".service")
+        return is_ours
+
     @property
     def type(self):
         return self._type
 
     async def is_running(self) -> bool:
         raise NotImplementedError()
+
+    async def _on_unexpected_termination(self):
+        logger.warning("Detected unexpected termination of unit %s", self.id)
 
     async def start(self):
         if self._persistance_type is SystemdPersistanceType.PERSISTENT:
@@ -111,15 +128,22 @@ class SystemdSubprocessController(SubprocessController):
 
     async def get_all_running_instances(self) -> Iterable[Subprocess]:
         res: List[SystemdSubprocess] = []
-        units = await compat.asyncio.to_thread(systemd.list_units, self._systemd_type)
+        units = await compat.asyncio.to_thread(systemd.list_unit_names, self._systemd_type)
         for unit in units:
             u: str = unit
             if u.startswith("kresd") and u.endswith(".service"):
                 iden = u.replace("kresd", "")[1:].replace(".service", "")
                 persistance_type = SystemdPersistanceType.PERSISTENT if "@" in u else SystemdPersistanceType.TRANSIENT
-                res.append(SystemdSubprocess(SubprocessType.KRESD, iden, self._systemd_type, persistance_type))
+                res.append(
+                    SystemdSubprocess(
+                        SubprocessType.KRESD,
+                        alloc_from_string(iden),
+                        self._systemd_type,
+                        persistance_type,
+                    )
+                )
             elif u == "kres-cache-gc.service":
-                res.append(SystemdSubprocess(SubprocessType.GC, "", self._systemd_type))
+                res.append(SystemdSubprocess(SubprocessType.GC, alloc(), self._systemd_type))
         return res
 
     async def initialize_controller(self) -> None:
@@ -128,5 +152,18 @@ class SystemdSubprocessController(SubprocessController):
     async def shutdown_controller(self) -> None:
         pass
 
-    async def create_subprocess(self, subprocess_type: SubprocessType, id_hint: object) -> Subprocess:
+    async def create_subprocess(self, subprocess_type: SubprocessType, id_hint: KresID) -> Subprocess:
         return SystemdSubprocess(subprocess_type, id_hint, self._systemd_type, self._persistance_type)
+
+    async def get_subprocess_info(self) -> List[SubprocessInfo]:
+        def convert(u: systemd.Unit) -> SubprocessInfo:
+            status_lookup_table = {"failed": SubprocessStatus.FAILED, "running": SubprocessStatus.RUNNING}
+
+            if u.state in status_lookup_table:
+                status = status_lookup_table[u.state]
+            else:
+                status = SubprocessStatus.UNKNOWN
+
+            return SubprocessInfo(id=u.name, status=status)
+
+        return list(map(convert, await to_thread(systemd.list_units, self._systemd_type)))

@@ -1,5 +1,8 @@
+from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Iterable
+from typing import Iterable, List
+
+from knot_resolver_manager.kres_id import KresID
 
 
 class SubprocessType(Enum):
@@ -39,6 +42,18 @@ class Subprocess:
         return hash(type(self)) ^ hash(self.type) ^ hash(self.id)
 
 
+class SubprocessStatus(Enum):
+    RUNNING = auto()
+    FAILED = auto()
+    UNKNOWN = auto()
+
+
+@dataclass
+class SubprocessInfo:
+    id: str
+    status: SubprocessStatus
+
+
 class SubprocessController:
     """
     The common Subprocess Controller interface. This is what KresManager requires and what has to be implemented by all
@@ -65,12 +80,19 @@ class SubprocessController:
         """
         raise NotImplementedError()
 
-    async def create_subprocess(self, subprocess_type: SubprocessType, id_hint: object) -> Subprocess:
+    async def create_subprocess(self, subprocess_type: SubprocessType, id_hint: KresID) -> Subprocess:
         """
         Return a Subprocess object which can be operated on. The subprocess is not
         started or in any way active after this call. That has to be performaed manually
         using the returned object itself.
 
         Must NOT be called before initialize_controller()
+        """
+        raise NotImplementedError()
+
+    async def get_subprocess_info(self) -> List[SubprocessInfo]:
+        """
+        Get a status of running subprocesses as seen by the controller. This method  actively polls
+        for information.
         """
         raise NotImplementedError()

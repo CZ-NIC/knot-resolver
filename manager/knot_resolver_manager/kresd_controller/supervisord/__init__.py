@@ -1,9 +1,14 @@
 import logging
-from asyncio.futures import Future
-from typing import Any, Iterable, Set
+from typing import Iterable, List, Set
 
-from knot_resolver_manager.compat.asyncio import create_task
-from knot_resolver_manager.kresd_controller.interface import Subprocess, SubprocessController, SubprocessType
+from knot_resolver_manager.compat.asyncio import to_thread
+from knot_resolver_manager.kres_id import KresID, alloc_from_string
+from knot_resolver_manager.kresd_controller.interface import (
+    Subprocess,
+    SubprocessController,
+    SubprocessInfo,
+    SubprocessType,
+)
 
 from .config import (
     SupervisordConfig,
@@ -11,20 +16,20 @@ from .config import (
     is_supervisord_available,
     is_supervisord_running,
     list_ids_from_existing_config,
+    list_subprocesses,
     restart,
     start_supervisord,
     stop_supervisord,
     update_config,
-    watchdog,
 )
 
 logger = logging.getLogger(__name__)
 
 
 class SupervisordSubprocess(Subprocess):
-    def __init__(self, controller: "SupervisordSubprocessController", id_: object, type_: SubprocessType):
+    def __init__(self, controller: "SupervisordSubprocessController", id_: KresID, type_: SubprocessType):
         self._controller: "SupervisordSubprocessController" = controller
-        self._id = id_
+        self._id: KresID = id_
         self._type: SubprocessType = type_
 
     @property
@@ -51,7 +56,6 @@ class SupervisordSubprocess(Subprocess):
 class SupervisordSubprocessController(SubprocessController):
     def __init__(self):
         self._running_instances: Set[SupervisordSubprocess] = set()
-        self._watchdog_task: "Future[Any]"
 
     def __str__(self):
         return "supervisord"
@@ -63,6 +67,8 @@ class SupervisordSubprocessController(SubprocessController):
         res = await is_supervisord_available()
         if not res:
             logger.info("Failed to find usable supervisord.")
+
+        logger.debug("Detection - supervisord controller is available for use")
         return res
 
     async def _update_config_with_real_state(self):
@@ -70,7 +76,7 @@ class SupervisordSubprocessController(SubprocessController):
         if running:
             ids = await list_ids_from_existing_config()
             for tp, id_ in ids:
-                self._running_instances.add(SupervisordSubprocess(self, id_, tp))
+                self._running_instances.add(SupervisordSubprocess(self, alloc_from_string(id_), tp))
 
     async def get_all_running_instances(self) -> Iterable[Subprocess]:
         await self._update_config_with_real_state()
@@ -83,10 +89,8 @@ class SupervisordSubprocessController(SubprocessController):
         if not await is_supervisord_running():
             config = self._create_config()
             await start_supervisord(config)
-        self._watchdog_task = create_task(watchdog())
 
     async def shutdown_controller(self) -> None:
-        self._watchdog_task.cancel()
         await stop_supervisord()
 
     async def start_subprocess(self, subprocess: SupervisordSubprocess):
@@ -103,5 +107,8 @@ class SupervisordSubprocessController(SubprocessController):
         assert subprocess in self._running_instances
         await restart(subprocess.id)
 
-    async def create_subprocess(self, subprocess_type: SubprocessType, id_hint: object) -> Subprocess:
+    async def create_subprocess(self, subprocess_type: SubprocessType, id_hint: KresID) -> Subprocess:
         return SupervisordSubprocess(self, id_hint, subprocess_type)
+
+    async def get_subprocess_info(self) -> List[SubprocessInfo]:
+        return await to_thread(list_subprocesses)

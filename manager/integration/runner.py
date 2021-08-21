@@ -1,5 +1,5 @@
 import logging
-from sys import exc_info
+import sys
 from typing import Callable
 
 from knot_resolver_manager.client import KnotManagerClient, count_running_kresds, start_manager_in_background
@@ -15,14 +15,15 @@ Test = Callable[[KnotManagerClient], None]
 logger = logging.getLogger(__name__)
 
 
-def test_wrapper(test: Test):
+def test_wrapper(test: Test) -> bool:
     p = start_manager_in_background(HOST, PORT)
     client = KnotManagerClient(BASE_URL)
     client.wait_for_initialization()
 
     logger.info("Starting test %s", test.__name__)
     try:
-        res = test(client)
+        test(client)
+        res = True
     except AssertionError:
         logger.error("Test %s failed", exc_info=True)
         res = False
@@ -77,5 +78,7 @@ def crash_resistance(client: KnotManagerClient):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
-    test_wrapper(worker_count)
-    # test_wrapper(crash_resistance)
+    success = True
+    success &= test_wrapper(worker_count)
+    # success &= test_wrapper(crash_resistance)
+    sys.exit(int(not success))
