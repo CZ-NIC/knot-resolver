@@ -1,58 +1,26 @@
 import asyncio
-import itertools
 import logging
-import weakref
+import sys
+from asyncio.futures import Future
 from subprocess import SubprocessError
-from typing import List, Optional, Type
+from typing import List, Optional
 
-from knot_resolver_manager.constants import KRESD_CONFIG_FILE
+import knot_resolver_manager.kresd_controller
+from knot_resolver_manager import kres_id
+from knot_resolver_manager.compat.asyncio import create_task
+from knot_resolver_manager.constants import KRESD_CONFIG_FILE, WATCHDOG_INTERVAL
 from knot_resolver_manager.exceptions import ValidationException
-from knot_resolver_manager.kresd_controller import get_best_controller_implementation
-from knot_resolver_manager.kresd_controller.interface import Subprocess, SubprocessController, SubprocessType
+from knot_resolver_manager.kresd_controller.interface import (
+    Subprocess,
+    SubprocessController,
+    SubprocessStatus,
+    SubprocessType,
+)
 from knot_resolver_manager.utils.async_utils import writefile
 
 from .datamodel import KresConfig
 
 logger = logging.getLogger(__name__)
-
-
-class _PrettyID:
-    """
-    ID object. Effectively only a wrapper around an int, so that the references
-    behave normally (bypassing integer interning and other optimizations)
-    """
-
-    def __init__(self, n: int):
-        self._id = n
-
-    def __str__(self):
-        return str(self._id)
-
-    def __hash__(self) -> int:
-        return self._id
-
-    def __eq__(self, o: object) -> bool:
-        return isinstance(o, _PrettyID) and self._id == o._id
-
-
-class _PrettyIDAllocator:
-    """
-    Pretty numeric ID allocator. Keeps weak refences to the IDs it has
-    allocated. The IDs get recycled once the previously allocated ID
-    objects get garbage collected
-    """
-
-    def __init__(self):
-        self._used: "weakref.WeakSet[_PrettyID]" = weakref.WeakSet()
-
-    def alloc(self) -> _PrettyID:
-        for i in itertools.count(start=1):
-            val = _PrettyID(i)
-            if val not in self._used:
-                self._used.add(val)
-                return val
-
-        raise RuntimeError("Reached an end of an infinite loop. How?")
 
 
 class KresManager:
@@ -63,34 +31,68 @@ class KresManager:
     Instantiate with `KresManager.create()`, not with the usual constructor!
     """
 
-    @classmethod
-    async def create(cls: Type["KresManager"], controller: Optional[SubprocessController]) -> "KresManager":
-        obj = cls()
-        await obj._async_init(controller)  # pylint: disable=protected-access
-        return obj
+    _instance_lock = asyncio.Lock()
+    _instance: Optional["KresManager"] = None
+
+    @staticmethod
+    async def create_instance(selected_controller: Optional[SubprocessController]) -> "KresManager":
+        """
+        Creates new singleton instance of KresManager. Can be called only once. Afterwards, use
+        `KresManager.get_instance()` to obtain the already existing instance
+        """
+
+        assert KresManager._instance is None
+
+        async with KresManager._instance_lock:
+            # trying to create, but racing and somebody already did it
+            if KresManager._instance is not None:
+                raise AssertionError("Must NOT call `create_instance` multiple times - race detected!")
+
+            # create it for real
+            inst = KresManager(_i_know_what_i_am_doing=True)
+            await inst._async_init(selected_controller)  # pylint: disable=protected-access
+            KresManager._instance = inst
+            return inst
+
+    @staticmethod
+    def get_instance() -> "KresManager":
+        """
+        Obtain reference to the singleton instance of this class. If you want to create an instance,
+        use `create_instance()`
+        """
+        assert KresManager._instance is not None
+        return KresManager._instance
 
     async def _async_init(self, selected_controller: Optional[SubprocessController]):
         if selected_controller is None:
-            self._controller = await get_best_controller_implementation()
+            self._controller = await knot_resolver_manager.kresd_controller.get_best_controller_implementation()
         else:
             self._controller = selected_controller
         await self._controller.initialize_controller()
+        self._watchdog_task = create_task(self._watchdog())
         await self.load_system_state()
 
-    def __init__(self):
+    def __init__(self, _i_know_what_i_am_doing: bool = False):
+        if not _i_know_what_i_am_doing:
+            logger.error(
+                "Trying to create an instance of KresManager using normal contructor. Please use "
+                "`KresManager.get_instance()` instead"
+            )
+            sys.exit(1)
+
         self._workers: List[Subprocess] = []
         self._gc: Optional[Subprocess] = None
         self._manager_lock = asyncio.Lock()
         self._controller: SubprocessController
         self._last_used_config: Optional[KresConfig] = None
-        self._id_allocator = _PrettyIDAllocator()
+        self._watchdog_task: Optional["Future[None]"] = None
 
     async def load_system_state(self):
         async with self._manager_lock:
             await self._collect_already_running_children()
 
     async def _spawn_new_worker(self):
-        subprocess = await self._controller.create_subprocess(SubprocessType.KRESD, self._id_allocator.alloc())
+        subprocess = await self._controller.create_subprocess(SubprocessType.KRESD, kres_id.alloc())
         await subprocess.start()
         self._workers.append(subprocess)
 
@@ -129,7 +131,7 @@ class KresManager:
         return self._gc is not None
 
     async def _start_gc(self):
-        subprocess = await self._controller.create_subprocess(SubprocessType.GC, "gc")
+        subprocess = await self._controller.create_subprocess(SubprocessType.GC, kres_id.alloc())
         await subprocess.start()
         self._gc = subprocess
 
@@ -175,5 +177,38 @@ class KresManager:
             await self._ensure_number_of_children(0)
             await self._controller.shutdown_controller()
 
+        if self._watchdog_task is not None:
+            self._watchdog_task.cancel()
+
     def get_last_used_config(self) -> Optional[KresConfig]:
         return self._last_used_config
+
+    async def _instability_handler(self) -> None:
+        logger.error("Instability callback invoked. No idea how to react, performing suicide. See you later!")
+        sys.exit(1)
+
+    async def _watchdog(self) -> None:
+        while True:
+            await asyncio.sleep(WATCHDOG_INTERVAL)
+
+            # gather current state
+            units = {u.id: u for u in await self._controller.get_subprocess_info()}
+            worker_ids = [x.id for x in self._workers]
+            invoke_callback = False
+
+            for w in worker_ids:
+                if w not in units:
+                    logger.error("Expected to find subprocess with id '%s' in the system, but did not.", w)
+                    invoke_callback = True
+                    continue
+
+                if units[w].status is SubprocessStatus.FAILED:
+                    logger.error("Subprocess '%s' is failed.", w)
+                    invoke_callback = True
+                    continue
+
+                if units[w].status is SubprocessStatus.UNKNOWN:
+                    logger.warning("Subprocess '%s' is in unknown state!", w)
+
+            if invoke_callback:
+                await self._instability_handler()

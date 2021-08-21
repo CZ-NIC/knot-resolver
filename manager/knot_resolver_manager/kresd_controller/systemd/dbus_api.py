@@ -1,6 +1,8 @@
 # pyright: reportUnknownMemberType=false
 # pyright: reportMissingTypeStubs=false
 
+import logging
+from dataclasses import dataclass
 from enum import Enum, auto
 from threading import Thread
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -13,6 +15,8 @@ from typing_extensions import Literal
 from knot_resolver_manager.constants import KRES_CACHE_DIR, KRESD_CONFIG_FILE, RUNTIME_DIR
 from knot_resolver_manager.exceptions import SubprocessControllerException
 from knot_resolver_manager.kresd_controller.interface import SubprocessType
+
+logger = logging.getLogger(__name__)
 
 
 class SystemdType(Enum):
@@ -89,8 +93,26 @@ def get_unit_file_state(
     return res
 
 
-def list_units(type_: SystemdType) -> List[str]:
-    return [str(u[0]) for u in _create_manager_proxy(type_).ListUnits()]
+@dataclass
+class Unit:
+    name: str
+    state: str
+
+
+def _list_units_internal(type_: SystemdType) -> List[Any]:
+    return _create_manager_proxy(type_).ListUnits()
+
+
+def list_units(type_: SystemdType) -> List[Unit]:
+    return [Unit(name=str(u[0]), state=str(u[4])) for u in _list_units_internal(type_)]
+
+
+def list_unit_names(type_: SystemdType) -> List[str]:
+    return [str(u[0]) for u in _list_units_internal(type_)]
+
+
+def list_failed_unit_names(type_: SystemdType) -> List[str]:
+    return [str(u[0]) for u in _list_units_internal(type_) if str(u[3]) == "failed"]
 
 
 def restart_unit(type_: SystemdType, unit_name: str):

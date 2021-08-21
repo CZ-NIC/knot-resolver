@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import sys
-from functools import partial
 from http import HTTPStatus
 from pathlib import Path
 from time import time
@@ -21,20 +20,19 @@ from knot_resolver_manager.utils.dataclasses_parservalidator import Format
 from .datamodel import KresConfig
 from .kres_manager import KresManager
 
-_MANAGER = "kres_manager"
 _SHUTDOWN_EVENT = "shutdown-event"
 
 logger = logging.getLogger(__name__)
 
 
-async def _index(request: web.Request) -> web.Response:
+async def _index(_request: web.Request) -> web.Response:
     """
     Dummy index handler to indicate that the server is indeed running...
     """
     return json_response(
         {
             "msg": "Knot Resolver Manager is running! The configuration endpoint is at /config",
-            "status": "RUNNING" if get_kres_manager(request.app) is not None else "INITIALIZING",
+            "status": "RUNNING",
         }
     )
 
@@ -46,7 +44,7 @@ async def _apply_config(request: web.Request) -> web.Response:
 
     document_path = request.match_info["path"]
 
-    manager: KresManager = get_kres_manager(request.app)
+    manager: KresManager = KresManager.get_instance()
     if manager is None:
         # handle the case when the manager is not yet initialized
         return web.Response(
@@ -99,13 +97,6 @@ def stop_server(app: web.Application):
     logger.info("Shutdown event triggered...")
 
 
-def get_kres_manager(app: web.Application) -> KresManager:
-    if _MANAGER not in app:
-        raise ValueError("Accessing manager in an application where it was not defined")
-
-    return app[_MANAGER]
-
-
 class _DefaultSentinel:
     pass
 
@@ -116,7 +107,6 @@ _DEFAULT_SENTINEL = _DefaultSentinel()
 async def _init_manager(
     config: Union[None, Path, KresConfig, _DefaultSentinel],
     subprocess_controller_name: Optional[str],
-    app: web.Application,
 ):
     """
     Called asynchronously when the application initializes.
@@ -129,8 +119,7 @@ async def _init_manager(
 
         # Create KresManager. This will perform autodetection of available service managers and
         # select the most appropriate to use (or use the one configured directly)
-        manager = await KresManager.create(controller)
-        app[_MANAGER] = manager
+        manager = await KresManager.create_instance(controller)
 
         # Initial configuration of the manager
         if config is None:
@@ -167,12 +156,11 @@ async def start_server(
 ):
     start_time = time()
 
+    # before starting any server, initialize the subprocess controller etc.
+    await _init_manager(config, subprocess_controller_name)
+
     app = web.Application(middlewares=[error_handler])
-
-    app[_MANAGER] = None
     app[_SHUTDOWN_EVENT] = asyncio.Event()
-
-    app.on_startup.append(partial(_init_manager, config, subprocess_controller_name))
 
     # configure routing
     setup_routes(app)
@@ -196,5 +184,5 @@ async def start_server(
     await app[_SHUTDOWN_EVENT].wait()
     logger.info("Gracefull shutdown triggered. Cleaning up...")
     await runner.cleanup()
-    await get_kres_manager(app).stop()
+    await KresManager.get_instance().stop()
     logger.info(f"The manager run for {round(time() - start_time)} seconds... Hope it served well. Bye!")
