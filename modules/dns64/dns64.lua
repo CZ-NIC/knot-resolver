@@ -184,19 +184,19 @@ function M.layer.produce(_, req, pkt)
 	local labels_missing = 16*2 + 2 - ffi.C.knot_dname_labels(sname, nil)
 	if labels_missing == 0 then
 		-- Transforming v6 labels (hex) to v4 ones (decimal) isn't trivial:
-		local l = sname
+		local labels = sname
 		local v4name = ''
 		for _ = 1, 4 do -- append one IPv4 label at a time into v4name
-			local v4lab = 0
+			local v4octet = 0
 			for i = 0, 1 do
-				if l[0] ~= 1 then return end
-				local ch = hexchar2int(l[1])
+				if labels[0] ~= 1 then return end
+				local ch = hexchar2int(labels[1])
 				if not ch then return end
-				v4lab = v4lab + ch * 16^i
-				l = l + 2
+				v4octet = v4octet + ch * 16^i
+				labels = labels + 2
 			end
-			v4lab = tostring(v4lab)
-			v4name = v4name .. string.char(#v4lab) .. v4lab
+			v4octet = tostring(v4octet)
+			v4name = v4name .. string.char(#v4octet) .. v4octet
 		end
 		v4name = v4name .. '\7in-addr\4arpa\0'
 		if not pkt:put(sname, M.rev_ttl, kres.class.IN, kres.type.CNAME, v4name)
@@ -209,7 +209,7 @@ function M.layer.produce(_, req, pkt)
 	else
 		pkt:rcode(kres.rcode.NOERROR)
 	end
-	pkt.parsed = pkt.size;
+	pkt.parsed = pkt.size
 	pkt:aa(true)
 	pkt:qr(true)
 	qry.flags.CACHED = true
