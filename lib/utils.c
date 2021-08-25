@@ -441,6 +441,8 @@ int kr_straddr_subnet(void *dst, const char *addr)
 	/* Parse subnet */
 	int bit_len = 0;
 	int family = kr_straddr_family(addr);
+	if (family != AF_INET && family != AF_INET6)
+		return kr_error(EINVAL);
 	auto_free char *addr_str = strdup(addr);
 	char *subnet = strchr(addr_str, '/');
 	if (subnet) {
