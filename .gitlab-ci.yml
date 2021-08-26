@@ -664,7 +664,7 @@ obs:leap15:x86_64:
   variables:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: leap15
-    DISTROTEST_REPO: openSUSE_Leap_15.2
+    DISTROTEST_REPO: openSUSE_Leap_15.3
 
 obs:ubuntu1804:x86_64:
   <<: *distrotest
