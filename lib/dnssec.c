@@ -49,35 +49,33 @@ void kr_crypto_reinit(void)
  * @param flags     The flags are going to be set according to validation result.
  * @param cov_labels Covered RRSet owner label count.
  * @param rrsigs    rdata containing the signatures.
- * @param key_owner Associated DNSKEY's owner.
- * @param key_rdata Associated DNSKEY's rdata.
+ * @param key_alg   DNSKEY's algorithm.
  * @param keytag    Used key tag.
- * @param zone_name The name of the zone cut.
- * @param timestamp Validation time.
+ * @param vctx->zone_name The name of the zone cut (and the DNSKEY).
+ * @param vctx->timestamp Validation time.
  */
 static int validate_rrsig_rr(int *flags, int cov_labels,
                              const knot_rdata_t *rrsigs,
-                             const knot_dname_t *key_owner, const knot_rdata_t *key_rdata,
+                             uint8_t key_alg,
 			     uint16_t keytag,
-                             const knot_dname_t *zone_name, uint32_t timestamp,
                              kr_rrset_validation_ctx_t *vctx)
 {
-	if (!flags || !rrsigs || !key_owner || !key_rdata || !zone_name) {
+	if (kr_fails_assert(flags && rrsigs && vctx && vctx->zone_name)) {
 		return kr_error(EINVAL);
 	}
 	/* bullet 5 */
-	if (knot_rrsig_sig_expiration(rrsigs) < timestamp) {
+	if (knot_rrsig_sig_expiration(rrsigs) < vctx->timestamp) {
 		vctx->rrs_counters.expired++;
 		return kr_error(EINVAL);
 	}
 	/* bullet 6 */
-	if (knot_rrsig_sig_inception(rrsigs) > timestamp) {
+	if (knot_rrsig_sig_inception(rrsigs) > vctx->timestamp) {
 		vctx->rrs_counters.notyet++;
 		return kr_error(EINVAL);
 	}
 	/* bullet 2 */
 	const knot_dname_t *signer_name = knot_rrsig_signer_name(rrsigs);
-	if (!signer_name || !knot_dname_is_equal(signer_name, zone_name)) {
+	if (!signer_name || !knot_dname_is_equal(signer_name, vctx->zone_name)) {
 		vctx->rrs_counters.signer_invalid++;
 		return kr_error(EAGAIN);
 	}
@@ -93,10 +91,9 @@ static int validate_rrsig_rr(int *flags, int cov_labels,
 		}
 	}
 
-	/* bullet 7 */
-	if ((!knot_dname_is_equal(key_owner, signer_name)) ||
-	    (knot_dnskey_alg(key_rdata) != knot_rrsig_alg(rrsigs)) ||
-	    (keytag != knot_rrsig_key_tag(rrsigs))) {
+	/* bullet 7
+	 * Part checked elsewhere: key owner matching the zone_name. */
+	if (key_alg != knot_rrsig_alg(rrsigs) || keytag != knot_rrsig_key_tag(rrsigs)) {
 		vctx->rrs_counters.key_invalid++;
 		return kr_error(EINVAL);
 	}
@@ -166,9 +163,11 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 	bool has_nsec3		      = vctx->has_nsec3;
 	struct dseckey *created_key = NULL;
 
-	/* It's just caller's approximation that the RR is in that particular zone.
-	 * We MUST guard against attempts of zones signing out-of-bailiwick records. */
-	if (knot_dname_in_bailiwick(covered->owner, zone_name) < 0) {
+	if (!knot_dname_is_equal(keys->owner, zone_name)
+	   /* It's just caller's approximation that the RR is in that particular zone,
+	    * so we verify that in the following condition.
+	    * We MUST guard against attempts of zones signing out-of-bailiwick records. */
+	    || knot_dname_in_bailiwick(covered->owner, zone_name) < 0) {
 		vctx->result = kr_error(ENOENT);
 		return vctx->result;
 	}
@@ -184,6 +183,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 		key = created_key;
 	}
 	uint16_t keytag = dnssec_key_get_keytag((dnssec_key_t *)key);
+	const uint8_t key_alg = knot_dnskey_alg(key_rdata);
 	int covered_labels = knot_dname_labels(covered->owner, NULL);
 	if (knot_dname_is_wildcard(covered->owner)) {
 		/* The asterisk does not count, RFC4034 3.1.3, paragraph 3. */
@@ -210,8 +210,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 			kr_rank_set(&vctx->rrs->at[i]->rank, KR_RANK_BOGUS); /* defensive style */
 			vctx->rrs_counters.matching_name_type++;
 			int retv = validate_rrsig_rr(&val_flgs, covered_labels, rdata_j,
-			                      keys->owner, key_rdata, keytag,
-			                      zone_name, timestamp, vctx);
+							key_alg, keytag, vctx);
 			if (retv == kr_error(EAGAIN)) {
 				kr_dnssec_key_free(&created_key);
 				vctx->result = retv;
