@@ -25,7 +25,7 @@
 
 /* forward */
 static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
-	knot_rrset_t *covered, size_t key_pos, const struct dseckey *key);
+	knot_rrset_t *covered, size_t key_pos, const struct dnssec_key *key);
 
 void kr_crypto_init(void)
 {
@@ -154,14 +154,14 @@ int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx, knot_rrset_t *covered)
  */
 static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 				knot_rrset_t *covered,
-				size_t key_pos, const struct dseckey *key)
+				size_t key_pos, const struct dnssec_key *key)
 {
 	const knot_pkt_t *pkt         = vctx->pkt;
 	const knot_rrset_t *keys      = vctx->keys;
 	const knot_dname_t *zone_name = vctx->zone_name;
 	uint32_t timestamp            = vctx->timestamp;
 	bool has_nsec3		      = vctx->has_nsec3;
-	struct dseckey *created_key = NULL;
+	struct dnssec_key *created_key = NULL;
 
 	if (!knot_dname_is_equal(keys->owner, zone_name)
 	   /* It's just caller's approximation that the RR is in that particular zone,
@@ -182,7 +182,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 		}
 		key = created_key;
 	}
-	uint16_t keytag = dnssec_key_get_keytag((dnssec_key_t *)key);
+	uint16_t keytag = dnssec_key_get_keytag(key);
 	const uint8_t key_alg = knot_dnskey_alg(key_rdata);
 	int covered_labels = knot_dname_labels(covered->owner, NULL);
 	if (knot_dname_is_wildcard(covered->owner)) {
@@ -224,7 +224,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 					break;
 				}
 			}
-			if (kr_check_signature(rdata_j, (dnssec_key_t *) key, covered, trim_labels) != 0) {
+			if (kr_check_signature(rdata_j, key, covered, trim_labels) != 0) {
 				vctx->rrs_counters.crypto_invalid++;
 				continue;
 			}
@@ -312,10 +312,10 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
 		if (!kr_dnssec_key_zsk(krr->data) || kr_dnssec_key_revoked(krr->data))
 			continue;
 
-		struct dseckey *key = NULL;
+		struct dnssec_key *key = NULL;
 		if (kr_dnssec_key_from_rdata(&key, keys->owner, krr->data, krr->len) != 0)
 			continue;
-		if (kr_authenticate_referral(ta, (dnssec_key_t *) key) != 0) {
+		if (kr_authenticate_referral(ta, key) != 0) {
 			kr_dnssec_key_free(&key);
 			continue;
 		}
@@ -357,12 +357,12 @@ int kr_dnssec_key_tag(uint16_t rrtype, const uint8_t *rdata, size_t rdlen)
 	if (rrtype == KNOT_RRTYPE_DS) {
 		return knot_wire_read_u16(rdata);
 	} else if (rrtype == KNOT_RRTYPE_DNSKEY) {
-		struct dseckey *key = NULL;
+		struct dnssec_key *key = NULL;
 		int ret = kr_dnssec_key_from_rdata(&key, NULL, rdata, rdlen);
 		if (ret != 0) {
 			return ret;
 		}
-		uint16_t keytag = dnssec_key_get_keytag((dnssec_key_t *)key);
+		uint16_t keytag = dnssec_key_get_keytag(key);
 		kr_dnssec_key_free(&key);
 		return keytag;
 	} else {
@@ -374,11 +374,11 @@ int kr_dnssec_key_match(const uint8_t *key_a_rdata, size_t key_a_rdlen,
                         const uint8_t *key_b_rdata, size_t key_b_rdlen)
 {
 	dnssec_key_t *key_a = NULL, *key_b = NULL;
-	int ret = kr_dnssec_key_from_rdata((struct dseckey **)&key_a, NULL, key_a_rdata, key_a_rdlen);
+	int ret = kr_dnssec_key_from_rdata(&key_a, NULL, key_a_rdata, key_a_rdlen);
 	if (ret != 0) {
 		return ret;
 	}
-	ret = kr_dnssec_key_from_rdata((struct dseckey **)&key_b, NULL, key_b_rdata, key_b_rdlen);
+	ret = kr_dnssec_key_from_rdata(&key_b, NULL, key_b_rdata, key_b_rdlen);
 	if (ret != 0) {
 		dnssec_key_free(key_a);
 		return ret;
@@ -399,7 +399,7 @@ int kr_dnssec_key_match(const uint8_t *key_a_rdata, size_t key_a_rdlen,
 	return ret;
 }
 
-int kr_dnssec_key_from_rdata(struct dseckey **key, const knot_dname_t *kown, const uint8_t *rdata, size_t rdlen)
+int kr_dnssec_key_from_rdata(struct dnssec_key **key, const knot_dname_t *kown, const uint8_t *rdata, size_t rdlen)
 {
 	if (!key || !rdata || rdlen == 0) {
 		return kr_error(EINVAL);
@@ -428,16 +428,16 @@ int kr_dnssec_key_from_rdata(struct dseckey **key, const knot_dname_t *kown, con
 		}
 	}
 
-	*key = (struct dseckey *) new_key;
+	*key = new_key;
 	return kr_ok();
 }
 
-void kr_dnssec_key_free(struct dseckey **key)
+void kr_dnssec_key_free(struct dnssec_key **key)
 {
 	if (kr_fails_assert(key))
 		return;
 
-	dnssec_key_free((dnssec_key_t *) *key);
+	dnssec_key_free(*key);
 	*key = NULL;
 }
 

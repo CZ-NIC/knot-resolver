@@ -27,9 +27,6 @@ void kr_crypto_cleanup(void);
 KR_EXPORT
 void kr_crypto_reinit(void);
 
-/** Opaque DNSSEC key pointer. */
-struct dseckey;
-
 #define KR_DNSSEC_VFLG_WEXPAND 0x01
 #define KR_DNSSEC_VFLG_OPTOUT  0x02
 
@@ -118,6 +115,9 @@ KR_EXPORT KR_PURE
 int kr_dnssec_key_match(const uint8_t *key_a_rdata, size_t key_a_rdlen,
                         const uint8_t *key_b_rdata, size_t key_b_rdlen);
 
+/* Opaque DNSSEC key struct; forward declaration from libdnssec. */
+struct dnssec_key;
+
 /**
  * Construct a DNSSEC key.
  * @param key   Pointer to be set to newly created DNSSEC key.
@@ -126,13 +126,13 @@ int kr_dnssec_key_match(const uint8_t *key_a_rdata, size_t key_a_rdlen,
  * @param rdlen DNSKEY RDATA length
  * @return 0 or error code; in particular: DNSSEC_INVALID_KEY_ALGORITHM
  */
-int kr_dnssec_key_from_rdata(struct dseckey **key, const knot_dname_t *kown, const uint8_t *rdata, size_t rdlen);
+int kr_dnssec_key_from_rdata(struct dnssec_key **key, const knot_dname_t *kown, const uint8_t *rdata, size_t rdlen);
 
 /**
  * Frees the DNSSEC key.
  * @param key Pointer to freed key.
  */
-void kr_dnssec_key_free(struct dseckey **key);
+void kr_dnssec_key_free(struct dnssec_key **key);
 
 /**
  * Checks whether NSEC/NSEC3 RR selected by iterator matches the supplied name and type.
