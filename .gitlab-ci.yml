@@ -17,6 +17,8 @@ variables:
   PREFIX: $CI_PROJECT_DIR/.local
   GIT_COMMITER_NAME: 'ci'
   EMAIL: 'ci@nic'
+  SAST_DISABLED: 1 # we call the jobs differently, enable them individually, etc.
+  SAST_EXCLUDED_PATHS: "bench, tests, **/test_*"
 
 image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-$KNOT_VERSION
 
@@ -29,6 +31,7 @@ stages:
   - pkgtest
 
 .common: &common
+  when: manual #FIXME: TMP
   except:
     refs:
       - master@knot/knot-resolver
@@ -40,6 +43,31 @@ stages:
     - docker
     - linux
     - amd64
+
+# https://gitlab.nic.cz/help/user/application_security/sast/index#configure-sast-manually
+include:
+  - template: Security/SAST.gitlab-ci.yml
+.sast-common: &sast-common
+  extends: .sast-analyzer
+  stage: sanity
+  image:
+    name: "$SAST_ANALYZER_IMAGE"
+  rules:
+    - if: $SAST_ANALYZER_IMAGE # Empty if broke the CI?
+      when: always
+  # wait for build, no artifacts are needed
+  needs: [ build ]
+  dependencies:
+sast:flawfinder:
+  extends: .sast-common
+  variables:
+    SAST_ANALYZER_IMAGE_TAG: 2
+    SAST_ANALYZER_IMAGE: "$SECURE_ANALYZERS_PREFIX/flawfinder:$SAST_ANALYZER_IMAGE_TAG"
+sast:semgrep:
+  extends: .sast-common
+  variables:
+    SAST_ANALYZER_IMAGE_TAG: 2
+    SAST_ANALYZER_IMAGE: "$SECURE_ANALYZERS_PREFIX/semgrep:$SAST_ANALYZER_IMAGE_TAG"
 
 .after_build: &after_build
   <<: *common
