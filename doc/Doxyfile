@@ -19,5 +19,5 @@ OPTIMIZE_OUTPUT_FOR_C = YES
 ENABLE_PREPROCESSING  = YES
 MACRO_EXPANSION   = YES
 EXPAND_ONLY_PREDEF     = YES
-PREDEFINED        = NDEBUG KR_CONST= KR_EXPORT= KR_PURE= lru_t(type)=see_source_code KR_PRINTF(n)= KR_COLD= array_t(type)=see_source_code
+PREDEFINED        = NDEBUG KR_CONST= KR_EXPORT= KR_PURE= lru_t(type)=see_source_code KR_PRINTF(n)= KR_COLD= array_t(type)=see_source_code __attribute__(x)=
 EXCLUDE_SYMBOLS = static_assert uint set_walk_cb module_api_cb kr_prop_cb kr_straddr_split
