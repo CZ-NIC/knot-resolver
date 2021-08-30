@@ -200,8 +200,6 @@ trivial_checks: # aggregated to save some processing
 
 doc:
   <<: *sanity
-  # TODO migrate doc to debian-11
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
   script:
     - meson build_doc -Ddoc=enabled
     - ninja -C build_doc doc-strict
@@ -212,8 +210,6 @@ doc:
 
 lint:other:
   <<: *sanity
-  # TODO migrate lint to debian-11
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
   script:
     - meson build_ci_lint &>/dev/null
     - ninja -C build_ci* pylint
@@ -222,10 +218,6 @@ lint:other:
 
 lint:pedantic:
   <<: *after_build
-  # TODO migrate lint to debian-11
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
-  before_script:
-  # -- end TODO
   stage: sanity
   script:
     - meson build_pedantic_gcc -Dwerror=true -Dc_args='-Wpedantic' -Dextra_tests=enabled
@@ -645,6 +637,13 @@ obs:debian10:x86_64:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: debian10
     DISTROTEST_REPO: Debian_10
+
+obs:debian11:x86_64:
+  <<: *distrotest
+  variables:
+    OBS_REPO: knot-resolver-latest
+    DISTROTEST_NAME: debian11
+    DISTROTEST_REPO: Debian_11
 
 obs:fedora33:x86_64:
   <<: *distrotest

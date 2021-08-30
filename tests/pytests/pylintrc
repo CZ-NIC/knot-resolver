@@ -15,6 +15,7 @@ disable=
     global-statement,
     no-else-return,
     redefined-outer-name,  # commonly used with pytest fixtures
+    consider-using-with,
 
 
 [SIMILARITIES]

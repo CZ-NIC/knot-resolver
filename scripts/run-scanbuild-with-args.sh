@@ -16,9 +16,9 @@ set -o errexit -o nounset
 # alpha.security.MallocOverflow # not smart enough to infer max values from data types
 
 exec scan-build --status-bugs -no-failure-reports \
+-analyzer-config  aggressive-binary-operation-simplification=true \
 -disable-checker  unix.Malloc \
 -enable-checker   alpha.core.BoolAssignment \
--enable-checker   alpha.core.CallAndMessageUnInitRefArg \
 -enable-checker   alpha.core.CastSize \
 -enable-checker   alpha.core.Conversion \
 -enable-checker   alpha.core.DynamicTypeChecker \
@@ -29,7 +29,6 @@ exec scan-build --status-bugs -no-failure-reports \
 -enable-checker   alpha.core.SizeofPtr \
 -enable-checker   alpha.core.TestAfterDivZero \
 -enable-checker   alpha.cplusplus.IteratorRange \
--enable-checker   alpha.cplusplus.MisusedMovedObject \
 -enable-checker   alpha.security.ArrayBound \
 -enable-checker   alpha.security.ArrayBoundV2 \
 -enable-checker   alpha.security.ReturnPtrRange \

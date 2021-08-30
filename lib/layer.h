@@ -37,6 +37,7 @@ static inline bool kr_state_consistent(enum kr_layer_state s)
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wtautological-constant-out-of-range-compare"
+#pragma clang diagnostic ignored "-Wtautological-unsigned-enum-zero-compare"
 #endif
 	return s >= 0 && s < (1 << 5);
 #ifdef __clang__
