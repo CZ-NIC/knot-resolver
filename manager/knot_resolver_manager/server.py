@@ -11,11 +11,10 @@ from aiohttp.web import middleware
 from aiohttp.web_response import json_response
 
 from knot_resolver_manager.constants import MANAGER_CONFIG_FILE
-from knot_resolver_manager.exceptions import ValidationException
 from knot_resolver_manager.kresd_controller import get_controller_by_name
 from knot_resolver_manager.kresd_controller.interface import SubprocessController
+from knot_resolver_manager.utils import DataValidationException, Format
 from knot_resolver_manager.utils.async_utils import readfile
-from knot_resolver_manager.utils.dataclasses_parservalidator import Format
 
 from .datamodel import KresConfig
 from .kres_manager import KresManager
@@ -83,7 +82,7 @@ async def error_handler(request: web.Request, handler: Any):
 
     try:
         return await handler(request)
-    except ValidationException as e:
+    except DataValidationException as e:
         logger.error("Failed to parse given data in API request", exc_info=True)
         return web.Response(text=f"Data validation failed: {e}", status=HTTPStatus.BAD_REQUEST)
 

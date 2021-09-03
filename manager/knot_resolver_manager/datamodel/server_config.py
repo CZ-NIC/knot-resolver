@@ -1,12 +1,10 @@
 import logging
 import os
-from typing import Optional, Union
+from typing import Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.compat.dataclasses import dataclass
-from knot_resolver_manager.exceptions import DataValidationException
-from knot_resolver_manager.utils.dataclasses_parservalidator import DataclassParserValidatorMixin
+from knot_resolver_manager.utils import DataParser, DataValidationException, DataValidator
 
 logger = logging.getLogger(__name__)
 
@@ -29,33 +27,22 @@ def _cpu_count() -> int:
         return cpus
 
 
-@dataclass
-class ServerConfig(DataclassParserValidatorMixin):
-    hostname: Optional[str] = None
-    instances: Union[Literal["auto"], int, None] = None
-    _instances: int = 1
+class Server(DataParser):
+    workers: Union[Literal["auto"], int] = 1
     use_cache_gc: bool = True
 
-    def __post_init__(self):
-        if isinstance(self.instances, int):
-            self._instances = self.instances
-        elif self.instances == "auto":
-            self._instances = _cpu_count()
 
-    def get_instances(self) -> int:
-        # FIXME: this is a hack to make the partial updates working without a second data structure
-        # this will be unnecessary in near future
-        if isinstance(self.instances, int):
-            return self.instances
-        elif self.instances == "auto":
-            cpu_count = os.cpu_count()
-            if cpu_count is not None:
-                return cpu_count
-            else:
-                raise RuntimeError("cannot find number of system available CPUs")
-        else:
-            return 0
+class ServerStrict(DataValidator):
+    workers: int
+    use_cache_gc: bool
 
-    def _validate(self):
-        if not 0 < self._instances <= 256:
-            raise DataValidationException("number of kresd instances must be in range 1..256")
+    def _workers(self, obj: Server) -> int:
+        if isinstance(obj.workers, int):
+            return obj.workers
+        elif obj.workers == "auto":
+            return _cpu_count()
+        raise DataValidationException(f"Unexpected value: {obj.workers}")
+
+    def _validate(self) -> None:
+        if self.workers < 0:
+            raise DataValidationException("Number of workers must be non-negative")

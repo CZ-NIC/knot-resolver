@@ -1,20 +1,21 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 
-from knot_resolver_manager.compat.dataclasses import dataclass
-from knot_resolver_manager.exceptions import DataValidationException
-from knot_resolver_manager.utils.dataclasses_parservalidator import DataclassParserValidatorMixin
+from knot_resolver_manager.utils import DataParser, DataValidator
 
 
-@dataclass
-class LuaConfig(DataclassParserValidatorMixin):
-    script_list: Optional[List[str]] = None
-    script: Optional[str] = None
+class Lua(DataParser):
+    script: Optional[Union[List[str], str]] = None
+    script_file: Optional[str] = None
 
-    def __post_init__(self):
-        # Concatenate array to single string
-        if self.script_list is not None:
-            self.script = "\n".join(self.script_list)
 
-    def _validate(self):
-        if self.script is None:
-            raise DataValidationException("Lua script not specified")
+class LuaStrict(DataValidator):
+    script: Optional[str]
+    script_file: Optional[str]
+
+    def _script(self, lua: Lua) -> Optional[str]:
+        if isinstance(lua.script, List):
+            return "\n".join(lua.script)
+        return lua.script
+
+    def _validate(self) -> None:
+        pass
