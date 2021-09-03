@@ -24,7 +24,7 @@ class KnotManagerClient:
         print(response.text)
 
     def set_num_workers(self, n: int):
-        response = requests.post(self._create_url("/config/server/instances"), data=str(n))
+        response = requests.post(self._create_url("/config/server/workers"), data=str(n))
         print(response.text)
 
     def wait_for_initialization(self, timeout_sec: float = 5, time_step: float = 0.4):

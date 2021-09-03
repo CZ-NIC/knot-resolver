@@ -30,12 +30,15 @@ def is_union(tp: Any) -> bool:
 
 
 def is_literal(tp: Any) -> bool:
-    return getattr(tp, "__origin__", None) == Literal
+    return isinstance(tp, type(Literal))
 
 
 def get_generic_type_arguments(tp: Any) -> List[Any]:
     default: List[Any] = []
-    return getattr(tp, "__args__", default)
+    if is_literal(tp):
+        return getattr(tp, "__values__")
+    else:
+        return getattr(tp, "__args__", default)
 
 
 def get_generic_type_argument(tp: Any) -> Any:
