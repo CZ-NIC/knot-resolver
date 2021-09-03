@@ -9,16 +9,16 @@ import knot_resolver_manager.kresd_controller
 from knot_resolver_manager import kres_id
 from knot_resolver_manager.compat.asyncio import create_task
 from knot_resolver_manager.constants import KRESD_CONFIG_FILE, WATCHDOG_INTERVAL
-from knot_resolver_manager.exceptions import ValidationException
 from knot_resolver_manager.kresd_controller.interface import (
     Subprocess,
     SubprocessController,
     SubprocessStatus,
     SubprocessType,
 )
+from knot_resolver_manager.utils import DataValidationException
 from knot_resolver_manager.utils.async_utils import writefile
 
-from .datamodel import KresConfig
+from .datamodel import KresConfig, KresConfigStrict
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +85,7 @@ class KresManager:
         self._manager_lock = asyncio.Lock()
         self._controller: SubprocessController
         self._last_used_config: Optional[KresConfig] = None
+        self._last_used_config_strict: Optional[KresConfigStrict] = None
         self._watchdog_task: Optional["Future[None]"] = None
 
     async def load_system_state(self):
@@ -140,28 +141,32 @@ class KresManager:
         await self._gc.stop()
         self._gc = None
 
-    async def _write_config(self, config: KresConfig):
-        lua_config = config.render_lua()
+    async def _write_config(self, config_strict: KresConfigStrict):
+        lua_config = config_strict.render_lua()
         await writefile(KRESD_CONFIG_FILE, lua_config)
 
     async def apply_config(self, config: KresConfig):
         async with self._manager_lock:
+            logger.debug("Validating configuration...")
+            config_strict = KresConfigStrict(config)
+
             logger.debug("Writing new config to file...")
-            await self._write_config(config)
+            await self._write_config(config_strict)
 
             logger.debug("Testing the new config with a canary process")
             try:
                 await self._spawn_new_worker()
             except SubprocessError:
                 logger.error("kresd with the new config failed to start, rejecting config")
-                last = self.get_last_used_config()
+                last = self.get_last_used_config_strict()
                 if last is not None:
                     await self._write_config(last)
-                raise ValidationException("Canary kresd instance failed. Config is invalid.")
+                raise DataValidationException("Canary kresd instance failed. Config is invalid.")
 
             logger.debug("Canary process test passed, Applying new config to all workers")
             self._last_used_config = config
-            await self._ensure_number_of_children(config.server.get_instances())
+            self._last_used_config_strict = config_strict
+            await self._ensure_number_of_children(config_strict.server.workers)
             await self._rolling_restart()
 
             if self._is_gc_running() != config.server.use_cache_gc:
@@ -182,6 +187,9 @@ class KresManager:
 
     def get_last_used_config(self) -> Optional[KresConfig]:
         return self._last_used_config
+
+    def get_last_used_config_strict(self) -> Optional[KresConfigStrict]:
+        return self._last_used_config_strict
 
     async def _instability_handler(self) -> None:
         logger.error("Instability callback invoked. No idea how to react, performing suicide. See you later!")
