@@ -377,6 +377,37 @@ static void shuffle_choices(struct choice choices[], int choices_len)
 	}
 }
 
+/* Adjust choice from `unresolved` in case of NO6 (broken IPv6). */
+static struct kr_transport unresolved_adjust(struct to_resolve unresolved[],
+					     int unresolved_len, int index)
+{
+	if (unresolved[index].type != KR_TRANSPORT_RESOLVE_AAAA || !no6_is_bad())
+		goto finish;
+	/* AAAA is detected as bad; let's choose randomly from others, if there are any. */
+	int aaaa_count = 0;
+	for (int i = 0; i < unresolved_len; ++i)
+		aaaa_count += (unresolved[i].type == KR_TRANSPORT_RESOLVE_AAAA);
+	if (aaaa_count == unresolved_len)
+		goto finish;
+	/* Chosen index within non-AAAA items. */
+	int i_no6 = kr_rand_bytes(1) % (unresolved_len - aaaa_count);
+	for (int i = 0; i < unresolved_len; ++i) {
+		if (unresolved[i].type == KR_TRANSPORT_RESOLVE_AAAA) {
+			//continue
+		} else if (i_no6 == 0) {
+			index = i;
+			break;
+		} else {
+			--i_no6;
+		}
+	}
+finish:
+	return (struct kr_transport){
+		.protocol = unresolved[index].type,
+		.ns_name = unresolved[index].name
+	};
+}
+
 /* Performs the actual selection (currently variation on epsilon-greedy). */
 struct kr_transport *select_transport(struct choice choices[], int choices_len,
 				      struct to_resolve unresolved[],
@@ -409,10 +440,7 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 		int index = kr_rand_bytes(1) % (choices_len + unresolved_len);
 		if (index < unresolved_len) {
 			// We will resolve a new NS name
-			*transport = (struct kr_transport){
-				.protocol = unresolved[index].type,
-				.ns_name = unresolved[index].name
-			};
+			*transport = unresolved_adjust(unresolved, unresolved_len, index);
 			return transport;
 		} else {
 			chosen = &choices[index - unresolved_len];
@@ -428,10 +456,7 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 	/* Don't try the same server again when there are other choices to be explored */
 	if (chosen->address_state->error_count && unresolved_len) {
 		int index = kr_rand_bytes(1) % unresolved_len;
-		*transport = (struct kr_transport){
-			.ns_name = unresolved[index].name,
-			.protocol = unresolved[index].type,
-		};
+		*transport = unresolved_adjust(unresolved, unresolved_len, index);
 		return transport;
 	}
 
