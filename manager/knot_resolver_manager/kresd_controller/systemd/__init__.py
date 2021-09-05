@@ -128,12 +128,21 @@ class SystemdSubprocessController(SubprocessController):
 
     async def get_all_running_instances(self) -> Iterable[Subprocess]:
         res: List[SystemdSubprocess] = []
-        units = await compat.asyncio.to_thread(systemd.list_unit_names, self._systemd_type)
+        units = await compat.asyncio.to_thread(systemd.list_units, self._systemd_type)
         for unit in units:
-            u: str = unit
-            if u.startswith("kresd") and u.endswith(".service"):
-                iden = u.replace("kresd", "")[1:].replace(".service", "")
-                persistance_type = SystemdPersistanceType.PERSISTENT if "@" in u else SystemdPersistanceType.TRANSIENT
+            if unit.name.startswith("kresd") and unit.name.endswith(".service"):
+                iden = unit.name.replace("kresd", "")[1:].replace(".service", "")
+                persistance_type = (
+                    SystemdPersistanceType.PERSISTENT if "@" in unit.name else SystemdPersistanceType.TRANSIENT
+                )
+
+                if unit.state == "failed":
+                    # if a unit is failed, remove it from the system by reseting its state
+                    # should work for both transient and persistent units
+                    logger.warning("Unit '%s' is already failed, resetting its state and ignoring it", unit.name)
+                    await compat.asyncio.to_thread(systemd.reset_failed_unit, self._systemd_type, unit.name)
+                    continue
+
                 res.append(
                     SystemdSubprocess(
                         SubprocessType.KRESD,
@@ -142,7 +151,10 @@ class SystemdSubprocessController(SubprocessController):
                         persistance_type,
                     )
                 )
-            elif u == "kres-cache-gc.service":
+            elif unit.name == "kres-cache-gc.service":
+                # we can't easily check, if the unit is transient or not without additional systemd call
+                # we ignore it for now and assume the default persistency state. It shouldn't cause any
+                # problems, because interactions with the process are done the same way in all cases
                 res.append(SystemdSubprocess(SubprocessType.GC, alloc(), self._systemd_type))
         return res
 

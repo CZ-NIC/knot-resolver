@@ -111,8 +111,9 @@ def list_unit_names(type_: SystemdType) -> List[str]:
     return [str(u[0]) for u in _list_units_internal(type_)]
 
 
-def list_failed_unit_names(type_: SystemdType) -> List[str]:
-    return [str(u[0]) for u in _list_units_internal(type_) if str(u[3]) == "failed"]
+def reset_failed_unit(typ: SystemdType, unit_name: str):
+    systemd = _create_manager_proxy(typ)
+    systemd.ResetFailedUnit(unit_name)
 
 
 def restart_unit(type_: SystemdType, unit_name: str):

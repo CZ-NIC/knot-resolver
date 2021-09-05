@@ -192,7 +192,10 @@ class KresManager:
         return self._last_used_config_strict
 
     async def _instability_handler(self) -> None:
-        logger.error("Instability callback invoked. No idea how to react, performing suicide. See you later!")
+        logger.error(
+            "Instability callback invoked. Something is wrong, no idea how to react."
+            " Performing suicide. See you later!"
+        )
         sys.exit(1)
 
     async def _watchdog(self) -> None:
