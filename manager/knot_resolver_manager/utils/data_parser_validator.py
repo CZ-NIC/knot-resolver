@@ -266,7 +266,7 @@ _SUBTREE_MUTATION_PATH_PATTERN = re.compile(r"^(/[^/]+)*/?$")
 
 
 class DataParser:
-    def __init__(self, obj: Optional[Dict[str, Any]] = None):
+    def __init__(self, obj: Optional[Dict[Any, Any]] = None):
         cls = self.__class__
         annot = cls.__dict__.get("__annotations__", {})
 

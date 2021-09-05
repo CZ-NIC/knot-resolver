@@ -1,6 +1,8 @@
+import ipaddress
+
 from pytest import raises
 
-from knot_resolver_manager.datamodel.types import SizeUnit, TimeUnit
+from knot_resolver_manager.datamodel.types import AnyPath, IPAndPort, SizeUnit, TimeUnit
 from knot_resolver_manager.utils import DataParser, DataValidationException, DataValidator
 
 
@@ -64,3 +66,30 @@ time: 10m
     b = TestClass.from_json(j)
     assert a.size == b.size == obj.size
     assert a.time == b.time == obj.time
+
+
+def test_ipandport():
+    class Data(DataParser):
+        o: IPAndPort
+        s: IPAndPort
+
+    val = """
+    o:
+      ip: "::"
+      port: 590
+    s: 127.0.0.1@5656
+    """
+
+    val = Data.from_yaml(val)
+
+    assert val.o.port == 590
+    assert val.o.ip == ipaddress.ip_address("::")
+    assert val.s.port == 5656
+    assert val.s.ip == ipaddress.ip_address("127.0.0.1")
+
+
+def test_anypath():
+    class Data(DataParser):
+        p: AnyPath
+
+    assert str(Data.from_yaml('p: "/tmp"').p) == "/tmp"
