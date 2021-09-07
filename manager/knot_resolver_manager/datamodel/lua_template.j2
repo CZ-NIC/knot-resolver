@@ -1,3 +1,14 @@
+-- SERVER section
+-- server.hostname
+hostname('{{ cfg.server.hostname }}')
+
+{% if cfg.server.nsid %}
+-- server.nsid
+modules.load('nsid')
+nsid.name('{{ cfg.server.nsid }} ' .. worker.id)
+{% endif %}
+
+-- NETWORK section
 -- network.interfaces
 {% for item in cfg.network.interfaces %}
 net.listen('{{ item.address }}', {{ item.port }}, {
@@ -7,7 +18,7 @@ net.listen('{{ item.address }}', {{ item.port }}, {
 {% endfor %}
 
 {% if cfg.lua %}
--- lua section
+-- LUA section
 {% if cfg.lua.script_file %}
 {% import cfg.lua.script_file as script_file %}
 -- lua.script-file
