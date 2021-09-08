@@ -6,6 +6,7 @@ from jinja2 import Environment, Template
 from knot_resolver_manager.datamodel.dns64_config import Dns64, Dns64Strict
 from knot_resolver_manager.datamodel.lua_config import Lua, LuaStrict
 from knot_resolver_manager.datamodel.network_config import Network, NetworkStrict
+from knot_resolver_manager.datamodel.options_config import Options, OptionsStrict
 from knot_resolver_manager.datamodel.server_config import Server, ServerStrict
 from knot_resolver_manager.utils import DataParser, DataValidator
 
@@ -23,6 +24,7 @@ _LUA_TEMPLATE = _import_lua_template()
 
 class KresConfig(DataParser):
     server: Server = Server()
+    options: Options = Options()
     network: Network = Network()
     dns64: Union[bool, Dns64] = False
     lua: Lua = Lua()
@@ -30,6 +32,7 @@ class KresConfig(DataParser):
 
 class KresConfigStrict(DataValidator):
     server: ServerStrict
+    options: OptionsStrict
     network: NetworkStrict
     dns64: Union[bool, Dns64Strict]
     lua: LuaStrict
