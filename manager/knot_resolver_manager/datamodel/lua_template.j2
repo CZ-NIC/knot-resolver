@@ -17,6 +17,13 @@ net.listen('{{ item.address }}', {{ item.port }}, {
 })
 {% endfor %}
 
+-- MODULES
+modules = {
+{% if cfg.dns64 %}
+    dns64 = '{{ cfg.dns64.prefix }}', -- DNS64
+{% endif %}
+}
+
 {% if cfg.lua %}
 -- LUA section
 {% if cfg.lua.script_file %}
