@@ -1,8 +1,9 @@
 import pkgutil
-from typing import Optional, Text
+from typing import Optional, Text, Union
 
 from jinja2 import Environment, Template
 
+from knot_resolver_manager.datamodel.dns64_config import Dns64, Dns64Strict
 from knot_resolver_manager.datamodel.lua_config import Lua, LuaStrict
 from knot_resolver_manager.datamodel.network_config import Network, NetworkStrict
 from knot_resolver_manager.datamodel.server_config import Server, ServerStrict
@@ -23,13 +24,20 @@ _LUA_TEMPLATE = _import_lua_template()
 class KresConfig(DataParser):
     server: Server = Server()
     network: Network = Network()
+    dns64: Union[bool, Dns64] = False
     lua: Optional[Lua] = None
 
 
 class KresConfigStrict(DataValidator):
     server: ServerStrict
     network: NetworkStrict
+    dns64: Union[bool, Dns64Strict] = False
     lua: Optional[LuaStrict]
+
+    def _dns64(self, obj: KresConfig) -> Union[bool, Dns64]:
+        if obj.dns64 is True:
+            return Dns64()
+        return obj.dns64
 
     def render_lua(self) -> Text:
         return _LUA_TEMPLATE.render(cfg=self)
