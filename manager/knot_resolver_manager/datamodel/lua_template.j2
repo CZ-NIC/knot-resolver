@@ -1,3 +1,5 @@
+{% if not cfg.lua.script_only %}
+
 -- SERVER section
 -- server.hostname
 hostname('{{ cfg.server.hostname }}')
@@ -19,12 +21,10 @@ net.listen('{{ item.address }}', {{ item.port }}, {
 
 -- MODULES
 modules = {
-{% if cfg.dns64 %}
-    dns64 = '{{ cfg.dns64.prefix }}', -- DNS64
-{% endif %}
+    {{ "dns64 = '"+cfg.dns64.prefix+"'," if cfg.dns64 }}
 }
 
-{% if cfg.lua %}
+{% endif %}
 -- LUA section
 {% if cfg.lua.script_file %}
 {% import cfg.lua.script_file as script_file %}
@@ -35,5 +35,4 @@ modules = {
 {% if cfg.lua.script %}
 -- lua.script
 {{ cfg.lua.script }}
-{% endif %}
 {% endif %}

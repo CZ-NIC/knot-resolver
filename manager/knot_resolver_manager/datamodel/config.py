@@ -1,5 +1,5 @@
 import pkgutil
-from typing import Optional, Text, Union
+from typing import Text, Union
 
 from jinja2 import Environment, Template
 
@@ -25,14 +25,14 @@ class KresConfig(DataParser):
     server: Server = Server()
     network: Network = Network()
     dns64: Union[bool, Dns64] = False
-    lua: Optional[Lua] = None
+    lua: Lua = Lua()
 
 
 class KresConfigStrict(DataValidator):
     server: ServerStrict
     network: NetworkStrict
-    dns64: Union[bool, Dns64Strict] = False
-    lua: Optional[LuaStrict]
+    dns64: Union[bool, Dns64Strict]
+    lua: LuaStrict
 
     def _dns64(self, obj: KresConfig) -> Union[bool, Dns64]:
         if obj.dns64 is True:
