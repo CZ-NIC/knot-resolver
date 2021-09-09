@@ -37,6 +37,41 @@ option('NO_0X20', {{ 'false' if cfg.options.query_case_randomization else 'true'
 {{ "modules.unload('detect_time_jump')" if not cfg.options.time_jump_detection }}
 {{ "modules.unload('refuse_nord')" if not cfg.options.refuse_no_rd }}
 
+-- DNSSEC section
+{% if not cfg.dnssec %}
+trust_anchors.remove('.')
+{% endif %}
+
+{{ "modules.unload('ta_sentinel')" if not cfg.dnssec.trust_anchor_sentinel }}
+{{ "modules.unload('ta_signal_query')" if not cfg.dnssec.trust_anchor_signal_query }}
+{{ "modules.unload('detect_time_skew')" if not cfg.dnssec.time_skew_detection }}
+
+trust_anchors.keep_removed = {{ cfg.dnssec.keep_removed }}
+{{ "trust_anchors.refresh_time = "+cfg.dnssec.refresh_time|string if cfg.dnssec.refresh_time }}
+
+-- dnssec.trust-anchors
+{% if cfg.dnssec.trust_anchors %}
+{% for ta in cfg.dnssec.trust_anchors %}
+trust_anchors.add('{{ ta }}')
+{% endfor %}
+{% endif %}
+
+-- dnssec.negative-trust-anchors
+{% if cfg.dnssec.negative_trust_anchors %}
+trust_anchors.set_insecure({
+{% for nta in cfg.dnssec.negative_trust_anchors %}
+    '{{ nta }}',
+{% endfor %}
+})
+{% endif %}
+
+-- dnssec.trust-anchors-files
+{% if cfg.dnssec.trust_anchors_files %}
+{% for taf in cfg.dnssec.trust_anchors_files %}
+trust_anchors.add_file('{{ taf.file }}',  readonly = {{ 'true' if taf.read_only else 'false' }})
+{% endfor %}
+{% endif %}
+
 {% endif %}
 -- LUA section
 {% if cfg.lua.script_file %}
