@@ -64,7 +64,11 @@ def crash_resistance(client: KnotManagerClient):
 
     # start the server again
     p = start_manager_in_background("localhost", PORT, initial_config=None)
-    client.wait_for_initialization()
+    try:
+        client.wait_for_initialization()
+    except TimeoutError as e:
+        p.terminate()
+        raise e
 
     # no change in number of workers should be visible
     cnt = count_running_kresds()
