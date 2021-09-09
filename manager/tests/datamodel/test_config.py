@@ -7,3 +7,19 @@ def test_dns64_true_default():
 
     assert strict.dns64
     assert strict.dns64.prefix == "64:ff9b::"
+
+
+def test_dnssec_true_default():
+    config = KresConfig({"dnssec": True})
+    strict = KresConfigStrict(config)
+
+    assert strict.dnssec.trust_anchor_sentinel == True
+    assert strict.dnssec.trust_anchor_signal_query == True
+    assert strict.dnssec.time_skew_detection == True
+    assert strict.dnssec.keep_removed == 0
+    assert strict.dnssec.refresh_time == None
+    assert strict.dnssec.hold_down_time == 30 * 24 * 60 ** 2
+
+    assert strict.dnssec.trust_anchors == None
+    assert strict.dnssec.negative_trust_anchors == None
+    assert strict.dnssec.trust_anchors_files == None

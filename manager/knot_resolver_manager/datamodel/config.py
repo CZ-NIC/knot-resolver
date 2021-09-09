@@ -4,6 +4,7 @@ from typing import Text, Union
 from jinja2 import Environment, Template
 
 from knot_resolver_manager.datamodel.dns64_config import Dns64, Dns64Strict
+from knot_resolver_manager.datamodel.dnssec_config import Dnssec, DnssecStrict
 from knot_resolver_manager.datamodel.lua_config import Lua, LuaStrict
 from knot_resolver_manager.datamodel.network_config import Network, NetworkStrict
 from knot_resolver_manager.datamodel.options_config import Options, OptionsStrict
@@ -26,6 +27,7 @@ class KresConfig(DataParser):
     server: Server = Server()
     options: Options = Options()
     network: Network = Network()
+    dnssec: Union[bool, Dnssec] = True
     dns64: Union[bool, Dns64] = False
     lua: Lua = Lua()
 
@@ -34,8 +36,14 @@ class KresConfigStrict(DataValidator):
     server: ServerStrict
     options: OptionsStrict
     network: NetworkStrict
+    dnssec: Union[bool, DnssecStrict]
     dns64: Union[bool, Dns64Strict]
     lua: LuaStrict
+
+    def _dnssec(self, obj: KresConfig) -> Union[bool, Dnssec]:
+        if obj.dnssec is True:
+            return Dnssec()
+        return obj.dnssec
 
     def _dns64(self, obj: KresConfig) -> Union[bool, Dns64]:
         if obj.dns64 is True:
