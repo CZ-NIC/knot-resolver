@@ -1,11 +1,12 @@
 import ipaddress
 import logging
 import re
+from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Dict, Optional, Pattern, Union, cast
+from typing import Any, Dict, Optional, Pattern, Union
 
 from knot_resolver_manager.utils import CustomValueType, DataValidationException
-from knot_resolver_manager.utils.data_parser_validator import DataParser
+from knot_resolver_manager.utils.data_parser_validator import DataParser, DataValidator
 
 logger = logging.getLogger(__name__)
 
@@ -23,16 +24,21 @@ class Unit(CustomValueType):
             grouped = type(self)._re.search(source_value)
             if grouped:
                 val, unit = grouped.groups()
-                if unit not in type(self)._units:
-                    raise DataValidationException(f"Used unexpected unit '{unit}' for {type(self).__name__}...")
+                if unit is None:
+                    raise DataValidationException(f"Missing units. Accepted units are {list(type(self)._units.keys())}")
+                elif unit not in type(self)._units:
+                    raise DataValidationException(
+                        f"Used unexpected unit '{unit}' for {type(self).__name__}."
+                        f" Accepted units are {list(type(self)._units.keys())}"
+                    )
                 self._value = int(val) * type(self)._units[unit]
             else:
                 raise DataValidationException(f"{type(self._value)} Failed to convert: {self}")
         elif isinstance(source_value, int):
-            if source_value < 0:
-                raise DataValidationException(f"Input value '{source_value}' is not non-negative.")
-            self._value_orig = source_value
-            self._value = source_value
+            raise DataValidationException(
+                "We do not accept number without units."
+                f" Please convert the value to string an add a unit - {list(type(self)._units.keys())}"
+            )
         else:
             raise DataValidationException(
                 f"Unexpected input type for Unit type - {type(source_value)}."
@@ -46,7 +52,7 @@ class Unit(CustomValueType):
         """
         Used by Jinja2. Must return only a number.
         """
-        return str(self._value)
+        return str(self._value_orig)
 
     def __eq__(self, o: object) -> bool:
         """
@@ -55,23 +61,37 @@ class Unit(CustomValueType):
         """
         return isinstance(o, Unit) and o._value == self._value
 
+    def serialize(self) -> Any:
+        return self._value_orig
+
 
 class SizeUnit(Unit):
     _re = re.compile(r"^([0-9]+)\s{0,1}([BKMG]){0,1}$")
-    _units = {None: 1, "B": 1, "K": 1024, "M": 1024 ** 2, "G": 1024 ** 3}
+    _units = {"B": 1, "K": 1024, "M": 1024 ** 2, "G": 1024 ** 3}
 
 
 class TimeUnit(Unit):
-    _re = re.compile(r"^(\d+)\s{0,1}([smhd]){0,1}$")
-    _units = {None: 1, "s": 1, "m": 60, "h": 3600, "d": 24 * 3600}
+    _re = re.compile(r"^(\d+)\s{0,1}([smhd]s?){0,1}$")
+    _units = {"ms": 1, "s": 1000, "m": 60 * 1000, "h": 3600 * 1000, "d": 24 * 3600 * 1000}
+
+    def seconds(self):
+        return self._value // 1000
+
+    def millis(self):
+        return self._value
 
 
 class AnyPath(CustomValueType):
     def __init__(self, source_value: Any) -> None:
         super().__init__(source_value)
-        if not isinstance(source_value, str):
-            raise DataValidationException(f"Expected file path in a string, got '{source_value}'")
-        self._value: Path = Path(source_value)
+        if isinstance(source_value, AnyPath):
+            self._value = source_value._value
+        elif isinstance(source_value, str):
+            self._value: Path = Path(source_value)
+        else:
+            raise DataValidationException(
+                f"Expected file path in a string, got '{source_value}' with type '{type(source_value)}'"
+            )
 
         try:
             self._value = self._value.resolve(strict=False)
@@ -90,54 +110,125 @@ class AnyPath(CustomValueType):
     def to_path(self) -> Path:
         return self._value
 
-
-class _IPAndPortData(DataParser):
-    ip: str
-    port: int
+    def serialize(self) -> Any:
+        return str(self._value)
 
 
-class IPAndPort(CustomValueType):
-    """
-    IP and port. Supports two formats:
-      1. string in the form of 'ip@port'
-      2. object with string field 'ip' and numeric field 'port'
-    """
+class Listen(DataParser):
+    ip: Optional[str] = None
+    port: Optional[int] = None
+    unix_socket: Optional[AnyPath] = None
+    interface: Optional[str] = None
 
-    def __init__(self, source_value: Any) -> None:
-        super().__init__(source_value)
 
-        # parse values from object
-        if isinstance(source_value, dict):
-            obj = _IPAndPortData(cast(Dict[Any, Any], source_value))
-            ip = obj.ip
-            port = obj.port
+class ListenType(Enum):
+    IP_AND_PORT = auto()
+    UNIX_SOCKET = auto()
+    INTERFACE = auto()
 
-        # parse values from string
-        elif isinstance(source_value, str):
-            if "@" not in source_value:
-                raise DataValidationException("Expected ip and port in format 'ip@port'. Missing '@'")
-            ip, port_str = source_value.split(maxsplit=1, sep="@")
-            try:
-                port = int(port_str)
-            except ValueError:
-                raise DataValidationException(f"Failed to parse port number from string '{port_str}'")
+
+class ListenStrict(DataValidator):
+    typ: ListenType
+    ip: Optional[Union[ipaddress.IPv4Address, ipaddress.IPv6Address]] = None
+    port: Optional[int] = None
+    unix_socket: Optional[AnyPath] = None
+    interface: Optional[str] = None
+
+    def _typ(self, origin: Listen):
+        present = {
+            "ip" if origin.ip is not None else ...,
+            "port" if origin.port is not None else ...,
+            "unix_socket" if origin.unix_socket is not None else ...,
+            "interface" if origin.interface is not None else ...,
+        }
+
+        if present == {"ip", "port", ...}:
+            return ListenType.IP_AND_PORT
+        elif present == {"unix_socket", ...}:
+            return ListenType.UNIX_SOCKET
+        elif present == {"interface", ...}:
+            return ListenType.INTERFACE
         else:
             raise DataValidationException(
-                "Expected IP and port as an object or as a string 'ip@port'," f" got '{source_value}'"
+                "Listen configuration contains multiple incompatible options at once. "
+                "You can use (IP and PORT) or (UNIX_SOCKET) or (INTERFACE)."
             )
 
-        # validate port value range
-        if not (0 <= port <= 65_535):
-            raise DataValidationException(f"Port value {port} out of range of usual 2-byte port value")
+    def _port(self, origin: Listen):
+        if origin.port is None:
+            return None
+        if not 0 <= origin.port <= 65_535:
+            raise DataValidationException(f"Port value {origin.port} out of range of usual 2-byte port value")
+        return origin.port
 
+    def _ip(self, origin: Listen):
+        if origin.ip is None:
+            return None
         try:
-            self.ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address] = ipaddress.ip_address(ip)
+            return ipaddress.ip_address(origin.ip)
         except ValueError as e:
-            raise DataValidationException(f"Failed to parse IP address from string '{ip}'") from e
-        self.port: int = port
+            raise DataValidationException(f"Failed to parse IP address from '{origin.ip}'") from e
+
+    def _validate(self) -> None:
+        # we already check that it's there is only one option in the `_typ` method
+        pass
+
+
+class IPNetwork(CustomValueType):
+    def __init__(self, source_value: Any) -> None:
+        super().__init__(source_value)
+        if isinstance(source_value, str):
+            try:
+                self._value: Union[ipaddress.IPv4Network, ipaddress.IPv6Network] = ipaddress.ip_network(source_value)
+            except ValueError as e:
+                raise DataValidationException("Failed to parse IP network.") from e
+        else:
+            raise DataValidationException(
+                f"Unexpected value for a network subnet. Expected string, got '{source_value}'"
+                " with type '{type(source_value)}'"
+            )
+
+    def to_std(self) -> Union[ipaddress.IPv4Network, ipaddress.IPv6Network]:
+        return self._value
 
     def __str__(self) -> str:
-        """
-        Returns value in 'ip@port' format
-        """
-        return f"{self.ip}@{self.port}"
+        return self._value.with_prefixlen
+
+    def __int__(self) -> int:
+        raise ValueError("Can't convert network prefix to an integer")
+
+    def serialize(self) -> Any:
+        return self._value.with_prefixlen
+
+
+class IPv6Network96(CustomValueType):
+    def __init__(self, source_value: Any) -> None:
+        super().__init__(source_value)
+        if isinstance(source_value, str):
+            try:
+                self._value: ipaddress.IPv6Network = ipaddress.IPv6Network(source_value)
+            except ValueError as e:
+                raise DataValidationException("Failed to parse IPv6 /96 network.") from e
+
+            if self._value.prefixlen != 96:
+                raise DataValidationException(
+                    "Expected IPv6 network address with /96 prefix lenght."
+                    f" Got prefix lenght of {self._value.prefixlen}"
+                )
+        else:
+            raise DataValidationException(
+                "Unexpected value for a network subnet."
+                f" Expected string, got '{source_value}' with type '{type(source_value)}'"
+            )
+
+    def __str__(self) -> str:
+        return self._value.with_prefixlen
+
+    def __int__(self) -> int:
+        raise ValueError("Can't convert network prefix to an integer")
+
+    def serialize(self) -> Any:
+        return self._value.with_prefixlen
+
+    def to_std(self) -> ipaddress.IPv6Network:
+        return self._value
