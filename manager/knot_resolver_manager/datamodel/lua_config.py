@@ -1,7 +1,7 @@
 from typing import Optional
 
+from knot_resolver_manager.exceptions import ValidationException
 from knot_resolver_manager.utils import DataParser, DataValidator
-from knot_resolver_manager.utils.exceptions import DataValidationException
 
 
 class Lua(DataParser):
@@ -17,4 +17,4 @@ class LuaStrict(DataValidator):
 
     def _validate(self) -> None:
         if self.script and self.script_file:
-            raise DataValidationException("'lua.script' and 'lua.script-file' are both defined, only one can be used")
+            raise ValidationException("'lua.script' and 'lua.script-file' are both defined, only one can be used")

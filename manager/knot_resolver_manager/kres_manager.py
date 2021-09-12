@@ -9,13 +9,13 @@ import knot_resolver_manager.kresd_controller
 from knot_resolver_manager import kres_id
 from knot_resolver_manager.compat.asyncio import create_task
 from knot_resolver_manager.constants import KRESD_CONFIG_FILE, WATCHDOG_INTERVAL
+from knot_resolver_manager.exceptions import KresdManagerException
 from knot_resolver_manager.kresd_controller.interface import (
     Subprocess,
     SubprocessController,
     SubprocessStatus,
     SubprocessType,
 )
-from knot_resolver_manager.utils import DataValidationException
 from knot_resolver_manager.utils.async_utils import writefile
 
 from .datamodel import KresConfig, KresConfigStrict
@@ -161,7 +161,7 @@ class KresManager:
                 last = self.get_last_used_config_strict()
                 if last is not None:
                     await self._write_config(last)
-                raise DataValidationException("Canary kresd instance failed. Config is invalid.")
+                raise KresdManagerException("Canary kresd instance failed. Config is invalid.")
 
             logger.debug("Canary process test passed, Applying new config to all workers")
             self._last_used_config = config

@@ -9,8 +9,13 @@ import yaml
 from yaml.constructor import ConstructorError
 from yaml.nodes import MappingNode
 
+from knot_resolver_manager.exceptions import (
+    DataParsingException,
+    DataValidationException,
+    ParsingException,
+    ValidationException,
+)
 from knot_resolver_manager.utils.custom_types import CustomValueType
-from knot_resolver_manager.utils.exceptions import DataParsingException
 from knot_resolver_manager.utils.types import (
     get_attr_type,
     get_generic_type_argument,
@@ -56,7 +61,9 @@ def _to_primitive(obj: Any) -> Any:
         return obj
 
 
-def _validated_object_type(cls: Type[Any], obj: Any, default: Any = ..., use_default: bool = False) -> Any:
+def _validated_object_type(
+    cls: Type[Any], obj: Any, default: Any = ..., use_default: bool = False, object_path: str = "/"
+) -> Any:
     """
     Given an expected type `cls` and a value object `obj`, validate the type of `obj` and return it
     """
@@ -74,21 +81,21 @@ def _validated_object_type(cls: Type[Any], obj: Any, default: Any = ..., use_def
         if obj is None:
             return None
         else:
-            raise DataParsingException(f"Expected None, found '{obj}'.")
+            raise DataParsingException(f"Expected None, found '{obj}'.", object_path)
 
     # Union[*variants] (handles Optional[T] due to the way the typing system works)
     elif is_union(cls):
         variants = get_generic_type_arguments(cls)
         for v in variants:
             try:
-                return _validated_object_type(v, obj)
+                return _validated_object_type(v, obj, object_path=object_path)
             except DataParsingException:
                 pass
-        raise DataParsingException(f"Union {cls} could not be parsed - parsing of all variants failed.")
+        raise DataParsingException(f"Union {cls} could not be parsed - parsing of all variants failed.", object_path)
 
     # after this, there is no place for a None object
     elif obj is None:
-        raise DataParsingException(f"Unexpected None value for type {cls}")
+        raise DataParsingException(f"Unexpected None value for type {cls}", object_path)
 
     # int
     elif cls == int:
@@ -96,7 +103,7 @@ def _validated_object_type(cls: Type[Any], obj: Any, default: Any = ..., use_def
         # except for CustomValueType class instances
         if is_obj_type(obj, int) or isinstance(obj, CustomValueType):
             return int(obj)
-        raise DataParsingException(f"Expected int, found {type(obj)}")
+        raise DataParsingException(f"Expected int, found {type(obj)}", object_path)
 
     # str
     elif cls == str:
@@ -107,11 +114,12 @@ def _validated_object_type(cls: Type[Any], obj: Any, default: Any = ..., use_def
             raise DataParsingException(
                 "Expected str, found bool. Be careful, that YAML parsers consider even"
                 ' "no" and "yes" as a bool. Search for the Norway Problem for more'
-                " details. And please use quotes explicitly."
+                " details. And please use quotes explicitly.",
+                object_path,
             )
         else:
             raise DataParsingException(
-                f"Expected str (or number that would be cast to string), but found type {type(obj)}"
+                f"Expected str (or number that would be cast to string), but found type {type(obj)}", object_path
             )
 
     # bool
@@ -119,7 +127,7 @@ def _validated_object_type(cls: Type[Any], obj: Any, default: Any = ..., use_def
         if is_obj_type(obj, bool):
             return obj
         else:
-            raise DataParsingException(f"Expected bool, found {type(obj)}")
+            raise DataParsingException(f"Expected bool, found {type(obj)}", object_path)
 
     # float
     elif cls == float:
@@ -134,57 +142,60 @@ def _validated_object_type(cls: Type[Any], obj: Any, default: Any = ..., use_def
         if obj == expected:
             return obj
         else:
-            raise DataParsingException(f"Literal {cls} is not matched with the value {obj}")
+            raise DataParsingException(f"Literal {cls} is not matched with the value {obj}", object_path)
 
     # Dict[K,V]
     elif is_dict(cls):
         key_type, val_type = get_generic_type_arguments(cls)
         try:
             return {
-                _validated_object_type(key_type, key): _validated_object_type(val_type, val) for key, val in obj.items()
+                _validated_object_type(key_type, key, object_path=f"{object_path} @ key {key}"): _validated_object_type(
+                    val_type, val, object_path=f"{object_path} @ value for key {key}"
+                )
+                for key, val in obj.items()
             }
         except AttributeError as e:
             raise DataParsingException(
-                f"Expected dict-like object, but failed to access its .items() method. Value was {obj}", e
-            )
+                f"Expected dict-like object, but failed to access its .items() method. Value was {obj}", object_path
+            ) from e
 
     # any Enums (probably used only internally in DataValidator)
     elif is_enum(cls):
         if isinstance(obj, cls):
             return obj
         else:
-            raise DataParsingException("Unexpected value '{obj}' for enum '{cls}'")
+            raise DataParsingException(f"Unexpected value '{obj}' for enum '{cls}'", object_path)
 
     # List[T]
     elif is_list(cls):
         inner_type = get_generic_type_argument(cls)
-        return [_validated_object_type(inner_type, val) for val in obj]
+        return [_validated_object_type(inner_type, val, object_path=f"{object_path}[]") for val in obj]
 
     # Tuple[A,B,C,D,...]
     elif is_tuple(cls):
         types = get_generic_type_arguments(cls)
-        return tuple(_validated_object_type(typ, val) for typ, val in zip(types, obj))
+        return tuple(_validated_object_type(typ, val, object_path=object_path) for typ, val in zip(types, obj))
 
     # CustomValueType subclasses
     elif inspect.isclass(cls) and issubclass(cls, CustomValueType):
         # no validation performed, the implementation does it in the constuctor
-        return cls(obj)
+        return cls(obj, object_path=object_path)
 
     # nested DataParser subclasses
     elif inspect.isclass(cls) and issubclass(cls, DataParser):
         # we should return DataParser, we expect to be given a dict,
         # because we can construct a DataParser from it
         if isinstance(obj, dict):
-            return cls(obj)  # type: ignore
-        raise DataParsingException(f"Expected '{dict}' object, found '{type(obj)}'")
+            return cls(obj, object_path=object_path)  # type: ignore
+        raise DataParsingException(f"Expected '{dict}' object, found '{type(obj)}'", object_path)
 
     # nested DataValidator subclasses
     elif inspect.isclass(cls) and issubclass(cls, DataValidator):
         # we should return DataValidator, we expect to be given a DataParser,
         # because we can construct a DataValidator from it
         if isinstance(obj, DataParser):
-            return cls(obj)
-        raise DataParsingException(f"Expected instance of '{DataParser}' class, found '{type(obj)}'")
+            return cls(obj, object_path=object_path)
+        raise DataParsingException(f"Expected instance of '{DataParser}' class, found '{type(obj)}'", object_path)
 
     # if the object matches, just pass it through
     elif inspect.isclass(cls) and isinstance(obj, cls):
@@ -194,7 +205,8 @@ def _validated_object_type(cls: Type[Any], obj: Any, default: Any = ..., use_def
     else:
         raise DataParsingException(
             f"Type {cls} cannot be parsed. This is a implementation error. "
-            "Please fix your types in the class or improve the parser/validator."
+            "Please fix your types in the class or improve the parser/validator.",
+            object_path,
         )
 
 
@@ -204,7 +216,7 @@ def json_raise_duplicates(pairs: List[Tuple[Any, Any]]) -> Optional[Any]:
     dict_out: Dict[Any, Any] = {}
     for key, val in pairs:
         if key in dict_out:
-            raise DataParsingException(f"Duplicate attribute key detected: {key}")
+            raise ParsingException(f"Duplicate attribute key detected: {key}")
         dict_out[key] = val
     return dict_out
 
@@ -231,7 +243,7 @@ class RaiseDuplicatesLoader(yaml.SafeLoader):
 
             # check for duplicate keys
             if key in mapping:
-                raise DataParsingException(f"duplicate key detected: {key_node.start_mark}")
+                raise ParsingException(f"duplicate key detected: {key_node.start_mark}")
             value = self.construct_object(value_node, deep=deep)  # type: ignore
             mapping[key] = value
         return mapping
@@ -267,7 +279,7 @@ class Format(Enum):
             "text/vnd.yaml": Format.YAML,
         }
         if mime_type not in formats:
-            raise DataParsingException("Unsupported MIME type")
+            raise ParsingException("Unsupported MIME type")
         return formats[mime_type]
 
 
@@ -278,7 +290,7 @@ _SUBTREE_MUTATION_PATH_PATTERN = re.compile(r"^(/[^/]+)*/?$")
 
 
 class DataParser:
-    def __init__(self, obj: Optional[Dict[Any, Any]] = None):
+    def __init__(self, obj: Optional[Dict[Any, Any]] = None, object_path: str = "/"):
         cls = self.__class__
         annot = cls.__dict__.get("__annotations__", {})
 
@@ -295,7 +307,7 @@ class DataParser:
 
             use_default = hasattr(cls, name)
             default = getattr(cls, name, ...)
-            value = _validated_object_type(python_type, val, default, use_default)
+            value = _validated_object_type(python_type, val, default, use_default, object_path=f"{object_path}/{name}")
             setattr(self, name, value)
 
         # check for unused keys
@@ -307,7 +319,9 @@ class DataParser:
                         additional_info = (
                             " The problem might be that you are using '_', but you should be using '-' instead."
                         )
-                    raise DataParsingException(f"Attribute '{key}' was not provided with any value." + additional_info)
+                    raise DataParsingException(
+                        f"Attribute '{key}' was not provided with any value." + additional_info, object_path
+                    )
 
     @classmethod
     def parse_from(cls: Type[_T], fmt: Format, text: str):
@@ -352,7 +366,7 @@ class DataParser:
         # prepare and validate the path object
         path = path[:-1] if path.endswith("/") else path
         if re.match(_SUBTREE_MUTATION_PATH_PATTERN, path) is None:
-            raise DataParsingException("Provided object path for mutation is invalid.")
+            raise ParsingException("Provided object path for mutation is invalid.")
         path = path[1:] if path.startswith("/") else path
 
         # now, the path variable should contain '/' separated field names
@@ -370,14 +384,16 @@ class DataParser:
             segment = dash_segment.replace("-", "_")
 
             if segment == "":
-                raise DataParsingException(f"Unexpectedly empty segment in path '{path}'")
+                raise ParsingException(f"Unexpectedly empty segment in path '{path}'")
             elif is_internal_field(segment):
-                raise DataParsingException("No, changing internal fields (starting with _) is not allowed. Nice try.")
+                raise ParsingException(
+                    "No, changing internal fields (starting with _) is not allowed. Nice try though."
+                )
             elif hasattr(obj, segment):
                 parent = obj
                 obj = getattr(parent, segment)
             else:
-                raise DataParsingException(
+                raise ParsingException(
                     f"Path segment '{dash_segment}' does not match any field on the provided parent object"
                 )
         assert parent is not None
@@ -393,7 +409,7 @@ class DataParser:
 
 
 class DataValidator:
-    def __init__(self, obj: DataParser):
+    def __init__(self, obj: DataParser, object_path: str = ""):
         cls = self.__class__
         anot = cls.__dict__.get("__annotations__", {})
 
@@ -403,11 +419,20 @@ class DataValidator:
 
             # use transformation function if available
             if hasattr(self, f"_{attr_name}"):
-                value = getattr(self, f"_{attr_name}")(obj)
+                try:
+                    value = getattr(self, f"_{attr_name}")(obj)
+                except (ValueError, ValidationException) as e:
+                    if len(e.args) > 0 and isinstance(e.args[0], str):
+                        msg = e.args[0]
+                    else:
+                        msg = "Failed to validate value type"
+                    raise DataValidationException(msg, object_path) from e
             elif hasattr(obj, attr_name):
                 value = getattr(obj, attr_name)
             else:
-                raise DataParsingException(f"DataParser object {obj} is missing '{attr_name}' attribute.")
+                raise DataValidationException(
+                    f"DataParser object {obj} is missing '{attr_name}' attribute.", object_path
+                )
 
             setattr(self, attr_name, _validated_object_type(attr_type, value))
 

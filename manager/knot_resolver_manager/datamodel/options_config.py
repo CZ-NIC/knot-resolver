@@ -30,7 +30,7 @@ class Options(DataParser):
 
 
 class PredictionStrict(DataValidator):
-    window: int
+    window: TimeUnit
     period: int
 
     def _validate(self) -> None:

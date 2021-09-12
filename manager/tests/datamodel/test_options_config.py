@@ -53,7 +53,7 @@ def test_validating():
     assert strict.violators_workarounds == True
     assert strict.serve_stale == True
 
-    assert strict.prediction.window == 10 * 60
+    assert strict.prediction.window == TimeUnit("10m")
     assert strict.prediction.period == 20
 
 
@@ -62,5 +62,5 @@ def test_prediction_true_defaults():
     y = OptionsStrict(x)
 
     assert x.prediction == True
-    assert y.prediction.window == 900
+    assert y.prediction.window == TimeUnit("15m")
     assert y.prediction.period == 24

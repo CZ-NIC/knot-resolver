@@ -43,8 +43,8 @@ def test_validating():
     assert strict.trust_anchor_signal_query == False
     assert strict.time_skew_detection == False
     assert strict.keep_removed == 3
-    assert strict.refresh_time == 10
-    assert strict.hold_down_time == 45 * 24 * 60 ** 2
+    assert strict.refresh_time == TimeUnit("10s")
+    assert strict.hold_down_time == TimeUnit("45d")
 
     assert strict.trust_anchors == [
         ". 3600 IN DS 19036 8 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5"

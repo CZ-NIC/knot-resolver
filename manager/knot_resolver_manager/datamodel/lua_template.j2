@@ -47,7 +47,7 @@ trust_anchors.remove('.')
 {{ "modules.unload('detect_time_skew')" if not cfg.dnssec.time_skew_detection }}
 
 trust_anchors.keep_removed = {{ cfg.dnssec.keep_removed }}
-{{ "trust_anchors.refresh_time = "+cfg.dnssec.refresh_time|string if cfg.dnssec.refresh_time }}
+{{ "trust_anchors.refresh_time = "+cfg.dnssec.refresh_time.seconds()|string if cfg.dnssec.refresh_time }}
 
 -- dnssec.trust-anchors
 {% if cfg.dnssec.trust_anchors %}

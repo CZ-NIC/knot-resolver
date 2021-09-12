@@ -3,8 +3,8 @@ from typing import Dict, List, Optional, Tuple, Union
 from pytest import raises
 from typing_extensions import Literal
 
-from knot_resolver_manager.utils import DataParser, DataValidationException, DataValidator, Format
-from knot_resolver_manager.utils.exceptions import DataParsingException
+from knot_resolver_manager.exceptions import DataParsingException
+from knot_resolver_manager.utils import DataParser, DataValidator, Format
 
 
 def test_primitive():
@@ -251,7 +251,7 @@ def test_partial_mutations():
 
         def _validate(self) -> None:
             if self.workers < 0:
-                raise DataValidationException("Number of workers must be non-negative")
+                raise ValueError("Number of workers must be non-negative")
 
     yaml = """
     workers: auto

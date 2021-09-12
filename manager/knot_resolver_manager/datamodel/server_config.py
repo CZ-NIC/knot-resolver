@@ -5,7 +5,8 @@ from typing import Optional, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.utils import DataParser, DataValidationException, DataValidator
+from knot_resolver_manager.exceptions import ValidationException
+from knot_resolver_manager.utils import DataParser, DataValidator
 from knot_resolver_manager.utils.types import LiteralEnum
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,7 @@ def _cpu_count() -> int:
         )
         cpus = os.cpu_count()
         if cpus is None:
-            raise DataValidationException(
+            raise ValidationException(
                 "The number of available CPUs to automatically set the number of running"
                 "'kresd' workers could not be determined."
                 "The number can be specified manually in 'server:instances' configuration option."
@@ -69,15 +70,15 @@ class ServerStrict(DataValidator):
             return obj.hostname
         elif obj.hostname is None:
             return socket.gethostname()
-        raise DataValidationException(f"Unexpected value for 'server.hostname': {obj.workers}")
+        raise ValueError(f"Unexpected value for 'server.hostname': {obj.workers}")
 
     def _workers(self, obj: Server) -> int:
         if isinstance(obj.workers, int):
             return obj.workers
         elif obj.workers == "auto":
             return _cpu_count()
-        raise DataValidationException(f"Unexpected value for 'server.workers': {obj.workers}")
+        raise ValueError(f"Unexpected value for 'server.workers': {obj.workers}")
 
     def _validate(self) -> None:
         if self.workers < 0:
-            raise DataValidationException("Number of workers must be non-negative")
+            raise ValueError("Number of workers must be non-negative")
