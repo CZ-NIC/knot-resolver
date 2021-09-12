@@ -35,8 +35,8 @@ class DnssecStrict(DataValidator):
     trust_anchor_signal_query: bool
     time_skew_detection: bool
     keep_removed: int
-    refresh_time: Optional[int]
-    hold_down_time: int
+    refresh_time: Optional[TimeUnit]
+    hold_down_time: TimeUnit
 
     trust_anchors: Optional[List[str]]
     negative_trust_anchors: Optional[List[str]]

@@ -1,7 +1,7 @@
 from pytest import raises
 
 from knot_resolver_manager.datamodel.lua_config import Lua, LuaStrict
-from knot_resolver_manager.utils.exceptions import DataValidationException
+from knot_resolver_manager.exceptions import KresdManagerException
 
 yaml = """
 script-only: true
@@ -28,5 +28,5 @@ script: -- lua script
 script-file: path/to/file
 """
 
-    with raises(DataValidationException):
+    with raises(KresdManagerException):
         LuaStrict(Lua.from_yaml(yaml2))

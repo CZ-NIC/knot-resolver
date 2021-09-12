@@ -21,7 +21,7 @@ class CustomValueType:
     raise a `DataValidationException` in case of errors.
     """
 
-    def __init__(self, source_value: Any) -> None:
+    def __init__(self, source_value: Any, object_path: str = "/") -> None:
         pass
 
     def __int__(self) -> int:

@@ -1,6 +1,6 @@
 from typing import Optional
 
-from knot_resolver_manager.utils import Overloaded
+from knot_resolver_manager.utils.overload import Overloaded
 
 
 def test_simple():
