@@ -1,3 +1,5 @@
+import enum
+import inspect
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 from typing_extensions import Literal
@@ -14,6 +16,10 @@ def is_optional(tp: Any) -> bool:
 
 def is_dict(tp: Any) -> bool:
     return getattr(tp, "__origin__", None) in (Dict, dict)
+
+
+def is_enum(tp: Any) -> bool:
+    return inspect.isclass(tp) and issubclass(tp, enum.Enum)
 
 
 def is_list(tp: Any) -> bool:

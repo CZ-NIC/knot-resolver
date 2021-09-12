@@ -16,6 +16,7 @@ from knot_resolver_manager.utils.types import (
     get_generic_type_argument,
     get_generic_type_arguments,
     is_dict,
+    is_enum,
     is_list,
     is_literal,
     is_none_type,
@@ -44,7 +45,7 @@ def _to_primitive(obj: Any) -> Any:
 
     # CustomValueType instances
     if isinstance(obj, CustomValueType):
-        return str(obj)
+        return obj.serialize()
 
     # nested DataParser class instances
     elif isinstance(obj, DataParser):
@@ -147,6 +148,13 @@ def _validated_object_type(cls: Type[Any], obj: Any, default: Any = ..., use_def
                 f"Expected dict-like object, but failed to access its .items() method. Value was {obj}", e
             )
 
+    # any Enums (probably used only internally in DataValidator)
+    elif is_enum(cls):
+        if isinstance(obj, cls):
+            return obj
+        else:
+            raise DataParsingException("Unexpected value '{obj}' for enum '{cls}'")
+
     # List[T]
     elif is_list(cls):
         inner_type = get_generic_type_argument(cls)
@@ -177,6 +185,10 @@ def _validated_object_type(cls: Type[Any], obj: Any, default: Any = ..., use_def
         if isinstance(obj, DataParser):
             return cls(obj)
         raise DataParsingException(f"Expected instance of '{DataParser}' class, found '{type(obj)}'")
+
+    # if the object matches, just pass it through
+    elif inspect.isclass(cls) and isinstance(obj, cls):
+        return obj
 
     # default error handler
     else:
@@ -266,7 +278,7 @@ _SUBTREE_MUTATION_PATH_PATTERN = re.compile(r"^(/[^/]+)*/?$")
 
 
 class DataParser:
-    def __init__(self, obj: Optional[Dict[str, Any]] = None):
+    def __init__(self, obj: Optional[Dict[Any, Any]] = None):
         cls = self.__class__
         annot = cls.__dict__.get("__annotations__", {})
 
@@ -290,7 +302,12 @@ class DataParser:
         if obj:
             for key in obj:
                 if key not in used_keys:
-                    raise DataParsingException(f"Unknown attribute key '{key}'.")
+                    additional_info = ""
+                    if "_" in key:
+                        additional_info = (
+                            " The problem might be that you are using '_', but you should be using '-' instead."
+                        )
+                    raise DataParsingException(f"Attribute '{key}' was not provided with any value." + additional_info)
 
     @classmethod
     def parse_from(cls: Type[_T], fmt: Format, text: str):
