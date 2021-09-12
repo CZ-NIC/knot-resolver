@@ -29,3 +29,12 @@ class CustomValueType:
 
     def __str__(self) -> str:
         raise NotImplementedError("CustomValueType return 'str()' value is not implemented.")
+
+    def serialize(self) -> Any:
+        """
+        Every custom type should implement this. It is used for dumping configuration.
+
+        It's not necessary to return the same structure that was given as an input. It only has
+        to be the same semantically.
+        """
+        raise NotImplementedError(f"{type(self).__name__}'s' 'to_dict()' not implemented.")
