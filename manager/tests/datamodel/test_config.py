@@ -1,5 +1,5 @@
 from knot_resolver_manager.datamodel import KresConfig, KresConfigStrict
-from knot_resolver_manager.datamodel.types import TimeUnit
+from knot_resolver_manager.datamodel.types import IPv6Network96, TimeUnit
 
 
 def test_dns64_true_default():
@@ -7,7 +7,7 @@ def test_dns64_true_default():
     strict = KresConfigStrict(config)
 
     assert strict.dns64
-    assert strict.dns64.prefix == "64:ff9b::"
+    assert strict.dns64.prefix == IPv6Network96("64:ff9b::/96")
 
 
 def test_dnssec_true_default():
