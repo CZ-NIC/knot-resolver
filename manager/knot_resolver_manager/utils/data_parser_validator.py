@@ -453,4 +453,4 @@ class DataValidator:
         self._validate()
 
     def _validate(self) -> None:
-        raise NotImplementedError(f"Validation function is not implemented in class {type(self).__name__}")
+        pass
