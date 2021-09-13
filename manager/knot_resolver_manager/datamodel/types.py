@@ -245,6 +245,9 @@ class IPv6Network96(CustomValueType):
     def __int__(self) -> int:
         raise ValueError("Can't convert network prefix to an integer")
 
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, IPv6Network96) and o._value == self._value
+
     def serialize(self) -> Any:
         return self._value.with_prefixlen
 
