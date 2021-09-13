@@ -133,7 +133,7 @@ class Listen(DataParser):
 class ListenType(Enum):
     IP_AND_PORT = auto()
     UNIX_SOCKET = auto()
-    INTERFACE = auto()
+    INTERFACE_AND_PORT = auto()
 
 
 class ListenStrict(DataValidator):
@@ -155,12 +155,12 @@ class ListenStrict(DataValidator):
             return ListenType.IP_AND_PORT
         elif present == {"unix_socket", ...}:
             return ListenType.UNIX_SOCKET
-        elif present == {"interface", ...}:
-            return ListenType.INTERFACE
+        elif present == {"interface", "port", ...}:
+            return ListenType.INTERFACE_AND_PORT
         else:
             raise ValueError(
                 "Listen configuration contains multiple incompatible options at once. "
-                "You can use (IP and PORT) or (UNIX_SOCKET) or (INTERFACE)."
+                "You can use (IP and PORT) or (UNIX_SOCKET) or (INTERFACE and PORT)."
             )
 
     def _port(self, origin: Listen):
