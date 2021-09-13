@@ -223,9 +223,17 @@ class IPv6Network96(CustomValueType):
             except ValueError as e:
                 raise DataValidationException("Failed to parse IPv6 /96 network.", object_path) from e
 
+            if self._value.prefixlen == 128:
+                raise DataValidationException(
+                    "Expected IPv6 network address with /96 prefix length."
+                    " Submitted address has been interpreted as /128."
+                    " Maybe, you forgot to add /96 after the base address?",
+                    object_path,
+                )
+
             if self._value.prefixlen != 96:
                 raise DataValidationException(
-                    "Expected IPv6 network address with /96 prefix lenght."
+                    "Expected IPv6 network address with /96 prefix length."
                     f" Got prefix lenght of {self._value.prefixlen}",
                     object_path,
                 )
