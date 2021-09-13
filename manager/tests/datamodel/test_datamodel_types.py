@@ -90,12 +90,17 @@ def test_listen():
     assert oo.unix_socket is not None
     assert oo.interface is None
 
-    o = Listen.from_yaml('interface: "eth0"')
+    o = Listen.from_yaml(
+        """
+    interface: eth0
+    port: 56
+    """
+    )
     oo = ListenStrict(o)
 
-    assert oo.typ == ListenType.INTERFACE
+    assert oo.typ == ListenType.INTERFACE_AND_PORT
     assert oo.ip is None
-    assert oo.port is None
+    assert oo.port == 56
     assert oo.unix_socket is None
     assert oo.interface == "eth0"
 
