@@ -33,9 +33,6 @@ class PredictionStrict(DataValidator):
     window: TimeUnit
     period: int
 
-    def _validate(self) -> None:
-        pass
-
 
 class OptionsStrict(DataValidator):
     glue_checking: GlueCheckingEnum
@@ -56,6 +53,3 @@ class OptionsStrict(DataValidator):
         if obj.prediction is True:
             return Prediction()
         return obj.prediction
-
-    def _validate(self) -> None:
-        pass
