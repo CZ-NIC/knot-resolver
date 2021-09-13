@@ -178,8 +178,12 @@ def _validated_object_type(
 
     # CustomValueType subclasses
     elif inspect.isclass(cls) and issubclass(cls, CustomValueType):
-        # no validation performed, the implementation does it in the constuctor
-        return cls(obj, object_path=object_path)
+        if isinstance(obj, cls):
+            # if we already have a custom value type, just pass it through
+            return obj
+        else:
+            # no validation performed, the implementation does it in the constuctor
+            return cls(obj, object_path=object_path)
 
     # nested DataParser subclasses
     elif inspect.isclass(cls) and issubclass(cls, DataParser):

@@ -44,9 +44,6 @@ class Unit(CustomValueType):
                 f" Please convert the value to string an add a unit - {list(type(self)._units.keys())}",
                 object_path,
             )
-        elif isinstance(source_value, type(self)):
-            self._value_orig = source_value._value_orig
-            self._value = source_value._value
         else:
             raise DataValidationException(
                 f"Unexpected input type for Unit type - {type(source_value)}."
@@ -96,9 +93,7 @@ class TimeUnit(Unit):
 class AnyPath(CustomValueType):
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
-        if isinstance(source_value, AnyPath):
-            self._value = source_value._value
-        elif isinstance(source_value, str):
+        if isinstance(source_value, str):
             self._value: Path = Path(source_value)
         else:
             raise DataValidationException(
