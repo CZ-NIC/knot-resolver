@@ -26,9 +26,6 @@ class TrustAnchorFileStrict(DataValidator):
     file: str
     read_only: bool
 
-    def _validate(self) -> None:
-        pass
-
 
 class DnssecStrict(DataValidator):
     trust_anchor_sentinel: bool
@@ -41,6 +38,3 @@ class DnssecStrict(DataValidator):
     trust_anchors: Optional[List[str]]
     negative_trust_anchors: Optional[List[str]]
     trust_anchors_files: Optional[List[TrustAnchorFileStrict]]
-
-    def _validate(self) -> None:
-        pass

@@ -31,9 +31,6 @@ class InterfaceStrict(DataValidator):
             return int(port)
         return port_map.get(obj.kind, 0)
 
-    def _validate(self) -> None:
-        pass
-
 
 class Network(DataParser):
     interfaces: List[Interface] = [Interface({"listen": "127.0.0.1"}), Interface({"listen": "::1", "freebind": True})]
@@ -41,6 +38,3 @@ class Network(DataParser):
 
 class NetworkStrict(DataValidator):
     interfaces: List[InterfaceStrict]
-
-    def _validate(self) -> None:
-        pass

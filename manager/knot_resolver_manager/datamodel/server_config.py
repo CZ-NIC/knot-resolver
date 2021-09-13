@@ -44,9 +44,6 @@ class ManagementStrict(DataValidator):
     backend: BackendEnum
     rundir: str
 
-    def _validate(self) -> None:
-        pass
-
 
 class Server(DataParser):
     hostname: Optional[str] = None

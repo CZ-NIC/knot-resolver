@@ -8,6 +8,3 @@ class Dns64(DataParser):
 
 class Dns64Strict(DataValidator):
     prefix: IPv6Network96
-
-    def _validate(self):
-        pass

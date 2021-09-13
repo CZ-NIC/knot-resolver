@@ -52,6 +52,3 @@ class KresConfigStrict(DataValidator):
 
     def render_lua(self) -> Text:
         return _LUA_TEMPLATE.render(cfg=self)
-
-    def _validate(self) -> None:
-        pass
