@@ -1,5 +1,13 @@
 {% if not cfg.lua.script_only %}
 
+-- MODULES
+modules = {
+    {{ "'rebinding < iterate'," if cfg.options.rebinding_protection }}
+    {{ "'workarounds < iterate'," if cfg.options.violators_workarounds }}
+    {{ "'serve_stale < cache'," if cfg.options.serve_stale }}
+    {{ "dns64 = '"+cfg.dns64.prefix+"'," if cfg.dns64 }}
+}
+
 -- SERVER section
 -- server.hostname
 hostname('{{ cfg.server.hostname }}')
@@ -10,6 +18,26 @@ modules.load('nsid')
 nsid.name('{{ cfg.server.nsid }} ' .. worker.id)
 {% endif %}
 
+{% if cfg.server.webmgmt %}
+-- server.webmgmt
+modules.load('http')
+http.config({
+    tls = {{ 'true' if cfg.server.webmgmt.tls else 'false'}},
+    {{ "cert = '"+cfg.server.webmgmt.cert_file+"'," if cfg.server.webmgmt.cert_file }}
+    {{ "key = '"+cfg.server.webmgmt.key_file+"'," if cfg.server.webmgmt.key_file }}
+}, 'webmgmt')
+net.listen(
+{% if cfg.server.webmgmt.listen.ip %}
+    '{{ cfg.server.webmgmt.listen.ip }}',
+{% elif cfg.server.webmgmt.listen.unix_socket %}
+    '{{ cfg.server.webmgmt.listen.unix_socket }}',
+{% elif cfg.server.webmgmt.listen.interface %}
+    net.{{ cfg.server.webmgmt.listen.interface }},
+{% endif %}
+    {{ cfg.server.webmgmt.listen.port|string if cfg.server.webmgmt.listen.port else 'nil' }},
+    { kind = 'webmgmt' })
+{% endif %}
+
 -- NETWORK section
 -- network.interfaces
 {% for item in cfg.network.interfaces %}
@@ -18,14 +46,6 @@ net.listen('{{ item.address }}', {{ item.port }}, {
     freebind = {{ 'true' if item.freebind else 'false'}}
 })
 {% endfor %}
-
--- MODULES
-modules = {
-    {{ "'rebinding < iterate'," if cfg.options.rebinding_protection }}
-    {{ "'workarounds < iterate'," if cfg.options.violators_workarounds }}
-    {{ "'serve_stale < cache'," if cfg.options.serve_stale }}
-    {{ "dns64 = '"+cfg.dns64.prefix+"'," if cfg.dns64 }}
-}
 
 -- OPTIONS section
 mode('{{ cfg.options.glue_checking }}')

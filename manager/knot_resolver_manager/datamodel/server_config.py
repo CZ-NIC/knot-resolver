@@ -5,6 +5,7 @@ from typing import Optional, Union
 
 from typing_extensions import Literal
 
+from knot_resolver_manager.datamodel.types import AnyPath, Listen, ListenStrict
 from knot_resolver_manager.exceptions import ValidationException
 from knot_resolver_manager.utils import DataParser, DataValidator
 from knot_resolver_manager.utils.types import LiteralEnum
@@ -34,15 +35,29 @@ BackendEnum = LiteralEnum["auto", "systemd", "supervisord"]
 
 
 class Management(DataParser):
-    listen: str = "/tmp/manager.sock"
+    listen: Listen = Listen({"unix-socket": "/tmp/manager.sock"})
     backend: BackendEnum = "auto"
-    rundir: str = "."
+    rundir: AnyPath = AnyPath(".")
 
 
 class ManagementStrict(DataValidator):
-    listen: str
+    listen: ListenStrict
     backend: BackendEnum
-    rundir: str
+    rundir: AnyPath
+
+
+class Webmgmt(DataParser):
+    listen: Listen
+    tls: bool = False
+    cert_file: Optional[AnyPath] = None
+    key_file: Optional[AnyPath] = None
+
+
+class WebmgmtStrict(DataValidator):
+    listen: ListenStrict
+    tls: bool
+    cert_file: Optional[AnyPath]
+    key_file: Optional[AnyPath]
 
 
 class Server(DataParser):
@@ -51,7 +66,9 @@ class Server(DataParser):
     nsid: Optional[str]
     workers: Union[Literal["auto"], int] = 1
     use_cache_gc: bool = True
+
     management: Management = Management()
+    webmgmt: Optional[Webmgmt] = None
 
 
 class ServerStrict(DataValidator):
@@ -60,7 +77,9 @@ class ServerStrict(DataValidator):
     nsid: Optional[str]
     workers: int
     use_cache_gc: bool
+
     management: ManagementStrict
+    webmgmt: Optional[WebmgmtStrict]
 
     def _hostname(self, obj: Server) -> str:
         if isinstance(obj.hostname, str):
