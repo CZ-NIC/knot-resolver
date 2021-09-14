@@ -76,11 +76,14 @@ bool kr_ds_algo_support(const knot_rrset_t *ta);
 
 /**
  * Check whether the DNSKEY rrset matches the supplied trust anchor RRSet.
+ *
  * @param vctx  Pointer to validation context.  Note that TTL of vctx->keys may get lowered.
- * @param ta    Trust anchor RRSet against which to validate the DNSKEY RRSet.
+ * @param sigs  RRSIGs for this DNSKEY set
+ * @param ta    Trusted DS RRSet against which to validate the DNSKEY RRSet.
  * @return      0 or error code, same as vctx->result.
  */
-int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta);
+int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rdataset_t *sigs,
+			const knot_rrset_t *ta);
 
 /** Return true if the DNSKEY can be used as a ZSK.  */
 KR_EXPORT KR_PURE

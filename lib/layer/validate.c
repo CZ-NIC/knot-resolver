@@ -340,6 +340,26 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 
 	/* Check if there's a key for current TA. */
 	if (updated_key && !(qry->flags.CACHED)) {
+		/* Find signatures for the DNSKEY; selected by iterator from ANSWER. */
+		int sig_index = -1;
+		for (int i = req->answ_selected.len - 1; i >= 0; --i) {
+			const knot_rrset_t *rrsig = req->answ_selected.at[i]->rr;
+			const bool ok = req->answ_selected.at[i]->qry_uid == qry->uid
+				&& rrsig->type == KNOT_RRTYPE_RRSIG
+				&& knot_rrsig_type_covered(rrsig->rrs.rdata)
+					== KNOT_RRTYPE_DNSKEY
+				&& rrsig->rclass == KNOT_CLASS_IN
+				&& knot_dname_is_equal(rrsig->owner,
+							qry->zone_cut.key->owner);
+			if (ok) {
+				sig_index = i;
+				break;
+			}
+		}
+		if (sig_index < 0) {
+			return kr_error(ENOENT);
+		}
+		const knot_rdataset_t *sig_rds = &req->answ_selected.at[sig_index]->rr->rrs;
 
 		kr_rrset_validation_ctx_t vctx = {
 			.pkt		= answer,
@@ -354,7 +374,12 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 			.result		= 0,
 			.log_qry	= qry,
 		};
-		int ret = kr_dnskeys_trusted(&vctx, qry->zone_cut.trust_anchor);
+		int ret = kr_dnskeys_trusted(&vctx, sig_rds, qry->zone_cut.trust_anchor);
+		/* Set rank of the RRSIG.  This may be needed, but I don't know why.
+		 * In particular, black_ent.rpl may get broken otherwise. */
+		kr_rank_set(&req->answ_selected.at[sig_index]->rank,
+				ret == 0 ? KR_RANK_SECURE : KR_RANK_BOGUS);
+
 		if (ret != 0) {
 			if (ret != kr_error(DNSSEC_INVALID_DS_ALGORITHM) &&
 			    ret != kr_error(EAGAIN)) {

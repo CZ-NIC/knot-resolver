@@ -348,12 +348,13 @@ bool kr_ds_algo_support(const knot_rrset_t *ta)
 	return false;
 }
 
-int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
+int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rdataset_t *sigs,
+			const knot_rrset_t *ta)
 {
-	knot_rrset_t *keys            = vctx->keys;
-
+	knot_rrset_t *keys = vctx->keys;
 	const bool ok = keys && ta && ta->rrs.count && ta->rrs.rdata
-			&& ta->type == KNOT_RRTYPE_DS;
+			&& ta->type == KNOT_RRTYPE_DS
+			&& knot_dname_is_equal(ta->owner, keys->owner);
 	if (kr_fails_assert(ok))
 		return kr_error(EINVAL);
 
@@ -361,28 +362,24 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
 	 * The supplied DS record has been authenticated.
 	 * It has been validated or is part of a configured trust anchor.
 	 */
-	memset(&vctx->rrs_counters, 0, sizeof(vctx->rrs_counters));
-	for (uint16_t i = 0; i < keys->rrs.count; ++i) {
+	knot_rdata_t *krr = keys->rrs.rdata;
+	for (int i = 0; i < keys->rrs.count; ++i, krr = knot_rdataset_next(krr)) {
 		/* RFC4035 5.3.1, bullet 8 */ /* ZSK */
-		/* LATER(optim.): more efficient way to iterate than _at() */
-		knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, i);
 		if (!kr_dnssec_key_zsk(krr->data) || kr_dnssec_key_revoked(krr->data))
 			continue;
 
-		struct dnssec_key *key = NULL;
-		if (kr_dnssec_key_from_rdata(&key, keys->owner, krr->data, krr->len) != 0)
-			continue;
-		if (kr_authenticate_referral(ta, key) != 0) {
-			kr_dnssec_key_free(&key);
-			continue;
+		kr_svldr_key_t key;
+		if (svldr_key_new(krr, keys->owner, &key) != 0)
+			continue; // it might e.g. be malformed
+
+		int ret = kr_authenticate_referral(ta, key.key);
+		if (ret == 0)
+			ret = kr_svldr_rrset_with_key(keys, sigs, vctx, &key);
+		svldr_key_del(&key);
+		if (ret == 0) {
+			kr_assert(vctx->result == 0);
+			return vctx->result;
 		}
-		if (kr_rrset_validate_with_key(vctx, keys, i, key) != 0) {
-			kr_dnssec_key_free(&key);
-			continue;
-		}
-		kr_dnssec_key_free(&key);
-		kr_assert(vctx->result == 0);
-		return vctx->result;
 	}
 
 	/* No useable key found */
