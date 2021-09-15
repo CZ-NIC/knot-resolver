@@ -26,9 +26,6 @@ kr_log_target_t kr_log_target = LOG_TARGET_DEFAULT;
 /** Set of log-groups that are on debug level.  It's a bitmap over 1 << enum kr_log_group. */
 static uint64_t kr_log_groups = 0;
 
-static_assert(LOG_GRP_DEVEL <= 8 * sizeof(kr_log_groups), "Too many log groups.");
-
-
 typedef struct {
 	const char		*g_name;
 	enum kr_log_group	g_val;
@@ -84,6 +81,7 @@ const log_group_names_t log_group_names[] = {
 	GRP_NAME_ITEM(LOG_GRP_REQDBG),
 	{ NULL, LOG_GRP_UNKNOWN },
 };
+static_assert(LOG_GRP_REQDBG <= 8 * sizeof(kr_log_groups), "Too many log groups.");
 
 bool kr_log_group_is_set(enum kr_log_group group)
 {
