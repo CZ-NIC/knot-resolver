@@ -9,7 +9,7 @@ from knot_resolver_manager.datamodel.lua_config import Lua, LuaStrict
 from knot_resolver_manager.datamodel.network_config import Network, NetworkStrict
 from knot_resolver_manager.datamodel.options_config import Options, OptionsStrict
 from knot_resolver_manager.datamodel.server_config import Server, ServerStrict
-from knot_resolver_manager.utils import DataParser, DataValidator
+from knot_resolver_manager.utils import SchemaNode
 
 
 def _import_lua_template() -> Template:
@@ -23,7 +23,7 @@ def _import_lua_template() -> Template:
 _LUA_TEMPLATE = _import_lua_template()
 
 
-class KresConfig(DataParser):
+class KresConfig(SchemaNode):
     server: Server = Server()
     options: Options = Options()
     network: Network = Network()
@@ -32,7 +32,7 @@ class KresConfig(DataParser):
     lua: Lua = Lua()
 
 
-class KresConfigStrict(DataValidator):
+class KresConfigStrict(SchemaNode):
     server: ServerStrict
     options: OptionsStrict
     network: NetworkStrict

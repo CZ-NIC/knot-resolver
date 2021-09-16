@@ -4,16 +4,16 @@ from pytest import raises
 from typing_extensions import Literal
 
 from knot_resolver_manager.exceptions import DataParsingException
-from knot_resolver_manager.utils import DataParser, DataValidator, Format
+from knot_resolver_manager.utils import Format, SchemaNode
 
 
 def test_primitive():
-    class TestClass(DataParser):
+    class TestClass(SchemaNode):
         i: int
         s: str
         b: bool
 
-    class TestClassStrict(DataValidator):
+    class TestClassStrict(SchemaNode):
         i: int
         s: str
         b: bool
@@ -47,14 +47,14 @@ b: false
 
 
 def test_parsing_primitive_exceptions():
-    class TestStr(DataParser):
+    class TestStr(SchemaNode):
         s: str
 
     # int and float are allowed inputs for string
     with raises(DataParsingException):
         TestStr.from_yaml("s: false")  # bool
 
-    class TestInt(DataParser):
+    class TestInt(SchemaNode):
         i: int
 
     with raises(DataParsingException):
@@ -64,7 +64,7 @@ def test_parsing_primitive_exceptions():
     with raises(DataParsingException):
         TestInt.from_yaml("i: 5.5")  # float
 
-    class TestBool(DataParser):
+    class TestBool(SchemaNode):
         b: bool
 
     with raises(DataParsingException):
@@ -76,19 +76,19 @@ def test_parsing_primitive_exceptions():
 
 
 def test_nested():
-    class Lower(DataParser):
+    class Lower(SchemaNode):
         i: int
 
-    class Upper(DataParser):
+    class Upper(SchemaNode):
         l: Lower
 
-    class LowerStrict(DataValidator):
+    class LowerStrict(SchemaNode):
         i: int
 
         def _validate(self) -> None:
             pass
 
-    class UpperStrict(DataValidator):
+    class UpperStrict(SchemaNode):
         l: LowerStrict
 
         def _validate(self) -> None:
@@ -113,13 +113,13 @@ l:
 
 
 def test_simple_compount_types():
-    class TestClass(DataParser):
+    class TestClass(SchemaNode):
         l: List[int]
         d: Dict[str, str]
         t: Tuple[str, int]
         o: Optional[int]
 
-    class TestClassStrict(DataValidator):
+    class TestClassStrict(SchemaNode):
         l: List[int]
         d: Dict[str, str]
         t: Tuple[str, int]
@@ -166,10 +166,10 @@ t:
 
 
 def test_nested_compound_types():
-    class TestClass(DataParser):
+    class TestClass(SchemaNode):
         o: Optional[Dict[str, str]]
 
-    class TestClassStrict(DataValidator):
+    class TestClassStrict(SchemaNode):
         o: Optional[Dict[str, str]]
 
         def _validate(self) -> None:
@@ -194,11 +194,11 @@ o:
 
 
 def test_nested_compount_types2():
-    class TestClass(DataParser):
+    class TestClass(SchemaNode):
         i: int
         o: Optional[Dict[str, str]]
 
-    class TestClassStrict(DataValidator):
+    class TestClassStrict(SchemaNode):
         i: int
         o: Optional[Dict[str, str]]
 
@@ -224,21 +224,21 @@ def test_nested_compount_types2():
 
 
 def test_partial_mutations():
-    class Inner(DataParser):
+    class Inner(SchemaNode):
         size: int = 5
 
-    class ConfData(DataParser):
+    class ConfData(SchemaNode):
         workers: Union[Literal["auto"], int] = 1
         lua_config: Optional[str] = None
         inner: Inner = Inner()
 
-    class InnerStrict(DataValidator):
+    class InnerStrict(SchemaNode):
         size: int
 
         def _validate(self) -> None:
             pass
 
-    class ConfDataStrict(DataValidator):
+    class ConfDataStrict(SchemaNode):
         workers: int
         lua_config: Optional[str]
         inner: InnerStrict

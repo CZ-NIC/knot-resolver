@@ -3,7 +3,7 @@ import inspect
 import json
 import re
 from enum import Enum, auto
-from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Type, TypeVar, Union
 
 import yaml
 from yaml.constructor import ConstructorError
@@ -17,6 +17,7 @@ from knot_resolver_manager.exceptions import (
 )
 from knot_resolver_manager.utils.custom_types import CustomValueType
 from knot_resolver_manager.utils.types import (
+    NoneType,
     get_attr_type,
     get_generic_type_argument,
     get_generic_type_arguments,
@@ -25,6 +26,7 @@ from knot_resolver_manager.utils.types import (
     is_list,
     is_literal,
     is_none_type,
+    is_optional,
     is_tuple,
     is_union,
 )
@@ -53,7 +55,7 @@ def _to_primitive(obj: Any) -> Any:
         return obj.serialize()
 
     # nested DataParser class instances
-    elif isinstance(obj, DataParser):
+    elif isinstance(obj, SchemaNode):
         return obj.to_dict()
 
     # otherwise just return, what we were given
@@ -185,21 +187,13 @@ def _validated_object_type(
             # no validation performed, the implementation does it in the constuctor
             return cls(obj, object_path=object_path)
 
-    # nested DataParser subclasses
-    elif inspect.isclass(cls) and issubclass(cls, DataParser):
+    # nested SchemaNode subclasses
+    elif inspect.isclass(cls) and issubclass(cls, SchemaNode):
         # we should return DataParser, we expect to be given a dict,
         # because we can construct a DataParser from it
-        if isinstance(obj, dict):
+        if isinstance(obj, (dict, SchemaNode)):
             return cls(obj, object_path=object_path)  # type: ignore
-        raise DataParsingException(f"Expected '{dict}' object, found '{type(obj)}'", object_path)
-
-    # nested DataValidator subclasses
-    elif inspect.isclass(cls) and issubclass(cls, DataValidator):
-        # we should return DataValidator, we expect to be given a DataParser,
-        # because we can construct a DataValidator from it
-        if isinstance(obj, DataParser):
-            return cls(obj, object_path=object_path)
-        raise DataParsingException(f"Expected instance of '{DataParser}' class, found '{type(obj)}'", object_path)
+        raise DataParsingException(f"Expected 'dict' or 'SchemaNode' object, found '{type(obj)}'", object_path)
 
     # if the object matches, just pass it through
     elif inspect.isclass(cls) and isinstance(obj, cls):
@@ -287,45 +281,97 @@ class Format(Enum):
         return formats[mime_type]
 
 
-_T = TypeVar("_T", bound="DataParser")
+_T = TypeVar("_T", bound="SchemaNode")
 
 
 _SUBTREE_MUTATION_PATH_PATTERN = re.compile(r"^(/[^/]+)*/?$")
 
 
-class DataParser:
-    def __init__(self, obj: Optional[Dict[Any, Any]] = None, object_path: str = "/"):
+TSource = Union[NoneType, Dict[Any, Any], "SchemaNode"]
+
+
+class SchemaNode:
+    def __init__(self, source: TSource = None, object_path: str = "/"):
         cls = self.__class__
         annot = cls.__dict__.get("__annotations__", {})
 
-        used_keys: List[str] = []
+        used_keys: Set[str] = set()
         for name, python_type in annot.items():
             if is_internal_field(name):
                 continue
 
-            val = None
-            dash_name = name.replace("_", "-")
-            if obj and dash_name in obj:
-                val = obj[dash_name]
-                used_keys.append(dash_name)
+            # convert naming (used when converting from json/yaml)
+            source_name = name.replace("_", "-") if isinstance(source, dict) else name
+
+            # populate field
+            if not source:
+                val = None
+            # we have a way how to create the value
+            elif hasattr(self, f"_{name}"):
+                val = self._get_converted_value(name, source, object_path)
+                used_keys.add(source_name)  # the field might not exist, but that won't break anything
+            # source just contains the value
+            elif source_name in source:
+                val = source[source_name]
+                used_keys.add(source_name)
+            # there is a default value and in the source, the value is missing
+            elif getattr(self, name, ...) is not ...:
+                val = None
+            # the value is optional and there is nothing
+            elif is_optional(python_type):
+                val = None
+            # we expected a value but it was not there
+            else:
+                raise DataValidationException(f"Missing attribute '{source_name}'.", object_path)
 
             use_default = hasattr(cls, name)
             default = getattr(cls, name, ...)
             value = _validated_object_type(python_type, val, default, use_default, object_path=f"{object_path}/{name}")
             setattr(self, name, value)
 
-        # check for unused keys
-        if obj:
-            for key in obj:
-                if key not in used_keys:
-                    additional_info = ""
-                    if "_" in key:
-                        additional_info = (
-                            " The problem might be that you are using '_', but you should be using '-' instead."
-                        )
-                    raise DataParsingException(
-                        f"Attribute '{key}' was not provided with any value." + additional_info, object_path
-                    )
+        # check for unused keys in case the
+        if source and isinstance(source, dict):
+            unused = source.keys() - used_keys
+            if len(unused) > 0:
+                raise DataParsingException(
+                    f"Keys {unused} in your configuration object are not part of the configuration schema."
+                    " Are you using '-' instead of '_'?",
+                    object_path,
+                )
+
+        # validate the constructed value
+        self._validate()
+
+    def _get_converted_value(self, key: str, source: TSource, object_path: str) -> Any:
+        try:
+            return getattr(self, f"_{key}")(source)
+        except (ValueError, ValidationException) as e:
+            if len(e.args) > 0 and isinstance(e.args[0], str):
+                msg = e.args[0]
+            else:
+                msg = "Failed to validate value type"
+            raise DataValidationException(msg, object_path) from e
+
+    def __getitem__(self, key: str) -> Any:
+        if not hasattr(self, key):
+            raise RuntimeError(f"Object '{self}' of type '{type(self)}' does not have field named '{key}'")
+        return getattr(self, key)
+
+    def __contains__(self, item: Any) -> bool:
+        return hasattr(self, item)
+
+    def validate(self) -> None:
+        for field_name in dir(self):
+            if is_internal_field(field_name):
+                continue
+
+            field = getattr(self, field_name)
+            if isinstance(field, SchemaNode):
+                field.validate()
+        self._validate()
+
+    def _validate(self) -> None:
+        pass
 
     @classmethod
     def parse_from(cls: Type[_T], fmt: Format, text: str):
@@ -410,47 +456,3 @@ class DataParser:
         setattr(parent, last_name, parsed_value)
 
         return to_mutate
-
-
-class DataValidator:
-    def __init__(self, obj: DataParser, object_path: str = ""):
-        cls = self.__class__
-        anot = cls.__dict__.get("__annotations__", {})
-
-        for attr_name, attr_type in anot.items():
-            if is_internal_field(attr_name):
-                continue
-
-            # use transformation function if available
-            if hasattr(self, f"_{attr_name}"):
-                try:
-                    value = getattr(self, f"_{attr_name}")(obj)
-                except (ValueError, ValidationException) as e:
-                    if len(e.args) > 0 and isinstance(e.args[0], str):
-                        msg = e.args[0]
-                    else:
-                        msg = "Failed to validate value type"
-                    raise DataValidationException(msg, object_path) from e
-            elif hasattr(obj, attr_name):
-                value = getattr(obj, attr_name)
-            else:
-                raise DataValidationException(
-                    f"DataParser object {obj} is missing '{attr_name}' attribute.", object_path
-                )
-
-            setattr(self, attr_name, _validated_object_type(attr_type, value))
-
-        self._validate()
-
-    def validate(self) -> None:
-        for field_name in dir(self):
-            if is_internal_field(field_name):
-                continue
-
-            field = getattr(self, field_name)
-            if isinstance(field, DataValidator):
-                field.validate()
-        self._validate()
-
-    def _validate(self) -> None:
-        pass

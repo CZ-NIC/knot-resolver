@@ -13,7 +13,7 @@ from knot_resolver_manager.datamodel.types import (
     TimeUnit,
 )
 from knot_resolver_manager.exceptions import KresdManagerException
-from knot_resolver_manager.utils import DataParser, DataValidator
+from knot_resolver_manager.utils import SchemaNode
 
 
 def test_size_unit():
@@ -41,11 +41,11 @@ def test_time_unit():
 
 
 def test_parsing_units():
-    class TestClass(DataParser):
+    class TestClass(SchemaNode):
         size: SizeUnit
         time: TimeUnit
 
-    class TestClassStrict(DataValidator):
+    class TestClassStrict(SchemaNode):
         size: int
         time: int
 
@@ -74,7 +74,7 @@ time: 10m
 
 
 def test_anypath():
-    class Data(DataParser):
+    class Data(SchemaNode):
         p: AnyPath
 
     assert str(Data.from_yaml('p: "/tmp"').p) == "/tmp"

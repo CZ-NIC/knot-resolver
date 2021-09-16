@@ -1,6 +1,6 @@
 from typing import Union
 
-from knot_resolver_manager.utils import DataParser, DataValidator
+from knot_resolver_manager.utils import SchemaNode
 from knot_resolver_manager.utils.types import LiteralEnum
 
 from .types import TimeUnit
@@ -8,12 +8,12 @@ from .types import TimeUnit
 GlueCheckingEnum = LiteralEnum["normal", "strict", "permissive"]
 
 
-class Prediction(DataParser):
+class Prediction(SchemaNode):
     window: TimeUnit = TimeUnit("15m")
     period: int = 24
 
 
-class Options(DataParser):
+class Options(SchemaNode):
     glue_checking: GlueCheckingEnum = "normal"
     qname_minimisation: bool = True
     query_loopback: bool = False
@@ -29,12 +29,12 @@ class Options(DataParser):
     prediction: Union[bool, Prediction] = False
 
 
-class PredictionStrict(DataValidator):
+class PredictionStrict(SchemaNode):
     window: TimeUnit
     period: int
 
 
-class OptionsStrict(DataValidator):
+class OptionsStrict(SchemaNode):
     glue_checking: GlueCheckingEnum
     qname_minimisation: bool
     query_loopback: bool

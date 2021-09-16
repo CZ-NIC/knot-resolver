@@ -1,7 +1,7 @@
 from typing import Any, Callable, Iterable, Optional, Type, TypeVar
 
 from .custom_types import CustomValueType
-from .data_parser_validator import DataParser, DataValidator, Format
+from .data_parser_validator import Format, SchemaNode
 
 T = TypeVar("T")
 
@@ -55,6 +55,5 @@ def contains_element_matching(cond: Callable[[T], bool], arr: Iterable[T]) -> bo
 __all__ = [
     "Format",
     "CustomValueType",
-    "DataParser",
-    "DataValidator",
+    "SchemaNode",
 ]
