@@ -1,18 +1,18 @@
 from typing import List
 
-from knot_resolver_manager.utils import DataParser, DataValidator
+from knot_resolver_manager.utils import SchemaNode
 from knot_resolver_manager.utils.types import LiteralEnum
 
 KindEnum = LiteralEnum["dns", "xdp", "dot", "doh"]
 
 
-class Interface(DataParser):
+class Interface(SchemaNode):
     listen: str
     kind: KindEnum = "dns"
     freebind: bool = False
 
 
-class InterfaceStrict(DataValidator):
+class InterfaceStrict(SchemaNode):
     address: str
     port: int
     kind: str
@@ -32,9 +32,9 @@ class InterfaceStrict(DataValidator):
         return port_map.get(obj.kind, 0)
 
 
-class Network(DataParser):
+class Network(SchemaNode):
     interfaces: List[Interface] = [Interface({"listen": "127.0.0.1"}), Interface({"listen": "::1", "freebind": True})]
 
 
-class NetworkStrict(DataValidator):
+class NetworkStrict(SchemaNode):
     interfaces: List[InterfaceStrict]

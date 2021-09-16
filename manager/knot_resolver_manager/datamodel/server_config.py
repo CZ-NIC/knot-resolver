@@ -7,7 +7,7 @@ from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import AnyPath, Listen, ListenStrict
 from knot_resolver_manager.exceptions import ValidationException
-from knot_resolver_manager.utils import DataParser, DataValidator
+from knot_resolver_manager.utils import SchemaNode
 from knot_resolver_manager.utils.types import LiteralEnum
 
 logger = logging.getLogger(__name__)
@@ -34,33 +34,33 @@ def _cpu_count() -> int:
 BackendEnum = LiteralEnum["auto", "systemd", "supervisord"]
 
 
-class Management(DataParser):
+class Management(SchemaNode):
     listen: Listen = Listen({"unix-socket": "/tmp/manager.sock"})
     backend: BackendEnum = "auto"
     rundir: AnyPath = AnyPath(".")
 
 
-class ManagementStrict(DataValidator):
+class ManagementStrict(SchemaNode):
     listen: ListenStrict
     backend: BackendEnum
     rundir: AnyPath
 
 
-class Webmgmt(DataParser):
+class Webmgmt(SchemaNode):
     listen: Listen
     tls: bool = False
     cert_file: Optional[AnyPath] = None
     key_file: Optional[AnyPath] = None
 
 
-class WebmgmtStrict(DataValidator):
+class WebmgmtStrict(SchemaNode):
     listen: ListenStrict
     tls: bool
     cert_file: Optional[AnyPath]
     key_file: Optional[AnyPath]
 
 
-class Server(DataParser):
+class Server(SchemaNode):
     hostname: Optional[str] = None
     groupid: Optional[str] = None
     nsid: Optional[str]
@@ -71,7 +71,7 @@ class Server(DataParser):
     webmgmt: Optional[Webmgmt] = None
 
 
-class ServerStrict(DataValidator):
+class ServerStrict(SchemaNode):
     hostname: str
     groupid: Optional[str]
     nsid: Optional[str]

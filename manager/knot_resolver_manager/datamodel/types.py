@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Pattern, Union
 
 from knot_resolver_manager.exceptions import DataValidationException
 from knot_resolver_manager.utils import CustomValueType
-from knot_resolver_manager.utils.data_parser_validator import DataParser, DataValidator
+from knot_resolver_manager.utils.data_parser_validator import SchemaNode
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +123,7 @@ class AnyPath(CustomValueType):
         return str(self._value)
 
 
-class Listen(DataParser):
+class Listen(SchemaNode):
     ip: Optional[str] = None
     port: Optional[int] = None
     unix_socket: Optional[AnyPath] = None
@@ -136,7 +136,7 @@ class ListenType(Enum):
     INTERFACE_AND_PORT = auto()
 
 
-class ListenStrict(DataValidator):
+class ListenStrict(SchemaNode):
     typ: ListenType
     ip: Optional[Union[ipaddress.IPv4Address, ipaddress.IPv6Address]] = None
     port: Optional[int] = None
