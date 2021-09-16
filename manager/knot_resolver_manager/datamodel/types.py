@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Pattern, Union
 
 from knot_resolver_manager.exceptions import DataValidationException
 from knot_resolver_manager.utils import CustomValueType
-from knot_resolver_manager.utils.data_parser_validator import SchemaNode
+from knot_resolver_manager.utils import SchemaNode
 
 logger = logging.getLogger(__name__)
 

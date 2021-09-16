@@ -1,7 +1,7 @@
 from typing import Any, Callable, Iterable, Optional, Type, TypeVar
 
 from .custom_types import CustomValueType
-from .data_parser_validator import Format, SchemaNode
+from .modelling import Format, SchemaNode
 
 T = TypeVar("T")
 

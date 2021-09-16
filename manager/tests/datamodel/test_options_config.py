@@ -1,6 +1,6 @@
 from knot_resolver_manager.datamodel.options_config import Options, OptionsStrict
 from knot_resolver_manager.datamodel.types import TimeUnit
-from knot_resolver_manager.utils.data_parser_validator import Format
+from knot_resolver_manager.utils import Format
 
 yaml = """
 glue-checking: strict
