@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from pytest import raises
 from typing_extensions import Literal
 
-from knot_resolver_manager.exceptions import DataParsingException
+from knot_resolver_manager.exceptions import SchemaException
 from knot_resolver_manager.utils import Format, SchemaNode
 
 
@@ -51,27 +51,27 @@ def test_parsing_primitive_exceptions():
         s: str
 
     # int and float are allowed inputs for string
-    with raises(DataParsingException):
+    with raises(SchemaException):
         TestStr.from_yaml("s: false")  # bool
 
     class TestInt(SchemaNode):
         i: int
 
-    with raises(DataParsingException):
+    with raises(SchemaException):
         TestInt.from_yaml("i: false")  # bool
-    with raises(DataParsingException):
+    with raises(SchemaException):
         TestInt.from_yaml('i: "5"')  # str
-    with raises(DataParsingException):
+    with raises(SchemaException):
         TestInt.from_yaml("i: 5.5")  # float
 
     class TestBool(SchemaNode):
         b: bool
 
-    with raises(DataParsingException):
+    with raises(SchemaException):
         TestBool.from_yaml("b: 5")  # int
-    with raises(DataParsingException):
+    with raises(SchemaException):
         TestBool.from_yaml('b: "5"')  # str
-    with raises(DataParsingException):
+    with raises(SchemaException):
         TestBool.from_yaml("b: 5.5")  # float
 
 

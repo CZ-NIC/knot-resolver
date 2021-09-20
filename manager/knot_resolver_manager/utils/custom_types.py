@@ -18,7 +18,7 @@ class CustomValueType:
 
     There is no validation done on the wrapped value. The only condition is that
     it can't be `None`. If you want to perform any validation during creation,
-    raise a `DataValidationException` in case of errors.
+    raise a `SchemaException` in case of errors.
     """
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:

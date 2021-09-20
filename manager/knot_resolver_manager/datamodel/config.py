@@ -1,14 +1,14 @@
 import pkgutil
-from typing import Text, Union
+from typing import Any, Text, Union
 
 from jinja2 import Environment, Template
 
-from knot_resolver_manager.datamodel.dns64_config import Dns64, Dns64Strict
-from knot_resolver_manager.datamodel.dnssec_config import Dnssec, DnssecStrict
-from knot_resolver_manager.datamodel.lua_config import Lua, LuaStrict
-from knot_resolver_manager.datamodel.network_config import Network, NetworkStrict
-from knot_resolver_manager.datamodel.options_config import Options, OptionsStrict
-from knot_resolver_manager.datamodel.server_config import Server, ServerStrict
+from knot_resolver_manager.datamodel.dns64_config import Dns64
+from knot_resolver_manager.datamodel.dnssec_config import Dnssec
+from knot_resolver_manager.datamodel.lua_config import Lua
+from knot_resolver_manager.datamodel.network_config import Network
+from knot_resolver_manager.datamodel.options_config import Options
+from knot_resolver_manager.datamodel.server_config import Server
 from knot_resolver_manager.utils import SchemaNode
 
 
@@ -31,24 +31,15 @@ class KresConfig(SchemaNode):
     dns64: Union[bool, Dns64] = False
     lua: Lua = Lua()
 
-
-class KresConfigStrict(SchemaNode):
-    server: ServerStrict
-    options: OptionsStrict
-    network: NetworkStrict
-    dnssec: Union[bool, DnssecStrict]
-    dns64: Union[bool, Dns64Strict]
-    lua: LuaStrict
-
-    def _dnssec(self, obj: KresConfig) -> Union[bool, Dnssec]:
-        if obj.dnssec is True:
+    def _dnssec(self, obj: Any) -> Union[bool, Dnssec]:
+        if "dnssec" not in obj or obj["dnssec"] is True:
             return Dnssec()
-        return obj.dnssec
+        return obj["dnssec"]
 
-    def _dns64(self, obj: KresConfig) -> Union[bool, Dns64]:
-        if obj.dns64 is True:
+    def _dns64(self, obj: Any) -> Union[bool, Dns64]:
+        if "dns64" not in obj or obj["dns64"] is True:
             return Dns64()
-        return obj.dns64
+        return obj["dns64"]
 
     def render_lua(self) -> Text:
         return _LUA_TEMPLATE.render(cfg=self)
