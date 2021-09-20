@@ -7,6 +7,10 @@ Improvements
 - dns64 module: allow disabling based on client address (#368, !1201)
 - dns64 module: allow configuring AAAA subnets not allowed in answer (!1201)
 
+Bugfixes
+--------
+- lua: log() output is visible with default log level again (!1208)
+
 
 Knot Resolver 5.4.1 (2021-08-19)
 ================================

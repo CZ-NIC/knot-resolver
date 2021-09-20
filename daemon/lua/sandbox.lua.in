@@ -69,7 +69,7 @@ function log_debug(grp, fmt, ...)
 end
 
 function log(fmt, ...)
-	log_info(ffi.C.LOG_GRP_MODULE, fmt, ...)
+	log_notice(ffi.C.LOG_GRP_MODULE, fmt, ...)
 end
 
 -- Resolver bindings
