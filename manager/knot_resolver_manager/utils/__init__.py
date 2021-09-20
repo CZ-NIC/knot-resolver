@@ -1,7 +1,7 @@
 from typing import Any, Callable, Iterable, Optional, Type, TypeVar
 
 from .custom_types import CustomValueType
-from .modelling import Format, SchemaNode
+from .modelling import SchemaNode
 
 T = TypeVar("T")
 
@@ -53,7 +53,6 @@ def contains_element_matching(cond: Callable[[T], bool], arr: Iterable[T]) -> bo
 
 
 __all__ = [
-    "Format",
     "CustomValueType",
     "SchemaNode",
 ]

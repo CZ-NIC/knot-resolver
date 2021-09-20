@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Any, Union
 
 from knot_resolver_manager.utils import SchemaNode
 from knot_resolver_manager.utils.types import LiteralEnum
@@ -28,28 +28,7 @@ class Options(SchemaNode):
 
     prediction: Union[bool, Prediction] = False
 
-
-class PredictionStrict(SchemaNode):
-    window: TimeUnit
-    period: int
-
-
-class OptionsStrict(SchemaNode):
-    glue_checking: GlueCheckingEnum
-    qname_minimisation: bool
-    query_loopback: bool
-    reorder_rrset: bool
-    query_case_randomization: bool
-    query_priming: bool
-    rebinding_protection: bool
-    refuse_no_rd: bool
-    time_jump_detection: bool
-    violators_workarounds: bool
-    serve_stale: bool
-
-    prediction: Union[bool, PredictionStrict]
-
-    def _prediction(self, obj: Options) -> Union[bool, Prediction]:
-        if obj.prediction is True:
+    def _prediction(self, obj: Any) -> Union[bool, Prediction]:
+        if obj["prediction"] is True:
             return Prediction()
-        return obj.prediction
+        return obj["prediction"]

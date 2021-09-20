@@ -17,17 +17,13 @@ class TreeException(KresdManagerException):
         return self._tree_path
 
 
-class DataParsingException(TreeException):
+class SchemaException(TreeException):
     pass
 
 
-class DataValidationException(TreeException):
+class DataException(KresdManagerException):
     pass
 
 
 class ParsingException(KresdManagerException):
-    pass
-
-
-class ValidationException(KresdManagerException):
     pass
