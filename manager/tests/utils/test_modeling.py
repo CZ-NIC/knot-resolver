@@ -162,7 +162,8 @@ def test_partial_mutations():
     assert o.workers == 8
 
     # replacement of 'lua-config' attribute
-    o = ConfSchema(d.update("/lua-config", parse_json('"new_value"')))
+    upd = d.update("/lua-config", parse_json('"new_value"'))
+    o = ConfSchema(upd)
     assert o.lua_config == "new_value"
     assert o.inner.size == 5
     assert o.workers == 8
@@ -175,7 +176,7 @@ def test_partial_mutations():
 
     # replacement of 'inner' subtree
     o = ConfSchema(d.update("/inner", parse_json('{"size": 33}')))
-    assert o.lua_config == None
+    assert o.lua_config == "something"
     assert o.workers == 8
     assert o.inner.size == 33
 

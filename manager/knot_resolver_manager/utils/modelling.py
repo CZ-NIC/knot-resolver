@@ -174,7 +174,7 @@ def _validated_object_type(
         )
 
 
-TSource = Union[NoneType, Dict[Any, Any], ParsedTree, "SchemaNode"]
+TSource = Union[NoneType, ParsedTree, "SchemaNode"]
 
 
 class SchemaNode:
@@ -185,6 +185,10 @@ class SchemaNode:
         if self._PREVIOUS_SCHEMA is not None:
             source = self._PREVIOUS_SCHEMA(source, object_path=object_path)  # pylint: disable=not-callable
 
+        # make sure that all raw data checks passed on the source object
+        if isinstance(source, dict):
+            source = ParsedTree(source)
+
         cls = self.__class__
         annot = cls.__dict__.get("__annotations__", {})
 
@@ -193,20 +197,17 @@ class SchemaNode:
             if is_internal_field_name(name):
                 continue
 
-            # convert naming (used when converting from json/yaml)
-            source_name = name.replace("_", "-") if isinstance(source, dict) else name
-
             # populate field
             if not source:
                 val = None
             # we have a way how to create the value
             elif hasattr(self, f"_{name}"):
                 val = self._get_converted_value(name, source, object_path)
-                used_keys.add(source_name)  # the field might not exist, but that won't break anything
+                used_keys.add(name)  # the field might not exist, but that won't break anything
             # source just contains the value
-            elif source_name in source:
-                val = source[source_name]
-                used_keys.add(source_name)
+            elif name in source:
+                val = source[name]
+                used_keys.add(name)
             # there is a default value and in the source, the value is missing
             elif getattr(self, name, ...) is not ...:
                 val = None
@@ -215,7 +216,7 @@ class SchemaNode:
                 val = None
             # we expected a value but it was not there
             else:
-                raise SchemaException(f"Missing attribute '{source_name}'.", object_path)
+                raise SchemaException(f"Missing attribute '{name}'.", object_path)
 
             use_default = hasattr(cls, name)
             default = getattr(cls, name, ...)
@@ -223,7 +224,7 @@ class SchemaNode:
             setattr(self, name, value)
 
         # check for unused keys in case the
-        if source and isinstance(source, dict):
+        if source and not isinstance(source, SchemaNode):
             unused = source.keys() - used_keys
             if len(unused) > 0:
                 raise SchemaException(
