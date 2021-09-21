@@ -144,6 +144,10 @@ def _validated_object_type(
         types = get_generic_type_arguments(cls)
         return tuple(_validated_object_type(typ, val, object_path=object_path) for typ, val in zip(types, obj))
 
+    # type of obj and cls type match
+    elif is_obj_type(obj, cls):
+        return obj
+
     # CustomValueType subclasses
     elif inspect.isclass(cls) and issubclass(cls, CustomValueType):
         if isinstance(obj, cls):
@@ -190,10 +194,12 @@ class SchemaNode:
             if val is not ...:
                 setattr(self, name, val)
                 used_keys.add(name)
-            
+
                 if hasattr(self, f"_{name}"):
                     # check, that the schema makes sense
-                    raise TypeError(f"{cls.__name__}.{name}: can't have both default value and transformation function at once. Use _PREVIOUS_SCHEMA...")
+                    raise TypeError(
+                        f"{cls.__name__}.{name}: can't have both default value and transformation function at once. Use _PREVIOUS_SCHEMA..."
+                    )
 
         return used_keys
 
