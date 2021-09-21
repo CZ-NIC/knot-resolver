@@ -190,6 +190,10 @@ class SchemaNode:
             if val is not ...:
                 setattr(self, name, val)
                 used_keys.add(name)
+            
+                if hasattr(self, f"_{name}"):
+                    # check, that the schema makes sense
+                    raise TypeError(f"{cls.__name__}.{name}: can't have both default value and transformation function at once. Use _PREVIOUS_SCHEMA...")
 
         return used_keys
 
