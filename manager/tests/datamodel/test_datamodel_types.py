@@ -40,24 +40,15 @@ def test_time_unit():
 
 
 def test_parsing_units():
-    class TestClass(SchemaNode):
+    class TestSchema(SchemaNode):
         size: SizeUnit
         time: TimeUnit
 
-    class TestClassStrict(SchemaNode):
-        size: int
-        time: int
-
-        def _validate(self) -> None:
-            pass
-
-    obj = TestClass({"size": "3K", "time": "10m"})
-    assert obj.size == SizeUnit("3072B")
-    assert obj.time == TimeUnit("10m")
-
-    strict = TestClassStrict(obj)
-    assert strict.size == 3 * 1024
-    assert strict.time == 10 * 60 * 1000
+    o = TestSchema({"size": "3K", "time": "10m"})
+    assert o.size == SizeUnit("3072B")
+    assert o.time == TimeUnit("10m")
+    assert o.size.bytes() == 3072
+    assert o.time.seconds() == 10 * 60
 
 
 def test_anypath():
