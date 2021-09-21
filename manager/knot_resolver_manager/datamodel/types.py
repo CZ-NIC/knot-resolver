@@ -77,6 +77,9 @@ class SizeUnit(Unit):
     _re = re.compile(r"^([0-9]+)\s{0,1}([BKMG]){0,1}$")
     _units = {"B": 1, "K": 1024, "M": 1024 ** 2, "G": 1024 ** 3}
 
+    def bytes(self) -> int:
+        return self._value
+
 
 class TimeUnit(Unit):
     _re = re.compile(r"^(\d+)\s{0,1}([smhd]s?){0,1}$")
@@ -136,10 +139,10 @@ class Listen(SchemaNode):
     _PREVIOUS_SCHEMA = Raw
 
     typ: ListenType
-    ip: Optional[Union[ipaddress.IPv4Address, ipaddress.IPv6Address]] = None
-    port: Optional[int] = None
-    unix_socket: Optional[AnyPath] = None
-    interface: Optional[str] = None
+    ip: Optional[Union[ipaddress.IPv4Address, ipaddress.IPv6Address]]
+    port: Optional[int]
+    unix_socket: Optional[AnyPath]
+    interface: Optional[str]
 
     def _typ(self, origin: Raw):
         present = {
