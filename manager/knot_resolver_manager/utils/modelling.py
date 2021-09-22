@@ -181,7 +181,7 @@ def _validated_object_type(
 TSource = Union[NoneType, ParsedTree, "SchemaNode", Dict[str, Any]]
 
 
-def create_untouchable(name: str):
+def _create_untouchable(name: str):
     class _Untouchable:
         def __getattribute__(self, item_name: str) -> Any:
             raise RuntimeError(f"You are not supposed to access object '{name}'.")
@@ -193,6 +193,68 @@ def create_untouchable(name: str):
 
 
 class SchemaNode:
+    """
+    Class for modelling configuration schema. It somewhat resembles standard dataclasses with additional
+    functionality:
+
+    * type validation
+    * data conversion
+
+    To create an instance of this class, you have to provide source data in the form of dict-like object.
+    Generally, we expect `ParsedTree`, raw dict or another `SchemaNode` instance. The provided data object
+    is traversed, transformed and validated before assigned to the appropriate fields.
+
+    Fields (attributes)
+    ===================
+
+    The fields (or attributes) of the class are defined the same way as in a dataclass by creating a class-level
+    type-annotated fields. An example of that is:
+
+    class A(SchemaNode):
+        awesome_number: int
+
+    If your `SchemaNode` instance has a field with type of a SchemaNode, its value is recursively created
+    from the nested input data. This way, you can specify a complex tree of SchemaNode's and use the root
+    SchemaNode to create instance of everything.
+
+    Transformation
+    ==============
+
+    You can provide the SchemaNode class with a field and a function with the same name, but starting with
+    underscore ('_'). For example, you could have field called `awesome_number` and function called
+    `_awesome_number(self, source)`. The function takes one argument - the source data (optionally with self,
+    but you are not supposed to touch that). It can read any data from the source object and return a value of
+    an appropriate type, which will be assigned to the field `awesome_number`. If you want to report an error
+    during validation, raise a `ValueError` exception.
+
+    Using this, you can convert any input values into any type and field you want. To make the conversion easier
+    to write, you could also specify a special class variable called `_PREVIOUS_SCHEMA` pointing to another
+    SchemaNode class. This causes the source object to be first parsed as the specified SchemaNode and after that
+    used a source for this class. This therefore allows nesting of transformation functions.
+
+    Validation
+    ==========
+
+    All assignments to fields during object construction are checked at runtime for proper types. This means,
+    you are free to use an untrusted source object and turn it into a data structure, where you are sure what
+    is what.
+
+    You can also define a `_validate` method, which will be called once the whole data structure is built. You
+    can validate the data in there and raise a `ValueError`, if they are invalid.
+
+    Default values
+    ==============
+
+    If you create a field with a value, it will be used as a default value whenever the data in source object
+    are not present. As a special case, default value for Optional type is None if not specified otherwise. You
+    are not allowed to have a field with a default value and a transformation function at once.
+
+    Example
+    =======
+
+    See tests/utils/test_modelling.py for example usage.
+    """
+
     _PREVIOUS_SCHEMA: Optional[Type["SchemaNode"]] = None
 
     def _assign_default(self, name: str, python_type: Any, object_path: str):
@@ -275,9 +337,15 @@ class SchemaNode:
                 )
 
         # validate the constructed value
-        self._validate()
+        try:
+            self._validate()
+        except ValueError as e:
+            raise SchemaException(e.args[0] if len(e.args) > 0 else "Validation error", object_path) from e
 
     def _get_converted_value(self, key: str, source: TSource, object_path: str) -> Any:
+        """
+        Get a value of a field by invoking appropriate transformation function.
+        """
         try:
             func = getattr(self.__class__, f"_{key}")
             argc = len(inspect.signature(func).parameters)
@@ -286,7 +354,7 @@ class SchemaNode:
                 return func(source)
             elif argc == 2:
                 # it is a instance method
-                return func(create_untouchable("self"), source)
+                return func(_create_untouchable("self"), source)
             else:
                 raise RuntimeError("Transformation function has wrong number of arguments")
         except (ValueError, DataException) as e:
@@ -305,4 +373,6 @@ class SchemaNode:
         return hasattr(self, item)
 
     def _validate(self) -> None:
-        pass
+        """
+        Validation procedure called after all field are assigned. Should throw a ValueError in case of failure.
+        """
