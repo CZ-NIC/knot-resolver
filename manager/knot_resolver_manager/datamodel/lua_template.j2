@@ -41,7 +41,7 @@ net.listen(
 -- NETWORK section
 -- network.interfaces
 {% for item in cfg.network.interfaces %}
-net.listen('{{ item.address }}', {{ item.port }}, {
+net.listen('{{ item.listen.ip }}', {{ item.listen.port }}, {
     kind = '{{ item.kind if item.kind != 'dot' else 'tls' }}',
     freebind = {{ 'true' if item.freebind else 'false'}}
 })
