@@ -15,6 +15,9 @@ class TreeException(KresdManagerException):
 
     def where(self) -> str:
         return self._tree_path
+    
+    def __str__(self) -> str:
+        return super().__str__() + f" @ {self.where()}"
 
 
 class SchemaException(TreeException):
