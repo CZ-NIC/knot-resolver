@@ -1,4 +1,4 @@
-from knot_resolver_manager.datamodel.options_config import Options
+from knot_resolver_manager.datamodel.options_config import OptionsSchema
 from knot_resolver_manager.datamodel.types import TimeUnit
 
 tree = {
@@ -16,7 +16,7 @@ tree = {
     "prediction": {"window": "10m", "period": 20},
 }
 
-strict = Options(tree)
+strict = OptionsSchema(tree)
 
 
 def test_validating():
@@ -37,7 +37,7 @@ def test_validating():
 
 
 def test_prediction_true_defaults():
-    y = Options({"prediction": True})
+    y = OptionsSchema({"prediction": True})
 
     assert y.prediction.window == TimeUnit("15m")
     assert y.prediction.period == 24

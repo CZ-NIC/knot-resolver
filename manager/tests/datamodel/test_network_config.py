@@ -1,10 +1,10 @@
 import ipaddress
 
-from knot_resolver_manager.datamodel.network_config import Network
+from knot_resolver_manager.datamodel.network_config import NetworkSchema
 
 
 def test_interfaces_default():
-    o = Network()
+    o = NetworkSchema()
 
     assert len(o.interfaces) == 2
     # {"listen": {"ip": "127.0.0.1", "port": 53}}

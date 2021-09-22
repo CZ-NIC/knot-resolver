@@ -34,28 +34,28 @@ def _cpu_count() -> int:
 BackendEnum = LiteralEnum["auto", "systemd", "supervisord"]
 
 
-class Management(SchemaNode):
+class ManagementSchema(SchemaNode):
     listen: Listen = Listen({"unix-socket": "/tmp/manager.sock"})
     backend: BackendEnum = "auto"
     rundir: AnyPath = AnyPath(".")
 
 
-class Webmgmt(SchemaNode):
+class WebmgmtSchema(SchemaNode):
     listen: Listen
     tls: bool = False
     cert_file: Optional[AnyPath] = None
     key_file: Optional[AnyPath] = None
 
 
-class Server(SchemaNode):
+class ServerSchema(SchemaNode):
     class Raw(SchemaNode):
         hostname: Optional[str] = None
         groupid: Optional[str] = None
         nsid: Optional[str] = None
         workers: Union[Literal["auto"], int] = 1
         use_cache_gc: bool = True
-        management: Management = Management()
-        webmgmt: Optional[Webmgmt] = None
+        management: ManagementSchema = ManagementSchema()
+        webmgmt: Optional[WebmgmtSchema] = None
 
     _PREVIOUS_SCHEMA = Raw
 
@@ -64,8 +64,8 @@ class Server(SchemaNode):
     nsid: Optional[str]
     workers: int
     use_cache_gc: bool
-    management: Management
-    webmgmt: Optional[Webmgmt]
+    management: ManagementSchema
+    webmgmt: Optional[WebmgmtSchema]
 
     def _hostname(self, obj: Raw) -> Any:
         if obj.hostname is None:

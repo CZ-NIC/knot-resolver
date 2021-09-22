@@ -10,12 +10,12 @@ from .types import TimeUnit
 GlueCheckingEnum = LiteralEnum["normal", "strict", "permissive"]
 
 
-class Prediction(SchemaNode):
+class PredictionSchema(SchemaNode):
     window: TimeUnit = TimeUnit("15m")
     period: int = 24
 
 
-class Options(SchemaNode):
+class OptionsSchema(SchemaNode):
     class Raw(SchemaNode):
         glue_checking: GlueCheckingEnum = "normal"
         qname_minimisation: bool = True
@@ -28,7 +28,7 @@ class Options(SchemaNode):
         time_jump_detection: bool = True
         violators_workarounds: bool = False
         serve_stale: bool = False
-        prediction: Union[bool, Prediction] = False
+        prediction: Union[bool, PredictionSchema] = False
 
     _PREVIOUS_SCHEMA = Raw
 
@@ -43,9 +43,9 @@ class Options(SchemaNode):
     time_jump_detection: bool
     violators_workarounds: bool
     serve_stale: bool
-    prediction: Union[Literal[False], Prediction]
+    prediction: Union[Literal[False], PredictionSchema]
 
     def _prediction(self, obj: Raw) -> Any:
         if obj.prediction is True:
-            return Prediction()
+            return PredictionSchema()
         return obj.prediction

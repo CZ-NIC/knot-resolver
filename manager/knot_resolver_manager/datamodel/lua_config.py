@@ -3,7 +3,7 @@ from typing import Optional
 from knot_resolver_manager.utils import SchemaNode
 
 
-class Lua(SchemaNode):
+class LuaSchema(SchemaNode):
     script_only: bool = False
     script: Optional[str] = None
     script_file: Optional[str] = None

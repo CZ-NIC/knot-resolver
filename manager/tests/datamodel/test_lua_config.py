@@ -1,10 +1,10 @@
 from pytest import raises
 
-from knot_resolver_manager.datamodel.lua_config import Lua
+from knot_resolver_manager.datamodel.lua_config import LuaSchema
 from knot_resolver_manager.exceptions import KresdManagerException
 
 tree = {"script-only": True, "script": "-- lua script"}
-strict = Lua(tree)
+strict = LuaSchema(tree)
 
 
 def test_validating():
@@ -14,4 +14,4 @@ def test_validating():
 
 def test_exception_raises():
     with raises(KresdManagerException):
-        Lua({"script": "-- lua script", "script-file": "path/to/file"})
+        LuaSchema({"script": "-- lua script", "script-file": "path/to/file"})
