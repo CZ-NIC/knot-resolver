@@ -1,12 +1,16 @@
 import pkgutil
-from typing import Optional, Text
+from typing import Text, Union
 
 from jinja2 import Environment, Template
+from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.lua_config import Lua, LuaStrict
-from knot_resolver_manager.datamodel.network_config import Network, NetworkStrict
-from knot_resolver_manager.datamodel.server_config import Server, ServerStrict
-from knot_resolver_manager.utils import DataParser, DataValidator
+from knot_resolver_manager.datamodel.dns64_config import Dns64
+from knot_resolver_manager.datamodel.dnssec_config import Dnssec
+from knot_resolver_manager.datamodel.lua_config import Lua
+from knot_resolver_manager.datamodel.network_config import Network
+from knot_resolver_manager.datamodel.options_config import Options
+from knot_resolver_manager.datamodel.server_config import Server
+from knot_resolver_manager.utils import SchemaNode
 
 
 def _import_lua_template() -> Template:
@@ -20,19 +24,33 @@ def _import_lua_template() -> Template:
 _LUA_TEMPLATE = _import_lua_template()
 
 
-class KresConfig(DataParser):
-    server: Server = Server()
-    network: Network = Network()
-    lua: Optional[Lua] = None
+class KresConfig(SchemaNode):
+    class Raw(SchemaNode):
+        server: Server = Server()
+        options: Options = Options()
+        network: Network = Network()
+        dnssec: Union[bool, Dnssec] = True
+        dns64: Union[bool, Dns64] = False
+        lua: Lua = Lua()
 
+    _PREVIOUS_SCHEMA = Raw
 
-class KresConfigStrict(DataValidator):
-    server: ServerStrict
-    network: NetworkStrict
-    lua: Optional[LuaStrict]
+    server: Server
+    options: Options
+    network: Network
+    dnssec: Union[Literal[False], Dnssec]
+    dns64: Union[Literal[False], Dns64]
+    lua: Lua
+
+    def _dnssec(self, obj: Raw) -> Union[Literal[False], Dnssec]:
+        if obj.dnssec is True:
+            return Dnssec()
+        return obj.dnssec
+
+    def _dns64(self, obj: Raw) -> Union[Literal[False], Dns64]:
+        if obj.dns64 is True:
+            return Dns64()
+        return obj.dns64
 
     def render_lua(self) -> Text:
         return _LUA_TEMPLATE.render(cfg=self)
-
-    def _validate(self) -> None:
-        pass

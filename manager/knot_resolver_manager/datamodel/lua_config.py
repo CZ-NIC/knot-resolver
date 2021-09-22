@@ -1,21 +1,13 @@
-from typing import List, Optional, Union
+from typing import Optional
 
-from knot_resolver_manager.utils import DataParser, DataValidator
+from knot_resolver_manager.utils import SchemaNode
 
 
-class Lua(DataParser):
-    script: Optional[Union[List[str], str]] = None
+class Lua(SchemaNode):
+    script_only: bool = False
+    script: Optional[str] = None
     script_file: Optional[str] = None
 
-
-class LuaStrict(DataValidator):
-    script: Optional[str]
-    script_file: Optional[str]
-
-    def _script(self, lua: Lua) -> Optional[str]:
-        if isinstance(lua.script, List):
-            return "\n".join(lua.script)
-        return lua.script
-
     def _validate(self) -> None:
-        pass
+        if self.script and self.script_file:
+            raise ValueError("'lua.script' and 'lua.script-file' are both defined, only one can be used")

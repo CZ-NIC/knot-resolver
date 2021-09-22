@@ -1,3 +1,3 @@
-from .config import KresConfig, KresConfigStrict
+from .config import KresConfig
 
-__all__ = ["KresConfig", "KresConfigStrict"]
+__all__ = ["KresConfig"]

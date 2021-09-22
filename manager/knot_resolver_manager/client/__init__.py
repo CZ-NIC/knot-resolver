@@ -8,8 +8,8 @@ from typing import Union
 import requests
 
 from knot_resolver_manager import compat
-from knot_resolver_manager.datamodel.config import KresConfig
 from knot_resolver_manager.server import start_server
+from knot_resolver_manager.utils.parsing import ParsedTree
 
 
 class KnotManagerClient:
@@ -64,7 +64,7 @@ _DEFAULT_SENTINEL = _DefaultSentinel()
 
 
 def start_manager_in_background(
-    host: str, port: int, initial_config: Union[None, KresConfig, _DefaultSentinel] = _DEFAULT_SENTINEL
+    host: str, port: int, initial_config: Union[None, ParsedTree, _DefaultSentinel] = _DEFAULT_SENTINEL
 ) -> multiprocessing.Process:
     if isinstance(initial_config, _DefaultSentinel):
         p = multiprocessing.Process(target=compat.asyncio.run, args=(start_server(tcp=[(host, port)], unix=[]),))

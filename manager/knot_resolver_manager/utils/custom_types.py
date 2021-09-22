@@ -18,10 +18,10 @@ class CustomValueType:
 
     There is no validation done on the wrapped value. The only condition is that
     it can't be `None`. If you want to perform any validation during creation,
-    raise a `DataValidationException` in case of errors.
+    raise a `SchemaException` in case of errors.
     """
 
-    def __init__(self, source_value: Any) -> None:
+    def __init__(self, source_value: Any, object_path: str = "/") -> None:
         pass
 
     def __int__(self) -> int:
@@ -29,3 +29,12 @@ class CustomValueType:
 
     def __str__(self) -> str:
         raise NotImplementedError("CustomValueType return 'str()' value is not implemented.")
+
+    def serialize(self) -> Any:
+        """
+        Every custom type should implement this. It is used for dumping configuration.
+
+        It's not necessary to return the same structure that was given as an input. It only has
+        to be the same semantically.
+        """
+        raise NotImplementedError(f"{type(self).__name__}'s' 'to_dict()' not implemented.")
