@@ -4,12 +4,12 @@ from knot_resolver_manager.datamodel.types import TimeUnit
 from knot_resolver_manager.utils import SchemaNode
 
 
-class TrustAnchorFile(SchemaNode):
+class TrustAnchorFileSchema(SchemaNode):
     file: str
     read_only: bool = False
 
 
-class Dnssec(SchemaNode):
+class DnssecSchema(SchemaNode):
     trust_anchor_sentinel: bool = True
     trust_anchor_signal_query: bool = True
     time_skew_detection: bool = True
@@ -19,4 +19,4 @@ class Dnssec(SchemaNode):
 
     trust_anchors: Optional[List[str]] = None
     negative_trust_anchors: Optional[List[str]] = None
-    trust_anchors_files: Optional[List[TrustAnchorFile]] = None
+    trust_anchors_files: Optional[List[TrustAnchorFileSchema]] = None
