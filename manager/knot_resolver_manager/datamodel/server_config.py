@@ -47,42 +47,35 @@ class Webmgmt(SchemaNode):
     key_file: Optional[AnyPath] = None
 
 
-class _ServerRaw(SchemaNode):
-    hostname: Optional[str] = None
-    groupid: Optional[str] = None
-    nsid: Optional[str]
-    workers: Union[Literal["auto"], int] = 1
-    use_cache_gc: bool = True
-
-    management: Management = Management()
-    webmgmt: Optional[Webmgmt] = None
-
-
 class Server(SchemaNode):
-    _PREVIOUS_SCHEMA = _ServerRaw
+    class Raw(SchemaNode):
+        hostname: Optional[str] = None
+        groupid: Optional[str] = None
+        nsid: Optional[str] = None
+        workers: Union[Literal["auto"], int] = 1
+        use_cache_gc: bool = True
+        management: Management = Management()
+        webmgmt: Optional[Webmgmt] = None
+
+    _PREVIOUS_SCHEMA = Raw
 
     hostname: str
     groupid: Optional[str]
     nsid: Optional[str]
     workers: int
     use_cache_gc: bool
-
     management: Management
     webmgmt: Optional[Webmgmt]
 
-    def _hostname(self, obj: Any) -> str:
-        if isinstance(obj["hostname"], str):
-            return obj["hostname"]
-        elif obj["hostname"] is None:
+    def _hostname(self, obj: Raw) -> Any:
+        if obj.hostname is None:
             return socket.gethostname()
-        raise ValueError(f"Unexpected value for 'server.hostname': {obj['hostname']}")
+        return obj.hostname
 
-    def _workers(self, obj: Any) -> int:
-        if isinstance(obj["workers"], int):
-            return obj["workers"]
-        elif obj["workers"] == "auto":
+    def _workers(self, obj: Raw) -> Any:
+        if obj.workers == "auto":
             return _cpu_count()
-        raise ValueError(f"Unexpected value for 'server.workers': {obj['workers']}")
+        return obj.workers
 
     def _validate(self) -> None:
         if self.workers < 0:
