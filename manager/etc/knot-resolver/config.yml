@@ -1,5 +1,7 @@
 network:
     interfaces:
-      - listen: 127.0.0.1@5353
+      - listen:
+            ip: 127.0.0.1
+            port: 5353
 server:
     workers: 1

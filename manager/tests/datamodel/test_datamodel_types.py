@@ -7,13 +7,12 @@ from knot_resolver_manager.datamodel.types import (
     IPNetwork,
     IPv6Network96,
     Listen,
-    ListenStrict,
     ListenType,
     SizeUnit,
     TimeUnit,
 )
 from knot_resolver_manager.exceptions import KresdManagerException
-from knot_resolver_manager.utils import DataParser, DataValidator
+from knot_resolver_manager.utils import SchemaNode
 
 
 def test_size_unit():
@@ -41,92 +40,52 @@ def test_time_unit():
 
 
 def test_parsing_units():
-    class TestClass(DataParser):
+    class TestSchema(SchemaNode):
         size: SizeUnit
         time: TimeUnit
 
-    class TestClassStrict(DataValidator):
-        size: int
-        time: int
-
-        def _validate(self) -> None:
-            pass
-
-    yaml = """
-size: 3K
-time: 10m
-"""
-
-    obj = TestClass.from_yaml(yaml)
-    assert obj.size == SizeUnit("3072B")
-    assert obj.time == TimeUnit("10m")
-
-    strict = TestClassStrict(obj)
-    assert strict.size == 3 * 1024
-    assert strict.time == 10 * 60 * 1000
-
-    y = obj.dump_to_yaml()
-    j = obj.dump_to_json()
-    a = TestClass.from_yaml(y)
-    b = TestClass.from_json(j)
-    assert a.size == b.size == obj.size
-    assert a.time == b.time == obj.time
+    o = TestSchema({"size": "3K", "time": "10m"})
+    assert o.size == SizeUnit("3072B")
+    assert o.time == TimeUnit("10m")
+    assert o.size.bytes() == 3072
+    assert o.time.seconds() == 10 * 60
 
 
 def test_anypath():
-    class Data(DataParser):
+    class Data(SchemaNode):
         p: AnyPath
 
-    assert str(Data.from_yaml('p: "/tmp"').p) == "/tmp"
+    assert str(Data({"p": "/tmp"}).p) == "/tmp"
 
 
 def test_listen():
-    o = Listen.from_yaml('unix-socket: "/tmp"')
-    oo = ListenStrict(o)
+    o = Listen({"unix-socket": "/tmp"})
 
-    assert oo.typ == ListenType.UNIX_SOCKET
-    assert oo.ip is None
-    assert oo.port is None
-    assert oo.unix_socket is not None
-    assert oo.interface is None
+    assert o.typ == ListenType.UNIX_SOCKET
+    assert o.ip is None
+    assert o.port is None
+    assert o.unix_socket is not None
+    assert o.interface is None
 
-    o = Listen.from_yaml(
-        """
-    interface: eth0
-    port: 56
-    """
-    )
-    oo = ListenStrict(o)
+    o = Listen({"interface": "eth0", "port": 56})
 
-    assert oo.typ == ListenType.INTERFACE_AND_PORT
-    assert oo.ip is None
-    assert oo.port == 56
-    assert oo.unix_socket is None
-    assert oo.interface == "eth0"
+    assert o.typ == ListenType.INTERFACE_AND_PORT
+    assert o.ip is None
+    assert o.port == 56
+    assert o.unix_socket is None
+    assert o.interface == "eth0"
 
-    o = Listen.from_yaml(
-        """
-    ip: 123.4.5.6
-    port: 56
-    """
-    )
-    oo = ListenStrict(o)
+    o = Listen({"ip": "123.4.5.6", "port": 56})
 
-    assert oo.typ == ListenType.IP_AND_PORT
-    assert oo.ip == ipaddress.ip_address("123.4.5.6")
-    assert oo.port == 56
-    assert oo.unix_socket is None
-    assert oo.interface is None
+    assert o.typ == ListenType.IP_AND_PORT
+    assert o.ip == ipaddress.ip_address("123.4.5.6")
+    assert o.port == 56
+    assert o.unix_socket is None
+    assert o.interface is None
 
     # check failure
-    o = Listen.from_yaml(
-        """
-        unix-socket: '/tmp'
-        ip: 127.0.0.1
-    """
-    )
     with raises(KresdManagerException):
-        ListenStrict(o)
+        Listen({"unix-socket": "/tmp", "ip": "127.0.0.1"})
 
 
 def test_network():
