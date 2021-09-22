@@ -112,6 +112,7 @@ disable= [
     "no-else-raise", # not helpful for readability, when we want explicit branches
     "raising-bad-type", # handled by type checker
     "too-many-arguments",  # sure, but how can we change the signatures to take less arguments? artificially create objects with arguments? That's stupid...
+    "no-member",  # checked by pyright
 ]
 
 [tool.pylint.SIMILARITIES]

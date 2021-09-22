@@ -1,10 +1,14 @@
 import logging
 import os
-from typing import Union
+import socket
+from typing import Any, Optional, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.utils import DataParser, DataValidationException, DataValidator
+from knot_resolver_manager.datamodel.types import AnyPath, Listen
+from knot_resolver_manager.exceptions import DataException
+from knot_resolver_manager.utils import SchemaNode
+from knot_resolver_manager.utils.types import LiteralEnum
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +23,7 @@ def _cpu_count() -> int:
         )
         cpus = os.cpu_count()
         if cpus is None:
-            raise DataValidationException(
+            raise DataException(
                 "The number of available CPUs to automatically set the number of running"
                 "'kresd' workers could not be determined."
                 "The number can be specified manually in 'server:instances' configuration option."
@@ -27,22 +31,52 @@ def _cpu_count() -> int:
         return cpus
 
 
-class Server(DataParser):
-    workers: Union[Literal["auto"], int] = 1
-    use_cache_gc: bool = True
+BackendEnum = LiteralEnum["auto", "systemd", "supervisord"]
 
 
-class ServerStrict(DataValidator):
+class Management(SchemaNode):
+    listen: Listen = Listen({"unix-socket": "/tmp/manager.sock"})
+    backend: BackendEnum = "auto"
+    rundir: AnyPath = AnyPath(".")
+
+
+class Webmgmt(SchemaNode):
+    listen: Listen
+    tls: bool = False
+    cert_file: Optional[AnyPath] = None
+    key_file: Optional[AnyPath] = None
+
+
+class Server(SchemaNode):
+    class Raw(SchemaNode):
+        hostname: Optional[str] = None
+        groupid: Optional[str] = None
+        nsid: Optional[str] = None
+        workers: Union[Literal["auto"], int] = 1
+        use_cache_gc: bool = True
+        management: Management = Management()
+        webmgmt: Optional[Webmgmt] = None
+
+    _PREVIOUS_SCHEMA = Raw
+
+    hostname: str
+    groupid: Optional[str]
+    nsid: Optional[str]
     workers: int
     use_cache_gc: bool
+    management: Management
+    webmgmt: Optional[Webmgmt]
 
-    def _workers(self, obj: Server) -> int:
-        if isinstance(obj.workers, int):
-            return obj.workers
-        elif obj.workers == "auto":
+    def _hostname(self, obj: Raw) -> Any:
+        if obj.hostname is None:
+            return socket.gethostname()
+        return obj.hostname
+
+    def _workers(self, obj: Raw) -> Any:
+        if obj.workers == "auto":
             return _cpu_count()
-        raise DataValidationException(f"Unexpected value: {obj.workers}")
+        return obj.workers
 
     def _validate(self) -> None:
         if self.workers < 0:
-            raise DataValidationException("Number of workers must be non-negative")
+            raise ValueError("Number of workers must be non-negative")

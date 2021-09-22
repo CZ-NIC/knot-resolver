@@ -11,12 +11,12 @@ from aiohttp.web import middleware
 from aiohttp.web_response import json_response
 
 from knot_resolver_manager.constants import MANAGER_CONFIG_FILE
+from knot_resolver_manager.exceptions import DataException, KresdManagerException, TreeException
 from knot_resolver_manager.kresd_controller import get_controller_by_name
 from knot_resolver_manager.kresd_controller.interface import SubprocessController
-from knot_resolver_manager.utils import DataValidationException, Format
 from knot_resolver_manager.utils.async_utils import readfile
+from knot_resolver_manager.utils.parsing import ParsedTree, parse, parse_yaml
 
-from .datamodel import KresConfig
 from .kres_manager import KresManager
 
 _SHUTDOWN_EVENT = "shutdown-event"
@@ -51,9 +51,9 @@ async def _apply_config(request: web.Request) -> web.Response:
         )
 
     # parse the incoming data
-    last: KresConfig = manager.get_last_used_config() or KresConfig()
-    fmt = Format.from_mime_type(request.content_type)
-    config = last.copy_with_changed_subtree(fmt, document_path, await request.text())
+    last: ParsedTree = manager.get_last_used_config_raw() or ParsedTree({})
+    new_partial: ParsedTree = parse(await request.text(), request.content_type)
+    config = last.update(document_path, new_partial)
 
     # apply config
     await manager.apply_config(config)
@@ -82,9 +82,16 @@ async def error_handler(request: web.Request, handler: Any):
 
     try:
         return await handler(request)
-    except DataValidationException as e:
-        logger.error("Failed to parse given data in API request", exc_info=True)
-        return web.Response(text=f"Data validation failed: {e}", status=HTTPStatus.BAD_REQUEST)
+    except KresdManagerException as e:
+        if isinstance(e, TreeException):
+            return web.Response(
+                text=f"Configuration validation failed @ '{e.where()}': {e}", status=HTTPStatus.BAD_REQUEST
+            )
+        elif isinstance(e, (DataException, DataException)):
+            return web.Response(text=f"Configuration validation failed: {e}", status=HTTPStatus.BAD_REQUEST)
+        else:
+            logger.error("Request processing failed", exc_info=True)
+            return web.Response(text=f"Request processing failed: {e}", status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
 def setup_routes(app: web.Application):
@@ -104,7 +111,7 @@ _DEFAULT_SENTINEL = _DefaultSentinel()
 
 
 async def _init_manager(
-    config: Union[None, Path, KresConfig, _DefaultSentinel],
+    config: Union[None, Path, ParsedTree, _DefaultSentinel],
     subprocess_controller_name: Optional[str],
 ):
     """
@@ -136,8 +143,8 @@ async def _init_manager(
                 sys.exit(1)
             else:
                 logger.info("Loading initial configuration from %s", config)
-                config = KresConfig.from_yaml(await readfile(config))
-        if isinstance(config, KresConfig):
+                config = parse_yaml(await readfile(config))
+        if isinstance(config, ParsedTree):
             await manager.apply_config(config)
             logger.info("Initial configuration applied...")
 
@@ -150,7 +157,7 @@ async def _init_manager(
 async def start_server(
     tcp: List[Tuple[str, int]],
     unix: List[Path],
-    config: Union[None, Path, KresConfig, _DefaultSentinel] = _DEFAULT_SENTINEL,
+    config: Union[None, Path, ParsedTree, _DefaultSentinel] = _DEFAULT_SENTINEL,
     subprocess_controller_name: Optional[str] = None,
 ):
     start_time = time()
