@@ -5,9 +5,8 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Dict, Optional, Pattern, Union
 
-from knot_resolver_manager.exceptions import DataValidationException
-from knot_resolver_manager.utils import CustomValueType
-from knot_resolver_manager.utils.data_parser_validator import DataParser, DataValidator
+from knot_resolver_manager.exceptions import SchemaException
+from knot_resolver_manager.utils import CustomValueType, SchemaNode
 
 logger = logging.getLogger(__name__)
 
@@ -26,26 +25,26 @@ class Unit(CustomValueType):
             if grouped:
                 val, unit = grouped.groups()
                 if unit is None:
-                    raise DataValidationException(
+                    raise SchemaException(
                         f"Missing units. Accepted units are {list(type(self)._units.keys())}", object_path
                     )
                 elif unit not in type(self)._units:
-                    raise DataValidationException(
+                    raise SchemaException(
                         f"Used unexpected unit '{unit}' for {type(self).__name__}."
                         f" Accepted units are {list(type(self)._units.keys())}",
                         object_path,
                     )
                 self._value = int(val) * type(self)._units[unit]
             else:
-                raise DataValidationException(f"{type(self._value)} Failed to convert: {self}", object_path)
+                raise SchemaException(f"{type(self._value)} Failed to convert: {self}", object_path)
         elif isinstance(source_value, int):
-            raise DataValidationException(
+            raise SchemaException(
                 "We do not accept number without units."
                 f" Please convert the value to string an add a unit - {list(type(self)._units.keys())}",
                 object_path,
             )
         else:
-            raise DataValidationException(
+            raise SchemaException(
                 f"Unexpected input type for Unit type - {type(source_value)}."
                 " Cause might be invalid format or invalid type.",
                 object_path,
@@ -78,6 +77,9 @@ class SizeUnit(Unit):
     _re = re.compile(r"^([0-9]+)\s{0,1}([BKMG]){0,1}$")
     _units = {"B": 1, "K": 1024, "M": 1024 ** 2, "G": 1024 ** 3}
 
+    def bytes(self) -> int:
+        return self._value
+
 
 class TimeUnit(Unit):
     _re = re.compile(r"^(\d+)\s{0,1}([smhd]s?){0,1}$")
@@ -96,16 +98,14 @@ class AnyPath(CustomValueType):
         if isinstance(source_value, str):
             self._value: Path = Path(source_value)
         else:
-            raise DataValidationException(
+            raise SchemaException(
                 f"Expected file path in a string, got '{source_value}' with type '{type(source_value)}'", object_path
             )
 
         try:
             self._value = self._value.resolve(strict=False)
         except RuntimeError as e:
-            raise DataValidationException(
-                "Failed to resolve given file path. Is there a symlink loop?", object_path
-            ) from e
+            raise SchemaException("Failed to resolve given file path. Is there a symlink loop?", object_path) from e
 
     def __str__(self) -> str:
         return str(self._value)
@@ -123,27 +123,28 @@ class AnyPath(CustomValueType):
         return str(self._value)
 
 
-class Listen(DataParser):
-    ip: Optional[str] = None
-    port: Optional[int] = None
-    unix_socket: Optional[AnyPath] = None
-    interface: Optional[str] = None
-
-
 class ListenType(Enum):
     IP_AND_PORT = auto()
     UNIX_SOCKET = auto()
     INTERFACE_AND_PORT = auto()
 
 
-class ListenStrict(DataValidator):
-    typ: ListenType
-    ip: Optional[Union[ipaddress.IPv4Address, ipaddress.IPv6Address]] = None
-    port: Optional[int] = None
-    unix_socket: Optional[AnyPath] = None
-    interface: Optional[str] = None
+class Listen(SchemaNode):
+    class Raw(SchemaNode):
+        ip: Optional[str] = None
+        port: Optional[int] = None
+        unix_socket: Optional[AnyPath] = None
+        interface: Optional[str] = None
 
-    def _typ(self, origin: Listen):
+    _PREVIOUS_SCHEMA = Raw
+
+    typ: ListenType
+    ip: Optional[Union[ipaddress.IPv4Address, ipaddress.IPv6Address]]
+    port: Optional[int]
+    unix_socket: Optional[AnyPath]
+    interface: Optional[str]
+
+    def _typ(self, origin: Raw):
         present = {
             "ip" if origin.ip is not None else ...,
             "port" if origin.port is not None else ...,
@@ -163,14 +164,14 @@ class ListenStrict(DataValidator):
                 "You can use (IP and PORT) or (UNIX_SOCKET) or (INTERFACE and PORT)."
             )
 
-    def _port(self, origin: Listen):
+    def _port(self, origin: Raw):
         if origin.port is None:
             return None
         if not 0 <= origin.port <= 65_535:
             raise ValueError(f"Port value {origin.port} out of range of usual 2-byte port value")
         return origin.port
 
-    def _ip(self, origin: Listen):
+    def _ip(self, origin: Raw):
         if origin.ip is None:
             return None
         # throws value error, so that get's caught outside of this function
@@ -188,9 +189,9 @@ class IPNetwork(CustomValueType):
             try:
                 self._value: Union[ipaddress.IPv4Network, ipaddress.IPv6Network] = ipaddress.ip_network(source_value)
             except ValueError as e:
-                raise DataValidationException("Failed to parse IP network.", object_path) from e
+                raise SchemaException("Failed to parse IP network.", object_path) from e
         else:
-            raise DataValidationException(
+            raise SchemaException(
                 f"Unexpected value for a network subnet. Expected string, got '{source_value}'"
                 " with type '{type(source_value)}'",
                 object_path,
@@ -216,10 +217,10 @@ class IPv6Network96(CustomValueType):
             try:
                 self._value: ipaddress.IPv6Network = ipaddress.IPv6Network(source_value)
             except ValueError as e:
-                raise DataValidationException("Failed to parse IPv6 /96 network.", object_path) from e
+                raise SchemaException("Failed to parse IPv6 /96 network.", object_path) from e
 
             if self._value.prefixlen == 128:
-                raise DataValidationException(
+                raise SchemaException(
                     "Expected IPv6 network address with /96 prefix length."
                     " Submitted address has been interpreted as /128."
                     " Maybe, you forgot to add /96 after the base address?",
@@ -227,13 +228,13 @@ class IPv6Network96(CustomValueType):
                 )
 
             if self._value.prefixlen != 96:
-                raise DataValidationException(
+                raise SchemaException(
                     "Expected IPv6 network address with /96 prefix length."
                     f" Got prefix lenght of {self._value.prefixlen}",
                     object_path,
                 )
         else:
-            raise DataValidationException(
+            raise SchemaException(
                 "Unexpected value for a network subnet."
                 f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,

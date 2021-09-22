@@ -82,3 +82,7 @@ T = TypeVar("T")
 def get_optional_inner_type(optional: Type[Optional[T]]) -> Type[T]:
     assert is_optional(optional)
     return get_generic_type_arguments(optional)[0]
+
+
+def is_internal_field_name(field_name: str) -> bool:
+    return field_name.startswith("_")

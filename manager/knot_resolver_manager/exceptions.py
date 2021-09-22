@@ -16,18 +16,17 @@ class TreeException(KresdManagerException):
     def where(self) -> str:
         return self._tree_path
 
+    def __str__(self) -> str:
+        return super().__str__() + f" @ {self.where()}"
 
-class DataParsingException(TreeException):
+
+class SchemaException(TreeException):
     pass
 
 
-class DataValidationException(TreeException):
+class DataException(KresdManagerException):
     pass
 
 
 class ParsingException(KresdManagerException):
-    pass
-
-
-class ValidationException(KresdManagerException):
     pass
