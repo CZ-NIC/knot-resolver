@@ -1,6 +1,5 @@
 from typing import Optional
 
-from knot_resolver_manager.exceptions import DataException
 from knot_resolver_manager.utils import SchemaNode
 
 
@@ -11,4 +10,4 @@ class Lua(SchemaNode):
 
     def _validate(self) -> None:
         if self.script and self.script_file:
-            raise DataException("'script' and 'script-file' are both defined, only one can be used")
+            raise ValueError("'lua.script' and 'lua.script-file' are both defined, only one can be used")
