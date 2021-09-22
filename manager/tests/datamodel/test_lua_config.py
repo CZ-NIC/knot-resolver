@@ -1,6 +1,6 @@
 from pytest import raises
 
-from knot_resolver_manager.datamodel.lua_config import LuaSchema
+from knot_resolver_manager.datamodel.lua_schema import LuaSchema
 from knot_resolver_manager.exceptions import KresdManagerException
 
 tree = {"script-only": True, "script": "-- lua script"}

@@ -1,4 +1,4 @@
-from knot_resolver_manager.datamodel.options_config import OptionsSchema
+from knot_resolver_manager.datamodel.options_schema import OptionsSchema
 from knot_resolver_manager.datamodel.types import TimeUnit
 
 tree = {

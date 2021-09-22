@@ -4,12 +4,12 @@ from typing import Text, Union
 from jinja2 import Environment, Template
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.dns64_config import Dns64Schema
-from knot_resolver_manager.datamodel.dnssec_config import DnssecSchema
-from knot_resolver_manager.datamodel.lua_config import LuaSchema
-from knot_resolver_manager.datamodel.network_config import NetworkSchema
-from knot_resolver_manager.datamodel.options_config import OptionsSchema
-from knot_resolver_manager.datamodel.server_config import ServerSchema
+from knot_resolver_manager.datamodel.dns64_schema import Dns64Schema
+from knot_resolver_manager.datamodel.dnssec_schema import DnssecSchema
+from knot_resolver_manager.datamodel.lua_schema import LuaSchema
+from knot_resolver_manager.datamodel.network_schema import NetworkSchema
+from knot_resolver_manager.datamodel.options_schema import OptionsSchema
+from knot_resolver_manager.datamodel.server_schema import ServerSchema
 from knot_resolver_manager.utils import SchemaNode
 
 

@@ -1,6 +1,6 @@
 import ipaddress
 
-from knot_resolver_manager.datamodel.network_config import NetworkSchema
+from knot_resolver_manager.datamodel.network_schema import NetworkSchema
 
 
 def test_interfaces_default():

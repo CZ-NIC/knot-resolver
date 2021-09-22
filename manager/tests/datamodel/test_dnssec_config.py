@@ -1,4 +1,4 @@
-from knot_resolver_manager.datamodel.dnssec_config import DnssecSchema
+from knot_resolver_manager.datamodel.dnssec_schema import DnssecSchema
 from knot_resolver_manager.datamodel.types import TimeUnit
 
 tree = {
