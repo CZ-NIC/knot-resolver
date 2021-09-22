@@ -180,6 +180,6 @@ def test_partial_mutations():
     assert o.workers == 8
     assert o.inner.size == 33
 
-    # raise validation ValueError
-    with raises(ValueError):
+    # raise validation SchemaException
+    with raises(SchemaException):
         o = ConfSchema(d.update("/", parse_json('{"workers": -5}')))
