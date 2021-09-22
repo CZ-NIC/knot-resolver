@@ -11,4 +11,4 @@ class Lua(SchemaNode):
 
     def _validate(self) -> None:
         if self.script and self.script_file:
-            raise DataException("'lua.script' and 'lua.script-file' are both defined, only one can be used")
+            raise DataException("'script' and 'script-file' are both defined, only one can be used")

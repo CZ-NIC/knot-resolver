@@ -1,7 +1,8 @@
 import pkgutil
-from typing import Any, Text, Union
+from typing import Text, Union
 
 from jinja2 import Environment, Template
+from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.dns64_config import Dns64
 from knot_resolver_manager.datamodel.dnssec_config import Dnssec
@@ -24,22 +25,32 @@ _LUA_TEMPLATE = _import_lua_template()
 
 
 class KresConfig(SchemaNode):
-    server: Server = Server()
-    options: Options = Options()
-    network: Network = Network()
-    dnssec: Union[bool, Dnssec] = True
-    dns64: Union[bool, Dns64] = False
-    lua: Lua = Lua()
+    class Raw(SchemaNode):
+        server: Server = Server()
+        options: Options = Options()
+        network: Network = Network()
+        dnssec: Union[bool, Dnssec] = True
+        dns64: Union[bool, Dns64] = False
+        lua: Lua = Lua()
 
-    def _dnssec(self, obj: Any) -> Union[bool, Dnssec]:
-        if "dnssec" not in obj or obj["dnssec"] is True:
+    _PREVIOUS_SCHEMA = Raw
+
+    server: Server
+    options: Options
+    network: Network
+    dnssec: Union[Literal[False], Dnssec]
+    dns64: Union[Literal[False], Dns64]
+    lua: Lua
+
+    def _dnssec(self, obj: Raw) -> Union[Literal[False], Dnssec]:
+        if obj.dnssec is True:
             return Dnssec()
-        return obj["dnssec"]
+        return obj.dnssec
 
-    def _dns64(self, obj: Any) -> Union[bool, Dns64]:
-        if "dns64" not in obj or obj["dns64"] is True:
+    def _dns64(self, obj: Raw) -> Union[Literal[False], Dns64]:
+        if obj.dns64 is True:
             return Dns64()
-        return obj["dns64"]
+        return obj.dns64
 
     def render_lua(self) -> Text:
         return _LUA_TEMPLATE.render(cfg=self)
