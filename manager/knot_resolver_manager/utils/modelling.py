@@ -1,5 +1,5 @@
 import inspect
-from typing import Any, Dict, List, Optional, Set, Tuple, Type, Union
+from typing import Any, Dict, Optional, Set, Tuple, Type, Union
 
 from knot_resolver_manager.exceptions import DataException, SchemaException
 from knot_resolver_manager.utils.custom_types import CustomValueType
@@ -180,16 +180,17 @@ def _validated_object_type(
 
 TSource = Union[NoneType, ParsedTree, "SchemaNode", Dict[str, Any]]
 
+
 def create_untouchable(name: str):
-    class _Untouchable(object):
-        def __init__(self) -> None:
-            super().__init__()
+    class _Untouchable:
         def __getattribute__(self, item_name: str) -> Any:
             raise RuntimeError(f"You are not supposed to access object '{name}'.")
+
         def __setattr__(self, item_name: str, value: Any) -> None:
             raise RuntimeError(f"You are not supposed to access object '{name}'.")
-        
+
     return _Untouchable()
+
 
 class SchemaNode:
     _PREVIOUS_SCHEMA: Optional[Type["SchemaNode"]] = None
@@ -221,6 +222,13 @@ class SchemaNode:
             # populate field
             if source is None:
                 self._assign_default(name, python_type, object_path)
+
+            # check for invalid configuration with both transformation function and default value
+            elif hasattr(self, f"_{name}") and hasattr(self, name):
+                raise RuntimeError(
+                    f"Field '{self.__class__.__name__}.{name}' has default value and transformation function at"
+                    " the same time. That is now allowed. Store the default in the transformation function."
+                )
 
             # there is a transformation function to create the value
             elif hasattr(self, f"_{name}"):
