@@ -167,6 +167,11 @@ typedef struct {
 	uint16_t tag;
 } kr_svldr_key_t;
 
+struct kr_svldr_ctx {
+	kr_rrset_validation_ctx_t vctx;
+	array_t(kr_svldr_key_t) keys; // owned(malloc), also insides via svldr_key_*
+};
+
 static int svldr_key_new(const knot_rdata_t *rdata, const knot_dname_t *owner,
 			 kr_svldr_key_t *result)
 {
@@ -180,6 +185,48 @@ static int svldr_key_new(const knot_rdata_t *rdata, const knot_dname_t *owner,
 static inline void svldr_key_del(kr_svldr_key_t *skey)
 {
 	kr_dnssec_key_free(&skey->key);
+}
+
+void kr_svldr_free_ctx(struct kr_svldr_ctx *ctx)
+{
+	if (!ctx) return;
+	for (ssize_t i = 0; i < ctx->keys.len; ++i)
+		svldr_key_del(&ctx->keys.at[i]);
+	array_clear(ctx->keys);
+	free_const(ctx->vctx.zone_name);
+	free(ctx);
+}
+struct kr_svldr_ctx * kr_svldr_new_ctx(const knot_rrset_t *ds, knot_rrset_t *dnskey,
+		const knot_rdataset_t *dnskey_sigs, uint32_t timestamp)
+{
+	// Basic init.
+	struct kr_svldr_ctx *ctx = calloc(1, sizeof(*ctx));
+	if (unlikely(!ctx))
+		return NULL;
+	ctx->vctx.timestamp = timestamp;
+	ctx->vctx.zone_name = knot_dname_copy(ds->owner, NULL);
+	if (unlikely(!ctx->vctx.zone_name))
+		goto fail;
+	// Validate the DNSKEY set.
+	ctx->vctx.keys = dnskey;
+	if (kr_dnskeys_trusted(&ctx->vctx, dnskey_sigs, ds) != 0)
+		goto fail;
+	// Put usable DNSKEYs into ctx->keys.  (Some duplication of work happens, but OK.)
+	array_init(ctx->keys);
+	array_reserve(ctx->keys, dnskey->rrs.count);
+	knot_rdata_t *krr = dnskey->rrs.rdata;
+	for (int i = 0; i < dnskey->rrs.count; ++i, krr = knot_rdataset_next(krr)) {
+		if (!kr_dnssec_key_zsk(krr->data) || kr_dnssec_key_revoked(krr->data))
+			continue; // key not usable for this
+		kr_svldr_key_t key;
+		if (unlikely(svldr_key_new(krr, NULL/*seems OK here*/, &key) != 0))
+			goto fail;
+		array_push(ctx->keys, key);
+	}
+	return ctx;
+fail:
+	kr_svldr_free_ctx(ctx);
+	return NULL;
 }
 
 static int kr_svldr_rrset_with_key(knot_rrset_t *rrs, const knot_rdataset_t *rrsigs,
@@ -215,6 +262,20 @@ static int kr_svldr_rrset_with_key(knot_rrset_t *rrs, const knot_rdataset_t *rrs
 	return vctx->result;
 }
 /* The implementation basically performs "parts of" kr_rrset_validate(). */
+int kr_svldr_rrset(knot_rrset_t *rrs, const knot_rdataset_t *rrsigs,
+			struct kr_svldr_ctx *ctx)
+{
+	if (knot_dname_in_bailiwick(rrs->owner, ctx->vctx.zone_name) < 0) {
+		ctx->vctx.result = kr_error(EAGAIN);
+		return ctx->vctx.result;
+	}
+	for (ssize_t i = 0; i < ctx->keys.len; ++i) {
+		kr_svldr_rrset_with_key(rrs, rrsigs, &ctx->vctx, &ctx->keys.at[i]);
+		if (ctx->vctx.result == 0)
+			break;
+	}
+	return ctx->vctx.result;
+}
 
 
 /**

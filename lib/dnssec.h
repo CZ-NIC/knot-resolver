@@ -147,3 +147,34 @@ void kr_dnssec_key_free(struct dnssec_key **key);
  */
 int kr_dnssec_matches_name_and_type(const ranked_rr_array_t *rrs, uint32_t qry_uid,
 				    const knot_dname_t *name, uint16_t type);
+
+
+/* Simple validator API.  Main use case: prefill module, i.e. RRs from a zone file. */
+
+/** Opaque context for simple validator. */
+struct kr_svldr_ctx;
+/**
+ * Create new context for validating within a given zone.
+ *
+ * - `ds` is assumed to be trusted, and it's used to validate `dnskey+dnskey_sigs`.
+ * - The TTL of `dnskey` may get trimmed.
+ * - The insides are placed on malloc heap (use _free_ctx).
+ */
+KR_EXPORT
+struct kr_svldr_ctx * kr_svldr_new_ctx(const knot_rrset_t *ds, knot_rrset_t *dnskey,
+		const knot_rdataset_t *dnskey_sigs, uint32_t timestamp);
+/** Free the context.  Passing NULL is OK. */
+KR_EXPORT
+void kr_svldr_free_ctx(struct kr_svldr_ctx *ctx);
+/**
+ * Validate an RRset with the associated signatures; assume no wildcard expansions.
+ *
+ * - It's caller's responsibility that rrsigs have matching owner, class and type.
+ * - The TTL of `rrs` may get trimmed.
+ * - If it's a wildcard other than in its simple `*.` form, it may fail to validate.
+ * - More generally, non-existence proofs are not supported.
+ */
+KR_EXPORT
+int kr_svldr_rrset(knot_rrset_t *rrs, const knot_rdataset_t *rrsigs,
+			struct kr_svldr_ctx *ctx);
+
