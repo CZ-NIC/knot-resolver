@@ -29,35 +29,6 @@
 #include "categories.h"
 #include "db.h"
 
-// section: timer
-// TODO replace/move to contrib
-
-typedef struct timespec gc_timer_t;
-static gc_timer_t gc_timer_internal = { 0 };
-
-static void gc_timer_start(gc_timer_t * t)
-{
-	(void)clock_gettime(CLOCK_MONOTONIC, t == NULL ? &gc_timer_internal : t);
-}
-
-static double gc_timer_end(gc_timer_t * t)
-{
-	gc_timer_t *start = t == NULL ? &gc_timer_internal : t;
-	gc_timer_t end = { 0 };
-	(void)clock_gettime(CLOCK_MONOTONIC, &end);
-	return (((double)end.tv_sec - (double)start->tv_sec) +
-		((double)end.tv_nsec - (double)start->tv_nsec) / 1e9);
-}
-
-static unsigned long gc_timer_usecs(gc_timer_t * t)
-{
-	gc_timer_t *start = t == NULL ? &gc_timer_internal : t;
-	gc_timer_t end = { 0 };
-	(void)clock_gettime(CLOCK_MONOTONIC, &end);
-	return ((end.tv_sec - start->tv_sec) * 1000000UL +
-		(end.tv_nsec - start->tv_nsec) / 1000UL);
-}
-
 // section: dbval_copy
 
 static knot_db_val_t *dbval_copy(const knot_db_val_t * from)
@@ -206,10 +177,10 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 
 	//// 2. classify all cache items into categories
 	//      and compute which categories to delete.
-	gc_timer_t timer_analyze = { 0 }, timer_choose = { 0 }, timer_delete =
+	kr_timer_t timer_analyze = { 0 }, timer_choose = { 0 }, timer_delete =
 	    { 0 }, timer_rw_txn = { 0 };
 
-	gc_timer_start(&timer_analyze);
+	kr_timer_start(&timer_analyze);
 	ctx_compute_categories_t cats = { { 0 }
 	};
 	ret = kr_gc_cache_iter(db, cfg, cb_compute_categories, &cats);
@@ -245,10 +216,10 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	}
 
 	printf("Cache analyzed in %.0lf msecs, %zu records, limit category is %d.\n",
-	       gc_timer_end(&timer_analyze) * 1000, cats.records, limit_category);
+	       kr_timer_elapsed(&timer_analyze) * 1000, cats.records, limit_category);
 
 	//// 3. pass whole cache again to collect a list of keys that should be deleted.
-	gc_timer_start(&timer_choose);
+	kr_timer_start(&timer_choose);
 	ctx_delete_categories_t to_del = { 0 };
 	to_del.cfg_temp_keys_space = cfg->temp_keys_space;
 	to_del.limit_category = limit_category;
@@ -268,8 +239,8 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	knot_db_txn_t txn = { 0 };
 	size_t deleted_records = 0, already_gone = 0, rw_txn_count = 0;
 
-	gc_timer_start(&timer_delete);
-	gc_timer_start(&timer_rw_txn);
+	kr_timer_start(&timer_delete);
+	kr_timer_start(&timer_rw_txn);
 	rrtype_dynarray_t deleted_rrtypes = { 0 };
 
 	ret = api->txn_begin(db, &txn, 0);
@@ -320,12 +291,12 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 		if ((cfg->rw_txn_items > 0 &&
 		     (deleted_records + already_gone) % cfg->rw_txn_items == 0) ||
 		    (cfg->rw_txn_duration > 0 &&
-		     gc_timer_usecs(&timer_rw_txn) > cfg->rw_txn_duration)) {
+		     kr_timer_elapsed_us(&timer_rw_txn) > cfg->rw_txn_duration)) {
 			ret = api->txn_commit(&txn);
 			if (ret == KNOT_EOK) {
 				rw_txn_count++;
 				usleep(cfg->rw_txn_delay);
-				gc_timer_start(&timer_rw_txn);
+				kr_timer_start(&timer_rw_txn);
 				ret = api->txn_begin(db, &txn, 0);
 			}
 			if (ret != KNOT_EOK) {
@@ -342,7 +313,7 @@ finish:
 	       already_gone);
 	rrtypelist_print(&deleted_rrtypes);
 	printf("It took %.0lf msecs, %zu transactions (%s)\n\n",
-	       gc_timer_end(&timer_delete) * 1000, rw_txn_count, knot_strerror(ret));
+	       kr_timer_elapsed(&timer_delete) * 1000, rw_txn_count, knot_strerror(ret));
 
 	rrtype_dynarray_free(&deleted_rrtypes);
 	entry_dynarray_deep_free(&to_del.to_delete);

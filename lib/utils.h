@@ -482,6 +482,43 @@ static inline int kr_dname_lf(uint8_t *dst, const knot_dname_t *src, bool add_wi
 	return KNOT_EOK;
 }
 
+
+/** Timer, i.e stop-watch. */
+typedef struct timespec kr_timer_t;
+
+/** Start, i.e. set the reference point. */
+static inline void kr_timer_start(kr_timer_t *start)
+{
+	/* The call should be very reliable, but let's check it in _start() at least. */
+	kr_require(start && clock_gettime(CLOCK_MONOTONIC, start) == 0);
+}
+
+/** Get elapsed time in floating-point seconds. */
+static inline double kr_timer_elapsed(kr_timer_t *start)
+{
+	kr_require(start);
+	kr_timer_t end = { 0 };
+	(void)clock_gettime(CLOCK_MONOTONIC, &end);
+	return (end.tv_sec - start->tv_sec) + (double)(end.tv_nsec - start->tv_nsec) / 1e9;
+}
+
+/** Get elapsed time in micro-seconds. */
+static inline uint64_t kr_timer_elapsed_us(kr_timer_t *start)
+{
+	kr_require(start);
+	kr_timer_t end = { 0 };
+	(void)clock_gettime(CLOCK_MONOTONIC, &end);
+	// avoid negative differences, because of integer division
+	if (end.tv_nsec - start->tv_nsec < 0) {
+		end.tv_nsec += 1000*1000*1000;
+		end.tv_sec  -= 1;
+	}
+	return (uint64_t)(end.tv_sec - start->tv_sec) * 1000000
+		// adding 500 gives us rounding
+		+ (end.tv_nsec - start->tv_nsec + 500) / 1000;
+}
+
+
 /**
  * Difference between two calendar times specified as strings.
  * \param[in]  format format for strptime
