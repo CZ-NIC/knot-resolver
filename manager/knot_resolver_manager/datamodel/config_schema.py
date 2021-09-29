@@ -4,6 +4,7 @@ from typing import Text, Union
 from jinja2 import Environment, Template
 from typing_extensions import Literal
 
+from knot_resolver_manager.datamodel.cache_schema import CacheSchema
 from knot_resolver_manager.datamodel.dns64_schema import Dns64Schema
 from knot_resolver_manager.datamodel.dnssec_schema import DnssecSchema
 from knot_resolver_manager.datamodel.lua_schema import LuaSchema
@@ -29,6 +30,7 @@ class KresConfig(SchemaNode):
         server: ServerSchema = ServerSchema()
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
+        cache: CacheSchema = CacheSchema()
         dnssec: Union[bool, DnssecSchema] = True
         dns64: Union[bool, Dns64Schema] = False
         lua: LuaSchema = LuaSchema()
@@ -38,6 +40,7 @@ class KresConfig(SchemaNode):
     server: ServerSchema
     options: OptionsSchema
     network: NetworkSchema
+    cache: CacheSchema
     dnssec: Union[Literal[False], DnssecSchema]
     dns64: Union[Literal[False], Dns64Schema]
     lua: LuaSchema

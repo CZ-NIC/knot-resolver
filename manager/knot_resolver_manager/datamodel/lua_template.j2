@@ -57,6 +57,26 @@ option('NO_0X20', {{ 'false' if cfg.options.query_case_randomization else 'true'
 {{ "modules.unload('detect_time_jump')" if not cfg.options.time_jump_detection }}
 {{ "modules.unload('refuse_nord')" if not cfg.options.refuse_no_rd }}
 
+-- CACHE section
+cache.open({{ cfg.cache.size_max.bytes() }}, 'lmdb://{{ cfg.cache.storage }}')
+cache.min_ttl({{ cfg.cache.ttl_min.seconds() }})
+cache.max_ttl({{ cfg.cache.ttl_max.seconds() }})
+cache.ns_tout({{ cfg.cache.ns_timeout.millis() }})
+
+-- cache.prefill
+{% if cfg.cache.prefill %}
+modules.load('prefill')
+prefill.config({
+{% for item in cfg.cache.prefill %}
+    ['{{ item.domain }}'] = {
+        url = '{{ item.url }}',
+        interval = {{ item.refresh_interval.seconds() }}
+        {{ "ca_file = '"+item.ca_file+"'," if item.ca_file }}
+    }
+{% endfor %}
+})
+{% endif %}
+
 -- DNSSEC section
 {% if not cfg.dnssec %}
 trust_anchors.remove('.')
