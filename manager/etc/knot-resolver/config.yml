@@ -1,7 +1,9 @@
+server:
+    workers: 1
 network:
     interfaces:
       - listen:
             ip: 127.0.0.1
             port: 5353
-server:
-    workers: 1
+cache:
+    storage: etc/knot-resolver/cache
