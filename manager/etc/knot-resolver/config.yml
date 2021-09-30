@@ -7,3 +7,5 @@ network:
             port: 5353
 cache:
     storage: etc/knot-resolver/cache
+logging:
+    level: debug

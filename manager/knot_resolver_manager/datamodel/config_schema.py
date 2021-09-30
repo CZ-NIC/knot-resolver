@@ -7,6 +7,7 @@ from typing_extensions import Literal
 from knot_resolver_manager.datamodel.cache_schema import CacheSchema
 from knot_resolver_manager.datamodel.dns64_schema import Dns64Schema
 from knot_resolver_manager.datamodel.dnssec_schema import DnssecSchema
+from knot_resolver_manager.datamodel.logging_config import LoggingSchema
 from knot_resolver_manager.datamodel.lua_schema import LuaSchema
 from knot_resolver_manager.datamodel.network_schema import NetworkSchema
 from knot_resolver_manager.datamodel.options_schema import OptionsSchema
@@ -33,6 +34,7 @@ class KresConfig(SchemaNode):
         cache: CacheSchema = CacheSchema()
         dnssec: Union[bool, DnssecSchema] = True
         dns64: Union[bool, Dns64Schema] = False
+        logging: LoggingSchema = LoggingSchema()
         lua: LuaSchema = LuaSchema()
 
     _PREVIOUS_SCHEMA = Raw
@@ -43,6 +45,7 @@ class KresConfig(SchemaNode):
     cache: CacheSchema
     dnssec: Union[Literal[False], DnssecSchema]
     dns64: Union[Literal[False], Dns64Schema]
+    logging: LoggingSchema
     lua: LuaSchema
 
     def _dnssec(self, obj: Raw) -> Union[Literal[False], DnssecSchema]:

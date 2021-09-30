@@ -112,6 +112,17 @@ trust_anchors.add_file('{{ taf.file }}',  readonly = {{ 'true' if taf.read_only 
 {% endfor %}
 {% endif %}
 
+-- LOGGING section
+log_level('{{ cfg.logging.level }}')
+{{ "log_target('"+cfg.logging.target+"')" if cfg.logging.target }}
+{% if cfg.logging.groups %}
+log_groups({
+{% for g in cfg.logging.groups %}
+    '{{ g }}',
+{% endfor %}
+})
+{% endif %}
+
 {% endif %}
 -- LUA section
 {% if cfg.lua.script_file %}
