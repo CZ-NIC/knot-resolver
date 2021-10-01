@@ -1,5 +1,6 @@
 import logging
 import sys
+from pathlib import Path
 from typing import Callable
 
 from knot_resolver_manager.client import KnotManagerClient, count_running_kresds, start_manager_in_background
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def test_wrapper(test: Test) -> bool:
-    p = start_manager_in_background(HOST, PORT)
+    p = start_manager_in_background(Path("integration/config.yml"))
     client = KnotManagerClient(BASE_URL)
     client.wait_for_initialization()
 
@@ -63,7 +64,7 @@ def crash_resistance(client: KnotManagerClient):
     assert cnt == 2, f"Expected 2 kresd instances, found {cnt}"
 
     # start the server again
-    p = start_manager_in_background("localhost", PORT, initial_config=None)
+    p = start_manager_in_background(Path("integration/config.yml"))
     try:
         client.wait_for_initialization()
     except TimeoutError as e:

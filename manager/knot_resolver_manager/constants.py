@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-LOG_LEVEL = logging.DEBUG
+STARTUP_LOG_LEVEL = logging.DEBUG
 
 CONFIGURATION_DIR = Path("etc/knot-resolver").absolute()
 CONFIGURATION_DIR.mkdir(exist_ok=True)

@@ -36,35 +36,17 @@ class KresManager:
     _instance: Optional["KresManager"] = None
 
     @staticmethod
-    async def create_instance(selected_controller: Optional[SubprocessController]) -> "KresManager":
+    async def create_instance(selected_controller: Optional[SubprocessController], config: KresConfig) -> "KresManager":
         """
-        Creates new singleton instance of KresManager. Can be called only once. Afterwards, use
-        `KresManager.get_instance()` to obtain the already existing instance
+        Creates new instance of KresManager.
         """
 
-        assert KresManager._instance is None
+        inst = KresManager(config, _i_know_what_i_am_doing=True)
+        await inst._async_init(selected_controller, config)  # pylint: disable=protected-access
+        KresManager._instance = inst
+        return inst
 
-        async with KresManager._instance_lock:
-            # trying to create, but racing and somebody already did it
-            if KresManager._instance is not None:
-                raise AssertionError("Must NOT call `create_instance` multiple times - race detected!")
-
-            # create it for real
-            inst = KresManager(_i_know_what_i_am_doing=True)
-            await inst._async_init(selected_controller)  # pylint: disable=protected-access
-            KresManager._instance = inst
-            return inst
-
-    @staticmethod
-    def get_instance() -> "KresManager":
-        """
-        Obtain reference to the singleton instance of this class. If you want to create an instance,
-        use `create_instance()`
-        """
-        assert KresManager._instance is not None
-        return KresManager._instance
-
-    async def _async_init(self, selected_controller: Optional[SubprocessController]):
+    async def _async_init(self, selected_controller: Optional[SubprocessController], config: KresConfig):
         if selected_controller is None:
             self._controller = await knot_resolver_manager.kresd_controller.get_best_controller_implementation()
         else:
@@ -72,8 +54,9 @@ class KresManager:
         await self._controller.initialize_controller()
         self._watchdog_task = create_task(self._watchdog())
         await self.load_system_state()
+        await self.apply_config(config)
 
-    def __init__(self, _i_know_what_i_am_doing: bool = False):
+    def __init__(self, config: KresConfig, _i_know_what_i_am_doing: bool = False):
         if not _i_know_what_i_am_doing:
             logger.error(
                 "Trying to create an instance of KresManager using normal contructor. Please use "
@@ -86,7 +69,7 @@ class KresManager:
         self._manager_lock = asyncio.Lock()
         self._controller: SubprocessController
         self._last_used_config_raw: Optional[ParsedTree]
-        self._last_used_config: Optional[KresConfig] = None
+        self._last_used_config: KresConfig = config
         self._watchdog_task: Optional["Future[None]"] = None
 
     async def load_system_state(self):
@@ -146,11 +129,8 @@ class KresManager:
         lua_config = config.render_lua()
         await writefile(KRESD_CONFIG_FILE, lua_config)
 
-    async def apply_config(self, config_raw: ParsedTree):
+    async def apply_config(self, config: KresConfig):
         async with self._manager_lock:
-            logger.debug("Validating configuration...")
-            config = KresConfig(config_raw)
-
             logger.debug("Writing new config to file...")
             await self._write_config(config)
 
@@ -166,7 +146,6 @@ class KresManager:
 
             logger.debug("Canary process test passed, Applying new config to all workers")
             self._last_used_config = config
-            self._last_used_config_raw = config_raw
             await self._ensure_number_of_children(config.server.workers)
             await self._rolling_restart()
 
@@ -186,11 +165,8 @@ class KresManager:
         if self._watchdog_task is not None:
             self._watchdog_task.cancel()
 
-    def get_last_used_config(self) -> Optional[KresConfig]:
+    def get_last_used_config(self) -> KresConfig:
         return self._last_used_config
-
-    def get_last_used_config_raw(self) -> Optional[ParsedTree]:
-        return self._last_used_config_raw
 
     async def _instability_handler(self) -> None:
         logger.error(
