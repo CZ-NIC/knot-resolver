@@ -3,6 +3,7 @@ import multiprocessing
 import subprocess
 import time
 import urllib.parse
+from pathlib import Path
 from typing import Union
 
 import requests
@@ -64,13 +65,11 @@ _DEFAULT_SENTINEL = _DefaultSentinel()
 
 
 def start_manager_in_background(
-    host: str, port: int, initial_config: Union[None, ParsedTree, _DefaultSentinel] = _DEFAULT_SENTINEL
+    initial_config: Union[Path, ParsedTree, _DefaultSentinel] = _DEFAULT_SENTINEL
 ) -> multiprocessing.Process:
     if isinstance(initial_config, _DefaultSentinel):
-        p = multiprocessing.Process(target=compat.asyncio.run, args=(start_server(tcp=[(host, port)], unix=[]),))
+        p = multiprocessing.Process(target=compat.asyncio.run, args=(start_server(),))
     else:
-        p = multiprocessing.Process(
-            target=compat.asyncio.run, args=(start_server(tcp=[(host, port)], unix=[], config=initial_config),)
-        )
+        p = multiprocessing.Process(target=compat.asyncio.run, args=(start_server(config=initial_config),))
     p.start()
     return p

@@ -181,6 +181,28 @@ class Listen(SchemaNode):
         # we already check that it's there is only one option in the `_typ` method
         pass
 
+    def __str__(self) -> str:
+        if self.typ is ListenType.IP_AND_PORT:
+            return f"{self.ip} @ {self.port}"
+        elif self.typ is ListenType.UNIX_SOCKET:
+            return f"{self.unix_socket}"
+        elif self.typ is ListenType.INTERFACE_AND_PORT:
+            return f"{self.interface} @ {self.port}"
+        else:
+            raise NotImplementedError()
+
+    def __eq__(self, o: object) -> bool:
+        if not isinstance(o, Listen):
+            return False
+
+        return (
+            self.port == o.port
+            and self.ip == o.ip
+            and self.typ == o.typ
+            and self.unix_socket == o.unix_socket
+            and self.interface == o.interface
+        )
+
 
 class IPNetwork(CustomValueType):
     def __init__(self, source_value: Any, object_path: str = "/") -> None:

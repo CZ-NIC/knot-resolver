@@ -315,13 +315,18 @@ class SchemaNode:
         return used_keys
 
     def __init__(self, source: TSource = None, object_path: str = ""):
+        # make sure that all raw data checks passed on the source object
+        if source is None:
+            source = ParsedTree({})
+        if isinstance(source, dict):
+            source = ParsedTree(source)
+
+        # save source
+        self._source: Union[ParsedTree, SchemaNode] = source
+
         # construct lower level schema node first if configured to do so
         if self._PREVIOUS_SCHEMA is not None:
             source = self._PREVIOUS_SCHEMA(source, object_path=object_path)  # pylint: disable=not-callable
-
-        # make sure that all raw data checks passed on the source object
-        if isinstance(source, dict):
-            source = ParsedTree(source)
 
         # assign fields
         used_keys = self._assign_fields(source, object_path)
@@ -341,6 +346,12 @@ class SchemaNode:
             self._validate()
         except ValueError as e:
             raise SchemaException(e.args[0] if len(e.args) > 0 else "Validation error", object_path) from e
+
+    def get_unparsed_data(self) -> ParsedTree:
+        if isinstance(self._source, SchemaNode):
+            return self._source.get_unparsed_data()
+        else:
+            return self._source
 
     def _get_converted_value(self, key: str, source: TSource, object_path: str) -> Any:
         """
