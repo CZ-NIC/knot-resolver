@@ -6,6 +6,7 @@ modules = {
     {{ "'workarounds < iterate'," if cfg.options.violators_workarounds }}
     {{ "'serve_stale < cache'," if cfg.options.serve_stale }}
     {{ "dns64 = '"+cfg.dns64.prefix+"'," if cfg.dns64 }}
+    'hints > iterate'
 }
 
 -- SERVER section
@@ -56,6 +57,41 @@ option('NO_0X20', {{ 'false' if cfg.options.query_case_randomization else 'true'
 {{ "modules.unload('priming')" if not cfg.options.query_priming }}
 {{ "modules.unload('detect_time_jump')" if not cfg.options.time_jump_detection }}
 {{ "modules.unload('refuse_nord')" if not cfg.options.refuse_no_rd }}
+
+-- STATIC-HINTS section
+{{ "hints.ttl("+cfg.static_hints.ttl.seconds()|string+")" if cfg.static_hints.ttl }}
+hints.use_nodata({{ 'true' if cfg.static_hints.no_data else 'false' }})
+{{ "hints.add_hosts()" if cfg.static_hints.etc_hosts }}
+{{ "hints.root_file('"+cfg.static_hints.root_hints_file+"')" if cfg.static_hints.root_hints_file }}
+
+-- static-hints.hints-files
+{% if cfg.static_hints.hints_files %}
+{% for item in cfg.static_hints.hints_files %}
+hints.add_hosts('{{ item }}')
+{% endfor %}
+{% endif %}
+
+-- static-hints.root-hints
+{% if cfg.static_hints.root_hints %}
+hints.root({
+{% for item in cfg.static_hints.root_hints %}
+    ['{{ item.name }}'] = {
+{% for addr in item.addresses %}
+        '{{ addr }}',
+{% endfor %}
+    },
+{% endfor %}
+})
+{% endif %}
+
+-- static-hints.hints
+{% if cfg.static_hints.hints %}
+{% for item in cfg.static_hints.hints %}
+{% for addr in item.addresses %}
+hints.set('{{ item.name }} {{ addr }}')
+{% endfor %}
+{% endfor %}
+{% endif %}
 
 -- CACHE section
 cache.open({{ cfg.cache.size_max.bytes() }}, 'lmdb://{{ cfg.cache.storage }}')

@@ -12,6 +12,7 @@ from knot_resolver_manager.datamodel.lua_schema import LuaSchema
 from knot_resolver_manager.datamodel.network_schema import NetworkSchema
 from knot_resolver_manager.datamodel.options_schema import OptionsSchema
 from knot_resolver_manager.datamodel.server_schema import ServerSchema
+from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.utils import SchemaNode
 
 
@@ -31,6 +32,7 @@ class KresConfig(SchemaNode):
         server: ServerSchema = ServerSchema()
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
+        static_hints: StaticHintsSchema = StaticHintsSchema()
         cache: CacheSchema = CacheSchema()
         dnssec: Union[bool, DnssecSchema] = True
         dns64: Union[bool, Dns64Schema] = False
@@ -42,6 +44,7 @@ class KresConfig(SchemaNode):
     server: ServerSchema
     options: OptionsSchema
     network: NetworkSchema
+    static_hints: StaticHintsSchema
     cache: CacheSchema
     dnssec: Union[Literal[False], DnssecSchema]
     dns64: Union[Literal[False], Dns64Schema]
