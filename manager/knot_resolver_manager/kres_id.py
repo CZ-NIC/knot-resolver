@@ -34,9 +34,9 @@ class KresID:
 _used: "weakref.WeakSet[KresID]" = weakref.WeakSet()
 
 
-def alloc() -> KresID:
+def alloc(_custom_name_id: bool=False) -> KresID:
     for i in itertools.count(start=1):
-        val = KresID(i)
+        val = KresID(i if not _custom_name_id else -i)
         if val not in _used:
             _used.add(val)
             return val
@@ -52,6 +52,8 @@ def alloc_from_string(val: str) -> KresID:
         _used.add(res)
         return res
     else:
-        res = alloc()
+        # this would be for example 'gc'
+        # we want a special value, so that they do not clash with normal numerical values
+        res = alloc(_custom_name_id=True)
         res.set_custom_str_representation(val)
         return res

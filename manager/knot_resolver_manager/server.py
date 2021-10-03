@@ -242,7 +242,9 @@ async def start_server(config: Union[Path, ParsedTree, _DefaultSentinel] = _DEFA
 
     await server.wait_for_shutdown()
 
-    logger.info("Gracefull shutdown triggered. Cleaning up...")
+    logger.info("Gracefull shutdown triggered.")
+    logger.info("Stopping API service...")
     await server.shutdown()
+    logger.info("Stopping kresd manager...")
     await manager.stop()
     logger.info(f"The manager run for {round(time() - start_time)} seconds... Hope it served well. Bye!")

@@ -10,4 +10,4 @@ echo The manager will start after you connect
 echo API will be running on port 5000
 echo ----------------------------------------
 
-poetry run python -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m knot_resolver_manager 5000 $@
+poetry run python -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m knot_resolver_manager $@
