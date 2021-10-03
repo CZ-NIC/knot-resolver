@@ -155,7 +155,7 @@ class SystemdSubprocessController(SubprocessController):
                 # we can't easily check, if the unit is transient or not without additional systemd call
                 # we ignore it for now and assume the default persistency state. It shouldn't cause any
                 # problems, because interactions with the process are done the same way in all cases
-                res.append(SystemdSubprocess(SubprocessType.GC, alloc(), self._systemd_type))
+                res.append(SystemdSubprocess(SubprocessType.GC, alloc_from_string("gc"), self._systemd_type))
         return res
 
     async def initialize_controller(self) -> None:
