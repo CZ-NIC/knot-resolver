@@ -5,7 +5,7 @@ from typing import Iterable, List
 
 from knot_resolver_manager import compat
 from knot_resolver_manager.compat.asyncio import to_thread
-from knot_resolver_manager.kres_id import KresID, alloc, alloc_from_string
+from knot_resolver_manager.kres_id import KresID, alloc_from_string
 from knot_resolver_manager.kresd_controller.interface import (
     Subprocess,
     SubprocessController,

@@ -34,7 +34,7 @@ class KresID:
 _used: "weakref.WeakSet[KresID]" = weakref.WeakSet()
 
 
-def alloc(_custom_name_id: bool=False) -> KresID:
+def alloc(_custom_name_id: bool = False) -> KresID:
     for i in itertools.count(start=1):
         val = KresID(i if not _custom_name_id else -i)
         if val not in _used:

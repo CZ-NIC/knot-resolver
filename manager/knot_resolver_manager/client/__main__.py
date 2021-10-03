@@ -37,6 +37,7 @@ def workers(ctx: click.Context, instances: int):
     client = KnotManagerClient(ctx.obj[BASE_URL])
     client.set_num_workers(instances)
 
+
 @main.command("one-static-hint", help="Set one inline static-hint hints (replaces old static hints)")
 @click.argument("name", type=str, nargs=1)
 @click.argument("ip", type=str, nargs=1)
@@ -44,6 +45,7 @@ def workers(ctx: click.Context, instances: int):
 def one_static_hint(ctx: click.Context, name: str, ip: str):
     client = KnotManagerClient(ctx.obj[BASE_URL])
     client.set_static_hints({name: [ipaddress.ip_address(ip)]})
+
 
 @main.command("listen-ip", help="Configure where the resolver should listen (replaces all previous locations)")
 @click.argument("ip", type=str, nargs=1)

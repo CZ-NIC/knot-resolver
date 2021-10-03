@@ -1,3 +1,4 @@
+import ipaddress
 import json
 import multiprocessing
 import subprocess
@@ -5,7 +6,6 @@ import time
 import urllib.parse
 from pathlib import Path
 from typing import Dict, List, Union
-import ipaddress
 
 import requests
 
@@ -28,27 +28,14 @@ class KnotManagerClient:
     def set_num_workers(self, n: int):
         response = requests.post(self._create_url("/config/server/workers"), data=str(n))
         print(response.text)
-    
+
     def set_static_hints(self, hints: Dict[str, List[Union[ipaddress.IPv4Address, ipaddress.IPv6Address]]]):
-        payload = [
-            {
-                "name": name,
-                "addresses": [str(a) for a in addrs]
-            }
-            for name, addrs in hints.items()
-        ]
+        payload = [{"name": name, "addresses": [str(a) for a in addrs]} for name, addrs in hints.items()]
         response = requests.post(self._create_url("/config/static-hints/hints"), json=payload)
         print(response.text)
-    
+
     def set_listen_ip_address(self, ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address], port: int):
-        payload = [
-            {
-                "listen": {
-                    "ip": str(ip),
-                    "port": port
-                }
-            }
-        ]
+        payload = [{"listen": {"ip": str(ip), "port": port}}]
         response = requests.post(self._create_url("/config/network/interfaces"), json=payload)
         print(response)
 
