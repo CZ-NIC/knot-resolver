@@ -59,7 +59,7 @@ static const uint16_t CACHE_VERSION = 6;
  */
 static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		const knot_rrset_t *rr, const knot_rrset_t *rr_sigs, uint32_t timestamp,
-		uint8_t rank, trie_t *nsec_pmap, bool *needs_pkt);
+		uint8_t rank, trie_t *nsec_pmap, knot_mm_t *pool, bool *needs_pkt);
 /** Preliminary checks before stash_rrset().  Don't call if returns <= 0. */
 static int stash_rrset_precond(const knot_rrset_t *rr, const struct kr_query *qry/*logs*/);
 
@@ -180,22 +180,6 @@ int kr_cache_commit(struct kr_cache *cache)
 		return cache_op(cache, commit);
 	}
 	return kr_ok();
-}
-
-int kr_cache_insert_rr(struct kr_cache *cache, const knot_rrset_t *rr, const knot_rrset_t *rrsig, uint8_t rank, uint32_t timestamp)
-{
-	int err = stash_rrset_precond(rr, NULL);
-	if (err <= 0) {
-		return kr_ok();
-	}
-	ssize_t written = stash_rrset(cache, NULL, rr, rrsig, timestamp, rank, NULL, NULL);
-		/* Zone's NSEC* params aren't updated, but that's probably OK
-		 * for kr_cache_insert_rr() */
-	if (written >= 0) {
-		return kr_ok();
-	}
-
-	return (int) written;
 }
 
 int kr_cache_clear(struct kr_cache *cache)
@@ -363,7 +347,8 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 			int *unauth_cnt, trie_t *nsec_pmap, bool *needs_pkt);
 /** Stash a single nsec_p.  \return 0 (errors are ignored). */
 static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
-			struct kr_request *req);
+			struct kr_cache *cache, uint32_t timestamp, knot_mm_t *pool,
+			const struct kr_query *qry/*logging*/);
 
 /** The whole .consume phase for the cache module. */
 int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
@@ -421,7 +406,8 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	trie_it_t *it;
 	for (it = trie_it_begin(nsec_pmap); !trie_it_finished(it); trie_it_next(it)) {
 		stash_nsec_p((const knot_dname_t *)trie_it_key(it, NULL),
-				(const char *)*trie_it_val(it), req);
+				(const char *)*trie_it_val(it),
+				cache, qry->timestamp.tv_sec, &req->pool, req->current_query);
 	}
 	trie_it_free(it);
 	/* LATER(optim.): typically we also have corresponding NS record in the list,
@@ -499,7 +485,7 @@ static bool rrset_has_min_range_or_weird(const knot_rrset_t *rr, const struct kr
 
 static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		const knot_rrset_t *rr, const knot_rrset_t *rr_sigs, uint32_t timestamp,
-		uint8_t rank, trie_t *nsec_pmap, bool *needs_pkt)
+		uint8_t rank, trie_t *nsec_pmap, knot_mm_t *pool, bool *needs_pkt)
 {
 	if (kr_rank_test(rank, KR_RANK_BOGUS)) {
 		WITH_VERBOSE(qry) {
@@ -575,7 +561,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		}
 		key = key_NSEC3(k, encloser, nsec_p_mkHash(rdata->data));
 		if (npp && !*npp) {
-			*npp = mm_alloc(&qry->request->pool, np_dlen);
+			*npp = mm_alloc(pool, np_dlen);
 			if (kr_fails_assert(*npp))
 				break;
 			memcpy(*npp, rdata->data, np_dlen);
@@ -688,7 +674,7 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 	}
 
 	ssize_t written = stash_rrset(cache, qry, rr, rr_sigs, qry->timestamp.tv_sec,
-					entry->rank, nsec_pmap, needs_pkt);
+				entry->rank, nsec_pmap, &qry->request->pool, needs_pkt);
 	if (written < 0) {
 		kr_log_error(CACHE, "[%05u.%02u] stash failed, ret = %d\n", qry->request->uid,
 			     qry->uid, ret);
@@ -710,11 +696,10 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 }
 
 static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
-			struct kr_request *req)
+			struct kr_cache *cache, uint32_t timestamp, knot_mm_t *pool,
+			const struct kr_query *qry/*logging*/)
 {
-	const struct kr_query *qry = req->current_query;
-	struct kr_cache *cache = &req->ctx->cache;
-	uint32_t valid_until = qry->timestamp.tv_sec + cache->ttl_max;
+	uint32_t valid_until = timestamp + cache->ttl_max;
 		/* LATER(optim.): be more precise here ^^ and reduce calls. */
 	static const int32_t ttl_margin = 3600;
 	const uint8_t *nsec_p = (const uint8_t *)nsec_p_v;
@@ -781,7 +766,7 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 	el[0].data = NULL;
 	knot_db_val_t val;
 	val.len = entry_list_serial_size(el),
-	val.data = mm_alloc(&req->pool, val.len),
+	val.data = mm_alloc(pool, val.len),
 	entry_list_memcpy(val.data, el);
 	/* Prepare the new data chunk */
 	memcpy(el[0].data, &valid_until, sizeof(valid_until));
@@ -791,6 +776,7 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 	}
 	/* Write it all to the cache */
 	ret = cache_op(cache, write, &key, &val, 1);
+	mm_free(pool, val.data);
 	if (ret || !val.data) {
 		VERBOSE_MSG(qry, "=> EL write failed (ret: %d)\n", ret);
 		return kr_ok();
@@ -805,6 +791,43 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 	return kr_ok();
 }
 
+int kr_cache_insert_rr(struct kr_cache *cache,
+			const knot_rrset_t *rr, const knot_rrset_t *rrsig,
+			uint8_t rank, uint32_t timestamp, bool ins_nsec_p)
+{
+	int err = stash_rrset_precond(rr, NULL);
+	if (err <= 0) {
+		return kr_ok();
+	}
+
+	trie_t *nsec_pmap = NULL;
+	knot_mm_t *pool = NULL;
+	if (ins_nsec_p && (rr->type == KNOT_RRTYPE_NSEC || rr->type == KNOT_RRTYPE_NSEC3)) {
+		pool = mm_ctx_mempool2(4096);
+		nsec_pmap = trie_create(pool);
+		kr_assert(pool && nsec_pmap);
+	}
+
+	ssize_t written = stash_rrset(cache, NULL, rr, rrsig, timestamp, rank,
+					nsec_pmap, pool, NULL);
+
+	if (nsec_pmap) {
+		trie_it_t *it;
+		for (it = trie_it_begin(nsec_pmap); !trie_it_finished(it); trie_it_next(it)) {
+			stash_nsec_p((const knot_dname_t *)trie_it_key(it, NULL),
+					(const char *)*trie_it_val(it),
+					cache, timestamp, pool, NULL);
+		}
+		trie_it_free(it);
+		mm_ctx_delete(pool);
+	}
+
+	if (written >= 0) {
+		return kr_ok();
+	}
+
+	return (int) written;
+}
 
 static int peek_exact_real(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
 			struct kr_cache_p *peek)
