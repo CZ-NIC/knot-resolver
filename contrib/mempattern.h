@@ -21,6 +21,7 @@
 #pragma once
 
 #include <libknot/mm_ctx.h>
+#include "contrib/ucw/mempool.h"
 #include "lib/defines.h"
 #include <assert.h>
 #include <stdint.h>
@@ -55,6 +56,17 @@ void mm_ctx_mempool(knot_mm_t *mm, size_t chunk_size);
 
 /* API in addition to Knot's mempattern. */
 
+/*! \brief New memory pool context, allocated on itself. */
+KR_EXPORT knot_mm_t * mm_ctx_mempool2(size_t chunk_size);
+
+/*! \brief Delete a memory pool.  OK to call on a non-pool. */
+static inline void mm_ctx_delete(knot_mm_t *mm)
+{
+	/* The mp_alloc comparison bears a risk of missing the private symbol from knot. */
+	if (mm && mm->ctx && mm->alloc == (knot_mm_alloc_t)mp_alloc)
+		mp_delete(mm->ctx);
+}
+
 /*! \brief Readability: avoid const-casts in code. */
 static inline void free_const(const void *what)
 {
@@ -77,7 +89,4 @@ static inline void mm_ctx_init_aligned(knot_mm_t *mm, size_t alignment)
 		mm->alloc = mm_malloc_aligned;
 	}
 }
-
-/*! \brief New memory pool context, allocated on itself. */
-KR_EXPORT knot_mm_t * mm_ctx_mempool2(size_t chunk_size);
 
