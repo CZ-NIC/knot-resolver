@@ -18,7 +18,7 @@ int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key);
 
 /**
  * Check the signature of the supplied RRSet.
- * @param rrsig       RRSet containing signatures.
+ * @param rrsig       A single signature.
  * @param key         Key to be used to validate the signature.
  * @param covered     The covered RRSet.
  * @param trim_labels Number of the leftmost labels to be removed and replaced with '*.'.
