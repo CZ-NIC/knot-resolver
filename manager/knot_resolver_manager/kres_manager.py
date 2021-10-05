@@ -59,7 +59,7 @@ class KresManager:
     def __init__(self, config: KresConfig, _i_know_what_i_am_doing: bool = False):
         if not _i_know_what_i_am_doing:
             logger.error(
-                "Trying to create an instance of KresManager using normal contructor. Please use "
+                "Trying to create an instance of KresManager using normal constructor. Please use "
                 "`KresManager.get_instance()` instead"
             )
             sys.exit(1)
