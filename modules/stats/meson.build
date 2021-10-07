@@ -15,6 +15,7 @@ stats_mod = shared_module(
   'stats',
   stats_src,
   dependencies: [
+    libknot,
     luajit_inc,
   ],
   include_directories: mod_inc_dir,

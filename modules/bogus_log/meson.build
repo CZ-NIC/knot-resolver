@@ -9,6 +9,7 @@ c_src_lint += bogus_log_src
 bogus_log_mod = shared_module(
   'bogus_log',
   bogus_log_src,
+  dependencies: libknot,
   include_directories: mod_inc_dir,
   name_prefix: '',
   install: true,

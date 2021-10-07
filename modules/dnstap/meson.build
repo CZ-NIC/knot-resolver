@@ -47,6 +47,7 @@ if build_dnstap
       declare_dependency(sources: dnstap_pb),
       libfstrm,
       libprotobuf_c,
+      libknot,
     ],
     include_directories: mod_inc_dir,
     name_prefix: '',

@@ -9,6 +9,7 @@ c_src_lint += edns_keepalive_src
 edns_keepalive_mod = shared_module(
   'edns_keepalive',
   edns_keepalive_src,
+  dependencies: libknot,
   include_directories: mod_inc_dir,
   name_prefix: '',
   install: true,

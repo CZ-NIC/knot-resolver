@@ -10,6 +10,7 @@ hints_mod = shared_module(
   'hints',
   hints_src,
   dependencies: [
+    libknot,
     luajit_inc,
   ],
   include_directories: mod_inc_dir,

@@ -13,6 +13,7 @@ c_src_lint += refuse_nord_src
 refuse_nord_mod = shared_module(
   'refuse_nord',
   refuse_nord_src,
+  dependencies: libknot,
   include_directories: mod_inc_dir,
   name_prefix: '',
   install: true,

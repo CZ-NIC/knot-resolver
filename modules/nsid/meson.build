@@ -10,6 +10,7 @@ nsid_mod = shared_module(
   'nsid',
   nsid_src,
   dependencies: [
+    libknot,
     luajit_inc,
   ],
   include_directories: mod_inc_dir,
