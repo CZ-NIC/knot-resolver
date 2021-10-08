@@ -59,9 +59,9 @@ local function check_time_callback(pkt, req)
 	end
 end
 
--- Make priming query and check time validty of RRSIGs.
+-- Do uncached priming query and check time validty of RRSIGs.
 local function check_time()
-	resolve(".", kres.type.NS, kres.class.IN, {"DNSSEC_WANT", "DNSSEC_CD"},
+	resolve(".", kres.type.NS, kres.class.IN, {"DNSSEC_WANT", "DNSSEC_CD", "NO_CACHE"},
                 check_time_callback)
 end
 
