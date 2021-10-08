@@ -51,7 +51,7 @@ local function check_time_callback(pkt, req)
 		     os.date("%c", now),
 		     math.abs(time_diff),
 		     time_diff > 0 and "future" or "past",
-		     time_diff > 0 and "yet" or "anymore")
+		     time_diff > 0 and "anymore" or "yet")
 	else
 		log_info(ffi.C.LOG_GRP_DETECTTIMESKEW, "Local system time %q is within "..
 		    "RRSIG validity interval <%q,%q>.", os.date("%c", now),
@@ -59,9 +59,9 @@ local function check_time_callback(pkt, req)
 	end
 end
 
--- Make priming query and check time validty of RRSIGs.
+-- Do uncached priming query and check time validty of RRSIGs.
 local function check_time()
-	resolve(".", kres.type.NS, kres.class.IN, {"DNSSEC_WANT", "DNSSEC_CD"},
+	resolve(".", kres.type.NS, kres.class.IN, {"DNSSEC_WANT", "DNSSEC_CD", "NO_CACHE"},
                 check_time_callback)
 end
 
