@@ -219,7 +219,7 @@ async def _init_manager(config: Union[Path, ParsedTree, _DefaultSentinel]) -> Kr
 
         # Create KresManager. This will perform autodetection of available service managers and
         # select the most appropriate to use (or use the one configured directly)
-        manager = await KresManager.create_instance(controller, config_validated)
+        manager = await KresManager.create(controller, config_validated)
 
         logger.info("Initial configuration applied. Process manager initialized...")
         return manager
