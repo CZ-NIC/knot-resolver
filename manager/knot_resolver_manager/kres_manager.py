@@ -32,18 +32,14 @@ class KresManager:
     Instantiate with `KresManager.create()`, not with the usual constructor!
     """
 
-    _instance_lock = asyncio.Lock()
-    _instance: Optional["KresManager"] = None
-
     @staticmethod
-    async def create_instance(selected_controller: Optional[SubprocessController], config: KresConfig) -> "KresManager":
+    async def create(selected_controller: Optional[SubprocessController], config: KresConfig) -> "KresManager":
         """
         Creates new instance of KresManager.
         """
 
         inst = KresManager(config, _i_know_what_i_am_doing=True)
         await inst._async_init(selected_controller, config)  # pylint: disable=protected-access
-        KresManager._instance = inst
         return inst
 
     async def _async_init(self, selected_controller: Optional[SubprocessController], config: KresConfig):
