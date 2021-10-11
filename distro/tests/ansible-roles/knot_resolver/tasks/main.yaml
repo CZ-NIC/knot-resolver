@@ -13,6 +13,8 @@
   package:
     name: "{{ packages }}"
     state: latest
+  # knot-utils may be missing on opensuse (depending on upstream vs downstream pkg)
+  failed_when: false
 
 - name: Always print package version at the end
   block:

@@ -10,6 +10,7 @@ mock_cmodule_mod = shared_module(
   'mock_cmodule',
   mock_cmodule_src,
   name_prefix: '',
+  dependencies: libknot,
   include_directories: include_directories('../../'),
 )
 
@@ -21,6 +22,7 @@ foreach unit_test : unit_tests
     dependencies: [
       contrib_dep,
       libkres_dep,
+      libknot,
       cmocka,
       lmdb,
     ],
