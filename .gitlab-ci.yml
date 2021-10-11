@@ -605,13 +605,6 @@ obs:build:all:
     when:
       - script_failure
 
-obs:centos7:x86_64:
-  <<: *distrotest
-  variables:
-    OBS_REPO: knot-resolver-latest
-    DISTROTEST_NAME: centos7
-    DISTROTEST_REPO: CentOS_7_EPEL
-
 obs:centos8:x86_64:
   <<: *distrotest
   allow_failure: true
