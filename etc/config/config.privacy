@@ -25,7 +25,7 @@ policy.add(policy.slice(
    -- forward over TLS
    policy.TLS_FORWARD({
       {'2001:DB8::d0c', hostname='res.example.com'},
-      {'192.0.2.1', pin_sha256={'YQ=='}
+      {'192.0.2.1', pin_sha256={'YQ=='}},
    }),
    policy.TLS_FORWARD({
       -- multiple servers can be specified for a single slice
