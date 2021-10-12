@@ -78,6 +78,15 @@ stages:
   after_script:
     - ci/fix-meson-junit.sh build_ci*/meson-logs/testlog.junit.xml
 
+ipcheck:
+  needs: []
+  stage: build
+  script:
+    - ip a
+    - apt-get install -y netcat
+    - nc -l ::1 53535
+    - nc -l 127.0.0.1 53535
+
 archive:
   <<: *build
   except: null
