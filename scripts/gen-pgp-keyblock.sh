@@ -5,7 +5,6 @@ set -o errexit -o nounset
 keys=(
     'B6006460B60A80E782062449E747DF1F9575A3AA'  # vladimir.cunat@nic.cz
     '4A8BA48C2AED933BD495C509A1FBA5F7EF8C4869'  # tomas.krizek@nic.cz
-    '457996D019A7B7C6C2F6862A16CFB506F21D834A'  # lukas.jezek@nic.cz
 )
 outfile="kresd-keyblock.asc"
 url="https://secure.nic.cz/files/knot-resolver/kresd-keyblock.asc"
