@@ -543,7 +543,7 @@ static int on_stream_close_callback(nghttp2_session *h2, int32_t stream_id,
 		http_cleanup_stream(ctx);
 
 	ret = trie_del(ctx->stream_write_data, (char *)&stream_id, sizeof(stream_id), (trie_val_t*)&data);
-	if (ret == kr_ok() && data)
+	if (ret == KNOT_EOK && data)
 		on_pkt_write(data, error_code == 0 ? 0 : kr_error(EIO));
 
 	return 0;

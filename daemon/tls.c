@@ -894,7 +894,7 @@ int tls_client_param_remove(tls_client_params_t *params, const struct sockaddr *
 		return kr_error(EINVAL);
 	trie_val_t param_ptr;
 	int ret = trie_del(params, key, len, &param_ptr);
-	if (ret)
+	if (ret != KNOT_EOK)
 		return kr_error(ret);
 	tls_client_param_unref(param_ptr);
 	return kr_ok();

@@ -53,14 +53,13 @@ distribution.
 
 .. code-block:: bash
 
-    $ sudo yum install -y https://secure.nic.cz/files/knot-resolver/knot-resolver-release.el.rpm
+    $ sudo yum install -y epel-release
     $ sudo yum install -y knot-resolver
 
 **Fedora**
 
 .. code-block:: bash
 
-    $ sudo dnf install -y https://secure.nic.cz/files/knot-resolver/knot-resolver-release.fedora.rpm
     $ sudo dnf install -y knot-resolver
 
 **Arch Linux**

@@ -107,7 +107,7 @@ static void test_queue(void **state)
 		char key_buf[len];
 		ptrdiff_t key_i_new;
 		int ret = trie_del_first(t, key_buf, &len, (trie_val_t *)&key_i_new);
-		assert_int_equal(ret, kr_ok());
+		assert_int_equal(ret, KNOT_EOK);
 		assert_int_equal(KEY_LEN(key_buf), len);
 		assert_int_equal(key_i, key_i_new);
 		assert_string_equal(dict[key_i], key_buf);

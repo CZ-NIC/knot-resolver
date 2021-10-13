@@ -621,7 +621,7 @@ int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 			return status;
 		// start the timer
 		struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
-		if (kr_fails_assert(qry))
+		if (kr_fails_assert(qry && task->transport))
 			return status;
 		size_t timeout = task->transport->timeout;
 		int ret = session_timer_start(s, on_udp_timeout, timeout, 0);

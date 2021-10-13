@@ -61,6 +61,7 @@ Security
 --------
 - validator: fix 5.3.1 regression on over-limit NSEC3 edge case (!1169)
   Assertion might be triggered by query/answer, potentially DoS.
+  CVE-2021-40083 was later assigned.
 
 Improvements
 ------------
