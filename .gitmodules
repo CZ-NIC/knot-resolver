@@ -7,3 +7,6 @@
 [submodule "tests/config/tapered"]
 	path = tests/config/tapered
 	url = https://gitlab.nic.cz/knot/3rdparty/lua-tapered.git
+[submodule "manager"]
+	path = manager
+	url = https://gitlab.nic.cz/knot/knot-resolver-manager.git
