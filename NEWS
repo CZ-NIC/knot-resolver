@@ -1,3 +1,11 @@
+Knot Resolver 5.4.3 (2021-mm-dd)
+================================
+
+Bugfixes
+--------
+- policy.rpz: improve logs, fix origin detection in files without $ORIGIN
+
+
 Knot Resolver 5.4.2 (2021-10-13)
 ================================
 

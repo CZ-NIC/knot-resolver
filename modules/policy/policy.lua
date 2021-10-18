@@ -404,13 +404,18 @@ local function rpz_parse(action, path)
 	local rrtype_bad = {
 		[kres.type.DNAME]  = true,
 		[kres.type.NS]     = false,
-		[kres.type.SOA]    = false,
 		[kres.type.DNSKEY] = true,
 		[kres.type.DS]     = true,
 		[kres.type.RRSIG]  = true,
 		[kres.type.NSEC]   = true,
 		[kres.type.NSEC3]  = true,
 	}
+
+	-- We generally don't know what zone should be in the file; we try to detect it.
+	-- Fortunately, it's typical that SOA is the first record, even required for AXFR.
+	local origin_soa = nil
+	local warned_soa, warned_bailiwick
+
 	local parser = require('zonefile').new()
 	local ok, errstr = parser:open(path)
 	if not ok then
@@ -427,14 +432,19 @@ local function rpz_parse(action, path)
 		local rdata = ffi.string(parser.r_data, parser.r_data_length)
 		ffi.C.knot_dname_to_lower(full_name)
 
-		local prefix_labels = ffi.C.knot_dname_in_bailiwick(full_name, parser.zone_origin)
+		local origin = origin_soa or parser.zone_origin
+		local prefix_labels = ffi.C.knot_dname_in_bailiwick(full_name, origin)
 		if prefix_labels < 0 then
-			log_info(ffi.C.LOG_GRP_POLICY, 'RPZ %s:%d: RR owner "%s" outside the zone (ignored)',
-				path, tonumber(parser.line_counter), kres.dname2str(full_name))
+			if not warned_bailiwick then
+				warned_bailiwick = true
+				log_warn(ffi.C.LOG_GRP_POLICY,
+					'RPZ %s:%d: RR owner "%s" outside the zone (ignored; reported once per file)',
+					path, tonumber(parser.line_counter), kres.dname2str(full_name))
+			end
 			goto continue
 		end
 
-		local bytes = ffi.C.knot_dname_size(full_name) - ffi.C.knot_dname_size(parser.zone_origin)
+		local bytes = ffi.C.knot_dname_size(full_name) - ffi.C.knot_dname_size(origin)
 		local name = ffi.string(full_name, bytes) .. '\0'
 
 		if parser.r_type == kres.type.CNAME then
@@ -447,6 +457,21 @@ local function rpz_parse(action, path)
 		else
 			if #name then
 				local is_bad = rrtype_bad[parser.r_type]
+
+				if parser.r_type == kres.type.SOA then
+					if origin_soa == nil then
+						origin_soa = ffi.gc(ffi.C.knot_dname_copy(parser.r_owner, nil), ffi.C.free)
+						goto continue -- we don't want to modify `new_actions`
+					else
+						is_bad = true -- maybe provide more info, but it seems rare
+					end
+				elseif origin_soa == nil and not warned_soa then
+					warned_soa = true
+					log_warn(ffi.C.LOG_GRP_POLICY,
+						'RPZ %s:%d warning: SOA missing as the first record',
+						path, tonumber(parser.line_counter))
+				end
+
 				if is_bad == true or (is_bad == false and prefix_labels ~= 0) then
 					log_warn(ffi.C.LOG_GRP_POLICY, 'RPZ %s:%d warning: RR type %s is not allowed in RPZ (ignored)',
 						path, tonumber(parser.line_counter), kres.tostring.type[parser.r_type])
