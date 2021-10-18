@@ -424,7 +424,8 @@ local function rpz_parse(action, path)
 	while true do
 		ok, errstr = parser:parse()
 		if errstr then
-			log_info(ffi.C.LOG_GRP_POLICY, 'RPZ %s:%d: %s', path, tonumber(parser.line_counter), errstr)
+			log_warn(ffi.C.LOG_GRP_POLICY, 'RPZ %s:%d: %s',
+				path, tonumber(parser.line_counter), errstr)
 		end
 		if not ok then break end
 
@@ -451,7 +452,8 @@ local function rpz_parse(action, path)
 			if action_map[rdata] then
 				rules[name] = action_map[rdata]
 			else
-				log_info(ffi.C.LOG_GRP_POLICY, 'RPZ %s:%d: CNAME with custom target in RPZ is not supported yet (ignored)',
+				log_warn(ffi.C.LOG_GRP_POLICY,
+					'RPZ %s:%d: CNAME with custom target in RPZ is not supported yet (ignored)',
 					path, tonumber(parser.line_counter))
 			end
 		else
