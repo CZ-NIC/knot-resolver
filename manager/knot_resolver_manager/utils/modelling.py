@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional, Set, Tuple, Type, Union
 
 from knot_resolver_manager.exceptions import DataException, SchemaException
 from knot_resolver_manager.utils.custom_types import CustomValueType
+from knot_resolver_manager.utils.functional import all_matches
 from knot_resolver_manager.utils.parsing import ParsedTree
 from knot_resolver_manager.utils.types import (
     NoneType,
@@ -27,6 +28,62 @@ def is_obj_type(obj: Any, types: Union[type, Tuple[Any, ...], Tuple[type, ...]])
     if isinstance(types, Tuple):
         return type(obj) in types
     return type(obj) == types
+
+
+def _get_properties_schema(typ: Type[Any]) -> Dict[Any, Any]:
+    schema: Dict[Any, Any] = {}
+    annot = typ.__dict__.get("__annotations__", {})
+    for name, python_type in annot.items():
+        schema[name] = _describe_type(python_type)
+
+    return schema
+
+
+def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
+    # pylint: disable=too-many-branches
+
+    if inspect.isclass(typ) and issubclass(typ, SchemaNode):
+        return typ.json_schema(include_schema_definition=False)
+
+    elif inspect.isclass(typ) and issubclass(typ, CustomValueType):
+        return typ.json_schema()
+
+    elif is_none_type(typ):
+        return {"type": "null"}
+
+    elif typ == int:
+        return {"type": "integer"}
+
+    elif typ == bool:
+        return {"type": "boolean"}
+
+    elif typ == str:
+        return {"type": "string"}
+
+    elif is_literal(typ):
+        val = get_generic_type_argument(typ)
+        return {"type": {str: "string", int: "integer", bool: "boolean"}[type(val)], "enum": [val]}
+
+    elif is_union(typ):
+        variants = get_generic_type_arguments(typ)
+        # simplification for Union of Literals
+        if all_matches(is_literal, variants):
+            return {"enum": [get_generic_type_argument(literal) for literal in variants]}
+        else:
+            return {"anyOf": [_describe_type(v) for v in variants]}
+
+    elif is_list(typ):
+        return {"type": "array", "items": _describe_type(get_generic_type_argument(typ))}
+
+    elif is_dict(typ):
+        key, val = get_generic_type_arguments(typ)
+        assert key == str, "We currently do not support any other keys then strings"
+        return {"type": "object", "additionalProperties": _describe_type(val)}
+
+    elif is_enum(typ):
+        return {"type": "string", "enum": [str(v) for v in typ]}
+
+    raise NotImplementedError(f"Trying to get JSON schema for type '{typ}', which is not implemented")
 
 
 def _validated_object_type(
@@ -387,3 +444,16 @@ class SchemaNode:
         """
         Validation procedure called after all field are assigned. Should throw a ValueError in case of failure.
         """
+
+    @classmethod
+    def json_schema(cls: Type["SchemaNode"], include_schema_definition: bool = True) -> Dict[Any, Any]:
+        if cls._PREVIOUS_SCHEMA is not None:
+            return cls._PREVIOUS_SCHEMA.json_schema(include_schema_definition=include_schema_definition)
+
+        schema: Dict[Any, Any] = {}
+        if include_schema_definition:
+            schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
+        schema["type"] = "object"
+        schema["properties"] = _get_properties_schema(cls)
+
+        return schema

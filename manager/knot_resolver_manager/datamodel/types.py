@@ -3,7 +3,7 @@ import logging
 import re
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Dict, Optional, Pattern, Union
+from typing import Any, Dict, Optional, Pattern, Type, Union
 
 from knot_resolver_manager.exceptions import SchemaException
 from knot_resolver_manager.utils import CustomValueType, SchemaNode
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class Unit(CustomValueType):
     _re: Pattern[str]
-    _units: Dict[Optional[str], int]
+    _units: Dict[str, int]
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
@@ -72,6 +72,10 @@ class Unit(CustomValueType):
     def serialize(self) -> Any:
         return self._value_orig
 
+    @classmethod
+    def json_schema(cls: Type["Unit"]) -> Dict[Any, Any]:
+        return {"type": "string", "pattern": r"\d+(" + "|".join(cls._units.keys()) + ")"}
+
 
 class SizeUnit(Unit):
     _re = re.compile(r"^([0-9]+)\s{0,1}([BKMG]){0,1}$")
@@ -121,6 +125,12 @@ class AnyPath(CustomValueType):
 
     def serialize(self) -> Any:
         return str(self._value)
+
+    @classmethod
+    def json_schema(cls: Type["AnyPath"]) -> Dict[Any, Any]:
+        return {
+            "type": "string",
+        }
 
 
 class ListenType(Enum):
@@ -231,6 +241,12 @@ class IPNetwork(CustomValueType):
     def serialize(self) -> Any:
         return self._value.with_prefixlen
 
+    @classmethod
+    def json_schema(cls: Type["IPNetwork"]) -> Dict[Any, Any]:
+        return {
+            "type": "string",
+        }
+
 
 class IPv6Network96(CustomValueType):
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
@@ -276,3 +292,7 @@ class IPv6Network96(CustomValueType):
 
     def to_std(self) -> ipaddress.IPv6Network:
         return self._value
+
+    @classmethod
+    def json_schema(cls: Type["IPv6Network96"]) -> Dict[Any, Any]:
+        return {"type": "string"}
