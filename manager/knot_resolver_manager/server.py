@@ -114,6 +114,9 @@ class Server:
         # return success
         return web.Response()
 
+    async def _handler_schema(self, _request: web.Request) -> web.Response:
+        return web.json_response(KresConfig.json_schema())
+
     def _set_log_level(self, config: KresConfig):
         if self.log_level != config.server.management.log_level:
             # expects one existing log handler on the root
@@ -139,6 +142,7 @@ class Server:
                 web.get("/", self._handler_index),
                 web.post(r"/config{path:.*}", self._handler_apply_config),
                 web.post("/stop", self._handler_stop),
+                web.get("/schema", self._handler_schema),
             ]
         )
 

@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Dict, Type
 
 
 class CustomValueType:
@@ -38,3 +38,7 @@ class CustomValueType:
         to be the same semantically.
         """
         raise NotImplementedError(f"{type(self).__name__}'s' 'to_dict()' not implemented.")
+
+    @classmethod
+    def json_schema(cls: Type["CustomValueType"]) -> Dict[Any, Any]:
+        raise NotImplementedError()
