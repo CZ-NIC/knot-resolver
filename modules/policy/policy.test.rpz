@@ -9,9 +9,9 @@ nodata			CNAME	*.
 rpzdrop			CNAME	rpz-drop.
 rpzpassthru		CNAME	rpz-passthru.
 rra				A	192.168.5.5
-rra-zonename-suffix			A 	192.168.6.6
-testdomain.rra.testdomain.	A 	192.168.7.7
-CaSe.SeNSiTiVe		A	192.168.8.8
+rra-zonename-suffix		A	192.168.6.6
+testdomain.rra.testdomain.	A	192.168.7.7
+CaSe.SeNSiTiVe			A	192.168.8.8
 
 two.records		AAAA	2001:db8::2
 two.records		AAAA	2001:db8::1
