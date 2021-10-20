@@ -7,6 +7,8 @@ Wants=kres-cache-gc.service
 Before=kres-cache-gc.service
 Wants=network-online.target
 After=network-online.target
+Before=nss-lookup.target
+Wants=nss-lookup.target
 
 [Service]
 Type=notify
