@@ -1,0 +1,5 @@
+test2domain.	SOA nonexistent.test2domain. test2domain. 1 12h 15m 3w 2h
+		NS  nonexistent.test2domain.
+
+nxdomain-fqdn.test2domain.		CNAME	.
+nodata-fqdn.test2domain.		CNAME	*.

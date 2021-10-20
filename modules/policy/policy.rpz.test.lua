@@ -44,13 +44,22 @@ local function test_rpz()
 		{'2001:db8::2', '2001:db8::1'})
 end
 
+local function test_rpz_soa()
+	check_answer('"CNAME ." return NXDOMAIN (SOA origin)',
+		'nxdomain-fqdn.', kres.type.A, kres.rcode.NXDOMAIN)
+	check_answer('"CNAME *." return NODATA (SOA origin)',
+		'nodata-fqdn.', kres.type.A, kres.rcode.NOERROR, {})
+end
+
 net.ipv4 = false
 net.ipv6 = false
 
 prepare_cache()
 
 policy.add(policy.rpz(policy.DENY, 'policy.test.rpz'))
+policy.add(policy.rpz(policy.DENY, 'policy.test.rpz.soa'))
 
 return {
 	test_rpz,
+	test_rpz_soa,
 }
