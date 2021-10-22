@@ -6,7 +6,7 @@ from typing import Optional
 import click
 
 from knot_resolver_manager import compat
-from knot_resolver_manager.constants import MANAGER_CONFIG_FILE, STARTUP_LOG_LEVEL
+from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, STARTUP_LOG_LEVEL
 from knot_resolver_manager.kresd_controller import list_controller_names
 from knot_resolver_manager.server import start_server
 
@@ -19,7 +19,7 @@ from knot_resolver_manager.server import start_server
     nargs=1,
     required=False,
     default=None,
-    help="Overrides default config location at '" + str(MANAGER_CONFIG_FILE) + "'",
+    help="Overrides default config location at '" + str(DEFAULT_MANAGER_CONFIG_FILE) + "'",
 )
 @click.option("--list-backends", "-l", type=bool, is_flag=True, default=False)
 def main(config: Optional[str], list_backends: bool):
@@ -28,7 +28,7 @@ def main(config: Optional[str], list_backends: bool):
     """Knot Resolver Manager
 
     [listen] ... numeric port or a path for a Unix domain socket, default is """ + str(
-        MANAGER_CONFIG_FILE
+        DEFAULT_MANAGER_CONFIG_FILE
     )
 
     # print list of backends and exit (if specified)
@@ -39,7 +39,7 @@ def main(config: Optional[str], list_backends: bool):
         sys.exit(0)
 
     # where to look for config
-    config_path = MANAGER_CONFIG_FILE if config is None else Path(config)
+    config_path = DEFAULT_MANAGER_CONFIG_FILE if config is None else Path(config)
 
     compat.asyncio.run(start_server(config=config_path))
 

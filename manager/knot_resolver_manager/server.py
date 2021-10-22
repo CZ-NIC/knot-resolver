@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import sys
 from http import HTTPStatus
 from pathlib import Path
@@ -12,7 +13,8 @@ from aiohttp.web_app import Application
 from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 
-from knot_resolver_manager.constants import MANAGER_CONFIG_FILE
+from knot_resolver_manager.config_store import ConfigStore
+from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.datamodel.types import Listen, ListenType
 from knot_resolver_manager.exceptions import DataException, KresdManagerException, TreeException
@@ -55,12 +57,13 @@ class Server:
     # This is top-level class containing pretty much everything. Instead of global
     # variables, we use instance attributes. That's why there are so many and it's
     # ok.
-    def __init__(self, manager: KresManager):
+    def __init__(self, store: ConfigStore):
+        # config store & server dynamic reconfiguration
+        self.config_store = store
 
-        self.manager = manager
+        # HTTP server
         self.app = Application(middlewares=[error_handler])
         self.runner = AppRunner(self.app)
-
         self.listen: Optional[Listen] = None
         self.site: Union[NoneType, TCPSite, UnixSite] = None
         self.listen_lock = asyncio.Lock()
@@ -74,10 +77,9 @@ class Server:
         await self._reconfigure_listen_address(config)
 
     async def start(self):
-        config = self.manager.get_last_used_config()
-        self.setup_routes()
+        self._setup_routes()
         await self.runner.setup()
-        await self._reconfigure(config)
+        await self.config_store.register_on_change_callback(self._reconfigure)
 
     async def wait_for_shutdown(self):
         await self.shutdown_event.wait()
@@ -100,7 +102,7 @@ class Server:
 
         # parse the incoming data
         document_path = request.match_info["path"]
-        last: ParsedTree = self.manager.get_last_used_config().get_unparsed_data()
+        last: ParsedTree = self.config_store.get().get_unparsed_data()
         new_partial: ParsedTree = parse(await request.text(), request.content_type)
         config = last.update(document_path, new_partial)
 
@@ -108,8 +110,7 @@ class Server:
         config_validated = KresConfig(config)
 
         # apply config
-        await self._reconfigure(config_validated)
-        await self.manager.apply_config(config_validated)
+        await self.config_store.update(config_validated)
 
         # return success
         return web.Response()
@@ -136,7 +137,7 @@ class Server:
         logger.info("Shutdown event triggered...")
         return web.Response(text="Shutting down...")
 
-    def setup_routes(self):
+    def _setup_routes(self):
         self.app.add_routes(
             [
                 web.get("/", self._handler_index),
@@ -191,39 +192,43 @@ class _DefaultSentinel:
 _DEFAULT_SENTINEL = _DefaultSentinel()
 
 
-async def _init_manager(config: Union[Path, ParsedTree, _DefaultSentinel]) -> KresManager:
+async def _init_config_store(config: Union[Path, ParsedTree, _DefaultSentinel]) -> ConfigStore:
+    # Initial configuration of the manager
+    if isinstance(config, _DefaultSentinel):
+        # use default
+        config = DEFAULT_MANAGER_CONFIG_FILE
+    if isinstance(config, Path):
+        if not config.exists():
+            logger.error(
+                "Manager is configured to load config file at %s on startup, but the file does not exist.",
+                config,
+            )
+            sys.exit(1)
+        else:
+            logger.info("Loading initial configuration from %s", config)
+            config = parse_yaml(await readfile(config))
+
+    # validate the initial configuration
+    assert isinstance(config, ParsedTree)
+    logger.info("Validating initial configuration...")
+    config_validated = KresConfig(config)
+
+    return ConfigStore(config_validated)
+
+
+async def _init_manager(config_store: ConfigStore) -> KresManager:
     """
     Called asynchronously when the application initializes.
     """
     try:
-        # Initial configuration of the manager
-        if isinstance(config, _DefaultSentinel):
-            # use default
-            config = MANAGER_CONFIG_FILE
-        if isinstance(config, Path):
-            if not config.exists():
-                logger.error(
-                    "Manager is configured to load config file at %s on startup, but the file does not exist.",
-                    config,
-                )
-                sys.exit(1)
-            else:
-                logger.info("Loading initial configuration from %s", config)
-                config = parse_yaml(await readfile(config))
-
-        # validate the initial configuration
-        assert isinstance(config, ParsedTree)
-        logger.info("Validating initial configuration...")
-        config_validated = KresConfig(config)
-
         # if configured, create a subprocess controller manually
         controller: Optional[SubprocessController] = None
-        if config_validated.server.management.backend != "auto":
-            controller = await get_controller_by_name(config_validated.server.management.backend)
+        if config_store.get().server.management.backend != "auto":
+            controller = await get_controller_by_name(config_store.get(), config_store.get().server.management.backend)
 
         # Create KresManager. This will perform autodetection of available service managers and
         # select the most appropriate to use (or use the one configured directly)
-        manager = await KresManager.create(controller, config_validated)
+        manager = await KresManager.create(controller, config_store)
 
         logger.info("Initial configuration applied. Process manager initialized...")
         return manager
@@ -232,13 +237,19 @@ async def _init_manager(config: Union[Path, ParsedTree, _DefaultSentinel]) -> Kr
         sys.exit(1)
 
 
+def _set_working_directory(config: KresConfig):
+    os.chdir(config.server.management.rundir.to_path())
+
+
 async def start_server(config: Union[Path, ParsedTree, _DefaultSentinel] = _DEFAULT_SENTINEL):
     start_time = time()
 
     # before starting server, initialize the subprocess controller etc.
-    manager = await _init_manager(config)
+    config_store = await _init_config_store(config)
+    _set_working_directory(config_store.get())
+    manager = await _init_manager(config_store)
 
-    server = Server(manager)
+    server = Server(config_store)
     await server.start()
 
     # stop the server gracefully and cleanup everything

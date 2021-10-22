@@ -89,7 +89,6 @@ commands =
     ./poe test
 """
 
-# pylint configuration copied from apkg (https://gitlab.nic.cz/packaging/apkg/-/blob/master/pylintrc)
 [tool.pylint."MESSAGES CONTROL"]
 disable= [
     "broad-except",
@@ -111,6 +110,7 @@ disable= [
     "raising-bad-type", # handled by type checker
     "too-many-arguments",  # sure, but how can we change the signatures to take less arguments? artificially create objects with arguments? That's stupid...
     "no-member",  # checked by pyright
+    "import-error", # checked by pyright (and pylint does not do it properly)
 ]
 
 [tool.pylint.SIMILARITIES]

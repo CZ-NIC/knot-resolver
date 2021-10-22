@@ -28,7 +28,7 @@ def ignore_exceptions_optional(
                 if isinstance(e, exceptions):  # pyright: reportUnnecessaryIsInstance=false
                     return default
                 else:
-                    raise e
+                    raise e  # pyright: reportGeneralTypeIssues=false
 
         return f
 
@@ -39,6 +39,13 @@ def ignore_exceptions(
     default: T, *exceptions: Type[BaseException]
 ) -> Callable[[Callable[..., Optional[T]]], Callable[..., Optional[T]]]:
     return ignore_exceptions_optional(type(default), default, *exceptions)
+
+
+def phantom_use(var: Any) -> None:  # pylint: disable=unused-argument
+    """
+    Function, which consumes its argument doing absolutely nothing with it. Useful
+    for convincing pylint, that we need the variable even when its unused.
+    """
 
 
 __all__ = [

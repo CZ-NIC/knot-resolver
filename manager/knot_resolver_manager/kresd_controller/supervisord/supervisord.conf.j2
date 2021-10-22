@@ -1,8 +1,8 @@
 [supervisord]
 pidfile = {{ config.pid_file }}
-directory = {{ workdir }}
+directory = {{ config.workdir }}
 nodaemon = false
-logfile = {{ log_file }}
+logfile = {{ config.log_file }}
 logfile_maxbytes = 50MB
 {# user=root #}
 
@@ -18,28 +18,15 @@ supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
 
 
 
-{% for instance in config.instances %}
+{% for instance in instances %}
 
 [program:{{ instance.id }}]
+type={{ instance.type }}
 redirect_stderr=false
-stdout_logfile={{ log_dir / (instance.id + ".log") }}
-stderr_logfile={{ log_dir / (instance.id + ".log") }}
-
-{%- if instance.type.name == "KRESD" %}
-
-directory={{ workdir }}
-command={{ kresd_executable }} {{ kresd_args }}
-environment=SYSTEMD_INSTANCE={{ instance.id }}
-{%- elif instance.type.name == "GC" %}
-
-directory={{ workdir }}
-command={{ gc_executable}} {{ gc_args }}
-
-{%- else %}
-
-{# other subprocess types are not implemented, fail #}
-{{ 0 / 0 }}
-
-{% endif %}
+stdout_logfile={{ instance.logfile }}
+stderr_logfile={{ instance.logfile }}
+directory={{ instance.workdir }}
+command={{ instance.command }}
+environment={{ instance.environment }}
 
 {%- endfor -%}

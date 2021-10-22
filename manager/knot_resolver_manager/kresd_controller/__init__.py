@@ -8,6 +8,7 @@ import asyncio
 import logging
 from typing import List, Optional
 
+from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.kresd_controller.interface import SubprocessController
 
 logger = logging.getLogger(__name__)
@@ -36,22 +37,20 @@ def try_systemd():
     Attempt to load systemd controllers.
     """
     try:
-        from knot_resolver_manager.kresd_controller.systemd import SystemdSubprocessController, SystemdPersistanceType
-
+        from knot_resolver_manager.kresd_controller.systemd import SystemdSubprocessController
         from knot_resolver_manager.kresd_controller.systemd.dbus_api import SystemdType
 
         _registered_controllers.extend(
             [
                 SystemdSubprocessController(SystemdType.SYSTEM),
                 SystemdSubprocessController(SystemdType.SESSION),
-                SystemdSubprocessController(SystemdType.SESSION, SystemdPersistanceType.TRANSIENT),
             ]
         )
     except ImportError:
         logger.info("Failed to import modules related to systemd service manager")
 
 
-async def get_best_controller_implementation() -> SubprocessController:
+async def get_best_controller_implementation(config: KresConfig) -> SubprocessController:
     logger.debug("Starting service manager auto-selection...")
 
     if len(_registered_controllers) == 0:
@@ -59,7 +58,7 @@ async def get_best_controller_implementation() -> SubprocessController:
         raise LookupError("No service managers available!")
 
     # check all controllers concurrently
-    res = await asyncio.gather(*(cont.is_controller_available() for cont in _registered_controllers))
+    res = await asyncio.gather(*(cont.is_controller_available(config) for cont in _registered_controllers))
 
     # take the first one on the list which is available
     for avail, controller in zip(res, _registered_controllers):
@@ -79,7 +78,7 @@ def list_controller_names() -> List[str]:
     return [str(controller) for controller in sorted(_registered_controllers, key=str)]
 
 
-async def get_controller_by_name(name: str) -> SubprocessController:
+async def get_controller_by_name(config: KresConfig, name: str) -> SubprocessController:
     logger.debug("Subprocess controller selected manualy by the user, testing feasibility...")
 
     controller: Optional[SubprocessController] = None
@@ -94,7 +93,7 @@ async def get_controller_by_name(name: str) -> SubprocessController:
         logger.error("Subprocess controller with name '%s' was not found", name)
         raise LookupError(f"No subprocess controller named '{name}' found")
 
-    if await controller.is_controller_available():
+    if await controller.is_controller_available(config):
         logger.info("Selected controller '%s'", str(controller))
         return controller
     else:

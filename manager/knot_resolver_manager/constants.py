@@ -1,38 +1,48 @@
 import logging
 from pathlib import Path
 
+from knot_resolver_manager.datamodel.config_schema import KresConfig
+from knot_resolver_manager.kres_id import KresID
+
 STARTUP_LOG_LEVEL = logging.DEBUG
-
-CONFIGURATION_DIR = Path("etc/knot-resolver").absolute()
-CONFIGURATION_DIR.mkdir(exist_ok=True)
-RUNTIME_DIR = Path("etc/knot-resolver/runtime").absolute()
-RUNTIME_DIR.mkdir(exist_ok=True)
-KRES_CACHE_DIR = Path("etc/knot-resolver/cache").absolute()
-KRES_CACHE_DIR.mkdir(exist_ok=True)
-
-
+DEFAULT_MANAGER_CONFIG_FILE = Path("/etc/knot-resolver/config.yml")
 KRESD_EXECUTABLE = Path("/usr/sbin/kresd")
 GC_EXECUTABLE = Path("/usr/sbin/kres-cache-gc")
-# KRES_CACHE_DIR = Path("/var/lib/knot-resolver")
 
-KRESD_CONFIG_FILE = RUNTIME_DIR / "kresd.conf"
-KRESD_SUPERVISORD_ARGS = f"-c {str(KRESD_CONFIG_FILE.absolute())} -n -vvv"
-KRES_GC_SUPERVISORD_ARGS = f"-c {KRES_CACHE_DIR.absolute()} -d 1000"
 
-SUPERVISORD_CONFIG_FILE = RUNTIME_DIR / "supervisord.conf"
-SUPERVISORD_CONFIG_FILE_TMP = RUNTIME_DIR / "supervisord.conf.tmp"
-SUPERVISORD_PID_FILE = RUNTIME_DIR / "supervisord.pid"
-SUPERVISORD_SOCK = RUNTIME_DIR / "supervisord.sock"
-SUPERVISORD_LOGFILE = RUNTIME_DIR / "supervisord.log"
+def kresd_cache_dir(config: KresConfig) -> Path:
+    return config.cache.storage.to_path()
 
-SUPERVISORD_SUBPROCESS_LOG_DIR = RUNTIME_DIR / "logs"
-SUPERVISORD_SUBPROCESS_LOG_DIR.mkdir(exist_ok=True)
 
-MANAGER_CONFIG_FILE = CONFIGURATION_DIR / "config.yml"
+def kresd_config_file(_config: KresConfig, kres_id: KresID) -> Path:
+    return Path(f"kresd_{kres_id}.conf")
 
-LISTEN_SOCKET_PATH = RUNTIME_DIR / "manager.sock"
 
+def supervisord_config_file(_config: KresConfig) -> Path:
+    return Path("supervisord.conf")
+
+
+def supervisord_config_file_tmp(_config: KresConfig) -> Path:
+    return Path("supervisord.conf.tmp")
+
+
+def supervisord_log_file(_config: KresConfig) -> Path:
+    return Path("supervisord.log")
+
+
+def supervisord_pid_file(_config: KresConfig) -> Path:
+    return Path("supervisord.pid")
+
+
+def supervisord_sock_file(_config: KresConfig) -> Path:
+    return Path("supervisord.sock")
+
+
+def supervisord_subprocess_log_dir(_config: KresConfig) -> Path:
+    return Path("logs")
+
+
+WATCHDOG_INTERVAL: float = 5
 """
 Used in KresdManager. It's a number of seconds in between system health checks.
 """
-WATCHDOG_INTERVAL: float = 5
