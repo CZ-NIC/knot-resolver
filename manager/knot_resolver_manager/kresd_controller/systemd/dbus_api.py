@@ -189,7 +189,7 @@ def start_transient_kresd_unit(
 ):
     name, properties = {
         SubprocessType.KRESD: (f"kresd_{kres_id}.service", _kresd_unit_properties(config, kres_id)),
-        SubprocessType.GC: ("kres-cache-gc.service", _gc_unit_properties(config)),
+        SubprocessType.GC: ("kres-managed-cache-gc.service", _gc_unit_properties(config)),
     }[subprocess_type]
 
     systemd = _create_manager_proxy(type_)
