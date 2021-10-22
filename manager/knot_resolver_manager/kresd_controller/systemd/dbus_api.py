@@ -2,7 +2,7 @@
 # pyright: reportMissingTypeStubs=false
 
 import logging
-from dataclasses import dataclass
+import os
 from enum import Enum, auto
 from threading import Thread
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -12,8 +12,11 @@ from pydbus import SystemBus
 from pydbus.bus import SessionBus
 from typing_extensions import Literal
 
-from knot_resolver_manager.constants import KRES_CACHE_DIR, KRESD_CONFIG_FILE, RUNTIME_DIR
+from knot_resolver_manager.compat.dataclasses import dataclass
+from knot_resolver_manager.constants import GC_EXECUTABLE, KRESD_EXECUTABLE, kresd_cache_dir, kresd_config_file
+from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.exceptions import SubprocessControllerException
+from knot_resolver_manager.kres_id import KresID
 from knot_resolver_manager.kresd_controller.interface import SubprocessType
 
 logger = logging.getLogger(__name__)
@@ -44,7 +47,7 @@ def _wait_for_job_completion(systemd: Any, job_creating_func: Callable[[], str])
     job_path: Optional[str] = None
 
     def _wait_for_job_completion_handler(loop: Any) -> Any:
-        completed_jobs: Dict[str, str] = dict()
+        completed_jobs: Dict[str, str] = {}
 
         def event_hander(_job_id: Any, path: Any, _unit: Any, state: Any):
             nonlocal result_state
@@ -125,39 +128,52 @@ def restart_unit(type_: SystemdType, unit_name: str):
     _wait_for_job_completion(systemd, job)
 
 
-def _kresd_unit_properties(unit_name: str) -> List[Tuple[str, str]]:
+def _kresd_unit_properties(config: KresConfig, kres_id: KresID) -> List[Tuple[str, str]]:
     val: Any = [
         ("Description", GLib.Variant("s", "transient Knot Resolver unit started by Knot Resolver Manager")),
         ("Type", GLib.Variant("s", "notify")),
-        ("WorkingDirectory", GLib.Variant("s", str(RUNTIME_DIR))),
+        ("WorkingDirectory", GLib.Variant("s", os.getcwd())),
         (
             "ExecStart",
             GLib.Variant(
-                "a(sasb)", [("/usr/bin/kresd", ["/usr/bin/kresd", "-c", str(KRESD_CONFIG_FILE), "-n"], False)]
+                "a(sasb)",
+                [
+                    (
+                        str(KRESD_EXECUTABLE),
+                        [str(KRESD_EXECUTABLE), "-c", str(kresd_config_file(config, kres_id)), "-n"],
+                        False,
+                    )
+                ],
             ),
         ),
         ("TimeoutStopUSec", GLib.Variant("t", 10000000)),
         ("WatchdogUSec", GLib.Variant("t", 10000000)),
         ("Restart", GLib.Variant("s", "on-abnormal")),
         ("LimitNOFILE", GLib.Variant("t", 524288)),
-        ("Environment", GLib.Variant("as", [f"SYSTEMD_INSTANCE={unit_name}"])),
+        ("Environment", GLib.Variant("as", [f"SYSTEMD_INSTANCE={kres_id}"])),
     ]
     return val
 
 
-def _gc_unit_properties() -> Any:
+def _gc_unit_properties(config: KresConfig) -> Any:
     val: Any = [
         (
             "Description",
             GLib.Variant("s", "transient Knot Resolver Garbage Collector unit started by Knot Resolver Manager"),
         ),
         ("Type", GLib.Variant("s", "simple")),
-        ("WorkingDirectory", GLib.Variant("s", str(RUNTIME_DIR))),
+        ("WorkingDirectory", GLib.Variant("s", str(config.server.management.rundir.to_path()))),
         (
             "ExecStart",
             GLib.Variant(
                 "a(sasb)",
-                [("/usr/bin/kres-cache-gc", ["/usr/bin/kres-cache-gc", "-c", str(KRES_CACHE_DIR), "-d", "1000"], True)],
+                [
+                    (
+                        str(GC_EXECUTABLE),
+                        [str(GC_EXECUTABLE), "-c", str(kresd_cache_dir(config)), "-d", "1000"],
+                        True,
+                    )
+                ],
             ),
         ),
         ("Restart", GLib.Variant("s", "on-failure")),
@@ -168,17 +184,23 @@ def _gc_unit_properties() -> Any:
     return val
 
 
-def start_transient_unit(type_: SystemdType, unit_name: str, subprocess_type: SubprocessType):
-    properties = {SubprocessType.KRESD: _kresd_unit_properties(unit_name), SubprocessType.GC: _gc_unit_properties()}[
-        subprocess_type
-    ]
+def start_transient_kresd_unit(
+    config: KresConfig, type_: SystemdType, kres_id: KresID, subprocess_type: SubprocessType
+):
+    name, properties = {
+        SubprocessType.KRESD: (f"kresd_{kres_id}.service", _kresd_unit_properties(config, kres_id)),
+        SubprocessType.GC: ("kres-cache-gc.service", _gc_unit_properties(config)),
+    }[subprocess_type]
 
     systemd = _create_manager_proxy(type_)
 
     def job():
-        return systemd.StartTransientUnit(unit_name, "fail", properties, [])
+        return systemd.StartTransientUnit(name, "fail", properties, [])
 
-    _wait_for_job_completion(systemd, job)
+    try:
+        _wait_for_job_completion(systemd, job)
+    except SubprocessControllerException as e:
+        raise SubprocessControllerException(f"Failed to start systemd transient service '{name}'") from e
 
 
 def start_unit(type_: SystemdType, unit_name: str):

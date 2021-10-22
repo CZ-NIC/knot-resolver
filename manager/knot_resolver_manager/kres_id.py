@@ -57,3 +57,11 @@ def alloc_from_string(val: str) -> KresID:
         res = alloc(_custom_name_id=True)
         res.set_custom_str_representation(val)
         return res
+
+
+def lookup_from_string(val: str) -> KresID:
+    for allocated_id in _used:
+        if str(allocated_id) == val:
+            return allocated_id
+
+    raise IndexError(f"ID with identifier '{val}' was not allocated")

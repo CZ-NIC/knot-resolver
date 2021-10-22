@@ -1,3 +1,6 @@
+# pylint: disable=comparison-with-callable
+
+
 import enum
 import inspect
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union

@@ -1,5 +1,5 @@
 cache:
-  storage: etc/knot-resolver/cache
+  storage: ../cache
 logging:
   level: debug
 network:
@@ -14,3 +14,4 @@ server:
       ip: 127.0.0.1
       port: 5000
     log-level: DEBUG
+    rundir: etc/knot-resolver/runtime

@@ -41,7 +41,7 @@ async def readfile(path: Union[str, PurePath]) -> str:
     """
 
     def readfile_sync(path: Union[str, PurePath]):
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf8") as f:
             return f.read()
 
     return await to_thread(readfile_sync, path)
@@ -53,7 +53,7 @@ async def writefile(path: Union[str, PurePath], content: str):
     """
 
     def writefile_sync(path: Union[str, PurePath], content: str):
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf8") as f:
             return f.write(content)
 
     await to_thread(writefile_sync, path, content)

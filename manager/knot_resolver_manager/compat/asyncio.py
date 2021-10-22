@@ -42,6 +42,7 @@ async def to_thread(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
             except BaseException as e:
                 logger.error("Task in thread failed...", exc_info=True)
                 exc = e
+                return None
 
         res = await loop.run_in_executor(None, exc_catcher)
         # propagate exception in this thread
@@ -69,16 +70,16 @@ def run(coro: Coroutine[Any, T, NoneType], debug: Optional[bool] = None) -> Awai
     # https://github.com/python/cpython/blob/3.9/Lib/asyncio/runners.py#L8
 
     # version 3.7 and higher, call directly
-    if sys.version_info.major >= 3 and sys.version_info.minor >= 7 and False:
-        return asyncio.run(coro, debug=debug)
-
+    # disabled due to incompatibilities
+    # if sys.version_info.major >= 3 and sys.version_info.minor >= 7 and False:
+    #    return asyncio.run(coro, debug=debug)
+    # else:
     # earlier versions, run with default executor
-    else:
-        # Explicitelly create a new loop to match behaviour of asyncio.run
-        loop = asyncio.events.new_event_loop()
-        asyncio.set_event_loop(loop)
-        if debug is not None:
-            loop.set_debug(debug)
-        return loop.run_until_complete(coro)
-        # asyncio.run would cancel all running tasks, but it would use internal API for that
-        # so let's ignore it and let the tasks die
+    # Explicitelly create a new loop to match behaviour of asyncio.run
+    loop = asyncio.events.new_event_loop()
+    asyncio.set_event_loop(loop)
+    if debug is not None:
+        loop.set_debug(debug)
+    return loop.run_until_complete(coro)
+    # asyncio.run would cancel all running tasks, but it would use internal API for that
+    # so let's ignore it and let the tasks die
