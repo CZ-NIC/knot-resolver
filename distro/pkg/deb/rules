@@ -10,14 +10,17 @@ export DEB_CFLAGS_MAINT_APPEND  = -Wall -pedantic -fno-omit-frame-pointer
 # package maintainers to append LDFLAGS
 export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
+export PYBUILD_NAME=knot_resolver_manager
+
 # see EXAMPLES in dpkg-buildflags(1) and read /usr/share/dpkg/*
 DPKG_EXPORT_BUILDFLAGS = 1
 include /usr/share/dpkg/default.mk
 
 export ARCH=$(DEB_HOST_GNU_CPU)
 
+
 %:
-	dh $@
+	dh $@ --with python3
 
 override_dh_auto_build:
 	meson build_deb \
@@ -36,9 +39,13 @@ override_dh_auto_build:
 		-Dc_link_args="$${LDFLAGS}"
 	ninja -v -C build_deb
 	ninja -v -C build_deb doc
+	dh_auto_build --buildsystem=pybuild --sourcedirectory manager
 
 override_dh_auto_install:
 	DESTDIR="${PWD}/debian/tmp" ninja -v -C build_deb install
+	dh_auto_install --buildsystem=pybuild --sourcedirectory manager
+	install -m 644 -D $(CURDIR)/manager/etc/knot-resolver/config.yml $(CURDIR)/debian/tmp/etc/knot-resolver/config.yml
+	install -m 644 -D $(CURDIR)/manager/knot-resolver-manager.service $(CURDIR)/debian/tmp/lib/systemd/system/knot-resolver-manager.service
 
 override_dh_auto_test:
 	meson test -C build_deb
