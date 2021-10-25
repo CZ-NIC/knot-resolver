@@ -1,0 +1,2 @@
+etc/knot-resolver/config.yml
+lib/systemd/system/knot-resolver-manager.service
