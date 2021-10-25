@@ -50,6 +50,7 @@ Resolver:
    "nghttp2_", "``daemon``", "DNS over HTTPS support."
    "libsystemd_", "``daemon``", "Systemd watchdog support."
    "`libcap-ng`_", "``daemon``", "Linux capabilities: support dropping them."
+   "`lua-basexx`_", "``config tests``", "Number base encoding/decoding for Lua."
    "`lua-http`_", "``modules/http``", "HTTP/2 client/server for Lua."
    "`lua-cqueues`_", "some lua modules", ""
    "cmocka_", "``unit tests``", "Unit testing framework."
@@ -168,7 +169,8 @@ command.
 Tests
 -----
 
-The following command runs all enabled tests. By default, only unit tests are enabled.
+The following command runs all enabled tests. By default, only unit tests are
+enabled (when ``cmocka`` is installed).
 
 .. code-block:: bash
 
@@ -297,6 +299,7 @@ For development, it's possible to build the container directly from your git tre
 .. _pkg-config: https://www.freedesktop.org/wiki/Software/pkg-config/
 .. _libknot: https://gitlab.nic.cz/knot/knot-dns
 .. _cmocka: https://cmocka.org/
+.. _lua-basexx: https://github.com/aiq/basexx
 .. _lua-http: https://luarocks.org/modules/daurnimator/http
 .. _lua-cqueues: https://25thandclement.com/~william/projects/cqueues.html
 .. _deckard: https://gitlab.nic.cz/knot/deckard
