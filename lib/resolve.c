@@ -1615,4 +1615,70 @@ knot_mm_t *kr_resolve_pool(struct kr_request *request)
 	return NULL;
 }
 
+static int ede_priority(int info_code)
+{
+	switch(info_code) {
+	case KNOT_EDNS_EDE_DNSKEY_BIT:
+	case KNOT_EDNS_EDE_DNSKEY_MISS:
+	case KNOT_EDNS_EDE_SIG_EXPIRED:
+	case KNOT_EDNS_EDE_SIG_NOTYET:
+	case KNOT_EDNS_EDE_RRSIG_MISS:
+	case KNOT_EDNS_EDE_NSEC_MISS:
+		return 900;  /* Specific DNSSEC failures */
+	case KNOT_EDNS_EDE_BOGUS:
+		return 800;  /* Generic DNSSEC failure */
+	case KNOT_EDNS_EDE_FORGED:
+	case KNOT_EDNS_EDE_FILTERED:
+		return 700;  /* Considered hard fail by firefox */
+	case KNOT_EDNS_EDE_PROHIBITED:
+	case KNOT_EDNS_EDE_BLOCKED:
+	case KNOT_EDNS_EDE_CENSORED:
+		return 600;  /* Policy related */
+	case KNOT_EDNS_EDE_DNSKEY_ALG:
+	case KNOT_EDNS_EDE_DS_DIGEST:
+		return 500;  /* Non-critical DNSSEC issues */
+	case KNOT_EDNS_EDE_STALE:
+	case KNOT_EDNS_EDE_INDETERMINATE:
+	case KNOT_EDNS_EDE_CACHED_ERR:
+	case KNOT_EDNS_EDE_NOT_READY:
+	case KNOT_EDNS_EDE_STALE_NXD:
+	case KNOT_EDNS_EDE_NOTAUTH:
+	case KNOT_EDNS_EDE_NOTSUP:
+	case KNOT_EDNS_EDE_NREACH_AUTH:
+	case KNOT_EDNS_EDE_NETWORK:
+	case KNOT_EDNS_EDE_INV_DATA:
+		return 200;  /* Assorted codes */
+	case KNOT_EDNS_EDE_OTHER:
+		return 100;  /* Most generic catch-all error */
+	case KNOT_EDNS_EDE_NONE:
+		return 0;  /* No error - allow overriding */
+	default:
+		kr_assert(false);  /* Unknown info_code */
+		return 50;
+	}
+}
+
+int kr_request_set_extended_error(struct kr_request *request, int info_code, const char *extra_text)
+{
+	if (kr_fails_assert(request))
+		return KNOT_EDNS_EDE_NONE;
+
+	struct kr_extended_error *ede = &request->extended_error;
+
+	/* Clear any previously set error. */
+	if (info_code == KNOT_EDNS_EDE_NONE) {
+		kr_assert(extra_text == NULL);
+		ede->info_code = KNOT_EDNS_EDE_NONE;
+		ede->extra_text = NULL;
+		return KNOT_EDNS_EDE_NONE;
+	}
+
+	if (ede_priority(info_code) >= ede_priority(ede->info_code)) {
+		ede->info_code = info_code;
+		ede->extra_text = extra_text;
+	}
+
+	return ede->info_code;
+}
+
 #undef VERBOSE_MSG

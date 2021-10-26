@@ -184,6 +184,13 @@ struct kr_request_qsource_flags {
 	bool xdp:1; /**< true if the request is on AF_XDP; only meaningful if (dst_addr). */
 };
 
+/* Extended DNS Errors, RFC 8914 */
+struct kr_extended_error {
+	int32_t info_code;  /**< May contain -1 (KNOT_EDNS_EDE_NONE); filter before converting to uint16_t. */
+	const char *extra_text; /**< Can be NULL.  Allocated on the kr_request::pool or static. */
+};
+
+
 typedef bool (*addr_info_f)(struct sockaddr*);
 typedef void (*async_resolution_f)(knot_dname_t*, enum knot_rr_type);
 typedef array_t(union kr_sockaddr) kr_sockaddr_array_t;
@@ -251,6 +258,7 @@ struct kr_request {
 	unsigned int count_no_nsaddr;
 	unsigned int count_fail_row;
 	alloc_wire_f alloc_wire_cb; /**< CB to allocate answer wire (can be NULL). */
+	struct kr_extended_error extended_error;  /**< EDE info; don't modify directly, use kr_request_set_extended_error() */
 };
 
 /** Initializer for an array of *_selected. */
@@ -365,3 +373,19 @@ struct kr_rplan *kr_resolve_plan(struct kr_request *request);
  */
 KR_EXPORT KR_PURE
 knot_mm_t *kr_resolve_pool(struct kr_request *request);
+
+/**
+ * Set the extended DNS error for request.
+ *
+ * The error is set only if it has a higher or the same priority as the one
+ * already assigned.  The provided extra_text may be NULL, or a string that is
+ * allocated either statically, or on the request's mempool. To clear any
+ * error, call it with KNOT_EDNS_EDE_NONE and NULL as extra_text.
+ *
+ * @param  request     request state
+ * @param  info_code   extended DNS error code
+ * @param  extra_text  optional string with additional information
+ * @return             info_code that is set after the call
+ */
+KR_EXPORT
+int kr_request_set_extended_error(struct kr_request *request, int info_code, const char *extra_text);

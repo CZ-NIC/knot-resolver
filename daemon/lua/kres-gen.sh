@@ -125,6 +125,7 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	kr_qarray_t
 	struct kr_rplan
 	struct kr_request_qsource_flags
+	struct kr_extended_error
 	struct kr_request
 	enum kr_rank
 	typedef kr_cdb_pt
@@ -203,6 +204,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 # Resolution request
 	kr_request_ensure_edns
 	kr_request_ensure_answer
+	kr_request_set_extended_error
 	kr_resolve_plan
 	kr_resolve_pool
 # Resolution plan

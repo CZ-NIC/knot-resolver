@@ -194,6 +194,10 @@ struct kr_request_qsource_flags {
 	_Bool http : 1;
 	_Bool xdp : 1;
 };
+struct kr_extended_error {
+	int32_t info_code;
+	const char *extra_text;
+};
 struct kr_request {
 	struct kr_context *ctx;
 	knot_pkt_t *answer;
@@ -234,6 +238,7 @@ struct kr_request {
 	unsigned int count_no_nsaddr;
 	unsigned int count_fail_row;
 	alloc_wire_f alloc_wire_cb;
+	struct kr_extended_error extended_error;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
 typedef struct kr_cdb * kr_cdb_pt;
@@ -380,6 +385,7 @@ void knot_pkt_free(knot_pkt_t *);
 int knot_pkt_parse(knot_pkt_t *, unsigned int);
 knot_rrset_t *kr_request_ensure_edns(struct kr_request *);
 knot_pkt_t *kr_request_ensure_answer(struct kr_request *);
+int kr_request_set_extended_error(struct kr_request *, int, const char *);
 struct kr_rplan *kr_resolve_plan(struct kr_request *);
 knot_mm_t *kr_resolve_pool(struct kr_request *);
 struct kr_query *kr_rplan_push(struct kr_rplan *, struct kr_query *, const knot_dname_t *, uint16_t, uint16_t);
