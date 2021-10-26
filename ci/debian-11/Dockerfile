@@ -3,7 +3,7 @@
 FROM debian:bullseye
 MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
 # >= 3.0 needed because of --enable-xdp=yes
-ARG KNOT_BRANCH=3.0
+ARG KNOT_BRANCH=3.1
 ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /root

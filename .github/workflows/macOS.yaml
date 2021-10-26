@@ -19,7 +19,7 @@ jobs:
 
       - name: Install libknot from sources
         env:
-          KNOT_DNS_VERSION: '3.0'
+          KNOT_DNS_VERSION: '3.1'
         run: |
           git clone -b ${KNOT_DNS_VERSION} https://gitlab.nic.cz/knot/knot-dns.git
           cd knot-dns

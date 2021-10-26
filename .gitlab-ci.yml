@@ -10,7 +10,7 @@ variables:
   RESPDIFF_COUNT: 1
   RESPDIFF_FORCE: 0
   RESPERF_FORCE: 0
-  KNOT_VERSION: '3.0'
+  KNOT_VERSION: '3.1'
   LIBKRES_ABI: 9
   LIBKRES_NAME: libkres
   MESON_TEST: meson test -C build_ci* -t 4 --print-errorlogs
@@ -261,11 +261,12 @@ lint:tidy:
     - ninja -C build_ci_lib daemon/kresd
     - ninja -C build_ci_lib kres-gen
     - git diff --quiet || (git diff; exit 1)
-kres-gen-default:
+kres-gen-30:
   <<: *kres-gen
-kres-gen-master:
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-3.0
+kres-gen-31:
   <<: *kres-gen
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-master
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-3.1
 
 root.hints:
   <<: *sanity
