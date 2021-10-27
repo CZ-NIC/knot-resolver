@@ -3,6 +3,7 @@
 
 import enum
 import inspect
+import sys
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 from typing_extensions import Literal
@@ -39,12 +40,15 @@ def is_union(tp: Any) -> bool:
 
 
 def is_literal(tp: Any) -> bool:
-    return isinstance(tp, type(Literal))
+    if sys.version_info.minor == 6:
+        return isinstance(tp, type(Literal))
+    else:
+        return getattr(tp, "__origin__", None) == Literal
 
 
 def get_generic_type_arguments(tp: Any) -> List[Any]:
     default: List[Any] = []
-    if is_literal(tp):
+    if sys.version_info.minor == 6 and is_literal(tp):
         return getattr(tp, "__values__")
     else:
         return getattr(tp, "__args__", default)
