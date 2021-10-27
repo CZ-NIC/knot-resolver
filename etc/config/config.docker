@@ -61,10 +61,9 @@ function debug_mode(qname, qtype)
 
 	-- execute query right after start up and exit when the query is finished
 	event.after(0, function()
-		-- ultra verbose log
-		log_level('debug')
+		log_level('info')
 		policy.add(policy.all(policy.DEBUG_ALWAYS))
-		log_debug(ffi.C.LOG_GRP_RESOLVER, 'starting DNS query for %s %s', qname, kres.tostring.type[qtype])
+		log_info(ffi.C.LOG_GRP_RESOLVER, 'starting DNS query for %s %s', qname, kres.tostring.type[qtype])
 		local starttime = cqueues.monotime()
 		resolve({
 			name = qname,
@@ -76,7 +75,7 @@ function debug_mode(qname, qtype)
 				event.after(1, -- milisecond
 					function()
 						local endtime = cqueues.monotime()
-						log_debug(ffi.C.LOG_GRP_RESOLVER, '\nrequest finished in %f ms', (endtime - starttime) * 1000)
+						log_info(ffi.C.LOG_GRP_RESOLVER, 'request finished in %f ms', (endtime - starttime) * 1000)
 						os.exit()
 					end)
 				end
