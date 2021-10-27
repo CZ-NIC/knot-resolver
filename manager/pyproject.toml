@@ -16,6 +16,7 @@ Jinja2 = "^2.11.3"
 click = "^7.1.2"
 PyYAML = "^5.4.1"
 requests = "^2.25.1"
+typing-extensions = "^3.10.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
