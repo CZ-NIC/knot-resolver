@@ -40,7 +40,7 @@ def create_file_from_template(template_path, dest, data):
     template = env.get_template(template_path)
     rendered_template = template.render(**data)
 
-    with open(dest, "w") as fh:
+    with open(dest, "w", encoding='UTF-8') as fh:
         fh.write(rendered_template)
 
 
@@ -92,7 +92,7 @@ class Kresd(ContextDecorator):
             self.tls_port = make_port(self.ip, self.ip6)
 
         create_file_from_template(KRESD_CONF_TEMPLATE, self.config_path, {'kresd': self})
-        self.logfile = open(self.logfile_path, 'w')
+        self.logfile = open(self.logfile_path, 'w', encoding='UTF-8')
         self.process = subprocess.Popen(
             ['kresd', '-c', self.config_path, '-n', self.workdir],
             stderr=self.logfile, env=os.environ.copy())
@@ -112,7 +112,7 @@ class Kresd(ContextDecorator):
                 raise RuntimeError("Kresd crashed with returncode: {}".format(
                     self.process.returncode))
         except (RuntimeError, ConnectionError):  # pylint: disable=try-except-raise
-            with open(self.logfile_path) as log:  # print log for debugging
+            with open(self.logfile_path, encoding='UTF-8') as log:  # print log for debugging
                 print(log.read())
             raise
 
@@ -221,7 +221,7 @@ class Kresd(ContextDecorator):
 
     def partial_log(self):
         partial_log = '\n (... ommiting log start)\n'
-        with open(self.logfile_path) as log:  # display partial log for debugging
+        with open(self.logfile_path, encoding='UTF-8') as log:  # display partial log for debugging
             past_startup_msgid = False
             past_startup = False
             for line in log:

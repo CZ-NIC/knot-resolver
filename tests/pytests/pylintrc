@@ -16,6 +16,7 @@ disable=
     no-else-return,
     redefined-outer-name,  # commonly used with pytest fixtures
     consider-using-with,
+    consider-using-f-string,
 
 
 [SIMILARITIES]

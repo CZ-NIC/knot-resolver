@@ -135,9 +135,9 @@ def kresd_tls_client(
     assert proxy.upstream_ip in ALLOWED_IPS, "only localhost IPs are supported for proxy"
 
     if kresd_tls_client_kwargs is None:
-        kresd_tls_client_kwargs = dict()
+        kresd_tls_client_kwargs = {}
     if kresd_fwd_target_kwargs is None:
-        kresd_fwd_target_kwargs = dict()
+        kresd_fwd_target_kwargs = {}
 
     # run forward target instance
     dir1 = os.path.join(workdir, 'kresd_fwd_target')
