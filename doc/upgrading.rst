@@ -28,6 +28,16 @@ newer versions when they are released.
 .. _`systemd`: https://systemd.io/
 .. _`supervisord`: http://supervisord.org/
 
+
+5.4 to 5.5
+==========
+
+Packagers & Developers
+----------------------
+
+* Knot DNS >= 3.0.2 is required.
+
+
 5.3 to 5.4
 ==========
 

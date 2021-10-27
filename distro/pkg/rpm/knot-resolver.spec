@@ -41,9 +41,9 @@ BuildRequires:  meson
 BuildRequires:  pkgconfig(cmocka)
 BuildRequires:  pkgconfig(gnutls)
 BuildRequires:  pkgconfig(libedit)
-BuildRequires:  pkgconfig(libknot) >= 2.9
-BuildRequires:  pkgconfig(libzscanner) >= 2.9
-BuildRequires:  pkgconfig(libdnssec) >= 2.9
+BuildRequires:  pkgconfig(libknot) >= 3.0.2
+BuildRequires:  pkgconfig(libzscanner) >= 3.0.2
+BuildRequires:  pkgconfig(libdnssec) >= 3.0.2
 BuildRequires:  pkgconfig(libnghttp2)
 BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  pkgconfig(libcap-ng)
