@@ -391,6 +391,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	req->vars_ref = LUA_NOREF;
 	req->uid = uid;
 	req->qsource.flags.xdp = is_xdp;
+	kr_request_set_extended_error(req, KNOT_EDNS_EDE_NONE, NULL);
 	array_init(req->qsource.headers);
 	if (session) {
 		req->qsource.flags.tcp = session_get_handle(session)->type == UV_TCP;
