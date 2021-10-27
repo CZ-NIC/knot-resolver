@@ -40,10 +40,21 @@ pyright knot_resolver_manager
 check_rv $?
 echo
 
+
+# check that setup.py is not behind pyproject.toml
+echo -e "${yellow}Checking setup.py${reset}"
+python scripts/create_setup.py | diff - setup.py
+check_rv $?
+echo
+
 # fancy messages at the end :)
 if test "$aggregate_rv" -eq "0"; then
 	echo -e "${green}Everything looks great!${reset} 🥳🎉🥰"
 else
+	echo -e "${red}Failure.${reset}"
+	echo -e "${red}These commands might help you:${reset}"
+	echo -e "${red}\tpoe format${reset}"
+	echo -e "${red}\tpoe gen-setuppy${reset}"
 	echo -e "${red}That's not great. Could you please fix that?${reset} 😲😟"
 fi
 

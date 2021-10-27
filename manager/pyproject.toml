@@ -53,6 +53,7 @@ clean = """
          dist
          .tox
 """
+gen-setuppy = { shell = "python scripts/create_setup.py > setup.py", help = "Generate setup.py file for backwards compatibility" }
 tox = { cmd = "tox", help = "Run tests in tox" }
 integration = {cmd = "python integration/runner.py", help = "Run integration tests" }
 configure-vscode = {cmd = "scripts/configure-vscode", help = "Create VSCode configuration for debugging, virtual envs etc" }
