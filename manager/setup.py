@@ -21,7 +21,8 @@ install_requires = \
  'aiohttp>=3.6.12,<4.0.0',
  'click>=7.1.2,<8.0.0',
  'pydbus>=0.6.0,<0.7.0',
- 'requests>=2.25.1,<3.0.0']
+ 'requests>=2.25.1,<3.0.0',
+ 'typing-extensions>=3.10.0,<4.0.0']
 
 setup_kwargs = {
     'name': 'knot-resolver-manager',
