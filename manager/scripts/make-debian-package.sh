@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -o errexit
+set -o nounset
+
 export DEBIAN_FRONTEND=noninteractive
 
 # upgrade system to latest
@@ -16,20 +19,23 @@ apt-get update -qqq
 apt-get install -y python3-pip
 pip3 install apkg
 
-# git
-apt-get install -y git
-
 # prepare the repo
 git clone https://gitlab.nic.cz/knot/knot-resolver
 cd knot-resolver
+git config --global user.email "ci@knot-resolver"
+git config --global user.name "GitLab CI"
 git checkout manager-pkg
 git rebase origin/manager-integration
 git submodule update --init --recursive
 
+# install meson, because its not installed for some reason
+apt-get install -y meson
+
 # build the package
 apkg system-setup
-apkg srcpkg
 apkg build -b
+apkg srcpkg
+
 
 
 

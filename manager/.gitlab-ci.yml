@@ -49,6 +49,6 @@ package-debian:
     - bash scripts/make-debian-package.sh
   artifacts:
     paths:
-      - pkg/pkgs/debian-10
-      - pkg/srcpkgs/debian-10
+      - knot-resolver/pkg/pkgs/debian-10
+      - knot-resolver/pkg/srcpkgs/debian-10
     expire_in: 1 week
