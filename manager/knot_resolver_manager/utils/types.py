@@ -15,7 +15,7 @@ def is_optional(tp: Any) -> bool:
     origin = getattr(tp, "__origin__", None)
     args = get_generic_type_arguments(tp)
 
-    return origin == Union and len(args) == 2 and args[1] == NoneType
+    return origin == Union and len(args) == 2 and args[1] == NoneType  # type: ignore
 
 
 def is_dict(tp: Any) -> bool:
@@ -36,7 +36,7 @@ def is_tuple(tp: Any) -> bool:
 
 def is_union(tp: Any) -> bool:
     """ Returns true even for optional types, because they are just a Union[T, NoneType] """
-    return getattr(tp, "__origin__", None) == Union
+    return getattr(tp, "__origin__", None) == Union  # type: ignore
 
 
 def is_literal(tp: Any) -> bool:
@@ -77,7 +77,7 @@ def get_attr_type(obj: Any, attr_name: str) -> Any:
 class _LiteralEnum:
     def __getitem__(self, args: Tuple[Union[str, int, bytes], ...]) -> Any:
         lits = tuple(Literal[x] for x in args)
-        return Union[lits]  # pyright: reportGeneralTypeIssues=false
+        return Union[lits]  # type: ignore
 
 
 LiteralEnum = _LiteralEnum()
