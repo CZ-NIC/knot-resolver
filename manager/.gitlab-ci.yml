@@ -1,5 +1,6 @@
 stages:
   - check
+  - packaging
 
 default:
   image: registry.nic.cz/knot/knot-resolver-manager/knot-manager:ci
@@ -37,3 +38,17 @@ integration:
   stage: check
   script:
     - poe integration
+
+
+package-debian:
+  when: manual
+  stage: packaging
+  image: registry.nic.cz/labs/lxc-gitlab-runner/debian-10
+  before_script: []
+  script:
+    - bash scripts/make-debian-package.sh
+  artifacts:
+    paths:
+      - pkg/pkgs/debian-10/
+      - pkg/srcpkgs/debian-10
+    expire_in: 1 week
