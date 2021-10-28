@@ -31,9 +31,9 @@ requests-unixsocket = "^0.2.0"
 click = "^7.1.2"
 toml = "^0.10.2"
 debugpy = "^1.2.1"
-apkg = { git = "https://gitlab.nic.cz/packaging/apkg.git", branch = "master" }
 Sphinx = "^4.0.2"
 supervisor = "^4.2.2"
+pylint = "^2.11.1"
 
 [tool.poe.tasks]
 run = { cmd = "scripts/run", help = "Run the manager" }
@@ -123,6 +123,13 @@ ignore-imports = "no"
 
 [tool.pylint.DESIGN]
 max-parents = "10"
+
+[tool.pyright]
+include = [
+    "knot_resolver_manager"
+]
+exclude = []
+typeCheckingMode = "strict"
 
 [build-system]
 requires = ["poetry>=0.12"]

@@ -1,7 +1,0 @@
-{
-  "include": [
-    "knot_resolver_manager"
-  ],
-  "exclude": [],
-  "typeCheckingMode": "strict"
-}
