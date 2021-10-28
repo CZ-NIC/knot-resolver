@@ -28,6 +28,7 @@ git submodule update --init --recursive
 
 # build the package
 apkg system-setup
+apkg srcpkg
 apkg build -b
 
 
