@@ -45,6 +45,8 @@ echo
 echo -e "${yellow}Checking setup.py${reset}"
 python scripts/create_setup.py | diff - setup.py
 check_rv $?
+python setup.py --help > /dev/null
+check_rv $?
 echo
 
 # fancy messages at the end :)
