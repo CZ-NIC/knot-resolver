@@ -385,10 +385,7 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 				ret == 0 ? KR_RANK_SECURE : KR_RANK_BOGUS);
 
 		if (ret != 0) {
-			if (ret != kr_error(DNSSEC_INVALID_DS_ALGORITHM) &&
-			    ret != kr_error(EAGAIN)) {
-				log_bogus_rrsig(&vctx, qry->zone_cut.key, "bogus key");
-			}
+			log_bogus_rrsig(&vctx, qry->zone_cut.key, "bogus key");
 			knot_rrset_free(qry->zone_cut.key, qry->zone_cut.pool);
 			qry->zone_cut.key = NULL;
 			return ret;
