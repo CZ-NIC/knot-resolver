@@ -93,8 +93,12 @@ local function priming_callback(pkt, req)
 			internal.to_resolve = internal.to_resolve + 2 * rr.rrs.count
 			for k = 0, rr.rrs.count-1 do
 				local nsname_text = rr:tostring(k)
-				resolve(nsname_text, kres.type.A, kres.class.IN, 0, address_callback)
-				resolve(nsname_text, kres.type.AAAA, kres.class.IN, 0, address_callback)
+				if net.ipv4 then
+					resolve(nsname_text, kres.type.A, kres.class.IN, 0, address_callback)
+				end
+				if net.ipv6 then
+					resolve(nsname_text, kres.type.AAAA, kres.class.IN, 0, address_callback)
+				end
 			end
 		end
 	end
