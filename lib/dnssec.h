@@ -43,7 +43,14 @@ struct kr_rrset_validation_ctx {
 	uint32_t flags;			/*!< Output - Flags. */
 	uint32_t err_cnt;		/*!< Output - Number of validation failures. */
 	uint32_t cname_norrsig_cnt;	/*!< Output - Number of CNAMEs missing RRSIGs. */
-	int result;			/*!< Output - 0 or error code. */
+
+	/** Validation result: kr_error() code.
+	 *
+	 * ENOENT: the usual, no suitable signature found
+	 * EAGAIN: encountered a different signer name
+	 * +others
+	 */
+	int result;
 	const struct kr_query *log_qry; /*!< The query; just for logging purposes. */
 	struct {
 		unsigned int matching_name_type;	/*!< Name + type matches */
@@ -64,7 +71,7 @@ typedef struct kr_rrset_validation_ctx kr_rrset_validation_ctx_t;
  * @param vctx    Pointer to validation context.
  * @param covered RRSet covered by a signature. It must be in canonical format.
  * 		  Its TTL may get lowered.
- * @return        0 or error code, same as vctx->result.
+ * @return        0 or kr_error() code, same as vctx->result (see its docs).
  */
 int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx, knot_rrset_t *covered);
 
@@ -173,6 +180,7 @@ void kr_svldr_free_ctx(struct kr_svldr_ctx *ctx);
  * - The TTL of `rrs` may get trimmed.
  * - If it's a wildcard other than in its simple `*.` form, it may fail to validate.
  * - More generally, non-existence proofs are not supported.
+ * @return  0 or kr_error() code, same as kr_rrset_validation_ctx::result (see its docs).
  */
 KR_EXPORT
 int kr_svldr_rrset(knot_rrset_t *rrs, const knot_rdataset_t *rrsigs,
