@@ -12,6 +12,10 @@ Knot Resolver supports 6 logging levels - ``crit``, ``err``, ``warning``,
 in ``syslog.h``. It is possible change logging level using
 :func:`log_level` function.
 
+.. code-block:: lua
+
+  log_level('debug') -- too verbose for normal usage
+
 Logging level ``notice`` is set after start by default,
 so logs from Knot Resolver should contain only couple lines a day.
 For debugging purposes it is possible to use the very verbose ``debug`` level,
