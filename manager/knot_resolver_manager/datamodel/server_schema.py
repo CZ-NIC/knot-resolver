@@ -36,6 +36,10 @@ LogLevelEnum = LiteralEnum["CRITICAL", "FATAL", "ERROR", "WARN", "WARNING", "INF
 
 
 class ManagementSchema(SchemaNode):
+    """
+    Configuration of the Manager itself.
+    """
+
     # the default listen path here MUST use the default rundir
     listen: Listen = Listen({"unix-socket": "./manager.sock"})
     backend: BackendEnum = "auto"

@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional, Pattern, Type, Union
 
 from knot_resolver_manager.exceptions import SchemaException
 from knot_resolver_manager.utils import CustomValueType, SchemaNode
+from knot_resolver_manager.utils.modelling import Serializable
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +140,7 @@ class ListenType(Enum):
     INTERFACE_AND_PORT = auto()
 
 
-class Listen(SchemaNode):
+class Listen(SchemaNode, Serializable):
     class Raw(SchemaNode):
         ip: Optional[str] = None
         port: Optional[int] = None
@@ -212,6 +213,16 @@ class Listen(SchemaNode):
             and self.unix_socket == o.unix_socket
             and self.interface == o.interface
         )
+
+    def to_dict(self) -> Dict[Any, Any]:
+        if self.typ is ListenType.IP_AND_PORT:
+            return {"port": self.port, "ip": str(self.ip)}
+        elif self.typ is ListenType.UNIX_SOCKET:
+            return {"unix_socket": str(self.unix_socket)}
+        elif self.typ is ListenType.INTERFACE_AND_PORT:
+            return {"interface": self.interface, "port": self.port}
+        else:
+            raise NotImplementedError()
 
 
 class IPNetwork(CustomValueType):
