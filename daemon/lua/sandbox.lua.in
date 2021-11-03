@@ -60,6 +60,10 @@ function log_warn(grp, fmt, ...)
 	log_fmt(grp, LOG_WARNING, fmt, ...)
 end
 
+function log_notice(grp, fmt, ...)
+	log_fmt(grp, LOG_NOTICE, fmt, ...)
+end
+
 function log_info(grp, fmt, ...)
 	log_fmt(grp, LOG_INFO, fmt, ...)
 end
