@@ -1,5 +1,4 @@
 import inspect
-from re import match
 from typing import Any, Dict, List, Optional, Set, Tuple, Type, Union, cast
 
 from knot_resolver_manager.exceptions import DataException, SchemaException
@@ -52,21 +51,21 @@ class Serializable:
             or (inspect.isclass(typ) and issubclass(typ, CustomValueType))
             or (inspect.isclass(typ) and issubclass(typ, SchemaNode))
             or (is_optional(typ) and Serializable.is_serializable(get_optional_inner_type(typ)))
-            or (is_union(typ) and all_matches(lambda t: Serializable.is_serializable(t), get_generic_type_arguments(typ)))
+            or (is_union(typ) and all_matches(Serializable.is_serializable, get_generic_type_arguments(typ)))
         )
-    
+
     @staticmethod
     def serialize(obj: Any, typ: Type[Any]) -> Any:
         if inspect.isclass(typ) and issubclass(typ, Serializable):
             return cast(Serializable, obj).to_dict()
-        
+
         elif inspect.isclass(typ) and issubclass(typ, CustomValueType):
             return cast(CustomValueType, obj).serialize()
-        
+
         elif inspect.isclass(typ) and issubclass(typ, SchemaNode):
             node = cast(SchemaNode, obj)
             return node.serialize()
-        
+
         elif is_list(typ):
             lst = cast(List[Any], obj)
             res: List[Any] = [Serializable.serialize(i, get_generic_type_argument(typ)) for i in lst]
@@ -509,7 +508,7 @@ class SchemaNode:
         schema["properties"] = _get_properties_schema(cls)
 
         return schema
-    
+
     def serialize(self) -> Dict[Any, Any]:
         res: Dict[Any, Any] = {}
         cls = self.__class__
