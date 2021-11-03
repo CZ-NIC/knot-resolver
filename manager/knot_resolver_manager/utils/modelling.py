@@ -1,5 +1,6 @@
 import inspect
-from typing import Any, Dict, Optional, Set, Tuple, Type, Union
+from re import match
+from typing import Any, Dict, List, Optional, Set, Tuple, Type, Union, cast
 
 from knot_resolver_manager.exceptions import DataException, SchemaException
 from knot_resolver_manager.utils.custom_types import CustomValueType
@@ -9,6 +10,7 @@ from knot_resolver_manager.utils.types import (
     NoneType,
     get_generic_type_argument,
     get_generic_type_arguments,
+    get_optional_inner_type,
     is_dict,
     is_enum,
     is_internal_field_name,
@@ -30,11 +32,59 @@ def is_obj_type(obj: Any, types: Union[type, Tuple[Any, ...], Tuple[type, ...]])
     return type(obj) == types
 
 
+class Serializable:
+    """
+    An interface for making classes serializable to a dictionary (and in turn into a JSON).
+    """
+
+    def to_dict(self) -> Dict[Any, Any]:
+        raise NotImplementedError(f"...for class {self.__class__.__name__}")
+
+    @staticmethod
+    def is_serializable(typ: Type[Any]) -> bool:
+        return (
+            typ in {str, bool, int, float}
+            or is_none_type(typ)
+            or is_literal(typ)
+            or is_dict(typ)
+            or is_list(typ)
+            or (inspect.isclass(typ) and issubclass(typ, Serializable))
+            or (inspect.isclass(typ) and issubclass(typ, CustomValueType))
+            or (inspect.isclass(typ) and issubclass(typ, SchemaNode))
+            or (is_optional(typ) and Serializable.is_serializable(get_optional_inner_type(typ)))
+            or (is_union(typ) and all_matches(lambda t: Serializable.is_serializable(t), get_generic_type_arguments(typ)))
+        )
+    
+    @staticmethod
+    def serialize(obj: Any, typ: Type[Any]) -> Any:
+        if inspect.isclass(typ) and issubclass(typ, Serializable):
+            return cast(Serializable, obj).to_dict()
+        
+        elif inspect.isclass(typ) and issubclass(typ, CustomValueType):
+            return cast(CustomValueType, obj).serialize()
+        
+        elif inspect.isclass(typ) and issubclass(typ, SchemaNode):
+            node = cast(SchemaNode, obj)
+            return node.serialize()
+        
+        elif is_list(typ):
+            lst = cast(List[Any], obj)
+            res: List[Any] = [Serializable.serialize(i, get_generic_type_argument(typ)) for i in lst]
+            return res
+
+        return obj
+
+
 def _get_properties_schema(typ: Type[Any]) -> Dict[Any, Any]:
     schema: Dict[Any, Any] = {}
     annot = typ.__dict__.get("__annotations__", {})
     for name, python_type in annot.items():
         schema[name] = _describe_type(python_type)
+        if hasattr(typ, name):
+            assert Serializable.is_serializable(
+                python_type
+            ), f"Type '{python_type}' does not appear to be JSON serializable"
+            schema[name]["default"] = Serializable.serialize(getattr(typ, name), python_type)
 
     return schema
 
@@ -62,7 +112,7 @@ def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
 
     elif is_literal(typ):
         val = get_generic_type_argument(typ)
-        return {"type": {str: "string", int: "integer", bool: "boolean"}[type(val)], "enum": [val]}
+        return {"type": {str: "string", int: "integer", bool: "boolean"}[type(val)], "const": val}
 
     elif is_union(typ):
         variants = get_generic_type_arguments(typ)
@@ -453,7 +503,18 @@ class SchemaNode:
         schema: Dict[Any, Any] = {}
         if include_schema_definition:
             schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
+        if cls.__doc__ is not None:
+            schema["description"] = cls.__doc__.strip()
         schema["type"] = "object"
         schema["properties"] = _get_properties_schema(cls)
 
         return schema
+    
+    def serialize(self) -> Dict[Any, Any]:
+        res: Dict[Any, Any] = {}
+        cls = self.__class__
+        annot = cls.__dict__.get("__annotations__", {})
+
+        for name, python_type in annot.items():
+            res[name] = Serializable.serialize(getattr(self, name), python_type)
+        return res
