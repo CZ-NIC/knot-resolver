@@ -1,5 +1,6 @@
 import json
 from typing import Any, Dict, cast
+
 from knot_resolver_manager.datamodel import KresConfig
 from knot_resolver_manager.datamodel.types import IPv6Network96, TimeUnit
 
@@ -41,7 +42,7 @@ def test_dnssec_default_true():
 def test_json_schema():
     dct = KresConfig.json_schema()
 
-    def recser(obj: Any, path: str = ''):
+    def recser(obj: Any, path: str = ""):
         if not isinstance(obj, dict):
             return
         else:
@@ -52,7 +53,5 @@ def test_json_schema():
                 _ = json.dumps(obj)
             except BaseException as e:
                 raise Exception(f"failed to serialize '{path}'") from e
-    
+
     recser(dct)
-
-
