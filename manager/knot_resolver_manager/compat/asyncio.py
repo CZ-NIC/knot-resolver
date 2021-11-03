@@ -26,7 +26,7 @@ T = TypeVar("T")
 async def to_thread(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
     # version 3.9 and higher, call directly
     if sys.version_info.major >= 3 and sys.version_info.minor >= 9:
-        return asyncio.to_thread(func, *args, **kwargs)
+        return await asyncio.to_thread(func, *args, **kwargs)
 
     # earlier versions, run with default executor
     else:

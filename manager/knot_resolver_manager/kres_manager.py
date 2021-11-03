@@ -154,12 +154,12 @@ class KresManager:
                     await self._stop_gc()
 
     async def stop(self):
+        if self._watchdog_task is not None:
+            self._watchdog_task.cancel()
+
         async with self._manager_lock:
             await self._ensure_number_of_children(KresConfig(), 0)
             await self._controller.shutdown_controller()
-
-        if self._watchdog_task is not None:
-            self._watchdog_task.cancel()
 
     async def _instability_handler(self) -> None:
         logger.error(

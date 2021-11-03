@@ -29,7 +29,10 @@ def dataclass(cls: Any):
 
         # set keyd arguments
         for key, val in kwargs.items():
-            assert key in anot, f"Key '{key}' not defined with a type annotation"
+            assert key in anot, (
+                f"Constructing dataclass with an argument '{key}' which is not defined with a type"
+                f" annotation in class {cls.__name__}"
+            )
             setattr(slf, key, val)
             used.add(key)
 

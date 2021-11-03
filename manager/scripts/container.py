@@ -12,9 +12,7 @@ import click
 
 
 def _get_git_root() -> Path:
-    result = subprocess.run(
-        "git rev-parse --show-toplevel", shell=True, stdout=subprocess.PIPE
-    )
+    result = subprocess.run("git rev-parse --show-toplevel", shell=True, stdout=subprocess.PIPE)
     return Path(str(result.stdout, encoding="utf8").strip())
 
 
@@ -23,20 +21,13 @@ PODMAN_EXECUTABLE = "/usr/bin/podman"
 CACHE_DIR: Path = GIT_ROOT / ".podman-cache"
 
 
-
-
-def _start_detached(
-    image: str, publish: List[int] = [], ro_mounts: Dict[Path, Path] = {}
-) -> str:
+def _start_detached(image: str, publish: List[int] = [], ro_mounts: Dict[Path, Path] = {}) -> str:
     """Start a detached container"""
     options = [f"--publish={port}:{port}/tcp" for port in publish] + [
-        f"--volume={str(src)}:{str(dst)}:O"
-        for src, dst in ro_mounts.items()
+        f"--volume={str(src)}:{str(dst)}:O" for src, dst in ro_mounts.items()
     ]
     command = ["podman", "run", "--rm", "-d", "--security-opt=seccomp=unconfined", *options, image]
-    proc = subprocess.run(
-        command, shell=False, executable=PODMAN_EXECUTABLE, stdout=subprocess.PIPE
-    )
+    proc = subprocess.run(command, shell=False, executable=PODMAN_EXECUTABLE, stdout=subprocess.PIPE)
     assert proc.returncode == 0
     return str(proc.stdout, "utf8").strip()
 
@@ -70,16 +61,17 @@ def _extract_tag_from_name(name: str, all: List[str] = _list_available_image_tag
     if ":" in name:
         s = name.split(":")
         if not s[0].endswith("knot-manager"):
-            click.secho(f"Unexpected image name \'{s[0]}\', expected \'knot-manager\'", fg="red")
+            click.secho(f"Unexpected image name '{s[0]}', expected 'knot-manager'", fg="red")
             sys.exit(1)
         name = s[-1]
-    
+
     if not name in all:
-        click.secho(f"Unexpected tag \'{name}\'", fg="red")
+        click.secho(f"Unexpected tag '{name}'", fg="red")
         click.secho(f"Available tags are [{' '.join(all)}]", fg="yellow")
         sys.exit(1)
-    
+
     return name
+
 
 def _get_tags_to_work_on(args: List[str]) -> List[str]:
     args = list(args)
@@ -87,7 +79,7 @@ def _get_tags_to_work_on(args: List[str]) -> List[str]:
     all = _list_available_image_tags()
 
     # convert to tags, if the user specified full names
-    for i,a in enumerate(args):
+    for i, a in enumerate(args):
         args[i] = _extract_tag_from_name(a, all)
 
     if len(args) == 0:
@@ -101,7 +93,16 @@ def _full_name_from_tag(tag: str) -> str:
 
 
 def _build(tag: str):
-    command = ["podman", "build", "--security-opt=seccomp=unconfined", "-f", str(GIT_ROOT / "containers" / tag / "Containerfile"), "-t", _full_name_from_tag(tag), str(GIT_ROOT)]
+    command = [
+        "podman",
+        "build",
+        "--security-opt=seccomp=unconfined",
+        "-f",
+        str(GIT_ROOT / "containers" / tag / "Containerfile"),
+        "-t",
+        _full_name_from_tag(tag),
+        str(GIT_ROOT),
+    ]
     ret = subprocess.call(command, shell=False, executable=PODMAN_EXECUTABLE)
     assert ret == 0
 
@@ -119,16 +120,33 @@ def _push(tag: str):
 
 
 def _login_ci():
-    command = ["podman", "login", "-u", environ["CI_REGISTRY_USER"], "-p", environ["CI_REGISTRY_PASSWORD"], environ["CI_REGISTRY"]]
+    command = [
+        "podman",
+        "login",
+        "-u",
+        environ["CI_REGISTRY_USER"],
+        "-p",
+        environ["CI_REGISTRY_PASSWORD"],
+        environ["CI_REGISTRY"],
+    ]
     ret = subprocess.call(command, shell=False, executable=PODMAN_EXECUTABLE)
     assert ret == 0
 
 
 def _save(tag: str):
     CACHE_DIR.mkdir(exist_ok=True)
-    command = ["podman", "save", "--format", "oci-archive", "-o", str(CACHE_DIR / (tag + ".tar")), _full_name_from_tag(tag)]
+    command = [
+        "podman",
+        "save",
+        "--format",
+        "oci-archive",
+        "-o",
+        str(CACHE_DIR / (tag + ".tar")),
+        _full_name_from_tag(tag),
+    ]
     ret = subprocess.call(command, shell=False, executable=PODMAN_EXECUTABLE)
     assert ret == 0
+
 
 def _load(tag: str):
     cache_file = CACHE_DIR / (tag + ".tar")
@@ -136,7 +154,6 @@ def _load(tag: str):
         command = ["podman", "load", "-i", str(CACHE_DIR / (tag + ".tar"))]
         ret = subprocess.call(command, shell=False, executable=PODMAN_EXECUTABLE)
         assert ret == 0
-
 
 
 @click.group()
@@ -154,7 +171,6 @@ def pull(images: List[str]):
         _pull(tag)
 
 
-
 @main.command(help="Build project containers")
 @click.argument("images", nargs=-1)
 @click.option("-f", "--fetch", "fetch", is_flag=True, default=False, type=bool, help="Pull before building")
@@ -166,12 +182,12 @@ def build(images: List[str], fetch: bool, ci_login: bool, push: bool, file_cache
 
     if ci_login:
         _login_ci()
-    
+
     for tag in tags:
         if fetch:
             click.secho(f"Pulling image with tag {tag}", fg="yellow")
             _pull(tag)
-        
+
         if file_cache:
             _load(tag)
 
@@ -181,7 +197,7 @@ def build(images: List[str], fetch: bool, ci_login: bool, push: bool, file_cache
         if push:
             click.secho(f"Pushing image with {tag}", fg="yellow")
             _push(tag)
-        
+
         if file_cache:
             _save(tag)
 
@@ -189,9 +205,7 @@ def build(images: List[str], fetch: bool, ci_login: bool, push: bool, file_cache
 @main.command(help="Run project containers")
 @click.argument("image", nargs=1)
 @click.argument("command", nargs=-1)
-@click.option(
-    "-p", "--publish", "publish", multiple=True, type=int, help="Port which should be published"
-)
+@click.option("-p", "--publish", "publish", multiple=True, type=int, help="Port which should be published")
 @click.option(
     "-m",
     "--mount",
@@ -217,7 +231,7 @@ def build(images: List[str], fetch: bool, ci_login: bool, push: bool, file_cache
     default=False,
     is_flag=True,
     type=bool,
-    help="Drop into interactive shell if the command fails"
+    help="Drop into interactive shell if the command fails",
 )
 def run(
     image: str,
@@ -248,6 +262,7 @@ def run(
     # register cleanup function
     def cleanup():
         _stop(cont)
+
     atexit.register(cleanup)
 
     # wait for the container to boot properly

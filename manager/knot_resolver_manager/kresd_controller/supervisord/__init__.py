@@ -25,7 +25,7 @@ from knot_resolver_manager.constants import (
     supervisord_subprocess_log_dir,
 )
 from knot_resolver_manager.datamodel.config_schema import KresConfig
-from knot_resolver_manager.kres_id import KresID, lookup_from_string
+from knot_resolver_manager.kres_id import KresID, alloc_from_string, lookup_from_string
 from knot_resolver_manager.kresd_controller.interface import (
     Subprocess,
     SubprocessController,
@@ -49,6 +49,7 @@ class _Instance:
     Data structure holding data for supervisord config template
     """
 
+    type: str
     logfile: str
     id: str
     workdir: str
@@ -68,7 +69,6 @@ def _get_command_based_on_type(config: KresConfig, i: "SupervisordSubprocess") -
 async def _write_config_file(config: KresConfig, instances: Set["SupervisordSubprocess"]):
     @dataclass
     class SupervisordConfig:
-        type: str
         unix_http_server: str
         pid_file: str
         workdir: str
@@ -80,7 +80,7 @@ async def _write_config_file(config: KresConfig, instances: Set["SupervisordSubp
     config_string = Template(template).render(
         instances=[
             _Instance(
-                type=i.type,
+                type=i.type.name,
                 logfile=supervisord_subprocess_log_dir(config) / f"{i.id}.log",
                 id=str(i.id),
                 workdir=str(os.getcwd()),
@@ -89,14 +89,12 @@ async def _write_config_file(config: KresConfig, instances: Set["SupervisordSubp
             )
             for i in instances
         ],
-        config={
-            SupervisordConfig(
-                unix_http_server=supervisord_sock_file(config),
-                pid_file=supervisord_pid_file(config),
-                workdir=str(config.server.management.rundir.to_path().absolute()),
-                log_file=supervisord_log_file(config),
-            )
-        },
+        config=SupervisordConfig(
+            unix_http_server=supervisord_sock_file(config),
+            pid_file=supervisord_pid_file(config),
+            workdir=str(config.server.management.rundir.to_path().absolute()),
+            logfile=supervisord_log_file(config),
+        ),
     )
     await writefile(supervisord_config_file_tmp(config), config_string)
     # atomically replace
@@ -191,7 +189,7 @@ async def _list_ids_from_existing_config(cfg: KresConfig) -> List[Tuple[Subproce
     for section in cp.sections():
         if section.startswith("program:"):
             program_id = section.replace("program:", "")
-            iid = lookup_from_string(program_id)
+            iid = alloc_from_string(program_id)
             typ = SubprocessType[cp[section].get("type")]
             res.append((typ, iid))
     return res
@@ -294,4 +292,4 @@ class SupervisordSubprocessController(SubprocessController):
         return SupervisordSubprocess(subprocess_config, self, id_hint, subprocess_type)
 
     async def get_subprocess_status(self) -> Dict[KresID, SubprocessStatus]:
-        return await to_thread(_list_subprocesses)
+        return await to_thread(_list_subprocesses, self._controller_config)
