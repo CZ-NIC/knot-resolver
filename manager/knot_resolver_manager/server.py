@@ -116,7 +116,33 @@ class Server:
         return web.Response()
 
     async def _handler_schema(self, _request: web.Request) -> web.Response:
-        return web.json_response(KresConfig.json_schema())
+        return web.json_response(KresConfig.json_schema(), headers={"Access-Control-Allow-Origin": "*"})
+
+    async def _handle_view_schema(self, _request: web.Request) -> web.Response:
+        """
+        Provides a UI for visuallising and understanding JSON schema.
+
+        The feature in the Knot Resolver Manager to render schemas is unwanted, as it's completely
+        out of scope. However, it can be convinient. We therefore rely on a public web-based viewers
+        and provide just a redirect. If this feature ever breaks due to disapearance of the public
+        service, we can fix it. But we are not guaranteeing, that this will always work.
+        """
+
+        return web.Response(text="""
+        <html>
+        <head><title>Redirect to schema viewer</title></head>
+        <body>
+        <script>
+          // we are using JS in order to use proper host
+          let protocol = window.location.protocol;
+          let host = window.location.host;
+          let url = encodeURIComponent(`${protocol}//${host}/schema`);
+          window.location.replace(`https://json-schema.app/view/%23?url=${url}`);
+        </script>
+        <h1>JavaScript required for a dynamic redirect...</h1>
+        </body>
+        </html>
+        """, content_type="text/html")
 
     def _set_log_level(self, config: KresConfig):
         if self.log_level != config.server.management.log_level:
@@ -144,6 +170,7 @@ class Server:
                 web.post(r"/config{path:.*}", self._handler_apply_config),
                 web.post("/stop", self._handler_stop),
                 web.get("/schema", self._handler_schema),
+                web.get("/schema/ui", self._handle_view_schema),
             ]
         )
 
