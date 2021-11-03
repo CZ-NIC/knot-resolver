@@ -119,7 +119,7 @@ disable= [
 min-similarity-lines = "6"
 ignore-comments = "yes"
 ignore-docstrings = "yes"
-ignore-imports = "no"
+ignore-imports = "yes"
 
 [tool.pylint.DESIGN]
 max-parents = "10"
