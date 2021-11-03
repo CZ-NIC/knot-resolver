@@ -134,7 +134,7 @@ class SystemdSubprocessController(SubprocessController):
                         self._systemd_type,
                     )
                 )
-            elif unit.name == "kres-cache-gc.service":
+            elif unit.name == systemd.GC_SERVICE_NAME:
                 # we can't easily check, if the unit is transient or not without additional systemd call
                 # we ignore it for now and assume the default persistency state. It shouldn't cause any
                 # problems, because interactions with the process are done the same way in all cases

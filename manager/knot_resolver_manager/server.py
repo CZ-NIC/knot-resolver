@@ -128,7 +128,8 @@ class Server:
         service, we can fix it. But we are not guaranteeing, that this will always work.
         """
 
-        return web.Response(text="""
+        return web.Response(
+            text="""
         <html>
         <head><title>Redirect to schema viewer</title></head>
         <body>
@@ -142,7 +143,9 @@ class Server:
         <h1>JavaScript required for a dynamic redirect...</h1>
         </body>
         </html>
-        """, content_type="text/html")
+        """,
+            content_type="text/html",
+        )
 
     def _set_log_level(self, config: KresConfig):
         if self.log_level != config.server.management.log_level:
