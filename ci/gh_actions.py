@@ -8,8 +8,9 @@ import requests
 
 
 BRANCH_API_ENDPOINT = "https://api.github.com/repos/CZ-NIC/knot-resolver/actions/runs?branch={branch}"  # noqa
-TIMEOUT = 15*60  # 15 mins max
+TIMEOUT = 20*60  # 20 mins max
 POLL_DELAY = 60
+SYNC_TIMEOUT = 10*60
 
 
 def exit(msg='', html_url='', code=1):
@@ -19,6 +20,7 @@ def exit(msg='', html_url='', code=1):
 
 
 end_time = time.time() + TIMEOUT
+sync_timeout = time.time() + SYNC_TIMEOUT
 while time.time() < end_time:
     response = requests.get(
         BRANCH_API_ENDPOINT.format(branch=sys.argv[1]),
@@ -37,6 +39,9 @@ while time.time() < end_time:
             continue
 
         if commit_sha != sys.argv[2]:
+            if time.time() < sync_timeout:
+                time.sleep(POLL_DELAY)
+                continue
             exit("Fetched invalid GH Action: commit mismatch. Re-run or push again?")
 
         if conclusion is None:
