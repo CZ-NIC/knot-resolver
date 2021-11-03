@@ -27,9 +27,6 @@ void kr_crypto_cleanup(void);
 KR_EXPORT
 void kr_crypto_reinit(void);
 
-/** Opaque DNSSEC key pointer. */
-struct dseckey;
-
 #define KR_DNSSEC_VFLG_WEXPAND 0x01
 #define KR_DNSSEC_VFLG_OPTOUT  0x02
 
@@ -46,7 +43,14 @@ struct kr_rrset_validation_ctx {
 	uint32_t flags;			/*!< Output - Flags. */
 	uint32_t err_cnt;		/*!< Output - Number of validation failures. */
 	uint32_t cname_norrsig_cnt;	/*!< Output - Number of CNAMEs missing RRSIGs. */
-	int result;			/*!< Output - 0 or error code. */
+
+	/** Validation result: kr_error() code.
+	 *
+	 * ENOENT: the usual, no suitable signature found
+	 * EAGAIN: encountered a different signer name
+	 * +others
+	 */
+	int result;
 	const struct kr_query *log_qry; /*!< The query; just for logging purposes. */
 	struct {
 		unsigned int matching_name_type;	/*!< Name + type matches */
@@ -67,7 +71,7 @@ typedef struct kr_rrset_validation_ctx kr_rrset_validation_ctx_t;
  * @param vctx    Pointer to validation context.
  * @param covered RRSet covered by a signature. It must be in canonical format.
  * 		  Its TTL may get lowered.
- * @return        0 or error code, same as vctx->result.
+ * @return        0 or kr_error() code, same as vctx->result (see its docs).
  */
 int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx, knot_rrset_t *covered);
 
@@ -79,11 +83,14 @@ bool kr_ds_algo_support(const knot_rrset_t *ta);
 
 /**
  * Check whether the DNSKEY rrset matches the supplied trust anchor RRSet.
+ *
  * @param vctx  Pointer to validation context.  Note that TTL of vctx->keys may get lowered.
- * @param ta    Trust anchor RRSet against which to validate the DNSKEY RRSet.
+ * @param sigs  RRSIGs for this DNSKEY set
+ * @param ta    Trusted DS RRSet against which to validate the DNSKEY RRSet.
  * @return      0 or error code, same as vctx->result.
  */
-int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta);
+int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rdataset_t *sigs,
+			const knot_rrset_t *ta);
 
 /** Return true if the DNSKEY can be used as a ZSK.  */
 KR_EXPORT KR_PURE
@@ -118,6 +125,9 @@ KR_EXPORT KR_PURE
 int kr_dnssec_key_match(const uint8_t *key_a_rdata, size_t key_a_rdlen,
                         const uint8_t *key_b_rdata, size_t key_b_rdlen);
 
+/* Opaque DNSSEC key struct; forward declaration from libdnssec. */
+struct dnssec_key;
+
 /**
  * Construct a DNSSEC key.
  * @param key   Pointer to be set to newly created DNSSEC key.
@@ -126,13 +136,13 @@ int kr_dnssec_key_match(const uint8_t *key_a_rdata, size_t key_a_rdlen,
  * @param rdlen DNSKEY RDATA length
  * @return 0 or error code; in particular: DNSSEC_INVALID_KEY_ALGORITHM
  */
-int kr_dnssec_key_from_rdata(struct dseckey **key, const knot_dname_t *kown, const uint8_t *rdata, size_t rdlen);
+int kr_dnssec_key_from_rdata(struct dnssec_key **key, const knot_dname_t *kown, const uint8_t *rdata, size_t rdlen);
 
 /**
  * Frees the DNSSEC key.
  * @param key Pointer to freed key.
  */
-void kr_dnssec_key_free(struct dseckey **key);
+void kr_dnssec_key_free(struct dnssec_key **key);
 
 /**
  * Checks whether NSEC/NSEC3 RR selected by iterator matches the supplied name and type.
@@ -144,3 +154,35 @@ void kr_dnssec_key_free(struct dseckey **key);
  */
 int kr_dnssec_matches_name_and_type(const ranked_rr_array_t *rrs, uint32_t qry_uid,
 				    const knot_dname_t *name, uint16_t type);
+
+
+/* Simple validator API.  Main use case: prefill module, i.e. RRs from a zone file. */
+
+/** Opaque context for simple validator. */
+struct kr_svldr_ctx;
+/**
+ * Create new context for validating within a given zone.
+ *
+ * - `ds` is assumed to be trusted, and it's used to validate `dnskey+dnskey_sigs`.
+ * - The TTL of `dnskey` may get trimmed.
+ * - The insides are placed on malloc heap (use _free_ctx).
+ */
+KR_EXPORT
+struct kr_svldr_ctx * kr_svldr_new_ctx(const knot_rrset_t *ds, knot_rrset_t *dnskey,
+		const knot_rdataset_t *dnskey_sigs, uint32_t timestamp);
+/** Free the context.  Passing NULL is OK. */
+KR_EXPORT
+void kr_svldr_free_ctx(struct kr_svldr_ctx *ctx);
+/**
+ * Validate an RRset with the associated signatures; assume no wildcard expansions.
+ *
+ * - It's caller's responsibility that rrsigs have matching owner, class and type.
+ * - The TTL of `rrs` may get trimmed.
+ * - If it's a wildcard other than in its simple `*.` form, it may fail to validate.
+ * - More generally, non-existence proofs are not supported.
+ * @return  0 or kr_error() code, same as kr_rrset_validation_ctx::result (see its docs).
+ */
+KR_EXPORT
+int kr_svldr_rrset(knot_rrset_t *rrs, const knot_rdataset_t *rrsigs,
+			struct kr_svldr_ctx *ctx);
+

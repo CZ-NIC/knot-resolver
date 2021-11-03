@@ -25,7 +25,7 @@
 
 /* forward */
 static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
-	knot_rrset_t *covered, size_t key_pos, const struct dseckey *key);
+	knot_rrset_t *covered, size_t key_pos, const struct dnssec_key *key);
 
 void kr_crypto_init(void)
 {
@@ -49,35 +49,33 @@ void kr_crypto_reinit(void)
  * @param flags     The flags are going to be set according to validation result.
  * @param cov_labels Covered RRSet owner label count.
  * @param rrsigs    rdata containing the signatures.
- * @param key_owner Associated DNSKEY's owner.
- * @param key_rdata Associated DNSKEY's rdata.
+ * @param key_alg   DNSKEY's algorithm.
  * @param keytag    Used key tag.
- * @param zone_name The name of the zone cut.
- * @param timestamp Validation time.
+ * @param vctx->zone_name The name of the zone cut (and the DNSKEY).
+ * @param vctx->timestamp Validation time.
  */
 static int validate_rrsig_rr(int *flags, int cov_labels,
                              const knot_rdata_t *rrsigs,
-                             const knot_dname_t *key_owner, const knot_rdata_t *key_rdata,
+                             uint8_t key_alg,
 			     uint16_t keytag,
-                             const knot_dname_t *zone_name, uint32_t timestamp,
                              kr_rrset_validation_ctx_t *vctx)
 {
-	if (!flags || !rrsigs || !key_owner || !key_rdata || !zone_name) {
+	if (kr_fails_assert(flags && rrsigs && vctx && vctx->zone_name)) {
 		return kr_error(EINVAL);
 	}
 	/* bullet 5 */
-	if (knot_rrsig_sig_expiration(rrsigs) < timestamp) {
+	if (knot_rrsig_sig_expiration(rrsigs) < vctx->timestamp) {
 		vctx->rrs_counters.expired++;
 		return kr_error(EINVAL);
 	}
 	/* bullet 6 */
-	if (knot_rrsig_sig_inception(rrsigs) > timestamp) {
+	if (knot_rrsig_sig_inception(rrsigs) > vctx->timestamp) {
 		vctx->rrs_counters.notyet++;
 		return kr_error(EINVAL);
 	}
 	/* bullet 2 */
 	const knot_dname_t *signer_name = knot_rrsig_signer_name(rrsigs);
-	if (!signer_name || !knot_dname_is_equal(signer_name, zone_name)) {
+	if (!signer_name || !knot_dname_is_equal(signer_name, vctx->zone_name)) {
 		vctx->rrs_counters.signer_invalid++;
 		return kr_error(EAGAIN);
 	}
@@ -93,10 +91,9 @@ static int validate_rrsig_rr(int *flags, int cov_labels,
 		}
 	}
 
-	/* bullet 7 */
-	if ((!knot_dname_is_equal(key_owner, signer_name)) ||
-	    (knot_dnskey_alg(key_rdata) != knot_rrsig_alg(rrsigs)) ||
-	    (keytag != knot_rrsig_key_tag(rrsigs))) {
+	/* bullet 7
+	 * Part checked elsewhere: key owner matching the zone_name. */
+	if (key_alg != knot_rrsig_alg(rrsigs) || keytag != knot_rrsig_key_tag(rrsigs)) {
 		vctx->rrs_counters.key_invalid++;
 		return kr_error(EINVAL);
 	}
@@ -145,6 +142,142 @@ int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx, knot_rrset_t *covered)
 	return kr_error(ENOENT);
 }
 
+/** Assuming `rrs` was validated with `sig`, trim its TTL in case it's over-extended. */
+static bool trim_ttl(knot_rrset_t *rrs, const knot_rdata_t *sig,
+			uint32_t timestamp, const struct kr_query *log_qry)
+{
+	const uint32_t ttl_max = MIN(knot_rrsig_original_ttl(sig),
+			knot_rrsig_sig_expiration(sig) - timestamp);
+	if (likely(rrs->ttl <= ttl_max))
+		return false;
+	if (kr_log_is_debug_qry(VALIDATOR, log_qry)) {
+		auto_free char *name_str = kr_dname_text(rrs->owner),
+				*type_str = kr_rrtype_text(rrs->type);
+		QRVERBOSE(log_qry, VALIDATOR, "trimming TTL of %s %s: %d -> %d\n",
+			name_str, type_str, (int)rrs->ttl, (int)ttl_max);
+	}
+	rrs->ttl = ttl_max;
+	return true;
+}
+
+
+typedef struct {
+	struct dnssec_key *key;
+	uint8_t alg;
+	uint16_t tag;
+} kr_svldr_key_t;
+
+struct kr_svldr_ctx {
+	kr_rrset_validation_ctx_t vctx;
+	array_t(kr_svldr_key_t) keys; // owned(malloc), also insides via svldr_key_*
+};
+
+static int svldr_key_new(const knot_rdata_t *rdata, const knot_dname_t *owner,
+			 kr_svldr_key_t *result)
+{
+	result->alg = knot_dnskey_alg(rdata);
+	result->key = NULL; // just silence analyzers
+	int ret = kr_dnssec_key_from_rdata(&result->key, owner, rdata->data, rdata->len);
+	if (likely(ret == 0))
+		result->tag = dnssec_key_get_keytag(result->key);
+	return ret;
+}
+static inline void svldr_key_del(kr_svldr_key_t *skey)
+{
+	kr_dnssec_key_free(&skey->key);
+}
+
+void kr_svldr_free_ctx(struct kr_svldr_ctx *ctx)
+{
+	if (!ctx) return;
+	for (ssize_t i = 0; i < ctx->keys.len; ++i)
+		svldr_key_del(&ctx->keys.at[i]);
+	array_clear(ctx->keys);
+	free_const(ctx->vctx.zone_name);
+	free(ctx);
+}
+struct kr_svldr_ctx * kr_svldr_new_ctx(const knot_rrset_t *ds, knot_rrset_t *dnskey,
+		const knot_rdataset_t *dnskey_sigs, uint32_t timestamp)
+{
+	// Basic init.
+	struct kr_svldr_ctx *ctx = calloc(1, sizeof(*ctx));
+	if (unlikely(!ctx))
+		return NULL;
+	ctx->vctx.timestamp = timestamp;
+	ctx->vctx.zone_name = knot_dname_copy(ds->owner, NULL);
+	if (unlikely(!ctx->vctx.zone_name))
+		goto fail;
+	// Validate the DNSKEY set.
+	ctx->vctx.keys = dnskey;
+	if (kr_dnskeys_trusted(&ctx->vctx, dnskey_sigs, ds) != 0)
+		goto fail;
+	// Put usable DNSKEYs into ctx->keys.  (Some duplication of work happens, but OK.)
+	array_init(ctx->keys);
+	array_reserve(ctx->keys, dnskey->rrs.count);
+	knot_rdata_t *krr = dnskey->rrs.rdata;
+	for (int i = 0; i < dnskey->rrs.count; ++i, krr = knot_rdataset_next(krr)) {
+		if (!kr_dnssec_key_zsk(krr->data) || kr_dnssec_key_revoked(krr->data))
+			continue; // key not usable for this
+		kr_svldr_key_t key;
+		if (unlikely(svldr_key_new(krr, NULL/*seems OK here*/, &key) != 0))
+			goto fail;
+		array_push(ctx->keys, key);
+	}
+	return ctx;
+fail:
+	kr_svldr_free_ctx(ctx);
+	return NULL;
+}
+
+static int kr_svldr_rrset_with_key(knot_rrset_t *rrs, const knot_rdataset_t *rrsigs,
+				kr_rrset_validation_ctx_t *vctx, const kr_svldr_key_t *key)
+{
+	const int covered_labels = knot_dname_labels(rrs->owner, NULL)
+				- knot_dname_is_wildcard(rrs->owner);
+	knot_rdata_t *rdata_j = rrsigs->rdata;
+	for (uint16_t j = 0; j < rrsigs->count; ++j, rdata_j = knot_rdataset_next(rdata_j)) {
+		if (kr_fails_assert(knot_rrsig_type_covered(rdata_j) == rrs->type))
+			continue; //^^ not a problem but no reason to allow them in the API
+		int val_flgs = 0;
+		int retv = validate_rrsig_rr(&val_flgs, covered_labels, rdata_j,
+						key->alg, key->tag, vctx);
+		if (retv == kr_error(EAGAIN)) {
+			vctx->result = retv;
+			return vctx->result;
+		} else if (retv != 0) {
+			continue;
+		}
+		// We only expect non-expanded wildcard records in input;
+		// that also means we don't need to perform non-existence proofs.
+		const int trim_labels = (val_flgs & FLG_WILDCARD_EXPANSION) ? 1 : 0;
+		if (kr_check_signature(rdata_j, key->key, rrs, trim_labels) == 0) {
+			trim_ttl(rrs, rdata_j, vctx->timestamp, vctx->log_qry);
+			vctx->result = kr_ok();
+			return vctx->result;
+		} else {
+			vctx->rrs_counters.crypto_invalid++;
+		}
+	}
+	vctx->result = kr_error(ENOENT);
+	return vctx->result;
+}
+/* The implementation basically performs "parts of" kr_rrset_validate(). */
+int kr_svldr_rrset(knot_rrset_t *rrs, const knot_rdataset_t *rrsigs,
+			struct kr_svldr_ctx *ctx)
+{
+	if (knot_dname_in_bailiwick(rrs->owner, ctx->vctx.zone_name) < 0) {
+		ctx->vctx.result = kr_error(EAGAIN);
+		return ctx->vctx.result;
+	}
+	for (ssize_t i = 0; i < ctx->keys.len; ++i) {
+		kr_svldr_rrset_with_key(rrs, rrsigs, &ctx->vctx, &ctx->keys.at[i]);
+		if (ctx->vctx.result == 0)
+			break;
+	}
+	return ctx->vctx.result;
+}
+
+
 /**
  * Validate RRSet using a specific key.
  * @param vctx    Pointer to validation context.
@@ -157,18 +290,19 @@ int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx, knot_rrset_t *covered)
  */
 static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 				knot_rrset_t *covered,
-				size_t key_pos, const struct dseckey *key)
+				size_t key_pos, const struct dnssec_key *key)
 {
 	const knot_pkt_t *pkt         = vctx->pkt;
 	const knot_rrset_t *keys      = vctx->keys;
 	const knot_dname_t *zone_name = vctx->zone_name;
-	uint32_t timestamp            = vctx->timestamp;
 	bool has_nsec3		      = vctx->has_nsec3;
-	struct dseckey *created_key = NULL;
+	struct dnssec_key *created_key = NULL;
 
-	/* It's just caller's approximation that the RR is in that particular zone.
-	 * We MUST guard against attempts of zones signing out-of-bailiwick records. */
-	if (knot_dname_in_bailiwick(covered->owner, zone_name) < 0) {
+	if (!knot_dname_is_equal(keys->owner, zone_name)
+	   /* It's just caller's approximation that the RR is in that particular zone,
+	    * so we verify that in the following condition.
+	    * We MUST guard against attempts of zones signing out-of-bailiwick records. */
+	    || knot_dname_in_bailiwick(covered->owner, zone_name) < 0) {
 		vctx->result = kr_error(ENOENT);
 		return vctx->result;
 	}
@@ -183,12 +317,11 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 		}
 		key = created_key;
 	}
-	uint16_t keytag = dnssec_key_get_keytag((dnssec_key_t *)key);
-	int covered_labels = knot_dname_labels(covered->owner, NULL);
-	if (knot_dname_is_wildcard(covered->owner)) {
-		/* The asterisk does not count, RFC4034 3.1.3, paragraph 3. */
-		--covered_labels;
-	}
+	uint16_t keytag = dnssec_key_get_keytag(key);
+	const uint8_t key_alg = knot_dnskey_alg(key_rdata);
+	/* The asterisk does not count, RFC4034 3.1.3, paragraph 3. */
+	const int covered_labels = knot_dname_labels(covered->owner, NULL)
+				- knot_dname_is_wildcard(covered->owner);
 
 	for (uint16_t i = 0; i < vctx->rrs->len; ++i) {
 		/* Consider every RRSIG that matches and comes from the same query. */
@@ -210,8 +343,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 			kr_rank_set(&vctx->rrs->at[i]->rank, KR_RANK_BOGUS); /* defensive style */
 			vctx->rrs_counters.matching_name_type++;
 			int retv = validate_rrsig_rr(&val_flgs, covered_labels, rdata_j,
-			                      keys->owner, key_rdata, keytag,
-			                      zone_name, timestamp, vctx);
+							key_alg, keytag, vctx);
 			if (retv == kr_error(EAGAIN)) {
 				kr_dnssec_key_free(&created_key);
 				vctx->result = retv;
@@ -225,7 +357,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 					break;
 				}
 			}
-			if (kr_check_signature(rdata_j, (dnssec_key_t *) key, covered, trim_labels) != 0) {
+			if (kr_check_signature(rdata_j, key, covered, trim_labels) != 0) {
 				vctx->rrs_counters.crypto_invalid++;
 				continue;
 			}
@@ -246,22 +378,8 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 				}
 				vctx->flags |= KR_DNSSEC_VFLG_WEXPAND;
 			}
-			/* Validated with current key, OK;
-			 * now just trim TTL in case it's over-extended. */
-			const uint32_t ttl_max = MIN(knot_rrsig_original_ttl(rdata_j),
-					knot_rrsig_sig_expiration(rdata_j) - timestamp);
-			if (unlikely(covered->ttl > ttl_max)) {
-				if (kr_log_is_debug_qry(VALIDATOR, vctx->log_qry)) {
-					auto_free char
-						*name_str = kr_dname_text(covered->owner),
-						*type_str = kr_rrtype_text(covered->type);
-					QRVERBOSE(vctx->log_qry, VALIDATOR,
-						"trimming TTL of %s %s: %d -> %d\n",
-						name_str, type_str,
-						(int)covered->ttl, (int)ttl_max);
-				}
-				covered->ttl = ttl_max;
-			}
+
+			trim_ttl(covered, rdata_j, vctx->timestamp, vctx->log_qry);
 
 			kr_dnssec_key_free(&created_key);
 			vctx->result = kr_ok();
@@ -291,13 +409,13 @@ bool kr_ds_algo_support(const knot_rrset_t *ta)
 	return false;
 }
 
-int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
+int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rdataset_t *sigs,
+			const knot_rrset_t *ta)
 {
-	const knot_pkt_t *pkt         = vctx->pkt;
-	knot_rrset_t *keys            = vctx->keys;
-
-	const bool ok = pkt && keys && ta && ta->rrs.count && ta->rrs.rdata
-			&& ta->type == KNOT_RRTYPE_DS;
+	knot_rrset_t *keys = vctx->keys;
+	const bool ok = keys && ta && ta->rrs.count && ta->rrs.rdata
+			&& ta->type == KNOT_RRTYPE_DS
+			&& knot_dname_is_equal(ta->owner, keys->owner);
 	if (kr_fails_assert(ok))
 		return kr_error(EINVAL);
 
@@ -305,28 +423,24 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rrset_t *ta)
 	 * The supplied DS record has been authenticated.
 	 * It has been validated or is part of a configured trust anchor.
 	 */
-	memset(&vctx->rrs_counters, 0, sizeof(vctx->rrs_counters));
-	for (uint16_t i = 0; i < keys->rrs.count; ++i) {
+	knot_rdata_t *krr = keys->rrs.rdata;
+	for (int i = 0; i < keys->rrs.count; ++i, krr = knot_rdataset_next(krr)) {
 		/* RFC4035 5.3.1, bullet 8 */ /* ZSK */
-		/* LATER(optim.): more efficient way to iterate than _at() */
-		knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, i);
 		if (!kr_dnssec_key_zsk(krr->data) || kr_dnssec_key_revoked(krr->data))
 			continue;
 
-		struct dseckey *key = NULL;
-		if (kr_dnssec_key_from_rdata(&key, keys->owner, krr->data, krr->len) != 0)
-			continue;
-		if (kr_authenticate_referral(ta, (dnssec_key_t *) key) != 0) {
-			kr_dnssec_key_free(&key);
-			continue;
+		kr_svldr_key_t key;
+		if (svldr_key_new(krr, keys->owner, &key) != 0)
+			continue; // it might e.g. be malformed
+
+		int ret = kr_authenticate_referral(ta, key.key);
+		if (ret == 0)
+			ret = kr_svldr_rrset_with_key(keys, sigs, vctx, &key);
+		svldr_key_del(&key);
+		if (ret == 0) {
+			kr_assert(vctx->result == 0);
+			return vctx->result;
 		}
-		if (kr_rrset_validate_with_key(vctx, keys, i, key) != 0) {
-			kr_dnssec_key_free(&key);
-			continue;
-		}
-		kr_dnssec_key_free(&key);
-		kr_assert(vctx->result == 0);
-		return vctx->result;
 	}
 
 	/* No useable key found */
@@ -358,12 +472,12 @@ int kr_dnssec_key_tag(uint16_t rrtype, const uint8_t *rdata, size_t rdlen)
 	if (rrtype == KNOT_RRTYPE_DS) {
 		return knot_wire_read_u16(rdata);
 	} else if (rrtype == KNOT_RRTYPE_DNSKEY) {
-		struct dseckey *key = NULL;
+		struct dnssec_key *key = NULL;
 		int ret = kr_dnssec_key_from_rdata(&key, NULL, rdata, rdlen);
 		if (ret != 0) {
 			return ret;
 		}
-		uint16_t keytag = dnssec_key_get_keytag((dnssec_key_t *)key);
+		uint16_t keytag = dnssec_key_get_keytag(key);
 		kr_dnssec_key_free(&key);
 		return keytag;
 	} else {
@@ -375,11 +489,11 @@ int kr_dnssec_key_match(const uint8_t *key_a_rdata, size_t key_a_rdlen,
                         const uint8_t *key_b_rdata, size_t key_b_rdlen)
 {
 	dnssec_key_t *key_a = NULL, *key_b = NULL;
-	int ret = kr_dnssec_key_from_rdata((struct dseckey **)&key_a, NULL, key_a_rdata, key_a_rdlen);
+	int ret = kr_dnssec_key_from_rdata(&key_a, NULL, key_a_rdata, key_a_rdlen);
 	if (ret != 0) {
 		return ret;
 	}
-	ret = kr_dnssec_key_from_rdata((struct dseckey **)&key_b, NULL, key_b_rdata, key_b_rdlen);
+	ret = kr_dnssec_key_from_rdata(&key_b, NULL, key_b_rdata, key_b_rdlen);
 	if (ret != 0) {
 		dnssec_key_free(key_a);
 		return ret;
@@ -400,7 +514,7 @@ int kr_dnssec_key_match(const uint8_t *key_a_rdata, size_t key_a_rdlen,
 	return ret;
 }
 
-int kr_dnssec_key_from_rdata(struct dseckey **key, const knot_dname_t *kown, const uint8_t *rdata, size_t rdlen)
+int kr_dnssec_key_from_rdata(struct dnssec_key **key, const knot_dname_t *kown, const uint8_t *rdata, size_t rdlen)
 {
 	if (!key || !rdata || rdlen == 0) {
 		return kr_error(EINVAL);
@@ -429,16 +543,16 @@ int kr_dnssec_key_from_rdata(struct dseckey **key, const knot_dname_t *kown, con
 		}
 	}
 
-	*key = (struct dseckey *) new_key;
+	*key = new_key;
 	return kr_ok();
 }
 
-void kr_dnssec_key_free(struct dseckey **key)
+void kr_dnssec_key_free(struct dnssec_key **key)
 {
 	if (kr_fails_assert(key))
 		return;
 
-	dnssec_key_free((dnssec_key_t *) *key);
+	dnssec_key_free(*key);
 	*key = NULL;
 }
 
