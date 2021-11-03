@@ -21,6 +21,8 @@ from knot_resolver_manager.kresd_controller.interface import SubprocessType
 
 logger = logging.getLogger(__name__)
 
+GC_SERVICE_NAME = "kres-managed-cache-gc.service"
+
 
 class SystemdType(Enum):
     SYSTEM = auto()
@@ -189,7 +191,7 @@ def start_transient_kresd_unit(
 ):
     name, properties = {
         SubprocessType.KRESD: (f"kresd_{kres_id}.service", _kresd_unit_properties(config, kres_id)),
-        SubprocessType.GC: ("kres-managed-cache-gc.service", _gc_unit_properties(config)),
+        SubprocessType.GC: (GC_SERVICE_NAME, _gc_unit_properties(config)),
     }[subprocess_type]
 
     systemd = _create_manager_proxy(type_)
