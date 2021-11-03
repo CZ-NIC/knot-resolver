@@ -953,7 +953,8 @@ ffi.metatype( kr_cache_t, {
 				timestamp = tonumber(now.tv_sec)
 			end
 			-- Insert record into cache
-			local ret = C.kr_cache_insert_rr(self, rr, rrsig, tonumber(rank or 0), timestamp)
+			local ret = C.kr_cache_insert_rr(self, rr, rrsig, tonumber(rank or 0),
+											 timestamp, true)
 			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,

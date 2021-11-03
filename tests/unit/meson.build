@@ -11,7 +11,7 @@ mock_cmodule_mod = shared_module(
   mock_cmodule_src,
   name_prefix: '',
   dependencies: libknot,
-  include_directories: include_directories('../../'),
+  include_directories: mod_inc_dir,
 )
 
 # executables with tests

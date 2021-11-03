@@ -175,8 +175,16 @@ struct entry_apex {
 	bool has_cname : 1;
 	bool has_dname : 1;
 
-	uint8_t pad_; /**< Weird: 1 byte + 2 bytes + x bytes; let's do 2+2+x. */
-	int8_t nsecs[ENTRY_APEX_NSECS_CNT]; /**< values:  0: none, 1: NSEC, 3: NSEC3 */
+	uint8_t pad_; /**< 1 byte + 2 bytes + x bytes would be weird; let's do 2+2+x. */
+
+	/** We have two slots for NSEC* parameters.
+	 *
+	 * This array describes how they're filled;
+	 * values:  0: none, 1: NSEC, 3: NSEC3.
+	 *
+	 * Two slots are a compromise to smoothly handle normal rollovers
+	 * (either changing NSEC3 parameters or between NSEC and NSEC3). */
+	int8_t nsecs[ENTRY_APEX_NSECS_CNT];
 	uint8_t data[];
 	/* XXX: if not first, stamp of last being the first?
 	 * Purpose: save cache operations if rolled the algo/params long ago. */
