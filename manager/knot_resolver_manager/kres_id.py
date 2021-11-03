@@ -48,7 +48,7 @@ def alloc_from_string(val: str) -> KresID:
     int_val = ignore_exceptions_optional(int, None, ValueError)(int)(val)
     if int_val is not None:
         res = KresID(int_val)
-        assert res not in _used
+        assert res not in _used, "Force allocating a KresID, which already exists..."
         _used.add(res)
         return res
     else:
