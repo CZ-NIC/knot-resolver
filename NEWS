@@ -4,6 +4,7 @@ Knot Resolver 5.4.3 (2021-mm-dd)
 Bugfixes
 --------
 - policy.rpz: improve logs, fix origin detection in files without $ORIGIN
+- lua: log() works again; broken in 5.4.2 (!1223)
 
 
 Knot Resolver 5.4.2 (2021-10-13)
