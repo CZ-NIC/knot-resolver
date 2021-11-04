@@ -241,8 +241,12 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, struct kr_query *qr
 		} else {
 			kr_rank_set(&entry->rank, KR_RANK_BOGUS);
 			vctx->err_cnt += 1;
-			req->extended_error.info_code = KNOT_EDNS_EDE_BOGUS;
-			req->extended_error.extra_text = "bogus signatures";
+			if (vctx->rrs_counters.expired > 0)
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_SIG_EXPIRED, NULL);
+			else if (vctx->rrs_counters.notyet > 0)
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_SIG_NOTYET, NULL);
+			else
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_BOGUS, NULL);
 			log_bogus_rrsig(vctx, rr, "bogus signatures");
 		}
 	}
@@ -361,6 +365,7 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 			}
 		}
 		if (sig_index < 0) {
+			kr_request_set_extended_error(req, KNOT_EDNS_EDE_RRSIG_MISS, NULL);
 			return kr_error(ENOENT);
 		}
 		const knot_rdataset_t *sig_rds = &req->answ_selected.at[sig_index]->rr->rrs;
@@ -388,6 +393,12 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 			log_bogus_rrsig(&vctx, qry->zone_cut.key, "bogus key");
 			knot_rrset_free(qry->zone_cut.key, qry->zone_cut.pool);
 			qry->zone_cut.key = NULL;
+			if (vctx.rrs_counters.expired > 0)
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_SIG_EXPIRED, NULL);
+			else if (vctx.rrs_counters.notyet > 0)
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_SIG_NOTYET, NULL);
+			else
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_BOGUS, NULL);
 			return ret;
 		}
 
@@ -1115,8 +1126,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			return KR_STATE_YIELD;
 		} else if (ret != 0) {
 			VERBOSE_MSG(qry, "<= bad keys, broken trust chain\n");
-			req->extended_error.info_code = KNOT_EDNS_EDE_BOGUS;
-			req->extended_error.extra_text = "bad keys, broken trust chain";
+			/* EDE code already set in validate_keyset() */
 			qry->flags.DNSSEC_BOGUS = true;
 			return KR_STATE_FAIL;
 		}
@@ -1295,16 +1305,16 @@ static int validate_wrapper(kr_layer_t *ctx, knot_pkt_t *pkt) {
 		switch (req->extended_error.info_code) {
 		case KNOT_EDNS_EDE_BOGUS:
 		case KNOT_EDNS_EDE_NSEC_MISS:
-			kr_request_set_extended_error(req, KNOT_EDNS_EDE_NONE, NULL);
-			break;
+		case KNOT_EDNS_EDE_RRSIG_MISS:
 		case KNOT_EDNS_EDE_SIG_EXPIRED:
 		case KNOT_EDNS_EDE_SIG_NOTYET:
+			kr_request_set_extended_error(req, KNOT_EDNS_EDE_NONE, NULL);
+			break;
 		case KNOT_EDNS_EDE_DNSKEY_MISS:
-		case KNOT_EDNS_EDE_RRSIG_MISS:
 		case KNOT_EDNS_EDE_DNSKEY_BIT:
 			kr_assert(false);  /* These EDE codes aren't used. */
 			break;
-		default: break;
+		default: break;  /* Remaining codes don't indicate hard DNSSEC failure. */
 		}
 	}
 	return ret;
