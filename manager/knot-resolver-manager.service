@@ -1,11 +1,10 @@
 [Unit]
 Description=Knot Resolver Manager
-Requires=dbus
-After=dbus
+Requires=dbus.service
+After=dbus.service
 
 [Service]
-WorkingDirectory=/code
-ExecStart=/usr/bin/python3 -m knot_resolver_manager --config=/etc/knot-resolver/kres-manager.yaml /etc/knot-resolver/manager.sock
+ExecStart=python3 -m knot_resolver_manager --config=/etc/knot-resolver/config.yml
 KillSignal=SIGINT
 
 [Install]
