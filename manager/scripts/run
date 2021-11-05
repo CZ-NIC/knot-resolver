@@ -7,4 +7,4 @@ source $src_dir/_env.sh
 echo Knot Manager API is accessible on http://localhost:5000
 echo -------------------------------------------------------
 
-poetry run python -m knot_resolver_manager -c etc/knot-resolver/config.yml $@
+poetry run python -m knot_resolver_manager -c etc/knot-resolver/config.dev.yml $@
