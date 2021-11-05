@@ -203,7 +203,7 @@ def start_transient_kresd_unit(
         _wait_for_job_completion(systemd, job)
     except SubprocessControllerException as e:
         logger.error(f"Failed to start transient '{name}':")
-        for (k,v) in properties:
+        for (k, v) in properties:
             logger.error(f"    {k}={v}")
         raise SubprocessControllerException(f"Failed to start systemd transient service '{name}'") from e
 
