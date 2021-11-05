@@ -1,11 +1,12 @@
 cache:
-  storage: /var/cache/knot-resolver
+  storage: ../cache
 logging:
-  level: info
+  level: debug
 network:
   interfaces:
     - listen:
-        unix-socket: /run/knot-resolver/manager.sock
+        ip: 127.0.0.1
+        port: 5353
 server:
   workers: 1
   management:
@@ -13,4 +14,4 @@ server:
       ip: 127.0.0.1
       port: 5000
     log-level: DEBUG
-    rundir: /run/knot-resolver
+    rundir: etc/knot-resolver/runtime
