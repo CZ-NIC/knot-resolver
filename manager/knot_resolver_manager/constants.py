@@ -3,11 +3,18 @@ from pathlib import Path
 
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.kres_id import KresID
+from knot_resolver_manager.utils import which
 
 STARTUP_LOG_LEVEL = logging.DEBUG
 DEFAULT_MANAGER_CONFIG_FILE = Path("/etc/knot-resolver/config.yml")
-KRESD_EXECUTABLE = Path("/usr/sbin/kresd")
-GC_EXECUTABLE = Path("/usr/sbin/kres-cache-gc")
+
+
+def kresd_executable() -> Path:
+    return which.which("kresd")
+
+
+def kres_gc_executable() -> Path:
+    return which.which("kres-cache-gc")
 
 
 def kresd_cache_dir(config: KresConfig) -> Path:

@@ -13,7 +13,7 @@ from pydbus.bus import SessionBus
 from typing_extensions import Literal
 
 from knot_resolver_manager.compat.dataclasses import dataclass
-from knot_resolver_manager.constants import GC_EXECUTABLE, KRESD_EXECUTABLE, kresd_cache_dir, kresd_config_file
+from knot_resolver_manager.constants import kres_gc_executable, kresd_cache_dir, kresd_config_file, kresd_executable
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.exceptions import SubprocessControllerException
 from knot_resolver_manager.kres_id import KresID
@@ -141,8 +141,8 @@ def _kresd_unit_properties(config: KresConfig, kres_id: KresID) -> List[Tuple[st
                 "a(sasb)",
                 [
                     (
-                        str(KRESD_EXECUTABLE),
-                        [str(KRESD_EXECUTABLE), "-c", str(kresd_config_file(config, kres_id)), "-n"],
+                        str(kresd_executable()),
+                        [str(kresd_executable()), "-c", str(kresd_config_file(config, kres_id)), "-n"],
                         False,
                     )
                 ],
@@ -171,8 +171,8 @@ def _gc_unit_properties(config: KresConfig) -> Any:
                 "a(sasb)",
                 [
                     (
-                        str(GC_EXECUTABLE),
-                        [str(GC_EXECUTABLE), "-c", str(kresd_cache_dir(config)), "-d", "1000"],
+                        str(kres_gc_executable()),
+                        [str(kres_gc_executable()), "-c", str(kresd_cache_dir(config)), "-d", "1000"],
                         True,
                     )
                 ],

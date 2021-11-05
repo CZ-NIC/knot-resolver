@@ -13,10 +13,10 @@ from jinja2 import Template
 from knot_resolver_manager.compat.asyncio import to_thread
 from knot_resolver_manager.compat.dataclasses import dataclass
 from knot_resolver_manager.constants import (
-    GC_EXECUTABLE,
-    KRESD_EXECUTABLE,
+    kres_gc_executable,
     kresd_cache_dir,
     kresd_config_file,
+    kresd_executable,
     supervisord_config_file,
     supervisord_config_file_tmp,
     supervisord_log_file,
@@ -59,9 +59,9 @@ class _Instance:
 
 def _get_command_based_on_type(config: KresConfig, i: "SupervisordSubprocess") -> str:
     if i.type is SubprocessType.KRESD:
-        return f"{KRESD_EXECUTABLE} -c {kresd_config_file(config, i.id)} -n"
+        return f"{kresd_executable()} -c {kresd_config_file(config, i.id)} -n"
     elif i.type is SubprocessType.GC:
-        return f"{GC_EXECUTABLE} -c {kresd_cache_dir(config)} -d 1000"
+        return f"{kres_gc_executable()} -c {kresd_cache_dir(config)} -d 1000"
     else:
         raise NotImplementedError("This subprocess type is not supported")
 
