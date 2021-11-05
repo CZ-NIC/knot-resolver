@@ -5,12 +5,12 @@ logging:
 network:
   interfaces:
     - listen:
-        unix-socket: /run/knot-resolver/manager.sock
+        ip: 127.0.0.1
+        port: 53
 server:
   workers: 1
   management:
     listen:
-      ip: 127.0.0.1
-      port: 5000
+      unix-socket: /run/knot-resolver/manager.sock
     log-level: DEBUG
     rundir: /run/knot-resolver
