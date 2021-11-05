@@ -205,6 +205,7 @@ def start_transient_kresd_unit(
         logger.error(f"Failed to start transient '{name}':")
         for (k, v) in properties:
             logger.error(f"    {k}={v}")
+        logger.error(f"More useful details might be found in the service's log by running 'journalctl -u {name}'")
         raise SubprocessControllerException(f"Failed to start systemd transient service '{name}'") from e
 
 
