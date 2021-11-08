@@ -457,7 +457,7 @@ static int answer_padding(struct kr_request *request)
 static void answer_fail(struct kr_request *request)
 {
 	/* Note: OPT in SERVFAIL response is still useful for cookies/additional info. */
-	if (kr_log_is_debug(RESOLVER, request))
+	if (kr_log_is_debug(RESOLVER, request))  /* logging optimization */
 		kr_log_req(request, 0, 0, RESOLVER,
 			"request failed, answering with empty SERVFAIL\n");
 	knot_pkt_t *answer = request->answer;
@@ -831,7 +831,7 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 	if (!qry->flags.CACHED) {
 		if (request->state & KR_STATE_FAIL) {
 			if (++request->count_fail_row > KR_CONSUME_FAIL_ROW_LIMIT) {
-				if (kr_log_is_debug(RESOLVER, request)) {
+				if (kr_log_is_debug(RESOLVER, request)) {  /* logging optimization */
 					kr_log_req(request, 0, 2, RESOLVER,
 						"=> too many failures in a row, "
 						"bail out (mitigation for NXNSAttack "

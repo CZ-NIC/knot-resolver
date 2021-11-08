@@ -43,7 +43,7 @@ static int nsid_finalize(kr_layer_t *ctx) {
 		/* FIXME: actually change RCODE in answer to FORMERR? */
 
 	/* Sanity check, answer should have EDNS as well but who knows ... */
-	if (req->answer->opt_rr == NULL)
+	if (kr_fails_assert(req->answer->opt_rr))
 		return ctx->state;
 
 	if (knot_edns_add_option(req->answer->opt_rr, KNOT_EDNS_OPTION_NSID,

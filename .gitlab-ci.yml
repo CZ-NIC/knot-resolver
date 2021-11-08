@@ -132,7 +132,7 @@ build:macOS:
       - branches@knot/security/knot-resolver
   stage: build
   when: delayed
-  start_in: 1 minutes  # allow some time for mirrorring, job creation
+  start_in: 3 minutes  # allow some time for mirrorring, job creation
   script:
     - ci/gh_actions.py ${CI_COMMIT_REF_NAME} ${CI_COMMIT_SHA}
 
@@ -639,19 +639,19 @@ obs:debian11:x86_64:
     DISTROTEST_NAME: debian11
     DISTROTEST_REPO: Debian_11
 
-obs:fedora33:x86_64:
-  <<: *distrotest
-  variables:
-    OBS_REPO: knot-resolver-latest
-    DISTROTEST_NAME: fedora33
-    DISTROTEST_REPO: Fedora_33
-
 obs:fedora34:x86_64:
   <<: *distrotest
   variables:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: fedora34
     DISTROTEST_REPO: Fedora_34
+
+obs:fedora35:x86_64:
+  <<: *distrotest
+  variables:
+    OBS_REPO: knot-resolver-latest
+    DISTROTEST_NAME: fedora35
+    DISTROTEST_REPO: Fedora_35
 
 obs:leap15:x86_64:
   <<: *distrotest
@@ -678,12 +678,12 @@ obs:ubuntu2004:x86_64:
     DISTROTEST_NAME: ubuntu2004
     DISTROTEST_REPO: xUbuntu_20.04
 
-obs:ubuntu2104:x86_64:
+obs:ubuntu2110:x86_64:
   <<: *distrotest
   variables:
     OBS_REPO: knot-resolver-latest
-    DISTROTEST_NAME: ubuntu2104
-    DISTROTEST_REPO: xUbuntu_21.04
+    DISTROTEST_NAME: ubuntu2110
+    DISTROTEST_REPO: xUbuntu_21.10
 
 .packagingtest: &packagingtest
   stage: pkgtest
