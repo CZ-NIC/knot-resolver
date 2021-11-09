@@ -26,7 +26,7 @@
 #define KNOT_EDNS_OPTION_COOKIE 10
 #endif /* ENABLE_COOKIES */
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), RESOLVER,  __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) kr_log_q((qry), RESOLVER,  __VA_ARGS__)
 
 bool kr_rank_check(uint8_t rank)
 {

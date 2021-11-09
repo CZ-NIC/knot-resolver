@@ -25,7 +25,7 @@
 #include "lib/module.h"
 #include "lib/selection.h"
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, VALIDATOR, __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) kr_log_q(qry, VALIDATOR, __VA_ARGS__)
 
 #define MAX_REVALIDATION_CNT 2
 

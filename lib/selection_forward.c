@@ -5,7 +5,7 @@
 #include "lib/selection_forward.h"
 #include "lib/resolve.h"
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), SELECTION, __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) kr_log_q((qry), SELECTION, __VA_ARGS__)
 
 #define FORWARDING_TIMEOUT 2000
 
