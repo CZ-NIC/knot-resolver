@@ -37,7 +37,7 @@ else
 
 	-- helper for returning useful values to test on
 --	local function http_get(uri)
---		local headers, stream = assert(request.new_from_uri(uri):go())
+--		local headers, stream = assert(request.new_from_uri(uri):go(16))
 --		local body = assert(stream:get_body_as_string())
 --		return tonumber(headers:get(':status')), body, headers:get('content-type')
 --	end
@@ -46,7 +46,7 @@ else
 		local req = assert(request.new_from_uri(baseuri .. uri))
 		req.headers:upsert(':method', method)
 		req:set_body(reqbody)
-		local headers, stream = assert(req:go())
+		local headers, stream = assert(req:go(16))
 		local ansbody = assert(stream:get_body_as_string())
 		return tonumber(headers:get(':status')), ansbody, headers:get('content-type')
 	end
