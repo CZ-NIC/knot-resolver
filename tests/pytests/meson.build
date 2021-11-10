@@ -42,7 +42,7 @@ test(
     '--html', 'pytests.parallel.html',
     '--self-contained-html',
     '--junitxml=pytests.parallel.junit.xml',
-    '-n', '24',
+    '-n', '12',
     '-v',
   ],
   env: pytests_env,
