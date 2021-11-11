@@ -22,7 +22,7 @@ install_requires = \
  'click>=7.1.2',
  'pydbus>=0.6.0',
  'requests>=2.25.1',
- 'typing-extensions>=3.10.0']
+ 'typing-extensions>=3.7.2']
 
 setup_kwargs = {
     'name': 'knot-resolver-manager',
