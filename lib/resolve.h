@@ -389,3 +389,15 @@ knot_mm_t *kr_resolve_pool(struct kr_request *request);
  */
 KR_EXPORT
 int kr_request_set_extended_error(struct kr_request *request, int info_code, const char *extra_text);
+
+static inline void kr_query_inform_timeout(struct kr_request *req, const struct kr_query *qry)
+{
+	kr_request_set_extended_error(req, KNOT_EDNS_EDE_NREACH_AUTH, NULL);
+
+	unsigned ind = 0;
+	for (const struct kr_query *q = qry; q; q = q->parent)
+		ind += 2;
+	const uint32_t qid = qry ? qry->uid : 0;
+
+	kr_log_req(req, qid, ind, WORKER, "internal timeout for resolving the request has expired\n");
+}
