@@ -983,8 +983,11 @@ policy.special_names = {
 				todname('test.'),
 				todname('onion.'),
 				todname('invalid.'),
-				todname('local.'), -- RFC 8375.4
 			}),
+		count=0
+	},
+	{
+		cb=policy.suffix(policy.DROP, { todname('local.') }),
 		count=0
 	},
 	{
