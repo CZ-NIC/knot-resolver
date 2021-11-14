@@ -40,15 +40,28 @@ integration:
     - poe integration
 
 
-package-debian:
+package-debian-10:
   when: manual
   stage: packaging
   image: registry.nic.cz/labs/lxc-gitlab-runner/debian-10
   before_script: []
   script:
-    - bash scripts/make-debian-package.sh
+    - bash scripts/make-package.sh
   artifacts:
     paths:
-      - knot-resolver/pkg/pkgs/debian-10
-      - knot-resolver/pkg/srcpkgs/debian-10
+      - knot-resolver/pkg/pkgs/
+      - knot-resolver/pkg/srcpkgs/
+    expire_in: 1 week
+
+package-fedora-34:
+  when: manual
+  stage: packaging
+  image: registry.nic.cz/labs/lxc-gitlab-runner/fedora-34
+  before_script: []
+  script:
+    - bash scripts/make-package.sh
+  artifacts:
+    paths:
+      - knot-resolver/pkg/pkgs/
+      - knot-resolver/pkg/srcpkgs/
     expire_in: 1 week
