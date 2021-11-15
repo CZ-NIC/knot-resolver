@@ -29,7 +29,7 @@ config_tests += [
 
 integr_tests += [
   ['rebinding', meson.current_source_dir() / 'rebinding' / 'test.integr'],
-  ['serve_stale', meson.current_source_dir() / 'serve_stale' / 'test.integr'],
+  ['serve_stale', meson.current_source_dir() / 'serve_stale' / 'test.integr', [], true],
 ]
 
 
