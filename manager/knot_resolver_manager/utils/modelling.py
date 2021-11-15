@@ -399,7 +399,7 @@ class SchemaNode:
                 )
 
             # there is a transformation function to create the value
-            elif hasattr(self, f"_{name}"):
+            elif hasattr(self, f"_{name}") and callable(getattr(self, f"_{name}")):
                 val = self._get_converted_value(name, source, object_path)
                 self._assign_field(name, python_type, val, object_path)
                 used_keys.add(name)

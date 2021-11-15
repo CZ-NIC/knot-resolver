@@ -6,7 +6,15 @@ modules = {
     {{ "'workarounds < iterate'," if cfg.options.violators_workarounds }}
     {{ "'serve_stale < cache'," if cfg.options.serve_stale }}
     {{ "dns64 = '"+cfg.dns64.prefix+"'," if cfg.dns64 }}
-    'hints > iterate'
+    'hints > iterate',
+{% if cfg.network.address_renumbering %}
+-- network.address-renumbering
+    renumber = {
+{% for item in cfg.network.address_renumbering %}
+        {'{{ item.source }}', '{{ item.destination }}'},
+{% endfor %}
+    }
+{% endif %}
 }
 
 -- SERVER section
@@ -40,6 +48,56 @@ net.listen(
 {% endif %}
 
 -- NETWORK section
+-- network.do-ipv4/6
+net.ipv4 = {{ 'true' if cfg.network.do_ipv4 else 'false' }}
+net.ipv6 = {{ 'true' if cfg.network.do_ipv6 else 'false' }}
+
+-- network.out-interface-v4/v6
+{% if cfg.network.out_interface_v4 %}
+net.outgoing_v4('{{ cfg.network.out_interface_v4 }}')
+{% endif %}
+{% if cfg.network.out_interface_v6 %}
+net.outgoing_v6('{{ cfg.network.out_interface_v6 }}')
+{% endif %}
+
+-- network.tcp-pipeline
+net.tcp_pipeline({{ cfg.network.tcp_pipeline }})
+
+-- network.edns-keep-alive
+{% if cfg.network.edns_keep_alive %}
+modules.load('edns_keepalive')
+{% else %}
+modules.unload('edns_keepalive')
+{% endif %}
+
+-- network.edns-buffer-size
+net.bufsize({{ cfg.network.edns_buffer_size.upstream.bytes() }}, {{ cfg.network.edns_buffer_size.downstream.bytes() }})
+
+{% if cfg.network.tls.cert_file and cfg.network.tls.key_file %}
+-- network.tls
+net.tls('{{ cfg.network.tls.cert_file  }}', '{{ cfg.network.tls.key_file }}')
+{% endif %}
+
+{% if cfg.network.tls.sticket_secret %}
+-- network.tls.sticket-secret
+net.tls_sticket_secret('{{ cfg.network.tls.sticket_secret }}')
+{% endif %}
+
+{% if cfg.network.tls.sticket_secret_file %}
+-- network.tls.sticket-secret-file
+net.tls_sticket_secret_file('{{ cfg.network.tls.sticket_secret_file }}')
+{% endif %}
+
+{% if cfg.network.tls.auto_discovery %}
+-- network.tls.auto-discovery
+modules.load('experimental_dot_auth')
+{% else %}
+-- modules.unload('experimental_dot_auth')
+{% endif %}
+
+-- network.tls.padding
+net.tls_padding({{ cfg.network.tls.padding }})
+
 -- network.interfaces
 {% for item in cfg.network.interfaces %}
 net.listen('{{ item.listen.ip }}', {{ item.listen.port }}, {
