@@ -16,6 +16,7 @@ run_configtest = find_program('../../scripts/test-config.sh')
 foreach config_test : config_tests
   # additional suites
   extra_suites = config_test.length() >= 3 ? config_test[2] : []
+  should_fail = config_test.length() >= 4 ? config_test[3] : false
 
   # environment variables for test
   conftest_env = environment()
@@ -37,5 +38,6 @@ foreach config_test : config_tests
       'postinstall',
       'config',
     ] + extra_suites,
+    should_fail: should_fail,
   )
 endforeach

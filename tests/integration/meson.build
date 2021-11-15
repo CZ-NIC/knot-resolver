@@ -44,6 +44,10 @@ test(
 
 deckard_run = find_program('deckard/run.sh')
 foreach integr_test : integr_tests
+  # additional params - extra_suites and should_fail
+  extra_suites = integr_test.length() >= 3 ? integr_test[2] : []
+  should_fail = integr_test.length() >= 4 ? integr_test[3] : false
+
   deckard_config_path = integr_test[1] / 'deckard.yaml'
   test(
     'integration.' + integr_test[0],
@@ -59,8 +63,9 @@ foreach integr_test : integr_tests
     suite: [
       'postinstall',
       'integration',
-    ],
+    ] + extra_suites,
     is_parallel: false,
     workdir: meson.source_root(),
+    should_fail: should_fail,
   )
 endforeach
