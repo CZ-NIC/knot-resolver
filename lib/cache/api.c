@@ -237,8 +237,13 @@ int32_t get_new_ttl(const struct entry_h *entry, const struct kr_query *qry,
 	if (res < 0 && owner && qry && qry->stale_cb) {
 		/* Stale-serving decision, delegated to a callback. */
 		int res_stale = qry->stale_cb(res, owner, type, qry);
-		if (res_stale >= 0)
+		if (res_stale >= 0) {
+			VERBOSE_MSG(qry, "responding with stale answer\n");
+			/* LATER: Perhaps we could use a more specific Stale
+			 * NXDOMAIN Answer code for applicable responses. */
+			kr_request_set_extended_error(qry->request, KNOT_EDNS_EDE_STALE, NULL);
 			return res_stale;
+		}
 	}
 	return res;
 }

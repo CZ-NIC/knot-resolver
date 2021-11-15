@@ -1629,10 +1629,11 @@ static int ede_priority(int info_code)
 	case KNOT_EDNS_EDE_DS_DIGEST:
 		return 500;  /* Non-critical DNSSEC issues */
 	case KNOT_EDNS_EDE_STALE:
+	case KNOT_EDNS_EDE_STALE_NXD:
+		return 300;  /* Serve-stale answers. */
 	case KNOT_EDNS_EDE_INDETERMINATE:
 	case KNOT_EDNS_EDE_CACHED_ERR:
 	case KNOT_EDNS_EDE_NOT_READY:
-	case KNOT_EDNS_EDE_STALE_NXD:
 	case KNOT_EDNS_EDE_NOTAUTH:
 	case KNOT_EDNS_EDE_NOTSUP:
 	case KNOT_EDNS_EDE_NREACH_AUTH:
