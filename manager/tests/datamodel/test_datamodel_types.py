@@ -4,6 +4,9 @@ from pytest import raises
 
 from knot_resolver_manager.datamodel.types import (
     AnyPath,
+    IPAddress,
+    IPv4Address,
+    IPv6Address,
     IPNetwork,
     IPv6Network96,
     Listen,
@@ -52,10 +55,26 @@ def test_parsing_units():
 
 
 def test_anypath():
-    class Data(SchemaNode):
+    class TestSchema(SchemaNode):
         p: AnyPath
 
-    assert str(Data({"p": "/tmp"}).p) == "/tmp"
+    assert str(TestSchema({"p": "/tmp"}).p) == "/tmp"
+
+
+def test_ipaddress():
+    class TestSchema(SchemaNode):
+        ip: IPAddress
+
+    o = TestSchema({"ip": "123.4.5.6"})
+    assert str(o.ip) == "123.4.5.6"
+    assert o.ip == IPv4Address("123.4.5.6")
+
+    o = TestSchema({"ip": "2001:db8::1000"})
+    assert str(o.ip) == "2001:db8::1000"
+    assert o.ip == IPv6Address("2001:db8::1000")
+
+    with raises(KresdManagerException):
+        TestSchema({"ip": "123456"})
 
 
 def test_listen():
@@ -78,7 +97,7 @@ def test_listen():
     o = Listen({"ip": "123.4.5.6", "port": 56})
 
     assert o.typ == ListenType.IP_AND_PORT
-    assert o.ip == ipaddress.ip_address("123.4.5.6")
+    assert o.ip == IPv4Address("123.4.5.6")
     assert o.port == 56
     assert o.unix_socket is None
     assert o.interface is None
