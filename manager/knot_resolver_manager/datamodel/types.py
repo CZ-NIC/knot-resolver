@@ -134,95 +134,87 @@ class AnyPath(CustomValueType):
         }
 
 
-class ListenType(Enum):
-    IP_AND_PORT = auto()
-    UNIX_SOCKET = auto()
-    INTERFACE_AND_PORT = auto()
-
-
-class Listen(SchemaNode, Serializable):
-    class Raw(SchemaNode):
-        ip: Optional[str] = None
-        port: Optional[int] = None
-        unix_socket: Optional[AnyPath] = None
-        interface: Optional[str] = None
-
-    _PREVIOUS_SCHEMA = Raw
-
-    typ: ListenType
-    ip: Optional[Union[ipaddress.IPv4Address, ipaddress.IPv6Address]]
-    port: Optional[int]
-    unix_socket: Optional[AnyPath]
-    interface: Optional[str]
-
-    def _typ(self, origin: Raw):
-        present = {
-            "ip" if origin.ip is not None else ...,
-            "port" if origin.port is not None else ...,
-            "unix_socket" if origin.unix_socket is not None else ...,
-            "interface" if origin.interface is not None else ...,
-        }
-
-        if present == {"ip", "port", ...}:
-            return ListenType.IP_AND_PORT
-        elif present == {"unix_socket", ...}:
-            return ListenType.UNIX_SOCKET
-        elif present == {"interface", "port", ...}:
-            return ListenType.INTERFACE_AND_PORT
+class IPv4Address(CustomValueType):
+    def __init__(self, source_value: Any, object_path: str = "/") -> None:
+        super().__init__(source_value)
+        if isinstance(source_value, str):
+            try:
+                self._value: ipaddress.IPv4Address = ipaddress.IPv4Address(source_value)
+            except ValueError as e:
+                raise SchemaException("Failed to parse IPv4 address.", object_path) from e
         else:
-            raise ValueError(
-                "Listen configuration contains multiple incompatible options at once. "
-                "You can use (IP and PORT) or (UNIX_SOCKET) or (INTERFACE and PORT)."
+            raise SchemaException(
+                f"Unexpected value for a IPv4 address. Expected string, got '{source_value}'"
+                f" with type '{type(source_value)}'",
+                object_path,
             )
 
-    def _port(self, origin: Raw):
-        if origin.port is None:
-            return None
-        if not 0 <= origin.port <= 65_535:
-            raise ValueError(f"Port value {origin.port} out of range of usual 2-byte port value")
-        return origin.port
-
-    def _ip(self, origin: Raw):
-        if origin.ip is None:
-            return None
-        # throws value error, so that get's caught outside of this function
-        return ipaddress.ip_address(origin.ip)
-
-    def _validate(self) -> None:
-        # we already check that it's there is only one option in the `_typ` method
-        pass
+    def to_std(self) -> ipaddress.IPv4Address:
+        return self._value
 
     def __str__(self) -> str:
-        if self.typ is ListenType.IP_AND_PORT:
-            return f"{self.ip} @ {self.port}"
-        elif self.typ is ListenType.UNIX_SOCKET:
-            return f"{self.unix_socket}"
-        elif self.typ is ListenType.INTERFACE_AND_PORT:
-            return f"{self.interface} @ {self.port}"
-        else:
-            raise NotImplementedError()
+        return str(self._value)
+
+    def __int__(self) -> int:
+        raise ValueError("Can't convert IPv4 address to an integer")
 
     def __eq__(self, o: object) -> bool:
-        if not isinstance(o, Listen):
-            return False
+        """
+        Two instances of IPv4Address are equal when they represent same IPv4 address as string.
+        """
+        return isinstance(o, IPv4Address) and str(o._value) == str(self._value)
 
-        return (
-            self.port == o.port
-            and self.ip == o.ip
-            and self.typ == o.typ
-            and self.unix_socket == o.unix_socket
-            and self.interface == o.interface
-        )
+    def serialize(self) -> Any:
+        return str(self._value)
 
-    def to_dict(self) -> Dict[Any, Any]:
-        if self.typ is ListenType.IP_AND_PORT:
-            return {"port": self.port, "ip": str(self.ip)}
-        elif self.typ is ListenType.UNIX_SOCKET:
-            return {"unix_socket": str(self.unix_socket)}
-        elif self.typ is ListenType.INTERFACE_AND_PORT:
-            return {"interface": self.interface, "port": self.port}
+    @classmethod
+    def json_schema(cls: Type["IPv4Address"]) -> Dict[Any, Any]:
+        return {
+            "type": "string",
+        }
+
+
+class IPv6Address(CustomValueType):
+    def __init__(self, source_value: Any, object_path: str = "/") -> None:
+        super().__init__(source_value)
+        if isinstance(source_value, str):
+            try:
+                self._value: ipaddress.IPv6Address = ipaddress.IPv6Address(source_value)
+            except ValueError as e:
+                raise SchemaException("Failed to parse IPv6 address.", object_path) from e
         else:
-            raise NotImplementedError()
+            raise SchemaException(
+                f"Unexpected value for a IPv6 address. Expected string, got '{source_value}'"
+                f" with type '{type(source_value)}'",
+                object_path,
+            )
+
+    def to_std(self) -> ipaddress.IPv6Address:
+        return self._value
+
+    def __str__(self) -> str:
+        return str(self._value)
+
+    def __int__(self) -> int:
+        raise ValueError("Can't convert IPv6 address to an integer")
+
+    def __eq__(self, o: object) -> bool:
+        """
+        Two instances of IPv6Address are equal when they represent same IPv6 address as string.
+        """
+        return isinstance(o, IPv6Address) and str(o._value) == str(self._value)
+
+    def serialize(self) -> Any:
+        return str(self._value)
+
+    @classmethod
+    def json_schema(cls: Type["IPv6Address"]) -> Dict[Any, Any]:
+        return {
+            "type": "string",
+        }
+
+
+IPAddress = Union[IPv4Address, IPv6Address]
 
 
 class IPNetwork(CustomValueType):
@@ -307,3 +299,88 @@ class IPv6Network96(CustomValueType):
     @classmethod
     def json_schema(cls: Type["IPv6Network96"]) -> Dict[Any, Any]:
         return {"type": "string"}
+
+
+class ListenType(Enum):
+    IP_AND_PORT = auto()
+    UNIX_SOCKET = auto()
+    INTERFACE_AND_PORT = auto()
+
+
+class Listen(SchemaNode, Serializable):
+    class Raw(SchemaNode):
+        ip: Optional[IPAddress] = None
+        port: Optional[int] = None
+        unix_socket: Optional[AnyPath] = None
+        interface: Optional[str] = None
+
+    _PREVIOUS_SCHEMA = Raw
+
+    typ: ListenType
+    ip: Optional[IPAddress]
+    port: Optional[int]
+    unix_socket: Optional[AnyPath]
+    interface: Optional[str]
+
+    def _typ(self, origin: Raw):
+        present = {
+            "ip" if origin.ip is not None else ...,
+            "port" if origin.port is not None else ...,
+            "unix_socket" if origin.unix_socket is not None else ...,
+            "interface" if origin.interface is not None else ...,
+        }
+
+        if present == {"ip", "port", ...}:
+            return ListenType.IP_AND_PORT
+        elif present == {"unix_socket", ...}:
+            return ListenType.UNIX_SOCKET
+        elif present == {"interface", "port", ...}:
+            return ListenType.INTERFACE_AND_PORT
+        else:
+            raise ValueError(
+                "Listen configuration contains multiple incompatible options at once. "
+                "You can use (IP and PORT) or (UNIX_SOCKET) or (INTERFACE and PORT)."
+            )
+
+    def _port(self, origin: Raw):
+        if origin.port is None:
+            return None
+        if not 0 <= origin.port <= 65_535:
+            raise ValueError(f"Port value {origin.port} out of range of usual 2-byte port value")
+        return origin.port
+
+    def _validate(self) -> None:
+        # we already check that it's there is only one option in the `_typ` method
+        pass
+
+    def __str__(self) -> str:
+        if self.typ is ListenType.IP_AND_PORT:
+            return f"{self.ip} @ {self.port}"
+        elif self.typ is ListenType.UNIX_SOCKET:
+            return f"{self.unix_socket}"
+        elif self.typ is ListenType.INTERFACE_AND_PORT:
+            return f"{self.interface} @ {self.port}"
+        else:
+            raise NotImplementedError()
+
+    def __eq__(self, o: object) -> bool:
+        if not isinstance(o, Listen):
+            return False
+
+        return (
+            self.port == o.port
+            and self.ip == o.ip
+            and self.typ == o.typ
+            and self.unix_socket == o.unix_socket
+            and self.interface == o.interface
+        )
+
+    def to_dict(self) -> Dict[Any, Any]:
+        if self.typ is ListenType.IP_AND_PORT:
+            return {"port": self.port, "ip": str(self.ip)}
+        elif self.typ is ListenType.UNIX_SOCKET:
+            return {"unix_socket": str(self.unix_socket)}
+        elif self.typ is ListenType.INTERFACE_AND_PORT:
+            return {"interface": self.interface, "port": self.port}
+        else:
+            raise NotImplementedError()
