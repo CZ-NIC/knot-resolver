@@ -37,6 +37,7 @@ static const char *kr_selection_error_str(enum kr_selection_error err) {
 	#define X(ENAME) case KR_SELECTION_ ## ENAME: return #ENAME
 		X(OK);
 		X(QUERY_TIMEOUT);
+		X(DATA_TIMEOUT);
 		X(TLS_HANDSHAKE_FAILED);
 		X(TCP_CONNECT_FAILED);
 		X(TCP_CONNECT_TIMEOUT);
@@ -626,6 +627,7 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		/* Connection and handshake failures have properties similar
 		 * to UDP timeouts, so we handle them (almost) the same way. */
 		/* fall-through */
+	case KR_SELECTION_DATA_TIMEOUT:
 	case KR_SELECTION_TLS_HANDSHAKE_FAILED:
 	case KR_SELECTION_QUERY_TIMEOUT:
 		qry->server_selection.local_state->timeouts++;
