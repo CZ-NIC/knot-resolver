@@ -134,6 +134,106 @@ class AnyPath(CustomValueType):
         }
 
 
+class DomainName(CustomValueType):
+    _re = re.compile(
+        r"^(([a-zA-Z]{1})|([a-zA-Z]{1}[a-zA-Z]{1})|"
+        r"([a-zA-Z]{1}[0-9]{1})|([0-9]{1}[a-zA-Z]{1})|"
+        r"([a-zA-Z0-9][-_.a-zA-Z0-9]{0,61}[a-zA-Z0-9]))\."
+        r"([a-zA-Z]{2,13}|[a-zA-Z0-9-]{2,30}.[a-zA-Z]{2,3})($|.$)"
+    )
+
+    def __init__(self, source_value: Any, object_path: str = "/") -> None:
+        super().__init__(source_value)
+        if isinstance(source_value, str):
+            if type(self)._re.match(source_value):
+                self._value: str = source_value
+            else:
+                raise SchemaException(f"'{source_value}' is not valid domain name", object_path)
+        else:
+            raise SchemaException(
+                f"Unexpected input type for DomainName type - {type(source_value)}."
+                "Cause might be invalid format or invalid type.",
+                object_path,
+            )
+
+    def to_std(self) -> str:
+        return self._value
+
+    def __str__(self) -> str:
+        return self._value
+
+    def __int__(self) -> int:
+        raise ValueError("Can't convert DomainName to an integer")
+
+    def __eq__(self, o: object) -> bool:
+        """
+        Two instances of DomainName are equal when they represent same string.
+        """
+        return isinstance(o, DomainName) and str(o._value) == str(self._value)
+
+    def serialize(self) -> Any:
+        return str(self._value)
+
+    @classmethod
+    def json_schema(cls: Type["DomainName"]) -> Dict[Any, Any]:
+        return {
+            "type": "string",
+        }
+
+
+class IPAddressPort(CustomValueType):
+    def __init__(self, source_value: Any, object_path: str = "/") -> None:
+        super().__init__(source_value)
+        if isinstance(source_value, str):
+            addr = source_value
+            if "@" in source_value:
+                sep = source_value.split("@", 1)
+                addr = sep[0]
+                try:
+                    port = int(sep[1])
+                except ValueError as e:
+                    raise SchemaException("Failed to parse port.", object_path) from e
+                if not 0 <= port <= 65_535:
+                    raise SchemaException(f"Port value '{port}' out of range of usual 2-byte port value", object_path)
+
+            try:
+                ipaddress.ip_address(addr)
+            except ValueError as e:
+                raise SchemaException("Failed to parse IP address.", object_path) from e
+
+            self._value: str = source_value
+        else:
+            raise SchemaException(
+                f"Unexpected value for a '<ip-address>@<port>'. Expected string, got '{source_value}'"
+                f" with type '{type(source_value)}'",
+                object_path,
+            )
+
+    def to_std(self) -> str:
+        return self._value
+
+    def __str__(self) -> str:
+        return self._value
+
+    def __int__(self) -> int:
+        raise ValueError("Can't convert IP address to an integer")
+
+    def __eq__(self, o: object) -> bool:
+        """
+        Two instances of IPAddressPORT are equal when they represent same string.
+        """
+        return isinstance(o, IPAddressPort) and str(o._value) == str(self._value)
+
+    def serialize(self) -> Any:
+        return str(self._value)
+
+    @classmethod
+    def json_schema(cls: Type["IPAddressPort"]) -> Dict[Any, Any]:
+        return {
+            "type": "string",
+        }
+
+
 class IPv4Address(CustomValueType):
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
