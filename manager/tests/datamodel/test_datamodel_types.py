@@ -4,7 +4,9 @@ from pytest import raises
 
 from knot_resolver_manager.datamodel.types import (
     AnyPath,
+    DomainName,
     IPAddress,
+    IPAddressPort,
     IPv4Address,
     IPv6Address,
     IPNetwork,
@@ -59,6 +61,54 @@ def test_anypath():
         p: AnyPath
 
     assert str(TestSchema({"p": "/tmp"}).p) == "/tmp"
+
+
+def test_domain_name():
+    class TestSchema(SchemaNode):
+        name: DomainName
+
+    o = TestSchema({"name": "test.domain.com."})
+    assert str(o.name) == "test.domain.com."
+    assert o.name == DomainName("test.domain.com.")
+
+    o = TestSchema({"name": "test.domain.com"})
+    assert str(o.name) == "test.domain.com"
+    assert o.name == DomainName("test.domain.com")
+
+    with raises(KresdManagerException):
+        TestSchema({"name": "b@d.domain.com."})
+
+
+def test_ipaddress_port():
+    class TestSchema(SchemaNode):
+        ip_port: IPAddressPort
+
+    o = TestSchema({"ip-port": "123.4.5.6"})
+    assert str(o.ip_port) == "123.4.5.6"
+    assert o.ip_port == IPAddressPort("123.4.5.6")
+
+    o = TestSchema({"ip-port": "123.4.5.6@5353"})
+    assert str(o.ip_port) == "123.4.5.6@5353"
+    assert o.ip_port == IPAddressPort("123.4.5.6@5353")
+
+    o = TestSchema({"ip-port": "2001:db8::1000"})
+    assert str(o.ip_port) == "2001:db8::1000"
+    assert o.ip_port == IPAddressPort("2001:db8::1000")
+
+    o = TestSchema({"ip-port": "2001:db8::1000@53"})
+    assert str(o.ip_port) == "2001:db8::1000@53"
+    assert o.ip_port == IPAddressPort("2001:db8::1000@53")
+
+    with raises(KresdManagerException):
+        TestSchema({"ip-port": "123.4.5.6.7"})
+    with raises(KresdManagerException):
+        TestSchema({"ip-port": "2001:db8::10000"})
+    with raises(KresdManagerException):
+        TestSchema({"ip-port": "123.4.5.6@"})
+    with raises(KresdManagerException):
+        TestSchema({"ip-port": "123.4.5.6@-1"})
+    with raises(KresdManagerException):
+        TestSchema({"ip-port": "123.4.5.6@65536"})
 
 
 def test_ipaddress():
