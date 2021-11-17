@@ -218,7 +218,7 @@ void tcp_timeout_trigger(uv_timer_t *timer)
 		the_worker->stats.timeout += finalized;
 		/* session_tasklist_finalize_expired() may call worker_task_finalize().
 		 * If session is a source session and there were IO errors,
-		 * worker_task_finalize() can filnalize all tasks and close session. */
+		 * worker_task_finalize() can finalize all tasks and close session. */
 		if (session_flags(s)->closing) {
 			return;
 		}
