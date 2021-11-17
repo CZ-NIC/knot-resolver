@@ -456,7 +456,7 @@ int kr_nsec_existence_denial(const knot_pkt_t *pkt, knot_section_t section_id,
 		no_data_wildcard_existence_check(&flags, rrset, sec);
 	}
 	if (kr_nsec_existence_denied(flags)) {
-		/* denial of existence proved accordignly to 4035 5.4 -
+		/* denial of existence proved accordingly to 4035 5.4 -
 		 * NSEC proving either rrset non-existance or
 		 * qtype non-existance has been found,
 		 * and no wildcard expansion occurred.
