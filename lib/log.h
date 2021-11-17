@@ -252,7 +252,7 @@ void kr_log_q1(const struct kr_query *qry, enum kr_log_group group, const char *
  * Typically you use this as condition to compute some data to be logged,
  * in case that's considered too expensive to do unless it really gets logged.
  *
- * The request can be NULL, and there's a _qry() shortand to specify query instead.
+ * The request can be NULL, and there's a _qry() shorthand to specify query instead.
  */
 #define kr_log_is_debug(grp, req) \
 	__builtin_expect(kr_log_is_debug_fun(LOG_GRP_ ## grp, (req)), false)
