@@ -230,7 +230,7 @@ int kr_nsec_name_error_response_check(const knot_pkt_t *pkt, knot_section_t sect
  * @param sec  Packet section.
  * @param      Number of labels or (negative) error code.
  */
-static int coverign_rrsig_labels(const knot_rrset_t *nsec, const knot_pktsection_t *sec)
+static int covering_rrsig_labels(const knot_rrset_t *nsec, const knot_pktsection_t *sec)
 {
 	if (kr_fails_assert(nsec && sec))
 		return kr_error(EINVAL);
@@ -342,7 +342,7 @@ static int no_data_wildcard_existence_check(int *flags, const knot_rrset_t *nsec
 	if (kr_fails_assert(flags && nsec && sec))
 		return kr_error(EINVAL);
 
-	int rrsig_labels = coverign_rrsig_labels(nsec, sec);
+	int rrsig_labels = covering_rrsig_labels(nsec, sec);
 	if (rrsig_labels < 0)
 		return rrsig_labels;
 	int nsec_labels = knot_dname_labels(nsec->owner, NULL);
@@ -380,7 +380,7 @@ static int wildcard_match_check(const knot_pkt_t *pkt, const knot_pktsection_t *
 		if (!knot_dname_is_equal(rrset->owner, sname)) {
 			int wcard_labels = knot_dname_labels(rrset->owner, NULL);
 			int common_labels = knot_dname_matched_labels(rrset->owner, sname);
-			int rrsig_labels = coverign_rrsig_labels(rrset, sec);
+			int rrsig_labels = covering_rrsig_labels(rrset, sec);
 			if (wcard_labels < 1 ||
 			    common_labels != wcard_labels - 1 ||
 			    common_labels != rrsig_labels) {
