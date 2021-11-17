@@ -251,7 +251,7 @@ def is_port_free(port, ip=None, ip6=None):
             check(socket.AF_INET6, socket.SOCK_STREAM, (ip6, port, 0, 0))
             check(socket.AF_INET6, socket.SOCK_DGRAM, (ip6, port, 0, 0))
     except OSError as exc:
-        if exc.errno == 98:  # address alrady in use
+        if exc.errno == 98:  # address already in use
             return False
         else:
             raise
