@@ -120,7 +120,7 @@ static int tst_key_update(tst_ctx_t *ctx, time_t epoch, bool force_update)
 {
 	if (kr_fails_assert(ctx && ctx->hash_len >= sizeof(epoch)))
 		return kr_error(EINVAL);
-	/* documented limitation: time_t and endianess must match
+	/* documented limitation: time_t and endianness must match
 	 * on instances sharing a secret */
 	if (!force_update && memcmp(ctx->hash_data, &epoch, sizeof(epoch)) == 0) {
 		return kr_ok(); /* we are up to date */
