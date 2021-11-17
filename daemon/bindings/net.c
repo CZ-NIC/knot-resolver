@@ -204,7 +204,7 @@ static int net_listen(lua_State *L)
 	int n = lua_gettop(L);
 	if (n < 1 || n > 3) {
 		lua_error_p(L, "expected one to three arguments; usage:\n"
-				"net.listen(addressses, [port = " STR(KR_DNS_PORT)
+				"net.listen(addresses, [port = " STR(KR_DNS_PORT)
 				", flags = {tls = (port == " STR(KR_DNS_TLS_PORT) ")}])\n");
 	}
 
