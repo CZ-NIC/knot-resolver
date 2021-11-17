@@ -147,7 +147,7 @@ class Kresd(ContextDecorator):
         while time.time() < end_time:
             i += 1
 
-            # use exponential backoff algorhitm to choose next delay
+            # use exponential backoff algorithm to choose next delay
             rand_delay = random.randrange(0, i)
             time.sleep(rand_delay * delay_step)
 

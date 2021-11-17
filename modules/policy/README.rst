@@ -462,7 +462,7 @@ different targets.
   It utilizes the `Public Suffix List`_ to ensure domains under the same
   registrable domain end up in a single slice. (see example below)
 
-  ``seed`` can be used to re-shuffle the slicing algorhitm when the slicing
+  ``seed`` can be used to re-shuffle the slicing algorithm when the slicing
   function is initialized. By default, the assigment is re-shuffled after one
   week (when resolver restart / reloads config). To force a stable
   distribution, pass a fixed value. To re-shuffle on every resolver restart,
