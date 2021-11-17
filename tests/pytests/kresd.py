@@ -220,7 +220,7 @@ class Kresd(ContextDecorator):
         return self._tls_socket_with_retry(socket.AF_INET6)
 
     def partial_log(self):
-        partial_log = '\n (... ommiting log start)\n'
+        partial_log = '\n (... omitting log start)\n'
         with open(self.logfile_path, encoding='UTF-8') as log:  # display partial log for debugging
             past_startup_msgid = False
             past_startup = False
