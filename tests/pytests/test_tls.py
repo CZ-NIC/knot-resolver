@@ -53,7 +53,7 @@ def test_tls_session_resumption(tmpdir, sf1, sf2, sf3):
     # at the first kresd instance
 
     # NOTE TLS 1.3 is intentionally disabled for session resumption tests,
-    # becuase python's SSLSocket.session isn't compatible with TLS 1.3
+    # because python's SSLSocket.session isn't compatible with TLS 1.3
     # https://docs.python.org/3/library/ssl.html?highlight=ssl%20ticket#tls-1-3
 
     def connect(kresd, ctx, sf, session=None):
