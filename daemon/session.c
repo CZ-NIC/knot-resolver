@@ -757,7 +757,7 @@ int session_wirebuf_process(struct session *session, const struct sockaddr *peer
 		if (kr_fails_assert(!session_wirebuf_error(session)))
 			return -1;
 		int res = worker_submit(session, peer, NULL, NULL, NULL, pkt);
-		/* Errors from worker_submit() are intetionally *not* handled in order to
+		/* Errors from worker_submit() are intentionally *not* handled in order to
 		 * ensure the entire wire buffer is processed. */
 		if (res == kr_ok())
 			ret += 1;
