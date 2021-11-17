@@ -3,7 +3,7 @@
 set -o errexit -o nounset
 
 # following checkers are disabled on purpose:
-# Clang does not suppor attribute cleanup and this is causing false positives in following checkers:
+# Clang does not support attribute cleanup and this is causing false positives in following checkers:
 # unix.Malloc
 # alpha.unix.SimpleStream
 # alpha.unix.Stream
