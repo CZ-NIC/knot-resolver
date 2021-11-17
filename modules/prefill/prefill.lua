@@ -18,7 +18,7 @@ local rz_first_try = true
 
 local prefill = {}
 
--- hack for circular depedency between timer() and fill_cache()
+-- hack for circular dependency between timer() and fill_cache()
 local forward_references = {}
 
 local function stop_timer()
