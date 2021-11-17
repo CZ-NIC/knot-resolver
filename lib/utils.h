@@ -66,7 +66,7 @@ typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
 /** Whether kr_assert() and kr_fails_assert() checks should abort. */
 KR_EXPORT extern bool kr_dbg_assertion_abort;
 
-/** How often kr_asert() should fork the process before issuing abort (if configured).
+/** How often kr_assert() should fork the process before issuing abort (if configured).
  *
  * This can be useful for debugging rare edge-cases in production.
  * if (kr_debug_assertion_abort && kr_debug_assertion_fork), it is
