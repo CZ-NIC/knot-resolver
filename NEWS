@@ -634,7 +634,7 @@ Incompatible changes
 
 Security
 --------
-- fix a rare case of zones incorrectly dowgraded to insecure status (!576)
+- fix a rare case of zones incorrectly downgraded to insecure status (!576)
 
 New features
 ------------
