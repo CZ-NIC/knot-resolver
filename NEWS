@@ -678,7 +678,7 @@ Bugfixes
 --------
 - validation: fix SERVFAIL in case of CNAME to NXDOMAIN in a single zone (!538)
 - validation: fix SERVFAIL for DS . query (!544)
-- lib/resolve: don't send unecessary queries to parent zone (!513)
+- lib/resolve: don't send unnecessary queries to parent zone (!513)
 - iterate: fix validation for zones where parent and child share NS (!543)
 - TLS: improve error handling and documentation (!536, !555, !559)
 
