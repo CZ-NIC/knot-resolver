@@ -113,7 +113,7 @@ struct kr_server_selection {
 	/** Report back the RTT of network operation for transport in ms. */
 	void (*update_rtt)(struct kr_query *qry,
 			   const struct kr_transport *transport, unsigned rtt);
-	/** Report back error encourtered with the chosen transport. See `enum kr_selection` */
+	/** Report back error encountered with the chosen transport. See `enum kr_selection` */
 	void (*error)(struct kr_query *qry,
 		      const struct kr_transport *transport,
 		      enum kr_selection_error error);
