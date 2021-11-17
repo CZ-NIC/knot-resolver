@@ -586,7 +586,7 @@ function policy.slice_randomize_psl(seed)
 	end
 	-- load psl
 	local has_latest, psl = pcall(psl_lib.latest)
-	if not has_latest then -- compatiblity with lua-psl < 0.15
+	if not has_latest then -- compatibility with lua-psl < 0.15
 		psl = psl_lib.builtin()
 	end
 
