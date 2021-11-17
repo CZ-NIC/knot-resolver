@@ -14,7 +14,7 @@ The subtree structure corresponds to the configuration variables in the declarat
 
 .. code-block:: bash
 
-	$ etcdctl set /knot-resolvevr/net/127.0.0.1 53
+	$ etcdctl set /knot-resolver/net/127.0.0.1 53
 	$ etcdctl set /knot-resolver/cache/size 10000000
 
 Configures all listening nodes to following configuration:
