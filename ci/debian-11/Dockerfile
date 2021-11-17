@@ -28,7 +28,7 @@ RUN bash -c "go get github.com/{FiloSottile/gvt,cloudflare/dns,dnstap/golang-dns
 # documentation dependencies
 RUN apt-get install -y -qqq doxygen python3-sphinx python3-breathe python3-sphinx-rtd-theme
 
-# Python packags required for Deckard CI
+# Python packages required for Deckard CI
 # Python: grab latest versions from PyPi
 # (Augeas binding in Debian packages are slow and buggy)
 RUN apt-get install -y -qqq python3-pip wget augeas-tools
