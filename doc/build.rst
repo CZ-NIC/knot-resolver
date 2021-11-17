@@ -216,7 +216,7 @@ Tarball
 
 Released tarballs are available from `<https://knot-resolver.cz/download/>`_
 
-To make a release tarball from git, use the follwing command. The
+To make a release tarball from git, use the following command. The
 
 .. code-block:: bash
 
