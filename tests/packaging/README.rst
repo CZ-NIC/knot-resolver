@@ -58,7 +58,7 @@ File structure of each component
     * post-build.sh - script called after build phase
     * pre-run.sh - script called before run phase
     * post-run.sh - script called after run phase
-    * install.sh and build.sh - scripts to rewrite standard commands for building and instaling knot-resolvers
+    * install.sh and build.sh - scripts to rewrite standard commands for building and installing knot-resolvers
     * pre-test.sh - script called immediately before testing
 * test.config or test.sh - kresd config test or shell script (one of them must exists)
 
