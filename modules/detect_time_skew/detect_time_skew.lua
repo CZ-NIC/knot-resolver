@@ -30,7 +30,7 @@ local function check_time_callback(pkt, req)
 				inception = ffi.C.kr_rrsig_sig_inception(rdata)
 				expiration = ffi.C.kr_rrsig_sig_expiration(rdata)
 				if now > expiration then
-					-- possitive value = in the future
+					-- positive value = in the future
 					time_diff = now - expiration
 				elseif now < inception then
 					-- negative value = in the past
