@@ -656,7 +656,7 @@ Most properties (actions, filters) are described above.
 
   .. code-block:: lua
 
-     -- mirror all queriesm, keep handle so we can retrieve information later
+     -- mirror all queries, keep handle so we can retrieve information later
      local rule = policy.add(policy.all(policy.MIRROR('127.0.0.2')))
      -- we can print statistics about this rule any time later
      print(string.format('id: %d, matched queries: %d', rule.id, rule.count)
