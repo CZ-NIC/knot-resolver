@@ -17,7 +17,7 @@ Typically a rule is defined as follows: ``filter(action(action parameters), filt
 
 This module is enabled by default because it implements mandatory :rfc:`6761` logic.
 When no rule applies to a query, built-in rules for `special-use <https://www.iana.org/assignments/special-use-domain-names/special-use-domain-names.xhtml>`_ and `locally-served <http://www.iana.org/assignments/locally-served-dns-zones>`_ domain names are applied.
-These rules can be overriden by action :any:`policy.PASS`.  For debugging purposes you can also add ``modules.unload('policy')`` to your config to unload the module.
+These rules can be overridden by action :any:`policy.PASS`.  For debugging purposes you can also add ``modules.unload('policy')`` to your config to unload the module.
 
 
 Filters
