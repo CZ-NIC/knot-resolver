@@ -18,7 +18,7 @@ end
 local function switch_to_binary_mode(sock)
 	data = sock:xread(2, nil, timeout)
 	sock:xwrite('__binary\n', nil, timeout)
-	same(data, '> ', 'probably successsful switch to binary mode')
+	same(data, '> ', 'probably successful switch to binary mode')
 end
 
 local function socket_connect(path)

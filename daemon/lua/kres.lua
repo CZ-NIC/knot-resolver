@@ -711,7 +711,7 @@ ffi.metatype( kr_query_t, {
 })
 
 -- helper for trace_chain_callbacks
--- ignores return values from successfull calls but logs tracebacks for throws
+-- ignores return values from successful calls but logs tracebacks for throws
 local function void_xpcall_log_tb(func, req, msg)
 	local ok, err = xpcall(func, debug.traceback, req, msg)
 	if not ok then

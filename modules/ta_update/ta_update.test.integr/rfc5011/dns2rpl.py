@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 """
-Generate RFC 5011 test simulating succesfull KSK roll-over in 2017.
+Generate RFC 5011 test simulating successful KSK roll-over in 2017.
 
 Dependencies: Knot DNS server + Deckard library.
 Environment: Set PYTHONPATH variable so "import pydnstest" will use module from Deckard.
@@ -204,7 +204,7 @@ def main():
 query-minimization: off
 CONFIG_END
 
-SCENARIO_BEGIN Simulation of successfull RFC 5011 KSK roll-over during 2017
+SCENARIO_BEGIN Simulation of successful RFC 5011 KSK roll-over during 2017
     """.format(ta=ta))
     for rng in ranges:
         print(rng)
