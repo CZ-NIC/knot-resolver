@@ -25,7 +25,7 @@ to aid further debugging.
 
    :return: int (default: 5 minutes in meson's release mode, 0 otherwise)
 
-   If a proccess should be aborted, it can be done in two ways. When this is
+   If a process should be aborted, it can be done in two ways. When this is
    set to nonzero (default), a child is forked and aborted to obtain a coredump,
    while the parent process recovers and keeps running. This can be useful to
    debug a rare issue that occurs in production, since it doesn't affect the
