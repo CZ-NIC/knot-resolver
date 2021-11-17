@@ -10,7 +10,7 @@ Multiple instances
 
 Knot Resolver can utilize multiple CPUs running in multiple independent instances (processes), where each process utilizes at most single CPU core on your machine. If your machine handles a lot of DNS traffic run multiple instances.
 
-All instances typically share the same configuration and cache, and incomming queries are automatically distributed by operating system among all instances.
+All instances typically share the same configuration and cache, and incoming queries are automatically distributed by operating system among all instances.
 
 Advantage of using multiple instances is that a problem in a single instance will not affect others, so a single instance crash will not bring whole DNS resolver service down.
 
