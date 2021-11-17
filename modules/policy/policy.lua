@@ -243,8 +243,8 @@ function policy.ANSWER(rtable, nodata)
 		else
 			answer:begin(kres.section.ANSWER)
 			if type(data.rdata) == 'table' then
-				for _, rdato in ipairs(data.rdata) do
-					answer:put(qry.sname, ttl, qry.sclass, qry.stype, rdato)
+				for _, rdata in ipairs(data.rdata) do
+					answer:put(qry.sname, ttl, qry.sclass, qry.stype, rdata)
 				end
 			else
 				answer:put(qry.sname, ttl, qry.sclass, qry.stype, data.rdata)
