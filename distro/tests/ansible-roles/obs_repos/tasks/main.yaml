@@ -8,5 +8,5 @@
   include_vars: "{{ obs_distro }}.yaml"
   when: obs_distro != "Debian"
 
-- name: Configure upstream reporitories
+- name: Configure upstream repositories
   include: "{{ obs_distro }}.yaml"

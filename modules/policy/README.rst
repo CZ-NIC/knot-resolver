@@ -17,7 +17,7 @@ Typically a rule is defined as follows: ``filter(action(action parameters), filt
 
 This module is enabled by default because it implements mandatory :rfc:`6761` logic.
 When no rule applies to a query, built-in rules for `special-use <https://www.iana.org/assignments/special-use-domain-names/special-use-domain-names.xhtml>`_ and `locally-served <http://www.iana.org/assignments/locally-served-dns-zones>`_ domain names are applied.
-These rules can be overriden by action :any:`policy.PASS`.  For debugging purposes you can also add ``modules.unload('policy')`` to your config to unload the module.
+These rules can be overridden by action :any:`policy.PASS`.  For debugging purposes you can also add ``modules.unload('policy')`` to your config to unload the module.
 
 
 Filters
@@ -106,7 +106,7 @@ Following actions stop the policy matching on the query, i.e. other rules are no
 
    Let the query pass through; it's useful to make exceptions before wider rules. For example:
 
-   More specific whitelist rule must preceede generic blacklist rule:
+   More specific whitelist rule must precede generic blacklist rule:
 
    .. code-block:: lua
 
@@ -438,7 +438,7 @@ Forwarding to multiple targets
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 With the use of :func:`policy.slice` function, it is possible to split the
-entire DNS namespace into distinct slices. When used in conjuction with
+entire DNS namespace into distinct slices. When used in conjunction with
 :func:`policy.TLS_FORWARD`, it's possible to forward different queries to
 different targets.
 
@@ -462,8 +462,8 @@ different targets.
   It utilizes the `Public Suffix List`_ to ensure domains under the same
   registrable domain end up in a single slice. (see example below)
 
-  ``seed`` can be used to re-shuffle the slicing algorhitm when the slicing
-  function is initialized. By default, the assigment is re-shuffled after one
+  ``seed`` can be used to re-shuffle the slicing algorithm when the slicing
+  function is initialized. By default, the assignment is re-shuffled after one
   week (when resolver restart / reloads config). To force a stable
   distribution, pass a fixed value. To re-shuffle on every resolver restart,
   use ``os.time()``.
@@ -544,13 +544,13 @@ Secondly, after disabling DNSSEC validation you have to solve another issue
 caused by grafting. For example, if you grafted your own top-level domain
 ``example.`` onto the public DNS namespace, at some point the root server might
 send proof-of-nonexistence proving e.g. that there are no other top-level
-domain in between names ``events.`` and ``exchange.``, effectivelly proving
+domain in between names ``events.`` and ``exchange.``, effectively proving
 non-existence of ``example.``.
 
 These proofs-of-nonexistence protect public DNS from spoofing but break
 *grafted* domains because proofs will be latter used by resolver
 (when the positive records for the grafted domain timeout from cache),
-effectivelly making grafted domain unavailable.
+effectively making grafted domain unavailable.
 The easiest work-around is to disable reading from cache for grafted domains.
 
 .. code-block:: lua
@@ -656,7 +656,7 @@ Most properties (actions, filters) are described above.
 
   .. code-block:: lua
 
-     -- mirror all queriesm, keep handle so we can retrieve information later
+     -- mirror all queries, keep handle so we can retrieve information later
      local rule = policy.add(policy.all(policy.MIRROR('127.0.0.2')))
      -- we can print statistics about this rule any time later
      print(string.format('id: %d, matched queries: %d', rule.id, rule.count)

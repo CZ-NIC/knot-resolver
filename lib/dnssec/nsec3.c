@@ -210,12 +210,12 @@ static int covers_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_t
 
 	if ((next_size > 0) && (owner_hash.size == next_size) && (name_hash.size == next_size)) {
 		/* All hash lengths must be same. */
-		const uint8_t *ownrd = owner_hash.data;
+		const uint8_t *ownerd = owner_hash.data;
 		const uint8_t *nextd = next_hash;
 		int covered = 0;
-		int greater_then_owner = (memcmp(ownrd, name_hash.data, next_size) < 0);
+		int greater_then_owner = (memcmp(ownerd, name_hash.data, next_size) < 0);
 		int less_then_next = (memcmp(name_hash.data, nextd, next_size) < 0);
-		if (memcmp(ownrd, nextd, next_size) < 0) {
+		if (memcmp(ownerd, nextd, next_size) < 0) {
 			/*
 			 * 0 (...) owner ... next (...) MAX
 			 *                ^
@@ -628,9 +628,9 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
 		 * Satisfies RFC5155 8.6 (QTYPE == DS), 2nd paragraph.
 		 * Also satisfies ERRATA 3441 8.5 (QTYPE != DS), 3rd paragraph.
 		 * - (wildcard) empty nonterminal
-		 * derived from unsecure delegation.
+		 * derived from insecure delegation.
 		 * Denial of existence can not be proven.
-		 * Set error code to proceed unsecure.
+		 * Set error code to proceed insecure.
 		 */
 		ret = kr_error(KNOT_ERANGE);
 	}

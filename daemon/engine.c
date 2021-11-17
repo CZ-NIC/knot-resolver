@@ -681,7 +681,7 @@ void engine_deinit(struct engine *engine)
 	/* Network deinit is split up.  We first need to stop listening,
 	 * then we can unload modules during which we still want
 	 * e.g. the endpoint kind registry to work (inside ->net),
-	 * and this registry deinitization uses the lua state. */
+	 * and this registry deinitialization uses the lua state. */
 	network_close_force(&engine->net);
 	for (size_t i = 0; i < engine->modules.len; ++i) {
 		engine_unload(engine, engine->modules.at[i]);

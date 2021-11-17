@@ -159,7 +159,7 @@ local function test_apex()
 	local prev_count = cache.count()
 	ok(prev_count > 0, 'previous subtree clearing did not remove everything')
 	res = cache.clear('.', false, nil, 10000)
-	is(res.count, prev_count, 'clear on root removed everyting including proofs')
+	is(res.count, prev_count, 'clear on root removed everything including proofs')
 	check_answer('exact match on qname must flush negative proofs for owner from cache',
 		     'a.b.subtree1.', kres.type.NULL, kres.rcode.SERVFAIL)
 end

@@ -96,7 +96,7 @@ enum kr_log_group {
 #define LOG_GRP_TAUPDATE_TAG		"taupd"		/**< ``taupd``: TA update */
 #define LOG_GRP_TLS_TAG			"tls"		/**< ``tls``: TLS encryption layer */
 #define LOG_GRP_GNUTLS_TAG		"gnutls"	/**< ``gnutls``: low-level logs from GnuTLS */
-#define LOG_GRP_TLSCLIENT_TAG		"tls_cl"	/**< ``tls_cl``: TLS client messagess (used for TLS forwarding) */
+#define LOG_GRP_TLSCLIENT_TAG		"tls_cl"	/**< ``tls_cl``: TLS client messages (used for TLS forwarding) */
 #define LOG_GRP_XDP_TAG			"xdp"		/**< ``xdp``: operations related to XDP */
 #define LOG_GRP_ZIMPORT_TAG		"zimprt"	/**< ``zimprt``: operations related to zimport */
 #define LOG_GRP_ZSCANNER_TAG		"zscann"	/**< ``zscann``: operations related to zscanner */
@@ -252,7 +252,7 @@ void kr_log_q1(const struct kr_query *qry, enum kr_log_group group, const char *
  * Typically you use this as condition to compute some data to be logged,
  * in case that's considered too expensive to do unless it really gets logged.
  *
- * The request can be NULL, and there's a _qry() shortand to specify query instead.
+ * The request can be NULL, and there's a _qry() shorthand to specify query instead.
  */
 #define kr_log_is_debug(grp, req) \
 	__builtin_expect(kr_log_is_debug_fun(LOG_GRP_ ## grp, (req)), false)

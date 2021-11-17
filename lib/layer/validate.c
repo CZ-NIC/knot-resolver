@@ -611,7 +611,7 @@ static const knot_dname_t *find_first_signer(ranked_rr_array_t *arr, struct kr_q
 		} else {
 			/* otherwise it's some nonsense, so we skip it */
 			kr_log_q(qry, VALIDATOR, "protocol violation: "
-					"out-of-bailwick RRSIG signer, skipping\n");
+					"out-of-bailiwick RRSIG signer, skipping\n");
 		}
 	}
 	return NULL;
@@ -1039,7 +1039,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			VERBOSE_MSG(qry, "<= cached insecure response, going insecure\n");
 			ctx->state = KR_STATE_DONE;
 		} else if (ctx->state == KR_STATE_YIELD) {
-			/* Transition to unsecure state
+			/* Transition to insecure state
 			   occurred during revalidation.
 			   if state remains YIELD, answer will not be cached.
 			   Let cache layers to work. */
@@ -1122,7 +1122,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			return KR_STATE_DONE;
 		} else if (ret != 0) {
 			/* something exceptional - no DNS key, empty pointers etc
-			 * normally it shoudn't happen */
+			 * normally it shouldn't happen */
 			VERBOSE_MSG(qry, "<= couldn't validate RRSIGs\n");
 			qry->flags.DNSSEC_BOGUS = true;
 			return KR_STATE_FAIL;
@@ -1190,7 +1190,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 					/* Could not return from here,
 					 * we must continue, validate NSEC\NSEC3 and
 					 * call update_parent_keys() to mark
-					 * parent queries as insecured */
+					 * parent queries as insecure */
 				} else {
 					VERBOSE_MSG(qry, "<= bad NODATA proof\n");
 					qry->flags.DNSSEC_BOGUS = true;
@@ -1220,7 +1220,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		   referral &&
 		   ((!qry->flags.DNSSEC_WANT && qry->flags.DNSSEC_INSECURE) ||
 		   (qry->flags.DNSSEC_NODS))) {
-		/* referral with proven DS non-existance */
+		/* referral with proven DS non-existence */
 		qtype = KNOT_RRTYPE_DS;
 	}
 	/* Update parent query zone cut */

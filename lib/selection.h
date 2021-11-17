@@ -82,7 +82,7 @@ struct kr_transport {
 };
 
 struct local_state {
-	int timeouts; /**< Number of timeouts that occured resolving this query.*/
+	int timeouts; /**< Number of timeouts that occurred resolving this query.*/
 	bool truncated; /**< Query was truncated, switch to TCP. */
 	/** Force resolution of a new NS name (if possible)
 	 * Done by selection.c:error in some cases. */
@@ -113,7 +113,7 @@ struct kr_server_selection {
 	/** Report back the RTT of network operation for transport in ms. */
 	void (*update_rtt)(struct kr_query *qry,
 			   const struct kr_transport *transport, unsigned rtt);
-	/** Report back error encourtered with the chosen transport. See `enum kr_selection` */
+	/** Report back error encountered with the chosen transport. See `enum kr_selection` */
 	void (*error)(struct kr_query *qry,
 		      const struct kr_transport *transport,
 		      enum kr_selection_error error);
@@ -204,7 +204,7 @@ struct to_resolve {
  *
  * @param choices Options to choose from, see struct above
  * @param unresolved Array of names that can be resolved (i.e. no A/AAAA record)
- * @param timeouts Number of timeouts that occured in this query (used for exponential backoff)
+ * @param timeouts Number of timeouts that occurred in this query (used for exponential backoff)
  * @param mempool Memory context of current request
  * @param tcp Force TCP as transport protocol
  * @param[out] choice_index Optionally index of the chosen transport in the @p choices array.

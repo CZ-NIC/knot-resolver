@@ -3,7 +3,7 @@
 Answer reordering
 =================
 Certain clients are "dumb" and always connect to first IP address or name found
-in a DNS answer received from resolver intead of picking randomly.
+in a DNS answer received from resolver instead of picking randomly.
 As a workaround for such broken clients it is possible to randomize
 order of records in DNS answers sent by resolver:
 

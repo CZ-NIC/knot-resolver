@@ -49,7 +49,7 @@ Less verbose logging for DNSSEC validation errors can be enabled by using :ref:`
      :return: boolean ``true`` when ``debug`` level is enabled.
 
      Toggle between ``debug`` and ``notice`` log level. Use only for debugging purposes.
-     On busy systems vebose logging can produce several MB of logs per
+     On busy systems verbose logging can produce several MB of logs per
      second and will slow down operation.
 
 .. py:function:: log_target(target)

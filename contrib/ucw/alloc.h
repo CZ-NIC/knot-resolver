@@ -24,7 +24,7 @@ struct ucw_allocator {
 /**
  * [[std]]
  * This allocator uses <<basics:xmalloc()>>, <<basics:xrealloc()>> and <<basics:xfree()>>. The memory
- * it allocates is left unitialized.
+ * it allocates is left uninitialized.
  **/
 extern struct ucw_allocator ucw_allocator_std;
 

@@ -35,7 +35,7 @@ popd &> /dev/null
 
 # determine GCOV_PREFIX_STRIP value for current source directory
 TOPSRCDIR_SLASHES="${TOPSRCDIR//[^\/]/}" # remove everything except /
-GCOV_PREFIX_STRIP="${#TOPSRCDIR_SLASHES}" # numer of / == number of components
+GCOV_PREFIX_STRIP="${#TOPSRCDIR_SLASHES}" # number of / == number of components
 
 KRESD_COVERAGE_STATS="${OUTPATH}/luacov.stats.out"
 GCOV_PREFIX="${OUTPATH}"

@@ -594,7 +594,7 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 	 * cleaned by another instance. */
 	ret = cdb_check_health(db, stats);
 	if (ret != 0) {
-		if (ret == 1) // file changed and reopened successfuly
+		if (ret == 1) // file changed and reopened successfully
 			ret = kr_ok();
 		// else pass some other error
 	} else {

@@ -83,7 +83,7 @@ void *map_get(map_t *map, const char *str);
 /** Inserts str into map.  Returns 0 if new, 1 if replaced, or ENOMEM. */
 int map_set(map_t *map, const char *str, void *val);
 
-/** Deletes str from the map, returns 0 on suceess */
+/** Deletes str from the map, returns 0 on success */
 int map_del(map_t *map, const char *str);
 
 /** Clears the given map */

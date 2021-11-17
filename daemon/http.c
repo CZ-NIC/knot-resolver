@@ -141,7 +141,7 @@ static int check_uri(const char* uri_path)
 {
 	static const char key[] = "dns=";
 	static const char *delim = "&";
-	static const char *endpoins[] = {"dns-query", "doh"};
+	static const char *endpoints[] = {"dns-query", "doh"};
 	char *beg;
 	char *end_prev;
 	ssize_t endpoint_len;
@@ -164,11 +164,11 @@ static int check_uri(const char* uri_path)
 
 	/* check endpoint */
 	ret = -1;
-	for(int i = 0; i < sizeof(endpoins)/sizeof(*endpoins); i++)
+	for(int i = 0; i < sizeof(endpoints)/sizeof(*endpoints); i++)
 	{
-		if (strlen(endpoins[i]) != endpoint_len)
+		if (strlen(endpoints[i]) != endpoint_len)
 			continue;
-		ret = strncmp(path + 1, endpoins[i], strlen(endpoins[i]));
+		ret = strncmp(path + 1, endpoints[i], strlen(endpoints[i]));
 		if (!ret)
 			break;
 	}
@@ -451,7 +451,7 @@ static int submit_to_wirebuffer(struct http_ctx *ctx)
 	/* Transfer ownership to stream (waiting in wirebuffer) */
 	/* FIXME: technically, transferring memory ownership should happen
 	 * along with queue_push(ctx->streams) to avoid confusion of who owns
-	 * what and when. Pushing to queue should be done AFTER we sucessfully
+	 * what and when. Pushing to queue should be done AFTER we successfully
 	 * finish this function. On error, we'd clean up and not push anything.
 	 * However, queue's content is now also used to detect first DATA frame
 	 * in stream, so it needs to be refactored first.
@@ -672,7 +672,7 @@ static ssize_t read_callback(nghttp2_session *h2, int32_t stream_id, uint8_t *bu
 }
 
 /*
- * Send dns response provided by the HTTTP/2 data provider.
+ * Send dns response provided by the HTTP/2 data provider.
  *
  * Data isn't guaranteed to be sent immediately due to underlying HTTP/2 flow control.
  */
@@ -737,7 +737,7 @@ static int http_send_response(struct http_ctx *ctx, int32_t stream_id,
  * Send HTTP/2 stream data created from packet's wire buffer.
  *
  * If this function returns an error, the on_write() callback isn't (and
- * musn't be!) called, since such errors are handled in an upper layer - in
+ * mustn't be!) called, since such errors are handled in an upper layer - in
  * qr_task_step() in daemon/worker.
  */
 static int http_write_pkt(struct http_ctx *ctx, knot_pkt_t *pkt, int32_t stream_id,

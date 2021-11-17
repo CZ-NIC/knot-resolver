@@ -52,13 +52,13 @@ File structure of each component
 
 * <distro>
   * <version>
-    * builddeps - list of build depedencies
-    * rundeps - list of runtime depedencies
+    * builddeps - list of build dependencies
+    * rundeps - list of runtime dependencies
     * pre-build.sh - script called before build phase
     * post-build.sh - script called after build phase
     * pre-run.sh - script called before run phase
     * post-run.sh - script called after run phase
-    * install.sh and build.sh - scripts to rewrite standard commands for building and instaling knot-resolvers
+    * install.sh and build.sh - scripts to rewrite standard commands for building and installing knot-resolvers
     * pre-test.sh - script called immediately before testing
 * test.config or test.sh - kresd config test or shell script (one of them must exists)
 
@@ -68,7 +68,7 @@ Commands order to create docker image
 For *build docker image*:
 
 #. run pre-build.sh
-#. install packages specifed in the file *builddeps*
+#. install packages specified in the file *builddeps*
 #. run build.sh
 #. run install.sh
 #. run post-build.sh
@@ -76,7 +76,7 @@ For *build docker image*:
 For *run docker image*:
 
 #. run pre-run.sh
-#. install packages specifed in the file *rundeps*
+#. install packages specified in the file *rundeps*
 #. run pre-test.sh
 #. run test (:code:`kresd -c test.config` or :code:`test.sh`)
 #. run post-build.sh

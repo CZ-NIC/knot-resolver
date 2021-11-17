@@ -72,7 +72,7 @@ function debug_mode(qname, qtype)
 			finish = function(pkt)
 				-- delay exit after packet is finished
 				-- to prevent us from losing policy.DEBUG finish callback
-				event.after(1, -- milisecond
+				event.after(1, -- millisecond
 					function()
 						local endtime = cqueues.monotime()
 						log_info(ffi.C.LOG_GRP_RESOLVER, 'request finished in %f ms', (endtime - starttime) * 1000)

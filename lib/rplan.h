@@ -43,7 +43,7 @@ struct kr_qflags {
 	bool REORDER_RR : 1;     /**< Reorder cached RRs. */
 	bool TRACE : 1;          /**< Also log answers on debug level. */
 	bool NO_0X20 : 1;        /**< Disable query case randomization . */
-	bool DNSSEC_NODS : 1;    /**< DS non-existance is proven */
+	bool DNSSEC_NODS : 1;    /**< DS non-existence is proven */
 	bool DNSSEC_OPTOUT : 1;  /**< Closest encloser proof has optout */
 	bool NONAUTH : 1;        /**< Non-authoritative in-bailiwick records are enough.
 				  * TODO: utilize this also outside cache. */
@@ -138,7 +138,7 @@ KR_EXPORT
 int kr_rplan_init(struct kr_rplan *rplan, struct kr_request *request, knot_mm_t *pool);
 
 /**
- * Deinitialize resolution plan, aborting any uncommited transactions.
+ * Deinitialize resolution plan, aborting any uncommitted transactions.
  * @param rplan plan instance
  */
 KR_EXPORT

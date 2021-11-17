@@ -40,7 +40,7 @@ static void kr_cookie_ctx_init(struct kr_cookie_ctx *ctx)
 
 /**
  * @brief Check whether node holds proper 'enabled' value.
- * @patam node JSON node holding the value
+ * @param node JSON node holding the value
  * @return true if value OK
  */
 static bool enabled_ok(const JsonNode *node)
@@ -53,7 +53,7 @@ static bool enabled_ok(const JsonNode *node)
 
 /**
  * @brief Check whether node holds proper 'secret' value.
- * @patam node JSON node holding the value
+ * @param node JSON node holding the value
  * @return true if value OK
  */
 static bool secret_ok(const JsonNode *node)
@@ -262,7 +262,7 @@ static struct kr_cookie_secret *new_sq_from_hexstr(const char *hexstr)
 
 /**
  * @brief Creates new secret.
- * @patam node JSON node holding the secret value
+ * @param node JSON node holding the secret value
  * @return pointer to newly allocated secret, NULL on error
  */
 static struct kr_cookie_secret *create_secret(const JsonNode *node)

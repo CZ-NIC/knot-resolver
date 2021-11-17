@@ -243,8 +243,8 @@ function policy.ANSWER(rtable, nodata)
 		else
 			answer:begin(kres.section.ANSWER)
 			if type(data.rdata) == 'table' then
-				for _, rdato in ipairs(data.rdata) do
-					answer:put(qry.sname, ttl, qry.sclass, qry.stype, rdato)
+				for _, entry in ipairs(data.rdata) do
+					answer:put(qry.sname, ttl, qry.sclass, qry.stype, entry)
 				end
 			else
 				answer:put(qry.sname, ttl, qry.sclass, qry.stype, data.rdata)
@@ -482,7 +482,7 @@ local function rpz_parse(action, path)
 					local act = new_actions[name][parser.r_type]
 					if act == nil then
 						new_actions[name][parser.r_type] = { ttl=parser.r_ttl, rdata=rdata }
-					else -- mutiple RRs: no reordering or deduplication
+					else -- multiple RRs: no reordering or deduplication
 						if type(act.rdata) ~= 'table' then
 							act.rdata = { act.rdata }
 						end
@@ -586,7 +586,7 @@ function policy.slice_randomize_psl(seed)
 	end
 	-- load psl
 	local has_latest, psl = pcall(psl_lib.latest)
-	if not has_latest then -- compatiblity with lua-psl < 0.15
+	if not has_latest then -- compatibility with lua-psl < 0.15
 		psl = psl_lib.builtin()
 	end
 
@@ -621,7 +621,7 @@ function policy.slice_randomize_psl(seed)
 			rand_seed = rand_seed + reg_domain:byte(i)
 		end
 
-		-- use lineral congruential generator with values from ANSI C
+		-- use linear congruential generator with values from ANSI C
 		rand_seed = rand_seed % 0x80000000  -- ensure seed is positive 32b int
 		local rand = (1103515245 * rand_seed + 12345) % 0x10000
 		return 1 + rand % length

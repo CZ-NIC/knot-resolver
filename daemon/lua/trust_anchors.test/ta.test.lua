@@ -54,8 +54,8 @@ local function test_add_file()
 	boom(trust_anchors.add_file, {'nonwriteable/root.keys', false},
 	     "Managed trust anchor in non-writeable directory")
 
-	boom(trust_anchors.add_file, {'nonexist.keys', true},
-	     "Nonexist unmanaged trust anchor file")
+	boom(trust_anchors.add_file, {'nonexistent.keys', true},
+	     "Nonexistent unmanaged trust anchor file")
 
 	is(warn_msg[overriding_msg], 0, "No override warning messages at start of test")
 	trust_anchors.add_file('root.keys', true)

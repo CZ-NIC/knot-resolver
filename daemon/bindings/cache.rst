@@ -328,7 +328,7 @@ Configuration reference
      [round] => 1
      [subtree] => com.
      > worker.sleep(0.1)
-     [cache] asynchonous cache.clear('com', false) finished
+     [cache] asynchronous cache.clear('com', false) finished
 
      -- Clear only 'www.example.com.'
      > cache.clear('www.example.com.', true)

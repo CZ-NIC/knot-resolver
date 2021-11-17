@@ -30,7 +30,7 @@ local function check_time_callback(pkt, req)
 				inception = ffi.C.kr_rrsig_sig_inception(rdata)
 				expiration = ffi.C.kr_rrsig_sig_expiration(rdata)
 				if now > expiration then
-					-- possitive value = in the future
+					-- positive value = in the future
 					time_diff = now - expiration
 				elseif now < inception then
 					-- negative value = in the past
@@ -59,7 +59,7 @@ local function check_time_callback(pkt, req)
 	end
 end
 
--- Do uncached priming query and check time validty of RRSIGs.
+-- Do uncached priming query and check time validity of RRSIGs.
 local function check_time()
 	resolve(".", kres.type.NS, kres.class.IN, {"DNSSEC_WANT", "DNSSEC_CD", "NO_CACHE"},
                 check_time_callback)

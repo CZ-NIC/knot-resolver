@@ -193,7 +193,7 @@ local function keyset_write(keyset)
 	assert(os.rename(fname_tmp, keyset.filename))
 end
 
--- Search the values of a table and return the corrseponding key (or nil).
+-- Search the values of a table and return the corresponding key (or nil).
 local function table_search(t, val)
 	for k, v in pairs(t) do
 		if v == val then

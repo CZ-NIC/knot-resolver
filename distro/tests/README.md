@@ -14,7 +14,7 @@ starts the kresd@1 service and finally attempts to use it to resolve
 a domain name. It also tests that DNSSEC validation is turned on.
 
 By default, the *knot-resolver-devel* repo (for knot-resolver) along
-with *knot-resoler-latest* (for knot) is used. To test only the
+with *knot-resolver-latest* (for knot) is used. To test only the
 *knot-resolver-latest* repo, set it in `repos.yaml` (or use the
 test-distro.sh script which overwrites this file). If you're running
 tests in parallel, they all HAVE TO use the same repo(s).

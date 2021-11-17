@@ -52,7 +52,7 @@ and will be lost on power-off or reboot.
    multiple systemd units, and a shared tmpfs space could be used up by other
    applications, leading to ``SIGBUS`` errors during runtime.
 
-Mounting the cache directory as tmpfs_ is recommended apparoach.
+Mounting the cache directory as tmpfs_ is recommended approach.
 Make sure to use appropriate ``size=`` option and don't forget to adjust the
 size in the config file as well.
 

@@ -207,19 +207,19 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 			struct kr_request *req, knot_pkt_t *pkt)
 {
 	/* It can occur that here parent query already have
-	 * provably insecured zonecut which not in the cache yet. */
+	 * provably insecure zonecut which not in the cache yet. */
 	struct kr_qflags pflags;
 	if (qry->parent) {
 		pflags = qry->parent->flags;
 	}
-	const bool is_insecured = qry->parent != NULL
+	const bool is_insecure = qry->parent != NULL
 		&& !(pflags.AWAIT_IPV4 || pflags.AWAIT_IPV6)
 		&& (pflags.DNSSEC_INSECURE || pflags.DNSSEC_NODS);
 
 	/* Want DNSSEC if it's possible to secure this name
 	 * (e.g. is covered by any TA) */
-	if (is_insecured) {
-		/* If parent is unsecured we don't want DNSSEC
+	if (is_insecure) {
+		/* If parent is insecure we don't want DNSSEC
 		 * even if cut name is covered by TA. */
 		qry->flags.DNSSEC_WANT = false;
 		qry->flags.DNSSEC_INSECURE = true;
@@ -234,11 +234,11 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	struct kr_zonecut cut_found;
 	kr_zonecut_init(&cut_found, requested_name, req->rplan.pool);
 	/* Cut that has been found can differs from cut that has been requested.
-	 * So if not already insecured,
+	 * So if not already insecure,
 	 * try to fetch ta & keys even if initial cut name not covered by TA */
-	bool secured = !is_insecured;
+	bool secure = !is_insecure;
 	int ret = kr_zonecut_find_cached(req->ctx, &cut_found, requested_name,
-					 qry, &secured);
+					 qry, &secure);
 	if (ret == kr_error(ENOENT)) {
 		/* No cached cut found, start from SBELT
 		 * and issue priming query. */
@@ -257,7 +257,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 
 	/* Find out security status.
 	 * Go insecure if the zone cut is provably insecure */
-	if ((qry->flags.DNSSEC_WANT) && !secured) {
+	if ((qry->flags.DNSSEC_WANT) && !secure) {
 		VERBOSE_MSG(qry, "=> NS is provably without DS, going insecure\n");
 		qry->flags.DNSSEC_WANT = false;
 		qry->flags.DNSSEC_INSECURE = true;
@@ -679,7 +679,7 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	if (qname != NULL) {
 		/* Deferred zone cut lookup for this query. */
 		qry->flags.AWAIT_CUT = true;
-		/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
+		/* Want DNSSEC if it's possible to secure this name (e.g. is covered by any TA) */
 		if ((knot_wire_get_ad(packet->wire) || knot_pkt_has_dnssec(packet)) &&
 		    kr_ta_closest(request->ctx, qry->sname, qtype)) {
 			qry->flags.DNSSEC_WANT = true;
@@ -1031,20 +1031,20 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	}
 
 	/* Enable DNSSEC if enters a new island of trust. */
-	bool want_secured = (qry->flags.DNSSEC_WANT) &&
+	bool want_secure = (qry->flags.DNSSEC_WANT) &&
 			    !knot_wire_get_cd(request->qsource.packet->wire);
 	if (!(qry->flags.DNSSEC_WANT) &&
 	    !knot_wire_get_cd(request->qsource.packet->wire) &&
 	    kr_ta_get(trust_anchors, wanted_name)) {
 		qry->flags.DNSSEC_WANT = true;
-		want_secured = true;
+		want_secure = true;
 		if (kr_log_is_debug_qry(RESOLVER, qry)) {
 			KR_DNAME_GET_STR(qname_str, wanted_name);
 			VERBOSE_MSG(qry, ">< TA: '%s'\n", qname_str);
 		}
 	}
 
-	if (want_secured && !qry->zone_cut.trust_anchor) {
+	if (want_secure && !qry->zone_cut.trust_anchor) {
 		knot_rrset_t *ta_rr = kr_ta_get(trust_anchors, wanted_name);
 		if (!ta_rr) {
 			char name[] = "\0";
@@ -1058,7 +1058,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	has_ta = (qry->zone_cut.trust_anchor != NULL);
 	ta_name = (has_ta ? qry->zone_cut.trust_anchor->owner : NULL);
 	refetch_ta = (!has_ta || !knot_dname_is_equal(wanted_name, ta_name));
-	if (!nods && want_secured && refetch_ta) {
+	if (!nods && want_secure && refetch_ta) {
 		struct kr_query *next = zone_cut_subreq(rplan, qry, wanted_name,
 							KNOT_RRTYPE_DS);
 		if (!next) {
@@ -1071,7 +1071,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	 * Do not fetch if this is a DNSKEY subrequest to avoid circular dependency. */
 	is_dnskey_subreq = kr_rplan_satisfies(qry, ta_name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);
 	refetch_key = has_ta && (!qry->zone_cut.key || !knot_dname_is_equal(ta_name, qry->zone_cut.key->owner));
-	if (want_secured && refetch_key && !is_dnskey_subreq) {
+	if (want_secure && refetch_key && !is_dnskey_subreq) {
 		struct kr_query *next = zone_cut_subreq(rplan, qry, ta_name, KNOT_RRTYPE_DNSKEY);
 		if (!next) {
 			return KR_STATE_FAIL;
@@ -1097,7 +1097,7 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	}
 	if (qry->flags.DNSSEC_NODS) {
 		/* This is the next query iteration with minimized qname.
-		 * At previous iteration DS non-existance has been proven */
+		 * At previous iteration DS non-existence has been proven */
 		VERBOSE_MSG(qry, "<= DS doesn't exist, going insecure\n");
 		qry->flags.DNSSEC_NODS = false;
 		qry->flags.DNSSEC_WANT = false;
@@ -1125,8 +1125,8 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	const bool has_ta = (qry->zone_cut.trust_anchor != NULL);
 	const knot_dname_t *ta_name = (has_ta ? qry->zone_cut.trust_anchor->owner : NULL);
 	const bool refetch_ta = !has_ta || !knot_dname_is_equal(qry->zone_cut.name, ta_name);
-	const bool want_secured = qry->flags.DNSSEC_WANT && !has_cd;
-	if (want_secured && refetch_ta) {
+	const bool want_secure = qry->flags.DNSSEC_WANT && !has_cd;
+	if (want_secure && refetch_ta) {
 		/* @todo we could fetch the information from the parent cut, but we don't remember that now */
 		struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.name, qry->sclass, KNOT_RRTYPE_DS);
 		if (!next) {
@@ -1140,7 +1140,7 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	 * Do not fetch if this is a DNSKEY subrequest to avoid circular dependency. */
 	const bool is_dnskey_subreq = kr_rplan_satisfies(qry, ta_name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);
 	const bool refetch_key = has_ta && (!qry->zone_cut.key || !knot_dname_is_equal(ta_name, qry->zone_cut.key->owner));
-	if (want_secured && refetch_key && !is_dnskey_subreq) {
+	if (want_secure && refetch_key && !is_dnskey_subreq) {
 		struct kr_query *next = zone_cut_subreq(rplan, qry, ta_name, KNOT_RRTYPE_DNSKEY);
 		if (!next) {
 			return KR_STATE_FAIL;
@@ -1322,7 +1322,7 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 		}
 	} else {
 		/* Caller is interested in always tracking a zone cut, even if the answer is cached
-		 * this is normally not required, and incurrs another cache lookups for cached answer. */
+		 * this is normally not required, and incurs another cache lookups for cached answer. */
 		if (qry->flags.ALWAYS_CUT) {
 			if (!(qry->flags.STUB)) {
 				switch(zone_cut_check(request, qry, packet)) {

@@ -891,12 +891,12 @@ static void flags_to_str(char *dst, const knot_pkt_t *pkt, size_t maxlen)
 
 static char *print_section_opt(struct mempool *mp, char *endp, const knot_rrset_t *rr, const uint8_t rcode)
 {
-	uint8_t ercode = knot_edns_get_ext_rcode(rr);
-	uint16_t ext_rcode_id = knot_edns_whole_rcode(ercode, rcode);
+	uint8_t errcode = knot_edns_get_ext_rcode(rr);
+	uint16_t ext_rcode_id = knot_edns_whole_rcode(errcode, rcode);
 	const char *ext_rcode_str = "Unused";
 	const knot_lookup_t *ext_rcode;
 
-	if (ercode > 0) {
+	if (errcode > 0) {
 		ext_rcode = knot_lookup_by_id(knot_rcode_names, ext_rcode_id);
 		if (ext_rcode != NULL) {
 			ext_rcode_str = ext_rcode->name;

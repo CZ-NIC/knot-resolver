@@ -49,7 +49,7 @@ Following functions allow to modify DNSSEC configuration *if you really have to*
 
 .. function:: trust_anchors.remove(zonename)
 
-   Remove specified trust anchor from trusted key set. Removing trust anchor for the root zone effectivelly disables DNSSEC validation (unless you configured another trust anchor).
+   Remove specified trust anchor from trusted key set. Removing trust anchor for the root zone effectively disables DNSSEC validation (unless you configured another trust anchor).
 
    .. code-block:: lua
 

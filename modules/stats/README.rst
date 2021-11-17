@@ -196,7 +196,7 @@ Outputs collected metrics as a JSON dictionary.
 
 Outputs a list of recent upstreams and their RTT. It is sorted by time and stored in a ring buffer of
 a fixed size. This means it's not aggregated and readable by multiple consumers, but also that
-you may lose entries if you don't read quickly enough. The default ring size is 512 entries, and may be overriden on compile time by ``-DUPSTREAMS_COUNT=X``.
+you may lose entries if you don't read quickly enough. The default ring size is 512 entries, and may be overridden on compile time by ``-DUPSTREAMS_COUNT=X``.
 
 .. function:: stats.frequent()
 

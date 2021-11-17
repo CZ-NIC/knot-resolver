@@ -172,7 +172,7 @@ of all queries performed by this client.
 
     Beware that this method has not been scientifically tested and there might be
     types of attacks which will allow remote resolvers to infer more information about the client.
-    Again: If possible encypt **all** your traffic and not just DNS queries!
+    Again: If possible encrypt **all** your traffic and not just DNS queries!
 
 .. code-block:: lua
 

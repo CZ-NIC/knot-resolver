@@ -111,7 +111,7 @@ Daemon will refrain from printing the command prompt.
 Increase logging to debug level.
 .TP
 .B \-h
-Show short commandline option help.
+Show short command-line option help.
 .TP
 .B \-V
 Show the version.

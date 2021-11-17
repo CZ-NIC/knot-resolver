@@ -216,7 +216,7 @@ Tarball
 
 Released tarballs are available from `<https://knot-resolver.cz/download/>`_
 
-To make a release tarball from git, use the follwing command. The
+To make a release tarball from git, use the following command. The
 
 .. code-block:: bash
 
@@ -235,7 +235,7 @@ Packaging
 
 Recommended build options for packagers:
 
-* ``--buildtype=release`` for default flags (optimalization, asserts, ...). For complete control over flags, use ``plain`` and see :ref:`build-custom-flags`.
+* ``--buildtype=release`` for default flags (optimization, asserts, ...). For complete control over flags, use ``plain`` and see :ref:`build-custom-flags`.
 * ``--prefix=/usr`` to customize
   prefix, other directories can be set in a similar fashion, see ``meson setup
   --help``

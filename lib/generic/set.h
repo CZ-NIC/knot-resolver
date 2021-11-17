@@ -69,7 +69,7 @@ typedef int (set_walk_cb)(const char *, void *);
 #define set_add(set, str) \
 	map_set((set), (str), (void *)1)
 
-/*! Deletes str from the set, returns 0 on suceess */
+/*! Deletes str from the set, returns 0 on success */
 #define set_del(set, str) \
 	map_del((set), (str))
 
