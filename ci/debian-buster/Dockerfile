@@ -14,7 +14,7 @@ RUN apt-get update -qq
 # TODO: run upgrade once buster reaches a stable release
 # RUN apt-get upgrade -y -qqq
 
-# Knot and Knot Resolver dependecies
+# Knot and Knot Resolver dependencies
 RUN apt-get install -y -qqq git make cmake pkg-config meson \
 	build-essential bsdmainutils libtool autoconf libcmocka-dev \
 	liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev \
@@ -29,7 +29,7 @@ RUN apt-get install -y -qqq \
 # package crypto/ed25519: unrecognized import path "crypto/ed25519"
 #RUN bash -c "go get github.com/{FiloSottile/gvt,cloudflare/dns,dnstap/golang-dnstap}"
 
-# documentation dependecies
+# documentation dependencies
 RUN apt-get install -y -qqq doxygen python3-sphinx python3-breathe python3-sphinx-rtd-theme
 
 # Python packags required for Deckard CI

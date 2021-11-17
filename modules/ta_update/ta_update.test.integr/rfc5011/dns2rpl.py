@@ -2,7 +2,7 @@
 """
 Generate RFC 5011 test simulating succesfull KSK roll-over in 2017.
 
-Depedencies: Knot DNS server + Deckard library.
+Dependencies: Knot DNS server + Deckard library.
 Environment: Set PYTHONPATH variable so "import pydnstest" will use module from Deckard.
 Input: Root zone files, presumably created by genkeyszones.sh.
 Output: RPL file for Deckard on standard output.

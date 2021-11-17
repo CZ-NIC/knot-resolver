@@ -52,8 +52,8 @@ File structure of each component
 
 * <distro>
   * <version>
-    * builddeps - list of build depedencies
-    * rundeps - list of runtime depedencies
+    * builddeps - list of build dependencies
+    * rundeps - list of runtime dependencies
     * pre-build.sh - script called before build phase
     * post-build.sh - script called after build phase
     * pre-run.sh - script called before run phase
