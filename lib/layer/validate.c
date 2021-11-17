@@ -611,7 +611,7 @@ static const knot_dname_t *find_first_signer(ranked_rr_array_t *arr, struct kr_q
 		} else {
 			/* otherwise it's some nonsense, so we skip it */
 			kr_log_q(qry, VALIDATOR, "protocol violation: "
-					"out-of-bailwick RRSIG signer, skipping\n");
+					"out-of-bailiwick RRSIG signer, skipping\n");
 		}
 	}
 	return NULL;
