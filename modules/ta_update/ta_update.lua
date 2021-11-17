@@ -322,7 +322,7 @@ ta_update = {
 }
 
 -- start tracking (already loaded) TA with given zone name in wire format
--- do first refresh immediatelly
+-- do first refresh immediately
 function ta_update.start(zname, managed)
 	local keyset = trust_anchors.keysets[zname]
 	if not keyset then

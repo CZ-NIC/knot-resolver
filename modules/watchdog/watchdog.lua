@@ -45,7 +45,7 @@ local function check_answer(logbuf)
 		else
 			log_info(ffi.C.LOG_GRP_WATCHDOG, 'answer was dropped')
 		end
-		-- failure! quit immediatelly to allow process supervisor to restart us
+		-- failure! quit immediately to allow process supervisor to restart us
 		private.fail_callback()
 	end
 end
