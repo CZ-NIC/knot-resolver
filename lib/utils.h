@@ -283,7 +283,7 @@ int kr_ntop_str(int family, const void *src, uint16_t port, char *buf, size_t *b
 static inline char *kr_straddr(const struct sockaddr *addr)
 {
 	if (kr_fails_assert(addr)) return NULL;
-	/* We are the sinle-threaded application */
+	/* We are the single-threaded application */
 	static char str[INET6_ADDRSTRLEN + 1 + 5 + 1];
 	size_t len = sizeof(str);
 	int ret = kr_inaddr_str(addr, str, &len);
