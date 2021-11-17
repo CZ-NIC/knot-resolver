@@ -277,7 +277,7 @@ int entry_h_splice(
 	/* Now we're in trouble.  In some cases, parts of data to be written
 	 * is an lmdb entry that may be invalidated by our write request.
 	 * (lmdb does even in-place updates!) Therefore we copy all into a buffer.
-	 * LATER(optim.): do this only when neccessary, or perhaps another approach.
+	 * LATER(optim.): do this only when necessary, or perhaps another approach.
 	 * This is also complicated by the fact that the val_new_entry part
 	 * is to be written *afterwards* by the caller.
 	 */
