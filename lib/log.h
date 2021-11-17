@@ -96,7 +96,7 @@ enum kr_log_group {
 #define LOG_GRP_TAUPDATE_TAG		"taupd"		/**< ``taupd``: TA update */
 #define LOG_GRP_TLS_TAG			"tls"		/**< ``tls``: TLS encryption layer */
 #define LOG_GRP_GNUTLS_TAG		"gnutls"	/**< ``gnutls``: low-level logs from GnuTLS */
-#define LOG_GRP_TLSCLIENT_TAG		"tls_cl"	/**< ``tls_cl``: TLS client messagess (used for TLS forwarding) */
+#define LOG_GRP_TLSCLIENT_TAG		"tls_cl"	/**< ``tls_cl``: TLS client messages (used for TLS forwarding) */
 #define LOG_GRP_XDP_TAG			"xdp"		/**< ``xdp``: operations related to XDP */
 #define LOG_GRP_ZIMPORT_TAG		"zimprt"	/**< ``zimprt``: operations related to zimport */
 #define LOG_GRP_ZSCANNER_TAG		"zscann"	/**< ``zscann``: operations related to zscanner */
