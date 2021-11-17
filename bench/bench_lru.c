@@ -143,7 +143,7 @@ static struct key * read_lines(const char *fname, size_t *count, char **pfree)
 	return result;
 }
 
-// compatibility layer for the oler lru_* names; it's more compler with lru_create
+// compatibility layer for the oler lru_* names; it's more complete with lru_create
 #ifndef lru_create
 	#define lru_get_new lru_set
 	#define lru_get_try lru_get
