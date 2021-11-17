@@ -120,7 +120,7 @@ Example:
 
      function async_print(testname, sleep)
              log(testname .. ': system time before sleep' .. tostring(os.time())
-             worker.sleep(sleep)  -- other corroutines continue execution now
+             worker.sleep(sleep)  -- other coroutines continue execution now
              log(testname .. ': system time AFTER sleep' .. tostring(os.time())
      end
 
