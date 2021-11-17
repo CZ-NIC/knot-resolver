@@ -71,7 +71,7 @@ static inline int execute_callback(lua_State *L, int argc)
 	if (ret != 0) {
 		kr_log_error(SYSTEM, "error: %s\n", lua_tostring(L, -1));
 	}
-	/* Clear the stack, there may be event a/o enything returned */
+	/* Clear the stack, there may be event a/o anything returned */
 	lua_settop(L, 0);
 	return ret;
 }
