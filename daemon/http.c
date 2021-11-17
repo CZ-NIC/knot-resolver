@@ -141,7 +141,7 @@ static int check_uri(const char* uri_path)
 {
 	static const char key[] = "dns=";
 	static const char *delim = "&";
-	static const char *endpoins[] = {"dns-query", "doh"};
+	static const char *endpoints[] = {"dns-query", "doh"};
 	char *beg;
 	char *end_prev;
 	ssize_t endpoint_len;
@@ -164,11 +164,11 @@ static int check_uri(const char* uri_path)
 
 	/* check endpoint */
 	ret = -1;
-	for(int i = 0; i < sizeof(endpoins)/sizeof(*endpoins); i++)
+	for(int i = 0; i < sizeof(endpoints)/sizeof(*endpoints); i++)
 	{
-		if (strlen(endpoins[i]) != endpoint_len)
+		if (strlen(endpoints[i]) != endpoint_len)
 			continue;
-		ret = strncmp(path + 1, endpoins[i], strlen(endpoins[i]));
+		ret = strncmp(path + 1, endpoints[i], strlen(endpoints[i]));
 		if (!ret)
 			break;
 	}

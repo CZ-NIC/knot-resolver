@@ -243,7 +243,7 @@ Configuration file
 
      "``trust_anchors.keyfile_default = nil``", "``trust_anchors.remove('.')``"
 
-* Network for HTTP endpoints is now configured using same mechanism as for normal DNS enpoints,
+* Network for HTTP endpoints is now configured using same mechanism as for normal DNS endpoints,
   please refer to chapter :ref:`network-configuration`. Migration table:
 
   .. csv-table::
