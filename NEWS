@@ -600,7 +600,7 @@ Bugfixes
 Improvements
 ------------
 - reorder_RR() implementation is brought back
-- bring in performace improvements provided by libknot 2.7
+- bring in performance improvements provided by libknot 2.7
 - cache.clear() has a new, more powerful API
 - cache documentation was improved
 - old name "Knot DNS Resolver" is replaced by unambiguous "Knot Resolver"
