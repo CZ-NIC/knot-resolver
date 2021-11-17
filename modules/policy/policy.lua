@@ -482,7 +482,7 @@ local function rpz_parse(action, path)
 					local act = new_actions[name][parser.r_type]
 					if act == nil then
 						new_actions[name][parser.r_type] = { ttl=parser.r_ttl, rdata=rdata }
-					else -- mutiple RRs: no reordering or deduplication
+					else -- multiple RRs: no reordering or deduplication
 						if type(act.rdata) ~= 'table' then
 							act.rdata = { act.rdata }
 						end
