@@ -672,7 +672,7 @@ static ssize_t read_callback(nghttp2_session *h2, int32_t stream_id, uint8_t *bu
 }
 
 /*
- * Send dns response provided by the HTTTP/2 data provider.
+ * Send dns response provided by the HTTP/2 data provider.
  *
  * Data isn't guaranteed to be sent immediately due to underlying HTTP/2 flow control.
  */

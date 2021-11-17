@@ -241,7 +241,7 @@ local function route(endpoints)
 			local ok, err, reason = http_util.yieldable_pcall(serve, endpoints, h, stream)
 			if not ok or err then
 				err = err or '500'
-				log_info(ffi.C.LOG_GRP_HTTP, '%s %s HTTTP/%s %s %s',
+				log_info(ffi.C.LOG_GRP_HTTP, '%s %s HTTP/%s %s %s',
 					m, path, tostring(connection.version), err, reason or '')
 				-- Method is not supported
 				local hsend = http_headers.new()
