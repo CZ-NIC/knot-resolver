@@ -1129,7 +1129,7 @@ Improvements:
 - hints module: previously /etc/hosts was loaded by default, but not anymore.
   Users can now actually avoid loading any file.
 - DNS over TLS now creates ephemeral certs.
-- Configurable cache.{min,max}_tll option, with max_ttl defaulting to 6 days.
+- Configurable cache.{min,max}_ttl option, with max_ttl defaulting to 6 days.
 - Option to reorder RRs in the response.
 - New policy.QTRACE policy to print packet contents
 
