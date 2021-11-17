@@ -729,7 +729,7 @@ end
 -- @returns table with results, one item per instance + key n=number of instances
 --          (order of return values is undefined)
 -- @throws Lua error if:
---         - communication failed in the middle of trasaction
+--         - communication failed in the middle of transaction
 --         - a result is not serializable
 --         - individual call throws an error
 --         - number of return values != 1 per instance per call
