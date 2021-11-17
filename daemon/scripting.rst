@@ -337,7 +337,7 @@ anonymous function:
 Note that each scheduled event is identified by a number valid for the duration
 of the event, you may use it to cancel the event at any time.
 
-To persist state between two invocations of a fuction Lua uses concept called
+To persist state between two invocations of a function Lua uses concept called
 closures_. In the following example function ``speed_monitor()`` is a closure
 function, which provides persistent variable called ``previous``.
 
