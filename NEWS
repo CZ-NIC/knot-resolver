@@ -1059,7 +1059,7 @@ Bugfixes
 - lua: do *not* truncate cache size to unsigned
 - forwarding mode: correctly forward +cd flag
 - fix a potential memory leak
-- don't treat answers that contain DS non-existance proof as insecure
+- don't treat answers that contain DS non-existence proof as insecure
 - don't store NSEC3 and their signatures in the cache
 - layer/iterate: when processing delegations, check if qname is at or
   below new authority

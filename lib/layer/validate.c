@@ -1220,7 +1220,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		   referral &&
 		   ((!qry->flags.DNSSEC_WANT && qry->flags.DNSSEC_INSECURE) ||
 		   (qry->flags.DNSSEC_NODS))) {
-		/* referral with proven DS non-existance */
+		/* referral with proven DS non-existence */
 		qtype = KNOT_RRTYPE_DS;
 	}
 	/* Update parent query zone cut */

@@ -138,14 +138,14 @@ static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 
 /**
  * According to set flags determine whether NSEC proving
- * RRset or RRType non-existense has been found.
+ * RRset or RRType non-existence has been found.
  * @param f Flags to inspect.
  * @return  True if required NSEC exists.
  */
 #define kr_nsec_rrset_noexist(f) \
         ((f) & (FLG_NOEXIST_RRTYPE | FLG_NOEXIST_RRSET))
 /**
- * According to set flags determine whether wildcard non-existense
+ * According to set flags determine whether wildcard non-existence
  * has been proven.
  * @param f Flags to inspect.
  * @return  True if wildcard not exists.
@@ -457,14 +457,14 @@ int kr_nsec_existence_denial(const knot_pkt_t *pkt, knot_section_t section_id,
 	}
 	if (kr_nsec_existence_denied(flags)) {
 		/* denial of existence proved accordingly to 4035 5.4 -
-		 * NSEC proving either rrset non-existance or
-		 * qtype non-existance has been found,
+		 * NSEC proving either rrset non-existence or
+		 * qtype non-existence has been found,
 		 * and no wildcard expansion occurred.
 		 */
 		return kr_ok();
 	} else if (kr_nsec_rrset_noexist(flags)) {
-		/* NSEC proving either rrset non-existance or
-		 * qtype non-existance has been found,
+		/* NSEC proving either rrset non-existence or
+		 * qtype non-existence has been found,
 		 * but wildcard expansion occurs.
 		 * Try to find matching wildcard and check
 		 * corresponding types.

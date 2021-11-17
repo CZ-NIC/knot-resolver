@@ -1097,7 +1097,7 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	}
 	if (qry->flags.DNSSEC_NODS) {
 		/* This is the next query iteration with minimized qname.
-		 * At previous iteration DS non-existance has been proven */
+		 * At previous iteration DS non-existence has been proven */
 		VERBOSE_MSG(qry, "<= DS doesn't exist, going insecure\n");
 		qry->flags.DNSSEC_NODS = false;
 		qry->flags.DNSSEC_WANT = false;
