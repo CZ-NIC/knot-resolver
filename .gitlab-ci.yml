@@ -132,7 +132,7 @@ build:macOS:
       - branches@knot/security/knot-resolver
   stage: build
   when: delayed
-  start_in: 3 minutes  # allow some time for mirrorring, job creation
+  start_in: 3 minutes  # allow some time for mirroring, job creation
   script:
     - ci/gh_actions.py ${CI_COMMIT_REF_NAME} ${CI_COMMIT_SHA}
 
