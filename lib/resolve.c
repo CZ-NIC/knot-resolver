@@ -1322,7 +1322,7 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 		}
 	} else {
 		/* Caller is interested in always tracking a zone cut, even if the answer is cached
-		 * this is normally not required, and incurrs another cache lookups for cached answer. */
+		 * this is normally not required, and incurs another cache lookups for cached answer. */
 		if (qry->flags.ALWAYS_CUT) {
 			if (!(qry->flags.STUB)) {
 				switch(zone_cut_check(request, qry, packet)) {
