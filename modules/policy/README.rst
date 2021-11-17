@@ -463,7 +463,7 @@ different targets.
   registrable domain end up in a single slice. (see example below)
 
   ``seed`` can be used to re-shuffle the slicing algorithm when the slicing
-  function is initialized. By default, the assigment is re-shuffled after one
+  function is initialized. By default, the assignment is re-shuffled after one
   week (when resolver restart / reloads config). To force a stable
   distribution, pass a fixed value. To re-shuffle on every resolver restart,
   use ``os.time()``.
