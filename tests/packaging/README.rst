@@ -68,7 +68,7 @@ Commands order to create docker image
 For *build docker image*:
 
 #. run pre-build.sh
-#. install packages specifed in the file *builddeps*
+#. install packages specified in the file *builddeps*
 #. run build.sh
 #. run install.sh
 #. run post-build.sh
@@ -76,7 +76,7 @@ For *build docker image*:
 For *run docker image*:
 
 #. run pre-run.sh
-#. install packages specifed in the file *rundeps*
+#. install packages specified in the file *rundeps*
 #. run pre-test.sh
 #. run test (:code:`kresd -c test.config` or :code:`test.sh`)
 #. run post-build.sh
