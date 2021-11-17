@@ -40,7 +40,7 @@ For more details see ``kresd.systemd(7)``.
 
 Zero-downtime restarts
 ----------------------
-Resolver restart normally takes just miliseconds and cache content is persistent to avoid performance drop
+Resolver restart normally takes just milliseconds and cache content is persistent to avoid performance drop
 after restart. If you want real zero-downtime restarts use `multiple instances`_ and do rolling
 restart, i.e. restart only one resolver process at a time.
 
