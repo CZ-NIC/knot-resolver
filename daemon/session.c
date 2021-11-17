@@ -40,7 +40,7 @@ struct session {
 	struct http_ctx *http_ctx;  /**< server side http-related data. */
 #endif
 
-	trie_t *tasks;                /**< list of tasks assotiated with given session. */
+	trie_t *tasks;                /**< list of tasks associated with given session. */
 	queue_t(struct qr_task *) waiting;  /**< list of tasks waiting for sending to upstream. */
 
 	uint8_t *wire_buf;            /**< Buffer for DNS message, except for XDP. */
