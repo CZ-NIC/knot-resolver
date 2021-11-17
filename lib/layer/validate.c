@@ -1122,7 +1122,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			return KR_STATE_DONE;
 		} else if (ret != 0) {
 			/* something exceptional - no DNS key, empty pointers etc
-			 * normally it shoudn't happen */
+			 * normally it shouldn't happen */
 			VERBOSE_MSG(qry, "<= couldn't validate RRSIGs\n");
 			qry->flags.DNSSEC_BOGUS = true;
 			return KR_STATE_FAIL;
