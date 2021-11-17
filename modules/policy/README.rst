@@ -438,7 +438,7 @@ Forwarding to multiple targets
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 With the use of :func:`policy.slice` function, it is possible to split the
-entire DNS namespace into distinct slices. When used in conjuction with
+entire DNS namespace into distinct slices. When used in conjunction with
 :func:`policy.TLS_FORWARD`, it's possible to forward different queries to
 different targets.
 
