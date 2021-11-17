@@ -210,12 +210,12 @@ static int covers_name(int *flags, const knot_rrset_t *nsec3, const knot_dname_t
 
 	if ((next_size > 0) && (owner_hash.size == next_size) && (name_hash.size == next_size)) {
 		/* All hash lengths must be same. */
-		const uint8_t *ownrd = owner_hash.data;
+		const uint8_t *ownerd = owner_hash.data;
 		const uint8_t *nextd = next_hash;
 		int covered = 0;
-		int greater_then_owner = (memcmp(ownrd, name_hash.data, next_size) < 0);
+		int greater_then_owner = (memcmp(ownerd, name_hash.data, next_size) < 0);
 		int less_then_next = (memcmp(name_hash.data, nextd, next_size) < 0);
-		if (memcmp(ownrd, nextd, next_size) < 0) {
+		if (memcmp(ownerd, nextd, next_size) < 0) {
 			/*
 			 * 0 (...) owner ... next (...) MAX
 			 *                ^
