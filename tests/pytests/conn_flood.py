@@ -22,7 +22,7 @@ import utils
 MAX_SOCKETS = 10000  # upper bound of how many connections to open
 MAX_ITERATIONS = 10  # number of iterations to run the test
 
-# we can't use softlimit ifself since kresd already has open sockets,
+# we can't use softlimit itself since kresd already has open sockets,
 # so use lesser value
 RESERVED_NOFILE = 40  # 40 is empirical value
 
