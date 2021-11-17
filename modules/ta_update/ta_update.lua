@@ -141,7 +141,7 @@ end
 local function update(keyset, new_keys)
 	if not new_keys then return false end
 	if not keyset.managed then
-		-- this may happen due to race condition during testing in CI (refesh time < query time)
+		-- this may happen due to race condition during testing in CI (refresh time < query time)
 		return false
 	end
 
