@@ -52,7 +52,7 @@ static const uint16_t CACHE_VERSION = 6;
  * 	even though it might have taken part in a successful DNSSEC proof:
  * 	1. any opt-out NSEC3, as they typically aren't much use aggressively anyway
  * 	2. some kinds of minimal NSEC* ranges, as they'd seem more trouble than worth:
- * 	    - extremely short range of covered names limits the benefits severly
+ * 	    - extremely short range of covered names limits the benefits severely
  * 	    - the type-set is often a lie, either a working lie, e.g. CloudFlare's
  * 	      black lies, or even a non-working lie, e.g. DVE-2018-0003
  * 	3. some kinds of "weird" RRsets, to get at least some caching on them
