@@ -33,7 +33,7 @@ Each test spawns an independent kresd instance, so test failures shouldn't affec
 each other.
 
 Some tests are omitted from automatic test collection by default, due to their
-resource contraints. These typicially have to be executed separately by providing
+resource constraints. These typicially have to be executed separately by providing
 the path to test file directly.
 
 .. code-block:: bash
