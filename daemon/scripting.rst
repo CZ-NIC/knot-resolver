@@ -118,7 +118,7 @@ process for liveliness by connecting to the UNIX socket.
       > map('require("kluautil").kr_table_pack(pcall(net.tls, "cert.pem", "key.pem"))')
       {
           {
-              true,  -- function suceeded
+              true,  -- function succeeded
               true,  -- function return value(s)
               ['n'] = 2,
           },
