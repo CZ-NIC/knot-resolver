@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Create a develpoment tarball
+# Create a development tarball
 set -o errexit -o nounset -o xtrace
 
 cd "$(dirname ${0})/.."
