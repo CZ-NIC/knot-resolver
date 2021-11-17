@@ -589,7 +589,7 @@ Incompatible changes
 - DNS cookie module (RFC 7873) is not available in this release,
   it will be later reworked to reflect development in IEFT dnsop working group
 - version module was permanently removed because it was not really used by users;
-  if you want to receive notifications abou new releases please subscribe to
+  if you want to receive notifications about new releases please subscribe to
   https://lists.nic.cz/cgi-bin/mailman/listinfo/knot-resolver-announce
 
 Bugfixes
