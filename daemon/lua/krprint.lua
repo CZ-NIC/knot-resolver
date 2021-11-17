@@ -223,7 +223,7 @@ local serializer_class = {
 	key_val_sep = ' ',
 	__inst_mt = {}
 }
--- inhertance form base class (for :new())
+-- inheritance form base class (for :new())
 setmetatable(serializer_class, { __index = base_class })
 -- class instances with following metatable inherit all class members
 serializer_class.__inst_mt.__index = serializer_class
