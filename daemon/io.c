@@ -686,7 +686,7 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 		if (data->mode == io_mode_binary) {
 			/* Leader expects length field in all cases */
 			if (!message || len_s > UINT32_MAX) {
-				kr_log_error(IO, "unrepresentable respose on control socket, "
+				kr_log_error(IO, "unrepresentable response on control socket, "
 						"sending back empty block (command '%s')\n", cmd);
 				len_s = 0;
 			}
