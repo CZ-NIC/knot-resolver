@@ -138,7 +138,7 @@ KR_EXPORT
 int kr_rplan_init(struct kr_rplan *rplan, struct kr_request *request, knot_mm_t *pool);
 
 /**
- * Deinitialize resolution plan, aborting any uncommited transactions.
+ * Deinitialize resolution plan, aborting any uncommitted transactions.
  * @param rplan plan instance
  */
 KR_EXPORT
