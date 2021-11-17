@@ -1788,7 +1788,7 @@ int worker_submit(struct session *session,
 		if (kr_fails_assert(!session_flags(session)->closing))
 			return kr_error(EINVAL);
 		addr = peer;
-		/* Note recieve time for RTT calculation */
+		/* Note receive time for RTT calculation */
 		task->recv_time = kr_now();
 	}
 	if (kr_fails_assert(!uv_is_closing(session_get_handle(session))))
