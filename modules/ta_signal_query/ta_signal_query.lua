@@ -40,7 +40,7 @@ local function send_ta_query(domain)
 	local keyset = trust_anchors.keysets[domain]
 	local qname = prepare_query_name(keyset, domain)
 	if qname ~= nil then
-		log_info(ffi.C.LOG_GRP_TASIGNALING, "signalling query trigered: %s", qname)
+		log_info(ffi.C.LOG_GRP_TASIGNALING, "signalling query triggered: %s", qname)
 		-- asynchronous query
 		-- we do not care about result or from where it was obtained
 		event.after(0, function ()
