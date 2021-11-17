@@ -1441,7 +1441,7 @@ static int tcp_task_existing_connection(struct session *session, struct qr_task 
 
 	/* No unsent queries at that point. */
 	if (session_tasklist_get_len(session) >= worker->tcp_pipeline_max) {
-		/* Too many outstanding queries, answer with SERFVAIL, */
+		/* Too many outstanding queries, answer with SERVFAIL, */
 		return kr_error(EINVAL);
 	}
 
