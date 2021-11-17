@@ -434,7 +434,7 @@ cache.clear = function (name, exact_name, rr_type, chunk_size, callback, prev_st
 						cache.clear(cbname, cbexact_name, cbrr_type, cbchunk_size, cbself, cbrettable)
 					end)
 			elseif cbrettable.round > 1 then
-				log_info(ffi.C.LOG_GRP_CACHE, 'asynchonous cache.clear(\'' .. cbname .. '\', '
+				log_info(ffi.C.LOG_GRP_CACHE, 'asynchronous cache.clear(\'' .. cbname .. '\', '
 				    .. tostring(cbexact_name) .. ') finished')
 			end
 			return cbrettable
