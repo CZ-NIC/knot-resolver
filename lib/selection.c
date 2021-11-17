@@ -273,7 +273,7 @@ static void invalidate_dead_upstream(struct address_state *state,
 /**
  * @internal Check if IP address is TLS capable.
  *
- * @p req has to have the selection_context properly initiazed.
+ * @p req has to have the selection_context properly initialized.
  */
 static void check_tls_capable(struct address_state *address_state,
 			      struct kr_request *req, struct sockaddr *address)
@@ -289,7 +289,7 @@ static void check_tls_capable(struct address_state *address_state,
 /**
  * Check if there is a existing TCP connection to this address.
  *
- * @p req has to have the selection_context properly initiazed.
+ * @p req has to have the selection_context properly initialized.
  */
 void check_tcp_connections(struct address_state *address_state, struct kr_request *req, struct sockaddr *address) {
 	address_state->tcp_connected = req->selection_context.is_tcp_connected ? req->selection_context.is_tcp_connected(address) : false;
