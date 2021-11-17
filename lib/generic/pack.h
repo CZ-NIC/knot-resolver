@@ -7,7 +7,7 @@
  * @brief A length-prefixed list of objects, also an array list.
  *
  * Each object is prefixed by item length, unlike array this structure
- * permits variable-length data. It is also equivallent to forward-only list
+ * permits variable-length data. It is also equivalent to forward-only list
  * backed by an array.
  *
  * @note Maximum object size is 2^16 bytes, see  ::pack_objlen_t
