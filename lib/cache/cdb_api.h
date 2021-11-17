@@ -65,7 +65,7 @@ struct kr_cdb_api {
 			knot_db_val_t *val, int maxcount);
 
 	/** Remove maxcount keys.
-	 * \returns the number of succesfully removed keys or the first error code
+	 * \returns the number of successfully removed keys or the first error code
 	 * It returns on first error, but ENOENT is not considered an error. */
 	int (*remove)(kr_cdb_pt db, struct kr_cdb_stats *stat,
 			knot_db_val_t keys[], int maxcount);

@@ -451,7 +451,7 @@ static int submit_to_wirebuffer(struct http_ctx *ctx)
 	/* Transfer ownership to stream (waiting in wirebuffer) */
 	/* FIXME: technically, transferring memory ownership should happen
 	 * along with queue_push(ctx->streams) to avoid confusion of who owns
-	 * what and when. Pushing to queue should be done AFTER we sucessfully
+	 * what and when. Pushing to queue should be done AFTER we successfully
 	 * finish this function. On error, we'd clean up and not push anything.
 	 * However, queue's content is now also used to detect first DATA frame
 	 * in stream, so it needs to be refactored first.
