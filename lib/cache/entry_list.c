@@ -217,7 +217,7 @@ int entry_h_splice(
 	const knot_dname_t *owner/*log only*/,
 	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp)
 {
-	//TODO: another review, perhaps incuding the API
+	//TODO: another review, perhaps including the API
 	if (kr_fails_assert(val_new_entry && val_new_entry->len > 0))
 		return kr_error(EINVAL);
 
