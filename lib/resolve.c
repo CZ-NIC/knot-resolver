@@ -679,7 +679,7 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	if (qname != NULL) {
 		/* Deferred zone cut lookup for this query. */
 		qry->flags.AWAIT_CUT = true;
-		/* Want DNSSEC if it's posible to secure this name (e.g. is covered by any TA) */
+		/* Want DNSSEC if it's possible to secure this name (e.g. is covered by any TA) */
 		if ((knot_wire_get_ad(packet->wire) || knot_pkt_has_dnssec(packet)) &&
 		    kr_ta_closest(request->ctx, qry->sname, qtype)) {
 			qry->flags.DNSSEC_WANT = true;
