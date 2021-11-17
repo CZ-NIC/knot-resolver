@@ -8,7 +8,7 @@ Run-time reconfiguration
 Knot Resolver offers several ways to modify its configuration at run-time:
 
   - Using control socket driven by an external system
-  - Using Lua program embeded in Resolver's configuration file
+  - Using Lua program embedded in Resolver's configuration file
 
 Both ways can also be combined: For example the configuration file can contain
 a little Lua function which gathers statistics and returns them in JSON string.
