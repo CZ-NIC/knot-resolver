@@ -737,7 +737,7 @@ static int http_send_response(struct http_ctx *ctx, int32_t stream_id,
  * Send HTTP/2 stream data created from packet's wire buffer.
  *
  * If this function returns an error, the on_write() callback isn't (and
- * musn't be!) called, since such errors are handled in an upper layer - in
+ * mustn't be!) called, since such errors are handled in an upper layer - in
  * qr_task_step() in daemon/worker.
  */
 static int http_write_pkt(struct http_ctx *ctx, knot_pkt_t *pkt, int32_t stream_id,
