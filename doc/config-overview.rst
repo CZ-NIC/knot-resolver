@@ -66,7 +66,7 @@ The **interactive prompt** is denoted by ``>``, so all examples starting with ``
         'notice'
         > -- the previous line without > character is output from log_level() command
 
-Following example demontrates how to interactivelly list all currently loaded modules, and includes multi-line output:
+Following example demonstrates how to interactivelly list all currently loaded modules, and includes multi-line output:
 
 .. code-block:: lua
 
