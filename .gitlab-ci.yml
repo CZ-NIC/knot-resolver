@@ -15,7 +15,7 @@ variables:
   LIBKRES_NAME: libkres
   MESON_TEST: meson test -C build_ci* -t 4 --print-errorlogs
   PREFIX: $CI_PROJECT_DIR/.local
-  GIT_COMMITER_NAME: 'ci'
+  GIT_COMMITTER_NAME: 'ci'
   EMAIL: 'ci@nic'
 
 image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-$KNOT_VERSION
