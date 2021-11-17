@@ -94,7 +94,7 @@ static uint8_t get_lowest_rank(const struct kr_query *qry, const knot_dname_t *n
 		/* ^ TODO: performance?  TODO: stype - call sites */
 		if (ta_covers) {
 			return KR_RANK_INSECURE | KR_RANK_AUTH;
-		} /* else falltrhough */
+		} /* else fallthrough */
 	}
 	return KR_RANK_INITIAL | KR_RANK_AUTH;
 }
