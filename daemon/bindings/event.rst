@@ -50,7 +50,7 @@ For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
       local interval = 1 * minute
       event.after(1 * minute, function (ev)
          print('Good morning!')
-         -- Halven the interval for each iteration
+         -- Halve the interval for each iteration
          interval = interval / 2
          event.reschedule(ev, interval)
       end)
