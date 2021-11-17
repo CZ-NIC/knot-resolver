@@ -7,7 +7,7 @@ Dnstap (traffic collection)
 
 The ``dnstap`` module supports logging DNS requests and responses to a unix
 socket in `dnstap format <https://dnstap.info>`_ using fstrm framing library.
-This logging is useful if you need effectivelly log all DNS traffic.
+This logging is useful if you need effectively log all DNS traffic.
 
 The unix socket and the socket reader must be present before starting resolver instances.
 

@@ -544,13 +544,13 @@ Secondly, after disabling DNSSEC validation you have to solve another issue
 caused by grafting. For example, if you grafted your own top-level domain
 ``example.`` onto the public DNS namespace, at some point the root server might
 send proof-of-nonexistence proving e.g. that there are no other top-level
-domain in between names ``events.`` and ``exchange.``, effectivelly proving
+domain in between names ``events.`` and ``exchange.``, effectively proving
 non-existence of ``example.``.
 
 These proofs-of-nonexistence protect public DNS from spoofing but break
 *grafted* domains because proofs will be latter used by resolver
 (when the positive records for the grafted domain timeout from cache),
-effectivelly making grafted domain unavailable.
+effectively making grafted domain unavailable.
 The easiest work-around is to disable reading from cache for grafted domains.
 
 .. code-block:: lua
