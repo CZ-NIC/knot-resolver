@@ -104,8 +104,8 @@ static inline bool kr_assert_func(bool result, const char *expr, const char *fun
 	knot_rrtype_to_string((rrtype), rrtype_str, sizeof(rrtype_str)); \
 	rrtype_str[sizeof(rrtype_str) - 1] = 0;
 
-// Use this for alocations with mm.
-// Use mm_alloc for alocations into mempool
+// Use this for allocations with mm.
+// Use mm_alloc for allocations into mempool
 
 /** A strcmp() variant directly usable for qsort() on an array of strings. */
 static inline int strcmp_p(const void *p1, const void *p2)
