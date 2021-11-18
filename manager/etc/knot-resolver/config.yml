@@ -12,5 +12,4 @@ server:
   management:
     listen:
       unix-socket: /run/knot-resolver/manager.sock
-    log-level: DEBUG
     rundir: /run/knot-resolver

@@ -6,6 +6,7 @@ from knot_resolver_manager.utils.types import LiteralEnum
 LogLevelEnum = LiteralEnum["crit", "err", "warning", "notice", "info", "debug"]
 LogTargetEnum = LiteralEnum["syslog", "stderr", "stdout"]
 LogGroupsEnum = LiteralEnum[
+    "manager",
     "system",
     "cache",
     "io",
