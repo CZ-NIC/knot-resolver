@@ -13,5 +13,4 @@ server:
     listen:
       ip: 127.0.0.1
       port: 5000
-    log-level: DEBUG
     rundir: etc/knot-resolver/runtime

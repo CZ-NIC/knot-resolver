@@ -212,7 +212,9 @@ log_level('{{ cfg.logging.level }}')
 {% if cfg.logging.groups %}
 log_groups({
 {% for g in cfg.logging.groups %}
+{% if g != "manager" %}
     '{{ g }}',
+{% endif %}
 {% endfor %}
 })
 {% endif %}

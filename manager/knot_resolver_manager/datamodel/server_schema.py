@@ -32,7 +32,6 @@ def _cpu_count() -> int:
 
 
 BackendEnum = LiteralEnum["auto", "systemd", "supervisord"]
-LogLevelEnum = LiteralEnum["CRITICAL", "FATAL", "ERROR", "WARN", "WARNING", "INFO", "DEBUG"]
 
 
 class ManagementSchema(SchemaNode):
@@ -44,7 +43,6 @@ class ManagementSchema(SchemaNode):
     listen: Listen = Listen({"unix-socket": "./manager.sock"})
     backend: BackendEnum = "auto"
     rundir: AnyPath = AnyPath(".")
-    log_level: LogLevelEnum = "INFO"
 
 
 class WebmgmtSchema(SchemaNode):
