@@ -9,7 +9,7 @@ server:
     listen:
       ip: 127.0.0.1
       port: 5001
-    rundir: integration/run
+    rundir: tests/integration/run
 cache:
   storage: cache
 logging:

@@ -18,7 +18,7 @@ set +e
 
 # check formatting using black
 echo -e "${yellow}Checking formatting using black...${reset}"
-black knot_resolver_manager tests integration scripts --check --diff
+black knot_resolver_manager tests scripts --check --diff
 check_rv $?
 echo
 

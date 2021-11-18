@@ -47,6 +47,10 @@ git config --global user.email "ci@knot-resolver"
 git config --global user.name "GitLab CI"
 git checkout manager-integration
 git submodule update --init --recursive
+cd manager
+git checkout master
+cd ..
+git commit -a -m "auto-update of knot-resolver's manager to the latest master branch"
 
 # build the package
 apkg system-setup
