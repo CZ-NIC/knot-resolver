@@ -148,12 +148,25 @@ class Server:
         )
 
     def _set_log_level(self, config: KresConfig):
-        if self.log_level != config.server.management.log_level:
+
+        levels_map = {
+            "crit": "CRITICAL",
+            "err": "ERROR",
+            "warning": "WARNING",
+            "notice": "WARNING",
+            "info": "INFO",
+            "debug": "DEBUG",
+        }
+
+        target = levels_map[config.logging.level]
+        if config.logging.groups and "manager" in config.logging.groups:
+            target = "DEBUG"
+
+        if self.log_level != target:
             # expects one existing log handler on the root
             h = logging.getLogger().handlers
             assert len(h) == 1
-            target = config.server.management.log_level
-            logger.warning(f"Changing log level to '{target}'")
+            logger.warning(f"Changing logging level to '{target}'")
             h[0].setLevel(target)
             self.log_level = target
 
