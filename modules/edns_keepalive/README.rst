@@ -19,4 +19,4 @@ unloaded using standard means:
 
 .. code-block:: lua
 
-        modules.load('edns_keepalive')
+        modules.unload('edns_keepalive')
