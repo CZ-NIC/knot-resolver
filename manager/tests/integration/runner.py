@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def test_wrapper(test: Test) -> bool:
-    p = start_manager_in_background(Path("integration/config.yml"))
+    p = start_manager_in_background(Path("tests/integration/config.yml"))
     client = KnotManagerClient(BASE_URL)
     client.wait_for_initialization()
 
@@ -64,7 +64,7 @@ def crash_resistance(client: KnotManagerClient):
     assert cnt == 2, f"Expected 2 kresd instances, found {cnt}"
 
     # start the server again
-    p = start_manager_in_background(Path("integration/config.yml"))
+    p = start_manager_in_background(Path("test/integration/config.yml"))
     try:
         client.wait_for_initialization()
     except TimeoutError as e:
@@ -83,7 +83,14 @@ def crash_resistance(client: KnotManagerClient):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
+
+    # create run directories if it does not exist
+    Path("tests/integration/run").mkdir(exist_ok=True)
+
+    # run the tests
     success = True
     success &= test_wrapper(worker_count)
     # success &= test_wrapper(crash_resistance)
+
+    # exit with proper exitcode
     sys.exit(int(not success))

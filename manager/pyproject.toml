@@ -39,9 +39,9 @@ pylint = "^2.11.1"
 run = { cmd = "scripts/run", help = "Run the manager" }
 run-debug = { cmd = "scripts/run-debug", help = "Run the manager under debugger" }
 docs = { cmd = "scripts/docs", help = "Create HTML documentation" }
-test = { cmd = "pytest --cov=knot_resolver_manager --show-capture=all tests/", help = "Run tests" }
+test = { cmd = "pytest --cov=knot_resolver_manager --show-capture=all tests/unit/", help = "Run tests" }
 check = { cmd = "scripts/codecheck", help = "Run static code analysis" }
-format = { shell = "black knot_resolver_manager/ tests/ integration/ scripts/; isort .", help = "Run code formatter" }
+format = { shell = "black knot_resolver_manager/ tests/ scripts/; isort .", help = "Run code formatter" }
 fixdeps = { shell = "poetry install; npm install; npm update", help = "Install/update dependencies according to configuration files"}
 commit = { shell = "scripts/commit", help = "Invoke every single check before commiting" }
 container = { cmd = "scripts/container.py", help = "Manage containers" }
@@ -56,7 +56,7 @@ clean = """
 """
 gen-setuppy = { shell = "python scripts/create_setup.py > setup.py", help = "Generate setup.py file for backwards compatibility" }
 tox = { cmd = "tox", help = "Run tests in tox" }
-integration = {cmd = "python integration/runner.py", help = "Run integration tests" }
+integration = {cmd = "python tests/integration/runner.py", help = "Run integration tests" }
 configure-vscode = {cmd = "scripts/configure-vscode", help = "Create VSCode configuration for debugging, virtual envs etc" }
 
 
