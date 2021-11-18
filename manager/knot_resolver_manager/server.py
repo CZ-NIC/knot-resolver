@@ -21,6 +21,7 @@ from knot_resolver_manager.exceptions import DataException, KresdManagerExceptio
 from knot_resolver_manager.kresd_controller import get_controller_by_name
 from knot_resolver_manager.kresd_controller.interface import SubprocessController
 from knot_resolver_manager.utils.async_utils import readfile
+from knot_resolver_manager.utils.functional import Result
 from knot_resolver_manager.utils.parsing import ParsedTree, parse, parse_yaml
 from knot_resolver_manager.utils.types import NoneType
 
@@ -242,11 +243,7 @@ async def _init_config_store(config: Union[Path, ParsedTree, _DefaultSentinel]) 
         config = DEFAULT_MANAGER_CONFIG_FILE
     if isinstance(config, Path):
         if not config.exists():
-            logger.error(
-                "Manager is configured to load config file at %s on startup, but the file does not exist.",
-                config,
-            )
-            sys.exit(1)
+            raise KresdManagerException(f"Manager is configured to load config file at {config} on startup, but the file does not exist.")
         else:
             logger.info("Loading initial configuration from %s", config)
             config = parse_yaml(await readfile(config))
@@ -263,34 +260,48 @@ async def _init_manager(config_store: ConfigStore) -> KresManager:
     """
     Called asynchronously when the application initializes.
     """
-    try:
-        # if configured, create a subprocess controller manually
-        controller: Optional[SubprocessController] = None
-        if config_store.get().server.management.backend != "auto":
-            controller = await get_controller_by_name(config_store.get(), config_store.get().server.management.backend)
+    # if configured, create a subprocess controller manually
+    controller: Optional[SubprocessController] = None
+    if config_store.get().server.management.backend != "auto":
+        controller = await get_controller_by_name(config_store.get(), config_store.get().server.management.backend)
 
-        # Create KresManager. This will perform autodetection of available service managers and
-        # select the most appropriate to use (or use the one configured directly)
-        manager = await KresManager.create(controller, config_store)
+    # Create KresManager. This will perform autodetection of available service managers and
+    # select the most appropriate to use (or use the one configured directly)
+    manager = await KresManager.create(controller, config_store)
 
-        logger.info("Initial configuration applied. Process manager initialized...")
-        return manager
-    except BaseException:
-        logger.error("Manager initialization failed... Shutting down!", exc_info=True)
-        sys.exit(1)
+    logger.info("Initial configuration applied. Process manager initialized...")
+    return manager
 
 
-def _set_working_directory(config: KresConfig):
+async def _validate_working_directory(config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
+    if config_old.server.management.rundir != config_new.server.management.rundir:
+        return Result.err("Changing manager's `rundir` during runtime is not allowed.")
+    
+    if not config_new.server.management.rundir.to_path().exists():
+        return Result.err(f"Configured `rundir` directory ({config_new.server.management.rundir}) does not exist!")
+
+    return Result.ok(None)
+
+
+async def _set_working_directory(config: KresConfig):
     os.chdir(config.server.management.rundir.to_path())
 
 
 async def start_server(config: Union[Path, ParsedTree, _DefaultSentinel] = _DEFAULT_SENTINEL):
     start_time = time()
 
-    # before starting server, initialize the subprocess controller etc.
-    config_store = await _init_config_store(config)
-    _set_working_directory(config_store.get())
-    manager = await _init_manager(config_store)
+    # before starting server, initialize the subprocess controller etc. Any errors during inicialization are fatal
+    try:
+        config_store = await _init_config_store(config)
+        await config_store.register_verifier(_validate_working_directory)
+        await config_store.register_on_change_callback(_set_working_directory)
+        manager = await _init_manager(config_store)
+    except KresdManagerException as e:
+        logger.error(e)
+        sys.exit(1)
+    except BaseException as e:
+        logger.error("Uncaught generic exception during manager inicialization..." , exc_info=True)
+        sys.exit(1)
 
     server = Server(config_store)
     await server.start()

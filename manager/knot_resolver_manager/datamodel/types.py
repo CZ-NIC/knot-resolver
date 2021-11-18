@@ -115,8 +115,11 @@ class AnyPath(CustomValueType):
     def __str__(self) -> str:
         return str(self._value)
 
-    def __eq__(self, _o: object) -> bool:
-        raise RuntimeError("Path's cannot be simply compared for equality")
+    def __eq__(self, o: object) -> bool:
+        if not isinstance(o, AnyPath):
+            return False
+        
+        return o._value == self._value
 
     def __int__(self) -> int:
         raise RuntimeError("Path cannot be converted to type <int>")
