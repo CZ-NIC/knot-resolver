@@ -36,7 +36,7 @@ A *filter* selects which queries will be affected by specified Actions_. There a
 
    .. code-block:: lua
 
-      policy.add(policy.domain(policy.DENY, policy.todnames({'example.com', 'example.net'})))
+      policy.add(policy.domains(policy.DENY, policy.todnames({'example.com', 'example.net'})))
 
 .. function:: pattern(action, pattern)
 
@@ -50,7 +50,7 @@ A *filter* selects which queries will be affected by specified Actions_. There a
 
    .. code-block:: lua
 
-      policy.suffix(policy.DENY, policy.todnames({'example.com', 'example.net'}))
+      policy.add(policy.suffix(policy.DENY, policy.todnames({'example.com', 'example.net'})))
 
 .. function:: suffix_common(action, suffix_table[, common_suffix])
 
