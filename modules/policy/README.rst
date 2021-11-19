@@ -28,6 +28,16 @@ A *filter* selects which queries will be affected by specified Actions_. There a
 
    Always applies the action.
 
+.. function:: domain(action, domain)
+
+   Applies the action if query name matches the provided domain name.
+
+.. note:: For speed this filter requires a domain name in DNS wire format, not textual representation, so each label in the name must be prefixed with its length. Always use convenience function :func:`todname` for automatic conversion from a string! For example:
+
+   .. code-block:: lua
+
+      policy.domain(policy.DENY, todname('example.com'))
+
 .. function:: pattern(action, pattern)
 
    Applies the action if query name matches a `Lua regular expression <http://lua-users.org/wiki/PatternsTutorial>`_.
