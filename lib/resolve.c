@@ -699,6 +699,27 @@ static int resolve_query(struct kr_request *request, const knot_pkt_t *packet)
 	return request->state;
 }
 
+knot_rrset_t* kr_request_ensure_edns(struct kr_request *request)
+{
+	kr_require(request && request->answer && request->qsource.packet && request->ctx);
+	knot_pkt_t* answer = request->answer;
+	bool want_edns = knot_pkt_has_edns(request->qsource.packet);
+	if (!want_edns) {
+		kr_assert(!answer->opt_rr);
+		return answer->opt_rr;
+	} else if (answer->opt_rr) {
+		return answer->opt_rr;
+	}
+
+	kr_assert(request->ctx->downstream_opt_rr);
+	answer->opt_rr = knot_rrset_copy(request->ctx->downstream_opt_rr, &answer->mm);
+	if (!answer->opt_rr)
+		return NULL;
+	if (knot_pkt_has_dnssec(request->qsource.packet))
+		knot_edns_set_do(answer->opt_rr);
+	return answer->opt_rr;
+}
+
 knot_pkt_t *kr_request_ensure_answer(struct kr_request *request)
 {
 	if (request->answer)
@@ -749,14 +770,8 @@ knot_pkt_t *kr_request_ensure_answer(struct kr_request *request)
 	}
 
 	// Prepare EDNS if required.
-	if (knot_pkt_has_edns(qs_pkt)) {
-		answer->opt_rr = knot_rrset_copy(request->ctx->downstream_opt_rr,
-						 &answer->mm);
-		if (!answer->opt_rr)
-			goto enomem; // answer is on mempool, so "leak" is OK
-		if (knot_pkt_has_dnssec(qs_pkt))
-			knot_edns_set_do(answer->opt_rr);
-	}
+	if (knot_pkt_has_edns(qs_pkt) && kr_fails_assert(kr_request_ensure_edns(request)))
+		goto enomem; // answer is on mempool, so "leak" is OK
 
 	return request->answer;
 enomem:

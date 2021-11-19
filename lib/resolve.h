@@ -273,6 +273,15 @@ KR_EXPORT
 int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx);
 
 /**
+ * Ensure that request->answer->opt_rr is present if query has EDNS.
+ *
+ * This function should be used after clearing a response packet to ensure its
+ * opt_rr is properly set. Returns the opt_rr (for convenience) or NULL.
+ */
+KR_EXPORT
+knot_rrset_t * kr_request_ensure_edns(struct kr_request *request);
+
+/**
  * Ensure that request->answer is usable, and return it (for convenience).
  *
  * It may return NULL, in which case it marks ->state with _FAIL and no answer will be sent.

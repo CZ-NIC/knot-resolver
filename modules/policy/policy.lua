@@ -654,6 +654,7 @@ local function answer_clear(req)
 	local pkt = req:ensure_answer()
 	if pkt == nil then return nil end
 	pkt:clear_payload()
+	req:ensure_edns()
 	return pkt
 end
 
