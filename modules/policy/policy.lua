@@ -621,7 +621,7 @@ function policy.slice_randomize_psl(seed)
 			rand_seed = rand_seed + reg_domain:byte(i)
 		end
 
-		-- use lineral congruential generator with values from ANSI C
+		-- use linear congruential generator with values from ANSI C
 		rand_seed = rand_seed % 0x80000000  -- ensure seed is positive 32b int
 		local rand = (1103515245 * rand_seed + 12345) % 0x10000
 		return 1 + rand % length
