@@ -236,9 +236,9 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	/* Cut that has been found can differs from cut that has been requested.
 	 * So if not already insecure,
 	 * try to fetch ta & keys even if initial cut name not covered by TA */
-	bool secured = !is_insecure;
+	bool secure = !is_insecure;
 	int ret = kr_zonecut_find_cached(req->ctx, &cut_found, requested_name,
-					 qry, &secured);
+					 qry, &secure);
 	if (ret == kr_error(ENOENT)) {
 		/* No cached cut found, start from SBELT
 		 * and issue priming query. */
@@ -257,7 +257,7 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 
 	/* Find out security status.
 	 * Go insecure if the zone cut is provably insecure */
-	if ((qry->flags.DNSSEC_WANT) && !secured) {
+	if ((qry->flags.DNSSEC_WANT) && !secure) {
 		VERBOSE_MSG(qry, "=> NS is provably without DS, going insecure\n");
 		qry->flags.DNSSEC_WANT = false;
 		qry->flags.DNSSEC_INSECURE = true;
