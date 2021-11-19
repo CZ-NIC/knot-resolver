@@ -903,7 +903,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 		 * It can be
 		 * 1) either successful rehandshake; in this case peer
 		 *    must be already in the connected list.
-		 * 2) or successful handshake with session, which was timeouted
+		 * 2) or successful handshake with session, which was timed out
 		 *    by on_tcp_connect_timeout(); after successful tcp connection;
 		 *    in this case peer isn't in the connected list.
 		 **/
@@ -981,17 +981,17 @@ static void on_connect(uv_connect_t *req, int status)
 	const bool log_debug = kr_log_is_debug(WORKER, NULL);
 
 	/* Check if the connection is in the waiting list.
-	 * If no, most likely this is timeouted connection
+	 * If no, most likely this is timed out connection
 	 * which was removed from waiting list by
 	 * on_tcp_connect_timeout() callback. */
 	struct session *s = worker_find_tcp_waiting(worker, peer);
 	if (!s || s != session) {
 		/* session isn't on the waiting list.
-		 * it's timeouted session. */
+		 * it's timed out session. */
 		if (log_debug) {
 			const char *peer_str = kr_straddr(peer);
 			kr_log_debug(WORKER, "=> connected to '%s', but session "
-					"is already timeouted, close\n",
+					"is already timed out, close\n",
 					peer_str ? peer_str : "");
 		}
 		kr_assert(session_tasklist_is_empty(session));
@@ -1123,7 +1123,7 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 	 * for this request.
 	 * So connection callback (on_connect()) must check
 	 * if connection is in the list of waiting connection.
-	 * If no, most likely this is timeouted connection even if
+	 * If no, most likely this is timed out connection even if
 	 * it was successful. */
 }
 

@@ -86,23 +86,23 @@ static inline bool no6_is_bad(void)
 	return no6_est.len_used == NO6_PREFIX_COUNT;
 }
 
-static void no6_timeouted(const struct kr_query *qry, const uint8_t *addr)
+static void no6_timed_out(const struct kr_query *qry, const uint8_t *addr)
 {
 	if (no6_is_bad()) { // we can't get worse
-		VERBOSE_MSG(qry, "NO6: timeouted, but bad already\n");
+		VERBOSE_MSG(qry, "NO6: timed out, but bad already\n");
 		return;
 	}
 	// If we have the address already, do nothing.
 	for (int i = 0; i < no6_est.len_used; ++i) {
 		if (memcmp(addr, no6_est.addr_prefixes[i], NO6_PREFIX_BYTES) == 0) {
-			VERBOSE_MSG(qry, "NO6: timeouted, repeated prefix, timeouts %d/%d\n",
+			VERBOSE_MSG(qry, "NO6: timed out, repeated prefix, timeouts %d/%d\n",
 					no6_est.len_used, (int)NO6_PREFIX_COUNT);
 			return;
 		}
 	}
 	// Append!
 	memcpy(no6_est.addr_prefixes[no6_est.len_used++], addr, NO6_PREFIX_BYTES);
-	VERBOSE_MSG(qry, "NO6: timeouted, appended, timeouts %d/%d\n",
+	VERBOSE_MSG(qry, "NO6: timed out, appended, timeouts %d/%d\n",
 			no6_est.len_used, (int)NO6_PREFIX_COUNT);
 }
 
@@ -587,7 +587,7 @@ static void cache_timeout(const struct kr_query *qry, const struct kr_transport 
 
 	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
 	if (transport->address_len == sizeof(struct in6_addr))
-		no6_timeouted(qry, address);
+		no6_timed_out(qry, address);
 
 	struct rtt_state old_state = addr_state->rtt_state;
 	struct rtt_state cur_state =

@@ -497,7 +497,7 @@ Bugfixes
 
 Improvements
 ------------
-- improve handling of timeouted outgoing TCP connections (!734)
+- improve handling of timed out outgoing TCP connections (!734)
 - trust_anchors: check syntax of public keys in DNSKEY RRs (!748)
 - validator: clarify message about bogus non-authoritative data (!735)
 - dnssec validation failures contain more verbose reasoning (!735)
@@ -1025,7 +1025,7 @@ Bugfixes
 - trust anchors: support non-root TAs, one domain per file
 - policy.DENY: set AA flag and clear AD flag
 - lib/resolve: avoid unnecessary DS queries
-- lib/nsrep: don't treat servers with NOIP4 + NOIP6 flags as timeouted
+- lib/nsrep: don't treat servers with NOIP4 + NOIP6 flags as timed out
 - layer/iterate: During packet classification (answer vs. referral)
   don't analyze AUTHORITY section in authoritative answer if ANSWER
   section contains records that have been requested
