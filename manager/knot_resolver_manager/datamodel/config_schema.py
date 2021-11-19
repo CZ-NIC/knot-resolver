@@ -14,6 +14,7 @@ from knot_resolver_manager.datamodel.options_schema import OptionsSchema
 from knot_resolver_manager.datamodel.server_schema import ServerSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
+from knot_resolver_manager.datamodel.forward_zone import ForwardZoneSchema
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.utils import SchemaNode
 
@@ -37,6 +38,7 @@ class KresConfig(SchemaNode):
         static_hints: StaticHintsSchema = StaticHintsSchema()
         views: Optional[List[ViewSchema]] = None
         stub_zones: Optional[List[StubZoneSchema]] = None
+        forward_zones: Optional[List[ForwardZoneSchema]] = None
         cache: CacheSchema = CacheSchema()
         dnssec: Union[bool, DnssecSchema] = True
         dns64: Union[bool, Dns64Schema] = False
@@ -51,6 +53,7 @@ class KresConfig(SchemaNode):
     static_hints: StaticHintsSchema
     views: Optional[List[ViewSchema]]
     stub_zones: Optional[List[StubZoneSchema]]
+    forward_zones: Optional[List[ForwardZoneSchema]]
     cache: CacheSchema
     dnssec: Union[Literal[False], DnssecSchema]
     dns64: Union[Literal[False], Dns64Schema]
