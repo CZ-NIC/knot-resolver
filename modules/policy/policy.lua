@@ -345,10 +345,13 @@ function policy.all(action)
 end
 
 -- Requests whose QNAME is exactly the provided domain
-function policy.domain(action, dname)
+function policy.domains(action, dname_list)
 	return function(_, query)
-		if query:name() == dname then
-			return action
+		local qname = query:name()
+		for i, dname in ipairs(dname_list) do
+			if ffi.C.knot_dname_is_equal(qname, dname) then
+				return action
+			end
 		end
 		return nil
 	end
