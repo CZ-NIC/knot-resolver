@@ -348,7 +348,7 @@ end
 function policy.domains(action, dname_list)
 	return function(_, query)
 		local qname = query:name()
-		for i, dname in ipairs(dname_list) do
+		for _, dname in ipairs(dname_list) do
 			if ffi.C.knot_dname_is_equal(qname, dname) then
 				return action
 			end
