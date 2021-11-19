@@ -1039,7 +1039,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			VERBOSE_MSG(qry, "<= cached insecure response, going insecure\n");
 			ctx->state = KR_STATE_DONE;
 		} else if (ctx->state == KR_STATE_YIELD) {
-			/* Transition to unsecure state
+			/* Transition to insecure state
 			   occurred during revalidation.
 			   if state remains YIELD, answer will not be cached.
 			   Let cache layers to work. */
@@ -1190,7 +1190,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 					/* Could not return from here,
 					 * we must continue, validate NSEC\NSEC3 and
 					 * call update_parent_keys() to mark
-					 * parent queries as insecured */
+					 * parent queries as insecure */
 				} else {
 					VERBOSE_MSG(qry, "<= bad NODATA proof\n");
 					qry->flags.DNSSEC_BOGUS = true;

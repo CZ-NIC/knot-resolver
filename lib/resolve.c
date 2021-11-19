@@ -207,19 +207,19 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 			struct kr_request *req, knot_pkt_t *pkt)
 {
 	/* It can occur that here parent query already have
-	 * provably insecured zonecut which not in the cache yet. */
+	 * provably insecure zonecut which not in the cache yet. */
 	struct kr_qflags pflags;
 	if (qry->parent) {
 		pflags = qry->parent->flags;
 	}
-	const bool is_insecured = qry->parent != NULL
+	const bool is_insecure = qry->parent != NULL
 		&& !(pflags.AWAIT_IPV4 || pflags.AWAIT_IPV6)
 		&& (pflags.DNSSEC_INSECURE || pflags.DNSSEC_NODS);
 
 	/* Want DNSSEC if it's possible to secure this name
 	 * (e.g. is covered by any TA) */
-	if (is_insecured) {
-		/* If parent is unsecured we don't want DNSSEC
+	if (is_insecure) {
+		/* If parent is insecure we don't want DNSSEC
 		 * even if cut name is covered by TA. */
 		qry->flags.DNSSEC_WANT = false;
 		qry->flags.DNSSEC_INSECURE = true;
@@ -234,9 +234,9 @@ static int ns_fetch_cut(struct kr_query *qry, const knot_dname_t *requested_name
 	struct kr_zonecut cut_found;
 	kr_zonecut_init(&cut_found, requested_name, req->rplan.pool);
 	/* Cut that has been found can differs from cut that has been requested.
-	 * So if not already insecured,
+	 * So if not already insecure,
 	 * try to fetch ta & keys even if initial cut name not covered by TA */
-	bool secured = !is_insecured;
+	bool secured = !is_insecure;
 	int ret = kr_zonecut_find_cached(req->ctx, &cut_found, requested_name,
 					 qry, &secured);
 	if (ret == kr_error(ENOENT)) {

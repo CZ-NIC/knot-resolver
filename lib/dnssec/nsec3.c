@@ -628,9 +628,9 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
 		 * Satisfies RFC5155 8.6 (QTYPE == DS), 2nd paragraph.
 		 * Also satisfies ERRATA 3441 8.5 (QTYPE != DS), 3rd paragraph.
 		 * - (wildcard) empty nonterminal
-		 * derived from unsecure delegation.
+		 * derived from insecure delegation.
 		 * Denial of existence can not be proven.
-		 * Set error code to proceed unsecure.
+		 * Set error code to proceed insecure.
 		 */
 		ret = kr_error(KNOT_ERANGE);
 	}
