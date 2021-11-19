@@ -497,7 +497,7 @@ Bugfixes
 
 Improvements
 ------------
-- improve handling of timeouted outgoing TCP connections (!734)
+- improve handling of timed out outgoing TCP connections (!734)
 - trust_anchors: check syntax of public keys in DNSKEY RRs (!748)
 - validator: clarify message about bogus non-authoritative data (!735)
 - dnssec validation failures contain more verbose reasoning (!735)
@@ -589,7 +589,7 @@ Incompatible changes
 - DNS cookie module (RFC 7873) is not available in this release,
   it will be later reworked to reflect development in IEFT dnsop working group
 - version module was permanently removed because it was not really used by users;
-  if you want to receive notifications abou new releases please subscribe to
+  if you want to receive notifications about new releases please subscribe to
   https://lists.nic.cz/cgi-bin/mailman/listinfo/knot-resolver-announce
 
 Bugfixes
@@ -600,7 +600,7 @@ Bugfixes
 Improvements
 ------------
 - reorder_RR() implementation is brought back
-- bring in performace improvements provided by libknot 2.7
+- bring in performance improvements provided by libknot 2.7
 - cache.clear() has a new, more powerful API
 - cache documentation was improved
 - old name "Knot DNS Resolver" is replaced by unambiguous "Knot Resolver"
@@ -634,7 +634,7 @@ Incompatible changes
 
 Security
 --------
-- fix a rare case of zones incorrectly dowgraded to insecure status (!576)
+- fix a rare case of zones incorrectly downgraded to insecure status (!576)
 
 New features
 ------------
@@ -678,7 +678,7 @@ Bugfixes
 --------
 - validation: fix SERVFAIL in case of CNAME to NXDOMAIN in a single zone (!538)
 - validation: fix SERVFAIL for DS . query (!544)
-- lib/resolve: don't send unecessary queries to parent zone (!513)
+- lib/resolve: don't send unnecessary queries to parent zone (!513)
 - iterate: fix validation for zones where parent and child share NS (!543)
 - TLS: improve error handling and documentation (!536, !555, !559)
 
@@ -1025,7 +1025,7 @@ Bugfixes
 - trust anchors: support non-root TAs, one domain per file
 - policy.DENY: set AA flag and clear AD flag
 - lib/resolve: avoid unnecessary DS queries
-- lib/nsrep: don't treat servers with NOIP4 + NOIP6 flags as timeouted
+- lib/nsrep: don't treat servers with NOIP4 + NOIP6 flags as timed out
 - layer/iterate: During packet classification (answer vs. referral)
   don't analyze AUTHORITY section in authoritative answer if ANSWER
   section contains records that have been requested
@@ -1059,7 +1059,7 @@ Bugfixes
 - lua: do *not* truncate cache size to unsigned
 - forwarding mode: correctly forward +cd flag
 - fix a potential memory leak
-- don't treat answers that contain DS non-existance proof as insecure
+- don't treat answers that contain DS non-existence proof as insecure
 - don't store NSEC3 and their signatures in the cache
 - layer/iterate: when processing delegations, check if qname is at or
   below new authority
@@ -1129,7 +1129,7 @@ Improvements:
 - hints module: previously /etc/hosts was loaded by default, but not anymore.
   Users can now actually avoid loading any file.
 - DNS over TLS now creates ephemeral certs.
-- Configurable cache.{min,max}_tll option, with max_ttl defaulting to 6 days.
+- Configurable cache.{min,max}_ttl option, with max_ttl defaulting to 6 days.
 - Option to reorder RRs in the response.
 - New policy.QTRACE policy to print packet contents
 

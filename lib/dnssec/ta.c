@@ -105,7 +105,7 @@ int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,
 		return kr_error(EINVAL);
 	}
 
-	/* DS/DNSEY types are accepted, for DNSKEY we
+	/* DS/DNSKEY types are accepted, for DNSKEY we
 	 * need to compute a DS digest. */
 	if (type == KNOT_RRTYPE_DS) {
 		return insert_ta(trust_anchors, name, ttl, rdata, rdlen);

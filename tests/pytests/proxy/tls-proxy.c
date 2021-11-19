@@ -156,7 +156,7 @@ static inline char *ip_straddr(const struct sockaddr_storage *saddr_storage)
 {
 	assert(saddr_storage != NULL);
 	const struct sockaddr *addr = (const struct sockaddr *)saddr_storage;
-	/* We are the sinle-threaded application */
+	/* We are the single-threaded application */
 	static char str[INET6_ADDRSTRLEN + 6];
 	size_t len = sizeof(str);
 	int ret = ip_addr_str(addr, str, &len);

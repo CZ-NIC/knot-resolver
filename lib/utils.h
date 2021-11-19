@@ -66,7 +66,7 @@ typedef void (*trace_log_f)(const struct kr_request *request, const char *msg);
 /** Whether kr_assert() and kr_fails_assert() checks should abort. */
 KR_EXPORT extern bool kr_dbg_assertion_abort;
 
-/** How often kr_asert() should fork the process before issuing abort (if configured).
+/** How often kr_assert() should fork the process before issuing abort (if configured).
  *
  * This can be useful for debugging rare edge-cases in production.
  * if (kr_debug_assertion_abort && kr_debug_assertion_fork), it is
@@ -104,8 +104,8 @@ static inline bool kr_assert_func(bool result, const char *expr, const char *fun
 	knot_rrtype_to_string((rrtype), rrtype_str, sizeof(rrtype_str)); \
 	rrtype_str[sizeof(rrtype_str) - 1] = 0;
 
-// Use this for alocations with mm.
-// Use mm_alloc for alocations into mempool
+// Use this for allocations with mm.
+// Use mm_alloc for allocations into mempool
 
 /** A strcmp() variant directly usable for qsort() on an array of strings. */
 static inline int strcmp_p(const void *p1, const void *p2)
@@ -283,7 +283,7 @@ int kr_ntop_str(int family, const void *src, uint16_t port, char *buf, size_t *b
 static inline char *kr_straddr(const struct sockaddr *addr)
 {
 	if (kr_fails_assert(addr)) return NULL;
-	/* We are the sinle-threaded application */
+	/* We are the single-threaded application */
 	static char str[INET6_ADDRSTRLEN + 1 + 5 + 1];
 	size_t len = sizeof(str);
 	int ret = kr_inaddr_str(addr, str, &len);

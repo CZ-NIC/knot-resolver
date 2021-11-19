@@ -14,7 +14,7 @@ addr_port = {}
 outfile = io.open(out, 'w')
 
 if outfile == nil then
-	-- this is technicaly an error, but upgrade script shouldn't fail in scriptlets
+	-- this is technically an error, but upgrade script shouldn't fail in scriptlets
 	os.exit(0)  -- make no changes and exit
 end
 

@@ -230,7 +230,7 @@ static inline struct ucw_allocator *mp_get_allocator(struct mempool *mp)
  * you can grow it incrementally to needed size. You can grow only
  * one buffer at a time on a given mempool.
  *
- * Similar functionality is provided by <<growbuf:,growing buffes>> module.
+ * Similar functionality is provided by <<growbuf:,growing buffers>> module.
  ***/
 
 /* For internal use only, do not call directly */

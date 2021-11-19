@@ -25,7 +25,7 @@ For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
 
    :return: event id
 
-   Execute function immediatelly and then periodically after each ``interval``.
+   Execute function immediately and then periodically after each ``interval``.
 
    Example:
 
@@ -50,7 +50,7 @@ For example, ``5 * hour`` represents five hours, or 5*60*60*100 milliseconds.
       local interval = 1 * minute
       event.after(1 * minute, function (ev)
          print('Good morning!')
-         -- Halven the interval for each iteration
+         -- Halve the interval for each iteration
          interval = interval / 2
          event.reschedule(ev, interval)
       end)
@@ -120,7 +120,7 @@ Example:
 
      function async_print(testname, sleep)
              log(testname .. ': system time before sleep' .. tostring(os.time())
-             worker.sleep(sleep)  -- other corroutines continue execution now
+             worker.sleep(sleep)  -- other coroutines continue execution now
              log(testname .. ': system time AFTER sleep' .. tostring(os.time())
      end
 

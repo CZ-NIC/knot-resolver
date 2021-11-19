@@ -10,7 +10,7 @@ local rz_default_interval = 86400
 local rz_https_fail_interval = 600
 local rz_import_error_interval = 600
 local rz_cur_interval = rz_default_interval
-local rz_interval_randomizator_limit = 10
+local rz_interval_randomizer_limit = 10
 local rz_interval_threshold = 5
 local rz_interval_min = 3600
 
@@ -18,7 +18,7 @@ local rz_first_try = true
 
 local prefill = {}
 
--- hack for circular depedency between timer() and fill_cache()
+-- hack for circular dependency between timer() and fill_cache()
 local forward_references = {}
 
 local function stop_timer()
@@ -109,7 +109,7 @@ function forward_references.fill_cache()
 		local ok, errmsg = pcall(download, rz_url, rz_local_fname)
 		if not ok then
 			rz_cur_interval = rz_https_fail_interval
-						- math.random(rz_interval_randomizator_limit)
+						- math.random(rz_interval_randomizer_limit)
 			log_info(ffi.C.LOG_GRP_PREFILL, "cannot download new zone (%s), "
 				.. "will retry root zone download in %s",
 				errmsg, display_delay(rz_cur_interval))
@@ -128,14 +128,14 @@ function forward_references.fill_cache()
 			rz_cur_interval = 1
 		else
 			rz_cur_interval = rz_import_error_interval
-				- math.random(rz_interval_randomizator_limit)
+				- math.random(rz_interval_randomizer_limit)
 		end
 		log_info(ffi.C.LOG_GRP_PREFILL, "root zone import failed (%s), retry in %s",
 			errmsg, display_delay(rz_cur_interval))
 	else
 		-- re-download before TTL expires
 		rz_cur_interval = (file_ttl - rz_interval_threshold
-					- math.random(rz_interval_randomizator_limit))
+					- math.random(rz_interval_randomizer_limit))
 		log_info(ffi.C.LOG_GRP_PREFILL, "root zone refresh in %s",
 			display_delay(rz_cur_interval))
 	end

@@ -759,7 +759,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			   ((query->stype == KNOT_RRTYPE_DS) ||
 			    (query->stype == KNOT_RRTYPE_NS))) {
 			/* CNAME'ed answer for DS or NS subquery.
-			 * Treat it as proof of zonecut nonexistance. */
+			 * Treat it as proof of zonecut nonexistence. */
 			return KR_STATE_DONE;
 		}
 		VERBOSE_MSG("<= cname chain, following\n");
@@ -791,7 +791,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 			next->forward_flags.CNAME = true;
 		}
 		next->cname_parent = query;
-		/* Want DNSSEC if and only if it's posible to secure
+		/* Want DNSSEC if and only if it's possible to secure
 		 * this name (i.e. iff it is covered by a TA) */
 		if (kr_ta_closest(req->ctx, cname, query->stype)) {
 			next->flags.DNSSEC_WANT = true;

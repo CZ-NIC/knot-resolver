@@ -6,7 +6,7 @@ Rebinding protection
 ====================
 
 This module provides protection from `DNS Rebinding attack`_ by blocking
-answers which cointain IPv4_ or IPv6_ addresses for private use
+answers which contain IPv4_ or IPv6_ addresses for private use
 (or some other special-use addresses).
 
 To enable this module insert following line into your configuration file:

@@ -94,7 +94,7 @@ static uint8_t get_lowest_rank(const struct kr_query *qry, const knot_dname_t *n
 		/* ^ TODO: performance?  TODO: stype - call sites */
 		if (ta_covers) {
 			return KR_RANK_INSECURE | KR_RANK_AUTH;
-		} /* else falltrhough */
+		} /* else fallthrough */
 	}
 	return KR_RANK_INITIAL | KR_RANK_AUTH;
 }
@@ -516,7 +516,7 @@ static int found_exact_hit(kr_layer_t *ctx, knot_pkt_t *pkt, knot_db_val_t val,
 	if (kr_fails_assert(eh))
 		return kr_error(ENOENT);
 		// LATER: recovery in case of error, perhaps via removing the entry?
-		// LATER(optim): pehaps optimize the zone cut search
+		// LATER(optim): perhaps optimize the zone cut search
 
 	int32_t new_ttl = get_new_ttl(eh, qry, qry->sname, qry->stype,
 					qry->timestamp.tv_sec);

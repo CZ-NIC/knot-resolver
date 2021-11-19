@@ -110,7 +110,7 @@ by a trusted CA. This is done using function :c:func:`net.tls()`.
 
    If you provide the same secret to multiple instances, they will be able to resume
    each other's sessions *without* any further communication between them.
-   This synchronization works only among instances having the same endianess
+   This synchronization works only among instances having the same endianness
    and time_t structure and size (`sizeof(time_t)`).
 
    **For good security** the secret must have enough entropy to be hard to guess,

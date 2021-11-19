@@ -40,7 +40,7 @@ struct session {
 	struct http_ctx *http_ctx;  /**< server side http-related data. */
 #endif
 
-	trie_t *tasks;                /**< list of tasks assotiated with given session. */
+	trie_t *tasks;                /**< list of tasks associated with given session. */
 	queue_t(struct qr_task *) waiting;  /**< list of tasks waiting for sending to upstream. */
 
 	uint8_t *wire_buf;            /**< Buffer for DNS message, except for XDP. */
@@ -757,7 +757,7 @@ int session_wirebuf_process(struct session *session, const struct sockaddr *peer
 		if (kr_fails_assert(!session_wirebuf_error(session)))
 			return -1;
 		int res = worker_submit(session, peer, NULL, NULL, NULL, pkt);
-		/* Errors from worker_submit() are intetionally *not* handled in order to
+		/* Errors from worker_submit() are intentionally *not* handled in order to
 		 * ensure the entire wire buffer is processed. */
 		if (res == kr_ok())
 			ret += 1;

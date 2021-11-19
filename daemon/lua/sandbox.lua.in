@@ -434,7 +434,7 @@ cache.clear = function (name, exact_name, rr_type, chunk_size, callback, prev_st
 						cache.clear(cbname, cbexact_name, cbrr_type, cbchunk_size, cbself, cbrettable)
 					end)
 			elseif cbrettable.round > 1 then
-				log_info(ffi.C.LOG_GRP_CACHE, 'asynchonous cache.clear(\'' .. cbname .. '\', '
+				log_info(ffi.C.LOG_GRP_CACHE, 'asynchronous cache.clear(\'' .. cbname .. '\', '
 				    .. tostring(cbexact_name) .. ') finished')
 			end
 			return cbrettable
@@ -709,7 +709,7 @@ local function map_send_recv(cmd, path)
 	recv = _sock_check(s, s.read, {s, 4}, path,
 		'response length read')
 	_sock_assert(recv and #recv == 4, path,
-		'length of response length preambule does not match')
+		'length of response length preamble does not match')
 	local len = tonumber(recv:byte(1))
 	for i=2,4 do
 		len = bit.bor(bit.lshift(len, 8), tonumber(recv:byte(i)))
@@ -717,7 +717,7 @@ local function map_send_recv(cmd, path)
 	ret = _sock_check(s, s.read, {s, len}, path,
 		'read response')
 	_sock_assert(ret and #ret == len, path,
-		'actual response length does not match length in preambule')
+		'actual response length does not match length in preamble')
 	s:close()
 	return ret
 end
@@ -729,7 +729,7 @@ end
 -- @returns table with results, one item per instance + key n=number of instances
 --          (order of return values is undefined)
 -- @throws Lua error if:
---         - communication failed in the middle of trasaction
+--         - communication failed in the middle of transaction
 --         - a result is not serializable
 --         - individual call throws an error
 --         - number of return values != 1 per instance per call

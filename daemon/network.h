@@ -93,7 +93,7 @@ struct network {
 void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog);
 void network_deinit(struct network *net);
 
-/** Start listenting on addr#port with flags.
+/** Start listening on addr#port with flags.
  * \note if we did listen on that combination already,
  *       nothing is done and kr_error(EADDRINUSE) is returned.
  * \note there's no short-hand to listen both on UDP and TCP.
@@ -105,7 +105,7 @@ void network_deinit(struct network *net);
 int network_listen(struct network *net, const char *addr, uint16_t port,
 		   int16_t nic_queue, endpoint_flags_t flags);
 
-/** Start listenting on an open file-descriptor.
+/** Start listening on an open file-descriptor.
  * \note flags.sock_type isn't meaningful here.
  * \note ownership of flags.* is taken on success.  TODO: non-success?
  */

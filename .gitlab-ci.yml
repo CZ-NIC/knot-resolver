@@ -15,7 +15,6 @@ variables:
   LIBKRES_NAME: libkres
   MESON_TEST: meson test -C build_ci* -t 4 --print-errorlogs
   PREFIX: $CI_PROJECT_DIR/.local
-  GIT_COMMITER_NAME: 'ci'
   EMAIL: 'ci@nic'
 
 image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-$KNOT_VERSION
@@ -132,7 +131,7 @@ build:macOS:
       - branches@knot/security/knot-resolver
   stage: build
   when: delayed
-  start_in: 3 minutes  # allow some time for mirrorring, job creation
+  start_in: 3 minutes  # allow some time for mirroring, job creation
   script:
     - ci/gh_actions.py ${CI_COMMIT_REF_NAME} ${CI_COMMIT_SHA}
 

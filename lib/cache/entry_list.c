@@ -217,7 +217,7 @@ int entry_h_splice(
 	const knot_dname_t *owner/*log only*/,
 	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp)
 {
-	//TODO: another review, perhaps incuding the API
+	//TODO: another review, perhaps including the API
 	if (kr_fails_assert(val_new_entry && val_new_entry->len > 0))
 		return kr_error(EINVAL);
 
@@ -277,7 +277,7 @@ int entry_h_splice(
 	/* Now we're in trouble.  In some cases, parts of data to be written
 	 * is an lmdb entry that may be invalidated by our write request.
 	 * (lmdb does even in-place updates!) Therefore we copy all into a buffer.
-	 * LATER(optim.): do this only when neccessary, or perhaps another approach.
+	 * LATER(optim.): do this only when necessary, or perhaps another approach.
 	 * This is also complicated by the fact that the val_new_entry part
 	 * is to be written *afterwards* by the caller.
 	 */

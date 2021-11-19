@@ -387,7 +387,7 @@ static int zi_rrset_import(zone_import_ctx_t *z_import, knot_rrset_t *rr)
 		knot_pkt_begin(answer, KNOT_AUTHORITY);
 	}
 
-	/* Put target rrset to ANSWER\AUTHORIRY as well as corresponding RRSIG */
+	/* Put target rrset to ANSWER\AUTHORITY as well as corresponding RRSIG */
 	int err = zi_rrset_put(z_import, answer, rr);
 	if (err != 0) {
 		goto cleanup;

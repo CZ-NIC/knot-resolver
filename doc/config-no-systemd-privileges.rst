@@ -60,6 +60,6 @@ Running as root
 ^^^^^^^^^^^^^^^
 
 .. warning:: Executing processes as root is generally insecure, as these
-   proccesses have unconstrained access to the complete system at runtime.
+   processes have unconstrained access to the complete system at runtime.
 
 While not recommended, it is also possible to run kresd directly as root.

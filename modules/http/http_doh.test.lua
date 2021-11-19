@@ -292,7 +292,7 @@ else
 		local req = assert(req_templ:clone())
 		req.headers:upsert(':method', 'GET')
 		req.headers:upsert(':path', '/doh?notdns=' .. basexx.to_url64(string.rep('\0', 1024)))
-		check_err(req, '400', 'GET without dns paramter finishes with 400')
+		check_err(req, '400', 'GET without dns parameter finishes with 400')
 	end
 
 	local function test_get_unparseable()

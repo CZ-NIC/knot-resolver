@@ -12,7 +12,7 @@ CMD ["/bin/bash"]
 # generic cleanup
 RUN apt-get update -qq
 
-# Knot and Knot Resolver dependecies
+# Knot and Knot Resolver dependencies
 RUN apt-get install -y -qqq git make cmake pkg-config meson \
 	build-essential bsdmainutils libtool autoconf libcmocka-dev \
 	liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev \
@@ -25,10 +25,10 @@ RUN apt-get install -y -qqq \
 	golang-any
 RUN bash -c "go get github.com/{FiloSottile/gvt,cloudflare/dns,dnstap/golang-dnstap,golang/protobuf/proto}"
 
-# documentation dependecies
+# documentation dependencies
 RUN apt-get install -y -qqq doxygen python3-sphinx python3-breathe python3-sphinx-rtd-theme
 
-# Python packags required for Deckard CI
+# Python packages required for Deckard CI
 # Python: grab latest versions from PyPi
 # (Augeas binding in Debian packages are slow and buggy)
 RUN apt-get install -y -qqq python3-pip wget augeas-tools

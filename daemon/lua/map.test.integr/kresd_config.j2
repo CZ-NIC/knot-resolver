@@ -144,7 +144,7 @@ local started = false
 function tests_start()
 	-- just in case, duplicates should not happen
 	if started then
-		log_info(ffi.C.LOG_GRP_TESTS, 'huh? duplicate test invocation ignored, a retrasmit?')
+		log_info(ffi.C.LOG_GRP_TESTS, 'huh? duplicate test invocation ignored, a retransmit?')
 		return
 	end
 	started = true

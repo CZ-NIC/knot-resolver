@@ -138,14 +138,14 @@ static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 
 /**
  * According to set flags determine whether NSEC proving
- * RRset or RRType non-existense has been found.
+ * RRset or RRType non-existence has been found.
  * @param f Flags to inspect.
  * @return  True if required NSEC exists.
  */
 #define kr_nsec_rrset_noexist(f) \
         ((f) & (FLG_NOEXIST_RRTYPE | FLG_NOEXIST_RRSET))
 /**
- * According to set flags determine whether wildcard non-existense
+ * According to set flags determine whether wildcard non-existence
  * has been proven.
  * @param f Flags to inspect.
  * @return  True if wildcard not exists.
@@ -230,7 +230,7 @@ int kr_nsec_name_error_response_check(const knot_pkt_t *pkt, knot_section_t sect
  * @param sec  Packet section.
  * @param      Number of labels or (negative) error code.
  */
-static int coverign_rrsig_labels(const knot_rrset_t *nsec, const knot_pktsection_t *sec)
+static int covering_rrsig_labels(const knot_rrset_t *nsec, const knot_pktsection_t *sec)
 {
 	if (kr_fails_assert(nsec && sec))
 		return kr_error(EINVAL);
@@ -342,7 +342,7 @@ static int no_data_wildcard_existence_check(int *flags, const knot_rrset_t *nsec
 	if (kr_fails_assert(flags && nsec && sec))
 		return kr_error(EINVAL);
 
-	int rrsig_labels = coverign_rrsig_labels(nsec, sec);
+	int rrsig_labels = covering_rrsig_labels(nsec, sec);
 	if (rrsig_labels < 0)
 		return rrsig_labels;
 	int nsec_labels = knot_dname_labels(nsec->owner, NULL);
@@ -380,7 +380,7 @@ static int wildcard_match_check(const knot_pkt_t *pkt, const knot_pktsection_t *
 		if (!knot_dname_is_equal(rrset->owner, sname)) {
 			int wcard_labels = knot_dname_labels(rrset->owner, NULL);
 			int common_labels = knot_dname_matched_labels(rrset->owner, sname);
-			int rrsig_labels = coverign_rrsig_labels(rrset, sec);
+			int rrsig_labels = covering_rrsig_labels(rrset, sec);
 			if (wcard_labels < 1 ||
 			    common_labels != wcard_labels - 1 ||
 			    common_labels != rrsig_labels) {
@@ -456,15 +456,15 @@ int kr_nsec_existence_denial(const knot_pkt_t *pkt, knot_section_t section_id,
 		no_data_wildcard_existence_check(&flags, rrset, sec);
 	}
 	if (kr_nsec_existence_denied(flags)) {
-		/* denial of existence proved accordignly to 4035 5.4 -
-		 * NSEC proving either rrset non-existance or
-		 * qtype non-existance has been found,
+		/* denial of existence proved accordingly to 4035 5.4 -
+		 * NSEC proving either rrset non-existence or
+		 * qtype non-existence has been found,
 		 * and no wildcard expansion occurred.
 		 */
 		return kr_ok();
 	} else if (kr_nsec_rrset_noexist(flags)) {
-		/* NSEC proving either rrset non-existance or
-		 * qtype non-existance has been found,
+		/* NSEC proving either rrset non-existence or
+		 * qtype non-existence has been found,
 		 * but wildcard expansion occurs.
 		 * Try to find matching wildcard and check
 		 * corresponding types.

@@ -9,7 +9,7 @@
  *
  * prefix - identifier prefix, e.g. ptr -> struct ptr_dynarray, ptr_dynarray_add(), ...
  * ntype - data type to be stored. Let it be a number, pointer or small struct
- * initial_capacity - how many data items will be allocated on stac and copied with assignment
+ * initial_capacity - how many data items will be allocated on stack and copied with assignment
  *
  * prefix_dynarray_add() - add a data item
  * prefix_dynarray_fix() - call EVERYTIME the array is copied from some already invalid stack

@@ -86,23 +86,23 @@ static inline bool no6_is_bad(void)
 	return no6_est.len_used == NO6_PREFIX_COUNT;
 }
 
-static void no6_timeouted(const struct kr_query *qry, const uint8_t *addr)
+static void no6_timed_out(const struct kr_query *qry, const uint8_t *addr)
 {
 	if (no6_is_bad()) { // we can't get worse
-		VERBOSE_MSG(qry, "NO6: timeouted, but bad already\n");
+		VERBOSE_MSG(qry, "NO6: timed out, but bad already\n");
 		return;
 	}
 	// If we have the address already, do nothing.
 	for (int i = 0; i < no6_est.len_used; ++i) {
 		if (memcmp(addr, no6_est.addr_prefixes[i], NO6_PREFIX_BYTES) == 0) {
-			VERBOSE_MSG(qry, "NO6: timeouted, repeated prefix, timeouts %d/%d\n",
+			VERBOSE_MSG(qry, "NO6: timed out, repeated prefix, timeouts %d/%d\n",
 					no6_est.len_used, (int)NO6_PREFIX_COUNT);
 			return;
 		}
 	}
 	// Append!
 	memcpy(no6_est.addr_prefixes[no6_est.len_used++], addr, NO6_PREFIX_BYTES);
-	VERBOSE_MSG(qry, "NO6: timeouted, appended, timeouts %d/%d\n",
+	VERBOSE_MSG(qry, "NO6: timed out, appended, timeouts %d/%d\n",
 			no6_est.len_used, (int)NO6_PREFIX_COUNT);
 }
 
@@ -273,7 +273,7 @@ static void invalidate_dead_upstream(struct address_state *state,
 /**
  * @internal Check if IP address is TLS capable.
  *
- * @p req has to have the selection_context properly initiazed.
+ * @p req has to have the selection_context properly initialized.
  */
 static void check_tls_capable(struct address_state *address_state,
 			      struct kr_request *req, struct sockaddr *address)
@@ -289,7 +289,7 @@ static void check_tls_capable(struct address_state *address_state,
 /**
  * Check if there is a existing TCP connection to this address.
  *
- * @p req has to have the selection_context properly initiazed.
+ * @p req has to have the selection_context properly initialized.
  */
 void check_tcp_connections(struct address_state *address_state, struct kr_request *req, struct sockaddr *address) {
 	address_state->tcp_connected = req->selection_context.is_tcp_connected ? req->selection_context.is_tcp_connected(address) : false;
@@ -587,7 +587,7 @@ static void cache_timeout(const struct kr_query *qry, const struct kr_transport 
 
 	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
 	if (transport->address_len == sizeof(struct in6_addr))
-		no6_timeouted(qry, address);
+		no6_timed_out(qry, address);
 
 	struct rtt_state old_state = addr_state->rtt_state;
 	struct rtt_state cur_state =
@@ -677,7 +677,7 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 	case KR_SELECTION_LAME_DELEGATION:
 		if (qry->flags.NO_MINIMIZE) {
 			/* Lame delegations are weird, they breed more lame delegations on broken
-			* zones since trying another server from the same set usualy doesn't help.
+			* zones since trying another server from the same set usually doesn't help.
 			* We force resolution of another NS name in hope of getting somewhere. */
 			qry->server_selection.local_state->force_resolve = true;
 			addr_state->broken = true;

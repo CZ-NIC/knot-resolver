@@ -1,13 +1,13 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Create a develpoment tarball
+# Create a development tarball
 set -o errexit -o nounset -o xtrace
 
 cd "$(dirname ${0})/.."
 
 # make sure we don't accidentally add / overwrite forgotten changes in git
 (git diff-index --quiet HEAD && git diff-index --cached --quiet HEAD) || \
-    (echo 'git index has uncommited changes!'; exit 1)
+    (echo 'git index has uncommitted changes!'; exit 1)
 
 if ! git describe --tags --exact-match; then
     # devel version
@@ -17,7 +17,7 @@ if ! git describe --tags --exact-match; then
     # modify and commit meson.build
     sed -i "s/^\(\s*version\s*:\s*'\)\([^']\+\)\('.*\)/\1\2.$TIMESTAMP.$GIT_HASH\3/" meson.build
 
-    : changed version in meson.build, changes must be commited to git
+    : changed version in meson.build, changes must be committed to git
     git add meson.build
     git commit -m 'DROP: devel version archive'
 

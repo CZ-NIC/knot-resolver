@@ -16,7 +16,7 @@ static void test_zonecut_params(void **state)
 	kr_zonecut_deinit(NULL);
 	kr_zonecut_set(NULL, NULL);
 	kr_zonecut_set(&cut, NULL);
-	/* TODO triggerring inner assertion:
+	/* TODO triggering inner assertion:
 	assert_int_not_equal(kr_zonecut_add(NULL, NULL, NULL, 0), 0);
 	*/
 	assert_null((void *)kr_zonecut_find(NULL, NULL));

@@ -147,7 +147,7 @@ class Kresd(ContextDecorator):
         while time.time() < end_time:
             i += 1
 
-            # use exponential backoff algorhitm to choose next delay
+            # use exponential backoff algorithm to choose next delay
             rand_delay = random.randrange(0, i)
             time.sleep(rand_delay * delay_step)
 
@@ -220,7 +220,7 @@ class Kresd(ContextDecorator):
         return self._tls_socket_with_retry(socket.AF_INET6)
 
     def partial_log(self):
-        partial_log = '\n (... ommiting log start)\n'
+        partial_log = '\n (... omitting log start)\n'
         with open(self.logfile_path, encoding='UTF-8') as log:  # display partial log for debugging
             past_startup_msgid = False
             past_startup = False
@@ -251,7 +251,7 @@ def is_port_free(port, ip=None, ip6=None):
             check(socket.AF_INET6, socket.SOCK_STREAM, (ip6, port, 0, 0))
             check(socket.AF_INET6, socket.SOCK_DGRAM, (ip6, port, 0, 0))
     except OSError as exc:
-        if exc.errno == 98:  # address alrady in use
+        if exc.errno == 98:  # address already in use
             return False
         else:
             raise

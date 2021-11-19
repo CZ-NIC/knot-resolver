@@ -137,7 +137,7 @@ Requires:       %{name} = %{version}-%{release}
 %description module-dnstap
 dnstap module for Knot Resolver supports logging DNS responses to a unix socket
 in dnstap format using fstrm framing library.  This logging is useful if you
-need effectivelly log all DNS traffic.
+need effectively log all DNS traffic.
 %endif
 
 %if "x%{?suse_version}" == "x"
