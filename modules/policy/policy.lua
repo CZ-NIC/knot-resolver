@@ -344,7 +344,20 @@ function policy.all(action)
 	return function(_, _) return action end
 end
 
--- Requests which QNAME matches given zone list (i.e. suffix match)
+-- Requests whose QNAME is exactly the provided domain
+function policy.domains(action, dname_list)
+	return function(_, query)
+		local qname = query:name()
+		for _, dname in ipairs(dname_list) do
+			if ffi.C.knot_dname_is_equal(qname, dname) then
+				return action
+			end
+		end
+		return nil
+	end
+end
+
+-- Requests whose QNAME matches given zone list (i.e. suffix match)
 function policy.suffix(action, zone_list)
 	local AC = require('ahocorasick')
 	local tree = AC.create(zone_list)

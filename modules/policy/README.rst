@@ -40,8 +40,12 @@ A *filter* selects which queries will be affected by specified Actions_. There a
 
    .. code-block:: lua
 
-      policy.suffix(policy.DENY, policy.todnames({'example.com', 'example.net'}))
+      policy.add(policy.suffix(policy.DENY, policy.todnames({'example.com', 'example.net'})))
 
+.. function:: domains(action, domain_table)
+
+   Like :func:`policy.suffix` match, but the queried name must match exactly, not just its suffix.
+   
 .. function:: suffix_common(action, suffix_table[, common_suffix])
 
   :param action: action if the pattern matches query name
@@ -168,13 +172,13 @@ Following actions stop the policy matching on the query, i.e. other rules are no
 
       -- policy to change IPv4 address and TTL for example.com
       policy.add(
-          policy.suffix(
+          policy.domains(
               policy.ANSWER(
                   { [kres.type.A] = { rdata=kres.str2ip('192.0.2.7'), ttl=300 } }
               ), { todname('example.com') }))
       -- policy to generate two TXT records (specified in binary format) for example.net
       policy.add(
-          policy.suffix(
+          policy.domains(
               policy.ANSWER(
                   { [kres.type.TXT] = { rdata={'\005first', '\006second'}, ttl=5 } }
               ), { todname('example.net') }))

@@ -1,5 +1,6 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 {% raw %}
+policy.add(policy.domains(policy.DENY, {todname('example.com')}))
 policy.add(policy.suffix(policy.REFUSE, {todname('refuse.example.com')}))
 
 -- make sure DNSSEC is turned off for tests
