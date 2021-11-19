@@ -1031,20 +1031,20 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	}
 
 	/* Enable DNSSEC if enters a new island of trust. */
-	bool want_secured = (qry->flags.DNSSEC_WANT) &&
+	bool want_secure = (qry->flags.DNSSEC_WANT) &&
 			    !knot_wire_get_cd(request->qsource.packet->wire);
 	if (!(qry->flags.DNSSEC_WANT) &&
 	    !knot_wire_get_cd(request->qsource.packet->wire) &&
 	    kr_ta_get(trust_anchors, wanted_name)) {
 		qry->flags.DNSSEC_WANT = true;
-		want_secured = true;
+		want_secure = true;
 		if (kr_log_is_debug_qry(RESOLVER, qry)) {
 			KR_DNAME_GET_STR(qname_str, wanted_name);
 			VERBOSE_MSG(qry, ">< TA: '%s'\n", qname_str);
 		}
 	}
 
-	if (want_secured && !qry->zone_cut.trust_anchor) {
+	if (want_secure && !qry->zone_cut.trust_anchor) {
 		knot_rrset_t *ta_rr = kr_ta_get(trust_anchors, wanted_name);
 		if (!ta_rr) {
 			char name[] = "\0";
@@ -1058,7 +1058,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	has_ta = (qry->zone_cut.trust_anchor != NULL);
 	ta_name = (has_ta ? qry->zone_cut.trust_anchor->owner : NULL);
 	refetch_ta = (!has_ta || !knot_dname_is_equal(wanted_name, ta_name));
-	if (!nods && want_secured && refetch_ta) {
+	if (!nods && want_secure && refetch_ta) {
 		struct kr_query *next = zone_cut_subreq(rplan, qry, wanted_name,
 							KNOT_RRTYPE_DS);
 		if (!next) {
@@ -1071,7 +1071,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	 * Do not fetch if this is a DNSKEY subrequest to avoid circular dependency. */
 	is_dnskey_subreq = kr_rplan_satisfies(qry, ta_name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);
 	refetch_key = has_ta && (!qry->zone_cut.key || !knot_dname_is_equal(ta_name, qry->zone_cut.key->owner));
-	if (want_secured && refetch_key && !is_dnskey_subreq) {
+	if (want_secure && refetch_key && !is_dnskey_subreq) {
 		struct kr_query *next = zone_cut_subreq(rplan, qry, ta_name, KNOT_RRTYPE_DNSKEY);
 		if (!next) {
 			return KR_STATE_FAIL;
@@ -1125,8 +1125,8 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	const bool has_ta = (qry->zone_cut.trust_anchor != NULL);
 	const knot_dname_t *ta_name = (has_ta ? qry->zone_cut.trust_anchor->owner : NULL);
 	const bool refetch_ta = !has_ta || !knot_dname_is_equal(qry->zone_cut.name, ta_name);
-	const bool want_secured = qry->flags.DNSSEC_WANT && !has_cd;
-	if (want_secured && refetch_ta) {
+	const bool want_secure = qry->flags.DNSSEC_WANT && !has_cd;
+	if (want_secure && refetch_ta) {
 		/* @todo we could fetch the information from the parent cut, but we don't remember that now */
 		struct kr_query *next = kr_rplan_push(rplan, qry, qry->zone_cut.name, qry->sclass, KNOT_RRTYPE_DS);
 		if (!next) {
@@ -1140,7 +1140,7 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	 * Do not fetch if this is a DNSKEY subrequest to avoid circular dependency. */
 	const bool is_dnskey_subreq = kr_rplan_satisfies(qry, ta_name, KNOT_CLASS_IN, KNOT_RRTYPE_DNSKEY);
 	const bool refetch_key = has_ta && (!qry->zone_cut.key || !knot_dname_is_equal(ta_name, qry->zone_cut.key->owner));
-	if (want_secured && refetch_key && !is_dnskey_subreq) {
+	if (want_secure && refetch_key && !is_dnskey_subreq) {
 		struct kr_query *next = zone_cut_subreq(rplan, qry, ta_name, KNOT_RRTYPE_DNSKEY);
 		if (!next) {
 			return KR_STATE_FAIL;
