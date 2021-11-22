@@ -1,5 +1,7 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 -- Module interface
+local kluautil = require('kluautil')
+local kres = require('kres')
 local ffi = require('ffi')
 local C = ffi.C
 local M = { layer = { } }
@@ -150,7 +152,9 @@ function M.layer.consume(state, req, pkt)
 				req.pool)
 		end
 	end
-	ffi.C.kr_ranked_rrarray_finalize(req.answ_selected, qry.uid, req.pool);
+	ffi.C.kr_ranked_rrarray_finalize(req.answ_selected, qry.uid, req.pool)
+	local msg = kluautil.kr_string2c("DNS64 synthesis", req.pool)
+	ffi.C.kr_request_set_extended_error(req, kres.extended_error.FORGED, msg)
 end
 
 local function hexchar2int(char)
