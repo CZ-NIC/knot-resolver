@@ -1,5 +1,6 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 
+local ffi = require('ffi')
 local kluautil = {}
 
 -- Get length of table
@@ -77,6 +78,15 @@ function kluautil.kr_https_fetch(url, out_file, ca_file)
 	out_file:seek('set', 0)
 
 	return true
+end
+
+-- Copy a lua string to C (to knot_mm_t or nil=malloc, zero-terminated).
+function kluautil.kr_string2c(str, mempool)
+	if str == nil then return nil end
+	local result = ffi.C.mm_realloc(mempool, nil, #str + 1, 0)
+	if result == nil then panic("not enough memory") end
+	ffi.copy(result, str)
+	return ffi.cast('const char *', result)
 end
 
 kluautil.list_dir = kluautil_list_dir
