@@ -11,6 +11,7 @@ from knot_resolver_manager.datamodel.logging_config import LoggingSchema
 from knot_resolver_manager.datamodel.lua_schema import LuaSchema
 from knot_resolver_manager.datamodel.network_schema import NetworkSchema
 from knot_resolver_manager.datamodel.options_schema import OptionsSchema
+from knot_resolver_manager.datamodel.policy_schema import PolicySchema
 from knot_resolver_manager.datamodel.server_schema import ServerSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
@@ -37,6 +38,7 @@ class KresConfig(SchemaNode):
         network: NetworkSchema = NetworkSchema()
         static_hints: StaticHintsSchema = StaticHintsSchema()
         views: Optional[List[ViewSchema]] = None
+        policy: Optional[List[PolicySchema]] = None
         stub_zones: Optional[List[StubZoneSchema]] = None
         forward_zones: Optional[List[ForwardZoneSchema]] = None
         cache: CacheSchema = CacheSchema()
@@ -52,6 +54,7 @@ class KresConfig(SchemaNode):
     network: NetworkSchema
     static_hints: StaticHintsSchema
     views: Optional[List[ViewSchema]]
+    policy: Optional[List[PolicySchema]]
     stub_zones: Optional[List[StubZoneSchema]]
     forward_zones: Optional[List[ForwardZoneSchema]]
     cache: CacheSchema
