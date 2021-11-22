@@ -22,6 +22,7 @@
 .dirstamp
 .libs
 .pytest_cache
+.cache
 /.build-depend
 /aclocal.m4
 /ar-lib
