@@ -23,6 +23,7 @@
 .libs
 .pytest_cache
 /.build-depend
+/.cache
 /aclocal.m4
 /ar-lib
 /autom4te.cache/*
