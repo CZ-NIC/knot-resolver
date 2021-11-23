@@ -5,7 +5,7 @@ from typing import Any, Optional, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.types import AnyPath, Listen
+from knot_resolver_manager.datamodel.types import CheckedPath, Listen, UncheckedPath
 from knot_resolver_manager.exceptions import DataException
 from knot_resolver_manager.utils import SchemaNode
 from knot_resolver_manager.utils.types import LiteralEnum
@@ -42,14 +42,14 @@ class ManagementSchema(SchemaNode):
     # the default listen path here MUST use the default rundir
     listen: Listen = Listen({"unix-socket": "./manager.sock"})
     backend: BackendEnum = "auto"
-    rundir: AnyPath = AnyPath(".")
+    rundir: UncheckedPath = UncheckedPath(".")
 
 
 class WebmgmtSchema(SchemaNode):
     listen: Listen
     tls: bool = False
-    cert_file: Optional[AnyPath] = None
-    key_file: Optional[AnyPath] = None
+    cert_file: Optional[CheckedPath] = None
+    key_file: Optional[CheckedPath] = None
 
 
 class ServerSchema(SchemaNode):
