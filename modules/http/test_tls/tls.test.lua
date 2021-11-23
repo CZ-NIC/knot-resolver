@@ -43,7 +43,7 @@ else
 			req.ctx:setVerify(openssl_ctx.VERIFY_NONE)
 		end
 
-		local headers = assert(req:go())
+		local headers = assert(req:go(16))
 		return tonumber(headers:get(':status'))
 	end
 
@@ -168,7 +168,7 @@ else
 			store:add('ca.crt')
 			req.ctx:setVerify(openssl_ctx.VERIFY_PEER)
 
-			local headers = assert(req:go())
+			local headers = assert(req:go(16))
 			local code = tonumber(headers:get(':status'))
 			same(code, 200, desc)
 		end
