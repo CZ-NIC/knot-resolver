@@ -97,9 +97,14 @@ class TimeUnit(Unit):
         return self._value
 
 
-class AnyPath(CustomValueType):
+class UncheckedPath(CustomValueType):
+    """
+    Wrapper around pathlib.Path object. Can represent pretty much any Path. No checks are
+    performed on the value. The value is taken as is.
+    """
+
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
-        super().__init__(source_value)
+        super().__init__(source_value, object_path=object_path)
         if isinstance(source_value, str):
             self._value: Path = Path(source_value)
         else:
@@ -107,18 +112,13 @@ class AnyPath(CustomValueType):
                 f"Expected file path in a string, got '{source_value}' with type '{type(source_value)}'", object_path
             )
 
-        try:
-            self._value = self._value.resolve(strict=False)
-        except RuntimeError as e:
-            raise SchemaException("Failed to resolve given file path. Is there a symlink loop?", object_path) from e
-
     def __str__(self) -> str:
         return str(self._value)
 
     def __eq__(self, o: object) -> bool:
-        if not isinstance(o, AnyPath):
+        if not isinstance(o, UncheckedPath):
             return False
-        
+
         return o._value == self._value
 
     def __int__(self) -> int:
@@ -131,10 +131,24 @@ class AnyPath(CustomValueType):
         return str(self._value)
 
     @classmethod
-    def json_schema(cls: Type["AnyPath"]) -> Dict[Any, Any]:
+    def json_schema(cls: Type["UncheckedPath"]) -> Dict[Any, Any]:
         return {
             "type": "string",
         }
+
+
+class CheckedPath(UncheckedPath):
+    """
+    Like UncheckedPath, but the file path is checked for being valid. So no non-existent directories in the middle,
+    no symlink loops. This however means, that resolving of relative path happens while validating.
+    """
+
+    def __init__(self, source_value: Any, object_path: str = "/") -> None:
+        super().__init__(source_value, object_path=object_path)
+        try:
+            self._value = self._value.resolve(strict=False)
+        except RuntimeError as e:
+            raise SchemaException("Failed to resolve given file path. Is there a symlink loop?", object_path) from e
 
 
 class DomainName(CustomValueType):
@@ -414,7 +428,7 @@ class Listen(SchemaNode, Serializable):
     class Raw(SchemaNode):
         ip: Optional[IPAddress] = None
         port: Optional[int] = None
-        unix_socket: Optional[AnyPath] = None
+        unix_socket: Optional[CheckedPath] = None
         interface: Optional[str] = None
 
     _PREVIOUS_SCHEMA = Raw
@@ -422,7 +436,7 @@ class Listen(SchemaNode, Serializable):
     typ: ListenType
     ip: Optional[IPAddress]
     port: Optional[int]
-    unix_socket: Optional[AnyPath]
+    unix_socket: Optional[CheckedPath]
     interface: Optional[str]
 
     def _typ(self, origin: Raw):

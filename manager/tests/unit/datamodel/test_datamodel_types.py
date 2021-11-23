@@ -4,17 +4,19 @@ from pytest import raises
 
 from knot_resolver_manager.datamodel.types import (
     AnyPath,
+    CheckedPath,
     DomainName,
     IPAddress,
     IPAddressPort,
+    IPNetwork,
     IPv4Address,
     IPv6Address,
-    IPNetwork,
     IPv6Network96,
     Listen,
     ListenType,
     SizeUnit,
     TimeUnit,
+    UncheckedPath,
 )
 from knot_resolver_manager.exceptions import KresdManagerException
 from knot_resolver_manager.utils import SchemaNode
@@ -56,9 +58,9 @@ def test_parsing_units():
     assert o.time.seconds() == 10 * 60
 
 
-def test_anypath():
+def test_checked_path():
     class TestSchema(SchemaNode):
-        p: AnyPath
+        p: CheckedPath
 
     assert str(TestSchema({"p": "/tmp"}).p) == "/tmp"
 
