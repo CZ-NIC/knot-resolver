@@ -77,9 +77,21 @@ class Server:
         self._set_log_level(config)
         await self._reconfigure_listen_address(config)
 
+    async def _deny_listen_address_changes(self, config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
+        if config_old.server.management.listen != config_new.server.management.listen:
+            return Result.err(
+                "Changing API listen address dynamically is not allowed as it's really dangerous. If you"
+                " really need this feature, please contact the developers and explain why. Technically,"
+                " there are no problems in supporting it. We are only blocking the dynamic changes because"
+                " we think the consequences of leaving this footgun unprotected are worse than its usefulness."
+            )
+
+        return Result.ok(None)
+
     async def start(self):
         self._setup_routes()
         await self.runner.setup()
+        await self.config_store.register_verifier(self._deny_listen_address_changes)
         await self.config_store.register_on_change_callback(self._reconfigure)
 
     async def wait_for_shutdown(self):
