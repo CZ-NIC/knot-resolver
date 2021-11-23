@@ -1,5 +1,5 @@
 import pkgutil
-from typing import List, Text, Union, Optional
+from typing import Dict, List, Optional, Text, Union
 
 from jinja2 import Environment, Template
 from typing_extensions import Literal
@@ -7,6 +7,7 @@ from typing_extensions import Literal
 from knot_resolver_manager.datamodel.cache_schema import CacheSchema
 from knot_resolver_manager.datamodel.dns64_schema import Dns64Schema
 from knot_resolver_manager.datamodel.dnssec_schema import DnssecSchema
+from knot_resolver_manager.datamodel.forward_zone import ForwardZoneSchema
 from knot_resolver_manager.datamodel.logging_config import LoggingSchema
 from knot_resolver_manager.datamodel.lua_schema import LuaSchema
 from knot_resolver_manager.datamodel.network_schema import NetworkSchema
@@ -15,7 +16,6 @@ from knot_resolver_manager.datamodel.policy_schema import PolicySchema
 from knot_resolver_manager.datamodel.server_schema import ServerSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
-from knot_resolver_manager.datamodel.forward_zone import ForwardZoneSchema
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.utils import SchemaNode
 
@@ -38,7 +38,7 @@ class KresConfig(SchemaNode):
         network: NetworkSchema = NetworkSchema()
         static_hints: StaticHintsSchema = StaticHintsSchema()
         views: Optional[List[ViewSchema]] = None
-        policy: Optional[List[PolicySchema]] = None
+        policy: Optional[Dict[str, PolicySchema]] = None
         stub_zones: Optional[List[StubZoneSchema]] = None
         forward_zones: Optional[List[ForwardZoneSchema]] = None
         cache: CacheSchema = CacheSchema()
@@ -54,7 +54,7 @@ class KresConfig(SchemaNode):
     network: NetworkSchema
     static_hints: StaticHintsSchema
     views: Optional[List[ViewSchema]]
-    policy: Optional[List[PolicySchema]]
+    policy: Optional[Dict[str, PolicySchema]]
     stub_zones: Optional[List[StubZoneSchema]]
     forward_zones: Optional[List[ForwardZoneSchema]]
     cache: CacheSchema
