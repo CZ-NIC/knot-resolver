@@ -3,7 +3,6 @@ import ipaddress
 from pytest import raises
 
 from knot_resolver_manager.datamodel.types import (
-    AnyPath,
     CheckedPath,
     DomainName,
     IPAddress,
@@ -16,7 +15,6 @@ from knot_resolver_manager.datamodel.types import (
     ListenType,
     SizeUnit,
     TimeUnit,
-    UncheckedPath,
 )
 from knot_resolver_manager.exceptions import KresdManagerException
 from knot_resolver_manager.utils import SchemaNode
