@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from knot_resolver_manager.datamodel.types import AnyPath, SizeUnit, TimeUnit
+from knot_resolver_manager.datamodel.types import CheckedPath, SizeUnit, TimeUnit
 from knot_resolver_manager.utils import SchemaNode
 
 
@@ -8,11 +8,11 @@ class PrefillSchema(SchemaNode):
     domain: str
     url: str
     refresh_interval: TimeUnit = TimeUnit("1d")
-    ca_file: Optional[AnyPath] = None
+    ca_file: Optional[CheckedPath] = None
 
 
 class CacheSchema(SchemaNode):
-    storage: AnyPath = AnyPath("/var/cache/knot-resolver")
+    storage: CheckedPath = CheckedPath("/var/cache/knot-resolver")
     size_max: SizeUnit = SizeUnit("100M")
     ttl_min: TimeUnit = TimeUnit("5s")
     ttl_max: TimeUnit = TimeUnit("6d")

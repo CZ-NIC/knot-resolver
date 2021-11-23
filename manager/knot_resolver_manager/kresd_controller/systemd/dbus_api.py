@@ -164,7 +164,7 @@ def _gc_unit_properties(config: KresConfig) -> Any:
             GLib.Variant("s", "transient Knot Resolver Garbage Collector unit started by Knot Resolver Manager"),
         ),
         ("Type", GLib.Variant("s", "simple")),
-        ("WorkingDirectory", GLib.Variant("s", str(config.server.management.rundir.to_path()))),
+        ("WorkingDirectory", GLib.Variant("s", os.getcwd())),
         (
             "ExecStart",
             GLib.Variant(
