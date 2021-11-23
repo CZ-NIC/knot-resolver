@@ -10,10 +10,6 @@ local function matchprefix(subnet, addr)
 	local addrtype = string.find(addr, ':', 1, true) and kres.type.AAAA or kres.type.A
 	local subnet_cd = ffi.new('char[16]')
 	local bitlen = ffi.C.kr_straddr_subnet(subnet_cd, subnet)
-	-- Mask unspecified, renumber whole IP
-	if bitlen == 0 then
-		bitlen = #target * 8
-	end
 	return {subnet_cd, bitlen, target, addrtype}
 end
 
