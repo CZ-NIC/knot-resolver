@@ -378,6 +378,7 @@ int knot_pkt_put_rotate(knot_pkt_t *, uint16_t, const knot_rrset_t *, uint16_t, 
 knot_pkt_t *knot_pkt_new(void *, uint16_t, knot_mm_t *);
 void knot_pkt_free(knot_pkt_t *);
 int knot_pkt_parse(knot_pkt_t *, unsigned int);
+knot_rrset_t *kr_request_ensure_edns(struct kr_request *);
 knot_pkt_t *kr_request_ensure_answer(struct kr_request *);
 struct kr_rplan *kr_resolve_plan(struct kr_request *);
 knot_mm_t *kr_resolve_pool(struct kr_request *);
