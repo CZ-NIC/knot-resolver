@@ -236,23 +236,33 @@ class _DefaultSentinel:
 _DEFAULT_SENTINEL = _DefaultSentinel()
 
 
-async def _init_config_store(config: Union[Path, ParsedTree, _DefaultSentinel]) -> ConfigStore:
+async def _load_raw_config(config: Union[Path, ParsedTree, _DefaultSentinel]) -> ParsedTree:
     # Initial configuration of the manager
     if isinstance(config, _DefaultSentinel):
         # use default
         config = DEFAULT_MANAGER_CONFIG_FILE
     if isinstance(config, Path):
         if not config.exists():
-            raise KresdManagerException(f"Manager is configured to load config file at {config} on startup, but the file does not exist.")
+            raise KresdManagerException(
+                f"Manager is configured to load config file at {config} on startup, but the file does not exist."
+            )
         else:
             logger.info("Loading initial configuration from %s", config)
             config = parse_yaml(await readfile(config))
 
     # validate the initial configuration
     assert isinstance(config, ParsedTree)
+    return config
+
+
+async def _load_config(config: ParsedTree) -> KresConfig:
     logger.info("Validating initial configuration...")
     config_validated = KresConfig(config)
+    return config_validated
 
+
+async def _init_config_store(config: ParsedTree) -> ConfigStore:
+    config_validated = await _load_config(config)
     return ConfigStore(config_validated)
 
 
@@ -273,44 +283,65 @@ async def _init_manager(config_store: ConfigStore) -> KresManager:
     return manager
 
 
-async def _validate_working_directory(config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
+async def _deny_working_directory_changes(config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
     if config_old.server.management.rundir != config_new.server.management.rundir:
         return Result.err("Changing manager's `rundir` during runtime is not allowed.")
-    
-    if not config_new.server.management.rundir.to_path().exists():
-        return Result.err(f"Configured `rundir` directory ({config_new.server.management.rundir}) does not exist!")
 
     return Result.ok(None)
 
 
-async def _set_working_directory(config: KresConfig):
+def _set_working_directory(config_raw: ParsedTree):
+    config = KresConfig(config_raw)
+
+    if not config.server.management.rundir.to_path().exists():
+        raise KresdManagerException(f"`rundir` directory ({config.server.management.rundir}) does not exist!")
+
     os.chdir(config.server.management.rundir.to_path())
 
 
 async def start_server(config: Union[Path, ParsedTree, _DefaultSentinel] = _DEFAULT_SENTINEL):
     start_time = time()
 
-    # before starting server, initialize the subprocess controller etc. Any errors during inicialization are fatal
+    # before starting server, initialize the subprocess controller, config store, etc. Any errors during inicialization
+    # are fatal
     try:
-        config_store = await _init_config_store(config)
-        await config_store.register_verifier(_validate_working_directory)
-        await config_store.register_on_change_callback(_set_working_directory)
+        # Preprocess config - load from file or in general take it to the last step before validation.
+        config_raw = await _load_raw_config(config)
+
+        # We want to change cwd as soon as possible. Especially before any real config validation, because cwd
+        # is used for resolving relative paths. Thats also a reason, why in practice, we validate the config twice.
+        # Once when setting up the cwd just to read the `rundir` property. When cwd is set, we do it again to resolve
+        # all paths correctly.
+        # Note: the first config validation is done here - therefore all initial config validation errors will
+        # originate from here.
+        _set_working_directory(config_raw)
+
+        # After the working directory is set, we can initialize proper config store with a newly parsed configuration.
+        config_store = await _init_config_store(config_raw)
+
+        # This behaviour described above with paths means, that we MUST NOT allow `rundir` change after initialization.
+        # It would cause strange problems because every other path configuration depends on it. Therefore, we have to
+        # add a check to the config store, which disallows changes.
+        await config_store.register_verifier(_deny_working_directory_changes)
+
+        # After we have loaded the configuration, we can start worring about subprocess management.
         manager = await _init_manager(config_store)
     except KresdManagerException as e:
         logger.error(e)
         sys.exit(1)
-    except BaseException as e:
-        logger.error("Uncaught generic exception during manager inicialization..." , exc_info=True)
+    except BaseException:
+        logger.error("Uncaught generic exception during manager inicialization...", exc_info=True)
         sys.exit(1)
 
+    # At this point, all backend functionality-providing components are initialized. It's therefore save to start
+    # the API server.
     server = Server(config_store)
     await server.start()
-
-    # stop the server gracefully and cleanup everything
     logger.info(f"Manager fully initialized and running in {round(time() - start_time, 3)} seconds")
 
     await server.wait_for_shutdown()
 
+    # After triggering shutdown, we neet to clean everything up
     logger.info("Gracefull shutdown triggered.")
     logger.info("Stopping API service...")
     await server.shutdown()

@@ -1,13 +1,13 @@
 from typing import List, Optional
 
 from knot_resolver_manager.datamodel.types import (
-    AnyPath,
+    CheckedPath,
     IPAddress,
+    IPNetwork,
     IPv4Address,
     IPv6Address,
     Listen,
     SizeUnit,
-    IPNetwork,
 )
 from knot_resolver_manager.utils import SchemaNode
 from knot_resolver_manager.utils.types import LiteralEnum
@@ -32,10 +32,10 @@ class AddressRenumberingSchema(SchemaNode):
 
 
 class TLSSchema(SchemaNode):
-    cert_file: Optional[AnyPath] = None
-    key_file: Optional[AnyPath] = None
+    cert_file: Optional[CheckedPath] = None
+    key_file: Optional[CheckedPath] = None
     sticket_secret: Optional[str] = None
-    sticket_secret_file: Optional[AnyPath] = None
+    sticket_secret_file: Optional[CheckedPath] = None
     auto_discovery: bool = False
     padding: int = 1
 
