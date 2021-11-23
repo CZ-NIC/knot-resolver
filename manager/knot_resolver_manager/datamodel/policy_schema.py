@@ -1,6 +1,6 @@
 from typing import List, Optional
-from knot_resolver_manager.datamodel.types import IPAddressPort
 
+from knot_resolver_manager.datamodel.types import IPAddressPort
 from knot_resolver_manager.datamodel.view_schema import FlagsEnum
 from knot_resolver_manager.utils import SchemaNode
 from knot_resolver_manager.utils.types import LiteralEnum
@@ -20,7 +20,6 @@ class AnswerSchema(SchemaNode):
 
 
 class PolicySchema(SchemaNode):
-    id: str
     action: ActionEnum
     mirror: Optional[List[IPAddressPort]] = None
     filters: Optional[List[FilterSchema]] = None
