@@ -10,7 +10,13 @@ e.g. you can redirect malicious addresses to a blackhole, or use private address
 in local zones, that will be remapped to real addresses by the resolver.
 
 
-.. warning:: While requests are still validated using DNSSEC, the signatures are stripped from final answer. The reason is that the address synthesis breaks signatures. You can see whether an answer was valid or not based on the AD flag.
+.. warning:: While requests are still validated using DNSSEC, the signatures
+   are stripped from final answer. The reason is that the address synthesis
+   breaks signatures. You can see whether an answer was valid or not based on
+   the AD flag.
+
+.. warning:: The module is currently limited to rewriting complete octets of
+   the IP addresses, i.e. only /8, /16, /24 etc. network masks are supported.
 
 Example configuration
 ---------------------

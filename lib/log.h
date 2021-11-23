@@ -78,6 +78,7 @@ enum kr_log_group {
 	LOG_GRP_CONTROL,
 	LOG_GRP_MODULE,
 	LOG_GRP_DEVEL,
+	LOG_GRP_RENUMBER,
 	/* ^^ Add new log groups above ^^. */
 	LOG_GRP_REQDBG, /* Must be first non-displayed entry in enum! */
 };
@@ -130,6 +131,7 @@ enum kr_log_group {
 #define LOG_GRP_CONTROL_TAG		"contrl"	/**< ``contrl``: TTY control sockets*/
 #define LOG_GRP_MODULE_TAG		"module"	/**< ``module``: suitable for user-defined modules */
 #define LOG_GRP_DEVEL_TAG		"devel"		/**< ``devel``: for development purposes */
+#define LOG_GRP_RENUMBER_TAG		"renum"		/**< ``renum``: operation related to renumber */
 #define LOG_GRP_REQDBG_TAG		"reqdbg"	/**< ``reqdbg``: debug logs enabled by policy actions */
 ///@}
 

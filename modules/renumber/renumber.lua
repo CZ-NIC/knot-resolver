@@ -25,7 +25,12 @@ end
 
 -- Add subnet prefix rewrite rule
 local function add_prefix(subnet, addr)
-	table.insert(prefixes_global, matchprefix(subnet, addr))
+	local prefix = matchprefix(subnet, addr)
+	local bitlen = prefix[2]
+	if bitlen ~= nil and bitlen % 8 ~= 0 then
+		log_warn(ffi.C.LOG_GRP_RENUMBER, 'network mask: only /8, /16, /24 etc. are supported (entire octets are rewritten)')
+	end
+	table.insert(prefixes_global, prefix)
 end
 
 -- Match IP against given subnet or record owner
