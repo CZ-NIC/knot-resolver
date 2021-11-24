@@ -1,12 +1,12 @@
 from typing import List, Optional
 
-from knot_resolver_manager.datamodel.types import IPAddressPort
+from knot_resolver_manager.datamodel.types import IPAddressPort, TimeUnit
 from knot_resolver_manager.datamodel.view_schema import FlagsEnum
 from knot_resolver_manager.utils import SchemaNode
 from knot_resolver_manager.utils.types import LiteralEnum
 
 # TODO: add all other options
-ActionEnum = LiteralEnum["deny", "pass", "mirror"]
+ActionEnum = LiteralEnum["pass", "deny", "mirror", "forward", "modify"]
 
 
 class FilterSchema(SchemaNode):
@@ -16,17 +16,21 @@ class FilterSchema(SchemaNode):
 
 
 class AnswerSchema(SchemaNode):
-    pass
+    query_type: str
+    rdata: str
+    ttl: TimeUnit = TimeUnit("1s")
+    no_data: bool = False
 
 
 class PolicySchema(SchemaNode):
     action: ActionEnum
-    mirror: Optional[List[IPAddressPort]] = None
     filters: Optional[List[FilterSchema]] = None
-    message: Optional[str] = None
-    answer: Optional[AnswerSchema] = None
     views: Optional[List[str]] = None
     options: Optional[List[FlagsEnum]] = None
+    message: Optional[str] = None
+    mirror: Optional[List[IPAddressPort]] = None
+    forward: Optional[List[IPAddressPort]] = None
+    answer: Optional[AnswerSchema] = None
 
     def _validate(self) -> None:
         pass
