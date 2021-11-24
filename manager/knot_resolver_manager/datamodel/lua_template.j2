@@ -132,9 +132,9 @@ hints.add_hosts('{{ item }}')
 -- static-hints.root-hints
 {% if cfg.static_hints.root_hints %}
 hints.root({
-{% for item in cfg.static_hints.root_hints %}
-    ['{{ item.name }}'] = {
-{% for addr in item.addresses %}
+{% for name, addrs in cfg.static_hints.root_hints.items() %}
+['{{ name }}'] = {
+{% for addr in addrs %}
         '{{ addr }}',
 {% endfor %}
     },
@@ -144,9 +144,9 @@ hints.root({
 
 -- static-hints.hints
 {% if cfg.static_hints.hints %}
-{% for item in cfg.static_hints.hints %}
-{% for addr in item.addresses %}
-hints.set('{{ item.name }} {{ addr }}')
+{% for name, addrs in cfg.static_hints.hints.items() %}
+{% for addr in addrs %}
+hints.set('{{ name }} {{ addr }}')
 {% endfor %}
 {% endfor %}
 {% endif %}

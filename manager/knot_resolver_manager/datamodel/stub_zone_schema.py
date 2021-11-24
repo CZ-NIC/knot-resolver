@@ -6,7 +6,6 @@ from knot_resolver_manager.utils import SchemaNode
 
 
 class StubZoneSchema(SchemaNode):
-    name: str
     servers: List[IPAddressPort]
     views: Optional[List[str]] = None
     options: Optional[List[FlagsEnum]] = None

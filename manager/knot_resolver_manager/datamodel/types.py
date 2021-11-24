@@ -176,6 +176,9 @@ class DomainName(CustomValueType):
     def to_std(self) -> str:
         return self._value
 
+    def __hash__(self) -> int:
+        return hash(self._value)
+
     def __str__(self) -> str:
         return self._value
 
