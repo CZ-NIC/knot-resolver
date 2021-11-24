@@ -45,7 +45,7 @@ A *filter* selects which queries will be affected by specified Actions_. There a
 .. function:: domains(action, domain_table)
 
    Like :func:`policy.suffix` match, but the queried name must match exactly, not just its suffix.
-   
+
 .. function:: suffix_common(action, suffix_table[, common_suffix])
 
   :param action: action if the pattern matches query name
@@ -139,16 +139,16 @@ Following actions stop the policy matching on the query, i.e. other rules are no
 
    Force requestor to use TCP. It sets truncated bit (*TC*) in response to true if the request came through UDP, which will force standard-compliant clients to retry the request over TCP.
 
-.. function:: REROUTE({{subnet,target}, ...})
+.. function:: REROUTE({subnet = target, ...})
 
-   Reroute IP addresses in response matching given subnet to given target, e.g. ``{'192.0.2.0/24', '127.0.0.0'}`` will rewrite '192.0.2.55' to '127.0.0.55', see :ref:`renumber module <mod-renumber>` for more information. See :func:`policy.add` and do not forget to specify that this is *postrule*. Quick example:
+   Reroute IP addresses in response matching given subnet to given target, e.g. ``{['192.0.2.0/24'] = '127.0.0.0'}`` will rewrite '192.0.2.55' to '127.0.0.55', see :ref:`renumber module <mod-renumber>` for more information. See :func:`policy.add` and do not forget to specify that this is *postrule*. Quick example:
 
    .. code-block:: lua
 
       -- this policy is enforced on answers
       -- therefore we have to use 'postrule'
       -- (the "true" at the end of policy.add)
-      policy.add(policy.REROUTE({'192.0.2.0/24', '127.0.0.0'}), true)
+      policy.add(policy.all(policy.REROUTE({['192.0.2.0/24'] = '127.0.0.0'})), true)
 
 .. function:: ANSWER({ type = { rdata=data, [ttl=1] } }, [nodata=false])
 

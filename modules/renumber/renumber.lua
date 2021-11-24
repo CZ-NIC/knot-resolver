@@ -10,10 +10,7 @@ local function matchprefix(subnet, addr)
 	local addrtype = string.find(addr, ':', 1, true) and kres.type.AAAA or kres.type.A
 	local subnet_cd = ffi.new('char[16]')
 	local bitlen = ffi.C.kr_straddr_subnet(subnet_cd, subnet)
-	-- Mask unspecified, renumber whole IP
-	if bitlen == 0 then
-		bitlen = #target * 8
-	end
+	if bitlen < 0 then error('[renumber] invalid subnet: '..subnet) end
 	return {subnet_cd, bitlen, target, addrtype}
 end
 
@@ -29,7 +26,12 @@ end
 
 -- Add subnet prefix rewrite rule
 local function add_prefix(subnet, addr)
-	table.insert(prefixes_global, matchprefix(subnet, addr))
+	local prefix = matchprefix(subnet, addr)
+	local bitlen = prefix[2]
+	if bitlen ~= nil and bitlen % 8 ~= 0 then
+		log_warn(ffi.C.LOG_GRP_RENUMBER, 'network mask: only /8, /16, /24 etc. are supported (entire octets are rewritten)')
+	end
+	table.insert(prefixes_global, prefix)
 end
 
 -- Match IP against given subnet or record owner

@@ -187,7 +187,13 @@ function policy.REROUTE(tbl, names)
 	local ren = require('kres_modules.renumber')
 	local prefixes = {}
 	for from, to in pairs(tbl) do
-		table.insert(prefixes, names and ren.name(from, to) or ren.prefix(from, to))
+		local prefix = names and ren.name(from, to) or ren.prefix(from, to)
+		local bitlen = prefix[2]
+		if bitlen ~= nil and bitlen % 8 ~= 0 then
+			log_warn(ffi.C.LOG_GRP_POLICY,
+				'REROUTE: network mask - only /8, /16, /24 etc. are supported (entire octets are rewritten)')
+		end
+		table.insert(prefixes, prefix)
 	end
 	-- Return rule closure
 	return ren.rule(prefixes)
