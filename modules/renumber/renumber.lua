@@ -10,6 +10,7 @@ local function matchprefix(subnet, addr)
 	local addrtype = string.find(addr, ':', 1, true) and kres.type.AAAA or kres.type.A
 	local subnet_cd = ffi.new('char[16]')
 	local bitlen = ffi.C.kr_straddr_subnet(subnet_cd, subnet)
+	if bitlen < 0 then error('[renumber] invalid subnet: '..subnet) end
 	return {subnet_cd, bitlen, target, addrtype}
 end
 
