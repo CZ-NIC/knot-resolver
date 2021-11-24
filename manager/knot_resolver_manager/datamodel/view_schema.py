@@ -9,7 +9,6 @@ FlagsEnum = LiteralEnum["no-cache", "no-edns"]
 
 
 class ViewSchema(SchemaNode):
-    id: str
     addresses: Optional[List[IPNetwork]] = None
     tsig: Optional[List[str]] = None
     options: Optional[List[FlagsEnum]] = None

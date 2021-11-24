@@ -1,5 +1,5 @@
 import pkgutil
-from typing import Dict, List, Optional, Text, Union
+from typing import Dict, Optional, Text, Union
 
 from jinja2 import Environment, Template
 from typing_extensions import Literal
@@ -16,6 +16,7 @@ from knot_resolver_manager.datamodel.policy_schema import PolicySchema
 from knot_resolver_manager.datamodel.server_schema import ServerSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
+from knot_resolver_manager.datamodel.types import DomainName
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.utils import SchemaNode
 
@@ -37,10 +38,10 @@ class KresConfig(SchemaNode):
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
         static_hints: StaticHintsSchema = StaticHintsSchema()
-        views: Optional[List[ViewSchema]] = None
+        views: Optional[Dict[str, ViewSchema]] = None
         policy: Optional[Dict[str, PolicySchema]] = None
-        stub_zones: Optional[List[StubZoneSchema]] = None
-        forward_zones: Optional[List[ForwardZoneSchema]] = None
+        stub_zones: Optional[Dict[DomainName, StubZoneSchema]] = None
+        forward_zones: Optional[Dict[DomainName, ForwardZoneSchema]] = None
         cache: CacheSchema = CacheSchema()
         dnssec: Union[bool, DnssecSchema] = True
         dns64: Union[bool, Dns64Schema] = False
@@ -53,10 +54,10 @@ class KresConfig(SchemaNode):
     options: OptionsSchema
     network: NetworkSchema
     static_hints: StaticHintsSchema
-    views: Optional[List[ViewSchema]]
+    views: Optional[Dict[str, ViewSchema]]
     policy: Optional[Dict[str, PolicySchema]]
-    stub_zones: Optional[List[StubZoneSchema]]
-    forward_zones: Optional[List[ForwardZoneSchema]]
+    stub_zones: Optional[Dict[DomainName, StubZoneSchema]]
+    forward_zones: Optional[Dict[DomainName, ForwardZoneSchema]]
     cache: CacheSchema
     dnssec: Union[Literal[False], DnssecSchema]
     dns64: Union[Literal[False], Dns64Schema]
