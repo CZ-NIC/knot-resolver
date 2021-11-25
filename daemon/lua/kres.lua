@@ -328,6 +328,28 @@ local function dname2wire(name)
 	return ffi.string(name, knot.knot_dname_size(name))
 end
 
+-- Parse RDATA, from presentation to wire-format.
+-- in: a table of strings, each a line describing RRTYPE+RDATA
+-- out: a table of RDATA strings in wire-format
+local function parse_rdata(strs, nothing)
+	local zonefile = require('zonefile')
+	if type(strs) ~= 'table' or nothing ~= nil then -- accidents like forgetting braces
+		error('a table of string(s) is expected', 2)
+	end
+	local res = {}
+	for _, line in ipairs(strs) do
+		if type(line) ~= 'string' then
+			error('table must contain strings', 2)
+		end
+		local rrs = zonefile.string('. ' .. line)
+		if #rrs == 0 then error('failed to parse line: ' .. line, 2) end
+		for _, rr in ipairs(rrs) do
+			table.insert(res, rr.rdata)
+		end
+	end
+	return res
+end
+
 -- RR sets created in Lua must have a destructor to release allocated memory
 local function rrset_free(rr)
 	if rr._owner ~= nil then ffi.C.free(rr._owner) end
@@ -1060,6 +1082,7 @@ kres = {
 	end,
 	dname2str = dname2str,
 	dname2wire = dname2wire,
+	parse_rdata = parse_rdata,
 
 	rr2str = rr2str,
 	str2ip = function (ip)
