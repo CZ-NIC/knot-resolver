@@ -157,7 +157,7 @@ Following actions stop the policy matching on the query, i.e. other rules are no
       * type
         - RR type to be replaced, e.g. ``[kres.type.A]`` or `numeric value <https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4>`_.
       * rdata
-        - RR data in DNS wire format, i.e. binary form specific for given RR type. Set of multiple RRs can be specified as table ``{ rdata1, rdata2, ... }``. Use helper function :func:`kres.str2ip` to generate wire format for A and AAAA records.
+        - RR data in DNS wire format, i.e. binary form specific for given RR type. Set of multiple RRs can be specified as table ``{ rdata1, rdata2, ... }``. Use helper function :func:`kres.str2ip` to generate wire format for A and AAAA records. Wire format for other record types can be generated with :func:`kres.parse_rdata`.
       * ttl
         - TTL in seconds. Default: 1 second.
       * nodata
@@ -182,6 +182,21 @@ Following actions stop the policy matching on the query, i.e. other rules are no
               policy.ANSWER(
                   { [kres.type.TXT] = { rdata={'\005first', '\006second'}, ttl=5 } }
               ), { todname('example.net') }))
+
+
+   .. function:: kres.parse_rdata({str, ...})
+
+      Parse string representation of RTYPE and RDATA into RDATA wire format. Expects
+      a table of string(s) and returns a table of wire data.
+
+      .. code-block:: lua
+
+         -- create wire format RDATA that can be passed to policy.ANSWER
+         kres.parse_rdata({'SVCB 1 resolver.example. alpn=dot'})
+         kres.parse_rdata({
+            'SVCB 1 resolver.example. alpn=dot ipv4hint=192.0.2.1 ipv6hint=2001:db8::1',
+            'SVCB 2 resolver.example. mandatory=key65380 alpn=h2 key65380=/dns-query{?dns}',
+         })
 
 More complex non-chain actions are described in their own chapters, namely:
 
