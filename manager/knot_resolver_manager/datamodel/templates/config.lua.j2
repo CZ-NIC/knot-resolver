@@ -151,6 +151,9 @@ hints.set('{{ name }} {{ addr }}')
 {% endfor %}
 {% endif %}
 
+-- POLICY section
+{{ path }}
+
 -- CACHE section
 cache.open({{ cfg.cache.size_max.bytes() }}, 'lmdb://{{ cfg.cache.storage }}')
 cache.min_ttl({{ cfg.cache.ttl_min.seconds() }})
