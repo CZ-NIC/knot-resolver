@@ -1,7 +1,8 @@
-import pkgutil
+import os
+import sys
 from typing import Dict, Optional, Text, Union
 
-from jinja2 import Environment, Template
+from jinja2 import Environment, FileSystemLoader, Template
 from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.cache_schema import CacheSchema
@@ -21,15 +22,26 @@ from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.utils import SchemaNode
 
 
+def _get_templates_dir() -> str:
+    module = sys.modules["knot_resolver_manager.datamodel"].__file__
+    if module:
+        return os.path.join(os.path.dirname(module), "templates")
+    raise OSError("package 'knot_resolver_manager.datamodel' cannot be located or loaded")
+
+
+_TEMPLATES_DIR = _get_templates_dir()
+
+
 def _import_lua_template() -> Template:
-    env = Environment(trim_blocks=True, lstrip_blocks=True)
-    template = pkgutil.get_data("knot_resolver_manager.datamodel", "lua_template.j2")
-    if template is None:
-        raise OSError("package cannot be located or loaded")
-    return env.from_string(template.decode("utf-8"))
+    ldr = FileSystemLoader(_TEMPLATES_DIR)
+    env = Environment(trim_blocks=True, lstrip_blocks=True, loader=ldr)
+    path = os.path.join(_TEMPLATES_DIR, "config.lua.j2")
+    with open(path, "r", encoding="UTF-8") as file:
+        template = file.read()
+    return env.from_string(template)
 
 
-_LUA_TEMPLATE = _import_lua_template()
+_MAIN_TEMPLATE = _import_lua_template()
 
 
 class KresConfig(SchemaNode):
@@ -75,4 +87,4 @@ class KresConfig(SchemaNode):
         return obj.dns64
 
     def render_lua(self) -> Text:
-        return _LUA_TEMPLATE.render(cfg=self)
+        return _MAIN_TEMPLATE.render(cfg=self)
