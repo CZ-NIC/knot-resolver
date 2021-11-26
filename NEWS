@@ -1,15 +1,17 @@
-Knot Resolver 5.4.3 (2021-mm-dd)
+Knot Resolver 5.4.3 (2021-12-01)
 ================================
 
 Improvements
 ------------
 - lua: add kres.parse_rdata() to parse RDATA from string to wire format (!1233)
+- lua: add policy.domains() for exact domain name matching (!1228)
 
 Bugfixes
 --------
-- policy.rpz: improve logs, fix origin detection in files without $ORIGIN
+- policy.rpz: fix origin detection in files without $ORIGIN (!1215)
 - lua: log() works again; broken in 5.4.2 (!1223)
 - policy: correctly include EDNS0 previously omitted by some actions (!1230)
+- edns_keepalive: module is now properly loaded (!1229, thanks Josh Soref!)
 
 
 Knot Resolver 5.4.2 (2021-10-13)
