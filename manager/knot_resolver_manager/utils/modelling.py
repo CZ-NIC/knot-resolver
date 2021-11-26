@@ -175,7 +175,14 @@ def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
 
     elif is_dict(typ):
         key, val = get_generic_type_arguments(typ)
-        assert key == str, "We currently do not support any other keys then strings"
+
+        if inspect.isclass(key) and issubclass(key, CustomValueType):
+            assert (
+                key.__str__ is not CustomValueType.__str__
+            ), "To support derived 'CustomValueType', __str__ must be implemented."
+        else:
+            assert key == str, "We currently do not support any other keys then strings"
+
         return {"type": "object", "additionalProperties": _describe_type(val)}
 
     elif is_enum(typ):
