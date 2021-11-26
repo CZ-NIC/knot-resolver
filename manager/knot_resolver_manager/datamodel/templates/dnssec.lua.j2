@@ -1,0 +1,34 @@
+{% if not cfg.dnssec %}
+-- disable dnssec
+trust_anchors.remove('.')
+{% endif %}
+
+{{ "modules.unload('ta_sentinel')" if not cfg.dnssec.trust_anchor_sentinel }}
+{{ "modules.unload('ta_signal_query')" if not cfg.dnssec.trust_anchor_signal_query }}
+{{ "modules.unload('detect_time_skew')" if not cfg.dnssec.time_skew_detection }}
+
+trust_anchors.keep_removed = {{ cfg.dnssec.keep_removed }}
+{{ "trust_anchors.refresh_time = "+cfg.dnssec.refresh_time.seconds()|string if cfg.dnssec.refresh_time }}
+
+{% if cfg.dnssec.trust_anchors %}
+-- dnssec.trust-anchors
+{% for ta in cfg.dnssec.trust_anchors %}
+trust_anchors.add('{{ ta }}')
+{% endfor %}
+{% endif %}
+
+{% if cfg.dnssec.negative_trust_anchors %}
+-- dnssec.negative-trust-anchors
+trust_anchors.set_insecure({
+{% for nta in cfg.dnssec.negative_trust_anchors %}
+    '{{ nta }}',
+{% endfor %}
+})
+{% endif %}
+
+{% if cfg.dnssec.trust_anchors_files %}
+-- dnssec.trust-anchors-files
+{% for taf in cfg.dnssec.trust_anchors_files %}
+trust_anchors.add_file('{{ taf.file }}',  readonly = {{ 'true' if taf.read_only else 'false' }})
+{% endfor %}
+{% endif %}
