@@ -1,6 +1,10 @@
 Knot Resolver 5.4.3 (2021-mm-dd)
 ================================
 
+Improvements
+------------
+- lua: add kres.parse_rdata() to parse RDATA from string to wire format (!1233)
+
 Bugfixes
 --------
 - policy.rpz: improve logs, fix origin detection in files without $ORIGIN

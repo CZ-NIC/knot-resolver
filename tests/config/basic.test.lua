@@ -31,6 +31,15 @@ local function test_globals()
 	same(table_print({fakepizza=1}), "{\n    ['fakepizza'] = 1,\n}", 'table print works on tables')
 end
 
+-- test global API functions
+local function test_global_functions()
+	boom(kres.parse_rdata, {'A 127.0.0.1'}, 'parse_rdata with non-table argument')
+	boom(kres.parse_rdata, {{1}}, 'parse_rdata with non-string data in arg table')
+	same(kres.parse_rdata({'A 127.0.0.1'}), {string.char(127, 0, 0, 1)}, 'parse_rdata with single record')
+	same(kres.parse_rdata({'A 127.0.0.1', 'A 127.0.0.2'}),
+		{string.char(127, 0, 0, 1), string.char(127, 0, 0, 2)}, 'parse_rdata with multiple records')
+end
+
 -- test if dns library functions work
 local function test_rrset_functions()
 	local rr = {owner = '\3com\0', ttl = 1, type = kres.type.TXT, rdata = '\5hello'}
@@ -195,6 +204,7 @@ end
 return {
 	test_constants,
 	test_globals,
+	test_global_functions,
 	test_rrset_functions,
 	test_packet_functions,
 	test_json_functions,
