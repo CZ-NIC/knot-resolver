@@ -1,0 +1,11 @@
+-- options.glue-checking
+mode('{{ cfg.options.glue_checking }}')
+
+-- options
+option('NO_MINIMIZE', {{ 'false' if cfg.options.qname_minimisation else 'true' }})
+option('ALLOW_LOCAL', {{ 'true' if cfg.options.query_loopback else 'false' }})
+option('REORDER_RR', {{ 'true' if cfg.options.reorder_rrset else 'false' }})
+option('NO_0X20', {{ 'false' if cfg.options.query_case_randomization else 'true' }})
+{{ "modules.unload('priming')" if not cfg.options.query_priming }}
+{{ "modules.unload('detect_time_jump')" if not cfg.options.time_jump_detection }}
+{{ "modules.unload('refuse_nord')" if not cfg.options.refuse_no_rd }}

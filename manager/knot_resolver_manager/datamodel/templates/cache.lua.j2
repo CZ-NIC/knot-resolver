@@ -1,0 +1,18 @@
+cache.open({{ cfg.cache.size_max.bytes() }}, 'lmdb://{{ cfg.cache.storage }}')
+cache.min_ttl({{ cfg.cache.ttl_min.seconds() }})
+cache.max_ttl({{ cfg.cache.ttl_max.seconds() }})
+cache.ns_tout({{ cfg.cache.ns_timeout.millis() }})
+
+{% if cfg.cache.prefill %}
+-- cache.prefill
+modules.load('prefill')
+prefill.config({
+{% for item in cfg.cache.prefill %}
+    ['{{ item.domain }}'] = {
+        url = '{{ item.url }}',
+        interval = {{ item.refresh_interval.seconds() }}
+        {{ "ca_file = '"+item.ca_file+"'," if item.ca_file }}
+    }
+{% endfor %}
+})
+{% endif %}
