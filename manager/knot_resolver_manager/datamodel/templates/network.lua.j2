@@ -6,6 +6,7 @@ net.ipv6 = {{ 'true' if cfg.network.do_ipv6 else 'false' }}
 -- network.out-interface-v4
 net.outgoing_v4('{{ cfg.network.out_interface_v4 }}')
 {% endif %}
+
 {% if cfg.network.out_interface_v6 %}
 -- network.out-interface-v6
 net.outgoing_v6('{{ cfg.network.out_interface_v6 }}')
@@ -22,7 +23,10 @@ modules.unload('edns_keepalive')
 {% endif %}
 
 -- network.edns-buffer-size
-net.bufsize({{ cfg.network.edns_buffer_size.upstream.bytes() }}, {{ cfg.network.edns_buffer_size.downstream.bytes() }})
+net.bufsize(
+    {{ cfg.network.edns_buffer_size.upstream.bytes() }},
+    {{ cfg.network.edns_buffer_size.downstream.bytes() }}
+)
 
 {% if cfg.network.tls.cert_file and cfg.network.tls.key_file %}
 -- network.tls

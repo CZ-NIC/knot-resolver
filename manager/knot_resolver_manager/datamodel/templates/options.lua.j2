@@ -1,11 +1,50 @@
 -- options.glue-checking
 mode('{{ cfg.options.glue_checking }}')
 
--- options
+{% if cfg.options.rebinding_protection %}
+-- options.rebinding-protection
+modules.load('rebinding < iterate')
+{% endif %}
+
+{% if cfg.options.violators_workarounds %}
+-- options.violators-workarounds
+modules.load('workarounds < iterate')
+{% endif %}
+
+{% if cfg.options.serve_stale %}
+-- options.serve-stale
+modules.load('serve_stale < cache')
+{% endif %}
+
+-- options.query-priming
+{% if cfg.options.query_priming %}
+modules.load('priming')
+{% else %}
+modules.unload('priming')
+{% endif %}
+
+-- options.time-jump-detection
+{% if cfg.options.time_jump_detection %}
+modules.load('detect_time_jump')
+{% else %}
+modules.unload('detect_time_jump')
+{% endif %}
+
+-- options.refuse-no-rd
+{% if cfg.options.refuse_no_rd %}
+modules.load('refuse_nord')
+{% else %}
+modules.unload('refuse_nord')
+{% endif %}
+
+-- options.qname-minimisation
 option('NO_MINIMIZE', {{ 'false' if cfg.options.qname_minimisation else 'true' }})
+
+-- options.query-loopback
 option('ALLOW_LOCAL', {{ 'true' if cfg.options.query_loopback else 'false' }})
+
+-- options.reorder-rrset
 option('REORDER_RR', {{ 'true' if cfg.options.reorder_rrset else 'false' }})
+
+-- options.query-case-randomization
 option('NO_0X20', {{ 'false' if cfg.options.query_case_randomization else 'true' }})
-{{ "modules.unload('priming')" if not cfg.options.query_priming }}
-{{ "modules.unload('detect_time_jump')" if not cfg.options.time_jump_detection }}
-{{ "modules.unload('refuse_nord')" if not cfg.options.refuse_no_rd }}

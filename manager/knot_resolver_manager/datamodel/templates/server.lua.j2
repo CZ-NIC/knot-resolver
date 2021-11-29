@@ -4,7 +4,7 @@ hostname('{{ cfg.server.hostname }}')
 {% if cfg.server.nsid %}
 -- server.nsid
 modules.load('nsid')
-nsid.name('{{ cfg.server.nsid }} ' .. worker.id)
+nsid.name('{{ cfg.server.nsid }}_' .. worker.id)
 {% endif %}
 
 {% if cfg.server.webmgmt %}
