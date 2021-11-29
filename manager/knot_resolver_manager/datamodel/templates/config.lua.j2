@@ -1,30 +1,16 @@
 {% if not cfg.lua.script_only %}
 
--- MODULES
-modules = {
-    {{ "'rebinding < iterate'," if cfg.options.rebinding_protection }}
-    {{ "'workarounds < iterate'," if cfg.options.violators_workarounds }}
-    {{ "'serve_stale < cache'," if cfg.options.serve_stale }}
-    {{ "dns64 = '"+cfg.dns64.prefix+"'," if cfg.dns64 }}
-    'hints > iterate',
-{% if cfg.network.address_renumbering %}
--- network.address-renumbering
-    renumber = {
-{% for item in cfg.network.address_renumbering %}
-        {'{{ item.source }}', '{{ item.destination }}'},
-{% endfor %}
-    }
-{% endif %}
-}
+-- LOGGING section
+{% include "logging.lua.j2" %}
 
 -- SERVER section
 {% include "server.lua.j2" %}
 
--- NETWORK section
-{% include "network.lua.j2" %}
-
 -- OPTIONS section
 {% include "options.lua.j2" %}
+
+-- NETWORK section
+{% include "network.lua.j2" %}
 
 -- STATIC-HINTS section
 {% include "static_hints.lua.j2" %}
@@ -35,19 +21,19 @@ modules = {
 -- DNSSEC section
 {% include "dnssec.lua.j2" %}
 
--- LOGGING section
-{% include "logging.lua.j2" %}
+-- DNS64 section
+{% include "dns64.lua.j2" %}
 
 {% endif %}
 
 -- LUA section
+-- Custom Lua code cannot be validated
+
 {% if cfg.lua.script_file %}
 {% import cfg.lua.script_file as script_file %}
--- lua.script-file
 {{ script_file }}
 {% endif %}
 
 {% if cfg.lua.script %}
--- lua.script
 {{ cfg.lua.script }}
 {% endif %}

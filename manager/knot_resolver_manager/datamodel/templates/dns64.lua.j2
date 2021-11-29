@@ -1,0 +1,7 @@
+{% if cfg.dns64 %}
+-- load dns64 module
+modules.load('dns64')
+
+-- dns64.prefix
+dns64.config('{{ cfg.dns64.prefix.to_std().network_address }}')
+{% endif %}

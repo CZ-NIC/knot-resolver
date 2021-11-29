@@ -3,12 +3,34 @@
 trust_anchors.remove('.')
 {% endif %}
 
-{{ "modules.unload('ta_sentinel')" if not cfg.dnssec.trust_anchor_sentinel }}
-{{ "modules.unload('ta_signal_query')" if not cfg.dnssec.trust_anchor_signal_query }}
-{{ "modules.unload('detect_time_skew')" if not cfg.dnssec.time_skew_detection }}
+-- options.trust-anchor-sentinel
+{% if cfg.dnssec.trust_anchor_sentinel %}
+modules.load('ta_sentinel')
+{% else %}
+modules.unload('ta_sentinel')
+{% endif %}
 
+-- options.trust-anchor-signal-query
+{% if cfg.dnssec.trust_anchor_signal_query %}
+modules.load('ta_signal_query')
+{% else %}
+modules.unload('ta_signal_query')
+{% endif %}
+
+-- options.time-skew-detection
+{% if cfg.dnssec.time_skew_detection %}
+modules.load('detect_time_skew')
+{% else %}
+modules.unload('detect_time_skew')
+{% endif %}
+
+-- dnssec.keep-removed
 trust_anchors.keep_removed = {{ cfg.dnssec.keep_removed }}
-{{ "trust_anchors.refresh_time = "+cfg.dnssec.refresh_time.seconds()|string if cfg.dnssec.refresh_time }}
+
+{% if cfg.dnssec.refresh_time %}
+-- dnssec.refresh-time
+trust_anchors.refresh_time = {{ cfg.dnssec.refresh_time.seconds()|string  }}
+{% endif %}
 
 {% if cfg.dnssec.trust_anchors %}
 -- dnssec.trust-anchors
