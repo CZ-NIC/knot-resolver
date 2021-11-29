@@ -53,6 +53,16 @@ modules.load('experimental_dot_auth')
 -- network.tls.padding
 net.tls_padding({{ cfg.network.tls.padding }})
 
+{% if cfg.network.address_renumbering %}
+-- network.address-renumbering
+modules.load('renumber')
+renumber.config = {
+{% for item in cfg.network.address_renumbering %}
+    {'{{ item.source }}', '{{ item.destination }}'},
+{% endfor %}
+}
+{% endif %}
+
 -- network.interfaces
 {% for item in cfg.network.interfaces %}
 net.listen('{{ item.listen.ip }}', {{ item.listen.port }}, {
