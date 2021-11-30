@@ -6,7 +6,8 @@ from knot_resolver_manager.utils.types import LiteralEnum
 
 # FLAGS from https://knot-resolver.readthedocs.io/en/stable/lib.html?highlight=options#c.kr_qflags
 FlagsEnum = LiteralEnum[
-    "no-minimize" "no-ipv4",
+    "no-minimize",
+    "no-ipv4",
     "no-ipv6",
     "tcp",
     "resolved",
