@@ -19,7 +19,7 @@ cache.size = 16 * GB
 
 -- Load Useful modules
 modules = {
-	'hints > iterate', -- Load /etc/hosts and allow custom root hints
+	'hints > iterate', -- Allow loading /etc/hosts or custom root hints
 	'stats',    -- Track internal statistics
 	graphite = { -- Send statistics to local InfluxDB
 		-- Address of the Graphite/InfluxDB server
