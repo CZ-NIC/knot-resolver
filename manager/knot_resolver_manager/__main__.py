@@ -1,4 +1,3 @@
-import logging
 import sys
 from pathlib import Path
 from typing import Optional
@@ -6,8 +5,9 @@ from typing import Optional
 import click
 
 from knot_resolver_manager import compat
-from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, STARTUP_LOG_LEVEL
+from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE
 from knot_resolver_manager.kresd_controller import list_controller_names
+from knot_resolver_manager.log import logger_startup
 from knot_resolver_manager.server import start_server
 
 
@@ -45,5 +45,8 @@ def main(config: Optional[str], list_backends: bool):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=STARTUP_LOG_LEVEL)
+    # initial logging is to memory until we read the config
+    logger_startup()
+
+    # run the main
     main()  # pylint: disable=no-value-for-parameter

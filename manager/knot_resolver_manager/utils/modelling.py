@@ -494,6 +494,18 @@ class SchemaNode:
         Validation procedure called after all field are assigned. Should throw a ValueError in case of failure.
         """
 
+    def __eq__(self, o: object) -> bool:
+        cls = self.__class__
+        if not isinstance(o, cls):
+            return False
+
+        annot = cls.__dict__.get("__annotations__", {})
+        for name in annot.keys():
+            if getattr(self, name) != getattr(o, name):
+                return False
+
+        return True
+
     @classmethod
     def json_schema(cls: Type["SchemaNode"], include_schema_definition: bool = True) -> Dict[Any, Any]:
         if cls._PREVIOUS_SCHEMA is not None:
