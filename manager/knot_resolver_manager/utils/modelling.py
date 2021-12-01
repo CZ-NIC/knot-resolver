@@ -278,12 +278,14 @@ def _validated_object_type(
     elif is_dict(cls):
         key_type, val_type = get_generic_type_arguments(cls)
         try:
-            return {
-                _validated_object_type(key_type, key, object_path=f"{object_path} @ key {key}"): _validated_object_type(
-                    val_type, val, object_path=f"{object_path} @ value for key {key}"
+            d: Dict[Any, Any] = {}
+            for key, val in obj.items():
+                k: str = str(key).replace("_", "-")
+
+                d[_validated_object_type(key_type, k, object_path=f"{object_path} @ key {k}")] = _validated_object_type(
+                    val_type, val, object_path=f"{object_path} @ value for key {k}"
                 )
-                for key, val in obj.items()
-            }
+            return d
         except AttributeError as e:
             raise SchemaException(
                 f"Expected dict-like object, but failed to access its .items() method. Value was {obj}", object_path
