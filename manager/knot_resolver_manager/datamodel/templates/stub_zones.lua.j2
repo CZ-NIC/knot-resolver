@@ -1,17 +1,17 @@
 {% if cfg.stub_zones %}
 
-{% for name, stub in cfg.stub_zones.items() %}
+{% for name, zone in cfg.stub_zones.items() %}
 -- stub-zone: {{ name }}
-{% if stub.views %}
-{% for view_id in stub.views %}
+{% if zone.views %}
+{% for view_id in zone.views %}
 -- stub-zone: {{ name }} view: {{ view_id }}
 {% set view = cfg.views[view_id] %}
 
 {% set options = none %}
-{% if stub.options and view.options %}
-{% set options = stub.options|list + view.options |list%}
-{% elif stub.options %}
-{% set options = stub.options|list %}
+{% if zone.options and view.options %}
+{% set options = zone.options|list + view.options |list%}
+{% elif zone.options %}
+{% set options = zone.options|list %}
 {% elif view.options %}
 {% set options = view.options|list %}
 {% endif %}
@@ -29,7 +29,7 @@ view:tsig('{{ sig }}', policy.suffix(policy.FLAGS({
 {% endif %}
 
 -- stub-zone: {{ name }} view: {{ view_id }} servers
-{% for server in stub.servers %}
+{% for server in zone.servers %}
 view:tsig('{{ sig }}', policy.suffix(policy.STUB('{{ server }}'), {todname('{{ name }}')}))
 {% endfor %}
 
@@ -49,7 +49,7 @@ view:addr('{{ addr }}', policy.suffix(policy.FLAGS({
 {% endif %}
 
 -- stub-zone: {{ name }} view: {{ view_id }} servers
-{% for server in stub.servers %}
+{% for server in zone.servers %}
 view:addr('{{ addr }}', policy.suffix(policy.STUB('{{ server }}'), {todname('{{ name }}')}))
 {% endfor %}
 
@@ -58,18 +58,18 @@ view:addr('{{ addr }}', policy.suffix(policy.STUB('{{ server }}'), {todname('{{ 
 
 {% endfor %}
 {% else %}
-{% if stub.options %}
+{% if zone.options %}
 
 -- stub-zone: {{ name }} options
 policy.add(policy.suffix(policy.FLAGS({
-{%- for flag in stub.options -%}
+{%- for flag in zone.options -%}
 '{{ flag.upper().replace("-", "_") }}',
 {%- endfor -%}
 }), {todname('{{ name }}')}))
 {% endif %}
 
 -- stub-zone: {{ name }} servers
-{% for server in stub.servers %}
+{% for server in zone.servers %}
 policy.add(policy.suffix(policy.STUB('{{ server }}'), {todname('{{ name }}')}))
 {% endfor %}
 
