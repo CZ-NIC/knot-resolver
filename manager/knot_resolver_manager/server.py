@@ -13,6 +13,7 @@ from aiohttp.web_app import Application
 from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 
+from knot_resolver_manager import log
 from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE
 from knot_resolver_manager.datamodel.config_schema import KresConfig
@@ -69,12 +70,9 @@ class Server:
         self.site: Union[NoneType, TCPSite, UnixSite] = None
         self.listen_lock = asyncio.Lock()
 
-        self.log_level = "dummy"
-
         self.shutdown_event = asyncio.Event()
 
     async def _reconfigure(self, config: KresConfig):
-        self._set_log_level(config)
         await self._reconfigure_listen_address(config)
 
     async def _deny_listen_address_changes(self, config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
@@ -159,29 +157,6 @@ class Server:
         """,
             content_type="text/html",
         )
-
-    def _set_log_level(self, config: KresConfig):
-
-        levels_map = {
-            "crit": "CRITICAL",
-            "err": "ERROR",
-            "warning": "WARNING",
-            "notice": "WARNING",
-            "info": "INFO",
-            "debug": "DEBUG",
-        }
-
-        target = levels_map[config.logging.level]
-        if config.logging.groups and "manager" in config.logging.groups:
-            target = "DEBUG"
-
-        if self.log_level != target:
-            # expects one existing log handler on the root
-            h = logging.getLogger().handlers
-            assert len(h) == 1
-            logger.warning(f"Changing logging level to '{target}'")
-            h[0].setLevel(target)
-            self.log_level = target
 
     async def _handler_stop(self, _request: web.Request) -> web.Response:
         """
@@ -335,6 +310,10 @@ async def start_server(config: Union[Path, ParsedTree, _DefaultSentinel] = _DEFA
         # It would cause strange problems because every other path configuration depends on it. Therefore, we have to
         # add a check to the config store, which disallows changes.
         await config_store.register_verifier(_deny_working_directory_changes)
+
+        # Up to this point, we have been logging to memory buffer. But now, when we have the configuration loaded, we
+        # can flush the buffer into the proper place
+        await log.logger_init(config_store)
 
         # After we have loaded the configuration, we can start worring about subprocess management.
         manager = await _init_manager(config_store)

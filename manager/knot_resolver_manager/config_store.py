@@ -1,6 +1,6 @@
 import asyncio
 from asyncio import Lock
-from typing import Awaitable, Callable, List, Tuple
+from typing import Any, Awaitable, Callable, List, Tuple
 
 from knot_resolver_manager.datamodel import KresConfig
 from knot_resolver_manager.exceptions import DataException, KresdManagerException
@@ -51,3 +51,24 @@ class ConfigStore:
 
     def get(self) -> KresConfig:
         return self._config
+
+
+def only_on_real_changes(selector: Callable[[KresConfig], Any]) -> Callable[[UpdateCallback], UpdateCallback]:
+    def decorator(orig_func: UpdateCallback) -> UpdateCallback:
+        original_value_set: Any = False
+        original_value: Any = None
+
+        async def new_func(config: KresConfig):
+            nonlocal original_value_set
+            nonlocal original_value
+            if not original_value_set:
+                original_value_set = True
+                original_value = selector(config)
+                await orig_func(config)
+            elif original_value != selector(config):
+                original_value = selector(config)
+                await orig_func(config)
+
+        return new_func
+
+    return decorator

@@ -2,6 +2,8 @@ cache:
   storage: ../cache
 logging:
   level: debug
+  groups:
+    - manager
 network:
   interfaces:
     - listen:

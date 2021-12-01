@@ -183,3 +183,21 @@ def test_partial_mutations():
     # raise validation SchemaException
     with raises(SchemaException):
         o = ConfSchema(d.update("/", parse_json('{"workers": -5}')))
+
+
+def test_eq():
+    class A(SchemaNode):
+        field: int
+
+    class B(SchemaNode):
+        a: A
+        field: str
+
+    b1 = B({"a": {"field": 6}, "field": "val"})
+    b2 = B({"a": {"field": 6}, "field": "val"})
+    b_diff = B({"a": {"field": 7}, "field": "val"})
+
+    assert b1 == b2
+    assert b2 != b_diff
+    assert b1 != b_diff
+    assert b_diff == b_diff
