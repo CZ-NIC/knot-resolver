@@ -204,7 +204,7 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 			m.has_query_message = qpkt != NULL;
 			if (qpkt != NULL) {
 				m.query_message.len = qpkt->size;
-				m.query_message.data = (uint8_t *)qpkt->wire;
+				m.query_message.data = qpkt->wire;
 			}
 		}
 
