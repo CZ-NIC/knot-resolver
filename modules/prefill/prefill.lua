@@ -56,9 +56,7 @@ end
 -- returns: number of seconds the file is valid for
 -- 0 indicates immediate download
 local function get_file_ttl(fname)
-	local c_str = ffi.new("char[?]", #fname)
-	ffi.copy(c_str, fname)
-	local mtime = tonumber(ffi.C.kr_file_mtime(c_str))
+	local mtime = tonumber(ffi.C.kr_file_mtime(fname))
 
 	if mtime > 0 then
 		local age = os.time() - mtime
