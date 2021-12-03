@@ -39,7 +39,7 @@ struct kr_context;
  * "Closest" means on path towards root.  Closer negative anchor results into NULL.
  * @param type serves as a shorthand because DS needs to start one level higher.
  */
-KR_PURE
+KR_EXPORT KR_PURE
 const knot_dname_t * kr_ta_closest(const struct kr_context *ctx, const knot_dname_t *name,
 				   const uint16_t type);
 

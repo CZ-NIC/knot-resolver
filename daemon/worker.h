@@ -176,7 +176,6 @@ struct worker_ctx {
 
 	struct worker_stats stats;
 
-	struct zone_import_ctx* z_import;
 	bool too_many_open;
 	size_t rconcurrent_highwatermark;
 	/** List of active outbound TCP sessions */

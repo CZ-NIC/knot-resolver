@@ -89,13 +89,16 @@ local function download(url, fname)
 end
 
 local function import(fname)
-	local res = cache.zone_import(fname)
-	if res.code == 1 then -- no TA found, wait
-		error("[prefill] no trust anchor found for root zone, import aborted")
-	elseif res.code == 0 then
-		log_info(ffi.C.LOG_GRP_PREFILL, "root zone successfully parsed, import started")
+	local ret = ffi.C.zi_zone_import({
+		zone_file = fname,
+		time_src = ffi.C.ZI_STAMP_MTIM, -- the file might be slightly older
+	})
+	if ret == 0 then
+		log_info(ffi.C.LOG_GRP_PREFILL, "zone successfully parsed, import started")
 	else
-		error(string.format("[prefill] root zone import failed (%s)", res.msg))
+		error(string.format(
+			"[prefill] zone import failed: %s", ffi.C.knot_strerror(ret)
+		))
 	end
 end
 

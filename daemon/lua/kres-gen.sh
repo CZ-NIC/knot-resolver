@@ -89,6 +89,7 @@ typedef void (*trace_log_f) (const struct kr_request *, const char *);
 typedef void (*trace_callback_f)(struct kr_request *);
 typedef uint8_t * (*alloc_wire_f)(struct kr_request *req, uint16_t *maxlen);
 typedef bool (*addr_info_f)(struct sockaddr*);
+typedef void (*zi_callback)(int state, void *param);
 "
 
 genResType() {
@@ -294,6 +295,7 @@ ${CDEFS} ${KRESD} types <<-EOF
 	flagged_fd_array_t
 	config_array_t
 	struct args
+	zi_config_t
 EOF
 echo "struct args *the_args;"
 
@@ -309,6 +311,7 @@ ${CDEFS} ${KRESD} functions <<-EOF
 	worker_resolve_exec
 	worker_resolve_mk_pkt
 	worker_resolve_start
+	zi_zone_import
 EOF
 
 echo "struct engine" | ${CDEFS} ${KRESD} types | sed '/struct network/,$ d'

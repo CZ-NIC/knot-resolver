@@ -2166,10 +2166,6 @@ void worker_deinit(void)
 	struct worker_ctx *worker = the_worker;
 	if (kr_fails_assert(worker))
 		return;
-	if (worker->z_import != NULL) {
-		zi_free(worker->z_import);
-		worker->z_import = NULL;
-	}
 	map_clear(&worker->tcp_connected);
 	map_clear(&worker->tcp_waiting);
 	trie_free(worker->subreq_out);

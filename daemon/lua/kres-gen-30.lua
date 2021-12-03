@@ -41,6 +41,7 @@ typedef void (*trace_log_f) (const struct kr_request *, const char *);
 typedef void (*trace_callback_f)(struct kr_request *);
 typedef uint8_t * (*alloc_wire_f)(struct kr_request *req, uint16_t *maxlen);
 typedef bool (*addr_info_f)(struct sockaddr*);
+typedef void (*zi_callback)(int state, void *param);
 typedef struct {
 	knot_dname_t *_owner;
 	uint32_t _ttl;
@@ -494,6 +495,17 @@ struct args {
 	_Bool quiet;
 	_Bool tty_binary_output;
 };
+typedef struct {
+	const char *zone_file;
+	const char *origin;
+	uint32_t ttl;
+	enum {ZI_STAMP_NOW, ZI_STAMP_MTIM} time_src;
+	_Bool downgrade;
+	_Bool zonemd;
+	const knot_rrset_t *ds;
+	zi_callback cb;
+	void *cb_param;
+} zi_config_t;
 struct args *the_args;
 struct endpoint {
 	void *handle;
@@ -517,6 +529,7 @@ struct qr_task {
 int worker_resolve_exec(struct qr_task *, knot_pkt_t *);
 knot_pkt_t *worker_resolve_mk_pkt(const char *, uint16_t, uint16_t, const struct kr_qflags *);
 struct qr_task *worker_resolve_start(knot_pkt_t *, struct kr_qflags);
+int zi_zone_import(const zi_config_t);
 struct engine {
 	struct kr_context resolver;
 	char _stub[];

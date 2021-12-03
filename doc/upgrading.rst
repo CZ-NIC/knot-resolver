@@ -37,6 +37,11 @@ Packagers & Developers
 
 * Knot DNS >= 3.0.2 is required.
 
+Module API changes
+------------------
+* Function `cache.zone_import` was removed;
+  you can use `ffi.C.zi_zone_import` instead (different API).
+
 
 5.3 to 5.4
 ==========
