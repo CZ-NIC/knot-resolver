@@ -113,6 +113,19 @@ o:
     assert o.o == {"key": "val"}
 
 
+def test_dash_conversion():
+    class TestSchema(SchemaNode):
+        awesome_field: Dict[str, str]
+
+    yaml = """
+awesome-field:
+  awesome-key: awesome-value
+"""
+
+    o = TestSchema(parse_yaml(yaml))
+    assert o.awesome_field["awesome-key"] == "awesome-value"
+
+
 def test_nested_compount_types2():
     class TestSchema(SchemaNode):
         i: int
