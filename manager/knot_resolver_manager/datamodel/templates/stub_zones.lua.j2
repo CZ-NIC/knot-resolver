@@ -5,7 +5,7 @@
 {% if zone.views %}
 {% for view_id in zone.views %}
 -- stub-zone: {{ name }} view: {{ view_id }}
-{% set view = cfg.views[view_id] %}
+{% set view = cfg.views[view_id.replace("-", "_")] %}
 
 {% set options = none %}
 {% if zone.options and view.options %}
