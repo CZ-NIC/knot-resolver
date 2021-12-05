@@ -1,77 +1,57 @@
-{% if cfg.stub_zones %}
+{% from 'macros/policy_macros.lua.j2' import policy_flags, policy_add, policy_suffix, policy_todname, policy_stub %}
+{% from 'macros/view_macros.lua.j2' import view_tsig, view_addr %}
 
+{% if cfg.stub_zones %}
 {% for name, zone in cfg.stub_zones.items() %}
 -- stub-zone: {{ name }}
-{% if zone.views %}
-{% for view_id in zone.views %}
--- stub-zone: {{ name }} view: {{ view_id }}
-{% set view = cfg.views[view_id.replace("-", "_")] %}
+{% if zone.views -%}
+{# views set for stub-zone #}
+{% for view_id in zone.views -%}
+{%- set view = cfg.views[view_id] -%}
 
-{% set options = none %}
-{% if zone.options and view.options %}
-{% set options = zone.options|list + view.options |list%}
+{# merge options from view and stub-zone #}
+{%- set options = none -%}
+{% if zone.options and view.options -%}
+{% set options = zone.options|list + view.options|list %}
 {% elif zone.options %}
 {% set options = zone.options|list %}
 {% elif view.options %}
 {% set options = view.options|list %}
-{% endif %}
+{%- endif %}
 
-{% if view.tsig %}
-{% for sig in view.tsig %}
+{% if view.tsig -%}
+{% for tsig in view.tsig -%}
 
-{% if options %}
--- stub-zone: {{ name }} view: {{ view_id }} options
-view:tsig('{{ sig }}', policy.suffix(policy.FLAGS({
-{%- for flag in options -%}
-'{{ flag.upper().replace("-", "_") }}',
-{%- endfor -%}
-}), {todname('{{ name }}')}))
-{% endif %}
+{%- if options -%}
+{{ view_tsig(tsig|string, policy_suffix(policy_flags(options|list), policy_todname(name|string))) }}
+{%- endif %}
 
--- stub-zone: {{ name }} view: {{ view_id }} servers
-{% for server in zone.servers %}
-view:tsig('{{ sig }}', policy.suffix(policy.STUB('{{ server }}'), {todname('{{ name }}')}))
-{% endfor %}
+{{ view_tsig(tsig|string, policy_suffix(policy_stub(zone.servers|list), policy_todname(name|string))) }}
 
 {% endfor %}
-{% endif %}
+{%- endif -%}
 
-{% if view.subnets %}
-{% for addr in view.subnets %}
+{% if view.subnets -%}
+{% for addr in view.subnets -%}
 
-{% if options %}
--- stub-zone: {{ name }} view: {{ view_id }} options
-view:addr('{{ addr }}', policy.suffix(policy.FLAGS({
-{%- for flag in options -%}
-'{{ flag.upper().replace("-", "_") }}',
-{%- endfor -%}
-}), {todname('{{ name }}')}))
-{% endif %}
+{%- if options -%}
+{{ view_addr(addr|string, policy_suffix(policy_flags(options|list), policy_todname(name|string))) }}
+{%- endif %}
 
--- stub-zone: {{ name }} view: {{ view_id }} servers
-{% for server in zone.servers %}
-view:addr('{{ addr }}', policy.suffix(policy.STUB('{{ server }}'), {todname('{{ name }}')}))
-{% endfor %}
+{{ view_addr(addr|string, policy_suffix(policy_stub(zone.servers|list), policy_todname(name|string))) }}
 
 {% endfor %}
 {% endif %}
 
 {% endfor %}
 {% else %}
-{% if zone.options %}
+{# no views set for stub-zone #}
 
--- stub-zone: {{ name }} options
-policy.add(policy.suffix(policy.FLAGS({
-{%- for flag in zone.options -%}
-'{{ flag.upper().replace("-", "_") }}',
-{%- endfor -%}
-}), {todname('{{ name }}')}))
-{% endif %}
+{% if zone.options -%}
+{{ policy_add(policy_suffix(policy_flags(zone.options|list), policy_todname(name|string))) }}
+{%- endif %}
 
--- stub-zone: {{ name }} servers
-{% for server in zone.servers %}
-policy.add(policy.suffix(policy.STUB('{{ server }}'), {todname('{{ name }}')}))
-{% endfor %}
+{{ policy_add(policy_suffix(policy_stub(zone.servers|list), policy_todname(name|string))) }}
 
 {% endif %}
 {% endfor %}

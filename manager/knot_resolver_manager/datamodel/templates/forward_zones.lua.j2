@@ -1,173 +1,72 @@
-{% if cfg.forward_zones %}
+{% from 'macros/policy_macros.lua.j2' import policy_flags, policy_add, policy_suffix, policy_todname, policy_forward, policy_tls_forward %}
+{% from 'macros/view_macros.lua.j2' import view_tsig, view_addr %}
 
+{% if cfg.forward_zones %}
 {% for name, zone in cfg.forward_zones.items() %}
 -- forward-zone: {{ name }}
-{% if zone.views %}
-{% for view_id in zone.views %}
--- forward-zone: {{ name }} view: {{ view_id }}
-{% set view = cfg.views[view_id] %}
+{% if zone.views -%}
+{# views set for forward-zone #}
+{% for view_id in zone.views -%}
+{%- set view = cfg.views[view_id] -%}
 
-{% set options = none %}
-{% if zone.options and view.options %}
+{# merge options from view and forward-zone #}
+{%- set options = none -%}
+{% if zone.options and view.options -%}
 {% set options = zone.options|list + view.options|list %}
 {% elif zone.options %}
 {% set options = zone.options|list %}
 {% elif view.options %}
 {% set options = view.options|list %}
-{% endif %}
+{%- endif %}
 
+{# view tsig #}
 {% if view.tsig %}
-{% for sig in view.tsig %}
+{% for tsig in view.tsig %}
 
-{% if options %}
--- forward-zone: {{ name }} view: {{ view_id }} options
-view:tsig('{{ sig }}', policy.suffix(policy.FLAGS({
-{%- for flag in options -%}
-'{{ flag.upper().replace("-", "_") }}',
-{%- endfor -%}
-}), {todname('{{ name }}')}))
-{% endif %}
+{%- if options -%}
+{{ view_tsig(tsig|string, policy_suffix(policy_flags(options|list), policy_todname(name|string))) }}
+{%- endif %}
 
--- forward-zone: {{ name }} view: {{ view_id }} servers
-{% for server in zone.servers %}
-view:tsig('{{ sig }}', policy.suffix(
-
-{%- if zone.tls -%}
-policy.TLS_FORWARD({{ '{{' }}'{{ server.address if server.address else server}}',
-
-{%- if server.pin_sha256 -%}
-pin_sha256=
-{%- if server.pin_sha256 is string -%}
-'{{ server.pin_sha256 }}',
-{%- else -%}
-{
-{%- for pin in server.pin_sha256 -%}
-'{{ pin }}',
-{%- endfor -%}
-},
-{%- endif -%}
-{%- endif -%}
-
-{%- if server.hostname -%}
-hostname='{{ server.hostname }}',
-{%- endif -%}
-
-{%- if server.ca_file -%}
-ca_file='{{ server.ca_file }}',
-{%- endif -%}
-
-{{ '}}' }})
-
-{%- else -%}
-policy.FORWARD('{{ server.address if server.address else server}}')
-{%- endif -%}
-, {todname('{{ name }}')}))
-
-{% endfor %}
+{% if zone.tls -%}
+{{ view_tsig(tsig|string, policy_suffix(policy_tls_forward(zone.servers|list), policy_todname(name|string))) }}
+{% else %}
+{{ view_tsig(tsig|string, policy_suffix(policy_forward(zone.servers|list), policy_todname(name|string))) }}
+{%- endif %}
 
 {% endfor %}
 {% endif %}
 
+{# view addr #}
 {% if view.subnets %}
 {% for addr in view.subnets %}
 
-{% if options %}
--- forward-zone: {{ name }} view: {{ view_id }} options
-view:addr('{{ addr }}', policy.suffix(policy.FLAGS({
-{%- for flag in options -%}
-'{{ flag.upper().replace("-", "_") }}',
-{%- endfor -%}
-}), {todname('{{ name }}')}))
-{% endif %}
+{%- if options -%}
+{{ view_addr(addr|string, policy_suffix(policy_flags(options|list), policy_todname(name|string))) }}
+{%- endif %}
 
--- forward-zone: {{ name }} view: {{ view_id }} servers
-{% for server in zone.servers %}
-view:addr('{{ addr }}', policy.suffix(
-
-{%- if zone.tls -%}
-policy.TLS_FORWARD({{ '{{' }}'{{ server.address if server.address else server}}',
-
-{%- if server.pin_sha256 -%}
-pin_sha256=
-{%- if server.pin_sha256 is string -%}
-'{{ server.pin_sha256 }}',
-{%- else -%}
-{
-{%- for pin in server.pin_sha256 -%}
-'{{ pin }}',
-{%- endfor -%}
-},
-{%- endif -%}
-{%- endif -%}
-
-{%- if server.hostname -%}
-hostname='{{ server.hostname }}',
-{%- endif -%}
-
-{%- if server.ca_file -%}
-ca_file='{{ server.ca_file }}',
-{%- endif -%}
-
-{{ '}}' }})
-
-{%- else -%}
-policy.FORWARD('{{ server.address if server.address else server}}')
-{%- endif -%}
-, {todname('{{ name }}')}))
-
-{% endfor %}
+{% if zone.tls -%}
+{{ view_addr(addr|string, policy_suffix(policy_tls_forward(zone.servers|list), policy_todname(name|string))) }}
+{% else %}
+{{ view_addr(addr|string, policy_suffix(policy_forward(zone.servers|list), policy_todname(name|string))) }}
+{%- endif %}
 
 {% endfor %}
 {% endif %}
 
 {% endfor %}
 {% else %}
+{# no views set for forward-zone #}
 
-{% if zone.options %}
--- forward-zone: {{ name }} options
-policy.add(policy.suffix(policy.FLAGS({
-{%- for flag in zone.options -%}
-'{{ flag.upper().replace("-", "_") }}',
-{%- endfor -%}
-}), {todname('{{ name }}')}))
-{% endif %}
+{% if zone.options -%}
+{{ policy_add(policy_suffix(policy_flags(zone.options|list), policy_todname(name|string))) }}
+{%- endif %}
 
--- forward-zone: {{ name }} servers
-{% for server in zone.servers %}
-policy.add(policy.suffix(
-{%- if zone.tls -%}
-policy.TLS_FORWARD({{ '{{' }}'{{ server.address if server.address else server}}',
-
-{%- if server.pin_sha256 -%}
-pin_sha256=
-{%- if server.pin_sha256 is string -%}
-'{{ server.pin_sha256 }}',
-{%- else -%}
-{
-{%- for pin in server.pin_sha256 -%}
-'{{ pin }}',
-{%- endfor -%}
-},
-{%- endif -%}
-{%- endif -%}
-
-{%- if server.hostname -%}
-hostname='{{ server.hostname }}',
-{%- endif -%}
-
-{%- if server.ca_file -%}
-ca_file='{{ server.ca_file }}',
-{%- endif -%}
-
-{{ '}}' }})
-
-{%- else -%}
-policy.FORWARD('{{ server.address if server.address else server}}')
-{%- endif -%}
-, {todname('{{ name }}')}))
-{% endfor %}
+{% if zone.tls -%}
+{{ policy_add(policy_suffix(policy_tls_forward(zone.servers|list), policy_todname(name|string))) }}
+{% else %}
+{{ policy_add(policy_suffix(policy_forward(zone.servers|list), policy_todname(name|string))) }}
+{%- endif %}
 
 {% endif %}
-
 {% endfor %}
 {% endif %}
