@@ -12,7 +12,8 @@ packages = \
  'knot_resolver_manager.utils']
 
 package_data = \
-{'': ['*'], 'knot_resolver_manager.datamodel': ['templates/*']}
+{'': ['*'],
+ 'knot_resolver_manager.datamodel': ['templates/*', 'templates/macros/*']}
 
 install_requires = \
 ['Jinja2>=2.11.3',

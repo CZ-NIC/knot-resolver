@@ -1,0 +1,95 @@
+{% macro policy_add(rule) -%}
+policy.add({{ rule }})
+{%- endmacro %}
+
+
+{% macro policy_flags(flags) -%}
+policy.FLAGS({
+{%- for flag in flags -%}
+'{{ flag.upper().replace("-", "_") }}',
+{%- endfor -%}
+})
+{%- endmacro %}
+
+
+{% macro policy_suffix(action, suffix_table) -%}
+policy.suffix({{ action }}, {{ suffix_table }})
+{%- endmacro %}
+
+
+{% macro policy_stub(servers) -%}
+policy.STUB({
+{%- if servers is string %}
+'{{ addresses|string }}'
+{%- else -%}
+{%- for server in servers -%}
+{%- if server.address %}
+'{{ server.address|string }}',
+{%- else -%}
+'{{ server|string }}',
+{%- endif -%}
+{%- endfor -%}
+{%- endif -%}
+})
+{%- endmacro %}
+
+
+{% macro policy_forward(servers) -%}
+policy.FORWARD({
+{%- if servers is string %}
+'{{ addresses|string }}'
+{%- else -%}
+{%- for server in servers -%}
+{%- if server.address %}
+'{{ server.address|string }}',
+{%- else -%}
+'{{ server|string }}',
+{%- endif -%}
+{%- endfor -%}
+{%- endif -%}
+})
+{%- endmacro %}
+
+
+{% macro tls_auth(server) -%}
+{%- if server.hostname -%}
+hostname='{{ server.hostname|string }}',
+{%- endif -%}
+{%- if server.ca_file -%}
+ca_file='{{ server.ca_file|string }}',
+{%- endif -%}
+{%- if server.pin_sha256 -%}
+pin_sha256=
+{%- if server.pin_sha256 is string -%}
+'{{ server.pin_sha256|string }}',
+{%- else -%}
+{
+{%- for pin in server.pin_sha256 -%}
+'{{ pin|string }}',
+{%- endfor -%}
+},
+{%- endif -%}
+{%- endif -%}
+{%- endmacro %}
+
+
+{% macro policy_tls_forward(servers) -%}
+policy.TLS_FORWARD({
+{%- for server in servers -%}
+{'{{ server.address }}', {{ tls_auth(server) }} },
+{%- endfor -%}
+})
+{%- endmacro %}
+
+
+{% macro policy_todname(names) -%}
+policy.todnames({
+{%- if names is string -%}
+'{{ names|string }}'
+{%- else -%}
+{%- for name in names -%}
+'{{ name|string }}',
+{%- endfor -%}
+{%- endif -%}
+})
+{%- endmacro %}
