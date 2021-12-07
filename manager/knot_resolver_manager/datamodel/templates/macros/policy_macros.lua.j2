@@ -1,86 +1,107 @@
-{% macro policy_add(rule) -%}
+{% from 'macros/common_macros.lua.j2' import string_table, str2ip_table, servers_table, tls_servers_table %}
+
+{% macro policy_add(rule, postrule=false) -%}
+{%- if postrule -%}
+policy.add({{ rule }}, true)
+{% else %}
 policy.add({{ rule }})
+{% endif %}
 {%- endmacro %}
 
+{# Flags #}
 
 {% macro policy_flags(flags) -%}
 policy.FLAGS({
-{%- for flag in flags -%}
+{%- for flag in flags|list -%}
 '{{ flag.upper().replace("-", "_") }}',
 {%- endfor -%}
 })
 {%- endmacro %}
 
+{# Filters #}
+
+{% macro policy_all(action) -%}
+policy.all({{ action }})
+{%- endmacro %}
 
 {% macro policy_suffix(action, suffix_table) -%}
 policy.suffix({{ action }}, {{ suffix_table }})
 {%- endmacro %}
 
+{% macro policy_pattern(action, pattern) -%}
+policy.pattern({{ action }}, {{ pattern }})
+{%- endmacro %}
+
+{% macro policy_rpz(action, path, watch) -%}
+policy.rpz({{ action|string }}, '{{ path|string }}', {{ 'true' if watch else 'false' }})
+{%- endmacro %}
+
+{# Non-chain actions #}
+
+{% macro policy_pass() -%}
+policy.PASS
+{%- endmacro %}
+
+{% macro policy_deny() -%}
+policy.DENY
+{%- endmacro %}
+
+{% macro policy_deny_msg(message) -%}
+policy.DENY_MSG('{{ message|string }}')
+{%- endmacro %}
+
+{% macro policy_drop() -%}
+policy.DROP
+{%- endmacro %}
+
+{% macro policy_refuse() -%}
+policy.REFUSE
+{%- endmacro %}
+
+{% macro policy_answer(answer) -%}
+policy.ANSWER({ [kres.type.{{ answer.query_type }}] = { rdata=
+{%- if answer.query_type == 'A' -%}
+{{ string_table(answer.rdata) }},
+{%- elif answer.query_type == 'AAAA' -%}
+{{ string_table(answer.rdata) }},
+{%- elif answer.query_type == 'TXT' -%}
+{{ str2ip_table(answer.rdata) }},
+{# TODO: do same for other types #}
+{%- endif -%}
+{% if answer.ttl %}
+ttl={{ answer.ttl.seconds()|int }},
+{%- endif -%}
+} }, nodata={{ 'true' if answer.nodata else 'false' }} )
+{%- endmacro %}
+
+{% macro policy_action(policy) -%}
+{%- if policy.action == 'pass' -%}
+{{ policy_pass()|string }}
+{%- elif policy.action == 'deny' -%}
+{%- if policy.message -%}
+{{ policy_deny_msg(policy.message)|string }}
+{%- else -%}
+{{ policy_deny()|string }}
+{%- endif -%}
+{# TODO: do same for other actions #}
+{%- endif -%}
+{%- endmacro %}
+
+{# Chain actions #}
 
 {% macro policy_stub(servers) -%}
-policy.STUB({
-{%- if servers is string %}
-'{{ addresses|string }}'
-{%- else -%}
-{%- for server in servers -%}
-{%- if server.address %}
-'{{ server.address|string }}',
-{%- else -%}
-'{{ server|string }}',
-{%- endif -%}
-{%- endfor -%}
-{%- endif -%}
-})
+policy.STUB({{ servers_table(servers) }})
 {%- endmacro %}
-
 
 {% macro policy_forward(servers) -%}
-policy.FORWARD({
-{%- if servers is string %}
-'{{ addresses|string }}'
-{%- else -%}
-{%- for server in servers -%}
-{%- if server.address %}
-'{{ server.address|string }}',
-{%- else -%}
-'{{ server|string }}',
-{%- endif -%}
-{%- endfor -%}
-{%- endif -%}
-})
+policy.FORWARD({{ servers_table(servers) }})
 {%- endmacro %}
-
-
-{% macro tls_auth(server) -%}
-{%- if server.hostname -%}
-hostname='{{ server.hostname|string }}',
-{%- endif -%}
-{%- if server.ca_file -%}
-ca_file='{{ server.ca_file|string }}',
-{%- endif -%}
-{%- if server.pin_sha256 -%}
-pin_sha256=
-{%- if server.pin_sha256 is string -%}
-'{{ server.pin_sha256|string }}',
-{%- else -%}
-{
-{%- for pin in server.pin_sha256 -%}
-'{{ pin|string }}',
-{%- endfor -%}
-},
-{%- endif -%}
-{%- endif -%}
-{%- endmacro %}
-
 
 {% macro policy_tls_forward(servers) -%}
-policy.TLS_FORWARD({
-{%- for server in servers -%}
-{'{{ server.address }}', {{ tls_auth(server) }} },
-{%- endfor -%}
-})
+policy.TLS_FORWARD({{ tls_servers_table(servers) }})
 {%- endmacro %}
 
+{# other #}
 
 {% macro policy_todname(names) -%}
 policy.todnames({
