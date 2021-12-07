@@ -10,6 +10,6 @@ class RPZSchema(SchemaNode):
     action: ActionEnum
     file: AnyPath
     watch: bool = True
-    message: Optional[str] = None
-    views: Optional[str] = None
+    views: Optional[List[str]] = None
     options: Optional[List[FlagsEnum]] = None
+    message: Optional[str] = None

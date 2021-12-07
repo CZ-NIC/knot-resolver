@@ -1,0 +1,58 @@
+{% from 'macros/policy_macros.lua.j2' import policy_flags, policy_add, policy_rpz, policy_action %}
+{% from 'macros/view_macros.lua.j2' import view_tsig, view_addr %}
+
+{% if cfg.rpz %}
+{% for id, rpz in cfg.rpz.items() %}
+-- rpz: {{ id }}
+{% if rpz.views -%}
+{# views set for rpz #}
+{% for view_id in rpz.views -%}
+{%- set view = cfg.views[view_id] -%}
+
+{# merge options from view and rpz #}
+{%- set options = none -%}
+{% if rpz.options and view.options -%}
+{% set options = rpz.options|list + view.options|list %}
+{% elif rpz.options %}
+{% set options = rpz.options|list %}
+{% elif view.options %}
+{% set options = view.options|list %}
+{%- endif %}
+
+{% if view.tsig -%}
+{% for tsig in view.tsig -%}
+
+{%- if options -%}
+{{ view_tsig(tsig|string,policy_rpz(policy_flags(rpz.options), rpz.file, rpz.watch)) }}
+{%- endif %}
+
+{{ view_tsig(tsig|string,policy_rpz(policy_action(rpz), rpz.file, rpz.watch )) }}
+
+{% endfor %}
+{%- endif -%}
+
+{% if view.subnets -%}
+{% for addr in view.subnets -%}
+
+{%- if options -%}
+{{ view_addr(addr|string,policy_rpz(policy_flags(rpz.options), rpz.file, rpz.watch)) }}
+{%- endif %}
+
+{{ view_addr(addr|string,policy_rpz(policy_action(rpz), rpz.file, rpz.watch )) }}
+
+{% endfor %}
+{% endif %}
+
+{% endfor %}
+{% else %}
+{# no views set for rpz #}
+
+{% if rpz.options -%}
+{{ policy_add(policy_rpz(policy_flags(rpz.options), rpz.file, rpz.watch)) }}
+{%- endif %}
+
+{{ policy_add(policy_rpz(policy_action(rpz), rpz.file, rpz.watch )) }}
+
+{% endif %}
+{% endfor %}
+{% endif %}

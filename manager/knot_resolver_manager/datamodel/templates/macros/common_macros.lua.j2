@@ -1,0 +1,80 @@
+{# Return string or table of strings #}
+{% macro string_table(table) -%}
+{%- if table is string -%}
+'{{ table|string }}'
+{%- else-%}
+{
+{%- for item in table -%}
+'{{ item|string }}',
+{%- endfor -%}
+}
+{%- endif -%}
+{%- endmacro %}
+
+{# Return str2ip or table of str2ip #}
+{% macro str2ip_table(table) -%}
+{%- if table is string -%}
+kres.str2ip('{{ table|string }}')
+{%- else-%}
+{
+{%- for item in table -%}
+kres.str2ip('{{ item|string }}'),
+{%- endfor -%}
+}
+{%- endif -%}
+{%- endmacro %}
+
+{# Return server address or table of server addresses #}
+{% macro servers_table(servers) -%}
+{%- if servers is string -%}
+'{{ servers|string }}'
+{%- else-%}
+{
+{%- for item in servers -%}
+{%- if item.address -%}
+'{{ item.address|string }}',
+{%- else -%}
+'{{ item|string }}',
+{%- endif -%}
+{%- endfor -%}
+}
+{%- endif -%}
+{%- endmacro %}
+
+{# Return server address or table of server addresses #}
+{% macro tls_servers_table(servers) -%}
+{%- if servers is string -%}
+'{{ servers|string }}', {{ tls_server_auth(servers) }}
+{%- else-%}
+{
+{%- for item in servers -%}
+{%- if item.address -%}
+{'{{ item.address|string }}', {{ tls_server_auth(item) }} },
+{%- else -%}
+'{{ item|string }}',
+{%- endif -%}
+{%- endfor -%}
+}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro tls_server_auth(server) -%}
+{%- if server.hostname -%}
+hostname='{{ server.hostname|string }}',
+{%- endif -%}
+{%- if server.ca_file -%}
+ca_file='{{ server.ca_file|string }}',
+{%- endif -%}
+{%- if server.pin_sha256 -%}
+pin_sha256=
+{%- if server.pin_sha256 is string -%}
+'{{ server.pin_sha256|string }}',
+{%- else -%}
+{
+{%- for pin in server.pin_sha256 -%}
+'{{ pin|string }}',
+{%- endfor -%}
+},
+{%- endif -%}
+{%- endif -%}
+{%- endmacro %}

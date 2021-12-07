@@ -53,7 +53,7 @@ class KresConfig(SchemaNode):
         static_hints: StaticHintsSchema = StaticHintsSchema()
         views: Optional[Dict[str, ViewSchema]] = None
         policy: Optional[Dict[str, PolicySchema]] = None
-        rpz: Optional[Dict[DomainName, RPZSchema]] = None
+        rpz: Optional[Dict[str, RPZSchema]] = None
         stub_zones: Optional[Dict[DomainName, StubZoneSchema]] = None
         forward_zones: Optional[Dict[DomainName, ForwardZoneSchema]] = None
         cache: CacheSchema = CacheSchema()
@@ -70,7 +70,7 @@ class KresConfig(SchemaNode):
     static_hints: StaticHintsSchema
     views: Optional[Dict[str, ViewSchema]]
     policy: Optional[Dict[str, PolicySchema]]
-    rpz: Optional[Dict[DomainName, RPZSchema]]
+    rpz: Optional[Dict[str, RPZSchema]]
     stub_zones: Optional[Dict[DomainName, StubZoneSchema]]
     forward_zones: Optional[Dict[DomainName, ForwardZoneSchema]]
     cache: CacheSchema
@@ -90,4 +90,6 @@ class KresConfig(SchemaNode):
         return obj.dns64
 
     def render_lua(self) -> Text:
-        return _MAIN_TEMPLATE.render(cfg=self)
+        lua = _MAIN_TEMPLATE.render(cfg=self)
+        print(lua)
+        return lua
