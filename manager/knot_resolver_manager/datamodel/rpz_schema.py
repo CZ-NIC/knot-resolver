@@ -13,3 +13,7 @@ class RPZSchema(SchemaNode):
     views: Optional[List[str]] = None
     options: Optional[List[FlagsEnum]] = None
     message: Optional[str] = None
+
+    def _validate(self) -> None:
+        if self.message and not self.action == "deny":
+            raise ValueError("'message' field can only be defined for 'deny' action")
