@@ -7,6 +7,13 @@ modules.load('nsid')
 nsid.name('{{ cfg.server.nsid }}_' .. worker.id)
 {% endif %}
 
+{% if cfg.server.management.watchdog -%}
+modules.load('watchdog')
+watchdog.config({ qname = '{{ cfg.server.management.watchdog.qname }}', qtype = kres.type.{{ cfg.server.management.watchdog.qtype }} })
+{% else %}
+modules.unload('watchdog')
+{%- endif %}
+
 {% if cfg.server.webmgmt %}
 -- server.webmgmt
 modules.load('http')
