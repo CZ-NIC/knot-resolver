@@ -1014,7 +1014,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	WITH_VERBOSE(query) {
 		if (query->flags.TRACE) {
 			auto_free char *pkt_text = kr_pkt_text(pkt);
-			VERBOSE_MSG("<= answer received: \n%s\n", pkt_text);
+			VERBOSE_MSG("<= answer received:\n%s\n", pkt_text);
 		}
 	}
 
