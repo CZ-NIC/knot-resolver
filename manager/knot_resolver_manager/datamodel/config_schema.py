@@ -90,6 +90,4 @@ class KresConfig(SchemaNode):
         return obj.dns64
 
     def render_lua(self) -> Text:
-        lua = _MAIN_TEMPLATE.render(cfg=self)
-        print(lua)
-        return lua
+        return _MAIN_TEMPLATE.render(cfg=self)

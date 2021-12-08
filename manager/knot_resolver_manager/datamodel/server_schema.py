@@ -5,7 +5,7 @@ from typing import Any, Optional, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.types import CheckedPath, Listen, UncheckedPath
+from knot_resolver_manager.datamodel.types import CheckedPath, DomainName, Listen, UncheckedPath
 from knot_resolver_manager.exceptions import DataException
 from knot_resolver_manager.utils import SchemaNode
 from knot_resolver_manager.utils.types import LiteralEnum
@@ -34,6 +34,11 @@ def _cpu_count() -> int:
 BackendEnum = LiteralEnum["auto", "systemd", "supervisord"]
 
 
+class WatchDogSchema(SchemaNode):
+    qname: DomainName
+    qtype: str
+
+
 class ManagementSchema(SchemaNode):
     """
     Configuration of the Manager itself.
@@ -42,12 +47,19 @@ class ManagementSchema(SchemaNode):
     listen: Specifies where does the manager listen with its API. Can't be changed in runtime!
     backend: Forces manager to use a specific service manager. Defaults to autodetection.
     rundir: Directory where the manager can create files and which will be manager's cwd
+    watchdog: Systemd watchdog configuration. Can only be used with systemd backend.
     """
 
     # the default listen path here MUST use the default rundir
     listen: Listen = Listen({"unix-socket": "./manager.sock"})
     backend: BackendEnum = "auto"
     rundir: UncheckedPath = UncheckedPath(".")
+    backend: BackendEnum = "auto"
+    watchdog: Union[Literal[False], WatchDogSchema] = False
+
+    def _validate(self) -> None:
+        if self.watchdog and self.backend not in ["auto", "systemd"]:
+            raise ValueError("'watchdog' can only be configured for 'systemd' backend")
 
 
 class WebmgmtSchema(SchemaNode):
