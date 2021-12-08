@@ -447,12 +447,16 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 
 	/* Nameserver is authoritative for both parent side and the child side of the
 	 * delegation may respond with an NS record in the answer section, and still update
-	 * the zone cut (e.g. what a.gtld-servers.net would respond for `com NS`) */
+	 * the zone cut (this e.g. happens on the `nrl.navy.mil.` zone cut).
+	 * By updating the zone cut, we can continue with QNAME minimization,
+	 * as the current code is only able to minimize one label below a zone cut. */
 	if (!ns_record_exists && knot_wire_get_aa(pkt->wire)) {
 		for (unsigned i = 0; i < an->count; ++i) {
 			const knot_rrset_t *rr = knot_pkt_rr(an, i);
 			if (rr->type == KNOT_RRTYPE_NS
-			    && knot_dname_in_bailiwick(rr->owner, qry->zone_cut.name) > 0) {
+			    && knot_dname_in_bailiwick(rr->owner, qry->zone_cut.name) > 0
+			    /* "confusing" NS records can happen e.g. on a CNAME chain */
+			    && knot_dname_in_bailiwick(qry->sname, rr->owner) >= 0) {
 				/* NS below cut in authority indicates different authority,
 				 * but same NS set. */
 				qry->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
