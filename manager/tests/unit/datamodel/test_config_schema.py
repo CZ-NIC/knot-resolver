@@ -1,8 +1,13 @@
 import json
 from typing import Any, Dict, cast
 
+from pytest import raises
+from yaml.nodes import Node
+
 from knot_resolver_manager.datamodel import KresConfig
 from knot_resolver_manager.datamodel.types import IPv6Network96, TimeUnit
+from knot_resolver_manager.exceptions import SchemaException
+from knot_resolver_manager.utils.modelling import SchemaNode
 
 
 def test_dns64_true():
@@ -55,3 +60,61 @@ def test_json_schema():
                 raise Exception(f"failed to serialize '{path}'") from e
 
     recser(dct)
+
+
+def test_attribute_parsing():
+    class TestClass(SchemaNode):
+        """
+        This is an awesome test class
+
+        ---
+        field: This field does nothing interesting
+        value: Neither does this
+        """
+
+        field: str
+        value: int
+
+    schema = TestClass.json_schema()
+    assert schema["properties"]["field"]["description"] == "This field does nothing interesting"
+    assert schema["properties"]["value"]["description"] == "Neither does this"
+
+    class AdditionalItem(SchemaNode):
+        """
+        This class is wrong
+
+        ---
+        field: nope
+        nothing: really nothing
+        """
+
+        nothing: str
+
+    with raises(SchemaException):
+        _ = AdditionalItem.json_schema()
+
+    class WrongDescription(SchemaNode):
+        """
+        This class is wrong
+
+        ---
+        other: description
+        """
+
+        nothing: str
+
+    with raises(SchemaException):
+        _ = WrongDescription.json_schema()
+
+    class NoDescription(SchemaNode):
+        nothing: str
+
+    _ = NoDescription.json_schema()
+
+    class NormalDescription(SchemaNode):
+        """
+        Does nothing special
+        Really
+        """
+
+    _ = NormalDescription.json_schema()

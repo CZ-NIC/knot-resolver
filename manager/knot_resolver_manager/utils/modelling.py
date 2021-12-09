@@ -1,6 +1,8 @@
 import inspect
 from typing import Any, Dict, List, Optional, Set, Tuple, Type, Union, cast
 
+import yaml
+
 from knot_resolver_manager.exceptions import DataException, SchemaException
 from knot_resolver_manager.utils.custom_types import CustomValueType
 from knot_resolver_manager.utils.functional import all_matches
@@ -74,16 +76,63 @@ class Serializable:
         return obj
 
 
+def _split_docstring(docstring: str) -> Tuple[str, Optional[str]]:
+    """
+    Splits docstring into description of the class and description of attributes
+    """
+
+    if "---" not in docstring:
+        return (docstring, None)
+
+    first, last = docstring.split("---", maxsplit=1)
+    return (
+        "\n".join([s.strip() for s in first.splitlines()]).strip(),
+        "\n".join([s.strip() for s in last.splitlines()]).strip(),
+    )
+
+
+def _parse_attrs_docstrings(docstring: str) -> Optional[Dict[str, str]]:
+    """
+    Given a docstring of a SchemaNode, return a dict with descriptions of individual attributes.
+    """
+
+    _, attrs_doc = _split_docstring(docstring)
+    if attrs_doc is None:
+        return None
+
+    # try to parse it as yaml:
+    data = yaml.safe_load(attrs_doc)
+    assert isinstance(data, dict), "Invalid format of attribute description"
+    return cast(Dict[str, str], data)
+
+
 def _get_properties_schema(typ: Type[Any]) -> Dict[Any, Any]:
     schema: Dict[Any, Any] = {}
     annot = typ.__dict__.get("__annotations__", {})
+    docstring: str = typ.__dict__.get("__doc__", "") or ""
+    attribute_documentation = _parse_attrs_docstrings(docstring)
     for name, python_type in annot.items():
         schema[name] = _describe_type(python_type)
+
+        # description
+        if attribute_documentation is not None:
+            if name not in attribute_documentation:
+                raise SchemaException(f"The docstring does not describe field '{name}'", str(typ))
+            schema[name]["description"] = attribute_documentation[name]
+            del attribute_documentation[name]
+
+        # default value
         if hasattr(typ, name):
             assert Serializable.is_serializable(
                 python_type
             ), f"Type '{python_type}' does not appear to be JSON serializable"
             schema[name]["default"] = Serializable.serialize(getattr(typ, name), python_type)
+
+    if attribute_documentation is not None and len(attribute_documentation) > 0:
+        raise SchemaException(
+            f"The docstring describes attributes which are not present - {tuple(attribute_documentation.keys())}",
+            str(typ),
+        )
 
     return schema
 
@@ -515,7 +564,7 @@ class SchemaNode:
         if include_schema_definition:
             schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
         if cls.__doc__ is not None:
-            schema["description"] = cls.__doc__.strip()
+            schema["description"] = _split_docstring(cls.__doc__)[0]
         schema["type"] = "object"
         schema["properties"] = _get_properties_schema(cls)
 

@@ -37,6 +37,11 @@ BackendEnum = LiteralEnum["auto", "systemd", "supervisord"]
 class ManagementSchema(SchemaNode):
     """
     Configuration of the Manager itself.
+
+    ---
+    listen: Specifies where does the manager listen with its API. Can't be changed in runtime!
+    backend: Forces manager to use a specific service manager. Defaults to autodetection.
+    rundir: Directory where the manager can create files and which will be manager's cwd
     """
 
     # the default listen path here MUST use the default rundir

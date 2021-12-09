@@ -114,6 +114,9 @@ disable= [
     "too-many-arguments",  # sure, but how can we change the signatures to take less arguments? artificially create objects with arguments? That's stupid...
     "no-member",  # checked by pyright
     "import-error", # checked by pyright (and pylint does not do it properly)
+    "unsupported-delete-operation", # checked by pyright
+    "unsubscriptable-object", # checked by pyright
+    "unsupported-membership-test", # checked by pyright
 ]
 
 [tool.pylint.SIMILARITIES]
