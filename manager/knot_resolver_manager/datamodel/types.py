@@ -8,8 +8,29 @@ from typing import Any, Dict, Optional, Pattern, Type, Union
 from knot_resolver_manager.exceptions import SchemaException
 from knot_resolver_manager.utils import CustomValueType, SchemaNode
 from knot_resolver_manager.utils.modelling import Serializable
+from knot_resolver_manager.utils.types import LiteralEnum
 
 logger = logging.getLogger(__name__)
+
+ActionEnum = LiteralEnum[
+    # Nonchain actions
+    "pass",
+    "deny",
+    "drop",
+    "refuse",
+    "tc",
+    "reroute",
+    "answer",
+    # Chain actions
+    "mirror",
+    "debug-always",
+    "debug-cache-miss",
+    "qtrace",
+    "reqtrace",
+]
+
+# TODO: add other query types
+QTypeEnum = LiteralEnum["A", "AAAA", "CNAME", "MX", "NS", "ptr", "CERT", "SRV", "TXT", "SOA"]
 
 
 class Unit(CustomValueType):

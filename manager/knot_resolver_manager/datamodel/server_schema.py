@@ -5,7 +5,7 @@ from typing import Any, Optional, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.types import CheckedPath, DomainName, Listen, UncheckedPath
+from knot_resolver_manager.datamodel.types import CheckedPath, DomainName, Listen, QTypeEnum, UncheckedPath
 from knot_resolver_manager.exceptions import DataException
 from knot_resolver_manager.utils import SchemaNode
 from knot_resolver_manager.utils.types import LiteralEnum
@@ -36,7 +36,7 @@ BackendEnum = LiteralEnum["auto", "systemd", "supervisord"]
 
 class WatchDogSchema(SchemaNode):
     qname: DomainName
-    qtype: str
+    qtype: QTypeEnum
 
 
 class ManagementSchema(SchemaNode):

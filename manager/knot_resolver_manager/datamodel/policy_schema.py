@@ -1,22 +1,20 @@
 from typing import List, Optional
 
-from knot_resolver_manager.datamodel.types import IPAddressPort, TimeUnit
+from knot_resolver_manager.datamodel.network_schema import AddressRenumberingSchema
+from knot_resolver_manager.datamodel.types import ActionEnum, DomainName, IPAddressPort, QTypeEnum, TimeUnit
 from knot_resolver_manager.datamodel.view_schema import FlagsEnum
 from knot_resolver_manager.utils import SchemaNode
-from knot_resolver_manager.utils.types import LiteralEnum
-
-# TODO: add all other options
-ActionEnum = LiteralEnum["pass", "deny", "mirror", "forward", "modify"]
 
 
 class FilterSchema(SchemaNode):
-    suffix: Optional[str] = None
-    pattern: Optional[str] = None
-    query_type: Optional[str] = None
+    domain: Optional[List[DomainName]] = None
+    suffix: Optional[List[str]] = None
+    pattern: Optional[List[str]] = None
+    qtype: Optional[List[QTypeEnum]] = None
 
 
 class AnswerSchema(SchemaNode):
-    query_type: str
+    qtype: QTypeEnum
     rdata: str
     ttl: TimeUnit = TimeUnit("1s")
     no_data: bool = False
@@ -24,13 +22,30 @@ class AnswerSchema(SchemaNode):
 
 class PolicySchema(SchemaNode):
     action: ActionEnum
-    filters: Optional[List[FilterSchema]] = None
+    order: Optional[int] = None
+    filter: Optional[FilterSchema] = None
     views: Optional[List[str]] = None
     options: Optional[List[FlagsEnum]] = None
     message: Optional[str] = None
-    mirror: Optional[List[IPAddressPort]] = None
-    forward: Optional[List[IPAddressPort]] = None
+    reroute: Optional[List[AddressRenumberingSchema]] = None
     answer: Optional[AnswerSchema] = None
+    mirror: Optional[List[IPAddressPort]] = None
 
     def _validate(self) -> None:
-        pass
+        # checking for missing fields
+        if self.action == "reroute" and not self.reroute:
+            raise ValueError("missing mandatory field 'reroute' for 'reroute' action")
+        if self.action == "answer" and not self.answer:
+            raise ValueError("missing mandatory field 'answer' for 'answer' action")
+        if self.action == "mirror" and not self.mirror:
+            raise ValueError("missing mandatory field 'mirror' for 'mirror' action")
+
+        # checking for unnecessary fields
+        if self.message and not self.action == "deny":
+            raise ValueError("'message' field can only be defined for 'deny' action")
+        if self.reroute and not self.action == "reroute":
+            raise ValueError("'answer' field can only be defined for 'answer' action")
+        if self.answer and not self.action == "answer":
+            raise ValueError("'answer' field can only be defined for 'answer' action")
+        if self.mirror and not self.action == "mirror":
+            raise ValueError("'mirror' field can only be defined for 'mirror' action")
