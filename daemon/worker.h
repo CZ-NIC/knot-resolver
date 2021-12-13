@@ -31,14 +31,17 @@ void worker_deinit(void);
 /**
  * Process an incoming packet (query from a client or answer from upstream).
  *
- * @param session  session the packet came from, or NULL (not from network)
- * @param peer     address the packet came from, or NULL (not from network)
- * @param eth_*    MAC addresses or NULL (they're useful for XDP)
- * @param pkt      the packet, or NULL (an error from the transport layer)
+ * @param session     session the packet came from, or NULL (not from network)
+ * @param src_addr    original address the packet came from, or NULL (not from network)
+ * @param comm_addr   actual address the packet came from, or NULL (then the same as src_addr).
+ *     May be different from peer if the packet went through a proxy with PROXYv2 enabled.
+ * @param eth_*       MAC addresses or NULL (they're useful for XDP)
+ * @param pkt         the packet, or NULL (an error from the transport layer)
  * @return 0 or an error code
  */
 int worker_submit(struct session *session,
-		  const struct sockaddr *peer, const struct sockaddr *dst_addr,
+		  const struct sockaddr *src_addr, const struct sockaddr *comm_addr,
+		  const struct sockaddr *dst_addr,
 		  const uint8_t *eth_from, const uint8_t *eth_to, knot_pkt_t *pkt);
 
 /**

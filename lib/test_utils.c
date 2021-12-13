@@ -67,6 +67,41 @@ static void test_straddr(void **state)
 	assert_int_not_equal(test_bitcmp(ip6_sub, ip6_out, 4), 0);
 }
 
+static inline int assert_bitmask(const char *addr, const char *exp_masked)
+{
+	unsigned char addr_buf[16];
+	unsigned char exp_masked_buf[16];
+
+	int bits = kr_straddr_subnet(addr_buf, addr);
+	size_t addr_len = (kr_straddr_family(addr) == AF_INET6) ? 16 : 4;
+	int exp_masked_bits = kr_straddr_subnet(exp_masked_buf, exp_masked);
+	size_t exp_masked_len = (kr_straddr_family(exp_masked) == AF_INET6) ? 16 : 4;
+
+	/* sanity checks */
+	assert_true(bits >= 0);
+	assert_int_equal(addr_len, exp_masked_len);
+	assert_int_equal(exp_masked_bits, exp_masked_len * 8);
+
+	kr_bitmask(addr_buf, addr_len, bits);
+	return memcmp(addr_buf, exp_masked_buf, addr_len);
+}
+
+static void test_bitmask(void **state)
+{
+	assert_int_equal(assert_bitmask("10.0.1.5/32", "10.0.1.5"), 0);
+	assert_int_equal(assert_bitmask("10.0.1.5", "10.0.1.5"), 0);
+	assert_int_equal(assert_bitmask("10.0.1.5/24", "10.0.1.0"), 0);
+	assert_int_equal(assert_bitmask("128.30.1.16/16", "128.30.0.0"), 0);
+	assert_int_equal(assert_bitmask("255.255.255.255/20", "255.255.240.0"), 0);
+	assert_int_equal(assert_bitmask("255.255.255.255/22", "255.255.252.0"), 0);
+	assert_int_equal(assert_bitmask("192.168.0.1/0", "0.0.0.0"), 0);
+	assert_int_equal(assert_bitmask("7caa::/4", "7000::"), 0);
+	assert_int_equal(assert_bitmask("dead:beef::/16", "dead::"), 0);
+	assert_int_equal(assert_bitmask("dead:beef::/20", "dead:b000::"), 0);
+	assert_int_equal(assert_bitmask("dead:beef::/0", "::"), 0);
+	assert_int_equal(assert_bitmask("64aa:22fa:1378:aaaa:bbbb::/36", "64aa:22fa:1000::"), 0);
+}
+
 static void test_strptime_diff(void **state)
 {
 	char *format = "%Y-%m-%dT%H:%M:%S";
@@ -104,7 +139,8 @@ int main(void)
 	const UnitTest tests[] = {
 		unit_test(test_strcatdup),
 		unit_test(test_straddr),
-		unit_test(test_strptime_diff),
+		unit_test(test_bitmask),
+		unit_test(test_strptime_diff)
 	};
 
 	return run_tests(tests);

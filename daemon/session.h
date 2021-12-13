@@ -20,6 +20,9 @@ struct session_flags {
 	bool has_tls : 1;       /**< True: given session uses TLS. */
 	bool has_http : 1;      /**< True: given session uses HTTP. */
 	bool connected : 1;     /**< True: TCP connection is established. */
+	bool no_proxy : 1;      /**< True: TCP has gotten some data - PROXYv2 header
+	                         * disallowed. Proxy headers are only expected at
+	                         * the very start of a stream. */
 	bool closing : 1;       /**< True: session close sequence is in progress. */
 	bool wirebuf_error : 1; /**< True: last operation with wirebuf ended up with an error. */
 };
@@ -128,10 +131,15 @@ size_t session_wirebuf_get_free_size(struct session *session);
 void session_wirebuf_discard(struct session *session);
 /** Move all data to the beginning of the buffer. */
 void session_wirebuf_compress(struct session *session);
-int session_wirebuf_process(struct session *session, const struct sockaddr *peer);
+int session_wirebuf_process(
+		struct session *session, const struct sockaddr *src_addr,
+		const struct sockaddr *comm_addr, const struct sockaddr *dst_addr);
 ssize_t session_wirebuf_consume(struct session *session,
 				const uint8_t *data, ssize_t len);
-
+/** Trims `len` bytes from the start of the session's wire buffer.
+ * If this operation makes the buffer's end appear before the start, it gets
+ * nudged to the same position as the start. */
+ssize_t session_wirebuf_trim(struct session *session, ssize_t len);
 /** poison session structure with ASAN. */
 void session_poison(struct session *session);
 /** unpoison session structure with ASAN. */

@@ -24,6 +24,8 @@ void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog)
 		net->loop = loop;
 		net->endpoints = map_make(NULL);
 		net->endpoint_kinds = trie_create(NULL);
+		net->proxy_addrs4 = trie_create(NULL);
+		net->proxy_addrs6 = trie_create(NULL);
 		net->tls_client_params = NULL;
 		net->tls_session_ticket_ctx = /* unsync. random, by default */
 		tls_session_ticket_ctx_create(loop, NULL, 0);
@@ -203,12 +205,27 @@ void network_close_force(struct network *net)
 	}
 }
 
+/** Frees all the `struct net_proxy_data` in the specified trie. */
+void network_proxy_free_addr_data(trie_t* trie)
+{
+	trie_it_t *it;
+	for (it = trie_it_begin(trie); !trie_it_finished(it); trie_it_next(it)) {
+		struct net_proxy_data *data = *trie_it_val(it);
+		free(data);
+	}
+	trie_it_free(it);
+}
+
 void network_deinit(struct network *net)
 {
 	if (net != NULL) {
 		network_close_force(net);
 		trie_apply(net->endpoint_kinds, kind_unregister, the_worker->engine->L);
 		trie_free(net->endpoint_kinds);
+		network_proxy_free_addr_data(net->proxy_addrs4);
+		trie_free(net->proxy_addrs4);
+		network_proxy_free_addr_data(net->proxy_addrs6);
+		trie_free(net->proxy_addrs6);
 
 		tls_credentials_free(net->tls_credentials);
 		tls_client_params_free(net->tls_client_params);
@@ -504,6 +521,79 @@ int network_listen(struct network *net, const char *addr, uint16_t port,
 
 	free_const(sa);
 	return ret;
+}
+
+int network_proxy_allow(struct network *net, const char* addr)
+{
+	if (kr_fails_assert(net != NULL && addr != NULL))
+		return kr_error(EINVAL);
+
+	int family = kr_straddr_family(addr);
+	if (family < 0) {
+		kr_log_error(NETWORK, "Wrong address format for proxy_allowed: %s\n",
+				addr);
+		return kr_error(EINVAL);
+	} else if (family == AF_UNIX) {
+		kr_log_error(NETWORK, "Unix sockets not supported for proxy_allowed: %s\n",
+				addr);
+		return kr_error(EINVAL);
+	}
+
+	union kr_in_addr ia;
+	int netmask = kr_straddr_subnet(&ia, addr);
+	if (netmask < 0) {
+		kr_log_error(NETWORK, "Wrong netmask format for proxy_allowed: %s\n", addr);
+		return kr_error(EINVAL);
+	} else if (netmask == 0) {
+		kr_log_error(NETWORK, "Zero netmask not allowed proxy_allowed: %s\n", addr);
+		return kr_error(EINVAL);
+	}
+
+	size_t addr_length;
+	trie_t *trie;
+	switch (family) {
+	case AF_INET:
+		addr_length = sizeof(ia.ip4);
+		trie = net->proxy_addrs4;
+		break;
+	case AF_INET6:
+		addr_length = sizeof(ia.ip6);
+		trie = net->proxy_addrs6;
+		break;
+	default:
+		kr_assert(false);
+		return kr_error(EINVAL);
+	}
+
+	kr_bitmask((unsigned char *) &ia, addr_length, netmask);
+	trie_val_t *val = trie_get_ins(trie, (char *) &ia, addr_length);
+	if (!val)
+		return kr_error(ENOMEM);
+
+	struct net_proxy_data *data = *val;
+	if (!data) { /* Allocate data if the entry is new in the trie */
+		*val = malloc(sizeof(struct net_proxy_data));
+		data = *val;
+		data->netmask = 0;
+	}
+
+	if (data->netmask == 0) {
+		memcpy(&data->addr, &ia, addr_length);
+		data->netmask = netmask;
+	} else if (data->netmask > netmask) {
+		/* A more relaxed netmask configured - replace it */
+		data->netmask = netmask;
+	}
+
+	return kr_ok();
+}
+
+void network_proxy_reset(struct network *net)
+{
+	network_proxy_free_addr_data(net->proxy_addrs4);
+	trie_clear(net->proxy_addrs4);
+	network_proxy_free_addr_data(net->proxy_addrs6);
+	trie_clear(net->proxy_addrs6);
 }
 
 int network_close(struct network *net, const char *addr, int port)

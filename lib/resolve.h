@@ -212,6 +212,9 @@ struct kr_request {
 	struct {
 		/** Address that originated the request. NULL for internal origin. */
 		const struct sockaddr *addr;
+		/** Address that communicated the request (e.g. a proxy). Same as
+		 * addr if no proxy is used. */
+		const struct sockaddr *comm_addr;
 		/** Address that accepted the request.  NULL for internal origin.
 		 * Beware: in case of UDP on wildcard address it will be wildcard;
 		 * closely related: issue #173. */

@@ -65,6 +65,8 @@ struct request_ctx
 		struct session *session;
 		/** Requestor's address; separate because of UDP session "sharing". */
 		union kr_sockaddr addr;
+		/** Request communication address; if not from a proxy, same as addr. */
+		union kr_sockaddr comm_addr;
 		/** Local address.  For AF_XDP we couldn't use session's,
 		 * as the address might be different every time. */
 		union kr_sockaddr dst_addr;
@@ -289,7 +291,7 @@ static uint8_t *alloc_wire_cb(struct kr_request *req, uint16_t *maxlen)
 		return NULL;
 	xdp_handle_data_t *xhd = handle->data;
 	knot_xdp_msg_t out;
-	bool ipv6 = ctx->source.addr.ip.sa_family == AF_INET6;
+	bool ipv6 = ctx->source.comm_addr.ip.sa_family == AF_INET6;
 	int ret = knot_xdp_send_alloc(xhd->socket,
 			#if KNOT_VERSION_HEX >= 0x030100
 					ipv6 ? KNOT_XDP_MSG_IPV6 : 0, &out);
@@ -353,6 +355,7 @@ static inline bool is_tcp_waiting(struct sockaddr *address) {
 static struct request_ctx *request_create(struct worker_ctx *worker,
 					  struct session *session,
 					  const struct sockaddr *addr,
+					  const struct sockaddr *comm_addr,
 					  const struct sockaddr *dst_addr,
 					  const uint8_t *eth_from,
 					  const uint8_t *eth_to,
@@ -425,6 +428,10 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		/* We need to store a copy of peer address. */
 		memcpy(&ctx->source.addr.ip, addr, kr_sockaddr_len(addr));
 		req->qsource.addr = &ctx->source.addr.ip;
+		if (!comm_addr)
+			comm_addr = addr;
+		memcpy(&ctx->source.comm_addr.ip, comm_addr, kr_sockaddr_len(comm_addr));
+		req->qsource.comm_addr = &ctx->source.comm_addr.ip;
 		if (!dst_addr) /* We wouldn't have to copy in this case, but for consistency. */
 			dst_addr = session_get_sockname(session);
 		memcpy(&ctx->source.dst_addr.ip, dst_addr, kr_sockaddr_len(dst_addr));
@@ -1377,7 +1384,7 @@ static int xdp_push(struct qr_task *task, const uv_handle_t *src_handle)
 
 	knot_xdp_msg_t msg;
 	const struct sockaddr *ip_from = &ctx->source.dst_addr.ip;
-	const struct sockaddr *ip_to   = &ctx->source.addr.ip;
+	const struct sockaddr *ip_to   = &ctx->source.comm_addr.ip;
 	memcpy(&msg.ip_from, ip_from, kr_sockaddr_len(ip_from));
 	memcpy(&msg.ip_to,   ip_to,   kr_sockaddr_len(ip_to));
 	msg.payload.iov_base = ctx->req.answer->wire;
@@ -1443,7 +1450,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		else
 			kr_assert(false);
 	} else {
-		ret = qr_task_send(task, source_session, &ctx->source.addr.ip, ctx->req.answer);
+		ret = qr_task_send(task, source_session, &ctx->source.comm_addr.ip, ctx->req.answer);
 	}
 
 	if (ret != kr_ok()) {
@@ -1796,7 +1803,8 @@ static int parse_packet(knot_pkt_t *query)
 }
 
 int worker_submit(struct session *session,
-		  const struct sockaddr *peer, const struct sockaddr *dst_addr,
+		  const struct sockaddr *src_addr, const struct sockaddr *comm_addr,
+		  const struct sockaddr *dst_addr,
 		  const uint8_t *eth_from, const uint8_t *eth_to, knot_pkt_t *pkt)
 {
 	if (!session || !pkt)
@@ -1841,7 +1849,7 @@ int worker_submit(struct session *session,
 	const struct sockaddr *addr = NULL;
 	if (!is_outgoing) { /* request from a client */
 		struct request_ctx *ctx =
-			request_create(the_worker, session, peer, dst_addr,
+			request_create(the_worker, session, src_addr, comm_addr, dst_addr,
 					eth_from, eth_to, knot_wire_get_id(pkt->wire));
 		if (http_ctx)
 			queue_pop(http_ctx->streams);
@@ -1873,7 +1881,7 @@ int worker_submit(struct session *session,
 		}
 		if (kr_fails_assert(!session_flags(session)->closing))
 			return kr_error(EINVAL);
-		addr = peer;
+		addr = src_addr;
 		/* Note receive time for RTT calculation */
 		task->recv_time = kr_now();
 	}
@@ -2081,7 +2089,7 @@ struct qr_task *worker_resolve_start(knot_pkt_t *query, struct kr_qflags options
 		return NULL;
 
 
-	struct request_ctx *ctx = request_create(worker, NULL, NULL, NULL, NULL, NULL,
+	struct request_ctx *ctx = request_create(worker, NULL, NULL, NULL, NULL, NULL, NULL,
 						 worker->next_request_uid);
 	if (!ctx)
 		return NULL;

@@ -205,6 +205,7 @@ struct kr_request {
 	struct kr_query *current_query;
 	struct {
 		const struct sockaddr *addr;
+		const struct sockaddr *comm_addr;
 		const struct sockaddr *dst_addr;
 		const knot_pkt_t *packet;
 		struct kr_request_qsource_flags flags;

@@ -534,22 +534,27 @@ int session_timer_stop(struct session *session)
 
 ssize_t session_wirebuf_consume(struct session *session, const uint8_t *data, ssize_t len)
 {
-	if (data != &session->wire_buf[session->wire_buf_end_idx]) {
-		/* shouldn't happen */
+	if (kr_fails_assert(data == &session->wire_buf[session->wire_buf_end_idx]))
 		return kr_error(EINVAL);
-	}
-
-	if (len < 0) {
-		/* shouldn't happen */
+	if (kr_fails_assert(len >= 0))
 		return kr_error(EINVAL);
-	}
-
-	if (session->wire_buf_end_idx + len > session->wire_buf_size) {
-		/* shouldn't happen */
+	if (kr_fails_assert(session->wire_buf_end_idx + len <= session->wire_buf_size))
 		return kr_error(EINVAL);
-	}
 
 	session->wire_buf_end_idx += len;
+	return len;
+}
+
+ssize_t session_wirebuf_trim(struct session *session, ssize_t len)
+{
+	if (kr_fails_assert(len >= 0))
+		return kr_error(EINVAL);
+	if (kr_fails_assert(session->wire_buf_start_idx + len <= session->wire_buf_size))
+		return kr_error(EINVAL);
+
+	session->wire_buf_start_idx += len;
+	if (session->wire_buf_start_idx > session->wire_buf_end_idx)
+		session->wire_buf_end_idx = session->wire_buf_start_idx;
 	return len;
 }
 
@@ -744,7 +749,9 @@ void session_unpoison(struct session *session)
 	kr_asan_unpoison(session, sizeof(*session));
 }
 
-int session_wirebuf_process(struct session *session, const struct sockaddr *peer)
+int session_wirebuf_process(
+		struct session *session, const struct sockaddr *src_addr,
+		const struct sockaddr *comm_addr, const struct sockaddr *dst_addr)
 {
 	int ret = 0;
 	if (session->wire_buf_start_idx == session->wire_buf_end_idx)
@@ -759,7 +766,7 @@ int session_wirebuf_process(struct session *session, const struct sockaddr *peer
 	       (ret < max_iterations)) {
 		if (kr_fails_assert(!session_wirebuf_error(session)))
 			return -1;
-		int res = worker_submit(session, peer, NULL, NULL, NULL, pkt);
+		int res = worker_submit(session, src_addr, comm_addr, dst_addr, NULL, NULL, pkt);
 		/* Errors from worker_submit() are intentionally *not* handled in order to
 		 * ensure the entire wire buffer is processed. */
 		if (res == kr_ok())

@@ -552,6 +552,22 @@ int kr_bitcmp(const char *a, const char *b, int bits)
 	return ret;
 }
 
+void kr_bitmask(unsigned char *a, size_t a_len, int bits)
+{
+	if (bits < 0 || !a || !a_len) {
+		return;
+	}
+
+	size_t i = bits / 8;
+	const size_t mid_bits = 8 - (bits % 8);
+	const unsigned char mask = 0xFF << mid_bits;
+	if (i < a_len)
+		a[i] &= mask;
+
+	for (++i; i < a_len; ++i)
+		a[i] = 0;
+}
+
 int kr_rrkey(char *key, uint16_t class, const knot_dname_t *owner,
 	     uint16_t type, uint16_t additional)
 {
