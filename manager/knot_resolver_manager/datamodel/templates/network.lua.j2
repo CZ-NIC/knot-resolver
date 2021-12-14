@@ -1,3 +1,5 @@
+{% from 'macros/network_macros.lua.j2' import net_listen %}
+
 -- network.do-ipv4/6
 net.ipv4 = {{ 'true' if cfg.network.do_ipv4 else 'false' }}
 net.ipv6 = {{ 'true' if cfg.network.do_ipv6 else 'false' }}
@@ -64,9 +66,6 @@ renumber.config = {
 {% endif %}
 
 -- network.interfaces
-{% for item in cfg.network.interfaces %}
-net.listen('{{ item.listen.ip }}', {{ item.listen.port }}, {
-    kind = '{{ item.kind if item.kind != 'dot' else 'tls' }}',
-    freebind = {{ 'true' if item.freebind else 'false'}}
-})
+{% for interface in cfg.network.interfaces %}
+{{ net_listen(interface) }}
 {% endfor %}
