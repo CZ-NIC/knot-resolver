@@ -1,0 +1,3 @@
+{% macro net_listen(interface) -%}
+net.listen('{{ interface.listen.ip|string }}', {{ interface.listen.port|int }}, { kind='{{ 'tls' if interface.kind == 'dot' else interface.kind }}', freebind={{ 'true' if interface.freebind else 'false'}} })
+{%- endmacro %}
