@@ -1,13 +1,12 @@
 from typing import List, Optional
 
 from knot_resolver_manager.datamodel.network_schema import AddressRenumberingSchema
-from knot_resolver_manager.datamodel.types import ActionEnum, DomainName, IPAddressPort, QTypeEnum, TimeUnit
+from knot_resolver_manager.datamodel.types import ActionEnum, IPAddressPort, QTypeEnum, TimeUnit
 from knot_resolver_manager.datamodel.view_schema import FlagsEnum
 from knot_resolver_manager.utils import SchemaNode
 
 
 class FilterSchema(SchemaNode):
-    domain: Optional[List[DomainName]] = None
     suffix: Optional[List[str]] = None
     pattern: Optional[List[str]] = None
     qtype: Optional[List[QTypeEnum]] = None
