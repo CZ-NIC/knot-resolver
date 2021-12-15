@@ -640,6 +640,15 @@ Response policy zones
   .. [#] Our :any:`policy.DROP` returns *SERVFAIL* answer (for historical reasons).
 
 
+  .. note::
+
+     To debug which domains are affected by RPZ (or other policy actions), you can enable the ``policy`` log group:
+
+     .. code-block:: lua
+
+        log_groups({'policy'})
+
+
 .. function:: rpz(action, path, [watch = true])
 
   :param action: the default action for match in the zone; typically you want :any:`policy.DENY`
