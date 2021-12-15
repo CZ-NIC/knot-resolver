@@ -24,6 +24,19 @@ kres.str2ip('{{ item|string }}'),
 {%- endif -%}
 {%- endmacro %}
 
+{# Return qtype or table of qtype #}
+{% macro qtype_table(table) -%}
+{%- if table is string -%}
+kres.type.{{ table|string }}
+{%- else-%}
+{
+{%- for item in table -%}
+kres.type.{{ item|string }},
+{%- endfor -%}
+}
+{%- endif -%}
+{%- endmacro %}
+
 {# Return server address or table of server addresses #}
 {% macro servers_table(servers) -%}
 {%- if servers is string -%}

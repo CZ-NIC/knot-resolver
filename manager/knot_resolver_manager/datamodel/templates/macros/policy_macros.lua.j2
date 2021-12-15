@@ -1,12 +1,16 @@
-{% from 'macros/common_macros.lua.j2' import string_table, str2ip_table, servers_table, tls_servers_table %}
+{% from 'macros/common_macros.lua.j2' import string_table, str2ip_table, qtype_table, servers_table, tls_servers_table %}
+
+
+{# Add policy #}
 
 {% macro policy_add(rule, postrule=false) -%}
 {%- if postrule -%}
 policy.add({{ rule }}, true)
-{% else %}
+{%- else -%}
 policy.add({{ rule }})
-{% endif %}
+{%- endif -%}
 {%- endmacro %}
+
 
 {# Flags #}
 
@@ -18,6 +22,7 @@ policy.FLAGS({
 })
 {%- endmacro %}
 
+
 {# Filters #}
 
 {% macro policy_all(action) -%}
@@ -28,6 +33,10 @@ policy.all({{ action }})
 policy.suffix({{ action }}, {{ suffix_table }})
 {%- endmacro %}
 
+{% macro policy_suffix_common(action, suffix_table, common_suffix) -%}
+policy.suffix_common({{ action }}, {{ suffix_table }}, {{ common_suffix }})
+{%- endmacro %}
+
 {% macro policy_pattern(action, pattern) -%}
 policy.pattern({{ action }}, {{ pattern }})
 {%- endmacro %}
@@ -35,6 +44,54 @@ policy.pattern({{ action }}, {{ pattern }})
 {% macro policy_rpz(action, path, watch) -%}
 policy.rpz({{ action|string }}, '{{ path|string }}', {{ 'true' if watch else 'false' }})
 {%- endmacro %}
+
+
+{# Custom filters #}
+
+{% macro declare_policy_qtype_custom_filter() -%}
+function policy_qtype(action, qtype)
+
+    local function has_value (tab, val)
+        for index, value in ipairs(tab) do
+            if value == val then
+                return true
+            end
+        end
+
+        return false
+    end
+
+    return function (state, query)
+        if query.stype == qtype then
+            return action
+        elseif has_value(qtype, query.stype) then
+            return action
+        else
+            return nil
+        end
+    end
+end
+{%- endmacro %}
+
+{% macro policy_qtype_custom_filter(action, qtype) -%}
+policy_qtype({{ action }}, {{ qtype }})
+{%- endmacro %}
+
+
+{# Auto Filter #}
+
+{% macro policy_auto_filter(action, filter=none) -%}
+{%- if filter.suffix -%}
+{{ policy_suffix(action, policy_todname(filter.suffix)) }}
+{%- elif filter.pattern -%}
+{{ policy_pattern(action, filter.pattern) }}
+{%- elif filter.qtype -%}
+{{ policy_qtype_custom_filter(action, qtype_table(filter.qtype)) }}
+{%- else -%}
+{{ policy_all(action) }}
+{%- endif %}
+{%- endmacro %}
+
 
 {# Non-chain actions #}
 
@@ -58,6 +115,16 @@ policy.DROP
 policy.REFUSE
 {%- endmacro %}
 
+{% macro policy_tc() -%}
+policy.TC
+{%- endmacro %}
+
+{% macro policy_reroute(reroute) -%}
+policy.REROUTE({
+{# TODO: completion of this action #}
+})
+{%- endmacro %}
+
 {% macro policy_answer(answer) -%}
 policy.ANSWER({ [kres.type.{{ answer.query_type }}] = { rdata=
 {%- if answer.query_type == 'A' -%}
@@ -74,20 +141,38 @@ ttl={{ answer.ttl.seconds()|int }},
 } }, nodata={{ 'true' if answer.nodata else 'false' }} )
 {%- endmacro %}
 
-{% macro policy_action(policy) -%}
-{%- if policy.action == 'pass' -%}
-{{ policy_pass()|string }}
-{%- elif policy.action == 'deny' -%}
-{%- if policy.message -%}
-{{ policy_deny_msg(policy.message)|string }}
-{%- else -%}
-{{ policy_deny()|string }}
-{%- endif -%}
-{# TODO: do same for other actions #}
-{%- endif -%}
-{%- endmacro %}
 
 {# Chain actions #}
+
+{% macro policy_mirror(mirror) -%}
+policy.MIRROR(
+{% if mirror is string %}
+'{{ mirror }}'
+{% else %}
+{
+{%- for addr in mirror -%}
+'{{ addr }}',
+{%- endfor -%}
+}
+{%- endif -%}
+)
+{%- endmacro %}
+
+{% macro policy_debug_always() -%}
+policy.DEBUG_ALWAYS
+{%- endmacro %}
+
+{% macro policy_debug_cache_miss() -%}
+policy.DEBUG_CACHE_MISS
+{%- endmacro %}
+
+{% macro policy_qtrace() -%}
+policy.QTRACE
+{%- endmacro %}
+
+{% macro policy_reqtrace() -%}
+policy.REQTRACE
+{%- endmacro %}
 
 {% macro policy_stub(servers) -%}
 policy.STUB({{ servers_table(servers) }})
@@ -101,7 +186,43 @@ policy.FORWARD({{ servers_table(servers) }})
 policy.TLS_FORWARD({{ tls_servers_table(servers) }})
 {%- endmacro %}
 
-{# other #}
+
+{# Auto Action #}
+
+{% macro policy_auto_action(rule) -%}
+{%- if rule.action == 'pass' -%}
+{{ policy_pass()|string }}
+{%- elif rule.action == 'deny' -%}
+{%- if rule.message -%}
+{{ policy_deny_msg(rule.message)|string }}
+{%- else -%}
+{{ policy_deny()|string }}
+{%- endif -%}
+{%- elif rule.action == 'drop' -%}
+{{ policy_drop() }}
+{%- elif rule.action == 'refuse' -%}
+{{ policy_refuse() }}
+{%- elif rule.action == 'tc' -%}
+{{ policy_tc() }}
+{%- elif rule.action == 'reroute' -%}
+{{ policy_reroute(rule.reroute) }}
+{%- elif rule.action == 'answer' -%}
+{{ policy_answer(rule.answer) }}
+{%- elif rule.action == 'mirror' -%}
+{{ policy_mirror(rule.mirror) }}
+{%- elif rule.action == 'debug-always' -%}
+{{ policy_debug_always() }}
+{%- elif rule.action == 'debug-cache-miss' -%}
+{{ policy_sebug_cache_miss() }}
+{%- elif rule.action == 'qtrace' -%}
+{{ policy_qtrace() }}
+{%- elif rule.action == 'reqtrace' -%}
+{{ policy_reqtrace() }}
+{%- endif -%}
+{%- endmacro %}
+
+
+{# Other #}
 
 {% macro policy_todname(names) -%}
 policy.todnames({
