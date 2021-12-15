@@ -393,6 +393,7 @@ int kr_rplan_pop(struct kr_rplan *, struct kr_query *);
 struct kr_query *kr_rplan_resolved(struct kr_rplan *);
 struct kr_query *kr_rplan_last(struct kr_rplan *);
 int kr_forward_add_target(struct kr_request *, const struct sockaddr *);
+_Bool kr_log_is_debug_fun(enum kr_log_group, const struct kr_request *);
 void kr_log_req1(const struct kr_request * const, uint32_t, const unsigned int, enum kr_log_group, const char *, const char *, ...);
 void kr_log_q1(const struct kr_query * const, enum kr_log_group, const char *, const char *, ...);
 const char *kr_log_grp2name(enum kr_log_group);

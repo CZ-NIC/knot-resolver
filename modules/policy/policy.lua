@@ -57,6 +57,17 @@ local function addr2sock(target, default_port)
 	return sock
 end
 
+-- Debug logging for taken policy actions
+local function log_policy_action(req, name)
+	if ffi.C.kr_log_is_debug_fun(ffi.C.LOG_GRP_POLICY, req) then
+		local qry = req:current()
+		ffi.C.kr_log_req1(
+			req, qry.uid, 2, ffi.C.LOG_GRP_POLICY, LOG_GRP_POLICY_TAG,
+			"%s applied for %s %s\n",
+			name, kres.dname2str(qry.sname), kres.tostring.type[qry.stype])
+	end
+end
+
 -- policy functions are defined below
 local policy = {}
 
@@ -247,6 +258,7 @@ function policy.ANSWER(rtable, nodata)
 			else
 				mkauth_soa(answer, kres.dname2wire(qry.sname), nil, ttl)
 			end
+			log_policy_action(req, 'ANSWER (nodata)')
 		else
 			answer:begin(kres.section.ANSWER)
 			if type(data.rdata) == 'table' then
@@ -256,6 +268,7 @@ function policy.ANSWER(rtable, nodata)
 			else
 				answer:put(qry.sname, ttl, qry.sclass, qry.stype, data.rdata)
 			end
+			log_policy_action(req, 'ANSWER (forged)')
 		end
 		return kres.DONE
 	end
@@ -672,6 +685,7 @@ function policy.DENY_MSG(msg, extended_error)
 	if extended_error == nil then
 		extended_error = kres.extended_error.BLOCKED
 	end
+	local action_name = msg and 'DENY_MSG' or 'DENY'
 
 	return function (_, req)
 		-- Write authority information
@@ -688,6 +702,7 @@ function policy.DENY_MSG(msg, extended_error)
 
 		end
 		req:set_extended_error(extended_error, "CR36")
+		log_policy_action(req, action_name)
 		return kres.DONE
 	end
 end
@@ -786,6 +801,7 @@ function policy.DROP(_, req)
 	local answer = answer_clear(req)
 	if answer == nil then return nil end
 	req:set_extended_error(kres.extended_error.PROHIBITED, "U5KL")
+	log_policy_action(req, 'DROP')
 	return kres.FAIL
 end
 
@@ -795,6 +811,7 @@ function policy.REFUSE(_, req)
 	answer:rcode(kres.rcode.REFUSED)
 	answer:ad(false)
 	req:set_extended_error(kres.extended_error.PROHIBITED, "EIM4")
+	log_policy_action(req, 'REFUSE')
 	return kres.DONE
 end
 
@@ -808,6 +825,7 @@ function policy.TC(state, req)
 	if answer == nil then return nil end
 	answer:tc(1)
 	answer:ad(false)
+	log_policy_action(req, 'TC')
 	return kres.DONE
 end
 
