@@ -11,6 +11,8 @@
 
 #include <stdlib.h>
 
+#define PROXY_DATA_STRLEN (INET6_ADDRSTRLEN + 1 + 3 + 1)
+
 /** Table and next index on top of stack -> append entries for given endpoint_array_t. */
 static int net_list_add(const char *key, void *val, void *ext)
 {
@@ -279,6 +281,97 @@ static int net_listen(lua_State *L)
 		lua_error_p(L, "net.listen() failed to bind");
 	lua_pushboolean(L, true);
 	return 1;
+}
+
+/** Prints the specified `data` into the specified `dst` buffer. */
+static char *proxy_data_to_string(int af, const struct net_proxy_data *data,
+		char *dst, size_t size)
+{
+	kr_assert(size >= PROXY_DATA_STRLEN);
+	const void *in_addr = (af == AF_INET)
+		? (void *) &data->addr.ip4
+		: (void *) &data->addr.ip6;
+	char *cur = dst;
+
+	const char *ret = inet_ntop(af, in_addr, cur, size);
+	if (!ret)
+		return NULL;
+
+	cur += strlen(cur); /*< advance cursor to after the address */
+	*(cur++) = '/';
+	int masklen = snprintf(cur, 3 + 1, "%u", data->netmask);
+	cur[masklen] = '\0';
+	return dst;
+}
+
+/** Allow PROXYv2 headers for IP address. */
+static int net_proxy_allowed(lua_State *L)
+{
+	struct network *net = &the_worker->engine->net;
+	int n = lua_gettop(L);
+	int i = 1;
+	const char *addr;
+	char addrbuf[PROXY_DATA_STRLEN];
+
+	/* Return current state */
+	if (n == 0) {
+		lua_newtable(L);
+		trie_it_t *it;
+		i = 1;
+		for (it = trie_it_begin(net->proxy_addrs4); !trie_it_finished(it); trie_it_next(it)) {
+			lua_pushinteger(L, i);
+			struct net_proxy_data *data = *trie_it_val(it);
+			addr = proxy_data_to_string(AF_INET, data,
+					addrbuf, sizeof(addrbuf));
+			lua_pushstring(L, addr);
+			lua_settable(L, -3);
+			i += 1;
+		}
+		trie_it_free(it);
+		for (it = trie_it_begin(net->proxy_addrs6); !trie_it_finished(it); trie_it_next(it)) {
+			lua_pushinteger(L, i);
+			struct net_proxy_data *data = *trie_it_val(it);
+			addr = proxy_data_to_string(AF_INET6, data,
+					addrbuf, sizeof(addrbuf));
+			lua_pushstring(L, addr);
+			lua_settable(L, -3);
+			i += 1;
+		}
+		trie_it_free(it);
+		return 1;
+	}
+
+	if (n != 1)
+		lua_error_p(L, "net.proxy_allowed() takes one parameter (string or table)");
+
+	if (!lua_istable(L, 1) && !lua_isstring(L, 1))
+		lua_error_p(L, "net.proxy_allowed() argument must be string or table");
+
+	/* Reset allowed proxy addresses */
+	network_proxy_reset(net);
+
+	/* Add new proxy addresses */
+	if (lua_istable(L, 1)) {
+		for (i = 1; !lua_isnil(L, -1); i++) {
+			lua_pushinteger(L, i);
+			lua_gettable(L, 1);
+			if (lua_isnil(L, -1)) /* missing value - end iteration */
+				break;
+			if (!lua_isstring(L, -1))
+				lua_error_p(L, "net.proxy_allowed() argument may only contain strings");
+			addr = lua_tostring(L, -1);
+			int ret = network_proxy_allow(net, addr);
+			if (ret)
+				lua_error_p(L, "invalid argument");
+		}
+	} else if (lua_isstring(L, 1)) {
+		addr = lua_tostring(L, 1);
+		int ret = network_proxy_allow(net, addr);
+		if (ret)
+			lua_error_p(L, "invalid argument");
+	}
+
+	return 0;
 }
 
 /** Close endpoint. */
@@ -1125,6 +1218,7 @@ int kr_bindings_net(lua_State *L)
 	static const luaL_Reg lib[] = {
 		{ "list",         net_list },
 		{ "listen",       net_listen },
+		{ "proxy_allowed", net_proxy_allowed },
 		{ "close",        net_close },
 		{ "interfaces",   net_interfaces },
 		{ "bufsize",      net_bufsize },
