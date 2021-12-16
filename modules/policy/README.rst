@@ -301,6 +301,24 @@ They are marked as ``debug`` level, so e.g. with journalctl command you can use 
    It makes most sense together with :ref:`mod-view` (enabling per-client)
    and probably with verbose logging those request (e.g. use :any:`DEBUG_ALWAYS` instead).
 
+.. py:attribute:: IPTRACE
+
+   Log how the request arrived.
+   Most notably, this includes the client's IP address, so beware of privacy implications.
+
+   .. code-block:: lua
+
+        -- example usage in configuration
+        policy.add(policy.all(policy.IPTRACE))
+        -- you might want to combine it with some other logs, e.g.
+        policy.add(policy.all(policy.DEBUG_ALWAYS))
+
+   .. code-block:: text
+
+        -- example log lines from IPTRACE:
+        [reqdbg][policy][57517.00] request packet arrived from ::1#37931 to ::1#00853 (TCP + TLS)
+        [reqdbg][policy][65538.00] request packet arrived internally
+
 
 Custom actions
 ^^^^^^^^^^^^^^

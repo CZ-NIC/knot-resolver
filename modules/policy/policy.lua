@@ -748,6 +748,24 @@ function policy.REQTRACE(_, req)
 	log_notrace(req, 'request packet:\n%s', req.qsource.packet)
 end
 
+-- log how the request arrived, notably the client's IP
+function policy.IPTRACE(_, req)
+	if req.qsource.addr == nil then
+		log_notrace(req, 'request packet arrived internally\n')
+	else
+		-- stringify transport flags: struct kr_request_qsource_flags
+		local qf = req.qsource.flags
+		local qf_str = qf.tcp and 'TCP' or 'UDP'
+		if qf.tls  then qf_str = qf_str .. ' + TLS'  end
+		if qf.http then qf_str = qf_str .. ' + HTTP' end
+		if qf.xdp  then qf_str = qf_str .. ' + XDP'  end
+
+		log_notrace(req, 'request packet arrived from %s to %s (%s)\n',
+			req.qsource.addr, req.qsource.dst_addr, qf_str)
+	end
+	return nil -- chain rule
+end
+
 function policy.DEBUG_ALWAYS(state, req)
 	policy.QTRACE(state, req)
 	req:trace_chain_callbacks(debug_logline_cb, debug_logfinish_cb)

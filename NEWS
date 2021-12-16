@@ -4,6 +4,7 @@ Knot Resolver 5.5.0 (2022-mm-dd)
 Improvements
 ------------
 - extended_errors: module for extended DNS error support, RFC8914 (!1234)
+- policy: log policy actions; useful for RPZ debugging (!1239)
 - policy: new action policy.IPTRACE for logging request origin (!1239)
 
 Incompatible changes
