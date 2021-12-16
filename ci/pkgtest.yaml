@@ -147,7 +147,8 @@ nixos-unstable:pkgbuild:
     - docker
     - linux
     - amd64
-  image: nixos/nix
+  # TODO: untag after resolving problems around https://github.com/NixOS/nix/issues/5776
+  image: nixos/nix:2.3.12
 
   variables:
     #NIX_PATH: nixpkgs=https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz
