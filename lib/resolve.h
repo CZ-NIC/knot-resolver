@@ -382,6 +382,11 @@ knot_mm_t *kr_resolve_pool(struct kr_request *request);
  * allocated either statically, or on the request's mempool. To clear any
  * error, call it with KNOT_EDNS_EDE_NONE and NULL as extra_text.
  *
+ * To facilitate debugging, we include a unique base32 identifier at the start
+ * of the extra_text field for every call of this function. To generate such an
+ * identifier, you can use the command:
+ * $ base32 /dev/random | head -c 4
+ *
  * @param  request     request state
  * @param  info_code   extended DNS error code
  * @param  extra_text  optional string with additional information
@@ -392,7 +397,7 @@ int kr_request_set_extended_error(struct kr_request *request, int info_code, con
 
 static inline void kr_query_inform_timeout(struct kr_request *req, const struct kr_query *qry)
 {
-	kr_request_set_extended_error(req, KNOT_EDNS_EDE_NREACH_AUTH, NULL);
+	kr_request_set_extended_error(req, KNOT_EDNS_EDE_NREACH_AUTH, "RRPF");
 
 	unsigned ind = 0;
 	for (const struct kr_query *q = qry; q; q = q->parent)

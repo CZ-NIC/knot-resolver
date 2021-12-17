@@ -21,7 +21,7 @@ static int refuse_nord_query(kr_layer_t *ctx)
 		return ctx->state;
 	knot_wire_set_rcode(answer->wire, KNOT_RCODE_REFUSED);
 	knot_wire_clear_ad(answer->wire);
-	kr_request_set_extended_error(req, KNOT_EDNS_EDE_NOTAUTH, NULL);
+	kr_request_set_extended_error(req, KNOT_EDNS_EDE_NOTAUTH, "ABC4");
 	ctx->state = KR_STATE_DONE;
 	return ctx->state;
 }

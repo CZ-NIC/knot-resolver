@@ -236,17 +236,17 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, struct kr_query *qr
 			/* no RRSIGs found */
 			kr_rank_set(&entry->rank, KR_RANK_MISSING);
 			vctx->err_cnt += 1;
-			kr_request_set_extended_error(req, KNOT_EDNS_EDE_RRSIG_MISS, NULL);  // TODO double-check EDE
+			kr_request_set_extended_error(req, KNOT_EDNS_EDE_RRSIG_MISS, "JZAJ");
 			log_bogus_rrsig(vctx, rr, "no valid RRSIGs found");
 		} else {
 			kr_rank_set(&entry->rank, KR_RANK_BOGUS);
 			vctx->err_cnt += 1;
 			if (vctx->rrs_counters.expired > 0)
-				kr_request_set_extended_error(req, KNOT_EDNS_EDE_SIG_EXPIRED, NULL);
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_SIG_EXPIRED, "YFJ2");
 			else if (vctx->rrs_counters.notyet > 0)
-				kr_request_set_extended_error(req, KNOT_EDNS_EDE_SIG_NOTYET, NULL);
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_SIG_NOTYET, "UBBS");
 			else
-				kr_request_set_extended_error(req, KNOT_EDNS_EDE_BOGUS, NULL);
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_BOGUS, "I74V");
 			log_bogus_rrsig(vctx, rr, "bogus signatures");
 		}
 	}
@@ -365,7 +365,7 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 			}
 		}
 		if (sig_index < 0) {
-			kr_request_set_extended_error(req, KNOT_EDNS_EDE_RRSIG_MISS, NULL);
+			kr_request_set_extended_error(req, KNOT_EDNS_EDE_RRSIG_MISS, "EZDC");
 			return kr_error(ENOENT);
 		}
 		const knot_rdataset_t *sig_rds = &req->answ_selected.at[sig_index]->rr->rrs;
@@ -394,11 +394,11 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 			knot_rrset_free(qry->zone_cut.key, qry->zone_cut.pool);
 			qry->zone_cut.key = NULL;
 			if (vctx.rrs_counters.expired > 0)
-				kr_request_set_extended_error(req, KNOT_EDNS_EDE_SIG_EXPIRED, NULL);
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_SIG_EXPIRED, "6GJV");
 			else if (vctx.rrs_counters.notyet > 0)
-				kr_request_set_extended_error(req, KNOT_EDNS_EDE_SIG_NOTYET, NULL);
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_SIG_NOTYET, "4DJQ");
 			else
-				kr_request_set_extended_error(req, KNOT_EDNS_EDE_BOGUS, NULL);
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_BOGUS, "EXRU");
 			return ret;
 		}
 
@@ -567,7 +567,7 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 			}
 		} else if (ret != 0) {
 			VERBOSE_MSG(qry, "<= bogus proof of DS non-existence\n");
-			kr_request_set_extended_error(req, KNOT_EDNS_EDE_BOGUS, NULL);
+			kr_request_set_extended_error(req, KNOT_EDNS_EDE_BOGUS, "Z4I6");
 			qry->flags.DNSSEC_BOGUS = true;
 		} else if (proved_name[0] != '\0') { /* don't go to insecure for . DS */
 			qry->flags.DNSSEC_NODS = true;
@@ -712,7 +712,8 @@ static int check_validation_result(kr_layer_t *ctx, const knot_pkt_t *pkt, ranke
 	if (!kr_rank_test(invalid_entry->rank, KR_RANK_SECURE) &&
 	    (++(invalid_entry->revalidation_cnt) > MAX_REVALIDATION_CNT)) {
 		VERBOSE_MSG(qry, "<= continuous revalidation, fails\n");
-		kr_request_set_extended_error(req, KNOT_EDNS_EDE_OTHER, "continuous revalidation, fails");
+		kr_request_set_extended_error(req, KNOT_EDNS_EDE_OTHER,
+			"4T4L: continuous revalidation");
 		qry->flags.DNSSEC_BOGUS = true;
 		return KR_STATE_FAIL;
 	}
@@ -736,7 +737,7 @@ static int check_validation_result(kr_layer_t *ctx, const knot_pkt_t *pkt, ranke
 	} else if (kr_rank_test(invalid_entry->rank, KR_RANK_MISSING)) {
 		ret = rrsig_not_found(ctx, pkt, rr);
 	} else if (!kr_rank_test(invalid_entry->rank, KR_RANK_SECURE)) {
-		kr_request_set_extended_error(req, KNOT_EDNS_EDE_BOGUS, NULL);
+		kr_request_set_extended_error(req, KNOT_EDNS_EDE_BOGUS, "NXJA");
 		qry->flags.DNSSEC_BOGUS = true;
 		ret = KR_STATE_FAIL;
 	}
@@ -1074,7 +1075,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	bool use_signatures = (knot_pkt_qtype(pkt) != KNOT_RRTYPE_RRSIG);
 	if (!(qry->flags.CACHED) && !knot_pkt_has_dnssec(pkt) && !use_signatures) {
 		VERBOSE_MSG(qry, "<= got insecure response\n");
-		kr_request_set_extended_error(req, KNOT_EDNS_EDE_BOGUS, NULL);
+		kr_request_set_extended_error(req, KNOT_EDNS_EDE_BOGUS, "MISQ");
 		qry->flags.DNSSEC_BOGUS = true;
 		return KR_STATE_FAIL;
 	}
@@ -1090,7 +1091,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		 * but iterator has not selected any records. */
 		if (!check_empty_answer(ctx, pkt)) {
 			VERBOSE_MSG(qry, "<= no useful RR in authoritative answer\n");
-			kr_request_set_extended_error(req, KNOT_EDNS_EDE_BOGUS, NULL);
+			kr_request_set_extended_error(req, KNOT_EDNS_EDE_BOGUS, "MJX6");
 			qry->flags.DNSSEC_BOGUS = true;
 			return KR_STATE_FAIL;
 		}
@@ -1112,7 +1113,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		if (ds && !kr_ds_algo_support(ds)) {
 			VERBOSE_MSG(qry, ">< all DS entries use unsupported algorithm pairs, going insecure\n");
 			/* ^ the message is a bit imprecise to avoid being too verbose */
-			kr_request_set_extended_error(req, KNOT_EDNS_EDE_OTHER, "unsupported digest/key");
+			kr_request_set_extended_error(req, KNOT_EDNS_EDE_OTHER, "LSLC: unsupported digest/key");
 			qry->flags.DNSSEC_WANT = false;
 			qry->flags.DNSSEC_INSECURE = true;
 			rank_records(qry, true, KR_RANK_INSECURE, qry->zone_cut.name);
@@ -1143,7 +1144,8 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			/* something exceptional - no DNS key, empty pointers etc
 			 * normally it shouldn't happen */
 			VERBOSE_MSG(qry, "<= couldn't validate RRSIGs\n");
-			kr_request_set_extended_error(req, KNOT_EDNS_EDE_OTHER, "couldn't validate RRSIGs");
+			kr_request_set_extended_error(req, KNOT_EDNS_EDE_OTHER,
+				"O4TP: couldn't validate RRSIGs");
 			qry->flags.DNSSEC_BOGUS = true;
 			return KR_STATE_FAIL;
 		}
@@ -1182,7 +1184,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			VERBOSE_MSG(qry, "<= can't prove NXDOMAIN due to optout, going insecure\n");
 		} else if (ret != 0) {
 			VERBOSE_MSG(qry, "<= bad NXDOMAIN proof\n");
-			kr_request_set_extended_error(req, KNOT_EDNS_EDE_NSEC_MISS, NULL);
+			kr_request_set_extended_error(req, KNOT_EDNS_EDE_NSEC_MISS, "3WKM");
 			qry->flags.DNSSEC_BOGUS = true;
 			return KR_STATE_FAIL;
 		}
@@ -1214,7 +1216,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 					 * parent queries as insecure */
 				} else {
 					VERBOSE_MSG(qry, "<= bad NODATA proof\n");
-					kr_request_set_extended_error(req, KNOT_EDNS_EDE_NSEC_MISS, NULL);
+					kr_request_set_extended_error(req, KNOT_EDNS_EDE_NSEC_MISS, "AHXI");
 					qry->flags.DNSSEC_BOGUS = true;
 					return KR_STATE_FAIL;
 				}
@@ -1229,7 +1231,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (ret == DNSSEC_NOT_FOUND && qry->stype != KNOT_RRTYPE_DS) {
 		if (ctx->state == KR_STATE_YIELD) {
 			VERBOSE_MSG(qry, "<= can't validate referral\n");
-			kr_request_set_extended_error(req, KNOT_EDNS_EDE_BOGUS, NULL);
+			kr_request_set_extended_error(req, KNOT_EDNS_EDE_BOGUS, "XLE4");
 			qry->flags.DNSSEC_BOGUS = true;
 			return KR_STATE_FAIL;
 		} else {

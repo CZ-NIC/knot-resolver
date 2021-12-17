@@ -236,7 +236,7 @@ function policy.ANSWER(rtable, nodata)
 		ffi.C.kr_pkt_make_auth_header(answer)
 		local ttl = (data or {}).ttl or 1
 		answer:rcode(kres.rcode.NOERROR)
-		ffi.C.kr_request_set_extended_error(req, kres.extended_error.FORGED, nil)
+		req:set_extended_error(kres.extended_error.FORGED, "5DO5")
 
 		if data == nil then -- want NODATA, i.e. just a SOA
 			answer:begin(kres.section.AUTHORITY)
@@ -687,7 +687,7 @@ function policy.DENY_MSG(msg, extended_error)
 				   string.char(#msg) .. msg)
 
 		end
-		ffi.C.kr_request_set_extended_error(req, extended_error, nil)
+		req:set_extended_error(extended_error, "CR36")
 		return kres.DONE
 	end
 end
@@ -785,7 +785,7 @@ policy.DENY = policy.DENY_MSG() -- compatibility with < 2.0
 function policy.DROP(_, req)
 	local answer = answer_clear(req)
 	if answer == nil then return nil end
-	ffi.C.kr_request_set_extended_error(req, kres.extended_error.PROHIBITED, nil)
+	req:set_extended_error(kres.extended_error.PROHIBITED, "U5KL")
 	return kres.FAIL
 end
 
@@ -794,7 +794,7 @@ function policy.REFUSE(_, req)
 	if answer == nil then return nil end
 	answer:rcode(kres.rcode.REFUSED)
 	answer:ad(false)
-	ffi.C.kr_request_set_extended_error(req, kres.extended_error.PROHIBITED, nil)
+	req:set_extended_error(kres.extended_error.PROHIBITED, "EIM4")
 	return kres.DONE
 end
 

@@ -1,6 +1,5 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 -- Module interface
-local kluautil = require('kluautil')
 local kres = require('kres')
 local ffi = require('ffi')
 local C = ffi.C
@@ -153,8 +152,7 @@ function M.layer.consume(state, req, pkt)
 		end
 	end
 	ffi.C.kr_ranked_rrarray_finalize(req.answ_selected, qry.uid, req.pool)
-	local msg = kluautil.kr_string2c("DNS64 synthesis", req.pool)
-	ffi.C.kr_request_set_extended_error(req, kres.extended_error.FORGED, msg)
+	req:set_extended_error(kres.extended_error.FORGED, "BHD4: DNS64 synthesis")
 end
 
 local function hexchar2int(char)

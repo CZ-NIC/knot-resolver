@@ -99,7 +99,7 @@ local function rule(prefixes)
 				pkt:put(rr.owner, rr.ttl, rr.class, rr.type, rr.rdata)
 			end
 		end
-		ffi.C.kr_request_set_extended_error(req, kres.extended_error.FORGED, nil)
+		req:set_extended_error(kres.extended_error.FORGED, "DUQR")
 		return state
 	end
 end

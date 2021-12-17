@@ -1664,12 +1664,13 @@ static int qr_task_step(struct qr_task *task,
 			if (task->iter_count > KR_ITER_LIMIT) {
 				char *msg = "cancelling query due to exceeded iteration count limit";
 				VERBOSE_MSG(last, "%s of %d\n", msg, KR_ITER_LIMIT);
-				kr_request_set_extended_error(req, KNOT_EDNS_EDE_OTHER, msg);
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_OTHER,
+					"OGHD: exceeded iteration count limit");
 			}
 			if (task->timeouts >= KR_TIMEOUT_LIMIT) {
 				char *msg = "cancelling query due to exceeded timeout retries limit";
 				VERBOSE_MSG(last, "%s of %d\n", msg, KR_TIMEOUT_LIMIT);
-				kr_request_set_extended_error(req, KNOT_EDNS_EDE_NREACH_AUTH, NULL);
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_NREACH_AUTH, "QLPL");
 			}
 
 			return qr_task_finalize(task, KR_STATE_FAIL);

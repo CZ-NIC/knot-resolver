@@ -241,7 +241,7 @@ int32_t get_new_ttl(const struct entry_h *entry, const struct kr_query *qry,
 			VERBOSE_MSG(qry, "responding with stale answer\n");
 			/* LATER: Perhaps we could use a more specific Stale
 			 * NXDOMAIN Answer code for applicable responses. */
-			kr_request_set_extended_error(qry->request, KNOT_EDNS_EDE_STALE, NULL);
+			kr_request_set_extended_error(qry->request, KNOT_EDNS_EDE_STALE, "6Q6X");
 			return res_stale;
 		}
 	}
