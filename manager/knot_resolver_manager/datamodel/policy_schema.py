@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 from knot_resolver_manager.datamodel.network_schema import AddressRenumberingSchema
-from knot_resolver_manager.datamodel.types import ActionEnum, IPAddressPort, QTypeEnum, TimeUnit
+from knot_resolver_manager.datamodel.types import ActionEnum, IPAddressPort, RecordTypeEnum, TimeUnit
 from knot_resolver_manager.datamodel.view_schema import FlagsEnum
 from knot_resolver_manager.utils import SchemaNode
 
@@ -9,11 +9,11 @@ from knot_resolver_manager.utils import SchemaNode
 class FilterSchema(SchemaNode):
     suffix: Optional[List[str]] = None
     pattern: Optional[List[str]] = None
-    qtype: Optional[List[QTypeEnum]] = None
+    qtype: Optional[List[RecordTypeEnum]] = None
 
 
 class AnswerSchema(SchemaNode):
-    qtype: QTypeEnum
+    qtype: RecordTypeEnum
     rdata: str
     ttl: TimeUnit = TimeUnit("1s")
     no_data: bool = False
