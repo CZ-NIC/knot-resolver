@@ -5,6 +5,7 @@
 
 local kres -- the module
 
+local kluautil = require('kluautil')
 local ffi = require('ffi')
 local bit = require('bit')
 local bor = bit.bor
@@ -860,6 +861,11 @@ ffi.metatype( kr_request_t, {
 				table.insert(buf, tostring(req.add_selected))
 			end
 			return table.concat(buf, '')
+		end,
+		set_extended_error = function(req, code, msg)
+			assert(ffi.istype(kr_request_t, req))
+			msg = kluautil.kr_string2c(msg, req.pool)
+			ffi.C.kr_request_set_extended_error(req, code, msg)
 		end,
 
 		-- chain new callbacks after the old ones
