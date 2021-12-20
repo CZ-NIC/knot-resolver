@@ -12,6 +12,7 @@ from knot_resolver_manager.utils.types import LiteralEnum
 
 logger = logging.getLogger(__name__)
 
+# Policy actions
 ActionEnum = LiteralEnum[
     # Nonchain actions
     "pass",
