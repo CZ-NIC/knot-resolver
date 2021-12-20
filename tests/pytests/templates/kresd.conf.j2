@@ -46,6 +46,11 @@ policy.add(policy.all(
 policy.add(policy.suffix(policy.PASS, {todname('test.')}))
 {% endif %}
 
+-- EDNS EDE tests
+policy.add(policy.suffix(policy.DENY, {todname('deny.test.')}))
+policy.add(policy.suffix(policy.REFUSE, {todname('refuse.test.')}))
+policy.add(policy.suffix(policy.ANSWER({ [kres.type.A] = { rdata=kres.str2ip('192.0.2.7'), ttl=300 } }), {todname('forge.test.')}))
+
 -- make sure DNSSEC is turned off for tests
 trust_anchors.remove('.')
 modules.unload("ta_update")
