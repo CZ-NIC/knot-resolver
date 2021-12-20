@@ -121,7 +121,7 @@ static void unpack_state_from_zonecut(struct iter_local_state *local_state,
 			} else if (address_len == sizeof(struct in6_addr)) {
 				name_state->aaaa_state = RECORD_RESOLVED;
 			}
-			union inaddr tmp_address;
+			union kr_sockaddr tmp_address;
 			bytes_to_ip(address, address_len, 0, &tmp_address);
 			update_address_state(address_state, &tmp_address, address_len, qry);
 		}

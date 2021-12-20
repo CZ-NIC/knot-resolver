@@ -929,11 +929,11 @@ static int net_tls_sticket_secret_file(lua_State *L)
 
 static int net_outgoing(lua_State *L, int family)
 {
-	union inaddr *addr;
+	union kr_sockaddr *addr;
 	if (family == AF_INET)
-		addr = (union inaddr*)&the_worker->out_addr4;
+		addr = (union kr_sockaddr*)&the_worker->out_addr4;
 	else
-		addr = (union inaddr*)&the_worker->out_addr6;
+		addr = (union kr_sockaddr*)&the_worker->out_addr6;
 
 	if (lua_gettop(L) == 0) { /* Return the current value. */
 		if (addr->ip.sa_family == AF_UNSPEC) {

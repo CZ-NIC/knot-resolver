@@ -66,7 +66,7 @@ enum kr_transport_protocol {
  */
 struct kr_transport {
 	knot_dname_t *ns_name; /**< Set to "." for forwarding targets.*/
-	union inaddr address;
+	union kr_sockaddr address;
 	size_t address_len;
 	enum kr_transport_protocol protocol;
 	unsigned timeout; /**< Timeout in ms to be set for UDP transmission. */
@@ -179,7 +179,7 @@ struct address_state {
  * @brief Array of these is one of inputs for the actual selection algorithm (`select_transport`)
  */
 struct choice {
-	union inaddr address;
+	union kr_sockaddr address;
 	size_t address_len;
 	struct address_state *address_state;
 	/** used to overwrite the port number;
@@ -245,12 +245,12 @@ int put_rtt_state(const uint8_t *ip, size_t len, struct rtt_state state,
 /**
  * @internal Helper function for conversion between different IP representations.
  */
-void bytes_to_ip(uint8_t *bytes, size_t len, uint16_t port, union inaddr *dst);
+void bytes_to_ip(uint8_t *bytes, size_t len, uint16_t port, union kr_sockaddr *dst);
 
 /**
  * @internal Helper function for conversion between different IP representations.
  */
-uint8_t *ip_to_bytes(const union inaddr *src, size_t len);
+uint8_t *ip_to_bytes(const union kr_sockaddr *src, size_t len);
 
 /**
  * @internal Fetch per-address information from various sources.
@@ -258,5 +258,5 @@ uint8_t *ip_to_bytes(const union inaddr *src, size_t len);
  * Note that this opens a RO cache transaction; the callee is responsible
  * for its closing not too long afterwards (e.g. calling kr_cache_commit).
  */
-void update_address_state(struct address_state *state, union inaddr *address,
+void update_address_state(struct address_state *state, union kr_sockaddr *address,
 			  size_t address_len, struct kr_query *qry);

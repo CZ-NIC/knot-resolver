@@ -196,7 +196,7 @@ int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
 	kr_require(s);
 	session_flags(s)->outgoing = false;
 
-	int socklen = sizeof(union inaddr);
+	int socklen = sizeof(union kr_sockaddr);
 	ret = uv_udp_getsockname(handle, session_get_sockname(s), &socklen);
 	if (ret) {
 		kr_log_error(IO, "ERROR: getsockname failed: %s\n", uv_strerror(ret));

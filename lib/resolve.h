@@ -186,7 +186,7 @@ struct kr_request_qsource_flags {
 
 typedef bool (*addr_info_f)(struct sockaddr*);
 typedef void (*async_resolution_f)(knot_dname_t*, enum knot_rr_type);
-typedef array_t(union inaddr) inaddr_array_t;
+typedef array_t(union kr_sockaddr) kr_sockaddr_array_t;
 
 /**
  * Name resolution request.
@@ -246,7 +246,7 @@ struct kr_request {
 		addr_info_f is_tls_capable;
 		addr_info_f is_tcp_connected;
 		addr_info_f is_tcp_waiting;
-		inaddr_array_t forwarding_targets; /**< When forwarding, possible targets are put here */
+		kr_sockaddr_array_t forwarding_targets; /**< When forwarding, possible targets are put here */
 	} selection_context;
 	unsigned int count_no_nsaddr;
 	unsigned int count_fail_row;

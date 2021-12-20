@@ -10,7 +10,7 @@
 #define FORWARDING_TIMEOUT 2000
 
 struct forward_local_state {
-	inaddr_array_t *targets;
+	kr_sockaddr_array_t *targets;
 	struct address_state *addr_states;
 	/** Index of last choice in the targets array, used for error reporting. */
 	size_t last_choice_index;
@@ -38,7 +38,7 @@ void forward_choose_transport(struct kr_query *qry,
 	int valid = 0;
 
 	for (int i = 0; i < local_state->targets->len; i++) {
-		union inaddr *address = &local_state->targets->at[i];
+		union kr_sockaddr *address = &local_state->targets->at[i];
 		size_t addr_len;
 		uint16_t port;
 		switch (address->ip.sa_family) {

@@ -842,7 +842,7 @@ tls_client_param_t * tls_client_param_new()
  * \param len[out] output length
  * \param key[out] output buffer
  */
-static bool construct_key(const union inaddr *addr, uint32_t *len, char *key)
+static bool construct_key(const union kr_sockaddr *addr, uint32_t *len, char *key)
 {
 	switch (addr->ip.sa_family) {
 	case AF_INET:
@@ -875,7 +875,7 @@ tls_client_param_t ** tls_client_param_getptr(tls_client_params_t **params,
 			return NULL;
 	}
 	/* Construct the key. */
-	const union inaddr *ia = (const union inaddr *)addr;
+	const union kr_sockaddr *ia = (const union kr_sockaddr *)addr;
 	char key[sizeof(ia->ip6.sin6_port) + sizeof(ia->ip6.sin6_addr)];
 	uint32_t len;
 	if (!construct_key(ia, &len, key))
@@ -887,7 +887,7 @@ tls_client_param_t ** tls_client_param_getptr(tls_client_params_t **params,
 
 int tls_client_param_remove(tls_client_params_t *params, const struct sockaddr *addr)
 {
-	const union inaddr *ia = (const union inaddr *)addr;
+	const union kr_sockaddr *ia = (const union kr_sockaddr *)addr;
 	char key[sizeof(ia->ip6.sin6_port) + sizeof(ia->ip6.sin6_addr)];
 	uint32_t len;
 	if (!construct_key(ia, &len, key))
