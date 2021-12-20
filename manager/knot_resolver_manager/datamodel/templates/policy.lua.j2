@@ -3,7 +3,6 @@
 
 {% if cfg.policy -%}
 
--- query type based custom policy filter
 {{ declare_policy_qtype_custom_filter() }}
 
 {% for id, rule in cfg.policy.items() %}
@@ -13,7 +12,7 @@
 {% for view_id in rule.views -%}
 {%- set view = cfg.views[view_id] -%}
 
-{# merge options from view and forward-zone #}
+{# merge options from view and policy rule #}
 {%- set options = none -%}
 {% if rule.options and view.options -%}
 {% set options = rule.options|list + view.options|list %}

@@ -7,16 +7,16 @@ from knot_resolver_manager.utils import SchemaNode
 
 
 class FilterSchema(SchemaNode):
-    suffix: Optional[List[str]] = None
-    pattern: Optional[List[str]] = None
-    qtype: Optional[List[RecordTypeEnum]] = None
+    suffix: Optional[str] = None
+    pattern: Optional[str] = None
+    qtype: Optional[RecordTypeEnum] = None
 
 
 class AnswerSchema(SchemaNode):
     qtype: RecordTypeEnum
     rdata: str
     ttl: TimeUnit = TimeUnit("1s")
-    no_data: bool = False
+    nodata: bool = False
 
 
 class PolicySchema(SchemaNode):

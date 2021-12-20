@@ -126,19 +126,20 @@ policy.REROUTE({
 {%- endmacro %}
 
 {% macro policy_answer(answer) -%}
-policy.ANSWER({ [kres.type.{{ answer.query_type }}] = { rdata=
-{%- if answer.query_type == 'A' -%}
-{{ string_table(answer.rdata) }},
-{%- elif answer.query_type == 'AAAA' -%}
-{{ string_table(answer.rdata) }},
-{%- elif answer.query_type == 'TXT' -%}
+policy.ANSWER({ [kres.type.{{ answer.qtype }}] = { rdata=
+{%- if answer.qtype == 'A' -%}
 {{ str2ip_table(answer.rdata) }},
-{# TODO: do same for other types #}
+{%- elif answer.qtype == 'AAAA' -%}
+{{ str2ip_table(answer.rdata) }},
+{# TODO: Do the same for other record types that require a special rdata type in Lua.
+By default, the raw string from config is used. #}
+{%- else -%}
+{{ string_table(answer.rdata) }},
 {%- endif -%}
 {% if answer.ttl %}
 ttl={{ answer.ttl.seconds()|int }},
 {%- endif -%}
-} }, nodata={{ 'true' if answer.nodata else 'false' }} )
+} }, {{ 'true' if answer.nodata else 'false' }} )
 {%- endmacro %}
 
 
@@ -187,16 +188,16 @@ policy.TLS_FORWARD({{ tls_servers_table(servers) }})
 {%- endmacro %}
 
 
-{# Auto Action #}
+{# Auto action #}
 
 {% macro policy_auto_action(rule) -%}
 {%- if rule.action == 'pass' -%}
-{{ policy_pass()|string }}
+{{ policy_pass() }}
 {%- elif rule.action == 'deny' -%}
 {%- if rule.message -%}
-{{ policy_deny_msg(rule.message)|string }}
+{{ policy_deny_msg(rule.message) }}
 {%- else -%}
-{{ policy_deny()|string }}
+{{ policy_deny() }}
 {%- endif -%}
 {%- elif rule.action == 'drop' -%}
 {{ policy_drop() }}
