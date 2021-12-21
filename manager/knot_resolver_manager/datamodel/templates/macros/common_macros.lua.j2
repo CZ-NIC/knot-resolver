@@ -56,19 +56,15 @@ kres.type.{{ item|string }},
 
 {# Return server address or table of server addresses #}
 {% macro tls_servers_table(servers) -%}
-{%- if servers is string -%}
-'{{ servers|string }}', {{ tls_server_auth(servers) }}
-{%- else-%}
 {
 {%- for item in servers -%}
 {%- if item.address -%}
-{'{{ item.address|string }}', {{ tls_server_auth(item) }} },
+{'{{ item.address|string }}',{{ tls_server_auth(item) }}},
 {%- else -%}
 '{{ item|string }}',
 {%- endif -%}
 {%- endfor -%}
 }
-{%- endif -%}
 {%- endmacro %}
 
 {% macro tls_server_auth(server) -%}
@@ -87,7 +83,7 @@ pin_sha256=
 {%- for pin in server.pin_sha256 -%}
 '{{ pin|string }}',
 {%- endfor -%}
-},
+}
 {%- endif -%}
 {%- endif -%}
 {%- endmacro %}
