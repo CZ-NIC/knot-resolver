@@ -64,10 +64,10 @@ struct request_ctx
 		/** NULL if the request didn't come over network. */
 		struct session *session;
 		/** Requestor's address; separate because of UDP session "sharing". */
-		union inaddr addr;
+		union kr_sockaddr addr;
 		/** Local address.  For AF_XDP we couldn't use session's,
 		 * as the address might be different every time. */
-		union inaddr dst_addr;
+		union kr_sockaddr dst_addr;
 		/** MAC addresses - ours [0] and router's [1], in case of AF_XDP socket. */
 		uint8_t eth_addrs[2][6];
 	} source;
@@ -163,11 +163,11 @@ static uv_handle_t *ioreq_spawn(struct worker_ctx *worker,
 	}
 
 	/* Bind to outgoing address, according to IP v4/v6. */
-	union inaddr *addr;
+	union kr_sockaddr *addr;
 	if (family == AF_INET) {
-		addr = (union inaddr *)&worker->out_addr4;
+		addr = (union kr_sockaddr *)&worker->out_addr4;
 	} else {
-		addr = (union inaddr *)&worker->out_addr6;
+		addr = (union kr_sockaddr *)&worker->out_addr6;
 	}
 	if (addr->ip.sa_family != AF_UNSPEC) {
 		if (kr_fails_assert(addr->ip.sa_family == family)) {

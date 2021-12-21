@@ -233,8 +233,8 @@ int kr_pkt_put(knot_pkt_t *pkt, const knot_dname_t *name, uint32_t ttl,
 KR_EXPORT
 void kr_pkt_make_auth_header(knot_pkt_t *pkt);
 
-/** Simple storage for IPx address or AF_UNSPEC. */
-union inaddr {
+/** Simple storage for IPx address and their ports or AF_UNSPEC. */
+union kr_sockaddr {
 	struct sockaddr ip;
 	struct sockaddr_in ip4;
 	struct sockaddr_in6 ip6;

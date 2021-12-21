@@ -120,7 +120,7 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	ranked_rr_array_t
 	kr_http_header_array_entry_t
 	kr_http_header_array_t
-	inaddr_array_t
+	kr_sockaddr_array_t
 	struct kr_zonecut
 	kr_qarray_t
 	struct kr_rplan

@@ -28,8 +28,8 @@
  */
 struct session {
 	struct session_flags sflags;  /**< miscellaneous flags. */
-	union inaddr peer;            /**< address of peer; not for UDP clients (downstream) */
-	union inaddr sockname;        /**< our local address; for UDP it may be a wildcard */
+	union kr_sockaddr peer;       /**< address of peer; not for UDP clients (downstream) */
+	union kr_sockaddr sockname;   /**< our local address; for UDP it may be a wildcard */
 	uv_handle_t *handle;          /**< libuv handle for IO operations. */
 	uv_timer_t timeout;           /**< libuv handle for timer. */
 
