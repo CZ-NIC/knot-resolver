@@ -1,5 +1,6 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 -- Module interface
+local kres = require('kres')
 local ffi = require('ffi')
 local C = ffi.C
 local M = { layer = { } }
@@ -150,7 +151,8 @@ function M.layer.consume(state, req, pkt)
 				req.pool)
 		end
 	end
-	ffi.C.kr_ranked_rrarray_finalize(req.answ_selected, qry.uid, req.pool);
+	ffi.C.kr_ranked_rrarray_finalize(req.answ_selected, qry.uid, req.pool)
+	req:set_extended_error(kres.extended_error.FORGED, "BHD4: DNS64 synthesis")
 end
 
 local function hexchar2int(char)

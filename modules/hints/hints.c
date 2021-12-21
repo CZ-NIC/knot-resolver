@@ -25,7 +25,7 @@
 #include <math.h>
 
 /* Defaults */
-#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, HINT,  __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) kr_log_q(qry, HINT,  __VA_ARGS__)
 #define ERR_MSG(...) kr_log_error(HINT, "[     ]" __VA_ARGS__)
 
 struct hints_data {

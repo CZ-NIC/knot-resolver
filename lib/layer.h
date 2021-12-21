@@ -8,8 +8,6 @@
 #include "lib/defines.h"
 #include "lib/utils.h"
 
-#define QRVERBOSE kr_log_q // TODO: perhaps eliminate
-
 /** Layer processing states.  Only one value at a time (but see TODO).
  *
  *  Each state represents the state machine transition,

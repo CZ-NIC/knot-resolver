@@ -50,7 +50,7 @@ def prepare_wire(
         qclass=dns.rdataclass.IN,
         msgid=None):
     """Utility function to generate DNS wire format message"""
-    msg = dns.message.make_query(qname, qtype, qclass)
+    msg = dns.message.make_query(qname, qtype, qclass, use_edns=True)
     if msgid is not None:
         msg.id = msgid
     return msg.to_wire(), msg.id

@@ -194,6 +194,10 @@ struct kr_request_qsource_flags {
 	_Bool http : 1;
 	_Bool xdp : 1;
 };
+struct kr_extended_error {
+	int32_t info_code;
+	const char *extra_text;
+};
 struct kr_request {
 	struct kr_context *ctx;
 	knot_pkt_t *answer;
@@ -234,6 +238,7 @@ struct kr_request {
 	unsigned int count_no_nsaddr;
 	unsigned int count_fail_row;
 	alloc_wire_f alloc_wire_cb;
+	struct kr_extended_error extended_error;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
 typedef struct kr_cdb * kr_cdb_pt;
@@ -308,7 +313,7 @@ struct kr_server_selection {
 	struct local_state *local_state;
 };
 typedef int kr_log_level_t;
-enum kr_log_group {LOG_GRP_UNKNOWN = -1, LOG_GRP_SYSTEM = 1, LOG_GRP_CACHE, LOG_GRP_IO, LOG_GRP_NETWORK, LOG_GRP_TA, LOG_GRP_TLS, LOG_GRP_GNUTLS, LOG_GRP_TLSCLIENT, LOG_GRP_XDP, LOG_GRP_ZIMPORT, LOG_GRP_ZSCANNER, LOG_GRP_DOH, LOG_GRP_DNSSEC, LOG_GRP_HINT, LOG_GRP_PLAN, LOG_GRP_ITERATOR, LOG_GRP_VALIDATOR, LOG_GRP_RESOLVER, LOG_GRP_SELECTION, LOG_GRP_ZCUT, LOG_GRP_COOKIES, LOG_GRP_STATISTICS, LOG_GRP_REBIND, LOG_GRP_WORKER, LOG_GRP_POLICY, LOG_GRP_TASENTINEL, LOG_GRP_TASIGNALING, LOG_GRP_TAUPDATE, LOG_GRP_DAF, LOG_GRP_DETECTTIMEJUMP, LOG_GRP_DETECTTIMESKEW, LOG_GRP_GRAPHITE, LOG_GRP_PREFILL, LOG_GRP_PRIMING, LOG_GRP_SRVSTALE, LOG_GRP_WATCHDOG, LOG_GRP_NSID, LOG_GRP_DNSTAP, LOG_GRP_TESTS, LOG_GRP_DOTAUTH, LOG_GRP_HTTP, LOG_GRP_CONTROL, LOG_GRP_MODULE, LOG_GRP_DEVEL, LOG_GRP_RENUMBER, LOG_GRP_REQDBG};
+enum kr_log_group {LOG_GRP_UNKNOWN = -1, LOG_GRP_SYSTEM = 1, LOG_GRP_CACHE, LOG_GRP_IO, LOG_GRP_NETWORK, LOG_GRP_TA, LOG_GRP_TLS, LOG_GRP_GNUTLS, LOG_GRP_TLSCLIENT, LOG_GRP_XDP, LOG_GRP_ZIMPORT, LOG_GRP_ZSCANNER, LOG_GRP_DOH, LOG_GRP_DNSSEC, LOG_GRP_HINT, LOG_GRP_PLAN, LOG_GRP_ITERATOR, LOG_GRP_VALIDATOR, LOG_GRP_RESOLVER, LOG_GRP_SELECTION, LOG_GRP_ZCUT, LOG_GRP_COOKIES, LOG_GRP_STATISTICS, LOG_GRP_REBIND, LOG_GRP_WORKER, LOG_GRP_POLICY, LOG_GRP_TASENTINEL, LOG_GRP_TASIGNALING, LOG_GRP_TAUPDATE, LOG_GRP_DAF, LOG_GRP_DETECTTIMEJUMP, LOG_GRP_DETECTTIMESKEW, LOG_GRP_GRAPHITE, LOG_GRP_PREFILL, LOG_GRP_PRIMING, LOG_GRP_SRVSTALE, LOG_GRP_WATCHDOG, LOG_GRP_NSID, LOG_GRP_DNSTAP, LOG_GRP_TESTS, LOG_GRP_DOTAUTH, LOG_GRP_HTTP, LOG_GRP_CONTROL, LOG_GRP_MODULE, LOG_GRP_DEVEL, LOG_GRP_RENUMBER, LOG_GRP_EDE, LOG_GRP_REQDBG};
 
 kr_layer_t kr_layer_t_static;
 _Bool kr_dbg_assertion_abort;
@@ -380,6 +385,7 @@ void knot_pkt_free(knot_pkt_t *);
 int knot_pkt_parse(knot_pkt_t *, unsigned int);
 knot_rrset_t *kr_request_ensure_edns(struct kr_request *);
 knot_pkt_t *kr_request_ensure_answer(struct kr_request *);
+int kr_request_set_extended_error(struct kr_request *, int, const char *);
 struct kr_rplan *kr_resolve_plan(struct kr_request *);
 knot_mm_t *kr_resolve_pool(struct kr_request *);
 struct kr_query *kr_rplan_push(struct kr_rplan *, struct kr_query *, const knot_dname_t *, uint16_t, uint16_t);

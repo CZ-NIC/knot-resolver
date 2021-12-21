@@ -18,7 +18,7 @@ endif
 
 
 message('--- required dependencies ---')
-knot_version = '>=2.9'
+knot_version = '>=3.0.2'
 libknot = dependency('libknot', version: knot_version)
 libdnssec = dependency('libdnssec', version: knot_version)
 libzscanner = dependency('libzscanner', version: knot_version)
@@ -110,8 +110,7 @@ else
 endif
 
 ### XDP: not configurable - we just check if libknot supports it
-xdp = meson.get_compiler('c').has_header('libknot/xdp/xdp.h'
-    ) and libknot.version().version_compare('>= 3.0.2')
+xdp = meson.get_compiler('c').has_header('libknot/xdp/xdp.h')
 
 ### Systemd
 systemd_files = get_option('systemd_files')

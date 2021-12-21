@@ -770,7 +770,7 @@ int kr_ranked_rrarray_finalize(ranked_rr_array_t *array, uint32_t qry_uid, knot_
 				if (knot_rdata_cmp(ra->at[i], ra->at[i + 1]) == 0) {
 					ra->at[i] = NULL;
 					++dup_count;
-					QRVERBOSE(NULL, ITERATOR, "deleted duplicate RR\n");
+					kr_log_q(NULL, ITERATOR, "deleted duplicate RR\n");
 				}
 			}
 			/* Prepare rdataset, except rdata contents. */

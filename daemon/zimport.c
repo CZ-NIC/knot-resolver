@@ -47,7 +47,7 @@
 #include "lib/generic/map.h"
 #include "lib/generic/array.h"
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, ZIMPORT, __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) kr_log_q(qry, ZIMPORT, __VA_ARGS__)
 
 /* Pause between parse and import stages, milliseconds.
  * See comment in zi_zone_import() */

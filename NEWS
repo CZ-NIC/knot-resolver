@@ -1,3 +1,15 @@
+Knot Resolver 5.5.0 (2022-mm-dd)
+================================
+
+Improvements
+------------
+- extended_errors: module for extended DNS error support, RFC8914 (!1234)
+
+Incompatible changes
+--------------------
+- libknot >= 3.0.2 is required
+
+
 Knot Resolver 5.4.3 (2021-12-01)
 ================================
 

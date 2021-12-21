@@ -8,6 +8,7 @@ usr/lib/knot-resolver/*.so
 usr/lib/knot-resolver/*.lua
 usr/lib/knot-resolver/kres_modules/bogus_log.so
 usr/lib/knot-resolver/kres_modules/edns_keepalive.so
+usr/lib/knot-resolver/kres_modules/extended_error.so
 usr/lib/knot-resolver/kres_modules/hints.so
 usr/lib/knot-resolver/kres_modules/nsid.so
 usr/lib/knot-resolver/kres_modules/refuse_nord.so

@@ -509,6 +509,7 @@ modules.load('ta_sentinel')
 modules.load('edns_keepalive')
 modules.load('refuse_nord')
 modules.load('watchdog')
+modules.load('extended_error')
 
 -- Load keyfile_default
 trust_anchors.add_file('@keyfile_default@', @unmanaged@)

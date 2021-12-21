@@ -153,7 +153,7 @@ static bool trim_ttl(knot_rrset_t *rrs, const knot_rdata_t *sig,
 	if (kr_log_is_debug_qry(VALIDATOR, log_qry)) {
 		auto_free char *name_str = kr_dname_text(rrs->owner),
 				*type_str = kr_rrtype_text(rrs->type);
-		QRVERBOSE(log_qry, VALIDATOR, "trimming TTL of %s %s: %d -> %d\n",
+		kr_log_q(log_qry, VALIDATOR, "trimming TTL of %s %s: %d -> %d\n",
 			name_str, type_str, (int)rrs->ttl, (int)ttl_max);
 	}
 	rrs->ttl = ttl_max;

@@ -32,8 +32,8 @@
 #include "lib/module.h"
 #include "lib/dnssec/ta.h"
 
-#define VERBOSE_MSG(...) QRVERBOSE(req->current_query, ITERATOR, __VA_ARGS__)
-#define QVERBOSE_MSG(qry, ...) QRVERBOSE(qry, ITERATOR, __VA_ARGS__)
+#define VERBOSE_MSG(...) kr_log_q(req->current_query, ITERATOR, __VA_ARGS__)
+#define QVERBOSE_MSG(qry, ...) kr_log_q(qry, ITERATOR, __VA_ARGS__)
 #define WITH_VERBOSE(qry) if (kr_log_is_debug_qry(ITERATOR, (qry)))
 
 /* Iterator often walks through packet section, this is an abstraction. */

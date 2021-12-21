@@ -236,6 +236,7 @@ function policy.ANSWER(rtable, nodata)
 		ffi.C.kr_pkt_make_auth_header(answer)
 		local ttl = (data or {}).ttl or 1
 		answer:rcode(kres.rcode.NOERROR)
+		req:set_extended_error(kres.extended_error.FORGED, "5DO5")
 
 		if data == nil then -- want NODATA, i.e. just a SOA
 			answer:begin(kres.section.AUTHORITY)
@@ -664,10 +665,13 @@ local function answer_clear(req)
 	return pkt
 end
 
-function policy.DENY_MSG(msg)
+function policy.DENY_MSG(msg, extended_error)
 	if msg and (type(msg) ~= 'string' or #msg >= 255) then
 		error('DENY_MSG: optional msg must be string shorter than 256 characters')
         end
+	if extended_error == nil then
+		extended_error = kres.extended_error.BLOCKED
+	end
 
 	return function (_, req)
 		-- Write authority information
@@ -683,6 +687,7 @@ function policy.DENY_MSG(msg)
 				   string.char(#msg) .. msg)
 
 		end
+		req:set_extended_error(extended_error, "CR36")
 		return kres.DONE
 	end
 end
@@ -780,6 +785,7 @@ policy.DENY = policy.DENY_MSG() -- compatibility with < 2.0
 function policy.DROP(_, req)
 	local answer = answer_clear(req)
 	if answer == nil then return nil end
+	req:set_extended_error(kres.extended_error.PROHIBITED, "U5KL")
 	return kres.FAIL
 end
 
@@ -788,6 +794,7 @@ function policy.REFUSE(_, req)
 	if answer == nil then return nil end
 	answer:rcode(kres.rcode.REFUSED)
 	answer:ad(false)
+	req:set_extended_error(kres.extended_error.PROHIBITED, "EIM4")
 	return kres.DONE
 end
 
@@ -990,7 +997,8 @@ policy.special_names = {
 		cb=policy.suffix_common(policy.DENY_MSG(
 			'Blocking is mandated by standards, see references on '
 			.. 'https://www.iana.org/assignments/'
-			.. 'locally-served-dns-zones/locally-served-dns-zones.xhtml'),
+			.. 'locally-served-dns-zones/locally-served-dns-zones.xhtml',
+			kres.extended_error.NOTSUP),
 			private_zones, todname('arpa.')),
 		count=0
 	},
@@ -998,7 +1006,8 @@ policy.special_names = {
 		cb=policy.suffix(policy.DENY_MSG(
 			'Blocking is mandated by standards, see references on '
 			.. 'https://www.iana.org/assignments/'
-			.. 'special-use-domain-names/special-use-domain-names.xhtml'),
+			.. 'special-use-domain-names/special-use-domain-names.xhtml',
+			kres.extended_error.NOTSUP),
 			{
 				todname('test.'),
 				todname('onion.'),
