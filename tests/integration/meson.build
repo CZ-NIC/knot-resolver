@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # deckard dependencies
-cmake = find_program('cmake')  # for libswrapper
+faketime = find_program('faketime')
 git = find_program('git')
 make = find_program('make')
 augeas = dependency('augeas')
@@ -11,7 +11,9 @@ augeas = dependency('augeas')
 py3_deps += [
   ['augeas', 'augeas (for deckard)'],
   ['dns', 'dnspython (for deckard)'],
+  ['dpkt', 'dpkt (for deckard)'],
   ['jinja2', 'jinja2 (for deckard)'],
+  ['pyroute2', 'pyroute2 (for deckard)'],
   ['pytest', 'pytest (for deckard)'],
   ['xdist', 'pytest-xdist (for deckard)'],
   ['yaml', 'PyYAML (for deckard)'],
