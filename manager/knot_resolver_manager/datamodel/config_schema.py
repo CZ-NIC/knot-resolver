@@ -33,13 +33,17 @@ def _get_templates_dir() -> str:
 _TEMPLATES_DIR = _get_templates_dir()
 
 
-def _import_lua_template() -> Template:
+def template_from_str(template: str) -> Template:
     ldr = FileSystemLoader(_TEMPLATES_DIR)
     env = Environment(trim_blocks=True, lstrip_blocks=True, loader=ldr)
+    return env.from_string(template)
+
+
+def _import_lua_template() -> Template:
     path = os.path.join(_TEMPLATES_DIR, "config.lua.j2")
     with open(path, "r", encoding="UTF-8") as file:
         template = file.read()
-    return env.from_string(template)
+    return template_from_str(template)
 
 
 _MAIN_TEMPLATE = _import_lua_template()
@@ -90,4 +94,6 @@ class KresConfig(SchemaNode):
         return obj.dns64
 
     def render_lua(self) -> Text:
-        return _MAIN_TEMPLATE.render(cfg=self)
+        lua = _MAIN_TEMPLATE.render(cfg=self)
+        print(lua)
+        return lua
