@@ -215,6 +215,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 # Forwarding
 	kr_forward_add_target
 # Utils
+	kr_log_is_debug_fun
 	kr_log_req1
 	kr_log_q1
 	kr_log_grp2name

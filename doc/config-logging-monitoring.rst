@@ -64,7 +64,7 @@ Less verbose logging for DNSSEC validation errors can be enabled by using :ref:`
 
 .. py:function:: log_groups([table])
 
-  :param: table of string(s) representing ref:`log groups <config_log_groups>`
+  :param: table of string(s) representing :ref:`log groups <config_log_groups>`
   :return: table of string with currently set log groups
 
   Use to turn-on debug logging for the selected groups regardless of the global
