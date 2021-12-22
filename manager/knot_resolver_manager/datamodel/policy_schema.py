@@ -1,8 +1,7 @@
 from typing import List, Optional
 
 from knot_resolver_manager.datamodel.network_schema import AddressRenumberingSchema
-from knot_resolver_manager.datamodel.types import ActionEnum, IPAddressPort, RecordTypeEnum, TimeUnit
-from knot_resolver_manager.datamodel.view_schema import FlagsEnum
+from knot_resolver_manager.datamodel.types import ActionEnum, FlagsEnum, IPAddressPort, RecordTypeEnum, TimeUnit
 from knot_resolver_manager.utils import SchemaNode
 
 

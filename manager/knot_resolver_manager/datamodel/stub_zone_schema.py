@@ -1,7 +1,6 @@
 from typing import List, Optional, Union
 
-from knot_resolver_manager.datamodel.types import IPAddressPort
-from knot_resolver_manager.datamodel.view_schema import FlagsEnum
+from knot_resolver_manager.datamodel.types import FlagsEnum, IPAddressPort
 from knot_resolver_manager.utils import SchemaNode
 
 
