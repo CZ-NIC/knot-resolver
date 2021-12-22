@@ -5,7 +5,7 @@
 
 {% macro policy_add(rule, postrule=false) -%}
 {%- if postrule -%}
-policy.add({{ rule }}, true)
+policy.add({{ rule }},true)
 {%- else -%}
 policy.add({{ rule }})
 {%- endif -%}
@@ -16,9 +16,13 @@ policy.add({{ rule }})
 
 {% macro policy_flags(flags) -%}
 policy.FLAGS({
+{%- if flags is string -%}
+'{{ flags.upper().replace("-", "_")|string }}'
+{%- else -%}
 {%- for flag in flags|list -%}
 '{{ flag.upper().replace("-", "_") }}',
 {%- endfor -%}
+{%- endif -%}
 })
 {%- endmacro %}
 
@@ -30,19 +34,23 @@ policy.all({{ action }})
 {%- endmacro %}
 
 {% macro policy_suffix(action, suffix_table) -%}
-policy.suffix({{ action }}, {{ suffix_table }})
+policy.suffix({{ action }},{{ suffix_table }})
 {%- endmacro %}
 
-{% macro policy_suffix_common(action, suffix_table, common_suffix) -%}
-policy.suffix_common({{ action }}, {{ suffix_table }}, {{ common_suffix }})
+{% macro policy_suffix_common(action, suffix_table, common_suffix=none) -%}
+policy.suffix_common({{ action }},{{ suffix_table }}
+{%- if common_suffix -%}
+,{{ common_suffix }}
+{%- endif -%}
+)
 {%- endmacro %}
 
 {% macro policy_pattern(action, pattern) -%}
-policy.pattern({{ action }}, {{ pattern }})
+policy.pattern({{ action }},'{{ pattern }}')
 {%- endmacro %}
 
-{% macro policy_rpz(action, path, watch) -%}
-policy.rpz({{ action|string }}, '{{ path|string }}', {{ 'true' if watch else 'false' }})
+{% macro policy_rpz(action, path, watch=true) -%}
+policy.rpz({{ action|string }},'{{ path|string }}',{{ 'true' if watch else 'false' }})
 {%- endmacro %}
 
 
@@ -126,22 +134,19 @@ policy.REROUTE({
 {%- endmacro %}
 
 {% macro policy_answer(answer) -%}
-policy.ANSWER({ [kres.type.{{ answer.qtype }}] = { rdata=
-{%- if answer.qtype == 'A' -%}
+policy.ANSWER({[kres.type.{{ answer.qtype }}]={rdata=
+{%- if answer.qtype in ['A','AAAA'] -%}
 {{ str2ip_table(answer.rdata) }},
-{%- elif answer.qtype == 'AAAA' -%}
-{{ str2ip_table(answer.rdata) }},
+{%- elif answer.qtype == '' -%}
 {# TODO: Do the same for other record types that require a special rdata type in Lua.
 By default, the raw string from config is used. #}
 {%- else -%}
 {{ string_table(answer.rdata) }},
 {%- endif -%}
-{% if answer.ttl %}
-ttl={{ answer.ttl.seconds()|int }},
-{%- endif -%}
-} }, {{ 'true' if answer.nodata else 'false' }} )
+ttl={{ answer.ttl.seconds()|int }}}},{{ 'true' if answer.nodata else 'false' }})
 {%- endmacro %}
 
+{# policy.ANSWER( { [kres.type.A] = { rdata=kres.str2ip('192.0.2.7'), ttl=300 }}) #}
 
 {# Chain actions #}
 
