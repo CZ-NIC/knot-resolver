@@ -680,14 +680,25 @@ int zi_zone_import(const zi_config_t config)
 		goto fail;
 	}
 
+	kr_rrset_validation_ctx_t err_ctx;
 	z_import->svldr = kr_svldr_new_ctx(ds, dnskey, &dnskey_sigs->rrs,
-						z_import->timestamp_rr);
+						z_import->timestamp_rr, &err_ctx);
 	if (!z_import->svldr) {
-		kr_log_error(PREFILL, "failed to validate DNSKEY for `%s`\n", zone_name_str);
+		// log RRSIG stats; very similar to log_bogus_rrsig()
+		kr_log_error(PREFILL, "failed to validate DNSKEY for `%s` "
+			"(%u matching RRSIGs, %u expired, %u not yet valid, "
+			"%u invalid signer, %u invalid label count, %u invalid key, "
+			"%u invalid crypto, %u invalid NSEC)\n",
+			zone_name_str,
+			err_ctx.rrs_counters.matching_name_type,
+			err_ctx.rrs_counters.expired, err_ctx.rrs_counters.notyet,
+			err_ctx.rrs_counters.signer_invalid,
+			err_ctx.rrs_counters.labels_invalid,
+			err_ctx.rrs_counters.key_invalid,
+			err_ctx.rrs_counters.crypto_invalid,
+			err_ctx.rrs_counters.nsec_invalid);
 		ret = kr_error(ENOENT);
 		goto fail;
-		/* TODO: more details about why validation failed.
-		 * Perhaps extend the SVLDR API to somehow return EDE code. */
 	}
 
    //// Do all ZONEMD processing, if desired.

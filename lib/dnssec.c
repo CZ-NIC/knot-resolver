@@ -197,7 +197,8 @@ void kr_svldr_free_ctx(struct kr_svldr_ctx *ctx)
 	free(ctx);
 }
 struct kr_svldr_ctx * kr_svldr_new_ctx(const knot_rrset_t *ds, knot_rrset_t *dnskey,
-		const knot_rdataset_t *dnskey_sigs, uint32_t timestamp)
+		const knot_rdataset_t *dnskey_sigs, uint32_t timestamp,
+		kr_rrset_validation_ctx_t *err_ctx)
 {
 	// Basic init.
 	struct kr_svldr_ctx *ctx = calloc(1, sizeof(*ctx));
@@ -225,6 +226,8 @@ struct kr_svldr_ctx * kr_svldr_new_ctx(const knot_rrset_t *ds, knot_rrset_t *dns
 	}
 	return ctx;
 fail:
+	if (err_ctx)
+		memcpy(err_ctx, &ctx->vctx, sizeof(*err_ctx));
 	kr_svldr_free_ctx(ctx);
 	return NULL;
 }
