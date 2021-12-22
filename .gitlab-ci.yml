@@ -97,7 +97,7 @@ build:armhf:
     - armhf
     - shell
   script:
-    - meson build_ci_armhf --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled
+    - meson build_ci_armhf --default-library=static --prefix=$PREFIX -Dwerror=true -Dconfig_tests=enabled
     - ninja -C build_ci_armhf
     - ninja -C build_ci_armhf install >/dev/null
     - MESON_TESTTHREADS=1 ${MESON_TEST} --suite unit --suite config --no-suite snowflake --no-suite y2k38
@@ -109,7 +109,7 @@ build:arm64:
     - shell
   allow_failure: true  # some issues with HTTP tests:daf (http module) and HTTP/2 (SIGSEGV)
   script:
-    - meson build_ci_arm64 --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled
+    - meson build_ci_arm64 --default-library=static --prefix=$PREFIX -Dwerror=true -Dconfig_tests=enabled
     - ninja -C build_ci_arm64
     - ninja -C build_ci_arm64 install >/dev/null
     - MESON_TESTTHREADS=1 ${MESON_TEST} --suite unit --suite config --no-suite snowflake
