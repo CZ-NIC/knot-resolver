@@ -43,8 +43,6 @@ enum kr_log_group {
 	LOG_GRP_GNUTLS,
 	LOG_GRP_TLSCLIENT,
 	LOG_GRP_XDP,
-	LOG_GRP_ZIMPORT,
-	LOG_GRP_ZSCANNER,
 	LOG_GRP_DOH,
 	LOG_GRP_DNSSEC,
 	LOG_GRP_HINT,
@@ -100,8 +98,6 @@ enum kr_log_group {
 #define LOG_GRP_GNUTLS_TAG		"gnutls"	/**< ``gnutls``: low-level logs from GnuTLS */
 #define LOG_GRP_TLSCLIENT_TAG		"tls_cl"	/**< ``tls_cl``: TLS client messages (used for TLS forwarding) */
 #define LOG_GRP_XDP_TAG			"xdp"		/**< ``xdp``: operations related to XDP */
-#define LOG_GRP_ZIMPORT_TAG		"zimprt"	/**< ``zimprt``: operations related to zimport */
-#define LOG_GRP_ZSCANNER_TAG		"zscann"	/**< ``zscann``: operations related to zscanner */
 #define LOG_GRP_DOH_TAG			"doh"		/**< ``doh``: DNS-over-HTTPS logger (doh2 implementation) */
 #define LOG_GRP_DNSSEC_TAG		"dnssec"	/**< ``dnssec``: operations related to DNSSEC */
 #define LOG_GRP_HINT_TAG		"hint"		/**< ``hint``: operations related to static hints */

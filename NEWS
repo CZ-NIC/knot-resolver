@@ -6,6 +6,7 @@ Improvements
 - extended_errors: module for extended DNS error support, RFC8914 (!1234)
 - policy: log policy actions; useful for RPZ debugging (!1239)
 - policy: new action policy.IPTRACE for logging request origin (!1239)
+- prefill module: prepare for ZONEMD, improve performance (!1225)
 
 Incompatible changes
 --------------------

@@ -56,9 +56,7 @@ end
 -- returns: number of seconds the file is valid for
 -- 0 indicates immediate download
 local function get_file_ttl(fname)
-	local c_str = ffi.new("char[?]", #fname)
-	ffi.copy(c_str, fname)
-	local mtime = tonumber(ffi.C.kr_file_mtime(c_str))
+	local mtime = tonumber(ffi.C.kr_file_mtime(fname))
 
 	if mtime > 0 then
 		local age = os.time() - mtime
@@ -75,27 +73,30 @@ local function download(url, fname)
 	local file, rcode, errmsg
 	file, errmsg = io.open(fname, 'w')
 	if not file then
-		error(string.format("[prefill] unable to open file %s (%s)",
+		error(string.format("[prefil] unable to open file %s (%s)",
 			fname, errmsg))
 	end
 
 	log_info(ffi.C.LOG_GRP_PREFILL, "downloading root zone to file %s ...", fname)
 	rcode, errmsg = kluautil.kr_https_fetch(url, file, rz_ca_file)
 	if rcode == nil then
-		error(string.format("[prefill] fetch of `%s` failed: %s", url, errmsg))
+		error(string.format("[prefil] fetch of `%s` failed: %s", url, errmsg))
 	end
 
 	file:close()
 end
 
 local function import(fname)
-	local res = cache.zone_import(fname)
-	if res.code == 1 then -- no TA found, wait
-		error("[prefill] no trust anchor found for root zone, import aborted")
-	elseif res.code == 0 then
-		log_info(ffi.C.LOG_GRP_PREFILL, "root zone successfully parsed, import started")
+	local ret = ffi.C.zi_zone_import({
+		zone_file = fname,
+		time_src = ffi.C.ZI_STAMP_MTIM, -- the file might be slightly older
+	})
+	if ret == 0 then
+		log_info(ffi.C.LOG_GRP_PREFILL, "zone successfully parsed, import started")
 	else
-		error(string.format("[prefill] root zone import failed (%s)", res.msg))
+		error(string.format(
+			"[prefil] zone import failed: %s", ffi.C.knot_strerror(ret)
+		))
 	end
 end
 
@@ -153,7 +154,7 @@ local function config_zone(zone_cfg)
 	if zone_cfg.interval then
 		zone_cfg.interval = tonumber(zone_cfg.interval)
 		if zone_cfg.interval < rz_interval_min then
-			error(string.format('[prefill] refresh interval %d s is too short, '
+			error(string.format('[prefil] refresh interval %d s is too short, '
 				.. 'minimal interval is %d s',
 				zone_cfg.interval, rz_interval_min))
 		end
@@ -164,7 +165,7 @@ local function config_zone(zone_cfg)
 	rz_ca_file = zone_cfg.ca_file
 
 	if not zone_cfg.url or not string.match(zone_cfg.url, '^https://') then
-		error('[prefill] option url must contain a '
+		error('[prefil] option url must contain a '
 			.. 'https:// URL of a zone file')
 	else
 		rz_url = zone_cfg.url
@@ -175,12 +176,12 @@ function prefill.config(config)
 	if config == nil then return end -- e.g. just modules = { 'prefill' }
 	local root_configured = false
 	if type(config) ~= 'table' then
-		error('[prefill] configuration must be in table '
+		error('[prefil] configuration must be in table '
 			.. '{owner name = {per-zone config}}')
 	end
 	for owner, zone_cfg in pairs(config) do
 		if owner ~= '.' then
-			error('[prefill] only root zone can be imported '
+			error('[prefil] only root zone can be imported '
 				.. 'at the moment')
 		else
 			config_zone(zone_cfg)
@@ -188,7 +189,7 @@ function prefill.config(config)
 		end
 	end
 	if not root_configured then
-		error('[prefill] this module version requires configuration '
+		error('[prefil] this module version requires configuration '
 			.. 'for root zone')
 	end
 
