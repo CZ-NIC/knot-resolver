@@ -26,7 +26,10 @@ from knot_resolver_manager.utils import SchemaNode
 def _get_templates_dir() -> str:
     module = sys.modules["knot_resolver_manager.datamodel"].__file__
     if module:
-        return os.path.join(os.path.dirname(module), "templates")
+        templates_dir = os.path.join(os.path.dirname(module), "templates")
+        if os.path.isdir(templates_dir):
+            return templates_dir
+        raise NotADirectoryError(f"the templates dir '{templates_dir}' is not a directory or does not exist")
     raise OSError("package 'knot_resolver_manager.datamodel' cannot be located or loaded")
 
 
