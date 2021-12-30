@@ -1,6 +1,7 @@
 from typing import List
 
 from knot_resolver_manager.datamodel.config_schema import template_from_str
+from knot_resolver_manager.datamodel.network_schema import AddressRenumberingSchema
 from knot_resolver_manager.datamodel.policy_schema import AnswerSchema
 from knot_resolver_manager.datamodel.types import FlagsEnum
 
@@ -97,7 +98,18 @@ def test_policy_deny_msg():
 
 
 def test_policy_reroute():
-    pass
+    r: List[AddressRenumberingSchema] = [
+        AddressRenumberingSchema({"source": "192.0.2.0/24", "destination": "127.0.0.0"}),
+        AddressRenumberingSchema({"source": "10.10.10.0/24", "destination": "192.168.1.0"}),
+    ]
+    tmpl_str = """{% from 'macros/policy_macros.lua.j2' import policy_reroute %}
+{{ policy_reroute(reroute) }}"""
+
+    tmpl = template_from_str(tmpl_str)
+    assert (
+        tmpl.render(reroute=r)
+        == f"policy.REROUTE({{['{r[0].source}']='{r[0].destination}'}},{{['{r[1].source}']='{r[1].destination}'}},)"
+    )
 
 
 def test_policy_answer():
