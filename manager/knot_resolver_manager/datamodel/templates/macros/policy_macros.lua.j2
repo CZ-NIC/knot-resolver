@@ -128,9 +128,11 @@ policy.TC
 {%- endmacro %}
 
 {% macro policy_reroute(reroute) -%}
-policy.REROUTE({
-{# TODO: completion of this action #}
-})
+policy.REROUTE(
+{%- for item in reroute -%}
+{['{{ item.source }}']='{{ item.destination }}'},
+{%- endfor -%}
+)
 {%- endmacro %}
 
 {% macro policy_answer(answer) -%}
