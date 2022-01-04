@@ -1,16 +1,13 @@
 ***************
-Getting started
+Getting Started
 ***************
 
 .. contents::
     :depth: 1
     :local:
 
-Introduction
+Installation
 ============
 
-How to use
+Management
 ==========
-
-Migration
-=========
