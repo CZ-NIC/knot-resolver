@@ -2,7 +2,7 @@ import copy
 import json
 import re
 from enum import Enum, auto
-from typing import Any, Dict, KeysView, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import yaml
 from yaml.constructor import ConstructorError
@@ -14,49 +14,44 @@ from knot_resolver_manager.utils.types import is_internal_field_name
 
 class ParsedTree:
     """
-    Simple wrapper for parsed data. Does not do anything that much useful at the moment,
-    only provides "type safety" (we can check types using isinstance)
+    Simple wrapper for parsed data. Changes internal naming convention (snake case)
+    to external (dashes) on the fly.
 
     IMMUTABLE, DO NOT MODIFY
     """
 
     @staticmethod
-    def _convert_to_underscores(dct: Dict[Any, Any]) -> Dict[Any, Any]:
-        assert isinstance(dct, dict)
-        res: Dict[Any, Any] = {}
-        for key in dct:
-            assert isinstance(key, str)
+    def _convert_internal_field_name_to_external(name: Any) -> Any:
+        if isinstance(name, str):
+            return name.replace("_", "-")
+        return name
 
-            # rename & convert recursively
-            obj = dct[key]
-            if isinstance(obj, dict):
-                obj = ParsedTree._convert_to_underscores(cast(Dict[Any, Any], obj))
-            res[key.replace("-", "_")] = obj
-
-        return res
+    @staticmethod
+    def _convert_external_field_name_to_internal(name: Any) -> Any:
+        if isinstance(name, str):
+            return name.replace("-", "_")
+        return name
 
     def __init__(self, data: Union[Dict[str, Any], str, int, bool]):
-        if isinstance(data, dict):
-            data = ParsedTree._convert_to_underscores(data)
-        self.data = data
+        self._data = data
 
     def to_raw(self) -> Union[Dict[str, Any], str, int, bool]:
-        return self.data
+        return self._data
 
     def __getitem__(self, key: str):
-        assert isinstance(self.data, dict)
-        return self.data[key]
+        assert isinstance(self._data, dict)
+        return self._data[ParsedTree._convert_internal_field_name_to_external(key)]
 
     def __contains__(self, key: str):
-        assert isinstance(self.data, dict)
-        return key in self.data
+        assert isinstance(self._data, dict)
+        return ParsedTree._convert_internal_field_name_to_external(key) in self._data
 
     def __str__(self) -> str:
-        return json.dumps(self.data, sort_keys=False, indent=2)
+        return json.dumps(self._data, sort_keys=False, indent=2)
 
-    def keys(self) -> KeysView[Any]:
-        assert isinstance(self.data, dict)
-        return self.data.keys()
+    def keys(self) -> Set[Any]:
+        assert isinstance(self._data, dict)
+        return {ParsedTree._convert_external_field_name_to_internal(key) for key in self._data.keys()}
 
     _SUBTREE_MUTATION_PATH_PATTERN = re.compile(r"^(/[^/]+)*/?$")
 
@@ -68,7 +63,8 @@ class ParsedTree:
             raise ParsingException("Provided object path for mutation is invalid.")
         if "_" in path:
             raise ParsingException("Provided object path contains character '_', which is illegal")
-        path = path.replace("-", "_")
+        # Note: mutation happens on the internal dict only, therefore we are working with external
+        # naming only. That means, there are '-' in between words.
         path = path[1:] if path.startswith("/") else path
 
         # now, the path variable should contain '/' separated field names

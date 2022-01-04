@@ -190,7 +190,7 @@ class Server:
             if mgn.listen.typ is ListenType.UNIX_SOCKET:
                 nsite = web.UnixSite(self.runner, str(mgn.listen.unix_socket))
                 logger.info(f"Starting API HTTP server on http+unix://{mgn.listen.unix_socket}")
-            elif mgn.listen.typ is ListenType.IP_AND_PORT:
+            elif mgn.listen.typ is ListenType.IP:
                 nsite = web.TCPSite(self.runner, str(mgn.listen.ip), mgn.listen.port)
                 logger.info(f"Starting API HTTP server on http://{mgn.listen.ip}:{mgn.listen.port}")
             else:
@@ -202,7 +202,7 @@ class Server:
             if self.listen is not None and self.site is not None:
                 if self.listen.typ is ListenType.UNIX_SOCKET:
                     logger.info(f"Stopping API HTTP server on http+unix://{mgn.listen.unix_socket}")
-                elif mgn.listen.typ is ListenType.IP_AND_PORT:
+                elif mgn.listen.typ is ListenType.IP:
                     logger.info(f"Stopping API HTTP server on http://{mgn.listen.ip}:{mgn.listen.port}")
                 await self.site.stop()
 

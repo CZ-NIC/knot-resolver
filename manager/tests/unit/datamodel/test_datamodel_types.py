@@ -138,23 +138,25 @@ def test_listen():
 
     o = Listen({"interface": "eth0", "port": 56})
 
-    assert o.typ == ListenType.INTERFACE_AND_PORT
+    assert o.typ == ListenType.INTERFACE
     assert o.ip is None
     assert o.port == 56
     assert o.unix_socket is None
     assert o.interface == "eth0"
 
-    o = Listen({"ip": "123.4.5.6", "port": 56})
+    o = Listen({"ip": "123.4.5.6"})
 
-    assert o.typ == ListenType.IP_AND_PORT
+    assert o.typ == ListenType.IP
     assert o.ip == IPv4Address("123.4.5.6")
-    assert o.port == 56
+    assert o.port == None
     assert o.unix_socket is None
     assert o.interface is None
 
     # check failure
     with raises(KresdManagerException):
         Listen({"unix-socket": "/tmp", "ip": "127.0.0.1"})
+    with raises(KresdManagerException):
+        Listen({"unix-socket": "/tmp", "port": 853})
 
 
 def test_network():

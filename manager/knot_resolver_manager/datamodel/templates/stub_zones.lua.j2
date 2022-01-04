@@ -1,0 +1,58 @@
+{% from 'macros/policy_macros.lua.j2' import policy_flags, policy_add, policy_suffix, policy_todname, policy_stub %}
+{% from 'macros/view_macros.lua.j2' import view_tsig, view_addr %}
+
+{% if cfg.stub_zones %}
+{% for name, zone in cfg.stub_zones.items() %}
+-- stub-zone: {{ name }}
+{% if zone.views -%}
+{# views set for stub-zone #}
+{% for view_id in zone.views -%}
+{%- set view = cfg.views[view_id] -%}
+
+{# merge options from view and stub-zone #}
+{%- set options = none -%}
+{% if zone.options and view.options -%}
+{% set options = zone.options|list + view.options|list %}
+{% elif zone.options %}
+{% set options = zone.options|list %}
+{% elif view.options %}
+{% set options = view.options|list %}
+{%- endif %}
+
+{% if view.tsig -%}
+{% for tsig in view.tsig -%}
+
+{%- if options -%}
+{{ view_tsig(tsig|string, policy_suffix(policy_flags(options|list), policy_todname(name|string))) }}
+{%- endif %}
+
+{{ view_tsig(tsig|string, policy_suffix(policy_stub(zone.servers|list), policy_todname(name|string))) }}
+
+{% endfor %}
+{%- endif -%}
+
+{% if view.subnets -%}
+{% for addr in view.subnets -%}
+
+{%- if options -%}
+{{ view_addr(addr|string, policy_suffix(policy_flags(options|list), policy_todname(name|string))) }}
+{%- endif %}
+
+{{ view_addr(addr|string, policy_suffix(policy_stub(zone.servers|list), policy_todname(name|string))) }}
+
+{% endfor %}
+{% endif %}
+
+{% endfor %}
+{% else %}
+{# no views set for stub-zone #}
+
+{% if zone.options -%}
+{{ policy_add(policy_suffix(policy_flags(zone.options|list), policy_todname(name|string))) }}
+{%- endif %}
+
+{{ policy_add(policy_suffix(policy_stub(zone.servers|list), policy_todname(name|string))) }}
+
+{% endif %}
+{% endfor %}
+{% endif %}

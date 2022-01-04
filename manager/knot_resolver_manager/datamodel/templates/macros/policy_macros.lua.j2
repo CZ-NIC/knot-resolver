@@ -1,0 +1,245 @@
+{% from 'macros/common_macros.lua.j2' import string_table, str2ip_table, qtype_table, servers_table, tls_servers_table %}
+
+
+{# Add policy #}
+
+{% macro policy_add(rule, postrule=false) -%}
+{%- if postrule -%}
+policy.add({{ rule }},true)
+{%- else -%}
+policy.add({{ rule }})
+{%- endif -%}
+{%- endmacro %}
+
+
+{# Flags #}
+
+{% macro policy_flags(flags) -%}
+policy.FLAGS({
+{%- if flags is string -%}
+'{{ flags.upper().replace("-", "_")|string }}'
+{%- else -%}
+{%- for flag in flags|list -%}
+'{{ flag.upper().replace("-", "_") }}',
+{%- endfor -%}
+{%- endif -%}
+})
+{%- endmacro %}
+
+
+{# Filters #}
+
+{% macro policy_all(action) -%}
+policy.all({{ action }})
+{%- endmacro %}
+
+{% macro policy_suffix(action, suffix_table) -%}
+policy.suffix({{ action }},{{ suffix_table }})
+{%- endmacro %}
+
+{% macro policy_suffix_common(action, suffix_table, common_suffix=none) -%}
+policy.suffix_common({{ action }},{{ suffix_table }}
+{%- if common_suffix -%}
+,{{ common_suffix }}
+{%- endif -%}
+)
+{%- endmacro %}
+
+{% macro policy_pattern(action, pattern) -%}
+policy.pattern({{ action }},'{{ pattern }}')
+{%- endmacro %}
+
+{% macro policy_rpz(action, path, watch=true) -%}
+policy.rpz({{ action|string }},'{{ path|string }}',{{ 'true' if watch else 'false' }})
+{%- endmacro %}
+
+
+{# Custom filters #}
+
+{% macro declare_policy_qtype_custom_filter() -%}
+function policy_qtype(action, qtype)
+
+    local function has_value (tab, val)
+        for index, value in ipairs(tab) do
+            if value == val then
+                return true
+            end
+        end
+
+        return false
+    end
+
+    return function (state, query)
+        if query.stype == qtype then
+            return action
+        elseif has_value(qtype, query.stype) then
+            return action
+        else
+            return nil
+        end
+    end
+end
+{%- endmacro %}
+
+{% macro policy_qtype_custom_filter(action, qtype) -%}
+policy_qtype({{ action }}, {{ qtype }})
+{%- endmacro %}
+
+
+{# Auto Filter #}
+
+{% macro policy_auto_filter(action, filter=none) -%}
+{%- if filter.suffix -%}
+{{ policy_suffix(action, policy_todname(filter.suffix)) }}
+{%- elif filter.pattern -%}
+{{ policy_pattern(action, filter.pattern) }}
+{%- elif filter.qtype -%}
+{{ policy_qtype_custom_filter(action, qtype_table(filter.qtype)) }}
+{%- else -%}
+{{ policy_all(action) }}
+{%- endif %}
+{%- endmacro %}
+
+
+{# Non-chain actions #}
+
+{% macro policy_pass() -%}
+policy.PASS
+{%- endmacro %}
+
+{% macro policy_deny() -%}
+policy.DENY
+{%- endmacro %}
+
+{% macro policy_deny_msg(message) -%}
+policy.DENY_MSG('{{ message|string }}')
+{%- endmacro %}
+
+{% macro policy_drop() -%}
+policy.DROP
+{%- endmacro %}
+
+{% macro policy_refuse() -%}
+policy.REFUSE
+{%- endmacro %}
+
+{% macro policy_tc() -%}
+policy.TC
+{%- endmacro %}
+
+{% macro policy_reroute(reroute) -%}
+policy.REROUTE(
+{%- for item in reroute -%}
+{['{{ item.source }}']='{{ item.destination }}'},
+{%- endfor -%}
+)
+{%- endmacro %}
+
+{% macro policy_answer(answer) -%}
+policy.ANSWER({[kres.type.{{ answer.qtype }}]={rdata=
+{%- if answer.qtype in ['A','AAAA'] -%}
+{{ str2ip_table(answer.rdata) }},
+{%- elif answer.qtype == '' -%}
+{# TODO: Do the same for other record types that require a special rdata type in Lua.
+By default, the raw string from config is used. #}
+{%- else -%}
+{{ string_table(answer.rdata) }},
+{%- endif -%}
+ttl={{ answer.ttl.seconds()|int }}}},{{ 'true' if answer.nodata else 'false' }})
+{%- endmacro %}
+
+{# policy.ANSWER( { [kres.type.A] = { rdata=kres.str2ip('192.0.2.7'), ttl=300 }}) #}
+
+{# Chain actions #}
+
+{% macro policy_mirror(mirror) -%}
+policy.MIRROR(
+{% if mirror is string %}
+'{{ mirror }}'
+{% else %}
+{
+{%- for addr in mirror -%}
+'{{ addr }}',
+{%- endfor -%}
+}
+{%- endif -%}
+)
+{%- endmacro %}
+
+{% macro policy_debug_always() -%}
+policy.DEBUG_ALWAYS
+{%- endmacro %}
+
+{% macro policy_debug_cache_miss() -%}
+policy.DEBUG_CACHE_MISS
+{%- endmacro %}
+
+{% macro policy_qtrace() -%}
+policy.QTRACE
+{%- endmacro %}
+
+{% macro policy_reqtrace() -%}
+policy.REQTRACE
+{%- endmacro %}
+
+{% macro policy_stub(servers) -%}
+policy.STUB({{ servers_table(servers) }})
+{%- endmacro %}
+
+{% macro policy_forward(servers) -%}
+policy.FORWARD({{ servers_table(servers) }})
+{%- endmacro %}
+
+{% macro policy_tls_forward(servers) -%}
+policy.TLS_FORWARD({{ tls_servers_table(servers) }})
+{%- endmacro %}
+
+
+{# Auto action #}
+
+{% macro policy_auto_action(rule) -%}
+{%- if rule.action == 'pass' -%}
+{{ policy_pass() }}
+{%- elif rule.action == 'deny' -%}
+{%- if rule.message -%}
+{{ policy_deny_msg(rule.message) }}
+{%- else -%}
+{{ policy_deny() }}
+{%- endif -%}
+{%- elif rule.action == 'drop' -%}
+{{ policy_drop() }}
+{%- elif rule.action == 'refuse' -%}
+{{ policy_refuse() }}
+{%- elif rule.action == 'tc' -%}
+{{ policy_tc() }}
+{%- elif rule.action == 'reroute' -%}
+{{ policy_reroute(rule.reroute) }}
+{%- elif rule.action == 'answer' -%}
+{{ policy_answer(rule.answer) }}
+{%- elif rule.action == 'mirror' -%}
+{{ policy_mirror(rule.mirror) }}
+{%- elif rule.action == 'debug-always' -%}
+{{ policy_debug_always() }}
+{%- elif rule.action == 'debug-cache-miss' -%}
+{{ policy_sebug_cache_miss() }}
+{%- elif rule.action == 'qtrace' -%}
+{{ policy_qtrace() }}
+{%- elif rule.action == 'reqtrace' -%}
+{{ policy_reqtrace() }}
+{%- endif -%}
+{%- endmacro %}
+
+
+{# Other #}
+
+{% macro policy_todname(names) -%}
+policy.todnames({
+{%- if names is string -%}
+'{{ names|string }}'
+{%- else -%}
+{%- for name in names -%}
+'{{ name|string }}',
+{%- endfor -%}
+{%- endif -%}
+})
+{%- endmacro %}

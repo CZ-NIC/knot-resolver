@@ -16,9 +16,26 @@ KindEnum = LiteralEnum["dns", "xdp", "dot", "doh"]
 
 
 class InterfaceSchema(SchemaNode):
+    class Raw(SchemaNode):
+        listen: Listen
+        kind: KindEnum = "dns"
+        freebind: bool = False
+
+    _PREVIOUS_SCHEMA = Raw
+
     listen: Listen
-    kind: KindEnum = "dns"
-    freebind: bool = False
+    kind: KindEnum
+    freebind: bool
+
+    def _listen(self, origin: Raw):
+        if not origin.listen.port:
+            if origin.kind == "dot":
+                origin.listen.port = 853
+            elif origin.kind == "doh":
+                origin.listen.port = 443
+            else:
+                origin.listen.port = 53
+        return origin.listen
 
 
 class EdnsBufferSizeSchema(SchemaNode):

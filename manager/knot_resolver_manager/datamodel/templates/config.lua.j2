@@ -1,0 +1,54 @@
+{% if not cfg.lua.script_only %}
+
+-- LOGGING section
+{% include "logging.lua.j2" %}
+
+-- SERVER section
+{% include "server.lua.j2" %}
+
+-- OPTIONS section
+{% include "options.lua.j2" %}
+
+-- NETWORK section
+{% include "network.lua.j2" %}
+
+-- STATIC-HINTS section
+{% include "static_hints.lua.j2" %}
+
+-- VIEWS section
+{% include "views.lua.j2" %}
+
+-- POLICY section
+{% include "policy.lua.j2" %}
+
+-- RPZ section
+{% include "rpz.lua.j2" %}
+
+-- STUB-ZONES section
+{% include "stub_zones.lua.j2" %}
+
+-- FORWARD-ZONES section
+{% include "forward_zones.lua.j2" %}
+
+-- CACHE section
+{% include "cache.lua.j2" %}
+
+-- DNSSEC section
+{% include "dnssec.lua.j2" %}
+
+-- DNS64 section
+{% include "dns64.lua.j2" %}
+
+{% endif %}
+
+-- LUA section
+-- Custom Lua code cannot be validated
+
+{% if cfg.lua.script_file %}
+{% import cfg.lua.script_file as script_file %}
+{{ script_file }}
+{% endif %}
+
+{% if cfg.lua.script %}
+{{ cfg.lua.script }}
+{% endif %}

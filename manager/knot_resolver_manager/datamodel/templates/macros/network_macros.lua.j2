@@ -1,0 +1,17 @@
+{% macro net_listen(interface) -%}
+net.listen(
+{%- if interface.listen.ip -%}
+'{{ interface.listen.ip|string }}',
+{%- if interface.listen.port -%}
+{{ interface.listen.port|int }},
+{%- endif -%}
+{%- elif interface.listen.unix_socket -%}
+'{{ interface.listen.unix_socket|string }}',nil,
+{%- elif interface.listen.interface -%}
+net.{{ interface.listen.interface|string }},
+{%- if interface.listen.port -%}
+{{ interface.listen.port|int }},
+{%- endif -%}
+{%- endif -%}
+{kind='{{ 'tls' if interface.kind == 'dot' else interface.kind }}',freebind={{ 'true' if interface.freebind else 'false'}}})
+{%- endmacro %}

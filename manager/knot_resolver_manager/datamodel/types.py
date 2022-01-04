@@ -8,8 +8,159 @@ from typing import Any, Dict, Optional, Pattern, Type, Union
 from knot_resolver_manager.exceptions import SchemaException
 from knot_resolver_manager.utils import CustomValueType, SchemaNode
 from knot_resolver_manager.utils.modelling import Serializable
+from knot_resolver_manager.utils.types import LiteralEnum
 
 logger = logging.getLogger(__name__)
+
+# Policy actions
+ActionEnum = LiteralEnum[
+    # Nonchain actions
+    "pass",
+    "deny",
+    "drop",
+    "refuse",
+    "tc",
+    "reroute",
+    "answer",
+    # Chain actions
+    "mirror",
+    "debug-always",
+    "debug-cache-miss",
+    "qtrace",
+    "reqtrace",
+]
+
+# FLAGS from https://knot-resolver.readthedocs.io/en/stable/lib.html?highlight=options#c.kr_qflags
+FlagsEnum = LiteralEnum[
+    "no-minimize",
+    "no-ipv4",
+    "no-ipv6",
+    "tcp",
+    "resolved",
+    "await-ipv4",
+    "await-ipv6",
+    "await-cut",
+    "no-edns",
+    "cached",
+    "no-cache",
+    "expiring",
+    "allow_local",
+    "dnssec-want",
+    "dnssec-bogus",
+    "dnssec-insecure",
+    "dnssec-cd",
+    "stub",
+    "always-cut",
+    "dnssec-wexpand",
+    "permissive",
+    "strict",
+    "badcookie-again",
+    "cname",
+    "reorder-rr",
+    "trace",
+    "no-0x20",
+    "dnssec-nods",
+    "dnssec-optout",
+    "nonauth",
+    "forward",
+    "dns64-mark",
+    "cache-tried",
+    "no-ns-found",
+    "pkt-is-sane",
+    "dns64-disable",
+]
+
+# DNS record types from 'kres.type' table
+RecordTypeEnum = LiteralEnum[
+    "A",
+    "A6",
+    "AAAA",
+    "AFSDB",
+    "ANY",
+    "APL",
+    "ATMA",
+    "AVC",
+    "AXFR",
+    "CAA",
+    "CDNSKEY",
+    "CDS",
+    "CERT",
+    "CNAME",
+    "CSYNC",
+    "DHCID",
+    "DLV",
+    "DNAME",
+    "DNSKEY",
+    "DOA",
+    "DS",
+    "EID",
+    "EUI48",
+    "EUI64",
+    "GID",
+    "GPOS",
+    "HINFO",
+    "HIP",
+    "HTTPS",
+    "IPSECKEY",
+    "ISDN",
+    "IXFR",
+    "KEY",
+    "KX",
+    "L32",
+    "L64",
+    "LOC",
+    "LP",
+    "MAILA",
+    "MAILB",
+    "MB",
+    "MD",
+    "MF",
+    "MG",
+    "MINFO",
+    "MR",
+    "MX",
+    "NAPTR",
+    "NID",
+    "NIMLOC",
+    "NINFO",
+    "NS",
+    "NSAP",
+    "NSAP-PTR",
+    "NSEC",
+    "NSEC3",
+    "NSEC3PARAM",
+    "NULL",
+    "NXT",
+    "OPENPGPKEY",
+    "OPT",
+    "PTR",
+    "PX",
+    "RKEY",
+    "RP",
+    "RRSIG",
+    "RT",
+    "SIG",
+    "SINK",
+    "SMIMEA",
+    "SOA",
+    "SPF",
+    "SRV",
+    "SSHFP",
+    "SVCB",
+    "TA",
+    "TALINK",
+    "TKEY",
+    "TLSA",
+    "TSIG",
+    "TXT",
+    "UID",
+    "UINFO",
+    "UNSPEC",
+    "URI",
+    "WKS",
+    "X25",
+    "ZONEMD",
+]
 
 
 class Unit(CustomValueType):
@@ -175,6 +326,9 @@ class DomainName(CustomValueType):
 
     def to_std(self) -> str:
         return self._value
+
+    def __hash__(self) -> int:
+        return hash(self._value)
 
     def __str__(self) -> str:
         return self._value
@@ -419,9 +573,9 @@ class IPv6Network96(CustomValueType):
 
 
 class ListenType(Enum):
-    IP_AND_PORT = auto()
+    IP = auto()
     UNIX_SOCKET = auto()
-    INTERFACE_AND_PORT = auto()
+    INTERFACE = auto()
 
 
 class Listen(SchemaNode, Serializable):
@@ -447,12 +601,12 @@ class Listen(SchemaNode, Serializable):
             "interface" if origin.interface is not None else ...,
         }
 
-        if present == {"ip", "port", ...}:
-            return ListenType.IP_AND_PORT
+        if present == {"ip", ...} or present == {"ip", "port", ...}:
+            return ListenType.IP
         elif present == {"unix_socket", ...}:
             return ListenType.UNIX_SOCKET
-        elif present == {"interface", "port", ...}:
-            return ListenType.INTERFACE_AND_PORT
+        elif present == {"interface", ...} or present == {"interface", "port", ...}:
+            return ListenType.INTERFACE
         else:
             raise ValueError(
                 "Listen configuration contains multiple incompatible options at once. "
@@ -471,11 +625,11 @@ class Listen(SchemaNode, Serializable):
         pass
 
     def __str__(self) -> str:
-        if self.typ is ListenType.IP_AND_PORT:
+        if self.typ is ListenType.IP:
             return f"{self.ip} @ {self.port}"
         elif self.typ is ListenType.UNIX_SOCKET:
             return f"{self.unix_socket}"
-        elif self.typ is ListenType.INTERFACE_AND_PORT:
+        elif self.typ is ListenType.INTERFACE:
             return f"{self.interface} @ {self.port}"
         else:
             raise NotImplementedError()
@@ -493,11 +647,11 @@ class Listen(SchemaNode, Serializable):
         )
 
     def to_dict(self) -> Dict[Any, Any]:
-        if self.typ is ListenType.IP_AND_PORT:
+        if self.typ is ListenType.IP:
             return {"port": self.port, "ip": str(self.ip)}
         elif self.typ is ListenType.UNIX_SOCKET:
             return {"unix_socket": str(self.unix_socket)}
-        elif self.typ is ListenType.INTERFACE_AND_PORT:
+        elif self.typ is ListenType.INTERFACE:
             return {"interface": self.interface, "port": self.port}
         else:
             raise NotImplementedError()
