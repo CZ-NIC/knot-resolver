@@ -1,0 +1,63 @@
+-- SPDX-License-Identifier: GPL-3.0-or-later
+{% raw %}
+modules.load('view < policy')
+view:addr("127.127.0.0", policy.suffix(policy.DENY_MSG("addr 127.127.0.0 matched com"),{"\3com\0"}))
+-- policy.add(policy.all(policy.FORWARD('1.2.3.4')))
+
+-- make sure DNSSEC is turned off for tests
+trust_anchors.remove('.')
+
+-- Disable RFC5011 TA update
+if ta_update then
+        modules.unload('ta_update')
+end
+
+-- Disable RFC8145 signaling, scenario doesn't provide expected answers
+if ta_signal_query then
+        modules.unload('ta_signal_query')
+end
+
+-- Disable RFC8109 priming, scenario doesn't provide expected answers
+if priming then
+        modules.unload('priming')
+end
+
+-- Disable this module because it make one priming query
+if detect_time_skew then
+        modules.unload('detect_time_skew')
+end
+
+_hint_root_file('hints')
+cache.size = 2*MB
+log_level('debug')
+{% endraw %}
+
+-- Allow PROXYv2 from dnsdist's address
+--net.proxy_allowed("{{PROGRAMS['dnsdist']['address']}}")
+net.proxy_allowed("127.127.0.0/16")
+
+net = { '{{SELF_ADDR}}' }
+
+{% if QMIN == "false" %}
+option('NO_MINIMIZE', true)
+{% else %}
+option('NO_MINIMIZE', false)
+{% endif %}
+
+
+-- Self-checks on globals
+assert(help() ~= nil)
+assert(worker.id ~= nil)
+-- Self-checks on facilities
+assert(cache.count() == 0)
+assert(cache.stats() ~= nil)
+assert(cache.backends() ~= nil)
+assert(worker.stats() ~= nil)
+assert(net.interfaces() ~= nil)
+-- Self-checks on loaded stuff
+assert(net.list()[1].transport.ip == '{{SELF_ADDR}}')
+assert(#modules.list() > 0)
+-- Self-check timers
+ev = event.recurrent(1 * sec, function (ev) return 1 end)
+event.cancel(ev)
+ev = event.after(0, function (ev) return 1 end)

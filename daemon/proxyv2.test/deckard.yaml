@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+programs:
+  - name: dnsdist
+    binary: dnsdist
+    additional:
+      - --verbose
+      - --supervised
+      - --config
+      - dnsdist.conf
+    ignore_exit_code: True
+    templates:
+      - daemon/proxyv2.test/dnsdist_config.j2
+    configs:
+      - dnsdist.conf
+  - name: kresd
+    binary: kresd
+    additional:
+      - --noninteractive
+    templates:
+      - daemon/proxyv2.test/kresd_config.j2
+      - tests/integration/hints_zone.j2
+    configs:
+      - config
+      - hints

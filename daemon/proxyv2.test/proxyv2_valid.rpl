@@ -1,0 +1,72 @@
+; SPDX-License-Identifier: GPL-3.0-or-later
+; config options
+	stub-addr: 1.2.3.4
+	query-minimization: off
+CONFIG_END
+
+SCENARIO_BEGIN proxyv2:valid test
+
+RANGE_BEGIN 0 110
+	ADDRESS 1.2.3.4
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR RD RA NOERROR
+SECTION QUESTION
+example.cz. IN A
+SECTION ANSWER
+example.cz. IN A 5.6.7.8
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR RD RA NOERROR
+SECTION QUESTION
+k.root-servers.net. IN AAAA
+SECTION ANSWER
+k.root-servers.net. IN AAAA ::1
+ENTRY_END
+
+RANGE_END
+
+; query with PROXYv2 header - not blocked
+STEP 10 QUERY
+ENTRY_BEGIN
+ADJUST raw_id
+REPLY RD
+SECTION QUESTION
+example.cz. IN A
+ENTRY_END
+
+STEP 20 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH flags rcode question answer
+REPLY QR RD RA NOERROR
+SECTION QUESTION
+example.cz. IN A
+SECTION ANSWER
+example.cz. IN A 5.6.7.8
+ENTRY_END
+
+; query with PROXYv2 header - blocked by view:addr
+; NXDOMAIN expected
+STEP 30 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+example.com. IN A
+ENTRY_END
+
+STEP 31 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH opcode question rcode additional
+REPLY QR RD RA AA NXDOMAIN
+SECTION QUESTION
+example.com. IN A
+SECTION ADDITIONAL
+explanation.invalid. 10800 IN TXT "addr 127.127.0.0 matched com"
+ENTRY_END
+
+SCENARIO_END
