@@ -6,8 +6,10 @@ Knot Resolver Manager
     :maxdepth: 2
     :caption: Manager:
 
-    getting-started
-    configuration
+    manager-introduction
+    manager-getting-started
+    manager-migration
+    manager-configuration
 
 ==================
 Indices and tables
