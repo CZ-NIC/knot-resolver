@@ -1,0 +1,51 @@
+{% if cfg.static_hints.etc_hosts or cfg.static_hints.root_hints_file or cfg.static_hints.hints_files or cfg.static_hints.root_hints or cfg.static_hints.hints %}
+modules.load('hints > iterate')
+
+{% if cfg.static_hints.ttl %}
+-- static-hints.ttl
+hints.ttl({{ cfg.static_hints.ttl.seconds()|string }})
+{% endif %}
+
+-- static-hints.no-data
+hints.use_nodata({{ 'true' if cfg.static_hints.no_data else 'false' }})
+
+{% if cfg.static_hints.etc_hosts %}
+-- static-hints.etc-hosts
+hints.add_hosts('/etc/hosts')
+{% endif %}
+
+{% if cfg.static_hints.root_hints_file %}
+-- static-hints.root-hints-file
+hints.root_file('{{ cfg.static_hints.root_hints_file }}')
+{% endif %}
+
+{% if cfg.static_hints.hints_files %}
+-- static-hints.hints-files
+{% for item in cfg.static_hints.hints_files %}
+hints.add_hosts('{{ item }}')
+{% endfor %}
+{% endif %}
+
+{% if cfg.static_hints.root_hints %}
+-- static-hints.root-hints
+hints.root({
+{% for name, addrs in cfg.static_hints.root_hints.items() %}
+['{{ name }}'] = {
+{% for addr in addrs %}
+        '{{ addr }}',
+{% endfor %}
+    },
+{% endfor %}
+})
+{% endif %}
+
+{% if cfg.static_hints.hints %}
+-- static-hints.hints
+{% for name, addrs in cfg.static_hints.hints.items() %}
+{% for addr in addrs %}
+hints.set('{{ name }} {{ addr }}')
+{% endfor %}
+{% endfor %}
+{% endif %}
+
+{% endif %}

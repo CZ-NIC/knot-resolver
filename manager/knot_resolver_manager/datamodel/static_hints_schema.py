@@ -1,12 +1,7 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 
-from knot_resolver_manager.datamodel.types import CheckedPath, TimeUnit
+from knot_resolver_manager.datamodel.types import CheckedPath, DomainName, IPAddress, TimeUnit
 from knot_resolver_manager.utils import SchemaNode
-
-
-class Hint(SchemaNode):
-    name: str
-    addresses: List[str]
 
 
 class StaticHintsSchema(SchemaNode):
@@ -15,5 +10,5 @@ class StaticHintsSchema(SchemaNode):
     etc_hosts: bool = False
     root_hints_file: Optional[CheckedPath] = None
     hints_files: Optional[List[CheckedPath]] = None
-    root_hints: Optional[List[Hint]] = None
-    hints: Optional[List[Hint]] = None
+    root_hints: Optional[Dict[DomainName, List[IPAddress]]] = None
+    hints: Optional[Dict[DomainName, List[IPAddress]]] = None

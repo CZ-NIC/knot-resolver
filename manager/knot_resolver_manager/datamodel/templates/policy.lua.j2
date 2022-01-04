@@ -1,0 +1,63 @@
+{% from 'macros/policy_macros.lua.j2' import declare_policy_qtype_custom_filter, policy_flags, policy_add, policy_auto_filter, policy_auto_action %}
+{% from 'macros/view_macros.lua.j2' import view_tsig, view_addr %}
+
+{% if cfg.policy -%}
+
+{{ declare_policy_qtype_custom_filter() }}
+
+{% for id, rule in cfg.policy.items() %}
+-- policy rule: {{ id }}
+{% if rule.views -%}
+{# views set for rule #}
+{% for view_id in rule.views -%}
+{%- set view = cfg.views[view_id] -%}
+
+{# merge options from view and policy rule #}
+{%- set options = none -%}
+{% if rule.options and view.options -%}
+{% set options = rule.options|list + view.options|list %}
+{% elif rule.options %}
+{% set options = rule.options|list %}
+{% elif view.options %}
+{% set options = view.options|list %}
+{%- endif %}
+
+{# view tsig #}
+{% if view.tsig -%}
+{% for tsig in view.tsig -%}
+
+{% if options -%}
+{{ view_tsig(tsig|string, policy_auto_filter(policy_flags(options|list), rule.filter)) }}
+{%- endif %}
+
+{{ view_tsig(tsig|string, policy_auto_filter(policy_auto_action(rule), rule.filter)) }}
+
+{% endfor %}
+{% endif -%}
+
+{# view addr #}
+{% if view.subnets -%}
+{% for addr in view.subnets -%}
+
+{% if options -%}
+{{ view_addr(addr|string, policy_auto_filter(policy_flags(options|list), rule.filter)) }}
+{%- endif %}
+
+{{ view_addr(addr|string, policy_auto_filter(policy_auto_action(rule), rule.filter)) }}
+
+{% endfor %}
+{% endif %}
+
+{%- endfor -%}
+{%- else -%}
+{# no views set for policy rule #}
+
+{% if rule.options -%}
+{{ policy_add(policy_auto_filter(policy_flags(rule.options|list), rule.filter)) }}
+{%- endif %}
+
+{{ policy_add(policy_auto_filter(policy_auto_action(rule), rule.filter)) }}
+
+{% endif %}
+{% endfor %}
+{% endif %}

@@ -1,0 +1,18 @@
+-- logging.level
+log_level('{{ cfg.logging.level }}')
+
+{% if cfg.logging.target %}
+-- logging.target
+log_target('{{ cfg.logging.target }}')
+{% endif %}
+
+{% if cfg.logging.groups %}
+-- logging.groups
+log_groups({
+{% for g in cfg.logging.groups %}
+{% if g != "manager" %}
+    '{{ g }}',
+{% endif %}
+{% endfor %}
+})
+{% endif %}
