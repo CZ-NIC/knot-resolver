@@ -123,9 +123,18 @@ Following actions stop the policy matching on the query, i.e. other rules are no
 
    Deny existence of names matching filter, i.e. reply NXDOMAIN authoritatively.
 
-.. function:: DENY_MSG(message)
+.. function:: DENY_MSG(message, [extended_error=kres.extended_error.BLOCKED])
 
-   Deny existence of a given domain and add explanatory message. NXDOMAIN reply contains an additional explanatory message as TXT record in the additional section.
+   Deny existence of a given domain and add explanatory message. NXDOMAIN reply
+   contains an additional explanatory message as TXT record in the additional
+   section.
+
+   You may override the extended DNS error to provide the user with more
+   information. By default, ``BLOCKED`` is returned to indicate the domain is
+   blocked due to the internal policy of the operator. Other suitable error
+   codes are ``CENSORED`` (for externally imposed policy reasons) or
+   ``FILTERED`` (for blocking requested by the client). For more information,
+   please refer to :rfc:`8914`.
 
 .. py:attribute:: DROP
 
@@ -291,6 +300,24 @@ They are marked as ``debug`` level, so e.g. with journalctl command you can use 
    Pretty-print DNS requests from clients into the verbose log. It's useful for debugging weird DNS clients.
    It makes most sense together with :ref:`mod-view` (enabling per-client)
    and probably with verbose logging those request (e.g. use :any:`DEBUG_ALWAYS` instead).
+
+.. py:attribute:: IPTRACE
+
+   Log how the request arrived.
+   Most notably, this includes the client's IP address, so beware of privacy implications.
+
+   .. code-block:: lua
+
+        -- example usage in configuration
+        policy.add(policy.all(policy.IPTRACE))
+        -- you might want to combine it with some other logs, e.g.
+        policy.add(policy.all(policy.DEBUG_ALWAYS))
+
+   .. code-block:: text
+
+        -- example log lines from IPTRACE:
+        [reqdbg][policy][57517.00] request packet arrived from ::1#37931 to ::1#00853 (TCP + TLS)
+        [reqdbg][policy][65538.00] request packet arrived internally
 
 
 Custom actions
@@ -629,6 +656,15 @@ Response policy zones
    "fake CNAME", "not supported", "no"
 
   .. [#] Our :any:`policy.DROP` returns *SERVFAIL* answer (for historical reasons).
+
+
+  .. note::
+
+     To debug which domains are affected by RPZ (or other policy actions), you can enable the ``policy`` log group:
+
+     .. code-block:: lua
+
+        log_groups({'policy'})
 
 
 .. function:: rpz(action, path, [watch = true])

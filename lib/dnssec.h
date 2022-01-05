@@ -166,10 +166,12 @@ struct kr_svldr_ctx;
  * - `ds` is assumed to be trusted, and it's used to validate `dnskey+dnskey_sigs`.
  * - The TTL of `dnskey` may get trimmed.
  * - The insides are placed on malloc heap (use _free_ctx).
+ * - `err_ctx` is optional, for use when error happens (but avoid the inside pointers)
  */
 KR_EXPORT
 struct kr_svldr_ctx * kr_svldr_new_ctx(const knot_rrset_t *ds, knot_rrset_t *dnskey,
-		const knot_rdataset_t *dnskey_sigs, uint32_t timestamp);
+		const knot_rdataset_t *dnskey_sigs, uint32_t timestamp,
+		kr_rrset_validation_ctx_t *err_ctx);
 /** Free the context.  Passing NULL is OK. */
 KR_EXPORT
 void kr_svldr_free_ctx(struct kr_svldr_ctx *ctx);

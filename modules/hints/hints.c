@@ -25,7 +25,7 @@
 #include <math.h>
 
 /* Defaults */
-#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, HINT,  __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) kr_log_q(qry, HINT,  __VA_ARGS__)
 #define ERR_MSG(...) kr_log_error(HINT, "[     ]" __VA_ARGS__)
 
 struct hints_data {
@@ -169,7 +169,7 @@ static int query(kr_layer_t *ctx, knot_pkt_t *pkt)
 	return KR_STATE_DONE;
 }
 
-static int parse_addr_str(union inaddr *sa, const char *addr)
+static int parse_addr_str(union kr_sockaddr *sa, const char *addr)
 {
 	int family = strchr(addr, ':') ? AF_INET6 : AF_INET;
 	memset(sa, 0, sizeof(*sa));
@@ -220,7 +220,7 @@ static const knot_dname_t * raw_addr2reverse(const uint8_t *raw_addr, int family
 static const knot_dname_t * addr2reverse(const char *addr)
 {
 	/* Parse address string */
-	union inaddr ia;
+	union kr_sockaddr ia;
 	if (parse_addr_str(&ia, addr) != 0) {
 		return NULL;
 	}
@@ -237,7 +237,7 @@ static int add_pair(struct kr_zonecut *hints, const char *name, const char *addr
 	}
 	knot_dname_to_lower(key);
 
-	union inaddr ia;
+	union kr_sockaddr ia;
 	if (parse_addr_str(&ia, addr) != 0) {
 		return kr_error(EINVAL);
 	}
@@ -276,7 +276,7 @@ static int del_pair(struct hints_data *data, const char *name, const char *addr)
 
         if (addr) {
 		/* Remove the pair. */
-		union inaddr ia;
+		union kr_sockaddr ia;
 		if (parse_addr_str(&ia, addr) != 0) {
 			return kr_error(EINVAL);
 		}

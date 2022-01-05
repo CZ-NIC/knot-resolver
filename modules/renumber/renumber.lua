@@ -99,6 +99,7 @@ local function rule(prefixes)
 				pkt:put(rr.owner, rr.ttl, rr.class, rr.type, rr.rdata)
 			end
 		end
+		req:set_extended_error(kres.extended_error.FORGED, "DUQR")
 		return state
 	end
 end

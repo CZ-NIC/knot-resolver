@@ -25,7 +25,7 @@
 #include "lib/resolve.h"
 
 /* Defaults */
-#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, STATISTICS,  __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) kr_log_q(qry, STATISTICS,  __VA_ARGS__)
 #define FREQUENT_PSAMPLE  10 /* Sampling rate, 1 in N */
 #ifdef LRU_REP_SIZE
  #define FREQUENT_COUNT LRU_REP_SIZE /* Size of frequent tables */
@@ -156,7 +156,7 @@ static int collect_rtt(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Socket address is encoded into sockaddr_in6 struct that
 	 * unions with sockaddr_in and differ in sa_family */
 	struct sockaddr_in6 *e = &data->upstreams.q.at[data->upstreams.head];
-	const union inaddr *src = &req->upstream.transport->address;
+	const union kr_sockaddr *src = &req->upstream.transport->address;
 	switch (src->ip.sa_family) {
 		case AF_INET:  memcpy(e, &src->ip4, sizeof(src->ip4)); break;
 		case AF_INET6: memcpy(e, &src->ip6, sizeof(src->ip6)); break;

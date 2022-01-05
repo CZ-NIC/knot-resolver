@@ -41,9 +41,9 @@ BuildRequires:  meson
 BuildRequires:  pkgconfig(cmocka)
 BuildRequires:  pkgconfig(gnutls)
 BuildRequires:  pkgconfig(libedit)
-BuildRequires:  pkgconfig(libknot) >= 2.9
-BuildRequires:  pkgconfig(libzscanner) >= 2.9
-BuildRequires:  pkgconfig(libdnssec) >= 2.9
+BuildRequires:  pkgconfig(libknot) >= 3.0.2
+BuildRequires:  pkgconfig(libzscanner) >= 3.0.2
+BuildRequires:  pkgconfig(libdnssec) >= 3.0.2
 BuildRequires:  pkgconfig(libnghttp2)
 BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  pkgconfig(libcap-ng)
@@ -321,6 +321,7 @@ fi
 %dir %{_libdir}/knot-resolver/kres_modules
 %{_libdir}/knot-resolver/kres_modules/bogus_log.so
 %{_libdir}/knot-resolver/kres_modules/edns_keepalive.so
+%{_libdir}/knot-resolver/kres_modules/extended_error.so
 %{_libdir}/knot-resolver/kres_modules/hints.so
 %{_libdir}/knot-resolver/kres_modules/nsid.so
 %{_libdir}/knot-resolver/kres_modules/refuse_nord.so

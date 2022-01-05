@@ -11,7 +11,7 @@
 #include "lib/defines.h"
 #include "lib/layer.h"
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, PLAN,  __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) kr_log_q(qry, PLAN,  __VA_ARGS__)
 
 inline static unsigned char chars_or(const unsigned char a, const unsigned char b)
 {

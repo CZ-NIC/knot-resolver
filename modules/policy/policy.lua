@@ -57,6 +57,17 @@ local function addr2sock(target, default_port)
 	return sock
 end
 
+-- Debug logging for taken policy actions
+local function log_policy_action(req, name)
+	if ffi.C.kr_log_is_debug_fun(ffi.C.LOG_GRP_POLICY, req) then
+		local qry = req:current()
+		ffi.C.kr_log_req1(
+			req, qry.uid, 2, ffi.C.LOG_GRP_POLICY, LOG_GRP_POLICY_TAG,
+			"%s applied for %s %s\n",
+			name, kres.dname2str(qry.sname), kres.tostring.type[qry.stype])
+	end
+end
+
 -- policy functions are defined below
 local policy = {}
 
@@ -236,6 +247,7 @@ function policy.ANSWER(rtable, nodata)
 		ffi.C.kr_pkt_make_auth_header(answer)
 		local ttl = (data or {}).ttl or 1
 		answer:rcode(kres.rcode.NOERROR)
+		req:set_extended_error(kres.extended_error.FORGED, "5DO5")
 
 		if data == nil then -- want NODATA, i.e. just a SOA
 			answer:begin(kres.section.AUTHORITY)
@@ -246,6 +258,7 @@ function policy.ANSWER(rtable, nodata)
 			else
 				mkauth_soa(answer, kres.dname2wire(qry.sname), nil, ttl)
 			end
+			log_policy_action(req, 'ANSWER (nodata)')
 		else
 			answer:begin(kres.section.ANSWER)
 			if type(data.rdata) == 'table' then
@@ -255,6 +268,7 @@ function policy.ANSWER(rtable, nodata)
 			else
 				answer:put(qry.sname, ttl, qry.sclass, qry.stype, data.rdata)
 			end
+			log_policy_action(req, 'ANSWER (forged)')
 		end
 		return kres.DONE
 	end
@@ -664,10 +678,14 @@ local function answer_clear(req)
 	return pkt
 end
 
-function policy.DENY_MSG(msg)
+function policy.DENY_MSG(msg, extended_error)
 	if msg and (type(msg) ~= 'string' or #msg >= 255) then
 		error('DENY_MSG: optional msg must be string shorter than 256 characters')
         end
+	if extended_error == nil then
+		extended_error = kres.extended_error.BLOCKED
+	end
+	local action_name = msg and 'DENY_MSG' or 'DENY'
 
 	return function (_, req)
 		-- Write authority information
@@ -683,6 +701,8 @@ function policy.DENY_MSG(msg)
 				   string.char(#msg) .. msg)
 
 		end
+		req:set_extended_error(extended_error, "CR36")
+		log_policy_action(req, action_name)
 		return kres.DONE
 	end
 end
@@ -726,6 +746,24 @@ ffi.gc(debug_logfinish_cb, free_cb)
 -- log request packet
 function policy.REQTRACE(_, req)
 	log_notrace(req, 'request packet:\n%s', req.qsource.packet)
+end
+
+-- log how the request arrived, notably the client's IP
+function policy.IPTRACE(_, req)
+	if req.qsource.addr == nil then
+		log_notrace(req, 'request packet arrived internally\n')
+	else
+		-- stringify transport flags: struct kr_request_qsource_flags
+		local qf = req.qsource.flags
+		local qf_str = qf.tcp and 'TCP' or 'UDP'
+		if qf.tls  then qf_str = qf_str .. ' + TLS'  end
+		if qf.http then qf_str = qf_str .. ' + HTTP' end
+		if qf.xdp  then qf_str = qf_str .. ' + XDP'  end
+
+		log_notrace(req, 'request packet arrived from %s to %s (%s)\n',
+			req.qsource.addr, req.qsource.dst_addr, qf_str)
+	end
+	return nil -- chain rule
 end
 
 function policy.DEBUG_ALWAYS(state, req)
@@ -780,6 +818,8 @@ policy.DENY = policy.DENY_MSG() -- compatibility with < 2.0
 function policy.DROP(_, req)
 	local answer = answer_clear(req)
 	if answer == nil then return nil end
+	req:set_extended_error(kres.extended_error.PROHIBITED, "U5KL")
+	log_policy_action(req, 'DROP')
 	return kres.FAIL
 end
 
@@ -788,6 +828,8 @@ function policy.REFUSE(_, req)
 	if answer == nil then return nil end
 	answer:rcode(kres.rcode.REFUSED)
 	answer:ad(false)
+	req:set_extended_error(kres.extended_error.PROHIBITED, "EIM4")
+	log_policy_action(req, 'REFUSE')
 	return kres.DONE
 end
 
@@ -801,6 +843,7 @@ function policy.TC(state, req)
 	if answer == nil then return nil end
 	answer:tc(1)
 	answer:ad(false)
+	log_policy_action(req, 'TC')
 	return kres.DONE
 end
 
@@ -990,7 +1033,8 @@ policy.special_names = {
 		cb=policy.suffix_common(policy.DENY_MSG(
 			'Blocking is mandated by standards, see references on '
 			.. 'https://www.iana.org/assignments/'
-			.. 'locally-served-dns-zones/locally-served-dns-zones.xhtml'),
+			.. 'locally-served-dns-zones/locally-served-dns-zones.xhtml',
+			kres.extended_error.NOTSUP),
 			private_zones, todname('arpa.')),
 		count=0
 	},
@@ -998,7 +1042,8 @@ policy.special_names = {
 		cb=policy.suffix(policy.DENY_MSG(
 			'Blocking is mandated by standards, see references on '
 			.. 'https://www.iana.org/assignments/'
-			.. 'special-use-domain-names/special-use-domain-names.xhtml'),
+			.. 'special-use-domain-names/special-use-domain-names.xhtml',
+			kres.extended_error.NOTSUP),
 			{
 				todname('test.'),
 				todname('onion.'),

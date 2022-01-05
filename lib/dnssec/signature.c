@@ -274,11 +274,7 @@ int kr_check_signature(const knot_rdata_t *rrsig,
 		goto fail;
 	}
 
-	ret = dnssec_sign_verify(sign_ctx,
-		#if KNOT_VERSION_MAJOR >= 3
-			false,
-		#endif
-			&signature);
+	ret = dnssec_sign_verify(sign_ctx, false, &signature);
 	if (ret != 0) {
 		ret = kr_error(EBADMSG);
 		goto fail;

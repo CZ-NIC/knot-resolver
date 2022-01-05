@@ -29,6 +29,7 @@ c_src_lint += kresd_src
 
 config_tests += [
   ['cache.clear', files('cache.test/clear.test.lua')],
+  ['zimport', files('zimport.test/zimport.test.lua')],
 ]
 
 integr_tests += [

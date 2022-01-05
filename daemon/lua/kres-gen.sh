@@ -89,6 +89,7 @@ typedef void (*trace_log_f) (const struct kr_request *, const char *);
 typedef void (*trace_callback_f)(struct kr_request *);
 typedef uint8_t * (*alloc_wire_f)(struct kr_request *req, uint16_t *maxlen);
 typedef bool (*addr_info_f)(struct sockaddr*);
+typedef void (*zi_callback)(int state, void *param);
 "
 
 genResType() {
@@ -120,11 +121,12 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	ranked_rr_array_t
 	kr_http_header_array_entry_t
 	kr_http_header_array_t
-	inaddr_array_t
+	kr_sockaddr_array_t
 	struct kr_zonecut
 	kr_qarray_t
 	struct kr_rplan
 	struct kr_request_qsource_flags
+	struct kr_extended_error
 	struct kr_request
 	enum kr_rank
 	typedef kr_cdb_pt
@@ -203,6 +205,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 # Resolution request
 	kr_request_ensure_edns
 	kr_request_ensure_answer
+	kr_request_set_extended_error
 	kr_resolve_plan
 	kr_resolve_pool
 # Resolution plan
@@ -213,6 +216,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 # Forwarding
 	kr_forward_add_target
 # Utils
+	kr_log_is_debug_fun
 	kr_log_req1
 	kr_log_q1
 	kr_log_grp2name
@@ -291,6 +295,7 @@ ${CDEFS} ${KRESD} types <<-EOF
 	flagged_fd_array_t
 	config_array_t
 	struct args
+	zi_config_t
 EOF
 echo "struct args *the_args;"
 
@@ -306,6 +311,7 @@ ${CDEFS} ${KRESD} functions <<-EOF
 	worker_resolve_exec
 	worker_resolve_mk_pkt
 	worker_resolve_start
+	zi_zone_import
 EOF
 
 echo "struct engine" | ${CDEFS} ${KRESD} types | sed '/struct network/,$ d'

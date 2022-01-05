@@ -51,7 +51,7 @@
 #define MAX_PIPELINED 100
 #endif
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE(qry, WORKER, __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) kr_log_q(qry, WORKER, __VA_ARGS__)
 
 /** Client request state. */
 struct request_ctx
@@ -64,10 +64,10 @@ struct request_ctx
 		/** NULL if the request didn't come over network. */
 		struct session *session;
 		/** Requestor's address; separate because of UDP session "sharing". */
-		union inaddr addr;
+		union kr_sockaddr addr;
 		/** Local address.  For AF_XDP we couldn't use session's,
 		 * as the address might be different every time. */
-		union inaddr dst_addr;
+		union kr_sockaddr dst_addr;
 		/** MAC addresses - ours [0] and router's [1], in case of AF_XDP socket. */
 		uint8_t eth_addrs[2][6];
 	} source;
@@ -163,11 +163,11 @@ static uv_handle_t *ioreq_spawn(struct worker_ctx *worker,
 	}
 
 	/* Bind to outgoing address, according to IP v4/v6. */
-	union inaddr *addr;
+	union kr_sockaddr *addr;
 	if (family == AF_INET) {
-		addr = (union inaddr *)&worker->out_addr4;
+		addr = (union kr_sockaddr *)&worker->out_addr4;
 	} else {
-		addr = (union inaddr *)&worker->out_addr6;
+		addr = (union kr_sockaddr *)&worker->out_addr6;
 	}
 	if (addr->ip.sa_family != AF_UNSPEC) {
 		if (kr_fails_assert(addr->ip.sa_family == family)) {
@@ -391,6 +391,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	req->vars_ref = LUA_NOREF;
 	req->uid = uid;
 	req->qsource.flags.xdp = is_xdp;
+	kr_request_set_extended_error(req, KNOT_EDNS_EDE_NONE, NULL);
 	array_init(req->qsource.headers);
 	if (session) {
 		req->qsource.flags.tcp = session_get_handle(session)->type == UV_TCP;
@@ -1616,6 +1617,9 @@ static int qr_task_step(struct qr_task *task,
 	/* Close pending I/O requests */
 	subreq_finalize(task, packet_source, packet);
 	if ((kr_now() - worker_task_creation_time(task)) >= KR_RESOLVE_TIME_LIMIT) {
+		struct kr_request *req = worker_task_request(task);
+		if (!kr_fails_assert(req))
+			kr_query_inform_timeout(req, req->current_query);
 		return qr_task_finalize(task, KR_STATE_FAIL);
 	}
 
@@ -1658,10 +1662,15 @@ static int qr_task_step(struct qr_task *task,
 			struct kr_rplan *rplan = &req->rplan;
 			struct kr_query *last = kr_rplan_last(rplan);
 			if (task->iter_count > KR_ITER_LIMIT) {
-				VERBOSE_MSG(last, "canceling query due to exceeded iteration count limit of %d\n", KR_ITER_LIMIT);
+				char *msg = "cancelling query due to exceeded iteration count limit";
+				VERBOSE_MSG(last, "%s of %d\n", msg, KR_ITER_LIMIT);
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_OTHER,
+					"OGHD: exceeded iteration count limit");
 			}
 			if (task->timeouts >= KR_TIMEOUT_LIMIT) {
-				VERBOSE_MSG(last, "canceling query due to exceeded timeout retries limit of %d\n", KR_TIMEOUT_LIMIT);
+				char *msg = "cancelling query due to exceeded timeout retries limit";
+				VERBOSE_MSG(last, "%s of %d\n", msg, KR_TIMEOUT_LIMIT);
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_NREACH_AUTH, "QLPL");
 			}
 
 			return qr_task_finalize(task, KR_STATE_FAIL);
@@ -2157,10 +2166,6 @@ void worker_deinit(void)
 	struct worker_ctx *worker = the_worker;
 	if (kr_fails_assert(worker))
 		return;
-	if (worker->z_import != NULL) {
-		zi_free(worker->z_import);
-		worker->z_import = NULL;
-	}
 	map_clear(&worker->tcp_connected);
 	map_clear(&worker->tcp_waiting);
 	trie_free(worker->subreq_out);

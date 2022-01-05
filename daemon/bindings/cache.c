@@ -361,81 +361,6 @@ static int cache_ns_tout(lua_State *L)
 	return 1;
 }
 
-/** Zone import completion callback.
- * Deallocates zone import context. */
-static void cache_zone_import_cb(int state, void *param)
-{
-	(void)state;
-	struct worker_ctx *worker = param;
-	if (kr_fails_assert(worker && worker->z_import)) return;
-	zi_free(worker->z_import);
-	worker->z_import = NULL;
-}
-
-/** Import zone from file. */
-static int cache_zone_import(lua_State *L)
-{
-	int ret = -1;
-	char msg[128];
-
-	struct worker_ctx *worker = the_worker;
-	if (!worker) {
-		strncpy(msg, "internal error, empty worker pointer", sizeof(msg));
-		goto finish;
-	}
-
-	if (worker->z_import && zi_import_started(worker->z_import)) {
-		strncpy(msg, "import already started", sizeof(msg));
-		goto finish;
-	}
-
-	(void)cache_assert_open(L); /* just check it in advance */
-
-	/* Check parameters */
-	int n = lua_gettop(L);
-	if (n < 1 || !lua_isstring(L, 1)) {
-		strncpy(msg, "expected 'cache.zone_import(path to zone file)'", sizeof(msg));
-		goto finish;
-	}
-
-	/* Parse zone file */
-	const char *zone_file = lua_tostring(L, 1);
-
-	const char *default_origin = NULL; /* TODO */
-	uint16_t default_rclass = 1;
-	uint32_t default_ttl = 0;
-
-	if (worker->z_import == NULL) {
-		worker->z_import = zi_allocate(worker, cache_zone_import_cb, worker);
-		if (worker->z_import == NULL) {
-			strncpy(msg, "can't allocate zone import context", sizeof(msg));
-			goto finish;
-		}
-	}
-
-	ret = zi_zone_import(worker->z_import, zone_file, default_origin,
-			     default_rclass, default_ttl);
-
-	lua_newtable(L);
-	if (ret == 0) {
-		strncpy(msg, "zone file successfully parsed, import started", sizeof(msg));
-	} else if (ret == 1) {
-		strncpy(msg, "TA not found", sizeof(msg));
-	} else {
-		strncpy(msg, "error parsing zone file", sizeof(msg));
-	}
-
-finish:
-	msg[sizeof(msg) - 1] = 0;
-	lua_newtable(L);
-	lua_pushstring(L, msg);
-	lua_setfield(L, -2, "msg");
-	lua_pushnumber(L, ret);
-	lua_setfield(L, -2, "code");
-
-	return 1;
-}
-
 int kr_bindings_cache(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
@@ -450,7 +375,6 @@ int kr_bindings_cache(lua_State *L)
 		{ "max_ttl", cache_max_ttl },
 		{ "min_ttl", cache_min_ttl },
 		{ "ns_tout", cache_ns_tout },
-		{ "zone_import", cache_zone_import },
 		{ NULL, NULL }
 	};
 

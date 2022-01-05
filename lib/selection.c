@@ -14,7 +14,7 @@
 
 #include "lib/utils.h"
 
-#define VERBOSE_MSG(qry, ...) QRVERBOSE((qry), SELECTION, __VA_ARGS__)
+#define VERBOSE_MSG(qry, ...) kr_log_q((qry), SELECTION, __VA_ARGS__)
 
 #define DEFAULT_TIMEOUT 400
 #define MAX_TIMEOUT 10000
@@ -180,7 +180,7 @@ int put_rtt_state(const uint8_t *ip, size_t len, struct rtt_state state,
 	return ret;
 }
 
-void bytes_to_ip(uint8_t *bytes, size_t len, uint16_t port, union inaddr *dst)
+void bytes_to_ip(uint8_t *bytes, size_t len, uint16_t port, union kr_sockaddr *dst)
 {
 	switch (len) {
 	case sizeof(struct in_addr):
@@ -199,7 +199,7 @@ void bytes_to_ip(uint8_t *bytes, size_t len, uint16_t port, union inaddr *dst)
 	}
 }
 
-uint8_t *ip_to_bytes(const union inaddr *src, size_t len)
+uint8_t *ip_to_bytes(const union kr_sockaddr *src, size_t len)
 {
 	switch (len) {
 	case sizeof(struct in_addr):
@@ -311,7 +311,7 @@ static void check_network_settings(struct address_state *address_state,
 	}
 }
 
-void update_address_state(struct address_state *state, union inaddr *address,
+void update_address_state(struct address_state *state, union kr_sockaddr *address,
 			  size_t address_len, struct kr_query *qry)
 {
 	check_tls_capable(state, qry->request, &address->ip);
@@ -751,7 +751,7 @@ int kr_forward_add_target(struct kr_request *req, const struct sockaddr *sock)
 		return kr_error(EINVAL);
 	}
 
-	union inaddr address;
+	union kr_sockaddr address;
 
 	switch (sock->sa_family) {
 	case AF_INET:

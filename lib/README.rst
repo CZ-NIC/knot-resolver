@@ -152,6 +152,7 @@ Elementary types and constants
 * DNS classes are in ``kres.class`` table, e.g. ``kres.class.IN`` for Internet class.
 * DNS types are in  ``kres.type`` table, e.g. ``kres.type.AAAA`` for AAAA type.
 * DNS rcodes types are in ``kres.rcode`` table, e.g. ``kres.rcode.NOERROR``.
+* Extended DNS error codes are in  ``kres.extended_error`` table, e.g. ``kres.extended_error.BLOCKED``.
 * Packet sections (QUESTION, ANSWER, AUTHORITY, ADDITIONAL) are in the ``kres.section`` table.
 
 Working with domain names

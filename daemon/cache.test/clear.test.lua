@@ -47,8 +47,8 @@ env.KRESD_NO_LISTEN = true
 
 
 local function import_zone()
-	local import_res = cache.zone_import('testroot.zone')
-	assert(import_res.code == 0)
+	local import_res = require('ffi').C.zi_zone_import({ zone_file = 'testroot.zone' })
+	assert(import_res == 0)
 	-- beware that import takes at least 100 ms
 	worker.sleep(0.2)  -- zimport is delayed by 100 ms from function call
 	-- sanity checks - cache must be filled in
@@ -189,22 +189,23 @@ end
 local function test_cache_used(lower, upper)
 	return function()
 		local usage = cache.stats().usage_percent
-		ok(usage >= lower and usage <= upper, string.format('cache percentage usage is between <%d, %d>', lower, upper))
+		ok(usage >= lower and usage <= upper,
+		   string.format('cache percentage usage %.1f is between <%d, %d>', usage, lower, upper))
 	end
 end
 
 return {
 	test_cache_used(0, 1),
 	import_zone,
-	test_cache_used(11, 12),
+	test_cache_used(9, 10),
 	test_exact_match_qtype,
 	test_exact_match_qname,
 	test_callback,
 	import_zone,
 	test_subtree,
-	test_cache_used(10, 11),
+	test_cache_used(9, 10),
 	test_subtree_limit,
-	test_cache_used(5, 6),
+	test_cache_used(5, 7),
 	test_apex,
 	import_zone,
 	test_root,

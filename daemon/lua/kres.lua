@@ -5,6 +5,7 @@
 
 local kres -- the module
 
+local kluautil = require('kluautil')
 local ffi = require('ffi')
 local bit = require('bit')
 local bor = bit.bor
@@ -203,6 +204,34 @@ local const_rank = {
 	AUTH = 16,
 	SECURE = 32
 }
+local const_extended_error = {
+	NONE = -1,
+	OTHER = 0,
+	DNSKEY_ALG = 1,
+	DS_DIGEST = 2,
+	STALE = 3,
+	FORGED = 4,
+	INDETERMINATE = 5,
+	BOGUS = 6,
+	SIG_EXPIRED = 7,
+	SIG_NOTYET = 8,
+	DNSKEY_MISS = 9,
+	RRSIG_MISS = 10,
+	DNSKEY_BIT = 11,
+	NSEC_MISS = 12,
+	CACHED_ERR = 13,
+	NOT_READY = 14,
+	BLOCKED = 15,
+	CENSORED = 16,
+	FILTERED = 17,
+	PROHIBITED = 18,
+	STALE_NXD = 19,
+	NOTAUTH = 20,
+	NOTSUP = 21,
+	NREACH_AUTH = 22,
+	NETWORK = 23,
+	INV_DATA = 24,
+}
 
 -- Constant tables
 local const_class_str = itable(const_class)
@@ -211,6 +240,7 @@ local const_rcode_str = itable(const_rcode)
 local const_opcode_str = itable(const_opcode)
 local const_section_str = itable(const_section)
 local const_rank_str = itable(const_rank)
+local const_extended_error_str = itable(const_extended_error)
 
 -- Metatype for RR types to allow anonymous types
 setmetatable(const_type, {
@@ -832,6 +862,11 @@ ffi.metatype( kr_request_t, {
 			end
 			return table.concat(buf, '')
 		end,
+		set_extended_error = function(req, code, msg)
+			assert(ffi.istype(kr_request_t, req))
+			msg = kluautil.kr_string2c(msg, req.pool)
+			ffi.C.kr_request_set_extended_error(req, code, msg)
+		end,
 
 		-- chain new callbacks after the old ones
 		-- creates new wrapper functions as necessary
@@ -1026,6 +1061,7 @@ kres = {
 	rcode = const_rcode,
 	opcode = const_opcode,
 	rank = const_rank,
+	extended_error = const_extended_error,
 
 	-- Constants to strings
 	tostring = {
@@ -1035,6 +1071,7 @@ kres = {
 		rcode = const_rcode_str,
 		opcode = const_opcode_str,
 		rank = const_rank_str,
+		extended_eror = const_extended_error_str,
 	},
 
 	-- Create a struct kr_qflags from a single flag name or a list of names.

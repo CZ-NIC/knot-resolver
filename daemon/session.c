@@ -28,8 +28,8 @@
  */
 struct session {
 	struct session_flags sflags;  /**< miscellaneous flags. */
-	union inaddr peer;            /**< address of peer; not for UDP clients (downstream) */
-	union inaddr sockname;        /**< our local address; for UDP it may be a wildcard */
+	union kr_sockaddr peer;       /**< address of peer; not for UDP clients (downstream) */
+	union kr_sockaddr sockname;   /**< our local address; for UDP it may be a wildcard */
 	uv_handle_t *handle;          /**< libuv handle for IO operations. */
 	uv_timer_t timeout;           /**< libuv handle for timer. */
 
@@ -458,6 +458,9 @@ int session_tasklist_finalize_expired(struct session *session)
 		trie_val_t *v = trie_it_val(it);
 		struct qr_task *task = (struct qr_task *)*v;
 		if ((now - worker_task_creation_time(task)) >= KR_RESOLVE_TIME_LIMIT) {
+			struct kr_request *req = worker_task_request(task);
+			if (!kr_fails_assert(req))
+				kr_query_inform_timeout(req, req->current_query);
 			queue_push(q, task);
 			worker_task_ref(task);
 		}

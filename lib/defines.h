@@ -8,6 +8,7 @@
 #include <libknot/errcode.h>
 #include <libknot/dname.h>
 #include <libknot/rrset.h>
+#include <libknot/version.h>
 
 /* Function attributes */
 #if __GNUC__ >= 4
@@ -69,6 +70,11 @@ static inline int KR_COLD kr_error(int x) {
 
 #define KR_DNAME_STR_MAXLEN (KNOT_DNAME_TXT_MAXLEN + 1)
 #define KR_RRTYPE_STR_MAXLEN (16 + 1)
+
+/* Compatibility with libknot<3.1.0 */
+#if KNOT_VERSION_HEX < 0x030100
+#define KNOT_EDNS_EDE_NONE (-1)
+#endif
 
 /*
  * Address sanitizer hints.
