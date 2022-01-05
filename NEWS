@@ -13,6 +13,14 @@ Incompatible changes
 - libknot >= 3.0.2 is required
 
 
+Knot Resolver 5.4.4 (2022-01-05)
+================================
+
+Bugfixes
+--------
+- fix bad zone cut update in certain cases (e.g. AWS; !1237)
+
+
 Knot Resolver 5.4.3 (2021-12-01)
 ================================
 
