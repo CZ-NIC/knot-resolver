@@ -74,15 +74,6 @@ def get_attr_type(obj: Any, attr_name: str) -> Any:
     return annot[attr_name]
 
 
-class _LiteralEnum:
-    def __getitem__(self, args: Tuple[Union[str, int, bytes], ...]) -> Any:
-        lits = tuple(Literal[x] for x in args)
-        return Union[lits]  # type: ignore
-
-
-LiteralEnum = _LiteralEnum()
-
-
 T = TypeVar("T")
 
 

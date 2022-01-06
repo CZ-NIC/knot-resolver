@@ -5,15 +5,16 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Dict, Optional, Pattern, Type, Union
 
+from typing_extensions import Literal
+
 from knot_resolver_manager.exceptions import SchemaException
 from knot_resolver_manager.utils import CustomValueType, SchemaNode
 from knot_resolver_manager.utils.modelling import Serializable
-from knot_resolver_manager.utils.types import LiteralEnum
 
 logger = logging.getLogger(__name__)
 
 # Policy actions
-ActionEnum = LiteralEnum[
+ActionEnum = Literal[
     # Nonchain actions
     "pass",
     "deny",
@@ -31,7 +32,7 @@ ActionEnum = LiteralEnum[
 ]
 
 # FLAGS from https://knot-resolver.readthedocs.io/en/stable/lib.html?highlight=options#c.kr_qflags
-FlagsEnum = LiteralEnum[
+FlagsEnum = Literal[
     "no-minimize",
     "no-ipv4",
     "no-ipv6",
@@ -71,7 +72,7 @@ FlagsEnum = LiteralEnum[
 ]
 
 # DNS record types from 'kres.type' table
-RecordTypeEnum = LiteralEnum[
+RecordTypeEnum = Literal[
     "A",
     "A6",
     "AAAA",

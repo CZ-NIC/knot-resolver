@@ -1,18 +1,26 @@
 """
-This is a compat module that we will use with dataclasses
-due to them being unsupported on Python 3.6. However, a proper backport exists.
-This module is simply a reimport of that backported library (or the system one),
-so that if we have to vendor that library or do something similar with it, we have
-the option to do it transparently, without changing anything else.
+This module contains rather simplistic reimplementation of dataclasses due to them being unsupported on Python 3.6
 """
 
 
 from typing import Any, Dict, Set, Type
 
+dataclasses_import_success = False
+try:
+    import dataclasses
+
+    dataclasses_import_success = True
+except ImportError:
+    pass
+
+
 _CUSTOM_DATACLASS_MARKER = "_CUSTOM_DATACLASS_MARKER"
 
 
 def dataclass(cls: Any):
+    if dataclasses_import_success:
+        return dataclasses.dataclass(cls)
+
     anot: Dict[str, Type[Any]] = cls.__dict__.get("__annotations__", {})
 
     def ninit(slf: Any, *args: Any, **kwargs: Any) -> None:
@@ -51,8 +59,11 @@ def dataclass(cls: Any):
     return cls
 
 
-def is_dataclass(cls: Any) -> bool:
-    return hasattr(cls, _CUSTOM_DATACLASS_MARKER)
+def is_dataclass(obj: Any) -> bool:
+    if dataclasses_import_success:
+        return dataclasses.is_dataclass(obj)
+
+    return hasattr(obj, _CUSTOM_DATACLASS_MARKER)
 
 
 __all__ = ["dataclass", "is_dataclass"]

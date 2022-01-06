@@ -8,7 +8,6 @@ from typing_extensions import Literal
 from knot_resolver_manager.datamodel.types import CheckedPath, DomainName, Listen, RecordTypeEnum, UncheckedPath
 from knot_resolver_manager.exceptions import DataException
 from knot_resolver_manager.utils import SchemaNode
-from knot_resolver_manager.utils.types import LiteralEnum
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +30,7 @@ def _cpu_count() -> int:
         return cpus
 
 
-BackendEnum = LiteralEnum["auto", "systemd", "supervisord"]
+BackendEnum = Literal["auto", "systemd", "supervisord"]
 
 
 class WatchDogSchema(SchemaNode):

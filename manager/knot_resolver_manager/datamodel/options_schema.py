@@ -3,11 +3,10 @@ from typing import Any, Union
 from typing_extensions import Literal
 
 from knot_resolver_manager.utils import SchemaNode
-from knot_resolver_manager.utils.types import LiteralEnum
 
 from .types import TimeUnit
 
-GlueCheckingEnum = LiteralEnum["normal", "strict", "permissive"]
+GlueCheckingEnum = Literal["normal", "strict", "permissive"]
 
 
 class PredictionSchema(SchemaNode):

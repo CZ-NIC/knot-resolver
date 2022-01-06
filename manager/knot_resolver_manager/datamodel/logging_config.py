@@ -1,11 +1,12 @@
 from typing import List, Optional
 
-from knot_resolver_manager.utils import SchemaNode
-from knot_resolver_manager.utils.types import LiteralEnum
+from typing_extensions import Literal, TypeAlias
 
-LogLevelEnum = LiteralEnum["crit", "err", "warning", "notice", "info", "debug"]
-LogTargetEnum = LiteralEnum["syslog", "stderr", "stdout"]
-LogGroupsEnum = LiteralEnum[
+from knot_resolver_manager.utils import SchemaNode
+
+LogLevelEnum = Literal["crit", "err", "warning", "notice", "info", "debug"]
+LogTargetEnum = Literal["syslog", "stderr", "stdout"]
+LogGroupsEnum: TypeAlias = Literal[
     "manager",
     "system",
     "cache",
