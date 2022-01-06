@@ -92,7 +92,7 @@ async def _write_config_file(config: KresConfig, instances: Set["SupervisordSubp
         config=SupervisordConfig(
             unix_http_server=supervisord_sock_file(config),
             pid_file=supervisord_pid_file(config),
-            workdir=str(config.server.management.rundir.to_path().absolute()),
+            workdir=str(config.server.rundir.to_path().absolute()),
             logfile=supervisord_log_file(config),
         ),
     )
