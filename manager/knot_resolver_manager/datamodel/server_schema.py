@@ -41,25 +41,13 @@ class WatchDogSchema(SchemaNode):
 
 class ManagementSchema(SchemaNode):
     """
-    Configuration of the Manager itself.
+    Management API configuration.
 
     ---
     listen: Specifies where does the manager listen with its API. Can't be changed in runtime!
-    backend: Forces manager to use a specific service manager. Defaults to autodetection.
-    rundir: Directory where the manager can create files and which will be manager's cwd
-    watchdog: Systemd watchdog configuration. Can only be used with systemd backend.
     """
 
-    # the default listen path here MUST use the default rundir
     listen: Listen = Listen({"unix-socket": "./manager.sock"})
-    backend: BackendEnum = "auto"
-    rundir: UncheckedPath = UncheckedPath(".")
-    backend: BackendEnum = "auto"
-    watchdog: Union[Literal[False], WatchDogSchema] = False
-
-    def _validate(self) -> None:
-        if self.watchdog and self.backend not in ["auto", "systemd"]:
-            raise ValueError("'watchdog' can only be configured for 'systemd' backend")
 
 
 class WebmgmtSchema(SchemaNode):
@@ -70,12 +58,31 @@ class WebmgmtSchema(SchemaNode):
 
 
 class ServerSchema(SchemaNode):
+    """
+    DNS resolver server control and management configuration.
+
+    ---
+    hostname: Internal Knot Resolver hostname. Default is hostname of machine.
+    groupid: Additional identifier in case more managers are running on single machine.
+    nsid: Name Server Identifier (RFC 5001) which allows DNS clients to request resolver to send back its NSID along with the reply to a DNS request.
+    workers: The number of running 'Knot Resolver daemon' (kresd) workers. Based on number of CPUs if set to 'auto'.
+    use-cache-gc: Use cache garbage collector (kres-cache-gc) automatically.
+    backend: Forces manager to use a specific service manager. Defaults to autodetection.
+    watchdog: Systemd watchdog configuration. Can only be used with 'systemd' backend.
+    rundir: Directory where the manager can create files and which will be manager's cwd
+    management: Management API configuration.
+    webmgmt: Legacy built-in web management API configuration.
+    """
+
     class Raw(SchemaNode):
         hostname: Optional[str] = None
         groupid: Optional[str] = None
         nsid: Optional[str] = None
         workers: Union[Literal["auto"], int] = 1
         use_cache_gc: bool = True
+        backend: BackendEnum = "auto"
+        watchdog: Union[Literal[False], WatchDogSchema] = False
+        rundir: UncheckedPath = UncheckedPath(".")
         management: ManagementSchema = ManagementSchema()
         webmgmt: Optional[WebmgmtSchema] = None
 
@@ -86,6 +93,9 @@ class ServerSchema(SchemaNode):
     nsid: Optional[str]
     workers: int
     use_cache_gc: bool
+    backend: BackendEnum = "auto"
+    watchdog: Union[Literal[False], WatchDogSchema]
+    rundir: UncheckedPath = UncheckedPath(".")
     management: ManagementSchema
     webmgmt: Optional[WebmgmtSchema]
 
@@ -102,3 +112,5 @@ class ServerSchema(SchemaNode):
     def _validate(self) -> None:
         if self.workers < 0:
             raise ValueError("Number of workers must be non-negative")
+        if self.watchdog and self.backend not in ["auto", "systemd"]:
+            raise ValueError("'watchdog' can only be configured for 'systemd' backend")

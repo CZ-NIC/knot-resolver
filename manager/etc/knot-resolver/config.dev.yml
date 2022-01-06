@@ -11,8 +11,8 @@ network:
         port: 5353
 server:
   workers: 1
+  rundir: etc/knot-resolver/runtime
   management:
     listen:
       ip: 127.0.0.1
       port: 5000
-    rundir: etc/knot-resolver/runtime
