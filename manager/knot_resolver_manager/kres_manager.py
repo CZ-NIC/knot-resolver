@@ -53,6 +53,7 @@ class KresManager:
         self._watchdog_task = create_task(self._watchdog())
         await self._load_system_state()
 
+        # registering the function calls them immediately, therefore after this, the config is applied
         await config_store.register_verifier(self.validate_config)
         await config_store.register_on_change_callback(self.apply_config)
 
