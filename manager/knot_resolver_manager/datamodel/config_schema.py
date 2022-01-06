@@ -1,6 +1,6 @@
 import os
 import sys
-from typing import Dict, Optional, Text, Union
+from typing import Dict, Optional, Union
 
 from jinja2 import Environment, FileSystemLoader, Template
 from typing_extensions import Literal
@@ -116,5 +116,5 @@ class KresConfig(SchemaNode):
             return Dns64Schema()
         return obj.dns64
 
-    def render_lua(self) -> Text:
-        return _MAIN_TEMPLATE.render(cfg=self)
+    def render_lua(self) -> str:
+        return _MAIN_TEMPLATE.render(cfg=self)  # pyright: reportUnknownMemberType=false

@@ -77,7 +77,7 @@ async def _write_config_file(config: KresConfig, instances: Set["SupervisordSubp
     template = await read_resource(__package__, "supervisord.conf.j2")
     assert template is not None
     template = template.decode("utf8")
-    config_string = Template(template).render(
+    config_string = Template(template).render(  # pyright: reportUnknownMemberType=false
         instances=[
             _Instance(
                 type=i.type.name,

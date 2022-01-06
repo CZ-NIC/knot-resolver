@@ -1,5 +1,7 @@
 from typing import List, Optional
 
+from typing_extensions import Literal
+
 from knot_resolver_manager.datamodel.types import (
     CheckedPath,
     IPAddress,
@@ -10,9 +12,8 @@ from knot_resolver_manager.datamodel.types import (
     SizeUnit,
 )
 from knot_resolver_manager.utils import SchemaNode
-from knot_resolver_manager.utils.types import LiteralEnum
 
-KindEnum = LiteralEnum["dns", "xdp", "dot", "doh"]
+KindEnum = Literal["dns", "xdp", "dot", "doh"]
 
 
 class InterfaceSchema(SchemaNode):

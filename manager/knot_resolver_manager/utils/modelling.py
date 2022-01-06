@@ -1,3 +1,4 @@
+import enum
 import inspect
 from typing import Any, Dict, List, Optional, Set, Tuple, Type, Union, cast
 
@@ -28,7 +29,7 @@ def is_obj_type(obj: Any, types: Union[type, Tuple[Any, ...], Tuple[type, ...]])
     # To check specific type we are using 'type()' instead of 'isinstance()'
     # because for example 'bool' is instance of 'int', 'isinstance(False, int)' returns True.
     # pylint: disable=unidiomatic-typecheck
-    if isinstance(types, Tuple):
+    if isinstance(types, tuple):
         return type(obj) in types
     return type(obj) == types
 
@@ -66,7 +67,7 @@ class Serializable:
 
         elif inspect.isclass(typ) and issubclass(typ, SchemaNode):
             node = cast(SchemaNode, obj)
-            return node.serialize()
+            return node.to_dict()
 
         elif is_list(typ):
             lst = cast(List[Any], obj)
@@ -159,16 +160,12 @@ def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
         return {"type": "string"}
 
     elif is_literal(typ):
-        val = get_generic_type_argument(typ)
-        return {"type": {str: "string", int: "integer", bool: "boolean"}[type(val)], "const": val}
+        val = get_generic_type_arguments(typ)
+        return {"enum": val}
 
     elif is_union(typ):
         variants = get_generic_type_arguments(typ)
-        # simplification for Union of Literals
-        if all_matches(is_literal, variants):
-            return {"enum": [get_generic_type_argument(literal) for literal in variants]}
-        else:
-            return {"anyOf": [_describe_type(v) for v in variants]}
+        return {"anyOf": [_describe_type(v) for v in variants]}
 
     elif is_list(typ):
         return {"type": "array", "items": _describe_type(get_generic_type_argument(typ))}
@@ -185,7 +182,7 @@ def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
 
         return {"type": "object", "additionalProperties": _describe_type(val)}
 
-    elif is_enum(typ):
+    elif inspect.isclass(typ) and issubclass(typ, enum.Enum):  # same as our is_enum(typ), but inlined for type checker
         return {"type": "string", "enum": [str(v) for v in typ]}
 
     raise NotImplementedError(f"Trying to get JSON schema for type '{typ}', which is not implemented")
@@ -268,8 +265,8 @@ def _validated_object_type(
 
     # Literal[T]
     elif is_literal(cls):
-        expected = get_generic_type_argument(cls)
-        if obj == expected:
+        expected = get_generic_type_arguments(cls)
+        if obj in expected:
             return obj
         else:
             raise SchemaException(f"Literal {cls} is not matched with the value {obj}", object_path)
@@ -354,7 +351,7 @@ def _create_untouchable(name: str):
     return _Untouchable()
 
 
-class SchemaNode:
+class SchemaNode(Serializable):
     """
     Class for modelling configuration schema. It somewhat resembles standard dataclasses with additional
     functionality:
@@ -577,7 +574,7 @@ class SchemaNode:
 
         return schema
 
-    def serialize(self) -> Dict[Any, Any]:
+    def to_dict(self) -> Dict[Any, Any]:
         res: Dict[Any, Any] = {}
         cls = self.__class__
         annot = cls.__dict__.get("__annotations__", {})

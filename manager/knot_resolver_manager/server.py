@@ -238,14 +238,7 @@ class Server:
         await self.runner.cleanup()
 
 
-class _DefaultSentinel:
-    pass
-
-
-_DEFAULT_SENTINEL = _DefaultSentinel()
-
-
-async def _load_raw_config(config: Union[Path, ParsedTree, _DefaultSentinel]) -> ParsedTree:
+async def _load_raw_config(config: Union[Path, ParsedTree]) -> ParsedTree:
     # Initial configuration of the manager
     if isinstance(config, Path):
         if not config.exists():
