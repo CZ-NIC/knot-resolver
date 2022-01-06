@@ -259,8 +259,8 @@ async def _init_manager(config_store: ConfigStore) -> KresManager:
     """
     # if configured, create a subprocess controller manually
     controller: Optional[SubprocessController] = None
-    if config_store.get().server.management.backend != "auto":
-        controller = await get_controller_by_name(config_store.get(), config_store.get().server.management.backend)
+    if config_store.get().server.backend != "auto":
+        controller = await get_controller_by_name(config_store.get(), config_store.get().server.backend)
 
     # Create KresManager. This will perform autodetection of available service managers and
     # select the most appropriate to use (or use the one configured directly)
@@ -271,7 +271,7 @@ async def _init_manager(config_store: ConfigStore) -> KresManager:
 
 
 async def _deny_working_directory_changes(config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
-    if config_old.server.management.rundir != config_new.server.management.rundir:
+    if config_old.server.rundir != config_new.server.rundir:
         return Result.err("Changing manager's `rundir` during runtime is not allowed.")
 
     return Result.ok(None)
@@ -280,10 +280,10 @@ async def _deny_working_directory_changes(config_old: KresConfig, config_new: Kr
 def _set_working_directory(config_raw: ParsedTree):
     config = KresConfig(config_raw)
 
-    if not config.server.management.rundir.to_path().exists():
-        raise KresdManagerException(f"`rundir` directory ({config.server.management.rundir}) does not exist!")
+    if not config.server.rundir.to_path().exists():
+        raise KresdManagerException(f"`rundir` directory ({config.server.rundir}) does not exist!")
 
-    os.chdir(config.server.management.rundir.to_path())
+    os.chdir(config.server.rundir.to_path())
 
 
 async def start_server(config: Union[Path, ParsedTree, _DefaultSentinel] = _DEFAULT_SENTINEL):

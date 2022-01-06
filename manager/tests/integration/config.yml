@@ -5,11 +5,11 @@ network:
         port: 5353
 server:
   workers: 1
+  rundir: tests/integration/run
   management:
     listen:
       ip: 127.0.0.1
       port: 5001
-    rundir: tests/integration/run
 cache:
   storage: cache
 logging:
