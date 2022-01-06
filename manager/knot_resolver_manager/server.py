@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import signal
 import sys
 from http import HTTPStatus
 from pathlib import Path
@@ -14,6 +15,7 @@ from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 
 from knot_resolver_manager import log
+from knot_resolver_manager.compat import asyncio as asyncio_compat
 from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE
 from knot_resolver_manager.datamodel.config_schema import KresConfig
@@ -59,7 +61,7 @@ class Server:
     # This is top-level class containing pretty much everything. Instead of global
     # variables, we use instance attributes. That's why there are so many and it's
     # ok.
-    def __init__(self, store: ConfigStore):
+    def __init__(self, store: ConfigStore, config_path: Optional[Path]):
         # config store & server dynamic reconfiguration
         self.config_store = store
 
@@ -69,6 +71,7 @@ class Server:
         self.listen: Optional[Listen] = None
         self.site: Union[NoneType, TCPSite, UnixSite] = None
         self.listen_lock = asyncio.Lock()
+        self._config_path: Optional[Path] = config_path
 
         self.shutdown_event = asyncio.Event()
 
@@ -86,8 +89,27 @@ class Server:
 
         return Result.ok(None)
 
+    async def sigint_handler(self):
+        logger.info("Received SIGINT, triggering graceful shutdown")
+        self.shutdown_event.set()
+
+    async def sighup_handler(self) -> None:
+        logger.info("Received SIGHUP, reloading configuration file")
+        if self._config_path is None:
+            logger.warning("The manager was started with inlined configuration - can't reload")
+        else:
+            data = await readfile(self._config_path)
+            config = KresConfig(parse_yaml(data))
+
+            try:
+                await self.config_store.update(config)
+            except KresdManagerException as e:
+                logger.error(f"Reloading of the configuration file failed. {e}")
+
     async def start(self):
         self._setup_routes()
+        asyncio_compat.add_async_signal_handler(signal.SIGINT, self.sigint_handler)
+        asyncio_compat.add_async_signal_handler(signal.SIGHUP, self.sighup_handler)
         await self.runner.setup()
         await self.config_store.register_verifier(self._deny_listen_address_changes)
         await self.config_store.register_on_change_callback(self._reconfigure)
@@ -225,9 +247,6 @@ _DEFAULT_SENTINEL = _DefaultSentinel()
 
 async def _load_raw_config(config: Union[Path, ParsedTree, _DefaultSentinel]) -> ParsedTree:
     # Initial configuration of the manager
-    if isinstance(config, _DefaultSentinel):
-        # use default
-        config = DEFAULT_MANAGER_CONFIG_FILE
     if isinstance(config, Path):
         if not config.exists():
             raise KresdManagerException(
@@ -286,12 +305,20 @@ def _set_working_directory(config_raw: ParsedTree):
     os.chdir(config.server.rundir.to_path())
 
 
-async def start_server(config: Union[Path, ParsedTree, _DefaultSentinel] = _DEFAULT_SENTINEL):
+async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_FILE):
     start_time = time()
+    manager: Optional[KresManager] = None
+
+    # Block signals during initialization to force their processing once everything is ready
+    signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT, signal.SIGHUP})
 
     # before starting server, initialize the subprocess controller, config store, etc. Any errors during inicialization
     # are fatal
     try:
+        # Make sure that the config path does not change meaning when we change working directory
+        if isinstance(config, Path):
+            config = config.absolute()
+
         # Preprocess config - load from file or in general take it to the last step before validation.
         config_raw = await _load_raw_config(config)
 
@@ -326,9 +353,12 @@ async def start_server(config: Union[Path, ParsedTree, _DefaultSentinel] = _DEFA
 
     # At this point, all backend functionality-providing components are initialized. It's therefore save to start
     # the API server.
-    server = Server(config_store)
+    server = Server(config_store, config if isinstance(config, Path) else None)
     await server.start()
     logger.info(f"Manager fully initialized and running in {round(time() - start_time, 3)} seconds")
+
+    # Now we are ready to process all signals
+    signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGINT, signal.SIGHUP})
 
     await server.wait_for_shutdown()
 

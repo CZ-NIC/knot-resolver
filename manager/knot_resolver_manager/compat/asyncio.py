@@ -83,3 +83,8 @@ def run(coro: Coroutine[Any, T, NoneType], debug: Optional[bool] = None) -> Awai
     return loop.run_until_complete(coro)
     # asyncio.run would cancel all running tasks, but it would use internal API for that
     # so let's ignore it and let the tasks die
+
+
+def add_async_signal_handler(signal: int, callback: Callable[[], Awaitable[None]]):
+    loop = asyncio.get_event_loop()
+    loop.add_signal_handler(signal, lambda: create_task(callback()))
