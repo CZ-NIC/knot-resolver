@@ -65,7 +65,7 @@ class ServerSchema(SchemaNode):
     groupid: Additional identifier in case more managers are running on single machine.
     nsid: Name Server Identifier (RFC 5001) which allows DNS clients to request resolver to send back its NSID along with the reply to a DNS request.
     workers: The number of running 'Knot Resolver daemon' (kresd) workers. Based on number of CPUs if set to 'auto'.
-    use-cache-gc: Use cache garbage collector (kres-cache-gc) automatically.
+    use_cache_gc: Use cache garbage collector (kres-cache-gc) automatically.
     backend: Forces manager to use a specific service manager. Defaults to autodetection.
     watchdog: Systemd watchdog configuration. Can only be used with 'systemd' backend.
     rundir: Directory where the manager can create files and which will be manager's cwd
