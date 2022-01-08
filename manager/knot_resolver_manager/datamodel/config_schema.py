@@ -69,7 +69,7 @@ class KresConfig(SchemaNode):
     cache: DNS resolver cache configuration.
     dnssec: DNSSEC disabling/enabling and configuration.
     dns64: DNS64 disabling/enabling and configuration.
-    logging: Logging configuration.
+    logging: Logging and debugging configuration.
     lua: Custom Lua configuration.
     """
 

@@ -1,10 +1,10 @@
 -- logging.level
 log_level('{{ cfg.logging.level }}')
 
-{% if cfg.logging.target %}
+{% if cfg.logging.target -%}
 -- logging.target
 log_target('{{ cfg.logging.target }}')
-{% endif %}
+{%- endif %}
 
 {% if cfg.logging.groups %}
 -- logging.groups
@@ -16,3 +16,10 @@ log_groups({
 {% endfor %}
 })
 {% endif %}
+
+-- logging.debugging.assertion-abort
+debugging.assertion_abort = {{ 'true' if cfg.logging.debugging.assertion_abort else 'false' }}
+
+-- logging.debugging.assertion-fork
+debugging.assertion_fork = {{ cfg.logging.debugging.assertion_fork.millis() }}
+
