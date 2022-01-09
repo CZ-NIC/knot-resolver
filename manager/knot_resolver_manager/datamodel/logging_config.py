@@ -69,7 +69,7 @@ class LoggingSchema(SchemaNode):
     ---
     level: Logging level for all processes.
     target: Logging stream target for all processes.
-    group: List of groups for which 'debug' logging level is set.
+    groups: List of groups for which 'debug' logging level is set.
     debugging: Advanced debugging parameters for Knot Resolver daemon (kresd).
     """
 
