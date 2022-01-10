@@ -620,7 +620,7 @@ Incompatible changes
   it will be later reworked to reflect development in IEFT dnsop working group
 - version module was permanently removed because it was not really used by users;
   if you want to receive notifications about new releases please subscribe to
-  https://lists.nic.cz/cgi-bin/mailman/listinfo/knot-resolver-announce
+  https://lists.nic.cz/postorius/lists/knot-resolver-announce.lists.nic.cz/
 
 Bugfixes
 --------
