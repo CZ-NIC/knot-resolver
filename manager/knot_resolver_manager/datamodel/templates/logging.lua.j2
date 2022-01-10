@@ -17,9 +17,21 @@ log_groups({
 })
 {% endif %}
 
+{% if cfg.logging.dnstap -%}
+-- logging.dnstap
+modules.load('dnstap')
+dnstap.config({
+    socket_path = '{{ cfg.logging.dnstap.unix_socket }}',
+    client = {
+        log_queries = {{ 'true' if cfg.logging.dnstap.log_queries else 'false' }},
+        log_responses = {{ 'true' if cfg.logging.dnstap.log_responses else 'false' }},
+        log_tcp_rtt = {{ 'true' if cfg.logging.dnstap.log_tcp_rtt else 'false' }}
+    }
+})
+{%- endif %}
+
 -- logging.debugging.assertion-abort
 debugging.assertion_abort = {{ 'true' if cfg.logging.debugging.assertion_abort else 'false' }}
 
 -- logging.debugging.assertion-fork
 debugging.assertion_fork = {{ cfg.logging.debugging.assertion_fork.millis() }}
-
