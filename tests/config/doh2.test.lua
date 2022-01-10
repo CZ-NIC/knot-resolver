@@ -117,6 +117,7 @@ else
 		end
 		-- uncacheable
 		same(headers:get('cache-control'), 'max-age=0', desc .. ': TTL 0')
+		same(headers:get('access-control-allow-origin'), '*', desc .. ': CORS headers')
 		same(pkt:rcode(), kres.rcode.SERVFAIL, desc .. ': rcode matches')
 	end
 
@@ -225,6 +226,7 @@ else
 		end
 		-- HTTP TTL is minimum from all RRs in the answer
 		same(headers:get('cache-control'), 'max-age=300', desc .. ': TTL 900')
+		same(headers:get('access-control-allow-origin'), '*', desc .. ': CORS headers')
 		same(pkt:rcode(), kres.rcode.NOERROR, desc .. ': rcode matches')
 		same(pkt:ancount(), 3, desc .. ': ANSWER is present')
 		same(pkt:nscount(), 1, desc .. ': AUTHORITY is present')
