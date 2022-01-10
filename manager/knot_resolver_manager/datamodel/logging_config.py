@@ -87,12 +87,14 @@ class LoggingSchema(SchemaNode):
     level: Logging level for all processes.
     target: Logging stream target for all processes.
     groups: List of groups for which 'debug' logging level is set.
-    debugging: Advanced debugging parameters for Knot Resolver daemon (kresd).
+    dnssec_bogus: Logging a message for each DNSSEC validation failure.
     dnstap: Logging DNS requests and responses to a unix socket.
+    debugging: Advanced debugging parameters for Knot Resolver daemon (kresd).
     """
 
     level: LogLevelEnum = "notice"
     target: Optional[LogTargetEnum] = None
     groups: Optional[List[LogGroupsEnum]] = None
+    dnssec_bogus: bool = False
     dnstap: Union[Literal[False], DnstapSchema] = False
     debugging: DebuggingSchema = DebuggingSchema()

@@ -17,6 +17,10 @@ log_groups({
 })
 {% endif %}
 
+{% if cfg.logging.dnssec_bogus %}
+modules.load('bogus_log')
+{% endif %}
+
 {% if cfg.logging.dnstap -%}
 -- logging.dnstap
 modules.load('dnstap')
