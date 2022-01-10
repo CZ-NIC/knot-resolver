@@ -695,6 +695,7 @@ static int http_send_response(struct http_ctx *ctx, int32_t stream_id,
 	nghttp2_nv hdrs[] = {
 		MAKE_STATIC_NV(":status", "200"),
 		MAKE_STATIC_NV("content-type", "application/dns-message"),
+		MAKE_STATIC_NV("access-control-allow-origin", "*"),
 		MAKE_NV("content-length", 14, size, size_len),
 		MAKE_NV("cache-control", 13, max_age, max_age_len),
 	};
