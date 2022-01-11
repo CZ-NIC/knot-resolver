@@ -12,6 +12,10 @@ Incompatible changes
 --------------------
 - libknot >= 3.0.2 is required
 
+Bugfixes
+--------
+- doh2: fix CORS by adding `access-control-allow-origin: *` (!1246)
+
 
 Knot Resolver 5.4.4 (2022-01-05)
 ================================
