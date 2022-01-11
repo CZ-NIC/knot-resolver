@@ -40,13 +40,13 @@ class SystemdSubprocess(Subprocess):
     @property
     def systemd_id(self) -> str:
         if self._type is SubprocessType.GC:
-            return "kres-cache-gc.service"
+            return systemd.GC_SERVICE_NAME
         else:
             return f"kresd_{self._id}.service"
 
     @staticmethod
     def is_unit_name_ours(unit_name: str) -> bool:
-        is_ours = unit_name == "kres-cache-gc.service"
+        is_ours = unit_name == systemd.GC_SERVICE_NAME
         is_ours |= unit_name.startswith("kresd_") and unit_name.endswith(".service")
         return is_ours
 
