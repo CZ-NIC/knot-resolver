@@ -3,7 +3,7 @@ from asyncio import Lock
 from typing import Any, Awaitable, Callable, List, Tuple
 
 from knot_resolver_manager.datamodel import KresConfig
-from knot_resolver_manager.exceptions import DataException, KresdManagerException
+from knot_resolver_manager.exceptions import DataException, KresManagerException
 from knot_resolver_manager.utils.functional import Result
 
 VerifyCallback = Callable[[KresConfig, KresConfig], Awaitable[Result[None, str]]]
@@ -25,7 +25,7 @@ class ConfigStore:
         err_res = filter(lambda r: r.is_err(), results)
         errs = list(map(lambda r: r.unwrap_err(), err_res))
         if len(errs) > 0:
-            raise KresdManagerException("Validation of the new config failed. The reasons are:", *errs)
+            raise KresManagerException("Validation of the new config failed. The reasons are:", *errs)
 
         async with self._update_lock:
             # update the stored config with the new version

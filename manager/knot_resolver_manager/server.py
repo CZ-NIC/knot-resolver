@@ -20,7 +20,7 @@ from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.datamodel.types import Listen, ListenType
-from knot_resolver_manager.exceptions import DataException, KresdManagerException, TreeException
+from knot_resolver_manager.exceptions import DataException, KresManagerException, SchemaException, TreeException
 from knot_resolver_manager.kresd_controller import get_controller_by_name
 from knot_resolver_manager.kresd_controller.interface import SubprocessController
 from knot_resolver_manager.utils.async_utils import readfile
@@ -44,7 +44,7 @@ async def error_handler(request: web.Request, handler: Any):
 
     try:
         return await handler(request)
-    except KresdManagerException as e:
+    except KresManagerException as e:
         if isinstance(e, TreeException):
             return web.Response(
                 text=f"Configuration validation failed @ '{e.where()}': {e}", status=HTTPStatus.BAD_REQUEST
@@ -98,13 +98,23 @@ class Server:
         if self._config_path is None:
             logger.warning("The manager was started with inlined configuration - can't reload")
         else:
-            data = await readfile(self._config_path)
-            config = KresConfig(parse_yaml(data))
-
             try:
+                data = await readfile(self._config_path)
+                config = KresConfig(parse_yaml(data))
                 await self.config_store.update(config)
-            except KresdManagerException as e:
-                logger.error(f"Reloading of the configuration file failed. {e}")
+                logger.info("Configuration file successfully reloaded")
+            except FileNotFoundError:
+                logger.error(
+                    f"Configuration file was not found at '{self._config_path}'."
+                    " Something must have happened to it while we were running."
+                )
+                logger.error("Configuration have NOT been changed.")
+            except SchemaException as e:
+                logger.error(f"Failed to parse the updated configuration file: {e}")
+                logger.error("Configuration have NOT been changed.")
+            except KresManagerException as e:
+                logger.error(f"Reloading of the configuration file failed: {e}")
+                logger.error("Configuration have NOT been changed.")
 
     async def start(self):
         self._setup_routes()
@@ -216,7 +226,7 @@ class Server:
                 nsite = web.TCPSite(self.runner, str(mgn.listen.ip), mgn.listen.port)
                 logger.info(f"Starting API HTTP server on http://{mgn.listen.ip}:{mgn.listen.port}")
             else:
-                raise KresdManagerException(f"Requested API on unsupported configuration format {mgn.listen.typ}")
+                raise KresManagerException(f"Requested API on unsupported configuration format {mgn.listen.typ}")
             await nsite.start()
 
             # stop the old listen
@@ -242,7 +252,7 @@ async def _load_raw_config(config: Union[Path, ParsedTree]) -> ParsedTree:
     # Initial configuration of the manager
     if isinstance(config, Path):
         if not config.exists():
-            raise KresdManagerException(
+            raise KresManagerException(
                 f"Manager is configured to load config file at {config} on startup, but the file does not exist."
             )
         else:
@@ -293,7 +303,7 @@ def _set_working_directory(config_raw: ParsedTree):
     config = KresConfig(config_raw)
 
     if not config.server.rundir.to_path().exists():
-        raise KresdManagerException(f"`rundir` directory ({config.server.rundir}) does not exist!")
+        raise KresManagerException(f"`rundir` directory ({config.server.rundir}) does not exist!")
 
     os.chdir(config.server.rundir.to_path())
 
@@ -337,7 +347,7 @@ async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_
 
         # After we have loaded the configuration, we can start worring about subprocess management.
         manager = await _init_manager(config_store)
-    except KresdManagerException as e:
+    except KresManagerException as e:
         logger.error(e)
         sys.exit(1)
     except BaseException:
