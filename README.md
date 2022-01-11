@@ -68,6 +68,6 @@ See the documentation at [knot-resolver.readthedocs.io][doc] for more options.
 ### Contacting us
 
 - [GitLab issues](https://gitlab.nic.cz/knot/knot-resolver/issues) (you may authenticate via GitHub)
-- [mailing list](https://lists.nic.cz/cgi-bin/mailman/listinfo/knot-resolver-users)
+- [mailing list](https://lists.nic.cz/postorius/lists/knot-resolver-announce.lists.nic.cz/)
 - [![Join the chat at https://gitter.im/CZ-NIC/knot-resolver](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/CZ-NIC/knot-resolver?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 

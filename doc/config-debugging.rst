@@ -6,7 +6,7 @@ Debugging options
 In case the resolver crashes, it is often helpful to collect a coredump from
 the crashed process. Configuring the system to collect coredump from crashed
 process is out of the scope of this documentation, but some tips can be found
-`here <https://lists.nic.cz/pipermail/knot-resolver-users/2019/000239.html>`_.
+`here <https://lists.nic.cz/hyperkitty/list/knot-resolver-users@lists.nic.cz/message/GUHW4JSDXZ6SZUAYYQ3U2WWOZEIVVF2S/>`_.
 
 Kresd uses its own mechanism for assertions. They are checks that should always
 pass and indicate some weird or unexpected state if they don't. In such cases,
