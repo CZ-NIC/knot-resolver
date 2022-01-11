@@ -8,8 +8,11 @@ nsid.name('{{ cfg.server.nsid }}_' .. worker.id)
 {% endif %}
 
 {% if cfg.server.watchdog -%}
+-- server.watchdog
 modules.load('watchdog')
+{% if cfg.server.watchdog.qname and cfg.server.watchdog.qtype -%}
 watchdog.config({ qname = '{{ cfg.server.watchdog.qname }}', qtype = kres.type.{{ cfg.server.watchdog.qtype }} })
+{%- endif %}
 {% else %}
 modules.unload('watchdog')
 {%- endif %}
