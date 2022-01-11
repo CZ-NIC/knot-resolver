@@ -407,6 +407,20 @@ Actions :func:`policy.FORWARD`, :func:`policy.TLS_FORWARD` and :func:`policy.STU
    `0x20 randomization <https://tools.ietf.org/html/draft-vixie-dnsext-dns0x20-00>`_.
    See example in `Replacing part of the DNS tree`_.
 
+.. warning::
+   Limiting forwarding actions by filters (e.g. :func:`policy.suffix`) may have unexpected consequences.
+   Notably, forwarders can inject *any* records into your cache
+   even if you "restrict" them to an insignificant DNS subtree --
+   except in cases where DNSSEC validation applies, of course.
+
+   The behavior is probably best understood through the fact
+   that filters and actions are completely decoupled.
+   The forwarding actions have no clue about why they were executed,
+   e.g. that the user wanted to restrict the forwarder only to some subtree.
+   The action just selects some set of forwarders to process this whole request from the client,
+   and during that processing it might need some other "sub-queries" (e.g. for validation).
+   Some of those might not've passed the intended filter,
+   but policy rule-set only applies once per client's request.
 
 .. _tls-forwarding:
 
