@@ -5,7 +5,7 @@ import time
 from asyncio import create_subprocess_exec, create_subprocess_shell
 from pathlib import PurePath
 from threading import Thread
-from typing import Generic, List, Optional, TypeVar, Union
+from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
 
 from knot_resolver_manager.compat.asyncio import to_thread
 
@@ -16,7 +16,7 @@ async def call(
     """
     custom async alternative to subprocess.call()
     """
-    kwargs = {}
+    kwargs: Dict[str, Any] = {}
     if discard_output:
         kwargs["stdout"] = asyncio.subprocess.DEVNULL
         kwargs["stderr"] = asyncio.subprocess.DEVNULL

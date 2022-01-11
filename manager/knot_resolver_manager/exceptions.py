@@ -1,14 +1,14 @@
-class KresdManagerException(Exception):
+class KresManagerException(Exception):
     """
     Base class for all custom exceptions we use in our code
     """
 
 
-class SubprocessControllerException(KresdManagerException):
+class SubprocessControllerException(KresManagerException):
     pass
 
 
-class TreeException(KresdManagerException):
+class TreeException(KresManagerException):
     def __init__(self, msg: str, tree_path: str) -> None:
         super().__init__(msg)
         self._tree_path = tree_path
@@ -24,9 +24,9 @@ class SchemaException(TreeException):
     pass
 
 
-class DataException(KresdManagerException):
+class DataException(KresManagerException):
     pass
 
 
-class ParsingException(KresdManagerException):
+class ParsingException(KresManagerException):
     pass
