@@ -2,8 +2,12 @@ import ipaddress
 import sys
 
 import click
+from click.exceptions import ClickException
 
 from knot_resolver_manager.client import KnotManagerClient
+from knot_resolver_manager.datamodel.config_schema import KresConfig
+from knot_resolver_manager.exceptions import KresManagerException
+from knot_resolver_manager.utils.parsing import parse_yaml
 
 BASE_URL = "base_url"
 
@@ -28,6 +32,22 @@ def main(ctx: click.Context, base_url: str):
 def stop(ctx: click.Context):
     client = KnotManagerClient(ctx.obj[BASE_URL])
     client.stop()
+
+
+@main.command("gen-lua", help="Generate LUA config from a given declarative config")
+@click.argument("config_path", type=str, nargs=1)
+def gen_lua(config_path: str):
+    try:
+        with open(config_path, "r", encoding="utf8") as f:
+            data = f.read()
+        parsed = parse_yaml(data)
+        config = KresConfig(parsed)
+        lua = config.render_lua()
+        click.echo_via_pager(lua)
+    except KresManagerException as e:
+        ne = ClickException(str(e))
+        ne.exit_code = 1
+        raise ne
 
 
 @main.command(help="Set number of workers")
