@@ -80,7 +80,7 @@ class ServerSchema(SchemaNode):
         workers: Union[Literal["auto"], int] = 1
         use_cache_gc: bool = True
         backend: BackendEnum = "auto"
-        watchdog: Union[Literal[False], WatchDogSchema] = False
+        watchdog: Union[bool, WatchDogSchema] = True
         rundir: UncheckedPath = UncheckedPath(".")
         management: ManagementSchema = ManagementSchema()
         webmgmt: Optional[WebmgmtSchema] = None
@@ -93,7 +93,7 @@ class ServerSchema(SchemaNode):
     workers: int
     use_cache_gc: bool
     backend: BackendEnum = "auto"
-    watchdog: Union[Literal[False], WatchDogSchema]
+    watchdog: Union[bool, WatchDogSchema]
     rundir: UncheckedPath = UncheckedPath(".")
     management: ManagementSchema
     webmgmt: Optional[WebmgmtSchema]

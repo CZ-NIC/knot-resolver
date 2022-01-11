@@ -149,11 +149,16 @@ def _kresd_unit_properties(config: KresConfig, kres_id: KresID) -> List[Tuple[st
             ),
         ),
         ("TimeoutStopUSec", GLib.Variant("t", 10000000)),
-        ("WatchdogUSec", GLib.Variant("t", 10000000)),
         ("Restart", GLib.Variant("s", "on-abnormal")),
         ("LimitNOFILE", GLib.Variant("t", 524288)),
         ("Environment", GLib.Variant("as", [f"SYSTEMD_INSTANCE={kres_id}"])),
     ]
+
+    if config.server.watchdog:
+        val.append(
+            ("WatchdogUSec", GLib.Variant("t", 10000000)),
+        )
+
     return val
 
 
