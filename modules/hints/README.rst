@@ -32,8 +32,26 @@ Examples
     -- Add a custom hint
     hints['foo.bar'] = '127.0.0.1'
 
-.. note:: The :ref:`policy <mod-policy>` module applies before hints, meaning e.g. that hints for special names (:rfc:`6761#section-6`) like ``localhost`` or ``test`` will get shadowed by policy rules by default.
-    That can be worked around e.g. by explicit :any:`policy.PASS` action.
+.. note::
+   The :ref:`policy <mod-policy>` module applies before hints,
+   so your hints might get surprisingly shadowed by even default policies.
+
+   That most often happens for :rfc:`6761#section-6` names, e.g.
+   ``localhost`` and ``test`` or with ``PTR`` records in private address ranges.
+   To unblock the required names, you may use an explicit :any:`policy.PASS` action.
+
+   .. code-block:: lua
+
+      policy.add(policy.suffix(policy.PASS, {todname('1.168.192.in-addr.arpa')}))
+
+   This ``.PASS`` workaround isn't ideal.  To improve some cases,
+   we recommend to move these ``.PASS`` lines to the end of your rule list.
+   The point is that applying any :ref:`non-chain action <mod-policy-actions>`
+   (e.g. :ref:`forwarding actions <forwarding>` or ``.PASS`` itself)
+   stops processing *any* later policy rules for that request (including the default block-rules).
+   You probably don't want this ``.PASS`` to shadow any other rules you might have;
+   and on the other hand, if any other non-chain rule triggers,
+   additional ``.PASS`` would not change anything even if it were somehow force-executed.
 
 Properties
 ----------
