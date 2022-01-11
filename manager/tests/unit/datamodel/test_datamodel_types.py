@@ -16,29 +16,29 @@ from knot_resolver_manager.datamodel.types import (
     SizeUnit,
     TimeUnit,
 )
-from knot_resolver_manager.exceptions import KresdManagerException
+from knot_resolver_manager.exceptions import KresManagerException
 from knot_resolver_manager.utils import SchemaNode
 
 
 def test_size_unit():
     assert SizeUnit("5368709120B") == SizeUnit("5242880K") == SizeUnit("5120M") == SizeUnit("5G")
 
-    with raises(KresdManagerException):
+    with raises(KresManagerException):
         SizeUnit("-5368709120B")
-    with raises(KresdManagerException):
+    with raises(KresManagerException):
         SizeUnit(-5368709120)
-    with raises(KresdManagerException):
+    with raises(KresManagerException):
         SizeUnit("5120MM")
 
 
 def test_time_unit():
     assert TimeUnit("1d") == TimeUnit("24h") == TimeUnit("1440m") == TimeUnit("86400s")
 
-    with raises(KresdManagerException):
+    with raises(KresManagerException):
         TimeUnit("-1")
-    with raises(KresdManagerException):
+    with raises(KresManagerException):
         TimeUnit(-24)
-    with raises(KresdManagerException):
+    with raises(KresManagerException):
         TimeUnit("1440mm")
 
     assert TimeUnit("10ms").millis() == 10
@@ -75,7 +75,7 @@ def test_domain_name():
     assert str(o.name) == "test.domain.com"
     assert o.name == DomainName("test.domain.com")
 
-    with raises(KresdManagerException):
+    with raises(KresManagerException):
         TestSchema({"name": "b@d.domain.com."})
 
 
@@ -99,15 +99,15 @@ def test_ipaddress_port():
     assert str(o.ip_port) == "2001:db8::1000@53"
     assert o.ip_port == IPAddressPort("2001:db8::1000@53")
 
-    with raises(KresdManagerException):
+    with raises(KresManagerException):
         TestSchema({"ip-port": "123.4.5.6.7"})
-    with raises(KresdManagerException):
+    with raises(KresManagerException):
         TestSchema({"ip-port": "2001:db8::10000"})
-    with raises(KresdManagerException):
+    with raises(KresManagerException):
         TestSchema({"ip-port": "123.4.5.6@"})
-    with raises(KresdManagerException):
+    with raises(KresManagerException):
         TestSchema({"ip-port": "123.4.5.6@-1"})
-    with raises(KresdManagerException):
+    with raises(KresManagerException):
         TestSchema({"ip-port": "123.4.5.6@65536"})
 
 
@@ -123,7 +123,7 @@ def test_ipaddress():
     assert str(o.ip) == "2001:db8::1000"
     assert o.ip == IPv6Address("2001:db8::1000")
 
-    with raises(KresdManagerException):
+    with raises(KresManagerException):
         TestSchema({"ip": "123456"})
 
 
@@ -153,9 +153,9 @@ def test_listen():
     assert o.interface is None
 
     # check failure
-    with raises(KresdManagerException):
+    with raises(KresManagerException):
         Listen({"unix-socket": "/tmp", "ip": "127.0.0.1"})
-    with raises(KresdManagerException):
+    with raises(KresManagerException):
         Listen({"unix-socket": "/tmp", "port": 853})
 
 
@@ -164,7 +164,7 @@ def test_network():
     assert o.to_std().prefixlen == 24
     assert o.to_std() == ipaddress.IPv4Network("10.11.12.0/24")
 
-    with raises(KresdManagerException):
+    with raises(KresManagerException):
         # because only the prefix can have non-zero bits
         IPNetwork("10.11.12.13/8")
 
@@ -172,8 +172,8 @@ def test_network():
 def test_ipv6_96_network():
     _ = IPv6Network96("fe80::/96")
 
-    with raises(KresdManagerException):
+    with raises(KresManagerException):
         IPv6Network96("fe80::/95")
 
-    with raises(KresdManagerException):
+    with raises(KresManagerException):
         IPv6Network96("10.11.12.3/96")
