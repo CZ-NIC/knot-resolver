@@ -160,6 +160,8 @@ class KresManager:
 
         async with self._manager_lock:
             await self._ensure_number_of_children(KresConfig(), 0)
+            if self._gc is not None:
+                await self._stop_gc()
             await self._controller.shutdown_controller()
 
     async def _instability_handler(self) -> None:
