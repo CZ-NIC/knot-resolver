@@ -30,7 +30,7 @@ class KnotManagerClient:
         print(response.text)
 
     def set_static_hints(self, hints: Dict[str, List[Union[ipaddress.IPv4Address, ipaddress.IPv6Address]]]):
-        payload = [{"name": name, "addresses": [str(a) for a in addrs]} for name, addrs in hints.items()]
+        payload = {name: [str(a) for a in addrs] for name, addrs in hints.items()}
         response = requests.post(self._create_url("/config/static-hints/hints"), json=payload)
         print(response.text)
 
