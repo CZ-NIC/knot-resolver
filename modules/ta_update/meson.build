@@ -6,6 +6,8 @@ config_tests += [
 ]
 
 integr_tests += [
+  # NOTE: ta_update may pass in cases when it should fail due to race conditions
+  # To ensure reliability, deckard should introduce a time wait
   ['ta_update', meson.current_source_dir() / 'ta_update.test.integr'],
   ['ta_update.unmanagedkey', meson.current_source_dir() / 'ta_update.unmanagedkey.test.integr'],
 ]
