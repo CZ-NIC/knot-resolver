@@ -594,7 +594,7 @@ class Listen(SchemaNode, Serializable):
     unix_socket: Optional[CheckedPath]
     interface: Optional[str]
 
-    def _typ(self, origin: Raw):
+    def _typ(self, origin: Raw) -> ListenType:
         present = {
             "ip" if origin.ip is not None else ...,
             "port" if origin.port is not None else ...,
@@ -614,7 +614,7 @@ class Listen(SchemaNode, Serializable):
                 "You can use (IP and PORT) or (UNIX_SOCKET) or (INTERFACE and PORT)."
             )
 
-    def _port(self, origin: Raw):
+    def _port(self, origin: Raw) -> Optional[int]:
         if origin.port is None:
             return None
         if not 0 <= origin.port <= 65_535:

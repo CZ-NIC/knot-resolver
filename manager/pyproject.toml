@@ -40,6 +40,7 @@ types-PyYAML = "^6.0.1"
 mypy = "^0.930"
 types-click = "^7.1.8"
 types-Jinja2 = "^2.11.9"
+types-dataclasses = "^0.6.4"
 
 [tool.poe.tasks]
 run = { cmd = "scripts/run", help = "Run the manager" }
@@ -143,3 +144,21 @@ typeCheckingMode = "strict"
 [build-system]
 requires = ["poetry>=0.12"]
 build-backend = "poetry.masonry.api"
+
+
+[tool.mypy]
+python_version = "3.6"
+#strict = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = false
+disallow_untyped_decorators = true
+pretty = true
+show_error_codes = true
+allow_redefinition = true
+disallow_untyped_defs = false
+strict_equality = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+implicit_reexport = false
+no_implicit_optional = true

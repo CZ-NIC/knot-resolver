@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 @middleware
-async def error_handler(request: web.Request, handler: Any):
+async def error_handler(request: web.Request, handler: Any) -> web.Response:
     """
     Generic error handler for route handlers.
 
@@ -75,7 +75,7 @@ class Server:
 
         self.shutdown_event = asyncio.Event()
 
-    async def _reconfigure(self, config: KresConfig):
+    async def _reconfigure(self, config: KresConfig) -> None:
         await self._reconfigure_listen_address(config)
 
     async def _deny_listen_address_changes(self, config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
@@ -89,7 +89,7 @@ class Server:
 
         return Result.ok(None)
 
-    async def sigint_handler(self):
+    async def sigint_handler(self) -> None:
         logger.info("Received SIGINT, triggering graceful shutdown")
         self.shutdown_event.set()
 
@@ -116,7 +116,7 @@ class Server:
                 logger.error(f"Reloading of the configuration file failed: {e}")
                 logger.error("Configuration have NOT been changed.")
 
-    async def start(self):
+    async def start(self) -> None:
         self._setup_routes()
         asyncio_compat.add_async_signal_handler(signal.SIGINT, self.sigint_handler)
         asyncio_compat.add_async_signal_handler(signal.SIGHUP, self.sighup_handler)
@@ -124,7 +124,7 @@ class Server:
         await self.config_store.register_verifier(self._deny_listen_address_changes)
         await self.config_store.register_on_change_callback(self._reconfigure)
 
-    async def wait_for_shutdown(self):
+    async def wait_for_shutdown(self) -> None:
         await self.shutdown_event.wait()
 
     async def _handler_index(self, _request: web.Request) -> web.Response:
@@ -199,7 +199,7 @@ class Server:
         logger.info("Shutdown event triggered...")
         return web.Response(text="Shutting down...")
 
-    def _setup_routes(self):
+    def _setup_routes(self) -> None:
         self.app.add_routes(
             [
                 web.get("/", self._handler_index),
@@ -210,7 +210,7 @@ class Server:
             ]
         )
 
-    async def _reconfigure_listen_address(self, config: KresConfig):
+    async def _reconfigure_listen_address(self, config: KresConfig) -> None:
         async with self.listen_lock:
             mgn = config.server.management
 
@@ -219,6 +219,7 @@ class Server:
                 return
 
             # start the new listen address
+            nsite: Union[web.TCPSite, web.UnixSite]
             if mgn.listen.typ is ListenType.UNIX_SOCKET:
                 nsite = web.UnixSite(self.runner, str(mgn.listen.unix_socket))
                 logger.info(f"Starting API HTTP server on http+unix://{mgn.listen.unix_socket}")
@@ -242,7 +243,7 @@ class Server:
             self.listen = mgn.listen
             self.site = nsite
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
         if self.site is not None:
             await self.site.stop()
         await self.runner.cleanup()
@@ -299,7 +300,7 @@ async def _deny_working_directory_changes(config_old: KresConfig, config_new: Kr
     return Result.ok(None)
 
 
-def _set_working_directory(config_raw: ParsedTree):
+def _set_working_directory(config_raw: ParsedTree) -> None:
     config = KresConfig(config_raw)
 
     if not config.server.rundir.to_path().exists():
@@ -308,7 +309,7 @@ def _set_working_directory(config_raw: ParsedTree):
     os.chdir(config.server.rundir.to_path())
 
 
-async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_FILE):
+async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_FILE) -> None:
     start_time = time()
     manager: Optional[KresManager] = None
 

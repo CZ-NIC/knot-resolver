@@ -17,10 +17,10 @@ class ConfigStore:
         self._callbacks: List[UpdateCallback] = []
         self._update_lock: Lock = Lock()
 
-    async def update(self, config: KresConfig):
+    async def update(self, config: KresConfig) -> None:
         # invoke pre-change verifiers
-        results: Tuple[Result[None, str], ...] = await asyncio.gather(
-            *[ver(self._config, config) for ver in self._verifiers]
+        results: Tuple[Result[None, str], ...] = tuple(
+            await asyncio.gather(*[ver(self._config, config) for ver in self._verifiers])
         )
         err_res = filter(lambda r: r.is_err(), results)
         errs = list(map(lambda r: r.unwrap_err(), err_res))
@@ -35,13 +35,13 @@ class ConfigStore:
             for call in self._callbacks:
                 await call(config)
 
-    async def register_verifier(self, verifier: VerifyCallback):
+    async def register_verifier(self, verifier: VerifyCallback) -> None:
         self._verifiers.append(verifier)
         res = await verifier(self.get(), self.get())
         if res.is_err():
             raise DataException(f"Initial config verification failed with error: {res.unwrap_err()}")
 
-    async def register_on_change_callback(self, callback: UpdateCallback):
+    async def register_on_change_callback(self, callback: UpdateCallback) -> None:
         """
         Registers new callback and immediatelly calls it with current config
         """
@@ -58,7 +58,7 @@ def only_on_real_changes(selector: Callable[[KresConfig], Any]) -> Callable[[Upd
         original_value_set: Any = False
         original_value: Any = None
 
-        async def new_func(config: KresConfig):
+        async def new_func(config: KresConfig) -> None:
             nonlocal original_value_set
             nonlocal original_value
             if not original_value_set:

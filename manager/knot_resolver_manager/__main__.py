@@ -22,7 +22,7 @@ from knot_resolver_manager.server import start_server
     help="Overrides default config location at '" + str(DEFAULT_MANAGER_CONFIG_FILE) + "'",
 )
 @click.option("--list-backends", "-l", type=bool, is_flag=True, default=False)
-def main(config: Optional[str], list_backends: bool):
+def main(config: Optional[str], list_backends: bool) -> None:
     # pylint: disable=expression-not-assigned
 
     """Knot Resolver Manager

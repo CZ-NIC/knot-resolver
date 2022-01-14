@@ -15,7 +15,7 @@ class KresID:
         self._id = n
         self._repr: Optional[str] = None
 
-    def set_custom_str_representation(self, representation: str):
+    def set_custom_str_representation(self, representation: str) -> None:
         self._repr = representation
 
     def __str__(self) -> str:

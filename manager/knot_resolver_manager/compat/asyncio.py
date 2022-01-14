@@ -16,8 +16,6 @@ import sys
 from asyncio.futures import Future
 from typing import Any, Awaitable, Callable, Coroutine, Optional, TypeVar
 
-from knot_resolver_manager.utils.types import NoneType
-
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
@@ -26,7 +24,7 @@ T = TypeVar("T")
 async def to_thread(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
     # version 3.9 and higher, call directly
     if sys.version_info.major >= 3 and sys.version_info.minor >= 9:
-        return await asyncio.to_thread(func, *args, **kwargs)
+        return await asyncio.to_thread(func, *args, **kwargs)  # type: ignore[attr-defined]
 
     # earlier versions, run with default executor
     else:
@@ -51,21 +49,21 @@ async def to_thread(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
         return res
 
 
-def create_task(coro: Coroutine[Any, T, NoneType], name: Optional[str] = None) -> "Future[T]":
+def create_task(coro: Awaitable[T], name: Optional[str] = None) -> "Future[T]":
     # version 3.8 and higher, call directly
     if sys.version_info.major >= 3 and sys.version_info.minor >= 8:
-        return asyncio.create_task(coro, name=name)
+        return asyncio.create_task(coro, name=name)  # type: ignore[attr-defined]
 
     # version 3.7 and higher, call directly without the name argument
     if sys.version_info.major >= 3 and sys.version_info.minor >= 8:
-        return asyncio.create_task(coro)
+        return asyncio.create_task(coro)  # type: ignore[attr-defined]
 
     # earlier versions, use older function
     else:
         return asyncio.ensure_future(coro)
 
 
-def run(coro: Coroutine[Any, T, NoneType], debug: Optional[bool] = None) -> Awaitable[T]:
+def run(coro: Awaitable[T], debug: Optional[bool] = None) -> Awaitable[T]:
     # ideally copy-paste of this:
     # https://github.com/python/cpython/blob/3.9/Lib/asyncio/runners.py#L8
 
@@ -80,11 +78,12 @@ def run(coro: Coroutine[Any, T, NoneType], debug: Optional[bool] = None) -> Awai
     asyncio.set_event_loop(loop)
     if debug is not None:
         loop.set_debug(debug)
-    return loop.run_until_complete(coro)
+    # The following line have a really weird type requirements. I don't understand the reasoning, but it works
+    return loop.run_until_complete(coro)  # type: ignore[arg-type]
     # asyncio.run would cancel all running tasks, but it would use internal API for that
     # so let's ignore it and let the tasks die
 
 
-def add_async_signal_handler(signal: int, callback: Callable[[], Awaitable[None]]):
+def add_async_signal_handler(signal: int, callback: Callable[[], Coroutine[Any, Any, None]]) -> None:
     loop = asyncio.get_event_loop()
     loop.add_signal_handler(signal, lambda: create_task(callback()))

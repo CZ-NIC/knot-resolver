@@ -1,7 +1,6 @@
 from typing import List, Optional
 
-from knot_resolver_manager.datamodel.policy_schema import ActionEnum
-from knot_resolver_manager.datamodel.types import CheckedPath, FlagsEnum
+from knot_resolver_manager.datamodel.types import ActionEnum, CheckedPath, FlagsEnum
 from knot_resolver_manager.utils import SchemaNode
 
 

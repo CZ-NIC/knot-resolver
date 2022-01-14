@@ -40,6 +40,12 @@ pyright knot_resolver_manager
 check_rv $?
 echo
 
+# check types with mypy
+echo -e "${yellow}Type checking using mypy...${reset}"
+mypy knot_resolver_manager
+check_rv $?
+echo
+
 
 # check that setup.py is not behind pyproject.toml
 echo -e "${yellow}Checking setup.py${reset}"

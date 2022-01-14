@@ -38,11 +38,11 @@ class ParsedTree:
     def to_raw(self) -> Union[Dict[str, Any], str, int, bool]:
         return self._data
 
-    def __getitem__(self, key: str):
+    def __getitem__(self, key: str) -> Any:
         assert isinstance(self._data, dict)
         return self._data[ParsedTree._convert_internal_field_name_to_external(key)]
 
-    def __contains__(self, key: str):
+    def __contains__(self, key: str) -> bool:
         assert isinstance(self._data, dict)
         return ParsedTree._convert_internal_field_name_to_external(key) in self._data
 

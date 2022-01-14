@@ -28,7 +28,7 @@ class InterfaceSchema(SchemaNode):
     kind: KindEnum
     freebind: bool
 
-    def _listen(self, origin: Raw):
+    def _listen(self, origin: Raw) -> Listen:
         if not origin.listen.port:
             if origin.kind == "dot":
                 origin.listen.port = 853

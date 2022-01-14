@@ -11,7 +11,7 @@ from knot_resolver_manager.datamodel.logging_config import LogTargetEnum
 logger = logging.getLogger(__name__)
 
 
-async def _set_log_level(config: KresConfig):
+async def _set_log_level(config: KresConfig) -> None:
     levels_map = {
         "crit": "CRITICAL",
         "err": "ERROR",
@@ -33,12 +33,13 @@ async def _set_log_level(config: KresConfig):
     logging.getLogger().setLevel(target)
 
 
-async def _set_logging_handler(config: KresConfig):
+async def _set_logging_handler(config: KresConfig) -> None:
     target: Optional[LogTargetEnum] = config.logging.target
 
     if target is None:
         target = "stdout"
 
+    handler: logging.Handler
     if target == "syslog":
         handler = logging.handlers.SysLogHandler(address="/dev/log")
         handler.setFormatter(logging.Formatter("%(name)s:%(message)s"))
@@ -67,16 +68,16 @@ async def _set_logging_handler(config: KresConfig):
 
 
 @only_on_real_changes(lambda config: config.logging)
-async def _configure_logger(config: KresConfig):
+async def _configure_logger(config: KresConfig) -> None:
     await _set_logging_handler(config)
     await _set_log_level(config)
 
 
-async def logger_init(config_store: ConfigStore):
+async def logger_init(config_store: ConfigStore) -> None:
     await config_store.register_on_change_callback(_configure_logger)
 
 
-def logger_startup():
+def logger_startup() -> None:
     logging.getLogger().setLevel(STARTUP_LOG_LEVEL)
     err_handler = logging.StreamHandler(sys.stderr)
     err_handler.setFormatter(logging.Formatter(logging.BASIC_FORMAT))

@@ -160,8 +160,8 @@ def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
         return {"type": "string"}
 
     elif is_literal(typ):
-        val = get_generic_type_arguments(typ)
-        return {"enum": val}
+        lit = get_generic_type_arguments(typ)
+        return {"enum": lit}
 
     elif is_union(typ):
         variants = get_generic_type_arguments(typ)
@@ -340,7 +340,7 @@ def _validated_object_type(
 TSource = Union[NoneType, ParsedTree, "SchemaNode", Dict[str, Any]]
 
 
-def _create_untouchable(name: str):
+def _create_untouchable(name: str) -> object:
     class _Untouchable:
         def __getattribute__(self, item_name: str) -> Any:
             raise RuntimeError(f"You are not supposed to access object '{name}'.")
@@ -416,13 +416,13 @@ class SchemaNode(Serializable):
 
     _PREVIOUS_SCHEMA: Optional[Type["SchemaNode"]] = None
 
-    def _assign_default(self, name: str, python_type: Any, object_path: str):
+    def _assign_default(self, name: str, python_type: Any, object_path: str) -> None:
         cls = self.__class__
         default = getattr(cls, name, None)
         value = _validated_object_type(python_type, default, object_path=f"{object_path}/{name}")
         setattr(self, name, value)
 
-    def _assign_field(self, name: str, python_type: Any, value: Any, object_path: str):
+    def _assign_field(self, name: str, python_type: Any, value: Any, object_path: str) -> None:
         value = _validated_object_type(python_type, value, object_path=f"{object_path}/{name}")
         setattr(self, name, value)
 
