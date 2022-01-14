@@ -17,7 +17,7 @@ except ImportError:
 _CUSTOM_DATACLASS_MARKER = "_CUSTOM_DATACLASS_MARKER"
 
 
-def dataclass(cls: Any):
+def dataclass(cls: Any) -> Any:
     if dataclasses_import_success:
         return dataclasses.dataclass(cls)
 

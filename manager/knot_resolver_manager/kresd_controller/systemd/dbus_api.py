@@ -5,11 +5,11 @@ import logging
 import os
 from enum import Enum, auto
 from threading import Thread
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from gi.repository import GLib
-from pydbus import SystemBus
-from pydbus.bus import SessionBus
+from gi.repository import GLib  # type: ignore[import]
+from pydbus import SystemBus  # type: ignore[import]
+from pydbus.bus import SessionBus  # type: ignore[import]
 from typing_extensions import Literal
 
 from knot_resolver_manager.compat.dataclasses import dataclass
@@ -39,7 +39,7 @@ def _create_manager_proxy(type_: SystemdType) -> Any:
     return _create_object_proxy(type_, ".systemd1")
 
 
-def _wait_for_job_completion(systemd: Any, job_creating_func: Callable[[], str]):
+def _wait_for_job_completion(systemd: Any, job_creating_func: Callable[[], str]) -> None:
     """
     Takes a function returning a systemd job path, executes it while simultaneously waiting
     for its completion. This prevents race conditions.
@@ -51,7 +51,7 @@ def _wait_for_job_completion(systemd: Any, job_creating_func: Callable[[], str])
     def _wait_for_job_completion_handler(loop: Any) -> Any:
         completed_jobs: Dict[str, str] = {}
 
-        def event_hander(_job_id: Any, path: Any, _unit: Any, state: Any):
+        def event_hander(_job_id: Any, path: Any, _unit: Any, state: Any) -> None:
             nonlocal result_state
             nonlocal completed_jobs
 
@@ -70,7 +70,7 @@ def _wait_for_job_completion(systemd: Any, job_creating_func: Callable[[], str])
 
         return event_hander
 
-    def event_loop_isolation_thread():
+    def event_loop_isolation_thread() -> None:
         loop: Any = GLib.MainLoop()
         systemd.JobRemoved.connect(_wait_for_job_completion_handler(loop))
         loop.run()
@@ -92,10 +92,10 @@ def _wait_for_job_completion(systemd: Any, job_creating_func: Callable[[], str])
 def get_unit_file_state(
     type_: SystemdType,
     unit_name: str,
-) -> Union[Literal["disabled"], Literal["enabled"]]:
+) -> Literal["disabled", "enabled"]:
     res = str(_create_manager_proxy(type_).GetUnitFileState(unit_name))
     assert res == "disabled" or res == "enabled"
-    return res
+    return res  # type: ignore
 
 
 @dataclass
@@ -109,19 +109,19 @@ def _list_units_internal(type_: SystemdType) -> List[Any]:
 
 
 def list_units(type_: SystemdType) -> List[Unit]:
-    return [Unit(name=str(u[0]), state=str(u[4])) for u in _list_units_internal(type_)]
+    return [Unit(name=str(u[0]), state=str(u[4])) for u in _list_units_internal(type_)]  # type: ignore[call-arg]
 
 
 def list_unit_names(type_: SystemdType) -> List[str]:
     return [str(u[0]) for u in _list_units_internal(type_)]
 
 
-def reset_failed_unit(typ: SystemdType, unit_name: str):
+def reset_failed_unit(typ: SystemdType, unit_name: str) -> None:
     systemd = _create_manager_proxy(typ)
     systemd.ResetFailedUnit(unit_name)
 
 
-def restart_unit(type_: SystemdType, unit_name: str):
+def restart_unit(type_: SystemdType, unit_name: str) -> None:
     systemd = _create_manager_proxy(type_)
 
     def job():
@@ -193,7 +193,7 @@ def _gc_unit_properties(config: KresConfig) -> Any:
 
 def start_transient_kresd_unit(
     config: KresConfig, type_: SystemdType, kres_id: KresID, subprocess_type: SubprocessType
-):
+) -> None:
     name, properties = {
         SubprocessType.KRESD: (f"kresd_{kres_id}.service", _kresd_unit_properties(config, kres_id)),
         SubprocessType.GC: (GC_SERVICE_NAME, _gc_unit_properties(config)),
@@ -214,19 +214,19 @@ def start_transient_kresd_unit(
         raise SubprocessControllerException(f"Failed to start systemd transient service '{name}'") from e
 
 
-def start_unit(type_: SystemdType, unit_name: str):
+def start_unit(type_: SystemdType, unit_name: str) -> None:
     systemd = _create_manager_proxy(type_)
 
-    def job():
+    def job() -> Any:
         return systemd.StartUnit(unit_name, "fail")
 
     _wait_for_job_completion(systemd, job)
 
 
-def stop_unit(type_: SystemdType, unit_name: str):
+def stop_unit(type_: SystemdType, unit_name: str) -> None:
     systemd = _create_manager_proxy(type_)
 
-    def job():
+    def job() -> Any:
         return systemd.StopUnit(unit_name, "fail")
 
     _wait_for_job_completion(systemd, job)

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 from xmlrpc.client import ServerProxy
 
-import supervisor.xmlrpc
+import supervisor.xmlrpc  # type: ignore[import]
 from jinja2 import Template
 
 from knot_resolver_manager.compat.asyncio import to_thread
@@ -66,7 +66,7 @@ def _get_command_based_on_type(config: KresConfig, i: "SupervisordSubprocess") -
         raise NotImplementedError("This subprocess type is not supported")
 
 
-async def _write_config_file(config: KresConfig, instances: Set["SupervisordSubprocess"]):
+async def _write_config_file(config: KresConfig, instances: Set["SupervisordSubprocess"]) -> None:
     @dataclass
     class SupervisordConfig:
         unix_http_server: str
@@ -79,7 +79,7 @@ async def _write_config_file(config: KresConfig, instances: Set["SupervisordSubp
     template = template.decode("utf8")
     config_string = Template(template).render(  # pyright: reportUnknownMemberType=false
         instances=[
-            _Instance(
+            _Instance(  # type: ignore[call-arg]
                 type=i.type.name,
                 logfile=supervisord_subprocess_log_dir(config) / f"{i.id}.log",
                 id=str(i.id),
@@ -89,7 +89,7 @@ async def _write_config_file(config: KresConfig, instances: Set["SupervisordSubp
             )
             for i in instances
         ],
-        config=SupervisordConfig(
+        config=SupervisordConfig(  # type: ignore[call-arg]
             unix_http_server=supervisord_sock_file(config),
             pid_file=supervisord_pid_file(config),
             workdir=str(config.server.rundir.to_path().absolute()),
@@ -101,24 +101,24 @@ async def _write_config_file(config: KresConfig, instances: Set["SupervisordSubp
     os.rename(supervisord_config_file_tmp(config), supervisord_config_file(config))
 
 
-async def _start_supervisord(config: KresConfig):
+async def _start_supervisord(config: KresConfig) -> None:
     await _write_config_file(config, set())
     res = await call(f'supervisord --configuration="{supervisord_config_file(config).absolute()}"', shell=True)
     assert res == 0
 
 
-async def _stop_supervisord(config: KresConfig):
+async def _stop_supervisord(config: KresConfig) -> None:
     pid = int(await readfile(supervisord_pid_file(config)))
     kill(pid, signal.SIGINT)
     await wait_for_process_termination(pid)
 
 
-async def _update_config(config: KresConfig, instances: Set["SupervisordSubprocess"]):
+async def _update_config(config: KresConfig, instances: Set["SupervisordSubprocess"]) -> None:
     await _write_config_file(config, instances)
     await call(f'supervisorctl -c "{supervisord_config_file(config).absolute()}" update', shell=True)
 
 
-async def _restart(config: KresConfig, id_: KresID):
+async def _restart(config: KresConfig, id_: KresID) -> None:
     await call(f'supervisorctl -c "{supervisord_config_file(config).absolute()}" restart {id_}', shell=True)
 
 
@@ -233,7 +233,7 @@ class SupervisordSubprocessController(SubprocessController):
     def __str__(self):
         return "supervisord"
 
-    def should_be_running(self, subprocess: SupervisordSubprocess):
+    def should_be_running(self, subprocess: SupervisordSubprocess) -> bool:
         return subprocess in self._running_instances
 
     async def is_controller_available(self, config: KresConfig) -> bool:
@@ -244,7 +244,7 @@ class SupervisordSubprocessController(SubprocessController):
         logger.debug("Detection - supervisord controller is available for use")
         return res
 
-    async def _update_config_with_real_state(self, config: KresConfig):
+    async def _update_config_with_real_state(self, config: KresConfig) -> None:
         assert self._controller_config is not None
 
         running = await _is_supervisord_running(config)
@@ -269,19 +269,19 @@ class SupervisordSubprocessController(SubprocessController):
         assert self._controller_config is not None
         await _stop_supervisord(self._controller_config)
 
-    async def start_subprocess(self, subprocess: SupervisordSubprocess):
+    async def start_subprocess(self, subprocess: SupervisordSubprocess) -> None:
         assert self._controller_config is not None
         assert subprocess not in self._running_instances
         self._running_instances.add(subprocess)
         await _update_config(self._controller_config, self._running_instances)
 
-    async def stop_subprocess(self, subprocess: SupervisordSubprocess):
+    async def stop_subprocess(self, subprocess: SupervisordSubprocess) -> None:
         assert self._controller_config is not None
         assert subprocess in self._running_instances
         self._running_instances.remove(subprocess)
         await _update_config(self._controller_config, self._running_instances)
 
-    async def restart_subprocess(self, subprocess: SupervisordSubprocess):
+    async def restart_subprocess(self, subprocess: SupervisordSubprocess) -> None:
         assert self._controller_config is not None
         assert subprocess in self._running_instances
         await _restart(self._controller_config, subprocess.id)

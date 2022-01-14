@@ -864,6 +864,14 @@ optional = false
 python-versions = "*"
 
 [[package]]
+name = "types-dataclasses"
+version = "0.6.4"
+description = "Typing stubs for dataclasses"
+category = "dev"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "types-jinja2"
 version = "2.11.9"
 description = "Typing stubs for Jinja2"
@@ -975,7 +983,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.6.8"
-content-hash = "db994629f529ada321967b8bb6e8d5c536461ec2fed89d986a2f71c348c24b30"
+content-hash = "5c4e322d694d291900f743ff1b4881c80311eae7320b41dae7edfbb2eb982d45"
 
 [metadata.files]
 aiohttp = [
@@ -1741,6 +1749,10 @@ typed-ast = [
 types-click = [
     {file = "types-click-7.1.8.tar.gz", hash = "sha256:b6604968be6401dc516311ca50708a0a28baa7a0cb840efd7412f0dbbff4e092"},
     {file = "types_click-7.1.8-py3-none-any.whl", hash = "sha256:8cb030a669e2e927461be9827375f83c16b8178c365852c060a34e24871e7e81"},
+]
+types-dataclasses = [
+    {file = "types-dataclasses-0.6.4.tar.gz", hash = "sha256:2f7ab6c565cf05cc7f27f31a4c2fcc803384e319aab292807b857ddf1473429f"},
+    {file = "types_dataclasses-0.6.4-py3-none-any.whl", hash = "sha256:fef6ed4742ca27996530c6d549cd704772a4a86e4781841c9bb387001e369ec3"},
 ]
 types-jinja2 = [
     {file = "types-Jinja2-2.11.9.tar.gz", hash = "sha256:dbdc74a40aba7aed520b7e4d89e8f0fe4286518494208b35123bcf084d4b8c81"},

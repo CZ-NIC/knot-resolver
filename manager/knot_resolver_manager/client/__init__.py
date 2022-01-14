@@ -21,25 +21,25 @@ class KnotManagerClient:
     def _create_url(self, path: str) -> str:
         return urllib.parse.urljoin(self._url, path)
 
-    def stop(self):
+    def stop(self) -> None:
         response = requests.post(self._create_url("/stop"))
         print(response.text)
 
-    def set_num_workers(self, n: int):
+    def set_num_workers(self, n: int) -> None:
         response = requests.post(self._create_url("/config/server/workers"), data=str(n))
         print(response.text)
 
-    def set_static_hints(self, hints: Dict[str, List[Union[ipaddress.IPv4Address, ipaddress.IPv6Address]]]):
+    def set_static_hints(self, hints: Dict[str, List[Union[ipaddress.IPv4Address, ipaddress.IPv6Address]]]) -> None:
         payload = {name: [str(a) for a in addrs] for name, addrs in hints.items()}
         response = requests.post(self._create_url("/config/static-hints/hints"), json=payload)
         print(response.text)
 
-    def set_listen_ip_address(self, ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address], port: int):
+    def set_listen_ip_address(self, ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address], port: int) -> None:
         payload = [{"listen": {"ip": str(ip), "port": port}}]
         response = requests.post(self._create_url("/config/network/interfaces"), json=payload)
         print(response)
 
-    def wait_for_initialization(self, timeout_sec: float = 5, time_step: float = 0.4):
+    def wait_for_initialization(self, timeout_sec: float = 5, time_step: float = 0.4) -> None:
         started = time.time()
         while True:
             try:

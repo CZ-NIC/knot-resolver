@@ -22,21 +22,21 @@ BASE_URL = "base_url"
     help="Set base URL on which the manager communicates",
 )
 @click.pass_context
-def main(ctx: click.Context, base_url: str):
+def main(ctx: click.Context, base_url: str) -> None:
     ctx.ensure_object(dict)
     ctx.obj[BASE_URL] = base_url
 
 
 @main.command(help="Shutdown the manager and all workers")
 @click.pass_context
-def stop(ctx: click.Context):
+def stop(ctx: click.Context) -> None:
     client = KnotManagerClient(ctx.obj[BASE_URL])
     client.stop()
 
 
 @main.command("gen-lua", help="Generate LUA config from a given declarative config")
 @click.argument("config_path", type=str, nargs=1)
-def gen_lua(config_path: str):
+def gen_lua(config_path: str) -> None:
     try:
         with open(config_path, "r", encoding="utf8") as f:
             data = f.read()
@@ -53,7 +53,7 @@ def gen_lua(config_path: str):
 @main.command(help="Set number of workers")
 @click.argument("instances", type=int, nargs=1)
 @click.pass_context
-def workers(ctx: click.Context, instances: int):
+def workers(ctx: click.Context, instances: int) -> None:
     client = KnotManagerClient(ctx.obj[BASE_URL])
     client.set_num_workers(instances)
 
@@ -62,7 +62,7 @@ def workers(ctx: click.Context, instances: int):
 @click.argument("name", type=str, nargs=1)
 @click.argument("ip", type=str, nargs=1)
 @click.pass_context
-def one_static_hint(ctx: click.Context, name: str, ip: str):
+def one_static_hint(ctx: click.Context, name: str, ip: str) -> None:
     client = KnotManagerClient(ctx.obj[BASE_URL])
     client.set_static_hints({name: [ipaddress.ip_address(ip)]})
 
@@ -71,14 +71,14 @@ def one_static_hint(ctx: click.Context, name: str, ip: str):
 @click.argument("ip", type=str, nargs=1)
 @click.argument("port", type=int, nargs=1)
 @click.pass_context
-def listen_ip(ctx: click.Context, ip: str, port: int):
+def listen_ip(ctx: click.Context, ip: str, port: int) -> None:
     client = KnotManagerClient(ctx.obj[BASE_URL])
     client.set_listen_ip_address(ipaddress.ip_address(ip), port)
 
 
 @main.command(help="Wait for manager initialization")
 @click.pass_context
-def wait(ctx: click.Context):
+def wait(ctx: click.Context) -> None:
     client = KnotManagerClient(ctx.obj[BASE_URL])
     try:
         client.wait_for_initialization()
