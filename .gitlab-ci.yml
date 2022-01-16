@@ -31,6 +31,7 @@ stages:
   except:
     refs:
       - master@knot/knot-resolver
+      - manager@knot/knot-resolver
       - master@knot/security/knot-resolver
       - tags
     variables:
@@ -79,7 +80,8 @@ stages:
 
 archive:
   <<: *build
-  except: null
+  except:
+      - manager@knot/knot-resolver
   script:
     - apkg make-archive
 
@@ -106,6 +108,7 @@ build:macOS:
   <<: *nodep
   except:
     refs:
+      - manager@knot/knot-resolver
       - branches@knot/security/knot-resolver
   stage: build
   when: delayed
@@ -132,7 +135,8 @@ docker:
 sonarcloud:
   <<: *nodep
   stage: build
-  except: null
+  except:
+      - manager@knot/knot-resolver
   only:
     - tags
     - master@knot/knot-resolver
@@ -333,6 +337,20 @@ pkgtest:
     - build
   variables: # https://gitlab.nic.cz/help/ci/yaml/README.md#artifact-downloads-to-child-pipelines
     PARENT_PIPELINE_ID: $CI_PIPELINE_ID
+  except:
+    refs:
+      - master@knot/knot-resolver
+      - manager@knot/knot-resolver
+      - master@knot/security/knot-resolver
+      - tags
+    variables:
+      - $SKIP_CI == "1"
+
+manager:  # TODO better CI integration
+  stage: test
+  trigger:
+    include: manager/.gitlab-ci.yml
+    strategy: depend
   except:
     refs:
       - master@knot/knot-resolver
