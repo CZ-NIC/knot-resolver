@@ -5,6 +5,7 @@ stages:
 default:
   image: registry.nic.cz/knot/knot-resolver-manager/knot-manager:ci
   before_script:
+    - pushd manager
     # make sure Poetry is in $PATH
     - source $HOME/.poetry/env
     # there is already a pyproject.toml with installed dependencies in the root
@@ -44,7 +45,8 @@ package-debian-10:
   when: manual
   stage: packaging
   image: registry.nic.cz/labs/lxc-gitlab-runner/debian-10
-  before_script: []
+  before_script:
+    - pushd manager
   script:
     - bash scripts/make-package.sh
   artifacts:
@@ -57,7 +59,8 @@ package-fedora-34:
   when: manual
   stage: packaging
   image: registry.nic.cz/labs/lxc-gitlab-runner/fedora-34
-  before_script: []
+  before_script:
+    - pushd manager
   script:
     - bash scripts/make-package.sh
   artifacts:
