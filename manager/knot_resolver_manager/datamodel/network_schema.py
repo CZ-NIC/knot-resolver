@@ -1,42 +1,20 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import (
     CheckedPath,
+    InterfacePort,
     IPAddress,
+    IPAddressPort,
     IPNetwork,
     IPv4Address,
     IPv6Address,
-    Listen,
     SizeUnit,
 )
 from knot_resolver_manager.utils import SchemaNode
 
-KindEnum = Literal["dns", "xdp", "dot", "doh"]
-
-
-class InterfaceSchema(SchemaNode):
-    class Raw(SchemaNode):
-        listen: Listen
-        kind: KindEnum = "dns"
-        freebind: bool = False
-
-    _PREVIOUS_SCHEMA = Raw
-
-    listen: Listen
-    kind: KindEnum
-    freebind: bool
-
-    def _listen(self, origin: Raw) -> Listen:
-        if not origin.listen.port:
-            if origin.kind == "dot":
-                origin.listen.port = 853
-            elif origin.kind == "doh":
-                origin.listen.port = 443
-            else:
-                origin.listen.port = 53
-        return origin.listen
+KindEnum = Literal["dns", "xdp", "dot", "doh2"]
 
 
 class EdnsBufferSizeSchema(SchemaNode):
@@ -64,6 +42,55 @@ class TLSSchema(SchemaNode):
             raise ValueError("'padding' must be number in range<0-512>")
 
 
+class ListenSchema(SchemaNode):
+    class Raw(SchemaNode):
+        unix_socket: Union[None, CheckedPath, List[CheckedPath]] = None
+        ip_address: Union[None, IPAddressPort, List[IPAddressPort]] = None
+        interface: Union[None, InterfacePort, List[InterfacePort]] = None
+        port: Optional[int] = None
+        kind: KindEnum = "dns"
+        freebind: bool = False
+
+    _PREVIOUS_SCHEMA = Raw
+
+    unix_socket: Union[None, CheckedPath, List[CheckedPath]]
+    ip_address: Union[None, IPAddressPort, IPAddressPort, List[IPAddressPort]]
+    interface: Union[None, InterfacePort, List[InterfacePort]]
+    port: Optional[int]
+    kind: KindEnum
+    freebind: bool
+
+    def _port(self, origin: Raw) -> Optional[int]:
+        if origin.port:
+            return origin.port
+        elif origin.ip_address or origin.interface:
+            if origin.kind == "dot":
+                return 853
+            elif origin.kind == "doh2":
+                return 443
+            return 53
+        return None
+
+    def _validate(self) -> None:
+        present = {
+            "ip_address" if self.ip_address is not None else ...,
+            "unix_socket" if self.unix_socket is not None else ...,
+            "interface" if self.interface is not None else ...,
+        }
+        if not (present == {"ip_address", ...} or present == {"unix_socket", ...} or present == {"interface", ...}):
+            raise ValueError(
+                "Listen configuration contains multiple incompatible options at once. "
+                "Only one of 'ip-address', 'interface' and 'unix-socket' optionscan be configured at once."
+            )
+        if self.port and self.unix_socket:
+            raise ValueError(
+                "'unix-socket' and 'port' are not compatible options. "
+                "Port configuration can only be used with 'ip-address' or 'interface'."
+            )
+        if self.port and not 0 <= self.port <= 65_535:
+            raise ValueError(f"Port value {self.port} out of range of usual 2-byte port value")
+
+
 class NetworkSchema(SchemaNode):
     do_ipv4: bool = True
     do_ipv6: bool = True
@@ -74,9 +101,9 @@ class NetworkSchema(SchemaNode):
     edns_buffer_size: EdnsBufferSizeSchema = EdnsBufferSizeSchema()
     address_renumbering: Optional[List[AddressRenumberingSchema]] = None
     tls: TLSSchema = TLSSchema()
-    interfaces: List[InterfaceSchema] = [
-        InterfaceSchema({"listen": {"ip": "127.0.0.1", "port": 53}}),
-        InterfaceSchema({"listen": {"ip": "::1", "port": 53}, "freebind": True}),
+    listen: List[ListenSchema] = [
+        ListenSchema({"ip-address": "127.0.0.1"}),
+        ListenSchema({"ip-address": "::1", "freebind": True}),
     ]
 
     def _validate(self):

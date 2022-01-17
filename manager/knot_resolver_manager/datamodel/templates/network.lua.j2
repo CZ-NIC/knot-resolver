@@ -1,4 +1,4 @@
-{% from 'macros/network_macros.lua.j2' import net_listen %}
+{% from 'macros/network_macros.lua.j2' import network_listen %}
 
 -- network.do-ipv4/6
 net.ipv4 = {{ 'true' if cfg.network.do_ipv4 else 'false' }}
@@ -65,7 +65,7 @@ renumber.config = {
 }
 {% endif %}
 
--- network.interfaces
-{% for interface in cfg.network.interfaces %}
-{{ net_listen(interface) }}
+-- network.listen
+{% for listen in cfg.network.listen %}
+{{ network_listen(listen) }}
 {% endfor %}
