@@ -6,7 +6,7 @@ RUN dnf install -y python3.6 nodejs python3-gobject pkg-config cairo-devel gcc p
 
 # Install Poetry
 RUN python3 -m pip install -U pip \
-  && curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python3 - \
+  && curl -sSL https://install.python-poetry.org | python3 - \
   && source $HOME/.poetry/env \
   # not exactly required, but helpful
   && python3 -m pip install poethepoet
