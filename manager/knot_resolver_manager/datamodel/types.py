@@ -353,30 +353,94 @@ class DomainName(CustomValueType):
         }
 
 
-class IPAddressPort(CustomValueType):
+class InterfacePort(CustomValueType):
+    intrfc: str
+    port: Optional[int] = None
+
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
         if isinstance(source_value, str):
-            addr = source_value
             if "@" in source_value:
                 sep = source_value.split("@", 1)
-                addr = sep[0]
                 try:
-                    port = int(sep[1])
+                    self.port = int(sep[1])
                 except ValueError as e:
                     raise SchemaException("Failed to parse port.", object_path) from e
-                if not 0 <= port <= 65_535:
-                    raise SchemaException(f"Port value '{port}' out of range of usual 2-byte port value", object_path)
 
-            try:
-                ipaddress.ip_address(addr)
-            except ValueError as e:
-                raise SchemaException("Failed to parse IP address.", object_path) from e
+                if not 0 <= self.port <= 65_535:
+                    raise SchemaException(
+                        f"Port value '{self.port}' out of range of usual 2-byte port value", object_path
+                    )
+                self.intrfc = sep[0]
+            else:
+                self.intrfc = source_value
+            self._value = source_value
 
-            self._value: str = source_value
         else:
             raise SchemaException(
-                f"Unexpected value for a '<ip-address>@<port>'. Expected string, got '{source_value}'"
+                f"Unexpected value for a '<interface>[@<port>]'. Expected string, got '{source_value}'"
+                f" with type '{type(source_value)}'",
+                object_path,
+            )
+
+    def to_std(self) -> str:
+        return self._value
+
+    def __str__(self) -> str:
+        return self._value
+
+    def __int__(self) -> int:
+        raise ValueError("Can't convert InterfacePort to an integer")
+
+    def __eq__(self, o: object) -> bool:
+        """
+        Two instances of InterfacePort are equal when they represent same string.
+        """
+        return isinstance(o, InterfacePort) and str(o._value) == str(self._value)
+
+    def serialize(self) -> Any:
+        return str(self._value)
+
+    @classmethod
+    def json_schema(cls: Type["InterfacePort"]) -> Dict[Any, Any]:
+        return {
+            "type": "string",
+        }
+
+
+class IPAddressPort(CustomValueType):
+    addr: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+    port: Optional[int] = None
+
+    def __init__(self, source_value: Any, object_path: str = "/") -> None:
+        super().__init__(source_value)
+        if isinstance(source_value, str):
+            if "@" in source_value:
+                sep = source_value.split("@", 1)
+                try:
+                    self.port = int(sep[1])
+                except ValueError as e:
+                    raise SchemaException("Failed to parse port.", object_path) from e
+
+                if not 0 <= self.port <= 65_535:
+                    raise SchemaException(
+                        f"Port value '{self.port}' out of range of usual 2-byte port value", object_path
+                    )
+
+                try:
+                    self.addr = ipaddress.ip_address(sep[0])
+                except ValueError as e:
+                    raise SchemaException("Failed to parse IP address.", object_path) from e
+            else:
+                try:
+                    self.addr = ipaddress.ip_address(source_value)
+                except ValueError as e:
+                    raise SchemaException("Failed to parse IP address.", object_path) from e
+            self._value = source_value
+
+        else:
+            raise SchemaException(
+                f"Unexpected value for a '<ip-address>[@<port>]'. Expected string, got '{source_value}'"
                 f" with type '{type(source_value)}'",
                 object_path,
             )

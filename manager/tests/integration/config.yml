@@ -1,8 +1,6 @@
 network:
-  interfaces:
-    - listen:
-        ip: 127.0.0.1
-        port: 5353
+  listen:
+    - ip-address: 127.0.0.1@5353
 server:
   workers: 1
   rundir: tests/integration/run

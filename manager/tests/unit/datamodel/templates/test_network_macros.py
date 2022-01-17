@@ -1,25 +1,35 @@
 from knot_resolver_manager.datamodel.config_schema import template_from_str
-from knot_resolver_manager.datamodel.network_schema import InterfaceSchema
+from knot_resolver_manager.datamodel.network_schema import ListenSchema
 
 
-def test_net_listen():
-    ip = InterfaceSchema({"listen": {"ip": "::1", "port": 53}, "freebind": True})
-    soc = InterfaceSchema({"listen": {"unix-socket": "/tmp/kresd-socket"}, "kind": "dot"})
-    infc = InterfaceSchema({"listen": {"interface": "eth0"}, "kind": "doh"})
-
-    tmpl_str = """{% from 'macros/network_macros.lua.j2' import net_listen %}
-{{ net_listen(interface) }}"""
-
+def test_network_listen():
+    tmpl_str = """{% from 'macros/network_macros.lua.j2' import network_listen %}
+{{ network_listen(listen) }}"""
     tmpl = template_from_str(tmpl_str)
+
+    soc = ListenSchema({"unix-socket": "/tmp/kresd-socket", "kind": "dot"})
+    assert tmpl.render(listen=soc) == "net.listen('/tmp/kresd-socket',nil,{kind='tls',freebind=false})"
+    soc_list = ListenSchema({"unix-socket": [soc.unix_socket, "/tmp/kresd-socket2"], "kind": "dot"})
     assert (
-        tmpl.render(interface=ip)
-        == f"net.listen('{ip.listen.ip}',{ip.listen.port},{{kind='dns',freebind={str(ip.freebind).lower()}}})"
+        tmpl.render(listen=soc_list)
+        == "net.listen('/tmp/kresd-socket',nil,{kind='tls',freebind=false})\n"
+        + "net.listen('/tmp/kresd-socket2',nil,{kind='tls',freebind=false})\n"
     )
+
+    ip = ListenSchema({"ip-address": "::1", "freebind": True})
+    assert tmpl.render(listen=ip) == "net.listen('::1',53,{kind='dns',freebind=true})"
+    ip_list = ListenSchema({"ip-address": [ip.ip_address, "127.0.0.1@5353"]})
     assert (
-        tmpl.render(interface=soc)
-        == f"net.listen('{soc.listen.unix_socket}',nil,{{kind='tls',freebind={str(soc.freebind).lower()}}})"
+        tmpl.render(listen=ip_list)
+        == "net.listen('::1',53,{kind='dns',freebind=false})\n"
+        + "net.listen('127.0.0.1',5353,{kind='dns',freebind=false})\n"
     )
+
+    intrfc = ListenSchema({"interface": "eth0", "kind": "doh2"})
+    assert tmpl.render(listen=intrfc) == "net.listen(net.eth0,443,{kind='doh2',freebind=false})"
+    intrfc_list = ListenSchema({"interface": [intrfc.interface, "lo@5353"], "port": 5555, "kind": "doh2"})
     assert (
-        tmpl.render(interface=infc)
-        == f"net.listen(net.{infc.listen.interface},443,{{kind='doh',freebind={str(soc.freebind).lower()}}})"
+        tmpl.render(listen=intrfc_list)
+        == "net.listen(net.eth0,5555,{kind='doh2',freebind=false})\n"
+        + "net.listen(net.lo,5353,{kind='doh2',freebind=false})\n"
     )
