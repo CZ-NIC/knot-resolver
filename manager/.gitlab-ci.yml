@@ -30,7 +30,8 @@ test:
   stage: check
   script:
     - poe test
-    - poetry run coverage xml
+    # the following command makes sure that the source root of the coverage file is at $gitroot
+    - poetry run bash -c "cd ..; coverage combine manager/.coverage; coverage xml"
   artifacts:
     reports:
       cobertura: coverage.xml
