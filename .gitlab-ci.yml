@@ -350,8 +350,9 @@ pkgtest:
     variables:
       - $SKIP_CI == "1"
 
-manager:  # TODO better CI integration
+manager:
   stage: test
+  needs: []
   trigger:
     include: manager/.gitlab-ci.yml
     strategy: depend
