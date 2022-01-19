@@ -54,11 +54,41 @@ class ListenSchema(SchemaNode):
     _PREVIOUS_SCHEMA = Raw
 
     unix_socket: Union[None, CheckedPath, List[CheckedPath]]
-    ip_address: Union[None, IPAddressPort, IPAddressPort, List[IPAddressPort]]
+    ip_address: Union[None, IPAddressPort, List[IPAddressPort]]
     interface: Union[None, InterfacePort, List[InterfacePort]]
     port: Optional[int]
     kind: KindEnum
     freebind: bool
+
+    def _ip_address(self, origin: Raw) -> Union[None, IPAddressPort, List[IPAddressPort]]:
+        if isinstance(origin.ip_address, list):
+            port_set: Optional[bool] = None
+            for addr in origin.ip_address:
+                if origin.port and addr.port:
+                    raise ValueError("The port number is defined in two places ('port' option and '@<port>' syntax).")
+                if port_set is not None and (bool(addr.port) != port_set):
+                    raise ValueError(
+                        "The port number specified by '@<port>' syntax must or must not be used for each IP address."
+                    )
+                port_set = True if addr.port else False
+        elif isinstance(origin.ip_address, IPAddressPort) and origin.ip_address.port and origin.port:
+            raise ValueError("The port number is defined in two places ('port' option and '@<port>' syntax).")
+        return origin.ip_address
+
+    def _interface(self, origin: Raw) -> Union[None, InterfacePort, List[InterfacePort]]:
+        if isinstance(origin.interface, list):
+            port_set: Optional[bool] = None
+            for intrfc in origin.interface:
+                if origin.port and intrfc.port:
+                    raise ValueError("The port number is defined in two places ('port' option and '@<port>' syntax).")
+                if port_set is not None and (bool(intrfc.port) != port_set):
+                    raise ValueError(
+                        "The port number specified by '@<port>' syntax must or must not be used for each interface."
+                    )
+                port_set = True if intrfc.port else False
+        elif isinstance(origin.interface, InterfacePort) and origin.interface.port and origin.port:
+            raise ValueError("The port number is defined in two places ('port' option and '@<port>' syntax).")
+        return origin.interface
 
     def _port(self, origin: Raw) -> Optional[int]:
         if origin.port:

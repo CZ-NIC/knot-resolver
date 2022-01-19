@@ -33,12 +33,50 @@ def test_listen_kind_port_defaults():
     assert doh2.port == 443
 
 
+def test_listen_unix_socket():
+    assert ListenSchema({"unix-socket": "/tmp/kresd-socket"})
+    assert ListenSchema({"unix-socket": ["/tmp/kresd-socket", "/tmp/kresd-socket2"]})
+
+    with raises(KresManagerException):
+        ListenSchema({"ip-address": "::1", "unix-socket": "/tmp/kresd-socket"})
+    with raises(KresManagerException):
+        ListenSchema({"unit-socket": "/tmp/kresd-socket", "port": "53"})
+
+
+def test_listen_ip_address():
+    assert ListenSchema({"ip-address": "::1"})
+    assert ListenSchema({"ip-address": "::1@5353"})
+    assert ListenSchema({"ip-address": "::1", "port": 5353})
+    assert ListenSchema({"ip-address": ["127.0.0.1", "::1"]})
+    assert ListenSchema({"ip-address": ["127.0.0.1@5353", "::1@5353"]})
+    assert ListenSchema({"ip-address": ["127.0.0.1", "::1"], "port": 5353})
+
+    with raises(KresManagerException):
+        ListenSchema({"ip-address": "::1@5353", "port": 5353})
+    with raises(KresManagerException):
+        ListenSchema({"ip-address": ["127.0.0.1", "::1@5353"]})
+    with raises(KresManagerException):
+        ListenSchema({"ip-address": ["127.0.0.1@5353", "::1@5353"], "port": 5353})
+
+
+def test_listen_interface():
+    assert ListenSchema({"interface": "lo"})
+    assert ListenSchema({"interface": "lo@5353"})
+    assert ListenSchema({"interface": "lo", "port": 5353})
+    assert ListenSchema({"interface": ["lo", "eth0"]})
+    assert ListenSchema({"interface": ["lo@5353", "eth0@5353"]})
+    assert ListenSchema({"interface": ["lo", "eth0"], "port": 5353})
+
+    with raises(KresManagerException):
+        ListenSchema({"interface": "lo@5353", "port": 5353})
+    with raises(KresManagerException):
+        ListenSchema({"interface": ["lo", "eth0@5353"]})
+    with raises(KresManagerException):
+        ListenSchema({"interface": ["lo@5353", "eth0@5353"], "port": 5353})
+
+
 def test_listen_validation():
     with raises(KresManagerException):
         ListenSchema({"ip-address": "::1", "port": -10})
     with raises(KresManagerException):
         ListenSchema({"ip-address": "::1", "interface": "eth0"})
-    with raises(KresManagerException):
-        ListenSchema({"ip-address": "::1", "unit-socket": "/tmp/kresd-socket"})
-    with raises(KresManagerException):
-        ListenSchema({"unit-socket": "/tmp/kresd-socket", "port": "53"})
