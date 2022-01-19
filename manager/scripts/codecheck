@@ -34,17 +34,6 @@ flake8 knot_resolver_manager
 check_rv $?
 echo
 
-# check types with pyright
-echo -e "${yellow}Type checking using pyright...${reset}"
-if command -v pyright > /dev/null; then
-	pyright knot_resolver_manager
-	check_rv $?
-	echo
-else
-	echo -e "${blue}  ...skipped - pyright binary was not found${reset}"
-	echo
-fi
-
 # check types with mypy
 echo -e "${yellow}Type checking using mypy...${reset}"
 mypy knot_resolver_manager
