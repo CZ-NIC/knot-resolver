@@ -361,6 +361,7 @@ manager:
       - $SKIP_CI == "1"
 
 pytests:
+  <<: *common
   # these are executed on LXC runners to increase stability
   image: $CI_REGISTRY/knot/knot-resolver/ci/lxc-debian-11:knot-$KNOT_VERSION
   needs: []
