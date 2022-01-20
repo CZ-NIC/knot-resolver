@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional, Union
 
 from typing_extensions import Literal
@@ -10,6 +11,7 @@ from knot_resolver_manager.datamodel.types import (
     IPNetwork,
     IPv4Address,
     IPv6Address,
+    PortNumber,
     SizeUnit,
 )
 from knot_resolver_manager.utils import SchemaNode
@@ -47,7 +49,7 @@ class ListenSchema(SchemaNode):
         unix_socket: Union[None, CheckedPath, List[CheckedPath]] = None
         ip_address: Union[None, IPAddressPort, List[IPAddressPort]] = None
         interface: Union[None, InterfacePort, List[InterfacePort]] = None
-        port: Optional[int] = None
+        port: Optional[PortNumber] = None
         kind: KindEnum = "dns"
         freebind: bool = False
 
@@ -56,7 +58,7 @@ class ListenSchema(SchemaNode):
     unix_socket: Union[None, CheckedPath, List[CheckedPath]]
     ip_address: Union[None, IPAddressPort, List[IPAddressPort]]
     interface: Union[None, InterfacePort, List[InterfacePort]]
-    port: Optional[int]
+    port: Optional[PortNumber]
     kind: KindEnum
     freebind: bool
 
@@ -90,15 +92,15 @@ class ListenSchema(SchemaNode):
             raise ValueError("The port number is defined in two places ('port' option and '@<port>' syntax).")
         return origin.interface
 
-    def _port(self, origin: Raw) -> Optional[int]:
+    def _port(self, origin: Raw) -> Optional[PortNumber]:
         if origin.port:
             return origin.port
         elif origin.ip_address or origin.interface:
             if origin.kind == "dot":
-                return 853
+                return PortNumber(853)
             elif origin.kind == "doh2":
-                return 443
-            return 53
+                return PortNumber(443)
+            return PortNumber(53)
         return None
 
     def _validate(self) -> None:
@@ -117,8 +119,6 @@ class ListenSchema(SchemaNode):
                 "'unix-socket' and 'port' are not compatible options. "
                 "Port configuration can only be used with 'ip-address' or 'interface'."
             )
-        if self.port and not 0 <= self.port <= 65_535:
-            raise ValueError(f"Port value {self.port} out of range of usual 2-byte port value")
 
 
 class NetworkSchema(SchemaNode):
