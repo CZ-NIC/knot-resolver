@@ -7,6 +7,7 @@ Improvements
 - policy: log policy actions; useful for RPZ debugging (!1239)
 - policy: new action policy.IPTRACE for logging request origin (!1239)
 - prefill module: prepare for ZONEMD, improve performance (!1225)
+- validator: conditionally ignore SHA1 DS, as SHOULD by RFC4509 (!1251)
 
 Incompatible changes
 --------------------

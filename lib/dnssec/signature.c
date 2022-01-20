@@ -47,18 +47,34 @@ int kr_authenticate_referral(const knot_rrset_t *ref, const dnssec_key_t *key)
 	if (ref->type != KNOT_RRTYPE_DS)
 		return kr_error(EINVAL);
 
-	/* Try all possible DS records */
-	int ret = 0;
+	/* Determine whether to ignore SHA1 digests, because:
+	    https://datatracker.ietf.org/doc/html/rfc4509#section-3
+	 * Now, the RFCs seem to only mention SHA1 and SHA256 (e.g. no SHA384),
+	 * but the most natural extension is to make any other algorithm trump SHA1.
+	 * (Note that the old GOST version is already unsupported by libdnssec.) */
+	bool skip_sha1 = false;
 	knot_rdata_t *rd = ref->rrs.rdata;
-	for (uint16_t i = 0; i < ref->rrs.count; ++i) {
+	for (int i = 0; i < ref->rrs.count; ++i, rd = knot_rdataset_next(rd)) {
+		const uint8_t algo = knot_ds_digest_type(rd);
+		if (algo != DNSSEC_KEY_DIGEST_SHA1 && dnssec_algorithm_digest_support(algo)) {
+			skip_sha1 = true;
+			break;
+		}
+	}
+	/* But otherwise try all possible DS records. */
+	int ret = 0;
+	rd = ref->rrs.rdata;
+	for (int i = 0; i < ref->rrs.count; ++i, rd = knot_rdataset_next(rd)) {
+		const uint8_t algo = knot_ds_digest_type(rd);
+		if (skip_sha1 && algo == DNSSEC_KEY_DIGEST_SHA1)
+			continue;
 		dnssec_binary_t ds_rdata = {
 			.size = rd->len,
 			.data = rd->data
 		};
-		ret = authenticate_ds(key, &ds_rdata, knot_ds_digest_type(rd));
+		ret = authenticate_ds(key, &ds_rdata, algo);
 		if (ret == 0) /* Found a good DS */
 			return kr_ok();
-		rd = knot_rdataset_next(rd);
 	}
 
 	return kr_error(ret);
