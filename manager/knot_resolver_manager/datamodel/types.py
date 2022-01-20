@@ -1,5 +1,6 @@
 import ipaddress
 import logging
+import os
 import re
 from enum import Enum, auto
 from pathlib import Path
@@ -162,6 +163,47 @@ RecordTypeEnum = Literal[
     "X25",
     "ZONEMD",
 ]
+
+
+class IntRange(CustomValueType):
+    _value: int
+    _min: int
+    _max: int
+
+    def __init__(self, source_value: Any, object_path: str = "/") -> None:
+        if isinstance(source_value, int):
+            if not self._min <= source_value <= self._max:
+                raise SchemaException(
+                    f"Integer value {source_value} out of range <{self._min}, {self._max}>", object_path
+                )
+            self._value = source_value
+        else:
+            raise SchemaException(
+                f"Unexpected input type for integer - {type(source_value)}."
+                " Cause might be invalid format or invalid type.",
+                object_path,
+            )
+
+    def __int__(self) -> int:
+        return self._value
+
+    def __str__(self) -> str:
+        return str(self._value)
+
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, IntRange) and o._value == self._value
+
+    def serialize(self) -> Any:
+        return self._value
+
+    @classmethod
+    def json_schema(cls: Type["IntRange"]) -> Dict[Any, Any]:
+        return {"type": "integer", "minimum": cls._min, "maximum": cls._max}
+
+
+class PortNumber(IntRange):
+    _min: int = 1
+    _max: int = 65_535
 
 
 class Unit(CustomValueType):
@@ -355,7 +397,7 @@ class DomainName(CustomValueType):
 
 class InterfacePort(CustomValueType):
     intrfc: str
-    port: Optional[int] = None
+    port: Optional[PortNumber] = None
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
@@ -363,14 +405,9 @@ class InterfacePort(CustomValueType):
             if "@" in source_value:
                 sep = source_value.split("@", 1)
                 try:
-                    self.port = int(sep[1])
+                    self.port = PortNumber(int(sep[1]))
                 except ValueError as e:
                     raise SchemaException("Failed to parse port.", object_path) from e
-
-                if not 0 <= self.port <= 65_535:
-                    raise SchemaException(
-                        f"Port value '{self.port}' out of range of usual 2-byte port value", object_path
-                    )
                 self.intrfc = sep[0]
             else:
                 self.intrfc = source_value
@@ -410,7 +447,7 @@ class InterfacePort(CustomValueType):
 
 class IPAddressPort(CustomValueType):
     addr: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
-    port: Optional[int] = None
+    port: Optional[PortNumber] = None
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
@@ -418,14 +455,9 @@ class IPAddressPort(CustomValueType):
             if "@" in source_value:
                 sep = source_value.split("@", 1)
                 try:
-                    self.port = int(sep[1])
+                    self.port = PortNumber(int(sep[1]))
                 except ValueError as e:
                     raise SchemaException("Failed to parse port.", object_path) from e
-
-                if not 0 <= self.port <= 65_535:
-                    raise SchemaException(
-                        f"Port value '{self.port}' out of range of usual 2-byte port value", object_path
-                    )
 
                 try:
                     self.addr = ipaddress.ip_address(sep[0])
