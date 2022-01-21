@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 from knot_resolver_manager.datamodel.network_schema import AddressRenumberingSchema
-from knot_resolver_manager.datamodel.types import ActionEnum, FlagsEnum, IPAddressPort, RecordTypeEnum, TimeUnit
+from knot_resolver_manager.datamodel.types import ActionEnum, FlagsEnum, IPAddressOptionalPort, RecordTypeEnum, TimeUnit
 from knot_resolver_manager.utils import SchemaNode
 
 
@@ -27,7 +27,7 @@ class PolicySchema(SchemaNode):
     message: Optional[str] = None
     reroute: Optional[List[AddressRenumberingSchema]] = None
     answer: Optional[AnswerSchema] = None
-    mirror: Optional[List[IPAddressPort]] = None
+    mirror: Optional[List[IPAddressOptionalPort]] = None
 
     def _validate(self) -> None:
         # checking for missing fields

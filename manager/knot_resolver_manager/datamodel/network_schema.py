@@ -1,13 +1,12 @@
-import os
 from typing import List, Optional, Union
 
 from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import (
     CheckedPath,
-    InterfacePort,
+    InterfaceOptionalPort,
     IPAddress,
-    IPAddressPort,
+    IPAddressOptionalPort,
     IPNetwork,
     IPv4Address,
     IPv6Address,
@@ -47,8 +46,8 @@ class TLSSchema(SchemaNode):
 class ListenSchema(SchemaNode):
     class Raw(SchemaNode):
         unix_socket: Union[None, CheckedPath, List[CheckedPath]] = None
-        ip_address: Union[None, IPAddressPort, List[IPAddressPort]] = None
-        interface: Union[None, InterfacePort, List[InterfacePort]] = None
+        ip_address: Union[None, IPAddressOptionalPort, List[IPAddressOptionalPort]] = None
+        interface: Union[None, InterfaceOptionalPort, List[InterfaceOptionalPort]] = None
         port: Optional[PortNumber] = None
         kind: KindEnum = "dns"
         freebind: bool = False
@@ -56,13 +55,13 @@ class ListenSchema(SchemaNode):
     _PREVIOUS_SCHEMA = Raw
 
     unix_socket: Union[None, CheckedPath, List[CheckedPath]]
-    ip_address: Union[None, IPAddressPort, List[IPAddressPort]]
-    interface: Union[None, InterfacePort, List[InterfacePort]]
+    ip_address: Union[None, IPAddressOptionalPort, List[IPAddressOptionalPort]]
+    interface: Union[None, InterfaceOptionalPort, List[InterfaceOptionalPort]]
     port: Optional[PortNumber]
     kind: KindEnum
     freebind: bool
 
-    def _ip_address(self, origin: Raw) -> Union[None, IPAddressPort, List[IPAddressPort]]:
+    def _ip_address(self, origin: Raw) -> Union[None, IPAddressOptionalPort, List[IPAddressOptionalPort]]:
         if isinstance(origin.ip_address, list):
             port_set: Optional[bool] = None
             for addr in origin.ip_address:
@@ -70,14 +69,14 @@ class ListenSchema(SchemaNode):
                     raise ValueError("The port number is defined in two places ('port' option and '@<port>' syntax).")
                 if port_set is not None and (bool(addr.port) != port_set):
                     raise ValueError(
-                        "The port number specified by '@<port>' syntax must or must not be used for each IP address."
+                        "The '@<port>' syntax must be used either for all or none of the IP addresses in the list."
                     )
                 port_set = True if addr.port else False
-        elif isinstance(origin.ip_address, IPAddressPort) and origin.ip_address.port and origin.port:
+        elif isinstance(origin.ip_address, IPAddressOptionalPort) and origin.ip_address.port and origin.port:
             raise ValueError("The port number is defined in two places ('port' option and '@<port>' syntax).")
         return origin.ip_address
 
-    def _interface(self, origin: Raw) -> Union[None, InterfacePort, List[InterfacePort]]:
+    def _interface(self, origin: Raw) -> Union[None, InterfaceOptionalPort, List[InterfaceOptionalPort]]:
         if isinstance(origin.interface, list):
             port_set: Optional[bool] = None
             for intrfc in origin.interface:
@@ -85,10 +84,10 @@ class ListenSchema(SchemaNode):
                     raise ValueError("The port number is defined in two places ('port' option and '@<port>' syntax).")
                 if port_set is not None and (bool(intrfc.port) != port_set):
                     raise ValueError(
-                        "The port number specified by '@<port>' syntax must or must not be used for each interface."
+                        "The '@<port>' syntax must be used either for all or none of the interface in the list."
                     )
                 port_set = True if intrfc.port else False
-        elif isinstance(origin.interface, InterfacePort) and origin.interface.port and origin.port:
+        elif isinstance(origin.interface, InterfaceOptionalPort) and origin.interface.port and origin.port:
             raise ValueError("The port number is defined in two places ('port' option and '@<port>' syntax).")
         return origin.interface
 

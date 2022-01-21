@@ -1,5 +1,5 @@
 from knot_resolver_manager.datamodel.config_schema import template_from_str
-from knot_resolver_manager.datamodel.types import IPAddressPort
+from knot_resolver_manager.datamodel.types import IPAddressOptionalPort
 
 
 def test_view_tsig():
@@ -13,7 +13,7 @@ def test_view_tsig():
 
 
 def test_view_addr():
-    addr: IPAddressPort = IPAddressPort("10.0.0.1")
+    addr: IPAddressOptionalPort = IPAddressOptionalPort("10.0.0.1")
     rule = "policy.all(policy.DENY)"
     tmpl_str = """{% from 'macros/view_macros.lua.j2' import view_addr %}
 {{ view_addr(addr, rule) }}"""

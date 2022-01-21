@@ -8,8 +8,8 @@ net.{{ interface }}
 {%- endmacro %}
 
 
-{% macro net_listen_unix_socket(socket, kind, freebind) -%}
-net.listen('{{ socket }}',nil,{kind={{ listen_kind(kind) }},freebind={{ 'true' if freebind else 'false'}}})
+{% macro net_listen_unix_socket(path, kind, freebind) -%}
+net.listen('{{ path }}',nil,{kind={{ listen_kind(kind) }},freebind={{ 'true' if freebind else 'false'}}})
 {%- endmacro %}
 
 
@@ -25,7 +25,7 @@ net.listen('{{ ip_address.addr }}',
 
 
 {% macro net_listen_interface(interface, kind, freebind, port) -%}
-net.listen({{ listen_interface(interface.intrfc) }},
+net.listen({{ listen_interface(interface.if_name) }},
 {%- if interface.port -%}
 {{ interface.port }},
 {%- else -%}
@@ -38,8 +38,8 @@ net.listen({{ listen_interface(interface.intrfc) }},
 {% macro network_listen(listen) -%}
 {%- if listen.unix_socket -%}
     {%- if listen.unix_socket is iterable-%}
-        {% for socket in listen.unix_socket -%}
-            {{ net_listen_unix_socket(socket, listen.kind, listen.freebind) }}
+        {% for path in listen.unix_socket -%}
+            {{ net_listen_unix_socket(path, listen.kind, listen.freebind) }}
         {% endfor -%}
     {%- else -%}
         {{ net_listen_unix_socket(listen.unix_socket, listen.kind, listen.freebind) }}

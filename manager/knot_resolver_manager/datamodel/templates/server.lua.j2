@@ -17,7 +17,7 @@ watchdog.config({ qname = '{{ cfg.server.watchdog.qname }}', qtype = kres.type.{
 modules.unload('watchdog')
 {%- endif %}
 
-{% if cfg.server.webmgmt %}
+{% if cfg.server.webmgmt -%}
 -- server.webmgmt
 modules.load('http')
 http.config({
@@ -26,13 +26,12 @@ http.config({
     {{ "key = '"+cfg.server.webmgmt.key_file+"'," if cfg.server.webmgmt.key_file }}
 }, 'webmgmt')
 net.listen(
-{% if cfg.server.webmgmt.listen.ip %}
-    '{{ cfg.server.webmgmt.listen.ip }}',
-{% elif cfg.server.webmgmt.listen.unix_socket %}
-    '{{ cfg.server.webmgmt.listen.unix_socket }}',
-{% elif cfg.server.webmgmt.listen.interface %}
-    net.{{ cfg.server.webmgmt.listen.interface }},
-{% endif %}
-    {{ cfg.server.webmgmt.listen.port|string if cfg.server.webmgmt.listen.port else 'nil' }},
-    { kind = 'webmgmt' })
-{% endif %}
+{%- if cfg.server.webmgmt.unix_socket -%}
+    '{{ cfg.server.webmgmt.unix_socket }}',nil,
+{%- elif cfg.server.webmgmt.ip_address -%}
+    '{{ cfg.server.webmgmt.ip_address.addr }}',{{ cfg.server.webmgmt.ip_address.port }},
+{%- elif cfg.server.webmgmt.interface -%}
+    net.{{ cfg.server.webmgmt.interface.if_name }},{{ cfg.server.webmgmt.interface.port }},
+{%- endif -%}
+{ kind = 'webmgmt' })
+{%- endif %}
