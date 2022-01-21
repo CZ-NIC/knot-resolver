@@ -29,6 +29,9 @@ lint:py3.10:
   artifacts:
     reports:
       cobertura: coverage.xml
+      junit: manager/unit.junit.xml
+    paths:
+      - manager/unit.junit.xml
 
 unit:py3.6:
   <<: *unit

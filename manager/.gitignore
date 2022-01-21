@@ -12,3 +12,4 @@ dist/
 /pkg
 .podman-cache/
 docs/_build/*
+*junit.xml
