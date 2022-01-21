@@ -19,7 +19,7 @@ from knot_resolver_manager.compat import asyncio as asyncio_compat
 from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE
 from knot_resolver_manager.datamodel.config_schema import KresConfig
-from knot_resolver_manager.datamodel.types import Listen, ListenType
+from knot_resolver_manager.datamodel.server_schema import ManagementSchema
 from knot_resolver_manager.exceptions import DataException, KresManagerException, SchemaException, TreeException
 from knot_resolver_manager.kresd_controller import get_controller_by_name
 from knot_resolver_manager.kresd_controller.interface import SubprocessController
@@ -68,7 +68,7 @@ class Server:
         # HTTP server
         self.app = Application(middlewares=[error_handler])
         self.runner = AppRunner(self.app)
-        self.listen: Optional[Listen] = None
+        self.listen: Optional[ManagementSchema] = None
         self.site: Union[NoneType, TCPSite, UnixSite] = None
         self.listen_lock = asyncio.Lock()
         self._config_path: Optional[Path] = config_path
@@ -79,7 +79,7 @@ class Server:
         await self._reconfigure_listen_address(config)
 
     async def _deny_listen_address_changes(self, config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
-        if config_old.server.management.listen != config_new.server.management.listen:
+        if config_old.server.management != config_new.server.management:
             return Result.err(
                 "Changing API listen address dynamically is not allowed as it's really dangerous. If you"
                 " really need this feature, please contact the developers and explain why. Technically,"
@@ -215,32 +215,34 @@ class Server:
             mgn = config.server.management
 
             # if the listen address did not change, do nothing
-            if self.listen == mgn.listen:
+            if self.listen == mgn:
                 return
 
             # start the new listen address
             nsite: Union[web.TCPSite, web.UnixSite]
-            if mgn.listen.typ is ListenType.UNIX_SOCKET:
-                nsite = web.UnixSite(self.runner, str(mgn.listen.unix_socket))
-                logger.info(f"Starting API HTTP server on http+unix://{mgn.listen.unix_socket}")
-            elif mgn.listen.typ is ListenType.IP:
-                nsite = web.TCPSite(self.runner, str(mgn.listen.ip), mgn.listen.port)
-                logger.info(f"Starting API HTTP server on http://{mgn.listen.ip}:{mgn.listen.port}")
+            if mgn.unix_socket:
+                nsite = web.UnixSite(self.runner, str(mgn.unix_socket))
+                logger.info(f"Starting API HTTP server on http+unix://{mgn.unix_socket}")
+            elif mgn.ip_address:
+                nsite = web.TCPSite(self.runner, str(mgn.ip_address.addr), int(mgn.ip_address.port))
+                logger.info(f"Starting API HTTP server on http://{mgn.ip_address.addr}:{mgn.ip_address.port}")
             else:
-                raise KresManagerException(f"Requested API on unsupported configuration format {mgn.listen.typ}")
+                raise KresManagerException(f"Requested API on unsupported configuration format.")
             await nsite.start()
 
             # stop the old listen
             assert (self.listen is None) == (self.site is None)
             if self.listen is not None and self.site is not None:
-                if self.listen.typ is ListenType.UNIX_SOCKET:
-                    logger.info(f"Stopping API HTTP server on http+unix://{mgn.listen.unix_socket}")
-                elif mgn.listen.typ is ListenType.IP:
-                    logger.info(f"Stopping API HTTP server on http://{mgn.listen.ip}:{mgn.listen.port}")
+                if self.listen.unix_socket:
+                    logger.info(f"Stopping API HTTP server on http+unix://{mgn.unix_socket}")
+                elif self.listen.ip_address:
+                    logger.info(
+                        f"Stopping API HTTP server on http://{self.listen.ip_address.addr}:{self.listen.ip_address.port}"
+                    )
                 await self.site.stop()
 
             # save new state
-            self.listen = mgn.listen
+            self.listen = mgn
             self.site = nsite
 
     async def shutdown(self) -> None:

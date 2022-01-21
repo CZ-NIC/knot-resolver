@@ -1,6 +1,5 @@
 import ipaddress
 import logging
-import os
 import re
 from enum import Enum, auto
 from pathlib import Path
@@ -165,8 +164,67 @@ RecordTypeEnum = Literal[
 ]
 
 
-class IntRange(CustomValueType):
+class _IntCustomBase(CustomValueType):
+    """
+    Base class to work with integer value that is intended as a basis for other custom types.
+    """
+
     _value: int
+
+    def __int__(self) -> int:
+        return self._value
+
+    def __str__(self) -> str:
+        return str(self._value)
+
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, _IntCustomBase) and o._value == self._value
+
+    def serialize(self) -> Any:
+        return self._value
+
+    @classmethod
+    def json_schema(cls: Type["_IntCustomBase"]) -> Dict[Any, Any]:
+        return {"type": "integer"}
+
+
+class _StrCustomBase(CustomValueType):
+    """
+    Base class to work with string value that is intended as a basis for other custom types.
+    """
+
+    _value: str
+
+    def __str__(self) -> str:
+        return self._value
+
+    def to_std(self) -> str:
+        return self._value
+
+    def __hash__(self) -> int:
+        return hash(self._value)
+
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, _StrCustomBase) and o._value == self._value
+
+    def serialize(self) -> Any:
+        return self._value
+
+    @classmethod
+    def json_schema(cls: Type["_StrCustomBase"]) -> Dict[Any, Any]:
+        return {"type": "string"}
+
+
+class _IntRangeBase(_IntCustomBase):
+    """
+    Base class to work with integer value ranges that is intended as a basis for other custom types.
+    Just inherit the class and set the values for _min and _max.
+
+    class CustomIntRange(_IntRangeBase):
+        _min: int = 0
+        _max: int = 10_000
+    """
+
     _min: int
     _max: int
 
@@ -184,24 +242,42 @@ class IntRange(CustomValueType):
                 object_path,
             )
 
-    def __int__(self) -> int:
-        return self._value
-
-    def __str__(self) -> str:
-        return str(self._value)
-
-    def __eq__(self, o: object) -> bool:
-        return isinstance(o, IntRange) and o._value == self._value
-
-    def serialize(self) -> Any:
-        return self._value
-
     @classmethod
-    def json_schema(cls: Type["IntRange"]) -> Dict[Any, Any]:
+    def json_schema(cls: Type["_IntRangeBase"]) -> Dict[Any, Any]:
         return {"type": "integer", "minimum": cls._min, "maximum": cls._max}
 
 
-class PortNumber(IntRange):
+class _PatternBase(_StrCustomBase):
+    """
+    Base class to work with string value that match regex pattern.
+    Just inherit the class and set pattern for _re.
+
+    class ABPattern(_PatternBase):
+        _re: Pattern[str] = r"ab*"
+    """
+
+    _re: Pattern[str]
+
+    def __init__(self, source_value: Any, object_path: str = "/") -> None:
+        super().__init__(source_value)
+        if isinstance(source_value, str):
+            if type(self)._re.match(source_value):
+                self._value: str = source_value
+            else:
+                raise SchemaException(f"'{source_value}' does not match '{self._re.pattern}' pattern", object_path)
+        else:
+            raise SchemaException(
+                f"Unexpected input type for string pattern - {type(source_value)}."
+                "Cause might be invalid format or invalid type.",
+                object_path,
+            )
+
+    @classmethod
+    def json_schema(cls: Type["_PatternBase"]) -> Dict[Any, Any]:
+        return {"type": "string", "pattern": rf"{cls._re.pattern}"}
+
+
+class PortNumber(_IntRangeBase):
     _min: int = 1
     _max: int = 65_535
 
@@ -345,7 +421,7 @@ class CheckedPath(UncheckedPath):
             raise SchemaException("Failed to resolve given file path. Is there a symlink loop?", object_path) from e
 
 
-class DomainName(CustomValueType):
+class DomainName(_PatternBase):
     _re = re.compile(
         r"^(([a-zA-Z]{1})|([a-zA-Z]{1}[a-zA-Z]{1})|"
         r"([a-zA-Z]{1}[0-9]{1})|([0-9]{1}[a-zA-Z]{1})|"
@@ -353,66 +429,49 @@ class DomainName(CustomValueType):
         r"([a-zA-Z]{2,13}|[a-zA-Z0-9-]{2,30}.[a-zA-Z]{2,3})($|.$)"
     )
 
+
+class InterfacePort(_StrCustomBase):
+    if_name: str
+    port: PortNumber
+
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
         if isinstance(source_value, str):
-            if type(self)._re.match(source_value):
-                self._value: str = source_value
+            if "@" in source_value:
+                parts = source_value.split("@", 1)
+                try:
+                    self.port = PortNumber(int(parts[1]))
+                except ValueError as e:
+                    raise SchemaException("Failed to parse port.", object_path) from e
+                self.if_name = parts[0]
             else:
-                raise SchemaException(f"'{source_value}' is not valid domain name", object_path)
+                raise SchemaException("Missing port number '<interface>@<port>'.", object_path)
+            self._value = source_value
         else:
             raise SchemaException(
-                f"Unexpected input type for DomainName type - {type(source_value)}."
-                "Cause might be invalid format or invalid type.",
+                f"Unexpected value for '<interface>@<port>'. Expected string, got '{source_value}'"
+                f" with type '{type(source_value)}'",
                 object_path,
             )
 
-    def to_std(self) -> str:
-        return self._value
 
-    def __hash__(self) -> int:
-        return hash(self._value)
-
-    def __str__(self) -> str:
-        return self._value
-
-    def __int__(self) -> int:
-        raise ValueError("Can't convert DomainName to an integer")
-
-    def __eq__(self, o: object) -> bool:
-        """
-        Two instances of DomainName are equal when they represent same string.
-        """
-        return isinstance(o, DomainName) and str(o._value) == str(self._value)
-
-    def serialize(self) -> Any:
-        return str(self._value)
-
-    @classmethod
-    def json_schema(cls: Type["DomainName"]) -> Dict[Any, Any]:
-        return {
-            "type": "string",
-        }
-
-
-class InterfacePort(CustomValueType):
-    intrfc: str
+class InterfaceOptionalPort(_StrCustomBase):
+    if_name: str
     port: Optional[PortNumber] = None
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
         if isinstance(source_value, str):
             if "@" in source_value:
-                sep = source_value.split("@", 1)
+                parts = source_value.split("@", 1)
                 try:
-                    self.port = PortNumber(int(sep[1]))
+                    self.port = PortNumber(int(parts[1]))
                 except ValueError as e:
                     raise SchemaException("Failed to parse port.", object_path) from e
-                self.intrfc = sep[0]
+                self.if_name = parts[0]
             else:
-                self.intrfc = source_value
+                self.if_name = source_value
             self._value = source_value
-
         else:
             raise SchemaException(
                 f"Unexpected value for a '<interface>[@<port>]'. Expected string, got '{source_value}'"
@@ -420,47 +479,52 @@ class InterfacePort(CustomValueType):
                 object_path,
             )
 
-    def to_std(self) -> str:
-        return self._value
 
-    def __str__(self) -> str:
-        return self._value
-
-    def __int__(self) -> int:
-        raise ValueError("Can't convert InterfacePort to an integer")
-
-    def __eq__(self, o: object) -> bool:
-        """
-        Two instances of InterfacePort are equal when they represent same string.
-        """
-        return isinstance(o, InterfacePort) and str(o._value) == str(self._value)
-
-    def serialize(self) -> Any:
-        return str(self._value)
-
-    @classmethod
-    def json_schema(cls: Type["InterfacePort"]) -> Dict[Any, Any]:
-        return {
-            "type": "string",
-        }
-
-
-class IPAddressPort(CustomValueType):
+class IPAddressPort(_StrCustomBase):
     addr: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
-    port: Optional[PortNumber] = None
+    port: PortNumber
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
         if isinstance(source_value, str):
             if "@" in source_value:
-                sep = source_value.split("@", 1)
+                parts = source_value.split("@", 1)
                 try:
-                    self.port = PortNumber(int(sep[1]))
+                    self.port = PortNumber(int(parts[1]))
                 except ValueError as e:
                     raise SchemaException("Failed to parse port.", object_path) from e
 
                 try:
-                    self.addr = ipaddress.ip_address(sep[0])
+                    self.addr = ipaddress.ip_address(parts[0])
+                except ValueError as e:
+                    raise SchemaException("Failed to parse IP address.", object_path) from e
+            else:
+                raise SchemaException("Missing port number '<ip-address>@<port>'.", object_path)
+            self._value = source_value
+
+        else:
+            raise SchemaException(
+                f"Unexpected value for a '<ip-address>@<port>'. Expected string, got '{source_value}'"
+                f" with type '{type(source_value)}'",
+                object_path,
+            )
+
+
+class IPAddressOptionalPort(_StrCustomBase):
+    addr: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+    port: Optional[PortNumber] = None
+
+    def __init__(self, source_value: Any, object_path: str = "/") -> None:
+        if isinstance(source_value, str):
+            if "@" in source_value:
+                parts = source_value.split("@", 1)
+                try:
+                    self.port: Optional[PortNumber] = PortNumber(int(parts[1]))
+                except ValueError as e:
+                    raise SchemaException("Failed to parse port.", object_path) from e
+
+                try:
+                    self.addr = ipaddress.ip_address(parts[0])
                 except ValueError as e:
                     raise SchemaException("Failed to parse IP address.", object_path) from e
             else:
@@ -476,30 +540,6 @@ class IPAddressPort(CustomValueType):
                 f" with type '{type(source_value)}'",
                 object_path,
             )
-
-    def to_std(self) -> str:
-        return self._value
-
-    def __str__(self) -> str:
-        return self._value
-
-    def __int__(self) -> int:
-        raise ValueError("Can't convert IP address to an integer")
-
-    def __eq__(self, o: object) -> bool:
-        """
-        Two instances of IPAddressPORT are equal when they represent same string.
-        """
-        return isinstance(o, IPAddressPort) and str(o._value) == str(self._value)
-
-    def serialize(self) -> Any:
-        return str(self._value)
-
-    @classmethod
-    def json_schema(cls: Type["IPAddressPort"]) -> Dict[Any, Any]:
-        return {
-            "type": "string",
-        }
 
 
 class IPv4Address(CustomValueType):
@@ -667,88 +707,3 @@ class IPv6Network96(CustomValueType):
     @classmethod
     def json_schema(cls: Type["IPv6Network96"]) -> Dict[Any, Any]:
         return {"type": "string"}
-
-
-class ListenType(Enum):
-    IP = auto()
-    UNIX_SOCKET = auto()
-    INTERFACE = auto()
-
-
-class Listen(SchemaNode, Serializable):
-    class Raw(SchemaNode):
-        ip: Optional[IPAddress] = None
-        port: Optional[int] = None
-        unix_socket: Optional[CheckedPath] = None
-        interface: Optional[str] = None
-
-    _PREVIOUS_SCHEMA = Raw
-
-    typ: ListenType
-    ip: Optional[IPAddress]
-    port: Optional[int]
-    unix_socket: Optional[CheckedPath]
-    interface: Optional[str]
-
-    def _typ(self, origin: Raw) -> ListenType:
-        present = {
-            "ip" if origin.ip is not None else ...,
-            "port" if origin.port is not None else ...,
-            "unix_socket" if origin.unix_socket is not None else ...,
-            "interface" if origin.interface is not None else ...,
-        }
-
-        if present == {"ip", ...} or present == {"ip", "port", ...}:
-            return ListenType.IP
-        elif present == {"unix_socket", ...}:
-            return ListenType.UNIX_SOCKET
-        elif present == {"interface", ...} or present == {"interface", "port", ...}:
-            return ListenType.INTERFACE
-        else:
-            raise ValueError(
-                "Listen configuration contains multiple incompatible options at once. "
-                "You can use (IP and PORT) or (UNIX_SOCKET) or (INTERFACE and PORT)."
-            )
-
-    def _port(self, origin: Raw) -> Optional[int]:
-        if origin.port is None:
-            return None
-        if not 0 <= origin.port <= 65_535:
-            raise ValueError(f"Port value {origin.port} out of range of usual 2-byte port value")
-        return origin.port
-
-    def _validate(self) -> None:
-        # we already check that it's there is only one option in the `_typ` method
-        pass
-
-    def __str__(self) -> str:
-        if self.typ is ListenType.IP:
-            return f"{self.ip} @ {self.port}"
-        elif self.typ is ListenType.UNIX_SOCKET:
-            return f"{self.unix_socket}"
-        elif self.typ is ListenType.INTERFACE:
-            return f"{self.interface} @ {self.port}"
-        else:
-            raise NotImplementedError()
-
-    def __eq__(self, o: object) -> bool:
-        if not isinstance(o, Listen):
-            return False
-
-        return (
-            self.port == o.port
-            and self.ip == o.ip
-            and self.typ == o.typ
-            and self.unix_socket == o.unix_socket
-            and self.interface == o.interface
-        )
-
-    def to_dict(self) -> Dict[Any, Any]:
-        if self.typ is ListenType.IP:
-            return {"port": self.port, "ip": str(self.ip)}
-        elif self.typ is ListenType.UNIX_SOCKET:
-            return {"unix_socket": str(self.unix_socket)}
-        elif self.typ is ListenType.INTERFACE:
-            return {"interface": self.interface, "port": self.port}
-        else:
-            raise NotImplementedError()

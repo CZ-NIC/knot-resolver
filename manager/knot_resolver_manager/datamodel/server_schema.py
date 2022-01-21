@@ -5,7 +5,14 @@ from typing import Any, Optional, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.types import CheckedPath, DomainName, Listen, RecordTypeEnum, UncheckedPath
+from knot_resolver_manager.datamodel.types import (
+    CheckedPath,
+    DomainName,
+    InterfacePort,
+    IPAddressPort,
+    RecordTypeEnum,
+    UncheckedPath,
+)
 from knot_resolver_manager.exceptions import DataException
 from knot_resolver_manager.utils import SchemaNode
 
@@ -39,21 +46,33 @@ class WatchDogSchema(SchemaNode):
 
 
 class ManagementSchema(SchemaNode):
-    """
-    Management API configuration.
+    unix_socket: Optional[CheckedPath] = None
+    ip_address: Optional[IPAddressPort] = None
 
-    ---
-    listen: Specifies where does the manager listen with its API. Can't be changed in runtime!
-    """
-
-    listen: Listen = Listen({"unix-socket": "./manager.sock"})
+    def _validate(self) -> None:
+        if bool(self.unix_socket) == bool(self.ip_address):
+            raise ValueError("One of 'ip-address' or 'unix-socket' must be configured..")
 
 
 class WebmgmtSchema(SchemaNode):
-    listen: Listen
+    unix_socket: Optional[CheckedPath] = None
+    ip_address: Optional[IPAddressPort] = None
+    interface: Optional[InterfacePort] = None
     tls: bool = False
     cert_file: Optional[CheckedPath] = None
     key_file: Optional[CheckedPath] = None
+
+    def _validate(self) -> None:
+        present = {
+            "ip_address" if self.ip_address is not None else ...,
+            "unix_socket" if self.unix_socket is not None else ...,
+            "interface" if self.interface is not None else ...,
+        }
+        if not (present == {"ip_address", ...} or present == {"unix_socket", ...} or present == {"interface", ...}):
+            raise ValueError(
+                "Listen configuration contains multiple incompatible options at once. "
+                "One of 'ip-address', 'interface' or 'unix-socket' must be configured."
+            )
 
 
 class ServerSchema(SchemaNode):
@@ -82,7 +101,7 @@ class ServerSchema(SchemaNode):
         backend: BackendEnum = "auto"
         watchdog: Union[bool, WatchDogSchema] = True
         rundir: UncheckedPath = UncheckedPath(".")
-        management: ManagementSchema = ManagementSchema()
+        management: ManagementSchema = ManagementSchema({"unix-socket": "./manager.sock"})
         webmgmt: Optional[WebmgmtSchema] = None
 
     _PREVIOUS_SCHEMA = Raw
