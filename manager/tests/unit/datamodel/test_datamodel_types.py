@@ -5,6 +5,7 @@ from pytest import raises
 from knot_resolver_manager.datamodel.types import (
     CheckedPath,
     DomainName,
+    InterfaceName,
     InterfaceOptionalPort,
     InterfacePort,
     IPAddress,
@@ -78,6 +79,27 @@ def test_domain_name():
 
     with raises(KresManagerException):
         TestSchema({"name": "b@d.domain.com."})
+
+
+def test_interface_name():
+    assert InterfaceName("lo")
+    assert InterfaceName("eth0")
+    assert InterfaceName("wlo1")
+    assert InterfaceName("web_ifgrp")
+    assert InterfaceName("e8-2")
+
+    with raises(KresManagerException):
+        InterfaceName("_lo")
+    with raises(KresManagerException):
+        InterfaceName("-wlo1")
+    with raises(KresManagerException):
+        InterfaceName("lo_")
+    with raises(KresManagerException):
+        InterfaceName("wlo1-")
+    with raises(KresManagerException):
+        InterfaceName("e8--2")
+    with raises(KresManagerException):
+        InterfaceName("web__ifgrp")
 
 
 def test_interface_port():

@@ -1,15 +1,13 @@
 import ipaddress
 import logging
 import re
-from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Dict, Optional, Pattern, Type, Union
 
 from typing_extensions import Literal
 
 from knot_resolver_manager.exceptions import SchemaException
-from knot_resolver_manager.utils import CustomValueType, SchemaNode
-from knot_resolver_manager.utils.modelling import Serializable
+from knot_resolver_manager.utils import CustomValueType
 
 logger = logging.getLogger(__name__)
 
@@ -281,6 +279,13 @@ class PortNumber(_IntRangeBase):
     _min: int = 1
     _max: int = 65_535
 
+    @classmethod
+    def from_str(cls: Type["PortNumber"], port: str, object_path: str = "/") -> "PortNumber":
+        try:
+            return cls(int(port), object_path)
+        except ValueError as e:
+            raise SchemaException(f"Invalid port number {port}", object_path) from e
+
 
 class Unit(CustomValueType):
     _re: Pattern[str]
@@ -430,52 +435,51 @@ class DomainName(_PatternBase):
     )
 
 
+class InterfaceName(_PatternBase):
+    _re = re.compile(r"^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$")
+
+
 class InterfacePort(_StrCustomBase):
-    if_name: str
+    if_name: InterfaceName
     port: PortNumber
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
         if isinstance(source_value, str):
-            if "@" in source_value:
-                parts = source_value.split("@", 1)
-                try:
-                    self.port = PortNumber(int(parts[1]))
-                except ValueError as e:
-                    raise SchemaException("Failed to parse port.", object_path) from e
-                self.if_name = parts[0]
+            parts = source_value.split("@")
+            if len(parts) == 2:
+                self.port = PortNumber.from_str(parts[1], object_path)
+                self.if_name = InterfaceName(parts[0], object_path)
             else:
-                raise SchemaException("Missing port number '<interface>@<port>'.", object_path)
+                raise SchemaException(f"Expected '<interface>@<port>', got '{source_value}'.", object_path)
             self._value = source_value
         else:
             raise SchemaException(
-                f"Unexpected value for '<interface>@<port>'. Expected string, got '{source_value}'"
-                f" with type '{type(source_value)}'",
+                f"Unexpected value for '<interface>@<port>'. "
+                f"Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
             )
 
 
 class InterfaceOptionalPort(_StrCustomBase):
-    if_name: str
+    if_name: InterfaceName
     port: Optional[PortNumber] = None
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
         if isinstance(source_value, str):
-            if "@" in source_value:
-                parts = source_value.split("@", 1)
-                try:
-                    self.port = PortNumber(int(parts[1]))
-                except ValueError as e:
-                    raise SchemaException("Failed to parse port.", object_path) from e
-                self.if_name = parts[0]
+            parts = source_value.split("@")
+            if 0 < len(parts) < 3:
+                self.if_name = InterfaceName(parts[0], object_path)
+                if len(parts) == 2:
+                    self.port = PortNumber.from_str(parts[1], object_path)
             else:
-                self.if_name = source_value
+                raise SchemaException(f"Expected '<interface>[@<port>]', got '{parts}'.", object_path)
             self._value = source_value
         else:
             raise SchemaException(
-                f"Unexpected value for a '<interface>[@<port>]'. Expected string, got '{source_value}'"
-                f" with type '{type(source_value)}'",
+                f"Unexpected value for '<interface>[@<port>]'. "
+                f"Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
             )
 
@@ -487,25 +491,20 @@ class IPAddressPort(_StrCustomBase):
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
         if isinstance(source_value, str):
-            if "@" in source_value:
-                parts = source_value.split("@", 1)
-                try:
-                    self.port = PortNumber(int(parts[1]))
-                except ValueError as e:
-                    raise SchemaException("Failed to parse port.", object_path) from e
-
+            parts = source_value.split("@")
+            if len(parts) == 2:
+                self.port = PortNumber.from_str(parts[1], object_path)
                 try:
                     self.addr = ipaddress.ip_address(parts[0])
                 except ValueError as e:
-                    raise SchemaException("Failed to parse IP address.", object_path) from e
+                    raise SchemaException(f"Failed to parse IP address '{parts[0]}'.", object_path) from e
             else:
-                raise SchemaException("Missing port number '<ip-address>@<port>'.", object_path)
+                raise SchemaException(f"Expected '<ip-address>@<port>', got '{source_value}'.", object_path)
             self._value = source_value
-
         else:
             raise SchemaException(
-                f"Unexpected value for a '<ip-address>@<port>'. Expected string, got '{source_value}'"
-                f" with type '{type(source_value)}'",
+                f"Unexpected value for '<ip-address>@<port>'. "
+                f"Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
             )
 
@@ -516,28 +515,21 @@ class IPAddressOptionalPort(_StrCustomBase):
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         if isinstance(source_value, str):
-            if "@" in source_value:
-                parts = source_value.split("@", 1)
-                try:
-                    self.port: Optional[PortNumber] = PortNumber(int(parts[1]))
-                except ValueError as e:
-                    raise SchemaException("Failed to parse port.", object_path) from e
-
+            parts = source_value.split("@")
+            if 0 < len(parts) < 3:
                 try:
                     self.addr = ipaddress.ip_address(parts[0])
                 except ValueError as e:
-                    raise SchemaException("Failed to parse IP address.", object_path) from e
+                    raise SchemaException(f"Failed to parse IP address '{parts[0]}'.", object_path) from e
+                if len(parts) == 2:
+                    self.port = PortNumber.from_str(parts[1], object_path)
             else:
-                try:
-                    self.addr = ipaddress.ip_address(source_value)
-                except ValueError as e:
-                    raise SchemaException("Failed to parse IP address.", object_path) from e
+                raise SchemaException(f"Expected '<ip-address>[@<port>]', got '{parts}'.", object_path)
             self._value = source_value
-
         else:
             raise SchemaException(
-                f"Unexpected value for a '<ip-address>[@<port>]'. Expected string, got '{source_value}'"
-                f" with type '{type(source_value)}'",
+                f"Unexpected value for a '<ip-address>[@<port>]'. "
+                f"Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
             )
 
