@@ -251,7 +251,7 @@ class _PatternBase(_StrCustomBase):
     Just inherit the class and set pattern for _re.
 
     class ABPattern(_PatternBase):
-        _re: Pattern[str] = r"ab*"
+        _re: Pattern[str] = re.compile(r"ab*")
     """
 
     _re: Pattern[str]
@@ -266,7 +266,7 @@ class _PatternBase(_StrCustomBase):
         else:
             raise SchemaException(
                 f"Unexpected input type for string pattern - {type(source_value)}."
-                "Cause might be invalid format or invalid type.",
+                " Cause might be invalid format or invalid type.",
                 object_path,
             )
 
@@ -384,7 +384,7 @@ class UncheckedPath(CustomValueType):
             self._value: Path = Path(source_value)
         else:
             raise SchemaException(
-                f"Expected file path in a string, got '{source_value}' with type '{type(source_value)}'", object_path
+                f"Expected file path in a string, got '{source_value}' with type '{type(source_value)}'.", object_path
             )
 
     def __str__(self) -> str:
@@ -455,8 +455,8 @@ class InterfacePort(_StrCustomBase):
             self._value = source_value
         else:
             raise SchemaException(
-                f"Unexpected value for '<interface>@<port>'. "
-                f"Expected string, got '{source_value}' with type '{type(source_value)}'",
+                "Unexpected value for '<interface>@<port>'."
+                f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
             )
 
@@ -478,8 +478,8 @@ class InterfaceOptionalPort(_StrCustomBase):
             self._value = source_value
         else:
             raise SchemaException(
-                f"Unexpected value for '<interface>[@<port>]'. "
-                f"Expected string, got '{source_value}' with type '{type(source_value)}'",
+                "Unexpected value for '<interface>[@<port>]'."
+                f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
             )
 
@@ -503,8 +503,8 @@ class IPAddressPort(_StrCustomBase):
             self._value = source_value
         else:
             raise SchemaException(
-                f"Unexpected value for '<ip-address>@<port>'. "
-                f"Expected string, got '{source_value}' with type '{type(source_value)}'",
+                "Unexpected value for '<ip-address>@<port>'."
+                f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
             )
 
@@ -528,13 +528,15 @@ class IPAddressOptionalPort(_StrCustomBase):
             self._value = source_value
         else:
             raise SchemaException(
-                f"Unexpected value for a '<ip-address>[@<port>]'. "
-                f"Expected string, got '{source_value}' with type '{type(source_value)}'",
+                "Unexpected value for a '<ip-address>[@<port>]'."
+                f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
             )
 
 
 class IPv4Address(CustomValueType):
+    _value: ipaddress.IPv4Address
+
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
         if isinstance(source_value, str):
@@ -544,8 +546,8 @@ class IPv4Address(CustomValueType):
                 raise SchemaException("Failed to parse IPv4 address.", object_path) from e
         else:
             raise SchemaException(
-                f"Unexpected value for a IPv4 address. Expected string, got '{source_value}'"
-                f" with type '{type(source_value)}'",
+                "Unexpected value for a IPv4 address."
+                f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
             )
 
@@ -575,6 +577,8 @@ class IPv4Address(CustomValueType):
 
 
 class IPv6Address(CustomValueType):
+    _value: ipaddress.IPv6Address
+
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
         if isinstance(source_value, str):
@@ -584,8 +588,8 @@ class IPv6Address(CustomValueType):
                 raise SchemaException("Failed to parse IPv6 address.", object_path) from e
         else:
             raise SchemaException(
-                f"Unexpected value for a IPv6 address. Expected string, got '{source_value}'"
-                f" with type '{type(source_value)}'",
+                "Unexpected value for a IPv6 address."
+                f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
             )
 
@@ -618,6 +622,8 @@ IPAddress = Union[IPv4Address, IPv6Address]
 
 
 class IPNetwork(CustomValueType):
+    _value: Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
+
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
         if isinstance(source_value, str):
@@ -627,8 +633,8 @@ class IPNetwork(CustomValueType):
                 raise SchemaException("Failed to parse IP network.", object_path) from e
         else:
             raise SchemaException(
-                f"Unexpected value for a network subnet. Expected string, got '{source_value}'"
-                " with type '{type(source_value)}'",
+                "Unexpected value for a network subnet."
+                f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
             )
 
@@ -652,6 +658,8 @@ class IPNetwork(CustomValueType):
 
 
 class IPv6Network96(CustomValueType):
+    _value: ipaddress.IPv6Network
+
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value, object_path=object_path)
         if isinstance(source_value, str):
