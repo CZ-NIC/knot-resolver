@@ -350,8 +350,9 @@ pkgtest:
     variables:
       - $SKIP_CI == "1"
 
-manager:  # TODO better CI integration
+manager:
   stage: test
+  needs: []
   trigger:
     include: manager/.gitlab-ci.yml
     strategy: depend
@@ -364,6 +365,7 @@ manager:  # TODO better CI integration
       - $SKIP_CI == "1"
 
 pytests:
+  <<: *common
   # these are executed on LXC runners to increase stability
   image: $CI_REGISTRY/knot/knot-resolver/ci/lxc-debian-11:knot-$KNOT_VERSION
   needs: []

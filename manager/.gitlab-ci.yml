@@ -1,70 +1,59 @@
 stages:
   - check
-  - packaging
 
 default:
-  image: registry.nic.cz/knot/knot-resolver-manager/knot-manager:ci
+  image: registry.nic.cz/knot/knot-resolver/ci/manager:knot-$KNOT_VERSION
   before_script:
-    - pushd manager
-    # make sure Poetry is in $PATH
-    - source $HOME/.poetry/env
-    # there is already a pyproject.toml with installed dependencies in the root
-    # it has its own virtualenv and we want to use that env in a different directory
-    # so let's create a new one and replace it by the already existing one
-    # we don't care about destroying the environment in process, because it's going to be discarded anyway
-    - poetry env use $(which python3.6); ourpath=$(poetry env info -p); upperpath=$( (cd ..; poetry env info -p) ); rm -rf "$ourpath"; cp -a "$upperpath" "$ourpath"
-    # the virtualenv we recycled might be slightly out of date. Let's quickly update it
+    - cd manager
+    - poetry env use $PYTHON_INTERPRETER
     - poetry install
-    # fix podman; see https://gitlab.nic.cz/labs/lxc-gitlab-runner#nesting-with-podman
-    - unset TMPDIR
   tags:
-    - lxc
+    - docker
+    - linux
     - amd64
 
-lint:
+lint:py3.10:
   stage: check
   script:
     - poe check
+  variables:
+    PYTHON_INTERPRETER: python3.10
 
-test:
+
+.unit: &unit
   stage: check
   script:
     - poe test
-    - poetry run coverage xml
+    # the following command makes sure that the source root of the coverage file is at $gitroot
+    - poetry run bash -c "cd ..; coverage combine manager/.coverage; coverage xml"
   artifacts:
     reports:
       cobertura: coverage.xml
-
-integration:
-  stage: check
-  script:
-    - poe integration
-
-
-package-debian-10:
-  when: manual
-  stage: packaging
-  image: registry.nic.cz/labs/lxc-gitlab-runner/debian-10
-  before_script:
-    - pushd manager
-  script:
-    - bash scripts/make-package.sh
-  artifacts:
+      junit: manager/unit.junit.xml
     paths:
-      - knot-resolver/pkg/pkgs/
-      - knot-resolver/pkg/srcpkgs/
-    expire_in: 1 week
+      - manager/unit.junit.xml
 
-package-fedora-34:
-  when: manual
-  stage: packaging
-  image: registry.nic.cz/labs/lxc-gitlab-runner/fedora-34
-  before_script:
-    - pushd manager
-  script:
-    - bash scripts/make-package.sh
-  artifacts:
-    paths:
-      - knot-resolver/pkg/pkgs/
-      - knot-resolver/pkg/srcpkgs/
-    expire_in: 1 week
+unit:py3.6:
+  <<: *unit
+  variables:
+    PYTHON_INTERPRETER: python3.6
+
+unit:py3.7:
+  <<: *unit
+  variables:
+    PYTHON_INTERPRETER: python3.7
+
+unit:py3.8:
+  <<: *unit
+  variables:
+    PYTHON_INTERPRETER: python3.8
+
+unit:py3.9:
+  <<: *unit
+  variables:
+    PYTHON_INTERPRETER: python3.9
+
+unit:py3.10:
+  <<: *unit
+  variables:
+    PYTHON_INTERPRETER: python3.10
