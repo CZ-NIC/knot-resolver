@@ -6,6 +6,7 @@ red="\033[0;31m"
 yellow="\033[0;33m"
 green="\033[0;32m"
 bright_black="\033[0;90m"
+blue="\033[0;34m"
 reset="\033[0m"
 
 # ensure consistent top level directory
@@ -14,7 +15,7 @@ if test -z "$gitroot"; then
 	echo -e "${red}This command can be run only in a git repository tree.${reset}"
 	exit 1
 fi
-cd $gitroot
+cd $gitroot/manager
 
 # ensure consistent environment with virtualenv
 if test -z "$VIRTUAL_ENV" -a "$CI" != "true" -a -z "$KNOT_ENV"; then

@@ -11,7 +11,6 @@ Because we want to support multiple versions of Python with one codebase, we dev
 Install these tools:
 * [pyenv](https://github.com/pyenv/pyenv#installation) - a tool for switching between Python versions without affecting the system (can be installed using distro's package manager)
 * [Poetry](https://python-poetry.org/docs/#installation) - dependency management (note: do not install the package via pip, follow instructions in Poetry's official documentation)
-* NodeJS+NPM - used for our type-checker, version packaged in your distro should work just fine
 
 Be careful, that you need the latest version of Poetry. The setup was tested with Poetry version 1.1.7. Due to it's ability to switch between Python versions, it has to be installed separately to work correctly. Make sure to follow [the latest setup guide](https://python-poetry.org/docs/#installation).
 
@@ -24,7 +23,6 @@ pyenv install 3.8.7
 pyenv install 3.9.1
 poetry env use $(pyenv which python)
 poetry install
-npm install
 ```
 
 With this environment, **everything else should just work**. You can run the same checks the CI runs, all commands listed bellow should pass. If something fails and you did all the steps above, please [open a new issue](https://gitlab.nic.cz/knot/knot-resolver-manager/-/issues/new).
@@ -74,14 +72,10 @@ Short answer - mainly for managing other dependencies. By using dependency manag
     * A dependency management system for Python libraries. Normally, all libraries in Python are installed system-wide and dependent on system's Python version. By using virtual environments managed by Poetry, configured to use a the correct Python version through pyenv, we can specify versions of the dependencies in any way we like.
     * Follows PEP 518 and uses the `pyproject.toml` file for all of it's configuration.
     * Written in Python, therefore it's problematic if installed system-wide as an ordinary Python package (because it would be unavailable in its own virtual environment).
-  * Yarn or NPM
-    * Dependency management systems from JavaScript development.
-    * Used for installing pyright - the type checker we use.
 * automatically managed dependencies
   * PoeThePoet - A task management system, or in other words glorified switch statement calling other tools. Used for simplifying interractions with the project.
   * pytest, pytest-cov - unit testing
   * pylint, flake8 - linting
-  * pyright - type checking, compatible with VSCode using the Pylance extension
   * black - autoformatter (might be removed in the future if not used in practice)
   * tox - testing automation
   * tox-pyenv - plugin for tox that makes use of pyenv provided Python binaries
@@ -89,14 +83,3 @@ Short answer - mainly for managing other dependencies. By using dependency manag
 ### Why Poetry? Why should I learn a new tool?
 
 This blog post explains it nicely - https://muttdata.ai/blog/2020/08/21/a-poetic-apology.html.
-
-### Why do we need JavaScript in Python project?
-
-We would like to use a type checker. As of writing this, there are 4 possible options (I was aware of):
-
-* [mypy](http://mypy-lang.org/) - oldest, reports correct code as broken, no advanced features, written in Python, works
-* [pytype](https://github.com/google/pytype) - supports type inference, written in Python, does not work in Python 3.9, Python versions > 3.7 are not yet supported
-* [pyre](https://pyre-check.org/) - supports type inference, contains security focused static analysis tool, written in Python, does not work in Python 3.6
-* [pyright](https://github.com/Microsoft/pyright) - not that advanced as pyre and pytype, reports correct code as broken, basic type inference when no typehints are provided, written in TypeScript, great integration with VSCode, works regardless of current Python version
-
-Type inference is really handy when it comes to libraries without type hints or when you use internal functions without specifiing their types. This is why we use pyright instead of the more classical approach with mypy.
