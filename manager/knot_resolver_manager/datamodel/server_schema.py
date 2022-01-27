@@ -5,6 +5,7 @@ from typing import Any, Optional, Union
 
 from typing_extensions import Literal
 
+from knot_resolver_manager.datamodel.network_schema import listen_config_validate
 from knot_resolver_manager.datamodel.types import (
     CheckedPath,
     DomainName,
@@ -63,16 +64,7 @@ class WebmgmtSchema(SchemaNode):
     key_file: Optional[CheckedPath] = None
 
     def _validate(self) -> None:
-        present = {
-            "ip_address" if self.ip_address is not None else ...,
-            "unix_socket" if self.unix_socket is not None else ...,
-            "interface" if self.interface is not None else ...,
-        }
-        if not (present == {"ip_address", ...} or present == {"unix_socket", ...} or present == {"interface", ...}):
-            raise ValueError(
-                "Listen configuration contains multiple incompatible options at once. "
-                "One of 'ip-address', 'interface' or 'unix-socket' must be configured."
-            )
+        listen_config_validate(self)
 
 
 class ServerSchema(SchemaNode):

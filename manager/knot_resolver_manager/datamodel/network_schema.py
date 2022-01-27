@@ -43,6 +43,19 @@ class TLSSchema(SchemaNode):
             raise ValueError("'padding' must be number in range<0-512>")
 
 
+def listen_config_validate(obj: object) -> None:
+    present = {
+        "ip-address" if hasattr(obj, "ip_address") and getattr(obj, "ip_address") is not None else ...,
+        "unix-socket" if hasattr(obj, "unix_socket") and getattr(obj, "unix_socket") is not None else ...,
+        "interface" if hasattr(obj, "interface") and getattr(obj, "interface") is not None else ...,
+    }
+    if not (present == {"ip-address", ...} or present == {"unix-socket", ...} or present == {"interface", ...}):
+        raise ValueError(
+            "Listen configuration contains incompatible configuration options."
+            f" Expected one of 'ip-address', 'interface' and 'unix-socket' options, got '{present}'."
+        )
+
+
 class ListenSchema(SchemaNode):
     class Raw(SchemaNode):
         unix_socket: Union[None, CheckedPath, List[CheckedPath]] = None
@@ -103,16 +116,7 @@ class ListenSchema(SchemaNode):
         return None
 
     def _validate(self) -> None:
-        present = {
-            "ip_address" if self.ip_address is not None else ...,
-            "unix_socket" if self.unix_socket is not None else ...,
-            "interface" if self.interface is not None else ...,
-        }
-        if not (present == {"ip_address", ...} or present == {"unix_socket", ...} or present == {"interface", ...}):
-            raise ValueError(
-                "Listen configuration contains multiple incompatible options at once. "
-                "Only one of 'ip-address', 'interface' and 'unix-socket' optionscan be configured at once."
-            )
+        listen_config_validate(self)
         if self.port and self.unix_socket:
             raise ValueError(
                 "'unix-socket' and 'port' are not compatible options. "
