@@ -8,6 +8,8 @@ aggregate_rv=0
 function check_rv {
 	if test "$1" -eq 0; then
 		echo -e "  ${green}OK${reset}"
+	else
+		echo -e "  ${red}FAIL${reset}"
 	fi
 	aggregate_rv=$(( $aggregate_rv + $1 ))
 }
@@ -15,6 +17,21 @@ function check_rv {
 
 # stop failing early, because we wouldn't do anything else than fail
 set +e
+
+
+# check that all dependencies are installed correctly
+echo -e "${yellow}Checking that all dependencies are properly installed...${reset}"
+poetry install --dry-run | grep "0 install" > /dev/null
+check_rv $?
+echo
+
+# early exit when dependencies are not installed
+if test "$aggregate_rv" -ne "0"; then
+	echo -e "${red}Dependencies are not properly installed. Run this command to fix it:${reset}"
+	echo -e "  ${red}poetry install${reset}"
+	exit 1
+fi
+
 
 # check formatting using black
 echo -e "${yellow}Checking formatting using black...${reset}"

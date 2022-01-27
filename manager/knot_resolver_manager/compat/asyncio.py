@@ -38,7 +38,6 @@ async def to_thread(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
             try:
                 return pfunc()
             except BaseException as e:
-                logger.error("Task in thread failed...", exc_info=True)
                 exc = e
                 return None
 
