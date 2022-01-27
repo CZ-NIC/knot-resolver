@@ -227,7 +227,7 @@ class Server:
                 nsite = web.TCPSite(self.runner, str(mgn.ip_address.addr), int(mgn.ip_address.port))
                 logger.info(f"Starting API HTTP server on http://{mgn.ip_address.addr}:{mgn.ip_address.port}")
             else:
-                raise KresManagerException(f"Requested API on unsupported configuration format.")
+                raise KresManagerException("Requested API on unsupported configuration format.")
             await nsite.start()
 
             # stop the old listen

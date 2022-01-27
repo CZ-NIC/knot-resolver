@@ -71,7 +71,7 @@ class ListenSchema(SchemaNode):
                     raise ValueError(
                         "The '@<port>' syntax must be used either for all or none of the IP addresses in the list."
                     )
-                port_set = True if addr.port else False
+                port_set = bool(addr.port)
         elif isinstance(origin.ip_address, IPAddressOptionalPort) and origin.ip_address.port and origin.port:
             raise ValueError("The port number is defined in two places ('port' option and '@<port>' syntax).")
         return origin.ip_address
@@ -86,7 +86,7 @@ class ListenSchema(SchemaNode):
                     raise ValueError(
                         "The '@<port>' syntax must be used either for all or none of the interface in the list."
                     )
-                port_set = True if intrfc.port else False
+                port_set = bool(intrfc.port)
         elif isinstance(origin.interface, InterfaceOptionalPort) and origin.interface.port and origin.port:
             raise ValueError("The port number is defined in two places ('port' option and '@<port>' syntax).")
         return origin.interface
