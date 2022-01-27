@@ -193,6 +193,9 @@ class _StrCustomBase(CustomValueType):
 
     _value: str
 
+    def __int__(self) -> int:
+        raise ValueError("Can't convert string to an integer.")
+
     def __str__(self) -> str:
         return self._value
 
@@ -227,6 +230,7 @@ class _IntRangeBase(_IntCustomBase):
     _max: int
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
+        super().__init__(source_value)
         if isinstance(source_value, int):
             if not self._min <= source_value <= self._max:
                 raise SchemaException(
@@ -514,6 +518,7 @@ class IPAddressOptionalPort(_StrCustomBase):
     port: Optional[PortNumber] = None
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
+        super().__init__(source_value)
         if isinstance(source_value, str):
             parts = source_value.split("@")
             if 0 < len(parts) < 3:
