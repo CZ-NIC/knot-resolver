@@ -3,7 +3,7 @@ from typing import List
 from knot_resolver_manager.datamodel.config_schema import template_from_str
 from knot_resolver_manager.datamodel.network_schema import AddressRenumberingSchema
 from knot_resolver_manager.datamodel.policy_schema import AnswerSchema
-from knot_resolver_manager.datamodel.types import FlagsEnum
+from knot_resolver_manager.datamodel.types import PolicyFlagEnum
 
 
 def test_policy_add():
@@ -17,7 +17,7 @@ def test_policy_add():
 
 
 def test_policy_flags():
-    flags: List[FlagsEnum] = ["no-cache", "no-edns"]
+    flags: List[PolicyFlagEnum] = ["no-cache", "no-edns"]
     tmpl_str = """{% from 'macros/policy_macros.lua.j2' import policy_flags %}
 {{ policy_flags(flags) }}"""
 

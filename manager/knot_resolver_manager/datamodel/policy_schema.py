@@ -1,29 +1,35 @@
 from typing import List, Optional
 
 from knot_resolver_manager.datamodel.network_schema import AddressRenumberingSchema
-from knot_resolver_manager.datamodel.types import ActionEnum, FlagsEnum, IPAddressOptionalPort, RecordTypeEnum, TimeUnit
+from knot_resolver_manager.datamodel.types import (
+    DNSRecordTypeEnum,
+    IPAddressOptionalPort,
+    PolicyActionEnum,
+    PolicyFlagEnum,
+    TimeUnit,
+)
 from knot_resolver_manager.utils import SchemaNode
 
 
 class FilterSchema(SchemaNode):
     suffix: Optional[str] = None
     pattern: Optional[str] = None
-    qtype: Optional[RecordTypeEnum] = None
+    qtype: Optional[DNSRecordTypeEnum] = None
 
 
 class AnswerSchema(SchemaNode):
-    qtype: RecordTypeEnum
+    qtype: DNSRecordTypeEnum
     rdata: str
     ttl: TimeUnit = TimeUnit("1s")
     nodata: bool = False
 
 
 class PolicySchema(SchemaNode):
-    action: ActionEnum
+    action: PolicyActionEnum
     order: Optional[int] = None
     filter: Optional[FilterSchema] = None
     views: Optional[List[str]] = None
-    options: Optional[List[FlagsEnum]] = None
+    options: Optional[List[PolicyFlagEnum]] = None
     message: Optional[str] = None
     reroute: Optional[List[AddressRenumberingSchema]] = None
     answer: Optional[AnswerSchema] = None
