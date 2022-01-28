@@ -1,6 +1,6 @@
 from typing import List, Optional, Union
 
-from knot_resolver_manager.datamodel.types import CheckedPath, DomainName, FlagsEnum, IPAddressOptionalPort
+from knot_resolver_manager.datamodel.types import CheckedPath, DomainName, IPAddressOptionalPort, PolicyFlagEnum
 from knot_resolver_manager.utils import SchemaNode
 
 
@@ -15,4 +15,4 @@ class ForwardZoneSchema(SchemaNode):
     tls: bool = False
     servers: Union[List[IPAddressOptionalPort], List[ForwardServerSchema]]
     views: Optional[List[str]] = None
-    options: Optional[List[FlagsEnum]] = None
+    options: Optional[List[PolicyFlagEnum]] = None

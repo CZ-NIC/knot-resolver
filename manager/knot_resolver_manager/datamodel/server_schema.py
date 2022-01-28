@@ -8,10 +8,10 @@ from typing_extensions import Literal
 from knot_resolver_manager.datamodel.network_schema import listen_config_validate
 from knot_resolver_manager.datamodel.types import (
     CheckedPath,
+    DNSRecordTypeEnum,
     DomainName,
     InterfacePort,
     IPAddressPort,
-    RecordTypeEnum,
     UncheckedPath,
 )
 from knot_resolver_manager.exceptions import DataException
@@ -43,7 +43,7 @@ BackendEnum = Literal["auto", "systemd", "supervisord"]
 
 class WatchDogSchema(SchemaNode):
     qname: DomainName
-    qtype: RecordTypeEnum
+    qtype: DNSRecordTypeEnum
 
 
 class ManagementSchema(SchemaNode):
