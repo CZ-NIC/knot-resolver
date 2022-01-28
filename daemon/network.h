@@ -87,7 +87,12 @@ struct network {
 	 * The ID is the usual: raw int index in the LUA_REGISTRYINDEX table. */
 	trie_t *endpoint_kinds;
 	/** See network_engage_endpoints() */
-	bool missing_kind_is_error;
+	bool missing_kind_is_error : 1;
+
+	/** True: All IPv4 addresses are allowed to use the PROXYv2 protocol */
+	bool proxy_all4 : 1;
+	/** True: All IPv6 addresses are allowed to use the PROXYv2 protocol */
+	bool proxy_all6 : 1;
 
 	/** IPv4 addresses and networks allowed to use the PROXYv2 protocol */
 	trie_t *proxy_addrs4;

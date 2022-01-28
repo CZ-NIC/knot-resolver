@@ -48,11 +48,17 @@ bool proxy_allowed(const struct network *net, const struct sockaddr *saddr)
 	size_t addr_size;
 	switch (saddr->sa_family) {
 	case AF_INET:
+		if (net->proxy_all4)
+			return true;
+
 		trie = net->proxy_addrs4;
 		addr_size = sizeof(addr.ip4);
 		addr.ip4 = ((struct sockaddr_in *) saddr)->sin_addr;
 		break;
 	case AF_INET6:
+		if (net->proxy_all6)
+			return true;
+
 		trie = net->proxy_addrs6;
 		addr_size = sizeof(addr.ip6);
 		addr.ip6 = ((struct sockaddr_in6 *) saddr)->sin6_addr;

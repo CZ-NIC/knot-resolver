@@ -304,6 +304,26 @@ static char *proxy_data_to_string(int af, const struct net_proxy_data *data,
 	return dst;
 }
 
+/** Put all IP addresses from `trie` into the table at the top of the Lua stack.
+ * For each address, increment the integer at `i`. All addresses in `trie` must
+ * be from the specified `family`. */
+static void net_proxy_addr_put(lua_State *L, int family, trie_t *trie, int *i)
+{
+	char addrbuf[PROXY_DATA_STRLEN];
+	const char *addr;
+	trie_it_t *it;
+	for (it = trie_it_begin(trie); !trie_it_finished(it); trie_it_next(it)) {
+		lua_pushinteger(L, *i);
+		struct net_proxy_data *data = *trie_it_val(it);
+		addr = proxy_data_to_string(family, data,
+				addrbuf, sizeof(addrbuf));
+		lua_pushstring(L, addr);
+		lua_settable(L, -3);
+		*i += 1;
+	}
+	trie_it_free(it);
+}
+
 /** Allow PROXYv2 headers for IP address. */
 static int net_proxy_allowed(lua_State *L)
 {
@@ -311,33 +331,30 @@ static int net_proxy_allowed(lua_State *L)
 	int n = lua_gettop(L);
 	int i = 1;
 	const char *addr;
-	char addrbuf[PROXY_DATA_STRLEN];
 
 	/* Return current state */
 	if (n == 0) {
 		lua_newtable(L);
-		trie_it_t *it;
 		i = 1;
-		for (it = trie_it_begin(net->proxy_addrs4); !trie_it_finished(it); trie_it_next(it)) {
+
+		if (net->proxy_all4) {
 			lua_pushinteger(L, i);
-			struct net_proxy_data *data = *trie_it_val(it);
-			addr = proxy_data_to_string(AF_INET, data,
-					addrbuf, sizeof(addrbuf));
-			lua_pushstring(L, addr);
+			lua_pushstring(L, "0.0.0.0/0");
 			lua_settable(L, -3);
 			i += 1;
+		} else {
+			net_proxy_addr_put(L, AF_INET, net->proxy_addrs4, &i);
 		}
-		trie_it_free(it);
-		for (it = trie_it_begin(net->proxy_addrs6); !trie_it_finished(it); trie_it_next(it)) {
+
+		if (net->proxy_all6) {
 			lua_pushinteger(L, i);
-			struct net_proxy_data *data = *trie_it_val(it);
-			addr = proxy_data_to_string(AF_INET6, data,
-					addrbuf, sizeof(addrbuf));
-			lua_pushstring(L, addr);
+			lua_pushstring(L, "::/0");
 			lua_settable(L, -3);
 			i += 1;
+		} else {
+			net_proxy_addr_put(L, AF_INET6, net->proxy_addrs6, &i);
 		}
-		trie_it_free(it);
+
 		return 1;
 	}
 

@@ -24,6 +24,8 @@ void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog)
 		net->loop = loop;
 		net->endpoints = map_make(NULL);
 		net->endpoint_kinds = trie_create(NULL);
+		net->proxy_all4 = false;
+		net->proxy_all6 = false;
 		net->proxy_addrs4 = trie_create(NULL);
 		net->proxy_addrs6 = trie_create(NULL);
 		net->tls_client_params = NULL;
@@ -545,8 +547,20 @@ int network_proxy_allow(struct network *net, const char* addr)
 		kr_log_error(NETWORK, "Wrong netmask format for proxy_allowed: %s\n", addr);
 		return kr_error(EINVAL);
 	} else if (netmask == 0) {
-		kr_log_error(NETWORK, "Zero netmask not allowed proxy_allowed: %s\n", addr);
-		return kr_error(EINVAL);
+		/* Netmask is zero: allow all addresses to use PROXYv2 */
+		switch (family) {
+		case AF_INET:
+			net->proxy_all4 = true;
+			break;
+		case AF_INET6:
+			net->proxy_all6 = true;
+			break;
+		default:
+			kr_assert(false);
+			return kr_error(EINVAL);
+		}
+
+		return kr_ok();
 	}
 
 	size_t addr_length;
@@ -571,7 +585,8 @@ int network_proxy_allow(struct network *net, const char* addr)
 		return kr_error(ENOMEM);
 
 	struct net_proxy_data *data = *val;
-	if (!data) { /* Allocate data if the entry is new in the trie */
+	if (!data) {
+		/* Allocate data if the entry is new in the trie */
 		*val = malloc(sizeof(struct net_proxy_data));
 		data = *val;
 		data->netmask = 0;
@@ -590,8 +605,10 @@ int network_proxy_allow(struct network *net, const char* addr)
 
 void network_proxy_reset(struct network *net)
 {
+	net->proxy_all4 = false;
 	network_proxy_free_addr_data(net->proxy_addrs4);
 	trie_clear(net->proxy_addrs4);
+	net->proxy_all6 = false;
 	network_proxy_free_addr_data(net->proxy_addrs6);
 	trie_clear(net->proxy_addrs6);
 }
