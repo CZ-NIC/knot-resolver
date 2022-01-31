@@ -6,7 +6,7 @@ logging:
     - manager
 network:
   listen:
-    - interface: lo@5353
+    - interface: 127.0.0.1@5353
 server:
   workers: 1
   rundir: etc/knot-resolver/runtime

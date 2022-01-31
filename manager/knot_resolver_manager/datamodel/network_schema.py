@@ -14,7 +14,7 @@ from knot_resolver_manager.datamodel.types import (
 )
 from knot_resolver_manager.utils import SchemaNode
 
-KindEnum = Literal["dns", "xdp", "dot", "doh2"]
+KindEnum = Literal["dns", "xdp", "dot", "doh-legacy", "doh2"]
 
 
 class EdnsBufferSizeSchema(SchemaNode):
@@ -80,7 +80,7 @@ class ListenSchema(SchemaNode):
         elif origin.interface:
             if origin.kind == "dot":
                 return PortNumber(853)
-            elif origin.kind == "doh2":
+            elif origin.kind in ["doh-legacy", "doh2"]:
                 return PortNumber(443)
             return PortNumber(53)
         return None

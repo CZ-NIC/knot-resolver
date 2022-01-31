@@ -1,5 +1,23 @@
+{% macro http_config(http_cfg, kind, tls=true) -%}
+http.config({tls={{ 'true' if tls else 'false'}},
+{%- if http_cfg.cert_file -%}
+    cert='{{ http_cfg.cert_file }}',
+{%- endif -%}
+{%- if http_cfg.key_file -%}
+    key='{{ http_cfg.key_file }}',
+{%- endif -%}
+},'{{ kind }}')
+{%- endmacro %}
+
+
 {% macro listen_kind(kind) -%}
-'{{ 'tls' if kind == 'dot' else kind }}'
+{%- if kind == "dot" -%}
+'tls'
+{%- elif kind == "doh-legacy" -%}
+'doh_legacy'
+{%- else -%}
+'{{ kind }}'
+{%- endif -%}
 {%- endmacro %}
 
 
