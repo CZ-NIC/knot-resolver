@@ -1,8 +1,3 @@
-{% macro listen_interface(interface) -%}
-net.{{ interface }}
-{%- endmacro %}
-
-
 {% macro listen_kind(kind) -%}
 '{{ 'tls' if kind == 'dot' else kind }}'
 {%- endmacro %}
@@ -13,19 +8,13 @@ net.listen('{{ path }}',nil,{kind={{ listen_kind(kind) }},freebind={{ 'true' if 
 {%- endmacro %}
 
 
-{% macro net_listen_ip_address(ip_address, kind, freebind, port) -%}
-net.listen('{{ ip_address.addr }}',
-{%- if ip_address.port -%}
-{{ ip_address.port }},
-{%- else -%}
-{{ port }},
-{%- endif -%}
-{kind={{ listen_kind(kind) }},freebind={{ 'true' if freebind else 'false'}}})
-{%- endmacro %}
-
-
 {% macro net_listen_interface(interface, kind, freebind, port) -%}
-net.listen({{ listen_interface(interface.if_name) }},
+net.listen(
+{%- if interface.addr -%}
+'{{ interface.addr }}',
+{%- elif interface.if_name -%}
+net.{{ interface.if_name }},
+{%- endif -%}
 {%- if interface.port -%}
 {{ interface.port }},
 {%- else -%}
@@ -43,14 +32,6 @@ net.listen({{ listen_interface(interface.if_name) }},
         {% endfor -%}
     {%- else -%}
         {{ net_listen_unix_socket(listen.unix_socket, listen.kind, listen.freebind) }}
-    {%- endif -%}
-{%- elif listen.ip_address -%}
-    {%- if listen.ip_address is iterable-%}
-        {% for address in listen.ip_address -%}
-            {{ net_listen_ip_address(address, listen.kind, listen.freebind, listen.port) }}
-        {% endfor -%}
-    {%- else -%}
-        {{ net_listen_ip_address(listen.ip_address, listen.kind, listen.freebind, listen.port) }}
     {%- endif -%}
 {%- elif listen.interface -%}
     {%- if listen.interface is iterable-%}

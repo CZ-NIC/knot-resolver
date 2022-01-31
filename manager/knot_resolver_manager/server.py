@@ -223,9 +223,9 @@ class Server:
             if mgn.unix_socket:
                 nsite = web.UnixSite(self.runner, str(mgn.unix_socket))
                 logger.info(f"Starting API HTTP server on http+unix://{mgn.unix_socket}")
-            elif mgn.ip_address:
-                nsite = web.TCPSite(self.runner, str(mgn.ip_address.addr), int(mgn.ip_address.port))
-                logger.info(f"Starting API HTTP server on http://{mgn.ip_address.addr}:{mgn.ip_address.port}")
+            elif mgn.interface:
+                nsite = web.TCPSite(self.runner, str(mgn.interface.addr), int(mgn.interface.port))
+                logger.info(f"Starting API HTTP server on http://{mgn.interface.addr}:{mgn.interface.port}")
             else:
                 raise KresManagerException("Requested API on unsupported configuration format.")
             await nsite.start()
@@ -235,9 +235,9 @@ class Server:
             if self.listen is not None and self.site is not None:
                 if self.listen.unix_socket:
                     logger.info(f"Stopping API HTTP server on http+unix://{mgn.unix_socket}")
-                elif self.listen.ip_address:
+                elif self.listen.interface:
                     logger.info(
-                        f"Stopping API HTTP server on http://{self.listen.ip_address.addr}:{self.listen.ip_address.port}"
+                        f"Stopping API HTTP server on http://{self.listen.interface.addr}:{self.listen.interface.port}"
                     )
                 await self.site.stop()
 

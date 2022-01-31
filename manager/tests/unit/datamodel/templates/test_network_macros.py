@@ -16,9 +16,9 @@ def test_network_listen():
         + "net.listen('/tmp/kresd-socket2',nil,{kind='tls',freebind=false})\n"
     )
 
-    ip = ListenSchema({"ip-address": "::1@55", "freebind": True})
+    ip = ListenSchema({"interface": "::1@55", "freebind": True})
     assert tmpl.render(listen=ip) == "net.listen('::1',55,{kind='dns',freebind=true})"
-    ip_list = ListenSchema({"ip-address": [ip.ip_address, "127.0.0.1@5353"]})
+    ip_list = ListenSchema({"interface": [ip.interface, "127.0.0.1@5353"]})
     assert (
         tmpl.render(listen=ip_list)
         == "net.listen('::1',55,{kind='dns',freebind=false})\n"

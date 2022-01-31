@@ -5,7 +5,6 @@ from typing import Any, Optional, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.network_schema import listen_config_validate
 from knot_resolver_manager.datamodel.types import (
     CheckedPath,
     DNSRecordTypeEnum,
@@ -48,23 +47,23 @@ class WatchDogSchema(SchemaNode):
 
 class ManagementSchema(SchemaNode):
     unix_socket: Optional[CheckedPath] = None
-    ip_address: Optional[IPAddressPort] = None
+    interface: Optional[IPAddressPort] = None
 
     def _validate(self) -> None:
-        if bool(self.unix_socket) == bool(self.ip_address):
-            raise ValueError("One of 'ip-address' or 'unix-socket' must be configured..")
+        if bool(self.unix_socket) == bool(self.interface):
+            raise ValueError("One of 'interface' or 'unix-socket' must be configured.")
 
 
 class WebmgmtSchema(SchemaNode):
     unix_socket: Optional[CheckedPath] = None
-    ip_address: Optional[IPAddressPort] = None
     interface: Optional[InterfacePort] = None
     tls: bool = False
     cert_file: Optional[CheckedPath] = None
     key_file: Optional[CheckedPath] = None
 
     def _validate(self) -> None:
-        listen_config_validate(self)
+        if bool(self.unix_socket) == bool(self.interface):
+            raise ValueError("One of 'interface' or 'unix-socket' must be configured.")
 
 
 class ServerSchema(SchemaNode):
