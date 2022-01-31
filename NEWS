@@ -15,6 +15,7 @@ Incompatible changes
 Bugfixes
 --------
 - doh2: fix CORS by adding `access-control-allow-origin: *` (!1246)
+- net: fix listen by interface - add interface suffix to link-local IPv6 (!1253)
 
 
 Knot Resolver 5.4.4 (2022-01-05)
