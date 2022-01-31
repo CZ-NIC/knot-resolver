@@ -51,6 +51,7 @@ class InterfaceName(PatternBase):
 
 
 class InterfacePort(StrBase):
+    addr: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
     if_name: InterfaceName
     port: PortNumber
 
@@ -59,21 +60,32 @@ class InterfacePort(StrBase):
         if isinstance(source_value, str):
             parts = source_value.split("@")
             if len(parts) == 2:
+                try:
+                    self.addr = ipaddress.ip_address(parts[0])
+                except ValueError as e1:
+                    try:
+                        self.if_name = InterfaceName(parts[0])
+                    except SchemaException as e2:
+                        raise SchemaException(
+                            f"Expected IP address or interface name, got '{parts[0]}'.", object_path
+                        ) from e1 and e2
                 self.port = PortNumber.from_str(parts[1], object_path)
-                self.if_name = InterfaceName(parts[0], object_path)
             else:
-                raise SchemaException(f"Expected '<interface>@<port>', got '{source_value}'.", object_path)
+                raise SchemaException(
+                    f"Expected '<ip-address|interface-name>@<port>', got '{source_value}'.", object_path
+                )
             self._value = source_value
         else:
             raise SchemaException(
-                "Unexpected value for '<interface>@<port>'."
+                "Unexpected value for '<ip-address|interface-name>@<port>'."
                 f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
             )
 
 
 class InterfaceOptionalPort(StrBase):
-    if_name: InterfaceName
+    addr: Union[None, ipaddress.IPv4Address, ipaddress.IPv6Address] = None
+    if_name: Optional[InterfaceName] = None
     port: Optional[PortNumber] = None
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
@@ -81,15 +93,23 @@ class InterfaceOptionalPort(StrBase):
         if isinstance(source_value, str):
             parts = source_value.split("@")
             if 0 < len(parts) < 3:
-                self.if_name = InterfaceName(parts[0], object_path)
+                try:
+                    self.addr = ipaddress.ip_address(parts[0])
+                except ValueError as e1:
+                    try:
+                        self.if_name = InterfaceName(parts[0])
+                    except SchemaException as e2:
+                        raise SchemaException(
+                            f"Expected IP address or interface name, got '{parts[0]}'.", object_path
+                        ) from e1 and e2
                 if len(parts) == 2:
                     self.port = PortNumber.from_str(parts[1], object_path)
             else:
-                raise SchemaException(f"Expected '<interface>[@<port>]', got '{parts}'.", object_path)
+                raise SchemaException(f"Expected '<ip-address|interface-name>[@<port>]', got '{parts}'.", object_path)
             self._value = source_value
         else:
             raise SchemaException(
-                "Unexpected value for '<interface>[@<port>]'."
+                "Unexpected value for '<ip-address|interface-name>[@<port>]'."
                 f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
             )

@@ -1,11 +1,11 @@
 network:
   listen:
-    - ip-address: 127.0.0.1@5353
+    - interface: 127.0.0.1@5353
 server:
   workers: 1
   rundir: tests/integration/run
   management:
-    ip-address: 127.0.0.1@5001
+    interface: 127.0.0.1@5001
 cache:
   storage: cache
 logging:

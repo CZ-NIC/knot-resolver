@@ -12,7 +12,7 @@ def test_watchdog():
 
 
 def test_management():
-    assert ManagementSchema({"ip-address": "::1@53"})
+    assert ManagementSchema({"interface": "::1@53"})
     assert ManagementSchema({"unix-socket": "/path/socket"})
 
     with raises(KresManagerException):

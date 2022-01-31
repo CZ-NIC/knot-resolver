@@ -6,7 +6,6 @@ from knot_resolver_manager.datamodel.types import (
     CheckedPath,
     InterfaceOptionalPort,
     IPAddress,
-    IPAddressOptionalPort,
     IPNetwork,
     IPv4Address,
     IPv6Address,
@@ -43,51 +42,21 @@ class TLSSchema(SchemaNode):
             raise ValueError("'padding' must be number in range<0-512>")
 
 
-def listen_config_validate(obj: object) -> None:
-    present = {
-        "ip-address" if hasattr(obj, "ip_address") and getattr(obj, "ip_address") is not None else ...,
-        "unix-socket" if hasattr(obj, "unix_socket") and getattr(obj, "unix_socket") is not None else ...,
-        "interface" if hasattr(obj, "interface") and getattr(obj, "interface") is not None else ...,
-    }
-    if not (present == {"ip-address", ...} or present == {"unix-socket", ...} or present == {"interface", ...}):
-        raise ValueError(
-            "Listen configuration contains incompatible configuration options."
-            f" Expected one of 'ip-address', 'interface' and 'unix-socket' options, got '{present}'."
-        )
-
-
 class ListenSchema(SchemaNode):
     class Raw(SchemaNode):
-        unix_socket: Union[None, CheckedPath, List[CheckedPath]] = None
-        ip_address: Union[None, IPAddressOptionalPort, List[IPAddressOptionalPort]] = None
         interface: Union[None, InterfaceOptionalPort, List[InterfaceOptionalPort]] = None
+        unix_socket: Union[None, CheckedPath, List[CheckedPath]] = None
         port: Optional[PortNumber] = None
         kind: KindEnum = "dns"
         freebind: bool = False
 
     _PREVIOUS_SCHEMA = Raw
 
-    unix_socket: Union[None, CheckedPath, List[CheckedPath]]
-    ip_address: Union[None, IPAddressOptionalPort, List[IPAddressOptionalPort]]
     interface: Union[None, InterfaceOptionalPort, List[InterfaceOptionalPort]]
+    unix_socket: Union[None, CheckedPath, List[CheckedPath]]
     port: Optional[PortNumber]
     kind: KindEnum
     freebind: bool
-
-    def _ip_address(self, origin: Raw) -> Union[None, IPAddressOptionalPort, List[IPAddressOptionalPort]]:
-        if isinstance(origin.ip_address, list):
-            port_set: Optional[bool] = None
-            for addr in origin.ip_address:
-                if origin.port and addr.port:
-                    raise ValueError("The port number is defined in two places ('port' option and '@<port>' syntax).")
-                if port_set is not None and (bool(addr.port) != port_set):
-                    raise ValueError(
-                        "The '@<port>' syntax must be used either for all or none of the IP addresses in the list."
-                    )
-                port_set = bool(addr.port)
-        elif isinstance(origin.ip_address, IPAddressOptionalPort) and origin.ip_address.port and origin.port:
-            raise ValueError("The port number is defined in two places ('port' option and '@<port>' syntax).")
-        return origin.ip_address
 
     def _interface(self, origin: Raw) -> Union[None, InterfaceOptionalPort, List[InterfaceOptionalPort]]:
         if isinstance(origin.interface, list):
@@ -107,7 +76,8 @@ class ListenSchema(SchemaNode):
     def _port(self, origin: Raw) -> Optional[PortNumber]:
         if origin.port:
             return origin.port
-        elif origin.ip_address or origin.interface:
+        # default port number based on kind
+        elif origin.interface:
             if origin.kind == "dot":
                 return PortNumber(853)
             elif origin.kind == "doh2":
@@ -116,11 +86,12 @@ class ListenSchema(SchemaNode):
         return None
 
     def _validate(self) -> None:
-        listen_config_validate(self)
+        if bool(self.unix_socket) == bool(self.interface):
+            raise ValueError("One of 'interface' or 'unix-socket' must be configured.")
         if self.port and self.unix_socket:
             raise ValueError(
-                "'unix-socket' and 'port' are not compatible options. "
-                "Port configuration can only be used with 'ip-address' or 'interface'."
+                "'unix-socket' and 'port' are not compatible options."
+                " Port configuration can only be used with 'interface' option."
             )
 
 
@@ -135,8 +106,8 @@ class NetworkSchema(SchemaNode):
     address_renumbering: Optional[List[AddressRenumberingSchema]] = None
     tls: TLSSchema = TLSSchema()
     listen: List[ListenSchema] = [
-        ListenSchema({"ip-address": "127.0.0.1"}),
-        ListenSchema({"ip-address": "::1", "freebind": True}),
+        ListenSchema({"interface": "127.0.0.1"}),
+        ListenSchema({"interface": "::1", "freebind": True}),
     ]
 
     def _validate(self):

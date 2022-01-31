@@ -6,9 +6,9 @@ logging:
     - manager
 network:
   listen:
-    - ip-address: 127.0.0.1@5353
+    - interface: lo@5353
 server:
   workers: 1
   rundir: etc/knot-resolver/runtime
   management:
-    ip-address: 127.0.0.1@5000
+    interface: 127.0.0.1@5000

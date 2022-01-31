@@ -20,18 +20,23 @@ modules.unload('watchdog')
 {% if cfg.server.webmgmt -%}
 -- server.webmgmt
 modules.load('http')
-http.config({
-    tls = {{ 'true' if cfg.server.webmgmt.tls else 'false'}},
-    {{ "cert = '"+cfg.server.webmgmt.cert_file+"'," if cfg.server.webmgmt.cert_file }}
-    {{ "key = '"+cfg.server.webmgmt.key_file+"'," if cfg.server.webmgmt.key_file }}
+http.config({tls = {{ 'true' if cfg.server.webmgmt.tls else 'false'}},
+{%- if cfg.server.webmgmt.cert_file -%}
+    cert = '{{ cfg.server.webmgmt.cert_file }}',
+{%- endif -%}
+{%- if cfg.server.webmgmt.cert_file -%}
+    key = '{{ cfg.server.webmgmt.key_file }}',
+{%- endif -%}
 }, 'webmgmt')
 net.listen(
 {%- if cfg.server.webmgmt.unix_socket -%}
     '{{ cfg.server.webmgmt.unix_socket }}',nil,
-{%- elif cfg.server.webmgmt.ip_address -%}
-    '{{ cfg.server.webmgmt.ip_address.addr }}',{{ cfg.server.webmgmt.ip_address.port }},
 {%- elif cfg.server.webmgmt.interface -%}
-    net.{{ cfg.server.webmgmt.interface.if_name }},{{ cfg.server.webmgmt.interface.port }},
+    {%- if cfg.server.webmgmt.interface.addr -%}
+        '{{ cfg.server.webmgmt.interface.addr }}',{{ cfg.server.webmgmt.interface.port }},
+    {%- elif cfg.server.webmgmt.interface.if_name -%}
+        net.{{ cfg.server.webmgmt.interface.if_name }},{{ cfg.server.webmgmt.interface.port }},
+    {%- endif -%}
 {%- endif -%}
 { kind = 'webmgmt' })
 {%- endif %}
