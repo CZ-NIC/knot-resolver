@@ -26,6 +26,7 @@ def test_listen_kind_port_defaults():
     assert ListenSchema({"unix-socket": "/tmp/kresd-socket"}).port == None
     assert ListenSchema({"interface": "::1"}).port == PortNumber(53)
     assert ListenSchema({"interface": "::1", "kind": "dot"}).port == PortNumber(853)
+    assert ListenSchema({"interface": "::1", "kind": "doh-legacy"}).port == PortNumber(443)
     assert ListenSchema({"interface": "::1", "kind": "doh2"}).port == PortNumber(443)
 
 
