@@ -107,22 +107,23 @@ def _get_properties_schema(typ: Type[Any]) -> Dict[Any, Any]:
     annot = typ.__dict__.get("__annotations__", {})
     docstring: str = typ.__dict__.get("__doc__", "") or ""
     attribute_documentation = _parse_attrs_docstrings(docstring)
-    for name, python_type in annot.items():
+    for field_name, python_type in annot.items():
+        name = field_name.replace("_", "-")
         schema[name] = _describe_type(python_type)
 
         # description
         if attribute_documentation is not None:
-            if name not in attribute_documentation:
-                raise SchemaException(f"The docstring does not describe field '{name}'", str(typ))
-            schema[name]["description"] = attribute_documentation[name]
-            del attribute_documentation[name]
+            if field_name not in attribute_documentation:
+                raise SchemaException(f"The docstring does not describe field '{field_name}'", str(typ))
+            schema[name]["description"] = attribute_documentation[field_name]
+            del attribute_documentation[field_name]
 
         # default value
-        if hasattr(typ, name):
+        if hasattr(typ, field_name):
             assert Serializable.is_serializable(
                 python_type
             ), f"Type '{python_type}' does not appear to be JSON serializable"
-            schema[name]["default"] = Serializable.serialize(getattr(typ, name))
+            schema[name]["default"] = Serializable.serialize(getattr(typ, field_name))
 
     if attribute_documentation is not None and len(attribute_documentation) > 0:
         raise SchemaException(
