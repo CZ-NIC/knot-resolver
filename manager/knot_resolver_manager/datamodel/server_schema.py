@@ -41,11 +41,27 @@ BackendEnum = Literal["auto", "systemd", "supervisord"]
 
 
 class WatchDogSchema(SchemaNode):
+    """
+    Configuration of systemd watchdog.
+
+    ---
+    qname: Name to internaly query for.
+    qtype: DNS type to internaly query for.
+    """
+
     qname: DomainName
     qtype: DNSRecordTypeEnum
 
 
 class ManagementSchema(SchemaNode):
+    """
+    Configuration of management HTTP API.
+
+    ---
+    unix_socket: Path to unix domain socket to listen to.
+    interface: IP address and port number to listen to.
+    """
+
     unix_socket: Optional[CheckedPath] = None
     interface: Optional[IPAddressPort] = None
 
@@ -55,6 +71,17 @@ class ManagementSchema(SchemaNode):
 
 
 class WebmgmtSchema(SchemaNode):
+    """
+    Configuration of legacy web management endpoint.
+
+    ---
+    unix_socket: Path to unix domain socket to listen to.
+    interface: IP address or interface name with port number to listen to.
+    tls: Enable/disable TLS.
+    cert_file: Path to certificate file.
+    key_file: Path to certificate key.
+    """
+
     unix_socket: Optional[CheckedPath] = None
     interface: Optional[InterfacePort] = None
     tls: bool = False
@@ -67,23 +94,23 @@ class WebmgmtSchema(SchemaNode):
 
 
 class ServerSchema(SchemaNode):
-    """
-    DNS resolver server control and management configuration.
-
-    ---
-    hostname: Internal Knot Resolver hostname. Default is hostname of machine.
-    groupid: Additional identifier in case more managers are running on single machine.
-    nsid: Name Server Identifier (RFC 5001) which allows DNS clients to request resolver to send back its NSID along with the reply to a DNS request.
-    workers: The number of running 'Knot Resolver daemon' (kresd) workers. Based on number of CPUs if set to 'auto'.
-    use_cache_gc: Use cache garbage collector (kres-cache-gc) automatically.
-    backend: Forces manager to use a specific service manager. Defaults to autodetection.
-    watchdog: Systemd watchdog configuration. Can only be used with 'systemd' backend.
-    rundir: Directory where the manager can create files and which will be manager's cwd
-    management: Management API configuration.
-    webmgmt: Legacy built-in web management API configuration.
-    """
-
     class Raw(SchemaNode):
+        """
+        DNS server control and management configuration.
+
+        ---
+        hostname: Internal DNS resolver hostname. Default is machine hostname.
+        groupid: Additional identifier in case more DNS resolvers are running on single machine.
+        nsid: Name Server Identifier (RFC 5001) which allows DNS clients to request resolver to send back its NSID along with the reply to a DNS request.
+        workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
+        use_cache_gc: Use (start) kres-cache-gc (cache garbage collector) automatically.
+        backend: Forces the manager to use a specific service supervisor.
+        watchdog: Disable systemd watchdog, enable with defaults or set new configuration. Can only be used with 'systemd' backend.
+        rundir: Directory where the resolver can create files and which will be it's cwd.
+        management: Configuration of management HTTP API.
+        webmgmt: Configuration of legacy web management endpoint.
+        """
+
         hostname: Optional[str] = None
         groupid: Optional[str] = None
         nsid: Optional[str] = None
