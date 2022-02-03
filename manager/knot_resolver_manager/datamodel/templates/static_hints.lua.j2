@@ -7,7 +7,7 @@ hints.ttl({{ cfg.static_hints.ttl.seconds()|string }})
 {% endif %}
 
 -- static-hints.no-data
-hints.use_nodata({{ 'true' if cfg.static_hints.no_data else 'false' }})
+hints.use_nodata({{ 'true' if cfg.static_hints.nodata else 'false' }})
 
 {% if cfg.static_hints.etc_hosts %}
 -- static-hints.etc-hosts

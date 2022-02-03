@@ -18,16 +18,44 @@ KindEnum = Literal["dns", "xdp", "dot", "doh-legacy", "doh2"]
 
 
 class EdnsBufferSizeSchema(SchemaNode):
+    """
+    EDNS payload size advertised in DNS packets.
+
+    ---
+    upstream: Maximum EDNS upstream (towards other DNS servers) payload size.
+    downstream: Maximum EDNS downstream (towards clients) payload size for communication.
+    """
+
     upstream: SizeUnit = SizeUnit("1232B")
     downstream: SizeUnit = SizeUnit("1232B")
 
 
 class AddressRenumberingSchema(SchemaNode):
+    """
+    Renumbers addresses in answers to different address space.
+
+    ---
+    source: Source subnet.
+    destination: Destination address prefix.
+    """
+
     source: IPNetwork
     destination: IPAddress
 
 
 class TLSSchema(SchemaNode):
+    """
+    TLS configuration, also affects DNS over TLS and DNS over HTTPS.
+
+    ---
+    cert_file: Path to certificate file.
+    key_file: Path to certificate key file.
+    sticket_secret: Secret for TLS session resumption via tickets. (RFC 5077).
+    sticket_secret_file: Path to file with secret for TLS session resumption via tickets. (RFC 5077).
+    auto_discovery: Automatic discovery of authoritative servers supporting DNS-over-TLS.
+    padding: EDNS(0) padding of answers to queries that arrive over TLS transport.
+    """
+
     cert_file: Optional[CheckedPath] = None
     key_file: Optional[CheckedPath] = None
     sticket_secret: Optional[str] = None
@@ -44,6 +72,17 @@ class TLSSchema(SchemaNode):
 
 class ListenSchema(SchemaNode):
     class Raw(SchemaNode):
+        """
+        Configuration of listening interface.
+
+        ---
+        unix_socket: Path to unix domain socket to listen to.
+        interface: IP address or interface name with optional port number to listen to.
+        port: Port number to listen to.
+        kind: Specifies DNS query transport protocol.
+        freebind: Used for binding to non-local address.
+        """
+
         interface: Union[None, InterfaceOptionalPort, List[InterfaceOptionalPort]] = None
         unix_socket: Union[None, CheckedPath, List[CheckedPath]] = None
         port: Optional[PortNumber] = None
@@ -96,12 +135,28 @@ class ListenSchema(SchemaNode):
 
 
 class NetworkSchema(SchemaNode):
+    """
+    Network connections and protocols configuration.
+
+    ---
+    do_ipv4: Enable/disable using IPv4 for contacting upstream nameservers.
+    do_ipv6: Enable/disable using IPv6 for contacting upstream nameservers.
+    out_interface_v4: IPv4 address used to perform queries. Not set by default, which lets the OS choose any address.
+    out_interface_v6: IPv6 address used to perform queries. Not set by default, which lets the OS choose any address.
+    tcp_pipeline: TCP pipeline limit. The number of outstanding queries that a single client connection can make in parallel.
+    edns_tcp_keepalive: Allows clients to discover the connection timeout. (RFC 7828)
+    edns_buffer_size: Maximum EDNS payload size advertised in DNS packets. Different values can be configured for communication downstream (towards clients) and upstream (towards other DNS servers).
+    address_renumbering: Renumbers addresses in answers to different address space.
+    tls: TLS configuration, also affects DNS over TLS and DNS over HTTPS.
+    listen: List of interfaces to listen to and its configuration.
+    """
+
     do_ipv4: bool = True
     do_ipv6: bool = True
     out_interface_v4: Optional[IPv4Address] = None
     out_interface_v6: Optional[IPv6Address] = None
     tcp_pipeline: int = 100
-    edns_keep_alive: bool = True
+    edns_tcp_keepalive: bool = True
     edns_buffer_size: EdnsBufferSizeSchema = EdnsBufferSizeSchema()
     address_renumbering: Optional[List[AddressRenumberingSchema]] = None
     tls: TLSSchema = TLSSchema()

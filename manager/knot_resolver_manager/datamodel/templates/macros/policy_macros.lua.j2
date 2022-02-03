@@ -136,10 +136,10 @@ policy.REROUTE(
 {%- endmacro %}
 
 {% macro policy_answer(answer) -%}
-policy.ANSWER({[kres.type.{{ answer.qtype }}]={rdata=
-{%- if answer.qtype in ['A','AAAA'] -%}
+policy.ANSWER({[kres.type.{{ answer.rtype }}]={rdata=
+{%- if answer.rtype in ['A','AAAA'] -%}
 {{ str2ip_table(answer.rdata) }},
-{%- elif answer.qtype == '' -%}
+{%- elif answer.rtype == '' -%}
 {# TODO: Do the same for other record types that require a special rdata type in Lua.
 By default, the raw string from config is used. #}
 {%- else -%}
