@@ -11,6 +11,7 @@
 #include "daemon/http.h"
 #include "daemon/worker.h"
 #include "daemon/io.h"
+#include "daemon/proxyv2.h"
 #include "lib/generic/queue.h"
 
 #define TLS_CHUNK_SIZE (16 * 1024)
@@ -749,9 +750,7 @@ void session_unpoison(struct session *session)
 	kr_asan_unpoison(session, sizeof(*session));
 }
 
-int session_wirebuf_process(
-		struct session *session, const struct sockaddr *src_addr,
-		const struct sockaddr *comm_addr, const struct sockaddr *dst_addr)
+int session_wirebuf_process(struct session *session, struct io_comm_data *comm)
 {
 	int ret = 0;
 	if (session->wire_buf_start_idx == session->wire_buf_end_idx)
@@ -766,7 +765,7 @@ int session_wirebuf_process(
 	       (ret < max_iterations)) {
 		if (kr_fails_assert(!session_wirebuf_error(session)))
 			return -1;
-		int res = worker_submit(session, src_addr, comm_addr, dst_addr, NULL, NULL, pkt);
+		int res = worker_submit(session, comm, NULL, NULL, pkt);
 		/* Errors from worker_submit() are intentionally *not* handled in order to
 		 * ensure the entire wire buffer is processed. */
 		if (res == kr_ok())

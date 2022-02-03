@@ -13,6 +13,7 @@
 struct qr_task;
 struct worker_ctx;
 struct session;
+struct io_comm_data;
 
 struct session_flags {
 	bool outgoing : 1;      /**< True: to upstream; false: from a client. */
@@ -131,9 +132,7 @@ size_t session_wirebuf_get_free_size(struct session *session);
 void session_wirebuf_discard(struct session *session);
 /** Move all data to the beginning of the buffer. */
 void session_wirebuf_compress(struct session *session);
-int session_wirebuf_process(
-		struct session *session, const struct sockaddr *src_addr,
-		const struct sockaddr *comm_addr, const struct sockaddr *dst_addr);
+int session_wirebuf_process(struct session *session, struct io_comm_data *comm);
 ssize_t session_wirebuf_consume(struct session *session,
 				const uint8_t *data, ssize_t len);
 /** Trims `len` bytes from the start of the session's wire buffer.

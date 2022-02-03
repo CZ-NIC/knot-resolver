@@ -90,6 +90,8 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	ssize_t data_len = nread;
 	const struct sockaddr *src_addr = comm_addr;
 	const struct sockaddr *dst_addr = NULL;
+	struct proxy_result proxy;
+	bool has_proxy = false;
 	if (!session_flags(s)->outgoing && proxy_header_present(data, data_len)) {
 		if (!proxy_allowed(&the_worker->engine->net, comm_addr)) {
 			kr_log_debug(IO, "<= ignoring PROXYv2 UDP from disallowed address '%s'\n",
@@ -97,7 +99,6 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 			return;
 		}
 
-		struct proxy_result proxy;
 		ssize_t trimmed = proxy_process_header(&proxy, s, data, data_len);
 		if (trimmed == KNOT_EMALF) {
 			if (kr_log_is_debug(IO, NULL)) {
@@ -116,6 +117,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		}
 
 		if (proxy.command == PROXY2_CMD_PROXY && proxy.family != AF_UNSPEC) {
+			has_proxy = true;
 			src_addr = &proxy.src_addr.ip;
 			dst_addr = &proxy.dst_addr.ip;
 
@@ -133,7 +135,13 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	ssize_t consumed = session_wirebuf_consume(s, data, data_len);
 	kr_assert(consumed == data_len);
 
-	session_wirebuf_process(s, src_addr, comm_addr, dst_addr);
+	struct io_comm_data comm = {
+		.src_addr = src_addr,
+		.comm_addr = comm_addr,
+		.dst_addr = dst_addr,
+		.proxy = (has_proxy) ? &proxy : NULL
+	};
+	session_wirebuf_process(s, &comm);
 	session_wirebuf_discard(s);
 	mp_flush(the_worker->pkt_pool.ctx);
 }
@@ -342,6 +350,8 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	ssize_t data_len = nread;
 	const struct sockaddr *src_addr = session_get_peer(s);
 	const struct sockaddr *dst_addr = NULL;
+	struct proxy_result proxy;
+	bool has_proxy = false;
 	if (!session_flags(s)->outgoing && !session_flags(s)->no_proxy &&
 			proxy_header_present(data, data_len)) {
 		if (!proxy_allowed(&the_worker->engine->net, src_addr)) {
@@ -354,7 +364,6 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 			return;
 		}
 
-		struct proxy_result proxy;
 		ssize_t trimmed = proxy_process_header(&proxy, s, data, data_len);
 		if (trimmed < 0) {
 			if (kr_log_is_debug(IO, NULL)) {
@@ -375,6 +384,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		}
 
 		if (proxy.command != PROXY2_CMD_LOCAL && proxy.family != AF_UNSPEC) {
+			has_proxy = true;
 			src_addr = &proxy.src_addr.ip;
 			dst_addr = &proxy.dst_addr.ip;
 
@@ -437,7 +447,13 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	consumed = session_wirebuf_consume(s, data, data_len);
 	kr_assert(consumed == data_len);
 
-	int ret = session_wirebuf_process(s, src_addr, session_get_peer(s), dst_addr);
+	struct io_comm_data comm = {
+		.src_addr = src_addr,
+		.comm_addr = session_get_peer(s),
+		.dst_addr = dst_addr,
+		.proxy = (has_proxy) ? &proxy : NULL
+	};
+	int ret = session_wirebuf_process(s, &comm);
 	if (ret < 0) {
 		/* An error has occurred, close the session. */
 		worker_end_tcp(s);
@@ -923,10 +939,12 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 		if (kpkt == NULL) {
 			ret = kr_error(ENOMEM);
 		} else {
-			ret = worker_submit(xhd->session,
-					(const struct sockaddr *)&msg->ip_from,
-					(const struct sockaddr *)&msg->ip_from,
-					(const struct sockaddr *)&msg->ip_to,
+			struct io_comm_data comm = {
+				.src_addr = (const struct sockaddr *)&msg->ip_from,
+				.comm_addr = (const struct sockaddr *)&msg->ip_from,
+				.dst_addr = (const struct sockaddr *)&msg->ip_to
+			};
+			ret = worker_submit(xhd->session, &comm,
 					msg->eth_from, msg->eth_to, kpkt);
 		}
 		if (ret)

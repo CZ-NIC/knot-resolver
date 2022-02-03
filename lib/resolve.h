@@ -220,7 +220,8 @@ struct kr_request {
 		 * closely related: issue #173. */
 		const struct sockaddr *dst_addr;
 		const knot_pkt_t *packet;
-		struct kr_request_qsource_flags flags; /**< See definition above. */
+		struct kr_request_qsource_flags flags; /**< Flags for the original client. */
+		struct kr_request_qsource_flags comm_flags; /**< Flags for the actual client (may be a proxy). */
 		size_t size; /**< query packet size */
 		int32_t stream_id; /**< HTTP/2 stream ID for DoH requests */
 		kr_http_header_array_t headers;  /**< HTTP/2 headers for DoH requests */

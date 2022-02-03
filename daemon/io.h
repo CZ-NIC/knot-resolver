@@ -16,6 +16,29 @@ struct tls_ctx;
 struct tls_client_ctx;
 struct io_stream_data;
 
+/** Communication data. */
+struct io_comm_data {
+	/** The original address the data came from. May be that of a proxied
+	 * client, if they came through a proxy. May be `NULL` if
+	 * the communication did not come from network. */
+	const struct sockaddr *src_addr;
+
+	/** The actual address the resolver is communicating with. May be
+	 * the address of a proxy if the communication came through one,
+	 * otherwise it will be the same as `src_addr`. May be `NULL` if
+	 * the communication did not come from network. */
+	const struct sockaddr *comm_addr;
+
+	/** The original destination address. May be the resolver's address, or
+	 * the address of a proxy if the communication came through one. May be
+	 * `NULL` if the communication did not come from network. */
+	const struct sockaddr *dst_addr;
+
+	/** Data parsed from a PROXY header. May be `NULL` if the communication
+	 * did not come through a proxy, or if the PROXYv2 protocol was not used. */
+	const struct proxy_result *proxy;
+};
+
 /** Bind address into a file-descriptor (only, no libuv).  type is e.g. SOCK_DGRAM */
 int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags);
 /** Initialize a UDP handle and start listening. */

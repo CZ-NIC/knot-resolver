@@ -27,6 +27,7 @@
 #include "daemon/bindings/api.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
+#include "daemon/proxyv2.h"
 #include "daemon/session.h"
 #include "daemon/tls.h"
 #include "daemon/http.h"
@@ -353,13 +354,11 @@ static inline bool is_tcp_waiting(struct sockaddr *address) {
  * in case the request didn't come from network.
  */
 static struct request_ctx *request_create(struct worker_ctx *worker,
-					  struct session *session,
-					  const struct sockaddr *addr,
-					  const struct sockaddr *comm_addr,
-					  const struct sockaddr *dst_addr,
-					  const uint8_t *eth_from,
-					  const uint8_t *eth_to,
-					  uint32_t uid)
+                                          struct session *session,
+                                          struct io_comm_data *comm,
+                                          const uint8_t *eth_from,
+                                          const uint8_t *eth_to,
+                                          uint32_t uid)
 {
 	knot_mm_t pool = {
 		.ctx = pool_borrow(worker),
@@ -405,13 +404,30 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	req->pool = pool;
 	req->vars_ref = LUA_NOREF;
 	req->uid = uid;
-	req->qsource.flags.xdp = is_xdp;
+	req->qsource.comm_flags.xdp = is_xdp;
 	kr_request_set_extended_error(req, KNOT_EDNS_EDE_NONE, NULL);
 	array_init(req->qsource.headers);
 	if (session) {
-		req->qsource.flags.tcp = session_get_handle(session)->type == UV_TCP;
-		req->qsource.flags.tls = session_flags(session)->has_tls;
-		req->qsource.flags.http = session_flags(session)->has_http;
+		const struct sockaddr *src_addr = NULL;
+		const struct sockaddr *comm_addr = NULL;
+		const struct sockaddr *dst_addr = NULL;
+		const struct proxy_result *proxy = NULL;
+		if (comm) {
+			src_addr = comm->src_addr;
+			comm_addr = comm->comm_addr;
+			dst_addr = comm->dst_addr;
+			proxy = comm->proxy;
+		}
+
+		req->qsource.comm_flags.tcp = session_get_handle(session)->type == UV_TCP;
+		req->qsource.comm_flags.tls = session_flags(session)->has_tls;
+		req->qsource.comm_flags.http = session_flags(session)->has_http;
+
+		req->qsource.flags = req->qsource.comm_flags;
+		if (proxy) {
+			req->qsource.flags.tcp = proxy->protocol == SOCK_STREAM;
+		}
+
 		req->qsource.stream_id = -1;
 #if ENABLE_DOH2
 		if (req->qsource.flags.http) {
@@ -426,16 +442,30 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		}
 #endif
 		/* We need to store a copy of peer address. */
-		memcpy(&ctx->source.addr.ip, addr, kr_sockaddr_len(addr));
-		req->qsource.addr = &ctx->source.addr.ip;
+		if (src_addr) {
+			memcpy(&ctx->source.addr.ip, src_addr, kr_sockaddr_len(src_addr));
+			req->qsource.addr = &ctx->source.addr.ip;
+		} else {
+			req->qsource.addr = NULL;
+		}
+
 		if (!comm_addr)
-			comm_addr = addr;
-		memcpy(&ctx->source.comm_addr.ip, comm_addr, kr_sockaddr_len(comm_addr));
-		req->qsource.comm_addr = &ctx->source.comm_addr.ip;
+			comm_addr = src_addr;
+		if (comm_addr) {
+			memcpy(&ctx->source.comm_addr.ip, comm_addr, kr_sockaddr_len(comm_addr));
+			req->qsource.comm_addr = &ctx->source.comm_addr.ip;
+		} else {
+			req->qsource.comm_addr = NULL;
+		}
+
 		if (!dst_addr) /* We wouldn't have to copy in this case, but for consistency. */
 			dst_addr = session_get_sockname(session);
-		memcpy(&ctx->source.dst_addr.ip, dst_addr, kr_sockaddr_len(dst_addr));
-		req->qsource.dst_addr = &ctx->source.dst_addr.ip;
+		if (dst_addr) {
+			memcpy(&ctx->source.dst_addr.ip, dst_addr, kr_sockaddr_len(dst_addr));
+			req->qsource.dst_addr = &ctx->source.dst_addr.ip;
+		} else {
+			req->qsource.dst_addr = NULL;
+		}
 	}
 
 	req->selection_context.is_tls_capable = is_tls_capable;
@@ -1802,10 +1832,8 @@ static int parse_packet(knot_pkt_t *query)
 	return ret;
 }
 
-int worker_submit(struct session *session,
-		  const struct sockaddr *src_addr, const struct sockaddr *comm_addr,
-		  const struct sockaddr *dst_addr,
-		  const uint8_t *eth_from, const uint8_t *eth_to, knot_pkt_t *pkt)
+int worker_submit(struct session *session, struct io_comm_data *comm,
+                  const uint8_t *eth_from, const uint8_t *eth_to, knot_pkt_t *pkt)
 {
 	if (!session || !pkt)
 		return kr_error(EINVAL);
@@ -1849,8 +1877,8 @@ int worker_submit(struct session *session,
 	const struct sockaddr *addr = NULL;
 	if (!is_outgoing) { /* request from a client */
 		struct request_ctx *ctx =
-			request_create(the_worker, session, src_addr, comm_addr, dst_addr,
-					eth_from, eth_to, knot_wire_get_id(pkt->wire));
+			request_create(the_worker, session, comm, eth_from,
+			               eth_to, knot_wire_get_id(pkt->wire));
 		if (http_ctx)
 			queue_pop(http_ctx->streams);
 		if (!ctx)
@@ -1881,7 +1909,7 @@ int worker_submit(struct session *session,
 		}
 		if (kr_fails_assert(!session_flags(session)->closing))
 			return kr_error(EINVAL);
-		addr = src_addr;
+		addr = (comm) ? comm->src_addr : NULL;
 		/* Note receive time for RTT calculation */
 		task->recv_time = kr_now();
 	}
@@ -2089,8 +2117,8 @@ struct qr_task *worker_resolve_start(knot_pkt_t *query, struct kr_qflags options
 		return NULL;
 
 
-	struct request_ctx *ctx = request_create(worker, NULL, NULL, NULL, NULL, NULL, NULL,
-						 worker->next_request_uid);
+	struct request_ctx *ctx = request_create(worker, NULL, NULL, NULL, NULL,
+	                                         worker->next_request_uid);
 	if (!ctx)
 		return NULL;
 

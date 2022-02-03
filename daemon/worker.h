@@ -17,6 +17,8 @@ struct worker_ctx;
 struct session;
 /** Zone import context (opaque). */
 struct zone_import_ctx;
+/** Data about the communication (defined in io.h). */
+struct io_comm_data;
 
 /** Pointer to the singleton worker.  NULL if not initialized. */
 KR_EXPORT extern struct worker_ctx *the_worker;
@@ -32,17 +34,13 @@ void worker_deinit(void);
  * Process an incoming packet (query from a client or answer from upstream).
  *
  * @param session     session the packet came from, or NULL (not from network)
- * @param src_addr    original address the packet came from, or NULL (not from network)
- * @param comm_addr   actual address the packet came from, or NULL (then the same as src_addr).
- *     May be different from peer if the packet went through a proxy with PROXYv2 enabled.
+ * @param comm        IO communication data (see `struct io_comm_data` docs)
  * @param eth_*       MAC addresses or NULL (they're useful for XDP)
  * @param pkt         the packet, or NULL (an error from the transport layer)
  * @return 0 or an error code
  */
-int worker_submit(struct session *session,
-		  const struct sockaddr *src_addr, const struct sockaddr *comm_addr,
-		  const struct sockaddr *dst_addr,
-		  const uint8_t *eth_from, const uint8_t *eth_to, knot_pkt_t *pkt);
+int worker_submit(struct session *session, struct io_comm_data *comm,
+                  const uint8_t *eth_from, const uint8_t *eth_to, knot_pkt_t *pkt);
 
 /**
  * End current DNS/TCP session, this disassociates pending tasks from this session
