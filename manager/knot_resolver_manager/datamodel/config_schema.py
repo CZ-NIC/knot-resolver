@@ -1,4 +1,5 @@
 import os
+import pathlib
 import sys
 from typing import Dict, Optional, Union
 
@@ -117,4 +118,7 @@ class KresConfig(SchemaNode):
         return obj.dns64
 
     def render_lua(self) -> str:
-        return _MAIN_TEMPLATE.render(cfg=self)  # pyright: reportUnknownMemberType=false
+        # FIXME the `cwd` argument is used only for configuring control socket path
+        # it should be removed and relative path used instead as soon as issue
+        # https://gitlab.nic.cz/knot/knot-resolver/-/issues/720 is fixed
+        return _MAIN_TEMPLATE.render(cfg=self, cwd=os.getcwd())  # pyright: reportUnknownMemberType=false
