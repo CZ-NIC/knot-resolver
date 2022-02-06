@@ -3,7 +3,7 @@ import logging
 import sys
 from asyncio.futures import Future
 from subprocess import SubprocessError
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import knot_resolver_manager.kresd_controller
 from knot_resolver_manager import kres_id
@@ -123,6 +123,13 @@ class KresManager:
         assert self._gc is not None
         await self._gc.stop()
         self._gc = None
+
+    async def command_all(self, cmd: str) -> Dict[kres_id.KresID, str]:
+        async def single_pair(sub: Subprocess) -> Tuple[kres_id.KresID, str]:
+            return sub.id, await sub.command(cmd)
+
+        pairs = await asyncio.gather(*(single_pair(inst) for inst in self._workers))
+        return dict(pairs)
 
     async def validate_config(self, _old: KresConfig, new: KresConfig) -> Result[NoneType, str]:
         async with self._manager_lock:

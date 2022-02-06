@@ -1,5 +1,7 @@
+import asyncio
+import sys
 from enum import Enum, auto
-from typing import Dict, Iterable
+from typing import Dict, Iterable, Optional
 
 from knot_resolver_manager.constants import kresd_config_file
 from knot_resolver_manager.datamodel.config_schema import KresConfig
@@ -65,6 +67,30 @@ class Subprocess:
     @property
     def id(self) -> KresID:
         raise NotImplementedError()
+
+    async def command(self, cmd: str) -> str:
+        reader: asyncio.StreamReader
+        writer: Optional[asyncio.StreamWriter] = None
+        try:
+            reader, writer = await asyncio.open_unix_connection(f"./control/{self.id}")
+
+            # drop prompt
+            _ = await reader.read(2)
+
+            # write command
+            writer.write(cmd.encode("utf8"))
+            writer.write(b"\n")
+            await writer.drain()
+
+            # read result
+            result_bytes = await reader.readline()
+            return result_bytes.decode("utf8")[:-1]  # strip trailing newline
+
+        finally:
+            if writer is not None:
+                writer.close()
+                if sys.version_info.minor >= 7:
+                    await writer.wait_closed()
 
 
 class SubprocessStatus(Enum):

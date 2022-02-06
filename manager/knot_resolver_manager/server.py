@@ -14,7 +14,7 @@ from aiohttp.web_app import Application
 from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 
-from knot_resolver_manager import log
+from knot_resolver_manager import log, statistics
 from knot_resolver_manager.compat import asyncio as asyncio_compat
 from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE
@@ -61,9 +61,12 @@ class Server:
     # This is top-level class containing pretty much everything. Instead of global
     # variables, we use instance attributes. That's why there are so many and it's
     # ok.
-    def __init__(self, store: ConfigStore, config_path: Optional[Path]):
+    def __init__(self, store: ConfigStore, config_path: Optional[Path], manager: KresManager):
         # config store & server dynamic reconfiguration
         self.config_store = store
+
+        # stats
+        self._manager = manager
 
         # HTTP server
         self.app = Application(middlewares=[error_handler])
@@ -158,6 +161,13 @@ class Server:
         # return success
         return web.Response()
 
+    async def _handler_metrics(self, _request: web.Request) -> web.Response:
+        return web.Response(
+            body=await statistics.collect(self.config_store.get(), self._manager),
+            content_type="text/plain",
+            charset="utf8",
+        )
+
     async def _handler_schema(self, _request: web.Request) -> web.Response:
         return web.json_response(KresConfig.json_schema(), headers={"Access-Control-Allow-Origin": "*"})
 
@@ -207,6 +217,7 @@ class Server:
                 web.post("/stop", self._handler_stop),
                 web.get("/schema", self._handler_schema),
                 web.get("/schema/ui", self._handle_view_schema),
+                web.get("/metrics", self._handler_metrics),
             ]
         )
 
@@ -359,7 +370,7 @@ async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_
 
     # At this point, all backend functionality-providing components are initialized. It's therefore save to start
     # the API server.
-    server = Server(config_store, config if isinstance(config, Path) else None)
+    server = Server(config_store, config if isinstance(config, Path) else None, manager)
     await server.start()
     logger.info(f"Manager fully initialized and running in {round(time() - start_time, 3)} seconds")
 

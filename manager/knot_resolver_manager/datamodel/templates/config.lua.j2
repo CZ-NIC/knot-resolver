@@ -68,3 +68,14 @@ else
 		log_warn(ffi.C.LOG_GRP_NETWORK, 'bind to '..path..' failed '..err)
 	end
 end
+
+function collect_lazy_statistics()
+	if stats == nil then
+		modules.load('stats')
+	end
+
+	return tojson(stats.list())
+end
+function collect_statistics()
+	return tojson(stats.list())
+end
