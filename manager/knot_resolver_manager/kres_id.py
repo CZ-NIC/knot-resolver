@@ -24,6 +24,9 @@ class KresID:
         else:
             return self._repr
 
+    def __repr__(self) -> str:
+        return f"KresID({self})"
+
     def __hash__(self) -> int:
         return self._id
 
