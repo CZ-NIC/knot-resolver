@@ -346,6 +346,19 @@ static int edns_erase_and_reserve(knot_pkt_t *pkt)
 	return knot_pkt_reserve(pkt, len);
 }
 
+static inline size_t edns_padding_option_size(int32_t tls_padding)
+{
+	if (tls_padding == -1)
+		/* FIXME: we do not know how to reserve space for the
+		 * default padding policy, since we can't predict what
+		 * it will select. So i'm just guessing :/ */
+		return KNOT_EDNS_OPTION_HDRLEN + 512;
+	if (tls_padding >= 2)
+		return KNOT_EDNS_OPTION_HDRLEN + tls_padding;
+
+	return 0;
+}
+
 static int edns_create(knot_pkt_t *pkt, const struct kr_request *req)
 {
 	pkt->opt_rr = knot_rrset_copy(req->ctx->upstream_opt_rr, &pkt->mm);
@@ -357,13 +370,7 @@ static int edns_create(knot_pkt_t *pkt, const struct kr_request *req)
 	}
 #endif /* ENABLE_COOKIES */
 	if (req->qsource.flags.tls) {
-		if (req->ctx->tls_padding == -1)
-			/* FIXME: we do not know how to reserve space for the
-			 * default padding policy, since we can't predict what
-			 * it will select. So i'm just guessing :/ */
-			wire_size += KNOT_EDNS_OPTION_HDRLEN + 512;
-		if (req->ctx->tls_padding >= 2)
-			wire_size += KNOT_EDNS_OPTION_HDRLEN + req->ctx->tls_padding;
+		wire_size += edns_padding_option_size(req->ctx->tls_padding);
 	}
 	return knot_pkt_reserve(pkt, wire_size);
 }
@@ -417,6 +424,33 @@ static int write_extra_ranked_records(const ranked_rr_array_t *arr, uint16_t reo
 	return err;
 }
 
+static int pkt_padding(knot_pkt_t *packet, int32_t padding)
+{
+	knot_rrset_t *opt_rr = packet->opt_rr;
+	int32_t pad_bytes = -1;
+
+	if (padding == -1) { /* use the default padding policy from libknot */
+		pad_bytes =  knot_pkt_default_padding_size(packet, opt_rr);
+	}
+	if (padding >= 2) {
+		int32_t max_pad_bytes = knot_edns_get_payload(opt_rr) - (packet->size + knot_rrset_size(opt_rr));
+		pad_bytes = MIN(knot_edns_alignment_size(packet->size, knot_rrset_size(opt_rr), padding),
+				max_pad_bytes);
+	}
+
+	if (pad_bytes >= 0) {
+		uint8_t zeros[MAX(1, pad_bytes)];
+		memset(zeros, 0, sizeof(zeros));
+		int r = knot_edns_add_option(opt_rr, KNOT_EDNS_OPTION_PADDING,
+					     pad_bytes, zeros, &packet->mm);
+		if (r != KNOT_EOK) {
+			knot_rrset_clear(opt_rr, &packet->mm);
+			return kr_error(r);
+		}
+	}
+	return kr_ok();
+}
+
 /** @internal Add an EDNS padding RR into the answer if requested and required. */
 static int answer_padding(struct kr_request *request)
 {
@@ -426,31 +460,7 @@ static int answer_padding(struct kr_request *request)
 		/* Not meaningful to pad without encryption. */
 		return kr_ok();
 	}
-	int32_t padding = request->ctx->tls_padding;
-	knot_pkt_t *answer = request->answer;
-	knot_rrset_t *opt_rr = answer->opt_rr;
-	int32_t pad_bytes = -1;
-
-	if (padding == -1) { /* use the default padding policy from libknot */
-		pad_bytes =  knot_pkt_default_padding_size(answer, opt_rr);
-	}
-	if (padding >= 2) {
-		int32_t max_pad_bytes = knot_edns_get_payload(opt_rr) - (answer->size + knot_rrset_size(opt_rr));
-		pad_bytes = MIN(knot_edns_alignment_size(answer->size, knot_rrset_size(opt_rr), padding),
-				max_pad_bytes);
-	}
-
-	if (pad_bytes >= 0) {
-		uint8_t zeros[MAX(1, pad_bytes)];
-		memset(zeros, 0, sizeof(zeros));
-		int r = knot_edns_add_option(opt_rr, KNOT_EDNS_OPTION_PADDING,
-					     pad_bytes, zeros, &answer->mm);
-		if (r != KNOT_EOK) {
-			knot_rrset_clear(opt_rr, &answer->mm);
-			return kr_error(r);
-		}
-	}
-	return kr_ok();
+	return pkt_padding(request->answer, request->ctx->tls_padding);
 }
 
 /* Make a clean SERVFAIL answer. */
@@ -1525,6 +1535,17 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 
 	/* Write down OPT unless in safemode */
 	if (!(qry->flags.NO_EDNS)) {
+		/* TLS padding */
+		if (transport->protocol == KR_TRANSPORT_TLS) {
+			size_t padding_size = edns_padding_option_size(request->ctx->tls_padding);
+			ret = knot_pkt_reserve(packet, padding_size);
+			if (ret)
+				return kr_error(EINVAL);
+			ret = pkt_padding(packet, request->ctx->tls_padding);
+			if (ret)
+				return kr_error(EINVAL);
+		}
+
 		ret = edns_put(packet, true);
 		if (ret != 0) {
 			return kr_error(EINVAL);
