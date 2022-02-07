@@ -69,7 +69,7 @@ class KresConfig(SchemaNode):
         forward_zones: List of Forward Zones and its configuration.
         cache: DNS resolver cache configuration.
         dnssec: Disable DNSSEC, enable with defaults or set new configuration.
-        dns64: Disable DNS64, enable with defaults or set new configuration.
+        dns64: Disable DNS64 (RFC 6147), enable with defaults or set new configuration.
         logging: Logging and debugging configuration.
         lua: Custom Lua configuration.
         """

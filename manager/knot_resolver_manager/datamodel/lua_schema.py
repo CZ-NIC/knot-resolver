@@ -8,9 +8,9 @@ class LuaSchema(SchemaNode):
     Custom Lua configuration.
 
     ---
-    script_only: Ignore all declarative configuration and use only Lua script or file.
+    script_only: Ignore declarative configuration and use only Lua script or file defined in this section.
     script: Custom Lua configuration script.
-    script_file: Path to custom Lua configuration script file.
+    script_file: Path to file that contains Lua configuration script.
     """
 
     script_only: bool = False

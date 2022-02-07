@@ -59,13 +59,13 @@ LogGroupsEnum: TypeAlias = Literal[
 
 class DnstapSchema(SchemaNode):
     """
-    Logging DNS queries and responses to a unix socket
+    Logging DNS queries and responses to a unix socket.
 
     ---
-    unix_socket: The unix socket file where dnstap messages will be sent.
-    log_queries: If true queries from downstream in wire format will be logged.
-    log_responses: If true responses to downstream in wire format will be logged.
-    log_tcp_rtt: If true TCP RTT (Round-trip time) will be logged.
+    unix_socket: Path to unix domain socket where dnstap messages will be sent.
+    log_queries: Log queries from downstream in wire format.
+    log_responses: Log responses to downstream in wire format.
+    log_tcp_rtt: Log TCP RTT (Round-trip time).
     """
 
     unix_socket: CheckedPath
@@ -75,6 +75,14 @@ class DnstapSchema(SchemaNode):
 
 
 class DebuggingSchema(SchemaNode):
+    """
+    Advanced debugging parameters for kresd (Knot Resolver daemon).
+
+    ---
+    assertion_abort: Allow the process to be aborted in case it encounters a failed assertion.
+    assertion_fork: Fork and abord child kresd process to obtain a coredump, while the parent process recovers and keeps running.
+    """
+
     assertion_abort: bool = False
     assertion_fork: TimeUnit = TimeUnit("5m")
 
@@ -84,12 +92,12 @@ class LoggingSchema(SchemaNode):
     Logging and debugging configuration.
 
     ---
-    level: Logging level for all processes.
-    target: Logging stream target for all processes.
+    level: Global logging level.
+    target: Global logging stream target.
     groups: List of groups for which 'debug' logging level is set.
     dnssec_bogus: Logging a message for each DNSSEC validation failure.
     dnstap: Logging DNS requests and responses to a unix socket.
-    debugging: Advanced debugging parameters for Knot Resolver daemon (kresd).
+    debugging: Advanced debugging parameters for kresd (Knot Resolver daemon).
     """
 
     level: LogLevelEnum = "notice"
