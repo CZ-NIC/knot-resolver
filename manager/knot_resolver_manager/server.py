@@ -141,6 +141,7 @@ class Server:
             }
         )
 
+    @statistics.async_timing_histogram(statistics.MANAGER_REQUEST_RECONFIGURE_LATENCY)
     async def _handler_apply_config(self, request: web.Request) -> web.Response:
         """
         Route handler for changing resolver configuration
