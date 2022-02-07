@@ -61,12 +61,9 @@ class Server:
     # This is top-level class containing pretty much everything. Instead of global
     # variables, we use instance attributes. That's why there are so many and it's
     # ok.
-    def __init__(self, store: ConfigStore, config_path: Optional[Path], manager: KresManager):
+    def __init__(self, store: ConfigStore, config_path: Optional[Path]):
         # config store & server dynamic reconfiguration
         self.config_store = store
-
-        # stats
-        self._manager = manager
 
         # HTTP server
         self.app = Application(middlewares=[error_handler])
@@ -164,7 +161,7 @@ class Server:
 
     async def _handler_metrics(self, _request: web.Request) -> web.Response:
         return web.Response(
-            body=await statistics.collect(self.config_store.get(), self._manager),
+            body=await statistics.report_stats(self.config_store.get()),
             content_type="text/plain",
             charset="utf8",
         )
@@ -371,7 +368,7 @@ async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_
 
     # At this point, all backend functionality-providing components are initialized. It's therefore save to start
     # the API server.
-    server = Server(config_store, config if isinstance(config, Path) else None, manager)
+    server = Server(config_store, config if isinstance(config, Path) else None)
     await server.start()
     logger.info(f"Manager fully initialized and running in {round(time() - start_time, 3)} seconds")
 
