@@ -350,8 +350,6 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	ssize_t data_len = nread;
 	const struct sockaddr *src_addr = session_get_peer(s);
 	const struct sockaddr *dst_addr = NULL;
-	struct proxy_result proxy;
-	bool has_proxy = false;
 	if (!session_flags(s)->outgoing && !session_flags(s)->no_proxy &&
 			proxy_header_present(data, data_len)) {
 		if (!proxy_allowed(&the_worker->engine->net, src_addr)) {
@@ -364,7 +362,8 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 			return;
 		}
 
-		ssize_t trimmed = proxy_process_header(&proxy, s, data, data_len);
+		struct proxy_result *proxy = session_proxy_create(s);
+		ssize_t trimmed = proxy_process_header(proxy, s, data, data_len);
 		if (trimmed < 0) {
 			if (kr_log_is_debug(IO, NULL)) {
 				if (trimmed == KNOT_EMALF) {
@@ -383,10 +382,9 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 			return;
 		}
 
-		if (proxy.command != PROXY2_CMD_LOCAL && proxy.family != AF_UNSPEC) {
-			has_proxy = true;
-			src_addr = &proxy.src_addr.ip;
-			dst_addr = &proxy.dst_addr.ip;
+		if (proxy->command != PROXY2_CMD_LOCAL && proxy->family != AF_UNSPEC) {
+			src_addr = &proxy->src_addr.ip;
+			dst_addr = &proxy->dst_addr.ip;
 
 			if (kr_log_is_debug(IO, NULL)) {
 				kr_log_debug(IO, "<= TCP stream from '%s'\n",
@@ -451,7 +449,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		.src_addr = src_addr,
 		.comm_addr = session_get_peer(s),
 		.dst_addr = dst_addr,
-		.proxy = (has_proxy) ? &proxy : NULL
+		.proxy = session_proxy_get(s)
 	};
 	int ret = session_wirebuf_process(s, &comm);
 	if (ret < 0) {

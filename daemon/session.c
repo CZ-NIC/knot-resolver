@@ -37,6 +37,8 @@ struct session {
 	struct tls_ctx *tls_ctx;      /**< server side tls-related data. */
 	struct tls_client_ctx *tls_client_ctx;  /**< client side tls-related data. */
 
+	struct proxy_result *proxy;   /**< PROXYv2 data for TCP. May be `NULL` if not proxied. */
+
 #if ENABLE_DOH2
 	struct http_ctx *http_ctx;  /**< server side http-related data. */
 #endif
@@ -83,6 +85,9 @@ void session_clear(struct session *session)
 	kr_require(session_is_empty(session));
 	if (session->handle && session->handle->type == UV_TCP) {
 		free(session->wire_buf);
+	}
+	if (session->proxy) {
+		free(session->proxy);
 	}
 #if ENABLE_DOH2
 	http_free(session->http_ctx);
@@ -435,6 +440,21 @@ void session_waitinglist_finalize(struct session *session, int status)
 		worker_task_finalize(t, status);
 		worker_task_unref(t);
 	}
+}
+
+struct proxy_result *session_proxy_create(struct session *session)
+{
+	if (!kr_fails_assert(!session->proxy)) {
+		session->proxy = calloc(1, sizeof(struct proxy_result));
+		kr_require(session->proxy);
+	}
+
+	return session->proxy;
+}
+
+struct proxy_result *session_proxy_get(struct session *session)
+{
+	return session->proxy;
 }
 
 void session_tasklist_finalize(struct session *session, int status)

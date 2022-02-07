@@ -14,6 +14,7 @@ struct qr_task;
 struct worker_ctx;
 struct session;
 struct io_comm_data;
+struct proxy_result;
 
 struct session_flags {
 	bool outgoing : 1;      /**< True: to upstream; false: from a client. */
@@ -57,6 +58,13 @@ size_t session_waitinglist_get_len(const struct session *session);
 void session_waitinglist_retry(struct session *session, bool increase_timeout_cnt);
 /** Finalize all tasks in the list. */
 void session_waitinglist_finalize(struct session *session, int status);
+
+/** PROXYv2 data. */
+/** Creates zero-initialized PROXYv2 data for the session. Should only be called
+ * once per session. */
+struct proxy_result *session_proxy_create(struct session *session);
+/** Gets the session's PROXYv2 data, if it exists. If it does not, returns `NULL`. */
+struct proxy_result *session_proxy_get(struct session *session);
 
 /** List of tasks associated with session. */
 /** Check if list is empty. */
