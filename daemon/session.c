@@ -86,9 +86,7 @@ void session_clear(struct session *session)
 	if (session->handle && session->handle->type == UV_TCP) {
 		free(session->wire_buf);
 	}
-	if (session->proxy) {
-		free(session->proxy);
-	}
+	free(session->proxy);
 #if ENABLE_DOH2
 	http_free(session->http_ctx);
 #endif

@@ -408,16 +408,12 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	kr_request_set_extended_error(req, KNOT_EDNS_EDE_NONE, NULL);
 	array_init(req->qsource.headers);
 	if (session) {
-		const struct sockaddr *src_addr = NULL;
-		const struct sockaddr *comm_addr = NULL;
-		const struct sockaddr *dst_addr = NULL;
-		const struct proxy_result *proxy = NULL;
-		if (comm) {
-			src_addr = comm->src_addr;
-			comm_addr = comm->comm_addr;
-			dst_addr = comm->dst_addr;
-			proxy = comm->proxy;
-		}
+		kr_require(comm);
+
+		const struct sockaddr *src_addr = comm->src_addr;
+		const struct sockaddr *comm_addr = comm->comm_addr;
+		const struct sockaddr *dst_addr = comm->dst_addr;
+		const struct proxy_result *proxy = comm->proxy;
 
 		req->qsource.comm_flags.tcp = session_get_handle(session)->type == UV_TCP;
 		req->qsource.comm_flags.tls = session_flags(session)->has_tls;
@@ -426,11 +422,12 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		req->qsource.flags = req->qsource.comm_flags;
 		if (proxy) {
 			req->qsource.flags.tcp = proxy->protocol == SOCK_STREAM;
+			req->qsource.flags.tls = proxy->has_tls;
 		}
 
 		req->qsource.stream_id = -1;
 #if ENABLE_DOH2
-		if (req->qsource.flags.http) {
+		if (req->qsource.comm_flags.http) {
 			struct http_ctx *http_ctx = session_http_get_server_ctx(session);
 			struct http_stream stream = queue_head(http_ctx->streams);
 			req->qsource.stream_id = stream.id;
@@ -442,30 +439,18 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		}
 #endif
 		/* We need to store a copy of peer address. */
-		if (src_addr) {
-			memcpy(&ctx->source.addr.ip, src_addr, kr_sockaddr_len(src_addr));
-			req->qsource.addr = &ctx->source.addr.ip;
-		} else {
-			req->qsource.addr = NULL;
-		}
+		memcpy(&ctx->source.addr.ip, src_addr, kr_sockaddr_len(src_addr));
+		req->qsource.addr = &ctx->source.addr.ip;
 
 		if (!comm_addr)
 			comm_addr = src_addr;
-		if (comm_addr) {
-			memcpy(&ctx->source.comm_addr.ip, comm_addr, kr_sockaddr_len(comm_addr));
-			req->qsource.comm_addr = &ctx->source.comm_addr.ip;
-		} else {
-			req->qsource.comm_addr = NULL;
-		}
+		memcpy(&ctx->source.comm_addr.ip, comm_addr, kr_sockaddr_len(comm_addr));
+		req->qsource.comm_addr = &ctx->source.comm_addr.ip;
 
 		if (!dst_addr) /* We wouldn't have to copy in this case, but for consistency. */
 			dst_addr = session_get_sockname(session);
-		if (dst_addr) {
-			memcpy(&ctx->source.dst_addr.ip, dst_addr, kr_sockaddr_len(dst_addr));
-			req->qsource.dst_addr = &ctx->source.dst_addr.ip;
-		} else {
-			req->qsource.dst_addr = NULL;
-		}
+		memcpy(&ctx->source.dst_addr.ip, dst_addr, kr_sockaddr_len(dst_addr));
+		req->qsource.dst_addr = &ctx->source.dst_addr.ip;
 	}
 
 	req->selection_context.is_tls_capable = is_tls_capable;

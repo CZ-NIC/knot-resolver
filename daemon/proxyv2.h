@@ -13,53 +13,10 @@
 extern const char PROXY2_SIGNATURE[12];
 
 #define PROXY2_MIN_SIZE 16
-#define PROXY2_IP6_ADDR_SIZE 16
-#define PROXY2_UNIX_ADDR_SIZE 108
 
 enum proxy2_command {
 	PROXY2_CMD_LOCAL = 0x0,
 	PROXY2_CMD_PROXY = 0x1
-};
-
-enum proxy2_family {
-	PROXY2_AF_UNSPEC = 0x0,
-	PROXY2_AF_INET   = 0x1,
-	PROXY2_AF_INET6  = 0x2,
-	PROXY2_AF_UNIX   = 0x3
-};
-
-enum proxy2_protocol {
-	PROXY2_PROTOCOL_UNSPEC = 0x0,
-	PROXY2_PROTOCOL_STREAM = 0x1,
-	PROXY2_PROTOCOL_DGRAM  = 0x2
-};
-
-/** PROXYv2 protocol header section */
-struct proxy2_header {
-	uint8_t signature[sizeof(PROXY2_SIGNATURE)];
-	uint8_t version_command;
-	uint8_t family_protocol;
-	uint16_t length; /**< Length of the address section */
-};
-
-/** PROXYv2 protocol address section */
-union proxy2_address {
-	struct {
-		uint32_t src_addr;
-		uint32_t dst_addr;
-		uint16_t src_port;
-		uint16_t dst_port;
-	} ipv4_addr;
-	struct {
-		uint8_t src_addr[PROXY2_IP6_ADDR_SIZE];
-		uint8_t dst_addr[PROXY2_IP6_ADDR_SIZE];
-		uint16_t src_port;
-		uint16_t dst_port;
-	} ipv6_addr;
-	struct {
-		uint8_t src_addr[PROXY2_UNIX_ADDR_SIZE];
-		uint8_t dst_addr[PROXY2_UNIX_ADDR_SIZE];
-	} unix_addr;
 };
 
 /** Parsed result of the PROXY protocol */
@@ -69,6 +26,9 @@ struct proxy_result {
 	int protocol;                 /**< Protocol type from socket library (e.g. SOCK_STREAM). */
 	union kr_sockaddr src_addr;   /**< Parsed source address and port. */
 	union kr_sockaddr dst_addr;   /**< Parsed destination address and port. */
+	bool has_tls : 1;             /**< `true` = client has used TLS with the proxy.
+	                                   If TLS padding is enabled, it will be used even if
+	                                   the proxy did not use TLS with kresd. */
 };
 
 /** Checks for a PROXY protocol version 2 signature in the specified buffer. */
@@ -87,4 +47,4 @@ bool proxy_allowed(const struct network *net, const struct sockaddr *saddr);
  * wire buffer. The function assumes that the PROXYv2 signature is present
  * and has been already checked by the caller (like `udp_recv` or `tcp_recv`). */
 ssize_t proxy_process_header(struct proxy_result *out, struct session *s,
-		const void *buf, ssize_t nread);
+                             const void *buf, ssize_t nread);
