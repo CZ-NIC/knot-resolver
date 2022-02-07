@@ -80,10 +80,10 @@ def _split_docstring(docstring: str) -> Tuple[str, Optional[str]]:
     if "---" not in docstring:
         return (docstring, None)
 
-    first, last = docstring.split("---", maxsplit=1)
+    doc, attrs_doc = docstring.split("---", maxsplit=1)
     return (
-        "\n".join([s.strip() for s in first.splitlines()]).strip(),
-        "\n".join([s.strip() for s in last.splitlines()]).strip(),
+        "\n".join([s.strip() for s in doc.splitlines()]).strip(),
+        attrs_doc,
     )
 
 
@@ -104,7 +104,7 @@ def _parse_attrs_docstrings(docstring: str) -> Optional[Dict[str, str]]:
 
 def _get_properties_schema(typ: Type[Any]) -> Dict[Any, Any]:
     schema: Dict[Any, Any] = {}
-    annot = typ.__dict__.get("__annotations__", {})
+    annot: Dict[str, Any] = typ.__dict__.get("__annotations__", {})
     docstring: str = typ.__dict__.get("__doc__", "") or ""
     attribute_documentation = _parse_attrs_docstrings(docstring)
     for field_name, python_type in annot.items():
