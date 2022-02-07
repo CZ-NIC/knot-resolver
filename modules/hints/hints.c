@@ -245,7 +245,7 @@ static int add_pair_root(struct kr_zonecut *hints, const char *name, const char 
 	return kr_zonecut_add(hints, key, kr_inaddr(&ia.ip), kr_inaddr_len(&ia.ip));
 }
 
-static int add_pair(struct kr_zonecut *hints, const char *name, const char *addr)
+static int add_pair(const struct hints_data *data, const char *name, const char *addr)
 {
 	/* Build key */
 	knot_dname_t key[KNOT_DNAME_MAXLEN];
@@ -261,22 +261,28 @@ static int add_pair(struct kr_zonecut *hints, const char *name, const char *addr
 
 	uint16_t rrtype = ia.ip.sa_family == AF_INET6 ? KNOT_RRTYPE_AAAA : KNOT_RRTYPE_A;
 	knot_rrset_t rrs;
-	knot_rrset_init(&rrs, key, rrtype, KNOT_CLASS_IN, HINTS_TTL_DEFAULT/*FIXME*/);
+	knot_rrset_init(&rrs, key, rrtype, KNOT_CLASS_IN, data->ttl);
 	int ret;
 	if (ia.ip.sa_family == AF_INET6) {
 		ret = knot_rrset_add_rdata(&rrs, (const uint8_t *)&ia.ip6.sin6_addr, 16, NULL);
 	} else {
 		ret = knot_rrset_add_rdata(&rrs, (const uint8_t *)&ia.ip4.sin_addr, 4, NULL);
 	}
-	if (ret == KNOT_EOK) {
+	if (!ret) ret = kr_rule_local_data_ins(&rrs, NULL, KR_RULE_TAGS_ALL);
+	if (!ret && data->use_nodata) {
+		rrs.type = KNOT_RRTYPE_CNAME;
+		rrs.rrs.count = 0;
+		rrs.rrs.size = 0;
 		ret = kr_rule_local_data_ins(&rrs, NULL, KR_RULE_TAGS_ALL);
 	}
+
 	knot_rdataset_clear(&rrs.rrs, NULL);
 	return ret;
 }
 
 static int add_reverse_pair(struct kr_zonecut *hints, const char *name, const char *addr)
 {
+	// FIXME: implement via new policy?
 	const knot_dname_t *key = addr2reverse(addr);
 
 	if (key == NULL) {
@@ -380,7 +386,7 @@ static int load_file(struct kr_module *module, const char *path)
 		 * we add canonical name as the last one. */
 		const char *name_tok;
 		while ((name_tok = strtok_r(NULL, " \t\n", &saveptr)) != NULL) {
-			ret = add_pair(&data->hints, name_tok, addr);
+			ret = add_pair(data, name_tok, addr);
 			if (!ret) {
 				ret = add_reverse_pair(&data->reverse_hints, name_tok, addr);
 			}
@@ -390,7 +396,7 @@ static int load_file(struct kr_module *module, const char *path)
 			}
 			count += 1;
 		}
-		ret = add_pair(&data->hints, canonical_name, addr);
+		ret = add_pair(data, canonical_name, addr);
 		if (!ret) {
 			ret = add_reverse_pair(&data->reverse_hints, canonical_name, addr);
 		}
@@ -442,7 +448,7 @@ static char* hint_set(void *env, struct kr_module *module, const char *args)
 		if (ret) {
 			del_pair(data, args_copy, addr);
 		} else {
-			ret = add_pair(&data->hints, args_copy, addr);
+			ret = add_pair(data, args_copy, addr);
 		}
 	}
 
@@ -644,6 +650,7 @@ int hints_init(struct kr_module *module)
 
 	static const struct kr_prop props[] = {
 	    { &hint_set,    "set", "Set {name, address} hint.", },
+	// TODO: _del, _get etc. with new policy
 	    { &hint_del,    "del", "Delete one {name, address} hint or all addresses for the name.", },
 	    { &hint_get,    "get", "Retrieve hint for given name.", },
 	    { &hint_ttl,    "ttl", "Set/get TTL used for the hints.", },

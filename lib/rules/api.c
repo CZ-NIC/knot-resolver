@@ -307,6 +307,14 @@ int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 	return kr_error(ENOENT);
 }
 
+/** SOA RDATA content, used as default in negative answers.
+ *
+ * It's as recommended except for using a fixed mname (for simplicity):
+	https://tools.ietf.org/html/rfc6303#section-3
+ */
+static const uint8_t soa_rdata[] = "\x09localhost\0\6nobody\7invalid\0"
+	"\0\0\0\1\0\0\x0e\x10\0\0\4\xb0\0\x09\x3a\x80\0\0\x2a\x30";
+
 #define CHECK_RET(ret) do { \
 	if ((ret) < 0) { kr_assert(false); return kr_error((ret)); } \
 } while (false)
@@ -334,22 +342,37 @@ static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t ty
 		return kr_error(ENOMEM);
 	ret = rdataset_materialize(&arrset.set.rr->rrs, data, data_bound, &pkt->mm);
 	CHECK_RET(ret);
-	const size_t data_off = ret;
+	data += ret;
 	arrset.set.rank = KR_RANK_SECURE | KR_RANK_AUTH; // local data has high trust
 	arrset.set.expiring = false;
 	/* Materialize the RRSIG RRset for the answer in (pseudo-)packet.
 	 * (There will almost never be any RRSIG.) */
-	ret = rdataset_materialize(&arrset.sig_rds, data + data_off, data_bound, &pkt->mm);
+	ret = rdataset_materialize(&arrset.sig_rds, data, data_bound, &pkt->mm);
 	CHECK_RET(ret);
+	data += ret;
 
 	/* Sanity check: we consumed exactly all data. */
-	const int unused_bytes = data_bound - data - data_off - ret;
+	const int unused_bytes = data_bound - data;
 	if (kr_fails_assert(unused_bytes == 0)) {
 		kr_log_error(RULES, "ERROR: unused bytes: %d\n", unused_bytes);
 		return kr_error(EILSEQ);
 	}
 
+	/* Special NODATA sub-case. */
+	knot_rrset_t *rr = arrset.set.rr;
+	const int is_nodata = rr->rrs.count == 0;
+	if (is_nodata) {
+		if (kr_fails_assert(type == KNOT_RRTYPE_CNAME && arrset.sig_rds.count == 0))
+			return kr_error(EILSEQ);
+		rr->type = KNOT_RRTYPE_SOA;
+		ret = knot_rrset_add_rdata(rr, soa_rdata, sizeof(soa_rdata) - 1, &pkt->mm);
+		CHECK_RET(ret);
+		ret = knot_pkt_begin(pkt, KNOT_AUTHORITY);
+		CHECK_RET(ret);
+	}
+
 	/* Put links to the materialized data into the pkt. */
+	knot_wire_set_rcode(pkt->wire, KNOT_RCODE_NOERROR);
 	ret = pkt_append(pkt, &arrset);
 	CHECK_RET(ret);
 
@@ -358,13 +381,15 @@ static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t ty
 	qry->flags.CACHED = true;
 	qry->flags.NO_MINIMIZE = true;
 
-	VERBOSE_MSG(qry, "=> satisfied by local data (positive)\n");
+	VERBOSE_MSG(qry, "=> satisfied by local data (%s)\n",
+			is_nodata ? "no data" : "positive");
 	return kr_ok();
 }
 
 int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_rds,
 				kr_rule_tags_t tags)
 {
+	// Construct the DB key.
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key;
 	key.data = key_dname_lf(rrs->owner, key_data);
@@ -381,6 +406,7 @@ int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_r
 	key.len = key_data + KEY_DNAME_END_OFFSET + 2 + sizeof(rrs->type)
 		- (uint8_t *)key.data;
 
+	// Allocate the data in DB.
 	const int rr_ssize = rdataset_dematerialize_size(&rrs->rrs);
 	const int to_alloc = sizeof(tags) + sizeof(rrs->ttl) + rr_ssize
 			+ rdataset_dematerialize_size(sig_rds);
@@ -388,6 +414,7 @@ int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_r
 	int ret = ruledb_op(write, &key, &val, 1);
 	CHECK_RET(ret);
 
+	// Write all the data.
 	memcpy(val.data, &tags, sizeof(tags));
 	val.data += sizeof(tags);
 	memcpy(val.data, &rrs->ttl, sizeof(rrs->ttl));
@@ -418,12 +445,7 @@ static int answer_zla_empty(struct kr_query *qry, knot_pkt_t *pkt,
 	struct answer_rrset arrset;
 	memset(&arrset, 0, sizeof(arrset));
 
-	/* Construct SOA or NS data (hardcoded content).  The SOA content is
-	 * as recommended except for using a fixed mname (for simplicity):
-		https://tools.ietf.org/html/rfc6303#section-3
-	 */
-	static const uint8_t soa_rdata[] = "\x09localhost\0\6nobody\7invalid\0"
-		"\0\0\0\1\0\0\x0e\x10\0\0\4\xb0\0\x09\x3a\x80\0\0\x2a\x30";
+	/* Construct SOA or NS data (hardcoded content). */
 	const bool name_matches = knot_dname_is_equal(qry->sname, apex_name);
 	const bool want_NS = name_matches && qry->stype == KNOT_RRTYPE_NS;
 	arrset.set.rr = knot_rrset_new(apex_name, want_NS ? KNOT_RRTYPE_NS : KNOT_RRTYPE_SOA,

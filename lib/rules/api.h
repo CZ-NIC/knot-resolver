@@ -25,7 +25,9 @@ void kr_rules_deinit(void);
 int kr_rule_local_data_answer(struct kr_query *qry, struct knot_pkt *pkt);
 
 /** Insert/overwrite a local data rule.
- * Into the default rule-set ATM. */
+ *
+ * Into the default rule-set ATM.
+ * Special NODATA case: use a CNAME type with zero records (TTL matters). */
 KR_EXPORT
 int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_rds,
 				kr_rule_tags_t tags);
