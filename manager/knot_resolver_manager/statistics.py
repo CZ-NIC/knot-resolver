@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, Coroutine
 
 from prometheus_client import Counter, Histogram, exposition
 
@@ -81,6 +81,18 @@ KRESD_ANSWER_FLAG_EDNS0 = Counter(
 
 KRESD_QUERY_EDNS = Counter("kresd_query_edns", "number of queries with EDNS present", labelnames=["instance_id"])
 KRESD_QUERY_DNSSEC = Counter("kresd_query_dnssec", "number of queries with DNSSEC DO=1", labelnames=["instance_id"])
+
+MANAGER_REQUEST_RECONFIGURE_LATENCY = Histogram("manager_request_reconfigure_latency", "Time it takes to change configuration")
+
+
+def async_timing_histogram(metric: Histogram):
+    def decorator(func: Coroutine[Any, Any, Any]):
+        async def wrapper(*args, **kwargs):
+            with metric.time():
+                res = await func(*args, **kwargs)
+                return res
+        return wrapper
+    return decorator
 
 
 def _generate_instance_metrics(instance_id: KresID, metrics: Any) -> None:
