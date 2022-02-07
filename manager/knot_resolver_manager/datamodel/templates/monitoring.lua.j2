@@ -1,0 +1,33 @@
+--- control socket location
+local ffi = require('ffi')
+local id = os.getenv('SYSTEMD_INSTANCE')
+if not id then
+	log_err(ffi.C.LOG_GRP_SYSTEM, 'environment variable $SYSTEMD_INSTANCE not set, which should not have been possible due to running under manager')
+else
+	-- Bind to control socket in CWD (= rundir in config)
+    -- FIXME replace with relative path after fixing https://gitlab.nic.cz/knot/knot-resolver/-/issues/720
+	local path = '{{ cwd }}/control/'..id
+    log_warn(ffi.C.LOG_GRP_SYSTEM, 'path = ' .. path)
+	local ok, err = pcall(net.listen, path, nil, { kind = 'control' })
+	if not ok then
+		log_warn(ffi.C.LOG_GRP_NETWORK, 'bind to '..path..' failed '..err)
+	end
+end
+
+{% if cfg.monitoring.state == "always" %}
+modules.load('stats')
+{% endif %}
+
+--- function used for statistics collection
+function collect_lazy_statistics()
+	if stats == nil then
+		modules.load('stats')
+	end
+
+	return tojson(stats.list())
+end
+
+--- function used for statistics collection
+function collect_statistics()
+	return tojson(stats.list())
+end

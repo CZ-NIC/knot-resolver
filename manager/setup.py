@@ -22,6 +22,7 @@ install_requires = \
  'PyYAML>=5.4.1',
  'aiohttp>=3.6.12',
  'click>=7.1.2',
+ 'prometheus-client>=0.6',
  'pydbus>=0.6.0',
  'requests>=2.25.1',
  'typing-extensions>=3.7.2']

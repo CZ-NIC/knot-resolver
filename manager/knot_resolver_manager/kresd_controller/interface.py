@@ -89,8 +89,10 @@ class Subprocess:
         finally:
             if writer is not None:
                 writer.close()
+
+                # proper closing of the socket is only implemented in later versions of python
                 if sys.version_info.minor >= 7:
-                    await writer.wait_closed()
+                    await writer.wait_closed()  # type: ignore
 
 
 class SubprocessStatus(Enum):

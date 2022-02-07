@@ -3,7 +3,7 @@ import logging
 import sys
 from asyncio.futures import Future
 from subprocess import SubprocessError
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional
 
 import knot_resolver_manager.kresd_controller
 from knot_resolver_manager import kres_id
@@ -16,6 +16,7 @@ from knot_resolver_manager.kresd_controller.interface import (
     SubprocessStatus,
     SubprocessType,
 )
+from knot_resolver_manager.statistics import register_resolver_metrics_for, unregister_resolver_metrics_for
 from knot_resolver_manager.utils.functional import Result
 from knot_resolver_manager.utils.types import NoneType
 
@@ -78,14 +79,17 @@ class KresManager:
     async def _spawn_new_worker(self, config: KresConfig) -> None:
         subprocess = await self._controller.create_subprocess(config, SubprocessType.KRESD, kres_id.alloc())
         await subprocess.start()
+
+        register_resolver_metrics_for(subprocess)
         self._workers.append(subprocess)
 
     async def _stop_a_worker(self) -> None:
         if len(self._workers) == 0:
             raise IndexError("Can't stop a kresd when there are no running")
 
-        kresd = self._workers.pop()
-        await kresd.stop()
+        subprocess = self._workers.pop()
+        unregister_resolver_metrics_for(subprocess)
+        await subprocess.stop()
 
     async def _collect_already_running_children(self) -> None:
         for subp in await self._controller.get_all_running_instances():
@@ -122,13 +126,6 @@ class KresManager:
         assert self._gc is not None
         await self._gc.stop()
         self._gc = None
-
-    async def command_all(self, cmd: str) -> Dict[kres_id.KresID, str]:
-        async def single_pair(sub: Subprocess) -> Tuple[kres_id.KresID, str]:
-            return sub.id, await sub.command(cmd)
-
-        pairs = await asyncio.gather(*(single_pair(inst) for inst in self._workers))
-        return dict(pairs)
 
     async def validate_config(self, _old: KresConfig, new: KresConfig) -> Result[NoneType, str]:
         async with self._manager_lock:
