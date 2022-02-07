@@ -100,7 +100,6 @@ class KresManager:
     async def _rolling_restart(self, new_config: KresConfig) -> None:
         for kresd in self._workers:
             await kresd.apply_new_config(new_config)
-            await asyncio.sleep(1)
 
     async def _ensure_number_of_children(self, config: KresConfig, n: int) -> None:
         # kill children that are not needed
