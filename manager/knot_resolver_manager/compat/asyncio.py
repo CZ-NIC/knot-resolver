@@ -13,7 +13,6 @@ import asyncio
 import functools
 import logging
 import sys
-from asyncio.futures import Future
 from typing import Any, Awaitable, Callable, Coroutine, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
@@ -48,7 +47,7 @@ async def to_thread(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
         return res
 
 
-def create_task(coro: Awaitable[T], name: Optional[str] = None) -> "Future[T]":
+def create_task(coro: Awaitable[T], name: Optional[str] = None) -> "asyncio.Task[T]":
     # version 3.8 and higher, call directly
     if sys.version_info.major >= 3 and sys.version_info.minor >= 8:
         return asyncio.create_task(coro, name=name)  # type: ignore[attr-defined]

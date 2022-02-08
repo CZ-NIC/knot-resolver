@@ -161,7 +161,7 @@ class Server:
 
     async def _handler_metrics(self, _request: web.Request) -> web.Response:
         return web.Response(
-            body=await statistics.report_stats(self.config_store.get()),
+            body=await statistics.report_stats(),
             content_type="text/plain",
             charset="utf8",
         )
@@ -356,6 +356,10 @@ async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_
         # Up to this point, we have been logging to memory buffer. But now, when we have the configuration loaded, we
         # can flush the buffer into the proper place
         await log.logger_init(config_store)
+
+        # With configuration on hand, we can initialize monitoring. We want to do this before any subprocesses are
+        # started, therefore before initializing manager
+        await statistics.init_monitoring(config_store)
 
         # After we have loaded the configuration, we can start worring about subprocess management.
         manager = await _init_manager(config_store)
