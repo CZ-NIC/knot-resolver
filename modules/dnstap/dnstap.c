@@ -404,11 +404,12 @@ static bool find_bool(const JsonNode *node) {
 KR_EXPORT
 int dnstap_config(struct kr_module *module, const char *conf) {
 	dnstap_clear(module);
+	if (!conf) return kr_ok(); /* loaded module without configuring */
 	struct dnstap_data *data = module->data;
 	auto_free char *sock_path = NULL;
 
 	/* Empty conf passed, set default */
-	if (!conf || strlen(conf) < 1) {
+	if (strlen(conf) < 1) {
 		sock_path = strdup(DEFAULT_SOCK_PATH);
 	} else {
 
