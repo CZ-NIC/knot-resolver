@@ -1437,7 +1437,11 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		return state == KR_STATE_DONE ? kr_ok() : kr_error(EIO);
 	}
 
-	if (unlikely(ctx->req.answer == NULL)) { /* meant to be dropped */
+	/* meant to be dropped */
+	if (unlikely(ctx->req.answer == NULL || ctx->req.options.NO_ANSWER)) {
+		/* For NO_ANSWER, a well-behaved layer should set the state to FAIL */
+		kr_assert(!ctx->req.options.NO_ANSWER || (ctx->req.state & KR_STATE_FAIL));
+
 		(void) qr_task_on_send(task, NULL, kr_ok());
 		return kr_ok();
 	}

@@ -823,6 +823,12 @@ function policy.DROP(_, req)
 	return kres.FAIL
 end
 
+function policy.NO_ANSWER(_, req)
+	req.options.NO_ANSWER = true
+	log_policy_action(req, 'NO_ANSWER')
+	return kres.FAIL
+end
+
 function policy.REFUSE(_, req)
 	local answer = answer_clear(req)
 	if answer == nil then return nil end

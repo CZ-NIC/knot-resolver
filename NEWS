@@ -10,6 +10,7 @@ Improvements
 - validator: conditionally ignore SHA1 DS, as SHOULD by RFC4509 (!1251)
 - lib/resolve: use EDNS padding for outgoing TLS queries (!1254)
 - support for PROXYv2 protocol (!1238)
+- lib/resolve, policy: new NO_ANSWER flag for not responding to clients (!1257)
 
 Incompatible changes
 --------------------

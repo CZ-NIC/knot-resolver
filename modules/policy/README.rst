@@ -144,6 +144,17 @@ Following actions stop the policy matching on the query, i.e. other rules are no
 
    Terminate query resolution and return REFUSED to the requestor.
 
+.. py:attribute:: NO_ANSWER
+
+   Terminate query resolution and do not return any answer to the requestor.
+
+   .. warning:: During normal operation, an answer should always be returned.
+      Deliberate query drops are indistinguishable from packet loss and may
+      cause problems as described in :rfc:`8906`. Only use :any:`NO_ANSWER`
+      on very specific occasions, e.g. as a defense mechanism during an attack,
+      and prefer other actions (e.g. :any:`DROP` or :any:`REFUSE`) for normal
+      operation.
+
 .. py:attribute:: TC
 
    Force requestor to use TCP. It sets truncated bit (*TC*) in response to true if the request came through UDP, which will force standard-compliant clients to retry the request over TCP.
