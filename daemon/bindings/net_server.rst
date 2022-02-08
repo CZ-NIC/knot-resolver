@@ -66,6 +66,8 @@ Examples:
         addresses if the network address ranges overlap,
         and clients would probably refuse such a response.
 
+.. _proxyv2:
+
 PROXYv2 protocol
 ^^^^^^^^^^^^^^^^
 
