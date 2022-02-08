@@ -10,6 +10,8 @@ socket in `dnstap format <https://dnstap.info>`_ using fstrm framing library.
 This logging is useful if you need effectively log all DNS traffic.
 
 The unix socket and the socket reader must be present before starting resolver instances.
+Also it needs appropriate filesystem permissions;
+the typical user and group of the daemon are called ``knot-resolver``.
 
 Tunables:
 
