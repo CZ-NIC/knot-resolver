@@ -120,12 +120,19 @@ class ResolverCollector:
         # this issue can be prevented by calling the `collect_kresd_stats()` function manually before entering
         # the Prometheus library. We just have to prevent the library from invoking it again. See the mentioned
         # function for details
-        if self._collection_task is not None and not self._collection_task.done():
-            logger.warning("Statistics collection task is still running. Skipping scheduling of a new one!")
+
+        if compat.asyncio.is_event_loop_running():
+            # when running, we can schedule the new data collection
+            if self._collection_task is not None and not self._collection_task.done():
+                logger.warning("Statistics collection task is still running. Skipping scheduling of a new one!")
+            else:
+                self._collection_task = compat.asyncio.create_task(
+                    self.collect_kresd_stats(_triggered_from_prometheus_library=True)
+                )
+
         else:
-            self._collection_task = compat.asyncio.create_task(
-                self.collect_kresd_stats(_triggered_from_prometheus_library=True)
-            )
+            # when not running, we can start a new loop (we are not in the manager's main thread)
+            compat.asyncio.run(self.collect_kresd_stats(_triggered_from_prometheus_library=True))
 
     def _create_resolver_metrics_loaded_gauge(self, kid: KresID, loaded: bool) -> GaugeMetricFamily:
         return _gauge(
