@@ -25,5 +25,5 @@ class MonitoringSchema(SchemaNode):
     graphite: optionally configures where should graphite metrics be sent to
     """
 
-    enabled: Literal["manager-only", "lazy", "always"] = "always"
+    enabled: Literal["manager-only", "lazy", "always"] = "lazy"
     graphite: Union[Literal[False], GraphiteSchema] = False

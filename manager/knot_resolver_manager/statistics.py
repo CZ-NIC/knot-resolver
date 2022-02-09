@@ -81,27 +81,51 @@ class ResolverCollector:
         self._stats_raw: Optional[Dict[KresID, str]] = None
         self._config_store: ConfigStore = config_store
         self._collection_task: "Optional[asyncio.Task[None]]" = None
+        self._skip_immediate_collection: bool = False
+
+    async def collect_kresd_stats(self, _triggered_from_prometheus_library: bool = False) -> None:
+        if self._skip_immediate_collection:
+            # this would happen because we are calling this function first manually before stat generation,
+            # and once again immediately afterwards caused by the prometheus library's stat collection
+            #
+            # this is a code made to solve problem with calling async functions from sync methods
+            self._skip_immediate_collection = False
+            return
+
+        config = self._config_store.get()
+
+        if config.monitoring.enabled == "manager-only":
+            logger.debug("Skipping kresd stat collection due to configuration")
+            self._stats_raw = None
+            return
+
+        lazy = config.monitoring.enabled == "lazy"
+        cmd = "collect_lazy_statistics()" if lazy else "collect_statistics()"
+        logger.debug("Collecting kresd stats with method '%s'", cmd)
+        stats_raw = await _command_registered_resolvers(cmd)
+        self._stats_raw = stats_raw
+
+        # if this function was not called by the prometheus library and calling collect() is imminent,
+        # we should block the next collection cycle as it would be useless
+        if not _triggered_from_prometheus_library:
+            self._skip_immediate_collection = True
 
     def _trigger_stats_collection(self) -> None:
-        async def collect(config: KresConfig) -> None:
-            if config.monitoring.enabled == "manager-only":
-                self._stats_raw = None
-                return
-
-            lazy = config.monitoring.enabled == "lazy"
-            cmd = "collect_lazy_statistics()" if lazy else "collect_statistics()"
-            stats_raw = await _command_registered_resolvers(cmd)
-            self._stats_raw = stats_raw
-
         # we are running inside an event loop, but in a synchronous function and that sucks a lot
         # it means that we shouldn't block the event loop by performing a blocking stats collection
         # but it also means that we can't yield to the event loop as this function is synchronous
         # therefore we can only start a new task, but we can't wait for it
         # which causes the metrics to be delayed by one collection pass (not the best, but probably good enough)
+        #
+        # this issue can be prevented by calling the `collect_kresd_stats()` function manually before entering
+        # the Prometheus library. We just have to prevent the library from invoking it again. See the mentioned
+        # function for details
         if self._collection_task is not None and not self._collection_task.done():
             logger.warning("Statistics collection task is still running. Skipping scheduling of a new one!")
         else:
-            self._collection_task = compat.asyncio.create_task(collect(self._config_store.get()))
+            self._collection_task = compat.asyncio.create_task(
+                self.collect_kresd_stats(_triggered_from_prometheus_library=True)
+            )
 
     def _create_resolver_metrics_loaded_gauge(self, kid: KresID, loaded: bool) -> GaugeMetricFamily:
         return _gauge(
@@ -140,6 +164,10 @@ class ResolverCollector:
                 )
 
             yield self._create_resolver_metrics_loaded_gauge(kid, success)
+
+    def describe(self) -> List[Metric]:
+        # this function prevents the collector registry from invoking the collect function on startup
+        return []
 
     def _parse_resolver_metrics(self, instance_id: KresID, metrics: Any) -> Generator[Metric, None, None]:
         sid = str(instance_id)
@@ -298,6 +326,9 @@ class ResolverCollector:
         )
 
 
+_resolver_collector: Optional[ResolverCollector] = None
+
+
 def unregister_resolver_metrics_for(subprocess: Subprocess) -> None:
     """
     Cancel metric collection from resolver subprocess
@@ -316,6 +347,14 @@ async def report_stats() -> bytes:
     """
     Collects metrics from everything, returns data string in Prometheus format.
     """
+
+    # manually trigger stat collection so that we do not have to wait for it
+    if _resolver_collector is not None:
+        await _resolver_collector.collect_kresd_stats()
+    else:
+        raise RuntimeError("Function invoked before initializing the module!")
+
+    # generate the report
     return exposition.generate_latest()  # type: ignore
 
 
@@ -345,7 +384,11 @@ async def _configure_graphite_bridge(config: KresConfig) -> None:
     """
     global _graphite_bridge
     if config.monitoring.graphite is not False and _graphite_bridge is None:
-        logger.info("Starting Graphite metrics exporter for [%s]:%d", config.monitoring.graphite.host, config.monitoring.graphite.port)
+        logger.info(
+            "Starting Graphite metrics exporter for [%s]:%d",
+            config.monitoring.graphite.host,
+            config.monitoring.graphite.port,
+        )
         _graphite_bridge = GraphiteBridge((config.monitoring.graphite.host, config.monitoring.graphite.port))
         _graphite_bridge.start(  # type: ignore
             interval=config.monitoring.graphite.interval_sec.seconds(), prefix=config.monitoring.graphite.prefix
@@ -357,8 +400,9 @@ async def init_monitoring(config_store: ConfigStore) -> None:
     Initialize monitoring. Must be called before any other function from this module.
     """
     # register metrics collector
-    _RESOLVER_COLLECTOR = ResolverCollector(config_store)
-    REGISTRY.register(_RESOLVER_COLLECTOR)  # type: ignore
+    global _resolver_collector
+    _resolver_collector = ResolverCollector(config_store)
+    REGISTRY.register(_resolver_collector)  # type: ignore
 
     # register graphite bridge
     await config_store.register_verifier(_deny_turning_off_graphite_bridge)
