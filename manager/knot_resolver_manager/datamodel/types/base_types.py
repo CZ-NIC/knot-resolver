@@ -64,9 +64,8 @@ class IntRangeBase(IntBase):
     Base class to work with integer value in range.
     Just inherit the class and set the values for '_min' and '_max'.
 
-    class CustomIntRange(IntRangeBase):
+    class IntNonNegative(IntRangeBase):
         _min: int = 0
-        _max: int = 10_000
     """
 
     _min: int
@@ -74,10 +73,14 @@ class IntRangeBase(IntBase):
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
-        if isinstance(source_value, int):
-            if not self._min <= source_value <= self._max:
+        if isinstance(source_value, int) and not isinstance(source_value, bool):
+            if hasattr(self, "_min") and (source_value < self._min):
                 raise SchemaException(
-                    f"Integer value {source_value} out of range <{self._min}, {self._max}>", object_path
+                    f"The value {source_value} is lower than the allowed minimum {self._min}.", object_path
+                )
+            if hasattr(self, "_max") and (source_value > self._max):
+                raise SchemaException(
+                    f"The value {source_value} is higher than the allowed maximum {self._max}", object_path
                 )
             self._value = source_value
         else:
@@ -89,7 +92,12 @@ class IntRangeBase(IntBase):
 
     @classmethod
     def json_schema(cls: Type["IntRangeBase"]) -> Dict[Any, Any]:
-        return {"type": "integer", "minimum": 0, "maximum": 65_535}
+        typ: Dict[str, Any] = {"type": "integer"}
+        if hasattr(cls, "_min"):
+            typ["minimum"] = cls._min
+        if hasattr(cls, "_max"):
+            typ["maximum"] = cls._max
+        return typ
 
 
 class PatternBase(StrBase):
