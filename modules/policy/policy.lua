@@ -71,7 +71,8 @@ end
 -- policy functions are defined below
 local policy = {}
 
-function policy.PASS(state, _)
+function policy.PASS(state, req)
+	policy.FLAGS('PASSTHRU_LEGACY')(state, req)
 	return state
 end
 

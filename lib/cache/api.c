@@ -340,12 +340,14 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* TODO: we _might_ want to process rules here even when some of the cache
 	 * exit-conditions happen, though I don't expect these cases to be important. */
-	int ret = kr_rule_local_data_answer(qry, pkt);
-	if (ret != -ENOENT) {
-		return ret;
+	if (!req->options.PASSTHRU_LEGACY) {
+		int ret = kr_rule_local_data_answer(qry, pkt);
+		if (ret != -ENOENT) {
+			return ret;
+		}
 	}
 
-	ret = peek_nosync(ctx, pkt);
+	int ret = peek_nosync(ctx, pkt);
 	kr_cache_commit(&req->ctx->cache);
 	return ret;
 }

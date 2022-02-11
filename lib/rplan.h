@@ -56,6 +56,7 @@ struct kr_qflags {
 	bool PKT_IS_SANE : 1;    /**< Set by iterator in consume phase to indicate whether
 				  * some basic aspects of the packet are OK, e.g. QNAME. */
 	bool DNS64_DISABLE : 1;  /**< Don't do any DNS64 stuff (meant for view:addr). */
+	bool PASSTHRU_LEGACY : 1;/**< Ignore local-data overrides/blocks for this kr_request. */
 };
 
 /** Combine flags together.  This means set union for simple flags. */
