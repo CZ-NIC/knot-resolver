@@ -2,7 +2,6 @@ import json
 from typing import Any, Dict, cast
 
 from pytest import raises
-from yaml.nodes import Node
 
 from knot_resolver_manager.datamodel import KresConfig
 from knot_resolver_manager.datamodel.types import IPv6Network96, TimeUnit
@@ -35,7 +34,7 @@ def test_dnssec_default_true():
     assert config.dnssec.trust_anchor_sentinel == True
     assert config.dnssec.trust_anchor_signal_query == True
     assert config.dnssec.time_skew_detection == True
-    assert config.dnssec.keep_removed == 0
+    assert int(config.dnssec.keep_removed) == 0
     assert config.dnssec.refresh_time == None
     assert config.dnssec.hold_down_time == TimeUnit("30d")
 

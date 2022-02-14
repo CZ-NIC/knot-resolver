@@ -146,7 +146,7 @@ class KresManager:
     async def apply_config(self, config: KresConfig) -> None:
         async with self._manager_lock:
             logger.debug("Applying new config to all workers")
-            await self._ensure_number_of_children(config, config.server.workers)
+            await self._ensure_number_of_children(config, int(config.server.workers))
             await self._rolling_restart(config)
 
             if self._is_gc_running() != config.server.use_cache_gc:

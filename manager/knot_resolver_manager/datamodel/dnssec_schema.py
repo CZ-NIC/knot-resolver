@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from knot_resolver_manager.datamodel.types import TimeUnit
+from knot_resolver_manager.datamodel.types import IntNonNegative, TimeUnit
 from knot_resolver_manager.utils import SchemaNode
 
 
@@ -37,7 +37,7 @@ class DnssecSchema(SchemaNode):
     trust_anchor_sentinel: bool = True
     trust_anchor_signal_query: bool = True
     time_skew_detection: bool = True
-    keep_removed: int = 0
+    keep_removed: IntNonNegative = IntNonNegative(0)
     refresh_time: Optional[TimeUnit] = None
     hold_down_time: TimeUnit = TimeUnit("30d")
     trust_anchors: Optional[List[str]] = None
