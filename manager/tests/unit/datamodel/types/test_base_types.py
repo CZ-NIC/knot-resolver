@@ -1,39 +1,38 @@
-import ipaddress
+import random
+import sys
+from typing import List, Optional
 
+import pytest
 from pytest import raises
 
 from knot_resolver_manager.datamodel.types.base_types import IntRangeBase
 from knot_resolver_manager.exceptions import KresManagerException
 
 
-def test_int_range_base():
-    class MinTest(IntRangeBase):
-        _min = 10
+@pytest.mark.parametrize("min,max", [(0, None), (None, 0), (1, 65535), (-65535, -1)])
+def test_int_range_base(min: Optional[int], max: Optional[int]):
+    class Test(IntRangeBase):
+        if min:
+            _min = min
+        if max:
+            _max = max
 
-    assert int(MinTest(10)) == 10
-    assert int(MinTest(20)) == 20
+    if min:
+        assert int(Test(min)) == min
+    if max:
+        assert int(Test(max)) == max
 
-    with raises(KresManagerException):
-        MinTest(9)
+    rmin = min if min else -sys.maxsize - 1
+    rmax = max if max else sys.maxsize
 
-    class MaxTest(IntRangeBase):
-        _max = 25
+    n = 100
+    vals: List[int] = [random.randint(rmin, rmax) for _ in range(n)]
+    assert [str(Test(val)) == f"{val}" for val in vals]
 
-    assert int(MaxTest(20)) == 20
-    assert int(MaxTest(25)) == 25
+    invals: List[int] = []
+    invals.extend([random.randint(rmax + 1, sys.maxsize) for _ in range(n % 2)] if max else [])
+    invals.extend([random.randint(-sys.maxsize - 1, rmin - 1) for _ in range(n % 2)] if max else [])
 
-    with raises(KresManagerException):
-        MaxTest(26)
-
-    class MinMaxTest(IntRangeBase):
-        _min = 10
-        _max = 25
-
-    assert int(MinMaxTest(10)) == 10
-    assert int(MinMaxTest(20)) == 20
-    assert int(MinMaxTest(25)) == 25
-
-    with raises(KresManagerException):
-        MinMaxTest(9)
-    with raises(KresManagerException):
-        MinMaxTest(26)
+    for inval in invals:
+        with raises(KresManagerException):
+            Test(inval)
