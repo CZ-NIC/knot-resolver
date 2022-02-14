@@ -4,6 +4,8 @@ from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import (
     CheckedPath,
+    Int0_512,
+    Int0_65535,
     InterfaceOptionalPort,
     IPAddress,
     IPNetwork,
@@ -61,13 +63,11 @@ class TLSSchema(SchemaNode):
     sticket_secret: Optional[str] = None
     sticket_secret_file: Optional[CheckedPath] = None
     auto_discovery: bool = False
-    padding: int = 1
+    padding: Union[bool, Int0_512] = True
 
     def _validate(self):
         if self.sticket_secret and self.sticket_secret_file:
             raise ValueError("'sticket_secret' and 'sticket_secret_file' are both defined, only one can be used")
-        if not 0 <= self.padding <= 512:
-            raise ValueError("'padding' must be number in range<0-512>")
 
 
 class ListenSchema(SchemaNode):
@@ -155,7 +155,7 @@ class NetworkSchema(SchemaNode):
     do_ipv6: bool = True
     out_interface_v4: Optional[IPv4Address] = None
     out_interface_v6: Optional[IPv6Address] = None
-    tcp_pipeline: int = 100
+    tcp_pipeline: Int0_65535 = Int0_65535(100)
     edns_tcp_keepalive: bool = True
     edns_buffer_size: EdnsBufferSizeSchema = EdnsBufferSizeSchema()
     address_renumbering: Optional[List[AddressRenumberingSchema]] = None
@@ -164,7 +164,3 @@ class NetworkSchema(SchemaNode):
         ListenSchema({"interface": "127.0.0.1"}),
         ListenSchema({"interface": "::1", "freebind": True}),
     ]
-
-    def _validate(self):
-        if self.tcp_pipeline < 0:
-            raise ValueError("'tcp-pipeline' must be nonnegative number")

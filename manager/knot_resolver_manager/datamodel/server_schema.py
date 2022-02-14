@@ -10,6 +10,7 @@ from knot_resolver_manager.datamodel.types import (
     DNSRecordTypeEnum,
     DomainName,
     InterfacePort,
+    IntPositive,
     IPAddressPort,
     UncheckedPath,
 )
@@ -114,7 +115,7 @@ class ServerSchema(SchemaNode):
         hostname: Optional[str] = None
         groupid: Optional[str] = None
         nsid: Optional[str] = None
-        workers: Union[Literal["auto"], int] = 1
+        workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         use_cache_gc: bool = True
         backend: BackendEnum = "auto"
         watchdog: Union[bool, WatchDogSchema] = True
@@ -127,7 +128,7 @@ class ServerSchema(SchemaNode):
     hostname: str
     groupid: Optional[str]
     nsid: Optional[str]
-    workers: int
+    workers: IntPositive
     use_cache_gc: bool
     backend: BackendEnum = "auto"
     watchdog: Union[bool, WatchDogSchema]
@@ -142,11 +143,9 @@ class ServerSchema(SchemaNode):
 
     def _workers(self, obj: Raw) -> Any:
         if obj.workers == "auto":
-            return _cpu_count()
+            return IntPositive(_cpu_count())
         return obj.workers
 
     def _validate(self) -> None:
-        if self.workers < 0:
-            raise ValueError("Number of workers must be non-negative")
         if self.watchdog and self.backend not in ["auto", "systemd"]:
             raise ValueError("'watchdog' can only be configured for 'systemd' backend")
