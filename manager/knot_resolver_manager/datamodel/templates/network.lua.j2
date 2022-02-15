@@ -1,4 +1,4 @@
-{% from 'macros/network_macros.lua.j2' import net_listen %}
+{% from 'macros/network_macros.lua.j2' import network_listen, http_config %}
 
 -- network.do-ipv4/6
 net.ipv4 = {{ 'true' if cfg.network.do_ipv4 else 'false' }}
@@ -65,7 +65,18 @@ renumber.config = {
 }
 {% endif %}
 
--- network.interfaces
-{% for interface in cfg.network.interfaces %}
-{{ net_listen(interface) }}
+{%- set vars = {'doh_legacy': False} -%}
+{% for listen in cfg.network.listen if listen.kind == "doh-legacy" -%}
+{%- if vars.update({'doh_legacy': True}) -%}{%- endif -%}
+{%- endfor %}
+
+{% if vars.doh_legacy %}
+-- doh_legacy http config
+modules.load('http')
+{{ http_config(cfg.network.tls,"doh_legacy") }}
+{% endif %}
+
+-- network.listen
+{% for listen in cfg.network.listen %}
+{{ network_listen(listen) }}
 {% endfor %}

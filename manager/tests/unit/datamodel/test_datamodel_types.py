@@ -5,19 +5,36 @@ from pytest import raises
 from knot_resolver_manager.datamodel.types import (
     CheckedPath,
     DomainName,
+    InterfaceName,
+    InterfaceOptionalPort,
+    InterfacePort,
     IPAddress,
+    IPAddressOptionalPort,
     IPAddressPort,
     IPNetwork,
     IPv4Address,
     IPv6Address,
     IPv6Network96,
-    Listen,
-    ListenType,
+    PortNumber,
     SizeUnit,
     TimeUnit,
 )
 from knot_resolver_manager.exceptions import KresManagerException
 from knot_resolver_manager.utils import SchemaNode
+
+
+def test_port_number():
+    assert PortNumber(1)
+    assert PortNumber(65_535)
+    assert PortNumber(5353)
+    assert PortNumber(5000)
+
+    with raises(KresManagerException):
+        PortNumber(0)
+    with raises(KresManagerException):
+        PortNumber(65_636)
+    with raises(KresManagerException):
+        PortNumber(-1)
 
 
 def test_size_unit():
@@ -79,25 +96,124 @@ def test_domain_name():
         TestSchema({"name": "b@d.domain.com."})
 
 
-def test_ipaddress_port():
+def test_interface_name():
+    assert InterfaceName("lo")
+    assert InterfaceName("eth0")
+    assert InterfaceName("wlo1")
+    assert InterfaceName("web_ifgrp")
+    assert InterfaceName("e8-2")
+
+    with raises(KresManagerException):
+        InterfaceName("_lo")
+    with raises(KresManagerException):
+        InterfaceName("-wlo1")
+    with raises(KresManagerException):
+        InterfaceName("lo_")
+    with raises(KresManagerException):
+        InterfaceName("wlo1-")
+    with raises(KresManagerException):
+        InterfaceName("e8--2")
+    with raises(KresManagerException):
+        InterfaceName("web__ifgrp")
+
+
+def test_interface_port():
+    o = InterfacePort("lo@5353")
+    assert str(o) == "lo@5353"
+    assert o == InterfacePort("lo@5353")
+    assert str(o.if_name) == "lo"
+    assert o.port == PortNumber(5353)
+
+    o = InterfacePort("2001:db8::1000@5001")
+    assert str(o) == "2001:db8::1000@5001"
+    assert o == InterfacePort("2001:db8::1000@5001")
+    assert str(o.addr) == "2001:db8::1000"
+    assert o.port == PortNumber(5001)
+
+    with raises(KresManagerException):
+        InterfacePort("lo")
+    with raises(KresManagerException):
+        InterfacePort("53")
+
+
+def test_interface_optional_port():
+    o = InterfaceOptionalPort("lo")
+    assert str(o) == "lo"
+    assert o == InterfaceOptionalPort("lo")
+    assert str(o.if_name) == "lo"
+    assert o.port == None
+
+    o = InterfaceOptionalPort("123.4.5.6")
+    assert str(o) == "123.4.5.6"
+    assert o == InterfaceOptionalPort("123.4.5.6")
+    assert str(o.addr) == "123.4.5.6"
+    assert o.port == None
+
+    o = InterfaceOptionalPort("lo@5353")
+    assert str(o) == "lo@5353"
+    assert o == InterfaceOptionalPort("lo@5353")
+    assert str(o.if_name) == "lo"
+    assert o.port == PortNumber(5353)
+
+    o = InterfaceOptionalPort("2001:db8::1000@5001")
+    assert str(o) == "2001:db8::1000@5001"
+    assert o == InterfaceOptionalPort("2001:db8::1000@5001")
+    assert str(o.addr) == "2001:db8::1000"
+    assert o.port == PortNumber(5001)
+
+    with raises(KresManagerException):
+        InterfaceOptionalPort("lo@")
+    with raises(KresManagerException):
+        InterfaceOptionalPort("@53")
+
+
+def test_ip_address_port():
     class TestSchema(SchemaNode):
         ip_port: IPAddressPort
-
-    o = TestSchema({"ip-port": "123.4.5.6"})
-    assert str(o.ip_port) == "123.4.5.6"
-    assert o.ip_port == IPAddressPort("123.4.5.6")
 
     o = TestSchema({"ip-port": "123.4.5.6@5353"})
     assert str(o.ip_port) == "123.4.5.6@5353"
     assert o.ip_port == IPAddressPort("123.4.5.6@5353")
 
-    o = TestSchema({"ip-port": "2001:db8::1000"})
-    assert str(o.ip_port) == "2001:db8::1000"
-    assert o.ip_port == IPAddressPort("2001:db8::1000")
-
     o = TestSchema({"ip-port": "2001:db8::1000@53"})
     assert str(o.ip_port) == "2001:db8::1000@53"
     assert o.ip_port == IPAddressPort("2001:db8::1000@53")
+
+    with raises(KresManagerException):
+        TestSchema({"ip-port": "123.4.5.6"})
+    with raises(KresManagerException):
+        TestSchema({"ip-port": "2001:db8::1000"})
+    with raises(KresManagerException):
+        TestSchema({"ip-port": "123.4.5.6.7@5000"})
+    with raises(KresManagerException):
+        TestSchema({"ip-port": "2001:db8::10000@5001"})
+    with raises(KresManagerException):
+        TestSchema({"ip-port": "123.4.5.6@"})
+    with raises(KresManagerException):
+        TestSchema({"ip-port": "123.4.5.6@-1"})
+    with raises(KresManagerException):
+        TestSchema({"ip-port": "123.4.5.6@65536"})
+
+
+def test_ip_address_optional_port():
+    class TestSchema(SchemaNode):
+        ip_port: IPAddressOptionalPort
+
+    o = TestSchema({"ip-port": "123.4.5.6"})
+    assert str(o.ip_port) == "123.4.5.6"
+    assert o.ip_port == IPAddressOptionalPort("123.4.5.6")
+
+    o = TestSchema({"ip-port": "123.4.5.6@5353"})
+    assert str(o.ip_port) == "123.4.5.6@5353"
+    assert o.ip_port == IPAddressOptionalPort("123.4.5.6@5353")
+
+    o = TestSchema({"ip-port": "2001:db8::1000"})
+    assert str(o.ip_port) == "2001:db8::1000"
+    assert o.ip_port == IPAddressOptionalPort("2001:db8::1000")
+
+    o = TestSchema({"ip-port": "2001:db8::1000@53"})
+    assert str(o.ip_port) == "2001:db8::1000@53"
+    assert o.ip_port == IPAddressOptionalPort("2001:db8::1000@53")
 
     with raises(KresManagerException):
         TestSchema({"ip-port": "123.4.5.6.7"})
@@ -111,7 +227,7 @@ def test_ipaddress_port():
         TestSchema({"ip-port": "123.4.5.6@65536"})
 
 
-def test_ipaddress():
+def test_ip_address():
     class TestSchema(SchemaNode):
         ip: IPAddress
 
@@ -125,38 +241,6 @@ def test_ipaddress():
 
     with raises(KresManagerException):
         TestSchema({"ip": "123456"})
-
-
-def test_listen():
-    o = Listen({"unix-socket": "/tmp"})
-
-    assert o.typ == ListenType.UNIX_SOCKET
-    assert o.ip is None
-    assert o.port is None
-    assert o.unix_socket is not None
-    assert o.interface is None
-
-    o = Listen({"interface": "eth0", "port": 56})
-
-    assert o.typ == ListenType.INTERFACE
-    assert o.ip is None
-    assert o.port == 56
-    assert o.unix_socket is None
-    assert o.interface == "eth0"
-
-    o = Listen({"ip": "123.4.5.6"})
-
-    assert o.typ == ListenType.IP
-    assert o.ip == IPv4Address("123.4.5.6")
-    assert o.port == None
-    assert o.unix_socket is None
-    assert o.interface is None
-
-    # check failure
-    with raises(KresManagerException):
-        Listen({"unix-socket": "/tmp", "ip": "127.0.0.1"})
-    with raises(KresManagerException):
-        Listen({"unix-socket": "/tmp", "port": 853})
 
 
 def test_network():
