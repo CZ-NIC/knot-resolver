@@ -18,7 +18,7 @@ net.outgoing_v6('{{ cfg.network.out_interface_v6 }}')
 net.tcp_pipeline({{ cfg.network.tcp_pipeline }})
 
 -- network.edns-keep-alive
-{% if cfg.network.edns_keep_alive %}
+{% if cfg.network.edns_tcp_keepalive %}
 modules.load('edns_keepalive')
 {% else %}
 modules.unload('edns_keepalive')
@@ -53,7 +53,15 @@ modules.load('experimental_dot_auth')
 {% endif %}
 
 -- network.tls.padding
-net.tls_padding({{ cfg.network.tls.padding }})
+net.tls_padding(
+{%- if cfg.network.tls.padding == true -%}
+true
+{%- elif cfg.network.tls.padding == false -%}
+false
+{%- else -%}
+{{ cfg.network.tls.padding }}
+{%- endif -%}
+)
 
 {% if cfg.network.address_renumbering %}
 -- network.address-renumbering

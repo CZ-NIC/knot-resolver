@@ -17,7 +17,7 @@ modules.load('serve_stale < cache')
 {% endif %}
 
 -- options.query-priming
-{% if cfg.options.query_priming %}
+{% if cfg.options.priming %}
 modules.load('priming')
 {% else %}
 modules.unload('priming')
