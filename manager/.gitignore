@@ -13,3 +13,5 @@ dist/
 .podman-cache/
 docs/_build/*
 *junit.xml
+.build_kresd/
+.install_kresd/

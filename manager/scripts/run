@@ -4,6 +4,18 @@
 src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/_env.sh
 
+echo
+echo Building Knot Resolver
+echo ----------------------
+cd ..
+mkdir -p manager/.build_kresd manager/.install_kresd
+meson manager/.build_kresd --prefix=$(realpath manager/.install_kresd) --default-library=static --buildtype=debug
+ninja -C manager/.build_kresd
+ninja install -C manager/.build_kresd
+export PATH="$(realpath manager/.install_kresd)/sbin:$PATH"
+cd manager
+
+echo
 echo Knot Manager API is accessible on http://localhost:5000
 echo -------------------------------------------------------
 

@@ -17,6 +17,7 @@ click = "^7.1.2"
 PyYAML = "^5.4.1"
 requests = "^2.25.1"
 typing-extensions = ">=3.7.2"
+prometheus-client = "^0.6"
 
 [tool.poetry.dev-dependencies]
 pytest-cov = "^2.11.1"

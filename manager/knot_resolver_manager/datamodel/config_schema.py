@@ -11,6 +11,7 @@ from knot_resolver_manager.datamodel.dnssec_schema import DnssecSchema
 from knot_resolver_manager.datamodel.forward_zone import ForwardZoneSchema
 from knot_resolver_manager.datamodel.logging_config import LoggingSchema
 from knot_resolver_manager.datamodel.lua_schema import LuaSchema
+from knot_resolver_manager.datamodel.monitoring_schema import MonitoringSchema
 from knot_resolver_manager.datamodel.network_schema import NetworkSchema
 from knot_resolver_manager.datamodel.options_schema import OptionsSchema
 from knot_resolver_manager.datamodel.policy_schema import PolicySchema
@@ -71,6 +72,7 @@ class KresConfig(SchemaNode):
         dnssec: Disable DNSSEC, enable with defaults or set new configuration.
         dns64: Disable DNS64 (RFC 6147), enable with defaults or set new configuration.
         logging: Logging and debugging configuration.
+        monitoring: Metrics exposisition configuration (Prometheus, Graphite)
         lua: Custom Lua configuration.
         """
 
@@ -87,6 +89,7 @@ class KresConfig(SchemaNode):
         dnssec: Union[bool, DnssecSchema] = True
         dns64: Union[bool, Dns64Schema] = False
         logging: LoggingSchema = LoggingSchema()
+        monitoring: MonitoringSchema = MonitoringSchema()
         lua: LuaSchema = LuaSchema()
 
     _PREVIOUS_SCHEMA = Raw
@@ -104,6 +107,7 @@ class KresConfig(SchemaNode):
     dnssec: Union[Literal[False], DnssecSchema]
     dns64: Union[Literal[False], Dns64Schema]
     logging: LoggingSchema
+    monitoring: MonitoringSchema
     lua: LuaSchema
 
     def _dnssec(self, obj: Raw) -> Union[Literal[False], DnssecSchema]:
@@ -117,4 +121,7 @@ class KresConfig(SchemaNode):
         return obj.dns64
 
     def render_lua(self) -> str:
-        return _MAIN_TEMPLATE.render(cfg=self)  # pyright: reportUnknownMemberType=false
+        # FIXME the `cwd` argument is used only for configuring control socket path
+        # it should be removed and relative path used instead as soon as issue
+        # https://gitlab.nic.cz/knot/knot-resolver/-/issues/720 is fixed
+        return _MAIN_TEMPLATE.render(cfg=self, cwd=os.getcwd())  # pyright: reportUnknownMemberType=false
