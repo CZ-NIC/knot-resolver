@@ -12,21 +12,55 @@ from knot_resolver_manager.utils import SchemaNode
 
 
 class FilterSchema(SchemaNode):
+    """
+    Query filtering configuration.
+
+    ---
+    suffix: Filter based on the suffix of the query name.
+    pattern: Filter based on the pattern that match query name.
+    qtype: Filter based on the DNS query type.
+    """
+
     suffix: Optional[str] = None
     pattern: Optional[str] = None
     qtype: Optional[DNSRecordTypeEnum] = None
 
 
 class AnswerSchema(SchemaNode):
-    qtype: DNSRecordTypeEnum
+    """
+    Configuration of custom resource record for DNS answer.
+
+    ---
+    rtype: Type of DNS resource record.
+    rdata: Data of DNS resource record.
+    ttl: Time-to-live value for defined answer.
+    nodata: Answer with NODATA If requested type is not configured in the answer. Otherwise policy rule is ignored.
+    """
+
+    rtype: DNSRecordTypeEnum
     rdata: str
     ttl: TimeUnit = TimeUnit("1s")
     nodata: bool = False
 
 
 class PolicySchema(SchemaNode):
+    """
+    Configuration of policy rule.
+
+    ---
+    action: Policy rule action.
+    priority: Policy rule priority.
+    filter: Query filtering configuration.
+    views: Use policy rule only for clients defined by views.
+    options: Configuration flags for policy rule.
+    message: Deny message for 'deny' action.
+    reroute: Configuration for 'reroute' action.
+    answer: Answer definition for 'answer' action.
+    mirror: Mirroring parameters for 'mirror' action.
+    """
+
     action: PolicyActionEnum
-    order: Optional[int] = None
+    priority: Optional[int] = None
     filter: Optional[FilterSchema] = None
     views: Optional[List[str]] = None
     options: Optional[List[PolicyFlagEnum]] = None

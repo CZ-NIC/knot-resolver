@@ -113,12 +113,12 @@ def test_policy_reroute():
 
 
 def test_policy_answer():
-    ans = AnswerSchema({"qtype": "AAAA", "rdata": "192.0.2.7"})
+    ans = AnswerSchema({"rtype": "AAAA", "rdata": "192.0.2.7"})
     tmpl_str = """{% from 'macros/policy_macros.lua.j2' import policy_answer %}
 {{ policy_answer(ans) }}"""
 
     tmpl = template_from_str(tmpl_str)
     assert (
         tmpl.render(ans=ans)
-        == f"policy.ANSWER({{[kres.type.{ans.qtype}]={{rdata=kres.str2ip('{ans.rdata}'),ttl={ans.ttl.seconds()}}}}},{str(ans.nodata).lower()})"
+        == f"policy.ANSWER({{[kres.type.{ans.rtype}]={{rdata=kres.str2ip('{ans.rdata}'),ttl={ans.ttl.seconds()}}}}},{str(ans.nodata).lower()})"
     )

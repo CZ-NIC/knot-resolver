@@ -10,7 +10,7 @@ class PrefillSchema(SchemaNode):
 
     ---
     origin: Origin for the imported data. Cache prefilling is only supported for the root zone ('.').
-    url: URL of the zone file to be imported.
+    url: URL of the zone data to be imported.
     refresh_interval: Time interval between consecutive refreshes of the imported zone data.
     ca_file: Path to the file containing a CA certificate bundle that is used to authenticate the HTTPS connection.
     """
@@ -30,10 +30,10 @@ class CacheSchema(SchemaNode):
     DNS resolver cache configuration.
 
     ---
-    storage: DNS resolver cache storage.
+    storage: Cache storage of the DNS resolver.
     size_max: Maximum size of the cache.
-    ttl_min: Minimum time-to-live for cache entries.
-    ttl_max: Maximum time-to-live for cache entries.
+    ttl_min: Minimum time-to-live for the cache entries.
+    ttl_max: Maximum time-to-live for the cache entries.
     ns_timeout: Time interval for which a nameserver address will be ignored after determining that it does not return (useful) answers.
     prefill: Prefill the cache periodically by importing zone data obtained over HTTP.
     """

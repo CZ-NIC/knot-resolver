@@ -36,12 +36,12 @@ def test_reroute():
 
 
 def test_answer():
-    assert PolicySchema({"action": "answer", "answer": {"qtype": "AAAA", "rdata": "::1"}})
+    assert PolicySchema({"action": "answer", "answer": {"rtype": "AAAA", "rdata": "::1"}})
 
     with raises(KresManagerException):
         PolicySchema({"action": "answer"})
     with raises(KresManagerException):
-        PolicySchema({"action": "pass", "answer": {"qtype": "AAAA", "rdata": "::1"}})
+        PolicySchema({"action": "pass", "answer": {"rtype": "AAAA", "rdata": "::1"}})
 
 
 def test_mirror():

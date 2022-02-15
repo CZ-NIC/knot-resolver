@@ -53,27 +53,27 @@ _MAIN_TEMPLATE = _import_lua_template()
 
 
 class KresConfig(SchemaNode):
-    """
-    Knot Resolver declarative configuration.
-
-    ---
-    server: DNS server control and management configuration.
-    options: Fine-tuning global parameters of DNS resolver operation.
-    network: Network connections and protocols.
-    static_hints: Static hints configuration section.
-    views: List of views and its configuration.
-    policy: List of policy rules and its configuration.
-    rpz: List of Response Policy Zones and its configuration.
-    stub_zones: List of Stub Zones and its configuration.
-    forward_zones: List of Forward Zones and its configuration.
-    cache: DNS resolver cache configuration.
-    dnssec: DNSSEC disabling/enabling and configuration.
-    dns64: DNS64 disabling/enabling and configuration.
-    logging: Logging and debugging configuration.
-    lua: Custom Lua configuration.
-    """
-
     class Raw(SchemaNode):
+        """
+        Knot Resolver declarative configuration.
+
+        ---
+        server: DNS server control and management configuration.
+        options: Fine-tuning global parameters of DNS resolver operation.
+        network: Network connections and protocols configuration.
+        static_hints: Static hints for forward records (A/AAAA) and reverse records (PTR)
+        views: List of views and its configuration.
+        policy: List of policy rules and its configuration.
+        rpz: List of Response Policy Zones and its configuration.
+        stub_zones: List of Stub Zones and its configuration.
+        forward_zones: List of Forward Zones and its configuration.
+        cache: DNS resolver cache configuration.
+        dnssec: Disable DNSSEC, enable with defaults or set new configuration.
+        dns64: Disable DNS64 (RFC 6147), enable with defaults or set new configuration.
+        logging: Logging and debugging configuration.
+        lua: Custom Lua configuration.
+        """
+
         server: ServerSchema = ServerSchema()
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
