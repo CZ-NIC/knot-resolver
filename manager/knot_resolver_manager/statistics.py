@@ -366,7 +366,7 @@ async def report_stats() -> bytes:
 
 
 async def _deny_turning_off_graphite_bridge(old_config: KresConfig, new_config: KresConfig) -> Result[None, str]:
-    if old_config.monitoring.graphite is not None and new_config.monitoring.graphite is None:
+    if old_config.monitoring.graphite and not new_config.monitoring.graphite:
         return Result.err(
             "You can't turn off graphite monitoring dynamically. If you really want this feature, please let the developers know."
         )
@@ -393,12 +393,12 @@ async def _configure_graphite_bridge(config: KresConfig) -> None:
     if config.monitoring.graphite is not False and _graphite_bridge is None:
         logger.info(
             "Starting Graphite metrics exporter for [%s]:%d",
-            config.monitoring.graphite.host,
-            config.monitoring.graphite.port,
+            str(config.monitoring.graphite.host),
+            int(config.monitoring.graphite.port),
         )
-        _graphite_bridge = GraphiteBridge((config.monitoring.graphite.host, config.monitoring.graphite.port))
+        _graphite_bridge = GraphiteBridge((str(config.monitoring.graphite.host), int(config.monitoring.graphite.port)))
         _graphite_bridge.start(  # type: ignore
-            interval=config.monitoring.graphite.interval_sec.seconds(), prefix=config.monitoring.graphite.prefix
+            interval=config.monitoring.graphite.interval.seconds(), prefix=config.monitoring.graphite.prefix
         )
 
 
