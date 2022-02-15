@@ -16,6 +16,7 @@ from knot_resolver_manager.kresd_controller.interface import (
     SubprocessStatus,
     SubprocessType,
 )
+from knot_resolver_manager.statistics import register_resolver_metrics_for, unregister_resolver_metrics_for
 from knot_resolver_manager.utils.functional import Result
 from knot_resolver_manager.utils.types import NoneType
 
@@ -78,14 +79,17 @@ class KresManager:
     async def _spawn_new_worker(self, config: KresConfig) -> None:
         subprocess = await self._controller.create_subprocess(config, SubprocessType.KRESD, kres_id.alloc())
         await subprocess.start()
+
+        register_resolver_metrics_for(subprocess)
         self._workers.append(subprocess)
 
     async def _stop_a_worker(self) -> None:
         if len(self._workers) == 0:
             raise IndexError("Can't stop a kresd when there are no running")
 
-        kresd = self._workers.pop()
-        await kresd.stop()
+        subprocess = self._workers.pop()
+        unregister_resolver_metrics_for(subprocess)
+        await subprocess.stop()
 
     async def _collect_already_running_children(self) -> None:
         for subp in await self._controller.get_all_running_instances():
@@ -100,7 +104,6 @@ class KresManager:
     async def _rolling_restart(self, new_config: KresConfig) -> None:
         for kresd in self._workers:
             await kresd.apply_new_config(new_config)
-            await asyncio.sleep(1)
 
     async def _ensure_number_of_children(self, config: KresConfig, n: int) -> None:
         # kill children that are not needed

@@ -14,7 +14,7 @@ from aiohttp.web_app import Application
 from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 
-from knot_resolver_manager import log
+from knot_resolver_manager import log, statistics
 from knot_resolver_manager.compat import asyncio as asyncio_compat
 from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE
@@ -138,6 +138,7 @@ class Server:
             }
         )
 
+    @statistics.async_timing_histogram(statistics.MANAGER_REQUEST_RECONFIGURE_LATENCY)
     async def _handler_apply_config(self, request: web.Request) -> web.Response:
         """
         Route handler for changing resolver configuration
@@ -157,6 +158,13 @@ class Server:
 
         # return success
         return web.Response()
+
+    async def _handler_metrics(self, _request: web.Request) -> web.Response:
+        return web.Response(
+            body=await statistics.report_stats(),
+            content_type="text/plain",
+            charset="utf8",
+        )
 
     async def _handler_schema(self, _request: web.Request) -> web.Response:
         return web.json_response(KresConfig.json_schema(), headers={"Access-Control-Allow-Origin": "*"})
@@ -207,6 +215,7 @@ class Server:
                 web.post("/stop", self._handler_stop),
                 web.get("/schema", self._handler_schema),
                 web.get("/schema/ui", self._handle_view_schema),
+                web.get("/metrics", self._handler_metrics),
             ]
         )
 
@@ -347,6 +356,10 @@ async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_
         # Up to this point, we have been logging to memory buffer. But now, when we have the configuration loaded, we
         # can flush the buffer into the proper place
         await log.logger_init(config_store)
+
+        # With configuration on hand, we can initialize monitoring. We want to do this before any subprocesses are
+        # started, therefore before initializing manager
+        await statistics.init_monitoring(config_store)
 
         # After we have loaded the configuration, we can start worring about subprocess management.
         manager = await _init_manager(config_store)

@@ -41,6 +41,7 @@
 	X(answer,total) X(answer,noerror) X(answer,nodata) X(answer,nxdomain) X(answer,servfail) \
 	X(answer,cached) X(answer,1ms) X(answer,10ms) X(answer,50ms) X(answer,100ms) \
 	X(answer,250ms) X(answer,500ms) X(answer,1000ms) X(answer,1500ms) X(answer,slow) \
+	X(answer,sum_ms) \
 	X(answer,aa) X(answer,tc) X(answer,rd) X(answer,ra) X(answer, ad) X(answer,cd) \
 	X(answer,edns0) X(answer,do) \
 	X(query,edns) X(query,dnssec) \
@@ -219,6 +220,7 @@ static int collect(kr_layer_t *ctx)
 		/* Histogram of answer latency. */
 		struct kr_query *first = rplan->resolved.at[0];
 		uint64_t elapsed = kr_now() - first->timestamp_mono;
+		stat_const_add(data, metric_answer_sum_ms, elapsed);
 		if (elapsed <= 1) {
 			stat_const_add(data, metric_answer_1ms, 1);
 		} else if (elapsed <= 10) {
