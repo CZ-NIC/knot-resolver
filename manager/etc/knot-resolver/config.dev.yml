@@ -5,14 +5,10 @@ logging:
   groups:
     - manager
 network:
-  interfaces:
-    - listen:
-        ip: 127.0.0.1
-        port: 5353
+  listen:
+    - interface: 127.0.0.1@5353
 server:
   workers: 1
   rundir: etc/knot-resolver/runtime
   management:
-    listen:
-      ip: 127.0.0.1
-      port: 5000
+    interface: 127.0.0.1@5000

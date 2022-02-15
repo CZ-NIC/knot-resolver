@@ -6,6 +6,7 @@ packages = \
  'knot_resolver_manager.client',
  'knot_resolver_manager.compat',
  'knot_resolver_manager.datamodel',
+ 'knot_resolver_manager.datamodel.types',
  'knot_resolver_manager.kresd_controller',
  'knot_resolver_manager.kresd_controller.supervisord',
  'knot_resolver_manager.kresd_controller.systemd',

@@ -5,7 +5,14 @@ from typing import Any, Optional, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.types import CheckedPath, DomainName, Listen, RecordTypeEnum, UncheckedPath
+from knot_resolver_manager.datamodel.types import (
+    CheckedPath,
+    DNSRecordTypeEnum,
+    DomainName,
+    InterfacePort,
+    IPAddressPort,
+    UncheckedPath,
+)
 from knot_resolver_manager.exceptions import DataException
 from knot_resolver_manager.utils import SchemaNode
 
@@ -35,25 +42,28 @@ BackendEnum = Literal["auto", "systemd", "supervisord"]
 
 class WatchDogSchema(SchemaNode):
     qname: DomainName
-    qtype: RecordTypeEnum
+    qtype: DNSRecordTypeEnum
 
 
 class ManagementSchema(SchemaNode):
-    """
-    Management API configuration.
+    unix_socket: Optional[CheckedPath] = None
+    interface: Optional[IPAddressPort] = None
 
-    ---
-    listen: Specifies where does the manager listen with its API. Can't be changed in runtime!
-    """
-
-    listen: Listen = Listen({"unix-socket": "./manager.sock"})
+    def _validate(self) -> None:
+        if bool(self.unix_socket) == bool(self.interface):
+            raise ValueError("One of 'interface' or 'unix-socket' must be configured.")
 
 
 class WebmgmtSchema(SchemaNode):
-    listen: Listen
+    unix_socket: Optional[CheckedPath] = None
+    interface: Optional[InterfacePort] = None
     tls: bool = False
     cert_file: Optional[CheckedPath] = None
     key_file: Optional[CheckedPath] = None
+
+    def _validate(self) -> None:
+        if bool(self.unix_socket) == bool(self.interface):
+            raise ValueError("One of 'interface' or 'unix-socket' must be configured.")
 
 
 class ServerSchema(SchemaNode):
@@ -82,7 +92,7 @@ class ServerSchema(SchemaNode):
         backend: BackendEnum = "auto"
         watchdog: Union[bool, WatchDogSchema] = True
         rundir: UncheckedPath = UncheckedPath(".")
-        management: ManagementSchema = ManagementSchema()
+        management: ManagementSchema = ManagementSchema({"unix-socket": "./manager.sock"})
         webmgmt: Optional[WebmgmtSchema] = None
 
     _PREVIOUS_SCHEMA = Raw

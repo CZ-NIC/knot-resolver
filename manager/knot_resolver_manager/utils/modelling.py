@@ -58,20 +58,15 @@ class Serializable:
         )
 
     @staticmethod
-    def serialize(obj: Any, typ: Type[Any]) -> Any:
-        if inspect.isclass(typ) and issubclass(typ, Serializable):
-            return cast(Serializable, obj).to_dict()
+    def serialize(obj: Any) -> Any:
+        if isinstance(obj, Serializable):
+            return obj.to_dict()
 
-        elif inspect.isclass(typ) and issubclass(typ, CustomValueType):
-            return cast(CustomValueType, obj).serialize()
+        elif isinstance(obj, CustomValueType):
+            return obj.serialize()
 
-        elif inspect.isclass(typ) and issubclass(typ, SchemaNode):
-            node = cast(SchemaNode, obj)
-            return node.to_dict()
-
-        elif is_list(typ):
-            lst = cast(List[Any], obj)
-            res: List[Any] = [Serializable.serialize(i, get_generic_type_argument(typ)) for i in lst]
+        elif isinstance(obj, list):
+            res: List[Any] = [Serializable.serialize(i) for i in cast(List[Any], obj)]
             return res
 
         return obj
@@ -127,7 +122,7 @@ def _get_properties_schema(typ: Type[Any]) -> Dict[Any, Any]:
             assert Serializable.is_serializable(
                 python_type
             ), f"Type '{python_type}' does not appear to be JSON serializable"
-            schema[name]["default"] = Serializable.serialize(getattr(typ, name), python_type)
+            schema[name]["default"] = Serializable.serialize(getattr(typ, name))
 
     if attribute_documentation is not None and len(attribute_documentation) > 0:
         raise SchemaException(
@@ -579,6 +574,6 @@ class SchemaNode(Serializable):
         cls = self.__class__
         annot = cls.__dict__.get("__annotations__", {})
 
-        for name, python_type in annot.items():
-            res[name] = Serializable.serialize(getattr(self, name), python_type)
+        for name in annot:
+            res[name] = Serializable.serialize(getattr(self, name))
         return res

@@ -1,17 +1,63 @@
-{% macro net_listen(interface) -%}
+{% macro http_config(http_cfg, kind, tls=true) -%}
+http.config({tls={{ 'true' if tls else 'false'}},
+{%- if http_cfg.cert_file -%}
+    cert='{{ http_cfg.cert_file }}',
+{%- endif -%}
+{%- if http_cfg.key_file -%}
+    key='{{ http_cfg.key_file }}',
+{%- endif -%}
+},'{{ kind }}')
+{%- endmacro %}
+
+
+{% macro listen_kind(kind) -%}
+{%- if kind == "dot" -%}
+'tls'
+{%- elif kind == "doh-legacy" -%}
+'doh_legacy'
+{%- else -%}
+'{{ kind }}'
+{%- endif -%}
+{%- endmacro %}
+
+
+{% macro net_listen_unix_socket(path, kind, freebind) -%}
+net.listen('{{ path }}',nil,{kind={{ listen_kind(kind) }},freebind={{ 'true' if freebind else 'false'}}})
+{%- endmacro %}
+
+
+{% macro net_listen_interface(interface, kind, freebind, port) -%}
 net.listen(
-{%- if interface.listen.ip -%}
-'{{ interface.listen.ip|string }}',
-{%- if interface.listen.port -%}
-{{ interface.listen.port|int }},
+{%- if interface.addr -%}
+'{{ interface.addr }}',
+{%- elif interface.if_name -%}
+net.{{ interface.if_name }},
 {%- endif -%}
-{%- elif interface.listen.unix_socket -%}
-'{{ interface.listen.unix_socket|string }}',nil,
-{%- elif interface.listen.interface -%}
-net.{{ interface.listen.interface|string }},
-{%- if interface.listen.port -%}
-{{ interface.listen.port|int }},
+{%- if interface.port -%}
+{{ interface.port }},
+{%- else -%}
+{{ port }},
 {%- endif -%}
+{kind={{ listen_kind(kind) }},freebind={{ 'true' if freebind else 'false'}}})
+{%- endmacro %}
+
+
+{% macro network_listen(listen) -%}
+{%- if listen.unix_socket -%}
+    {%- if listen.unix_socket is iterable-%}
+        {% for path in listen.unix_socket -%}
+            {{ net_listen_unix_socket(path, listen.kind, listen.freebind) }}
+        {% endfor -%}
+    {%- else -%}
+        {{ net_listen_unix_socket(listen.unix_socket, listen.kind, listen.freebind) }}
+    {%- endif -%}
+{%- elif listen.interface -%}
+    {%- if listen.interface is iterable-%}
+        {% for interface in listen.interface -%}
+            {{ net_listen_interface(interface, listen.kind, listen.freebind, listen.port) }}
+        {% endfor -%}
+    {%- else -%}
+        {{ net_listen_interface(listen.interface, listen.kind, listen.freebind, listen.port) }}
+    {%- endif -%}
 {%- endif -%}
-{kind='{{ 'tls' if interface.kind == 'dot' else interface.kind }}',freebind={{ 'true' if interface.freebind else 'false'}}})
 {%- endmacro %}
