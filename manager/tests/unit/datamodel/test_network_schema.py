@@ -1,3 +1,6 @@
+from typing import Any, Dict, Optional
+
+import pytest
 from pytest import raises
 
 from knot_resolver_manager.datamodel.network_schema import ListenSchema, NetworkSchema
@@ -22,66 +25,56 @@ def test_listen_defaults():
     assert o.listen[1].freebind == True
 
 
-def test_listen_kind_port_defaults():
-    assert ListenSchema({"unix-socket": "/tmp/kresd-socket"}).port == None
-    assert ListenSchema({"interface": "::1"}).port == PortNumber(53)
-    assert ListenSchema({"interface": "::1", "kind": "dot"}).port == PortNumber(853)
-    assert ListenSchema({"interface": "::1", "kind": "doh-legacy"}).port == PortNumber(443)
-    assert ListenSchema({"interface": "::1", "kind": "doh2"}).port == PortNumber(443)
+@pytest.mark.parametrize(
+    "listen,port",
+    [
+        ({"unix-socket": "/tmp/kresd-socket"}, None),
+        ({"interface": "::1"}, 53),
+        ({"interface": "::1", "kind": "dot"}, 853),
+        ({"interface": "::1", "kind": "doh-legacy"}, 443),
+        ({"interface": "::1", "kind": "doh2"}, 443),
+    ],
+)
+def test_listen_port_defaults(listen: Dict[str, Any], port: Optional[int]):
+    assert ListenSchema(listen).port == (PortNumber(port) if port else None)
 
 
-def test_listen_unix_socket_valid():
-    assert ListenSchema({"unix-socket": "/tmp/kresd-socket"})
-    assert ListenSchema({"unix-socket": ["/tmp/kresd-socket", "/tmp/kresd-socket2"]})
+@pytest.mark.parametrize(
+    "listen",
+    [
+        {"unix-socket": "/tmp/kresd-socket"},
+        {"unix-socket": ["/tmp/kresd-socket", "/tmp/kresd-socket2"]},
+        {"interface": "::1"},
+        {"interface": "::1@5353"},
+        {"interface": "::1", "port": 5353},
+        {"interface": ["127.0.0.1", "::1"]},
+        {"interface": ["127.0.0.1@5353", "::1@5353"]},
+        {"interface": ["127.0.0.1", "::1"], "port": 5353},
+        {"interface": "lo"},
+        {"interface": "lo@5353"},
+        {"interface": "lo", "port": 5353},
+        {"interface": ["lo", "eth0"]},
+        {"interface": ["lo@5353", "eth0@5353"]},
+        {"interface": ["lo", "eth0"], "port": 5353},
+    ],
+)
+def test_listen_valid(listen: Dict[str, Any]):
+    assert ListenSchema(listen)
 
 
-def test_listen_unix_socket_invalid():
+@pytest.mark.parametrize(
+    "listen",
+    [
+        {"unit-socket": "/tmp/kresd-socket", "port": "53"},
+        {"interface": "::1", "unit-socket": "/tmp/kresd-socket"},
+        {"interface": "::1@5353", "port": 5353},
+        {"interface": ["127.0.0.1", "::1@5353"]},
+        {"interface": ["127.0.0.1@5353", "::1@5353"], "port": 5353},
+        {"interface": "lo@5353", "port": 5353},
+        {"interface": ["lo", "eth0@5353"]},
+        {"interface": ["lo@5353", "eth0@5353"], "port": 5353},
+    ],
+)
+def test_listen_invalid(listen: Dict[str, Any]):
     with raises(KresManagerException):
-        ListenSchema({"ip-address": "::1", "unix-socket": "/tmp/kresd-socket"})
-    with raises(KresManagerException):
-        ListenSchema({"unit-socket": "/tmp/kresd-socket", "port": "53"})
-
-
-def test_listen_ip_address_valid():
-    assert ListenSchema({"interface": "::1"})
-    assert ListenSchema({"interface": "::1@5353"})
-    assert ListenSchema({"interface": "::1", "port": 5353})
-    assert ListenSchema({"interface": ["127.0.0.1", "::1"]})
-    assert ListenSchema({"interface": ["127.0.0.1@5353", "::1@5353"]})
-    assert ListenSchema({"interface": ["127.0.0.1", "::1"], "port": 5353})
-
-
-def test_listen_ip_address_invalid():
-    with raises(KresManagerException):
-        ListenSchema({"ip-address": "::1@5353", "port": 5353})
-    with raises(KresManagerException):
-        ListenSchema({"ip-address": ["127.0.0.1", "::1@5353"]})
-    with raises(KresManagerException):
-        ListenSchema({"ip-address": ["127.0.0.1@5353", "::1@5353"], "port": 5353})
-
-
-def test_listen_interface_valid():
-    assert ListenSchema({"interface": "lo"})
-    assert ListenSchema({"interface": "lo@5353"})
-    assert ListenSchema({"interface": "lo", "port": 5353})
-    assert ListenSchema({"interface": ["lo", "eth0"]})
-    assert ListenSchema({"interface": ["lo@5353", "eth0@5353"]})
-    assert ListenSchema({"interface": ["lo", "eth0"], "port": 5353})
-
-
-def test_listen_interface_invalid():
-    with raises(KresManagerException):
-        ListenSchema({"interface": "lo@5353", "port": 5353})
-    with raises(KresManagerException):
-        ListenSchema({"interface": ["lo", "eth0@5353"]})
-    with raises(KresManagerException):
-        ListenSchema({"interface": ["lo@5353", "eth0@5353"], "port": 5353})
-
-
-def test_listen_invalid():
-    with raises(KresManagerException):
-        ListenSchema({"ip-address": "::1", "port": 0})
-    with raises(KresManagerException):
-        ListenSchema({"ip-address": "::1", "port": 65_536})
-    with raises(KresManagerException):
-        ListenSchema({"ip-address": "::1", "interface": "lo"})
+        ListenSchema(listen)

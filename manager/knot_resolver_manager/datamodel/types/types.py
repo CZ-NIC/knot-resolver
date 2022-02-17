@@ -77,8 +77,8 @@ class IDPattern(PatternBase):
 
 
 class InterfacePort(StrBase):
-    addr: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
-    if_name: InterfaceName
+    addr: Union[None, ipaddress.IPv4Address, ipaddress.IPv6Address] = None
+    if_name: Optional[InterfaceName] = None
     port: PortNumber
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
