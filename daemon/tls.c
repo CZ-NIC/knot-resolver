@@ -380,6 +380,17 @@ void tls_close(struct tls_common_ctx *ctx)
 	}
 }
 
+void tls_client_close(struct tls_client_ctx *ctx)
+{
+	/* Store the current session data for potential resumption of this session */
+	if (ctx->params) {
+		gnutls_free(ctx->params->session_data.data);
+		gnutls_session_get_data2(ctx->c.tls_session, &ctx->params->session_data);
+	}
+
+	tls_close(&ctx->c);
+}
+
 void tls_free(struct tls_ctx *tls)
 {
 	if (!tls) {

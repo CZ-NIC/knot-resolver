@@ -19,6 +19,7 @@ Bugfixes
 - fix task resolution hang when a connected TCP session yields no answers (!1226)
 - doh2: fix CORS by adding `access-control-allow-origin: *` (!1246)
 - net: fix listen by interface - add interface suffix to link-local IPv6 (!1253)
+- daemon/tls: fix resumption for outgoing TLS (e.g. TLS_FORWARD) (!1261)
 
 
 Knot Resolver 5.4.4 (2022-01-05)
