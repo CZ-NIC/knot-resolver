@@ -108,7 +108,7 @@ void session_close(struct session *session)
 	if (!uv_is_closing((uv_handle_t *)&session->timeout)) {
 		uv_timer_stop(&session->timeout);
 		if (session->tls_client_ctx) {
-			tls_close(&session->tls_client_ctx->c);
+			tls_client_close(session->tls_client_ctx);
 		}
 		if (session->tls_ctx) {
 			tls_close(&session->tls_ctx->c);

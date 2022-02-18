@@ -151,6 +151,10 @@ struct tls_ctx* tls_new(struct worker_ctx *worker);
 /*! Close a TLS context (call gnutls_bye()) */
 void tls_close(struct tls_common_ctx *ctx);
 
+/*! Close a TLS client context (call gnutls_bye()), storing its session data
+ * for potential resumption. */
+void tls_client_close(struct tls_client_ctx *ctx);
+
 /*! Release a TLS context */
 void tls_free(struct tls_ctx* tls);
 
