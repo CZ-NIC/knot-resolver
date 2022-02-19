@@ -7,6 +7,7 @@ from knot_resolver_manager.constants import kresd_config_file
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.exceptions import SubprocessControllerException
 from knot_resolver_manager.kres_id import KresID
+from knot_resolver_manager.statistics import register_resolver_metrics_for, unregister_resolver_metrics_for
 from knot_resolver_manager.utils.async_utils import writefile
 
 
@@ -20,8 +21,11 @@ class Subprocess:
     One SubprocessInstance corresponds to one manager's subprocess
     """
 
-    def __init__(self, config: KresConfig) -> None:
+    def __init__(self, config: KresConfig, typ: SubprocessType, custom_id: Optional[KresID] = None) -> None:
+        self._id = KresID.alloc() if custom_id is None else custom_id
         self._config = config
+        self._metrics_registered: bool = False
+        self._type = typ
 
     async def start(self) -> None:
         # create config file
@@ -29,6 +33,8 @@ class Subprocess:
         await writefile(kresd_config_file(self._config, self.id), lua_config)
         try:
             await self._start()
+            register_resolver_metrics_for(self)
+            self._metrics_registered = True
         except SubprocessControllerException as e:
             kresd_config_file(self._config, self.id).unlink()
             raise e
@@ -42,6 +48,8 @@ class Subprocess:
         await self._restart()
 
     async def stop(self) -> None:
+        if self._metrics_registered:
+            unregister_resolver_metrics_for(self)
         await self._stop()
         kresd_config_file(self._config, self.id).unlink()
 
@@ -62,11 +70,11 @@ class Subprocess:
 
     @property
     def type(self) -> SubprocessType:
-        raise NotImplementedError()
+        return self._type
 
     @property
     def id(self) -> KresID:
-        raise NotImplementedError()
+        return self._id
 
     async def command(self, cmd: str) -> str:
         reader: asyncio.StreamReader
@@ -136,9 +144,7 @@ class SubprocessController:
         """
         raise NotImplementedError()
 
-    async def create_subprocess(
-        self, subprocess_config: KresConfig, subprocess_type: SubprocessType, id_hint: KresID
-    ) -> Subprocess:
+    async def create_subprocess(self, subprocess_config: KresConfig, subprocess_type: SubprocessType) -> Subprocess:
         """
         Return a Subprocess object which can be operated on. The subprocess is not
         started or in any way active after this call. That has to be performaed manually
