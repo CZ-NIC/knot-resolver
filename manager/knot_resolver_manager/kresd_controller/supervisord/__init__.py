@@ -25,7 +25,7 @@ from knot_resolver_manager.constants import (
     supervisord_subprocess_log_dir,
 )
 from knot_resolver_manager.datamodel.config_schema import KresConfig
-from knot_resolver_manager.kres_id import KresID, alloc_from_string, lookup_from_string
+from knot_resolver_manager.kres_id import KresID
 from knot_resolver_manager.kresd_controller.interface import (
     Subprocess,
     SubprocessController,
@@ -177,7 +177,7 @@ def _list_subprocesses(config: KresConfig) -> Dict[KresID, SubprocessStatus]:
             status = SubprocessStatus.UNKNOWN
         return status
 
-    return {lookup_from_string(pr["name"]): convert(pr) for pr in processes}
+    return {KresID.from_string(pr["name"]): convert(pr) for pr in processes}
 
 
 async def _list_ids_from_existing_config(cfg: KresConfig) -> List[Tuple[SubprocessType, KresID]]:
@@ -189,7 +189,7 @@ async def _list_ids_from_existing_config(cfg: KresConfig) -> List[Tuple[Subproce
     for section in cp.sections():
         if section.startswith("program:"):
             program_id = section.replace("program:", "")
-            iid = alloc_from_string(program_id)
+            iid = KresID.from_string(program_id)
             typ = SubprocessType[cp[section].get("type")]
             res.append((typ, iid))
     return res
@@ -197,20 +197,14 @@ async def _list_ids_from_existing_config(cfg: KresConfig) -> List[Tuple[Subproce
 
 class SupervisordSubprocess(Subprocess):
     def __init__(
-        self, config: KresConfig, controller: "SupervisordSubprocessController", id_: KresID, type_: SubprocessType
+        self,
+        config: KresConfig,
+        controller: "SupervisordSubprocessController",
+        typ: SubprocessType,
+        custom_id: Optional[KresID] = None,
     ):
-        super().__init__(config)
+        super().__init__(config, typ, custom_id=custom_id)
         self._controller: "SupervisordSubprocessController" = controller
-        self._id: KresID = id_
-        self._type: SubprocessType = type_
-
-    @property
-    def type(self) -> SubprocessType:
-        return self._type
-
-    @property
-    def id(self) -> KresID:
-        return self._id
 
     async def _start(self) -> None:
         return await self._controller.start_subprocess(self)
@@ -251,7 +245,7 @@ class SupervisordSubprocessController(SubprocessController):
         if running:
             ids = await _list_ids_from_existing_config(config)
             for tp, id_ in ids:
-                self._running_instances.add(SupervisordSubprocess(self._controller_config, self, id_, tp))
+                self._running_instances.add(SupervisordSubprocess(self._controller_config, self, tp, custom_id=id_))
 
     async def get_all_running_instances(self) -> Iterable[Subprocess]:
         assert self._controller_config is not None
@@ -286,10 +280,8 @@ class SupervisordSubprocessController(SubprocessController):
         assert subprocess in self._running_instances
         await _restart(self._controller_config, subprocess.id)
 
-    async def create_subprocess(
-        self, subprocess_config: KresConfig, subprocess_type: SubprocessType, id_hint: KresID
-    ) -> Subprocess:
-        return SupervisordSubprocess(subprocess_config, self, id_hint, subprocess_type)
+    async def create_subprocess(self, subprocess_config: KresConfig, subprocess_type: SubprocessType) -> Subprocess:
+        return SupervisordSubprocess(subprocess_config, self, subprocess_type)
 
     async def get_subprocess_status(self) -> Dict[KresID, SubprocessStatus]:
         return await to_thread(_list_subprocesses, self._controller_config)

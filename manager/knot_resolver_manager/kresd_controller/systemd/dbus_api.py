@@ -24,6 +24,21 @@ logger = logging.getLogger(__name__)
 GC_SERVICE_NAME = "kres-managed-cache-gc.service"
 
 
+def kres_id_from_service_name(service_name: str) -> KresID:
+    v = service_name.replace("kresd_", "").replace(".service", "")
+    return KresID.from_string(v)
+
+
+def service_name_from_kres_id(kid: KresID) -> str:
+    return f"kresd_{kid}.service"
+
+
+def is_service_name_ours(service_name: str) -> bool:
+    is_ours = service_name == GC_SERVICE_NAME
+    is_ours |= service_name.startswith("kresd_") and service_name.endswith(".service")
+    return is_ours
+
+
 class SystemdType(Enum):
     SYSTEM = auto()
     SESSION = auto()
@@ -223,8 +238,8 @@ def start_transient_kresd_unit(
     config: KresConfig, type_: SystemdType, kres_id: KresID, subprocess_type: SubprocessType
 ) -> None:
     name, properties = {
-        SubprocessType.KRESD: (f"kresd_{kres_id}.service", _kresd_unit_properties(config, kres_id)),
-        SubprocessType.GC: (GC_SERVICE_NAME, _gc_unit_properties(config)),
+        SubprocessType.KRESD: (service_name_from_kres_id(kres_id), _kresd_unit_properties(config, kres_id)),
+        SubprocessType.GC: (service_name_from_kres_id(kres_id), _gc_unit_properties(config)),
     }[subprocess_type]
 
     systemd = _create_manager_proxy(type_)

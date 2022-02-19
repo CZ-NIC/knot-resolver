@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from typing import Any, Awaitable, Callable, Dict, Generator, List, Optional, Tuple, TypeVar
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Generator, List, Optional, Tuple, TypeVar
 
 from prometheus_client import Histogram, exposition  # type: ignore
 from prometheus_client.bridge.graphite import GraphiteBridge  # type: ignore
@@ -17,8 +17,11 @@ from knot_resolver_manager import compat
 from knot_resolver_manager.config_store import ConfigStore, only_on_real_changes
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.kres_id import KresID
-from knot_resolver_manager.kresd_controller.interface import Subprocess
 from knot_resolver_manager.utils.functional import Result
+
+if TYPE_CHECKING:
+    from knot_resolver_manager.kresd_controller.interface import Subprocess
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +29,7 @@ MANAGER_REQUEST_RECONFIGURE_LATENCY = Histogram(
     "manager_request_reconfigure_latency", "Time it takes to change configuration"
 )
 
-_REGISTERED_RESOLVERS: Dict[KresID, Subprocess] = {}
+_REGISTERED_RESOLVERS: "Dict[KresID, Subprocess]" = {}
 
 
 T = TypeVar("T")
@@ -49,7 +52,7 @@ def async_timing_histogram(metric: Histogram) -> Callable[[Callable[..., Awaitab
 
 
 async def _command_registered_resolvers(cmd: str) -> Dict[KresID, str]:
-    async def single_pair(sub: Subprocess) -> Tuple[KresID, str]:
+    async def single_pair(sub: "Subprocess") -> Tuple[KresID, str]:
         return sub.id, await sub.command(cmd)
 
     pairs = await asyncio.gather(*(single_pair(inst) for inst in _REGISTERED_RESOLVERS.values()))
@@ -336,16 +339,16 @@ class ResolverCollector:
 _resolver_collector: Optional[ResolverCollector] = None
 
 
-def unregister_resolver_metrics_for(subprocess: Subprocess) -> None:
+def unregister_resolver_metrics_for(subprocess: "Subprocess") -> None:
     """
-    Cancel metric collection from resolver subprocess
+    Cancel metric collection from resolver "Subprocess"
     """
     del _REGISTERED_RESOLVERS[subprocess.id]
 
 
-def register_resolver_metrics_for(subprocess: Subprocess) -> None:
+def register_resolver_metrics_for(subprocess: "Subprocess") -> None:
     """
-    Register resolver subprocess for metric collection
+    Register resolver "Subprocess" for metric collection
     """
     _REGISTERED_RESOLVERS[subprocess.id] = subprocess
 
