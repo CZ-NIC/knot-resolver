@@ -21,7 +21,7 @@ from knot_resolver_manager.kresd_controller.interface import SubprocessType
 
 logger = logging.getLogger(__name__)
 
-GC_SERVICE_NAME = "kres-managed-cache-gc.service"
+GC_SERVICE_NAME = "kresd_gc.service"
 
 
 def kres_id_from_service_name(service_name: str) -> KresID:

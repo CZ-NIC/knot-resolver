@@ -25,6 +25,7 @@ from knot_resolver_manager.constants import (
     supervisord_subprocess_log_dir,
 )
 from knot_resolver_manager.datamodel.config_schema import KresConfig
+from knot_resolver_manager.exceptions import SubprocessControllerException
 from knot_resolver_manager.kres_id import KresID
 from knot_resolver_manager.kresd_controller.interface import (
     Subprocess,
@@ -77,13 +78,16 @@ async def _write_config_file(config: KresConfig, instances: Set["SupervisordSubp
     template = await read_resource(__package__, "supervisord.conf.j2")
     assert template is not None
     template = template.decode("utf8")
+    cwd = str(os.getcwd())
+    if not supervisord_subprocess_log_dir(config).exists():
+        supervisord_subprocess_log_dir(config).mkdir(exist_ok=True)
     config_string = Template(template).render(  # pyright: reportUnknownMemberType=false
         instances=[
             _Instance(  # type: ignore[call-arg]
                 type=i.type.name,
                 logfile=supervisord_subprocess_log_dir(config) / f"{i.id}.log",
                 id=str(i.id),
-                workdir=str(os.getcwd()),
+                workdir=cwd,
                 command=_get_command_based_on_type(config, i),
                 environment=f"SYSTEMD_INSTANCE={i.id}",
             )
@@ -92,7 +96,7 @@ async def _write_config_file(config: KresConfig, instances: Set["SupervisordSubp
         config=SupervisordConfig(  # type: ignore[call-arg]
             unix_http_server=supervisord_sock_file(config),
             pid_file=supervisord_pid_file(config),
-            workdir=str(config.server.rundir.to_path().absolute()),
+            workdir=cwd,
             logfile=supervisord_log_file(config),
         ),
     )
@@ -104,12 +108,13 @@ async def _write_config_file(config: KresConfig, instances: Set["SupervisordSubp
 async def _start_supervisord(config: KresConfig) -> None:
     await _write_config_file(config, set())
     res = await call(f'supervisord --configuration="{supervisord_config_file(config).absolute()}"', shell=True)
-    assert res == 0
+    if res != 0:
+        raise SubprocessControllerException(f"Supervisord exited with exit code {res}")
 
 
 async def _stop_supervisord(config: KresConfig) -> None:
     pid = int(await readfile(supervisord_pid_file(config)))
-    kill(pid, signal.SIGINT)
+    kill(pid, signal.SIGTERM)
     await wait_for_process_termination(pid)
 
 
