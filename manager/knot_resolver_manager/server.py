@@ -20,7 +20,7 @@ from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, init_user_constants
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.datamodel.server_schema import ManagementSchema
-from knot_resolver_manager.exceptions import DataException, KresManagerException, SchemaException, TreeException
+from knot_resolver_manager.exceptions import DataException, KresManagerException, SchemaException
 from knot_resolver_manager.kresd_controller import get_controller_by_name
 from knot_resolver_manager.kresd_controller.interface import SubprocessController
 from knot_resolver_manager.utils.async_utils import readfile
@@ -45,12 +45,8 @@ async def error_handler(request: web.Request, handler: Any) -> web.Response:
     try:
         return await handler(request)
     except KresManagerException as e:
-        if isinstance(e, TreeException):
-            return web.Response(
-                text=f"Configuration validation failed @ '{e.where()}': {e}", status=HTTPStatus.BAD_REQUEST
-            )
-        elif isinstance(e, (DataException, DataException)):
-            return web.Response(text=f"Configuration validation failed: {e}", status=HTTPStatus.BAD_REQUEST)
+        if isinstance(e, (SchemaException, DataException)):
+            return web.Response(text=f"validation of configuration failed: {e}", status=HTTPStatus.BAD_REQUEST)
         else:
             logger.error("Request processing failed", exc_info=True)
             return web.Response(text=f"Request processing failed: {e}", status=HTTPStatus.INTERNAL_SERVER_ERROR)
