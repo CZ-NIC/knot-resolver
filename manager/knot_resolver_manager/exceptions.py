@@ -17,7 +17,7 @@ class TreeException(KresManagerException):
         return self._tree_path
 
     def __str__(self) -> str:
-        return super().__str__() + f" @ {self.where()}"
+        return f"configuration field {self.where()}: " + super().__str__()
 
 
 class SchemaException(TreeException):

@@ -204,21 +204,32 @@ def _validated_object_type(
         if obj is None:
             return None
         else:
-            raise SchemaException(f"Expected None, found '{obj}'.", object_path)
+            raise SchemaException(f"expected None, found '{obj}'.", object_path)
 
-    # Union[*variants] (handles Optional[T] due to the way the typing system works)
+    # Optional[T]  (could be technically handled by Union[*variants], but this way we have better error reporting)
+    elif is_optional(cls):
+        inner: Type[Any] = get_optional_inner_type(cls)
+        if obj is None:
+            return None
+        else:
+            return _validated_object_type(inner, obj, object_path=object_path)
+
+    # Union[*variants]
     elif is_union(cls):
         variants = get_generic_type_arguments(cls)
+        errs: List[SchemaException] = []
         for v in variants:
             try:
                 return _validated_object_type(v, obj, object_path=object_path)
-            except SchemaException:
-                pass
-        raise SchemaException(f"Union {cls} could not be parsed - parsing of all variants failed.", object_path)
+            except SchemaException as e:
+                errs.append(e)
+
+        err_string = "\n\t- ".join([str(e) for e in errs])
+        raise SchemaException(f"failed to parse union type, all variants failed:\n\t- {err_string}", object_path)
 
     # after this, there is no place for a None object
     elif obj is None:
-        raise SchemaException(f"Unexpected value 'None' for type {cls}", object_path)
+        raise SchemaException(f"unexpected value 'None' for type {cls}", object_path)
 
     # int
     elif cls == int:
@@ -226,7 +237,7 @@ def _validated_object_type(
         # except for CustomValueType class instances
         if is_obj_type(obj, int) or isinstance(obj, CustomValueType):
             return int(obj)
-        raise SchemaException(f"Expected int, found {type(obj)}", object_path)
+        raise SchemaException(f"expected int, found {type(obj)}", object_path)
 
     # str
     elif cls == str:
@@ -242,7 +253,7 @@ def _validated_object_type(
             )
         else:
             raise SchemaException(
-                f"Expected str (or number that would be cast to string), but found type {type(obj)}", object_path
+                f"expected str (or number that would be cast to string), but found type {type(obj)}", object_path
             )
 
     # bool
@@ -250,7 +261,7 @@ def _validated_object_type(
         if is_obj_type(obj, bool):
             return obj
         else:
-            raise SchemaException(f"Expected bool, found {type(obj)}", object_path)
+            raise SchemaException(f"expected bool, found {type(obj)}", object_path)
 
     # float
     elif cls == float:
@@ -265,7 +276,7 @@ def _validated_object_type(
         if obj in expected:
             return obj
         else:
-            raise SchemaException(f"Literal {cls} is not matched with the value {obj}", object_path)
+            raise SchemaException(f"'{obj}' does not match any of the expected values {expected}", object_path)
 
     # Dict[K,V]
     elif is_dict(cls):
@@ -287,12 +298,12 @@ def _validated_object_type(
         if isinstance(obj, cls):
             return obj
         else:
-            raise SchemaException(f"Unexpected value '{obj}' for enum '{cls}'", object_path)
+            raise SchemaException(f"unexpected value '{obj}' for enum '{cls}'", object_path)
 
     # List[T]
     elif is_list(cls):
         inner_type = get_generic_type_argument(cls)
-        return [_validated_object_type(inner_type, val, object_path=f"{object_path}[]") for val in obj]
+        return [_validated_object_type(inner_type, val, object_path=f"{object_path}[{i}]") for i, val in enumerate(obj)]
 
     # Tuple[A,B,C,D,...]
     elif is_tuple(cls):
@@ -318,7 +329,7 @@ def _validated_object_type(
         # because we can construct a DataParser from it
         if isinstance(obj, (dict, SchemaNode)):
             return cls(obj, object_path=object_path)  # type: ignore
-        raise SchemaException(f"Expected 'dict' or 'SchemaNode' object, found '{type(obj)}'", object_path)
+        raise SchemaException(f"expected 'dict' or 'SchemaNode' object, found '{type(obj)}'", object_path)
 
     # if the object matches, just pass it through
     elif inspect.isclass(cls) and isinstance(obj, cls):
