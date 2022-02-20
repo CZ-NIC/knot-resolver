@@ -107,16 +107,7 @@ class SystemdSubprocessController(SubprocessController):
                 res.append(
                     SystemdSubprocess(
                         self._controller_config,
-                        SubprocessType.KRESD,
-                        self._systemd_type,
-                        custom_id=kres_id_from_service_name(unit.name),
-                    )
-                )
-            elif unit.name == GC_SERVICE_NAME:
-                res.append(
-                    SystemdSubprocess(
-                        self._controller_config,
-                        SubprocessType.GC,
+                        SubprocessType.GC if unit.name == GC_SERVICE_NAME else SubprocessType.KRESD,
                         self._systemd_type,
                         custom_id=kres_id_from_service_name(unit.name),
                     )
