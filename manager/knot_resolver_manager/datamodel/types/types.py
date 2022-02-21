@@ -8,6 +8,24 @@ from knot_resolver_manager.exceptions import SchemaException
 from knot_resolver_manager.utils import CustomValueType
 
 
+class IntNonNegative(IntRangeBase):
+    _min: int = 0
+
+
+class IntPositive(IntRangeBase):
+    _min: int = 1
+
+
+class Int0_512(IntRangeBase):
+    _min: int = 0
+    _max: int = 512
+
+
+class Int0_65535(IntRangeBase):
+    _min: int = 0
+    _max: int = 65_535
+
+
 class PortNumber(IntRangeBase):
     _min: int = 1
     _max: int = 65_535

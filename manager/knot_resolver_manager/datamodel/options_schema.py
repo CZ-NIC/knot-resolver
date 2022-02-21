@@ -2,9 +2,8 @@ from typing import Any, Union
 
 from typing_extensions import Literal
 
+from knot_resolver_manager.datamodel.types import IntNonNegative, TimeUnit
 from knot_resolver_manager.utils import SchemaNode
-
-from .types import TimeUnit
 
 GlueCheckingEnum = Literal["normal", "strict", "permissive"]
 
@@ -19,7 +18,7 @@ class PredictionSchema(SchemaNode):
     """
 
     window: TimeUnit = TimeUnit("15m")
-    period: int = 24
+    period: IntNonNegative = IntNonNegative(24)
 
 
 class OptionsSchema(SchemaNode):
