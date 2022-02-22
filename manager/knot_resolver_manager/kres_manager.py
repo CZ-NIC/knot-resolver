@@ -178,22 +178,24 @@ class KresManager:
             try:
                 # gather current state
                 detected_subprocesses = await self._controller.get_subprocess_status()
-                worker_ids = [x.id for x in self._workers]
+                expected_ids = [x.id for x in self._workers]
+                if self._gc:
+                    expected_ids.append(self._gc.id)
                 invoke_callback = False
 
-                for w in worker_ids:
-                    if w not in detected_subprocesses:
-                        logger.error("Expected to find subprocess with id '%s' in the system, but did not.", w)
+                for eid in expected_ids:
+                    if eid not in detected_subprocesses:
+                        logger.error("Expected to find subprocess with id '%s' in the system, but did not.", eid)
                         invoke_callback = True
                         continue
 
-                    if detected_subprocesses[w] is SubprocessStatus.FAILED:
-                        logger.error("Subprocess '%s' is failed.", w)
+                    if detected_subprocesses[eid] is SubprocessStatus.FAILED:
+                        logger.error("Subprocess '%s' is failed.", eid)
                         invoke_callback = True
                         continue
 
-                    if detected_subprocesses[w] is SubprocessStatus.UNKNOWN:
-                        logger.warning("Subprocess '%s' is in unknown state!", w)
+                    if detected_subprocesses[eid] is SubprocessStatus.UNKNOWN:
+                        logger.warning("Subprocess '%s' is in unknown state!", eid)
 
             except asyncio.CancelledError:
                 raise

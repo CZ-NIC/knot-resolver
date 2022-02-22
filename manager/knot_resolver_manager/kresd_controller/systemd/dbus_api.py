@@ -3,6 +3,7 @@
 
 import logging
 import os
+import re
 from enum import Enum, auto
 from threading import Thread
 from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
@@ -21,21 +22,28 @@ from knot_resolver_manager.kresd_controller.interface import SubprocessType
 
 logger = logging.getLogger(__name__)
 
-GC_SERVICE_NAME = "kresd_gc.service"
+_PREFIX = "mkres"
+GC_SERVICE_NAME = f"{_PREFIX}_cache_gc.service"
+KRESD_SERVICE_PATTERN = re.compile(rf"^{_PREFIX}d_([0-9]+).service$")
 
 
 def kres_id_from_service_name(service_name: str) -> KresID:
-    v = service_name.replace("kresd_", "").replace(".service", "")
-    return KresID.from_string(v)
+    kid = KRESD_SERVICE_PATTERN.search(service_name)
+    if kid:
+        return KresID.from_string(kid.groups()[0])
+    return KresID.from_string(service_name)
 
 
 def service_name_from_kres_id(kid: KresID) -> str:
-    return f"kresd_{kid}.service"
+    rep = str(kid)
+    if rep.isnumeric():
+        return f"{_PREFIX}d_{rep}.service"
+    return rep
 
 
 def is_service_name_ours(service_name: str) -> bool:
     is_ours = service_name == GC_SERVICE_NAME
-    is_ours |= service_name.startswith("kresd_") and service_name.endswith(".service")
+    is_ours |= bool(KRESD_SERVICE_PATTERN.match(service_name))
     return is_ours
 
 

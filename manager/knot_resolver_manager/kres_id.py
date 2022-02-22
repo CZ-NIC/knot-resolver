@@ -58,7 +58,14 @@ class KresID:
         return f"KresID({self})"
 
     def __hash__(self) -> int:
+        if self._repr:
+            return hash(self._repr)
         return self._id
 
     def __eq__(self, o: object) -> bool:
-        return isinstance(o, KresID) and self._id == o._id
+        if isinstance(o, KresID):
+            ret = self._id == o._id
+            if self._repr:
+                ret |= self._repr == o._repr
+            return ret
+        return False
