@@ -123,7 +123,7 @@ class SystemdSubprocessController(SubprocessController):
 
     async def create_subprocess(self, subprocess_config: KresConfig, subprocess_type: SubprocessType) -> Subprocess:
         assert self._controller_config is not None
-        custom_id = KresID.from_string("gc") if subprocess_type == SubprocessType.GC else None
+        custom_id = KresID.from_string(GC_SERVICE_NAME) if subprocess_type == SubprocessType.GC else None
         return SystemdSubprocess(subprocess_config, subprocess_type, self._systemd_type, custom_id=custom_id)
 
     async def get_subprocess_status(self) -> Dict[KresID, SubprocessStatus]:
