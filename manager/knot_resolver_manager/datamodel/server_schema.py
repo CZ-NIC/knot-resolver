@@ -113,7 +113,7 @@ class ServerSchema(SchemaNode):
         """
 
         hostname: Optional[str] = None
-        groupid: Optional[str] = None
+        groupid: str = "m"
         nsid: Optional[str] = None
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         use_cache_gc: bool = True
@@ -126,7 +126,7 @@ class ServerSchema(SchemaNode):
     _PREVIOUS_SCHEMA = Raw
 
     hostname: str
-    groupid: Optional[str]
+    groupid: str
     nsid: Optional[str]
     workers: IntPositive
     use_cache_gc: bool
