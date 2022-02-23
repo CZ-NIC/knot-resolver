@@ -13,15 +13,15 @@ from knot_resolver_manager.kresd_controller.interface import (
     SubprocessType,
 )
 from knot_resolver_manager.kresd_controller.systemd.dbus_api import (
-    GC_SERVICE_NAME,
+    GC_SERVICE_BASE_NAME,
     SystemdType,
     Unit,
+    create_service_name,
     is_service_name_ours,
     kres_id_from_service_name,
     list_units,
     reset_failed_unit,
     restart_unit,
-    service_name_from_kres_id,
     start_transient_kresd_unit,
     stop_unit,
 )
@@ -44,10 +44,10 @@ class SystemdSubprocess(Subprocess):
         )
 
     async def _stop(self):
-        await compat.asyncio.to_thread(stop_unit, self._systemd_type, service_name_from_kres_id(self.id))
+        await compat.asyncio.to_thread(stop_unit, self._systemd_type, create_service_name(self.id, self._config))
 
     async def _restart(self):
-        await compat.asyncio.to_thread(restart_unit, self._systemd_type, service_name_from_kres_id(self.id))
+        await compat.asyncio.to_thread(restart_unit, self._systemd_type, create_service_name(self.id, self._config))
 
 
 class SystemdSubprocessController(SubprocessController):
@@ -97,7 +97,7 @@ class SystemdSubprocessController(SubprocessController):
         res: List[SystemdSubprocess] = []
         units = await compat.asyncio.to_thread(list_units, self._systemd_type)
         for unit in units:
-            if is_service_name_ours(unit.name):
+            if is_service_name_ours(unit.name, self._controller_config):
                 if unit.state == "failed":
                     # if a unit is failed, remove it from the system by reseting its state
                     logger.warning("Unit '%s' is already failed, resetting its state and ignoring it", unit.name)
@@ -107,9 +107,11 @@ class SystemdSubprocessController(SubprocessController):
                 res.append(
                     SystemdSubprocess(
                         self._controller_config,
-                        SubprocessType.GC if unit.name == GC_SERVICE_NAME else SubprocessType.KRESD,
+                        SubprocessType.GC
+                        if unit.name == self._controller_config.server.groupid + GC_SERVICE_BASE_NAME
+                        else SubprocessType.KRESD,
                         self._systemd_type,
-                        custom_id=kres_id_from_service_name(unit.name),
+                        custom_id=kres_id_from_service_name(unit.name, self._controller_config),
                     )
                 )
 
@@ -123,7 +125,11 @@ class SystemdSubprocessController(SubprocessController):
 
     async def create_subprocess(self, subprocess_config: KresConfig, subprocess_type: SubprocessType) -> Subprocess:
         assert self._controller_config is not None
-        custom_id = KresID.from_string(GC_SERVICE_NAME) if subprocess_type == SubprocessType.GC else None
+
+        custom_id = None
+        if subprocess_type == SubprocessType.GC:
+            custom_id = KresID.from_string(subprocess_config.server.groupid + GC_SERVICE_BASE_NAME)
+
         return SystemdSubprocess(subprocess_config, subprocess_type, self._systemd_type, custom_id=custom_id)
 
     async def get_subprocess_status(self) -> Dict[KresID, SubprocessStatus]:
@@ -137,5 +143,6 @@ class SystemdSubprocessController(SubprocessController):
                 return SubprocessStatus.UNKNOWN
 
         data: List[Unit] = await to_thread(list_units, self._systemd_type)
-        our_data = filter(lambda u: is_service_name_ours(u.name), data)
-        return {kres_id_from_service_name(u.name): convert(u.state) for u in our_data}
+
+        our_data = filter(lambda u: is_service_name_ours(u.name, self._controller_config), data)  # type: ignore
+        return {kres_id_from_service_name(u.name, self._controller_config): convert(u.state) for u in our_data}

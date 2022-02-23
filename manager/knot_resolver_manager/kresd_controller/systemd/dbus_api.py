@@ -22,28 +22,32 @@ from knot_resolver_manager.kresd_controller.interface import SubprocessType
 
 logger = logging.getLogger(__name__)
 
-_PREFIX = "mkres"
-GC_SERVICE_NAME = f"{_PREFIX}_cache_gc.service"
-KRESD_SERVICE_PATTERN = re.compile(rf"^{_PREFIX}d_([0-9]+).service$")
+GC_SERVICE_BASE_NAME = "kres_cache_gc.service"
+KRESD_SERVICE_BASE_PATTERN = re.compile(r"^kresd_([0-9]+).service$")
 
 
-def kres_id_from_service_name(service_name: str) -> KresID:
-    kid = KRESD_SERVICE_PATTERN.search(service_name)
+def kres_id_from_service_name(service_name: str, config: KresConfig) -> KresID:
+    base_service_name = service_name
+    if service_name.startswith(config.server.groupid):
+        base_service_name = service_name[len(config.server.groupid) :]  # noqa: E203
+    kid = KRESD_SERVICE_BASE_PATTERN.search(base_service_name)
     if kid:
         return KresID.from_string(kid.groups()[0])
     return KresID.from_string(service_name)
 
 
-def service_name_from_kres_id(kid: KresID) -> str:
+def create_service_name(kid: KresID, config: KresConfig) -> str:
     rep = str(kid)
     if rep.isnumeric():
-        return f"{_PREFIX}d_{rep}.service"
+        return f"{config.server.groupid}kresd_{rep}.service"
     return rep
 
 
-def is_service_name_ours(service_name: str) -> bool:
-    is_ours = service_name == GC_SERVICE_NAME
-    is_ours |= bool(KRESD_SERVICE_PATTERN.match(service_name))
+def is_service_name_ours(service_name: str, config: KresConfig) -> bool:
+    if service_name.startswith(config.server.groupid):
+        service_name = service_name[len(config.server.groupid) :]  # noqa: E203
+    is_ours = service_name == GC_SERVICE_BASE_NAME
+    is_ours |= bool(KRESD_SERVICE_BASE_PATTERN.match(service_name))
     return is_ours
 
 
@@ -246,8 +250,8 @@ def start_transient_kresd_unit(
     config: KresConfig, type_: SystemdType, kres_id: KresID, subprocess_type: SubprocessType
 ) -> None:
     name, properties = {
-        SubprocessType.KRESD: (service_name_from_kres_id(kres_id), _kresd_unit_properties(config, kres_id)),
-        SubprocessType.GC: (service_name_from_kres_id(kres_id), _gc_unit_properties(config)),
+        SubprocessType.KRESD: (create_service_name(kres_id, config), _kresd_unit_properties(config, kres_id)),
+        SubprocessType.GC: (create_service_name(kres_id, config), _gc_unit_properties(config)),
     }[subprocess_type]
 
     systemd = _create_manager_proxy(type_)
