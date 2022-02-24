@@ -21,8 +21,8 @@ def kresd_cache_dir(config: KresConfig) -> Path:
     return config.cache.storage.to_path()
 
 
-def kresd_config_file(_config: KresConfig, kres_id: KresID) -> Path:
-    return Path(f"kresd_{kres_id}.conf")
+def kresd_config_file(config: KresConfig, kres_id: KresID) -> Path:
+    return Path(f"{config.server.groupid}kresd_{kres_id}.conf")
 
 
 def supervisord_config_file(_config: KresConfig) -> Path:

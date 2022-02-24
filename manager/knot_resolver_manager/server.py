@@ -78,15 +78,22 @@ class Server:
     async def _reconfigure(self, config: KresConfig) -> None:
         await self._reconfigure_listen_address(config)
 
-    async def _deny_listen_address_changes(self, config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
+    async def _deny_management_changes(self, config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
         if config_old.server.management != config_new.server.management:
             return Result.err(
-                "Changing API listen address dynamically is not allowed as it's really dangerous. If you"
-                " really need this feature, please contact the developers and explain why. Technically,"
+                "/server/management: Changing management API address/unix-socket dynamically is not allowed as it's really dangerous."
+                " If you really need this feature, please contact the developers and explain why. Technically,"
                 " there are no problems in supporting it. We are only blocking the dynamic changes because"
                 " we think the consequences of leaving this footgun unprotected are worse than its usefulness."
             )
+        return Result.ok(None)
 
+    async def _deny_groupid_changes(self, config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
+        if config_old.server.groupid != config_new.server.groupid:
+            return Result.err(
+                "/server/groupid: Based on the groupid, the manager recognizes his subprocesses,"
+                " so it is not possible to change it while services are running."
+            )
         return Result.ok(None)
 
     async def sigint_handler(self) -> None:
@@ -121,7 +128,8 @@ class Server:
         asyncio_compat.add_async_signal_handler(signal.SIGINT, self.sigint_handler)
         asyncio_compat.add_async_signal_handler(signal.SIGHUP, self.sighup_handler)
         await self.runner.setup()
-        await self.config_store.register_verifier(self._deny_listen_address_changes)
+        await self.config_store.register_verifier(self._deny_management_changes)
+        await self.config_store.register_verifier(self._deny_groupid_changes)
         await self.config_store.register_on_change_callback(self._reconfigure)
 
     async def wait_for_shutdown(self) -> None:
