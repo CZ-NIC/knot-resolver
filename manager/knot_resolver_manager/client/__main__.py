@@ -58,6 +58,14 @@ def workers(ctx: click.Context, instances: int) -> None:
     client.set_num_workers(instances)
 
 
+@main.command(help="Set the manager groupid")
+@click.argument("gid", type=str, nargs=1)
+@click.pass_context
+def groupid(ctx: click.Context, gid: str) -> None:
+    client = KnotManagerClient(ctx.obj[BASE_URL])
+    client.set_groupid(gid)
+
+
 @main.command("one-static-hint", help="Set one inline static-hint hints (replaces old static hints)")
 @click.argument("name", type=str, nargs=1)
 @click.argument("ip", type=str, nargs=1)

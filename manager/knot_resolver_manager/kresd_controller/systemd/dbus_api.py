@@ -26,11 +26,13 @@ GC_SERVICE_BASE_NAME = "kres_cache_gc.service"
 KRESD_SERVICE_BASE_PATTERN = re.compile(r"^kresd_([0-9]+).service$")
 
 
+def service_name_remove_prefix(service_name: str, prefix: str) -> str:
+    return service_name[len(prefix) :] if service_name.startswith(prefix) else service_name  # noqa: E203
+
+
 def kres_id_from_service_name(service_name: str, config: KresConfig) -> KresID:
-    base_service_name = service_name
-    if service_name.startswith(config.server.groupid):
-        base_service_name = service_name[len(config.server.groupid) :]  # noqa: E203
-    kid = KRESD_SERVICE_BASE_PATTERN.search(base_service_name)
+    service_name_noprefix = service_name_remove_prefix(service_name, config.server.groupid)
+    kid = KRESD_SERVICE_BASE_PATTERN.search(service_name_noprefix)
     if kid:
         return KresID.from_string(kid.groups()[0])
     return KresID.from_string(service_name)
@@ -44,10 +46,9 @@ def create_service_name(kid: KresID, config: KresConfig) -> str:
 
 
 def is_service_name_ours(service_name: str, config: KresConfig) -> bool:
-    if service_name.startswith(config.server.groupid):
-        service_name = service_name[len(config.server.groupid) :]  # noqa: E203
-    is_ours = service_name == GC_SERVICE_BASE_NAME
-    is_ours |= bool(KRESD_SERVICE_BASE_PATTERN.match(service_name))
+    service_name_noprefix = service_name_remove_prefix(service_name, config.server.groupid)
+    is_ours = service_name_noprefix == GC_SERVICE_BASE_NAME
+    is_ours |= bool(KRESD_SERVICE_BASE_PATTERN.match(service_name_noprefix))
     return is_ours
 
 
