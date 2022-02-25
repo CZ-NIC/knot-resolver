@@ -83,7 +83,7 @@ static inline int execute_callback(lua_State *L, int argc)
  */
 static inline void lua_pushpointer(lua_State *L, void *p)
 {
-       void *addr = lua_newuserdata(L, sizeof(void *));
+       void **addr = lua_newuserdata(L, sizeof(void *));
        kr_require(addr);
        memcpy(addr, &p, sizeof(void *));
 }

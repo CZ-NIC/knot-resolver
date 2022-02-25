@@ -828,13 +828,6 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 		worker_task_pkt_set_msgid(task, msg_id);
 	}
 
-	uv_handle_t *ioreq = malloc(is_stream ? sizeof(uv_write_t) : sizeof(uv_udp_send_t));
-	if (!ioreq)
-		return qr_task_on_send(task, handle, kr_error(ENOMEM));
-
-	/* Pending ioreq on current task */
-	qr_task_ref(task);
-
 	struct worker_ctx *worker = ctx->worker;
 	/* Note time for upstream RTT */
 	task->send_time = kr_now();
@@ -842,6 +835,14 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 	/* Send using given protocol */
 	if (kr_fails_assert(!session_flags(session)->closing))
 		return qr_task_on_send(task, NULL, kr_error(EIO));
+
+	uv_handle_t *ioreq = malloc(is_stream ? sizeof(uv_write_t) : sizeof(uv_udp_send_t));
+	if (!ioreq)
+		return qr_task_on_send(task, handle, kr_error(ENOMEM));
+
+	/* Pending ioreq on current task */
+	qr_task_ref(task);
+
 	if (session_flags(session)->has_http) {
 #if ENABLE_DOH2
 		uv_write_t *write_req = (uv_write_t *)ioreq;

@@ -650,7 +650,6 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 		if (ns->type != KNOT_RRTYPE_NS)
 			continue;
 
-		int flags = 0;
 		bool nsec3_found = false;
 		for (unsigned j = 0; j < sec->count; ++j) {
 			const knot_rrset_t *nsec3 = knot_pkt_rr(sec, j);
@@ -680,13 +679,6 @@ int kr_nsec3_ref_to_unsigned(const knot_pkt_t *pkt)
 		}
 		if (!nsec3_found)
 			return kr_error(DNSSEC_NOT_FOUND);
-		if (flags & FLG_NAME_MATCHED) {
-			/* nsec3 which owner matches
-			 * the delegation name was found,
-			 * but nsec3 type bitmap contains wrong types
-			 */
-			return kr_error(EINVAL);
-		}
 		/* nsec3 that matches the delegation was not found.
 		 * Check rfc5155, 8.9. paragraph 4.
 		 * Find closest provable encloser.

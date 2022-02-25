@@ -548,27 +548,26 @@ static void answer_finalize(struct kr_request *request)
 	/* AD flag.  We can only change `secure` from true to false.
 	 * Be conservative.  Primary approach: check ranks of all RRs in wire.
 	 * Only "negative answers" need special handling. */
-	bool secure = last != NULL && request->state == KR_STATE_DONE /*< suspicious otherwise */
+	bool secure = request->state == KR_STATE_DONE /*< suspicious otherwise */
 		&& knot_pkt_qtype(answer) != KNOT_RRTYPE_RRSIG;
-	if (last && (last->flags.STUB)) {
+	if (last->flags.STUB) {
 		secure = false; /* don't trust forwarding for now */
 	}
-	if (last && (last->flags.DNSSEC_OPTOUT)) {
+	if (last->flags.DNSSEC_OPTOUT) {
 		VERBOSE_MSG(last, "insecure because of opt-out\n");
 		secure = false; /* the last answer is insecure due to opt-out */
 	}
 
 	/* Write all RRsets meant for the answer. */
-	const uint16_t reorder = last ? last->reorder : 0;
 	bool answ_all_cnames = false/*arbitrary*/;
 	if (knot_pkt_begin(answer, KNOT_ANSWER)
-	    || write_extra_ranked_records(&request->answ_selected, reorder,
+	    || write_extra_ranked_records(&request->answ_selected, last->reorder,
 					answer, &secure, &answ_all_cnames)
 	    || knot_pkt_begin(answer, KNOT_AUTHORITY)
-	    || write_extra_ranked_records(&request->auth_selected, reorder,
+	    || write_extra_ranked_records(&request->auth_selected, last->reorder,
 					answer, &secure, NULL)
 	    || knot_pkt_begin(answer, KNOT_ADDITIONAL)
-	    || write_extra_ranked_records(&request->add_selected, reorder,
+	    || write_extra_ranked_records(&request->add_selected, last->reorder,
 					answer, NULL/*not relevant to AD*/, NULL)
 	    || answer_append_edns(request)
 	   )
@@ -577,7 +576,6 @@ static void answer_finalize(struct kr_request *request)
 		return;
 	}
 
-	if (!last) secure = false; /*< should be no-op, mostly documentation */
 	/* AD: "negative answers" need more handling. */
 	if (kr_response_classify(answer) != PKT_NOERROR
 	    /* Additionally check for CNAME chains that "end in NODATA",
@@ -812,32 +810,31 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 		return KR_STATE_FAIL;
 	}
 	bool tried_tcp = (qry->flags.TCP);
-	if (!packet || packet->size == 0) {
+	if (!packet || packet->size == 0)
 		return KR_STATE_PRODUCE;
+
+	/* Packet cleared, derandomize QNAME. */
+	knot_dname_t *qname_raw = knot_pkt_qname(packet);
+	if (qname_raw && qry->secret != 0) {
+		randomized_qname_case(qname_raw, qry->secret);
+	}
+	request->state = KR_STATE_CONSUME;
+	if (qry->flags.CACHED) {
+		ITERATE_LAYERS(request, qry, consume, packet);
 	} else {
-		/* Packet cleared, derandomize QNAME. */
-		knot_dname_t *qname_raw = knot_pkt_qname(packet);
-		if (qname_raw && qry->secret != 0) {
-			randomized_qname_case(qname_raw, qry->secret);
-		}
-		request->state = KR_STATE_CONSUME;
-		if (qry->flags.CACHED) {
-			ITERATE_LAYERS(request, qry, consume, packet);
-		} else {
-			/* Fill in source and latency information. */
-			request->upstream.rtt = kr_now() - qry->timestamp_mono;
-			request->upstream.transport = transport ? *transport : NULL;
-			ITERATE_LAYERS(request, qry, consume, packet);
-			/* Clear temporary information */
-			request->upstream.transport = NULL;
-			request->upstream.rtt = 0;
-		}
+		/* Fill in source and latency information. */
+		request->upstream.rtt = kr_now() - qry->timestamp_mono;
+		request->upstream.transport = transport ? *transport : NULL;
+		ITERATE_LAYERS(request, qry, consume, packet);
+		/* Clear temporary information */
+		request->upstream.transport = NULL;
+		request->upstream.rtt = 0;
 	}
 
 	if (transport && !qry->flags.CACHED) {
 		if (!(request->state & KR_STATE_FAIL)) {
 			/* Do not complete NS address resolution on soft-fail. */
-			const int rcode = packet ? knot_wire_get_rcode(packet->wire) : 0;
+			const int rcode = knot_wire_get_rcode(packet->wire);
 			if (rcode != KNOT_RCODE_SERVFAIL && rcode != KNOT_RCODE_REFUSED) {
 				qry->flags.AWAIT_IPV6 = false;
 				qry->flags.AWAIT_IPV4 = false;

@@ -109,7 +109,7 @@ char* kr_strcatdup(unsigned n, ...)
 	/* Allocate result and fill */
 	char *result = NULL;
 	if (total_len > 0) {
-		if (unlikely(total_len + 1 == 0)) return NULL;
+		if (unlikely(total_len == SIZE_MAX)) return NULL;
 		result = malloc(total_len + 1);
 	}
 	if (result) {
@@ -335,9 +335,14 @@ void kr_inaddr_set_port(struct sockaddr *addr, uint16_t port)
 		return;
 	}
 	switch (addr->sa_family) {
-	case AF_INET:  ((struct sockaddr_in *)addr)->sin_port = htons(port);
-	case AF_INET6: ((struct sockaddr_in6 *)addr)->sin6_port = htons(port);
-	default: break;
+	case AF_INET:
+		((struct sockaddr_in *)addr)->sin_port = htons(port);
+		break;
+	case AF_INET6:
+		((struct sockaddr_in6 *)addr)->sin6_port = htons(port);
+		break;
+	default:
+		break;
 	}
 }
 
@@ -729,7 +734,10 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 		return kr_error(ENOMEM);
 	}
 	rr_new->rrs = rr->rrs;
-	if (kr_fails_assert(rr_new->additional == NULL)) return kr_error(EINVAL);
+	if (kr_fails_assert(rr_new->additional == NULL)) {
+		mm_free(pool, entry);
+		return kr_error(EINVAL);
+	}
 
 	entry->qry_uid = qry_uid;
 	entry->rr = rr_new;

@@ -44,6 +44,8 @@ typedef struct {
 static udp_queue_t * udp_queue_create()
 {
 	udp_queue_t *q = calloc(1, sizeof(*q));
+	kr_require(q != NULL);
+
 	for (int i = 0; i < UDP_QUEUE_LEN; ++i) {
 		struct msghdr *mhi = &q->msgvec[i].msg_hdr;
 		/* These shall remain always the same. */

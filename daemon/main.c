@@ -159,6 +159,8 @@ static int run_worker(uv_loop_t *loop, struct engine *engine, bool leader, struc
 
 	/* Control sockets or TTY */
 	uv_pipe_t *pipe = malloc(sizeof(*pipe));
+	if (!pipe)
+		return EXIT_FAILURE;
 	uv_pipe_init(loop, pipe, 0);
 	if (args->interactive) {
 		if (!args->quiet)

@@ -115,6 +115,7 @@ int cb_delete_categories(const knot_db_val_t * key, gc_record_info_t * info,
 		if ((ctx->cfg_temp_keys_space > 0 &&
 		     used > ctx->cfg_temp_keys_space) || todelete == NULL) {
 			ctx->oversize_records++;
+			free(todelete);
 		} else {
 			entry_dynarray_add(&ctx->to_delete, &todelete);
 			ctx->used_space = used;

@@ -37,7 +37,7 @@ bool starts_with(const char *a, const char *b)
 }
 
 //! Returns Lua name of type of value, NULL on error. Puts length of type in name_len;
-const char *get_type_name(const char *value)
+char *get_type_name(const char *value)
 {
 	if (value == NULL) {
 		return NULL;
@@ -51,7 +51,6 @@ const char *get_type_name(const char *value)
 	}
 
 	char *cmd = afmt("type(%s)", value);
-
 	if (!cmd) {
 		perror("While tab-completing.");
 		return NULL;
@@ -61,16 +60,15 @@ const char *get_type_name(const char *value)
 	char *type = run_cmd(cmd, &name_len);
 	if (!type) {
 		return NULL;
-	} else {
-		free(cmd);
 	}
+	free(cmd);
 
 	if (starts_with(type, "[")) {
 		//Return "nil" on non-valid name.
 		free(type);
-		return "nil";
+		return strdup("nil");
 	} else {
-		type[(strlen(type)) - 1] = '\0';
+		type[strlen(type) - 1] = '\0';
 		return type;
 	}
 }
@@ -145,7 +143,7 @@ static void complete_members(EditLine * el, const char *str,
 		} else {
 			//Print members matching the current line.
 			while (token) {
-				if (str && starts_with(token, dot + 1)) {
+				if (starts_with(token, dot + 1)) {
 					const char *member_type =
 					    get_type_name(afmt
 							  ("%s.%s", table,
@@ -204,7 +202,9 @@ static void complete_globals(EditLine * el, const char *str, int str_len)
 	char *lastmatch = NULL;
 	while (token) {
 		if (str && starts_with(token, str)) {
-			printf("\n%s (%s)", token, get_type_name(token));
+			char *name = get_type_name(token);
+			printf("\n%s (%s)", token, name);
+			free(name);
 			lastmatch = token;
 			matches++;
 		}
@@ -332,6 +332,8 @@ static char *run_cmd(const char *cmd, size_t * out_len)
 	if (!fread(&len, sizeof(len), 1, g_tty))
 		return NULL;
 	len = ntohl(len);
+	if (!len)
+		return NULL;
 	char *msg = malloc(1 + (size_t) len);
 	if (!msg)
 		return NULL;
