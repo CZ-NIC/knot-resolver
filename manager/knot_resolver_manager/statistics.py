@@ -16,11 +16,10 @@ from prometheus_client.core import (  # type: ignore
 from knot_resolver_manager import compat
 from knot_resolver_manager.config_store import ConfigStore, only_on_real_changes
 from knot_resolver_manager.datamodel.config_schema import KresConfig
-from knot_resolver_manager.kres_id import KresID
 from knot_resolver_manager.utils.functional import Result
 
 if TYPE_CHECKING:
-    from knot_resolver_manager.kresd_controller.interface import Subprocess
+    from knot_resolver_manager.kresd_controller.interface import KresID, Subprocess
 
 
 logger = logging.getLogger(__name__)
@@ -51,8 +50,8 @@ def async_timing_histogram(metric: Histogram) -> Callable[[Callable[..., Awaitab
     return decorator
 
 
-async def _command_registered_resolvers(cmd: str) -> Dict[KresID, str]:
-    async def single_pair(sub: "Subprocess") -> Tuple[KresID, str]:
+async def _command_registered_resolvers(cmd: str) -> "Dict[KresID, str]":
+    async def single_pair(sub: "Subprocess") -> "Tuple[KresID, str]":
         return sub.id, await sub.command(cmd)
 
     pairs = await asyncio.gather(*(single_pair(inst) for inst in _REGISTERED_RESOLVERS.values()))
@@ -81,7 +80,7 @@ def _histogram(
 
 class ResolverCollector:
     def __init__(self, config_store: ConfigStore) -> None:
-        self._stats_raw: Optional[Dict[KresID, str]] = None
+        self._stats_raw: "Optional[Dict[KresID, str]]" = None
         self._config_store: ConfigStore = config_store
         self._collection_task: "Optional[asyncio.Task[None]]" = None
         self._skip_immediate_collection: bool = False
@@ -137,7 +136,7 @@ class ResolverCollector:
             # when not running, we can start a new loop (we are not in the manager's main thread)
             compat.asyncio.run(self.collect_kresd_stats(_triggered_from_prometheus_library=True))
 
-    def _create_resolver_metrics_loaded_gauge(self, kid: KresID, loaded: bool) -> GaugeMetricFamily:
+    def _create_resolver_metrics_loaded_gauge(self, kid: "KresID", loaded: bool) -> GaugeMetricFamily:
         return _gauge(
             "resolver_metrics_loaded",
             "0 if metrics from resolver instance were not loaded, otherwise 1",
@@ -179,7 +178,7 @@ class ResolverCollector:
         # this function prevents the collector registry from invoking the collect function on startup
         return []
 
-    def _parse_resolver_metrics(self, instance_id: KresID, metrics: Any) -> Generator[Metric, None, None]:
+    def _parse_resolver_metrics(self, instance_id: "KresID", metrics: Any) -> Generator[Metric, None, None]:
         sid = str(instance_id)
 
         # response latency histogram

@@ -1,24 +1,22 @@
 import logging
 import os
-from typing import Dict, Iterable, List, Optional
+import re
+from typing import Dict, Iterable, List, Optional, Union
 
 from knot_resolver_manager import compat
 from knot_resolver_manager.compat.asyncio import to_thread
+from knot_resolver_manager.constants import user_constants
 from knot_resolver_manager.datamodel.config_schema import KresConfig
-from knot_resolver_manager.kres_id import KresID
 from knot_resolver_manager.kresd_controller.interface import (
+    KresID,
     Subprocess,
     SubprocessController,
     SubprocessStatus,
     SubprocessType,
 )
 from knot_resolver_manager.kresd_controller.systemd.dbus_api import (
-    GC_SERVICE_BASE_NAME,
     SystemdType,
     Unit,
-    create_service_name,
-    is_service_name_ours,
-    kres_id_from_service_name,
     list_units,
     reset_failed_unit,
     restart_unit,
@@ -31,23 +29,57 @@ from knot_resolver_manager.utils.async_utils import call
 logger = logging.getLogger(__name__)
 
 
+GC_SERVICE_BASE_NAME = "kres_cache_gc.service"
+KRESD_SERVICE_BASE_PATTERN = re.compile(r"^kresd_([0-9]+).service$")
+
+
+def _is_service_name_ours(name: str) -> bool:
+    pref_len = len(user_constants().SERVICE_GROUP_ID)
+    is_ours = name == user_constants().SERVICE_GROUP_ID + GC_SERVICE_BASE_NAME
+    is_ours |= name.startswith(user_constants().SERVICE_GROUP_ID) and bool(
+        KRESD_SERVICE_BASE_PATTERN.match(name[pref_len:])
+    )
+    return is_ours
+
+
+class SystemdKresID(KresID):
+    @staticmethod
+    def from_string(val: str) -> "SystemdKresID":
+        if val == user_constants().SERVICE_GROUP_ID + GC_SERVICE_BASE_NAME:
+            return SystemdKresID.new(SubprocessType.GC, -1)
+        else:
+            val = val[len(user_constants().SERVICE_GROUP_ID) :]
+            kid = KRESD_SERVICE_BASE_PATTERN.search(val)
+            if kid:
+                return SystemdKresID.new(SubprocessType.KRESD, int(kid.groups()[0]))
+            else:
+                raise RuntimeError("Trying to parse systemd service name which does not match our expectations")
+
+    def __str__(self) -> str:
+        if self.subprocess_type is SubprocessType.GC:
+            return user_constants().SERVICE_GROUP_ID + GC_SERVICE_BASE_NAME
+        elif self.subprocess_type is SubprocessType.KRESD:
+            return f"{user_constants().SERVICE_GROUP_ID}kresd_{self._id}.service"
+        else:
+            raise RuntimeError(f"Unexpected subprocess type {self.subprocess_type}")
+
+
 class SystemdSubprocess(Subprocess):
-    def __init__(
-        self, config: KresConfig, typ: SubprocessType, systemd_type: SystemdType, custom_id: Optional[KresID] = None
-    ):
-        super().__init__(config, typ, custom_id=custom_id)
+    def __init__(self, config: KresConfig, systemd_type: SystemdType, id_base: Union[SubprocessType, KresID]):
+        if isinstance(id_base, SubprocessType):
+            super().__init__(config, SystemdKresID.alloc(id_base))
+        else:
+            super().__init__(config, id_base)
         self._systemd_type = systemd_type
 
     async def _start(self):
-        await compat.asyncio.to_thread(
-            start_transient_kresd_unit, self._config, self._systemd_type, self.id, self._type
-        )
+        await compat.asyncio.to_thread(start_transient_kresd_unit, self._config, self._systemd_type, self.id)
 
     async def _stop(self):
-        await compat.asyncio.to_thread(stop_unit, self._systemd_type, create_service_name(self.id, self._config))
+        await compat.asyncio.to_thread(stop_unit, self._systemd_type, str(self.id))
 
     async def _restart(self):
-        await compat.asyncio.to_thread(restart_unit, self._systemd_type, create_service_name(self.id, self._config))
+        await compat.asyncio.to_thread(restart_unit, self._systemd_type, str(self.id))
 
 
 class SystemdSubprocessController(SubprocessController):
@@ -97,7 +129,7 @@ class SystemdSubprocessController(SubprocessController):
         res: List[SystemdSubprocess] = []
         units = await compat.asyncio.to_thread(list_units, self._systemd_type)
         for unit in units:
-            if is_service_name_ours(unit.name, self._controller_config):
+            if _is_service_name_ours(unit.name):
                 if unit.state == "failed":
                     # if a unit is failed, remove it from the system by reseting its state
                     logger.warning("Unit '%s' is already failed, resetting its state and ignoring it", unit.name)
@@ -107,11 +139,8 @@ class SystemdSubprocessController(SubprocessController):
                 res.append(
                     SystemdSubprocess(
                         self._controller_config,
-                        SubprocessType.GC
-                        if unit.name == self._controller_config.server.groupid + GC_SERVICE_BASE_NAME
-                        else SubprocessType.KRESD,
                         self._systemd_type,
-                        custom_id=kres_id_from_service_name(unit.name, self._controller_config),
+                        SystemdKresID.from_string(unit.name),
                     )
                 )
 
@@ -125,12 +154,7 @@ class SystemdSubprocessController(SubprocessController):
 
     async def create_subprocess(self, subprocess_config: KresConfig, subprocess_type: SubprocessType) -> Subprocess:
         assert self._controller_config is not None
-
-        custom_id = None
-        if subprocess_type == SubprocessType.GC:
-            custom_id = KresID.from_string(subprocess_config.server.groupid + GC_SERVICE_BASE_NAME)
-
-        return SystemdSubprocess(subprocess_config, subprocess_type, self._systemd_type, custom_id=custom_id)
+        return SystemdSubprocess(subprocess_config, self._systemd_type, subprocess_type)
 
     async def get_subprocess_status(self) -> Dict[KresID, SubprocessStatus]:
         assert self._controller_config is not None
@@ -144,5 +168,5 @@ class SystemdSubprocessController(SubprocessController):
 
         data: List[Unit] = await to_thread(list_units, self._systemd_type)
 
-        our_data = filter(lambda u: is_service_name_ours(u.name, self._controller_config), data)  # type: ignore
-        return {kres_id_from_service_name(u.name, self._controller_config): convert(u.state) for u in our_data}
+        our_data = filter(lambda u: _is_service_name_ours(u.name), data)
+        return {SystemdKresID.from_string(u.name): convert(u.state) for u in our_data}
