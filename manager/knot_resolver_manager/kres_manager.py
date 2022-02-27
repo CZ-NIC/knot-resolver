@@ -177,7 +177,8 @@ class KresManager:
 
             try:
                 # gather current state
-                detected_subprocesses = await self._controller.get_subprocess_status()
+                async with self._manager_lock:
+                    detected_subprocesses = await self._controller.get_subprocess_status()
                 expected_ids = [x.id for x in self._workers]
                 if self._gc:
                     expected_ids.append(self._gc.id)

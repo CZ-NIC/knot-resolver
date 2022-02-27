@@ -3,7 +3,6 @@
 
 import logging
 import os
-import re
 from enum import Enum, auto
 from threading import Thread
 from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
@@ -17,39 +16,9 @@ from knot_resolver_manager.compat.dataclasses import dataclass
 from knot_resolver_manager.constants import kres_gc_executable, kresd_cache_dir, kresd_config_file, kresd_executable
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.exceptions import SubprocessControllerException
-from knot_resolver_manager.kres_id import KresID
-from knot_resolver_manager.kresd_controller.interface import SubprocessType
+from knot_resolver_manager.kresd_controller.interface import KresID, SubprocessType
 
 logger = logging.getLogger(__name__)
-
-GC_SERVICE_BASE_NAME = "kres_cache_gc.service"
-KRESD_SERVICE_BASE_PATTERN = re.compile(r"^kresd_([0-9]+).service$")
-
-
-def service_name_remove_prefix(service_name: str, prefix: str) -> str:
-    return service_name[len(prefix) :] if service_name.startswith(prefix) else service_name  # noqa: E203
-
-
-def kres_id_from_service_name(service_name: str, config: KresConfig) -> KresID:
-    service_name_noprefix = service_name_remove_prefix(service_name, config.server.groupid)
-    kid = KRESD_SERVICE_BASE_PATTERN.search(service_name_noprefix)
-    if kid:
-        return KresID.from_string(kid.groups()[0])
-    return KresID.from_string(service_name)
-
-
-def create_service_name(kid: KresID, config: KresConfig) -> str:
-    rep = str(kid)
-    if rep.isnumeric():
-        return f"{config.server.groupid}kresd_{rep}.service"
-    return rep
-
-
-def is_service_name_ours(service_name: str, config: KresConfig) -> bool:
-    service_name_noprefix = service_name_remove_prefix(service_name, config.server.groupid)
-    is_ours = service_name_noprefix == GC_SERVICE_BASE_NAME
-    is_ours |= bool(KRESD_SERVICE_BASE_PATTERN.match(service_name_noprefix))
-    return is_ours
 
 
 class SystemdType(Enum):
@@ -117,17 +86,24 @@ def _wait_for_job_completion(systemd: Any, job_creating_func: Callable[[], str])
 
         return event_hander
 
+    loop: Any = None
+
     def event_loop_isolation_thread() -> None:
-        loop: Any = GLib.MainLoop()
+        nonlocal loop
+        loop = GLib.MainLoop()
         systemd.JobRemoved.connect(_wait_for_job_completion_handler(loop))
         loop.run()
 
     # first start the thread to watch for results to prevent race conditions
-    thread = Thread(target=event_loop_isolation_thread)
+    thread = Thread(target=event_loop_isolation_thread, name="glib-loop-isolation-thread")
     thread.start()
 
     # then create the job
-    job_path = job_creating_func()
+    try:
+        job_path = job_creating_func()
+    except BaseException:
+        loop.quit()
+        raise
 
     # then wait for the results
     thread.join()
@@ -247,13 +223,12 @@ def _gc_unit_properties(config: KresConfig) -> Any:
 
 
 @_wrap_dbus_errors
-def start_transient_kresd_unit(
-    config: KresConfig, type_: SystemdType, kres_id: KresID, subprocess_type: SubprocessType
-) -> None:
-    name, properties = {
-        SubprocessType.KRESD: (create_service_name(kres_id, config), _kresd_unit_properties(config, kres_id)),
-        SubprocessType.GC: (create_service_name(kres_id, config), _gc_unit_properties(config)),
-    }[subprocess_type]
+def start_transient_kresd_unit(config: KresConfig, type_: SystemdType, kres_id: KresID) -> None:
+    properties = {
+        SubprocessType.KRESD: _kresd_unit_properties(config, kres_id),
+        SubprocessType.GC: _gc_unit_properties(config),
+    }[kres_id.subprocess_type]
+    name = str(kres_id)
 
     systemd = _create_manager_proxy(type_)
 

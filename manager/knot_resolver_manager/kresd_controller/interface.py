@@ -1,12 +1,13 @@
 import asyncio
+import itertools
 import sys
 from enum import Enum, auto
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable, Optional, Type, TypeVar
+from weakref import WeakValueDictionary
 
 from knot_resolver_manager.constants import kresd_config_file
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.exceptions import SubprocessControllerException
-from knot_resolver_manager.kres_id import KresID
 from knot_resolver_manager.statistics import register_resolver_metrics_for, unregister_resolver_metrics_for
 from knot_resolver_manager.utils.async_utils import writefile
 
@@ -16,16 +17,97 @@ class SubprocessType(Enum):
     GC = auto()
 
 
+T = TypeVar("T", bound="KresID")
+
+
+class KresID:
+    """
+    ID object used for identifying subprocesses.
+    """
+
+    _used: "WeakValueDictionary[int, KresID]" = WeakValueDictionary()
+
+    @classmethod
+    def alloc(cls: Type[T], typ: SubprocessType) -> T:
+        # we split them in order to make the numbers nice (no gaps, pretty naming)
+        # there are no strictly technical reasons to do this
+        #
+        # GC - negative IDs
+        # KRESD - positive IDs
+        if typ is SubprocessType.GC:
+            start = -1
+            step = -1
+        elif typ is SubprocessType.KRESD:
+            start = 1
+            step = 1
+        else:
+            raise RuntimeError(f"Unexpected subprocess type {typ}")
+
+        # find free ID closest to zero
+        for i in itertools.count(start=start, step=step):
+            if i not in cls._used:
+                res = cls.new(typ, i)
+                return res
+
+        raise RuntimeError("Reached an end of an infinite loop. How?")
+
+    @classmethod
+    def new(cls: "Type[T]", typ: SubprocessType, n: int) -> "T":
+        if n in cls._used:
+            # Ignoring typing here, because I can't find a way how to make the _used dict
+            # typed based on subclass. I am not even sure that it's different between subclasses,
+            # it's probably still the same dict. But we don't really care about it
+            return cls._used[n]  # type: ignore
+        else:
+            val = cls(typ, n, _i_know_what_i_am_doing=True)
+            cls._used[n] = val
+            return val
+
+    def __init__(self, typ: SubprocessType, n: int, _i_know_what_i_am_doing: bool = False):
+        if not _i_know_what_i_am_doing:
+            raise RuntimeError("Don't do this. You seem to have no idea what it does")
+
+        self._id = n
+        self._type = typ
+
+    @property
+    def subprocess_type(self) -> SubprocessType:
+        return self._type
+
+    def __repr__(self) -> str:
+        return f"KresID({self})"
+
+    def __hash__(self) -> int:
+        return self._id
+
+    def __eq__(self, o: object) -> bool:
+        if isinstance(o, KresID):
+            return self._id == o._id
+        return False
+
+    def __str__(self) -> str:
+        """
+        Returns string representation of the ID usable directly in the underlying service manager
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def from_string(val: str) -> "KresID":
+        """
+        Inverse of __str__
+        """
+        raise NotImplementedError()
+
+
 class Subprocess:
     """
     One SubprocessInstance corresponds to one manager's subprocess
     """
 
-    def __init__(self, config: KresConfig, typ: SubprocessType, custom_id: Optional[KresID] = None) -> None:
-        self._id = KresID.alloc() if custom_id is None else custom_id
+    def __init__(self, config: KresConfig, kid: KresID) -> None:
+        self._id = kid
         self._config = config
         self._metrics_registered: bool = False
-        self._type = typ
 
     async def start(self) -> None:
         # create config file
@@ -70,7 +152,7 @@ class Subprocess:
 
     @property
     def type(self) -> SubprocessType:
-        return self._type
+        return self.id.subprocess_type
 
     @property
     def id(self) -> KresID:
