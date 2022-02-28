@@ -66,7 +66,7 @@ static inline int KR_COLD kr_error(int x) {
 #define KR_EDNS_VERSION 0
 #define KR_EDNS_PAYLOAD 1232 /* Default UDP payload; see https://www.dnsflagday.net/2020/ */
 #define KR_CACHE_DEFAULT_TTL_MIN (5) /* avoid bursts of queries */
-#define KR_CACHE_DEFAULT_TTL_MAX (6 * 24 * 3600) /* 6 days, like the root NS TTL */
+#define KR_CACHE_DEFAULT_TTL_MAX (1 * 24 * 3600) /* one day seems enough; fits prefill module */
 
 #define KR_DNAME_STR_MAXLEN (KNOT_DNAME_TXT_MAXLEN + 1)
 #define KR_RRTYPE_STR_MAXLEN (16 + 1)

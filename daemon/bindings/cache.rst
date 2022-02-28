@@ -221,7 +221,7 @@ Configuration reference
 
 .. function:: cache.max_ttl([ttl])
 
-  :param number ttl: maximum cache TTL in seconds (default: 6 days)
+  :param number ttl: maximum cache TTL in seconds (default: 1 day)
 
   .. KR_CACHE_DEFAULT_TTL_MAX ^^
 
