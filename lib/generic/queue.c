@@ -36,8 +36,9 @@ void queue_deinit_impl(struct queue *q)
 
 static struct queue_chunk * queue_chunk_new(const struct queue *q)
 {
+	/* size_t cast is to avoid unintended sign-extension */
 	struct queue_chunk *c = malloc(offsetof(struct queue_chunk, data)
-					+ q->chunk_cap * q->item_size);
+					+ (size_t) q->chunk_cap * (size_t) q->item_size);
 	if (unlikely(!c)) abort(); // simplify stuff
 	memset(c, 0, offsetof(struct queue_chunk, data));
 	c->cap = q->chunk_cap;
@@ -57,9 +58,10 @@ void * queue_push_impl(struct queue *q)
 	} else
 	if (t->end == t->cap) {
 		if (t->begin * 2 >= t->cap) {
-			/* Utilization is below 50%, so let's shift (no overlap). */
+			/* Utilization is below 50%, so let's shift (no overlap).
+			 * (size_t cast is to avoid unintended sign-extension) */
 			memcpy(t->data, t->data + t->begin * q->item_size,
-				(t->end - t->begin) * q->item_size);
+				(size_t) (t->end - t->begin) * (size_t) q->item_size);
 			t->end -= t->begin;
 			t->begin = 0;
 		} else {
@@ -91,10 +93,11 @@ void * queue_push_head_impl(struct queue *q)
 	if (h->begin == 0) {
 		if (h->end * 2 <= h->cap) {
 			/* Utilization is below 50%, so let's shift (no overlap).
-			 * Computations here are simplified due to h->begin == 0. */
+			 * Computations here are simplified due to h->begin == 0.
+			 * (size_t cast is to avoid unintended sign-extension) */
 			const int cnt = h->end;
 			memcpy(h->data + (h->cap - cnt) * q->item_size, h->data,
-				cnt * q->item_size);
+				(size_t) cnt * (size_t) q->item_size);
 			h->begin = h->cap - cnt;
 			h->end = h->cap;
 		} else {

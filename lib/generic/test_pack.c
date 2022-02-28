@@ -36,12 +36,10 @@ static void test_pack_std(void **state)
 	/* Iterate */
 	uint8_t *it = pack_head(pack);
 	assert_non_null(it);
-	unsigned count = 0;
 	while (it != pack_tail(pack)) {
 		assert_int_equal(pack_obj_len(it), 2);
 		assert_true(memcmp(pack_obj_val(it), "de", 2) == 0);
 		it = pack_obj_next(it);
-		count += 1;
 	}
 
 	/* Find */

@@ -28,7 +28,7 @@ static void test_rplan_params(void **state)
 
 static void test_rplan_push(void **state)
 {
-	knot_mm_t mm;
+	knot_mm_t mm = { 0 };
 	test_mm_ctx_init(&mm);
 	struct kr_request request = {
 		.pool = mm,

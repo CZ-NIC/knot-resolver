@@ -183,29 +183,42 @@ int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags
 
 	int yes = 1;
 	if (addr->sa_family == AF_INET || addr->sa_family == AF_INET6) {
-		if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)))
+		if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes))) {
+			close(fd);
 			return kr_error(errno);
+		}
 
 #ifdef SO_REUSEPORT_LB
-		if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT_LB, &yes, sizeof(yes)))
+		if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT_LB, &yes, sizeof(yes))) {
+			close(fd);
 			return kr_error(errno);
+		}
 #elif defined(SO_REUSEPORT) && defined(__linux__) /* different meaning on (Free)BSD */
-		if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(yes)))
+		if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(yes))) {
+			close(fd);
 			return kr_error(errno);
+		}
 #endif
 
 #ifdef IPV6_V6ONLY
 		if (addr->sa_family == AF_INET6
-		    && setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &yes, sizeof(yes)))
+		    && setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &yes, sizeof(yes))) {
+			close(fd);
 			return kr_error(errno);
+		}
 #endif
 		if (flags != NULL && flags->freebind) {
 			int optlevel;
 			int optname;
 			int ret = family_to_freebind_option(addr->sa_family, &optlevel, &optname);
-			if (ret) return kr_error(ret);
-			if (setsockopt(fd, optlevel, optname, &yes, sizeof(yes)))
+			if (ret) {
+				close(fd);
+				return kr_error(ret);
+			}
+			if (setsockopt(fd, optlevel, optname, &yes, sizeof(yes))) {
+				close(fd);
 				return kr_error(errno);
+			}
 		}
 
 		/* Linux 3.15 has IP_PMTUDISC_OMIT which makes sockets
@@ -226,8 +239,10 @@ int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags
 #endif
 	}
 
-	if (bind(fd, addr, kr_sockaddr_len(addr)))
+	if (bind(fd, addr, kr_sockaddr_len(addr))) {
+		close(fd);
 		return kr_error(errno);
+	}
 
 	return fd;
 }
@@ -721,11 +736,11 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 	char *cmd, *cmd_next = NULL;
 	bool incomplete_cmd = false;
 
-	if (!(stream && commands && nread > 0)) {
+	if (!commands || nread <= 0) {
 		goto finish;
 	}
-	/* Execute */
 
+	/* Execute */
 	if (commands[nread - 1] != '\n') {
 		incomplete_cmd = true;
 	}
@@ -859,24 +874,30 @@ struct io_stream_data *io_tty_alloc_data() {
 
 void io_tty_accept(uv_stream_t *master, int status)
 {
-	struct io_stream_data *data = io_tty_alloc_data();
 	/* We can't use any allocations after mp_start() and it's easier anyway. */
 	uv_pipe_t *client = malloc(sizeof(*client));
+	if (!client)
+		return;
+
+	struct io_stream_data *data = io_tty_alloc_data();
+	if (!data) {
+		free(client);
+		return;
+	}
 	client->data = data;
 
 	struct args *args = the_args;
-	if (client && client->data) {
-		 uv_pipe_init(master->loop, client, 0);
-		 if (uv_accept(master, (uv_stream_t *)client) != 0) {
-			mp_delete(data->pool->ctx);
-			return;
-		 }
-		 uv_read_start((uv_stream_t *)client, io_tty_alloc, io_tty_process_input);
-		 /* Write command line */
-		 if (!args->quiet) {
-			uv_buf_t buf = { "> ", 2 };
-			uv_try_write((uv_stream_t *)client, &buf, 1);
-		 }
+	uv_pipe_init(master->loop, client, 0);
+	if (uv_accept(master, (uv_stream_t *)client) != 0) {
+		mp_delete(data->pool->ctx);
+		return;
+	}
+	uv_read_start((uv_stream_t *)client, io_tty_alloc, io_tty_process_input);
+
+	/* Write command line */
+	if (!args->quiet) {
+		uv_buf_t buf = { "> ", 2 };
+		uv_try_write((uv_stream_t *)client, &buf, 1);
 	}
 }
 

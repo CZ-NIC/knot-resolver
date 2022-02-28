@@ -200,7 +200,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 
 		info.entry_size = key.len + val.len;
 		info.valid = false;
-		const int entry_type = ret == KNOT_EOK ? kr_gc_key_consistent(key) : -1;
+		const int entry_type = kr_gc_key_consistent(key);
 		const struct entry_h *entry = NULL;
 		if (entry_type >= 0) {
 			counter_gc_consistent++;
