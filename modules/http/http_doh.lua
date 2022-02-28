@@ -3,12 +3,6 @@ local basexx = require('basexx')
 local ffi = require('ffi')
 local condition = require('cqueues.condition')
 
-local function get_http_ttl(pkt)
-	local an_records = pkt:section(kres.section.ANSWER)
-	local is_negative = #an_records <= 0
-	return ffi.C.packet_ttl(pkt, is_negative)
-end
-
 -- Trace execution of DNS queries
 local function serve_doh(h, stream)
 	local input
@@ -68,7 +62,7 @@ local function serve_doh(h, stream)
 	local cond = condition.new()
 	local waiting, done = false, false
 	local finish_cb = function (answer, _)
-		output_ttl = get_http_ttl(answer)
+		output_ttl = ffi.C.packet_ttl(answer)
 		-- binary output
 		output = ffi.string(answer.wire, answer.size)
 		if waiting then
