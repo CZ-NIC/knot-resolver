@@ -17,7 +17,7 @@ from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 from knot_resolver_manager import log, statistics
 from knot_resolver_manager.compat import asyncio as asyncio_compat
 from knot_resolver_manager.config_store import ConfigStore
-from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE
+from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, init_user_constants
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.datamodel.server_schema import ManagementSchema
 from knot_resolver_manager.exceptions import DataException, KresManagerException, SchemaException, TreeException
@@ -78,15 +78,14 @@ class Server:
     async def _reconfigure(self, config: KresConfig) -> None:
         await self._reconfigure_listen_address(config)
 
-    async def _deny_listen_address_changes(self, config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
+    async def _deny_management_changes(self, config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
         if config_old.server.management != config_new.server.management:
             return Result.err(
-                "Changing API listen address dynamically is not allowed as it's really dangerous. If you"
-                " really need this feature, please contact the developers and explain why. Technically,"
+                "/server/management: Changing management API address/unix-socket dynamically is not allowed as it's really dangerous."
+                " If you really need this feature, please contact the developers and explain why. Technically,"
                 " there are no problems in supporting it. We are only blocking the dynamic changes because"
                 " we think the consequences of leaving this footgun unprotected are worse than its usefulness."
             )
-
         return Result.ok(None)
 
     async def sigint_handler(self) -> None:
@@ -121,7 +120,7 @@ class Server:
         asyncio_compat.add_async_signal_handler(signal.SIGINT, self.sigint_handler)
         asyncio_compat.add_async_signal_handler(signal.SIGHUP, self.sighup_handler)
         await self.runner.setup()
-        await self.config_store.register_verifier(self._deny_listen_address_changes)
+        await self.config_store.register_verifier(self._deny_management_changes)
         await self.config_store.register_on_change_callback(self._reconfigure)
 
     async def wait_for_shutdown(self) -> None:
@@ -284,7 +283,9 @@ async def _load_config(config: ParsedTree) -> KresConfig:
 
 async def _init_config_store(config: ParsedTree) -> ConfigStore:
     config_validated = await _load_config(config)
-    return ConfigStore(config_validated)
+    config_store = ConfigStore(config_validated)
+    await init_user_constants(config_store)
+    return config_store
 
 
 async def _init_manager(config_store: ConfigStore) -> KresManager:
