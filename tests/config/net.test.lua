@@ -25,10 +25,40 @@ local function test_freebind()
 		'net.listen({freebind = true}) enables FREEBIND for UDP listener')
 	same(net_list[2].transport.freebind, true,
 		'net.listen({freebind = true}) enables FREEBIND for TCP listener')
+end
 
+local function test_proxy_allowed()
+	same(net.proxy_allowed(), {}, 'net.proxy_allowed() empty by default')
+	net.proxy_allowed('172.22.0.1')
+	same(net.proxy_allowed(), {'172.22.0.1/32'}, 'net.proxy_allowed() single IPv4 host')
+	net.proxy_allowed({'172.22.0.1'})
+	same(net.proxy_allowed(), {'172.22.0.1/32'}, 'net.proxy_allowed() single IPv4 host (as table)')
+	net.proxy_allowed('172.18.1.0/24')
+	same(net.proxy_allowed(), {'172.18.1.0/24'}, 'net.proxy_allowed() IPv4 net')
+	net.proxy_allowed({'172.22.0.1', '172.18.1.0/24'})
+	same(net.proxy_allowed(), {'172.18.1.0/24', '172.22.0.1/32'}, 'net.proxy_allowed() multiple IPv4 args as table')
+	net.proxy_allowed({})
+	same(net.proxy_allowed(), {}, 'net.proxy_allowed() clear table')
+	net.proxy_allowed({'::1'})
+	same(net.proxy_allowed(), {'::1/128'}, 'net.proxy_allowed() single IPv6 host')
+	net.proxy_allowed({'2001:db8:cafe:beef::/64'})
+	same(net.proxy_allowed(), {'2001:db8:cafe:beef::/64'}, 'net.proxy_allowed() IPv6 net')
+	net.proxy_allowed({'0.0.0.0/0', '::/0'})
+	same(net.proxy_allowed(), {'0.0.0.0/0', '::/0'}, 'net.proxy_allowed() allow all IPv4 and IPv6')
+	net.proxy_allowed({'::1'})
+	same(net.proxy_allowed(), {'::1/128'}, 'net.proxy_allowed() single IPv6 host after all (proper reset)')
+	boom(net.proxy_allowed, {'a'}, 'net.proxy_allowed() invalid string arg')
+	boom(net.proxy_allowed, {'127.0.0.'}, 'net.proxy_allowed() incomplete IPv4')
+	boom(net.proxy_allowed, {'256.0.0.0'}, 'net.proxy_allowed() invalid IPv4')
+	boom(net.proxy_allowed, {'xx::'}, 'net.proxy_allowed() invalid IPv6')
+	boom(net.proxy_allowed, {'127.0.0.1/33'}, 'net.proxy_allowed() IPv4 invalid netmask')
+	boom(net.proxy_allowed, {'127.0.0.1/-1'}, 'net.proxy_allowed() IPv4 negative netmask')
+	boom(net.proxy_allowed, {'fd::/132'}, 'net.proxy_allowed() IPv6 invalid netmask')
+	boom(net.proxy_allowed, {{'127.0.0.0/8', '::1/129'}}, 'net.proxy_allowed() single param invalid')
 end
 
 return {
 	test_env_no_listen,
 	test_freebind,
+	test_proxy_allowed,
 }

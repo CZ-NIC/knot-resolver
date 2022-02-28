@@ -120,7 +120,7 @@ void udp_queue_push(int fd, struct kr_request *req, struct qr_task *task)
 	udp_queue_t *const q = state.udp_queues[fd];
 
 	/* Append to the queue */
-	struct sockaddr *sa = (struct sockaddr *)/*const-cast*/req->qsource.addr;
+	struct sockaddr *sa = (struct sockaddr *)/*const-cast*/req->qsource.comm_addr;
 	q->msgvec[q->len].msg_hdr.msg_name = sa;
 	q->msgvec[q->len].msg_hdr.msg_namelen = kr_sockaddr_len(sa);
 	q->items[q->len].task = task;

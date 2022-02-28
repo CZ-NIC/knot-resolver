@@ -9,6 +9,7 @@ Improvements
 - prefill module: prepare for ZONEMD, improve performance (!1225)
 - validator: conditionally ignore SHA1 DS, as SHOULD by RFC4509 (!1251)
 - lib/resolve: use EDNS padding for outgoing TLS queries (!1254)
+- support for PROXYv2 protocol (!1238)
 
 Incompatible changes
 --------------------

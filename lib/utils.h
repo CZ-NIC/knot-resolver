@@ -240,6 +240,12 @@ union kr_sockaddr {
 	struct sockaddr_in6 ip6;
 };
 
+/** Simple storage for IPx addresses. */
+union kr_in_addr {
+	struct in_addr ip4;
+	struct in6_addr ip6;
+};
+
 /** Address bytes for given family. */
 KR_EXPORT KR_PURE
 const char *kr_inaddr(const struct sockaddr *addr);
@@ -336,6 +342,12 @@ int kr_straddr_join(const char *addr, uint16_t port, char *buf, size_t *buflen);
  *  so this is e.g. suitable for comparing IP prefixes. */
 KR_EXPORT KR_PURE
 int kr_bitcmp(const char *a, const char *b, int bits);
+
+/** Masks bits. The specified number of bits in `a` from the left (network order)
+ * will remain their original value, while the rest will be set to zero.
+ * This is useful for storing network addresses in a trie. */
+KR_EXPORT
+void kr_bitmask(unsigned char *a, size_t a_len, int bits);
 
 /** @internal RR map flags. */
 static const uint8_t KEY_FLAG_RRSIG = 0x02;

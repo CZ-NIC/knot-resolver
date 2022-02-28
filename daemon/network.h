@@ -68,6 +68,12 @@ struct net_tcp_param {
 	uint64_t tls_handshake_timeout;
 };
 
+/** Information about an address that is allowed to use PROXYv2. */
+struct net_proxy_data {
+	union kr_in_addr addr;
+	uint8_t netmask;   /**< Number of bits to be matched */
+};
+
 struct network {
 	uv_loop_t *loop;
 
@@ -81,7 +87,17 @@ struct network {
 	 * The ID is the usual: raw int index in the LUA_REGISTRYINDEX table. */
 	trie_t *endpoint_kinds;
 	/** See network_engage_endpoints() */
-	bool missing_kind_is_error;
+	bool missing_kind_is_error : 1;
+
+	/** True: All IPv4 addresses are allowed to use the PROXYv2 protocol */
+	bool proxy_all4 : 1;
+	/** True: All IPv6 addresses are allowed to use the PROXYv2 protocol */
+	bool proxy_all6 : 1;
+
+	/** IPv4 addresses and networks allowed to use the PROXYv2 protocol */
+	trie_t *proxy_addrs4;
+	/** IPv6 addresses and networks allowed to use the PROXYv2 protocol */
+	trie_t *proxy_addrs6;
 
 	struct tls_credentials *tls_credentials;
 	tls_client_params_t *tls_client_params; /**< Use tls_client_params_*() functions. */
@@ -104,6 +120,17 @@ void network_deinit(struct network *net);
  */
 int network_listen(struct network *net, const char *addr, uint16_t port,
 		   int16_t nic_queue, endpoint_flags_t flags);
+
+/** Allow the specified address to send the PROXYv2 header.
+ * \note the address may be specified with a netmask
+ */
+int network_proxy_allow(struct network *net, const char* addr);
+
+/** Reset all addresses allowed to send the PROXYv2 header. No addresses will
+ * be allowed to send PROXYv2 headers from the point of calling this function
+ * until re-allowed via network_proxy_allow again.
+ */
+void network_proxy_reset(struct network *net);
 
 /** Start listening on an open file-descriptor.
  * \note flags.sock_type isn't meaningful here.

@@ -369,7 +369,7 @@ static int edns_create(knot_pkt_t *pkt, const struct kr_request *req)
 		wire_size += KR_COOKIE_OPT_MAX_LEN;
 	}
 #endif /* ENABLE_COOKIES */
-	if (req->qsource.flags.tls) {
+	if (req->qsource.flags.tls || req->qsource.comm_flags.tls) {
 		wire_size += edns_padding_option_size(req->ctx->tls_padding);
 	}
 	return knot_pkt_reserve(pkt, wire_size);
@@ -456,7 +456,7 @@ static int answer_padding(struct kr_request *request)
 {
 	if (kr_fails_assert(request && request->answer && request->ctx))
 		return kr_error(EINVAL);
-	if (!request->qsource.flags.tls) {
+	if (!request->qsource.flags.tls && !request->qsource.comm_flags.tls) {
 		/* Not meaningful to pad without encryption. */
 		return kr_ok();
 	}
@@ -741,9 +741,10 @@ knot_pkt_t *kr_request_ensure_answer(struct kr_request *request)
 	// Find answer_max: limit on DNS wire length.
 	uint16_t answer_max;
 	const struct kr_request_qsource_flags *qs_flags = &request->qsource.flags;
-	if (kr_fails_assert((qs_flags->tls || qs_flags->http) ? qs_flags->tcp : true))
+	const struct kr_request_qsource_flags *qs_cflags = &request->qsource.comm_flags;
+	if (kr_fails_assert(!(qs_flags->tls || qs_cflags->tls || qs_cflags->http) || qs_flags->tcp))
 		goto fail;
-	if (!request->qsource.addr || qs_flags->tcp) {
+	if (!request->qsource.addr || qs_flags->tcp || qs_cflags->tcp) {
 		// not on UDP
 		answer_max = KNOT_WIRE_MAX_PKTSIZE;
 	} else if (knot_pkt_has_edns(qs_pkt)) {

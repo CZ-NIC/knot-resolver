@@ -13,6 +13,7 @@ kresd_src = files([
   'io.c',
   'main.c',
   'network.c',
+  'proxyv2.c',
   'session.c',
   'tls.c',
   'tls_ephemeral_credentials.c',
@@ -33,7 +34,8 @@ config_tests += [
 ]
 
 integr_tests += [
-  ['cache_insert_ns', meson.current_source_dir() / 'cache.test' / 'insert_ns.test.integr']
+  ['cache_insert_ns', meson.current_source_dir() / 'cache.test' / 'insert_ns.test.integr'],
+  ['proxyv2', meson.current_source_dir() / 'proxyv2.test']
 ]
 
 kresd_deps = [

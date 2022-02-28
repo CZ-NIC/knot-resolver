@@ -13,6 +13,8 @@
 struct qr_task;
 struct worker_ctx;
 struct session;
+struct io_comm_data;
+struct proxy_result;
 
 struct session_flags {
 	bool outgoing : 1;      /**< True: to upstream; false: from a client. */
@@ -20,6 +22,9 @@ struct session_flags {
 	bool has_tls : 1;       /**< True: given session uses TLS. */
 	bool has_http : 1;      /**< True: given session uses HTTP. */
 	bool connected : 1;     /**< True: TCP connection is established. */
+	bool no_proxy : 1;      /**< True: TCP has gotten some data - PROXYv2 header
+	                         * disallowed. Proxy headers are only expected at
+	                         * the very start of a stream. */
 	bool closing : 1;       /**< True: session close sequence is in progress. */
 	bool wirebuf_error : 1; /**< True: last operation with wirebuf ended up with an error. */
 };
@@ -53,6 +58,13 @@ size_t session_waitinglist_get_len(const struct session *session);
 void session_waitinglist_retry(struct session *session, bool increase_timeout_cnt);
 /** Finalize all tasks in the list. */
 void session_waitinglist_finalize(struct session *session, int status);
+
+/** PROXYv2 data. */
+/** Creates zero-initialized PROXYv2 data for the session. Should only be called
+ * once per session. */
+struct proxy_result *session_proxy_create(struct session *session);
+/** Gets the session's PROXYv2 data, if it exists. If it does not, returns `NULL`. */
+struct proxy_result *session_proxy_get(struct session *session);
 
 /** List of tasks associated with session. */
 /** Check if list is empty. */
@@ -128,10 +140,13 @@ size_t session_wirebuf_get_free_size(struct session *session);
 void session_wirebuf_discard(struct session *session);
 /** Move all data to the beginning of the buffer. */
 void session_wirebuf_compress(struct session *session);
-int session_wirebuf_process(struct session *session, const struct sockaddr *peer);
+int session_wirebuf_process(struct session *session, struct io_comm_data *comm);
 ssize_t session_wirebuf_consume(struct session *session,
 				const uint8_t *data, ssize_t len);
-
+/** Trims `len` bytes from the start of the session's wire buffer.
+ * If this operation makes the buffer's end appear before the start, it gets
+ * nudged to the same position as the start. */
+ssize_t session_wirebuf_trim(struct session *session, ssize_t len);
 /** poison session structure with ASAN. */
 void session_poison(struct session *session);
 /** unpoison session structure with ASAN. */

@@ -66,6 +66,65 @@ Examples:
         addresses if the network address ranges overlap,
         and clients would probably refuse such a response.
 
+.. _proxyv2:
+
+PROXYv2 protocol
+^^^^^^^^^^^^^^^^
+
+Knot Resolver supports proxies that utilize the `PROXYv2 protocol <https://www.haproxy.org/download/2.5/doc/proxy-protocol.txt>`_
+to identify clients.
+
+A PROXY header contains the IP address of the original client who sent a query.
+This allows the resolver to treat queries as if they actually came from
+the client's IP address rather than the address of the proxy they came through.
+For example, :ref:`Views and ACLs <mod-view>` are able to work properly when
+PROXYv2 is in use.
+
+Since allowing usage of the PROXYv2 protocol for all clients would be a security
+vulnerability, because clients would then be able to spoof their IP addresses via
+the PROXYv2 header, the resolver requires you to specify explicitly which clients
+are allowed to send PROXYv2 headers via the :func:`net.proxy_allowed` function.
+
+PROXYv2 queries from clients who are not explicitly allowed to use this protocol
+will be discarded.
+
+.. function:: net.proxy_allowed([addresses])
+
+   Allow usage of the PROXYv2 protocol headers by clients on the specified
+   ``addresses``. It is possible to permit whole networks to send PROXYv2 headers
+   by specifying the network mask using the CIDR notation
+   (e.g. ``172.22.0.0/16``). IPv4 as well as IPv6 addresses are supported.
+
+   If you wish to allow all clients to use PROXYv2 (e.g. because you have this
+   kind of security handled on another layer of your network infrastructure),
+   you can specify a netmask of ``/0``. Please note that this setting is
+   address-family-specific, so this needs to be applied to both IPv4 and IPv6
+   separately.
+
+   Subsequent calls to the function overwrite the effects of all previous calls.
+   Providing a table of strings as the function parameter allows multiple
+   distinct addresses to use the PROXYv2 protocol.
+
+   When called without arguments, ``net.proxy_allowed`` returns a table of all
+   addresses currently allowed to use the PROXYv2 protocol and does not change
+   the configuration.
+
+Examples:
+
+   .. code-block:: lua
+
+	net.proxy_allowed('172.22.0.1')    -- allows '172.22.0.1' specifically
+	net.proxy_allowed('172.18.1.0/24') -- allows everyone at '172.18.1.*'
+	net.proxy_allowed({
+		'172.22.0.1', '172.18.1.0/24'
+	})                                 -- allows both of the above at once
+	net.proxy_allowed({ 'fe80::/10' }  -- allows everyone at IPv6 link-local
+	net.proxy_allowed({
+		'::/0', '0.0.0.0/0'
+	})                                 -- allows everyone
+	net.proxy_allowed('::/0')          -- allows all IPv6 (but no IPv4)
+	net.proxy_allowed({})              -- prevents everyone from using PROXYv2
+	net.proxy_allowed()                -- returns a list of all currently allowed addresses
 
 Features for scripting
 ^^^^^^^^^^^^^^^^^^^^^^

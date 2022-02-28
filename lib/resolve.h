@@ -210,14 +210,27 @@ struct kr_request {
 	knot_pkt_t *answer; /**< See kr_request_ensure_answer() */
 	struct kr_query *current_query;    /**< Current evaluated query. */
 	struct {
-		/** Address that originated the request. NULL for internal origin. */
+		/** Address that originated the request. May be that of a client
+		 * behind a proxy, if PROXYv2 is used. Otherwise, it will be
+		 * the same as `comm_addr`. `NULL` for internal origin. */
 		const struct sockaddr *addr;
-		/** Address that accepted the request.  NULL for internal origin.
+		/** Address that communicated the request. This may be the address
+		 * of a proxy. It is the same as `addr` if no proxy is used.
+		 * `NULL` for internal origin. */
+		const struct sockaddr *comm_addr;
+		/** Address that accepted the request. `NULL` for internal origin.
 		 * Beware: in case of UDP on wildcard address it will be wildcard;
 		 * closely related: issue #173. */
 		const struct sockaddr *dst_addr;
 		const knot_pkt_t *packet;
-		struct kr_request_qsource_flags flags; /**< See definition above. */
+		/** Request flags from the point of view of the original client.
+		 * This client may be behind a proxy. */
+		struct kr_request_qsource_flags flags;
+		/** Request flags from the point of view of the client actually
+		 * communicating with the resolver. When PROXYv2 protocol is used,
+		 * this describes the request from the proxy. When there is no
+		 * proxy, this will have exactly the same value as `flags`. */
+		struct kr_request_qsource_flags comm_flags;
 		size_t size; /**< query packet size */
 		int32_t stream_id; /**< HTTP/2 stream ID for DoH requests */
 		kr_http_header_array_t headers;  /**< HTTP/2 headers for DoH requests */

@@ -41,6 +41,10 @@ Module API changes
 ------------------
 * Function `cache.zone_import` was removed;
   you can use `ffi.C.zi_zone_import` instead (different API).
+* When using :ref:`proxyv2`, the meaning of ``qsource.flags`` and ``qsource.comm_flags``
+  in :c:member:`kr_request` changes so that ``flags`` describes the original client
+  communicating with the proxy, while ``comm_flags`` describes the proxy communicating
+  with the resolver. When there is no proxy, ``flags`` and ``comm_flags`` are the same.
 
 
 5.3 to 5.4

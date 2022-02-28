@@ -1,0 +1,11 @@
+-- vim:syntax=lua
+setLocal('{{SELF_ADDR}}')
+setVerboseHealthChecks(true)
+setServerPolicy(firstAvailable)
+
+local server = newServer({
+	address="{{PROGRAMS['kresd']['address']}}",
+	useProxyProtocol=true,
+	checkName="example.cz."
+})
+server:setUp()

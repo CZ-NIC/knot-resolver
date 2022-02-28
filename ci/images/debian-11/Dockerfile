@@ -101,6 +101,9 @@ RUN printf 'options {\n directory "/var/cache/bind";\n listen-on port 53533 { 12
 # PowerDNS Recursor for Deckard CI
 RUN apt-get install pdns-recursor -y -qqq
 
+# dnsdist for Deckard CI
+RUN apt-get install dnsdist -y -qqq
+
 # code coverage
 RUN apt-get install -y -qqq lcov
 RUN luarocks --lua-version 5.1 install luacov
