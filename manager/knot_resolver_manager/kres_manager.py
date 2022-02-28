@@ -1,12 +1,10 @@
 import asyncio
 import logging
 import sys
-from asyncio.futures import Future
 from subprocess import SubprocessError
 from typing import List, Optional
 
 import knot_resolver_manager.kresd_controller
-from knot_resolver_manager import kres_id
 from knot_resolver_manager.compat.asyncio import create_task
 from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.constants import WATCHDOG_INTERVAL
@@ -16,7 +14,6 @@ from knot_resolver_manager.kresd_controller.interface import (
     SubprocessStatus,
     SubprocessType,
 )
-from knot_resolver_manager.statistics import register_resolver_metrics_for, unregister_resolver_metrics_for
 from knot_resolver_manager.utils.functional import Result
 from knot_resolver_manager.utils.types import NoneType
 
@@ -45,7 +42,7 @@ class KresManager:
         self._gc: Optional[Subprocess] = None
         self._manager_lock = asyncio.Lock()
         self._controller: SubprocessController
-        self._watchdog_task: Optional["Future[None]"] = None
+        self._watchdog_task: Optional["asyncio.Task[None]"] = None
 
     @staticmethod
     async def create(selected_controller: Optional[SubprocessController], config_store: ConfigStore) -> "KresManager":
@@ -77,10 +74,8 @@ class KresManager:
             await self._collect_already_running_children()
 
     async def _spawn_new_worker(self, config: KresConfig) -> None:
-        subprocess = await self._controller.create_subprocess(config, SubprocessType.KRESD, kres_id.alloc())
+        subprocess = await self._controller.create_subprocess(config, SubprocessType.KRESD)
         await subprocess.start()
-
-        register_resolver_metrics_for(subprocess)
         self._workers.append(subprocess)
 
     async def _stop_a_worker(self) -> None:
@@ -88,7 +83,6 @@ class KresManager:
             raise IndexError("Can't stop a kresd when there are no running")
 
         subprocess = self._workers.pop()
-        unregister_resolver_metrics_for(subprocess)
         await subprocess.stop()
 
     async def _collect_already_running_children(self) -> None:
@@ -118,7 +112,7 @@ class KresManager:
         return self._gc is not None
 
     async def _start_gc(self, config: KresConfig) -> None:
-        subprocess = await self._controller.create_subprocess(config, SubprocessType.GC, kres_id.alloc())
+        subprocess = await self._controller.create_subprocess(config, SubprocessType.GC)
         await subprocess.start()
         self._gc = subprocess
 
@@ -159,7 +153,11 @@ class KresManager:
 
     async def stop(self):
         if self._watchdog_task is not None:
-            self._watchdog_task.cancel()
+            self._watchdog_task.cancel()  # cancel it
+            try:
+                await self._watchdog_task  # and let it really finish
+            except asyncio.CancelledError:
+                pass
 
         async with self._manager_lock:
             await self._ensure_number_of_children(KresConfig(), 0)
@@ -169,8 +167,7 @@ class KresManager:
 
     async def _instability_handler(self) -> None:
         logger.error(
-            "Instability callback invoked. Something is wrong, no idea how to react."
-            " Performing suicide. See you later!"
+            "Instability detected. Something is wrong, no idea how to react." " Performing suicide. See you later!"
         )
         sys.exit(1)
 
@@ -178,24 +175,34 @@ class KresManager:
         while True:
             await asyncio.sleep(WATCHDOG_INTERVAL)
 
-            # gather current state
-            detected_subprocesses = await self._controller.get_subprocess_status()
-            worker_ids = [x.id for x in self._workers]
-            invoke_callback = False
+            try:
+                # gather current state
+                async with self._manager_lock:
+                    detected_subprocesses = await self._controller.get_subprocess_status()
+                expected_ids = [x.id for x in self._workers]
+                if self._gc:
+                    expected_ids.append(self._gc.id)
+                invoke_callback = False
 
-            for w in worker_ids:
-                if w not in detected_subprocesses:
-                    logger.error("Expected to find subprocess with id '%s' in the system, but did not.", w)
-                    invoke_callback = True
-                    continue
+                for eid in expected_ids:
+                    if eid not in detected_subprocesses:
+                        logger.error("Expected to find subprocess with id '%s' in the system, but did not.", eid)
+                        invoke_callback = True
+                        continue
 
-                if detected_subprocesses[w] is SubprocessStatus.FAILED:
-                    logger.error("Subprocess '%s' is failed.", w)
-                    invoke_callback = True
-                    continue
+                    if detected_subprocesses[eid] is SubprocessStatus.FAILED:
+                        logger.error("Subprocess '%s' is failed.", eid)
+                        invoke_callback = True
+                        continue
 
-                if detected_subprocesses[w] is SubprocessStatus.UNKNOWN:
-                    logger.warning("Subprocess '%s' is in unknown state!", w)
+                    if detected_subprocesses[eid] is SubprocessStatus.UNKNOWN:
+                        logger.warning("Subprocess '%s' is in unknown state!", eid)
+
+            except asyncio.CancelledError:
+                raise
+            except BaseException:
+                invoke_callback = True
+                logger.error("Knot Resolver watchdog failed with an unexpected exception.", exc_info=True)
 
             if invoke_callback:
                 await self._instability_handler()

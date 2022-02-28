@@ -16,12 +16,9 @@ from knot_resolver_manager.compat.dataclasses import dataclass
 from knot_resolver_manager.constants import kres_gc_executable, kresd_cache_dir, kresd_config_file, kresd_executable
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.exceptions import SubprocessControllerException
-from knot_resolver_manager.kres_id import KresID
-from knot_resolver_manager.kresd_controller.interface import SubprocessType
+from knot_resolver_manager.kresd_controller.interface import KresID, SubprocessType
 
 logger = logging.getLogger(__name__)
-
-GC_SERVICE_NAME = "kres-managed-cache-gc.service"
 
 
 class SystemdType(Enum):
@@ -89,17 +86,24 @@ def _wait_for_job_completion(systemd: Any, job_creating_func: Callable[[], str])
 
         return event_hander
 
+    loop: Any = None
+
     def event_loop_isolation_thread() -> None:
-        loop: Any = GLib.MainLoop()
+        nonlocal loop
+        loop = GLib.MainLoop()
         systemd.JobRemoved.connect(_wait_for_job_completion_handler(loop))
         loop.run()
 
     # first start the thread to watch for results to prevent race conditions
-    thread = Thread(target=event_loop_isolation_thread)
+    thread = Thread(target=event_loop_isolation_thread, name="glib-loop-isolation-thread")
     thread.start()
 
     # then create the job
-    job_path = job_creating_func()
+    try:
+        job_path = job_creating_func()
+    except BaseException:
+        loop.quit()
+        raise
 
     # then wait for the results
     thread.join()
@@ -219,13 +223,12 @@ def _gc_unit_properties(config: KresConfig) -> Any:
 
 
 @_wrap_dbus_errors
-def start_transient_kresd_unit(
-    config: KresConfig, type_: SystemdType, kres_id: KresID, subprocess_type: SubprocessType
-) -> None:
-    name, properties = {
-        SubprocessType.KRESD: (f"kresd_{kres_id}.service", _kresd_unit_properties(config, kres_id)),
-        SubprocessType.GC: (GC_SERVICE_NAME, _gc_unit_properties(config)),
-    }[subprocess_type]
+def start_transient_kresd_unit(config: KresConfig, type_: SystemdType, kres_id: KresID) -> None:
+    properties = {
+        SubprocessType.KRESD: _kresd_unit_properties(config, kres_id),
+        SubprocessType.GC: _gc_unit_properties(config),
+    }[kres_id.subprocess_type]
+    name = str(kres_id)
 
     systemd = _create_manager_proxy(type_)
 

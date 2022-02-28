@@ -29,6 +29,10 @@ class KnotManagerClient:
         response = requests.post(self._create_url("/config/server/workers"), data=str(n))
         print(response.text)
 
+    def set_groupid(self, gid: str) -> None:
+        response = requests.post(self._create_url("/config/server/groupid"), data=f'"{gid}"')
+        print(response.text)
+
     def set_static_hints(self, hints: Dict[str, List[Union[ipaddress.IPv4Address, ipaddress.IPv6Address]]]) -> None:
         payload = {name: [str(a) for a in addrs] for name, addrs in hints.items()}
         response = requests.post(self._create_url("/config/static-hints/hints"), json=payload)
