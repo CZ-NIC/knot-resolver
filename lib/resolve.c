@@ -732,6 +732,10 @@ knot_rrset_t* kr_request_ensure_edns(struct kr_request *request)
 
 knot_pkt_t *kr_request_ensure_answer(struct kr_request *request)
 {
+	if (request->options.NO_ANSWER) {
+		kr_assert(request->state & KR_STATE_FAIL);
+		return NULL;
+	}
 	if (request->answer)
 		return request->answer;
 

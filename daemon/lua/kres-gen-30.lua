@@ -104,6 +104,7 @@ struct kr_qflags {
 	_Bool NO_IPV6 : 1;
 	_Bool NO_IPV4 : 1;
 	_Bool TCP : 1;
+	_Bool NO_ANSWER : 1;
 	_Bool RESOLVED : 1;
 	_Bool AWAIT_IPV4 : 1;
 	_Bool AWAIT_IPV6 : 1;

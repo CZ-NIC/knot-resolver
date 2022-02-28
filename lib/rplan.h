@@ -18,6 +18,9 @@ struct kr_qflags {
 	bool NO_IPV6 : 1;        /**< Disable IPv6 */
 	bool NO_IPV4 : 1;        /**< Disable IPv4 */
 	bool TCP : 1;            /**< Use TCP (or TLS) for this query. */
+	bool NO_ANSWER : 1;      /**< Do not send any answer to the client.
+				  *   Request state should be set to `KR_STATE_FAIL`
+				  *   when this flag is set. */
 	bool RESOLVED : 1;       /**< Query is resolved.  Note that kr_query gets
 				  *   RESOLVED before following a CNAME chain; see .CNAME. */
 	bool AWAIT_IPV4 : 1;     /**< Query is waiting for A address. */
