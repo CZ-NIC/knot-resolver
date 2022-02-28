@@ -22,6 +22,7 @@
 #include <uv.h>
 
 #define DEBUG_MSG(fmt, ...) kr_log_debug(DNSTAP, fmt, ##__VA_ARGS__);
+#define ERROR_MSG(fmt, ...) kr_log_error(DNSTAP, fmt, ##__VA_ARGS__);
 #define CFG_SOCK_PATH "socket_path"
 #define CFG_IDENTITY_STRING "identity"
 #define CFG_VERSION_STRING "version"
@@ -404,17 +405,18 @@ static bool find_bool(const JsonNode *node) {
 KR_EXPORT
 int dnstap_config(struct kr_module *module, const char *conf) {
 	dnstap_clear(module);
+	if (!conf) return kr_ok(); /* loaded module without configuring */
 	struct dnstap_data *data = module->data;
 	auto_free char *sock_path = NULL;
 
 	/* Empty conf passed, set default */
-	if (!conf || strlen(conf) < 1) {
+	if (strlen(conf) < 1) {
 		sock_path = strdup(DEFAULT_SOCK_PATH);
 	} else {
 
 		JsonNode *root_node = json_decode(conf);
 		if (!root_node) {
-			DEBUG_MSG("error parsing json\n");
+			ERROR_MSG("error parsing json\n");
 			return kr_error(EINVAL);
 		}
 
@@ -483,13 +485,15 @@ int dnstap_config(struct kr_module *module, const char *conf) {
 	DEBUG_MSG("opening sock file %s\n",sock_path);
 	struct fstrm_writer *writer = dnstap_unix_writer(sock_path);
 	if (!writer) {
-		DEBUG_MSG("can't create unix writer\n");
+		ERROR_MSG("failed to open socket %s\n"
+			"Please ensure that it exists beforehand and has appropriate access permissions.\n",
+			sock_path);
 		return kr_error(EINVAL);
 	}
 
 	struct fstrm_iothr_options *opt = fstrm_iothr_options_init();
 	if (!opt) {
-		DEBUG_MSG("can't init fstrm options\n");
+		ERROR_MSG("can't init fstrm options\n");
 		fstrm_writer_destroy(&writer);
 		return kr_error(EINVAL);
 	}
@@ -498,7 +502,7 @@ int dnstap_config(struct kr_module *module, const char *conf) {
 	data->iothread = fstrm_iothr_init(opt, &writer);
 	fstrm_iothr_options_destroy(&opt);
 	if (!data->iothread) {
-		DEBUG_MSG("can't init fstrm_iothr\n");
+		ERROR_MSG("can't init fstrm_iothr\n");
 		fstrm_writer_destroy(&writer);
 		return kr_error(ENOMEM);
 	}
@@ -509,7 +513,7 @@ int dnstap_config(struct kr_module *module, const char *conf) {
 	data->ioq = fstrm_iothr_get_input_queue_idx(data->iothread, 0);
 	if (!data->ioq) {
 		fstrm_iothr_destroy(&data->iothread);
-		DEBUG_MSG("can't get fstrm queue\n");
+		ERROR_MSG("can't get fstrm queue\n");
 		return kr_error(EBUSY);
 	}
 
