@@ -1279,6 +1279,7 @@ static uv_handle_t *transmit(struct qr_task *task)
 		struct session *session = ret->data;
 		struct sockaddr *peer = session_get_peer(session);
 		kr_assert(peer->sa_family == AF_UNSPEC && session_flags(session)->outgoing);
+		kr_require(addr->sa_family == AF_INET || addr->sa_family == AF_INET6);
 		memcpy(peer, addr, kr_sockaddr_len(addr));
 		if (qr_task_send(task, session, (struct sockaddr *)choice,
 				 task->pktbuf) != 0) {

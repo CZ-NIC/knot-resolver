@@ -407,6 +407,9 @@ static void ctx_delete(zone_import_ctx_t *z_import)
 {
 	if (kr_fails_assert(z_import)) return;
 	kr_svldr_free_ctx(z_import->svldr);
+
+	/* Free `z_import`'s pool, including `z_import` itself, because it is
+	 * allocated inside said pool. */
 	mm_ctx_delete(z_import->pool);
 }
 static void timer_close(uv_handle_t *handle)
