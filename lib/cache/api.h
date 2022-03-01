@@ -37,6 +37,8 @@ struct kr_cache
 
 	uv_timer_t *health_timer; /**< Timer used for kr_cache_check_health() */
 };
+// https://datatracker.ietf.org/doc/html/rfc2181#section-8
+#define TTL_MAX_MAX ((1u << 31) - 1)
 
 /**
  * Open/create cache with provided storage options.

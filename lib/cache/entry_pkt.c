@@ -18,7 +18,7 @@ KR_EXPORT
 uint32_t packet_ttl(const knot_pkt_t *pkt, bool is_negative)
 {
 	bool has_ttl = false;
-	uint32_t ttl = UINT32_MAX;
+	uint32_t ttl = TTL_MAX_MAX;
 	/* Find minimum entry TTL in the packet or SOA minimum TTL. */
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
