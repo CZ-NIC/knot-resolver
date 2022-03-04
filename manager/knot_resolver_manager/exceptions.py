@@ -10,6 +10,9 @@ class KresManagerException(Exception):
 class SubprocessControllerException(KresManagerException):
     pass
 
+class SubprocessControllerTimeoutException(KresManagerException):
+    pass
+
 
 class SchemaException(KresManagerException):
     def __init__(self, msg: str, tree_path: str, child_exceptions: "Iterable[SchemaException]" = tuple()) -> None:

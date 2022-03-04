@@ -15,8 +15,8 @@ from typing_extensions import Literal
 from knot_resolver_manager.compat.dataclasses import dataclass
 from knot_resolver_manager.constants import kres_gc_executable, kresd_cache_dir, kresd_config_file, kresd_executable
 from knot_resolver_manager.datamodel.config_schema import KresConfig
-from knot_resolver_manager.exceptions import SubprocessControllerException
 from knot_resolver_manager.kresd_controller.interface import KresID, SubprocessType
+from knot_resolver_manager.exceptions import SubprocessControllerException, SubprocessControllerTimeoutException
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ def _create_manager_proxy(type_: SystemdType) -> Any:
     return _create_object_proxy(type_, ".systemd1")
 
 
-def _wait_for_job_completion(systemd: Any, job_creating_func: Callable[[], str]) -> None:
+def _wait_for_job_completion(systemd: Any, job_creating_func: Callable[[], str], timeout_sec: int = 30) -> None:
     """
     Takes a function returning a systemd job path, executes it while simultaneously waiting
     for its completion. This prevents race conditions.
@@ -88,9 +88,16 @@ def _wait_for_job_completion(systemd: Any, job_creating_func: Callable[[], str])
 
     loop: Any = None
 
+    def timeout_stop_loop():
+        nonlocal loop
+        nonlocal result_state
+        result_state = "timeout"
+        loop.quit()
+
     def event_loop_isolation_thread() -> None:
         nonlocal loop
         loop = GLib.MainLoop()
+        GLib.timeout_add_seconds(timeout_sec, timeout_stop_loop)
         systemd.JobRemoved.connect(_wait_for_job_completion_handler(loop))
         loop.run()
 
@@ -108,8 +115,10 @@ def _wait_for_job_completion(systemd: Any, job_creating_func: Callable[[], str])
     # then wait for the results
     thread.join()
 
+    if result_state == "timeout":
+        raise SubprocessControllerTimeoutException(f"systemd job '{job_path}' did not finish in {timeout_sec} seconds")
     if result_state != "done":
-        raise SubprocessControllerException(f"Job completed with state '{result_state}' instead of expected 'done'")
+        raise SubprocessControllerException(f"systemd job '{job_path}' completed with state '{result_state}' instead of expected 'done'")
 
 
 @_wrap_dbus_errors
@@ -237,12 +246,18 @@ def start_transient_kresd_unit(config: KresConfig, type_: SystemdType, kres_id: 
 
     try:
         _wait_for_job_completion(systemd, job)
+    except SubprocessControllerTimeoutException:
+        logger.error(
+            f"Failed to start transient '{name}'."
+            "The start operation did not finish within the expected timeframe"
+        )
+        raise
     except SubprocessControllerException as e:
         logger.error(f"Failed to start transient '{name}':")
         for (k, v) in properties:
             logger.error(f"    {k}={v}")
         logger.error(f"More useful details might be found in the service's log by running 'journalctl -u {name}'")
-        raise SubprocessControllerException(f"Failed to start systemd transient service '{name}'") from e
+        raise SubprocessControllerException(f"Failed to start systemd transient service '{name}': {e}") from e
 
 
 @_wrap_dbus_errors
