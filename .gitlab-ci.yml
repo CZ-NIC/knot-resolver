@@ -603,6 +603,13 @@ obs:build:all:
 
 .distrotest: &distrotest
   <<: *deploytest
+  # Description of the distrotest script workflow:
+  # 1. wait for OBS package build to complete
+  # 2. check the OBS build suceeded
+  # 3. set up some variables, dir names etc.
+  # 4. create a symlink with predictable name to export artifacts afterwards
+  # 5. create an HTCondor job and submit it to a HTCondor cluster
+  # 6. check exit code from condor, optionally display one of the logs and end the job with same exit code
   script:
     - "osc results home:CZ-NIC:$OBS_REPO knot-resolver -a x86_64 -r $DISTROTEST_REPO -w"
     - >
