@@ -211,8 +211,8 @@ struct to_resolve {
  * @param[out] choice_index Optionally index of the chosen transport in the @p choices array.
  * @return Chosen transport (on mempool) or NULL when no choice is viable
  */
-struct kr_transport *select_transport(struct choice choices[], int choices_len,
-				      struct to_resolve unresolved[],
+struct kr_transport *select_transport(const struct choice choices[], int choices_len,
+				      const struct to_resolve unresolved[],
 				      int unresolved_len, int timeouts,
 				      struct knot_mm *mempool, bool tcp,
 				      size_t *choice_index);

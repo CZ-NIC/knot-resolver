@@ -336,11 +336,8 @@ void update_address_state(struct address_state *state, union kr_sockaddr *addres
 #endif
 }
 
-static int cmp_choices(const void *a, const void *b)
+static int cmp_choices(const struct choice *a_, const struct choice *b_)
 {
-	const struct choice *a_ = a;
-	const struct choice *b_ = b;
-
 	int diff;
 	/* Prefer IPv4 if IPv6 appears to be generally broken. */
 	diff = (int)a_->address_len - (int)b_->address_len;
@@ -365,21 +362,40 @@ static int cmp_choices(const void *a, const void *b)
 	}
 	return 0;
 }
-
-/* Fisher-Yates shuffle of the choices */
-static void shuffle_choices(struct choice choices[], int choices_len)
+/** Select the best entry from choices[] according to cmp_choices() comparator.
+ *
+ * Ties are decided in an (almost) uniformly random fashion.
+ */
+static const struct choice * select_best(const struct choice choices[], int choices_len)
 {
-	struct choice tmp;
-	for (int i = choices_len - 1; i > 0; i--) {
-		int j = kr_rand_bytes(1) % (i + 1);
-		tmp = choices[i];
-		choices[i] = choices[j];
-		choices[j] = tmp;
+	/* Deciding ties: it's as-if each index carries one byte of randomness.
+	 * Ties get decided by comparing that byte, and the byte itself
+	 * is computed lazily (negative until computed).
+	 */
+	int best_i = 0;
+	int best_rnd = -1;
+	for (int i = 1; i < choices_len; ++i) {
+		int diff = cmp_choices(&choices[i], &choices[best_i]);
+		if (diff > 0)
+			continue;
+		if (diff < 0) {
+			best_i = i;
+			best_rnd = -1;
+			continue;
+		}
+		if (best_rnd < 0)
+			best_rnd = kr_rand_bytes(1);
+		int new_rnd = kr_rand_bytes(1);
+		if (new_rnd < best_rnd) {
+			best_i = i;
+			best_rnd = new_rnd;
+		}
 	}
+	return &choices[best_i];
 }
 
 /* Adjust choice from `unresolved` in case of NO6 (broken IPv6). */
-static struct kr_transport unresolved_adjust(struct to_resolve unresolved[],
+static struct kr_transport unresolved_adjust(const struct to_resolve unresolved[],
 					     int unresolved_len, int index)
 {
 	if (unresolved[index].type != KR_TRANSPORT_RESOLVE_AAAA || !no6_is_bad())
@@ -410,8 +426,8 @@ finish:
 }
 
 /* Performs the actual selection (currently variation on epsilon-greedy). */
-struct kr_transport *select_transport(struct choice choices[], int choices_len,
-				      struct to_resolve unresolved[],
+struct kr_transport *select_transport(const struct choice choices[], int choices_len,
+				      const struct to_resolve unresolved[],
 				      int unresolved_len, int timeouts,
 				      struct knot_mm *mempool, bool tcp,
 				      size_t *choice_index)
@@ -423,15 +439,12 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 
 	struct kr_transport *transport = mm_calloc(mempool, 1, sizeof(*transport));
 
-	/* Shuffle, so we choose fairly between choices with same attributes. */
-	shuffle_choices(choices, choices_len);
 	/* If there are some addresses with no rtt_info we try them
 	 * first (see cmp_choices). So unknown servers are chosen
 	 * *before* the best know server. This ensures that every option
 	 * is tried before going back to some that was tried before. */
-	qsort(choices, choices_len, sizeof(struct choice), cmp_choices);
-	struct choice *best = &choices[0];
-	struct choice *chosen;
+	const struct choice *best = select_best(choices, choices_len);
+	const struct choice *chosen;
 
 	const bool explore = choices_len == 0 || kr_rand_coin(EPSILON_NOMIN, EPSILON_DENOM);
 	if (explore) {
