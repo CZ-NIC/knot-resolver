@@ -632,12 +632,11 @@ obs:build:all:
     when:
       - script_failure
 
-obs:centos8:x86_64:
+obs:rocky8:x86_64:
   <<: *distrotest
-  allow_failure: true
   variables:
     OBS_REPO: knot-resolver-latest
-    DISTROTEST_NAME: centos8
+    DISTROTEST_NAME: rocky8
     DISTROTEST_REPO: CentOS_8_EPEL
 
 obs:debian9:x86_64:
