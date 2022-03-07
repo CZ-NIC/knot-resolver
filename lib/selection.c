@@ -590,34 +590,37 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state,
 	}
 }
 
-static void cache_timeout(const struct kr_query *qry, const struct kr_transport *transport,
+/// Update rtt_state (including caching) after a server timed out.
+static void server_timeout(const struct kr_query *qry, const struct kr_transport *transport,
 			  struct address_state *addr_state, struct kr_cache *cache)
 {
-	if (transport->deduplicated) {
-		/* Transport was chosen by a different query, that one will
-		 * cache the result. */
+	// Make sure that the timeout wasn't capped; see kr_transport::timeout_capped
+	if (transport->timeout_capped)
 		return;
-	}
 
-	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
+	const uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
 	if (transport->address_len == sizeof(struct in6_addr))
 		no6_timed_out(qry, address);
 
-	struct rtt_state old_state = addr_state->rtt_state;
-	struct rtt_state cur_state =
-		get_rtt_state(address, transport->address_len, cache);
+	struct rtt_state *state = &addr_state->rtt_state;
+	// While we were waiting for timeout, the stats might have changed considerably,
+	// so let's overwrite what we had by fresh cache contents.
+	// This is useful when the address is busy (we query it concurrently).
+	*state = get_rtt_state(address, transport->address_len, cache);
 
-	/* We could lose some update from some other process by doing this,
-	 * but at least timeout count can't blow up. */
-	if (cur_state.consecutive_timeouts == old_state.consecutive_timeouts) {
-		if (++cur_state.consecutive_timeouts >=
-		    KR_NS_TIMEOUT_ROW_DEAD) {
-			cur_state.dead_since = kr_now();
-		}
-		put_rtt_state(address, transport->address_len, cur_state, cache);
+	++state->consecutive_timeouts;
+	if (state->consecutive_timeouts >= KR_NS_TIMEOUT_ROW_DEAD) {
+		state->dead_since = kr_now();
+		// We limit the count, as we don't really utilize higher values
+		// and overflow would be bad.
+		state->consecutive_timeouts = KR_NS_TIMEOUT_ROW_DEAD;
+	}
+
+	// If transport was chosen by a different query, that one will cache it.
+	if (!transport->deduplicated) {
+		put_rtt_state(address, transport->address_len, *state, cache);
 	} else {
-		/* `get_rtt_state` opens a cache transaction, we have to end it. */
-		kr_cache_commit(cache);
+		kr_cache_commit(cache); // Avoid any risk of long transaction.
 	}
 }
 
@@ -644,12 +647,7 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 	case KR_SELECTION_TLS_HANDSHAKE_FAILED:
 	case KR_SELECTION_QUERY_TIMEOUT:
 		qry->server_selection.local_state->timeouts++;
-		/* Make sure that the query was chosen by this query and timeout wasn't capped
-		 * (see kr_transport::timeout_capped for details). */
-		if (!transport->deduplicated && !transport->timeout_capped) {
-			cache_timeout(qry, transport, addr_state,
-				      &qry->request->ctx->cache);
-		}
+		server_timeout(qry, transport, addr_state, &qry->request->ctx->cache);
 		break;
 	case KR_SELECTION_FORMERR:
 		if (qry->flags.NO_EDNS) {
