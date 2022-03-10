@@ -87,14 +87,12 @@ struct qr_task
 	uint16_t timeouts;
 	uint16_t iter_count;
 	uint32_t refs;
-	bool finished      : 1;
-	bool leading       : 1;
-	bool timeout_valid : 1; /**< true: `->timeout` is not yet closed. */
+	bool finished : 1;
+	bool leading  : 1;
 	uint64_t creation_time;
 	uint64_t send_time;
 	uint64_t recv_time;
 	struct kr_transport *transport;
-	uv_timer_t timeout;
 };
 
 
@@ -137,16 +135,6 @@ static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_
 
 struct worker_ctx the_worker_value; /**< Static allocation is suitable for the singleton. */
 struct worker_ctx *the_worker = NULL;
-
-
-static struct kr_query *task_get_last_pending_query(struct qr_task *task)
-{
-	if (!task || task->ctx->req.rplan.pending.len == 0) {
-		return NULL;
-	}
-
-	return array_tail(task->ctx->req.rplan.pending);
-}
 
 /*! @internal Create a UDP/TCP handle for an outgoing AF_INET* connection.
  *  socktype is SOCK_* */
@@ -568,13 +556,6 @@ static struct qr_task *qr_task_create(struct request_ctx *ctx)
 	qr_task_ref(task);
 	task->creation_time = kr_now();
 	ctx->worker->stats.concurrent += 1;
-
-	/* Reference for timer callbacks - unref'd in 'qr_task_timeout_onclose()' */
-	qr_task_ref(task);
-	uv_timer_init(ctx->worker->loop, &task->timeout);
-	task->timeout.data = task;
-	task->timeout_valid = true;
-
 	return task;
 }
 
@@ -622,23 +603,6 @@ static int qr_task_register(struct qr_task *task, struct session *session)
 	return 0;
 }
 
-static void qr_task_timeout_onclose(uv_handle_t *timer_handle)
-{
-	/* Remove the reference made in qr_task_create for timeout callbacks */
-	struct qr_task* task = timer_handle->data;
-	qr_task_unref(task);
-}
-
-/** Closes the timeout in this task, if it has not been closed yet. */
-static void qr_task_close_timeout(struct qr_task *task)
-{
-	if (task->timeout_valid) {
-		uv_timer_stop(&task->timeout);
-		uv_close((uv_handle_t*) &task->timeout, qr_task_timeout_onclose);
-		task->timeout_valid = false;
-	}
-}
-
 static void qr_task_complete(struct qr_task *task)
 {
 	struct request_ctx *ctx = task->ctx;
@@ -647,9 +611,6 @@ static void qr_task_complete(struct qr_task *task)
 	ioreq_kill_pending(task);
 	kr_require(task->waiting.len == 0);
 	kr_require(task->leading == false);
-
-	/* Close task-specific timeout */
-	qr_task_close_timeout(task);
 
 	struct session *s = ctx->source.session;
 	if (s) {
@@ -661,44 +622,6 @@ static void qr_task_complete(struct qr_task *task)
 	/* Release primary reference to task. */
 	if (ctx->task == task) {
 		ctx->task = NULL;
-		qr_task_unref(task);
-	}
-}
-
-static void qr_task_timeout(uv_timer_t* timer)
-{
-	/* A task may time out when no data is received on an otherwise valid
-	 * TCP connection. */
-
-	struct qr_task *task = timer->data;
-
-	/* Find connected TCP session for this task. If none exists,
-	 * no timeout logic is currently defined. There are also session-level
-	 * timeouts in the resolver that handle the other cases. */
-	const struct sockaddr *addr = &task->transport->address.ip;
-	struct session *session = worker_find_tcp_connected(task->ctx->worker, addr);
-	if (session && session_flags(session)->outgoing) {
-		/* Check if the pointer with our msgid points to our task. */
-		uint16_t msg_id = worker_task_pkt_get_msgid(task);
-		struct qr_task *other = session_tasklist_find_msgid(session, msg_id);
-		if (other != task)
-			return;
-
-		qr_task_ref(task);
-
-		struct kr_query *qry = task_get_last_pending_query(task);
-		VERBOSE_MSG(qry, "=> Query resolution task timed out\n");
-		session_tasklist_finalize_expired(session);
-		session_tasklist_del(session, task);
-
-		if (qry)
-			qry->server_selection.error(qry, task->transport,
-					KR_SELECTION_DATA_TIMEOUT);
-
-		task->timeouts += 1;
-		task->ctx->worker->stats.timeout += 1;
-		qr_task_step(task, NULL, NULL);
-
 		qr_task_unref(task);
 	}
 }
@@ -752,15 +675,8 @@ int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 			return status;
 		}
 
-		if (session_flags(s)->closing)
+		if (session_flags(s)->outgoing || session_flags(s)->closing)
 			return status;
-
-		if (session_flags(s)->outgoing) {
-			if (task->transport)
-				uv_timer_start(&task->timeout, &qr_task_timeout,
-						task->transport->timeout, 0);
-			return status;
-		}
 
 		struct worker_ctx *worker = task->ctx->worker;
 		if (session_flags(s)->throttled &&
@@ -932,6 +848,15 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 			worker->stats.ipv4 += 1;
 	}
 	return ret;
+}
+
+static struct kr_query *task_get_last_pending_query(struct qr_task *task)
+{
+	if (!task || task->ctx->req.rplan.pending.len == 0) {
+		return NULL;
+	}
+
+	return array_tail(task->ctx->req.rplan.pending);
 }
 
 static int session_tls_hs_cb(struct session *session, int status)
@@ -1430,8 +1355,6 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	struct request_ctx *ctx = task->ctx;
 	struct session *source_session = ctx->source.session;
 	kr_resolve_finish(&ctx->req, state);
-
-	qr_task_close_timeout(task);
 
 	task->finished = true;
 	if (source_session == NULL) {
