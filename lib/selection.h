@@ -12,8 +12,11 @@
 
 #include "lib/cache/api.h"
 
-/* After KR_NS_TIMEOUT_ROW_DEAD consecutive timeouts, we consider the upstream IP dead for KR_NS_TIMEOUT_RETRY_INTERVAL ms */
+/* After KR_NS_TIMEOUT_ROW_DEAD consecutive timeouts
+ * where at least one was over KR_NS_TIMEOUT_MIN_DEAD_TIMEOUT ms,
+ * we consider the upstream IP dead for KR_NS_TIMEOUT_RETRY_INTERVAL ms */
 #define KR_NS_TIMEOUT_ROW_DEAD 4
+#define KR_NS_TIMEOUT_MIN_DEAD_TIMEOUT 800 /* == DEFAULT_TIMEOUT * 2 */
 #define KR_NS_TIMEOUT_RETRY_INTERVAL 1000
 
 /**

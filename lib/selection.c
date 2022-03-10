@@ -19,7 +19,7 @@
 #define DEFAULT_TIMEOUT 400
 #define MAX_TIMEOUT 10000
 #define EXPLORE_TIMEOUT_COEFFICIENT 2
-#define MAX_BACKOFF 5
+#define MAX_BACKOFF 8
 #define MINIMAL_TIMEOUT_ADDITION 20
 
 /* After TCP_TIMEOUT_THRESHOLD timeouts one transport, we'll switch to TCP. */
@@ -255,7 +255,7 @@ static void invalidate_dead_upstream(struct address_state *state,
 				     unsigned int retry_timeout)
 {
 	struct rtt_state *rs = &state->rtt_state;
-	if (rs->consecutive_timeouts >= KR_NS_TIMEOUT_ROW_DEAD) {
+	if (rs->dead_since) {
 		uint64_t now = kr_now();
 		if (now < rs->dead_since) {
 			// broken continuity of timestamp (reboot, different machine, etc.)
@@ -609,11 +609,13 @@ static void server_timeout(const struct kr_query *qry, const struct kr_transport
 	*state = get_rtt_state(address, transport->address_len, cache);
 
 	++state->consecutive_timeouts;
+	// Avoid overflow; we don't utilize very high values anyway (arbitrary limit).
+	state->consecutive_timeouts = MIN(64, state->consecutive_timeouts);
 	if (state->consecutive_timeouts >= KR_NS_TIMEOUT_ROW_DEAD) {
-		state->dead_since = kr_now();
-		// We limit the count, as we don't really utilize higher values
-		// and overflow would be bad.
-		state->consecutive_timeouts = KR_NS_TIMEOUT_ROW_DEAD;
+		// Only mark as dead if we waited long enough,
+		// so that many (concurrent) short attempts can't cause the dead state.
+		if (transport->timeout >= KR_NS_TIMEOUT_MIN_DEAD_TIMEOUT)
+			state->dead_since = kr_now();
 	}
 
 	// If transport was chosen by a different query, that one will cache it.
@@ -622,6 +624,15 @@ static void server_timeout(const struct kr_query *qry, const struct kr_transport
 	} else {
 		kr_cache_commit(cache); // Avoid any risk of long transaction.
 	}
+}
+// Not everything can be checked in nice ways like static_assert()
+static __attribute__((constructor)) void test_RTT_consts(void)
+{
+	// See KR_NS_TIMEOUT_MIN_DEAD_TIMEOUT above.
+	kr_require(
+		calc_timeout((struct rtt_state){ .consecutive_timeouts = MAX_BACKOFF, })
+		 >= KR_NS_TIMEOUT_MIN_DEAD_TIMEOUT
+	);
 }
 
 void error(struct kr_query *qry, struct address_state *addr_state,
