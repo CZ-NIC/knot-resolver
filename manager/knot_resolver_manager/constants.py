@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 
 STARTUP_LOG_LEVEL = logging.DEBUG
 DEFAULT_MANAGER_CONFIG_FILE = Path("/etc/knot-resolver/config.yml")
+MANAGER_FIX_ATTEMPT_MAX_COUNTER = 2
+FIX_COUNTER_DECREASE_INTERVAL_SEC = 30 * 60
 
 
 def kresd_executable() -> Path:
