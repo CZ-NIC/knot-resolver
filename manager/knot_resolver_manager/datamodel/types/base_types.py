@@ -76,17 +76,16 @@ class IntRangeBase(IntBase):
         if isinstance(source_value, int) and not isinstance(source_value, bool):
             if hasattr(self, "_min") and (source_value < self._min):
                 raise SchemaException(
-                    f"The value {source_value} is lower than the allowed minimum {self._min}.", object_path
+                    f"value {source_value} is lower than the minimum {self._min}.", object_path
                 )
             if hasattr(self, "_max") and (source_value > self._max):
                 raise SchemaException(
-                    f"The value {source_value} is higher than the allowed maximum {self._max}", object_path
+                    f"value {source_value} is higher than the maximum {self._max}", object_path
                 )
             self._value = source_value
         else:
             raise SchemaException(
-                f"Unexpected input type for integer - {type(source_value)}."
-                " Cause might be invalid format or invalid type.",
+                f"expected integer, got '{type(source_value)}'",
                 object_path,
             )
 
@@ -120,8 +119,7 @@ class PatternBase(StrBase):
                 raise SchemaException(f"'{source_value}' does not match '{self._re.pattern}' pattern", object_path)
         else:
             raise SchemaException(
-                f"Unexpected input type for string pattern - {type(source_value)}."
-                " Cause might be invalid format or invalid type.",
+                f"expected string, got '{type(source_value)}'",
                 object_path,
             )
 
@@ -166,14 +164,12 @@ class UnitBase(IntBase):
                 raise SchemaException(f"{type(self._value)} Failed to convert: {self}", object_path)
         elif isinstance(source_value, int):
             raise SchemaException(
-                "We do not accept number without units."
-                f" Please convert the value to string an add a unit - {list(type(self)._units.keys())}",
+                f"number without units, please convert to string and add unit  - {list(type(self)._units.keys())}",
                 object_path,
             )
         else:
             raise SchemaException(
-                f"Unexpected input type for Unit type - {type(source_value)}."
-                " Cause might be invalid format or invalid type.",
+                f"expected number with units in a string, got '{type(source_value)}'.",
                 object_path,
             )
 

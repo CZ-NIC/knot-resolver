@@ -10,6 +10,7 @@ class KresManagerException(Exception):
 class SubprocessControllerException(KresManagerException):
     pass
 
+
 class SubprocessControllerTimeoutException(KresManagerException):
     pass
 
@@ -24,7 +25,7 @@ class SchemaException(KresManagerException):
         return self._tree_path
 
     def msg(self):
-        return f"field {self.where()}: " + super().__str__()
+        return f"[{self.where()}] " + super().__str__()
 
     def recursive_msg(self, indentation_level: int = 0) -> str:
         INDENT = indentation_level * "\t"

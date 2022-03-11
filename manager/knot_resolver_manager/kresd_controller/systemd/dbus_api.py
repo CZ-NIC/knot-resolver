@@ -15,8 +15,8 @@ from typing_extensions import Literal
 from knot_resolver_manager.compat.dataclasses import dataclass
 from knot_resolver_manager.constants import kres_gc_executable, kresd_cache_dir, kresd_config_file, kresd_executable
 from knot_resolver_manager.datamodel.config_schema import KresConfig
-from knot_resolver_manager.kresd_controller.interface import KresID, SubprocessType
 from knot_resolver_manager.exceptions import SubprocessControllerException, SubprocessControllerTimeoutException
+from knot_resolver_manager.kresd_controller.interface import KresID, SubprocessType
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +118,9 @@ def _wait_for_job_completion(systemd: Any, job_creating_func: Callable[[], str],
     if result_state == "timeout":
         raise SubprocessControllerTimeoutException(f"systemd job '{job_path}' did not finish in {timeout_sec} seconds")
     if result_state != "done":
-        raise SubprocessControllerException(f"systemd job '{job_path}' completed with state '{result_state}' instead of expected 'done'")
+        raise SubprocessControllerException(
+            f"systemd job '{job_path}' completed with state '{result_state}' instead of expected 'done'"
+        )
 
 
 @_wrap_dbus_errors
@@ -248,8 +250,7 @@ def start_transient_kresd_unit(config: KresConfig, type_: SystemdType, kres_id: 
         _wait_for_job_completion(systemd, job)
     except SubprocessControllerTimeoutException:
         logger.error(
-            f"Failed to start transient '{name}'."
-            "The start operation did not finish within the expected timeframe"
+            f"Failed to start transient '{name}'." "The start operation did not finish within the expected timeframe"
         )
         raise
     except SubprocessControllerException as e:
