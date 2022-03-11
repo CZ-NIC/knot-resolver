@@ -273,7 +273,7 @@ def _validated_object_type(
             except SchemaException as e:
                 errs.append(e)
 
-        raise SchemaException("failed to parse union type, all variants failed", object_path, child_exceptions=errs)
+        raise SchemaException("could not parse any of the possible variants", object_path, child_exceptions=errs)
 
     # after this, there is no place for a None object
     elif obj is None:
@@ -339,6 +339,8 @@ def _validated_object_type(
 
     # List[T]
     elif is_list(cls):
+        if isinstance(obj, str):
+            raise SchemaException("expected list, got string", object_path)
         return _validated_list(cls, obj, object_path)
 
     # Tuple[A,B,C,D,...]
