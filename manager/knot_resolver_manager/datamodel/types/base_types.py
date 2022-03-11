@@ -75,13 +75,9 @@ class IntRangeBase(IntBase):
         super().__init__(source_value)
         if isinstance(source_value, int) and not isinstance(source_value, bool):
             if hasattr(self, "_min") and (source_value < self._min):
-                raise SchemaException(
-                    f"value {source_value} is lower than the minimum {self._min}.", object_path
-                )
+                raise SchemaException(f"value {source_value} is lower than the minimum {self._min}.", object_path)
             if hasattr(self, "_max") and (source_value > self._max):
-                raise SchemaException(
-                    f"value {source_value} is higher than the maximum {self._max}", object_path
-                )
+                raise SchemaException(f"value {source_value} is higher than the maximum {self._max}", object_path)
             self._value = source_value
         else:
             raise SchemaException(
