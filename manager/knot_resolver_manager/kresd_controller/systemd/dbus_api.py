@@ -110,6 +110,7 @@ def _wait_for_job_completion(systemd: Any, job_creating_func: Callable[[], str],
         job_path = job_creating_func()
     except BaseException:
         loop.quit()
+        thread.join()
         raise
 
     # then wait for the results
