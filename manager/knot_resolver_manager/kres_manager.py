@@ -3,7 +3,7 @@ import logging
 import sys
 import time
 from subprocess import SubprocessError
-from typing import List, NoReturn, Optional
+from typing import Callable, List, Optional
 
 import knot_resolver_manager.kresd_controller
 from knot_resolver_manager.compat.asyncio import create_task
@@ -50,10 +50,10 @@ class _FixCounter:
         return str(self._counter)
 
     def is_too_high(self) -> bool:
-        return self._counter > MANAGER_FIX_ATTEMPT_MAX_COUNTER
+        return self._counter >= MANAGER_FIX_ATTEMPT_MAX_COUNTER
 
 
-class KresManager:
+class KresManager:  # pylint: disable=too-many-instance-attributes
     """
     Core of the whole operation. Orchestrates individual instances under some
     service manager like systemd.
@@ -61,13 +61,13 @@ class KresManager:
     Instantiate with `KresManager.create()`, not with the usual constructor!
     """
 
-    def __init__(self, _i_know_what_i_am_doing: bool = False):
+    def __init__(self, shutdown_trigger: Callable[[int], None], _i_know_what_i_am_doing: bool = False):
         if not _i_know_what_i_am_doing:
             logger.error(
                 "Trying to create an instance of KresManager using normal constructor. Please use "
                 "`KresManager.get_instance()` instead"
             )
-            sys.exit(1)
+            assert False
 
         self._workers: List[Subprocess] = []
         self._gc: Optional[Subprocess] = None
@@ -76,14 +76,19 @@ class KresManager:
         self._watchdog_task: Optional["asyncio.Task[None]"] = None
         self._fix_counter: _FixCounter = _FixCounter()
         self._config_store: ConfigStore
+        self._shutdown_trigger: Callable[[int], None] = shutdown_trigger
 
     @staticmethod
-    async def create(selected_controller: Optional[SubprocessController], config_store: ConfigStore) -> "KresManager":
+    async def create(
+        selected_controller: Optional[SubprocessController],
+        config_store: ConfigStore,
+        shutdown_trigger: Callable[[int], None],
+    ) -> "KresManager":
         """
         Creates new instance of KresManager.
         """
 
-        inst = KresManager(_i_know_what_i_am_doing=True)
+        inst = KresManager(shutdown_trigger, _i_know_what_i_am_doing=True)
         await inst._async_init(selected_controller, config_store)  # pylint: disable=protected-access
         return inst
 
@@ -215,16 +220,11 @@ class KresManager:
                 await self._stop_gc()
             await self._controller.shutdown_controller()
 
-    async def forced_shutdown(self) -> NoReturn:
+    async def forced_shutdown(self) -> None:
         logger.warning("Collecting all remaining workers...")
         await self._reload_system_state()
-
-        logger.warning("Stopping all workers...")
-        await self.stop()
-        logger.warning(
-            "All workers stopped. Terminating. You might see an exception stack trace at the end of the log."
-        )
-        sys.exit(1)
+        logger.warning("Terminating...")
+        self._shutdown_trigger(1)
 
     async def _instability_handler(self) -> None:
         if self._fix_counter.is_too_high():
@@ -232,6 +232,7 @@ class KresManager:
                 "Already attempted to many times to fix system state. Refusing to try again and shutting down."
             )
             await self.forced_shutdown()
+            return
 
         try:
             logger.warning("Instability detected. Dropping known list of workers and reloading it from the system.")
@@ -261,7 +262,7 @@ class KresManager:
 
                 for eid in expected_ids:
                     if eid not in detected_subprocesses:
-                        logger.error("Expected to find subprocess with id '%s' in the system, but did not.", eid)
+                        logger.error("Subprocess with id '%s' was not found in the system!", eid)
                         invoke_callback = True
                         continue
 
@@ -272,6 +273,14 @@ class KresManager:
 
                     if detected_subprocesses[eid] is SubprocessStatus.UNKNOWN:
                         logger.warning("Subprocess '%s' is in unknown state!", eid)
+
+                non_registered_ids = detected_subprocesses.keys() - set(expected_ids)
+                if len(non_registered_ids) != 0:
+                    logger.error(
+                        "Found additional kresd instances in the system, which shouldn't be there - %s",
+                        non_registered_ids,
+                    )
+                    invoke_callback = True
 
             except asyncio.CancelledError:
                 raise

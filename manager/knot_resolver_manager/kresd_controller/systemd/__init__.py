@@ -67,7 +67,10 @@ class SystemdKresID(KresID):
 class SystemdSubprocess(Subprocess):
     def __init__(self, config: KresConfig, systemd_type: SystemdType, id_base: Union[SubprocessType, KresID]):
         if isinstance(id_base, SubprocessType):
-            super().__init__(config, SystemdKresID.alloc(id_base))
+            if id_base is SubprocessType.GC:
+                super().__init__(config, SystemdKresID.new(id_base, -1))
+            else:
+                super().__init__(config, SystemdKresID.alloc(id_base))
         else:
             super().__init__(config, id_base)
         self._systemd_type = systemd_type

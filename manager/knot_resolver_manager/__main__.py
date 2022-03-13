@@ -22,7 +22,7 @@ from knot_resolver_manager.server import start_server
     help="Overrides default config location at '" + str(DEFAULT_MANAGER_CONFIG_FILE) + "'",
 )
 @click.option("--list-backends", "-l", type=bool, is_flag=True, default=False)
-def main(config: Optional[str], list_backends: bool) -> None:
+def main(config: Optional[str], list_backends: bool) -> int:
     # pylint: disable=expression-not-assigned
 
     """Knot Resolver Manager
@@ -41,7 +41,8 @@ def main(config: Optional[str], list_backends: bool) -> None:
     # where to look for config
     config_path = DEFAULT_MANAGER_CONFIG_FILE if config is None else Path(config)
 
-    compat.asyncio.run(start_server(config=config_path))
+    exit_code = compat.asyncio.run(start_server(config=config_path))
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":
