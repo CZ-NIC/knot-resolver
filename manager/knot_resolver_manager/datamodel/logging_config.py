@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Set, Union
 
 from typing_extensions import Literal, TypeAlias
 
@@ -106,3 +106,13 @@ class LoggingSchema(SchemaNode):
     dnssec_bogus: bool = False
     dnstap: Union[Literal[False], DnstapSchema] = False
     debugging: DebuggingSchema = DebuggingSchema()
+
+    def _validate(self):
+        if self.groups is None:
+            return
+
+        checked: Set[str] = set()
+        for i, g in enumerate(self.groups):
+            if g in checked:
+                raise ValueError(f"duplicate logging group '{g}' on index {i}")
+            checked.add(g)
