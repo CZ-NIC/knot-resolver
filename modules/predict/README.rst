@@ -22,7 +22,7 @@ Prediction
 ----------
 
 The predict module can also learn usage patterns and repetitive queries,
-though this mechanism is basically a prototype.
+though this mechanism is a prototype and **not recommended** for use in production or with high traffic.
 
 For example, if it makes a query every day at 18:00,
 the resolver expects that it is needed by that time and prefetches it ahead of time.
@@ -41,12 +41,11 @@ Example configuration
 
 	modules = {
 		predict = {
+                        -- this mode is NOT RECOMMENDED for use in production
 			window = 15, -- 15 minutes sampling window
 			period = 6*(60/15) -- track last 6 hours
 		}
 	}
-
-Defaults are as above: 15 minutes window, 6 hours period.
 
 Exported metrics
 ----------------
