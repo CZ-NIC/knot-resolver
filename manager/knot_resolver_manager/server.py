@@ -1,8 +1,9 @@
 import asyncio
+import atexit
+import errno
 import logging
 import os
 import signal
-import sys
 from http import HTTPStatus
 from pathlib import Path
 from time import time
@@ -17,10 +18,10 @@ from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 from knot_resolver_manager import log, statistics
 from knot_resolver_manager.compat import asyncio as asyncio_compat
 from knot_resolver_manager.config_store import ConfigStore
-from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, init_user_constants
+from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, PID_FILE_NAME, init_user_constants
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.datamodel.server_schema import ManagementSchema
-from knot_resolver_manager.exceptions import DataException, KresManagerException, SchemaException, TreeException
+from knot_resolver_manager.exceptions import DataException, KresManagerException, SchemaException
 from knot_resolver_manager.kresd_controller import get_controller_by_name
 from knot_resolver_manager.kresd_controller.interface import SubprocessController
 from knot_resolver_manager.utils.async_utils import readfile
@@ -45,12 +46,8 @@ async def error_handler(request: web.Request, handler: Any) -> web.Response:
     try:
         return await handler(request)
     except KresManagerException as e:
-        if isinstance(e, TreeException):
-            return web.Response(
-                text=f"Configuration validation failed @ '{e.where()}': {e}", status=HTTPStatus.BAD_REQUEST
-            )
-        elif isinstance(e, (DataException, DataException)):
-            return web.Response(text=f"Configuration validation failed: {e}", status=HTTPStatus.BAD_REQUEST)
+        if isinstance(e, (SchemaException, DataException)):
+            return web.Response(text=f"validation of configuration failed: {e}", status=HTTPStatus.BAD_REQUEST)
         else:
             logger.error("Request processing failed", exc_info=True)
             return web.Response(text=f"Request processing failed: {e}", status=HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -72,8 +69,8 @@ class Server:
         self.site: Union[NoneType, TCPSite, UnixSite] = None
         self.listen_lock = asyncio.Lock()
         self._config_path: Optional[Path] = config_path
-
-        self.shutdown_event = asyncio.Event()
+        self._exit_code: int = 0
+        self._shutdown_event = asyncio.Event()
 
     async def _reconfigure(self, config: KresConfig) -> None:
         await self._reconfigure_listen_address(config)
@@ -90,7 +87,7 @@ class Server:
 
     async def sigint_handler(self) -> None:
         logger.info("Received SIGINT, triggering graceful shutdown")
-        self.shutdown_event.set()
+        self.trigger_shutdown(0)
 
     async def sighup_handler(self) -> None:
         logger.info("Received SIGHUP, reloading configuration file")
@@ -124,7 +121,11 @@ class Server:
         await self.config_store.register_on_change_callback(self._reconfigure)
 
     async def wait_for_shutdown(self) -> None:
-        await self.shutdown_event.wait()
+        await self._shutdown_event.wait()
+
+    def trigger_shutdown(self, exit_code: int) -> None:
+        self._shutdown_event.set()
+        self._exit_code = exit_code
 
     async def _handler_index(self, _request: web.Request) -> web.Response:
         """
@@ -202,7 +203,7 @@ class Server:
         Route handler for shutting down the server (and whole manager)
         """
 
-        self.shutdown_event.set()
+        self._shutdown_event.set()
         logger.info("Shutdown event triggered...")
         return web.Response(text="Shutting down...")
 
@@ -258,6 +259,9 @@ class Server:
             await self.site.stop()
         await self.runner.cleanup()
 
+    def get_exit_code(self) -> int:
+        return self._exit_code
+
 
 async def _load_raw_config(config: Union[Path, ParsedTree]) -> ParsedTree:
     # Initial configuration of the manager
@@ -288,7 +292,7 @@ async def _init_config_store(config: ParsedTree) -> ConfigStore:
     return config_store
 
 
-async def _init_manager(config_store: ConfigStore) -> KresManager:
+async def _init_manager(config_store: ConfigStore, server: Server) -> KresManager:
     """
     Called asynchronously when the application initializes.
     """
@@ -299,7 +303,7 @@ async def _init_manager(config_store: ConfigStore) -> KresManager:
 
     # Create KresManager. This will perform autodetection of available service managers and
     # select the most appropriate to use (or use the one configured directly)
-    manager = await KresManager.create(controller, config_store)
+    manager = await KresManager.create(controller, config_store, server.trigger_shutdown)
 
     logger.info("Initial configuration applied. Process manager initialized...")
     return manager
@@ -321,7 +325,45 @@ def _set_working_directory(config_raw: ParsedTree) -> None:
     os.chdir(config.server.rundir.to_path())
 
 
-async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_FILE) -> None:
+def _lock_working_directory(attempt: int = 0) -> None:
+    # the following syscall is atomic, it's essentially the same as acquiring a lock
+    try:
+        pidfile_fd = os.open(PID_FILE_NAME, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+    except OSError as e:
+        if e.errno == errno.EEXIST and attempt == 0:
+            # the pid file exists, let's check PID
+            with open(PID_FILE_NAME, "r", encoding="utf-8") as f:
+                pid = int(f.read().strip())
+            try:
+                os.kill(pid, 0)
+            except OSError as e:
+                if e.errno == errno.ESRCH:
+                    os.unlink(PID_FILE_NAME)
+                    _lock_working_directory(attempt=attempt + 1)
+                    return
+            raise KresManagerException(
+                "Another manager is running in the same working directory."
+                f" PID file is located at {os.getcwd()}/{PID_FILE_NAME}"
+            )
+        else:
+            raise KresManagerException(
+                "Another manager is running in the same working directory."
+                f" PID file is located at {os.getcwd()}/{PID_FILE_NAME}"
+            )
+
+    # now we know that we are the only manager running in this directory
+
+    # write PID to the pidfile and close it afterwards
+    pidfile = os.fdopen(pidfile_fd, "w")
+    pid = os.getpid()
+    pidfile.write(f"{pid}\n")
+    pidfile.close()
+
+    # make sure that the file is deleted on shutdown
+    atexit.register(lambda: os.unlink(PID_FILE_NAME))
+
+
+async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_FILE) -> int:
     start_time = time()
     manager: Optional[KresManager] = None
 
@@ -346,6 +388,10 @@ async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_
         # originate from here.
         _set_working_directory(config_raw)
 
+        # We don't want more than one manager in a single working directory. So we lock it with a PID file.
+        # Warning - this does not prevent multiple managers with the same naming of kresd service.
+        _lock_working_directory()
+
         # After the working directory is set, we can initialize proper config store with a newly parsed configuration.
         config_store = await _init_config_store(config_raw)
 
@@ -362,19 +408,30 @@ async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_
         # started, therefore before initializing manager
         await statistics.init_monitoring(config_store)
 
+        # prepare instance of the server (no side effects)
+        server = Server(config_store, config if isinstance(config, Path) else None)
+
         # After we have loaded the configuration, we can start worring about subprocess management.
-        manager = await _init_manager(config_store)
+        manager = await _init_manager(config_store, server)
     except KresManagerException as e:
         logger.error(e)
-        sys.exit(1)
+        return 1
     except BaseException:
         logger.error("Uncaught generic exception during manager inicialization...", exc_info=True)
-        sys.exit(1)
+        return 1
 
     # At this point, all backend functionality-providing components are initialized. It's therefore save to start
     # the API server.
-    server = Server(config_store, config if isinstance(config, Path) else None)
-    await server.start()
+    try:
+        await server.start()
+    except OSError as e:
+        if e.errno in (errno.EADDRINUSE, errno.EADDRNOTAVAIL):
+            # fancy error reporting of network binding errors
+            logger.error(str(e))
+            await manager.stop()
+            return 1
+        raise
+
     logger.info(f"Manager fully initialized and running in {round(time() - start_time, 3)} seconds")
 
     # Now we are ready to process all signals
@@ -382,10 +439,13 @@ async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_
 
     await server.wait_for_shutdown()
 
+    # block signals during shutdown
+    signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT, signal.SIGHUP})
+
     # After triggering shutdown, we neet to clean everything up
-    logger.info("Gracefull shutdown triggered.")
     logger.info("Stopping API service...")
     await server.shutdown()
     logger.info("Stopping kresd manager...")
     await manager.stop()
-    logger.info(f"The manager run for {round(time() - start_time)} seconds... Hope it served well. Bye!")
+    logger.info(f"The manager run for {round(time() - start_time)} seconds...")
+    return server.get_exit_code()

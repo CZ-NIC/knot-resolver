@@ -147,5 +147,13 @@ class ServerSchema(SchemaNode):
         return obj.workers
 
     def _validate(self) -> None:
+        try:
+            cpu_count = _cpu_count()
+            if int(self.workers) > 10 * cpu_count:
+                raise ValueError("refusing to run with more then instances 10 instances per cpu core")
+        except DataException:
+            # sometimes, we won't be able to get information about the cpu count
+            pass
+
         if self.watchdog and self.backend not in ["auto", "systemd"]:
             raise ValueError("'watchdog' can only be configured for 'systemd' backend")

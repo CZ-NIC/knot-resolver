@@ -32,21 +32,7 @@ async def to_thread(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
     else:
         loop = asyncio.get_event_loop()
         pfunc = functools.partial(func, *args, **kwargs)
-        exc: Optional[BaseException] = None
-
-        def exc_catcher():
-            nonlocal exc
-
-            try:
-                return pfunc()
-            except BaseException as e:
-                exc = e
-                return None
-
-        res = await loop.run_in_executor(None, exc_catcher)
-        # propagate exception in this thread
-        if exc is not None:
-            raise exc
+        res = await loop.run_in_executor(None, pfunc)
         return res
 
 
