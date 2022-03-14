@@ -55,7 +55,7 @@ def _create_manager_proxy(type_: SystemdType) -> Any:
     return _create_object_proxy(type_, ".systemd1")
 
 
-def _wait_for_job_completion(systemd: Any, job_creating_func: Callable[[], str], timeout_sec: int = 30) -> None:
+def _wait_for_job_completion(systemd: Any, job_creating_func: Callable[[], str], timeout_sec: int = 10) -> None:
     """
     Takes a function returning a systemd job path, executes it while simultaneously waiting
     for its completion. This prevents race conditions.
@@ -251,7 +251,7 @@ def start_transient_kresd_unit(config: KresConfig, type_: SystemdType, kres_id: 
         _wait_for_job_completion(systemd, job)
     except SubprocessControllerTimeoutException:
         logger.error(
-            f"Failed to start transient '{name}'." "The start operation did not finish within the expected timeframe"
+            f"Failed to start transient '{name}'. The start operation did not finish within the expected timeframe"
         )
         raise
     except SubprocessControllerException as e:
