@@ -28,7 +28,6 @@ enum kr_selection_error {
 
 	// Network errors
 	KR_SELECTION_QUERY_TIMEOUT,
-	KR_SELECTION_DATA_TIMEOUT,
 	KR_SELECTION_TLS_HANDSHAKE_FAILED,
 	KR_SELECTION_TCP_CONNECT_FAILED,
 	KR_SELECTION_TCP_CONNECT_TIMEOUT,
@@ -73,7 +72,7 @@ struct kr_transport {
 	union kr_sockaddr address;
 	size_t address_len;
 	enum kr_transport_protocol protocol;
-	unsigned timeout; /**< Timeout in ms; needed for: UDP, TCP, TLS. */
+	unsigned timeout; /**< Timeout in ms to be set for UDP transmission. */
 	/** Timeout was capped to a maximum value based on the other candidates
 	 * when choosing this transport. The timeout therefore can be much lower
 	 * than what we expect it to be. We basically probe the server for a sudden
