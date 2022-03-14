@@ -19,7 +19,7 @@
 #define DEFAULT_TIMEOUT 400
 #define MAX_TIMEOUT 10000
 #define EXPLORE_TIMEOUT_COEFFICIENT 2
-#define MAX_BACKOFF 5
+#define MAX_BACKOFF 8
 #define MINIMAL_TIMEOUT_ADDITION 20
 
 /* After TCP_TIMEOUT_THRESHOLD timeouts one transport, we'll switch to TCP. */
@@ -37,7 +37,6 @@ static const char *kr_selection_error_str(enum kr_selection_error err) {
 	#define X(ENAME) case KR_SELECTION_ ## ENAME: return #ENAME
 		X(OK);
 		X(QUERY_TIMEOUT);
-		X(DATA_TIMEOUT);
 		X(TLS_HANDSHAKE_FAILED);
 		X(TCP_CONNECT_FAILED);
 		X(TCP_CONNECT_TIMEOUT);
@@ -255,7 +254,7 @@ static void invalidate_dead_upstream(struct address_state *state,
 				     unsigned int retry_timeout)
 {
 	struct rtt_state *rs = &state->rtt_state;
-	if (rs->consecutive_timeouts >= KR_NS_TIMEOUT_ROW_DEAD) {
+	if (rs->dead_since) {
 		uint64_t now = kr_now();
 		if (now < rs->dead_since) {
 			// broken continuity of timestamp (reboot, different machine, etc.)
@@ -336,11 +335,8 @@ void update_address_state(struct address_state *state, union kr_sockaddr *addres
 #endif
 }
 
-static int cmp_choices(const void *a, const void *b)
+static int cmp_choices(const struct choice *a_, const struct choice *b_)
 {
-	const struct choice *a_ = a;
-	const struct choice *b_ = b;
-
 	int diff;
 	/* Prefer IPv4 if IPv6 appears to be generally broken. */
 	diff = (int)a_->address_len - (int)b_->address_len;
@@ -365,21 +361,40 @@ static int cmp_choices(const void *a, const void *b)
 	}
 	return 0;
 }
-
-/* Fisher-Yates shuffle of the choices */
-static void shuffle_choices(struct choice choices[], int choices_len)
+/** Select the best entry from choices[] according to cmp_choices() comparator.
+ *
+ * Ties are decided in an (almost) uniformly random fashion.
+ */
+static const struct choice * select_best(const struct choice choices[], int choices_len)
 {
-	struct choice tmp;
-	for (int i = choices_len - 1; i > 0; i--) {
-		int j = kr_rand_bytes(1) % (i + 1);
-		tmp = choices[i];
-		choices[i] = choices[j];
-		choices[j] = tmp;
+	/* Deciding ties: it's as-if each index carries one byte of randomness.
+	 * Ties get decided by comparing that byte, and the byte itself
+	 * is computed lazily (negative until computed).
+	 */
+	int best_i = 0;
+	int best_rnd = -1;
+	for (int i = 1; i < choices_len; ++i) {
+		int diff = cmp_choices(&choices[i], &choices[best_i]);
+		if (diff > 0)
+			continue;
+		if (diff < 0) {
+			best_i = i;
+			best_rnd = -1;
+			continue;
+		}
+		if (best_rnd < 0)
+			best_rnd = kr_rand_bytes(1);
+		int new_rnd = kr_rand_bytes(1);
+		if (new_rnd < best_rnd) {
+			best_i = i;
+			best_rnd = new_rnd;
+		}
 	}
+	return &choices[best_i];
 }
 
 /* Adjust choice from `unresolved` in case of NO6 (broken IPv6). */
-static struct kr_transport unresolved_adjust(struct to_resolve unresolved[],
+static struct kr_transport unresolved_adjust(const struct to_resolve unresolved[],
 					     int unresolved_len, int index)
 {
 	if (unresolved[index].type != KR_TRANSPORT_RESOLVE_AAAA || !no6_is_bad())
@@ -410,8 +425,8 @@ finish:
 }
 
 /* Performs the actual selection (currently variation on epsilon-greedy). */
-struct kr_transport *select_transport(struct choice choices[], int choices_len,
-				      struct to_resolve unresolved[],
+struct kr_transport *select_transport(const struct choice choices[], int choices_len,
+				      const struct to_resolve unresolved[],
 				      int unresolved_len, int timeouts,
 				      struct knot_mm *mempool, bool tcp,
 				      size_t *choice_index)
@@ -423,15 +438,12 @@ struct kr_transport *select_transport(struct choice choices[], int choices_len,
 
 	struct kr_transport *transport = mm_calloc(mempool, 1, sizeof(*transport));
 
-	/* Shuffle, so we choose fairly between choices with same attributes. */
-	shuffle_choices(choices, choices_len);
 	/* If there are some addresses with no rtt_info we try them
 	 * first (see cmp_choices). So unknown servers are chosen
 	 * *before* the best know server. This ensures that every option
 	 * is tried before going back to some that was tried before. */
-	qsort(choices, choices_len, sizeof(struct choice), cmp_choices);
-	struct choice *best = &choices[0];
-	struct choice *chosen;
+	const struct choice *best = select_best(choices, choices_len);
+	const struct choice *chosen;
 
 	const bool explore = choices_len == 0 || kr_rand_coin(EPSILON_NOMIN, EPSILON_DENOM);
 	if (explore) {
@@ -577,35 +589,49 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state,
 	}
 }
 
-static void cache_timeout(const struct kr_query *qry, const struct kr_transport *transport,
+/// Update rtt_state (including caching) after a server timed out.
+static void server_timeout(const struct kr_query *qry, const struct kr_transport *transport,
 			  struct address_state *addr_state, struct kr_cache *cache)
 {
-	if (transport->deduplicated) {
-		/* Transport was chosen by a different query, that one will
-		 * cache the result. */
+	// Make sure that the timeout wasn't capped; see kr_transport::timeout_capped
+	if (transport->timeout_capped)
 		return;
-	}
 
-	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
+	const uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
 	if (transport->address_len == sizeof(struct in6_addr))
 		no6_timed_out(qry, address);
 
-	struct rtt_state old_state = addr_state->rtt_state;
-	struct rtt_state cur_state =
-		get_rtt_state(address, transport->address_len, cache);
+	struct rtt_state *state = &addr_state->rtt_state;
+	// While we were waiting for timeout, the stats might have changed considerably,
+	// so let's overwrite what we had by fresh cache contents.
+	// This is useful when the address is busy (we query it concurrently).
+	*state = get_rtt_state(address, transport->address_len, cache);
 
-	/* We could lose some update from some other process by doing this,
-	 * but at least timeout count can't blow up. */
-	if (cur_state.consecutive_timeouts == old_state.consecutive_timeouts) {
-		if (++cur_state.consecutive_timeouts >=
-		    KR_NS_TIMEOUT_ROW_DEAD) {
-			cur_state.dead_since = kr_now();
-		}
-		put_rtt_state(address, transport->address_len, cur_state, cache);
-	} else {
-		/* `get_rtt_state` opens a cache transaction, we have to end it. */
-		kr_cache_commit(cache);
+	++state->consecutive_timeouts;
+	// Avoid overflow; we don't utilize very high values anyway (arbitrary limit).
+	state->consecutive_timeouts = MIN(64, state->consecutive_timeouts);
+	if (state->consecutive_timeouts >= KR_NS_TIMEOUT_ROW_DEAD) {
+		// Only mark as dead if we waited long enough,
+		// so that many (concurrent) short attempts can't cause the dead state.
+		if (transport->timeout >= KR_NS_TIMEOUT_MIN_DEAD_TIMEOUT)
+			state->dead_since = kr_now();
 	}
+
+	// If transport was chosen by a different query, that one will cache it.
+	if (!transport->deduplicated) {
+		put_rtt_state(address, transport->address_len, *state, cache);
+	} else {
+		kr_cache_commit(cache); // Avoid any risk of long transaction.
+	}
+}
+// Not everything can be checked in nice ways like static_assert()
+static __attribute__((constructor)) void test_RTT_consts(void)
+{
+	// See KR_NS_TIMEOUT_MIN_DEAD_TIMEOUT above.
+	kr_require(
+		calc_timeout((struct rtt_state){ .consecutive_timeouts = MAX_BACKOFF, })
+		 >= KR_NS_TIMEOUT_MIN_DEAD_TIMEOUT
+	);
 }
 
 void error(struct kr_query *qry, struct address_state *addr_state,
@@ -627,16 +653,10 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		/* Connection and handshake failures have properties similar
 		 * to UDP timeouts, so we handle them (almost) the same way. */
 		/* fall-through */
-	case KR_SELECTION_DATA_TIMEOUT:
 	case KR_SELECTION_TLS_HANDSHAKE_FAILED:
 	case KR_SELECTION_QUERY_TIMEOUT:
 		qry->server_selection.local_state->timeouts++;
-		/* Make sure that the query was chosen by this query and timeout wasn't capped
-		 * (see kr_transport::timeout_capped for details). */
-		if (!transport->deduplicated && !transport->timeout_capped) {
-			cache_timeout(qry, transport, addr_state,
-				      &qry->request->ctx->cache);
-		}
+		server_timeout(qry, transport, addr_state, &qry->request->ctx->cache);
 		break;
 	case KR_SELECTION_FORMERR:
 		if (qry->flags.NO_EDNS) {

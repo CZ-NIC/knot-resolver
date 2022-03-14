@@ -8,6 +8,11 @@
 #define VERBOSE_MSG(qry, ...) kr_log_q((qry), SELECTION, __VA_ARGS__)
 
 #define FORWARDING_TIMEOUT 2000
+/* TODO: well, this is a bit hard; maybe we'd better have a different approach
+ * for estimating DEAD-ness for forwarding.
+ * Even ACKs on connections might be useful here. */
+static_assert(FORWARDING_TIMEOUT >= KR_NS_TIMEOUT_MIN_DEAD_TIMEOUT,
+		"Bad combination of NS selection limits.");
 
 struct forward_local_state {
 	kr_sockaddr_array_t *targets;

@@ -12,8 +12,11 @@
 
 #include "lib/cache/api.h"
 
-/* After KR_NS_TIMEOUT_ROW_DEAD consecutive timeouts, we consider the upstream IP dead for KR_NS_TIMEOUT_RETRY_INTERVAL ms */
+/* After KR_NS_TIMEOUT_ROW_DEAD consecutive timeouts
+ * where at least one was over KR_NS_TIMEOUT_MIN_DEAD_TIMEOUT ms,
+ * we consider the upstream IP dead for KR_NS_TIMEOUT_RETRY_INTERVAL ms */
 #define KR_NS_TIMEOUT_ROW_DEAD 4
+#define KR_NS_TIMEOUT_MIN_DEAD_TIMEOUT 800 /* == DEFAULT_TIMEOUT * 2 */
 #define KR_NS_TIMEOUT_RETRY_INTERVAL 1000
 
 /**
@@ -25,7 +28,6 @@ enum kr_selection_error {
 
 	// Network errors
 	KR_SELECTION_QUERY_TIMEOUT,
-	KR_SELECTION_DATA_TIMEOUT,
 	KR_SELECTION_TLS_HANDSHAKE_FAILED,
 	KR_SELECTION_TCP_CONNECT_FAILED,
 	KR_SELECTION_TCP_CONNECT_TIMEOUT,
@@ -70,7 +72,7 @@ struct kr_transport {
 	union kr_sockaddr address;
 	size_t address_len;
 	enum kr_transport_protocol protocol;
-	unsigned timeout; /**< Timeout in ms; needed for: UDP, TCP, TLS. */
+	unsigned timeout; /**< Timeout in ms to be set for UDP transmission. */
 	/** Timeout was capped to a maximum value based on the other candidates
 	 * when choosing this transport. The timeout therefore can be much lower
 	 * than what we expect it to be. We basically probe the server for a sudden
@@ -211,8 +213,8 @@ struct to_resolve {
  * @param[out] choice_index Optionally index of the chosen transport in the @p choices array.
  * @return Chosen transport (on mempool) or NULL when no choice is viable
  */
-struct kr_transport *select_transport(struct choice choices[], int choices_len,
-				      struct to_resolve unresolved[],
+struct kr_transport *select_transport(const struct choice choices[], int choices_len,
+				      const struct to_resolve unresolved[],
 				      int unresolved_len, int timeouts,
 				      struct knot_mm *mempool, bool tcp,
 				      size_t *choice_index);
