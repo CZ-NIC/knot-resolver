@@ -122,3 +122,8 @@ def _cancel_all_tasks(loop: AbstractEventLoop) -> None:
 def add_async_signal_handler(signal: int, callback: Callable[[], Coroutine[Any, Any, None]]) -> None:
     loop = asyncio.get_event_loop()
     loop.add_signal_handler(signal, lambda: create_task(callback()))
+
+
+def remove_signal_handler(signal: int) -> bool:
+    loop = asyncio.get_event_loop()
+    return loop.remove_signal_handler(signal)

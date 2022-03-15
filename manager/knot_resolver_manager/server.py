@@ -4,10 +4,11 @@ import errno
 import logging
 import os
 import signal
+import sys
 from http import HTTPStatus
 from pathlib import Path
 from time import time
-from typing import Any, Optional, Union
+from typing import Any, Optional, Set, Union
 
 from aiohttp import web
 from aiohttp.web import middleware
@@ -89,6 +90,10 @@ class Server:
         logger.info("Received SIGINT, triggering graceful shutdown")
         self.trigger_shutdown(0)
 
+    async def sigterm_handler(self) -> None:
+        logger.info("Received SIGTERM, triggering graceful shutdown")
+        self.trigger_shutdown(0)
+
     async def sighup_handler(self) -> None:
         logger.info("Received SIGHUP, reloading configuration file")
         if self._config_path is None:
@@ -112,10 +117,22 @@ class Server:
                 logger.error(f"Reloading of the configuration file failed: {e}")
                 logger.error("Configuration have NOT been changed.")
 
-    async def start(self) -> None:
-        self._setup_routes()
+    @staticmethod
+    def all_handled_signals() -> Set[signal.Signals]:
+        return {signal.SIGHUP, signal.SIGINT, signal.SIGTERM}
+
+    def bind_signal_handlers(self):
+        asyncio_compat.add_async_signal_handler(signal.SIGTERM, self.sigterm_handler)
         asyncio_compat.add_async_signal_handler(signal.SIGINT, self.sigint_handler)
         asyncio_compat.add_async_signal_handler(signal.SIGHUP, self.sighup_handler)
+
+    def unbind_signal_handlers(self):
+        asyncio_compat.remove_signal_handler(signal.SIGTERM)
+        asyncio_compat.remove_signal_handler(signal.SIGINT)
+        asyncio_compat.remove_signal_handler(signal.SIGHUP)
+
+    async def start(self) -> None:
+        self._setup_routes()
         await self.runner.setup()
         await self.config_store.register_verifier(self._deny_management_changes)
         await self.config_store.register_on_change_callback(self._reconfigure)
@@ -363,12 +380,24 @@ def _lock_working_directory(attempt: int = 0) -> None:
     atexit.register(lambda: os.unlink(PID_FILE_NAME))
 
 
+async def _sigint_while_shutting_down():
+    logger.warning(
+        "Received SIGINT while already shutting down. Ignoring."
+        " If you want to forcefully stop the manager right now, use SIGTERM."
+    )
+
+
+async def _sigterm_while_shutting_down():
+    logger.warning("Received SIGTERM. Invoking dirty shutdown!")
+    sys.exit(128 + signal.SIGTERM)
+
+
 async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_FILE) -> int:
     start_time = time()
     manager: Optional[KresManager] = None
 
     # Block signals during initialization to force their processing once everything is ready
-    signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT, signal.SIGHUP})
+    signal.pthread_sigmask(signal.SIG_BLOCK, Server.all_handled_signals())
 
     # before starting server, initialize the subprocess controller, config store, etc. Any errors during inicialization
     # are fatal
@@ -432,15 +461,25 @@ async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_
             return 1
         raise
 
-    logger.info(f"Manager fully initialized and running in {round(time() - start_time, 3)} seconds")
+    # At this point, pretty much everything is ready to go. We should just make sure the user can shut
+    # the manager down with signals.
+    server.bind_signal_handlers()
+    signal.pthread_sigmask(signal.SIG_UNBLOCK, Server.all_handled_signals())
 
-    # Now we are ready to process all signals
-    signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGINT, signal.SIGHUP})
+    logger.info(f"Manager fully initialized and running in {round(time() - start_time, 3)} seconds")
 
     await server.wait_for_shutdown()
 
-    # block signals during shutdown
-    signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT, signal.SIGHUP})
+    # Ok, now we are tearing everything down.
+
+    # First of all, let's block all unwanted interruptions. We don't want to be reconfiguring kresd's while
+    # shutting down.
+    signal.pthread_sigmask(signal.SIG_BLOCK, Server.all_handled_signals())
+    server.unbind_signal_handlers()
+    # on the other hand, we want to immediatelly stop when the user really wants us to stop
+    asyncio_compat.add_async_signal_handler(signal.SIGTERM, _sigterm_while_shutting_down)
+    asyncio_compat.add_async_signal_handler(signal.SIGINT, _sigint_while_shutting_down)
+    signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGTERM, signal.SIGINT})
 
     # After triggering shutdown, we neet to clean everything up
     logger.info("Stopping API service...")
