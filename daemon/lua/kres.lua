@@ -688,6 +688,12 @@ ffi.metatype( knot_pkt_t, {
 			if ret ~= 0 then return nil, knot_error_t(ret) end
 			return true
 		end,
+		-- Checks whether the packet has a wire, i.e. the .size is not
+		-- equal to KR_PKT_SIZE_NOWIRE
+		has_wire = function (pkt)
+			assert(ffi.istype(knot_pkt_t, pkt))
+			return C.kr_pkt_has_wire(pkt)
+		end,
 		recycle = function (pkt)
 			assert(ffi.istype(knot_pkt_t, pkt))
 			local ret = C.kr_pkt_recycle(pkt)

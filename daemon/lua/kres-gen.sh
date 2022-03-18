@@ -226,6 +226,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_pkt_put
 	kr_pkt_recycle
 	kr_pkt_clear_payload
+	kr_pkt_has_wire
 	kr_pkt_has_dnssec
 	kr_pkt_qclass
 	kr_pkt_qtype

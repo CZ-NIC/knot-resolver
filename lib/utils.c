@@ -1174,7 +1174,11 @@ void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 	if (kr_fails_assert(rrset)) return;
 	knot_rrset_init(rrset, owner, type, rclass, ttl);
 }
-uint16_t kr_pkt_has_dnssec(const knot_pkt_t *pkt)
+bool kr_pkt_has_wire(const knot_pkt_t *pkt)
+{
+	return pkt->size != KR_PKT_SIZE_NOWIRE;
+}
+bool kr_pkt_has_dnssec(const knot_pkt_t *pkt)
 {
 	return knot_pkt_has_dnssec(pkt);
 }

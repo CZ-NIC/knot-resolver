@@ -29,6 +29,10 @@
 #include "lib/log.h"
 
 
+/** When knot_pkt is passed from cache without ->wire, this is the ->size. */
+static const size_t KR_PKT_SIZE_NOWIRE = -1;
+
+
 /*
  * Logging and debugging.
  */
@@ -543,7 +547,8 @@ const char *kr_strptime_diff(const char *format, const char *time1_str,
 /* Trivial non-inline wrappers, to be used in lua. */
 KR_EXPORT void kr_rrset_init(knot_rrset_t *rrset, knot_dname_t *owner,
 				uint16_t type, uint16_t rclass, uint32_t ttl);
-KR_EXPORT uint16_t kr_pkt_has_dnssec(const knot_pkt_t *pkt);
+KR_EXPORT bool kr_pkt_has_wire(const knot_pkt_t *pkt);
+KR_EXPORT bool kr_pkt_has_dnssec(const knot_pkt_t *pkt);
 KR_EXPORT uint16_t kr_pkt_qclass(const knot_pkt_t *pkt);
 KR_EXPORT uint16_t kr_pkt_qtype(const knot_pkt_t *pkt);
 KR_EXPORT uint32_t kr_rrsig_sig_inception(const knot_rdata_t *rdata);
