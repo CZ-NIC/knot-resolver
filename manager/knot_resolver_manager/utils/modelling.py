@@ -78,7 +78,7 @@ def _split_docstring(docstring: str) -> Tuple[str, Optional[str]]:
     """
 
     if "---" not in docstring:
-        return (docstring, None)
+        return ("\n".join([s.strip() for s in docstring.splitlines()]).strip(), None)
 
     doc, attrs_doc = docstring.split("---", maxsplit=1)
     return (
