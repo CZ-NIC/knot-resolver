@@ -71,7 +71,7 @@ def test_parsing_units():
 
     o = TestSchema({"size": "3K", "time": "10m"})
     assert o.size == SizeUnit("3072B")
-    assert o.time == TimeUnit("10m")
+    assert o.time == TimeUnit("600s")
     assert o.size.bytes() == 3072
     assert o.time.seconds() == 10 * 60
 
@@ -83,20 +83,17 @@ def test_checked_path():
     assert str(TestSchema({"p": "/tmp"}).p) == "/tmp"
 
 
-def test_domain_name():
-    class TestSchema(SchemaNode):
-        name: DomainName
+@pytest.mark.parametrize("val", ["example.com.", "test.example.com", "test-example.com"])
+def test_domain_name_valid(val: str):
+    o = DomainName(val)
+    assert str(o) == val
+    assert o == DomainName(val)
 
-    o = TestSchema({"name": "test.domain.com."})
-    assert str(o.name) == "test.domain.com."
-    assert o.name == DomainName("test.domain.com.")
 
-    o = TestSchema({"name": "test.domain.com"})
-    assert str(o.name) == "test.domain.com"
-    assert o.name == DomainName("test.domain.com")
-
+@pytest.mark.parametrize("val", ["test.example.com..", "-example.com", "test-.example.net"])
+def test_domain_name_invalid(val: str):
     with raises(KresManagerException):
-        TestSchema({"name": "b@d.domain.com."})
+        DomainName(val)
 
 
 @pytest.mark.parametrize("val", ["lo", "eth0", "wlo1", "web_ifgrp", "e8-2"])
@@ -185,12 +182,7 @@ def test_ipv4_address_invalid(val: Any):
         IPv4Address(val)
 
 
-@pytest.mark.parametrize(
-    "val",
-    [
-        "2001:db8::1000",
-    ],
-)
+@pytest.mark.parametrize("val", ["2001:db8::1000", "2001:db8:85a3::8a2e:370:7334"])
 def test_ipv6_address_valid(val: str):
     o = IPv6Address(val)
     assert str(o) == val
@@ -214,7 +206,6 @@ def test_ip_network_valid(val: str):
 @pytest.mark.parametrize("val", ["10.11.12.13/8", "10.11.12.5/128"])
 def test_ip_network_invalid(val: str):
     with raises(KresManagerException):
-        # because only the prefix can have non-zero bits
         IPNetwork(val)
 
 

@@ -56,11 +56,14 @@ class TimeUnit(UnitBase):
 
 
 class DomainName(PatternBase):
+    _spec_chars = "ßàÁâãóôþüúðæåïçèõöÿýòäœêëìíøùîûñé"
     _re = re.compile(
-        r"^(([a-zA-Z]{1})|([a-zA-Z]{1}[a-zA-Z]{1})|"
-        r"([a-zA-Z]{1}[0-9]{1})|([0-9]{1}[a-zA-Z]{1})|"
-        r"([a-zA-Z0-9][-_.a-zA-Z0-9]{0,61}[a-zA-Z0-9]))\."
-        r"([a-zA-Z]{2,13}|[a-zA-Z0-9-]{2,30}.[a-zA-Z]{2,3})($|.$)"
+        # max 253 chars
+        r"(?=^.{,253}$)"
+        # do not start/end with dash; 1-63 chars in name; allow special chars; max 126 levels+TLD
+        rf"^((?!-)([{_spec_chars}]|[a-zA-Z0-9-]){{1,62}}[a-zA-Z0-9]\.){{0,126}}"
+        # TLD
+        r"[a-zA-Z]{2,6}($|.$)"
     )
 
 
