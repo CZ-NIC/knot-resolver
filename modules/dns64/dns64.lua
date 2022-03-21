@@ -177,7 +177,7 @@ function M.layer.produce(_, req, pkt)
 		then return end
 	-- Update packet question if it was minimized.
 	qry.flags.NO_MINIMIZE = true
-	if not ffi.C.knot_dname_is_equal(pkt.wire + 12, sname) then
+	if not ffi.C.knot_dname_is_equal(pkt.wire + 12, sname) or not pkt:has_wire() then
 		if not pkt:recycle() or not pkt:question(sname, qry.sclass, qry.stype)
 			then return end
 	end

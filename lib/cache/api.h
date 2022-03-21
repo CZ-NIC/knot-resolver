@@ -11,10 +11,6 @@
 #include "lib/defines.h"
 #include "contrib/ucw/config.h" /*uint*/
 
-/** When knot_pkt is passed from cache without ->wire, this is the ->size. */
-static const size_t PKT_SIZE_NOWIRE = -1;
-
-
 #include "lib/module.h"
 /* Prototypes for the 'cache' module implementation. */
 int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt);

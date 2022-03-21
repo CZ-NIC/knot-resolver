@@ -20,7 +20,7 @@ int pkt_renew(knot_pkt_t *pkt, const knot_dname_t *name, uint16_t type)
 		if (ret) return kr_error(ret);
 	}
 
-	pkt->parsed = pkt->size = PKT_SIZE_NOWIRE;
+	pkt->parsed = pkt->size = KR_PKT_SIZE_NOWIRE;
 	knot_wire_set_qr(pkt->wire);
 	knot_wire_set_aa(pkt->wire);
 	return kr_ok();
