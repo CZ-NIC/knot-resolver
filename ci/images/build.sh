@@ -10,4 +10,4 @@ if [ -n "$COVERITY_SCAN_TOKEN" ]; then
 fi
 
 export DOCKER_BUILDKIT=1 # Enables using secrets in docker-build
-docker build --no-cache -t "${FULL_NAME}" "${IMAGE}" --build-arg KNOT_BRANCH=${KNOT_BRANCH} $SECRETS
+docker build --pull --no-cache -t "${FULL_NAME}" "${IMAGE}" --build-arg KNOT_BRANCH=${KNOT_BRANCH} $SECRETS
