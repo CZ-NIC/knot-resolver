@@ -102,6 +102,23 @@ build-asan:
       # TODO skip_asan: all three of these disappear locally when using gcc 9.1 (except some leaks)
     - MESON_TESTTHREADS=1 ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite skip_asan --no-suite snowflake
 
+
+build-asan-arm64:
+  <<: *build
+  tags:
+    - docker
+    - linux
+    - arm64
+  #FIXME: deduplicate, etc.
+  script:
+      # "undefined" sanitizer causes C++ issues when loading ahocorasick.so in CI
+    - CC=clang CXX=clang++ CFLAGS=-fno-sanitize-recover=all CXXFLAGS=-fno-sanitize=undefined meson build_ci_asan_arm64 --default-library=static --prefix=$PREFIX -Db_sanitize=address,undefined -Dextra_tests=enabled
+    - ninja -C build_ci_asan_arm64
+    - ninja -C build_ci_asan_arm64 install >/dev/null
+      # TODO _leaks: not sure what exactly is wrong in leak detection on config tests
+      # TODO skip_asan: all three of these disappear locally when using gcc 9.1 (except some leaks)
+    - MESON_TESTTHREADS=1 ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite skip_asan --no-suite snowflake
+
 build:macOS:
   <<: *nodep
   except:
