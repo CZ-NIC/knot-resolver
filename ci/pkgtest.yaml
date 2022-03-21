@@ -168,7 +168,7 @@ nixos-unstable:pkgbuild-arm64:
     - linux
     - arm64
   # TODO: untag after resolving problems around https://github.com/NixOS/nix/issues/5776
-  image: nixos/nix:2.3.12
+  image: nixos/nix
 
   variables:
     #NIX_PATH: nixpkgs=https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz
