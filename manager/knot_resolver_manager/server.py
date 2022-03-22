@@ -19,7 +19,7 @@ from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 from knot_resolver_manager import log, statistics
 from knot_resolver_manager.compat import asyncio as asyncio_compat
 from knot_resolver_manager.config_store import ConfigStore
-from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, PID_FILE_NAME, init_user_constants
+from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, PID_FILE_NAME
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.datamodel.server_schema import ManagementSchema
 from knot_resolver_manager.exceptions import DataException, KresManagerException, SchemaException
@@ -305,7 +305,6 @@ async def _load_config(config: ParsedTree) -> KresConfig:
 async def _init_config_store(config: ParsedTree) -> ConfigStore:
     config_validated = await _load_config(config)
     config_store = ConfigStore(config_validated)
-    await init_user_constants(config_store)
     return config_store
 
 
@@ -355,6 +354,9 @@ def _lock_working_directory(attempt: int = 0) -> None:
                 os.kill(pid, 0)
             except OSError as e:
                 if e.errno == errno.ESRCH:
+                    logger.warning(
+                        "Detected old lock file in the working directory, previous instance of the manager must have crashed."
+                    )
                     os.unlink(PID_FILE_NAME)
                     _lock_working_directory(attempt=attempt + 1)
                     return

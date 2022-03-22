@@ -101,7 +101,6 @@ class ServerSchema(SchemaNode):
 
         ---
         hostname: Internal DNS resolver hostname. Default is machine hostname.
-        groupid: Additional identifier in case more DNS resolvers are running on single machine.
         nsid: Name Server Identifier (RFC 5001) which allows DNS clients to request resolver to send back its NSID along with the reply to a DNS request.
         workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
         use_cache_gc: Use (start) kres-cache-gc (cache garbage collector) automatically.
@@ -113,7 +112,6 @@ class ServerSchema(SchemaNode):
         """
 
         hostname: Optional[str] = None
-        groupid: str = "m"
         nsid: Optional[str] = None
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         use_cache_gc: bool = True
@@ -126,7 +124,6 @@ class ServerSchema(SchemaNode):
     _PREVIOUS_SCHEMA = Raw
 
     hostname: str
-    groupid: str
     nsid: Optional[str]
     workers: IntPositive
     use_cache_gc: bool
