@@ -32,6 +32,7 @@ stages:
     refs:
       - master@knot/knot-resolver
       - manager@knot/knot-resolver
+      - /^manager.*$/
       - master@knot/security/knot-resolver
       - tags
     variables:
@@ -82,6 +83,7 @@ archive:
   <<: *build
   except:
       - manager@knot/knot-resolver
+      - /^manager.*$/
   script:
     - apkg make-archive
 
@@ -109,6 +111,7 @@ build:macOS:
   except:
     refs:
       - manager@knot/knot-resolver
+      - /^manager.*$/
       - branches@knot/security/knot-resolver
   stage: build
   when: delayed
@@ -137,6 +140,7 @@ sonarcloud:
   stage: build
   except:
       - manager@knot/knot-resolver
+      - /^manager.*$/
   only:
     - tags
     - master@knot/knot-resolver
@@ -341,6 +345,7 @@ pkgtest:
     refs:
       - master@knot/knot-resolver
       - manager@knot/knot-resolver
+      - /^manager.*$/
       - master@knot/security/knot-resolver
       - tags
     variables:
