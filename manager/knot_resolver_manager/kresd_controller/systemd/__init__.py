@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import re
@@ -5,8 +6,8 @@ from typing import Dict, Iterable, List, Optional, Union
 
 from knot_resolver_manager import compat
 from knot_resolver_manager.compat.asyncio import to_thread
-from knot_resolver_manager.constants import user_constants
 from knot_resolver_manager.datamodel.config_schema import KresConfig
+from knot_resolver_manager.exceptions import SubprocessControllerException
 from knot_resolver_manager.kresd_controller.interface import (
     KresID,
     Subprocess,
@@ -17,10 +18,14 @@ from knot_resolver_manager.kresd_controller.interface import (
 from knot_resolver_manager.kresd_controller.systemd.dbus_api import (
     SystemdType,
     Unit,
+    is_unit_failed,
+    list_our_slice_processes,
     list_units,
     reset_failed_unit,
     restart_unit,
+    start_slice,
     start_transient_kresd_unit,
+    stop_slice,
     stop_unit,
 )
 from knot_resolver_manager.utils import phantom_use
@@ -34,21 +39,17 @@ KRESD_SERVICE_BASE_PATTERN = re.compile(r"^kresd_([0-9]+).service$")
 
 
 def _is_service_name_ours(name: str) -> bool:
-    pref_len = len(user_constants().SERVICE_GROUP_ID)
-    is_ours = name == user_constants().SERVICE_GROUP_ID + GC_SERVICE_BASE_NAME
-    is_ours |= name.startswith(user_constants().SERVICE_GROUP_ID) and bool(
-        KRESD_SERVICE_BASE_PATTERN.match(name[pref_len:])
-    )
+    is_ours = name == GC_SERVICE_BASE_NAME
+    is_ours |= bool(KRESD_SERVICE_BASE_PATTERN.match(name))
     return is_ours
 
 
 class SystemdKresID(KresID):
     @staticmethod
     def from_string(val: str) -> "SystemdKresID":
-        if val == user_constants().SERVICE_GROUP_ID + GC_SERVICE_BASE_NAME:
+        if val == GC_SERVICE_BASE_NAME:
             return SystemdKresID.new(SubprocessType.GC, -1)
         else:
-            val = val[len(user_constants().SERVICE_GROUP_ID) :]
             kid = KRESD_SERVICE_BASE_PATTERN.search(val)
             if kid:
                 return SystemdKresID.new(SubprocessType.KRESD, int(kid.groups()[0]))
@@ -57,9 +58,9 @@ class SystemdKresID(KresID):
 
     def __str__(self) -> str:
         if self.subprocess_type is SubprocessType.GC:
-            return user_constants().SERVICE_GROUP_ID + GC_SERVICE_BASE_NAME
+            return GC_SERVICE_BASE_NAME
         elif self.subprocess_type is SubprocessType.KRESD:
-            return f"{user_constants().SERVICE_GROUP_ID}kresd_{self._id}.service"
+            return f"kresd_{self._id}.service"
         else:
             raise RuntimeError(f"Unexpected subprocess type {self.subprocess_type}")
 
@@ -129,31 +130,41 @@ class SystemdSubprocessController(SubprocessController):
     async def get_all_running_instances(self) -> Iterable[Subprocess]:
         assert self._controller_config is not None
 
-        res: List[SystemdSubprocess] = []
-        units = await compat.asyncio.to_thread(list_units, self._systemd_type)
-        for unit in units:
-            if _is_service_name_ours(unit.name):
-                if unit.state == "failed":
+        units = await compat.asyncio.to_thread(list_our_slice_processes, self._controller_config, self._systemd_type)
+
+        async def load(name: str) -> Optional[SystemdSubprocess]:
+            assert self._controller_config is not None
+
+            if _is_service_name_ours(name):
+                failed = await to_thread(is_unit_failed, self._systemd_type, name)
+                if failed:
                     # if a unit is failed, remove it from the system by reseting its state
-                    logger.warning("Unit '%s' is already failed, resetting its state and ignoring it", unit.name)
-                    await compat.asyncio.to_thread(reset_failed_unit, self._systemd_type, unit.name)
-                    continue
+                    logger.warning("Unit '%s' is already failed, resetting its state and ignoring it", name)
+                    await compat.asyncio.to_thread(reset_failed_unit, self._systemd_type, name)
+                    return None
 
-                res.append(
-                    SystemdSubprocess(
-                        self._controller_config,
-                        self._systemd_type,
-                        SystemdKresID.from_string(unit.name),
-                    )
+                return SystemdSubprocess(
+                    self._controller_config,
+                    self._systemd_type,
+                    SystemdKresID.from_string(name),
                 )
+            else:
+                return None
 
-        return res
+        subprocesses = await asyncio.gather(*[load(name) for name in units])
+        return filter(lambda x: x is not None, subprocesses)  # type: ignore
 
     async def initialize_controller(self, config: KresConfig) -> None:
         self._controller_config = config
+        try:
+            await to_thread(start_slice, self._controller_config, self._systemd_type)
+        except SubprocessControllerException as e:
+            logger.warning(
+                f"Failed to create systemd slice for our subprocesses: '{e}'. There is/was a manager running with the same ID."
+            )
 
     async def shutdown_controller(self) -> None:
-        pass
+        await to_thread(stop_slice, self._controller_config, self._systemd_type)
 
     async def create_subprocess(self, subprocess_config: KresConfig, subprocess_type: SubprocessType) -> Subprocess:
         assert self._controller_config is not None

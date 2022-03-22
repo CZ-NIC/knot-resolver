@@ -1,3 +1,4 @@
+id: dev
 cache:
   storage: ../cache
 logging:

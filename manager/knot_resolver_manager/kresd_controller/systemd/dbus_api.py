@@ -5,7 +5,7 @@ import logging
 import os
 from enum import Enum, auto
 from threading import Thread
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypeVar
 
 from gi.repository import GLib  # type: ignore[import]
 from pydbus import SystemBus  # type: ignore[import]
@@ -161,6 +161,16 @@ def reset_failed_unit(typ: SystemdType, unit_name: str) -> None:
 
 
 @_wrap_dbus_errors
+def _list_slice_services(typ: SystemdType, slice_name: str) -> Set[str]:
+    # uses DBus method call, which is not documented, but is present since 2016 and is used by `systemctl status`
+    # appears for the first time in commit 291d565a04263452c03beaf537773ade4f0b1617 in systemd
+
+    systemd = _create_manager_proxy(typ)
+    data = systemd.GetUnitProcesses(slice_name)
+    return set((p[0].split("/")[-1] for p in data))
+
+
+@_wrap_dbus_errors
 def restart_unit(type_: SystemdType, unit_name: str) -> None:
     systemd = _create_manager_proxy(type_)
 
@@ -168,6 +178,10 @@ def restart_unit(type_: SystemdType, unit_name: str) -> None:
         return systemd.RestartUnit(unit_name, "fail")
 
     _wait_for_job_completion(systemd, job)
+
+
+def _slice_name(config: KresConfig) -> str:
+    return f"kres-{config.id}.slice"
 
 
 def _kresd_unit_properties(config: KresConfig, kres_id: KresID) -> List[Tuple[str, str]]:
@@ -195,6 +209,7 @@ def _kresd_unit_properties(config: KresConfig, kres_id: KresID) -> List[Tuple[st
         ("Restart", GLib.Variant("s", "always")),
         ("LimitNOFILE", GLib.Variant("t", 524288)),
         ("Environment", GLib.Variant("as", [f"SYSTEMD_INSTANCE={kres_id}"])),
+        ("Slice", GLib.Variant("s", _slice_name(config))),
     ]
 
     if config.server.watchdog:
@@ -230,19 +245,21 @@ def _gc_unit_properties(config: KresConfig) -> Any:
         ("RestartUSec", GLib.Variant("t", 30000000)),
         ("StartLimitIntervalUSec", GLib.Variant("t", 400000000)),
         ("StartLimitBurst", GLib.Variant("u", 10)),
+        ("Slice", GLib.Variant("s", _slice_name(config))),
+    ]
+    return val
+
+
+def _kres_slice_properties() -> Any:
+    val: Any = [
+        ("Description", GLib.Variant("s", "Knot Resolver processes")),
     ]
     return val
 
 
 @_wrap_dbus_errors
-def start_transient_kresd_unit(config: KresConfig, type_: SystemdType, kres_id: KresID) -> None:
-    properties = {
-        SubprocessType.KRESD: _kresd_unit_properties(config, kres_id),
-        SubprocessType.GC: _gc_unit_properties(config),
-    }[kres_id.subprocess_type]
-    name = str(kres_id)
-
-    systemd = _create_manager_proxy(type_)
+def _start_transient_unit(systemd_type: SystemdType, name: str, properties: Any) -> None:
+    systemd = _create_manager_proxy(systemd_type)
 
     def job():
         return systemd.StartTransientUnit(name, "fail", properties, [])
@@ -260,6 +277,28 @@ def start_transient_kresd_unit(config: KresConfig, type_: SystemdType, kres_id: 
             logger.error(f"    {k}={v}")
         logger.error(f"More useful details might be found in the service's log by running 'journalctl -u {name}'")
         raise SubprocessControllerException(f"Failed to start systemd transient service '{name}': {e}") from e
+
+
+def start_transient_kresd_unit(config: KresConfig, type_: SystemdType, kres_id: KresID) -> None:
+    properties = {
+        SubprocessType.KRESD: _kresd_unit_properties(config, kres_id),
+        SubprocessType.GC: _gc_unit_properties(config),
+    }[kres_id.subprocess_type]
+    name = str(kres_id)
+
+    _start_transient_unit(type_, name, properties)
+
+
+def start_slice(config: KresConfig, systemd_type: SystemdType) -> None:
+    _start_transient_unit(systemd_type, _slice_name(config), _kres_slice_properties())
+
+
+def stop_slice(config: KresConfig, systemd_type: SystemdType) -> None:
+    stop_unit(systemd_type, _slice_name(config))
+
+
+def list_our_slice_processes(config: KresConfig, systemd_type: SystemdType) -> Set[str]:
+    return _list_slice_services(systemd_type, _slice_name(config))
 
 
 @_wrap_dbus_errors
@@ -287,6 +326,14 @@ def list_unit_files(type_: SystemdType) -> List[str]:
     systemd = _create_manager_proxy(type_)
     files = systemd.ListUnitFiles()
     return [str(x[0]) for x in files]
+
+
+@_wrap_dbus_errors
+def is_unit_failed(typ: SystemdType, unit_name: str) -> bool:
+    systemd = _create_manager_proxy(typ)
+    unit_path = systemd.LoadUnit(unit_name)
+    unit_object = _create_object_proxy(typ, ".systemd1", unit_path)
+    return unit_object.ActiveState == "failed"
 
 
 @_wrap_dbus_errors
