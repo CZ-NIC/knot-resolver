@@ -318,8 +318,13 @@ static void free_wire(const struct request_ctx *ctx)
 	knot_xdp_msg_t out;
 	out.payload.iov_base = ans->wire;
 	out.payload.iov_len = 0;
-	uint32_t sent;
+	uint32_t sent = 0;
+#if KNOT_VERSION_HEX >= 0x030100
+	int ret = 0;
+	knot_xdp_send_free(xhd->socket, &out, 1);
+#else
 	int ret = knot_xdp_send(xhd->socket, &out, 1, &sent);
+#endif
 	kr_assert(ret == KNOT_EOK && sent == 0);
 	kr_log_debug(XDP, "freed unsent buffer, ret = %d\n", ret);
 }
