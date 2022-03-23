@@ -193,7 +193,9 @@ def _validated_tuple(cls: Type[Any], obj: Tuple[Any, ...], object_path: str) -> 
             res.append(_validated_object_type(tp, val, object_path=f"{object_path}[{i}]"))
         except SchemaException as e:
             errs.append(e)
-    if len(errs) > 0:
+    if len(errs) == 1:
+        raise errs[0]
+    elif len(errs) > 1:
         raise AggregateSchemaException(object_path, child_exceptions=errs)
     return tuple(res)
 
@@ -210,7 +212,9 @@ def _validated_dict(cls: Type[Any], obj: Dict[Any, Any], object_path: str) -> Di
                 res[nkey] = nval
             except SchemaException as e:
                 errs.append(e)
-        if len(errs) > 0:
+        if len(errs) == 1:
+            raise errs[0]
+        elif len(errs) > 1:
             raise AggregateSchemaException(object_path, child_exceptions=errs)
         return res
     except AttributeError as e:
@@ -228,7 +232,9 @@ def _validated_list(cls: Type[Any], obj: List[Any], object_path: str) -> List[An
             res.append(_validated_object_type(inner_type, val, object_path=f"{object_path}[{i}]"))
         except SchemaException as e:
             errs.append(e)
-    if len(errs) > 0:
+    if len(errs) == 1:
+        raise errs[0]
+    elif len(errs) > 1:
         raise AggregateSchemaException(object_path, child_exceptions=errs)
     return res
 

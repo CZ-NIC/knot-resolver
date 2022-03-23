@@ -6,6 +6,7 @@ from typing import Dict, Iterable, List, Optional, Union
 
 from knot_resolver_manager import compat
 from knot_resolver_manager.compat.asyncio import to_thread
+from knot_resolver_manager.constants import user_constants
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.exceptions import SubprocessControllerException
 from knot_resolver_manager.kresd_controller.interface import (
@@ -18,8 +19,6 @@ from knot_resolver_manager.kresd_controller.interface import (
 from knot_resolver_manager.kresd_controller.systemd.dbus_api import (
     SystemdType,
     Unit,
-    is_unit_failed,
-    list_our_slice_processes,
     list_units,
     reset_failed_unit,
     restart_unit,
@@ -34,33 +33,35 @@ from knot_resolver_manager.utils.async_utils import call
 logger = logging.getLogger(__name__)
 
 
-GC_SERVICE_BASE_NAME = "kres_cache_gc.service"
-KRESD_SERVICE_BASE_PATTERN = re.compile(r"^kresd_([0-9]+).service$")
+GC_SERVICE_BASE_NAME = "kres-cache-gc-{id}.service"
+KRESD_SERVICE_BASE_NMAE = "kresd-{id}-{num}.service"
+KRESD_SERVICE_BASE_PATTERN = re.compile(r"^kresd-([0-9a-zA-Z]*)-([0-9]+).service$")
 
 
 def _is_service_name_ours(name: str) -> bool:
-    is_ours = name == GC_SERVICE_BASE_NAME
-    is_ours |= bool(KRESD_SERVICE_BASE_PATTERN.match(name))
+    is_ours = name == GC_SERVICE_BASE_NAME.format(id=user_constants().ID)
+    m = KRESD_SERVICE_BASE_PATTERN.match(name)
+    is_ours |= m is not None and m.groups()[0] == user_constants().ID
     return is_ours
 
 
 class SystemdKresID(KresID):
     @staticmethod
     def from_string(val: str) -> "SystemdKresID":
-        if val == GC_SERVICE_BASE_NAME:
+        if val == GC_SERVICE_BASE_NAME.format(id=user_constants().ID):
             return SystemdKresID.new(SubprocessType.GC, -1)
         else:
             kid = KRESD_SERVICE_BASE_PATTERN.search(val)
-            if kid:
-                return SystemdKresID.new(SubprocessType.KRESD, int(kid.groups()[0]))
+            if kid and kid.groups()[0] == user_constants().ID:
+                return SystemdKresID.new(SubprocessType.KRESD, int(kid.groups()[1]))
             else:
                 raise RuntimeError("Trying to parse systemd service name which does not match our expectations")
 
     def __str__(self) -> str:
         if self.subprocess_type is SubprocessType.GC:
-            return GC_SERVICE_BASE_NAME
+            return GC_SERVICE_BASE_NAME.format(id=user_constants().ID)
         elif self.subprocess_type is SubprocessType.KRESD:
-            return f"kresd_{self._id}.service"
+            return KRESD_SERVICE_BASE_NMAE.format(id=user_constants().ID, num=self._id)
         else:
             raise RuntimeError(f"Unexpected subprocess type {self.subprocess_type}")
 
@@ -130,23 +131,35 @@ class SystemdSubprocessController(SubprocessController):
     async def get_all_running_instances(self) -> Iterable[Subprocess]:
         assert self._controller_config is not None
 
-        units = await compat.asyncio.to_thread(list_our_slice_processes, self._controller_config, self._systemd_type)
+        # There are two possibilities (that I knew about when writing this) how to implement this function. We could
+        #
+        # 1. list all units in the system/session
+        # 2. list processes within our slice
+        #
+        # With the list of all units, we would get information about unit states with one DBus method call. However,
+        # there are usually lot of units and the message being passed through DBus is quite big.
+        #
+        # Other option is to query processes within our slice. We can extract service names from the result of the call,
+        # we won't however know whether the units are failed. Actually, we won't know about failed units. This is in
+        # general cheaper as there won't be any processes in the slice. However, missing any failed units would lead to
+        # problems later on - we have to reset state of those. Therefore, we have to query all units and use the first
+        # method.
+        units = await compat.asyncio.to_thread(list_units, self._systemd_type)
 
-        async def load(name: str) -> Optional[SystemdSubprocess]:
+        async def load(unit: Unit) -> Optional[SystemdSubprocess]:
             assert self._controller_config is not None
 
-            if _is_service_name_ours(name):
-                failed = await to_thread(is_unit_failed, self._systemd_type, name)
-                if failed:
+            if _is_service_name_ours(unit.name):
+                if unit.state == "failed":
                     # if a unit is failed, remove it from the system by reseting its state
-                    logger.warning("Unit '%s' is already failed, resetting its state and ignoring it", name)
-                    await compat.asyncio.to_thread(reset_failed_unit, self._systemd_type, name)
+                    logger.warning("Unit '%s' is already failed, resetting its state and ignoring it", unit.name)
+                    await compat.asyncio.to_thread(reset_failed_unit, self._systemd_type, unit.name)
                     return None
 
                 return SystemdSubprocess(
                     self._controller_config,
                     self._systemd_type,
-                    SystemdKresID.from_string(name),
+                    SystemdKresID.from_string(unit.name),
                 )
             else:
                 return None
