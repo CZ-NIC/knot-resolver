@@ -1,9 +1,11 @@
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
+from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.utils import which
+from knot_resolver_manager.utils.functional import Result
 
 if TYPE_CHECKING:
     from knot_resolver_manager.kresd_controller.interface import KresID
@@ -59,3 +61,40 @@ WATCHDOG_INTERVAL: float = 5
 """
 Used in KresdManager. It's a number of seconds in between system health checks.
 """
+
+
+class _UserConstants:
+    """
+    Class for accessing constants, which are technically not constants as they are user configurable.
+    """
+
+    def __init__(self, config_store: ConfigStore) -> None:
+        self._config_store = config_store
+
+    @property
+    def ID(self) -> str:
+        return self._config_store.get().id
+
+
+_user_constants: Optional[_UserConstants] = None
+
+
+async def _deny_id_changes(config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
+    if config_old.id != config_new.id:
+        return Result.err(
+            "/id: Based on the groupid, the manager recognizes subprocesses,"
+            " so it is not possible to change it while services are running."
+        )
+    return Result.ok(None)
+
+
+async def init_user_constants(config_store: ConfigStore) -> None:
+    global _user_constants
+    _user_constants = _UserConstants(config_store)
+
+    await config_store.register_verifier(_deny_id_changes)
+
+
+def user_constants() -> _UserConstants:
+    assert _user_constants is not None
+    return _user_constants

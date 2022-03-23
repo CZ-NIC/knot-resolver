@@ -10,26 +10,26 @@ from knot_resolver_manager.utils.modelling import SchemaNode
 
 
 def test_dns64_true():
-    config = KresConfig({"dns64": True})
+    config = KresConfig({"id": "test", "dns64": True})
 
     assert config.dns64
     assert config.dns64.prefix == IPv6Network96("64:ff9b::/96")
 
 
 def test_dns64_default_false():
-    config = KresConfig()
+    config = KresConfig.test_instance()
 
     assert config.dns64 == False
 
 
 def test_dnssec_false():
-    config = KresConfig({"dnssec": False})
+    config = KresConfig({"id": "test", "dnssec": False})
 
     assert config.dnssec == False
 
 
 def test_dnssec_default_true():
-    config = KresConfig()
+    config = KresConfig.test_instance()
 
     assert config.dnssec.trust_anchor_sentinel == True
     assert config.dnssec.trust_anchor_signal_query == True
