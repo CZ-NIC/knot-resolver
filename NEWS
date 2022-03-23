@@ -4,6 +4,7 @@ Knot Resolver 5.5.1 (2022-mm-dd)
 Bugfixes
 --------
 - modules/dns64: fix incorrect packet writes for cached packets (#727, !1275)
+- xdp: make it work also with libknot 3.1 (#735, !1276)
 
 
 Knot Resolver 5.5.0 (2022-03-15)
