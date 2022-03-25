@@ -8,6 +8,7 @@
  */
 
 #include <errno.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,15 +19,25 @@
 #include "daemon/session.h"
 #include "lib/layer/iterate.h" /* kr_response_classify */
 #include "lib/cache/util.h"
+#include "lib/generic/array.h"
 
 #include "contrib/cleanup.h"
 #include "contrib/base64url.h"
 
+/** Makes a `nghttp2_nv`. `K` is the key, `KS` is the key length,
+ * `V` is the value, `VS` is the value length. */
 #define MAKE_NV(K, KS, V, VS) \
-	{ (uint8_t *)(K), (uint8_t *)(V), (KS), (VS), NGHTTP2_NV_FLAG_NONE }
+	(nghttp2_nv) { (uint8_t *)(K), (uint8_t *)(V), (KS), (VS), NGHTTP2_NV_FLAG_NONE }
 
+/** Makes a `nghttp2_nv` with static data. `K` is the key,
+ * `V` is the value. Both `K` and `V` MUST be string literals. */
 #define MAKE_STATIC_NV(K, V) \
 	MAKE_NV((K), sizeof(K) - 1, (V), sizeof(V) - 1)
+
+/** Makes a `nghttp2_nv` with a static key. `K` is the key,
+ * `V` is the value, `VS` is the value length. `K` MUST be a string literal. */
+#define MAKE_STATIC_KEY_NV(K, V, VS) \
+	MAKE_NV((K), sizeof(K) - 1, (V), (VS))
 
 /* Use same maximum as for tcp_pipeline_max. */
 #define HTTP_MAX_CONCURRENT_STREAMS UINT16_MAX
@@ -38,6 +49,18 @@
 
 #define MAX_DECIMAL_LENGTH(VT) ((CHAR_BIT * sizeof(VT) / 3) + 3)
 
+/** HTTP status codes returned by kresd.
+ * This is obviously non-exhaustive of all HTTP status codes, feel free to add
+ * more if needed. */
+enum http_status {
+	HTTP_STATUS_OK                              = 200,
+	HTTP_STATUS_BAD_REQUEST                     = 400,
+	HTTP_STATUS_NOT_FOUND                       = 404,
+	HTTP_STATUS_PAYLOAD_TOO_LARGE               = 413,
+	HTTP_STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE = 431,
+	HTTP_STATUS_NOT_IMPLEMENTED                 = 501,
+};
+
 struct http_data {
 	uint8_t *buf;
 	size_t len;
@@ -46,6 +69,11 @@ struct http_data {
 	uv_write_cb on_write;
 	uv_write_t *req;
 };
+
+typedef array_t(nghttp2_nv) nghttp2_array_t;
+
+static int http_send_response(struct http_ctx *ctx, int32_t stream_id,
+			      nghttp2_data_provider *prov, enum http_status status);
 
 /*
  * Write HTTP/2 protocol data to underlying transport layer.
@@ -174,7 +202,7 @@ static int check_uri(const char* uri_path)
 	}
 
 	if (ret) /* no endpoint found */
-		return -1;
+		return kr_error(ENOENT);
 
 	/* FIXME This also passes for GET when no variables are provided.
 	 * Fixing it doesn't seem straightforward, since :method may not be
@@ -340,8 +368,8 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 				kr_log_debug(DOH,
 					"[%p] stream %d: header too large (%zu B), refused\n",
 					(void *)h2, stream_id, valuelen);
-				refuse_stream(h2, stream_id);
-				return 0;
+				return http_send_response(ctx, stream_id, NULL,
+						HTTP_STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE);
 			}
 
 			/* Copy the user-provided header name to keep the original case. */
@@ -359,9 +387,11 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 	}
 
 	if (!strcasecmp(":path", (const char *)name)) {
-		if (check_uri((const char *)value) < 0) {
-			refuse_stream(h2, stream_id);
-			return 0;
+		int uri_result = check_uri((const char *)value);
+		if (uri_result == kr_error(ENOENT)) {
+			return http_send_response(ctx, stream_id, NULL, HTTP_STATUS_NOT_FOUND);
+		} else if (uri_result < 0) {
+			return http_send_response(ctx, stream_id, NULL, HTTP_STATUS_BAD_REQUEST);
 		}
 
 		kr_assert(ctx->uri_path == NULL);
@@ -377,8 +407,11 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 			ctx->current_method = HTTP_METHOD_GET;
 		} else if (!strcasecmp("post", (const char *)value)) {
 			ctx->current_method = HTTP_METHOD_POST;
+		} else if (!strcasecmp("head", (const char *)value)) {
+			ctx->current_method = HTTP_METHOD_HEAD;
 		} else {
 			ctx->current_method = HTTP_METHOD_NONE;
+			return http_send_response(ctx, stream_id, NULL, HTTP_STATUS_NOT_IMPLEMENTED);
 		}
 	}
 
@@ -463,6 +496,9 @@ static int submit_to_wirebuffer(struct http_ctx *ctx)
 	len = ctx->buf_pos - sizeof(uint16_t);
 	if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
 		kr_log_debug(DOH, "[%p] invalid dnsmsg size: %zd B\n", (void *)ctx->h2, len);
+		http_send_response(ctx, stream_id, NULL, (len <= 0)
+				? HTTP_STATUS_BAD_REQUEST
+				: HTTP_STATUS_PAYLOAD_TOO_LARGE);
 		ret = -1;
 		goto cleanup;
 	}
@@ -494,10 +530,10 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 
 	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) && ctx->incomplete_stream == stream_id) {
-		if (ctx->current_method == HTTP_METHOD_GET) {
+		if (ctx->current_method == HTTP_METHOD_GET || ctx->current_method == HTTP_METHOD_HEAD) {
 			if (process_uri_path(ctx, ctx->uri_path, stream_id) < 0) {
-				refuse_stream(h2, stream_id);
-				return 0;  /* End processing - don't submit to wirebuffer. */
+				/* End processing - don't submit to wirebuffer. */
+				return http_send_response(ctx, stream_id, NULL, HTTP_STATUS_BAD_REQUEST);
 			}
 		}
 
@@ -670,36 +706,67 @@ static ssize_t read_callback(nghttp2_session *h2, int32_t stream_id, uint8_t *bu
 	return send;
 }
 
+/** Convenience function for pushing `nghttp2_nv` made with MAKE_*_NV into
+ * arrays. */
+static inline void push_nv(nghttp2_array_t *arr, nghttp2_nv nv)
+{
+	array_push(*arr, nv);
+}
+
 /*
  * Send dns response provided by the HTTP/2 data provider.
  *
  * Data isn't guaranteed to be sent immediately due to underlying HTTP/2 flow control.
  */
 static int http_send_response(struct http_ctx *ctx, int32_t stream_id,
-			      nghttp2_data_provider *prov)
+			      nghttp2_data_provider *prov, enum http_status status)
 {
 	nghttp2_session *h2 = ctx->h2;
-	struct http_data *data = (struct http_data*)prov->source.ptr;
 	int ret;
-	const char *directive_max_age = "max-age=";
-	char size[MAX_DECIMAL_LENGTH(data->len)] = { 0 };
-	int max_age_len = MAX_DECIMAL_LENGTH(data->ttl) + strlen(directive_max_age);
-	char max_age[max_age_len];
-	int size_len;
 
-	memset(max_age, 0, max_age_len * sizeof(*max_age));
-	size_len = snprintf(size, MAX_DECIMAL_LENGTH(data->len), "%zu", data->len);
-	max_age_len = snprintf(max_age, max_age_len, "%s%u", directive_max_age, data->ttl);
+	nghttp2_array_t hdrs;
+	array_init(hdrs);
+	array_reserve(hdrs, 5);
 
-	nghttp2_nv hdrs[] = {
-		MAKE_STATIC_NV(":status", "200"),
-		MAKE_STATIC_NV("content-type", "application/dns-message"),
-		MAKE_STATIC_NV("access-control-allow-origin", "*"),
-		MAKE_NV("content-length", 14, size, size_len),
-		MAKE_NV("cache-control", 13, max_age, max_age_len),
-	};
+	auto_free char *status_str = NULL;
+	if (likely(status == HTTP_STATUS_OK)) {
+		push_nv(&hdrs, MAKE_STATIC_NV(":status", "200"));
+	} else {
+		int status_len = asprintf(&status_str, "%" PRIu16, status);
+		kr_require(status_len >= 0);
+		push_nv(&hdrs, MAKE_STATIC_KEY_NV(":status", status_str, status_len));
+	}
+	push_nv(&hdrs, MAKE_STATIC_NV("access-control-allow-origin", "*"));
 
-	ret = nghttp2_submit_response(h2, stream_id, hdrs, sizeof(hdrs)/sizeof(*hdrs), prov);
+	struct http_data *data = NULL;
+	auto_free char *size = NULL;
+	auto_free char *max_age = NULL;
+
+	if (ctx->current_method == HTTP_METHOD_HEAD && prov) {
+		/* HEAD method is the same as GET but only returns headers,
+		 * so let's clean up the data here as we don't need it. */
+		free(prov->source.ptr);
+		prov = NULL;
+	}
+
+	if (prov) {
+		data = (struct http_data*)prov->source.ptr;
+		const char *directive_max_age = "max-age=";
+		int max_age_len;
+		int size_len;
+
+		size_len = asprintf(&size, "%zu", data->len);
+		kr_require(size_len >= 0);
+		max_age_len = asprintf(&max_age, "%s%" PRIu32, directive_max_age, data->ttl);
+		kr_require(max_age_len >= 0);
+
+		push_nv(&hdrs, MAKE_STATIC_NV("content-type", "application/dns-message"));
+		push_nv(&hdrs, MAKE_STATIC_KEY_NV("content-length", size, size_len));
+		push_nv(&hdrs, MAKE_STATIC_KEY_NV("cache-control", max_age, max_age_len));
+	}
+
+	ret = nghttp2_submit_response(h2, stream_id, hdrs.at, hdrs.len, prov);
+	array_clear(hdrs);
 	if (ret != 0) {
 		kr_log_debug(DOH, "[%p] nghttp2_submit_response failed: %s\n", (void *)h2, nghttp2_strerror(ret));
 		free(data);
@@ -728,6 +795,10 @@ static int http_send_response(struct http_ctx *ctx, int32_t stream_id,
 		 * on_write() was already called. */
 		nghttp2_submit_rst_stream(h2, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_INTERNAL_ERROR);
 		return 0;
+	}
+
+	if (status != HTTP_STATUS_OK) {
+		nghttp2_submit_rst_stream(h2, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_NO_ERROR);
 	}
 
 	return 0;
@@ -761,7 +832,7 @@ static int http_write_pkt(struct http_ctx *ctx, knot_pkt_t *pkt, int32_t stream_
 	prov.source.ptr = data;
 	prov.read_callback = read_callback;
 
-	return http_send_response(ctx, stream_id, &prov);
+	return http_send_response(ctx, stream_id, &prov, HTTP_STATUS_OK);
 }
 
 /*

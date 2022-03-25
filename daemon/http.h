@@ -16,6 +16,7 @@
 #endif
 
 #include "lib/generic/queue.h"
+#include "lib/generic/trie.h"
 
 /** Transport session (opaque). */
 struct session;
@@ -35,6 +36,8 @@ typedef enum {
 	HTTP_METHOD_NONE = 0,
 	HTTP_METHOD_GET = 1,
 	HTTP_METHOD_POST = 2,
+	HTTP_METHOD_HEAD = 3, /**< Same as GET, except it does not return payload.
+			       * Required to be implemented by RFC 7231. */
 } http_method_t;
 
 struct http_ctx {
