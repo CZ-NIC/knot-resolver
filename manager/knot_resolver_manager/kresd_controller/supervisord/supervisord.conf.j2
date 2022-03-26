@@ -28,5 +28,8 @@ stderr_logfile={{ instance.logfile }}
 directory={{ instance.workdir }}
 command={{ instance.command }}
 environment={{ instance.environment }}
+autostart=false
+autorestart=true
+startsecs=1  # this is what makes start operation slow, it would be better replaced with something similar to systemd notify
 
 {%- endfor -%}

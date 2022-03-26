@@ -125,6 +125,7 @@ disable= [
     "unsupported-delete-operation", # checked by pyright
     "unsubscriptable-object", # checked by pyright
     "unsupported-membership-test", # checked by pyright
+    "invalid-overridden-method",  # hopefully checked by type checkers
 ]
 
 [tool.pylint.SIMILARITIES]

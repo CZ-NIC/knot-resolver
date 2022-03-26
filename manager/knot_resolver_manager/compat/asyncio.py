@@ -36,6 +36,13 @@ async def to_thread(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
         return res
 
 
+def async_in_a_thread(func: Callable[..., T]) -> Callable[..., Coroutine[None, None, T]]:
+    async def wrapper(*args: Any, **kwargs: Any) -> T:
+        return await to_thread(func, *args, **kwargs)
+
+    return wrapper
+
+
 def create_task(coro: Awaitable[T], name: Optional[str] = None) -> "asyncio.Task[T]":
     # version 3.8 and higher, call directly
     if sys.version_info.major >= 3 and sys.version_info.minor >= 8:

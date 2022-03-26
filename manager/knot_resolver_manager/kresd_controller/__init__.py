@@ -29,7 +29,7 @@ def try_supervisord():
 
         _registered_controllers.append(SupervisordSubprocessController())
     except ImportError:
-        logger.info("Failed to import modules related to supervisord service manager")
+        logger.error("Failed to import modules related to supervisord service manager", exc_info=True)
 
 
 def try_systemd():
