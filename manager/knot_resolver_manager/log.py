@@ -11,6 +11,9 @@ from knot_resolver_manager.datamodel.logging_schema import LogTargetEnum
 logger = logging.getLogger(__name__)
 
 
+FORMAT = "%(relativeCreated)dms:%(levelname)s:%(name)s:%(message)s"
+
+
 async def _set_log_level(config: KresConfig) -> None:
     levels_map = {
         "crit": "CRITICAL",
@@ -45,10 +48,10 @@ async def _set_logging_handler(config: KresConfig) -> None:
         handler.setFormatter(logging.Formatter("%(name)s:%(message)s"))
     elif target == "stdout":
         handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(logging.Formatter(logging.BASIC_FORMAT))
+        handler.setFormatter(logging.Formatter(FORMAT))
     elif target == "stderr":
         handler = logging.StreamHandler(sys.stderr)
-        handler.setFormatter(logging.Formatter(logging.BASIC_FORMAT))
+        handler.setFormatter(logging.Formatter(FORMAT))
     else:
         raise RuntimeError(f"Unexpected value '{target}' for log target in the config")
 
