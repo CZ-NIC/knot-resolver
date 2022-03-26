@@ -47,6 +47,7 @@ struct http_ctx {
 	queue_http_stream streams;  /* Streams present in the wire buffer. */
 	trie_t *stream_write_data;  /* Dictionary of stream data that needs to be freed after write. */
 	int32_t incomplete_stream;
+	int32_t submitted_stream;   /* Stream whose data has been submitted to the wire buffer. */
 	ssize_t submitted;
 	http_method_t current_method;
 	char *uri_path;
@@ -54,11 +55,14 @@ struct http_ctx {
 	uint8_t *buf;  /* Part of the wire_buf that belongs to current HTTP/2 stream. */
 	ssize_t buf_pos;
 	ssize_t buf_size;
+	bool streaming;             /* True: not all data in the stream has been received yet. */
 };
 
 #if ENABLE_DOH2
 struct http_ctx* http_new(struct session *session, http_send_callback send_cb);
-ssize_t http_process_input_data(struct session *session, const uint8_t *buf, ssize_t nread);
+int http_process_input_data(struct session *session, const uint8_t *buf,
+		            ssize_t nread, ssize_t *out_submitted);
+int http_send_bad_request(struct session *session);
 int http_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t* pkt, int32_t stream_id,
 	       uv_write_cb on_write);
 void http_free(struct http_ctx *ctx);

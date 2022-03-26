@@ -505,6 +505,7 @@ static int submit_to_wirebuffer(struct http_ctx *ctx)
 
 	/* Submit data to wirebuffer. */
 	knot_wire_write_u16(ctx->buf, len);
+	ctx->submitted_stream = stream_id;
 	ctx->submitted += ctx->buf_pos;
 	ctx->buf += ctx->buf_pos;
 	ctx->buf_pos = 0;
@@ -530,6 +531,8 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 
 	if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) && ctx->incomplete_stream == stream_id) {
+		ctx->streaming = false;
+
 		if (ctx->current_method == HTTP_METHOD_GET || ctx->current_method == HTTP_METHOD_HEAD) {
 			if (process_uri_path(ctx, ctx->uri_path, stream_id) < 0) {
 				/* End processing - don't submit to wirebuffer. */
@@ -639,9 +642,12 @@ finish:
  * Process inbound HTTP/2 data and return number of bytes read into session wire buffer.
  *
  * This function may trigger outgoing HTTP/2 data, such as stream resets, window updates etc.
+ *
+ * Returns 1 if stream has not ended yet, 0 if the stream has ended, or
+ * a negative value on error.
  */
-ssize_t http_process_input_data(struct session *session, const uint8_t *buf,
-				ssize_t nread)
+int http_process_input_data(struct session *session, const uint8_t *buf,
+			    ssize_t nread, ssize_t *out_submitted)
 {
 	struct http_ctx *ctx = session_http_get_server_ctx(session);
 	ssize_t ret = 0;
@@ -658,6 +664,7 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *buf,
 	 * query will be ignored).  This may also be problematic in other
 	 * cases.  */
 	ctx->submitted = 0;
+	ctx->streaming = true;
 	ctx->buf = session_wirebuf_get_free_start(session);
 	ctx->buf_pos = 0;
 	ctx->buf_size = session_wirebuf_get_free_size(session);
@@ -676,7 +683,17 @@ ssize_t http_process_input_data(struct session *session, const uint8_t *buf,
 		return kr_error(EIO);
 	}
 
-	return ctx->submitted;
+	*out_submitted = ctx->submitted;
+	return ctx->streaming;
+}
+
+int http_send_bad_request(struct session *session)
+{
+	struct http_ctx *ctx = session_http_get_server_ctx(session);
+	if (ctx->submitted_stream >= 0)
+		return http_send_response(ctx, ctx->submitted_stream, NULL, HTTP_STATUS_BAD_REQUEST);
+
+	return 0;
 }
 
 /*
