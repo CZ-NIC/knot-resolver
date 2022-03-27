@@ -525,7 +525,9 @@ class SchemaNode(Serializable):
             except SchemaException as e:
                 errs.append(e)
 
-        if len(errs) > 0:
+        if len(errs) == 1:
+            raise errs[0]
+        elif len(errs) > 1:
             raise AggregateSchemaException(object_path, errs)
         return used_keys
 
@@ -550,9 +552,9 @@ class SchemaNode(Serializable):
         if source and not isinstance(source, SchemaNode):
             unused = source.keys() - used_keys
             if len(unused) > 0:
+                keys = ", ".join((f"'{u}'" for u in unused))
                 raise SchemaException(
-                    f"Keys {unused} in your configuration object are not part of the configuration schema."
-                    " Are you using '-' instead of '_'?",
+                    f"unexpected extra key(s) {keys}",
                     object_path,
                 )
 

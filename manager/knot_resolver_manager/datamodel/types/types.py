@@ -68,6 +68,14 @@ class InterfaceName(PatternBase):
     _re = re.compile(r"^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$")
 
 
+class IDPattern(PatternBase):
+    """
+    Alphanumerical ID for identifying systemd slice.
+    """
+
+    _re = re.compile(r"[a-zA-Z0-9]+")
+
+
 class InterfacePort(StrBase):
     addr: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
     if_name: InterfaceName

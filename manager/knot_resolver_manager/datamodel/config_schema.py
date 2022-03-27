@@ -1,5 +1,4 @@
 import os
-import re
 import sys
 from typing import Dict, Optional, Union
 
@@ -21,7 +20,6 @@ from knot_resolver_manager.datamodel.server_schema import ServerSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
 from knot_resolver_manager.datamodel.types import DomainName
-from knot_resolver_manager.datamodel.types.base_types import PatternBase
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.utils import SchemaNode
 
@@ -55,17 +53,12 @@ def _import_lua_template() -> Template:
 _MAIN_TEMPLATE = _import_lua_template()
 
 
-class IDPattern(PatternBase):
-    _re = re.compile(r"[a-zA-Z0-9]*")
-
-
 class KresConfig(SchemaNode):
     class Raw(SchemaNode):
         """
         Knot Resolver declarative configuration.
 
         ---
-        id: System-wide unique identifier of this manager instance. Used for grouping logs and tagging kresd processes.
         server: DNS server control and management configuration.
         options: Fine-tuning global parameters of DNS resolver operation.
         network: Network connections and protocols configuration.
@@ -83,8 +76,7 @@ class KresConfig(SchemaNode):
         lua: Custom Lua configuration.
         """
 
-        id: IDPattern
-        server: ServerSchema = ServerSchema()
+        server: ServerSchema
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
         static_hints: StaticHintsSchema = StaticHintsSchema()
@@ -102,7 +94,6 @@ class KresConfig(SchemaNode):
 
     _PREVIOUS_SCHEMA = Raw
 
-    id: str
     server: ServerSchema
     options: OptionsSchema
     network: NetworkSchema
@@ -141,4 +132,4 @@ class KresConfig(SchemaNode):
         Funtion used just for testing purposes. Creates an instance of KresConfig without requiring
         any arguments.
         """
-        return KresConfig({"id": "test"})
+        return KresConfig({"server": {"id": "test"}})
