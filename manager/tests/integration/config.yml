@@ -1,8 +1,8 @@
-id: integration
 network:
   listen:
     - interface: 127.0.0.1@5353
 server:
+  id: integration-test
   workers: 1
   rundir: tests/integration/run
   management:

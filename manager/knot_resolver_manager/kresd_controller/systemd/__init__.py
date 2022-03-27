@@ -170,14 +170,14 @@ class SystemdSubprocessController(SubprocessController):
     async def initialize_controller(self, config: KresConfig) -> None:
         self._controller_config = config
         try:
-            await to_thread(start_slice, self._controller_config, self._systemd_type)
+            await to_thread(start_slice, self._systemd_type)
         except SubprocessControllerException as e:
             logger.warning(
                 f"Failed to create systemd slice for our subprocesses: '{e}'. There is/was a manager running with the same ID."
             )
 
     async def shutdown_controller(self) -> None:
-        await to_thread(stop_slice, self._controller_config, self._systemd_type)
+        await to_thread(stop_slice, self._systemd_type)
 
     async def create_subprocess(self, subprocess_config: KresConfig, subprocess_type: SubprocessType) -> Subprocess:
         assert self._controller_config is not None
