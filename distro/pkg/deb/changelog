@@ -1,6 +1,6 @@
 knot-resolver ({{ version }}-cznic.{{ release }}) unstable; urgency=medium
 
-  * move changelog to OBS
+  * upstream package
   * see NEWS or https://knot-resolver.cz
 
- -- Tomas Krizek <tomas.krizek@nic.cz>  Tue, 20 Feb 2018 19:36:45 +0100
+ -- Jakub Ružička <jakub.ruzicka@nic.cz>  {{ now }}

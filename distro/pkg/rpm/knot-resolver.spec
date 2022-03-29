@@ -377,6 +377,6 @@ fi
 %endif
 
 %changelog
-* Fri Feb 16 2018 Tomas Krizek <tomas.krizek@nic.cz> - 2.1.0-1
+* {{ now }} Jakub Ružička <jakub.ruzicka@nic.cz> - {{ version }}-{{ release }}
+- upstream package
 - see NEWS or https://www.knot-resolver.cz/
-- move spec file to upstream
