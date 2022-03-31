@@ -7,6 +7,7 @@ from knot_resolver_manager.datamodel import KresConfig
 from knot_resolver_manager.datamodel.types import IPv6Network96, TimeUnit
 from knot_resolver_manager.exceptions import SchemaException
 from knot_resolver_manager.utils.modelling import SchemaNode
+from tests.unit.utils import test_instance_of_kres_config
 
 
 def test_dns64_true():
@@ -17,7 +18,7 @@ def test_dns64_true():
 
 
 def test_dns64_default_false():
-    config = KresConfig.test_instance()
+    config = test_instance_of_kres_config()
 
     assert config.dns64 == False
 
@@ -29,7 +30,7 @@ def test_dnssec_false():
 
 
 def test_dnssec_default_true():
-    config = KresConfig.test_instance()
+    config = test_instance_of_kres_config()
 
     assert config.dnssec.trust_anchor_sentinel == True
     assert config.dnssec.trust_anchor_signal_query == True
@@ -46,7 +47,7 @@ def test_dnssec_default_true():
 def test_json_schema():
     dct = KresConfig.json_schema()
 
-    def recser(obj: Any, path: str = ""):
+    def recser(obj: Any, path: str = "") -> None:
         if not isinstance(obj, dict):
             return
         else:
