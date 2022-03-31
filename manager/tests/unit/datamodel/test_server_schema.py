@@ -5,7 +5,7 @@ from knot_resolver_manager.exceptions import KresManagerException
 
 
 def test_watchdog():
-    assert ServerSchema({"watchdog": {"qname": "nic.cz.", "qtype": "A"}})
+    assert ServerSchema({"watchdog": {"qname": "nic.cz.", "qtype": "A"}, "id": "test"})
 
     with raises(KresManagerException):
         ServerSchema({"backend": "supervisord", "watchdog": {"qname": "nic.cz.", "qtype": "A"}})

@@ -14,6 +14,7 @@ from knot_resolver_manager.datamodel.types import (
     IPAddressPort,
     UncheckedPath,
 )
+from knot_resolver_manager.datamodel.types.types import IDPattern
 from knot_resolver_manager.exceptions import DataException
 from knot_resolver_manager.utils import SchemaNode
 
@@ -100,8 +101,8 @@ class ServerSchema(SchemaNode):
         DNS server control and management configuration.
 
         ---
+        id: System-wide unique identifier of this manager instance. Used for grouping logs and tagging kresd processes.
         hostname: Internal DNS resolver hostname. Default is machine hostname.
-        groupid: Additional identifier in case more DNS resolvers are running on single machine.
         nsid: Name Server Identifier (RFC 5001) which allows DNS clients to request resolver to send back its NSID along with the reply to a DNS request.
         workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
         use_cache_gc: Use (start) kres-cache-gc (cache garbage collector) automatically.
@@ -112,8 +113,8 @@ class ServerSchema(SchemaNode):
         webmgmt: Configuration of legacy web management endpoint.
         """
 
+        id: IDPattern
         hostname: Optional[str] = None
-        groupid: str = "m"
         nsid: Optional[str] = None
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         use_cache_gc: bool = True
@@ -125,8 +126,8 @@ class ServerSchema(SchemaNode):
 
     _PREVIOUS_SCHEMA = Raw
 
+    id: IDPattern
     hostname: str
-    groupid: str
     nsid: Optional[str]
     workers: IntPositive
     use_cache_gc: bool

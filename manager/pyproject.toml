@@ -138,7 +138,8 @@ max-parents = "10"
 
 [tool.pyright]
 include = [
-    "knot_resolver_manager"
+    "knot_resolver_manager",
+    "tests"
 ]
 exclude = []
 typeCheckingMode = "strict"

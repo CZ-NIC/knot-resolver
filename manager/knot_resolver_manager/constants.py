@@ -72,17 +72,17 @@ class _UserConstants:
         self._config_store = config_store
 
     @property
-    def SERVICE_GROUP_ID(self) -> str:
-        return self._config_store.get().server.groupid
+    def ID(self) -> str:
+        return str(self._config_store.get().server.id)
 
 
 _user_constants: Optional[_UserConstants] = None
 
 
-async def _deny_groupid_changes(config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
-    if config_old.server.groupid != config_new.server.groupid:
+async def _deny_id_changes(config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
+    if config_old.server.id != config_new.server.id:
         return Result.err(
-            "/server/groupid: Based on the groupid, the manager recognizes his subprocesses,"
+            "/id: Based on the ID, the manager recognizes subprocesses,"
             " so it is not possible to change it while services are running."
         )
     return Result.ok(None)
@@ -92,7 +92,7 @@ async def init_user_constants(config_store: ConfigStore) -> None:
     global _user_constants
     _user_constants = _UserConstants(config_store)
 
-    await config_store.register_verifier(_deny_groupid_changes)
+    await config_store.register_verifier(_deny_id_changes)
 
 
 def user_constants() -> _UserConstants:

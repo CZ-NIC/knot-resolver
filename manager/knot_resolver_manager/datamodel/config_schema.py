@@ -76,7 +76,7 @@ class KresConfig(SchemaNode):
         lua: Custom Lua configuration.
         """
 
-        server: ServerSchema = ServerSchema()
+        server: ServerSchema
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
         static_hints: StaticHintsSchema = StaticHintsSchema()
