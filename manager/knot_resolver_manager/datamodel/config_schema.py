@@ -125,11 +125,3 @@ class KresConfig(SchemaNode):
         # it should be removed and relative path used instead as soon as issue
         # https://gitlab.nic.cz/knot/knot-resolver/-/issues/720 is fixed
         return _MAIN_TEMPLATE.render(cfg=self, cwd=os.getcwd())  # pyright: reportUnknownMemberType=false
-
-    @staticmethod
-    def test_instance() -> "KresConfig":
-        """
-        Funtion used just for testing purposes. Creates an instance of KresConfig without requiring
-        any arguments.
-        """
-        return KresConfig({"server": {"id": "test"}})
