@@ -133,6 +133,13 @@ class Subprocess:
         if self._metrics_registered:
             unregister_resolver_metrics_for(self)
         await self._stop()
+        await self.cleanup()
+
+    async def cleanup(self) -> None:
+        """
+        Remove temporary files and all traces of this instance running. It is NOT SAFE to call this while
+        the kresd is running, because it will break automatic restarts (at the very least).
+        """
         kresd_config_file(self._config, self.id).unlink()
 
     def __eq__(self, o: object) -> bool:

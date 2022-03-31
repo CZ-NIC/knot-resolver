@@ -218,6 +218,8 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             # we could stop all the children one by one right now
             # we won't do that and we leave that up to the subprocess controller to do that while it is shutting down
             await self._controller.shutdown_controller()
+            # now, when everything is stopped, let's clean up all the remains
+            await asyncio.gather(*[w.cleanup() for w in self._workers])
 
     async def forced_shutdown(self) -> None:
         logger.warning("Collecting all remaining workers...")
