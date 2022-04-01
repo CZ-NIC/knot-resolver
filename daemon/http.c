@@ -57,6 +57,7 @@ enum http_status {
 	HTTP_STATUS_BAD_REQUEST                     = 400,
 	HTTP_STATUS_NOT_FOUND                       = 404,
 	HTTP_STATUS_PAYLOAD_TOO_LARGE               = 413,
+	HTTP_STATUS_UNSUPPORTED_MEDIA_TYPE          = 415,
 	HTTP_STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE = 431,
 	HTTP_STATUS_NOT_IMPLEMENTED                 = 501,
 };
@@ -73,6 +74,8 @@ struct http_data {
 typedef array_t(nghttp2_nv) nghttp2_array_t;
 
 static int http_send_response(struct http_ctx *ctx, int32_t stream_id,
+			      nghttp2_data_provider *prov, enum http_status status);
+static int http_send_response_rst_stream(struct http_ctx *ctx, int32_t stream_id,
 			      nghttp2_data_provider *prov, enum http_status status);
 
 /*
@@ -219,7 +222,7 @@ static int check_uri(const char* uri_path)
 			}
 			end_prev = beg + strlen(beg);
 			beg = strtok(NULL, delim);
-			if (beg-1 != end_prev) { /* detect && */
+			if (!beg || beg-1 != end_prev) { /* detect && */
 				return -1;
 			}
 		}
@@ -368,7 +371,7 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 				kr_log_debug(DOH,
 					"[%p] stream %d: header too large (%zu B), refused\n",
 					(void *)h2, stream_id, valuelen);
-				return http_send_response(ctx, stream_id, NULL,
+				return http_send_response_rst_stream(ctx, stream_id, NULL,
 						HTTP_STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE);
 			}
 
@@ -389,9 +392,11 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 	if (!strcasecmp(":path", (const char *)name)) {
 		int uri_result = check_uri((const char *)value);
 		if (uri_result == kr_error(ENOENT)) {
-			return http_send_response(ctx, stream_id, NULL, HTTP_STATUS_NOT_FOUND);
+			return http_send_response_rst_stream(ctx, stream_id, NULL,
+					HTTP_STATUS_NOT_FOUND);
 		} else if (uri_result < 0) {
-			return http_send_response(ctx, stream_id, NULL, HTTP_STATUS_BAD_REQUEST);
+			return http_send_response_rst_stream(ctx, stream_id, NULL,
+					HTTP_STATUS_BAD_REQUEST);
 		}
 
 		kr_assert(ctx->uri_path == NULL);
@@ -411,7 +416,15 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 			ctx->current_method = HTTP_METHOD_HEAD;
 		} else {
 			ctx->current_method = HTTP_METHOD_NONE;
-			return http_send_response(ctx, stream_id, NULL, HTTP_STATUS_NOT_IMPLEMENTED);
+			return http_send_response_rst_stream(ctx, stream_id, NULL,
+					HTTP_STATUS_NOT_IMPLEMENTED);
+		}
+	}
+
+	if (!strcasecmp("content-type", (const char *)name)) {
+		if (strcasecmp("application/dns-message", (const char *)value)) {
+			return http_send_response_rst_stream(ctx, stream_id, NULL,
+					HTTP_STATUS_UNSUPPORTED_MEDIA_TYPE);
 		}
 	}
 
@@ -496,7 +509,7 @@ static int submit_to_wirebuffer(struct http_ctx *ctx)
 	len = ctx->buf_pos - sizeof(uint16_t);
 	if (len <= 0 || len > KNOT_WIRE_MAX_PKTSIZE) {
 		kr_log_debug(DOH, "[%p] invalid dnsmsg size: %zd B\n", (void *)ctx->h2, len);
-		http_send_response(ctx, stream_id, NULL, (len <= 0)
+		http_send_response_rst_stream(ctx, stream_id, NULL, (len <= 0)
 				? HTTP_STATUS_BAD_REQUEST
 				: HTTP_STATUS_PAYLOAD_TOO_LARGE);
 		ret = -1;
@@ -536,7 +549,8 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 		if (ctx->current_method == HTTP_METHOD_GET || ctx->current_method == HTTP_METHOD_HEAD) {
 			if (process_uri_path(ctx, ctx->uri_path, stream_id) < 0) {
 				/* End processing - don't submit to wirebuffer. */
-				return http_send_response(ctx, stream_id, NULL, HTTP_STATUS_BAD_REQUEST);
+				return http_send_response_rst_stream(ctx, stream_id, NULL,
+						HTTP_STATUS_BAD_REQUEST);
 			}
 		}
 
@@ -623,7 +637,9 @@ struct http_ctx* http_new(struct session *session, http_send_callback send_cb)
 	queue_init(ctx->streams);
 	ctx->stream_write_data = trie_create(NULL);
 	ctx->incomplete_stream = -1;
+	ctx->submitted_stream = -1;
 	ctx->submitted = 0;
+	ctx->streaming = true;
 	ctx->current_method = HTTP_METHOD_NONE;
 	ctx->uri_path = NULL;
 
@@ -691,7 +707,8 @@ int http_send_bad_request(struct session *session)
 {
 	struct http_ctx *ctx = session_http_get_server_ctx(session);
 	if (ctx->submitted_stream >= 0)
-		return http_send_response(ctx, ctx->submitted_stream, NULL, HTTP_STATUS_BAD_REQUEST);
+		return http_send_response_rst_stream(ctx, ctx->submitted_stream, NULL,
+				HTTP_STATUS_BAD_REQUEST);
 
 	return 0;
 }
@@ -814,12 +831,26 @@ static int http_send_response(struct http_ctx *ctx, int32_t stream_id,
 		return 0;
 	}
 
-	if (status != HTTP_STATUS_OK) {
-		nghttp2_submit_rst_stream(h2, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_NO_ERROR);
-	}
-
 	return 0;
 }
+
+/*
+ * Same as `http_send_response`, but resets the HTTP stream afterwards. Used
+ * for sending negative status messages.
+ */
+static int http_send_response_rst_stream(struct http_ctx *ctx, int32_t stream_id,
+			      nghttp2_data_provider *prov, enum http_status status)
+{
+	int ret = http_send_response(ctx, stream_id, prov, status);
+	if (ret)
+		return ret;
+
+	ctx->submitted_stream = -1;
+	nghttp2_submit_rst_stream(ctx->h2, NGHTTP2_FLAG_NONE, stream_id, NGHTTP2_NO_ERROR);
+	ret = nghttp2_session_send(ctx->h2);
+	return ret;
+}
+
 
 /*
  * Send HTTP/2 stream data created from packet's wire buffer.

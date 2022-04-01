@@ -63,15 +63,15 @@ local function check_ok(req, desc)
 	return headers, pkt
 end
 
---local function check_err(req, exp_status, desc)
---	local headers, errmsg, errno = req:go(16)
---	if errno then
---		nok(errmsg, desc .. ': ' .. errmsg)
---		return
---	end
---	local got_status = headers:get(':status')
---	same(got_status, exp_status, desc)
---end
+local function check_err(req, exp_status, desc)
+	local headers, errmsg, errno = req:go(16)
+	if errno then
+		nok(errmsg, desc .. ': ' .. errmsg)
+		return
+	end
+	local got_status = headers:get(':status')
+	same(got_status, exp_status, desc)
+end
 
 -- check prerequisites
 local bound, port
@@ -169,34 +169,38 @@ else
 	end
 
 	-- test an invalid DNS query using POST
---	local function test_post_short_input()
---		local req = assert(req_templ:clone())
---		req.headers:upsert(':method', 'POST')
---		req:set_body(string.rep('0', 11))  -- 11 bytes < DNS msg header
---		check_err(req, '400', 'too short POST finishes with 400')
---	end
---
+	local function test_post_short_input()
+		local req = assert(req_templ:clone())
+		req.headers:upsert(':method', 'POST')
+		req:set_body(string.rep('0', 11))  -- 11 bytes < DNS msg header
+		check_err(req, '400', 'too short POST finishes with 400')
+	end
+
 --	local function test_post_long_input()
+--		-- FIXME: This test is broken in Lua. The connection times out
+--		-- for some reason, but sending a request like this with `curl`
+--		-- or PowerShell's `Invoke-RestMethod` provides correct results.
+--
 --		local req = assert(req_templ:clone())
 --		req.headers:upsert(':method', 'POST')
 --		req:set_body(string.rep('s', 1025))  -- > DNS msg over UDP
---		check_err(req, '413', 'too long POST finishes with 413')
+--		check_err(req, '400', 'too long POST finishes with 400')
 --	end
---
---	local function test_post_unparseable_input()
---		local req = assert(req_templ:clone())
---		req.headers:upsert(':method', 'POST')
---		req:set_body(string.rep('\0', 1024))  -- garbage
---		check_err(req, '400', 'unparseable DNS message finishes with 400')
---	end
---
---	local function test_post_unsupp_type()
---		local req = assert(req_templ:clone())
---		req.headers:upsert(':method', 'POST')
---		req.headers:upsert('content-type', 'application/dns+json')
---		req:set_body(string.rep('\0', 12))  -- valid message
---		check_err(req, '415', 'unsupported request content type finishes with 415')
---	end
+
+	local function test_post_unparseable_input()
+		local req = assert(req_templ:clone())
+		req.headers:upsert(':method', 'POST')
+		req:set_body(string.rep('\0', 1024))  -- garbage
+		check_err(req, '400', 'unparseable DNS message finishes with 400')
+	end
+
+	local function test_post_unsupp_type()
+		local req = assert(req_templ:clone())
+		req.headers:upsert(':method', 'POST')
+		req.headers:upsert('content-type', 'application/dns+json')
+		req:set_body(string.rep('\0', 12))  -- valid message
+		check_err(req, '415', 'unsupported request content type finishes with 415')
+	end
 
 	-- test a valid DNS query using GET
 	local function test_get_servfail()
@@ -275,47 +279,47 @@ else
 		check_ok(req, desc)
 	end
 
---	-- test an invalid DNS query using GET
---		local function test_get_long_input()
---		local req = assert(req_templ:clone())
---		req.headers:upsert(':method', 'GET')
---		req.headers:upsert(':path', '/doh?dns=' .. basexx.to_url64(string.rep('\0', 1030)))
---		check_err(req, '414', 'too long GET finishes with 414')
---	end
---
---	local function test_get_no_dns_param()
---		local req = assert(req_templ:clone())
---		req.headers:upsert(':method', 'GET')
---		req.headers:upsert(':path', '/doh?notdns=' .. basexx.to_url64(string.rep('\0', 1024)))
---		check_err(req, '400', 'GET without dns parameter finishes with 400')
---	end
---
---	local function test_get_unparseable()
---		local req = assert(req_templ:clone())
---		req.headers:upsert(':method', 'GET')
---		req.headers:upsert(':path', '/doh??dns=' .. basexx.to_url64(string.rep('\0', 1024)))
---		check_err(req, '400', 'unparseable GET finishes with 400')
---	end
---
---	local function test_get_invalid_b64()
---		local req = assert(req_templ:clone())
---		req.headers:upsert(':method', 'GET')
---		req.headers:upsert(':path', '/doh?dns=thisisnotb64')
---		check_err(req, '400', 'GET with invalid base64 finishes with 400')
---	end
---
---	local function test_get_invalid_chars()
---		local req = assert(req_templ:clone())
---		req.headers:upsert(':method', 'GET')
---		req.headers:upsert(':path', '/doh?dns=' .. basexx.to_url64(string.rep('\0', 200)) .. '@#$%?!')
---		check_err(req, '400', 'GET with invalid characters in b64 finishes with 400')
---	end
---
---	local function test_unsupp_method()
---		local req = assert(req_templ:clone())
---		req.headers:upsert(':method', 'PUT')
---		check_err(req, '405', 'unsupported method finishes with 405')
---	end
+	-- test an invalid DNS query using GET
+		local function test_get_long_input()
+		local req = assert(req_templ:clone())
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path', '/doh?dns=' .. basexx.to_url64(string.rep('\0', 1030)))
+		check_err(req, '400', 'too long GET finishes with 400')
+	end
+
+	local function test_get_no_dns_param()
+		local req = assert(req_templ:clone())
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path', '/doh?notdns=' .. basexx.to_url64(string.rep('\0', 1024)))
+		check_err(req, '400', 'GET without dns parameter finishes with 400')
+	end
+
+	local function test_get_unparseable()
+		local req = assert(req_templ:clone())
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path', '/doh??dns=' .. basexx.to_url64(string.rep('\0', 1024)))
+		check_err(req, '400', 'unparseable GET finishes with 400')
+	end
+
+	local function test_get_invalid_b64()
+		local req = assert(req_templ:clone())
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path', '/doh?dns=thisisnotb64')
+		check_err(req, '400', 'GET with invalid base64 finishes with 400')
+	end
+
+	local function test_get_invalid_chars()
+		local req = assert(req_templ:clone())
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path', '/doh?dns=' .. basexx.to_url64(string.rep('\0', 200)) .. '@#$%?!')
+		check_err(req, '400', 'GET with invalid characters in b64 finishes with 400')
+	end
+
+	local function test_unsupp_method()
+		local req = assert(req_templ:clone())
+		req.headers:upsert(':method', 'PUT')
+		check_err(req, '501', 'unsupported method finishes with 501')
+	end
 
 	local function test_dstaddr()
 		local triggered = false
@@ -438,29 +442,28 @@ else
 --	end
 
 	-- plan tests
-	-- TODO: implement (some) of the error status codes
 	local tests = {
 		start_server,
 		test_post_servfail,
 		test_post_noerror,
 		test_post_nxdomain,
 		test_huge_answer,
-		--test_post_short_input,
-		--test_post_long_input,
-		--test_post_unparseable_input,
-		--test_post_unsupp_type,
+		test_post_short_input,
+--		test_post_long_input, -- FIXME see the test function
+		test_post_unparseable_input,
+		test_post_unsupp_type,
 		test_get_servfail,
 		test_get_noerror,
 		test_get_nxdomain,
 		test_get_other_params_before_dns,
 		test_get_other_params_after_dns,
 		test_get_other_params,
-		--test_get_long_input,
-		--test_get_no_dns_param,
-		--test_get_unparseable,
-		--test_get_invalid_b64,
-		--test_get_invalid_chars,
-		--test_unsupp_method,
+		test_get_long_input,
+		test_get_no_dns_param,
+		test_get_unparseable,
+		test_get_invalid_b64,
+		test_get_invalid_chars,
+		test_unsupp_method,
 		test_dstaddr,
 		test_srcaddr,
 		test_headers

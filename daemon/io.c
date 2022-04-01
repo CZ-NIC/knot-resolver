@@ -478,7 +478,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 #if ENABLE_DOH2
 	if (session_flags(s)->has_http && streaming == 0 && ret == 0) {
 		ret = http_send_bad_request(s);
-		if (ret < 0) {
+		if (ret) {
 			/* An error has occurred, close the session. */
 			worker_end_tcp(s);
 		}
