@@ -29,9 +29,8 @@ Source1:        knot-resolver-%{version}.tar.xz.asc
 # PGP keys used to sign upstream releases
 # Export with --armor using command from https://fedoraproject.org/wiki/PackagingDrafts:GPGSignatures
 # Don't forget to update %%prep section when adding/removing keys
-Source100:	gpgkey-B6006460B60A80E782062449E747DF1F9575A3AA.gpg.asc
-Source101:	gpgkey-BE26EBB9CBE059B3910CA35BCE8DD6A1A50A21E4.gpg.asc
-Source102:	gpgkey-4A8BA48C2AED933BD495C509A1FBA5F7EF8C4869.gpg.asc
+# This key is from: https://secure.nic.cz/files/knot-resolver/kresd-keyblock.asc
+Source100:      kresd-keyblock.asc
 BuildRequires:  gnupg2
 %endif
 
@@ -162,8 +161,8 @@ native C implementation, which doesn't require this package.
 %prep
 %if 0%{GPG_CHECK}
 export GNUPGHOME=./gpg-keyring
-mkdir ${GNUPGHOME}
-gpg2 --import %{SOURCE100} %{SOURCE101} %{SOURCE102}
+mkdir -m 700 ${GNUPGHOME}
+gpg2 --import %{SOURCE100}
 gpg2 --verify %{SOURCE1} %{SOURCE0}
 %endif
 %setup -q -n %{name}-%{version}
@@ -378,6 +377,6 @@ fi
 %endif
 
 %changelog
-* Fri Feb 16 2018 Tomas Krizek <tomas.krizek@nic.cz> - 2.1.0-1
+* {{ now }} Jakub Ružička <jakub.ruzicka@nic.cz> - {{ version }}-{{ release }}
+- upstream package
 - see NEWS or https://www.knot-resolver.cz/
-- move spec file to upstream

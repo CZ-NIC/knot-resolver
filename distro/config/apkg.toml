@@ -9,4 +9,4 @@ archive_url = "https://secure.nic.cz/files/knot-resolver/knot-resolver-{{ versio
 signature_url = "https://secure.nic.cz/files/knot-resolver/knot-resolver-{{ version }}.tar.xz.asc"
 
 [apkg]
-compat = 1
+compat = 2
