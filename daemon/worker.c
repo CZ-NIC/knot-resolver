@@ -293,9 +293,11 @@ static uint8_t *alloc_wire_cb(struct kr_request *req, uint16_t *maxlen)
 		return NULL;
 	}
 	*maxlen = MIN(*maxlen, out.payload.iov_len);
+#if KNOT_VERSION_HEX < 0x030100
 	/* It's most convenient to fill the MAC addresses at this point. */
 	memcpy(out.eth_from, &ctx->source.eth_addrs[0], 6);
 	memcpy(out.eth_to,   &ctx->source.eth_addrs[1], 6);
+#endif
 	return out.payload.iov_base;
 }
 static void free_wire(const struct request_ctx *ctx)
@@ -316,8 +318,13 @@ static void free_wire(const struct request_ctx *ctx)
 	knot_xdp_msg_t out;
 	out.payload.iov_base = ans->wire;
 	out.payload.iov_len = 0;
-	uint32_t sent;
+	uint32_t sent = 0;
+#if KNOT_VERSION_HEX >= 0x030100
+	int ret = 0;
+	knot_xdp_send_free(xhd->socket, &out, 1);
+#else
 	int ret = knot_xdp_send(xhd->socket, &out, 1, &sent);
+#endif
 	kr_assert(ret == KNOT_EOK && sent == 0);
 	kr_log_debug(XDP, "freed unsent buffer, ret = %d\n", ret);
 }
@@ -1325,6 +1332,15 @@ static int xdp_push(struct qr_task *task, const uv_handle_t *src_handle)
 		return qr_task_on_send(task, src_handle, kr_error(EINVAL));
 
 	knot_xdp_msg_t msg;
+#if KNOT_VERSION_HEX >= 0x030100
+	/* We don't have a nice way of preserving the _msg_t from frame allocation,
+	 * so we manually redo all other parts of knot_xdp_send_alloc() */
+	memset(&msg, 0, sizeof(msg));
+	bool ipv6 = ctx->source.addr.ip.sa_family == AF_INET6;
+	msg.flags = ipv6 ? KNOT_XDP_MSG_IPV6 : 0;
+	memcpy(msg.eth_from, &ctx->source.eth_addrs[0], 6);
+	memcpy(msg.eth_to,   &ctx->source.eth_addrs[1], 6);
+#endif
 	const struct sockaddr *ip_from = &ctx->source.dst_addr.ip;
 	const struct sockaddr *ip_to   = &ctx->source.comm_addr.ip;
 	memcpy(&msg.ip_from, ip_from, kr_sockaddr_len(ip_from));
