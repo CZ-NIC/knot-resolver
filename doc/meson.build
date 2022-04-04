@@ -29,6 +29,16 @@ if get_option('doc') == 'enabled'
   endif
   makeinfo = find_program('makeinfo', required: false)
 
+  # python dependencies: breathe, sphinx_rtd_theme
+  python_breathe = run_command('python3', '-c', 'import breathe')
+  if python_breathe.returncode() != 0
+      error('missing doc dependency: python breathe')
+  else
+    python_sphinx_rtd_theme = run_command('python3', '-c', 'import sphinx_rtd_theme')
+    if python_sphinx_rtd_theme.returncode() != 0
+      error('missing doc dependency: python sphinx_rtd_theme')
+    endif
+  endif
   message('------------------------')
 
   # install html docs
