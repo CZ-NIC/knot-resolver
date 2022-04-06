@@ -20,8 +20,8 @@ stages:
     paths:
       - pkg/
 
-.apkgbuild: &apkgbuild
-  - pip3 install -U apkg
+.apkgbuild: &apkgbuild # new jinja2 breaks docs (sphinx/breathe)
+  - pip3 install -U apkg 'jinja2<3.1'
   - apkg build-dep -y
   - apkg build
 
