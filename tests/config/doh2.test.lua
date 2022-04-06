@@ -280,7 +280,7 @@ else
 	end
 
 	-- test an invalid DNS query using GET
-		local function test_get_long_input()
+	local function test_get_long_input()
 		local req = assert(req_templ:clone())
 		req.headers:upsert(':method', 'GET')
 		req.headers:upsert(':path', '/doh?dns=' .. basexx.to_url64(string.rep('\0', 1030)))

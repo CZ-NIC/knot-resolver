@@ -1779,7 +1779,7 @@ int worker_submit(struct session *session, struct io_comm_data *comm,
 #if ENABLE_DOH2
 	http_ctx = session_http_get_server_ctx(session);
 	if (http_ctx && !is_outgoing && ret) {
-		http_send_bad_request(session);
+		http_send_status(session, HTTP_STATUS_BAD_REQUEST);
 		return kr_error(EMSGSIZE);
 	}
 #endif
