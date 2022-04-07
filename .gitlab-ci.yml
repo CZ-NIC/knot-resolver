@@ -119,6 +119,7 @@ docker:
   image: docker:latest
   tags:
     - dind
+    - amd64
   variables:
     DOCKER_IMAGE_NAME: knot-resolver-test:${CI_COMMIT_SHA}
   script:
@@ -287,6 +288,7 @@ deckard:
     - branches@knot/security/knot-resolver
   tags:
     - privileged
+    - amd64
   variables:
     TMPDIR: $CI_PROJECT_DIR
   script:
@@ -702,6 +704,7 @@ obs:ubuntu2110:x86_64:
   needs: []
   tags:
     - dind
+    - amd64
   variables:
     DISTRO: debian_10
   script:
