@@ -13,7 +13,7 @@ variables:
   KNOT_VERSION: '3.1'
   LIBKRES_ABI: 9
   LIBKRES_NAME: libkres
-  MESON_TEST: meson test -C build_ci* -t 4 --print-errorlogs
+  MESON_TEST: meson test -C build_ci_${PLATFORM}_* -t 4 --print-errorlogs
   PREFIX: $CI_PROJECT_DIR/.local
   EMAIL: 'ci@nic'
 
@@ -27,7 +27,19 @@ stages:
   - deploy
   - pkgtest
 
+
+ # https://docs.gitlab.com/ce/ci/jobs/job_control.html#select-different-runner-tags-for-each-parallel-matrix-job
+.multi_platform: &multi_platform
+  parallel:
+    matrix:
+      - PLATFORM: [ amd64, arm64 ]
+  tags: # some will override this part
+    - ${PLATFORM}
+    - docker
+    - linux
+
 .common: &common
+  <<: *multi_platform
   except:
     refs:
       - master@knot/knot-resolver
@@ -35,10 +47,6 @@ stages:
       - tags
     variables:
       - $SKIP_CI == "1"
-  tags:
-    - docker
-    - linux
-    - amd64
 
 .after_build: &after_build
   <<: *common
@@ -46,17 +54,17 @@ stages:
     - build
   before_script:
     # meson detects changes and performs useless rebuild; hide the log
-    - ninja -C build_ci* &>/dev/null
-    - rm build_ci*/meson-logs/testlog*.txt  # start with clean testlog
+    - ninja -C build_ci_${PLATFORM}_* &>/dev/null
+    - rm build_ci_${PLATFORM}_*/meson-logs/testlog*.txt  # start with clean testlog
   artifacts:
     when: always
     # The deckard-specific parts are a little messy, but they're hard to separate in YAML.
     paths:
-      - build_ci*/meson-logs/testlog*.txt
+      - build_ci_${PLATFORM}_*/meson-logs/testlog*.txt
       - tmpdeckard*
-      - build_ci*/meson-logs/integration.deckard.junit.xml
+      - build_ci_${PLATFORM}_*/meson-logs/integration.deckard.junit.xml
     reports:
-      junit: build_ci*/meson-logs/integration.deckard.junit.xml
+      junit: build_ci_${PLATFORM}_*/meson-logs/integration.deckard.junit.xml
 
 .nodep: &nodep
   <<: *common
@@ -70,12 +78,12 @@ stages:
     when: always
     paths:
       - .local
-      - build_ci*
+      - build_ci_${PLATFORM}_*
       - pkg
     reports:
-      junit: build_ci*/meson-logs/testlog.junit.xml
+      junit: build_ci_${PLATFORM}_*/meson-logs/testlog.junit.xml
   after_script:
-    - ci/fix-meson-junit.sh build_ci*/meson-logs/testlog.junit.xml
+    - ci/fix-meson-junit.sh build_ci_${PLATFORM}_*/meson-logs/testlog.junit.xml
 
 archive:
   <<: *build
@@ -86,9 +94,9 @@ archive:
 build:
   <<: *build
   script:
-    - meson build_ci --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled
-    - ninja -C build_ci
-    - ninja -C build_ci install >/dev/null
+    - meson build_ci_${PLATFORM}_ --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled
+    - ninja -C build_ci_${PLATFORM}_
+    - ninja -C build_ci_${PLATFORM}_ install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
 
 build-asan:
@@ -117,9 +125,10 @@ docker:
   <<: *nodep
   stage: build
   image: docker:latest
+  <<: *multi_platform
   tags:
+    - ${PLATFORM}
     - dind
-    - amd64
   variables:
     DOCKER_IMAGE_NAME: knot-resolver-test:${CI_COMMIT_SHA}
   script:
@@ -190,9 +199,9 @@ lint:other:
   <<: *sanity
   script:
     - meson build_ci_lint &>/dev/null
-    - ninja -C build_ci* pylint
-    - ninja -C build_ci* flake8
-    - ninja -C build_ci* luacheck
+    - ninja -C build_ci_${PLATFORM}_* pylint
+    - ninja -C build_ci_${PLATFORM}_* flake8
+    - ninja -C build_ci_${PLATFORM}_* luacheck
 
 lint:pedantic:
   <<: *after_build
@@ -216,11 +225,11 @@ lint:scan-build:
     when: on_failure
     expire_in: '1 day'
     paths:
-      - build_ci*/meson-logs/scanbuild
+      - build_ci_${PLATFORM}_*/meson-logs/scanbuild
   script:
     - export SCANBUILD="$(realpath ./scripts/run-scanbuild-with-args.sh)"
-    - ninja -C build_ci* scan-build || true
-    - test "$(ls build_ci*/meson-logs/scanbuild/*/report-*.html | wc -l)" = 23 # we have this many errors ATM :-)
+    - ninja -C build_ci_${PLATFORM}_* scan-build || true
+    - test "$(ls build_ci_${PLATFORM}_*/meson-logs/scanbuild/*/report-*.html | wc -l)" = 23 # we have this many errors ATM :-)
 
 lint:tidy:
   <<: *after_build
@@ -230,7 +239,7 @@ lint:tidy:
   # -- end TODO
   stage: sanity
   script:
-    - ninja -C build_ci* tidy
+    - ninja -C build_ci_${PLATFORM}_* tidy
 
 # Coverity reference: https://www.synopsys.com/blogs/software-security/integrating-coverity-scan-with-gitlab-ci/
 lint:coverity:
@@ -286,9 +295,10 @@ deckard:
   only:  # trigger job only in repos under our control (privileged runner required)
     - branches@knot/knot-resolver
     - branches@knot/security/knot-resolver
+  <<: *multi_platform
   tags:
+    - ${PLATFORM}
     - privileged
-    - amd64
   variables:
     TMPDIR: $CI_PROJECT_DIR
   script:
@@ -345,9 +355,11 @@ pytests:
   # these are executed on LXC runners to increase stability
   image: $CI_REGISTRY/knot/knot-resolver/ci/lxc-debian-11:knot-$KNOT_VERSION
   needs: []
+  variables:
+    PLATFORM: amd64
   tags:
+    - ${PLATFORM}
     - lxc
-    - amd64
   before_script:
     # build-asan artifacts can't be reused (different container is used)
     - CC=clang CXX=clang++ CFLAGS=-fno-sanitize-recover=all CXXFLAGS=-fno-sanitize=undefined meson build_ci_asan --default-library=static --prefix=$PREFIX -Db_sanitize=address,undefined -Dextra_tests=enabled
@@ -357,7 +369,7 @@ pytests:
   artifacts:
     when: always
     paths:
-      - build_ci*/meson-logs/testlog*.txt
+      - build_ci_${PLATFORM}_*/meson-logs/testlog*.txt
       - tests/pytests/*.html
       - tests/pytests/*.junit.xml
     reports: # Can't have multiple junit XMLs?
@@ -702,9 +714,10 @@ obs:ubuntu2110:x86_64:
     refs:
       - nightly@knot/knot-resolver
   needs: []
+  <<: *multi_platform
   tags:
+    - ${PLATFORM}
     - dind
-    - amd64
   variables:
     DISTRO: debian_10
   script:
