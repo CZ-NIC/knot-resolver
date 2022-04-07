@@ -27,6 +27,17 @@ stages:
   - deploy
   - pkgtest
 
+
+ # https://docs.gitlab.com/ce/ci/jobs/job_control.html#select-different-runner-tags-for-each-parallel-matrix-job
+.multi_platform: &multi_platform
+  parallel:
+    matrix:
+      - PLATFORM: [ amd64, arm64 ]
+  tags: # some will override this part
+    - ${PLATFORM}
+    - docker
+    - linux
+
 .common: &common
   except:
     refs:
@@ -117,9 +128,10 @@ docker:
   <<: *nodep
   stage: build
   image: docker:latest
+  <<: *multi_platform
   tags:
+    - ${PLATFORM}
     - dind
-    - amd64
   variables:
     DOCKER_IMAGE_NAME: knot-resolver-test:${CI_COMMIT_SHA}
   script:
