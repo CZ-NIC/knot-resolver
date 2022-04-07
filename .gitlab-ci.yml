@@ -645,6 +645,10 @@ obs:debian10:x86_64:
 
 obs:debian11:x86_64:
   <<: *distrotest
+  only:
+    variables:
+      - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing|knot-resolver-odvr$/
+      - $CI_COMMIT_TAG
   variables:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: debian11
