@@ -43,14 +43,10 @@ pip3 install apkg
 # prepare the repo
 git clone https://gitlab.nic.cz/knot/knot-resolver
 cd knot-resolver
-git config --global user.email "ci@knot-resolver"
-git config --global user.name "GitLab CI"
-git checkout manager-integration
+git config --global user.email "automated-script"
+git config --global user.name "Automated Script"
+git checkout manager-integration-without-submodule
 git submodule update --init --recursive
-cd manager
-git checkout master
-cd ..
-git commit -a -m "auto-update of knot-resolver's manager to the latest master branch"
 
 # build the package
 apkg system-setup
