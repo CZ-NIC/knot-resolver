@@ -17,7 +17,7 @@ function init_debian {
     apt-get update -qqq
 
     # apkg
-    apt-get install -y python3-pip meson git
+    apt-get install -y python3-pip meson git python3-venv
 }
 
 function init_fedora {
@@ -38,7 +38,10 @@ else
 fi
 
 # install apkg
-pip3 install apkg
+python3 -m pip install --user pipx
+python3 -m pipx ensurepath
+PATH="$PATH:/root/.local/bin"  # hack to make binaries installed with pipx work
+python3 -m pipx install apkg
 
 # prepare the repo
 git clone https://gitlab.nic.cz/knot/knot-resolver
