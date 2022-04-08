@@ -68,6 +68,28 @@ additional considerations for TLS 1.2 required by HTTP/2 are not implemented
 
 .. _dot-doh-config-options:
 
+HTTP status codes
+"""""""""""""""""
+
+As specified by :rfc:`8484`, the resolver responds with status **200 OK** whenever 
+it can produce a valid DNS reply for a given query, even in cases where the DNS
+``rcode`` indicates an error (like ``NXDOMAIN``, ``SERVFAIL``, etc.).
+
+For DoH queries malformed at the HTTP level, the resolver may respond with
+the following status codes:
+
+ * **400 Bad Request** for a generally malformed query, like one not containing
+   a valid DNS packet
+ * **404 Not Found** when an incorrect HTTP endpoint is queried - the only 
+   supported ones are ``/dns-query`` and ``/doh``
+ * **413 Payload Too Large** when the DNS query exceeds its maximum size
+ * **415 Unsupported Media Type** when the query's ``Content-Type`` header
+   is not ``application/dns-message``
+ * **431 Request Header Fields Too Large** when a header in the query is too
+   large to process
+ * **501 Not Implemented** when the query uses a method other than
+   ``GET``, ``POST``, or ``HEAD``
+
 Configuration options for DoT and DoH
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
