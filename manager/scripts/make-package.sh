@@ -44,8 +44,8 @@ PATH="$PATH:/root/.local/bin"  # hack to make binaries installed with pipx work
 python3 -m pipx install apkg
 
 # prepare the repo
-git clone https://gitlab.nic.cz/knot/knot-resolver
-cd knot-resolver
+#git clone https://gitlab.nic.cz/knot/knot-resolver
+cd /repo
 git config --global user.email "automated-script"
 git config --global user.name "Automated Script"
 git checkout manager-integration-without-submodule

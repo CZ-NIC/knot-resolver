@@ -12,8 +12,5 @@ fi
 
 systemctl start knot-resolver.service
 
-# FIXME remove after implementing sd_notify in manager
-sleep 10
-
 # check that the resolvers are actually running
 kdig @127.0.0.1 nic.cz

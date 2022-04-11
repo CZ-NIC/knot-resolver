@@ -25,6 +25,7 @@ from knot_resolver_manager.datamodel.server_schema import ManagementSchema
 from knot_resolver_manager.exceptions import DataException, KresManagerException, SchemaException
 from knot_resolver_manager.kresd_controller import get_controller_by_name
 from knot_resolver_manager.kresd_controller.interface import SubprocessController
+from knot_resolver_manager.utils import systemd_notify
 from knot_resolver_manager.utils.async_utils import readfile
 from knot_resolver_manager.utils.functional import Result
 from knot_resolver_manager.utils.parsing import ParsedTree, parse, parse_yaml
@@ -96,6 +97,8 @@ class Server:
 
     async def sighup_handler(self) -> None:
         logger.info("Received SIGHUP, reloading configuration file")
+        systemd_notify.systemd_notify(RELOADING="1")
+
         if self._config_path is None:
             logger.warning("The manager was started with inlined configuration - can't reload")
         else:
@@ -116,6 +119,8 @@ class Server:
             except KresManagerException as e:
                 logger.error(f"Reloading of the configuration file failed: {e}")
                 logger.error("Configuration have NOT been changed.")
+
+        systemd_notify.systemd_notify(READY="1")
 
     @staticmethod
     def all_handled_signals() -> Set[signal.Signals]:
@@ -468,7 +473,13 @@ async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_
 
     logger.info(f"Manager fully initialized and running in {round(time() - start_time, 3)} seconds")
 
+    # notify systemd about that we are ready
+    systemd_notify.systemd_notify(READY="1")
+
     await server.wait_for_shutdown()
+
+    # notify systemd that we are shutting down
+    systemd_notify.systemd_notify(STOPPING="1")
 
     # Ok, now we are tearing everything down.
 
