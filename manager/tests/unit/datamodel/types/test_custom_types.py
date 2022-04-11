@@ -83,11 +83,12 @@ def test_checked_path():
     assert str(TestSchema({"p": "/tmp"}).p) == "/tmp"
 
 
-@pytest.mark.parametrize("val", ["example.com.", "test.example.com", "test-example.com"])
+@pytest.mark.parametrize("val", ["example.com.", "test.example.com", "test-example.com", "bücher.com.", "příklad.cz"])
 def test_domain_name_valid(val: str):
     o = DomainName(val)
     assert str(o) == val
     assert o == DomainName(val)
+    assert o.punycode() == val.encode("idna")
 
 
 @pytest.mark.parametrize("val", ["test.example.com..", "-example.com", "test-.example.net"])
