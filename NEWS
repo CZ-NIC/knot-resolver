@@ -5,6 +5,7 @@ Bugfixes
 --------
 - modules/dns64: fix incorrect packet writes for cached packets (#727, !1275)
 - xdp: make it work also with libknot 3.1 (#735, !1276)
+- prefill module: fix lockup when starting multiple idle instances (!1285)
 
 
 Knot Resolver 5.5.0 (2022-03-15)

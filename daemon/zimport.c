@@ -426,6 +426,7 @@ static void zi_zone_process(uv_timer_t *timer)
 	kr_timer_start(&stopwatch);
 
 	int ret = trie_apply(z_import->rrsets, zi_rrset_import, z_import);
+	(void)kr_cache_commit(&the_worker->engine->resolver.cache); // RW transaction open
 	if (ret == 0) {
 		kr_log_info(PREFILL, "performance: validating and caching took %.3lf s\n",
 			kr_timer_elapsed(&stopwatch));
