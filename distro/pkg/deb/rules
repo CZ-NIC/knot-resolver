@@ -45,7 +45,7 @@ override_dh_auto_install:
 	DESTDIR="${PWD}/debian/tmp" ninja -v -C build_deb install
 	dh_auto_install --buildsystem=pybuild --sourcedirectory manager
 	install -m 644 -D $(CURDIR)/manager/etc/knot-resolver/config.yml $(CURDIR)/debian/tmp/etc/knot-resolver/config.yml
-	install -m 644 -D $(CURDIR)/manager/knot-resolver-manager.service $(CURDIR)/debian/tmp/lib/systemd/system/knot-resolver-manager.service
+	install -m 644 -D $(CURDIR)/manager/knot-resolver.service $(CURDIR)/debian/tmp/lib/systemd/system/knot-resolver.service
 
 override_dh_auto_test:
 	meson test -C build_deb

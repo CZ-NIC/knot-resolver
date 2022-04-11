@@ -96,6 +96,8 @@ class Server:
 
     async def sighup_handler(self) -> None:
         logger.info("Received SIGHUP, reloading configuration file")
+        systemd_notify(RELOADING="1")
+
         if self._config_path is None:
             logger.warning("The manager was started with inlined configuration - can't reload")
         else:
@@ -116,6 +118,8 @@ class Server:
             except KresManagerException as e:
                 logger.error(f"Reloading of the configuration file failed: {e}")
                 logger.error("Configuration have NOT been changed.")
+
+        systemd_notify(READY="1")
 
     @staticmethod
     def all_handled_signals() -> Set[signal.Signals]:
@@ -496,6 +500,9 @@ async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_
     systemd_notify(READY="1")
 
     await server.wait_for_shutdown()
+
+    # notify systemd that we are shutting down
+    systemd_notify(STOPPING="1")
 
     # Ok, now we are tearing everything down.
 

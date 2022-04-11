@@ -242,7 +242,7 @@ mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 pushd manager
 %py3_install
 install -m 644 -D etc/knot-resolver/config.yml %{buildroot}%{_sysconfdir}/knot-resolver/config.yml
-install -m 644 -D knot-resolver-manager.service %{buildroot}%{_unitdir}/knot-resolver-manager.service
+install -m 644 -D knot-resolver.service %{buildroot}%{_unitdir}/knot-resolver.service
 popd
 
 %pre
@@ -401,7 +401,7 @@ fi
 %files -n python3-knot-resolver-manager
 %{python3_sitelib}/knot_resolver_manager*
 %{_sysconfdir}/knot-resolver/config.yml
-%{_unitdir}/knot-resolver-manager.service
+%{_unitdir}/knot-resolver.service
 
 %changelog
 * {{ now }} Jakub Ružička <jakub.ruzicka@nic.cz> - {{ version }}-{{ release }}

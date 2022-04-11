@@ -3,13 +3,11 @@ cache:
 logging:
   level: info
 network:
-  interfaces:
-    - listen:
-        ip: 127.0.0.1
-        port: 53
+  listen:
+    - interface: 127.0.0.1@53
 server:
-  workers: 1
+  id: distro
+  workers: 2
+  rundir: /run/knot-resolver
   management:
-    listen:
-      unix-socket: /run/knot-resolver/manager.sock
-    rundir: /run/knot-resolver
+    unix-socket: /run/knot-resolver/manager.sock
