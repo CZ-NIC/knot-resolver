@@ -31,8 +31,6 @@ stages:
   except:
     refs:
       - master@knot/knot-resolver
-      - manager@knot/knot-resolver
-      - /^manager.*$/
       - master@knot/security/knot-resolver
       - tags
     variables:
@@ -44,6 +42,9 @@ stages:
 
 .after_build: &after_build
   <<: *common
+  except:
+    refs:
+      - /^manager.*$/
   needs:
     - build
   before_script:
@@ -62,6 +63,9 @@ stages:
 
 .nodep: &nodep
   <<: *common
+  except:
+    refs:
+      - /^manager.*$/
   needs: []
 
 # build {{{
@@ -81,9 +85,6 @@ stages:
 
 archive:
   <<: *build
-  except:
-      - manager@knot/knot-resolver
-      - /^manager.*$/
   script:
     - apkg make-archive
 
@@ -97,6 +98,9 @@ build:
 
 build-asan:
   <<: *build
+  except:
+    refs:
+      - /^manager.*$/
   script:
       # "undefined" sanitizer causes C++ issues when loading ahocorasick.so in CI
     - CC=clang CXX=clang++ CFLAGS=-fno-sanitize-recover=all CXXFLAGS=-fno-sanitize=undefined meson build_ci_asan --default-library=static --prefix=$PREFIX -Db_sanitize=address,undefined -Dextra_tests=enabled
@@ -110,7 +114,6 @@ build:macOS:
   <<: *nodep
   except:
     refs:
-      - manager@knot/knot-resolver
       - /^manager.*$/
       - branches@knot/security/knot-resolver
   stage: build
@@ -138,9 +141,6 @@ docker:
 sonarcloud:
   <<: *nodep
   stage: build
-  except:
-      - manager@knot/knot-resolver
-      - /^manager.*$/
   only:
     - tags
     - master@knot/knot-resolver
@@ -344,8 +344,6 @@ pkgtest:
   except:
     refs:
       - master@knot/knot-resolver
-      - manager@knot/knot-resolver
-      - /^manager.*$/
       - master@knot/security/knot-resolver
       - tags
     variables:
@@ -367,6 +365,9 @@ manager:
 
 pytests:
   <<: *common
+  except:
+    refs:
+    - /^manager.*$/
   # these are executed on LXC runners to increase stability
   image: $CI_REGISTRY/knot/knot-resolver/ci/lxc-debian-11:knot-$KNOT_VERSION
   needs: []
@@ -394,6 +395,9 @@ pytests:
 # respdiff {{{
 .condor: &condor
   <<: *common
+  except:
+    refs:
+      - /^manager.*$/
   needs:
     - job: deckard
       artifacts: false
