@@ -61,12 +61,12 @@ class DomainName(StrBase):
     """
 
     _re = re.compile(
-        r"(?=^.{,253}$)"  # max 253 chars
-        r"^([a-zA-Z0-9]"  # do not start with hyphen
-        r"([a-zA-Z0-9-]){1,61}"  # max 63 chars in label
-        r"[a-zA-Z0-9]\.)"  # do not end with hyphen
-        r"{0,126}"  # max 126 levels+TLD
-        r"([a-zA-Z]){2,6}($|.$)"  # TLD; end with or without '.'
+        r"(?=^.{,253}\.?$)"  # max 253 chars
+        r"^(?!\.)"  # do not start name with dot
+        r"((?!-)"  # do not start label with hyphen
+        r"\.?[a-zA-Z0-9-]{,62}"  # max 63 chars in label
+        r"[a-zA-Z0-9])+"  # do not end label with hyphen
+        r"\.?$"  # end with or without '.'
     )
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
@@ -99,8 +99,8 @@ class DomainName(StrBase):
             return hash(self._value)
         return hash(f"{self._value}.")
 
-    def punycode(self) -> bytes:
-        return self._value.encode("idna")
+    def punycode(self) -> str:
+        return self._value.encode("idna").decode("utf-8")
 
     @classmethod
     def json_schema(cls: Type["DomainName"]) -> Dict[Any, Any]:

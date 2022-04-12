@@ -1,4 +1,6 @@
 import ipaddress
+import random
+import string
 from typing import Any
 
 import pytest
@@ -22,6 +24,12 @@ from knot_resolver_manager.datamodel.types import (
 )
 from knot_resolver_manager.exceptions import KresManagerException
 from knot_resolver_manager.utils import SchemaNode
+
+
+def _rand_domain(label_chars: int, levels: int = 1) -> str:
+    return "".join(
+        ["".join(random.choices(string.ascii_letters + string.digits, k=label_chars)) + "." for i in range(levels)]
+    )
 
 
 @pytest.mark.parametrize("val", [1, 65_535, 5353, 5000])
@@ -83,15 +91,37 @@ def test_checked_path():
     assert str(TestSchema({"p": "/tmp"}).p) == "/tmp"
 
 
-@pytest.mark.parametrize("val", ["example.com.", "test.example.com", "test-example.com", "bücher.com.", "příklad.cz"])
+@pytest.mark.parametrize(
+    "val",
+    [
+        "example.com",
+        "this.is.example.com.",
+        "test.example.com",
+        "test-example.com",
+        "bücher.com.",
+        "příklad.cz",
+        _rand_domain(63),
+        _rand_domain(1, 127),
+    ],
+)
 def test_domain_name_valid(val: str):
     o = DomainName(val)
     assert str(o) == val
     assert o == DomainName(val)
-    assert o.punycode() == val.encode("idna")
+    assert o.punycode() == val.encode("idna").decode("utf-8")
 
 
-@pytest.mark.parametrize("val", ["test.example.com..", "-example.com", "test-.example.net"])
+@pytest.mark.parametrize(
+    "val",
+    [
+        "test.example..com.",
+        "-example.com",
+        "test-.example.net",
+        ".example.net",
+        _rand_domain(64),
+        _rand_domain(1, 128),
+    ],
+)
 def test_domain_name_invalid(val: str):
     with raises(KresManagerException):
         DomainName(val)
