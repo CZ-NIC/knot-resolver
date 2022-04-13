@@ -8,7 +8,7 @@ cache.ns_tout({{ cfg.cache.ns_timeout.millis() }})
 modules.load('prefill')
 prefill.config({
 {% for item in cfg.cache.prefill %}
-    ['{{ item.domain }}'] = {
+    ['{{ item.origin.punycode() }}'] = {
         url = '{{ item.url }}',
         interval = {{ item.refresh_interval.seconds() }}
         {{ "ca_file = '"+item.ca_file+"'," if item.ca_file }}

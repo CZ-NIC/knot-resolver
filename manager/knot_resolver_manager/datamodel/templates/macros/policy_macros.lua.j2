@@ -235,10 +235,10 @@ policy.TLS_FORWARD({{ tls_servers_table(servers) }})
 {% macro policy_todname(names) -%}
 policy.todnames({
 {%- if names is string -%}
-'{{ names|string }}'
+'{{ names.punycode()|string }}'
 {%- else -%}
 {%- for name in names -%}
-'{{ name|string }}',
+'{{ name.punycode()|string }}',
 {%- endfor -%}
 {%- endif -%}
 })
