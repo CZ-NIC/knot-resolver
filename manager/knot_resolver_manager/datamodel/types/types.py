@@ -60,20 +60,22 @@ class DomainName(StrBase):
     Fully or partially qualified domain name.
     """
 
+    _punycode: str
     _re = re.compile(
         r"(?=^.{,253}\.?$)"  # max 253 chars
-        r"^(?!\.)"  # do not start name with dot
+        r"(^(?!\.)"  # do not start name with dot
         r"((?!-)"  # do not start label with hyphen
         r"\.?[a-zA-Z0-9-]{,62}"  # max 63 chars in label
         r"[a-zA-Z0-9])+"  # do not end label with hyphen
-        r"\.?$"  # end with or without '.'
+        r"\.?$)"  # end with or without '.'
+        r"|^\.$"  # allow root-zone
     )
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
         if isinstance(source_value, str):
             try:
-                punycode = source_value.encode("idna").decode("utf-8")
+                punycode = source_value.encode("idna").decode("utf-8") if source_value != "." else "."
             except ValueError:
                 raise SchemaException(
                     f"conversion of '{source_value}' to IDN punycode representation failed",
@@ -82,6 +84,7 @@ class DomainName(StrBase):
 
             if type(self)._re.match(punycode):
                 self._value = source_value
+                self._punycode = punycode
             else:
                 raise SchemaException(
                     f"'{source_value}' represented in punycode '{punycode}' does not match '{self._re.pattern}' pattern",
@@ -100,7 +103,7 @@ class DomainName(StrBase):
         return hash(f"{self._value}.")
 
     def punycode(self) -> str:
-        return self._value.encode("idna").decode("utf-8")
+        return self._punycode
 
     @classmethod
     def json_schema(cls: Type["DomainName"]) -> Dict[Any, Any]:

@@ -94,6 +94,7 @@ def test_checked_path():
 @pytest.mark.parametrize(
     "val",
     [
+        ".",
         "example.com",
         "this.is.example.com.",
         "test.example.com",
@@ -108,7 +109,7 @@ def test_domain_name_valid(val: str):
     o = DomainName(val)
     assert str(o) == val
     assert o == DomainName(val)
-    assert o.punycode() == val.encode("idna").decode("utf-8")
+    assert o.punycode() == val.encode("idna").decode("utf-8") if val != "." else "."
 
 
 @pytest.mark.parametrize(
