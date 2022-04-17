@@ -186,11 +186,14 @@ def restart_unit(type_: SystemdType, unit_name: str) -> None:
     _wait_for_job_completion(systemd, job)
 
 
-def _slice_name() -> str:
-    return f"kres-{user_constants().ID}.slice"
+def _slice_name(systemd_type: SystemdType) -> str:
+    if systemd_type is SystemdType.SESSION:
+        return f"kres-{user_constants().ID}.slice"
+    else:
+        return f"system-kres-{user_constants().ID}.slice"
 
 
-def _kresd_unit_properties(config: KresConfig, kres_id: KresID) -> List[Tuple[str, str]]:
+def _kresd_unit_properties(config: KresConfig, kres_id: KresID, systemd_type: SystemdType) -> List[Tuple[str, str]]:
     val: Any = [
         ("Description", GLib.Variant("s", "transient Knot Resolver unit started by Knot Resolver Manager")),
         ("Type", GLib.Variant("s", "notify")),
@@ -215,7 +218,7 @@ def _kresd_unit_properties(config: KresConfig, kres_id: KresID) -> List[Tuple[st
         ("Restart", GLib.Variant("s", "always")),
         ("LimitNOFILE", GLib.Variant("t", 524288)),
         ("Environment", GLib.Variant("as", [f"SYSTEMD_INSTANCE={kres_id}"])),
-        ("Slice", GLib.Variant("s", _slice_name())),
+        ("Slice", GLib.Variant("s", _slice_name(systemd_type))),
     ]
 
     if config.server.watchdog:
@@ -226,7 +229,7 @@ def _kresd_unit_properties(config: KresConfig, kres_id: KresID) -> List[Tuple[st
     return val
 
 
-def _gc_unit_properties(config: KresConfig) -> Any:
+def _gc_unit_properties(config: KresConfig, systemd_type: SystemdType) -> Any:
     val: Any = [
         (
             "Description",
@@ -251,7 +254,7 @@ def _gc_unit_properties(config: KresConfig) -> Any:
         ("RestartUSec", GLib.Variant("t", 30000000)),
         ("StartLimitIntervalUSec", GLib.Variant("t", 400000000)),
         ("StartLimitBurst", GLib.Variant("u", 10)),
-        ("Slice", GLib.Variant("s", _slice_name())),
+        ("Slice", GLib.Variant("s", _slice_name(systemd_type))),
     ]
     return val
 
@@ -287,8 +290,8 @@ def _start_transient_unit(systemd_type: SystemdType, name: str, properties: Any)
 
 def start_transient_kresd_unit(config: KresConfig, type_: SystemdType, kres_id: KresID) -> None:
     properties = {
-        SubprocessType.KRESD: _kresd_unit_properties(config, kres_id),
-        SubprocessType.GC: _gc_unit_properties(config),
+        SubprocessType.KRESD: _kresd_unit_properties(config, kres_id, type_),
+        SubprocessType.GC: _gc_unit_properties(config, type_),
     }[kres_id.subprocess_type]
     name = str(kres_id)
 
@@ -296,15 +299,15 @@ def start_transient_kresd_unit(config: KresConfig, type_: SystemdType, kres_id: 
 
 
 def start_slice(systemd_type: SystemdType) -> None:
-    _start_transient_unit(systemd_type, _slice_name(), _kres_slice_properties())
+    _start_transient_unit(systemd_type, _slice_name(systemd_type), _kres_slice_properties())
 
 
 def stop_slice(systemd_type: SystemdType) -> None:
-    stop_unit(systemd_type, _slice_name())
+    stop_unit(systemd_type, _slice_name(systemd_type))
 
 
 def list_our_slice_processes(systemd_type: SystemdType) -> Set[str]:
-    return _list_slice_services(systemd_type, _slice_name())
+    return _list_slice_services(systemd_type, _slice_name(systemd_type))
 
 
 @_wrap_dbus_errors
