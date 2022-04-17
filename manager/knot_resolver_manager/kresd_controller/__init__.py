@@ -51,7 +51,7 @@ def try_systemd():
 
 
 async def get_best_controller_implementation(config: KresConfig) -> SubprocessController:
-    logger.debug("Starting service manager auto-selection...")
+    logger.info("Starting service manager auto-selection...")
 
     if len(_registered_controllers) == 0:
         logger.error("No controllers are available! Did you install all dependencies?")
@@ -59,6 +59,10 @@ async def get_best_controller_implementation(config: KresConfig) -> SubprocessCo
 
     # check all controllers concurrently
     res = await asyncio.gather(*(cont.is_controller_available(config) for cont in _registered_controllers))
+    logger.info(
+        "Available subprocess controllers are %s",
+        str(tuple((str(c) for r, c in zip(res, _registered_controllers) if r))),
+    )
 
     # take the first one on the list which is available
     for avail, controller in zip(res, _registered_controllers):

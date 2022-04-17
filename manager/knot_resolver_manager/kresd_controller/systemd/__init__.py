@@ -109,7 +109,7 @@ class SystemdSubprocessController(SubprocessController):
         cmd = f"systemctl {'--user' if self._systemd_type == SystemdType.SESSION else ''} status"
         ret = await call(cmd, shell=True, discard_output=True)
         if ret != 0:
-            logger.info(
+            logger.debug(
                 "Calling '%s' failed. Assumming systemd (%s) is not running/installed.", cmd, self._systemd_type
             )
             return False
@@ -117,7 +117,7 @@ class SystemdSubprocessController(SubprocessController):
         # check that we run under root for non-session systemd
         try:
             if self._systemd_type is SystemdType.SYSTEM and os.geteuid() != 0:
-                logger.info(
+                logger.debug(
                     "Systemd (%s) looks functional, but we are not running as root. Assuming not enough privileges",
                     self._systemd_type,
                 )
@@ -125,7 +125,7 @@ class SystemdSubprocessController(SubprocessController):
 
             return True
         except BaseException:  # we want every possible exception to be caught
-            logger.warning("Communicating with systemd DBus API failed", exc_info=True)
+            logger.warning("Systemd autodetection error: communicating with systemd DBus API failed", exc_info=True)
             return False
 
     async def get_all_running_instances(self) -> Iterable[Subprocess]:
