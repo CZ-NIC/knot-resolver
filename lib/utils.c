@@ -378,6 +378,7 @@ struct sockaddr *kr_sockaddr_from_key(struct sockaddr_storage *dst,
 		return (struct sockaddr *) addr_un;
 
 	default:
+		kr_assert(false);
 		return NULL;
 	}
 }
@@ -486,7 +487,10 @@ int kr_straddr_family(const char *addr)
 	if (strchr(addr, ':')) {
 		return AF_INET6;
 	}
-	return AF_INET;
+	if (strchr(addr, '.')) {
+		return AF_INET;
+	}
+	return kr_error(EINVAL);
 }
 
 int kr_family_len(int family)
@@ -531,7 +535,6 @@ struct sockaddr * kr_straddr_socket(const char *addr, int port, knot_mm_t *pool)
 		return (struct sockaddr *)res;
 	}
 	default:
-		kr_assert(false);
 		return NULL;
 	}
 }
