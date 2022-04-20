@@ -21,7 +21,7 @@ class PrefillSchema(SchemaNode):
     ca_file: Optional[CheckedPath] = None
 
     def _validate(self) -> None:
-        if self.origin != ".":
+        if str(self.origin) != ".":
             raise ValueError("cache prefilling is not yet supported for non-root zones")
 
 

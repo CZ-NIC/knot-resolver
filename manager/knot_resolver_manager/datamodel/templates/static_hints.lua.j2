@@ -30,7 +30,7 @@ hints.add_hosts('{{ item }}')
 -- static-hints.root-hints
 hints.root({
 {% for name, addrs in cfg.static_hints.root_hints.items() %}
-['{{ name }}'] = {
+['{{ name.punycode() }}'] = {
 {% for addr in addrs %}
         '{{ addr }}',
 {% endfor %}
@@ -43,7 +43,7 @@ hints.root({
 -- static-hints.hints
 {% for name, addrs in cfg.static_hints.hints.items() %}
 {% for addr in addrs %}
-hints.set('{{ name }} {{ addr }}')
+hints.set('{{ name.punycode() }} {{ addr }}')
 {% endfor %}
 {% endfor %}
 {% endif %}

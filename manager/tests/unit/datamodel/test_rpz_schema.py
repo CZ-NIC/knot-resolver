@@ -1,12 +1,23 @@
+import pytest
 from pytest import raises
 
 from knot_resolver_manager.datamodel.rpz_schema import RPZSchema
 from knot_resolver_manager.exceptions import KresManagerException
 
 
-def test_message():
-
-    assert RPZSchema({"action": "deny", "file": "blocklist.rpz", "message": "this is deny message"})
-
+@pytest.mark.parametrize(
+    "val",
+    [
+        "pass",
+        "drop",
+        "refuse",
+        "tc",
+        "debug-always",
+        "debug-cache-miss",
+        "qtrace",
+        "reqtrace",
+    ],
+)
+def test_message_invalid(val: str):
     with raises(KresManagerException):
-        RPZSchema({"action": "pass", "file": "whitelist.rpz", "message": "this is deny message"})
+        RPZSchema({"action": f"{val}", "file": "whitelist.rpz", "message": "this is deny message"})

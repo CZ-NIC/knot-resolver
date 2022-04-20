@@ -55,13 +55,59 @@ class TimeUnit(UnitBase):
         return self._value
 
 
-class DomainName(PatternBase):
+class DomainName(StrBase):
+    """
+    Fully or partially qualified domain name.
+    """
+
+    _punycode: str
     _re = re.compile(
-        r"^(([a-zA-Z]{1})|([a-zA-Z]{1}[a-zA-Z]{1})|"
-        r"([a-zA-Z]{1}[0-9]{1})|([0-9]{1}[a-zA-Z]{1})|"
-        r"([a-zA-Z0-9][-_.a-zA-Z0-9]{0,61}[a-zA-Z0-9]))\."
-        r"([a-zA-Z]{2,13}|[a-zA-Z0-9-]{2,30}.[a-zA-Z]{2,3})($|.$)"
+        r"(?=^.{,253}\.?$)"  # max 253 chars
+        r"(^(?!\.)"  # do not start name with dot
+        r"((?!-)"  # do not start label with hyphen
+        r"\.?[a-zA-Z0-9-]{,62}"  # max 63 chars in label
+        r"[a-zA-Z0-9])+"  # do not end label with hyphen
+        r"\.?$)"  # end with or without '.'
+        r"|^\.$"  # allow root-zone
     )
+
+    def __init__(self, source_value: Any, object_path: str = "/") -> None:
+        super().__init__(source_value)
+        if isinstance(source_value, str):
+            try:
+                punycode = source_value.encode("idna").decode("utf-8") if source_value != "." else "."
+            except ValueError:
+                raise SchemaException(
+                    f"conversion of '{source_value}' to IDN punycode representation failed",
+                    object_path,
+                )
+
+            if type(self)._re.match(punycode):
+                self._value = source_value
+                self._punycode = punycode
+            else:
+                raise SchemaException(
+                    f"'{source_value}' represented in punycode '{punycode}' does not match '{self._re.pattern}' pattern",
+                    object_path,
+                )
+        else:
+            raise SchemaException(
+                "Unexpected value for '<domain-name>'."
+                f" Expected string, got '{source_value}' with type '{type(source_value)}'",
+                object_path,
+            )
+
+    def __hash__(self) -> int:
+        if self._value.endswith("."):
+            return hash(self._value)
+        return hash(f"{self._value}.")
+
+    def punycode(self) -> str:
+        return self._punycode
+
+    @classmethod
+    def json_schema(cls: Type["DomainName"]) -> Dict[Any, Any]:
+        return {"type": "string", "pattern": rf"{cls._re.pattern}"}
 
 
 class InterfaceName(PatternBase):
@@ -77,8 +123,8 @@ class IDPattern(PatternBase):
 
 
 class InterfacePort(StrBase):
-    addr: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
-    if_name: InterfaceName
+    addr: Union[None, ipaddress.IPv4Address, ipaddress.IPv6Address] = None
+    if_name: Optional[InterfaceName] = None
     port: PortNumber
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
