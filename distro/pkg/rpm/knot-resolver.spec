@@ -402,6 +402,7 @@ fi
 %{python3_sitelib}/knot_resolver_manager*
 %{_sysconfdir}/knot-resolver/config.yml
 %{_unitdir}/knot-resolver.service
+%{_bindir}/kresctl
 
 %changelog
 * {{ now }} Jakub Ružička <jakub.ruzicka@nic.cz> - {{ version }}-{{ release }}
