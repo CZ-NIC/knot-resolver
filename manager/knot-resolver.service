@@ -5,10 +5,10 @@ After=dbus.service
 
 [Service]
 Type=notify
-ExecStart=python3 -m knot_resolver_manager --config=/etc/knot-resolver/config.yml
+ExecStart=/usr/bin/env python3 -m knot_resolver_manager --config=/etc/knot-resolver/config.yml
 KillSignal=SIGINT
 # See systemd.service(5) for explanation, why we should replace this with a blocking request
-ExecReload=kill -HUP $MAINPID
+ExecReload=/usr/bin/env kill -HUP $MAINPID
 
 [Install]
 WantedBy=multi-user.target
