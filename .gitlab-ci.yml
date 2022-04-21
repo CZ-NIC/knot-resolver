@@ -382,6 +382,7 @@ pytests:
     - CC=clang CXX=clang++ CFLAGS=-fno-sanitize-recover=all CXXFLAGS=-fno-sanitize=undefined meson build_ci_asan --default-library=static --prefix=$PREFIX -Db_sanitize=address,undefined -Dextra_tests=enabled
     - ninja -C build_ci_asan
     - ninja -C build_ci_asan install >/dev/null
+  # END lxc specific section
   artifacts:
     when: always
     paths:
