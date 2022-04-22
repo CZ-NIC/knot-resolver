@@ -84,6 +84,17 @@ modules.load('http')
 {{ http_config(cfg.network.tls,"doh_legacy") }}
 {% endif %}
 
+{% if cfg.network.proxy_v2 %}
+-- network.proxy-v2
+net.proxy_allowed({
+{% for item in cfg.network.proxy_v2.allow %}
+'{{ item }}',
+{% endfor %}
+})
+{% else %}
+net.proxy_allowed({})
+{% endif %}
+
 -- network.listen
 {% for listen in cfg.network.listen %}
 {{ network_listen(listen) }}
