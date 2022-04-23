@@ -16,11 +16,11 @@
 #include "lib/defines.h"
 #include "lib/dnssec/nsec.h"
 #include "lib/utils.h"
-
+#include "resolve.h"
 
 int kr_nsec_children_in_zone_check(const uint8_t *bm, uint16_t bm_size)
 {
-	if (!bm)
+	if (kr_fails_assert(bm))
 		return kr_error(EINVAL);
 	const bool parent_side =
 		dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_DNAME)
@@ -94,26 +94,28 @@ static int dname_cmp(const knot_dname_t *d1, const knot_dname_t *d2)
 
 
 /**
- * Check whether the NSEC RR proves that there is no closer match for <SNAME, SCLASS>.
+ * Check whether this nsec proves that there is no closer match for sname.
+ *
  * @param nsec  NSEC RRSet.
  * @param sname Searched name.
- * @return      0 if proves, >0 if not (abs(ENOENT)), or error code (<0).
+ * @return      0 if proves, >0 if not (abs(ENOENT) or abs(EEXIST)), or error code (<0).
  */
 static int nsec_covers(const knot_rrset_t *nsec, const knot_dname_t *sname)
 {
 	if (kr_fails_assert(nsec && sname))
 		return kr_error(EINVAL);
-	if (dname_cmp(sname, nsec->owner) <= 0)
-		return abs(ENOENT); /* 'sname' before 'owner', so can't be covered */
+	const int cmp = dname_cmp(sname, nsec->owner);
+	if (cmp  < 0) return abs(ENOENT); /* 'sname' before 'owner', so can't be covered */
+	if (cmp == 0) return abs(EEXIST); /* matched, not covered */
 
-	/* If NSEC 'owner' >= 'next', it means that there is nothing after 'owner' */
-	/* We have to lower-case it with libknot >= 2.7; see also RFC 6840 5.1. */
+	/* We have to lower-case 'next' with libknot >= 2.7; see also RFC 6840 5.1. */
 	knot_dname_t next[KNOT_DNAME_MAXLEN];
 	int ret = knot_dname_to_wire(next, knot_nsec_next(nsec->rrs.rdata), sizeof(next));
 	if (kr_fails_assert(ret >= 0))
 		return kr_error(ret);
 	knot_dname_to_lower(next);
 
+	/* If NSEC 'owner' >= 'next', it means that there is nothing after 'owner' */
 	const bool is_last_nsec = dname_cmp(nsec->owner, next) >= 0;
 	const bool in_range = is_last_nsec || dname_cmp(sname, next) < 0;
 	if (!in_range)
@@ -223,47 +225,6 @@ int kr_nsec_name_error_response_check(const knot_pkt_t *pkt, knot_section_t sect
 	return kr_nsec_existence_denied(flags) ? kr_ok() : kr_error(ENOENT);
 }
 
-/**
- * Returns the labels from the covering RRSIG RRs.
- * @note The number must be the same in all covering RRSIGs.
- * @param nsec NSEC RR.
- * @param sec  Packet section.
- * @param      Number of labels or (negative) error code.
- */
-static int covering_rrsig_labels(const knot_rrset_t *nsec, const knot_pktsection_t *sec)
-{
-	if (kr_fails_assert(nsec && sec))
-		return kr_error(EINVAL);
-
-	int ret = kr_error(ENOENT);
-
-	for (unsigned i = 0; i < sec->count; ++i) {
-		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
-		if ((rrset->type != KNOT_RRTYPE_RRSIG) ||
-		    (!knot_dname_is_equal(rrset->owner, nsec->owner))) {
-			continue;
-		}
-
-		knot_rdata_t *rdata_j = rrset->rrs.rdata;
-		for (uint16_t j = 0; j < rrset->rrs.count;
-				++j, rdata_j = knot_rdataset_next(rdata_j)) {
-			if (knot_rrsig_type_covered(rdata_j) != KNOT_RRTYPE_NSEC)
-				continue;
-
-			if (ret < 0) {
-				ret = knot_rrsig_labels(rdata_j);
-			} else {
-				if (ret != knot_rrsig_labels(rdata_j)) {
-					return kr_error(EINVAL);
-				}
-			}
-		}
-	}
-
-	return ret;
-}
-
-
 int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t type, const knot_dname_t *owner)
 {
 	const int NO_PROOF = abs(ENOENT);
@@ -306,114 +267,14 @@ int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t ty
 	return kr_ok();
 }
 
-/**
- * Attempt to prove NODATA given a matching NSEC.
- * @param flags Flags to be set according to check outcome.
- * @param nsec  NSEC RR.
- * @param type  Type to be checked.
- * @return      0 on success, abs(ENOENT) for no proof, or error code (<0).
- * @note        It's not a *full* proof, of course (wildcards, etc.)
- * @TODO returning result via `flags` is just ugly.
- */
-static int no_data_response_check_rrtype(int *flags, const knot_rrset_t *nsec,
-                                         uint16_t type)
+/// Convenience wrapper for kr_nsec_bitmap_nodata_check()
+static int no_data_response_check_rrtype(const knot_rrset_t *nsec, uint16_t type)
 {
-	if (kr_fails_assert(flags && nsec))
+	if (kr_fails_assert(nsec && nsec->type == KNOT_RRTYPE_NSEC))
 		return kr_error(EINVAL);
-
 	const uint8_t *bm = knot_nsec_bitmap(nsec->rrs.rdata);
 	uint16_t bm_size = knot_nsec_bitmap_len(nsec->rrs.rdata);
-	int ret = kr_nsec_bitmap_nodata_check(bm, bm_size, type, nsec->owner);
-	if (ret == kr_ok())
-		*flags |= FLG_NOEXIST_RRTYPE;
-	return ret <= 0 ? ret : kr_ok();
-}
-
-/**
- * Perform check for RR type wildcard existence denial according to RFC4035 5.4, bullet 1.
- * @param flags Flags to be set according to check outcome.
- * @param nsec  NSEC RR.
- * @param sec   Packet section to work with.
- * @return      0 or error code.
- */
-static int no_data_wildcard_existence_check(int *flags, const knot_rrset_t *nsec,
-                                            const knot_pktsection_t *sec)
-{
-	if (kr_fails_assert(flags && nsec && sec))
-		return kr_error(EINVAL);
-
-	int rrsig_labels = covering_rrsig_labels(nsec, sec);
-	if (rrsig_labels < 0)
-		return rrsig_labels;
-	int nsec_labels = knot_dname_labels(nsec->owner, NULL);
-	if (nsec_labels < 0)
-		return nsec_labels;
-
-	if (rrsig_labels == nsec_labels)
-		*flags |= FLG_NOEXIST_WILDCARD;
-
-	return kr_ok();
-}
-
-/**
- * Perform check for NSEC wildcard existence that covers sname and
- * have no stype bit set.
- * @param pkt   Packet structure to be processed.
- * @param sec   Packet section to work with.
- * @param sname Queried domain name.
- * @param stype Queried type.
- * @return      0 or error code.
- */
-static int wildcard_match_check(const knot_pkt_t *pkt, const knot_pktsection_t *sec,
-				const knot_dname_t *sname, uint16_t stype)
-{
-	if (!sec || !sname)
-		return kr_error(EINVAL);
-
-	int flags = 0;
-	for (unsigned i = 0; i < sec->count; ++i) {
-		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
-		if (rrset->type != KNOT_RRTYPE_NSEC)
-			continue;
-		if (!knot_dname_is_wildcard(rrset->owner))
-			continue;
-		if (!knot_dname_is_equal(rrset->owner, sname)) {
-			int wcard_labels = knot_dname_labels(rrset->owner, NULL);
-			int common_labels = knot_dname_matched_labels(rrset->owner, sname);
-			int rrsig_labels = covering_rrsig_labels(rrset, sec);
-			if (wcard_labels < 1 ||
-			    common_labels != wcard_labels - 1 ||
-			    common_labels != rrsig_labels) {
-				continue;
-			}
-		}
-		int ret = no_data_response_check_rrtype(&flags, rrset, stype);
-		if (ret != 0)
-			return ret;
-	}
-	return (flags & FLG_NOEXIST_RRTYPE) ? kr_ok() : kr_error(ENOENT);
-}
-
-int kr_nsec_no_data_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
-                                   const knot_dname_t *sname, uint16_t stype)
-{
-	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
-	if (!sec || !sname)
-		return kr_error(EINVAL);
-
-	int flags = 0;
-	for (unsigned i = 0; i < sec->count; ++i) {
-		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
-		if (rrset->type != KNOT_RRTYPE_NSEC)
-			continue;
-		if (knot_dname_is_equal(rrset->owner, sname)) {
-			int ret = no_data_response_check_rrtype(&flags, rrset, stype);
-			if (ret != 0)
-				return ret;
-		}
-	}
-
-	return (flags & FLG_NOEXIST_RRTYPE) ? kr_ok() : kr_error(ENOENT);
+	return kr_nsec_bitmap_nodata_check(bm, bm_size, type, nsec->owner);
 }
 
 int kr_nsec_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
@@ -434,42 +295,73 @@ int kr_nsec_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_t
 	return kr_error(ENOENT);
 }
 
-int kr_nsec_existence_denial(const knot_pkt_t *pkt, knot_section_t section_id,
-                             const knot_dname_t *sname, uint16_t stype)
+int kr_nsec_negative(const ranked_rr_array_t *rrrs, uint32_t qry_uid,
+			const knot_dname_t *sname, uint16_t stype)
 {
-	const knot_pktsection_t *sec = knot_pkt_section(pkt, section_id);
-	if (!sec || !sname)
+	// We really only consider the (canonically) first NSEC in each RRset.
+	// Using same owner with differing content probably isn't useful for NSECs anyway.
+	// Many other parts of code do the same, too.
+	if (kr_fails_assert(rrrs && sname))
 		return kr_error(EINVAL);
 
-	int flags = 0;
-	for (unsigned i = 0; i < sec->count; ++i) {
-		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
-		if (rrset->type != KNOT_RRTYPE_NSEC)
-			continue;
-		/* NSEC proves that name exists, but has no data (RFC4035 4.9, 1) */
-		if (knot_dname_is_equal(rrset->owner, sname)) {
-			no_data_response_check_rrtype(&flags, rrset, stype);
-		} else {
-			/* NSEC proves that name doesn't exist (RFC4035, 4.9, 2) */
-			name_error_response_check_rr(&flags, rrset, sname);
+	// Terminology: https://datatracker.ietf.org/doc/html/rfc4592#section-3.3.1
+	int clencl_labels = -1; // the label count of the closest encloser of sname
+	for (int i = rrrs->len - 1; i >= 0; --i) { // NSECs near the end typically
+		const knot_rrset_t *nsec = rrrs->at[i]->rr;
+		bool ok = rrrs->at[i]->qry_uid == qry_uid
+			&& nsec->type == KNOT_RRTYPE_NSEC
+			&& kr_rank_test(rrrs->at[i]->rank, KR_RANK_SECURE);
+		if (!ok) continue;
+		const int covers = nsec_covers(nsec, sname);
+		if (covers == abs(EEXIST)
+		    && no_data_response_check_rrtype(nsec, stype) == 0) {
+			return PKT_NODATA; // proven NODATA by matching NSEC
 		}
-		no_data_wildcard_existence_check(&flags, rrset, sec);
+		if (covers != 0) continue;
+
+		// We have to lower-case 'next' with libknot >= 2.7; see also RFC 6840 5.1.
+		// LATER(optim.): it's duplicate work with the nsec_covers() call.
+		knot_dname_t next[KNOT_DNAME_MAXLEN];
+		int ret = knot_dname_to_wire(next, knot_nsec_next(nsec->rrs.rdata), sizeof(next));
+		if (kr_fails_assert(ret >= 0))
+			return kr_error(ret);
+		knot_dname_to_lower(next);
+
+		clencl_labels = MAX(knot_dname_matched_labels(nsec->owner, sname),
+				    knot_dname_matched_labels(sname, next));
+		break; // reduce indentation again
 	}
-	if (kr_nsec_existence_denied(flags)) {
-		/* denial of existence proved accordingly to 4035 5.4 -
-		 * NSEC proving either rrset non-existence or
-		 * qtype non-existence has been found,
-		 * and no wildcard expansion occurred.
-		 */
-		return kr_ok();
-	} else if (kr_nsec_rrset_noexist(flags)) {
-		/* NSEC proving either rrset non-existence or
-		 * qtype non-existence has been found,
-		 * but wildcard expansion occurs.
-		 * Try to find matching wildcard and check
-		 * corresponding types.
-		 */
-		return wildcard_match_check(pkt, sec, sname, stype);
+
+	if (clencl_labels < 0)
+		return kr_error(ENOENT);
+	const int sname_labels = knot_dname_labels(sname, NULL);
+	if (sname_labels == clencl_labels)
+		return PKT_NODATA; // proven NODATA; sname is an empty non-terminal
+
+	// Explicitly construct name for the corresponding source of synthesis.
+	knot_dname_t ssynth[KNOT_DNAME_MAXLEN + 2];
+	ssynth[0] = 1;
+	ssynth[1] = '*';
+	const knot_dname_t *clencl = sname;
+	for (int l = sname_labels; l > clencl_labels; --l)
+		clencl = knot_wire_next_label(clencl, NULL);
+	(void)!!knot_dname_store(&ssynth[2], clencl);
+
+	// Try to (dis)prove the source of synthesis by a covering or matching NSEC.
+	for (int i = rrrs->len - 1; i >= 0; --i) { // NSECs near the end typically
+		const knot_rrset_t *nsec = rrrs->at[i]->rr;
+		bool ok = rrrs->at[i]->qry_uid == qry_uid
+			&& nsec->type == KNOT_RRTYPE_NSEC
+			&& kr_rank_test(rrrs->at[i]->rank, KR_RANK_SECURE);
+		if (!ok) continue;
+		const int covers = nsec_covers(nsec, ssynth);
+		if (covers == abs(EEXIST)) {
+			int ret = no_data_response_check_rrtype(nsec, stype);
+			if (ret == 0) return PKT_NODATA; // proven NODATA by wildcard NSEC
+			// TODO: also try expansion?  Or at least a different return code?
+		} else if (covers == 0) {
+			return PKT_NXDOMAIN | PKT_NODATA;
+		}
 	}
 	return kr_error(ENOENT);
 }

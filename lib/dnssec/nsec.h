@@ -6,6 +6,8 @@
 
 #include <libknot/packet/pkt.h>
 
+#include "lib/layer/iterate.h"
+
 /**
  * Check bitmap that child names are contained in the same zone.
  * @note see RFC6840 4.1.
@@ -38,17 +40,6 @@ int kr_nsec_name_error_response_check(const knot_pkt_t *pkt, knot_section_t sect
                                       const knot_dname_t *sname);
 
 /**
- * No data response check (RFC4035 3.1.3.1; RFC4035 5.4, bullet 1).
- * @param pkt        Packet structure to be processed.
- * @param section_id Packet section to be processed.
- * @param sname      Name to be checked.
- * @param stype      Type to be checked.
- * @return           0 or error code.
- */
-int kr_nsec_no_data_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
-                                   const knot_dname_t *sname, uint16_t stype);
-
-/**
  * Wildcard answer response check (RFC4035 3.1.3.3).
  * @param pkt        Packet structure to be processed.
  * @param section_id Packet section to be processed.
@@ -59,16 +50,14 @@ int kr_nsec_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_t
                                            const knot_dname_t *sname);
 
 /**
- * Authenticated denial of existence according to RFC4035 5.4.
- * @note No RRSIGs are validated.
- * @param pkt        Packet structure to be processed.
- * @param section_id Packet section to be processed.
- * @param sname      Queried domain name.
- * @param stype      Queried type.
- * @return           0 or error code.
+ * Search for a negative proof for sname+stype among validated NSECs.
+ *
+ * @param rrrs       list of RRs to search; typically kr_request::auth_selected
+ * @param qry_uid    only consider NSECs from this packet, for better efficiency
+ * @return           negative error code, or PKT_NXDOMAIN | PKT_NODATA (both for NXDOMAIN)
  */
-int kr_nsec_existence_denial(const knot_pkt_t *pkt, knot_section_t section_id,
-                             const knot_dname_t *sname, uint16_t stype);
+int kr_nsec_negative(const ranked_rr_array_t *rrrs, uint32_t qry_uid,
+			const knot_dname_t *sname, uint16_t stype);
 
 /**
  * Referral to unsigned subzone check (RFC4035 5.2).
