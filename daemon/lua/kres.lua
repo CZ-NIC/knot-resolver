@@ -970,6 +970,7 @@ local function rank_tostring(rank)
 			table.insert(names, string.lower(name))
 		end
 	end
+	table.sort(names) -- pairs() above doesn't give a stable ordering
 	return string.format('0%.2o (%s)', rank, table.concat(names, ' '))
 end
 
