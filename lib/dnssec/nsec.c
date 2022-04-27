@@ -273,60 +273,27 @@ int kr_nsec_negative(const ranked_rr_array_t *rrrs, uint32_t qry_uid,
 	return kr_error(ENOENT);
 }
 
-int kr_nsec_ref_to_unsigned(const knot_pkt_t *pkt)
+int kr_nsec_ref_to_unsigned(const ranked_rr_array_t *rrrs, uint32_t qry_uid,
+				const knot_dname_t *sname)
 {
-	int nsec_found = 0;
-	const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_AUTHORITY);
-	if (!sec)
-		return kr_error(EINVAL);
-	for (unsigned i = 0; i < sec->count; ++i) {
-		const knot_rrset_t *ns = knot_pkt_rr(sec, i);
-		if (ns->type == KNOT_RRTYPE_DS)
-			return kr_error(EEXIST);
-		if (ns->type != KNOT_RRTYPE_NS)
-			continue;
-		nsec_found = 0;
-		for (unsigned j = 0; j < sec->count; ++j) {
-			const knot_rrset_t *nsec = knot_pkt_rr(sec, j);
-			if (nsec->type == KNOT_RRTYPE_DS)
-				return kr_error(EEXIST);
-			if (nsec->type != KNOT_RRTYPE_NSEC)
-				continue;
-			/* nsec found
-			 * check if owner name matches the delegation name
-			 */
-			if (!knot_dname_is_equal(nsec->owner, ns->owner)) {
-				/* nsec does not match the delegation */
-				continue;
-			}
-			nsec_found = 1;
-			const uint8_t *bm = knot_nsec_bitmap(nsec->rrs.rdata);
-			uint16_t bm_size = knot_nsec_bitmap_len(nsec->rrs.rdata);
-			if (!bm)
-				return kr_error(EINVAL);
-			if (dnssec_nsec_bitmap_contains(bm, bm_size,
-							  KNOT_RRTYPE_NS) &&
-			    !dnssec_nsec_bitmap_contains(bm, bm_size,
-							  KNOT_RRTYPE_DS) &&
-			    !dnssec_nsec_bitmap_contains(bm, bm_size,
-							  KNOT_RRTYPE_SOA)) {
-				/* rfc4035, 5.2 */
-				return kr_ok();
-			}
-		}
-		if (nsec_found) {
-			/* nsec which owner matches
-			 * the delegation name was found,
-			 * but nsec type bitmap contains wrong types
-			 */
-			return kr_error(EINVAL);
-		} else {
-			/* nsec that matches delegation was not found */
-			return kr_error(DNSSEC_NOT_FOUND);
-		}
-	}
+	for (int i = rrrs->len - 1; i >= 0; --i) { // NSECs near the end typically
+		const knot_rrset_t *nsec = rrrs->at[i]->rr;
+		bool ok = rrrs->at[i]->qry_uid == qry_uid
+			&& nsec->type == KNOT_RRTYPE_NSEC
+			&& kr_rank_test(rrrs->at[i]->rank, KR_RANK_SECURE)
+			// avoid any possibility of getting tricked in deeper zones
+			&& knot_dname_in_bailiwick(sname, nsec->owner) >= 0;
+		if (!ok) continue;
 
-	return kr_error(EINVAL);
+		kr_assert(nsec->rrs.rdata);
+		const uint8_t *bm = knot_nsec_bitmap(nsec->rrs.rdata);
+		uint16_t bm_size = knot_nsec_bitmap_len(nsec->rrs.rdata);
+		ok = ok &&  dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_NS)
+			&& !dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_DS)
+			&& !dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_SOA);
+		if (ok) return kr_ok();
+	}
+	return kr_error(DNSSEC_NOT_FOUND);
 }
 
 int kr_nsec_matches_name_and_type(const knot_rrset_t *nsec,

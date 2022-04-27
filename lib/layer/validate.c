@@ -536,7 +536,8 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 		if (!has_nsec3) {
 			if (referral) {
 				/* Check if it is referral to unsigned, rfc4035 5.2 */
-				ret = kr_nsec_ref_to_unsigned(answer);
+				ret = kr_nsec_ref_to_unsigned(&req->auth_selected,
+								qry->uid, proved_name);
 			} else {
 				/* No-data answer */
 				ret = kr_nsec_negative(&req->auth_selected, qry->uid,

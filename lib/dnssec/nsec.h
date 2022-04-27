@@ -50,15 +50,13 @@ int kr_nsec_negative(const ranked_rr_array_t *rrrs, uint32_t qry_uid,
 
 /**
  * Referral to unsigned subzone check (RFC4035 5.2).
- * @note 	     No RRSIGs are validated.
- * @param pkt        Packet structure to be processed.
- * @return           0 or error code:
- * 		     DNSSEC_NOT_FOUND - neither ds nor nsec records
- *		     were not found.
- *		     EEXIST - ds record was found.
- *		     EINVAL - bogus.
+ *
+ * @param rrrs       list of RRs to search; typically kr_request::auth_selected
+ * @param qry_uid    only consider NSECs from this packet, for better efficiency
+ * @return           0 or negative error code, in particular DNSSEC_NOT_FOUND
  */
-int kr_nsec_ref_to_unsigned(const knot_pkt_t *pkt);
+int kr_nsec_ref_to_unsigned(const ranked_rr_array_t *rrrs, uint32_t qry_uid,
+				const knot_dname_t *sname);
 
 /**
  * Checks whether supplied NSEC RR matches the supplied name and type.
