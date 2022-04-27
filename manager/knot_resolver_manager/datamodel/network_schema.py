@@ -134,7 +134,7 @@ class ListenSchema(SchemaNode):
             )
 
 
-class PROXYv2Schema(SchemaNode):
+class ProxyProtocolSchema(SchemaNode):
     """
     PROXYv2 protocol configuration.
 
@@ -159,7 +159,7 @@ class NetworkSchema(SchemaNode):
     edns_buffer_size: Maximum EDNS payload size advertised in DNS packets. Different values can be configured for communication downstream (towards clients) and upstream (towards other DNS servers).
     address_renumbering: Renumbers addresses in answers to different address space.
     tls: TLS configuration, also affects DNS over TLS and DNS over HTTPS.
-    proxy_v2: PROXYv2 protocol configuration.
+    proxy_protocol: PROXYv2 protocol configuration.
     listen: List of interfaces to listen to and its configuration.
     """
 
@@ -172,7 +172,7 @@ class NetworkSchema(SchemaNode):
     edns_buffer_size: EdnsBufferSizeSchema = EdnsBufferSizeSchema()
     address_renumbering: Optional[List[AddressRenumberingSchema]] = None
     tls: TLSSchema = TLSSchema()
-    proxy_v2: Union[Literal[False], PROXYv2Schema] = False
+    proxy_protocol: Union[Literal[False], ProxyProtocolSchema] = False
     listen: List[ListenSchema] = [
         ListenSchema({"interface": "127.0.0.1"}),
         ListenSchema({"interface": "::1", "freebind": True}),
