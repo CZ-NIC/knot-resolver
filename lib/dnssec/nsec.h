@@ -29,17 +29,6 @@ int kr_nsec_children_in_zone_check(const uint8_t *bm, uint16_t bm_size);
 int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t type, const knot_dname_t *owner);
 
 /**
- * Name error response check (RFC4035 3.1.3.2; RFC4035 5.4, bullet 2).
- * @note No RRSIGs are validated.
- * @param pkt        Packet structure to be processed.
- * @param section_id Packet section to be processed.
- * @param sname      Name to be checked.
- * @return           0 or error code.
- */
-int kr_nsec_name_error_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
-                                      const knot_dname_t *sname);
-
-/**
  * Wildcard answer response check (RFC4035 3.1.3.3).
  * @param pkt        Packet structure to be processed.
  * @param section_id Packet section to be processed.

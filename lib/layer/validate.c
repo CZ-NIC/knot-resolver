@@ -1179,7 +1179,15 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (!qry->flags.CACHED && pkt_rcode == KNOT_RCODE_NXDOMAIN && !qry->flags.CNAME) {
 		/* @todo If knot_pkt_qname(pkt) is used instead of qry->sname then the tests crash. */
 		if (!has_nsec3) {
-			ret = kr_nsec_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname);
+			ret = kr_nsec_negative(&req->auth_selected, qry->uid,
+						qry->sname, KNOT_RRTYPE_NULL);
+			if (ret >= 0) {
+				if (ret & PKT_NXDOMAIN) {
+					ret = kr_ok();
+				} else {
+					ret = kr_error(ENOENT); // probably proved NODATA
+				}
+			}
 		} else {
 			ret = kr_nsec3_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname);
 		}
