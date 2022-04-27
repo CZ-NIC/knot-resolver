@@ -107,11 +107,6 @@ struct qr_task
 			qr_task_free((task)); \
 	} while (0)
 
-/** @internal get key for tcp session
- *  @note kr_straddr() return pointer to static string
- */
-#define tcpsess_key(addr) kr_straddr(addr)
-
 /* Forward decls */
 static void qr_task_free(struct qr_task *task);
 static int qr_task_step(struct qr_task *task,
@@ -888,9 +883,12 @@ static int session_tls_hs_cb(struct session *session, int status)
 			 * So that it MUST be unsuccessful rehandshake.
 			 * Check it. */
 			kr_require(deletion_res != 0);
-			const char *key = tcpsess_key(peer);
-			kr_require(key);
-			kr_require(map_contains(&the_worker->tcp_connected, key) != 0);
+			struct kr_sockaddr_key_storage key;
+			ssize_t keylen = kr_sockaddr_key(&key, peer);
+			if (keylen < 0)
+				return keylen;
+			trie_val_t *val;
+			kr_require((val = trie_get_try(the_worker->tcp_connected, key.bytes, keylen)) && *val);
 		}
 #endif
 		return ret;
@@ -1854,77 +1852,83 @@ int worker_submit(struct session *session, struct io_comm_data *comm,
 	return qr_task_step(task, addr, pkt);
 }
 
-static int map_add_tcp_session(map_t *map, const struct sockaddr* addr,
-			       struct session *session)
+static int trie_add_tcp_session(trie_t *trie, const struct sockaddr *addr,
+                                struct session *session)
 {
-	if (kr_fails_assert(map && addr))
+	if (kr_fails_assert(trie && addr))
 		return kr_error(EINVAL);
-	const char *key = tcpsess_key(addr);
-	if (kr_fails_assert(key && map_contains(map, key) == 0))
+	struct kr_sockaddr_key_storage key;
+	ssize_t keylen = kr_sockaddr_key(&key, addr);
+	if (keylen < 0)
+		return keylen;
+	trie_val_t *val = trie_get_ins(trie, key.bytes, keylen);
+	if (kr_fails_assert(*val == NULL))
 		return kr_error(EINVAL);
-	int ret = map_set(map, key, session);
-	return ret ? kr_error(EINVAL) : kr_ok();
+	*val = session;
+	return kr_ok();
 }
 
-static int map_del_tcp_session(map_t *map, const struct sockaddr* addr)
+static int trie_del_tcp_session(trie_t *trie, const struct sockaddr *addr)
 {
-	if (kr_fails_assert(map && addr))
+	if (kr_fails_assert(trie && addr))
 		return kr_error(EINVAL);
-	const char *key = tcpsess_key(addr);
-	if (kr_fails_assert(key))
-		return kr_error(EINVAL);
-	int ret = map_del(map, key);
+	struct kr_sockaddr_key_storage key;
+	ssize_t keylen = kr_sockaddr_key(&key, addr);
+	if (keylen < 0)
+		return keylen;
+	int ret = trie_del(trie, key.bytes, keylen, NULL);
 	return ret ? kr_error(ENOENT) : kr_ok();
 }
 
-static struct session* map_find_tcp_session(map_t *map,
-					    const struct sockaddr *addr)
+static struct session *trie_find_tcp_session(trie_t *trie,
+                                             const struct sockaddr *addr)
 {
-	if (kr_fails_assert(map && addr))
+	if (kr_fails_assert(trie && addr))
 		return NULL;
-	const char *key = tcpsess_key(addr);
-	if (kr_fails_assert(key))
+	struct kr_sockaddr_key_storage key;
+	ssize_t keylen = kr_sockaddr_key(&key, addr);
+	if (keylen < 0)
 		return NULL;
-	struct session* ret = map_get(map, key);
-	return ret;
+	trie_val_t *val = trie_get_try(trie, key.bytes, keylen);
+	return val ? *val : NULL;
 }
 
 int worker_add_tcp_connected(struct worker_ctx *worker,
 				    const struct sockaddr* addr,
 				    struct session *session)
 {
-	return map_add_tcp_session(&worker->tcp_connected, addr, session);
+	return trie_add_tcp_session(worker->tcp_connected, addr, session);
 }
 
 int worker_del_tcp_connected(struct worker_ctx *worker,
 				    const struct sockaddr* addr)
 {
-	return map_del_tcp_session(&worker->tcp_connected, addr);
+	return trie_del_tcp_session(worker->tcp_connected, addr);
 }
 
 struct session* worker_find_tcp_connected(struct worker_ctx *worker,
 						 const struct sockaddr* addr)
 {
-	return map_find_tcp_session(&worker->tcp_connected, addr);
+	return trie_find_tcp_session(worker->tcp_connected, addr);
 }
 
 static int worker_add_tcp_waiting(struct worker_ctx *worker,
 				  const struct sockaddr* addr,
 				  struct session *session)
 {
-	return map_add_tcp_session(&worker->tcp_waiting, addr, session);
+	return trie_add_tcp_session(worker->tcp_waiting, addr, session);
 }
 
 int worker_del_tcp_waiting(struct worker_ctx *worker,
 			   const struct sockaddr* addr)
 {
-	return map_del_tcp_session(&worker->tcp_waiting, addr);
+	return trie_del_tcp_session(worker->tcp_waiting, addr);
 }
 
 struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
 					       const struct sockaddr* addr)
 {
-	return map_find_tcp_session(&worker->tcp_waiting, addr);
+	return trie_find_tcp_session(worker->tcp_waiting, addr);
 }
 
 int worker_end_tcp(struct session *session)
@@ -2180,8 +2184,8 @@ bool worker_task_finished(struct qr_task *task)
 /** Reserve worker buffers.  We assume worker's been zeroed. */
 static int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
 {
-	worker->tcp_connected = map_make(NULL);
-	worker->tcp_waiting = map_make(NULL);
+	worker->tcp_connected = trie_create(NULL);
+	worker->tcp_waiting = trie_create(NULL);
 	worker->subreq_out = trie_create(NULL);
 
 	array_init(worker->pool_mp);
@@ -2209,8 +2213,8 @@ void worker_deinit(void)
 	struct worker_ctx *worker = the_worker;
 	if (kr_fails_assert(worker))
 		return;
-	map_clear(&worker->tcp_connected);
-	map_clear(&worker->tcp_waiting);
+	trie_free(worker->tcp_connected);
+	trie_free(worker->tcp_waiting);
 	trie_free(worker->subreq_out);
 	worker->subreq_out = NULL;
 
