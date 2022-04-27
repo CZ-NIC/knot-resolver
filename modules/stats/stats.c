@@ -18,6 +18,7 @@
 #include <arpa/inet.h>
 #include <lua.h>
 
+#include "lib/generic/trie.h"
 #include "lib/layer/iterate.h"
 #include "lib/rplan.h"
 #include "lib/module.h"
@@ -70,7 +71,7 @@ typedef array_t(struct sockaddr_in6) addrlist_t;
 
 /** @internal Stats data structure. */
 struct stat_data {
-	map_t map;
+	trie_t *trie;
 	struct {
 		namehash_t *frequent;
 	} queries;
@@ -291,7 +292,8 @@ static char* stats_set(void *env, struct kr_module *module, const char *args)
 				return NULL;
 			}
 		}
-		map_set(&data->map, pair, (void *)number);
+		trie_val_t *trie_val = trie_get_ins(data->trie, pair, strlen(pair));
+		*trie_val = (void *)number;
 	}
 
 	return NULL;
@@ -324,20 +326,39 @@ static char* stats_get(void *env, struct kr_module *module, const char *args)
 		}
 	}
 	/* Check in variable map */
-	if (!map_contains(&data->map, args)) {
+	trie_val_t *val = trie_get_try(data->trie, args, strlen(args));
+	if (!val) {
 		free(ret);
 		return NULL;
 	}
-	void *val = map_get(&data->map, args);
-	sprintf(ret, "%zu", (size_t) val);
+	sprintf(ret, "%zu", (size_t) *val);
 	return ret;
 }
 
-static int list_entry(const char *key, void *val, void *baton)
+/** Checks whether:
+ *   - `key` starts with `prefix`; OR
+ *   - The prefix is a wildcard, which is indicated by `prefix_len` being zero. */
+static inline bool key_matches_prefix(const char *key, size_t key_len,
+                                      const char *prefix, size_t prefix_len)
 {
-	JsonNode *root = baton;
-	size_t number = (size_t) val;
-	json_append_member(root, key, json_mknumber(number));
+	return prefix_len == 0 || (prefix_len <= key_len && memcmp(key, prefix, prefix_len) == 0);
+}
+
+struct list_entry_context {
+	JsonNode *root;         /**< JSON object into which matching entries will be inserted. */
+	const char *key_prefix; /**< The prefix against which entries will be matched. */
+	size_t key_prefix_len;  /**< Prefix length. Prefix is a wildcard if zero. */
+};
+
+/** Inserts the entry with a matching key into the JSON object. */
+static int list_entry(const char *key, uint32_t key_len, trie_val_t *val, void *baton)
+{
+	struct list_entry_context *ctx = baton;
+	if (!key_matches_prefix(key, key_len, ctx->key_prefix, ctx->key_prefix_len))
+		return 0;
+	size_t number = (size_t) *val;
+	auto_free char *key_nt = strndup(key, key_len);
+	json_append_member(ctx->root, key_nt, json_mknumber(number));
 	return 0;
 }
 
@@ -348,7 +369,6 @@ static int list_entry(const char *key, void *val, void *baton)
  */
 static char* stats_list(void *env, struct kr_module *module, const char *args)
 {
-	struct stat_data *data = module->data;
 	JsonNode *root = json_mkobject();
 	/* Walk const metrics map */
 	size_t args_len = args ? strlen(args) : 0;
@@ -358,7 +378,13 @@ static char* stats_list(void *env, struct kr_module *module, const char *args)
 			json_append_member(root, elm->key, json_mknumber(elm->val));
 		}
 	}
-	map_walk_prefixed(&data->map, (args_len > 0) ? args : "", list_entry, root);
+	struct list_entry_context ctx = {
+		.root = root,
+		.key_prefix = args,
+		.key_prefix_len = args_len
+	};
+	struct stat_data *data = module->data;
+	trie_apply_with_key(data->trie, list_entry, &ctx);
 	char *ret = json_encode(root);
 	json_delete(root);
 	return ret;
@@ -475,7 +501,7 @@ int stats_init(struct kr_module *module)
 	if (!data) {
 		return kr_error(ENOMEM);
 	}
-	data->map = map_make(NULL);
+	data->trie = trie_create(NULL);
 	module->data = data;
 	lru_create(&data->queries.frequent, FREQUENT_COUNT, NULL, NULL);
 	/* Initialize ring buffer of recently visited upstreams */
@@ -495,7 +521,7 @@ int stats_deinit(struct kr_module *module)
 {
 	struct stat_data *data = module->data;
 	if (data) {
-		map_clear(&data->map);
+		trie_free(data->trie);
 		lru_free(data->queries.frequent);
 		array_clear(data->upstreams.q);
 		free(data);
