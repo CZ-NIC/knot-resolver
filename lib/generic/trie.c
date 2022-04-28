@@ -843,6 +843,26 @@ int trie_apply(trie_t *tbl, int (*f)(trie_val_t *, void *), void *d)
 	return apply_trie(&tbl->root, f, d);
 }
 
+/*! \brief Apply a function to every key + trie_val_t*, in order; a recursive solution. */
+static int apply_trie_with_key(node_t *t, int (*f)(const char *, uint32_t, trie_val_t *, void *), void *d)
+{
+	kr_require(t);
+	if (!isbranch(t))
+		return f(t->leaf.key->chars, t->leaf.key->len, &t->leaf.val, d);
+	int child_count = bitmap_weight(t->branch.bitmap);
+	for (int i = 0; i < child_count; ++i)
+		ERR_RETURN(apply_trie_with_key(twig(t, i), f, d));
+	return KNOT_EOK;
+}
+
+int trie_apply_with_key(trie_t *tbl, int (*f)(const char *, uint32_t, trie_val_t *, void *), void *d)
+{
+	kr_require(tbl && f);
+	if (!tbl->weight)
+		return KNOT_EOK;
+	return apply_trie_with_key(&tbl->root, f, d);
+}
+
 /* These are all thin wrappers around static Tns* functions. */
 trie_it_t* trie_it_begin(trie_t *tbl)
 {
