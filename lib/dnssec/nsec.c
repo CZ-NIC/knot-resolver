@@ -300,16 +300,13 @@ int kr_nsec_matches_name_and_type(const knot_rrset_t *nsec,
 				   const knot_dname_t *name, uint16_t type)
 {
 	/* It's not secure enough to just check a single bit for (some) other types,
-	 * but we don't (currently) only use this API for NS.  See RFC 6840 sec. 4.
-	 */
-	if (kr_fails_assert(type == KNOT_RRTYPE_NS && nsec && name))
+	 * but we (currently) only use this API for NS.  See RFC 6840 sec. 4.  */
+	if (kr_fails_assert(type == KNOT_RRTYPE_NS && nsec && nsec->rrs.rdata && name))
 		return kr_error(EINVAL);
 	if (!knot_dname_is_equal(nsec->owner, name))
 		return kr_error(ENOENT);
 	const uint8_t *bm = knot_nsec_bitmap(nsec->rrs.rdata);
 	uint16_t bm_size = knot_nsec_bitmap_len(nsec->rrs.rdata);
-	if (!bm)
-		return kr_error(EINVAL);
 	if (dnssec_nsec_bitmap_contains(bm, bm_size, type)) {
 		return kr_ok();
 	} else {
