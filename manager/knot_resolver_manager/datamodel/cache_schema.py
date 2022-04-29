@@ -30,6 +30,7 @@ class CacheSchema(SchemaNode):
     DNS resolver cache configuration.
 
     ---
+    garbage_collector: Automatically use garbage collector to periodically clear cache.
     storage: Cache storage of the DNS resolver.
     size_max: Maximum size of the cache.
     ttl_min: Minimum time-to-live for the cache entries.
@@ -38,6 +39,7 @@ class CacheSchema(SchemaNode):
     prefill: Prefill the cache periodically by importing zone data obtained over HTTP.
     """
 
+    garbage_collector: bool = True
     storage: CheckedPath = CheckedPath("/var/cache/knot-resolver")
     size_max: SizeUnit = SizeUnit("100M")
     ttl_min: TimeUnit = TimeUnit("5s")

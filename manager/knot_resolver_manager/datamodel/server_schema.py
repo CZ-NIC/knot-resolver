@@ -105,7 +105,6 @@ class ServerSchema(SchemaNode):
         hostname: Internal DNS resolver hostname. Default is machine hostname.
         nsid: Name Server Identifier (RFC 5001) which allows DNS clients to request resolver to send back its NSID along with the reply to a DNS request.
         workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
-        use_cache_gc: Use (start) kres-cache-gc (cache garbage collector) automatically.
         backend: Forces the manager to use a specific service supervisor.
         watchdog: Disable systemd watchdog, enable with defaults or set new configuration. Can only be used with 'systemd' backend.
         rundir: Directory where the resolver can create files and which will be it's cwd.
@@ -117,7 +116,6 @@ class ServerSchema(SchemaNode):
         hostname: Optional[str] = None
         nsid: Optional[str] = None
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
-        use_cache_gc: bool = True
         backend: BackendEnum = "auto"
         watchdog: Union[bool, WatchDogSchema] = True
         rundir: UncheckedPath = UncheckedPath(".")
@@ -130,7 +128,6 @@ class ServerSchema(SchemaNode):
     hostname: str
     nsid: Optional[str]
     workers: IntPositive
-    use_cache_gc: bool
     backend: BackendEnum = "auto"
     watchdog: Union[bool, WatchDogSchema]
     rundir: UncheckedPath = UncheckedPath(".")
