@@ -414,18 +414,6 @@ static int net_close(lua_State *L)
 	return 1;
 }
 
-/** Check whether `addr` points to an `AF_INET6` address and whether the address
- * is link-local. */
-static bool ip6_link_local(struct sockaddr_in6 *addr)
-{
-	if (addr->sin6_family != AF_INET6)
-		return false;
-
-	/* Link-local: https://tools.ietf.org/html/rfc4291#section-2.4 */
-	const uint8_t prefix[] = { 0xFE, 0x80 };
-	return kr_bitcmp((char *) addr->sin6_addr.s6_addr, (char *) prefix, 10) == 0;
-}
-
 /** List available interfaces. */
 static int net_interfaces(lua_State *L)
 {
@@ -457,7 +445,7 @@ static int net_interfaces(lua_State *L)
 			buf[0] = '\0';
 		}
 
-		if (ip6_link_local(&iface.address.address6)) {
+		if (kr_sockaddr_link_local((struct sockaddr *) &iface.address)) {
 			/* Link-local IPv6: add %interface prefix */
 			auto_free char *str = NULL;
 			int ret = asprintf(&str, "%s%%%s", buf, iface.name);

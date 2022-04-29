@@ -28,9 +28,14 @@
 #include "lib/generic/array.h"
 #include "lib/log.h"
 
-
 /** When knot_pkt is passed from cache without ->wire, this is the ->size. */
 static const size_t KR_PKT_SIZE_NOWIRE = -1;
+
+/** Used for reserving enough space for the `kr_sockaddr_key` function
+ * output. */
+struct kr_sockaddr_key_storage {
+	char bytes[sizeof(struct sockaddr_storage)];
+};
 
 
 /*
@@ -262,6 +267,22 @@ int kr_inaddr_len(const struct sockaddr *addr);
 /** Sockaddr length for given family, i.e. sizeof(struct sockaddr_in*). */
 KR_EXPORT KR_PURE
 int kr_sockaddr_len(const struct sockaddr *addr);
+
+/** Creates a packed structure from the specified `addr`, safe for use as a key
+ * in containers like `trie_t`, and writes it into `dst`. On success, returns
+ * the actual length of the key.
+ *
+ * Returns `kr_error(EAFNOSUPPORT)` if the family of `addr` is unsupported. */
+KR_EXPORT
+ssize_t kr_sockaddr_key(struct kr_sockaddr_key_storage *dst,
+                        const struct sockaddr *addr);
+
+/** Creates a `struct sockaddr` from the specified `key` created using the
+ * `kr_sockaddr_key()` function. */
+KR_EXPORT
+struct sockaddr *kr_sockaddr_from_key(struct sockaddr_storage *dst,
+                                      const char *key);
+
 /** Compare two given sockaddr.
  * return 0 - addresses are equal, error code otherwise.
  */
@@ -352,6 +373,19 @@ int kr_bitcmp(const char *a, const char *b, int bits);
  * This is useful for storing network addresses in a trie. */
 KR_EXPORT
 void kr_bitmask(unsigned char *a, size_t a_len, int bits);
+
+/** Check whether `addr` points to an `AF_INET6` address and whether the address
+ * is link-local. */
+static inline bool kr_sockaddr_link_local(const struct sockaddr *addr)
+{
+	if (addr->sa_family != AF_INET6)
+		return false;
+
+	/* Link-local: https://tools.ietf.org/html/rfc4291#section-2.4 */
+	const uint8_t prefix[] = { 0xFE, 0x80 };
+	const struct sockaddr_in6 *ip6 = (const struct sockaddr_in6 *) addr;
+	return kr_bitcmp((char *) ip6->sin6_addr.s6_addr, (char *) prefix, 10) == 0;
+}
 
 /** @internal RR map flags. */
 static const uint8_t KEY_FLAG_RRSIG = 0x02;
