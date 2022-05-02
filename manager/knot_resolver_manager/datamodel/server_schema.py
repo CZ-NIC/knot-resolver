@@ -103,7 +103,6 @@ class ServerSchema(SchemaNode):
         ---
         id: System-wide unique identifier of this manager instance. Used for grouping logs and tagging kresd processes.
         hostname: Internal DNS resolver hostname. Default is machine hostname.
-        nsid: Name Server Identifier (RFC 5001) which allows DNS clients to request resolver to send back its NSID along with the reply to a DNS request.
         workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
         backend: Forces the manager to use a specific service supervisor.
         watchdog: Disable systemd watchdog, enable with defaults or set new configuration. Can only be used with 'systemd' backend.
@@ -114,7 +113,6 @@ class ServerSchema(SchemaNode):
 
         id: IDPattern
         hostname: Optional[str] = None
-        nsid: Optional[str] = None
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         backend: BackendEnum = "auto"
         watchdog: Union[bool, WatchDogSchema] = True
@@ -126,7 +124,6 @@ class ServerSchema(SchemaNode):
 
     id: IDPattern
     hostname: str
-    nsid: Optional[str]
     workers: IntPositive
     backend: BackendEnum = "auto"
     watchdog: Union[bool, WatchDogSchema]

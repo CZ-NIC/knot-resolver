@@ -1,4 +1,4 @@
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 from typing_extensions import Literal
 
@@ -27,6 +27,7 @@ class OptionsSchema(SchemaNode):
         Fine-tuning global parameters of DNS resolver operation.
 
         ---
+        nsid: Name Server Identifier (RFC 5001) which allows DNS clients to request resolver to send back its NSID along with the reply to a DNS request.
         glue_checking: Glue records scrictness checking level.
         qname_minimisation: Send minimum amount of information in recursive queries to enhance privacy.
         query_loopback: Permits queries to loopback addresses.
@@ -41,6 +42,7 @@ class OptionsSchema(SchemaNode):
         prediction: Helps keep the cache hot by prefetching expiring records and learning usage patterns and repetitive queries.
         """
 
+        nsid: Optional[str] = None
         glue_checking: GlueCheckingEnum = "normal"
         qname_minimisation: bool = True
         query_loopback: bool = False
@@ -56,6 +58,7 @@ class OptionsSchema(SchemaNode):
 
     _PREVIOUS_SCHEMA = Raw
 
+    nsid: Optional[str]
     glue_checking: GlueCheckingEnum
     qname_minimisation: bool
     query_loopback: bool
