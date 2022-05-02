@@ -1,6 +1,5 @@
 import logging
 import os
-import socket
 from typing import Any, Optional, Union
 
 from typing_extensions import Literal
@@ -12,9 +11,7 @@ from knot_resolver_manager.datamodel.types import (
     InterfacePort,
     IntPositive,
     IPAddressPort,
-    UncheckedPath,
 )
-from knot_resolver_manager.datamodel.types.types import IDPattern
 from knot_resolver_manager.exceptions import DataException
 from knot_resolver_manager.utils import SchemaNode
 
@@ -101,40 +98,26 @@ class ServerSchema(SchemaNode):
         DNS server control and management configuration.
 
         ---
-        id: System-wide unique identifier of this manager instance. Used for grouping logs and tagging kresd processes.
-        hostname: Internal DNS resolver hostname. Default is machine hostname.
         workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
         backend: Forces the manager to use a specific service supervisor.
         watchdog: Disable systemd watchdog, enable with defaults or set new configuration. Can only be used with 'systemd' backend.
-        rundir: Directory where the resolver can create files and which will be it's cwd.
         management: Configuration of management HTTP API.
         webmgmt: Configuration of legacy web management endpoint.
         """
 
-        id: IDPattern
-        hostname: Optional[str] = None
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         backend: BackendEnum = "auto"
         watchdog: Union[bool, WatchDogSchema] = True
-        rundir: UncheckedPath = UncheckedPath(".")
         management: ManagementSchema = ManagementSchema({"unix-socket": "./manager.sock"})
         webmgmt: Optional[WebmgmtSchema] = None
 
     _PREVIOUS_SCHEMA = Raw
 
-    id: IDPattern
-    hostname: str
     workers: IntPositive
     backend: BackendEnum = "auto"
     watchdog: Union[bool, WatchDogSchema]
-    rundir: UncheckedPath = UncheckedPath(".")
     management: ManagementSchema
     webmgmt: Optional[WebmgmtSchema]
-
-    def _hostname(self, obj: Raw) -> Any:
-        if obj.hostname is None:
-            return socket.gethostname()
-        return obj.hostname
 
     def _workers(self, obj: Raw) -> Any:
         if obj.workers == "auto":

@@ -327,7 +327,7 @@ async def _init_manager(config_store: ConfigStore, server: Server) -> KresManage
 
 
 async def _deny_working_directory_changes(config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
-    if config_old.server.rundir != config_new.server.rundir:
+    if config_old.rundir != config_new.rundir:
         return Result.err("Changing manager's `rundir` during runtime is not allowed.")
 
     return Result.ok(None)
@@ -336,10 +336,10 @@ async def _deny_working_directory_changes(config_old: KresConfig, config_new: Kr
 def _set_working_directory(config_raw: ParsedTree) -> None:
     config = KresConfig(config_raw)
 
-    if not config.server.rundir.to_path().exists():
-        raise KresManagerException(f"`rundir` directory ({config.server.rundir}) does not exist!")
+    if not config.rundir.to_path().exists():
+        raise KresManagerException(f"`rundir` directory ({config.rundir}) does not exist!")
 
-    os.chdir(config.server.rundir.to_path())
+    os.chdir(config.rundir.to_path())
 
 
 def _lock_working_directory(attempt: int = 0) -> None:

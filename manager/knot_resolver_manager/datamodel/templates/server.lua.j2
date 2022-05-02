@@ -1,6 +1,3 @@
--- server.hostname
-hostname('{{ cfg.server.hostname }}')
-
 {% if cfg.server.watchdog -%}
 -- server.watchdog
 modules.load('watchdog')

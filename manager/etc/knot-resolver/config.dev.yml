@@ -1,3 +1,9 @@
+id: dev
+rundir: etc/knot-resolver/runtime
+server:
+  workers: 1
+  management:
+    interface: 127.0.0.1@5000
 cache:
   storage: ../cache
 logging:
@@ -7,9 +13,3 @@ logging:
 network:
   listen:
     - interface: 127.0.0.1@5353
-server:
-  id: dev
-  workers: 1
-  rundir: etc/knot-resolver/runtime
-  management:
-    interface: 127.0.0.1@5000

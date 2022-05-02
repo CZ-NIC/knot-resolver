@@ -17,7 +17,7 @@ def test_config_defaults():
 
 
 def test_dnssec_false():
-    config = KresConfig({"server": {"id": "test"}, "dnssec": False})
+    config = KresConfig({"id": "test", "dnssec": False})
 
     assert config.dnssec == False
 
@@ -38,7 +38,7 @@ def test_dnssec_default_true():
 
 
 def test_dns64_prefix_default():
-    assert str(KresConfig({"server": {"id": "test"}, "dns64": True}).dns64.prefix) == "64:ff9b::/96"
+    assert str(KresConfig({"id": "test", "dns64": True}).dns64.prefix) == "64:ff9b::/96"
 
 
 def test_config_json_schema():

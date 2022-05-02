@@ -1,5 +1,8 @@
 {% if not cfg.lua.script_only %}
 
+-- hostname
+hostname('{{ cfg.hostname }}')
+
 -- LOGGING section
 {% include "logging.lua.j2" %}
 

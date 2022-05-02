@@ -1,4 +1,5 @@
 import os
+import socket
 import sys
 from typing import Dict, Optional, Union
 
@@ -20,6 +21,7 @@ from knot_resolver_manager.datamodel.server_schema import ServerSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
 from knot_resolver_manager.datamodel.types import DomainName
+from knot_resolver_manager.datamodel.types.types import IDPattern, UncheckedPath
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.utils import SchemaNode
 
@@ -59,6 +61,9 @@ class KresConfig(SchemaNode):
         Knot Resolver declarative configuration.
 
         ---
+        id: System-wide unique identifier of this instance. Used for grouping logs and tagging workers.
+        hostname: Internal DNS resolver hostname. Default is machine hostname.
+        rundir: Directory where the resolver can create files and which will be it's cwd.
         server: DNS server control and management configuration.
         options: Fine-tuning global parameters of DNS resolver operation.
         network: Network connections and protocols configuration.
@@ -76,7 +81,10 @@ class KresConfig(SchemaNode):
         lua: Custom Lua configuration.
         """
 
-        server: ServerSchema
+        id: IDPattern
+        hostname: Optional[str] = None
+        rundir: UncheckedPath = UncheckedPath(".")
+        server: ServerSchema = ServerSchema()
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
         static_hints: StaticHintsSchema = StaticHintsSchema()
@@ -94,6 +102,9 @@ class KresConfig(SchemaNode):
 
     _PREVIOUS_SCHEMA = Raw
 
+    id: IDPattern
+    hostname: str
+    rundir: UncheckedPath
     server: ServerSchema
     options: OptionsSchema
     network: NetworkSchema
@@ -109,6 +120,11 @@ class KresConfig(SchemaNode):
     logging: LoggingSchema
     monitoring: MonitoringSchema
     lua: LuaSchema
+
+    def _hostname(self, obj: Raw) -> str:
+        if obj.hostname is None:
+            return socket.gethostname()
+        return obj.hostname
 
     def _dnssec(self, obj: Raw) -> Union[Literal[False], DnssecSchema]:
         if obj.dnssec is True:
