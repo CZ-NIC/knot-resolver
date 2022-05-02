@@ -31,6 +31,28 @@
 #include <sys/statvfs.h>
 #include <sys/un.h>
 
+struct __attribute__((packed)) kr_sockaddr_key {
+	int family;
+};
+
+struct __attribute__((packed)) kr_sockaddr_in_key {
+	int family;
+	char address[sizeof(((struct sockaddr_in *) NULL)->sin_addr)];
+	uint16_t port;
+};
+
+struct __attribute__((packed)) kr_sockaddr_in6_key {
+	int family;
+	char address[sizeof(((struct sockaddr_in6 *) NULL)->sin6_addr)];
+	uint32_t scope;
+	uint16_t port;
+};
+
+struct __attribute((packed)) kr_sockaddr_un_key {
+	int family;
+	char path[sizeof(((struct sockaddr_un *) NULL)->sun_path)];
+};
+
 /* Logging & debugging */
 bool kr_dbg_assertion_abort = DBG_ASSERTION_ABORT;
 int kr_dbg_assertion_fork = DBG_ASSERTION_FORK;
@@ -281,6 +303,82 @@ int kr_sockaddr_len(const struct sockaddr *addr)
 	case AF_INET6: return sizeof(struct sockaddr_in6);
 	case AF_UNIX:  return sizeof(struct sockaddr_un);
 	default:       return kr_error(EINVAL);
+	}
+}
+
+ssize_t kr_sockaddr_key(struct kr_sockaddr_key_storage *dst,
+                        const struct sockaddr *addr)
+{
+	kr_require(addr);
+
+	switch (addr->sa_family) {
+	case AF_INET:;
+		const struct sockaddr_in *addr_in = (const struct sockaddr_in *) addr;
+		struct kr_sockaddr_in_key *inkey = (struct kr_sockaddr_in_key *) dst;
+		inkey->family = AF_INET;
+		memcpy(&inkey->address, &addr_in->sin_addr, sizeof(inkey->address));
+		memcpy(&inkey->port, &addr_in->sin_port, sizeof(inkey->port));
+		return sizeof(*inkey);
+
+	case AF_INET6:;
+		const struct sockaddr_in6 *addr_in6 = (const struct sockaddr_in6 *) addr;
+		struct kr_sockaddr_in6_key *in6key = (struct kr_sockaddr_in6_key *) dst;
+		in6key->family = AF_INET6;
+		memcpy(&in6key->address, &addr_in6->sin6_addr, sizeof(in6key->address));
+		memcpy(&in6key->port, &addr_in6->sin6_port, sizeof(in6key->port));
+		if (kr_sockaddr_link_local(addr))
+			memcpy(&in6key->scope, &addr_in6->sin6_scope_id, sizeof(in6key->scope));
+		else
+			in6key->scope = 0;
+		return sizeof(*in6key);
+
+	case AF_UNIX:;
+		const struct sockaddr_un *addr_un = (const struct sockaddr_un *) addr;
+		struct kr_sockaddr_un_key *unkey = (struct kr_sockaddr_un_key *) dst;
+		unkey->family = AF_UNIX;
+		strncpy(unkey->path, addr_un->sun_path, sizeof(unkey->path));
+		size_t pathlen = strnlen(unkey->path, sizeof(unkey->path));
+		if (pathlen < sizeof(unkey->path)) /* Include null-terminator */
+			pathlen += 1;
+		return offsetof(struct kr_sockaddr_un_key, path) + pathlen;
+
+	default:
+		return kr_error(EAFNOSUPPORT);
+	}
+}
+
+struct sockaddr *kr_sockaddr_from_key(struct sockaddr_storage *dst,
+                                      const char *key)
+{
+	kr_require(key);
+
+	switch (((struct kr_sockaddr_key *) key)->family) {
+	case AF_INET:;
+		const struct kr_sockaddr_in_key *inkey = (struct kr_sockaddr_in_key *) key;
+		struct sockaddr_in *addr_in = (struct sockaddr_in *) dst;
+		addr_in->sin_family = AF_INET;
+		memcpy(&addr_in->sin_addr, &inkey->address, sizeof(inkey->address));
+		memcpy(&addr_in->sin_port, &inkey->port, sizeof(inkey->port));
+		return (struct sockaddr *) addr_in;
+
+	case AF_INET6:;
+		const struct kr_sockaddr_in6_key *in6key = (struct kr_sockaddr_in6_key *) key;
+		struct sockaddr_in6 *addr_in6 = (struct sockaddr_in6 *) dst;
+		addr_in6->sin6_family = AF_INET6;
+		memcpy(&addr_in6->sin6_addr, &in6key->address, sizeof(in6key->address));
+		memcpy(&addr_in6->sin6_port, &in6key->port, sizeof(in6key->port));
+		memcpy(&addr_in6->sin6_scope_id, &in6key->scope, sizeof(in6key->scope));
+		return (struct sockaddr *) addr_in6;
+
+	case AF_UNIX:;
+		const struct kr_sockaddr_un_key *unkey = (struct kr_sockaddr_un_key *) key;
+		struct sockaddr_un *addr_un = (struct sockaddr_un *) dst;
+		addr_un->sun_family = AF_UNIX;
+		strncpy(addr_un->sun_path, unkey->path, sizeof(unkey->path));
+		return (struct sockaddr *) addr_un;
+
+	default:
+		return NULL;
 	}
 }
 
