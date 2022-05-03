@@ -218,7 +218,7 @@ def _kresd_unit_properties(config: KresConfig, kres_id: KresID) -> List[Tuple[st
         ("Slice", GLib.Variant("s", _slice_name())),
     ]
 
-    if config.server.watchdog:
+    if config.supervisor.watchdog:
         val.append(
             ("WatchdogUSec", GLib.Variant("t", 10000000)),
         )

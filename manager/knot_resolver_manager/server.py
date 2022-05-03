@@ -315,8 +315,8 @@ async def _init_manager(config_store: ConfigStore, server: Server) -> KresManage
     """
     # if configured, create a subprocess controller manually
     controller: Optional[SubprocessController] = None
-    if config_store.get().server.backend != "auto":
-        controller = await get_controller_by_name(config_store.get(), config_store.get().server.backend)
+    if config_store.get().supervisor.backend != "auto":
+        controller = await get_controller_by_name(config_store.get(), config_store.get().supervisor.backend)
 
     # Create KresManager. This will perform autodetection of available service managers and
     # select the most appropriate to use (or use the one configured directly)

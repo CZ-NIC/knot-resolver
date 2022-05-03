@@ -20,6 +20,7 @@ from knot_resolver_manager.datamodel.rpz_schema import RPZSchema
 from knot_resolver_manager.datamodel.server_schema import ServerSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
+from knot_resolver_manager.datamodel.supervisor_schema import SupervisorSchema
 from knot_resolver_manager.datamodel.types import DomainName
 from knot_resolver_manager.datamodel.types.types import IDPattern, UncheckedPath
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
@@ -65,6 +66,7 @@ class KresConfig(SchemaNode):
         hostname: Internal DNS resolver hostname. Default is machine hostname.
         rundir: Directory where the resolver can create files and which will be it's cwd.
         server: DNS server control and management configuration.
+        supervisor: Proceses supervisor configuration.
         options: Fine-tuning global parameters of DNS resolver operation.
         network: Network connections and protocols configuration.
         static_hints: Static hints for forward records (A/AAAA) and reverse records (PTR)
@@ -85,6 +87,7 @@ class KresConfig(SchemaNode):
         hostname: Optional[str] = None
         rundir: UncheckedPath = UncheckedPath(".")
         server: ServerSchema = ServerSchema()
+        supervisor: SupervisorSchema = SupervisorSchema()
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
         static_hints: StaticHintsSchema = StaticHintsSchema()
@@ -106,6 +109,7 @@ class KresConfig(SchemaNode):
     hostname: str
     rundir: UncheckedPath
     server: ServerSchema
+    supervisor: SupervisorSchema
     options: OptionsSchema
     network: NetworkSchema
     static_hints: StaticHintsSchema

@@ -4,14 +4,7 @@ from typing import Any, Optional, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.types import (
-    CheckedPath,
-    DNSRecordTypeEnum,
-    DomainName,
-    InterfacePort,
-    IntPositive,
-    IPAddressPort,
-)
+from knot_resolver_manager.datamodel.types import CheckedPath, InterfacePort, IntPositive, IPAddressPort
 from knot_resolver_manager.exceptions import DataException
 from knot_resolver_manager.utils import SchemaNode
 
@@ -34,22 +27,6 @@ def _cpu_count() -> int:
                 "The number can be specified manually in 'server:instances' configuration option."
             )
         return cpus
-
-
-BackendEnum = Literal["auto", "systemd", "supervisord"]
-
-
-class WatchDogSchema(SchemaNode):
-    """
-    Configuration of systemd watchdog.
-
-    ---
-    qname: Name to internaly query for.
-    qtype: DNS type to internaly query for.
-    """
-
-    qname: DomainName
-    qtype: DNSRecordTypeEnum
 
 
 class ManagementSchema(SchemaNode):
@@ -99,23 +76,17 @@ class ServerSchema(SchemaNode):
 
         ---
         workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
-        backend: Forces the manager to use a specific service supervisor.
-        watchdog: Disable systemd watchdog, enable with defaults or set new configuration. Can only be used with 'systemd' backend.
         management: Configuration of management HTTP API.
         webmgmt: Configuration of legacy web management endpoint.
         """
 
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
-        backend: BackendEnum = "auto"
-        watchdog: Union[bool, WatchDogSchema] = True
         management: ManagementSchema = ManagementSchema({"unix-socket": "./manager.sock"})
         webmgmt: Optional[WebmgmtSchema] = None
 
     _PREVIOUS_SCHEMA = Raw
 
     workers: IntPositive
-    backend: BackendEnum = "auto"
-    watchdog: Union[bool, WatchDogSchema]
     management: ManagementSchema
     webmgmt: Optional[WebmgmtSchema]
 
@@ -132,6 +103,3 @@ class ServerSchema(SchemaNode):
         except DataException:
             # sometimes, we won't be able to get information about the cpu count
             pass
-
-        if self.watchdog and self.backend not in ["auto", "systemd"]:
-            raise ValueError("'watchdog' can only be configured for 'systemd' backend")
