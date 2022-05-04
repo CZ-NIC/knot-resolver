@@ -336,10 +336,20 @@ ssize_t kr_sockaddr_key(struct kr_sockaddr_key_storage *dst,
 		const struct sockaddr_un *addr_un = (const struct sockaddr_un *) addr;
 		struct kr_sockaddr_un_key *unkey = (struct kr_sockaddr_un_key *) dst;
 		unkey->family = AF_UNIX;
-		strncpy(unkey->path, addr_un->sun_path, sizeof(unkey->path));
-		size_t pathlen = strnlen(unkey->path, sizeof(unkey->path));
-		if (pathlen < sizeof(unkey->path)) /* Include null-terminator */
-			pathlen += 1;
+		size_t pathlen = strnlen(addr_un->sun_path, sizeof(unkey->path));
+		if (pathlen == 0 || pathlen >= sizeof(unkey->path)) {
+			/* Abstract sockets are not supported - we would need
+			 * to also supply a length value for the abstract
+			 * pathname.
+			 *
+			 * UNIX socket path should be null-terminated.
+			 *
+			 * See unix(7). */
+			return kr_error(EINVAL);
+		}
+
+		pathlen += 1; /* Include null-terminator */
+		strncpy(unkey->path, addr_un->sun_path, pathlen);
 		return offsetof(struct kr_sockaddr_un_key, path) + pathlen;
 
 	default:
