@@ -2,13 +2,8 @@ from typing import Any, Dict, Optional
 
 import pytest
 
-from knot_resolver_manager.datamodel.server_schema import ManagementSchema, ServerSchema
+from knot_resolver_manager.datamodel.management_schema import ManagementSchema
 from knot_resolver_manager.exceptions import KresManagerException
-
-
-def test_watchdog_backend_invalid():
-    with pytest.raises(KresManagerException):
-        ServerSchema({"backend": "supervisord", "watchdog": {"qname": "nic.cz.", "qtype": "A"}})
 
 
 @pytest.mark.parametrize("val", [{"interface": "::1@53"}, {"unix-socket": "/path/socket"}])

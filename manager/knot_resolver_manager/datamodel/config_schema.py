@@ -13,18 +13,19 @@ from knot_resolver_manager.datamodel.dnssec_schema import DnssecSchema
 from knot_resolver_manager.datamodel.forward_zone import ForwardZoneSchema
 from knot_resolver_manager.datamodel.logging_config import LoggingSchema
 from knot_resolver_manager.datamodel.lua_schema import LuaSchema
+from knot_resolver_manager.datamodel.management_schema import ManagementSchema
 from knot_resolver_manager.datamodel.monitoring_schema import MonitoringSchema
 from knot_resolver_manager.datamodel.network_schema import NetworkSchema
 from knot_resolver_manager.datamodel.options_schema import OptionsSchema
 from knot_resolver_manager.datamodel.policy_schema import PolicySchema
 from knot_resolver_manager.datamodel.rpz_schema import RPZSchema
-from knot_resolver_manager.datamodel.server_schema import ServerSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
 from knot_resolver_manager.datamodel.supervisor_schema import SupervisorSchema
 from knot_resolver_manager.datamodel.types import DomainName
 from knot_resolver_manager.datamodel.types.types import IDPattern, IntPositive, UncheckedPath
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
+from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
 from knot_resolver_manager.exceptions import DataException
 from knot_resolver_manager.utils import SchemaNode
 
@@ -88,7 +89,8 @@ class KresConfig(SchemaNode):
         rundir: Directory where the resolver can create files and which will be it's cwd.
         hostname: Internal DNS resolver hostname. Default is machine hostname.
         workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
-        server: DNS server control and management configuration.
+        management: Configuration of management HTTP API.
+        webmgmt: Configuration of legacy web management endpoint.
         supervisor: Proceses supervisor configuration.
         options: Fine-tuning global parameters of DNS resolver operation.
         network: Network connections and protocols configuration.
@@ -110,7 +112,8 @@ class KresConfig(SchemaNode):
         rundir: UncheckedPath = UncheckedPath(".")
         hostname: Optional[str] = None
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
-        server: ServerSchema = ServerSchema()
+        management: ManagementSchema = ManagementSchema({"unix-socket": "./manager.sock"})
+        webmgmt: Optional[WebmgmtSchema] = None
         supervisor: SupervisorSchema = SupervisorSchema()
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
@@ -133,7 +136,8 @@ class KresConfig(SchemaNode):
     rundir: UncheckedPath
     hostname: str
     workers: IntPositive
-    server: ServerSchema
+    management: ManagementSchema
+    webmgmt: Optional[WebmgmtSchema]
     supervisor: SupervisorSchema
     options: OptionsSchema
     network: NetworkSchema

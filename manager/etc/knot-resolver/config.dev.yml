@@ -1,9 +1,8 @@
 id: dev
 rundir: etc/knot-resolver/runtime
 workers: 1
-server:
-  management:
-    interface: 127.0.0.1@5000
+management:
+  interface: 127.0.0.1@5000
 cache:
   storage: ../cache
 logging:
