@@ -654,7 +654,7 @@ int zi_zone_import(const zi_config_t config)
 		goto zonemd;
 	struct kr_context *resolver = &the_worker->engine->resolver;
 	const knot_rrset_t * const ds = c->ds ? c->ds :
-		kr_ta_get(&resolver->trust_anchors, z_import->origin);
+		kr_ta_get(resolver->trust_anchors, z_import->origin);
 	if (!ds) {
 		if (!kr_ta_closest(resolver, z_import->origin, KNOT_RRTYPE_DNSKEY))
 			goto zonemd; // our TAs say we're insecure
