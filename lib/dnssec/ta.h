@@ -5,7 +5,7 @@
 #pragma once
 
 #include "lib/defines.h"
-#include "lib/generic/map.h"
+#include "lib/generic/trie.h"
 #include <libknot/rrset.h>
 
 /**
@@ -15,20 +15,20 @@
  * @return non-empty RRSet or NULL
  */
 KR_EXPORT
-knot_rrset_t *kr_ta_get(map_t *trust_anchors, const knot_dname_t *name);
+knot_rrset_t *kr_ta_get(trie_t *trust_anchors, const knot_dname_t *name);
 
 /**
  * Add TA to trust store. DS or DNSKEY types are supported.
  * @param  trust_anchors trust store
  * @param  name          name of the TA
  * @param  type          RR type of the TA (DS or DNSKEY)
- * @param  ttl           
- * @param  rdata         
- * @param  rdlen         
+ * @param  ttl
+ * @param  rdata
+ * @param  rdlen
  * @return 0 or an error
  */
 KR_EXPORT
-int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,
+int kr_ta_add(trie_t *trust_anchors, const knot_dname_t *name, uint16_t type,
                uint32_t ttl, const uint8_t *rdata, uint16_t rdlen);
 
 struct kr_context;
@@ -50,12 +50,12 @@ const knot_dname_t * kr_ta_closest(const struct kr_context *ctx, const knot_dnam
  * @return 0 or an error
  */
 KR_EXPORT
-int kr_ta_del(map_t *trust_anchors, const knot_dname_t *name);
+int kr_ta_del(trie_t *trust_anchors, const knot_dname_t *name);
 
 /**
  * Clear trust store.
  * @param trust_anchors trust store
  */
 KR_EXPORT
-void kr_ta_clear(map_t *trust_anchors);
+void kr_ta_clear(trie_t *trust_anchors);
 

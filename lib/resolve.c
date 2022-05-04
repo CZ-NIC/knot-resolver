@@ -918,8 +918,8 @@ static struct kr_query *zone_cut_subreq(struct kr_rplan *rplan, struct kr_query 
 static int forward_trust_chain_check(struct kr_request *request, struct kr_query *qry, bool resume)
 {
 	struct kr_rplan *rplan = &request->rplan;
-	map_t *trust_anchors = &request->ctx->trust_anchors;
-	map_t *negative_anchors = &request->ctx->negative_anchors;
+	trie_t *trust_anchors = request->ctx->trust_anchors;
+	trie_t *negative_anchors = request->ctx->negative_anchors;
 
 	if (qry->parent != NULL &&
 	    !(qry->forward_flags.CNAME) &&
@@ -1104,8 +1104,8 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 {
 	struct kr_rplan *rplan = &request->rplan;
-	map_t *trust_anchors = &request->ctx->trust_anchors;
-	map_t *negative_anchors = &request->ctx->negative_anchors;
+	trie_t *trust_anchors = request->ctx->trust_anchors;
+	trie_t *negative_anchors = request->ctx->negative_anchors;
 
 	/* Disable DNSSEC if it enters NTA. */
 	if (kr_ta_get(negative_anchors, qry->zone_cut.name)){

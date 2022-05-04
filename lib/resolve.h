@@ -161,8 +161,8 @@ struct kr_context
 	knot_rrset_t *downstream_opt_rr;
 	knot_rrset_t *upstream_opt_rr;
 
-	map_t trust_anchors;
-	map_t negative_anchors;
+	trie_t *trust_anchors;
+	trie_t *negative_anchors;
 	struct kr_zonecut root_hints;
 	struct kr_cache cache;
 	unsigned cache_rtt_tout_retry_interval;
