@@ -1,7 +1,8 @@
+import logging
 import os
 import socket
 import sys
-from typing import Dict, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from jinja2 import Environment, FileSystemLoader, Template
 from typing_extensions import Literal
@@ -22,9 +23,12 @@ from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchem
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
 from knot_resolver_manager.datamodel.supervisor_schema import SupervisorSchema
 from knot_resolver_manager.datamodel.types import DomainName
-from knot_resolver_manager.datamodel.types.types import IDPattern, UncheckedPath
+from knot_resolver_manager.datamodel.types.types import IDPattern, IntPositive, UncheckedPath
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
+from knot_resolver_manager.exceptions import DataException
 from knot_resolver_manager.utils import SchemaNode
+
+logger = logging.getLogger(__name__)
 
 
 def _get_templates_dir() -> str:
@@ -56,6 +60,24 @@ def _import_lua_template() -> Template:
 _MAIN_TEMPLATE = _import_lua_template()
 
 
+def _cpu_count() -> int:
+    try:
+        return len(os.sched_getaffinity(0))
+    except (NotImplementedError, AttributeError):
+        logger.warning(
+            "The number of usable CPUs could not be determined using 'os.sched_getaffinity()'."
+            "Attempting to get the number of system CPUs using 'os.cpu_count()'"
+        )
+        cpus = os.cpu_count()
+        if cpus is None:
+            raise DataException(
+                "The number of available CPUs to automatically set the number of running"
+                "'kresd' workers could not be determined."
+                "The number can be specified manually in 'server:instances' configuration option."
+            )
+        return cpus
+
+
 class KresConfig(SchemaNode):
     class Raw(SchemaNode):
         """
@@ -63,8 +85,9 @@ class KresConfig(SchemaNode):
 
         ---
         id: System-wide unique identifier of this instance. Used for grouping logs and tagging workers.
-        hostname: Internal DNS resolver hostname. Default is machine hostname.
         rundir: Directory where the resolver can create files and which will be it's cwd.
+        hostname: Internal DNS resolver hostname. Default is machine hostname.
+        workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
         server: DNS server control and management configuration.
         supervisor: Proceses supervisor configuration.
         options: Fine-tuning global parameters of DNS resolver operation.
@@ -84,8 +107,9 @@ class KresConfig(SchemaNode):
         """
 
         id: IDPattern
-        hostname: Optional[str] = None
         rundir: UncheckedPath = UncheckedPath(".")
+        hostname: Optional[str] = None
+        workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         server: ServerSchema = ServerSchema()
         supervisor: SupervisorSchema = SupervisorSchema()
         options: OptionsSchema = OptionsSchema()
@@ -106,8 +130,9 @@ class KresConfig(SchemaNode):
     _PREVIOUS_SCHEMA = Raw
 
     id: IDPattern
-    hostname: str
     rundir: UncheckedPath
+    hostname: str
+    workers: IntPositive
     server: ServerSchema
     supervisor: SupervisorSchema
     options: OptionsSchema
@@ -125,20 +150,34 @@ class KresConfig(SchemaNode):
     monitoring: MonitoringSchema
     lua: LuaSchema
 
-    def _hostname(self, obj: Raw) -> str:
+    def _hostname(self, obj: Raw) -> Any:
         if obj.hostname is None:
             return socket.gethostname()
         return obj.hostname
 
-    def _dnssec(self, obj: Raw) -> Union[Literal[False], DnssecSchema]:
+    def _workers(self, obj: Raw) -> Any:
+        if obj.workers == "auto":
+            return IntPositive(_cpu_count())
+        return obj.workers
+
+    def _dnssec(self, obj: Raw) -> Any:
         if obj.dnssec is True:
             return DnssecSchema()
         return obj.dnssec
 
-    def _dns64(self, obj: Raw) -> Union[Literal[False], Dns64Schema]:
+    def _dns64(self, obj: Raw) -> Any:
         if obj.dns64 is True:
             return Dns64Schema()
         return obj.dns64
+
+    def _validate(self) -> None:
+        try:
+            cpu_count = _cpu_count()
+            if int(self.workers) > 10 * cpu_count:
+                raise ValueError("refusing to run with more then instances 10 instances per cpu core")
+        except DataException:
+            # sometimes, we won't be able to get information about the cpu count
+            pass
 
     def render_lua(self) -> str:
         # FIXME the `cwd` argument is used only for configuring control socket path

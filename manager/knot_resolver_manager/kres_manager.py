@@ -182,7 +182,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         try:
             async with self._manager_lock:
                 logger.debug("Applying config to all workers")
-                await self._ensure_number_of_children(config, int(config.server.workers))
+                await self._ensure_number_of_children(config, int(config.workers))
                 await self._rolling_restart(config)
 
                 if self._is_gc_running() != config.cache.garbage_collector:

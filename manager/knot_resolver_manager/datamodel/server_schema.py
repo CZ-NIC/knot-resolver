@@ -1,32 +1,7 @@
-import logging
-import os
-from typing import Any, Optional, Union
+from typing import Optional
 
-from typing_extensions import Literal
-
-from knot_resolver_manager.datamodel.types import CheckedPath, InterfacePort, IntPositive, IPAddressPort
-from knot_resolver_manager.exceptions import DataException
+from knot_resolver_manager.datamodel.types import CheckedPath, InterfacePort, IPAddressPort
 from knot_resolver_manager.utils import SchemaNode
-
-logger = logging.getLogger(__name__)
-
-
-def _cpu_count() -> int:
-    try:
-        return len(os.sched_getaffinity(0))
-    except (NotImplementedError, AttributeError):
-        logger.warning(
-            "The number of usable CPUs could not be determined using 'os.sched_getaffinity()'."
-            "Attempting to get the number of system CPUs using 'os.cpu_count()'"
-        )
-        cpus = os.cpu_count()
-        if cpus is None:
-            raise DataException(
-                "The number of available CPUs to automatically set the number of running"
-                "'kresd' workers could not be determined."
-                "The number can be specified manually in 'server:instances' configuration option."
-            )
-        return cpus
 
 
 class ManagementSchema(SchemaNode):
@@ -75,31 +50,14 @@ class ServerSchema(SchemaNode):
         DNS server control and management configuration.
 
         ---
-        workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
         management: Configuration of management HTTP API.
         webmgmt: Configuration of legacy web management endpoint.
         """
 
-        workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         management: ManagementSchema = ManagementSchema({"unix-socket": "./manager.sock"})
         webmgmt: Optional[WebmgmtSchema] = None
 
     _PREVIOUS_SCHEMA = Raw
 
-    workers: IntPositive
     management: ManagementSchema
     webmgmt: Optional[WebmgmtSchema]
-
-    def _workers(self, obj: Raw) -> Any:
-        if obj.workers == "auto":
-            return IntPositive(_cpu_count())
-        return obj.workers
-
-    def _validate(self) -> None:
-        try:
-            cpu_count = _cpu_count()
-            if int(self.workers) > 10 * cpu_count:
-                raise ValueError("refusing to run with more then instances 10 instances per cpu core")
-        except DataException:
-            # sometimes, we won't be able to get information about the cpu count
-            pass
