@@ -3,6 +3,12 @@
 -- hostname
 hostname('{{ cfg.hostname }}')
 
+{% if cfg.nsid %}
+-- nsid
+modules.load('nsid')
+nsid.name('{{ cfg.nsid }}_' .. worker.id)
+{% endif %}
+
 -- LOGGING section
 {% include "logging.lua.j2" %}
 

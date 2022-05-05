@@ -1,9 +1,3 @@
-{% if cfg.options.nsid %}
--- options.nsid
-modules.load('nsid')
-nsid.name('{{ cfg.options.nsid }}_' .. worker.id)
-{% endif %}
-
 -- options.glue-checking
 mode('{{ cfg.options.glue_checking }}')
 

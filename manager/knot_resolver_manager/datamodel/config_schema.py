@@ -86,8 +86,9 @@ class KresConfig(SchemaNode):
 
         ---
         id: System-wide unique identifier of this instance. Used for grouping logs and tagging workers.
-        rundir: Directory where the resolver can create files and which will be it's cwd.
+        nsid: Name Server Identifier (RFC 5001) which allows DNS clients to request resolver to send back its NSID along with the reply to a DNS request.
         hostname: Internal DNS resolver hostname. Default is machine hostname.
+        rundir: Directory where the resolver can create files and which will be it's cwd.
         workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
         management: Configuration of management HTTP API.
         webmgmt: Configuration of legacy web management endpoint.
@@ -109,8 +110,9 @@ class KresConfig(SchemaNode):
         """
 
         id: IDPattern
-        rundir: UncheckedPath = UncheckedPath(".")
+        nsid: Optional[str] = None
         hostname: Optional[str] = None
+        rundir: UncheckedPath = UncheckedPath(".")
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         management: ManagementSchema = ManagementSchema({"unix-socket": "./manager.sock"})
         webmgmt: Optional[WebmgmtSchema] = None
@@ -133,8 +135,9 @@ class KresConfig(SchemaNode):
     _PREVIOUS_SCHEMA = Raw
 
     id: IDPattern
-    rundir: UncheckedPath
+    nsid: Optional[str]
     hostname: str
+    rundir: UncheckedPath
     workers: IntPositive
     management: ManagementSchema
     webmgmt: Optional[WebmgmtSchema]
