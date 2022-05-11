@@ -393,6 +393,41 @@ struct sockaddr *kr_sockaddr_from_key(struct sockaddr_storage *dst,
 	}
 }
 
+bool kr_sockaddr_key_same_addr(const char *key_a, const char *key_b)
+{
+	const struct kr_sockaddr_key *kkey_a = (struct kr_sockaddr_key *) key_a;
+	const struct kr_sockaddr_key *kkey_b = (struct kr_sockaddr_key *) key_b;
+
+	if (kkey_a->family != kkey_b->family)
+		return false;
+
+	ptrdiff_t offset;
+	switch (kkey_a->family) {
+		case AF_INET:
+			offset = offsetof(struct kr_sockaddr_in_key, address);
+			break;
+		case AF_INET6:
+			offset = offsetof(struct kr_sockaddr_in6_key, address);
+			break;
+
+		case AF_UNIX:;
+			const struct kr_sockaddr_un_key *unkey_a =
+				(struct kr_sockaddr_un_key *) key_a;
+			const struct kr_sockaddr_un_key *unkey_b =
+				(struct kr_sockaddr_un_key *) key_b;
+
+			return strncmp(unkey_a->path, unkey_b->path,
+			               sizeof(unkey_a->path)) == 0;
+
+		default:
+			kr_assert(false);
+			return false;
+	}
+
+	size_t len = kr_family_len(kkey_a->family);
+	return memcmp(key_a + offset, key_b + offset, len) == 0;
+}
+
 int kr_sockaddr_cmp(const struct sockaddr *left, const struct sockaddr *right)
 {
 	if (!left || !right) {

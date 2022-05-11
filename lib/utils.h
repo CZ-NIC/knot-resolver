@@ -289,6 +289,11 @@ KR_EXPORT
 struct sockaddr *kr_sockaddr_from_key(struct sockaddr_storage *dst,
                                       const char *key);
 
+/** Checks whether the two keys represent the same address;
+ * does NOT compare the ports. */
+KR_EXPORT
+bool kr_sockaddr_key_same_addr(const char *key_a, const char *key_b);
+
 /** Compare two given sockaddr.
  * return 0 - addresses are equal, error code otherwise.
  */
