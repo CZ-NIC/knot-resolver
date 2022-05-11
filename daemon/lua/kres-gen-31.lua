@@ -94,10 +94,6 @@ struct knot_pkt {
 	knot_mm_t mm;
 	knot_compr_t compr;
 };
-typedef struct {
-	void *root;
-	struct knot_mm *pool;
-} map_t;
 typedef struct trie trie_t;
 struct kr_qflags {
 	_Bool NO_MINIMIZE : 1;

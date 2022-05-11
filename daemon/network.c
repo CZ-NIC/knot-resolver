@@ -236,7 +236,7 @@ static void endpoint_close(struct network *net, struct endpoint *ep, bool force)
 	}
 }
 
-/** Endpoint visitor (see @file map.h) */
+/** Endpoint visitor (see @file trie.h) */
 static int close_key(trie_val_t *val, void* net)
 {
 	endpoint_array_t *ep_array = *val;

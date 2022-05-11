@@ -111,8 +111,6 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	knot_pktsection_t
 	knot_compr_t
 	struct knot_pkt
-	# lib/generic/
-	map_t
 	#trie_t inside is private to libknot
 	typedef trie_t
 	# libkres
