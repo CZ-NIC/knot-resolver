@@ -71,7 +71,7 @@ additional considerations for TLS 1.2 required by HTTP/2 are not implemented
 HTTP status codes
 """""""""""""""""
 
-As specified by :rfc:`8484`, the resolver responds with status **200 OK** whenever 
+As specified by :rfc:`8484`, the resolver responds with status **200 OK** whenever
 it can produce a valid DNS reply for a given query, even in cases where the DNS
 ``rcode`` indicates an error (like ``NXDOMAIN``, ``SERVFAIL``, etc.).
 
@@ -80,7 +80,7 @@ the following status codes:
 
  * **400 Bad Request** for a generally malformed query, like one not containing
    a valid DNS packet
- * **404 Not Found** when an incorrect HTTP endpoint is queried - the only 
+ * **404 Not Found** when an incorrect HTTP endpoint is queried - the only
    supported ones are ``/dns-query`` and ``/doh``
  * **413 Payload Too Large** when the DNS query exceeds its maximum size
  * **415 Unsupported Media Type** when the query's ``Content-Type`` header

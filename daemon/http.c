@@ -65,6 +65,13 @@ static int http_send_response(struct http_ctx *ctx, int32_t stream_id,
 static int http_send_response_rst_stream(struct http_ctx *ctx, int32_t stream_id,
 			      nghttp2_data_provider *prov, enum http_status status);
 
+/** Checks if `status` has the correct `category`.
+ * E.g. status 200 has category 2, status 404 has category 4, 501 has category 5 etc. */
+static inline bool http_status_has_category(enum http_status status, int category)
+{
+	return status / 100 == category;
+}
+
 /*
  * Write HTTP/2 protocol data to underlying transport layer.
  */
@@ -232,6 +239,23 @@ static int check_uri(const char* uri_path)
 	return 0;
 }
 
+static kr_http_header_array_t *headers_dup(kr_http_header_array_t *src)
+{
+	kr_http_header_array_t *dst = malloc(sizeof(kr_http_header_array_t));
+	kr_require(dst);
+	array_init(*dst);
+	for (size_t i = 0; i < src->len; i++) {
+		struct kr_http_header_array_entry *src_entry = &src->at[i];
+		struct kr_http_header_array_entry dst_entry = {
+			.name = strdup(src_entry->name),
+			.value = strdup(src_entry->value)
+		};
+		array_push(*dst, dst_entry);
+	}
+
+	return dst;
+}
+
 /*
  * Process a query from URI path if there's base64url encoded dns variable.
  */
@@ -269,7 +293,7 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 
 	struct http_stream stream = {
 		.id = stream_id,
-		.headers = ctx->headers
+		.headers = headers_dup(ctx->headers)
 	};
 	queue_push(ctx->streams, stream);
 	return 0;
@@ -476,7 +500,7 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 		ctx->buf_pos = sizeof(uint16_t);  /* Reserve 2B for dnsmsg len. */
 		struct http_stream stream = {
 			.id = stream_id,
-			.headers = ctx->headers
+			.headers = headers_dup(ctx->headers)
 		};
 		queue_push(ctx->streams, stream);
 	}
@@ -491,7 +515,8 @@ static int submit_to_wirebuffer(struct http_ctx *ctx)
 	int ret = -1;
 	ssize_t len;
 
-	/* Transfer ownership to stream (waiting in wirebuffer) */
+	/* Free http_ctx's headers - by now the stream has obtained its own
+	 * copy of the headers which it can operate on. */
 	/* FIXME: technically, transferring memory ownership should happen
 	 * along with queue_push(ctx->streams) to avoid confusion of who owns
 	 * what and when. Pushing to queue should be done AFTER we successfully
@@ -501,7 +526,16 @@ static int submit_to_wirebuffer(struct http_ctx *ctx)
 	 *
 	 * For now, we assume memory is transferred even on error and the
 	 * headers themselves get cleaned up during http_free() which is
-	 * triggered after the error when session is closed.  */
+	 * triggered after the error when session is closed.
+	 *
+	 * EDIT(2022-05-19): The original logic was causing occasional
+	 * double-free conditions once status code support was extended.
+	 *
+	 * Currently, we are copying the headers from ctx instead of transferring
+	 * ownership, which is still a dirty workaround and, ideally, the whole
+	 * logic around header (de)allocation should be reworked to make
+	 * the ownership situation clear. */
+	http_free_headers(ctx->headers);
 	ctx->headers = NULL;
 
 	len = ctx->buf_pos - sizeof(uint16_t);
@@ -935,8 +969,6 @@ void http_free(struct http_ctx *ctx)
 	while (queue_len(ctx->streams) > 0) {
 		struct http_stream stream = queue_head(ctx->streams);
 		http_free_headers(stream.headers);
-		if (stream.headers == ctx->headers)
-			ctx->headers = NULL;  // to prevent double-free
 		queue_pop(ctx->streams);
 	}
 
