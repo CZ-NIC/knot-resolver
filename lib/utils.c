@@ -395,8 +395,8 @@ struct sockaddr *kr_sockaddr_from_key(struct sockaddr_storage *dst,
 
 bool kr_sockaddr_key_same_addr(const char *key_a, const char *key_b)
 {
-	const struct kr_sockaddr_key *kkey_a = (struct kr_sockaddr_key *) key_a;
-	const struct kr_sockaddr_key *kkey_b = (struct kr_sockaddr_key *) key_b;
+	const struct kr_sockaddr_in6_key *kkey_a = (struct kr_sockaddr_in6_key *) key_a;
+	const struct kr_sockaddr_in6_key *kkey_b = (struct kr_sockaddr_in6_key *) key_b;
 
 	if (kkey_a->family != kkey_b->family)
 		return false;
@@ -407,6 +407,8 @@ bool kr_sockaddr_key_same_addr(const char *key_a, const char *key_b)
 			offset = offsetof(struct kr_sockaddr_in_key, address);
 			break;
 		case AF_INET6:
+			if (unlikely(kkey_a->scope != kkey_b->scope))
+				return false;
 			offset = offsetof(struct kr_sockaddr_in6_key, address);
 			break;
 
