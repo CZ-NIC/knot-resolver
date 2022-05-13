@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/un.h>
 #include <netinet/in.h>
 #include <unistd.h>
 
@@ -30,6 +31,10 @@
 
 /** When knot_pkt is passed from cache without ->wire, this is the ->size. */
 static const size_t KR_PKT_SIZE_NOWIRE = -1;
+
+/** Maximum length (excluding null-terminator) of a presentation-form address
+ * returned by `kr_straddr`. */
+#define KR_STRADDR_MAXLEN 109
 
 /** Used for reserving enough space for the `kr_sockaddr_key` function
  * output. */
@@ -255,6 +260,7 @@ union kr_in_addr {
 	struct in6_addr ip6;
 };
 
+/* TODO: rename kr_inaddr functions to kr_sockaddr */
 /** Address bytes for given family. */
 KR_EXPORT KR_PURE
 const char *kr_inaddr(const struct sockaddr *addr);
@@ -282,6 +288,11 @@ ssize_t kr_sockaddr_key(struct kr_sockaddr_key_storage *dst,
 KR_EXPORT
 struct sockaddr *kr_sockaddr_from_key(struct sockaddr_storage *dst,
                                       const char *key);
+
+/** Checks whether the two keys represent the same address;
+ * does NOT compare the ports. */
+KR_EXPORT
+bool kr_sockaddr_key_same_addr(const char *key_a, const char *key_b);
 
 /** Compare two given sockaddr.
  * return 0 - addresses are equal, error code otherwise.
@@ -315,8 +326,12 @@ static inline char *kr_straddr(const struct sockaddr *addr)
 {
 	if (kr_fails_assert(addr)) return NULL;
 	/* We are the single-threaded application */
-	static char str[INET6_ADDRSTRLEN + 1 + 5 + 1];
-	size_t len = sizeof(str);
+	static char str[KR_STRADDR_MAXLEN + 1] = {0};
+	if (addr->sa_family == AF_UNIX) {
+		strncpy(str, ((struct sockaddr_un *) addr)->sun_path, sizeof(str) - 1);
+		return str;
+	}
+	size_t len = KR_STRADDR_MAXLEN;
 	int ret = kr_inaddr_str(addr, str, &len);
 	return ret != kr_ok() || len == 0 ? NULL : str;
 }

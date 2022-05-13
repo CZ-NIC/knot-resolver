@@ -336,10 +336,20 @@ ssize_t kr_sockaddr_key(struct kr_sockaddr_key_storage *dst,
 		const struct sockaddr_un *addr_un = (const struct sockaddr_un *) addr;
 		struct kr_sockaddr_un_key *unkey = (struct kr_sockaddr_un_key *) dst;
 		unkey->family = AF_UNIX;
-		strncpy(unkey->path, addr_un->sun_path, sizeof(unkey->path));
-		size_t pathlen = strnlen(unkey->path, sizeof(unkey->path));
-		if (pathlen < sizeof(unkey->path)) /* Include null-terminator */
-			pathlen += 1;
+		size_t pathlen = strnlen(addr_un->sun_path, sizeof(unkey->path));
+		if (pathlen == 0 || pathlen >= sizeof(unkey->path)) {
+			/* Abstract sockets are not supported - we would need
+			 * to also supply a length value for the abstract
+			 * pathname.
+			 *
+			 * UNIX socket path should be null-terminated.
+			 *
+			 * See unix(7). */
+			return kr_error(EINVAL);
+		}
+
+		pathlen += 1; /* Include null-terminator */
+		strncpy(unkey->path, addr_un->sun_path, pathlen);
 		return offsetof(struct kr_sockaddr_un_key, path) + pathlen;
 
 	default:
@@ -378,8 +388,46 @@ struct sockaddr *kr_sockaddr_from_key(struct sockaddr_storage *dst,
 		return (struct sockaddr *) addr_un;
 
 	default:
+		kr_assert(false);
 		return NULL;
 	}
+}
+
+bool kr_sockaddr_key_same_addr(const char *key_a, const char *key_b)
+{
+	const struct kr_sockaddr_in6_key *kkey_a = (struct kr_sockaddr_in6_key *) key_a;
+	const struct kr_sockaddr_in6_key *kkey_b = (struct kr_sockaddr_in6_key *) key_b;
+
+	if (kkey_a->family != kkey_b->family)
+		return false;
+
+	ptrdiff_t offset;
+	switch (kkey_a->family) {
+		case AF_INET:
+			offset = offsetof(struct kr_sockaddr_in_key, address);
+			break;
+		case AF_INET6:
+			if (unlikely(kkey_a->scope != kkey_b->scope))
+				return false;
+			offset = offsetof(struct kr_sockaddr_in6_key, address);
+			break;
+
+		case AF_UNIX:;
+			const struct kr_sockaddr_un_key *unkey_a =
+				(struct kr_sockaddr_un_key *) key_a;
+			const struct kr_sockaddr_un_key *unkey_b =
+				(struct kr_sockaddr_un_key *) key_b;
+
+			return strncmp(unkey_a->path, unkey_b->path,
+			               sizeof(unkey_a->path)) == 0;
+
+		default:
+			kr_assert(false);
+			return false;
+	}
+
+	size_t len = kr_family_len(kkey_a->family);
+	return memcmp(key_a + offset, key_b + offset, len) == 0;
 }
 
 int kr_sockaddr_cmp(const struct sockaddr *left, const struct sockaddr *right)
@@ -486,7 +534,10 @@ int kr_straddr_family(const char *addr)
 	if (strchr(addr, ':')) {
 		return AF_INET6;
 	}
-	return AF_INET;
+	if (strchr(addr, '.')) {
+		return AF_INET;
+	}
+	return kr_error(EINVAL);
 }
 
 int kr_family_len(int family)
@@ -531,7 +582,6 @@ struct sockaddr * kr_straddr_socket(const char *addr, int port, knot_mm_t *pool)
 		return (struct sockaddr *)res;
 	}
 	default:
-		kr_assert(false);
 		return NULL;
 	}
 }

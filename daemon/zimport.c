@@ -47,7 +47,6 @@
 #include "daemon/worker.h"
 #include "lib/dnssec/ta.h"
 #include "lib/dnssec.h"
-#include "lib/generic/map.h"
 #include "lib/generic/array.h"
 #include "lib/generic/trie.h"
 #include "lib/utils.h"

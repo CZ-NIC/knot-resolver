@@ -7,7 +7,6 @@
 #include "daemon/tls.h"
 
 #include "lib/generic/array.h"
-#include "lib/generic/map.h"
 #include "lib/generic/trie.h"
 
 #include <uv.h>
@@ -30,6 +29,8 @@ typedef struct {
 	bool freebind;    /**< used for binding to non-local address */
 	const char *kind; /**< tag for other types: "control" or module-handled kinds */
 } endpoint_flags_t;
+
+struct endpoint_key;
 
 static inline bool endpoint_flags_eq(endpoint_flags_t f1, endpoint_flags_t f2)
 {
@@ -78,9 +79,8 @@ struct network {
 	uv_loop_t *loop;
 
 	/** Map: address string -> endpoint_array_t.
-	 * \note even same address-port-flags tuples may appear.
-	 * TODO: trie_t, keyed on *binary* address-port pair. */
-	map_t endpoints;
+	 * \note even same address-port-flags tuples may appear. */
+	trie_t *endpoints;
 
 	/** Registry of callbacks for special endpoint kinds (for opening/closing).
 	 * Map: kind (lowercased) -> lua function ID converted to void *
@@ -149,6 +149,11 @@ void network_close_force(struct network *net);
 /** Enforce that all endpoints are registered from now on.
  * This only does anything with struct endpoint::flags.kind != NULL. */
 int network_engage_endpoints(struct network *net);
+
+/** Returns a string representation of the specified endpoint key.
+ *
+ * The result points into key or is on static storage like for kr_straddr() */
+const char *network_endpoint_key_str(const struct endpoint_key *key);
 
 int network_set_tls_cert(struct network *net, const char *cert);
 int network_set_tls_key(struct network *net, const char *key);
