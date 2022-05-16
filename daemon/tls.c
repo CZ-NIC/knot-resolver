@@ -332,7 +332,12 @@ struct tls_ctx *tls_new(struct worker_ctx *worker)
 		return NULL;
 	}
 
-	int err = gnutls_init(&tls->c.tls_session, GNUTLS_SERVER | GNUTLS_NONBLOCK);
+	int flags = GNUTLS_SERVER | GNUTLS_NONBLOCK;
+#if GNUTLS_VERSION_NUMBER >= 0x030705
+	if (gnutls_check_version("3.7.5"))
+		flags |= GNUTLS_NO_TICKETS_TLS12;
+#endif
+	int err = gnutls_init(&tls->c.tls_session, flags);
 	if (err != GNUTLS_E_SUCCESS) {
 		kr_log_error(TLS, "gnutls_init(): %s (%d)\n", gnutls_strerror_name(err), err);
 		tls_free(tls);
@@ -1067,6 +1072,10 @@ struct tls_client_ctx *tls_client_ctx_new(tls_client_param_t *entry,
 			     | GNUTLS_ENABLE_FALSE_START
 #endif
 	;
+#if GNUTLS_VERSION_NUMBER >= 0x030705
+	if (gnutls_check_version("3.7.5"))
+		flags |= GNUTLS_NO_TICKETS_TLS12;
+#endif
 	int ret = gnutls_init(&ctx->c.tls_session,  flags);
 	if (ret != GNUTLS_E_SUCCESS) {
 		tls_client_ctx_free(ctx);

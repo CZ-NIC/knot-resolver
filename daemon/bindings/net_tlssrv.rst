@@ -113,15 +113,18 @@ by a trusted CA. This is done using function :c:func:`net.tls()`.
    This synchronization works only among instances having the same endianness
    and time_t structure and size (`sizeof(time_t)`).
 
+.. _pfs: https://en.wikipedia.org/wiki/Forward_secrecy
+
    **For good security** the secret must have enough entropy to be hard to guess,
    and it should still be occasionally rotated manually and securely forgotten,
    to reduce the scope of privacy leak in case the
-   `secret leaks eventually <https://en.wikipedia.org/wiki/Forward_secrecy>`_.
+   `secret leaks eventually <pfs_>`_.
 
-   .. warning:: **Setting the secret is probably too risky with TLS <= 1.2**.
-      GnuTLS stable release supports TLS 1.3 since 3.6.3 (summer 2018).
-      Therefore setting the secrets should be considered experimental for now
-      and might not be available on your system.
+   .. warning:: **Setting the secret is probably too risky with TLS <= 1.2 and
+      GnuTLS < 3.7.5**. GnuTLS 3.7.5 adds an option to disable resumption via
+      tickets for TLS <= 1.2, enabling them only for protocols that do guarantee
+      `PFS <pfs_>`_. Knot Resolver makes use of this new option when linked
+      against GnuTLS >= 3.7.5.
 
 .. function:: net.tls_sticket_secret_file([string with path to a file containing pre-shared secret])
 
