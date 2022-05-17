@@ -1,3 +1,8 @@
+{# Test that all packages are installed #}
+Tests: dependencies.py
+Tests-Directory: manager/tests/packaging/
+
+
 {# Test that kresctl command exists and is in $PATH #}
 Tests: kresctl.sh
 Tests-Directory: manager/tests/packaging

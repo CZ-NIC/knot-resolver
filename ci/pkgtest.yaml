@@ -5,9 +5,9 @@ stages:
 # pkgbuild {{{
 .pkgbuild: &pkgbuild
   stage: pkgbuild
-  tags:
-    - lxc
-    - amd64
+#   tags:
+#     - lxc
+#     - amd64
   before_script:
     - git config --global user.name CI
     - git config --global user.email ci@nic
