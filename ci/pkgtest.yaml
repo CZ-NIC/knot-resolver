@@ -21,6 +21,7 @@ stages:
       - pkg/
 
 .apkginstall: &apkginstall  # new jinja2 breaks docs (sphinx/breathe)
+  - apt-get install -y python3-pip # I have no idea why this is needed as it was not needed previously
   - git clone https://gitlab.nic.cz/packaging/apkg.git
   - cd apkg; git checkout test; pip3 install -U . 'jinja2<3.1'
   # - pip3 install -U . 'jinja2<3.1'
