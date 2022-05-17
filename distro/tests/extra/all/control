@@ -1,0 +1,2 @@
+{# This adds all tests for manager's packaging #}
+{% include 'distro/tests/manager-packaging/control' %}

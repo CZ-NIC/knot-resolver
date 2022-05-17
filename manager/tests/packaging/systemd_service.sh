@@ -10,6 +10,7 @@ if test "$(id -u)" -ne 0; then
 fi
 
 
+trap "systemctl stop knot-resolver.service" EXIT
 systemctl start knot-resolver.service
 
 # check that the resolvers are actually running

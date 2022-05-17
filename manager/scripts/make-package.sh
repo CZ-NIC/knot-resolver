@@ -3,6 +3,16 @@
 set -o errexit
 set -o nounset
 
+function install_pipx {
+	python3 -m pip install --user pipx
+	python3 -m pipx ensurepath
+	export PATH="$PATH:/root/.local/bin"  # hack to make binaries installed with pipx work
+}
+
+function pipx {
+	python3 -m pipx ${@}
+}
+
 function init_debian {
     export DEBIAN_FRONTEND=noninteractive
 
@@ -38,10 +48,8 @@ else
 fi
 
 # install apkg
-python3 -m pip install --user pipx
-python3 -m pipx ensurepath
-PATH="$PATH:/root/.local/bin"  # hack to make binaries installed with pipx work
-python3 -m pipx install apkg
+install_pipx
+pipx install apkg
 
 # prepare the repo
 #git clone https://gitlab.nic.cz/knot/knot-resolver

@@ -1,0 +1,15 @@
+{# Test that kresctl command exists and is in $PATH #}
+Test-Command: bash manager/tests/packaging/kresctl.sh
+
+
+{# Tests that manager can be started with default config and it resolves some domains #}
+Test-Command: bash manager/tests/packaging/systemd_service.sh
+{% if distro.match('fedora') -%}
+Depends: knot-utils
+{% elif distro.match('debian') -%}
+Depends: knot-dnsutils
+{% elif distro.match('arch') -%}
+Depends: knot
+{% else -%}
+error this should fail
+{%- endif %}

@@ -20,8 +20,14 @@ stages:
     paths:
       - pkg/
 
-.apkgbuild: &apkgbuild # new jinja2 breaks docs (sphinx/breathe)
-  - pip3 install -U apkg 'jinja2<3.1'
+.apkginstall: &apkginstall  # new jinja2 breaks docs (sphinx/breathe)
+  - git clone https://gitlab.nic.cz/packaging/apkg.git
+  - cd apkg; git checkout test; pip3 install -U . 'jinja2<3.1'
+  # - pip3 install -U . 'jinja2<3.1'
+  
+
+.apkgbuild: &apkgbuild
+  - *apkginstall
   - apkg build-dep -y
   - apkg build
 
@@ -170,13 +176,10 @@ nixos-unstable:pkgbuild:
 
 .debpkgtest: &debpkgtest
   - *pkgdebrepo
-  - apt-get install -y knot-dnsutils
   - apt-get install -y $(find ./pkg/pkgs -name '*.deb' | grep -v module | grep -v debug | grep -v devel)
-  - systemctl start kresd@1
-  - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
-  - systemctl stop kresd@1
-  - systemctl start knot-resolver
-  - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+  - *apkginstall
+  - apkg test-dep
+  - apkg test
 
 centos-7:pkgtest:
   <<: *pkgtest
