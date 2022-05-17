@@ -1,0 +1,23 @@
+{% if cfg.webmgmt -%}
+-- webmgmt
+modules.load('http')
+http.config({tls = {{ 'true' if cfg.webmgmt.tls else 'false'}},
+{%- if cfg.webmgmt.cert_file -%}
+    cert = '{{ cfg.webmgmt.cert_file }}',
+{%- endif -%}
+{%- if cfg.webmgmt.cert_file -%}
+    key = '{{ cfg.webmgmt.key_file }}',
+{%- endif -%}
+}, 'webmgmt')
+net.listen(
+{%- if cfg.webmgmt.unix_socket -%}
+    '{{ cfg.webmgmt.unix_socket }}',nil,
+{%- elif cfg.webmgmt.interface -%}
+    {%- if cfg.webmgmt.interface.addr -%}
+        '{{ cfg.webmgmt.interface.addr }}',{{ cfg.webmgmt.interface.port }},
+    {%- elif cfg.webmgmt.interface.if_name -%}
+        net.{{ cfg.webmgmt.interface.if_name }},{{ cfg.webmgmt.interface.port }},
+    {%- endif -%}
+{%- endif -%}
+{ kind = 'webmgmt' })
+{%- endif %}

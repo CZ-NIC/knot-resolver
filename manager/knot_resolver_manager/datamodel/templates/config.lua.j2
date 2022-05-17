@@ -1,10 +1,22 @@
 {% if not cfg.lua.script_only %}
 
+-- hostname
+hostname('{{ cfg.hostname }}')
+
+{% if cfg.nsid %}
+-- nsid
+modules.load('nsid')
+nsid.name('{{ cfg.nsid }}_' .. worker.id)
+{% endif %}
+
 -- LOGGING section
 {% include "logging.lua.j2" %}
 
--- SERVER section
-{% include "server.lua.j2" %}
+-- SUPERVISOR section
+{% include "supervisor.lua.j2" %}
+
+-- WEBMGMT section
+{% include "webmgmt.lua.j2" %}
 
 -- OPTIONS section
 {% include "options.lua.j2" %}

@@ -21,7 +21,7 @@ from knot_resolver_manager.compat import asyncio as asyncio_compat
 from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, PID_FILE_NAME, init_user_constants
 from knot_resolver_manager.datamodel.config_schema import KresConfig
-from knot_resolver_manager.datamodel.server_schema import ManagementSchema
+from knot_resolver_manager.datamodel.management_schema import ManagementSchema
 from knot_resolver_manager.exceptions import DataException, KresManagerException, SchemaException
 from knot_resolver_manager.kresd_controller import get_controller_by_name
 from knot_resolver_manager.kresd_controller.interface import SubprocessController
@@ -77,7 +77,7 @@ class Server:
         await self._reconfigure_listen_address(config)
 
     async def _deny_management_changes(self, config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
-        if config_old.server.management != config_new.server.management:
+        if config_old.management != config_new.management:
             return Result.err(
                 "/server/management: Changing management API address/unix-socket dynamically is not allowed as it's really dangerous."
                 " If you really need this feature, please contact the developers and explain why. Technically,"
@@ -238,7 +238,7 @@ class Server:
 
     async def _reconfigure_listen_address(self, config: KresConfig) -> None:
         async with self.listen_lock:
-            mgn = config.server.management
+            mgn = config.management
 
             # if the listen address did not change, do nothing
             if self.listen == mgn:
@@ -315,8 +315,8 @@ async def _init_manager(config_store: ConfigStore, server: Server) -> KresManage
     """
     # if configured, create a subprocess controller manually
     controller: Optional[SubprocessController] = None
-    if config_store.get().server.backend != "auto":
-        controller = await get_controller_by_name(config_store.get(), config_store.get().server.backend)
+    if config_store.get().supervisor.backend != "auto":
+        controller = await get_controller_by_name(config_store.get(), config_store.get().supervisor.backend)
 
     # Create KresManager. This will perform autodetection of available service managers and
     # select the most appropriate to use (or use the one configured directly)
@@ -327,7 +327,7 @@ async def _init_manager(config_store: ConfigStore, server: Server) -> KresManage
 
 
 async def _deny_working_directory_changes(config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
-    if config_old.server.rundir != config_new.server.rundir:
+    if config_old.rundir != config_new.rundir:
         return Result.err("Changing manager's `rundir` during runtime is not allowed.")
 
     return Result.ok(None)
@@ -336,10 +336,10 @@ async def _deny_working_directory_changes(config_old: KresConfig, config_new: Kr
 def _set_working_directory(config_raw: ParsedTree) -> None:
     config = KresConfig(config_raw)
 
-    if not config.server.rundir.to_path().exists():
-        raise KresManagerException(f"`rundir` directory ({config.server.rundir}) does not exist!")
+    if not config.rundir.to_path().exists():
+        raise KresManagerException(f"`rundir` directory ({config.rundir}) does not exist!")
 
-    os.chdir(config.server.rundir.to_path())
+    os.chdir(config.rundir.to_path())
 
 
 def _lock_working_directory(attempt: int = 0) -> None:

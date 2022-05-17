@@ -1,6 +1,8 @@
+import logging
 import os
+import socket
 import sys
-from typing import Dict, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from jinja2 import Environment, FileSystemLoader, Template
 from typing_extensions import Literal
@@ -11,17 +13,23 @@ from knot_resolver_manager.datamodel.dnssec_schema import DnssecSchema
 from knot_resolver_manager.datamodel.forward_zone import ForwardZoneSchema
 from knot_resolver_manager.datamodel.logging_config import LoggingSchema
 from knot_resolver_manager.datamodel.lua_schema import LuaSchema
+from knot_resolver_manager.datamodel.management_schema import ManagementSchema
 from knot_resolver_manager.datamodel.monitoring_schema import MonitoringSchema
 from knot_resolver_manager.datamodel.network_schema import NetworkSchema
 from knot_resolver_manager.datamodel.options_schema import OptionsSchema
 from knot_resolver_manager.datamodel.policy_schema import PolicySchema
 from knot_resolver_manager.datamodel.rpz_schema import RPZSchema
-from knot_resolver_manager.datamodel.server_schema import ServerSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
+from knot_resolver_manager.datamodel.supervisor_schema import SupervisorSchema
 from knot_resolver_manager.datamodel.types import DomainName
+from knot_resolver_manager.datamodel.types.types import IDPattern, IntPositive, UncheckedPath
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
+from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
+from knot_resolver_manager.exceptions import DataException
 from knot_resolver_manager.utils import SchemaNode
+
+logger = logging.getLogger(__name__)
 
 
 def _get_templates_dir() -> str:
@@ -53,13 +61,38 @@ def _import_lua_template() -> Template:
 _MAIN_TEMPLATE = _import_lua_template()
 
 
+def _cpu_count() -> int:
+    try:
+        return len(os.sched_getaffinity(0))
+    except (NotImplementedError, AttributeError):
+        logger.warning(
+            "The number of usable CPUs could not be determined using 'os.sched_getaffinity()'."
+            "Attempting to get the number of system CPUs using 'os.cpu_count()'"
+        )
+        cpus = os.cpu_count()
+        if cpus is None:
+            raise DataException(
+                "The number of available CPUs to automatically set the number of running"
+                "'kresd' workers could not be determined."
+                "The number can be specified manually in 'server:instances' configuration option."
+            )
+        return cpus
+
+
 class KresConfig(SchemaNode):
     class Raw(SchemaNode):
         """
         Knot Resolver declarative configuration.
 
         ---
-        server: DNS server control and management configuration.
+        id: System-wide unique identifier of this instance. Used for grouping logs and tagging workers.
+        nsid: Name Server Identifier (RFC 5001) which allows DNS clients to request resolver to send back its NSID along with the reply to a DNS request.
+        hostname: Internal DNS resolver hostname. Default is machine hostname.
+        rundir: Directory where the resolver can create files and which will be it's cwd.
+        workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
+        management: Configuration of management HTTP API.
+        webmgmt: Configuration of legacy web management endpoint.
+        supervisor: Proceses supervisor configuration.
         options: Fine-tuning global parameters of DNS resolver operation.
         network: Network connections and protocols configuration.
         static_hints: Static hints for forward records (A/AAAA) and reverse records (PTR)
@@ -76,7 +109,14 @@ class KresConfig(SchemaNode):
         lua: Custom Lua configuration.
         """
 
-        server: ServerSchema
+        id: IDPattern
+        nsid: Optional[str] = None
+        hostname: Optional[str] = None
+        rundir: UncheckedPath = UncheckedPath(".")
+        workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
+        management: ManagementSchema = ManagementSchema({"unix-socket": "./manager.sock"})
+        webmgmt: Optional[WebmgmtSchema] = None
+        supervisor: SupervisorSchema = SupervisorSchema()
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
         static_hints: StaticHintsSchema = StaticHintsSchema()
@@ -94,7 +134,14 @@ class KresConfig(SchemaNode):
 
     _PREVIOUS_SCHEMA = Raw
 
-    server: ServerSchema
+    id: IDPattern
+    nsid: Optional[str]
+    hostname: str
+    rundir: UncheckedPath
+    workers: IntPositive
+    management: ManagementSchema
+    webmgmt: Optional[WebmgmtSchema]
+    supervisor: SupervisorSchema
     options: OptionsSchema
     network: NetworkSchema
     static_hints: StaticHintsSchema
@@ -110,15 +157,34 @@ class KresConfig(SchemaNode):
     monitoring: MonitoringSchema
     lua: LuaSchema
 
-    def _dnssec(self, obj: Raw) -> Union[Literal[False], DnssecSchema]:
+    def _hostname(self, obj: Raw) -> Any:
+        if obj.hostname is None:
+            return socket.gethostname()
+        return obj.hostname
+
+    def _workers(self, obj: Raw) -> Any:
+        if obj.workers == "auto":
+            return IntPositive(_cpu_count())
+        return obj.workers
+
+    def _dnssec(self, obj: Raw) -> Any:
         if obj.dnssec is True:
             return DnssecSchema()
         return obj.dnssec
 
-    def _dns64(self, obj: Raw) -> Union[Literal[False], Dns64Schema]:
+    def _dns64(self, obj: Raw) -> Any:
         if obj.dns64 is True:
             return Dns64Schema()
         return obj.dns64
+
+    def _validate(self) -> None:
+        try:
+            cpu_count = _cpu_count()
+            if int(self.workers) > 10 * cpu_count:
+                raise ValueError("refusing to run with more then instances 10 instances per cpu core")
+        except DataException:
+            # sometimes, we won't be able to get information about the cpu count
+            pass
 
     def render_lua(self) -> str:
         # FIXME the `cwd` argument is used only for configuring control socket path
