@@ -21,7 +21,6 @@ stages:
       - pkg/
 
 .apkginstall: &apkginstall  # new jinja2 breaks docs (sphinx/breathe)
-  - apt-get install -y python3-pip # I have no idea why this is needed as it was not needed previously
   - git clone https://gitlab.nic.cz/packaging/apkg.git
   - cd apkg; git checkout test; pip3 install -U . 'jinja2<3.1'; cd ..
   # - pip3 install -U . 'jinja2<3.1'
@@ -178,6 +177,7 @@ nixos-unstable:pkgbuild:
 .debpkgtest: &debpkgtest
   - *pkgdebrepo
   - apt-get install -y $(find ./pkg/pkgs -name '*.deb' | grep -v module | grep -v debug | grep -v devel)
+  - apt-get install python3-pip
   - *apkginstall
   - apkg test-dep
   - apkg test
@@ -235,13 +235,11 @@ fedora-34:pkgtest:
     - fedora-34:pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-34
   script:
-    - dnf install -y knot-utils findutils
+    - dnf install -y findutils python3-pip
     - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
-    - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
-    - systemctl stop kresd@1
-    - systemctl start knot-resolver
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+    - *apkginstall
+    - apkg test-dep
+    - apkg test
 
 fedora-35:pkgtest:
   <<: *pkgtest
@@ -249,13 +247,12 @@ fedora-35:pkgtest:
     - fedora-35:pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-35
   script:
-    - dnf install -y knot-utils findutils
+    - dnf install -y findutils python3-pip
     - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
-    - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
-    - systemctl stop kresd@1
-    - systemctl start knot-resolver
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+    - *apkginstall
+    - apkg test-dep
+    - apkg test
+    
 
 opensuse-15.2:pkgtest:
   <<: *pkgtest
