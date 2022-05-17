@@ -20,8 +20,14 @@ stages:
     paths:
       - pkg/
 
-.apkgbuild: &apkgbuild # new jinja2 breaks docs (sphinx/breathe)
-  - pip3 install -U apkg 'jinja2<3.1'
+.apkginstall: &apkginstall  # new jinja2 breaks docs (sphinx/breathe)
+  - git clone https://gitlab.nic.cz/packaging/apkg.git
+  - cd apkg; pip3 install -U . 'jinja2<3.1'; cd ..
+  # - pip3 install -U apkg 'jinja2<3.1'
+  
+
+.apkgbuild: &apkgbuild
+  - *apkginstall
   - apkg build-dep -y
   - apkg build
 
@@ -168,15 +174,17 @@ nixos-unstable:pkgbuild:
     - lxc
     - amd64
 
+.apkgtest: &apkgtest
+  - export PYTHONIOENCODING=utf8
+  - *apkginstall
+  - apkg test-dep
+  - apkg test
+
 .debpkgtest: &debpkgtest
   - *pkgdebrepo
-  - apt-get install -y knot-dnsutils
   - apt-get install -y $(find ./pkg/pkgs -name '*.deb' | grep -v module | grep -v debug | grep -v devel)
-  - systemctl start kresd@1
-  - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
-  - systemctl stop kresd@1
-  - systemctl start knot-resolver
-  - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+  - apt-get install -y python3-pip
+  - *apkgtest
 
 centos-7:pkgtest:
   <<: *pkgtest
@@ -187,21 +195,9 @@ centos-7:pkgtest:
     - export LC_ALL=en_US.UTF-8
   script:
     - yum install -y epel-release
-    - yum install -y knot-utils findutils
+    - yum install -y findutils
     - yum install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
-    - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
-
-debian-9:pkgtest:
-  <<: *pkgtest
-  needs:
-    - debian-9:pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-9
-  variables:
-    OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: Debian_9.0
-  script:
-    - *debpkgtest
+    - *apkgtest
 
 debian-10:pkgtest:
   <<: *pkgtest
@@ -231,13 +227,9 @@ fedora-34:pkgtest:
     - fedora-34:pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-34
   script:
-    - dnf install -y knot-utils findutils
+    - dnf install -y findutils python3-pip
     - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
-    - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
-    - systemctl stop kresd@1
-    - systemctl start knot-resolver
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+    - *apkgtest
 
 fedora-35:pkgtest:
   <<: *pkgtest
@@ -245,13 +237,10 @@ fedora-35:pkgtest:
     - fedora-35:pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-35
   script:
-    - dnf install -y knot-utils findutils
+    - dnf install -y findutils python3-pip
     - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
-    - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
-    - systemctl stop kresd@1
-    - systemctl start knot-resolver
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+    - *apkgtest
+    
 
 opensuse-15.2:pkgtest:
   <<: *pkgtest
@@ -260,10 +249,9 @@ opensuse-15.2:pkgtest:
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/opensuse-15.2
   script:
     - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.2/home:CZ-NIC:knot-resolver-build.repo
-    - zypper install -y knot-utils
+    - zypper install -y python3-pip
     - zypper install --allow-unsigned-rpm -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
-    - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+    - *apkgtest
 
 opensuse-15.3:pkgtest:
   <<: *pkgtest
@@ -272,10 +260,9 @@ opensuse-15.3:pkgtest:
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/opensuse-15.3
   script:
     - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.3/home:CZ-NIC:knot-resolver-build.repo
-    - zypper install -y knot-utils
+    - zypper install -y python3-pip
     - zypper install --allow-unsigned-rpm -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
-    - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+    - *apkgtest
 
 rocky-8:pkgtest:
   <<: *pkgtest
@@ -284,10 +271,9 @@ rocky-8:pkgtest:
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/rocky-8
   script:
     - dnf install -y epel-release
-    - dnf install -y knot-utils findutils
+    - dnf install -y findutils python39-pip
     - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
-    - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+    - *apkgtest
 
 ubuntu-18.04:pkgtest:
   <<: *pkgtest

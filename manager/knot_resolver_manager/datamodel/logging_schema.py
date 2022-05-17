@@ -1,9 +1,18 @@
 from typing import List, Optional, Set, Union
 
-from typing_extensions import Literal, TypeAlias
+from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import CheckedPath, TimeUnit
 from knot_resolver_manager.utils.modeling import BaseSchema
+
+try:
+    # On Debian 10, the typing_extensions library does not contain TypeAlias.
+    # We don't strictly need the import for anything except for type checking,
+    # so this try-except makes sure it works either way.
+    from typing_extensions import TypeAlias  # pylint: disable=ungrouped-imports
+except ImportError:
+    TypeAlias = None  # type: ignore
+
 
 LogLevelEnum = Literal["crit", "err", "warning", "notice", "info", "debug"]
 LogTargetEnum = Literal["syslog", "stderr", "stdout"]
