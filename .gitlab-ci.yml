@@ -25,7 +25,7 @@ stages:
   - test
   - respdiff
   - deploy
-  - pkgtest
+  - pkg
 
  # https://docs.gitlab.com/ce/ci/jobs/job_control.html#select-different-runner-tags-for-each-parallel-matrix-job
 .multi_platform: &multi_platform
@@ -578,10 +578,92 @@ obs:release:
 
 obs:odvr:
   <<: *obs_trigger
-  stage: pkgtest  # last stage to ensure it doesn't block anything
+  stage: pkg  # last stage to ensure it doesn't block anything
   only:
     - tags
   variables:
     OBS_REPO: knot-resolver-odvr
   when: manual
+# }}}
+
+# pkg {{{
+.setup_apkg: &setup_apkg
+  - python3 -m pip install -U apkg
+
+.pkg_deb_extras: &pkg_deb_extras
+  before_script:
+    - apt update
+
+.enable_repo_build: &enable_repo_build
+  before_script:
+    - ./scripts/enable-repo.py build
+
+.pkg_test: &pkg_test
+  stage: pkg
+  needs:
+    - pkg:make-archive
+  tags:
+    - lxc
+    - amd64
+  script:
+    - *setup_apkg
+    # make sure the archive from pkg:make-archive is available
+    - apkg info cache | grep archive/dev
+    - apkg install --build-dep
+    - apkg test --test-dep
+
+.pkg_test_deb: &pkg_test_deb
+  <<: *pkg_test
+  <<: *pkg_deb_extras
+
+pkg:make-archive:
+  # archive is created once and reused in other pkg jobs
+  <<: *pkg_deb_extras
+  image: $CI_REGISTRY/packaging/apkg/ci/debian-11:apkg
+  stage: pkg
+  needs: []
+  artifacts:
+    paths:
+      - pkg/
+  script:
+    - *setup_apkg
+    - apkg build-dep
+    - apkg make-archive
+
+pkg:debian-11:
+  <<: *pkg_test_deb
+  image: $CI_REGISTRY/packaging/apkg/lxc/debian-11
+
+pkg:debian-10:
+  <<: *pkg_test_deb
+  <<: *enable_repo_build
+  image: $CI_REGISTRY/packaging/apkg/lxc/debian-10
+
+pkg:ubuntu-22.04:
+  <<: *pkg_test_deb
+  image: $CI_REGISTRY/packaging/apkg/lxc/ubuntu-22.04
+
+pkg:ubuntu-20.04:
+  <<: *pkg_test_deb
+  <<: *enable_repo_build
+  image: $CI_REGISTRY/packaging/apkg/lxc/ubuntu-20.04
+
+pkg:ubuntu-18.04:
+  <<: *pkg_test_deb
+  <<: *enable_repo_build
+  image: $CI_REGISTRY/packaging/apkg/lxc/ubuntu-18.04
+
+pkg:fedora-36:
+  <<: *pkg_test
+  image: $CI_REGISTRY/packaging/apkg/lxc/fedora-36
+
+pkg:rocky-8:
+  <<: *pkg_test
+  image: $CI_REGISTRY/packaging/apkg/lxc/rocky-8
+
+pkg:opensuse-15.3:
+  <<: *pkg_test
+  <<: *enable_repo_build
+  image: $CI_REGISTRY/packaging/apkg/lxc/opensuse-15.3
+
 # }}}
