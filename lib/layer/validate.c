@@ -536,10 +536,19 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 		if (!has_nsec3) {
 			if (referral) {
 				/* Check if it is referral to unsigned, rfc4035 5.2 */
-				ret = kr_nsec_ref_to_unsigned(answer);
+				ret = kr_nsec_ref_to_unsigned(&req->auth_selected,
+								qry->uid, proved_name);
 			} else {
 				/* No-data answer */
-				ret = kr_nsec_existence_denial(answer, KNOT_AUTHORITY, proved_name, KNOT_RRTYPE_DS);
+				ret = kr_nsec_negative(&req->auth_selected, qry->uid,
+							proved_name, KNOT_RRTYPE_DS);
+				if (ret >= 0) {
+					if (ret == PKT_NODATA) {
+						ret = kr_ok();
+					} else {
+						ret = kr_error(ENOENT); // suspicious
+					}
+				}
 			}
 		} else {
 			if (referral) {
@@ -1171,7 +1180,15 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (!qry->flags.CACHED && pkt_rcode == KNOT_RCODE_NXDOMAIN && !qry->flags.CNAME) {
 		/* @todo If knot_pkt_qname(pkt) is used instead of qry->sname then the tests crash. */
 		if (!has_nsec3) {
-			ret = kr_nsec_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname);
+			ret = kr_nsec_negative(&req->auth_selected, qry->uid,
+						qry->sname, KNOT_RRTYPE_NULL);
+			if (ret >= 0) {
+				if (ret & PKT_NXDOMAIN) {
+					ret = kr_ok();
+				} else {
+					ret = kr_error(ENOENT); // probably proved NODATA
+				}
+			}
 		} else {
 			ret = kr_nsec3_name_error_response_check(pkt, KNOT_AUTHORITY, qry->sname);
 		}
@@ -1202,7 +1219,15 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			 * ? merge the functionality together to share code/resources
 			 */
 			if (!has_nsec3) {
-				ret = kr_nsec_existence_denial(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
+				ret = kr_nsec_negative(&req->auth_selected, qry->uid,
+							knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
+				if (ret >= 0) {
+					if (ret == PKT_NODATA) {
+						ret = kr_ok();
+					} else {
+						ret = kr_error(ENOENT); // suspicious
+					}
+				}
 			} else {
 				ret = kr_nsec3_no_data(pkt, KNOT_AUTHORITY, knot_pkt_qname(pkt), knot_pkt_qtype(pkt));
 			}
