@@ -436,9 +436,11 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		data_len = consumed;
 	}
 #if ENABLE_DOH2
+	int streaming = 1;
 	if (session_flags(s)->has_http) {
-		consumed = http_process_input_data(s, data, data_len);
-		if (consumed < 0) {
+		streaming = http_process_input_data(s, data, data_len,
+				&consumed);
+		if (streaming < 0) {
 			if (kr_log_is_debug(IO, NULL)) {
 				char *peer_str = kr_straddr(src_addr);
 				kr_log_debug(IO, "=> connection to '%s': "
@@ -447,7 +449,8 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 			}
 			worker_end_tcp(s);
 			return;
-		} else if (consumed == 0) {
+		}
+		if (consumed == 0) {
 			return;
 		}
 		data = session_wirebuf_get_free_start(s);
@@ -473,6 +476,15 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	}
 	session_wirebuf_compress(s);
 	mp_flush(the_worker->pkt_pool.ctx);
+#if ENABLE_DOH2
+	if (session_flags(s)->has_http && streaming == 0 && ret == 0) {
+		ret = http_send_status(s, HTTP_STATUS_BAD_REQUEST);
+		if (ret) {
+			/* An error has occurred, close the session. */
+			worker_end_tcp(s);
+		}
+	}
+#endif
 }
 
 #if ENABLE_DOH2

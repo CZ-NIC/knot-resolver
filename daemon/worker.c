@@ -1778,6 +1778,12 @@ int worker_submit(struct session *session, struct io_comm_data *comm,
 	struct http_ctx *http_ctx = NULL;
 #if ENABLE_DOH2
 	http_ctx = session_http_get_server_ctx(session);
+
+	/* Badly formed query when using DoH leads to a Bad Request */
+	if (http_ctx && !is_outgoing && ret) {
+		http_send_status(session, HTTP_STATUS_BAD_REQUEST);
+		return ret;
+	}
 #endif
 
 	if (!is_outgoing && http_ctx && queue_len(http_ctx->streams) <= 0)
@@ -1788,13 +1794,6 @@ int worker_submit(struct session *session, struct io_comm_data *comm,
 	    (is_query == is_outgoing)) {
 		if (!is_outgoing) {
 			the_worker->stats.dropped += 1;
-		#if ENABLE_DOH2
-			if (http_ctx) {
-				struct http_stream stream = queue_head(http_ctx->streams);
-				http_free_headers(stream.headers);
-				queue_pop(http_ctx->streams);
-			}
-		#endif
 		}
 		return kr_error(EILSEQ);
 	}
