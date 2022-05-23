@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2016 American Civil Liberties Union (ACLU)
  * Copyright (C) 2016-2017 CZ.NIC, z.s.p.o.
- * 
+ *
  * Initial Author: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -66,7 +66,7 @@ static gnutls_x509_privkey_t get_ephemeral_privkey ()
 		kr_log_error(TLS, "unable to lock lockfile " EPHEMERAL_PRIVKEY_FILENAME ".lock\n");
 		goto done;
 	}
-	
+
 	if ((err = gnutls_x509_privkey_init (&privkey)) < 0) {
 		kr_log_error(TLS, "gnutls_x509_privkey_init() failed: %d (%s)\n",
 			     err, gnutls_strerror_name(err));
@@ -189,7 +189,7 @@ bad:
 	return NULL;
 }
 
-struct tls_credentials * tls_get_ephemeral_credentials(struct engine *engine)
+struct tls_credentials * tls_get_ephemeral_credentials()
 {
 	struct tls_credentials *creds = NULL;
 	gnutls_x509_privkey_t privkey = NULL;
@@ -208,14 +208,14 @@ struct tls_credentials * tls_get_ephemeral_credentials(struct engine *engine)
 	}
 
 	creds->valid_until = now + EPHEMERAL_CERT_EXPIRATION_SECONDS;
-	creds->ephemeral_servicename = strdup(engine_get_hostname(engine));
+	creds->ephemeral_servicename = strdup(engine_get_hostname());
 	if (creds->ephemeral_servicename == NULL) {
 		kr_log_error(TLS, "could not get server's hostname, using '" INVALID_HOSTNAME "' instead\n");
 		if ((creds->ephemeral_servicename = strdup(INVALID_HOSTNAME)) == NULL) {
 			kr_log_error(TLS, "failed to allocate memory for ephemeral credentials\n");
 			goto failure;
 		}
-	}		
+	}
 	if ((privkey = get_ephemeral_privkey()) == NULL) {
 		goto failure;
 	}

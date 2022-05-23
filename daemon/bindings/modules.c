@@ -8,7 +8,7 @@
 /** List loaded modules */
 static int mod_list(lua_State *L)
 {
-	const module_array_t * const modules = &the_worker->engine->modules;
+	const module_array_t * const modules = engine_modules();
 	lua_newtable(L);
 	for (unsigned i = 0; i < modules->len; ++i) {
 		struct kr_module *module = modules->at[i];
@@ -33,7 +33,7 @@ static int mod_load(lua_State *L)
 	const char *precedence = strtok(NULL, " ");
 	const char *ref = strtok(NULL, " ");
 	/* Load engine module */
-	int ret = engine_register(the_worker->engine, name, precedence, ref);
+	int ret = engine_register(name, precedence, ref);
 	free(declaration);
 	if (ret != 0) {
 		if (ret == kr_error(EIDRM)) {
@@ -55,7 +55,7 @@ static int mod_unload(lua_State *L)
 	if (n != 1 || !lua_isstring(L, 1))
 		lua_error_p(L, "expected 'unload(string name)'");
 	/* Unload engine module */
-	int ret = engine_unregister(the_worker->engine, lua_tostring(L, 1));
+	int ret = engine_unregister(lua_tostring(L, 1));
 	lua_error_maybe(L, ret);
 
 	lua_pushboolean(L, 1);

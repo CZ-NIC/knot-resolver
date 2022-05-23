@@ -286,31 +286,30 @@ static int tls_handshake(struct tls_common_ctx *ctx, tls_handshake_cb handshake_
 }
 
 
-struct tls_ctx *tls_new(struct worker_ctx *worker)
+struct tls_ctx *tls_new(void)
 {
-	if (kr_fails_assert(worker && worker->engine))
+	if (kr_fails_assert(the_worker && the_engine))
 		return NULL;
 
-	struct network *net = &worker->engine->net;
-	if (!net->tls_credentials) {
-		net->tls_credentials = tls_get_ephemeral_credentials(worker->engine);
-		if (!net->tls_credentials) {
+	if (!the_network->tls_credentials) {
+		the_network->tls_credentials = tls_get_ephemeral_credentials();
+		if (!the_network->tls_credentials) {
 			kr_log_error(TLS, "X.509 credentials are missing, and ephemeral credentials failed; no TLS\n");
 			return NULL;
 		}
 		kr_log_info(TLS, "Using ephemeral TLS credentials\n");
-		tls_credentials_log_pins(net->tls_credentials);
+		tls_credentials_log_pins(the_network->tls_credentials);
 	}
 
 	time_t now = time(NULL);
-	if (net->tls_credentials->valid_until != GNUTLS_X509_NO_WELL_DEFINED_EXPIRATION) {
-		if (net->tls_credentials->ephemeral_servicename) {
+	if (the_network->tls_credentials->valid_until != GNUTLS_X509_NO_WELL_DEFINED_EXPIRATION) {
+		if (the_network->tls_credentials->ephemeral_servicename) {
 			/* ephemeral cert: refresh if due to expire within a week */
-			if (now >= net->tls_credentials->valid_until - EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE) {
-				struct tls_credentials *newcreds = tls_get_ephemeral_credentials(worker->engine);
+			if (now >= the_network->tls_credentials->valid_until - EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE) {
+				struct tls_credentials *newcreds = tls_get_ephemeral_credentials();
 				if (newcreds) {
-					tls_credentials_release(net->tls_credentials);
-					net->tls_credentials = newcreds;
+					tls_credentials_release(the_network->tls_credentials);
+					the_network->tls_credentials = newcreds;
 					kr_log_info(TLS, "Renewed expiring ephemeral X.509 cert\n");
 				} else {
 					kr_log_error(TLS, "Failed to renew expiring ephemeral X.509 cert, using existing one\n");
@@ -318,9 +317,9 @@ struct tls_ctx *tls_new(struct worker_ctx *worker)
 			}
 		} else {
 			/* non-ephemeral cert: warn once when certificate expires */
-			if (now >= net->tls_credentials->valid_until) {
+			if (now >= the_network->tls_credentials->valid_until) {
 				kr_log_error(TLS, "X.509 certificate has expired!\n");
-				net->tls_credentials->valid_until = GNUTLS_X509_NO_WELL_DEFINED_EXPIRATION;
+				the_network->tls_credentials->valid_until = GNUTLS_X509_NO_WELL_DEFINED_EXPIRATION;
 			}
 		}
 	}
@@ -342,7 +341,7 @@ struct tls_ctx *tls_new(struct worker_ctx *worker)
 		tls_free(tls);
 		return NULL;
 	}
-	tls->credentials = tls_credentials_reserve(net->tls_credentials);
+	tls->credentials = tls_credentials_reserve(the_network->tls_credentials);
 	err = gnutls_credentials_set(tls->c.tls_session, GNUTLS_CRD_CERTIFICATE,
 				     tls->credentials->credentials);
 	if (err != GNUTLS_E_SUCCESS) {
@@ -355,15 +354,14 @@ struct tls_ctx *tls_new(struct worker_ctx *worker)
 		return NULL;
 	}
 
-	tls->c.worker = worker;
 	tls->c.client_side = false;
 
 	gnutls_transport_set_pull_function(tls->c.tls_session, kres_gnutls_pull);
 	gnutls_transport_set_vec_push_function(tls->c.tls_session, kres_gnutls_vec_push);
 	gnutls_transport_set_ptr(tls->c.tls_session, tls);
 
-	if (net->tls_session_ticket_ctx) {
-		tls_session_ticket_enable(net->tls_session_ticket_ctx,
+	if (the_network->tls_session_ticket_ctx) {
+		tls_session_ticket_enable(the_network->tls_session_ticket_ctx,
 					  tls->c.tls_session);
 	}
 
@@ -687,9 +685,9 @@ static time_t _get_end_entity_expiration(gnutls_certificate_credentials_t creds)
 	return ret;
 }
 
-int tls_certificate_set(struct network *net, const char *tls_cert, const char *tls_key)
+int tls_certificate_set(const char *tls_cert, const char *tls_key)
 {
-	if (!net) {
+	if (kr_fails_assert(the_network)) {
 		return kr_error(EINVAL);
 	}
 
@@ -731,11 +729,11 @@ int tls_certificate_set(struct network *net, const char *tls_cert, const char *t
 	tls_credentials->valid_until = _get_end_entity_expiration(tls_credentials->credentials);
 
 	/* Exchange the x509 credentials */
-	struct tls_credentials *old_credentials = net->tls_credentials;
+	struct tls_credentials *old_credentials = the_network->tls_credentials;
 
 	/* Start using the new x509_credentials */
-	net->tls_credentials = tls_credentials;
-	tls_credentials_log_pins(net->tls_credentials);
+	the_network->tls_credentials = tls_credentials;
+	tls_credentials_log_pins(the_network->tls_credentials);
 
 	if (old_credentials) {
 		err = tls_credentials_release(old_credentials);
@@ -1059,8 +1057,7 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 		return client_verify_certchain(ctx->c.tls_session, ctx->params->hostname);
 }
 
-struct tls_client_ctx *tls_client_ctx_new(tls_client_param_t *entry,
-					    struct worker_ctx *worker)
+struct tls_client_ctx *tls_client_ctx_new(tls_client_param_t *entry)
 {
 	struct tls_client_ctx *ctx = calloc(1, sizeof (struct tls_client_ctx));
 	if (!ctx) {
@@ -1106,7 +1103,6 @@ struct tls_client_ctx *tls_client_ctx_new(tls_client_param_t *entry,
 		return NULL;
 	}
 
-	ctx->c.worker = worker;
 	ctx->c.client_side = true;
 
 	gnutls_transport_set_pull_function(ctx->c.tls_session, kres_gnutls_pull);
@@ -1162,7 +1158,7 @@ int tls_client_connect_start(struct tls_client_ctx *client_ctx,
 	struct tls_common_ctx *ctx = &client_ctx->c;
 
 	gnutls_session_set_ptr(ctx->tls_session, client_ctx);
-	gnutls_handshake_set_timeout(ctx->tls_session, ctx->worker->engine->net.tcp.tls_handshake_timeout);
+	gnutls_handshake_set_timeout(ctx->tls_session, the_network->tcp.tls_handshake_timeout);
 	gnutls_transport_set_pull_timeout_function(ctx->tls_session, tls_pull_timeout_func);
 	session_tls_set_client_ctx(session, client_ctx);
 	ctx->handshake_cb = handshake_cb;

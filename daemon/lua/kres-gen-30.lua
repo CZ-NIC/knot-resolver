@@ -518,7 +518,6 @@ struct endpoint {
 };
 struct request_ctx {
 	struct kr_request req;
-	struct worker_ctx *worker;
 	struct qr_task *task;
 	/* beware: hidden stub, to avoid hardcoding sockaddr lengths */
 };
@@ -531,14 +530,14 @@ knot_pkt_t *worker_resolve_mk_pkt(const char *, uint16_t, uint16_t, const struct
 struct qr_task *worker_resolve_start(knot_pkt_t *, struct kr_qflags);
 int zi_zone_import(const zi_config_t);
 struct engine {
-	struct kr_context resolver;
 	char _stub[];
 };
 struct worker_ctx {
-	struct engine *engine;
 	char _stub[];
 };
+struct kr_context *the_resolver;
 struct worker_ctx *the_worker;
+struct engine *the_engine;
 typedef struct {
 	uint8_t bitmap[32];
 	uint8_t length;

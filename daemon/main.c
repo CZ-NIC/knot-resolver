@@ -35,6 +35,13 @@
 #endif
 #include <libknot/error.h>
 
+/**@internal Maximum number of incomplete TCP connections in queue.
+* Default is from empirical testing - in our case, more isn't necessarily better.
+* See https://gitlab.nic.cz/knot/knot-resolver/-/merge_requests/968
+* */
+#ifndef TCP_BACKLOG_DEFAULT
+#define TCP_BACKLOG_DEFAULT 128
+#endif
 
 struct args the_args_value;  /** Static allocation for the_args singleton. */
 
@@ -133,7 +140,7 @@ static void help(int argc, char *argv[])
 }
 
 /** \return exit code for main()  */
-static int run_worker(uv_loop_t *loop, struct engine *engine, bool leader, struct args *args)
+static int run_worker(uv_loop_t *loop, bool leader, struct args *args)
 {
 	/* Only some kinds of stdin work with uv_pipe_t.
 	 * Otherwise we would abort() from libuv e.g. with </dev/null */
@@ -355,11 +362,11 @@ static int bind_sockets(addr_array_t *addrs, bool tls, flagged_fd_array_t *fds)
 	return has_error ? EXIT_FAILURE : kr_ok();
 }
 
-static int start_listening(struct network *net, flagged_fd_array_t *fds) {
+static int start_listening(flagged_fd_array_t *fds) {
 	int some_bad_ret = 0;
 	for (size_t i = 0; i < fds->len; ++i) {
 		flagged_fd_t *ffd = &fds->at[i];
-		int ret = network_listen_fd(net, ffd->fd, ffd->flags);
+		int ret = network_listen_fd(ffd->fd, ffd->flags);
 		if (ret != 0) {
 			some_bad_ret = ret;
 			/* TODO: try logging address@port.  It's not too important,
@@ -483,17 +490,23 @@ int main(int argc, char **argv)
 
 	kr_crypto_init();
 
+	network_init(uv_default_loop(), TCP_BACKLOG_DEFAULT);
+
 	/* Create a server engine. */
-	knot_mm_t pool;
-	mm_ctx_mempool(&pool, MM_DEFAULT_BLKSIZE);
-	static struct engine engine;
-	ret = engine_init(&engine, &pool);
+	ret = engine_init();
 	if (ret != 0) {
 		kr_log_error(SYSTEM, "failed to initialize engine: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;
 	}
-	/* Initialize the worker */
-	ret = worker_init(&engine, the_args->forks);
+
+	/* Create resolver context. */
+	ret = kr_resolver_init(&the_engine->modules, &the_engine->pool);
+	if (ret != 0) {
+		kr_log_error(SYSTEM, "failed to initialize resolver: %s\n", kr_strerror(ret));
+		return EXIT_FAILURE;
+	}
+	/* Initialize the worker. */
+	ret = worker_init(the_args->forks);
 	if (ret != 0) {
 		kr_log_error(SYSTEM, "failed to initialize worker: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;
@@ -536,7 +549,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Start listening, in the sense of network_listen_fd(). */
-	if (start_listening(&engine.net, &the_args->fds) != 0) {
+	if (start_listening(&the_args->fds) != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -550,42 +563,45 @@ int main(int argc, char **argv)
 	}
 
 	/* Start the scripting engine */
-	if (engine_load_sandbox(&engine) != 0) {
+	if (engine_load_sandbox() != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
 
 	for (i = 0; i < the_args->config.len; ++i) {
 		const char *config = the_args->config.at[i];
-		if (engine_loadconf(&engine, config) != 0) {
+		if (engine_loadconf(config) != 0) {
 			ret = EXIT_FAILURE;
 			goto cleanup;
 		}
-		lua_settop(engine.L, 0);
+		lua_settop(the_engine->L, 0);
 	}
 
 	drop_capabilities();
 
-	if (engine_start(&engine) != 0) {
+	if (engine_start() != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
 
-	if (network_engage_endpoints(&engine.net)) {
+	if (network_engage_endpoints()) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
 
 	/* Run the event loop */
-	ret = run_worker(loop, &engine, fork_id == 0, the_args);
+	ret = run_worker(loop, fork_id == 0, the_args);
 
 cleanup:/* Cleanup. */
-	engine_deinit(&engine);
+	network_unregister();
+
+	kr_resolver_deinit();
 	worker_deinit();
+	engine_deinit();
+	network_deinit();
 	if (loop != NULL) {
 		uv_loop_close(loop);
 	}
-	mp_delete(pool.ctx);
 cleanup_args:
 	args_deinit(the_args);
 	kr_crypto_cleanup();

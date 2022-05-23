@@ -313,13 +313,15 @@ ${CDEFS} ${KRESD} functions <<-EOF
 	zi_zone_import
 EOF
 
-echo "struct engine" | ${CDEFS} ${KRESD} types | sed '/struct network/,$ d'
+echo "struct engine" | ${CDEFS} ${KRESD} types | sed '/module_array_t/,$ d'
 printf "\tchar _stub[];\n};\n"
 
 echo "struct worker_ctx" | ${CDEFS} ${KRESD} types | sed '/uv_loop_t/,$ d'
 printf "\tchar _stub[];\n};\n"
 
+echo "struct kr_context *the_resolver;"
 echo "struct worker_ctx *the_worker;"
+echo "struct engine *the_engine;"
 
 
 ## libzscanner API for ./zonefile.lua

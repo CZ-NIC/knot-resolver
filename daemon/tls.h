@@ -121,7 +121,6 @@ struct tls_common_ctx {
 	ssize_t consumed;
 	uint8_t recv_buf[16384];
 	tls_handshake_cb handshake_cb;
-	struct worker_ctx *worker;
 	size_t write_queue_size;
 };
 
@@ -146,7 +145,7 @@ struct tls_client_ctx {
 };
 
 /*! Create an empty TLS context in query context */
-struct tls_ctx* tls_new(struct worker_ctx *worker);
+struct tls_ctx* tls_new(void);
 
 /*! Close a TLS context (call gnutls_bye()) */
 void tls_close(struct tls_common_ctx *ctx);
@@ -167,7 +166,7 @@ int tls_write(uv_write_t *req, uv_handle_t* handle, knot_pkt_t * pkt, uv_write_c
 ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nread);
 
 /*! Set TLS certificate and key from files. */
-int tls_certificate_set(struct network *net, const char *tls_cert, const char *tls_key);
+int tls_certificate_set(const char *tls_cert, const char *tls_key);
 
 /*! Borrow TLS credentials for context. */
 struct tls_credentials *tls_credentials_reserve(struct tls_credentials *tls_credentials);
@@ -183,7 +182,7 @@ void tls_credentials_free(struct tls_credentials *tls_credentials);
 void tls_credentials_log_pins(struct tls_credentials *tls_credentials);
 
 /*! Generate new ephemeral TLS credentials. */
-struct tls_credentials * tls_get_ephemeral_credentials(struct engine *engine);
+struct tls_credentials * tls_get_ephemeral_credentials();
 
 /*! Get TLS handshake state. */
 tls_hs_state_t tls_get_hs_state(const struct tls_common_ctx *ctx);
@@ -193,8 +192,7 @@ int tls_set_hs_state(struct tls_common_ctx *ctx, tls_hs_state_t state);
 
 
 /*! Allocate new client TLS context */
-struct tls_client_ctx *tls_client_ctx_new(tls_client_param_t *entry,
-					    struct worker_ctx *worker);
+struct tls_client_ctx *tls_client_ctx_new(tls_client_param_t *entry);
 
 /*! Free client TLS context */
 void tls_client_ctx_free(struct tls_client_ctx *ctx);

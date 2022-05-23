@@ -58,7 +58,6 @@ struct request_ctx
 {
 	struct kr_request req;
 
-	struct worker_ctx *worker;
 	struct qr_task *task;
 	struct {
 		/** NULL if the request didn't come over network. */
@@ -115,13 +114,7 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 			const struct sockaddr *addr, knot_pkt_t *pkt);
 static int qr_task_finalize(struct qr_task *task, int state);
 static void qr_task_complete(struct qr_task *task);
-struct session* worker_find_tcp_connected(struct worker_ctx *worker,
-						 const struct sockaddr *addr);
-static int worker_add_tcp_waiting(struct worker_ctx *worker,
-				  const struct sockaddr *addr,
-				  struct session *session);
-struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
-					       const struct sockaddr *addr);
+static int worker_add_tcp_waiting(const struct sockaddr* addr, struct session *session);
 static void on_tcp_connect_timeout(uv_timer_t *timer);
 static void on_udp_timeout(uv_timer_t *timer);
 static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_source, knot_pkt_t *pkt);
@@ -132,8 +125,7 @@ struct worker_ctx *the_worker = NULL;
 
 /*! @internal Create a UDP/TCP handle for an outgoing AF_INET* connection.
  *  socktype is SOCK_* */
-static uv_handle_t *ioreq_spawn(struct worker_ctx *worker,
-				int socktype, sa_family_t family, bool has_tls,
+static uv_handle_t *ioreq_spawn(int socktype, sa_family_t family, bool has_tls,
 				bool has_http)
 {
 	bool precond = (socktype == SOCK_DGRAM || socktype == SOCK_STREAM)
@@ -149,11 +141,11 @@ static uv_handle_t *ioreq_spawn(struct worker_ctx *worker,
 	if (!handle) {
 		return NULL;
 	}
-	int ret = io_create(worker->loop, handle, socktype, family, has_tls, has_http);
+	int ret = io_create(the_worker->loop, handle, socktype, family, has_tls, has_http);
 	if (ret) {
 		if (ret == UV_EMFILE) {
-			worker->too_many_open = true;
-			worker->rconcurrent_highwatermark = worker->stats.rconcurrent;
+			the_worker->too_many_open = true;
+			the_worker->rconcurrent_highwatermark = the_worker->stats.rconcurrent;
 		}
 		free(handle);
 		return NULL;
@@ -162,9 +154,9 @@ static uv_handle_t *ioreq_spawn(struct worker_ctx *worker,
 	/* Bind to outgoing address, according to IP v4/v6. */
 	union kr_sockaddr *addr;
 	if (family == AF_INET) {
-		addr = (union kr_sockaddr *)&worker->out_addr4;
+		addr = (union kr_sockaddr *)&the_worker->out_addr4;
 	} else {
-		addr = (union kr_sockaddr *)&worker->out_addr6;
+		addr = (union kr_sockaddr *)&the_worker->out_addr6;
 	}
 	if (addr->ip.sa_family != AF_UNSPEC) {
 		if (kr_fails_assert(addr->ip.sa_family == family)) {
@@ -225,12 +217,12 @@ static void mp_poison(struct mempool *mp, bool poison)
 /** @endcond */
 
 /** Get a mempool.  (Recycle if possible.)  */
-static inline struct mempool *pool_borrow(struct worker_ctx *worker)
+static inline struct mempool *pool_borrow(void)
 {
 	struct mempool *mp = NULL;
-	if (worker->pool_mp.len > 0) {
-		mp = array_tail(worker->pool_mp);
-		array_pop(worker->pool_mp);
+	if (the_worker->pool_mp.len > 0) {
+		mp = array_tail(the_worker->pool_mp);
+		array_pop(the_worker->pool_mp);
 		mp_poison(mp, 0);
 	} else { /* No mempool on the freelist, create new one */
 		mp = mp_new (4 * CPU_PAGE_SIZE);
@@ -239,11 +231,11 @@ static inline struct mempool *pool_borrow(struct worker_ctx *worker)
 }
 
 /** Return a mempool.  (Cache them up to some count.) */
-static inline void pool_release(struct worker_ctx *worker, struct mempool *mp)
+static inline void pool_release(struct mempool *mp)
 {
-	if (worker->pool_mp.len < MP_FREELIST_SIZE) {
+	if (the_worker->pool_mp.len < MP_FREELIST_SIZE) {
 		mp_flush(mp);
-		array_push(worker->pool_mp, mp);
+		array_push(the_worker->pool_mp, mp);
 		mp_poison(mp, 1);
 	} else {
 		mp_delete(mp);
@@ -325,16 +317,17 @@ static void free_wire(const struct request_ctx *ctx)
 #endif
 /* Helper functions for transport selection */
 static inline bool is_tls_capable(struct sockaddr *address) {
-	tls_client_param_t *tls_entry = tls_client_param_get(the_worker->engine->net.tls_client_params, address);
+	tls_client_param_t *tls_entry = tls_client_param_get(
+			the_network->tls_client_params, address);
 	return tls_entry;
 }
 
 static inline bool is_tcp_connected(struct sockaddr *address) {
-	return worker_find_tcp_connected(the_worker, address);
+	return worker_find_tcp_connected(address);
 }
 
 static inline bool is_tcp_waiting(struct sockaddr *address) {
-	return worker_find_tcp_waiting(the_worker, address);
+	return worker_find_tcp_waiting(address);
 }
 
 /** Create and initialize a request_ctx (on a fresh mempool).
@@ -342,41 +335,39 @@ static inline bool is_tcp_waiting(struct sockaddr *address) {
  * session and addr point to the source of the request, and they are NULL
  * in case the request didn't come from network.
  */
-static struct request_ctx *request_create(struct worker_ctx *worker,
-                                          struct session *session,
+static struct request_ctx *request_create(struct session *session,
                                           struct io_comm_data *comm,
                                           const uint8_t *eth_from,
                                           const uint8_t *eth_to,
                                           uint32_t uid)
 {
 	knot_mm_t pool = {
-		.ctx = pool_borrow(worker),
+		.ctx = pool_borrow(),
 		.alloc = (knot_mm_alloc_t) mp_alloc
 	};
 
 	/* Create request context */
 	struct request_ctx *ctx = mm_calloc(&pool, 1, sizeof(*ctx));
 	if (!ctx) {
-		pool_release(worker, pool.ctx);
+		pool_release(pool.ctx);
 		return NULL;
 	}
 
 	/* TODO Relocate pool to struct request */
-	ctx->worker = worker;
 	if (session && kr_fails_assert(session_flags(session)->outgoing == false)) {
-		pool_release(worker, pool.ctx);
+		pool_release(pool.ctx);
 		return NULL;
 	}
 	ctx->source.session = session;
 	if (kr_fails_assert(!!eth_to == !!eth_from)) {
-		pool_release(worker, pool.ctx);
+		pool_release(pool.ctx);
 		return NULL;
 	}
 	const bool is_xdp = eth_to != NULL;
 	if (is_xdp) {
 	#if ENABLE_XDP
 		if (kr_fails_assert(session)) {
-			pool_release(worker, pool.ctx);
+			pool_release(pool.ctx);
 			return NULL;
 		}
 		memcpy(&ctx->source.eth_addrs[0], eth_to,   sizeof(ctx->source.eth_addrs[0]));
@@ -384,7 +375,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 		ctx->req.alloc_wire_cb = alloc_wire_cb;
 	#else
 		kr_assert(!EINVAL);
-		pool_release(worker, pool.ctx);
+		pool_release(pool.ctx);
 		return NULL;
 	#endif
 	}
@@ -448,7 +439,7 @@ static struct request_ctx *request_create(struct worker_ctx *worker,
 	array_init(req->selection_context.forwarding_targets);
 	array_reserve_mm(req->selection_context.forwarding_targets, 1, kr_memreserve, &req->pool);
 
-	worker->stats.rconcurrent += 1;
+	the_worker->stats.rconcurrent += 1;
 
 	return ctx;
 }
@@ -477,21 +468,18 @@ static int request_start(struct request_ctx *ctx, knot_pkt_t *query)
 	req->qsource.packet = pkt;
 
 	/* Start resolution */
-	struct worker_ctx *worker = ctx->worker;
-	struct engine *engine = worker->engine;
-	kr_resolve_begin(req, &engine->resolver);
-	worker->stats.queries += 1;
+	kr_resolve_begin(req, the_resolver);
+	the_worker->stats.queries += 1;
 	return kr_ok();
 }
 
 static void request_free(struct request_ctx *ctx)
 {
-	struct worker_ctx *worker = ctx->worker;
 	/* Dereference any Lua vars table if exists */
 	if (ctx->req.vars_ref != LUA_NOREF) {
-		lua_State *L = worker->engine->L;
+		lua_State *L = the_engine->L;
 		/* Get worker variables table */
-		lua_rawgeti(L, LUA_REGISTRYINDEX, worker->vars_table_ref);
+		lua_rawgeti(L, LUA_REGISTRYINDEX, the_worker->vars_table_ref);
 		/* Get next free element (position 0) and store it under current reference (forming a list) */
 		lua_rawgeti(L, -1, 0);
 		lua_rawseti(L, -2, ctx->req.vars_ref);
@@ -517,9 +505,9 @@ static void request_free(struct request_ctx *ctx)
 	#endif
 	}
 	/* Return mempool to ring or free it if it's full */
-	pool_release(worker, ctx->req.pool.ctx);
+	pool_release(ctx->req.pool.ctx);
 	/* @note The 'task' is invalidated from now on. */
-	worker->stats.rconcurrent -= 1;
+	the_worker->stats.rconcurrent -= 1;
 }
 
 static struct qr_task *qr_task_create(struct request_ctx *ctx)
@@ -528,7 +516,7 @@ static struct qr_task *qr_task_create(struct request_ctx *ctx)
 	 * for UDP answers from upstream *and* from cache
 	 * and for sending queries upstream */
 	uint16_t pktbuf_max = KR_EDNS_PAYLOAD;
-	const knot_rrset_t *opt_our = ctx->worker->engine->resolver.upstream_opt_rr;
+	const knot_rrset_t *opt_our = the_resolver->upstream_opt_rr;
 	if (opt_our) {
 		pktbuf_max = MAX(pktbuf_max, knot_edns_get_payload(opt_our));
 	}
@@ -556,7 +544,7 @@ static struct qr_task *qr_task_create(struct request_ctx *ctx)
 	/* Make the primary reference to task. */
 	qr_task_ref(task);
 	task->creation_time = kr_now();
-	ctx->worker->stats.concurrent += 1;
+	the_worker->stats.concurrent += 1;
 	return task;
 }
 
@@ -568,14 +556,12 @@ static void qr_task_free(struct qr_task *task)
 	if (kr_fails_assert(ctx))
 		return;
 
-	struct worker_ctx *worker = ctx->worker;
-
 	if (ctx->task == NULL) {
 		request_free(ctx);
 	}
 
 	/* Update stats */
-	worker->stats.concurrent -= 1;
+	the_worker->stats.concurrent -= 1;
 }
 
 /*@ Register new qr_task within session. */
@@ -595,7 +581,7 @@ static int qr_task_register(struct qr_task *task, struct session *session)
 	 * an in effect shrink TCP window size. To get more precise throttling,
 	 * we would need to copy remainder of the unread buffer and reassemble
 	 * when resuming reading. This is NYI.  */
-	if (session_tasklist_get_len(session) >= task->ctx->worker->tcp_pipeline_max &&
+	if (session_tasklist_get_len(session) >= the_worker->tcp_pipeline_max &&
 	    !session_flags(session)->throttled && !session_flags(session)->closing) {
 		session_stop_read(session);
 		session_flags(session)->throttled = true;
@@ -679,9 +665,8 @@ int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 		if (session_flags(s)->outgoing || session_flags(s)->closing)
 			return status;
 
-		struct worker_ctx *worker = task->ctx->worker;
 		if (session_flags(s)->throttled &&
-		    session_tasklist_get_len(s) < worker->tcp_pipeline_max/2) {
+		    session_tasklist_get_len(s) < the_worker->tcp_pipeline_max/2) {
 			/* Start reading again if the session is throttled and
 			 * the number of outgoing requests is below watermark. */
 			session_start_read(s);
@@ -745,7 +730,6 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 		worker_task_pkt_set_msgid(task, msg_id);
 	}
 
-	struct worker_ctx *worker = ctx->worker;
 	/* Note time for upstream RTT */
 	task->send_time = kr_now();
 	task->recv_time = 0; // task structure is being reused so we have to zero this out here
@@ -810,43 +794,43 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 		if (session_flags(session)->outgoing) {
 			session_tasklist_add(session, task);
 		}
-		if (worker->too_many_open &&
-		    worker->stats.rconcurrent <
-			worker->rconcurrent_highwatermark - 10) {
-			worker->too_many_open = false;
+		if (the_worker->too_many_open &&
+		    the_worker->stats.rconcurrent <
+			the_worker->rconcurrent_highwatermark - 10) {
+			the_worker->too_many_open = false;
 		}
 	} else {
 		free(ioreq);
 		qr_task_unref(task);
 		if (ret == UV_EMFILE) {
-			worker->too_many_open = true;
-			worker->rconcurrent_highwatermark = worker->stats.rconcurrent;
+			the_worker->too_many_open = true;
+			the_worker->rconcurrent_highwatermark = the_worker->stats.rconcurrent;
 			ret = kr_error(UV_EMFILE);
 		}
 
 		if (session_flags(session)->has_http)
-			worker->stats.err_http += 1;
+			the_worker->stats.err_http += 1;
 		else if (session_flags(session)->has_tls)
-			worker->stats.err_tls += 1;
+			the_worker->stats.err_tls += 1;
 		else if (handle->type == UV_UDP)
-			worker->stats.err_udp += 1;
+			the_worker->stats.err_udp += 1;
 		else
-			worker->stats.err_tcp += 1;
+			the_worker->stats.err_tcp += 1;
 	}
 
 	/* Update outgoing query statistics */
 	if (session_flags(session)->outgoing && addr) {
 		if (session_flags(session)->has_tls)
-			worker->stats.tls += 1;
+			the_worker->stats.tls += 1;
 		else if (handle->type == UV_UDP)
-			worker->stats.udp += 1;
+			the_worker->stats.udp += 1;
 		else
-			worker->stats.tcp += 1;
+			the_worker->stats.tcp += 1;
 
 		if (addr->sa_family == AF_INET6)
-			worker->stats.ipv6 += 1;
+			the_worker->stats.ipv6 += 1;
 		else if (addr->sa_family == AF_INET)
-			worker->stats.ipv4 += 1;
+			the_worker->stats.ipv4 += 1;
 	}
 	return ret;
 }
@@ -865,7 +849,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 	if (kr_fails_assert(session_flags(session)->outgoing))
 		return kr_error(EINVAL);
 	struct sockaddr *peer = session_get_peer(session);
-	int deletion_res = worker_del_tcp_waiting(the_worker, peer);
+	int deletion_res = worker_del_tcp_waiting(peer);
 	int ret = kr_ok();
 
 	if (status) {
@@ -915,7 +899,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 		}
 	}
 
-	struct session *s = worker_find_tcp_connected(the_worker, peer);
+	struct session *s = worker_find_tcp_connected(peer);
 	ret = kr_ok();
 	if (deletion_res == kr_ok()) {
 		/* peer was in the waiting list, add to the connected list. */
@@ -924,7 +908,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 			 * peer already is in the connected list. */
 			ret = kr_error(EINVAL);
 		} else {
-			ret = worker_add_tcp_connected(the_worker, peer, session);
+			ret = worker_add_tcp_connected(peer, session);
 		}
 	} else {
 		/* peer wasn't in the waiting list.
@@ -956,7 +940,7 @@ static int session_tls_hs_cb(struct session *session, int status)
 		/* Something went wrong.
 		 * Either addition to the list of connected sessions
 		 * or write to upstream failed. */
-		worker_del_tcp_connected(the_worker, peer);
+		worker_del_tcp_connected(peer);
 		session_waitinglist_finalize(session, KR_STATE_FAIL);
 		session_tasklist_finalize(session, KR_STATE_FAIL);
 		session_close(session);
@@ -975,11 +959,10 @@ static int send_waiting(struct session *session)
 		struct qr_task *t = session_waitinglist_get(session);
 		ret = qr_task_send(t, session, NULL, NULL);
 		if (ret != 0) {
-			struct worker_ctx *worker = t->ctx->worker;
 			struct sockaddr *peer = session_get_peer(session);
 			session_waitinglist_finalize(session, KR_STATE_FAIL);
 			session_tasklist_finalize(session, KR_STATE_FAIL);
-			worker_del_tcp_connected(worker, peer);
+			worker_del_tcp_connected(peer);
 			session_close(session);
 			break;
 		}
@@ -990,8 +973,7 @@ static int send_waiting(struct session *session)
 
 static void on_connect(uv_connect_t *req, int status)
 {
-	struct worker_ctx *worker = the_worker;
-	kr_require(worker);
+	kr_require(the_worker);
 	uv_stream_t *handle = req->handle;
 	struct session *session = handle->data;
 	struct sockaddr *peer = session_get_peer(session);
@@ -1001,7 +983,7 @@ static void on_connect(uv_connect_t *req, int status)
 		return;
 
 	if (session_flags(session)->closing) {
-		worker_del_tcp_waiting(worker, peer);
+		worker_del_tcp_waiting(peer);
 		kr_assert(session_is_empty(session));
 		return;
 	}
@@ -1012,7 +994,7 @@ static void on_connect(uv_connect_t *req, int status)
 	 * If no, most likely this is timed out connection
 	 * which was removed from waiting list by
 	 * on_tcp_connect_timeout() callback. */
-	struct session *s = worker_find_tcp_waiting(worker, peer);
+	struct session *s = worker_find_tcp_waiting(peer);
 	if (!s || s != session) {
 		/* session isn't on the waiting list.
 		 * it's timed out session. */
@@ -1028,7 +1010,7 @@ static void on_connect(uv_connect_t *req, int status)
 		return;
 	}
 
-	s = worker_find_tcp_connected(worker, peer);
+	s = worker_find_tcp_connected(peer);
 	if (s) {
 		/* session already in the connected list.
 		 * Something went wrong, it can be due to races when kresd has tried
@@ -1051,7 +1033,7 @@ static void on_connect(uv_connect_t *req, int status)
 			kr_log_debug(WORKER, "=> connection to '%s' failed (%s), flagged as 'bad'\n",
 					peer_str ? peer_str : "", uv_strerror(status));
 		}
-		worker_del_tcp_waiting(worker, peer);
+		worker_del_tcp_waiting(peer);
 		struct qr_task *task = session_waitinglist_get(session);
 		if (task && status != UV_ETIMEDOUT) {
 			/* Penalize upstream.
@@ -1069,7 +1051,7 @@ static void on_connect(uv_connect_t *req, int status)
 	if (!session_flags(session)->has_tls) {
 		/* if there is a TLS, session still waiting for handshake,
 		 * otherwise remove it from waiting list */
-		if (worker_del_tcp_waiting(worker, peer) != 0) {
+		if (worker_del_tcp_waiting(peer) != 0) {
 			/* session isn't in list of waiting queries, *
 			 * something gone wrong */
 			session_waitinglist_finalize(session, KR_STATE_FAIL);
@@ -1098,7 +1080,7 @@ static void on_connect(uv_connect_t *req, int status)
 			return;
 		}
 	} else {
-		worker_add_tcp_connected(worker, peer, session);
+		worker_add_tcp_connected(peer, session);
 	}
 
 	ret = send_waiting(session);
@@ -1116,13 +1098,12 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 	struct session *session = timer->data;
 
 	uv_timer_stop(timer);
-	struct worker_ctx *worker = the_worker;
-	kr_require(worker);
+	kr_require(the_worker);
 
 	kr_assert(session_tasklist_is_empty(session));
 
 	struct sockaddr *peer = session_get_peer(session);
-	worker_del_tcp_waiting(worker, peer);
+	worker_del_tcp_waiting(peer);
 
 	struct qr_task *task = session_waitinglist_get(session);
 	if (!task) {
@@ -1142,7 +1123,7 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 
 	qry->server_selection.error(qry, task->transport, KR_SELECTION_TCP_CONNECT_TIMEOUT);
 
-	worker->stats.timeout += session_waitinglist_get_len(session);
+	the_worker->stats.timeout += session_waitinglist_get_len(session);
 	session_waitinglist_retry(session, true);
 	kr_assert(session_tasklist_is_empty(session));
 	/* uv_cancel() doesn't support uv_connect_t request,
@@ -1168,7 +1149,6 @@ static void on_udp_timeout(uv_timer_t *timer)
 	struct qr_task *task = session_tasklist_get_first(session);
 	if (!task)
 		return;
-	struct worker_ctx *worker = task->ctx->worker;
 
 	if (task->leading && task->pending_count > 0) {
 		struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
@@ -1176,7 +1156,7 @@ static void on_udp_timeout(uv_timer_t *timer)
 	}
 
 	task->timeouts += 1;
-	worker->stats.timeout += 1;
+	the_worker->stats.timeout += 1;
 	qr_task_step(task, NULL, NULL);
 }
 
@@ -1200,7 +1180,7 @@ static uv_handle_t *transmit(struct qr_task *task)
 		if (kr_resolve_checkout(&ctx->req, NULL, transport, task->pktbuf) != 0) {
 			return ret;
 		}
-		ret = ioreq_spawn(ctx->worker, SOCK_DGRAM, choice->sin6_family, false, false);
+		ret = ioreq_spawn(SOCK_DGRAM, choice->sin6_family, false, false);
 		if (!ret) {
 			return ret;
 		}
@@ -1238,7 +1218,7 @@ static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_
 	const int klen = subreq_key(key, task->pktbuf);
 	if (klen > 0) {
 		void *val_deleted;
-		int ret = trie_del(task->ctx->worker->subreq_out, key, klen, &val_deleted);
+		int ret = trie_del(the_worker->subreq_out, key, klen, &val_deleted);
 		kr_assert(ret == KNOT_EOK && val_deleted == task);
 	}
 	/* Notify waiting tasks. */
@@ -1274,7 +1254,7 @@ static void subreq_lead(struct qr_task *task)
 	if (klen < 0)
 		return;
 	struct qr_task **tvp = (struct qr_task **)
-		trie_get_ins(task->ctx->worker->subreq_out, key, klen);
+		trie_get_ins(the_worker->subreq_out, key, klen);
 	if (unlikely(!tvp))
 		return; /*ENOMEM*/
 	if (kr_fails_assert(*tvp == NULL))
@@ -1292,7 +1272,7 @@ static bool subreq_enqueue(struct qr_task *task)
 	if (klen < 0)
 		return false;
 	struct qr_task **leader = (struct qr_task **)
-		trie_get_try(task->ctx->worker->subreq_out, key, klen);
+		trie_get_try(the_worker->subreq_out, key, klen);
 	if (!leader /*ENOMEM*/ || !*leader)
 		return false;
 	/* Enqueue itself to leader for this subrequest. */
@@ -1472,8 +1452,6 @@ static int tcp_task_existing_connection(struct session *session, struct qr_task 
 {
 	if (kr_fails_assert(session_flags(session)->outgoing && !session_flags(session)->closing))
 		return kr_error(EINVAL);
-	struct request_ctx *ctx = task->ctx;
-	struct worker_ctx *worker = ctx->worker;
 
 	/* If there are any unsent queries, send it first. */
 	int ret = send_waiting(session);
@@ -1482,7 +1460,7 @@ static int tcp_task_existing_connection(struct session *session, struct qr_task 
 	}
 
 	/* No unsent queries at that point. */
-	if (session_tasklist_get_len(session) >= worker->tcp_pipeline_max) {
+	if (session_tasklist_get_len(session) >= the_worker->tcp_pipeline_max) {
 		/* Too many outstanding queries, answer with SERVFAIL, */
 		return kr_error(EINVAL);
 	}
@@ -1493,7 +1471,7 @@ static int tcp_task_existing_connection(struct session *session, struct qr_task 
 		/* Error, finalize task with SERVFAIL and
 		 * close connection to upstream. */
 		session_tasklist_finalize(session, KR_STATE_FAIL);
-		worker_del_tcp_connected(worker, session_get_peer(session));
+		worker_del_tcp_connected(session_get_peer(session));
 		session_close(session);
 		return kr_error(EINVAL);
 	}
@@ -1503,17 +1481,14 @@ static int tcp_task_existing_connection(struct session *session, struct qr_task 
 
 static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr *addr)
 {
-	struct request_ctx *ctx = task->ctx;
-	struct worker_ctx *worker = ctx->worker;
-
 	/* Check if there must be TLS */
 	struct tls_client_ctx *tls_ctx = NULL;
-	struct network *net = &worker->engine->net;
-	tls_client_param_t *entry = tls_client_param_get(net->tls_client_params, addr);
+	tls_client_param_t *entry = tls_client_param_get(
+			the_network->tls_client_params, addr);
 	if (entry) {
 		/* Address is configured to be used with TLS.
 		 * We need to allocate auxiliary data structure. */
-		tls_ctx = tls_client_ctx_new(entry, worker);
+		tls_ctx = tls_client_ctx_new(entry);
 		if (!tls_ctx) {
 			return kr_error(EINVAL);
 		}
@@ -1526,7 +1501,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	}
 	bool has_http = false;
 	bool has_tls = (tls_ctx != NULL);
-	uv_handle_t *client = ioreq_spawn(worker, SOCK_STREAM, addr->sa_family, has_tls, has_http);
+	uv_handle_t *client = ioreq_spawn(SOCK_STREAM, addr->sa_family, has_tls, has_http);
 	if (!client) {
 		tls_client_ctx_free(tls_ctx);
 		free(conn);
@@ -1545,7 +1520,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 
 	/* Add address to the waiting list.
 	 * Now it "is waiting to be connected to." */
-	int ret = worker_add_tcp_waiting(worker, addr, session);
+	int ret = worker_add_tcp_waiting(addr, session);
 	if (ret < 0) {
 		free(conn);
 		session_close(session);
@@ -1561,7 +1536,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	ret = session_timer_start(session, on_tcp_connect_timeout,
 				  KR_CONN_RTT_MAX, 0);
 	if (ret != 0) {
-		worker_del_tcp_waiting(worker, addr);
+		worker_del_tcp_waiting(addr);
 		free(conn);
 		session_close(session);
 		return kr_error(EINVAL);
@@ -1577,7 +1552,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	ret = uv_tcp_connect(conn, (uv_tcp_t *)client, addr , on_connect);
 	if (ret != 0) {
 		session_timer_stop(session);
-		worker_del_tcp_waiting(worker, addr);
+		worker_del_tcp_waiting(addr);
 		free(conn);
 		session_close(session);
 		qry->server_selection.error(qry, task->transport, KR_SELECTION_TCP_CONNECT_FAILED);
@@ -1589,7 +1564,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	ret = session_waitinglist_push(session, task);
 	if (ret < 0) {
 		session_timer_stop(session);
-		worker_del_tcp_waiting(worker, addr);
+		worker_del_tcp_waiting(addr);
 		free(conn);
 		session_close(session);
 		return kr_error(EINVAL);
@@ -1623,11 +1598,11 @@ static int tcp_task_step(struct qr_task *task,
 	}
 	int ret;
 	struct session* session = NULL;
-	if ((session = worker_find_tcp_waiting(ctx->worker, addr)) != NULL) {
+	if ((session = worker_find_tcp_waiting(addr)) != NULL) {
 		/* Connection is in the list of waiting connections.
 		 * It means that connection establishing is coming right now. */
 		ret = tcp_task_waiting_connection(session, task);
-	} else if ((session = worker_find_tcp_connected(ctx->worker, addr)) != NULL) {
+	} else if ((session = worker_find_tcp_connected(addr)) != NULL) {
 		/* Connection has been already established. */
 		ret = tcp_task_existing_connection(session, task);
 	} else {
@@ -1669,14 +1644,13 @@ static int qr_task_step(struct qr_task *task,
 	if (kr_fails_assert(ctx))
 		return qr_task_finalize(task, KR_STATE_FAIL);
 	struct kr_request *req = &ctx->req;
-	struct worker_ctx *worker = ctx->worker;
 
-	if (worker->too_many_open) {
+	if (the_worker->too_many_open) {
 		/* */
 		struct kr_rplan *rplan = &req->rplan;
-		if (worker->stats.rconcurrent <
-			worker->rconcurrent_highwatermark - 10) {
-			worker->too_many_open = false;
+		if (the_worker->stats.rconcurrent <
+			the_worker->rconcurrent_highwatermark - 10) {
+			the_worker->too_many_open = false;
 		} else {
 			if (packet && kr_rplan_empty(rplan)) {
 				/* new query; TODO - make this detection more obvious */
@@ -1803,7 +1777,7 @@ int worker_submit(struct session *session, struct io_comm_data *comm,
 	const struct sockaddr *addr = NULL;
 	if (!is_outgoing) { /* request from a client */
 		struct request_ctx *ctx =
-			request_create(the_worker, session, comm, eth_from,
+			request_create(session, comm, eth_from,
 			               eth_to, knot_wire_get_id(pkt->wire));
 		if (http_ctx)
 			queue_pop(http_ctx->streams);
@@ -1891,42 +1865,35 @@ static struct session *trie_find_tcp_session(trie_t *trie,
 	return val ? *val : NULL;
 }
 
-int worker_add_tcp_connected(struct worker_ctx *worker,
-				    const struct sockaddr* addr,
-				    struct session *session)
+int worker_add_tcp_connected(const struct sockaddr* addr, struct session *session)
 {
-	return trie_add_tcp_session(worker->tcp_connected, addr, session);
+	return trie_add_tcp_session(the_worker->tcp_connected, addr, session);
 }
 
-int worker_del_tcp_connected(struct worker_ctx *worker,
-				    const struct sockaddr* addr)
+int worker_del_tcp_connected(const struct sockaddr* addr)
 {
-	return trie_del_tcp_session(worker->tcp_connected, addr);
+	return trie_del_tcp_session(the_worker->tcp_connected, addr);
 }
 
-struct session* worker_find_tcp_connected(struct worker_ctx *worker,
-						 const struct sockaddr* addr)
+struct session* worker_find_tcp_connected(const struct sockaddr* addr)
 {
-	return trie_find_tcp_session(worker->tcp_connected, addr);
+	return trie_find_tcp_session(the_worker->tcp_connected, addr);
 }
 
-static int worker_add_tcp_waiting(struct worker_ctx *worker,
-				  const struct sockaddr* addr,
+static int worker_add_tcp_waiting(const struct sockaddr* addr,
 				  struct session *session)
 {
-	return trie_add_tcp_session(worker->tcp_waiting, addr, session);
+	return trie_add_tcp_session(the_worker->tcp_waiting, addr, session);
 }
 
-int worker_del_tcp_waiting(struct worker_ctx *worker,
-			   const struct sockaddr* addr)
+int worker_del_tcp_waiting(const struct sockaddr* addr)
 {
-	return trie_del_tcp_session(worker->tcp_waiting, addr);
+	return trie_del_tcp_session(the_worker->tcp_waiting, addr);
 }
 
-struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
-					       const struct sockaddr* addr)
+struct session* worker_find_tcp_waiting(const struct sockaddr* addr)
 {
-	return trie_find_tcp_session(worker->tcp_waiting, addr);
+	return trie_find_tcp_session(the_worker->tcp_waiting, addr);
 }
 
 int worker_end_tcp(struct session *session)
@@ -1938,8 +1905,8 @@ int worker_end_tcp(struct session *session)
 
 	struct sockaddr *peer = session_get_peer(session);
 
-	worker_del_tcp_waiting(the_worker, peer);
-	worker_del_tcp_connected(the_worker, peer);
+	worker_del_tcp_waiting(peer);
+	worker_del_tcp_connected(peer);
 	session_flags(session)->connected = false;
 
 	struct tls_client_ctx *tls_client_ctx = session_tls_get_client_ctx(session);
@@ -2008,7 +1975,7 @@ knot_pkt_t *worker_resolve_mk_pkt_dname(knot_dname_t *qname, uint16_t qtype, uin
 
 	/* Add OPT RR, including wire format so modules can see both representations.
 	 * knot_pkt_put() copies the outside; we need to duplicate the inside manually. */
-	knot_rrset_t *opt = knot_rrset_copy(the_worker->engine->resolver.downstream_opt_rr, NULL);
+	knot_rrset_t *opt = knot_rrset_copy(the_resolver->downstream_opt_rr, NULL);
 	if (!opt) {
 		knot_pkt_free(pkt);
 		return NULL;
@@ -2044,13 +2011,12 @@ knot_pkt_t *worker_resolve_mk_pkt(const char *qname_str, uint16_t qtype, uint16_
 
 struct qr_task *worker_resolve_start(knot_pkt_t *query, struct kr_qflags options)
 {
-	struct worker_ctx *worker = the_worker;
-	if (kr_fails_assert(worker && query))
+	if (kr_fails_assert(the_worker && query))
 		return NULL;
 
 
-	struct request_ctx *ctx = request_create(worker, NULL, NULL, NULL, NULL,
-	                                         worker->next_request_uid);
+	struct request_ctx *ctx = request_create(NULL, NULL, NULL, NULL,
+	                                         the_worker->next_request_uid);
 	if (!ctx)
 		return NULL;
 
@@ -2072,9 +2038,9 @@ struct qr_task *worker_resolve_start(knot_pkt_t *query, struct kr_qflags options
 		return NULL;
 	}
 
-	worker->next_request_uid += 1;
-	if (worker->next_request_uid == 0)
-		worker->next_request_uid = UINT16_MAX + 1;
+	the_worker->next_request_uid += 1;
+	if (the_worker->next_request_uid == 0)
+		the_worker->next_request_uid = UINT16_MAX + 1;
 
 	/* Set options late, as qr_task_start() -> kr_resolve_begin() rewrite it. */
 	kr_qflags_set(&task->ctx->req.options, options);
@@ -2180,18 +2146,18 @@ bool worker_task_finished(struct qr_task *task)
 }
 
 /** Reserve worker buffers.  We assume worker's been zeroed. */
-static int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
+static int worker_reserve(size_t ring_maxlen)
 {
-	worker->tcp_connected = trie_create(NULL);
-	worker->tcp_waiting = trie_create(NULL);
-	worker->subreq_out = trie_create(NULL);
+	the_worker->tcp_connected = trie_create(NULL);
+	the_worker->tcp_waiting = trie_create(NULL);
+	the_worker->subreq_out = trie_create(NULL);
 
-	array_init(worker->pool_mp);
-	if (array_reserve(worker->pool_mp, ring_maxlen)) {
+	array_init(the_worker->pool_mp);
+	if (array_reserve(the_worker->pool_mp, ring_maxlen)) {
 		return kr_error(ENOMEM);
 	}
 
-	mm_ctx_mempool(&worker->pkt_pool, 4 * sizeof(knot_pkt_t));
+	mm_ctx_mempool(&the_worker->pkt_pool, 4 * sizeof(knot_pkt_t));
 
 	return kr_ok();
 }
@@ -2208,84 +2174,83 @@ static inline void reclaim_mp_freelist(mp_freelist_t *list)
 
 void worker_deinit(void)
 {
-	struct worker_ctx *worker = the_worker;
-	if (kr_fails_assert(worker))
+	if (kr_fails_assert(the_worker))
 		return;
-	trie_free(worker->tcp_connected);
-	trie_free(worker->tcp_waiting);
-	trie_free(worker->subreq_out);
-	worker->subreq_out = NULL;
+	trie_free(the_worker->tcp_connected);
+	trie_free(the_worker->tcp_waiting);
+	trie_free(the_worker->subreq_out);
+	the_worker->subreq_out = NULL;
 
-	for (int i = 0; i < worker->doh_qry_headers.len; i++)
-		free((void *)worker->doh_qry_headers.at[i]);
-	array_clear(worker->doh_qry_headers);
+	for (int i = 0; i < the_worker->doh_qry_headers.len; i++)
+		free((void *)the_worker->doh_qry_headers.at[i]);
+	array_clear(the_worker->doh_qry_headers);
 
-	reclaim_mp_freelist(&worker->pool_mp);
-	mp_delete(worker->pkt_pool.ctx);
-	worker->pkt_pool.ctx = NULL;
+	reclaim_mp_freelist(&the_worker->pool_mp);
+	mp_delete(the_worker->pkt_pool.ctx);
+	the_worker->pkt_pool.ctx = NULL;
 
 	the_worker = NULL;
 }
 
-int worker_init(struct engine *engine, int worker_count)
+int worker_init(void)
 {
-	if (kr_fails_assert(engine && engine->L && the_worker == NULL))
+	if (kr_fails_assert(the_worker == NULL))
 		return kr_error(EINVAL);
-	kr_bindings_register(engine->L);
+	kr_bindings_register(the_engine->L); // TODO move
 
 	/* Create main worker. */
-	struct worker_ctx *worker = &the_worker_value;
-	memset(worker, 0, sizeof(*worker));
-	worker->engine = engine;
+	the_worker = &the_worker_value;
+	memset(the_worker, 0, sizeof(*the_worker));
 
 	uv_loop_t *loop = uv_default_loop();
-	worker->loop = loop;
+	the_worker->loop = loop;
 
-	worker->count = worker_count;
+	static const int worker_count = 1;
+	the_worker->count = worker_count;
 
 	/* Register table for worker per-request variables */
-	lua_newtable(engine->L);
-	lua_setfield(engine->L, -2, "vars");
-	lua_getfield(engine->L, -1, "vars");
-	worker->vars_table_ref = luaL_ref(engine->L, LUA_REGISTRYINDEX);
-	lua_pop(engine->L, 1);
+	struct lua_State *L = the_engine->L;
+	lua_newtable(L);
+	lua_setfield(L, -2, "vars");
+	lua_getfield(L, -1, "vars");
+	the_worker->vars_table_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	lua_pop(L, 1);
 
-	worker->tcp_pipeline_max = MAX_PIPELINED;
-	worker->out_addr4.sin_family = AF_UNSPEC;
-	worker->out_addr6.sin6_family = AF_UNSPEC;
+	the_worker->tcp_pipeline_max = MAX_PIPELINED;
+	the_worker->out_addr4.sin_family = AF_UNSPEC;
+	the_worker->out_addr6.sin6_family = AF_UNSPEC;
 
-	array_init(worker->doh_qry_headers);
+	array_init(the_worker->doh_qry_headers);
 
-	int ret = worker_reserve(worker, MP_FREELIST_SIZE);
+	int ret = worker_reserve(MP_FREELIST_SIZE);
 	if (ret) return ret;
-	worker->next_request_uid = UINT16_MAX + 1;
+	the_worker->next_request_uid = UINT16_MAX + 1;
 
 	/* Set some worker.* fields in Lua */
-	lua_getglobal(engine->L, "worker");
+	lua_getglobal(L, "worker");
 	pid_t pid = getpid();
 
 	auto_free char *pid_str = NULL;
 	const char *inst_name = getenv("SYSTEMD_INSTANCE");
 	if (inst_name) {
-		lua_pushstring(engine->L, inst_name);
+		lua_pushstring(L, inst_name);
 	} else {
 		ret = asprintf(&pid_str, "%ld", (long)pid);
 		kr_assert(ret > 0);
-		lua_pushstring(engine->L, pid_str);
+		lua_pushstring(L, pid_str);
 	}
-	lua_setfield(engine->L, -2, "id");
+	lua_setfield(L, -2, "id");
 
-	lua_pushnumber(engine->L, pid);
-	lua_setfield(engine->L, -2, "pid");
-	lua_pushnumber(engine->L, worker_count);
-	lua_setfield(engine->L, -2, "count");
+	lua_pushnumber(L, pid);
+	lua_setfield(L, -2, "pid");
+	lua_pushnumber(L, worker_count);
+	lua_setfield(L, -2, "count");
 
 	char cwd[PATH_MAX];
 	get_workdir(cwd, sizeof(cwd));
-	lua_pushstring(engine->L, cwd);
-	lua_setfield(engine->L, -2, "cwd");
+	lua_pushstring(L, cwd);
+	lua_setfield(L, -2, "cwd");
 
-	the_worker = worker;
 	loop->data = the_worker;
 	/* ^^^^ Now this shouldn't be used anymore, but it's hard to be 100% sure. */
 	return kr_ok();

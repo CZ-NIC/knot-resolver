@@ -25,10 +25,10 @@ KR_EXPORT extern struct worker_ctx *the_worker;
 
 /** Create and initialize the worker.
  * \return error code (ENOMEM) */
-int worker_init(struct engine *engine, int worker_count);
+int worker_init();
 
 /** Destroy the worker (free memory). */
-void worker_deinit(void);
+void worker_deinit();
 
 /**
  * Process an incoming packet (query from a client or answer from upstream).
@@ -93,17 +93,11 @@ void worker_task_unref(struct qr_task *task);
 
 void worker_task_timeout_inc(struct qr_task *task);
 
-int worker_add_tcp_connected(struct worker_ctx *worker,
-			     const struct sockaddr *addr,
-			     struct session *session);
-int worker_del_tcp_connected(struct worker_ctx *worker,
-			     const struct sockaddr *addr);
-int worker_del_tcp_waiting(struct worker_ctx *worker,
-			   const struct sockaddr* addr);
-struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
-					       const struct sockaddr* addr);
-struct session* worker_find_tcp_connected(struct worker_ctx *worker,
-					       const struct sockaddr* addr);
+int worker_add_tcp_connected(const struct sockaddr *addr, struct session *session);
+int worker_del_tcp_connected(const struct sockaddr *addr);
+int worker_del_tcp_waiting(const struct sockaddr* addr);
+struct session* worker_find_tcp_waiting(const struct sockaddr* addr);
+struct session* worker_find_tcp_connected(const struct sockaddr* addr);
 knot_pkt_t *worker_task_get_pktbuf(const struct qr_task *task);
 
 struct request_ctx *worker_task_get_request(struct qr_task *task);
@@ -163,7 +157,6 @@ typedef array_t(const char *) doh_headerlist_t;
 
 /** \details Worker state is meant to persist during the whole life of daemon. */
 struct worker_ctx {
-	struct engine *engine;
 	uv_loop_t *loop;
 	int count;  /** unreliable, does not count systemd instance, do not use */
 	int vars_table_ref;

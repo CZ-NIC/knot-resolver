@@ -59,13 +59,12 @@ static int nsid_finalize(kr_layer_t *ctx) {
 
 static char* nsid_name(void *env, struct kr_module *module, const char *args)
 {
-	struct engine *engine = env;
 	struct nsid_config *config = module->data;
 	if (args) {  /* set */
 		/* API is not binary safe, we need to fix this one day */
 		uint8_t *arg_copy = (uint8_t *)strdup(args);
 		if (arg_copy == NULL)
-			luaL_error(engine->L, "[nsid] error while allocating new NSID value\n");
+			luaL_error(the_engine->L, "[nsid] error while allocating new NSID value\n");
 		free(config->local_nsid);
 		config->local_nsid = arg_copy;
 		config->local_nsid_len = strlen(args);

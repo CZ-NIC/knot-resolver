@@ -27,6 +27,24 @@
 
 #define VERBOSE_MSG(qry, ...) kr_log_q((qry), RESOLVER,  __VA_ARGS__)
 
+/** Magic defaults */
+#ifndef LRU_RTT_SIZE
+#define LRU_RTT_SIZE 65536 /**< NS RTT cache size */
+#endif
+#ifndef LRU_REP_SIZE
+#define LRU_REP_SIZE (LRU_RTT_SIZE / 4) /**< NS reputation cache size */
+#endif
+#ifndef LRU_COOKIES_SIZE
+	#if ENABLE_COOKIES
+	#define LRU_COOKIES_SIZE LRU_RTT_SIZE /**< DNS cookies cache size. */
+	#else
+	#define LRU_COOKIES_SIZE LRU_ASSOC /* simpler than guards everywhere */
+	#endif
+#endif
+
+static struct kr_context the_resolver_value = {0};
+struct kr_context *the_resolver = NULL;
+
 bool kr_rank_check(uint8_t rank)
 {
 	switch (rank & ~KR_RANK_AUTH) {
@@ -636,6 +654,52 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 		}
 	}
 	return kr_ok();
+}
+
+int kr_resolver_init(module_array_t *modules, knot_mm_t *pool)
+{
+	the_resolver = &the_resolver_value;
+
+	/* Default options (request flags). */
+	the_resolver->options.REORDER_RR = true;
+
+	/* Open resolution context */
+	the_resolver->trust_anchors = trie_create(NULL);
+	the_resolver->negative_anchors = trie_create(NULL);
+	the_resolver->pool = pool;
+	the_resolver->modules = modules;
+	the_resolver->cache_rtt_tout_retry_interval = KR_NS_TIMEOUT_RETRY_INTERVAL;
+	/* Create OPT RR */
+	the_resolver->downstream_opt_rr = mm_alloc(pool, sizeof(knot_rrset_t));
+	the_resolver->upstream_opt_rr = mm_alloc(pool, sizeof(knot_rrset_t));
+	if (!the_resolver->downstream_opt_rr || !the_resolver->upstream_opt_rr) {
+		return kr_error(ENOMEM);
+	}
+	knot_edns_init(the_resolver->downstream_opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, pool);
+	knot_edns_init(the_resolver->upstream_opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, pool);
+	/* Use default TLS padding */
+	the_resolver->tls_padding = -1;
+	/* Empty init; filled via ./lua/postconfig.lua */
+	kr_zonecut_init(&the_resolver->root_hints, (const uint8_t *)"", pool);
+	lru_create(&the_resolver->cache_cookie, LRU_COOKIES_SIZE, NULL, NULL);
+
+	return kr_ok();
+}
+
+void kr_resolver_deinit(void)
+{
+	kr_zonecut_deinit(&the_resolver->root_hints);
+	kr_cache_close(&the_resolver->cache);
+
+	/* The LRUs are currently malloc-ated and need to be freed. */
+	lru_free(the_resolver->cache_cookie);
+
+	kr_ta_clear(the_resolver->trust_anchors);
+	trie_free(the_resolver->trust_anchors);
+	kr_ta_clear(the_resolver->negative_anchors);
+	trie_free(the_resolver->negative_anchors);
+
+	the_resolver = NULL;
 }
 
 int kr_resolve_begin(struct kr_request *request, struct kr_context *ctx)

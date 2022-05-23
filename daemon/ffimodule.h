@@ -24,7 +24,7 @@ struct kr_module;
  * @param  name   module name
  * @return        0 or an error
  */
-int ffimodule_register_lua(struct engine *engine, struct kr_module *module, const char *name);
+int ffimodule_register_lua(struct kr_module *module, const char *name);
 
 int ffimodule_init(lua_State *L);
 void ffimodule_deinit(lua_State *L);

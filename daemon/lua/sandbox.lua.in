@@ -263,7 +263,7 @@ function modules_create_table_for_c(kr_module_ud)
 					elseif arg ~= nil then
 						arg_conv = tostring(arg)
 					end
-					local ret_cstr = cb(ffi.C.the_worker.engine, kr_module, arg_conv)
+					local ret_cstr = cb(ffi.C.the_engine, kr_module, arg_conv)
 					if ret_cstr == nil then
 						return nil
 					end

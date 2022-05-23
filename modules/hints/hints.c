@@ -525,9 +525,7 @@ static void unpack_hint(struct kr_zonecut *root_hints, JsonNode *table, const ch
  */
 static char* hint_root(void *env, struct kr_module *module, const char *args)
 {
-	struct engine *engine = env;
-	struct kr_context *ctx = &engine->resolver;
-	struct kr_zonecut *root_hints = &ctx->root_hints;
+	struct kr_zonecut *root_hints = &the_resolver->root_hints;
 	/* Replace root hints if parameter is set */
 	if (args && args[0] != '\0') {
 		JsonNode *root_node = json_decode(args);
@@ -541,11 +539,9 @@ static char* hint_root(void *env, struct kr_module *module, const char *args)
 
 static char* hint_root_file(void *env, struct kr_module *module, const char *args)
 {
-	struct engine *engine = env;
-	struct kr_context *ctx = &engine->resolver;
-	const char *err_msg = engine_hint_root_file(ctx, args);
+	const char *err_msg = engine_hint_root_file(args);
 	if (err_msg) {
-		luaL_error(engine->L, "error when opening '%s': %s", args, err_msg);
+		luaL_error(the_engine->L, "error when opening '%s': %s", args, err_msg);
 	}
 	return strdup(err_msg ? err_msg : "");
 }

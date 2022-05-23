@@ -14,17 +14,22 @@ struct lua_State;
 #include "daemon/network.h"
 
 struct engine {
-    struct kr_context resolver;
-    struct network net;
     module_array_t modules;
     array_t(const struct kr_cdb_api *) backends;
-    knot_mm_t *pool;
+    knot_mm_t pool;
     char *hostname;
     struct lua_State *L;
 };
 
-int engine_init(struct engine *engine, knot_mm_t *pool);
-void engine_deinit(struct engine *engine);
+/** Pointer to the singleton engine state. NULL if not initialized. */
+KR_EXPORT extern struct engine *the_engine;
+
+/** Initializes the engine. */
+int engine_init(void);
+
+/* Deinitializes the engine. `network_unregister` should be called before
+ * this and before `network_deinit`. */
+void engine_deinit(void);
 
 /** Perform a lua command within the sandbox.
  *
@@ -36,18 +41,20 @@ int engine_cmd(struct lua_State *L, const char *str, bool raw);
 /** Execute current chunk in the sandbox */
 int engine_pcall(struct lua_State *L, int argc);
 
-int engine_load_sandbox(struct engine *engine);
-int engine_loadconf(struct engine *engine, const char *config_path);
+int engine_load_sandbox(void);
+int engine_loadconf(const char *config_path);
 
 /** Start the lua engine and execute the config. */
-int engine_start(struct engine *engine);
-void engine_stop(struct engine *engine);
-int engine_register(struct engine *engine, const char *name, const char *precedence, const char* ref);
-int engine_unregister(struct engine *engine, const char *name);
+int engine_start(void);
+void engine_stop(void);
+int engine_register(const char *name, const char *precedence, const char* ref);
+int engine_unregister(const char *name);
+/** Gets the list of the engine's registered modules. */
+module_array_t *engine_modules(void);
 
 /** Set/get the per engine hostname */
-char *engine_get_hostname(struct engine *engine);
-int engine_set_hostname(struct engine *engine, const char *hostname);
+char *engine_get_hostname(void);
+int engine_set_hostname(const char *hostname);
 
 /** Load root hints from a zonefile (or config-time default if NULL).
  *
@@ -55,7 +62,7 @@ int engine_set_hostname(struct engine *engine, const char *hostname);
  * @note exported to be usable from the hints module.
  */
 KR_EXPORT
-const char* engine_hint_root_file(struct kr_context *ctx, const char *file);
+const char* engine_hint_root_file(const char *file);
 
 /* @internal Array of ip address shorthand. */
 typedef array_t(char*) addr_array_t;
