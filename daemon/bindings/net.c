@@ -110,7 +110,7 @@ static int net_list(lua_State *L)
 {
 	lua_newtable(L);
 	lua_pushinteger(L, 1);
-	trie_apply_with_key(the_worker->engine->net.endpoints, net_list_add, L);
+	trie_apply_with_key(the_network->endpoints, net_list_add, L);
 	lua_pop(L, 1);
 	return 1;
 }
@@ -134,21 +134,20 @@ static bool net_listen_addrs(lua_State *L, int port, endpoint_flags_t flags, int
 	/* Case: string, representing a single address. */
 	const char *str = lua_tostring(L, -1);
 	if (str != NULL) {
-		struct network *net = &the_worker->engine->net;
 		const bool is_unix = str[0] == '/';
 		int ret = 0;
 		if (!flags.kind && !flags.tls) { /* normal UDP or XDP */
 			flags.sock_type = SOCK_DGRAM;
-			ret = network_listen(net, str, port, nic_queue, flags);
+			ret = network_listen(str, port, nic_queue, flags);
 		}
 		if (!flags.kind && !flags.xdp && ret == 0) { /* common for TCP, DoT and DoH (v2) */
 			flags.sock_type = SOCK_STREAM;
-			ret = network_listen(net, str, port, nic_queue, flags);
+			ret = network_listen(str, port, nic_queue, flags);
 		}
 		if (flags.kind) {
 			flags.kind = strdup(flags.kind);
 			flags.sock_type = SOCK_STREAM; /* TODO: allow to override this? */
-			ret = network_listen(net, str, (is_unix ? 0 : port), nic_queue, flags);
+			ret = network_listen(str, (is_unix ? 0 : port), nic_queue, flags);
 		}
 		if (ret == 0) return true; /* success */
 
@@ -336,7 +335,6 @@ static void net_proxy_addr_put(lua_State *L, int family, trie_t *trie, int *i)
 /** Allow PROXYv2 headers for IP address. */
 static int net_proxy_allowed(lua_State *L)
 {
-	struct network *net = &the_worker->engine->net;
 	int n = lua_gettop(L);
 	int i = 1;
 	const char *addr;
@@ -346,22 +344,22 @@ static int net_proxy_allowed(lua_State *L)
 		lua_newtable(L);
 		i = 1;
 
-		if (net->proxy_all4) {
+		if (the_network->proxy_all4) {
 			lua_pushinteger(L, i);
 			lua_pushstring(L, "0.0.0.0/0");
 			lua_settable(L, -3);
 			i += 1;
 		} else {
-			net_proxy_addr_put(L, AF_INET, net->proxy_addrs4, &i);
+			net_proxy_addr_put(L, AF_INET, the_network->proxy_addrs4, &i);
 		}
 
-		if (net->proxy_all6) {
+		if (the_network->proxy_all6) {
 			lua_pushinteger(L, i);
 			lua_pushstring(L, "::/0");
 			lua_settable(L, -3);
 			i += 1;
 		} else {
-			net_proxy_addr_put(L, AF_INET6, net->proxy_addrs6, &i);
+			net_proxy_addr_put(L, AF_INET6, the_network->proxy_addrs6, &i);
 		}
 
 		return 1;
@@ -374,7 +372,7 @@ static int net_proxy_allowed(lua_State *L)
 		lua_error_p(L, "net.proxy_allowed() argument must be string or table");
 
 	/* Reset allowed proxy addresses */
-	network_proxy_reset(net);
+	network_proxy_reset();
 
 	/* Add new proxy addresses */
 	if (lua_istable(L, 1)) {
@@ -386,13 +384,13 @@ static int net_proxy_allowed(lua_State *L)
 			if (!lua_isstring(L, -1))
 				lua_error_p(L, "net.proxy_allowed() argument may only contain strings");
 			addr = lua_tostring(L, -1);
-			int ret = network_proxy_allow(net, addr);
+			int ret = network_proxy_allow(addr);
 			if (ret)
 				lua_error_p(L, "invalid argument");
 		}
 	} else if (lua_isstring(L, 1)) {
 		addr = lua_tostring(L, 1);
-		int ret = network_proxy_allow(net, addr);
+		int ret = network_proxy_allow(addr);
 		if (ret)
 			lua_error_p(L, "invalid argument");
 	}
@@ -418,7 +416,7 @@ static int net_close(lua_State *L)
 	if (!ok)
 		lua_error_p(L, "expected 'close(string addr, [number port])'");
 
-	int ret = network_close(&the_worker->engine->net, addr, port);
+	int ret = network_close(addr, port);
 	lua_pushboolean(L, ret == 0);
 	return 1;
 }
@@ -488,11 +486,10 @@ static int net_interfaces(lua_State *L)
 /** Set UDP maximum payload size. */
 static int net_bufsize(lua_State *L)
 {
-	struct kr_context *ctx = &the_worker->engine->resolver;
 	const int argc = lua_gettop(L);
 	if (argc == 0) {
-		lua_pushinteger(L, knot_edns_get_payload(ctx->downstream_opt_rr));
-		lua_pushinteger(L, knot_edns_get_payload(ctx->upstream_opt_rr));
+		lua_pushinteger(L, knot_edns_get_payload(the_resolver->downstream_opt_rr));
+		lua_pushinteger(L, knot_edns_get_payload(the_resolver->upstream_opt_rr));
 		return 2;
 	}
 
@@ -500,8 +497,8 @@ static int net_bufsize(lua_State *L)
 		int bufsize = lua_tointeger(L, 1);
 		if (bufsize < 512 || bufsize > UINT16_MAX)
 			lua_error_p(L, "bufsize must be within <512, " STR(UINT16_MAX) ">");
-		knot_edns_set_payload(ctx->downstream_opt_rr, (uint16_t)bufsize);
-		knot_edns_set_payload(ctx->upstream_opt_rr, (uint16_t)bufsize);
+		knot_edns_set_payload(the_resolver->downstream_opt_rr, (uint16_t)bufsize);
+		knot_edns_set_payload(the_resolver->upstream_opt_rr, (uint16_t)bufsize);
 	} else if (argc == 2) {
 		int bufsize_downstream = lua_tointeger(L, 1);
 		int bufsize_upstream = lua_tointeger(L, 2);
@@ -509,8 +506,8 @@ static int net_bufsize(lua_State *L)
 		    || bufsize_downstream > UINT16_MAX || bufsize_upstream > UINT16_MAX) {
 			lua_error_p(L, "bufsize must be within <512, " STR(UINT16_MAX) ">");
 		}
-		knot_edns_set_payload(ctx->downstream_opt_rr, (uint16_t)bufsize_downstream);
-		knot_edns_set_payload(ctx->upstream_opt_rr, (uint16_t)bufsize_upstream);
+		knot_edns_set_payload(the_resolver->downstream_opt_rr, (uint16_t)bufsize_downstream);
+		knot_edns_set_payload(the_resolver->upstream_opt_rr, (uint16_t)bufsize_upstream);
 	}
 	return 0;
 }
@@ -518,39 +515,37 @@ static int net_bufsize(lua_State *L)
 /** Set TCP pipelining size. */
 static int net_pipeline(lua_State *L)
 {
-	struct worker_ctx *worker = the_worker;
-	if (!worker) {
+	if (!the_worker) {
 		return 0;
 	}
 	if (!lua_isnumber(L, 1)) {
-		lua_pushinteger(L, worker->tcp_pipeline_max);
+		lua_pushinteger(L, the_worker->tcp_pipeline_max);
 		return 1;
 	}
 	int len = lua_tointeger(L, 1);
 	if (len < 0 || len > UINT16_MAX)
 		lua_error_p(L, "tcp_pipeline must be within <0, " STR(UINT16_MAX) ">");
-	worker->tcp_pipeline_max = len;
+	the_worker->tcp_pipeline_max = len;
 	lua_pushinteger(L, len);
 	return 1;
 }
 
 static int net_tls(lua_State *L)
 {
-	struct network *net = &the_worker->engine->net;
-	if (!net) {
+	if (kr_fails_assert(the_network)) {
 		return 0;
 	}
 
 	/* Only return current credentials. */
 	if (lua_gettop(L) == 0) {
 		/* No credentials configured yet. */
-		if (!net->tls_credentials) {
+		if (!the_network->tls_credentials) {
 			return 0;
 		}
 		lua_newtable(L);
-		lua_pushstring(L, net->tls_credentials->tls_cert);
+		lua_pushstring(L, the_network->tls_credentials->tls_cert);
 		lua_setfield(L, -2, "cert_file");
-		lua_pushstring(L, net->tls_credentials->tls_key);
+		lua_pushstring(L, the_network->tls_credentials->tls_key);
 		lua_setfield(L, -2, "key_file");
 		return 1;
 	}
@@ -558,7 +553,7 @@ static int net_tls(lua_State *L)
 	if ((lua_gettop(L) != 2) || !lua_isstring(L, 1) || !lua_isstring(L, 2))
 		lua_error_p(L, "net.tls takes two parameters: (\"cert_file\", \"key_file\")");
 
-	int r = tls_certificate_set(net, lua_tostring(L, 1), lua_tostring(L, 2));
+	int r = tls_certificate_set(lua_tostring(L, 1), lua_tostring(L, 2));
 	lua_error_maybe(L, r);
 
 	lua_pushboolean(L, true);
@@ -714,9 +709,8 @@ static int net_tls_client(lua_State *L)
 	/* TODO idea: allow starting the lua table with *multiple* IP targets,
 	 * meaning the authentication config should be applied to each.
 	 */
-	struct network *net = &the_worker->engine->net;
 	if (lua_gettop(L) == 0)
-		return tls_params2lua(L, net->tls_client_params);
+		return tls_params2lua(L, the_network->tls_client_params);
 	/* Various basic sanity-checking. */
 	if (lua_gettop(L) != 1 || !lua_istable(L, 1))
 		lua_error_maybe(L, EINVAL);
@@ -882,7 +876,7 @@ static int net_tls_client(lua_State *L)
 	if (!addr)
 		lua_error_p(L, "address '%s' could not be converted", addr_str);
 	tls_client_param_t **oldcfgp = tls_client_param_getptr(
-			&net->tls_client_params, addr, true);
+			&the_network->tls_client_params, addr, true);
 	free_const(addr);
 	if (!oldcfgp)
 		lua_error_p(L, "internal error when extending tls_client_params map");
@@ -925,8 +919,7 @@ int net_tls_client_clear(lua_State *L)
 	if (!addr)
 		lua_error_p(L, "invalid IP address");
 	/* Do the actual removal. */
-	struct network *net = &the_worker->engine->net;
-	int r = tls_client_param_remove(net->tls_client_params, addr);
+	int r = tls_client_param_remove(the_network->tls_client_params, addr);
 	free_const(addr);
 	lua_error_maybe(L, r);
 	lua_pushboolean(L, true);
@@ -935,18 +928,16 @@ int net_tls_client_clear(lua_State *L)
 
 static int net_tls_padding(lua_State *L)
 {
-	struct kr_context *ctx = &the_worker->engine->resolver;
-
 	/* Only return current padding. */
 	if (lua_gettop(L) == 0) {
-		if (ctx->tls_padding < 0) {
+		if (the_resolver->tls_padding < 0) {
 			lua_pushboolean(L, true);
 			return 1;
-		} else if (ctx->tls_padding == 0) {
+		} else if (the_resolver->tls_padding == 0) {
 			lua_pushboolean(L, false);
 			return 1;
 		}
-		lua_pushinteger(L, ctx->tls_padding);
+		lua_pushinteger(L, the_resolver->tls_padding);
 		return 1;
 	}
 
@@ -957,15 +948,15 @@ static int net_tls_padding(lua_State *L)
 	if (lua_isboolean(L, 1)) {
 		bool x = lua_toboolean(L, 1);
 		if (x) {
-			ctx->tls_padding = -1;
+			the_resolver->tls_padding = -1;
 		} else {
-			ctx->tls_padding = 0;
+			the_resolver->tls_padding = 0;
 		}
 	} else if (lua_isnumber(L, 1)) {
 		int padding = lua_tointeger(L, 1);
 		if ((padding < 0) || (padding > MAX_TLS_PADDING))
 			lua_error_p(L, "%s", errstr);
-		ctx->tls_padding = padding;
+		the_resolver->tls_padding = padding;
 	} else {
 		lua_error_p(L, "%s", errstr);
 	}
@@ -978,8 +969,6 @@ static int net_tls_padding(lua_State *L)
 
 static int net_tls_sticket_secret_string(lua_State *L)
 {
-	struct network *net = &the_worker->engine->net;
-
 	size_t secret_len;
 	const char *secret;
 
@@ -999,10 +988,10 @@ static int net_tls_sticket_secret_string(lua_State *L)
 		}
 	}
 
-	tls_session_ticket_ctx_destroy(net->tls_session_ticket_ctx);
-	net->tls_session_ticket_ctx =
-		tls_session_ticket_ctx_create(net->loop, secret, secret_len);
-	if (net->tls_session_ticket_ctx == NULL) {
+	tls_session_ticket_ctx_destroy(the_network->tls_session_ticket_ctx);
+	the_network->tls_session_ticket_ctx =
+		tls_session_ticket_ctx_create(the_network->loop, secret, secret_len);
+	if (the_network->tls_session_ticket_ctx == NULL) {
 		lua_error_p(L,
 			"net.tls_sticket_secret_string - can't create session ticket context");
 	}
@@ -1044,12 +1033,10 @@ static int net_tls_sticket_secret_file(lua_State *L)
 	}
 	fclose(fp);
 
-	struct network *net = &the_worker->engine->net;
-
-	tls_session_ticket_ctx_destroy(net->tls_session_ticket_ctx);
-	net->tls_session_ticket_ctx =
-		tls_session_ticket_ctx_create(net->loop, secret_buf, secret_len);
-	if (net->tls_session_ticket_ctx == NULL) {
+	tls_session_ticket_ctx_destroy(the_network->tls_session_ticket_ctx);
+	the_network->tls_session_ticket_ctx =
+		tls_session_ticket_ctx_create(the_network->loop, secret_buf, secret_len);
+	if (the_network->tls_session_ticket_ctx == NULL) {
 		lua_error_p(L,
 			"net.tls_sticket_secret_file - can't create session ticket context");
 	}
@@ -1131,14 +1118,12 @@ static int net_update_timeout(lua_State *L, uint64_t *timeout, const char *name)
 
 static int net_tcp_in_idle(lua_State *L)
 {
-	struct network *net = &the_worker->engine->net;
-	return net_update_timeout(L, &net->tcp.in_idle_timeout, "net.tcp_in_idle");
+	return net_update_timeout(L, &the_network->tcp.in_idle_timeout, "net.tcp_in_idle");
 }
 
 static int net_tls_handshake_timeout(lua_State *L)
 {
-	struct network *net = &the_worker->engine->net;
-	return net_update_timeout(L, &net->tcp.tls_handshake_timeout, "net.tls_handshake_timeout");
+	return net_update_timeout(L, &the_network->tcp.tls_handshake_timeout, "net.tls_handshake_timeout");
 }
 
 static int net_bpf_set(lua_State *L)
@@ -1159,7 +1144,7 @@ static int net_bpf_set(lua_State *L)
 	}
 	lua_pop(L, 1);
 
-	if (network_set_bpf(&the_worker->engine->net, progfd) == 0) {
+	if (network_set_bpf(progfd) == 0) {
 		lua_error_p(L, "failed to attach BPF program to some networks: %s",
 				kr_strerror(errno));
 	}
@@ -1178,7 +1163,7 @@ static int net_bpf_clear(lua_State *L)
 
 #if __linux__
 
-	network_clear_bpf(&the_worker->engine->net);
+	network_clear_bpf();
 
 	lua_pushboolean(L, 1);
 	return 1;
@@ -1197,12 +1182,11 @@ static int net_register_endpoint_kind(lua_State *L)
 	}
 	size_t kind_len;
 	const char *kind = lua_tolstring(L, 1, &kind_len);
-	struct network *net = &the_worker->engine->net;
 
 	/* Unregistering */
 	if (param_count == 1) {
 		void *val;
-		if (trie_del(net->endpoint_kinds, kind, kind_len, &val) == KNOT_EOK) {
+		if (trie_del(the_network->endpoint_kinds, kind, kind_len, &val) == KNOT_EOK) {
 			const int fun_id = (char *)val - (char *)NULL;
 			luaL_unref(L, LUA_REGISTRYINDEX, fun_id);
 			return 0;
@@ -1217,7 +1201,7 @@ static int net_register_endpoint_kind(lua_State *L)
 	}
 	const int fun_id = luaL_ref(L, LUA_REGISTRYINDEX);
 		/* ^^ The function is on top of the stack, incidentally. */
-	void **pp = trie_get_ins(net->endpoint_kinds, kind, kind_len);
+	void **pp = trie_get_ins(the_network->endpoint_kinds, kind, kind_len);
 	if (!pp) lua_error_maybe(L, kr_error(ENOMEM));
 	if (*pp != NULL || !strcasecmp(kind, "dns") || !strcasecmp(kind, "tls"))
 		lua_error_p(L, "attempt to register known kind '%s'\n", kind);

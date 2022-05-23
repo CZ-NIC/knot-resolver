@@ -29,29 +29,6 @@
 #include "lib/dnssec/ta.h"
 #include "lib/log.h"
 
-/* Magic defaults for the engine. */
-#ifndef LRU_RTT_SIZE
-#define LRU_RTT_SIZE 65536 /**< NS RTT cache size */
-#endif
-#ifndef LRU_REP_SIZE
-#define LRU_REP_SIZE (LRU_RTT_SIZE / 4) /**< NS reputation cache size */
-#endif
-#ifndef LRU_COOKIES_SIZE
-	#if ENABLE_COOKIES
-	#define LRU_COOKIES_SIZE LRU_RTT_SIZE /**< DNS cookies cache size. */
-	#else
-	#define LRU_COOKIES_SIZE LRU_ASSOC /* simpler than guards everywhere */
-	#endif
-#endif
-
-/**@internal Maximum number of incomplete TCP connections in queue.
-* Default is from empirical testing - in our case, more isn't necessarily better.
-* See https://gitlab.nic.cz/knot/knot-resolver/-/merge_requests/968
-* */
-#ifndef TCP_BACKLOG_DEFAULT
-#define TCP_BACKLOG_DEFAULT 128
-#endif
-
 /* Cleanup engine state every 5 minutes */
 const size_t CLEANUP_TIMER = 5*60*1000;
 
@@ -63,6 +40,9 @@ const size_t CLEANUP_TIMER = 5*60*1000;
  * Global bindings.
  */
 struct args *the_args;
+
+static struct engine engine = {0};
+struct engine *the_engine = NULL;
 
 
 /** Print help and available commands. */
@@ -140,7 +120,7 @@ static int l_setuser(lua_State *L)
 /** Quit current executable. */
 static int l_quit(lua_State *L)
 {
-	engine_stop(the_worker->engine);
+	engine_stop();
 	return 0;
 }
 
@@ -257,22 +237,19 @@ bad_call:
 	lua_error_p(L, "takes a table of string groups as parameter or nothing");
 }
 
-char *engine_get_hostname(struct engine *engine) {
+char *engine_get_hostname(void) {
 	static char hostname_str[KNOT_DNAME_MAXLEN];
-	if (!engine) {
-		return NULL;
-	}
 
-	if (!engine->hostname) {
+	if (!the_engine->hostname) {
 		if (gethostname(hostname_str, sizeof(hostname_str)) != 0)
 			return NULL;
 		return hostname_str;
 	}
-	return engine->hostname;
+	return the_engine->hostname;
 }
 
-int engine_set_hostname(struct engine *engine, const char *hostname) {
-	if (!engine || !hostname) {
+int engine_set_hostname(const char *hostname) {
+	if (!hostname) {
 		return kr_error(EINVAL);
 	}
 
@@ -280,11 +257,11 @@ int engine_set_hostname(struct engine *engine, const char *hostname) {
 	if (!new_hostname) {
 		return kr_error(ENOMEM);
 	}
-	if (engine->hostname) {
-		free(engine->hostname);
+	if (the_engine->hostname) {
+		free(the_engine->hostname);
 	}
-	engine->hostname = new_hostname;
-	network_new_hostname(&engine->net, engine);
+	the_engine->hostname = new_hostname;
+	network_new_hostname();
 
 	return 0;
 }
@@ -292,18 +269,17 @@ int engine_set_hostname(struct engine *engine, const char *hostname) {
 /** Return hostname. */
 static int l_hostname(lua_State *L)
 {
-	struct engine *engine = the_worker->engine;
 	if (lua_gettop(L) == 0) {
-		lua_pushstring(L, engine_get_hostname(engine));
+		lua_pushstring(L, engine_get_hostname());
 		return 1;
 	}
 	if ((lua_gettop(L) != 1) || !lua_isstring(L, 1))
 		lua_error_p(L, "hostname takes at most one parameter: (\"fqdn\")");
 
-	if (engine_set_hostname(engine, lua_tostring(L, 1)) != 0)
+	if (engine_set_hostname(lua_tostring(L, 1)) != 0)
 		lua_error_p(L, "setting hostname failed");
 
-	lua_pushstring(L, engine_get_hostname(engine));
+	lua_pushstring(L, engine_get_hostname());
 	return 1;
 }
 
@@ -317,10 +293,9 @@ static int l_package_version(lua_State *L)
 /** Load root hints from zonefile. */
 static int l_hint_root_file(lua_State *L)
 {
-	struct kr_context *ctx = &the_worker->engine->resolver;
 	const char *file = lua_tostring(L, 1);
 
-	const char *err = engine_hint_root_file(ctx, file);
+	const char *err = engine_hint_root_file(file);
 	if (err) {
 		if (!file) {
 			file = ROOTHINTS;
@@ -343,15 +318,15 @@ static void roothints_add(zs_scanner_t *zs)
 		kr_zonecut_add(hints, zs->r_owner, zs->r_data, zs->r_data_length);
 	}
 }
-const char* engine_hint_root_file(struct kr_context *ctx, const char *file)
+const char* engine_hint_root_file(const char *file)
 {
 	if (!file) {
 		file = ROOTHINTS;
 	}
-	if (strlen(file) == 0 || !ctx) {
+	if (strlen(file) == 0) {
 		return "invalid parameters";
 	}
-	struct kr_zonecut *root_hints = &ctx->root_hints;
+	struct kr_zonecut *root_hints = &the_resolver->root_hints;
 
 	zs_scanner_t zs;
 	if (zs_init(&zs, ".", 1, 0) != 0) {
@@ -482,86 +457,51 @@ static int l_fromjson(lua_State *L)
  * Engine API.
  */
 
-static int init_resolver(struct engine *engine)
-{
-	/* Note: whole *engine had been zeroed by engine_init(). */
-	struct kr_context * const ctx = &engine->resolver;
-	/* Default options (request flags). */
-	ctx->options.REORDER_RR = true;
-
-	/* Open resolution context */
-	ctx->trust_anchors = trie_create(NULL);
-	ctx->negative_anchors = trie_create(NULL);
-	ctx->pool = engine->pool;
-	ctx->modules = &engine->modules;
-	ctx->cache_rtt_tout_retry_interval = KR_NS_TIMEOUT_RETRY_INTERVAL;
-	/* Create OPT RR */
-	ctx->downstream_opt_rr = mm_alloc(engine->pool, sizeof(knot_rrset_t));
-	ctx->upstream_opt_rr = mm_alloc(engine->pool, sizeof(knot_rrset_t));
-	if (!ctx->downstream_opt_rr || !ctx->upstream_opt_rr) {
-		return kr_error(ENOMEM);
-	}
-	knot_edns_init(ctx->downstream_opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, engine->pool);
-	knot_edns_init(ctx->upstream_opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, engine->pool);
-	/* Use default TLS padding */
-	ctx->tls_padding = -1;
-	/* Empty init; filled via ./lua/postconfig.lua */
-	kr_zonecut_init(&ctx->root_hints, (const uint8_t *)"", engine->pool);
-	lru_create(&ctx->cache_cookie, LRU_COOKIES_SIZE, NULL, NULL);
-
-	/* Load basic modules */
-	engine_register(engine, "iterate", NULL, NULL);
-	engine_register(engine, "validate", NULL, NULL);
-	engine_register(engine, "cache", NULL, NULL);
-
-	return array_push(engine->backends, kr_cdb_lmdb());
-}
-
-static int init_state(struct engine *engine)
+static int init_state(void)
 {
 	/* Initialize Lua state */
-	engine->L = luaL_newstate();
-	if (engine->L == NULL) {
+	the_engine->L = luaL_newstate();
+	if (the_engine->L == NULL) {
 		return kr_error(ENOMEM);
 	}
 	/* Initialize used libraries. */
-	luaL_openlibs(engine->L);
+	luaL_openlibs(the_engine->L);
 	/* Global functions */
-	lua_pushcfunction(engine->L, l_help);
-	lua_setglobal(engine->L, "help");
-	lua_pushcfunction(engine->L, l_quit);
-	lua_setglobal(engine->L, "quit");
-	lua_pushcfunction(engine->L, l_hostname);
-	lua_setglobal(engine->L, "hostname");
-	lua_pushcfunction(engine->L, l_package_version);
-	lua_setglobal(engine->L, "package_version");
-	lua_pushcfunction(engine->L, l_verbose);
-	lua_setglobal(engine->L, "verbose");
-	lua_pushcfunction(engine->L, l_log_level);
-	lua_setglobal(engine->L, "log_level");
-	lua_pushcfunction(engine->L, l_log_target);
-	lua_setglobal(engine->L, "log_target");
-	lua_pushcfunction(engine->L, l_log_groups);
-	lua_setglobal(engine->L, "log_groups");
-	lua_pushcfunction(engine->L, l_setuser);
-	lua_setglobal(engine->L, "user");
-	lua_pushcfunction(engine->L, l_hint_root_file);
-	lua_setglobal(engine->L, "_hint_root_file");
-	lua_pushliteral(engine->L, libknot_SONAME);
-	lua_setglobal(engine->L, "libknot_SONAME");
-	lua_pushliteral(engine->L, libzscanner_SONAME);
-	lua_setglobal(engine->L, "libzscanner_SONAME");
-	lua_pushcfunction(engine->L, l_tojson);
-	lua_setglobal(engine->L, "tojson");
-	lua_pushcfunction(engine->L, l_fromjson);
-	lua_setglobal(engine->L, "fromjson");
+	lua_pushcfunction(the_engine->L, l_help);
+	lua_setglobal(the_engine->L, "help");
+	lua_pushcfunction(the_engine->L, l_quit);
+	lua_setglobal(the_engine->L, "quit");
+	lua_pushcfunction(the_engine->L, l_hostname);
+	lua_setglobal(the_engine->L, "hostname");
+	lua_pushcfunction(the_engine->L, l_package_version);
+	lua_setglobal(the_engine->L, "package_version");
+	lua_pushcfunction(the_engine->L, l_verbose);
+	lua_setglobal(the_engine->L, "verbose");
+	lua_pushcfunction(the_engine->L, l_log_level);
+	lua_setglobal(the_engine->L, "log_level");
+	lua_pushcfunction(the_engine->L, l_log_target);
+	lua_setglobal(the_engine->L, "log_target");
+	lua_pushcfunction(the_engine->L, l_log_groups);
+	lua_setglobal(the_engine->L, "log_groups");
+	lua_pushcfunction(the_engine->L, l_setuser);
+	lua_setglobal(the_engine->L, "user");
+	lua_pushcfunction(the_engine->L, l_hint_root_file);
+	lua_setglobal(the_engine->L, "_hint_root_file");
+	lua_pushliteral(the_engine->L, libknot_SONAME);
+	lua_setglobal(the_engine->L, "libknot_SONAME");
+	lua_pushliteral(the_engine->L, libzscanner_SONAME);
+	lua_setglobal(the_engine->L, "libzscanner_SONAME");
+	lua_pushcfunction(the_engine->L, l_tojson);
+	lua_setglobal(the_engine->L, "tojson");
+	lua_pushcfunction(the_engine->L, l_fromjson);
+	lua_setglobal(the_engine->L, "fromjson");
 	/* Random number generator */
-	lua_getfield(engine->L, LUA_GLOBALSINDEX, "math");
-	lua_getfield(engine->L, -1, "randomseed");
-	lua_remove(engine->L, -2);
+	lua_getfield(the_engine->L, LUA_GLOBALSINDEX, "math");
+	lua_getfield(the_engine->L, -1, "randomseed");
+	lua_remove(the_engine->L, -2);
 	lua_Number seed = kr_rand_bytes(sizeof(lua_Number));
-	lua_pushnumber(engine->L, seed);
-	lua_call(engine->L, 1, 0);
+	lua_pushnumber(the_engine->L, seed);
+	lua_call(the_engine->L, 1, 0);
 	return kr_ok();
 }
 
@@ -570,7 +510,7 @@ static int init_state(struct engine *engine)
  * KRESD_COVERAGE_STATS environment variable.
  * Do nothing if the variable is not set.
  */
-static void init_measurement(struct engine *engine)
+static void init_measurement(void)
 {
 	const char * const statspath = getenv("KRESD_COVERAGE_STATS");
 	if (!statspath)
@@ -588,20 +528,16 @@ static void init_measurement(struct engine *engine)
 	if (kr_fails_assert(ret > 0))
 		return;
 
-	ret = luaL_loadstring(engine->L, snippet);
+	ret = luaL_loadstring(the_engine->L, snippet);
 	if (kr_fails_assert(ret == 0)) {
 		free(snippet);
 		return;
 	}
-	lua_call(engine->L, 0, 0);
+	lua_call(the_engine->L, 0, 0);
 	free(snippet);
 }
 
-int init_lua(struct engine *engine) {
-	if (!engine) {
-		return kr_error(EINVAL);
-	}
-
+int init_lua(void) {
 	/* Use libdir path for including Lua scripts */
 	char l_paths[MAXPATHLEN] = { 0 };
 	#pragma GCC diagnostic push
@@ -615,44 +551,44 @@ int init_lua(struct engine *engine) {
 		 LIBDIR, LIBEXT);
 	#pragma GCC diagnostic pop
 
-	int ret = l_dobytecode(engine->L, l_paths, strlen(l_paths), "");
+	int ret = l_dobytecode(the_engine->L, l_paths, strlen(l_paths), "");
 	if (ret != 0) {
-		lua_pop(engine->L, 1);
+		lua_pop(the_engine->L, 1);
 		return ret;
 	}
 	return 0;
 }
 
 
-int engine_init(struct engine *engine, knot_mm_t *pool)
+int engine_init(void)
 {
-	if (engine == NULL) {
-		return kr_error(EINVAL);
-	}
-
-	memset(engine, 0, sizeof(*engine));
-	engine->pool = pool;
+	kr_require(!the_engine);
+	the_engine = &engine;
+	mm_ctx_mempool(&the_engine->pool, MM_DEFAULT_BLKSIZE);
 
 	/* Initialize state */
-	int ret = init_state(engine);
+	int ret = init_state();
 	if (ret != 0) {
-		engine_deinit(engine);
+		engine_deinit();
 		return ret;
 	}
-	init_measurement(engine);
-	/* Initialize resolver */
-	ret = init_resolver(engine);
+	init_measurement();
+
+	/* Load basic modules */
+	engine_register("iterate", NULL, NULL);
+	engine_register("validate", NULL, NULL);
+	engine_register("cache", NULL, NULL);
+
+	ret = array_push(the_engine->backends, kr_cdb_lmdb());
 	if (ret != 0) {
-		engine_deinit(engine);
+		engine_deinit();
 		return ret;
 	}
-	/* Initialize network */
-	network_init(&engine->net, uv_default_loop(), TCP_BACKLOG_DEFAULT);
 
 	/* Initialize lua */
-	ret = init_lua(engine);
+	ret = init_lua();
 	if (ret != 0) {
-		engine_deinit(engine);
+		engine_deinit();
 		return ret;
 	}
 
@@ -660,21 +596,21 @@ int engine_init(struct engine *engine, knot_mm_t *pool)
 }
 
 /** Unregister a (found) module */
-static void engine_unload(struct engine *engine, struct kr_module *module)
+static void engine_unload(struct kr_module *module)
 {
 	auto_free char *name = module->name ? strdup(module->name) : NULL;
 	kr_module_unload(module); /* beware: lua/C mix, could be confusing */
 	/* Clear in Lua world, but not for embedded modules ('cache' in particular). */
 	if (name && !kr_module_get_embedded(name)) {
-		lua_pushnil(engine->L);
-		lua_setglobal(engine->L, name);
+		lua_pushnil(the_engine->L);
+		lua_setglobal(the_engine->L, name);
 	}
 	free(module);
 }
 
-void engine_deinit(struct engine *engine)
+void engine_deinit(void)
 {
-	if (!engine || kr_fails_assert(engine->L))
+	if (kr_fails_assert(the_engine->L))
 		return;
 	/* Only close sockets and services; no need to clean up mempool. */
 
@@ -682,28 +618,20 @@ void engine_deinit(struct engine *engine)
 	 * then we can unload modules during which we still want
 	 * e.g. the endpoint kind registry to work (inside ->net),
 	 * and this registry deinitialization uses the lua state. */
-	network_close_force(&engine->net);
-	for (size_t i = 0; i < engine->modules.len; ++i) {
-		engine_unload(engine, engine->modules.at[i]);
+	for (size_t i = 0; i < the_engine->modules.len; ++i) {
+		engine_unload(the_engine->modules.at[i]);
 	}
-	kr_zonecut_deinit(&engine->resolver.root_hints);
-	kr_cache_close(&engine->resolver.cache);
 
-	/* The LRUs are currently malloc-ated and need to be freed. */
-	lru_free(engine->resolver.cache_cookie);
-
-	network_deinit(&engine->net);
-	ffimodule_deinit(engine->L);
-	lua_close(engine->L);
+	ffimodule_deinit(the_engine->L);
+	lua_close(the_engine->L);
 
 	/* Free data structures */
-	array_clear(engine->modules);
-	array_clear(engine->backends);
-	kr_ta_clear(engine->resolver.trust_anchors);
-	trie_free(engine->resolver.trust_anchors);
-	kr_ta_clear(engine->resolver.negative_anchors);
-	trie_free(engine->resolver.negative_anchors);
-	free(engine->hostname);
+	array_clear(the_engine->modules);
+	array_clear(the_engine->backends);
+	free(the_engine->hostname);
+	mp_delete(the_engine->pool.ctx);
+
+	the_engine = NULL;
 }
 
 int engine_pcall(lua_State *L, int argc)
@@ -726,20 +654,20 @@ int engine_cmd(lua_State *L, const char *str, bool raw)
 	return engine_pcall(L, 2);
 }
 
-int engine_load_sandbox(struct engine *engine)
+int engine_load_sandbox(void)
 {
 	/* Init environment */
-	int ret = luaL_dofile(engine->L, LIBDIR "/sandbox.lua");
+	int ret = luaL_dofile(the_engine->L, LIBDIR "/sandbox.lua");
 	if (ret != 0) {
-		kr_log_error(SYSTEM, "error %s\n", lua_tostring(engine->L, -1));
-		lua_pop(engine->L, 1);
+		kr_log_error(SYSTEM, "error %s\n", lua_tostring(the_engine->L, -1));
+		lua_pop(the_engine->L, 1);
 		return kr_error(ENOEXEC);
 	}
-	ret = ffimodule_init(engine->L);
+	ret = ffimodule_init(the_engine->L);
 	return ret;
 }
 
-int engine_loadconf(struct engine *engine, const char *config_path)
+int engine_loadconf(const char *config_path)
 {
 	if (kr_fails_assert(config_path))
 		return kr_error(EINVAL);
@@ -748,28 +676,25 @@ int engine_loadconf(struct engine *engine, const char *config_path)
 	get_workdir(cwd, sizeof(cwd));
 	kr_log_debug(SYSTEM, "loading config '%s' (workdir '%s')\n", config_path, cwd);
 
-	int ret = luaL_dofile(engine->L, config_path);
+	int ret = luaL_dofile(the_engine->L, config_path);
 	if (ret != 0) {
 		kr_log_error(SYSTEM, "error while loading config: "
-			"%s (workdir '%s')\n", lua_tostring(engine->L, -1), cwd);
-		lua_pop(engine->L, 1);
+			"%s (workdir '%s')\n", lua_tostring(the_engine->L, -1), cwd);
+		lua_pop(the_engine->L, 1);
 	}
 	return ret;
 }
 
-int engine_start(struct engine *engine)
+int engine_start(void)
 {
 	/* Clean up stack */
-	lua_settop(engine->L, 0);
+	lua_settop(the_engine->L, 0);
 
 	return kr_ok();
 }
 
-void engine_stop(struct engine *engine)
+void engine_stop(void)
 {
-	if (!engine) {
-		return;
-	}
 	uv_stop(uv_default_loop());
 }
 
@@ -787,14 +712,14 @@ static size_t module_find(module_array_t *mod_list, const char *name)
 	return found;
 }
 
-int engine_register(struct engine *engine, const char *name, const char *precedence, const char* ref)
+int engine_register(const char *name, const char *precedence, const char* ref)
 {
-	if (kr_fails_assert(engine && name))
+	if (kr_fails_assert(name))
 		return kr_error(EINVAL);
 	/* Make sure module is unloaded */
-	(void) engine_unregister(engine, name);
+	(void) engine_unregister(name);
 	/* Find the index of referenced module. */
-	module_array_t *mod_list = &engine->modules;
+	module_array_t *mod_list = &the_engine->modules;
 	size_t ref_pos = mod_list->len;
 	if (precedence && ref) {
 		ref_pos = module_find(mod_list, ref);
@@ -807,13 +732,13 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 	if (!module) {
 		return kr_error(ENOMEM);
 	}
-	module->data = engine; /*< some outside modules may still use this value */
+	module->data = the_engine; /*< some outside modules may still use this value */
 
 	int ret = kr_module_load(module, name, LIBDIR "/kres_modules");
 	if (ret == 0) {
 		/* We have a C module, loaded and init() was called.
 		 * Now we need to prepare the lua side. */
-		lua_State *L = engine->L;
+		lua_State *L = the_engine->L;
 		lua_getglobal(L, "modules_create_table_for_c");
 		lua_pushpointer(L, module);
 		if (lua_isnil(L, -2)) {
@@ -837,7 +762,7 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 
 	} else if (ret == kr_error(ENOENT)) {
 		/* No luck with C module, so try to load and .init() lua module. */
-		ret = ffimodule_register_lua(engine, module, name);
+		ret = ffimodule_register_lua(module, name);
 		if (ret != 0) {
 			kr_log_error(SYSTEM, "failed to load module '%s'\n", name);
 		}
@@ -848,13 +773,13 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 	}
 
 	if (ret != 0) {
-		engine_unload(engine, module);
+		engine_unload(module);
 		return ret;
 	}
 
-	/* Push to the right place in engine->modules */
-	if (array_push(engine->modules, module) < 0) {
-		engine_unload(engine, module);
+	/* Push to the right place in the_engine->modules */
+	if (array_push(the_engine->modules, module) < 0) {
+		engine_unload(module);
 		return kr_error(ENOMEM);
 	}
 	if (precedence) {
@@ -877,12 +802,12 @@ int engine_register(struct engine *engine, const char *name, const char *precede
 	return kr_ok();
 }
 
-int engine_unregister(struct engine *engine, const char *name)
+int engine_unregister(const char *name)
 {
-	module_array_t *mod_list = &engine->modules;
+	module_array_t *mod_list = &the_engine->modules;
 	size_t found = module_find(mod_list, name);
 	if (found < mod_list->len) {
-		engine_unload(engine, mod_list->at[found]);
+		engine_unload(mod_list->at[found]);
 		array_del(*mod_list, found);
 		return kr_ok();
 	}
@@ -890,3 +815,7 @@ int engine_unregister(struct engine *engine, const char *name)
 	return kr_error(ENOENT);
 }
 
+module_array_t *engine_modules(void)
+{
+	return &the_engine->modules;
+}

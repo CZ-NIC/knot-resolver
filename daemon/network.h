@@ -106,8 +106,19 @@ struct network {
 	int tcp_backlog;
 };
 
-void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog);
-void network_deinit(struct network *net);
+/** Pointer to the singleton network state. NULL if not initialized. */
+KR_EXPORT extern struct network *the_network;
+
+/** Initializes the network. */
+void network_init(uv_loop_t *loop, int tcp_backlog);
+
+/** Unregisters endpoints. Should be called before `network_deinit`
+ * and `engine_deinit`. */
+void network_unregister(void);
+
+/** Deinitializes the network. `network_unregister` should be called before
+ * this and before `engine_deinit`. */
+void network_deinit(void);
 
 /** Start listening on addr#port with flags.
  * \note if we did listen on that combination already,
@@ -118,45 +129,45 @@ void network_deinit(struct network *net);
  * \note In XDP mode, addr may be also interface name, so kr_error(ENODEV)
  *       is returned if some nonsense is passed
  */
-int network_listen(struct network *net, const char *addr, uint16_t port,
+int network_listen(const char *addr, uint16_t port,
 		   int16_t nic_queue, endpoint_flags_t flags);
 
 /** Allow the specified address to send the PROXYv2 header.
  * \note the address may be specified with a netmask
  */
-int network_proxy_allow(struct network *net, const char* addr);
+int network_proxy_allow(const char* addr);
 
 /** Reset all addresses allowed to send the PROXYv2 header. No addresses will
  * be allowed to send PROXYv2 headers from the point of calling this function
  * until re-allowed via network_proxy_allow again.
  */
-void network_proxy_reset(struct network *net);
+void network_proxy_reset(void);
 
 /** Start listening on an open file-descriptor.
  * \note flags.sock_type isn't meaningful here.
  * \note ownership of flags.* is taken on success.  TODO: non-success?
  */
-int network_listen_fd(struct network *net, int fd, endpoint_flags_t flags);
+int network_listen_fd(int fd, endpoint_flags_t flags);
 
 /** Stop listening on all endpoints with matching addr#port.
  * port < 0 serves as a wild-card.
  * \return kr_error(ENOENT) if nothing matched. */
-int network_close(struct network *net, const char *addr, int port);
+int network_close(const char *addr, int port);
 
 /** Close all endpoints immediately (no waiting for UV loop). */
-void network_close_force(struct network *net);
+void network_close_force(void);
 
 /** Enforce that all endpoints are registered from now on.
  * This only does anything with struct endpoint::flags.kind != NULL. */
-int network_engage_endpoints(struct network *net);
+int network_engage_endpoints(void);
 
 /** Returns a string representation of the specified endpoint key.
  *
  * The result points into key or is on static storage like for kr_straddr() */
 const char *network_endpoint_key_str(const struct endpoint_key *key);
 
-int network_set_tls_cert(struct network *net, const char *cert);
-int network_set_tls_key(struct network *net, const char *key);
-void network_new_hostname(struct network *net, struct engine *engine);
-int network_set_bpf(struct network *net, int bpf_fd);
-void network_clear_bpf(struct network *net);
+int network_set_tls_cert(const char *cert);
+int network_set_tls_key(const char *key);
+void network_new_hostname(void);
+int network_set_bpf(int bpf_fd);
+void network_clear_bpf(void);

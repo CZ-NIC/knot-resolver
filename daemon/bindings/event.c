@@ -9,7 +9,7 @@
 
 static void event_free(uv_timer_t *timer)
 {
-	lua_State *L = the_worker->engine->L;
+	lua_State *L = the_engine->L;
 	int ref = (intptr_t) timer->data;
 	luaL_unref(L, LUA_REGISTRYINDEX, ref);
 	free(timer);
@@ -17,7 +17,7 @@ static void event_free(uv_timer_t *timer)
 
 static void event_callback(uv_timer_t *timer)
 {
-	lua_State *L = the_worker->engine->L;
+	lua_State *L = the_engine->L;
 
 	/* Retrieve callback and execute */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) timer->data);
@@ -34,7 +34,7 @@ static void event_callback(uv_timer_t *timer)
 
 static void event_fdcallback(uv_poll_t* handle, int status, int events)
 {
-	lua_State *L = the_worker->engine->L;
+	lua_State *L = the_engine->L;
 
 	/* Retrieve callback and execute */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) handle->data);

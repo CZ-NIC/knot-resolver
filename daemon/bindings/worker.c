@@ -13,37 +13,36 @@ static inline double getseconds(uv_timeval_t *tv)
 /** Return worker statistics. */
 static int wrk_stats(lua_State *L)
 {
-	struct worker_ctx *worker = the_worker;
-	if (!worker) {
+	if (kr_fails_assert(the_worker)) {
 		return 0;
 	}
 	lua_newtable(L);
-	lua_pushnumber(L, worker->stats.queries);
+	lua_pushnumber(L, the_worker->stats.queries);
 	lua_setfield(L, -2, "queries");
-	lua_pushnumber(L, worker->stats.concurrent);
+	lua_pushnumber(L, the_worker->stats.concurrent);
 	lua_setfield(L, -2, "concurrent");
-	lua_pushnumber(L, worker->stats.dropped);
+	lua_pushnumber(L, the_worker->stats.dropped);
 	lua_setfield(L, -2, "dropped");
 
-	lua_pushnumber(L, worker->stats.timeout);
+	lua_pushnumber(L, the_worker->stats.timeout);
 	lua_setfield(L, -2, "timeout");
-	lua_pushnumber(L, worker->stats.udp);
+	lua_pushnumber(L, the_worker->stats.udp);
 	lua_setfield(L, -2, "udp");
-	lua_pushnumber(L, worker->stats.tcp);
+	lua_pushnumber(L, the_worker->stats.tcp);
 	lua_setfield(L, -2, "tcp");
-	lua_pushnumber(L, worker->stats.tls);
+	lua_pushnumber(L, the_worker->stats.tls);
 	lua_setfield(L, -2, "tls");
-	lua_pushnumber(L, worker->stats.ipv4);
+	lua_pushnumber(L, the_worker->stats.ipv4);
 	lua_setfield(L, -2, "ipv4");
-	lua_pushnumber(L, worker->stats.ipv6);
+	lua_pushnumber(L, the_worker->stats.ipv6);
 	lua_setfield(L, -2, "ipv6");
-	lua_pushnumber(L, worker->stats.err_udp);
+	lua_pushnumber(L, the_worker->stats.err_udp);
 	lua_setfield(L, -2, "err_udp");
-	lua_pushnumber(L, worker->stats.err_tcp);
+	lua_pushnumber(L, the_worker->stats.err_tcp);
 	lua_setfield(L, -2, "err_tcp");
-	lua_pushnumber(L, worker->stats.err_tls);
+	lua_pushnumber(L, the_worker->stats.err_tls);
 	lua_setfield(L, -2, "err_tls");
-	lua_pushnumber(L, worker->stats.err_http);
+	lua_pushnumber(L, the_worker->stats.err_http);
 	lua_setfield(L, -2, "err_http");
 
 	/* Add subset of rusage that represents counters. */
