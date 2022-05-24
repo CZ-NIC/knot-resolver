@@ -51,6 +51,8 @@ struct __attribute((packed)) kr_sockaddr_un_key {
 	char path[sizeof(((struct sockaddr_un *) NULL)->sun_path)];
 };
 
+extern inline uint64_t kr_rand_bytes(unsigned int size);
+
 /* Logging & debugging */
 bool kr_dbg_assertion_abort = DBG_ASSERTION_ABORT;
 int kr_dbg_assertion_fork = DBG_ASSERTION_FORK;
@@ -519,6 +521,19 @@ int kr_ntop_str(int family, const void *src, uint16_t port, char *buf, size_t *b
 	u16tostr((uint8_t *)&buf[len + 1], port);
 	buf[len_need - 1] = 0;
 	return kr_ok();
+}
+
+char *kr_straddr(const struct sockaddr *addr)
+{
+	if (kr_fails_assert(addr)) return NULL;
+	static char str[KR_STRADDR_MAXLEN + 1] = {0};
+	if (addr->sa_family == AF_UNIX) {
+		strncpy(str, ((struct sockaddr_un *)addr)->sun_path, sizeof(str) - 1);
+		return str;
+	}
+	size_t len = KR_STRADDR_MAXLEN;
+	int ret = kr_inaddr_str(addr, str, &len);
+	return ret != kr_ok() || len == 0 ? NULL : str;
 }
 
 int kr_straddr_family(const char *addr)

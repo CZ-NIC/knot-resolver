@@ -185,7 +185,8 @@ KR_EXPORT
 void kr_rnd_buffered(void *data, unsigned int size);
 
 /** Return a few random bytes. */
-static inline uint64_t kr_rand_bytes(unsigned int size)
+KR_EXPORT inline
+uint64_t kr_rand_bytes(unsigned int size)
 {
 	uint64_t result;
 	if (size <= 0 || size > sizeof(result)) {
@@ -320,22 +321,10 @@ KR_EXPORT
 int kr_ntop_str(int family, const void *src, uint16_t port, char *buf, size_t *buflen);
 
 /** @internal Create string representation addr#port.
- *  @return pointer to static string
+ *  @return pointer to a *static* string, i.e. each call will overwrite it
  */
-static inline char *kr_straddr(const struct sockaddr *addr)
-{
-	if (kr_fails_assert(addr)) return NULL;
-	/* We are the single-threaded application */
-	static char str[KR_STRADDR_MAXLEN + 1] = {0};
-	if (addr->sa_family == AF_UNIX) {
-		strncpy(str, ((struct sockaddr_un *) addr)->sun_path, sizeof(str) - 1);
-		return str;
-	}
-	size_t len = KR_STRADDR_MAXLEN;
-	int ret = kr_inaddr_str(addr, str, &len);
-	return ret != kr_ok() || len == 0 ? NULL : str;
-}
-
+KR_EXPORT
+char *kr_straddr(const struct sockaddr *addr);
 
 /** Return address type for string. */
 KR_EXPORT KR_PURE
