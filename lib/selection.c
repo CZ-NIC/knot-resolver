@@ -440,7 +440,9 @@ struct kr_transport *select_transport(const struct choice choices[], int choices
 	const struct choice *best = select_best(choices, choices_len);
 	const struct choice *chosen;
 
-	const bool explore = choices_len == 0 || kr_rand_coin(EPSILON_NOMIN, EPSILON_DENOM);
+	const bool explore = choices_len == 0 || kr_rand_coin(EPSILON_NOMIN, EPSILON_DENOM)
+		/* We may need to explore to get at least one A record. */
+		|| (no6_is_bad() && best->address.ip.sa_family == AF_INET6);
 	if (explore) {
 		/* "EXPLORE":
 		 * randomly choose some option
