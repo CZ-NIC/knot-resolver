@@ -249,10 +249,29 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 	// Filter valid addresses and names from the tries
 	int choices_len = get_valid_addresses(local_state, choices);
 	int resolvable_len = get_resolvable_names(local_state, resolvable, qry);
+	bool * const force_resolve_p = &qry->server_selection.local_state->force_resolve;
 
-	if (qry->server_selection.local_state->force_resolve && resolvable_len) {
+	// Print some stats into debug logs.
+	if (kr_log_is_debug_qry(SELECTION, qry)) {
+		int v4_choices = 0;
+		for (int i = 0; i < choices_len; ++i)
+			if (choices[i].address.ip.sa_family == AF_INET)
+				++v4_choices;
+		int v4_resolvable = 0;
+		for (int i = 0; i < resolvable_len; ++i)
+			if (resolvable[i].type == KR_TRANSPORT_RESOLVE_A)
+				++v4_resolvable;
+		VERBOSE_MSG(qry, "=> id: '%05u' choosing from addresses: %d v4 + %d v6; "
+			"names to resolve: %d v4 + %d v6; "
+			"force_resolve: %d; NO6: IPv6 is %s\n",
+			qry->id, v4_choices, choices_len - v4_choices,
+			v4_resolvable, resolvable_len - v4_resolvable,
+			(int)*force_resolve_p, no6_is_bad() ? "KO" : "OK");
+	}
+
+	if (*force_resolve_p && resolvable_len) {
 		choices_len = 0;
-		qry->server_selection.local_state->force_resolve = false;
+		*force_resolve_p = false;
 	}
 
 	bool tcp = qry->flags.TCP || qry->server_selection.local_state->truncated;
