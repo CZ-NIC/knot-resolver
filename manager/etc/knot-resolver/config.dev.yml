@@ -8,6 +8,8 @@ network:
   listen:
     - interface: 127.0.0.1@5353
 server:
+  backend: supervisord
+  watchdog: false
   id: dev
   workers: 1
   rundir: etc/knot-resolver/runtime

@@ -15,7 +15,8 @@ serverurl = unix://{{ config.unix_http_server }}
 [rpcinterface:supervisor]
 supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
 
-
+[rpcinterface:notify]
+supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin:make_rpcinterface
 
 
 {% for instance in instances %}
@@ -27,6 +28,7 @@ stdout_logfile={{ instance.logfile }}
 stderr_logfile={{ instance.logfile }}
 directory={{ instance.workdir }}
 command={{ instance.command }}
-environment={{ instance.environment }}
+environment={{ instance.environment }},NOTIFY_SOCKET="@knot-resolver-control-socket"
+startsecs=10
 
 {%- endfor -%}
