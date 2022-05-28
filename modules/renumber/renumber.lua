@@ -3,19 +3,31 @@
 local ffi = require('ffi')
 local prefixes_global = {}
 
+-- get address from config: either subnet prefix or fixed endpoint
+local function extract_address(target)
+	local idx = string.find(target, "!", 0)
+	if idx == nil then 
+		return target, false
+	end
+	if idx ~= #target then error("\"!\" symbol in target is only accepted at the end of address") end
+	return string.sub(target, 1, idx - 1), true
+end
+
 -- Create subnet prefix rule
 local function matchprefix(subnet, addr)
+	local addr, is_exact = extract_address(addr)
 	local target = kres.str2ip(addr)
 	if target == nil then error('[renumber] invalid address: '..addr) end
 	local addrtype = string.find(addr, ':', 1, true) and kres.type.AAAA or kres.type.A
 	local subnet_cd = ffi.new('char[16]')
 	local bitlen = ffi.C.kr_straddr_subnet(subnet_cd, subnet)
 	if bitlen < 0 then error('[renumber] invalid subnet: '..subnet) end
-	return {subnet_cd, bitlen, target, addrtype}
+	return {subnet_cd, bitlen, target, addrtype, is_exact}
 end
 
 -- Create name match rule
 local function matchname(name, addr)
+	local addr, is_exact = ren.extract(addr)
 	local target = kres.str2ip(addr)
 	if target == nil then error('[renumber] invalid address: '..addr) end
 	local owner = todname(name)
@@ -50,7 +62,7 @@ local function renumber_record(tbl, rr)
 		-- If provided, compare record owner to prefix name
 		if match_subnet(prefix[1], prefix[2], prefix[4], rr) then
 			-- Replace part or whole address
-			local to_copy = prefix[2] or (#prefix[3] * 8)
+			local to_copy = prefix[2] and not prefix[5] or (#prefix[3] * 8)
 			local chunks = to_copy / 8
 			local rdlen = #rr.rdata
 			if rdlen < chunks then return rr end -- Address length mismatch
