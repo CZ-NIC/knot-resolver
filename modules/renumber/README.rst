@@ -28,6 +28,10 @@ Example configuration
 			-- Source subnet, destination subnet
 			{'10.10.10.0/24', '192.168.1.0'},
 			-- Remap /16 block to localhost address range
-			{'166.66.0.0/16', '127.0.0.0'}
+			{'166.66.0.0/16', '127.0.0.0'},
+			-- Remap a /32 block to a single address
+			{'2001:db8::/32', '::1!'},
 		}
 	}
+
+.. TODO: renumber.name() hangs in vacuum, kind of.  No occurrences in code or docs, and probably bad UX.
