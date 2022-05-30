@@ -596,6 +596,7 @@ int kr_straddr_subnet(void *dst, const char *addr)
 	int family = kr_straddr_family(addr);
 	if (family != AF_INET && family != AF_INET6)
 		return kr_error(EINVAL);
+	const int max_len = (family == AF_INET6) ? 128 : 32;
 	auto_free char *addr_str = strdup(addr);
 	char *subnet = strchr(addr_str, '/');
 	if (subnet) {
@@ -603,13 +604,12 @@ int kr_straddr_subnet(void *dst, const char *addr)
 		subnet += 1;
 		bit_len = strtol(subnet, NULL, 10);
 		/* Check client subnet length */
-		const int max_len = (family == AF_INET6) ? 128 : 32;
 		if (bit_len < 0 || bit_len > max_len) {
 			return kr_error(ERANGE);
 		}
 	} else {
 		/* No subnet, use maximal subnet length. */
-		bit_len = (family == AF_INET6) ? 128 : 32;
+		bit_len = max_len;
 	}
 	/* Parse address */
 	int ret = inet_pton(family, addr_str, dst);
