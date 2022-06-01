@@ -33,6 +33,13 @@ local function prepare_cache()
 			}),
 		nil, ffi.C.KR_RANK_SECURE + ffi.C.KR_RANK_AUTH))
 	assert(c:insert(
+		gen_rrset('a10-3plus4.test.',
+			kres.type.A, {
+				kres.str2ip('10.3.0.1'),
+				kres.str2ip('10.4.0.1')
+			}),
+		nil, ffi.C.KR_RANK_SECURE + ffi.C.KR_RANK_AUTH))
+	assert(c:insert(
 		gen_rrset('a166-66.test.',
 			kres.type.A, kres.str2ip('166.66.42.123')),
 		nil, ffi.C.KR_RANK_SECURE + ffi.C.KR_RANK_AUTH))
@@ -56,6 +63,8 @@ local function test_renumber()
 		'a10-2.test.', kres.type.A, kres.rcode.NOERROR, '192.168.2.1')
 	check_answer('mix of known and unknown IPv4 ranges is remapped correctly',
 		'a10-0plus2.test.', kres.type.A, kres.rcode.NOERROR, {'192.168.2.1', '10.0.0.1'})
+	check_answer('mix of known and unknown IPv4 ranges is remapped correctly to exact address',
+		'a10-3plus4.test.', kres.type.A, kres.rcode.NOERROR, {'10.3.0.1', '192.168.3.10'})
 	check_answer('known IPv4 range is remapped when matching second-defined rule',
 		'a166-66.test.', kres.type.A, kres.rcode.NOERROR, '127.0.42.123')
 
@@ -78,6 +87,7 @@ modules.load('renumber < cache')
 renumber.config({
 	-- Source subnet, destination subnet
 	{'10.2.0.0/24', '192.168.2.0'},
+	{'10.4.0.0/24', '192.168.3.10!'},
 	{'166.66.0.0/16', '127.0.0.0'},
 	{'2001:db8:1::/48', '2001:db8:2::'},
 })
