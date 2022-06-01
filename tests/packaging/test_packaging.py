@@ -150,15 +150,33 @@ class DockerImages(ABC):
 
         dockerf.close()
 
+    def build_printing_errors(self, path, dockerfile, network_mode, tag, rm):
+        try:
+            return client.images.build(path=path, dockerfile=dockerfile,
+                                       network_mode=network_mode, tag=tag, rm=rm)
+        except docker.errors.BuildError as e:
+            iterable = iter(e.build_log)
+            while True:
+                try:
+                    item = next(iterable)
+                    if item['stream']:
+                        for l in item['stream'].splitlines():
+                            stripped = l.strip()
+                            if stripped:
+                                logging.error(stripped)
+                except StopIteration:
+                    break
+            raise e
+
     def build(self, tmpdir, tag="", from_image=None):
         self.__genDockerFile(tmpdir, from_image=from_image)
 
         logger.debug('tmpdir={}'.format(tmpdir))
         logger.debug('datadir={}'.format(pytest.KR_ROOT_DIR))
         logger.debug('tag={}'.format(tag))
-        image = client.images.build(path=str(pytest.KR_ROOT_DIR),
-                                    dockerfile=os.path.join(tmpdir, 'Dockerfile-build'),
-                                    network_mode='host', tag=tag, rm=True)
+        image = self.build_printing_errors(path=str(pytest.KR_ROOT_DIR),
+                                           dockerfile=os.path.join(tmpdir, 'Dockerfile-build'),
+                                           network_mode='host', tag=tag, rm=True)
         logger.info('"Build image" ID={} created'.format(image[0].short_id))
         self.build_id = image[0].short_id
         return self.build_id
@@ -169,9 +187,9 @@ class DockerImages(ABC):
         logger.debug('tmpdir={}'.format(tmpdir))
         logger.debug('datadir={}'.format(tmpdir))
         logger.debug('tag={}'.format(tag))
-        image = client.images.build(path=str(tmpdir),
-                                    dockerfile=os.path.join(tmpdir, 'Dockerfile-run'),
-                                    network_mode='host', tag=tag, rm=True)
+        image = self.build_printing_errors(path=str(tmpdir),
+                                           dockerfile=os.path.join(tmpdir, 'Dockerfile-run'),
+                                           network_mode='host', tag=tag, rm=True)
         logger.info('"Run image" ID={} created'.format(image[0].short_id))
         self.run_id = image[0].short_id
         return self.run_id
