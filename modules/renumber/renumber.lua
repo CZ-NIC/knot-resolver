@@ -62,21 +62,27 @@ local addr_buf = ffi.new('char[16]')
 local function renumber_record(tbl, rr)
 	for i = 1, #tbl do
 		local prefix = tbl[i]
+		local subnet = prefix[1]
+		local bitlen = prefix[2]
+		local target = prefix[3]
+		local addrtype = prefix[4]
+		local is_exact = prefix[5]
+
 		-- Match record type to address family and record address to given subnet
 		-- If provided, compare record owner to prefix name
-		if match_subnet(prefix[1], prefix[2], prefix[4], rr) then
+		if match_subnet(subnet, bitlen, addrtype, rr) then
 			-- Replace part or whole address
 			local to_copy
-			if prefix[2] and not prefix[5] then
-				to_copy = prefix[2]
+			if bitlen and not is_exact then
+				to_copy = bitlen
 			else
-				to_copy = #prefix[3] * 8
+				to_copy = #target * 8
 			end
 			local chunks = to_copy / 8
 			local rdlen = #rr.rdata
 			if rdlen < chunks then return rr end -- Address length mismatch
 			ffi.copy(addr_buf, rr.rdata, rdlen)
-			ffi.copy(addr_buf, prefix[3], chunks) -- Rewrite prefix
+			ffi.copy(addr_buf, target, chunks) -- Rewrite prefix
 			rr.rdata = ffi.string(addr_buf, rdlen)
 			return rr
 		end
