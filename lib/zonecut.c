@@ -87,7 +87,7 @@ void kr_zonecut_deinit(struct kr_zonecut *cut)
 
 void kr_zonecut_move(struct kr_zonecut *to, const struct kr_zonecut *from)
 {
-	if (!to || !from) abort();
+	kr_require(to && from);
 	kr_zonecut_deinit(to);
 	memcpy(to, from, sizeof(*to));
 }
@@ -322,7 +322,7 @@ static addrset_info_t fetch_addr(pack_t *addrs, const knot_dname_t *ns, uint16_t
 		- cached_rr.rrs.count * offsetof(knot_rdata_t, len);
 	int ret = pack_reserve_mm(*addrs, cached_rr.rrs.count, pack_extra_size,
 				  kr_memreserve, mm_pool);
-	if (ret) abort(); /* ENOMEM "probably" */
+	kr_require(ret == 0); /* ENOMEM "probably" */
 
 	int usable_cnt = 0;
 	addrset_info_t result = AI_EMPTY;

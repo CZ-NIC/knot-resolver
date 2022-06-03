@@ -28,7 +28,7 @@ inline static unsigned char chars_mask(const unsigned char a, const unsigned cha
 inline static void kr_qflags_mod(struct kr_qflags *fl1, struct kr_qflags fl2,
 			unsigned char mod(const unsigned char a, const unsigned char b))
 {
-	if (!fl1) abort();
+	kr_require(fl1);
 	union {
 		struct kr_qflags flags;
 		/* C99 section 6.5.3.4: sizeof(char) == 1 */
