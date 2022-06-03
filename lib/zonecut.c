@@ -7,7 +7,6 @@
 #include "contrib/cleanup.h"
 #include "lib/defines.h"
 #include "lib/generic/pack.h"
-#include "lib/layer.h"
 #include "lib/resolve.h"
 #include "lib/rplan.h"
 

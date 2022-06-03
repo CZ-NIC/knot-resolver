@@ -6,7 +6,6 @@
 
 #include "lib/defines.h"
 #include "daemon/session.h"
-#include "daemon/engine.h"
 #include "daemon/tls.h"
 #include "daemon/http.h"
 #include "daemon/worker.h"

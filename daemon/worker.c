@@ -32,7 +32,6 @@
 #include "daemon/tls.h"
 #include "daemon/http.h"
 #include "daemon/udp_queue.h"
-#include "daemon/zimport.h"
 #include "lib/layer.h"
 #include "lib/utils.h"
 

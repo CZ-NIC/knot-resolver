@@ -7,9 +7,6 @@
 
 #include "lib/rplan.h"
 #include "lib/resolve.h"
-#include "lib/cache/api.h"
-#include "lib/defines.h"
-#include "lib/layer.h"
 
 #define VERBOSE_MSG(qry, ...) kr_log_q(qry, PLAN,  __VA_ARGS__)
 

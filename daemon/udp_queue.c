@@ -5,7 +5,6 @@
 #include "kresconfig.h"
 #include "daemon/udp_queue.h"
 
-#include "daemon/session.h"
 #include "daemon/worker.h"
 #include "lib/generic/array.h"
 #include "lib/utils.h"
