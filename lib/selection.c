@@ -3,14 +3,9 @@
 #include "lib/selection.h"
 #include "lib/selection_forward.h"
 #include "lib/selection_iter.h"
-#include "lib/generic/pack.h"
-#include "lib/generic/trie.h"
 #include "lib/rplan.h"
 #include "lib/cache/api.h"
 #include "lib/resolve.h"
-
-#include "daemon/worker.h"
-#include "daemon/tls.h"
 
 #include "lib/utils.h"
 

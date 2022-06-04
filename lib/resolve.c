@@ -11,7 +11,6 @@
 #include <libknot/descriptor.h>
 #include <ucw/mempool.h>
 #include <sys/socket.h>
-#include "kresconfig.h"
 #include "lib/resolve.h"
 #include "lib/layer.h"
 #include "lib/rplan.h"

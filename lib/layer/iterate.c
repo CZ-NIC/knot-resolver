@@ -23,7 +23,6 @@
 #include <libknot/rrtype/rdname.h>
 #include <libknot/rrtype/rrsig.h>
 
-#include "kresconfig.h"
 #include "lib/layer/iterate.h"
 #include "lib/resolve.h"
 #include "lib/rplan.h"

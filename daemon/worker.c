@@ -32,7 +32,6 @@
 #include "daemon/tls.h"
 #include "daemon/http.h"
 #include "daemon/udp_queue.h"
-#include "daemon/zimport.h"
 #include "lib/layer.h"
 #include "lib/utils.h"
 
@@ -724,7 +723,7 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 	if (kr_fails_assert(handle && handle->data == session))
 		return qr_task_on_send(task, NULL, kr_error(EINVAL));
 	const bool is_stream = handle->type == UV_TCP;
-	if (!is_stream && handle->type != UV_UDP) abort();
+	kr_require(is_stream || handle->type == UV_UDP);
 
 	if (addr == NULL)
 		addr = session_get_peer(session);

@@ -19,7 +19,6 @@
 
 #include "contrib/ucw/lib.h"
 #include "contrib/base64.h"
-#include "daemon/io.h"
 #include "daemon/tls.h"
 #include "daemon/worker.h"
 #include "daemon/session.h"

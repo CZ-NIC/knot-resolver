@@ -4,14 +4,12 @@
 
 #include "lib/utils.h"
 
-#include "contrib/ccan/asprintf/asprintf.h"
 #include "contrib/cleanup.h"
 #include "contrib/ucw/mempool.h"
 #include "kresconfig.h"
 #include "lib/defines.h"
 #include "lib/generic/array.h"
 #include "lib/module.h"
-#include "lib/selection.h"
 #include "lib/resolve.h"
 
 #include <libknot/descriptor.h>
