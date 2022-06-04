@@ -143,12 +143,14 @@ ubuntu-21.10:pkgbuild:
 nixos-unstable:pkgbuild:
   <<: *pkgbuild
   # We do NOT use LXC, for now at least.
+  parallel:
+    matrix:
+      - PLATFORM: [ amd64, arm64 ]
   tags:
     - docker
     - linux
-    - amd64
-  # TODO: untag after resolving problems around https://github.com/NixOS/nix/issues/5776
-  image: nixos/nix:2.3.12
+    - ${PLATFORM}
+  image: nixos/nix
 
   variables:
     #NIX_PATH: nixpkgs=https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz
