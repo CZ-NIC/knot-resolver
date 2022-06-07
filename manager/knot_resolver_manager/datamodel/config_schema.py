@@ -19,6 +19,7 @@ from knot_resolver_manager.datamodel.network_schema import NetworkSchema
 from knot_resolver_manager.datamodel.options_schema import OptionsSchema
 from knot_resolver_manager.datamodel.policy_schema import PolicySchema
 from knot_resolver_manager.datamodel.rpz_schema import RPZSchema
+from knot_resolver_manager.datamodel.slice_schema import SliceSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
 from knot_resolver_manager.datamodel.supervisor_schema import SupervisorSchema
@@ -97,6 +98,7 @@ class KresConfig(SchemaNode):
         network: Network connections and protocols configuration.
         static_hints: Static hints for forward records (A/AAAA) and reverse records (PTR)
         views: List of views and its configuration.
+        slices: Split the entire DNS namespace into distinct slices.
         policy: List of policy rules and its configuration.
         rpz: List of Response Policy Zones and its configuration.
         stub_zones: List of Stub Zones and its configuration.
@@ -121,6 +123,7 @@ class KresConfig(SchemaNode):
         network: NetworkSchema = NetworkSchema()
         static_hints: StaticHintsSchema = StaticHintsSchema()
         views: Optional[Dict[str, ViewSchema]] = None
+        slices: Optional[Dict[str, SliceSchema]] = None
         policy: Optional[Dict[str, PolicySchema]] = None
         rpz: Optional[Dict[str, RPZSchema]] = None
         stub_zones: Optional[Dict[DomainName, StubZoneSchema]] = None
@@ -146,6 +149,7 @@ class KresConfig(SchemaNode):
     network: NetworkSchema
     static_hints: StaticHintsSchema
     views: Optional[Dict[str, ViewSchema]]
+    slices: Optional[Dict[str, SliceSchema]]
     policy: Optional[Dict[str, PolicySchema]]
     rpz: Optional[Dict[str, RPZSchema]]
     stub_zones: Optional[Dict[DomainName, StubZoneSchema]]
