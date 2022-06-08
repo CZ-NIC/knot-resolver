@@ -9,51 +9,54 @@ modules.load('nsid')
 nsid.name('{{ cfg.nsid }}_' .. worker.id)
 {% endif %}
 
--- LOGGING section
+-- LOGGING section ----------------------------------
 {% include "logging.lua.j2" %}
 
--- SUPERVISOR section
+-- SUPERVISOR section -------------------------------
 {% include "supervisor.lua.j2" %}
 
--- WEBMGMT section
+-- WEBMGMT section ----------------------------------
 {% include "webmgmt.lua.j2" %}
 
--- OPTIONS section
+-- OPTIONS section ----------------------------------
 {% include "options.lua.j2" %}
 
--- NETWORK section
+-- NETWORK section ----------------------------------
 {% include "network.lua.j2" %}
 
--- STATIC-HINTS section
+-- STATIC-HINTS section -----------------------------
 {% include "static_hints.lua.j2" %}
 
--- VIEWS section
+-- VIEWS section ------------------------------------
 {% include "views.lua.j2" %}
 
--- POLICY section
+-- SLICES section -----------------------------------
+{% include "slices.lua.j2" %}
+
+-- POLICY section -----------------------------------
 {% include "policy.lua.j2" %}
 
--- RPZ section
+-- RPZ section --------------------------------------
 {% include "rpz.lua.j2" %}
 
--- STUB-ZONES section
+-- STUB-ZONES section -------------------------------
 {% include "stub_zones.lua.j2" %}
 
--- FORWARD-ZONES section
+-- FORWARD-ZONES section ----------------------------
 {% include "forward_zones.lua.j2" %}
 
--- CACHE section
+-- CACHE section ------------------------------------
 {% include "cache.lua.j2" %}
 
--- DNSSEC section
+-- DNSSEC section -----------------------------------
 {% include "dnssec.lua.j2" %}
 
--- DNS64 section
+-- DNS64 section ------------------------------------
 {% include "dns64.lua.j2" %}
 
 {% endif %}
 
--- LUA section
+-- LUA section --------------------------------------
 -- Custom Lua code cannot be validated
 
 {% if cfg.lua.script_file %}
