@@ -32,7 +32,6 @@ local function mergeIps(ipNet, ipHost, intMask)
 	for currentOctetNo = 1, #ipNet do
 		if intMask >= 8 then
 			result = result .. ipNet:sub(currentOctetNo,currentOctetNo)
-			intMask = intMask - 8
 		elseif (intMask <= 0) then
 			result = result .. ipHost:sub(currentOctetNo,currentOctetNo)
 		else
@@ -42,6 +41,7 @@ local function mergeIps(ipNet, ipHost, intMask)
 					bit.band(string.byte(ipHost:sub(currentOctetNo,currentOctetNo)), bit.bnot(octetMask))
 			))
 		end
+		intMask = intMask - 8
 	end
 
 	return result
