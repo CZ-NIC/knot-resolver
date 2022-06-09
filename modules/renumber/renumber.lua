@@ -15,6 +15,38 @@ local function extract_address(target)
 	return string.sub(target, 1, idx - 1), true
 end
 
+-- Create bitmask from integer mask for single octet: 2 -> 11000000
+local function getOctetBitmask(intMask)
+	return bit.lshift(bit.rshift(255, 8 - intMask), 8 - intMask)
+end
+
+-- Merge ipNet with ipHost, using intMask
+local function mergeIps(ipNet, ipHost, intMask)
+	local octetMask
+	local result = ""
+
+	if (#ipNet ~= #ipHost) then
+		return nil
+	end
+
+	for currentOctetNo = 1, #ipNet do
+		if intMask >= 8 then
+			result = result .. ipNet:sub(currentOctetNo,currentOctetNo)
+		elseif (intMask <= 0) then
+			result = result .. ipHost:sub(currentOctetNo,currentOctetNo)
+		else
+			octetMask = getOctetBitmask(intMask)
+			result = result .. string.char(bit.bor(
+					bit.band(string.byte(ipNet:sub(currentOctetNo,currentOctetNo)), octetMask),
+					bit.band(string.byte(ipHost:sub(currentOctetNo,currentOctetNo)), bit.bnot(octetMask))
+			))
+		end
+		intMask = intMask - 8
+	end
+
+	return result
+end
+
 -- Create subnet prefix rule
 local function matchprefix(subnet, addr)
 	local is_exact
@@ -43,10 +75,6 @@ end
 -- Add subnet prefix rewrite rule
 local function add_prefix(subnet, addr)
 	local prefix = matchprefix(subnet, addr)
-	local bitlen = prefix[2]
-	if bitlen ~= nil and bitlen % 8 ~= 0 then
-		log_warn(ffi.C.LOG_GRP_RENUMBER, 'network mask: only /8, /16, /24 etc. are supported (entire octets are rewritten)')
-	end
 	table.insert(prefixes_global, prefix)
 end
 
@@ -58,7 +86,6 @@ local function match_subnet(subnet, bitlen, addrtype, rr)
 end
 
 -- Renumber address record
-local addr_buf = ffi.new('char[16]')
 local function renumber_record(tbl, rr)
 	for i = 1, #tbl do
 		local prefix = tbl[i]
@@ -71,19 +98,13 @@ local function renumber_record(tbl, rr)
 		-- Match record type to address family and record address to given subnet
 		-- If provided, compare record owner to prefix name
 		if match_subnet(subnet, bitlen, addrtype, rr) then
-			-- Replace part or whole address
-			local to_copy
-			if bitlen and not is_exact then
-				to_copy = bitlen
+			if is_exact then
+				rr.rdata = target
 			else
-				to_copy = #target * 8
+				local mergedHost = mergeIps(target, rr.rdata, bitlen)
+				if mergedHost ~= nil then rr.rdata = mergedHost end
 			end
-			local chunks = to_copy / 8
-			local rdlen = #rr.rdata
-			if rdlen < chunks then return rr end -- Address length mismatch
-			ffi.copy(addr_buf, rr.rdata, rdlen)
-			ffi.copy(addr_buf, target, chunks) -- Rewrite prefix
-			rr.rdata = ffi.string(addr_buf, rdlen)
+
 			return rr
 		end
 	end
