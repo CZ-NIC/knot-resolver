@@ -76,7 +76,7 @@ static struct {
 	uint8_t addr_prefixes[NO6_PREFIX_COUNT][NO6_PREFIX_BYTES];
 } no6_est = { .len_used = 0 };
 
-static inline bool no6_is_bad(void)
+bool no6_is_bad(void)
 {
 	return no6_est.len_used == NO6_PREFIX_COUNT;
 }
@@ -440,7 +440,9 @@ struct kr_transport *select_transport(const struct choice choices[], int choices
 	const struct choice *best = select_best(choices, choices_len);
 	const struct choice *chosen;
 
-	const bool explore = choices_len == 0 || kr_rand_coin(EPSILON_NOMIN, EPSILON_DENOM);
+	const bool explore = choices_len == 0 || kr_rand_coin(EPSILON_NOMIN, EPSILON_DENOM)
+		/* We may need to explore to get at least one A record. */
+		|| (no6_is_bad() && best->address.ip.sa_family == AF_INET6);
 	if (explore) {
 		/* "EXPLORE":
 		 * randomly choose some option
@@ -457,8 +459,6 @@ struct kr_transport *select_transport(const struct choice choices[], int choices
 		/* "EXPLOIT":
 		 * choose a resolved address which seems best right now. */
 		chosen = best;
-		if (no6_is_bad())
-			VERBOSE_MSG(NULL, "NO6: is KO [exploit]\n");
 	}
 
 	/* Don't try the same server again when there are other choices to be explored */

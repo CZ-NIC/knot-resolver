@@ -6,6 +6,7 @@ Improvements
 - daemon/tls: disable TLS resumption via tickets for TLS <= 1.2 (#742, !1295)
 - daemon/http: DoH now responds with proper HTTP codes (#728, !1279)
 - renumber module: allow rewriting subnet to a single IP (!1302)
+- nameserver selection algorithm: improve IPv6 avoidance if broken (!1298)
 
 Bugfixes
 --------
