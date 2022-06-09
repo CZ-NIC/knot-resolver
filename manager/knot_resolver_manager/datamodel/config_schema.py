@@ -10,7 +10,7 @@ from typing_extensions import Literal
 from knot_resolver_manager.datamodel.cache_schema import CacheSchema
 from knot_resolver_manager.datamodel.dns64_schema import Dns64Schema
 from knot_resolver_manager.datamodel.dnssec_schema import DnssecSchema
-from knot_resolver_manager.datamodel.forward_zone import ForwardZoneSchema
+from knot_resolver_manager.datamodel.forward_zone_schema import ForwardZoneSchema
 from knot_resolver_manager.datamodel.logging_config import LoggingSchema
 from knot_resolver_manager.datamodel.lua_schema import LuaSchema
 from knot_resolver_manager.datamodel.management_schema import ManagementSchema

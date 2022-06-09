@@ -1,5 +1,5 @@
 from knot_resolver_manager.datamodel.config_schema import template_from_str
-from knot_resolver_manager.datamodel.forward_zone import ForwardServerSchema
+from knot_resolver_manager.datamodel.forward_zone_schema import ForwardServerSchema
 
 
 def test_string_table():

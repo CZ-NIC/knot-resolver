@@ -70,20 +70,13 @@ class PolicySchema(SchemaNode):
     mirror: Optional[List[IPAddressOptionalPort]] = None
 
     def _validate(self) -> None:
-        # checking for missing fields
-        if self.action == "reroute" and not self.reroute:
-            raise ValueError("missing mandatory field 'reroute' for 'reroute' action")
-        if self.action == "answer" and not self.answer:
-            raise ValueError("missing mandatory field 'answer' for 'answer' action")
-        if self.action == "mirror" and not self.mirror:
-            raise ValueError("missing mandatory field 'mirror' for 'mirror' action")
+        # checking for missing mandatory fields for actions
+        mandatory_fields = ["reroute", "answer", "mirror"]
+        if self.action in mandatory_fields and not getattr(self, self.action):
+            raise ValueError(f"missing mandatory field '{self.action}' for '{self.action}' action")
 
         # checking for unnecessary fields
-        if self.message and not self.action == "deny":
-            raise ValueError("'message' field can only be defined for 'deny' action")
-        if self.reroute and not self.action == "reroute":
-            raise ValueError("'answer' field can only be defined for 'answer' action")
-        if self.answer and not self.action == "answer":
-            raise ValueError("'answer' field can only be defined for 'answer' action")
-        if self.mirror and not self.action == "mirror":
-            raise ValueError("'mirror' field can only be defined for 'mirror' action")
+        for action in ["deny"] + mandatory_fields:
+            field = {"deny": "message"}.get(action, action)
+            if getattr(self, field) and not self.action == action:
+                raise ValueError(f"'{field}' field can only be defined for '{self.action}' action")
