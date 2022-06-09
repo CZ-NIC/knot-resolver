@@ -44,6 +44,10 @@ local function prepare_cache()
 			kres.type.A, kres.str2ip('166.66.42.123')),
 		nil, ffi.C.KR_RANK_SECURE + ffi.C.KR_RANK_AUTH))
 	assert(c:insert(
+		gen_rrset('a167-81.test.',
+			kres.type.A, kres.str2ip('167.81.254.221')),
+		nil, ffi.C.KR_RANK_SECURE + ffi.C.KR_RANK_AUTH))
+	assert(c:insert(
 		gen_rrset('aaaa-db8-1.test.',
 			kres.type.AAAA, {
 				kres.str2ip('2001:db8:1::1'),
@@ -67,7 +71,8 @@ local function test_renumber()
 		'a10-3plus4.test.', kres.type.A, kres.rcode.NOERROR, {'10.3.0.1', '192.168.3.10'})
 	check_answer('known IPv4 range is remapped when matching second-defined rule',
 		'a166-66.test.', kres.type.A, kres.rcode.NOERROR, '127.0.42.123')
-
+	check_answer('known IPv4 range is remapped when matching a rule with netmask not on a byte boundary',
+		'a167-81.test.', kres.type.A, kres.rcode.NOERROR, {'127.0.30.221'})
 
 	check_answer('two AAAA records',
 		'aaaa-db8-1.test.', kres.type.AAAA, kres.rcode.NOERROR,
@@ -89,6 +94,7 @@ renumber.config({
 	{'10.2.0.0/24', '192.168.2.0'},
 	{'10.4.0.0/24', '192.168.3.10!'},
 	{'166.66.0.0/16', '127.0.0.0'},
+	{'167.81.255.0/19', '127.0.0.0'},
 	{'2001:db8:1::/48', '2001:db8:2::'},
 })
 
