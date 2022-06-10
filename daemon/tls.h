@@ -95,7 +95,6 @@ void tls_client_params_free(tls_client_params_t *params);
 
 
 struct worker_ctx;
-struct qr_task;
 struct network;
 struct engine;
 

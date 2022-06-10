@@ -140,6 +140,8 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_server_selection
 	kr_log_level_t
 	enum kr_log_group
+	# lib/weakptr.h
+	typedef weakptr_t
 EOF
 
 # static variables; these lines might not be simple to generate
@@ -287,6 +289,7 @@ EOF
 ## kresd itself: worker stuff
 
 ${CDEFS} ${KRESD} types <<-EOF
+	typedef qr_task_weakptr_t
 	endpoint_flags_t
 	# struct args is a bit complex
 	addr_array_t
@@ -302,12 +305,10 @@ echo "struct endpoint"    | ${CDEFS} ${KRESD} types | sed 's/uv_handle_t \*/void
 echo "struct request_ctx" | ${CDEFS} ${KRESD} types | sed '/struct {/,$ d'
 printf "\t/* beware: hidden stub, to avoid hardcoding sockaddr lengths */\n};\n"
 
-echo "struct qr_task" | ${CDEFS} ${KRESD} types | sed '/pktbuf/,$ d'
-printf "\t/* beware: hidden stub, to avoid qr_tasklist_t */\n};\n"
-
 
 ${CDEFS} ${KRESD} functions <<-EOF
 	worker_resolve_exec
+	worker_task_request
 	worker_resolve_mk_pkt
 	worker_resolve_start
 	zi_zone_import

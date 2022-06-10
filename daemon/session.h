@@ -9,8 +9,9 @@
 #include <stdbool.h>
 #include <uv.h>
 #include "lib/defines.h"
+#include "lib/weakptr.h"
 
-struct qr_task;
+typedef weakptr_t qr_task_weakptr_t;
 struct worker_ctx;
 struct session;
 struct io_comm_data;
@@ -45,15 +46,15 @@ int session_stop_read(struct session *session);
 
 /** List of tasks been waiting for IO. */
 /** Check if list is empty. */
-bool session_waitinglist_is_empty(const struct session *session);
+bool session_waitinglist_is_empty(struct session *session);
 /** Add task to the end of the list. */
-int session_waitinglist_push(struct session *session, struct qr_task *task);
+int session_waitinglist_push(struct session *session, qr_task_weakptr_t taskptr);
 /** Get the first element. */
-struct qr_task *session_waitinglist_get(const struct session *session);
+qr_task_weakptr_t session_waitinglist_get(struct session *session);
 /** Get the first element and remove it from the list. */
-struct qr_task *session_waitinglist_pop(struct session *session, bool deref);
+qr_task_weakptr_t session_waitinglist_pop(struct session *session);
 /** Get the list length. */
-size_t session_waitinglist_get_len(const struct session *session);
+size_t session_waitinglist_get_len(struct session *session);
 /** Retry resolution for each task in the list. */
 void session_waitinglist_retry(struct session *session, bool increase_timeout_cnt);
 /** Finalize all tasks in the list. */
@@ -68,21 +69,21 @@ struct proxy_result *session_proxy_get(struct session *session);
 
 /** List of tasks associated with session. */
 /** Check if list is empty. */
-bool session_tasklist_is_empty(const struct session *session);
+bool session_tasklist_is_empty(struct session *session);
 /** Get the first element. */
-struct qr_task *session_tasklist_get_first(struct session *session);
+qr_task_weakptr_t session_tasklist_get_first(struct session *session);
 /** Get the first element and remove it from the list. */
-struct qr_task *session_tasklist_del_first(struct session *session, bool deref);
+qr_task_weakptr_t session_tasklist_del_first(struct session *session);
 /** Get the list length. */
-size_t session_tasklist_get_len(const struct session *session);
+size_t session_tasklist_get_len(struct session *session);
 /** Add task to the list. */
-int session_tasklist_add(struct session *session, struct qr_task *task);
+int session_tasklist_add(struct session *session, qr_task_weakptr_t taskptr);
 /** Remove task from the list. */
-int session_tasklist_del(struct session *session, struct qr_task *task);
+int session_tasklist_del(struct session *session, qr_task_weakptr_t taskptr);
 /** Remove task with given msg_id, session_flags(session)->outgoing must be true. */
-struct qr_task* session_tasklist_del_msgid(const struct session *session, uint16_t msg_id);
+qr_task_weakptr_t session_tasklist_del_msgid(const struct session *session, uint16_t msg_id);
 /** Find task with given msg_id */
-struct qr_task* session_tasklist_find_msgid(const struct session *session, uint16_t msg_id);
+qr_task_weakptr_t session_tasklist_find_msgid(const struct session *session, uint16_t msg_id);
 /** Finalize all tasks in the list. */
 void session_tasklist_finalize(struct session *session, int status);
 /** Finalize all expired tasks in the list. */
@@ -90,7 +91,7 @@ int session_tasklist_finalize_expired(struct session *session);
 
 /** Both of task lists (associated & waiting). */
 /** Check if empty. */
-bool session_is_empty(const struct session *session);
+bool session_is_empty(struct session *session);
 /** Get pointer to session flags */
 struct session_flags *session_flags(struct session *session);
 /** Get pointer to peer address. */
@@ -155,7 +156,7 @@ void session_unpoison(struct session *session);
 knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm);
 int session_discard_packet(struct session *session, const knot_pkt_t *pkt);
 
-void session_kill_ioreq(struct session *session, struct qr_task *task);
+void session_kill_ioreq(struct session *session, qr_task_weakptr_t taskptr);
 /** Update timestamp */
 void session_touch(struct session *session);
 /** Returns either creation time or time of last IO activity if any occurs. */

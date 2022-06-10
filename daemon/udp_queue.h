@@ -5,12 +5,14 @@
 #pragma once
 
 #include <uv.h>
+#include "lib/weakptr.h"
+
 struct kr_request;
-struct qr_task;
+typedef weakptr_t qr_task_weakptr_t;
 
 /** Initialize the global state for udp_queue. */
 int udp_queue_init_global(uv_loop_t *loop);
 
 /** Send req->answer via UDP, possibly not immediately. */
-void udp_queue_push(int fd, struct kr_request *req, struct qr_task *task);
+void udp_queue_push(int fd, struct kr_request *req, qr_task_weakptr_t task);
 

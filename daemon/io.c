@@ -302,9 +302,8 @@ void tcp_timeout_trigger(uv_timer_t *timer)
 		/* Normally it should not happen,
 		 * but better to check if there anything in this list. */
 		while (!session_waitinglist_is_empty(s)) {
-			struct qr_task *t = session_waitinglist_pop(s, false);
+			qr_task_weakptr_t t = session_waitinglist_pop(s);
 			worker_task_finalize(t, KR_STATE_FAIL);
-			worker_task_unref(t);
 			the_worker->stats.timeout += 1;
 			if (session_flags(s)->closing) {
 				return;

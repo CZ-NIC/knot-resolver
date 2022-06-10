@@ -24,7 +24,6 @@
 	#include <libknot/xdp/xdp.h>
 #endif
 
-#include "daemon/bindings/api.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
 #include "daemon/proxyv2.h"
@@ -58,7 +57,7 @@ struct request_ctx
 {
 	struct kr_request req;
 
-	struct qr_task *task;
+	qr_task_weakptr_t taskptr;
 	struct {
 		/** NULL if the request didn't come over network. */
 		struct session *session;
@@ -84,7 +83,7 @@ struct qr_task
 	uint16_t pending_count;
 	uint16_t timeouts;
 	uint16_t iter_count;
-	uint32_t refs;
+	qr_task_weakptr_t weakptr; /**< Weak pointer to self. */
 	bool finished : 1;
 	bool leading  : 1;
 	uint64_t creation_time;
@@ -94,18 +93,10 @@ struct qr_task
 };
 
 
-/* Convenience macros */
-#define qr_task_ref(task) \
-	do { ++(task)->refs; } while(0)
-#define qr_task_unref(task) \
-	do { \
-		if (task) \
-			kr_require((task)->refs > 0); \
-		if ((task) && --(task)->refs == 0) \
-			qr_task_free((task)); \
-	} while (0)
-
 /* Forward decls */
+static struct session* worker_find_tcp_connected(const struct sockaddr* addr);
+static struct session* worker_find_tcp_waiting(const struct sockaddr* addr);
+static int worker_add_tcp_connected(const struct sockaddr* addr, struct session *session);
 static void qr_task_free(struct qr_task *task);
 static int qr_task_step(struct qr_task *task,
 			const struct sockaddr *packet_source,
@@ -114,6 +105,7 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 			const struct sockaddr *addr, knot_pkt_t *pkt);
 static int qr_task_finalize(struct qr_task *task, int state);
 static void qr_task_complete(struct qr_task *task);
+static void qr_task_assert_weakptr(struct qr_task *task);
 static int worker_add_tcp_waiting(const struct sockaddr* addr, struct session *session);
 static void on_tcp_connect_timeout(uv_timer_t *timer);
 static void on_udp_timeout(uv_timer_t *timer);
@@ -122,6 +114,23 @@ static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_
 
 struct worker_ctx the_worker_value; /**< Static allocation is suitable for the singleton. */
 struct worker_ctx *the_worker = NULL;
+
+static struct kr_query *task_get_last_pending_query(struct qr_task *task)
+{
+	if (!task || task->ctx->req.rplan.pending.len == 0) {
+		return NULL;
+	}
+
+	return array_tail(task->ctx->req.rplan.pending);
+}
+
+static inline void worker_task_pkt_set_msgid(struct qr_task *task, uint16_t msgid)
+{
+	knot_pkt_t *pktbuf = task->pktbuf;
+	knot_wire_set_id(pktbuf->wire, msgid);
+	struct kr_query *q = task_get_last_pending_query(task);
+	q->id = msgid;
+}
 
 /*! @internal Create a UDP/TCP handle for an outgoing AF_INET* connection.
  *  socktype is SOCK_* */
@@ -186,8 +195,9 @@ static uv_handle_t *ioreq_spawn(int socktype, sa_family_t family, bool has_tls,
 
 static void ioreq_kill_pending(struct qr_task *task)
 {
+	qr_task_weakptr_t taskptr = task->weakptr;
 	for (uint16_t i = 0; i < task->pending_count; ++i) {
-		session_kill_ioreq(task->pending[i], task);
+		session_kill_ioreq(task->pending[i], taskptr);
 	}
 	task->pending_count = 0;
 }
@@ -510,7 +520,7 @@ static void request_free(struct request_ctx *ctx)
 	the_worker->stats.rconcurrent -= 1;
 }
 
-static struct qr_task *qr_task_create(struct request_ctx *ctx)
+static struct qr_task *qr_task_create(struct request_ctx *ctx, qr_task_weakptr_t *out_weakptr)
 {
 	/* Choose (initial) pktbuf size.  As it is now, pktbuf can be used
 	 * for UDP answers from upstream *and* from cache
@@ -522,10 +532,15 @@ static struct qr_task *qr_task_create(struct request_ctx *ctx)
 	}
 
 	/* Create resolution task */
-	struct qr_task *task = mm_calloc(&ctx->req.pool, 1, sizeof(*task));
-	if (!task) {
+	struct qr_task *task;
+	qr_task_weakptr_t taskptr = weakptr_mm_alloc(&ctx->req.pool,
+			sizeof(*task), (void **)&task);
+	if (!taskptr || !task) {
 		return NULL;
 	}
+
+	/* Initialize task to zero + make self-reference with `weakptr` */
+	*task = (struct qr_task) { .weakptr = taskptr };
 
 	/* Create packet buffers for answer and subrequests */
 	knot_pkt_t *pktbuf = knot_pkt_new(NULL, pktbuf_max, &ctx->req.pool);
@@ -538,25 +553,29 @@ static struct qr_task *qr_task_create(struct request_ctx *ctx)
 	task->ctx = ctx;
 	task->pktbuf = pktbuf;
 	array_init(task->waiting);
-	task->refs = 0;
-	kr_assert(ctx->task == NULL);
-	ctx->task = task;
-	/* Make the primary reference to task. */
-	qr_task_ref(task);
+	kr_assert(ctx->taskptr == WEAKPTR_NULL);
+	ctx->taskptr = taskptr;
 	task->creation_time = kr_now();
 	the_worker->stats.concurrent += 1;
+	if (out_weakptr)
+		*out_weakptr = taskptr;
 	return task;
 }
 
-/* This is called when the task refcount is zero, free memory. */
 static void qr_task_free(struct qr_task *task)
 {
+	if (!task)
+		return;
+
+	qr_task_assert_weakptr(task);
+
 	struct request_ctx *ctx = task->ctx;
+	weakptr_mm_free(&ctx->req.pool, task->weakptr);
 
 	if (kr_fails_assert(ctx))
 		return;
 
-	if (ctx->task == NULL) {
+	if (ctx->taskptr == WEAKPTR_NULL) {
 		request_free(ctx);
 	}
 
@@ -570,7 +589,7 @@ static int qr_task_register(struct qr_task *task, struct session *session)
 	if (kr_fails_assert(!session_flags(session)->outgoing && session_get_handle(session)->type == UV_TCP))
 		return kr_error(EINVAL);
 
-	session_tasklist_add(session, task);
+	session_tasklist_add(session, task->weakptr);
 
 	struct request_ctx *ctx = task->ctx;
 	if (kr_fails_assert(ctx && (ctx->source.session == NULL || ctx->source.session == session)))
@@ -603,42 +622,54 @@ static void qr_task_complete(struct qr_task *task)
 	if (s) {
 		kr_require(!session_flags(s)->outgoing && session_waitinglist_is_empty(s));
 		ctx->source.session = NULL;
-		session_tasklist_del(s, task);
+		session_tasklist_del(s, task->weakptr);
 	}
 
-	/* Release primary reference to task. */
-	if (ctx->task == task) {
-		ctx->task = NULL;
-		qr_task_unref(task);
-	}
+	if (ctx->taskptr == task->weakptr)
+		ctx->taskptr = WEAKPTR_NULL;
+}
+
+/** A debug function checking if `task->weakptr` is not corrupted, i.e. still
+ * pointing to `task` itself. */
+static inline void qr_task_assert_weakptr(struct qr_task *task)
+{
+#ifndef NDEBUG
+	if (!task)
+		return;
+	struct qr_task *self = weakptr_get(task->weakptr);
+	kr_require(self); /* Weakptr did not exist */
+	kr_require(self == task); /* Weakptr existed but did not point to `task` */
+#endif
 }
 
 /* This is called when we send subrequest / answer */
-int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
+static int qr_task_on_send_internal(struct qr_task *task, const uv_handle_t *handle, int status)
 {
+	qr_task_assert_weakptr(task);
 	if (task->finished) {
 		kr_require(task->leading == false);
 		qr_task_complete(task);
 	}
 
 	if (!handle || kr_fails_assert(handle->data))
-		return status;
+		goto cleanup;
 	struct session* s = handle->data;
 
 	if (handle->type == UV_UDP && session_flags(s)->outgoing) {
 		// This should ensure that we are only dealing with our question to upstream
 		if (kr_fails_assert(!knot_wire_get_qr(task->pktbuf->wire)))
-			return status;
+			goto cleanup;
 		// start the timer
 		struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
 		if (kr_fails_assert(qry && task->transport))
-			return status;
+			goto cleanup;
 		size_t timeout = task->transport->timeout;
 		int ret = session_timer_start(s, on_udp_timeout, timeout, 0);
 		/* Start next step with timeout, fatal if can't start a timer. */
 		if (ret != 0) {
 			subreq_finalize(task, &task->transport->address.ip, task->pktbuf);
 			qr_task_finalize(task, KR_STATE_FAIL);
+			return status;
 		}
 	}
 
@@ -659,11 +690,11 @@ int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 						peer_str, uv_strerror(status));
 			}
 			worker_end_tcp(s);
-			return status;
+			goto cleanup;
 		}
 
 		if (session_flags(s)->outgoing || session_flags(s)->closing)
-			return status;
+			goto cleanup;
 
 		if (session_flags(s)->throttled &&
 		    session_tasklist_get_len(s) < the_worker->tcp_pipeline_max/2) {
@@ -674,24 +705,36 @@ int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 		}
 	}
 
+cleanup:;
+	if (task->finished) {
+		/* Answer has been sent or an error has occurred,
+		 * the task is complete, we can free it. */
+		qr_task_free(task);
+	}
 	return status;
+}
+
+int qr_task_on_send(qr_task_weakptr_t taskptr, const uv_handle_t *handle, int status)
+{
+	struct qr_task *task = weakptr_get(taskptr);
+	if (!task)
+		return kr_error(ENOENT);
+	return qr_task_on_send_internal(task, handle, status);
 }
 
 static void on_send(uv_udp_send_t *req, int status)
 {
-	struct qr_task *task = req->data;
+	qr_task_weakptr_t taskptr = (qr_task_weakptr_t) req->data;
 	uv_handle_t *h = (uv_handle_t *)req->handle;
-	qr_task_on_send(task, h, status);
-	qr_task_unref(task);
+	qr_task_on_send(taskptr, h, status);
 	free(req);
 }
 
 static void on_write(uv_write_t *req, int status)
 {
-	struct qr_task *task = req->data;
+	qr_task_weakptr_t taskptr = (qr_task_weakptr_t) req->data;
 	uv_handle_t *h = (uv_handle_t *)req->handle;
-	qr_task_on_send(task, h, status);
-	qr_task_unref(task);
+	qr_task_on_send(taskptr, h, status);
 	free(req);
 }
 
@@ -699,14 +742,14 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 			const struct sockaddr *addr, knot_pkt_t *pkt)
 {
 	if (!session)
-		return qr_task_on_send(task, NULL, kr_error(EIO));
+		return qr_task_on_send_internal(task, NULL, kr_error(EIO));
 
 	int ret = 0;
 	struct request_ctx *ctx = task->ctx;
 
 	uv_handle_t *handle = session_get_handle(session);
 	if (kr_fails_assert(handle && handle->data == session))
-		return qr_task_on_send(task, NULL, kr_error(EINVAL));
+		return qr_task_on_send_internal(task, NULL, kr_error(EINVAL));
 	const bool is_stream = handle->type == UV_TCP;
 	kr_require(is_stream || handle->type == UV_UDP);
 
@@ -714,7 +757,7 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 		addr = session_get_peer(session);
 
 	if (pkt == NULL)
-		pkt = worker_task_get_pktbuf(task);
+		pkt = task->pktbuf;
 
 	if (session_flags(session)->outgoing && handle->type == UV_TCP) {
 		size_t try_limit = session_tasklist_get_len(session) + 1;
@@ -725,8 +768,10 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 			++msg_id;
 			++try_count;
 		}
-		if (try_count > try_limit)
+		if (try_count > try_limit) {
+			qr_task_free(task);
 			return kr_error(ENOENT);
+		}
 		worker_task_pkt_set_msgid(task, msg_id);
 	}
 
@@ -735,31 +780,28 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 	task->recv_time = 0; // task structure is being reused so we have to zero this out here
 	/* Send using given protocol */
 	if (kr_fails_assert(!session_flags(session)->closing))
-		return qr_task_on_send(task, NULL, kr_error(EIO));
+		return qr_task_on_send_internal(task, NULL, kr_error(EIO));
 
 	uv_handle_t *ioreq = malloc(is_stream ? sizeof(uv_write_t) : sizeof(uv_udp_send_t));
 	if (!ioreq)
-		return qr_task_on_send(task, handle, kr_error(ENOMEM));
-
-	/* Pending ioreq on current task */
-	qr_task_ref(task);
+		return qr_task_on_send_internal(task, handle, kr_error(ENOMEM));
 
 	if (session_flags(session)->has_http) {
 #if ENABLE_DOH2
 		uv_write_t *write_req = (uv_write_t *)ioreq;
-		write_req->data = task;
+		write_req->data = (void *)task->weakptr;
 		ret = http_write(write_req, handle, pkt, ctx->req.qsource.stream_id, &on_write);
 #else
 		ret = kr_error(ENOPROTOOPT);
 #endif
 	} else if (session_flags(session)->has_tls) {
 		uv_write_t *write_req = (uv_write_t *)ioreq;
-		write_req->data = task;
+		write_req->data = (void *)task->weakptr;
 		ret = tls_write(write_req, handle, pkt, &on_write);
 	} else if (handle->type == UV_UDP) {
 		uv_udp_send_t *send_req = (uv_udp_send_t *)ioreq;
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
-		send_req->data = task;
+		send_req->data = (void *)task->weakptr;
 		ret = uv_udp_send(send_req, (uv_udp_t *)handle, &buf, 1, addr, &on_send);
 	} else if (handle->type == UV_TCP) {
 		uv_write_t *write_req = (uv_write_t *)ioreq;
@@ -783,7 +825,7 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 			{ (char *)&pkt->size + lsbi,  1 },
 			{ (char *)pkt->wire, pkt->size },
 		};
-		write_req->data = task;
+		write_req->data = (void *)task->weakptr;
 		ret = uv_write(write_req, (uv_stream_t *)handle, buf, 3, &on_write);
 	} else {
 		kr_assert(false);
@@ -792,7 +834,7 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 	if (ret == 0) {
 		session_touch(session);
 		if (session_flags(session)->outgoing) {
-			session_tasklist_add(session, task);
+			session_tasklist_add(session, task->weakptr);
 		}
 		if (the_worker->too_many_open &&
 		    the_worker->stats.rconcurrent <
@@ -801,7 +843,6 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 		}
 	} else {
 		free(ioreq);
-		qr_task_unref(task);
 		if (ret == UV_EMFILE) {
 			the_worker->too_many_open = true;
 			the_worker->rconcurrent_highwatermark = the_worker->stats.rconcurrent;
@@ -835,15 +876,6 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 	return ret;
 }
 
-static struct kr_query *task_get_last_pending_query(struct qr_task *task)
-{
-	if (!task || task->ctx->req.rplan.pending.len == 0) {
-		return NULL;
-	}
-
-	return array_tail(task->ctx->req.rplan.pending);
-}
-
 static int session_tls_hs_cb(struct session *session, int status)
 {
 	if (kr_fails_assert(session_flags(session)->outgoing))
@@ -853,9 +885,10 @@ static int session_tls_hs_cb(struct session *session, int status)
 	int ret = kr_ok();
 
 	if (status) {
-		struct qr_task *task = session_waitinglist_get(session);
-		if (task) {
+		qr_task_weakptr_t taskptr = session_waitinglist_get(session);
+		if (taskptr) {
 			// TLS handshake failed, report it to server selection
+			struct qr_task *task = weakptr_get(taskptr);
 			struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
 			qry->server_selection.error(qry, task->transport, KR_SELECTION_TLS_HANDSHAKE_FAILED);
 		}
@@ -925,12 +958,15 @@ static int session_tls_hs_cb(struct session *session, int status)
 	}
 	if (ret == kr_ok()) {
 		while (!session_waitinglist_is_empty(session)) {
-			struct qr_task *t = session_waitinglist_get(session);
-			ret = qr_task_send(t, session, NULL, NULL);
-			if (ret != 0) {
-				break;
+			qr_task_weakptr_t taskptr = session_waitinglist_get(session);
+			struct qr_task *t = weakptr_get(taskptr);
+			if (t) {
+				ret = qr_task_send(t, session, NULL, NULL);
+				if (ret != 0) {
+					break;
+				}
 			}
-			session_waitinglist_pop(session, true);
+			session_waitinglist_pop(session);
 		}
 	} else {
 		ret = kr_error(EINVAL);
@@ -956,17 +992,20 @@ static int send_waiting(struct session *session)
 {
 	int ret = 0;
 	while (!session_waitinglist_is_empty(session)) {
-		struct qr_task *t = session_waitinglist_get(session);
-		ret = qr_task_send(t, session, NULL, NULL);
-		if (ret != 0) {
-			struct sockaddr *peer = session_get_peer(session);
-			session_waitinglist_finalize(session, KR_STATE_FAIL);
-			session_tasklist_finalize(session, KR_STATE_FAIL);
-			worker_del_tcp_connected(peer);
-			session_close(session);
-			break;
+		qr_task_weakptr_t taskptr = session_waitinglist_get(session);
+		struct qr_task *t = weakptr_get(taskptr);
+		if (t) {
+			ret = qr_task_send(t, session, NULL, NULL);
+			if (ret != 0) {
+				struct sockaddr *peer = session_get_peer(session);
+				session_waitinglist_finalize(session, KR_STATE_FAIL);
+				session_tasklist_finalize(session, KR_STATE_FAIL);
+				worker_del_tcp_connected(peer);
+				session_close(session);
+				break;
+			}
 		}
-		session_waitinglist_pop(session, true);
+		session_waitinglist_pop(session);
 	}
 	return ret;
 }
@@ -1034,7 +1073,8 @@ static void on_connect(uv_connect_t *req, int status)
 					peer_str ? peer_str : "", uv_strerror(status));
 		}
 		worker_del_tcp_waiting(peer);
-		struct qr_task *task = session_waitinglist_get(session);
+		qr_task_weakptr_t taskptr = session_waitinglist_get(session);
+		struct qr_task *task = weakptr_get(taskptr);
 		if (task && status != UV_ETIMEDOUT) {
 			/* Penalize upstream.
 			* In case of UV_ETIMEDOUT upstream has been
@@ -1105,7 +1145,8 @@ static void on_tcp_connect_timeout(uv_timer_t *timer)
 	struct sockaddr *peer = session_get_peer(session);
 	worker_del_tcp_waiting(peer);
 
-	struct qr_task *task = session_waitinglist_get(session);
+	qr_task_weakptr_t taskptr = session_waitinglist_get(session);
+	struct qr_task *task = weakptr_get(taskptr);
 	if (!task) {
 		/* Normally shouldn't happen. */
 		const char *peer_str = kr_straddr(peer);
@@ -1146,7 +1187,8 @@ static void on_udp_timeout(uv_timer_t *timer)
 
 	uv_timer_stop(timer);
 
-	struct qr_task *task = session_tasklist_get_first(session);
+	qr_task_weakptr_t taskptr = session_tasklist_get_first(session);
+	struct qr_task *task = weakptr_get(taskptr);
 	if (!task)
 		return;
 
@@ -1162,44 +1204,39 @@ static void on_udp_timeout(uv_timer_t *timer)
 
 static uv_handle_t *transmit(struct qr_task *task)
 {
-	uv_handle_t *ret = NULL;
 
-	if (task) {
-		struct kr_transport* transport = task->transport;
+	if (!task)
+		return NULL;
 
-		struct sockaddr_in6 *choice = (struct sockaddr_in6 *)&transport->address;
+	struct kr_transport* transport = task->transport;
+	struct sockaddr_in6 *choice = (struct sockaddr_in6 *)&transport->address;
 
-		if (!choice) {
-			return ret;
-		}
-		if (task->pending_count >= MAX_PENDING) {
-			return ret;
-		}
-		/* Checkout answer before sending it */
-		struct request_ctx *ctx = task->ctx;
-		if (kr_resolve_checkout(&ctx->req, NULL, transport, task->pktbuf) != 0) {
-			return ret;
-		}
-		ret = ioreq_spawn(SOCK_DGRAM, choice->sin6_family, false, false);
-		if (!ret) {
-			return ret;
-		}
-		struct sockaddr *addr = (struct sockaddr *)choice;
-		struct session *session = ret->data;
-		struct sockaddr *peer = session_get_peer(session);
-		kr_assert(peer->sa_family == AF_UNSPEC && session_flags(session)->outgoing);
-		kr_require(addr->sa_family == AF_INET || addr->sa_family == AF_INET6);
-		memcpy(peer, addr, kr_sockaddr_len(addr));
-		if (qr_task_send(task, session, (struct sockaddr *)choice,
-				 task->pktbuf) != 0) {
-			session_close(session);
-			ret = NULL;
-		} else {
-			task->pending[task->pending_count] = session;
-			task->pending_count += 1;
-			session_start_read(session); /* Start reading answer */
-		}
+	if (!choice || task->pending_count >= MAX_PENDING)
+		return NULL;
+
+	/* Checkout answer before sending it */
+	struct request_ctx *ctx = task->ctx;
+	if (kr_resolve_checkout(&ctx->req, NULL, transport, task->pktbuf) != 0)
+		return NULL;
+
+	uv_handle_t *ret = ioreq_spawn(SOCK_DGRAM, choice->sin6_family, false, false);
+	if (!ret)
+		return ret;
+
+	struct sockaddr *addr = (struct sockaddr *)choice;
+	struct session *session = ret->data;
+	struct sockaddr *peer = session_get_peer(session);
+	kr_assert(peer->sa_family == AF_UNSPEC && session_flags(session)->outgoing);
+	kr_require(addr->sa_family == AF_INET || addr->sa_family == AF_INET6);
+	memcpy(peer, addr, kr_sockaddr_len(addr));
+	if (qr_task_send(task, session, (struct sockaddr *)choice, task->pktbuf) != 0) {
+		session_close(session);
+		return NULL;
 	}
+
+	task->pending[task->pending_count] = session;
+	task->pending_count += 1;
+	session_start_read(session); /* Start reading answer */
 	return ret;
 }
 
@@ -1224,7 +1261,11 @@ static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_
 	/* Notify waiting tasks. */
 	struct kr_query *leader_qry = array_tail(task->ctx->req.rplan.pending);
 	for (size_t i = task->waiting.len; i > 0; i--) {
-		struct qr_task *follower = task->waiting.at[i - 1];
+		qr_task_weakptr_t followerptr = task->waiting.at[i - 1];
+		struct qr_task *follower = weakptr_get(followerptr);
+		if (!follower)
+			continue;
+
 		/* Reuse MSGID and 0x20 secret */
 		if (follower->ctx->req.rplan.pending.len > 0) {
 			struct kr_query *qry = array_tail(follower->ctx->req.rplan.pending);
@@ -1239,7 +1280,6 @@ static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_
 			leader_qry->secret = 0; /* Next will be already decoded */
 		}
 		qr_task_step(follower, packet_source, pkt);
-		qr_task_unref(follower);
 	}
 	task->waiting.len = 0;
 	task->leading = false;
@@ -1276,11 +1316,11 @@ static bool subreq_enqueue(struct qr_task *task)
 	if (!leader /*ENOMEM*/ || !*leader)
 		return false;
 	/* Enqueue itself to leader for this subrequest. */
-	int ret = array_push_mm((*leader)->waiting, task,
+
+	int ret = array_push_mm((*leader)->waiting, task->weakptr,
 				kr_memreserve, &(*leader)->ctx->req.pool);
 	if (unlikely(ret < 0)) /*ENOMEM*/
 		return false;
-	qr_task_ref(task);
 	return true;
 }
 
@@ -1306,7 +1346,7 @@ static int xdp_push(struct qr_task *task, const uv_handle_t *src_handle)
 	struct request_ctx *ctx = task->ctx;
 	xdp_handle_data_t *xhd = src_handle->data;
 	if (kr_fails_assert(xhd && xhd->socket && xhd->session == ctx->source.session))
-		return qr_task_on_send(task, src_handle, kr_error(EINVAL));
+		return qr_task_on_send_internal(task, src_handle, kr_error(EINVAL));
 
 	knot_xdp_msg_t msg;
 #if KNOT_VERSION_HEX >= 0x030100
@@ -1332,7 +1372,7 @@ static int xdp_push(struct qr_task *task, const uv_handle_t *src_handle)
 	uv_idle_start(&xhd->tx_waker, xdp_tx_waker);
 	kr_log_debug(XDP, "pushed a packet, ret = %d\n", ret);
 
-	return qr_task_on_send(task, src_handle, ret);
+	return qr_task_on_send_internal(task, src_handle, ret);
 #else
 	kr_assert(!EINVAL);
 	return kr_error(EINVAL);
@@ -1342,7 +1382,9 @@ static int xdp_push(struct qr_task *task, const uv_handle_t *src_handle)
 static int qr_task_finalize(struct qr_task *task, int state)
 {
 	kr_require(task && task->leading == false);
+	qr_task_assert_weakptr(task);
 	if (task->finished) {
+		qr_task_free(task);
 		return kr_ok();
 	}
 	struct request_ctx *ctx = task->ctx;
@@ -1351,7 +1393,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 
 	task->finished = true;
 	if (source_session == NULL) {
-		(void) qr_task_on_send(task, NULL, kr_error(EIO));
+		(void) qr_task_on_send_internal(task, NULL, kr_error(EIO));
 		return state == KR_STATE_DONE ? kr_ok() : kr_error(EIO);
 	}
 
@@ -1360,20 +1402,21 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		/* For NO_ANSWER, a well-behaved layer should set the state to FAIL */
 		kr_assert(!ctx->req.options.NO_ANSWER || (ctx->req.state & KR_STATE_FAIL));
 
-		(void) qr_task_on_send(task, NULL, kr_ok());
+		(void) qr_task_on_send_internal(task, NULL, kr_ok());
 		return kr_ok();
 	}
 
 	if (session_flags(source_session)->closing ||
-	    ctx->source.addr.ip.sa_family == AF_UNSPEC)
+	    ctx->source.addr.ip.sa_family == AF_UNSPEC) {
+		qr_task_free(task);
 		return kr_error(EINVAL);
-
-	/* Reference task as the callback handler can close it */
-	qr_task_ref(task);
+	}
 
 	/* Send back answer */
 	int ret;
 	const uv_handle_t *src_handle = session_get_handle(source_session);
+	qr_task_assert_weakptr(task);
+	qr_task_weakptr_t taskptr = task->weakptr;
 	if (kr_fails_assert(src_handle->type == UV_UDP || src_handle->type == UV_TCP
 		       || src_handle->type == UV_POLL)) {
 		ret = kr_error(EINVAL);
@@ -1382,31 +1425,31 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	} else if (src_handle->type == UV_UDP && ENABLE_SENDMMSG) {
 		int fd;
 		ret = uv_fileno(src_handle, &fd);
-		if (ret == 0)
-			udp_queue_push(fd, &ctx->req, task);
-		else
+		if (ret == 0) {
+			udp_queue_push(fd, &ctx->req, taskptr);
+		} else {
 			kr_assert(false);
+		}
 	} else {
 		ret = qr_task_send(task, source_session, &ctx->source.comm_addr.ip, ctx->req.answer);
 	}
 
 	if (ret != kr_ok()) {
-		(void) qr_task_on_send(task, NULL, kr_error(EIO));
+		if (worker_task_exists(taskptr)) /* May have been freed by `qr_task_send` above */
+			(void) qr_task_on_send_internal(task, NULL, kr_error(EIO));
+
 		/* Since source session is erroneous detach all tasks. */
 		while (!session_tasklist_is_empty(source_session)) {
-			struct qr_task *t = session_tasklist_del_first(source_session, false);
+			qr_task_weakptr_t tptr = session_tasklist_del_first(source_session);
+			struct qr_task *t = weakptr_get(tptr);
+			if (!t) continue;
+
 			struct request_ctx *c = t->ctx;
 			kr_assert(c->source.session == source_session);
 			c->source.session = NULL;
-			/* Don't finalize them as there can be other tasks
-			 * waiting for answer to this particular task.
-			 * (ie. task->leading is true) */
-			worker_task_unref(t);
 		}
 		session_close(source_session);
 	}
-
-	qr_task_unref(task);
 
 	if (ret != kr_ok() || state != KR_STATE_DONE)
 		return kr_error(EIO);
@@ -1441,7 +1484,7 @@ static int tcp_task_waiting_connection(struct session *session, struct qr_task *
 		return kr_error(EINVAL);
 	/* Add task to the end of list of waiting tasks.
 	 * It will be notified in on_connect() or qr_task_on_send(). */
-	int ret = session_waitinglist_push(session, task);
+	int ret = session_waitinglist_push(session, task->weakptr);
 	if (ret < 0) {
 		return kr_error(EINVAL);
 	}
@@ -1561,7 +1604,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 
 	/* Add task to the end of list of waiting tasks.
 	 * Will be notified either in on_connect() or in qr_task_on_send(). */
-	ret = session_waitinglist_push(session, task);
+	ret = session_waitinglist_push(session, task->weakptr);
 	if (ret < 0) {
 		session_timer_stop(session);
 		worker_del_tcp_waiting(addr);
@@ -1632,8 +1675,8 @@ static int qr_task_step(struct qr_task *task,
 
 	/* Close pending I/O requests */
 	subreq_finalize(task, packet_source, packet);
-	if ((kr_now() - worker_task_creation_time(task)) >= KR_RESOLVE_TIME_LIMIT) {
-		struct kr_request *req = worker_task_request(task);
+	if ((kr_now() - task->creation_time) >= KR_RESOLVE_TIME_LIMIT) {
+		struct kr_request *req = &task->ctx->req;
 		if (!kr_fails_assert(req))
 			kr_query_inform_timeout(req, req->current_query);
 		return qr_task_finalize(task, KR_STATE_FAIL);
@@ -1790,7 +1833,7 @@ int worker_submit(struct session *session, struct io_comm_data *comm,
 			return kr_error(ENOMEM);
 		}
 
-		task = qr_task_create(ctx);
+		task = qr_task_create(ctx, NULL);
 		if (!task) {
 			request_free(ctx);
 			return kr_error(ENOMEM);
@@ -1801,9 +1844,15 @@ int worker_submit(struct session *session, struct io_comm_data *comm,
 		}
 	} else { /* response from upstream */
 		const uint16_t id = knot_wire_get_id(pkt->wire);
-		task = session_tasklist_del_msgid(session, id);
-		if (task == NULL) {
+		qr_task_weakptr_t taskptr = session_tasklist_del_msgid(session, id);
+		if (taskptr == WEAKPTR_NULL) {
 			VERBOSE_MSG(NULL, "=> ignoring packet with mismatching ID %d\n",
+					(int)id);
+			return kr_error(ENOENT);
+		}
+		task = weakptr_get(taskptr);
+		if (task == NULL) {
+			VERBOSE_MSG(NULL, "=> ignoring packet for no longer valid task (ID %d)\n",
 					(int)id);
 			return kr_error(ENOENT);
 		}
@@ -1922,9 +1971,11 @@ int worker_end_tcp(struct session *session)
 	}
 
 	while (!session_waitinglist_is_empty(session)) {
-		struct qr_task *task = session_waitinglist_pop(session, false);
-		kr_assert(task->refs > 1);
-		session_tasklist_del(session, task);
+		qr_task_weakptr_t taskptr = session_waitinglist_pop(session);
+		struct qr_task *task = weakptr_get(taskptr);
+		if (!task) continue;
+
+		session_tasklist_del(session, taskptr);
 		if (session_flags(session)->outgoing) {
 			if (task->ctx->req.options.FORWARD) {
 				/* We are in TCP_FORWARD mode.
@@ -1941,10 +1992,12 @@ int worker_end_tcp(struct session *session)
 			kr_assert(task->ctx->source.session == session);
 			task->ctx->source.session = NULL;
 		}
-		worker_task_unref(task);
 	}
 	while (!session_tasklist_is_empty(session)) {
-		struct qr_task *task = session_tasklist_del_first(session, false);
+		qr_task_weakptr_t taskptr = session_tasklist_del_first(session);
+		struct qr_task *task = weakptr_get(taskptr);
+		if (!task) continue;
+
 		if (session_flags(session)->outgoing) {
 			if (task->ctx->req.options.FORWARD) {
 				struct kr_request *req = &task->ctx->req;
@@ -1957,7 +2010,6 @@ int worker_end_tcp(struct session *session)
 			kr_assert(task->ctx->source.session == session);
 			task->ctx->source.session = NULL;
 		}
-		worker_task_unref(task);
 	}
 	session_close(session);
 	return kr_ok();
@@ -2009,33 +2061,34 @@ knot_pkt_t *worker_resolve_mk_pkt(const char *qname_str, uint16_t qtype, uint16_
 	return worker_resolve_mk_pkt_dname(qname, qtype, qclass, options);
 }
 
-struct qr_task *worker_resolve_start(knot_pkt_t *query, struct kr_qflags options)
+qr_task_weakptr_t worker_resolve_start(knot_pkt_t *query, struct kr_qflags options)
 {
 	if (kr_fails_assert(the_worker && query))
-		return NULL;
+		return WEAKPTR_NULL;
 
 
 	struct request_ctx *ctx = request_create(NULL, NULL, NULL, NULL,
 	                                         the_worker->next_request_uid);
 	if (!ctx)
-		return NULL;
+		return WEAKPTR_NULL;
 
 	/* Create task */
-	struct qr_task *task = qr_task_create(ctx);
+	qr_task_weakptr_t taskptr;
+	struct qr_task *task = qr_task_create(ctx, &taskptr);
 	if (!task) {
 		request_free(ctx);
-		return NULL;
+		return WEAKPTR_NULL;
 	}
 
 	/* Start task */
 	int ret = request_start(ctx, query);
 	if (ret != 0) {
 		/* task is attached to request context,
-		 * so dereference (and deallocate) it first */
-		ctx->task = NULL;
-		qr_task_unref(task);
+		 * so deallocate it first */
+		ctx->taskptr = WEAKPTR_NULL;
+		qr_task_free(task);
 		request_free(ctx);
-		return NULL;
+		return WEAKPTR_NULL;
 	}
 
 	the_worker->next_request_uid += 1;
@@ -2044,68 +2097,70 @@ struct qr_task *worker_resolve_start(knot_pkt_t *query, struct kr_qflags options
 
 	/* Set options late, as qr_task_start() -> kr_resolve_begin() rewrite it. */
 	kr_qflags_set(&task->ctx->req.options, options);
-	return task;
+	return taskptr;
 }
 
-int worker_resolve_exec(struct qr_task *task, knot_pkt_t *query)
+int worker_resolve_exec(qr_task_weakptr_t taskptr, knot_pkt_t *query)
 {
-	if (!task)
+	if (!taskptr)
 		return kr_error(EINVAL);
+	struct qr_task *task = weakptr_get(taskptr);
+	if (!task)
+		return kr_error(ENOENT);
 	return qr_task_step(task, NULL, query);
 }
 
-int worker_task_numrefs(const struct qr_task *task)
+bool worker_task_exists(qr_task_weakptr_t taskptr)
 {
-	return task->refs;
+	return weakptr_get(taskptr) != NULL;
 }
 
-struct kr_request *worker_task_request(struct qr_task *task)
+struct kr_request *worker_task_request(qr_task_weakptr_t taskptr)
 {
+	if (!taskptr)
+		return NULL;
+	struct qr_task *task = weakptr_get(taskptr);
 	if (!task || !task->ctx)
 		return NULL;
 
 	return &task->ctx->req;
 }
 
-int worker_task_finalize(struct qr_task *task, int state)
+int worker_task_finalize(qr_task_weakptr_t taskptr, int state)
 {
+	struct qr_task *task = weakptr_get(taskptr);
+	if (!task)
+		return kr_error(ENOENT);
 	return qr_task_finalize(task, state);
 }
 
- int worker_task_step(struct qr_task *task, const struct sockaddr *packet_source,
-		      knot_pkt_t *packet)
- {
-	 return qr_task_step(task, packet_source, packet);
- }
-
-void worker_task_complete(struct qr_task *task)
+int worker_task_step(qr_task_weakptr_t taskptr, const struct sockaddr *packet_source,
+		knot_pkt_t *packet)
 {
-	qr_task_complete(task);
+	struct qr_task *task = weakptr_get(taskptr);
+	if (!task)
+		return kr_error(ENOENT);
+	return qr_task_step(task, packet_source, packet);
 }
 
-void worker_task_ref(struct qr_task *task)
+void worker_task_complete(qr_task_weakptr_t taskptr)
 {
-	qr_task_ref(task);
+	struct qr_task *task = weakptr_get(taskptr);
+	if (task)
+		qr_task_complete(task);
 }
 
-void worker_task_unref(struct qr_task *task)
+void worker_task_timeout_inc(qr_task_weakptr_t taskptr)
 {
-	qr_task_unref(task);
+	struct qr_task *task = weakptr_get(taskptr);
+	if (task)
+		task->timeouts += 1;
 }
 
-void worker_task_timeout_inc(struct qr_task *task)
+knot_pkt_t *worker_task_get_pktbuf(qr_task_weakptr_t taskptr)
 {
-	task->timeouts += 1;
-}
-
-knot_pkt_t *worker_task_get_pktbuf(const struct qr_task *task)
-{
-	return task->pktbuf;
-}
-
-struct request_ctx *worker_task_get_request(struct qr_task *task)
-{
-	return task->ctx;
+	struct qr_task *task = weakptr_get(taskptr);
+	return (task) ? task->pktbuf : NULL;
 }
 
 struct session *worker_request_get_source_session(const struct kr_request *req)
@@ -2115,34 +2170,27 @@ struct session *worker_request_get_source_session(const struct kr_request *req)
 	return ((struct request_ctx *)req)->source.session;
 }
 
-uint16_t worker_task_pkt_get_msgid(struct qr_task *task)
+uint64_t worker_task_creation_time(qr_task_weakptr_t taskptr)
 {
-	knot_pkt_t *pktbuf = worker_task_get_pktbuf(task);
-	uint16_t msg_id = knot_wire_get_id(pktbuf->wire);
-	return msg_id;
+	struct qr_task *task = weakptr_get(taskptr);
+	return (task) ? task->creation_time : UINT64_MAX;
 }
 
-void worker_task_pkt_set_msgid(struct qr_task *task, uint16_t msgid)
+void worker_task_subreq_finalize(qr_task_weakptr_t taskptr)
 {
-	knot_pkt_t *pktbuf = worker_task_get_pktbuf(task);
-	knot_wire_set_id(pktbuf->wire, msgid);
-	struct kr_query *q = task_get_last_pending_query(task);
-	q->id = msgid;
+	struct qr_task *task = weakptr_get(taskptr);
+	if (task)
+		subreq_finalize(task, NULL, NULL);
 }
 
-uint64_t worker_task_creation_time(struct qr_task *task)
+bool worker_task_finished(qr_task_weakptr_t taskptr)
 {
-	return task->creation_time;
-}
-
-void worker_task_subreq_finalize(struct qr_task *task)
-{
-	subreq_finalize(task, NULL, NULL);
-}
-
-bool worker_task_finished(struct qr_task *task)
-{
-	return task->finished;
+	struct qr_task *task = weakptr_get(taskptr);
+	return (task)
+		? task->finished
+		: true; /* When the weak pointer is not valid, the task has most
+			   probably finished. May also be a corruption, but
+			   that's not very likely, I think. */
 }
 
 /** Reserve worker buffers.  We assume worker's been zeroed. */
@@ -2196,7 +2244,6 @@ int worker_init(void)
 {
 	if (kr_fails_assert(the_worker == NULL))
 		return kr_error(EINVAL);
-	kr_bindings_register(the_engine->L); // TODO move
 
 	/* Create main worker. */
 	the_worker = &the_worker_value;

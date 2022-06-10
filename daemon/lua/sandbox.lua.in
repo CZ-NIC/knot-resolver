@@ -87,6 +87,9 @@ worker.resolve_pkt = function (pkt, options, finish, init)
 	local task = ffi.C.worker_resolve_start(pkt, options)
 
 	-- Deal with finish and init callbacks
+	local request = ffi.C.worker_task_request(task)
+	assert(request ~= nil, 'request was nil for a just-created task')
+
 	if finish ~= nil then
 		local finish_cb
 		finish_cb = ffi.cast('trace_callback_f',
@@ -95,10 +98,14 @@ worker.resolve_pkt = function (pkt, options, finish, init)
 				finish(req.answer, req)
 				finish_cb:free()
 			end)
-		task.ctx.req.trace_finish = finish_cb
+		if request ~= nil then
+			request.trace_finish = finish_cb
+		else
+			finish_cb(nil)
+		end
 	end
-	if init ~= nil then
-		init(task.ctx.req)
+	if init ~= nil and request ~= nil then
+		init(request)
 	end
 
 	return ffi.C.worker_resolve_exec(task, pkt) == 0

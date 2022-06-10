@@ -42,15 +42,15 @@ struct session {
 	struct http_ctx *http_ctx;  /**< server side http-related data. */
 #endif
 
-	trie_t *tasks;                /**< list of tasks associated with given session. */
-	queue_t(struct qr_task *) waiting;  /**< list of tasks waiting for sending to upstream. */
+	trie_t *tasks;                       /**< list of tasks associated with given session. */
+	queue_t(qr_task_weakptr_t) waiting;  /**< list of tasks waiting for sending to upstream. */
 
-	uint8_t *wire_buf;            /**< Buffer for DNS message, except for XDP. */
-	ssize_t wire_buf_size;        /**< Buffer size. */
-	ssize_t wire_buf_start_idx;   /**< Data start offset in wire_buf. */
-	ssize_t wire_buf_end_idx;     /**< Data end offset in wire_buf. */
-	uint64_t last_activity;       /**< Time of last IO activity (if any occurs).
-				       *   Otherwise session creation time. */
+	uint8_t *wire_buf;                   /**< Buffer for DNS message, except for XDP. */
+	ssize_t wire_buf_size;               /**< Buffer size. */
+	ssize_t wire_buf_start_idx;          /**< Data start offset in wire_buf. */
+	ssize_t wire_buf_end_idx;            /**< Data end offset in wire_buf. */
+	uint64_t last_activity;              /**< Time of last IO activity (if any occurs).
+				              *   Otherwise session creation time. */
 };
 
 static void on_session_close(uv_handle_t *handle)
@@ -132,126 +132,147 @@ int session_stop_read(struct session *session)
 	return io_stop_read(session->handle);
 }
 
-int session_waitinglist_push(struct session *session, struct qr_task *task)
+int session_waitinglist_push(struct session *session, qr_task_weakptr_t taskptr)
 {
-	queue_push(session->waiting, task);
-	worker_task_ref(task);
+	if (kr_fails_assert(worker_task_exists(taskptr)))
+		return kr_error(EINVAL);
+	queue_push(session->waiting, taskptr);
 	return kr_ok();
 }
 
-struct qr_task *session_waitinglist_get(const struct session *session)
+qr_task_weakptr_t session_waitinglist_get(struct session *session)
 {
-	return (queue_len(session->waiting) > 0) ? (queue_head(session->waiting)) : NULL;
+	do {
+		if (queue_len(session->waiting) == 0)
+			return WEAKPTR_NULL;
+		qr_task_weakptr_t ptr = queue_head(session->waiting);
+		if (!ptr || !worker_task_exists(ptr)) {
+			queue_pop(session->waiting);
+			continue;
+		}
+		return ptr;
+	} while (true);
 }
 
-struct qr_task *session_waitinglist_pop(struct session *session, bool deref)
+qr_task_weakptr_t session_waitinglist_pop(struct session *session)
 {
-	struct qr_task *t = session_waitinglist_get(session);
+	qr_task_weakptr_t t = session_waitinglist_get(session);
 	queue_pop(session->waiting);
-	if (deref) {
-		worker_task_unref(t);
-	}
 	return t;
 }
 
-int session_tasklist_add(struct session *session, struct qr_task *task)
+int session_tasklist_add(struct session *session, qr_task_weakptr_t taskptr)
 {
+	if (kr_fails_assert(worker_task_exists(taskptr)))
+		return kr_error(ENOENT);
+
 	trie_t *t = session->tasks;
 	uint16_t task_msg_id = 0;
 	const char *key = NULL;
 	size_t key_len = 0;
 	if (session->sflags.outgoing) {
-		knot_pkt_t *pktbuf = worker_task_get_pktbuf(task);
+		knot_pkt_t *pktbuf = worker_task_get_pktbuf(taskptr);
+		kr_require(pktbuf);
 		task_msg_id = knot_wire_get_id(pktbuf->wire);
 		key = (const char *)&task_msg_id;
 		key_len = sizeof(task_msg_id);
 	} else {
-		key = (const char *)&task;
-		key_len = sizeof(char *);
+		key = (const char *)&taskptr;
+		key_len = sizeof(taskptr);
 	}
 	trie_val_t *v = trie_get_ins(t, key, key_len);
 	if (kr_fails_assert(v))
 		return kr_error(ENOMEM);
 	if (*v == NULL) {
-		*v = task;
-		worker_task_ref(task);
-	} else if (kr_fails_assert(*v == task)) {
+		*v = (void *) taskptr;
+	} else if (kr_fails_assert((qr_task_weakptr_t) *v == taskptr)) {
 		return kr_error(EINVAL);
 	}
 	return kr_ok();
 }
 
-int session_tasklist_del(struct session *session, struct qr_task *task)
+int session_tasklist_del(struct session *session, qr_task_weakptr_t taskptr)
 {
+	if (kr_fails_assert(worker_task_exists(taskptr)))
+		return kr_error(ENOENT);
+
 	trie_t *t = session->tasks;
 	uint16_t task_msg_id = 0;
 	const char *key = NULL;
 	size_t key_len = 0;
-	trie_val_t val;
 	if (session->sflags.outgoing) {
-		knot_pkt_t *pktbuf = worker_task_get_pktbuf(task);
+		knot_pkt_t *pktbuf = worker_task_get_pktbuf(taskptr);
 		task_msg_id = knot_wire_get_id(pktbuf->wire);
 		key = (const char *)&task_msg_id;
 		key_len = sizeof(task_msg_id);
 	} else {
-		key = (const char *)&task;
-		key_len = sizeof(char *);
+		key = (const char *)&taskptr;
+		key_len = sizeof(taskptr);
 	}
-	int ret = trie_del(t, key, key_len, &val);
-	if (ret == KNOT_EOK) {
-		kr_require(val == task);
-		worker_task_unref(val);
-	}
+	int ret = trie_del(t, key, key_len, NULL);
+
 	return ret;
 }
 
-struct qr_task *session_tasklist_get_first(struct session *session)
+qr_task_weakptr_t session_tasklist_get_first(struct session *session)
 {
-	trie_val_t *val = trie_get_first(session->tasks, NULL, NULL);
-	return val ? (struct qr_task *) *val : NULL;
+	do {
+		trie_val_t *val = trie_get_first(session->tasks, NULL, NULL);
+		if (!val)
+			return WEAKPTR_NULL;
+		if (!worker_task_exists((qr_task_weakptr_t) *val)) {
+			// Task is not valid anymore, fetch next
+			trie_del_first(session->tasks, NULL, NULL, NULL);
+			continue;
+		}
+
+		return (qr_task_weakptr_t) *val;
+	} while (true);
 }
 
-struct qr_task *session_tasklist_del_first(struct session *session, bool deref)
+qr_task_weakptr_t session_tasklist_del_first(struct session *session)
 {
-	trie_val_t val = NULL;
-	int res = trie_del_first(session->tasks, NULL, NULL, &val);
-	if (res != KNOT_EOK) {
-		val = NULL;
-	} else if (deref) {
-		worker_task_unref(val);
-	}
-	return (struct qr_task *)val;
+	do {
+		trie_val_t val = NULL;
+		int res = trie_del_first(session->tasks, NULL, NULL, &val);
+		if (res != KNOT_EOK)
+			return WEAKPTR_NULL;
+		if (!worker_task_exists((qr_task_weakptr_t) val)) {
+			// Task is not valid anymore, delete next
+			continue;
+		}
+		return (qr_task_weakptr_t)val;
+	} while (true);
 }
-struct qr_task* session_tasklist_del_msgid(const struct session *session, uint16_t msg_id)
+
+qr_task_weakptr_t session_tasklist_del_msgid(const struct session *session, uint16_t msg_id)
 {
 	if (kr_fails_assert(session->sflags.outgoing))
-		return NULL;
+		return WEAKPTR_NULL;
 	trie_t *t = session->tasks;
-	struct qr_task *ret = NULL;
 	const char *key = (const char *)&msg_id;
 	size_t key_len = sizeof(msg_id);
 	trie_val_t val;
 	int res = trie_del(t, key, key_len, &val);
-	if (res == KNOT_EOK) {
-		if (worker_task_numrefs(val) > 1) {
-			ret = val;
-		}
-		worker_task_unref(val);
-	}
-	return ret;
+	if (res != KNOT_EOK || !worker_task_exists((qr_task_weakptr_t)val))
+		return WEAKPTR_NULL;
+	return (qr_task_weakptr_t)val;
 }
 
-struct qr_task* session_tasklist_find_msgid(const struct session *session, uint16_t msg_id)
+qr_task_weakptr_t session_tasklist_find_msgid(const struct session *session, uint16_t msg_id)
 {
 	if (kr_fails_assert(session->sflags.outgoing))
-		return NULL;
+		return WEAKPTR_NULL;
 	trie_t *t = session->tasks;
-	struct qr_task *ret = NULL;
 	trie_val_t *val = trie_get_try(t, (char *)&msg_id, sizeof(msg_id));
 	if (val) {
-		ret = *val;
+		if (!worker_task_exists((qr_task_weakptr_t)*val)) {
+			trie_del(t, (char *)&msg_id, sizeof(msg_id), NULL);
+			return WEAKPTR_NULL;
+		}
+		return (qr_task_weakptr_t)*val;
 	}
-	return ret;
+	return WEAKPTR_NULL;
 }
 
 struct session_flags *session_flags(struct session *session)
@@ -382,27 +403,29 @@ struct session *session_new(uv_handle_t *handle, bool has_tls, bool has_http)
 	return session;
 }
 
-size_t session_tasklist_get_len(const struct session *session)
+size_t session_tasklist_get_len(struct session *session)
 {
+	session_tasklist_get_first(session); // Clean up no-longer-valid tasks
 	return trie_weight(session->tasks);
 }
 
-size_t session_waitinglist_get_len(const struct session *session)
+size_t session_waitinglist_get_len(struct session *session)
 {
+	session_waitinglist_get(session); // Clean up no-longer-valid tasks
 	return queue_len(session->waiting);
 }
 
-bool session_tasklist_is_empty(const struct session *session)
+bool session_tasklist_is_empty(struct session *session)
 {
 	return session_tasklist_get_len(session) == 0;
 }
 
-bool session_waitinglist_is_empty(const struct session *session)
+bool session_waitinglist_is_empty(struct session *session)
 {
 	return session_waitinglist_get_len(session) == 0;
 }
 
-bool session_is_empty(const struct session *session)
+bool session_is_empty(struct session *session)
 {
 	return session_tasklist_is_empty(session) &&
 	       session_waitinglist_is_empty(session);
@@ -421,21 +444,19 @@ void session_set_has_tls(struct session *session, bool has_tls)
 void session_waitinglist_retry(struct session *session, bool increase_timeout_cnt)
 {
 	while (!session_waitinglist_is_empty(session)) {
-		struct qr_task *task = session_waitinglist_pop(session, false);
+		qr_task_weakptr_t t = session_waitinglist_pop(session);
 		if (increase_timeout_cnt) {
-			worker_task_timeout_inc(task);
+			worker_task_timeout_inc(t);
 		}
-		worker_task_step(task, &session->peer.ip, NULL);
-		worker_task_unref(task);
+		worker_task_step(t, &session->peer.ip, NULL);
 	}
 }
 
 void session_waitinglist_finalize(struct session *session, int status)
 {
 	while (!session_waitinglist_is_empty(session)) {
-		struct qr_task *t = session_waitinglist_pop(session, false);
+		qr_task_weakptr_t t = session_waitinglist_pop(session);
 		worker_task_finalize(t, status);
-		worker_task_unref(t);
 	}
 }
 
@@ -457,62 +478,65 @@ struct proxy_result *session_proxy_get(struct session *session)
 void session_tasklist_finalize(struct session *session, int status)
 {
 	while (session_tasklist_get_len(session) > 0) {
-		struct qr_task *t = session_tasklist_del_first(session, false);
-		kr_require(worker_task_numrefs(t) > 0);
+		qr_task_weakptr_t t = session_tasklist_del_first(session);
 		worker_task_finalize(t, status);
-		worker_task_unref(t);
 	}
 }
 
 int session_tasklist_finalize_expired(struct session *session)
 {
 	int ret = 0;
-	queue_t(struct qr_task *) q;
+	queue_t(qr_task_weakptr_t) q;
 	uint64_t now = kr_now();
 	trie_t *t = session->tasks;
 	trie_it_t *it;
 	queue_init(q);
 	for (it = trie_it_begin(t); !trie_it_finished(it); trie_it_next(it)) {
 		trie_val_t *v = trie_it_val(it);
-		struct qr_task *task = (struct qr_task *)*v;
-		if ((now - worker_task_creation_time(task)) >= KR_RESOLVE_TIME_LIMIT) {
-			struct kr_request *req = worker_task_request(task);
+		qr_task_weakptr_t taskptr = (qr_task_weakptr_t)*v;
+		if (!worker_task_exists(taskptr))
+			continue;
+
+		if ((now - worker_task_creation_time(taskptr)) >= KR_RESOLVE_TIME_LIMIT
+				&& worker_task_exists(taskptr)) {
+			struct kr_request *req = worker_task_request(taskptr);
 			if (!kr_fails_assert(req))
 				kr_query_inform_timeout(req, req->current_query);
-			queue_push(q, task);
-			worker_task_ref(task);
+			queue_push(q, taskptr);
 		}
 	}
 	trie_it_free(it);
 
-	struct qr_task *task = NULL;
+	qr_task_weakptr_t taskptr = WEAKPTR_NULL;
 	uint16_t msg_id = 0;
-	char *key = (char *)&task;
-	int32_t keylen = sizeof(struct qr_task *);
+	char *key = (char *)&taskptr;
+	int32_t keylen = sizeof(taskptr);
 	if (session->sflags.outgoing) {
 		key = (char *)&msg_id;
 		keylen = sizeof(msg_id);
 	}
 	while (queue_len(q) > 0) {
-		task = queue_head(q);
+		taskptr = queue_head(q);
+		if (!worker_task_exists(taskptr)) {
+			queue_pop(q);
+			continue;
+		}
+
 		if (session->sflags.outgoing) {
-			knot_pkt_t *pktbuf = worker_task_get_pktbuf(task);
+			knot_pkt_t *pktbuf = worker_task_get_pktbuf(taskptr);
+			kr_require(pktbuf); // should never happen - task check above
 			msg_id = knot_wire_get_id(pktbuf->wire);
 		}
-		int res = trie_del(t, key, keylen, NULL);
-		if (!worker_task_finished(task)) {
+		trie_del(t, key, keylen, NULL);
+		if (!worker_task_finished(taskptr)) {
 			/* task->pending_count must be zero,
 			 * but there are can be followers,
 			 * so run worker_task_subreq_finalize() to ensure retrying
 			 * for all the followers. */
-			worker_task_subreq_finalize(task);
-			worker_task_finalize(task, KR_STATE_FAIL);
-		}
-		if (res == KNOT_EOK) {
-			worker_task_unref(task);
+			worker_task_subreq_finalize(taskptr);
+			worker_task_finalize(taskptr, KR_STATE_FAIL);
 		}
 		queue_pop(q);
-		worker_task_unref(task);
 		++ret;
 	}
 
@@ -803,7 +827,7 @@ int session_wirebuf_process(struct session *session, struct io_comm_data *comm)
 	return ret;
 }
 
-void session_kill_ioreq(struct session *session, struct qr_task *task)
+void session_kill_ioreq(struct session *session, qr_task_weakptr_t task)
 {
 	if (!session || session->sflags.closing)
 		return;

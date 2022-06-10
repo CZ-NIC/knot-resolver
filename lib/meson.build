@@ -30,6 +30,7 @@ libkres_src = files([
   'selection_forward.c',
   'selection_iter.c',
   'utils.c',
+  'weakptr.c',
   'zonecut.c',
 ])
 c_src_lint += libkres_src
@@ -60,6 +61,7 @@ libkres_headers = files([
   'selection_forward.h',
   'selection_iter.h',
   'utils.h',
+  'weakptr.h',
   'zonecut.h',
 ])
 

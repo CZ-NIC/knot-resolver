@@ -5,6 +5,7 @@
 #include "kresconfig.h"
 
 #include "contrib/ucw/mempool.h"
+#include "daemon/bindings/api.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
 #include "daemon/network.h"
@@ -13,6 +14,7 @@
 #include "lib/defines.h"
 #include "lib/dnssec.h"
 #include "lib/log.h"
+#include "lib/weakptr.h"
 
 #include <arpa/inet.h>
 #include <getopt.h>
@@ -490,6 +492,13 @@ int main(int argc, char **argv)
 
 	kr_crypto_init();
 
+	ret = weakptr_manager_init();
+	if (ret != 0) {
+		kr_log_error(SYSTEM, "failed to initialize weakptr manager: %s\n",
+				kr_strerror(ret));
+		return EXIT_FAILURE;
+	}
+
 	network_init(uv_default_loop(), TCP_BACKLOG_DEFAULT);
 
 	/* Create a server engine. */
@@ -505,6 +514,10 @@ int main(int argc, char **argv)
 		kr_log_error(SYSTEM, "failed to initialize resolver: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;
 	}
+
+	/* Register Lua bindings. */
+	kr_bindings_register(the_engine->L);
+
 	/* Initialize the worker. */
 	ret = worker_init(the_args->forks);
 	if (ret != 0) {
@@ -602,6 +615,7 @@ cleanup:/* Cleanup. */
 	if (loop != NULL) {
 		uv_loop_close(loop);
 	}
+	weakptr_manager_deinit();
 cleanup_args:
 	args_deinit(the_args);
 	kr_crypto_cleanup();

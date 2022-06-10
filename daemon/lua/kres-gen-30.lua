@@ -313,7 +313,8 @@ struct kr_server_selection {
 	struct local_state *local_state;
 };
 typedef int kr_log_level_t;
-enum kr_log_group {LOG_GRP_UNKNOWN = -1, LOG_GRP_SYSTEM = 1, LOG_GRP_CACHE, LOG_GRP_IO, LOG_GRP_NETWORK, LOG_GRP_TA, LOG_GRP_TLS, LOG_GRP_GNUTLS, LOG_GRP_TLSCLIENT, LOG_GRP_XDP, LOG_GRP_DOH, LOG_GRP_DNSSEC, LOG_GRP_HINT, LOG_GRP_PLAN, LOG_GRP_ITERATOR, LOG_GRP_VALIDATOR, LOG_GRP_RESOLVER, LOG_GRP_SELECTION, LOG_GRP_ZCUT, LOG_GRP_COOKIES, LOG_GRP_STATISTICS, LOG_GRP_REBIND, LOG_GRP_WORKER, LOG_GRP_POLICY, LOG_GRP_TASENTINEL, LOG_GRP_TASIGNALING, LOG_GRP_TAUPDATE, LOG_GRP_DAF, LOG_GRP_DETECTTIMEJUMP, LOG_GRP_DETECTTIMESKEW, LOG_GRP_GRAPHITE, LOG_GRP_PREFILL, LOG_GRP_PRIMING, LOG_GRP_SRVSTALE, LOG_GRP_WATCHDOG, LOG_GRP_NSID, LOG_GRP_DNSTAP, LOG_GRP_TESTS, LOG_GRP_DOTAUTH, LOG_GRP_HTTP, LOG_GRP_CONTROL, LOG_GRP_MODULE, LOG_GRP_DEVEL, LOG_GRP_RENUMBER, LOG_GRP_EDE, LOG_GRP_REQDBG};
+enum kr_log_group {LOG_GRP_UNKNOWN = -1, LOG_GRP_SYSTEM = 1, LOG_GRP_CACHE, LOG_GRP_IO, LOG_GRP_NETWORK, LOG_GRP_TA, LOG_GRP_TLS, LOG_GRP_GNUTLS, LOG_GRP_TLSCLIENT, LOG_GRP_XDP, LOG_GRP_DOH, LOG_GRP_DNSSEC, LOG_GRP_HINT, LOG_GRP_PLAN, LOG_GRP_ITERATOR, LOG_GRP_VALIDATOR, LOG_GRP_RESOLVER, LOG_GRP_SELECTION, LOG_GRP_ZCUT, LOG_GRP_COOKIES, LOG_GRP_STATISTICS, LOG_GRP_REBIND, LOG_GRP_WORKER, LOG_GRP_POLICY, LOG_GRP_TASENTINEL, LOG_GRP_TASIGNALING, LOG_GRP_TAUPDATE, LOG_GRP_DAF, LOG_GRP_DETECTTIMEJUMP, LOG_GRP_DETECTTIMESKEW, LOG_GRP_GRAPHITE, LOG_GRP_PREFILL, LOG_GRP_PRIMING, LOG_GRP_SRVSTALE, LOG_GRP_WATCHDOG, LOG_GRP_NSID, LOG_GRP_DNSTAP, LOG_GRP_TESTS, LOG_GRP_DOTAUTH, LOG_GRP_HTTP, LOG_GRP_CONTROL, LOG_GRP_MODULE, LOG_GRP_DEVEL, LOG_GRP_RENUMBER, LOG_GRP_EDE, LOG_GRP_WEAKPTR, LOG_GRP_REQDBG};
+typedef unsigned long weakptr_t;
 
 kr_layer_t kr_layer_t_static;
 _Bool kr_dbg_assertion_abort;
@@ -456,6 +457,7 @@ int kr_cache_remove(struct kr_cache *, const knot_dname_t *, uint16_t);
 int kr_cache_remove_subtree(struct kr_cache *, const knot_dname_t *, _Bool, int);
 int kr_cache_commit(struct kr_cache *);
 uint32_t packet_ttl(const knot_pkt_t *, _Bool);
+typedef unsigned long qr_task_weakptr_t;
 typedef struct {
 	int sock_type;
 	_Bool tls;
@@ -518,16 +520,13 @@ struct endpoint {
 };
 struct request_ctx {
 	struct kr_request req;
-	struct qr_task *task;
+	qr_task_weakptr_t taskptr;
 	/* beware: hidden stub, to avoid hardcoding sockaddr lengths */
 };
-struct qr_task {
-	struct request_ctx *ctx;
-	/* beware: hidden stub, to avoid qr_tasklist_t */
-};
-int worker_resolve_exec(struct qr_task *, knot_pkt_t *);
+int worker_resolve_exec(qr_task_weakptr_t, knot_pkt_t *);
+struct kr_request *worker_task_request(qr_task_weakptr_t);
 knot_pkt_t *worker_resolve_mk_pkt(const char *, uint16_t, uint16_t, const struct kr_qflags *);
-struct qr_task *worker_resolve_start(knot_pkt_t *, struct kr_qflags);
+qr_task_weakptr_t worker_resolve_start(knot_pkt_t *, struct kr_qflags);
 int zi_zone_import(const zi_config_t);
 struct engine {
 	char _stub[];
