@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from knot_resolver_manager.datamodel.network_schema import AddressRenumberingSchema
 from knot_resolver_manager.datamodel.types import (
@@ -43,6 +43,10 @@ class AnswerSchema(SchemaNode):
     nodata: bool = False
 
 
+class ForwardServerSchema(SchemaNode):
+    pass
+
+
 class PolicySchema(SchemaNode):
     """
     Configuration of policy rule.
@@ -56,7 +60,7 @@ class PolicySchema(SchemaNode):
     message: Deny message for 'deny' action.
     reroute: Configuration for 'reroute' action.
     answer: Answer definition for 'answer' action.
-    mirror: Mirroring parameters for 'mirror' action.
+    servers: Servers configuration for 'mirror', 'forward', 'forward-tls' and 'stub' action.
     """
 
     action: PolicyActionEnum
@@ -67,16 +71,25 @@ class PolicySchema(SchemaNode):
     message: Optional[str] = None
     reroute: Optional[List[AddressRenumberingSchema]] = None
     answer: Optional[AnswerSchema] = None
-    mirror: Optional[List[IPAddressOptionalPort]] = None
+    servers: Optional[Union[List[IPAddressOptionalPort], List[ForwardServerSchema]]] = None
 
     def _validate(self) -> None:
+        servers = ["mirror", "forward", "forward-tls", "stub"]
+
+        def _field(action: str) -> str:
+            if action in servers:
+                return "servers"
+            return {"deny": "message"}.get(action, action)
+
+        configurable_actions = ["deny", "reroute", "answer"] + servers
+
         # checking for missing mandatory fields for actions
-        mandatory_fields = ["reroute", "answer", "mirror"]
-        if self.action in mandatory_fields and not getattr(self, self.action):
-            raise ValueError(f"missing mandatory field '{self.action}' for '{self.action}' action")
+        field = _field(self.action)
+        if self.action in configurable_actions and not getattr(self, field):
+            raise ValueError(f"missing mandatory field '{field}' for '{self.action}' action")
 
         # checking for unnecessary fields
-        for action in ["deny"] + mandatory_fields:
-            field = {"deny": "message"}.get(action, action)
-            if getattr(self, field) and not self.action == action:
-                raise ValueError(f"'{field}' field can only be defined for '{self.action}' action")
+        for action in configurable_actions + ["deny"]:
+            field = _field(action)
+            if getattr(self, field) and _field(self.action) != field:
+                raise ValueError(f"'{field}' field can only be defined for '{action}' action")

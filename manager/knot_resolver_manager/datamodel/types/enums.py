@@ -12,6 +12,9 @@ PolicyActionEnum = Literal[
     "answer",
     # Chain actions
     "mirror",
+    "forward",
+    "forward-tls",
+    "stub",
     "debug-always",
     "debug-cache-miss",
     "qtrace",
