@@ -46,130 +46,6 @@ static char * bool2jsonstr(bool val)
 	return result;
 }
 
-static int put_answer(knot_pkt_t *pkt, struct kr_query *qry, knot_rrset_t *rr, bool use_nodata)
-{
-	int ret = 0;
-	if (!knot_rrset_empty(rr) || use_nodata) {
-		/* Update packet question */
-		if (!knot_dname_is_equal(knot_pkt_qname(pkt), rr->owner)) {
-			kr_pkt_recycle(pkt);
-			knot_pkt_put_question(pkt, qry->sname, qry->sclass, qry->stype);
-		}
-		if (!knot_rrset_empty(rr)) {
-			/* Append to packet */
-			ret = knot_pkt_put_rotate(pkt, KNOT_COMPR_HINT_QNAME, rr,
-						  qry->reorder, KNOT_PF_FREE);
-		} else {
-			/* Return empty answer if name exists, but type doesn't match */
-			knot_wire_set_aa(pkt->wire);
-		}
-	} else {
-		ret = kr_error(ENOENT);
-	}
-	/* Clear RR if failed */
-	if (ret != 0) {
-		knot_rrset_clear(rr, &pkt->mm);
-	}
-	return ret;
-}
-
-static int satisfy_reverse(/*const*/ struct hints_data *data,
-			   knot_pkt_t *pkt, struct kr_query *qry)
-{
-	/* Find a matching name */
-	pack_t *addr_set = kr_zonecut_find(&data->reverse_hints, qry->sname);
-	if (!addr_set || addr_set->len == 0) {
-		return kr_error(ENOENT);
-	}
-	knot_dname_t *qname = knot_dname_copy(qry->sname, &pkt->mm);
-	knot_rrset_t rr;
-	knot_rrset_init(&rr, qname, KNOT_RRTYPE_PTR, KNOT_CLASS_IN, data->ttl);
-
-	/* Append address records from hints */
-	uint8_t *addr = pack_last(*addr_set);
-	if (addr != NULL) {
-		size_t len = pack_obj_len(addr);
-		void *addr_val = pack_obj_val(addr);
-		knot_rrset_add_rdata(&rr, addr_val, len, &pkt->mm);
-	}
-
-	return put_answer(pkt, qry, &rr, data->use_nodata);
-}
-
-static int satisfy_forward(/*const*/ struct hints_data *data,
-			   knot_pkt_t *pkt, struct kr_query *qry)
-{
-	/* Find a matching name */
-	pack_t *addr_set = kr_zonecut_find(&data->hints, qry->sname);
-	if (!addr_set || addr_set->len == 0) {
-		return kr_error(ENOENT);
-	}
-	knot_dname_t *qname = knot_dname_copy(qry->sname, &pkt->mm);
-	knot_rrset_t rr;
-	knot_rrset_init(&rr, qname, qry->stype, qry->sclass, data->ttl);
-
-	size_t family_len;
-	switch (rr.type) {
-	case KNOT_RRTYPE_A:
-		family_len = sizeof(struct in_addr);
-		break;
-	case KNOT_RRTYPE_AAAA:
-		family_len = sizeof(struct in6_addr);
-		break;
-	default:
-		goto finish;
-	};
-
-	/* Append address records from hints */
-	uint8_t *addr = pack_head(*addr_set);
-	while (addr != pack_tail(*addr_set)) {
-		size_t len = pack_obj_len(addr);
-		void *addr_val = pack_obj_val(addr);
-		if (len == family_len) {
-			knot_rrset_add_rdata(&rr, addr_val, len, &pkt->mm);
-		}
-		addr = pack_obj_next(addr);
-	}
-finish:
-	return put_answer(pkt, qry, &rr, data->use_nodata);
-}
-
-static int query(kr_layer_t *ctx, knot_pkt_t *pkt)
-{
-	struct kr_query *qry = ctx->req->current_query;
-	if (!qry || (ctx->state & KR_STATE_FAIL)) {
-		return ctx->state;
-	}
-
-	struct kr_module *module = ctx->api->data;
-	struct hints_data *data = module->data;
-	if (!data) { /* No valid file. */
-		return ctx->state;
-	}
-	/* We can optimize for early return like this: */
-	if (!data->use_nodata && qry->stype != KNOT_RRTYPE_A
-	    && qry->stype != KNOT_RRTYPE_AAAA && qry->stype != KNOT_RRTYPE_PTR) {
-		return ctx->state;
-	}
-	/* FIXME: putting directly into packet breaks ordering in case the hint
-	 * is applied after a CNAME jump. */
-	if (knot_dname_in_bailiwick(qry->sname, (const uint8_t *)"\4arpa\0") >= 0) {
-		if (satisfy_reverse(data, pkt, qry) != 0)
-			return ctx->state;
-	} else {
-		if (satisfy_forward(data, pkt, qry) != 0)
-			return ctx->state;
-	}
-
-	VERBOSE_MSG(qry, "<= answered from hints\n");
-	qry->flags.DNSSEC_WANT = false; /* Never authenticated */
-	qry->flags.CACHED = true;
-	qry->flags.NO_MINIMIZE = true;
-	pkt->parsed = pkt->size;
-	knot_wire_set_qr(pkt->wire);
-	return KR_STATE_DONE;
-}
-
 static int parse_addr_str(union kr_sockaddr *sa, const char *addr)
 {
 	int family = strchr(addr, ':') ? AF_INET6 : AF_INET;
@@ -280,70 +156,69 @@ static int add_pair(const struct hints_data *data, const char *name, const char 
 	return ret;
 }
 
-static int add_reverse_pair(struct kr_zonecut *hints, const char *name, const char *addr)
+static int add_reverse_pair(const struct hints_data *data, const char *name, const char *addr)
 {
-	// FIXME: implement via new policy?
 	const knot_dname_t *key = addr2reverse(addr);
-
-	if (key == NULL) {
+	if (!key)
 		return kr_error(EINVAL);
-	}
-
+	knot_rrset_t rrs;
+	knot_rrset_init(&rrs, /*const-cast*/(knot_dname_t *)key,
+			KNOT_RRTYPE_PTR, KNOT_CLASS_IN, data->ttl);
 	knot_dname_t ptr_name[KNOT_DNAME_MAXLEN];
-	if (!knot_dname_from_str(ptr_name, name, sizeof(ptr_name))) {
+	if (!knot_dname_from_str(ptr_name, name, sizeof(ptr_name)))
 		return kr_error(EINVAL);
+	int ret = knot_rrset_add_rdata(&rrs, ptr_name, knot_dname_size(ptr_name), NULL);
+	if (!ret) {
+		ret = kr_rule_local_data_ins(&rrs, NULL, KR_RULE_TAGS_ALL);
+		knot_rdataset_clear(&rrs.rrs, NULL);
 	}
-
-	return kr_zonecut_add(hints, key, ptr_name, knot_dname_size(ptr_name));
+	return ret;
 }
 
-/** For a given name, remove either one address or all of them (if == NULL).
+/** For a given name, remove either one address  ##or all of them (if == NULL).
  *
  * Also remove the corresponding reverse records.
  */
 static int del_pair(struct hints_data *data, const char *name, const char *addr)
 {
-	/* Build key */
-	knot_dname_t key[KNOT_DNAME_MAXLEN];
-	if (!knot_dname_from_str(key, name, sizeof(key))) {
+	// Parse addr
+	if (!addr)
+		return kr_error(ENOSYS);
+	union kr_sockaddr ia;
+	if (parse_addr_str(&ia, addr) != 0)
 		return kr_error(EINVAL);
+
+	// Remove the PTR
+	const knot_dname_t *reverse_key = addr2reverse(addr);
+	knot_rrset_t rrs;
+	knot_rrset_init(&rrs, /*const-cast*/(knot_dname_t *)reverse_key,
+			KNOT_RRTYPE_PTR, KNOT_CLASS_IN, data->ttl);
+	int ret = kr_rule_local_data_del(&rrs, KR_RULE_TAGS_ALL);
+	if (ret != 1)
+		VERBOSE_MSG(NULL, "del_pair PTR for %s; error: %s\n", addr, kr_strerror(ret));
+	if (ret != 1 && ret != kr_error(ENOENT)) // ignore ENOENT for PTR (duplicities)
+		return ret;
+
+	// Remove the forward entry
+	knot_dname_t key_buf[KNOT_DNAME_MAXLEN];
+	rrs.owner = knot_dname_from_str(key_buf, name, sizeof(key_buf));
+	if (!rrs.owner)
+		return kr_error(EINVAL);
+	rrs.type = ia.ip.sa_family == AF_INET6 ? KNOT_RRTYPE_AAAA : KNOT_RRTYPE_A;
+	ret = kr_rule_local_data_del(&rrs, KR_RULE_TAGS_ALL);
+	if (ret != 1)
+		VERBOSE_MSG(NULL, "del_pair for %s; error: %s\n", name, kr_strerror(ret));
+
+	// Remove the NODATA entry; again, not perfect matching,
+	//  but we don't care much about this dynamic hints API.
+	if (ret == 1 && data->use_nodata) {
+		rrs.type = KNOT_RRTYPE_CNAME;
+		ret = kr_rule_local_data_del(&rrs, KR_RULE_TAGS_ALL);
+		if (ret != 1)
+			VERBOSE_MSG(NULL, "del_pair for NODATA %s; error: %s\n",
+					name, kr_strerror(ret));
 	}
-	int key_len = knot_dname_size(key);
-
-        if (addr) {
-		/* Remove the pair. */
-		union kr_sockaddr ia;
-		if (parse_addr_str(&ia, addr) != 0) {
-			return kr_error(EINVAL);
-		}
-
-		const knot_dname_t *reverse_key = addr2reverse(addr);
-		kr_zonecut_del(&data->reverse_hints, reverse_key, key, key_len);
-		return kr_zonecut_del(&data->hints, key,
-					kr_inaddr(&ia.ip), kr_inaddr_len(&ia.ip));
-	}
-	/* We're removing everything for the name;
-	 * first find the name's pack */
-	pack_t *addr_set = kr_zonecut_find(&data->hints, key);
-	if (!addr_set || addr_set->len == 0) {
-		return kr_error(ENOENT);
-	}
-
-	/* Remove address records in hints from reverse_hints. */
-
-	for (uint8_t *a = pack_head(*addr_set); a != pack_tail(*addr_set);
-						a = pack_obj_next(a)) {
-		void *addr_val = pack_obj_val(a);
-		int family = pack_obj_len(a) == kr_family_len(AF_INET)
-				? AF_INET : AF_INET6;
-		const knot_dname_t *reverse_key = raw_addr2reverse(addr_val, family);
-		if (reverse_key != NULL) {
-			kr_zonecut_del(&data->reverse_hints, reverse_key, key, key_len);
-		}
-	}
-
-	/* Remove the whole name. */
-	return kr_zonecut_del_all(&data->hints, key);
+	return ret < 0 ? ret : kr_ok();
 }
 
 static int load_file(struct kr_module *module, const char *path)
@@ -379,31 +254,21 @@ static int load_file(struct kr_module *module, const char *path)
 		}
 		const char *canonical_name = strtok_r(NULL, " \t\n", &saveptr);
 		if (canonical_name == NULL) {
-			ret = -1;
+			ret = kr_error(EINVAL);
 			goto error;
 		}
-		/* Since the last added PTR records takes preference,
-		 * we add canonical name as the last one. */
 		const char *name_tok;
 		while ((name_tok = strtok_r(NULL, " \t\n", &saveptr)) != NULL) {
 			ret = add_pair(data, name_tok, addr);
-			if (!ret) {
-				ret = add_reverse_pair(&data->reverse_hints, name_tok, addr);
-			}
-			if (ret) {
-				ret = -1;
+			if (ret)
 				goto error;
-			}
 			count += 1;
 		}
 		ret = add_pair(data, canonical_name, addr);
-		if (!ret) {
-			ret = add_reverse_pair(&data->reverse_hints, canonical_name, addr);
-		}
-		if (ret) {
-			ret = -1;
+		if (!ret) // PTR only to the canonical name
+			ret = add_reverse_pair(data, canonical_name, addr);
+		if (ret)
 			goto error;
-		}
 		count += 1;
 	}
 error:
@@ -444,12 +309,9 @@ static char* hint_set(void *env, struct kr_module *module, const char *args)
 	if (addr) {
 		*addr = '\0';
 		++addr;
-		ret = add_reverse_pair(&data->reverse_hints, args_copy, addr);
-		if (ret) {
-			del_pair(data, args_copy, addr);
-		} else {
+		ret = add_reverse_pair(data, args_copy, addr);
+		if (!ret)
 			ret = add_pair(data, args_copy, addr);
-		}
 	}
 
 	return bool2jsonstr(ret == 0);
@@ -471,6 +333,8 @@ static char* hint_del(void *env, struct kr_module *module, const char *args)
 		++addr;
 	}
 	ret = del_pair(data, args_copy, addr);
+	if (ret)
+		VERBOSE_MSG(NULL, "hints.del(%s) error: %s\n", args, kr_strerror(ret));
 
 	return bool2jsonstr(ret == 0);
 }
@@ -502,30 +366,7 @@ static char* pack_hints(struct kr_zonecut *hints);
  */
 static char* hint_get(void *env, struct kr_module *module, const char *args)
 {
-	struct kr_zonecut *hints = &((struct hints_data *) module->data)->hints;
-	if (kr_fails_assert(hints))
-		return NULL;
-
-	if (!args) {
-		return pack_hints(hints);
-	}
-
-	knot_dname_t key[KNOT_DNAME_MAXLEN];
-	pack_t *pack = NULL;
-	if (knot_dname_from_str(key, args, sizeof(key))) {
-		pack = kr_zonecut_find(hints, key);
-	}
-	if (!pack || pack->len == 0) {
-		return NULL;
-	}
-
-	char *result = NULL;
-	JsonNode *root = pack_addrs(pack);
-	if (root) {
-		result = json_encode(root);
-		json_delete(root);
-	}
-	return result;
+	return NULL;
 }
 
 /** @internal Pack all hints into serialized JSON. */
@@ -641,16 +482,23 @@ static char* hint_ttl(void *env, struct kr_module *module, const char *args)
 KR_EXPORT
 int hints_init(struct kr_module *module)
 {
-	static kr_layer_api_t layer = {
-		.produce = &query,
-	};
+	static kr_layer_api_t layer = { 0 };
 	/* Store module reference */
 	layer.data = module;
 	module->layer = &layer;
 
 	static const struct kr_prop props[] = {
+	/* FIXME(decide): .set() and .del() used to work on individual RRs;
+	 * now they overwrite or delete whole RRsets.
+	 * Also, .get() doesn't work at all.
+	 *
+	 * It really depends what kind of config/API we'll be exposing to user.
+	 *  - Manipulating whole RRsets generally makes more sense to me.
+	 *    (But hints.set() currently can't even insert larger sets.)
+	 *  - We'll probably be deprecating access through these non-declarative
+	 *    commands (set, get, del) which are also usable dynamically.
+	 */
 	    { &hint_set,    "set", "Set {name, address} hint.", },
-	// TODO: _del, _get etc. with new policy
 	    { &hint_del,    "del", "Delete one {name, address} hint or all addresses for the name.", },
 	    { &hint_get,    "get", "Retrieve hint for given name.", },
 	    { &hint_ttl,    "ttl", "Set/get TTL used for the hints.", },
