@@ -386,11 +386,9 @@ static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t ty
 	return kr_ok();
 }
 
-int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_rds,
-				kr_rule_tags_t tags)
+
+static knot_db_val_t local_data_key(const knot_rrset_t *rrs, uint8_t key_data[KEY_MAXLEN])
 {
-	// Construct the DB key.
-	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key;
 	key.data = key_dname_lf(rrs->owner, key_data);
 	key_data[KEY_DNAME_END_OFFSET + 1] = '\0'; // double zero
@@ -405,6 +403,14 @@ int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_r
 	memcpy(key_data + KEY_DNAME_END_OFFSET + 2, &rrs->type, sizeof(rrs->type));
 	key.len = key_data + KEY_DNAME_END_OFFSET + 2 + sizeof(rrs->type)
 		- (uint8_t *)key.data;
+	return key;
+}
+int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_rds,
+				kr_rule_tags_t tags)
+{
+	// Construct the DB key.
+	uint8_t key_data[KEY_MAXLEN];
+	knot_db_val_t key = local_data_key(rrs, key_data);
 
 	// Allocate the data in DB.
 	const int rr_ssize = rdataset_dematerialize_size(&rrs->rrs);
@@ -423,9 +429,18 @@ int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_r
 	val.data += rr_ssize;
 	rdataset_dematerialize(sig_rds, val.data);
 
-	return kr_ok();
+	return ruledb_op(commit);
 }
-
+int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags)
+{
+	uint8_t key_data[KEY_MAXLEN];
+	knot_db_val_t key = local_data_key(rrs, key_data);
+	int ret = ruledb_op(remove, &key, 1);
+	if (ret != 1)
+		return ret;
+	ret = ruledb_op(commit);
+	return ret == 0 ? 1 : ret;
+}
 
 static int answer_zla_empty(struct kr_query *qry, knot_pkt_t *pkt,
 				const knot_db_val_t zla_lf, const knot_db_val_t val)
@@ -514,6 +529,7 @@ int kr_rule_local_data_emptyzone(const knot_dname_t *apex, kr_rule_tags_t tags)
 	val.data += sizeof(tags);
 	memcpy(val.data, &ztype, sizeof(ztype));
 	val.data += sizeof(ztype);
-	return ret;
+
+	return ruledb_op(commit);
 }
 

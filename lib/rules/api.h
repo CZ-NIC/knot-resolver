@@ -24,6 +24,14 @@ void kr_rules_deinit(void);
  */
 int kr_rule_local_data_answer(struct kr_query *qry, struct knot_pkt *pkt);
 
+
+/* API to modify the rule DB.
+ *
+ * FIXME:
+ *  - what about transactions in this API?
+ *  - a way to read/modify a rule?
+ */
+
 /** Insert/overwrite a local data rule.
  *
  * Into the default rule-set ATM.
@@ -31,6 +39,16 @@ int kr_rule_local_data_answer(struct kr_query *qry, struct knot_pkt *pkt);
 KR_EXPORT
 int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_rds,
 				kr_rule_tags_t tags);
+
+/** Remove a local data rule.
+ *
+ * \return the number of deleted rules or error < 0
+ *
+ * TODO: some other matching than name+type?  Currently `tags` is unused; match all types?
+ * (would be useful in del_pair)
+ */
+KR_EXPORT
+int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags);
 
 /** Insert an empty zone.
  * Into the default rule-set ATM. */
