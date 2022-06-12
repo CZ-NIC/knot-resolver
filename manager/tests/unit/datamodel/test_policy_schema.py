@@ -18,7 +18,7 @@ noconfig_actions = [
     "qtrace",
     "reqtrace",
 ]
-configurable_actions = ["deny", "reroute", "answer", "mirror", "forward", "forward-tls", "stub"]
+configurable_actions = ["deny", "reroute", "answer", "mirror", "forward", "stub"]
 policy_actions = get_generic_type_arguments(PolicyActionEnum)
 
 
@@ -47,7 +47,6 @@ def test_action_invalid(val: Dict[str, Any]):
         {"action": "answer", "answer": {"rtype": "AAAA", "rdata": "192.0.2.7"}},
         {"action": "mirror", "servers": ["192.0.2.1@5353", "2001:148f:ffff::1"]},
         {"action": "forward", "servers": ["192.0.2.1@5353", "2001:148f:ffff::1"]},
-        {"action": "forward-tls", "servers": ["192.0.2.1@5353", "2001:148f:ffff::1"]},
         {"action": "stub", "servers": ["192.0.2.1@5353", "2001:148f:ffff::1"]},
     ],
 )

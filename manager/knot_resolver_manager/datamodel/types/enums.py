@@ -13,7 +13,6 @@ PolicyActionEnum = Literal[
     # Chain actions
     "mirror",
     "forward",
-    "forward-tls",
     "stub",
     "debug-always",
     "debug-cache-miss",

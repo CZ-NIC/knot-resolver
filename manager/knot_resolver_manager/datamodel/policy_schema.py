@@ -2,7 +2,9 @@ from typing import List, Optional, Union
 
 from knot_resolver_manager.datamodel.network_schema import AddressRenumberingSchema
 from knot_resolver_manager.datamodel.types import (
+    CheckedPath,
     DNSRecordTypeEnum,
+    DomainName,
     IPAddressOptionalPort,
     PolicyActionEnum,
     PolicyFlagEnum,
@@ -44,7 +46,20 @@ class AnswerSchema(SchemaNode):
 
 
 class ForwardServerSchema(SchemaNode):
-    pass
+    """
+    Configuration of Forward server.
+
+    ---
+    address: IP address of Forward server.
+    pin_sha256: Hash of accepted CA certificate.
+    hostname: Hostname of the Forward server.
+    ca_file: Path to CA certificate file.
+    """
+
+    address: IPAddressOptionalPort
+    pin_sha256: Optional[Union[str, List[str]]] = None
+    hostname: Optional[DomainName] = None
+    ca_file: Optional[CheckedPath] = None
 
 
 class PolicySchema(SchemaNode):
@@ -60,7 +75,7 @@ class PolicySchema(SchemaNode):
     message: Deny message for 'deny' action.
     reroute: Configuration for 'reroute' action.
     answer: Answer definition for 'answer' action.
-    servers: Servers configuration for 'mirror', 'forward', 'forward-tls' and 'stub' action.
+    servers: Servers configuration for 'mirror', 'forward' and 'stub' action.
     """
 
     action: PolicyActionEnum
@@ -74,7 +89,7 @@ class PolicySchema(SchemaNode):
     servers: Optional[Union[List[IPAddressOptionalPort], List[ForwardServerSchema]]] = None
 
     def _validate(self) -> None:
-        servers = ["mirror", "forward", "forward-tls", "stub"]
+        servers = ["mirror", "forward", "stub"]
 
         def _field(action: str) -> str:
             if action in servers:

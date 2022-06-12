@@ -1,24 +1,8 @@
 from typing import List, Optional, Union
 
-from knot_resolver_manager.datamodel.types import CheckedPath, DomainName, IPAddressOptionalPort, PolicyFlagEnum
+from knot_resolver_manager.datamodel.policy_schema import ForwardServerSchema
+from knot_resolver_manager.datamodel.types import IPAddressOptionalPort, PolicyFlagEnum
 from knot_resolver_manager.utils import SchemaNode
-
-
-class ForwardServerSchema(SchemaNode):
-    """
-    Configuration of Forward server.
-
-    ---
-    address: IP address of Forward server.
-    pin_sha256: Hash of accepted CA certificate.
-    hostname: Hostname of the Forward server.
-    ca_file: Path to CA certificate file.
-    """
-
-    address: IPAddressOptionalPort
-    pin_sha256: Optional[Union[str, List[str]]] = None
-    hostname: Optional[DomainName] = None
-    ca_file: Optional[CheckedPath] = None
 
 
 class ForwardZoneSchema(SchemaNode):
