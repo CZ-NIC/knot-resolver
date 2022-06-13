@@ -37,7 +37,7 @@ RUN pip3 install pylint
 RUN pip3 install pep8
 RUN pip3 install pytest-xdist
 # FIXME replace with dnspython >= 2.2.0 once released
-RUN pip3 install git+git://github.com/bwelling/dnspython.git@72348d4698a8f8b209fbdf9e72738904ad31b930
+RUN pip3 install git+https://github.com/bwelling/dnspython.git@72348d4698a8f8b209fbdf9e72738904ad31b930
 # tests/pytest dependencies: skip over broken versions
 RUN pip3 install jinja2 'pytest != 6.0.0' pytest-html pytest-xdist
 # apkg for packaging
