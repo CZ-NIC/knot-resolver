@@ -3,6 +3,7 @@ Knot Resolver 5.5.2 (2022-mm-dd)
 
 Improvements
 ------------
+- libknot 3.2 is supported (!1309)
 - priming module: hide failures from the default log level (!1310)
 
 Bugfixes
