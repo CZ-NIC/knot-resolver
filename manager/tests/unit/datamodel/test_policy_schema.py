@@ -48,6 +48,7 @@ def test_action_invalid(val: Dict[str, Any]):
         {"action": "mirror", "servers": ["192.0.2.1@5353", "2001:148f:ffff::1"]},
         {"action": "forward", "servers": ["192.0.2.1@5353", "2001:148f:ffff::1"]},
         {"action": "stub", "servers": ["192.0.2.1@5353", "2001:148f:ffff::1"]},
+        {"action": "forward", "servers": [{"address": "127.0.0.1@5353"}]},
     ],
 )
 def test_policy_valid(val: Dict[str, Any]):
@@ -63,6 +64,7 @@ def test_policy_valid(val: Dict[str, Any]):
         {"action": "pass", "reroute": [{"source": "192.0.2.0/24", "destination": "127.0.0.0"}]},
         {"action": "pass", "answer": {"rtype": "AAAA", "rdata": "::1"}},
         {"action": "pass", "servers": ["127.0.0.1@5353"]},
+        {"action": "mirror", "servers": [{"address": "127.0.0.1@5353"}]},
     ],
 )
 def test_policy_invalid(val: Dict[str, Any]):

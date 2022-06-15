@@ -108,3 +108,11 @@ class PolicySchema(SchemaNode):
             field = _field(action)
             if getattr(self, field) and _field(self.action) != field:
                 raise ValueError(f"'{field}' field can only be defined for '{action}' action")
+
+        # ForwardServerSchema is valid only for 'forward' action
+        if self.servers:
+            for server in self.servers:  # pylint: disable=not-an-iterable
+                if self.action != "forward" and isinstance(server, ForwardServerSchema):
+                    raise ValueError(
+                        f"'ForwardServerSchema' in 'servers' is valid only for 'forward' action, got '{self.action}'"
+                    )
