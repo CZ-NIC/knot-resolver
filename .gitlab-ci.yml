@@ -276,6 +276,9 @@ kres-gen-30:
 kres-gen-31:
   <<: *kres-gen
   image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-3.1
+kres-gen-32:
+  <<: *kres-gen
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-3.2
 
 root.hints:
   <<: *sanity

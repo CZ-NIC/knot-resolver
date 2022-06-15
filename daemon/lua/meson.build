@@ -39,8 +39,13 @@ distro_preconfig = configure_file(
 )
 
 # Unfortunately the different ABI implies different contents of 'kres-gen.lua'.
-kres_gen_fname = (libknot.version().version_compare('>= 3.1')
-                 ? 'kres-gen-31.lua' : 'kres-gen-30.lua')
+if libknot.version().version_compare('>= 3.2')
+  kres_gen_fname = 'kres-gen-32.lua'
+elif libknot.version().version_compare('>= 3.1')
+  kres_gen_fname = 'kres-gen-31.lua'
+else
+  kres_gen_fname = 'kres-gen-30.lua'
+endif
 
 kres_gen_lua = configure_file(
   input: kres_gen_fname,
