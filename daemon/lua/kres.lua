@@ -631,7 +631,7 @@ ffi.metatype( knot_pkt_t, {
 		-- Question
 		qname = function(pkt)
 			assert(ffi.istype(knot_pkt_t, pkt))
-			-- inlined knot_pkt_qname(), basically
+			-- inlined knot_pkt_qname(), basically but not lower-cased
 			if pkt == nil or pkt.qname_size == 0 then return nil end
 			return ffi.string(pkt.wire + 12, pkt.qname_size)
 		end,
