@@ -14,6 +14,5 @@ the resolver software. Unlike other DNS resolvers, Knot Resolver caches
 result of priming query on disk and keeps the data between restarts until
 TTL expires.
 
-This module is enabled by default and it is not recommended to disable it.
-For debugging purposes you may disable the module by appending
+This module is enabled by default; you may disable it by adding
 ``modules.unload('priming')`` to your configuration.
