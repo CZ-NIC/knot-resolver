@@ -101,6 +101,15 @@ build:
     - ninja -C build_ci install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
 
+build-knot32:
+  <<: *build
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-3.2
+  script:
+    - meson build_ci_knot32 --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled
+    - ninja -C build_ci_knot32
+    - ninja -C build_ci_knot32 install >/dev/null
+    - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
+
 build-asan:
   <<: *build
   script:
