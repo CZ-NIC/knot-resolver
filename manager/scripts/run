@@ -19,6 +19,22 @@ export PATH="$(realpath manager/.install_kresd)/sbin:$PATH"
 cd manager
 
 echo
+echo Building Knot Resolver Manager native extensions
+echo ------------------------------------------------
+poetry build
+# copy native modules from build directory to source directory
+shopt -s globstar
+shopt -s nullglob
+for d in build/lib*; do
+    for f in "$d/"**/*.so; do
+        cp -v "$f" ${f#"$d/"}
+    done
+done
+shopt -u globstar
+shopt -u nullglob
+
+
+echo
 echo Knot Manager API is accessible on http://localhost:5000
 echo -------------------------------------------------------
 

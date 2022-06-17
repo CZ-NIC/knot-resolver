@@ -7,6 +7,12 @@ authors = [
     "Aleš Mrázek <ales.mrazek@nic.cz>"
 ]
 
+# See currently open issue about building C extensions here:
+# https://github.com/python-poetry/poetry/issues/2740
+[tool.poetry.build]
+script = "build.py"
+generate-setup-file = true
+
 [tool.poetry.dependencies]
 python = "^3.6.8"
 aiohttp = "^3.6.12"
@@ -50,7 +56,7 @@ run-debug = { cmd = "scripts/run-debug", help = "Run the manager under debugger"
 docs = { cmd = "scripts/docs", help = "Create HTML documentation" }
 test = { shell = "env PYTHONPATH=. pytest --junitxml=unit.junit.xml --cov=knot_resolver_manager --show-capture=all tests/unit/", help = "Run tests" }
 check = { cmd = "scripts/codecheck", help = "Run static code analysis" }
-format = { shell = "black knot_resolver_manager/ tests/ scripts/; isort .", help = "Run code formatter" }
+format = { shell = "black knot_resolver_manager/ tests/ scripts/ build.py; isort .", help = "Run code formatter" }
 fixdeps = { shell = "poetry install; npm install; npm update", help = "Install/update dependencies according to configuration files"}
 commit = { shell = "scripts/commit", help = "Invoke every single check before commiting" }
 container = { cmd = "scripts/container.py", help = "Manage containers" }
@@ -73,6 +79,9 @@ configure-vscode = {cmd = "scripts/configure-vscode", help = "Create VSCode conf
 line-length = 120
 target_version = ['py38']
 include = '\.py$'
+exclude = '''
+^/setup.py  # Poetry generates it and we want to keep it unchanged
+'''
 
 [tool.isort]
 line_length=120                # corresponds to -w  flag
@@ -80,6 +89,10 @@ multi_line_output=3            # corresponds to -m  flag
 include_trailing_comma=true    # corresponds to -tc flag
 skip_glob = '^((?!py$).)*$'    # isort all Python files
 float_to_top=true
+profile = "black"
+skip = [
+    "setup.py",  # Poetry generates it and we want to keep it unchanged
+]
 
 [tool.tox]
 legacy_tox_ini = """

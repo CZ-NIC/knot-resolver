@@ -15,3 +15,4 @@ docs/_build/*
 *junit.xml
 .build_kresd/
 .install_kresd/
+build/
