@@ -9,6 +9,7 @@ packages = \
  'knot_resolver_manager.datamodel.types',
  'knot_resolver_manager.kresd_controller',
  'knot_resolver_manager.kresd_controller.supervisord',
+ 'knot_resolver_manager.kresd_controller.supervisord.plugin',
  'knot_resolver_manager.kresd_controller.systemd',
  'knot_resolver_manager.utils']
 

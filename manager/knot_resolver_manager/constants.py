@@ -34,6 +34,10 @@ def kresd_config_file(_config: "KresConfig", kres_id: "KresID") -> Path:
     return Path(f"{kres_id}.conf")
 
 
+def kresd_config_file_supervisord_pattern(_config: "KresConfig") -> Path:
+    return Path("kresd%(process_num)d.conf")
+
+
 def supervisord_config_file(_config: "KresConfig") -> Path:
     return Path("supervisord.conf")
 

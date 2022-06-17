@@ -1,5 +1,4 @@
 import os
-from typing import List
 
 from jinja2 import Template
 
@@ -7,7 +6,7 @@ from knot_resolver_manager.compat.dataclasses import dataclass
 from knot_resolver_manager.constants import (
     kres_gc_executable,
     kresd_cache_dir,
-    kresd_config_file,
+    kresd_config_file_supervisord_pattern,
     kresd_executable,
     supervisord_config_file,
     supervisord_config_file_tmp,
@@ -43,48 +42,38 @@ class SupervisordKresID(KresID):
             raise RuntimeError(f"Unexpected subprocess type {self.subprocess_type}")
 
 
-def _get_command_based_on_type(config: KresConfig, i: "SupervisordKresID") -> str:
-    if i.subprocess_type is SubprocessType.KRESD:
-        return f"{kresd_executable()} -c {kresd_config_file(config, i)} -n"
-    elif i.subprocess_type is SubprocessType.GC:
-        return f"{kres_gc_executable()} -c {kresd_cache_dir(config)} -d 1000"
-    else:
-        raise NotImplementedError("This subprocess type is not supported")
-
-
 @dataclass
-class _Instance:
+class ProcessTypeConfig:
     """
     Data structure holding data for supervisord config template
     """
 
-    type: str
     logfile: str
-    id: str
     workdir: str
     command: str
     environment: str
+    max_procs: int = 1
 
     @staticmethod
-    def create_list(config: KresConfig) -> List["_Instance"]:
+    def create_gc_config(config: KresConfig) -> "ProcessTypeConfig":
         cwd = str(os.getcwd())
+        return ProcessTypeConfig(  # type: ignore[call-arg]
+            logfile=supervisord_subprocess_log_dir(config) / "gc.log",
+            workdir=cwd,
+            command=f"{kres_gc_executable()} -c {kresd_cache_dir(config)} -d 1000",
+            environment="",
+        )
 
-        instances = [
-            SupervisordKresID(SubprocessType.KRESD, i, _i_know_what_i_am_doing=True)
-            for i in range(1, int(config.max_workers) + 1)
-        ] + [SupervisordKresID(SubprocessType.GC, -1, _i_know_what_i_am_doing=True)]
-
-        return [
-            _Instance(  # type: ignore[call-arg]
-                type=i.subprocess_type.name,
-                logfile=supervisord_subprocess_log_dir(config) / f"{i}.log",
-                id=str(i),
-                workdir=cwd,
-                command=_get_command_based_on_type(config, i),
-                environment=f"SYSTEMD_INSTANCE={i}",
-            )
-            for i in instances
-        ]
+    @staticmethod
+    def create_kresd_config(config: KresConfig) -> "ProcessTypeConfig":
+        cwd = str(os.getcwd())
+        return ProcessTypeConfig(  # type: ignore[call-arg]
+            logfile=supervisord_subprocess_log_dir(config) / "kresd%(process_num)d.log",
+            workdir=cwd,
+            command=f"{kresd_executable()} -c {kresd_config_file_supervisord_pattern(config)} -n",
+            environment='SYSTEMD_INSTANCE="%(process_num)d",X-SUPERVISORD-TYPE=notify',
+            max_procs=config.max_workers,
+        )
 
 
 @dataclass
@@ -113,7 +102,8 @@ async def write_config_file(config: KresConfig) -> None:
     assert template is not None
     template = template.decode("utf8")
     config_string = Template(template).render(  # pyright: reportUnknownMemberType=false
-        instances=_Instance.create_list(config),
+        gc=ProcessTypeConfig.create_gc_config(config),
+        kresd=ProcessTypeConfig.create_kresd_config(config),
         config=SupervisordConfig.create(config),
     )
     await writefile(supervisord_config_file_tmp(config), config_string)

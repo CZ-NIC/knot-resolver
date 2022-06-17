@@ -175,7 +175,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 #   if it keeps running, the config is valid and others will soon join as well
                 #   if it crashes and the startup fails, then well, it's not running anymore... :)
                 await self._spawn_new_worker(new)
-            except SubprocessError:
+            except (SubprocessError, SubprocessControllerException):
                 logger.error("kresd with the new config failed to start, rejecting config")
                 return Result.err("Canary kresd instance failed to start. Config is invalid.")
 

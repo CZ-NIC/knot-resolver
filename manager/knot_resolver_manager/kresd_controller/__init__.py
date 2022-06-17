@@ -101,5 +101,5 @@ async def get_controller_by_name(config: KresConfig, name: str) -> SubprocessCon
 
 
 # run the imports on module load
-try_systemd()
 try_supervisord()
+try_systemd()

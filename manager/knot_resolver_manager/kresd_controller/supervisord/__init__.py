@@ -1,8 +1,9 @@
 import logging
 from os import kill
 from pathlib import Path
+from time import sleep
 from typing import Any, Dict, Iterable, Optional, Union, cast
-from xmlrpc.client import ServerProxy
+from xmlrpc.client import Fault, ServerProxy
 
 import supervisor.xmlrpc  # type: ignore[import]
 
@@ -40,7 +41,14 @@ async def _reload_supervisord(config: KresConfig) -> None:
 @async_in_a_thread
 def _stop_supervisord(config: KresConfig) -> None:
     supervisord = _create_supervisord_proxy(config)
+    pid = supervisord.getPID()
     supervisord.shutdown()
+    try:
+        while True:
+            kill(pid, 0)
+            sleep(0.1)
+    except ProcessLookupError:
+        pass  # there is finally no supervisord process
     supervisord_config_file(config).unlink()
 
 
@@ -126,21 +134,30 @@ class SupervisordSubprocess(Subprocess):
             super().__init__(config, base_id)
         self._controller: "SupervisordSubprocessController" = controller
 
+    def _name(self):
+        if self.type is SubprocessType.GC:
+            return str(self.id)
+        else:
+            return f"kresd:{self.id}"
+
     @async_in_a_thread
     def _start(self) -> None:
-        supervisord = _create_supervisord_proxy(self._config)
-        supervisord.startProcess(str(self.id))
+        try:
+            supervisord = _create_supervisord_proxy(self._config)
+            supervisord.startProcess(self._name())
+        except Fault as e:
+            raise SubprocessControllerException(f"failed to start '{self.id}'") from e
 
     @async_in_a_thread
     def _stop(self) -> None:
         supervisord = _create_supervisord_proxy(self._config)
-        supervisord.stopProcess(str(self.id))
+        supervisord.stopProcess(self._name())
 
     @async_in_a_thread
     def _restart(self) -> None:
         supervisord = _create_supervisord_proxy(self._config)
-        supervisord.stopProcess(str(self.id))
-        supervisord.startProcess(str(self.id))
+        supervisord.stopProcess(self._name())
+        supervisord.startProcess(self._name())
 
     def get_used_config(self) -> KresConfig:
         return self._config
