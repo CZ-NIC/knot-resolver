@@ -3,7 +3,7 @@ from typing import Any, Dict
 import pytest
 from pytest import raises
 
-from knot_resolver_manager.datamodel.policy_schema import PolicySchema
+from knot_resolver_manager.datamodel.policy_schema import ActionSchema, PolicySchema
 from knot_resolver_manager.datamodel.types import PolicyActionEnum
 from knot_resolver_manager.exceptions import KresManagerException
 from knot_resolver_manager.utils.types import get_generic_type_arguments
@@ -25,12 +25,15 @@ policy_actions = get_generic_type_arguments(PolicyActionEnum)
 @pytest.mark.parametrize("val", [item for item in policy_actions if item not in configurable_actions])
 def test_policy_action_valid(val: Any):
     PolicySchema({"action": val})
+    ActionSchema({"action": val})
 
 
 @pytest.mark.parametrize("val", [{"action": "invalid-action"}])
 def test_action_invalid(val: Dict[str, Any]):
     with raises(KresManagerException):
         PolicySchema(val)
+    with raises(KresManagerException):
+        ActionSchema(val)
 
 
 @pytest.mark.parametrize(
@@ -53,6 +56,7 @@ def test_action_invalid(val: Dict[str, Any]):
 )
 def test_policy_valid(val: Dict[str, Any]):
     PolicySchema(val)
+    ActionSchema(val)
 
 
 @pytest.mark.parametrize(
@@ -70,6 +74,8 @@ def test_policy_valid(val: Dict[str, Any]):
 def test_policy_invalid(val: Dict[str, Any]):
     with raises(KresManagerException):
         PolicySchema(val)
+    with raises(KresManagerException):
+        ActionSchema(val)
 
 
 @pytest.mark.parametrize(
@@ -79,3 +85,5 @@ def test_policy_invalid(val: Dict[str, Any]):
 def test_policy_message_invalid(val: str):
     with raises(KresManagerException):
         PolicySchema({"action": f"{val}", "message": "this is deny message"})
+    with raises(KresManagerException):
+        ActionSchema({"action": f"{val}", "message": "this is deny message"})
