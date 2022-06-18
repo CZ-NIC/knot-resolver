@@ -107,8 +107,10 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         else:
             self._controller = selected_controller
         self._config_store = config_store
+        logger.debug("Starting controller")
         await self._controller.initialize_controller(config_store.get())
         self._watchdog_task = create_task(self._watchdog())
+        logger.debug("Looking for already running workers")
         await self._collect_already_running_workers()
 
         # registering the function calls them immediately, therefore after this, the config is applied

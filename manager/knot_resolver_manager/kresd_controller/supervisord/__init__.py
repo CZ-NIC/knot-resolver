@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from os import kill
 from pathlib import Path
@@ -25,8 +26,10 @@ logger = logging.getLogger(__name__)
 
 
 async def _start_supervisord(config: KresConfig) -> None:
+    logger.debug("Writing supervisord config")
     await write_config_file(config)
-    res = await call(f'supervisord --configuration="{supervisord_config_file(config).absolute()}"', shell=True)
+    logger.debug("Starting supervisord")
+    res = await call(["supervisord", "--configuration", str(supervisord_config_file(config).absolute())])
     if res != 0:
         raise SubprocessControllerException(f"Supervisord exited with exit code {res}")
 
@@ -53,9 +56,11 @@ def _stop_supervisord(config: KresConfig) -> None:
 
 
 async def _is_supervisord_available() -> bool:
-    i = await call("supervisorctl -h > /dev/null", shell=True, discard_output=True)
-    i += await call("supervisord -h > /dev/null", shell=True, discard_output=True)
-    return i == 0
+    i, y = await asyncio.gather(
+        call("supervisorctl -h > /dev/null", shell=True, discard_output=True),
+        call("supervisord -h > /dev/null", shell=True, discard_output=True),
+    )
+    return i + y == 0
 
 
 async def _get_supervisord_pid(config: KresConfig) -> Optional[int]:
