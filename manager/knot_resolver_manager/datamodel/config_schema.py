@@ -117,6 +117,7 @@ class KresConfig(SchemaNode):
         hostname: Optional[str] = None
         rundir: UncheckedPath = UncheckedPath(".")
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
+        max_workers: IntPositive = IntPositive(MAX_WORKERS)
         management: ManagementSchema = ManagementSchema({"unix-socket": "./manager.sock"})
         webmgmt: Optional[WebmgmtSchema] = None
         supervisor: SupervisorSchema = SupervisorSchema()
@@ -143,7 +144,7 @@ class KresConfig(SchemaNode):
     hostname: str
     rundir: UncheckedPath
     workers: IntPositive
-    max_workers: IntPositive = IntPositive(MAX_WORKERS)
+    max_workers: IntPositive
     management: ManagementSchema
     webmgmt: Optional[WebmgmtSchema]
     supervisor: SupervisorSchema
