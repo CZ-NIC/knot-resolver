@@ -2,8 +2,8 @@
 {% from 'macros/view_macros.lua.j2' import view_tsig, view_addr %}
 
 {% if cfg.forward_zones %}
-{% for name, zone in cfg.forward_zones.items() %}
--- forward-zone: {{ name }}
+{% for zone in cfg.forward_zones %}
+-- forward-zone: {{ zone.name }}
 {% if zone.views -%}
 {# views set for forward-zone #}
 {% for view_id in zone.views -%}
@@ -24,13 +24,13 @@
 {% for tsig in view.tsig %}
 
 {%- if options -%}
-{{ view_tsig(tsig|string, policy_suffix(policy_flags(options|list), policy_todname(name|string))) }}
+{{ view_tsig(tsig|string, policy_suffix(policy_flags(options|list), policy_todname(zone.name|string))) }}
 {%- endif %}
 
 {% if zone.tls -%}
-{{ view_tsig(tsig|string, policy_suffix(policy_tls_forward(zone.servers|list), policy_todname(name|string))) }}
+{{ view_tsig(tsig|string, policy_suffix(policy_tls_forward(zone.servers|list), policy_todname(zone.name|string))) }}
 {% else %}
-{{ view_tsig(tsig|string, policy_suffix(policy_forward(zone.servers|list), policy_todname(name|string))) }}
+{{ view_tsig(tsig|string, policy_suffix(policy_forward(zone.servers|list), policy_todname(zone.name|string))) }}
 {%- endif %}
 
 {% endfor %}
@@ -41,13 +41,13 @@
 {% for addr in view.subnets %}
 
 {%- if options -%}
-{{ view_addr(addr|string, policy_suffix(policy_flags(options|list), policy_todname(name|string))) }}
+{{ view_addr(addr|string, policy_suffix(policy_flags(options|list), policy_todname(zone.name|string))) }}
 {%- endif %}
 
 {% if zone.tls -%}
-{{ view_addr(addr|string, policy_suffix(policy_tls_forward(zone.servers|list), policy_todname(name|string))) }}
+{{ view_addr(addr|string, policy_suffix(policy_tls_forward(zone.servers|list), policy_todname(zone.name|string))) }}
 {% else %}
-{{ view_addr(addr|string, policy_suffix(policy_forward(zone.servers|list), policy_todname(name|string))) }}
+{{ view_addr(addr|string, policy_suffix(policy_forward(zone.servers|list), policy_todname(zone.name|string))) }}
 {%- endif %}
 
 {% endfor %}
@@ -58,13 +58,13 @@
 {# no views set for forward-zone #}
 
 {% if zone.options -%}
-{{ policy_add(policy_suffix(policy_flags(zone.options|list), policy_todname(name|string))) }}
+{{ policy_add(policy_suffix(policy_flags(zone.options|list), policy_todname(zone.name|string))) }}
 {%- endif %}
 
 {% if zone.tls -%}
-{{ policy_add(policy_suffix(policy_tls_forward(zone.servers|list), policy_todname(name|string))) }}
+{{ policy_add(policy_suffix(policy_tls_forward(zone.servers|list), policy_todname(zone.name|string))) }}
 {% else %}
-{{ policy_add(policy_suffix(policy_forward(zone.servers|list), policy_todname(name|string))) }}
+{{ policy_add(policy_suffix(policy_forward(zone.servers|list), policy_todname(zone.name|string))) }}
 {%- endif %}
 
 {% endif %}

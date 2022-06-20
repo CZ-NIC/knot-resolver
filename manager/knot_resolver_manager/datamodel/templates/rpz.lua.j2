@@ -2,8 +2,7 @@
 {% from 'macros/view_macros.lua.j2' import view_tsig, view_addr %}
 
 {% if cfg.rpz %}
-{% for id, rpz in cfg.rpz.items() %}
--- rpz: {{ id }}
+{% for rpz in cfg.rpz %}
 {% if rpz.views -%}
 {# views set for rpz #}
 {% for view_id in rpz.views -%}

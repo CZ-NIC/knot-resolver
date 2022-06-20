@@ -2,7 +2,7 @@ import logging
 import os
 import socket
 import sys
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from jinja2 import Environment, FileSystemLoader, Template
 from typing_extensions import Literal
@@ -23,7 +23,6 @@ from knot_resolver_manager.datamodel.slice_schema import SliceSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
 from knot_resolver_manager.datamodel.supervisor_schema import SupervisorSchema
-from knot_resolver_manager.datamodel.types import DomainName
 from knot_resolver_manager.datamodel.types.types import IDPattern, IntPositive, UncheckedPath
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
@@ -123,11 +122,11 @@ class KresConfig(SchemaNode):
         network: NetworkSchema = NetworkSchema()
         static_hints: StaticHintsSchema = StaticHintsSchema()
         views: Optional[Dict[str, ViewSchema]] = None
-        slices: Optional[Dict[str, SliceSchema]] = None
-        policy: Optional[Dict[str, PolicySchema]] = None
-        rpz: Optional[Dict[str, RPZSchema]] = None
-        stub_zones: Optional[Dict[DomainName, StubZoneSchema]] = None
-        forward_zones: Optional[Dict[DomainName, ForwardZoneSchema]] = None
+        slices: Optional[List[SliceSchema]] = None
+        policy: Optional[List[PolicySchema]] = None
+        rpz: Optional[List[RPZSchema]] = None
+        stub_zones: Optional[List[StubZoneSchema]] = None
+        forward_zones: Optional[List[ForwardZoneSchema]] = None
         cache: CacheSchema = CacheSchema()
         dnssec: Union[bool, DnssecSchema] = True
         dns64: Union[bool, Dns64Schema] = False
@@ -149,11 +148,11 @@ class KresConfig(SchemaNode):
     network: NetworkSchema
     static_hints: StaticHintsSchema
     views: Optional[Dict[str, ViewSchema]]
-    slices: Optional[Dict[str, SliceSchema]]
-    policy: Optional[Dict[str, PolicySchema]]
-    rpz: Optional[Dict[str, RPZSchema]]
-    stub_zones: Optional[Dict[DomainName, StubZoneSchema]]
-    forward_zones: Optional[Dict[DomainName, ForwardZoneSchema]]
+    slices: Optional[List[SliceSchema]]
+    policy: Optional[List[PolicySchema]]
+    rpz: Optional[List[RPZSchema]]
+    stub_zones: Optional[List[StubZoneSchema]]
+    forward_zones: Optional[List[ForwardZoneSchema]]
     cache: CacheSchema
     dnssec: Union[Literal[False], DnssecSchema]
     dns64: Union[Literal[False], Dns64Schema]

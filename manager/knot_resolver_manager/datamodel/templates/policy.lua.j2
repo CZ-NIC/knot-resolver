@@ -5,8 +5,7 @@
 
 {{ declare_policy_qtype_custom_filter() }}
 
-{% for id, rule in cfg.policy.items() %}
--- policy rule: {{ id }}
+{% for rule in cfg.policy %}
 {% if rule.views -%}
 {# views set for rule #}
 {% for view_id in rule.views -%}
