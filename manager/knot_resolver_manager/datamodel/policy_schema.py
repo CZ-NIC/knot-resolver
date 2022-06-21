@@ -68,7 +68,7 @@ def _validate_policy_action(policy_action: Union["ActionSchema", "PolicySchema"]
     def _field(ac: str) -> str:
         if ac in servers:
             return "servers"
-        return {"deny": "message"}.get(ac, ac)
+        return "message" if ac == "deny" else ac
 
     configurable_actions = ["deny", "reroute", "answer"] + servers
 
