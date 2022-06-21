@@ -12,6 +12,27 @@ policy.add({{ rule }})
 {%- endmacro %}
 
 
+{# Slice #}
+
+{% macro policy_slice_randomize_psl(seed='') -%}
+{%- if seed == '' -%}
+policy.slice_randomize_psl()
+{%- else -%}
+policy.slice_randomize_psl(seed={{ seed }})
+{%- endif -%}
+{%- endmacro %}
+
+{% macro policy_slice(func, actions) -%}
+policy.slice(
+{%- if func == 'randomize-psl' -%}
+policy.slice_randomize_psl()
+{%- else -%}
+policy.slice_randomize_psl()
+{%- endif -%}
+,{{ actions }})
+{%- endmacro %}
+
+
 {# Flags #}
 
 {% macro policy_flags(flags) -%}

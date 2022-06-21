@@ -1,8 +1,10 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from knot_resolver_manager.datamodel.network_schema import AddressRenumberingSchema
 from knot_resolver_manager.datamodel.types import (
+    CheckedPath,
     DNSRecordTypeEnum,
+    DomainName,
     IPAddressOptionalPort,
     PolicyActionEnum,
     PolicyFlagEnum,
@@ -43,6 +45,75 @@ class AnswerSchema(SchemaNode):
     nodata: bool = False
 
 
+class ForwardServerSchema(SchemaNode):
+    """
+    Configuration of Forward server.
+
+    ---
+    address: IP address of Forward server.
+    pin_sha256: Hash of accepted CA certificate.
+    hostname: Hostname of the Forward server.
+    ca_file: Path to CA certificate file.
+    """
+
+    address: IPAddressOptionalPort
+    pin_sha256: Optional[Union[str, List[str]]] = None
+    hostname: Optional[DomainName] = None
+    ca_file: Optional[CheckedPath] = None
+
+
+def _validate_policy_action(policy_action: Union["ActionSchema", "PolicySchema"]) -> None:
+    servers = ["mirror", "forward", "stub"]
+
+    def _field(ac: str) -> str:
+        if ac in servers:
+            return "servers"
+        return "message" if ac == "deny" else ac
+
+    configurable_actions = ["deny", "reroute", "answer"] + servers
+
+    # checking for missing mandatory fields for actions
+    field = _field(policy_action.action)
+    if policy_action.action in configurable_actions and not getattr(policy_action, field):
+        raise ValueError(f"missing mandatory field '{field}' for '{policy_action.action}' action")
+
+    # checking for unnecessary fields
+    for ac in configurable_actions + ["deny"]:
+        field = _field(ac)
+        if getattr(policy_action, field) and _field(policy_action.action) != field:
+            raise ValueError(f"'{field}' field can only be defined for '{ac}' action")
+
+    # ForwardServerSchema is valid only for 'forward' action
+    if policy_action.servers:
+        for server in policy_action.servers:  # pylint: disable=not-an-iterable
+            if policy_action.action != "forward" and isinstance(server, ForwardServerSchema):
+                raise ValueError(
+                    f"'ForwardServerSchema' in 'servers' is valid only for 'forward' action, got '{policy_action.action}'"
+                )
+
+
+class ActionSchema(SchemaNode):
+    """
+    Configuration of policy action.
+
+    ---
+    action: Policy action.
+    message: Deny message for 'deny' action.
+    reroute: Configuration for 'reroute' action.
+    answer: Answer definition for 'answer' action.
+    servers: Servers configuration for 'mirror', 'forward' and 'stub' action.
+    """
+
+    action: PolicyActionEnum
+    message: Optional[str] = None
+    reroute: Optional[List[AddressRenumberingSchema]] = None
+    answer: Optional[AnswerSchema] = None
+    servers: Optional[Union[List[IPAddressOptionalPort], List[ForwardServerSchema]]] = None
+
+    def _validate(self) -> None:
+        _validate_policy_action(self)
+
+
 class PolicySchema(SchemaNode):
     """
     Configuration of policy rule.
@@ -56,7 +127,7 @@ class PolicySchema(SchemaNode):
     message: Deny message for 'deny' action.
     reroute: Configuration for 'reroute' action.
     answer: Answer definition for 'answer' action.
-    mirror: Mirroring parameters for 'mirror' action.
+    servers: Servers configuration for 'mirror', 'forward' and 'stub' action.
     """
 
     action: PolicyActionEnum
@@ -67,23 +138,7 @@ class PolicySchema(SchemaNode):
     message: Optional[str] = None
     reroute: Optional[List[AddressRenumberingSchema]] = None
     answer: Optional[AnswerSchema] = None
-    mirror: Optional[List[IPAddressOptionalPort]] = None
+    servers: Optional[Union[List[IPAddressOptionalPort], List[ForwardServerSchema]]] = None
 
     def _validate(self) -> None:
-        # checking for missing fields
-        if self.action == "reroute" and not self.reroute:
-            raise ValueError("missing mandatory field 'reroute' for 'reroute' action")
-        if self.action == "answer" and not self.answer:
-            raise ValueError("missing mandatory field 'answer' for 'answer' action")
-        if self.action == "mirror" and not self.mirror:
-            raise ValueError("missing mandatory field 'mirror' for 'mirror' action")
-
-        # checking for unnecessary fields
-        if self.message and not self.action == "deny":
-            raise ValueError("'message' field can only be defined for 'deny' action")
-        if self.reroute and not self.action == "reroute":
-            raise ValueError("'answer' field can only be defined for 'answer' action")
-        if self.answer and not self.action == "answer":
-            raise ValueError("'answer' field can only be defined for 'answer' action")
-        if self.mirror and not self.action == "mirror":
-            raise ValueError("'mirror' field can only be defined for 'mirror' action")
+        _validate_policy_action(self)

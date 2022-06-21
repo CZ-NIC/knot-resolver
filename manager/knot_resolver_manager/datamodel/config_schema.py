@@ -2,7 +2,7 @@ import logging
 import os
 import socket
 import sys
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from jinja2 import Environment, FileSystemLoader, Template
 from typing_extensions import Literal
@@ -10,8 +10,8 @@ from typing_extensions import Literal
 from knot_resolver_manager.datamodel.cache_schema import CacheSchema
 from knot_resolver_manager.datamodel.dns64_schema import Dns64Schema
 from knot_resolver_manager.datamodel.dnssec_schema import DnssecSchema
-from knot_resolver_manager.datamodel.forward_zone import ForwardZoneSchema
-from knot_resolver_manager.datamodel.logging_config import LoggingSchema
+from knot_resolver_manager.datamodel.forward_zone_schema import ForwardZoneSchema
+from knot_resolver_manager.datamodel.logging_schema import LoggingSchema
 from knot_resolver_manager.datamodel.lua_schema import LuaSchema
 from knot_resolver_manager.datamodel.management_schema import ManagementSchema
 from knot_resolver_manager.datamodel.monitoring_schema import MonitoringSchema
@@ -19,10 +19,10 @@ from knot_resolver_manager.datamodel.network_schema import NetworkSchema
 from knot_resolver_manager.datamodel.options_schema import OptionsSchema
 from knot_resolver_manager.datamodel.policy_schema import PolicySchema
 from knot_resolver_manager.datamodel.rpz_schema import RPZSchema
+from knot_resolver_manager.datamodel.slice_schema import SliceSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
 from knot_resolver_manager.datamodel.supervisor_schema import SupervisorSchema
-from knot_resolver_manager.datamodel.types import DomainName
 from knot_resolver_manager.datamodel.types.types import IDPattern, IntPositive, UncheckedPath
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
@@ -97,6 +97,7 @@ class KresConfig(SchemaNode):
         network: Network connections and protocols configuration.
         static_hints: Static hints for forward records (A/AAAA) and reverse records (PTR)
         views: List of views and its configuration.
+        slices: Split the entire DNS namespace into distinct slices.
         policy: List of policy rules and its configuration.
         rpz: List of Response Policy Zones and its configuration.
         stub_zones: List of Stub Zones and its configuration.
@@ -121,10 +122,11 @@ class KresConfig(SchemaNode):
         network: NetworkSchema = NetworkSchema()
         static_hints: StaticHintsSchema = StaticHintsSchema()
         views: Optional[Dict[str, ViewSchema]] = None
-        policy: Optional[Dict[str, PolicySchema]] = None
-        rpz: Optional[Dict[str, RPZSchema]] = None
-        stub_zones: Optional[Dict[DomainName, StubZoneSchema]] = None
-        forward_zones: Optional[Dict[DomainName, ForwardZoneSchema]] = None
+        slices: Optional[List[SliceSchema]] = None
+        policy: Optional[List[PolicySchema]] = None
+        rpz: Optional[List[RPZSchema]] = None
+        stub_zones: Optional[List[StubZoneSchema]] = None
+        forward_zones: Optional[List[ForwardZoneSchema]] = None
         cache: CacheSchema = CacheSchema()
         dnssec: Union[bool, DnssecSchema] = True
         dns64: Union[bool, Dns64Schema] = False
@@ -146,10 +148,11 @@ class KresConfig(SchemaNode):
     network: NetworkSchema
     static_hints: StaticHintsSchema
     views: Optional[Dict[str, ViewSchema]]
-    policy: Optional[Dict[str, PolicySchema]]
-    rpz: Optional[Dict[str, RPZSchema]]
-    stub_zones: Optional[Dict[DomainName, StubZoneSchema]]
-    forward_zones: Optional[Dict[DomainName, ForwardZoneSchema]]
+    slices: Optional[List[SliceSchema]]
+    policy: Optional[List[PolicySchema]]
+    rpz: Optional[List[RPZSchema]]
+    stub_zones: Optional[List[StubZoneSchema]]
+    forward_zones: Optional[List[ForwardZoneSchema]]
     cache: CacheSchema
     dnssec: Union[Literal[False], DnssecSchema]
     dns64: Union[Literal[False], Dns64Schema]
