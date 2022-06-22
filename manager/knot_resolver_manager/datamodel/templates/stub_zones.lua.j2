@@ -3,7 +3,7 @@
 
 {% if cfg.stub_zones %}
 {% for zone in cfg.stub_zones %}
--- stub-zone: {{ zone.name }}
+-- stub-zone: {{ zone.subtree }}
 {% if zone.views -%}
 {# views set for stub-zone #}
 {% for view_id in zone.views -%}
@@ -23,10 +23,10 @@
 {% for tsig in view.tsig -%}
 
 {%- if options -%}
-{{ view_tsig(tsig|string, policy_suffix(policy_flags(options|list), policy_todname(zone.name|string))) }}
+{{ view_tsig(tsig|string, policy_suffix(policy_flags(options|list), policy_todname(zone.subtree|string))) }}
 {%- endif %}
 
-{{ view_tsig(tsig|string, policy_suffix(policy_stub(zone.servers|list), policy_todname(zone.name|string))) }}
+{{ view_tsig(tsig|string, policy_suffix(policy_stub(zone.servers|list), policy_todname(zone.subtree|string))) }}
 
 {% endfor %}
 {%- endif -%}
@@ -35,10 +35,10 @@
 {% for addr in view.subnets -%}
 
 {%- if options -%}
-{{ view_addr(addr|string, policy_suffix(policy_flags(options|list), policy_todname(zone.name|string))) }}
+{{ view_addr(addr|string, policy_suffix(policy_flags(options|list), policy_todname(zone.subtree|string))) }}
 {%- endif %}
 
-{{ view_addr(addr|string, policy_suffix(policy_stub(zone.servers|list), policy_todname(zone.name|string))) }}
+{{ view_addr(addr|string, policy_suffix(policy_stub(zone.servers|list), policy_todname(zone.subtree|string))) }}
 
 {% endfor %}
 {% endif %}
@@ -48,10 +48,10 @@
 {# no views set for stub-zone #}
 
 {% if zone.options -%}
-{{ policy_add(policy_suffix(policy_flags(zone.options|list), policy_todname(zone.name|string))) }}
+{{ policy_add(policy_suffix(policy_flags(zone.options|list), policy_todname(zone.subtree|string))) }}
 {%- endif %}
 
-{{ policy_add(policy_suffix(policy_stub(zone.servers|list), policy_todname(zone.name|string))) }}
+{{ policy_add(policy_suffix(policy_stub(zone.servers|list), policy_todname(zone.subtree|string))) }}
 
 {% endif %}
 {% endfor %}

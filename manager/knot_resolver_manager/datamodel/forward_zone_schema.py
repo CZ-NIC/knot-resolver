@@ -10,15 +10,13 @@ class ForwardZoneSchema(ConfigSchema):
     Configuration of Forward Zone.
 
     ---
-    name: Domain name of the zone.
-    tls: Enable/disable TLS for Forward servers.
+    subtree: Domain name of the zone.
     servers: IP address of Forward server.
     views: Use this Forward Zone only for clients defined by views.
     options: Configuration flags for Forward Zone.
     """
 
-    name: DomainName
-    tls: bool = False
+    subtree: DomainName
     servers: Union[List[IPAddressOptionalPort], List[ForwardServerSchema]]
     views: Optional[List[str]] = None
     options: Optional[List[PolicyFlagEnum]] = None

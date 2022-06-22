@@ -1,5 +1,7 @@
 from typing import List, Optional, Union
 
+from typing_extensions import Literal
+
 from knot_resolver_manager.datamodel.network_schema import AddressRenumberingSchema
 from knot_resolver_manager.datamodel.types import (
     DNSRecordTypeEnum,
@@ -47,16 +49,18 @@ class AnswerSchema(ConfigSchema):
 
 class ForwardServerSchema(ConfigSchema):
     """
-    Configuration of Forward server.
+    Configuration of forward server.
 
     ---
-    address: IP address of Forward server.
+    address: IP address of a forward server.
+    transport: Transport protocol for a forward server.
     pin_sha256: Hash of accepted CA certificate.
     hostname: Hostname of the Forward server.
     ca_file: Path to CA certificate file.
     """
 
-    address: IPAddressOptionalPort
+    address: List[IPAddressOptionalPort]
+    transport: Optional[Literal["tls"]] = None
     pin_sha256: Optional[Union[str, List[str]]] = None
     hostname: Optional[DomainName] = None
     ca_file: Optional[File] = None
