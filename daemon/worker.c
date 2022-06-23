@@ -73,6 +73,9 @@ struct request_ctx
 	} source;
 };
 
+/** List of query resolution tasks. */
+typedef array_t(qr_task_weakptr_t) qr_tasklist_t;
+
 /** Query resolution task. */
 struct qr_task
 {

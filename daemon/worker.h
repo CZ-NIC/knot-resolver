@@ -46,9 +46,6 @@ struct worker_stats {
 /** Freelist of available mempools. */
 typedef array_t(struct mempool *) mp_freelist_t;
 
-/** List of query resolution tasks. */
-typedef array_t(qr_task_weakptr_t) qr_tasklist_t;
-
 /** List of HTTP header names. */
 typedef array_t(const char *) doh_headerlist_t;
 
