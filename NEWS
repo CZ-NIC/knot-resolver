@@ -1,3 +1,11 @@
+Knot Resolver 5.5.2 (2022-mm-dd)
+================================
+
+Bugfixes
+--------
+- daemon/http: improved URI checks to fix some proxies (#746, !1311)
+
+
 Knot Resolver 5.5.1 (2022-06-14)
 ================================
 

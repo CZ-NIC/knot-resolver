@@ -172,25 +172,14 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 /*
  * Check endpoint and uri path
  */
-static int check_uri(const char* uri_path)
+static int check_uri(const char* path)
 {
-	static const char key[] = "dns=";
-	static const char *delim = "&";
 	static const char *endpoints[] = {"dns-query", "doh"};
-	char *beg;
-	char *end_prev;
 	ssize_t endpoint_len;
 	ssize_t ret;
 
-	if (!uri_path)
-		return kr_error(EINVAL);
-
-	auto_free char *path = malloc(sizeof(*path) * (strlen(uri_path) + 1));
 	if (!path)
-		return kr_error(ENOMEM);
-
-	memcpy(path, uri_path, strlen(uri_path));
-	path[strlen(uri_path)] = '\0';
+		return kr_error(EINVAL);
 
 	char *query_mark = strstr(path, "?");
 
@@ -208,35 +197,7 @@ static int check_uri(const char* uri_path)
 			break;
 	}
 
-	if (ret) /* no endpoint found */
-		return kr_error(ENOENT);
-
-	/* FIXME This also passes for GET when no variables are provided.
-	 * Fixing it doesn't seem straightforward, since :method may not be
-	 * known by the time check_uri() is called... */
-	if (endpoint_len == strlen(path) - 1) /* done for POST method */
-		return 0;
-
-	/* go over key:value pair */
-	beg = strtok(query_mark + 1, delim);
-	if (beg) {
-		while (beg != NULL) {
-			if (!strncmp(beg, key, 4)) { /* dns variable in path found */
-				break;
-			}
-			end_prev = beg + strlen(beg);
-			beg = strtok(NULL, delim);
-			if (!beg || beg-1 != end_prev) { /* detect && */
-				return -1;
-			}
-		}
-
-		if (!beg) { /* no dns variable in path */
-			return -1;
-		}
-	}
-
-	return 0;
+	return (ret) ? kr_error(ENOENT) : kr_ok();
 }
 
 static kr_http_header_array_t *headers_dup(kr_http_header_array_t *src)
@@ -265,13 +226,26 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 		return kr_error(EINVAL);
 
 	static const char key[] = "dns=";
-	char *beg = strstr(path, key);
-	char *end;
-	size_t remaining;
+	static const char *delim = "&";
+	char *beg, *end;
 	uint8_t *dest;
+	uint32_t remaining;
 
-	if (!beg)  /* No dns variable in path. */
-		return -1;
+	if (!path)
+		return kr_error(EINVAL);
+
+	char *query_mark = strstr(path, "?");
+	if (!query_mark || strlen(query_mark) == 0) /* no parameters in path */
+		return kr_error(EINVAL);
+
+	/* go over key:value pair */
+	for (beg = strtok(query_mark + 1, delim); beg != NULL; beg = strtok(NULL, delim)) {
+		if (!strncmp(beg, key, 4)) /* dns variable in path found */
+			break;
+	}
+
+	if (!beg) /* no dns variable in path */
+		return kr_error(EINVAL);
 
 	beg += sizeof(key) - 1;
 	end = strchr(beg, '&');
@@ -282,6 +256,7 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 	remaining = ctx->buf_size - ctx->submitted - ctx->buf_pos;
 	dest = ctx->buf + ctx->buf_pos;
 
+	/* Decode dns message from the parameter */
 	int ret = kr_base64url_decode((uint8_t*)beg, end - beg, dest, remaining);
 	if (ret < 0) {
 		ctx->buf_pos = 0;
@@ -296,7 +271,8 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 		.headers = headers_dup(ctx->headers)
 	};
 	queue_push(ctx->streams, stream);
-	return 0;
+
+	return kr_ok();
 }
 
 static void refuse_stream(nghttp2_session *h2, int32_t stream_id)

@@ -139,6 +139,45 @@ else
 		same(pkt:arcount(), 0, desc .. ': ADDITIONAL is empty')
 	end
 
+	local function test_post_ignore_params_1()
+		local desc = 'valid POST ignores parameters (without ?dns)'
+		local req = req_templ:clone()
+		req.headers:upsert(':method', 'POST')
+		req.headers:upsert(':path', '/doh?something=asdf&aaa=bbb')
+		req:set_body(basexx.from_base64(  -- noerror.test. A
+			'vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB'))
+		local headers, pkt = check_ok(req, desc)
+		if not (headers and pkt) then
+			return
+		end
+		-- HTTP TTL is minimum from all RRs in the answer
+		same(headers:get('cache-control'), 'max-age=300', desc .. ': TTL 900')
+		same(pkt:rcode(), kres.rcode.NOERROR, desc .. ': rcode matches')
+		same(pkt:ancount(), 3, desc .. ': ANSWER is present')
+		same(pkt:nscount(), 1, desc .. ': AUTHORITY is present')
+		same(pkt:arcount(), 0, desc .. ': ADDITIONAL is empty')
+	end
+
+	local function test_post_ignore_params_2()
+		local desc = 'valid POST ignores parameters (with ?dns)'
+		local req = req_templ:clone()
+		req.headers:upsert(':method', 'POST')
+		req.headers:upsert(':path', '/dns-query?dns='  -- servfail.test. A
+			.. 'FZUBAAABAAAAAAAACHNlcnZmYWlsBHRlc3QAAAEAAQ')
+		req:set_body(basexx.from_base64(  -- noerror.test. A
+			'vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB'))
+		local headers, pkt = check_ok(req, desc)
+		if not (headers and pkt) then
+			return
+		end
+		-- HTTP TTL is minimum from all RRs in the answer
+		same(headers:get('cache-control'), 'max-age=300', desc .. ': TTL 900')
+		same(pkt:rcode(), kres.rcode.NOERROR, desc .. ': rcode matches')
+		same(pkt:ancount(), 3, desc .. ': ANSWER is present')
+		same(pkt:nscount(), 1, desc .. ': AUTHORITY is present')
+		same(pkt:arcount(), 0, desc .. ': ADDITIONAL is empty')
+	end
+
 	local function test_post_nxdomain()
 		local desc = 'valid POST query which ends with NXDOMAIN'
 		local req = req_templ:clone()
@@ -250,6 +289,15 @@ else
 		same(headers:get('cache-control'), 'max-age=10800', desc .. ': TTL 10800')
 		same(pkt:rcode(), kres.rcode.NXDOMAIN, desc .. ': rcode matches')
 		same(pkt:nscount(), 1, desc .. ': AUTHORITY is present')
+	end
+
+	local function test_get_multiple_amps()
+		local desc = 'GET query with consecutive ampersands'
+		local req = req_templ:clone()
+		req.headers:upsert(':method', 'GET')
+		req.headers:upsert(':path',
+		'/doh?other=something&another=something&&&&dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
+		check_ok(req, desc)
 	end
 
 	local function test_get_other_params_before_dns()
@@ -446,6 +494,8 @@ else
 		start_server,
 		test_post_servfail,
 		test_post_noerror,
+		test_post_ignore_params_1,
+		test_post_ignore_params_2,
 		test_post_nxdomain,
 		test_huge_answer,
 		test_post_short_input,
@@ -455,6 +505,7 @@ else
 		test_get_servfail,
 		test_get_noerror,
 		test_get_nxdomain,
+		test_get_multiple_amps,
 		test_get_other_params_before_dns,
 		test_get_other_params_after_dns,
 		test_get_other_params,
