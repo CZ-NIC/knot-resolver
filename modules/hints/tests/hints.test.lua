@@ -35,7 +35,7 @@ end
 local function test_nxdomain()
 	hints.config() -- clean start
 	hints.use_nodata(false)
-	hints['myname.lan'] = '192.0.2.1'
+	hints.add_hosts('hints.test.hosts')
 	-- TODO: prefilling or some other way of getting NXDOMAIN (instead of SERVFAIL)
 	utils.check_answer('bad name gives NXDOMAIN',
 		'badname.lan', kres.type.A, kres.rcode.SERVFAIL)
