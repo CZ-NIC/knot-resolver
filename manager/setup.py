@@ -10,7 +10,6 @@ packages = \
  'knot_resolver_manager.kresd_controller',
  'knot_resolver_manager.kresd_controller.supervisord',
  'knot_resolver_manager.kresd_controller.supervisord.plugin',
- 'knot_resolver_manager.kresd_controller.systemd',
  'knot_resolver_manager.utils']
 
 package_data = \
@@ -19,12 +18,10 @@ package_data = \
 
 install_requires = \
 ['Jinja2>=2.11.3',
- 'PyGObject>=3.38.0',
  'PyYAML>=5.4.1',
  'aiohttp>=3.6.12',
  'click>=7.1.2',
  'prometheus-client>=0.6',
- 'pydbus>=0.6.0',
  'requests>=2.25.1',
  'typing-extensions>=3.7.2']
 
