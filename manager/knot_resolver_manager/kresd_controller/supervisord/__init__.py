@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from os import kill
 from pathlib import Path
@@ -20,6 +19,7 @@ from knot_resolver_manager.kresd_controller.interface import (
     SubprocessType,
 )
 from knot_resolver_manager.kresd_controller.supervisord.config_file import SupervisordKresID, write_config_file
+from knot_resolver_manager.utils import which
 from knot_resolver_manager.utils.async_utils import call, readfile
 
 logger = logging.getLogger(__name__)
@@ -56,11 +56,17 @@ def _stop_supervisord(config: KresConfig) -> None:
 
 
 async def _is_supervisord_available() -> bool:
-    i, y = await asyncio.gather(
-        call("supervisorctl -h > /dev/null", shell=True, discard_output=True),
-        call("supervisord -h > /dev/null", shell=True, discard_output=True),
-    )
-    return i + y == 0
+    # yes, it is! The code in this file wouldn't be running without it due to imports :)
+
+    # so let's just check that we can find supervisord and supervisorctl binaries
+    try:
+        which.which("supervisord")
+        which.which("supervisorctl")
+    except RuntimeError:
+        logger.error("Failed to find supervisord or supervisorctl executables in $PATH")
+        return False
+
+    return True
 
 
 async def _get_supervisord_pid(config: KresConfig) -> Optional[int]:
@@ -90,14 +96,23 @@ async def _is_supervisord_running(config: KresConfig) -> bool:
         return True
 
 
-def _create_supervisord_proxy(config: KresConfig) -> Any:
-    proxy = ServerProxy(
+def _create_proxy(config: KresConfig) -> ServerProxy:
+    return ServerProxy(
         "http://127.0.0.1",
         transport=supervisor.xmlrpc.SupervisorTransport(
             None, None, serverurl="unix://" + str(supervisord_sock_file(config))
         ),
     )
+
+
+def _create_supervisord_proxy(config: KresConfig) -> Any:
+    proxy = _create_proxy(config)
     return getattr(proxy, "supervisor")
+
+
+def _create_fast_proxy(config: KresConfig) -> Any:
+    proxy = _create_proxy(config)
+    return getattr(proxy, "fast")
 
 
 def _list_running_subprocesses(config: KresConfig) -> Dict[SupervisordKresID, SubprocessStatus]:
@@ -148,7 +163,7 @@ class SupervisordSubprocess(Subprocess):
     @async_in_a_thread
     def _start(self) -> None:
         try:
-            supervisord = _create_supervisord_proxy(self._config)
+            supervisord = _create_fast_proxy(self._config)
             supervisord.startProcess(self._name())
         except Fault as e:
             raise SubprocessControllerException(f"failed to start '{self.id}'") from e
@@ -162,7 +177,8 @@ class SupervisordSubprocess(Subprocess):
     def _restart(self) -> None:
         supervisord = _create_supervisord_proxy(self._config)
         supervisord.stopProcess(self._name())
-        supervisord.startProcess(self._name())
+        fast = _create_fast_proxy(self._config)
+        fast.startProcess(self._name())
 
     def get_used_config(self) -> KresConfig:
         return self._config
