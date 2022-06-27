@@ -1,6 +1,10 @@
 Knot Resolver 5.5.2 (2022-mm-dd)
 ================================
 
+Improvements
+------------
+- priming module: hide failures from the default log level (!1310)
+
 Bugfixes
 --------
 - daemon/http: improved URI checks to fix some proxies (#746, !1311)
