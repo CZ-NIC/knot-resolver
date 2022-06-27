@@ -231,9 +231,6 @@ static int process_uri_path(struct http_ctx *ctx, const char* path, int32_t stre
 	uint8_t *dest;
 	uint32_t remaining;
 
-	if (!path)
-		return kr_error(EINVAL);
-
 	char *query_mark = strstr(path, "?");
 	if (!query_mark || strlen(query_mark) == 0) /* no parameters in path */
 		return kr_error(EINVAL);
