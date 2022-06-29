@@ -30,16 +30,34 @@ Detailed configuration of daemon and implemented modules can be found in configu
 Listening on network interfaces
 ===============================
 
-Network interfaces to listen on and supported protocols are configured using :func:`net.listen()` function.
-
 The following configuration instructs Knot Resolver to receive standard unencrypted DNS queries on IP addresses `192.0.2.1` and `2001:db8::1`. Encrypted DNS queries are accepted using DNS-over-TLS protocol on all IP addresses configured on network interface `eth0`, TCP port 853.
 
-.. code-block:: lua
 
-    -- unencrypted DNS on port 53 is default
-    net.listen('192.0.2.1')
-    net.listen('2001:db8::1')
-    net.listen(net.eth0, 853, { kind = 'tls' })
+.. tabs::
+
+    .. tab:: yaml
+
+        .. code-block:: yaml
+
+            network:
+                listen:
+                  - interface: ['192.0.2.1', '2001:db8::1'] # unencrypted DNS on port 53 is default
+                  - interface: 'eth0'
+                    port: 853
+                    kind: 'dot'
+
+
+    .. tab:: lua legacy
+
+        Network interfaces to listen on and supported protocols are configured using :func:`net.listen()` function.
+
+        .. code-block:: lua
+
+            -- unencrypted DNS on port 53 is default
+            net.listen('192.0.2.1')
+            net.listen('2001:db8::1')
+            net.listen(net.eth0, 853, { kind = 'tls' })
+
 
 .. warning::
 
