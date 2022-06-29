@@ -32,10 +32,9 @@ Listening on network interfaces
 
 The following configuration instructs Knot Resolver to receive standard unencrypted DNS queries on IP addresses `192.0.2.1` and `2001:db8::1`. Encrypted DNS queries are accepted using DNS-over-TLS protocol on all IP addresses configured on network interface `eth0`, TCP port 853.
 
-
 .. tabs::
 
-    .. tab:: yaml
+    .. group-tab:: yaml
 
         .. code-block:: yaml
 
@@ -46,8 +45,7 @@ The following configuration instructs Knot Resolver to receive standard unencryp
                     port: 853
                     kind: 'dot'
 
-
-    .. tab:: lua legacy
+    .. group-tab:: lua legacy
 
         Network interfaces to listen on and supported protocols are configured using :func:`net.listen()` function.
 
@@ -57,7 +55,6 @@ The following configuration instructs Knot Resolver to receive standard unencryp
             net.listen('192.0.2.1')
             net.listen('2001:db8::1')
             net.listen(net.eth0, 853, { kind = 'tls' })
-
 
 .. warning::
 
@@ -78,14 +75,24 @@ An internal-only domain is a domain not accessible from the public Internet.
 In order to resolve internal-only domains a query policy has to be added to forward queries to a correct internal server.
 This configuration will forward two listed domains to a DNS server with IP address ``192.0.2.44``.
 
-.. code-block:: lua
+.. tabs::
 
-    -- define list of internal-only domains
-    internalDomains = policy.todnames({'company.example', 'internal.example'})
+    .. group-tab:: yaml
 
-    -- forward all queries belonging to domains in the list above to IP address '192.0.2.44'
-    policy.add(policy.suffix(policy.FLAGS({'NO_CACHE'}), internalDomains))
-    policy.add(policy.suffix(policy.STUB({'192.0.2.44'}), internalDomains))
+        .. code-block:: yaml
+
+
+    .. group-tab:: lua legacy
+
+        .. code-block:: lua
+
+            -- define list of internal-only domains
+            internalDomains = policy.todnames({'company.example', 'internal.example'})
+
+            -- forward all queries belonging to domains in the list above to IP address '192.0.2.44'
+            policy.add(policy.suffix(policy.FLAGS({'NO_CACHE'}), internalDomains))
+            policy.add(policy.suffix(policy.STUB({'192.0.2.44'}), internalDomains))
+
 
 See chapter :ref:`dns-graft` for more details.
 
@@ -106,15 +113,24 @@ With exception of public resolvers, a DNS resolver should resolve only queries s
 In a situation where access to DNS resolver is not limited using IP firewall, you can implement access restrictions using the :ref:`view module <mod-view>` which combines query source information with :ref:`policy rules <mod-policy>`.
 Following configuration allows only queries from clients in subnet 192.0.2.0/24 and refuses all the rest.
 
-.. code-block:: lua
+.. tabs::
 
-    modules.load('view')
+    .. group-tab:: yaml
 
-    -- whitelist queries identified by subnet
-    view:addr('192.0.2.0/24', policy.all(policy.PASS))
+        .. code-block:: yaml
 
-    -- drop everything that hasn't matched
-    view:addr('0.0.0.0/0', policy.all(policy.DROP))
+
+    .. group-tab:: lua legacy
+
+        .. code-block:: lua
+
+            modules.load('view')
+
+            -- whitelist queries identified by subnet
+            view:addr('192.0.2.0/24', policy.all(policy.PASS))
+
+            -- drop everything that hasn't matched
+            view:addr('0.0.0.0/0', policy.all(policy.DROP))
 
 TLS server configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -122,18 +138,36 @@ Today clients are demanding secure transport for DNS queries between client mach
 
 First step is to enable TLS on listening interfaces:
 
-.. code-block:: lua
+.. tabs::
 
-   net.listen('192.0.2.1', 853, { kind = 'tls' })
-   net.listen('2001::db8:1', 853, { kind = 'tls' })
+    .. group-tab:: yaml
+
+        .. code-block:: yaml
+
+
+    .. group-tab:: lua legacy
+
+        .. code-block:: lua
+
+            net.listen('192.0.2.1', 853, { kind = 'tls' })
+            net.listen('2001::db8:1', 853, { kind = 'tls' })
 
 By default a self-signed certificate is generated.
 Second step is then obtaining and configuring your own TLS certificates
 signed by a trusted CA. Once the certificate was obtained a path to certificate files can be specified using function :func:`net.tls()`:
 
-.. code-block:: lua
+.. tabs::
 
-    net.tls("/etc/knot-resolver/server-cert.pem", "/etc/knot-resolver/server-key.pem")
+    .. group-tab:: yaml
+
+        .. code-block:: yaml
+
+
+    .. group-tab:: lua legacy
+
+        .. code-block:: lua
+
+            net.tls("/etc/knot-resolver/server-cert.pem", "/etc/knot-resolver/server-key.pem")
 
 
 Mandatory domain blocking
@@ -141,12 +175,21 @@ Mandatory domain blocking
 
 Some jurisdictions mandate blocking access to certain domains. This can be achieved using following :ref:`policy rule <mod-policy>`:
 
-.. code-block:: lua
 
-  policy.add(
-        policy.suffix(policy.DENY,
-                policy.todnames({'example.com.', 'blocked.example.net.'})))
+.. tabs::
 
+    .. group-tab:: yaml
+
+        .. code-block:: yaml
+
+
+    .. group-tab:: lua legacy
+
+        .. code-block:: lua
+
+            policy.add(
+                    policy.suffix(policy.DENY,
+                            policy.todnames({'example.com.', 'blocked.example.net.'})))
 
 
 .. _personalresolver:
@@ -192,18 +235,27 @@ of all queries performed by this client.
     types of attacks which will allow remote resolvers to infer more information about the client.
     Again: If possible encrypt **all** your traffic and not just DNS queries!
 
-.. code-block:: lua
+.. tabs::
 
-    policy.add(policy.slice(
-       policy.slice_randomize_psl(),
-       policy.TLS_FORWARD({{'192.0.2.1', hostname='res.example.com'}}),
-       policy.TLS_FORWARD({
-          -- multiple servers can be specified for a single slice
-          -- the one with lowest round-trip time will be used
-          {'193.17.47.1', hostname='odvr.nic.cz'},
-          {'185.43.135.1', hostname='odvr.nic.cz'},
-       })
-    ))
+    .. group-tab:: yaml
+
+        .. code-block:: yaml
+
+
+    .. group-tab:: lua legacy
+
+        .. code-block:: lua
+
+            policy.add(policy.slice(
+            policy.slice_randomize_psl(),
+            policy.TLS_FORWARD({{'192.0.2.1', hostname='res.example.com'}}),
+            policy.TLS_FORWARD({
+                -- multiple servers can be specified for a single slice
+                -- the one with lowest round-trip time will be used
+                {'193.17.47.1', hostname='odvr.nic.cz'},
+                {'185.43.135.1', hostname='odvr.nic.cz'},
+            })
+            ))
 
 Non-persistent cache
 ^^^^^^^^^^^^^^^^^^^^
