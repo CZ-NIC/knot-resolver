@@ -389,6 +389,8 @@ void tls_client_close(struct tls_client_ctx *ctx)
 	/* Store the current session data for potential resumption of this session */
 	if (ctx->params) {
 		gnutls_free(ctx->params->session_data.data);
+		ctx->params->session_data.data = NULL;
+		ctx->params->session_data.size = 0;
 		gnutls_session_get_data2(ctx->c.tls_session, &ctx->params->session_data);
 	}
 
