@@ -51,7 +51,12 @@ KR_EXPORT
 int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags);
 
 /** Insert an empty zone.
- * Into the default rule-set ATM. */
+ * Into the default rule-set ATM.  SOA for generated NODATA isn't overridable. */
 KR_EXPORT
 int kr_rule_local_data_emptyzone(const knot_dname_t *apex, kr_rule_tags_t tags);
+
+/** Insert a redirect zone.
+ * Into the default rule-set ATM.  SOA for generated NODATA isn't overridable. */
+KR_EXPORT
+int kr_rule_local_data_redirect(const knot_dname_t *apex, kr_rule_tags_t tags);
 

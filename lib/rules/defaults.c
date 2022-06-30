@@ -6,6 +6,10 @@
 #include "lib/rules/api.h"
 #include "lib/utils.h"
 
+#define CHECK_RET(ret) do { \
+	if ((ret) < 0) { kr_assert(false); return kr_error((ret)); } \
+} while (false)
+
 int rules_defaults_insert(void)
 {
 	static const char * names[] = {
@@ -133,8 +137,7 @@ int rules_defaults_insert(void)
 		const knot_dname_t *dname =
 			knot_dname_from_str(name_buf, names[i], sizeof(name_buf));
 		int ret = kr_rule_local_data_emptyzone(dname, KR_RULE_TAGS_ALL);
-		if (kr_fails_assert(!ret))
-			return kr_error(ret);
+		CHECK_RET(ret);
 		/* The double conversion is perhaps a bit wasteful, but it should be rare. */
 		/* LATER: add extra info with explanation?  policy module had an ADDITIONAL
 		 * record with explanation, but perhaps extended errors are more suitable?
@@ -142,30 +145,64 @@ int rules_defaults_insert(void)
 		 */
 	}
 
-	{ // reverse localhost; LATER: the situation isn't ideal with NXDOMAIN + some exact matches
-		knot_dname_t name_buf[KNOT_DNAME_MAXLEN];
+	knot_dname_t localhost_dname[] = "\x09localhost\0";
+	{ // forward localhost
+		int ret = kr_rule_local_data_redirect(localhost_dname, KR_RULE_TAGS_ALL);
+		CHECK_RET(ret);
+
 		knot_rrset_t rr = {
-			.owner = knot_dname_from_str(name_buf,
-				"1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa.",
-				sizeof(name_buf)),
+			.owner = localhost_dname,
+			.ttl = RULE_TTL_DEFAULT,
+			.rclass = KNOT_CLASS_IN,
+			.rrs = { 0 },
+			.additional = NULL,
+		};
+		rr.type = KNOT_RRTYPE_A;
+		ret = knot_rrset_add_rdata(&rr, (const uint8_t *)"\x7f\0\0\1", 4, NULL);
+		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL, KR_RULE_TAGS_ALL);
+		knot_rdataset_clear(&rr.rrs, NULL);
+		CHECK_RET(ret);
+
+		rr.type = KNOT_RRTYPE_AAAA;
+		ret = knot_rrset_add_rdata(&rr,
+				(const uint8_t *)"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1",
+				16, NULL);
+		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL, KR_RULE_TAGS_ALL);
+		knot_rdataset_clear(&rr.rrs, NULL);
+		CHECK_RET(ret);
+
+		rr.type = KNOT_RRTYPE_NS;
+		ret = knot_rrset_add_rdata(&rr, localhost_dname, 1+9+1, NULL);
+		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL, KR_RULE_TAGS_ALL);
+		knot_rdataset_clear(&rr.rrs, NULL);
+		CHECK_RET(ret);
+	}
+
+	{ // reverse localhost; LATER: the situation isn't ideal with NXDOMAIN + some exact matches
+		knot_rrset_t rr = {
+			.owner = localhost_dname,
 			.ttl = RULE_TTL_DEFAULT,
 			.type = KNOT_RRTYPE_PTR,
 			.rclass = KNOT_CLASS_IN,
 			.rrs = { 0 },
 			.additional = NULL,
 		};
-		int ret = knot_rrset_add_rdata(&rr, (const knot_dname_t *)"\x09localhost\0",
-						1+9+1, NULL);
+		int ret = knot_rrset_add_rdata(&rr, localhost_dname, 1+9+1, NULL);
 		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL, KR_RULE_TAGS_ALL);
 
+		knot_dname_t name_buf[KNOT_DNAME_MAXLEN];
 		rr.owner = knot_dname_from_str(name_buf,
 				"1.0.0.127.in-addr.arpa.",
 				sizeof(name_buf));
 		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL, KR_RULE_TAGS_ALL);
 
+		rr.owner = knot_dname_from_str(name_buf,
+			"1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa.",
+			sizeof(name_buf));
+		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL, KR_RULE_TAGS_ALL);
+
 		knot_rdataset_clear(&rr.rrs, NULL);
-		if (kr_fails_assert(!ret))
-			return kr_error(ret);
+		CHECK_RET(ret);
 	}
 
 	return kr_ok();

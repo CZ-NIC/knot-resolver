@@ -5,8 +5,6 @@ local ffi = require('ffi')
 local LOG_GRP_POLICY_TAG = ffi.string(ffi.C.kr_log_grp2name(ffi.C.LOG_GRP_POLICY))
 local LOG_GRP_REQDBG_TAG = ffi.string(ffi.C.kr_log_grp2name(ffi.C.LOG_GRP_REQDBG))
 
-local todname = kres.str2dname -- not available during module load otherwise
-
 -- Counter of unique rules
 local nextid = 0
 local function getruleid()
@@ -268,35 +266,6 @@ function policy.ANSWER(rtable, nodata)
 		end
 		return kres.DONE
 	end
-end
-
-local dname_localhost = todname('localhost.')
-
--- Rule for localhost. zone; see RFC6303, sec. 3
-local function localhost(_, req)
-	local qry = req:current()
-	local answer = req:ensure_answer()
-	if answer == nil then return nil end
-	ffi.C.kr_pkt_make_auth_header(answer)
-
-	local is_exact = ffi.C.knot_dname_is_equal(qry.sname, dname_localhost)
-
-	answer:rcode(kres.rcode.NOERROR)
-	answer:begin(kres.section.ANSWER)
-	if qry.stype == kres.type.AAAA then
-		answer:put(qry.sname, 900, answer:qclass(), kres.type.AAAA,
-			'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1')
-	elseif qry.stype == kres.type.A then
-		answer:put(qry.sname, 900, answer:qclass(), kres.type.A, '\127\0\0\1')
-	elseif is_exact and qry.stype == kres.type.SOA then
-		mkauth_soa(answer, dname_localhost)
-	elseif is_exact and qry.stype == kres.type.NS then
-		answer:put(dname_localhost, 900, answer:qclass(), kres.type.NS, dname_localhost)
-	else
-		answer:begin(kres.section.AUTHORITY)
-		mkauth_soa(answer, dname_localhost)
-	end
-	return kres.DONE
 end
 
 -- All requests
@@ -864,29 +833,6 @@ end
 -- @var Default rules
 policy.rules = {}
 policy.postrules = {}
-policy.special_names = {
-	-- XXX: beware of special_names_optim() when modifying these filters
-	{
-		cb=policy.suffix(localhost, {dname_localhost}),
-		count=0
-	},
-}
-
--- Return boolean; false = no special name may apply, true = some might apply.
--- The point is to *efficiently* filter almost all QNAMEs that do not apply.
-local function special_names_optim(req, sname)
-	local qname_size = req.qsource.packet.qname_size
-	if qname_size < 9 then return true end -- don't want to special-case bad array access
-	local root = sname + qname_size - 1
-	return
-		-- .a???. or .t???.
-		(root[-5] == 4 and (root[-4] == 97 or root[-4] == 116))
-		-- .on???. or .in?????. or lo???. or *ost.
-		or (root[-6] == 5 and root[-5] == 111 and root[-4] == 110)
-		or (root[-8] == 7 and root[-7] == 105 and root[-6] == 110)
-		or (root[-6] == 5 and root[-5] == 108 and root[-4] == 111)
-		or (root[-3] == 111 and root[-2] == 115 and root[-1] == 116)
-end
 
 -- Top-down policy list walk until we hit a match
 -- the caller is responsible for reordering policy list
@@ -899,8 +845,6 @@ policy.layer = {
 		if bit.band(state, bit.bor(kres.FAIL, kres.DONE)) ~= 0 then return state end
 		local qry = req:initial() -- same as :current() but more descriptive
 		return policy.evaluate(policy.rules, req, qry, state)
-			or (special_names_optim(req, qry.sname)
-					and policy.evaluate(policy.special_names, req, qry, state))
 			or state
 	end,
 	finish = function(state, req)
