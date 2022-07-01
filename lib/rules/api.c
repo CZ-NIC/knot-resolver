@@ -194,38 +194,40 @@ int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 
 	const uint16_t rrtype = qry->stype;
 
-	// LATER(optim.): we might cache the ruleset list a bit
-	uint8_t key_rs[] = "\0rulesets";
-	knot_db_val_t rulesets = { NULL, 0 };
-	int ret;
-	{
-		knot_db_val_t key = { .data = key_rs, .len = sizeof(key_rs) };
-		ret = ruledb_op(read, &key, &rulesets, 1);
-	}
-	if (ret != 0) return ret; /* including ENOENT: no rulesets -> no rule used */
-	const char *rulesets_str = rulesets.data;
-
+	// Init the SNAME-based part of key; it's pretty static.
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key;
 	key.data = key_dname_lf(qry->sname, key_data);
 	key_data[KEY_DNAME_END_OFFSET + 1] = '\0'; // double zero
-
 	key.data -= sizeof(KEY_EXACT_MATCH);
-	uint8_t * const key_data_ruleset_end = key.data;
 
-	/* Iterate over all rulesets. */
+	int ret;
+
+	// Init code for managing the ruleset part of the key.
+	// LATER(optim.): we might cache the ruleset list a bit
+	uint8_t * const key_data_ruleset_end = key.data;
+	knot_db_val_t rulesets = { NULL, 0 };
+	{
+		uint8_t key_rs[] = "\0rulesets";
+		knot_db_val_t key_rsk = { .data = key_rs, .len = sizeof(key_rs) };
+		ret = ruledb_op(read, &key_rsk, &rulesets, 1);
+	}
+	if (ret != 0) return ret; // including ENOENT: no rulesets -> no rule used
+	const char *rulesets_str = rulesets.data;
+
+	// Iterate over all rulesets.
 	while (rulesets.len > 0) {
 		const char * const ruleset_name = rulesets_str;
-		{ /* Write ruleset-specific prefix of the key. */
+		{ // Write ruleset-specific prefix of the key.
 			const size_t rsp_len = strnlen(rulesets_str, rulesets.len);
 			kr_require(rsp_len <= KEY_RULESET_MAXLEN - 1);
-			key.data -= rsp_len;
+			key.data = key_data_ruleset_end - rsp_len;
 			memcpy(key.data, rulesets_str, rsp_len);
 			rulesets_str += rsp_len + 1;
 			rulesets.len -= rsp_len + 1;
 		}
 
-		/* Probe for exact and CNAME rule. */
+		// Probe for exact and CNAME rule.
 		memcpy(key_data_ruleset_end, &KEY_EXACT_MATCH, sizeof(KEY_EXACT_MATCH));
 		key.len = key_data + KEY_DNAME_END_OFFSET + 2 + sizeof(rrtype)
 			- (uint8_t *)key.data;
@@ -245,7 +247,7 @@ int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 			}
 			if (!kr_rule_consume_tags(&val, qry->request)) continue;
 
-			/* We found a rule that applies to the dname+rrtype+req. */
+			// We found a rule that applies to the dname+rrtype+req.
 			return answer_exact_match(qry, pkt, types[i],
 							val.data, val.data + val.len);
 		}
@@ -283,18 +285,18 @@ int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 				.data = key_leq.data + lf_start_i,
 				.len  = key_leq.len  - lf_start_i,
 			};
-			/* Found some good key, now check tags. */
+			// Found some good key, now check tags.
 			if (!kr_rule_consume_tags(&val, qry->request)) {
 				kr_assert(key_leq.len >= lf_start_i);
 			shorten:
-				/* Shorten key_leq by one label and retry. */
+				// Shorten key_leq by one label and retry.
 				if (key_leq.len <= lf_start_i) // nowhere to shorten
 					break;
 				const char *data = key_leq.data;
 				while (key_leq.len > lf_start_i && data[--key_leq.len] != '\0') ;
 				continue;
 			}
-			/* Tags OK; execute the rule. */
+			// Tags OK; execute the rule.
 			val_zla_type_t ztype;
 			if (val.len < sizeof(ztype))
 				return kr_error(EILSEQ);
