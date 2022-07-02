@@ -273,6 +273,7 @@ struct kr_cdb_stats {
 	uint64_t match_miss;
 	uint64_t read_leq;
 	uint64_t read_leq_miss;
+	uint64_t read_less;
 	double usage_percent;
 };
 typedef struct uv_timer_s uv_timer_t;

@@ -833,6 +833,33 @@ failure:
 	return lmdb_error(ret);
 }
 
+static int cdb_read_less(kr_cdb_pt db, struct kr_cdb_stats *stats,
+		knot_db_val_t *key, knot_db_val_t *val)
+{
+	if (kr_fails_assert(db && key && key->data && val))
+		return kr_error(EINVAL);
+	struct lmdb_env *env = db2env(db);
+	MDB_cursor *curs = NULL;
+	int ret = txn_curs_get(env, &curs, stats);
+	if (ret) return ret;
+
+	MDB_val key2_m = val_knot2mdb(*key);
+	MDB_val val2_m = { 0, NULL };
+	stats->read_less++;
+	ret = mdb_cursor_get(curs, &key2_m, &val2_m, MDB_PREV);
+	if (!ret) {
+		/* finalize the output */
+		*key = val_mdb2knot(key2_m);
+		*val = val_mdb2knot(val2_m);
+		return 1;
+	} else if (ret == MDB_NOTFOUND) {
+		// stats->read_less++; // seems a pointless stat
+	} else {
+		txn_abort(env);
+	}
+	return lmdb_error(ret);
+}
+
 static double cdb_usage_percent(kr_cdb_pt db)
 {
 	knot_db_t *kdb = kr_cdb_pt2knot_db_t(db);
@@ -870,7 +897,7 @@ const struct kr_cdb_api *kr_cdb_lmdb(void)
 		cdb_init, cdb_deinit, cdb_count, cdb_clear, cdb_commit,
 		cdb_readv, cdb_writev, cdb_remove,
 		cdb_match,
-		cdb_read_leq,
+		cdb_read_leq, cdb_read_less,
 		cdb_usage_percent, cdb_get_maxsize,
 		cdb_check_health,
 	};

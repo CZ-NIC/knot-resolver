@@ -32,6 +32,7 @@ struct kr_cdb_stats {
 	uint64_t match_miss;
 	uint64_t read_leq;
 	uint64_t read_leq_miss;
+	uint64_t read_less;
 	double usage_percent;
 };
 
@@ -83,6 +84,12 @@ struct kr_cdb_api {
 	 * On successful return, key->data and val->data point to DB-owned data.
 	 * return: 0 for equality, > 0 for less, < 0 kr_error */
 	int (*read_leq)(kr_cdb_pt db, struct kr_cdb_stats *stat,
+			knot_db_val_t *key, knot_db_val_t *val);
+
+	/** Less-than search (lexicographic ordering).
+	 * On successful return, key->data and val->data point to DB-owned data.
+	 * return: > 0 for less, < 0 kr_error */
+	int (*read_less)(kr_cdb_pt db, struct kr_cdb_stats *stat,
 			knot_db_val_t *key, knot_db_val_t *val);
 
 	/** Return estimated space usage (0--100). */
