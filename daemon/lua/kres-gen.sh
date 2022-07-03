@@ -69,12 +69,13 @@ struct kr_cdb_api {};
 struct lru {};
 "
 
-${CDEFS} ${LIBKRES} types <<-EOF
+${CDEFS} libknot types <<-EOF
 	knot_section_t
 	knot_rrinfo_t
 	knot_dname_t
 	knot_rdata_t
 	knot_rdataset_t
+	knot_db_val_t
 EOF
 
 # The generator doesn't work well with typedefs of functions.
@@ -283,6 +284,9 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_cache_commit
 	# FIXME: perhaps rename this exported symbol
 	packet_ttl
+# New policy
+	kr_view_insert_action
+	kr_view_select_action
 EOF
 
 

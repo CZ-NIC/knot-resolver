@@ -5,7 +5,9 @@
 
 #include "lib/defines.h"
 struct kr_query;
+struct kr_request;
 struct knot_pkt;
+#include <libknot/db/db.h>
 
 typedef uint64_t kr_rule_tags_t;
 #define KR_RULE_TAGS_ALL ((kr_rule_tags_t)0)
@@ -24,8 +26,17 @@ void kr_rules_deinit(void);
  */
 int kr_rule_local_data_answer(struct kr_query *qry, struct knot_pkt *pkt);
 
+/** Select the view action to perform.
+ *
+ * \param selected The action string from kr_view_insert_action()
+ * \return 0 or negative error code, in particular kr_error(ENOENT)
+ */
+KR_EXPORT
+int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected);
 
-/* API to modify the rule DB.
+
+
+/* APIs to modify the rule DB.
  *
  * FIXME:
  *  - what about transactions in this API?
@@ -59,4 +70,17 @@ int kr_rule_local_data_emptyzone(const knot_dname_t *apex, kr_rule_tags_t tags);
  * Into the default rule-set ATM.  SOA for generated NODATA isn't overridable. */
 KR_EXPORT
 int kr_rule_local_data_redirect(const knot_dname_t *apex, kr_rule_tags_t tags);
+
+/** Insert a view action into the default ruleset.
+ *
+ * \param subnet String specifying a subnet, e.g. "192.168.0.0/16".
+ * \param action Currently a string to execute, like in old policies, e.g. `policy.REFUSE`
+ *
+ * The concept of chain actions isn't respected; the most prioritized rule wins.
+ * If exactly the same subnet is specified repeatedly, that rule gets overwritten silently.
+ * TODO: improve? (return code, warning, ...)
+ * TODO: a well-usable action that assigns a tag-set
+ */
+KR_EXPORT
+int kr_view_insert_action(const char *subnet, const char *action);
 

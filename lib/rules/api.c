@@ -34,6 +34,8 @@ struct kr_rules *the_rules = NULL;
 	-> exact-match rule (for the given name)
     - KEY_ZONELIKE_A  + dname_lf (no '\0' at end)
 	-> zone-like apex (on the given name)
+    - KEY_VIEW_SRC4 or KEY_VIEW_SRC6 + subnet_encode()
+	-> action-rule string; see kr_view_insert_action()
  */
 
 #define KEY_RULESET_MAXLEN 16 /**< max. len of ruleset ID + 1(for kind) */
@@ -41,6 +43,9 @@ static /*const*/ char RULESET_DEFAULT[] = "d";
 
 static const uint8_t KEY_EXACT_MATCH[1] = "e";
 static const uint8_t KEY_ZONELIKE_A [1] = "a";
+
+static const uint8_t KEY_VIEW_SRC4[1] = "4";
+static const uint8_t KEY_VIEW_SRC6[1] = "6";
 
 /** The first byte of zone-like apex value is its type. */
 typedef uint8_t val_zla_type_t;
@@ -620,3 +625,183 @@ int kr_rule_local_data_redirect(const knot_dname_t *apex, kr_rule_tags_t tags)
 	return insert_trivial_zone(VAL_ZLAT_REDIRECT, apex, tags);
 }
 
+
+/** Encode a subnet into a (longer) string.
+ *
+ * The point is to have different encodings for different subnets,
+ * with using just byte-length strings (e.g. for ::/1 vs. ::/2).
+ * And we need to preserve order: FIXME description
+ *  - natural partial order on subnets, one included in another
+ *  - partial order on strings, one being a prefix of another
+ *  - implies lexicographical order on the encoded strings
+ *
+ * Consequently, given a set of subnets, the t
+ */
+static int subnet_encode(const struct sockaddr *addr, int sub_len, uint8_t buf[32])
+{
+	const int len = kr_inaddr_len(addr);
+	if (kr_fails_assert(len > 0))
+		return kr_error(len);
+	if (kr_fails_assert(sub_len >= 0 && sub_len <= 8 * len))
+		return kr_error(EINVAL);
+	const uint8_t *a = (const uint8_t *)/*sign*/kr_inaddr(addr);
+
+	// Algo: interleave bits of the address.  Bit pairs:
+	//  - 00 -> beyond the subnet's prefix
+	//  - 10 -> zero bit within the subnet's prefix
+	//  - 11 ->  one bit within the subnet's prefix
+	// Multiplying one uint8_t by 01010101 (in binary) will do interleaving.
+	int i;
+	// Let's hope that compiler optimizes this into something reasonable.
+	for (i = 0; sub_len > 0; ++i, sub_len -= 8) {
+		uint16_t x = a[i] * 85; // interleave by zero bits
+		uint8_t sub_mask = 255 >> (8 - MIN(sub_len, 8));
+		uint16_t r = x | (sub_mask * 85 * 2);
+		buf[2*i] = r / 256;
+		buf[2*i + 1] = r % 256;
+	}
+	return i * 2;
+}
+
+// Is `a` subnet-prefix of `b`?  (a byte format of subnet_encode())
+bool subnet_is_prefix(uint8_t a, uint8_t b)
+{
+	while (true) {
+		if (a >> 6 == 0)
+			return true;
+		if (a >> 6 != b >> 6) {
+			kr_assert(b >> 6 != 0);
+			return false;
+		}
+		a = (a << 2) & 0xff;
+		b = (b << 2) & 0xff;
+	}
+}
+
+#define KEY_PREPEND(key, arr) do { \
+		key.data -= sizeof(arr); \
+		key.len  += sizeof(arr); \
+		memcpy(key.data, arr, sizeof(arr)); \
+	} while (false)
+
+int kr_view_insert_action(const char *subnet, const char *action)
+{
+	// Parse the subnet string.
+	union kr_sockaddr saddr;
+	saddr.ip.sa_family = kr_straddr_family(subnet);
+	int bitlen = kr_straddr_subnet((char *)/*const-cast*/kr_inaddr(&saddr.ip), subnet);
+	if (bitlen < 0) return kr_error(bitlen);
+
+	// Init the addr-based part of key.
+	uint8_t key_data[KEY_MAXLEN];
+	knot_db_val_t key;
+	key.data = &key_data[KEY_RULESET_MAXLEN];
+	key.len = subnet_encode(&saddr.ip, bitlen, key.data);
+	switch (saddr.ip.sa_family) {
+		case AF_INET:  KEY_PREPEND(key, KEY_VIEW_SRC4);  break;
+		case AF_INET6: KEY_PREPEND(key, KEY_VIEW_SRC6);  break;
+		default:       kr_assert(false);  return kr_error(EINVAL);
+	}
+
+	{ // Write ruleset-specific prefix of the key.
+		const size_t rsp_len = strlen(RULESET_DEFAULT);
+		key.data -= rsp_len;
+		memcpy(key.data, RULESET_DEFAULT, rsp_len);
+	}
+
+	// Insert & commit.
+	knot_db_val_t val = {
+		.data = (void *)/*const-cast*/action,
+		.len = strlen(action),
+	};
+	int ret = ruledb_op(write, &key, &val, 1);
+	return ret < 0 ? ret : ruledb_op(commit);
+}
+
+int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)
+{
+	const struct sockaddr * const addr = req->qsource.addr;
+	if (!addr) return kr_error(ENOENT); // internal request; LATER: act somehow?
+
+	// Init the addr-based part of key; it's pretty static.
+	uint8_t key_data[KEY_MAXLEN];
+	knot_db_val_t key;
+	key.data = &key_data[KEY_RULESET_MAXLEN];
+	key.len = subnet_encode(addr, kr_inaddr_len(addr) * 8, key.data);
+	switch (kr_inaddr_family(addr)) {
+		case AF_INET:  KEY_PREPEND(key, KEY_VIEW_SRC4);  break;
+		case AF_INET6: KEY_PREPEND(key, KEY_VIEW_SRC6);  break;
+		default:       kr_assert(false);  return kr_error(EINVAL);
+	}
+
+	int ret;
+
+	// Init code for managing the ruleset part of the key.
+	// LATER(optim.): we might cache the ruleset list a bit
+	uint8_t * const key_data_ruleset_end = key.data;
+	knot_db_val_t rulesets = { NULL, 0 };
+	{
+		uint8_t key_rs[] = "\0rulesets";
+		knot_db_val_t key_rsk = { .data = key_rs, .len = sizeof(key_rs) };
+		ret = ruledb_op(read, &key_rsk, &rulesets, 1);
+	}
+	if (ret != 0) return ret; // including ENOENT: no rulesets -> no rule used
+	const char *rulesets_str = rulesets.data;
+
+	// Iterate over all rulesets.
+	while (rulesets.len > 0) {
+		{ // Write ruleset-specific prefix of the key.
+			const size_t rsp_len = strnlen(rulesets_str, rulesets.len);
+			kr_require(rsp_len <= KEY_RULESET_MAXLEN - 1);
+			key.data = key_data_ruleset_end - rsp_len;
+			memcpy(key.data, rulesets_str, rsp_len);
+			rulesets_str += rsp_len + 1;
+			rulesets.len -= rsp_len + 1;
+		}
+
+		static_assert(sizeof(KEY_VIEW_SRC4) == sizeof(KEY_VIEW_SRC6),
+				"bad combination of constants");
+		const size_t addr_start_i = key_data_ruleset_end + sizeof(KEY_VIEW_SRC4)
+					- (const uint8_t *)key.data;
+
+		knot_db_val_t key_leq = {
+			.data = key.data,
+			.len = key.len + (key_data_ruleset_end - (uint8_t *)key.data),
+		};
+		knot_db_val_t val;
+		ret = ruledb_op(read_leq, &key_leq, &val);
+		for (; true; ret = ruledb_op(read_less, &key_leq, &val)) {
+			if (ret == -ENOENT) break;
+			if (ret < 0) return kr_error(ret);
+			if (ret > 0) { // found a previous key
+				ssize_t i = key_common_prefix(key, key_leq);
+				if (i < addr_start_i) // no suitable key can exist in DB
+					break;
+				if (i != key_leq.len) {
+					if (kr_fails_assert(i < key.len && i < key_leq.len))
+						break;
+					if (!subnet_is_prefix(((uint8_t *)key_leq.data)[i],
+							      ((uint8_t *)key.data)[i])) {
+						// the key doesn't match
+						// We can shorten the key to potentially
+						// speed up by skipping over whole subtrees.
+						key_leq.len = i + 1;
+						continue;
+					}
+				}
+			}
+			// We certainly have a matching key (join of various sub-cases).
+			if (kr_log_is_debug(RULES, NULL)) {
+				// it's complex to get zero-terminated string for the action
+				char act_0t[val.len + 1];
+				memcpy(act_0t, val.data, val.len);
+				act_0t[val.len] = 0;
+				VERBOSE_MSG(req->rplan.initial, "=> view selected action: %s\n",
+					act_0t);
+			}
+			*selected = val;
+			return kr_ok();
+		}
+	}
+	return kr_error(ENOENT);
+}

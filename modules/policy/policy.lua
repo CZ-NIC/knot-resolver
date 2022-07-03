@@ -834,6 +834,8 @@ end
 policy.rules = {}
 policy.postrules = {}
 
+local view_action_buf = ffi.new('knot_db_val_t[1]')
+
 -- Top-down policy list walk until we hit a match
 -- the caller is responsible for reordering policy list
 -- from most specific to least specific.
@@ -843,6 +845,12 @@ policy.layer = {
 	begin = function(state, req)
 		-- Don't act on "finished" cases.
 		if bit.band(state, bit.bor(kres.FAIL, kres.DONE)) ~= 0 then return state end
+
+		if ffi.C.kr_view_select_action(req, view_action_buf) == 0 then
+			local act_str = ffi.string(view_action_buf[0].data, view_action_buf[0].len)
+			return loadstring('return '..act_str)()(state, req)
+		end
+
 		local qry = req:initial() -- same as :current() but more descriptive
 		return policy.evaluate(policy.rules, req, qry, state)
 			or state

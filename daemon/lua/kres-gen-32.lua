@@ -30,6 +30,10 @@ typedef struct {
 	uint32_t size;
 	knot_rdata_t *rdata;
 } knot_rdataset_t;
+typedef struct knot_db_val {
+	void *data;
+	size_t len;
+} knot_db_val_t;
 
 typedef struct knot_mm {
 	void *ctx, *alloc, *free;
@@ -472,6 +476,8 @@ int kr_cache_remove(struct kr_cache *, const knot_dname_t *, uint16_t);
 int kr_cache_remove_subtree(struct kr_cache *, const knot_dname_t *, _Bool, int);
 int kr_cache_commit(struct kr_cache *);
 uint32_t packet_ttl(const knot_pkt_t *);
+int kr_view_insert_action(const char *, const char *);
+int kr_view_select_action(const struct kr_request *, knot_db_val_t *);
 typedef struct {
 	int sock_type;
 	_Bool tls;
