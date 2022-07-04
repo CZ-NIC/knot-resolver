@@ -11,6 +11,8 @@ struct knot_pkt;
 
 typedef uint64_t kr_rule_tags_t;
 #define KR_RULE_TAGS_ALL ((kr_rule_tags_t)0)
+/// Tags "capacity", i.e. numbered from 0 to _CAP - 1.
+#define KR_RULE_TAGS_CAP (sizeof(kr_rule_tags_t) * 8)
 
 KR_EXPORT
 int kr_rules_init(void);
@@ -79,8 +81,16 @@ int kr_rule_local_data_redirect(const knot_dname_t *apex, kr_rule_tags_t tags);
  * The concept of chain actions isn't respected; the most prioritized rule wins.
  * If exactly the same subnet is specified repeatedly, that rule gets overwritten silently.
  * TODO: improve? (return code, warning, ...)
- * TODO: a well-usable action that assigns a tag-set
+ * TODO: some way to do multiple actions?  Will be useful e.g. with option-setting actions.
+ *    On implementation side this would probably be multi-value LMDB, cf. local_data rules.
  */
 KR_EXPORT
 int kr_view_insert_action(const char *subnet, const char *action);
+
+/** Add a tag by name into a tag-set variable.
+ *
+ * It also ensures allocation of tag names in the DB, etc.
+ */
+KR_EXPORT
+int kr_rule_tag_add(const char *tag, kr_rule_tags_t *tagset);
 

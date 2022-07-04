@@ -27,6 +27,8 @@ struct kr_rules *the_rules = NULL;
 /* DB key-space summary
 
  - "\0" starts special keys like "\0rulesets" or "\0stamp"
+  - "\0tagBits" -> kr_rule_tags_t denoting the set of tags that have a name in DB
+  - "\0tag_" + tag name -> one byte with the tag's number
  - some future additions?
  - otherwise it's rulesets - each has a prefix, e.g. RULESET_DEFAULT,
    its length is bounded by KEY_RULESET_MAXLEN - 1; after that prefix:
@@ -64,6 +66,91 @@ static int answer_zla_empty(struct kr_query *qry, knot_pkt_t *pkt,
 static int answer_zla_redirect(struct kr_query *qry, knot_pkt_t *pkt, const char *ruleset_name,
 				knot_db_val_t zla_lf, knot_db_val_t val);
 
+// LATER: doing tag_names_default() and kr_rule_tag_add() inside a RW transaction would be better.
+static int tag_names_default(void)
+{
+	uint8_t key_tb_str[] = "\0tagBits";
+	knot_db_val_t key = { .data = key_tb_str, .len = sizeof(key_tb_str) };
+	knot_db_val_t val;
+	// Check what's in there.
+	int ret = ruledb_op(read, &key, &val, 1);
+	if (ret == 0 && !kr_fails_assert(val.data && val.len == sizeof(kr_rule_tags_t)))
+		return kr_ok(); // it's probably OK
+	if (ret != kr_error(ENOENT))
+		return kr_error(ret);
+	kr_rule_tags_t empty = 0;
+	val.data = &empty;
+	val.len = sizeof(empty);
+	return ruledb_op(write, &key, &val, 1);
+}
+
+int kr_rule_tag_add(const char *tag, kr_rule_tags_t *tagset)
+{
+	// Construct the DB key.
+	const uint8_t key_prefix[] = "\0tag_";
+	knot_db_val_t key;
+	knot_db_val_t val;
+	const size_t tag_len = strlen(tag);
+	key.len = sizeof(key_prefix) + tag_len;
+	uint8_t key_buf[key.len];
+	key.data = key_buf;
+	memcpy(key_buf, key_prefix, sizeof(key_prefix));
+	memcpy(key_buf + sizeof(key_prefix), tag, tag_len);
+
+	int ret = ruledb_op(read, &key, &val, 1);
+	if (ret == 0) { // tag exists already
+		uint8_t *tindex_p = val.data;
+		static_assert(KR_RULE_TAGS_CAP < (1 << 8 * sizeof(*tindex_p)),
+				"bad combination of constants");
+		if (kr_fails_assert(val.data && val.len == 1
+					&& *tindex_p < KR_RULE_TAGS_CAP)) {
+			kr_log_error(RULES, "ERROR: invalid length: %d\n", (int)val.len);
+			return kr_error(EILSEQ);
+		}
+		*tagset |= (1 << *tindex_p);
+		return kr_ok();
+	} else if (ret != kr_error(ENOENT)) {
+		return ret;
+	}
+
+	// We need to add it as a new tag.  First find the bitmap of named tags.
+	uint8_t key_tb_str[] = "\0tagBits";
+	knot_db_val_t key_tb = { .data = key_tb_str, .len = sizeof(key_tb_str) };
+	ret = ruledb_op(read, &key_tb, &val, 1);
+	if (ret != 0)
+		return kr_error(ret);
+	if (kr_fails_assert(val.data && val.len == sizeof(kr_rule_tags_t))) {
+		kr_log_error(RULES, "ERROR: invalid length: %d\n", (int)val.len);
+		return kr_error(EILSEQ);
+	}
+	kr_rule_tags_t bmp;
+	memcpy(&bmp, val.data, sizeof(bmp));
+	// Find a free index.
+	static_assert(sizeof(long long) >= sizeof(bmp), "bad combination of constants");
+	int ix = ffsll(~bmp) - 1;
+	if (ix < 0 || ix >= 8 * sizeof(bmp))
+		return kr_error(E2BIG);
+	const kr_rule_tags_t tag_new = 1 << ix;
+	kr_require((tag_new & bmp) == 0);
+
+	// Update the mappings
+	bmp |= tag_new;
+	val.data = &bmp;
+	val.len = sizeof(bmp);
+	ret = ruledb_op(write, &key_tb, &val, 1);
+	if (ret != 0)
+		return kr_error(ret);
+	uint8_t ix_8t = ix;
+	val.data = &ix_8t;
+	val.len = sizeof(ix_8t);
+	ret = ruledb_op(write, &key, &val, 1); // key remained correct
+	if (ret != 0)
+		return kr_error(ret);
+	*tagset |= tag_new;
+	return kr_ok();
+}
+
+
 //TODO later, maybe.  ATM it would be cumbersome to avoid void* arithmetics.
 #pragma GCC diagnostic ignored "-Wpointer-arith"
 
@@ -94,6 +181,9 @@ int kr_rules_init(void)
 	if (ret == 0) ret = ruledb_op(clear);
 	if (ret != 0) goto failure;
 	kr_require(the_rules->db);
+
+	ret = tag_names_default();
+	if (ret != 0) goto failure;
 
 	ret = rules_defaults_insert();
 	if (ret != 0) goto failure;

@@ -287,6 +287,8 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 # New policy
 	kr_view_insert_action
 	kr_view_select_action
+	kr_rule_tag_add
+	kr_rule_local_data_emptyzone
 EOF
 
 

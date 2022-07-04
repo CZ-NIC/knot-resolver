@@ -834,6 +834,29 @@ end
 policy.rules = {}
 policy.postrules = {}
 
+-- This certainly isn't perfect, but it allows lua config like:
+-- kr_view_insert_action('127.0.0.0/24', policy.TAGS_ASSIGN({'t01', 't02'}))
+local kr_rule_tags_t = ffi.typeof('kr_rule_tags_t[1]')
+function policy.get_tagset(names)
+	local result = ffi.new(kr_rule_tags_t, 0)
+	for _, name in pairs(names) do
+		if ffi.C.kr_rule_tag_add(name, result) ~= 0 then
+			error('converting tagset failed')
+		end
+	end
+	return result[0] -- it's atomic value fortunately
+end
+function policy.tags_assign_bitmap(bitmap)
+	return function (_, req)
+		req.rule_tags = bitmap
+	end
+end
+function policy.TAGS_ASSIGN(names)
+	local bitmap = policy.get_tagset(names)
+	return 'policy.tags_assign_bitmap(' .. tostring(bitmap) .. ')'
+end
+
+
 local view_action_buf = ffi.new('knot_db_val_t[1]')
 
 -- Top-down policy list walk until we hit a match
