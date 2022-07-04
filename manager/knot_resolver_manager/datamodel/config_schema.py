@@ -23,9 +23,9 @@ from knot_resolver_manager.datamodel.rpz_schema import RPZSchema
 from knot_resolver_manager.datamodel.slice_schema import SliceSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
-from knot_resolver_manager.datamodel.supervisor_schema import SupervisorSchema
 from knot_resolver_manager.datamodel.types.types import IDPattern, IntPositive, UncheckedPath
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
+from knot_resolver_manager.datamodel.watchdog_schema import WatchDogSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
 from knot_resolver_manager.exceptions import DataException
 from knot_resolver_manager.utils import SchemaNode
@@ -92,9 +92,9 @@ class KresConfig(SchemaNode):
         rundir: Directory where the resolver can create files and which will be it's cwd.
         workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
         max_workers: The maximum number of workers allowed. Cannot be changed in runtime.
+        watchdog: Disable supervisord's watchdog, enable with defaults or set new configuration.
         management: Configuration of management HTTP API.
         webmgmt: Configuration of legacy web management endpoint.
-        supervisor: Proceses supervisor configuration.
         options: Fine-tuning global parameters of DNS resolver operation.
         network: Network connections and protocols configuration.
         static_hints: Static hints for forward records (A/AAAA) and reverse records (PTR)
@@ -118,9 +118,9 @@ class KresConfig(SchemaNode):
         rundir: UncheckedPath = UncheckedPath(".")
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         max_workers: IntPositive = IntPositive(MAX_WORKERS)
+        watchdog: Union[bool, WatchDogSchema] = True
         management: ManagementSchema = ManagementSchema({"unix-socket": "./manager.sock"})
         webmgmt: Optional[WebmgmtSchema] = None
-        supervisor: SupervisorSchema = SupervisorSchema()
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
         static_hints: StaticHintsSchema = StaticHintsSchema()
@@ -147,7 +147,7 @@ class KresConfig(SchemaNode):
     max_workers: IntPositive
     management: ManagementSchema
     webmgmt: Optional[WebmgmtSchema]
-    supervisor: SupervisorSchema
+    watchdog: Union[bool, WatchDogSchema]
     options: OptionsSchema
     network: NetworkSchema
     static_hints: StaticHintsSchema

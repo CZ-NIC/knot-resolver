@@ -12,8 +12,8 @@ nsid.name('{{ cfg.nsid }}_' .. worker.id)
 -- LOGGING section ----------------------------------
 {% include "logging.lua.j2" %}
 
--- SUPERVISOR section -------------------------------
-{% include "supervisor.lua.j2" %}
+-- WATCHDOG section -------------------------------
+{% include "watchdog.lua.j2" %}
 
 -- WEBMGMT section ----------------------------------
 {% include "webmgmt.lua.j2" %}

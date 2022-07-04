@@ -23,8 +23,6 @@ from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, PID_FIL
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.datamodel.management_schema import ManagementSchema
 from knot_resolver_manager.exceptions import DataException, KresManagerException, SchemaException
-from knot_resolver_manager.kresd_controller import get_controller_by_name
-from knot_resolver_manager.kresd_controller.interface import SubprocessController
 from knot_resolver_manager.utils.async_utils import readfile
 from knot_resolver_manager.utils.functional import Result
 from knot_resolver_manager.utils.parsing import ParsedTree, parse, parse_yaml
@@ -313,14 +311,10 @@ async def _init_manager(config_store: ConfigStore, server: Server) -> KresManage
     """
     Called asynchronously when the application initializes.
     """
-    # if configured, create a subprocess controller manually
-    controller: Optional[SubprocessController] = None
-    if config_store.get().supervisor.backend != "auto":
-        controller = await get_controller_by_name(config_store.get(), config_store.get().supervisor.backend)
 
     # Create KresManager. This will perform autodetection of available service managers and
     # select the most appropriate to use (or use the one configured directly)
-    manager = await KresManager.create(controller, config_store, server.trigger_shutdown)
+    manager = await KresManager.create(None, config_store, server.trigger_shutdown)
 
     logger.info("Initial configuration applied. Process manager initialized...")
     return manager

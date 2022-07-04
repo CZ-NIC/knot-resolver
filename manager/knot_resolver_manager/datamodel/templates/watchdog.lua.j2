@@ -1,0 +1,9 @@
+{% if cfg.watchdog -%}
+-- watchdog
+modules.load('watchdog')
+{% if cfg.watchdog.qname and cfg.watchdog.qtype -%}
+watchdog.config({ qname = '{{ cfg.watchdog.qname.punycode() }}', qtype = kres.type.{{ cfg.watchdog.qtype }} })
+{%- endif %}
+{% else %}
+modules.unload('watchdog')
+{%- endif %}
