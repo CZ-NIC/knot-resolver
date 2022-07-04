@@ -53,6 +53,13 @@ class _FixCounter:
         return self._counter >= MANAGER_FIX_ATTEMPT_MAX_COUNTER
 
 
+async def _deny_max_worker_changes(config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
+    if config_old.max_workers != config_new.max_workers:
+        return Result.err("Changing manager's `rundir` during runtime is not allowed.")
+
+    return Result.ok(None)
+
+
 class KresManager:  # pylint: disable=too-many-instance-attributes
     """
     Core of the whole operation. Orchestrates individual instances under some
@@ -100,13 +107,18 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         else:
             self._controller = selected_controller
         self._config_store = config_store
+        logger.debug("Starting controller")
         await self._controller.initialize_controller(config_store.get())
         self._watchdog_task = create_task(self._watchdog())
+        logger.debug("Looking for already running workers")
         await self._collect_already_running_workers()
 
         # registering the function calls them immediately, therefore after this, the config is applied
         await config_store.register_verifier(self.validate_config)
         await config_store.register_on_change_callback(self.apply_config)
+
+        # register controller config change listeners
+        await config_store.register_verifier(_deny_max_worker_changes)
 
     async def _spawn_new_worker(self, config: KresConfig) -> None:
         subprocess = await self._controller.create_subprocess(config, SubprocessType.KRESD)
@@ -165,7 +177,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 #   if it keeps running, the config is valid and others will soon join as well
                 #   if it crashes and the startup fails, then well, it's not running anymore... :)
                 await self._spawn_new_worker(new)
-            except SubprocessError:
+            except (SubprocessError, SubprocessControllerException):
                 logger.error("kresd with the new config failed to start, rejecting config")
                 return Result.err("Canary kresd instance failed to start. Config is invalid.")
 
@@ -182,8 +194,8 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         try:
             async with self._manager_lock:
                 logger.debug("Applying config to all workers")
-                await self._ensure_number_of_children(config, int(config.workers))
                 await self._rolling_restart(config)
+                await self._ensure_number_of_children(config, int(config.workers))
 
                 if self._is_gc_running() != config.cache.garbage_collector:
                     if config.cache.garbage_collector:

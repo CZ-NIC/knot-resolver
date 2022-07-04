@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 from jinja2 import Environment, FileSystemLoader, Template
 from typing_extensions import Literal
 
+from knot_resolver_manager.constants import MAX_WORKERS
 from knot_resolver_manager.datamodel.cache_schema import CacheSchema
 from knot_resolver_manager.datamodel.dns64_schema import Dns64Schema
 from knot_resolver_manager.datamodel.dnssec_schema import DnssecSchema
@@ -90,6 +91,7 @@ class KresConfig(SchemaNode):
         hostname: Internal DNS resolver hostname. Default is machine hostname.
         rundir: Directory where the resolver can create files and which will be it's cwd.
         workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
+        max_workers: The maximum number of workers allowed. Cannot be changed in runtime.
         management: Configuration of management HTTP API.
         webmgmt: Configuration of legacy web management endpoint.
         supervisor: Proceses supervisor configuration.
@@ -115,6 +117,7 @@ class KresConfig(SchemaNode):
         hostname: Optional[str] = None
         rundir: UncheckedPath = UncheckedPath(".")
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
+        max_workers: IntPositive = IntPositive(MAX_WORKERS)
         management: ManagementSchema = ManagementSchema({"unix-socket": "./manager.sock"})
         webmgmt: Optional[WebmgmtSchema] = None
         supervisor: SupervisorSchema = SupervisorSchema()
@@ -141,6 +144,7 @@ class KresConfig(SchemaNode):
     hostname: str
     rundir: UncheckedPath
     workers: IntPositive
+    max_workers: IntPositive
     management: ManagementSchema
     webmgmt: Optional[WebmgmtSchema]
     supervisor: SupervisorSchema

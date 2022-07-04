@@ -4,6 +4,7 @@ directory = {{ config.workdir }}
 nodaemon = false
 logfile = {{ config.logfile }}
 logfile_maxbytes = 50MB
+loglevel = trace
 {# user=root #}
 
 [unix_http_server]
@@ -15,18 +16,37 @@ serverurl = unix://{{ config.unix_http_server }}
 [rpcinterface:supervisor]
 supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
 
+[rpcinterface:notify]
+supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin:make_rpcinterface
+
+[rpcinterface:fast]
+supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.fast_rpcinterface:make_main_rpcinterface
 
 
-
-{% for instance in instances %}
-
-[program:{{ instance.id }}]
-type={{ instance.type }}
+[program:kresd]
+process_name=%(program_name)s%(process_num)d
+numprocs={{ kresd.max_procs }}
 redirect_stderr=false
-stdout_logfile={{ instance.logfile }}
-stderr_logfile={{ instance.logfile }}
-directory={{ instance.workdir }}
-command={{ instance.command }}
-environment={{ instance.environment }}
+stdout_logfile={{ kresd.logfile }}
+stderr_logfile={{ kresd.logfile }}
+directory={{ kresd.workdir }}
+command={{ kresd.command }}
+autostart=false
+autorestart=true
+stopsignal=TERM
+killasgroup=true
+startsecs=10
+environment={{ kresd.environment }}
 
-{%- endfor -%}
+[program:gc]
+redirect_stderr=false
+stdout_logfile={{ gc.logfile }}
+stderr_logfile={{ gc.logfile }}
+directory={{ gc.workdir }}
+command={{ gc.command }}
+autostart=false
+autorestart=true
+stopsignal=TERM
+killasgroup=true
+startsecs=0
+environment={{ gc.environment }}

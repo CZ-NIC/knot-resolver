@@ -9,6 +9,7 @@ packages = \
  'knot_resolver_manager.datamodel.types',
  'knot_resolver_manager.kresd_controller',
  'knot_resolver_manager.kresd_controller.supervisord',
+ 'knot_resolver_manager.kresd_controller.supervisord.plugin',
  'knot_resolver_manager.kresd_controller.systemd',
  'knot_resolver_manager.utils']
 
@@ -42,7 +43,8 @@ setup_kwargs = {
     'install_requires': install_requires,
     'python_requires': '>=3.6.8,<4.0.0',
 }
-
+from build import *
+build(setup_kwargs)
 
 setup(**setup_kwargs)
 

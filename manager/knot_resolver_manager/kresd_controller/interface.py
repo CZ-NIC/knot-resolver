@@ -1,5 +1,6 @@
 import asyncio
 import itertools
+import logging
 import sys
 from enum import Enum, auto
 from typing import Dict, Iterable, Optional, Type, TypeVar
@@ -10,6 +11,8 @@ from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.exceptions import SubprocessControllerException
 from knot_resolver_manager.statistics import register_resolver_metrics_for, unregister_resolver_metrics_for
 from knot_resolver_manager.utils.async_utils import writefile
+
+logger = logging.getLogger(__name__)
 
 
 class SubprocessType(Enum):
@@ -124,9 +127,11 @@ class Subprocess:
     async def apply_new_config(self, new_config: KresConfig) -> None:
         self._config = new_config
         # update config file
+        logger.debug(f"Writing config file for {self.id}")
         lua_config = new_config.render_lua()
         await writefile(kresd_config_file(new_config, self.id), lua_config)
         # update runtime status
+        logger.debug(f"Restarting {self.id}")
         await self._restart()
 
     async def stop(self) -> None:
