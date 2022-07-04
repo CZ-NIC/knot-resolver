@@ -28,7 +28,9 @@ lint:py3.10:
     - poetry run bash -c "cd ..; coverage combine manager/.coverage; coverage xml"
   artifacts:
     reports:
-      cobertura: coverage.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
       junit: manager/unit.junit.xml
     paths:
       - manager/unit.junit.xml
