@@ -5,7 +5,6 @@ import time
 from subprocess import SubprocessError
 from typing import Callable, List, Optional
 
-import knot_resolver_manager.kresd_controller
 from knot_resolver_manager.compat.asyncio import create_task
 from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.constants import (
@@ -87,7 +86,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
 
     @staticmethod
     async def create(
-        selected_controller: Optional[SubprocessController],
+        subprocess_controller: SubprocessController,
         config_store: ConfigStore,
         shutdown_trigger: Callable[[int], None],
     ) -> "KresManager":
@@ -96,17 +95,14 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         """
 
         inst = KresManager(shutdown_trigger, _i_know_what_i_am_doing=True)
-        await inst._async_init(selected_controller, config_store)  # pylint: disable=protected-access
+        await inst._async_init(subprocess_controller, config_store)  # pylint: disable=protected-access
         return inst
 
-    async def _async_init(self, selected_controller: Optional[SubprocessController], config_store: ConfigStore) -> None:
-        if selected_controller is None:
-            self._controller = await knot_resolver_manager.kresd_controller.get_best_controller_implementation(
-                config_store.get()
-            )
-        else:
-            self._controller = selected_controller
+    async def _async_init(self, subprocess_controller: SubprocessController, config_store: ConfigStore) -> None:
+        self._controller = subprocess_controller
         self._config_store = config_store
+
+        # initialize subprocess controller
         logger.debug("Starting controller")
         await self._controller.initialize_controller(config_store.get())
         self._watchdog_task = create_task(self._watchdog())
