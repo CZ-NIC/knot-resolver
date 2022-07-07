@@ -9,6 +9,7 @@ Bugfixes
 --------
 - daemon/http: improved URI checks to fix some proxies (#746, !1311)
 - daemon/tls: fixed a double-free for some cases of policy.TLS_FORWARD (!1314)
+- hints module: improve parsing comments in hosts files (!1315)
 
 
 Knot Resolver 5.5.1 (2022-06-14)
