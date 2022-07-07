@@ -124,10 +124,25 @@ def process_transition(slf: Subprocess) -> None:
                 f"process '{slf.config.name}' did not send ready notification within {slf.config.startsecs} secs, killing"
             )
             slf.kill(signal.SIGKILL)
-            slf.laststart = time.time()  # prevent further state transition from happening
+            slf.x_notifykilled = True  # used in finish() function to set to FATAL state
+            slf.laststart = time.time() + 1  # prevent immediate state transition to RUNNING from happening
 
     # return self for chaining
     return slf
+
+
+def subprocess_finish_tail(slf, pid, sts) -> Tuple[Any, Any, Any]:
+    if getattr(slf, "x_notifykilled", False):
+        # we want FATAL, not STOPPED state after timeout waiting for startup notification
+        # why? because it's likely not gonna help to try starting the process up again if
+        # it failed so early
+        slf.change_state(ProcessStates.FATAL)
+
+        # clear the marker value
+        del slf.x_notifykilled
+
+    # return for chaining
+    return slf, pid, sts
 
 
 def supervisord_get_process_map(supervisord: Any, mp: Dict[Any, Any]) -> Dict[Any, Any]:
@@ -165,6 +180,15 @@ def chain(first: Callable[..., U], second: Callable[[U], T]) -> Callable[..., T]
     return wrapper
 
 
+def append(first: Callable[..., T], second: Callable[..., None]) -> Callable[..., T]:
+    def wrapper(*args: Any, **kwargs: Any) -> T:
+        res = first(*args, **kwargs)
+        second(*args, **kwargs)
+        return res
+
+    return wrapper
+
+
 def monkeypatch(supervisord: Supervisor) -> None:
     """Inject ourselves into supervisord code"""
 
@@ -173,6 +197,7 @@ def monkeypatch(supervisord: Supervisor) -> None:
 
     # prepend timeout handler to transition method
     Subprocess.transition = chain(process_transition, Subprocess.transition)
+    Subprocess.finish = append(Subprocess.finish, subprocess_finish_tail)
 
     # add environment variable $NOTIFY_SOCKET to starting processes
     Subprocess._spawn_as_child = chain(process_spawn_as_child_add_env, Subprocess._spawn_as_child)
