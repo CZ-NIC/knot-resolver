@@ -4,7 +4,7 @@ directory = {{ config.workdir }}
 nodaemon = false
 logfile = {{ config.logfile }}
 logfile_maxbytes = 50MB
-loglevel = trace
+loglevel = info
 {# user=root #}
 
 [unix_http_server]
@@ -22,6 +22,18 @@ supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervi
 [rpcinterface:fast]
 supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.fast_rpcinterface:make_main_rpcinterface
 
+[program:manager]
+redirect_stderr=false
+stdout_logfile=/proc/self/fd/1
+stdout_logfile_maxbytes=0
+directory={{ manager.workdir }}
+command={{ manager.command }}
+stopsignal=SIGINT
+killasgroup=true
+autorestart=true
+autostart=true
+startsecs=5
+environment={{ manager.environment }}
 
 [program:kresd]
 process_name=%(program_name)s%(process_num)d

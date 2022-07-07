@@ -14,6 +14,7 @@ from knot_resolver_manager.constants import (
     supervisord_pid_file,
     supervisord_sock_file,
     supervisord_subprocess_log_dir,
+    user_constants,
 )
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.kresd_controller.interface import KresID, SubprocessType
@@ -75,6 +76,20 @@ class ProcessTypeConfig:
             max_procs=config.max_workers,
         )
 
+    @staticmethod
+    def create_manager_config(config: KresConfig) -> "ProcessTypeConfig":
+        # read original command from /proc
+        with open("/proc/self/cmdline", 'rb') as f:
+            args = [s.decode('utf-8') for s in f.read()[:-1].split(b'\0')]
+        cmd = '"' + '" "'.join(args) + '"'
+
+        return ProcessTypeConfig(  # type: ignore[call-arg]
+            workdir=user_constants().working_directory_on_startup,
+            command=cmd,
+            environment='X-SUPERVISORD-TYPE=notify',
+            logfile=""  # this will be ignored
+        )
+
 
 @dataclass
 class SupervisordConfig:
@@ -104,6 +119,7 @@ async def write_config_file(config: KresConfig) -> None:
     config_string = Template(template).render(  # pyright: reportUnknownMemberType=false
         gc=ProcessTypeConfig.create_gc_config(config),
         kresd=ProcessTypeConfig.create_kresd_config(config),
+        manager=ProcessTypeConfig.create_manager_config(config),
         config=SupervisordConfig.create(config),
     )
     await writefile(supervisord_config_file_tmp(config), config_string)

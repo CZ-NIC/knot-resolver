@@ -22,12 +22,13 @@ from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, PID_FILE_NAME, init_user_constants
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.datamodel.management_schema import ManagementSchema
-from knot_resolver_manager.exceptions import DataException, KresManagerException, SchemaException
+from knot_resolver_manager.exceptions import CancelStartupExecInsteadException, DataException, KresManagerException, SchemaException
 from knot_resolver_manager.kresd_controller import get_best_controller_implementation
 from knot_resolver_manager.utils.async_utils import readfile
 from knot_resolver_manager.utils.functional import Result
 from knot_resolver_manager.utils.parsing import ParsedTree, parse, parse_yaml
 from knot_resolver_manager.utils.types import NoneType
+from knot_resolver_manager.utils.systemd_notify import systemd_notify
 
 from .kres_manager import KresManager
 
@@ -304,7 +305,6 @@ async def _load_config(config: ParsedTree) -> KresConfig:
 async def _init_config_store(config: ParsedTree) -> ConfigStore:
     config_validated = await _load_config(config)
     config_store = ConfigStore(config_validated)
-    await init_user_constants(config_store)
     return config_store
 
 
@@ -392,6 +392,7 @@ async def _sigterm_while_shutting_down():
 
 async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_FILE) -> int:
     start_time = time()
+    working_directory_on_startup = os.getcwd()
     manager: Optional[KresManager] = None
 
     # Block signals during initialization to force their processing once everything is ready
@@ -422,6 +423,9 @@ async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_
         # After the working directory is set, we can initialize proper config store with a newly parsed configuration.
         config_store = await _init_config_store(config_raw)
 
+        # Some "constants" need to be loaded from the initial config, some need to be stored from the initial run conditions
+        await init_user_constants(config_store, working_directory_on_startup)
+
         # This behaviour described above with paths means, that we MUST NOT allow `rundir` change after initialization.
         # It would cause strange problems because every other path configuration depends on it. Therefore, we have to
         # add a check to the config store, which disallows changes.
@@ -440,9 +444,28 @@ async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_
 
         # After we have loaded the configuration, we can start worring about subprocess management.
         manager = await _init_manager(config_store, server)
+
+    except CancelStartupExecInsteadException as e:
+        # if we caught this exception, some component wants to perform a reexec during startup. Most likely, it would
+        # be a subprocess manager like supervisord, which wants to make sure the manager runs under supervisord in
+        # the process tree. So now we stop everything, and exec what we are told to. We are assuming, that the thing
+        # we'll exec will invoke us again.
+        logger.info("Exec requested with arguments: %s", str(e.exec_args))
+
+        # unblock signals, this could actually terminate us straight away
+        signal.pthread_sigmask(signal.SIG_UNBLOCK, Server.all_handled_signals())
+
+        # run exit functions
+        atexit._run_exitfuncs()
+
+        # and finally exec what we we told to exec
+        os.execl(*e.exec_args)
+
     except KresManagerException as e:
+        # We caught an error with a pretty error message. Just print it and exit.
         logger.error(e)
         return 1
+
     except BaseException:
         logger.error("Uncaught generic exception during manager inicialization...", exc_info=True)
         return 1
@@ -465,6 +488,9 @@ async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_
     signal.pthread_sigmask(signal.SIG_UNBLOCK, Server.all_handled_signals())
 
     logger.info(f"Manager fully initialized and running in {round(time() - start_time, 3)} seconds")
+
+    # notify systemd/anything compatible that we are ready
+    systemd_notify(READY="1")
 
     await server.wait_for_shutdown()
 

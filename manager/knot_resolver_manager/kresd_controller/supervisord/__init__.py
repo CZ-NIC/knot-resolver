@@ -1,8 +1,8 @@
 import logging
-from os import kill
+from os import execl, kill
 from pathlib import Path
 from time import sleep
-from typing import Any, Dict, Iterable, Optional, Union, cast
+from typing import Any, Dict, Iterable, NoReturn, Optional, Union, cast
 from xmlrpc.client import Fault, ServerProxy
 
 import supervisor.xmlrpc  # type: ignore[import]
@@ -10,7 +10,7 @@ import supervisor.xmlrpc  # type: ignore[import]
 from knot_resolver_manager.compat.asyncio import async_in_a_thread
 from knot_resolver_manager.constants import supervisord_config_file, supervisord_pid_file, supervisord_sock_file
 from knot_resolver_manager.datamodel.config_schema import KresConfig
-from knot_resolver_manager.exceptions import SubprocessControllerException
+from knot_resolver_manager.exceptions import CancelStartupExecInsteadException, SubprocessControllerException
 from knot_resolver_manager.kresd_controller.interface import (
     KresID,
     Subprocess,
@@ -32,6 +32,13 @@ async def _start_supervisord(config: KresConfig) -> None:
     res = await call(["supervisord", "--configuration", str(supervisord_config_file(config).absolute())])
     if res != 0:
         raise SubprocessControllerException(f"Supervisord exited with exit code {res}")
+
+
+async def _exec_supervisord(config: KresConfig) -> NoReturn:
+    logger.debug("Writing supervisord config")
+    await write_config_file(config)
+    logger.debug("Execing supervisord")
+    raise CancelStartupExecInsteadException([str(which.which("supervisord")), "supervisord", "--configuration", str(supervisord_config_file(config).absolute()), "-n"])
 
 
 async def _reload_supervisord(config: KresConfig) -> None:
@@ -138,6 +145,10 @@ def _list_running_subprocesses(config: KresConfig) -> Dict[SupervisordKresID, Su
             status = SubprocessStatus.UNKNOWN
         return status
 
+    # there will be a manager process as well, but we don't want to report anything on ourselves
+    processes = [pr for pr in processes if pr["name"] != "manager"]
+
+    # convert all the names
     return {SupervisordKresID.from_string(pr["name"]): convert(pr) for pr in processes if pr["statename"] != "STOPPED"}
 
 
@@ -216,7 +227,8 @@ class SupervisordSubprocessController(SubprocessController):
         self._controller_config = config
 
         if not await _is_supervisord_running(config):
-            await _start_supervisord(config)
+            #await _start_supervisord(config)
+            await _exec_supervisord(config)
         else:
             await _reload_supervisord(config)
 
