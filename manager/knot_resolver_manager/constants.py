@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from knot_resolver_manager.utils import which
-from knot_resolver_manager.utils.functional import Result
 
 if TYPE_CHECKING:
     from knot_resolver_manager.config_store import ConfigStore

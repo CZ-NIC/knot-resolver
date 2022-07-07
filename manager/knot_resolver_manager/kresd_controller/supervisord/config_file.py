@@ -77,17 +77,17 @@ class ProcessTypeConfig:
         )
 
     @staticmethod
-    def create_manager_config(config: KresConfig) -> "ProcessTypeConfig":
+    def create_manager_config(_config: KresConfig) -> "ProcessTypeConfig":
         # read original command from /proc
-        with open("/proc/self/cmdline", 'rb') as f:
-            args = [s.decode('utf-8') for s in f.read()[:-1].split(b'\0')]
+        with open("/proc/self/cmdline", "rb") as f:
+            args = [s.decode("utf-8") for s in f.read()[:-1].split(b"\0")]
         cmd = '"' + '" "'.join(args) + '"'
 
         return ProcessTypeConfig(  # type: ignore[call-arg]
             workdir=user_constants().working_directory_on_startup,
             command=cmd,
-            environment='X-SUPERVISORD-TYPE=notify',
-            logfile=""  # this will be ignored
+            environment="X-SUPERVISORD-TYPE=notify",
+            logfile="",  # this will be ignored
         )
 
 

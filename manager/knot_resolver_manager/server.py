@@ -1,5 +1,4 @@
 import asyncio
-import atexit
 import errno
 import logging
 import os
@@ -16,19 +15,25 @@ from aiohttp.web_app import Application
 from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 
+import knot_resolver_manager.utils.custom_atexit as atexit
 from knot_resolver_manager import log, statistics
 from knot_resolver_manager.compat import asyncio as asyncio_compat
 from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, PID_FILE_NAME, init_user_constants
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.datamodel.management_schema import ManagementSchema
-from knot_resolver_manager.exceptions import CancelStartupExecInsteadException, DataException, KresManagerException, SchemaException
+from knot_resolver_manager.exceptions import (
+    CancelStartupExecInsteadException,
+    DataException,
+    KresManagerException,
+    SchemaException,
+)
 from knot_resolver_manager.kresd_controller import get_best_controller_implementation
 from knot_resolver_manager.utils.async_utils import readfile
 from knot_resolver_manager.utils.functional import Result
 from knot_resolver_manager.utils.parsing import ParsedTree, parse, parse_yaml
-from knot_resolver_manager.utils.types import NoneType
 from knot_resolver_manager.utils.systemd_notify import systemd_notify
+from knot_resolver_manager.utils.types import NoneType
 
 from .kres_manager import KresManager
 
@@ -391,6 +396,9 @@ async def _sigterm_while_shutting_down():
 
 
 async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_FILE) -> int:
+    # This function is quite long, but it describes how manager runs. So let's silence pylint
+    # pylint: disable=too-many-statements
+
     start_time = time()
     working_directory_on_startup = os.getcwd()
     manager: Optional[KresManager] = None
@@ -456,9 +464,9 @@ async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_
         signal.pthread_sigmask(signal.SIG_UNBLOCK, Server.all_handled_signals())
 
         # run exit functions
-        atexit._run_exitfuncs()
+        atexit.run_callbacks()
 
-        # and finally exec what we we told to exec
+        # and finally exec what we were told to exec
         os.execl(*e.exec_args)
 
     except KresManagerException as e:

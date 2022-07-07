@@ -1,10 +1,11 @@
 [supervisord]
 pidfile = {{ config.pid_file }}
 directory = {{ config.workdir }}
-nodaemon = false
+nodaemon = true
 logfile = {{ config.logfile }}
 logfile_maxbytes = 50MB
 loglevel = info
+silent=true
 {# user=root #}
 
 [unix_http_server]

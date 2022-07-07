@@ -8,6 +8,7 @@ class CancelStartupExecInsteadException(Exception):
     controllers such as supervisord to allow them to run as top-level
     process in a process tree.
     """
+
     def __init__(self, exec_args: List[str], *args: object) -> None:
         self.exec_args = exec_args
         super().__init__(*args)

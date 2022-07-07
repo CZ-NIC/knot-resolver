@@ -23,7 +23,7 @@ from knot_resolver_manager.datamodel.rpz_schema import RPZSchema
 from knot_resolver_manager.datamodel.slice_schema import SliceSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
-from knot_resolver_manager.datamodel.types.types import IDPattern, IntPositive, UncheckedPath
+from knot_resolver_manager.datamodel.types.types import IntPositive, UncheckedPath
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
 from knot_resolver_manager.exceptions import DataException
