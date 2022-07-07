@@ -25,7 +25,6 @@ from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchem
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
 from knot_resolver_manager.datamodel.types.types import IDPattern, IntPositive, UncheckedPath
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
-from knot_resolver_manager.datamodel.watchdog_schema import WatchDogSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
 from knot_resolver_manager.exceptions import DataException
 from knot_resolver_manager.utils import SchemaNode
@@ -92,7 +91,6 @@ class KresConfig(SchemaNode):
         rundir: Directory where the resolver can create files and which will be it's cwd.
         workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
         max_workers: The maximum number of workers allowed. Cannot be changed in runtime.
-        watchdog: Disable supervisord's watchdog, enable with defaults or set new configuration.
         management: Configuration of management HTTP API.
         webmgmt: Configuration of legacy web management endpoint.
         options: Fine-tuning global parameters of DNS resolver operation.
@@ -118,7 +116,6 @@ class KresConfig(SchemaNode):
         rundir: UncheckedPath = UncheckedPath(".")
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         max_workers: IntPositive = IntPositive(MAX_WORKERS)
-        watchdog: Union[bool, WatchDogSchema] = True
         management: ManagementSchema = ManagementSchema({"unix-socket": "./manager.sock"})
         webmgmt: Optional[WebmgmtSchema] = None
         options: OptionsSchema = OptionsSchema()
@@ -147,7 +144,6 @@ class KresConfig(SchemaNode):
     max_workers: IntPositive
     management: ManagementSchema
     webmgmt: Optional[WebmgmtSchema]
-    watchdog: Union[bool, WatchDogSchema]
     options: OptionsSchema
     network: NetworkSchema
     static_hints: StaticHintsSchema
