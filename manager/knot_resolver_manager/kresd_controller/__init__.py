@@ -1,6 +1,9 @@
 """
 This file contains autodetection logic for available subprocess controllers. Because we have to catch errors
 from imports, they are located in functions which are invoked at the end of this file.
+
+We supported multiple subprocess controllers while developing it. It now all converged onto just supervisord.
+The interface however remains so that different controllers can be added in the future.
 """
 # pylint: disable=import-outside-toplevel
 
@@ -30,24 +33,6 @@ def try_supervisord():
         _registered_controllers.append(SupervisordSubprocessController())
     except ImportError:
         logger.error("Failed to import modules related to supervisord service manager", exc_info=True)
-
-
-def try_systemd():
-    """
-    Attempt to load systemd controllers.
-    """
-    try:
-        from knot_resolver_manager.kresd_controller.systemd import SystemdSubprocessController
-        from knot_resolver_manager.kresd_controller.systemd.dbus_api import SystemdType
-
-        _registered_controllers.extend(
-            [
-                SystemdSubprocessController(SystemdType.SYSTEM),
-                SystemdSubprocessController(SystemdType.SESSION),
-            ]
-        )
-    except ImportError:
-        logger.info("Failed to import modules related to systemd service manager")
 
 
 async def get_best_controller_implementation(config: KresConfig) -> SubprocessController:
@@ -102,4 +87,3 @@ async def get_controller_by_name(config: KresConfig, name: str) -> SubprocessCon
 
 # run the imports on module load
 try_supervisord()
-try_systemd()

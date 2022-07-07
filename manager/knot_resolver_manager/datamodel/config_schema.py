@@ -23,7 +23,6 @@ from knot_resolver_manager.datamodel.rpz_schema import RPZSchema
 from knot_resolver_manager.datamodel.slice_schema import SliceSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
-from knot_resolver_manager.datamodel.supervisor_schema import SupervisorSchema
 from knot_resolver_manager.datamodel.types.types import IDPattern, IntPositive, UncheckedPath
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
@@ -94,7 +93,6 @@ class KresConfig(SchemaNode):
         max_workers: The maximum number of workers allowed. Cannot be changed in runtime.
         management: Configuration of management HTTP API.
         webmgmt: Configuration of legacy web management endpoint.
-        supervisor: Proceses supervisor configuration.
         options: Fine-tuning global parameters of DNS resolver operation.
         network: Network connections and protocols configuration.
         static_hints: Static hints for forward records (A/AAAA) and reverse records (PTR)
@@ -120,7 +118,6 @@ class KresConfig(SchemaNode):
         max_workers: IntPositive = IntPositive(MAX_WORKERS)
         management: ManagementSchema = ManagementSchema({"unix-socket": "./manager.sock"})
         webmgmt: Optional[WebmgmtSchema] = None
-        supervisor: SupervisorSchema = SupervisorSchema()
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
         static_hints: StaticHintsSchema = StaticHintsSchema()
@@ -147,7 +144,6 @@ class KresConfig(SchemaNode):
     max_workers: IntPositive
     management: ManagementSchema
     webmgmt: Optional[WebmgmtSchema]
-    supervisor: SupervisorSchema
     options: OptionsSchema
     network: NetworkSchema
     static_hints: StaticHintsSchema
