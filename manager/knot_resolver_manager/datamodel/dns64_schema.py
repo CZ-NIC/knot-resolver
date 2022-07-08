@@ -1,5 +1,5 @@
 from knot_resolver_manager.datamodel.types import IPv6Network96
-from knot_resolver_manager.utils import SchemaNode
+from knot_resolver_manager.utils.modeling import SchemaNode
 
 
 class Dns64Schema(SchemaNode):

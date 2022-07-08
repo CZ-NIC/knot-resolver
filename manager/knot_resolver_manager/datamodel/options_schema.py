@@ -3,7 +3,7 @@ from typing import Any, Union
 from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import IntNonNegative, TimeUnit
-from knot_resolver_manager.utils import SchemaNode
+from knot_resolver_manager.utils.modeling import SchemaNode
 
 GlueCheckingEnum = Literal["normal", "strict", "permissive"]
 

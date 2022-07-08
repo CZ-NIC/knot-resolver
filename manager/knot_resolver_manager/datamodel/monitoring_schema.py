@@ -3,7 +3,7 @@ from typing import Union
 from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import DomainName, IPAddress, PortNumber, TimeUnit
-from knot_resolver_manager.utils.modelling import SchemaNode
+from knot_resolver_manager.utils.modeling import SchemaNode
 
 
 class GraphiteSchema(SchemaNode):

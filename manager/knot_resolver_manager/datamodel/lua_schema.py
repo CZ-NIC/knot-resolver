@@ -1,6 +1,6 @@
 from typing import Optional
 
-from knot_resolver_manager.utils import SchemaNode
+from knot_resolver_manager.utils.modeling import SchemaNode
 
 
 class LuaSchema(SchemaNode):

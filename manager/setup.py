@@ -10,7 +10,8 @@ packages = \
  'knot_resolver_manager.kresd_controller',
  'knot_resolver_manager.kresd_controller.supervisord',
  'knot_resolver_manager.kresd_controller.supervisord.plugin',
- 'knot_resolver_manager.utils']
+ 'knot_resolver_manager.utils',
+ 'knot_resolver_manager.utils.modeling']
 
 package_data = \
 {'': ['*'],

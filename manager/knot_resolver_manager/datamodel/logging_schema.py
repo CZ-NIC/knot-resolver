@@ -3,7 +3,7 @@ from typing import List, Optional, Set, Union
 from typing_extensions import Literal, TypeAlias
 
 from knot_resolver_manager.datamodel.types import CheckedPath, TimeUnit
-from knot_resolver_manager.utils import SchemaNode
+from knot_resolver_manager.utils.modeling import SchemaNode
 
 LogLevelEnum = Literal["crit", "err", "warning", "notice", "info", "debug"]
 LogTargetEnum = Literal["syslog", "stderr", "stdout"]

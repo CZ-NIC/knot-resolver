@@ -1,7 +1,7 @@
 from typing import List, Optional, Union
 
 from knot_resolver_manager.datamodel.types import DomainName, IPAddressOptionalPort, PolicyFlagEnum
-from knot_resolver_manager.utils import SchemaNode
+from knot_resolver_manager.utils.modeling import SchemaNode
 
 
 class StubServerSchema(SchemaNode):

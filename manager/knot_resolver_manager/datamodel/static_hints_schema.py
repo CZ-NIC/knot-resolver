@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional
 
 from knot_resolver_manager.datamodel.types import CheckedPath, DomainName, IPAddress, TimeUnit
-from knot_resolver_manager.utils import SchemaNode
+from knot_resolver_manager.utils.modeling import SchemaNode
 
 
 class StaticHintsSchema(SchemaNode):

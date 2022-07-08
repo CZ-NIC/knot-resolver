@@ -20,7 +20,7 @@ from knot_resolver_manager.kresd_controller.interface import (
     SubprocessType,
 )
 from knot_resolver_manager.utils.functional import Result
-from knot_resolver_manager.utils.types import NoneType
+from knot_resolver_manager.utils.modeling.types import NoneType
 
 from .datamodel import KresConfig
 

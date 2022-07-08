@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Type, Union
 
 from knot_resolver_manager.datamodel.types.base_types import IntRangeBase, PatternBase, StrBase, UnitBase
-from knot_resolver_manager.exceptions import SchemaException
-from knot_resolver_manager.utils import CustomValueType
+from knot_resolver_manager.utils.modeling import CustomValueType
+from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
 
 
 class IntNonNegative(IntRangeBase):
@@ -35,7 +35,7 @@ class PortNumber(IntRangeBase):
         try:
             return cls(int(port), object_path)
         except ValueError as e:
-            raise SchemaException(f"invalid port number {port}", object_path) from e
+            raise DataValidationError(f"invalid port number {port}", object_path) from e
 
 
 class SizeUnit(UnitBase):
@@ -77,7 +77,7 @@ class DomainName(StrBase):
             try:
                 punycode = source_value.encode("idna").decode("utf-8") if source_value != "." else "."
             except ValueError:
-                raise SchemaException(
+                raise DataValidationError(
                     f"conversion of '{source_value}' to IDN punycode representation failed",
                     object_path,
                 )
@@ -86,12 +86,12 @@ class DomainName(StrBase):
                 self._value = source_value
                 self._punycode = punycode
             else:
-                raise SchemaException(
+                raise DataValidationError(
                     f"'{source_value}' represented in punycode '{punycode}' does not match '{self._re.pattern}' pattern",
                     object_path,
                 )
         else:
-            raise SchemaException(
+            raise DataValidationError(
                 "Unexpected value for '<domain-name>'."
                 f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
@@ -137,18 +137,18 @@ class InterfacePort(StrBase):
                 except ValueError as e1:
                     try:
                         self.if_name = InterfaceName(parts[0])
-                    except SchemaException as e2:
-                        raise SchemaException(
+                    except DataValidationError as e2:
+                        raise DataValidationError(
                             f"expected IP address or interface name, got '{parts[0]}'.", object_path
                         ) from e1 and e2
                 self.port = PortNumber.from_str(parts[1], object_path)
             else:
-                raise SchemaException(
+                raise DataValidationError(
                     f"expected '<ip-address|interface-name>@<port>', got '{source_value}'.", object_path
                 )
             self._value = source_value
         else:
-            raise SchemaException(
+            raise DataValidationError(
                 "Unexpected value for '<ip-address|interface-name>@<port>'."
                 f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
@@ -170,17 +170,19 @@ class InterfaceOptionalPort(StrBase):
                 except ValueError as e1:
                     try:
                         self.if_name = InterfaceName(parts[0])
-                    except SchemaException as e2:
-                        raise SchemaException(
+                    except DataValidationError as e2:
+                        raise DataValidationError(
                             f"expected IP address or interface name, got '{parts[0]}'.", object_path
                         ) from e1 and e2
                 if len(parts) == 2:
                     self.port = PortNumber.from_str(parts[1], object_path)
             else:
-                raise SchemaException(f"expected '<ip-address|interface-name>[@<port>]', got '{parts}'.", object_path)
+                raise DataValidationError(
+                    f"expected '<ip-address|interface-name>[@<port>]', got '{parts}'.", object_path
+                )
             self._value = source_value
         else:
-            raise SchemaException(
+            raise DataValidationError(
                 "Unexpected value for '<ip-address|interface-name>[@<port>]'."
                 f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
@@ -200,12 +202,12 @@ class IPAddressPort(StrBase):
                 try:
                     self.addr = ipaddress.ip_address(parts[0])
                 except ValueError as e:
-                    raise SchemaException(f"failed to parse IP address '{parts[0]}'.", object_path) from e
+                    raise DataValidationError(f"failed to parse IP address '{parts[0]}'.", object_path) from e
             else:
-                raise SchemaException(f"expected '<ip-address>@<port>', got '{source_value}'.", object_path)
+                raise DataValidationError(f"expected '<ip-address>@<port>', got '{source_value}'.", object_path)
             self._value = source_value
         else:
-            raise SchemaException(
+            raise DataValidationError(
                 "Unexpected value for '<ip-address>@<port>'."
                 f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
@@ -224,14 +226,14 @@ class IPAddressOptionalPort(StrBase):
                 try:
                     self.addr = ipaddress.ip_address(parts[0])
                 except ValueError as e:
-                    raise SchemaException(f"failed to parse IP address '{parts[0]}'.", object_path) from e
+                    raise DataValidationError(f"failed to parse IP address '{parts[0]}'.", object_path) from e
                 if len(parts) == 2:
                     self.port = PortNumber.from_str(parts[1], object_path)
             else:
-                raise SchemaException(f"expected '<ip-address>[@<port>]', got '{parts}'.", object_path)
+                raise DataValidationError(f"expected '<ip-address>[@<port>]', got '{parts}'.", object_path)
             self._value = source_value
         else:
-            raise SchemaException(
+            raise DataValidationError(
                 "Unexpected value for a '<ip-address>[@<port>]'."
                 f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
@@ -247,9 +249,9 @@ class IPv4Address(CustomValueType):
             try:
                 self._value: ipaddress.IPv4Address = ipaddress.IPv4Address(source_value)
             except ValueError as e:
-                raise SchemaException("failed to parse IPv4 address.", object_path) from e
+                raise DataValidationError("failed to parse IPv4 address.", object_path) from e
         else:
-            raise SchemaException(
+            raise DataValidationError(
                 "Unexpected value for a IPv4 address."
                 f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
@@ -289,9 +291,9 @@ class IPv6Address(CustomValueType):
             try:
                 self._value: ipaddress.IPv6Address = ipaddress.IPv6Address(source_value)
             except ValueError as e:
-                raise SchemaException("failed to parse IPv6 address.", object_path) from e
+                raise DataValidationError("failed to parse IPv6 address.", object_path) from e
         else:
-            raise SchemaException(
+            raise DataValidationError(
                 "Unexpected value for a IPv6 address."
                 f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
@@ -334,9 +336,9 @@ class IPNetwork(CustomValueType):
             try:
                 self._value: Union[ipaddress.IPv4Network, ipaddress.IPv6Network] = ipaddress.ip_network(source_value)
             except ValueError as e:
-                raise SchemaException("failed to parse IP network.", object_path) from e
+                raise DataValidationError("failed to parse IP network.", object_path) from e
         else:
-            raise SchemaException(
+            raise DataValidationError(
                 "Unexpected value for a network subnet."
                 f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
@@ -370,10 +372,10 @@ class IPv6Network96(CustomValueType):
             try:
                 self._value: ipaddress.IPv6Network = ipaddress.IPv6Network(source_value)
             except ValueError as e:
-                raise SchemaException("failed to parse IPv6 /96 network.", object_path) from e
+                raise DataValidationError("failed to parse IPv6 /96 network.", object_path) from e
 
             if self._value.prefixlen == 128:
-                raise SchemaException(
+                raise DataValidationError(
                     "Expected IPv6 network address with /96 prefix length."
                     " Submitted address has been interpreted as /128."
                     " Maybe, you forgot to add /96 after the base address?",
@@ -381,13 +383,13 @@ class IPv6Network96(CustomValueType):
                 )
 
             if self._value.prefixlen != 96:
-                raise SchemaException(
+                raise DataValidationError(
                     "expected IPv6 network address with /96 prefix length."
                     f" Got prefix lenght of {self._value.prefixlen}",
                     object_path,
                 )
         else:
-            raise SchemaException(
+            raise DataValidationError(
                 "Unexpected value for a network subnet."
                 f" Expected string, got '{source_value}' with type '{type(source_value)}'",
                 object_path,
@@ -426,7 +428,7 @@ class UncheckedPath(CustomValueType):
         if isinstance(source_value, str):
             self._value: Path = Path(source_value)
         else:
-            raise SchemaException(
+            raise DataValidationError(
                 f"expected file path in a string, got '{source_value}' with type '{type(source_value)}'.", object_path
             )
 
@@ -466,4 +468,4 @@ class CheckedPath(UncheckedPath):
         try:
             self._value = self._value.resolve(strict=False)
         except RuntimeError as e:
-            raise SchemaException("Failed to resolve given file path. Is there a symlink loop?", object_path) from e
+            raise DataValidationError("Failed to resolve given file path. Is there a symlink loop?", object_path) from e

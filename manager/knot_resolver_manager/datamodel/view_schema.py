@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 from knot_resolver_manager.datamodel.types import IPNetwork, PolicyFlagEnum
-from knot_resolver_manager.utils import SchemaNode
+from knot_resolver_manager.utils.modeling import SchemaNode
 
 
 class ViewSchema(SchemaNode):

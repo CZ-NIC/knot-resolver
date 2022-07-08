@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 from knot_resolver_manager.datamodel.types import CheckedPath, DomainName, SizeUnit, TimeUnit
-from knot_resolver_manager.utils import SchemaNode
+from knot_resolver_manager.utils.modeling import SchemaNode
 
 
 class PrefillSchema(SchemaNode):

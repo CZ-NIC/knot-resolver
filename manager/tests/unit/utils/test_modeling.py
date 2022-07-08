@@ -4,9 +4,8 @@ import pytest
 from pytest import raises
 from typing_extensions import Literal
 
-from knot_resolver_manager.exceptions import SchemaException
-from knot_resolver_manager.utils import SchemaNode
-from knot_resolver_manager.utils.parsing import parse_json, parse_yaml
+from knot_resolver_manager.utils.modeling import SchemaNode, parse_json, parse_yaml
+from knot_resolver_manager.utils.modeling.exceptions import DataDescriptionError, DataValidationError
 
 
 class _TestBool(SchemaNode):
@@ -28,7 +27,7 @@ def test_parsing_bool_valid(val: str, exp: bool):
 
 @pytest.mark.parametrize("val", ["0", "1", "5", "'true'", "'false'", "5.5"])  # int, str, float
 def test_parsing_bool_invalid(val: str):
-    with raises(SchemaException):
+    with raises(DataValidationError):
         _TestBool(parse_yaml(f"v: {val}"))
 
 
@@ -39,7 +38,7 @@ def test_parsing_int_valid(val: str, exp: int):
 
 @pytest.mark.parametrize("val", ["false", "'5'", "5.5"])  # bool, str, float
 def test_parsing_int_invalid(val: str):
-    with raises(SchemaException):
+    with raises(DataValidationError):
         _TestInt(parse_yaml(f"v: {val}"))
 
 
@@ -50,7 +49,7 @@ def test_parsing_str_valid(val: Any, exp: str):
 
 
 def test_parsing_str_invalid():
-    with raises(SchemaException):
+    with raises(DataValidationError):
         _TestStr(parse_yaml("v: false"))  # bool
 
 
@@ -174,8 +173,8 @@ def test_partial_mutations():
     assert o.workers == 8
     assert o.inner.size == 33
 
-    # raise validation SchemaException
-    with raises(SchemaException):
+    # raise validation DataValidationError
+    with raises(DataValidationError):
         o = ConfSchema(d.update("/", parse_json('{"workers": -5}')))
 
 
@@ -250,7 +249,7 @@ def test_docstring_parsing_invalid():
 
         nothing: str
 
-    with raises(SchemaException):
+    with raises(DataDescriptionError):
         _ = AdditionalItem.json_schema()
 
     class WrongDescription(SchemaNode):
@@ -262,5 +261,5 @@ def test_docstring_parsing_invalid():
 
         nothing: str
 
-    with raises(SchemaException):
+    with raises(DataDescriptionError):
         _ = WrongDescription.json_schema()

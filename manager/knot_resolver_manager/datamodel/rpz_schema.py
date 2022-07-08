@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 from knot_resolver_manager.datamodel.types import CheckedPath, PolicyActionEnum, PolicyFlagEnum
-from knot_resolver_manager.utils import SchemaNode
+from knot_resolver_manager.utils.modeling import SchemaNode
 
 
 class RPZSchema(SchemaNode):

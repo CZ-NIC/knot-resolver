@@ -10,7 +10,7 @@ from knot_resolver_manager.datamodel.types import (
     PolicyFlagEnum,
     TimeUnit,
 )
-from knot_resolver_manager.utils import SchemaNode
+from knot_resolver_manager.utils.modeling import SchemaNode
 
 
 class FilterSchema(SchemaNode):

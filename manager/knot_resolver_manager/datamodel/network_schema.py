@@ -14,7 +14,7 @@ from knot_resolver_manager.datamodel.types import (
     PortNumber,
     SizeUnit,
 )
-from knot_resolver_manager.utils import SchemaNode
+from knot_resolver_manager.utils.modeling import SchemaNode
 
 KindEnum = Literal["dns", "xdp", "dot", "doh-legacy", "doh2"]
 
