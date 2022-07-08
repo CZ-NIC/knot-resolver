@@ -1,4 +1,3 @@
-id: dev
 rundir: etc/knot-resolver/runtime
 workers: 1
 management:

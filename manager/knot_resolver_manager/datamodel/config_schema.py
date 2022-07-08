@@ -23,7 +23,7 @@ from knot_resolver_manager.datamodel.rpz_schema import RPZSchema
 from knot_resolver_manager.datamodel.slice_schema import SliceSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
-from knot_resolver_manager.datamodel.types.types import IDPattern, IntPositive, UncheckedPath
+from knot_resolver_manager.datamodel.types.types import IntPositive, UncheckedPath
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
 from knot_resolver_manager.exceptions import DataException
@@ -85,7 +85,6 @@ class KresConfig(SchemaNode):
         Knot Resolver declarative configuration.
 
         ---
-        id: System-wide unique identifier of this instance. Used for grouping logs and tagging workers.
         nsid: Name Server Identifier (RFC 5001) which allows DNS clients to request resolver to send back its NSID along with the reply to a DNS request.
         hostname: Internal DNS resolver hostname. Default is machine hostname.
         rundir: Directory where the resolver can create files and which will be it's cwd.
@@ -110,7 +109,6 @@ class KresConfig(SchemaNode):
         lua: Custom Lua configuration.
         """
 
-        id: IDPattern
         nsid: Optional[str] = None
         hostname: Optional[str] = None
         rundir: UncheckedPath = UncheckedPath(".")
@@ -136,7 +134,6 @@ class KresConfig(SchemaNode):
 
     _PREVIOUS_SCHEMA = Raw
 
-    id: IDPattern
     nsid: Optional[str]
     hostname: str
     rundir: UncheckedPath

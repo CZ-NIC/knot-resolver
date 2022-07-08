@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from knot_resolver_manager.utils import which
-from knot_resolver_manager.utils.functional import Result
 
 if TYPE_CHECKING:
     from knot_resolver_manager.config_store import ConfigStore
@@ -73,31 +72,17 @@ class _UserConstants:
     Class for accessing constants, which are technically not constants as they are user configurable.
     """
 
-    def __init__(self, config_store: "ConfigStore") -> None:
+    def __init__(self, config_store: "ConfigStore", working_directory_on_startup: str) -> None:
         self._config_store = config_store
-
-    @property
-    def ID(self) -> str:
-        return str(self._config_store.get().id)
+        self.working_directory_on_startup = working_directory_on_startup
 
 
 _user_constants: Optional[_UserConstants] = None
 
 
-async def _deny_id_changes(config_old: "KresConfig", config_new: "KresConfig") -> Result[None, str]:
-    if config_old.id != config_new.id:
-        return Result.err(
-            "/id: Based on the ID, the manager recognizes subprocesses,"
-            " so it is not possible to change it while services are running."
-        )
-    return Result.ok(None)
-
-
-async def init_user_constants(config_store: "ConfigStore") -> None:
+async def init_user_constants(config_store: "ConfigStore", working_directory_on_startup: str) -> None:
     global _user_constants
-    _user_constants = _UserConstants(config_store)
-
-    await config_store.register_verifier(_deny_id_changes)
+    _user_constants = _UserConstants(config_store, working_directory_on_startup)
 
 
 def user_constants() -> _UserConstants:

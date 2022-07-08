@@ -1,10 +1,11 @@
 [supervisord]
 pidfile = {{ config.pid_file }}
 directory = {{ config.workdir }}
-nodaemon = false
+nodaemon = true
 logfile = {{ config.logfile }}
 logfile_maxbytes = 50MB
-loglevel = trace
+loglevel = info
+silent=true
 {# user=root #}
 
 [unix_http_server]
@@ -13,15 +14,32 @@ file = {{ config.unix_http_server }}
 [supervisorctl]
 serverurl = unix://{{ config.unix_http_server }}
 
+{# Extensions for actual API control #}
 [rpcinterface:supervisor]
 supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
-
-[rpcinterface:notify]
-supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin:make_rpcinterface
 
 [rpcinterface:fast]
 supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.fast_rpcinterface:make_main_rpcinterface
 
+{# Extensions to changing the supervisord behavior #}
+[rpcinterface:notify]
+supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin:make_rpcinterface
+
+[rpcinterface:fatal_manager]
+supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.stop_when_manager_fatal:make_rpcinterface
+
+[program:manager]
+redirect_stderr=false
+stdout_logfile=/proc/self/fd/1
+stdout_logfile_maxbytes=0
+directory={{ manager.workdir }}
+command={{ manager.command }}
+stopsignal=SIGINT
+killasgroup=true
+autorestart=true
+autostart=true
+startsecs=5
+environment={{ manager.environment }}
 
 [program:kresd]
 process_name=%(program_name)s%(process_num)d

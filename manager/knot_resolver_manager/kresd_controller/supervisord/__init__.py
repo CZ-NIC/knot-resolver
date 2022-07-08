@@ -1,8 +1,7 @@
 import logging
 from os import kill
 from pathlib import Path
-from time import sleep
-from typing import Any, Dict, Iterable, Optional, Union, cast
+from typing import Any, Dict, Iterable, NoReturn, Optional, Union, cast
 from xmlrpc.client import Fault, ServerProxy
 
 import supervisor.xmlrpc  # type: ignore[import]
@@ -10,7 +9,7 @@ import supervisor.xmlrpc  # type: ignore[import]
 from knot_resolver_manager.compat.asyncio import async_in_a_thread
 from knot_resolver_manager.constants import supervisord_config_file, supervisord_pid_file, supervisord_sock_file
 from knot_resolver_manager.datamodel.config_schema import KresConfig
-from knot_resolver_manager.exceptions import SubprocessControllerException
+from knot_resolver_manager.exceptions import CancelStartupExecInsteadException, SubprocessControllerException
 from knot_resolver_manager.kresd_controller.interface import (
     KresID,
     Subprocess,
@@ -34,25 +33,50 @@ async def _start_supervisord(config: KresConfig) -> None:
         raise SubprocessControllerException(f"Supervisord exited with exit code {res}")
 
 
+async def _exec_supervisord(config: KresConfig) -> NoReturn:
+    logger.debug("Writing supervisord config")
+    await write_config_file(config)
+    logger.debug("Execing supervisord")
+    raise CancelStartupExecInsteadException(
+        [
+            str(which.which("supervisord")),
+            "supervisord",
+            "--configuration",
+            str(supervisord_config_file(config).absolute()),
+        ]
+    )
+
+
 async def _reload_supervisord(config: KresConfig) -> None:
     await write_config_file(config)
-    res = await call(f'supervisorctl --configuration="{supervisord_config_file(config).absolute()}" update', shell=True)
-    if res != 0:
-        raise SubprocessControllerException(f"Supervisord reload failed with exit code {res}")
+    try:
+        supervisord = _create_supervisord_proxy(config)
+        supervisord.reloadConfig()
+    except Fault as e:
+        raise SubprocessControllerException("supervisord reload failed") from e
 
 
 @async_in_a_thread
 def _stop_supervisord(config: KresConfig) -> None:
     supervisord = _create_supervisord_proxy(config)
-    pid = supervisord.getPID()
-    supervisord.shutdown()
+    # pid = supervisord.getPID()
     try:
-        while True:
-            kill(pid, 0)
-            sleep(0.1)
-    except ProcessLookupError:
-        pass  # there is finally no supervisord process
-    supervisord_config_file(config).unlink()
+        # we might be trying to shut down supervisord at a moment, when it's waiting
+        # for us to stop. Therefore, this shutdown request for supervisord might
+        # die and it's not a problem.
+        supervisord.shutdown()
+    except Fault as e:
+        if e.faultCode == 6 and e.faultString == "SHUTDOWN_STATE":
+            # supervisord is already stopping, so it's fine
+            pass
+        else:
+            # something wrong happened, let's be loud about it
+            raise
+
+    # We could remove the configuration, but there is actually no specific need to do so.
+    # If we leave it behind, someone might find it and use it to start us from scratch again,
+    # which is perfectly fine.
+    # supervisord_config_file(config).unlink()
 
 
 async def _is_supervisord_available() -> bool:
@@ -138,6 +162,10 @@ def _list_running_subprocesses(config: KresConfig) -> Dict[SupervisordKresID, Su
             status = SubprocessStatus.UNKNOWN
         return status
 
+    # there will be a manager process as well, but we don't want to report anything on ourselves
+    processes = [pr for pr in processes if pr["name"] != "manager"]
+
+    # convert all the names
     return {SupervisordKresID.from_string(pr["name"]): convert(pr) for pr in processes if pr["statename"] != "STOPPED"}
 
 
@@ -216,8 +244,12 @@ class SupervisordSubprocessController(SubprocessController):
         self._controller_config = config
 
         if not await _is_supervisord_running(config):
-            await _start_supervisord(config)
+            logger.info(
+                "We want supervisord to restart us when needed, we will therefore exec() it and let it start us again."
+            )
+            await _exec_supervisord(config)
         else:
+            logger.info("Supervisord is already running, we will just update its config...")
             await _reload_supervisord(config)
 
     async def shutdown_controller(self) -> None:
