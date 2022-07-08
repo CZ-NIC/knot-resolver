@@ -1,29 +1,24 @@
 import json
 from typing import Any, Dict, cast
 
-from pytest import raises
-
 from knot_resolver_manager.datamodel import KresConfig
-from knot_resolver_manager.exceptions import SchemaException
-from knot_resolver_manager.utils.modelling import SchemaNode
-from tests.unit.utils import test_instance_of_kres_config
 
 
 def test_config_defaults():
-    config = test_instance_of_kres_config()
+    config = KresConfig()
 
     # DNS64 default
     assert config.dns64 == False
 
 
 def test_dnssec_false():
-    config = KresConfig({"id": "test", "dnssec": False})
+    config = KresConfig({"dnssec": False})
 
     assert config.dnssec == False
 
 
 def test_dnssec_default_true():
-    config = test_instance_of_kres_config()
+    config = KresConfig()
 
     # DNSSEC defaults
     assert config.dnssec.trust_anchor_sentinel == True
@@ -38,7 +33,7 @@ def test_dnssec_default_true():
 
 
 def test_dns64_prefix_default():
-    assert str(KresConfig({"id": "test", "dns64": True}).dns64.prefix) == "64:ff9b::/96"
+    assert str(KresConfig({"dns64": True}).dns64.prefix) == "64:ff9b::/96"
 
 
 def test_config_json_schema():

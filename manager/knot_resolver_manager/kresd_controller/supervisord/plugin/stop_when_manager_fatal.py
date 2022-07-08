@@ -2,7 +2,6 @@
 # pylint: disable=protected-access
 import atexit
 import os
-
 from typing import Any, Optional
 
 from supervisor.compat import as_string
