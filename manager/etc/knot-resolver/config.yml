@@ -1,4 +1,3 @@
-id: distro
 rundir: /run/knot-resolver
 workers: 2
 cache:
