@@ -25,6 +25,7 @@ install_requires = \
  'click>=7.1.2',
  'prometheus-client>=0.6',
  'requests>=2.25.1',
+ 'supervisor>=4.2.2',
  'typing-extensions>=3.7.2']
 
 entry_points = \
