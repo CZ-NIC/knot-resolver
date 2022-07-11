@@ -124,7 +124,7 @@ class KresConfig(SchemaNode):
         monitoring: MonitoringSchema = MonitoringSchema()
         lua: LuaSchema = LuaSchema()
 
-    _PREVIOUS_SCHEMA = Raw
+    _LAYER = Raw
 
     nsid: Optional[str]
     hostname: str

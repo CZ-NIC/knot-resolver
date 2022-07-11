@@ -438,7 +438,7 @@ class SchemaNode(Serializable):
     during validation, raise a `ValueError` exception.
 
     Using this, you can convert any input values into any type and field you want. To make the conversion easier
-    to write, you could also specify a special class variable called `_PREVIOUS_SCHEMA` pointing to another
+    to write, you could also specify a special class variable called `_LAYER` pointing to another
     SchemaNode class. This causes the source object to be first parsed as the specified SchemaNode and after that
     used a source for this class. This therefore allows nesting of transformation functions.
 
@@ -465,7 +465,7 @@ class SchemaNode(Serializable):
     See tests/utils/test_modelling.py for example usage.
     """
 
-    _PREVIOUS_SCHEMA: Optional[Type["SchemaNode"]] = None
+    _LAYER: Optional[Type["SchemaNode"]] = None
 
     def _assign_default(self, name: str, python_type: Any, object_path: str) -> None:
         cls = self.__class__
@@ -543,8 +543,8 @@ class SchemaNode(Serializable):
         self._source: Union[ParsedTree, SchemaNode] = source
 
         # construct lower level schema node first if configured to do so
-        if self._PREVIOUS_SCHEMA is not None:
-            source = self._PREVIOUS_SCHEMA(source, object_path=object_path)  # pylint: disable=not-callable
+        if self._LAYER is not None:
+            source = self._LAYER(source, object_path=object_path)  # pylint: disable=not-callable
 
         # assign fields
         used_keys = self._assign_fields(source, object_path)
@@ -620,8 +620,8 @@ class SchemaNode(Serializable):
 
     @classmethod
     def json_schema(cls: Type["SchemaNode"], include_schema_definition: bool = True) -> Dict[Any, Any]:
-        if cls._PREVIOUS_SCHEMA is not None:
-            return cls._PREVIOUS_SCHEMA.json_schema(include_schema_definition=include_schema_definition)
+        if cls._LAYER is not None:
+            return cls._LAYER.json_schema(include_schema_definition=include_schema_definition)
 
         schema: Dict[Any, Any] = {}
         if include_schema_definition:

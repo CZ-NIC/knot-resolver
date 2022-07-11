@@ -89,7 +89,7 @@ class ListenSchema(SchemaNode):
         kind: KindEnum = "dns"
         freebind: bool = False
 
-    _PREVIOUS_SCHEMA = Raw
+    _LAYER = Raw
 
     interface: Union[None, InterfaceOptionalPort, List[InterfaceOptionalPort]]
     unix_socket: Union[None, CheckedPath, List[CheckedPath]]

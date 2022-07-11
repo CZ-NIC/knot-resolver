@@ -54,7 +54,7 @@ class OptionsSchema(SchemaNode):
         serve_stale: bool = False
         prediction: Union[bool, PredictionSchema] = False
 
-    _PREVIOUS_SCHEMA = Raw
+    _LAYER = Raw
 
     glue_checking: GlueCheckingEnum
     qname_minimisation: bool

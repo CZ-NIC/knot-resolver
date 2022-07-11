@@ -128,7 +128,7 @@ def test_partial_mutations():
         inner: InnerSchema = InnerSchema()
 
     class ConfSchema(SchemaNode):
-        _PREVIOUS_SCHEMA = ConfPreviousSchema
+        _LAYER = ConfPreviousSchema
 
         workers: int
         lua_config: Optional[str]
