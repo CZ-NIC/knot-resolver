@@ -407,7 +407,7 @@ fi
 %endif
 
 %files -n python3-knot-resolver-manager
-%{python3_sitelib}/knot_resolver_manager*
+%{python3_sitearch}/knot_resolver_manager*
 %{_sysconfdir}/knot-resolver/config.yml
 %{_unitdir}/knot-resolver.service
 %{_bindir}/kresctl
