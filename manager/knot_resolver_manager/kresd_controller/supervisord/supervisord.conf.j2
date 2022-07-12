@@ -28,10 +28,13 @@ supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervi
 [rpcinterface:notify]
 supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin:make_rpcinterface
 
+[rpcinterface:stdout_pipe]
+supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.stdout_pipe_log:make_rpcinterface
+
 
 [program:manager]
 redirect_stderr=false
-stdout_logfile=/proc/self/fd/1
+stdout_logfile=/proc/self/fd/42  # handled by stdout_pipe plugin
 stdout_logfile_maxbytes=0
 directory={{ manager.workdir }}
 command={{ manager.command }}
