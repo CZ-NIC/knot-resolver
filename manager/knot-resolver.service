@@ -2,6 +2,8 @@
 Description=Knot Resolver Manager
 
 [Service]
+Type=notify
+TimeoutStartSec=10s
 ExecStart=/usr/bin/env python3 -m knot_resolver_manager --config=/etc/knot-resolver/config.yml
 KillSignal=SIGINT
 # See systemd.service(5) for explanation, why we should replace this with a blocking request

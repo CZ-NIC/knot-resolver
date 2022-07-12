@@ -22,11 +22,12 @@ supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
 supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.fast_rpcinterface:make_main_rpcinterface
 
 {# Extensions to changing the supervisord behavior #}
+[rpcinterface:manager_lifecycle_monitor]
+supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.manager_lifecycle_monitor:make_rpcinterface
+
 [rpcinterface:notify]
 supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin:make_rpcinterface
 
-[rpcinterface:fatal_manager]
-supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.stop_when_manager_fatal:make_rpcinterface
 
 [program:manager]
 redirect_stderr=false
