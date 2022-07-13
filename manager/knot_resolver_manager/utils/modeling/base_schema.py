@@ -365,7 +365,14 @@ def _validated_object_type(
             return obj
         else:
             # no validation performed, the implementation does it in the constuctor
-            return cls(obj, object_path=object_path)
+            try:
+                return cls(obj, object_path=object_path)
+            except ValueError as e:
+                if len(e.args) > 0 and isinstance(e.args[0], str):
+                    msg = e.args[0]
+                else:
+                    msg = f"Failed to validate value against {cls} type"
+                raise DataValidationError(msg, object_path) from e
 
     # nested BaseSchema subclasses
     elif inspect.isclass(cls) and issubclass(cls, BaseSchema):

@@ -2,7 +2,6 @@ import re
 from typing import Any, Dict, Pattern, Type
 
 from knot_resolver_manager.utils.modeling import BaseCustomType
-from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
 
 
 class IntBase(BaseCustomType):
@@ -75,12 +74,12 @@ class IntRangeBase(IntBase):
         super().__init__(source_value)
         if isinstance(source_value, int) and not isinstance(source_value, bool):
             if hasattr(self, "_min") and (source_value < self._min):
-                raise DataValidationError(f"value {source_value} is lower than the minimum {self._min}.", object_path)
+                raise ValueError(f"value {source_value} is lower than the minimum {self._min}.")
             if hasattr(self, "_max") and (source_value > self._max):
-                raise DataValidationError(f"value {source_value} is higher than the maximum {self._max}", object_path)
+                raise ValueError(f"value {source_value} is higher than the maximum {self._max}")
             self._value = source_value
         else:
-            raise DataValidationError(
+            raise ValueError(
                 f"expected integer, got '{type(source_value)}'",
                 object_path,
             )
@@ -112,9 +111,9 @@ class PatternBase(StrBase):
             if type(self)._re.match(source_value):
                 self._value: str = source_value
             else:
-                raise DataValidationError(f"'{source_value}' does not match '{self._re.pattern}' pattern", object_path)
+                raise ValueError(f"'{source_value}' does not match '{self._re.pattern}' pattern")
         else:
-            raise DataValidationError(
+            raise ValueError(
                 f"expected string, got '{type(source_value)}'",
                 object_path,
             )
@@ -146,25 +145,23 @@ class UnitBase(IntBase):
             if grouped:
                 val, unit = grouped.groups()
                 if unit is None:
-                    raise DataValidationError(
-                        f"Missing units. Accepted units are {list(type(self)._units.keys())}", object_path
-                    )
+                    raise ValueError(f"Missing units. Accepted units are {list(type(self)._units.keys())}")
                 elif unit not in type(self)._units:
-                    raise DataValidationError(
+                    raise ValueError(
                         f"Used unexpected unit '{unit}' for {type(self).__name__}."
                         f" Accepted units are {list(type(self)._units.keys())}",
                         object_path,
                     )
                 self._value = int(val) * type(self)._units[unit]
             else:
-                raise DataValidationError(f"{type(self._value)} Failed to convert: {self}", object_path)
+                raise ValueError(f"{type(self._value)} Failed to convert: {self}")
         elif isinstance(source_value, int):
-            raise DataValidationError(
+            raise ValueError(
                 f"number without units, please convert to string and add unit  - {list(type(self)._units.keys())}",
                 object_path,
             )
         else:
-            raise DataValidationError(
+            raise ValueError(
                 f"expected number with units in a string, got '{type(source_value)}'.",
                 object_path,
             )

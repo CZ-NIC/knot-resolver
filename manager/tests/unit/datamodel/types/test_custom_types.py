@@ -23,7 +23,6 @@ from knot_resolver_manager.datamodel.types import (
     TimeUnit,
 )
 from knot_resolver_manager.utils.modeling import BaseSchema
-from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
 
 
 def _rand_domain(label_chars: int, levels: int = 1) -> str:
@@ -39,7 +38,7 @@ def test_port_number_valid(val: int):
 
 @pytest.mark.parametrize("val", [0, 65_636, -1, "53"])
 def test_port_number_invalid(val: Any):
-    with raises(DataValidationError):
+    with raises(ValueError):
         PortNumber(val)
 
 
@@ -53,7 +52,7 @@ def test_size_unit_valid(val: str):
 
 @pytest.mark.parametrize("val", ["-5B", 5, -5242880, "45745mB"])
 def test_size_unit_invalid(val: Any):
-    with raises(DataValidationError):
+    with raises(ValueError):
         SizeUnit(val)
 
 
@@ -68,7 +67,7 @@ def test_time_unit_valid(val: str):
 
 @pytest.mark.parametrize("val", ["-1", "-24h", "1440mm", 6575, -1440])
 def test_time_unit_invalid(val: Any):
-    with raises(DataValidationError):
+    with raises(ValueError):
         TimeUnit("-1")
 
 
@@ -124,7 +123,7 @@ def test_domain_name_valid(val: str):
     ],
 )
 def test_domain_name_invalid(val: str):
-    with raises(DataValidationError):
+    with raises(ValueError):
         DomainName(val)
 
 
@@ -135,7 +134,7 @@ def test_interface_name_valid(val: str):
 
 @pytest.mark.parametrize("val", ["_lo", "-wlo1", "lo_", "wlo1-", "e8--2", "web__ifgrp"])
 def test_interface_name_invalid(val: Any):
-    with raises(DataValidationError):
+    with raises(ValueError):
         InterfaceName(val)
 
 
@@ -150,7 +149,7 @@ def test_interface_port_valid(val: str):
 
 @pytest.mark.parametrize("val", ["lo", "2001:db8::1000", "53"])
 def test_interface_port_invalid(val: Any):
-    with raises(DataValidationError):
+    with raises(ValueError):
         InterfacePort(val)
 
 
@@ -165,7 +164,7 @@ def test_interface_optional_port_valid(val: str):
 
 @pytest.mark.parametrize("val", ["lo@", "@53"])
 def test_interface_optional_port_invalid(val: Any):
-    with raises(DataValidationError):
+    with raises(ValueError):
         InterfaceOptionalPort(val)
 
 
@@ -182,7 +181,7 @@ def test_ip_address_port_valid(val: str):
     "val", ["123.4.5.6", "2001:db8::1000", "123.4.5.6.7@5000", "2001:db8::10000@5001", "123.4.5.6@"]
 )
 def test_ip_address_port_invalid(val: Any):
-    with raises(DataValidationError):
+    with raises(ValueError):
         IPAddressPort(val)
 
 
@@ -197,7 +196,7 @@ def test_ip_address_optional_port_valid(val: str):
 
 @pytest.mark.parametrize("val", ["123.4.5.6.7", "2001:db8::10000", "123.4.5.6@", "@55"])
 def test_ip_address_optional_port_invalid(val: Any):
-    with raises(DataValidationError):
+    with raises(ValueError):
         IPAddressOptionalPort(val)
 
 
@@ -210,7 +209,7 @@ def test_ipv4_address_valid(val: str):
 
 @pytest.mark.parametrize("val", ["123456", "2001:db8::1000"])
 def test_ipv4_address_invalid(val: Any):
-    with raises(DataValidationError):
+    with raises(ValueError):
         IPv4Address(val)
 
 
@@ -223,7 +222,7 @@ def test_ipv6_address_valid(val: str):
 
 @pytest.mark.parametrize("val", ["123.4.5.6", "2001::db8::1000"])
 def test_ipv6_address_invalid(val: Any):
-    with raises(DataValidationError):
+    with raises(ValueError):
         IPv6Address(val)
 
 
@@ -237,7 +236,7 @@ def test_ip_network_valid(val: str):
 
 @pytest.mark.parametrize("val", ["10.11.12.13/8", "10.11.12.5/128"])
 def test_ip_network_invalid(val: str):
-    with raises(DataValidationError):
+    with raises(ValueError):
         IPNetwork(val)
 
 
@@ -248,5 +247,5 @@ def test_ipv6_96_network_valid(val: str):
 
 @pytest.mark.parametrize("val", ["fe80::/95", "10.11.12.3/96", "64:ff9b::1/96"])
 def test_ipv6_96_network_invalid(val: Any):
-    with raises(DataValidationError):
+    with raises(ValueError):
         IPv6Network96(val)
