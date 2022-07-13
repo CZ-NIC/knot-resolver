@@ -14,8 +14,8 @@ from .types import is_internal_field_name
 
 class ParsedTree:
     """
-    Simple wrapper for parsed data. Changes internal naming convention (snake case)
-    to external (dashes) on the fly.
+    Simple wrapper for parsed data.
+    Changes external naming convention (hyphen separator) to internal (snake_case) on the fly.
 
     IMMUTABLE, DO NOT MODIFY
     """

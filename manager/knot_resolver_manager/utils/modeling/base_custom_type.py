@@ -8,14 +8,6 @@ class BaseCustomType:
     calling the constructor of the appropriate type on the field value. The only limitation
     is that the value MUST NOT be `None`.
 
-    Example:
-    ```
-    class A(DataParser):
-        field: MyBaseCustomType
-
-    A.from_json('{"field": "value"}') == A(field=MyBaseCustomType("value"))
-    ```
-
     There is no validation done on the wrapped value. The only condition is that
     it can't be `None`. If you want to perform any validation during creation,
     raise a `ValueError` in case of errors.
@@ -25,10 +17,10 @@ class BaseCustomType:
         pass
 
     def __int__(self) -> int:
-        raise NotImplementedError("BaseCustomType return 'int()' value is not implemented.")
+        raise NotImplementedError(f" return 'int()' value for {type(self).__name__} is not implemented.")
 
     def __str__(self) -> str:
-        raise NotImplementedError("BaseCustomType return 'str()' value is not implemented.")
+        raise NotImplementedError(f"return 'str()' value for {type(self).__name__} is not implemented.")
 
     def serialize(self) -> Any:
         """
@@ -37,7 +29,7 @@ class BaseCustomType:
         It's not necessary to return the same structure that was given as an input. It only has
         to be the same semantically.
         """
-        raise NotImplementedError(f"{type(self).__name__}'s' 'to_dict()' not implemented.")
+        raise NotImplementedError(f"{type(self).__name__}'s' 'serialize()' not implemented.")
 
     @classmethod
     def json_schema(cls: Type["BaseCustomType"]) -> Dict[Any, Any]:

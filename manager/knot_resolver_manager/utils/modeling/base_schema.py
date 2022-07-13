@@ -411,7 +411,7 @@ def _create_untouchable(name: str) -> object:
 
 class BaseSchema(Serializable):
     """
-    Class for modelling configuration schema. It somewhat resembles standard dataclasses with additional
+    Base class for modeling configuration schema. It somewhat resembles standard dataclasses with additional
     functionality:
 
     * type validation
@@ -419,7 +419,7 @@ class BaseSchema(Serializable):
 
     To create an instance of this class, you have to provide source data in the form of dict-like object.
     Generally, we expect `ParsedTree`, raw dict or another `BaseSchema` instance. The provided data object
-    is traversed, transformed and validated before assigned to the appropriate fields.
+    is traversed, transformed and validated before assigned to the appropriate fields (attributes).
 
     Fields (attributes)
     ===================
@@ -446,7 +446,7 @@ class BaseSchema(Serializable):
 
     Using this, you can convert any input values into any type and field you want. To make the conversion easier
     to write, you could also specify a special class variable called `_LAYER` pointing to another
-    BaseSchema class. This causes the source object to be first parsed as the specified BaseSchema and after that
+    BaseSchema class. This causes the source object to be first parsed as the specified additional layer of BaseSchema and after that
     used a source for this class. This therefore allows nesting of transformation functions.
 
     Validation
