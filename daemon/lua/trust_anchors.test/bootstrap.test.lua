@@ -46,7 +46,7 @@ env.KRESD_NO_LISTEN = true
 local function start_webserver()
 	-- srvout = io.popen('luajit webserv.lua')
 	-- TODO
-	os.execute('luajit webserv.lua &')
+	os.execute('luajit webserv.lua >/dev/null 2>&1 &')
 	-- assert(srvout, 'failed to start webserver')
 end
 
