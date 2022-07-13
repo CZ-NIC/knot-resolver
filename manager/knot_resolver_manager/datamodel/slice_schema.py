@@ -3,10 +3,10 @@ from typing import List, Optional
 from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.policy_schema import ActionSchema
-from knot_resolver_manager.utils.modeling import SchemaNode
+from knot_resolver_manager.utils.modeling import BaseSchema
 
 
-class SliceSchema(SchemaNode):
+class SliceSchema(BaseSchema):
     """
     Split the entire DNS namespace into distinct slices.
 

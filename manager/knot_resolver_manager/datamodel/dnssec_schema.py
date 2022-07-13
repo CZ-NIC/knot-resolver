@@ -1,10 +1,10 @@
 from typing import List, Optional
 
 from knot_resolver_manager.datamodel.types import IntNonNegative, TimeUnit
-from knot_resolver_manager.utils.modeling import SchemaNode
+from knot_resolver_manager.utils.modeling import BaseSchema
 
 
-class TrustAnchorFileSchema(SchemaNode):
+class TrustAnchorFileSchema(BaseSchema):
     """
     Trust-anchor zonefile configuration.
 
@@ -18,7 +18,7 @@ class TrustAnchorFileSchema(SchemaNode):
     read_only: bool = False
 
 
-class DnssecSchema(SchemaNode):
+class DnssecSchema(BaseSchema):
     """
     DNSSEC configuration.
 

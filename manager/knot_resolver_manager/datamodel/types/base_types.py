@@ -1,11 +1,11 @@
 import re
 from typing import Any, Dict, Pattern, Type
 
-from knot_resolver_manager.utils.modeling import CustomValueType
+from knot_resolver_manager.utils.modeling import BaseCustomType
 from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
 
 
-class IntBase(CustomValueType):
+class IntBase(BaseCustomType):
     """
     Base class to work with integer value.
     """
@@ -29,7 +29,7 @@ class IntBase(CustomValueType):
         return {"type": "integer"}
 
 
-class StrBase(CustomValueType):
+class StrBase(BaseCustomType):
     """
     Base class to work with string value.
     """

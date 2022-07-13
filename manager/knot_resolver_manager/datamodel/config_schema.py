@@ -26,7 +26,7 @@ from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
 from knot_resolver_manager.datamodel.types.types import IntPositive, UncheckedPath
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
-from knot_resolver_manager.utils.modeling import SchemaNode
+from knot_resolver_manager.utils.modeling import BaseSchema
 
 logger = logging.getLogger(__name__)
 
@@ -71,8 +71,8 @@ def _cpu_count() -> Optional[int]:
         return cpus
 
 
-class KresConfig(SchemaNode):
-    class Raw(SchemaNode):
+class KresConfig(BaseSchema):
+    class Raw(BaseSchema):
         """
         Knot Resolver declarative configuration.
 

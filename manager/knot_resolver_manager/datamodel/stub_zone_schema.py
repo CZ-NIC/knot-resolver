@@ -1,10 +1,10 @@
 from typing import List, Optional, Union
 
 from knot_resolver_manager.datamodel.types import DomainName, IPAddressOptionalPort, PolicyFlagEnum
-from knot_resolver_manager.utils.modeling import SchemaNode
+from knot_resolver_manager.utils.modeling import BaseSchema
 
 
-class StubServerSchema(SchemaNode):
+class StubServerSchema(BaseSchema):
     """
     Configuration of Stub server.
 
@@ -15,7 +15,7 @@ class StubServerSchema(SchemaNode):
     address: IPAddressOptionalPort
 
 
-class StubZoneSchema(SchemaNode):
+class StubZoneSchema(BaseSchema):
     """
     Configuration of Stub Zone.
 

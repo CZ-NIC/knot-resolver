@@ -1,7 +1,7 @@
 from typing import Any, Dict, Type
 
 
-class CustomValueType:
+class BaseCustomType:
     """
     Subclasses of this class can be used as type annotations in 'DataParser'. When a value
     is being parsed from a serialized format (e.g. JSON/YAML), an object will be created by
@@ -11,9 +11,9 @@ class CustomValueType:
     Example:
     ```
     class A(DataParser):
-        field: MyCustomValueType
+        field: MyBaseCustomType
 
-    A.from_json('{"field": "value"}') == A(field=MyCustomValueType("value"))
+    A.from_json('{"field": "value"}') == A(field=MyBaseCustomType("value"))
     ```
 
     There is no validation done on the wrapped value. The only condition is that
@@ -25,10 +25,10 @@ class CustomValueType:
         pass
 
     def __int__(self) -> int:
-        raise NotImplementedError("CustomValueType return 'int()' value is not implemented.")
+        raise NotImplementedError("BaseCustomType return 'int()' value is not implemented.")
 
     def __str__(self) -> str:
-        raise NotImplementedError("CustomValueType return 'str()' value is not implemented.")
+        raise NotImplementedError("BaseCustomType return 'str()' value is not implemented.")
 
     def serialize(self) -> Any:
         """
@@ -40,5 +40,5 @@ class CustomValueType:
         raise NotImplementedError(f"{type(self).__name__}'s' 'to_dict()' not implemented.")
 
     @classmethod
-    def json_schema(cls: Type["CustomValueType"]) -> Dict[Any, Any]:
+    def json_schema(cls: Type["BaseCustomType"]) -> Dict[Any, Any]:
         raise NotImplementedError()

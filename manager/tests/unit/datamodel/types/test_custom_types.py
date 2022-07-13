@@ -22,7 +22,7 @@ from knot_resolver_manager.datamodel.types import (
     SizeUnit,
     TimeUnit,
 )
-from knot_resolver_manager.utils.modeling import SchemaNode
+from knot_resolver_manager.utils.modeling import BaseSchema
 from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
 
 
@@ -73,7 +73,7 @@ def test_time_unit_invalid(val: Any):
 
 
 def test_parsing_units():
-    class TestSchema(SchemaNode):
+    class TestSchema(BaseSchema):
         size: SizeUnit
         time: TimeUnit
 
@@ -85,7 +85,7 @@ def test_parsing_units():
 
 
 def test_checked_path():
-    class TestSchema(SchemaNode):
+    class TestSchema(BaseSchema):
         p: CheckedPath
 
     assert str(TestSchema({"p": "/tmp"}).p) == "/tmp"

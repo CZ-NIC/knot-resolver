@@ -14,12 +14,12 @@ from knot_resolver_manager.datamodel.types import (
     PortNumber,
     SizeUnit,
 )
-from knot_resolver_manager.utils.modeling import SchemaNode
+from knot_resolver_manager.utils.modeling import BaseSchema
 
 KindEnum = Literal["dns", "xdp", "dot", "doh-legacy", "doh2"]
 
 
-class EdnsBufferSizeSchema(SchemaNode):
+class EdnsBufferSizeSchema(BaseSchema):
     """
     EDNS payload size advertised in DNS packets.
 
@@ -32,7 +32,7 @@ class EdnsBufferSizeSchema(SchemaNode):
     downstream: SizeUnit = SizeUnit("1232B")
 
 
-class AddressRenumberingSchema(SchemaNode):
+class AddressRenumberingSchema(BaseSchema):
     """
     Renumbers addresses in answers to different address space.
 
@@ -45,7 +45,7 @@ class AddressRenumberingSchema(SchemaNode):
     destination: IPAddress
 
 
-class TLSSchema(SchemaNode):
+class TLSSchema(BaseSchema):
     """
     TLS configuration, also affects DNS over TLS and DNS over HTTPS.
 
@@ -70,8 +70,8 @@ class TLSSchema(SchemaNode):
             raise ValueError("'sticket_secret' and 'sticket_secret_file' are both defined, only one can be used")
 
 
-class ListenSchema(SchemaNode):
-    class Raw(SchemaNode):
+class ListenSchema(BaseSchema):
+    class Raw(BaseSchema):
         """
         Configuration of listening interface.
 
@@ -134,7 +134,7 @@ class ListenSchema(SchemaNode):
             )
 
 
-class ProxyProtocolSchema(SchemaNode):
+class ProxyProtocolSchema(BaseSchema):
     """
     PROXYv2 protocol configuration.
 
@@ -145,7 +145,7 @@ class ProxyProtocolSchema(SchemaNode):
     allow: List[Union[IPAddress, IPNetwork]]
 
 
-class NetworkSchema(SchemaNode):
+class NetworkSchema(BaseSchema):
     """
     Network connections and protocols configuration.
 

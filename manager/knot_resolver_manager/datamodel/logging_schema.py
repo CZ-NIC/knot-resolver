@@ -3,7 +3,7 @@ from typing import List, Optional, Set, Union
 from typing_extensions import Literal, TypeAlias
 
 from knot_resolver_manager.datamodel.types import CheckedPath, TimeUnit
-from knot_resolver_manager.utils.modeling import SchemaNode
+from knot_resolver_manager.utils.modeling import BaseSchema
 
 LogLevelEnum = Literal["crit", "err", "warning", "notice", "info", "debug"]
 LogTargetEnum = Literal["syslog", "stderr", "stdout"]
@@ -57,7 +57,7 @@ LogGroupsEnum: TypeAlias = Literal[
 ]
 
 
-class DnstapSchema(SchemaNode):
+class DnstapSchema(BaseSchema):
     """
     Logging DNS queries and responses to a unix socket.
 
@@ -74,7 +74,7 @@ class DnstapSchema(SchemaNode):
     log_tcp_rtt: bool = True
 
 
-class DebuggingSchema(SchemaNode):
+class DebuggingSchema(BaseSchema):
     """
     Advanced debugging parameters for kresd (Knot Resolver daemon).
 
@@ -87,7 +87,7 @@ class DebuggingSchema(SchemaNode):
     assertion_fork: TimeUnit = TimeUnit("5m")
 
 
-class LoggingSchema(SchemaNode):
+class LoggingSchema(BaseSchema):
     """
     Logging and debugging configuration.
 

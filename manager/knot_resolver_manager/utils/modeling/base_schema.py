@@ -6,9 +6,9 @@ import yaml
 
 from knot_resolver_manager.utils.functional import all_matches
 
-from .custom_value_type import CustomValueType
+from .base_custom_type import BaseCustomType
 from .exceptions import AggregateDataValidationError, DataDescriptionError, DataValidationError
-from .parsed_tree import ParsedTree
+from .parsing import ParsedTree
 from .types import (
     NoneType,
     get_generic_type_argument,
@@ -52,8 +52,8 @@ class Serializable:
             or is_dict(typ)
             or is_list(typ)
             or (inspect.isclass(typ) and issubclass(typ, Serializable))
-            or (inspect.isclass(typ) and issubclass(typ, CustomValueType))
-            or (inspect.isclass(typ) and issubclass(typ, SchemaNode))
+            or (inspect.isclass(typ) and issubclass(typ, BaseCustomType))
+            or (inspect.isclass(typ) and issubclass(typ, BaseSchema))
             or (is_optional(typ) and Serializable.is_serializable(get_optional_inner_type(typ)))
             or (is_union(typ) and all_matches(Serializable.is_serializable, get_generic_type_arguments(typ)))
         )
@@ -63,7 +63,7 @@ class Serializable:
         if isinstance(obj, Serializable):
             return obj.to_dict()
 
-        elif isinstance(obj, CustomValueType):
+        elif isinstance(obj, BaseCustomType):
             return obj.serialize()
 
         elif isinstance(obj, list):
@@ -90,7 +90,7 @@ def _split_docstring(docstring: str) -> Tuple[str, Optional[str]]:
 
 def _parse_attrs_docstrings(docstring: str) -> Optional[Dict[str, str]]:
     """
-    Given a docstring of a SchemaNode, return a dict with descriptions of individual attributes.
+    Given a docstring of a BaseSchema, return a dict with descriptions of individual attributes.
     """
 
     _, attrs_doc = _split_docstring(docstring)
@@ -138,10 +138,10 @@ def _get_properties_schema(typ: Type[Any]) -> Dict[Any, Any]:
 def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
     # pylint: disable=too-many-branches
 
-    if inspect.isclass(typ) and issubclass(typ, SchemaNode):
+    if inspect.isclass(typ) and issubclass(typ, BaseSchema):
         return typ.json_schema(include_schema_definition=False)
 
-    elif inspect.isclass(typ) and issubclass(typ, CustomValueType):
+    elif inspect.isclass(typ) and issubclass(typ, BaseCustomType):
         return typ.json_schema()
 
     elif is_none_type(typ):
@@ -170,10 +170,10 @@ def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
     elif is_dict(typ):
         key, val = get_generic_type_arguments(typ)
 
-        if inspect.isclass(key) and issubclass(key, CustomValueType):
+        if inspect.isclass(key) and issubclass(key, BaseCustomType):
             assert (
-                key.__str__ is not CustomValueType.__str__
-            ), "To support derived 'CustomValueType', __str__ must be implemented."
+                key.__str__ is not BaseCustomType.__str__
+            ), "To support derived 'BaseCustomType', __str__ must be implemented."
         else:
             assert key == str, "We currently do not support any other keys then strings"
 
@@ -289,15 +289,15 @@ def _validated_object_type(
     # int
     elif cls == int:
         # we don't want to make an int out of anything else than other int
-        # except for CustomValueType class instances
-        if is_obj_type(obj, int) or isinstance(obj, CustomValueType):
+        # except for BaseCustomType class instances
+        if is_obj_type(obj, int) or isinstance(obj, BaseCustomType):
             return int(obj)
         raise DataValidationError(f"expected int, found {type(obj)}", object_path)
 
     # str
     elif cls == str:
         # we are willing to cast any primitive value to string, but no compound values are allowed
-        if is_obj_type(obj, (str, float, int)) or isinstance(obj, CustomValueType):
+        if is_obj_type(obj, (str, float, int)) or isinstance(obj, BaseCustomType):
             return str(obj)
         elif is_obj_type(obj, bool):
             raise DataValidationError(
@@ -358,8 +358,8 @@ def _validated_object_type(
     elif is_obj_type(obj, cls):
         return obj
 
-    # CustomValueType subclasses
-    elif inspect.isclass(cls) and issubclass(cls, CustomValueType):
+    # BaseCustomType subclasses
+    elif inspect.isclass(cls) and issubclass(cls, BaseCustomType):
         if isinstance(obj, cls):
             # if we already have a custom value type, just pass it through
             return obj
@@ -367,13 +367,13 @@ def _validated_object_type(
             # no validation performed, the implementation does it in the constuctor
             return cls(obj, object_path=object_path)
 
-    # nested SchemaNode subclasses
-    elif inspect.isclass(cls) and issubclass(cls, SchemaNode):
+    # nested BaseSchema subclasses
+    elif inspect.isclass(cls) and issubclass(cls, BaseSchema):
         # we should return DataParser, we expect to be given a dict,
         # because we can construct a DataParser from it
-        if isinstance(obj, (dict, SchemaNode)):
+        if isinstance(obj, (dict, BaseSchema)):
             return cls(obj, object_path=object_path)  # type: ignore
-        raise DataValidationError(f"expected 'dict' or 'SchemaNode' object, found '{type(obj)}'", object_path)
+        raise DataValidationError(f"expected 'dict' or 'BaseSchema' object, found '{type(obj)}'", object_path)
 
     # if the object matches, just pass it through
     elif inspect.isclass(cls) and isinstance(obj, cls):
@@ -388,7 +388,7 @@ def _validated_object_type(
         )
 
 
-TSource = Union[NoneType, ParsedTree, "SchemaNode", Dict[str, Any]]
+TSource = Union[NoneType, ParsedTree, "BaseSchema", Dict[str, Any]]
 
 
 def _create_untouchable(name: str) -> object:
@@ -402,7 +402,7 @@ def _create_untouchable(name: str) -> object:
     return _Untouchable()
 
 
-class SchemaNode(Serializable):
+class BaseSchema(Serializable):
     """
     Class for modelling configuration schema. It somewhat resembles standard dataclasses with additional
     functionality:
@@ -411,7 +411,7 @@ class SchemaNode(Serializable):
     * data conversion
 
     To create an instance of this class, you have to provide source data in the form of dict-like object.
-    Generally, we expect `ParsedTree`, raw dict or another `SchemaNode` instance. The provided data object
+    Generally, we expect `ParsedTree`, raw dict or another `BaseSchema` instance. The provided data object
     is traversed, transformed and validated before assigned to the appropriate fields.
 
     Fields (attributes)
@@ -420,17 +420,17 @@ class SchemaNode(Serializable):
     The fields (or attributes) of the class are defined the same way as in a dataclass by creating a class-level
     type-annotated fields. An example of that is:
 
-    class A(SchemaNode):
+    class A(BaseSchema):
         awesome_number: int
 
-    If your `SchemaNode` instance has a field with type of a SchemaNode, its value is recursively created
-    from the nested input data. This way, you can specify a complex tree of SchemaNode's and use the root
-    SchemaNode to create instance of everything.
+    If your `BaseSchema` instance has a field with type of a BaseSchema, its value is recursively created
+    from the nested input data. This way, you can specify a complex tree of BaseSchema's and use the root
+    BaseSchema to create instance of everything.
 
     Transformation
     ==============
 
-    You can provide the SchemaNode class with a field and a function with the same name, but starting with
+    You can provide the BaseSchema class with a field and a function with the same name, but starting with
     underscore ('_'). For example, you could have field called `awesome_number` and function called
     `_awesome_number(self, source)`. The function takes one argument - the source data (optionally with self,
     but you are not supposed to touch that). It can read any data from the source object and return a value of
@@ -439,7 +439,7 @@ class SchemaNode(Serializable):
 
     Using this, you can convert any input values into any type and field you want. To make the conversion easier
     to write, you could also specify a special class variable called `_LAYER` pointing to another
-    SchemaNode class. This causes the source object to be first parsed as the specified SchemaNode and after that
+    BaseSchema class. This causes the source object to be first parsed as the specified BaseSchema and after that
     used a source for this class. This therefore allows nesting of transformation functions.
 
     Validation
@@ -465,7 +465,7 @@ class SchemaNode(Serializable):
     See tests/utils/test_modelling.py for example usage.
     """
 
-    _LAYER: Optional[Type["SchemaNode"]] = None
+    _LAYER: Optional[Type["BaseSchema"]] = None
 
     def _assign_default(self, name: str, python_type: Any, object_path: str) -> None:
         cls = self.__class__
@@ -477,7 +477,7 @@ class SchemaNode(Serializable):
         value = _validated_object_type(python_type, value, object_path=f"{object_path}/{name}")
         setattr(self, name, value)
 
-    def _assign_fields(self, source: Union[ParsedTree, "SchemaNode", NoneType], object_path: str) -> Set[str]:
+    def _assign_fields(self, source: Union[ParsedTree, "BaseSchema", NoneType], object_path: str) -> Set[str]:
         """
         Order of assignment:
           1. all direct assignments
@@ -540,9 +540,9 @@ class SchemaNode(Serializable):
             source = ParsedTree(source)
 
         # save source
-        self._source: Union[ParsedTree, SchemaNode] = source
+        self._source: Union[ParsedTree, BaseSchema] = source
 
-        # construct lower level schema node first if configured to do so
+        # construct lower level schema first if configured to do so
         if self._LAYER is not None:
             source = self._LAYER(source, object_path=object_path)  # pylint: disable=not-callable
 
@@ -550,7 +550,7 @@ class SchemaNode(Serializable):
         used_keys = self._assign_fields(source, object_path)
 
         # check for unused keys in the source object
-        if source and not isinstance(source, SchemaNode):
+        if source and not isinstance(source, BaseSchema):
             unused = source.keys() - used_keys
             if len(unused) > 0:
                 keys = ", ".join((f"'{u}'" for u in unused))
@@ -566,7 +566,7 @@ class SchemaNode(Serializable):
             raise DataValidationError(e.args[0] if len(e.args) > 0 else "Validation error", object_path) from e
 
     def get_unparsed_data(self) -> ParsedTree:
-        if isinstance(self._source, SchemaNode):
+        if isinstance(self._source, BaseSchema):
             return self._source.get_unparsed_data()
         else:
             return self._source
@@ -619,7 +619,7 @@ class SchemaNode(Serializable):
         return True
 
     @classmethod
-    def json_schema(cls: Type["SchemaNode"], include_schema_definition: bool = True) -> Dict[Any, Any]:
+    def json_schema(cls: Type["BaseSchema"], include_schema_definition: bool = True) -> Dict[Any, Any]:
         if cls._LAYER is not None:
             return cls._LAYER.json_schema(include_schema_definition=include_schema_definition)
 

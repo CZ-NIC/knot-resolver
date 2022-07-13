@@ -1,10 +1,10 @@
 from typing import List, Optional
 
 from knot_resolver_manager.datamodel.types import CheckedPath, PolicyActionEnum, PolicyFlagEnum
-from knot_resolver_manager.utils.modeling import SchemaNode
+from knot_resolver_manager.utils.modeling import BaseSchema
 
 
-class RPZSchema(SchemaNode):
+class RPZSchema(BaseSchema):
     """
     Configuration or Response Policy Zone (RPZ).
 

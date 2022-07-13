@@ -5,12 +5,12 @@ The utilities also take care of parsing, validating and creating JSON schemas an
 
 ## Creating schema
 
-Schema is created using `SchemaNode` class. Schema structure is specified using annotations.
+Schema is created using `BaseSchema` class. Schema structure is specified using annotations.
 
 ```python
-from .modeling import SchemaNode
+from .modeling import BaseSchema
 
-class SimpleSchema(SchemaNode):
+class SimpleSchema(BaseSchema):
     integer: int = 5    # a default value can be specified
     string: str
     boolean: bool
@@ -21,7 +21,7 @@ Words in multi-word names are separated by underscore `_` (e.g. `simple_schema`)
 ```python
 from typing import Dict, List, Optional, Union
 
-class ComplexSchema(SchemaNode):
+class ComplexSchema(BaseSchema):
     optional: Optional[str]     # this field is optional
     union: Union[int, str]      # integer and string are both valid
     list: List[int]             # list of integers
@@ -36,7 +36,7 @@ If a some additional validation needs to be done, there is `_validate()` method 
 `ValueError` exception should be raised in case of validation error.
 
 ```python
-class FieldsSchema(SchemaNode):
+class FieldsSchema(BaseSchema):
     field1: int
     field2: int
 
@@ -53,8 +53,8 @@ Transformation method must be named based on field (`value` in this example) wit
 In this example, the `Layer2Schema` is structure for input data and `Layer1Schema` is for result data.
 
 ```python
-class Layer1Schema(SchemaNode):
-    class Layer2Schema(SchemaNode):
+class Layer1Schema(BaseSchema):
+    class Layer2Schema(BaseSchema):
         value: Union[str, int]
 
     _LAYER = Layer2Schema
@@ -72,7 +72,7 @@ class Layer1Schema(SchemaNode):
 Created schema can be documented using simple docstring. Json schema is created by calling `json_schema()` method on schema class. JSON schema includes description from docstring, defaults, etc.
 
 ```python
-SimpleSchema(SchemaNode):
+SimpleSchema(BaseSchema):
     """
     This is description for SimpleSchema itself.
 
@@ -92,14 +92,14 @@ json_schema = SimpleSchema.json_schema()
 
 ## Creating custom type
 
-Custom types can be made by extending `CustomValueType` class which is integrated to parsing and validating process.
+Custom types can be made by extending `BaseCustomType` class which is integrated to parsing and validating process.
 Use `DataValidationError` to rase exception during validation. `object_path` is used to track node in more complex/nested schemas and create useful logging message.
 
 ```python
-from .modeling import CustomValueType
+from .modeling import BaseCustomType
 from .modeling.exceptions import DataValidationError
 
-class IntNonNegative(CustomValueType):
+class IntNonNegative(BaseCustomType):
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
         if isinstance(source_value, int) and not isinstance(source_value, bool):
