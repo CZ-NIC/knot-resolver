@@ -10,22 +10,23 @@ Schema is created using `SchemaNode` class. Schema structure is specified using 
 ```python
 from .modeling import SchemaNode
 
-class BasicSchema(SchemaNode):
+class SimpleSchema(SchemaNode):
     integer: int = 5    # a default value can be specified
     string: str
     boolean: bool
 ```
 Even more complex types can be used in a schema. Schemas can be also nested.
+Words in multi-word names are separated by underscore `_` (e.g. `simple_schema`).
 
 ```python
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 class ComplexSchema(SchemaNode):
     optional: Optional[str]     # this field is optional
     union: Union[int, str]      # integer and string are both valid
     list: List[int]             # list of integers
-    dictionary: Dict[str, Any] = {"key": False}
-    basic_schema: BasicSchema   # nested schema
+    dictionary: Dict[str, bool] = {"key": False}
+    simple_schema: SimpleSchema   # nested schema
 ```
 
 
@@ -71,9 +72,9 @@ class Layer1Schema(SchemaNode):
 Created schema can be documented using simple docstring. Json schema is created by calling `json_schema()` method on schema class. JSON schema includes description from docstring, defaults, etc.
 
 ```python
-BasicSchema(SchemaNode):
+SimpleSchema(SchemaNode):
     """
-    This is description for BasicSchema itself.
+    This is description for SimpleSchema itself.
 
     ---
     integer: description for integer field
@@ -85,13 +86,13 @@ BasicSchema(SchemaNode):
     string: str
     boolean: bool
 
-json_schema = BasicSchema.json_schema()
+json_schema = SimpleSchema.json_schema()
 ```
 
 
 ## Creating custom type
 
-Custom types can be only using `CustomValueType` class which is integrated to parsing a validating process.
+Custom types can be made by extending `CustomValueType` class which is integrated to parsing and validating process.
 Use `DataValidationError` to rase exception during validation. `object_path` is used to track node in more complex/nested schemas and create useful logging message.
 
 ```python
@@ -124,13 +125,19 @@ It should return [JSON schema representation](https://json-schema.org/understand
 
 ## Parsing JSON/YAML
 
-For example, YAML data for `BasicSchema` look like this.
+For example, YAML data for `ComplexSchema` can look like this.
+Words in multi-word names are separated by hyphen `-` (e.g. `simple-schema`).
 
 ```yaml
 # data.yaml
-integer: 55
-string: this is string
-boolean: false
+union: here could also be a number
+list: [1,2,3,]
+dictionary:
+    key": false
+simple-schema:
+    integer: 55
+    string: this is string
+    boolean: false
 ```
 
 To parse data from YAML format just use `parse_yaml` function or `parse_json` for JSON format.
@@ -143,5 +150,5 @@ with open("data.yaml") as f:
     str_data = f.read()
 
 dict_data = parse_yaml(str_data)
-validated_data = BasicSchema(dict_data)
+validated_data = ComplexSchema(dict_data)
 ```
