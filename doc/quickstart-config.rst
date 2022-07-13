@@ -12,12 +12,12 @@ Configuration
 
 .. note::
 
-   When copy&pasting examples from this manual please pay close
-   attention to brackets and also line ordering - order of lines matters.
+            When copy&pasting examples from this manual please pay close
+            attention to brackets and also line ordering - order of lines matters.
 
-   The configuration language is in fact Lua script, so you can use full power
-   of this programming language. See article
-   `Learn Lua in 15 minutes`_ for a syntax overview.
+            The configuration language is in fact Lua script, so you can use full power
+            of this programming language. See article
+            `Learn Lua in 15 minutes`_ for a syntax overview.
 
 Easiest way to configure Knot Resolver is to paste your configuration into
 configuration file ``/etc/knot-resolver/kresd.conf``.
@@ -34,18 +34,18 @@ The following configuration instructs Knot Resolver to receive standard unencryp
 
 .. tabs::
 
-    .. group-tab:: yaml
+    .. group-tab:: |yaml|
 
         .. code-block:: yaml
 
             network:
-                listen:
-                  - interface: ['192.0.2.1', '2001:db8::1'] # unencrypted DNS on port 53 is default
-                  - interface: 'eth0'
-                    port: 853
-                    kind: 'dot'
+              listen:
+                - interface: ['192.0.2.1', '2001:db8::1'] # unencrypted DNS on port 53 is default
+                - interface: 'eth0'
+                  port: 853
+                  kind: 'dot'
 
-    .. group-tab:: lua legacy
+    .. group-tab:: |lua|
 
         Network interfaces to listen on and supported protocols are configured using :func:`net.listen()` function.
 
@@ -77,12 +77,12 @@ This configuration will forward two listed domains to a DNS server with IP addre
 
 .. tabs::
 
-    .. group-tab:: yaml
+    .. group-tab:: |yaml|
 
         .. code-block:: yaml
 
 
-    .. group-tab:: lua legacy
+    .. group-tab:: |lua|
 
         .. code-block:: lua
 
@@ -115,12 +115,12 @@ Following configuration allows only queries from clients in subnet 192.0.2.0/24 
 
 .. tabs::
 
-    .. group-tab:: yaml
+    .. group-tab:: |yaml|
 
         .. code-block:: yaml
 
 
-    .. group-tab:: lua legacy
+    .. group-tab:: |lua|
 
         .. code-block:: lua
 
@@ -140,12 +140,12 @@ First step is to enable TLS on listening interfaces:
 
 .. tabs::
 
-    .. group-tab:: yaml
+    .. group-tab:: |yaml|
 
         .. code-block:: yaml
 
 
-    .. group-tab:: lua legacy
+    .. group-tab:: |lua|
 
         .. code-block:: lua
 
@@ -158,12 +158,12 @@ signed by a trusted CA. Once the certificate was obtained a path to certificate 
 
 .. tabs::
 
-    .. group-tab:: yaml
+    .. group-tab:: |yaml|
 
         .. code-block:: yaml
 
 
-    .. group-tab:: lua legacy
+    .. group-tab:: |lua|
 
         .. code-block:: lua
 
@@ -178,12 +178,12 @@ Some jurisdictions mandate blocking access to certain domains. This can be achie
 
 .. tabs::
 
-    .. group-tab:: yaml
+    .. group-tab:: |yaml|
 
         .. code-block:: yaml
 
 
-    .. group-tab:: lua legacy
+    .. group-tab:: |lua|
 
         .. code-block:: lua
 
@@ -237,12 +237,12 @@ of all queries performed by this client.
 
 .. tabs::
 
-    .. group-tab:: yaml
+    .. group-tab:: |yaml|
 
         .. code-block:: yaml
 
 
-    .. group-tab:: lua legacy
+    .. group-tab:: |lua|
 
         .. code-block:: lua
 

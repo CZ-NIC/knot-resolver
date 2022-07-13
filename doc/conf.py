@@ -31,7 +31,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Knot Resolver'
-copyright = u'2014-2020 CZ.NIC labs'
+copyright = u'2014-2022 CZ.NIC labs'
 with open('../meson.build') as f:
     for line in f:
         match = re.match(r"\s*version\s*:\s*'([^']+)'.*", line)
@@ -98,3 +98,10 @@ texinfo_documents = [
     ('index', 'knot-resolver', u'Knot Resolver', u'CZ.NIC Labs',
      'Knot Resolver', 'Caching DNS resolver.', 'Network services'),
 ]
+
+# reStructuredText that will be included at the beginning of every source file that is read.
+# This is a possible place to add substitutions that should be available in every file.
+rst_prolog = """
+.. |yaml| replace:: YAML
+.. |lua| replace:: Lua
+"""
