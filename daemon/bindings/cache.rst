@@ -227,7 +227,7 @@ Configuration reference
 
   :return: current maximum TTL
 
-  Get or set maximum TTL bound applied to all received records.
+  Get or set upper TTL bound applied to all received records.
 
   .. note:: The `ttl` value must be in range `(min_ttl, 2147483647)`.
 
@@ -246,10 +246,10 @@ Configuration reference
 
   .. KR_CACHE_DEFAULT_TTL_MIN ^^
 
-  :return: current maximum TTL
+  :return: current minimum TTL
 
-  Get or set minimum TTL bound applied to all received records.
-  Forcing TTL higher than specified violates DNS standards, so use it with care.
+  Get or set lower TTL bound applied to all received records.
+  Forcing TTL higher than specified violates DNS standards, so use higher values with care.
   TTL still won't be extended beyond expiration of the corresponding DNSSEC signature.
 
   .. note:: The `ttl` value must be in range `<0, max_ttl)`.
