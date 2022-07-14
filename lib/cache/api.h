@@ -25,7 +25,7 @@ struct kr_cache
 	kr_cdb_pt db;                 /**< Storage instance */
 	const struct kr_cdb_api *api; /**< Storage engine */
 	struct kr_cdb_stats stats;
-	uint32_t ttl_min, ttl_max; /**< TTL limits */
+	uint32_t ttl_min, ttl_max; /**< TTL limits; enforced primarily in iterator actually. */
 
 	/* A pair of stamps for detection of real-time shifts during runtime. */
 	struct timeval checkpoint_walltime; /**< Wall time on the last check-point. */

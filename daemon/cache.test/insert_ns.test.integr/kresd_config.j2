@@ -14,7 +14,7 @@ local ffi = require('ffi')
 local c = kres.context().cache
 ns_name = todname('ns.example.com')
 local ns_addr = '\1\2\3\4'
-local rr = kres.rrset(ns_name, kres.type.A, kres.class.IN, 3600999999)
+local rr = kres.rrset(ns_name, kres.type.A, kres.class.IN, 2147483647)
 assert(rr:add_rdata(ns_addr, #ns_addr))
 assert(c:insert(rr, nil, ffi.C.KR_RANK_SECURE))
 

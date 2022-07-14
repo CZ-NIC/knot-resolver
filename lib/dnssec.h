@@ -38,6 +38,7 @@ struct kr_rrset_validation_ctx {
 	knot_rrset_t *keys;		/*!< DNSKEY RRSet; TTLs may get lowered when validating this set. */
         const knot_dname_t *zone_name;	/*!< Name of the zone containing the RRSIG RRSet. */
 	uint32_t timestamp;		/*!< Validation time. */
+	uint32_t ttl_min;		/*!< See trim_ttl() for details. */
         bool has_nsec3;			/*!< Whether to use NSEC3 validation. */
 	uint32_t qry_uid;		/*!< Current query uid. */
 	uint32_t flags;			/*!< Output - Flags. */

@@ -1010,6 +1010,22 @@ static bool satisfied_by_additional(const struct kr_query *qry)
 	return false;
 }
 
+/** Restrict all RRset TTLs to the specified bounds (if matching qry_uid). */
+static void bound_ttls(ranked_rr_array_t *array, uint32_t qry_uid,
+			uint32_t ttl_min, uint32_t ttl_max)
+{
+	for (ssize_t i = 0; i < array->len; ++i) {
+		if (array->at[i]->qry_uid != qry_uid)
+			continue;
+		uint32_t *ttl = &array->at[i]->rr->ttl;
+		if (*ttl < ttl_min) {
+			*ttl = ttl_min;
+		} else if (*ttl > ttl_max) {
+			*ttl = ttl_max;
+		}
+	}
+}
+
 /** Resolve input query or continue resolution with followups.
  *
  *  This roughly corresponds to RFC1034, 5.3.3 4a-d.
@@ -1186,12 +1202,14 @@ rrarray_finalize:
 	/* Finish construction of libknot-format RRsets.
 	 * We do this even if dropping the answer, though it's probably useless. */
 	(void)0;
+	const struct kr_cache *cache = &req->ctx->cache;
 	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		ret = kr_ranked_rrarray_finalize(selected[i], query->uid, &req->pool);
-		if (unlikely(ret)) {
+		if (unlikely(ret))
 			return KR_STATE_FAIL;
-		}
+		if (!query->flags.CACHED)
+			bound_ttls(selected[i], query->uid, cache->ttl_min, cache->ttl_max);
 	}
 
 	return state;
