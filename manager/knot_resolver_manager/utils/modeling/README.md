@@ -92,14 +92,14 @@ json_schema = SimpleSchema.json_schema()
 
 ## Creating custom type
 
-Custom types can be made by extending `BaseCustomType` class which is integrated to parsing and validating process.
+Custom types can be made by extending `BaseValueType` class which is integrated to parsing and validating process.
 Use `DataValidationError` to rase exception during validation. `object_path` is used to track node in more complex/nested schemas and create useful logging message.
 
 ```python
-from .modeling import BaseCustomType
+from .modeling import BaseValueType
 from .modeling.exceptions import DataValidationError
 
-class IntNonNegative(BaseCustomType):
+class IntNonNegative(BaseValueType):
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
         if isinstance(source_value, int) and not isinstance(source_value, bool):

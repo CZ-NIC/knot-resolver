@@ -1,9 +1,9 @@
-from .base_custom_type import BaseCustomType
 from .base_schema import BaseSchema
+from .base_value_type import BaseValueType
 from .parsing import ParsedTree, parse, parse_json, parse_yaml
 
 __all__ = [
-    "BaseCustomType",
+    "BaseValueType",
     "BaseSchema",
     "ParsedTree",
     "parse",

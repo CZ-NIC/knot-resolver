@@ -1,7 +1,7 @@
 from typing import Any, Dict, Type
 
 
-class BaseCustomType:
+class BaseValueType:
     """
     Subclasses of this class can be used as type annotations in 'DataParser'. When a value
     is being parsed from a serialized format (e.g. JSON/YAML), an object will be created by
@@ -32,5 +32,5 @@ class BaseCustomType:
         raise NotImplementedError(f"{type(self).__name__}'s' 'serialize()' not implemented.")
 
     @classmethod
-    def json_schema(cls: Type["BaseCustomType"]) -> Dict[Any, Any]:
+    def json_schema(cls: Type["BaseValueType"]) -> Dict[Any, Any]:
         raise NotImplementedError()

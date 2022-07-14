@@ -6,7 +6,7 @@ import yaml
 
 from knot_resolver_manager.utils.functional import all_matches
 
-from .base_custom_type import BaseCustomType
+from .base_value_type import BaseValueType
 from .exceptions import AggregateDataValidationError, DataDescriptionError, DataValidationError
 from .parsing import ParsedTree
 from .types import (
@@ -52,7 +52,7 @@ class Serializable:
             or is_dict(typ)
             or is_list(typ)
             or (inspect.isclass(typ) and issubclass(typ, Serializable))
-            or (inspect.isclass(typ) and issubclass(typ, BaseCustomType))
+            or (inspect.isclass(typ) and issubclass(typ, BaseValueType))
             or (inspect.isclass(typ) and issubclass(typ, BaseSchema))
             or (is_optional(typ) and Serializable.is_serializable(get_optional_inner_type(typ)))
             or (is_union(typ) and all_matches(Serializable.is_serializable, get_generic_type_arguments(typ)))
@@ -63,7 +63,7 @@ class Serializable:
         if isinstance(obj, Serializable):
             return obj.to_dict()
 
-        elif isinstance(obj, BaseCustomType):
+        elif isinstance(obj, BaseValueType):
             return obj.serialize()
 
         elif isinstance(obj, list):
@@ -141,7 +141,7 @@ def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
     if inspect.isclass(typ) and issubclass(typ, BaseSchema):
         return typ.json_schema(include_schema_definition=False)
 
-    elif inspect.isclass(typ) and issubclass(typ, BaseCustomType):
+    elif inspect.isclass(typ) and issubclass(typ, BaseValueType):
         return typ.json_schema()
 
     elif is_none_type(typ):
@@ -170,10 +170,10 @@ def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
     elif is_dict(typ):
         key, val = get_generic_type_arguments(typ)
 
-        if inspect.isclass(key) and issubclass(key, BaseCustomType):
+        if inspect.isclass(key) and issubclass(key, BaseValueType):
             assert (
-                key.__str__ is not BaseCustomType.__str__
-            ), "To support derived 'BaseCustomType', __str__ must be implemented."
+                key.__str__ is not BaseValueType.__str__
+            ), "To support derived 'BaseValueType', __str__ must be implemented."
         else:
             assert key == str, "We currently do not support any other keys then strings"
 
@@ -289,15 +289,15 @@ def _validated_object_type(
     # int
     elif cls == int:
         # we don't want to make an int out of anything else than other int
-        # except for BaseCustomType class instances
-        if is_obj_type(obj, int) or isinstance(obj, BaseCustomType):
+        # except for BaseValueType class instances
+        if is_obj_type(obj, int) or isinstance(obj, BaseValueType):
             return int(obj)
         raise DataValidationError(f"expected int, found {type(obj)}", object_path)
 
     # str
     elif cls == str:
         # we are willing to cast any primitive value to string, but no compound values are allowed
-        if is_obj_type(obj, (str, float, int)) or isinstance(obj, BaseCustomType):
+        if is_obj_type(obj, (str, float, int)) or isinstance(obj, BaseValueType):
             return str(obj)
         elif is_obj_type(obj, bool):
             raise DataValidationError(
@@ -358,8 +358,8 @@ def _validated_object_type(
     elif is_obj_type(obj, cls):
         return obj
 
-    # BaseCustomType subclasses
-    elif inspect.isclass(cls) and issubclass(cls, BaseCustomType):
+    # BaseValueType subclasses
+    elif inspect.isclass(cls) and issubclass(cls, BaseValueType):
         if isinstance(obj, cls):
             # if we already have a custom value type, just pass it through
             return obj

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Type, Union
 
 from knot_resolver_manager.datamodel.types.base_types import IntRangeBase, PatternBase, StrBase, UnitBase
-from knot_resolver_manager.utils.modeling import BaseCustomType
+from knot_resolver_manager.utils.modeling import BaseValueType
 
 
 class IntNonNegative(IntRangeBase):
@@ -230,7 +230,7 @@ class IPAddressOptionalPort(StrBase):
             )
 
 
-class IPv4Address(BaseCustomType):
+class IPv4Address(BaseValueType):
     _value: ipaddress.IPv4Address
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
@@ -272,7 +272,7 @@ class IPv4Address(BaseCustomType):
         }
 
 
-class IPv6Address(BaseCustomType):
+class IPv6Address(BaseValueType):
     _value: ipaddress.IPv6Address
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
@@ -317,7 +317,7 @@ class IPv6Address(BaseCustomType):
 IPAddress = Union[IPv4Address, IPv6Address]
 
 
-class IPNetwork(BaseCustomType):
+class IPNetwork(BaseValueType):
     _value: Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
@@ -352,7 +352,7 @@ class IPNetwork(BaseCustomType):
         }
 
 
-class IPv6Network96(BaseCustomType):
+class IPv6Network96(BaseValueType):
     _value: ipaddress.IPv6Network
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
@@ -401,7 +401,7 @@ class IPv6Network96(BaseCustomType):
         return {"type": "string"}
 
 
-class UncheckedPath(BaseCustomType):
+class UncheckedPath(BaseValueType):
     """
     Wrapper around pathlib.Path object. Can represent pretty much any Path. No checks are
     performed on the value. The value is taken as is.
