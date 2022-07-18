@@ -167,9 +167,16 @@ Requires:       python3
 Requires:       python3-pyyaml
 Requires:       python3-aiohttp
 Requires:       python3-typing-extensions
-Requires:       python3-gobject
 Requires:       python3-prometheus_client
 Requires:       supervisor
+%endif
+%if 0%{?suse_version}
+Requires:		python3
+Requires:		python3-PyYAML
+Requires:		python3-aiohttp
+Requires:		python3-typing_extensions
+Requires:		python3-prometheus_client
+Requires:		supervisor
 %endif
 
 %description -n python3-knot-resolver-manager
