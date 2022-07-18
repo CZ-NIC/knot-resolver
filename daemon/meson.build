@@ -15,6 +15,7 @@ kresd_src = files([
   'network.c',
   'proxyv2.c',
   'session.c',
+  'session2.c',
   'tls.c',
   'tls_ephemeral_credentials.c',
   'tls_session_ticket-srv.c',
