@@ -1,8 +1,5 @@
 from typing import Any, Callable, Optional, Type, TypeVar
 
-from .custom_types import CustomValueType
-from .modelling import SchemaNode
-
 T = TypeVar("T")
 
 
@@ -46,9 +43,3 @@ def phantom_use(var: Any) -> None:  # pylint: disable=unused-argument
     Function, which consumes its argument doing absolutely nothing with it. Useful
     for convincing pylint, that we need the variable even when its unused.
     """
-
-
-__all__ = [
-    "CustomValueType",
-    "SchemaNode",
-]

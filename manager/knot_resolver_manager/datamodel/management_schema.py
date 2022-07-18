@@ -1,10 +1,10 @@
 from typing import Optional
 
 from knot_resolver_manager.datamodel.types import CheckedPath, IPAddressPort
-from knot_resolver_manager.utils import SchemaNode
+from knot_resolver_manager.utils.modeling import BaseSchema
 
 
-class ManagementSchema(SchemaNode):
+class ManagementSchema(BaseSchema):
     """
     Configuration of management HTTP API.
 

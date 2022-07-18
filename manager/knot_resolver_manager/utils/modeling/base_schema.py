@@ -4,11 +4,12 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Type, Union, cast
 
 import yaml
 
-from knot_resolver_manager.exceptions import AggregateSchemaException, DataException, SchemaException
-from knot_resolver_manager.utils.custom_types import CustomValueType
 from knot_resolver_manager.utils.functional import all_matches
-from knot_resolver_manager.utils.parsing import ParsedTree
-from knot_resolver_manager.utils.types import (
+
+from .base_value_type import BaseValueType
+from .exceptions import AggregateDataValidationError, DataDescriptionError, DataValidationError
+from .parsing import ParsedTree
+from .types import (
     NoneType,
     get_generic_type_argument,
     get_generic_type_arguments,
@@ -51,8 +52,8 @@ class Serializable:
             or is_dict(typ)
             or is_list(typ)
             or (inspect.isclass(typ) and issubclass(typ, Serializable))
-            or (inspect.isclass(typ) and issubclass(typ, CustomValueType))
-            or (inspect.isclass(typ) and issubclass(typ, SchemaNode))
+            or (inspect.isclass(typ) and issubclass(typ, BaseValueType))
+            or (inspect.isclass(typ) and issubclass(typ, BaseSchema))
             or (is_optional(typ) and Serializable.is_serializable(get_optional_inner_type(typ)))
             or (is_union(typ) and all_matches(Serializable.is_serializable, get_generic_type_arguments(typ)))
         )
@@ -62,7 +63,7 @@ class Serializable:
         if isinstance(obj, Serializable):
             return obj.to_dict()
 
-        elif isinstance(obj, CustomValueType):
+        elif isinstance(obj, BaseValueType):
             return obj.serialize()
 
         elif isinstance(obj, list):
@@ -89,7 +90,7 @@ def _split_docstring(docstring: str) -> Tuple[str, Optional[str]]:
 
 def _parse_attrs_docstrings(docstring: str) -> Optional[Dict[str, str]]:
     """
-    Given a docstring of a SchemaNode, return a dict with descriptions of individual attributes.
+    Given a docstring of a BaseSchema, return a dict with descriptions of individual attributes.
     """
 
     _, attrs_doc = _split_docstring(docstring)
@@ -114,7 +115,7 @@ def _get_properties_schema(typ: Type[Any]) -> Dict[Any, Any]:
         # description
         if attribute_documentation is not None:
             if field_name not in attribute_documentation:
-                raise SchemaException(f"The docstring does not describe field '{field_name}'", str(typ))
+                raise DataDescriptionError(f"The docstring does not describe field '{field_name}'", str(typ))
             schema[name]["description"] = attribute_documentation[field_name]
             del attribute_documentation[field_name]
 
@@ -126,7 +127,7 @@ def _get_properties_schema(typ: Type[Any]) -> Dict[Any, Any]:
             schema[name]["default"] = Serializable.serialize(getattr(typ, field_name))
 
     if attribute_documentation is not None and len(attribute_documentation) > 0:
-        raise SchemaException(
+        raise DataDescriptionError(
             f"The docstring describes attributes which are not present - {tuple(attribute_documentation.keys())}",
             str(typ),
         )
@@ -137,10 +138,10 @@ def _get_properties_schema(typ: Type[Any]) -> Dict[Any, Any]:
 def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
     # pylint: disable=too-many-branches
 
-    if inspect.isclass(typ) and issubclass(typ, SchemaNode):
+    if inspect.isclass(typ) and issubclass(typ, BaseSchema):
         return typ.json_schema(include_schema_definition=False)
 
-    elif inspect.isclass(typ) and issubclass(typ, CustomValueType):
+    elif inspect.isclass(typ) and issubclass(typ, BaseValueType):
         return typ.json_schema()
 
     elif is_none_type(typ):
@@ -169,10 +170,10 @@ def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
     elif is_dict(typ):
         key, val = get_generic_type_arguments(typ)
 
-        if inspect.isclass(key) and issubclass(key, CustomValueType):
+        if inspect.isclass(key) and issubclass(key, BaseValueType):
             assert (
-                key.__str__ is not CustomValueType.__str__
-            ), "To support derived 'CustomValueType', __str__ must be implemented."
+                key.__str__ is not BaseValueType.__str__
+            ), "To support derived 'BaseValueType', __str__ must be implemented."
         else:
             assert key == str, "We currently do not support any other keys then strings"
 
@@ -186,56 +187,56 @@ def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
 
 def _validated_tuple(cls: Type[Any], obj: Tuple[Any, ...], object_path: str) -> Tuple[Any, ...]:
     types = get_generic_type_arguments(cls)
-    errs: List[SchemaException] = []
+    errs: List[DataValidationError] = []
     res: List[Any] = []
     for i, (tp, val) in enumerate(zip(types, obj)):
         try:
             res.append(_validated_object_type(tp, val, object_path=f"{object_path}[{i}]"))
-        except SchemaException as e:
+        except DataValidationError as e:
             errs.append(e)
     if len(errs) == 1:
         raise errs[0]
     elif len(errs) > 1:
-        raise AggregateSchemaException(object_path, child_exceptions=errs)
+        raise AggregateDataValidationError(object_path, child_exceptions=errs)
     return tuple(res)
 
 
 def _validated_dict(cls: Type[Any], obj: Dict[Any, Any], object_path: str) -> Dict[Any, Any]:
     key_type, val_type = get_generic_type_arguments(cls)
     try:
-        errs: List[SchemaException] = []
+        errs: List[DataValidationError] = []
         res: Dict[Any, Any] = {}
         for key, val in obj.items():
             try:
                 nkey = _validated_object_type(key_type, key, object_path=f"{object_path}[{key}]")
                 nval = _validated_object_type(val_type, val, object_path=f"{object_path}[{key}]")
                 res[nkey] = nval
-            except SchemaException as e:
+            except DataValidationError as e:
                 errs.append(e)
         if len(errs) == 1:
             raise errs[0]
         elif len(errs) > 1:
-            raise AggregateSchemaException(object_path, child_exceptions=errs)
+            raise AggregateDataValidationError(object_path, child_exceptions=errs)
         return res
     except AttributeError as e:
-        raise SchemaException(
+        raise DataValidationError(
             f"Expected dict-like object, but failed to access its .items() method. Value was {obj}", object_path
         ) from e
 
 
 def _validated_list(cls: Type[Any], obj: List[Any], object_path: str) -> List[Any]:
     inner_type = get_generic_type_argument(cls)
-    errs: List[SchemaException] = []
+    errs: List[DataValidationError] = []
     res: List[Any] = []
     for i, val in enumerate(obj):
         try:
             res.append(_validated_object_type(inner_type, val, object_path=f"{object_path}[{i}]"))
-        except SchemaException as e:
+        except DataValidationError as e:
             errs.append(e)
     if len(errs) == 1:
         raise errs[0]
     elif len(errs) > 1:
-        raise AggregateSchemaException(object_path, child_exceptions=errs)
+        raise AggregateDataValidationError(object_path, child_exceptions=errs)
     return res
 
 
@@ -259,7 +260,7 @@ def _validated_object_type(
         if obj is None:
             return None
         else:
-            raise SchemaException(f"expected None, found '{obj}'.", object_path)
+            raise DataValidationError(f"expected None, found '{obj}'.", object_path)
 
     # Optional[T]  (could be technically handled by Union[*variants], but this way we have better error reporting)
     elif is_optional(cls):
@@ -272,41 +273,41 @@ def _validated_object_type(
     # Union[*variants]
     elif is_union(cls):
         variants = get_generic_type_arguments(cls)
-        errs: List[SchemaException] = []
+        errs: List[DataValidationError] = []
         for v in variants:
             try:
                 return _validated_object_type(v, obj, object_path=object_path)
-            except SchemaException as e:
+            except DataValidationError as e:
                 errs.append(e)
 
-        raise SchemaException("could not parse any of the possible variants", object_path, child_exceptions=errs)
+        raise DataValidationError("could not parse any of the possible variants", object_path, child_exceptions=errs)
 
     # after this, there is no place for a None object
     elif obj is None:
-        raise SchemaException(f"unexpected value 'None' for type {cls}", object_path)
+        raise DataValidationError(f"unexpected value 'None' for type {cls}", object_path)
 
     # int
     elif cls == int:
         # we don't want to make an int out of anything else than other int
-        # except for CustomValueType class instances
-        if is_obj_type(obj, int) or isinstance(obj, CustomValueType):
+        # except for BaseValueType class instances
+        if is_obj_type(obj, int) or isinstance(obj, BaseValueType):
             return int(obj)
-        raise SchemaException(f"expected int, found {type(obj)}", object_path)
+        raise DataValidationError(f"expected int, found {type(obj)}", object_path)
 
     # str
     elif cls == str:
         # we are willing to cast any primitive value to string, but no compound values are allowed
-        if is_obj_type(obj, (str, float, int)) or isinstance(obj, CustomValueType):
+        if is_obj_type(obj, (str, float, int)) or isinstance(obj, BaseValueType):
             return str(obj)
         elif is_obj_type(obj, bool):
-            raise SchemaException(
+            raise DataValidationError(
                 "Expected str, found bool. Be careful, that YAML parsers consider even"
                 ' "no" and "yes" as a bool. Search for the Norway Problem for more'
                 " details. And please use quotes explicitly.",
                 object_path,
             )
         else:
-            raise SchemaException(
+            raise DataValidationError(
                 f"expected str (or number that would be cast to string), but found type {type(obj)}", object_path
             )
 
@@ -315,7 +316,7 @@ def _validated_object_type(
         if is_obj_type(obj, bool):
             return obj
         else:
-            raise SchemaException(f"expected bool, found {type(obj)}", object_path)
+            raise DataValidationError(f"expected bool, found {type(obj)}", object_path)
 
     # float
     elif cls == float:
@@ -330,7 +331,7 @@ def _validated_object_type(
         if obj in expected:
             return obj
         else:
-            raise SchemaException(f"'{obj}' does not match any of the expected values {expected}", object_path)
+            raise DataValidationError(f"'{obj}' does not match any of the expected values {expected}", object_path)
 
     # Dict[K,V]
     elif is_dict(cls):
@@ -341,12 +342,12 @@ def _validated_object_type(
         if isinstance(obj, cls):
             return obj
         else:
-            raise SchemaException(f"unexpected value '{obj}' for enum '{cls}'", object_path)
+            raise DataValidationError(f"unexpected value '{obj}' for enum '{cls}'", object_path)
 
     # List[T]
     elif is_list(cls):
         if isinstance(obj, str):
-            raise SchemaException("expected list, got string", object_path)
+            raise DataValidationError("expected list, got string", object_path)
         return _validated_list(cls, obj, object_path)
 
     # Tuple[A,B,C,D,...]
@@ -357,22 +358,29 @@ def _validated_object_type(
     elif is_obj_type(obj, cls):
         return obj
 
-    # CustomValueType subclasses
-    elif inspect.isclass(cls) and issubclass(cls, CustomValueType):
+    # BaseValueType subclasses
+    elif inspect.isclass(cls) and issubclass(cls, BaseValueType):
         if isinstance(obj, cls):
             # if we already have a custom value type, just pass it through
             return obj
         else:
             # no validation performed, the implementation does it in the constuctor
-            return cls(obj, object_path=object_path)
+            try:
+                return cls(obj, object_path=object_path)
+            except ValueError as e:
+                if len(e.args) > 0 and isinstance(e.args[0], str):
+                    msg = e.args[0]
+                else:
+                    msg = f"Failed to validate value against {cls} type"
+                raise DataValidationError(msg, object_path) from e
 
-    # nested SchemaNode subclasses
-    elif inspect.isclass(cls) and issubclass(cls, SchemaNode):
+    # nested BaseSchema subclasses
+    elif inspect.isclass(cls) and issubclass(cls, BaseSchema):
         # we should return DataParser, we expect to be given a dict,
         # because we can construct a DataParser from it
-        if isinstance(obj, (dict, SchemaNode)):
+        if isinstance(obj, (dict, BaseSchema)):
             return cls(obj, object_path=object_path)  # type: ignore
-        raise SchemaException(f"expected 'dict' or 'SchemaNode' object, found '{type(obj)}'", object_path)
+        raise DataValidationError(f"expected 'dict' or 'BaseSchema' object, found '{type(obj)}'", object_path)
 
     # if the object matches, just pass it through
     elif inspect.isclass(cls) and isinstance(obj, cls):
@@ -380,14 +388,14 @@ def _validated_object_type(
 
     # default error handler
     else:
-        raise SchemaException(
+        raise DataValidationError(
             f"Type {cls} cannot be parsed. This is a implementation error. "
             "Please fix your types in the class or improve the parser/validator.",
             object_path,
         )
 
 
-TSource = Union[NoneType, ParsedTree, "SchemaNode", Dict[str, Any]]
+TSource = Union[NoneType, ParsedTree, "BaseSchema", Dict[str, Any]]
 
 
 def _create_untouchable(name: str) -> object:
@@ -401,17 +409,17 @@ def _create_untouchable(name: str) -> object:
     return _Untouchable()
 
 
-class SchemaNode(Serializable):
+class BaseSchema(Serializable):
     """
-    Class for modelling configuration schema. It somewhat resembles standard dataclasses with additional
+    Base class for modeling configuration schema. It somewhat resembles standard dataclasses with additional
     functionality:
 
     * type validation
     * data conversion
 
     To create an instance of this class, you have to provide source data in the form of dict-like object.
-    Generally, we expect `ParsedTree`, raw dict or another `SchemaNode` instance. The provided data object
-    is traversed, transformed and validated before assigned to the appropriate fields.
+    Generally, we expect `ParsedTree`, raw dict or another `BaseSchema` instance. The provided data object
+    is traversed, transformed and validated before assigned to the appropriate fields (attributes).
 
     Fields (attributes)
     ===================
@@ -419,17 +427,17 @@ class SchemaNode(Serializable):
     The fields (or attributes) of the class are defined the same way as in a dataclass by creating a class-level
     type-annotated fields. An example of that is:
 
-    class A(SchemaNode):
+    class A(BaseSchema):
         awesome_number: int
 
-    If your `SchemaNode` instance has a field with type of a SchemaNode, its value is recursively created
-    from the nested input data. This way, you can specify a complex tree of SchemaNode's and use the root
-    SchemaNode to create instance of everything.
+    If your `BaseSchema` instance has a field with type of a BaseSchema, its value is recursively created
+    from the nested input data. This way, you can specify a complex tree of BaseSchema's and use the root
+    BaseSchema to create instance of everything.
 
     Transformation
     ==============
 
-    You can provide the SchemaNode class with a field and a function with the same name, but starting with
+    You can provide the BaseSchema class with a field and a function with the same name, but starting with
     underscore ('_'). For example, you could have field called `awesome_number` and function called
     `_awesome_number(self, source)`. The function takes one argument - the source data (optionally with self,
     but you are not supposed to touch that). It can read any data from the source object and return a value of
@@ -437,8 +445,8 @@ class SchemaNode(Serializable):
     during validation, raise a `ValueError` exception.
 
     Using this, you can convert any input values into any type and field you want. To make the conversion easier
-    to write, you could also specify a special class variable called `_PREVIOUS_SCHEMA` pointing to another
-    SchemaNode class. This causes the source object to be first parsed as the specified SchemaNode and after that
+    to write, you could also specify a special class variable called `_LAYER` pointing to another
+    BaseSchema class. This causes the source object to be first parsed as the specified additional layer of BaseSchema and after that
     used a source for this class. This therefore allows nesting of transformation functions.
 
     Validation
@@ -464,7 +472,7 @@ class SchemaNode(Serializable):
     See tests/utils/test_modelling.py for example usage.
     """
 
-    _PREVIOUS_SCHEMA: Optional[Type["SchemaNode"]] = None
+    _LAYER: Optional[Type["BaseSchema"]] = None
 
     def _assign_default(self, name: str, python_type: Any, object_path: str) -> None:
         cls = self.__class__
@@ -476,7 +484,7 @@ class SchemaNode(Serializable):
         value = _validated_object_type(python_type, value, object_path=f"{object_path}/{name}")
         setattr(self, name, value)
 
-    def _assign_fields(self, source: Union[ParsedTree, "SchemaNode", NoneType], object_path: str) -> Set[str]:
+    def _assign_fields(self, source: Union[ParsedTree, "BaseSchema", NoneType], object_path: str) -> Set[str]:
         """
         Order of assignment:
           1. all direct assignments
@@ -484,7 +492,7 @@ class SchemaNode(Serializable):
         """
         cls = self.__class__
         annot = cls.__dict__.get("__annotations__", {})
-        errs: List[SchemaException] = []
+        errs: List[DataValidationError] = []
 
         used_keys: Set[str] = set()
         for name, python_type in annot.items():
@@ -521,14 +529,14 @@ class SchemaNode(Serializable):
 
                 # we expected a value but it was not there
                 else:
-                    errs.append(SchemaException(f"missing attribute '{name}'.", object_path))
-            except SchemaException as e:
+                    errs.append(DataValidationError(f"missing attribute '{name}'.", object_path))
+            except DataValidationError as e:
                 errs.append(e)
 
         if len(errs) == 1:
             raise errs[0]
         elif len(errs) > 1:
-            raise AggregateSchemaException(object_path, errs)
+            raise AggregateDataValidationError(object_path, errs)
         return used_keys
 
     def __init__(self, source: TSource = None, object_path: str = ""):
@@ -539,21 +547,21 @@ class SchemaNode(Serializable):
             source = ParsedTree(source)
 
         # save source
-        self._source: Union[ParsedTree, SchemaNode] = source
+        self._source: Union[ParsedTree, BaseSchema] = source
 
-        # construct lower level schema node first if configured to do so
-        if self._PREVIOUS_SCHEMA is not None:
-            source = self._PREVIOUS_SCHEMA(source, object_path=object_path)  # pylint: disable=not-callable
+        # construct lower level schema first if configured to do so
+        if self._LAYER is not None:
+            source = self._LAYER(source, object_path=object_path)  # pylint: disable=not-callable
 
         # assign fields
         used_keys = self._assign_fields(source, object_path)
 
         # check for unused keys in the source object
-        if source and not isinstance(source, SchemaNode):
+        if source and not isinstance(source, BaseSchema):
             unused = source.keys() - used_keys
             if len(unused) > 0:
                 keys = ", ".join((f"'{u}'" for u in unused))
-                raise SchemaException(
+                raise DataValidationError(
                     f"unexpected extra key(s) {keys}",
                     object_path,
                 )
@@ -562,10 +570,10 @@ class SchemaNode(Serializable):
         try:
             self._validate()
         except ValueError as e:
-            raise SchemaException(e.args[0] if len(e.args) > 0 else "Validation error", object_path) from e
+            raise DataValidationError(e.args[0] if len(e.args) > 0 else "Validation error", object_path) from e
 
     def get_unparsed_data(self) -> ParsedTree:
-        if isinstance(self._source, SchemaNode):
+        if isinstance(self._source, BaseSchema):
             return self._source.get_unparsed_data()
         else:
             return self._source
@@ -585,12 +593,12 @@ class SchemaNode(Serializable):
                 return func(_create_untouchable("self"), source)
             else:
                 raise RuntimeError("Transformation function has wrong number of arguments")
-        except (ValueError, DataException) as e:
+        except ValueError as e:
             if len(e.args) > 0 and isinstance(e.args[0], str):
                 msg = e.args[0]
             else:
                 msg = "Failed to validate value type"
-            raise SchemaException(msg, object_path) from e
+            raise DataValidationError(msg, object_path) from e
 
     def __getitem__(self, key: str) -> Any:
         if not hasattr(self, key):
@@ -618,9 +626,9 @@ class SchemaNode(Serializable):
         return True
 
     @classmethod
-    def json_schema(cls: Type["SchemaNode"], include_schema_definition: bool = True) -> Dict[Any, Any]:
-        if cls._PREVIOUS_SCHEMA is not None:
-            return cls._PREVIOUS_SCHEMA.json_schema(include_schema_definition=include_schema_definition)
+    def json_schema(cls: Type["BaseSchema"], include_schema_definition: bool = True) -> Dict[Any, Any]:
+        if cls._LAYER is not None:
+            return cls._LAYER.json_schema(include_schema_definition=include_schema_definition)
 
         schema: Dict[Any, Any] = {}
         if include_schema_definition:

@@ -1,10 +1,10 @@
 from typing import Optional
 
 from knot_resolver_manager.datamodel.types import CheckedPath, InterfacePort
-from knot_resolver_manager.utils import SchemaNode
+from knot_resolver_manager.utils.modeling import BaseSchema
 
 
-class WebmgmtSchema(SchemaNode):
+class WebmgmtSchema(BaseSchema):
     """
     Configuration of legacy web management endpoint.
 

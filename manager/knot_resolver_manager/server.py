@@ -22,18 +22,14 @@ from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, PID_FILE_NAME, init_user_constants
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.datamodel.management_schema import ManagementSchema
-from knot_resolver_manager.exceptions import (
-    CancelStartupExecInsteadException,
-    DataException,
-    KresManagerException,
-    SchemaException,
-)
+from knot_resolver_manager.exceptions import CancelStartupExecInsteadException, KresManagerException
 from knot_resolver_manager.kresd_controller import get_best_controller_implementation
 from knot_resolver_manager.utils.async_utils import readfile
 from knot_resolver_manager.utils.functional import Result
-from knot_resolver_manager.utils.parsing import ParsedTree, parse, parse_yaml
+from knot_resolver_manager.utils.modeling import ParsedTree, parse, parse_yaml
+from knot_resolver_manager.utils.modeling.exceptions import DataParsingError, DataValidationError
+from knot_resolver_manager.utils.modeling.types import NoneType
 from knot_resolver_manager.utils.systemd_notify import systemd_notify
-from knot_resolver_manager.utils.types import NoneType
 
 from .kres_manager import KresManager
 
@@ -51,12 +47,11 @@ async def error_handler(request: web.Request, handler: Any) -> web.Response:
 
     try:
         return await handler(request)
+    except DataValidationError as e:
+        return web.Response(text=f"validation of configuration failed: {e}", status=HTTPStatus.BAD_REQUEST)
     except KresManagerException as e:
-        if isinstance(e, (SchemaException, DataException)):
-            return web.Response(text=f"validation of configuration failed: {e}", status=HTTPStatus.BAD_REQUEST)
-        else:
-            logger.error("Request processing failed", exc_info=True)
-            return web.Response(text=f"Request processing failed: {e}", status=HTTPStatus.INTERNAL_SERVER_ERROR)
+        logger.error("Request processing failed", exc_info=True)
+        return web.Response(text=f"Request processing failed: {e}", status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
 class Server:
@@ -106,7 +101,7 @@ class Server:
         else:
             try:
                 data = await readfile(self._config_path)
-                config = KresConfig(parse_yaml(data))
+                config = KresConfig(ParsedTree(data))
                 await self.config_store.update(config)
                 logger.info("Configuration file successfully reloaded")
             except FileNotFoundError:
@@ -115,7 +110,7 @@ class Server:
                     " Something must have happened to it while we were running."
                 )
                 logger.error("Configuration have NOT been changed.")
-            except SchemaException as e:
+            except (DataParsingError, DataValidationError) as e:
                 logger.error(f"Failed to parse the updated configuration file: {e}")
                 logger.error("Configuration have NOT been changed.")
             except KresManagerException as e:

@@ -4,20 +4,19 @@ import pytest
 from pytest import raises
 from typing_extensions import Literal
 
-from knot_resolver_manager.exceptions import SchemaException
-from knot_resolver_manager.utils import SchemaNode
-from knot_resolver_manager.utils.parsing import parse_json, parse_yaml
+from knot_resolver_manager.utils.modeling import BaseSchema, parse_json, parse_yaml
+from knot_resolver_manager.utils.modeling.exceptions import DataDescriptionError, DataValidationError
 
 
-class _TestBool(SchemaNode):
+class _TestBool(BaseSchema):
     v: bool
 
 
-class _TestInt(SchemaNode):
+class _TestInt(BaseSchema):
     v: int
 
 
-class _TestStr(SchemaNode):
+class _TestStr(BaseSchema):
     v: str
 
 
@@ -28,7 +27,7 @@ def test_parsing_bool_valid(val: str, exp: bool):
 
 @pytest.mark.parametrize("val", ["0", "1", "5", "'true'", "'false'", "5.5"])  # int, str, float
 def test_parsing_bool_invalid(val: str):
-    with raises(SchemaException):
+    with raises(DataValidationError):
         _TestBool(parse_yaml(f"v: {val}"))
 
 
@@ -39,7 +38,7 @@ def test_parsing_int_valid(val: str, exp: int):
 
 @pytest.mark.parametrize("val", ["false", "'5'", "5.5"])  # bool, str, float
 def test_parsing_int_invalid(val: str):
-    with raises(SchemaException):
+    with raises(DataValidationError):
         _TestInt(parse_yaml(f"v: {val}"))
 
 
@@ -50,13 +49,13 @@ def test_parsing_str_valid(val: Any, exp: str):
 
 
 def test_parsing_str_invalid():
-    with raises(SchemaException):
+    with raises(DataValidationError):
         _TestStr(parse_yaml("v: false"))  # bool
 
 
 @pytest.mark.parametrize("typ,val", [(_TestInt, 5), (_TestBool, False), (_TestStr, "test")])
-def test_parsing_nested(typ: Type[SchemaNode], val: Any):
-    class UpperSchema(SchemaNode):
+def test_parsing_nested(typ: Type[BaseSchema], val: Any):
+    class UpperSchema(BaseSchema):
         l: typ
 
     yaml = f"""
@@ -69,7 +68,7 @@ l:
 
 
 def test_parsing_simple_compound_types():
-    class TestSchema(SchemaNode):
+    class TestSchema(BaseSchema):
         l: List[int]
         d: Dict[str, str]
         t: Tuple[str, int]
@@ -98,7 +97,7 @@ t:
 
 
 def test_parsing_nested_compound_types():
-    class TestSchema(SchemaNode):
+    class TestSchema(BaseSchema):
         i: int
         o: Optional[Dict[str, str]]
 
@@ -120,16 +119,16 @@ o:
 
 
 def test_partial_mutations():
-    class InnerSchema(SchemaNode):
+    class InnerSchema(BaseSchema):
         size: int = 5
 
-    class ConfPreviousSchema(SchemaNode):
+    class ConfPreviousSchema(BaseSchema):
         workers: Union[Literal["auto"], int] = 1
         lua_config: Optional[str] = None
         inner: InnerSchema = InnerSchema()
 
-    class ConfSchema(SchemaNode):
-        _PREVIOUS_SCHEMA = ConfPreviousSchema
+    class ConfSchema(BaseSchema):
+        _LAYER = ConfPreviousSchema
 
         workers: int
         lua_config: Optional[str]
@@ -174,13 +173,13 @@ def test_partial_mutations():
     assert o.workers == 8
     assert o.inner.size == 33
 
-    # raise validation SchemaException
-    with raises(SchemaException):
+    # raise validation DataValidationError
+    with raises(DataValidationError):
         o = ConfSchema(d.update("/", parse_json('{"workers": -5}')))
 
 
 def test_dash_conversion():
-    class TestSchema(SchemaNode):
+    class TestSchema(BaseSchema):
         awesome_field: Dict[str, str]
 
     yaml = """
@@ -193,7 +192,7 @@ awesome-field:
 
 
 def test_eq():
-    class B(SchemaNode):
+    class B(BaseSchema):
         a: _TestInt
         field: str
 
@@ -208,7 +207,7 @@ def test_eq():
 
 
 def test_docstring_parsing_valid():
-    class NormalDescription(SchemaNode):
+    class NormalDescription(BaseSchema):
         """
         Does nothing special
         Really
@@ -217,7 +216,7 @@ def test_docstring_parsing_valid():
     desc = NormalDescription.json_schema()
     assert desc["description"] == "Does nothing special\nReally"
 
-    class FieldsDescription(SchemaNode):
+    class FieldsDescription(BaseSchema):
         """
         This is an awesome test class
         ---
@@ -233,14 +232,14 @@ def test_docstring_parsing_valid():
     assert schema["properties"]["field"]["description"] == "This field does nothing interesting"
     assert schema["properties"]["value"]["description"] == "Neither does this"
 
-    class NoDescription(SchemaNode):
+    class NoDescription(BaseSchema):
         nothing: str
 
     _ = NoDescription.json_schema()
 
 
 def test_docstring_parsing_invalid():
-    class AdditionalItem(SchemaNode):
+    class AdditionalItem(BaseSchema):
         """
         This class is wrong
         ---
@@ -250,10 +249,10 @@ def test_docstring_parsing_invalid():
 
         nothing: str
 
-    with raises(SchemaException):
+    with raises(DataDescriptionError):
         _ = AdditionalItem.json_schema()
 
-    class WrongDescription(SchemaNode):
+    class WrongDescription(BaseSchema):
         """
         This class is wrong
         ---
@@ -262,5 +261,5 @@ def test_docstring_parsing_invalid():
 
         nothing: str
 
-    with raises(SchemaException):
+    with raises(DataDescriptionError):
         _ = WrongDescription.json_schema()

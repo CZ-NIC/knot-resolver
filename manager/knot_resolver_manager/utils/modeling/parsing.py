@@ -8,14 +8,14 @@ import yaml
 from yaml.constructor import ConstructorError
 from yaml.nodes import MappingNode
 
-from knot_resolver_manager.exceptions import DataException, ParsingException
-from knot_resolver_manager.utils.types import is_internal_field_name
+from .exceptions import DataParsingError
+from .types import is_internal_field_name
 
 
 class ParsedTree:
     """
-    Simple wrapper for parsed data. Changes internal naming convention (snake case)
-    to external (dashes) on the fly.
+    Simple wrapper for parsed data.
+    Changes external naming convention (hyphen separator) to internal (snake_case) on the fly.
 
     IMMUTABLE, DO NOT MODIFY
     """
@@ -60,9 +60,9 @@ class ParsedTree:
         # prepare and validate the path object
         path = path[:-1] if path.endswith("/") else path
         if re.match(ParsedTree._SUBTREE_MUTATION_PATH_PATTERN, path) is None:
-            raise ParsingException("Provided object path for mutation is invalid.")
+            raise DataParsingError("Provided object path for mutation is invalid.")
         if "_" in path:
-            raise ParsingException("Provided object path contains character '_', which is illegal")
+            raise DataParsingError("Provided object path contains character '_', which is illegal")
         # Note: mutation happens on the internal dict only, therefore we are working with external
         # naming only. That means, there are '-' in between words.
         path = path[1:] if path.startswith("/") else path
@@ -82,9 +82,9 @@ class ParsedTree:
             assert isinstance(obj, dict)
 
             if segment == "":
-                raise ParsingException(f"Unexpectedly empty segment in path '{path}'")
+                raise DataParsingError(f"Unexpectedly empty segment in path '{path}'")
             elif is_internal_field_name(segment):
-                raise ParsingException(
+                raise DataParsingError(
                     "No, changing internal fields (starting with _) is not allowed. Nice try though."
                 )
             elif segment in obj:
@@ -109,7 +109,7 @@ def _json_raise_duplicates(pairs: List[Tuple[Any, Any]]) -> Optional[Any]:
     dict_out: Dict[Any, Any] = {}
     for key, val in pairs:
         if key in dict_out:
-            raise DataException(f"Duplicate attribute key detected: {key}")
+            raise DataParsingError(f"Duplicate attribute key detected: {key}")
         dict_out[key] = val
     return dict_out
 
@@ -136,7 +136,7 @@ class _RaiseDuplicatesLoader(yaml.SafeLoader):
 
             # check for duplicate keys
             if key in mapping:
-                raise DataException(f"duplicate key detected: {key_node.start_mark}")
+                raise DataParsingError(f"duplicate key detected: {key_node.start_mark}")
             value = self.construct_object(value_node, deep=deep)  # type: ignore
             mapping[key] = value
         return mapping
@@ -172,7 +172,7 @@ class _Format(Enum):
             "text/vnd.yaml": _Format.YAML,
         }
         if mime_type not in formats:
-            raise DataException("Unsupported MIME type")
+            raise DataParsingError("Unsupported MIME type")
         return formats[mime_type]
 
 

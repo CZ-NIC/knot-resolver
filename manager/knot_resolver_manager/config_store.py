@@ -3,8 +3,9 @@ from asyncio import Lock
 from typing import Any, Awaitable, Callable, List, Tuple
 
 from knot_resolver_manager.datamodel import KresConfig
-from knot_resolver_manager.exceptions import DataException, KresManagerException
+from knot_resolver_manager.exceptions import KresManagerException
 from knot_resolver_manager.utils.functional import Result
+from knot_resolver_manager.utils.modeling.exceptions import DataParsingError
 
 VerifyCallback = Callable[[KresConfig, KresConfig], Awaitable[Result[None, str]]]
 UpdateCallback = Callable[[KresConfig], Awaitable[None]]
@@ -39,7 +40,7 @@ class ConfigStore:
         self._verifiers.append(verifier)
         res = await verifier(self.get(), self.get())
         if res.is_err():
-            raise DataException(f"Initial config verification failed with error: {res.unwrap_err()}")
+            raise DataParsingError(f"Initial config verification failed with error: {res.unwrap_err()}")
 
     async def register_on_change_callback(self, callback: UpdateCallback) -> None:
         """

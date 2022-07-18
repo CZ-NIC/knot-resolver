@@ -6,7 +6,7 @@ from pytest import raises
 from knot_resolver_manager.datamodel.network_schema import ListenSchema, NetworkSchema
 from knot_resolver_manager.datamodel.types import PortNumber
 from knot_resolver_manager.datamodel.types.types import InterfaceOptionalPort
-from knot_resolver_manager.exceptions import KresManagerException
+from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
 
 
 def test_listen_defaults():
@@ -76,5 +76,5 @@ def test_listen_valid(listen: Dict[str, Any]):
     ],
 )
 def test_listen_invalid(listen: Dict[str, Any]):
-    with raises(KresManagerException):
+    with raises(DataValidationError):
         ListenSchema(listen)

@@ -10,10 +10,10 @@ from knot_resolver_manager.datamodel.types import (
     PolicyFlagEnum,
     TimeUnit,
 )
-from knot_resolver_manager.utils import SchemaNode
+from knot_resolver_manager.utils.modeling import BaseSchema
 
 
-class FilterSchema(SchemaNode):
+class FilterSchema(BaseSchema):
     """
     Query filtering configuration.
 
@@ -28,7 +28,7 @@ class FilterSchema(SchemaNode):
     qtype: Optional[DNSRecordTypeEnum] = None
 
 
-class AnswerSchema(SchemaNode):
+class AnswerSchema(BaseSchema):
     """
     Configuration of custom resource record for DNS answer.
 
@@ -45,7 +45,7 @@ class AnswerSchema(SchemaNode):
     nodata: bool = False
 
 
-class ForwardServerSchema(SchemaNode):
+class ForwardServerSchema(BaseSchema):
     """
     Configuration of Forward server.
 
@@ -92,7 +92,7 @@ def _validate_policy_action(policy_action: Union["ActionSchema", "PolicySchema"]
                 )
 
 
-class ActionSchema(SchemaNode):
+class ActionSchema(BaseSchema):
     """
     Configuration of policy action.
 
@@ -114,7 +114,7 @@ class ActionSchema(SchemaNode):
         _validate_policy_action(self)
 
 
-class PolicySchema(SchemaNode):
+class PolicySchema(BaseSchema):
     """
     Configuration of policy rule.
 

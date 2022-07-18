@@ -26,8 +26,7 @@ from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
 from knot_resolver_manager.datamodel.types.types import IntPositive, UncheckedPath
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
-from knot_resolver_manager.exceptions import DataException
-from knot_resolver_manager.utils import SchemaNode
+from knot_resolver_manager.utils.modeling import BaseSchema
 
 logger = logging.getLogger(__name__)
 
@@ -61,26 +60,19 @@ def _import_lua_template() -> Template:
 _MAIN_TEMPLATE = _import_lua_template()
 
 
-def _cpu_count() -> int:
+def _cpu_count() -> Optional[int]:
     try:
         return len(os.sched_getaffinity(0))
     except (NotImplementedError, AttributeError):
-        logger.warning(
-            "The number of usable CPUs could not be determined using 'os.sched_getaffinity()'."
-            "Attempting to get the number of system CPUs using 'os.cpu_count()'"
-        )
+        logger.warning("The number of usable CPUs could not be determined using 'os.sched_getaffinity()'.")
         cpus = os.cpu_count()
         if cpus is None:
-            raise DataException(
-                "The number of available CPUs to automatically set the number of running"
-                "'kresd' workers could not be determined."
-                "The number can be specified manually in 'server:instances' configuration option."
-            )
+            logger.warning("The number of usable CPUs could not be determined using 'os.cpu_count()'.")
         return cpus
 
 
-class KresConfig(SchemaNode):
-    class Raw(SchemaNode):
+class KresConfig(BaseSchema):
+    class Raw(BaseSchema):
         """
         Knot Resolver declarative configuration.
 
@@ -132,7 +124,7 @@ class KresConfig(SchemaNode):
         monitoring: MonitoringSchema = MonitoringSchema()
         lua: LuaSchema = LuaSchema()
 
-    _PREVIOUS_SCHEMA = Raw
+    _LAYER = Raw
 
     nsid: Optional[str]
     hostname: str
@@ -164,7 +156,13 @@ class KresConfig(SchemaNode):
 
     def _workers(self, obj: Raw) -> Any:
         if obj.workers == "auto":
-            return IntPositive(_cpu_count())
+            count = _cpu_count()
+            if count:
+                return IntPositive(count)
+            raise ValueError(
+                "The number of available CPUs to automatically set the number of running 'kresd' workers could not be determined."
+                "The number of workers can be configured manually in 'workers' option."
+            )
         return obj.workers
 
     def _dnssec(self, obj: Raw) -> Any:
@@ -178,13 +176,12 @@ class KresConfig(SchemaNode):
         return obj.dns64
 
     def _validate(self) -> None:
-        try:
-            cpu_count = _cpu_count()
-            if int(self.workers) > 10 * cpu_count:
-                raise ValueError("refusing to run with more then instances 10 instances per cpu core")
-        except DataException:
-            # sometimes, we won't be able to get information about the cpu count
-            pass
+        cpu_count = _cpu_count()
+
+        if cpu_count and int(self.workers) > 10 * cpu_count:
+            raise ValueError("refusing to run with more then 10 workers per cpu core")
+        elif int(self.workers) > MAX_WORKERS:
+            raise ValueError(f"refusing to run with more workers then allowed maximum {MAX_WORKERS}")
 
     def render_lua(self) -> str:
         # FIXME the `cwd` argument is used only for configuring control socket path

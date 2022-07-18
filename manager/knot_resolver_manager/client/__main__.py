@@ -7,7 +7,7 @@ from click.exceptions import ClickException
 from knot_resolver_manager.client import KnotManagerClient
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.exceptions import KresManagerException
-from knot_resolver_manager.utils.parsing import parse_yaml
+from knot_resolver_manager.utils.modeling import parse_yaml
 
 BASE_URL = "base_url"
 

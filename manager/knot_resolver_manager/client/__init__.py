@@ -11,7 +11,7 @@ import requests
 
 from knot_resolver_manager import compat
 from knot_resolver_manager.server import start_server
-from knot_resolver_manager.utils.parsing import ParsedTree
+from knot_resolver_manager.utils.modeling import ParsedTree
 
 
 class KnotManagerClient:

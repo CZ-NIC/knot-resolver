@@ -3,10 +3,10 @@ from typing import Union
 from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import DomainName, IPAddress, PortNumber, TimeUnit
-from knot_resolver_manager.utils.modelling import SchemaNode
+from knot_resolver_manager.utils.modeling import BaseSchema
 
 
-class GraphiteSchema(SchemaNode):
+class GraphiteSchema(BaseSchema):
     host: Union[IPAddress, DomainName]
     port: PortNumber = PortNumber(2003)
     prefix: str = ""
@@ -14,7 +14,7 @@ class GraphiteSchema(SchemaNode):
     tcp: bool = False
 
 
-class MonitoringSchema(SchemaNode):
+class MonitoringSchema(BaseSchema):
     """
     ---
     enabled: configures, whether statistics module will be loaded into resolver
