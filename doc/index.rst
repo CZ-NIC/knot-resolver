@@ -15,8 +15,19 @@ and it provides a state-machine like API for extensions.
 
    gettingstarted-intro
    gettingstarted-install
-   gettingstarted-startup
    gettingstarted-config
+   gettingstarted-startup
+
+
+.. toctree::
+   :caption: Scenarios (Use Cases)
+   :name: usecases
+   :maxdepth: 1
+
+   usecase-internal-resolver
+   usecase-isp-resolver
+   usecase-personal-resolver
+
 
 .. _configuration-chapter:
 
