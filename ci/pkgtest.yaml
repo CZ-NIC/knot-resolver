@@ -21,9 +21,9 @@ stages:
       - pkg/
 
 .apkginstall: &apkginstall  # new jinja2 breaks docs (sphinx/breathe)
-  - git clone https://gitlab.nic.cz/packaging/apkg.git
-  - cd apkg; pip3 install -U . 'jinja2<3.1'; cd ..
-  # - pip3 install -U apkg 'jinja2<3.1'
+  # - git clone https://gitlab.nic.cz/packaging/apkg.git
+  # - cd apkg; pip3 install -U . 'jinja2<3.1'; cd ..
+  - pip3 install -U apkg 'jinja2<3.1'
   
 
 .apkgbuild: &apkgbuild
