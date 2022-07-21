@@ -6,7 +6,7 @@ Configuration Overview
 
 Configuration file is named ``/etc/knot-resolver/kresd.conf`` and is read when
 you execute Knot Resolver using systemd commands described in section
-:ref:`quickstart-startup`. [#]_
+:ref:`gettingstarted-startup`. [#]_
 
 .. _config-syntax:
 

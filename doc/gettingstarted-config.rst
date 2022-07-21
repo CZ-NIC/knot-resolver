@@ -1,6 +1,6 @@
 .. SPDX-License-Identifier: GPL-3.0-or-later
 
-.. _quickstart-config:
+.. _gettingstarted-config:
 
 *************
 Configuration
@@ -10,27 +10,31 @@ Configuration
    :depth: 1
    :local:
 
+Easiest way to configure Knot Resolver is to paste your configuration into YAML configuration file ``/etc/knot-resolver/config.yml``.
+Complete configurations files for examples in this chapter can be found `here <https://gitlab.nic.cz/knot/knot-resolver/tree/master/etc/config>`_.
+The example configuration files are also installed as documentation files, typically in directory ``/usr/share/doc/knot-resolver/examples/`` (their location may be different based on your Linux distribution).
+Detailed configuration can be found in configuration section.
+
+Legacy Lua configuration
+========================
+
+Legacy way to configure Knot Resolver daemon is to paste your configuration into configuration file ``/etc/knot-resolver/kresd.conf``.
+When using this configuration approach, the daemon must be started using legacy systemd service ``kresd@``.
+
 .. note::
 
-            When copy&pasting examples from this manual please pay close
-            attention to brackets and also line ordering - order of lines matters.
+    When copy&pasting examples from this manual please pay close
+    attention to brackets and also line ordering - order of lines matters.
 
-            The configuration language is in fact Lua script, so you can use full power
-            of this programming language. See article
-            `Learn Lua in 15 minutes`_ for a syntax overview.
-
-Easiest way to configure Knot Resolver is to paste your configuration into
-configuration file ``/etc/knot-resolver/kresd.conf``.
-Complete configurations files for examples in this chapter
-can be found `here <https://gitlab.nic.cz/knot/knot-resolver/tree/master/etc/config>`_.
-The example configuration files are also installed as documentation files, typically in directory ``/usr/share/doc/knot-resolver/examples/`` (their location may be different based on your Linux distribution).
-Detailed configuration of daemon and implemented modules can be found in configuration reference:
-
+    The configuration language is in fact Lua script, so you can use full power
+    of this programming language. See article
+    `Learn Lua in 15 minutes`_ for a syntax overview.
 
 Listening on network interfaces
 ===============================
 
-The following configuration instructs Knot Resolver to receive standard unencrypted DNS queries on IP addresses `192.0.2.1` and `2001:db8::1`. Encrypted DNS queries are accepted using DNS-over-TLS protocol on all IP addresses configured on network interface `eth0`, TCP port 853.
+The following configuration instructs Knot Resolver to receive standard unencrypted DNS queries on IP addresses `192.0.2.1` and `2001:db8::1`.
+Encrypted DNS queries are accepted using DNS-over-TLS protocol on all IP addresses configured on network interface `eth0`, TCP port 853.
 
 .. tabs::
 
@@ -144,6 +148,11 @@ First step is to enable TLS on listening interfaces:
 
         .. code-block:: yaml
 
+            network:
+                listen:
+                  - interface: ['192.0.2.1', '2001::db8:1']
+                    kind: 'dot' # dns-over-tls, default port is 853
+
 
     .. group-tab:: |lua|
 
@@ -153,8 +162,7 @@ First step is to enable TLS on listening interfaces:
             net.listen('2001::db8:1', 853, { kind = 'tls' })
 
 By default a self-signed certificate is generated.
-Second step is then obtaining and configuring your own TLS certificates
-signed by a trusted CA. Once the certificate was obtained a path to certificate files can be specified using function :func:`net.tls()`:
+Second step is then obtaining and configuring your own TLS certificates signed by a trusted CA.
 
 .. tabs::
 
@@ -162,8 +170,14 @@ signed by a trusted CA. Once the certificate was obtained a path to certificate 
 
         .. code-block:: yaml
 
+            network:
+                tls:
+                    cert-file: '/etc/knot-resolver/server-cert.pem'
+                    key-file: '/etc/knot-resolver/server-key.pem'
 
     .. group-tab:: |lua|
+
+        Once the certificate was obtained a path to certificate files can be specified using function :func:`net.tls()`:
 
         .. code-block:: lua
 
@@ -173,7 +187,7 @@ signed by a trusted CA. Once the certificate was obtained a path to certificate 
 Mandatory domain blocking
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Some jurisdictions mandate blocking access to certain domains. This can be achieved using following :ref:`policy rule <mod-policy>`:
+Some jurisdictions mandate blocking access to certain domains.
 
 
 .. tabs::
@@ -185,11 +199,13 @@ Some jurisdictions mandate blocking access to certain domains. This can be achie
 
     .. group-tab:: |lua|
 
+        Blocking can be achieved using following :ref:`policy rule <mod-policy>`:
+
         .. code-block:: lua
 
             policy.add(
-                    policy.suffix(policy.DENY,
-                            policy.todnames({'example.com.', 'blocked.example.net.'})))
+                policy.suffix(policy.DENY,
+                    policy.todnames({'example.com.', 'blocked.example.net.'})))
 
 
 .. _personalresolver:
