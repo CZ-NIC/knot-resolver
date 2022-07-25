@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # see FEATURE AREAS in dpkg-buildflags(1)
-export DEB_BUILD_MAINT_OPTIONS = hardening=+all,-pie
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 
 # see ENVIRONMENT in dpkg-buildflags(1)
 # package maintainers to append CFLAGS
