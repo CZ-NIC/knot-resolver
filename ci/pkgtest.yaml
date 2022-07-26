@@ -141,15 +141,6 @@ ubuntu-20.04:pkgbuild:
   script:
     - *debpkgbuild
 
-ubuntu-21.10:pkgbuild:
-  <<: *pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-21.10
-  variables:
-    OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: xUbuntu_21.10
-  script:
-    - *debpkgbuild
-
 nixos-unstable:pkgbuild:
   <<: *pkgbuild
   # We do NOT use LXC, for now at least.
@@ -321,17 +312,6 @@ ubuntu-20.04:pkgtest:
   variables:
     OBS_REPO: knot-resolver-build
     DISTROTEST_REPO: xUbuntu_20.04
-  script:
-    - *debpkgtest
-
-ubuntu-21.10:pkgtest:
-  <<: *pkgtest
-  needs:
-    - ubuntu-21.10:pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-21.10
-  variables:
-    OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: xUbuntu_21.10
   script:
     - *debpkgtest
 # }}}
