@@ -77,7 +77,7 @@ static bool is_paired_to_query(const knot_pkt_t *answer, struct kr_query *query)
 	       qtype          == knot_pkt_qtype(answer) &&
 	       /* qry->secret had been xor-applied to answer already,
 		* so this also checks for correctness of case randomization */
-	       knot_dname_is_equal(qname, knot_pkt_qname(answer));
+	       knot_dname_is_equal(qname, kr_pkt_qname_raw(answer));
 }
 
 /** Relaxed rule for AA, either AA=1 or SOA matching zone cut is required. */

@@ -1029,15 +1029,24 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 	xdp_handle_data_t *xhd = malloc(sizeof(*xhd));
 	if (!xhd) return kr_error(ENOMEM);
 
-	const int port = ep->port ? ep->port : // all ports otherwise
-			#if KNOT_VERSION_HEX >= 0x030100
-				(KNOT_XDP_LISTEN_PORT_PASS | 0);
-			#else
-				KNOT_XDP_LISTEN_PORT_ALL;
-			#endif
 	xhd->socket = NULL; // needed for some reason
-	int ret = knot_xdp_init(&xhd->socket, ifname, ep->nic_queue, port,
-				KNOT_XDP_LOAD_BPF_MAYBE);
+
+	// This call is a libknot version hell, unfortunately.
+	int ret = knot_xdp_init(&xhd->socket, ifname, ep->nic_queue,
+		#if KNOT_VERSION_HEX < 0x030100
+			ep->port ? ep->port : KNOT_XDP_LISTEN_PORT_ALL,
+			KNOT_XDP_LOAD_BPF_MAYBE
+		#elif KNOT_VERSION_HEX < 0x030200
+			ep->port ? ep->port : (KNOT_XDP_LISTEN_PORT_PASS | 0),
+			KNOT_XDP_LOAD_BPF_MAYBE
+		#else
+			KNOT_XDP_FILTER_UDP | (ep->port ? 0 : KNOT_XDP_FILTER_PASS),
+			ep->port, 0/*quic_port*/,
+			KNOT_XDP_LOAD_BPF_MAYBE,
+			NULL/*xdp_config*/
+		#endif
+		);
+
 	if (!ret) xdp_warn_mode(ifname);
 
 	if (!ret) ret = uv_idle_init(loop, &xhd->tx_waker);

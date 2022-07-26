@@ -102,6 +102,7 @@ genResType "knot_rrset_t" | sed 's/\<owner\>/_owner/; s/\<ttl\>/_ttl/'
 printf "
 struct kr_module;
 typedef char *(kr_prop_cb)(void *, struct kr_module *, const char *);
+typedef unsigned char knot_dname_storage_t[255];
 "
 
 ${CDEFS} ${LIBKRES} types <<-EOF
