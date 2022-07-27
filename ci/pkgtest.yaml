@@ -40,8 +40,6 @@ stages:
 centos-7:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-7
-  when: manual # this image fails to start now
-  allow_failure: true
   before_script:
     - export LC_ALL=en_US.UTF-8
     - git config --global user.name CI
@@ -80,8 +78,6 @@ debian-11:pkgbuild:
 fedora-34:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-34
-  when: manual # this image fails to start now
-  allow_failure: true
   script:
     - dnf install -y rpm-build python3-pip
     - *apkgbuild
@@ -89,8 +85,6 @@ fedora-34:pkgbuild:
 fedora-35:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-35
-  when: manual # this image fails to start now
-  allow_failure: true
   script:
     - dnf install -y rpm-build python3-pip
     - *apkgbuild
@@ -98,8 +92,6 @@ fedora-35:pkgbuild:
 opensuse-15.2:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/opensuse-15.2
-  when: manual # this image fails to start now
-  allow_failure: true
   script:
     - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.2/home:CZ-NIC:knot-resolver-build.repo
     - zypper install -y rpm-build python3-pip
@@ -108,8 +100,6 @@ opensuse-15.2:pkgbuild:
 opensuse-15.3:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/opensuse-15.3
-  when: manual # this image fails to start now
-  allow_failure: true
   script:
     - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.3/home:CZ-NIC:knot-resolver-build.repo
     - zypper install -y rpm-build python3-pip
@@ -138,15 +128,6 @@ ubuntu-20.04:pkgbuild:
   variables:
     OBS_REPO: knot-resolver-build
     DISTROTEST_REPO: xUbuntu_20.04
-  script:
-    - *debpkgbuild
-
-ubuntu-21.10:pkgbuild:
-  <<: *pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-21.10
-  variables:
-    OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: xUbuntu_21.10
   script:
     - *debpkgbuild
 
@@ -192,8 +173,6 @@ centos-7:pkgtest:
   needs:
     - centos-7:pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-7
-  when: manual # this image fails to start now
-  allow_failure: true
   before_script:
     - export LC_ALL=en_US.UTF-8
   script:
@@ -241,8 +220,6 @@ fedora-34:pkgtest:
   needs:
     - fedora-34:pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-34
-  when: manual # this image fails to start now
-  allow_failure: true
   script:
     - dnf install -y knot-utils findutils
     - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
@@ -254,8 +231,6 @@ fedora-35:pkgtest:
   needs:
     - fedora-35:pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-35
-  when: manual # this image fails to start now
-  allow_failure: true
   script:
     - dnf install -y knot-utils findutils
     - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
@@ -267,8 +242,6 @@ opensuse-15.2:pkgtest:
   needs:
     - opensuse-15.2:pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/opensuse-15.2
-  when: manual # this image fails to start now
-  allow_failure: true
   script:
     - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.2/home:CZ-NIC:knot-resolver-build.repo
     - zypper install -y knot-utils
@@ -281,8 +254,6 @@ opensuse-15.3:pkgtest:
   needs:
     - opensuse-15.3:pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/opensuse-15.3
-  when: manual # this image fails to start now
-  allow_failure: true
   script:
     - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.3/home:CZ-NIC:knot-resolver-build.repo
     - zypper install -y knot-utils
@@ -321,17 +292,6 @@ ubuntu-20.04:pkgtest:
   variables:
     OBS_REPO: knot-resolver-build
     DISTROTEST_REPO: xUbuntu_20.04
-  script:
-    - *debpkgtest
-
-ubuntu-21.10:pkgtest:
-  <<: *pkgtest
-  needs:
-    - ubuntu-21.10:pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-21.10
-  variables:
-    OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: xUbuntu_21.10
   script:
     - *debpkgtest
 # }}}
