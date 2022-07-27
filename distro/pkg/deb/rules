@@ -27,7 +27,6 @@ override_dh_auto_build:
 		--buildtype=plain \
 		--prefix=/usr \
 		--libdir=lib \
-		-Ddoc=enabled \
 		-Dsystemd_files=enabled \
 		-Dclient=enabled \
 		-Ddnstap=enabled \
@@ -38,7 +37,6 @@ override_dh_auto_build:
 		-Dc_args="$${CFLAGS}" \
 		-Dc_link_args="$${LDFLAGS}"
 	ninja -v -C build_deb
-	ninja -v -C build_deb doc
 	dh_auto_build --buildsystem=pybuild --sourcedirectory manager
 
 override_dh_auto_install:
