@@ -43,14 +43,16 @@ stages:
   - apt-get install -y python3-pip devscripts
   - *apkgbuild
 
-debian-10:pkgbuild:
-  <<: *pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-10
-  variables:
-    OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: Debian_10
-  script:
-    - *debpkgbuild
+# Missing reasonably up-to-date supervisord package:
+#
+# debian-10:pkgbuild:
+#   <<: *pkgbuild
+#   image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-10
+#   variables:
+#     OBS_REPO: knot-resolver-build
+#     DISTROTEST_REPO: Debian_10
+#   script:
+#     - *debpkgbuild
 
 debian-11:pkgbuild:
   <<: *pkgbuild
@@ -108,15 +110,6 @@ ubuntu-20.04:pkgbuild:
   script:
     - *debpkgbuild
 
-ubuntu-21.10:pkgbuild:
-  <<: *pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-21.10
-  variables:
-    OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: xUbuntu_21.10
-  script:
-    - *debpkgbuild
-
 ubuntu-22.04:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-22.04
@@ -166,16 +159,18 @@ nixos-unstable:pkgbuild:
   - apt-get install -y python3-pip
   - *apkgtest
 
-debian-10:pkgtest:
-  <<: *pkgtest
-  needs:
-    - debian-10:pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-10
-  variables:
-    OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: Debian_10
-  script:
-    - *debpkgtest
+# Missing reasonably up-to-date supervisord package:
+#
+# debian-10:pkgtest:
+#   <<: *pkgtest
+#   needs:
+#     - debian-10:pkgbuild
+#   image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-10
+#   variables:
+#     OBS_REPO: knot-resolver-build
+#     DISTROTEST_REPO: Debian_10
+#   script:
+#     - *debpkgtest
 
 debian-11:pkgtest:
   <<: *pkgtest
@@ -249,17 +244,6 @@ ubuntu-20.04:pkgtest:
   variables:
     OBS_REPO: knot-resolver-build
     DISTROTEST_REPO: xUbuntu_20.04
-  script:
-    - *debpkgtest
-
-ubuntu-21.10:pkgtest:
-  <<: *pkgtest
-  needs:
-    - ubuntu-21.10:pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-21.10
-  variables:
-    OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: xUbuntu_21.10
   script:
     - *debpkgtest
 
