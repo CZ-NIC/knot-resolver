@@ -10,8 +10,6 @@ as long as it comes with a test case in `tests/test_generics.c`.
 
 * array_ - a set of simple macros to make working with dynamic arrays easier.
 * queue_ - a FIFO + LIFO queue.
-* map_ - a `Crit-bit tree`_ key-value map implementation (public domain) that comes with tests.
-* set_ - set abstraction implemented on top of ``map`` (unused now).
 * pack_ - length-prefixed list of objects (i.e. array-list).
 * lru_ - LRU-like hash table
 * trie_ - a trie-based key-value map, taken from knot-dns
@@ -26,18 +24,6 @@ queue
 ~~~~~
 
 .. doxygenfile:: queue.h
-   :project: libkres
-
-map
-~~~
-
-.. doxygenfile:: map.h
-   :project: libkres
-
-set
-~~~
-
-.. doxygenfile:: set.h
    :project: libkres
 
 pack

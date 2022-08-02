@@ -11,7 +11,6 @@
 #include <libknot/descriptor.h>
 #include <ucw/mempool.h>
 #include <sys/socket.h>
-#include "kresconfig.h"
 #include "lib/resolve.h"
 #include "lib/layer.h"
 #include "lib/rplan.h"
@@ -814,7 +813,7 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 		return KR_STATE_PRODUCE;
 
 	/* Packet cleared, derandomize QNAME. */
-	knot_dname_t *qname_raw = knot_pkt_qname(packet);
+	knot_dname_t *qname_raw = kr_pkt_qname_raw(packet);
 	if (qname_raw && qry->secret != 0) {
 		randomized_qname_case(qname_raw, qry->secret);
 	}
@@ -918,8 +917,8 @@ static struct kr_query *zone_cut_subreq(struct kr_rplan *rplan, struct kr_query 
 static int forward_trust_chain_check(struct kr_request *request, struct kr_query *qry, bool resume)
 {
 	struct kr_rplan *rplan = &request->rplan;
-	map_t *trust_anchors = &request->ctx->trust_anchors;
-	map_t *negative_anchors = &request->ctx->negative_anchors;
+	trie_t *trust_anchors = request->ctx->trust_anchors;
+	trie_t *negative_anchors = request->ctx->negative_anchors;
 
 	if (qry->parent != NULL &&
 	    !(qry->forward_flags.CNAME) &&
@@ -1104,8 +1103,8 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 {
 	struct kr_rplan *rplan = &request->rplan;
-	map_t *trust_anchors = &request->ctx->trust_anchors;
-	map_t *negative_anchors = &request->ctx->negative_anchors;
+	trie_t *trust_anchors = request->ctx->trust_anchors;
+	trie_t *negative_anchors = request->ctx->negative_anchors;
 
 	/* Disable DNSSEC if it enters NTA. */
 	if (kr_ta_get(negative_anchors, qry->zone_cut.name)){
@@ -1426,7 +1425,7 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 
 	/* Randomize query case (if not in not turned off) */
 	qry->secret = qry->flags.NO_0X20 ? 0 : kr_rand_bytes(sizeof(qry->secret));
-	knot_dname_t *qname_raw = knot_pkt_qname(packet);
+	knot_dname_t *qname_raw = kr_pkt_qname_raw(packet);
 	randomized_qname_case(qname_raw, qry->secret);
 
 	/*
@@ -1530,9 +1529,9 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 	}
 
 	/* Randomize query case (if secret changed) */
-	knot_dname_t *qname = knot_pkt_qname(packet);
+	knot_dname_t *qname_raw = kr_pkt_qname_raw(packet);
 	if (qry->secret != old_minimization_secret) {
-		randomized_qname_case(qname, qry->secret);
+		randomized_qname_case(qname_raw, qry->secret);
 	}
 
 	/* Write down OPT unless in safemode */

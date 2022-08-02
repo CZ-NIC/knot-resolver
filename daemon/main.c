@@ -4,19 +4,14 @@
 
 #include "kresconfig.h"
 
-#include "contrib/ccan/asprintf/asprintf.h"
-#include "contrib/cleanup.h"
 #include "contrib/ucw/mempool.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
 #include "daemon/network.h"
-#include "daemon/tls.h"
 #include "daemon/udp_queue.h"
 #include "daemon/worker.h"
 #include "lib/defines.h"
 #include "lib/dnssec.h"
-#include "lib/dnssec/ta.h"
-#include "lib/resolve.h"
 #include "lib/log.h"
 
 #include <arpa/inet.h>

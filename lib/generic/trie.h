@@ -84,6 +84,17 @@ KR_EXPORT
 int trie_apply(trie_t *tbl, int (*f)(trie_val_t *, void *), void *d);
 
 /*!
+ * \brief Apply a function to every trie_val_t, in order.
+ *
+ * It's like trie_apply() but additionally passes keys and their lengths.
+ *
+ * \param d Parameter passed as the second argument to f().
+ * \return First nonzero from f() or zero (i.e. KNOT_EOK).
+ */
+KR_EXPORT
+int trie_apply_with_key(trie_t *tbl, int (*f)(const char *, uint32_t, trie_val_t *, void *), void *d);
+
+/*!
  * \brief Remove an item, returning KNOT_EOK if succeeded or KNOT_ENOENT if not found.
  *
  * If val!=NULL and deletion succeeded, the deleted value is set.

@@ -322,17 +322,23 @@ static int load_file(struct kr_module *module, const char *path)
 
 	/* Load file to map */
 	struct hints_data *data = module->data;
-	size_t line_len = 0;
+	size_t line_len_unused = 0;
 	size_t count = 0;
 	size_t line_count = 0;
 	auto_free char *line = NULL;
 	int ret = kr_ok();
 
-	while (getline(&line, &line_len, fp) > 0) {
+	while (getline(&line, &line_len_unused, fp) > 0) {
 		++line_count;
+		/* Ingore #comments as described in man hosts.5 */
+		char *comm = strchr(line, '#');
+		if (comm) {
+			*comm = '\0';
+		}
+
 		char *saveptr = NULL;
 		const char *addr = strtok_r(line, " \t\n", &saveptr);
-		if (addr == NULL || strchr(addr, '#') || strlen(addr) == 0) {
+		if (addr == NULL || strlen(addr) == 0) {
 			continue;
 		}
 		const char *canonical_name = strtok_r(NULL, " \t\n", &saveptr);

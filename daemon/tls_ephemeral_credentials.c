@@ -12,7 +12,7 @@
 #include <gnutls/x509.h>
 #include <gnutls/crypto.h>
 
-#include "daemon/worker.h"
+#include "daemon/engine.h"
 #include "daemon/tls.h"
 
 #define EPHEMERAL_PRIVKEY_FILENAME "ephemeral_key.pem"

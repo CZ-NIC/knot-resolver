@@ -263,3 +263,7 @@ uint8_t *ip_to_bytes(const union kr_sockaddr *src, size_t len);
  */
 void update_address_state(struct address_state *state, union kr_sockaddr *address,
 			  size_t address_len, struct kr_query *qry);
+
+/** @internal Return whether IPv6 is considered to be broken. */
+bool no6_is_bad(void);
+

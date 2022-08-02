@@ -15,8 +15,6 @@
 #include "contrib/ucw/lib.h"
 #include "lib/cache/cdb_lmdb.h"
 #include "lib/cache/cdb_api.h"
-#include "lib/cache/api.h"
-#include "lib/cache/impl.h"
 #include "lib/utils.h"
 
 
@@ -381,9 +379,10 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	} else {
 		ret = 0;
 	}
-	if (ret == EINVAL) {
+	if (ret == EINVAL || ret == EOPNOTSUPP) {
 		/* POSIX says this can happen when the feature isn't supported by the FS.
-		 * We haven't seen this happen on Linux+glibc but it was reported on FreeBSD.*/
+		 * We haven't seen this happen on Linux+glibc but it was reported on
+		 * Linux+musl and FreeBSD. */
 		kr_log_info(CACHE, "space pre-allocation failed and ignored; "
 				"your (file)system probably doesn't support it.\n");
 	} else if (ret != 0) {

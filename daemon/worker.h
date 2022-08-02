@@ -6,7 +6,7 @@
 
 #include "daemon/engine.h"
 #include "lib/generic/array.h"
-#include "lib/generic/map.h"
+#include "lib/generic/trie.h"
 
 
 /** Query resolution task (opaque). */
@@ -180,9 +180,9 @@ struct worker_ctx {
 	bool too_many_open;
 	size_t rconcurrent_highwatermark;
 	/** List of active outbound TCP sessions */
-	map_t tcp_connected;
+	trie_t *tcp_connected;
 	/** List of outbound TCP sessions waiting to be accepted */
-	map_t tcp_waiting;
+	trie_t *tcp_waiting;
 	/** Subrequest leaders (struct qr_task*), indexed by qname+qtype+qclass. */
 	trie_t *subreq_out;
 	mp_freelist_t pool_mp;

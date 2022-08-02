@@ -39,8 +39,13 @@ distro_preconfig = configure_file(
 )
 
 # Unfortunately the different ABI implies different contents of 'kres-gen.lua'.
-kres_gen_fname = (libknot.version().version_compare('>= 3.1')
-                 ? 'kres-gen-31.lua' : 'kres-gen-30.lua')
+if libknot.version().version_compare('>= 3.2')
+  kres_gen_fname = 'kres-gen-32.lua'
+elif libknot.version().version_compare('>= 3.1')
+  kres_gen_fname = 'kres-gen-31.lua'
+else
+  kres_gen_fname = 'kres-gen-30.lua'
+endif
 
 kres_gen_lua = configure_file(
   input: kres_gen_fname,
@@ -87,7 +92,7 @@ if get_option('kres_gen_test') and not meson.is_cross_build()
     '''.format(ttc.get('tname'), tsize)
   endforeach
   # Now feed it directly into luajit.
-  kres_gen_test = run_command(find_program('luajit'), '-e', kres_gen_test_luastr)
+  kres_gen_test = run_command(find_program('luajit'), '-e', kres_gen_test_luastr, check: false)
   if kres_gen_test.returncode() != 0
     error('if you use released Knot* versions, please contact us: https://www.knot-resolver.cz/contact/\n'
         + kres_gen_test.stderr().strip())

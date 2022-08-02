@@ -4,7 +4,7 @@
 # man page
 man_config = configuration_data()
 man_config.set('version', meson.project_version())
-man_config.set('date', run_command('../scripts/get-date.sh').stdout())
+man_config.set('date', run_command('../scripts/get-date.sh', check: true).stdout())
 
 man_config.set('man_seealso_systemd', '')
 if systemd_files == 'enabled'
@@ -30,20 +30,20 @@ if get_option('doc') == 'enabled'
   makeinfo = find_program('makeinfo', required: false)
 
   # python dependencies: breathe, sphinx_rtd_theme
-  python_breathe = run_command('python3', '-c', 'import breathe')
+  python_breathe = run_command('python3', '-c', 'import breathe', check: false)
   if python_breathe.returncode() != 0
     # some distros might use python2 sphinx
-    python_breathe = run_command('python2', '-c', 'import breathe')
+    python_breathe = run_command('python2', '-c', 'import breathe', check: false)
     if python_breathe.returncode() != 0
       error('missing doc dependency: python breathe')
     else
-      python_sphinx_rtd_theme = run_command('python2', '-c', 'import sphinx_rtd_theme')
+      python_sphinx_rtd_theme = run_command('python2', '-c', 'import sphinx_rtd_theme', check: false)
       if python_sphinx_rtd_theme.returncode() != 0
 	error('missing doc dependency: python sphinx_rtd_theme')
       endif
     endif
   else
-    python_sphinx_rtd_theme = run_command('python3', '-c', 'import sphinx_rtd_theme')
+    python_sphinx_rtd_theme = run_command('python3', '-c', 'import sphinx_rtd_theme', check: false)
     if python_sphinx_rtd_theme.returncode() != 0
       error('missing doc dependency: python sphinx_rtd_theme')
     endif

@@ -56,7 +56,7 @@ typedef char *(kr_prop_cb)(void *, struct kr_module *, const char *);
 typedef unsigned char knot_dname_storage_t[255];
 typedef struct knot_pkt knot_pkt_t;
 typedef struct {
-	uint8_t *ptr[15];
+	uint8_t *ptr[18];
 } knot_edns_options_t;
 typedef struct {
 	knot_pkt_t *pkt;
@@ -94,6 +94,7 @@ struct knot_pkt {
 	knot_rrset_t *rr;
 	knot_mm_t mm;
 	knot_compr_t compr;
+	knot_dname_storage_t lower_qname;
 };
 typedef struct trie trie_t;
 struct kr_qflags {
@@ -541,6 +542,12 @@ struct worker_ctx {
 };
 struct worker_ctx *the_worker;
 typedef struct {
+	uint8_t *params_position;
+	uint8_t *mandatory_position;
+	uint8_t *param_position;
+	int32_t last_key;
+} zs_svcb_t;
+typedef struct {
 	uint8_t bitmap[32];
 	uint8_t length;
 } zs_win_t;
@@ -578,6 +585,7 @@ typedef struct zs_scanner {
 	uint32_t item_length;
 	uint32_t item_length_position;
 	uint8_t *item_length_location;
+	uint8_t *item_length2_location;
 	uint32_t buffer_length;
 	uint8_t buffer[65535];
 	char include_filename[65535];
@@ -586,8 +594,10 @@ typedef struct zs_scanner {
 	int16_t last_window;
 	zs_apl_t apl;
 	zs_loc_t loc;
+	zs_svcb_t svcb;
 	uint8_t addr[16];
 	_Bool long_string;
+	_Bool comma_list;
 	uint8_t *dname;
 	uint32_t *dname_length;
 	uint32_t dname_tmp_length;

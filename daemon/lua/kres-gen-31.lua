@@ -53,6 +53,7 @@ typedef struct {
 
 struct kr_module;
 typedef char *(kr_prop_cb)(void *, struct kr_module *, const char *);
+typedef unsigned char knot_dname_storage_t[255];
 typedef struct knot_pkt knot_pkt_t;
 typedef struct {
 	uint8_t *ptr[18];
@@ -94,10 +95,6 @@ struct knot_pkt {
 	knot_mm_t mm;
 	knot_compr_t compr;
 };
-typedef struct {
-	void *root;
-	struct knot_mm *pool;
-} map_t;
 typedef struct trie trie_t;
 struct kr_qflags {
 	_Bool NO_MINIMIZE : 1;
@@ -354,8 +351,8 @@ struct kr_context {
 	struct kr_qflags options;
 	knot_rrset_t *downstream_opt_rr;
 	knot_rrset_t *upstream_opt_rr;
-	map_t trust_anchors;
-	map_t negative_anchors;
+	trie_t *trust_anchors;
+	trie_t *negative_anchors;
 	struct kr_zonecut root_hints;
 	struct kr_cache cache;
 	unsigned int cache_rtt_tout_retry_interval;
@@ -446,10 +443,10 @@ void lru_free_items_impl(struct lru *);
 struct lru *lru_create_impl(unsigned int, unsigned int, knot_mm_t *, knot_mm_t *);
 void *lru_get_impl(struct lru *, const char *, unsigned int, unsigned int, _Bool, _Bool *);
 void *mm_realloc(knot_mm_t *, void *, size_t, size_t);
-knot_rrset_t *kr_ta_get(map_t *, const knot_dname_t *);
-int kr_ta_add(map_t *, const knot_dname_t *, uint16_t, uint32_t, const uint8_t *, uint16_t);
-int kr_ta_del(map_t *, const knot_dname_t *);
-void kr_ta_clear(map_t *);
+knot_rrset_t *kr_ta_get(trie_t *, const knot_dname_t *);
+int kr_ta_add(trie_t *, const knot_dname_t *, uint16_t, uint32_t, const uint8_t *, uint16_t);
+int kr_ta_del(trie_t *, const knot_dname_t *);
+void kr_ta_clear(trie_t *);
 _Bool kr_dnssec_key_ksk(const uint8_t *);
 _Bool kr_dnssec_key_revoked(const uint8_t *);
 int kr_dnssec_key_tag(uint16_t, const uint8_t *, size_t);

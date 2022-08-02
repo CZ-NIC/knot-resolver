@@ -631,7 +631,7 @@ ffi.metatype( knot_pkt_t, {
 		-- Question
 		qname = function(pkt)
 			assert(ffi.istype(knot_pkt_t, pkt))
-			-- inlined knot_pkt_qname(), basically
+			-- inlined knot_pkt_qname(), basically but not lower-cased
 			if pkt == nil or pkt.qname_size == 0 then return nil end
 			return ffi.string(pkt.wire + 12, pkt.qname_size)
 		end,
@@ -970,6 +970,7 @@ local function rank_tostring(rank)
 			table.insert(names, string.lower(name))
 		end
 	end
+	table.sort(names) -- pairs() above doesn't give a stable ordering
 	return string.format('0%.2o (%s)', rank, table.concat(names, ' '))
 end
 

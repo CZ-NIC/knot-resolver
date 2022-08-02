@@ -22,15 +22,15 @@ endif
 ## config tests
 if build_config_tests
   message('--- config_tests dependencies ---')
-  cqueues = run_command('luajit', '-l', 'cqueues', '-e', 'os.exit(0)')  # luajit -l $(1) -e "os.exit(0)"
+  cqueues = run_command('luajit', '-l', 'cqueues', '-e', 'os.exit(0)', check: false)  # luajit -l $(1) -e "os.exit(0)"
   if cqueues.returncode() != 0
     error('missing luajit package: cqueues')
   endif
-  basexx = run_command('luajit', '-l', 'basexx', '-e', 'os.exit(0)')  # luajit -l $(1) -e "os.exit(0)"
+  basexx = run_command('luajit', '-l', 'basexx', '-e', 'os.exit(0)', check: false)  # luajit -l $(1) -e "os.exit(0)"
   if basexx.returncode() != 0
     error('missing luajit package: basexx')
   endif
-  ffi = run_command('luajit', '-l', 'ffi', '-e', 'os.exit(0)')  # luajit -l $(1) -e "os.exit(0)"
+  ffi = run_command('luajit', '-l', 'ffi', '-e', 'os.exit(0)', check: false)  # luajit -l $(1) -e "os.exit(0)"
   if ffi.returncode() != 0
     error('missing luajit package: ffi')
   endif
@@ -52,7 +52,7 @@ if build_extra_tests
   endif
 
   foreach py3_dep : py3_deps
-    py3_import = run_command(python3, '-c', 'import @0@'.format(py3_dep[0]))
+    py3_import = run_command(python3, '-c', 'import @0@'.format(py3_dep[0]), check: false)
     if py3_import.returncode() != 0
       error('missing python3 dependency: @0@'.format(py3_dep[1]))
     endif

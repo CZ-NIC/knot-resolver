@@ -4,8 +4,6 @@
 
 #include "daemon/bindings/impl.h"
 
-#include "daemon/zimport.h"
-
 /** @internal return cache, or throw lua error if not open */
 static struct kr_cache * cache_assert_open(lua_State *L)
 {

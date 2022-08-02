@@ -55,13 +55,6 @@ Files: contrib/ccan/json/*
 Copyright: 2011 Joey Adams
 License: Expat
 
-Files: lib/generic/map.c lib/generic/map.h
-Copyright: Dan Bernstein
-	   Jonas Gehring
-	   Adam Langley
-	   Marek Vavrusa
-License: public-domain
-
 Files: modules/policy/lua-aho-corasick/*
 Copyright: 2013 CloudFlare, Inc.
 License: BSD-3-CloudFlare

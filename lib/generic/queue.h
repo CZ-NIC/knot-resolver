@@ -146,6 +146,7 @@ KR_EXPORT void queue_init_impl(struct queue *q, size_t item_size);
 KR_EXPORT void queue_deinit_impl(struct queue *q);
 KR_EXPORT void * queue_push_impl(struct queue *q);
 KR_EXPORT void * queue_push_head_impl(struct queue *q);
+KR_EXPORT void queue_pop_impl(struct queue *q);
 
 struct queue_chunk;
 struct queue {
@@ -172,7 +173,7 @@ struct queue_chunk {
 	 */
 };
 
-static inline void * queue_head_impl(const struct queue *q)
+KR_EXPORT inline void * queue_head_impl(const struct queue *q)
 {
 	kr_require(q);
 	struct queue_chunk *h = q->head;
@@ -187,29 +188,6 @@ static inline void * queue_tail_impl(const struct queue *q)
 	kr_require(t && t->end > t->begin);
 	return t->data + (t->end - 1) * q->item_size;
 }
-
-static inline void queue_pop_impl(struct queue *q)
-{
-	kr_require(q);
-	struct queue_chunk *h = q->head;
-	kr_require(h && h->end > h->begin);
-	if (h->end - h->begin == 1) {
-		/* removing the last element in the chunk */
-		kr_require((q->len == 1) == (q->head == q->tail));
-		if (q->len == 1) {
-			q->tail = NULL;
-			kr_require(!h->next);
-		} else {
-			kr_require(h->next);
-		}
-		q->head = h->next;
-		free(h);
-	} else {
-		++(h->begin);
-	}
-	--(q->len);
-}
-
 
 struct queue_it {
 	struct queue_chunk *chunk;

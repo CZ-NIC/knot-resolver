@@ -16,9 +16,10 @@
 #include "lib/resolve.h"
 #include "lib/utils.h"
 
-knot_rrset_t *kr_ta_get(map_t *trust_anchors, const knot_dname_t *name)
+knot_rrset_t *kr_ta_get(trie_t *trust_anchors, const knot_dname_t *name)
 {
-	return map_get(trust_anchors, (const char *)name);
+	trie_val_t *val = trie_get_try(trust_anchors, (const char *)name, strlen((const char *)name));
+	return (val) ? *val : NULL;
 }
 
 const knot_dname_t * kr_ta_closest(const struct kr_context *ctx, const knot_dname_t *name,
@@ -31,10 +32,10 @@ const knot_dname_t * kr_ta_closest(const struct kr_context *ctx, const knot_dnam
 	}
 	while (name) {
 		struct kr_context *ctx_nc = (struct kr_context *)/*const-cast*/ctx;
-		if (kr_ta_get(&ctx_nc->trust_anchors, name)) {
+		if (kr_ta_get(ctx_nc->trust_anchors, name)) {
 			return name;
 		}
-		if (kr_ta_get(&ctx_nc->negative_anchors, name)) {
+		if (kr_ta_get(ctx_nc->negative_anchors, name)) {
 			return NULL;
 		}
 		name = knot_wire_next_label(name, NULL);
@@ -78,7 +79,7 @@ cleanup:
 }
 
 /* @internal Insert new TA to trust anchor set, rdata MUST be of DS type. */
-static int insert_ta(map_t *trust_anchors, const knot_dname_t *name,
+static int insert_ta(trie_t *trust_anchors, const knot_dname_t *name,
                      uint32_t ttl, const uint8_t *rdata, uint16_t rdlen)
 {
 	bool is_new_key = false;
@@ -93,12 +94,15 @@ static int insert_ta(map_t *trust_anchors, const knot_dname_t *name,
 		return kr_error(ENOMEM);
 	}
 	if (is_new_key) {
-		return map_set(trust_anchors, (const char *)name, ta_rr);
+		trie_val_t *val = trie_get_ins(trust_anchors, (const char *)name, strlen((const char *)name));
+		if (kr_fails_assert(val))
+			return kr_error(EINVAL);
+		*val = ta_rr;
 	}
 	return kr_ok();
 }
 
-int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,
+int kr_ta_add(trie_t *trust_anchors, const knot_dname_t *name, uint16_t type,
               uint32_t ttl, const uint8_t *rdata, uint16_t rdlen)
 {
 	if (!trust_anchors || !name) {
@@ -124,27 +128,27 @@ int kr_ta_add(map_t *trust_anchors, const knot_dname_t *name, uint16_t type,
 }
 
 /* Delete record data */
-static int del_record(const char *k, void *v, void *ext)
+static int del_record(trie_val_t *v, void *ext)
 {
-	knot_rrset_t *ta_rr = v;
+	knot_rrset_t *ta_rr = *v;
 	if (ta_rr) {
 		knot_rrset_free(ta_rr, NULL);
 	}
 	return 0;
 }
 
-int kr_ta_del(map_t *trust_anchors, const knot_dname_t *name)
+int kr_ta_del(trie_t *trust_anchors, const knot_dname_t *name)
 {
-	knot_rrset_t *ta_rr = kr_ta_get(trust_anchors, name);
-	if (ta_rr) {
-		del_record(NULL, ta_rr, NULL);
-		map_del(trust_anchors, (const char *)name);
-	}
+	knot_rrset_t *ta_rr;
+	int ret = trie_del(trust_anchors, (const char *)name, strlen((const char *)name),
+			(trie_val_t *) &ta_rr);
+	if (ret == KNOT_EOK && ta_rr)
+		knot_rrset_free(ta_rr, NULL);
 	return kr_ok();
 }
 
-void kr_ta_clear(map_t *trust_anchors)
+void kr_ta_clear(trie_t *trust_anchors)
 {
-	map_walk(trust_anchors, del_record, NULL);
-	map_clear(trust_anchors);
+	trie_apply(trust_anchors, del_record, NULL);
+	trie_clear(trust_anchors);
 }

@@ -27,6 +27,16 @@ stages:
   - deploy
   - pkgtest
 
+ # https://docs.gitlab.com/ce/ci/jobs/job_control.html#select-different-runner-tags-for-each-parallel-matrix-job
+.multi_platform: &multi_platform
+  parallel:
+    matrix:
+      - PLATFORM: [ amd64, arm64 ]
+  tags: # some will override this part
+    - ${PLATFORM}
+    - docker
+    - linux
+
 .common: &common
   except:
     refs:
@@ -96,6 +106,15 @@ build:
     - ninja -C build_ci install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
 
+build-knot32:
+  <<: *build
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-3.2
+  script:
+    - meson build_ci_knot32 --default-library=static --prefix=$PREFIX -Dwerror=true -Dextra_tests=enabled
+    - ninja -C build_ci_knot32
+    - ninja -C build_ci_knot32 install >/dev/null
+    - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
+
 build-asan:
   <<: *build
   except:
@@ -112,10 +131,9 @@ build-asan:
 
 build:macOS:
   <<: *nodep
-  except:
+  only:
     refs:
-      - /^manager.*$/
-      - branches@knot/security/knot-resolver
+      - branches@knot/knot-resolver
   stage: build
   when: delayed
   start_in: 3 minutes  # allow some time for mirroring, job creation
@@ -126,9 +144,13 @@ docker:
   <<: *nodep
   stage: build
   image: docker:latest
+  <<: *multi_platform
+  only:
+    refs:
+      - branches@knot/knot-resolver
   tags:
+    - ${PLATFORM}
     - dind
-    - amd64
   variables:
     DOCKER_IMAGE_NAME: knot-resolver-test:${CI_COMMIT_SHA}
   script:
@@ -228,7 +250,7 @@ lint:scan-build:
   script:
     - export SCANBUILD="$(realpath ./scripts/run-scanbuild-with-args.sh)"
     - ninja -C build_ci* scan-build || true
-    - test "$(ls build_ci*/meson-logs/scanbuild/*/report-*.html | wc -l)" = 23 # we have this many errors ATM :-)
+    - test "$(ls build_ci*/meson-logs/scanbuild/*/report-*.html | wc -l)" = 24 # we have this many errors ATM :-)
 
 lint:tidy:
   <<: *after_build
@@ -270,6 +292,9 @@ kres-gen-30:
 kres-gen-31:
   <<: *kres-gen
   image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-3.1
+kres-gen-32:
+  <<: *kres-gen
+  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-3.2
 
 root.hints:
   <<: *sanity
@@ -370,6 +395,9 @@ pytests:
     - /^manager.*$/
   # these are executed on LXC runners to increase stability
   image: $CI_REGISTRY/knot/knot-resolver/ci/lxc-debian-11:knot-$KNOT_VERSION
+  only:
+    refs:
+      - branches@knot/knot-resolver
   needs: []
   tags:
     - lxc
@@ -674,6 +702,10 @@ obs:debian10:x86_64:
 
 obs:debian11:x86_64:
   <<: *distrotest
+  only:
+    variables:
+      - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing|knot-resolver-odvr$/
+      - $CI_COMMIT_TAG
   variables:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: debian11

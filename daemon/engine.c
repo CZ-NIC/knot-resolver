@@ -490,8 +490,8 @@ static int init_resolver(struct engine *engine)
 	ctx->options.REORDER_RR = true;
 
 	/* Open resolution context */
-	ctx->trust_anchors = map_make(NULL);
-	ctx->negative_anchors = map_make(NULL);
+	ctx->trust_anchors = trie_create(NULL);
+	ctx->negative_anchors = trie_create(NULL);
 	ctx->pool = engine->pool;
 	ctx->modules = &engine->modules;
 	ctx->cache_rtt_tout_retry_interval = KR_NS_TIMEOUT_RETRY_INTERVAL;
@@ -699,8 +699,10 @@ void engine_deinit(struct engine *engine)
 	/* Free data structures */
 	array_clear(engine->modules);
 	array_clear(engine->backends);
-	kr_ta_clear(&engine->resolver.trust_anchors);
-	kr_ta_clear(&engine->resolver.negative_anchors);
+	kr_ta_clear(engine->resolver.trust_anchors);
+	trie_free(engine->resolver.trust_anchors);
+	kr_ta_clear(engine->resolver.negative_anchors);
+	trie_free(engine->resolver.negative_anchors);
 	free(engine->hostname);
 }
 

@@ -3,34 +3,78 @@
 local ffi = require('ffi')
 local prefixes_global = {}
 
+-- get address from config: either subnet prefix or fixed endpoint
+local function extract_address(target)
+	local idx = string.find(target, "!", 1, true)
+	if idx == nil then
+		return target, false
+	end
+	if idx ~= #target then
+		error("[renumber] \"!\" symbol in target is only accepted at the end of address")
+	end
+	return string.sub(target, 1, idx - 1), true
+end
+
+-- Create bitmask from integer mask for single octet: 2 -> 11000000
+local function getOctetBitmask(intMask)
+	return bit.lshift(bit.rshift(255, 8 - intMask), 8 - intMask)
+end
+
+-- Merge ipNet with ipHost, using intMask
+local function mergeIps(ipNet, ipHost, intMask)
+	local octetMask
+	local result = ""
+
+	if (#ipNet ~= #ipHost) then
+		return nil
+	end
+
+	for currentOctetNo = 1, #ipNet do
+		if intMask >= 8 then
+			result = result .. ipNet:sub(currentOctetNo,currentOctetNo)
+		elseif (intMask <= 0) then
+			result = result .. ipHost:sub(currentOctetNo,currentOctetNo)
+		else
+			octetMask = getOctetBitmask(intMask)
+			result = result .. string.char(bit.bor(
+					bit.band(string.byte(ipNet:sub(currentOctetNo,currentOctetNo)), octetMask),
+					bit.band(string.byte(ipHost:sub(currentOctetNo,currentOctetNo)), bit.bnot(octetMask))
+			))
+		end
+		intMask = intMask - 8
+	end
+
+	return result
+end
+
 -- Create subnet prefix rule
 local function matchprefix(subnet, addr)
+	local is_exact
+	addr, is_exact = extract_address(addr)
 	local target = kres.str2ip(addr)
 	if target == nil then error('[renumber] invalid address: '..addr) end
 	local addrtype = string.find(addr, ':', 1, true) and kres.type.AAAA or kres.type.A
 	local subnet_cd = ffi.new('char[16]')
 	local bitlen = ffi.C.kr_straddr_subnet(subnet_cd, subnet)
 	if bitlen < 0 then error('[renumber] invalid subnet: '..subnet) end
-	return {subnet_cd, bitlen, target, addrtype}
+	return {subnet_cd, bitlen, target, addrtype, is_exact}
 end
 
 -- Create name match rule
 local function matchname(name, addr)
+	local is_exact
+	addr, is_exact = extract_address(addr) -- though matchname() always leads to replacing whole address
 	local target = kres.str2ip(addr)
 	if target == nil then error('[renumber] invalid address: '..addr) end
 	local owner = todname(name)
 	if not name then error('[renumber] invalid name: '..name) end
 	local addrtype = string.find(addr, ':', 1, true) and kres.type.AAAA or kres.type.A
-	return {owner, nil, target, addrtype}
+	return {owner, nil, target, addrtype, is_exact}
 end
 
 -- Add subnet prefix rewrite rule
 local function add_prefix(subnet, addr)
 	local prefix = matchprefix(subnet, addr)
-	local bitlen = prefix[2]
-	if bitlen ~= nil and bitlen % 8 ~= 0 then
-		log_warn(ffi.C.LOG_GRP_RENUMBER, 'network mask: only /8, /16, /24 etc. are supported (entire octets are rewritten)')
-	end
 	table.insert(prefixes_global, prefix)
 end
 
@@ -42,21 +86,25 @@ local function match_subnet(subnet, bitlen, addrtype, rr)
 end
 
 -- Renumber address record
-local addr_buf = ffi.new('char[16]')
 local function renumber_record(tbl, rr)
 	for i = 1, #tbl do
 		local prefix = tbl[i]
+		local subnet = prefix[1]
+		local bitlen = prefix[2]
+		local target = prefix[3]
+		local addrtype = prefix[4]
+		local is_exact = prefix[5]
+
 		-- Match record type to address family and record address to given subnet
 		-- If provided, compare record owner to prefix name
-		if match_subnet(prefix[1], prefix[2], prefix[4], rr) then
-			-- Replace part or whole address
-			local to_copy = prefix[2] or (#prefix[3] * 8)
-			local chunks = to_copy / 8
-			local rdlen = #rr.rdata
-			if rdlen < chunks then return rr end -- Address length mismatch
-			ffi.copy(addr_buf, rr.rdata, rdlen)
-			ffi.copy(addr_buf, prefix[3], chunks) -- Rewrite prefix
-			rr.rdata = ffi.string(addr_buf, rdlen)
+		if match_subnet(subnet, bitlen, addrtype, rr) then
+			if is_exact then
+				rr.rdata = target
+			else
+				local mergedHost = mergeIps(target, rr.rdata, bitlen)
+				if mergedHost ~= nil then rr.rdata = mergedHost end
+			end
+
 			return rr
 		end
 	end

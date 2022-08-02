@@ -75,7 +75,7 @@ static int nsec_p_ttl(knot_db_val_t entry, const uint32_t timestamp, int32_t *ne
 static uint8_t get_lowest_rank(const struct kr_query *qry, const knot_dname_t *name, const uint16_t type)
 {
 	/* Shut up linters. */
-	if (unlikely(!qry || !qry->request)) abort();
+	kr_require(qry && qry->request);
 	/* TODO: move rank handling into the iterator (DNSSEC_* flags)? */
 	const bool allow_unverified =
 		knot_wire_get_cd(qry->request->qsource.packet->wire) || qry->flags.STUB;

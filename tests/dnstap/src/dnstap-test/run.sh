@@ -11,7 +11,7 @@ if [ -z "$GITLAB_CI" ]; then
 	type -P go >/dev/null || exit 77
 	echo "Building the dnstap test and its dependencies..."
 	# some packages may be missing on the system right now
-	go get github.com/{FiloSottile/gvt,cloudflare/dns,dnstap/golang-dnstap}
+	go get github.com/{FiloSottile/gvt,cloudflare/dns,dnstap/golang-dnstap,golang/protobuf/proto}
 else
 	# In CI we've prebuilt dependencies into the default GOPATH.
 	# We're in a scratch container, so we just add the dnstap test inside.

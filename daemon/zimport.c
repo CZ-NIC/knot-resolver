@@ -29,7 +29,6 @@
 #include <sys/stat.h>
 #include <uv.h>
 
-#include "contrib/ucw/mempool.h"
 #include <libknot/rrset.h>
 #include <libzscanner/scanner.h>
 
@@ -47,8 +46,6 @@
 #include "daemon/worker.h"
 #include "lib/dnssec/ta.h"
 #include "lib/dnssec.h"
-#include "lib/generic/map.h"
-#include "lib/generic/array.h"
 #include "lib/generic/trie.h"
 #include "lib/utils.h"
 
@@ -426,6 +423,7 @@ static void zi_zone_process(uv_timer_t *timer)
 	kr_timer_start(&stopwatch);
 
 	int ret = trie_apply(z_import->rrsets, zi_rrset_import, z_import);
+	(void)kr_cache_commit(&the_worker->engine->resolver.cache); // RW transaction open
 	if (ret == 0) {
 		kr_log_info(PREFILL, "performance: validating and caching took %.3lf s\n",
 			kr_timer_elapsed(&stopwatch));
@@ -653,7 +651,7 @@ int zi_zone_import(const zi_config_t config)
 		goto zonemd;
 	struct kr_context *resolver = &the_worker->engine->resolver;
 	const knot_rrset_t * const ds = c->ds ? c->ds :
-		kr_ta_get(&resolver->trust_anchors, z_import->origin);
+		kr_ta_get(resolver->trust_anchors, z_import->origin);
 	if (!ds) {
 		if (!kr_ta_closest(resolver, z_import->origin, KNOT_RRTYPE_DNSKEY))
 			goto zonemd; // our TAs say we're insecure

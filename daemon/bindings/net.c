@@ -8,17 +8,18 @@
 #include "contrib/cleanup.h"
 #include "daemon/network.h"
 #include "daemon/tls.h"
+#include "lib/utils.h"
 
 #include <stdlib.h>
 
 #define PROXY_DATA_STRLEN (INET6_ADDRSTRLEN + 1 + 3 + 1)
 
 /** Table and next index on top of stack -> append entries for given endpoint_array_t. */
-static int net_list_add(const char *key, void *val, void *ext)
+static int net_list_add(const char *b_key, uint32_t key_len, trie_val_t *val, void *ext)
 {
+	endpoint_array_t *ep_array = *val;
 	lua_State *L = (lua_State *)ext;
 	lua_Integer i = lua_tointeger(L, -1);
-	endpoint_array_t *ep_array = val;
 	for (int j = 0; j < ep_array->len; ++j) {
 		struct endpoint *ep = &ep_array->at[j];
 		lua_newtable(L);  // connection tuple
@@ -57,7 +58,15 @@ static int net_list_add(const char *key, void *val, void *ext)
 		}
 		lua_setfield(L, -2, "family");
 
-		lua_pushstring(L, key);
+		const char *ip_str_const = network_endpoint_key_str((struct endpoint_key *) b_key);
+		kr_require(ip_str_const);
+		auto_free char *ip_str = strdup(ip_str_const);
+		kr_require(ip_str);
+		char *hm = strchr(ip_str, '#');
+		if (hm) /* Omit port */
+			*hm = '\0';
+		lua_pushstring(L, ip_str);
+
 		if (ep->family == AF_INET || ep->family == AF_INET6) {
 			lua_setfield(L, -2, "ip");
 			lua_pushboolean(L, ep->flags.freebind);
@@ -101,7 +110,7 @@ static int net_list(lua_State *L)
 {
 	lua_newtable(L);
 	lua_pushinteger(L, 1);
-	map_walk(&the_worker->engine->net.endpoints, net_list_add, L);
+	trie_apply_with_key(the_worker->engine->net.endpoints, net_list_add, L);
 	lua_pop(L, 1);
 	return 1;
 }
@@ -414,18 +423,6 @@ static int net_close(lua_State *L)
 	return 1;
 }
 
-/** Check whether `addr` points to an `AF_INET6` address and whether the address
- * is link-local. */
-static bool ip6_link_local(struct sockaddr_in6 *addr)
-{
-	if (addr->sin6_family != AF_INET6)
-		return false;
-
-	/* Link-local: https://tools.ietf.org/html/rfc4291#section-2.4 */
-	const uint8_t prefix[] = { 0xFE, 0x80 };
-	return kr_bitcmp((char *) addr->sin6_addr.s6_addr, (char *) prefix, 10) == 0;
-}
-
 /** List available interfaces. */
 static int net_interfaces(lua_State *L)
 {
@@ -457,7 +454,7 @@ static int net_interfaces(lua_State *L)
 			buf[0] = '\0';
 		}
 
-		if (ip6_link_local(&iface.address.address6)) {
+		if (kr_sockaddr_link_local((struct sockaddr *) &iface.address)) {
 			/* Link-local IPv6: add %interface prefix */
 			auto_free char *str = NULL;
 			int ret = asprintf(&str, "%s%%%s", buf, iface.name);
