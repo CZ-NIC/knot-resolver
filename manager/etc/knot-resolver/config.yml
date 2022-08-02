@@ -1,15 +1,11 @@
+rundir: /run/knot-resolver
+workers: 2
 cache:
   storage: /var/cache/knot-resolver
 logging:
   level: info
 network:
-  interfaces:
-    - listen:
-        ip: 127.0.0.1
-        port: 53
-server:
-  workers: 1
-  management:
-    listen:
-      unix-socket: /run/knot-resolver/manager.sock
-    rundir: /run/knot-resolver
+  listen:
+    - interface: 127.0.0.1@53
+management:
+  unix-socket: /run/knot-resolver/manager.sock

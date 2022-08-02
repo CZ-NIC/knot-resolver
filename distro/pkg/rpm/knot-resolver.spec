@@ -48,6 +48,7 @@ BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  pkgconfig(libcap-ng)
 BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
+BuildRequires:  python3-devel
 
 Requires:       systemd
 Requires(post): systemd
@@ -158,6 +159,32 @@ queries. It can also serve DNS-over-HTTPS, but it is deprecated in favor of
 native C implementation, which doesn't require this package.
 %endif
 
+%package -n python3-knot-resolver-manager
+Summary:        Configuration tool for Knot Resolver
+Requires:       %{name} = %{version}-%{release}
+%if 0%{?rhel} == 8
+Requires:       python3
+Requires:       python3-pyyaml
+Requires:       python3-aiohttp
+Requires:       python3-typing-extensions
+Requires:       python3-prometheus_client
+Requires:       supervisor
+%endif
+%if 0%{?suse_version}
+Requires:		python3
+Requires:		python3-PyYAML
+Requires:		python3-aiohttp
+Requires:		python3-typing_extensions
+Requires:		python3-prometheus_client
+Requires:		supervisor
+%endif
+
+%description -n python3-knot-resolver-manager
+Knot Resolver Manager is a configuration tool for Knot Resolver. The Manager
+hides the complexity of running several independent resolver processes while
+ensuring zero-downtime reconfiguration with YAML/JSON declarative
+configuration and an optional HTTP API for dynamic changes.
+
 %prep
 %if 0%{GPG_CHECK}
 export GNUPGHOME=./gpg-keyring
@@ -194,6 +221,10 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
 %{NINJA} -v -C build_rpm doc
 %endif
 
+pushd manager
+%py3_build
+popd
+
 %check
 meson test -C build_rpm
 
@@ -222,6 +253,13 @@ rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/prometheus.lua
 install -m 755 -d %{buildroot}/%{_pkgdocdir}
 mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 %endif
+
+# install knot-resolver-manager
+pushd manager
+%py3_install
+install -m 644 -D etc/knot-resolver/config.yml %{buildroot}%{_sysconfdir}/knot-resolver/config.yml
+install -m 644 -D knot-resolver.service %{buildroot}%{_unitdir}/knot-resolver.service
+popd
 
 %pre
 getent group knot-resolver >/dev/null || groupadd -r knot-resolver
@@ -375,6 +413,12 @@ fi
 %{_libdir}/knot-resolver/kres_modules/http*.lua
 %{_libdir}/knot-resolver/kres_modules/prometheus.lua
 %endif
+
+%files -n python3-knot-resolver-manager
+%{python3_sitearch}/knot_resolver_manager*
+%{_sysconfdir}/knot-resolver/config.yml
+%{_unitdir}/knot-resolver.service
+%{_bindir}/kresctl
 
 %changelog
 * {{ now }} Jakub Ružička <jakub.ruzicka@nic.cz> - {{ version }}-{{ release }}

@@ -3,6 +3,7 @@ from setuptools import setup
 
 packages = \
 ['knot_resolver_manager',
+ 'knot_resolver_manager.cli',
  'knot_resolver_manager.client',
  'knot_resolver_manager.compat',
  'knot_resolver_manager.datamodel',
@@ -24,7 +25,11 @@ install_requires = \
  'click>=7.1.2',
  'prometheus-client>=0.6',
  'requests>=2.25.1',
+ 'supervisor>=4.2.2',
  'typing-extensions>=3.7.2']
+
+entry_points = \
+{'console_scripts': ['kresctl = knot_resolver_manager.cli:main']}
 
 setup_kwargs = {
     'name': 'knot-resolver-manager',
@@ -39,6 +44,7 @@ setup_kwargs = {
     'packages': packages,
     'package_data': package_data,
     'install_requires': install_requires,
+    'entry_points': entry_points,
     'python_requires': '>=3.6.8,<4.0.0',
 }
 from build import *

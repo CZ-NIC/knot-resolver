@@ -5,9 +5,9 @@ stages:
 # pkgbuild {{{
 .pkgbuild: &pkgbuild
   stage: pkgbuild
-  tags:
-    - lxc
-    - amd64
+#   tags:
+#     - lxc
+#     - amd64
   before_script:
     - git config --global user.name CI
     - git config --global user.email ci@nic
@@ -20,8 +20,14 @@ stages:
     paths:
       - pkg/
 
-.apkgbuild: &apkgbuild # new jinja2 breaks docs (sphinx/breathe)
+.apkginstall: &apkginstall  # new jinja2 breaks docs (sphinx/breathe)
+  # - git clone https://gitlab.nic.cz/packaging/apkg.git
+  # - cd apkg; pip3 install -U . 'jinja2<3.1'; cd ..
   - pip3 install -U apkg 'jinja2<3.1'
+  
+
+.apkgbuild: &apkgbuild
+  - *apkginstall
   - apkg build-dep -y
   - apkg build
 
@@ -37,34 +43,16 @@ stages:
   - apt-get install -y python3-pip devscripts
   - *apkgbuild
 
-centos-7:pkgbuild:
-  <<: *pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-7
-  before_script:
-    - export LC_ALL=en_US.UTF-8
-    - git config --global user.name CI
-    - git config --global user.email ci@nic
-  script:
-    - yum install -y rpm-build python3-pip epel-release
-    - *apkgbuild
-
-debian-9:pkgbuild:
-  <<: *pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-9
-  variables:
-    OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: Debian_9.0
-  script:
-    - *debpkgbuild
-
-debian-10:pkgbuild:
-  <<: *pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-10
-  variables:
-    OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: Debian_10
-  script:
-    - *debpkgbuild
+# Missing reasonably up-to-date supervisord package:
+#
+# debian-10:pkgbuild:
+#   <<: *pkgbuild
+#   image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-10
+#   variables:
+#     OBS_REPO: knot-resolver-build
+#     DISTROTEST_REPO: Debian_10
+#   script:
+#     - *debpkgbuild
 
 debian-11:pkgbuild:
   <<: *pkgbuild
@@ -75,16 +63,16 @@ debian-11:pkgbuild:
   script:
     - *debpkgbuild
 
-fedora-34:pkgbuild:
+fedora-35:pkgbuild:
   <<: *pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-34
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-35
   script:
     - dnf install -y rpm-build python3-pip
     - *apkgbuild
 
-fedora-35:pkgbuild:
+fedora-36:pkgbuild:
   <<: *pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-35
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-36
   script:
     - dnf install -y rpm-build python3-pip
     - *apkgbuild
@@ -113,15 +101,6 @@ rocky-8:pkgbuild:
     - dnf config-manager --set-enabled powertools
     - *apkgbuild
 
-ubuntu-18.04:pkgbuild:
-  <<: *pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-18.04
-  variables:
-    OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: xUbuntu_18.04
-  script:
-    - *debpkgbuild
-
 ubuntu-20.04:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-20.04
@@ -131,12 +110,12 @@ ubuntu-20.04:pkgbuild:
   script:
     - *debpkgbuild
 
-ubuntu-21.10:pkgbuild:
+ubuntu-22.04:pkgbuild:
   <<: *pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-21.10
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-22.04
   variables:
     OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: xUbuntu_21.10
+    DISTROTEST_REPO: xUbuntu_22.04
   script:
     - *debpkgbuild
 
@@ -168,48 +147,30 @@ nixos-unstable:pkgbuild:
     - lxc
     - amd64
 
+.apkgtest: &apkgtest
+  - export PYTHONIOENCODING=utf8
+  - *apkginstall
+  - apkg test-dep
+  - apkg test
+
 .debpkgtest: &debpkgtest
   - *pkgdebrepo
-  - apt-get install -y knot-dnsutils
   - apt-get install -y $(find ./pkg/pkgs -name '*.deb' | grep -v module | grep -v debug | grep -v devel)
-  - systemctl start kresd@1
-  - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+  - apt-get install -y python3-pip
+  - *apkgtest
 
-centos-7:pkgtest:
-  <<: *pkgtest
-  needs:
-    - centos-7:pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-7
-  before_script:
-    - export LC_ALL=en_US.UTF-8
-  script:
-    - yum install -y epel-release
-    - yum install -y knot-utils findutils
-    - yum install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
-    - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
-
-debian-9:pkgtest:
-  <<: *pkgtest
-  needs:
-    - debian-9:pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-9
-  variables:
-    OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: Debian_9.0
-  script:
-    - *debpkgtest
-
-debian-10:pkgtest:
-  <<: *pkgtest
-  needs:
-    - debian-10:pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-10
-  variables:
-    OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: Debian_10
-  script:
-    - *debpkgtest
+# Missing reasonably up-to-date supervisord package:
+#
+# debian-10:pkgtest:
+#   <<: *pkgtest
+#   needs:
+#     - debian-10:pkgbuild
+#   image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-10
+#   variables:
+#     OBS_REPO: knot-resolver-build
+#     DISTROTEST_REPO: Debian_10
+#   script:
+#     - *debpkgtest
 
 debian-11:pkgtest:
   <<: *pkgtest
@@ -222,28 +183,26 @@ debian-11:pkgtest:
   script:
     - *debpkgtest
 
-fedora-34:pkgtest:
-  <<: *pkgtest
-  needs:
-    - fedora-34:pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-34
-  script:
-    - dnf install -y knot-utils findutils
-    - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
-    - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
-
 fedora-35:pkgtest:
   <<: *pkgtest
   needs:
     - fedora-35:pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-35
   script:
-    - dnf install -y knot-utils findutils
+    - dnf install -y findutils python3-pip
     - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
-    - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+    - *apkgtest
 
+fedora-36:pkgtest:
+  <<: *pkgtest
+  needs:
+    - fedora-36:pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/fedora-36
+  script:
+    - dnf install -y findutils python3-pip
+    - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
+    - *apkgtest
+    
 opensuse-15.2:pkgtest:
   <<: *pkgtest
   needs:
@@ -251,10 +210,9 @@ opensuse-15.2:pkgtest:
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/opensuse-15.2
   script:
     - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.2/home:CZ-NIC:knot-resolver-build.repo
-    - zypper install -y knot-utils
+    - zypper install -y python3-pip
     - zypper install --allow-unsigned-rpm -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
-    - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+    - *apkgtest
 
 opensuse-15.3:pkgtest:
   <<: *pkgtest
@@ -263,10 +221,9 @@ opensuse-15.3:pkgtest:
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/opensuse-15.3
   script:
     - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.3/home:CZ-NIC:knot-resolver-build.repo
-    - zypper install -y knot-utils
+    - zypper install -y python3-pip
     - zypper install --allow-unsigned-rpm -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
-    - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
+    - *apkgtest
 
 rocky-8:pkgtest:
   <<: *pkgtest
@@ -275,21 +232,9 @@ rocky-8:pkgtest:
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/rocky-8
   script:
     - dnf install -y epel-release
-    - dnf install -y knot-utils findutils
+    - dnf install -y findutils python39-pip
     - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
-    - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
-
-ubuntu-18.04:pkgtest:
-  <<: *pkgtest
-  needs:
-    - ubuntu-18.04:pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-18.04
-  variables:
-    OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: xUbuntu_18.04
-  script:
-    - *debpkgtest
+    - *apkgtest
 
 ubuntu-20.04:pkgtest:
   <<: *pkgtest
@@ -302,14 +247,14 @@ ubuntu-20.04:pkgtest:
   script:
     - *debpkgtest
 
-ubuntu-21.10:pkgtest:
+ubuntu-22.04:pkgtest:
   <<: *pkgtest
   needs:
-    - ubuntu-21.10:pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-21.10
+    - ubuntu-22.04:pkgbuild
+  image: $CI_REGISTRY/labs/lxc-gitlab-runner/ubuntu-22.04
   variables:
     OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: xUbuntu_21.10
+    DISTROTEST_REPO: xUbuntu_22.04
   script:
     - *debpkgtest
 # }}}
