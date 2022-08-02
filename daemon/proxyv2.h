@@ -6,7 +6,7 @@
 
 #include <stdint.h>
 
-#include "daemon/session.h"
+#include "daemon/session2.h"
 #include "lib/utils.h"
 
 extern const char PROXY2_SIGNATURE[12];
@@ -42,8 +42,7 @@ static inline bool proxy_header_present(const void* buf, const ssize_t nread)
 bool proxy_allowed(const struct sockaddr *saddr);
 
 /** Parses the PROXYv2 header from buf of size nread and writes the result into
- * out. The rest of the buffer is moved to free bytes of the specified session's
- * wire buffer. The function assumes that the PROXYv2 signature is present
+ * out. The function assumes that the PROXYv2 signature is present
  * and has been already checked by the caller (like `udp_recv` or `tcp_recv`). */
-ssize_t proxy_process_header(struct proxy_result *out, struct session *s,
+ssize_t proxy_process_header(struct proxy_result *out,
                              const void *buf, ssize_t nread);

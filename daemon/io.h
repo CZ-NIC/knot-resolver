@@ -11,33 +11,14 @@
 #include "lib/generic/array.h"
 #include "daemon/worker.h"
 #include "daemon/engine.h"
+#include "daemon/session2.h"
 
 struct tls_ctx;
 struct tls_client_ctx;
 struct io_stream_data;
 
-/** Communication data. */
-struct io_comm_data {
-	/** The original address the data came from. May be that of a proxied
-	 * client, if they came through a proxy. May be `NULL` if
-	 * the communication did not come from network. */
-	const struct sockaddr *src_addr;
-
-	/** The actual address the resolver is communicating with. May be
-	 * the address of a proxy if the communication came through one,
-	 * otherwise it will be the same as `src_addr`. May be `NULL` if
-	 * the communication did not come from network. */
-	const struct sockaddr *comm_addr;
-
-	/** The original destination address. May be the resolver's address, or
-	 * the address of a proxy if the communication came through one. May be
-	 * `NULL` if the communication did not come from network. */
-	const struct sockaddr *dst_addr;
-
-	/** Data parsed from a PROXY header. May be `NULL` if the communication
-	 * did not come through a proxy, or if the PROXYv2 protocol was not used. */
-	const struct proxy_result *proxy;
-};
+/** Initializes the protocol layers managed by io. */
+void io_protolayers_init();
 
 /** Bind address into a file-descriptor (only, no libuv).  type is e.g. SOCK_DGRAM */
 int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags);
@@ -64,7 +45,7 @@ void tcp_timeout_trigger(uv_timer_t *timer);
  * \param family = AF_*
  * \param has_tls has meanings only when type is SOCK_STREAM */
 int io_create(uv_loop_t *loop, uv_handle_t *handle, int type,
-	      unsigned family, bool has_tls, bool has_http);
+	      unsigned family, enum protolayer_grp grp, bool outgoing);
 void io_free(uv_handle_t *handle);
 
 int io_start_read(uv_handle_t *handle);
@@ -74,7 +55,7 @@ int io_stop_read(uv_handle_t *handle);
  * (Other cases store a direct struct session pointer in ::data.) */
 typedef struct {
 	struct knot_xdp_socket *socket;
-	struct session *session;
+	struct session2 *session;
 	uv_idle_t tx_waker;
 } xdp_handle_data_t;
 

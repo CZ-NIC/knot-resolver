@@ -10,7 +10,7 @@
 #include "modules/dnstap/dnstap.pb-c.h"
 
 #include "contrib/cleanup.h"
-#include "daemon/session.h"
+#include "daemon/session2.h"
 #include "daemon/worker.h"
 #include "lib/layer.h"
 #include "lib/resolve.h"
@@ -116,7 +116,7 @@ static int get_tcp_info(const struct kr_request *req, struct tcp_info *info)
 	if (!req->qsource.dst_addr || !req->qsource.flags.tcp) /* not TCP-based */
 		return -abs(ENOENT);
 	/* First obtain the file-descriptor. */
-	uv_handle_t *h = session_get_handle(worker_request_get_source_session(req));
+	uv_handle_t *h = session2_get_handle(worker_request_get_source_session(req));
 	uv_os_fd_t fd;
 	int ret = uv_fileno(h, &fd);
 	if (ret)

@@ -14,18 +14,17 @@ kresd_src = files([
   'main.c',
   'network.c',
   'proxyv2.c',
-  'session.c',
   'session2.c',
-  'tls.c',
-  'tls_ephemeral_credentials.c',
-  'tls_session_ticket-srv.c',
+#  'tls.c',
+#  'tls_ephemeral_credentials.c',
+#  'tls_session_ticket-srv.c',
   'udp_queue.c',
   'worker.c',
   'zimport.c',
 ])
-if nghttp2.found()
-  kresd_src += files(['http.c'])
-endif
+#if nghttp2.found()
+#  kresd_src += files(['http.c'])
+#endif
 
 c_src_lint += kresd_src
 
@@ -51,7 +50,7 @@ kresd_deps = [
   gnutls,
   libsystemd,
   capng,
-  nghttp2,
+#  nghttp2,
   malloc,
 ]
 

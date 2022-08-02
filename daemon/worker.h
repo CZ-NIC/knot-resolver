@@ -11,14 +11,14 @@
 
 /** Query resolution task (opaque). */
 struct qr_task;
-/** Worker state (opaque). */
+/** Worker state. */
 struct worker_ctx;
 /** Transport session (opaque). */
-struct session;
+struct session2;
 /** Zone import context (opaque). */
 struct zone_import_ctx;
 /** Data about the communication (defined in io.h). */
-struct io_comm_data;
+struct comm_info;
 
 /** Pointer to the singleton worker.  NULL if not initialized. */
 KR_EXPORT extern struct worker_ctx *the_worker;
@@ -39,14 +39,14 @@ void worker_deinit();
  * @param pkt         the packet, or NULL (an error from the transport layer)
  * @return 0 or an error code
  */
-int worker_submit(struct session *session, struct io_comm_data *comm,
+int worker_submit(struct session2 *session, struct comm_info *comm,
                   const uint8_t *eth_from, const uint8_t *eth_to, knot_pkt_t *pkt);
 
 /**
  * End current DNS/TCP session, this disassociates pending tasks from this session
  * which may be freely closed afterwards.
  */
-int worker_end_tcp(struct session *session);
+int worker_end_tcp(struct session2 *session);
 
 KR_EXPORT knot_pkt_t *worker_resolve_mk_pkt_dname(knot_dname_t *qname, uint16_t qtype, uint16_t qclass,
 				   const struct kr_qflags *options);
@@ -93,17 +93,17 @@ void worker_task_unref(struct qr_task *task);
 
 void worker_task_timeout_inc(struct qr_task *task);
 
-int worker_add_tcp_connected(const struct sockaddr *addr, struct session *session);
+int worker_add_tcp_connected(const struct sockaddr *addr, struct session2 *session);
 int worker_del_tcp_connected(const struct sockaddr *addr);
 int worker_del_tcp_waiting(const struct sockaddr* addr);
-struct session* worker_find_tcp_waiting(const struct sockaddr* addr);
-struct session* worker_find_tcp_connected(const struct sockaddr* addr);
+struct session2* worker_find_tcp_waiting(const struct sockaddr* addr);
+struct session2* worker_find_tcp_connected(const struct sockaddr* addr);
 knot_pkt_t *worker_task_get_pktbuf(const struct qr_task *task);
 
 struct request_ctx *worker_task_get_request(struct qr_task *task);
 
 /** Note: source session is NULL in case the request hasn't come over network. */
-KR_EXPORT struct session *worker_request_get_source_session(const struct kr_request *req);
+KR_EXPORT struct session2 *worker_request_get_source_session(const struct kr_request *req);
 
 uint16_t worker_task_pkt_get_msgid(struct qr_task *task);
 void worker_task_pkt_set_msgid(struct qr_task *task, uint16_t msgid);
@@ -162,8 +162,6 @@ struct worker_ctx {
 	/** Addresses to bind for outgoing connections or AF_UNSPEC. */
 	struct sockaddr_in out_addr4;
 	struct sockaddr_in6 out_addr6;
-
-	uint8_t wire_buf[RECVMMSG_BATCH * KNOT_WIRE_MAX_PKTSIZE];
 
 	struct worker_stats stats;
 

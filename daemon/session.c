@@ -767,7 +767,7 @@ void session_unpoison(struct session *session)
 	kr_asan_unpoison(session, sizeof(*session));
 }
 
-int session_wirebuf_process(struct session *session, struct io_comm_data *comm)
+int session_wirebuf_process(struct session *session, struct comm_info *comm)
 {
 	int ret = 0;
 	if (session->wire_buf_start_idx == session->wire_buf_end_idx)

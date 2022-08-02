@@ -532,32 +532,35 @@ static int net_pipeline(lua_State *L)
 
 static int net_tls(lua_State *L)
 {
-	if (kr_fails_assert(the_network)) {
-		return 0;
-	}
-
-	/* Only return current credentials. */
-	if (lua_gettop(L) == 0) {
-		/* No credentials configured yet. */
-		if (!the_network->tls_credentials) {
-			return 0;
-		}
-		lua_newtable(L);
-		lua_pushstring(L, the_network->tls_credentials->tls_cert);
-		lua_setfield(L, -2, "cert_file");
-		lua_pushstring(L, the_network->tls_credentials->tls_key);
-		lua_setfield(L, -2, "key_file");
-		return 1;
-	}
-
-	if ((lua_gettop(L) != 2) || !lua_isstring(L, 1) || !lua_isstring(L, 2))
-		lua_error_p(L, "net.tls takes two parameters: (\"cert_file\", \"key_file\")");
-
-	int r = tls_certificate_set(lua_tostring(L, 1), lua_tostring(L, 2));
-	lua_error_maybe(L, r);
-
-	lua_pushboolean(L, true);
-	return 1;
+	/* TODO */
+	kr_assert(false && "Unimplemented");
+	return 0;
+//	if (kr_fails_assert(the_network)) {
+//		return 0;
+//	}
+//
+//	/* Only return current credentials. */
+//	if (lua_gettop(L) == 0) {
+//		/* No credentials configured yet. */
+//		if (!the_network->tls_credentials) {
+//			return 0;
+//		}
+//		lua_newtable(L);
+//		lua_pushstring(L, the_network->tls_credentials->tls_cert);
+//		lua_setfield(L, -2, "cert_file");
+//		lua_pushstring(L, the_network->tls_credentials->tls_key);
+//		lua_setfield(L, -2, "key_file");
+//		return 1;
+//	}
+//
+//	if ((lua_gettop(L) != 2) || !lua_isstring(L, 1) || !lua_isstring(L, 2))
+//		lua_error_p(L, "net.tls takes two parameters: (\"cert_file\", \"key_file\")");
+//
+//	int r = tls_certificate_set(lua_tostring(L, 1), lua_tostring(L, 2));
+//	lua_error_maybe(L, r);
+//
+//	lua_pushboolean(L, true);
+//	return 1;
 }
 
 /** Configure HTTP headers for DoH requests. */
@@ -614,90 +617,93 @@ static int net_doh_headers(lua_State *L)
  * more precisely, it's in a compatible canonical form. */
 static int tls_params2lua(lua_State *L, trie_t *params)
 {
-	lua_newtable(L);
-	if (!params) /* Allowed special case. */
-		return 1;
-	trie_it_t *it;
-	size_t list_index = 0;
-	for (it = trie_it_begin(params); !trie_it_finished(it); trie_it_next(it)) {
-		/* Prepare table for the current address
-		 * and its index in the returned list. */
-		lua_pushinteger(L, ++list_index);
-		lua_createtable(L, 0, 2);
-
-		/* Get the "addr#port" string... */
-		size_t ia_len;
-		const char *key = trie_it_key(it, &ia_len);
-		int af = AF_UNSPEC;
-		if (ia_len == 2 + sizeof(struct in_addr)) {
-			af = AF_INET;
-		} else if (ia_len == 2 + sizeof(struct in6_addr)) {
-			af = AF_INET6;
-		}
-		if (kr_fails_assert(key && af != AF_UNSPEC))
-			lua_error_p(L, "internal error: bad IP address");
-		uint16_t port;
-		memcpy(&port, key, sizeof(port));
-		port = ntohs(port);
-		const char *ia = key + sizeof(port);
-		char str[INET6_ADDRSTRLEN + 1 + 5 + 1];
-		size_t len = sizeof(str);
-		if (kr_fails_assert(kr_ntop_str(af, ia, port, str, &len) == kr_ok()))
-			lua_error_p(L, "internal error: bad IP address conversion");
-		/* ...and push it as [1]. */
-		lua_pushinteger(L, 1);
-		lua_pushlstring(L, str, len - 1 /* len includes '\0' */);
-		lua_settable(L, -3);
-
-		const tls_client_param_t *e = *trie_it_val(it);
-		if (kr_fails_assert(e))
-			lua_error_p(L, "internal problem - NULL entry for %s", str);
-
-		/* .hostname = */
-		if (e->hostname) {
-			lua_pushstring(L, e->hostname);
-			lua_setfield(L, -2, "hostname");
-		}
-
-		/* .ca_files = */
-		if (e->ca_files.len) {
-			lua_createtable(L, e->ca_files.len, 0);
-			for (size_t i = 0; i < e->ca_files.len; ++i) {
-				lua_pushinteger(L, i + 1);
-				lua_pushstring(L, e->ca_files.at[i]);
-				lua_settable(L, -3);
-			}
-			lua_setfield(L, -2, "ca_files");
-		}
-
-		/* .pin_sha256 = ... ; keep sane indentation via goto. */
-		if (!e->pins.len) goto no_pins;
-		lua_createtable(L, e->pins.len, 0);
-		for (size_t i = 0; i < e->pins.len; ++i) {
-			uint8_t pin_base64[TLS_SHA256_BASE64_BUFLEN];
-			int err = kr_base64_encode(e->pins.at[i], TLS_SHA256_RAW_LEN,
-						pin_base64, sizeof(pin_base64));
-			if (kr_fails_assert(err >= 0))
-				lua_error_p(L,
-					"internal problem when converting pin_sha256: %s",
-					kr_strerror(err));
-			lua_pushinteger(L, i + 1);
-			lua_pushlstring(L, (const char *)pin_base64, err);
-				/* pin_base64 isn't 0-terminated     ^^^ */
-			lua_settable(L, -3);
-		}
-		lua_setfield(L, -2, "pin_sha256");
-
-	no_pins:/* .insecure = */
-		if (e->insecure) {
-			lua_pushboolean(L, true);
-			lua_setfield(L, -2, "insecure");
-		}
-		/* Now the whole table is pushed atop the returned list. */
-		lua_settable(L, -3);
-	}
-	trie_it_free(it);
-	return 1;
+	/* TODO */
+	kr_assert(false && "Unimplemented");
+	return 0;
+//	lua_newtable(L);
+//	if (!params) /* Allowed special case. */
+//		return 1;
+//	trie_it_t *it;
+//	size_t list_index = 0;
+//	for (it = trie_it_begin(params); !trie_it_finished(it); trie_it_next(it)) {
+//		/* Prepare table for the current address
+//		 * and its index in the returned list. */
+//		lua_pushinteger(L, ++list_index);
+//		lua_createtable(L, 0, 2);
+//
+//		/* Get the "addr#port" string... */
+//		size_t ia_len;
+//		const char *key = trie_it_key(it, &ia_len);
+//		int af = AF_UNSPEC;
+//		if (ia_len == 2 + sizeof(struct in_addr)) {
+//			af = AF_INET;
+//		} else if (ia_len == 2 + sizeof(struct in6_addr)) {
+//			af = AF_INET6;
+//		}
+//		if (kr_fails_assert(key && af != AF_UNSPEC))
+//			lua_error_p(L, "internal error: bad IP address");
+//		uint16_t port;
+//		memcpy(&port, key, sizeof(port));
+//		port = ntohs(port);
+//		const char *ia = key + sizeof(port);
+//		char str[INET6_ADDRSTRLEN + 1 + 5 + 1];
+//		size_t len = sizeof(str);
+//		if (kr_fails_assert(kr_ntop_str(af, ia, port, str, &len) == kr_ok()))
+//			lua_error_p(L, "internal error: bad IP address conversion");
+//		/* ...and push it as [1]. */
+//		lua_pushinteger(L, 1);
+//		lua_pushlstring(L, str, len - 1 /* len includes '\0' */);
+//		lua_settable(L, -3);
+//
+//		const tls_client_param_t *e = *trie_it_val(it);
+//		if (kr_fails_assert(e))
+//			lua_error_p(L, "internal problem - NULL entry for %s", str);
+//
+//		/* .hostname = */
+//		if (e->hostname) {
+//			lua_pushstring(L, e->hostname);
+//			lua_setfield(L, -2, "hostname");
+//		}
+//
+//		/* .ca_files = */
+//		if (e->ca_files.len) {
+//			lua_createtable(L, e->ca_files.len, 0);
+//			for (size_t i = 0; i < e->ca_files.len; ++i) {
+//				lua_pushinteger(L, i + 1);
+//				lua_pushstring(L, e->ca_files.at[i]);
+//				lua_settable(L, -3);
+//			}
+//			lua_setfield(L, -2, "ca_files");
+//		}
+//
+//		/* .pin_sha256 = ... ; keep sane indentation via goto. */
+//		if (!e->pins.len) goto no_pins;
+//		lua_createtable(L, e->pins.len, 0);
+//		for (size_t i = 0; i < e->pins.len; ++i) {
+//			uint8_t pin_base64[TLS_SHA256_BASE64_BUFLEN];
+//			int err = kr_base64_encode(e->pins.at[i], TLS_SHA256_RAW_LEN,
+//						pin_base64, sizeof(pin_base64));
+//			if (kr_fails_assert(err >= 0))
+//				lua_error_p(L,
+//					"internal problem when converting pin_sha256: %s",
+//					kr_strerror(err));
+//			lua_pushinteger(L, i + 1);
+//			lua_pushlstring(L, (const char *)pin_base64, err);
+//				/* pin_base64 isn't 0-terminated     ^^^ */
+//			lua_settable(L, -3);
+//		}
+//		lua_setfield(L, -2, "pin_sha256");
+//
+//	no_pins:/* .insecure = */
+//		if (e->insecure) {
+//			lua_pushboolean(L, true);
+//			lua_setfield(L, -2, "insecure");
+//		}
+//		/* Now the whole table is pushed atop the returned list. */
+//		lua_settable(L, -3);
+//	}
+//	trie_it_free(it);
+//	return 1;
 }
 
 static inline int cmp_sha256(const void *p1, const void *p2)
@@ -706,224 +712,230 @@ static inline int cmp_sha256(const void *p1, const void *p2)
 }
 static int net_tls_client(lua_State *L)
 {
-	/* TODO idea: allow starting the lua table with *multiple* IP targets,
-	 * meaning the authentication config should be applied to each.
-	 */
-	if (lua_gettop(L) == 0)
-		return tls_params2lua(L, the_network->tls_client_params);
-	/* Various basic sanity-checking. */
-	if (lua_gettop(L) != 1 || !lua_istable(L, 1))
-		lua_error_maybe(L, EINVAL);
-	/* check that only allowed keys are present */
-	{
-		const char *bad_key = lua_table_checkindices(L, (const char *[])
-			{ "1", "hostname", "ca_file", "pin_sha256", "insecure", NULL });
-		if (bad_key)
-			lua_error_p(L, "found unexpected key '%s'", bad_key);
-	}
-
-	/**** Phase 1: get the parameter into a C struct, incl. parse of CA files,
-	 * 	 regardless of the address-pair having an entry already. */
-
-	tls_client_param_t *newcfg = tls_client_param_new();
-	if (!newcfg)
-		lua_error_p(L, "out of memory or something like that :-/");
-	/* Shortcut for cleanup actions needed from now on. */
-	#define ERROR(...) do { \
-		free(newcfg); \
-		lua_error_p(L, __VA_ARGS__); \
-	} while (false)
-
-	/* .hostname - always accepted. */
-	lua_getfield(L, 1, "hostname");
-	if (!lua_isnil(L, -1)) {
-		const char *hn_str = lua_tostring(L, -1);
-		/* Convert to lower-case dname and back, for checking etc. */
-		knot_dname_t dname[KNOT_DNAME_MAXLEN];
-		if (!hn_str || !knot_dname_from_str(dname, hn_str, sizeof(dname)))
-			ERROR("invalid hostname");
-		knot_dname_to_lower(dname);
-		char *h = knot_dname_to_str_alloc(dname);
-		if (!h)
-			ERROR("%s", kr_strerror(ENOMEM));
-		/* Strip the final dot produced by knot_dname_*() */
-		h[strlen(h) - 1] = '\0';
-		newcfg->hostname = h;
-	}
-	lua_pop(L, 1);
-
-	/* .ca_file - it can be a list of paths, contrary to the name. */
-	bool has_ca_file = false;
-	lua_getfield(L, 1, "ca_file");
-	if (!lua_isnil(L, -1)) {
-		if (!newcfg->hostname)
-			ERROR("missing hostname but specifying ca_file");
-		lua_listify(L);
-		array_init(newcfg->ca_files); /*< placate apparently confused scan-build */
-		if (array_reserve(newcfg->ca_files, lua_objlen(L, -1)) != 0) /*< optim. */
-			ERROR("%s", kr_strerror(ENOMEM));
-		/* Iterate over table at the top of the stack.
-		 * http://www.lua.org/manual/5.1/manual.html#lua_next */
-		for (lua_pushnil(L); lua_next(L, -2); lua_pop(L, 1)) {
-			has_ca_file = true; /* deferred here so that {} -> false */
-			const char *ca_file = lua_tostring(L, -1);
-			if (!ca_file)
-				ERROR("ca_file contains a non-string");
-			/* Let gnutls process it immediately, so garbage gets detected. */
-			int ret = gnutls_certificate_set_x509_trust_file(
-					newcfg->credentials, ca_file, GNUTLS_X509_FMT_PEM);
-			if (ret < 0) {
-				ERROR("failed to import certificate file '%s': %s - %s\n",
-					ca_file, gnutls_strerror_name(ret),
-					gnutls_strerror(ret));
-			} else {
-				kr_log_debug(TLSCLIENT, "imported %d certs from file '%s'\n",
-					ret, ca_file);
-			}
-
-			ca_file = strdup(ca_file);
-			if (!ca_file || array_push(newcfg->ca_files, ca_file) < 0)
-				ERROR("%s", kr_strerror(ENOMEM));
-		}
-		/* Sort the strings for easier comparison later. */
-		if (newcfg->ca_files.len) {
-			qsort(&newcfg->ca_files.at[0], newcfg->ca_files.len,
-				sizeof(newcfg->ca_files.at[0]), strcmp_p);
-		}
-	}
-	lua_pop(L, 1);
-
-	/* .pin_sha256 */
-	lua_getfield(L, 1, "pin_sha256");
-	if (!lua_isnil(L, -1)) {
-		if (has_ca_file)
-			ERROR("mixing pin_sha256 with ca_file is not supported");
-		lua_listify(L);
-		array_init(newcfg->pins); /*< placate apparently confused scan-build */
-		if (array_reserve(newcfg->pins, lua_objlen(L, -1)) != 0) /*< optim. */
-			ERROR("%s", kr_strerror(ENOMEM));
-		/* Iterate over table at the top of the stack. */
-		for (lua_pushnil(L); lua_next(L, -2); lua_pop(L, 1)) {
-			const char *pin = lua_tostring(L, -1);
-			if (!pin)
-				ERROR("pin_sha256 is not a string");
-			uint8_t *pin_raw = malloc(TLS_SHA256_RAW_LEN);
-			/* Push the string early to simplify error processing. */
-			if (kr_fails_assert(pin_raw && array_push(newcfg->pins, pin_raw) >= 0)) {
-				free(pin_raw);
-				ERROR("%s", kr_strerror(ENOMEM));
-			}
-			int ret = kr_base64_decode((const uint8_t *)pin, strlen(pin),
-						pin_raw, TLS_SHA256_RAW_LEN + 8);
-			if (ret < 0) {
-				ERROR("not a valid pin_sha256: '%s' (length %d), %s\n",
-					pin, (int)strlen(pin), knot_strerror(ret));
-			} else if (ret != TLS_SHA256_RAW_LEN) {
-				ERROR("not a valid pin_sha256: '%s', "
-						"raw length %d instead of "
-						STR(TLS_SHA256_RAW_LEN)"\n",
-					pin, ret);
-			}
-		}
-		/* Sort the raw strings for easier comparison later. */
-		if (newcfg->pins.len) {
-			qsort(&newcfg->pins.at[0], newcfg->pins.len,
-				sizeof(newcfg->pins.at[0]), cmp_sha256);
-		}
-	}
-	lua_pop(L, 1);
-
-	/* .insecure */
-	lua_getfield(L, 1, "insecure");
-	if (lua_isnil(L, -1)) {
-		if (!newcfg->hostname && !newcfg->pins.len)
-			ERROR("no way to authenticate and not set as insecure");
-	} else if (lua_isboolean(L, -1) && lua_toboolean(L, -1)) {
-		newcfg->insecure = true;
-		if (has_ca_file || newcfg->pins.len)
-			ERROR("set as insecure but provided authentication config");
-	} else {
-		ERROR("incorrect value in the 'insecure' field");
-	}
-	lua_pop(L, 1);
-
-	/* Init CAs from system trust store, if needed. */
-	if (!newcfg->insecure && !newcfg->pins.len && !has_ca_file) {
-		int ret = gnutls_certificate_set_x509_system_trust(newcfg->credentials);
-		if (ret <= 0) {
-			ERROR("failed to use system CA certificate store: %s",
-				ret ? gnutls_strerror(ret) : kr_strerror(ENOENT));
-		} else {
-			kr_log_debug(TLSCLIENT, "imported %d certs from system store\n",
-				ret);
-		}
-	}
-	#undef ERROR
-
-	/**** Phase 2: deal with the C authentication "table". */
-	/* Parse address and port. */
-	lua_pushinteger(L, 1);
-	lua_gettable(L, 1);
-	const char *addr_str = lua_tostring(L, -1);
-	if (!addr_str)
-		lua_error_p(L, "address is not a string");
-	char buf[INET6_ADDRSTRLEN + 1];
-	uint16_t port = 853;
-	const struct sockaddr *addr = NULL;
-	if (kr_straddr_split(addr_str, buf, &port) == kr_ok())
-		addr = kr_straddr_socket(buf, port, NULL);
-	/* Add newcfg into the C map, saving the original into oldcfg. */
-	if (!addr)
-		lua_error_p(L, "address '%s' could not be converted", addr_str);
-	tls_client_param_t **oldcfgp = tls_client_param_getptr(
-			&the_network->tls_client_params, addr, true);
-	free_const(addr);
-	if (!oldcfgp)
-		lua_error_p(L, "internal error when extending tls_client_params map");
-	tls_client_param_t *oldcfg = *oldcfgp;
-	*oldcfgp = newcfg;  /* replace old config in trie with the new one */
-	/* If there was no original entry, it's easy! */
-	if (!oldcfg)
-		return 0;
-
-	/* Check for equality (newcfg vs. oldcfg), and print a warning if not equal.*/
-	const bool ok_h = (!newcfg->hostname && !oldcfg->hostname)
-		|| (newcfg->hostname && oldcfg->hostname && strcmp(newcfg->hostname, oldcfg->hostname) == 0);
-	bool ok_ca = newcfg->ca_files.len == oldcfg->ca_files.len;
-	for (int i = 0; ok_ca && i < newcfg->ca_files.len; ++i)
-		ok_ca = strcmp(newcfg->ca_files.at[i], oldcfg->ca_files.at[i]) == 0;
-	bool ok_pins = newcfg->pins.len == oldcfg->pins.len;
-	for (int i = 0; ok_pins && i < newcfg->pins.len; ++i)
-		ok_ca = memcmp(newcfg->pins.at[i], oldcfg->pins.at[i], TLS_SHA256_RAW_LEN) == 0;
-	const bool ok_insecure = newcfg->insecure == oldcfg->insecure;
-	if (!(ok_h && ok_ca && ok_pins && ok_insecure)) {
-		kr_log_warning(TLSCLIENT,
-			"warning: re-defining TLS authentication parameters for %s\n",
-			addr_str);
-	}
-	tls_client_param_unref(oldcfg);
+	/* TODO */
+	kr_assert(false && "Unimplemented");
 	return 0;
+//	/* TODO idea: allow starting the lua table with *multiple* IP targets,
+//	 * meaning the authentication config should be applied to each.
+//	 */
+//	if (lua_gettop(L) == 0)
+//		return tls_params2lua(L, the_network->tls_client_params);
+//	/* Various basic sanity-checking. */
+//	if (lua_gettop(L) != 1 || !lua_istable(L, 1))
+//		lua_error_maybe(L, EINVAL);
+//	/* check that only allowed keys are present */
+//	{
+//		const char *bad_key = lua_table_checkindices(L, (const char *[])
+//			{ "1", "hostname", "ca_file", "pin_sha256", "insecure", NULL });
+//		if (bad_key)
+//			lua_error_p(L, "found unexpected key '%s'", bad_key);
+//	}
+//
+//	/**** Phase 1: get the parameter into a C struct, incl. parse of CA files,
+//	 * 	 regardless of the address-pair having an entry already. */
+//
+//	tls_client_param_t *newcfg = tls_client_param_new();
+//	if (!newcfg)
+//		lua_error_p(L, "out of memory or something like that :-/");
+//	/* Shortcut for cleanup actions needed from now on. */
+//	#define ERROR(...) do { \
+//		free(newcfg); \
+//		lua_error_p(L, __VA_ARGS__); \
+//	} while (false)
+//
+//	/* .hostname - always accepted. */
+//	lua_getfield(L, 1, "hostname");
+//	if (!lua_isnil(L, -1)) {
+//		const char *hn_str = lua_tostring(L, -1);
+//		/* Convert to lower-case dname and back, for checking etc. */
+//		knot_dname_t dname[KNOT_DNAME_MAXLEN];
+//		if (!hn_str || !knot_dname_from_str(dname, hn_str, sizeof(dname)))
+//			ERROR("invalid hostname");
+//		knot_dname_to_lower(dname);
+//		char *h = knot_dname_to_str_alloc(dname);
+//		if (!h)
+//			ERROR("%s", kr_strerror(ENOMEM));
+//		/* Strip the final dot produced by knot_dname_*() */
+//		h[strlen(h) - 1] = '\0';
+//		newcfg->hostname = h;
+//	}
+//	lua_pop(L, 1);
+//
+//	/* .ca_file - it can be a list of paths, contrary to the name. */
+//	bool has_ca_file = false;
+//	lua_getfield(L, 1, "ca_file");
+//	if (!lua_isnil(L, -1)) {
+//		if (!newcfg->hostname)
+//			ERROR("missing hostname but specifying ca_file");
+//		lua_listify(L);
+//		array_init(newcfg->ca_files); /*< placate apparently confused scan-build */
+//		if (array_reserve(newcfg->ca_files, lua_objlen(L, -1)) != 0) /*< optim. */
+//			ERROR("%s", kr_strerror(ENOMEM));
+//		/* Iterate over table at the top of the stack.
+//		 * http://www.lua.org/manual/5.1/manual.html#lua_next */
+//		for (lua_pushnil(L); lua_next(L, -2); lua_pop(L, 1)) {
+//			has_ca_file = true; /* deferred here so that {} -> false */
+//			const char *ca_file = lua_tostring(L, -1);
+//			if (!ca_file)
+//				ERROR("ca_file contains a non-string");
+//			/* Let gnutls process it immediately, so garbage gets detected. */
+//			int ret = gnutls_certificate_set_x509_trust_file(
+//					newcfg->credentials, ca_file, GNUTLS_X509_FMT_PEM);
+//			if (ret < 0) {
+//				ERROR("failed to import certificate file '%s': %s - %s\n",
+//					ca_file, gnutls_strerror_name(ret),
+//					gnutls_strerror(ret));
+//			} else {
+//				kr_log_debug(TLSCLIENT, "imported %d certs from file '%s'\n",
+//					ret, ca_file);
+//			}
+//
+//			ca_file = strdup(ca_file);
+//			if (!ca_file || array_push(newcfg->ca_files, ca_file) < 0)
+//				ERROR("%s", kr_strerror(ENOMEM));
+//		}
+//		/* Sort the strings for easier comparison later. */
+//		if (newcfg->ca_files.len) {
+//			qsort(&newcfg->ca_files.at[0], newcfg->ca_files.len,
+//				sizeof(newcfg->ca_files.at[0]), strcmp_p);
+//		}
+//	}
+//	lua_pop(L, 1);
+//
+//	/* .pin_sha256 */
+//	lua_getfield(L, 1, "pin_sha256");
+//	if (!lua_isnil(L, -1)) {
+//		if (has_ca_file)
+//			ERROR("mixing pin_sha256 with ca_file is not supported");
+//		lua_listify(L);
+//		array_init(newcfg->pins); /*< placate apparently confused scan-build */
+//		if (array_reserve(newcfg->pins, lua_objlen(L, -1)) != 0) /*< optim. */
+//			ERROR("%s", kr_strerror(ENOMEM));
+//		/* Iterate over table at the top of the stack. */
+//		for (lua_pushnil(L); lua_next(L, -2); lua_pop(L, 1)) {
+//			const char *pin = lua_tostring(L, -1);
+//			if (!pin)
+//				ERROR("pin_sha256 is not a string");
+//			uint8_t *pin_raw = malloc(TLS_SHA256_RAW_LEN);
+//			/* Push the string early to simplify error processing. */
+//			if (kr_fails_assert(pin_raw && array_push(newcfg->pins, pin_raw) >= 0)) {
+//				free(pin_raw);
+//				ERROR("%s", kr_strerror(ENOMEM));
+//			}
+//			int ret = kr_base64_decode((const uint8_t *)pin, strlen(pin),
+//						pin_raw, TLS_SHA256_RAW_LEN + 8);
+//			if (ret < 0) {
+//				ERROR("not a valid pin_sha256: '%s' (length %d), %s\n",
+//					pin, (int)strlen(pin), knot_strerror(ret));
+//			} else if (ret != TLS_SHA256_RAW_LEN) {
+//				ERROR("not a valid pin_sha256: '%s', "
+//						"raw length %d instead of "
+//						STR(TLS_SHA256_RAW_LEN)"\n",
+//					pin, ret);
+//			}
+//		}
+//		/* Sort the raw strings for easier comparison later. */
+//		if (newcfg->pins.len) {
+//			qsort(&newcfg->pins.at[0], newcfg->pins.len,
+//				sizeof(newcfg->pins.at[0]), cmp_sha256);
+//		}
+//	}
+//	lua_pop(L, 1);
+//
+//	/* .insecure */
+//	lua_getfield(L, 1, "insecure");
+//	if (lua_isnil(L, -1)) {
+//		if (!newcfg->hostname && !newcfg->pins.len)
+//			ERROR("no way to authenticate and not set as insecure");
+//	} else if (lua_isboolean(L, -1) && lua_toboolean(L, -1)) {
+//		newcfg->insecure = true;
+//		if (has_ca_file || newcfg->pins.len)
+//			ERROR("set as insecure but provided authentication config");
+//	} else {
+//		ERROR("incorrect value in the 'insecure' field");
+//	}
+//	lua_pop(L, 1);
+//
+//	/* Init CAs from system trust store, if needed. */
+//	if (!newcfg->insecure && !newcfg->pins.len && !has_ca_file) {
+//		int ret = gnutls_certificate_set_x509_system_trust(newcfg->credentials);
+//		if (ret <= 0) {
+//			ERROR("failed to use system CA certificate store: %s",
+//				ret ? gnutls_strerror(ret) : kr_strerror(ENOENT));
+//		} else {
+//			kr_log_debug(TLSCLIENT, "imported %d certs from system store\n",
+//				ret);
+//		}
+//	}
+//	#undef ERROR
+//
+//	/**** Phase 2: deal with the C authentication "table". */
+//	/* Parse address and port. */
+//	lua_pushinteger(L, 1);
+//	lua_gettable(L, 1);
+//	const char *addr_str = lua_tostring(L, -1);
+//	if (!addr_str)
+//		lua_error_p(L, "address is not a string");
+//	char buf[INET6_ADDRSTRLEN + 1];
+//	uint16_t port = 853;
+//	const struct sockaddr *addr = NULL;
+//	if (kr_straddr_split(addr_str, buf, &port) == kr_ok())
+//		addr = kr_straddr_socket(buf, port, NULL);
+//	/* Add newcfg into the C map, saving the original into oldcfg. */
+//	if (!addr)
+//		lua_error_p(L, "address '%s' could not be converted", addr_str);
+//	tls_client_param_t **oldcfgp = tls_client_param_getptr(
+//			&the_network->tls_client_params, addr, true);
+//	free_const(addr);
+//	if (!oldcfgp)
+//		lua_error_p(L, "internal error when extending tls_client_params map");
+//	tls_client_param_t *oldcfg = *oldcfgp;
+//	*oldcfgp = newcfg;  /* replace old config in trie with the new one */
+//	/* If there was no original entry, it's easy! */
+//	if (!oldcfg)
+//		return 0;
+//
+//	/* Check for equality (newcfg vs. oldcfg), and print a warning if not equal.*/
+//	const bool ok_h = (!newcfg->hostname && !oldcfg->hostname)
+//		|| (newcfg->hostname && oldcfg->hostname && strcmp(newcfg->hostname, oldcfg->hostname) == 0);
+//	bool ok_ca = newcfg->ca_files.len == oldcfg->ca_files.len;
+//	for (int i = 0; ok_ca && i < newcfg->ca_files.len; ++i)
+//		ok_ca = strcmp(newcfg->ca_files.at[i], oldcfg->ca_files.at[i]) == 0;
+//	bool ok_pins = newcfg->pins.len == oldcfg->pins.len;
+//	for (int i = 0; ok_pins && i < newcfg->pins.len; ++i)
+//		ok_ca = memcmp(newcfg->pins.at[i], oldcfg->pins.at[i], TLS_SHA256_RAW_LEN) == 0;
+//	const bool ok_insecure = newcfg->insecure == oldcfg->insecure;
+//	if (!(ok_h && ok_ca && ok_pins && ok_insecure)) {
+//		kr_log_warning(TLSCLIENT,
+//			"warning: re-defining TLS authentication parameters for %s\n",
+//			addr_str);
+//	}
+//	tls_client_param_unref(oldcfg);
+//	return 0;
 }
 
 int net_tls_client_clear(lua_State *L)
 {
-	/* One parameter: address -> convert it to a struct sockaddr. */
-	if (lua_gettop(L) != 1 || !lua_isstring(L, 1))
-		lua_error_p(L, "net.tls_client_clear() requires one parameter (\"address\")");
-	const char *addr_str = lua_tostring(L, 1);
-	char buf[INET6_ADDRSTRLEN + 1];
-	uint16_t port = 853;
-	const struct sockaddr *addr = NULL;
-	if (kr_straddr_split(addr_str, buf, &port) == kr_ok())
-		addr = kr_straddr_socket(buf, port, NULL);
-	if (!addr)
-		lua_error_p(L, "invalid IP address");
-	/* Do the actual removal. */
-	int r = tls_client_param_remove(the_network->tls_client_params, addr);
-	free_const(addr);
-	lua_error_maybe(L, r);
-	lua_pushboolean(L, true);
-	return 1;
+	/* TODO */
+	kr_assert(false && "Unimplemented");
+	return 0;
+//	/* One parameter: address -> convert it to a struct sockaddr. */
+//	if (lua_gettop(L) != 1 || !lua_isstring(L, 1))
+//		lua_error_p(L, "net.tls_client_clear() requires one parameter (\"address\")");
+//	const char *addr_str = lua_tostring(L, 1);
+//	char buf[INET6_ADDRSTRLEN + 1];
+//	uint16_t port = 853;
+//	const struct sockaddr *addr = NULL;
+//	if (kr_straddr_split(addr_str, buf, &port) == kr_ok())
+//		addr = kr_straddr_socket(buf, port, NULL);
+//	if (!addr)
+//		lua_error_p(L, "invalid IP address");
+//	/* Do the actual removal. */
+//	int r = tls_client_param_remove(the_network->tls_client_params, addr);
+//	free_const(addr);
+//	lua_error_maybe(L, r);
+//	lua_pushboolean(L, true);
+//	return 1;
 }
 
 static int net_tls_padding(lua_State *L)
@@ -969,79 +981,85 @@ static int net_tls_padding(lua_State *L)
 
 static int net_tls_sticket_secret_string(lua_State *L)
 {
-	size_t secret_len;
-	const char *secret;
-
-	if (lua_gettop(L) == 0) {
-		/* Zero-length secret, implying random key. */
-		secret_len = 0;
-		secret = NULL;
-	} else {
-		if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
-			lua_error_p(L,
-				"net.tls_sticket_secret takes one parameter: (\"secret string\")");
-		}
-		secret = lua_tolstring(L, 1, &secret_len);
-		if (secret_len < net_tls_sticket_MIN_SECRET_LEN || !secret) {
-			lua_error_p(L, "net.tls_sticket_secret - the secret is shorter than "
-					STR(net_tls_sticket_MIN_SECRET_LEN) " bytes");
-		}
-	}
-
-	tls_session_ticket_ctx_destroy(the_network->tls_session_ticket_ctx);
-	the_network->tls_session_ticket_ctx =
-		tls_session_ticket_ctx_create(the_network->loop, secret, secret_len);
-	if (the_network->tls_session_ticket_ctx == NULL) {
-		lua_error_p(L,
-			"net.tls_sticket_secret_string - can't create session ticket context");
-	}
-
-	lua_pushboolean(L, true);
-	return 1;
+	/* TODO */
+	kr_assert(false && "Unimplemented");
+	return 0;
+//	size_t secret_len;
+//	const char *secret;
+//
+//	if (lua_gettop(L) == 0) {
+//		/* Zero-length secret, implying random key. */
+//		secret_len = 0;
+//		secret = NULL;
+//	} else {
+//		if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
+//			lua_error_p(L,
+//				"net.tls_sticket_secret takes one parameter: (\"secret string\")");
+//		}
+//		secret = lua_tolstring(L, 1, &secret_len);
+//		if (secret_len < net_tls_sticket_MIN_SECRET_LEN || !secret) {
+//			lua_error_p(L, "net.tls_sticket_secret - the secret is shorter than "
+//					STR(net_tls_sticket_MIN_SECRET_LEN) " bytes");
+//		}
+//	}
+//
+//	tls_session_ticket_ctx_destroy(the_network->tls_session_ticket_ctx);
+//	the_network->tls_session_ticket_ctx =
+//		tls_session_ticket_ctx_create(the_network->loop, secret, secret_len);
+//	if (the_network->tls_session_ticket_ctx == NULL) {
+//		lua_error_p(L,
+//			"net.tls_sticket_secret_string - can't create session ticket context");
+//	}
+//
+//	lua_pushboolean(L, true);
+//	return 1;
 }
 
 static int net_tls_sticket_secret_file(lua_State *L)
 {
-	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
-		lua_error_p(L,
-			"net.tls_sticket_secret_file takes one parameter: (\"file name\")");
-	}
-
-	const char *file_name = lua_tostring(L, 1);
-	if (strlen(file_name) == 0)
-		lua_error_p(L, "net.tls_sticket_secret_file - empty file name");
-
-	FILE *fp = fopen(file_name, "r");
-	if (fp == NULL) {
-		lua_error_p(L, "net.tls_sticket_secret_file - can't open file '%s': %s",
-				file_name, strerror(errno));
-	}
-
-	char secret_buf[TLS_SESSION_TICKET_SECRET_MAX_LEN];
-	const size_t secret_len = fread(secret_buf, 1, sizeof(secret_buf), fp);
-	int err = ferror(fp);
-	if (err) {
-		lua_error_p(L,
-			"net.tls_sticket_secret_file - error reading from file '%s': %s",
-			file_name, strerror(err));
-	}
-	if (secret_len < net_tls_sticket_MIN_SECRET_LEN) {
-		lua_error_p(L,
-			"net.tls_sticket_secret_file - file '%s' is shorter than "
-				STR(net_tls_sticket_MIN_SECRET_LEN) " bytes",
-			file_name);
-	}
-	fclose(fp);
-
-	tls_session_ticket_ctx_destroy(the_network->tls_session_ticket_ctx);
-	the_network->tls_session_ticket_ctx =
-		tls_session_ticket_ctx_create(the_network->loop, secret_buf, secret_len);
-	if (the_network->tls_session_ticket_ctx == NULL) {
-		lua_error_p(L,
-			"net.tls_sticket_secret_file - can't create session ticket context");
-	}
-	lua_pushboolean(L, true);
-	return 1;
+	/* TODO */
+	kr_assert(false && "Unimplemented");
+	return 0;
+//	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
+//		lua_error_p(L,
+//			"net.tls_sticket_secret_file takes one parameter: (\"file name\")");
+//	}
+//
+//	const char *file_name = lua_tostring(L, 1);
+//	if (strlen(file_name) == 0)
+//		lua_error_p(L, "net.tls_sticket_secret_file - empty file name");
+//
+//	FILE *fp = fopen(file_name, "r");
+//	if (fp == NULL) {
+//		lua_error_p(L, "net.tls_sticket_secret_file - can't open file '%s': %s",
+//				file_name, strerror(errno));
+//	}
+//
+//	char secret_buf[TLS_SESSION_TICKET_SECRET_MAX_LEN];
+//	const size_t secret_len = fread(secret_buf, 1, sizeof(secret_buf), fp);
+//	int err = ferror(fp);
+//	if (err) {
+//		lua_error_p(L,
+//			"net.tls_sticket_secret_file - error reading from file '%s': %s",
+//			file_name, strerror(err));
+//	}
+//	if (secret_len < net_tls_sticket_MIN_SECRET_LEN) {
+//		lua_error_p(L,
+//			"net.tls_sticket_secret_file - file '%s' is shorter than "
+//				STR(net_tls_sticket_MIN_SECRET_LEN) " bytes",
+//			file_name);
+//	}
+//	fclose(fp);
+//
+//	tls_session_ticket_ctx_destroy(the_network->tls_session_ticket_ctx);
+//	the_network->tls_session_ticket_ctx =
+//		tls_session_ticket_ctx_create(the_network->loop, secret_buf, secret_len);
+//	if (the_network->tls_session_ticket_ctx == NULL) {
+//		lua_error_p(L,
+//			"net.tls_sticket_secret_file - can't create session ticket context");
+//	}
+//	lua_pushboolean(L, true);
+//	return 1;
 }
 
 static int net_outgoing(lua_State *L, int family)

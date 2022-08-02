@@ -167,7 +167,7 @@ bool proxy_allowed(const struct sockaddr *saddr)
 	return kr_bitcmp((char *) &addr, (char *) &found->addr, found->netmask) == 0;
 }
 
-ssize_t proxy_process_header(struct proxy_result *out, struct session *s,
+ssize_t proxy_process_header(struct proxy_result *out,
 		const void *buf, const ssize_t nread)
 {
 	if (!buf)
@@ -287,5 +287,5 @@ ssize_t proxy_process_header(struct proxy_result *out, struct session *s,
 	}
 
 fill_wirebuf:
-	return session_wirebuf_trim(s, hdr_len);
+	return hdr_len;
 }
