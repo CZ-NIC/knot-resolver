@@ -241,7 +241,6 @@ static int pl_tcp_sess_deinit(struct protolayer_manager *manager, struct protola
 static enum protolayer_cb_result pl_tcp_unwrap_timeout(
 		struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
 {
-	/* TODO - connecting timeout? */
 	struct session2 *s = ctx->manager->session;
 
 	if (kr_fails_assert(!s->closing))
@@ -261,8 +260,7 @@ static enum protolayer_cb_result pl_tcp_unwrap_timeout(
 		session2_timer_stop(s);
 		session2_timer_start(s,
 				KR_RESOLVE_TIME_LIMIT / 2,
-				KR_RESOLVE_TIME_LIMIT / 2,
-				PROTOLAYER_UNWRAP);
+				KR_RESOLVE_TIME_LIMIT / 2);
 	} else {
 		/* Normally it should not happen,
 		 * but better to check if there anything in this list. */
@@ -279,9 +277,7 @@ static enum protolayer_cb_result pl_tcp_unwrap_timeout(
 		if (idle_time < idle_in_timeout) {
 			idle_in_timeout -= idle_time;
 			session2_timer_stop(s);
-			session2_timer_start(s,
-					idle_in_timeout, idle_in_timeout,
-					PROTOLAYER_UNWRAP);
+			session2_timer_start(s, idle_in_timeout, idle_in_timeout);
 		} else {
 			struct sockaddr *peer = session2_get_peer(s);
 			char *peer_str = kr_straddr(peer);
@@ -291,7 +287,7 @@ static enum protolayer_cb_result pl_tcp_unwrap_timeout(
 				worker_del_tcp_waiting(peer);
 				worker_del_tcp_connected(peer);
 			}
-			session2_unwrap(s, protolayer_event_nd(PROTOLAYER_EVENT_CLOSE), NULL, NULL, NULL);
+			session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
 		}
 	}
 
@@ -553,8 +549,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 				       uv_strerror(nread));
 		}
 		worker_end_tcp(s);
-		session2_unwrap(s, protolayer_event_nd(PROTOLAYER_EVENT_FORCE_CLOSE),
-				NULL, NULL, NULL);
+		session2_event(s, PROTOLAYER_EVENT_FORCE_CLOSE, NULL);
 		return;
 	}
 
@@ -688,9 +683,7 @@ static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp
 	if (uv_accept(master, (uv_stream_t *)client) != 0) {
 		/* close session, close underlying uv handles and
 		 * deallocate (or return to memory pool) memory. */
-		session2_unwrap(s,
-				protolayer_event_nd(PROTOLAYER_EVENT_CLOSE),
-				NULL, NULL, NULL);
+		session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
 		return;
 	}
 
@@ -700,18 +693,14 @@ static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp
 	int sa_len = sizeof(struct sockaddr_in6);
 	int ret = uv_tcp_getpeername(client, sa, &sa_len);
 	if (ret || sa->sa_family == AF_UNSPEC) {
-		session2_unwrap(s,
-				protolayer_event_nd(PROTOLAYER_EVENT_CLOSE),
-				NULL, NULL, NULL);
+		session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
 		return;
 	}
 	sa = session2_get_sockname(s);
 	sa_len = sizeof(struct sockaddr_in6);
 	ret = uv_tcp_getsockname(client, sa, &sa_len);
 	if (ret || sa->sa_family == AF_UNSPEC) {
-		session2_unwrap(s,
-				protolayer_event_nd(PROTOLAYER_EVENT_CLOSE),
-				NULL, NULL, NULL);
+		session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
 		return;
 	}
 
@@ -776,7 +765,7 @@ static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp
 //		}
 //	}
 //#endif
-	session2_timer_start(s, timeout, idle_in_timeout, PROTOLAYER_UNWRAP);
+	session2_timer_start(s, timeout, idle_in_timeout);
 	io_start_read((uv_handle_t *)client);
 }
 

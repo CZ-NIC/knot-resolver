@@ -145,7 +145,8 @@ typedef void (*protolayer_finished_cb)(int status, struct session2 *session,
 	                 * session - i.e. layers SHOULD NOT add
 	                 * any disconnection ceremony, if
 	                 * avoidable. */\
-	XX(TIMEOUT) /**< Signal that the session has timed out. */
+	XX(TIMEOUT) /**< Signal that the session has timed out. */\
+	XX(CONNECT) /**< Signal that a connection has been established. */
 
 /** Event type, to be interpreted by a layer. */
 enum protolayer_event_type {
@@ -506,21 +507,28 @@ struct session2 {
 	struct protolayer_manager *layers; /**< Protocol layers of this session. */
 	knot_mm_t pool;
 
-	uv_timer_t timer;
-	enum protolayer_direction timer_direction; /**< Timeout event direction. */
+	uv_timer_t timer; /**< For session-wide timeout events. */
 
-	trie_t *tasks; /**< list of tasks associated with given session. */
-	queue_t(struct qr_task *) waiting; /**< list of tasks waiting for sending to upstream. */
+	trie_t *tasks; /**< List of tasks associated with given session. */
+	queue_t(struct qr_task *) waiting; /**< List of tasks waiting for
+	                                    * sending to upstream. */
 
 	struct wire_buf wire_buf;
 
 	uint64_t last_activity; /**< Time of last IO activity (if any occurs).
 	                         * Otherwise session creation time. */
 
-	bool closing : 1;
-	bool throttled : 1;
-	bool outgoing : 1;
-	bool secure : 1; /**< Whether encryption takes place in this session.
+	void *data; /**< Pointer to arbitrary data for callbacks. */
+
+	bool outgoing : 1; /**< True: session's transport is towards an upstream
+	                    * server. Otherwise, it is towards a client
+	                    * connected to the resolver. */
+	bool closing : 1; /**< True: session is at the end of its lifecycle and
+	                   * is going to close. */
+	bool connected : 1; /**< For connection-based sessions. True: connection
+	                     * is established. */
+	bool throttled : 1; /**< True: session is being rate-limited. */
+	bool secure : 1; /**< True: encryption takes place in this session.
 	                  * Layers may use this to determine whether padding
 	                  * should be applied. */
 };
@@ -582,12 +590,11 @@ struct sockaddr *session2_get_sockname(struct session2 *s);
  * needed.
  *
  * May return `NULL` if no peer is set.  */
-uv_handle_t *session2_get_handle(struct session2 *s);
+KR_EXPORT uv_handle_t *session2_get_handle(struct session2 *s);
 
 /** Start the session timer. When the timer ends, a `_TIMEOUT` event is sent
- * in the specified `direction`. */
-int session2_timer_start(struct session2 *s, uint64_t timeout, uint64_t repeat,
-                          enum protolayer_direction direction);
+ * in the `_UNWRAP` direction. */
+int session2_timer_start(struct session2 *s, uint64_t timeout, uint64_t repeat);
 
 /** Restart the session timer without changing any of its parameters. */
 int session2_timer_restart(struct session2 *s);
@@ -662,6 +669,20 @@ int session2_unwrap(struct session2 *s, struct protolayer_payload payload,
  * indicating an error. */
 int session2_wrap(struct session2 *s, struct protolayer_payload payload,
                   const void *target, protolayer_finished_cb cb, void *baton);
+
+/** Convenience function to send the specified event to be processed in the
+ * `unwrap` direction. `data` may be `NULL`.
+ *
+ * See `session2_unwrap` for more information. */
+static inline int session2_event(struct session2 *s,
+                                 enum protolayer_event_type type, void *data)
+{
+	struct protolayer_event event = {
+		.type = type,
+		.data = { .ptr = data }
+	};
+	return session2_unwrap(s, protolayer_event(event), NULL, NULL, NULL);
+}
 
 /** Removes the specified request task from the session's tasklist. The session
  * must be outgoing. If the session is UDP, a signal to close is also sent to it. */

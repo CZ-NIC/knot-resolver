@@ -105,8 +105,6 @@ static int qr_task_send(struct qr_task *task, struct session2 *session,
 static int qr_task_finalize(struct qr_task *task, int state);
 static void qr_task_complete(struct qr_task *task);
 static int worker_add_tcp_waiting(const struct sockaddr* addr, struct session2 *session);
-static void on_tcp_connect_timeout(uv_timer_t *timer);
-static void on_udp_timeout(uv_timer_t *timer);
 static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_source, knot_pkt_t *pkt);
 
 
@@ -128,9 +126,8 @@ static uv_handle_t *ioreq_spawn(int socktype, sa_family_t family,
 	/* Create connection for iterative query */
 	uv_handle_t *handle = malloc(socktype == SOCK_DGRAM
 					? sizeof(uv_udp_t) : sizeof(uv_tcp_t));
-	if (!handle) {
-		return NULL;
-	}
+	kr_require(handle);
+
 	int ret = io_create(the_worker->loop, handle, socktype, family, grp, true);
 	if (ret) {
 		if (ret == UV_EMFILE) {
@@ -351,6 +348,7 @@ static struct request_ctx *request_create(struct session2 *session,
 		req->qsource.comm_flags.tcp = session2_get_handle(session)->type == UV_TCP;
 		req->qsource.comm_flags.tls = session->secure;
 //		req->qsource.comm_flags.http = session->has_http; /* TODO */
+		req->qsource.comm_flags.http = false;
 
 		req->qsource.flags = req->qsource.comm_flags;
 		if (proxy) {
@@ -590,7 +588,7 @@ int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 		if (kr_fails_assert(qry && task->transport))
 			return status;
 		size_t timeout = task->transport->timeout;
-		int ret = session2_timer_start(s, timeout, 0, PROTOLAYER_UNWRAP);
+		int ret = session2_timer_start(s, timeout, 0);
 		/* Start next step with timeout, fatal if can't start a timer. */
 		if (ret != 0) {
 			subreq_finalize(task, &task->transport->address.ip, task->pktbuf);
@@ -615,6 +613,7 @@ int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 						peer_str, uv_strerror(status));
 			}
 			worker_end_tcp(s);
+			session2_event(s, PROTOLAYER_EVENT_FORCE_CLOSE, NULL);
 			return status;
 		}
 
@@ -631,24 +630,6 @@ int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 	}
 
 	return status;
-}
-
-static void on_send(uv_udp_send_t *req, int status)
-{
-	struct qr_task *task = req->data;
-	uv_handle_t *h = (uv_handle_t *)req->handle;
-	qr_task_on_send(task, h, status);
-	qr_task_unref(task);
-	free(req);
-}
-
-static void on_write(uv_write_t *req, int status)
-{
-	struct qr_task *task = req->data;
-	uv_handle_t *h = (uv_handle_t *)req->handle;
-	qr_task_on_send(task, h, status);
-	qr_task_unref(task);
-	free(req);
 }
 
 static void qr_task_wrap_finished(int status, struct session2 *session, const void *target, void *baton)
@@ -933,9 +914,7 @@ static int send_waiting(struct session2 *session)
 			session2_waitinglist_finalize(session, KR_STATE_FAIL);
 			session2_tasklist_finalize(session, KR_STATE_FAIL);
 			worker_del_tcp_connected(peer);
-			session2_unwrap(session,
-					protolayer_event_nd(PROTOLAYER_EVENT_CLOSE),
-					NULL, NULL, NULL);
+			session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
 			break;
 		}
 		session2_waitinglist_pop(session, true);
@@ -978,9 +957,7 @@ static void on_connect(uv_connect_t *req, int status)
 		}
 		kr_assert(session2_tasklist_is_empty(session));
 		session2_waitinglist_retry(session, false);
-		session2_unwrap(session,
-				protolayer_event_nd(PROTOLAYER_EVENT_CLOSE),
-				NULL, NULL, NULL);
+		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
 		return;
 	}
 
@@ -997,9 +974,7 @@ static void on_connect(uv_connect_t *req, int status)
 		}
 		kr_assert(session2_tasklist_is_empty(session));
 		session2_waitinglist_retry(session, false);
-		session2_unwrap(session,
-				protolayer_event_nd(PROTOLAYER_EVENT_CLOSE),
-				NULL, NULL, NULL);
+		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
 		return;
 	}
 
@@ -1020,9 +995,7 @@ static void on_connect(uv_connect_t *req, int status)
 		}
 		kr_assert(session2_tasklist_is_empty(session));
 		session2_waitinglist_retry(session, false);
-		session2_unwrap(session,
-				protolayer_event_nd(PROTOLAYER_EVENT_CLOSE),
-				NULL, NULL, NULL);
+		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
 		return;
 	}
 
@@ -1034,9 +1007,7 @@ static void on_connect(uv_connect_t *req, int status)
 			 * something gone wrong */
 			session2_waitinglist_finalize(session, KR_STATE_FAIL);
 			kr_assert(session2_tasklist_is_empty(session));
-			session2_unwrap(session,
-					protolayer_event_nd(PROTOLAYER_EVENT_CLOSE),
-					NULL, NULL, NULL);
+			session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
 			return;
 		}
 	}
@@ -1047,7 +1018,7 @@ static void on_connect(uv_connect_t *req, int status)
 	}
 
 	/* TODO */
-//	session->connected = true;
+	session->connected = true;
 	session2_start_read(session);
 
 	int ret = kr_ok();
@@ -1070,76 +1041,7 @@ static void on_connect(uv_connect_t *req, int status)
 	}
 
 	session2_timer_stop(session);
-	session2_timer_start(session,
-			    MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY,
-			    PROTOLAYER_UNWRAP);
-}
-
-static void on_tcp_connect_timeout(uv_timer_t *timer)
-{
-	struct session2 *session = timer->data;
-
-	uv_timer_stop(timer);
-	kr_require(the_worker);
-
-	kr_assert(session2_tasklist_is_empty(session));
-
-	struct sockaddr *peer = session2_get_peer(session);
-	worker_del_tcp_waiting(peer);
-
-	struct qr_task *task = session2_waitinglist_get(session);
-	if (!task) {
-		/* Normally shouldn't happen. */
-		const char *peer_str = kr_straddr(peer);
-		VERBOSE_MSG(NULL, "=> connection to '%s' failed (internal timeout), empty waitinglist\n",
-			    peer_str ? peer_str : "");
-		return;
-	}
-
-	struct kr_query *qry = task_get_last_pending_query(task);
-	if (kr_log_is_debug_qry(WORKER, qry)) {
-		const char *peer_str = kr_straddr(peer);
-		VERBOSE_MSG(qry, "=> connection to '%s' failed (internal timeout)\n",
-			    peer_str ? peer_str : "");
-	}
-
-	qry->server_selection.error(qry, task->transport, KR_SELECTION_TCP_CONNECT_TIMEOUT);
-
-	the_worker->stats.timeout += session2_waitinglist_get_len(session);
-	session2_waitinglist_retry(session, true);
-	kr_assert(session2_tasklist_is_empty(session));
-	/* uv_cancel() doesn't support uv_connect_t request,
-	 * so that we can't cancel it.
-	 * There still exists possibility of successful connection
-	 * for this request.
-	 * So connection callback (on_connect()) must check
-	 * if connection is in the list of waiting connection.
-	 * If no, most likely this is timed out connection even if
-	 * it was successful. */
-}
-
-/* This is called when I/O timeouts */
-static void on_udp_timeout(uv_timer_t *timer)
-{
-	struct session2 *session = timer->data;
-	kr_assert(session2_get_handle(session)->data == session);
-	kr_assert(session2_tasklist_get_len(session) == 1);
-	kr_assert(session2_waitinglist_is_empty(session));
-
-	uv_timer_stop(timer);
-
-	struct qr_task *task = session2_tasklist_get_first(session);
-	if (!task)
-		return;
-
-	if (task->leading && task->pending_count > 0) {
-		struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
-		qry->server_selection.error(qry, task->transport, KR_SELECTION_QUERY_TIMEOUT);
-	}
-
-	task->timeouts += 1;
-	the_worker->stats.timeout += 1;
-	qr_task_step(task, NULL, NULL);
+	session2_timer_start(session, MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
 }
 
 static uv_handle_t *transmit(struct qr_task *task)
@@ -1174,9 +1076,7 @@ static uv_handle_t *transmit(struct qr_task *task)
 		memcpy(peer, addr, kr_sockaddr_len(addr));
 		if (qr_task_send(task, session, (struct sockaddr *)choice,
 				 task->pktbuf) != 0) {
-			session2_unwrap(session,
-					protolayer_event_nd(PROTOLAYER_EVENT_CLOSE),
-					NULL, NULL, NULL);
+			session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
 			ret = NULL;
 		} else {
 			task->pending[task->pending_count] = session;
@@ -1388,9 +1288,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 			 * (ie. task->leading is true) */
 			worker_task_unref(t);
 		}
-		session2_unwrap(source_session,
-				protolayer_event_nd(PROTOLAYER_EVENT_CLOSE),
-				NULL, NULL, NULL);
+		session2_event(source_session, PROTOLAYER_EVENT_CLOSE, NULL);
 	}
 
 	qr_task_unref(task);
@@ -1459,9 +1357,7 @@ static int tcp_task_existing_connection(struct session2 *session, struct qr_task
 		 * close connection to upstream. */
 		session2_tasklist_finalize(session, KR_STATE_FAIL);
 		worker_del_tcp_connected(session2_get_peer(session));
-		session2_unwrap(session,
-				protolayer_event_nd(PROTOLAYER_EVENT_CLOSE),
-				NULL, NULL, NULL);
+		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
 		return kr_error(EINVAL);
 	}
 
@@ -1471,6 +1367,7 @@ static int tcp_task_existing_connection(struct session2 *session, struct qr_task
 static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr *addr)
 {
 	/* Check if there must be TLS */
+	/* TODO: tls */
 //	struct tls_client_ctx *tls_ctx = NULL;
 //	tls_client_param_t *entry = tls_client_param_get(
 //			the_network->tls_client_params, addr);
@@ -1515,9 +1412,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	int ret = worker_add_tcp_waiting(addr, session);
 	if (ret < 0) {
 		free(conn);
-		session2_unwrap(session,
-				protolayer_event_nd(PROTOLAYER_EVENT_CLOSE),
-				NULL, NULL, NULL);
+		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
 		return kr_error(EINVAL);
 	}
 
@@ -1527,14 +1422,11 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	memcpy(peer, addr, kr_sockaddr_len(addr));
 
 	/*  Start watchdog to catch eventual connection timeout. */
-	ret = session2_timer_start(session,
-				  KR_CONN_RTT_MAX, 0, PROTOLAYER_UNWRAP);
+	ret = session2_timer_start(session, KR_CONN_RTT_MAX, 0);
 	if (ret != 0) {
 		worker_del_tcp_waiting(addr);
 		free(conn);
-		session2_unwrap(session,
-				protolayer_event_nd(PROTOLAYER_EVENT_CLOSE),
-				NULL, NULL, NULL);
+		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
 		return kr_error(EINVAL);
 	}
 
@@ -1550,9 +1442,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 		session2_timer_stop(session);
 		worker_del_tcp_waiting(addr);
 		free(conn);
-		session2_unwrap(session,
-				protolayer_event_nd(PROTOLAYER_EVENT_CLOSE),
-				NULL, NULL, NULL);
+		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
 		qry->server_selection.error(qry, task->transport, KR_SELECTION_TCP_CONNECT_FAILED);
 		return kr_error(EAGAIN);
 	}
@@ -1564,9 +1454,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 		session2_timer_stop(session);
 		worker_del_tcp_waiting(addr);
 		free(conn);
-		session2_unwrap(session,
-				protolayer_event_nd(PROTOLAYER_EVENT_CLOSE),
-				NULL, NULL, NULL);
+		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
 		return kr_error(EINVAL);
 	}
 
@@ -1752,7 +1640,7 @@ int worker_submit(struct session2 *session, struct comm_info *comm,
 
 	struct http_ctx *http_ctx = NULL;
 #if ENABLE_DOH2
-	/* TODO: devise a way to do this... don't know yet */
+	/* TODO: http. Devise a way to do this... don't know yet */
 //	http_ctx = session_http_get_server_ctx(session);
 //
 //	/* Badly formed query when using DoH leads to a Bad Request */
@@ -1912,6 +1800,7 @@ int worker_end_tcp(struct session2 *session)
 
 	worker_del_tcp_waiting(peer);
 	worker_del_tcp_connected(peer);
+	session->connected = false;
 
 	while (!session2_waitinglist_is_empty(session)) {
 		struct qr_task *task = session2_waitinglist_pop(session, false);
@@ -2136,7 +2025,8 @@ void worker_task_pkt_set_msgid(struct qr_task *task, uint16_t msgid)
 	knot_pkt_t *pktbuf = worker_task_get_pktbuf(task);
 	knot_wire_set_id(pktbuf->wire, msgid);
 	struct kr_query *q = task_get_last_pending_query(task);
-	q->id = msgid;
+	if (q)
+		q->id = msgid;
 }
 
 uint64_t worker_task_creation_time(struct qr_task *task)
@@ -2190,15 +2080,45 @@ static inline knot_pkt_t *produce_packet_dgram(char *buf, size_t buf_len)
 	return knot_pkt_new(buf, buf_len, &the_worker->pkt_pool);
 }
 
-static enum protolayer_cb_result pl_dns_dgram_unwrap(
+static enum protolayer_cb_result pl_dns_dgram_unwrap_timeout(
 		struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
 {
 	struct session2 *session = ctx->manager->session;
+	kr_assert(session2_get_handle(session)->data == session);
+	kr_assert(session2_tasklist_get_len(session) == 1);
+	kr_assert(session2_waitinglist_is_empty(session));
+
+	session2_timer_stop(session);
+
+	struct qr_task *task = session2_tasklist_get_first(session);
+	if (!task)
+		return protolayer_continue(ctx);
+
+	if (task->leading && task->pending_count > 0) {
+		struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
+		qry->server_selection.error(qry, task->transport, KR_SELECTION_QUERY_TIMEOUT);
+	}
+
+	task->timeouts += 1;
+	the_worker->stats.timeout += 1;
+	qr_task_step(task, NULL, NULL);
+
+	return protolayer_continue(ctx);
+}
+
+static enum protolayer_cb_result pl_dns_dgram_unwrap(
+		struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
+{
 
 	if (ctx->payload.type == PROTOLAYER_PAYLOAD_EVENT) {
+		if (ctx->payload.event.type == PROTOLAYER_EVENT_TIMEOUT)
+			return pl_dns_dgram_unwrap_timeout(layer, ctx);
+
 		/* pass thru */
 		return protolayer_continue(ctx);
 	}
+
+	struct session2 *session = ctx->manager->session;
 
 	if (ctx->payload.type == PROTOLAYER_PAYLOAD_IOVEC) {
 		int ret = kr_ok();
@@ -2294,10 +2214,61 @@ static int pl_dns_stream_iter_deinit(struct protolayer_manager *manager,
 	return kr_ok();
 }
 
+static enum protolayer_cb_result pl_dns_stream_unwrap_timeout(
+		struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
+{
+	struct session2 *session = ctx->manager->session;
+	if (session->connected || session->closing)
+		return protolayer_continue(ctx);
+
+	/* Connection timeout */
+	session2_timer_stop(session);
+
+	kr_assert(session2_tasklist_is_empty(session));
+
+	struct sockaddr *peer = session2_get_peer(session);
+	worker_del_tcp_waiting(peer);
+
+	struct qr_task *task = session2_waitinglist_get(session);
+	if (!task) {
+		/* Normally shouldn't happen. */
+		const char *peer_str = kr_straddr(peer);
+		VERBOSE_MSG(NULL, "=> connection to '%s' failed (internal timeout), empty waitinglist\n",
+			    peer_str ? peer_str : "");
+		return protolayer_continue(ctx);
+	}
+
+	struct kr_query *qry = task_get_last_pending_query(task);
+	if (kr_log_is_debug_qry(WORKER, qry)) {
+		const char *peer_str = kr_straddr(peer);
+		VERBOSE_MSG(qry, "=> connection to '%s' failed (internal timeout)\n",
+			    peer_str ? peer_str : "");
+	}
+
+	qry->server_selection.error(qry, task->transport, KR_SELECTION_TCP_CONNECT_TIMEOUT);
+
+	the_worker->stats.timeout += session2_waitinglist_get_len(session);
+	session2_waitinglist_retry(session, true);
+	kr_assert(session2_tasklist_is_empty(session));
+	/* uv_cancel() doesn't support uv_connect_t request,
+	 * so that we can't cancel it.
+	 * There still exists possibility of successful connection
+	 * for this request.
+	 * So connection callback (on_connect()) must check
+	 * if connection is in the list of waiting connection.
+	 * If no, most likely this is timed out connection even if
+	 * it was successful. */
+
+	return protolayer_continue(ctx);
+}
+
 static enum protolayer_cb_result pl_dns_stream_unwrap(
 		struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
 {
 	if (ctx->payload.type == PROTOLAYER_PAYLOAD_EVENT) {
+		if (ctx->payload.event.type == PROTOLAYER_EVENT_TIMEOUT)
+			return pl_dns_stream_unwrap_timeout(layer, ctx);
+
 		/* pass thru */
 		return protolayer_continue(ctx);
 	}

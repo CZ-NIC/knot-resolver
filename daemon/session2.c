@@ -206,9 +206,11 @@ static int protolayer_step(struct protolayer_cb_ctx *ctx)
 				result = cb(ldata, ctx);
 			else
 				ctx->action = PROTOLAYER_CB_ACTION_CONTINUE;
+
 			ldata->processed = true;
 		} else {
-			kr_assert(false && "Repeated protocol layer step");
+			//kr_assert(false && "Repeated protocol layer step");
+			kr_log_debug(PROTOLAYER, "Repeated protocol layer step\n");
 		}
 
 		if (kr_fails_assert(result == PROTOLAYER_CB_RESULT_MAGIC)) {
@@ -522,8 +524,8 @@ int wire_buf_movestart(struct wire_buf *wb)
 	size_t len = wire_buf_data_length(wb);
 	if (len)
 		memmove(wb->buf, wire_buf_data(wb), len);
-	wb->end -= wb->start;
 	wb->start = 0;
+	wb->end = len;
 	return kr_ok();
 }
 
@@ -642,15 +644,11 @@ uv_handle_t *session2_get_handle(struct session2 *s)
 static void session2_on_timeout(uv_timer_t *timer)
 {
 	struct session2 *s = timer->data;
-	protolayer_manager_submit(s->layers, s->timer_direction,
-			protolayer_event_nd(PROTOLAYER_EVENT_TIMEOUT),
-			NULL, NULL, NULL);
+	session2_event(s, PROTOLAYER_EVENT_TIMEOUT, NULL);
 }
 
-int session2_timer_start(struct session2 *s, uint64_t timeout, uint64_t repeat,
-                          enum protolayer_direction direction)
+int session2_timer_start(struct session2 *s, uint64_t timeout, uint64_t repeat)
 {
-	s->timer_direction = direction;
 	return uv_timer_start(&s->timer, session2_on_timeout, timeout, repeat);
 }
 
@@ -1079,7 +1077,8 @@ struct event_ctx {
 
 static void session2_transport_io_event_finished(uv_handle_t *handle)
 {
-	struct event_ctx *ctx = handle->data;
+	struct session2 *s = handle->data;
+	struct event_ctx *ctx = s->data;
 	if (ctx->cb)
 		ctx->cb(kr_ok(), ctx->session, ctx->target, ctx->baton);
 	free(ctx);
@@ -1100,7 +1099,7 @@ static int session2_handle_close(struct session2 *s, uv_handle_t *handle,
                                  struct event_ctx *ctx)
 {
 	io_stop_read(handle);
-	handle->data = ctx;
+	s->data = ctx;
 	uv_close(handle, session2_transport_io_event_finished);
 
 	return kr_ok();
@@ -1145,11 +1144,20 @@ static int session2_transport_event(struct session2 *s,
 		if (is_close_event)
 			return session2_handle_close(s, handle, ctx);
 
+		if (ctx->cb)
+			ctx->cb(kr_ok(), s, target, baton);
+
+		free(ctx);
 		return kr_ok();
 
-	case SESSION2_TRANSPORT_PARENT:
-		session2_wrap(s, protolayer_event(event), target,
+	case SESSION2_TRANSPORT_PARENT:;
+		int ret = session2_wrap(s, protolayer_event(event), target,
 				session2_transport_parent_event_finished, ctx);
+		if (ret < 0) {
+			free(ctx);
+			return ret;
+		}
+
 		return kr_ok();
 
 	default:
@@ -1169,7 +1177,5 @@ void session2_kill_ioreq(struct session2 *session, struct qr_task *task)
 		return;
 	session2_tasklist_del(session, task);
 	if (session->transport.io.handle->type == UV_UDP)
-		session2_unwrap(session,
-				protolayer_event_nd(PROTOLAYER_EVENT_CLOSE),
-				NULL, NULL, NULL);
+		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
 }
