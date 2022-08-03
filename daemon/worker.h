@@ -152,9 +152,6 @@ struct worker_stats {
 #define RECVMMSG_BATCH 1
 #endif
 
-/** Freelist of available mempools. */
-typedef array_t(struct mempool *) mp_freelist_t;
-
 /** List of query resolution tasks. */
 typedef array_t(struct qr_task *) qr_tasklist_t;
 
@@ -185,7 +182,6 @@ struct worker_ctx {
 	trie_t *tcp_waiting;
 	/** Subrequest leaders (struct qr_task*), indexed by qname+qtype+qclass. */
 	trie_t *subreq_out;
-	mp_freelist_t pool_mp;
 	knot_mm_t pkt_pool;
 	unsigned int next_request_uid;
 

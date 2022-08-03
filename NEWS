@@ -5,6 +5,7 @@ Improvements
 ------------
 - libknot 3.2 is supported (!1309)
 - priming module: hide failures from the default log level (!1310)
+- less memory usage in some cases (!1328)
 
 Bugfixes
 --------
