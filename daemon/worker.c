@@ -44,9 +44,6 @@
 #  define MP_FREELIST_SIZE 64 /**< Maximum length of the worker mempool freelist */
 # endif
 #endif
-#ifndef QUERY_RATE_THRESHOLD
-#define QUERY_RATE_THRESHOLD (2 * MP_FREELIST_SIZE) /**< Nr of parallel queries considered as high rate */
-#endif
 #ifndef MAX_PIPELINED
 #define MAX_PIPELINED 100
 #endif
