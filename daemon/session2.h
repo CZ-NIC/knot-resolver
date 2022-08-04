@@ -137,6 +137,7 @@ enum protolayer_ret {
 typedef void (*protolayer_finished_cb)(int status, struct session2 *session,
                                        const void *target, void *baton);
 
+
 #define PROTOLAYER_EVENT_MAP(XX) \
 	XX(CLOSE) /**< Signal to gracefully close the session -
 	           * i.e. layers add their standard disconnection
@@ -159,20 +160,10 @@ enum protolayer_event_type {
 
 extern char *protolayer_event_names[];
 
-/** Event, with optional auxiliary data. */
-struct protolayer_event {
-	enum protolayer_event_type type;
-	union {
-		void *ptr;
-		char raw[sizeof(void *)];
-	} data; /**< Optional data supplied with the event.
-	         * May be used by a layer. */
-};
 
 #define PROTOLAYER_PAYLOAD_MAP(XX) \
 	XX(BUFFER, "Buffer") \
 	XX(IOVEC, "IOVec") \
-	XX(EVENT, "Event") \
 	XX(WIRE_BUF, "Wire buffer")
 
 /** Defines whether the data for a `struct protolayer_cb_ctx` is represented
@@ -205,9 +196,6 @@ struct protolayer_payload {
 			struct iovec *iov;
 			int cnt;
 		} iovec;
-
-		/** Only valid if `type` is `_EVENT`. */
-		struct protolayer_event event;
 
 		/** Only valid if `type` is `_WIRE_BUF`. */
 		struct wire_buf *wire_buf;
@@ -267,26 +255,6 @@ static inline struct protolayer_payload protolayer_iovec(
 	};
 }
 
-/** Convenience function to get an event-type payload. */
-static inline struct protolayer_payload protolayer_event(struct protolayer_event event)
-{
-	return (struct protolayer_payload){
-		.type = PROTOLAYER_PAYLOAD_EVENT,
-		.event = event
-	};
-}
-
-/** Convenience function to get an event-type payload without auxiliary data. */
-static inline struct protolayer_payload protolayer_event_nd(enum protolayer_event_type event)
-{
-	return (struct protolayer_payload){
-		.type = PROTOLAYER_PAYLOAD_EVENT,
-		.event = {
-			.type = event
-		}
-	};
-}
-
 /** Convenience function to get a wire-buf-type payload. */
 static inline struct protolayer_payload protolayer_wire_buf(struct wire_buf *wire_buf)
 {
@@ -333,8 +301,26 @@ enum protolayer_cb_result {
 	PROTOLAYER_CB_RESULT_MAGIC = 0x364F392E,
 };
 
+/** Function type for `wrap` and `unwrap` callbacks of layers. Return value
+ * determines the flow of iteration; see the enum docs for more info. */
 typedef enum protolayer_cb_result (*protolayer_cb)(
 		struct protolayer_data *layer, struct protolayer_cb_ctx *ctx);
+
+/** Function type for `event_wrap` and `event_unwrap` callbacks of layers.
+ * `baton` always points to some memory; it may be modified accommodate for
+ * the behaviour of the next layer in the sequence.
+ *
+ * When `true` is returned, iteration proceeds as normal. When `false` is
+ * returned, iteration stops. */
+typedef bool (*protolayer_event_cb)(enum protolayer_event_type event,
+                                    void **baton,
+                                    struct protolayer_manager *manager,
+                                    struct protolayer_data *layer);
+
+/** Function type for (de)initialization callbacks of layers.
+ *
+ * Returning 0 means success, other return values mean error and halt the
+ * initialization. */
 typedef int (*protolayer_data_cb)(struct protolayer_manager *manager,
                                   struct protolayer_data *layer);
 
@@ -373,12 +359,16 @@ struct protolayer_globals {
 	protolayer_data_cb iter_deinit; /**< Called at the end of a layer
 	                                 * sequence to deinitialize
 	                                 * layer-specific iteration data. */
+
 	protolayer_cb unwrap; /**< Strips the buffer of protocol-specific
 	                       * data. E.g. a HTTP layer removes HTTP
 	                       * status and headers. */
 	protolayer_cb wrap;   /**< Wraps the buffer into protocol-specific
 	                       * data. E.g. a HTTP layer adds HTTP status
 	                       * and headers. */
+
+	protolayer_event_cb event_unwrap; /**< Processes events in the unwrap order. */
+	protolayer_event_cb event_wrap; /**< Processes events in the wrap order. */
 };
 
 /** Global data about layered protocols. Indexed by `enum protolayer_protocol`. */
@@ -456,22 +446,22 @@ int wire_buf_movestart(struct wire_buf *wb);
 /** Resets the valid bytes of the buffer to zero, as well as the error flag. */
 int wire_buf_reset(struct wire_buf *wb);
 
-static void *wire_buf_data(const struct wire_buf *wb)
+static inline void *wire_buf_data(const struct wire_buf *wb)
 {
 	return &wb->buf[wb->start];
 }
 
-static size_t wire_buf_data_length(const struct wire_buf *wb)
+static inline size_t wire_buf_data_length(const struct wire_buf *wb)
 {
 	return wb->end - wb->start;
 }
 
-static void *wire_buf_free_space(const struct wire_buf *wb)
+static inline void *wire_buf_free_space(const struct wire_buf *wb)
 {
 	return &wb->buf[wb->end];
 }
 
-static size_t wire_buf_free_space_length(const struct wire_buf *wb)
+static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 {
 	return wb->size - wb->end;
 }
@@ -670,19 +660,10 @@ int session2_unwrap(struct session2 *s, struct protolayer_payload payload,
 int session2_wrap(struct session2 *s, struct protolayer_payload payload,
                   const void *target, protolayer_finished_cb cb, void *baton);
 
-/** Convenience function to send the specified event to be processed in the
- * `unwrap` direction. `data` may be `NULL`.
- *
- * See `session2_unwrap` for more information. */
-static inline int session2_event(struct session2 *s,
-                                 enum protolayer_event_type type, void *data)
-{
-	struct protolayer_event event = {
-		.type = type,
-		.data = { .ptr = data }
-	};
-	return session2_unwrap(s, protolayer_event(event), NULL, NULL, NULL);
-}
+/** Sends an event to be synchronously processed by the protocol layers of the
+ * specified session. The layers are first iterated through in the `_UNWRAP`
+ * direction, then bounced back in the `_WRAP` direction. */
+void session2_event(struct session2 *s, enum protolayer_event_type type, void *baton);
 
 /** Removes the specified request task from the session's tasklist. The session
  * must be outgoing. If the session is UDP, a signal to close is also sent to it. */

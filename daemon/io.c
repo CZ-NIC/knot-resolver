@@ -147,11 +147,6 @@ static int pl_udp_iter_init(struct protolayer_manager *manager, struct protolaye
 
 static enum protolayer_cb_result pl_udp_unwrap(struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
 {
-	if (ctx->payload.type == PROTOLAYER_PAYLOAD_EVENT) {
-		/* events should not happen in UDP (currently) */
-		return protolayer_continue(ctx);
-	}
-
 	ctx->payload = protolayer_as_buffer(&ctx->payload);
 	if (kr_fails_assert(ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER)) {
 		/* unsupported payload */
@@ -238,75 +233,11 @@ static int pl_tcp_sess_deinit(struct protolayer_manager *manager, struct protola
 	return 0;
 }
 
-static enum protolayer_cb_result pl_tcp_unwrap_timeout(
-		struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
-{
-	struct session2 *s = ctx->manager->session;
-
-	if (kr_fails_assert(!s->closing))
-		return protolayer_continue(ctx);
-
-	if (!session2_tasklist_is_empty(s)) {
-		int finalized = session2_tasklist_finalize_expired(s);
-		the_worker->stats.timeout += finalized;
-		/* session2_tasklist_finalize_expired() may call worker_task_finalize().
-		 * If session is a source session and there were IO errors,
-		 * worker_task_finalize() can finalize all tasks and close session. */
-		if (s->closing)
-			return protolayer_continue(ctx);
-	}
-
-	if (!session2_tasklist_is_empty(s)) {
-		session2_timer_stop(s);
-		session2_timer_start(s,
-				KR_RESOLVE_TIME_LIMIT / 2,
-				KR_RESOLVE_TIME_LIMIT / 2);
-	} else {
-		/* Normally it should not happen,
-		 * but better to check if there anything in this list. */
-		while (!session2_waitinglist_is_empty(s)) {
-			struct qr_task *t = session2_waitinglist_pop(s, false);
-			worker_task_finalize(t, KR_STATE_FAIL);
-			worker_task_unref(t);
-			the_worker->stats.timeout += 1;
-			if (s->closing)
-				return protolayer_continue(ctx);
-		}
-		uint64_t idle_in_timeout = the_network->tcp.in_idle_timeout;
-		uint64_t idle_time = kr_now() - s->last_activity;
-		if (idle_time < idle_in_timeout) {
-			idle_in_timeout -= idle_time;
-			session2_timer_stop(s);
-			session2_timer_start(s, idle_in_timeout, idle_in_timeout);
-		} else {
-			struct sockaddr *peer = session2_get_peer(s);
-			char *peer_str = kr_straddr(peer);
-			kr_log_debug(IO, "=> closing connection to '%s'\n",
-				       peer_str ? peer_str : "");
-			if (s->outgoing) {
-				worker_del_tcp_waiting(peer);
-				worker_del_tcp_connected(peer);
-			}
-			session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
-		}
-	}
-
-	return protolayer_continue(ctx);
-}
-
 static enum protolayer_cb_result pl_tcp_unwrap(struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
 {
 	struct session2 *s = ctx->manager->session;
 	struct pl_tcp_sess_data *tcp = protolayer_sess_data(layer);
 	struct sockaddr *peer = session2_get_peer(s);
-
-	if (ctx->payload.type == PROTOLAYER_PAYLOAD_EVENT) {
-		if (ctx->payload.event.type == PROTOLAYER_EVENT_TIMEOUT)
-			return pl_tcp_unwrap_timeout(layer, ctx);
-
-		/* pass thru */
-		return protolayer_continue(ctx);
-	}
 
 	if (ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
 		const char *buf = ctx->payload.buffer.buf;
@@ -356,8 +287,8 @@ static enum protolayer_cb_result pl_tcp_unwrap(struct protolayer_data *layer, st
 						kr_straddr(peer));
 			}
 			worker_end_tcp(s);
-			ctx->payload = protolayer_event_nd(PROTOLAYER_EVENT_CLOSE);
-			return protolayer_push(ctx);
+			session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
+			return protolayer_break(ctx, ECONNRESET);
 		}
 
 		ssize_t trimmed = proxy_process_header(&tcp->proxy, data, data_len);
@@ -374,11 +305,11 @@ static enum protolayer_cb_result pl_tcp_unwrap(struct protolayer_data *layer, st
 				}
 			}
 			worker_end_tcp(s);
-			ctx->payload = protolayer_event_nd(PROTOLAYER_EVENT_CLOSE);
-			return protolayer_push(ctx);
+			session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
+			return protolayer_break(ctx, ECONNRESET);
 		} else if (trimmed == 0) {
-			ctx->payload = protolayer_event_nd(PROTOLAYER_EVENT_CLOSE);
-			return protolayer_push(ctx);
+			session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
+			return protolayer_break(ctx, ECONNRESET);
 		}
 
 		if (tcp->proxy.command != PROXY2_CMD_LOCAL && tcp->proxy.family != AF_UNSPEC) {

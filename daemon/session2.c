@@ -22,9 +22,8 @@ static inline int session2_transport_push(struct session2 *s,
                                           const void *target,
                                           protolayer_finished_cb cb, void *baton);
 static int session2_transport_event(struct session2 *s,
-                                    struct protolayer_event event,
-                                    const void *target,
-                                    protolayer_finished_cb cb, void *baton);
+                                    enum protolayer_event_type event,
+                                    void *baton);
 
 struct protolayer_globals protolayer_globals[PROTOLAYER_PROTOCOL_COUNT] = {0};
 
@@ -162,14 +161,6 @@ static int protolayer_cb_ctx_finish(struct protolayer_cb_ctx *ctx, int ret,
 		ctx->finished_cb(ret, session, ctx->finished_cb_target,
 				ctx->finished_cb_baton);
 
-	/* events bounce back from unwrap to wrap */
-	bool bounce_back = (ctx->direction == PROTOLAYER_UNWRAP
-			&& ret == PROTOLAYER_RET_NORMAL
-			&& !ctx->status
-			&& ctx->payload.type == PROTOLAYER_PAYLOAD_EVENT);
-	if (bounce_back)
-		session2_wrap(session, ctx->payload, NULL, NULL, NULL);
-
 	free(ctx);
 
 	return ret;
@@ -277,14 +268,9 @@ static int protolayer_manager_submit(
 
 	if (kr_log_is_debug(PROTOLAYER, NULL)) {
 		const char *sess_dir = manager->session->outgoing ? "out" : "in";
-		const char *event_name = (payload.type == PROTOLAYER_PAYLOAD_EVENT)
-			? protolayer_event_names[payload.event.type]
-			: "";
-		const char *event_space = (payload.type == PROTOLAYER_PAYLOAD_EVENT) ? " " : "";
-		kr_log_debug(PROTOLAYER, "[%s] %s%s%s submitted to grp '%s' in %s direction\n",
+		kr_log_debug(PROTOLAYER, "[%s] %s submitted to grp '%s' in %s direction\n",
 				sess_dir,
 				protolayer_payload_names[payload.type],
-				event_space, event_name,
 				protolayer_grp_names[manager->grp],
 				(direction == PROTOLAYER_UNWRAP) ? "unwrap" : "wrap");
 	}
@@ -445,10 +431,6 @@ enum protolayer_cb_result protolayer_push(struct protolayer_cb_ctx *ctx)
 	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_IOVEC) {
 		ret = session2_transport_pushv(session,
 				ctx->payload.iovec.iov, ctx->payload.iovec.cnt,
-				ctx->target, protolayer_push_finished, ctx);
-	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_EVENT) {
-		ret = session2_transport_event(session,
-				ctx->payload.event,
 				ctx->target, protolayer_push_finished, ctx);
 	} else {
 		kr_assert(false && "Invalid payload type");
@@ -886,6 +868,50 @@ int session2_wrap(struct session2 *s, struct protolayer_payload payload,
 			payload, target, cb, baton);
 }
 
+static void session2_event_wrap(struct session2 *s, enum protolayer_event_type event, void *baton)
+{
+	bool cont;
+	struct protolayer_manager *m = s->layers;
+	for (ssize_t i = m->num_layers - 1; i >= 0; i--) {
+		struct protolayer_data *data = protolayer_manager_get(m, i);
+		struct protolayer_globals *globals = &protolayer_globals[data->protocol];
+		if (globals->event_wrap)
+			cont = globals->event_wrap(event, &baton, m, data);
+		else
+			cont = true;
+
+		if (!cont)
+			return;
+	}
+
+	session2_transport_event(s, event, baton);
+}
+
+void session2_event(struct session2 *s, enum protolayer_event_type event, void *baton)
+{
+	bool cont;
+	struct protolayer_manager *m = s->layers;
+	for (ssize_t i = 0; i < m->num_layers; i++) {
+		struct protolayer_data *data = protolayer_manager_get(m, i);
+		struct protolayer_globals *globals = &protolayer_globals[data->protocol];
+		if (globals->event_unwrap)
+			cont = globals->event_unwrap(event, &baton, m, data);
+		else
+			cont = true;
+
+		if (!cont)
+			return;
+	}
+
+	/* Immediately bounce back in the `wrap` direction.
+	 *
+	 * TODO: This might be undesirable for cases with sub-sessions - the
+	 * current idea is for the layers managing sub-sessions to just return
+	 * `false` on `event_unwrap`, but a more "automatic" mechanism may be
+	 * added when this is relevant, to make it less error-prone. */
+	session2_event_wrap(s, event, baton);
+}
+
 
 struct parent_pushv_ctx {
 	struct session2 *session;
@@ -1068,101 +1094,47 @@ static inline int session2_transport_push(struct session2 *s,
 			session2_transport_single_push_finished, ctx);
 }
 
-struct event_ctx {
-	struct session2 *session;
-	protolayer_finished_cb cb;
-	void *baton;
-	const void *target;
-};
-
-static void session2_transport_io_event_finished(uv_handle_t *handle)
-{
-	struct session2 *s = handle->data;
-	struct event_ctx *ctx = s->data;
-	if (ctx->cb)
-		ctx->cb(kr_ok(), ctx->session, ctx->target, ctx->baton);
-	free(ctx);
-}
-
-static void session2_transport_parent_event_finished(int status,
-                                                     struct session2 *session,
-                                                     const void *target,
-                                                     void *baton)
-{
-	struct event_ctx *ctx = baton;
-	if (ctx->cb)
-		ctx->cb(status, ctx->session, target, ctx->baton);
-	free(ctx);
-}
-
-static int session2_handle_close(struct session2 *s, uv_handle_t *handle,
-                                 struct event_ctx *ctx)
+static int session2_handle_close(struct session2 *s, uv_handle_t *handle)
 {
 	io_stop_read(handle);
-	s->data = ctx;
-	uv_close(handle, session2_transport_io_event_finished);
+	uv_close(handle, NULL);
 
 	return kr_ok();
 }
 
 static int session2_transport_event(struct session2 *s,
-                                    struct protolayer_event event,
-                                    const void *target,
-                                    protolayer_finished_cb cb, void *baton)
+                                    enum protolayer_event_type event,
+                                    void *baton)
 {
-	if (s->closing) {
-		if (cb)
-			cb(kr_error(ESTALE), s, target, baton);
+	if (s->closing)
 		return kr_ok();
-	}
 
-	bool is_close_event = (event.type == PROTOLAYER_EVENT_CLOSE ||
-			event.type == PROTOLAYER_EVENT_FORCE_CLOSE);
+	bool is_close_event = (event == PROTOLAYER_EVENT_CLOSE ||
+			event == PROTOLAYER_EVENT_FORCE_CLOSE);
 	if (is_close_event) {
 		kr_require(session2_is_empty(s));
 		session2_timer_stop(s);
 		s->closing = true;
 	}
 
-	struct event_ctx *ctx = malloc(sizeof(*ctx));
-	kr_require(ctx);
-	*ctx = (struct event_ctx){
-		.session = s,
-		.cb = cb,
-		.baton = baton,
-		.target = target
-	};
-
 	switch (s->transport.type) {
 	case SESSION2_TRANSPORT_IO:;
 		uv_handle_t *handle = s->transport.io.handle;
 		if (kr_fails_assert(handle)) {
-			free(ctx);
 			return kr_error(EINVAL);
 		}
 
 		if (is_close_event)
-			return session2_handle_close(s, handle, ctx);
+			return session2_handle_close(s, handle);
 
-		if (ctx->cb)
-			ctx->cb(kr_ok(), s, target, baton);
-
-		free(ctx);
 		return kr_ok();
 
 	case SESSION2_TRANSPORT_PARENT:;
-		int ret = session2_wrap(s, protolayer_event(event), target,
-				session2_transport_parent_event_finished, ctx);
-		if (ret < 0) {
-			free(ctx);
-			return ret;
-		}
-
+		session2_event_wrap(s, event, baton);
 		return kr_ok();
 
 	default:
 		kr_assert(false && "Invalid transport");
-		free(ctx);
 		return kr_error(EINVAL);
 	}
 }

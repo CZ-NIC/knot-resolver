@@ -2080,19 +2080,24 @@ static inline knot_pkt_t *produce_packet_dgram(char *buf, size_t buf_len)
 	return knot_pkt_new(buf, buf_len, &the_worker->pkt_pool);
 }
 
-static enum protolayer_cb_result pl_dns_dgram_unwrap_timeout(
-		struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
+static bool pl_dns_dgram_event_unwrap(enum protolayer_event_type event,
+                                      void **baton,
+                                      struct protolayer_manager *manager,
+                                      struct protolayer_data *layer)
 {
-	struct session2 *session = ctx->manager->session;
-	kr_assert(session2_get_handle(session)->data == session);
-	kr_assert(session2_tasklist_get_len(session) == 1);
-	kr_assert(session2_waitinglist_is_empty(session));
+	if (event != PROTOLAYER_EVENT_TIMEOUT)
+		return true;
+
+	struct session2 *session = manager->session;
+	if (session2_tasklist_get_len(session) != 1 ||
+			!session2_waitinglist_is_empty(session))
+		return true;
 
 	session2_timer_stop(session);
 
 	struct qr_task *task = session2_tasklist_get_first(session);
 	if (!task)
-		return protolayer_continue(ctx);
+		return true;
 
 	if (task->leading && task->pending_count > 0) {
 		struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
@@ -2103,21 +2108,12 @@ static enum protolayer_cb_result pl_dns_dgram_unwrap_timeout(
 	the_worker->stats.timeout += 1;
 	qr_task_step(task, NULL, NULL);
 
-	return protolayer_continue(ctx);
+	return true;
 }
 
 static enum protolayer_cb_result pl_dns_dgram_unwrap(
 		struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
 {
-
-	if (ctx->payload.type == PROTOLAYER_PAYLOAD_EVENT) {
-		if (ctx->payload.event.type == PROTOLAYER_EVENT_TIMEOUT)
-			return pl_dns_dgram_unwrap_timeout(layer, ctx);
-
-		/* pass thru */
-		return protolayer_continue(ctx);
-	}
-
 	struct session2 *session = ctx->manager->session;
 
 	if (ctx->payload.type == PROTOLAYER_PAYLOAD_IOVEC) {
@@ -2214,14 +2210,61 @@ static int pl_dns_stream_iter_deinit(struct protolayer_manager *manager,
 	return kr_ok();
 }
 
-static enum protolayer_cb_result pl_dns_stream_unwrap_timeout(
-		struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
+static bool pl_dns_stream_resolution_timeout(struct session2 *s)
 {
-	struct session2 *session = ctx->manager->session;
-	if (session->connected || session->closing)
-		return protolayer_continue(ctx);
+	if (kr_fails_assert(!s->closing))
+		return true;
 
-	/* Connection timeout */
+	if (!session2_tasklist_is_empty(s)) {
+		int finalized = session2_tasklist_finalize_expired(s);
+		the_worker->stats.timeout += finalized;
+		/* session2_tasklist_finalize_expired() may call worker_task_finalize().
+		 * If session is a source session and there were IO errors,
+		 * worker_task_finalize() can finalize all tasks and close session. */
+		if (s->closing)
+			return true;
+	}
+
+	if (!session2_tasklist_is_empty(s)) {
+		session2_timer_stop(s);
+		session2_timer_start(s,
+				KR_RESOLVE_TIME_LIMIT / 2,
+				KR_RESOLVE_TIME_LIMIT / 2);
+	} else {
+		/* Normally it should not happen,
+		 * but better to check if there anything in this list. */
+		while (!session2_waitinglist_is_empty(s)) {
+			struct qr_task *t = session2_waitinglist_pop(s, false);
+			worker_task_finalize(t, KR_STATE_FAIL);
+			worker_task_unref(t);
+			the_worker->stats.timeout += 1;
+			if (s->closing)
+				return true;
+		}
+		uint64_t idle_in_timeout = the_network->tcp.in_idle_timeout;
+		uint64_t idle_time = kr_now() - s->last_activity;
+		if (idle_time < idle_in_timeout) {
+			idle_in_timeout -= idle_time;
+			session2_timer_stop(s);
+			session2_timer_start(s, idle_in_timeout, idle_in_timeout);
+		} else {
+			struct sockaddr *peer = session2_get_peer(s);
+			char *peer_str = kr_straddr(peer);
+			kr_log_debug(IO, "=> closing connection to '%s'\n",
+				       peer_str ? peer_str : "");
+			if (s->outgoing) {
+				worker_del_tcp_waiting(peer);
+				worker_del_tcp_connected(peer);
+			}
+			session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
+		}
+	}
+
+	return true;
+}
+
+static bool pl_dns_stream_connection_timeout(struct session2 *session)
+{
 	session2_timer_stop(session);
 
 	kr_assert(session2_tasklist_is_empty(session));
@@ -2235,7 +2278,7 @@ static enum protolayer_cb_result pl_dns_stream_unwrap_timeout(
 		const char *peer_str = kr_straddr(peer);
 		VERBOSE_MSG(NULL, "=> connection to '%s' failed (internal timeout), empty waitinglist\n",
 			    peer_str ? peer_str : "");
-		return protolayer_continue(ctx);
+		return true;
 	}
 
 	struct kr_query *qry = task_get_last_pending_query(task);
@@ -2259,20 +2302,27 @@ static enum protolayer_cb_result pl_dns_stream_unwrap_timeout(
 	 * If no, most likely this is timed out connection even if
 	 * it was successful. */
 
-	return protolayer_continue(ctx);
+	return true;
+}
+
+static bool pl_dns_stream_event_unwrap(enum protolayer_event_type event,
+                                       void **baton,
+                                       struct protolayer_manager *manager,
+                                       struct protolayer_data *layer)
+{
+	struct session2 *session = manager->session;
+	if (session->closing || event != PROTOLAYER_EVENT_TIMEOUT)
+		return true;
+
+	if (session->connected)
+		return pl_dns_stream_resolution_timeout(manager->session);
+	else
+		return pl_dns_stream_connection_timeout(manager->session);
 }
 
 static enum protolayer_cb_result pl_dns_stream_unwrap(
 		struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
 {
-	if (ctx->payload.type == PROTOLAYER_PAYLOAD_EVENT) {
-		if (ctx->payload.event.type == PROTOLAYER_EVENT_TIMEOUT)
-			return pl_dns_stream_unwrap_timeout(layer, ctx);
-
-		/* pass thru */
-		return protolayer_continue(ctx);
-	}
-
 	if (kr_fails_assert(ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF)) {
 		/* DNS stream only works with a wire buffer */
 		return protolayer_break(ctx, kr_error(EINVAL));
@@ -2312,11 +2362,6 @@ struct sized_iovs {
 static enum protolayer_cb_result pl_dns_stream_wrap(
 		struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
 {
-	if (ctx->payload.type == PROTOLAYER_PAYLOAD_EVENT) {
-		/* pass thru */
-		return protolayer_continue(ctx);
-	}
-
 	struct pl_dns_stream_iter_data *stream = protolayer_iter_data(layer);
 	struct session2 *s = ctx->manager->session;
 
@@ -2388,6 +2433,7 @@ int worker_init(void)
 	/* DNS protocol layers */
 	protolayer_globals[PROTOLAYER_DNS_DGRAM] = (struct protolayer_globals){
 		.unwrap = pl_dns_dgram_unwrap,
+		.event_unwrap = pl_dns_dgram_event_unwrap
 	};
 	const struct protolayer_globals stream_common = {
 		.sess_size = sizeof(struct pl_dns_stream_sess_data),
@@ -2396,7 +2442,8 @@ int worker_init(void)
 		.iter_init = pl_dns_stream_iter_init,
 		.iter_deinit = pl_dns_stream_iter_deinit,
 		.unwrap = pl_dns_stream_unwrap,
-		.wrap = pl_dns_stream_wrap
+		.wrap = pl_dns_stream_wrap,
+		.event_unwrap = pl_dns_stream_event_unwrap
 	};
 	protolayer_globals[PROTOLAYER_DNS_MSTREAM] = stream_common;
 	protolayer_globals[PROTOLAYER_DNS_MSTREAM].sess_init = pl_dns_mstream_sess_init;
