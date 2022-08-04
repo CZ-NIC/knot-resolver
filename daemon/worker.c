@@ -2075,7 +2075,7 @@ void worker_deinit(void)
 	the_worker = NULL;
 }
 
-static inline knot_pkt_t *produce_packet_dgram(char *buf, size_t buf_len)
+static inline knot_pkt_t *produce_packet(char *buf, size_t buf_len)
 {
 	return knot_pkt_new(buf, buf_len, &the_worker->pkt_pool);
 }
@@ -2120,7 +2120,7 @@ static enum protolayer_cb_result pl_dns_dgram_unwrap(
 		int ret = kr_ok();
 		for (int i = 0; i < ctx->payload.iovec.cnt; i++) {
 			struct iovec *iov = &ctx->payload.iovec.iov[i];
-			knot_pkt_t *pkt = produce_packet_dgram(
+			knot_pkt_t *pkt = produce_packet(
 					iov->iov_base, iov->iov_len);
 			if (!pkt) {
 				ret = KNOT_EMALF;
@@ -2134,7 +2134,7 @@ static enum protolayer_cb_result pl_dns_dgram_unwrap(
 
 		return protolayer_break(ctx, ret);
 	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
-		knot_pkt_t *pkt = produce_packet_dgram(
+		knot_pkt_t *pkt = produce_packet(
 				ctx->payload.buffer.buf,
 				ctx->payload.buffer.len);
 		if (!pkt)
@@ -2143,7 +2143,7 @@ static enum protolayer_cb_result pl_dns_dgram_unwrap(
 		int ret = worker_submit(session, &ctx->comm, NULL, NULL, pkt);
 		return protolayer_break(ctx, ret);
 	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
-		knot_pkt_t *pkt = produce_packet_dgram(
+		knot_pkt_t *pkt = produce_packet(
 				wire_buf_data(ctx->payload.wire_buf),
 				wire_buf_data_length(ctx->payload.wire_buf));
 		if (!pkt)
@@ -2339,23 +2339,27 @@ static enum protolayer_cb_result pl_dns_stream_unwrap(
 	}
 
 	struct wire_buf *wb = ctx->payload.wire_buf;
-	size_t pkt_len = ntohs(*(uint16_t *)wire_buf_data(wb));
+	if (wire_buf_data_length(wb) < sizeof(uint16_t))
+		return protolayer_break(ctx, KNOT_EMALF);
+
+	uint16_t pkt_len = knot_wire_read_u16(wire_buf_data(wb));
 	if (wire_buf_data_length(wb) < pkt_len + sizeof(uint16_t))
 		return protolayer_wait(ctx);
 
 	wire_buf_trim(wb, sizeof(uint16_t));
-	knot_pkt_t *pkt = produce_packet_dgram(wire_buf_data(wb), pkt_len);
+	knot_pkt_t *pkt = produce_packet(wire_buf_data(wb), pkt_len);
 	wire_buf_trim(wb, pkt_len);
 	stream->produced = true;
 	if (!pkt)
 		return protolayer_break(ctx, KNOT_EMALF);
 
 	int ret = worker_submit(ctx->manager->session, &ctx->comm, NULL, NULL, pkt);
+	wire_buf_movestart(wb);
 	return protolayer_break(ctx, ret);
 }
 
 struct sized_iovs {
-	uint16_t nlen;
+	uint8_t nlen[2];
 	struct iovec iovs[];
 };
 
@@ -2376,7 +2380,7 @@ static enum protolayer_cb_result pl_dns_stream_wrap(
 		struct sized_iovs *siov = mm_alloc(&s->pool,
 				sizeof(*siov) + iovcnt * sizeof(struct iovec));
 		kr_require(siov);
-		siov->nlen = htons(ctx->payload.buffer.len);
+		knot_wire_write_u16(siov->nlen, ctx->payload.buffer.len);
 		siov->iovs[0] = (struct iovec){
 			.iov_base = &siov->nlen,
 			.iov_len = sizeof(siov->nlen)
@@ -2406,7 +2410,7 @@ static enum protolayer_cb_result pl_dns_stream_wrap(
 
 		if (kr_fails_assert(total_len <= UINT16_MAX))
 			return protolayer_break(ctx, kr_error(EMSGSIZE));
-		siov->nlen = htons(total_len);
+		knot_wire_write_u16(siov->nlen, total_len);
 		siov->iovs[0] = (struct iovec){
 			.iov_base = &siov->nlen,
 			.iov_len = sizeof(siov->nlen)
