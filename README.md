@@ -26,7 +26,7 @@ to add this repository to your system.
 
 Knot Resolver is also available from the following distributions' repositories.
 
-* [Fedora and Fedora EPEL](https://apps.fedoraproject.org/packages/knot-resolver)
+* [Fedora and Fedora EPEL](https://src.fedoraproject.org/rpms/knot-resolver)
 * [Debian stable](https://packages.debian.org/stable/knot-resolver),
   [Debian testing](https://packages.debian.org/testing/knot-resolver),
   [Debian unstable](https://packages.debian.org/sid/knot-resolver)
