@@ -73,7 +73,7 @@ class ProcessTypeConfig:
             workdir=cwd,
             command=f"{kresd_executable()} -c {kresd_config_file_supervisord_pattern(config)} -n",
             environment='SYSTEMD_INSTANCE="%(process_num)d",X-SUPERVISORD-TYPE=notify',
-            max_procs=config.max_workers,
+            max_procs=int(config.max_workers) + 1,  # +1 for the canary process
         )
 
     @staticmethod
