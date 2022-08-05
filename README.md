@@ -30,7 +30,7 @@ Knot Resolver is also available from the following distributions' repositories.
 * [Debian stable](https://packages.debian.org/stable/knot-resolver),
   [Debian testing](https://packages.debian.org/testing/knot-resolver),
   [Debian unstable](https://packages.debian.org/sid/knot-resolver)
-* [Ubuntu](https://packages.ubuntu.com/bionic/knot-resolver)
+* [Ubuntu](https://packages.ubuntu.com/jammy/knot-resolver)
 * [Arch Linux](https://archlinux.org/packages/community/x86_64/knot-resolver/)
 * [Alpine Linux](https://pkgs.alpinelinux.org/packages?name=knot-resolver)
 
