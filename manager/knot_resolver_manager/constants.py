@@ -30,7 +30,7 @@ def kresd_cache_dir(config: "KresConfig") -> Path:
 
 
 def kresd_config_file(_config: "KresConfig", kres_id: "KresID") -> Path:
-    return Path(f"{kres_id}.conf")
+    return Path(f"kresd{int(kres_id)}.conf")
 
 
 def kresd_config_file_supervisord_pattern(_config: "KresConfig") -> Path:

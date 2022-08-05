@@ -28,27 +28,13 @@ class KresID:
     ID object used for identifying subprocesses.
     """
 
-    _used: "WeakValueDictionary[int, KresID]" = WeakValueDictionary()
+    _used: "Dict[SubprocessType, WeakValueDictionary[int, KresID]]" = {k: WeakValueDictionary() for k in SubprocessType}
 
     @classmethod
     def alloc(cls: Type[T], typ: SubprocessType) -> T:
-        # we split them in order to make the numbers nice (no gaps, pretty naming)
-        # there are no strictly technical reasons to do this
-        #
-        # GC - negative IDs
-        # KRESD - positive IDs
-        if typ is SubprocessType.GC:
-            start = -1
-            step = -1
-        elif typ is SubprocessType.KRESD:
-            start = 1
-            step = 1
-        else:
-            raise RuntimeError(f"Unexpected subprocess type {typ}")
-
         # find free ID closest to zero
-        for i in itertools.count(start=start, step=step):
-            if i not in cls._used:
+        for i in itertools.count(start=0, step=1):
+            if i not in cls._used[typ]:
                 res = cls.new(typ, i)
                 return res
 
@@ -56,14 +42,14 @@ class KresID:
 
     @classmethod
     def new(cls: "Type[T]", typ: SubprocessType, n: int) -> "T":
-        if n in cls._used:
+        if n in cls._used[typ]:
             # Ignoring typing here, because I can't find a way how to make the _used dict
             # typed based on subclass. I am not even sure that it's different between subclasses,
             # it's probably still the same dict. But we don't really care about it
-            return cls._used[n]  # type: ignore
+            return cls._used[typ][n]  # type: ignore
         else:
             val = cls(typ, n, _i_know_what_i_am_doing=True)
-            cls._used[n] = val
+            cls._used[typ][n] = val
             return val
 
     def __init__(self, typ: SubprocessType, n: int, _i_know_what_i_am_doing: bool = False):
@@ -100,6 +86,9 @@ class KresID:
         Inverse of __str__
         """
         raise NotImplementedError()
+
+    def __int__(self) -> int:
+        return self._id
 
 
 class Subprocess:

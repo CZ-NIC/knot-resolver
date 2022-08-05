@@ -28,17 +28,17 @@ class SupervisordKresID(KresID):
 
     @staticmethod
     def from_string(val: str) -> "SupervisordKresID":
-        if val == "gc":
-            return SupervisordKresID.new(SubprocessType.GC, -1)
+        if val == "gc:gc":
+            return SupervisordKresID.new(SubprocessType.GC, 0)
         else:
-            val = val.replace("kresd", "")
+            val = val.replace("kresd:kresd", "")
             return SupervisordKresID.new(SubprocessType.KRESD, int(val))
 
     def __str__(self) -> str:
         if self.subprocess_type is SubprocessType.GC:
             return "gc"
         elif self.subprocess_type is SubprocessType.KRESD:
-            return f"kresd{self._id}"
+            return f"kresd:kresd{self._id}"
         else:
             raise RuntimeError(f"Unexpected subprocess type {self.subprocess_type}")
 

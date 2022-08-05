@@ -166,7 +166,11 @@ def _list_running_subprocesses(config: KresConfig) -> Dict[SupervisordKresID, Su
     processes = [pr for pr in processes if pr["name"] != "manager"]
 
     # convert all the names
-    return {SupervisordKresID.from_string(pr["name"]): convert(pr) for pr in processes if pr["statename"] != "STOPPED"}
+    return {
+        SupervisordKresID.from_string(f"{pr['group']}:{pr['name']}"): convert(pr)
+        for pr in processes
+        if pr["statename"] != "STOPPED"
+    }
 
 
 class SupervisordSubprocess(Subprocess):
@@ -182,31 +186,31 @@ class SupervisordSubprocess(Subprocess):
             super().__init__(config, base_id)
         self._controller: "SupervisordSubprocessController" = controller
 
-    def _name(self):
-        if self.type is SubprocessType.GC:
-            return str(self.id)
-        else:
-            return f"kresd:{self.id}"
+    @property
+    def name(self):
+        return str(self.id)
 
     @async_in_a_thread
     def _start(self) -> None:
+        # +1 for canary process (same as in config_file.py)
+        assert int(self.id) <= int(self._config.max_workers) + 1, "trying to spawn more than allowed limit of workers"
         try:
             supervisord = _create_fast_proxy(self._config)
-            supervisord.startProcess(self._name())
+            supervisord.startProcess(self.name)
         except Fault as e:
             raise SubprocessControllerException(f"failed to start '{self.id}'") from e
 
     @async_in_a_thread
     def _stop(self) -> None:
         supervisord = _create_supervisord_proxy(self._config)
-        supervisord.stopProcess(self._name())
+        supervisord.stopProcess(self.name)
 
     @async_in_a_thread
     def _restart(self) -> None:
         supervisord = _create_supervisord_proxy(self._config)
-        supervisord.stopProcess(self._name())
+        supervisord.stopProcess(self.name)
         fast = _create_fast_proxy(self._config)
-        fast.startProcess(self._name())
+        fast.startProcess(self.name)
 
     def get_used_config(self) -> KresConfig:
         return self._config
