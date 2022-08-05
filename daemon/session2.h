@@ -147,7 +147,8 @@ typedef void (*protolayer_finished_cb)(int status, struct session2 *session,
 	                 * any disconnection ceremony, if
 	                 * avoidable. */\
 	XX(TIMEOUT) /**< Signal that the session has timed out. */\
-	XX(CONNECT) /**< Signal that a connection has been established. */
+	XX(CONNECT) /**< Signal that a connection has been established. */\
+	XX(DISCONNECT) /**< Signal that a connection has ended. */
 
 /** Event type, to be interpreted by a layer. */
 enum protolayer_event_type {

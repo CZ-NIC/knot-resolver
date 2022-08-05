@@ -287,8 +287,7 @@ static enum protolayer_cb_result pl_tcp_unwrap(struct protolayer_data *layer, st
 						kr_straddr(peer));
 			}
 			worker_end_tcp(s);
-			session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
-			return protolayer_break(ctx, ECONNRESET);
+			return protolayer_break(ctx, kr_error(ECONNRESET));
 		}
 
 		ssize_t trimmed = proxy_process_header(&tcp->proxy, data, data_len);
@@ -305,11 +304,10 @@ static enum protolayer_cb_result pl_tcp_unwrap(struct protolayer_data *layer, st
 				}
 			}
 			worker_end_tcp(s);
-			session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
-			return protolayer_break(ctx, ECONNRESET);
+			return protolayer_break(ctx, kr_error(ECONNRESET));
 		} else if (trimmed == 0) {
 			session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
-			return protolayer_break(ctx, ECONNRESET);
+			return protolayer_break(ctx, kr_error(ECONNRESET));
 		}
 
 		if (tcp->proxy.command != PROXY2_CMD_LOCAL && tcp->proxy.family != AF_UNSPEC) {
@@ -696,6 +694,7 @@ static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp
 //		}
 //	}
 //#endif
+	session2_event(s, PROTOLAYER_EVENT_CONNECT, NULL);
 	session2_timer_start(s, timeout, idle_in_timeout);
 	io_start_read((uv_handle_t *)client);
 }
