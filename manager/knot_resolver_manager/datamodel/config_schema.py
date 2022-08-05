@@ -71,6 +71,13 @@ def _cpu_count() -> Optional[int]:
         return cpus
 
 
+def _default_max_worker_count() -> Optional[int]:
+    c = _cpu_count()
+    if c is not None:
+        return c * 10
+    return MAX_WORKERS
+
+
 class KresConfig(BaseSchema):
     class Raw(BaseSchema):
         """
@@ -105,7 +112,7 @@ class KresConfig(BaseSchema):
         hostname: Optional[str] = None
         rundir: UncheckedPath = UncheckedPath(".")
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
-        max_workers: IntPositive = IntPositive(MAX_WORKERS)
+        max_workers: IntPositive = IntPositive(_default_max_worker_count())
         management: ManagementSchema = ManagementSchema({"unix-socket": "./manager.sock"})
         webmgmt: Optional[WebmgmtSchema] = None
         options: OptionsSchema = OptionsSchema()
@@ -176,12 +183,16 @@ class KresConfig(BaseSchema):
         return obj.dns64
 
     def _validate(self) -> None:
-        cpu_count = _cpu_count()
+        # enforce max-workers config
+        if int(self.workers) > int(self.max_workers):
+            raise ValueError(f"can't run with more workers then the configured maximum {self.max_workers}")
 
+        # sanity check
+        cpu_count = _cpu_count()
         if cpu_count and int(self.workers) > 10 * cpu_count:
-            raise ValueError("refusing to run with more then 10 workers per cpu core")
-        elif int(self.workers) > MAX_WORKERS:
-            raise ValueError(f"refusing to run with more workers then allowed maximum {MAX_WORKERS}")
+            raise ValueError(
+                "refusing to run with more then 10 workers per cpu core, the system wouldn't behave nicely"
+            )
 
     def render_lua(self) -> str:
         # FIXME the `cwd` argument is used only for configuring control socket path
