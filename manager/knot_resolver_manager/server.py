@@ -7,13 +7,14 @@ import sys
 from http import HTTPStatus
 from pathlib import Path
 from time import time
-from typing import Any, Optional, Set, Union
+from typing import Any, Optional, Set, Union, cast
 
-from aiohttp import web
+from aiohttp import ETag, web
 from aiohttp.web import middleware
 from aiohttp.web_app import Application
 from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
+from typing_extensions import Literal
 
 import knot_resolver_manager.utils.custom_atexit as atexit
 from knot_resolver_manager import log, statistics
@@ -160,25 +161,33 @@ class Server:
         )
 
     @statistics.async_timing_histogram(statistics.MANAGER_REQUEST_RECONFIGURE_LATENCY)
-    async def _handler_apply_config(self, request: web.Request) -> web.Response:
+    async def _handler_config_query(self, request: web.Request) -> web.Response:
         """
         Route handler for changing resolver configuration
         """
 
         # parse the incoming data
         document_path = request.match_info["path"]
+        etags = request.if_match
         last: ParsedTree = self.config_store.get().get_unparsed_data()
-        new_partial: ParsedTree = parse(await request.text(), request.content_type)
-        config = last.update(document_path, new_partial)
+        update_with: ParsedTree = parse(await request.text(), request.content_type)
+
+        if etags is not None and last.etag not in map(str, etags):
+            return web.Response(status=HTTPStatus.PRECONDITION_FAILED)
+
+        op = cast(Literal["get", "post", "delete", "patch", "put"], request.method.lower())
+        root, to_return = last.query(op, document_path, update_with)
 
         # validate config
-        config_validated = KresConfig(config)
+        config_validated = KresConfig(root)
 
         # apply config
         await self.config_store.update(config_validated)
 
         # return success
-        return web.Response()
+        res = web.Response(status=HTTPStatus.OK, text=str(to_return))
+        res.etag = ETag(config_validated.get_unparsed_data().etag)
+        return res
 
     async def _handler_metrics(self, _request: web.Request) -> web.Response:
         return web.Response(
@@ -232,7 +241,11 @@ class Server:
         self.app.add_routes(
             [
                 web.get("/", self._handler_index),
-                web.post(r"/config{path:.*}", self._handler_apply_config),
+                web.post(r"/config{path:.*}", self._handler_config_query),
+                web.put(r"/config{path:.*}", self._handler_config_query),
+                web.patch(r"/config{path:.*}", self._handler_config_query),
+                web.get(r"/config{path:.*}", self._handler_config_query),
+                web.delete(r"/config{path:.*}", self._handler_config_query),
                 web.post("/stop", self._handler_stop),
                 web.get("/schema", self._handler_schema),
                 web.get("/schema/ui", self._handle_view_schema),

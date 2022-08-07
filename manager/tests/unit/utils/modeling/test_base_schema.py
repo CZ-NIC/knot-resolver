@@ -118,66 +118,6 @@ o:
     assert o.o == {"key1": "str1", "key2": "str2"}
 
 
-def test_partial_mutations():
-    class InnerSchema(BaseSchema):
-        size: int = 5
-
-    class ConfPreviousSchema(BaseSchema):
-        workers: Union[Literal["auto"], int] = 1
-        lua_config: Optional[str] = None
-        inner: InnerSchema = InnerSchema()
-
-    class ConfSchema(BaseSchema):
-        _LAYER = ConfPreviousSchema
-
-        workers: int
-        lua_config: Optional[str]
-        inner: InnerSchema
-
-        def _workers(self, obj: Any) -> Any:
-            if "workers" in obj and obj["workers"] == "auto":
-                return 8
-            return obj["workers"]
-
-        def _validate(self) -> None:
-            if self.workers < 0:
-                raise ValueError("Number of workers must be non-negative")
-
-    yaml = """
-    workers: auto
-    lua-config: something
-    """
-
-    d = parse_yaml(yaml)
-    o = ConfSchema(d)
-    assert o.lua_config == "something"
-    assert o.inner.size == 5
-    assert o.workers == 8
-
-    # replacement of 'lua-config' attribute
-    upd = d.update("/lua-config", parse_json('"new_value"'))
-    o = ConfSchema(upd)
-    assert o.lua_config == "new_value"
-    assert o.inner.size == 5
-    assert o.workers == 8
-
-    # replacement of the whole tree
-    o = ConfSchema(d.update("/", parse_json('{"inner": {"size": 55}}')))
-    assert o.lua_config is None
-    assert o.workers == 1
-    assert o.inner.size == 55
-
-    # replacement of 'inner' subtree
-    o = ConfSchema(d.update("/inner", parse_json('{"size": 33}')))
-    assert o.lua_config == "something"
-    assert o.workers == 8
-    assert o.inner.size == 33
-
-    # raise validation DataValidationError
-    with raises(DataValidationError):
-        o = ConfSchema(d.update("/", parse_json('{"workers": -5}')))
-
-
 def test_dash_conversion():
     class TestSchema(BaseSchema):
         awesome_field: Dict[str, str]

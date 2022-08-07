@@ -1,15 +1,17 @@
-import copy
+import base64
 import json
-import re
 from enum import Enum, auto
+from hashlib import blake2b
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import yaml
+from typing_extensions import Literal
 from yaml.constructor import ConstructorError
 from yaml.nodes import MappingNode
 
+from knot_resolver_manager.utils.modeling.query import QueryTree
+
 from .exceptions import DataParsingError
-from .types import is_internal_field_name
 
 
 class ParsedTree:
@@ -32,10 +34,10 @@ class ParsedTree:
             return name.replace("-", "_")
         return name
 
-    def __init__(self, data: Union[Dict[str, Any], str, int, bool]):
+    def __init__(self, data: Union[Dict[str, Any], str, int, bool, List[Any]]):
         self._data = data
 
-    def to_raw(self) -> Union[Dict[str, Any], str, int, bool]:
+    def to_raw(self) -> Union[Dict[str, Any], str, int, bool, List[Any]]:
         return self._data
 
     def __getitem__(self, key: str) -> Any:
@@ -53,54 +55,22 @@ class ParsedTree:
         assert isinstance(self._data, dict)
         return {ParsedTree._convert_external_field_name_to_internal(key) for key in self._data.keys()}
 
-    _SUBTREE_MUTATION_PATH_PATTERN = re.compile(r"^(/[^/]+)*/?$")
+    def query(
+        self,
+        op: Literal["get", "post", "delete", "patch", "put"],
+        path: str,
+        update_with: Optional["ParsedTree"] = None,
+    ) -> "Tuple[ParsedTree, Optional[ParsedTree]]":
+        new_root, res = QueryTree(self._data).query(
+            op, path, update_with=QueryTree(update_with.to_raw()) if update_with is not None else None
+        )
+        return ParsedTree(new_root.to_raw()), ParsedTree(res.to_raw()) if res is not None else None
 
-    def update(self, path: str, data: "ParsedTree") -> "ParsedTree":
-
-        # prepare and validate the path object
-        path = path[:-1] if path.endswith("/") else path
-        if re.match(ParsedTree._SUBTREE_MUTATION_PATH_PATTERN, path) is None:
-            raise DataParsingError("Provided object path for mutation is invalid.")
-        if "_" in path:
-            raise DataParsingError("Provided object path contains character '_', which is illegal")
-        # Note: mutation happens on the internal dict only, therefore we are working with external
-        # naming only. That means, there are '-' in between words.
-        path = path[1:] if path.startswith("/") else path
-
-        # now, the path variable should contain '/' separated field names
-
-        # check if we should mutate whole object
-        if path == "":
-            return data
-
-        # find the subtree we will replace in a copy of the original object
-        to_mutate = copy.deepcopy(self.to_raw())
-        obj = to_mutate
-        parent = None
-
-        for segment in path.split("/"):
-            assert isinstance(obj, dict)
-
-            if segment == "":
-                raise DataParsingError(f"Unexpectedly empty segment in path '{path}'")
-            elif is_internal_field_name(segment):
-                raise DataParsingError(
-                    "No, changing internal fields (starting with _) is not allowed. Nice try though."
-                )
-            elif segment in obj:
-                parent = obj
-                obj = obj[segment]
-            elif segment not in obj:
-                parent = obj
-                obj = {}
-                parent[segment] = obj
-        assert parent is not None
-
-        # assign the subtree
-        last_name = path.split("/")[-1]
-        parent[last_name] = data.to_raw()
-
-        return ParsedTree(to_mutate)
+    @property
+    def etag(self) -> str:
+        m = blake2b(digest_size=9)
+        m.update(json.dumps(self._data, sort_keys=True).encode("utf8"))
+        return base64.urlsafe_b64encode(m.digest()).decode("utf8")
 
 
 # custom hook for 'json.loads()' to detect duplicate keys in data
