@@ -85,6 +85,9 @@ static_assert(LOG_GRP_REQDBG <= 8 * sizeof(kr_log_groups), "Too many log groups.
 
 bool kr_log_group_is_set(enum kr_log_group group)
 {
+	if (kr_fails_assert(group >= 0))
+		return false;
+
 	return kr_log_groups & (1ULL << group);
 }
 
@@ -162,7 +165,7 @@ const char *kr_log_level2name(kr_log_level_t level)
 kr_log_level_t kr_log_name2level(const char *name)
 {
 	if (kr_fails_assert(name))
-		return LOG_GRP_UNKNOWN;
+		return LOG_UNKNOWN_LEVEL;
 
 	for (int i = 0; level_names[i].name; ++i)
 	{
@@ -170,7 +173,7 @@ kr_log_level_t kr_log_name2level(const char *name)
 			return level_names[i].level;
 	}
 
-	return LOG_GRP_UNKNOWN;
+	return LOG_UNKNOWN_LEVEL;
 }
 
 const char *kr_log_grp2name(enum kr_log_group group)
@@ -187,7 +190,7 @@ const char *kr_log_grp2name(enum kr_log_group group)
 enum kr_log_group kr_log_name2grp(const char *name)
 {
 	if (kr_fails_assert(name))
-		return -1;
+		return LOG_GRP_UNKNOWN;
 
 	for (int i = 0; log_group_names[i].g_name; ++i)
 	{
@@ -195,7 +198,7 @@ enum kr_log_group kr_log_name2grp(const char *name)
 			return log_group_names[i].g_val;
 	}
 
-	return -1;
+	return LOG_GRP_UNKNOWN;
 }
 
 
@@ -227,6 +230,9 @@ void kr_log_level_set(kr_log_level_t level)
 
 void kr_log_group_add(enum kr_log_group group)
 {
+	if (kr_fails_assert(group >= 0))
+		return;
+
 	kr_log_groups |= (1ULL << group);
 	if (group == LOG_GRP_GNUTLS)
 		kr_gnutls_log_level_set();
