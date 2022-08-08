@@ -25,8 +25,12 @@ local function mergeIps(ipNet, ipHost, intMask)
 	local octetMask
 	local result = ""
 
-	if (#ipNet ~= #ipHost) then
+	if #ipNet ~= #ipHost then
 		return nil
+	end
+
+	if intMask == nil then
+		return ipNet
 	end
 
 	for currentOctetNo = 1, #ipNet do
