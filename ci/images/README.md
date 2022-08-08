@@ -15,6 +15,14 @@ inputs for [Coverity Scan](https://scan.coverity.com/).
 It is used by the `coverity` CI job to generate and send data to Coverity Scan
 for analysis.
 
+To build this image, you need to retrieve the Coverity Scan token from the
+dashboard and pass it to the `build.sh` script using the `COVERITY_SCAN_TOKEN`
+environment variable, e.g.:
+
+```
+$ COVERITY_SCAN_TOKEN=the_secret_token ./build.sh debian-11-coverity
+```
+
 ### debian-bullseye
 
 Used to serve the same purpose as `debian-11`. As of 2022-03-09, it is still
