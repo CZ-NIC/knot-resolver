@@ -185,7 +185,7 @@ int kr_memreserve(void *baton, void **mem, size_t elm_size, size_t want, size_t 
         return 0;
     } else {
         knot_mm_t *pool = baton;
-        size_t next_size = array_next_count(want);
+        size_t next_size = array_next_count(elm_size, want, *have);
         void *mem_new = mm_alloc(pool, next_size * elm_size);
         if (mem_new != NULL) {
 	    if (*mem) { /* 0-length memcpy from NULL isn't technically OK */

@@ -53,14 +53,17 @@
 #pragma once
 #include <stdlib.h>
 
-/** Simplified Qt containers growth strategy. */
-static inline size_t array_next_count(size_t want)
+/** Choose array length when it overflows. */
+static inline size_t array_next_count(size_t elm_size, size_t want, size_t have)
 {
-	if (want < 2048) {
-		return (want < 20) ? want + 4 : want * 2;
-	} else {
-		return want + 2048;
-	}
+	if (want >= have * 2) // We amortized enough and maybe more won't be needed.
+		return want;
+	const size_t want_b = want * elm_size;
+	if (want_b < 64) // Short arrays are cheap to copy; get just one extra.
+		return want + 1;
+	if (want_b < 1024) // 50% growth amortizes to roughly 3 copies per element.
+		return want + want / 2;
+	return want * 2; // Doubling growth amortizes to roughly 2 copies per element.
 }
 
 /** @internal Incremental memory reservation */
@@ -70,7 +73,7 @@ static inline int array_std_reserve(void *baton, void **mem, size_t elm_size, si
 		return 0;
 	}
 	/* Simplified Qt containers growth strategy */
-	size_t next_size = array_next_count(want);
+	size_t next_size = array_next_count(elm_size, want, *have);
 	void *mem_new = realloc(*mem, next_size * elm_size);
 	if (mem_new != NULL) {
 		*mem = mem_new;
