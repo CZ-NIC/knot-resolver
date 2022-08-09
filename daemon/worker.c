@@ -647,7 +647,7 @@ static int qr_task_send(struct qr_task *task, struct session2 *session,
 		return qr_task_on_send(task, NULL, kr_error(EIO));
 
 	int ret = 0;
-	//struct request_ctx *ctx = task->ctx; /* TODO */
+//	struct request_ctx *ctx = task->ctx; /* TODO: used with doh below */
 
 	uv_handle_t *handle = session2_get_handle(session);
 	if (kr_fails_assert(handle && handle->data == session))
@@ -685,7 +685,7 @@ static int qr_task_send(struct qr_task *task, struct session2 *session,
 	/* Pending ioreq on current task */
 	qr_task_ref(task);
 
-	/* TODO */
+	/* TODO: doh */
 //	if (session_flags(session)->has_http) {
 //#if ENABLE_DOH2
 //		uv_write_t *write_req = (uv_write_t *)ioreq;
@@ -756,7 +756,7 @@ static int qr_task_send(struct qr_task *task, struct session2 *session,
 			ret = kr_error(UV_EMFILE);
 		}
 
-		/* TODO */
+		/* TODO: doh */
 //		if (session_flags(session)->has_http)
 //			the_worker->stats.err_http += 1;
 //		else
@@ -1812,10 +1812,10 @@ int worker_end_tcp(struct session2 *session)
 				 * To prevent failing at kr_resolve_consume()
 				 * qry.flags.TCP must be cleared.
 				 * TODO - refactoring is needed. */
-					struct kr_request *req = &task->ctx->req;
-					struct kr_rplan *rplan = &req->rplan;
-					struct kr_query *qry = array_tail(rplan->pending);
-					qry->flags.TCP = false;
+				struct kr_request *req = &task->ctx->req;
+				struct kr_rplan *rplan = &req->rplan;
+				struct kr_query *qry = array_tail(rplan->pending);
+				qry->flags.TCP = false;
 			}
 			qr_task_step(task, NULL, NULL);
 		} else {
