@@ -37,16 +37,6 @@
 
 
 /* Magic defaults for the worker. */
-#ifndef MP_FREELIST_SIZE
-# ifdef __clang_analyzer__
-#  define MP_FREELIST_SIZE 0
-# else
-#  define MP_FREELIST_SIZE 64 /**< Maximum length of the worker mempool freelist */
-# endif
-#endif
-#ifndef QUERY_RATE_THRESHOLD
-#define QUERY_RATE_THRESHOLD (2 * MP_FREELIST_SIZE) /**< Nr of parallel queries considered as high rate */
-#endif
 #ifndef MAX_PIPELINED
 #define MAX_PIPELINED 100
 #endif
@@ -200,54 +190,17 @@ static void ioreq_kill_pending(struct qr_task *task)
 	task->pending_count = 0;
 }
 
-/** @cond This memory layout is internal to mempool.c, use only for debugging. */
-#if defined(__SANITIZE_ADDRESS__)
-struct mempool_chunk {
-  struct mempool_chunk *next;
-  size_t size;
-};
-static void mp_poison(struct mempool *mp, bool poison)
-{
-	if (!poison) { /* @note mempool is part of the first chunk, unpoison it first */
-		kr_asan_unpoison(mp, sizeof(*mp));
-	}
-	struct mempool_chunk *chunk = mp->state.last[0];
-	void *chunk_off = (uint8_t *)chunk - chunk->size;
-	if (poison) {
-		kr_asan_poison(chunk_off, chunk->size);
-	} else {
-		kr_asan_unpoison(chunk_off, chunk->size);
-	}
-}
-#else
-#define mp_poison(mp, enable)
-#endif
-/** @endcond */
-
-/** Get a mempool.  (Recycle if possible.)  */
+/** Get a mempool. */
 static inline struct mempool *pool_borrow(struct worker_ctx *worker)
 {
-	struct mempool *mp = NULL;
-	if (worker->pool_mp.len > 0) {
-		mp = array_tail(worker->pool_mp);
-		array_pop(worker->pool_mp);
-		mp_poison(mp, 0);
-	} else { /* No mempool on the freelist, create new one */
-		mp = mp_new (4 * CPU_PAGE_SIZE);
-	}
-	return mp;
+	/* The implementation used to have extra caching layer,
+	 * but it didn't work well.  Now it's very simple. */
+	return mp_new(16 * 1024);
 }
-
-/** Return a mempool.  (Cache them up to some count.) */
+/** Return a mempool. */
 static inline void pool_release(struct worker_ctx *worker, struct mempool *mp)
 {
-	if (worker->pool_mp.len < MP_FREELIST_SIZE) {
-		mp_flush(mp);
-		array_push(worker->pool_mp, mp);
-		mp_poison(mp, 1);
-	} else {
-		mp_delete(mp);
-	}
+	mp_delete(mp);
 }
 
 /** Create a key for an outgoing subrequest: qname, qclass, qtype.
@@ -2180,30 +2133,15 @@ bool worker_task_finished(struct qr_task *task)
 }
 
 /** Reserve worker buffers.  We assume worker's been zeroed. */
-static int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
+static int worker_reserve(struct worker_ctx *worker)
 {
 	worker->tcp_connected = trie_create(NULL);
 	worker->tcp_waiting = trie_create(NULL);
 	worker->subreq_out = trie_create(NULL);
 
-	array_init(worker->pool_mp);
-	if (array_reserve(worker->pool_mp, ring_maxlen)) {
-		return kr_error(ENOMEM);
-	}
-
 	mm_ctx_mempool(&worker->pkt_pool, 4 * sizeof(knot_pkt_t));
 
 	return kr_ok();
-}
-
-static inline void reclaim_mp_freelist(mp_freelist_t *list)
-{
-	for (unsigned i = 0; i < list->len; ++i) {
-		struct mempool *e = list->at[i];
-		kr_asan_unpoison(e, sizeof(*e));
-		mp_delete(e);
-	}
-	array_clear(*list);
 }
 
 void worker_deinit(void)
@@ -2220,7 +2158,6 @@ void worker_deinit(void)
 		free((void *)worker->doh_qry_headers.at[i]);
 	array_clear(worker->doh_qry_headers);
 
-	reclaim_mp_freelist(&worker->pool_mp);
 	mp_delete(worker->pkt_pool.ctx);
 	worker->pkt_pool.ctx = NULL;
 
@@ -2256,7 +2193,7 @@ int worker_init(struct engine *engine, int worker_count)
 
 	array_init(worker->doh_qry_headers);
 
-	int ret = worker_reserve(worker, MP_FREELIST_SIZE);
+	int ret = worker_reserve(worker);
 	if (ret) return ret;
 	worker->next_request_uid = UINT16_MAX + 1;
 
