@@ -31,7 +31,6 @@
 #include "daemon/session2.h"
 #include "daemon/tls.h"
 #include "daemon/http.h"
-#include "daemon/udp_queue.h"
 #include "lib/layer.h"
 #include "lib/utils.h"
 
@@ -1256,24 +1255,8 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	qr_task_ref(task);
 
 	/* Send back answer */
-	int ret;
-	const uv_handle_t *src_handle = session2_get_handle(source_session);
-	/* TODO: this should probably just be a _wrap? */
-	if (kr_fails_assert(src_handle->type == UV_UDP || src_handle->type == UV_TCP
-		       || src_handle->type == UV_POLL)) {
-		ret = kr_error(EINVAL);
-	} else if (src_handle->type == UV_POLL) {
-		ret = xdp_push(task, src_handle);
-	} else if (src_handle->type == UV_UDP && ENABLE_SENDMMSG) {
-		int fd;
-		ret = uv_fileno(src_handle, &fd);
-		if (ret == 0)
-			udp_queue_push(fd, &ctx->req, task);
-		else
-			kr_assert(false);
-	} else {
-		ret = qr_task_send(task, source_session, &ctx->source.comm_addr.ip, ctx->req.answer);
-	}
+	/* TODO: xdp */
+	int ret = qr_task_send(task, source_session, &ctx->source.comm_addr.ip, ctx->req.answer);
 
 	if (ret != kr_ok()) {
 		(void) qr_task_on_send(task, NULL, kr_error(EIO));

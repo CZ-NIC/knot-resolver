@@ -5,7 +5,7 @@
 #include "kresconfig.h"
 #include "daemon/udp_queue.h"
 
-#include "daemon/worker.h"
+#include "daemon/session2.h"
 #include "lib/generic/array.h"
 #include "lib/utils.h"
 
@@ -20,7 +20,8 @@ int udp_queue_init_global(uv_loop_t *loop)
 	return 0;
 }
 /* Appease the linker in case this unused call isn't optimized out. */
-void udp_queue_push(int fd, struct kr_request *req, struct qr_task *task)
+void udp_queue_push(int fd, const struct sockaddr *sa, char *buf, size_t buf_len,
+                    udp_queue_cb cb, void *baton)
 {
 	abort();
 }
@@ -35,7 +36,8 @@ typedef struct {
 	int len; /**< The number of messages in the queue: 0..UDP_QUEUE_LEN */
 	struct mmsghdr msgvec[UDP_QUEUE_LEN]; /**< Parameter for sendmmsg() */
 	struct {
-		struct qr_task *task; /**< Links for completion callbacks. */
+		udp_queue_cb cb;
+		void *cb_baton;
 		struct iovec msg_iov[1]; /**< storage for .msgvec[i].msg_iov */
 	} items[UDP_QUEUE_LEN];
 } udp_queue_t;
@@ -77,8 +79,8 @@ static void udp_queue_send(int fd)
 	/* ATM we don't really do anything about failures. */
 	int err = sent_len < 0 ? errno : EAGAIN /* unknown error, really */;
 	for (int i = 0; i < q->len; ++i) {
-		qr_task_on_send(q->items[i].task, NULL, i < sent_len ? 0 : err);
-		worker_task_unref(q->items[i].task);
+		if (q->items[i].cb)
+			q->items[i].cb(i < sent_len ? 0 : err, q->items[i].cb_baton);
 	}
 	q->len = 0;
 }
@@ -99,13 +101,13 @@ int udp_queue_init_global(uv_loop_t *loop)
 	return ret;
 }
 
-void udp_queue_push(int fd, struct kr_request *req, struct qr_task *task)
+void udp_queue_push(int fd, const struct sockaddr *sa, char *buf, size_t buf_len,
+                    udp_queue_cb cb, void *baton)
 {
 	if (fd < 0) {
 		kr_log_error(SYSTEM, "ERROR: called udp_queue_push(fd = %d, ...)\n", fd);
 		abort();
 	}
-	worker_task_ref(task);
 	/* Get a valid correct queue. */
 	if (fd >= state.udp_queues_len) {
 		const int new_len = fd + 1;
@@ -121,13 +123,13 @@ void udp_queue_push(int fd, struct kr_request *req, struct qr_task *task)
 	udp_queue_t *const q = state.udp_queues[fd];
 
 	/* Append to the queue */
-	struct sockaddr *sa = (struct sockaddr *)/*const-cast*/req->qsource.comm_addr;
-	q->msgvec[q->len].msg_hdr.msg_name = sa;
+	q->msgvec[q->len].msg_hdr.msg_name = (void *)sa;
 	q->msgvec[q->len].msg_hdr.msg_namelen = kr_sockaddr_len(sa);
-	q->items[q->len].task = task;
+	q->items[q->len].cb = cb;
+	q->items[q->len].cb_baton = baton;
 	q->items[q->len].msg_iov[0] = (struct iovec){
-		.iov_base = req->answer->wire,
-		.iov_len  = req->answer->size,
+		.iov_base = buf,
+		.iov_len  = buf_len,
 	};
 	if (q->len == 0)
 		array_push(state.waiting_fds, fd);

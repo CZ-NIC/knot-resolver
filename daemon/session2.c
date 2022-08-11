@@ -8,13 +8,14 @@
 #include "lib/log.h"
 #include "lib/utils.h"
 #include "daemon/io.h"
+#include "daemon/udp_queue.h"
 #include "daemon/worker.h"
 
 #include "daemon/session2.h"
 
 
 static int session2_transport_pushv(struct session2 *s,
-                                    const struct iovec *iov, int iovcnt,
+                                    struct iovec *iov, int iovcnt,
                                     const void *target,
                                     protolayer_finished_cb cb, void *baton);
 static inline int session2_transport_push(struct session2 *s,
@@ -913,7 +914,7 @@ void session2_event(struct session2 *s, enum protolayer_event_type event, void *
 }
 
 
-struct parent_pushv_ctx {
+struct session2_pushv_ctx {
 	struct session2 *session;
 	protolayer_finished_cb cb;
 	const void *target;
@@ -928,16 +929,25 @@ static void session2_transport_parent_pushv_finished(int status,
                                                      const void *target,
                                                      void *baton)
 {
-	struct parent_pushv_ctx *ctx = baton;
+	struct session2_pushv_ctx *ctx = baton;
 	if (ctx->cb)
 		ctx->cb(status, ctx->session, target, ctx->baton);
 	free(ctx->buf);
 	free(ctx);
 }
 
+static void session2_transport_udp_queue_pushv_finished(int status, void *baton)
+{
+	struct session2_pushv_ctx *ctx = baton;
+	if (ctx->cb)
+		ctx->cb(status, ctx->session, ctx->target, ctx->baton);
+	free(ctx->buf);
+	free(ctx);
+}
+
 static void session2_transport_udp_pushv_finished(uv_udp_send_t *req, int status)
 {
-	struct parent_pushv_ctx *ctx = req->data;
+	struct session2_pushv_ctx *ctx = req->data;
 	if (ctx->cb)
 		ctx->cb(status, ctx->session, ctx->target, ctx->baton);
 	free(ctx->buf);
@@ -947,7 +957,7 @@ static void session2_transport_udp_pushv_finished(uv_udp_send_t *req, int status
 
 static void session2_transport_stream_pushv_finished(uv_write_t *req, int status)
 {
-	struct parent_pushv_ctx *ctx = req->data;
+	struct session2_pushv_ctx *ctx = req->data;
 	if (ctx->cb)
 		ctx->cb(status, ctx->session, ctx->target, ctx->baton);
 	free(ctx->buf);
@@ -955,52 +965,17 @@ static void session2_transport_stream_pushv_finished(uv_write_t *req, int status
 	free(req);
 }
 
-static int concat_iovs(const struct iovec *iov, int iovcnt, char **buf, size_t *buf_len)
-{
-	if (!iov || iovcnt <= 0)
-		return kr_error(ENODATA);
-
-	size_t len = 0;
-	for (int i = 0; i < iovcnt; i++) {
-		size_t old_len = len;
-		len += iov[i].iov_len;
-		if (kr_fails_assert(len >= old_len)) {
-			*buf = NULL;
-			return kr_error(EFBIG);
-		}
-	}
-
-	*buf_len = len;
-	if (len == 0) {
-		*buf = NULL;
-		return kr_ok();
-	}
-
-	*buf = malloc(len);
-	kr_require(*buf);
-
-	char *c = *buf;
-	for (int i = 0; i < iovcnt; i++) {
-		if (iov[i].iov_len == 0)
-			continue;
-		memcpy(c, iov[i].iov_base, iov[i].iov_len);
-		c += iov[i].iov_len;
-	}
-
-	return kr_ok();
-}
-
 static int session2_transport_pushv(struct session2 *s,
-                                    const struct iovec *iov, int iovcnt,
+                                    struct iovec *iov, int iovcnt,
                                     const void *target,
                                     protolayer_finished_cb cb, void *baton)
 {
 	if (kr_fails_assert(s))
 		return kr_error(EINVAL);
 
-	struct parent_pushv_ctx *ctx = malloc(sizeof(*ctx));
+	struct session2_pushv_ctx *ctx = malloc(sizeof(*ctx));
 	kr_require(ctx);
-	*ctx = (struct parent_pushv_ctx){
+	*ctx = (struct session2_pushv_ctx){
 		.session = s,
 		.cb = cb,
 		.baton = baton,
@@ -1015,13 +990,30 @@ static int session2_transport_pushv(struct session2 *s,
 			return kr_error(EINVAL);
 		}
 
+		/* TODO: XDP */
 		if (handle->type == UV_UDP) {
-			uv_udp_send_t *req = malloc(sizeof(*req));
-			req->data = ctx;
-			uv_udp_send(req, (uv_udp_t *)handle,
-					(uv_buf_t *)iov, iovcnt, target,
-					session2_transport_udp_pushv_finished);
-			return kr_ok();
+			if (ENABLE_SENDMMSG && !s->outgoing) {
+				int fd;
+				int ret = uv_fileno(handle, &fd);
+				if (kr_fails_assert(!ret))
+					return kr_error(EIO);
+
+				/* TODO: support multiple iovecs properly? */
+				if (kr_fails_assert(iovcnt == 1))
+					return kr_error(EINVAL);
+
+				udp_queue_push(fd, target, iov->iov_base, iov->iov_len,
+						session2_transport_udp_queue_pushv_finished,
+						ctx);
+				return kr_ok();
+			} else {
+				uv_udp_send_t *req = malloc(sizeof(*req));
+				req->data = ctx;
+				uv_udp_send(req, (uv_udp_t *)handle,
+						(uv_buf_t *)iov, iovcnt, target,
+						session2_transport_udp_pushv_finished);
+				return kr_ok();
+			}
 		} else if (handle->type == UV_TCP) {
 			uv_write_t *req = malloc(sizeof(*req));
 			req->data = ctx;
@@ -1040,15 +1032,10 @@ static int session2_transport_pushv(struct session2 *s,
 			free(ctx);
 			return kr_error(EINVAL);
 		}
-		int ret = concat_iovs(iov, iovcnt, &ctx->buf, &ctx->buf_len);
-		if (ret) {
-			free(ctx);
-			return ret;
-		}
-		session2_wrap(parent, protolayer_buffer(ctx->buf, ctx->buf_len),
+		int ret = session2_wrap(parent, protolayer_iovec(iov, iovcnt),
 				target, session2_transport_parent_pushv_finished,
 				ctx);
-		return kr_ok();
+		return (ret < 0) ? ret : kr_ok();
 
 	default:
 		kr_assert(false && "Invalid transport");
