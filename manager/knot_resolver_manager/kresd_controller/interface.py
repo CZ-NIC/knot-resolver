@@ -163,7 +163,7 @@ class Subprocess:
         reader: asyncio.StreamReader
         writer: Optional[asyncio.StreamWriter] = None
         try:
-            reader, writer = await asyncio.open_unix_connection(f"./control/{self.id}")
+            reader, writer = await asyncio.open_unix_connection(f"./control/{int(self.id)}")
 
             # drop prompt
             _ = await reader.read(2)

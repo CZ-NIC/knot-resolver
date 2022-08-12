@@ -68,7 +68,7 @@ class ParsedTree:
 
     @property
     def etag(self) -> str:
-        m = blake2b(digest_size=9)
+        m = blake2b(digest_size=15)
         m.update(json.dumps(self._data, sort_keys=True).encode("utf8"))
         return base64.urlsafe_b64encode(m.digest()).decode("utf8")
 

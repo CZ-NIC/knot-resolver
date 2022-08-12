@@ -6,6 +6,7 @@ Type=notify
 TimeoutStartSec=10s
 ExecStart=/usr/bin/env python3 -m knot_resolver_manager --config=/etc/knot-resolver/config.yml
 KillSignal=SIGINT
+WorkingDirectory=/var/run/knot-resolver/
 # See systemd.service(5) for explanation, why we should replace this with a blocking request
 # ExecReload=/usr/bin/env kill -HUP $MAINPID
 
