@@ -50,10 +50,11 @@ async def error_handler(request: web.Request, handler: Any) -> web.Response:
     try:
         return await handler(request)
     except DataValidationError as e:
-        return web.Response(text=f"validation of configuration failed: {e}", status=HTTPStatus.BAD_REQUEST)
+        return web.Response(text=f"validation of configuration failed:\n{e}", status=HTTPStatus.BAD_REQUEST)
+    except DataParsingError as e:
+        return web.Response(text=f"request processing error:\n{e}", status=HTTPStatus.BAD_REQUEST)
     except KresManagerException as e:
-        logger.error("Request processing failed", exc_info=True)
-        return web.Response(text=f"Request processing failed: {e}", status=HTTPStatus.INTERNAL_SERVER_ERROR)
+        return web.Response(text=f"request processing failed:\n{e}", status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
 class Server:

@@ -2,7 +2,7 @@ import base64
 import json
 from enum import Enum, auto
 from hashlib import blake2b
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Type, Union
 
 import yaml
 from typing_extensions import Literal
@@ -43,6 +43,12 @@ class ParsedTree:
     def __getitem__(self, key: str) -> Any:
         assert isinstance(self._data, dict)
         return self._data[ParsedTree._convert_internal_field_name_to_external(key)]
+
+    def is_dict(self) -> bool:
+        return isinstance(self._data, dict)
+
+    def type(self) -> Type[Any]:
+        return type(self._data)
 
     def __contains__(self, key: str) -> bool:
         assert isinstance(self._data, dict)
@@ -142,7 +148,9 @@ class _Format(Enum):
             "text/vnd.yaml": _Format.YAML,
         }
         if mime_type not in formats:
-            raise DataParsingError("Unsupported MIME type")
+            raise DataParsingError(
+                f"unsupported MIME type '{mime_type}', expected 'application/json' or 'text/vnd.yaml'"
+            )
         return formats[mime_type]
 
 
