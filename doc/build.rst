@@ -283,5 +283,5 @@ For development, it's possible to build the container directly from your git tre
 .. _libfstrm: https://github.com/farsightsec/fstrm
 .. _luacheck: http://luacheck.readthedocs.io
 .. _clang-tidy: http://clang.llvm.org/extra/clang-tidy/index.html
-.. _luacov: https://keplerproject.github.io/luacov/
+.. _luacov: https://lunarmodules.github.io/luacov/
 .. _lcov: http://ltp.sourceforge.net/coverage/lcov.php
