@@ -683,19 +683,19 @@ obs:debian11:x86_64:
     DISTROTEST_NAME: debian11
     DISTROTEST_REPO: Debian_11
 
-obs:fedora34:x86_64:
-  <<: *distrotest
-  variables:
-    OBS_REPO: knot-resolver-latest
-    DISTROTEST_NAME: fedora34
-    DISTROTEST_REPO: Fedora_34
-
 obs:fedora35:x86_64:
   <<: *distrotest
   variables:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: fedora35
     DISTROTEST_REPO: Fedora_35
+
+obs:fedora36:x86_64:
+  <<: *distrotest
+  variables:
+    OBS_REPO: knot-resolver-latest
+    DISTROTEST_NAME: fedora36
+    DISTROTEST_REPO: Fedora_36
 
 obs:leap15:x86_64:
   <<: *distrotest
