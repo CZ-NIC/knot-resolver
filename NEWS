@@ -1,18 +1,18 @@
-Knot Resolver 5.5.2 (2022-mm-dd)
+Knot Resolver 5.5.2 (2022-08-16)
 ================================
 
 Improvements
 ------------
-- libknot 3.2 is supported (!1309)
+- support libknot 3.2 (!1309)
 - priming module: hide failures from the default log level (!1310)
-- less memory usage in some cases (!1328)
+- reduce memory usage in some cases (!1328)
 
 Bugfixes
 --------
-- daemon/http: improved URI checks to fix some proxies (#746, !1311)
-- daemon/tls: fixed a double-free for some cases of policy.TLS_FORWARD (!1314)
+- daemon/http: improve URI checks to fix some proxies (#746, !1311)
+- daemon/tls: fix a double-free for some cases of policy.TLS_FORWARD (!1314)
 - hints module: improve parsing comments in hosts files (!1315)
-- renumber module: renumbering works with name matching again (#760, !1334)
+- renumber module: fix renumbering with name matching again (#760, !1334)
 
 
 Knot Resolver 5.5.1 (2022-06-14)
