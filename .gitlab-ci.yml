@@ -722,12 +722,12 @@ obs:ubuntu2004:x86_64:
     DISTROTEST_NAME: ubuntu2004
     DISTROTEST_REPO: xUbuntu_20.04
 
-obs:ubuntu2110:x86_64:
+obs:ubuntu2204:x86_64:
   <<: *distrotest
   variables:
     OBS_REPO: knot-resolver-latest
-    DISTROTEST_NAME: ubuntu2110
-    DISTROTEST_REPO: xUbuntu_21.10
+    DISTROTEST_NAME: ubuntu2204
+    DISTROTEST_REPO: xUbuntu_22.04
 
 .packagingtest: &packagingtest
   stage: pkgtest
