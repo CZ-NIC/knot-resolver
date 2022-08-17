@@ -1,6 +1,10 @@
 Knot Resolver 5.x.y (2022-mm-dd)
 ================================
 
+Security
+--------
+- fix CPU-expensive DoS by malicious domains - CVE-2022-40188
+
 Improvements
 ------------
 - fix config_tests on macOS (both HW variants)

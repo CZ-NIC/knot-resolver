@@ -140,6 +140,8 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut);
 /**
  * Populate zone cut address set from cache.
  *
+ * The size is limited to avoid possibility of doing too much CPU work.
+ *
  * @param ctx       resolution context (to fetch data from LRU caches)
  * @param cut       zone cut to be populated
  * @param name      QNAME to start finding zone cut for
