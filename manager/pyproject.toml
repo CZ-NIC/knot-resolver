@@ -54,7 +54,7 @@ format = { shell = "black knot_resolver_manager/ tests/ scripts/ build.py; isort
 fixdeps = { shell = "poetry install; npm install; npm update", help = "Install/update dependencies according to configuration files"}
 commit = { shell = "scripts/commit", help = "Invoke every single check before commiting" }
 container = { cmd = "scripts/container.py", help = "Manage containers" }
-client = { script = "knot_resolver_manager.client.__main__:main", help="Run Managers API client CLI" }
+kresctl = { script = "knot_resolver_manager.cli:main", help="run kresctl" }
 clean = """
   rm -rf .coverage
          .mypy_cache

@@ -4,6 +4,7 @@ from setuptools import setup
 packages = \
 ['knot_resolver_manager',
  'knot_resolver_manager.cli',
+ 'knot_resolver_manager.cli.cmd',
  'knot_resolver_manager.compat',
  'knot_resolver_manager.datamodel',
  'knot_resolver_manager.datamodel.types',
