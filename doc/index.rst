@@ -21,10 +21,11 @@ and it provides a state-machine like API for extensions.
 
 
 .. toctree::
-   :caption: Scenarios (Use Cases)
-   :name: scenarios-chapter
+   :caption: Common Use Cases
+   :name: usecases-chapter
    :maxdepth: 1
 
+   usecase-network-interfaces
    usecase-internal-resolver
    usecase-isp-resolver
    usecase-personal-resolver
