@@ -17,7 +17,7 @@ generate-setup-file = true
 python = "^3.6.8"
 aiohttp = "^3.6.12"
 Jinja2 = "^2.11.3"
-PyYAML = "^5.4.1"
+PyYAML = "*"
 typing-extensions = ">=3.7.2"
 prometheus-client = "^0.6"
 supervisor = "^4.2.2"

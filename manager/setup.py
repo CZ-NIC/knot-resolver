@@ -20,7 +20,7 @@ package_data = \
 
 install_requires = \
 ['Jinja2>=2.11.3',
- 'PyYAML>=5.4.1',
+ 'PyYAML',
  'aiohttp>=3.6.12',
  'prometheus-client>=0.6',
  'supervisor>=4.2.2',
