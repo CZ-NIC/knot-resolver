@@ -2,14 +2,21 @@ import argparse
 import importlib
 import pkgutil
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import List, Optional, Tuple, Type, TypeVar, cast
+from urllib.parse import quote
 
 from typing_extensions import Protocol
 
 
 class TopLevelArgs:
     def __init__(self, ns: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
-        self.socket: str = ns.socket
+        self.socket: str = ns.socket[0]
+        if Path(self.socket).exists():
+            self.socket = f'http+unix://{quote(self.socket, safe="")}/'
+        if self.socket.endswith("/"):
+            self.socket = self.socket[:-1]
+
         self.command: Type["Command"] = ns.first_level_command
         self.parser = parser
         self.namespace = ns
@@ -58,7 +65,7 @@ def create_main_arg_parser() -> argparse.ArgumentParser:
         action="store",
         type=str,
         help="manager API listen address",
-        default="http+unix://%2Fvar%2Frun%2Fknot-resolver%2Fmanager.sock",  # FIXME
+        default=["http+unix://%2Fvar%2Frun%2Fknot-resolver%2Fmanager.sock"],  # FIXME
         nargs=1,
         required=False,
     )
