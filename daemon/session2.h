@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <stdalign.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <uv.h>
@@ -220,7 +221,6 @@ struct protolayer_cb_ctx {
 	protolayer_finished_cb finished_cb;
 	const void *finished_cb_target;
 	void *finished_cb_baton;
-	struct wire_buf *converted_wire_buf;
 
 	/* internal information for the manager - private */
 	enum protolayer_direction direction;
@@ -267,18 +267,23 @@ static inline struct protolayer_payload protolayer_wire_buf(struct wire_buf *wir
 
 /** Convenience function to represent the specified payload as a buffer-type.
  * Supports only `_BUFFER` and `_WIRE_BUF` on the input, otherwise returns
- * `_NULL` type or aborts on assertion if allowed. */
+ * `_NULL` type or aborts on assertion if allowed.
+ *
+ * If the input payload is `_WIRE_BUF`, the pointed-to wire buffer is reset
+ * to indicate that all of its contents have been used and the buffer is ready
+ * to be reused. */
 struct protolayer_payload protolayer_as_buffer(const struct protolayer_payload *payload);
 
 
 /** Per-session layer-specific data - generic struct. */
 struct protolayer_data {
 	enum protolayer_protocol protocol;
-	bool processed : 1; /**< Internal safeguard so that the layer does not
-	                     * get executed multiple times on the same buffer. */
 	size_t sess_size; /**< Size of the session data (aligned). */
 	size_t iter_size; /**< Size of the iteration data (aligned). */
-	uint8_t data[]; /**< Memory for the layer-specific structs. */
+	struct protolayer_manager *manager; /**< Pointer to the owner manager. */
+	bool processed : 1; /**< Internal safeguard so that the layer does not
+	                     * get executed multiple times on the same buffer. */
+	alignas(CPU_STRUCT_ALIGN) uint8_t data[]; /**< Memory for the layer-specific structs. */
 };
 
 /** Get a pointer to the session data of the layer. This data shares
@@ -318,6 +323,15 @@ typedef bool (*protolayer_event_cb)(enum protolayer_event_type event,
                                     struct protolayer_manager *manager,
                                     struct protolayer_data *layer);
 
+/** Function type for initialization callbacks of layer session data, with
+ * `param`, if any is passed to the layer.
+ *
+ * Returning 0 means success, other return values mean error and halt the
+ * initialization. */
+typedef int (*protolayer_data_sess_init_cb)(struct protolayer_manager *manager,
+                                            struct protolayer_data *layer,
+                                            void *param);
+
 /** Function type for (de)initialization callbacks of layers.
  *
  * Returning 0 means success, other return values mean error and halt the
@@ -336,9 +350,20 @@ struct protolayer_manager {
 	char data[];
 };
 
+/** Initialization parameters for protocol layer session data. */
+struct protolayer_data_param {
+	enum protolayer_protocol protocol; /**< Which protocol these parameters
+	                                     * are meant for. */
+	void *param; /**< Pointer to protolayer-related initialization parameters.
+	              * Only needs to be valid for session initialization. */
+};
+
 /** Allocates and initializes a new manager. */
-struct protolayer_manager *protolayer_manager_new(struct session2 *s,
-                                                  enum protolayer_grp grp);
+struct protolayer_manager *protolayer_manager_new(
+		struct session2 *s,
+		enum protolayer_grp grp,
+		struct protolayer_data_param *layer_param,
+		size_t layer_param_count);
 
 /** Deinitializes all layer data in the manager and deallocates it. */
 void protolayer_manager_free(struct protolayer_manager *m);
@@ -348,9 +373,9 @@ void protolayer_manager_free(struct protolayer_manager *m);
 struct protolayer_globals {
 	size_t sess_size; /**< Size of the layer-specific session data struct. */
 	size_t iter_size; /**< Size of the layer-specific iteration data struct. */
-	protolayer_data_cb sess_init;   /**< Called upon session creation to
-	                                 * initialize layer-specific session
-	                                 * data. */
+	protolayer_data_sess_init_cb sess_init; /**< Called upon session
+	                                          * creation to initialize
+	                                          * layer-specific session data. */
 	protolayer_data_cb sess_deinit; /**< Called upon session destruction to
 	                                 * deinitialize layer-specific session
 	                                 * data. */
@@ -525,18 +550,28 @@ struct session2 {
 };
 
 /** Allocates and initializes a new session with the specified protocol layer
- * group, and the provided transport context. */
+ * group, and the provided transport context.
+ *
+ * `layer_param` is a pointer to an array of size `layer_param_count`. The
+ * parameters are passed to the layer session initializers. The parameters and
+ * the pointed-to data are only required to be valid while calling this
+ * function. */
 struct session2 *session2_new(enum session2_transport_type transport_type,
                               enum protolayer_grp layer_grp,
+                              struct protolayer_data_param *layer_param,
+                              size_t layer_param_count,
                               bool outgoing);
 
 /** Allocates and initializes a new session with the specified protocol layer
  * group, using a *libuv handle* as its transport. */
 static inline struct session2 *session2_new_io(uv_handle_t *handle,
                                                enum protolayer_grp layer_grp,
+                                               struct protolayer_data_param *layer_param,
+                                               size_t layer_param_count,
                                                bool outgoing)
 {
-	struct session2 *s = session2_new(SESSION2_TRANSPORT_IO, layer_grp, outgoing);
+	struct session2 *s = session2_new(SESSION2_TRANSPORT_IO, layer_grp,
+			layer_param, layer_param_count, outgoing);
 	s->transport.io.handle = handle;
 	handle->data = s;
 	return s;
@@ -546,9 +581,12 @@ static inline struct session2 *session2_new_io(uv_handle_t *handle,
  * group, using a *parent session* as its transport. */
 static inline struct session2 *session2_new_child(struct session2 *parent,
                                                   enum protolayer_grp layer_grp,
+                                                  struct protolayer_data_param *layer_param,
+                                                  size_t layer_param_count,
                                                   bool outgoing)
 {
-	struct session2 *s = session2_new(SESSION2_TRANSPORT_PARENT, layer_grp, outgoing);
+	struct session2 *s = session2_new(SESSION2_TRANSPORT_PARENT, layer_grp,
+			layer_param, layer_param_count, outgoing);
 	s->transport.parent = parent;
 	return s;
 }
@@ -648,6 +686,10 @@ static inline bool session2_is_empty(const struct session2 *session)
 int session2_unwrap(struct session2 *s, struct protolayer_payload payload,
                     const void *target, protolayer_finished_cb cb, void *baton);
 
+int session2_unwrap_after(struct session2 *s, enum protolayer_protocol protocol,
+                         struct protolayer_payload payload, const void *target,
+                         protolayer_finished_cb cb, void *baton);
+
 /** Sends the specified `payload` to be processed in the `wrap` direction by the
  * session's protocol layers. The `target` parameter may contain a pointer to
  * some data specific to the producer-consumer layer of this session.
@@ -661,10 +703,21 @@ int session2_unwrap(struct session2 *s, struct protolayer_payload payload,
 int session2_wrap(struct session2 *s, struct protolayer_payload payload,
                   const void *target, protolayer_finished_cb cb, void *baton);
 
+int session2_wrap_after(struct session2 *s, enum protolayer_protocol protocol,
+                       struct protolayer_payload payload, const void *target,
+                       protolayer_finished_cb cb, void *baton);
+
 /** Sends an event to be synchronously processed by the protocol layers of the
  * specified session. The layers are first iterated through in the `_UNWRAP`
  * direction, then bounced back in the `_WRAP` direction. */
 void session2_event(struct session2 *s, enum protolayer_event_type type, void *baton);
+
+/** Sends an event to be synchronously processed by the protocol layers of the
+ * specified session, starting from the specified `protocol` in the `_UNWRAP`
+ * direction. The layers are first iterated through in the `_UNWRAP` direction,
+ * then bounced back in the `_WRAP` direction. */
+void session2_event_after(struct session2 *s, enum protolayer_protocol protocol,
+                          enum protolayer_event_type type, void *baton);
 
 /** Removes the specified request task from the session's tasklist. The session
  * must be outgoing. If the session is UDP, a signal to close is also sent to it. */

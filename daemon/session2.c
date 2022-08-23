@@ -15,7 +15,7 @@
 
 
 static int session2_transport_pushv(struct session2 *s,
-                                    struct iovec *iov, int iovcnt,
+                                    const struct iovec *iov, int iovcnt,
                                     const void *target,
                                     protolayer_finished_cb cb, void *baton);
 static inline int session2_transport_push(struct session2 *s,
@@ -90,14 +90,17 @@ struct protolayer_payload protolayer_as_buffer(const struct protolayer_payload *
 	if (payload->type == PROTOLAYER_PAYLOAD_BUFFER)
 		return *payload;
 
-	if (payload->type == PROTOLAYER_PAYLOAD_WIRE_BUF)
-		return (struct protolayer_payload){
+	if (payload->type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
+		struct protolayer_payload new_payload = {
 			.type = PROTOLAYER_PAYLOAD_BUFFER,
 			.buffer = {
 				.buf = wire_buf_data(payload->wire_buf),
 				.len = wire_buf_data_length(payload->wire_buf)
 			}
 		};
+		wire_buf_reset(payload->wire_buf);
+		return new_payload;
+	}
 
 	kr_assert(false && "Unsupported payload type.");
 	return (struct protolayer_payload){
@@ -116,6 +119,18 @@ static inline struct protolayer_data *protolayer_manager_get(
 	const size_t *offsets = (size_t *)m->data;
 	char *pl_data_beg = m->data + (m->num_layers * sizeof(*offsets));
 	return (struct protolayer_data *)(pl_data_beg + offsets[layer_ix]);
+}
+
+static inline ssize_t protolayer_manager_get_protocol(
+		struct protolayer_manager *m, enum protolayer_protocol protocol)
+{
+	for (ssize_t i = 0; i < m->num_layers; i++) {
+		struct protolayer_data *d = protolayer_manager_get(m, i);
+		if (d->protocol == protocol)
+			return i;
+	}
+
+	return -1;
 }
 
 static inline bool protolayer_cb_ctx_is_last(struct protolayer_cb_ctx *ctx)
@@ -155,8 +170,8 @@ static int protolayer_cb_ctx_finish(struct protolayer_cb_ctx *ctx, int ret,
 				protolayer_grp_names[ctx->manager->grp], ret);
 
 	if (ctx->status)
-		kr_log_debug(PROTOLAYER, "layer %u iteration of group '%s' ended with status %d\n",
-				ctx->layer_ix, protolayer_grp_names[ctx->manager->grp], ctx->status);
+		kr_log_debug(PROTOLAYER, "iteration of group '%s' layer %u ended with status %d\n",
+				protolayer_grp_names[ctx->manager->grp], ctx->layer_ix, ctx->status);
 
 	if (ctx->finished_cb)
 		ctx->finished_cb(ret, session, ctx->finished_cb_target,
@@ -257,23 +272,21 @@ static int protolayer_step(struct protolayer_cb_ctx *ctx)
  * or a negative number for errors (kr_error). */
 static int protolayer_manager_submit(
 		struct protolayer_manager *manager,
-		enum protolayer_direction direction,
+		enum protolayer_direction direction, size_t layer_ix,
 		struct protolayer_payload payload, const void *target,
 		protolayer_finished_cb cb, void *baton)
 {
-	size_t layer_ix = (direction == PROTOLAYER_UNWRAP)
-		? 0 : manager->num_layers - 1;
-
 	struct protolayer_cb_ctx *ctx = malloc(sizeof(*ctx)); // TODO - mempool?
 	kr_require(ctx);
 
 	if (kr_log_is_debug(PROTOLAYER, NULL)) {
 		const char *sess_dir = manager->session->outgoing ? "out" : "in";
-		kr_log_debug(PROTOLAYER, "[%s] %s submitted to grp '%s' in %s direction\n",
+		kr_log_debug(PROTOLAYER, "[%s] %s submitted to grp '%s' in %s direction (layer %zu)\n",
 				sess_dir,
 				protolayer_payload_names[payload.type],
 				protolayer_grp_names[manager->grp],
-				(direction == PROTOLAYER_UNWRAP) ? "unwrap" : "wrap");
+				(direction == PROTOLAYER_UNWRAP) ? "unwrap" : "wrap",
+				layer_ix);
 	}
 
 	for (size_t i = 0; i < manager->num_layers; i++) {
@@ -298,9 +311,24 @@ static int protolayer_manager_submit(
 	return protolayer_step(ctx);
 }
 
+static void *get_init_param(enum protolayer_protocol p,
+                            struct protolayer_data_param *layer_param,
+                            size_t layer_param_count)
+{
+	if (!layer_param || !layer_param_count)
+		return NULL;
+	for (size_t i = 0; i < layer_param_count; i++) {
+		if (layer_param[i].protocol == p)
+			return layer_param[i].param;
+	}
+	return NULL;
+}
 
-struct protolayer_manager *protolayer_manager_new(struct session2 *s,
-                                                  enum protolayer_grp grp)
+struct protolayer_manager *protolayer_manager_new(
+		struct session2 *s,
+		enum protolayer_grp grp,
+		struct protolayer_data_param *layer_param,
+		size_t layer_param_count)
 {
 	if (kr_fails_assert(grp))
 		return NULL;
@@ -345,10 +373,12 @@ struct protolayer_manager *protolayer_manager_new(struct session2 *s,
 	for (size_t i = 0; i < num_layers; i++) {
 		struct protolayer_globals *globals = &protolayer_globals[protocols[i]];
 		struct protolayer_data *data = protolayer_manager_get(m, i);
+		data->manager = m;
 		data->protocol = protocols[i];
 		data->sess_size = ALIGN_TO(globals->sess_size, CPU_STRUCT_ALIGN);
+		void *param = get_init_param(protocols[i], layer_param, layer_param_count);
 		if (globals->sess_init)
-			globals->sess_init(m, data);
+			globals->sess_init(m, data, param);
 	}
 
 	return m;
@@ -403,10 +433,6 @@ enum protolayer_cb_result protolayer_break(struct protolayer_cb_ctx *ctx, int st
 static void protolayer_push_finished(int status, struct session2 *s, const void *target, void *baton)
 {
 	struct protolayer_cb_ctx *ctx = baton;
-	if (ctx->converted_wire_buf) {
-		wire_buf_reset(ctx->converted_wire_buf);
-		ctx->converted_wire_buf = NULL;
-	}
 	protolayer_break(ctx, status);
 }
 
@@ -416,7 +442,6 @@ enum protolayer_cb_result protolayer_push(struct protolayer_cb_ctx *ctx)
 	struct session2 *session = ctx->manager->session;
 
 	if (ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
-		ctx->converted_wire_buf = ctx->payload.wire_buf;
 		ctx->payload = protolayer_as_buffer(&ctx->payload);
 	}
 
@@ -523,6 +548,8 @@ int wire_buf_reset(struct wire_buf *wb)
 
 struct session2 *session2_new(enum session2_transport_type transport_type,
                               enum protolayer_grp layer_grp,
+                              struct protolayer_data_param *layer_param,
+                              size_t layer_param_count,
                               bool outgoing)
 {
 	kr_require(transport_type && layer_grp);
@@ -530,20 +557,21 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 	struct session2 *s = malloc(sizeof(*s));
 	kr_require(s);
 
-	struct protolayer_manager *layers = protolayer_manager_new(s, layer_grp);
-	if (!layers) {
-		free(s);
-		return NULL;
-	}
-
 	*s = (struct session2) {
 		.transport = {
 			.type = transport_type,
 		},
-		.layers = layers,
 		.outgoing = outgoing,
 		.tasks = trie_create(NULL),
 	};
+
+	struct protolayer_manager *layers = protolayer_manager_new(s, layer_grp,
+			layer_param, layer_param_count);
+	if (!layers) {
+		free(s);
+		return NULL;
+	}
+	s->layers = layers;
 
 	mm_ctx_mempool(&s->pool, 4 * CPU_PAGE_SIZE);
 	queue_init(s->waiting);
@@ -858,7 +886,18 @@ void session2_waitinglist_finalize(struct session2 *session, int status)
 int session2_unwrap(struct session2 *s, struct protolayer_payload payload,
                     const void *target, protolayer_finished_cb cb, void *baton)
 {
-	return protolayer_manager_submit(s->layers, PROTOLAYER_UNWRAP,
+	return protolayer_manager_submit(s->layers, PROTOLAYER_UNWRAP, 0,
+			payload, target, cb, baton);
+}
+
+int session2_unwrap_after(struct session2 *s, enum protolayer_protocol protocol,
+                         struct protolayer_payload payload, const void *target,
+                         protolayer_finished_cb cb, void *baton)
+{
+	ssize_t layer_ix = protolayer_manager_get_protocol(s->layers, protocol) + 1;
+	if (layer_ix < 0)
+		return layer_ix;
+	return protolayer_manager_submit(s->layers, PROTOLAYER_UNWRAP, layer_ix,
 			payload, target, cb, baton);
 }
 
@@ -866,6 +905,18 @@ int session2_wrap(struct session2 *s, struct protolayer_payload payload,
                   const void *target, protolayer_finished_cb cb, void *baton)
 {
 	return protolayer_manager_submit(s->layers, PROTOLAYER_WRAP,
+			s->layers->num_layers - 1,
+			payload, target, cb, baton);
+}
+
+int session2_wrap_after(struct session2 *s, enum protolayer_protocol protocol,
+                       struct protolayer_payload payload, const void *target,
+                       protolayer_finished_cb cb, void *baton)
+{
+	ssize_t layer_ix = protolayer_manager_get_protocol(s->layers, protocol) - 1;
+	if (layer_ix < 0)
+		return layer_ix;
+	return protolayer_manager_submit(s->layers, PROTOLAYER_WRAP, layer_ix,
 			payload, target, cb, baton);
 }
 
@@ -888,11 +939,11 @@ static void session2_event_wrap(struct session2 *s, enum protolayer_event_type e
 	session2_transport_event(s, event, baton);
 }
 
-void session2_event(struct session2 *s, enum protolayer_event_type event, void *baton)
+void session2_event_unwrap(struct session2 *s, ssize_t start_ix, enum protolayer_event_type event, void *baton)
 {
 	bool cont;
 	struct protolayer_manager *m = s->layers;
-	for (ssize_t i = 0; i < m->num_layers; i++) {
+	for (ssize_t i = start_ix; i < m->num_layers; i++) {
 		struct protolayer_data *data = protolayer_manager_get(m, i);
 		struct protolayer_globals *globals = &protolayer_globals[data->protocol];
 		if (globals->event_unwrap)
@@ -911,6 +962,20 @@ void session2_event(struct session2 *s, enum protolayer_event_type event, void *
 	 * `false` on `event_unwrap`, but a more "automatic" mechanism may be
 	 * added when this is relevant, to make it less error-prone. */
 	session2_event_wrap(s, event, baton);
+}
+
+void session2_event(struct session2 *s, enum protolayer_event_type event, void *baton)
+{
+	session2_event_unwrap(s, 0, event, baton);
+}
+
+void session2_event_after(struct session2 *s, enum protolayer_protocol protocol,
+                          enum protolayer_event_type event, void *baton)
+{
+	ssize_t start_ix = protolayer_manager_get_protocol(s->layers, protocol);
+	if (kr_fails_assert(start_ix >= 0))
+		return;
+	session2_event_unwrap(s, start_ix + 1, event, baton);
 }
 
 
@@ -966,7 +1031,7 @@ static void session2_transport_stream_pushv_finished(uv_write_t *req, int status
 }
 
 static int session2_transport_pushv(struct session2 *s,
-                                    struct iovec *iov, int iovcnt,
+                                    const struct iovec *iov, int iovcnt,
                                     const void *target,
                                     protolayer_finished_cb cb, void *baton)
 {

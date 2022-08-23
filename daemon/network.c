@@ -72,9 +72,8 @@ void network_init(uv_loop_t *loop, int tcp_backlog)
 	the_network->proxy_addrs4 = trie_create(NULL);
 	the_network->proxy_addrs6 = trie_create(NULL);
 	the_network->tls_client_params = NULL;
-	/* TODO: tls */
-//	the_network->tls_session_ticket_ctx = /* unsync. random, by default */
-//			tls_session_ticket_ctx_create(loop, NULL, 0);
+	the_network->tls_session_ticket_ctx = /* unsync. random, by default */
+			tls_session_ticket_ctx_create(loop, NULL, 0);
 	the_network->tcp.in_idle_timeout = 10000;
 	the_network->tcp.tls_handshake_timeout = TLS_MAX_HANDSHAKE_TIME;
 	the_network->tcp_backlog = tcp_backlog;
@@ -300,10 +299,9 @@ void network_deinit(void)
 	network_proxy_free_addr_data(the_network->proxy_addrs6);
 	trie_free(the_network->proxy_addrs6);
 
-	/* TODO: tls */
-//	tls_credentials_free(the_network->tls_credentials);
-//	tls_client_params_free(the_network->tls_client_params);
-//	tls_session_ticket_ctx_destroy(the_network->tls_session_ticket_ctx);
+	tls_credentials_free(the_network->tls_credentials);
+	tls_client_params_free(the_network->tls_client_params);
+	tls_session_ticket_ctx_destroy(the_network->tls_session_ticket_ctx);
 #ifndef NDEBUG
 	memset(the_network, 0, sizeof(*the_network));
 #endif
@@ -844,19 +842,18 @@ int network_close(const char *addr_str, int port)
 
 void network_new_hostname(void)
 {
-	/* TODO: tls */
-//	if (the_network->tls_credentials &&
-//	    the_network->tls_credentials->ephemeral_servicename) {
-//		struct tls_credentials *newcreds;
-//		newcreds = tls_get_ephemeral_credentials();
-//		if (newcreds) {
-//			tls_credentials_release(the_network->tls_credentials);
-//			the_network->tls_credentials = newcreds;
-//			kr_log_info(TLS, "Updated ephemeral X.509 cert with new hostname\n");
-//		} else {
-//			kr_log_error(TLS, "Failed to update ephemeral X.509 cert with new hostname, using existing one\n");
-//		}
-//	}
+	if (the_network->tls_credentials &&
+	    the_network->tls_credentials->ephemeral_servicename) {
+		struct tls_credentials *newcreds;
+		newcreds = tls_get_ephemeral_credentials();
+		if (newcreds) {
+			tls_credentials_release(the_network->tls_credentials);
+			the_network->tls_credentials = newcreds;
+			kr_log_info(TLS, "Updated ephemeral X.509 cert with new hostname\n");
+		} else {
+			kr_log_error(TLS, "Failed to update ephemeral X.509 cert with new hostname, using existing one\n");
+		}
+	}
 }
 
 #ifdef SO_ATTACH_BPF

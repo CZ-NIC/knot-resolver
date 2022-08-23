@@ -570,6 +570,7 @@ int main(int argc, char **argv)
 	}
 
 	io_protolayers_init();
+	tls_protolayers_init();
 
 	/* Start listening, in the sense of network_listen_fd(). */
 	if (start_listening(&the_args->fds) != 0) {

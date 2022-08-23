@@ -219,7 +219,7 @@ struct pl_tcp_sess_data {
 	bool has_proxy : 1;
 };
 
-static int pl_tcp_sess_init(struct protolayer_manager *manager, struct protolayer_data *layer)
+static int pl_tcp_sess_init(struct protolayer_manager *manager, struct protolayer_data *layer, void *param)
 {
 	struct pl_tcp_sess_data *tcp = protolayer_sess_data(layer);
 	*tcp = (struct pl_tcp_sess_data){0};
@@ -336,7 +336,7 @@ static enum protolayer_cb_result pl_tcp_wrap(struct protolayer_data *layer, stru
 }
 
 
-void io_protolayers_init()
+void io_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_UDP] = (struct protolayer_globals){
 		.iter_size = sizeof(struct pl_udp_iter_data),
@@ -440,7 +440,7 @@ int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
 	uv_handle_t *h = (uv_handle_t *)handle;
 	check_bufsize(h);
 	/* Handle is already created, just create context. */
-	struct session2 *s = session2_new_io(h, PROTOLAYER_GRP_DOUDP, false);
+	struct session2 *s = session2_new_io(h, PROTOLAYER_GRP_DOUDP, NULL, 0, false);
 	kr_require(s);
 
 	int socklen = sizeof(union kr_sockaddr);
@@ -1165,7 +1165,7 @@ int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family,
 	if (ret != 0) {
 		return ret;
 	}
-	struct session2 *s = session2_new_io(handle, grp, outgoing);
+	struct session2 *s = session2_new_io(handle, grp, NULL, 0, outgoing);
 	if (s == NULL) {
 		ret = -1;
 	}

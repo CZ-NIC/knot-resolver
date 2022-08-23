@@ -1031,7 +1031,6 @@ static void on_connect(uv_connect_t *req, int status)
 //			return;
 //		}
 //	} else {
-		worker_add_tcp_connected(peer, session);
 //	}
 
 	ret = send_waiting(session);
@@ -2104,7 +2103,7 @@ static enum protolayer_cb_result pl_dns_dgram_unwrap(
 	if (ctx->payload.type == PROTOLAYER_PAYLOAD_IOVEC) {
 		int ret = kr_ok();
 		for (int i = 0; i < ctx->payload.iovec.cnt; i++) {
-			struct iovec *iov = &ctx->payload.iovec.iov[i];
+			const struct iovec *iov = &ctx->payload.iovec.iov[i];
 			knot_pkt_t *pkt = produce_packet(
 					iov->iov_base, iov->iov_len);
 			if (!pkt) {
@@ -2156,7 +2155,7 @@ struct pl_dns_stream_iter_data {
 };
 
 static void pl_dns_stream_sess_init_common(struct pl_dns_stream_sess_data *stream,
-                                       bool single)
+                                           bool single)
 {
 	*stream = (struct pl_dns_stream_sess_data){
 		.single = single
@@ -2164,7 +2163,8 @@ static void pl_dns_stream_sess_init_common(struct pl_dns_stream_sess_data *strea
 }
 
 static int pl_dns_mstream_sess_init(struct protolayer_manager *manager,
-                                    struct protolayer_data *layer)
+                                    struct protolayer_data *layer,
+                                    void *param)
 {
 	struct pl_dns_stream_sess_data *stream = protolayer_sess_data(layer);
 	pl_dns_stream_sess_init_common(stream, false);
@@ -2172,7 +2172,8 @@ static int pl_dns_mstream_sess_init(struct protolayer_manager *manager,
 }
 
 static int pl_dns_sstream_sess_init(struct protolayer_manager *manager,
-                                    struct protolayer_data *layer)
+                                    struct protolayer_data *layer,
+                                    void *param)
 {
 	struct pl_dns_stream_sess_data *stream = protolayer_sess_data(layer);
 	pl_dns_stream_sess_init_common(stream, true);
@@ -2306,6 +2307,8 @@ static bool pl_dns_stream_event_unwrap(enum protolayer_event_type event,
 		else
 			return pl_dns_stream_connection_timeout(manager->session);
 	} else if (event == PROTOLAYER_EVENT_CONNECT) {
+		struct sockaddr *peer = session2_get_peer(session);
+		worker_add_tcp_connected(peer, session);
 		session->connected = true;
 		return true;
 	} else if (event == PROTOLAYER_EVENT_DISCONNECT) {

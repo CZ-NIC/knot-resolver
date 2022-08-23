@@ -189,7 +189,8 @@ bad:
 	return NULL;
 }
 
-struct tls_credentials * tls_get_ephemeral_credentials()
+/*! Generate new ephemeral TLS credentials. */
+struct tls_credentials * tls_get_ephemeral_credentials(void)
 {
 	struct tls_credentials *creds = NULL;
 	gnutls_x509_privkey_t privkey = NULL;
