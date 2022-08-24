@@ -9,6 +9,9 @@ local function test_env_no_listen()
 end
 
 local function test_freebind()
+	if require('jit').os == 'OSX' then
+		return 77 -- freebind is not supported on macOS
+	end
 	boom(net.listen, {'192.0.2.1', 50049},
 		'net.listen() without freebind should fail')
 	-- TODO: same(kr_table_len(net.list()), 0,
