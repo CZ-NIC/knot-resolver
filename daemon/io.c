@@ -148,6 +148,8 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 
 static int family_to_freebind_option(sa_family_t sa_family, int *level, int *name)
 {
+#define LOG_NO_FB kr_log_error(NETWORK, "your system does not support 'freebind', " \
+				"please remove it from your configuration\n")
 	switch (sa_family) {
 	case AF_INET:
 		*level = IPPROTO_IP;
@@ -156,6 +158,7 @@ static int family_to_freebind_option(sa_family_t sa_family, int *level, int *nam
 #elif defined(IP_BINDANY)
 		*name = IP_BINDANY;
 #else
+		LOG_NO_FB;
 		return kr_error(ENOTSUP);
 #endif
 		break;
@@ -167,6 +170,7 @@ static int family_to_freebind_option(sa_family_t sa_family, int *level, int *nam
 		*level = IPPROTO_IPV6;
 		*name = IPV6_BINDANY;
 #else
+		LOG_NO_FB;
 		return kr_error(ENOTSUP);
 #endif
 		break;
