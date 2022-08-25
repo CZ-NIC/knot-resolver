@@ -71,7 +71,6 @@ Requires(pre):  shadow-utils
 %endif
 %if 0%{?fedora} || 0%{?rhel} > 7
 BuildRequires:  pkgconfig(lmdb)
-BuildRequires:  python3-sphinx
 Requires:       lua5.1-basexx
 Requires:       lua5.1-cqueues
 Requires:       lua5.1-http
@@ -87,19 +86,7 @@ BuildRequires:  openssl-devel
 %if 0%{?suse_version}
 %define NINJA ninja
 BuildRequires:  lmdb-devel
-BuildRequires:  python3-Sphinx
 Requires(pre):  shadow
-%endif
-
-%if "x%{?rhel}" == "x"
-# dependencies for doc package
-# NOTE: doc isn't possible to build on CentOS 7, 8
-#       python2-sphinx is too old and python36-breathe is broken on CentOS 7
-#       python3-breathe isn't available for CentOS 8 (yet? rhbz#1808766)
-BuildRequires:  doxygen
-BuildRequires:  python3-breathe
-BuildRequires:  python3-sphinx_rtd_theme
-BuildRequires:  texinfo
 %endif
 
 %description
@@ -118,16 +105,6 @@ Requires:       %{name}%{?_isa} = %{version}-%{release}
 
 %description devel
 The package contains development headers for Knot Resolver.
-
-%if "x%{?rhel}" == "x"
-%package doc
-Summary:        Documentation for Knot Resolver
-BuildArch:      noarch
-Requires:       %{name} = %{version}-%{release}
-
-%description doc
-Documentation for Knot Resolver
-%endif
 
 %if "x%{?suse_version}" == "x"
 %package module-dnstap
@@ -196,9 +173,6 @@ gpg2 --verify %{SOURCE1} %{SOURCE0}
 
 %build
 CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
-%if "x%{?rhel}" == "x"
-    -Ddoc=enabled \
-%endif
     -Dsystemd_files=enabled \
     -Dclient=enabled \
 %if "x%{?suse_version}" == "x"
@@ -217,9 +191,6 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
     --sysconfdir="%{_sysconfdir}" \
 
 %{NINJA} -v -C build_rpm
-%if "x%{?rhel}" == "x"
-%{NINJA} -v -C build_rpm doc
-%endif
 
 pushd manager
 %py3_build
@@ -391,15 +362,6 @@ fi
 %{_includedir}/libkres
 %{_libdir}/pkgconfig/libkres.pc
 %{_libdir}/libkres.so
-
-%if "x%{?rhel}" == "x"
-%files doc
-%dir %{_pkgdocdir}
-%doc %{_pkgdocdir}/html
-%doc %{_datadir}/info/knot-resolver.info*
-%dir %{_datadir}/info/knot-resolver-figures
-%doc %{_datadir}/info/knot-resolver-figures/*
-%endif
 
 %if "x%{?suse_version}" == "x"
 %files module-dnstap

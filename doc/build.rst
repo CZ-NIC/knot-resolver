@@ -55,7 +55,7 @@ Resolver:
    "`lua-cqueues`_", "some lua modules", ""
    "cmocka_", "``unit tests``", "Unit testing framework."
    "Doxygen_", "``documentation``", "Generating API documentation."
-   "Sphinx_ and sphinx_rtd_theme_", "``documentation``", "Building this
+   "Sphinx_, sphinx-tabs_ and sphinx_rtd_theme_", "``documentation``", "Building this
    documentation."
    "Texinfo_", "``documentation``", "Generating this documentation in Info
    format."
@@ -265,6 +265,7 @@ For development, it's possible to build the container directly from your git tre
 .. _Doxygen: https://www.doxygen.nl/manual/index.html
 .. _breathe: https://github.com/michaeljones/breathe
 .. _Sphinx: http://sphinx-doc.org/
+.. _sphinx-tabs: https://sphinx-tabs.readthedocs.io
 .. _sphinx_rtd_theme: https://pypi.python.org/pypi/sphinx_rtd_theme
 .. _Texinfo: https://www.gnu.org/software/texinfo/
 .. _pkg-config: https://www.freedesktop.org/wiki/Software/pkg-config/

@@ -39,13 +39,21 @@ if get_option('doc') == 'enabled'
     else
       python_sphinx_rtd_theme = run_command('python2', '-c', 'import sphinx_rtd_theme', check: false)
       if python_sphinx_rtd_theme.returncode() != 0
-	error('missing doc dependency: python sphinx_rtd_theme')
+	      error('missing doc dependency: python sphinx_rtd_theme')
+      endif
+      python_sphinx_tabs = run_command('python2', '-c', 'import sphinx_tabs', check: false)
+      if python_sphinx_tabs.returncode() != 0
+        error('missing doc dependency: python python-sphinx-tabs')
       endif
     endif
   else
     python_sphinx_rtd_theme = run_command('python3', '-c', 'import sphinx_rtd_theme', check: false)
     if python_sphinx_rtd_theme.returncode() != 0
-      error('missing doc dependency: python sphinx_rtd_theme')
+      error('missing doc dependency: sphinx_rtd_theme')
+    endif
+    python_sphinx_tabs = run_command('python3', '-c', 'import sphinx_tabs', check: false)
+    if python_sphinx_tabs.returncode() != 0
+      error('missing doc dependency: python sphinx-tabs')
     endif
   endif
   message('------------------------')

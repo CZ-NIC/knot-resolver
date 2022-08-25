@@ -8,20 +8,32 @@ Knot Resolver is a minimalistic implementation of a caching validating DNS resol
 Modular architecture keeps the core tiny and efficient,
 and it provides a state-machine like API for extensions.
 
+
 .. toctree::
-   :caption: Quick Start
-   :name: quickstart
+   :caption: Getting Started
+   :name: gettingstarted-chapter
    :maxdepth: 1
 
-   quickstart-install
-   quickstart-startup
-   quickstart-config
+   gettingstarted-intro
+   gettingstarted-install
+   gettingstarted-startup
+   gettingstarted-config
 
-.. _configuration-chapter:
+
+.. toctree::
+   :caption: Common Use Cases
+   :name: usecases-chapter
+   :maxdepth: 1
+
+   usecase-network-interfaces
+   usecase-internal-resolver
+   usecase-isp-resolver
+   usecase-personal-resolver
+
 
 .. toctree::
    :caption: Configuration
-   :name: users
+   :name: configuration-chapter
    :maxdepth: 3
 
    config-overview
@@ -33,25 +45,26 @@ and it provides a state-machine like API for extensions.
    config-experimental
    config-no-systemd
 
-.. _operation-chapter:
 
 .. toctree::
-   :caption: Operation
+   :caption: For operators
+   :name: operators-chapter
    :maxdepth: 1
 
    upgrading
    NEWS
 
+
 .. toctree::
-   :caption: Developers
-   :name: developers
+   :caption: For developers
+   :name: developers-chapter
    :maxdepth: 2
 
    build
-   modules-http-custom-services
    lib
    modules_api
    worker_api
+   modules-http-custom-services
 
 
 Indices and tables
