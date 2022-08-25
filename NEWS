@@ -1,3 +1,11 @@
+Knot Resolver 5.x.y (2022-mm-dd)
+================================
+
+Improvements
+------------
+- fix config_tests on macOS (both HW variants)
+
+
 Knot Resolver 5.5.2 (2022-08-16)
 ================================
 
