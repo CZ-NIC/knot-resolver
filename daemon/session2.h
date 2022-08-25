@@ -44,17 +44,21 @@ struct comm_info {
 /** Protocol types - individual implementations of protocol layers. */
 enum protolayer_protocol {
 	PROTOLAYER_NULL = 0,
+
+	/* General transport protocols */
 	PROTOLAYER_UDP,
 	PROTOLAYER_TCP,
 	PROTOLAYER_TLS,
 	PROTOLAYER_HTTP,
 
+	/* QUIC (not yet implemented) */
 	PROTOLAYER_UDP_TO_QCONN,
 	PROTOLAYER_QCONN_TO_QSTREAM,
 
+	/* DNS (`worker`) */
 	PROTOLAYER_DNS_DGRAM,
-	PROTOLAYER_DNS_MSTREAM, /* DoTCP allows multiple packets per stream */
-	PROTOLAYER_DNS_SSTREAM, /* DoQ only allows a single packet per stream */
+	PROTOLAYER_DNS_MSTREAM,
+	PROTOLAYER_DNS_SSTREAM,
 
 	PROTOLAYER_PROTOCOL_COUNT
 };
@@ -87,25 +91,25 @@ enum protolayer_grp {
 extern char *protolayer_grp_names[];
 
 /** Flow control indicators for protocol layer `wrap` and `unwrap` callbacks.
- * Use via `protolayer_continue`, `protolayer_wait`, `protolayer_break`, and
- * `protolayer_push` functions. */
+ * Use via `protolayer_continue`, `protolayer_break`, and `protolayer_push`
+ * functions. */
 enum protolayer_cb_action {
 	PROTOLAYER_CB_ACTION_NULL = 0,
 
 	PROTOLAYER_CB_ACTION_CONTINUE,
-	PROTOLAYER_CB_ACTION_WAIT,
 	PROTOLAYER_CB_ACTION_BREAK,
 };
 
 /** Direction of layer sequence processing. */
 enum protolayer_direction {
 	/** Processes buffers in order of layers as defined in the layer group.
-	 * In this direction, protocol data should be removed from the buffer,
-	 * parsing additional data provided by the protocol. */
+	 * In this direction, protocol ceremony data should be removed from the
+	 * buffer, parsing additional data provided by the protocol. */
 	PROTOLAYER_UNWRAP,
 
-	/** Processes buffers in reverse order of layers as defined in the layer
-	 * group. In this direction, protocol data should be added. */
+	/** Processes buffers in reverse order of layers as defined in the
+	 * layer group. In this direction, protocol ceremony data should be
+	 * added. */
 	PROTOLAYER_WRAP,
 };
 
@@ -129,12 +133,11 @@ enum protolayer_ret {
  * `session2_wrap`) has ended - i.e. the input buffer will not be processed
  * any further.
  *
- * `status` may be one of `enum protolayer_ret` or a negative
- * number indicating an error.
+ * `status` may be one of `enum protolayer_ret` or a negative number indicating
+ * an error.
  * `target` is the `target` parameter passed to the `session2_(un)wrap`
  * function.
- * `baton` is the `baton` parameter passed to the
- * `session2_(un)wrap` function. */
+ * `baton` is the `baton` parameter passed to the `session2_(un)wrap` function. */
 typedef void (*protolayer_finished_cb)(int status, struct session2 *session,
                                        const void *target, void *baton);
 
@@ -163,6 +166,11 @@ enum protolayer_event_type {
 extern char *protolayer_event_names[];
 
 
+/** Payload types.
+ *
+ * Parameters are:
+ *   1. Constant name
+ *   2. Human-readable name for logging */
 #define PROTOLAYER_PAYLOAD_MAP(XX) \
 	XX(BUFFER, "Buffer") \
 	XX(IOVEC, "IOVec") \
@@ -307,8 +315,11 @@ enum protolayer_cb_result {
 	PROTOLAYER_CB_RESULT_MAGIC = 0x364F392E,
 };
 
-/** Function type for `wrap` and `unwrap` callbacks of layers. Return value
- * determines the flow of iteration; see the enum docs for more info. */
+/** Function type for `wrap` and `unwrap` callbacks of layers.
+ *
+ * The pointed-to function, or another function spawned by this function, must
+ * call one of the *layer sequence return functions*. The pointed-to function
+ * must return the result of such a return function. */
 typedef enum protolayer_cb_result (*protolayer_cb)(
 		struct protolayer_data *layer, struct protolayer_cb_ctx *ctx);
 
@@ -342,6 +353,7 @@ typedef int (*protolayer_data_cb)(struct protolayer_manager *manager,
 /** A collection of protocol layers and their layer-specific data. */
 struct protolayer_manager {
 	enum protolayer_grp grp;
+	/* TODO: move iter data to `struct protolayer_cb_ctx` */
 	bool iter_data_inited : 1; /**< True: layers' iteration data is
 	                            * initialized (e.g. from a previous
 	                            * iteration). */
@@ -369,75 +381,95 @@ struct protolayer_manager *protolayer_manager_new(
 void protolayer_manager_free(struct protolayer_manager *m);
 
 
-/** Global data for a specific layered protocol. */
+/** Global data for a specific layered protocol. This is to be initialized in
+ * the `protolayer_globals` global array (below) during the start of the
+ * resolver. It contains pointers to the specific protocol's functions. */
 struct protolayer_globals {
-	size_t sess_size; /**< Size of the layer-specific session data struct. */
-	size_t iter_size; /**< Size of the layer-specific iteration data struct. */
-	protolayer_data_sess_init_cb sess_init; /**< Called upon session
-	                                          * creation to initialize
-	                                          * layer-specific session data. */
-	protolayer_data_cb sess_deinit; /**< Called upon session destruction to
-	                                 * deinitialize layer-specific session
-	                                 * data. */
-	protolayer_data_cb iter_init;   /**< Called at the beginning of a layer
-	                                 * sequence to initialize layer-specific
-	                                 * iteration data. */
-	protolayer_data_cb iter_deinit; /**< Called at the end of a layer
-	                                 * sequence to deinitialize
-	                                 * layer-specific iteration data. */
+	/** Size of the layer-specific session data struct. */
+	size_t sess_size;
 
-	protolayer_cb unwrap; /**< Strips the buffer of protocol-specific
-	                       * data. E.g. a HTTP layer removes HTTP
-	                       * status and headers. */
-	protolayer_cb wrap;   /**< Wraps the buffer into protocol-specific
-	                       * data. E.g. a HTTP layer adds HTTP status
-	                       * and headers. */
+	/** Size of the layer-specific iteration data struct. */
+	size_t iter_size;
 
-	protolayer_event_cb event_unwrap; /**< Processes events in the unwrap order. */
-	protolayer_event_cb event_wrap; /**< Processes events in the wrap order. */
+	/** Called during session creation to initialize layer-specific
+	 * session data. */
+	protolayer_data_sess_init_cb sess_init;
+
+	/** Called during session destruction to deinitialize layer-specific
+	 * session data. */
+	protolayer_data_cb sess_deinit;
+
+	/** Called at the beginning of a layer sequence to initialize
+	 * layer-specific iteration data. */
+	protolayer_data_cb iter_init;
+
+	/** Called at the end of a layer sequence to deinitialize
+	 * layer-specific iteration data. */
+	protolayer_data_cb iter_deinit;
+
+	/** Strips the buffer of protocol-specific data. E.g. a HTTP layer
+	 * removes HTTP status and headers. */
+	protolayer_cb unwrap;
+
+	/** Wraps the buffer into protocol-specific data. E.g. a HTTP layer
+	 * adds HTTP status and headers. */
+	protolayer_cb wrap;
+
+	/** Processes events in the unwrap order (sent from the outside). */
+	protolayer_event_cb event_unwrap;
+
+	/** Processes events in the wrap order (bounced back by the session). */
+	protolayer_event_cb event_wrap;
 };
 
 /** Global data about layered protocols. Indexed by `enum protolayer_protocol`. */
 extern struct protolayer_globals protolayer_globals[PROTOLAYER_PROTOCOL_COUNT];
 
-/** *Continuation function* - signals the protolayer manager to continue
- * processing the next layer. */
+/** *Layer sequence return function* - signalizes the protolayer manager to
+ * continue processing the next layer. */
 enum protolayer_cb_result protolayer_continue(struct protolayer_cb_ctx *ctx);
 
-/** *Continuation function* - signals that the layer needs more data to produce
- * a new buffer for the next layer. */
-enum protolayer_cb_result protolayer_wait(struct protolayer_cb_ctx *ctx);
-
-/** *Continuation function* - signals that the layer wants to stop processing
- * of the buffer and clean up, possibly due to an error (indicated by
- * `status`).
- *
- * `status` must be 0 or a negative integer. */
+/** *Layer sequence return function* - signalizes that the layer wants to stop
+ * processing of the buffer and clean up, possibly due to an error (indicated
+ * by a non-zero `status`). */
 enum protolayer_cb_result protolayer_break(struct protolayer_cb_ctx *ctx, int status);
 
-/** *Continuation function* - pushes data to the session's transport and
- * signals that the layer wants to stop processing of the buffer and clean up.
+/** *Layer sequence return function* - pushes data to the session's transport
+ * and signalizes that the layer wants to stop processing of the buffer and
+ * clean up.
  *
- * This function is meant to be called by the `wrap` callback of first layer in
- * the sequence.  */
+ * This function is to be called by the `wrap` callback of first layer in
+ * the sequence.
+ *
+ * TODO: get rid of this and just do the push within `_continue` when called
+ * from the first layer in `_UNWRAP` direction. */
 enum protolayer_cb_result protolayer_push(struct protolayer_cb_ctx *ctx);
 
+/** *Layer sequence return function* - signalizes that the current sequence
+ * will continue in an asynchronous manner. The layer should store the context
+ * and call another sequence return function at another point. This may be used
+ * in layers that work through libraries whose operation is asynchronous, like
+ * GnuTLS.
+ *
+ * Note that this return function is just a readability hint - another return
+ * function may be called in a lower stack frame before it and the sequence
+ * will behave correctly. */
 static inline enum protolayer_cb_result protolayer_async()
 {
 	return PROTOLAYER_CB_RESULT_MAGIC;
 }
 
 
-/** Wire buffer.
+/** A buffer, with indices marking the chunk containing valid data.
  *
- * May be initialized via `wire_buf_init` or to zero (ZII), then reserved via
- * `wire_buf_reserve`. */
+ * May be initialized in two possible ways:
+ *  - via `wire_buf_init`
+ *  - to zero, then reserved via `wire_buf_reserve`. */
 struct wire_buf {
 	char *buf; /**< Buffer memory. */
 	size_t size; /**< Current size of the buffer memory. */
 	size_t start; /**< Index at which the valid data of the buffer starts (inclusive). */
 	size_t end; /**< Index at which the valid data of the buffer ends (exclusive). */
-	bool error; /**< Whether there has been an error. */
 };
 
 /** Allocates the wire buffer with the specified `initial_size`. */
@@ -472,21 +504,25 @@ int wire_buf_movestart(struct wire_buf *wb);
 /** Resets the valid bytes of the buffer to zero, as well as the error flag. */
 int wire_buf_reset(struct wire_buf *wb);
 
+/** Gets a pointer to the data marked as valid in the wire buffer. */
 static inline void *wire_buf_data(const struct wire_buf *wb)
 {
 	return &wb->buf[wb->start];
 }
 
+/** Gets the length of the data marked as valid in the wire buffer. */
 static inline size_t wire_buf_data_length(const struct wire_buf *wb)
 {
 	return wb->end - wb->start;
 }
 
+/** Gets a pointer to the free space after the valid data of the wire buffer. */
 static inline void *wire_buf_free_space(const struct wire_buf *wb)
 {
 	return &wb->buf[wb->end];
 }
 
+/** Gets the lengthof the free space after the valid data of the wire buffer. */
 static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 {
 	return wb->size - wb->end;
@@ -501,6 +537,22 @@ enum session2_transport_type {
 	SESSION2_TRANSPORT_PARENT,
 };
 
+/** A data unit for a single sequential data source. The data may be organized
+ * as a stream or a sequence of datagrams - this is up to the actual individual
+ * protocols used by the session.
+ *
+ * A session processes data in two directions:
+ *
+ *  - `_UNWRAP` deals with raw data received from the session's transport. It
+ *    strips the ceremony of individual protocols from the buffers. The last
+ *    (bottommost) layer is generally responsible for submitting the unwrapped
+ *    data to be processed by an internal system, e.g. to be resolved as a DNS
+ *    query.
+ *
+ *  - `_WRAP` deals with data generated by an internal system. It adds the
+ *    required protocol ceremony to it (e.g. encryption). The first (topmost)
+ *    layer is responsible for preparing the data to be sent through the
+ *    session's transport. */
 struct session2 {
 	/** Data for sending data out in the `wrap` direction and receiving new
 	 * data in the `unwrap` direction. */
@@ -508,7 +560,7 @@ struct session2 {
 		enum session2_transport_type type; /**< See `enum session2_transport_type` */
 		union {
 			/** For `_IO` type transport. Contains a libuv handle
-			 * and session-related addresses. */
+			 * and session-related address storage. */
 			struct {
 				uv_handle_t *handle;
 				union kr_sockaddr peer;
@@ -522,31 +574,42 @@ struct session2 {
 
 	struct protolayer_manager *layers; /**< Protocol layers of this session. */
 	knot_mm_t pool;
-
 	uv_timer_t timer; /**< For session-wide timeout events. */
-
 	trie_t *tasks; /**< List of tasks associated with given session. */
 	queue_t(struct qr_task *) waiting; /**< List of tasks waiting for
 	                                    * sending to upstream. */
 
+	/** Managed buffer for data received by `io`. */
 	struct wire_buf wire_buf;
 
-	uint64_t last_activity; /**< Time of last IO activity (if any occurs).
-	                         * Otherwise session creation time. */
+	/** Time of last IO activity (if any occurs). Otherwise session
+	 * creation time. */
+	uint64_t last_activity;
 
-	void *data; /**< Pointer to arbitrary data for callbacks. */
+	/** If true, the session's transport is towards an upstream server.
+	 * Otherwise, it is towards a client. */
+	bool outgoing : 1;
 
-	bool outgoing : 1; /**< True: session's transport is towards an upstream
-	                    * server. Otherwise, it is towards a client
-	                    * connected to the resolver. */
-	bool closing : 1; /**< True: session is at the end of its lifecycle and
-	                   * is going to close. */
-	bool connected : 1; /**< For connection-based sessions. True: connection
-	                     * is established. */
-	bool throttled : 1; /**< True: session is being rate-limited. */
-	bool secure : 1; /**< True: encryption takes place in this session.
-	                  * Layers may use this to determine whether padding
-	                  * should be applied. */
+	/** If true, the session is at the end of its lifecycle and is about
+	 * to close. */
+	bool closing : 1;
+
+	/** If true, a connection is established. Only applicable to sessions
+	 * using connection-based protocols.
+	 *
+	 * TODO: move to `worker`? */
+	bool connected : 1;
+
+	/** If true, session is being rate-limited.
+	 *
+	 * TODO: move to `worker`? */
+	bool throttled : 1;
+
+	/** If true, encryption takes place in this session. Layers may use
+	 * this to determine whether padding should be applied. A layer that
+	 * provides security shall set this to `true` during session
+	 * initialization. */
+	bool secure : 1;
 };
 
 /** Allocates and initializes a new session with the specified protocol layer
@@ -672,10 +735,14 @@ static inline bool session2_is_empty(const struct session2 *session)
 	       session2_waitinglist_is_empty(session);
 }
 
-/** Sends the specified `payload` to be processed in the `unwrap` direction by
+/** Sends the specified `payload` to be processed in the `_UNWRAP` direction by
  * the session's protocol layers. The `target` parameter may contain a pointer
  * to transport-specific data, e.g. for UDP, it shall contain a pointer to the
  * sender's `struct sockaddr_*`.
+ *
+ * Note that the payload data may be modified by any of the layers, to avoid
+ * making copies. Once the payload is passed to this function, the content of
+ * the referenced data is undefined to the caller.
  *
  * Once all layers are processed, `cb` is called with `baton` passed as one
  * of its parameters. `cb` may also be `NULL`. See `protolayer_finished_cb` for
@@ -686,13 +753,23 @@ static inline bool session2_is_empty(const struct session2 *session)
 int session2_unwrap(struct session2 *s, struct protolayer_payload payload,
                     const void *target, protolayer_finished_cb cb, void *baton);
 
+/** Same as `session2_unwrap`, but looks up the specified `protocol` in the
+ * session's assigned protocol group and sends the `payload` to the layer that
+ * is next in the sequence in the `_UNWRAP` direction.
+ *
+ * Layers may use this to generate their own data to send in the sequence, e.g.
+ * for protocol-specific ceremony. */
 int session2_unwrap_after(struct session2 *s, enum protolayer_protocol protocol,
                          struct protolayer_payload payload, const void *target,
                          protolayer_finished_cb cb, void *baton);
 
-/** Sends the specified `payload` to be processed in the `wrap` direction by the
- * session's protocol layers. The `target` parameter may contain a pointer to
- * some data specific to the producer-consumer layer of this session.
+/** Sends the specified `payload` to be processed in the `_WRAP` direction by
+ * the session's protocol layers. The `target` parameter may contain a pointer
+ * to some data specific to the bottommost layer of this session.
+ *
+ * Note that the payload data may be modified by any of the layers, to avoid
+ * making copies. Once the payload is passed to this function, the content of
+ * the referenced data is undefined to the caller.
  *
  * Once all layers are processed, `cb` is called with `baton` passed as one
  * of its parameters. `cb` may also be `NULL`. See `protolayer_finished_cb` for
@@ -703,6 +780,12 @@ int session2_unwrap_after(struct session2 *s, enum protolayer_protocol protocol,
 int session2_wrap(struct session2 *s, struct protolayer_payload payload,
                   const void *target, protolayer_finished_cb cb, void *baton);
 
+/** Same as `session2_wrap`, but looks up the specified `protocol` in the
+ * session's assigned protocol group and sends the `payload` to the layer that
+ * is next in the sequence in the `_WRAP` direction.
+ *
+ * Layers may use this to generate their own data to send in the sequence, e.g.
+ * for protocol-specific ceremony. */
 int session2_wrap_after(struct session2 *s, enum protolayer_protocol protocol,
                        struct protolayer_payload payload, const void *target,
                        protolayer_finished_cb cb, void *baton);

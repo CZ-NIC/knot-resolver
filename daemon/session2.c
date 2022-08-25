@@ -15,7 +15,7 @@
 
 
 static int session2_transport_pushv(struct session2 *s,
-                                    const struct iovec *iov, int iovcnt,
+                                    struct iovec *iov, int iovcnt,
                                     const void *target,
                                     protolayer_finished_cb cb, void *baton);
 static inline int session2_transport_push(struct session2 *s,
@@ -231,12 +231,6 @@ static int protolayer_step(struct protolayer_cb_ctx *ctx)
 			return PROTOLAYER_RET_ASYNC;
 		}
 
-		if (ctx->action == PROTOLAYER_CB_ACTION_WAIT) {
-			kr_assert(ctx->status == 0);
-			return protolayer_cb_ctx_finish(
-					ctx, PROTOLAYER_RET_WAITING, false);
-		}
-
 		if (ctx->action == PROTOLAYER_CB_ACTION_BREAK) {
 			return protolayer_cb_ctx_finish(
 					ctx, PROTOLAYER_RET_NORMAL, true);
@@ -409,16 +403,6 @@ enum protolayer_cb_result protolayer_continue(struct protolayer_cb_ctx *ctx)
 	return PROTOLAYER_CB_RESULT_MAGIC;
 }
 
-enum protolayer_cb_result protolayer_wait(struct protolayer_cb_ctx *ctx)
-{
-	if (ctx->async_mode) {
-		protolayer_cb_ctx_finish(ctx, PROTOLAYER_RET_WAITING, false);
-	} else {
-		ctx->action = PROTOLAYER_CB_ACTION_WAIT;
-	}
-	return PROTOLAYER_CB_RESULT_MAGIC;
-}
-
 enum protolayer_cb_result protolayer_break(struct protolayer_cb_ctx *ctx, int status)
 {
 	ctx->status = status;
@@ -541,7 +525,6 @@ int wire_buf_reset(struct wire_buf *wb)
 {
 	wb->start = 0;
 	wb->end = 0;
-	wb->error = false;
 	return kr_ok();
 }
 
@@ -1031,7 +1014,7 @@ static void session2_transport_stream_pushv_finished(uv_write_t *req, int status
 }
 
 static int session2_transport_pushv(struct session2 *s,
-                                    const struct iovec *iov, int iovcnt,
+                                    struct iovec *iov, int iovcnt,
                                     const void *target,
                                     protolayer_finished_cb cb, void *baton)
 {
