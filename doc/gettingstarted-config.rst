@@ -16,13 +16,52 @@ You can start with :ref:`network interfaces <usecase-network-interfaces>`, conti
 Complete configurations files for examples can be found `here <https://gitlab.nic.cz/knot/knot-resolver/tree/master/etc/config>`_.
 The example configuration files are also installed as documentation files, typically in directory ``/usr/share/doc/knot-resolver/examples/`` (their location may be different based on your Linux distribution).
 
-============================
-Configuration tool - kresctl
-============================
+=====================
+Client tool - kresctl
+=====================
 
-=================
-Configuration API
-=================
+===
+API
+===
+
+You can use HTTP API to configure already running Knot Resolver.
+By default HTTP API is configured as UNIX domain socket ``manager.sock`` located in rundir.
+This socket is used by ``kresctl`` tool.
+
+Configuration of API can be changed in ``/etc/knot-resolver/config.yml`` file, e.g.:
+
+.. code-block:: yaml
+
+    management:
+        interface: 127.0.0.1@5000
+        # or use unix socket instead of inteface
+        # unix-socket: /my/new/socket.sock
+
+Configuration API is available on ``/config`` HTTP endpoint.
+All requests support ``If-Match`` HTTP header with an ETag.
+If the ETag is wrong, the request fails.
+
+API support following HTTP request methods:
+
+=============================   =========================
+HTTP request methods            Operation
+=============================   =========================
+**GET**    ``/config[/path]``   returns current config with an ETag
+**POST**   ``/config[/path]``   upsert (try update, if does not exists, insert), appends to array
+**PUT**    ``/config[/path]``   insert (fails if object already exists)
+**PATCH**  ``/config[/path]``   update (fails if object does not exist)
+**DELETE** ``/config[/path]``   delete an existing object
+=============================   =========================
+
+Path
+----
+
+The configuration path is used to determine specific configuration option or subtree of configuration.
+
+Items in lists and dictionaries are reachable as follows and can also be combined:
+
+* ``/{list}/{0}``
+* ``/{dict}/{key}``
 
 ========================
 Legacy Lua configuration
