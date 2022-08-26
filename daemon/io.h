@@ -45,7 +45,10 @@ void tcp_timeout_trigger(uv_timer_t *timer);
  * \param family = AF_*
  * \param has_tls has meanings only when type is SOCK_STREAM */
 int io_create(uv_loop_t *loop, uv_handle_t *handle, int type,
-	      unsigned family, enum protolayer_grp grp, bool outgoing);
+	      unsigned family, enum protolayer_grp grp,
+	      struct protolayer_data_param *layer_param,
+	      size_t layer_param_count,
+	      bool outgoing);
 void io_free(uv_handle_t *handle);
 
 int io_start_read(uv_handle_t *handle);

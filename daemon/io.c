@@ -92,10 +92,8 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		return;
 	}
 
-	ret = session2_unwrap(s, protolayer_wire_buf(&s->wire_buf), comm_addr,
+	session2_unwrap(s, protolayer_wire_buf(&s->wire_buf), comm_addr,
 			udp_on_unwrapped, NULL);
-	if (ret)
-		wire_buf_reset(&s->wire_buf);
 }
 
 static int family_to_freebind_option(sa_family_t sa_family, int *level, int *name)
@@ -591,7 +589,7 @@ static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp
 		return;
 	}
 	int res = io_create(master->loop, (uv_handle_t *)client,
-			    SOCK_STREAM, AF_UNSPEC, grp, false);
+			    SOCK_STREAM, AF_UNSPEC, grp, NULL, 0, false);
 	if (res) {
 		if (res == UV_EMFILE) {
 			the_worker->too_many_open = true;
@@ -1153,7 +1151,10 @@ int io_listen_pipe(uv_loop_t *loop, uv_pipe_t *handle, int fd)
 //#endif
 
 int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family,
-		enum protolayer_grp grp, bool outgoing)
+		enum protolayer_grp grp,
+		struct protolayer_data_param *layer_param,
+		size_t layer_param_count,
+		bool outgoing)
 {
 	int ret = -1;
 	if (type == SOCK_DGRAM) {
@@ -1165,7 +1166,8 @@ int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family,
 	if (ret != 0) {
 		return ret;
 	}
-	struct session2 *s = session2_new_io(handle, grp, NULL, 0, outgoing);
+	struct session2 *s = session2_new_io(handle, grp, layer_param,
+			layer_param_count, outgoing);
 	if (s == NULL) {
 		ret = -1;
 	}

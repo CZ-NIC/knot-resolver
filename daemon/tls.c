@@ -270,6 +270,33 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 	return total_len;
 }
 
+static void tls_handshake_success(struct pl_tls_sess_data *tls,
+                                  struct session2 *session)
+{
+	if (tls->client_side) {
+		tls_client_param_t *tls_params = tls->client_params;
+		gnutls_session_t tls_session = tls->tls_session;
+		if (gnutls_session_is_resumed(tls_session) != 0) {
+			kr_log_debug(TLSCLIENT, "TLS session has resumed\n");
+		} else {
+			kr_log_debug(TLSCLIENT, "TLS session has not resumed\n");
+			/* session wasn't resumed, delete old session data ... */
+			if (tls_params->session_data.data != NULL) {
+				gnutls_free(tls_params->session_data.data);
+				tls_params->session_data.data = NULL;
+				tls_params->session_data.size = 0;
+			}
+			/* ... and get the new session data */
+			gnutls_datum_t tls_session_data = { NULL, 0 };
+			int ret = gnutls_session_get_data2(tls_session, &tls_session_data);
+			if (ret == 0) {
+				tls_params->session_data = tls_session_data;
+			}
+		}
+	}
+	session2_event_after(session, PROTOLAYER_TLS, PROTOLAYER_EVENT_CONNECT, NULL);
+}
+
 /** Perform TLS handshake and handle error codes according to the documentation.
   * See See https://gnutls.org/manual/html_node/TLS-handshake.html#TLS-handshake
   * The function returns kr_ok() or success or non fatal error, kr_error(EAGAIN) on blocking, or kr_error(EIO) on fatal error.
@@ -283,7 +310,7 @@ static int tls_handshake(struct pl_tls_sess_data *tls, struct session2 *session)
 		struct sockaddr *peer = session2_get_peer(session);
 		VERBOSE_MSG(tls->client_side, "TLS handshake with %s has completed\n",
 				kr_straddr(peer));
-		session2_event_after(session, PROTOLAYER_TLS, PROTOLAYER_EVENT_CONNECT, NULL);
+		tls_handshake_success(tls, session);
 	} else if (err == GNUTLS_E_AGAIN) {
 		return kr_error(EAGAIN);
 	} else if (gnutls_error_is_fatal(err)) {
@@ -292,7 +319,8 @@ static int tls_handshake(struct pl_tls_sess_data *tls, struct session2 *session)
 				gnutls_strerror_name(err), err);
 		/* Notify the peer about handshake failure via an alert. */
 		gnutls_alert_send_appropriate(tls->tls_session, err);
-		session2_event(session, PROTOLAYER_EVENT_FORCE_CLOSE, NULL);
+		session2_event(session, PROTOLAYER_EVENT_CONNECT_FAIL,
+				(void *)KR_SELECTION_TLS_HANDSHAKE_FAILED);
 		return kr_error(EIO);
 	} else if (err == GNUTLS_E_WARNING_ALERT_RECEIVED) {
 		/* Handle warning when in verbose mode */

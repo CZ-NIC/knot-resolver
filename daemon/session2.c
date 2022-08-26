@@ -194,7 +194,7 @@ static int protolayer_step(struct protolayer_cb_ctx *ctx)
 				ctx->manager, ctx->layer_ix);
 		if (kr_fails_assert(ldata)) {
 			/* Probably layer index or data corruption */
-			return kr_error(EINVAL);
+			return protolayer_cb_ctx_finish(ctx, kr_error(EINVAL), true);
 		}
 
 		enum protolayer_protocol protocol = ldata->protocol;
@@ -222,7 +222,7 @@ static int protolayer_step(struct protolayer_cb_ctx *ctx)
 
 		if (kr_fails_assert(result == PROTOLAYER_CB_RESULT_MAGIC)) {
 			/* Callback did not use a continuation function to return. */
-			return kr_error(EINVAL);
+			return protolayer_cb_ctx_finish(ctx, kr_error(EINVAL), true);
 		}
 
 		if (!ctx->action) {
@@ -731,15 +731,9 @@ struct qr_task *session2_tasklist_find_msgid(const struct session2 *session, uin
 		return NULL;
 	trie_t *t = session->tasks;
 	struct qr_task *ret = NULL;
-	const char *key = (const char *)&msg_id;
-	size_t key_len = sizeof(msg_id);
-	trie_val_t val;
-	int res = trie_del(t, key, key_len, &val);
-	if (res == KNOT_EOK) {
-		if (worker_task_numrefs(val) > 1) {
-			ret = val;
-		}
-		worker_task_unref(val);
+	trie_val_t *val = trie_get_try(t, (char *)&msg_id, sizeof(msg_id));
+	if (val) {
+		ret = *val;
 	}
 	return ret;
 }
@@ -750,9 +744,15 @@ struct qr_task *session2_tasklist_del_msgid(const struct session2 *session, uint
 		return NULL;
 	trie_t *t = session->tasks;
 	struct qr_task *ret = NULL;
-	trie_val_t *val = trie_get_try(t, (char *)&msg_id, sizeof(msg_id));
-	if (val) {
-		ret = *val;
+	const char *key = (const char *)&msg_id;
+	size_t key_len = sizeof(msg_id);
+	trie_val_t val;
+	int res = trie_del(t, key, key_len, &val);
+	if (res == KNOT_EOK) {
+		if (worker_task_numrefs(val) > 1) {
+			ret = val;
+		}
+		worker_task_unref(val);
 	}
 	return ret;
 }
