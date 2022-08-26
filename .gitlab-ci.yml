@@ -757,43 +757,4 @@ obs:ubuntu2204:x86_64:
     DISTROTEST_NAME: ubuntu2204
     DISTROTEST_REPO: xUbuntu_22.04
 
-.packagingtest: &packagingtest
-  stage: pkgtest
-  only:
-    refs:
-      - nightly@knot/knot-resolver
-  needs: []
-  tags:
-    - dind
-    - amd64
-  variables:
-    DISTRO: debian_10
-  script:
-    - pytest -r fEsxX tests/packaging -k $DISTRO
-
-packaging:centos_8:
-  <<: *packagingtest
-  variables:
-    DISTRO: centos_8
-
-packaging:centos_7:
-  <<: *packagingtest
-  variables:
-    DISTRO: centos_7
-
-packaging:fedora_31:
-  <<: *packagingtest
-  variables:
-    DISTRO: fedora_31
-
-packaging:fedora_32:
-  <<: *packagingtest
-  variables:
-    DISTRO: fedora_32
-
-packaging:leap_15.2:
-  <<: *packagingtest
-  variables:
-    DISTRO: leap_15.2
-
 # }}}
