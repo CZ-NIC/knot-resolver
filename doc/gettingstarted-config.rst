@@ -16,19 +16,24 @@ You can start with :ref:`network interfaces <usecase-network-interfaces>`, conti
 Complete configurations files for examples can be found `here <https://gitlab.nic.cz/knot/knot-resolver/tree/master/etc/config>`_.
 The example configuration files are also installed as documentation files, typically in directory ``/usr/share/doc/knot-resolver/examples/`` (their location may be different based on your Linux distribution).
 
-=====================
-Client tool - kresctl
-=====================
+.. tip::
 
-===
-API
-===
+    An easy way to see the complete configuration structure is to look at the `JSON Schema <https://json-schema.org/>`_ on `http://localhost:5000/schema/ui <http://localhost:5000/schema/ui>`_ with the Knot Resolver running.
+    The raw schema is availiable on `http://localhost:5000/schema <http://localhost:5000/schema>`_.
+
+============
+kresctl tool
+============
+
+========
+HTTP API
+========
 
 You can use HTTP API to configure already running Knot Resolver.
-By default HTTP API is configured as UNIX domain socket ``manager.sock`` located in rundir.
+By default HTTP API is configured as UNIX domain socket ``manager.sock`` located in the resolver's rundir.
 This socket is used by ``kresctl`` tool.
 
-Configuration of API can be changed in ``/etc/knot-resolver/config.yml`` file, e.g.:
+Configuration of API can be changed only in ``/etc/knot-resolver/config.yml`` file:
 
 .. code-block:: yaml
 
@@ -53,6 +58,11 @@ HTTP request methods            Operation
 **DELETE** ``/config[/path]``   delete an existing object
 =============================   =========================
 
+.. note::
+
+    Some configuration options cannot be configured via the API for stability and security reasons(e.g. API configuration itself).
+    In the case of an attempt to configure such an option, the operation is rejected.
+
 Path
 ----
 
@@ -60,8 +70,17 @@ The configuration path is used to determine specific configuration option or sub
 
 Items in lists and dictionaries are reachable as follows and can also be combined:
 
-* ``/{list}/{0}``
-* ``/{dict}/{key}``
+* ``/list-name/{num-id}``
+* ``/dict-name/{key}``
+
+For example, the configuration path might look like this:
+
+* ``/config/network/listen/1/interface``
+
+Payload
+-------
+
+The API uses JSON encoding for payload. It has the same structure as YAML configuration file.
 
 ========================
 Legacy Lua configuration
@@ -77,6 +96,4 @@ When using this configuration approach, the daemon must be started using legacy 
 
     The configuration language is in fact Lua script, so you can use full power
     of this programming language. See article
-    `Learn Lua in 15 minutes`_ for a syntax overview.
-
-.. _`Learn Lua in 15 minutes`: http://tylerneylon.com/a/learn-lua/
+    `Learn Lua in 15 minutes <http://tylerneylon.com/a/learn-lua/>`_ for a syntax overview.
