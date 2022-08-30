@@ -17,9 +17,7 @@ generate-setup-file = true
 python = "^3.6.8"
 aiohttp = "^3.6.12"
 Jinja2 = "^2.11.3"
-click = "^7.1.2"
-PyYAML = "^5.4.1"
-requests = "^2.25.1"
+PyYAML = "*"
 typing-extensions = ">=3.7.2"
 prometheus-client = "^0.6"
 supervisor = "^4.2.2"
@@ -31,19 +29,14 @@ black = "^20.8b1"
 tox = "^3.21.4"
 tox-pyenv = "^1.1.0"
 poethepoet = "^0.13.0"
-requests = "^2.25.1"
-requests-unixsocket = "^0.2.0"
-click = "^7.1.2"
 toml = "^0.10.2"
 debugpy = "^1.2.1"
 Sphinx = "^4.0.2"
 pylint = "^2.11.1"
 pytest-asyncio = "^0.16.0"
 pytest = "^6.2.5"
-types-requests = "^2.26.3"
 types-PyYAML = "^6.0.1"
 mypy = "^0.930"
-types-click = "^7.1.8"
 types-Jinja2 = "^2.11.9"
 types-dataclasses = "^0.6.4"
 poetry = "^1.1.12"
@@ -61,7 +54,7 @@ format = { shell = "black knot_resolver_manager/ tests/ scripts/ build.py; isort
 fixdeps = { shell = "poetry install; npm install; npm update", help = "Install/update dependencies according to configuration files"}
 commit = { shell = "scripts/commit", help = "Invoke every single check before commiting" }
 container = { cmd = "scripts/container.py", help = "Manage containers" }
-client = { script = "knot_resolver_manager.client.__main__:main", help="Run Managers API client CLI" }
+kresctl = { script = "knot_resolver_manager.cli:main", help="run kresctl" }
 clean = """
   rm -rf .coverage
          .mypy_cache

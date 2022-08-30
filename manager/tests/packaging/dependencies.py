@@ -20,8 +20,8 @@ mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 install_requires = mod.install_requires
 
-# stip version codes
-deps = set((x[: x.index(">")].lower() for x in install_requires))
+# strip version codes
+deps = set((x[: x.index(">")].lower() if ">" in x else x.lower() for x in install_requires))
 
 # find out which packages are missing
 installed = {pkg.key for pkg in pkg_resources.working_set}

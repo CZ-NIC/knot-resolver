@@ -7,13 +7,14 @@ import sys
 from http import HTTPStatus
 from pathlib import Path
 from time import time
-from typing import Any, Optional, Set, Union
+from typing import Any, List, Optional, Set, Union, cast
 
 from aiohttp import web
 from aiohttp.web import middleware
 from aiohttp.web_app import Application
 from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
+from typing_extensions import Literal
 
 import knot_resolver_manager.utils.custom_atexit as atexit
 from knot_resolver_manager import log, statistics
@@ -24,6 +25,7 @@ from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.datamodel.management_schema import ManagementSchema
 from knot_resolver_manager.exceptions import CancelStartupExecInsteadException, KresManagerException
 from knot_resolver_manager.kresd_controller import get_best_controller_implementation
+from knot_resolver_manager.utils import ignore_exceptions_optional
 from knot_resolver_manager.utils.async_utils import readfile
 from knot_resolver_manager.utils.functional import Result
 from knot_resolver_manager.utils.modeling import ParsedTree, parse, parse_yaml
@@ -48,10 +50,11 @@ async def error_handler(request: web.Request, handler: Any) -> web.Response:
     try:
         return await handler(request)
     except DataValidationError as e:
-        return web.Response(text=f"validation of configuration failed: {e}", status=HTTPStatus.BAD_REQUEST)
+        return web.Response(text=f"validation of configuration failed:\n{e}", status=HTTPStatus.BAD_REQUEST)
+    except DataParsingError as e:
+        return web.Response(text=f"request processing error:\n{e}", status=HTTPStatus.BAD_REQUEST)
     except KresManagerException as e:
-        logger.error("Request processing failed", exc_info=True)
-        return web.Response(text=f"Request processing failed: {e}", status=HTTPStatus.INTERNAL_SERVER_ERROR)
+        return web.Response(text=f"request processing failed:\n{e}", status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
 class Server:
@@ -160,25 +163,50 @@ class Server:
         )
 
     @statistics.async_timing_histogram(statistics.MANAGER_REQUEST_RECONFIGURE_LATENCY)
-    async def _handler_apply_config(self, request: web.Request) -> web.Response:
+    async def _handler_config_query(self, request: web.Request) -> web.Response:
         """
         Route handler for changing resolver configuration
         """
+        # There are a lot of local variables in here, but they are usually immutable (almost SSA form :) )
+        # pylint: disable=too-many-locals
 
         # parse the incoming data
         document_path = request.match_info["path"]
-        last: ParsedTree = self.config_store.get().get_unparsed_data()
-        new_partial: ParsedTree = parse(await request.text(), request.content_type)
-        config = last.update(document_path, new_partial)
+        getheaders = ignore_exceptions_optional(List[str], None, KeyError)(request.headers.getall)
+        etags = getheaders("if-match")
+        not_etags = getheaders("if-none-match")
+        current_config: ParsedTree = self.config_store.get().get_unparsed_data()
+        if request.method == "GET":
+            update_with: Optional[ParsedTree] = None
+        else:
+            update_with = parse(await request.text(), request.content_type)
 
-        # validate config
-        config_validated = KresConfig(config)
+        # stop processing if etags
+        def strip_quotes(s: str) -> str:
+            return s.strip('"')
 
-        # apply config
-        await self.config_store.update(config_validated)
+        status = HTTPStatus.NOT_MODIFIED if request.method in ("GET", "HEAD") else HTTPStatus.PRECONDITION_FAILED
+        if etags is not None and current_config.etag not in map(strip_quotes, etags):
+            return web.Response(status=status)
+        if not_etags is not None and current_config.etag in map(strip_quotes, not_etags):
+            return web.Response(status=status)
+
+        # run query
+        op = cast(Literal["get", "post", "delete", "patch", "put"], request.method.lower())
+        new_config, to_return = current_config.query(op, document_path, update_with)
+
+        # update the config
+        if request.method != "GET":
+            # validate
+            config_validated = KresConfig(new_config)
+            # apply
+            await self.config_store.update(config_validated)
 
         # return success
-        return web.Response()
+        resp_text: Optional[str] = str(to_return) if to_return is not None else None
+        res = web.Response(status=HTTPStatus.OK, text=resp_text)
+        res.headers.add("ETag", f'"{new_config.etag}"')
+        return res
 
     async def _handler_metrics(self, _request: web.Request) -> web.Response:
         return web.Response(
@@ -232,7 +260,11 @@ class Server:
         self.app.add_routes(
             [
                 web.get("/", self._handler_index),
-                web.post(r"/config{path:.*}", self._handler_apply_config),
+                web.post(r"/v1/config{path:.*}", self._handler_config_query),
+                web.put(r"/v1/config{path:.*}", self._handler_config_query),
+                web.patch(r"/v1/config{path:.*}", self._handler_config_query),
+                web.get(r"/v1/config{path:.*}", self._handler_config_query),
+                web.delete(r"/v1/config{path:.*}", self._handler_config_query),
                 web.post("/stop", self._handler_stop),
                 web.get("/schema", self._handler_schema),
                 web.get("/schema/ui", self._handle_view_schema),

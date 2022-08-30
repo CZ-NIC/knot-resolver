@@ -22,5 +22,11 @@ if ! systemctl start knot-resolver.service; then
 else
 	# check that the resolvers are actually running
 	kdig @127.0.0.1 nic.cz
+
+	echo "Running interactive tests..."
+	for test in "$(dirname $0)"/interactive/*; do
+		echo "[test] $test"
+		$test
+	done
 fi
 

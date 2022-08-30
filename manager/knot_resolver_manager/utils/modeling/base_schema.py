@@ -553,6 +553,10 @@ class BaseSchema(Serializable):
         if self._LAYER is not None:
             source = self._LAYER(source, object_path=object_path)  # pylint: disable=not-callable
 
+        # prevent failure when user provides a different type than object
+        if isinstance(source, ParsedTree) and not source.is_dict():
+            raise DataValidationError(f"expected object, found '{source.type()}'", object_path)
+
         # assign fields
         used_keys = self._assign_fields(source, object_path)
 
