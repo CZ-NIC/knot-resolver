@@ -21,13 +21,9 @@ The example configuration files are also installed as documentation files, typic
     An easy way to see the complete configuration structure is to look at the `JSON Schema <https://json-schema.org/>`_ on `http://localhost:5000/schema/ui <http://localhost:5000/schema/ui>`_ with the Knot Resolver running.
     The raw schema is availiable on `http://localhost:5000/schema <http://localhost:5000/schema>`_.
 
-============
-kresctl tool
-============
-
-========
-HTTP API
-========
+===================
+Management HTTP API
+===================
 
 You can use HTTP API to configure already running Knot Resolver.
 By default HTTP API is configured as UNIX domain socket ``manager.sock`` located in the resolver's rundir.
@@ -81,6 +77,43 @@ Payload
 -------
 
 The API uses JSON encoding for payload. It has the same structure as YAML configuration file.
+
+===============
+kresctl utility
+===============
+
+Command-line utility to configure and control running Knot Resolver. It uses the above mentioned HTTP API.
+With no changed configuration for management HTTP API, ``kresctl`` shoul work out of the box.
+In other case there is ``-s`` argument to specify path to HTTP API endpoint.
+
+.. code-block::
+
+    $ kresctl -h
+    usage: kresctl [-h] [-i] [-s SOCKET] {stop,config,exit} ...
+
+    Command-line interface for controlling Knot Resolver
+
+    positional arguments:
+    {stop,config,exit}    command type
+        stop                shutdown everything
+        config              dynamically change configuration of a running resolver
+        exit                exit kresctl
+
+    optional arguments:
+    -h, --help            show this help message and exit
+    -i, --interactive     Interactive mode of kresctl utility
+    -s SOCKET, --socket SOCKET
+                          Path to the Unix domain socket of the configuration API
+
+
+You can also get detailed help of every command, e.g. ``$ kresctl config -h``.
+
+Folowing command changes configuration of the number of daemon workers to 4.
+
+.. code-block::
+
+    $ kresctl config /workers 4
+
 
 ========================
 Legacy Lua configuration
