@@ -908,8 +908,11 @@ static int pl_tls_sess_data_deinit(struct pl_tls_sess_data *tls)
 		tls->tls_session = NULL;
 	}
 
-	tls_client_param_unref(tls->client_params);
-	tls_credentials_release(tls->server_credentials);
+	if (tls->client_side) {
+		tls_client_param_unref(tls->client_params);
+	} else {
+		tls_credentials_release(tls->server_credentials);
+	}
 	wire_buf_deinit(&tls->unwrap_buf);
 	queue_deinit(tls->unwrap_queue); /* TODO: break contexts? */
 	return kr_ok();
