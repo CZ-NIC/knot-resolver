@@ -1978,6 +1978,7 @@ static enum protolayer_cb_result pl_dns_dgram_unwrap(
 				break;
 		}
 
+		mp_flush(the_worker->pkt_pool.ctx);
 		return protolayer_break(ctx, ret);
 	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
 		knot_pkt_t *pkt = produce_packet(
@@ -1987,6 +1988,7 @@ static enum protolayer_cb_result pl_dns_dgram_unwrap(
 			return protolayer_break(ctx, KNOT_EMALF);
 
 		int ret = worker_submit(session, &ctx->comm, NULL, NULL, pkt);
+		mp_flush(the_worker->pkt_pool.ctx);
 		return protolayer_break(ctx, ret);
 	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
 		knot_pkt_t *pkt = produce_packet(
@@ -1997,6 +1999,7 @@ static enum protolayer_cb_result pl_dns_dgram_unwrap(
 
 		int ret = worker_submit(session, &ctx->comm, NULL, NULL, pkt);
 		wire_buf_reset(ctx->payload.wire_buf);
+		mp_flush(the_worker->pkt_pool.ctx);
 		return protolayer_break(ctx, ret);
 	} else {
 		kr_assert(false && "Invalid payload");
@@ -2292,6 +2295,7 @@ static enum protolayer_cb_result pl_dns_stream_unwrap(
 				kr_log_debug(WORKER, "Unexpected extra data from %s\n",
 						kr_straddr(ctx->comm.src_addr));
 			}
+			mp_flush(the_worker->pkt_pool.ctx);
 			worker_end_tcp(session);
 			return protolayer_break(ctx, KNOT_EMALF);
 		}
@@ -2301,6 +2305,8 @@ static enum protolayer_cb_result pl_dns_stream_unwrap(
 			return protolayer_break(ctx, KNOT_EMALF);
 
 		int ret = worker_submit(session, &ctx->comm, NULL, NULL, pkt);
+		wire_buf_movestart(wb);
+		mp_flush(the_worker->pkt_pool.ctx);
 		if (ret) {
 			worker_end_tcp(session);
 			return protolayer_break(ctx, ret);
