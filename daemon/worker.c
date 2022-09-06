@@ -511,9 +511,8 @@ static void qr_task_free(struct qr_task *task)
 	if (kr_fails_assert(ctx))
 		return;
 
-	if (ctx->task == NULL) {
-		request_free(ctx);
-	}
+	kr_require(ctx->task == NULL);
+	request_free(ctx);
 
 	/* Update stats */
 	the_worker->stats.concurrent -= 1;

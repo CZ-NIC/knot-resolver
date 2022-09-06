@@ -556,7 +556,7 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 	}
 	s->layers = layers;
 
-	mm_ctx_mempool(&s->pool, 4 * CPU_PAGE_SIZE);
+	mm_ctx_mempool(&s->pool, CPU_PAGE_SIZE);
 	queue_init(s->waiting);
 
 	int ret = wire_buf_init(&s->wire_buf, KNOT_WIRE_MAX_PKTSIZE);
@@ -575,13 +575,15 @@ static void session2_timer_on_close(uv_handle_t *handle)
 {
 	struct session2 *s = handle->data;
 	protolayer_manager_free(s->layers);
+	wire_buf_deinit(&s->wire_buf);
+	mm_ctx_delete(&s->pool);
+	trie_free(s->tasks);
+	queue_deinit(s->waiting);
 	free(s);
 }
 
 void session2_free(struct session2 *s)
 {
-	trie_free(s->tasks);
-	queue_deinit(s->waiting);
 	uv_close((uv_handle_t *)&s->timer, session2_timer_on_close);
 }
 
@@ -1129,11 +1131,18 @@ static inline int session2_transport_push(struct session2 *s,
 			session2_transport_single_push_finished, ctx);
 }
 
+static void on_session2_handle_close(uv_handle_t *handle)
+{
+	struct session2 *session = handle->data;
+	kr_require(session->transport.type == SESSION2_TRANSPORT_IO &&
+			session->transport.io.handle == handle);
+	io_free(handle);
+}
+
 static int session2_handle_close(struct session2 *s, uv_handle_t *handle)
 {
 	io_stop_read(handle);
-	uv_close(handle, NULL);
-
+	uv_close(handle, on_session2_handle_close);
 	return kr_ok();
 }
 
