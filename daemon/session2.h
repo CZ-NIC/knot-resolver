@@ -426,17 +426,6 @@ enum protolayer_cb_result protolayer_continue(struct protolayer_cb_ctx *ctx);
  * by a non-zero `status`). */
 enum protolayer_cb_result protolayer_break(struct protolayer_cb_ctx *ctx, int status);
 
-/** *Layer sequence return function* - pushes data to the session's transport
- * and signalizes that the layer wants to stop processing of the buffer and
- * clean up.
- *
- * This function is to be called by the `wrap` callback of first layer in
- * the sequence.
- *
- * TODO: get rid of this and just do the push within `_continue` when called
- * from the first layer in `_UNWRAP` direction. */
-enum protolayer_cb_result protolayer_push(struct protolayer_cb_ctx *ctx);
-
 /** *Layer sequence return function* - signalizes that the current sequence
  * will continue in an asynchronous manner. The layer should store the context
  * and call another sequence return function at another point. This may be used

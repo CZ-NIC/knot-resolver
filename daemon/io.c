@@ -204,11 +204,6 @@ static enum protolayer_cb_result pl_udp_unwrap(struct protolayer_data *layer, st
 	return protolayer_continue(ctx);
 }
 
-static enum protolayer_cb_result pl_udp_wrap(struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
-{
-	return protolayer_push(ctx);
-}
-
 static bool pl_udp_event_wrap(enum protolayer_event_type event,
                               void **baton,
                               struct protolayer_manager *manager,
@@ -344,11 +339,6 @@ static enum protolayer_cb_result pl_tcp_unwrap(struct protolayer_data *layer, st
 	return protolayer_continue(ctx);
 }
 
-static enum protolayer_cb_result pl_tcp_wrap(struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
-{
-	return protolayer_push(ctx);
-}
-
 static bool pl_tcp_event_wrap(enum protolayer_event_type event,
                               void **baton,
                               struct protolayer_manager *manager,
@@ -371,7 +361,6 @@ void io_protolayers_init(void)
 		.iter_size = sizeof(struct pl_udp_iter_data),
 		.iter_init = pl_udp_iter_init,
 		.unwrap = pl_udp_unwrap,
-		.wrap = pl_udp_wrap,
 		.event_wrap = pl_udp_event_wrap,
 	};
 
@@ -380,7 +369,6 @@ void io_protolayers_init(void)
 		.sess_init = pl_tcp_sess_init,
 		.sess_deinit = pl_tcp_sess_deinit,
 		.unwrap = pl_tcp_unwrap,
-		.wrap = pl_tcp_wrap,
 		.event_wrap = pl_tcp_event_wrap,
 	};
 }

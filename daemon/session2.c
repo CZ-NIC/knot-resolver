@@ -182,6 +182,49 @@ static int protolayer_cb_ctx_finish(struct protolayer_cb_ctx *ctx, int ret,
 	return ret;
 }
 
+static void protolayer_push_finished(int status, struct session2 *s, const void *target, void *baton)
+{
+	struct protolayer_cb_ctx *ctx = baton;
+	ctx->status = status;
+	protolayer_cb_ctx_finish(ctx, PROTOLAYER_RET_NORMAL, true);
+}
+
+/** Pushes the specified protocol layer's payload to the session's transport. */
+static int protolayer_push(struct protolayer_cb_ctx *ctx)
+{
+	struct session2 *session = ctx->manager->session;
+
+	if (ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
+		ctx->payload = protolayer_as_buffer(&ctx->payload);
+	}
+
+	if (kr_log_is_debug(PROTOLAYER, NULL)) {
+		kr_log_debug(PROTOLAYER, "Pushing %s\n",
+				protolayer_payload_names[ctx->payload.type]);
+	}
+
+	int status;
+	if (ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
+		status = session2_transport_push(session,
+				ctx->payload.buffer.buf, ctx->payload.buffer.len,
+				ctx->target, protolayer_push_finished, ctx);
+	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_IOVEC) {
+		status = session2_transport_pushv(session,
+				ctx->payload.iovec.iov, ctx->payload.iovec.cnt,
+				ctx->target, protolayer_push_finished, ctx);
+	} else {
+		kr_assert(false && "Invalid payload type");
+		status = kr_error(EINVAL);
+	}
+
+	if (status < 0) {
+		ctx->status = status;
+		return protolayer_cb_ctx_finish(ctx, status, true);
+	}
+
+	return PROTOLAYER_RET_ASYNC;
+}
+
 /** Processes as many layers as possible synchronously, returning when either
  * a layer has gone asynchronous, or when the whole sequence has finished.
  *
@@ -216,8 +259,8 @@ static int protolayer_step(struct protolayer_cb_ctx *ctx)
 
 			ldata->processed = true;
 		} else {
-			//kr_assert(false && "Repeated protocol layer step");
-			kr_log_debug(PROTOLAYER, "Repeated protocol layer step\n");
+			kr_assert(false && "Repeated protocol layer step");
+			//kr_log_debug(PROTOLAYER, "Repeated protocol layer step\n");
 		}
 
 		if (kr_fails_assert(result == PROTOLAYER_CB_RESULT_MAGIC)) {
@@ -243,9 +286,13 @@ static int protolayer_step(struct protolayer_cb_ctx *ctx)
 		}
 
 		if (ctx->action == PROTOLAYER_CB_ACTION_CONTINUE) {
-			if (protolayer_cb_ctx_is_last(ctx))
+			if (protolayer_cb_ctx_is_last(ctx)) {
+				if (ctx->direction == PROTOLAYER_WRAP)
+					return protolayer_push(ctx);
+
 				return protolayer_cb_ctx_finish(
 						ctx, PROTOLAYER_RET_NORMAL, true);
+			}
 
 			protolayer_cb_ctx_next(ctx);
 			continue;
@@ -413,48 +460,6 @@ enum protolayer_cb_result protolayer_break(struct protolayer_cb_ctx *ctx, int st
 	} else {
 		ctx->action = PROTOLAYER_CB_ACTION_BREAK;
 	}
-	return PROTOLAYER_CB_RESULT_MAGIC;
-}
-
-static void protolayer_push_finished(int status, struct session2 *s, const void *target, void *baton)
-{
-	struct protolayer_cb_ctx *ctx = baton;
-	protolayer_break(ctx, status);
-}
-
-enum protolayer_cb_result protolayer_push(struct protolayer_cb_ctx *ctx)
-{
-	int ret;
-	struct session2 *session = ctx->manager->session;
-
-	if (ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
-		ctx->payload = protolayer_as_buffer(&ctx->payload);
-	}
-
-	if (kr_log_is_debug(PROTOLAYER, NULL)) {
-		kr_log_debug(PROTOLAYER, "Pushing %s\n",
-				protolayer_payload_names[ctx->payload.type]);
-	}
-
-	if (ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
-		ret = session2_transport_push(session,
-				ctx->payload.buffer.buf, ctx->payload.buffer.len,
-				ctx->target, protolayer_push_finished, ctx);
-	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_IOVEC) {
-		ret = session2_transport_pushv(session,
-				ctx->payload.iovec.iov, ctx->payload.iovec.cnt,
-				ctx->target, protolayer_push_finished, ctx);
-	} else {
-		kr_assert(false && "Invalid payload type");
-		ret = kr_error(EINVAL);
-	}
-
-	/* Push error - otherwise the callback will be called by a push
-	 * function called above. */
-	if (ret && ctx->finished_cb)
-		ctx->finished_cb(ret, session, ctx->finished_cb_target,
-				ctx->finished_cb_baton);
-
 	return PROTOLAYER_CB_RESULT_MAGIC;
 }
 
