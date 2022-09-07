@@ -153,7 +153,9 @@ typedef void (*protolayer_finished_cb)(int status, struct session2 *session,
 	XX(TIMEOUT) /**< Signal that the session has timed out. */\
 	XX(CONNECT) /**< Signal that a connection has been established. */\
 	XX(CONNECT_FAIL) /**< Signal that a connection could not have been established. */\
-	XX(DISCONNECT) /**< Signal that a connection has ended. */
+	XX(DISCONNECT) /**< Signal that a connection has ended. */\
+	XX(STATS_SEND_ERR) /**< Failed task send - update stats. */\
+	XX(STATS_QRY_OUT) /**< Outgoing query submission - update stats. */
 
 /** Event type, to be interpreted by a layer. */
 enum protolayer_event_type {
@@ -371,17 +373,6 @@ struct protolayer_data_param {
 	              * Only needs to be valid for session initialization. */
 };
 
-/** Allocates and initializes a new manager. */
-struct protolayer_manager *protolayer_manager_new(
-		struct session2 *s,
-		enum protolayer_grp grp,
-		struct protolayer_data_param *layer_param,
-		size_t layer_param_count);
-
-/** Deinitializes all layer data in the manager and deallocates it. */
-void protolayer_manager_free(struct protolayer_manager *m);
-
-
 /** Global data for a specific layered protocol. This is to be initialized in
  * the `protolayer_globals` global array (below) during the start of the
  * resolver. It contains pointers to the specific protocol's functions. */
@@ -595,22 +586,24 @@ struct session2 {
 	 * to close. */
 	bool closing : 1;
 
-	/** If true, a connection is established. Only applicable to sessions
-	 * using connection-based protocols.
-	 *
-	 * TODO: move to `worker`? */
-	bool connected : 1;
-
-	/** If true, session is being rate-limited.
-	 *
-	 * TODO: move to `worker`? */
-	bool throttled : 1;
-
 	/** If true, encryption takes place in this session. Layers may use
 	 * this to determine whether padding should be applied. A layer that
 	 * provides security shall set this to `true` during session
 	 * initialization. */
 	bool secure : 1;
+
+	/** If true, the session contains a stream-based protocol layer.
+	 * Set during protocol layer initialization by the stream-based layer. */
+	bool stream : 1;
+
+	/** If true, a connection is established. Only applicable to sessions
+	 * using connection-based protocols. One of the stream-based protocol
+	 * layers is going to be the writer for this flag. */
+	bool connected : 1;
+
+	/** If true, session is being rate-limited. One of the protocol layers
+	 * is going to be the writer for this flag. */
+	bool throttled : 1;
 };
 
 /** Allocates and initializes a new session with the specified protocol layer

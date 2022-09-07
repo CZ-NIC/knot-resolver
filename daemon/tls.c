@@ -1303,6 +1303,22 @@ static bool pl_tls_event_unwrap(enum protolayer_event_type event,
 	return true;
 }
 
+static bool pl_tls_event_wrap(enum protolayer_event_type event,
+                              void **baton,
+                              struct protolayer_manager *manager,
+                              struct protolayer_data *layer)
+{
+	if (event == PROTOLAYER_EVENT_STATS_SEND_ERR) {
+		the_worker->stats.err_tls += 1;
+		return false;
+	} else if (event == PROTOLAYER_EVENT_STATS_QRY_OUT) {
+		the_worker->stats.tls += 1;
+		return false;
+	}
+
+	return true;
+}
+
 void tls_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_TLS] = (struct protolayer_globals){
@@ -1312,6 +1328,7 @@ void tls_protolayers_init(void)
 		.unwrap = pl_tls_unwrap,
 		.wrap = pl_tls_wrap,
 		.event_unwrap = pl_tls_event_unwrap,
+		.event_wrap = pl_tls_event_wrap,
 	};
 }
 

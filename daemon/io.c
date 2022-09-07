@@ -209,6 +209,22 @@ static enum protolayer_cb_result pl_udp_wrap(struct protolayer_data *layer, stru
 	return protolayer_push(ctx);
 }
 
+static bool pl_udp_event_wrap(enum protolayer_event_type event,
+                              void **baton,
+                              struct protolayer_manager *manager,
+                              struct protolayer_data *layer)
+{
+	if (event == PROTOLAYER_EVENT_STATS_SEND_ERR) {
+		the_worker->stats.err_udp += 1;
+		return false;
+	} else if (event == PROTOLAYER_EVENT_STATS_QRY_OUT) {
+		the_worker->stats.udp += 1;
+		return false;
+	}
+
+	return true;
+}
+
 
 struct pl_tcp_sess_data {
 	struct proxy_result proxy;
@@ -333,6 +349,21 @@ static enum protolayer_cb_result pl_tcp_wrap(struct protolayer_data *layer, stru
 	return protolayer_push(ctx);
 }
 
+static bool pl_tcp_event_wrap(enum protolayer_event_type event,
+                              void **baton,
+                              struct protolayer_manager *manager,
+                              struct protolayer_data *layer)
+{
+	if (event == PROTOLAYER_EVENT_STATS_SEND_ERR) {
+		the_worker->stats.err_tcp += 1;
+		return false;
+	} else if (event == PROTOLAYER_EVENT_STATS_QRY_OUT) {
+		the_worker->stats.tcp += 1;
+		return false;
+	}
+
+	return true;
+}
 
 void io_protolayers_init(void)
 {
@@ -340,7 +371,8 @@ void io_protolayers_init(void)
 		.iter_size = sizeof(struct pl_udp_iter_data),
 		.iter_init = pl_udp_iter_init,
 		.unwrap = pl_udp_unwrap,
-		.wrap = pl_udp_wrap
+		.wrap = pl_udp_wrap,
+		.event_wrap = pl_udp_event_wrap,
 	};
 
 	protolayer_globals[PROTOLAYER_TCP] = (struct protolayer_globals){
@@ -348,7 +380,8 @@ void io_protolayers_init(void)
 		.sess_init = pl_tcp_sess_init,
 		.sess_deinit = pl_tcp_sess_deinit,
 		.unwrap = pl_tcp_unwrap,
-		.wrap = pl_tcp_wrap
+		.wrap = pl_tcp_wrap,
+		.event_wrap = pl_tcp_event_wrap,
 	};
 }
 

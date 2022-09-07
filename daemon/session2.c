@@ -318,7 +318,8 @@ static void *get_init_param(enum protolayer_protocol p,
 	return NULL;
 }
 
-struct protolayer_manager *protolayer_manager_new(
+/** Allocates and initializes a new manager. */
+static struct protolayer_manager *protolayer_manager_new(
 		struct session2 *s,
 		enum protolayer_grp grp,
 		struct protolayer_data_param *layer_param,
@@ -378,7 +379,8 @@ struct protolayer_manager *protolayer_manager_new(
 	return m;
 }
 
-void protolayer_manager_free(struct protolayer_manager *m)
+/** Deinitializes all layer data in the manager and deallocates it. */
+static void protolayer_manager_free(struct protolayer_manager *m)
 {
 	if (!m) return;
 
