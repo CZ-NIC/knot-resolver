@@ -8,7 +8,7 @@ from knot_resolver_manager.cli.command import Command, CommandArgs, register_com
 
 
 @register_command
-class MetricsCommand(Command):
+class SchemaCommand(Command):
 
     def __init__(self, namespace: argparse.Namespace) -> None:
         self.file: Optional[str] = namespace.file
@@ -19,12 +19,12 @@ class MetricsCommand(Command):
     def register_args_subparser(
         parser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        metrics = parser.add_parser("metrics", help="get prometheus metrics data")
-        metrics.add_argument('file', help="optional, file to export metrics to", nargs='?', default=None)
-        return metrics, MetricsCommand
+        schema = parser.add_parser("schema", help="get JSON schema reprezentation of the configuration")
+        schema.add_argument('file', help="optional, file to export JSON schema to", nargs='?', default=None)
+        return schema, SchemaCommand
 
     def run(self, args: CommandArgs) -> None:
-        url = f"{args.socket}/metrics"
+        url = f"{args.socket}/schema"
         response = request("GET", url)
 
         if self.file and response.status == 200:
