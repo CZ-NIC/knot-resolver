@@ -132,18 +132,20 @@ static int family_to_freebind_option(sa_family_t sa_family, int *level, int *nam
 
 
 struct pl_udp_iter_data {
+	PROTOLAYER_DATA_HEADER();
 	struct proxy_result proxy;
 	bool has_proxy;
 };
 
-static int pl_udp_iter_init(struct protolayer_manager *manager, struct protolayer_data *layer)
+static int pl_udp_iter_init(struct protolayer_manager *manager, void *iter_data)
 {
-	struct pl_udp_iter_data *udp = protolayer_iter_data(layer);
+	struct pl_udp_iter_data *udp = iter_data;
 	*udp = (struct pl_udp_iter_data){0};
 	return 0;
 }
 
-static enum protolayer_cb_result pl_udp_unwrap(struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
+static enum protolayer_cb_result pl_udp_unwrap(
+		void *sess_data, void *iter_data, struct protolayer_cb_ctx *ctx)
 {
 	ctx->payload = protolayer_as_buffer(&ctx->payload);
 	if (kr_fails_assert(ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER)) {
@@ -152,7 +154,7 @@ static enum protolayer_cb_result pl_udp_unwrap(struct protolayer_data *layer, st
 	}
 
 	struct session2 *s = ctx->manager->session;
-	struct pl_udp_iter_data *udp = protolayer_iter_data(layer);
+	struct pl_udp_iter_data *udp = iter_data;
 
 	char *data = ctx->payload.buffer.buf;
 	ssize_t data_len = ctx->payload.buffer.len;
@@ -207,7 +209,7 @@ static enum protolayer_cb_result pl_udp_unwrap(struct protolayer_data *layer, st
 static bool pl_udp_event_wrap(enum protolayer_event_type event,
                               void **baton,
                               struct protolayer_manager *manager,
-                              struct protolayer_data *layer)
+                              void *sess_data)
 {
 	if (event == PROTOLAYER_EVENT_STATS_SEND_ERR) {
 		the_worker->stats.err_udp += 1;
@@ -222,30 +224,32 @@ static bool pl_udp_event_wrap(enum protolayer_event_type event,
 
 
 struct pl_tcp_sess_data {
+	PROTOLAYER_DATA_HEADER();
 	struct proxy_result proxy;
 	struct wire_buf wire_buf;
 	bool had_data : 1;
 	bool has_proxy : 1;
 };
 
-static int pl_tcp_sess_init(struct protolayer_manager *manager, struct protolayer_data *layer, void *param)
+static int pl_tcp_sess_init(struct protolayer_manager *manager, void *sess_data, void *param)
 {
-	struct pl_tcp_sess_data *tcp = protolayer_sess_data(layer);
+	struct pl_tcp_sess_data *tcp = sess_data;
 	*tcp = (struct pl_tcp_sess_data){0};
 	return 0;
 }
 
-static int pl_tcp_sess_deinit(struct protolayer_manager *manager, struct protolayer_data *layer)
+static int pl_tcp_sess_deinit(struct protolayer_manager *manager, void *sess_data)
 {
-	struct pl_tcp_sess_data *tcp = protolayer_sess_data(layer);
+	struct pl_tcp_sess_data *tcp = sess_data;
 	wire_buf_deinit(&tcp->wire_buf);
 	return 0;
 }
 
-static enum protolayer_cb_result pl_tcp_unwrap(struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
+static enum protolayer_cb_result pl_tcp_unwrap(
+		void *sess_data, void *iter_data, struct protolayer_cb_ctx *ctx)
 {
 	struct session2 *s = ctx->manager->session;
-	struct pl_tcp_sess_data *tcp = protolayer_sess_data(layer);
+	struct pl_tcp_sess_data *tcp = sess_data;
 	struct sockaddr *peer = session2_get_peer(s);
 
 	if (ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
@@ -342,7 +346,7 @@ static enum protolayer_cb_result pl_tcp_unwrap(struct protolayer_data *layer, st
 static bool pl_tcp_event_wrap(enum protolayer_event_type event,
                               void **baton,
                               struct protolayer_manager *manager,
-                              struct protolayer_data *layer)
+                              void *sess_data)
 {
 	if (event == PROTOLAYER_EVENT_STATS_SEND_ERR) {
 		the_worker->stats.err_tcp += 1;

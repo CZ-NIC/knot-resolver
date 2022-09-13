@@ -1881,7 +1881,7 @@ static inline knot_pkt_t *produce_packet(char *buf, size_t buf_len)
 static bool pl_dns_dgram_event_unwrap(enum protolayer_event_type event,
                                       void **baton,
                                       struct protolayer_manager *manager,
-                                      struct protolayer_data *layer)
+                                      void *sess_data)
 {
 	if (event != PROTOLAYER_EVENT_TIMEOUT)
 		return true;
@@ -1910,7 +1910,7 @@ static bool pl_dns_dgram_event_unwrap(enum protolayer_event_type event,
 }
 
 static enum protolayer_cb_result pl_dns_dgram_unwrap(
-		struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
+		void *sess_data, void *iter_data, struct protolayer_cb_ctx *ctx)
 {
 	struct session2 *session = ctx->manager->session;
 
@@ -1960,11 +1960,13 @@ static enum protolayer_cb_result pl_dns_dgram_unwrap(
 }
 
 struct pl_dns_stream_sess_data {
+	PROTOLAYER_DATA_HEADER();
 	bool single : 1; /**< True: Stream only allows a single packet */
 	bool produced : 1; /**< True: At least one packet has been produced */
 };
 
 struct pl_dns_stream_iter_data {
+	PROTOLAYER_DATA_HEADER();
 	struct {
 		knot_mm_t *pool;
 		void *mem;
@@ -1982,35 +1984,35 @@ static void pl_dns_stream_sess_init_common(struct session2 *session,
 }
 
 static int pl_dns_mstream_sess_init(struct protolayer_manager *manager,
-                                    struct protolayer_data *layer,
+                                    void *sess_data,
                                     void *param)
 {
-	struct pl_dns_stream_sess_data *stream = protolayer_sess_data(layer);
+	struct pl_dns_stream_sess_data *stream = sess_data;
 	pl_dns_stream_sess_init_common(manager->session, stream, false);
 	return kr_ok();
 }
 
 static int pl_dns_sstream_sess_init(struct protolayer_manager *manager,
-                                    struct protolayer_data *layer,
+                                    void *sess_data,
                                     void *param)
 {
-	struct pl_dns_stream_sess_data *stream = protolayer_sess_data(layer);
+	struct pl_dns_stream_sess_data *stream = sess_data;
 	pl_dns_stream_sess_init_common(manager->session, stream, true);
 	return kr_ok();
 }
 
 static int pl_dns_stream_iter_init(struct protolayer_manager *manager,
-                                   struct protolayer_data *layer)
+                                   void *iter_data)
 {
-	struct pl_dns_stream_iter_data *stream = protolayer_iter_data(layer);
+	struct pl_dns_stream_iter_data *stream = iter_data;
 	*stream = (struct pl_dns_stream_iter_data){0};
 	return kr_ok();
 }
 
 static int pl_dns_stream_iter_deinit(struct protolayer_manager *manager,
-                                     struct protolayer_data *layer)
+                                     void *iter_data)
 {
-	struct pl_dns_stream_iter_data *stream = protolayer_iter_data(layer);
+	struct pl_dns_stream_iter_data *stream = iter_data;
 	mm_free(stream->sent.pool, stream->sent.mem);
 	return kr_ok();
 }
@@ -2190,7 +2192,7 @@ static bool pl_dns_stream_disconnected(struct session2 *session)
 static bool pl_dns_stream_event_unwrap(enum protolayer_event_type event,
                                        void **baton,
                                        struct protolayer_manager *manager,
-                                       struct protolayer_data *layer)
+                                       void *sess_data)
 {
 	struct session2 *session = manager->session;
 	if (session->closing)
@@ -2231,7 +2233,7 @@ static knot_pkt_t *produce_stream_packet(struct wire_buf *wb)
 }
 
 static enum protolayer_cb_result pl_dns_stream_unwrap(
-		struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
+		void *sess_data, void *iter_data, struct protolayer_cb_ctx *ctx)
 {
 	if (kr_fails_assert(ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF)) {
 		/* DNS stream only works with a wire buffer */
@@ -2239,12 +2241,12 @@ static enum protolayer_cb_result pl_dns_stream_unwrap(
 	}
 
 	struct session2 *session = ctx->manager->session;
-	struct pl_dns_stream_sess_data *stream = protolayer_sess_data(layer);
+	struct pl_dns_stream_sess_data *stream_sess = sess_data;
 	struct wire_buf *wb = ctx->payload.wire_buf;
 
 	knot_pkt_t *pkt;
 	while ((pkt = produce_stream_packet(wb))) {
-		if (stream->single && stream->produced) {
+		if (stream_sess->single && stream_sess->produced) {
 			if (kr_log_is_debug(WORKER, NULL)) {
 				kr_log_debug(WORKER, "Unexpected extra data from %s\n",
 						kr_straddr(ctx->comm.src_addr));
@@ -2254,7 +2256,7 @@ static enum protolayer_cb_result pl_dns_stream_unwrap(
 			return protolayer_break(ctx, KNOT_EMALF);
 		}
 
-		stream->produced = true;
+		stream_sess->produced = true;
 		if (!pkt)
 			return protolayer_break(ctx, KNOT_EMALF);
 
@@ -2276,9 +2278,9 @@ struct sized_iovs {
 };
 
 static enum protolayer_cb_result pl_dns_stream_wrap(
-		struct protolayer_data *layer, struct protolayer_cb_ctx *ctx)
+		void *sess_data, void *iter_data, struct protolayer_cb_ctx *ctx)
 {
-	struct pl_dns_stream_iter_data *stream = protolayer_iter_data(layer);
+	struct pl_dns_stream_iter_data *stream = iter_data;
 	struct session2 *s = ctx->manager->session;
 
 	if (kr_fails_assert(!stream->sent.mem))

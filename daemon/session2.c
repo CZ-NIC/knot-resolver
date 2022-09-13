@@ -109,24 +109,50 @@ struct protolayer_payload protolayer_as_buffer(const struct protolayer_payload *
 }
 
 
-/** Gets context for the layer with the specified index from the manager. */
-static inline struct protolayer_data *protolayer_manager_get(
+/** Gets layer-specific session data for the layer with the specified index
+ * from the manager. */
+static inline struct protolayer_data *protolayer_sess_data_get(
 		struct protolayer_manager *m, size_t layer_ix)
 {
 	if (kr_fails_assert(layer_ix < m->num_layers))
 		return NULL;
 
-	const size_t *offsets = (size_t *)m->data;
-	char *pl_data_beg = m->data + (m->num_layers * sizeof(*offsets));
-	return (struct protolayer_data *)(pl_data_beg + offsets[layer_ix]);
+	/* See doc comment of `struct protolayer_manager::data` */
+	const ssize_t *offsets = (ssize_t *)m->data;
+	char *pl_data_beg = &m->data[2 * m->num_layers * sizeof(*offsets)];
+	ssize_t offset = offsets[layer_ix];
+
+	if (offset < 0) /* No session data for this layer */
+		return NULL;
+
+	return (struct protolayer_data *)(pl_data_beg + offset);
+}
+
+/** Gets layer-specific iteration data for the layer with the specified index
+ * from the context. */
+static inline struct protolayer_data *protolayer_iter_data_get(
+		struct protolayer_cb_ctx *ctx, size_t layer_ix)
+{
+	struct protolayer_manager *m = ctx->manager;
+	if (kr_fails_assert(layer_ix < m->num_layers))
+		return NULL;
+
+	/* See doc comment of `struct protolayer_manager::data` */
+	const ssize_t *offsets = (ssize_t *)&m->data[m->num_layers * sizeof(*offsets)];
+	ssize_t offset = offsets[layer_ix];
+
+	if (offset < 0) /* No iteration data for this layer */
+		return NULL;
+
+	return (struct protolayer_data *)(ctx->data + offset);
 }
 
 static inline ssize_t protolayer_manager_get_protocol(
 		struct protolayer_manager *m, enum protolayer_protocol protocol)
 {
 	for (ssize_t i = 0; i < m->num_layers; i++) {
-		struct protolayer_data *d = protolayer_manager_get(m, i);
-		if (d->protocol == protocol)
+		enum protolayer_protocol found = protolayer_grps[m->grp][i];
+		if (protocol == found)
 			return i;
 	}
 
@@ -149,20 +175,16 @@ static inline void protolayer_cb_ctx_next(struct protolayer_cb_ctx *ctx)
 		ctx->layer_ix--;
 }
 
-static int protolayer_cb_ctx_finish(struct protolayer_cb_ctx *ctx, int ret,
-                                    bool deinit_iter_data)
+static int protolayer_cb_ctx_finish(struct protolayer_cb_ctx *ctx, int ret)
 {
 	struct session2 *session = ctx->manager->session;
 
-	if (deinit_iter_data) {
-		struct protolayer_manager *m = ctx->manager;
-		struct protolayer_globals *globals = &protolayer_globals[m->grp];
-		for (size_t i = 0; i < m->num_layers; i++) {
-			struct protolayer_data *d = protolayer_manager_get(m, i);
-			if (globals->iter_deinit)
-				globals->iter_deinit(m, d);
-		}
-		m->iter_data_inited = false;
+	struct protolayer_manager *m = ctx->manager;
+	struct protolayer_globals *globals = &protolayer_globals[m->grp];
+	for (size_t i = 0; i < m->num_layers; i++) {
+		struct protolayer_data *d = protolayer_iter_data_get(ctx, i);
+		if (globals->iter_deinit)
+			globals->iter_deinit(m, d);
 	}
 
 	if (ret)
@@ -186,7 +208,7 @@ static void protolayer_push_finished(int status, struct session2 *s, const void 
 {
 	struct protolayer_cb_ctx *ctx = baton;
 	ctx->status = status;
-	protolayer_cb_ctx_finish(ctx, PROTOLAYER_RET_NORMAL, true);
+	protolayer_cb_ctx_finish(ctx, PROTOLAYER_RET_NORMAL);
 }
 
 /** Pushes the specified protocol layer's payload to the session's transport. */
@@ -219,7 +241,7 @@ static int protolayer_push(struct protolayer_cb_ctx *ctx)
 
 	if (status < 0) {
 		ctx->status = status;
-		return protolayer_cb_ctx_finish(ctx, status, true);
+		return protolayer_cb_ctx_finish(ctx, status);
 	}
 
 	return PROTOLAYER_RET_ASYNC;
@@ -233,40 +255,30 @@ static int protolayer_push(struct protolayer_cb_ctx *ctx)
 static int protolayer_step(struct protolayer_cb_ctx *ctx)
 {
 	while (true) {
-		struct protolayer_data *ldata = protolayer_manager_get(
-				ctx->manager, ctx->layer_ix);
-		if (kr_fails_assert(ldata)) {
-			/* Probably layer index or data corruption */
-			return protolayer_cb_ctx_finish(ctx, kr_error(EINVAL), true);
-		}
-
-		enum protolayer_protocol protocol = ldata->protocol;
+		enum protolayer_protocol protocol = protolayer_grps[ctx->manager->grp][ctx->layer_ix];
 		struct protolayer_globals *globals = &protolayer_globals[protocol];
 
-		enum protolayer_cb_result result = PROTOLAYER_CB_RESULT_MAGIC;
-		if (!ldata->processed) { /* Avoid repetition */
-			ctx->async_mode = false;
-			ctx->status = 0;
-			ctx->action = PROTOLAYER_CB_ACTION_NULL;
+		ctx->async_mode = false;
+		ctx->status = 0;
+		ctx->action = PROTOLAYER_CB_ACTION_NULL;
 
-			protolayer_cb cb = (ctx->direction == PROTOLAYER_UNWRAP)
-				? globals->unwrap : globals->wrap;
+		protolayer_cb cb = (ctx->direction == PROTOLAYER_UNWRAP)
+			? globals->unwrap : globals->wrap;
 
-			if (cb)
-				result = cb(ldata, ctx);
-			else
-				ctx->action = PROTOLAYER_CB_ACTION_CONTINUE;
-
-			ldata->processed = true;
+		if (cb) {
+			struct protolayer_data *sess_data = protolayer_sess_data_get(
+					ctx->manager, ctx->layer_ix);
+			struct protolayer_data *iter_data = protolayer_iter_data_get(
+					ctx, ctx->layer_ix);
+			enum protolayer_cb_result result = cb(sess_data, iter_data, ctx);
+			if (kr_fails_assert(result == PROTOLAYER_CB_RESULT_MAGIC)) {
+				/* Callback did not use a continuation function to return. */
+				return protolayer_cb_ctx_finish(ctx, kr_error(EINVAL));
+			}
 		} else {
-			kr_assert(false && "Repeated protocol layer step");
-			//kr_log_debug(PROTOLAYER, "Repeated protocol layer step\n");
+			ctx->action = PROTOLAYER_CB_ACTION_CONTINUE;
 		}
 
-		if (kr_fails_assert(result == PROTOLAYER_CB_RESULT_MAGIC)) {
-			/* Callback did not use a continuation function to return. */
-			return protolayer_cb_ctx_finish(ctx, kr_error(EINVAL), true);
-		}
 
 		if (!ctx->action) {
 			/* Next step is from a callback */
@@ -276,13 +288,12 @@ static int protolayer_step(struct protolayer_cb_ctx *ctx)
 
 		if (ctx->action == PROTOLAYER_CB_ACTION_BREAK) {
 			return protolayer_cb_ctx_finish(
-					ctx, PROTOLAYER_RET_NORMAL, true);
+					ctx, PROTOLAYER_RET_NORMAL);
 		}
 
 		if (kr_fails_assert(ctx->status == 0)) {
 			/* Status should be zero without a BREAK. */
-			return protolayer_cb_ctx_finish(
-					ctx, kr_error(ECANCELED), true);
+			return protolayer_cb_ctx_finish(ctx, kr_error(ECANCELED));
 		}
 
 		if (ctx->action == PROTOLAYER_CB_ACTION_CONTINUE) {
@@ -291,7 +302,7 @@ static int protolayer_step(struct protolayer_cb_ctx *ctx)
 					return protolayer_push(ctx);
 
 				return protolayer_cb_ctx_finish(
-						ctx, PROTOLAYER_RET_NORMAL, true);
+						ctx, PROTOLAYER_RET_NORMAL);
 			}
 
 			protolayer_cb_ctx_next(ctx);
@@ -300,7 +311,7 @@ static int protolayer_step(struct protolayer_cb_ctx *ctx)
 
 		/* Should never get here */
 		kr_assert(false && "Invalid layer callback action");
-		return protolayer_cb_ctx_finish(ctx, kr_error(EINVAL), true);
+		return protolayer_cb_ctx_finish(ctx, kr_error(EINVAL));
 	}
 }
 
@@ -317,7 +328,7 @@ static int protolayer_manager_submit(
 		struct protolayer_payload payload, const void *target,
 		protolayer_finished_cb cb, void *baton)
 {
-	struct protolayer_cb_ctx *ctx = malloc(sizeof(*ctx)); // TODO - mempool?
+	struct protolayer_cb_ctx *ctx = malloc(manager->cb_ctx_size);
 	kr_require(ctx);
 
 	if (kr_log_is_debug(PROTOLAYER, NULL)) {
@@ -330,14 +341,6 @@ static int protolayer_manager_submit(
 				layer_ix);
 	}
 
-	for (size_t i = 0; i < manager->num_layers; i++) {
-		struct protolayer_data *data = protolayer_manager_get(manager, i);
-		data->processed = false;
-		struct protolayer_globals *globals = &protolayer_globals[data->protocol];
-		if (globals->iter_init)
-			globals->iter_init(manager, data);
-	}
-
 	*ctx = (struct protolayer_cb_ctx) {
 		.payload = payload,
 		.target = target,
@@ -348,6 +351,20 @@ static int protolayer_manager_submit(
 		.finished_cb_target = target,
 		.finished_cb_baton = baton
 	};
+
+	for (size_t i = 0; i < manager->num_layers; i++) {
+		enum protolayer_protocol p = protolayer_grps[manager->grp][i];
+		struct protolayer_globals *globals = &protolayer_globals[p];
+		struct protolayer_data *iter_data = protolayer_iter_data_get(ctx, i);
+		if (iter_data) {
+			bzero(iter_data, globals->iter_size);
+			iter_data->protocol = p;
+			iter_data->session = manager->session;
+		}
+
+		if (globals->iter_init)
+			globals->iter_init(manager, iter_data);
+	}
 
 	return protolayer_step(ctx);
 }
@@ -372,11 +389,13 @@ static struct protolayer_manager *protolayer_manager_new(
 		struct protolayer_data_param *layer_param,
 		size_t layer_param_count)
 {
-	if (kr_fails_assert(grp))
+	if (kr_fails_assert(s && grp))
 		return NULL;
 
 	size_t num_layers = 0;
-	size_t size = sizeof(struct protolayer_manager);
+	size_t manager_size = sizeof(struct protolayer_manager);
+	size_t cb_ctx_size = sizeof(struct protolayer_cb_ctx);
+
 	enum protolayer_protocol *protocols = protolayer_grps[grp];
 	if (kr_fails_assert(protocols))
 		return NULL;
@@ -387,40 +406,52 @@ static struct protolayer_manager *protolayer_manager_new(
 		num_layers++;
 	if (kr_fails_assert(num_layers))
 		return NULL;
-	size_t offsets[num_layers];
-	size += sizeof(offsets);
+
+	ssize_t offsets[2 * num_layers];
+	manager_size += sizeof(offsets);
+
+	ssize_t *sess_offsets = offsets;
+	ssize_t *iter_offsets = &offsets[num_layers];
 
 	/* Space for layer-specific data, guaranteeing alignment */
-	size_t total_data_size = 0;
+	size_t total_sess_data_size = 0;
+	size_t total_iter_data_size = 0;
 	for (size_t i = 0; i < num_layers; i++) {
-		offsets[i] = total_data_size;
-		total_data_size += ALIGN_TO(sizeof(struct protolayer_data),
+		sess_offsets[i] = protolayer_globals[protocols[i]].sess_size
+			? total_sess_data_size : -1;
+		total_sess_data_size += ALIGN_TO(protolayer_globals[protocols[i]].sess_size,
 				CPU_STRUCT_ALIGN);
-		total_data_size += ALIGN_TO(protolayer_globals[protocols[i]].sess_size,
-				CPU_STRUCT_ALIGN);
-		total_data_size += ALIGN_TO(protolayer_globals[protocols[i]].iter_size,
+
+		iter_offsets[i] = protolayer_globals[protocols[i]].iter_size
+			? total_iter_data_size : -1;
+		total_iter_data_size += ALIGN_TO(protolayer_globals[protocols[i]].iter_size,
 				CPU_STRUCT_ALIGN);
 	}
-	size += total_data_size;
+	manager_size += total_sess_data_size;
+	cb_ctx_size += total_iter_data_size;
 
 	/* Allocate and initialize manager */
-	struct protolayer_manager *m = calloc(1, size);
+	struct protolayer_manager *m = calloc(1, manager_size);
 	kr_require(m);
 	m->grp = grp;
 	m->session = s;
 	m->num_layers = num_layers;
+	m->cb_ctx_size = cb_ctx_size;
 	memcpy(m->data, offsets, sizeof(offsets));
 
-	/* Initialize layer data */
+	/* Initialize the layer's session data */
 	for (size_t i = 0; i < num_layers; i++) {
 		struct protolayer_globals *globals = &protolayer_globals[protocols[i]];
-		struct protolayer_data *data = protolayer_manager_get(m, i);
-		data->manager = m;
-		data->protocol = protocols[i];
-		data->sess_size = ALIGN_TO(globals->sess_size, CPU_STRUCT_ALIGN);
+		struct protolayer_data *sess_data = protolayer_sess_data_get(m, i);
+		if (sess_data) {
+			bzero(sess_data, globals->sess_size);
+			sess_data->session = s;
+			sess_data->protocol = protocols[i];
+		}
+
 		void *param = get_init_param(protocols[i], layer_param, layer_param_count);
 		if (globals->sess_init)
-			globals->sess_init(m, data, param);
+			globals->sess_init(m, sess_data, param);
 	}
 
 	return m;
@@ -432,10 +463,12 @@ static void protolayer_manager_free(struct protolayer_manager *m)
 	if (!m) return;
 
 	for (size_t i = 0; i < m->num_layers; i++) {
-		struct protolayer_data *data = protolayer_manager_get(m, i);
-		struct protolayer_globals *globals = &protolayer_globals[data->protocol];
-		if (globals->sess_deinit)
-			globals->sess_deinit(m, data);
+		enum protolayer_protocol p = protolayer_grps[m->grp][i];
+		struct protolayer_globals *globals = &protolayer_globals[p];
+		if (globals->sess_deinit) {
+			struct protolayer_data *sess_data = protolayer_sess_data_get(m, i);
+			globals->sess_deinit(m, sess_data);
+		}
 	}
 
 	free(m);
@@ -456,7 +489,7 @@ enum protolayer_cb_result protolayer_break(struct protolayer_cb_ctx *ctx, int st
 {
 	ctx->status = status;
 	if (ctx->async_mode) {
-		protolayer_cb_ctx_finish(ctx, PROTOLAYER_RET_NORMAL, true);
+		protolayer_cb_ctx_finish(ctx, PROTOLAYER_RET_NORMAL);
 	} else {
 		ctx->action = PROTOLAYER_CB_ACTION_BREAK;
 	}
@@ -917,12 +950,14 @@ static void session2_event_wrap(struct session2 *s, enum protolayer_event_type e
 	bool cont;
 	struct protolayer_manager *m = s->layers;
 	for (ssize_t i = m->num_layers - 1; i >= 0; i--) {
-		struct protolayer_data *data = protolayer_manager_get(m, i);
-		struct protolayer_globals *globals = &protolayer_globals[data->protocol];
-		if (globals->event_wrap)
-			cont = globals->event_wrap(event, &baton, m, data);
-		else
+		enum protolayer_protocol p = protolayer_grps[s->layers->grp][i];
+		struct protolayer_globals *globals = &protolayer_globals[p];
+		if (globals->event_wrap) {
+			struct protolayer_data *sess_data = protolayer_sess_data_get(m, i);
+			cont = globals->event_wrap(event, &baton, m, sess_data);
+		} else {
 			cont = true;
+		}
 
 		if (!cont)
 			return;
@@ -936,12 +971,14 @@ void session2_event_unwrap(struct session2 *s, ssize_t start_ix, enum protolayer
 	bool cont;
 	struct protolayer_manager *m = s->layers;
 	for (ssize_t i = start_ix; i < m->num_layers; i++) {
-		struct protolayer_data *data = protolayer_manager_get(m, i);
-		struct protolayer_globals *globals = &protolayer_globals[data->protocol];
-		if (globals->event_unwrap)
-			cont = globals->event_unwrap(event, &baton, m, data);
-		else
+		enum protolayer_protocol p = protolayer_grps[s->layers->grp][i];
+		struct protolayer_globals *globals = &protolayer_globals[p];
+		if (globals->event_unwrap) {
+			struct protolayer_data *sess_data = protolayer_sess_data_get(m, i);
+			cont = globals->event_unwrap(event, &baton, m, sess_data);
+		} else {
 			cont = true;
+		}
 
 		if (!cont)
 			return;

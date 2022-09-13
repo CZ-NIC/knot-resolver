@@ -54,6 +54,7 @@ typedef int (*tls_handshake_cb) (struct session2 *session, int status);
 typedef queue_t(struct protolayer_cb_ctx *) pl_cb_ctx_queue_t;
 
 struct pl_tls_sess_data {
+	PROTOLAYER_DATA_HEADER();
 	bool client_side;
 	gnutls_session_t tls_session;
 	tls_hs_state_t handshake_state;
@@ -125,8 +126,7 @@ static size_t count_avail_payload(pl_cb_ctx_queue_t *queue)
 
 static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 {
-	struct protolayer_data *layer = h;
-	struct pl_tls_sess_data *tls = protolayer_sess_data(layer);
+	struct pl_tls_sess_data *tls = h;
 	if (kr_fails_assert(tls)) {
 		errno = EFAULT;
 		return -1;
@@ -223,7 +223,7 @@ static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 }
 
 struct kres_gnutls_push_ctx {
-	struct protolayer_data *layer;
+	void *sess_data;
 	struct iovec iov[];
 };
 
@@ -231,7 +231,7 @@ static void kres_gnutls_push_finished(int status, struct session2 *session,
                                       const void *target, void *baton)
 {
 	struct kres_gnutls_push_ctx *push_ctx = baton;
-	struct pl_tls_sess_data *tls = protolayer_sess_data(push_ctx->layer);
+	struct pl_tls_sess_data *tls = push_ctx->sess_data;
 	while (queue_len(tls->wrap_queue)) {
 		struct protolayer_cb_ctx *ctx = queue_head(tls->wrap_queue);
 		protolayer_break(ctx, kr_ok());
@@ -242,8 +242,7 @@ static void kres_gnutls_push_finished(int status, struct session2 *session,
 
 static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * iov, int iovcnt)
 {
-	struct protolayer_data *layer = h;
-	struct pl_tls_sess_data *tls = protolayer_sess_data(layer);
+	struct pl_tls_sess_data *tls = h;
 	if (kr_fails_assert(tls)) {
 		errno = EFAULT;
 		return -1;
@@ -260,10 +259,10 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 	struct kres_gnutls_push_ctx *push_ctx =
 		malloc(sizeof(*push_ctx) + sizeof(struct iovec[iovcnt]));
 	kr_require(push_ctx);
-	push_ctx->layer = layer;
+	push_ctx->sess_data = tls;
 	memcpy(push_ctx->iov, iov, sizeof(struct iovec[iovcnt]));
 
-	session2_wrap_after(layer->manager->session, PROTOLAYER_TLS,
+	session2_wrap_after(tls->session, PROTOLAYER_TLS,
 			protolayer_iovec(push_ctx->iov, iovcnt), NULL,
 			kres_gnutls_push_finished, push_ctx);
 
@@ -883,8 +882,7 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 
 static int tls_pull_timeout_func(gnutls_transport_ptr_t h, unsigned int ms)
 {
-	struct protolayer_data *layer = h;
-	struct pl_tls_sess_data *tls = protolayer_sess_data(layer);
+	struct pl_tls_sess_data *tls = h;
 	if (kr_fails_assert(tls)) {
 		errno = EFAULT;
 		return -1;
@@ -919,9 +917,8 @@ static int pl_tls_sess_data_deinit(struct pl_tls_sess_data *tls)
 }
 
 static int pl_tls_sess_server_init(struct protolayer_manager *manager,
-                                   struct protolayer_data *layer)
+                                   struct pl_tls_sess_data *tls)
 {
-	struct pl_tls_sess_data *tls = protolayer_sess_data(layer);
 	if (kr_fails_assert(the_worker && the_engine))
 		return kr_error(EINVAL);
 
@@ -990,7 +987,7 @@ static int pl_tls_sess_server_init(struct protolayer_manager *manager,
 
 	gnutls_transport_set_pull_function(tls->tls_session, kres_gnutls_pull);
 	gnutls_transport_set_vec_push_function(tls->tls_session, kres_gnutls_vec_push);
-	gnutls_transport_set_ptr(tls->tls_session, layer);
+	gnutls_transport_set_ptr(tls->tls_session, tls);
 
 	if (the_network->tls_session_ticket_ctx) {
 		tls_session_ticket_enable(the_network->tls_session_ticket_ctx,
@@ -1001,10 +998,9 @@ static int pl_tls_sess_server_init(struct protolayer_manager *manager,
 }
 
 static int pl_tls_sess_client_init(struct protolayer_manager *manager,
-                                   struct protolayer_data *layer,
+                                   struct pl_tls_sess_data *tls,
                                    tls_client_param_t *param)
 {
-	struct pl_tls_sess_data *tls = protolayer_sess_data(layer);
 	unsigned int flags = GNUTLS_CLIENT | GNUTLS_NONBLOCK
 #ifdef GNUTLS_ENABLE_FALSE_START
 			     | GNUTLS_ENABLE_FALSE_START
@@ -1051,37 +1047,35 @@ static int pl_tls_sess_client_init(struct protolayer_manager *manager,
 
 	gnutls_transport_set_pull_function(tls->tls_session, kres_gnutls_pull);
 	gnutls_transport_set_vec_push_function(tls->tls_session, kres_gnutls_vec_push);
-	gnutls_transport_set_ptr(tls->tls_session, layer);
+	gnutls_transport_set_ptr(tls->tls_session, tls);
 
 	return kr_ok();
 }
 
 static int pl_tls_sess_init(struct protolayer_manager *manager,
-                            struct protolayer_data *layer,
+                            void *sess_data,
                             void *param)
 {
-	struct pl_tls_sess_data *tls = protolayer_sess_data(layer);
-	*tls = (struct pl_tls_sess_data){0};
+	struct pl_tls_sess_data *tls = sess_data;
 	manager->session->secure = true;
 	queue_init(tls->unwrap_queue);
 	queue_init(tls->wrap_queue);
 	if (manager->session->outgoing)
-		return pl_tls_sess_client_init(manager, layer, param);
+		return pl_tls_sess_client_init(manager, tls, param);
 	else
-		return pl_tls_sess_server_init(manager, layer);
+		return pl_tls_sess_server_init(manager, tls);
 }
 
 static int pl_tls_sess_deinit(struct protolayer_manager *manager,
-                              struct protolayer_data *layer)
+                              void *sess_data)
 {
-	struct pl_tls_sess_data *tls = protolayer_sess_data(layer);
-	return pl_tls_sess_data_deinit(tls);
+	return pl_tls_sess_data_deinit(sess_data);
 }
 
-static enum protolayer_cb_result pl_tls_unwrap(struct protolayer_data *layer,
+static enum protolayer_cb_result pl_tls_unwrap(void *sess_data, void *iter_data,
                                                struct protolayer_cb_ctx *ctx)
 {
-	struct pl_tls_sess_data *tls = protolayer_sess_data(layer);
+	struct pl_tls_sess_data *tls = sess_data;
 	struct session2 *s = ctx->manager->session;
 
 	queue_push(tls->unwrap_queue, ctx);
@@ -1172,8 +1166,7 @@ static enum protolayer_cb_result pl_tls_unwrap(struct protolayer_data *layer,
 	return protolayer_continue(ctx);
 }
 
-static ssize_t pl_tls_submit(struct protolayer_data *layer,
-                             gnutls_session_t tls_session,
+static ssize_t pl_tls_submit(gnutls_session_t tls_session,
                              struct protolayer_payload payload)
 {
 	if (payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF)
@@ -1204,15 +1197,15 @@ static ssize_t pl_tls_submit(struct protolayer_data *layer,
 	return kr_error(EINVAL);
 }
 
-static enum protolayer_cb_result pl_tls_wrap(struct protolayer_data *layer,
+static enum protolayer_cb_result pl_tls_wrap(void *sess_data, void *iter_data,
                                              struct protolayer_cb_ctx *ctx)
 {
-	struct pl_tls_sess_data *tls = protolayer_sess_data(layer);
+	struct pl_tls_sess_data *tls = sess_data;
 	gnutls_session_t tls_session = tls->tls_session;
 
 	gnutls_record_cork(tls_session);
 
-	ssize_t submitted = pl_tls_submit(layer, tls_session, ctx->payload);
+	ssize_t submitted = pl_tls_submit(tls_session, ctx->payload);
 	if (submitted < 0) {
 		VERBOSE_MSG(tls->client_side, "pl_tls_submit failed: %s (%zd)\n",
 				gnutls_strerror_name(submitted), submitted);
@@ -1275,10 +1268,10 @@ static bool pl_tls_client_connect_start(struct pl_tls_sess_data *tls,
 static bool pl_tls_event_unwrap(enum protolayer_event_type event,
                                 void **baton,
                                 struct protolayer_manager *manager,
-                                struct protolayer_data *layer)
+                                void *sess_data)
 {
 	struct session2 *s = manager->session;
-	struct pl_tls_sess_data *tls = protolayer_sess_data(layer);
+	struct pl_tls_sess_data *tls = sess_data;
 
 	if (event == PROTOLAYER_EVENT_CLOSE) {
 		tls_close(tls, s, true); /* WITH gnutls_bye */
@@ -1306,7 +1299,7 @@ static bool pl_tls_event_unwrap(enum protolayer_event_type event,
 static bool pl_tls_event_wrap(enum protolayer_event_type event,
                               void **baton,
                               struct protolayer_manager *manager,
-                              struct protolayer_data *layer)
+                              void *sess_data)
 {
 	if (event == PROTOLAYER_EVENT_STATS_SEND_ERR) {
 		the_worker->stats.err_tls += 1;
