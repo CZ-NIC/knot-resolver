@@ -137,15 +137,8 @@ struct pl_udp_iter_data {
 	bool has_proxy;
 };
 
-static int pl_udp_iter_init(struct protolayer_manager *manager, void *iter_data)
-{
-	struct pl_udp_iter_data *udp = iter_data;
-	*udp = (struct pl_udp_iter_data){0};
-	return 0;
-}
-
-static enum protolayer_cb_result pl_udp_unwrap(
-		void *sess_data, void *iter_data, struct protolayer_cb_ctx *ctx)
+static enum protolayer_iter_cb_result pl_udp_unwrap(
+		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
 {
 	ctx->payload = protolayer_as_buffer(&ctx->payload);
 	if (kr_fails_assert(ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER)) {
@@ -231,13 +224,6 @@ struct pl_tcp_sess_data {
 	bool has_proxy : 1;
 };
 
-static int pl_tcp_sess_init(struct protolayer_manager *manager, void *sess_data, void *param)
-{
-	struct pl_tcp_sess_data *tcp = sess_data;
-	*tcp = (struct pl_tcp_sess_data){0};
-	return 0;
-}
-
 static int pl_tcp_sess_deinit(struct protolayer_manager *manager, void *sess_data)
 {
 	struct pl_tcp_sess_data *tcp = sess_data;
@@ -245,8 +231,8 @@ static int pl_tcp_sess_deinit(struct protolayer_manager *manager, void *sess_dat
 	return 0;
 }
 
-static enum protolayer_cb_result pl_tcp_unwrap(
-		void *sess_data, void *iter_data, struct protolayer_cb_ctx *ctx)
+static enum protolayer_iter_cb_result pl_tcp_unwrap(
+		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
 {
 	struct session2 *s = ctx->manager->session;
 	struct pl_tcp_sess_data *tcp = sess_data;
@@ -363,14 +349,12 @@ void io_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_UDP] = (struct protolayer_globals){
 		.iter_size = sizeof(struct pl_udp_iter_data),
-		.iter_init = pl_udp_iter_init,
 		.unwrap = pl_udp_unwrap,
 		.event_wrap = pl_udp_event_wrap,
 	};
 
 	protolayer_globals[PROTOLAYER_TCP] = (struct protolayer_globals){
 		.sess_size = sizeof(struct pl_tcp_sess_data),
-		.sess_init = pl_tcp_sess_init,
 		.sess_deinit = pl_tcp_sess_deinit,
 		.unwrap = pl_tcp_unwrap,
 		.event_wrap = pl_tcp_event_wrap,

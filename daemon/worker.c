@@ -1909,8 +1909,8 @@ static bool pl_dns_dgram_event_unwrap(enum protolayer_event_type event,
 	return true;
 }
 
-static enum protolayer_cb_result pl_dns_dgram_unwrap(
-		void *sess_data, void *iter_data, struct protolayer_cb_ctx *ctx)
+static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
+		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
 {
 	struct session2 *session = ctx->manager->session;
 
@@ -2232,8 +2232,8 @@ static knot_pkt_t *produce_stream_packet(struct wire_buf *wb)
 	return pkt;
 }
 
-static enum protolayer_cb_result pl_dns_stream_unwrap(
-		void *sess_data, void *iter_data, struct protolayer_cb_ctx *ctx)
+static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
+		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
 {
 	if (kr_fails_assert(ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF)) {
 		/* DNS stream only works with a wire buffer */
@@ -2277,8 +2277,8 @@ struct sized_iovs {
 	struct iovec iovs[];
 };
 
-static enum protolayer_cb_result pl_dns_stream_wrap(
-		void *sess_data, void *iter_data, struct protolayer_cb_ctx *ctx)
+static enum protolayer_iter_cb_result pl_dns_stream_wrap(
+		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
 {
 	struct pl_dns_stream_iter_data *stream = iter_data;
 	struct session2 *s = ctx->manager->session;

@@ -51,7 +51,7 @@ typedef enum tls_client_hs_state {
 } tls_hs_state_t;
 
 typedef int (*tls_handshake_cb) (struct session2 *session, int status);
-typedef queue_t(struct protolayer_cb_ctx *) pl_cb_ctx_queue_t;
+typedef queue_t(struct protolayer_iter_ctx *) pl_cb_ctx_queue_t;
 
 struct pl_tls_sess_data {
 	PROTOLAYER_DATA_HEADER();
@@ -102,9 +102,9 @@ static size_t count_avail_payload(pl_cb_ctx_queue_t *queue)
 		return 0;
 
 	size_t avail = 0;
-	queue_it_t(struct protolayer_cb_ctx *) it = queue_it_begin(*queue);
+	queue_it_t(struct protolayer_iter_ctx *) it = queue_it_begin(*queue);
 	for (; !queue_it_finished(it); queue_it_next(it)) {
-		struct protolayer_cb_ctx *ctx = queue_it_val(it);
+		struct protolayer_iter_ctx *ctx = queue_it_val(it);
 		struct protolayer_payload *pld = &ctx->payload;
 		if (pld->type == PROTOLAYER_PAYLOAD_BUFFER) {
 			avail += pld->buffer.len;
@@ -144,7 +144,7 @@ static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 	char *dest = buf;
 	size_t transfer = 0;
 	while (queue_len(tls->unwrap_queue) > 0 && len > 0) {
-		struct protolayer_cb_ctx *ctx = queue_head(tls->unwrap_queue);
+		struct protolayer_iter_ctx *ctx = queue_head(tls->unwrap_queue);
 		struct protolayer_payload *pld = &ctx->payload;
 
 		bool fully_consumed = false;
@@ -233,7 +233,7 @@ static void kres_gnutls_push_finished(int status, struct session2 *session,
 	struct kres_gnutls_push_ctx *push_ctx = baton;
 	struct pl_tls_sess_data *tls = push_ctx->sess_data;
 	while (queue_len(tls->wrap_queue)) {
-		struct protolayer_cb_ctx *ctx = queue_head(tls->wrap_queue);
+		struct protolayer_iter_ctx *ctx = queue_head(tls->wrap_queue);
 		protolayer_break(ctx, kr_ok());
 		queue_pop(tls->wrap_queue);
 	}
@@ -1072,8 +1072,8 @@ static int pl_tls_sess_deinit(struct protolayer_manager *manager,
 	return pl_tls_sess_data_deinit(sess_data);
 }
 
-static enum protolayer_cb_result pl_tls_unwrap(void *sess_data, void *iter_data,
-                                               struct protolayer_cb_ctx *ctx)
+static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_data,
+                                               struct protolayer_iter_ctx *ctx)
 {
 	struct pl_tls_sess_data *tls = sess_data;
 	struct session2 *s = ctx->manager->session;
@@ -1144,7 +1144,7 @@ static enum protolayer_cb_result pl_tls_unwrap(void *sess_data, void *iter_data,
 		if (kr_fails_assert(queue_len(tls->unwrap_queue) == 1))
 			return protolayer_break(ctx, kr_error(EINVAL));
 
-		struct protolayer_cb_ctx *ctx_head = queue_head(tls->unwrap_queue);
+		struct protolayer_iter_ctx *ctx_head = queue_head(tls->unwrap_queue);
 		if (kr_fails_assert(ctx == ctx_head)) {
 			protolayer_break(ctx, kr_error(EINVAL));
 			ctx = ctx_head;
@@ -1197,8 +1197,8 @@ static ssize_t pl_tls_submit(gnutls_session_t tls_session,
 	return kr_error(EINVAL);
 }
 
-static enum protolayer_cb_result pl_tls_wrap(void *sess_data, void *iter_data,
-                                             struct protolayer_cb_ctx *ctx)
+static enum protolayer_iter_cb_result pl_tls_wrap(void *sess_data, void *iter_data,
+                                             struct protolayer_iter_ctx *ctx)
 {
 	struct pl_tls_sess_data *tls = sess_data;
 	gnutls_session_t tls_session = tls->tls_session;

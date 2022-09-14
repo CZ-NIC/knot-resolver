@@ -5,6 +5,31 @@
 /* HINT: If you are looking to implement a new protocol, start with the doc
  * comment of `enum protolayer_protocol` and continue from there. */
 
+/* GLOSSARY:
+ *
+ * Iteration:
+ *   - The processing of a piece of data (a.k.a. payload) using a particular
+ *   sequence of Protocol layers, either in Wrap or Unwrap direction. It is
+ *   also the lifetime of `struct protolayer_iter_ctx` and layer-specific data.
+ *
+ * Protocol layer:
+ *   - An implementation of a particular protocol. A layer transforms data
+ *   within the resolver to conform to a particular protocol, e.g. UDP, TCP,
+ *   TLS, HTTP, QUIC, etc.
+ *
+ * Protolayer:
+ *   - Same as 'Protocol layer'.
+ *
+ * Unwrap:
+ *   - The direction of data transformation, starting with the transport (e.g.
+ *   data that came from the network), ending with an internal subsystem (e.g.
+ *   DNS query resolution).
+ *
+ * Wrap:
+ *   - The direction of data transformation, starting with an internal
+ *   subsystem (e.g. an answer to a resolved DNS query), ending with the
+ *   transport (e.g. data that is going to be sent to the client). */
+
 #pragma once
 
 #include <stdalign.h>
@@ -19,7 +44,7 @@
 
 /* Forward declarations */
 struct session2;
-struct protolayer_cb_ctx;
+struct protolayer_iter_ctx;
 
 /** Information about the transport - addresses and proxy. */
 struct comm_info {
@@ -50,7 +75,11 @@ struct comm_info {
  * some logical compilation unit (e.g. `daemon/worker.c`), create a function
  * that will initialize the protocol's `protolayer_globals[]`, ideally at the
  * start of the program. See the docs of `struct protolayer_globals` for more
- * details. */
+ * details.
+ *
+ * To use protocols within sessions, protocol layer groups also need to be
+ * defined, to indicate the order in which individual protocols are to be
+ * processed. See `PROTOLAYER_GRP_MAP` below for more details. */
 enum protolayer_protocol {
 	PROTOLAYER_NULL = 0,
 
@@ -73,8 +102,12 @@ enum protolayer_protocol {
 };
 
 /** Protocol layer groups. Each of these represents a sequence of layers in the
- * unwrap direction (wrap direction being the opposite). This macro is used to
- * generate `enum protolayer_grp` and `protolayer_grp_descs[]`.
+ * unwrap direction (wrap direction being the opposite). The sequence dictates
+ * the order, in which individual layers are processed. This macro is used to
+ * generate global data about groups.
+ *
+ * For defining new groups, see the docs of `protolayer_grps[]` in
+ * `daemon/session2.h`.
  *
  * Parameters are:
  *   1. Constant name (for e.g. PROTOLAYER_GRP_* constants)
@@ -102,11 +135,11 @@ extern char *protolayer_grp_names[];
 /** Flow control indicators for protocol layer `wrap` and `unwrap` callbacks.
  * Use via `protolayer_continue`, `protolayer_break`, and `protolayer_push`
  * functions. */
-enum protolayer_cb_action {
-	PROTOLAYER_CB_ACTION_NULL = 0,
+enum protolayer_iter_action {
+	PROTOLAYER_ITER_ACTION_NULL = 0,
 
-	PROTOLAYER_CB_ACTION_CONTINUE,
-	PROTOLAYER_CB_ACTION_BREAK,
+	PROTOLAYER_ITER_ACTION_CONTINUE,
+	PROTOLAYER_ITER_ACTION_BREAK,
 };
 
 /** Direction of layer sequence processing. */
@@ -224,10 +257,11 @@ struct protolayer_payload {
 	};
 };
 
-/** Context for protocol layer callbacks, containing buffer data and internal
- * information for protocol layer manager. */
-struct protolayer_cb_ctx {
-	/* read-write */
+/** Context for protocol layer iterations, containing payload data,
+ * layer-specific data, and internal information for the protocol layer
+ * manager. */
+struct protolayer_iter_ctx {
+/* read-write: */
 	/** The payload */
 	struct protolayer_payload payload;
 	/** Transport information (e.g. UDP sender address). May be `NULL`. */
@@ -237,20 +271,20 @@ struct protolayer_cb_ctx {
 	 * Zero-initialized in the beginning. */
 	struct comm_info comm;
 
-	/* callback for when the layer iteration has ended - read-only */
+/* callback for when the layer iteration has ended - read-only: */
 	protolayer_finished_cb finished_cb;
 	const void *finished_cb_target;
 	void *finished_cb_baton;
 
-	/* internal information for the manager - private */
+/* internal information for the manager - private: */
 	enum protolayer_direction direction;
 	bool async_mode;
 	unsigned int layer_ix;
 	struct protolayer_manager *manager;
 	int status;
-	enum protolayer_cb_action action;
+	enum protolayer_iter_action action;
 
-	/** This contains variably-sized layer-specific data. See `struct
+	/** Contains variably-sized layer-specific data. See `struct
 	 * protolayer_manager::data`. */
 	alignas(CPU_STRUCT_ALIGN) char data[];
 };
@@ -293,47 +327,49 @@ static inline struct protolayer_payload protolayer_wire_buf(struct wire_buf *wir
  * Supports only `_BUFFER` and `_WIRE_BUF` on the input, otherwise returns
  * `_NULL` type or aborts on assertion if allowed.
  *
- * If the input payload is `_WIRE_BUF`, the pointed-to wire buffer is reset
- * to indicate that all of its contents have been used and the buffer is ready
+ * If the input payload is `_WIRE_BUF`, the pointed-to wire buffer is reset to
+ * indicate that all of its contents have been used up, and the buffer is ready
  * to be reused. */
 struct protolayer_payload protolayer_as_buffer(const struct protolayer_payload *payload);
 
 /** Mandatory header members for any layer-specific data. */
 #define PROTOLAYER_DATA_HEADER() struct {\
-	enum protolayer_protocol protocol;\
 	struct session2 *session; /**< Pointer to the owner session. */\
 }
 
-/** Layer-specific data - generic struct. */
+/** Layer-specific data - the generic struct. */
 struct protolayer_data {
 	PROTOLAYER_DATA_HEADER();
 };
 
-/** Return value of `protolayer_cb` callbacks. To be generated by continuation
- * functions, never returned directly. */
-enum protolayer_cb_result {
-	PROTOLAYER_CB_RESULT_MAGIC = 0x364F392E,
+/** Return value of `protolayer_iter_cb` callbacks. To be returned by *layer
+ * sequence return functions* as a sanity check. Not to be used directly by
+ * user code. */
+enum protolayer_iter_cb_result {
+	PROTOLAYER_ITER_CB_RESULT_MAGIC = 0x364F392E,
 };
 
-/** Function type for `wrap` and `unwrap` callbacks of layers. The function
- * processes the provided `ctx->payload` and decides on the next action for the
- * currently processed sequence.
+/** Function type for `struct protolayer_globals::wrap` and `struct
+ * protolayer_globals::unwrap`. The function processes the provided
+ * `ctx->payload` and decides the next action for the currently processed
+ * sequence.
  *
  * The pointed-to function (or another function, that the pointed-to function
- * causes to be called, e.g. through an asynchronous operation), must call one
- * of the *layer sequence return functions* to advance (or end) the layer
- * iteration. The pointed-to function must return the result of such a return
- * function. */
-typedef enum protolayer_cb_result (*protolayer_cb)(
+ * causes to be called, directly or through an asynchronous operation), must
+ * call one of the *layer sequence return functions* to advance (or end) the
+ * layer iteration. The pointed-to function must return the result of such a
+ * return function. */
+typedef enum protolayer_iter_cb_result (*protolayer_iter_cb)(
 		void *sess_data,
 		void *iter_data,
-		struct protolayer_cb_ctx *ctx);
+		struct protolayer_iter_ctx *ctx);
 
-/** Function type for `event_wrap` and `event_unwrap` callbacks of layers.
- * The `baton` parameter points to the mutable, iteration-specific baton
- * pointer, initialized by the `baton` parameter of one of the `session2_event`
- * functions. The pointed-to value of `baton` may be modified to accommodate
- * for the next layer in the sequence.
+/** Function type for `struct protolayer_globals::event_wrap` and `struct
+ * protolayer_globals::event_unwrap` callbacks of layers. The `baton` parameter
+ * points to the mutable, iteration-specific baton pointer, initialized by the
+ * `baton` parameter of one of the `session2_event` functions. The pointed-to
+ * value of `baton` may be modified to accommodate for the next layer in the
+ * sequence.
  *
  * When `true` is returned, iteration over the sequence of layers continues.
  * When `false` is returned, iteration stops. */
@@ -342,10 +378,11 @@ typedef bool (*protolayer_event_cb)(enum protolayer_event_type event,
                                     struct protolayer_manager *manager,
                                     void *sess_data);
 
-/** Function type for initialization callbacks of layer session data. The
- * `param` value is the one associated with the currently initialized layer,
- * from the `layer_param` array of `session2_new()` - may be NULL if none is
- * provided for the current layer.
+/** Function type for initialization callbacks of layer session data.
+ *
+ * The `param` value is the one associated with the currently initialized
+ * layer, from the `layer_param` array of `session2_new()` - may be NULL if
+ * none is provided for the current layer.
  *
  * `data` points to the layer-specific data struct.
  *
@@ -391,7 +428,7 @@ struct protolayer_manager {
 	 * `sess_offsets` determines data offsets in `sess_data`.
 	 *
 	 * `iter_offsets` determines data offsets in
-	 * `struct protolayer_cb_ctx::data`. */
+	 * `struct protolayer_iter_ctx::data`. */
 	alignas(CPU_STRUCT_ALIGN) char data[];
 };
 
@@ -407,62 +444,70 @@ struct protolayer_data_param {
  * the `protolayer_globals` global array (below) during the start of the
  * resolver. It contains pointers to the specific protocol's functions. */
 struct protolayer_globals {
-	/** Size of the layer-specific data struct, that is valid per-session.
+	/** Size of the layer-specific data struct, valid per-session.
 	 *
 	 * The struct MUST begin with the `PROTOLAYER_DATA_HEADER()` macro. If
 	 * no session struct is used by the layer, the value may be zero. */
 	size_t sess_size;
 
-	/** Size of the layer-specific data struct, that is valid
-	 * per-iteration. It gets created and destroyed together with a `struct
-	 * protolayer_cb_ctx`.
+	/** Size of the layer-specific data struct, valid per-iteration. It
+	 * gets created and destroyed together with a `struct
+	 * protolayer_iter_ctx`.
 	 *
 	 * The struct MUST begin with the `PROTOLAYER_DATA_HEADER()` macro. If
 	 * no iteration struct is used by the layer, the value may be zero. */
 	size_t iter_size;
 
-	/** Called during session creation to initialize layer-specific
-	 * session data. */
+	/** Called during session creation to initialize layer-specific session
+	 * data. Optional. The data is always zero-initialized during session
+	 * initialization. */
 	protolayer_data_sess_init_cb sess_init;
 
 	/** Called during session destruction to deinitialize layer-specific
-	 * session data. */
+	 * session data. Optional. */
 	protolayer_data_cb sess_deinit;
 
 	/** Called at the beginning of a layer sequence to initialize
-	 * layer-specific iteration data. */
+	 * layer-specific iteration data. Optional. The data is always
+	 * zero-initialized during iteration context initialization. */
 	protolayer_data_cb iter_init;
 
 	/** Called at the end of a layer sequence to deinitialize
-	 * layer-specific iteration data. */
+	 * layer-specific iteration data. Optional. */
 	protolayer_data_cb iter_deinit;
 
 	/** Strips the buffer of protocol-specific data. E.g. a HTTP layer
-	 * removes HTTP status and headers. */
-	protolayer_cb unwrap;
+	 * removes HTTP status and headers. Optional - iteration continues
+	 * automatically if this is NULL. */
+	protolayer_iter_cb unwrap;
 
 	/** Wraps the buffer into protocol-specific data. E.g. a HTTP layer
-	 * adds HTTP status and headers. */
-	protolayer_cb wrap;
+	 * adds HTTP status and headers. Optional - iteration continues
+	 * automatically if this is NULL. */
+	protolayer_iter_cb wrap;
 
-	/** Processes events in the unwrap order (sent from the outside). */
+	/** Processes events in the unwrap order (sent from the outside).
+	 * Optional - iteration continues automatically if this is NULL. */
 	protolayer_event_cb event_unwrap;
 
-	/** Processes events in the wrap order (bounced back by the session). */
+	/** Processes events in the wrap order (bounced back by the session).
+	 * Optional - iteration continues automatically if this is NULL. */
 	protolayer_event_cb event_wrap;
 };
 
-/** Global data about layered protocols. Indexed by `enum protolayer_protocol`. */
+/** Global data about layered protocols. Mapped by `enum protolayer_protocol`.
+ * Individual protocols are to be initialized during resolver startup. */
 extern struct protolayer_globals protolayer_globals[PROTOLAYER_PROTOCOL_COUNT];
+
 
 /** *Layer sequence return function* - signalizes the protolayer manager to
  * continue processing the next layer. */
-enum protolayer_cb_result protolayer_continue(struct protolayer_cb_ctx *ctx);
+enum protolayer_iter_cb_result protolayer_continue(struct protolayer_iter_ctx *ctx);
 
 /** *Layer sequence return function* - signalizes that the layer wants to stop
  * processing of the buffer and clean up, possibly due to an error (indicated
  * by a non-zero `status`). */
-enum protolayer_cb_result protolayer_break(struct protolayer_cb_ctx *ctx, int status);
+enum protolayer_iter_cb_result protolayer_break(struct protolayer_iter_ctx *ctx, int status);
 
 /** *Layer sequence return function* - signalizes that the current sequence
  * will continue in an asynchronous manner. The layer should store the context
@@ -473,9 +518,9 @@ enum protolayer_cb_result protolayer_break(struct protolayer_cb_ctx *ctx, int st
  * Note that this return function is just a readability hint - another return
  * function may be called in another stack frame before it and the sequence
  * will continue correctly. */
-static inline enum protolayer_cb_result protolayer_async()
+static inline enum protolayer_iter_cb_result protolayer_async()
 {
-	return PROTOLAYER_CB_RESULT_MAGIC;
+	return PROTOLAYER_ITER_CB_RESULT_MAGIC;
 }
 
 
@@ -638,9 +683,10 @@ struct session2 {
  * group, and the provided transport context.
  *
  * `layer_param` is a pointer to an array of size `layer_param_count`. The
- * parameters are passed to the layer session initializers. The parameters and
- * the pointed-to data are only required to be valid while calling this
- * function. */
+ * parameters are passed to the layer session initializers. The parameter array
+ * is only required to be valid before this function returns. It is up to the
+ * individual layer implementations to determine the lifetime of the data
+ * pointed to by the parameters. */
 struct session2 *session2_new(enum session2_transport_type transport_type,
                               enum protolayer_grp layer_grp,
                               struct protolayer_data_param *layer_param,
@@ -820,7 +866,11 @@ void session2_event(struct session2 *s, enum protolayer_event_type type, void *b
 /** Sends an event to be synchronously processed by the protocol layers of the
  * specified session, starting from the specified `protocol` in the `_UNWRAP`
  * direction. The layers are first iterated through in the `_UNWRAP` direction,
- * then bounced back in the `_WRAP` direction. */
+ * then bounced back in the `_WRAP` direction.
+ *
+ * NOTE: The bounced iteration does not exclude any layers - the layer
+ * specified by `protocol` and those before it are only skipped in the
+ * `_UNWRAP` direction! */
 void session2_event_after(struct session2 *s, enum protolayer_protocol protocol,
                           enum protolayer_event_type type, void *baton);
 

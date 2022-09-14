@@ -29,26 +29,26 @@ static int session2_transport_event(struct session2 *s,
 struct protolayer_globals protolayer_globals[PROTOLAYER_PROTOCOL_COUNT] = {0};
 
 
-enum protolayer_protocol protolayer_grp_doudp[] = {
+static enum protolayer_protocol protolayer_grp_doudp[] = {
 	PROTOLAYER_UDP,
 	PROTOLAYER_DNS_DGRAM,
 	PROTOLAYER_NULL
 };
 
-enum protolayer_protocol protolayer_grp_dotcp[] = {
+static enum protolayer_protocol protolayer_grp_dotcp[] = {
 	PROTOLAYER_TCP,
 	PROTOLAYER_DNS_MSTREAM,
 	PROTOLAYER_NULL
 };
 
-enum protolayer_protocol protolayer_grp_dot[] = {
+static enum protolayer_protocol protolayer_grp_dot[] = {
 	PROTOLAYER_TCP,
 	PROTOLAYER_TLS,
 	PROTOLAYER_DNS_MSTREAM,
 	PROTOLAYER_NULL
 };
 
-enum protolayer_protocol protolayer_grp_doh[] = {
+static enum protolayer_protocol protolayer_grp_doh[] = {
 	PROTOLAYER_TCP,
 	PROTOLAYER_TLS,
 	PROTOLAYER_HTTP,
@@ -57,12 +57,21 @@ enum protolayer_protocol protolayer_grp_doh[] = {
 };
 
 
-enum protolayer_protocol *protolayer_grps[PROTOLAYER_GRP_COUNT] = {
+/** Sequences of layers, mapped by `enum protolayer_grp`.
+ *
+ * To define a new group, add a new entry in the `PROTOLAYER_GRP_MAP` macro and
+ * create a new static `protolayer_grp_*` array above, similarly to the already
+ * existing ones. Each array must end with `PROTOLAYER_GRP_NULL`, to indicate
+ * the end of the list of protocol layers. The array name's suffix must be the
+ * one defined as *Variable name* (2nd parameter) in the `PROTOLAYER_GRP_MAP`
+ * macro. */
+static enum protolayer_protocol *protolayer_grps[PROTOLAYER_GRP_COUNT] = {
 #define XX(cid, vid, name) [PROTOLAYER_GRP_##cid] = protolayer_grp_##vid,
 	PROTOLAYER_GRP_MAP(XX)
 #undef XX
 };
 
+/** Human-readable names for protocol layer groups. */
 char *protolayer_grp_names[PROTOLAYER_GRP_COUNT] = {
 	[PROTOLAYER_GRP_NULL] = "(null)",
 #define XX(cid, vid, name) [PROTOLAYER_GRP_##cid] = name,
@@ -70,6 +79,7 @@ char *protolayer_grp_names[PROTOLAYER_GRP_COUNT] = {
 #undef XX
 };
 
+/** Human-readable names for events. */
 char *protolayer_event_names[PROTOLAYER_EVENT_COUNT] = {
 	[PROTOLAYER_EVENT_NULL] = "(null)",
 #define XX(cid) [PROTOLAYER_EVENT_##cid] = #cid,
@@ -77,6 +87,7 @@ char *protolayer_event_names[PROTOLAYER_EVENT_COUNT] = {
 #undef XX
 };
 
+/** Human-readable names for payloads. */
 char *protolayer_payload_names[PROTOLAYER_PAYLOAD_COUNT] = {
 	[PROTOLAYER_PAYLOAD_NULL] = "(null)",
 #define XX(cid, name) [PROTOLAYER_PAYLOAD_##cid] = name,
@@ -131,7 +142,7 @@ static inline struct protolayer_data *protolayer_sess_data_get(
 /** Gets layer-specific iteration data for the layer with the specified index
  * from the context. */
 static inline struct protolayer_data *protolayer_iter_data_get(
-		struct protolayer_cb_ctx *ctx, size_t layer_ix)
+		struct protolayer_iter_ctx *ctx, size_t layer_ix)
 {
 	struct protolayer_manager *m = ctx->manager;
 	if (kr_fails_assert(layer_ix < m->num_layers))
@@ -159,7 +170,7 @@ static inline ssize_t protolayer_manager_get_protocol(
 	return -1;
 }
 
-static inline bool protolayer_cb_ctx_is_last(struct protolayer_cb_ctx *ctx)
+static inline bool protolayer_iter_ctx_is_last(struct protolayer_iter_ctx *ctx)
 {
 	unsigned int last_ix = (ctx->direction == PROTOLAYER_UNWRAP)
 		? ctx->manager->num_layers - 1
@@ -167,7 +178,7 @@ static inline bool protolayer_cb_ctx_is_last(struct protolayer_cb_ctx *ctx)
 	return ctx->layer_ix == last_ix;
 }
 
-static inline void protolayer_cb_ctx_next(struct protolayer_cb_ctx *ctx)
+static inline void protolayer_iter_ctx_next(struct protolayer_iter_ctx *ctx)
 {
 	if (ctx->direction == PROTOLAYER_UNWRAP)
 		ctx->layer_ix++;
@@ -175,7 +186,7 @@ static inline void protolayer_cb_ctx_next(struct protolayer_cb_ctx *ctx)
 		ctx->layer_ix--;
 }
 
-static int protolayer_cb_ctx_finish(struct protolayer_cb_ctx *ctx, int ret)
+static int protolayer_iter_ctx_finish(struct protolayer_iter_ctx *ctx, int ret)
 {
 	struct session2 *session = ctx->manager->session;
 
@@ -206,13 +217,13 @@ static int protolayer_cb_ctx_finish(struct protolayer_cb_ctx *ctx, int ret)
 
 static void protolayer_push_finished(int status, struct session2 *s, const void *target, void *baton)
 {
-	struct protolayer_cb_ctx *ctx = baton;
+	struct protolayer_iter_ctx *ctx = baton;
 	ctx->status = status;
-	protolayer_cb_ctx_finish(ctx, PROTOLAYER_RET_NORMAL);
+	protolayer_iter_ctx_finish(ctx, PROTOLAYER_RET_NORMAL);
 }
 
 /** Pushes the specified protocol layer's payload to the session's transport. */
-static int protolayer_push(struct protolayer_cb_ctx *ctx)
+static int protolayer_push(struct protolayer_iter_ctx *ctx)
 {
 	struct session2 *session = ctx->manager->session;
 
@@ -241,7 +252,7 @@ static int protolayer_push(struct protolayer_cb_ctx *ctx)
 
 	if (status < 0) {
 		ctx->status = status;
-		return protolayer_cb_ctx_finish(ctx, status);
+		return protolayer_iter_ctx_finish(ctx, status);
 	}
 
 	return PROTOLAYER_RET_ASYNC;
@@ -252,7 +263,7 @@ static int protolayer_push(struct protolayer_cb_ctx *ctx)
  *
  * May be called multiple times on the same `ctx` to continue processing
  * after an asynchronous operation. */
-static int protolayer_step(struct protolayer_cb_ctx *ctx)
+static int protolayer_step(struct protolayer_iter_ctx *ctx)
 {
 	while (true) {
 		enum protolayer_protocol protocol = protolayer_grps[ctx->manager->grp][ctx->layer_ix];
@@ -260,9 +271,9 @@ static int protolayer_step(struct protolayer_cb_ctx *ctx)
 
 		ctx->async_mode = false;
 		ctx->status = 0;
-		ctx->action = PROTOLAYER_CB_ACTION_NULL;
+		ctx->action = PROTOLAYER_ITER_ACTION_NULL;
 
-		protolayer_cb cb = (ctx->direction == PROTOLAYER_UNWRAP)
+		protolayer_iter_cb cb = (ctx->direction == PROTOLAYER_UNWRAP)
 			? globals->unwrap : globals->wrap;
 
 		if (cb) {
@@ -270,13 +281,13 @@ static int protolayer_step(struct protolayer_cb_ctx *ctx)
 					ctx->manager, ctx->layer_ix);
 			struct protolayer_data *iter_data = protolayer_iter_data_get(
 					ctx, ctx->layer_ix);
-			enum protolayer_cb_result result = cb(sess_data, iter_data, ctx);
-			if (kr_fails_assert(result == PROTOLAYER_CB_RESULT_MAGIC)) {
+			enum protolayer_iter_cb_result result = cb(sess_data, iter_data, ctx);
+			if (kr_fails_assert(result == PROTOLAYER_ITER_CB_RESULT_MAGIC)) {
 				/* Callback did not use a continuation function to return. */
-				return protolayer_cb_ctx_finish(ctx, kr_error(EINVAL));
+				return protolayer_iter_ctx_finish(ctx, kr_error(EINVAL));
 			}
 		} else {
-			ctx->action = PROTOLAYER_CB_ACTION_CONTINUE;
+			ctx->action = PROTOLAYER_ITER_ACTION_CONTINUE;
 		}
 
 
@@ -286,32 +297,32 @@ static int protolayer_step(struct protolayer_cb_ctx *ctx)
 			return PROTOLAYER_RET_ASYNC;
 		}
 
-		if (ctx->action == PROTOLAYER_CB_ACTION_BREAK) {
-			return protolayer_cb_ctx_finish(
+		if (ctx->action == PROTOLAYER_ITER_ACTION_BREAK) {
+			return protolayer_iter_ctx_finish(
 					ctx, PROTOLAYER_RET_NORMAL);
 		}
 
 		if (kr_fails_assert(ctx->status == 0)) {
 			/* Status should be zero without a BREAK. */
-			return protolayer_cb_ctx_finish(ctx, kr_error(ECANCELED));
+			return protolayer_iter_ctx_finish(ctx, kr_error(ECANCELED));
 		}
 
-		if (ctx->action == PROTOLAYER_CB_ACTION_CONTINUE) {
-			if (protolayer_cb_ctx_is_last(ctx)) {
+		if (ctx->action == PROTOLAYER_ITER_ACTION_CONTINUE) {
+			if (protolayer_iter_ctx_is_last(ctx)) {
 				if (ctx->direction == PROTOLAYER_WRAP)
 					return protolayer_push(ctx);
 
-				return protolayer_cb_ctx_finish(
+				return protolayer_iter_ctx_finish(
 						ctx, PROTOLAYER_RET_NORMAL);
 			}
 
-			protolayer_cb_ctx_next(ctx);
+			protolayer_iter_ctx_next(ctx);
 			continue;
 		}
 
 		/* Should never get here */
 		kr_assert(false && "Invalid layer callback action");
-		return protolayer_cb_ctx_finish(ctx, kr_error(EINVAL));
+		return protolayer_iter_ctx_finish(ctx, kr_error(EINVAL));
 	}
 }
 
@@ -328,7 +339,7 @@ static int protolayer_manager_submit(
 		struct protolayer_payload payload, const void *target,
 		protolayer_finished_cb cb, void *baton)
 {
-	struct protolayer_cb_ctx *ctx = malloc(manager->cb_ctx_size);
+	struct protolayer_iter_ctx *ctx = malloc(manager->cb_ctx_size);
 	kr_require(ctx);
 
 	if (kr_log_is_debug(PROTOLAYER, NULL)) {
@@ -341,7 +352,7 @@ static int protolayer_manager_submit(
 				layer_ix);
 	}
 
-	*ctx = (struct protolayer_cb_ctx) {
+	*ctx = (struct protolayer_iter_ctx) {
 		.payload = payload,
 		.target = target,
 		.direction = direction,
@@ -358,7 +369,6 @@ static int protolayer_manager_submit(
 		struct protolayer_data *iter_data = protolayer_iter_data_get(ctx, i);
 		if (iter_data) {
 			bzero(iter_data, globals->iter_size);
-			iter_data->protocol = p;
 			iter_data->session = manager->session;
 		}
 
@@ -394,7 +404,7 @@ static struct protolayer_manager *protolayer_manager_new(
 
 	size_t num_layers = 0;
 	size_t manager_size = sizeof(struct protolayer_manager);
-	size_t cb_ctx_size = sizeof(struct protolayer_cb_ctx);
+	size_t cb_ctx_size = sizeof(struct protolayer_iter_ctx);
 
 	enum protolayer_protocol *protocols = protolayer_grps[grp];
 	if (kr_fails_assert(protocols))
@@ -446,7 +456,6 @@ static struct protolayer_manager *protolayer_manager_new(
 		if (sess_data) {
 			bzero(sess_data, globals->sess_size);
 			sess_data->session = s;
-			sess_data->protocol = protocols[i];
 		}
 
 		void *param = get_init_param(protocols[i], layer_param, layer_param_count);
@@ -474,26 +483,26 @@ static void protolayer_manager_free(struct protolayer_manager *m)
 	free(m);
 }
 
-enum protolayer_cb_result protolayer_continue(struct protolayer_cb_ctx *ctx)
+enum protolayer_iter_cb_result protolayer_continue(struct protolayer_iter_ctx *ctx)
 {
 	if (ctx->async_mode) {
-		protolayer_cb_ctx_next(ctx);
+		protolayer_iter_ctx_next(ctx);
 		protolayer_step(ctx);
 	} else {
-		ctx->action = PROTOLAYER_CB_ACTION_CONTINUE;
+		ctx->action = PROTOLAYER_ITER_ACTION_CONTINUE;
 	}
-	return PROTOLAYER_CB_RESULT_MAGIC;
+	return PROTOLAYER_ITER_CB_RESULT_MAGIC;
 }
 
-enum protolayer_cb_result protolayer_break(struct protolayer_cb_ctx *ctx, int status)
+enum protolayer_iter_cb_result protolayer_break(struct protolayer_iter_ctx *ctx, int status)
 {
 	ctx->status = status;
 	if (ctx->async_mode) {
-		protolayer_cb_ctx_finish(ctx, PROTOLAYER_RET_NORMAL);
+		protolayer_iter_ctx_finish(ctx, PROTOLAYER_RET_NORMAL);
 	} else {
-		ctx->action = PROTOLAYER_CB_ACTION_BREAK;
+		ctx->action = PROTOLAYER_ITER_ACTION_BREAK;
 	}
-	return PROTOLAYER_CB_RESULT_MAGIC;
+	return PROTOLAYER_ITER_CB_RESULT_MAGIC;
 }
 
 
