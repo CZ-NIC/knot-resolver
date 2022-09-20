@@ -11,4 +11,5 @@ __all__ = [
     "parse_yaml",
     "parse_json",
     "QueryTree",
+    "try_to_parse",
 ]
