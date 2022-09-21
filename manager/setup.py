@@ -21,9 +21,9 @@ package_data = \
 install_requires = \
 ['Jinja2>=2.11.3',
  'PyYAML',
- 'aiohttp>=3.6.12',
+ 'aiohttp>=3.6',
  'prometheus-client>=0.6',
- 'supervisor>=4.2.2',
+ 'supervisor>=4',
  'typing-extensions>=3.7.2']
 
 entry_points = \
