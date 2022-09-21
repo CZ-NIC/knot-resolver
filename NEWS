@@ -1,5 +1,9 @@
-Knot Resolver 5.x.y (2022-mm-dd)
+Knot Resolver 5.5.3 (2022-09-21)
 ================================
+
+Security
+--------
+- fix CPU-expensive DoS by malicious domains - CVE-2022-40188
 
 Improvements
 ------------
