@@ -804,7 +804,7 @@ knot_pkt_t *kr_request_ensure_answer(struct kr_request *request)
 	uint16_t answer_max;
 	const struct kr_request_qsource_flags *qs_flags = &request->qsource.flags;
 	const struct kr_request_qsource_flags *qs_cflags = &request->qsource.comm_flags;
-	if (kr_fails_assert(!(qs_flags->tls || qs_cflags->tls || qs_cflags->http) || qs_flags->tcp))
+	if (kr_fails_assert(!(qs_flags->tls || qs_cflags->tls) || qs_flags->tcp || qs_cflags->http))
 		goto fail;
 	if (!request->qsource.addr || qs_flags->tcp || qs_cflags->tcp) {
 		// not on UDP

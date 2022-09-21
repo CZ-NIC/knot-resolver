@@ -10,6 +10,11 @@
 #include "daemon/network.h"
 #include "daemon/udp_queue.h"
 #include "daemon/worker.h"
+
+#ifdef ENABLE_DOH2
+#include "daemon/http.h"
+#endif
+
 #include "lib/defines.h"
 #include "lib/dnssec.h"
 #include "lib/log.h"
@@ -571,6 +576,9 @@ int main(int argc, char **argv)
 
 	io_protolayers_init();
 	tls_protolayers_init();
+#ifdef ENABLE_DOH2
+	http_protolayers_init();
+#endif
 
 	/* Start listening, in the sense of network_listen_fd(). */
 	if (start_listening(&the_args->fds) != 0) {

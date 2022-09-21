@@ -57,6 +57,13 @@ static enum protolayer_protocol protolayer_grp_doh[] = {
 };
 
 
+char *protolayer_protocol_names[PROTOLAYER_PROTOCOL_COUNT] = {
+	[PROTOLAYER_NULL] = "(null)",
+#define XX(cid) [PROTOLAYER_##cid] = #cid,
+	PROTOLAYER_PROTOCOL_MAP(XX)
+#undef XX
+};
+
 /** Sequences of layers, mapped by `enum protolayer_grp`.
  *
  * To define a new group, add a new entry in the `PROTOLAYER_GRP_MAP` macro and
@@ -66,7 +73,7 @@ static enum protolayer_protocol protolayer_grp_doh[] = {
  * one defined as *Variable name* (2nd parameter) in the `PROTOLAYER_GRP_MAP`
  * macro. */
 static enum protolayer_protocol *protolayer_grps[PROTOLAYER_GRP_COUNT] = {
-#define XX(cid, vid, name) [PROTOLAYER_GRP_##cid] = protolayer_grp_##vid,
+#define XX(cid, vid, name, alpn) [PROTOLAYER_GRP_##cid] = protolayer_grp_##vid,
 	PROTOLAYER_GRP_MAP(XX)
 #undef XX
 };
@@ -74,7 +81,7 @@ static enum protolayer_protocol *protolayer_grps[PROTOLAYER_GRP_COUNT] = {
 /** Human-readable names for protocol layer groups. */
 char *protolayer_grp_names[PROTOLAYER_GRP_COUNT] = {
 	[PROTOLAYER_GRP_NULL] = "(null)",
-#define XX(cid, vid, name) [PROTOLAYER_GRP_##cid] = name,
+#define XX(cid, vid, name, alpn) [PROTOLAYER_GRP_##cid] = name,
 	PROTOLAYER_GRP_MAP(XX)
 #undef XX
 };
@@ -95,6 +102,59 @@ char *protolayer_payload_names[PROTOLAYER_PAYLOAD_COUNT] = {
 #undef XX
 };
 
+size_t protolayer_payload_size(const struct protolayer_payload *payload)
+{
+	if (payload->type == PROTOLAYER_PAYLOAD_BUFFER) {
+		return payload->buffer.len;
+	} else if (payload->type == PROTOLAYER_PAYLOAD_IOVEC) {
+		size_t sum = 0;
+		for (int i = 0; i < payload->iovec.cnt; i++) {
+			sum += payload->iovec.iov[i].iov_len;
+		}
+		return sum;
+	} else if (payload->type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
+		return wire_buf_data_length(payload->wire_buf);
+	} else if(!payload->type) {
+		return 0;
+	} else {
+		kr_assert(false && "Invalid payload type");
+		return 0;
+	}
+}
+
+size_t protolayer_payload_copy(void *dest,
+                               const struct protolayer_payload *payload,
+                               size_t max_len)
+{
+	const size_t pld_size = protolayer_payload_size(payload);
+	const size_t copy_size = MIN(max_len, pld_size);
+
+	if (payload->type == PROTOLAYER_PAYLOAD_BUFFER) {
+		memcpy(dest, payload->buffer.buf, copy_size);
+		return copy_size;
+	} else if (payload->type == PROTOLAYER_PAYLOAD_IOVEC) {
+		char *cur = dest;
+		size_t remaining = copy_size;
+		for (int i = 0; i < payload->iovec.cnt && remaining; i++) {
+			size_t l = payload->iovec.iov[i].iov_len;
+			size_t to_copy = MIN(l, remaining);
+			memcpy(cur, payload->iovec.iov[i].iov_base, to_copy);
+			remaining -= l;
+			cur += l;
+		}
+
+		kr_assert(remaining == 0 && (cur - (char *)dest) == copy_size);
+		return copy_size;
+	} else if (payload->type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
+		memcpy(dest, wire_buf_data(payload->wire_buf), copy_size);
+		return copy_size;
+	} else if(!payload->type) {
+		return 0;
+	} else {
+		kr_assert(false && "Invalid payload type");
+		return 0;
+	}
+}
 
 struct protolayer_payload protolayer_as_buffer(const struct protolayer_payload *payload)
 {
@@ -104,6 +164,7 @@ struct protolayer_payload protolayer_as_buffer(const struct protolayer_payload *
 	if (payload->type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
 		struct protolayer_payload new_payload = {
 			.type = PROTOLAYER_PAYLOAD_BUFFER,
+			.ttl = payload->ttl,
 			.buffer = {
 				.buf = wire_buf_data(payload->wire_buf),
 				.len = wire_buf_data_length(payload->wire_buf)
@@ -117,6 +178,21 @@ struct protolayer_payload protolayer_as_buffer(const struct protolayer_payload *
 	return (struct protolayer_payload){
 		.type = PROTOLAYER_PAYLOAD_NULL
 	};
+}
+
+size_t protolayer_queue_count_payload(protolayer_iter_ctx_queue_t *queue)
+{
+	if (!queue || queue_len(*queue) == 0)
+		return 0;
+
+	size_t sum = 0;
+	queue_it_t(struct protolayer_iter_ctx *) it = queue_it_begin(*queue);
+	for (; !queue_it_finished(it); queue_it_next(it)) {
+		struct protolayer_iter_ctx *ctx = queue_it_val(it);
+		sum += protolayer_payload_size(&ctx->payload);
+	}
+
+	return sum;
 }
 
 
@@ -186,6 +262,17 @@ static inline void protolayer_iter_ctx_next(struct protolayer_iter_ctx *ctx)
 		ctx->layer_ix--;
 }
 
+static const char *layer_name(enum protolayer_grp grp, ssize_t layer_ix)
+{
+	enum protolayer_protocol p = protolayer_grps[grp][layer_ix];
+	return protolayer_protocol_names[p];
+}
+
+static inline const char *layer_name_ctx(struct protolayer_iter_ctx *ctx)
+{
+	return layer_name(ctx->manager->grp, ctx->layer_ix);
+}
+
 static int protolayer_iter_ctx_finish(struct protolayer_iter_ctx *ctx, int ret)
 {
 	struct session2 *session = ctx->manager->session;
@@ -195,16 +282,18 @@ static int protolayer_iter_ctx_finish(struct protolayer_iter_ctx *ctx, int ret)
 	for (size_t i = 0; i < m->num_layers; i++) {
 		struct protolayer_data *d = protolayer_iter_data_get(ctx, i);
 		if (globals->iter_deinit)
-			globals->iter_deinit(m, d);
+			globals->iter_deinit(m, ctx, d);
 	}
 
 	if (ret)
-		kr_log_debug(PROTOLAYER, "layer context of group '%s' ended with return code %d\n",
-				protolayer_grp_names[ctx->manager->grp], ret);
+		kr_log_debug(PROTOLAYER, "layer context of group '%s' (on %u: %s) ended with return code %d\n",
+				protolayer_grp_names[ctx->manager->grp],
+				ctx->layer_ix, layer_name_ctx(ctx), ret);
 
 	if (ctx->status)
-		kr_log_debug(PROTOLAYER, "iteration of group '%s' layer %u ended with status %d\n",
-				protolayer_grp_names[ctx->manager->grp], ctx->layer_ix, ctx->status);
+		kr_log_debug(PROTOLAYER, "iteration of group '%s' (on %u: %s) ended with status %d\n",
+				protolayer_grp_names[ctx->manager->grp],
+				ctx->layer_ix, layer_name_ctx(ctx), ctx->status);
 
 	if (ctx->finished_cb)
 		ctx->finished_cb(ret, session, ctx->finished_cb_target,
@@ -344,17 +433,18 @@ static int protolayer_manager_submit(
 
 	if (kr_log_is_debug(PROTOLAYER, NULL)) {
 		const char *sess_dir = manager->session->outgoing ? "out" : "in";
-		kr_log_debug(PROTOLAYER, "[%s] %s submitted to grp '%s' in %s direction (layer %zu)\n",
+		kr_log_debug(PROTOLAYER, "[%s] %s submitted to grp '%s' in %s direction (%zu: %s)\n",
 				sess_dir,
 				protolayer_payload_names[payload.type],
 				protolayer_grp_names[manager->grp],
 				(direction == PROTOLAYER_UNWRAP) ? "unwrap" : "wrap",
-				layer_ix);
+				layer_ix, layer_name(manager->grp, layer_ix));
 	}
 
 	*ctx = (struct protolayer_iter_ctx) {
 		.payload = payload,
 		.target = target,
+		.comm = &manager->session->comm,
 		.direction = direction,
 		.layer_ix = layer_ix,
 		.manager = manager,
@@ -373,7 +463,7 @@ static int protolayer_manager_submit(
 		}
 
 		if (globals->iter_init)
-			globals->iter_init(manager, iter_data);
+			globals->iter_init(manager, ctx, iter_data);
 	}
 
 	return protolayer_step(ctx);
@@ -1014,6 +1104,19 @@ void session2_event_after(struct session2 *s, enum protolayer_protocol protocol,
 	if (kr_fails_assert(start_ix >= 0))
 		return;
 	session2_event_unwrap(s, start_ix + 1, event, baton);
+}
+
+void session2_init_request(struct session2 *s, struct kr_request *req)
+{
+	struct protolayer_manager *m = s->layers;
+	for (ssize_t i = 0; i < m->num_layers; i++) {
+		enum protolayer_protocol p = protolayer_grps[s->layers->grp][i];
+		struct protolayer_globals *globals = &protolayer_globals[p];
+		if (globals->request_init) {
+			struct protolayer_data *sess_data = protolayer_sess_data_get(m, i);
+			globals->request_init(m, req, sess_data);
+		}
+	}
 }
 
 

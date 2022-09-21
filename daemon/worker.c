@@ -30,8 +30,9 @@
 #include "daemon/proxyv2.h"
 #include "daemon/session2.h"
 #include "daemon/tls.h"
-#include "daemon/http.h"
+#include "lib/cache/util.h" /* packet_ttl */
 #include "lib/layer.h"
+#include "lib/layer/iterate.h" /* kr_response_classify */
 #include "lib/utils.h"
 
 
@@ -349,8 +350,6 @@ static struct request_ctx *request_create(struct session2 *session,
 
 		req->qsource.comm_flags.tcp = session->stream;
 		req->qsource.comm_flags.tls = session->secure;
-//		req->qsource.comm_flags.http = session->has_http; /* TODO */
-		req->qsource.comm_flags.http = false;
 
 		req->qsource.flags = req->qsource.comm_flags;
 		if (proxy) {
@@ -360,19 +359,8 @@ static struct request_ctx *request_create(struct session2 *session,
 
 		req->qsource.stream_id = -1;
 
-		/* TODO: http */
-//#if ENABLE_DOH2
-//		if (req->qsource.comm_flags.http) {
-//			struct http_ctx *http_ctx = session_http_get_server_ctx(session);
-//			struct http_stream stream = queue_head(http_ctx->streams);
-//			req->qsource.stream_id = stream.id;
-//			if (stream.headers) {
-//				req->qsource.headers = *stream.headers;
-//				free(stream.headers);
-//				stream.headers = NULL;
-//			}
-//		}
-//#endif
+		session2_init_request(session, req);
+
 		/* We need to store a copy of peer address. */
 		memcpy(&ctx->source.addr.ip, src_addr, kr_sockaddr_len(src_addr));
 		req->qsource.addr = &ctx->source.addr.ip;
@@ -646,7 +634,6 @@ static int qr_task_send(struct qr_task *task, struct session2 *session,
 		return qr_task_on_send(task, NULL, kr_error(EIO));
 
 	int ret = 0;
-//	struct request_ctx *ctx = task->ctx; /* TODO: used with doh below */
 
 	if (addr == NULL)
 		addr = session2_get_peer(session);
@@ -675,24 +662,11 @@ static int qr_task_send(struct qr_task *task, struct session2 *session,
 	if (kr_fails_assert(!session->closing))
 		return qr_task_on_send(task, NULL, kr_error(EIO));
 
-	/* TODO: doh */
-//	if (session_flags(session)->has_http) {
-//#if ENABLE_DOH2
-//		uv_write_t *write_req = (uv_write_t *)ioreq;
-//		write_req->data = task;
-//		ret = http_write(write_req, handle, pkt, ctx->req.qsource.stream_id, &on_write);
-//#else
-//		ret = kr_error(ENOPROTOOPT);
-//#endif
-//	}
-//
-//	*snip*
-
 	/* Pending '_finished' callback on current task */
 	qr_task_ref(task);
-	ret = session2_wrap(session,
-			protolayer_buffer((char *)pkt->wire, pkt->size),
-			addr, qr_task_wrap_finished, task);
+	struct protolayer_payload payload = protolayer_buffer((char *)pkt->wire, pkt->size);
+	payload.ttl = packet_ttl(pkt);
+	ret = session2_wrap(session, payload, addr, qr_task_wrap_finished, task);
 
 	if (ret >= 0) {
 		session2_touch(session);
@@ -1498,20 +1472,13 @@ int worker_submit(struct session2 *session, struct comm_info *comm,
 	if (ret == KNOT_ETRAIL && is_outgoing && !kr_fails_assert(pkt->parsed < pkt->size))
 		ret = KNOT_EOK; // we deal with this later, so that `selection` applies
 
-	struct http_ctx *http_ctx = NULL;
-#if ENABLE_DOH2
-	/* TODO: http. Devise a way to do this... don't know yet */
-//	http_ctx = session_http_get_server_ctx(session);
-//
-//	/* Badly formed query when using DoH leads to a Bad Request */
-//	if (http_ctx && !is_outgoing && ret) {
-//		http_send_status(session, HTTP_STATUS_BAD_REQUEST);
-//		return ret;
-//	}
-#endif
-
-	if (!is_outgoing && http_ctx && queue_len(http_ctx->streams) <= 0)
-		return kr_error(ENOENT);
+	/* Badly formed query when using DoH leads to a Bad Request */
+	/* TODO: Do not necessarily tie it to HTTP - it should probably be a
+	 * more generic flag */
+	if (session->http && !is_outgoing && ret) {
+		session2_event(session, PROTOLAYER_EVENT_MALFORMED, NULL);
+		return ret;
+	}
 
 	/* Ignore badly formed queries. */
 	if (ret && kr_log_is_debug(WORKER, NULL)) {
@@ -1532,8 +1499,6 @@ int worker_submit(struct session2 *session, struct comm_info *comm,
 		struct request_ctx *ctx =
 			request_create(session, comm, eth_from,
 			               eth_to, knot_wire_get_id(pkt->wire));
-		if (http_ctx)
-			queue_pop(http_ctx->streams);
 		if (!ctx)
 			return kr_error(ENOMEM);
 
@@ -1925,7 +1890,7 @@ static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 				break;
 			}
 
-			ret = worker_submit(session, &ctx->comm, NULL, NULL, pkt);
+			ret = worker_submit(session, ctx->comm, NULL, NULL, pkt);
 			if (ret)
 				break;
 		}
@@ -1939,7 +1904,7 @@ static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 		if (!pkt)
 			return protolayer_break(ctx, KNOT_EMALF);
 
-		int ret = worker_submit(session, &ctx->comm, NULL, NULL, pkt);
+		int ret = worker_submit(session, ctx->comm, NULL, NULL, pkt);
 		mp_flush(the_worker->pkt_pool.ctx);
 		return protolayer_break(ctx, ret);
 	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
@@ -1949,7 +1914,7 @@ static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 		if (!pkt)
 			return protolayer_break(ctx, KNOT_EMALF);
 
-		int ret = worker_submit(session, &ctx->comm, NULL, NULL, pkt);
+		int ret = worker_submit(session, ctx->comm, NULL, NULL, pkt);
 		wire_buf_reset(ctx->payload.wire_buf);
 		mp_flush(the_worker->pkt_pool.ctx);
 		return protolayer_break(ctx, ret);
@@ -2002,6 +1967,7 @@ static int pl_dns_sstream_sess_init(struct protolayer_manager *manager,
 }
 
 static int pl_dns_stream_iter_init(struct protolayer_manager *manager,
+                                   struct protolayer_iter_ctx *ctx,
                                    void *iter_data)
 {
 	struct pl_dns_stream_iter_data *stream = iter_data;
@@ -2010,6 +1976,7 @@ static int pl_dns_stream_iter_init(struct protolayer_manager *manager,
 }
 
 static int pl_dns_stream_iter_deinit(struct protolayer_manager *manager,
+                                     struct protolayer_iter_ctx *ctx,
                                      void *iter_data)
 {
 	struct pl_dns_stream_iter_data *stream = iter_data;
@@ -2249,7 +2216,7 @@ static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
 		if (stream_sess->single && stream_sess->produced) {
 			if (kr_log_is_debug(WORKER, NULL)) {
 				kr_log_debug(WORKER, "Unexpected extra data from %s\n",
-						kr_straddr(ctx->comm.src_addr));
+						kr_straddr(ctx->comm->src_addr));
 			}
 			mp_flush(the_worker->pkt_pool.ctx);
 			worker_end_tcp(session);
@@ -2260,7 +2227,7 @@ static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
 		if (!pkt)
 			return protolayer_break(ctx, KNOT_EMALF);
 
-		int ret = worker_submit(session, &ctx->comm, NULL, NULL, pkt);
+		int ret = worker_submit(session, ctx->comm, NULL, NULL, pkt);
 		wire_buf_movestart(wb);
 		mp_flush(the_worker->pkt_pool.ctx);
 		if (ret) {

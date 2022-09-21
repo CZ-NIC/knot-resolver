@@ -80,26 +80,34 @@ struct comm_info {
  * To use protocols within sessions, protocol layer groups also need to be
  * defined, to indicate the order in which individual protocols are to be
  * processed. See `PROTOLAYER_GRP_MAP` below for more details. */
+#define PROTOLAYER_PROTOCOL_MAP(XX) \
+	/* General transport protocols */\
+	XX(UDP) \
+	XX(TCP) \
+	XX(TLS) \
+	XX(HTTP) \
+	\
+	/* QUIC (not yet implemented) */\
+	XX(UDP_TO_QCONN)\
+	XX(QCONN_TO_QSTREAM)\
+	\
+	/* DNS (`worker`) */\
+	XX(DNS_DGRAM)\
+	XX(DNS_MSTREAM)\
+	XX(DNS_SSTREAM)
+
+/** The identifiers of protocol layer types. */
 enum protolayer_protocol {
 	PROTOLAYER_NULL = 0,
-
-	/* General transport protocols */
-	PROTOLAYER_UDP,
-	PROTOLAYER_TCP,
-	PROTOLAYER_TLS,
-	PROTOLAYER_HTTP,
-
-	/* QUIC (not yet implemented) */
-	PROTOLAYER_UDP_TO_QCONN,
-	PROTOLAYER_QCONN_TO_QSTREAM,
-
-	/* DNS (`worker`) */
-	PROTOLAYER_DNS_DGRAM,
-	PROTOLAYER_DNS_MSTREAM,
-	PROTOLAYER_DNS_SSTREAM,
-
+#define XX(cid) PROTOLAYER_##cid,
+	PROTOLAYER_PROTOCOL_MAP(XX)
+#undef XX
 	PROTOLAYER_PROTOCOL_COUNT /* must be the last! */
 };
+
+/** Maps protocol layer type IDs to string names.
+ * E.g. PROTOLAYER_HTTP has name 'HTTP'. */
+extern char *protolayer_protocol_names[];
 
 /** Protocol layer groups. Each of these represents a sequence of layers in the
  * unwrap direction (wrap direction being the opposite). The sequence dictates
@@ -112,17 +120,18 @@ enum protolayer_protocol {
  * Parameters are:
  *   1. Constant name (for e.g. PROTOLAYER_GRP_* constants)
  *   2. Variable name (for e.g. protolayer_grp_* arrays)
- *   3. Human-readable name for logging */
+ *   3. Human-readable name for logging
+ *   4. ALPN protocol identifier (for TLS) */
 #define PROTOLAYER_GRP_MAP(XX) \
-	XX(DOUDP, doudp, "DNS UDP") \
-	XX(DOTCP, dotcp, "DNS TCP") \
-	XX(DOTLS, dot, "DNS-over-TLS") \
-	XX(DOHTTPS, doh, "DNS-over-HTTPS")
+	XX(DOUDP, doudp, "DNS UDP", "") \
+	XX(DOTCP, dotcp, "DNS TCP", "") \
+	XX(DOTLS, dot, "DNS-over-TLS", "dot") \
+	XX(DOHTTPS, doh, "DNS-over-HTTPS", "h2")
 
 /** The identifiers of pre-defined protocol layer sequences. */
 enum protolayer_grp {
 	PROTOLAYER_GRP_NULL = 0,
-#define XX(cid, vid, name) PROTOLAYER_GRP_##cid,
+#define XX(cid, vid, name, alpn) PROTOLAYER_GRP_##cid,
 	PROTOLAYER_GRP_MAP(XX)
 #undef XX
 	PROTOLAYER_GRP_COUNT
@@ -195,6 +204,7 @@ typedef void (*protolayer_finished_cb)(int status, struct session2 *session,
 	XX(TIMEOUT) /**< Signal that the session has timed out. */\
 	XX(CONNECT) /**< Signal that a connection has been established. */\
 	XX(CONNECT_FAIL) /**< Signal that a connection could not have been established. */\
+	XX(MALFORMED) /**< Signal that a malformed request has been received. */\
 	XX(DISCONNECT) /**< Signal that a connection has ended. */\
 	XX(STATS_SEND_ERR) /**< Failed task send - update stats. */\
 	XX(STATS_QRY_OUT) /**< Outgoing query submission - update stats. */
@@ -239,10 +249,11 @@ extern char *protolayer_payload_names[];
  * is ever (de-)allocated by the protolayer manager! */
 struct protolayer_payload {
 	enum protolayer_payload_type type;
+	unsigned int ttl; /**< time-to-live hint (for e.g. HTTP Cache-Control) */
 	union {
 		/** Only valid if `type` is `_BUFFER`. */
 		struct {
-			char *buf;
+			void *buf;
 			size_t len;
 		} buffer;
 
@@ -268,8 +279,9 @@ struct protolayer_iter_ctx {
 	const void *target;
 	/** Communication information. Typically written into by one of the
 	 * first layers facilitating transport protocol processing.
-	 * Zero-initialized in the beginning. */
-	struct comm_info comm;
+	 * Points to session-wide comm info by default, may be changed
+	 * by a layer to point elsewhere. */
+	struct comm_info *comm;
 
 /* callback for when the layer iteration has ended - read-only: */
 	protolayer_finished_cb finished_cb;
@@ -289,8 +301,19 @@ struct protolayer_iter_ctx {
 	alignas(CPU_STRUCT_ALIGN) char data[];
 };
 
+/** Gets the total size of the specified payload. */
+size_t protolayer_payload_size(const struct protolayer_payload *payload);
+
+/** Copies the specified payload to `dest`. Only `max_len` or the size of the
+ * payload is written, whichever is less.
+ *
+ * Returns the actual length of copied data. */
+size_t protolayer_payload_copy(void *dest,
+                               const struct protolayer_payload *payload,
+                               size_t max_len);
+
 /** Convenience function to get a buffer-type payload. */
-static inline struct protolayer_payload protolayer_buffer(char *buf, size_t len)
+static inline struct protolayer_payload protolayer_buffer(void *buf, size_t len)
 {
 	return (struct protolayer_payload){
 		.type = PROTOLAYER_PAYLOAD_BUFFER,
@@ -331,6 +354,13 @@ static inline struct protolayer_payload protolayer_wire_buf(struct wire_buf *wir
  * indicate that all of its contents have been used up, and the buffer is ready
  * to be reused. */
 struct protolayer_payload protolayer_as_buffer(const struct protolayer_payload *payload);
+
+/** A predefined queue type for iteration context. */
+typedef queue_t(struct protolayer_iter_ctx *) protolayer_iter_ctx_queue_t;
+
+/** Iterates through the specified `queue` and gets the sum of all payloads
+ * available in it. */
+size_t protolayer_queue_count_payload(protolayer_iter_ctx_queue_t *queue);
 
 /** Mandatory header members for any layer-specific data. */
 #define PROTOLAYER_DATA_HEADER() struct {\
@@ -392,6 +422,10 @@ typedef int (*protolayer_data_sess_init_cb)(struct protolayer_manager *manager,
                                             void *data,
                                             void *param);
 
+typedef int (*protolayer_iter_data_cb)(struct protolayer_manager *manager,
+                                       struct protolayer_iter_ctx *ctx,
+                                       void *data);
+
 /** Function type for (de)initialization callbacks of layers.
  *
  * `data` points to the layer-specific data struct.
@@ -400,6 +434,14 @@ typedef int (*protolayer_data_sess_init_cb)(struct protolayer_manager *manager,
  * initialization. */
 typedef int (*protolayer_data_cb)(struct protolayer_manager *manager,
                                   void *data);
+
+/** Function type for (de)initialization callbacks of DNS requests.
+ *
+ * `req` points to the request for initialization.
+ * `sess_data` points to layer-specific session data struct. */
+typedef void (*protolayer_request_cb)(struct protolayer_manager *manager,
+                                      struct kr_request *req,
+                                      void *sess_data);
 
 /** A collection of protocol layers and their layer-specific data, tied to a
  * session. The manager contains a sequence of protocol layers (determined by
@@ -470,11 +512,11 @@ struct protolayer_globals {
 	/** Called at the beginning of a layer sequence to initialize
 	 * layer-specific iteration data. Optional. The data is always
 	 * zero-initialized during iteration context initialization. */
-	protolayer_data_cb iter_init;
+	protolayer_iter_data_cb iter_init;
 
 	/** Called at the end of a layer sequence to deinitialize
 	 * layer-specific iteration data. Optional. */
-	protolayer_data_cb iter_deinit;
+	protolayer_iter_data_cb iter_deinit;
 
 	/** Strips the buffer of protocol-specific data. E.g. a HTTP layer
 	 * removes HTTP status and headers. Optional - iteration continues
@@ -493,6 +535,9 @@ struct protolayer_globals {
 	/** Processes events in the wrap order (bounced back by the session).
 	 * Optional - iteration continues automatically if this is NULL. */
 	protolayer_event_cb event_wrap;
+
+	/** Modifies the provided request for use with the layer. */
+	protolayer_request_cb request_init;
 };
 
 /** Global data about layered protocols. Mapped by `enum protolayer_protocol`.
@@ -644,6 +689,11 @@ struct session2 {
 	queue_t(struct qr_task *) waiting; /**< List of tasks waiting for
 	                                    * sending to upstream. */
 
+	/** Communication information. Typically written into by one of the
+	 * first layers facilitating transport protocol processing.
+	 * Zero-initialized by default. */
+	struct comm_info comm;
+
 	/** Managed buffer for data received by `io`. */
 	struct wire_buf wire_buf;
 
@@ -668,6 +718,10 @@ struct session2 {
 	/** If true, the session contains a stream-based protocol layer.
 	 * Set during protocol layer initialization by the stream-based layer. */
 	bool stream : 1;
+
+	/** If true, the session contains a HTTP protocol layer.
+	 * Set during protocol layer initialization by the HTTP layer. */
+	bool http : 1;
 
 	/** If true, a connection is established. Only applicable to sessions
 	 * using connection-based protocols. One of the stream-based protocol
@@ -873,6 +927,8 @@ void session2_event(struct session2 *s, enum protolayer_event_type type, void *b
  * `_UNWRAP` direction! */
 void session2_event_after(struct session2 *s, enum protolayer_protocol protocol,
                           enum protolayer_event_type type, void *baton);
+
+void session2_init_request(struct session2 *s, struct kr_request *req);
 
 /** Removes the specified request task from the session's tasklist. The session
  * must be outgoing. If the session is UDP, a signal to close is also sent to it. */

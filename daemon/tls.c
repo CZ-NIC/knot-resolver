@@ -23,7 +23,6 @@
 #include "daemon/tls.h"
 #include "daemon/worker.h"
 #include "daemon/session2.h"
-#include "lib/generic/queue.h"
 
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE (60*60*24*7)
 #define GNUTLS_PIN_MIN_VERSION  0x030400
@@ -42,6 +41,13 @@
 #define DEBUG_MSG(...)
 #endif
 
+static const gnutls_datum_t tls_grp_alpn[PROTOLAYER_GRP_COUNT] = {
+#define XX(cid, vid, name, alpn) [PROTOLAYER_GRP_##cid] = \
+	{ .data = (unsigned char *)alpn, .size = sizeof(alpn) - 1 },
+	PROTOLAYER_GRP_MAP(XX)
+#undef XX
+};
+
 typedef enum tls_client_hs_state {
 	TLS_HS_NOT_STARTED = 0,
 	TLS_HS_IN_PROGRESS,
@@ -50,18 +56,14 @@ typedef enum tls_client_hs_state {
 	TLS_HS_LAST
 } tls_hs_state_t;
 
-typedef int (*tls_handshake_cb) (struct session2 *session, int status);
-typedef queue_t(struct protolayer_iter_ctx *) pl_cb_ctx_queue_t;
-
 struct pl_tls_sess_data {
 	PROTOLAYER_DATA_HEADER();
 	bool client_side;
 	gnutls_session_t tls_session;
 	tls_hs_state_t handshake_state;
-	pl_cb_ctx_queue_t unwrap_queue;
-	pl_cb_ctx_queue_t wrap_queue;
+	protolayer_iter_ctx_queue_t unwrap_queue;
+	protolayer_iter_ctx_queue_t wrap_queue;
 	struct wire_buf unwrap_buf;
-	tls_handshake_cb handshake_cb;
 	size_t write_queue_size;
 	union {
 		struct tls_credentials *server_credentials;
@@ -96,34 +98,6 @@ static int kres_gnutls_set_priority(gnutls_session_t session) {
 	return err;
 }
 
-static size_t count_avail_payload(pl_cb_ctx_queue_t *queue)
-{
-	if (queue_len(*queue) == 0)
-		return 0;
-
-	size_t avail = 0;
-	queue_it_t(struct protolayer_iter_ctx *) it = queue_it_begin(*queue);
-	for (; !queue_it_finished(it); queue_it_next(it)) {
-		struct protolayer_iter_ctx *ctx = queue_it_val(it);
-		struct protolayer_payload *pld = &ctx->payload;
-		if (pld->type == PROTOLAYER_PAYLOAD_BUFFER) {
-			avail += pld->buffer.len;
-		} else if (pld->type == PROTOLAYER_PAYLOAD_IOVEC) {
-			for (int i = 0; i < pld->iovec.cnt; i++) {
-				avail += pld->iovec.iov[i].iov_len;
-			}
-		} else if (pld->type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
-			avail += wire_buf_data_length(pld->wire_buf);
-		} else if(!pld->type) {
-			continue;
-		} else {
-			kr_assert(false && "Invalid payload type");
-		}
-	}
-
-	return avail;
-}
-
 static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 {
 	struct pl_tls_sess_data *tls = h;
@@ -132,7 +106,7 @@ static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 		return -1;
 	}
 
-	size_t avail = count_avail_payload(&tls->unwrap_queue);
+	size_t avail = protolayer_queue_count_payload(&tls->unwrap_queue);
 	DEBUG_MSG("[%s] pull wanted: %zu avail: %zu\n",
 			tls->client_side ? "tls_client" : "tls",
 			len, avail);
@@ -154,7 +128,7 @@ static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 			memcpy(dest, pld->buffer.buf, to_copy);
 			dest += to_copy;
 			len -= to_copy;
-			pld->buffer.buf += to_copy;
+			pld->buffer.buf = (char *)pld->buffer.buf + to_copy;
 			pld->buffer.len -= to_copy;
 			transfer += to_copy;
 
@@ -223,7 +197,7 @@ static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 }
 
 struct kres_gnutls_push_ctx {
-	void *sess_data;
+	struct pl_tls_sess_data *sess_data;
 	struct iovec iov[];
 };
 
@@ -888,7 +862,7 @@ static int tls_pull_timeout_func(gnutls_transport_ptr_t h, unsigned int ms)
 		return -1;
 	}
 
-	size_t avail = count_avail_payload(&tls->unwrap_queue);
+	size_t avail = protolayer_queue_count_payload(&tls->unwrap_queue);
 	DEBUG_MSG("[%s] timeout check: available: %zu\n",
 		  tls->client_side ? "tls_client" : "tls", avail);
 	if (!avail) {
@@ -992,6 +966,23 @@ static int pl_tls_sess_server_init(struct protolayer_manager *manager,
 	if (the_network->tls_session_ticket_ctx) {
 		tls_session_ticket_enable(the_network->tls_session_ticket_ctx,
 					  tls->tls_session);
+	}
+
+	const gnutls_datum_t *alpn = &tls_grp_alpn[manager->grp];
+	if (alpn->size) { /* ALPN is a non-empty string */
+		flags = 0;
+#if GNUTLS_VERSION_NUMBER >= 0x030500
+		/* Mandatory ALPN means the protocol must match if and
+		 * only if ALPN extension is used by the client. */
+		flags |= GNUTLS_ALPN_MANDATORY;
+#endif
+
+		ret = gnutls_alpn_set_protocols(tls->tls_session, alpn, 1, flags);
+		if (ret != GNUTLS_E_SUCCESS) {
+			kr_log_error(TLS, "gnutls_alpn_set_protocols(): %s (%d)\n", gnutls_strerror_name(ret), ret);
+			pl_tls_sess_data_deinit(tls);
+			return ret;
+		}
 	}
 
 	return kr_ok();
@@ -1098,7 +1089,7 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 				wire_buf_free_space(&tls->unwrap_buf),
 				wire_buf_free_space_length(&tls->unwrap_buf));
 		if (count == GNUTLS_E_AGAIN) {
-			if (count_avail_payload(&tls->unwrap_queue) == 0) {
+			if (protolayer_queue_count_payload(&tls->unwrap_queue) == 0) {
 				/* See https://www.gnutls.org/manual/html_node/Asynchronous-operation.html */
 				break;
 			}
@@ -1152,7 +1143,7 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 	}
 
 	/* Here all data must be consumed. */
-	while (count_avail_payload(&tls->unwrap_queue) > 0) {
+	while (protolayer_queue_count_payload(&tls->unwrap_queue) > 0) {
 		/* Something went wrong, better return error.
 		 * This is most probably due to gnutls_record_recv() did not
 		 * consume all available network data by calling kres_gnutls_pull().

@@ -22,9 +22,10 @@ kresd_src = files([
   'worker.c',
   'zimport.c',
 ])
-#if nghttp2.found()
-#  kresd_src += files(['http.c'])
-#endif
+
+if nghttp2.found()
+  kresd_src += files(['http.c'])
+endif
 
 c_src_lint += kresd_src
 
@@ -50,7 +51,7 @@ kresd_deps = [
   gnutls,
   libsystemd,
   capng,
-#  nghttp2,
+  nghttp2,
   malloc,
 ]
 

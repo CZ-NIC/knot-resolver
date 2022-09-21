@@ -134,8 +134,18 @@ static int family_to_freebind_option(sa_family_t sa_family, int *level, int *nam
 struct pl_udp_iter_data {
 	PROTOLAYER_DATA_HEADER();
 	struct proxy_result proxy;
+	struct comm_info comm;
 	bool has_proxy;
 };
+
+static int pl_udp_iter_init(struct protolayer_manager *manager,
+                            struct protolayer_iter_ctx *ctx,
+                            void *iter_data)
+{
+	struct pl_udp_iter_data *udp = iter_data;
+	ctx->comm = &udp->comm;
+	return kr_ok();
+}
 
 static enum protolayer_iter_cb_result pl_udp_unwrap(
 		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
@@ -151,7 +161,7 @@ static enum protolayer_iter_cb_result pl_udp_unwrap(
 
 	char *data = ctx->payload.buffer.buf;
 	ssize_t data_len = ctx->payload.buffer.len;
-	struct comm_info *comm = &ctx->comm;
+	struct comm_info *comm = ctx->comm;
 	comm->comm_addr = ctx->target;
 	comm->src_addr = ctx->target;
 	if (!s->outgoing && proxy_header_present(data, data_len)) {
@@ -274,7 +284,7 @@ static enum protolayer_iter_cb_result pl_tcp_unwrap(
 
 	char *data = wire_buf_data(ctx->payload.wire_buf); /* layer's or session's wirebuf */
 	ssize_t data_len = wire_buf_data_length(ctx->payload.wire_buf);
-	struct comm_info *comm = &ctx->comm;
+	struct comm_info *comm = ctx->comm;
 	comm->src_addr = peer;
 	comm->comm_addr = peer;
 	comm->dst_addr = NULL;
@@ -349,6 +359,7 @@ void io_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_UDP] = (struct protolayer_globals){
 		.iter_size = sizeof(struct pl_udp_iter_data),
+		.iter_init = pl_udp_iter_init,
 		.unwrap = pl_udp_unwrap,
 		.event_wrap = pl_udp_event_wrap,
 	};
@@ -496,96 +507,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	}
 
 	session2_unwrap(s, protolayer_wire_buf(&s->wire_buf), NULL, NULL, NULL);
-
-//	ssize_t consumed = 0;
-//	if (session_flags(s)->has_tls) {
-//		/* buf->base points to start of the tls receive buffer.
-//		   Decode data free space in session wire buffer. */
-//		consumed = tls_process_input_data(s, data, data_len);
-//		if (consumed < 0) {
-//			if (kr_log_is_debug(IO, NULL)) {
-//				char *peer_str = kr_straddr(src_addr);
-//				kr_log_debug(IO, "=> connection to '%s': "
-//					       "error processing TLS data, close\n",
-//					       peer_str ? peer_str : "");
-//			}
-//			worker_end_tcp(s);
-//			return;
-//		} else if (consumed == 0) {
-//			return;
-//		}
-//		data = session_wirebuf_get_free_start(s);
-//		data_len = consumed;
-//	}
-//#if ENABLE_DOH2
-//	int streaming = 1;
-//	if (session_flags(s)->has_http) {
-//		streaming = http_process_input_data(s, data, data_len,
-//				&consumed);
-//		if (streaming < 0) {
-//			if (kr_log_is_debug(IO, NULL)) {
-//				char *peer_str = kr_straddr(src_addr);
-//				kr_log_debug(IO, "=> connection to '%s': "
-//				       "error processing HTTP data, close\n",
-//				       peer_str ? peer_str : "");
-//			}
-//			worker_end_tcp(s);
-//			return;
-//		}
-//		if (consumed == 0) {
-//			return;
-//		}
-//		data = session_wirebuf_get_free_start(s);
-//		data_len = consumed;
-//	}
-//#endif
-//
-//	/* data points to start of the free space in session wire buffer.
-//	   Simple increase internal counter. */
-//	consumed = session_wirebuf_consume(s, data, data_len);
-//	kr_assert(consumed == data_len);
-//
-//	struct io_comm_data comm = {
-//		.src_addr = src_addr,
-//		.comm_addr = session_get_peer(s),
-//		.dst_addr = dst_addr,
-//		.proxy = session_proxy_get(s)
-//	};
-//	int ret = session_wirebuf_process(s, &comm);
-//	if (ret < 0) {
-//		/* An error has occurred, close the session. */
-//		worker_end_tcp(s);
-//	}
-//	session_wirebuf_compress(s);
-//	mp_flush(the_worker->pkt_pool.ctx);
-//#if ENABLE_DOH2
-//	if (session_flags(s)->has_http && streaming == 0 && ret == 0) {
-//		ret = http_send_status(s, HTTP_STATUS_BAD_REQUEST);
-//		if (ret) {
-//			/* An error has occurred, close the session. */
-//			worker_end_tcp(s);
-//		}
-//	}
-//#endif
 }
-
-/* TODO: http */
-//#if ENABLE_DOH2
-//static ssize_t tls_send(const uint8_t *buf, const size_t len, struct session *session)
-//{
-//	struct tls_ctx *ctx = session_tls_get_server_ctx(session);
-//	ssize_t sent = 0;
-//	kr_require(ctx);
-//
-//	sent = gnutls_record_send(ctx->c.tls_session, buf, len);
-//	if (sent < 0) {
-//		kr_log_debug(DOH, "gnutls_record_send failed: %s (%zd)\n",
-//			       gnutls_strerror_name(sent), sent);
-//		return kr_error(EIO);
-//	}
-//	return sent;
-//}
-//#endif
 
 static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp)
 {
@@ -614,7 +536,6 @@ static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp
 	/* struct session was allocated \ borrowed from memory pool. */
 	struct session2 *s = client->data;
 	kr_require(s->outgoing == false);
-//	kr_require(s->secure == tls); /* TODO */
 
 	if (uv_accept(master, (uv_stream_t *)client) != 0) {
 		/* close session, close underlying uv handles and
@@ -645,62 +566,7 @@ static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp
 	 * is idle and should be terminated, this is an educated guess. */
 
 	uint64_t idle_in_timeout = the_network->tcp.in_idle_timeout;
-
 	uint64_t timeout = KR_CONN_RTT_MAX / 2;
-	/* TODO: tls, http */
-//	if (tls) {
-//		timeout += TLS_MAX_HANDSHAKE_TIME;
-//		struct tls_ctx *ctx = session_tls_get_server_ctx(s);
-//		if (!ctx) {
-//			ctx = tls_new();
-//			if (!ctx) {
-//				session_close(s);
-//				return;
-//			}
-//			ctx->c.session = s;
-//			ctx->c.handshake_state = TLS_HS_IN_PROGRESS;
-//
-//			/* Configure ALPN. */
-//			gnutls_datum_t proto;
-//			if (!http) {
-//				proto.data = (unsigned char *)"dot";
-//				proto.size = 3;
-//			} else {
-//				proto.data = (unsigned char *)"h2";
-//				proto.size = 2;
-//			}
-//			unsigned int flags = 0;
-//#if GNUTLS_VERSION_NUMBER >= 0x030500
-//			/* Mandatory ALPN means the protocol must match if and
-//			 * only if ALPN extension is used by the client. */
-//			flags |= GNUTLS_ALPN_MANDATORY;
-//#endif
-//			ret = gnutls_alpn_set_protocols(ctx->c.tls_session, &proto, 1, flags);
-//			if (ret != GNUTLS_E_SUCCESS) {
-//				session_close(s);
-//				return;
-//			}
-//
-//			session_tls_set_server_ctx(s, ctx);
-//		}
-//	}
-//#if ENABLE_DOH2
-//	if (http) {
-//		struct http_ctx *ctx = session_http_get_server_ctx(s);
-//		if (!ctx) {
-//			if (!tls) {  /* Plain HTTP is not supported. */
-//				session_close(s);
-//				return;
-//			}
-//			ctx = http_new(s, tls_send);
-//			if (!ctx) {
-//				session_close(s);
-//				return;
-//			}
-//			session_http_set_server_ctx(s, ctx);
-//		}
-//	}
-//#endif
 	session2_event(s, PROTOLAYER_EVENT_CONNECT, NULL);
 	session2_timer_start(s, timeout, idle_in_timeout);
 	io_start_read((uv_handle_t *)client);
