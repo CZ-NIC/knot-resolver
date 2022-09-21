@@ -1,63 +1,48 @@
 import argparse
 import json
-from typing import Optional, Tuple, Type
+from enum import Enum
+from typing import List, Optional, Tuple, Type
 
 import yaml
 from typing_extensions import Literal
 
 from knot_resolver_manager.cli.command import Command, CommandArgs, register_command
+from knot_resolver_manager.utils.modeling import try_to_parse
 from knot_resolver_manager.utils.requests import request
 
 
-class Operations:
+class Operations(Enum):
     SET = 0
     DELETE = 1
     GET = 2
 
 
-class Formats:
+class Formats(Enum):
     JSON = 0
     YAML = 1
 
 
-Methods = Literal["POST", "GET", "DELETE"]
-
-
-def _method_map(op: Operations) -> Methods:
-    if op == Operations.SET:
+def operation_to_method(operation: Operations) -> Literal["POST", "GET", "DELETE"]:
+    if operation == Operations.SET:
         return "POST"
-    elif op == Operations.DELETE:
+    elif operation == Operations.DELETE:
         return "DELETE"
-    elif op == Operations.GET:
-        return "GET"
-    else:
-        pass
+
+    return "GET"
 
 
-def _format(data: Optional[str], req_format: Formats) -> Optional[str]:
-    if not data:
-        return None
+def reformat(data: str, req_format: Formats) -> str:
+    dict = try_to_parse(data).to_raw()
 
-    dic = {}
-    try:
-        dic = json.loads(data)
-    except json.JSONDecodeError:
-        try:
-            dic = yaml.load(data)
-        except yaml.YAMLError:
-            return data
-
-    if req_format == Formats.JSON:
-        return json.dumps(dic, indent=4)
-    elif req_format == Formats.YAML:
-        return yaml.dump(dic, indent=4)
-    return None
+    if req_format == Formats.YAML:
+        return yaml.dump(dict, indent=4)
+    return json.dumps(dict, indent=4)
 
 
 @register_command
 class ConfigCommand(Command):
-    def __init__(self, namespace: argparse.Namespace) -> None:
-        super().__init__(namespace)
+    def __init__(self, namespace: argparse.Namespace, unknown_args: List[str]) -> None:
+        super().__init__(namespace, unknown_args)
         self.path: str = str(namespace.path)
         self.value_or_file: Optional[str] = namespace.value_or_file
         self.operation: Operations = namespace.operation
@@ -66,9 +51,9 @@ class ConfigCommand(Command):
 
     @staticmethod
     def register_args_subparser(
-        parser: "argparse._SubParsersAction[argparse.ArgumentParser]",
+        subparser: argparse._SubParsersAction[argparse.ArgumentParser],
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        config = parser.add_parser("config", help="change configuration of a running resolver")
+        config = subparser.add_parser("config", help="change configuration of a running resolver")
         config.add_argument(
             "path",
             type=str,
@@ -123,13 +108,17 @@ class ConfigCommand(Command):
 
         return config, ConfigCommand
 
+    @staticmethod
+    def completion(args: List[str], parser: argparse.ArgumentParser) -> List[str]:
+        return []
+
     def run(self, args: CommandArgs) -> None:
         if not self.path.startswith("/"):
             self.path = "/" + self.path
 
         new_config = None
         url = f"{args.socket}/v1/config{self.path}"
-        method = _method_map(self.operation)
+        method = operation_to_method(self.operation)
 
         if self.operation == Operations.SET:
             # use STDIN also when value_or_file is not specified
@@ -142,12 +131,12 @@ class ConfigCommand(Command):
                 except FileNotFoundError:
                     new_config = self.value_or_file
 
-        response = request(method, url, _format(new_config, Formats.JSON))
+        response = request(method, url, reformat(new_config, Formats.JSON) if new_config else None)
         print(f"status: {response.status}")
 
         if self.operation == Operations.GET and self.value_or_file:
             with open(self.value_or_file, "w") as f:
-                f.write(_format(response.body, self.format))
+                f.write(reformat(response.body, self.format))
             print(f"response body saved to: {self.value_or_file}")
         else:
-            print(_format(response.body, self.format))
+            print(reformat(response.body, self.format))

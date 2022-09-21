@@ -1,18 +1,26 @@
 import argparse
+from typing import List
 
 from knot_resolver_manager.cli.command import CommandArgs
 
 
 class Kresctl:
-    def __init__(self, namespace: argparse.Namespace, parser: argparse.ArgumentParser, prompt: str = "kresctl") -> None:
+    def __init__(
+        self,
+        namespace: argparse.Namespace,
+        unknown_args: List[str],
+        parser: argparse.ArgumentParser,
+        prompt: str = "kresctl",
+    ) -> None:
         self.path = None
         self.prompt = prompt
         self.namespace = namespace
+        self.unknown_args = unknown_args
         self.parser = parser
 
     def execute(self):
         cmd_args = CommandArgs(self.namespace, self.parser)
-        command = self.namespace.command(self.namespace)
+        command = self.namespace.command(self.namespace, self.unknown_args)
         command.run(cmd_args)
 
     def _prompt_format(self) -> str:

@@ -41,8 +41,8 @@ def main() -> None:
     autoimport_commands()
     parser = create_main_argument_parser()
     install_commands_parsers(parser)
-    namespace = parser.parse_args()
-    kresctl = Kresctl(namespace, parser)
+    namespace, unknown_args = parser.parse_known_args()
+    kresctl = Kresctl(namespace, unknown_args, parser)
 
     if namespace.interactive or len(vars(namespace)) == 2:
         kresctl.interactive()
