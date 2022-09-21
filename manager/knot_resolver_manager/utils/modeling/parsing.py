@@ -98,7 +98,7 @@ def parse_json(data: str) -> Any:
     return _Format.JSON.parse_to_dict(data)
 
 
-def try_to_parse(data: str) -> ParsedTree:
+def try_to_parse(data: str) -> Any:
     """Attempt to parse the data as a YAML or JSON string."""
     try:
         return parse_yaml(data)
