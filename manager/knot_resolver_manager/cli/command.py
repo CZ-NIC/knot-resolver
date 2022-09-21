@@ -38,14 +38,19 @@ class Command(ABC):
     @staticmethod
     @abstractmethod
     def register_args_subparser(
-        parser: argparse.ArgumentParser,
+        subparser: argparse._SubParsersAction[argparse.ArgumentParser],
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
         raise NotImplementedError()
 
     @abstractmethod
-    def __init__(self, namespace: argparse.Namespace) -> None:
+    def __init__(self, namespace: argparse.Namespace, unknown_args: List[str]) -> None:
         super().__init__()
 
     @abstractmethod
     def run(self, args: CommandArgs) -> None:
+        raise NotImplementedError()
+
+    @staticmethod
+    @abstractmethod
+    def completion(args: List[str], parser: argparse.ArgumentParser) -> List[str]:
         raise NotImplementedError()

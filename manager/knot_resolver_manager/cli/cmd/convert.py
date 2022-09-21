@@ -1,46 +1,32 @@
 import argparse
-import json
-from typing import Optional, Tuple, Type
-
-import yaml
+from typing import List, Optional, Tuple, Type
 
 from knot_resolver_manager.cli.command import Command, CommandArgs, register_command
 from knot_resolver_manager.datamodel import KresConfig
-from knot_resolver_manager.utils.modeling.parsing import ParsedTree, parse_json, parse_yaml
-
-
-def _parse_data(input: str) -> Optional[ParsedTree]:
-    try:
-        return parse_yaml(input)
-    except yaml.YAMLError:
-        print(f"failed to parse input as YAML")
-        try:
-            return parse_json(input)
-        except json.JSONDecodeError:
-            print(f"failed to parse input as JSON")
-            return None
+from knot_resolver_manager.utils.modeling import try_to_parse
+from knot_resolver_manager.utils.modeling.exceptions import DataParsingError
 
 
 @register_command
 class ConvertCommand(Command):
-    def __init__(self, namespace: argparse.Namespace) -> None:
-        super().__init__(namespace)
+    def __init__(self, namespace: argparse.Namespace, unknown_args: List[str]) -> None:
+        super().__init__(namespace, unknown_args)
         self.input_file: str = namespace.input_file
         self.output_file: Optional[str] = namespace.output_file
 
     @staticmethod
     def register_args_subparser(
-        parser: "argparse._SubParsersAction[argparse.ArgumentParser]",
+        subparser: argparse._SubParsersAction[argparse.ArgumentParser],
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        config = parser.add_parser("convert", help="convert JSON/YAML configuration to Lua script")
-        config.add_argument(
+        convert = subparser.add_parser("convert", help="convert JSON/YAML configuration to Lua script")
+        convert.add_argument(
             "input_file",
             type=str,
             help="JSON/YAML configuration input file",
         )
 
-        config.add_argument("--stdin", help="read new config value on stdin", action="store_true", default=False)
-        config.add_argument(
+        convert.add_argument("--stdin", help="read new config value on stdin", action="store_true", default=False)
+        convert.add_argument(
             "output_file",
             type=str,
             nargs="?",
@@ -48,15 +34,21 @@ class ConvertCommand(Command):
             default=None,
         )
 
-        return config, ConvertCommand
+        return convert, ConvertCommand
+
+    @staticmethod
+    def completion(args: List[str], parser: argparse.ArgumentParser) -> List[str]:
+        return []
 
     def run(self, args: CommandArgs) -> None:
 
         with open(self.input_file, "r") as f:
             data = f.read()
 
-        parsed = _parse_data(data)
-        if not parsed:
+        try:
+            parsed = try_to_parse(data)
+        except DataParsingError as e:
+            print(e)
             return
 
         lua = KresConfig(parsed).render_lua()

@@ -1,5 +1,5 @@
 import argparse
-from typing import Optional, Tuple, Type
+from typing import List, Optional, Tuple, Type
 
 from knot_resolver_manager.cli.command import Command, CommandArgs, register_command
 from knot_resolver_manager.utils.requests import request
@@ -7,18 +7,22 @@ from knot_resolver_manager.utils.requests import request
 
 @register_command
 class MetricsCommand(Command):
-    def __init__(self, namespace: argparse.Namespace) -> None:
+    def __init__(self, namespace: argparse.Namespace, unknown_args: List[str]) -> None:
         self.file: Optional[str] = namespace.file
 
-        super().__init__(namespace)
+        super().__init__(namespace, unknown_args)
 
     @staticmethod
     def register_args_subparser(
-        parser: "argparse._SubParsersAction[argparse.ArgumentParser]",
+        subparser: argparse._SubParsersAction[argparse.ArgumentParser],
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        metrics = parser.add_parser("metrics", help="get prometheus metrics data")
+        metrics = subparser.add_parser("metrics", help="get prometheus metrics data")
         metrics.add_argument("file", help="optional, file to export metrics to", nargs="?", default=None)
         return metrics, MetricsCommand
+
+    @staticmethod
+    def completion(args: List[str], parser: argparse.ArgumentParser) -> List[str]:
+        return []
 
     def run(self, args: CommandArgs) -> None:
         url = f"{args.socket}/metrics"
