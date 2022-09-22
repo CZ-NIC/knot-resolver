@@ -1938,40 +1938,21 @@ struct pl_dns_stream_iter_data {
 	} sent;
 };
 
-static void pl_dns_stream_sess_init_common(struct session2 *session,
-                                           struct pl_dns_stream_sess_data *stream,
-                                           bool single)
+static int pl_dns_stream_sess_init(struct protolayer_manager *manager,
+                                         void *sess_data, void *param)
 {
-	session->stream = true;
-	*stream = (struct pl_dns_stream_sess_data){
-		.single = single
-	};
-}
-
-static int pl_dns_mstream_sess_init(struct protolayer_manager *manager,
-                                    void *sess_data,
-                                    void *param)
-{
-	struct pl_dns_stream_sess_data *stream = sess_data;
-	pl_dns_stream_sess_init_common(manager->session, stream, false);
+	/* _UNSIZED_STREAM and _MULTI_STREAM - don't forget to split if needed
+	 * at some point */
+	manager->session->stream = true;
 	return kr_ok();
 }
 
-static int pl_dns_sstream_sess_init(struct protolayer_manager *manager,
-                                    void *sess_data,
-                                    void *param)
+static int pl_dns_single_stream_sess_init(struct protolayer_manager *manager,
+                                          void *sess_data, void *param)
 {
+	manager->session->stream = true;
 	struct pl_dns_stream_sess_data *stream = sess_data;
-	pl_dns_stream_sess_init_common(manager->session, stream, true);
-	return kr_ok();
-}
-
-static int pl_dns_stream_iter_init(struct protolayer_manager *manager,
-                                   struct protolayer_iter_ctx *ctx,
-                                   void *iter_data)
-{
-	struct pl_dns_stream_iter_data *stream = iter_data;
-	*stream = (struct pl_dns_stream_iter_data){0};
+	stream->single = true;
 	return kr_ok();
 }
 
@@ -2320,20 +2301,24 @@ int worker_init(void)
 		.unwrap = pl_dns_dgram_unwrap,
 		.event_unwrap = pl_dns_dgram_event_unwrap
 	};
+	protolayer_globals[PROTOLAYER_DNS_UNSIZED_STREAM] = (struct protolayer_globals){
+		.sess_init = pl_dns_stream_sess_init,
+		.unwrap = pl_dns_dgram_unwrap,
+		.event_unwrap = pl_dns_stream_event_unwrap
+	};
 	const struct protolayer_globals stream_common = {
 		.sess_size = sizeof(struct pl_dns_stream_sess_data),
 		.sess_init = NULL, /* replaced in specific layers below */
 		.iter_size = sizeof(struct pl_dns_stream_iter_data),
-		.iter_init = pl_dns_stream_iter_init,
 		.iter_deinit = pl_dns_stream_iter_deinit,
 		.unwrap = pl_dns_stream_unwrap,
 		.wrap = pl_dns_stream_wrap,
 		.event_unwrap = pl_dns_stream_event_unwrap
 	};
-	protolayer_globals[PROTOLAYER_DNS_MSTREAM] = stream_common;
-	protolayer_globals[PROTOLAYER_DNS_MSTREAM].sess_init = pl_dns_mstream_sess_init;
-	protolayer_globals[PROTOLAYER_DNS_SSTREAM] = stream_common;
-	protolayer_globals[PROTOLAYER_DNS_SSTREAM].sess_init = pl_dns_sstream_sess_init;
+	protolayer_globals[PROTOLAYER_DNS_MULTI_STREAM] = stream_common;
+	protolayer_globals[PROTOLAYER_DNS_MULTI_STREAM].sess_init = pl_dns_stream_sess_init;
+	protolayer_globals[PROTOLAYER_DNS_SINGLE_STREAM] = stream_common;
+	protolayer_globals[PROTOLAYER_DNS_SINGLE_STREAM].sess_init = pl_dns_single_stream_sess_init;
 
 	/* Create main worker. */
 	the_worker = &the_worker_value;

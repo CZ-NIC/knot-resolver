@@ -82,19 +82,21 @@ struct comm_info {
  * processed. See `PROTOLAYER_GRP_MAP` below for more details. */
 #define PROTOLAYER_PROTOCOL_MAP(XX) \
 	/* General transport protocols */\
-	XX(UDP) \
-	XX(TCP) \
-	XX(TLS) \
-	XX(HTTP) \
-	\
-	/* QUIC (not yet implemented) */\
-	XX(UDP_TO_QCONN)\
-	XX(QCONN_TO_QSTREAM)\
+	XX(UDP)\
+	XX(TCP)\
+	XX(TLS)\
+	XX(HTTP)\
 	\
 	/* DNS (`worker`) */\
-	XX(DNS_DGRAM)\
-	XX(DNS_MSTREAM)\
-	XX(DNS_SSTREAM)
+	XX(DNS_DGRAM) /**< Packets WITHOUT prepended size, one per (un)wrap,
+	                * limited to UDP sizes, multiple sources (single
+	                * session for multiple clients). */\
+	XX(DNS_UNSIZED_STREAM) /**< Singular packet WITHOUT prepended size, one
+	                         * per (un)wrap, no UDP limits, single source. */\
+	XX(DNS_MULTI_STREAM) /**< Multiple packets WITH prepended sizes in a
+	                       * stream (may span multiple (un)wraps). */\
+	XX(DNS_SINGLE_STREAM) /**< Singular packet WITH prepended size in a
+	                        * stream (may span multiple (un)wraps). */
 
 /** The identifiers of protocol layer types. */
 enum protolayer_protocol {

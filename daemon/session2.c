@@ -37,14 +37,14 @@ static enum protolayer_protocol protolayer_grp_doudp[] = {
 
 static enum protolayer_protocol protolayer_grp_dotcp[] = {
 	PROTOLAYER_TCP,
-	PROTOLAYER_DNS_MSTREAM,
+	PROTOLAYER_DNS_MULTI_STREAM,
 	PROTOLAYER_NULL
 };
 
 static enum protolayer_protocol protolayer_grp_dot[] = {
 	PROTOLAYER_TCP,
 	PROTOLAYER_TLS,
-	PROTOLAYER_DNS_MSTREAM,
+	PROTOLAYER_DNS_MULTI_STREAM,
 	PROTOLAYER_NULL
 };
 
@@ -52,7 +52,7 @@ static enum protolayer_protocol protolayer_grp_doh[] = {
 	PROTOLAYER_TCP,
 	PROTOLAYER_TLS,
 	PROTOLAYER_HTTP,
-	PROTOLAYER_DNS_DGRAM,
+	PROTOLAYER_DNS_UNSIZED_STREAM,
 	PROTOLAYER_NULL
 };
 
