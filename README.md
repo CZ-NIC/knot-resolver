@@ -3,6 +3,7 @@
 [![Build Status](https://gitlab.nic.cz/knot/knot-resolver/badges/nightly/pipeline.svg?x)](https://gitlab.nic.cz/knot/knot-resolver/commits/nightly)
 [![Coverage Status](https://gitlab.nic.cz/knot/knot-resolver/badges/nightly/coverage.svg?x)](https://knot.pages.nic.cz/knot-resolver/)
 [![Documentation Status](https://readthedocs.org/projects/knot-resolver/badge/?version=latest)](https://readthedocs.org/projects/knot-resolver/?badge=latest)
+[![Packaging status](https://repology.org/badge/tiny-repos/knot-resolver.svg)](https://repology.org/project/knot-resolver/versions)
 
 Knot Resolver is a caching full resolver implementation written in C and [LuaJIT][luajit], both a resolver library and a daemon. The core architecture is tiny and efficient, and provides a foundation and
 a state-machine like API for extensions. There are three modules built-in - *iterator*, *validator*, *cache*, and a few more are loaded by default. Most of the [rich features](https://knot-resolver.readthedocs.io/en/latest/config-overview.html) are written in Lua(JIT) and C. Batteries are included, but optional.
@@ -25,12 +26,13 @@ to add this repository to your system.
 
 Knot Resolver is also available from the following distributions' repositories.
 
-* [Fedora and Fedora EPEL](https://apps.fedoraproject.org/packages/knot-resolver)
+* [Fedora and Fedora EPEL](https://src.fedoraproject.org/rpms/knot-resolver)
 * [Debian stable](https://packages.debian.org/stable/knot-resolver),
   [Debian testing](https://packages.debian.org/testing/knot-resolver),
   [Debian unstable](https://packages.debian.org/sid/knot-resolver)
-* [Ubuntu](https://packages.ubuntu.com/bionic/knot-resolver)
+* [Ubuntu](https://packages.ubuntu.com/jammy/knot-resolver)
 * [Arch Linux](https://archlinux.org/packages/community/x86_64/knot-resolver/)
+* [Alpine Linux](https://pkgs.alpinelinux.org/packages?name=knot-resolver)
 
 ### Building from sources
 

@@ -778,7 +778,7 @@ static int http_send_response(struct http_ctx *ctx, int32_t stream_id,
 	if (likely(status == HTTP_STATUS_OK)) {
 		push_nv(&hdrs, MAKE_STATIC_NV(":status", "200"));
 	} else {
-		int status_len = asprintf(&status_str, "%" PRIu16, status);
+		int status_len = asprintf(&status_str, "%d", (int)status);
 		kr_require(status_len >= 0);
 		push_nv(&hdrs, MAKE_STATIC_KEY_NV(":status", status_str, status_len));
 	}

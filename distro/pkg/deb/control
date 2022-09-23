@@ -2,8 +2,6 @@ Source: knot-resolver
 Section: net
 Priority: optional
 Maintainer: Knot Resolver <knot-resolver@labs.nic.cz>
-Uploaders:
- Tomas Krizek <tomas.krizek@nic.cz>
 Build-Depends:
  debhelper (>= 9~),
  dh-python,

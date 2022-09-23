@@ -187,6 +187,8 @@ static int update_nsaddr(const knot_rrset_t *rr, struct kr_query *query, int *gl
 	return KR_STATE_CONSUME;
 }
 
+enum { GLUE_COUNT_THROTTLE = 26 };
+
 /** @internal From \a pkt, fetch glue records for name \a ns, and update the cut etc.
  *
  * \param glue_cnt the number of accepted addresses (to be incremented)
@@ -223,6 +225,10 @@ static void fetch_glue(knot_pkt_t *pkt, const knot_dname_t *ns, bool in_bailiwic
 				continue;
 			}
 			(void) update_nsaddr(rr, req->current_query, glue_cnt);
+			/* If we reach limit on total glue addresses,
+			 * we only load the first one per NS name (the one just above). */
+			if (*glue_cnt > GLUE_COUNT_THROTTLE)
+				break;
 		}
 	}
 }
@@ -425,6 +431,7 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 	const knot_dname_t *current_zone_cut = qry->zone_cut.name;
 	bool ns_record_exists = false;
 	int glue_cnt = 0;
+	int ns_count = 0;
 	/* Update zone cut information. */
 	for (unsigned i = 0; i < ns->count; ++i) {
 		const knot_rrset_t *rr = knot_pkt_rr(ns, i);
@@ -435,6 +442,11 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 			case KR_STATE_DONE: result = state; break;
 			case KR_STATE_FAIL: return state; break;
 			default:              /* continue */ break;
+			}
+
+			if (++ns_count >= 13) {
+				VERBOSE_MSG("<= authority: many glue NSs, skipping the rest\n");
+				break;
 			}
 		} else if (rr->type == KNOT_RRTYPE_SOA
 			   && knot_dname_in_bailiwick(rr->owner, qry->zone_cut.name) > 0) {
@@ -465,6 +477,9 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 
 	if (glue_cnt) {
 		VERBOSE_MSG("<= loaded %d glue addresses\n", glue_cnt);
+	}
+	if (glue_cnt > GLUE_COUNT_THROTTLE) {
+		VERBOSE_MSG("<= (some may have been omitted due to being too many)\n");
 	}
 
 
