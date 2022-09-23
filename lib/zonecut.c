@@ -282,6 +282,7 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut)
 
 /** Fetch address for zone cut.  Any rank is accepted (i.e. glue as well). */
 static addrset_info_t fetch_addr(pack_t *addrs, const knot_dname_t *ns, uint16_t rrtype,
+				 int *addr_budget,
 				 knot_mm_t *mm_pool, const struct kr_query *qry)
 // LATER(optim.): excessive data copying
 {
@@ -313,6 +314,12 @@ static addrset_info_t fetch_addr(pack_t *addrs, const knot_dname_t *ns, uint16_t
 			KNOT_CLASS_IN, new_ttl);
 	if (kr_cache_materialize(&cached_rr.rrs, &peek, mm_pool) < 0) {
 		return AI_UNKNOWN;
+	}
+
+	*addr_budget -= cached_rr.rrs.count - 1;
+	if (*addr_budget < 0) {
+		cached_rr.rrs.count += *addr_budget;
+		*addr_budget = 0;
 	}
 
 	/* Reserve memory in *addrs.  Implementation detail:
@@ -380,6 +387,22 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 		return ret;
 	}
 
+	/* Consider at most 13 first NSs (like root).  It's a trivial approach
+	 * to limit our resources when choosing NSs.  Otherwise DoS might be viable.
+	 * We're not aware of any reasonable use case for having many NSs. */
+	if (ns_rds.count > 13) {
+		if (kr_log_is_debug_qry(ZCUT, qry)) {
+			auto_free char *name_txt = kr_dname_text(name);
+			VERBOSE_MSG(qry, "NS %s too large, reducing from %d names\n",
+					name_txt, (int)ns_rds.count);
+		}
+		ns_rds.count = 13;
+	}
+	/* Also trivially limit the total address count:
+	 * first A and first AAAA are for free per NS,
+	 * but the rest get a shared small limit and get skipped if exhausted. */
+	int addr_budget = 8;
+
 	/* Insert name servers for this zone cut, addresses will be looked up
 	 * on-demand (either from cache or iteratively) */
 	bool all_bad = true; /**< All NSs (seen so far) are in a bad state. */
@@ -401,8 +424,10 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 		addrset_info_t infos[2];
 
 		/* Fetch NS reputation and decide whether to prefetch A/AAAA records. */
-		infos[0] = fetch_addr(*pack, ns_name, KNOT_RRTYPE_A, cut->pool, qry);
-		infos[1] = fetch_addr(*pack, ns_name, KNOT_RRTYPE_AAAA, cut->pool, qry);
+		infos[0] = fetch_addr(*pack, ns_name, KNOT_RRTYPE_A, &addr_budget,
+					cut->pool, qry);
+		infos[1] = fetch_addr(*pack, ns_name, KNOT_RRTYPE_AAAA, &addr_budget,
+					cut->pool, qry);
 
 		#if 0 /* rather unlikely to be useful unless changing some zcut code */
 		if (kr_log_is_debug_qry(ZCUT, qry)) {
@@ -448,6 +473,14 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 		VERBOSE_MSG(qry, "cut %s: all NSs bad, count = %d\n",
 				name_txt, (int)ns_rds.count);
 	}
+
+	kr_assert(addr_budget >= 0);
+	if (addr_budget <= 0 && kr_log_is_debug_qry(ZCUT, qry)) {
+		auto_free char *name_txt = kr_dname_text(name);
+		VERBOSE_MSG(qry, "NS %s have too many addresses together, reduced\n",
+				name_txt);
+	}
+
 	knot_rdataset_clear(&ns_rds, cut->pool);
 	return all_bad ? ELOOP : kr_ok();
 }

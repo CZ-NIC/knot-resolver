@@ -9,7 +9,6 @@
 #include <libknot/codes.h>
 
 #include "lib/selection.h"
-#include "lib/cache/api.h"
 #include "lib/zonecut.h"
 
 /** Query flags */

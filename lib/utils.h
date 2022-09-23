@@ -405,13 +405,6 @@ static inline bool kr_sockaddr_link_local(const struct sockaddr *addr)
 	return kr_bitcmp((char *) ip6->sin6_addr.s6_addr, (char *) prefix, 10) == 0;
 }
 
-/** @internal RR map flags. */
-static const uint8_t KEY_FLAG_RRSIG = 0x02;
-static inline uint8_t KEY_FLAG_RANK(const char *key)
-	{ return ((uint8_t)(key[0])) >> 2; }
-static inline bool KEY_COVERING_RRSIG(const char *key)
-	{ return ((uint8_t)(key[0])) & KEY_FLAG_RRSIG; }
-
 /* Stash key = {[5] class, [1-255] owner, [5] type, [5] additional, [1] \x00 } */
 #define KR_RRKEY_LEN (16 + KNOT_DNAME_MAXLEN)
 /** Create unique null-terminated string key for RR.

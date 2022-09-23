@@ -7,6 +7,7 @@
 #include <syslog.h>
 #include "lib/defines.h"
 
+#define LOG_UNKNOWN_LEVEL	-1 /**< Negative error value. */
 #define LOG_GNUTLS_LEVEL	5 /**< GnuTLS level is 5. */
 
 /* Targets */
