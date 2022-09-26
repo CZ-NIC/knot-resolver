@@ -51,6 +51,7 @@
 /doc/html
 /doc/kresd.8
 /doc/texinfo
+/doc/_static/config-schema.json
 /ephemeral_key.pem
 /install-sh
 /libkres.pc
