@@ -16,7 +16,7 @@ class ConvertCommand(Command):
 
     @staticmethod
     def register_args_subparser(
-        subparser: argparse._SubParsersAction[argparse.ArgumentParser],
+        subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
         convert = subparser.add_parser("convert", help="convert JSON/YAML configuration to Lua script")
         convert.add_argument(
