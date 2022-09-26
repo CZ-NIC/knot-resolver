@@ -18,8 +18,8 @@ The example configuration files are also installed as documentation files, typic
 
 .. tip::
 
-    An easy way to see the complete configuration structure is to look at the `JSON Schema <https://json-schema.org/>`_ on `http://localhost:5000/schema/ui <http://localhost:5000/schema/ui>`_ with the Knot Resolver running.
-    The raw schema is availiable on `http://localhost:5000/schema <http://localhost:5000/schema>`_.
+    An easy way to see the complete configuration structure is to look at the `JSON Schema <https://json-schema.org/>`_ of the configuration format with some graphical visualizer such as `this one <https://json-schema.app/>`_.
+    The raw schema is accessible from every running Knot Resolver at the HTTP API socket at path ``/schema`` or on `this link <_static/config-schema.json>`_ (valid only for the version of resolver this documentation was generated for)
 
 ===================
 Management HTTP API
