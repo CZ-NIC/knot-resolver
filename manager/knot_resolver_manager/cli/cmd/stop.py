@@ -21,7 +21,7 @@ class StopCommand(Command):
 
     @staticmethod
     def register_args_subparser(
-        subparser: argparse._SubParsersAction[argparse.ArgumentParser],
+        subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
         stop = subparser.add_parser("stop", help="shutdown everything")
         return stop, StopCommand

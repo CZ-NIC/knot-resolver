@@ -38,7 +38,7 @@ class Command(ABC):
     @staticmethod
     @abstractmethod
     def register_args_subparser(
-        subparser: argparse._SubParsersAction[argparse.ArgumentParser],
+        subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
         raise NotImplementedError()
 
