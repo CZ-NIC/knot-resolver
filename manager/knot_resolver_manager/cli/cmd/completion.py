@@ -19,7 +19,7 @@ class CompletionCommand(Command):
 
     @staticmethod
     def register_args_subparser(
-        subparser: argparse._SubParsersAction[argparse.ArgumentParser],
+        subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
         completion = subparser.add_parser("completion", help="commands auto-completion")
 
