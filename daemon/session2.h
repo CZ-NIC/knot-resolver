@@ -107,7 +107,7 @@ enum protolayer_protocol {
 
 /** Maps protocol layer type IDs to string names.
  * E.g. PROTOLAYER_HTTP has name 'HTTP'. */
-extern char *protolayer_protocol_names[];
+extern const char *protolayer_protocol_names[];
 
 /** Protocol layer groups. Each of these represents a sequence of layers in the
  * unwrap direction (wrap direction being the opposite). The sequence dictates
@@ -139,7 +139,7 @@ enum protolayer_grp {
 
 /** Maps protocol layer group IDs to human-readable descriptions.
  * E.g. PROTOLAYER_GRP_DOH has description 'DNS-over-HTTPS'. */
-extern char *protolayer_grp_names[];
+extern const char *protolayer_grp_names[];
 
 /** Flow control indicators for protocol layer `wrap` and `unwrap` callbacks.
  * Use via `protolayer_continue`, `protolayer_break`, and `protolayer_push`
@@ -218,7 +218,7 @@ enum protolayer_event_type {
 	PROTOLAYER_EVENT_COUNT
 };
 
-extern char *protolayer_event_names[];
+extern const char *protolayer_event_names[];
 
 
 /** Payload types.
@@ -241,7 +241,7 @@ enum protolayer_payload_type {
 	PROTOLAYER_PAYLOAD_COUNT
 };
 
-extern char *protolayer_payload_names[];
+extern const char *protolayer_payload_names[];
 
 /** Data processed by the sequence of layers. All pointed-to memory is always
  * owned by its creator. It is also the layer (group) implementor's

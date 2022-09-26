@@ -57,7 +57,7 @@ static enum protolayer_protocol protolayer_grp_doh[] = {
 };
 
 
-char *protolayer_protocol_names[PROTOLAYER_PROTOCOL_COUNT] = {
+const char *protolayer_protocol_names[PROTOLAYER_PROTOCOL_COUNT] = {
 	[PROTOLAYER_NULL] = "(null)",
 #define XX(cid) [PROTOLAYER_##cid] = #cid,
 	PROTOLAYER_PROTOCOL_MAP(XX)
@@ -79,7 +79,7 @@ static enum protolayer_protocol *protolayer_grps[PROTOLAYER_GRP_COUNT] = {
 };
 
 /** Human-readable names for protocol layer groups. */
-char *protolayer_grp_names[PROTOLAYER_GRP_COUNT] = {
+const char *protolayer_grp_names[PROTOLAYER_GRP_COUNT] = {
 	[PROTOLAYER_GRP_NULL] = "(null)",
 #define XX(cid, vid, name, alpn) [PROTOLAYER_GRP_##cid] = name,
 	PROTOLAYER_GRP_MAP(XX)
@@ -87,7 +87,7 @@ char *protolayer_grp_names[PROTOLAYER_GRP_COUNT] = {
 };
 
 /** Human-readable names for events. */
-char *protolayer_event_names[PROTOLAYER_EVENT_COUNT] = {
+const char *protolayer_event_names[PROTOLAYER_EVENT_COUNT] = {
 	[PROTOLAYER_EVENT_NULL] = "(null)",
 #define XX(cid) [PROTOLAYER_EVENT_##cid] = #cid,
 	PROTOLAYER_EVENT_MAP(XX)
@@ -95,7 +95,7 @@ char *protolayer_event_names[PROTOLAYER_EVENT_COUNT] = {
 };
 
 /** Human-readable names for payloads. */
-char *protolayer_payload_names[PROTOLAYER_PAYLOAD_COUNT] = {
+const char *protolayer_payload_names[PROTOLAYER_PAYLOAD_COUNT] = {
 	[PROTOLAYER_PAYLOAD_NULL] = "(null)",
 #define XX(cid, name) [PROTOLAYER_PAYLOAD_##cid] = name,
 	PROTOLAYER_PAYLOAD_MAP(XX)
