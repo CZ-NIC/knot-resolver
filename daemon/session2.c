@@ -73,7 +73,7 @@ const char *protolayer_protocol_names[PROTOLAYER_PROTOCOL_COUNT] = {
  * one defined as *Variable name* (2nd parameter) in the `PROTOLAYER_GRP_MAP`
  * macro. */
 static enum protolayer_protocol *protolayer_grps[PROTOLAYER_GRP_COUNT] = {
-#define XX(cid, vid, name, alpn) [PROTOLAYER_GRP_##cid] = protolayer_grp_##vid,
+#define XX(cid, vid, name) [PROTOLAYER_GRP_##cid] = protolayer_grp_##vid,
 	PROTOLAYER_GRP_MAP(XX)
 #undef XX
 };
@@ -81,7 +81,7 @@ static enum protolayer_protocol *protolayer_grps[PROTOLAYER_GRP_COUNT] = {
 /** Human-readable names for protocol layer groups. */
 const char *protolayer_grp_names[PROTOLAYER_GRP_COUNT] = {
 	[PROTOLAYER_GRP_NULL] = "(null)",
-#define XX(cid, vid, name, alpn) [PROTOLAYER_GRP_##cid] = name,
+#define XX(cid, vid, name) [PROTOLAYER_GRP_##cid] = name,
 	PROTOLAYER_GRP_MAP(XX)
 #undef XX
 };

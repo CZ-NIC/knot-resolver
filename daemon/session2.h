@@ -122,18 +122,17 @@ extern const char *protolayer_protocol_names[];
  * Parameters are:
  *   1. Constant name (for e.g. PROTOLAYER_GRP_* constants)
  *   2. Variable name (for e.g. protolayer_grp_* arrays)
- *   3. Human-readable name for logging
- *   4. ALPN protocol identifier (for TLS) */
+ *   3. Human-readable name for logging */
 #define PROTOLAYER_GRP_MAP(XX) \
-	XX(DOUDP, doudp, "DNS UDP", "") \
-	XX(DOTCP, dotcp, "DNS TCP", "") \
-	XX(DOTLS, dot, "DNS-over-TLS", "dot") \
-	XX(DOHTTPS, doh, "DNS-over-HTTPS", "h2")
+	XX(DOUDP, doudp, "DNS UDP") \
+	XX(DOTCP, dotcp, "DNS TCP") \
+	XX(DOTLS, dot, "DNS-over-TLS") \
+	XX(DOHTTPS, doh, "DNS-over-HTTPS")
 
 /** The identifiers of pre-defined protocol layer sequences. */
 enum protolayer_grp {
 	PROTOLAYER_GRP_NULL = 0,
-#define XX(cid, vid, name, alpn) PROTOLAYER_GRP_##cid,
+#define XX(cid, vid, name) PROTOLAYER_GRP_##cid,
 	PROTOLAYER_GRP_MAP(XX)
 #undef XX
 	PROTOLAYER_GRP_COUNT

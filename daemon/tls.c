@@ -42,10 +42,8 @@
 #endif
 
 static const gnutls_datum_t tls_grp_alpn[PROTOLAYER_GRP_COUNT] = {
-#define XX(cid, vid, name, alpn) [PROTOLAYER_GRP_##cid] = \
-	{ .data = (unsigned char *)alpn, .size = sizeof(alpn) - 1 },
-	PROTOLAYER_GRP_MAP(XX)
-#undef XX
+	[PROTOLAYER_GRP_DOTLS] = { (uint8_t *)"dot", 3 },
+	[PROTOLAYER_GRP_DOHTTPS] = { (uint8_t *)"h2", 2 },
 };
 
 typedef enum tls_client_hs_state {

@@ -233,6 +233,7 @@ static void http_cleanup_stream(struct pl_http_sess_data *ctx)
 {
 	ctx->incomplete_stream = -1;
 	ctx->current_method = HTTP_METHOD_NONE;
+	ctx->status = HTTP_STATUS_OK;
 	free(ctx->uri_path);
 	ctx->uri_path = NULL;
 	http_free_headers(ctx->headers);
@@ -294,6 +295,8 @@ static int http_send_response(struct pl_http_sess_data *http, int32_t stream_id,
 		max_age_len = asprintf(&max_age, "%s%" PRIu32, directive_max_age, ctx->payload.ttl);
 		kr_require(max_age_len >= 0);
 
+		/* TODO: add a per-group option for content-type if we need to
+		 * support protocols other than DNS here */
 		push_nv(&hdrs, MAKE_STATIC_NV("content-type", "application/dns-message"));
 		push_nv(&hdrs, MAKE_STATIC_KEY_NV("content-length", size, size_len));
 		push_nv(&hdrs, MAKE_STATIC_KEY_NV("cache-control", max_age, max_age_len));
@@ -386,32 +389,60 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 {
 	struct pl_http_sess_data *http = user_data;
 
-/* I'm not yet sure if the below code is correct... the other one should be,
- * but it's probably considerably slower. */
-#if 1
 	int has_padding = !!(frame->data.padlen);
 	uint8_t padlen = (frame->data.padlen > 1) ? frame->data.padlen : 2;
 
 	struct protolayer_iter_ctx *ctx = source->ptr;
-	struct protolayer_payload pld = ctx->payload;
+	struct protolayer_payload *pld = &ctx->payload;
 
 	struct iovec bufiov;
 	struct iovec *dataiov;
 	int dataiovcnt;
-	if (pld.type == PROTOLAYER_PAYLOAD_BUFFER) {
-		bufiov = (struct iovec){ pld.buffer.buf, pld.buffer.len };
+	bool adapt_iovs = false;
+	if (pld->type == PROTOLAYER_PAYLOAD_BUFFER) {
+		size_t to_copy = MIN(length, pld->buffer.len);
+		if (!to_copy)
+			return NGHTTP2_ERR_PAUSE;
+
+		bufiov = (struct iovec){ pld->buffer.buf, to_copy };
 		dataiov = &bufiov;
 		dataiovcnt = 1;
-	} else if (pld.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
+
+		pld->buffer.buf = (char *)pld->buffer.buf + to_copy;
+		pld->buffer.len -= to_copy;
+	} else if (pld->type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
+		size_t wbl = wire_buf_data_length(pld->wire_buf);
+		size_t to_copy = MIN(length, wbl);
+		if (!to_copy)
+			return NGHTTP2_ERR_PAUSE;
+
 		bufiov = (struct iovec){
-			wire_buf_data(pld.wire_buf),
-			wire_buf_data_length(pld.wire_buf)
+			wire_buf_data(pld->wire_buf),
+			to_copy
 		};
 		dataiov = &bufiov;
 		dataiovcnt = 1;
-	} else if (pld.type == PROTOLAYER_PAYLOAD_IOVEC) {
-		dataiov = pld.iovec.iov;
-		dataiovcnt = pld.iovec.cnt;
+
+		wire_buf_trim(pld->wire_buf, to_copy);
+		if (wire_buf_data_length(pld->wire_buf) == 0) {
+			wire_buf_reset(pld->wire_buf);
+		}
+	} else if (pld->type == PROTOLAYER_PAYLOAD_IOVEC) {
+		if (pld->iovec.cnt <= 0)
+			return NGHTTP2_ERR_PAUSE;
+
+		dataiov = pld->iovec.iov;
+		dataiovcnt = 0;
+		size_t avail = 0;
+		for (int i = 0; i < pld->iovec.cnt && avail < length; i++) {
+			avail += pld->iovec.iov[i].iov_len;
+			dataiovcnt += 1;
+		}
+
+		/* The actual iovec generation needs to be done later when we
+		 * have memory for them. Here, we just count the number of
+		 * needed iovecs. */
+		adapt_iovs = true;
 	} else {
 		kr_assert(false && "Invalid payload");
 		protolayer_break(ctx, kr_error(EINVAL));
@@ -422,69 +453,48 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 	struct http_send_data_ctx *sdctx = calloc(iovcnt, sizeof(*ctx) + sizeof(struct iovec[iovcnt]));
 	sdctx->padlen = padlen;
 
-	struct iovec *iov = sdctx->iov;
+	struct iovec *dest_iov = sdctx->iov;
 	static const uint8_t padding[UINT8_MAX];
 
 	int cur = 0;
-	iov[cur++] = (struct iovec){ (void *)framehd, HTTP_FRAME_HDLEN };
+	dest_iov[cur++] = (struct iovec){ (void *)framehd, HTTP_FRAME_HDLEN };
 
 	if (has_padding)
-		iov[cur++] = (struct iovec){ &sdctx->padlen, HTTP_FRAME_PADLEN };
+		dest_iov[cur++] = (struct iovec){ &sdctx->padlen, HTTP_FRAME_PADLEN };
 
-	memcpy(&iov[cur], dataiov, sizeof(struct iovec[dataiovcnt]));
-	cur += dataiovcnt;
+	if (adapt_iovs) {
+		while (pld->iovec.cnt && length > 0) {
+			struct iovec *iov = pld->iovec.iov;
+			size_t to_copy = MIN(length, iov->iov_len);
+
+			dest_iov[cur++] = (struct iovec){
+				iov->iov_base, to_copy
+			};
+			length -= to_copy;
+			iov->iov_base = ((char *)iov->iov_base) + to_copy;
+			iov->iov_len -= to_copy;
+
+			if (iov->iov_len == 0) {
+				pld->iovec.iov++;
+				pld->iovec.cnt--;
+			}
+		}
+	} else {
+		memcpy(&dest_iov[cur], dataiov, sizeof(struct iovec[dataiovcnt]));
+		cur += dataiovcnt;
+	}
 
 	if (has_padding)
-		iov[cur++] = (struct iovec){ (void *)padding, padlen - 1 };
+		dest_iov[cur++] = (struct iovec){ (void *)padding, padlen - 1 };
 
 	kr_assert(cur == iovcnt);
 	int ret = session2_wrap_after(http->session, PROTOLAYER_HTTP,
-			protolayer_iovec(iov, cur),
+			protolayer_iovec(dest_iov, cur),
 			NULL, callback_finished_free_baton, sdctx);
 
 	if (ret < 0)
 		return ret;
 	return 0;
-#else
-	struct protolayer_iter_ctx *ctx = source->ptr;
-	if (kr_fails_assert(ctx)) {
-		return NGHTTP2_ERR_WOULDBLOCK;
-	}
-
-	size_t total_len = HTTP_FRAME_HDLEN + length + frame->data.padlen;
-	struct http_send_ctx *send_ctx = malloc(sizeof(*send_ctx) + total_len);
-	kr_require(send_ctx);
-
-	send_ctx->sess_data = http;
-	uint8_t *cur = send_ctx->data;
-
-	/* TODO - remove these unnecessary copies */
-
-	/* Frame header */
-	memcpy(cur, framehd, HTTP_FRAME_HDLEN);
-	cur += HTTP_FRAME_HDLEN;
-
-	/* Length of frame padding */
-	if (frame->data.padlen) {
-		*cur = frame->data.padlen - 1;
-		cur++;
-	}
-
-	/* Data */
-	size_t copied = protolayer_payload_copy(cur, &ctx->payload, length);
-	cur += copied;
-
-	/* Padding */
-	if (frame->data.padlen > 1)
-		bzero(cur, frame->data.padlen - 1);
-
-	kr_log_debug(DOH, "[%p] send_data_callback: %p\n", (void *)h2, (void *)send_ctx->data);
-	session2_wrap_after(http->session, PROTOLAYER_HTTP,
-			protolayer_buffer(send_ctx->data, total_len), NULL,
-			callback_finished_free_baton, send_ctx);
-
-	return 0;
-#endif
 }
 
 /*
@@ -603,6 +613,8 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 	}
 
 	if (!strcasecmp("content-type", (const char *)name)) {
+		/* TODO: add a per-group option for content-type if we need to
+		 * support protocols other than DNS here */
 		if (strcasecmp("application/dns-message", (const char *)value)) {
 			set_status(ctx, HTTP_STATUS_UNSUPPORTED_MEDIA_TYPE);
 			return 0;
@@ -733,6 +745,9 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 				return 0;
 			}
 		}
+
+		if (!http_status_has_category(ctx->status, 2))
+			return 0;
 
 		if (submit_to_wirebuffer(ctx) < 0)
 			return NGHTTP2_ERR_CALLBACK_FAILURE;
