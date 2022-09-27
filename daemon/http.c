@@ -615,7 +615,7 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 	if (!strcasecmp("content-type", (const char *)name)) {
 		/* TODO: add a per-group option for content-type if we need to
 		 * support protocols other than DNS here */
-		if (strcasecmp("application/dns-message", (const char *)value)) {
+		if (strcasecmp("application/dns-message", (const char *)value) != 0) {
 			set_status(ctx, HTTP_STATUS_UNSUPPORTED_MEDIA_TYPE);
 			return 0;
 		}

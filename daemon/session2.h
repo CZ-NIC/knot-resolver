@@ -916,7 +916,7 @@ int session2_wrap_after(struct session2 *s, enum protolayer_protocol protocol,
 /** Sends an event to be synchronously processed by the protocol layers of the
  * specified session. The layers are first iterated through in the `_UNWRAP`
  * direction, then bounced back in the `_WRAP` direction. */
-void session2_event(struct session2 *s, enum protolayer_event_type type, void *baton);
+void session2_event(struct session2 *s, enum protolayer_event_type event, void *baton);
 
 /** Sends an event to be synchronously processed by the protocol layers of the
  * specified session, starting from the specified `protocol` in the `_UNWRAP`
@@ -927,7 +927,7 @@ void session2_event(struct session2 *s, enum protolayer_event_type type, void *b
  * specified by `protocol` and those before it are only skipped in the
  * `_UNWRAP` direction! */
 void session2_event_after(struct session2 *s, enum protolayer_protocol protocol,
-                          enum protolayer_event_type type, void *baton);
+                          enum protolayer_event_type event, void *baton);
 
 void session2_init_request(struct session2 *s, struct kr_request *req);
 

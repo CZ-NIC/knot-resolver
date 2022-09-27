@@ -26,7 +26,7 @@ static int session2_transport_event(struct session2 *s,
                                     enum protolayer_event_type event,
                                     void *baton);
 
-struct protolayer_globals protolayer_globals[PROTOLAYER_PROTOCOL_COUNT] = {0};
+struct protolayer_globals protolayer_globals[PROTOLAYER_PROTOCOL_COUNT] = {{0}};
 
 
 static enum protolayer_protocol protolayer_grp_doudp[] = {
@@ -81,7 +81,7 @@ static enum protolayer_protocol *protolayer_grps[PROTOLAYER_GRP_COUNT] = {
 /** Human-readable names for protocol layer groups. */
 const char *protolayer_grp_names[PROTOLAYER_GRP_COUNT] = {
 	[PROTOLAYER_GRP_NULL] = "(null)",
-#define XX(cid, vid, name) [PROTOLAYER_GRP_##cid] = name,
+#define XX(cid, vid, name) [PROTOLAYER_GRP_##cid] = (name),
 	PROTOLAYER_GRP_MAP(XX)
 #undef XX
 };
@@ -97,7 +97,7 @@ const char *protolayer_event_names[PROTOLAYER_EVENT_COUNT] = {
 /** Human-readable names for payloads. */
 const char *protolayer_payload_names[PROTOLAYER_PAYLOAD_COUNT] = {
 	[PROTOLAYER_PAYLOAD_NULL] = "(null)",
-#define XX(cid, name) [PROTOLAYER_PAYLOAD_##cid] = name,
+#define XX(cid, name) [PROTOLAYER_PAYLOAD_##cid] = (name),
 	PROTOLAYER_PAYLOAD_MAP(XX)
 #undef XX
 };
@@ -458,7 +458,7 @@ static int protolayer_manager_submit(
 		struct protolayer_globals *globals = &protolayer_globals[p];
 		struct protolayer_data *iter_data = protolayer_iter_data_get(ctx, i);
 		if (iter_data) {
-			bzero(iter_data, globals->iter_size);
+			memset(iter_data, 0, globals->iter_size);
 			iter_data->session = manager->session;
 		}
 
@@ -544,7 +544,7 @@ static struct protolayer_manager *protolayer_manager_new(
 		struct protolayer_globals *globals = &protolayer_globals[protocols[i]];
 		struct protolayer_data *sess_data = protolayer_sess_data_get(m, i);
 		if (sess_data) {
-			bzero(sess_data, globals->sess_size);
+			memset(sess_data, 0, globals->sess_size);
 			sess_data->session = s;
 		}
 

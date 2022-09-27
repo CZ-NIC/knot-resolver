@@ -42,7 +42,7 @@
 	#endif
 #endif
 
-static struct kr_context the_resolver_value = {0};
+static struct kr_context the_resolver_value = {{0}};
 struct kr_context *the_resolver = NULL;
 
 bool kr_rank_check(uint8_t rank)

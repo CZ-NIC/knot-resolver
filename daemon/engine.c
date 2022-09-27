@@ -41,7 +41,7 @@ const size_t CLEANUP_TIMER = 5*60*1000;
  */
 struct args *the_args;
 
-static struct engine engine = {0};
+static struct engine engine = {{0}};
 struct engine *the_engine = NULL;
 
 
