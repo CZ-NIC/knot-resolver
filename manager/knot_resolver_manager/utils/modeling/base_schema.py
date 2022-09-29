@@ -1,5 +1,6 @@
 import enum
 import inspect
+from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Set, Tuple, Type, TypeVar, Union, cast
 
 import yaml
@@ -35,11 +36,12 @@ def is_obj_type(obj: Any, types: Union[type, Tuple[Any, ...], Tuple[type, ...]])
     return type(obj) == types
 
 
-class Serializable:
+class Serializable(ABC):
     """
     An interface for making classes serializable to a dictionary (and in turn into a JSON).
     """
 
+    @abstractmethod
     def to_dict(self) -> Dict[Any, Any]:
         raise NotImplementedError(f"...for class {self.__class__.__name__}")
 
