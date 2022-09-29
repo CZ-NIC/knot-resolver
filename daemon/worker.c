@@ -348,18 +348,14 @@ static struct request_ctx *request_create(struct session2 *session,
 		const struct sockaddr *dst_addr = comm->dst_addr;
 		const struct proxy_result *proxy = comm->proxy;
 
-		req->qsource.comm_flags.tcp = session->stream;
-		req->qsource.comm_flags.tls = session->secure;
+		req->qsource.stream_id = -1;
+		session2_init_request(session, req);
 
 		req->qsource.flags = req->qsource.comm_flags;
 		if (proxy) {
 			req->qsource.flags.tcp = proxy->protocol == SOCK_STREAM;
 			req->qsource.flags.tls = proxy->has_tls;
 		}
-
-		req->qsource.stream_id = -1;
-
-		session2_init_request(session, req);
 
 		/* We need to store a copy of peer address. */
 		memcpy(&ctx->source.addr.ip, src_addr, kr_sockaddr_len(src_addr));
@@ -2289,6 +2285,12 @@ static enum protolayer_iter_cb_result pl_dns_stream_wrap(
 	}
 }
 
+static void pl_dns_stream_request_init(struct protolayer_manager *manager,
+                                       struct kr_request *req,
+                                       void *sess_data)
+{
+	req->qsource.comm_flags.tcp = true;
+}
 
 int worker_init(void)
 {
@@ -2304,7 +2306,8 @@ int worker_init(void)
 	protolayer_globals[PROTOLAYER_DNS_UNSIZED_STREAM] = (struct protolayer_globals){
 		.sess_init = pl_dns_stream_sess_init,
 		.unwrap = pl_dns_dgram_unwrap,
-		.event_unwrap = pl_dns_stream_event_unwrap
+		.event_unwrap = pl_dns_stream_event_unwrap,
+		.request_init = pl_dns_stream_request_init
 	};
 	const struct protolayer_globals stream_common = {
 		.sess_size = sizeof(struct pl_dns_stream_sess_data),
@@ -2313,7 +2316,8 @@ int worker_init(void)
 		.iter_deinit = pl_dns_stream_iter_deinit,
 		.unwrap = pl_dns_stream_unwrap,
 		.wrap = pl_dns_stream_wrap,
-		.event_unwrap = pl_dns_stream_event_unwrap
+		.event_unwrap = pl_dns_stream_event_unwrap,
+		.request_init = pl_dns_stream_request_init
 	};
 	protolayer_globals[PROTOLAYER_DNS_MULTI_STREAM] = stream_common;
 	protolayer_globals[PROTOLAYER_DNS_MULTI_STREAM].sess_init = pl_dns_stream_sess_init;

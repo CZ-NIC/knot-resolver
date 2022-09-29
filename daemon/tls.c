@@ -1315,6 +1315,13 @@ static bool pl_tls_event_wrap(enum protolayer_event_type event,
 	return true;
 }
 
+static void pl_tls_request_init(struct protolayer_manager *manager,
+                                struct kr_request *req,
+                                void *sess_data)
+{
+	req->qsource.comm_flags.tls = true;
+}
+
 void tls_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_TLS] = (struct protolayer_globals){
@@ -1325,6 +1332,7 @@ void tls_protolayers_init(void)
 		.wrap = pl_tls_wrap,
 		.event_unwrap = pl_tls_event_unwrap,
 		.event_wrap = pl_tls_event_wrap,
+		.request_init = pl_tls_request_init
 	};
 }
 

@@ -537,7 +537,8 @@ struct protolayer_globals {
 	 * Optional - iteration continues automatically if this is NULL. */
 	protolayer_event_cb event_wrap;
 
-	/** Modifies the provided request for use with the layer. */
+	/** Modifies the provided request for use with the layer. Mostly for
+	 * setting `struct kr_request::qsource.comm_flags`. */
 	protolayer_request_cb request_init;
 };
 
@@ -929,6 +930,8 @@ void session2_event(struct session2 *s, enum protolayer_event_type event, void *
 void session2_event_after(struct session2 *s, enum protolayer_protocol protocol,
                           enum protolayer_event_type event, void *baton);
 
+/** Performs initial setup of the specified `req`, using the session's protocol
+ * layers. Layers are processed in the `_UNWRAP` direction. */
 void session2_init_request(struct session2 *s, struct kr_request *req);
 
 /** Removes the specified request task from the session's tasklist. The session
