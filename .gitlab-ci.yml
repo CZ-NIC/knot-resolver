@@ -634,11 +634,6 @@ pkg:debian-11:
   <<: *pkg_test_deb
   image: $CI_REGISTRY/packaging/apkg/lxc/debian-11
 
-pkg:debian-10:
-  <<: *pkg_test_deb
-  <<: *enable_repo_build
-  image: $CI_REGISTRY/packaging/apkg/lxc/debian-10
-
 pkg:ubuntu-22.04:
   <<: *pkg_test_deb
   image: $CI_REGISTRY/packaging/apkg/lxc/ubuntu-22.04
@@ -647,11 +642,6 @@ pkg:ubuntu-20.04:
   <<: *pkg_test_deb
   <<: *enable_repo_build
   image: $CI_REGISTRY/packaging/apkg/lxc/ubuntu-20.04
-
-pkg:ubuntu-18.04:
-  <<: *pkg_test_deb
-  <<: *enable_repo_build
-  image: $CI_REGISTRY/packaging/apkg/lxc/ubuntu-18.04
 
 pkg:fedora-36:
   <<: *pkg_test
@@ -665,5 +655,6 @@ pkg:opensuse-15.3:
   <<: *pkg_test
   <<: *enable_repo_build
   image: $CI_REGISTRY/packaging/apkg/lxc/opensuse-15.3
+  allow_failure: true  # SUSE is always special
 
 # }}}
