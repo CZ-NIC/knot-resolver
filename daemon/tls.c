@@ -1064,6 +1064,7 @@ static int pl_tls_sess_deinit(struct protolayer_manager *manager,
 static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_data,
                                                struct protolayer_iter_ctx *ctx)
 {
+	int brstatus = kr_ok();
 	struct pl_tls_sess_data *tls = sess_data;
 	struct session2 *s = ctx->manager->session;
 
@@ -1076,8 +1077,8 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 		if (err == kr_error(EAGAIN)) {
 			return protolayer_async(); /* Wait for more data */
 		} else if (err != kr_ok()) {
-			queue_pop(tls->unwrap_queue);
-			return protolayer_break(ctx, err);
+			brstatus = err;
+			goto exit_break;
 		}
 	}
 
@@ -1106,8 +1107,8 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 				if (err == kr_error(EAGAIN)) {
 					break;
 				} else if (err != kr_ok()) {
-					queue_pop(tls->unwrap_queue);
-					return protolayer_break(ctx, err);
+					brstatus = err;
+					goto exit_break;
 				}
 			}
 			if (err == kr_error(EAGAIN)) {
@@ -1119,7 +1120,8 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 		} else if (count < 0) {
 			VERBOSE_MSG(tls->client_side, "gnutls_record_recv failed: %s (%zd)\n",
 					gnutls_strerror_name(count), count);
-			return protolayer_break(ctx, kr_error(EIO));
+			brstatus = kr_error(EIO);
+			goto exit_break;
 		} else if (count == 0) {
 			break;
 		}
@@ -1127,11 +1129,14 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 		wire_buf_consume(&tls->unwrap_buf, count);
 		if (wire_buf_free_space_length(&tls->unwrap_buf) == 0 && queue_len(tls->unwrap_queue) > 0) {
 			/* wire buffer is full but not all data was consumed */
-			return protolayer_break(ctx, kr_error(ENOSPC));
+			brstatus = kr_error(ENOSPC);
+			goto exit_break;
 		}
 
-		if (kr_fails_assert(queue_len(tls->unwrap_queue) == 1))
-			return protolayer_break(ctx, kr_error(EINVAL));
+		if (kr_fails_assert(queue_len(tls->unwrap_queue) == 1)) {
+			brstatus = kr_error(EINVAL);
+			goto exit_break;
+		}
 
 		struct protolayer_iter_ctx *ctx_head = queue_head(tls->unwrap_queue);
 		if (kr_fails_assert(ctx == ctx_head)) {
@@ -1147,12 +1152,21 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 		 * consume all available network data by calling kres_gnutls_pull().
 		 * TODO assess the need for buffering of data amount.
 		 */
-		return protolayer_break(ctx, kr_error(ENOSPC));
+		brstatus = kr_error(ENOSPC);
+		goto exit_break;
 	}
 
-	queue_pop(tls->unwrap_queue);
+	struct protolayer_iter_ctx *ctx_head = queue_head(tls->unwrap_queue);
+	if (!kr_fails_assert(ctx == ctx_head))
+		queue_pop(tls->unwrap_queue);
 	ctx->payload = protolayer_wire_buf(&tls->unwrap_buf);
 	return protolayer_continue(ctx);
+
+exit_break:
+	ctx_head = queue_head(tls->unwrap_queue);
+	if (!kr_fails_assert(ctx == ctx_head))
+		queue_pop(tls->unwrap_queue);
+	return protolayer_break(ctx, brstatus);
 }
 
 static ssize_t pl_tls_submit(gnutls_session_t tls_session,
