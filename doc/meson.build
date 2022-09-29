@@ -81,29 +81,14 @@ if get_option('doc') == 'enabled'
 endif
 
 
-python3 = find_program('python3')
-json_schema = custom_target(
-  'doc-json-schema',
-  command: [python3, '-m', 'manager.knot_resolver_manager.cli', 'schema', 'docs/_static/config-schema.json'],
-  input: [
-    
-  ],
-  output: [
-    'docs/_static/config-schema.json'
-  ]
-)
-
-
 make_doc = find_program('../scripts/make-doc.sh')
 run_target(
   'doc',
-  command: make_doc,
-  depends: [json_schema],
+  command: make_doc
 )
 
 
 run_target(
   'doc-strict',
-  command: [make_doc, '-W'],
-  depends: [json_schema],
+  command: [make_doc, '-W']
 )
