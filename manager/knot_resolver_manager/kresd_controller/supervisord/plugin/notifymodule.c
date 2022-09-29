@@ -8,7 +8,6 @@
 #include <sys/types.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include <errno.h>
 #include <sys/socket.h>
 #include <fcntl.h>
@@ -115,9 +114,13 @@ static PyObject *handle_control_socket_connection_event(PyObject *self,
 	pid_t pid = -1;
 	while (cmsgp != NULL) {
 		if (cmsgp->cmsg_type == SCM_CREDENTIALS) {
-			assert(cmsgp->cmsg_len ==
-			       CMSG_LEN(sizeof(struct ucred)));
-			assert(cmsgp->cmsg_level == SOL_SOCKET);
+		    if (
+		    	cmsgp->cmsg_len != CMSG_LEN(sizeof(struct ucred)) ||
+		    	cmsgp->cmsg_level != SOL_SOCKET
+		    ) {
+		    	printf("[notify_socket] invalid cmsg data, ignoring\n");
+		    	Py_RETURN_NONE;
+		    }
 
 			struct ucred cred;
 			memcpy(&cred, CMSG_DATA(cmsgp), sizeof(cred));
