@@ -27,10 +27,7 @@ if install_root_keys
   )
 endif
 
-
 subdir('config')
-
-subdir('shell-completion')
 
 install_data(
   sources: etc_files,
