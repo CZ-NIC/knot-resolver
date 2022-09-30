@@ -31,12 +31,12 @@ class CompletionCommand(Command):
         return completion, CompletionCommand
 
     @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> List[str]:
-        return []
+    def completion(args: List[str], parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
+        return {}
 
     def run(self, args: CommandArgs) -> None:
         parser = args.parser
-        comp: List[str] = []
+        comp: Dict[str, Optional[str]] = {}
 
         top_comp: Dict[str, Optional[str]] = {}
 
@@ -57,7 +57,7 @@ class CompletionCommand(Command):
                         subparser: argparse.ArgumentParser = action.choices[arg]
                         command: Command = subparser._defaults["command"]
 
-                        comp += command.completion(self.unknown_args, subparser)
+                        comp.update(command.completion(self.unknown_args, subparser))
                     else:
                         pass
 

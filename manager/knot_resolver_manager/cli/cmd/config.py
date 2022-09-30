@@ -1,7 +1,7 @@
 import argparse
 import json
 from enum import Enum
-from typing import List, Optional, Tuple, Type
+from typing import Dict, List, Optional, Tuple, Type
 
 import yaml
 from typing_extensions import Literal
@@ -109,8 +109,9 @@ class ConfigCommand(Command):
         return config, ConfigCommand
 
     @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> List[str]:
-        return []
+    def completion(args: List[str], parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
+        comp: Dict[str, Optional[str]] = {}
+        return comp
 
     def run(self, args: CommandArgs) -> None:
         if not self.path.startswith("/"):
