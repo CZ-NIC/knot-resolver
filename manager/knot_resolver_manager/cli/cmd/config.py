@@ -134,9 +134,9 @@ class ConfigCommand(Command):
         response = request(method, url, reformat(new_config, Formats.JSON) if new_config else None)
         print(f"status: {response.status}")
 
-        if self.operation == Operations.GET and self.value_or_file:
+        if self.operation == Operations.GET and self.value_or_file and response.status == 200:
             with open(self.value_or_file, "w") as f:
                 f.write(reformat(response.body, self.format))
-            print(f"response body saved to: {self.value_or_file}")
+            print(f"saved to: {self.value_or_file}")
         else:
             print(reformat(response.body, self.format))
