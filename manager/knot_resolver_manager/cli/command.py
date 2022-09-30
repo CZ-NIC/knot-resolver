@@ -1,7 +1,7 @@
 import argparse
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Tuple, Type, TypeVar
+from typing import Dict, List, Optional, Tuple, Type, TypeVar
 from urllib.parse import quote
 
 T = TypeVar("T", bound=Type["Command"])
@@ -52,5 +52,5 @@ class Command(ABC):
 
     @staticmethod
     @abstractmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> List[str]:
+    def completion(args: List[str], parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
         raise NotImplementedError()

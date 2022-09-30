@@ -1,5 +1,5 @@
 import argparse
-from typing import List, Optional, Tuple, Type
+from typing import Dict, List, Optional, Tuple, Type
 
 from knot_resolver_manager.cli.command import Command, CommandArgs, register_command
 from knot_resolver_manager.utils.requests import request
@@ -21,8 +21,8 @@ class MetricsCommand(Command):
         return metrics, MetricsCommand
 
     @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> List[str]:
-        return []
+    def completion(args: List[str], parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
+        return {}
 
     def run(self, args: CommandArgs) -> None:
         url = f"{args.socket}/metrics"
