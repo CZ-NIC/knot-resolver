@@ -651,10 +651,10 @@ pkg:rocky-8:
   <<: *pkg_test
   image: $CI_REGISTRY/packaging/apkg/lxc/rocky-8
 
-pkg:opensuse-15.3:
+pkg:opensuse-15.4:
   <<: *pkg_test
   <<: *enable_repo_build
-  image: $CI_REGISTRY/packaging/apkg/lxc/opensuse-15.3
+  image: $CI_REGISTRY/packaging/apkg/lxc/opensuse-15.4
   allow_failure: true  # SUSE is always special
 
 # }}}
