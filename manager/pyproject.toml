@@ -15,12 +15,12 @@ generate-setup-file = true
 
 [tool.poetry.dependencies]
 python = "^3.6.8"
-aiohttp = "^3.6"
-Jinja2 = "^2.11.3"
+aiohttp = "*"
+Jinja2 = "*"
 PyYAML = "*"
-typing-extensions = ">=3.7.2"
-prometheus-client = "^0.6"
-supervisor = "^4"
+typing-extensions = "*"
+prometheus-client = "*"
+supervisor = "*"
 
 [tool.poetry.dev-dependencies]
 pytest-cov = "^2.11.1"
