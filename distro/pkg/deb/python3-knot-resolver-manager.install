@@ -1,2 +1,4 @@
 etc/knot-resolver/config.yml
 usr/lib/systemd/system/knot-resolver.service
+usr/share/bash-completion/completions/kresctl
+usr/share/fish/vendor_completions.d/kresctl.fish
