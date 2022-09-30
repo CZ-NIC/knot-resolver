@@ -587,9 +587,6 @@ obs:odvr:
 # }}}
 
 # pkg {{{
-.setup_apkg: &setup_apkg
-  - python3 -m pip install -U apkg
-
 .pkg_deb_extras: &pkg_deb_extras
   before_script:
     - apt update
@@ -606,7 +603,6 @@ obs:odvr:
     - lxc
     - amd64
   script:
-    - *setup_apkg
     # make sure the archive from pkg:make-archive is available
     - apkg info cache | grep archive/dev
     - apkg install --build-dep
@@ -619,14 +615,13 @@ obs:odvr:
 pkg:make-archive:
   # archive is created once and reused in other pkg jobs
   <<: *pkg_deb_extras
-  image: $CI_REGISTRY/packaging/apkg/ci/debian-11:apkg
+  image: $CI_REGISTRY/packaging/apkg/lxc/debian-11
   stage: pkg
   needs: []
   artifacts:
     paths:
       - pkg/
   script:
-    - *setup_apkg
     - apkg build-dep
     - apkg make-archive
 
