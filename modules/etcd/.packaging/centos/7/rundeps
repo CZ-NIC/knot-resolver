@@ -1,6 +1,0 @@
-openssl-devel
-lua-devel
-luarocks
-git
-gcc
-make

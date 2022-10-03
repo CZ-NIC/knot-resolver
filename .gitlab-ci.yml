@@ -25,7 +25,7 @@ stages:
   - test
   - respdiff
   - deploy
-  - pkgtest
+  - pkg
 
  # https://docs.gitlab.com/ce/ci/jobs/job_control.html#select-different-runner-tags-for-each-parallel-matrix-job
 .multi_platform: &multi_platform
@@ -357,23 +357,6 @@ test:valgrind:
     - ${MESON_TEST} --suite unit --suite config --no-suite snowflake --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
     - MESON_TESTTHREADS=1 ${MESON_TEST} --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp" --suite snowflake
 
-pkgtest:
-  stage: test
-  trigger:
-    include: ci/pkgtest.yaml
-    strategy: depend
-  needs:
-    - build
-  variables: # https://gitlab.nic.cz/help/ci/yaml/README.md#artifact-downloads-to-child-pipelines
-    PARENT_PIPELINE_ID: $CI_PIPELINE_ID
-  except:
-    refs:
-      - master@knot/knot-resolver
-      - master@knot/security/knot-resolver
-      - tags
-    variables:
-      - $SKIP_CI == "1"
-
 manager:
   stage: test
   needs: []
@@ -595,7 +578,7 @@ obs:release:
 
 obs:odvr:
   <<: *obs_trigger
-  stage: pkgtest  # last stage to ensure it doesn't block anything
+  stage: pkg  # last stage to ensure it doesn't block anything
   only:
     - tags
   variables:
@@ -603,197 +586,70 @@ obs:odvr:
   when: manual
 # }}}
 
-# pkgtest {{{
-.deploytest: &deploytest
-  stage: pkgtest
-  only:
-    variables:
-      - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing$/
-      - $CI_COMMIT_TAG
-  dependencies: []  # wait for previous stages to finish
-  variables:
-    OBS_REPO: knot-resolver-latest
-  when: delayed
-  start_in: 3 minutes  # give OBS build some time
+# pkg {{{
+.pkg_deb_extras: &pkg_deb_extras
+  before_script:
+    - apt update
+
+.enable_repo_build: &enable_repo_build
+  before_script:
+    - ./scripts/enable-repo.py build
+
+.pkg_test: &pkg_test
+  stage: pkg
+  needs:
+    - pkg:make-archive
   tags:
-    - condor
-
-obs:build:all:
-  <<: *deploytest
-  only:
-    variables:
-      - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing|knot-resolver-odvr$/
-      - $CI_COMMIT_TAG
-  allow_failure: true
-  script:
-    - "osc results home:CZ-NIC:$OBS_REPO knot-resolver -w"
-    - version=$(sed 's/^v//' <(git describe --exact-match HEAD || git rev-parse --short HEAD) )
-    - > # check version only for one (reliable) repo to avoid false negatives
-      ! osc ls -b home:CZ-NIC:$OBS_REPO knot-resolver Debian_9.0 x86_64 | \
-        grep -E '(rpm|deb|tar\.xz)$' | grep -v $version || \
-        (echo "ERROR: version mismatch"; exit 1)
-    - >
-      ! osc results home:CZ-NIC:$OBS_REPO knot-resolver --csv | \
-        grep -Ev 'disabled|excluded|Rawhide|CentOS_8_EPEL' | grep -v 'succeeded' -q || \
-        (echo "ERROR: build(s) failed"; exit 1)
-
-.distrotest: &distrotest
-  <<: *deploytest
-  # Description of the distrotest script workflow:
-  # 1. wait for OBS package build to complete
-  # 2. check the OBS build suceeded
-  # 3. set up some variables, dir names etc.
-  # 4. create a symlink with predictable name to export artifacts afterwards
-  # 5. create an HTCondor job and submit it to a HTCondor cluster
-  # 6. check exit code from condor, optionally display one of the logs and end the job with same exit code
-  script:
-    - "osc results home:CZ-NIC:$OBS_REPO knot-resolver -a x86_64 -r $DISTROTEST_REPO -w"
-    - >
-      osc results home:CZ-NIC:$OBS_REPO knot-resolver -a x86_64 -r $DISTROTEST_REPO --csv | grep 'succeeded|$' -q || \
-        (echo "ERROR: build failed"; exit 1)
-    - export LABEL="gl$(date +%s)_$OBS_REPO"
-    - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
-    - export TESTDIR="$COMMITDIR/distrotest.$DISTROTEST_NAME"
-    - ln -s $COMMITDIR distrotest_commitdir
-    - sudo -u respdiff /var/opt/respdiff/contrib/job_manager/submit.py -w
-      -p $DISTROTEST_PRIORITY
-      $(sudo -u respdiff /var/opt/respdiff/contrib/job_manager/create.py
-        "$(git rev-parse --short HEAD)" -l $LABEL -t distrotest.$DISTROTEST_NAME
-        --obs-repo $OBS_REPO)
-    - export EXITCODE=$(cat $TESTDIR/j*_exitcode)
-    - if [[ "$EXITCODE" != "0" ]]; then cat $TESTDIR/j*_{vagrant.log.txt,stdout.txt}; fi
-    - exit $EXITCODE
-  after_script:
-    - 'cp -t . distrotest_commitdir/distrotest.$DISTROTEST_NAME/j* ||:'
-  artifacts:
-    when: always
-    expire_in: 1 week
-    paths:
-      - ./j*
-  retry:
-    max: 1
-    when:
-      - script_failure
-
-obs:rocky8:x86_64:
-  <<: *distrotest
-  variables:
-    OBS_REPO: knot-resolver-latest
-    DISTROTEST_NAME: rocky8
-    DISTROTEST_REPO: CentOS_8_EPEL
-
-obs:debian9:x86_64:
-  <<: *distrotest
-  variables:
-    OBS_REPO: knot-resolver-latest
-    DISTROTEST_NAME: debian9
-    DISTROTEST_REPO: Debian_9.0
-
-obs:debian10:x86_64:
-  <<: *distrotest
-  only:
-    variables:
-      - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing|knot-resolver-odvr$/
-      - $CI_COMMIT_TAG
-  variables:
-    OBS_REPO: knot-resolver-latest
-    DISTROTEST_NAME: debian10
-    DISTROTEST_REPO: Debian_10
-
-obs:debian11:x86_64:
-  <<: *distrotest
-  only:
-    variables:
-      - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing|knot-resolver-odvr$/
-      - $CI_COMMIT_TAG
-  variables:
-    OBS_REPO: knot-resolver-latest
-    DISTROTEST_NAME: debian11
-    DISTROTEST_REPO: Debian_11
-
-obs:fedora35:x86_64:
-  <<: *distrotest
-  variables:
-    OBS_REPO: knot-resolver-latest
-    DISTROTEST_NAME: fedora35
-    DISTROTEST_REPO: Fedora_35
-
-obs:fedora36:x86_64:
-  <<: *distrotest
-  variables:
-    OBS_REPO: knot-resolver-latest
-    DISTROTEST_NAME: fedora36
-    DISTROTEST_REPO: Fedora_36
-
-obs:leap15:x86_64:
-  <<: *distrotest
-  variables:
-    OBS_REPO: knot-resolver-latest
-    DISTROTEST_NAME: leap15
-    DISTROTEST_REPO: openSUSE_Leap_15.3
-
-obs:ubuntu1804:x86_64:
-  <<: *distrotest
-  variables:
-    OBS_REPO: knot-resolver-latest
-    DISTROTEST_NAME: ubuntu1804
-    DISTROTEST_REPO: xUbuntu_18.04
-
-obs:ubuntu2004:x86_64:
-  <<: *distrotest
-  only:
-    variables:
-      - $OBS_REPO =~ /^knot-resolver-devel|knot-dns-devel|knot-resolver-testing|knot-resolver-odvr$/
-      - $CI_COMMIT_TAG
-  variables:
-    OBS_REPO: knot-resolver-latest
-    DISTROTEST_NAME: ubuntu2004
-    DISTROTEST_REPO: xUbuntu_20.04
-
-obs:ubuntu2204:x86_64:
-  <<: *distrotest
-  variables:
-    OBS_REPO: knot-resolver-latest
-    DISTROTEST_NAME: ubuntu2204
-    DISTROTEST_REPO: xUbuntu_22.04
-
-.packagingtest: &packagingtest
-  stage: pkgtest
-  only:
-    refs:
-      - nightly@knot/knot-resolver
-  needs: []
-  tags:
-    - dind
+    - lxc
     - amd64
-  variables:
-    DISTRO: debian_10
   script:
-    - pytest -r fEsxX tests/packaging -k $DISTRO
+    # make sure the archive from pkg:make-archive is available
+    - apkg info cache | grep archive/dev
+    - apkg install --build-dep
+    - apkg test --test-dep
 
-packaging:centos_8:
-  <<: *packagingtest
-  variables:
-    DISTRO: centos_8
+.pkg_test_deb: &pkg_test_deb
+  <<: *pkg_test
+  <<: *pkg_deb_extras
 
-packaging:centos_7:
-  <<: *packagingtest
-  variables:
-    DISTRO: centos_7
+pkg:make-archive:
+  # archive is created once and reused in other pkg jobs
+  <<: *pkg_deb_extras
+  image: $CI_REGISTRY/packaging/apkg/lxc/debian-11
+  stage: pkg
+  needs: []
+  artifacts:
+    paths:
+      - pkg/
+  script:
+    - apkg build-dep
+    - apkg make-archive
 
-packaging:fedora_31:
-  <<: *packagingtest
-  variables:
-    DISTRO: fedora_31
+pkg:debian-11:
+  <<: *pkg_test_deb
+  image: $CI_REGISTRY/packaging/apkg/lxc/debian-11
 
-packaging:fedora_32:
-  <<: *packagingtest
-  variables:
-    DISTRO: fedora_32
+pkg:ubuntu-22.04:
+  <<: *pkg_test_deb
+  image: $CI_REGISTRY/packaging/apkg/lxc/ubuntu-22.04
 
-packaging:leap_15.2:
-  <<: *packagingtest
-  variables:
-    DISTRO: leap_15.2
+pkg:ubuntu-20.04:
+  <<: *pkg_test_deb
+  <<: *enable_repo_build
+  image: $CI_REGISTRY/packaging/apkg/lxc/ubuntu-20.04
+
+pkg:fedora-36:
+  <<: *pkg_test
+  image: $CI_REGISTRY/packaging/apkg/lxc/fedora-36
+
+pkg:rocky-8:
+  <<: *pkg_test
+  image: $CI_REGISTRY/packaging/apkg/lxc/rocky-8
+
+pkg:opensuse-15.4:
+  <<: *pkg_test
+  <<: *enable_repo_build
+  image: $CI_REGISTRY/packaging/apkg/lxc/opensuse-15.4
+  allow_failure: true  # SUSE is always special
 
 # }}}

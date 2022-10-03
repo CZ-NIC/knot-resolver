@@ -19,12 +19,12 @@ package_data = \
  'knot_resolver_manager.datamodel': ['templates/*', 'templates/macros/*']}
 
 install_requires = \
-['Jinja2>=2.11.3',
+['Jinja2',
  'PyYAML',
- 'aiohttp>=3.6',
- 'prometheus-client>=0.6',
- 'supervisor>=4',
- 'typing-extensions>=3.7.2']
+ 'aiohttp',
+ 'prometheus-client',
+ 'supervisor',
+ 'typing-extensions']
 
 entry_points = \
 {'console_scripts': ['kresctl = knot_resolver_manager.cli:main']}
