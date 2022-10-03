@@ -116,6 +116,18 @@ option(
 )
 
 option(
+  'manager',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'auto',
+  description: 'build manager and its features',
+)
+
+option(
   'client',
   type: 'combo',
   choices: [
