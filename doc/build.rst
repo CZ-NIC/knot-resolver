@@ -18,6 +18,49 @@ Beware that some 64-bit systems with LuaJIT 2.1 may be affected by
 
    $ git clone --recursive https://gitlab.nic.cz/knot/knot-resolver.git
 
+
+Building with `apkg`
+-------------------
+
+`apkg <https://pkg.labs.nic.cz/pages/apkg/>` is cross-distro upstream packaging automation tool that is also used by Knot Resolver.
+It allows you to locally build packages for supported distributions, which it then installs.
+`apkg` also takes care of dependencies itself.
+
+First, you need to install and setup `apkg`.
+
+.. code-block:: bash
+
+   $ pip3 install apkg
+   $ apkg system-setup
+
+
+Clone and change dir to `knot-resolver` git repository.
+
+.. code-block:: bash
+
+   $ git clone --recursive https://gitlab.nic.cz/knot/knot-resolver.git
+   $ cd knot-resolver
+
+
+.. tip:: The `apkg status` command can be used to find out useful information, such as whether the current distribution is supported.
+
+When the `apkg` is ready, the package can be build and installed.
+
+.. code-block:: bash
+
+   # takes care of dependencies
+   apkg build-dep
+
+   # build package
+   apkg build
+
+   # (build and) install package, builds package when it is not already built
+   apkg install
+
+
+After that Knot Resolver should be installed.
+
+
 Dependencies
 ------------
 
