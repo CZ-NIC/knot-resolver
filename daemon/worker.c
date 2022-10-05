@@ -706,115 +706,6 @@ static struct kr_query *task_get_last_pending_query(struct qr_task *task)
 	return array_tail(task->ctx->req.rplan.pending);
 }
 
-/* TODO: tls */
-//static int session_tls_hs_cb(struct session2 *session, int status)
-//{
-//	if (kr_fails_assert(session->outgoing))
-//		return kr_error(EINVAL);
-//	struct sockaddr *peer = session2_get_peer(session);
-//	int deletion_res = worker_del_tcp_waiting(peer);
-//	int ret = kr_ok();
-//
-//	if (status) {
-//		struct qr_task *task = session2_waitinglist_get(session);
-//		if (task) {
-//			// TLS handshake failed, report it to server selection
-//			struct kr_query *qry = array_tail(task->ctx->req.rplan.pending);
-//			qry->server_selection.error(qry, task->transport, KR_SELECTION_TLS_HANDSHAKE_FAILED);
-//		}
-//#ifndef NDEBUG
-//		else {
-//			/* Task isn't in the list of tasks
-//			 * waiting for connection to upstream.
-//			 * So that it MUST be unsuccessful rehandshake.
-//			 * Check it. */
-//			kr_require(deletion_res != 0);
-//			struct kr_sockaddr_key_storage key;
-//			ssize_t keylen = kr_sockaddr_key(&key, peer);
-//			if (keylen < 0)
-//				return keylen;
-//			trie_val_t *val;
-//			kr_require((val = trie_get_try(the_worker->tcp_connected, key.bytes, keylen)) && *val);
-//		}
-//#endif
-//		return ret;
-//	}
-//
-//	/* handshake was completed successfully */
-//	struct tls_client_ctx *tls_client_ctx = session_tls_get_client_ctx(session);
-//	tls_client_param_t *tls_params = tls_client_ctx->params;
-//	gnutls_session_t tls_session = tls_client_ctx->c.tls_session;
-//	if (gnutls_session_is_resumed(tls_session) != 0) {
-//		kr_log_debug(TLSCLIENT, "TLS session has resumed\n");
-//	} else {
-//		kr_log_debug(TLSCLIENT, "TLS session has not resumed\n");
-//		/* session wasn't resumed, delete old session data ... */
-//		if (tls_params->session_data.data != NULL) {
-//			gnutls_free(tls_params->session_data.data);
-//			tls_params->session_data.data = NULL;
-//			tls_params->session_data.size = 0;
-//		}
-//		/* ... and get the new session data */
-//		gnutls_datum_t tls_session_data = { NULL, 0 };
-//		ret = gnutls_session_get_data2(tls_session, &tls_session_data);
-//		if (ret == 0) {
-//			tls_params->session_data = tls_session_data;
-//		}
-//	}
-//
-//	struct session2 *s = worker_find_tcp_connected(peer);
-//	ret = kr_ok();
-//	if (deletion_res == kr_ok()) {
-//		/* peer was in the waiting list, add to the connected list. */
-//		if (s) {
-//			/* Something went wrong,
-//			 * peer already is in the connected list. */
-//			ret = kr_error(EINVAL);
-//		} else {
-//			ret = worker_add_tcp_connected(peer, session);
-//		}
-//	} else {
-//		/* peer wasn't in the waiting list.
-//		 * It can be
-//		 * 1) either successful rehandshake; in this case peer
-//		 *    must be already in the connected list.
-//		 * 2) or successful handshake with session, which was timed out
-//		 *    by on_tcp_connect_timeout(); after successful tcp connection;
-//		 *    in this case peer isn't in the connected list.
-//		 **/
-//		if (!s || s != session) {
-//			ret = kr_error(EINVAL);
-//		}
-//	}
-//	if (ret == kr_ok()) {
-//		while (!session_waitinglist_is_empty(session)) {
-//			struct qr_task *t = session_waitinglist_get(session);
-//			ret = qr_task_send(t, session, NULL, NULL);
-//			if (ret != 0) {
-//				break;
-//			}
-//			session_waitinglist_pop(session, true);
-//		}
-//	} else {
-//		ret = kr_error(EINVAL);
-//	}
-//
-//	if (ret != kr_ok()) {
-//		/* Something went wrong.
-//		 * Either addition to the list of connected sessions
-//		 * or write to upstream failed. */
-//		worker_del_tcp_connected(peer);
-//		session_waitinglist_finalize(session, KR_STATE_FAIL);
-//		session_tasklist_finalize(session, KR_STATE_FAIL);
-//		session_close(session);
-//	} else {
-//		session_timer_stop(session);
-//		session_timer_start(session, tcp_timeout_trigger,
-//				    MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
-//	}
-//	return kr_ok();
-//}
-
 static int send_waiting(struct session2 *session)
 {
 	int ret = 0;
@@ -1047,60 +938,61 @@ static bool subreq_enqueue(struct qr_task *task)
 	return true;
 }
 
-#if ENABLE_XDP
-static void xdp_tx_waker(uv_idle_t *handle)
-{
-	int ret = knot_xdp_send_finish(handle->data);
-	if (ret != KNOT_EAGAIN && ret != KNOT_EOK)
-		kr_log_error(XDP, "check: ret = %d, %s\n", ret, knot_strerror(ret));
-	/* Apparently some drivers need many explicit wake-up calls
-	 * even if we push no additional packets (in case they accumulated a lot) */
-	if (ret != KNOT_EAGAIN)
-		uv_idle_stop(handle);
-	knot_xdp_send_prepare(handle->data);
-	/* LATER(opt.): it _might_ be better for performance to do these two steps
-	 * at different points in time */
-}
-#endif
-/** Send an answer packet over XDP. */
-static int xdp_push(struct qr_task *task, const uv_handle_t *src_handle)
-{
-#if ENABLE_XDP
-	struct request_ctx *ctx = task->ctx;
-	xdp_handle_data_t *xhd = src_handle->data;
-	if (kr_fails_assert(xhd && xhd->socket && xhd->session == ctx->source.session))
-		return qr_task_on_send(task, NULL, kr_error(EINVAL));
-
-	knot_xdp_msg_t msg;
-#if KNOT_VERSION_HEX >= 0x030100
-	/* We don't have a nice way of preserving the _msg_t from frame allocation,
-	 * so we manually redo all other parts of knot_xdp_send_alloc() */
-	memset(&msg, 0, sizeof(msg));
-	bool ipv6 = ctx->source.addr.ip.sa_family == AF_INET6;
-	msg.flags = ipv6 ? KNOT_XDP_MSG_IPV6 : 0;
-	memcpy(msg.eth_from, &ctx->source.eth_addrs[0], 6);
-	memcpy(msg.eth_to,   &ctx->source.eth_addrs[1], 6);
-#endif
-	const struct sockaddr *ip_from = &ctx->source.dst_addr.ip;
-	const struct sockaddr *ip_to   = &ctx->source.comm_addr.ip;
-	memcpy(&msg.ip_from, ip_from, kr_sockaddr_len(ip_from));
-	memcpy(&msg.ip_to,   ip_to,   kr_sockaddr_len(ip_to));
-	msg.payload.iov_base = ctx->req.answer->wire;
-	msg.payload.iov_len  = ctx->req.answer->size;
-
-	uint32_t sent;
-	int ret = knot_xdp_send(xhd->socket, &msg, 1, &sent);
-	ctx->req.answer->wire = NULL; /* it's been freed */
-
-	uv_idle_start(&xhd->tx_waker, xdp_tx_waker);
-	kr_log_debug(XDP, "pushed a packet, ret = %d\n", ret);
-
-	return qr_task_on_send(task, xhd->session, ret);
-#else
-	kr_assert(!EINVAL);
-	return kr_error(EINVAL);
-#endif
-}
+//#if ENABLE_XDP
+//static void xdp_tx_waker(uv_idle_t *handle)
+//{
+//	int ret = knot_xdp_send_finish(handle->data);
+//	if (ret != KNOT_EAGAIN && ret != KNOT_EOK)
+//		kr_log_error(XDP, "check: ret = %d, %s\n", ret, knot_strerror(ret));
+//	/* Apparently some drivers need many explicit wake-up calls
+//	 * even if we push no additional packets (in case they accumulated a lot) */
+//	if (ret != KNOT_EAGAIN)
+//		uv_idle_stop(handle);
+//	knot_xdp_send_prepare(handle->data);
+//	/* LATER(opt.): it _might_ be better for performance to do these two steps
+//	 * at different points in time */
+//}
+//#endif
+//
+///** Send an answer packet over XDP. */
+//static int xdp_push(struct qr_task *task, const uv_handle_t *src_handle)
+//{
+//#if ENABLE_XDP
+//	struct request_ctx *ctx = task->ctx;
+//	xdp_handle_data_t *xhd = src_handle->data;
+//	if (kr_fails_assert(xhd && xhd->socket && xhd->session == ctx->source.session))
+//		return qr_task_on_send(task, NULL, kr_error(EINVAL));
+//
+//	knot_xdp_msg_t msg;
+//#if KNOT_VERSION_HEX >= 0x030100
+//	/* We don't have a nice way of preserving the _msg_t from frame allocation,
+//	 * so we manually redo all other parts of knot_xdp_send_alloc() */
+//	memset(&msg, 0, sizeof(msg));
+//	bool ipv6 = ctx->source.addr.ip.sa_family == AF_INET6;
+//	msg.flags = ipv6 ? KNOT_XDP_MSG_IPV6 : 0;
+//	memcpy(msg.eth_from, &ctx->source.eth_addrs[0], 6);
+//	memcpy(msg.eth_to,   &ctx->source.eth_addrs[1], 6);
+//#endif
+//	const struct sockaddr *ip_from = &ctx->source.dst_addr.ip;
+//	const struct sockaddr *ip_to   = &ctx->source.comm_addr.ip;
+//	memcpy(&msg.ip_from, ip_from, kr_sockaddr_len(ip_from));
+//	memcpy(&msg.ip_to,   ip_to,   kr_sockaddr_len(ip_to));
+//	msg.payload.iov_base = ctx->req.answer->wire;
+//	msg.payload.iov_len  = ctx->req.answer->size;
+//
+//	uint32_t sent;
+//	int ret = knot_xdp_send(xhd->socket, &msg, 1, &sent);
+//	ctx->req.answer->wire = NULL; /* it's been freed */
+//
+//	uv_idle_start(&xhd->tx_waker, xdp_tx_waker);
+//	kr_log_debug(XDP, "pushed a packet, ret = %d\n", ret);
+//
+//	return qr_task_on_send(task, xhd->session, ret);
+//#else
+//	kr_assert(!EINVAL);
+//	return kr_error(EINVAL);
+//#endif
+//}
 
 static int qr_task_finalize(struct qr_task *task, int state)
 {
