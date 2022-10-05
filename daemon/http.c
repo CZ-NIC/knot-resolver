@@ -72,7 +72,7 @@ struct pl_http_sess_data {
 	struct nghttp2_session *h2;
 
 	queue_http_stream streams;  /* Streams present in the wire buffer. */
-	trie_t *stream_write_data;  /* Dictionary of stream data that needs to be freed after write. */
+	trie_t *stream_write_queues;  /* Dictionary of stream data that needs to be freed after write. */
 	int32_t incomplete_stream;
 	int32_t last_stream;   /* The last used stream - mostly the same as incomplete_stream, but can be used after
 				  completion for sending HTTP status codes. */
@@ -295,8 +295,8 @@ static int http_send_response(struct pl_http_sess_data *http, int32_t stream_id,
 		max_age_len = asprintf(&max_age, "%s%" PRIu32, directive_max_age, ctx->payload.ttl);
 		kr_require(max_age_len >= 0);
 
-		/* TODO: add a per-group option for content-type if we need to
-		 * support protocols other than DNS here */
+		/* TODO: add a per-protolayer_grp option for content-type if we
+		 * need to support protocols other than DNS here */
 		push_nv(&hdrs, MAKE_STATIC_NV("content-type", "application/dns-message"));
 		push_nv(&hdrs, MAKE_STATIC_KEY_NV("content-length", size, size_len));
 		push_nv(&hdrs, MAKE_STATIC_KEY_NV("cache-control", max_age, max_age_len));
@@ -314,14 +314,28 @@ static int http_send_response(struct pl_http_sess_data *http, int32_t stream_id,
 	/* Keep reference to data, since we need to free it later on.
 	 * Due to HTTP/2 flow control, this stream data may be sent at a later point, or not at all.
 	 */
-	trie_val_t *stream_data_p = trie_get_ins(http->stream_write_data, (char *)&stream_id, sizeof(stream_id));
-	if (kr_fails_assert(stream_data_p)) {
-		kr_log_debug(DOH, "[%p] failed to insert to stream_write_data\n", (void *)h2);
-		if (ctx)
-			protolayer_break(ctx, kr_error(EIO));
-		return kr_error(EIO);
+	if (ctx) {
+		protolayer_iter_ctx_queue_t **ctx_queue =
+			(protolayer_iter_ctx_queue_t **)trie_get_ins(
+					http->stream_write_queues,
+					(char *)&stream_id, sizeof(stream_id));
+
+		if (kr_fails_assert(ctx_queue)) {
+			kr_log_debug(DOH, "[%p] failed to insert to stream_write_data\n", (void *)h2);
+			if (ctx)
+				protolayer_break(ctx, kr_error(EIO));
+			return kr_error(EIO);
+		}
+
+		if (!*ctx_queue) {
+			*ctx_queue = malloc(sizeof(**ctx_queue));
+			kr_require(*ctx_queue);
+			queue_init(**ctx_queue);
+		}
+
+		queue_push(**ctx_queue, ctx);
 	}
-	*stream_data_p = ctx;
+
 	ret = nghttp2_session_send(h2);
 	if(ret) {
 		kr_log_debug(DOH, "[%p] nghttp2_session_send failed: %s\n", (void *)h2, nghttp2_strerror(ret));
@@ -762,7 +776,6 @@ static int on_frame_recv_callback(nghttp2_session *h2, const nghttp2_frame *fram
 static int on_stream_close_callback(nghttp2_session *h2, int32_t stream_id,
                                     uint32_t error_code, void *user_data)
 {
-	struct protolayer_iter_ctx *ctx;
 	struct pl_http_sess_data *http = user_data;
 	int ret;
 
@@ -771,9 +784,18 @@ static int on_stream_close_callback(nghttp2_session *h2, int32_t stream_id,
 	if (http->incomplete_stream == stream_id)
 		http_cleanup_stream(http);
 
-	ret = trie_del(http->stream_write_data, (char *)&stream_id, sizeof(stream_id), (trie_val_t*)&ctx);
-	if (ret == KNOT_EOK && ctx)
-		protolayer_break(ctx, error_code == 0 ? 0 : kr_error(EIO));
+	protolayer_iter_ctx_queue_t *queue;
+	ret = trie_del(http->stream_write_queues, (char *)&stream_id, sizeof(stream_id), (trie_val_t*)&queue);
+	if (ret == KNOT_EOK && queue) {
+		uint32_t e = error_code == 0 ? 0 : kr_error(EIO);
+		while (queue_len(*queue) > 0) {
+			struct protolayer_iter_ctx *ctx = queue_head(*queue);
+			protolayer_break(ctx, e);
+			queue_pop(*queue);
+		}
+		queue_deinit(*queue);
+		free(queue);
+	}
 
 	return 0;
 }
@@ -836,7 +858,7 @@ static int pl_http_sess_init(struct protolayer_manager *manager,
 		callbacks, on_stream_close_callback);
 
 	queue_init(http->streams);
-	http->stream_write_data = trie_create(NULL);
+	http->stream_write_queues = trie_create(NULL);
 	http->incomplete_stream = -1;
 	http->last_stream = -1;
 	http->current_method = HTTP_METHOD_NONE;
@@ -863,7 +885,17 @@ exit_callbacks:
 
 static int stream_write_data_break_err(trie_val_t *val, void *baton)
 {
-	protolayer_break(*val, kr_error(EIO));
+	protolayer_iter_ctx_queue_t *queue = *val;
+	if (!queue)
+		return 0;
+
+	while (queue_len(*queue) > 0) {
+		struct protolayer_iter_ctx *ctx = queue_head(*queue);
+		protolayer_break(ctx, kr_error(EIO));
+		queue_pop(*queue);
+	}
+	queue_deinit(*queue);
+	free(queue);
 	return 0;
 }
 
@@ -880,8 +912,8 @@ static int pl_http_sess_deinit(struct protolayer_manager *manager,
 		queue_pop(http->streams);
 	}
 
-	trie_apply(http->stream_write_data, stream_write_data_break_err, NULL);
-	trie_free(http->stream_write_data);
+	trie_apply(http->stream_write_queues, stream_write_data_break_err, NULL);
+	trie_free(http->stream_write_queues);
 
 	http_cleanup_stream(http);
 	queue_deinit(http->streams);
