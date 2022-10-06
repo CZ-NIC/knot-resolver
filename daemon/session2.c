@@ -14,6 +14,14 @@
 #include "daemon/session2.h"
 
 
+#define VERBOSE_LOG(session, fmt, ...) do {\
+	if (kr_log_is_debug(PROTOLAYER, NULL)) {\
+		const char *sess_dir = (session)->outgoing ? "out" : "in";\
+		kr_log_debug(PROTOLAYER, "(%s) " fmt, sess_dir, __VA_ARGS__);\
+	}\
+} while (0);\
+
+
 struct protolayer_globals protolayer_globals[PROTOLAYER_PROTOCOL_COUNT] = {{0}};
 
 static const enum protolayer_protocol protolayer_grp_doudp[] = {
@@ -288,12 +296,12 @@ static int protolayer_iter_ctx_finish(struct protolayer_iter_ctx *ctx, int ret)
 	}
 
 	if (ret)
-		kr_log_debug(PROTOLAYER, "layer context of group '%s' (on %u: %s) ended with return code %d\n",
+		VERBOSE_LOG(session, "layer context of group '%s' (on %u: %s) ended with return code %d\n",
 				protolayer_grp_names[ctx->manager->grp],
 				ctx->layer_ix, layer_name_ctx(ctx), ret);
 
 	if (ctx->status)
-		kr_log_debug(PROTOLAYER, "iteration of group '%s' (on %u: %s) ended with status %d\n",
+		VERBOSE_LOG(session, "iteration of group '%s' (on %u: %s) ended with status %d\n",
 				protolayer_grp_names[ctx->manager->grp],
 				ctx->layer_ix, layer_name_ctx(ctx), ctx->status);
 
@@ -323,7 +331,7 @@ static int protolayer_push(struct protolayer_iter_ctx *ctx)
 	}
 
 	if (kr_log_is_debug(PROTOLAYER, NULL)) {
-		kr_log_debug(PROTOLAYER, "Pushing %s\n",
+		VERBOSE_LOG(session, "Pushing %s\n",
 				protolayer_payload_names[ctx->payload.type]);
 	}
 
@@ -433,15 +441,12 @@ static int protolayer_manager_submit(
 	struct protolayer_iter_ctx *ctx = malloc(manager->cb_ctx_size);
 	kr_require(ctx);
 
-	if (kr_log_is_debug(PROTOLAYER, NULL)) {
-		const char *sess_dir = manager->session->outgoing ? "out" : "in";
-		kr_log_debug(PROTOLAYER, "[%s] %s submitted to grp '%s' in %s direction (%zu: %s)\n",
-				sess_dir,
-				protolayer_payload_names[payload.type],
-				protolayer_grp_names[manager->grp],
-				(direction == PROTOLAYER_UNWRAP) ? "unwrap" : "wrap",
-				layer_ix, layer_name(manager->grp, layer_ix));
-	}
+	VERBOSE_LOG(manager->session,
+			"%s submitted to grp '%s' in %s direction (%zu: %s)\n",
+			protolayer_payload_names[payload.type],
+			protolayer_grp_names[manager->grp],
+			(direction == PROTOLAYER_UNWRAP) ? "unwrap" : "wrap",
+			layer_ix, layer_name(manager->grp, layer_ix));
 
 	*ctx = (struct protolayer_iter_ctx) {
 		.payload = payload,
