@@ -15,8 +15,6 @@ struct qr_task;
 struct worker_ctx;
 /** Transport session (opaque). */
 struct session2;
-/** Zone import context (opaque). */
-struct zone_import_ctx;
 /** Data about the communication (defined in io.h). */
 struct comm_info;
 
@@ -29,18 +27,6 @@ int worker_init();
 
 /** Destroy the worker (free memory). */
 void worker_deinit();
-
-/**
- * Process an incoming packet (query from a client or answer from upstream).
- *
- * @param session     session the packet came from, or NULL (not from network)
- * @param comm        IO communication data (see `struct io_comm_data` docs)
- * @param eth_*       MAC addresses or NULL (they're useful for XDP)
- * @param pkt         the packet, or NULL (an error from the transport layer)
- * @return 0 or an error code
- */
-int worker_submit(struct session2 *session, struct comm_info *comm,
-                  const uint8_t *eth_from, const uint8_t *eth_to, knot_pkt_t *pkt);
 
 /**
  * End current DNS/TCP session, this disassociates pending tasks from this session
@@ -93,14 +79,7 @@ void worker_task_unref(struct qr_task *task);
 
 void worker_task_timeout_inc(struct qr_task *task);
 
-int worker_add_tcp_connected(const struct sockaddr *addr, struct session2 *session);
-int worker_del_tcp_connected(const struct sockaddr *addr);
-int worker_del_tcp_waiting(const struct sockaddr* addr);
-struct session2* worker_find_tcp_waiting(const struct sockaddr* addr);
-struct session2* worker_find_tcp_connected(const struct sockaddr* addr);
 knot_pkt_t *worker_task_get_pktbuf(const struct qr_task *task);
-
-struct request_ctx *worker_task_get_request(struct qr_task *task);
 
 /** Note: source session is NULL in case the request hasn't come over network. */
 KR_EXPORT struct session2 *worker_request_get_source_session(const struct kr_request *req);

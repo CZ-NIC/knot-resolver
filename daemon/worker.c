@@ -104,7 +104,14 @@ static int qr_task_send(struct qr_task *task, struct session2 *session,
 			const struct sockaddr *addr, knot_pkt_t *pkt);
 static int qr_task_finalize(struct qr_task *task, int state);
 static void qr_task_complete(struct qr_task *task);
-static int worker_add_tcp_waiting(const struct sockaddr* addr, struct session2 *session);
+static int worker_add_tcp_connected(const struct sockaddr* addr, struct session2 *session);
+static int worker_del_tcp_connected(const struct sockaddr* addr);
+static struct session2* worker_find_tcp_connected(const struct sockaddr* addr);
+static int worker_add_tcp_waiting(const struct sockaddr* addr,
+				  struct session2 *session);
+static int worker_del_tcp_waiting(const struct sockaddr* addr);
+static struct session2* worker_find_tcp_waiting(const struct sockaddr* addr);
+
 static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_source, knot_pkt_t *pkt);
 
 
@@ -1471,17 +1478,17 @@ static struct session2 *trie_find_tcp_session(trie_t *trie,
 	return val ? *val : NULL;
 }
 
-int worker_add_tcp_connected(const struct sockaddr* addr, struct session2 *session)
+static int worker_add_tcp_connected(const struct sockaddr* addr, struct session2 *session)
 {
 	return trie_add_tcp_session(the_worker->tcp_connected, addr, session);
 }
 
-int worker_del_tcp_connected(const struct sockaddr* addr)
+static int worker_del_tcp_connected(const struct sockaddr* addr)
 {
 	return trie_del_tcp_session(the_worker->tcp_connected, addr);
 }
 
-struct session2* worker_find_tcp_connected(const struct sockaddr* addr)
+static struct session2* worker_find_tcp_connected(const struct sockaddr* addr)
 {
 	return trie_find_tcp_session(the_worker->tcp_connected, addr);
 }
@@ -1492,12 +1499,12 @@ static int worker_add_tcp_waiting(const struct sockaddr* addr,
 	return trie_add_tcp_session(the_worker->tcp_waiting, addr, session);
 }
 
-int worker_del_tcp_waiting(const struct sockaddr* addr)
+static int worker_del_tcp_waiting(const struct sockaddr* addr)
 {
 	return trie_del_tcp_session(the_worker->tcp_waiting, addr);
 }
 
-struct session2* worker_find_tcp_waiting(const struct sockaddr* addr)
+static struct session2* worker_find_tcp_waiting(const struct sockaddr* addr)
 {
 	return trie_find_tcp_session(the_worker->tcp_waiting, addr);
 }
@@ -1621,15 +1628,10 @@ int worker_task_finalize(struct qr_task *task, int state)
 	return qr_task_finalize(task, state);
 }
 
- int worker_task_step(struct qr_task *task, const struct sockaddr *packet_source,
-		      knot_pkt_t *packet)
- {
-	 return qr_task_step(task, packet_source, packet);
- }
-
-void worker_task_complete(struct qr_task *task)
+int worker_task_step(struct qr_task *task, const struct sockaddr *packet_source,
+                     knot_pkt_t *packet)
 {
-	qr_task_complete(task);
+	 return qr_task_step(task, packet_source, packet);
 }
 
 void worker_task_ref(struct qr_task *task)
@@ -1650,11 +1652,6 @@ void worker_task_timeout_inc(struct qr_task *task)
 knot_pkt_t *worker_task_get_pktbuf(const struct qr_task *task)
 {
 	return task->pktbuf;
-}
-
-struct request_ctx *worker_task_get_request(struct qr_task *task)
-{
-	return task->ctx;
 }
 
 struct session2 *worker_request_get_source_session(const struct kr_request *req)

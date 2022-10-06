@@ -14,41 +14,28 @@
 #include "daemon/session2.h"
 
 
-static int session2_transport_pushv(struct session2 *s,
-                                    struct iovec *iov, int iovcnt,
-                                    const void *target,
-                                    protolayer_finished_cb cb, void *baton);
-static inline int session2_transport_push(struct session2 *s,
-                                          char *buf, size_t buf_len,
-                                          const void *target,
-                                          protolayer_finished_cb cb, void *baton);
-static int session2_transport_event(struct session2 *s,
-                                    enum protolayer_event_type event,
-                                    void *baton);
-
 struct protolayer_globals protolayer_globals[PROTOLAYER_PROTOCOL_COUNT] = {{0}};
 
-
-static enum protolayer_protocol protolayer_grp_doudp[] = {
+static const enum protolayer_protocol protolayer_grp_doudp[] = {
 	PROTOLAYER_UDP,
 	PROTOLAYER_DNS_DGRAM,
 	PROTOLAYER_NULL
 };
 
-static enum protolayer_protocol protolayer_grp_dotcp[] = {
+static const enum protolayer_protocol protolayer_grp_dotcp[] = {
 	PROTOLAYER_TCP,
 	PROTOLAYER_DNS_MULTI_STREAM,
 	PROTOLAYER_NULL
 };
 
-static enum protolayer_protocol protolayer_grp_dot[] = {
+static const enum protolayer_protocol protolayer_grp_dot[] = {
 	PROTOLAYER_TCP,
 	PROTOLAYER_TLS,
 	PROTOLAYER_DNS_MULTI_STREAM,
 	PROTOLAYER_NULL
 };
 
-static enum protolayer_protocol protolayer_grp_doh[] = {
+static const enum protolayer_protocol protolayer_grp_doh[] = {
 	PROTOLAYER_TCP,
 	PROTOLAYER_TLS,
 	PROTOLAYER_HTTP,
@@ -72,7 +59,7 @@ const char *protolayer_protocol_names[PROTOLAYER_PROTOCOL_COUNT] = {
  * the end of the list of protocol layers. The array name's suffix must be the
  * one defined as *Variable name* (2nd parameter) in the `PROTOLAYER_GRP_MAP`
  * macro. */
-static enum protolayer_protocol *protolayer_grps[PROTOLAYER_GRP_COUNT] = {
+static const enum protolayer_protocol *protolayer_grps[PROTOLAYER_GRP_COUNT] = {
 #define XX(cid, vid, name) [PROTOLAYER_GRP_##cid] = protolayer_grp_##vid,
 	PROTOLAYER_GRP_MAP(XX)
 #undef XX
@@ -101,6 +88,21 @@ const char *protolayer_payload_names[PROTOLAYER_PAYLOAD_COUNT] = {
 	PROTOLAYER_PAYLOAD_MAP(XX)
 #undef XX
 };
+
+
+/* Forward decls. */
+static int session2_transport_pushv(struct session2 *s,
+                                    struct iovec *iov, int iovcnt,
+                                    const void *target,
+                                    protolayer_finished_cb cb, void *baton);
+static inline int session2_transport_push(struct session2 *s,
+                                          char *buf, size_t buf_len,
+                                          const void *target,
+                                          protolayer_finished_cb cb, void *baton);
+static int session2_transport_event(struct session2 *s,
+                                    enum protolayer_event_type event,
+                                    void *baton);
+
 
 size_t protolayer_payload_size(const struct protolayer_payload *payload)
 {
@@ -419,9 +421,9 @@ static int protolayer_step(struct protolayer_iter_ctx *ctx)
  * specified protolayer manager. The sequence will be processed in the
  * specified direction.
  *
- * Returns 0 when all layers have finished, 1 when some layers are asynchronous
- * and waiting for continuation, 2 when a layer is waiting for more data,
- * or a negative number for errors (kr_error). */
+ * Returns PROTOLAYER_RET_NORMAL when all layers have finished,
+ * PROTOLAYER_RET_ASYNC when some layers are asynchronous and waiting for
+ * continuation, or a negative number for errors (kr_error). */
 static int protolayer_manager_submit(
 		struct protolayer_manager *manager,
 		enum protolayer_direction direction, size_t layer_ix,
@@ -496,10 +498,10 @@ static struct protolayer_manager *protolayer_manager_new(
 	size_t manager_size = sizeof(struct protolayer_manager);
 	size_t cb_ctx_size = sizeof(struct protolayer_iter_ctx);
 
-	enum protolayer_protocol *protocols = protolayer_grps[grp];
+	const enum protolayer_protocol *protocols = protolayer_grps[grp];
 	if (kr_fails_assert(protocols))
 		return NULL;
-	enum protolayer_protocol *p = protocols;
+	const enum protolayer_protocol *p = protocols;
 
 	/* Space for offset index */
 	for (; *p; p++)

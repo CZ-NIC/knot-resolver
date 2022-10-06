@@ -219,6 +219,7 @@ enum protolayer_event_type {
 	PROTOLAYER_EVENT_COUNT
 };
 
+/** Maps event IDs to names. */
 extern const char *protolayer_event_names[];
 
 
@@ -232,8 +233,8 @@ extern const char *protolayer_event_names[];
 	XX(IOVEC, "IOVec") \
 	XX(WIRE_BUF, "Wire buffer")
 
-/** Defines whether the data for a `struct protolayer_cb_ctx` is represented
- * by a single buffer, an array of `struct iovec`, or an `enum protolayer_event`. */
+/** Determines which union member of `struct protolayer_payload` is currently
+ * valid. */
 enum protolayer_payload_type {
 	PROTOLAYER_PAYLOAD_NULL = 0,
 #define XX(cid, name) PROTOLAYER_PAYLOAD_##cid,
@@ -242,6 +243,7 @@ enum protolayer_payload_type {
 	PROTOLAYER_PAYLOAD_COUNT
 };
 
+/** Maps payload type IDs to human-readable names. */
 extern const char *protolayer_payload_names[];
 
 /** Data processed by the sequence of layers. All pointed-to memory is always
@@ -250,7 +252,7 @@ extern const char *protolayer_payload_names[];
  * is ever (de-)allocated by the protolayer manager! */
 struct protolayer_payload {
 	enum protolayer_payload_type type;
-	unsigned int ttl; /**< time-to-live hint (for e.g. HTTP Cache-Control) */
+	unsigned int ttl; /**< time-to-live hint (e.g. for HTTP Cache-Control) */
 	union {
 		/** Only valid if `type` is `_BUFFER`. */
 		struct {
@@ -583,10 +585,12 @@ struct wire_buf {
 	size_t end; /**< Index at which the valid data of the buffer ends (exclusive). */
 };
 
-/** Allocates the wire buffer with the specified `initial_size`. */
+/** Initializes the wire buffer with the specified `initial_size` and allocates
+ * the underlying memory. */
 int wire_buf_init(struct wire_buf *wb, size_t initial_size);
 
-/** De-allocates the wire buffer. */
+/** De-allocates the wire buffer's underlying memory (the struct itself is left
+ * intact). */
 void wire_buf_deinit(struct wire_buf *wb);
 
 /** Ensures that the wire buffer's size is at least `size`. `*wb` must be
