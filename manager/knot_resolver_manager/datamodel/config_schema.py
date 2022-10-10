@@ -84,6 +84,7 @@ class KresConfig(BaseSchema):
         Knot Resolver declarative configuration.
 
         ---
+        version: Version of the configuration schema. By default it is the latest supported by the resolver, but couple of versions back are be supported as well.
         nsid: Name Server Identifier (RFC 5001) which allows DNS clients to request resolver to send back its NSID along with the reply to a DNS request.
         hostname: Internal DNS resolver hostname. Default is machine hostname.
         rundir: Directory where the resolver can create files and which will be it's cwd.
@@ -108,6 +109,7 @@ class KresConfig(BaseSchema):
         lua: Custom Lua configuration.
         """
 
+        version: int = 1
         nsid: Optional[str] = None
         hostname: Optional[str] = None
         rundir: UncheckedPath = UncheckedPath(".")
