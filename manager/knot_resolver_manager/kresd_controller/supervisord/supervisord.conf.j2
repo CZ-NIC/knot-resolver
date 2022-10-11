@@ -2,17 +2,33 @@
 pidfile = {{ config.pid_file }}
 directory = {{ config.workdir }}
 nodaemon = true
-logfile = {{ config.logfile }}
-logfile_maxbytes = 50MB
-loglevel = info
-silent=true
-{# user=root #}
+
+{# disable initial logging until patch_logger.py takes over #}
+logfile = /dev/null
+logfile_maxbytes = 0
+silent = true
+
+{# config for patch_logger.py #}
+loglevel = {{ config.loglevel }}
+{# there are more options in the plugin section #}
+
 
 [unix_http_server]
 file = {{ config.unix_http_server }}
 
 [supervisorctl]
 serverurl = unix://{{ config.unix_http_server }}
+
+{# Extensions to changing the supervisord behavior #}
+[rpcinterface:patch_logger]
+supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.patch_logger:inject
+target = {{ config.target }}
+
+[rpcinterface:manager_lifecycle_monitor]
+supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.manager_lifecycle_monitor:inject
+
+[rpcinterface:sd_notify]
+supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.sd_notify:inject
 
 {# Extensions for actual API control #}
 [rpcinterface:supervisor]
@@ -21,21 +37,10 @@ supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
 [rpcinterface:fast]
 supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.fast_rpcinterface:make_main_rpcinterface
 
-{# Extensions to changing the supervisord behavior #}
-[rpcinterface:manager_lifecycle_monitor]
-supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.manager_lifecycle_monitor:make_rpcinterface
-
-[rpcinterface:notify]
-supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin:make_rpcinterface
-
-[rpcinterface:stdout_pipe]
-supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.stdout_pipe_log:make_rpcinterface
 
 
 [program:manager]
 redirect_stderr=false
-stdout_logfile=/proc/self/fd/42  # handled by stdout_pipe plugin
-stdout_logfile_maxbytes=0
 directory={{ manager.workdir }}
 command={{ manager.command }}
 stopsignal=SIGINT
@@ -43,14 +48,12 @@ killasgroup=true
 autorestart=true
 autostart=true
 startsecs=5
-environment={{ manager.environment }}
+environment={{ manager.environment }},KRES_SUPRESS_LOG_PREFIX=true
 
 [program:kresd]
 process_name=%(program_name)s%(process_num)d
 numprocs={{ kresd.max_procs }}
 redirect_stderr=false
-stdout_logfile={{ kresd.logfile }}
-stderr_logfile={{ kresd.logfile }}
 directory={{ kresd.workdir }}
 command={{ kresd.command }}
 autostart=false
@@ -62,8 +65,6 @@ environment={{ kresd.environment }}
 
 [program:gc]
 redirect_stderr=false
-stdout_logfile={{ gc.logfile }}
-stderr_logfile={{ gc.logfile }}
 directory={{ gc.workdir }}
 command={{ gc.command }}
 autostart=false

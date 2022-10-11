@@ -1,9 +1,11 @@
-from typing import List, Optional, Set, Union
+import os
+from typing import Any, List, Optional, Set, Type, Union, cast
 
 from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import CheckedPath, TimeUnit
 from knot_resolver_manager.utils.modeling import BaseSchema
+from knot_resolver_manager.utils.modeling.base_schema import is_obj_type_Valid
 
 try:
     # On Debian 10, the typing_extensions library does not contain TypeAlias.
@@ -18,6 +20,7 @@ LogLevelEnum = Literal["crit", "err", "warning", "notice", "info", "debug"]
 LogTargetEnum = Literal["syslog", "stderr", "stdout"]
 LogGroupsEnum: TypeAlias = Literal[
     "manager",
+    "supervisord",
     "system",
     "cache",
     "io",
@@ -97,24 +100,43 @@ class DebuggingSchema(BaseSchema):
 
 
 class LoggingSchema(BaseSchema):
-    """
-    Logging and debugging configuration.
+    class Raw(BaseSchema):
+        """
+        Logging and debugging configuration.
 
-    ---
-    level: Global logging level.
-    target: Global logging stream target.
-    groups: List of groups for which 'debug' logging level is set.
-    dnssec_bogus: Logging a message for each DNSSEC validation failure.
-    dnstap: Logging DNS requests and responses to a unix socket.
-    debugging: Advanced debugging parameters for kresd (Knot Resolver daemon).
-    """
+        ---
+        level: Global logging level.
+        target: Global logging stream target. "from-env" uses $KRES_LOG_TARGET and defaults to "stdout".
+        groups: List of groups for which 'debug' logging level is set.
+        dnssec_bogus: Logging a message for each DNSSEC validation failure.
+        dnstap: Logging DNS requests and responses to a unix socket.
+        debugging: Advanced debugging parameters for kresd (Knot Resolver daemon).
+        """
 
-    level: LogLevelEnum = "notice"
-    target: Optional[LogTargetEnum] = None
-    groups: Optional[List[LogGroupsEnum]] = None
-    dnssec_bogus: bool = False
-    dnstap: Union[Literal[False], DnstapSchema] = False
-    debugging: DebuggingSchema = DebuggingSchema()
+        level: LogLevelEnum = "notice"
+        target: Union[LogTargetEnum, Literal["from-env"]] = "from-env"
+        groups: Optional[List[LogGroupsEnum]] = None
+        dnssec_bogus: bool = False
+        dnstap: Union[Literal[False], DnstapSchema] = False
+        debugging: DebuggingSchema = DebuggingSchema()
+
+    _LAYER = Raw
+
+    level: LogLevelEnum
+    target: LogTargetEnum
+    groups: Optional[List[LogGroupsEnum]]
+    dnssec_bogus: bool
+    dnstap: Union[Literal[False], DnstapSchema]
+    debugging: DebuggingSchema
+
+    def _target(self, raw: Raw) -> LogTargetEnum:
+        if raw.target == "from-env":
+            target = os.environ.get("KRES_LOGGING_TARGET") or "stdout"
+            if not is_obj_type_Valid(target, cast(Type[Any], LogTargetEnum)):
+                raise ValueError(f"logging target '{target}' read from $KRES_LOGGING_TARGET is invalid")
+            return cast(LogTargetEnum, target)
+        else:
+            return raw.target
 
     def _validate(self):
         if self.groups is None:

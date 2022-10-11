@@ -45,10 +45,6 @@ def supervisord_config_file_tmp(_config: "KresConfig") -> Path:
     return Path("supervisord.conf.tmp")
 
 
-def supervisord_log_file(_config: "KresConfig") -> Path:
-    return Path("supervisord.log")
-
-
 def supervisord_pid_file(_config: "KresConfig") -> Path:
     return Path("supervisord.pid")
 

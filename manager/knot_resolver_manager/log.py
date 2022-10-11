@@ -1,5 +1,6 @@
 import logging
 import logging.handlers
+import os
 import sys
 from typing import Optional
 
@@ -11,7 +12,20 @@ from knot_resolver_manager.datamodel.logging_schema import LogTargetEnum
 logger = logging.getLogger(__name__)
 
 
-FORMAT = "%(relativeCreated)dms:%(levelname)s:%(name)s:%(message)s"
+def get_log_format(config: KresConfig) -> str:
+    """
+    Based on an environment variable $KRES_SUPRESS_LOG_PREFIX, returns the appropriate format string for logger.
+    """
+
+    if os.environ.get("KRES_SUPRESS_LOG_PREFIX") == "true":
+        # In this case, we are running under supervisord and it's adding prefixes to our output
+        return "[%(levelname)s] %(name)s: %(message)s"
+    else:
+        # In this case, we are running standalone during inicialization and we need to add a prefix to each line
+        # by ourselves to make it consistent
+        assert config.logging.target != "syslog"
+        channel = config.logging.target[3:]
+        return f"[%(asctime)s][manager:{channel}] [%(levelname)s] %(name)s: %(message)s"
 
 
 async def _set_log_level(config: KresConfig) -> None:
@@ -24,9 +38,9 @@ async def _set_log_level(config: KresConfig) -> None:
         "debug": "DEBUG",
     }
 
-    # when logging is configured but not for us, still log all WARNING
-    if config.logging.groups and "manager" not in config.logging.groups:
-        target = "WARNING"
+    # when logging group is set to make us log with DEBUG
+    if config.logging.groups and "manager" in config.logging.groups:
+        target = "DEBUG"
     # otherwise, follow the standard log level
     else:
         target = levels_map[config.logging.level]
@@ -45,13 +59,13 @@ async def _set_logging_handler(config: KresConfig) -> None:
     handler: logging.Handler
     if target == "syslog":
         handler = logging.handlers.SysLogHandler(address="/dev/log")
-        handler.setFormatter(logging.Formatter("%(name)s:%(message)s"))
+        handler.setFormatter(logging.Formatter("%(name)s: %(message)s"))
     elif target == "stdout":
         handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(logging.Formatter(FORMAT))
+        handler.setFormatter(logging.Formatter(get_log_format(config)))
     elif target == "stderr":
         handler = logging.StreamHandler(sys.stderr)
-        handler.setFormatter(logging.Formatter(FORMAT))
+        handler.setFormatter(logging.Formatter(get_log_format(config)))
     else:
         raise RuntimeError(f"Unexpected value '{target}' for log target in the config")
 

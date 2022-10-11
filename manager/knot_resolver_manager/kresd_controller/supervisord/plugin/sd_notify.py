@@ -161,7 +161,6 @@ def supervisord_get_process_map(supervisord: Any, mp: Dict[Any, Any]) -> Dict[An
 def process_spawn_as_child_add_env(slf: Subprocess, *args: Any) -> Tuple[Any, ...]:
     if is_type_notify(slf):
         slf.config.environment["NOTIFY_SOCKET"] = "@knot-resolver-control-socket"
-        slf.config.options.logger.info("setting env")
     return (slf, *args)
 
 
@@ -206,7 +205,7 @@ def monkeypatch(supervisord: Supervisor) -> None:
     subscribe(ProcessStateEvent, keep_track_of_starting_processes)
 
 
-def make_rpcinterface(supervisord: Supervisor, **_config: Any) -> Any:  # pylint: disable=useless-return
+def inject(supervisord: Supervisor, **_config: Any) -> Any:  # pylint: disable=useless-return
     monkeypatch(supervisord)
 
     # this method is called by supervisord when loading the plugin,
