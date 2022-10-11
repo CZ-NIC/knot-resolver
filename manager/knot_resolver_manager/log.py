@@ -24,8 +24,12 @@ def get_log_format(config: KresConfig) -> str:
         # In this case, we are running standalone during inicialization and we need to add a prefix to each line
         # by ourselves to make it consistent
         assert config.logging.target != "syslog"
-        channel = config.logging.target[3:]
-        return f"[%(asctime)s][manager:{channel}] [%(levelname)s] %(name)s: %(message)s"
+        stream = ""
+        if config.logging.target == "stderr":
+            stream = " (stderr)"
+
+        pid = os.getpid()
+        return f"%(asctime)s manager[{pid}]{stream}: [%(levelname)s] %(name)s: %(message)s"
 
 
 async def _set_log_level(config: KresConfig) -> None:

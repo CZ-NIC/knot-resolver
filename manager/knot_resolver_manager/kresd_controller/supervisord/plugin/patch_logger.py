@@ -1,6 +1,7 @@
 # type: ignore
 # pylint: disable=protected-access
 
+import os
 import sys
 import traceback
 from typing import Any
@@ -32,8 +33,13 @@ def POutputDispatcher_log(self: POutputDispatcher, data: bytearray):
         config = self.process.config
         config.options.logger.handlers = forward_handlers
         for line in text.splitlines():
-            msg = "[%(name)s:%(channel)s] %(data)s"
-            config.options.logger.log(FORWARD_LOG_LEVEL, msg, name=config.name, channel=self.channel[3:], data=line)
+            msg = "%(name)s[%(pid)d]%(stream)s: %(data)s"
+            stream = ""
+            if self.channel == "stderr":
+                stream = " (stderr)"
+            config.options.logger.log(
+                FORWARD_LOG_LEVEL, msg, name=config.name, stream=stream, data=line, pid=self.process.pid
+            )
         config.options.logger.handlers = supervisord_handlers
 
 
@@ -57,13 +63,13 @@ def inject(supervisord: Supervisor, **config: Any) -> Any:  # pylint: disable=us
         supervisord.options.logger.info("reconfiguring log handlers")
         supervisord_handlers.append(
             _create_handler(
-                "[%(asctime)s][supervisor] [%(levelname)s] %(message)s\n",
+                f"%(asctime)s supervisor[{os.getpid()}]: [%(levelname)s] %(message)s\n",
                 supervisord.options.loglevel,
                 config["target"],
             )
         )
         forward_handlers.append(
-            _create_handler("[%(asctime)s]%(message)s\n", supervisord.options.loglevel, config["target"])
+            _create_handler("%(asctime)s %(message)s\n", supervisord.options.loglevel, config["target"])
         )
         supervisord.options.logger.handlers = supervisord_handlers
 
