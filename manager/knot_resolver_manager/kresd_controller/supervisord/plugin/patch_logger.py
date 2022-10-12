@@ -18,6 +18,9 @@ def empty_function(*args, **kwargs):
     pass
 
 
+FORWARD_MSG_FORMAT: str = "%(name)s[%(pid)d]%(stream)s: %(data)s"
+
+
 def POutputDispatcher_log(self: POutputDispatcher, data: bytearray):
     if data:
         # parse the input
@@ -33,12 +36,11 @@ def POutputDispatcher_log(self: POutputDispatcher, data: bytearray):
         config = self.process.config
         config.options.logger.handlers = forward_handlers
         for line in text.splitlines():
-            msg = "%(name)s[%(pid)d]%(stream)s: %(data)s"
             stream = ""
             if self.channel == "stderr":
                 stream = " (stderr)"
             config.options.logger.log(
-                FORWARD_LOG_LEVEL, msg, name=config.name, stream=stream, data=line, pid=self.process.pid
+                FORWARD_LOG_LEVEL, FORWARD_MSG_FORMAT, name=config.name, stream=stream, data=line, pid=self.process.pid
             )
         config.options.logger.handlers = supervisord_handlers
 
@@ -74,10 +76,14 @@ def inject(supervisord: Supervisor, **config: Any) -> Any:  # pylint: disable=us
         supervisord.options.logger.handlers = supervisord_handlers
 
         # replace output handler for subprocesses
+        POutputDispatcher._log = POutputDispatcher_log
+
+        # we forward stdio in all cases, even when logging to syslog. This should prevent the unforturtunate
+        # case of swallowing an error message leaving the users confused. To make the forwarded lines obvious
+        # we just prepend a explanatory string at the beginning of all messages
         if config["target"] == "syslog":
-            POutputDispatcher._log = empty_function
-        else:
-            POutputDispatcher._log = POutputDispatcher_log
+            global FORWARD_MSG_FORMAT
+            FORWARD_MSG_FORMAT = "captured stdio output from " + FORWARD_MSG_FORMAT
 
         # this method is called by supervisord when loading the plugin,
         # it should return XML-RPC object, which we don't care about
