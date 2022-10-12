@@ -652,3 +652,15 @@ class BaseSchema(Serializable):
         for name in annot:
             res[name] = Serializable.serialize(getattr(self, name))
         return res
+
+
+def is_obj_type_Valid(obj: Any, tp: Type[Any]) -> bool:
+    """
+    Runtime type checking. Validate, that a given object is of a given type.
+    """
+
+    try:
+        _validated_object_type(tp, obj)
+        return True
+    except (DataValidationError, ValueError):
+        return False

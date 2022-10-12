@@ -1,7 +1,9 @@
 from typing import Iterable, List
 
+from knot_resolver_manager.exceptions import KresManagerException
 
-class DataModelingBaseException(Exception):
+
+class DataModelingBaseException(KresManagerException):
     """
     Base class for all exceptions used in modelling.
     """

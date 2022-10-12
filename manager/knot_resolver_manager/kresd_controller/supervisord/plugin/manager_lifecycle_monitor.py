@@ -49,7 +49,7 @@ def check_for_runnning_manager(event: ProcessStateRunningEvent) -> None:
         systemd_notify(READY="1", STATUS="Ready")
 
 
-def make_rpcinterface(supervisord: Supervisor, **_config: Any) -> Any:  # pylint: disable=useless-return
+def inject(supervisord: Supervisor, **_config: Any) -> Any:  # pylint: disable=useless-return
     global superd
     superd = supervisord
 

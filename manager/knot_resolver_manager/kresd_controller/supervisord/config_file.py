@@ -1,6 +1,7 @@
 import os
 
 from jinja2 import Template
+from typing_extensions import Literal
 
 from knot_resolver_manager.compat.dataclasses import dataclass
 from knot_resolver_manager.constants import (
@@ -10,13 +11,13 @@ from knot_resolver_manager.constants import (
     kresd_executable,
     supervisord_config_file,
     supervisord_config_file_tmp,
-    supervisord_log_file,
     supervisord_pid_file,
     supervisord_sock_file,
     supervisord_subprocess_log_dir,
     user_constants,
 )
 from knot_resolver_manager.datamodel.config_schema import KresConfig
+from knot_resolver_manager.datamodel.logging_schema import LogTargetEnum
 from knot_resolver_manager.kresd_controller.interface import KresID, SubprocessType
 from knot_resolver_manager.utils.async_utils import read_resource, writefile
 
@@ -28,7 +29,8 @@ class SupervisordKresID(KresID):
 
     @staticmethod
     def from_string(val: str) -> "SupervisordKresID":
-        if val == "gc:gc":
+        if val == "cache-gc" or val == "cache-gc:cache-gc":
+            # the double name is checked because thats how we read it from supervisord
             return SupervisordKresID.new(SubprocessType.GC, 0)
         else:
             val = val.replace("kresd:kresd", "")
@@ -36,7 +38,7 @@ class SupervisordKresID(KresID):
 
     def __str__(self) -> str:
         if self.subprocess_type is SubprocessType.GC:
-            return "gc"
+            return "cache-gc"
         elif self.subprocess_type is SubprocessType.KRESD:
             return f"kresd:kresd{self._id}"
         else:
@@ -97,15 +99,32 @@ class SupervisordConfig:
     pid_file: str
     workdir: str
     logfile: str
+    loglevel: Literal["critical", "error", "warn", "info", "debug", "trace", "blather"]
+    target: LogTargetEnum
 
     @staticmethod
     def create(config: KresConfig) -> "SupervisordConfig":
+        # determine the correct logging level
+        if config.logging.groups and "supervisord" in config.logging.groups:
+            loglevel = "info"
+        else:
+            loglevel = {
+                "crit": "critical",
+                "err": "error",
+                "warning": "warn",
+                "notice": "warn",
+                "info": "info",
+                "debug": "debug",
+            }[config.logging.level]
+
         cwd = str(os.getcwd())
         return SupervisordConfig(  # type: ignore[call-arg]
             unix_http_server=supervisord_sock_file(config),
             pid_file=supervisord_pid_file(config),
             workdir=cwd,
-            logfile=supervisord_log_file(config),
+            logfile="syslog" if config.logging.target == "syslog" else "/dev/null",
+            loglevel=loglevel,
+            target=config.logging.target,
         )
 
 
