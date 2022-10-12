@@ -578,7 +578,8 @@ int qr_task_on_send(struct qr_task *task, struct session2 *s, int status)
 		if (kr_fails_assert(qry && task->transport))
 			return status;
 		size_t timeout = task->transport->timeout;
-		int ret = session2_timer_start(s, timeout, 0);
+		int ret = session2_timer_start(s, PROTOLAYER_EVENT_GENERAL_TIMEOUT,
+				timeout, 0);
 		/* Start next step with timeout, fatal if can't start a timer. */
 		if (ret != 0) {
 			subreq_finalize(task, &task->transport->address.ip, task->pktbuf);
@@ -819,7 +820,8 @@ static void on_connect(uv_connect_t *req, int status)
 	}
 
 	session2_timer_stop(session);
-	session2_timer_start(session, MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
+	session2_timer_start(session, PROTOLAYER_EVENT_GENERAL_TIMEOUT,
+			MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
 }
 
 static int transmit(struct qr_task *task)
@@ -1176,7 +1178,8 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	memcpy(peer, addr, kr_sockaddr_len(addr));
 
 	/*  Start watchdog to catch eventual connection timeout. */
-	ret = session2_timer_start(session, KR_CONN_RTT_MAX, 0);
+	ret = session2_timer_start(session, PROTOLAYER_EVENT_CONNECT_TIMEOUT,
+			KR_CONN_RTT_MAX, 0);
 	if (ret != 0) {
 		worker_del_tcp_waiting(addr);
 		free(conn);
@@ -1733,7 +1736,7 @@ static bool pl_dns_dgram_event_unwrap(enum protolayer_event_type event,
                                       struct protolayer_manager *manager,
                                       void *sess_data)
 {
-	if (event != PROTOLAYER_EVENT_TIMEOUT)
+	if (event != PROTOLAYER_EVENT_GENERAL_TIMEOUT)
 		return true;
 
 	struct session2 *session = manager->session;
@@ -1868,6 +1871,7 @@ static bool pl_dns_stream_resolution_timeout(struct session2 *s)
 	if (!session2_tasklist_is_empty(s)) {
 		session2_timer_stop(s);
 		session2_timer_start(s,
+				PROTOLAYER_EVENT_GENERAL_TIMEOUT,
 				KR_RESOLVE_TIME_LIMIT / 2,
 				KR_RESOLVE_TIME_LIMIT / 2);
 	} else {
@@ -1886,7 +1890,8 @@ static bool pl_dns_stream_resolution_timeout(struct session2 *s)
 		if (idle_time < idle_in_timeout) {
 			idle_in_timeout -= idle_time;
 			session2_timer_stop(s);
-			session2_timer_start(s, idle_in_timeout, idle_in_timeout);
+			session2_timer_start(s, PROTOLAYER_EVENT_GENERAL_TIMEOUT,
+					idle_in_timeout, idle_in_timeout);
 		} else {
 			struct sockaddr *peer = session2_get_peer(s);
 			char *peer_str = kr_straddr(peer);
@@ -2031,12 +2036,11 @@ static bool pl_dns_stream_event_unwrap(enum protolayer_event_type event,
 	if (session->closing)
 		return true;
 
-	if (event == PROTOLAYER_EVENT_TIMEOUT) {
-		if (session->connected)
-			return pl_dns_stream_resolution_timeout(manager->session);
-		else
-			return pl_dns_stream_connection_fail(manager->session,
-					KR_SELECTION_TCP_CONNECT_TIMEOUT);
+	if (event == PROTOLAYER_EVENT_GENERAL_TIMEOUT) {
+		return pl_dns_stream_resolution_timeout(manager->session);
+	} else if (event == PROTOLAYER_EVENT_CONNECT_TIMEOUT) {
+		return pl_dns_stream_connection_fail(manager->session,
+				KR_SELECTION_TCP_CONNECT_TIMEOUT);
 	} else if (event == PROTOLAYER_EVENT_CONNECT) {
 		return pl_dns_stream_connected(session);
 	} else if (event == PROTOLAYER_EVENT_DISCONNECT

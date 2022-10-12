@@ -1261,6 +1261,12 @@ static bool pl_tls_client_connect_start(struct pl_tls_sess_data *tls,
 	while (tls->handshake_state <= TLS_HS_IN_PROGRESS) {
 		int ret = tls_handshake(tls, session);
 		if (ret != kr_ok()) {
+			if (ret == kr_error(EAGAIN)) {
+				session2_timer_stop(session);
+				session2_timer_start(session,
+						PROTOLAYER_EVENT_GENERAL_TIMEOUT,
+						MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
+			}
 			return false;
 		}
 	}

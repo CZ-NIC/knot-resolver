@@ -568,7 +568,8 @@ static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp
 	uint64_t idle_in_timeout = the_network->tcp.in_idle_timeout;
 	uint64_t timeout = KR_CONN_RTT_MAX / 2;
 	session2_event(s, PROTOLAYER_EVENT_CONNECT, NULL);
-	session2_timer_start(s, timeout, idle_in_timeout);
+	session2_timer_start(s, PROTOLAYER_EVENT_GENERAL_TIMEOUT,
+			timeout, idle_in_timeout);
 	io_start_read((uv_handle_t *)client);
 }
 

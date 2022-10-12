@@ -202,7 +202,8 @@ typedef void (*protolayer_finished_cb)(int status, struct session2 *session,
 	                 * session - i.e. layers SHOULD NOT add
 	                 * any disconnection ceremony, if
 	                 * avoidable. */\
-	XX(TIMEOUT) /**< Signal that the session has timed out. */\
+	XX(CONNECT_TIMEOUT) /**< Signal that a connection could not be established due to a timeout. */\
+	XX(GENERAL_TIMEOUT) /**< Signal that a general application-defined timeout has occurred. */\
 	XX(CONNECT) /**< Signal that a connection has been established. */\
 	XX(CONNECT_FAIL) /**< Signal that a connection could not have been established. */\
 	XX(MALFORMED) /**< Signal that a malformed request has been received. */\
@@ -691,6 +692,7 @@ struct session2 {
 	struct protolayer_manager *layers; /**< Protocol layers of this session. */
 	knot_mm_t pool;
 	uv_timer_t timer; /**< For session-wide timeout events. */
+	enum protolayer_event_type timer_event; /**< The event fired on timeout. */
 	trie_t *tasks; /**< List of tasks associated with given session. */
 	queue_t(struct qr_task *) waiting; /**< List of tasks waiting for
 	                                    * sending to upstream. */
@@ -812,9 +814,10 @@ struct sockaddr *session2_get_sockname(struct session2 *s);
  * May return `NULL` if no peer is set.  */
 KR_EXPORT uv_handle_t *session2_get_handle(struct session2 *s);
 
-/** Start the session timer. When the timer ends, a `_TIMEOUT` event is sent
- * in the `_UNWRAP` direction. */
-int session2_timer_start(struct session2 *s, uint64_t timeout, uint64_t repeat);
+/** Start the session timer. On timeout, the specified `event` is sent in the
+ * `_UNWRAP` direction. Only a single timeout can be active at a time. */
+int session2_timer_start(struct session2 *s, enum protolayer_event_type event,
+                         uint64_t timeout, uint64_t repeat);
 
 /** Restart the session timer without changing any of its parameters. */
 int session2_timer_restart(struct session2 *s);

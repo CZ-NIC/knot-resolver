@@ -786,11 +786,12 @@ uv_handle_t *session2_get_handle(struct session2 *s)
 static void session2_on_timeout(uv_timer_t *timer)
 {
 	struct session2 *s = timer->data;
-	session2_event(s, PROTOLAYER_EVENT_TIMEOUT, NULL);
+	session2_event(s, s->timer_event, NULL);
 }
 
-int session2_timer_start(struct session2 *s, uint64_t timeout, uint64_t repeat)
+int session2_timer_start(struct session2 *s, enum protolayer_event_type event, uint64_t timeout, uint64_t repeat)
 {
+	s->timer_event = event;
 	return uv_timer_start(&s->timer, session2_on_timeout, timeout, repeat);
 }
 
