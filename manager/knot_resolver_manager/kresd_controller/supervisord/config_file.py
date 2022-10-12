@@ -29,7 +29,8 @@ class SupervisordKresID(KresID):
 
     @staticmethod
     def from_string(val: str) -> "SupervisordKresID":
-        if val == "gc:gc":
+        if val == "cache-gc" or val == "cache-gc:cache-gc":
+            # the double name is checked because thats how we read it from supervisord
             return SupervisordKresID.new(SubprocessType.GC, 0)
         else:
             val = val.replace("kresd:kresd", "")
@@ -37,7 +38,7 @@ class SupervisordKresID(KresID):
 
     def __str__(self) -> str:
         if self.subprocess_type is SubprocessType.GC:
-            return "gc"
+            return "cache-gc"
         elif self.subprocess_type is SubprocessType.KRESD:
             return f"kresd:kresd{self._id}"
         else:
