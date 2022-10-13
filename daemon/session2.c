@@ -335,23 +335,17 @@ static int protolayer_push(struct protolayer_iter_ctx *ctx)
 				protolayer_payload_names[ctx->payload.type]);
 	}
 
-	int status;
 	if (ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
-		status = session2_transport_push(session,
+		session2_transport_push(session,
 				ctx->payload.buffer.buf, ctx->payload.buffer.len,
 				ctx->target, protolayer_push_finished, ctx);
 	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_IOVEC) {
-		status = session2_transport_pushv(session,
+		session2_transport_pushv(session,
 				ctx->payload.iovec.iov, ctx->payload.iovec.cnt,
 				ctx->target, protolayer_push_finished, ctx);
 	} else {
 		kr_assert(false && "Invalid payload type");
-		status = kr_error(EINVAL);
-	}
-
-	if (status < 0) {
-		ctx->status = status;
-		return protolayer_iter_ctx_finish(ctx, status);
+		return kr_error(EINVAL);
 	}
 
 	return PROTOLAYER_RET_ASYNC;
@@ -1200,6 +1194,8 @@ static int session2_transport_pushv(struct session2 *s,
 	case SESSION2_TRANSPORT_IO:;
 		uv_handle_t *handle = s->transport.io.handle;
 		if (kr_fails_assert(handle)) {
+			if (cb)
+				cb(kr_error(EINVAL), s, target, baton);
 			free(ctx);
 			return kr_error(EINVAL);
 		}
@@ -1223,19 +1219,33 @@ static int session2_transport_pushv(struct session2 *s,
 			} else {
 				uv_udp_send_t *req = malloc(sizeof(*req));
 				req->data = ctx;
-				uv_udp_send(req, (uv_udp_t *)handle,
+				int ret = uv_udp_send(req, (uv_udp_t *)handle,
 						(uv_buf_t *)iov, iovcnt, target,
 						session2_transport_udp_pushv_finished);
-				return kr_ok();
+				if (ret) {
+					if (cb)
+						cb(ret, s, target, baton);
+					free(req);
+					free(ctx);
+				}
+				return ret;
 			}
 		} else if (handle->type == UV_TCP) {
 			uv_write_t *req = malloc(sizeof(*req));
 			req->data = ctx;
-			uv_write(req, (uv_stream_t *)handle, (uv_buf_t *)iov, iovcnt,
+			int ret = uv_write(req, (uv_stream_t *)handle, (uv_buf_t *)iov, iovcnt,
 					session2_transport_stream_pushv_finished);
-			return kr_ok();
+			if (ret) {
+				if (cb)
+					cb(ret, s, target, baton);
+				free(req);
+				free(ctx);
+			}
+			return ret;
 		} else {
 			kr_assert(false && "Unsupported handle");
+			if (cb)
+				cb(kr_error(EINVAL), s, target, baton);
 			free(ctx);
 			return kr_error(EINVAL);
 		}
