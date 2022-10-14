@@ -15,9 +15,14 @@ if build_manager_client
         subdir: manager_module_dir / cli_dir
     )
 
-    # install_data(
-    #     sources : 'kresctl',
-    #     install_dir: get_option('sbindir'),
-    # )
+    configure_file(
+        input: 'cli.in',
+        output: 'kresctl',
+        install_mode: ['rwxr-xr-x', user, group],
+        configuration: configuration_data({
+            'cmd': ' '.join([py3.path(), '-m', manager_module_dir+'.'+cli_dir, '$@'])
+        }),
+        install_dir: get_option('sbindir'),
+    )
 
 endif
