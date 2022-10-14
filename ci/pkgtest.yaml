@@ -144,12 +144,12 @@ nixos-unstable:pkgbuild:
   image: nixos/nix
 
   variables:
-    #NIX_PATH: nixpkgs=https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz
-    NIX_PATH: nixpkgs=https://github.com/vcunat/nixpkgs/archive/p/apkg.tar.gz
+    NIX_PATH: nixpkgs=https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz
   before_script:
   script:
     - nix-build '<nixpkgs>' -QA apkg
     # the image auto-detects as alpine distro
+    # If apkg version differs (too much), it will fail to reuse archive and fail.
     - ./result/bin/apkg install -d nix
     - kresd --version
 # }}}
