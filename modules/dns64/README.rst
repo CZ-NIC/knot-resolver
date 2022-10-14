@@ -52,8 +52,11 @@ you can set ``DNS64_DISABLE`` flag via the :ref:`view module <mod-view>`.
 .. code-block:: lua
 
     modules = { 'dns64', 'view' }
-    -- Disable dns64 for everyone, but re-enable it for two particular subnets.
+    -- disable dns64 for all IPv4 source addresses
+    view:addr('0.0.0.0/0', policy.all(policy.FLAGS('DNS64_DISABLE')))
+    -- disable dns64 for all IPv6 source addresses
     view:addr('::/0', policy.all(policy.FLAGS('DNS64_DISABLE')))
+    -- re-enable dns64 for two IPv6 subnets
     view:addr('2001:db8:11::/48', policy.all(policy.FLAGS(nil, 'DNS64_DISABLE')))
     view:addr('2001:db8:93::/48', policy.all(policy.FLAGS(nil, 'DNS64_DISABLE')))
 
