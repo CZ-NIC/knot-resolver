@@ -71,7 +71,7 @@ Dependencies
 .. note:: This section lists basic requirements. Individual modules
    might have additional build or runtime dependencies.
 
-The following dependencies are needed to build and run Knot Resolver:
+The following dependencies are needed to build and run Knot Resolver with core functions:
 
 .. csv-table::
    :header: "Requirement", "Notes"
@@ -85,6 +85,12 @@ The following dependencies are needed to build and run Knot Resolver:
    "libuv_ 1.7+", "Multiplatform I/O and services"
    "lmdb", "Memory-mapped database for cache"
    "GnuTLS", "TLS"
+
+Additional dependencies are needed to build and run Knot Resolver with ``manager``:
+
+.. csv-table::
+   :header: "Requirement", "Notes"
+
    "python3_ >=3.6.8", "Python language interpreter"
    "Jinja2_", "Template engine for Python"
    "PyYAML_", "YAML framework for Python"
@@ -151,10 +157,11 @@ Compilation
 ~~~~~~~~~~~
 
 Folowing meson command creates new build directory named ``build_dir``, configures installation path to ``/tmp/kr`` and enables static build (to allow installation to non-standard path).
+You can also configure some :ref:`build-options`, in this case enable ``manager``, which is disabled by default.
 
 .. code-block:: bash
 
-   $ meson build_dir --prefix=/tmp/kr --default-library=static
+   $ meson build_dir --prefix=/tmp/kr --default-library=static -Dmanager=enabled
 
 After that it is possible to build and install Knot Resolver.
 
@@ -171,6 +178,8 @@ At this point you can execute the newly installed binary using path ``/tmp/kr/sb
 .. note:: When compiling on OS X, creating a shared library is currently not
    possible when using luajit package from Homebrew due to `#37169
    <https://github.com/Homebrew/homebrew-core/issues/37169>`_.
+
+.. _build-options:
 
 Build options
 ~~~~~~~~~~~~~
