@@ -1,4 +1,3 @@
-# manager
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 build_manager = false
@@ -8,12 +7,12 @@ if get_option('manager') != 'disabled'
     message('--- manager dependencies ---')
 
     python_deps = [
-        # 'jinja2',
-        # 'yaml',
-        # 'aiohttp',
-        # 'prometheus_client',
-        # 'supervisor',
-        # 'typing_extensions',
+        'jinja2',
+        'yaml',
+        'aiohttp',
+        'prometheus_client',
+        'supervisor',
+        'typing_extensions',
     ]
 
     pymod = import('python')
