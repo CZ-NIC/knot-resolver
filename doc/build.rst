@@ -47,6 +47,7 @@ Resolver:
 .. csv-table::
    :header: "Optional", "Needed for", "Notes"
 
+   "jemalloc_", "``daemon``", "Improve long-term memory consumption."
    "nghttp2_", "``daemon``", "DNS over HTTPS support."
    "libsystemd_", "``daemon``", "Systemd watchdog support."
    "`libcap-ng`_", "``daemon``", "Linux capabilities: support dropping them."
@@ -261,6 +262,7 @@ For development, it's possible to build the container directly from your git tre
    $ docker build -t knot-resolver .
 
 
+.. _jemalloc: https://jemalloc.net
 .. _libuv: https://github.com/libuv/libuv
 .. _LuaJIT: http://luajit.org/luajit.html
 .. _Doxygen: https://www.doxygen.nl/manual/index.html
