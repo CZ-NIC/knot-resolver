@@ -426,6 +426,14 @@ typedef int (*protolayer_data_sess_init_cb)(struct protolayer_manager *manager,
                                             void *data,
                                             void *param);
 
+/** Function type for (de)initialization callback of layer iteration data.
+ *
+ * `ctx` points to the iteration context that `data` belongs to.
+ *
+ * `data` points to the layer-specific data struct.
+ *
+ * Returning 0 means success, other return values mean error and halt the
+ * initialization. */
 typedef int (*protolayer_iter_data_cb)(struct protolayer_manager *manager,
                                        struct protolayer_iter_ctx *ctx,
                                        void *data);
@@ -481,9 +489,9 @@ struct protolayer_manager {
 /** Initialization parameters for protocol layer session data. */
 struct protolayer_data_param {
 	enum protolayer_protocol protocol; /**< Which protocol these parameters
-	                                     * are meant for. */
+	                                    * are meant for. */
 	void *param; /**< Pointer to protolayer-related initialization parameters.
-	              * Only needs to be valid for session initialization. */
+	              * Only needs to be valid during session initialization. */
 };
 
 /** Global data for a specific layered protocol. This is to be initialized in
@@ -566,8 +574,9 @@ enum protolayer_iter_cb_result protolayer_break(struct protolayer_iter_ctx *ctx,
  * GnuTLS.
  *
  * Note that this return function is just a readability hint - another return
- * function may be called in another stack frame before it and the sequence
- * will continue correctly. */
+ * function may be called in another stack frame before it (generally during a
+ * call to an external library function, e.g. GnuTLS or nghttp2) and the
+ * sequence will continue correctly. */
 static inline enum protolayer_iter_cb_result protolayer_async()
 {
 	return PROTOLAYER_ITER_CB_RESULT_MAGIC;
@@ -638,7 +647,7 @@ static inline void *wire_buf_free_space(const struct wire_buf *wb)
 	return &wb->buf[wb->end];
 }
 
-/** Gets the lengthof the free space after the valid data of the wire buffer. */
+/** Gets the length of the free space after the valid data of the wire buffer. */
 static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 {
 	return wb->size - wb->end;
