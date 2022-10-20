@@ -60,5 +60,6 @@ typedef struct {
 	struct knot_xdp_socket *socket;
 	struct session2 *session;
 	uv_idle_t tx_waker;
+	queue_t(void *) tx_waker_queue;
 } xdp_handle_data_t;
 

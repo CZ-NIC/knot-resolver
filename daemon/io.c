@@ -63,7 +63,7 @@ static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* 
 }
 
 static void udp_on_unwrapped(int status, struct session2 *session,
-                             const void *target, void *baton)
+                             const struct comm_info *comm, void *baton)
 {
 	wire_buf_reset(&session->wire_buf);
 }
@@ -92,7 +92,11 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		return;
 	}
 
-	session2_unwrap(s, protolayer_wire_buf(&s->wire_buf), comm_addr,
+	struct comm_info in_comm = {
+		.comm_addr = comm_addr,
+		.src_addr = comm_addr
+	};
+	session2_unwrap(s, protolayer_wire_buf(&s->wire_buf), &in_comm,
 			udp_on_unwrapped, NULL);
 }
 
@@ -134,18 +138,8 @@ static int family_to_freebind_option(sa_family_t sa_family, int *level, int *nam
 struct pl_udp_iter_data {
 	PROTOLAYER_DATA_HEADER();
 	struct proxy_result proxy;
-	struct comm_info comm;
 	bool has_proxy;
 };
-
-static int pl_udp_iter_init(struct protolayer_manager *manager,
-                            struct protolayer_iter_ctx *ctx,
-                            void *iter_data)
-{
-	struct pl_udp_iter_data *udp = iter_data;
-	ctx->comm = &udp->comm;
-	return kr_ok();
-}
 
 static enum protolayer_iter_cb_result pl_udp_unwrap(
 		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
@@ -161,9 +155,7 @@ static enum protolayer_iter_cb_result pl_udp_unwrap(
 
 	char *data = ctx->payload.buffer.buf;
 	ssize_t data_len = ctx->payload.buffer.len;
-	struct comm_info *comm = ctx->comm;
-	comm->comm_addr = ctx->target;
-	comm->src_addr = ctx->target;
+	struct comm_info *comm = &ctx->comm;
 	if (!s->outgoing && proxy_header_present(data, data_len)) {
 		if (!proxy_allowed(comm->comm_addr)) {
 			kr_log_debug(IO, "<= ignoring PROXYv2 UDP from disallowed address '%s'\n",
@@ -234,6 +226,18 @@ struct pl_tcp_sess_data {
 	bool has_proxy : 1;
 };
 
+static int pl_tcp_sess_init(struct protolayer_manager *manager,
+                            void *data,
+                            void *param)
+{
+	struct sockaddr *peer = session2_get_peer(manager->session);
+	manager->session->comm = (struct comm_info) {
+		.comm_addr = peer,
+		.src_addr = peer
+	};
+	return 0;
+}
+
 static int pl_tcp_sess_deinit(struct protolayer_manager *manager, void *sess_data)
 {
 	struct pl_tcp_sess_data *tcp = sess_data;
@@ -284,10 +288,7 @@ static enum protolayer_iter_cb_result pl_tcp_unwrap(
 
 	char *data = wire_buf_data(ctx->payload.wire_buf); /* layer's or session's wirebuf */
 	ssize_t data_len = wire_buf_data_length(ctx->payload.wire_buf);
-	struct comm_info *comm = ctx->comm;
-	comm->src_addr = peer;
-	comm->comm_addr = peer;
-	comm->dst_addr = NULL;
+	struct comm_info *comm = &ctx->manager->session->comm;
 	if (!s->outgoing && !tcp->had_data && proxy_header_present(data, data_len)) {
 		if (!proxy_allowed(comm->src_addr)) {
 			if (kr_log_is_debug(IO, NULL)) {
@@ -335,7 +336,7 @@ static enum protolayer_iter_cb_result pl_tcp_unwrap(
 	}
 
 	tcp->had_data = true;
-
+	ctx->comm = ctx->manager->session->comm;
 	return protolayer_continue(ctx);
 }
 
@@ -359,13 +360,13 @@ void io_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_UDP] = (struct protolayer_globals){
 		.iter_size = sizeof(struct pl_udp_iter_data),
-		.iter_init = pl_udp_iter_init,
 		.unwrap = pl_udp_unwrap,
 		.event_wrap = pl_udp_event_wrap,
 	};
 
 	protolayer_globals[PROTOLAYER_TCP] = (struct protolayer_globals){
 		.sess_size = sizeof(struct pl_tcp_sess_data),
+		.sess_init = pl_tcp_sess_init,
 		.sess_deinit = pl_tcp_sess_deinit,
 		.unwrap = pl_tcp_unwrap,
 		.event_wrap = pl_tcp_event_wrap,
@@ -882,149 +883,147 @@ int io_listen_pipe(uv_loop_t *loop, uv_pipe_t *handle, int fd)
 	return 0;
 }
 
-/* TODO: xdp */
-//#if ENABLE_XDP
-//static void xdp_rx(uv_poll_t* handle, int status, int events)
-//{
-//	const int XDP_RX_BATCH_SIZE = 64;
-//	if (status < 0) {
-//		kr_log_error(XDP, "poll status %d: %s\n", status, uv_strerror(status));
-//		return;
-//	}
-//	if (events != UV_READABLE) {
-//		kr_log_error(XDP, "poll unexpected events: %d\n", events);
-//		return;
-//	}
-//
-//	xdp_handle_data_t *xhd = handle->data;
-//	kr_require(xhd && xhd->session && xhd->socket);
-//	uint32_t rcvd;
-//	knot_xdp_msg_t msgs[XDP_RX_BATCH_SIZE];
-//	int ret = knot_xdp_recv(xhd->socket, msgs, XDP_RX_BATCH_SIZE, &rcvd
-//			#if KNOT_VERSION_HEX >= 0x030100
-//			, NULL
-//			#endif
-//			);
-//
-//	if (kr_fails_assert(ret == KNOT_EOK)) {
-//		/* ATM other error codes can only be returned when called incorrectly */
-//		kr_log_error(XDP, "knot_xdp_recv(): %d, %s\n", ret, knot_strerror(ret));
-//		return;
-//	}
-//	kr_log_debug(XDP, "poll triggered, processing a batch of %d packets\n", (int)rcvd);
-//	kr_require(rcvd <= XDP_RX_BATCH_SIZE);
-//	for (int i = 0; i < rcvd; ++i) {
-//		const knot_xdp_msg_t *msg = &msgs[i];
-//		kr_require(msg->payload.iov_len <= KNOT_WIRE_MAX_PKTSIZE);
-//		knot_pkt_t *kpkt = knot_pkt_new(msg->payload.iov_base, msg->payload.iov_len,
-//						&the_worker->pkt_pool);
-//		if (kpkt == NULL) {
-//			ret = kr_error(ENOMEM);
-//		} else {
-//			struct io_comm_data comm = {
-//				.src_addr = (const struct sockaddr *)&msg->ip_from,
-//				.comm_addr = (const struct sockaddr *)&msg->ip_from,
-//				.dst_addr = (const struct sockaddr *)&msg->ip_to
-//			};
-//			ret = worker_submit(xhd->session, &comm,
-//					msg->eth_from, msg->eth_to, kpkt);
-//		}
-//		if (ret)
-//			kr_log_debug(XDP, "worker_submit() == %d: %s\n", ret, kr_strerror(ret));
-//		mp_flush(the_worker->pkt_pool.ctx);
-//	}
-//	knot_xdp_recv_finish(xhd->socket, msgs, rcvd);
-//}
-///// Warn if the XDP program is running in emulated mode (XDP_SKB)
-//static void xdp_warn_mode(const char *ifname)
-//{
-//	if (kr_fails_assert(ifname))
-//		return;
-//
-//	const unsigned if_index = if_nametoindex(ifname);
-//	if (!if_index) {
-//		kr_log_warning(XDP, "warning: interface %s, unexpected error when converting its name: %s\n",
-//				ifname, strerror(errno));
-//		return;
-//	}
-//
-//	const knot_xdp_mode_t mode = knot_eth_xdp_mode(if_index);
-//	switch (mode) {
-//	case KNOT_XDP_MODE_FULL:
-//		return;
-//	case KNOT_XDP_MODE_EMUL:
-//		kr_log_warning(XDP, "warning: interface %s running only with XDP emulation\n",
-//				ifname);
-//		return;
-//	case KNOT_XDP_MODE_NONE: // enum warnings from compiler
-//		break;
-//	}
-//	kr_log_warning(XDP, "warning: interface %s running in unexpected XDP mode %d\n",
-//			ifname, (int)mode);
-//}
-//int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
-//{
-//	if (!ep || !ep->handle) {
-//		return kr_error(EINVAL);
-//	}
-//
-//	// RLIMIT_MEMLOCK often needs raising when operating on BPF
-//	static int ret_limit = 1;
-//	if (ret_limit == 1) {
-//		struct rlimit no_limit = { RLIM_INFINITY, RLIM_INFINITY };
-//		ret_limit = setrlimit(RLIMIT_MEMLOCK, &no_limit)
-//			? kr_error(errno) : 0;
-//	}
-//	if (ret_limit) return ret_limit;
-//
-//	xdp_handle_data_t *xhd = malloc(sizeof(*xhd));
-//	if (!xhd) return kr_error(ENOMEM);
-//
-//	xhd->socket = NULL; // needed for some reason
-//
-//	// This call is a libknot version hell, unfortunately.
-//	int ret = knot_xdp_init(&xhd->socket, ifname, ep->nic_queue,
-//		#if KNOT_VERSION_HEX < 0x030100
-//			ep->port ? ep->port : KNOT_XDP_LISTEN_PORT_ALL,
-//			KNOT_XDP_LOAD_BPF_MAYBE
-//		#elif KNOT_VERSION_HEX < 0x030200
-//			ep->port ? ep->port : (KNOT_XDP_LISTEN_PORT_PASS | 0),
-//			KNOT_XDP_LOAD_BPF_MAYBE
-//		#else
-//			KNOT_XDP_FILTER_UDP | (ep->port ? 0 : KNOT_XDP_FILTER_PASS),
-//			ep->port, 0/*quic_port*/,
-//			KNOT_XDP_LOAD_BPF_MAYBE,
-//			NULL/*xdp_config*/
-//		#endif
-//		);
-//
-//	if (!ret) xdp_warn_mode(ifname);
-//
-//	if (!ret) ret = uv_idle_init(loop, &xhd->tx_waker);
-//	if (ret || kr_fails_assert(xhd->socket)) {
-//		free(xhd);
-//		return ret == 0 ? kr_error(EINVAL) : kr_error(ret);
-//	}
-//	xhd->tx_waker.data = xhd->socket;
-//
-//	ep->fd = knot_xdp_socket_fd(xhd->socket); // probably not useful
-//	ret = uv_poll_init(loop, (uv_poll_t *)ep->handle, ep->fd);
-//	if (ret) {
-//		knot_xdp_deinit(xhd->socket);
-//		free(xhd);
-//		return kr_error(ret);
-//	}
-//
-//	// beware: this sets poll_handle->data
-//	xhd->session = session_new(ep->handle, false, false);
-//	kr_require(!session_flags(xhd->session)->outgoing);
-//	session_get_sockname(xhd->session)->sa_family = AF_XDP; // to have something in there
-//
-//	ep->handle->data = xhd;
-//	ret = uv_poll_start((uv_poll_t *)ep->handle, UV_READABLE, xdp_rx);
-//	return ret;
-//}
-//#endif
+#if ENABLE_XDP
+static void xdp_rx(uv_poll_t* handle, int status, int events)
+{
+	const int XDP_RX_BATCH_SIZE = 64;
+	if (status < 0) {
+		kr_log_error(XDP, "poll status %d: %s\n", status, uv_strerror(status));
+		return;
+	}
+	if (events != UV_READABLE) {
+		kr_log_error(XDP, "poll unexpected events: %d\n", events);
+		return;
+	}
+
+	xdp_handle_data_t *xhd = handle->data;
+	kr_require(xhd && xhd->session && xhd->socket);
+	uint32_t rcvd;
+	knot_xdp_msg_t msgs[XDP_RX_BATCH_SIZE];
+	int ret = knot_xdp_recv(xhd->socket, msgs, XDP_RX_BATCH_SIZE, &rcvd
+			#if KNOT_VERSION_HEX >= 0x030100
+			, NULL
+			#endif
+			);
+
+	if (kr_fails_assert(ret == KNOT_EOK)) {
+		/* ATM other error codes can only be returned when called incorrectly */
+		kr_log_error(XDP, "knot_xdp_recv(): %d, %s\n", ret, knot_strerror(ret));
+		return;
+	}
+	kr_log_debug(XDP, "poll triggered, processing a batch of %d packets\n", (int)rcvd);
+	kr_require(rcvd <= XDP_RX_BATCH_SIZE);
+	for (int i = 0; i < rcvd; ++i) {
+		knot_xdp_msg_t *msg = &msgs[i];
+		kr_require(msg->payload.iov_len <= KNOT_WIRE_MAX_PKTSIZE);
+		struct comm_info comm = {
+			.src_addr = (const struct sockaddr *)&msg->ip_from,
+			.comm_addr = (const struct sockaddr *)&msg->ip_from,
+			.dst_addr = (const struct sockaddr *)&msg->ip_to,
+			.xdp = true
+		};
+		memcpy(comm.eth_from, msg->eth_from, sizeof(comm.eth_from));
+		memcpy(comm.eth_to, msg->eth_to, sizeof(comm.eth_to));
+		session2_unwrap(xhd->session,
+				protolayer_buffer(msg->payload.iov_base, msg->payload.iov_len),
+				&comm, NULL, NULL);
+		if (ret)
+			kr_log_debug(XDP, "worker_submit() == %d: %s\n", ret, kr_strerror(ret));
+		mp_flush(the_worker->pkt_pool.ctx);
+	}
+	knot_xdp_recv_finish(xhd->socket, msgs, rcvd);
+}
+/// Warn if the XDP program is running in emulated mode (XDP_SKB)
+static void xdp_warn_mode(const char *ifname)
+{
+	if (kr_fails_assert(ifname))
+		return;
+
+	const unsigned if_index = if_nametoindex(ifname);
+	if (!if_index) {
+		kr_log_warning(XDP, "warning: interface %s, unexpected error when converting its name: %s\n",
+				ifname, strerror(errno));
+		return;
+	}
+
+	const knot_xdp_mode_t mode = knot_eth_xdp_mode(if_index);
+	switch (mode) {
+	case KNOT_XDP_MODE_FULL:
+		return;
+	case KNOT_XDP_MODE_EMUL:
+		kr_log_warning(XDP, "warning: interface %s running only with XDP emulation\n",
+				ifname);
+		return;
+	case KNOT_XDP_MODE_NONE: // enum warnings from compiler
+		break;
+	}
+	kr_log_warning(XDP, "warning: interface %s running in unexpected XDP mode %d\n",
+			ifname, (int)mode);
+}
+int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
+{
+	if (!ep || !ep->handle) {
+		return kr_error(EINVAL);
+	}
+
+	// RLIMIT_MEMLOCK often needs raising when operating on BPF
+	static int ret_limit = 1;
+	if (ret_limit == 1) {
+		struct rlimit no_limit = { RLIM_INFINITY, RLIM_INFINITY };
+		ret_limit = setrlimit(RLIMIT_MEMLOCK, &no_limit)
+			? kr_error(errno) : 0;
+	}
+	if (ret_limit) return ret_limit;
+
+	xdp_handle_data_t *xhd = malloc(sizeof(*xhd));
+	if (!xhd) return kr_error(ENOMEM);
+
+	xhd->socket = NULL; // needed for some reason
+	queue_init(xhd->tx_waker_queue);
+
+	// This call is a libknot version hell, unfortunately.
+	int ret = knot_xdp_init(&xhd->socket, ifname, ep->nic_queue,
+		#if KNOT_VERSION_HEX < 0x030100
+			ep->port ? ep->port : KNOT_XDP_LISTEN_PORT_ALL,
+			KNOT_XDP_LOAD_BPF_MAYBE
+		#elif KNOT_VERSION_HEX < 0x030200
+			ep->port ? ep->port : (KNOT_XDP_LISTEN_PORT_PASS | 0),
+			KNOT_XDP_LOAD_BPF_MAYBE
+		#else
+			KNOT_XDP_FILTER_UDP | (ep->port ? 0 : KNOT_XDP_FILTER_PASS),
+			ep->port, 0/*quic_port*/,
+			KNOT_XDP_LOAD_BPF_MAYBE,
+			NULL/*xdp_config*/
+		#endif
+		);
+
+	if (!ret) xdp_warn_mode(ifname);
+
+	if (!ret) ret = uv_idle_init(loop, &xhd->tx_waker);
+	if (ret || kr_fails_assert(xhd->socket)) {
+		free(xhd);
+		return ret == 0 ? kr_error(EINVAL) : kr_error(ret);
+	}
+	xhd->tx_waker.data = xhd;
+
+	ep->fd = knot_xdp_socket_fd(xhd->socket); // probably not useful
+	ret = uv_poll_init(loop, (uv_poll_t *)ep->handle, ep->fd);
+	if (ret) {
+		knot_xdp_deinit(xhd->socket);
+		free(xhd);
+		return kr_error(ret);
+	}
+
+	xhd->session = session2_new_io(ep->handle, PROTOLAYER_GRP_DOUDP,
+			NULL, 0, false);
+	kr_require(xhd->session);
+	session2_get_sockname(xhd->session)->sa_family = AF_XDP; // to have something in there
+
+	ep->handle->data = xhd;
+	ret = uv_poll_start((uv_poll_t *)ep->handle, UV_READABLE, xdp_rx);
+	return ret;
+}
+#endif
 
 int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family,
 		enum protolayer_grp grp,
@@ -1064,6 +1063,7 @@ static void io_deinit(uv_handle_t *handle)
 		uv_close((uv_handle_t *)&xhd->tx_waker, NULL);
 		session2_free(xhd->session);
 		knot_xdp_deinit(xhd->socket);
+		queue_deinit(xhd->tx_waker_queue);
 		free(xhd);
 	#else
 		kr_assert(false);

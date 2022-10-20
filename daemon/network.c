@@ -417,14 +417,14 @@ static int open_endpoint(const char *addr_str,
 	}
 
 	if (is_xdp) {
-//	#if ENABLE_XDP
-//		uv_poll_t *ep_handle = malloc(sizeof(uv_poll_t));
-//		ep->handle = (uv_handle_t *)ep_handle;
-//		ret = !ep->handle ? ENOMEM
-//			: io_listen_xdp(the_network->loop, ep, addr_str);
-//	#else
+	#if ENABLE_XDP
+		uv_poll_t *ep_handle = malloc(sizeof(uv_poll_t));
+		ep->handle = (uv_handle_t *)ep_handle;
+		ret = !ep->handle ? ENOMEM
+			: io_listen_xdp(the_network->loop, ep, addr_str);
+	#else
 		ret = ESOCKTNOSUPPORT;
-//	#endif
+	#endif
 		goto finish_ret;
 	} /* else */
 

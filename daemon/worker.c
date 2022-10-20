@@ -59,8 +59,13 @@ struct request_ctx
 		/** Local address.  For AF_XDP we couldn't use session's,
 		 * as the address might be different every time. */
 		union kr_sockaddr dst_addr;
-		/** MAC addresses - ours [0] and router's [1], in case of AF_XDP socket. */
-		uint8_t eth_addrs[2][6];
+
+		/** Router's MAC address for XDP. */
+		ethaddr_t eth_from;
+		/** Our MAC address for XDP. */
+		ethaddr_t eth_to;
+		/** Whether XDP was used. */
+		bool xdp : 1;
 	} source;
 };
 
@@ -101,7 +106,7 @@ static int qr_task_step(struct qr_task *task,
 			const struct sockaddr *packet_source,
 			knot_pkt_t *packet);
 static int qr_task_send(struct qr_task *task, struct session2 *session,
-			const struct sockaddr *addr, knot_pkt_t *pkt);
+			const struct comm_info *comm, knot_pkt_t *pkt);
 static int qr_task_finalize(struct qr_task *task, int state);
 static void qr_task_complete(struct qr_task *task);
 static int worker_add_tcp_connected(const struct sockaddr* addr, struct session2 *session);
@@ -241,8 +246,8 @@ static uint8_t *alloc_wire_cb(struct kr_request *req, uint16_t *maxlen)
 	*maxlen = MIN(*maxlen, out.payload.iov_len);
 #if KNOT_VERSION_HEX < 0x030100
 	/* It's most convenient to fill the MAC addresses at this point. */
-	memcpy(out.eth_from, &ctx->source.eth_addrs[0], 6);
-	memcpy(out.eth_to,   &ctx->source.eth_addrs[1], 6);
+	memcpy(out.eth_from, &ctx->source.eth_from, 6);
+	memcpy(out.eth_to,   &ctx->source.eth_to, 6);
 #endif
 	return out.payload.iov_base;
 }
@@ -255,9 +260,11 @@ static void free_wire(const struct request_ctx *ctx)
 		return;
 	if (likely(ans->wire == NULL)) /* sent most likely */
 		return;
+	if (!ctx->source.session)
+		return;
 	/* We know it's an AF_XDP socket; otherwise alloc_wire_cb isn't assigned. */
 	uv_handle_t *handle = session2_get_handle(ctx->source.session);
-	if (kr_fails_assert(handle->type == UV_POLL))
+	if (!handle || kr_fails_assert(handle->type == UV_POLL))
 		return;
 	xdp_handle_data_t *xhd = handle->data;
 	/* Freeing is done by sending an empty packet (the API won't really send it). */
@@ -297,8 +304,6 @@ static inline bool is_tcp_waiting(struct sockaddr *address) {
  */
 static struct request_ctx *request_create(struct session2 *session,
                                           struct comm_info *comm,
-                                          const uint8_t *eth_from,
-                                          const uint8_t *eth_to,
                                           uint32_t uid)
 {
 	knot_mm_t pool = {
@@ -319,19 +324,14 @@ static struct request_ctx *request_create(struct session2 *session,
 		return NULL;
 	}
 	ctx->source.session = session;
-	if (kr_fails_assert(!!eth_to == !!eth_from)) {
-		pool_release(pool.ctx);
-		return NULL;
-	}
-	const bool is_xdp = eth_to != NULL;
-	if (is_xdp) {
+	if (comm && comm->xdp) {
 	#if ENABLE_XDP
 		if (kr_fails_assert(session)) {
 			pool_release(pool.ctx);
 			return NULL;
 		}
-		memcpy(&ctx->source.eth_addrs[0], eth_to,   sizeof(ctx->source.eth_addrs[0]));
-		memcpy(&ctx->source.eth_addrs[1], eth_from, sizeof(ctx->source.eth_addrs[1]));
+		memcpy(ctx->source.eth_to,   comm->eth_to,   sizeof(ctx->source.eth_to));
+		memcpy(ctx->source.eth_from, comm->eth_from, sizeof(ctx->source.eth_from));
 		ctx->req.alloc_wire_cb = alloc_wire_cb;
 	#else
 		kr_assert(!EINVAL);
@@ -344,7 +344,7 @@ static struct request_ctx *request_create(struct session2 *session,
 	req->pool = pool;
 	req->vars_ref = LUA_NOREF;
 	req->uid = uid;
-	req->qsource.comm_flags.xdp = is_xdp;
+	req->qsource.comm_flags.xdp = comm && comm->xdp;
 	kr_request_set_extended_error(req, KNOT_EDNS_EDE_NONE, NULL);
 	array_init(req->qsource.headers);
 	if (session) {
@@ -623,7 +623,7 @@ int qr_task_on_send(struct qr_task *task, struct session2 *s, int status)
 }
 
 static void qr_task_wrap_finished(int status, struct session2 *session,
-                                  const void *target, void *baton)
+                                  const struct comm_info *comm, void *baton)
 {
 	struct qr_task *task = baton;
 	qr_task_on_send(task, session, status);
@@ -632,15 +632,15 @@ static void qr_task_wrap_finished(int status, struct session2 *session,
 }
 
 static int qr_task_send(struct qr_task *task, struct session2 *session,
-			const struct sockaddr *addr, knot_pkt_t *pkt)
+			const struct comm_info *comm, knot_pkt_t *pkt)
 {
 	if (!session)
 		return qr_task_on_send(task, NULL, kr_error(EIO));
 
 	int ret = 0;
 
-	if (addr == NULL)
-		addr = session2_get_peer(session);
+	if (comm == NULL)
+		comm = &session->comm;
 
 	if (pkt == NULL)
 		pkt = worker_task_get_pktbuf(task);
@@ -670,7 +670,7 @@ static int qr_task_send(struct qr_task *task, struct session2 *session,
 	qr_task_ref(task);
 	struct protolayer_payload payload = protolayer_buffer((char *)pkt->wire, pkt->size);
 	payload.ttl = packet_ttl(pkt);
-	ret = session2_wrap(session, payload, addr, qr_task_wrap_finished, task);
+	ret = session2_wrap(session, payload, comm, qr_task_wrap_finished, task);
 
 	if (ret >= 0) {
 		session2_touch(session);
@@ -694,12 +694,12 @@ static int qr_task_send(struct qr_task *task, struct session2 *session,
 	}
 
 	/* Update outgoing query statistics */
-	if (session->outgoing && addr) {
+	if (session->outgoing && comm) {
 		session2_event(session, PROTOLAYER_EVENT_STATS_QRY_OUT, NULL);
 
-		if (addr->sa_family == AF_INET6)
+		if (comm->comm_addr->sa_family == AF_INET6)
 			the_worker->stats.ipv6 += 1;
-		else if (addr->sa_family == AF_INET)
+		else if (comm->comm_addr->sa_family == AF_INET)
 			the_worker->stats.ipv4 += 1;
 	}
 	return ret;
@@ -854,7 +854,10 @@ static int transmit(struct qr_task *task)
 	kr_require(addr->sa_family == AF_INET || addr->sa_family == AF_INET6);
 	memcpy(peer, addr, kr_sockaddr_len(addr));
 
-	ret = qr_task_send(task, session, (struct sockaddr *)choice, task->pktbuf);
+	struct comm_info out_comm = {
+		.comm_addr = (struct sockaddr *)choice
+	};
+	ret = qr_task_send(task, session, &out_comm, task->pktbuf);
 	if (ret) {
 		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
 		return ret;
@@ -947,62 +950,6 @@ static bool subreq_enqueue(struct qr_task *task)
 	return true;
 }
 
-//#if ENABLE_XDP
-//static void xdp_tx_waker(uv_idle_t *handle)
-//{
-//	int ret = knot_xdp_send_finish(handle->data);
-//	if (ret != KNOT_EAGAIN && ret != KNOT_EOK)
-//		kr_log_error(XDP, "check: ret = %d, %s\n", ret, knot_strerror(ret));
-//	/* Apparently some drivers need many explicit wake-up calls
-//	 * even if we push no additional packets (in case they accumulated a lot) */
-//	if (ret != KNOT_EAGAIN)
-//		uv_idle_stop(handle);
-//	knot_xdp_send_prepare(handle->data);
-//	/* LATER(opt.): it _might_ be better for performance to do these two steps
-//	 * at different points in time */
-//}
-//#endif
-//
-///** Send an answer packet over XDP. */
-//static int xdp_push(struct qr_task *task, const uv_handle_t *src_handle)
-//{
-//#if ENABLE_XDP
-//	struct request_ctx *ctx = task->ctx;
-//	xdp_handle_data_t *xhd = src_handle->data;
-//	if (kr_fails_assert(xhd && xhd->socket && xhd->session == ctx->source.session))
-//		return qr_task_on_send(task, NULL, kr_error(EINVAL));
-//
-//	knot_xdp_msg_t msg;
-//#if KNOT_VERSION_HEX >= 0x030100
-//	/* We don't have a nice way of preserving the _msg_t from frame allocation,
-//	 * so we manually redo all other parts of knot_xdp_send_alloc() */
-//	memset(&msg, 0, sizeof(msg));
-//	bool ipv6 = ctx->source.addr.ip.sa_family == AF_INET6;
-//	msg.flags = ipv6 ? KNOT_XDP_MSG_IPV6 : 0;
-//	memcpy(msg.eth_from, &ctx->source.eth_addrs[0], 6);
-//	memcpy(msg.eth_to,   &ctx->source.eth_addrs[1], 6);
-//#endif
-//	const struct sockaddr *ip_from = &ctx->source.dst_addr.ip;
-//	const struct sockaddr *ip_to   = &ctx->source.comm_addr.ip;
-//	memcpy(&msg.ip_from, ip_from, kr_sockaddr_len(ip_from));
-//	memcpy(&msg.ip_to,   ip_to,   kr_sockaddr_len(ip_to));
-//	msg.payload.iov_base = ctx->req.answer->wire;
-//	msg.payload.iov_len  = ctx->req.answer->size;
-//
-//	uint32_t sent;
-//	int ret = knot_xdp_send(xhd->socket, &msg, 1, &sent);
-//	ctx->req.answer->wire = NULL; /* it's been freed */
-//
-//	uv_idle_start(&xhd->tx_waker, xdp_tx_waker);
-//	kr_log_debug(XDP, "pushed a packet, ret = %d\n", ret);
-//
-//	return qr_task_on_send(task, xhd->session, ret);
-//#else
-//	kr_assert(!EINVAL);
-//	return kr_error(EINVAL);
-//#endif
-//}
-
 static int qr_task_finalize(struct qr_task *task, int state)
 {
 	kr_require(task && task->leading == false);
@@ -1036,8 +983,17 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	qr_task_ref(task);
 
 	/* Send back answer */
-	/* TODO: xdp */
-	int ret = qr_task_send(task, source_session, &ctx->source.comm_addr.ip, ctx->req.answer);
+	struct comm_info out_comm = {
+		.src_addr = &ctx->source.addr.ip,
+		.dst_addr = &ctx->source.dst_addr.ip,
+		.comm_addr = &ctx->source.comm_addr.ip,
+		.xdp = ctx->source.xdp
+	};
+	if (ctx->source.xdp) {
+		memcpy(out_comm.eth_from, ctx->source.eth_from, sizeof(out_comm.eth_from));
+		memcpy(out_comm.eth_to,   ctx->source.eth_to,   sizeof(out_comm.eth_to));
+	}
+	int ret = qr_task_send(task, source_session, &out_comm, ctx->req.answer);
 
 	if (ret != kr_ok()) {
 		(void) qr_task_on_send(task, NULL, kr_error(EIO));
@@ -1357,8 +1313,7 @@ static int qr_task_step(struct qr_task *task,
 	}
 }
 
-int worker_submit(struct session2 *session, struct comm_info *comm,
-                  const uint8_t *eth_from, const uint8_t *eth_to, knot_pkt_t *pkt)
+static int worker_submit(struct session2 *session, struct comm_info *comm, knot_pkt_t *pkt)
 {
 	if (!session || !pkt)
 		return kr_error(EINVAL);
@@ -1395,8 +1350,7 @@ int worker_submit(struct session2 *session, struct comm_info *comm,
 	const struct sockaddr *addr = NULL;
 	if (!is_outgoing) { /* request from a client */
 		struct request_ctx *ctx =
-			request_create(session, comm, eth_from,
-			               eth_to, knot_wire_get_id(pkt->wire));
+			request_create(session, comm, knot_wire_get_id(pkt->wire));
 		if (!ctx)
 			return kr_error(ENOMEM);
 
@@ -1574,8 +1528,7 @@ struct qr_task *worker_resolve_start(knot_pkt_t *query, struct kr_qflags options
 		return NULL;
 
 
-	struct request_ctx *ctx = request_create(NULL, NULL, NULL, NULL,
-	                                         the_worker->next_request_uid);
+	struct request_ctx *ctx = request_create(NULL, NULL, the_worker->next_request_uid);
 	if (!ctx)
 		return NULL;
 
@@ -1778,7 +1731,7 @@ static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 				break;
 			}
 
-			ret = worker_submit(session, ctx->comm, NULL, NULL, pkt);
+			ret = worker_submit(session, &ctx->comm, pkt);
 			if (ret)
 				break;
 		}
@@ -1792,7 +1745,7 @@ static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 		if (!pkt)
 			return protolayer_break(ctx, KNOT_EMALF);
 
-		int ret = worker_submit(session, ctx->comm, NULL, NULL, pkt);
+		int ret = worker_submit(session, &ctx->comm, pkt);
 		mp_flush(the_worker->pkt_pool.ctx);
 		return protolayer_break(ctx, ret);
 	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
@@ -1802,7 +1755,7 @@ static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 		if (!pkt)
 			return protolayer_break(ctx, KNOT_EMALF);
 
-		int ret = worker_submit(session, ctx->comm, NULL, NULL, pkt);
+		int ret = worker_submit(session, &ctx->comm, pkt);
 		wire_buf_reset(ctx->payload.wire_buf);
 		mp_flush(the_worker->pkt_pool.ctx);
 		return protolayer_break(ctx, ret);
@@ -2090,7 +2043,7 @@ static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
 		if (stream_sess->single && stream_sess->produced) {
 			if (kr_log_is_debug(WORKER, NULL)) {
 				kr_log_debug(WORKER, "Unexpected extra data from %s\n",
-						kr_straddr(ctx->comm->src_addr));
+						kr_straddr(ctx->comm.src_addr));
 			}
 			worker_end_tcp(session);
 			status = KNOT_EMALF;
@@ -2103,7 +2056,7 @@ static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
 			goto exit;
 		}
 
-		int ret = worker_submit(session, ctx->comm, NULL, NULL, pkt);
+		int ret = worker_submit(session, &ctx->comm, pkt);
 		wire_buf_movestart(wb);
 		if (ret == kr_ok()) {
 			iters += 1;

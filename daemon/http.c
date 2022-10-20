@@ -368,7 +368,7 @@ static int http_send_response_rst_stream(struct pl_http_sess_data *ctx, int32_t 
 }
 
 static void callback_finished_free_baton(int status, struct session2 *session,
-                                         const void *target, void *baton)
+                                         const struct comm_info *comm, void *baton)
 {
 	free(baton);
 }

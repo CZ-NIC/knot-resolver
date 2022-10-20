@@ -200,7 +200,7 @@ struct kres_gnutls_push_ctx {
 };
 
 static void kres_gnutls_push_finished(int status, struct session2 *session,
-                                      const void *target, void *baton)
+                                      const struct comm_info *comm, void *baton)
 {
 	struct kres_gnutls_push_ctx *push_ctx = baton;
 	struct pl_tls_sess_data *tls = push_ctx->sess_data;

@@ -46,6 +46,9 @@
 struct session2;
 struct protolayer_iter_ctx;
 
+/** Type of MAC addresses. */
+typedef uint8_t ethaddr_t[6];
+
 /** Information about the transport - addresses and proxy. */
 struct comm_info {
 	/** The original address the data came from. May be that of a proxied
@@ -67,6 +70,15 @@ struct comm_info {
 	/** Data parsed from a PROXY header. May be `NULL` if the communication
 	 * did not come through a proxy, or if the PROXYv2 protocol was not used. */
 	const struct proxy_result *proxy;
+
+	/** Pointer to protolayer-specific data, e.g. a key to decide, which
+	 * sub-session to use. */
+	void *target;
+
+	/* XDP data */
+	ethaddr_t eth_from;
+	ethaddr_t eth_to;
+	bool xdp:1;
 };
 
 /** Protocol layer types - the individual implementations of protocol layers.
@@ -191,7 +203,7 @@ enum protolayer_ret {
  * function.
  * `baton` is the `baton` parameter passed to the `session2_(un)wrap` function. */
 typedef void (*protolayer_finished_cb)(int status, struct session2 *session,
-                                       const void *target, void *baton);
+                                       const struct comm_info *comm, void *baton);
 
 
 #define PROTOLAYER_EVENT_MAP(XX) \
@@ -279,17 +291,12 @@ struct protolayer_iter_ctx {
 /* read-write: */
 	/** The payload */
 	struct protolayer_payload payload;
-	/** Transport information (e.g. UDP sender address). May be `NULL`. */
-	const void *target;
 	/** Communication information. Typically written into by one of the
-	 * first layers facilitating transport protocol processing.
-	 * Points to session-wide comm info by default, may be changed
-	 * by a layer to point elsewhere. */
-	struct comm_info *comm;
+	 * first layers facilitating transport protocol processing. */
+	struct comm_info comm;
 
 /* callback for when the layer iteration has ended - read-only: */
 	protolayer_finished_cb finished_cb;
-	const void *finished_cb_target;
 	void *finished_cb_baton;
 
 /* internal information for the manager - private: */
@@ -793,7 +800,8 @@ static inline struct session2 *session2_new_child(struct session2 *parent,
 	return s;
 }
 
-/** De-allocates the session. */
+/** De-allocates the session. Must only be called once the underlying IO handle
+ * and timer are already closed, otherwise may leak resources. */
 void session2_free(struct session2 *s);
 
 /** Start reading from the underlying transport. */
@@ -876,9 +884,11 @@ static inline bool session2_is_empty(const struct session2 *session)
 }
 
 /** Sends the specified `payload` to be processed in the `_UNWRAP` direction by
- * the session's protocol layers. The `target` parameter may contain a pointer
- * to transport-specific data, e.g. for UDP, it shall contain a pointer to the
- * sender's `struct sockaddr_*`.
+ * the session's protocol layers.
+ *
+ * The `comm` parameter may contain a pointer to comm data, e.g. for UDP, that
+ * comm data shall contain a pointer to the sender's `struct sockaddr_*`. If
+ * `comm` is `NULL`, session-wide data shall be used.
  *
  * Note that the payload data may be modified by any of the layers, to avoid
  * making copies. Once the payload is passed to this function, the content of
@@ -891,7 +901,8 @@ static inline bool session2_is_empty(const struct session2 *session)
  * Returns one of `enum protolayer_ret` or a negative number
  * indicating an error. */
 int session2_unwrap(struct session2 *s, struct protolayer_payload payload,
-                    const void *target, protolayer_finished_cb cb, void *baton);
+                    const struct comm_info *comm, protolayer_finished_cb cb,
+		    void *baton);
 
 /** Same as `session2_unwrap`, but looks up the specified `protocol` in the
  * session's assigned protocol group and sends the `payload` to the layer that
@@ -900,8 +911,9 @@ int session2_unwrap(struct session2 *s, struct protolayer_payload payload,
  * Layers may use this to generate their own data to send in the sequence, e.g.
  * for protocol-specific ceremony. */
 int session2_unwrap_after(struct session2 *s, enum protolayer_protocol protocol,
-                         struct protolayer_payload payload, const void *target,
-                         protolayer_finished_cb cb, void *baton);
+                          struct protolayer_payload payload,
+                          const struct comm_info *comm,
+                          protolayer_finished_cb cb, void *baton);
 
 /** Sends the specified `payload` to be processed in the `_WRAP` direction by
  * the session's protocol layers. The `target` parameter may contain a pointer
@@ -918,7 +930,8 @@ int session2_unwrap_after(struct session2 *s, enum protolayer_protocol protocol,
  * Returns one of `enum protolayer_ret` or a negative number
  * indicating an error. */
 int session2_wrap(struct session2 *s, struct protolayer_payload payload,
-                  const void *target, protolayer_finished_cb cb, void *baton);
+                  const struct comm_info *comm, protolayer_finished_cb cb,
+                  void *baton);
 
 /** Same as `session2_wrap`, but looks up the specified `protocol` in the
  * session's assigned protocol group and sends the `payload` to the layer that
@@ -927,8 +940,9 @@ int session2_wrap(struct session2 *s, struct protolayer_payload payload,
  * Layers may use this to generate their own data to send in the sequence, e.g.
  * for protocol-specific ceremony. */
 int session2_wrap_after(struct session2 *s, enum protolayer_protocol protocol,
-                       struct protolayer_payload payload, const void *target,
-                       protolayer_finished_cb cb, void *baton);
+                        struct protolayer_payload payload,
+                        const struct comm_info *comm,
+                        protolayer_finished_cb cb, void *baton);
 
 /** Sends an event to be synchronously processed by the protocol layers of the
  * specified session. The layers are first iterated through in the `_UNWRAP`
