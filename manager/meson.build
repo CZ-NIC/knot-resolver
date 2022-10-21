@@ -6,17 +6,8 @@ build_manager_client = false
 if get_option('manager') != 'disabled'
     message('--- manager dependencies ---')
 
-    python_deps = [
-        'jinja2',
-        'yaml',
-        'aiohttp',
-        'prometheus_client',
-        'supervisor',
-        'typing_extensions',
-    ]
-
     pymod = import('python')
-    py3 = pymod.find_installation('python3', modules: python_deps)
+    py3 = pymod.find_installation('python3')
     py3_deps = py3.dependency()
 
     if py3.language_version().version_compare('<3.6')
@@ -32,10 +23,10 @@ endif
 
 if build_manager
 
-    manager_module_dir = 'knot_resolver_manager'
-    subdir(manager_module_dir)
+    # installation script
+    meson.add_install_script('scripts/install.sh', py3.path())
 
-    # YAML config: etc/knot-resolver/config.yml
+    # YAML config configuration file
     install_data(
         sources: 'etc/knot-resolver/config.yml',
         install_dir: etc_dir,
