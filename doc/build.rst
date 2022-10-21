@@ -27,6 +27,9 @@ It allows build packages localy for supported distributions, which it then insta
 
 First, you need to install and setup ``apkg``.
 
+.. tip::
+   Install ``apkg`` with `pipx <https://pypa.github.io/pipx/>`_ to avoid version conflicts.
+
 .. code-block:: bash
 
    $ pip3 install apkg
@@ -41,7 +44,7 @@ Clone and change dir to ``knot-resolver`` git repository.
 
 .. tip:: The ``apkg status`` command can be used to find out some useful information, such as whether the current distribution is supported.
 
-When ``apkg`` is ready, a package can be build and installed.
+When ``apkg`` is ready, a package can be built and installed.
 
 .. code-block:: bash
 
@@ -87,6 +90,7 @@ The following dependencies are needed to build and run Knot Resolver with core f
    "GnuTLS", "TLS"
 
 Additional dependencies are needed to build and run Knot Resolver with ``manager``:
+All dependencies are also listed in `pyproject.toml <https://gitlab.nic.cz/knot/knot-resolver/-/blob/manager/manager/pyproject.toml>`_ which is our authoritative source.
 
 .. csv-table::
    :header: "Requirement", "Notes"
