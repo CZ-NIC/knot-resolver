@@ -165,13 +165,7 @@ You can also configure some :ref:`build-options`, in this case enable ``manager`
 
 .. code-block:: bash
 
-   $ meson build_dir --prefix=/tmp/kr --default-library=static -Dmanager=enabled -Dpython.install_env=auto
-
-.. note::
-
-   For the ``manager``, it is recommended to set ``python.install_env`` option to ``auto`` or ``env``.
-   Otherwise, python package may not be installed in the correct packages or virtual environment.
-   See more on `meson:python-module <https://mesonbuild.com/Builtin-options.html#python-module>`_.
+   $ meson build_dir --prefix=/tmp/kr --default-library=static -Dmanager=enabled
 
 After that it is possible to build and install Knot Resolver.
 
