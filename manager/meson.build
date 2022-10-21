@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 build_manager = false
-build_manager_client = false
 
 if get_option('manager') != 'disabled'
     message('--- manager dependencies ---')
@@ -17,8 +16,6 @@ if get_option('manager') != 'disabled'
     endif
 
     message('----------------------------')
-elif get_option('manager') == 'disabled' and get_option('manager_client') == 'enabled'
-    error('manager client cannot be build without manager')
 endif
 
 if build_manager

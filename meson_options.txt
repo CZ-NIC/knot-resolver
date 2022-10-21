@@ -128,18 +128,6 @@ option(
 )
 
 option(
-  'manager_client',
-  type: 'combo',
-  choices: [
-    'auto',
-    'enabled',
-    'disabled',
-  ],
-  value: 'auto',
-  description: 'build kresctl manager client',
-)
-
-option(
   'client',
   type: 'combo',
   choices: [

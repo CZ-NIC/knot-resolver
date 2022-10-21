@@ -288,7 +288,6 @@ run_target(
 s_managed_ta = managed_ta ? 'enabled' : 'disabled'
 s_install_root_keys = install_root_keys ? 'enabled' : 'disabled'
 s_build_manager = build_manager ? 'enabled' : 'disabled'
-s_build_manager_client = build_manager_client ? 'enabled' : 'disabled'
 s_build_client = build_client ? 'enabled' : 'disabled'
 s_build_utils = build_utils ? 'enabled' : 'disabled'
 s_build_dnstap = build_dnstap ? 'enabled' : 'disabled'
@@ -324,7 +323,6 @@ message('''
 
   optional components
     manager:            @0@'''.format(s_build_manager) + '''
-    manager_client:     @0@'''.format(s_build_manager_client) + '''
     client:             @0@'''.format(s_build_client) + '''
     utils:              @0@'''.format(s_build_utils) + '''
     dnstap:             @0@'''.format(s_build_dnstap) + '''
