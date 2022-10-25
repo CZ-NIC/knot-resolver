@@ -7,11 +7,14 @@ if get_option('manager') != 'disabled'
 
     pymod = import('python')
     py3 = pymod.find_installation('python3')
-    py3_deps = py3.dependency()
+    py3_deps = run_command(py3, 'tests/packaging/dependencies.py', 'setup.py', check: false)
 
     if py3.language_version().version_compare('<3.6')
         error('At least Python 3.6 is required.')
+    elif py3_deps.returncode() != 0
+        error(py3_deps.stderr().strip())
     else
+        message('all dependencies found')
         build_manager = true
     endif
 
