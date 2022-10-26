@@ -18,6 +18,12 @@ variables:
   EMAIL: 'ci@nic'
 
 image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-$KNOT_VERSION
+default:
+  interruptible: true
+  tags:
+    - docker
+    - linux
+    - amd64
 
 stages:
   - build
