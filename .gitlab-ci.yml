@@ -392,16 +392,14 @@ pytests:
 # respdiff {{{
 .condor: &condor
   <<: *common
-  needs:
-    - job: deckard
-      artifacts: false
-    - job: respdiff:basic
-      artifacts: false
+  tags:
+    - condor
+  needs: []
   only:  # trigger job only in repos under our control
     - branches@knot/knot-resolver
     - branches@knot/security/knot-resolver
-  tags:
-    - condor
+  # The set of respdiff+resperf jobs takes over two hours to execute.
+  when: manual
 
 .respdiff:  &respdiff
   <<: *condor
