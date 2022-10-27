@@ -12,7 +12,7 @@ echo -e "\t${blue}rm -r $(realpath .install_kresd) $(realpath .build_kresd)${res
 echo
 cd ..
 mkdir -p manager/.build_kresd manager/.install_kresd
-meson manager/.build_kresd --prefix=$(realpath manager/.install_kresd) --default-library=static --buildtype=debug
+meson manager/.build_kresd --prefix=$(realpath manager/.install_kresd) --default-library=static --buildtype=debug -Dmanager=enabled
 ninja -C manager/.build_kresd
 ninja install -C manager/.build_kresd
 export PATH="$(realpath manager/.install_kresd)/sbin:$PATH"
@@ -38,4 +38,4 @@ echo
 echo Knot Manager API is accessible on http://localhost:5000
 echo -------------------------------------------------------
 
-poetry run python -m knot_resolver_manager -c etc/knot-resolver/config.dev.yml $@
+poetry run python3 -m knot_resolver_manager -c etc/knot-resolver/config.dev.yml $@
