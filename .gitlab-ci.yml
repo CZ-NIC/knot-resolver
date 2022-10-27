@@ -406,12 +406,8 @@ pytests:
   only:  # trigger job only in repos under our control
     - branches@knot/knot-resolver
     - branches@knot/security/knot-resolver
-  # As the set of respdiff+resperf jobs takes over two hours to execute,
-  # we leave time to auto-cancel them by pushing to the same branch again.
-  # The delay is important, as cancelling a job running on GitLab level
-  # won't remove it from Condor's queue even if it hasn't really started executing yet.
-  when: delayed
-  start_in: 30 minutes # timer starts after dependencies finish; normally +5 minutes
+  # The set of respdiff+resperf jobs takes over two hours to execute.
+  when: manual
 
 .respdiff:  &respdiff
   <<: *condor
