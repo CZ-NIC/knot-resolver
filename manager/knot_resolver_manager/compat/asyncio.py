@@ -46,6 +46,7 @@ def async_in_a_thread(func: Callable[..., T]) -> Callable[..., Coroutine[None, N
 def create_task(coro: Awaitable[T], name: Optional[str] = None) -> "asyncio.Task[T]":
     # version 3.8 and higher, call directly
     if sys.version_info.major >= 3 and sys.version_info.minor >= 8:
+        # pylint: disable=unexpected-keyword-arg
         return asyncio.create_task(coro, name=name)  # type: ignore[attr-defined]
 
     # version 3.7 and higher, call directly without the name argument
