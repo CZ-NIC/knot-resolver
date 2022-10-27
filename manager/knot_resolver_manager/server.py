@@ -106,7 +106,7 @@ class Server:
         else:
             try:
                 data = await readfile(self._config_path)
-                config = KresConfig(ParsedTree(data))
+                config = KresConfig(parse_yaml(data))
                 await self.config_store.update(config)
                 logger.info("Configuration file successfully reloaded")
             except FileNotFoundError:
