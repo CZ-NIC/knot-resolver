@@ -222,6 +222,7 @@ class QueryTree:
         if update_with is None:
             raise DataParsingError("query invalid: can't request an insert via PUT and not provide a value")
         if obj is None:
+            # FIXME probably a bug, this is weird
             if parent._is_list():
                 parent._append(update_with)
                 return fakeroot["root"], None
