@@ -1,3 +1,4 @@
+import logging
 import os
 
 from jinja2 import Template
@@ -20,6 +21,8 @@ from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.datamodel.logging_schema import LogTargetEnum
 from knot_resolver_manager.kresd_controller.interface import KresID, SubprocessType
 from knot_resolver_manager.utils.async_utils import read_resource, writefile
+
+logger = logging.getLogger(__name__)
 
 
 class SupervisordKresID(KresID):
@@ -83,6 +86,14 @@ class ProcessTypeConfig:
         # read original command from /proc
         with open("/proc/self/cmdline", "rb") as f:
             args = [s.decode("utf-8") for s in f.read()[:-1].split(b"\0")]
+
+        # insert debugger when asked
+        if os.environ.get("KRES_DEBUG_MANAGER"):
+            logger.warning("Injecting debugger into the supervisord config")
+            # the args array looks like this:
+            # [PYTHON_PATH, "-m", "knot_resolver_manager", ...]
+            args = args[:1] + ["-m", "debugpy", "--listen", "0.0.0.0:5678", "--wait-for-client"] + args[2:]
+
         cmd = '"' + '" "'.join(args) + '"'
 
         return ProcessTypeConfig(  # type: ignore[call-arg]
