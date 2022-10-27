@@ -24,8 +24,8 @@ serverurl = unix://{{ config.unix_http_server }}
 supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.patch_logger:inject
 target = {{ config.target }}
 
-[rpcinterface:manager_lifecycle_monitor]
-supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.manager_lifecycle_monitor:inject
+[rpcinterface:manager_integration]
+supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.manager_integration:inject
 
 [rpcinterface:sd_notify]
 supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.sd_notify:inject

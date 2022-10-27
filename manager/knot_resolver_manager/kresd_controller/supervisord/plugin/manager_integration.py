@@ -2,10 +2,12 @@
 # pylint: disable=protected-access
 import atexit
 import os
+import signal
 from typing import Any, Optional
 
 from supervisor.compat import as_string
 from supervisor.events import ProcessStateFatalEvent, ProcessStateRunningEvent, ProcessStateStartingEvent, subscribe
+from supervisor.options import ServerOptions
 from supervisor.process import Subprocess
 from supervisor.states import SupervisorStates
 from supervisor.supervisord import Supervisor
@@ -49,6 +51,17 @@ def check_for_runnning_manager(event: ProcessStateRunningEvent) -> None:
         systemd_notify(READY="1", STATUS="Ready")
 
 
+def ServerOptions_get_signal(self):
+    sig = self.signal_receiver.get_signal()
+    if sig == signal.SIGHUP and superd is not None:
+        superd.options.logger.info("received SIGHUP, forwarding to the process 'manager'")
+        manager_pid = superd.process_groups["manager"].processes["manager"].pid
+        os.kill(manager_pid, signal.SIGHUP)
+        return None
+
+    return sig
+
+
 def inject(supervisord: Supervisor, **_config: Any) -> Any:  # pylint: disable=useless-return
     global superd
     superd = supervisord
@@ -62,6 +75,9 @@ def inject(supervisord: Supervisor, **_config: Any) -> Any:  # pylint: disable=u
     subscribe(ProcessStateFatalEvent, check_for_fatal_manager)
     subscribe(ProcessStateStartingEvent, check_for_starting_manager)
     subscribe(ProcessStateRunningEvent, check_for_runnning_manager)
+
+    # forward SIGHUP to manager
+    ServerOptions.get_signal = ServerOptions_get_signal
 
     # this method is called by supervisord when loading the plugin,
     # it should return XML-RPC object, which we don't care about
