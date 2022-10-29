@@ -6,7 +6,7 @@ default:
   before_script:
     - cd manager
     - poetry env use $PYTHON_INTERPRETER
-    - poetry install
+    - poetry install --no-root
   tags:
     - docker
     - linux
