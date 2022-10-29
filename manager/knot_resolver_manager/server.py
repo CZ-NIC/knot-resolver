@@ -387,8 +387,8 @@ def _lock_working_directory(attempt: int = 0) -> None:
                 pid = int(f.read().strip())
             try:
                 os.kill(pid, 0)
-            except OSError as e:
-                if e.errno == errno.ESRCH:
+            except OSError as e2:
+                if e2.errno == errno.ESRCH:
                     os.unlink(PID_FILE_NAME)
                     _lock_working_directory(attempt=attempt + 1)
                     return
