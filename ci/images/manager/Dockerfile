@@ -13,6 +13,6 @@ RUN dnf install -y git diffutils python3.6 python3.7 python3.8 python3.9 python3
 
 # Install Poetry
 RUN python3 -m pip install -U pip \
-	&& curl -sSL https://install.python-poetry.org | python3 - \
+	&& curl -sSL https://install.python-poetry.org | python3 - --version 1.1.12\
 	# not exactly required, but helpful
 	&& python3 -m pip install poethepoet

@@ -38,4 +38,4 @@ echo
 echo Knot Manager API is accessible on http://localhost:5000
 echo -------------------------------------------------------
 
-poetry run python3 -m knot_resolver_manager -c etc/knot-resolver/config.dev.yml $@
+python3 -m knot_resolver_manager -c etc/knot-resolver/config.dev.yml $@

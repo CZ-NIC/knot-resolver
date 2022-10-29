@@ -160,7 +160,6 @@ typeCheckingMode = "strict"
 requires = ["poetry>=0.12"]
 build-backend = "poetry.masonry.api"
 
-
 [tool.mypy]
 python_version = "3.6"
 #strict = true
