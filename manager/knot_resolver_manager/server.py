@@ -171,20 +171,22 @@ class Server:
         # pylint: disable=too-many-locals
 
         # parse the incoming data
+        if request.method == "GET":
+            update_with: Optional[ParsedTree] = None
+        else:
+            update_with = parse(await request.text(), request.content_type)
         document_path = request.match_info["path"]
         getheaders = ignore_exceptions_optional(List[str], None, KeyError)(request.headers.getall)
         etags = getheaders("if-match")
         not_etags = getheaders("if-none-match")
         current_config: ParsedTree = self.config_store.get().get_unparsed_data()
-        if request.method == "GET":
-            update_with: Optional[ParsedTree] = None
-        else:
-            update_with = parse(await request.text(), request.content_type)
 
         # stop processing if etags
         def strip_quotes(s: str) -> str:
             return s.strip('"')
 
+        # WARNING: this check is prone to race conditions. When changing, make sure that the current config
+        # is really the latest current config (i.e. no await in between obtaining the config and the checks)
         status = HTTPStatus.NOT_MODIFIED if request.method in ("GET", "HEAD") else HTTPStatus.PRECONDITION_FAILED
         if etags is not None and current_config.etag not in map(strip_quotes, etags):
             return web.Response(status=status)
@@ -204,7 +206,7 @@ class Server:
 
         # return success
         resp_text: Optional[str] = str(to_return) if to_return is not None else None
-        res = web.Response(status=HTTPStatus.OK, text=resp_text)
+        res = web.Response(status=HTTPStatus.OK, text=resp_text, content_type="application/json")
         res.headers.add("ETag", f'"{new_config.etag}"')
         return res
 
