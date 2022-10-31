@@ -1,7 +1,7 @@
 #/usr/bin/env bash
 
 # completion function for the kresctl
-_kresctl_completion() {
+__kresctl_completion() {
     local cur prev opts
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
@@ -19,4 +19,4 @@ _kresctl_completion() {
 }
 
 # use the bash default completion for other arguments
-complete -o filenames -o nospace -o bashdefault -F _kresctl_completion kresctl
+complete -o filenames -o nospace -o bashdefault -F __kresctl_completion kresctl

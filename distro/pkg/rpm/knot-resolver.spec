@@ -229,8 +229,8 @@ mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 pushd manager
 %py3_install
 install -m 644 -D etc/knot-resolver/config.yml %{buildroot}%{_sysconfdir}/knot-resolver/config.yml
-install -m 644 -D shell-completion/kresctl.bash %{buildroot}%{_datarootdir}/bash-completion/completions/kresctl
-install -m 644 -D shell-completion/kresctl.fish %{buildroot}%{_datarootdir}/fish/vendor_completions.d/kresctl.fish
+install -m 644 -D shell-completion/client.bash %{buildroot}%{_datarootdir}/bash-completion/completions/kresctl
+install -m 644 -D shell-completion/client.fish %{buildroot}%{_datarootdir}/fish/completions/kresctl.fish
 
 popd
 
@@ -385,7 +385,7 @@ fi
 %{_unitdir}/knot-resolver.service
 %{_bindir}/kresctl
 %{_datarootdir}/bash-completion/completions/kresctl
-%{_datarootdir}/fish/vendor_completions.d/kresctl.fish
+%{_datarootdir}/fish/completions/kresctl.fish
 
 %changelog
 * {{ now }} Jakub Ružička <jakub.ruzicka@nic.cz> - {{ version }}-{{ release }}
