@@ -32,7 +32,12 @@ class CompletionCommand(Command):
 
     @staticmethod
     def completion(args: List[str], parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
-        return {}
+        comp: Dict[str, Optional[str]] = {}
+
+        for action in parser._actions:
+            for opt in action.option_strings:
+                comp[opt] = action.help
+        return comp
 
     def run(self, args: CommandArgs) -> None:
         parser = args.parser
@@ -66,5 +71,4 @@ class CompletionCommand(Command):
         elif self.shell == Shells.FISH:
             pass
         else:
-            pass
-            # error
+            raise ValueError(f"unexpected value of {Shells}: {self.shell}")
