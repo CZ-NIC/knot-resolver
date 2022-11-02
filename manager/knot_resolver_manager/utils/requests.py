@@ -34,7 +34,7 @@ def request(
         with urlopen(req) as response:
             return Response(response.status, response.read().decode("utf8"))
     except HTTPError as err:
-        return Response(err.code, response.read().decode("utf8"))
+        return Response(err.code, err.read().decode("utf8"))
 
 
 # Code heavily inspired by requests-unixsocket
