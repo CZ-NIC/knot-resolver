@@ -57,8 +57,10 @@ And insert these lines:
 .. code-block:: ini
 
 	[Service]
-	CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN CAP_SYS_ADMIN CAP_SYS_RESOURCE
-	AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN CAP_SYS_ADMIN CAP_SYS_RESOURCE
+        CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN CAP_SYS_ADMIN CAP_IPC_LOCK CAP_SYS_RESOURCE
+        AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN CAP_SYS_ADMIN CAP_IPC_LOCK CAP_SYS_RESOURCE
+
+The ``CAP_SYS_RESOURCE`` is only needed on Linux < 5.11.
 
 .. TODO suggest some way for ethtool -L?  Perhaps via systemd units?
 
