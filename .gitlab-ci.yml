@@ -97,6 +97,11 @@ stages:
   after_script:
     - ci/fix-meson-junit.sh build_ci*/meson-logs/testlog.junit.xml
 
+vartest:
+  <<: *build
+  script:
+    - echo CI_PIPELINE_SOURCE = $CI_PIPELINE_SOURCE
+
 archive:
   <<: *build
   except: null
