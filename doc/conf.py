@@ -4,6 +4,7 @@
 import os
 import re
 import subprocess
+from datetime import date
 
 import sphinx_rtd_theme
 
@@ -24,9 +25,20 @@ breathe_domain_by_extension = {"h": "c"}
 source_suffix = '.rst'
 master_doc = 'index'
 
+# Get current year (preferably from Git commit)
+commit_year = date.today().year
+
+try:
+    commit_date_str = subprocess.check_output(['git', 'show', '--no-patch', '--format=%cs'])\
+            .decode().strip()
+    commit_date = date.fromisoformat(commit_date_str)
+    commit_year = commit_date.year
+except BaseException as e:
+    print('Could not get current commit, using system time for copyright:', e)
+
 # General information about the project.
 project = u'Knot Resolver'
-copyright = u'2014-2020 CZ.NIC labs'
+copyright = u'2014-{current} CZ.NIC labs'.format(current=commit_year)
 with open('../meson.build') as f:
     for line in f:
         match = re.match(r"\s*version\s*:\s*'([^']+)'.*", line)
