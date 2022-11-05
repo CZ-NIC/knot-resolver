@@ -94,7 +94,7 @@ Users
 * Users of :ref:`control-sockets` API need to terminate each command sent to resolver with newline
   character (ASCII ``\n``). Correct usage: ``cache.stats()\n``.
   Newline terminated commands are accepted by all resolver versions >= 1.0.0.
-* `DNS Flag Day 2020 <https://dnsflagday.net/2020/>`_ is now effective and Knot Resolver uses
+* `DNS Flag Day 2020 <https://www.dnsflagday.net/2020/>`_ is now effective and Knot Resolver uses
   maximum size of UDP answer to 1232 bytes. Please double-check your firewall,
   it has to allow DNS traffic on UDP and **also TCP** port 53.
 * Human readable output in interactive mode and from :ref:`control-sockets` was improved and
