@@ -42,7 +42,7 @@ types-dataclasses = "^0.6.4"
 poetry = "^1.1.12"
 
 [tool.poetry.scripts]
-kresctl = 'knot_resolver_manager.cli:main'
+kresctl = 'knot_resolver_manager.cli.main:main'
 
 [tool.poe.tasks]
 run = { cmd = "scripts/run", help = "Run the manager" }
@@ -54,7 +54,7 @@ format = { shell = "black knot_resolver_manager/ tests/ scripts/ build.py; isort
 fixdeps = { shell = "poetry install; npm install; npm update", help = "Install/update dependencies according to configuration files"}
 commit = { shell = "scripts/commit", help = "Invoke every single check before commiting" }
 container = { cmd = "scripts/container.py", help = "Manage containers" }
-kresctl = { script = "knot_resolver_manager.cli:main", help="run kresctl" }
+kresctl = { script = "knot_resolver_manager.cli.main:main", help="run kresctl" }
 clean = """
   rm -rf .coverage
          .mypy_cache
