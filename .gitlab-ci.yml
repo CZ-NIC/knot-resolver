@@ -18,6 +18,12 @@ variables:
   EMAIL: 'ci@nic'
 
 image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-$KNOT_VERSION
+default:
+  interruptible: true
+  tags:
+    - docker
+    - linux
+    - amd64
 
 stages:
   - build
@@ -49,6 +55,10 @@ stages:
     - docker
     - linux
     - amd64
+  # Tests which decided to skip themselves get orange non-failure.
+  allow_failure:
+    exit_codes:
+      - 77
 
 .after_build: &after_build
   <<: *common
@@ -368,21 +378,9 @@ pkgtest:
       - $SKIP_CI == "1"
 
 pytests:
-  # these are executed on LXC runners to increase stability
-  image: $CI_REGISTRY/knot/knot-resolver/ci/lxc-debian-11:knot-$KNOT_VERSION
-  only:
-    refs:
-      - branches@knot/knot-resolver
-  needs: []
-  tags:
-    - lxc
-    - amd64
-  before_script:
-    # build-asan artifacts can't be reused (different container is used)
-    - CC=clang CXX=clang++ CFLAGS=-fno-sanitize-recover=all CXXFLAGS=-fno-sanitize=undefined meson build_ci_asan --default-library=static --prefix=$PREFIX -Db_sanitize=address,undefined -Dextra_tests=enabled
-    - ninja -C build_ci_asan
-    - ninja -C build_ci_asan install >/dev/null
-  # END lxc specific section
+  <<: *test_flaky
+  needs:
+    - build-asan
   artifacts:
     when: always
     paths:
@@ -398,22 +396,20 @@ pytests:
 # respdiff {{{
 .condor: &condor
   <<: *common
-  needs:
-    - job: deckard
-      artifacts: false
-    - job: respdiff:basic
-      artifacts: false
+  tags:
+    - condor
+  needs: []
   only:  # trigger job only in repos under our control
     - branches@knot/knot-resolver
     - branches@knot/security/knot-resolver
-  tags:
-    - condor
+  # The set of respdiff+resperf jobs takes over two hours to execute.
+  when: manual
 
 .respdiff:  &respdiff
   <<: *condor
   stage: respdiff
   script:
-    - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPDIFF_FORCE -gt 0 || exit 0
+    - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPDIFF_FORCE -gt 0 || exit 77
     - test ! -f /var/tmp/respdiff-jobs/buffer/buffer_$RESPDIFF_TEST_stats.json || test $RESPDIFF_FORCE -gt 0 || ( echo "Reference unstable, try again in ~3h or use RESPDIFF_FORCE=1."; exit 1 )
     - export LABEL=gl$(date +%s)
     - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
@@ -479,7 +475,7 @@ fwd-udp6-unbound.tls6:
   <<: *condor
   stage: respdiff
   script:
-    - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPERF_FORCE -gt 0 || exit 0
+    - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPERF_FORCE -gt 0 || exit 77
     - export LABEL=gl$(date +%s)
     - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
     - export TESTDIR="$COMMITDIR/$RESPERF_TEST"
