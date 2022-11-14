@@ -7,7 +7,7 @@ import sys
 from http import HTTPStatus
 from pathlib import Path
 from time import time
-from typing import Any, List, Optional, Set, Union, cast
+from typing import Any, Dict, List, Optional, Set, Union, cast
 
 from aiohttp import web
 from aiohttp.web import middleware
@@ -27,9 +27,11 @@ from knot_resolver_manager.exceptions import CancelStartupExecInsteadException, 
 from knot_resolver_manager.kresd_controller import get_best_controller_implementation
 from knot_resolver_manager.utils import ignore_exceptions_optional
 from knot_resolver_manager.utils.async_utils import readfile
+from knot_resolver_manager.utils.etag import structural_etag
 from knot_resolver_manager.utils.functional import Result
-from knot_resolver_manager.utils.modeling import ParsedTree, parse, parse_yaml
 from knot_resolver_manager.utils.modeling.exceptions import DataParsingError, DataValidationError
+from knot_resolver_manager.utils.modeling.parsing import parse, parse_yaml
+from knot_resolver_manager.utils.modeling.query import query
 from knot_resolver_manager.utils.modeling.types import NoneType
 from knot_resolver_manager.utils.systemd_notify import systemd_notify
 
@@ -172,14 +174,14 @@ class Server:
 
         # parse the incoming data
         if request.method == "GET":
-            update_with: Optional[ParsedTree] = None
+            update_with: Optional[Dict[str, Any]] = None
         else:
             update_with = parse(await request.text(), request.content_type)
         document_path = request.match_info["path"]
         getheaders = ignore_exceptions_optional(List[str], None, KeyError)(request.headers.getall)
         etags = getheaders("if-match")
         not_etags = getheaders("if-none-match")
-        current_config: ParsedTree = self.config_store.get().get_unparsed_data()
+        current_config: Dict[str, Any] = self.config_store.get().get_unparsed_data()
 
         # stop processing if etags
         def strip_quotes(s: str) -> str:
@@ -188,14 +190,14 @@ class Server:
         # WARNING: this check is prone to race conditions. When changing, make sure that the current config
         # is really the latest current config (i.e. no await in between obtaining the config and the checks)
         status = HTTPStatus.NOT_MODIFIED if request.method in ("GET", "HEAD") else HTTPStatus.PRECONDITION_FAILED
-        if etags is not None and current_config.etag not in map(strip_quotes, etags):
+        if etags is not None and structural_etag(current_config) not in map(strip_quotes, etags):
             return web.Response(status=status)
-        if not_etags is not None and current_config.etag in map(strip_quotes, not_etags):
+        if not_etags is not None and structural_etag(current_config) in map(strip_quotes, not_etags):
             return web.Response(status=status)
 
         # run query
-        op = cast(Literal["get", "post", "delete", "patch", "put"], request.method.lower())
-        new_config, to_return = current_config.query(op, document_path, update_with)
+        op = cast(Literal["get", "delete", "patch", "put"], request.method.lower())
+        new_config, to_return = query(current_config, op, document_path, update_with)
 
         # update the config
         if request.method != "GET":
@@ -207,7 +209,7 @@ class Server:
         # return success
         resp_text: Optional[str] = str(to_return) if to_return is not None else None
         res = web.Response(status=HTTPStatus.OK, text=resp_text, content_type="application/json")
-        res.headers.add("ETag", f'"{new_config.etag}"')
+        res.headers.add("ETag", f'"{structural_etag(new_config)}"')
         return res
 
     async def _handler_metrics(self, _request: web.Request) -> web.Response:
@@ -262,11 +264,10 @@ class Server:
         self.app.add_routes(
             [
                 web.get("/", self._handler_index),
-                web.post(r"/v1/config{path:.*}", self._handler_config_query),
-                web.put(r"/v1/config{path:.*}", self._handler_config_query),
-                web.patch(r"/v1/config{path:.*}", self._handler_config_query),
                 web.get(r"/v1/config{path:.*}", self._handler_config_query),
+                web.put(r"/v1/config{path:.*}", self._handler_config_query),
                 web.delete(r"/v1/config{path:.*}", self._handler_config_query),
+                web.patch(r"/v1/config{path:.*}", self._handler_config_query),
                 web.post("/stop", self._handler_stop),
                 web.get("/schema", self._handler_schema),
                 web.get("/schema/ui", self._handle_view_schema),
@@ -318,7 +319,7 @@ class Server:
         return self._exit_code
 
 
-async def _load_raw_config(config: Union[Path, ParsedTree]) -> ParsedTree:
+async def _load_raw_config(config: Union[Path, Dict[str, Any]]) -> Dict[str, Any]:
     # Initial configuration of the manager
     if isinstance(config, Path):
         if not config.exists():
@@ -330,17 +331,17 @@ async def _load_raw_config(config: Union[Path, ParsedTree]) -> ParsedTree:
             config = parse_yaml(await readfile(config))
 
     # validate the initial configuration
-    assert isinstance(config, ParsedTree)
+    assert isinstance(config, dict)
     return config
 
 
-async def _load_config(config: ParsedTree) -> KresConfig:
+async def _load_config(config: Dict[str, Any]) -> KresConfig:
     logger.info("Validating initial configuration...")
     config_validated = KresConfig(config)
     return config_validated
 
 
-async def _init_config_store(config: ParsedTree) -> ConfigStore:
+async def _init_config_store(config: Dict[str, Any]) -> ConfigStore:
     config_validated = await _load_config(config)
     config_store = ConfigStore(config_validated)
     return config_store
@@ -369,7 +370,7 @@ async def _deny_working_directory_changes(config_old: KresConfig, config_new: Kr
     return Result.ok(None)
 
 
-def _set_working_directory(config_raw: ParsedTree) -> None:
+def _set_working_directory(config_raw: Dict[str, Any]) -> None:
     config = KresConfig(config_raw)
 
     if not config.rundir.to_path().exists():
@@ -428,7 +429,7 @@ async def _sigterm_while_shutting_down():
     sys.exit(128 + signal.SIGTERM)
 
 
-async def start_server(config: Union[Path, ParsedTree] = DEFAULT_MANAGER_CONFIG_FILE) -> int:
+async def start_server(config: Union[Path, Dict[str, Any]] = DEFAULT_MANAGER_CONFIG_FILE) -> int:
     # This function is quite long, but it describes how manager runs. So let's silence pylint
     # pylint: disable=too-many-statements
 

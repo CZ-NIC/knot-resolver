@@ -141,7 +141,7 @@ simple-schema:
 ```
 
 To parse data from YAML format just use `parse_yaml` function or `parse_json` for JSON format.
-Parsed data are represented as `ParsedTree` which is a simple wrapper for dict-like object that takes care of `-`/`_` conversion.
+Parsed data are stored in a dict-like object that takes care of `-`/`_` conversion.
 
 ```python
 from .modeling import parse_yaml

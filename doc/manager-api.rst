@@ -31,7 +31,7 @@ List of API endpoints
 - ``GET /metrics`` provides Prometheus metrics
 - ``GET /`` static response that could be used to determine, whether the Manager is running
 - ``POST /stop`` gracefully stops the Manager, empty request body
-- ``{GET,POST,PUT,DELETE,PATCH} /v1/config`` allows reading and modifying current configuration
+- ``{GET,PUT,DELETE,PATCH} /v1/config`` allows reading and modifying current configuration
 
 
 Config modification endpoint (v1)
@@ -39,23 +39,16 @@ Config modification endpoint (v1)
 
 Note: The ``v1`` version qualifier is there for future-proofing. We don't have any plans at the moment to change the API any time soon. If that happens, we will support both old and new API versions for the some transition period.
 
-The API by default expects JSON, but can also parse YAML when the ``Content-Type`` header is set to ``text/vnd.yaml``. The return value is always a JSON with ``Content-Type: application/json``. The schema of input and output is always a subtree of the configuration data model which is described by the JSON schema exposed at ``/schema``.
+The API by default expects JSON, but can also parse YAML when the ``Content-Type`` header is set to ``application/yaml`` or ``text/vnd.yaml``. The return value is always a JSON with ``Content-Type: application/json``. The schema of input and output is always a subtree of the configuration data model which is described by the JSON schema exposed at ``/schema``.
 
 The API can operate on any configuration subtree by specifying a `JSON pointer <https://www.rfc-editor.org/rfc/rfc6901>`_ in the URL path (property names and list indices joined with ``/``). For example, to get the number of worker processes, you can send ``GET`` request to ``v1/config/workers``.
 
 The different HTTP methods perform different modifications of the configuration:
 
 - ``GET`` return subtree of the current configuration
-- ``POST`` set property value or append to a list 
-- ``DELETE`` removes the given property or list index
-- ``PATCH`` set property or list item value, fails when not present 
-- ``PUT`` set property, never replaces an existing value
-
-TODO Make sure we follow the JSON pointer RFC (we do not do that exactly at this point)
-TODO consider using JSON Patch format instead
-TODO this is not tested properly
-TODO consider using JSON Patch the ``PATCH`` method
-TODO there is probably a bug in query.py (see FIXME comment there), verify that
+- ``PUT`` set property
+- ``DELETE`` removes the given property or list item at the given index
+- ``PATCH`` updates the configuration using `JSON Patch <https://jsonpatch.com/>_`
 
 To prevent race conditions when changing configuration from multiple clients simultaneously, every response from the Manager has an ``ETag`` header set. Requests then accept ``If-Match`` and ``If-None-Match`` headers with the latest ``ETag`` value and the corresponding request processing fails with HTTP error code 412 (precondition failed).
 

@@ -1,6 +1,6 @@
 import enum
 import inspect
-from typing import Any, Dict, List, Optional, Set, Tuple, Type, Union, cast
+from typing import Any, Dict, List, Optional, Set, Tuple, Type, TypeVar, Union, cast
 
 import yaml
 
@@ -8,7 +8,7 @@ from knot_resolver_manager.utils.functional import all_matches
 
 from .base_value_type import BaseValueType
 from .exceptions import AggregateDataValidationError, DataDescriptionError, DataValidationError
-from .parsing import ParsedTree
+from .renaming import Renamed, renamed
 from .types import (
     NoneType,
     get_generic_type_argument,
@@ -185,217 +185,7 @@ def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
     raise NotImplementedError(f"Trying to get JSON schema for type '{typ}', which is not implemented")
 
 
-def _validated_tuple(cls: Type[Any], obj: Tuple[Any, ...], object_path: str) -> Tuple[Any, ...]:
-    types = get_generic_type_arguments(cls)
-    errs: List[DataValidationError] = []
-    res: List[Any] = []
-    for i, (tp, val) in enumerate(zip(types, obj)):
-        try:
-            res.append(_validated_object_type(tp, val, object_path=f"{object_path}[{i}]"))
-        except DataValidationError as e:
-            errs.append(e)
-    if len(errs) == 1:
-        raise errs[0]
-    elif len(errs) > 1:
-        raise AggregateDataValidationError(object_path, child_exceptions=errs)
-    return tuple(res)
-
-
-def _validated_dict(cls: Type[Any], obj: Dict[Any, Any], object_path: str) -> Dict[Any, Any]:
-    key_type, val_type = get_generic_type_arguments(cls)
-    try:
-        errs: List[DataValidationError] = []
-        res: Dict[Any, Any] = {}
-        for key, val in obj.items():
-            try:
-                nkey = _validated_object_type(key_type, key, object_path=f"{object_path}[{key}]")
-                nval = _validated_object_type(val_type, val, object_path=f"{object_path}[{key}]")
-                res[nkey] = nval
-            except DataValidationError as e:
-                errs.append(e)
-        if len(errs) == 1:
-            raise errs[0]
-        elif len(errs) > 1:
-            raise AggregateDataValidationError(object_path, child_exceptions=errs)
-        return res
-    except AttributeError as e:
-        raise DataValidationError(
-            f"Expected dict-like object, but failed to access its .items() method. Value was {obj}", object_path
-        ) from e
-
-
-def _validated_list(cls: Type[Any], obj: List[Any], object_path: str) -> List[Any]:
-    inner_type = get_generic_type_argument(cls)
-    errs: List[DataValidationError] = []
-    res: List[Any] = []
-    for i, val in enumerate(obj):
-        try:
-            res.append(_validated_object_type(inner_type, val, object_path=f"{object_path}[{i}]"))
-        except DataValidationError as e:
-            errs.append(e)
-    if len(errs) == 1:
-        raise errs[0]
-    elif len(errs) > 1:
-        raise AggregateDataValidationError(object_path, child_exceptions=errs)
-    return res
-
-
-def _validated_object_type(
-    cls: Type[Any], obj: Any, default: Any = ..., use_default: bool = False, object_path: str = "/"
-) -> Any:
-    """
-    Given an expected type `cls` and a value object `obj`, validate the type of `obj` and return it
-    """
-
-    # Disabling these checks, because I think it's much more readable as a single function
-    # and it's not that large at this point. If it got larger, then we should definitely split it
-    # pylint: disable=too-many-branches,too-many-locals,too-many-statements
-
-    # default values
-    if obj is None and use_default:
-        return default
-
-    # NoneType
-    elif is_none_type(cls):
-        if obj is None:
-            return None
-        else:
-            raise DataValidationError(f"expected None, found '{obj}'.", object_path)
-
-    # Optional[T]  (could be technically handled by Union[*variants], but this way we have better error reporting)
-    elif is_optional(cls):
-        inner: Type[Any] = get_optional_inner_type(cls)
-        if obj is None:
-            return None
-        else:
-            return _validated_object_type(inner, obj, object_path=object_path)
-
-    # Union[*variants]
-    elif is_union(cls):
-        variants = get_generic_type_arguments(cls)
-        errs: List[DataValidationError] = []
-        for v in variants:
-            try:
-                return _validated_object_type(v, obj, object_path=object_path)
-            except DataValidationError as e:
-                errs.append(e)
-
-        raise DataValidationError("could not parse any of the possible variants", object_path, child_exceptions=errs)
-
-    # after this, there is no place for a None object
-    elif obj is None:
-        raise DataValidationError(f"unexpected value 'None' for type {cls}", object_path)
-
-    # int
-    elif cls == int:
-        # we don't want to make an int out of anything else than other int
-        # except for BaseValueType class instances
-        if is_obj_type(obj, int) or isinstance(obj, BaseValueType):
-            return int(obj)
-        raise DataValidationError(f"expected int, found {type(obj)}", object_path)
-
-    # str
-    elif cls == str:
-        # we are willing to cast any primitive value to string, but no compound values are allowed
-        if is_obj_type(obj, (str, float, int)) or isinstance(obj, BaseValueType):
-            return str(obj)
-        elif is_obj_type(obj, bool):
-            raise DataValidationError(
-                "Expected str, found bool. Be careful, that YAML parsers consider even"
-                ' "no" and "yes" as a bool. Search for the Norway Problem for more'
-                " details. And please use quotes explicitly.",
-                object_path,
-            )
-        else:
-            raise DataValidationError(
-                f"expected str (or number that would be cast to string), but found type {type(obj)}", object_path
-            )
-
-    # bool
-    elif cls == bool:
-        if is_obj_type(obj, bool):
-            return obj
-        else:
-            raise DataValidationError(f"expected bool, found {type(obj)}", object_path)
-
-    # float
-    elif cls == float:
-        raise NotImplementedError(
-            "Floating point values are not supported in the parser."
-            " Please implement them and be careful with type coercions"
-        )
-
-    # Literal[T]
-    elif is_literal(cls):
-        expected = get_generic_type_arguments(cls)
-        if obj in expected:
-            return obj
-        else:
-            raise DataValidationError(f"'{obj}' does not match any of the expected values {expected}", object_path)
-
-    # Dict[K,V]
-    elif is_dict(cls):
-        return _validated_dict(cls, obj, object_path)
-
-    # any Enums (probably used only internally in DataValidator)
-    elif is_enum(cls):
-        if isinstance(obj, cls):
-            return obj
-        else:
-            raise DataValidationError(f"unexpected value '{obj}' for enum '{cls}'", object_path)
-
-    # List[T]
-    elif is_list(cls):
-        if isinstance(obj, str):
-            raise DataValidationError("expected list, got string", object_path)
-        return _validated_list(cls, obj, object_path)
-
-    # Tuple[A,B,C,D,...]
-    elif is_tuple(cls):
-        return _validated_tuple(cls, obj, object_path)
-
-    # type of obj and cls type match
-    elif is_obj_type(obj, cls):
-        return obj
-
-    # BaseValueType subclasses
-    elif inspect.isclass(cls) and issubclass(cls, BaseValueType):
-        if isinstance(obj, cls):
-            # if we already have a custom value type, just pass it through
-            return obj
-        else:
-            # no validation performed, the implementation does it in the constuctor
-            try:
-                return cls(obj, object_path=object_path)
-            except ValueError as e:
-                if len(e.args) > 0 and isinstance(e.args[0], str):
-                    msg = e.args[0]
-                else:
-                    msg = f"Failed to validate value against {cls} type"
-                raise DataValidationError(msg, object_path) from e
-
-    # nested BaseSchema subclasses
-    elif inspect.isclass(cls) and issubclass(cls, BaseSchema):
-        # we should return DataParser, we expect to be given a dict,
-        # because we can construct a DataParser from it
-        if isinstance(obj, (dict, BaseSchema)):
-            return cls(obj, object_path=object_path)  # type: ignore
-        raise DataValidationError(f"expected 'dict' or 'BaseSchema' object, found '{type(obj)}'", object_path)
-
-    # if the object matches, just pass it through
-    elif inspect.isclass(cls) and isinstance(obj, cls):
-        return obj
-
-    # default error handler
-    else:
-        raise DataValidationError(
-            f"Type {cls} cannot be parsed. This is a implementation error. "
-            "Please fix your types in the class or improve the parser/validator.",
-            object_path,
-        )
-
-
-TSource = Union[NoneType, ParsedTree, "BaseSchema", Dict[str, Any]]
+TSource = Union[NoneType, "NoRenameBaseSchema", Dict[str, Any]]
 
 
 def _create_untouchable(name: str) -> object:
@@ -409,7 +199,7 @@ def _create_untouchable(name: str) -> object:
     return _Untouchable()
 
 
-class BaseSchema(Serializable):
+class NoRenameBaseSchema(Serializable):
     """
     Base class for modeling configuration schema. It somewhat resembles standard dataclasses with additional
     functionality:
@@ -418,8 +208,8 @@ class BaseSchema(Serializable):
     * data conversion
 
     To create an instance of this class, you have to provide source data in the form of dict-like object.
-    Generally, we expect `ParsedTree`, raw dict or another `BaseSchema` instance. The provided data object
-    is traversed, transformed and validated before assigned to the appropriate fields (attributes).
+    Generally, raw dict or another `BaseSchema` instance. The provided data object is traversed, transformed
+    and validated before assigned to the appropriate fields (attributes).
 
     Fields (attributes)
     ===================
@@ -472,19 +262,19 @@ class BaseSchema(Serializable):
     See tests/utils/test_modelling.py for example usage.
     """
 
-    _LAYER: Optional[Type["BaseSchema"]] = None
+    _LAYER: Optional[Type["NoRenameBaseSchema"]] = None
 
     def _assign_default(self, name: str, python_type: Any, object_path: str) -> None:
         cls = self.__class__
         default = getattr(cls, name, None)
-        value = _validated_object_type(python_type, default, object_path=f"{object_path}/{name}")
+        value = type(self).validated_object_type(python_type, default, object_path=f"{object_path}/{name}")
         setattr(self, name, value)
 
     def _assign_field(self, name: str, python_type: Any, value: Any, object_path: str) -> None:
-        value = _validated_object_type(python_type, value, object_path=f"{object_path}/{name}")
+        value = type(self).validated_object_type(python_type, value, object_path=f"{object_path}/{name}")
         setattr(self, name, value)
 
-    def _assign_fields(self, source: Union[ParsedTree, "BaseSchema", NoneType], object_path: str) -> Set[str]:
+    def _assign_fields(self, source: Union[Dict[str, Any], "NoRenameBaseSchema", None], object_path: str) -> Set[str]:
         """
         Order of assignment:
           1. all direct assignments
@@ -542,26 +332,23 @@ class BaseSchema(Serializable):
     def __init__(self, source: TSource = None, object_path: str = ""):
         # make sure that all raw data checks passed on the source object
         if source is None:
-            source = ParsedTree({})
-        if isinstance(source, dict):
-            source = ParsedTree(source)
+            source = {}
 
-        # save source
-        self._source: Union[ParsedTree, BaseSchema] = source
+        if not isinstance(source, (NoRenameBaseSchema, dict)):
+            raise DataValidationError(f"expected dict-like object, found '{type(source)}'", object_path)
+
+        # save source (3 underscores to prevent collisions with any user defined conversion methods or system methods)
+        self.___source: Union[Dict[str, Any], NoRenameBaseSchema] = source
 
         # construct lower level schema first if configured to do so
         if self._LAYER is not None:
             source = self._LAYER(source, object_path=object_path)  # pylint: disable=not-callable
 
-        # prevent failure when user provides a different type than object
-        if isinstance(source, ParsedTree) and not source.is_dict():
-            raise DataValidationError(f"expected object, found '{source.type()}'", object_path)
-
         # assign fields
         used_keys = self._assign_fields(source, object_path)
 
         # check for unused keys in the source object
-        if source and not isinstance(source, BaseSchema):
+        if source and not isinstance(source, NoRenameBaseSchema):
             unused = source.keys() - used_keys
             if len(unused) > 0:
                 keys = ", ".join((f"'{u}'" for u in unused))
@@ -576,11 +363,13 @@ class BaseSchema(Serializable):
         except ValueError as e:
             raise DataValidationError(e.args[0] if len(e.args) > 0 else "Validation error", object_path) from e
 
-    def get_unparsed_data(self) -> ParsedTree:
-        if isinstance(self._source, BaseSchema):
-            return self._source.get_unparsed_data()
+    def get_unparsed_data(self) -> Dict[str, Any]:
+        if isinstance(self.___source, NoRenameBaseSchema):
+            return self.___source.get_unparsed_data()
+        elif isinstance(self.___source, Renamed):
+            return self.___source.original()
         else:
-            return self._source
+            return self.___source
 
     def _get_converted_value(self, key: str, source: TSource, object_path: str) -> Any:
         """
@@ -630,7 +419,7 @@ class BaseSchema(Serializable):
         return True
 
     @classmethod
-    def json_schema(cls: Type["BaseSchema"], include_schema_definition: bool = True) -> Dict[Any, Any]:
+    def json_schema(cls: Type["NoRenameBaseSchema"], include_schema_definition: bool = True) -> Dict[Any, Any]:
         if cls._LAYER is not None:
             return cls._LAYER.json_schema(include_schema_definition=include_schema_definition)
 
@@ -653,14 +442,270 @@ class BaseSchema(Serializable):
             res[name] = Serializable.serialize(getattr(self, name))
         return res
 
+    @classmethod
+    def _validated_tuple(
+        cls: Type["NoRenameBaseSchema"], tp: Type[Any], obj: Tuple[Any, ...], object_path: str
+    ) -> Tuple[Any, ...]:
+        types = get_generic_type_arguments(tp)
+        errs: List[DataValidationError] = []
+        res: List[Any] = []
+        for i, (t, val) in enumerate(zip(types, obj)):
+            try:
+                res.append(cls.validated_object_type(t, val, object_path=f"{object_path}[{i}]"))
+            except DataValidationError as e:
+                errs.append(e)
+        if len(errs) == 1:
+            raise errs[0]
+        elif len(errs) > 1:
+            raise AggregateDataValidationError(object_path, child_exceptions=errs)
+        return tuple(res)
 
-def is_obj_type_Valid(obj: Any, tp: Type[Any]) -> bool:
+    @classmethod
+    def _validated_dict(
+        cls: Type["NoRenameBaseSchema"], tp: Type[Any], obj: Dict[Any, Any], object_path: str
+    ) -> Dict[Any, Any]:
+        key_type, val_type = get_generic_type_arguments(tp)
+        try:
+            errs: List[DataValidationError] = []
+            res: Dict[Any, Any] = {}
+            for key, val in obj.items():
+                try:
+                    nkey = cls.validated_object_type(key_type, key, object_path=f"{object_path}[{key}]")
+                    nval = cls.validated_object_type(val_type, val, object_path=f"{object_path}[{key}]")
+                    res[nkey] = nval
+                except DataValidationError as e:
+                    errs.append(e)
+            if len(errs) == 1:
+                raise errs[0]
+            elif len(errs) > 1:
+                raise AggregateDataValidationError(object_path, child_exceptions=errs)
+            return res
+        except AttributeError as e:
+            raise DataValidationError(
+                f"Expected dict-like object, but failed to access its .items() method. Value was {obj}", object_path
+            ) from e
+
+    @classmethod
+    def _validated_list(cls: Type["NoRenameBaseSchema"], tp: Type[Any], obj: List[Any], object_path: str) -> List[Any]:
+        inner_type = get_generic_type_argument(tp)
+        errs: List[DataValidationError] = []
+        res: List[Any] = []
+        for i, val in enumerate(obj):
+            try:
+                res.append(cls.validated_object_type(inner_type, val, object_path=f"{object_path}[{i}]"))
+            except DataValidationError as e:
+                errs.append(e)
+        if len(errs) == 1:
+            raise errs[0]
+        elif len(errs) > 1:
+            raise AggregateDataValidationError(object_path, child_exceptions=errs)
+        return res
+
+    @classmethod
+    def validated_object_type(
+        cls: Type["NoRenameBaseSchema"],
+        tp: Type[Any],
+        obj: Any,
+        default: Any = ...,
+        use_default: bool = False,
+        object_path: str = "/",
+    ) -> Any:
+        """
+        Given an expected type `cls` and a value object `obj`, validate the type of `obj` and return it
+        """
+
+        # Disabling these checks, because I think it's much more readable as a single function
+        # and it's not that large at this point. If it got larger, then we should definitely split it
+        # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+
+        # default values
+        if obj is None and use_default:
+            return default
+
+        # NoneType
+        elif is_none_type(tp):
+            if obj is None:
+                return None
+            else:
+                raise DataValidationError(f"expected None, found '{obj}'.", object_path)
+
+        # Optional[T]  (could be technically handled by Union[*variants], but this way we have better error reporting)
+        elif is_optional(tp):
+            inner: Type[Any] = get_optional_inner_type(tp)
+            if obj is None:
+                return None
+            else:
+                return cls.validated_object_type(inner, obj, object_path=object_path)
+
+        # Union[*variants]
+        elif is_union(tp):
+            variants = get_generic_type_arguments(tp)
+            errs: List[DataValidationError] = []
+            for v in variants:
+                try:
+                    return cls.validated_object_type(v, obj, object_path=object_path)
+                except DataValidationError as e:
+                    errs.append(e)
+
+            raise DataValidationError(
+                "could not parse any of the possible variants", object_path, child_exceptions=errs
+            )
+
+        # after this, there is no place for a None object
+        elif obj is None:
+            raise DataValidationError(f"unexpected value 'None' for type {tp}", object_path)
+
+        # int
+        elif tp == int:
+            # we don't want to make an int out of anything else than other int
+            # except for BaseValueType class instances
+            if is_obj_type(obj, int) or isinstance(obj, BaseValueType):
+                return int(obj)
+            raise DataValidationError(f"expected int, found {type(obj)}", object_path)
+
+        # str
+        elif tp == str:
+            # we are willing to cast any primitive value to string, but no compound values are allowed
+            if is_obj_type(obj, (str, float, int)) or isinstance(obj, BaseValueType):
+                return str(obj)
+            elif is_obj_type(obj, bool):
+                raise DataValidationError(
+                    "Expected str, found bool. Be careful, that YAML parsers consider even"
+                    ' "no" and "yes" as a bool. Search for the Norway Problem for more'
+                    " details. And please use quotes explicitly.",
+                    object_path,
+                )
+            else:
+                raise DataValidationError(
+                    f"expected str (or number that would be cast to string), but found type {type(obj)}", object_path
+                )
+
+        # bool
+        elif tp == bool:
+            if is_obj_type(obj, bool):
+                return obj
+            else:
+                raise DataValidationError(f"expected bool, found {type(obj)}", object_path)
+
+        # float
+        elif tp == float:
+            raise NotImplementedError(
+                "Floating point values are not supported in the parser."
+                " Please implement them and be careful with type coercions"
+            )
+
+        # Literal[T]
+        elif is_literal(tp):
+            expected = get_generic_type_arguments(tp)
+            if obj in expected:
+                return obj
+            else:
+                raise DataValidationError(f"'{obj}' does not match any of the expected values {expected}", object_path)
+
+        # Dict[K,V]
+        elif is_dict(tp):
+            return cls._validated_dict(tp, obj, object_path)
+
+        # any Enums (probably used only internally in DataValidator)
+        elif is_enum(tp):
+            if isinstance(obj, tp):
+                return obj
+            else:
+                raise DataValidationError(f"unexpected value '{obj}' for enum '{tp}'", object_path)
+
+        # List[T]
+        elif is_list(tp):
+            if isinstance(obj, str):
+                raise DataValidationError("expected list, got string", object_path)
+            return cls._validated_list(tp, obj, object_path)
+
+        # Tuple[A,B,C,D,...]
+        elif is_tuple(tp):
+            return cls._validated_tuple(tp, obj, object_path)
+
+        # type of obj and cls type match
+        elif is_obj_type(obj, tp):
+            return obj
+
+        # when the specified type is Any, just return the given value
+        # (pylint does something weird on the following line and it happens only on python 3.10)
+        elif tp == Any:  # pylint: disable=comparison-with-callable
+            return obj
+
+        # BaseValueType subclasses
+        elif inspect.isclass(tp) and issubclass(tp, BaseValueType):
+            if isinstance(obj, tp):
+                # if we already have a custom value type, just pass it through
+                return obj
+            else:
+                # no validation performed, the implementation does it in the constuctor
+                try:
+                    return tp(obj, object_path=object_path)
+                except ValueError as e:
+                    if len(e.args) > 0 and isinstance(e.args[0], str):
+                        msg = e.args[0]
+                    else:
+                        msg = f"Failed to validate value against {tp} type"
+                    raise DataValidationError(msg, object_path) from e
+
+        # nested BaseSchema subclasses
+        elif inspect.isclass(tp) and issubclass(tp, NoRenameBaseSchema):
+            # we should return DataParser, we expect to be given a dict,
+            # because we can construct a DataParser from it
+            if isinstance(obj, (dict, NoRenameBaseSchema)):
+                return tp(obj, object_path=object_path)  # type: ignore
+            raise DataValidationError(
+                f"expected 'dict' or 'NoRenameBaseSchema' object, found '{type(obj)}'", object_path
+            )
+
+        # if the object matches, just pass it through
+        elif inspect.isclass(tp) and isinstance(obj, tp):
+            return obj
+
+        # default error handler
+        else:
+            raise DataValidationError(
+                f"Type {tp} cannot be parsed. This is a implementation error. "
+                "Please fix your types in the class or improve the parser/validator.",
+                object_path,
+            )
+
+
+def is_obj_type_valid(obj: Any, tp: Type[Any]) -> bool:
     """
     Runtime type checking. Validate, that a given object is of a given type.
     """
 
     try:
-        _validated_object_type(tp, obj)
+        NoRenameBaseSchema.validated_object_type(tp, obj)
         return True
     except (DataValidationError, ValueError):
         return False
+
+
+T = TypeVar("T")
+
+
+def load(cls: Type[T], obj: Any, default: Any = ..., use_default: bool = False) -> T:
+    return NoRenameBaseSchema.validated_object_type(cls, obj, default, use_default)
+
+
+class BaseSchema(NoRenameBaseSchema):
+    """
+    In Knot Resolver Manager, we need renamed keys most of the time, as we are using the modelling
+    tools mostly for configuration schema. That's why the normal looking name BaseSchema does renaming
+    and NoRenameBaseSchema is the opposite.
+    """
+
+    def __init__(self, source: TSource = None, object_path: str = ""):
+        if isinstance(source, dict):
+            source = renamed(source)
+        super().__init__(source, object_path)
+
+    @classmethod
+    def _validated_dict(
+        cls: Type["BaseSchema"], tp: Type[Any], obj: Dict[Any, Any], object_path: str
+    ) -> Dict[Any, Any]:
+        if isinstance(obj, Renamed):
+            obj = obj.original()
+        return super()._validated_dict(tp, obj, object_path)

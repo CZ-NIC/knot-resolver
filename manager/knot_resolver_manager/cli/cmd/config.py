@@ -40,7 +40,7 @@ class ConfigCmd(Command):
         if not self.path.startswith("/"):
             self.path = "/" + self.path
 
-        method: Literal["GET", "POST"] = "GET" if self.replacement_value is None else "POST"
+        method: Literal["GET", "PUT"] = "GET" if self.replacement_value is None else "PUT"
         url = f"{args.socket}/v1/config{self.path}"
         response = request(method, url, self.replacement_value)
         print(response)
