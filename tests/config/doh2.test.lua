@@ -77,8 +77,7 @@ end
 local bound, port
 local host = '127.0.0.1'
 for _  = 1,10 do
-	--port = math.random(30000, 39999)
-	port = 30000
+	port = math.random(30000, 39999)
 	bound = pcall(net.listen, host, port, { kind = 'doh2'})
 	if bound then
 		break
