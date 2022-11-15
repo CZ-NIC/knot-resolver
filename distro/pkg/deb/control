@@ -22,6 +22,7 @@ Build-Depends:
  meson (>= 0.49),
  protobuf-c-compiler,
  python3-all,
+ python3-dev,
  python3-setuptools,
  libssl-dev,
 Homepage: https://www.knot-resolver.cz/

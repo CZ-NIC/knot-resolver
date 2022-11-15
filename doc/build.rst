@@ -18,13 +18,63 @@ Beware that some 64-bit systems with LuaJIT 2.1 may be affected by
 
    $ git clone --recursive https://gitlab.nic.cz/knot/knot-resolver.git
 
+Building with apkg
+------------------
+
+Knot Resolver uses `apkg tool <https://pkg.labs.nic.cz/pages/apkg/>`_ for upstream packaging.
+It allows build packages localy for supported distributions, which it then installs.
+``apkg`` also takes care of dependencies itself.
+
+First, you need to install and setup ``apkg``.
+
+.. tip::
+   Install ``apkg`` with `pipx <https://pypa.github.io/pipx/>`_ to avoid version conflicts.
+
+.. code-block:: bash
+
+   $ pip3 install apkg
+   $ apkg system-setup
+
+Clone and change dir to ``knot-resolver`` git repository.
+
+.. code-block:: bash
+
+   $ git clone --recursive https://gitlab.nic.cz/knot/knot-resolver.git
+   $ cd knot-resolver
+
+.. tip:: The ``apkg status`` command can be used to find out some useful information, such as whether the current distribution is supported.
+
+When ``apkg`` is ready, a package can be built and installed.
+
+.. code-block:: bash
+
+   # takes care of dependencies
+   apkg build-dep
+
+   # build package
+   apkg build
+
+   # (build and) install package, builds package when it is not already built
+   apkg install
+
+After that Knot Resolver should be installed.
+
+Building with Meson
+-------------------
+
+Knot Resolver uses `Meson Build system <https://mesonbuild.com/>`_.
+Shell snippets below should be sufficient for basic usage
+but users unfamiliar with Meson might want to read introductory
+article `Using Meson <https://mesonbuild.com/Quick-guide.html>`_.
+
+
 Dependencies
-------------
+~~~~~~~~~~~~
 
 .. note:: This section lists basic requirements. Individual modules
    might have additional build or runtime dependencies.
 
-The following dependencies are needed to build and run Knot Resolver:
+The following dependencies are needed to build and run Knot Resolver with core functions:
 
 .. csv-table::
    :header: "Requirement", "Notes"
@@ -38,6 +88,20 @@ The following dependencies are needed to build and run Knot Resolver:
    "libuv_ 1.7+", "Multiplatform I/O and services"
    "lmdb", "Memory-mapped database for cache"
    "GnuTLS", "TLS"
+
+Additional dependencies are needed to build and run Knot Resolver with ``manager``:
+All dependencies are also listed in `pyproject.toml <https://gitlab.nic.cz/knot/knot-resolver/-/blob/manager/manager/pyproject.toml>`_ which is our authoritative source.
+
+.. csv-table::
+   :header: "Requirement", "Notes"
+
+   "python3_ >=3.6.8", "Python language interpreter"
+   "Jinja2_", "Template engine for Python"
+   "PyYAML_", "YAML framework for Python"
+   "aiohttp_", "HTTP Client/Server for Python."
+   "prometheus-client_", "Prometheus client for Python"
+   "typing-extensions_", "Compatibility module for Python"
+
 
 There are also *optional* packages that enable specific functionality in Knot
 Resolver:
@@ -77,9 +141,6 @@ Resolver:
    to configure dependencies manually (i.e. ``libknot_CFLAGS`` and
    ``libknot_LIBS``).
 
-Packaged dependencies
-~~~~~~~~~~~~~~~~~~~~~
-
 .. note:: Some build dependencies can be found in
    `home:CZ-NIC:knot-resolver-build
    <https://build.opensuse.org/project/show/home:CZ-NIC:knot-resolver-build>`_.
@@ -97,27 +158,23 @@ here's an overview for several platforms.
 * **Mac OS X** - the dependencies can be obtained from `Homebrew formula <https://formulae.brew.sh/formula/knot-resolver>`_.
 
 Compilation
------------
+~~~~~~~~~~~
 
-.. note::
-
-   Knot Resolver uses `Meson Build system <https://mesonbuild.com/>`_.
-   Shell snippets below should be sufficient for basic usage
-   but users unfamiliar with Meson Build might want to read introductory
-   article `Using Meson <https://mesonbuild.com/Quick-guide.html>`_.
-
-Following example script will:
-
-  - create new build directory named ``build_dir``
-  - configure installation path ``/tmp/kr``
-  - enable static build (to allow installation to non-standard path)
-  - build Knot Resolver
-  - install it into the previously configured path
+Folowing meson command creates new build directory named ``build_dir``, configures installation path to ``/tmp/kr`` and enables static build (to allow installation to non-standard path).
+You can also configure some :ref:`build-options`, in this case enable ``manager``, which is disabled by default.
 
 .. code-block:: bash
 
-   $ meson build_dir --prefix=/tmp/kr --default-library=static
+   $ meson build_dir --prefix=/tmp/kr --default-library=static -Dmanager=enabled
+
+After that it is possible to build and install Knot Resolver.
+
+.. code-block:: bash
+
+   # build Knot Resolver
    $ ninja -C build_dir
+
+   # install Knot Resolver into the previously configured '/tmp/kr' path
    $ ninja install -C build_dir
 
 At this point you can execute the newly installed binary using path ``/tmp/kr/sbin/kresd``.
@@ -125,6 +182,8 @@ At this point you can execute the newly installed binary using path ``/tmp/kr/sb
 .. note:: When compiling on OS X, creating a shared library is currently not
    possible when using luajit package from Homebrew due to `#37169
    <https://github.com/Homebrew/homebrew-core/issues/37169>`_.
+
+.. _build-options:
 
 Build options
 ~~~~~~~~~~~~~
@@ -213,6 +272,7 @@ Recommended build options for packagers:
 * ``-Dsystemd_files=enabled`` for systemd unit files
 * ``-Ddoc=enabled`` for offline documentation (see :ref:`build-html-doc`)
 * ``-Dinstall_kresd_conf=enabled`` to install default config file
+* ``-Dmanager=enabled`` to force build of the manager and its features
 * ``-Dclient=enabled`` to force build of kresc
 * ``-Dunit_tests=enabled`` to force build of unit tests
 
@@ -286,3 +346,9 @@ For development, it's possible to build the container directly from your git tre
 .. _clang-tidy: http://clang.llvm.org/extra/clang-tidy/index.html
 .. _luacov: https://lunarmodules.github.io/luacov/
 .. _lcov: http://ltp.sourceforge.net/coverage/lcov.php
+.. _python3: https://www.python.org/
+.. _Jinja2: https://jinja.palletsprojects.com/
+.. _PyYAML: https://pyyaml.org/
+.. _aiohttp: https://docs.aiohttp.org/
+.. _prometheus-client: https://github.com/prometheus/client_python
+.. _typing-extensions: https://pypi.org/project/typing-extensions/
