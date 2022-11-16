@@ -10,18 +10,68 @@ class Shells(Enum):
     FISH = 1
 
 
+CompWords = Dict[str, Optional[str]]
+
+
+def _parser_top_lvl_words(actions: List[argparse.Action]) -> CompWords:
+    words: CompWords = {}
+
+    for action in actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for sub in action._get_subactions():
+                words[sub.dest] = sub.help
+        else:
+            for s in action.option_strings:
+                words[s] = action.help
+    return words
+
+
+def _subparser_words(unknown_args: List[str], actions: List[argparse.Action]) -> Optional[CompWords]:
+    for arg in unknown_args:
+        for action in actions:
+            if isinstance(action, argparse._SubParsersAction) and arg in action.choices:
+                subparser: argparse.ArgumentParser = action.choices[arg]
+                command: Command = subparser._defaults["command"]
+
+                subparser_args = unknown_args[unknown_args.index(arg) + 1 :]
+                if subparser_args:
+                    return command.completion(subparser_args, subparser)
+    return None
+
+
+def subparser_comp(parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
+    comp: Dict[str, Optional[str]] = {}
+
+    for action in parser._actions:
+        if isinstance(action, (argparse._StoreConstAction, argparse._HelpAction)):
+            for s in action.option_strings:
+                comp[s] = action.help
+    return comp
+
+
 @register_command
 class CompletionCommand(Command):
     def __init__(self, namespace: argparse.Namespace, unknown_args: List[str]) -> None:
         super().__init__(namespace, unknown_args)
         self.shell: Shells = namespace.shell
+        self.space = namespace.space
         self.unknown_args: List[str] = unknown_args
+
+        if self.space:
+            self.unknown_args.append("")
 
     @staticmethod
     def register_args_subparser(
         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
         completion = subparser.add_parser("completion", help="commands auto-completion")
+        completion.add_argument(
+            "--space",
+            help="space after last word, returns all possible folowing options",
+            dest="space",
+            action="store_true",
+            default=False,
+        )
 
         shells_dest = "shell"
         shells = completion.add_mutually_exclusive_group()
@@ -41,34 +91,24 @@ class CompletionCommand(Command):
 
     def run(self, args: CommandArgs) -> None:
         parser = args.parser
-        comp: Dict[str, Optional[str]] = {}
-
-        top_comp: Dict[str, Optional[str]] = {}
+        words: CompWords = {}
 
         if parser._subparsers:
-            for action in parser._subparsers._actions:
-                if isinstance(action, argparse._SubParsersAction):
-                    for sub in action._get_subactions():
-                        top_comp[sub.dest] = sub.help
-                else:
-                    for s in action.option_strings:
-                        top_comp[s] = action.help
+            subparser_words = _subparser_words(self.unknown_args, parser._subparsers._actions)
 
-            for arg in self.unknown_args:
-                for action in parser._subparsers._actions:
-                    if arg in action.option_strings:
-                        continue
-                    if isinstance(action, argparse._SubParsersAction) and arg in action.choices:
-                        subparser: argparse.ArgumentParser = action.choices[arg]
-                        command: Command = subparser._defaults["command"]
+            if subparser_words is None:
+                # parser top level options/commands
+                words = _parser_top_lvl_words(parser._subparsers._actions)
+            else:
+                # subparsers optons/commands
+                words = subparser_words
 
-                        comp.update(command.completion(self.unknown_args, subparser))
-                    else:
-                        pass
-
+        # print completion words
+        # based on required bash/fish shell format
         if self.shell == Shells.BASH:
-            print(" ".join(comp))
+            print(" ".join(words))
         elif self.shell == Shells.FISH:
+            # TODO: FISH completion implementation
             pass
         else:
             raise ValueError(f"unexpected value of {Shells}: {self.shell}")
