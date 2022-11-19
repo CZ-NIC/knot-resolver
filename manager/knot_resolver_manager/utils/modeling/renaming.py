@@ -1,3 +1,20 @@
+"""
+This module implements a standard dict and list alternatives, which can dynamically rename its keys replacing `-` with `_`.
+They persist in nested data structes, meaning that if you try to obtain a dict from Renamed variant, you will actually
+get RenamedDict back instead.
+
+Usage:
+
+d = dict()
+l = list()
+
+rd = renamed(d)
+rl = renamed(l)
+
+assert isinstance(rd, Renamed) == True
+assert l = rl.original()
+"""
+
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, TypeVar
 
@@ -68,3 +85,6 @@ def renamed(obj: Any) -> Any:
         return RenamedList(obj)
     else:
         return obj
+
+
+__all__ = ["renamed", "Renamed"]
