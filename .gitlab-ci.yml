@@ -615,8 +615,11 @@ obs:odvr:
 pkg:make-archive:
   # archive is created once and reused in other pkg jobs
   <<: *pkg_deb_extras
-  image: $CI_REGISTRY/packaging/apkg/lxc/debian-11
   stage: pkg
+  image: $CI_REGISTRY/packaging/apkg/lxc/debian-11
+  tags:
+    - lxc
+    - amd64
   needs: []
   artifacts:
     paths:
