@@ -41,6 +41,11 @@ help_text=$(cat << EOF
 $short_help_text
 
 Available options:
+	-a, --vim-debug [executable]
+		Runs kresd under Termdebug in the specified version of Vim
+		(vim by default). Termdebug must be enabled for this to work
+		(:packadd termdebug).
+
 	-b, --debug [debugger]
 		Runs kresd under the specified debugger (gdb by default)
 
@@ -137,8 +142,8 @@ fi
 ## Process CLI arguments #######################################################
 
 GETOPT=$(getopt \
-	--options     'b::cdghm::npr::sx'\
-	--longoptions 'debug::,clean,no-run,valgrind,help,massif::,no-delete,caps,rr::,sudo,xdp-if:'\
+	--options     'a::b::cdghm::npr::sx'\
+	--longoptions 'vim-debug::,debug::,clean,no-run,valgrind,help,massif::,no-delete,caps,rr::,sudo,xdp-if:'\
 	--name 'krdbg'\
 	-- "$@")
 
@@ -153,6 +158,16 @@ unset GETOPT
 
 while true; do
 	case "$1" in
+		'-a'|'--vim-debug')
+			vim_debug=1
+			if [ -z "$2" ]; then
+				dbgvim="vim"
+			else
+				dbgvim="$2"
+			fi
+			shift 2
+			continue
+			;;
 		'-b'|'--debug')
 			debug=1
 			if [ -z "$2" ]; then
@@ -226,6 +241,14 @@ while true; do
 done
 
 
+## Validate options ############################################################
+
+if [ "$vim_debug" == "1" -a "$debug" == "1" ]; then
+	echo '--debug and --vim-debug are mutually exclusive!' >&2
+	exit 1
+fi
+
+
 ## Prepare kresd ###############################################################
 
 mkdir -p "$wd_dir"
@@ -270,6 +293,9 @@ if [ "$rr" == "1" ]; then
 	else
 		kr_command="rr record $rr_args $kr_command"
 	fi
+fi
+if [ "$vim_debug" == "1" ]; then
+	kr_command="$dbgvim -c ':cd $build_path' -c ':TermdebugCommand $(eval "echo $kr_command")'"
 fi
 if [ "$debug" == "1" ]; then
 	kr_command="${debugger[@]} $kr_command"
