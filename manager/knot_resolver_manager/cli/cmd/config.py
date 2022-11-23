@@ -1,12 +1,13 @@
 import argparse
 import json
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 import yaml
 from typing_extensions import Literal
 
 from knot_resolver_manager.cli.command import Command, CommandArgs, register_command
+from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.utils.modeling import try_to_parse
 from knot_resolver_manager.utils.requests import request
 
@@ -37,6 +38,41 @@ def reformat(data: str, req_format: Formats) -> str:
     if req_format == Formats.YAML:
         return yaml.dump(dict, indent=4)
     return json.dumps(dict, indent=4)
+
+
+def properties_comp(props: Dict[str, Any]) -> Dict[str, Optional[str]]:
+    comp: Dict[str, Optional[str]] = {}
+    for name, prop in props.items():
+        comp[name] = prop["description"] if "description" in prop else None
+    return comp
+
+
+def node_comp(nodes: List[str], props: Dict[str, Any]) -> Dict[str, Optional[str]]:
+
+    if len(nodes) > 1 and nodes[0] in props:
+        prop = props[nodes[0]]
+        if "properties" in prop:
+            return node_comp(nodes[1:], prop["properties"])
+        else:
+            return {}
+    else:
+        return properties_comp(props)
+
+
+def config_path_comp(path: str) -> Dict[str, Optional[str]]:
+    nodes = path[1:].split("/") if path.startswith("/") else path.split("/")
+    properties: Dict[str, Any] = KresConfig.json_schema()["properties"]
+    return node_comp(nodes, properties)
+
+
+def subparser_comp(parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
+    comp: Dict[str, Optional[str]] = {}
+
+    for action in parser._actions:
+        if isinstance(action, (argparse._StoreConstAction, argparse._HelpAction)):
+            for s in action.option_strings:
+                comp[s] = action.help
+    return comp
 
 
 @register_command
@@ -110,8 +146,18 @@ class ConfigCommand(Command):
 
     @staticmethod
     def completion(args: List[str], parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
-        comp: Dict[str, Optional[str]] = {}
-        return comp
+        top_comp = subparser_comp(parser)
+
+        for arg in args:
+            if arg in top_comp:
+                continue
+            elif arg.startswith("-"):
+                return top_comp
+            elif arg == args[-1]:
+                return config_path_comp(arg)
+            else:
+                break
+        return {}
 
     def run(self, args: CommandArgs) -> None:
         if not self.path.startswith("/"):
