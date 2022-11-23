@@ -39,16 +39,6 @@ def _subparser_words(unknown_args: List[str], actions: List[argparse.Action]) ->
     return None
 
 
-def subparser_comp(parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
-    comp: Dict[str, Optional[str]] = {}
-
-    for action in parser._actions:
-        if isinstance(action, (argparse._StoreConstAction, argparse._HelpAction)):
-            for s in action.option_strings:
-                comp[s] = action.help
-    return comp
-
-
 @register_command
 class CompletionCommand(Command):
     def __init__(self, namespace: argparse.Namespace, unknown_args: List[str]) -> None:
