@@ -4,6 +4,7 @@ Knot Resolver 5.x.y (202y-mm-dd)
 Improvements
 ------------
 - depend on jemalloc, preferably, to improve memory usage (!1353)
+- policy.STUB: avoid applying aggressive DNSSEC denial proofs (!1364)
 
 Bugfixes
 --------
