@@ -619,11 +619,8 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 	ret = edns_create(pkt, request);
 	if (ret) return ret;
 	if (qry->flags.STUB) {
-		/* Stub resolution (ask for +rd and +do) */
+		/* Stub resolution */
 		knot_wire_set_rd(pkt->wire);
-		if (knot_pkt_has_dnssec(request->qsource.packet)) {
-			knot_edns_set_do(pkt->opt_rr);
-		}
 		if (knot_wire_get_cd(request->qsource.packet->wire)) {
 			knot_wire_set_cd(pkt->wire);
 		}

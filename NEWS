@@ -5,6 +5,7 @@ Improvements
 ------------
 - depend on jemalloc, preferably, to improve memory usage (!1353)
 - policy.STUB: avoid applying aggressive DNSSEC denial proofs (!1364)
+- policy.STUB: avoid copying +dnssec flag from client to upstream (!1364)
 
 Bugfixes
 --------
