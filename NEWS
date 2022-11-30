@@ -1,3 +1,11 @@
+Knot Resolver 5.x.y (202y-mm-dd)
+================================
+
+Improvements
+------------
+- depend on jemalloc, preferably, to improve memory usage (!1353)
+
+
 Knot Resolver 5.5.3 (2022-09-21)
 ================================
 

@@ -152,6 +152,18 @@ option(
 )
 
 option(
+  'malloc',
+  type: 'combo',
+  choices: [
+    'auto',     # 'jemalloc' if available
+    'disabled', # default provided by libc
+    'jemalloc',
+  ],
+  value: 'auto',
+  description: 'memory allocator to use in kresd',
+)
+
+option(
   'doc',
   type: 'combo',
   choices: [

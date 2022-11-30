@@ -20,6 +20,7 @@ depends=(
     'systemd'
     'libcap-ng'
     'libnghttp2'
+    'jemalloc'
 )
 makedepends=(
     'cmocka'
@@ -47,6 +48,7 @@ build() {
         -D systemd_files=enabled \
         -D client=enabled \
         -D install_kresd_conf=enabled \
+        -D malloc=jemalloc \
         -D unit_tests=enabled
     ninja -C build
 }
