@@ -8,10 +8,7 @@ ENV DISTROTEST_REPO=Debian_11
 
 
 RUN apt-get update -qq && \
-	apt-get -qqq -y install gnupg2 curl python3-pip python3-venv devscripts && \
-	echo "deb http://download.opensuse.org/repositories/home:/CZ-NIC:/$OBS_REPO/$DISTROTEST_REPO/ /" > /etc/apt/sources.list.d/obs.list && \
-	curl -fsSL "https://download.opensuse.org/repositories/home:CZ-NIC:$OBS_REPO/$DISTROTEST_REPO/Release.key" | gpg --dearmor > /etc/apt/trusted.gpg.d/obs.gpg && \
-	apt-get update -qq && \
+	apt-get -qqq -y install python3-pip python3-venv devscripts && \
 	pip3 install pipx && \
 	pipx install apkg
 
@@ -33,9 +30,6 @@ ENV OBS_REPO=knot-resolver-latest
 ENV DISTROTEST_REPO=Debian_11
 
 RUN apt-get update -qq && \
-	apt-get -qqq -y install gnupg2 curl && \
-	echo "deb http://download.opensuse.org/repositories/home:/CZ-NIC:/$OBS_REPO/$DISTROTEST_REPO/ /" > /etc/apt/sources.list.d/obs.list && \
-	curl -fsSL "https://download.opensuse.org/repositories/home:CZ-NIC:$OBS_REPO/$DISTROTEST_REPO/Release.key" | gpg --dearmor > /etc/apt/trusted.gpg.d/obs.gpg && \
 	apt-get update -qq
 
 COPY --from=build /source/pkg/pkgs/debian-11 /pkg
