@@ -1,20 +1,20 @@
 import argparse
 import sys
-from typing import Dict, List, Optional, Tuple, Type
+from typing import List, Tuple, Type
 
-from knot_resolver_manager.cli.command import Command, CommandArgs, register_command
+from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
 
 
 @register_command
 class ExitCommand(Command):
-    def __init__(self, namespace: argparse.Namespace, unknown_args: List[str]) -> None:
-        super().__init__(namespace, unknown_args)
+    def __init__(self, namespace: argparse.Namespace) -> None:
+        super().__init__(namespace)
 
     def run(self, args: CommandArgs) -> None:
         sys.exit()
 
     @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
+    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
         return {}
 
     @staticmethod

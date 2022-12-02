@@ -6,6 +6,8 @@ from urllib.parse import quote
 
 T = TypeVar("T", bound=Type["Command"])
 
+CompWords = Dict[str, Optional[str]]
+
 _registered_commands: List[Type["Command"]] = []
 
 
@@ -43,7 +45,7 @@ class Command(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def __init__(self, namespace: argparse.Namespace, unknown_args: List[str]) -> None:
+    def __init__(self, namespace: argparse.Namespace) -> None:
         super().__init__()
 
     @abstractmethod
@@ -52,5 +54,5 @@ class Command(ABC):
 
     @staticmethod
     @abstractmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
+    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
         raise NotImplementedError()

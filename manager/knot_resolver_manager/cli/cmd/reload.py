@@ -1,14 +1,14 @@
 import argparse
-from typing import Dict, List, Optional, Tuple, Type
+from typing import List, Tuple, Type
 
-from knot_resolver_manager.cli.command import Command, CommandArgs, register_command
+from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
 from knot_resolver_manager.utils.requests import request
 
 
 @register_command
 class ReloadCommand(Command):
-    def __init__(self, namespace: argparse.Namespace, unknown_args: List[str]) -> None:
-        super().__init__(namespace, unknown_args)
+    def __init__(self, namespace: argparse.Namespace) -> None:
+        super().__init__(namespace)
 
     @staticmethod
     def register_args_subparser(
@@ -19,7 +19,7 @@ class ReloadCommand(Command):
         return reload, ReloadCommand
 
     @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
+    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
         return {}
 
     def run(self, args: CommandArgs) -> None:
