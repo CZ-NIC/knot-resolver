@@ -1,7 +1,7 @@
 import argparse
-from typing import Dict, List, Optional, Tuple, Type
+from typing import List, Tuple, Type
 
-from knot_resolver_manager.cli.command import Command, CommandArgs, register_command
+from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
 from knot_resolver_manager.datamodel import KresConfig
 from knot_resolver_manager.utils.modeling import try_to_parse
 from knot_resolver_manager.utils.modeling.exceptions import DataParsingError, DataValidationError
@@ -9,8 +9,8 @@ from knot_resolver_manager.utils.modeling.exceptions import DataParsingError, Da
 
 @register_command
 class ValidateCommand(Command):
-    def __init__(self, namespace: argparse.Namespace, unknown_args: List[str]) -> None:
-        super().__init__(namespace, unknown_args)
+    def __init__(self, namespace: argparse.Namespace) -> None:
+        super().__init__(namespace)
         self.input_file: str = namespace.input_file
 
     @staticmethod
@@ -29,7 +29,7 @@ class ValidateCommand(Command):
         return validate, ValidateCommand
 
     @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
+    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
         return {}
 
     def run(self, args: CommandArgs) -> None:

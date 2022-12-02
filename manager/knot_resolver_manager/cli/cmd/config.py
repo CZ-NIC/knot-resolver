@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type
 import yaml
 from typing_extensions import Literal
 
-from knot_resolver_manager.cli.command import Command, CommandArgs, register_command
+from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.utils.modeling import try_to_parse
 from knot_resolver_manager.utils.requests import request
@@ -40,14 +40,14 @@ def reformat(data: str, req_format: Formats) -> str:
     return json.dumps(dict, indent=4)
 
 
-def properties_comp(props: Dict[str, Any]) -> Dict[str, Optional[str]]:
-    comp: Dict[str, Optional[str]] = {}
+def properties_comp(props: Dict[str, Any]) -> CompWords:
+    comp: CompWords = {}
     for name, prop in props.items():
         comp[name] = prop["description"] if "description" in prop else None
     return comp
 
 
-def node_comp(nodes: List[str], props: Dict[str, Any]) -> Dict[str, Optional[str]]:
+def node_comp(nodes: List[str], props: Dict[str, Any]) -> CompWords:
 
     if len(nodes) > 1 and nodes[0] in props:
         prop = props[nodes[0]]
@@ -77,8 +77,8 @@ def subparser_comp(parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
 
 @register_command
 class ConfigCommand(Command):
-    def __init__(self, namespace: argparse.Namespace, unknown_args: List[str]) -> None:
-        super().__init__(namespace, unknown_args)
+    def __init__(self, namespace: argparse.Namespace) -> None:
+        super().__init__(namespace)
         self.path: str = str(namespace.path)
         self.value_or_file: Optional[str] = namespace.value_or_file
         self.operation: Operations = namespace.operation

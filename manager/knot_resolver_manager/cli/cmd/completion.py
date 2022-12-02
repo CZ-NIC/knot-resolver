@@ -1,16 +1,13 @@
 import argparse
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, Type
+from typing import List, Optional, Tuple, Type
 
-from knot_resolver_manager.cli.command import Command, CommandArgs, register_command
+from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
 
 
 class Shells(Enum):
     BASH = 0
     FISH = 1
-
-
-CompWords = Dict[str, Optional[str]]
 
 
 def _parser_top_lvl_words(actions: List[argparse.Action]) -> CompWords:
@@ -26,14 +23,14 @@ def _parser_top_lvl_words(actions: List[argparse.Action]) -> CompWords:
     return words
 
 
-def _subparser_words(unknown_args: List[str], actions: List[argparse.Action]) -> Optional[CompWords]:
-    for arg in unknown_args:
+def _subparser_words(comp_args: List[str], actions: List[argparse.Action]) -> Optional[CompWords]:
+    for arg in comp_args:
         for action in actions:
             if isinstance(action, argparse._SubParsersAction) and arg in action.choices:
                 subparser: argparse.ArgumentParser = action.choices[arg]
                 command: Command = subparser._defaults["command"]
 
-                subparser_args = unknown_args[unknown_args.index(arg) + 1 :]
+                subparser_args = comp_args[comp_args.index(arg) + 1 :]
                 if subparser_args:
                     return command.completion(subparser_args, subparser)
     return None
@@ -41,14 +38,14 @@ def _subparser_words(unknown_args: List[str], actions: List[argparse.Action]) ->
 
 @register_command
 class CompletionCommand(Command):
-    def __init__(self, namespace: argparse.Namespace, unknown_args: List[str]) -> None:
-        super().__init__(namespace, unknown_args)
+    def __init__(self, namespace: argparse.Namespace) -> None:
+        super().__init__(namespace)
         self.shell: Shells = namespace.shell
         self.space = namespace.space
-        self.unknown_args: List[str] = unknown_args
+        self.comp_args: List[str] = namespace.comp_args
 
         if self.space:
-            self.unknown_args.append("")
+            self.comp_args.append("")
 
     @staticmethod
     def register_args_subparser(
@@ -62,6 +59,12 @@ class CompletionCommand(Command):
             action="store_true",
             default=False,
         )
+        completion.add_argument(
+            "comp_args",
+            type=str,
+            help="arguments to complete",
+            nargs="*",
+        )
 
         shells_dest = "shell"
         shells = completion.add_mutually_exclusive_group()
@@ -71,8 +74,8 @@ class CompletionCommand(Command):
         return completion, CompletionCommand
 
     @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
-        comp: Dict[str, Optional[str]] = {}
+    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
+        comp: CompWords = {}
 
         for action in parser._actions:
             for opt in action.option_strings:
@@ -84,7 +87,7 @@ class CompletionCommand(Command):
         words: CompWords = {}
 
         if parser._subparsers:
-            subparser_words = _subparser_words(self.unknown_args, parser._subparsers._actions)
+            subparser_words = _subparser_words(self.comp_args, parser._subparsers._actions)
 
             if subparser_words is None:
                 # parser top level options/commands
