@@ -229,7 +229,6 @@ mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 pushd manager
 %py3_install
 install -m 644 -D etc/knot-resolver/config.yml %{buildroot}%{_sysconfdir}/knot-resolver/config.yml
-install -m 644 -D knot-resolver.service %{buildroot}%{_unitdir}/knot-resolver.service
 popd
 
 %pre
@@ -357,6 +356,7 @@ fi
 %{_libdir}/knot-resolver/kres_modules/watchdog.lua
 %{_libdir}/knot-resolver/kres_modules/workarounds.lua
 %{_mandir}/man8/kresd.8.gz
+%{_mandir}/man8/kresctl.8.gz
 
 %files devel
 %{_includedir}/libkres

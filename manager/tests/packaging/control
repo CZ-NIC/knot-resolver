@@ -27,3 +27,10 @@ Depends: knot-utils, jq, curl
 {% else -%}
 Depends: unsupported-distro-this-package-does-not-exist-and-the-test-should-fail
 {%- endif %}
+
+
+Tests: manpage.sh
+Tests-Directory: manager/tests/packaging
+{% if distro.match('fedora') or distro.match('rocky') or distro.match('opensuse') -%}
+Depends: man
+{%- endif %}
