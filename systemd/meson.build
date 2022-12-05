@@ -30,6 +30,12 @@ if systemd_files == 'enabled'
     sources: 'kresd.target',
     install_dir: systemd_unit_dir,
   )
+  manager_service = configure_file(
+    input: 'knot-resolver.service.in',
+    output: 'knot-resolver.service',
+    configuration: systemd_config,
+    install_dir: systemd_unit_dir,
+  )
 
   ## man page
   kresd_systemd_man = configure_file(

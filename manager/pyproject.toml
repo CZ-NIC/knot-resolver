@@ -67,6 +67,7 @@ gen-setuppy = { shell = "python scripts/create_setup.py > setup.py", help = "Gen
 tox = { cmd = "tox", help = "Run tests in tox" }
 integration = {cmd = "python tests/integration/runner.py", help = "Run integration tests" }
 configure-vscode = {cmd = "scripts/configure-vscode", help = "Create VSCode configuration for debugging, virtual envs etc" }
+man = {cmd = "scripts/man", help = "Display manpage from sources" }
 
 
 [tool.black]
@@ -157,8 +158,8 @@ exclude = []
 typeCheckingMode = "strict"
 
 [build-system]
-requires = ["poetry>=0.12"]
-build-backend = "poetry.masonry.api"
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.mypy]
 python_version = "3.6"

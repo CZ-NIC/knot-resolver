@@ -33,3 +33,20 @@ PATH="$PATH:$gitroot/node_modules/.bin"
 
 # fail even on unbound variables
 set -o nounset
+
+
+function build_kresd {
+	echo
+	echo Building Knot Resolver
+	echo ----------------------
+	echo -e "${blue}In case of an compilation error, run this command to try to fix it:${reset}"
+	echo -e "\t${blue}rm -r $(realpath .install_kresd) $(realpath .build_kresd)${reset}"
+	echo
+	pushd ..
+	mkdir -p manager/.build_kresd manager/.install_kresd
+	meson manager/.build_kresd --prefix=$(realpath manager/.install_kresd) --default-library=static --buildtype=debug
+	ninja -C manager/.build_kresd
+	ninja install -C manager/.build_kresd
+	export PATH="$(realpath manager/.install_kresd)/sbin:$PATH"
+	popd
+}

@@ -18,6 +18,12 @@ man_kresd = configure_file(
 )
 install_man(man_kresd)
 
+man_kresctl = configure_file(
+  input: 'kresctl.8.in',
+  output: 'kresctl.8',
+  configuration: man_config,
+)
+install_man(man_kresctl)
 
 # html and info documentation
 if get_option('doc') == 'enabled'

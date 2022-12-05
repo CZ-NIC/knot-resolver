@@ -1,82 +1,13 @@
-import base64
 import json
 from enum import Enum, auto
-from hashlib import blake2b
-from typing import Any, Dict, List, Optional, Set, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import yaml
-from typing_extensions import Literal
 from yaml.constructor import ConstructorError
 from yaml.nodes import MappingNode
 
-from knot_resolver_manager.utils.modeling.query import QueryTree
-
 from .exceptions import DataParsingError
-
-
-class ParsedTree:
-    """
-    Simple wrapper for parsed data.
-    Changes external naming convention (hyphen separator) to internal (snake_case) on the fly.
-
-    IMMUTABLE, DO NOT MODIFY
-    """
-
-    @staticmethod
-    def _convert_internal_field_name_to_external(name: Any) -> Any:
-        if isinstance(name, str):
-            return name.replace("_", "-")
-        return name
-
-    @staticmethod
-    def _convert_external_field_name_to_internal(name: Any) -> Any:
-        if isinstance(name, str):
-            return name.replace("-", "_")
-        return name
-
-    def __init__(self, data: Union[Dict[str, Any], str, int, bool, List[Any]]):
-        self._data = data
-
-    def to_raw(self) -> Union[Dict[str, Any], str, int, bool, List[Any]]:
-        return self._data
-
-    def __getitem__(self, key: str) -> Any:
-        assert isinstance(self._data, dict)
-        return self._data[ParsedTree._convert_internal_field_name_to_external(key)]
-
-    def is_dict(self) -> bool:
-        return isinstance(self._data, dict)
-
-    def type(self) -> Type[Any]:
-        return type(self._data)
-
-    def __contains__(self, key: str) -> bool:
-        assert isinstance(self._data, dict)
-        return ParsedTree._convert_internal_field_name_to_external(key) in self._data
-
-    def __str__(self) -> str:
-        return json.dumps(self._data, sort_keys=False, indent=2)
-
-    def keys(self) -> Set[Any]:
-        assert isinstance(self._data, dict)
-        return {ParsedTree._convert_external_field_name_to_internal(key) for key in self._data.keys()}
-
-    def query(
-        self,
-        op: Literal["get", "post", "delete", "patch", "put"],
-        path: str,
-        update_with: Optional["ParsedTree"] = None,
-    ) -> "Tuple[ParsedTree, Optional[ParsedTree]]":
-        new_root, res = QueryTree(self._data).query(
-            op, path, update_with=QueryTree(update_with.to_raw()) if update_with is not None else None
-        )
-        return ParsedTree(new_root.to_raw()), ParsedTree(res.to_raw()) if res is not None else None
-
-    @property
-    def etag(self) -> str:
-        m = blake2b(digest_size=15)
-        m.update(json.dumps(self._data, sort_keys=True).encode("utf8"))
-        return base64.urlsafe_b64encode(m.digest()).decode("utf8")
+from .renaming import renamed
 
 
 # custom hook for 'json.loads()' to detect duplicate keys in data
@@ -122,13 +53,13 @@ class _Format(Enum):
     YAML = auto()
     JSON = auto()
 
-    def parse_to_dict(self, text: str) -> ParsedTree:
+    def parse_to_dict(self, text: str) -> Any:
         if self is _Format.YAML:
             # RaiseDuplicatesLoader extends yaml.SafeLoader, so this should be safe
             # https://python.land/data-processing/python-yaml#PyYAML_safe_load_vs_load
-            return ParsedTree(yaml.load(text, Loader=_RaiseDuplicatesLoader))  # type: ignore
+            return renamed(yaml.load(text, Loader=_RaiseDuplicatesLoader))  # type: ignore
         elif self is _Format.JSON:
-            return ParsedTree(json.loads(text, object_pairs_hook=_json_raise_duplicates))
+            return renamed(json.loads(text, object_pairs_hook=_json_raise_duplicates))
         else:
             raise NotImplementedError(f"Parsing of format '{self}' is not implemented")
 
@@ -144,23 +75,24 @@ class _Format(Enum):
     def from_mime_type(mime_type: str) -> "_Format":
         formats = {
             "application/json": _Format.JSON,
+            "application/yaml": _Format.YAML,
             "application/octet-stream": _Format.JSON,  # default in aiohttp
             "text/vnd.yaml": _Format.YAML,
         }
         if mime_type not in formats:
             raise DataParsingError(
-                f"unsupported MIME type '{mime_type}', expected 'application/json' or 'text/vnd.yaml'"
+                f"unsupported MIME type '{mime_type}', expected 'application/json' or 'application/yaml'"
             )
         return formats[mime_type]
 
 
-def parse(data: str, mime_type: str) -> ParsedTree:
+def parse(data: str, mime_type: str) -> Any:
     return _Format.from_mime_type(mime_type).parse_to_dict(data)
 
 
-def parse_yaml(data: str) -> ParsedTree:
+def parse_yaml(data: str) -> Any:
     return _Format.YAML.parse_to_dict(data)
 
 
-def parse_json(data: str) -> ParsedTree:
+def parse_json(data: str) -> Any:
     return _Format.JSON.parse_to_dict(data)

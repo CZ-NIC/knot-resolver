@@ -5,7 +5,7 @@ from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import CheckedPath, TimeUnit
 from knot_resolver_manager.utils.modeling import BaseSchema
-from knot_resolver_manager.utils.modeling.base_schema import is_obj_type_Valid
+from knot_resolver_manager.utils.modeling.base_schema import is_obj_type_valid
 
 try:
     # On Debian 10, the typing_extensions library does not contain TypeAlias.
@@ -132,7 +132,7 @@ class LoggingSchema(BaseSchema):
     def _target(self, raw: Raw) -> LogTargetEnum:
         if raw.target == "from-env":
             target = os.environ.get("KRES_LOGGING_TARGET") or "stdout"
-            if not is_obj_type_Valid(target, cast(Type[Any], LogTargetEnum)):
+            if not is_obj_type_valid(target, cast(Type[Any], LogTargetEnum)):
                 raise ValueError(f"logging target '{target}' read from $KRES_LOGGING_TARGET is invalid")
             return cast(LogTargetEnum, target)
         else:
