@@ -23,9 +23,9 @@ class Formats(Enum):
     YAML = 1
 
 
-def operation_to_method(operation: Operations) -> Literal["POST", "GET", "DELETE"]:
+def operation_to_method(operation: Operations) -> Literal["PUT", "GET", "DELETE"]:
     if operation == Operations.SET:
-        return "POST"
+        return "PUT"
     elif operation == Operations.DELETE:
         return "DELETE"
 
@@ -181,9 +181,12 @@ class ConfigCommand(Command):
         response = request(method, url, reformat(new_config, Formats.JSON) if new_config else None)
         print(f"status: {response.status}")
 
-        if self.operation == Operations.GET and self.value_or_file and response.status == 200:
-            with open(self.value_or_file, "w") as f:
-                f.write(reformat(response.body, self.format))
-            print(f"saved to: {self.value_or_file}")
+        if self.operation == Operations.GET and response.status == 200:
+            if self.value_or_file:
+                with open(self.value_or_file, "w") as f:
+                    f.write(reformat(response.body, self.format))
+                print(f"saved to: {self.value_or_file}")
+            else:
+                print(reformat(response.body, self.format))
         else:
-            print(reformat(response.body, self.format))
+            print(response.body)
