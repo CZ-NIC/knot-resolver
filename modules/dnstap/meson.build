@@ -54,3 +54,6 @@ if build_dnstap
     install_dir: modules_dir,
   )
 endif
+
+summary({'dnstap module': build_dnstap,
+        }, section: 'Optional components', bool_yn: true)

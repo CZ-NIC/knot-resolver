@@ -33,3 +33,6 @@ if install_kresd_conf
     install_dir: etc_dir,
   )
 endif
+
+summary({'install kresd.conf': install_kresd_conf,
+        }, section: 'Paths', bool_yn: true)
