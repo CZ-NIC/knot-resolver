@@ -4,6 +4,7 @@ Knot Resolver 5.x.y (202y-mm-dd)
 Improvements
 ------------
 - depend on jemalloc, preferably, to improve memory usage (!1353)
+- no longer accept DNS messages with trailing data (!1365)
 - policy.STUB: avoid applying aggressive DNSSEC denial proofs (!1364)
 - policy.STUB: avoid copying +dnssec flag from client to upstream (!1364)
 

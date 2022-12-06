@@ -1039,12 +1039,6 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Check for packet processing errors first.
 	 * Note - we *MUST* check if it has at least a QUESTION,
 	 * otherwise it would crash on accessing QNAME. */
-#ifdef STRICT_MODE
-	if (pkt->parsed < pkt->size) {
-		VERBOSE_MSG("<= pkt contains excessive data\n");
-		return KR_STATE_FAIL;
-	} else
-#endif
 	if (pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
 		if (pkt->parsed == KNOT_WIRE_HEADER_SIZE && knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_FORMERR) {
 			/* This is a special case where we get valid header with FORMERR and nothing else.
@@ -1080,6 +1074,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* If exiting above here, there's no sense to put it into packet cache.
+	 * Having "extra bytes" at the end of DNS message is considered SANE here.
 	 * The most important part is to check for spoofing: is_paired_to_query() */
 	query->flags.PKT_IS_SANE = true;
 
@@ -1133,6 +1128,15 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		ret = KR_STATE_FAIL;
 		selection_error = KR_SELECTION_OTHER_RCODE;
 		break;
+	}
+
+	/* Check for "extra bytes" is deferred, so that RCODE-based failures take priority. */
+	if (ret != KR_STATE_FAIL && pkt->parsed < pkt->size) {
+		VERBOSE_MSG("<= malformed response with %zu extra bytes\n",
+				pkt->size - pkt->parsed);
+		ret = KR_STATE_FAIL;
+		if (selection_error == KR_SELECTION_OK)
+			selection_error = KR_SELECTION_MALFORMED;
 	}
 
 	if (query->server_selection.initialized) {
