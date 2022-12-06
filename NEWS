@@ -5,6 +5,10 @@ Improvements
 ------------
 - depend on jemalloc, preferably, to improve memory usage (!1353)
 
+Bugfixes
+--------
+- policy.DEBUG_IF: don't print client's packet unconditionally (!1366)
+
 
 Knot Resolver 5.5.3 (2022-09-21)
 ================================
