@@ -6,7 +6,7 @@ project(
   license: 'GPLv3+',
   version: '6.0.17',
   default_options: ['c_std=gnu11', 'b_ndebug=true'],
-  meson_version: '>=0.49',
+  meson_version: '>=0.53',
 )
 
 
