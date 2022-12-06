@@ -41,6 +41,9 @@ set -o xtrace
 
 : removing existing output files at output dir: $OUTDIR
 rm -rf "$OUTDIR"
+: make-archive script is quite heavy on dependencies, almost same as doing a build
+: so we install dependencies from the latest *released* version, i.e. tarball instead
+apkg build-dep -u
 : making debian source package from archive
 apkg srcpkg $APKG_OPTS -d debian
 : removing extra debian source package files
