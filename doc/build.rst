@@ -118,7 +118,7 @@ Following example script will:
 
 .. code-block:: bash
 
-   $ meson build_dir --prefix=/tmp/kr --default-library=static
+   $ meson setup build_dir --prefix=/tmp/kr --default-library=static
    $ ninja -C build_dir
    $ ninja install -C build_dir
 
@@ -181,7 +181,7 @@ target ``doc`` must be called explicitly.
 
 .. code-block:: bash
 
-   $ meson build_dir -Ddoc=enabled
+   $ meson configure build_dir -Ddoc=enabled
    $ ninja -C build_dir doc
 
 Tarball
