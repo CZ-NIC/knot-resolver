@@ -167,9 +167,7 @@ endif
 malloc = meson.get_compiler('c').find_library(
   malloc_name,
   required: get_option('malloc') == 'jemalloc',
-  #static: false, #TODO: add when bumping meson to >= 0.51;
-  # static linking would most likely cause issues.
-  # Fortunately it seems unlikely that dynamic wouldn't be found and static would be.
+  static: false, # static linking would most likely cause issues.
 )
 
 summary({'sendmmsg': sendmmsg,
