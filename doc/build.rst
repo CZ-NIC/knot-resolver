@@ -139,7 +139,7 @@ For complete list of build options create a build directory and run:
 
 .. code-block:: bash
 
-   $ meson build_dir
+   $ meson setup build_dir
    $ meson configure build_dir
 
 To customize project build options, use ``-Doption=value`` when creating
@@ -147,7 +147,7 @@ a build directory:
 
 .. code-block:: bash
 
-   $ meson build_dir -Ddoc=enabled
+   $ meson setup build_dir -Ddoc=enabled
 
 ... or change options in an already existing build directory:
 
