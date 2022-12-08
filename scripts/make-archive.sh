@@ -9,6 +9,8 @@ cd "$(dirname ${0})/.."
 (git diff-index --quiet HEAD && git diff-index --cached --quiet HEAD) || \
     (echo 'git index has uncommitted changes!'; exit 1)
 
+./scripts/gen-vcs-info.sh
+
 if ! git describe --tags --exact-match; then
     # devel version
     GIT_HASH=$(git rev-parse --short HEAD )

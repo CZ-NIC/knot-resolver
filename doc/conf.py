@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # -*- coding: utf-8 -*-
 
+import errno
+import json
 import os
 import re
 import subprocess
@@ -25,16 +27,37 @@ breathe_domain_by_extension = {"h": "c"}
 source_suffix = '.rst'
 master_doc = 'index'
 
-# Get current year (preferably from Git commit)
+# Get current year in the order of preference (fallback to system time)
 commit_year = date.today().year
+commit_year_src = 'system time'
+commit_year_got = False
 
-try:
-    commit_date_str = subprocess.check_output(['git', 'show', '--no-patch', '--format=%cs'])\
-            .decode().strip()
-    commit_date = date.fromisoformat(commit_date_str)
-    commit_year = commit_date.year
-except BaseException as e:
-    print('Could not get current commit, using system time for copyright:', e)
+if not commit_year_got:
+    try:
+        commit_date_str = subprocess.check_output(['git', 'show', '--no-patch', '--format=%cs'])\
+                .decode().strip()
+        commit_date = date.fromisoformat(commit_date_str)
+        commit_year = commit_date.year
+        commit_year_src = 'Git'
+        commit_year_got = True
+    except subprocess.CalledProcessError as e:
+        pass # Kind of expected, just silently fall back to '.kr-vcs-info'
+
+if not commit_year_got:
+    try:
+        with open('../.kr-vcs-info', 'rb') as vcs_info_fp:
+            vcs_info = json.load(vcs_info_fp)
+
+        commit_date = date.fromisoformat(vcs_info['commitDate'])
+        commit_year = commit_date.year
+        commit_year_src = '.kr-vcs-info'
+        commit_year_got = True
+    except OSError as e:
+        if e.errno != errno.ENOENT:
+            raise e
+
+print('Using copyright year ({year}) from {year_src}'.format(
+    year=commit_year, year_src=commit_year_src))
 
 # General information about the project.
 project = u'Knot Resolver'

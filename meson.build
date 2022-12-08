@@ -43,6 +43,9 @@ if host_machine.system() == 'darwin'
   libext = '.dylib'
 endif
 
+# VCS info
+meson.add_dist_script('scripts/dist-copy-vcs-info.sh')
+
 ## Paths
 prefix = get_option('prefix')
 data_dir = prefix / get_option('datadir') / 'knot-resolver'
