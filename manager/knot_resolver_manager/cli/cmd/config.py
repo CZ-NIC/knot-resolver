@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type
 import yaml
 from typing_extensions import Literal
 
-from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
+from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, parser_words, register_command
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.utils.modeling import try_to_parse
 from knot_resolver_manager.utils.requests import request
@@ -40,39 +40,34 @@ def reformat(data: str, req_format: Formats) -> str:
     return json.dumps(dict, indent=4)
 
 
-def properties_comp(props: Dict[str, Any]) -> CompWords:
-    comp: CompWords = {}
+def _properties_words(props: Dict[str, Any]) -> CompWords:
+    words: CompWords = {}
     for name, prop in props.items():
-        comp[name] = prop["description"] if "description" in prop else None
-    return comp
+        words[name] = prop["description"] if "description" in prop else None
+    return words
 
 
-def node_comp(nodes: List[str], props: Dict[str, Any]) -> CompWords:
+def _path_comp_words(node: str, nodes: List[str], props: Dict[str, Any]) -> CompWords:
+    i = nodes.index(node)
+    ln = len(nodes[i:])
 
-    if len(nodes) > 1 and nodes[0] in props:
-        prop = props[nodes[0]]
-        if "properties" in prop:
-            return node_comp(nodes[1:], prop["properties"])
-        else:
-            return {}
+    # if node is last in path, return all possible words on thi level
+    if ln == 1:
+        return _properties_words(props)
+    # if node is valid
+    elif node in props:
+        node_schema = props[node]
+
+        # arrays/lists must be handled sparately
+        if node_schema["type"] == "array":
+            if ln > 2:
+                # skip index for item in array
+                return _path_comp_words(nodes[i + 2], nodes, node_schema["items"]["properties"])
+            return {"0": "first array item", "-": "last array item"}
+        return _path_comp_words(nodes[i + 1], nodes, node_schema["properties"])
     else:
-        return properties_comp(props)
-
-
-def config_path_comp(path: str) -> Dict[str, Optional[str]]:
-    nodes = path[1:].split("/") if path.startswith("/") else path.split("/")
-    properties: Dict[str, Any] = KresConfig.json_schema()["properties"]
-    return node_comp(nodes, properties)
-
-
-def subparser_comp(parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
-    comp: Dict[str, Optional[str]] = {}
-
-    for action in parser._actions:
-        if isinstance(action, (argparse._StoreConstAction, argparse._HelpAction)):
-            for s in action.option_strings:
-                comp[s] = action.help
-    return comp
+        # if node is not last or valid, value error
+        raise ValueError(f"unknown config path node: {node}")
 
 
 @register_command
@@ -146,15 +141,17 @@ class ConfigCommand(Command):
 
     @staticmethod
     def completion(args: List[str], parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
-        top_comp = subparser_comp(parser)
+        words = parser_words(parser._actions)  # pylint: disable=W0212
 
         for arg in args:
-            if arg in top_comp:
+            if arg in words:
                 continue
             elif arg.startswith("-"):
-                return top_comp
+                return words
             elif arg == args[-1]:
-                return config_path_comp(arg)
+                config_path = arg[1:].split("/") if arg.startswith("/") else arg.split("/")
+                schema_props: Dict[str, Any] = KresConfig.json_schema()["properties"]
+                return _path_comp_words(config_path[0], config_path, schema_props)
             else:
                 break
         return {}

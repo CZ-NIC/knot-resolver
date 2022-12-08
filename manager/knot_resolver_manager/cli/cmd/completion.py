@@ -1,39 +1,21 @@
 import argparse
 from enum import Enum
-from typing import List, Optional, Tuple, Type
+from typing import List, Tuple, Type
 
-from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
+from knot_resolver_manager.cli.command import (
+    Command,
+    CommandArgs,
+    CompWords,
+    parser_words,
+    register_command,
+    subparser_by_name,
+    subparser_command,
+)
 
 
 class Shells(Enum):
     BASH = 0
     FISH = 1
-
-
-def _parser_top_lvl_words(actions: List[argparse.Action]) -> CompWords:
-    words: CompWords = {}
-
-    for action in actions:
-        if isinstance(action, argparse._SubParsersAction):
-            for sub in action._get_subactions():
-                words[sub.dest] = sub.help
-        else:
-            for s in action.option_strings:
-                words[s] = action.help
-    return words
-
-
-def _subparser_words(comp_args: List[str], actions: List[argparse.Action]) -> Optional[CompWords]:
-    for arg in comp_args:
-        for action in actions:
-            if isinstance(action, argparse._SubParsersAction) and arg in action.choices:
-                subparser: argparse.ArgumentParser = action.choices[arg]
-                command: Command = subparser._defaults["command"]
-
-                subparser_args = comp_args[comp_args.index(arg) + 1 :]
-                if subparser_args:
-                    return command.completion(subparser_args, subparser)
-    return None
 
 
 @register_command
@@ -75,26 +57,38 @@ class CompletionCommand(Command):
 
     @staticmethod
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        comp: CompWords = {}
-
+        words: CompWords = {}
         for action in parser._actions:
             for opt in action.option_strings:
-                comp[opt] = action.help
-        return comp
+                words[opt] = action.help
+        return words
 
     def run(self, args: CommandArgs) -> None:
-        parser = args.parser
+        subparsers = args.parser._subparsers
         words: CompWords = {}
 
-        if parser._subparsers:
-            subparser_words = _subparser_words(self.comp_args, parser._subparsers._actions)
+        if subparsers:
+            words = parser_words(subparsers._actions)
 
-            if subparser_words is None:
-                # parser top level options/commands
-                words = _parser_top_lvl_words(parser._subparsers._actions)
-            else:
-                # subparsers optons/commands
-                words = subparser_words
+            uargs = iter(self.comp_args)
+            for uarg in uargs:
+                subparser = subparser_by_name(uarg, subparsers._actions)  # pylint: disable=W0212
+
+                if subparser:
+                    cmd: Command = subparser_command(subparser)
+                    subparser_args = self.comp_args[self.comp_args.index(uarg) + 1 :]
+                    if subparser_args:
+                        words = cmd.completion(subparser_args, subparser)
+                    break
+                elif uarg in ["-s", "--socket"]:
+                    # if arg is socket config, skip next arg
+                    next(uargs)
+                    continue
+                elif uarg in words:
+                    # uarg is walid arg, continue
+                    continue
+                else:
+                    raise ValueError(f"unknown argument: {uarg}")
 
         # print completion words
         # based on required bash/fish shell format
