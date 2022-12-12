@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 CZ.NIC, z.s.p.o
+ * Copyright (C) CZ.NIC, z.s.p.o
  *
  * Initial Author: Jan Hák <jan.hak@nic.cz>
  *

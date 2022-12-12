@@ -2,7 +2,7 @@
 .\"
 .\" kresd.8 -- kresd daemon manpage
 .\"
-.\" Copyright (c) 2019, CZ.NIC. All rights reserved.
+.\" Copyright (c) CZ.NIC. All rights reserved.
 .\"
 .\" SPDX-License-Identifier: GPL-3.0-or-later
 .\"
