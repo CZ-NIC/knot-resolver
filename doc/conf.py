@@ -40,8 +40,10 @@ if not commit_year_got:
         commit_year = commit_date.year
         commit_year_src = 'Git'
         commit_year_got = True
-    except subprocess.CalledProcessError as e:
-        pass # Kind of expected, just silently fall back to '.kr-vcs-info'
+    except subprocess.CalledProcessError:
+        pass # .git probably does not exist, silently fall back to '.kr-vcs-info'
+    except FileNotFoundError:
+        pass # Git is probably not installed, silently fall back to '.kr-vcs-info'
 
 if not commit_year_got:
     try:
