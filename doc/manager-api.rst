@@ -1,5 +1,11 @@
 .. SPDX-License-Identifier: GPL-3.0-or-later
 
+.. _manager-api:
+
+********
+HTTP API
+********
+
 ===================================
 Dynamically changing configuration
 ===================================
