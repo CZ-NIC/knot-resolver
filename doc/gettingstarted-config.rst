@@ -71,37 +71,22 @@ HTTP request methods               Operation
 kresctl utility
 ===============
 
-Command-line utility to configure and control running Knot Resolver. It uses the above mentioned HTTP API.
-With no changed configuration for management HTTP API, ``kresctl`` shoul work out of the box.
-In other case there is ``-s`` argument to specify path to HTTP API endpoint.
+This command-line utility allows you to configure and control running Knot Resolver.
+For that it uses the above mentioned HTTP API.
 
-.. code-block::
-
-    $ kresctl -h
-    usage: kresctl [-h] [-i] [-s SOCKET] {stop,config,exit} ...
-
-    Command-line interface for controlling Knot Resolver
-
-    positional arguments:
-    {stop,config,exit}    command type
-        stop                shutdown everything
-        config              dynamically change configuration of a running resolver
-        exit                exit kresctl
-
-    optional arguments:
-    -h, --help            show this help message and exit
-    -i, --interactive     Interactive mode of kresctl utility
-    -s SOCKET, --socket SOCKET
-                          Path to the Unix domain socket of the configuration API
-
-
-You can also get detailed help of every command, e.g. ``$ kresctl config -h``.
-
-Folowing command changes configuration of the number of daemon workers to 4.
+For example, folowing command changes the number of ``kresd`` workers to 4.
 
 .. code-block::
 
     $ kresctl config /workers 4
+
+The utility can also help with configuration **validation** and with configuration format **conversion**.
+For more information read full :ref:`kresctl documentation <manager-client>` or use ``kresctl --help`` command.
+
+.. note::
+
+    With no changes in management configuration, ``kresctl`` should work out of the box.
+    In other case there is ``-s`` argument to specify path to HTTP API endpoint.
 
 
 ========================
