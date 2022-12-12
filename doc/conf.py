@@ -54,9 +54,8 @@ if not commit_year_got:
         commit_year = commit_date.year
         commit_year_src = '.kr-vcs-info'
         commit_year_got = True
-    except OSError as e:
-        if e.errno != errno.ENOENT:
-            raise e
+    except FileNotFoundError:
+        pass
 
 print('Using copyright year ({year}) from {year_src}'.format(
     year=commit_year, year_src=commit_year_src))
