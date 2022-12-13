@@ -1,10 +1,10 @@
-Knot Resolver 5.x.y (202y-mm-dd)
+Knot Resolver 5.6.0 (202y-mm-dd)
 ================================
 
 Improvements
 ------------
-- cache.max_ttl(): lower the default from six days to one day (!1323)
-  and apply both limits to the first uncached answer already
+- cache.max_ttl(): lower the default from six days to one day
+  and apply both limits to the first uncached answer already (!1323 #127)
 - depend on jemalloc, preferably, to improve memory usage (!1353)
 - no longer accept DNS messages with trailing data (!1365)
 - policy.STUB: avoid applying aggressive DNSSEC denial proofs (!1364)
