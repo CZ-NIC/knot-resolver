@@ -597,14 +597,11 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	if (kr_fails_assert(val_new_entry.data))
 		return kr_error(EFAULT);
 
-	const uint32_t ttl = rr->ttl;
-	/* FIXME: consider TTLs and expirations of RRSIGs as well, just in case. */
-
 	/* Write the entry itself. */
 	struct entry_h *eh = val_new_entry.data;
 	memset(eh, 0, offsetof(struct entry_h, data));
 	eh->time = timestamp;
-	eh->ttl  = MAX(MIN(ttl, cache->ttl_max), cache->ttl_min);
+	eh->ttl  = rr->ttl;
 	eh->rank = rank;
 	rdataset_dematerialize(&rr->rrs, eh->data);
 	rdataset_dematerialize(rds_sigs, eh->data + rr_ssize);

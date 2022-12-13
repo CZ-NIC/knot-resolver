@@ -221,17 +221,15 @@ Configuration reference
 
 .. function:: cache.max_ttl([ttl])
 
-  :param number ttl: maximum cache TTL in seconds (default: 6 days)
+  :param number ttl: maximum TTL in seconds (default: 1 day)
 
   .. KR_CACHE_DEFAULT_TTL_MAX ^^
 
   :return: current maximum TTL
 
-  Get or set maximum cache TTL.
+  Get or set maximum TTL bound applied to all received records.
 
-  .. note:: The `ttl` value must be in range `(min_ttl, 4294967295)`.
-
-  .. warning:: This settings applies only to currently open cache, it will not persist if the cache is closed or reopened.
+  .. note:: The `ttl` value must be in range `(min_ttl, 2147483647)`.
 
   .. code-block:: lua
 
@@ -244,17 +242,17 @@ Configuration reference
 
 .. function:: cache.min_ttl([ttl])
 
-  :param number ttl: minimum cache TTL in seconds (default: 5 seconds)
+  :param number ttl: minimum TTL in seconds (default: 5 seconds)
 
   .. KR_CACHE_DEFAULT_TTL_MIN ^^
 
   :return: current maximum TTL
 
-  Get or set minimum cache TTL. Any entry inserted into cache with TTL lower than minimal will be overridden to minimum TTL. Forcing TTL higher than specified violates DNS standards, use with care.
+  Get or set minimum TTL bound applied to all received records.
+  Forcing TTL higher than specified violates DNS standards, so use it with care.
+  TTL still won't be extended beyond expiration of the corresponding DNSSEC signature.
 
   .. note:: The `ttl` value must be in range `<0, max_ttl)`.
-
-  .. warning:: This settings applies only to currently open cache, it will not persist if the cache is closed or reopened.
 
   .. code-block:: lua
 
