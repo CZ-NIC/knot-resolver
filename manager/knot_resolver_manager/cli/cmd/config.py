@@ -28,12 +28,11 @@ def operation_to_method(operation: Operations) -> Literal["PUT", "GET", "DELETE"
         return "PUT"
     elif operation == Operations.DELETE:
         return "DELETE"
-
     return "GET"
 
 
 def reformat(data: str, req_format: Formats) -> str:
-    dict = try_to_parse(data).to_raw()
+    dict = try_to_parse(data)
 
     if req_format == Formats.YAML:
         return yaml.dump(dict, indent=4)
