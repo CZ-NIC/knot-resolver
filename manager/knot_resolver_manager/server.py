@@ -5,6 +5,7 @@ import logging
 import os
 import signal
 import sys
+from functools import partial
 from http import HTTPStatus
 from pathlib import Path
 from time import time
@@ -225,7 +226,9 @@ class Server:
         )
 
     async def _handler_schema(self, _request: web.Request) -> web.Response:
-        return web.json_response(KresConfig.json_schema(), headers={"Access-Control-Allow-Origin": "*"})
+        return web.json_response(
+            KresConfig.json_schema(), headers={"Access-Control-Allow-Origin": "*"}, dumps=partial(json.dumps, indent=4)
+        )
 
     async def _handle_view_schema(self, _request: web.Request) -> web.Response:
         """
