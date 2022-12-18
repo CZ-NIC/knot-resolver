@@ -160,7 +160,15 @@ def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
 
     elif is_literal(typ):
         lit = get_generic_type_arguments(typ)
-        return {"enum": lit}
+        return {"type": "string", "enum": lit}
+
+    elif is_optional(typ):
+        desc = _describe_type(get_optional_inner_type(typ))
+        if "type" in desc:
+            desc["type"] = [desc["type"], "null"]
+            return desc
+        else:
+            return {"anyOf": [{"type": "null"}, desc]}
 
     elif is_union(typ):
         variants = get_generic_type_arguments(typ)

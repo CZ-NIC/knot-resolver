@@ -7,7 +7,10 @@ cd "$(dirname ${0})/.."
 pushd manager
 ## the following python command should hopefully run without any dependencies except for standard python
 mkdir -p ../doc/_static/
-python3 -m knot_resolver_manager.cli schema > ../doc/_static/config-schema.json
+python3 -m knot_resolver_manager.cli schema > ../doc/_static/config.schema.json
+
+# generate readable version of the JSON schema. The command bellow generates a markdown document, prepends a header and lowers priority of all headings by one.
+cat ../doc/config-schema-header.md <(jsonschema2md ../doc/_static/config.schema.json /dev/stdout | sed 's/^#/##/') > ../doc/config-schema.md
 popd
 
 

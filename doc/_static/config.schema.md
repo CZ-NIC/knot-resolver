@@ -1,0 +1,185 @@
+# JSON Schema
+
+*Knot Resolver declarative configuration.*
+
+## Properties
+
+- **`version`** *(integer)*: Version of the configuration schema. By default it is the latest supported by the resolver, but couple of versions back are be supported as well. Default: `1`.
+- **`nsid`** *(['string', 'null'])*: Name Server Identifier (RFC 5001) which allows DNS clients to request resolver to send back its NSID along with the reply to a DNS request. Default: `None`.
+- **`hostname`** *(['string', 'null'])*: Internal DNS resolver hostname. Default is machine hostname. Default: `None`.
+- **`rundir`** *(string)*: Directory where the resolver can create files and which will be it's cwd. Default: `.`.
+- **`workers`**: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available. Default: `1`.
+- **`max-workers`** *(integer)*: The maximum number of workers allowed. Cannot be changed in runtime. Minimum: `1`. Default: `80`.
+- **`management`** *(object)*: Configuration of management HTTP API. Default: `{'unix_socket': './manager.sock', 'interface': None}`.
+  - **`unix-socket`** *(['string', 'null'])*: Path to unix domain socket to listen to. Default: `None`.
+  - **`interface`** *(['string', 'null'])*: IP address and port number to listen to. Default: `None`.
+- **`webmgmt`** *(['object', 'null'])*: Configuration of legacy web management endpoint. Default: `None`.
+  - **`unix-socket`** *(['string', 'null'])*: Path to unix domain socket to listen to. Default: `None`.
+  - **`interface`** *(['string', 'null'])*: IP address or interface name with port number to listen to. Default: `None`.
+  - **`tls`** *(boolean)*: Enable/disable TLS. Default: `False`.
+  - **`cert-file`** *(['string', 'null'])*: Path to certificate file. Default: `None`.
+  - **`key-file`** *(['string', 'null'])*: Path to certificate key. Default: `None`.
+- **`options`** *(object)*: Fine-tuning global parameters of DNS resolver operation. Default: `{'glue_checking': 'normal', 'qname_minimisation': True, 'query_loopback': False, 'reorder_rrset': True, 'query_case_randomization': True, 'priming': True, 'rebinding_protection': False, 'refuse_no_rd': True, 'time_jump_detection': True, 'violators_workarounds': False, 'serve_stale': False, 'prediction': False}`.
+  - **`glue-checking`** *(string)*: Glue records scrictness checking level. Must be one of: `['normal', 'strict', 'permissive']`. Default: `normal`.
+  - **`qname-minimisation`** *(boolean)*: Send minimum amount of information in recursive queries to enhance privacy. Default: `True`.
+  - **`query-loopback`** *(boolean)*: Permits queries to loopback addresses. Default: `False`.
+  - **`reorder-rrset`** *(boolean)*: Controls whether resource records within a RRSet are reordered each time it is served from the cache. Default: `True`.
+  - **`query-case-randomization`** *(boolean)*: Randomize Query Character Case. Default: `True`.
+  - **`priming`** *(boolean)*: Initializing DNS resolver cache with Priming Queries (RFC 8109). Default: `True`.
+  - **`rebinding-protection`** *(boolean)*: Protection against DNS Rebinding attack. Default: `False`.
+  - **`refuse-no-rd`** *(boolean)*: Queries without RD (recursion desired) bit set in query are answered with REFUSED. Default: `True`.
+  - **`time-jump-detection`** *(boolean)*: Detection of difference between local system time and expiration time bounds in DNSSEC signatures for '. NS' records. Default: `True`.
+  - **`violators-workarounds`** *(boolean)*: Workarounds for known DNS protocol violators. Default: `False`.
+  - **`serve-stale`** *(boolean)*: Allows using timed-out records in case DNS resolver is unable to contact upstream servers. Default: `False`.
+  - **`prediction`**: Helps keep the cache hot by prefetching expiring records and learning usage patterns and repetitive queries. Default: `False`.
+- **`network`** *(object)*: Network connections and protocols configuration. Default: `{'do_ipv4': True, 'do_ipv6': True, 'out_interface_v4': None, 'out_interface_v6': None, 'tcp_pipeline': 100, 'edns_tcp_keepalive': True, 'edns_buffer_size': {'upstream': '1232B', 'downstream': '1232B'}, 'address_renumbering': None, 'tls': {'cert_file': None, 'key_file': None, 'sticket_secret': None, 'sticket_secret_file': None, 'auto_discovery': False, 'padding': True}, 'proxy_protocol': False, 'listen': [{'interface': '127.0.0.1', 'unix_socket': None, 'port': 53, 'kind': 'dns', 'freebind': False}, {'interface': '::1', 'unix_socket': None, 'port': 53, 'kind': 'dns', 'freebind': True}]}`.
+  - **`do-ipv4`** *(boolean)*: Enable/disable using IPv4 for contacting upstream nameservers. Default: `True`.
+  - **`do-ipv6`** *(boolean)*: Enable/disable using IPv6 for contacting upstream nameservers. Default: `True`.
+  - **`out-interface-v4`** *(['string', 'null'])*: IPv4 address used to perform queries. Not set by default, which lets the OS choose any address. Default: `None`.
+  - **`out-interface-v6`** *(['string', 'null'])*: IPv6 address used to perform queries. Not set by default, which lets the OS choose any address. Default: `None`.
+  - **`tcp-pipeline`** *(integer)*: TCP pipeline limit. The number of outstanding queries that a single client connection can make in parallel. Minimum: `0`. Maximum: `65535`. Default: `100`.
+  - **`edns-tcp-keepalive`** *(boolean)*: Allows clients to discover the connection timeout. (RFC 7828). Default: `True`.
+  - **`edns-buffer-size`** *(object)*: Maximum EDNS payload size advertised in DNS packets. Different values can be configured for communication downstream (towards clients) and upstream (towards other DNS servers). Default: `{'upstream': '1232B', 'downstream': '1232B'}`.
+    - **`upstream`** *(string)*: Maximum EDNS upstream (towards other DNS servers) payload size. Default: `1232B`.
+    - **`downstream`** *(string)*: Maximum EDNS downstream (towards clients) payload size for communication. Default: `1232B`.
+  - **`address-renumbering`** *(['array', 'null'])*: Renumbers addresses in answers to different address space. Default: `None`.
+    - **Items** *(object)*: Renumbers addresses in answers to different address space.
+      - **`source`** *(string)*: Source subnet.
+      - **`destination`**: Destination address prefix.
+  - **`tls`** *(object)*: TLS configuration, also affects DNS over TLS and DNS over HTTPS. Default: `{'cert_file': None, 'key_file': None, 'sticket_secret': None, 'sticket_secret_file': None, 'auto_discovery': False, 'padding': True}`.
+    - **`cert-file`** *(['string', 'null'])*: Path to certificate file. Default: `None`.
+    - **`key-file`** *(['string', 'null'])*: Path to certificate key file. Default: `None`.
+    - **`sticket-secret`** *(['string', 'null'])*: Secret for TLS session resumption via tickets. (RFC 5077). Default: `None`.
+    - **`sticket-secret-file`** *(['string', 'null'])*: Path to file with secret for TLS session resumption via tickets. (RFC 5077). Default: `None`.
+    - **`auto-discovery`** *(boolean)*: Automatic discovery of authoritative servers supporting DNS-over-TLS. Default: `False`.
+    - **`padding`**: EDNS(0) padding of answers to queries that arrive over TLS transport. Default: `True`.
+  - **`proxy-protocol`**: PROXYv2 protocol configuration. Default: `False`.
+  - **`listen`** *(array)*: List of interfaces to listen to and its configuration. Default: `[{'interface': '127.0.0.1', 'unix_socket': None, 'port': 53, 'kind': 'dns', 'freebind': False}, {'interface': '::1', 'unix_socket': None, 'port': 53, 'kind': 'dns', 'freebind': True}]`.
+    - **Items** *(object)*: Configuration of listening interface.
+      - **`interface`**: IP address or interface name with optional port number to listen to. Default: `None`.
+      - **`unix-socket`**: Path to unix domain socket to listen to. Default: `None`.
+      - **`port`** *(['integer', 'null'])*: Port number to listen to. Minimum: `1`. Maximum: `65535`. Default: `None`.
+      - **`kind`** *(string)*: Specifies DNS query transport protocol. Must be one of: `['dns', 'xdp', 'dot', 'doh-legacy', 'doh2']`. Default: `dns`.
+      - **`freebind`** *(boolean)*: Used for binding to non-local address. Default: `False`.
+- **`static-hints`** *(object)*: Static hints for forward records (A/AAAA) and reverse records (PTR). Default: `{'ttl': None, 'nodata': True, 'etc_hosts': False, 'root_hints': None, 'root_hints_file': None, 'hints': None, 'hints_files': None}`.
+  - **`ttl`** *(['string', 'null'])*: TTL value used for records added from static hints. Default: `None`.
+  - **`nodata`** *(boolean)*: Use NODATA synthesis. NODATA will be synthesised for matching hint name, but mismatching type. Default: `True`.
+  - **`etc-hosts`** *(boolean)*: Add hints from '/etc/hosts' file. Default: `False`.
+  - **`root-hints`** *(['object', 'null'])*: Direct addition of root hints pairs (hostname, list of addresses). Can contain additional properties. Default: `None`.
+    - **Additional Properties** *(array)*
+      - **Items**
+  - **`root-hints-file`** *(['string', 'null'])*: Path to root hints in zonefile. Replaces all current root hints. Default: `None`.
+  - **`hints`** *(['object', 'null'])*: Direct addition of hints pairs (hostname, list of addresses). Can contain additional properties. Default: `None`.
+    - **Additional Properties** *(array)*
+      - **Items**
+  - **`hints-files`** *(['array', 'null'])*: Path to hints in hosts-like file. Default: `None`.
+    - **Items** *(string)*
+- **`views`** *(['object', 'null'])*: List of views and its configuration. Can contain additional properties. Default: `None`.
+  - **Additional Properties** *(object)*: Configuration parameters that allow you to create personalized policy rules and other.
+    - **`subnets`** *(['array', 'null'])*: Identifies the client based on his subnet. Default: `None`.
+      - **Items** *(string)*
+    - **`tsig`** *(['array', 'null'])*: Identifies the client based on a TSIG key name (for testing purposes, TSIG signature is not verified!). Default: `None`.
+      - **Items** *(string)*
+    - **`options`** *(['array', 'null'])*: Configuration flags for clients identified by the view. Default: `None`.
+      - **Items** *(string)*: Must be one of: `['no-minimize', 'no-ipv4', 'no-ipv6', 'tcp', 'resolved', 'await-ipv4', 'await-ipv6', 'await-cut', 'no-edns', 'cached', 'no-cache', 'expiring', 'allow_local', 'dnssec-want', 'dnssec-bogus', 'dnssec-insecure', 'dnssec-cd', 'stub', 'always-cut', 'dnssec-wexpand', 'permissive', 'strict', 'badcookie-again', 'cname', 'reorder-rr', 'trace', 'no-0x20', 'dnssec-nods', 'dnssec-optout', 'nonauth', 'forward', 'dns64-mark', 'cache-tried', 'no-ns-found', 'pkt-is-sane', 'dns64-disable']`.
+- **`slices`** *(['array', 'null'])*: Split the entire DNS namespace into distinct slices. Default: `None`.
+  - **Items** *(object)*: Split the entire DNS namespace into distinct slices.
+    - **`function`** *(string)*: Slicing function that returns index based on query. Must be one of: `['randomize-psl']`. Default: `randomize-psl`.
+    - **`views`** *(['array', 'null'])*: Use this Slice only for clients defined by views. Default: `None`.
+      - **Items** *(string)*
+    - **`actions`** *(array)*: Actions for slice.
+      - **Items** *(object)*: Configuration of policy action.
+        - **`action`** *(string)*: Policy action. Must be one of: `['pass', 'deny', 'drop', 'refuse', 'tc', 'reroute', 'answer', 'mirror', 'forward', 'stub', 'debug-always', 'debug-cache-miss', 'qtrace', 'reqtrace']`.
+        - **`message`** *(['string', 'null'])*: Deny message for 'deny' action. Default: `None`.
+        - **`reroute`** *(['array', 'null'])*: Configuration for 'reroute' action. Default: `None`.
+          - **Items** *(object)*: Renumbers addresses in answers to different address space.
+            - **`source`** *(string)*: Source subnet.
+            - **`destination`**: Destination address prefix.
+        - **`answer`** *(['object', 'null'])*: Answer definition for 'answer' action. Default: `None`.
+          - **`rtype`** *(string)*: Type of DNS resource record. Must be one of: `['A', 'A6', 'AAAA', 'AFSDB', 'ANY', 'APL', 'ATMA', 'AVC', 'AXFR', 'CAA', 'CDNSKEY', 'CDS', 'CERT', 'CNAME', 'CSYNC', 'DHCID', 'DLV', 'DNAME', 'DNSKEY', 'DOA', 'DS', 'EID', 'EUI48', 'EUI64', 'GID', 'GPOS', 'HINFO', 'HIP', 'HTTPS', 'IPSECKEY', 'ISDN', 'IXFR', 'KEY', 'KX', 'L32', 'L64', 'LOC', 'LP', 'MAILA', 'MAILB', 'MB', 'MD', 'MF', 'MG', 'MINFO', 'MR', 'MX', 'NAPTR', 'NID', 'NIMLOC', 'NINFO', 'NS', 'NSAP', 'NSAP-PTR', 'NSEC', 'NSEC3', 'NSEC3PARAM', 'NULL', 'NXT', 'OPENPGPKEY', 'OPT', 'PTR', 'PX', 'RKEY', 'RP', 'RRSIG', 'RT', 'SIG', 'SINK', 'SMIMEA', 'SOA', 'SPF', 'SRV', 'SSHFP', 'SVCB', 'TA', 'TALINK', 'TKEY', 'TLSA', 'TSIG', 'TXT', 'UID', 'UINFO', 'UNSPEC', 'URI', 'WKS', 'X25', 'ZONEMD']`.
+          - **`rdata`** *(string)*: Data of DNS resource record.
+          - **`ttl`** *(string)*: Time-to-live value for defined answer. Default: `1s`.
+          - **`nodata`** *(boolean)*: Answer with NODATA If requested type is not configured in the answer. Otherwise policy rule is ignored. Default: `False`.
+        - **`servers`**: Servers configuration for 'mirror', 'forward' and 'stub' action. Default: `None`.
+- **`policy`** *(['array', 'null'])*: List of policy rules and its configuration. Default: `None`.
+  - **Items** *(object)*: Configuration of policy rule.
+    - **`action`** *(string)*: Policy rule action. Must be one of: `['pass', 'deny', 'drop', 'refuse', 'tc', 'reroute', 'answer', 'mirror', 'forward', 'stub', 'debug-always', 'debug-cache-miss', 'qtrace', 'reqtrace']`.
+    - **`priority`** *(['integer', 'null'])*: Policy rule priority. Default: `None`.
+    - **`filter`** *(['object', 'null'])*: Query filtering configuration. Default: `None`.
+      - **`suffix`** *(['string', 'null'])*: Filter based on the suffix of the query name. Default: `None`.
+      - **`pattern`** *(['string', 'null'])*: Filter based on the pattern that match query name. Default: `None`.
+      - **`qtype`** *(['string', 'null'])*: Filter based on the DNS query type. Must be one of: `['A', 'A6', 'AAAA', 'AFSDB', 'ANY', 'APL', 'ATMA', 'AVC', 'AXFR', 'CAA', 'CDNSKEY', 'CDS', 'CERT', 'CNAME', 'CSYNC', 'DHCID', 'DLV', 'DNAME', 'DNSKEY', 'DOA', 'DS', 'EID', 'EUI48', 'EUI64', 'GID', 'GPOS', 'HINFO', 'HIP', 'HTTPS', 'IPSECKEY', 'ISDN', 'IXFR', 'KEY', 'KX', 'L32', 'L64', 'LOC', 'LP', 'MAILA', 'MAILB', 'MB', 'MD', 'MF', 'MG', 'MINFO', 'MR', 'MX', 'NAPTR', 'NID', 'NIMLOC', 'NINFO', 'NS', 'NSAP', 'NSAP-PTR', 'NSEC', 'NSEC3', 'NSEC3PARAM', 'NULL', 'NXT', 'OPENPGPKEY', 'OPT', 'PTR', 'PX', 'RKEY', 'RP', 'RRSIG', 'RT', 'SIG', 'SINK', 'SMIMEA', 'SOA', 'SPF', 'SRV', 'SSHFP', 'SVCB', 'TA', 'TALINK', 'TKEY', 'TLSA', 'TSIG', 'TXT', 'UID', 'UINFO', 'UNSPEC', 'URI', 'WKS', 'X25', 'ZONEMD']`. Default: `None`.
+    - **`views`** *(['array', 'null'])*: Use policy rule only for clients defined by views. Default: `None`.
+      - **Items** *(string)*
+    - **`options`** *(['array', 'null'])*: Configuration flags for policy rule. Default: `None`.
+      - **Items** *(string)*: Must be one of: `['no-minimize', 'no-ipv4', 'no-ipv6', 'tcp', 'resolved', 'await-ipv4', 'await-ipv6', 'await-cut', 'no-edns', 'cached', 'no-cache', 'expiring', 'allow_local', 'dnssec-want', 'dnssec-bogus', 'dnssec-insecure', 'dnssec-cd', 'stub', 'always-cut', 'dnssec-wexpand', 'permissive', 'strict', 'badcookie-again', 'cname', 'reorder-rr', 'trace', 'no-0x20', 'dnssec-nods', 'dnssec-optout', 'nonauth', 'forward', 'dns64-mark', 'cache-tried', 'no-ns-found', 'pkt-is-sane', 'dns64-disable']`.
+    - **`message`** *(['string', 'null'])*: Deny message for 'deny' action. Default: `None`.
+    - **`reroute`** *(['array', 'null'])*: Configuration for 'reroute' action. Default: `None`.
+      - **Items** *(object)*: Renumbers addresses in answers to different address space.
+        - **`source`** *(string)*: Source subnet.
+        - **`destination`**: Destination address prefix.
+    - **`answer`** *(['object', 'null'])*: Answer definition for 'answer' action. Default: `None`.
+      - **`rtype`** *(string)*: Type of DNS resource record. Must be one of: `['A', 'A6', 'AAAA', 'AFSDB', 'ANY', 'APL', 'ATMA', 'AVC', 'AXFR', 'CAA', 'CDNSKEY', 'CDS', 'CERT', 'CNAME', 'CSYNC', 'DHCID', 'DLV', 'DNAME', 'DNSKEY', 'DOA', 'DS', 'EID', 'EUI48', 'EUI64', 'GID', 'GPOS', 'HINFO', 'HIP', 'HTTPS', 'IPSECKEY', 'ISDN', 'IXFR', 'KEY', 'KX', 'L32', 'L64', 'LOC', 'LP', 'MAILA', 'MAILB', 'MB', 'MD', 'MF', 'MG', 'MINFO', 'MR', 'MX', 'NAPTR', 'NID', 'NIMLOC', 'NINFO', 'NS', 'NSAP', 'NSAP-PTR', 'NSEC', 'NSEC3', 'NSEC3PARAM', 'NULL', 'NXT', 'OPENPGPKEY', 'OPT', 'PTR', 'PX', 'RKEY', 'RP', 'RRSIG', 'RT', 'SIG', 'SINK', 'SMIMEA', 'SOA', 'SPF', 'SRV', 'SSHFP', 'SVCB', 'TA', 'TALINK', 'TKEY', 'TLSA', 'TSIG', 'TXT', 'UID', 'UINFO', 'UNSPEC', 'URI', 'WKS', 'X25', 'ZONEMD']`.
+      - **`rdata`** *(string)*: Data of DNS resource record.
+      - **`ttl`** *(string)*: Time-to-live value for defined answer. Default: `1s`.
+      - **`nodata`** *(boolean)*: Answer with NODATA If requested type is not configured in the answer. Otherwise policy rule is ignored. Default: `False`.
+    - **`servers`**: Servers configuration for 'mirror', 'forward' and 'stub' action. Default: `None`.
+- **`rpz`** *(['array', 'null'])*: List of Response Policy Zones and its configuration. Default: `None`.
+  - **Items** *(object)*: Configuration or Response Policy Zone (RPZ).
+    - **`action`** *(string)*: RPZ rule action, typically 'deny'. Must be one of: `['pass', 'deny', 'drop', 'refuse', 'tc', 'reroute', 'answer', 'mirror', 'forward', 'stub', 'debug-always', 'debug-cache-miss', 'qtrace', 'reqtrace']`.
+    - **`file`** *(string)*: Path to the RPZ zone file.
+    - **`watch`** *(boolean)*: Reload the file when it changes. Default: `True`.
+    - **`views`** *(['array', 'null'])*: Use RPZ rule only for clients defined by views. Default: `None`.
+      - **Items** *(string)*
+    - **`options`** *(['array', 'null'])*: Configuration flags for RPZ rule. Default: `None`.
+      - **Items** *(string)*: Must be one of: `['no-minimize', 'no-ipv4', 'no-ipv6', 'tcp', 'resolved', 'await-ipv4', 'await-ipv6', 'await-cut', 'no-edns', 'cached', 'no-cache', 'expiring', 'allow_local', 'dnssec-want', 'dnssec-bogus', 'dnssec-insecure', 'dnssec-cd', 'stub', 'always-cut', 'dnssec-wexpand', 'permissive', 'strict', 'badcookie-again', 'cname', 'reorder-rr', 'trace', 'no-0x20', 'dnssec-nods', 'dnssec-optout', 'nonauth', 'forward', 'dns64-mark', 'cache-tried', 'no-ns-found', 'pkt-is-sane', 'dns64-disable']`.
+    - **`message`** *(['string', 'null'])*: Deny message for 'deny' action. Default: `None`.
+- **`stub-zones`** *(['array', 'null'])*: List of Stub Zones and its configuration. Default: `None`.
+  - **Items** *(object)*: Configuration of Stub Zone.
+    - **`name`** *(string)*: Domain name of the zone.
+    - **`servers`**: IP address of Stub server.
+    - **`views`** *(['array', 'null'])*: Use this Stub Zone only for clients defined by views. Default: `None`.
+      - **Items** *(string)*
+    - **`options`** *(['array', 'null'])*: Configuration flags for Stub Zone. Default: `None`.
+      - **Items** *(string)*: Must be one of: `['no-minimize', 'no-ipv4', 'no-ipv6', 'tcp', 'resolved', 'await-ipv4', 'await-ipv6', 'await-cut', 'no-edns', 'cached', 'no-cache', 'expiring', 'allow_local', 'dnssec-want', 'dnssec-bogus', 'dnssec-insecure', 'dnssec-cd', 'stub', 'always-cut', 'dnssec-wexpand', 'permissive', 'strict', 'badcookie-again', 'cname', 'reorder-rr', 'trace', 'no-0x20', 'dnssec-nods', 'dnssec-optout', 'nonauth', 'forward', 'dns64-mark', 'cache-tried', 'no-ns-found', 'pkt-is-sane', 'dns64-disable']`.
+- **`forward-zones`** *(['array', 'null'])*: List of Forward Zones and its configuration. Default: `None`.
+  - **Items** *(object)*: Configuration of Forward Zone.
+    - **`name`** *(string)*: Domain name of the zone.
+    - **`tls`** *(boolean)*: Enable/disable TLS for Forward servers. Default: `False`.
+    - **`servers`**: IP address of Forward server.
+    - **`views`** *(['array', 'null'])*: Use this Forward Zone only for clients defined by views. Default: `None`.
+      - **Items** *(string)*
+    - **`options`** *(['array', 'null'])*: Configuration flags for Forward Zone. Default: `None`.
+      - **Items** *(string)*: Must be one of: `['no-minimize', 'no-ipv4', 'no-ipv6', 'tcp', 'resolved', 'await-ipv4', 'await-ipv6', 'await-cut', 'no-edns', 'cached', 'no-cache', 'expiring', 'allow_local', 'dnssec-want', 'dnssec-bogus', 'dnssec-insecure', 'dnssec-cd', 'stub', 'always-cut', 'dnssec-wexpand', 'permissive', 'strict', 'badcookie-again', 'cname', 'reorder-rr', 'trace', 'no-0x20', 'dnssec-nods', 'dnssec-optout', 'nonauth', 'forward', 'dns64-mark', 'cache-tried', 'no-ns-found', 'pkt-is-sane', 'dns64-disable']`.
+- **`cache`** *(object)*: DNS resolver cache configuration. Default: `{'garbage_collector': True, 'storage': '/var/cache/knot-resolver', 'size_max': '100M', 'ttl_min': '5s', 'ttl_max': '6d', 'ns_timeout': '1000ms', 'prefill': None}`.
+  - **`garbage-collector`** *(boolean)*: Automatically use garbage collector to periodically clear cache. Default: `True`.
+  - **`storage`** *(string)*: Cache storage of the DNS resolver. Default: `/var/cache/knot-resolver`.
+  - **`size-max`** *(string)*: Maximum size of the cache. Default: `100M`.
+  - **`ttl-min`** *(string)*: Minimum time-to-live for the cache entries. Default: `5s`.
+  - **`ttl-max`** *(string)*: Maximum time-to-live for the cache entries. Default: `6d`.
+  - **`ns-timeout`** *(string)*: Time interval for which a nameserver address will be ignored after determining that it does not return (useful) answers. Default: `1000ms`.
+  - **`prefill`** *(['array', 'null'])*: Prefill the cache periodically by importing zone data obtained over HTTP. Default: `None`.
+    - **Items** *(object)*: Prefill the cache periodically by importing zone data obtained over HTTP.
+      - **`origin`** *(string)*: Origin for the imported data. Cache prefilling is only supported for the root zone ('.').
+      - **`url`** *(string)*: URL of the zone data to be imported.
+      - **`refresh-interval`** *(string)*: Time interval between consecutive refreshes of the imported zone data. Default: `1d`.
+      - **`ca-file`** *(['string', 'null'])*: Path to the file containing a CA certificate bundle that is used to authenticate the HTTPS connection. Default: `None`.
+- **`dnssec`**: Disable DNSSEC, enable with defaults or set new configuration. Default: `True`.
+- **`dns64`**: Disable DNS64 (RFC 6147), enable with defaults or set new configuration. Default: `False`.
+- **`logging`** *(object)*: Logging and debugging configuration. Default: `{'level': 'notice', 'target': 'stdout', 'groups': None, 'dnssec_bogus': False, 'dnstap': False, 'debugging': {'assertion_abort': False, 'assertion_fork': '5m'}}`.
+  - **`level`** *(string)*: Global logging level. Must be one of: `['crit', 'err', 'warning', 'notice', 'info', 'debug']`. Default: `notice`.
+  - **`target`**: Global logging stream target. "from-env" uses $KRES_LOG_TARGET and defaults to "stdout". Default: `from-env`.
+  - **`groups`** *(['array', 'null'])*: List of groups for which 'debug' logging level is set. Default: `None`.
+    - **Items** *(string)*: Must be one of: `['manager', 'supervisord', 'system', 'cache', 'io', 'net', 'ta', 'tasent', 'tasign', 'taupd', 'tls', 'gnutls', 'tls_cl', 'xdp', 'zimprt', 'zscann', 'doh', 'dnssec', 'hint', 'plan', 'iterat', 'valdtr', 'resolv', 'select', 'zonecut', 'cookie', 'statis', 'rebind', 'worker', 'policy', 'daf', 'timejm', 'timesk', 'graphi', 'prefil', 'primin', 'srvstl', 'wtchdg', 'nsid', 'dnstap', 'tests', 'dotaut', 'http', 'contrl', 'module', 'devel', 'reqdbg']`.
+  - **`dnssec-bogus`** *(boolean)*: Logging a message for each DNSSEC validation failure. Default: `False`.
+  - **`dnstap`**: Logging DNS requests and responses to a unix socket. Default: `False`.
+  - **`debugging`** *(object)*: Advanced debugging parameters for kresd (Knot Resolver daemon). Default: `{'assertion_abort': False, 'assertion_fork': '5m'}`.
+    - **`assertion-abort`** *(boolean)*: Allow the process to be aborted in case it encounters a failed assertion. Default: `False`.
+    - **`assertion-fork`** *(string)*: Fork and abord child kresd process to obtain a coredump, while the parent process recovers and keeps running. Default: `5m`.
+- **`monitoring`** *(object)*: Metrics exposisition configuration (Prometheus, Graphite). Default: `{'enabled': 'lazy', 'graphite': False}`.
+  - **`enabled`** *(string)*: configures, whether statistics module will be loaded into resolver. Must be one of: `['manager-only', 'lazy', 'always']`. Default: `lazy`.
+  - **`graphite`**: optionally configures where should graphite metrics be sent to. Default: `False`.
+- **`lua`** *(object)*: Custom Lua configuration. Default: `{'script_only': False, 'script': None, 'script_file': None}`.
+  - **`script-only`** *(boolean)*: Ignore declarative configuration and use only Lua script or file defined in this section. Default: `False`.
+  - **`script`** *(['string', 'null'])*: Custom Lua configuration script. Default: `None`.
+  - **`script-file`** *(['string', 'null'])*: Path to file that contains Lua configuration script. Default: `None`.

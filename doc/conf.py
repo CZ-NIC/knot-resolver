@@ -17,7 +17,8 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
     'sphinx_tabs.tabs',
-    'breathe'
+    'breathe',
+    'myst_parser',
 ]
 
 # Breathe configuration
