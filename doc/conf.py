@@ -26,7 +26,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Knot Resolver'
-copyright = u'2014-2020 CZ.NIC labs'
+copyright = u'CZ.NIC labs'
 with open('../meson.build') as f:
     for line in f:
         match = re.match(r"\s*version\s*:\s*'([^']+)'.*", line)

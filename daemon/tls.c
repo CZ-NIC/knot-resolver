@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 American Civil Liberties Union (ACLU)
- *               2016-2018 CZ.NIC, z.s.p.o
+ * Copyright (C) CZ.NIC, z.s.p.o
  *
  * Initial Author: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
  *                 Ondřej Surý <ondrej@sury.org>
