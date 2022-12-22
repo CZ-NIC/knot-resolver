@@ -140,7 +140,7 @@ function predict.process()
 end
 
 function predict.init()
-	if predict.window > 0 then
+	if predict.window > 0 and predict.period > 0 then
 		predict.current_epoch = predict.epoch()
 		predict.ev_sample = event.after(next_event(), predict.process)
 	end
