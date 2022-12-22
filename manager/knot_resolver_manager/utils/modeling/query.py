@@ -136,11 +136,6 @@ class TestOp(Op):
 def query(
     original: Any, method: Literal["get", "delete", "put", "patch"], ptr: str, payload: Any
 ) -> Tuple[Any, Optional[Any]]:
-    """
-    Implements a modification API in the style of Caddy:
-        https://caddyserver.com/docs/api
-    """
-
     ########################################
     # Prepare data we will be working on
 
