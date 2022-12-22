@@ -1,5 +1,6 @@
 import asyncio
 import errno
+import json
 import logging
 import os
 import signal
@@ -206,8 +207,10 @@ class Server:
             # apply
             await self.config_store.update(config_validated)
 
-        # return success
-        resp_text: Optional[str] = str(to_return) if to_return is not None else None
+        # serialize the response (the `to_return` object is a Dict/list/scalar, we want to return json)
+        resp_text: Optional[str] = json.dumps(to_return) if to_return is not None else None
+
+        # create the response and return it
         res = web.Response(status=HTTPStatus.OK, text=resp_text, content_type="application/json")
         res.headers.add("ETag", f'"{structural_etag(new_config)}"')
         return res
