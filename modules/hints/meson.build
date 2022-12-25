@@ -16,6 +16,7 @@ hints_mod = shared_module(
   name_prefix: '',
   install: true,
   install_dir: modules_dir,
+  link_with: kresd,
 )
 
 config_tests += [
