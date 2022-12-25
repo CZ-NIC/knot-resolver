@@ -11,11 +11,13 @@ nsid_mod = shared_module(
   nsid_src,
   dependencies: [
     libknot,
+    luajit,
   ],
   include_directories: mod_inc_dir,
   name_prefix: '',
   install: true,
   install_dir: modules_dir,
+  link_with: kresd,
 )
 
 config_tests += [

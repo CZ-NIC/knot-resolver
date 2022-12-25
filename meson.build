@@ -38,6 +38,8 @@ libkres_soversion = 9
 libext = '.so'
 if host_machine.system() == 'darwin'
   libext = '.dylib'
+elif host_machine.system() == 'cygwin'
+  libext = '.dll'
 endif
 
 ## Paths
