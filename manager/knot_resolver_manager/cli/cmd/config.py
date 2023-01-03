@@ -57,6 +57,26 @@ def _path_comp_words(node: str, nodes: List[str], props: Dict[str, Any]) -> Comp
     elif node in props:
         node_schema = props[node]
 
+        if "anyOf" in node_schema:
+            for item in node_schema["anyOf"]:
+                print(item)
+
+        elif "type" not in node_schema:
+            pass
+
+        elif node_schema["type"] == "array":
+            if ln > 2:
+                # skip index for item in array
+                return _path_comp_words(nodes[i + 2], nodes, node_schema["items"]["properties"])
+            if "enum" in node_schema["items"]:
+                print(node_schema["items"]["enum"])
+            return {"0": "first array item", "-": "last array item"}
+        elif node_schema["type"] == "object":
+            if "additionalProperties" in node_schema:
+                print(node_schema)
+            return _path_comp_words(nodes[i + 1], nodes, node_schema["properties"])
+        return {}
+
         # arrays/lists must be handled sparately
         if node_schema["type"] == "array":
             if ln > 2:
@@ -83,19 +103,20 @@ class ConfigCommand(Command):
     def register_args_subparser(
         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        config = subparser.add_parser("config", help="change configuration of a running resolver")
+        config = subparser.add_parser("config", help="Performs operations on the running resolver's configuration.")
         config.add_argument(
             "path",
             type=str,
-            help="path to the specify part of the configuration to work with",
+            help="Path (JSON pointer, RFC6901) to the configuration resources to work with.",
         )
 
-        config.add_argument("--stdin", help="read new config value on stdin", action="store_true", default=False)
+        config.add_argument("--stdin", help="Read config values from stdin.", action="store_true", default=False)
         config.add_argument(
             "value_or_file",
             type=str,
             nargs="?",
-            help="optional, new configuration values, path to the file with new values or path to the file to export data",
+            help="Optional, new configuration value, path to file with new configuraion or path to file where to save exported configuration data."
+            "If not specified, the configuration is printed.",
             default=None,
         )
 
@@ -104,7 +125,7 @@ class ConfigCommand(Command):
         operations.add_argument(
             "-s",
             "--set",
-            help="set new configuration",
+            help="Set new configuration for the resolver.",
             action="store_const",
             dest=op_dest,
             const=Operations.SET,
@@ -113,27 +134,36 @@ class ConfigCommand(Command):
         operations.add_argument(
             "-d",
             "--delete",
-            help="delete configuration",
+            help="Delete given configuration property or list item at the given index.",
             action="store_const",
             dest=op_dest,
             const=Operations.DELETE,
         )
         operations.add_argument(
-            "-g", "--get", help="get configuration", action="store_const", dest=op_dest, const=Operations.GET
+            "-g",
+            "--get",
+            help="Get current configuration from the resolver.",
+            action="store_const",
+            dest=op_dest,
+            const=Operations.GET,
         )
 
         fm_dest = "format"
         formats = config.add_mutually_exclusive_group()
         formats.add_argument(
             "--json",
-            help="JSON configuration format",
+            help="JSON format for input configuration or required format for exported configuration.",
             action="store_const",
             dest=fm_dest,
             const=Formats.JSON,
             default=Formats.JSON,
         )
         formats.add_argument(
-            "--yaml", help="YAML configuration format", action="store_const", dest=fm_dest, const=Formats.YAML
+            "--yaml",
+            help="YAML format for input configuration or required format for exported configuration.",
+            action="store_const",
+            dest=fm_dest,
+            const=Formats.YAML,
         )
 
         return config, ConfigCommand

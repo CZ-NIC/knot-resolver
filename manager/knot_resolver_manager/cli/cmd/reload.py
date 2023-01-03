@@ -14,7 +14,12 @@ class ReloadCommand(Command):
     def register_args_subparser(
         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        reload = subparser.add_parser("reload", help="reload configuration file")
+        reload = subparser.add_parser(
+            "reload",
+            help="Tells the resolver to reload YAML configuration file."
+            " Old processes are replaced by new ones (with updated configuration) using rolling restarts."
+            " So there will be no DNS service unavailability during reload operation.",
+        )
 
         return reload, ReloadCommand
 

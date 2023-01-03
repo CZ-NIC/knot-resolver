@@ -18,19 +18,19 @@ class ConvertCommand(Command):
     def register_args_subparser(
         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        convert = subparser.add_parser("convert", help="convert JSON/YAML configuration to Lua script")
+        convert = subparser.add_parser("convert", help="Converts JSON or YAML configuration to Lua script.")
         convert.add_argument(
             "input_file",
             type=str,
-            help="JSON/YAML configuration input file",
+            help="File with configuration in YAML or JSON format.",
         )
 
-        convert.add_argument("--stdin", help="read new config value on stdin", action="store_true", default=False)
+        convert.add_argument("--stdin", help="Read config values from stdin.", action="store_true", default=False)
         convert.add_argument(
             "output_file",
             type=str,
             nargs="?",
-            help="optional, output Lua script file",
+            help="Optional, output file for converted configuration in Lua script. If not specified, converted configuration is printed.",
             default=None,
         )
 

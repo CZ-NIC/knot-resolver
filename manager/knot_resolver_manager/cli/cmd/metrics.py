@@ -17,7 +17,12 @@ class MetricsCommand(Command):
         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
         metrics = subparser.add_parser("metrics", help="get prometheus metrics data")
-        metrics.add_argument("file", help="optional, file to export metrics to", nargs="?", default=None)
+        metrics.add_argument(
+            "file",
+            help="Optional, file where to export Prometheus metrics. If not specified, the metrics are printed.",
+            nargs="?",
+            default=None,
+        )
         return metrics, MetricsCommand
 
     @staticmethod
