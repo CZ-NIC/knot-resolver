@@ -16,8 +16,10 @@ class SchemaCommand(Command):
     def register_args_subparser(
         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        schema = subparser.add_parser("schema", help="get JSON schema representation of the configuration")
-        schema.add_argument("file", help="optional, file to export JSON schema to", nargs="?", default=None)
+        schema = subparser.add_parser(
+            "schema", help="Reads JSON-schema repersentation of the configuration directly from the running resolver."
+        )
+        schema.add_argument("file", help="Optional, file where to export JSON-schema.", nargs="?", default=None)
         return schema, SchemaCommand
 
     @staticmethod

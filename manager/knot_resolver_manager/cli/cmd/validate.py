@@ -17,12 +17,12 @@ class ValidateCommand(Command):
     def register_args_subparser(
         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        validate = subparser.add_parser("validate", help="validate JSON/YAML configuration")
+        validate = subparser.add_parser("validate", help="Validates configuration in JSON or YAML format.")
         validate.add_argument(
             "input_file",
             type=str,
             nargs="?",
-            help="JSON/YAML configuration input file",
+            help="File with configuration in YAML or JSON format.",
             default=None,
         )
 

@@ -23,5 +23,7 @@ class StopCommand(Command):
     def register_args_subparser(
         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        stop = subparser.add_parser("stop", help="shutdown everything")
+        stop = subparser.add_parser(
+            "stop", help="Tells the resolver to shutdown everthing. No process will run after this command."
+        )
         return stop, StopCommand
