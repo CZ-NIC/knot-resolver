@@ -651,3 +651,20 @@ pkg:opensuse-15.4:
   allow_failure: true  # SUSE is always special
 
 # }}}
+
+
+pages:
+  image: $CI_REGISTRY/packaging/apkg/lxc/fedora-36
+  stage: deploy
+  script:
+    - git submodule update --init --recursive
+    - apkg build-dep -y
+    - dnf install -y python3-sphinx texinfo doxygen
+    - pip3 install -r doc/requirements.txt
+    - pip3 install sphinx_rtd_theme
+    - meson build_doc -Ddoc=enabled
+    - ninja -C build_doc doc
+    - mv doc/html public
+  artifacts:
+    paths:
+      - public
