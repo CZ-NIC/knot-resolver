@@ -62,9 +62,9 @@ if get_option('doc') == 'enabled'
     error('missing doc dependency: python jsonschema2md')
   endif
 
-  myst_parser = run_command(python, '-c', 'import myst_parser', check: false)
-  if myst_parser.returncode() != 0
-    error('missing doc dependency: python myst_parser')
+  jsonschemaforhumans = run_command(python, '-c', 'import json_schema_for_humans', check: false)
+  if jsonschemaforhumans.returncode() != 0
+    error('missing doc dependency: python json-schema-for-humans')
   endif
 
   message('------------------------')
