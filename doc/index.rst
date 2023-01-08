@@ -48,13 +48,8 @@ and it provides a state-machine like API for extensions.
 
    config-overview
    config-schema
-   config-network
-   config-performance
-   config-policy
-   config-logging-monitoring
-   config-dnssec
-   config-experimental
    config-no-systemd
+   config-lua
 
 
 .. toctree::

@@ -1,6 +1,3 @@
-
-
-
 .. _config-syntax:
 
 Syntax
