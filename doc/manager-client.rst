@@ -117,17 +117,22 @@ Only one of these arguments can be selected during the execution of a single ``k
 
 .. option:: schema
 
-    Reads JSON-schema repersentation of the configuration directly from the running resolver.
-    Requires connection to the management API.
+
+    Shows JSON-schema repersentation of the Knot Resolver's configuration.
+
+    .. option:: -l, --live
+
+        Get current configuration JSON-schema directly from the running resolver.
+        Requires connection to the management API.
 
     .. option:: <file>
 
         Optional, file where to export JSON-schema.
-        If not specified, the schema is printed.
+        If not specified, the JSON-schema is printed.
 
     .. code-block:: bash
 
-        $ kresctl schema ./mydir/config-schema.json
+        $ kresctl schema --live ./mydir/config-schema.json
 
 
 .. option:: validate
