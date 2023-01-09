@@ -2,14 +2,14 @@ Configuration schema
 ====================
 
 
-The configuration schema describes the structure of accepted configuration files (or objects via the API). While originally specified in Python source code, it can be visualized as a `JSON schema <https://json-schema.org/>_`.
+The configuration schema describes the structure of accepted configuration files (or objects via the API). While originally specified in Python source code, it can be visualized as a `JSON schema <https://json-schema.org/>`_.
 
 Getting the JSON schema
 -----------------------
 
 1. The JSON schema can be obtained from a running Resolver by sending a HTTP GET request to the path ``/schema`` on the management socket (by default a Unix socket at ``/var/run/knot-resolver/manager.sock``).
 2. The ``kresctl schema`` command outputs the schema of the currently installed version as well. It does not require a running resolver.
-3. JSON schema for the most recent Knot Resolver version can be `downloaded here <_static/config.schema.json>_`.
+3. JSON schema for the most recent Knot Resolver version can be `downloaded here <_static/config.schema.json>`_.
 
 Validating you configuration
 ----------------------------

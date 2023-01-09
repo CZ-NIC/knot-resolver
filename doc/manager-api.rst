@@ -52,6 +52,9 @@ HTTP request methods               Operation
     In the case of an attempt to configure such an option, the operation is rejected.
 
 
+-----------------------------------
+
+
 
 
 ===================================
@@ -102,7 +105,7 @@ The different HTTP methods perform different modifications of the configuration:
 - ``GET`` return subtree of the current configuration
 - ``PUT`` set property
 - ``DELETE`` removes the given property or list item at the given index
-- ``PATCH`` updates the configuration using `JSON Patch <https://jsonpatch.com/>_`
+- ``PATCH`` updates the configuration using `JSON Patch <https://jsonpatch.com/>`_
 
 To prevent race conditions when changing configuration from multiple clients simultaneously, every response from the Manager has an ``ETag`` header set. Requests then accept ``If-Match`` and ``If-None-Match`` headers with the latest ``ETag`` value and the corresponding request processing fails with HTTP error code 412 (precondition failed).
 

@@ -12,8 +12,8 @@ Different configuration file can be loaded by using command line option
 Syntax
 ======
 
-The configuration file uses `YAML format version 1.1 <https://yaml.org/spec/1.1/>_`.
-To quickly learn about the format, you can have a look at `Learn YAML in Y minutes <https://learnxinyminutes.com/docs/yaml/>_`.
+The configuration file uses `YAML format version 1.1 <https://yaml.org/spec/1.1/>`_.
+To quickly learn about the format, you can have a look at `Learn YAML in Y minutes <https://learnxinyminutes.com/docs/yaml/>`_.
 
 
 Schema
