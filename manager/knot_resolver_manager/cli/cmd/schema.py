@@ -3,7 +3,7 @@ import json
 import sys
 from typing import List, Optional, Tuple, Type
 
-from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, parser_words, register_command
+from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.utils.requests import request
 
@@ -35,7 +35,8 @@ class SchemaCommand(Command):
 
     @staticmethod
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return parser_words(parser._actions)  # pylint: disable=W0212
+        return {}
+        # return parser_words(parser._actions)  # pylint: disable=W0212
 
     def run(self, args: CommandArgs) -> None:
         if self.live:

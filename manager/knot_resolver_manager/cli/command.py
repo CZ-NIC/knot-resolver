@@ -58,26 +58,26 @@ class Command(ABC):
         raise NotImplementedError()
 
 
-def parser_words(actions: List[argparse.Action]) -> CompWords:
-    words: CompWords = {}
-    for action in actions:
-        if isinstance(action, argparse._SubParsersAction):  # pylint: disable=W0212
-            for sub in action._get_subactions():  # pylint: disable=W0212
-                words[sub.dest] = sub.help
-        elif isinstance(
-            action, (argparse._StoreConstAction, argparse._StoreAction, argparse._HelpAction)  # pylint: disable=W0212
-        ):  # pylint: disable=W0212
-            for s in action.option_strings:
-                words[s] = action.help
-    return words
+# def parser_words(actions: List[argparse.Action]) -> CompWords:
+#     words: CompWords = {}
+#     for action in actions:
+#         if isinstance(action, argparse._SubParsersAction):  # pylint: disable=W0212
+#             for sub in action._get_subactions():  # pylint: disable=W0212
+#                 words[sub.dest] = sub.help
+#         elif isinstance(
+#             action, (argparse._StoreConstAction, argparse._StoreAction, argparse._HelpAction)  # pylint: disable=W0212
+#         ):  # pylint: disable=W0212
+#             for s in action.option_strings:
+#                 words[s] = action.help
+#     return words
 
 
-def subparser_by_name(subparser_name: str, actions: List[argparse.Action]) -> Optional[argparse.ArgumentParser]:
-    for action in actions:
-        if isinstance(action, argparse._SubParsersAction) and subparser_name in action.choices:  # pylint: disable=W0212
-            return action.choices[subparser_name]
-    return None
+# def subparser_by_name(subparser_name: str, actions: List[argparse.Action]) -> Optional[argparse.ArgumentParser]:
+#     for action in actions:
+#         if isinstance(action, argparse._SubParsersAction) and subparser_name in action.choices:  # pylint: disable=W0212
+#             return action.choices[subparser_name]
+#     return None
 
 
-def subparser_command(subparser: argparse.ArgumentParser) -> Command:
-    return subparser._defaults["command"]  # pylint: disable=W0212
+# def subparser_command(subparser: argparse.ArgumentParser) -> Command:
+#     return subparser._defaults["command"]  # pylint: disable=W0212

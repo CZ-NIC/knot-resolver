@@ -2,15 +2,7 @@ import argparse
 from enum import Enum
 from typing import List, Tuple, Type
 
-from knot_resolver_manager.cli.command import (
-    Command,
-    CommandArgs,
-    CompWords,
-    parser_words,
-    register_command,
-    subparser_by_name,
-    subparser_command,
-)
+from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
 
 
 class Shells(Enum):
@@ -58,44 +50,46 @@ class CompletionCommand(Command):
     @staticmethod
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
         words: CompWords = {}
-        for action in parser._actions:
-            for opt in action.option_strings:
-                words[opt] = action.help
+        # for action in parser._actions:
+        #     for opt in action.option_strings:
+        #         words[opt] = action.help
+        # return words
         return words
 
     def run(self, args: CommandArgs) -> None:
-        subparsers = args.parser._subparsers
-        words: CompWords = {}
+        pass
+        # subparsers = args.parser._subparsers
+        # words: CompWords = {}
 
-        if subparsers:
-            words = parser_words(subparsers._actions)
+        # if subparsers:
+        #     words = parser_words(subparsers._actions)
 
-            uargs = iter(self.comp_args)
-            for uarg in uargs:
-                subparser = subparser_by_name(uarg, subparsers._actions)  # pylint: disable=W0212
+        #     uargs = iter(self.comp_args)
+        #     for uarg in uargs:
+        #         subparser = subparser_by_name(uarg, subparsers._actions)  # pylint: disable=W0212
 
-                if subparser:
-                    cmd: Command = subparser_command(subparser)
-                    subparser_args = self.comp_args[self.comp_args.index(uarg) + 1 :]
-                    if subparser_args:
-                        words = cmd.completion(subparser_args, subparser)
-                    break
-                elif uarg in ["-s", "--socket"]:
-                    # if arg is socket config, skip next arg
-                    next(uargs)
-                    continue
-                elif uarg in words:
-                    # uarg is walid arg, continue
-                    continue
-                else:
-                    raise ValueError(f"unknown argument: {uarg}")
+        #         if subparser:
+        #             cmd: Command = subparser_command(subparser)
+        #             subparser_args = self.comp_args[self.comp_args.index(uarg) + 1 :]
+        #             if subparser_args:
+        #                 words = cmd.completion(subparser_args, subparser)
+        #             break
+        #         elif uarg in ["-s", "--socket"]:
+        #             # if arg is socket config, skip next arg
+        #             next(uargs)
+        #             continue
+        #         elif uarg in words:
+        #             # uarg is walid arg, continue
+        #             continue
+        #         else:
+        #             raise ValueError(f"unknown argument: {uarg}")
 
-        # print completion words
-        # based on required bash/fish shell format
-        if self.shell == Shells.BASH:
-            print(" ".join(words))
-        elif self.shell == Shells.FISH:
-            # TODO: FISH completion implementation
-            pass
-        else:
-            raise ValueError(f"unexpected value of {Shells}: {self.shell}")
+        # # print completion words
+        # # based on required bash/fish shell format
+        # if self.shell == Shells.BASH:
+        #     print(" ".join(words))
+        # elif self.shell == Shells.FISH:
+        #     # TODO: FISH completion implementation
+        #     pass
+        # else:
+        #     raise ValueError(f"unexpected value of {Shells}: {self.shell}")
