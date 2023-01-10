@@ -412,6 +412,7 @@ class UncheckedPath(BaseValueType):
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value, object_path=object_path)
         if isinstance(source_value, str):
+            self._raw_value: str = source_value
             self._value: Path = Path(source_value)
         else:
             raise ValueError(f"expected file path in a string, got '{source_value}' with type '{type(source_value)}'.")
@@ -432,7 +433,7 @@ class UncheckedPath(BaseValueType):
         return self._value
 
     def serialize(self) -> Any:
-        return str(self._value)
+        return self._raw_value
 
     @classmethod
     def json_schema(cls: Type["UncheckedPath"]) -> Dict[Any, Any]:

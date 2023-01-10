@@ -5,6 +5,7 @@ import logging
 import os
 import signal
 import sys
+from functools import partial
 from http import HTTPStatus
 from pathlib import Path
 from time import time
@@ -92,17 +93,7 @@ class Server:
             )
         return Result.ok(None)
 
-    async def sigint_handler(self) -> None:
-        logger.info("Received SIGINT, triggering graceful shutdown")
-        self.trigger_shutdown(0)
-
-    async def sigterm_handler(self) -> None:
-        logger.info("Received SIGTERM, triggering graceful shutdown")
-        self.trigger_shutdown(0)
-
-    async def sighup_handler(self) -> None:
-        logger.info("Received SIGHUP, reloading configuration file")
-        systemd_notify(RELOADING="1")
+    async def _reload_config(self) -> None:
 
         if self._config_path is None:
             logger.warning("The manager was started with inlined configuration - can't reload")
@@ -125,6 +116,18 @@ class Server:
                 logger.error(f"Reloading of the configuration file failed: {e}")
                 logger.error("Configuration have NOT been changed.")
 
+    async def sigint_handler(self) -> None:
+        logger.info("Received SIGINT, triggering graceful shutdown")
+        self.trigger_shutdown(0)
+
+    async def sigterm_handler(self) -> None:
+        logger.info("Received SIGTERM, triggering graceful shutdown")
+        self.trigger_shutdown(0)
+
+    async def sighup_handler(self) -> None:
+        logger.info("Received SIGHUP, reloading configuration file")
+        systemd_notify(RELOADING="1")
+        await self._reload_config()
         systemd_notify(READY="1")
 
     @staticmethod
@@ -223,7 +226,9 @@ class Server:
         )
 
     async def _handler_schema(self, _request: web.Request) -> web.Response:
-        return web.json_response(KresConfig.json_schema(), headers={"Access-Control-Allow-Origin": "*"})
+        return web.json_response(
+            KresConfig.json_schema(), headers={"Access-Control-Allow-Origin": "*"}, dumps=partial(json.dumps, indent=4)
+        )
 
     async def _handle_view_schema(self, _request: web.Request) -> web.Response:
         """
@@ -263,6 +268,15 @@ class Server:
         logger.info("Shutdown event triggered...")
         return web.Response(text="Shutting down...")
 
+    async def _handler_reload(self, _request: web.Request) -> web.Response:
+        """
+        Route handler for reloading the server
+        """
+
+        logger.info("Reloading event triggered...")
+        await self._reload_config()
+        return web.Response(text="Reloading...")
+
     def _setup_routes(self) -> None:
         self.app.add_routes(
             [
@@ -272,6 +286,7 @@ class Server:
                 web.delete(r"/v1/config{path:.*}", self._handler_config_query),
                 web.patch(r"/v1/config{path:.*}", self._handler_config_query),
                 web.post("/stop", self._handler_stop),
+                web.post("/reload", self._handler_reload),
                 web.get("/schema", self._handler_schema),
                 web.get("/schema/ui", self._handle_view_schema),
                 web.get("/metrics", self._handler_metrics),

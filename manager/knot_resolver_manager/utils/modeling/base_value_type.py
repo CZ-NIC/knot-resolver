@@ -1,7 +1,8 @@
+from abc import ABC, abstractmethod
 from typing import Any, Dict, Type
 
 
-class BaseValueType:
+class BaseValueType(ABC):
     """
     Subclasses of this class can be used as type annotations in 'DataParser'. When a value
     is being parsed from a serialized format (e.g. JSON/YAML), an object will be created by
@@ -13,18 +14,23 @@ class BaseValueType:
     raise a `ValueError` in case of errors.
     """
 
+    @abstractmethod
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         pass
 
+    @abstractmethod
     def __int__(self) -> int:
         raise NotImplementedError(f" return 'int()' value for {type(self).__name__} is not implemented.")
 
+    @abstractmethod
     def __str__(self) -> str:
         raise NotImplementedError(f"return 'str()' value for {type(self).__name__} is not implemented.")
 
+    @abstractmethod
     def serialize(self) -> Any:
         """
-        Every custom type should implement this. It is used for dumping configuration.
+        Used for dumping configuration. Returns a JSON-serializable object from which the object
+        can be recreated again using the constructor.
 
         It's not necessary to return the same structure that was given as an input. It only has
         to be the same semantically.
@@ -32,5 +38,6 @@ class BaseValueType:
         raise NotImplementedError(f"{type(self).__name__}'s' 'serialize()' not implemented.")
 
     @classmethod
+    @abstractmethod
     def json_schema(cls: Type["BaseValueType"]) -> Dict[Any, Any]:
         raise NotImplementedError()

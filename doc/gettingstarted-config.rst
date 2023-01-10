@@ -18,22 +18,18 @@ The example configuration files are also installed as documentation files, typic
 
 .. tip::
 
-    An easy way to see the complete configuration structure is to look at the `JSON Schema <https://json-schema.org/>`_ on `http://localhost:5000/schema/ui <http://localhost:5000/schema/ui>`_ with the Knot Resolver running.
-    The raw schema is availiable on `http://localhost:5000/schema <http://localhost:5000/schema>`_.
+    An easy way to see the complete configuration structure is to look at the `JSON Schema <https://json-schema.org/>`_ of the configuration format with some graphical visualizer such as `this one <https://json-schema.app/>`_.
+    The raw schema is accessible from every running Knot Resolver at the HTTP API socket at path ``/schema`` or on `this link <_static/config-schema.json>`_ (valid only for the version of resolver this documentation was generated for)
 
-============
-kresctl tool
-============
+===================
+Management HTTP API
+===================
 
-========
-HTTP API
-========
+You can use HTTP API to dynamically change configuration of already running Knot Resolver.
+By default the API is configured as UNIX domain socket ``manager.sock`` located in the resolver's rundir (typically ``/run/knot-resolver/``).
+This socket is used by ``kresctl`` utility in default.
 
-You can use HTTP API to configure already running Knot Resolver.
-By default HTTP API is configured as UNIX domain socket ``manager.sock`` located in the resolver's rundir.
-This socket is used by ``kresctl`` tool.
-
-Configuration of API can be changed only in ``/etc/knot-resolver/config.yml`` file:
+The API setting can be changed only in ``/etc/knot-resolver/config.yml`` configuration file:
 
 .. code-block:: yaml
 
@@ -42,45 +38,56 @@ Configuration of API can be changed only in ``/etc/knot-resolver/config.yml`` fi
         # or use unix socket instead of inteface
         # unix-socket: /my/new/socket.sock
 
-Configuration API is available on ``/config`` HTTP endpoint.
-All requests support ``If-Match`` HTTP header with an ETag.
-If the ETag is wrong, the request fails.
+First version of configuration API endpoint is available on ``/v1/config`` HTTP endpoint.
+Configuration API supports following HTTP request methods:
 
-API support following HTTP request methods:
+================================   =========================
+HTTP request methods               Operation
+================================   =========================
+**GET**    ``/v1/config[/path]``   returns current configuration with an ETag
+**PUT**    ``/v1/config[/path]``   upsert (try update, if does not exists, insert), appends to array
+**PATCH**  ``/v1/config[/path]``   update property using `JSON Patch <https://jsonpatch.com/>`_
+**DELETE** ``/v1/config[/path]``   delete an existing property or list item at given index
+================================   =========================
 
-=============================   =========================
-HTTP request methods            Operation
-=============================   =========================
-**GET**    ``/config[/path]``   returns current config with an ETag
-**POST**   ``/config[/path]``   upsert (try update, if does not exists, insert), appends to array
-**PUT**    ``/config[/path]``   insert (fails if object already exists)
-**PATCH**  ``/config[/path]``   update (fails if object does not exist)
-**DELETE** ``/config[/path]``   delete an existing object
-=============================   =========================
+.. note::
+
+    Managemnet API has other useful endpoints (metrics, schema, ...), see the detailed :ref:`API documentation <manager-api>`.
+
+**path:**
+    Determines specific configuration option or configuration subtree on that path.
+    Items in lists and dictionaries are reachable using indexes ``/list-name/{index}/`` and keys ``/dict-name/{key}/``.
+
+**payload:**
+    JSON or YAML encoding is used for configuration payload.
 
 .. note::
 
     Some configuration options cannot be configured via the API for stability and security reasons(e.g. API configuration itself).
     In the case of an attempt to configure such an option, the operation is rejected.
 
-Path
-----
 
-The configuration path is used to determine specific configuration option or subtree of configuration.
+===============
+kresctl utility
+===============
 
-Items in lists and dictionaries are reachable as follows and can also be combined:
+This command-line utility allows you to configure and control running Knot Resolver.
+For that it uses the above mentioned HTTP API.
 
-* ``/list-name/{num-id}``
-* ``/dict-name/{key}``
+For example, folowing command changes the number of ``kresd`` workers to 4.
 
-For example, the configuration path might look like this:
+.. code-block::
 
-* ``/config/network/listen/1/interface``
+    $ kresctl config /workers 4
 
-Payload
--------
+The utility can also help with configuration **validation** and with configuration format **conversion**.
+For more information read full :ref:`kresctl documentation <manager-client>` or use ``kresctl --help`` command.
 
-The API uses JSON encoding for payload. It has the same structure as YAML configuration file.
+.. note::
+
+    With no changes in management configuration, ``kresctl`` should work out of the box.
+    In other case there is ``-s`` argument to specify path to HTTP API endpoint.
+
 
 ========================
 Legacy Lua configuration

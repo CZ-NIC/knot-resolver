@@ -96,3 +96,14 @@ def parse_yaml(data: str) -> Any:
 
 def parse_json(data: str) -> Any:
     return _Format.JSON.parse_to_dict(data)
+
+
+def try_to_parse(data: str) -> Any:
+    """Attempt to parse the data as a YAML or JSON string."""
+    try:
+        return parse_yaml(data)
+    except yaml.YAMLError as ye:
+        try:
+            return parse_json(data)
+        except json.JSONDecodeError as je:
+            raise DataParsingError(f"failed to parse data, YAML: {ye}, JSON: {je}")

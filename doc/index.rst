@@ -32,6 +32,15 @@ and it provides a state-machine like API for extensions.
 
 
 .. toctree::
+   :caption: Features
+   :name: features-chapter
+   :maxdepth: 1
+
+   manager-api
+   manager-client
+
+
+.. toctree::
    :caption: Configuration
    :name: configuration-chapter
    :maxdepth: 3

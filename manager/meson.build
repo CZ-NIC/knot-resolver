@@ -23,6 +23,9 @@ endif
 
 if build_manager
 
+    # shell completion
+    subdir('shell-completion')
+
     # installation script
     meson.add_install_script('scripts/install.sh', py3.path())
 

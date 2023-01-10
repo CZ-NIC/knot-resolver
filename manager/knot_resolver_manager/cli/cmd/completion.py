@@ -1,59 +1,95 @@
 import argparse
-from typing import Dict, Optional, Tuple, Type
+from enum import Enum
+from typing import List, Tuple, Type
 
-from knot_resolver_manager.cli import Command, TopLevelArgs, register_subcommand
-
-
-def _list_subcommands(parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
-    try:
-        result: Dict[str, Optional[str]] = {}
-        for action in parser._subparsers._actions:  # type: ignore
-            if isinstance(action, argparse._SubParsersAction):
-                for subact in action._get_subactions():
-                    name = subact.dest
-                    help = subact.help
-                    result[name] = help
-        return result
-    except Exception:
-        # if it fails, abort
-        return {}
+from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
 
 
-Completions = register_subcommand("completion", help="shell completions")
+class Shells(Enum):
+    BASH = 0
+    FISH = 1
 
 
-@Completions.register_command
-class FishCompletion(Command):
-    def __init__(self, ns: argparse.Namespace) -> None:
-        super().__init__(ns)
+@register_command
+class CompletionCommand(Command):
+    def __init__(self, namespace: argparse.Namespace) -> None:
+        super().__init__(namespace)
+        self.shell: Shells = namespace.shell
+        self.space = namespace.space
+        self.comp_args: List[str] = namespace.comp_args
+
+        if self.space:
+            self.comp_args.append("")
 
     @staticmethod
     def register_args_subparser(
-        parser: "argparse._SubParsersAction[argparse.ArgumentParser]",
+        subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        fcpl = parser.add_parser("fish", help="completion for fish")
-        return fcpl, FishCompletion
+        completion = subparser.add_parser("completion", help="commands auto-completion")
+        completion.add_argument(
+            "--space",
+            help="space after last word, returns all possible folowing options",
+            dest="space",
+            action="store_true",
+            default=False,
+        )
+        completion.add_argument(
+            "comp_args",
+            type=str,
+            help="arguments to complete",
+            nargs="*",
+        )
 
-    def run(self, args: TopLevelArgs) -> None:
-        for cmd, help in _list_subcommands(args.parser).items():
-            print(f"complete -c kresctl -a '{cmd}'", end="")
-            if help is not None:
-                print(f" -d '{help}'")
-            else:
-                print()
+        shells_dest = "shell"
+        shells = completion.add_mutually_exclusive_group()
+        shells.add_argument("--bash", action="store_const", dest=shells_dest, const=Shells.BASH, default=Shells.BASH)
+        shells.add_argument("--fish", action="store_const", dest=shells_dest, const=Shells.FISH)
 
-
-@Completions.register_command
-class BashCompletion(Command):
-    def __init__(self, ns: argparse.Namespace) -> None:
-        super().__init__(ns)
+        return completion, CompletionCommand
 
     @staticmethod
-    def register_args_subparser(
-        parser: "argparse._SubParsersAction[argparse.ArgumentParser]",
-    ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        fcpl = parser.add_parser("bash", help="completion for bash")
-        return fcpl, BashCompletion
+    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
+        words: CompWords = {}
+        # for action in parser._actions:
+        #     for opt in action.option_strings:
+        #         words[opt] = action.help
+        # return words
+        return words
 
-    def run(self, args: TopLevelArgs) -> None:
-        raise NotImplementedError
+    def run(self, args: CommandArgs) -> None:
+        pass
+        # subparsers = args.parser._subparsers
+        # words: CompWords = {}
+
+        # if subparsers:
+        #     words = parser_words(subparsers._actions)
+
+        #     uargs = iter(self.comp_args)
+        #     for uarg in uargs:
+        #         subparser = subparser_by_name(uarg, subparsers._actions)  # pylint: disable=W0212
+
+        #         if subparser:
+        #             cmd: Command = subparser_command(subparser)
+        #             subparser_args = self.comp_args[self.comp_args.index(uarg) + 1 :]
+        #             if subparser_args:
+        #                 words = cmd.completion(subparser_args, subparser)
+        #             break
+        #         elif uarg in ["-s", "--socket"]:
+        #             # if arg is socket config, skip next arg
+        #             next(uargs)
+        #             continue
+        #         elif uarg in words:
+        #             # uarg is walid arg, continue
+        #             continue
+        #         else:
+        #             raise ValueError(f"unknown argument: {uarg}")
+
+        # # print completion words
+        # # based on required bash/fish shell format
+        # if self.shell == Shells.BASH:
+        #     print(" ".join(words))
+        # elif self.shell == Shells.FISH:
+        #     # TODO: FISH completion implementation
+        #     pass
+        # else:
+        #     raise ValueError(f"unexpected value of {Shells}: {self.shell}")

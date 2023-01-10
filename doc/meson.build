@@ -80,14 +80,15 @@ if get_option('doc') == 'enabled'
   endif
 endif
 
+
 make_doc = find_program('../scripts/make-doc.sh')
 run_target(
   'doc',
-  command: make_doc,
+  command: make_doc
 )
 
 
 run_target(
   'doc-strict',
-  command: [make_doc, '-W'],
+  command: [make_doc, '-W']
 )

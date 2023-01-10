@@ -59,6 +59,7 @@ systemd_cache_dir = prefix / get_option('localstatedir') / 'cache' / 'knot-resol
 systemd_unit_dir = prefix / 'lib' / 'systemd' / 'system'
 systemd_tmpfiles_dir = prefix / 'lib' / 'tmpfiles.d'
 systemd_sysusers_dir = prefix / 'lib' / 'sysusers.d'
+completion_dir = prefix / 'share'
 mod_inc_dir = include_directories('.', 'contrib/')
 
 ## Trust anchors
