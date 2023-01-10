@@ -1,4 +1,5 @@
 import argparse
+import sys
 from typing import List, Tuple, Type
 
 from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
@@ -31,3 +32,6 @@ class ReloadCommand(Command):
         url = f"{args.socket}/reload"
         response = request("POST", url)
         print(response)
+
+        if response.status != 200:
+            sys.exit(1)

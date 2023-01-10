@@ -1,4 +1,5 @@
 import argparse
+import sys
 from typing import List, Tuple, Type
 
 from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
@@ -45,3 +46,4 @@ class ValidateCommand(Command):
             print("config is valid")
         except (DataParsingError, DataValidationError) as e:
             print(e)
+            sys.exit(1)
