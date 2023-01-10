@@ -2,13 +2,12 @@ import argparse
 import json
 import sys
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import List, Optional, Tuple, Type
 
 import yaml
 from typing_extensions import Literal
 
-from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, parser_words, register_command
-from knot_resolver_manager.datamodel.config_schema import KresConfig
+from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
 from knot_resolver_manager.utils.modeling import try_to_parse
 from knot_resolver_manager.utils.requests import request
 
@@ -40,54 +39,54 @@ def reformat(data: str, req_format: Formats) -> str:
     return json.dumps(dict, indent=4)
 
 
-def _properties_words(props: Dict[str, Any]) -> CompWords:
-    words: CompWords = {}
-    for name, prop in props.items():
-        words[name] = prop["description"] if "description" in prop else None
-    return words
+# def _properties_words(props: Dict[str, Any]) -> CompWords:
+#     words: CompWords = {}
+#     for name, prop in props.items():
+#         words[name] = prop["description"] if "description" in prop else None
+#     return words
 
 
-def _path_comp_words(node: str, nodes: List[str], props: Dict[str, Any]) -> CompWords:
-    i = nodes.index(node)
-    ln = len(nodes[i:])
+# def _path_comp_words(node: str, nodes: List[str], props: Dict[str, Any]) -> CompWords:
+#     i = nodes.index(node)
+#     ln = len(nodes[i:])
 
-    # if node is last in path, return all possible words on thi level
-    if ln == 1:
-        return _properties_words(props)
-    # if node is valid
-    elif node in props:
-        node_schema = props[node]
+#     # if node is last in path, return all possible words on thi level
+#     if ln == 1:
+#         return _properties_words(props)
+#     # if node is valid
+#     elif node in props:
+#         node_schema = props[node]
 
-        if "anyOf" in node_schema:
-            for item in node_schema["anyOf"]:
-                print(item)
+#         if "anyOf" in node_schema:
+#             for item in node_schema["anyOf"]:
+#                 print(item)
 
-        elif "type" not in node_schema:
-            pass
+#         elif "type" not in node_schema:
+#             pass
 
-        elif node_schema["type"] == "array":
-            if ln > 2:
-                # skip index for item in array
-                return _path_comp_words(nodes[i + 2], nodes, node_schema["items"]["properties"])
-            if "enum" in node_schema["items"]:
-                print(node_schema["items"]["enum"])
-            return {"0": "first array item", "-": "last array item"}
-        elif node_schema["type"] == "object":
-            if "additionalProperties" in node_schema:
-                print(node_schema)
-            return _path_comp_words(nodes[i + 1], nodes, node_schema["properties"])
-        return {}
+#         elif node_schema["type"] == "array":
+#             if ln > 2:
+#                 # skip index for item in array
+#                 return _path_comp_words(nodes[i + 2], nodes, node_schema["items"]["properties"])
+#             if "enum" in node_schema["items"]:
+#                 print(node_schema["items"]["enum"])
+#             return {"0": "first array item", "-": "last array item"}
+#         elif node_schema["type"] == "object":
+#             if "additionalProperties" in node_schema:
+#                 print(node_schema)
+#             return _path_comp_words(nodes[i + 1], nodes, node_schema["properties"])
+#         return {}
 
-        # arrays/lists must be handled sparately
-        if node_schema["type"] == "array":
-            if ln > 2:
-                # skip index for item in array
-                return _path_comp_words(nodes[i + 2], nodes, node_schema["items"]["properties"])
-            return {"0": "first array item", "-": "last array item"}
-        return _path_comp_words(nodes[i + 1], nodes, node_schema["properties"])
-    else:
-        # if node is not last or valid, value error
-        raise ValueError(f"unknown config path node: {node}")
+#         # arrays/lists must be handled sparately
+#         if node_schema["type"] == "array":
+#             if ln > 2:
+#                 # skip index for item in array
+#                 return _path_comp_words(nodes[i + 2], nodes, node_schema["items"]["properties"])
+#             return {"0": "first array item", "-": "last array item"}
+#         return _path_comp_words(nodes[i + 1], nodes, node_schema["properties"])
+#     else:
+#         # if node is not last or valid, value error
+#         raise ValueError(f"unknown config path node: {node}")
 
 
 @register_command
@@ -170,20 +169,20 @@ class ConfigCommand(Command):
         return config, ConfigCommand
 
     @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> Dict[str, Optional[str]]:
-        words = parser_words(parser._actions)  # pylint: disable=W0212
+    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
+        # words = parser_words(parser._actions)  # pylint: disable=W0212
 
-        for arg in args:
-            if arg in words:
-                continue
-            elif arg.startswith("-"):
-                return words
-            elif arg == args[-1]:
-                config_path = arg[1:].split("/") if arg.startswith("/") else arg.split("/")
-                schema_props: Dict[str, Any] = KresConfig.json_schema()["properties"]
-                return _path_comp_words(config_path[0], config_path, schema_props)
-            else:
-                break
+        # for arg in args:
+        #     if arg in words:
+        #         continue
+        #     elif arg.startswith("-"):
+        #         return words
+        #     elif arg == args[-1]:
+        #         config_path = arg[1:].split("/") if arg.startswith("/") else arg.split("/")
+        #         schema_props: Dict[str, Any] = KresConfig.json_schema()["properties"]
+        #         return _path_comp_words(config_path[0], config_path, schema_props)
+        #     else:
+        #         break
         return {}
 
     def run(self, args: CommandArgs) -> None:
