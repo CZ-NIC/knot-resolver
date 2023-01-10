@@ -1,12 +1,28 @@
 .. SPDX-License-Identifier: GPL-3.0-or-later
 
+.. _gettingstarted-startup:
+
+*****************************
+Upgrading to 6.0.0 from 5.x.x
+*****************************
+
+Version 6 of Knot Resolver brings one significant change - it introduces *Knot Resolver Manager* - a new way for interacting with Knot Resolver. The Manager brings several new features:
+
+* **new declarative configuration**
+* HTTP API to change configuration on the fly without downtime
+* it hides complexities of running multiple instances of ``kresd``
+
+Now, you might be worried about the future of ``kresd``. No worries, you can use ``kresd`` directly the same way you did before, nothing changes there right now. However, in the long run, we might make breaking changes in the way ``kresd`` is configured and using it directly is from now on considered advanced.
+
 With the release of version 6, there is a new way to configure and control your running ``kresd`` instances
 so that you don't have to configure multiple systemd services. The new Knot Resolver Manager handles it for you.
 In the table below, you can find comparison of how things were done before and how they can be done now.
 
-======================
-Administration changes
-======================
+
+Command rosetta
+===============
+
+In the table below, you can compare the way Knot Resolver was used before and how it can be used now.
 
 ==========================================  ===========================================================================================  ==================================================================
 Task                                        How to do it now                                                                             How it was done before           

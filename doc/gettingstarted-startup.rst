@@ -19,15 +19,6 @@ See logs and status of running instance with ``systemctl status knot-resolver.se
     ``knot-resolver.service`` is not enabled by default, thus Knot Resolver won't start automatically after reboot.
     To start and enable service in one command use ``systemctl enable --now knot-resolver.service``
 
-=====================
-Legacy daemon startup
-=====================
-
-Legacy way to run single instance of Knot Resolver daemon is to use ``kresd@`` systemd integration:
-
-.. code-block:: bash
-
-   $ sudo systemctl start kresd@1.service
 
 ===============
 First DNS query

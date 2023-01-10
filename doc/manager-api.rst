@@ -6,6 +6,57 @@
 HTTP API
 ********
 
+===================
+Management HTTP API
+===================
+
+You can use HTTP API to dynamically change configuration of already running Knot Resolver.
+By default the API is configured as UNIX domain socket ``manager.sock`` located in the resolver's rundir (typically ``/run/knot-resolver/``).
+This socket is used by ``kresctl`` utility in default.
+
+The API setting can be changed only in ``/etc/knot-resolver/config.yml`` configuration file:
+
+.. code-block:: yaml
+
+    management:
+        interface: 127.0.0.1@5000
+        # or use unix socket instead of inteface
+        # unix-socket: /my/new/socket.sock
+
+First version of configuration API endpoint is available on ``/v1/config`` HTTP endpoint.
+Configuration API supports following HTTP request methods:
+
+================================   =========================
+HTTP request methods               Operation
+================================   =========================
+**GET**    ``/v1/config[/path]``   returns current configuration with an ETag
+**PUT**    ``/v1/config[/path]``   upsert (try update, if does not exists, insert), appends to array
+**PATCH**  ``/v1/config[/path]``   update property using `JSON Patch <https://jsonpatch.com/>`_
+**DELETE** ``/v1/config[/path]``   delete an existing property or list item at given index
+================================   =========================
+
+.. note::
+
+    Managemnet API has other useful endpoints (metrics, schema, ...), see the detailed :ref:`API documentation <manager-api>`.
+
+**path:**
+    Determines specific configuration option or configuration subtree on that path.
+    Items in lists and dictionaries are reachable using indexes ``/list-name/{index}/`` and keys ``/dict-name/{key}/``.
+
+**payload:**
+    JSON or YAML encoding is used for configuration payload.
+
+.. note::
+
+    Some configuration options cannot be configured via the API for stability and security reasons(e.g. API configuration itself).
+    In the case of an attempt to configure such an option, the operation is rejected.
+
+
+-----------------------------------
+
+
+
+
 ===================================
 Dynamically changing configuration
 ===================================
@@ -54,7 +105,7 @@ The different HTTP methods perform different modifications of the configuration:
 - ``GET`` return subtree of the current configuration
 - ``PUT`` set property
 - ``DELETE`` removes the given property or list item at the given index
-- ``PATCH`` updates the configuration using `JSON Patch <https://jsonpatch.com/>_`
+- ``PATCH`` updates the configuration using `JSON Patch <https://jsonpatch.com/>`_
 
 To prevent race conditions when changing configuration from multiple clients simultaneously, every response from the Manager has an ``ETag`` header set. Requests then accept ``If-Match`` and ``If-None-Match`` headers with the latest ``ETag`` value and the corresponding request processing fails with HTTP error code 412 (precondition failed).
 

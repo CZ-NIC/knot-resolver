@@ -18,6 +18,7 @@ and it provides a state-machine like API for extensions.
    gettingstarted-install
    gettingstarted-startup
    gettingstarted-config
+   upgrading-to-6
 
 
 .. toctree::
@@ -25,10 +26,10 @@ and it provides a state-machine like API for extensions.
    :name: usecases-chapter
    :maxdepth: 1
 
-   usecase-network-interfaces
+   usecase-personal-resolver
    usecase-internal-resolver
    usecase-isp-resolver
-   usecase-personal-resolver
+   usecase-network-interfaces
 
 
 .. toctree::
@@ -46,13 +47,9 @@ and it provides a state-machine like API for extensions.
    :maxdepth: 3
 
    config-overview
-   config-network
-   config-performance
-   config-policy
-   config-logging-monitoring
-   config-dnssec
-   config-experimental
+   config-schema
    config-no-systemd
+   config-lua
 
 
 .. toctree::
@@ -69,6 +66,7 @@ and it provides a state-machine like API for extensions.
    :name: developers-chapter
    :maxdepth: 2
 
+   architecture
    build
    lib
    modules_api
