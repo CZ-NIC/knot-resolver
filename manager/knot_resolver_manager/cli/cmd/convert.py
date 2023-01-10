@@ -1,10 +1,11 @@
 import argparse
+import sys
 from typing import List, Optional, Tuple, Type
 
 from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
 from knot_resolver_manager.datamodel import KresConfig
 from knot_resolver_manager.utils.modeling import try_to_parse
-from knot_resolver_manager.utils.modeling.exceptions import DataParsingError
+from knot_resolver_manager.utils.modeling.exceptions import DataParsingError, DataValidationError
 
 
 @register_command
@@ -47,11 +48,10 @@ class ConvertCommand(Command):
 
         try:
             parsed = try_to_parse(data)
-        except DataParsingError as e:
+            lua = KresConfig(parsed).render_lua()
+        except (DataParsingError, DataValidationError) as e:
             print(e)
-            return
-
-        lua = KresConfig(parsed).render_lua()
+            sys.exit(1)
 
         if self.output_file:
             with open(self.output_file, "w") as f:

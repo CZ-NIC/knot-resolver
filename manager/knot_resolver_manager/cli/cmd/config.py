@@ -1,5 +1,6 @@
 import argparse
 import json
+import sys
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Type
 
@@ -205,14 +206,16 @@ class ConfigCommand(Command):
                     new_config = self.value_or_file
 
         response = request(method, url, reformat(new_config, Formats.JSON) if new_config else None)
+
+        if response.status != 200:
+            print(response)
+            sys.exit(1)
+
         print(f"status: {response.status}")
 
-        if self.operation == Operations.GET and response.status == 200:
-            if self.value_or_file:
-                with open(self.value_or_file, "w") as f:
-                    f.write(reformat(response.body, self.format))
-                print(f"saved to: {self.value_or_file}")
-            else:
-                print(reformat(response.body, self.format))
+        if self.operation == Operations.GET and self.value_or_file:
+            with open(self.value_or_file, "w") as f:
+                f.write(reformat(response.body, self.format))
+            print(f"saved to: {self.value_or_file}")
         else:
-            print(response.body)
+            print(reformat(response.body, self.format))

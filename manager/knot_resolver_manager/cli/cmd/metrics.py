@@ -1,4 +1,5 @@
 import argparse
+import sys
 from typing import List, Optional, Tuple, Type
 
 from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
@@ -33,8 +34,12 @@ class MetricsCommand(Command):
         url = f"{args.socket}/metrics"
         response = request("GET", url)
 
-        if self.file and response.status == 200:
-            with open(self.file, "w") as f:
-                f.write(response.body)
+        if response.status == 200:
+            if self.file:
+                with open(self.file, "w") as f:
+                    f.write(response.body)
+            else:
+                print(response.body)
         else:
             print(response)
+            sys.exit(1)

@@ -1,5 +1,6 @@
 import argparse
 import json
+import sys
 from typing import List, Optional, Tuple, Type
 
 from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, parser_words, register_command
@@ -43,7 +44,7 @@ class SchemaCommand(Command):
                 schema = response.body
             else:
                 print(response)
-                return
+                sys.exit(1)
         else:
             schema = json.dumps(KresConfig.json_schema(), indent=4)
 
