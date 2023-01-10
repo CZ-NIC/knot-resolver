@@ -1,4 +1,4 @@
-/*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) CZ.NIC, z.s.p.o. <knot-resolver@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -1010,6 +1010,22 @@ static bool satisfied_by_additional(const struct kr_query *qry)
 	return false;
 }
 
+/** Restrict all RRset TTLs to the specified bounds (if matching qry_uid). */
+static void bound_ttls(ranked_rr_array_t *array, uint32_t qry_uid,
+			uint32_t ttl_min, uint32_t ttl_max)
+{
+	for (ssize_t i = 0; i < array->len; ++i) {
+		if (array->at[i]->qry_uid != qry_uid)
+			continue;
+		uint32_t *ttl = &array->at[i]->rr->ttl;
+		if (*ttl < ttl_min) {
+			*ttl = ttl_min;
+		} else if (*ttl > ttl_max) {
+			*ttl = ttl_max;
+		}
+	}
+}
+
 /** Resolve input query or continue resolution with followups.
  *
  *  This roughly corresponds to RFC1034, 5.3.3 4a-d.
@@ -1039,12 +1055,6 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Check for packet processing errors first.
 	 * Note - we *MUST* check if it has at least a QUESTION,
 	 * otherwise it would crash on accessing QNAME. */
-#ifdef STRICT_MODE
-	if (pkt->parsed < pkt->size) {
-		VERBOSE_MSG("<= pkt contains excessive data\n");
-		return KR_STATE_FAIL;
-	} else
-#endif
 	if (pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
 		if (pkt->parsed == KNOT_WIRE_HEADER_SIZE && knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_FORMERR) {
 			/* This is a special case where we get valid header with FORMERR and nothing else.
@@ -1080,6 +1090,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 
 	/* If exiting above here, there's no sense to put it into packet cache.
+	 * Having "extra bytes" at the end of DNS message is considered SANE here.
 	 * The most important part is to check for spoofing: is_paired_to_query() */
 	query->flags.PKT_IS_SANE = true;
 
@@ -1135,6 +1146,15 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		break;
 	}
 
+	/* Check for "extra bytes" is deferred, so that RCODE-based failures take priority. */
+	if (ret != KR_STATE_FAIL && pkt->parsed < pkt->size) {
+		VERBOSE_MSG("<= malformed response with %zu extra bytes\n",
+				pkt->size - pkt->parsed);
+		ret = KR_STATE_FAIL;
+		if (selection_error == KR_SELECTION_OK)
+			selection_error = KR_SELECTION_MALFORMED;
+	}
+
 	if (query->server_selection.initialized) {
 		query->server_selection.error(query, req->upstream.transport, selection_error);
 	}
@@ -1182,12 +1202,14 @@ rrarray_finalize:
 	/* Finish construction of libknot-format RRsets.
 	 * We do this even if dropping the answer, though it's probably useless. */
 	(void)0;
+	const struct kr_cache *cache = &req->ctx->cache;
 	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		ret = kr_ranked_rrarray_finalize(selected[i], query->uid, &req->pool);
-		if (unlikely(ret)) {
+		if (unlikely(ret))
 			return KR_STATE_FAIL;
-		}
+		if (!query->flags.CACHED)
+			bound_ttls(selected[i], query->uid, cache->ttl_min, cache->ttl_max);
 	}
 
 	return state;

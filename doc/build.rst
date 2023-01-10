@@ -111,6 +111,7 @@ Resolver:
 .. csv-table::
    :header: "Optional", "Needed for", "Notes"
 
+   "jemalloc_", "``daemon``", "Improve long-term memory consumption."
    "nghttp2_", "``daemon``", "DNS over HTTPS support."
    "libsystemd_", "``daemon``", "Systemd watchdog support."
    "`libcap-ng`_", "``daemon``", "Linux capabilities: support dropping them."
@@ -118,6 +119,7 @@ Resolver:
    "`lua-http`_", "``modules/http``", "HTTP/2 client/server for Lua."
    "`lua-cqueues`_", "some lua modules", ""
    "cmocka_", "``unit tests``", "Unit testing framework."
+   "dnsdist_", "``proxyv2 test``", "DNS proxy server"
    "Doxygen_", "``documentation``", "Generating API documentation."
    "Sphinx_, sphinx-tabs_ and sphinx_rtd_theme_", "``documentation``", "Building this
    documentation."
@@ -171,7 +173,7 @@ After that it is possible to build and install Knot Resolver.
 
 .. code-block:: bash
 
-   # build Knot Resolver
+   $ meson setup build_dir --prefix=/tmp/kr --default-library=static
    $ ninja -C build_dir
 
    # install Knot Resolver into the previously configured '/tmp/kr' path
@@ -196,7 +198,7 @@ For complete list of build options create a build directory and run:
 
 .. code-block:: bash
 
-   $ meson build_dir
+   $ meson setup build_dir
    $ meson configure build_dir
 
 To customize project build options, use ``-Doption=value`` when creating
@@ -204,7 +206,7 @@ a build directory:
 
 .. code-block:: bash
 
-   $ meson build_dir -Ddoc=enabled
+   $ meson setup build_dir -Ddoc=enabled
 
 ... or change options in an already existing build directory:
 
@@ -238,7 +240,7 @@ target ``doc`` must be called explicitly.
 
 .. code-block:: bash
 
-   $ meson build_dir -Ddoc=enabled
+   $ meson configure build_dir -Ddoc=enabled
    $ ninja -C build_dir doc
 
 Tarball
@@ -320,6 +322,7 @@ For development, it's possible to build the container directly from your git tre
    $ docker build -t knot-resolver .
 
 
+.. _jemalloc: https://jemalloc.net
 .. _libuv: https://github.com/libuv/libuv
 .. _LuaJIT: http://luajit.org/luajit.html
 .. _Doxygen: https://www.doxygen.nl/manual/index.html
@@ -331,6 +334,7 @@ For development, it's possible to build the container directly from your git tre
 .. _pkg-config: https://www.freedesktop.org/wiki/Software/pkg-config/
 .. _libknot: https://gitlab.nic.cz/knot/knot-dns
 .. _cmocka: https://cmocka.org/
+.. _dnsdist: https://dnsdist.org/
 .. _lua-basexx: https://github.com/aiq/basexx
 .. _lua-http: https://luarocks.org/modules/daurnimator/http
 .. _lua-cqueues: https://25thandclement.com/~william/projects/cqueues.html

@@ -1,4 +1,4 @@
-/*  Copyright (C) 2015-2020 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) CZ.NIC, z.s.p.o. <knot-resolver@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -302,6 +302,8 @@ void network_deinit(struct network *net)
 	}
 }
 
+/** Creates an endpoint key for use with a `trie_t` and stores it into `dst`.
+ * Returns the actual length of the generated key. */
 static ssize_t endpoint_key_create(struct endpoint_key_storage *dst,
                                    const char *addr_str,
                                    const struct sockaddr *sa)
@@ -317,8 +319,11 @@ static ssize_t endpoint_key_create(struct endpoint_key_storage *dst,
 	} else {
 		struct endpoint_key_ifname *key = &dst->ifname;
 		key->type = ENDPOINT_KEY_IFNAME;
+
+		/* The subtractions and additions of 1 are here to account for
+		 * null-terminators. */
 		strncpy(key->ifname, addr_str, sizeof(key->ifname) - 1);
-		return sizeof(struct endpoint_key) + strnlen(key->ifname, sizeof(key->ifname));
+		return sizeof(struct endpoint_key) + strlen(key->ifname) + 1;
 	}
 }
 

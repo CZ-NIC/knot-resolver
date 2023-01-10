@@ -1,6 +1,7 @@
-/*  Copyright (C) 2016 American Civil Liberties Union (ACLU)
- *  SPDX-License-Identifier: GPL-3.0-or-later
-*/
+/* Copyright (C) 2016 American Civil Liberties Union (ACLU)
+ * Copyright (C) CZ.NIC, z.s.p.o
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
 
 #pragma once
 

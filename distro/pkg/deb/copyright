@@ -3,7 +3,7 @@ Upstream-Name: knot-resolver
 Source: https://www.knot-resolver.cz/
 
 Files: *
-Copyright: 2015-2018 CZ.NIC
+Copyright: CZ.NIC
 License: GPL-3.0+
 
 Files: contrib/ccan/asprintf/*

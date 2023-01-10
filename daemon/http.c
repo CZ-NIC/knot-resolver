@@ -1,6 +1,5 @@
 /*
- *
- * Copyright (C) 2020 CZ.NIC, z.s.p.o
+ * Copyright (C) CZ.NIC, z.s.p.o
  *
  * Initial Author: Jan Hák <jan.hak@nic.cz>
  *
@@ -876,7 +875,6 @@ static int http_write_pkt(struct http_ctx *ctx, knot_pkt_t *pkt, int32_t stream_
 {
 	struct http_data *data;
 	nghttp2_data_provider prov;
-	const bool is_negative = kr_response_classify(pkt) & (PKT_NODATA|PKT_NXDOMAIN);
 
 	data = malloc(sizeof(struct http_data));
 	if (!data)
@@ -887,7 +885,7 @@ static int http_write_pkt(struct http_ctx *ctx, knot_pkt_t *pkt, int32_t stream_
 	data->pos = 0;
 	data->on_write = on_write;
 	data->req = req;
-	data->ttl = packet_ttl(pkt, is_negative);
+	data->ttl = packet_ttl(pkt);
 
 	prov.source.ptr = data;
 	prov.read_callback = read_callback;

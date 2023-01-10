@@ -1,4 +1,4 @@
-/*  Copyright (C) 2015-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) CZ.NIC, z.s.p.o. <knot-resolver@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -144,16 +144,24 @@ int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx, knot_rrset_t *covered)
 
 /** Assuming `rrs` was validated with `sig`, trim its TTL in case it's over-extended. */
 static bool trim_ttl(knot_rrset_t *rrs, const knot_rdata_t *sig,
-			uint32_t timestamp, const struct kr_query *log_qry)
+			const kr_rrset_validation_ctx_t *vctx)
 {
-	const uint32_t ttl_max = MIN(knot_rrsig_original_ttl(sig),
-			knot_rrsig_sig_expiration(sig) - timestamp);
+	/* The trimming logic is a bit complicated.
+	 *
+	 * We respect configured ttl_min over the (signed) original TTL,
+	 * but we very much want to avoid TTLs over signature expiration,
+	 * as that could cause serious issues with downstream validators.
+	 */
+	const uint32_t ttl_max = MIN(
+			MAX(knot_rrsig_original_ttl(sig), vctx->ttl_min),
+			knot_rrsig_sig_expiration(sig) - vctx->timestamp
+	);
 	if (likely(rrs->ttl <= ttl_max))
 		return false;
-	if (kr_log_is_debug_qry(VALIDATOR, log_qry)) {
+	if (kr_log_is_debug_qry(VALIDATOR, vctx->log_qry)) {
 		auto_free char *name_str = kr_dname_text(rrs->owner),
 				*type_str = kr_rrtype_text(rrs->type);
-		kr_log_q(log_qry, VALIDATOR, "trimming TTL of %s %s: %d -> %d\n",
+		kr_log_q(vctx->log_qry, VALIDATOR, "trimming TTL of %s %s: %d -> %d\n",
 			name_str, type_str, (int)rrs->ttl, (int)ttl_max);
 	}
 	rrs->ttl = ttl_max;
@@ -204,7 +212,7 @@ struct kr_svldr_ctx * kr_svldr_new_ctx(const knot_rrset_t *ds, knot_rrset_t *dns
 	struct kr_svldr_ctx *ctx = calloc(1, sizeof(*ctx));
 	if (unlikely(!ctx))
 		return NULL;
-	ctx->vctx.timestamp = timestamp;
+	ctx->vctx.timestamp = timestamp; // .ttl_min is implicitly zero
 	ctx->vctx.zone_name = knot_dname_copy(ds->owner, NULL);
 	if (unlikely(!ctx->vctx.zone_name))
 		goto fail;
@@ -254,7 +262,7 @@ static int kr_svldr_rrset_with_key(knot_rrset_t *rrs, const knot_rdataset_t *rrs
 		// that also means we don't need to perform non-existence proofs.
 		const int trim_labels = (val_flgs & FLG_WILDCARD_EXPANSION) ? 1 : 0;
 		if (kr_check_signature(rdata_j, key->key, rrs, trim_labels) == 0) {
-			trim_ttl(rrs, rdata_j, vctx->timestamp, vctx->log_qry);
+			trim_ttl(rrs, rdata_j, vctx);
 			vctx->result = kr_ok();
 			return vctx->result;
 		} else {
@@ -382,7 +390,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 				vctx->flags |= KR_DNSSEC_VFLG_WEXPAND;
 			}
 
-			trim_ttl(covered, rdata_j, vctx->timestamp, vctx->log_qry);
+			trim_ttl(covered, rdata_j, vctx);
 
 			kr_dnssec_key_free(&created_key);
 			vctx->result = kr_ok();

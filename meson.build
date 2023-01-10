@@ -116,6 +116,18 @@ xdp = meson.get_compiler('c').has_header('libknot/xdp/xdp.h')
 ### Systemd
 systemd_files = get_option('systemd_files')
 libsystemd = dependency('libsystemd', required: systemd_files == 'enabled')
+
+### Allocator
+# use empty name to disable the dependency, but still compile the dependent kresd
+malloc_name = get_option('malloc') == 'disabled' ? '' : 'jemalloc'
+malloc = meson.get_compiler('c').find_library(
+  malloc_name,
+  required: get_option('malloc') == 'jemalloc',
+  #static: false, #TODO: add when bumping meson to >= 0.51;
+  # static linking would most likely cause issues.
+  # Fortunately it seems unlikely that dynamic wouldn't be found and static would be.
+)
+
 message('---------------------------')
 
 ## Compiler args
@@ -175,6 +187,7 @@ conf_data.set('ENABLE_LIBSYSTEMD', libsystemd.found().to_int())
 conf_data.set('ENABLE_SENDMMSG', sendmmsg.to_int())
 conf_data.set('ENABLE_XDP', xdp.to_int())
 conf_data.set('ENABLE_CAP_NG', capng.found().to_int())
+conf_data.set('ENABLE_JEMALLOC', malloc.found().to_int())
 conf_data.set('ENABLE_DOH2', nghttp2.found().to_int())
 conf_data.set('DBG_ASSERTION_ABORT', get_option('debug').to_int())
 if get_option('debug')
@@ -300,6 +313,7 @@ s_sendmmsg = sendmmsg ? 'enabled': 'disabled'
 s_xdp = xdp ? 'enabled': 'disabled'
 s_openssl = openssl.found() ? 'present': 'missing'
 s_capng = capng.found() ? 'enabled': 'disabled'
+s_malloc = malloc.found() ? 'jemalloc' : 'libc default'
 s_doh2 = nghttp2.found() ? 'enabled': 'disabled'
 message('''
 
@@ -339,6 +353,7 @@ message('''
     XDP (in libknot):   @0@'''.format(s_xdp) + '''
     openssl debug:      @0@'''.format(s_openssl) + '''
     capng:              @0@'''.format(s_capng) + '''
+    malloc:             @0@'''.format(s_malloc) + '''
     doh2:               @0@'''.format(s_doh2) + '''
 
 =======================================================

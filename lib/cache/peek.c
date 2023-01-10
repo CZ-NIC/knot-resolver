@@ -1,4 +1,4 @@
-/*  Copyright (C) 2018 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) CZ.NIC, z.s.p.o. <knot-resolver@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -133,6 +133,12 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		VERBOSE_MSG(qry, "=> exact hit error: %d %s\n", ret, kr_strerror(ret));
 		return ctx->state;
 	}
+
+	/* Avoid aggressive answers in STUB mode.
+	 * As STUB mode doesn't validate, it wouldn't save the necessary records.
+	 * Moreover, this special case avoids unintentional NXDOMAIN on grafted subtrees. */
+	if (qry->flags.STUB)
+		return ctx->state;
 
 	/**** 1b. otherwise, find the longest prefix zone/xNAME (with OK time+rank). [...] */
 	k->zname = qry->sname;

@@ -23,19 +23,10 @@ environment variable, e.g.:
 $ COVERITY_SCAN_TOKEN=the_secret_token ./build.sh debian-11-coverity
 ```
 
-### debian-bullseye
+### debian-buster (10)
 
 Used to serve the same purpose as `debian-11`. As of 2022-03-09, it is still
 used by some jobs (linters).
-
-### lxc-debian-11
-
-Very similar to the main image. The main difference is a custom base image
-which can be used for LXC runners and boots into systemd. It is useful to
-update it when `debian-11` gets updated, as it will allow some of the tests to
-be migrated to the LXC runners in the future (especially the
-unstable/problematic ones - pytests already migrated, deckard might be a good
-candidate).
 
 ## Maintenance
 

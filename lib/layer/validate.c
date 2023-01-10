@@ -1,4 +1,4 @@
-/*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) CZ.NIC, z.s.p.o. <knot-resolver@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -268,6 +268,7 @@ static int validate_records(struct kr_request *req, knot_pkt_t *answer, knot_mm_
 		.keys		= qry->zone_cut.key,
 		.zone_name	= qry->zone_cut.name,
 		.timestamp	= qry->timestamp.tv_sec,
+		.ttl_min	= req->ctx->cache.ttl_min,
 		.qry_uid	= qry->uid,
 		.has_nsec3	= has_nsec3,
 		.flags		= 0,
@@ -377,6 +378,7 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 			.keys		= qry->zone_cut.key,
 			.zone_name	= qry->zone_cut.name,
 			.timestamp	= qry->timestamp.tv_sec,
+			.ttl_min	= req->ctx->cache.ttl_min,
 			.qry_uid	= qry->uid,
 			.has_nsec3	= has_nsec3,
 			.flags		= 0,

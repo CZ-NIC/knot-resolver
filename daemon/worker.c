@@ -1,4 +1,4 @@
-/*  Copyright (C) 2014-2020 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) CZ.NIC, z.s.p.o. <knot-resolver@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -1691,27 +1691,6 @@ static int qr_task_step(struct qr_task *task,
 	}
 }
 
-static int parse_packet(knot_pkt_t *query)
-{
-	if (!query){
-		return kr_error(EINVAL);
-	}
-
-	/* Parse query packet. */
-	int ret = knot_pkt_parse(query, 0);
-	if (ret == KNOT_ETRAIL) {
-		/* Extra data after message end. */
-		ret = kr_error(EMSGSIZE);
-	} else if (ret != KNOT_EOK) {
-		/* Malformed query. */
-		ret = kr_error(EPROTO);
-	} else {
-		ret = kr_ok();
-	}
-
-	return ret;
-}
-
 int worker_submit(struct session *session, struct io_comm_data *comm,
                   const uint8_t *eth_from, const uint8_t *eth_to, knot_pkt_t *pkt)
 {
@@ -1722,10 +1701,12 @@ int worker_submit(struct session *session, struct io_comm_data *comm,
 	if (!handle || !handle->loop->data)
 		return kr_error(EINVAL);
 
-	int ret = parse_packet(pkt);
-
 	const bool is_query = (knot_wire_get_qr(pkt->wire) == 0);
 	const bool is_outgoing = session_flags(session)->outgoing;
+
+	int ret = knot_pkt_parse(pkt, 0);
+	if (ret == KNOT_ETRAIL && is_outgoing && !kr_fails_assert(pkt->parsed < pkt->size))
+		ret = KNOT_EOK; // we deal with this later, so that `selection` applies
 
 	struct http_ctx *http_ctx = NULL;
 #if ENABLE_DOH2
@@ -1734,7 +1715,7 @@ int worker_submit(struct session *session, struct io_comm_data *comm,
 	/* Badly formed query when using DoH leads to a Bad Request */
 	if (http_ctx && !is_outgoing && ret) {
 		http_send_status(session, HTTP_STATUS_BAD_REQUEST);
-		return ret;
+		return kr_error(ret);
 	}
 #endif
 
@@ -1742,11 +1723,13 @@ int worker_submit(struct session *session, struct io_comm_data *comm,
 		return kr_error(ENOENT);
 
 	/* Ignore badly formed queries. */
-	if ((ret != kr_ok() && ret != kr_error(EMSGSIZE)) ||
-	    (is_query == is_outgoing)) {
-		if (!is_outgoing) {
+	if (ret && kr_log_is_debug(WORKER, NULL)) {
+		VERBOSE_MSG(NULL, "=> incoming packet failed to parse, %s\n",
+				knot_strerror(ret));
+	}
+	if (ret || is_query == is_outgoing) {
+		if (!is_outgoing)
 			the_worker->stats.dropped += 1;
-		}
 		return kr_error(EILSEQ);
 	}
 

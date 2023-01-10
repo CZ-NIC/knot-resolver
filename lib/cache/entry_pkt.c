@@ -1,4 +1,4 @@
-/*  Copyright (C) 2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) CZ.NIC, z.s.p.o. <knot-resolver@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -13,33 +13,20 @@
 #include "lib/cache/impl.h"
 
 
-/** Compute TTL for a packet.  Generally it's minimum TTL, with extra conditions. */
+/** Compute TTL for a packet.  It's minimum TTL or zero.  (You can apply limits.) */
 KR_EXPORT
-uint32_t packet_ttl(const knot_pkt_t *pkt, bool is_negative)
+uint32_t packet_ttl(const knot_pkt_t *pkt)
 {
 	bool has_ttl = false;
 	uint32_t ttl = TTL_MAX_MAX;
-	/* Find minimum entry TTL in the packet or SOA minimum TTL. */
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		for (unsigned k = 0; k < sec->count; ++k) {
 			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
-			if (is_negative) {
-				/* Use SOA minimum TTL for negative answers. */
-				if (rr->type == KNOT_RRTYPE_SOA) {
-					return MIN(rr->ttl, knot_soa_minimum(rr->rrs.rdata));
-				} else {
-					continue; /* Use SOA only for negative answers. */
-				}
-			}
-			if (knot_rrtype_is_metatype(rr->type)) {
-				continue; /* Skip metatypes. */
-			}
 			ttl = MIN(ttl, rr->ttl);
 			has_ttl = true;
 		}
 	}
-	/* If no valid TTL present, go with zero (will get clamped to minimum). */
 	return has_ttl ? ttl : 0;
 }
 
@@ -120,7 +107,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	struct entry_h *eh = val_new_entry.data;
 	memset(eh, 0, offsetof(struct entry_h, data));
 	eh->time = qry->timestamp.tv_sec;
-	eh->ttl  = MAX(MIN(packet_ttl(pkt, is_negative), cache->ttl_max), cache->ttl_min);
+	eh->ttl  = MAX(MIN(packet_ttl(pkt), cache->ttl_max), cache->ttl_min);
 	eh->rank = rank;
 	eh->is_packet = true;
 	eh->has_optout = qf->DNSSEC_OPTOUT;

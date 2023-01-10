@@ -781,6 +781,7 @@ function policy.DEBUG_IF(test)
 	local debug_finish_cb = ffi.cast('trace_callback_f', function (cbreq)
 		jit.off(true, true) -- JIT for (C -> lua)^2 nesting isn't allowed
 		if test(cbreq) then
+			policy.REQTRACE(nil, cbreq)
 			debug_logfinish_cb(cbreq)  -- unconditional version
 
 			local stash = cbreq:vars()['policy_debug_stash']
@@ -797,7 +798,6 @@ function policy.DEBUG_IF(test)
 		req:vars()['policy_debug_stash'] = {}
 		policy.QTRACE(state, req)
 		req:trace_chain_callbacks(debug_stashlog_cb, debug_finish_cb)
-		policy.REQTRACE(state, req)
 		return
 	end
 end

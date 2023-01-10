@@ -48,6 +48,7 @@ BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  pkgconfig(libcap-ng)
 BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
+BuildRequires:  jemalloc-devel
 BuildRequires:  python3-devel
 
 Requires:       systemd
@@ -183,6 +184,7 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
     -Dkeyfile_default="%{_sharedstatedir}/knot-resolver/root.keys" \
     -Dinstall_root_keys=enabled \
     -Dinstall_kresd_conf=enabled \
+    -Dmalloc=jemalloc \
     --buildtype=plain \
     --prefix="%{_prefix}" \
     --sbindir="%{_sbindir}" \

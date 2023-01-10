@@ -3,7 +3,7 @@
 , runCommand, pkg-config, meson, ninja, makeWrapper
 # build+runtime deps.
 , knot-dns, luajitPackages, libuv, gnutls, lmdb
-, systemd, libcap_ng, dns-root-data, nghttp2 # optionals, in principle
+, jemalloc, systemd, libcap_ng, dns-root-data, nghttp2 # optionals, in principle
 # test-only deps.
 , cmocka, which, cacert
 , extraFeatures ? false /* catch-all if defaults aren't enough */
@@ -56,7 +56,7 @@ unwrapped = stdenv.mkDerivation rec {
   # http://knot-resolver.readthedocs.io/en/latest/build.html#requirements
   buildInputs = [ knot-dns lua.lua libuv gnutls lmdb ]
     ++ optionals stdenv.isLinux [ systemd libcap_ng ]
-    ++ [ nghttp2 ]
+    ++ [ jemalloc nghttp2 ]
     ## optional dependencies; TODO: dnstap
     ;
 
@@ -64,6 +64,7 @@ unwrapped = stdenv.mkDerivation rec {
     "-Dkeyfile_default=${dns-root-data}/root.ds"
     "-Droot_hints=${dns-root-data}/root.hints"
     "-Dinstall_kresd_conf=disabled" # not really useful; examples are inside share/doc/
+    "-Dmalloc=jemalloc"
     "--default-library=static" # not used by anyone
   ]
   ++ optional doInstallCheck "-Dunit_tests=enabled"

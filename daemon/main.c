@@ -1,4 +1,4 @@
-/*  Copyright (C) 2014-2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) CZ.NIC, z.s.p.o. <knot-resolver@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -35,6 +35,26 @@
 #endif
 #include <libknot/error.h>
 
+#if ENABLE_JEMALLOC
+/* Make the jemalloc library needed.
+ *
+ * The problem is with --as-needed for linker which is added by default by meson.
+ * If we don't use any jemalloc-specific calls, linker will decide that
+ * it is not needed and won't link it.  Making it needed seems better than
+ * trying to override the flag which might be useful in some other cases, etc.
+ *
+ * Exporting the function is a very easy way of ensuring that it's not optimized out.
+ */
+#include <jemalloc/jemalloc.h>
+KR_EXPORT void kr_jemalloc_unused(void)
+{
+	malloc_stats_print(NULL, NULL, NULL);
+}
+/* We don't use threads (or rarely in some parts), so multiple arenas don't make sense.
+   https://jemalloc.net/jemalloc.3.html
+ */
+KR_EXPORT const char *malloc_conf = "narenas:1";
+#endif
 
 struct args the_args_value;  /** Static allocation for the_args singleton. */
 

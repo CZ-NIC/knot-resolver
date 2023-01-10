@@ -620,19 +620,6 @@ and you trust your link to it, you need to use the :func:`policy.STUB` policy
 instead of :func:`policy.FORWARD` to disable DNSSEC validation for those
 *grafted* domains.
 
-Secondly, after disabling DNSSEC validation you have to solve another issue
-caused by grafting. For example, if you grafted your own top-level domain
-``example.`` onto the public DNS namespace, at some point the root server might
-send proof-of-nonexistence proving e.g. that there are no other top-level
-domain in between names ``events.`` and ``exchange.``, effectively proving
-non-existence of ``example.``.
-
-These proofs-of-nonexistence protect public DNS from spoofing but break
-*grafted* domains because proofs will be latter used by resolver
-(when the positive records for the grafted domain timeout from cache),
-effectively making grafted domain unavailable.
-The easiest work-around is to disable reading from cache for grafted domains.
-
 .. code-block:: lua
    :caption: Example configuration grafting domains onto public DNS namespace
 
@@ -647,7 +634,9 @@ The easiest work-around is to disable reading from cache for grafted domains.
    -- validated anyway; in some of those cases adding 'NO_0X20' can also help,
    -- though it also lowers defenses against off-path attacks on communication
    -- between the two servers.
-   policy.add(policy.suffix(policy.FLAGS({'NO_CACHE', 'NO_EDNS'}), extraTrees))
+   -- With kresd <= 5.5.3 you also needed 'NO_CACHE' flag to avoid unintentional
+   -- NXDOMAINs that could sometimes happen due to aggressive DNSSEC caching.
+   policy.add(policy.suffix(policy.FLAGS({'NO_EDNS'}), extraTrees))
    policy.add(policy.suffix(policy.STUB({'2001:db8::1'}), extraTrees))
 
 Response policy zones

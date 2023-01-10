@@ -7,7 +7,7 @@ local function prepare_cache()
 	local c = kres.context().cache
 
 	local passthru_addr = '\127\0\0\9'
-	rr_passthru = kres.rrset(todname('rpzpassthru.'), kres.type.A, kres.class.IN, 3600999999)
+	rr_passthru = kres.rrset(todname('rpzpassthru.'), kres.type.A, kres.class.IN, 2147483647)
 	assert(rr_passthru:add_rdata(passthru_addr, #passthru_addr))
 	assert(c:insert(rr_passthru, nil, ffi.C.KR_RANK_SECURE + ffi.C.KR_RANK_AUTH))
 
