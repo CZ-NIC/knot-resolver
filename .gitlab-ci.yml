@@ -62,9 +62,6 @@ stages:
 
 .after_build: &after_build
   <<: *common
-  except:
-    refs:
-      - /^manager.*$/
   needs:
     - build
   before_script:
@@ -83,9 +80,6 @@ stages:
 
 .nodep: &nodep
   <<: *common
-  except:
-    refs:
-      - /^manager.*$/
   needs: []
 
 # build {{{
@@ -105,6 +99,7 @@ stages:
 
 archive:
   <<: *build
+  except: null
   script:
     - apkg make-archive
 
@@ -127,9 +122,6 @@ build-knot32:
 
 build-asan:
   <<: *build
-  except:
-    refs:
-      - /^manager.*$/
   script:
       # "undefined" sanitizer causes C++ issues when loading ahocorasick.so in CI
     - CC=clang CXX=clang++ CFLAGS=-fno-sanitize-recover=all CXXFLAGS=-fno-sanitize=undefined meson build_ci_asan --default-library=static --prefix=$PREFIX -Dmalloc=jemalloc -Db_sanitize=address,undefined -Dextra_tests=enabled
