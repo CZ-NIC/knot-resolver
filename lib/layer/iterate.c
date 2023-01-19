@@ -1055,6 +1055,8 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	/* Check for packet processing errors first.
 	 * Note - we *MUST* check if it has at least a QUESTION,
 	 * otherwise it would crash on accessing QNAME. */
+	/* TODO: some of these erros are probably unreachable
+	 * thanks to getting caught earlier, in particular in worker_submit() */
 	if (pkt->parsed <= KNOT_WIRE_HEADER_SIZE) {
 		if (pkt->parsed == KNOT_WIRE_HEADER_SIZE && knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_FORMERR) {
 			/* This is a special case where we get valid header with FORMERR and nothing else.

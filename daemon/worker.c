@@ -1701,12 +1701,52 @@ int worker_submit(struct session *session, struct io_comm_data *comm,
 	if (!handle || !handle->loop->data)
 		return kr_error(EINVAL);
 
-	const bool is_query = (knot_wire_get_qr(pkt->wire) == 0);
+	const bool is_query = pkt->size > KNOT_WIRE_OFFSET_FLAGS1
+				&& knot_wire_get_qr(pkt->wire) == 0;
 	const bool is_outgoing = session_flags(session)->outgoing;
 
-	int ret = knot_pkt_parse(pkt, 0);
-	if (ret == KNOT_ETRAIL && is_outgoing && !kr_fails_assert(pkt->parsed < pkt->size))
-		ret = KNOT_EOK; // we deal with this later, so that `selection` applies
+	int ret = 0;
+	if (is_query == is_outgoing)
+		ret = KNOT_ENOENT;
+
+	// For responses from upstream, try to find associated task and query.
+	// In case of errors, at least try to guess.
+	struct qr_task *task = NULL;
+	bool task_matched_id = false;
+	if (is_outgoing && pkt->size >= 2) {
+		const uint16_t id = knot_wire_get_id(pkt->wire);
+		task = session_tasklist_del_msgid(session, id);
+		task_matched_id = task != NULL;
+		if (task_matched_id) // Note receive time for RTT calculation
+			task->recv_time = kr_now();
+		if (!task_matched_id) {
+			ret = KNOT_ENOENT;
+			VERBOSE_MSG(NULL, "=> DNS message with mismatching ID %d\n",
+					(int)id);
+		}
+	}
+	if (!task && is_outgoing && handle->type == UV_TCP) {
+		// Source address of the reply got somewhat validated,
+		// so we try to at least guess which query, for error reporting.
+		task = session_tasklist_get_first(session);
+	}
+	struct kr_query *qry = NULL;
+	if (task)
+		qry = array_tail(task->ctx->req.rplan.pending);
+
+	// Parse the packet, unless it's useless anyway.
+	if (ret == 0) {
+		ret = knot_pkt_parse(pkt, 0);
+		if (ret == KNOT_ETRAIL && is_outgoing
+				&& !kr_fails_assert(pkt->parsed < pkt->size)) {
+			// We deal with this later, so that RCODE takes priority.
+			ret = 0;
+		}
+		if (ret && kr_log_is_debug_qry(WORKER, qry)) {
+			VERBOSE_MSG(qry, "=> DNS message failed to parse, %s\n",
+					knot_strerror(ret));
+		}
+	}
 
 	struct http_ctx *http_ctx = NULL;
 #if ENABLE_DOH2
@@ -1722,21 +1762,21 @@ int worker_submit(struct session *session, struct io_comm_data *comm,
 	if (!is_outgoing && http_ctx && queue_len(http_ctx->streams) <= 0)
 		return kr_error(ENOENT);
 
+	const struct sockaddr *addr = comm ? comm->src_addr : NULL;
+
 	/* Ignore badly formed queries. */
-	if (ret && kr_log_is_debug(WORKER, NULL)) {
-		VERBOSE_MSG(NULL, "=> incoming packet failed to parse, %s\n",
-				knot_strerror(ret));
-	}
-	if (ret || is_query == is_outgoing) {
+	if (ret) {
+		if (is_outgoing && qry) // unusuable response from somewhat validated IP
+			qry->server_selection.error(qry, task->transport, KR_SELECTION_MALFORMED);
 		if (!is_outgoing)
 			the_worker->stats.dropped += 1;
+		if (task_matched_id) // notify task that answer won't be coming anymore
+			qr_task_step(task, addr, NULL);
 		return kr_error(EILSEQ);
 	}
 
 	/* Start new task on listening sockets,
 	 * or resume if this is subrequest */
-	struct qr_task *task = NULL;
-	const struct sockaddr *addr = NULL;
 	if (!is_outgoing) { /* request from a client */
 		struct request_ctx *ctx =
 			request_create(the_worker, session, comm, eth_from,
@@ -1762,18 +1802,11 @@ int worker_submit(struct session *session, struct io_comm_data *comm,
 			return kr_error(ENOMEM);
 		}
 	} else { /* response from upstream */
-		const uint16_t id = knot_wire_get_id(pkt->wire);
-		task = session_tasklist_del_msgid(session, id);
 		if (task == NULL) {
-			VERBOSE_MSG(NULL, "=> ignoring packet with mismatching ID %d\n",
-					(int)id);
 			return kr_error(ENOENT);
 		}
 		if (kr_fails_assert(!session_flags(session)->closing))
 			return kr_error(EINVAL);
-		addr = (comm) ? comm->src_addr : NULL;
-		/* Note receive time for RTT calculation */
-		task->recv_time = kr_now();
 	}
 	if (kr_fails_assert(!uv_is_closing(session_get_handle(session))))
 		return kr_error(EINVAL);
