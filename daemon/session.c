@@ -51,6 +51,7 @@ struct session {
 	ssize_t wire_buf_end_idx;     /**< Data end offset in wire_buf. */
 	uint64_t last_activity;       /**< Time of last IO activity (if any occurs).
 				       *   Otherwise session creation time. */
+	bool was_useful;              /**< I.e. produced a DNS message at some point. */
 };
 
 static void on_session_close(uv_handle_t *handle)
@@ -120,6 +121,11 @@ void session_close(struct session *session)
 		session->timeout.data = session;
 		uv_close((uv_handle_t *)&session->timeout, on_session_timer_close);
 	}
+}
+
+bool session_was_useful(const struct session *session)
+{
+	return session->was_useful;
 }
 
 int session_start_read(struct session *session)
@@ -628,7 +634,7 @@ knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm)
 		return NULL;
 	}
 
-
+	session->was_useful = true;
 	knot_pkt_t *pkt = knot_pkt_new(msg_start, msg_size, mm);
 	session->sflags.wirebuf_error = (pkt == NULL);
 	return pkt;

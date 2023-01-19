@@ -2111,6 +2111,11 @@ struct request_ctx *worker_task_get_request(struct qr_task *task)
 	return task->ctx;
 }
 
+struct kr_transport *worker_task_get_transport(struct qr_task *task)
+{
+	return task->transport;
+}
+
 struct session *worker_request_get_source_session(const struct kr_request *req)
 {
 	static_assert(offsetof(struct request_ctx, req) == 0,

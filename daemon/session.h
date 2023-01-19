@@ -91,6 +91,8 @@ int session_tasklist_finalize_expired(struct session *session);
 /** Both of task lists (associated & waiting). */
 /** Check if empty. */
 bool session_is_empty(const struct session *session);
+/** Return whether session seems to have done something useful. */
+bool session_was_useful(const struct session *session);
 /** Get pointer to session flags */
 struct session_flags *session_flags(struct session *session);
 /** Get pointer to peer address. */
