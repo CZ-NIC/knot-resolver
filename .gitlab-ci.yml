@@ -652,10 +652,10 @@ pkg:opensuse-15.4:
 
 # }}}
 
-
 pages:
   image: $CI_REGISTRY/packaging/apkg/lxc/fedora-36
   stage: deploy
+  needs: []
   script:
     - git submodule update --init --recursive
     - apkg build-dep -y
@@ -668,4 +668,3 @@ pages:
   artifacts:
     paths:
       - public
-  when: manual
