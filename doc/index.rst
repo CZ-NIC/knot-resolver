@@ -18,7 +18,6 @@ and it provides a state-machine like API for extensions.
    gettingstarted-install
    gettingstarted-startup
    gettingstarted-config
-   upgrading-to-6
 
 
 .. toctree::
@@ -57,6 +56,7 @@ and it provides a state-machine like API for extensions.
    :name: operators-chapter
    :maxdepth: 1
 
+   upgrading-to-6
    upgrading
    NEWS
 
