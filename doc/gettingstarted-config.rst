@@ -10,19 +10,27 @@ Configuration
    :depth: 1
    :local:
 
-Easiest way to configure the resolver is to have your configuration in the ``/etc/knot-resolver/config.yml`` YAML file. If you change the configuration while the resolver is running, you can load it into the running resolver by invoking the ``systemctl reload knot-resolver.service`` command.
+Easiest way to configure Knot Resolver is to put configuration to ``/etc/knot-resolver/config.yml`` file.
 
-.. note::
+The first thing you will probably want to configure are the network interfaces to listen to.
 
-    **Reloading configuration** can fail even when your configuration is valid, because some options cannot be changed while running. You can always find an explanation of the error in the log accesed by the ``journalctl -eu knot-resolver`` command.
+The following example instructs the resolver to receive standard unencrypted DNS queries on ``192.0.2.1`` and ``2001:db8::1`` IP addresses.
+Encrypted DNS queries using ``DNS-over-TLS`` protocol are accepted on all IP addresses of ``eth0`` network interface, TCP port ``853``.
+For more details look at the :ref:`network configuration <config-network>`.
 
+.. code-block:: yaml
 
-The configuration file follows a strict schema which can be validated using ``kresctl validate /path/to/config/file`` without running the resolver.
+    network:
+        listen:
+        - interface: ['192.0.2.1', '2001:db8::1'] # port 53 is default
+        - interface: 'eth0'
+            port: 853
+            kind: 'dot' # DNS-over-TLS
 
-You can continue exploring the configuration options by reading about :ref:`network interfaces <usecase-network-interfaces>`, continue with other :ref:`common use cases <usecases-chapter>` or look at the complete :ref:`configuration <configuration-chapter>` documentation.
+You can also start exploring the configuration by reading about :ref:`common use cases <usecases-chapter>` or look at the complete :ref:`configuration <configuration-chapter>` documentation.
 
-Complete configurations files for examples can be found `here <https://gitlab.nic.cz/knot/knot-resolver/tree/master/etc/config>`_.
-The example configuration files are also installed as documentation files, typically in directory ``/usr/share/doc/knot-resolver/examples/`` (their location may be different based on your Linux distribution).
+Complete configurations files examples can be found `here <https://gitlab.nic.cz/knot/knot-resolver/tree/master/etc/config>`_.
+Examples are also installed as documentation files, typically in ``/usr/share/doc/knot-resolver/examples/`` directory (location may be different based on your Linux distribution).
 
 .. tip::
 
@@ -31,16 +39,48 @@ The example configuration files are also installed as documentation files, typic
 
 
 ==========
-Config API
+Validation
 ==========
 
-Configuration of the resolver can be changed at runtime through the provided :ref:`HTTP API <manager-api>`. Any changes made during runtime are not persistent unless you modify the configuration file yourself. Also, changing the configuration through the API does not introduce any downtime to the provided service.
+Knot Resolver's configuration follows strict schema for validation.
 
-The API can be used from the command-line with the :ref:`kresctl utility <manager-kresctl>`.
+You can use :ref:` kresctl <manager-client>` utility to validate your configuration before pushing it into the running resolver.
+It should help prevent many typos in the configuration.
+
+.. code-block::
+
+    $ kresctl validate /etc/knot-resolver/config.yml
 
 
-=================
-Lua configuration
-=================
+======
+Reload
+======
 
-When reading the documentation, whenever you see a configuration snippet, you might see a Lua version of the configuration as well. Lua was used earlier as the main configuration language. Starting with Knot Resolver version 6.0.0 it was replaced by the YAML configuration we wrote about in all sections above. Lua will remain supported and in use internally, however unless want to do something really advanced, you should ignore it and use the YAML configuration. You can learn more about the Lua configuration in :ref:`this section <config-lua>`.
+If you change the configuration while the resolver is running, you can push it into the running resolver by invoking a ``systemd`` reload command.
+
+.. code-block::
+
+    # systemctl reload knot-resolver.service
+
+.. note::
+
+    **Reloading configuration** can fail even when your configuration is valid, because some options cannot be changed while running. You can always find an explanation of the error in the log accesed by the ``journalctl -eu knot-resolver`` command.
+
+
+==============
+Management API
+==============
+
+The configuration can be also changed at runtime through the provided :ref:`management API <manager-api>`.
+Changing the configuration through the API does not introduce any downtime to the provided service.
+
+.. note::
+
+    Any changes made during runtime are not persistent unless you modify the configuration file yourself.
+
+The API can be used from the command-line with the :ref:`kresctl <manager-client>` utility.
+For example, you can change the number of daemon workers.
+
+.. code-block::
+
+    $ kresctl config --set /workers 4
