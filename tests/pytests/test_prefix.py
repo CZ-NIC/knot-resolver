@@ -11,8 +11,6 @@ is either too short or too long, instead of matching the length of DNS
 message exactly.
 """
 
-import time
-
 import pytest
 
 import utils
@@ -71,26 +69,19 @@ def test_prefix_cuts_message(kresd_sock, datalen, send_query):
 
 def test_prefix_greater_than_message(kresd_sock, send_query):
     """Prefix is greater than the length of the entire DNS message."""
-    wire, invalid_msgid = utils.prepare_wire()
+    wire, _ = utils.prepare_wire()
     datalen = len(wire) + 16
     invalid_buff = utils.prepare_buffer(wire, datalen)
 
     send_query(kresd_sock, invalid_buff)
 
-    valid_buff, _ = utils.get_msgbuff()
-    kresd_sock.sendall(valid_buff)
-
-    # invalid_buff is answered (treats additional data as trailing garbage)
-    answer = utils.receive_parse_answer(kresd_sock)
-    assert answer.id == invalid_msgid
-
-    # parsing stream is broken by the invalid_buff, valid query is never answered
+    # The query is ignored due to trailing garbage and parsing stream
+    # is broken by the invalid_buff, so valid query is never answered.
     with utils.expect_kresd_close():
-        utils.receive_parse_answer(kresd_sock)
+        utils.ping_alive(kresd_sock)
 
 
 @pytest.mark.parametrize('glength', [
-    0,
     1,
     8,
     1024,
@@ -102,13 +93,10 @@ def test_prefix_trailing_garbage(kresd_sock, glength, query_before):
     if query_before:
         utils.ping_alive(kresd_sock)
 
-    for _ in range(10):
-        wire, msgid = utils.prepare_wire()
-        wire += utils.get_garbage(glength)
-        buff = utils.prepare_buffer(wire)
+    wire, _ = utils.prepare_wire()
+    wire += utils.get_garbage(glength)
+    buff = utils.prepare_buffer(wire)
 
-        kresd_sock.sendall(buff)
-        answer = utils.receive_parse_answer(kresd_sock)
-        assert answer.id == msgid
-
-        time.sleep(0.1)
+    kresd_sock.sendall(buff)
+    # The query is ignored due to trailing garbage but others can proceed.
+    utils.ping_alive(kresd_sock)
