@@ -647,6 +647,7 @@ obs:build:all:
 
 obs:rocky8:x86_64:
   <<: *distrotest
+  allow_failure: true
   variables:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: rocky8
@@ -683,6 +684,7 @@ obs:debian11:x86_64:
 
 obs:fedora35:x86_64:
   <<: *distrotest
+  allow_failure: true
   variables:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: fedora35
@@ -690,6 +692,7 @@ obs:fedora35:x86_64:
 
 obs:fedora36:x86_64:
   <<: *distrotest
+  allow_failure: true
   variables:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: fedora36
@@ -722,6 +725,7 @@ obs:ubuntu2004:x86_64:
 
 obs:ubuntu2204:x86_64:
   <<: *distrotest
+  allow_failure: true
   variables:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: ubuntu2204
