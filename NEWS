@@ -1,8 +1,19 @@
 Knot Resolver 5.6.0 (202y-mm-dd)
 ================================
 
+Security
+--------
+- avoid excessive TCP reconnections in some cases
+  For example, a DNS server that just closes connections without answer
+  could cause lots of work for the resolver (and itself, too).
+  The number of connections could be up to around 100 per client's query.
+
+  We thank Xiang Li from NISL Lab, Tsinghua University,
+  and Xuesong Bai and Qifan Zhang from DSP Lab, UCI.
+
 Improvements
 ------------
+- daemon: feed server selection with more kinds of bad-answer events
 - cache.max_ttl(): lower the default from six days to one day
   and apply both limits to the first uncached answer already (!1323 #127)
 - depend on jemalloc, preferably, to improve memory usage (!1353)
