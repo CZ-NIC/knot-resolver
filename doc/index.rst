@@ -19,6 +19,12 @@ and it provides a state-machine like API for extensions.
    gettingstarted-startup
    gettingstarted-config
 
+.. toctree::
+   :caption: Legacy
+   :name: legacy-chapter
+   :maxdepth: 1
+
+   legacy
 
 .. toctree::
    :caption: Common Use Cases
