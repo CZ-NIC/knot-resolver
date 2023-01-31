@@ -713,6 +713,9 @@ struct session2 {
 	queue_t(struct qr_task *) waiting; /**< List of tasks waiting for
 	                                    * sending to upstream. */
 
+	int uv_count; /**< Number of unclosed libUV handles owned by this
+	               * session. */
+
 	/** Communication information. Typically written into by one of the
 	 * first layers facilitating transport protocol processing.
 	 * Zero-initialized by default. */
@@ -783,6 +786,7 @@ static inline struct session2 *session2_new_io(uv_handle_t *handle,
 			layer_param, layer_param_count, outgoing);
 	s->transport.io.handle = handle;
 	handle->data = s;
+	s->uv_count++; /* Session owns the handle */
 	return s;
 }
 
@@ -800,9 +804,9 @@ static inline struct session2 *session2_new_child(struct session2 *parent,
 	return s;
 }
 
-/** De-allocates the session. Must only be called once the underlying IO handle
- * and timer are already closed, otherwise may leak resources. */
-void session2_free(struct session2 *s);
+/** Used when a libUV handle owned by the session is closed. Once all owned
+ * handles are closed, the session is freed. */
+void session2_unhandle(struct session2 *s);
 
 /** Start reading from the underlying transport. */
 int session2_start_read(struct session2 *session);

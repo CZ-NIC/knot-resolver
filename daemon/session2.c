@@ -709,13 +709,16 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 	ret = uv_timer_init(uv_default_loop(), &s->timer);
 	kr_require(!ret);
 	s->timer.data = s;
+	s->uv_count++; /* Session owns the timer */
 
 	session2_touch(s);
 
 	return s;
 }
 
-void session2_free(struct session2 *s)
+/** De-allocates the session. Must only be called once the underlying IO handle
+ * and timer are already closed, otherwise may leak resources. */
+static void session2_free(struct session2 *s)
 {
 	protolayer_manager_free(s->layers);
 	wire_buf_deinit(&s->wire_buf);
@@ -723,6 +726,18 @@ void session2_free(struct session2 *s)
 	trie_free(s->tasks);
 	queue_deinit(s->waiting);
 	free(s);
+}
+
+void session2_unhandle(struct session2 *s)
+{
+	if (kr_fails_assert(s->uv_count > 0)) {
+		session2_free(s);
+		return;
+	}
+
+	s->uv_count--;
+	if (s->uv_count <= 0)
+		session2_free(s);
 }
 
 int session2_start_read(struct session2 *session)
@@ -1373,6 +1388,11 @@ static void on_session2_handle_close(uv_handle_t *handle)
 	io_free(handle);
 }
 
+static void on_session2_timer_close(uv_handle_t *handle)
+{
+	session2_unhandle(handle->data);
+}
+
 static int session2_handle_close(struct session2 *s, uv_handle_t *handle)
 {
 	if (kr_fails_assert(s->transport.type == SESSION2_TRANSPORT_IO
@@ -1380,7 +1400,7 @@ static int session2_handle_close(struct session2 *s, uv_handle_t *handle)
 		return kr_error(EINVAL);
 
 	io_stop_read(handle);
-	uv_close((uv_handle_t *)&s->timer, NULL);
+	uv_close((uv_handle_t *)&s->timer, on_session2_timer_close);
 	uv_close(handle, on_session2_handle_close);
 	return kr_ok();
 }

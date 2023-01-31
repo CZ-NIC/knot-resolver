@@ -516,12 +516,9 @@ static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp
 		return;
 	}
 
-	uv_tcp_t *client = malloc(sizeof(uv_tcp_t));
-	if (!client) {
-		return;
-	}
-	int res = io_create(master->loop, (uv_handle_t *)client,
-			    SOCK_STREAM, AF_UNSPEC, grp, NULL, 0, false);
+	struct session2 *s;
+	int res = io_create(master->loop, &s, SOCK_STREAM, AF_UNSPEC, grp,
+			NULL, 0, false);
 	if (res) {
 		if (res == UV_EMFILE) {
 			the_worker->too_many_open = true;
@@ -530,14 +527,12 @@ static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp
 		/* Since res isn't OK struct session wasn't allocated \ borrowed.
 		 * We must release client handle only.
 		 */
-		free(client);
 		return;
 	}
 
-	/* struct session was allocated \ borrowed from memory pool. */
-	struct session2 *s = client->data;
 	kr_require(s->outgoing == false);
 
+	uv_tcp_t *client = (uv_tcp_t *)session2_get_handle(s);
 	if (uv_accept(master, (uv_stream_t *)client) != 0) {
 		/* close session, close underlying uv handles and
 		 * deallocate (or return to memory pool) memory. */
@@ -820,7 +815,7 @@ void io_tty_alloc(uv_handle_t *handle, size_t suggested, uv_buf_t *buf)
 	buf->base = malloc(suggested);
 }
 
-struct io_stream_data *io_tty_alloc_data() {
+struct io_stream_data *io_tty_alloc_data(void) {
 	knot_mm_t *pool = mm_ctx_mempool2(MM_DEFAULT_BLKSIZE);
 	if (!pool) {
 		return NULL;
@@ -1025,18 +1020,29 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 }
 #endif
 
-int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family,
-		enum protolayer_grp grp,
-		struct protolayer_data_param *layer_param,
-		size_t layer_param_count,
-		bool outgoing)
+int io_create(uv_loop_t *loop, struct session2 **out_session, int type,
+              unsigned family, enum protolayer_grp grp,
+              struct protolayer_data_param *layer_param,
+              size_t layer_param_count, bool outgoing)
 {
+	*out_session = NULL;
 	int ret = -1;
+	uv_handle_t *handle;
 	if (type == SOCK_DGRAM) {
-		ret = uv_udp_init(loop, (uv_udp_t *)handle);
+		uv_udp_t *udp = malloc(sizeof(uv_udp_t));
+		kr_require(udp);
+		ret = uv_udp_init(loop, udp);
+
+		handle = (uv_handle_t *)udp;
 	} else if (type == SOCK_STREAM) {
-		ret = uv_tcp_init_ex(loop, (uv_tcp_t *)handle, family);
-		uv_tcp_nodelay((uv_tcp_t *)handle, 1);
+		uv_tcp_t *tcp = malloc(sizeof(uv_tcp_t));
+		kr_require(tcp);
+		ret = uv_tcp_init_ex(loop, tcp, family);
+		uv_tcp_nodelay(tcp, 1);
+
+		handle = (uv_handle_t *)tcp;
+	} else {
+		kr_require(false && "io_create: invalid socket type");
 	}
 	if (ret != 0) {
 		return ret;
@@ -1046,6 +1052,8 @@ int io_create(uv_loop_t *loop, uv_handle_t *handle, int type, unsigned family,
 	if (s == NULL) {
 		ret = -1;
 	}
+
+	*out_session = s;
 	return ret;
 }
 
@@ -1055,13 +1063,13 @@ static void io_deinit(uv_handle_t *handle)
 		return;
 	}
 	if (handle->type != UV_POLL) {
-		session2_free(handle->data);
+		session2_unhandle(handle->data);
 	} else {
 	#if ENABLE_XDP
 		xdp_handle_data_t *xhd = handle->data;
 		uv_idle_stop(&xhd->tx_waker);
 		uv_close((uv_handle_t *)&xhd->tx_waker, NULL);
-		session2_free(xhd->session);
+		session2_unhandle(xhd->session);
 		knot_xdp_deinit(xhd->socket);
 		queue_deinit(xhd->tx_waker_queue);
 		free(xhd);

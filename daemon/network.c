@@ -235,7 +235,8 @@ static void endpoint_close(struct endpoint *ep, bool force)
 			io_free(ep->handle);
 		}
 	} else { /* Asynchronous close */
-		uv_close(ep->handle, io_free);
+		struct session2 *s = ep->handle->data;
+		session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
 	}
 }
 

@@ -125,10 +125,10 @@ struct worker_ctx *the_worker = NULL;
 
 /*! @internal Create a UDP/TCP handle for an outgoing AF_INET* connection.
  *  socktype is SOCK_* */
-static uv_handle_t *ioreq_spawn(int socktype, sa_family_t family,
-                                enum protolayer_grp grp,
-                                struct protolayer_data_param *layer_param,
-                                size_t layer_param_count)
+static struct session2 *ioreq_spawn(int socktype, sa_family_t family,
+                                    enum protolayer_grp grp,
+                                    struct protolayer_data_param *layer_param,
+                                    size_t layer_param_count)
 {
 	bool precond = (socktype == SOCK_DGRAM || socktype == SOCK_STREAM)
 			&& (family == AF_INET  || family == AF_INET6);
@@ -138,18 +138,14 @@ static uv_handle_t *ioreq_spawn(int socktype, sa_family_t family,
 	}
 
 	/* Create connection for iterative query */
-	uv_handle_t *handle = malloc(socktype == SOCK_DGRAM
-					? sizeof(uv_udp_t) : sizeof(uv_tcp_t));
-	kr_require(handle);
-
-	int ret = io_create(the_worker->loop, handle, socktype, family, grp,
+	struct session2 *s;
+	int ret = io_create(the_worker->loop, &s, socktype, family, grp,
 			layer_param, layer_param_count, true);
 	if (ret) {
 		if (ret == UV_EMFILE) {
 			the_worker->too_many_open = true;
 			the_worker->rconcurrent_highwatermark = the_worker->stats.rconcurrent;
 		}
-		free(handle);
 		return NULL;
 	}
 
@@ -162,28 +158,25 @@ static uv_handle_t *ioreq_spawn(int socktype, sa_family_t family,
 	}
 	if (addr->ip.sa_family != AF_UNSPEC) {
 		if (kr_fails_assert(addr->ip.sa_family == family)) {
-			io_free(handle);
+			session2_event(s, PROTOLAYER_EVENT_FORCE_CLOSE, NULL);
 			return NULL;
 		}
 		if (socktype == SOCK_DGRAM) {
-			uv_udp_t *udp = (uv_udp_t *)handle;
+			uv_udp_t *udp = (uv_udp_t *)session2_get_handle(s);
 			ret = uv_udp_bind(udp, &addr->ip, 0);
 		} else if (socktype == SOCK_STREAM){
-			uv_tcp_t *tcp = (uv_tcp_t *)handle;
+			uv_tcp_t *tcp = (uv_tcp_t *)session2_get_handle(s);
 			ret = uv_tcp_bind(tcp, &addr->ip, 0);
 		}
 	}
 
 	if (ret != 0) {
-		io_free(handle);
+		session2_event(s, PROTOLAYER_EVENT_FORCE_CLOSE, NULL);
 		return NULL;
 	}
 
-	/* Set current handle as a subrequest type. */
-	struct session2 *session = handle->data;
-	kr_assert(session->outgoing);
 	/* Connect or issue query datagram */
-	return handle;
+	return s;
 }
 
 static void ioreq_kill_pending(struct qr_task *task)
@@ -842,13 +835,12 @@ static int transmit(struct qr_task *task)
 	if (ret)
 		return ret;
 
-	uv_handle_t *handle = ioreq_spawn(SOCK_DGRAM, choice->sin6_family,
+	struct session2 *session = ioreq_spawn(SOCK_DGRAM, choice->sin6_family,
 			PROTOLAYER_GRP_DOUDP, NULL, 0);
-	if (!handle)
+	if (!session)
 		return kr_error(EINVAL);
 
 	struct sockaddr *addr = (struct sockaddr *)choice;
-	struct session2 *session = handle->data;
 	struct sockaddr *peer = session2_get_peer(session);
 	kr_assert(peer->sa_family == AF_UNSPEC && session->outgoing);
 	kr_require(addr->sa_family == AF_INET || addr->sa_family == AF_INET6);
@@ -1095,7 +1087,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	if (!conn) {
 		return kr_error(EINVAL);
 	}
-	uv_handle_t *client;
+	struct session2 *session;
 
 	bool has_tls = tls_entry;
 	if (has_tls) {
@@ -1103,17 +1095,16 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 			.protocol = PROTOLAYER_TLS,
 			.param = tls_entry
 		};
-		client = ioreq_spawn(SOCK_STREAM, addr->sa_family,
+		session = ioreq_spawn(SOCK_STREAM, addr->sa_family,
 				PROTOLAYER_GRP_DOTLS, &param, 1);
 	} else {
-		client = ioreq_spawn(SOCK_STREAM, addr->sa_family,
+		session = ioreq_spawn(SOCK_STREAM, addr->sa_family,
 				PROTOLAYER_GRP_DOTCP, NULL, 0);
 	}
-	if (!client) {
+	if (!session) {
 		free(conn);
 		return kr_error(EINVAL);
 	}
-	struct session2 *session = client->data;
 	if (kr_fails_assert(session->secure == has_tls)) {
 		free(conn);
 		return kr_error(EINVAL);
@@ -1150,7 +1141,8 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	}
 
 	/*  Start connection process to upstream. */
-	ret = uv_tcp_connect(conn, (uv_tcp_t *)client, addr , on_connect);
+	ret = uv_tcp_connect(conn, (uv_tcp_t *)session2_get_handle(session),
+			addr , on_connect);
 	if (ret != 0) {
 		session2_timer_stop(session);
 		worker_del_tcp_waiting(addr);
