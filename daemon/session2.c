@@ -196,13 +196,20 @@ struct protolayer_payload protolayer_as_buffer(const struct protolayer_payload *
 	};
 }
 
-size_t protolayer_queue_count_payload(protolayer_iter_ctx_queue_t *queue)
+size_t protolayer_queue_count_payload(const protolayer_iter_ctx_queue_t *queue)
 {
 	if (!queue || queue_len(*queue) == 0)
 		return 0;
 
 	size_t sum = 0;
-	queue_it_t(struct protolayer_iter_ctx *) it = queue_it_begin(*queue);
+
+	/* We're only reading from the queue, but we need to discard the
+	 * `const` so that `queue_it_begin()` accepts it. As long as
+	 * `queue_it_` operations do not write into the queue (which they do
+	 * not, checked at the time of writing), we should be safely in the
+	 * defined behavior territory. */
+	queue_it_t(struct protolayer_iter_ctx *) it =
+		queue_it_begin(*(protolayer_iter_ctx_queue_t *)queue);
 	for (; !queue_it_finished(it); queue_it_next(it)) {
 		struct protolayer_iter_ctx *ctx = queue_it_val(it);
 		sum += protolayer_payload_size(&ctx->payload);
@@ -278,7 +285,7 @@ static inline void protolayer_iter_ctx_next(struct protolayer_iter_ctx *ctx)
 		ctx->layer_ix--;
 }
 
-static const char *layer_name(enum protolayer_grp grp, ssize_t layer_ix)
+static inline const char *layer_name(enum protolayer_grp grp, ssize_t layer_ix)
 {
 	enum protolayer_protocol p = protolayer_grps[grp][layer_ix];
 	return protolayer_protocol_names[p];
