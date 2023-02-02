@@ -29,9 +29,12 @@
  *   is retrieved.
  *
  * Protocol layer:
- *   - An implementation of a particular protocol. A layer transforms data
- *   within the resolver to conform to a particular protocol, e.g. UDP, TCP,
- *   TLS, HTTP, QUIC, etc.
+ *   - An implementation of a particular protocol. A layer transforms payloads
+ *   to conform to a particular protocol, e.g. UDP, TCP, TLS, HTTP, QUIC, etc.
+ *   While transforming a payload, a layer may also modify metadata - e.g. the
+ *   UDP and TCP layers in the Unwrap direction implement the PROXYv2 protocol,
+ *   using which they retrieve the IP address of the actual originating client
+ *   and store it in the appropriate struct.
  *
  * Protolayer:
  *   - Same as 'Protocol layer'.

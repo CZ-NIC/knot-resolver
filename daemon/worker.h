@@ -23,10 +23,10 @@ KR_EXPORT extern struct worker_ctx *the_worker;
 
 /** Create and initialize the worker.
  * \return error code (ENOMEM) */
-int worker_init();
+int worker_init(void);
 
 /** Destroy the worker (free memory). */
-void worker_deinit();
+void worker_deinit(void);
 
 /**
  * End current DNS/TCP session, this disassociates pending tasks from this session

@@ -532,7 +532,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	/* Initialize the worker. */
-	ret = worker_init(the_args->forks);
+	ret = worker_init();
 	if (ret != 0) {
 		kr_log_error(SYSTEM, "failed to initialize worker: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;
