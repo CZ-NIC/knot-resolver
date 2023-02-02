@@ -42,6 +42,19 @@ the path to test file directly.
 
 Note: some tests may fail without an internet connection.
 
+Additional usage notes
+----------------------
+
+- Not everything is logged into pytest's standard output. To inspect the logs of
+  `kresd` itself, see `/tmp/pytest-of-<username>/pytest-current`.
+- The `rr` and `valgrind` parameters of the `Kresd` constructor may be used to
+  gain further information on failing tests. Simply set them to `True` in the
+  test cases temporarily if you need them.
+    - `rr=True` will record the execution of `kresd`, which can then be replayed
+      with the usual `rr replay` command.
+    - `valgrind=True` will run `kresd` under `valgrind`, the results of which
+      can be inspected in `kresd`'s logs (see above).
+
 Developer notes
 ---------------
 

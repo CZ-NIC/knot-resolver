@@ -65,7 +65,7 @@
 /tags
 /tests/pytests/*/tcproxy
 /tests/pytests/*/tlsproxy
-/tests/pytests/pytests.parallel.html
+/tests/pytests/pytests.*.html
 /tests/pytests/*.junit.xml
 /tests/test_array
 /tests/test_lru
