@@ -232,7 +232,9 @@ static void endpoint_close(struct endpoint *ep, bool force)
 		}
 		if (ep->handle) {
 			ep->handle->loop = NULL;
-			io_free(ep->handle);
+			struct session2 *s = ep->handle->data;
+			if (s)
+				session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
 		}
 	} else { /* Asynchronous close */
 		struct session2 *s = ep->handle->data;

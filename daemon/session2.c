@@ -1400,11 +1400,22 @@ static void on_session2_timer_close(uv_handle_t *handle)
 	session2_unhandle(handle->data);
 }
 
-static int session2_handle_close(struct session2 *s, uv_handle_t *handle)
+static int session2_handle_close(struct session2 *s)
 {
-	if (kr_fails_assert(s->transport.type == SESSION2_TRANSPORT_IO
-				&& s->transport.io.handle == handle))
+	if (kr_fails_assert(s->transport.type == SESSION2_TRANSPORT_IO))
 		return kr_error(EINVAL);
+
+	uv_handle_t *handle = s->transport.io.handle;
+
+	if (!handle->loop) {
+		/* This happens when kresd is stopping and the libUV loop has
+		 * been ended. We do not `uv_close` the handles, we just free
+		 * up the memory. */
+
+		session2_unhandle(s); /* For timer handle */
+		io_free(handle); /* This will unhandle the transport handle */
+		return kr_ok();
+	}
 
 	io_stop_read(handle);
 	uv_close((uv_handle_t *)&s->timer, on_session2_timer_close);
@@ -1429,13 +1440,12 @@ static int session2_transport_event(struct session2 *s,
 
 	switch (s->transport.type) {
 	case SESSION2_TRANSPORT_IO:;
-		uv_handle_t *handle = s->transport.io.handle;
-		if (kr_fails_assert(handle)) {
+		if (kr_fails_assert(s->transport.io.handle)) {
 			return kr_error(EINVAL);
 		}
 
 		if (is_close_event)
-			return session2_handle_close(s, handle);
+			return session2_handle_close(s);
 
 		return kr_ok();
 
