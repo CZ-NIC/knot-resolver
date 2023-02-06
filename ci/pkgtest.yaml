@@ -92,22 +92,6 @@ fedora-35:pkgbuild:
     - dnf install -y rpm-build python3-pip
     - *apkgbuild
 
-opensuse-15.2:pkgbuild:
-  <<: *pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/opensuse-15.2
-  script:
-    - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.2/home:CZ-NIC:knot-resolver-build.repo
-    - zypper install -y rpm-build python3-pip
-    - *apkgbuild
-
-opensuse-15.3:pkgbuild:
-  <<: *pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/opensuse-15.3
-  script:
-    - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.3/home:CZ-NIC:knot-resolver-build.repo
-    - zypper install -y rpm-build python3-pip
-    - *apkgbuild
-
 rocky-8:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/rocky-8
@@ -237,30 +221,6 @@ fedora-35:pkgtest:
   script:
     - dnf install -y knot-utils findutils
     - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
-    - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
-
-opensuse-15.2:pkgtest:
-  <<: *pkgtest
-  needs:
-    - opensuse-15.2:pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/opensuse-15.2
-  script:
-    - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.2/home:CZ-NIC:knot-resolver-build.repo
-    - zypper install -y knot-utils
-    - zypper install --allow-unsigned-rpm -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
-    - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
-
-opensuse-15.3:pkgtest:
-  <<: *pkgtest
-  needs:
-    - opensuse-15.3:pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/opensuse-15.3
-  script:
-    - zypper addrepo -G -f https://download.opensuse.org/repositories/home:CZ-NIC:knot-resolver-build/openSUSE_Leap_15.3/home:CZ-NIC:knot-resolver-build.repo
-    - zypper install -y knot-utils
-    - zypper install --allow-unsigned-rpm -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
     - systemctl start kresd@1
     - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
 

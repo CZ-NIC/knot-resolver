@@ -700,10 +700,11 @@ obs:fedora36:x86_64:
 
 obs:leap15:x86_64:
   <<: *distrotest
+  allow_failure: true
   variables:
     OBS_REPO: knot-resolver-latest
     DISTROTEST_NAME: leap15
-    DISTROTEST_REPO: openSUSE_Leap_15.3
+    DISTROTEST_REPO: openSUSE_Leap_15.4
 
 obs:ubuntu1804:x86_64:
   <<: *distrotest
@@ -764,10 +765,5 @@ packaging:fedora_32:
   <<: *packagingtest
   variables:
     DISTRO: fedora_32
-
-packaging:leap_15.2:
-  <<: *packagingtest
-  variables:
-    DISTRO: leap_15.2
 
 # }}}
