@@ -32,6 +32,8 @@ integr_tests += [
   ['serve_stale', meson.current_source_dir() / 'serve_stale' / 'test.integr'],
 ]
 
+mod_inc_dir = include_directories('..', '../contrib',
+  luajit.get_pkgconfig_variable('includedir'))
 
 # handle more complex C/LUA modules separately
 subdir('bogus_log')
