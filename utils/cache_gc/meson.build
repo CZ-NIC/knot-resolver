@@ -18,7 +18,6 @@ if build_utils
       contrib_dep,
       libkres_dep,
       libknot,
-      luajit_inc,
     ],
     install: true,
     install_dir: get_option('sbindir'),
