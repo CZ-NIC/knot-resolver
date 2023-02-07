@@ -784,6 +784,10 @@ struct session2 {
 	 * to close. */
 	bool closing : 1;
 
+	/** If true, the session has done something useful,
+	 * e.g. it has produced a packet. */
+	bool was_useful : 1;
+
 	/** If true, encryption takes place in this session. Layers may use
 	 * this to determine whether padding should be applied. A layer that
 	 * provides security shall set this to `true` during session

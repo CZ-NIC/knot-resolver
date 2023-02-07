@@ -81,6 +81,8 @@ void worker_task_timeout_inc(struct qr_task *task);
 
 knot_pkt_t *worker_task_get_pktbuf(const struct qr_task *task);
 
+struct kr_transport *worker_task_get_transport(struct qr_task *task);
+
 /** Note: source session is NULL in case the request hasn't come over network. */
 KR_EXPORT struct session2 *worker_request_get_source_session(const struct kr_request *req);
 
