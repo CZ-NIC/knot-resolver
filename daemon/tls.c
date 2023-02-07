@@ -70,7 +70,7 @@ struct pl_tls_sess_data {
 };
 
 
-struct tls_credentials * tls_get_ephemeral_credentials();
+struct tls_credentials * tls_get_ephemeral_credentials(void);
 void tls_credentials_log_pins(struct tls_credentials *tls_credentials);
 static int client_verify_certificate(gnutls_session_t tls_session);
 static struct tls_credentials *tls_credentials_reserve(struct tls_credentials *tls_credentials);
@@ -623,7 +623,7 @@ void tls_client_params_free(tls_client_params_t *params)
 	trie_free(params);
 }
 
-tls_client_param_t * tls_client_param_new()
+tls_client_param_t * tls_client_param_new(void)
 {
 	tls_client_param_t *e = calloc(1, sizeof(*e));
 	if (kr_fails_assert(e))
@@ -1237,14 +1237,14 @@ static enum protolayer_iter_cb_result pl_tls_wrap(void *sess_data, void *iter_da
 	return protolayer_async();
 }
 
-static bool pl_tls_client_connect_start(struct pl_tls_sess_data *tls,
-                                        struct session2 *session)
+static enum protolayer_event_cb_result pl_tls_client_connect_start(
+		struct pl_tls_sess_data *tls, struct session2 *session)
 {
 	if (tls->handshake_state != TLS_HS_NOT_STARTED)
-		return false;
+		return PROTOLAYER_EVENT_CONSUME;
 
 	if (kr_fails_assert(session->outgoing))
-		return false;
+		return PROTOLAYER_EVENT_CONSUME;
 
 	gnutls_session_set_ptr(tls->tls_session, tls);
 	gnutls_handshake_set_timeout(tls->tls_session, the_network->tcp.tls_handshake_timeout);
@@ -1267,28 +1267,27 @@ static bool pl_tls_client_connect_start(struct pl_tls_sess_data *tls,
 						PROTOLAYER_EVENT_GENERAL_TIMEOUT,
 						MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
 			}
-			return false;
+			return PROTOLAYER_EVENT_CONSUME;
 		}
 	}
 
-	return false;
+	return PROTOLAYER_EVENT_CONSUME;
 }
 
-static bool pl_tls_event_unwrap(enum protolayer_event_type event,
-                                void **baton,
-                                struct protolayer_manager *manager,
-                                void *sess_data)
+static enum protolayer_event_cb_result pl_tls_event_unwrap(
+		enum protolayer_event_type event, void **baton,
+		struct protolayer_manager *manager, void *sess_data)
 {
 	struct session2 *s = manager->session;
 	struct pl_tls_sess_data *tls = sess_data;
 
 	if (event == PROTOLAYER_EVENT_CLOSE) {
 		tls_close(tls, s, true); /* WITH gnutls_bye */
-		return true;
+		return PROTOLAYER_EVENT_PROPAGATE;
 	}
 	if (event == PROTOLAYER_EVENT_FORCE_CLOSE) {
 		tls_close(tls, s, false); /* WITHOUT gnutls_bye */
-		return true;
+		return PROTOLAYER_EVENT_PROPAGATE;
 	}
 
 	if (tls->client_side) {
@@ -1298,27 +1297,26 @@ static bool pl_tls_event_unwrap(enum protolayer_event_type event,
 		if (event == PROTOLAYER_EVENT_CONNECT) {
 			/* TLS sends its own _CONNECT event when the handshake
 			 * is finished. */
-			return false;
+			return PROTOLAYER_EVENT_CONSUME;
 		}
 	}
 
-	return true;
+	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
-static bool pl_tls_event_wrap(enum protolayer_event_type event,
-                              void **baton,
-                              struct protolayer_manager *manager,
-                              void *sess_data)
+static enum protolayer_event_cb_result pl_tls_event_wrap(
+		enum protolayer_event_type event, void **baton,
+		struct protolayer_manager *manager, void *sess_data)
 {
 	if (event == PROTOLAYER_EVENT_STATS_SEND_ERR) {
 		the_worker->stats.err_tls += 1;
-		return false;
+		return PROTOLAYER_EVENT_CONSUME;
 	} else if (event == PROTOLAYER_EVENT_STATS_QRY_OUT) {
 		the_worker->stats.tls += 1;
-		return false;
+		return PROTOLAYER_EVENT_CONSUME;
 	}
 
-	return true;
+	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
 static void pl_tls_request_init(struct protolayer_manager *manager,

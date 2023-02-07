@@ -201,20 +201,19 @@ static enum protolayer_iter_cb_result pl_udp_unwrap(
 	return protolayer_continue(ctx);
 }
 
-static bool pl_udp_event_wrap(enum protolayer_event_type event,
-                              void **baton,
-                              struct protolayer_manager *manager,
-                              void *sess_data)
+static enum protolayer_event_cb_result pl_udp_event_wrap(
+		enum protolayer_event_type event, void **baton,
+		struct protolayer_manager *manager, void *sess_data)
 {
 	if (event == PROTOLAYER_EVENT_STATS_SEND_ERR) {
 		the_worker->stats.err_udp += 1;
-		return false;
+		return PROTOLAYER_EVENT_CONSUME;
 	} else if (event == PROTOLAYER_EVENT_STATS_QRY_OUT) {
 		the_worker->stats.udp += 1;
-		return false;
+		return PROTOLAYER_EVENT_CONSUME;
 	}
 
-	return true;
+	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
 
@@ -340,20 +339,19 @@ static enum protolayer_iter_cb_result pl_tcp_unwrap(
 	return protolayer_continue(ctx);
 }
 
-static bool pl_tcp_event_wrap(enum protolayer_event_type event,
-                              void **baton,
-                              struct protolayer_manager *manager,
-                              void *sess_data)
+static enum protolayer_event_cb_result pl_tcp_event_wrap(
+		enum protolayer_event_type event, void **baton,
+		struct protolayer_manager *manager, void *sess_data)
 {
 	if (event == PROTOLAYER_EVENT_STATS_SEND_ERR) {
 		the_worker->stats.err_tcp += 1;
-		return false;
+		return PROTOLAYER_EVENT_CONSUME;
 	} else if (event == PROTOLAYER_EVENT_STATS_QRY_OUT) {
 		the_worker->stats.tcp += 1;
-		return false;
+		return PROTOLAYER_EVENT_CONSUME;
 	}
 
-	return true;
+	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
 void io_protolayers_init(void)

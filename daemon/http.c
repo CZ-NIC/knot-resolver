@@ -996,19 +996,18 @@ static enum protolayer_iter_cb_result pl_http_wrap(
 	return protolayer_async();
 }
 
-static bool pl_http_event_unwrap(enum protolayer_event_type event,
-                                 void **baton,
-                                 struct protolayer_manager *manager,
-                                 void *sess_data)
+static enum protolayer_event_cb_result pl_http_event_unwrap(
+		enum protolayer_event_type event, void **baton,
+		struct protolayer_manager *manager, void *sess_data)
 {
 	struct pl_http_sess_data *http = sess_data;
 
 	if (event == PROTOLAYER_EVENT_MALFORMED) {
 		http_send_status(http, HTTP_STATUS_BAD_REQUEST);
-		return true;
+		return PROTOLAYER_EVENT_PROPAGATE;
 	}
 
-	return true;
+	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
 static void pl_http_request_init(struct protolayer_manager *manager,
@@ -1028,7 +1027,7 @@ static void pl_http_request_init(struct protolayer_manager *manager,
 	}
 }
 
-void http_protolayers_init()
+void http_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_HTTP] = (struct protolayer_globals) {
 		.sess_size = sizeof(struct pl_http_sess_data),

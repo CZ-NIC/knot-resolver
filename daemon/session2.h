@@ -444,6 +444,13 @@ typedef enum protolayer_iter_cb_result (*protolayer_iter_cb)(
 		void *iter_data,
 		struct protolayer_iter_ctx *ctx);
 
+/** Return value of `protolayer_event_cb` callbacks. Controls the flow of
+ * events. See `protolayer_event_cb` for details. */
+enum protolayer_event_cb_result {
+	PROTOLAYER_EVENT_CONSUME = 0,
+	PROTOLAYER_EVENT_PROPAGATE = 1
+};
+
 /** Function type for `struct protolayer_globals::event_wrap` and `struct
  * protolayer_globals::event_unwrap` callbacks of layers. The `baton` parameter
  * points to the mutable, iteration-specific baton pointer, initialized by the
@@ -451,12 +458,12 @@ typedef enum protolayer_iter_cb_result (*protolayer_iter_cb)(
  * value of `baton` may be modified to accommodate for the next layer in the
  * sequence.
  *
- * When `true` is returned, iteration over the sequence of layers continues.
- * When `false` is returned, iteration stops. */
-typedef bool (*protolayer_event_cb)(enum protolayer_event_type event,
-                                    void **baton,
-                                    struct protolayer_manager *manager,
-                                    void *sess_data);
+ * When `PROTOLAYER_EVENT_PROPAGATE` is returned, iteration over the sequence
+ * of layers continues. When `PROTOLAYER_EVENT_CONSUME` is returned, iteration
+ * stops. */
+typedef enum protolayer_event_cb_result (*protolayer_event_cb)(
+		enum protolayer_event_type event, void **baton,
+		struct protolayer_manager *manager, void *sess_data);
 
 /** Function type for initialization callbacks of layer session data.
  *
