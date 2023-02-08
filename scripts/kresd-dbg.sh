@@ -63,6 +63,11 @@ Available options:
 	-h, --help
 		Displays this help and exits
 
+	-l, --callgrind [args]
+		Runs kresd under Valgrind Callgrind, optionally with the
+		specified arguments, with default output to
+		'callgrind.out.kresd' in the wrapper script directory
+
 	-m, --massif [args]
 		Runs kresd under Valgrind Massif, optionally with the specified
 		arguments, with default output to 'massif.out.kresd' in
@@ -142,8 +147,8 @@ fi
 ## Process CLI arguments #######################################################
 
 GETOPT=$(getopt \
-	--options     'a::b::cdghm::npr::sx'\
-	--longoptions 'vim-debug::,debug::,clean,no-run,valgrind,help,massif::,no-delete,caps,rr::,sudo,xdp-if:'\
+	--options     'a::b::cdghl::m::npr::sx'\
+	--longoptions 'vim-debug::,debug::,clean,no-run,valgrind,help,callgrind::,massif::,no-delete,caps,rr::,sudo,xdp-if:'\
 	--name 'krdbg'\
 	-- "$@")
 
@@ -196,6 +201,12 @@ while true; do
 		'-h'|'--help')
 			echo "$help_text"
 			exit 0
+			;;
+		'-l'|'--callgrind')
+			callgrind=1
+			callgrind_args="$2"
+			shift 2
+			continue
 			;;
 		'-m'|'--massif')
 			massif=1
@@ -300,8 +311,11 @@ fi
 if [ "$debug" == "1" ]; then
 	kr_command="${debugger[@]} $kr_command"
 fi
+if [ "$callgrind" == "1" ]; then
+	kr_command="valgrind --tool=callgrind --callgrind-out-file=\"$script_dir/callgrind.out.kresd\" $callgrind_args -- $kr_command"
+fi
 if [ "$massif" == "1" ]; then
-	kr_command="valgrind --tool=massif --massif-out-file=\"$script_dir/massif.out.kresd $massif_args\" -- $kr_command"
+	kr_command="valgrind --tool=massif --massif-out-file=\"$script_dir/massif.out.kresd\" $massif_args -- $kr_command"
 fi
 if [ "$valgrind" == "1" ]; then
 	kr_command="valgrind -- $kr_command"
