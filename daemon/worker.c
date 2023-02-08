@@ -2044,8 +2044,10 @@ static enum protolayer_event_cb_result pl_dns_stream_event_unwrap(
 static knot_pkt_t *produce_stream_packet(struct wire_buf *wb)
 {
 	uint16_t pkt_len = knot_wire_read_u16(wire_buf_data(wb));
-	if (wire_buf_data_length(wb) < pkt_len + sizeof(uint16_t))
+	if (wire_buf_data_length(wb) < pkt_len + sizeof(uint16_t)) {
+		wire_buf_reset(wb);
 		return NULL;
+	}
 
 	wire_buf_trim(wb, sizeof(uint16_t));
 	knot_pkt_t *pkt = produce_packet(wire_buf_data(wb), pkt_len);
@@ -2065,28 +2067,28 @@ static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
 	struct session2 *session = ctx->manager->session;
 	struct pl_dns_stream_sess_data *stream_sess = sess_data;
 	struct wire_buf *wb = ctx->payload.wire_buf;
+
+	if (wire_buf_data_length(wb) == 0)
+		return protolayer_break(ctx, status);
+
 	const uint32_t max_iters = (wire_buf_data_length(wb) /
 		(KNOT_WIRE_HEADER_SIZE + KNOT_WIRE_QUESTION_MIN_SIZE)) + 1;
 	int iters = 0;
 
 	knot_pkt_t *pkt;
 	while ((pkt = produce_stream_packet(wb)) && iters < max_iters) {
-		session->was_useful = true;
 		if (stream_sess->single && stream_sess->produced) {
 			if (kr_log_is_debug(WORKER, NULL)) {
 				kr_log_debug(WORKER, "Unexpected extra data from %s\n",
 						kr_straddr(ctx->comm.src_addr));
 			}
-			worker_end_tcp(session);
 			status = KNOT_EMALF;
 			goto exit;
 		}
 
 		stream_sess->produced = true;
-		if (!pkt) {
-			status = KNOT_EMALF;
-			goto exit;
-		}
+		if (pkt)
+			session->was_useful = true;
 
 		int ret = worker_submit(session, &ctx->comm, pkt);
 		wire_buf_movestart(wb);
@@ -2094,8 +2096,6 @@ static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
 			iters += 1;
 		}
 	}
-
-
 
 	/* worker_submit() may cause the session to close (e.g. due to IO
 	 * write error when the packet triggers an immediate answer). This is
@@ -2106,6 +2106,8 @@ static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
 exit:
 	wire_buf_movestart(wb);
 	mp_flush(the_worker->pkt_pool.ctx);
+	if (status < 0)
+		worker_end_tcp(session);
 	return protolayer_break(ctx, status);
 }
 

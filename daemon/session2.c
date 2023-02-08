@@ -665,8 +665,12 @@ int wire_buf_movestart(struct wire_buf *wb)
 		return kr_ok();
 
 	size_t len = wire_buf_data_length(wb);
-	if (len)
-		memmove(wb->buf, wire_buf_data(wb), len);
+	if (len) {
+		if (wb->start < len)
+			memmove(wb->buf, wire_buf_data(wb), len);
+		else
+			memcpy(wb->buf, wire_buf_data(wb), len);
+	}
 	wb->start = 0;
 	wb->end = len;
 	return kr_ok();
