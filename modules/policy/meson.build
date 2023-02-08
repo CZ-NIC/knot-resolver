@@ -40,6 +40,9 @@ lua_ac_lib = shared_module(
     '-Wall',
     '-fPIC',
   ],
+  dependencies: [
+    luajit,
+  ],
   include_directories: mod_inc_dir,
   name_prefix: '',
   install: true,

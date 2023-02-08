@@ -11,6 +11,7 @@ hints_mod = shared_module(
   hints_src,
   dependencies: [
     libknot,
+    luajit,
   ],
   include_directories: mod_inc_dir,
   name_prefix: '',
