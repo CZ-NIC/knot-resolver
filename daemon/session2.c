@@ -23,10 +23,12 @@
 #define VERBOSE_LOG(session, fmt, ...) do {\
 	if (kr_log_is_debug(PROTOLAYER, NULL)) {\
 		const char *sess_dir = (session)->outgoing ? "out" : "in";\
-		kr_log_debug(PROTOLAYER, "(%s) " fmt, sess_dir, __VA_ARGS__);\
+		kr_log_debug(PROTOLAYER, "[%08X] (%s) " fmt, \
+				(session)->log_id, sess_dir, __VA_ARGS__);\
 	}\
 } while (0);\
 
+static uint32_t next_log_id = 1;
 
 struct protolayer_globals protolayer_globals[PROTOLAYER_PROTOCOL_COUNT] = {{0}};
 
@@ -540,6 +542,7 @@ static struct protolayer_manager *protolayer_manager_new(
 	if (kr_fails_assert(num_layers))
 		return NULL;
 
+	size_t wire_buf_length = 0;
 	ssize_t offsets[2 * num_layers];
 	manager_size += sizeof(offsets);
 
@@ -550,15 +553,15 @@ static struct protolayer_manager *protolayer_manager_new(
 	size_t total_sess_data_size = 0;
 	size_t total_iter_data_size = 0;
 	for (size_t i = 0; i < num_layers; i++) {
-		sess_offsets[i] = protolayer_globals[protocols[i]].sess_size
-			? total_sess_data_size : -1;
-		total_sess_data_size += ALIGN_TO(protolayer_globals[protocols[i]].sess_size,
-				CPU_STRUCT_ALIGN);
+		const struct protolayer_globals *g = &protolayer_globals[protocols[i]];
 
-		iter_offsets[i] = protolayer_globals[protocols[i]].iter_size
-			? total_iter_data_size : -1;
-		total_iter_data_size += ALIGN_TO(protolayer_globals[protocols[i]].iter_size,
-				CPU_STRUCT_ALIGN);
+		sess_offsets[i] = g->sess_size ? total_sess_data_size : -1;
+		total_sess_data_size += ALIGN_TO(g->sess_size, CPU_STRUCT_ALIGN);
+
+		iter_offsets[i] = g->iter_size ? total_iter_data_size : -1;
+		total_iter_data_size += ALIGN_TO(g->iter_size, CPU_STRUCT_ALIGN);
+
+		wire_buf_length += g->wire_buf_overhead;
 	}
 	manager_size += total_sess_data_size;
 	cb_ctx_size += total_iter_data_size;
@@ -571,6 +574,9 @@ static struct protolayer_manager *protolayer_manager_new(
 	m->num_layers = num_layers;
 	m->cb_ctx_size = cb_ctx_size;
 	memcpy(m->data, offsets, sizeof(offsets));
+
+	int ret = wire_buf_init(&m->wire_buf, wire_buf_length);
+	kr_require(!ret);
 
 	/* Initialize the layer's session data */
 	for (size_t i = 0; i < num_layers; i++) {
@@ -603,6 +609,7 @@ static void protolayer_manager_free(struct protolayer_manager *m)
 		}
 	}
 
+	wire_buf_deinit(&m->wire_buf);
 	free(m);
 }
 
@@ -720,6 +727,7 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 		.transport = {
 			.type = transport_type,
 		},
+		.log_id = next_log_id++,
 		.outgoing = outgoing,
 		.tasks = trie_create(NULL),
 	};
@@ -735,10 +743,7 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 	mm_ctx_mempool(&s->pool, CPU_PAGE_SIZE);
 	queue_init(s->waiting);
 
-	int ret = wire_buf_init(&s->wire_buf, KNOT_WIRE_MAX_PKTSIZE);
-	kr_require(!ret);
-
-	ret = uv_timer_init(uv_default_loop(), &s->timer);
+	int ret = uv_timer_init(uv_default_loop(), &s->timer);
 	kr_require(!ret);
 	s->timer.data = s;
 	s->uv_count++; /* Session owns the timer */
@@ -753,7 +758,6 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 static void session2_free(struct session2 *s)
 {
 	protolayer_manager_free(s->layers);
-	wire_buf_deinit(&s->wire_buf);
 	mm_ctx_delete(&s->pool);
 	trie_free(s->tasks);
 	queue_deinit(s->waiting);

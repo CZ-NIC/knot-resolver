@@ -35,6 +35,9 @@
 
 #define HTTP_MAX_HEADER_IN_SIZE 1024
 
+/* Initial max frame size: https://tools.ietf.org/html/rfc7540#section-6.5.2 */
+#define HTTP_MAX_FRAME_SIZE 16384
+
 #define HTTP_FRAME_HDLEN 9
 #define HTTP_FRAME_PADLEN 1
 
@@ -864,7 +867,7 @@ static int pl_http_sess_init(struct protolayer_manager *manager,
 	http->current_method = HTTP_METHOD_NONE;
 	http->uri_path = NULL;
 	http->status = HTTP_STATUS_OK;
-	wire_buf_init(&http->wire_buf, KNOT_WIRE_MAX_PKTSIZE);
+	wire_buf_init(&http->wire_buf, manager->wire_buf.size);
 
 	ret = nghttp2_session_server_new(&http->h2, callbacks, http);
 	if (ret < 0)
@@ -1031,8 +1034,9 @@ void http_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_HTTP] = (struct protolayer_globals) {
 		.sess_size = sizeof(struct pl_http_sess_data),
-		.sess_init = pl_http_sess_init,
 		.sess_deinit = pl_http_sess_deinit,
+		.wire_buf_overhead = HTTP_MAX_FRAME_SIZE,
+		.sess_init = pl_http_sess_init,
 		.unwrap = pl_http_unwrap,
 		.wrap = pl_http_wrap,
 		.event_unwrap = pl_http_event_unwrap,

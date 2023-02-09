@@ -27,6 +27,7 @@
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE (60*60*24*7)
 #define GNUTLS_PIN_MIN_VERSION  0x030400
 #define UNWRAP_BUF_SIZE 16384
+#define TLS_CHUNK_SIZE (16 * 1024)
 
 #define VERBOSE_MSG(cl_side, ...)\
 	if (cl_side) \
@@ -1331,8 +1332,9 @@ void tls_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_TLS] = (struct protolayer_globals){
 		.sess_size = sizeof(struct pl_tls_sess_data),
-		.sess_init = pl_tls_sess_init,
 		.sess_deinit = pl_tls_sess_deinit,
+		.wire_buf_overhead = TLS_CHUNK_SIZE,
+		.sess_init = pl_tls_sess_init,
 		.unwrap = pl_tls_unwrap,
 		.wrap = pl_tls_wrap,
 		.event_unwrap = pl_tls_event_unwrap,

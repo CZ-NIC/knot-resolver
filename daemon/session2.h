@@ -65,6 +65,7 @@
 struct session2;
 struct protolayer_iter_ctx;
 
+
 /** Type of MAC addresses. */
 typedef uint8_t ethaddr_t[6];
 
@@ -99,6 +100,79 @@ struct comm_info {
 	ethaddr_t eth_to;
 	bool xdp:1;
 };
+
+
+/** A buffer, with indices marking the chunk containing valid data.
+ *
+ * May be initialized in two possible ways:
+ *  - via `wire_buf_init`
+ *  - to zero, then reserved via `wire_buf_reserve`. */
+struct wire_buf {
+	char *buf; /**< Buffer memory. */
+	size_t size; /**< Current size of the buffer memory. */
+	size_t start; /**< Index at which the valid data of the buffer starts (inclusive). */
+	size_t end; /**< Index at which the valid data of the buffer ends (exclusive). */
+};
+
+/** Initializes the wire buffer with the specified `initial_size` and allocates
+ * the underlying memory. */
+int wire_buf_init(struct wire_buf *wb, size_t initial_size);
+
+/** De-allocates the wire buffer's underlying memory (the struct itself is left
+ * intact). */
+void wire_buf_deinit(struct wire_buf *wb);
+
+/** Ensures that the wire buffer's size is at least `size`. `*wb` must be
+ * initialized, either to zero or via `wire_buf_init`. */
+int wire_buf_reserve(struct wire_buf *wb, size_t size);
+
+/** Adds `length` to the end index of the valid data, marking `length` more
+ * bytes as valid.
+ *
+ * Returns 0 on success.
+ * Returns `kr_error(EINVAL)` if the end index would exceed the
+ * buffer size. */
+int wire_buf_consume(struct wire_buf *wb, size_t length);
+
+/** Adds `length` to the start index of the valid data, marking `length` less
+ * bytes as valid.
+ *
+ * Returns 0 on success.
+ * Returns `kr_error(EINVAL)` if the start index would exceed
+ * the end index. */
+int wire_buf_trim(struct wire_buf *wb, size_t length);
+
+/** Moves the valid bytes of the buffer to the buffer's beginning. */
+int wire_buf_movestart(struct wire_buf *wb);
+
+/** Resets the valid bytes of the buffer to zero, as well as the error flag. */
+int wire_buf_reset(struct wire_buf *wb);
+
+/** Gets a pointer to the data marked as valid in the wire buffer. */
+static inline void *wire_buf_data(const struct wire_buf *wb)
+{
+	return &wb->buf[wb->start];
+}
+
+/** Gets the length of the data marked as valid in the wire buffer. */
+static inline size_t wire_buf_data_length(const struct wire_buf *wb)
+{
+	return wb->end - wb->start;
+}
+
+/** Gets a pointer to the free space after the valid data of the wire buffer. */
+static inline void *wire_buf_free_space(const struct wire_buf *wb)
+{
+	return &wb->buf[wb->end];
+}
+
+/** Gets the length of the free space after the valid data of the wire buffer. */
+static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
+{
+	return wb->size - wb->end;
+}
+
+
 
 /** Protocol layer types map - an enumeration of individual protocol layer
  * implementations
@@ -519,6 +593,7 @@ typedef void (*protolayer_request_cb)(struct protolayer_manager *manager,
  * interpreted. */
 struct protolayer_manager {
 	enum protolayer_grp grp;
+	struct wire_buf wire_buf;
 	struct session2 *session;
 	size_t num_layers;
 	size_t cb_ctx_size; /**< Size of a single callback context, including
@@ -578,6 +653,11 @@ struct protolayer_globals {
 	 * The struct MUST begin with the `PROTOLAYER_DATA_HEADER()` macro. If
 	 * no iteration struct is used by the layer, the value may be zero. */
 	size_t iter_size;
+
+	/** Number of bytes that this layer adds onto the session's wire
+	 * buffer. All overheads in a group are summed together to form the
+	 * resulting wire buffer length. */
+	size_t wire_buf_overhead;
 
 	/** Called during session creation to initialize
 	 * layer-specific session data. The data is always provided
@@ -650,77 +730,6 @@ static inline enum protolayer_iter_cb_result protolayer_async(void)
 }
 
 
-/** A buffer, with indices marking the chunk containing valid data.
- *
- * May be initialized in two possible ways:
- *  - via `wire_buf_init`
- *  - to zero, then reserved via `wire_buf_reserve`. */
-struct wire_buf {
-	char *buf; /**< Buffer memory. */
-	size_t size; /**< Current size of the buffer memory. */
-	size_t start; /**< Index at which the valid data of the buffer starts (inclusive). */
-	size_t end; /**< Index at which the valid data of the buffer ends (exclusive). */
-};
-
-/** Initializes the wire buffer with the specified `initial_size` and allocates
- * the underlying memory. */
-int wire_buf_init(struct wire_buf *wb, size_t initial_size);
-
-/** De-allocates the wire buffer's underlying memory (the struct itself is left
- * intact). */
-void wire_buf_deinit(struct wire_buf *wb);
-
-/** Ensures that the wire buffer's size is at least `size`. `*wb` must be
- * initialized, either to zero or via `wire_buf_init`. */
-int wire_buf_reserve(struct wire_buf *wb, size_t size);
-
-/** Adds `length` to the end index of the valid data, marking `length` more
- * bytes as valid.
- *
- * Returns 0 on success.
- * Returns `kr_error(EINVAL)` if the end index would exceed the
- * buffer size. */
-int wire_buf_consume(struct wire_buf *wb, size_t length);
-
-/** Adds `length` to the start index of the valid data, marking `length` less
- * bytes as valid.
- *
- * Returns 0 on success.
- * Returns `kr_error(EINVAL)` if the start index would exceed
- * the end index. */
-int wire_buf_trim(struct wire_buf *wb, size_t length);
-
-/** Moves the valid bytes of the buffer to the buffer's beginning. */
-int wire_buf_movestart(struct wire_buf *wb);
-
-/** Resets the valid bytes of the buffer to zero, as well as the error flag. */
-int wire_buf_reset(struct wire_buf *wb);
-
-/** Gets a pointer to the data marked as valid in the wire buffer. */
-static inline void *wire_buf_data(const struct wire_buf *wb)
-{
-	return &wb->buf[wb->start];
-}
-
-/** Gets the length of the data marked as valid in the wire buffer. */
-static inline size_t wire_buf_data_length(const struct wire_buf *wb)
-{
-	return wb->end - wb->start;
-}
-
-/** Gets a pointer to the free space after the valid data of the wire buffer. */
-static inline void *wire_buf_free_space(const struct wire_buf *wb)
-{
-	return &wb->buf[wb->end];
-}
-
-/** Gets the length of the free space after the valid data of the wire buffer. */
-static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
-{
-	return wb->size - wb->end;
-}
-
-
 /** Indicates how a session sends data in the `wrap` direction and receives
  * data in the `unwrap` direction. */
 enum session2_transport_type {
@@ -773,6 +782,8 @@ struct session2 {
 	queue_t(struct qr_task *) waiting; /**< List of tasks waiting for
 	                                    * sending to upstream. */
 
+	uint32_t log_id; /**< Session ID for logging. */
+
 	int uv_count; /**< Number of unclosed libUV handles owned by this
 	               * session. */
 
@@ -780,9 +791,6 @@ struct session2 {
 	 * first layers facilitating transport protocol processing.
 	 * Zero-initialized by default. */
 	struct comm_info comm;
-
-	/** Managed buffer for data received by `io`. */
-	struct wire_buf wire_buf;
 
 	/** Time of last IO activity (if any occurs). Otherwise session
 	 * creation time. */

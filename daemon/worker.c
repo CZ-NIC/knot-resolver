@@ -621,7 +621,6 @@ static void qr_task_wrap_finished(int status, struct session2 *session,
 	struct qr_task *task = baton;
 	qr_task_on_send(task, session, status);
 	qr_task_unref(task);
-	wire_buf_reset(&session->wire_buf);
 }
 
 static int qr_task_send(struct qr_task *task, struct session2 *session,
@@ -1709,7 +1708,7 @@ void worker_deinit(void)
 	the_worker = NULL;
 }
 
-static inline knot_pkt_t *produce_packet(char *buf, size_t buf_len)
+static inline knot_pkt_t *produce_packet(uint8_t *buf, size_t buf_len)
 {
 	return knot_pkt_new(buf, buf_len, &the_worker->pkt_pool);
 }
@@ -1894,7 +1893,7 @@ static enum protolayer_event_cb_result pl_dns_stream_resolution_timeout(
 static enum protolayer_event_cb_result pl_dns_stream_connected(
 		struct session2 *session)
 {
-	if (session->connected)
+	if (kr_fails_assert(!session->connected))
 		return PROTOLAYER_EVENT_PROPAGATE;
 
 	session->connected = true;
@@ -2041,7 +2040,7 @@ static enum protolayer_event_cb_result pl_dns_stream_event_unwrap(
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
-static knot_pkt_t *produce_stream_packet(struct session2 *session,
+static knot_pkt_t *stream_produce_packet(struct session2 *session,
                                          struct wire_buf *wb,
                                          bool *out_err)
 {
@@ -2054,25 +2053,70 @@ static knot_pkt_t *produce_stream_packet(struct session2 *session,
 		return NULL;
 	}
 
-	uint16_t pkt_len = knot_wire_read_u16(wire_buf_data(wb));
-	if (pkt_len == 0) {
+	uint16_t msg_len = knot_wire_read_u16(wire_buf_data(wb));
+	if (msg_len == 0) {
 		*out_err = true;
 		return NULL;
 	}
-	if (pkt_len >= wb->size) {
+	if (msg_len >= wb->size) {
 		*out_err = true;
 		return NULL;
 	}
-	if (wire_buf_data_length(wb) < pkt_len + sizeof(uint16_t)) {
+	if (wire_buf_data_length(wb) < msg_len + sizeof(uint16_t)) {
 		return NULL;
 	}
 
+	uint8_t *wire = (uint8_t *)wire_buf_data(wb) + sizeof(uint16_t);
+
 	session->was_useful = true;
-	wire_buf_trim(wb, sizeof(uint16_t));
-	knot_pkt_t *pkt = produce_packet(wire_buf_data(wb), pkt_len);
+	knot_pkt_t *pkt = produce_packet(wire, msg_len);
 	*out_err = (pkt == NULL);
-	wire_buf_trim(wb, pkt_len);
 	return pkt;
+}
+
+static int stream_discard_packet(struct session2 *session,
+                                 struct wire_buf *wb,
+                                 const knot_pkt_t *pkt,
+                                 bool *out_err)
+{
+	*out_err = true;
+
+	if (kr_fails_assert(wire_buf_data_length(wb) >= sizeof(uint16_t))) {
+		wire_buf_reset(wb);
+		return kr_error(EINVAL);
+	}
+
+	size_t msg_size = knot_wire_read_u16(wire_buf_data(wb));
+	uint8_t *wire = (uint8_t *)wire_buf_data(wb) + sizeof(uint16_t);
+	if (kr_fails_assert(msg_size + sizeof(uint16_t) <= wire_buf_data_length(wb))) {
+		/* TCP message length field is greater then
+		 * number of bytes in buffer, must not happen. */
+		wire_buf_reset(wb);
+		return kr_error(EINVAL);
+	}
+
+	if (kr_fails_assert(wire == pkt->wire)) {
+		/* packet wirebuf must be located at the beginning
+		 * of the session wirebuf, must not happen. */
+		wire_buf_reset(wb);
+		return kr_error(EINVAL);
+	}
+
+	if (kr_fails_assert(msg_size >= pkt->size)) {
+		wire_buf_reset(wb);
+		return kr_error(EINVAL);
+	}
+
+	wire_buf_trim(wb, msg_size + sizeof(uint16_t));
+	*out_err = false;
+
+	if (wire_buf_data_length(wb) == 0) {
+		wire_buf_reset(wb);
+	} else if (wire_buf_data_length(wb) < KNOT_WIRE_HEADER_SIZE) {
+		wire_buf_movestart(wb);
+	}
+
+	return kr_ok();
 }
 
 static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
@@ -2097,7 +2141,7 @@ static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
 
 	bool pkt_error = false;
 	knot_pkt_t *pkt = NULL;
-	while ((pkt = produce_stream_packet(session, wb, &pkt_error)) && iters < max_iters) {
+	while ((pkt = stream_produce_packet(session, wb, &pkt_error)) && iters < max_iters) {
 		if (kr_fails_assert(!pkt_error)) {
 			status = kr_error(EINVAL);
 			goto exit;
@@ -2112,14 +2156,17 @@ static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
 		}
 
 		stream_sess->produced = true;
-
 		int ret = worker_submit(session, &ctx->comm, pkt);
-		wire_buf_movestart(wb);
 
 		/* Errors from worker_submit() are intentionally *not* handled
 		 * in order to ensure the entire wire buffer is processed. */
 		if (ret == kr_ok()) {
 			iters += 1;
+		}
+		if (stream_discard_packet(session, wb, pkt, &pkt_error) < 0) {
+			/* Packet data isn't stored in memory as expected.
+			 * something went wrong, normally should not happen. */
+			break;
 		}
 	}
 
@@ -2221,10 +2268,12 @@ int worker_init(void)
 
 	/* DNS protocol layers */
 	protolayer_globals[PROTOLAYER_DNS_DGRAM] = (struct protolayer_globals){
+		.wire_buf_overhead = KNOT_WIRE_MAX_PKTSIZE,
 		.unwrap = pl_dns_dgram_unwrap,
 		.event_unwrap = pl_dns_dgram_event_unwrap
 	};
 	protolayer_globals[PROTOLAYER_DNS_UNSIZED_STREAM] = (struct protolayer_globals){
+		.wire_buf_overhead = KNOT_WIRE_MAX_PKTSIZE,
 		.sess_init = pl_dns_stream_sess_init,
 		.unwrap = pl_dns_dgram_unwrap,
 		.event_unwrap = pl_dns_stream_event_unwrap,
@@ -2232,8 +2281,9 @@ int worker_init(void)
 	};
 	const struct protolayer_globals stream_common = {
 		.sess_size = sizeof(struct pl_dns_stream_sess_data),
-		.sess_init = NULL, /* replaced in specific layers below */
 		.iter_size = sizeof(struct pl_dns_stream_iter_data),
+		.wire_buf_overhead = KNOT_WIRE_MAX_PKTSIZE,
+		.sess_init = NULL, /* replaced in specific layers below */
 		.iter_deinit = pl_dns_stream_iter_deinit,
 		.unwrap = pl_dns_stream_unwrap,
 		.wrap = pl_dns_stream_wrap,

@@ -49,23 +49,15 @@ static void check_bufsize(uv_handle_t* handle)
 
 static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
 {
-	/* UDP sessions use worker buffer for wire data,
-	 * TCP sessions use session buffer for wire data
-	 * (see session_set_handle()).
-	 * TLS sessions use buffer from TLS context.
-	 * The content of the worker buffer is
-	 * guaranteed to be unchanged only for the duration of
-	 * udp_read() and tcp_read().
-	 */
 	struct session2 *s = handle->data;
-	buf->base = wire_buf_free_space(&s->wire_buf);
-	buf->len = wire_buf_free_space_length(&s->wire_buf);
+	buf->base = wire_buf_free_space(&s->layers->wire_buf);
+	buf->len = wire_buf_free_space_length(&s->layers->wire_buf);
 }
 
 static void udp_on_unwrapped(int status, struct session2 *session,
                              const struct comm_info *comm, void *baton)
 {
-	wire_buf_reset(&session->wire_buf);
+	wire_buf_reset(&session->layers->wire_buf);
 }
 
 void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
@@ -86,9 +78,9 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		}
 	}
 
-	int ret = wire_buf_consume(&s->wire_buf, nread);
+	int ret = wire_buf_consume(&s->layers->wire_buf, nread);
 	if (ret) {
-		wire_buf_reset(&s->wire_buf);
+		wire_buf_reset(&s->layers->wire_buf);
 		return;
 	}
 
@@ -96,7 +88,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		.comm_addr = comm_addr,
 		.src_addr = comm_addr
 	};
-	session2_unwrap(s, protolayer_wire_buf(&s->wire_buf), &in_comm,
+	session2_unwrap(s, protolayer_wire_buf(&s->layers->wire_buf), &in_comm,
 			udp_on_unwrapped, NULL);
 }
 
@@ -519,13 +511,17 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		return;
 	}
 
-	int ret = wire_buf_consume(&s->wire_buf, nread);
-	if (ret) {
-		wire_buf_reset(&s->wire_buf);
+	if (kr_fails_assert(buf->base == wire_buf_free_space(&s->layers->wire_buf))) {
 		return;
 	}
 
-	session2_unwrap(s, protolayer_wire_buf(&s->wire_buf), NULL, NULL, NULL);
+	int ret = wire_buf_consume(&s->layers->wire_buf, nread);
+	if (ret) {
+		wire_buf_reset(&s->layers->wire_buf);
+		return;
+	}
+
+	session2_unwrap(s, protolayer_wire_buf(&s->layers->wire_buf), NULL, NULL, NULL);
 }
 
 static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp)
