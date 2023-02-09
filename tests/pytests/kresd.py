@@ -50,7 +50,8 @@ Forward = namedtuple('Forward', ['proto', 'ip', 'port', 'hostname', 'ca_file'])
 class Kresd(ContextDecorator):
     def __init__(
             self, workdir, port=None, tls_port=None, ip=None, ip6=None, certname=None,
-            verbose=True, hints=None, forward=None, policy_test_pass=False):
+            verbose=True, hints=None, forward=None, policy_test_pass=False, rr=False,
+            valgrind=False):
         if ip is None and ip6 is None:
             raise ValueError("IPv4 or IPv6 must be specified!")
         self.workdir = str(workdir)
@@ -65,6 +66,8 @@ class Kresd(ContextDecorator):
         self.hints = {} if hints is None else hints
         self.forward = forward
         self.policy_test_pass = policy_test_pass
+        self.rr = rr
+        self.valgrind = valgrind
 
         if certname:
             self.tls_cert_path = os.path.join(CERTS_DIR, certname + '.cert.pem')
@@ -93,8 +96,15 @@ class Kresd(ContextDecorator):
 
         create_file_from_template(KRESD_CONF_TEMPLATE, self.config_path, {'kresd': self})
         self.logfile = open(self.logfile_path, 'w', encoding='UTF-8')
+
+        proc_args = ['kresd', '-c', self.config_path, '-n', self.workdir]
+        if self.rr:
+            proc_args = ['rr', 'record', '--'] + proc_args
+        if self.valgrind:
+            proc_args = ['valgrind', '--'] + proc_args
+
         self.process = subprocess.Popen(
-            ['kresd', '-c', self.config_path, '-n', self.workdir],
+            proc_args,
             stderr=self.logfile, env=os.environ.copy())
 
         try:
