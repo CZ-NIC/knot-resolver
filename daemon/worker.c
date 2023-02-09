@@ -2041,16 +2041,36 @@ static enum protolayer_event_cb_result pl_dns_stream_event_unwrap(
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
-static knot_pkt_t *produce_stream_packet(struct wire_buf *wb)
+static knot_pkt_t *produce_stream_packet(struct session2 *session,
+                                         struct wire_buf *wb,
+                                         bool *out_err)
 {
-	uint16_t pkt_len = knot_wire_read_u16(wire_buf_data(wb));
-	if (wire_buf_data_length(wb) < pkt_len + sizeof(uint16_t)) {
+	*out_err = false;
+	if (wire_buf_data_length(wb) == 0) {
 		wire_buf_reset(wb);
 		return NULL;
 	}
+	if (wire_buf_data_length(wb) < sizeof(uint16_t)) {
+		return NULL;
+	}
 
+	uint16_t pkt_len = knot_wire_read_u16(wire_buf_data(wb));
+	if (pkt_len == 0) {
+		*out_err = true;
+		return NULL;
+	}
+	if (pkt_len >= wb->size) {
+		*out_err = true;
+		return NULL;
+	}
+	if (wire_buf_data_length(wb) < pkt_len + sizeof(uint16_t)) {
+		return NULL;
+	}
+
+	session->was_useful = true;
 	wire_buf_trim(wb, sizeof(uint16_t));
 	knot_pkt_t *pkt = produce_packet(wire_buf_data(wb), pkt_len);
+	*out_err = (pkt == NULL);
 	wire_buf_trim(wb, pkt_len);
 	return pkt;
 }
@@ -2075,8 +2095,13 @@ static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
 		(KNOT_WIRE_HEADER_SIZE + KNOT_WIRE_QUESTION_MIN_SIZE)) + 1;
 	int iters = 0;
 
-	knot_pkt_t *pkt;
-	while ((pkt = produce_stream_packet(wb)) && iters < max_iters) {
+	bool pkt_error = false;
+	knot_pkt_t *pkt = NULL;
+	while ((pkt = produce_stream_packet(session, wb, &pkt_error)) && iters < max_iters) {
+		if (kr_fails_assert(!pkt_error)) {
+			status = kr_error(EINVAL);
+			goto exit;
+		}
 		if (stream_sess->single && stream_sess->produced) {
 			if (kr_log_is_debug(WORKER, NULL)) {
 				kr_log_debug(WORKER, "Unexpected extra data from %s\n",
@@ -2087,11 +2112,12 @@ static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
 		}
 
 		stream_sess->produced = true;
-		if (pkt)
-			session->was_useful = true;
 
 		int ret = worker_submit(session, &ctx->comm, pkt);
 		wire_buf_movestart(wb);
+
+		/* Errors from worker_submit() are intentionally *not* handled
+		 * in order to ensure the entire wire buffer is processed. */
 		if (ret == kr_ok()) {
 			iters += 1;
 		}
@@ -2100,7 +2126,7 @@ static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
 	/* worker_submit() may cause the session to close (e.g. due to IO
 	 * write error when the packet triggers an immediate answer). This is
 	 * an error state, as well as any wirebuf error. */
-	if (session->closing)
+	if (session->closing || pkt_error)
 		status = kr_error(EIO);
 
 exit:

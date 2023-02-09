@@ -412,6 +412,11 @@ typedef queue_t(struct protolayer_iter_ctx *) protolayer_iter_ctx_queue_t;
  * available in it. */
 size_t protolayer_queue_count_payload(const protolayer_iter_ctx_queue_t *queue);
 
+/** Checks if the specified `queue` has any payload data (i.e.
+ * `protolayer_queue_count_payload` would be non-zero). This optimizes calls to
+ * queue iterators, as it does not need to iterate through the whole queue. */
+bool protolayer_queue_has_payload(const protolayer_iter_ctx_queue_t *queue);
+
 /** Mandatory header members for any layer-specific data. */
 #define PROTOLAYER_DATA_HEADER() struct {\
 	struct session2 *session; /**< Pointer to the owner session. */\

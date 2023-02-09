@@ -104,11 +104,11 @@ static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 		return -1;
 	}
 
-	size_t avail = protolayer_queue_count_payload(&tls->unwrap_queue);
-	DEBUG_MSG("[%s] pull wanted: %zu avail: %zu\n",
+	bool avail = protolayer_queue_has_payload(&tls->unwrap_queue);
+	DEBUG_MSG("[%s] pull wanted: %zu avail: %s\n",
 			tls->client_side ? "tls_client" : "tls",
-			len, avail);
-	if (avail == 0) {
+			len, avail ? "yes" : "no");
+	if (!avail) {
 		errno = EAGAIN;
 		return -1;
 	}
@@ -1088,7 +1088,7 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 				wire_buf_free_space(&tls->unwrap_buf),
 				wire_buf_free_space_length(&tls->unwrap_buf));
 		if (count == GNUTLS_E_AGAIN) {
-			if (protolayer_queue_count_payload(&tls->unwrap_queue) == 0) {
+			if (!protolayer_queue_has_payload(&tls->unwrap_queue)) {
 				/* See https://www.gnutls.org/manual/html_node/Asynchronous-operation.html */
 				break;
 			}
@@ -1146,7 +1146,7 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 	}
 
 	/* Here all data must be consumed. */
-	while (protolayer_queue_count_payload(&tls->unwrap_queue) > 0) {
+	if (protolayer_queue_has_payload(&tls->unwrap_queue)) {
 		/* Something went wrong, better return error.
 		 * This is most probably due to gnutls_record_recv() did not
 		 * consume all available network data by calling kres_gnutls_pull().
@@ -1200,8 +1200,9 @@ static ssize_t pl_tls_submit(gnutls_session_t tls_session,
 	return kr_error(EINVAL);
 }
 
-static enum protolayer_iter_cb_result pl_tls_wrap(void *sess_data, void *iter_data,
-                                             struct protolayer_iter_ctx *ctx)
+static enum protolayer_iter_cb_result pl_tls_wrap(
+		void *sess_data, void *iter_data,
+		struct protolayer_iter_ctx *ctx)
 {
 	struct pl_tls_sess_data *tls = sess_data;
 	gnutls_session_t tls_session = tls->tls_session;
