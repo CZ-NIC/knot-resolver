@@ -16,6 +16,13 @@ def register_command(cls: T) -> T:
     return cls
 
 
+def get_help_command() -> Type["Command"]:
+    for command in _registered_commands:
+        if command.__name__ == "HelpCommand":
+            return command
+    raise ValueError("missing HelpCommand")
+
+
 def install_commands_parsers(parser: argparse.ArgumentParser) -> None:
     subparsers = parser.add_subparsers(help="command type")
     for command in _registered_commands:
@@ -30,6 +37,8 @@ class CommandArgs:
             self.socket = f'http+unix://{quote(self.socket, safe="")}/'
         if self.socket.endswith("/"):
             self.socket = self.socket[:-1]
+        if not hasattr(namespace, "command"):
+            setattr(namespace, "command", get_help_command())
 
         self.command: Type["Command"] = namespace.command
         self.parser = parser
