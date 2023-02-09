@@ -54,6 +54,8 @@ typedef uint8_t val_zla_type_t;
 enum {
 	/** Empty zone. No data in DB value after this byte. */
 	VAL_ZLAT_EMPTY = 1,
+	/** Forced NXDOMAIN. */
+	VAL_ZLAT_NXDOMAIN,
 	/** Redirect: anything beneath has the same data as apex (except NS+SOA). */
 	VAL_ZLAT_REDIRECT,
 };
@@ -61,7 +63,7 @@ enum {
 
 static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,
 		const uint8_t *data, const uint8_t *data_bound);
-static int answer_zla_empty(struct kr_query *qry, knot_pkt_t *pkt,
+static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_t *pkt,
 		knot_db_val_t zla_lf, knot_db_val_t val);
 static int answer_zla_redirect(struct kr_query *qry, knot_pkt_t *pkt, const char *ruleset_name,
 				knot_db_val_t zla_lf, knot_db_val_t val);
@@ -399,7 +401,8 @@ int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 			++val.data; --val.len;
 			switch (ztype) {
 			case VAL_ZLAT_EMPTY:
-				return answer_zla_empty(qry, pkt, zla_lf, val);
+			case VAL_ZLAT_NXDOMAIN:
+				return answer_zla_empty(ztype, qry, pkt, zla_lf, val);
 			case VAL_ZLAT_REDIRECT:
 				return answer_zla_redirect(qry, pkt, ruleset_name, zla_lf, val);
 			default:
@@ -547,9 +550,12 @@ int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags)
 	return ret == 0 ? 1 : ret;
 }
 
-static int answer_zla_empty(struct kr_query *qry, knot_pkt_t *pkt,
+/** Empty or NXDOMAIN */
+static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_t *pkt,
 				const knot_db_val_t zla_lf, const knot_db_val_t val)
 {
+	if (kr_fails_assert(type == VAL_ZLAT_EMPTY || type == VAL_ZLAT_NXDOMAIN))
+		return kr_error(EINVAL);
 	if (kr_fails_assert(val.len == 0)) {
 		kr_log_error(RULES, "ERROR: unused bytes: %zu\n", val.len);
 		return kr_error(EILSEQ);
@@ -566,7 +572,7 @@ static int answer_zla_empty(struct kr_query *qry, knot_pkt_t *pkt,
 	memset(&arrset, 0, sizeof(arrset));
 
 	/* Construct SOA or NS data (hardcoded content). */
-	const bool name_matches = knot_dname_is_equal(qry->sname, apex_name);
+	const bool name_matches = type != VAL_ZLAT_NXDOMAIN && knot_dname_is_equal(qry->sname, apex_name);
 	const bool want_NS = name_matches && qry->stype == KNOT_RRTYPE_NS;
 	arrset.set.rr = knot_rrset_new(apex_name, want_NS ? KNOT_RRTYPE_NS : KNOT_RRTYPE_SOA,
 					KNOT_CLASS_IN, RULE_TTL_DEFAULT, &pkt->mm);
@@ -574,6 +580,7 @@ static int answer_zla_empty(struct kr_query *qry, knot_pkt_t *pkt,
 		return kr_error(ENOMEM);
 	if (want_NS) {
 		kr_require(zla_lf.len + 2 == knot_dname_size(apex_name));
+		// TODO: maybe it's weird to use this NS name, but what else?
 		ret = knot_rrset_add_rdata(arrset.set.rr, apex_name, zla_lf.len + 2, &pkt->mm);
 	} else {
 		ret = knot_rrset_add_rdata(arrset.set.rr, soa_rdata,
@@ -605,7 +612,8 @@ static int answer_zla_empty(struct kr_query *qry, knot_pkt_t *pkt,
 	qry->flags.CACHED = true;
 	qry->flags.NO_MINIMIZE = true;
 
-	VERBOSE_MSG(qry, "=> satisfied by local data (empty zone)\n");
+	VERBOSE_MSG(qry, "=> satisfied by local data (%s zone)\n",
+		     type == VAL_ZLAT_EMPTY ? "empty" : "nxdomain");
 	return kr_ok();
 }
 
@@ -709,6 +717,10 @@ static int insert_trivial_zone(val_zla_type_t ztype,
 int kr_rule_local_data_emptyzone(const knot_dname_t *apex, kr_rule_tags_t tags)
 {
 	return insert_trivial_zone(VAL_ZLAT_EMPTY, apex, tags);
+}
+int kr_rule_local_data_nxdomain(const knot_dname_t *apex, kr_rule_tags_t tags)
+{
+	return insert_trivial_zone(VAL_ZLAT_NXDOMAIN, apex, tags);
 }
 int kr_rule_local_data_redirect(const knot_dname_t *apex, kr_rule_tags_t tags)
 {

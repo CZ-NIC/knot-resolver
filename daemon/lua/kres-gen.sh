@@ -289,6 +289,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_view_select_action
 	kr_rule_tag_add
 	kr_rule_local_data_emptyzone
+	kr_rule_local_data_nxdomain
 EOF
 
 

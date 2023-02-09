@@ -480,6 +480,7 @@ int kr_view_insert_action(const char *, const char *);
 int kr_view_select_action(const struct kr_request *, knot_db_val_t *);
 int kr_rule_tag_add(const char *, kr_rule_tags_t *);
 int kr_rule_local_data_emptyzone(const knot_dname_t *, kr_rule_tags_t);
+int kr_rule_local_data_nxdomain(const knot_dname_t *, kr_rule_tags_t);
 typedef struct {
 	int sock_type;
 	_Bool tls;

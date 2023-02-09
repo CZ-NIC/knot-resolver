@@ -63,13 +63,19 @@ int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_r
 KR_EXPORT
 int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags);
 
+// TODO: perhaps expose an enum to unify these simple subtree rules?
+
 /** Insert an empty zone.
- * Into the default rule-set ATM.  SOA for generated NODATA isn't overridable. */
+ * Into the default rule-set ATM.  SOA and NS for generated answers aren't overridable. */
 KR_EXPORT
 int kr_rule_local_data_emptyzone(const knot_dname_t *apex, kr_rule_tags_t tags);
 
+/** Insert an "NXDOMAIN zone".  TODO: SOA owner is hard. */
+KR_EXPORT
+int kr_rule_local_data_nxdomain(const knot_dname_t *apex, kr_rule_tags_t tags);
+
 /** Insert a redirect zone.
- * Into the default rule-set ATM.  SOA for generated NODATA isn't overridable. */
+ * Into the default rule-set ATM.  SOA for generated NODATA answers isn't overridable. */
 KR_EXPORT
 int kr_rule_local_data_redirect(const knot_dname_t *apex, kr_rule_tags_t tags);
 
