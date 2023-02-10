@@ -21,7 +21,7 @@ For more information about systemd integration see ``man knot-resolver.systemd``
     To start and enable service in one command use ``systemctl enable --now knot-resolver.service``
 
 Unfortunately, for some cases (typically Docker and minimalistic systems), ``systemd`` is not available, therefore it is not possible to use ``knot-resolver.service``.
-If you have this problem, look at :ref:`usage without systemd <config-no-systemd>` section.
+If you have this problem, look at :ref:`usage without systemd <manager-no-systemd>` section.
 
 
 ===============

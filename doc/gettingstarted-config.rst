@@ -13,10 +13,8 @@ Configuration
 Easiest way to configure Knot Resolver is to put configuration to ``/etc/knot-resolver/config.yml`` file.
 
 The first thing you will probably want to configure are the network interfaces to listen to.
-
 The following example instructs the resolver to receive standard unencrypted DNS queries on ``192.0.2.1`` and ``2001:db8::1`` IP addresses.
 Encrypted DNS queries using ``DNS-over-TLS`` protocol are accepted on all IP addresses of ``eth0`` network interface, TCP port ``853``.
-For more details look at the :ref:`network configuration <config-network>`.
 
 .. code-block:: yaml
 
@@ -27,6 +25,13 @@ For more details look at the :ref:`network configuration <config-network>`.
             port: 853
             kind: 'dot' # DNS-over-TLS
 
+For more details look at the :ref:`network configuration <config-network>`.
+
+.. warning::
+
+    On machines with multiple IP addresses on the same interface avoid listening on wildcards ``0.0.0.0`` or ``::``.
+    Knot Resolver could answer from different IP addresses if the network address ranges overlap, and clients would refuse such a response.
+
 You can also start exploring the configuration by reading about :ref:`common use cases <usecases-chapter>` or look at the complete :ref:`configuration <configuration-chapter>` documentation.
 
 Complete configurations files examples can be found `here <https://gitlab.nic.cz/knot/knot-resolver/tree/master/etc/config>`_.
@@ -34,9 +39,9 @@ Examples are also installed as documentation files, typically in ``/usr/share/do
 
 .. tip::
 
-    An easy way to see the complete configuration structure is to look at the `JSON Schema <https://json-schema.org/>`_ of the configuration format with some graphical visualizer such as `this one <https://json-schema.app/>`_.
-    The raw schema is accessible from every running Knot Resolver at the HTTP API socket at path ``/schema`` or on `this link <_static/config.schema.json>`_ (valid only for the version of resolver this documentation was generated for)
-
+    An easy way to see the complete configuration structure is to look at the `JSON schema <https://json-schema.org/>`_ represention.
+    The raw JSON schema is available at `this link <_static/config.schema.json>`_ (valid only for the version of resolver this documentation was generated for).
+    For the schema readability, some graphical visualizer can be used, for example `this one <https://json-schema.app/>`_.
 
 ==========
 Validation
@@ -44,7 +49,7 @@ Validation
 
 Knot Resolver's configuration follows strict schema for validation.
 
-You can use :ref:` kresctl <manager-client>` utility to validate your configuration before pushing it into the running resolver.
+You can use :ref:`kresctl <manager-client>` utility to validate your configuration before pushing it into the running resolver.
 It should help prevent many typos in the configuration.
 
 .. code-block::

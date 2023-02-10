@@ -2,9 +2,9 @@
 
 .. _gettingstarted-install:
 
-************************
-Installation and Startup
-************************
+************
+Installation
+************
 
 As a first step, configure your system to use upstream repositories which have
 the **latest version** of Knot Resolver. Follow the instructions below for your
