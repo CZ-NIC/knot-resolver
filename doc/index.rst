@@ -4,10 +4,11 @@
 Knot Resolver
 #############
 
-Knot Resolver is a minimalistic implementation of a caching validating DNS resolver.
-Modular architecture keeps the core tiny and efficient,
-and it provides a state-machine like API for extensions.
+Welcome to Knot Resolver's documentation!
+Knot Resolver is an opensource implementation of a caching validating DNS resolver.
+Modular architecture keeps the core tiny and efficient, and it also provides a state-machine like API for extensions.
 
+If you are a new user, please start with chapter for :ref:`getting started <gettingstarted>`.
 
 .. toctree::
    :caption: Getting Started
@@ -25,6 +26,7 @@ and it provides a state-machine like API for extensions.
    :maxdepth: 1
 
    legacy
+
 
 .. toctree::
    :caption: Common Use Cases
