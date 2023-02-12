@@ -1,10 +1,10 @@
 .. SPDX-License-Identifier: GPL-3.0-or-later
 
-.. _legacy-approach:
+.. _advanced-no-manager:
 
-***************
-Legacy approach
-***************
+***********************************
+Advanced: Usage without the manager
+***********************************
 
 If you want to continue using Knot Resolver as before version ``6.0.0`` this is chapter for you.
 For new and less experienced users, we recommend using the newer approach starting in :ref:`Getting Started <gettingstarted-intro>` chapter.
@@ -15,11 +15,11 @@ There are a few downsides to using the legacy approach that need to be mentioned
 * manual process management
 
 
-.. _legacy-startup:
+.. _advanced-no-manager-startup:
 
-**************
-Daemon startup
-**************
+=======
+Startup
+=======
 
 The legacy way to start Knot Resolver is to run single instance of its resolving daemon manualy using ``kresd@`` systemd integration.
 The daemon is single thread process.
@@ -30,14 +30,14 @@ The daemon is single thread process.
 
 .. tip::
 
-    For more information about Systemd integration see man kresd.systemd.
+    For more information about ``systemd`` integration see ``man kresd.systemd``.
 
 
-.. _legacy-config:
+.. _advanced-no-manager-config:
 
-*****************
-Lua configuration
-*****************
+=============
+Configuration
+=============
 
 Legacy way to configure Knot Resolver is to paste your Lua code typically into ``/etc/knot-resolver/kresd.conf`` configuration script.
 The resolver's daemon is preconfigure to load this script when using ``kresd@`` systemd integration.

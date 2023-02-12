@@ -20,19 +20,13 @@ If you are a new user, please start with chapter for :ref:`getting started <gett
    gettingstarted-startup
    gettingstarted-config
 
-.. toctree::
-   :caption: Legacy
-   :name: legacy-chapter
-   :maxdepth: 1
-
-   legacy
-
 
 .. toctree::
-   :caption: Common Use Cases
+   :caption: Use Cases
    :name: usecases-chapter
    :maxdepth: 1
 
+   advanced-no-manager
    usecase-personal-resolver
    usecase-internal-resolver
    usecase-isp-resolver

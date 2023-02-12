@@ -12,6 +12,8 @@ This chapter will introduce Knot Resolver and will guide you through :ref:`insta
 Introduction
 ************
 
+If you are an advanced user and want to use Knot Resolver like before version 6, you can switch to :ref:`usage without the manager <advanced-no-manager>`, for other users, it is recommended to stick to this chapter.
+
 ==================
 Basic architecture
 ==================
