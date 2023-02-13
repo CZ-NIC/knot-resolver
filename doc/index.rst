@@ -15,32 +15,10 @@ If you are a new user, please start with chapter for :ref:`getting started <gett
    :name: gettingstarted-chapter
    :maxdepth: 1
 
-   gettingstarted-intro
    gettingstarted-install
    gettingstarted-startup
    gettingstarted-config
-
-
-.. toctree::
-   :caption: Use Cases
-   :name: usecases-chapter
-   :maxdepth: 1
-
-   advanced-no-manager
-   usecase-personal-resolver
-   usecase-internal-resolver
-   usecase-isp-resolver
-   usecase-network-interfaces
-
-
-.. toctree::
-   :caption: Features
-   :name: features-chapter
-   :maxdepth: 1
-
-   manager-api
-   manager-client
-
+   examples
 
 .. toctree::
    :caption: Configuration
@@ -49,9 +27,25 @@ If you are a new user, please start with chapter for :ref:`getting started <gett
 
    config-overview
    config-schema
-   config-no-systemd
+   usecase-network-interfaces
    config-lua
 
+.. toctree::
+   :caption: Deployment
+   :name: deployment-chapter
+   :maxdepth: 1
+
+   config-no-systemd
+   deployment-docker
+   deployment-advanced
+
+.. toctree::
+   :caption: Management
+   :name: management-chapter
+   :maxdepth: 1
+
+   manager-api
+   manager-client
 
 .. toctree::
    :caption: For operators
