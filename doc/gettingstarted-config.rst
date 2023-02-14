@@ -37,12 +37,6 @@ You can also start exploring the configuration by reading about :ref:`common use
 Complete configurations files examples can be found `here <https://gitlab.nic.cz/knot/knot-resolver/tree/master/etc/config>`_.
 Examples are also installed as documentation files, typically in ``/usr/share/doc/knot-resolver/examples/`` directory (location may be different based on your Linux distribution).
 
-.. tip::
-
-    An easy way to see the complete configuration structure is to look at the `JSON schema <https://json-schema.org/>`_ represention.
-    The raw JSON schema is available at `this link <_static/config.schema.json>`_ (valid only for the version of resolver this documentation was generated for).
-    For the schema readability, some graphical visualizer can be used, for example `this one <https://json-schema.app/>`_.
-
 ==========
 Validation
 ==========

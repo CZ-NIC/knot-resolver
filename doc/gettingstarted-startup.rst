@@ -6,7 +6,7 @@
 Startup
 *******
 
-The best way to run Knot Resolver is to use provided integration with ``systemd``.
+The main way to run Knot Resolver is to use provided integration with ``systemd``.
 
 .. code-block:: bash
 
@@ -21,8 +21,12 @@ For more information about systemd integration see ``man knot-resolver.systemd``
     To start and enable service in one command use ``systemctl enable --now knot-resolver.service``
 
 Unfortunately, for some cases (typically Docker and minimalistic systems), ``systemd`` is not available, therefore it is not possible to use ``knot-resolver.service``.
-If you have this problem, look at :ref:`usage without systemd <manager-no-systemd>` section.
+If you have this problem, look at :ref:`usage without systemd <config-no-systemd>` section.
 
+.. note::
+
+    If for some reason you need to use Knot Resolver as it was before version 6, check out :ref:`usage without the manager <advanced-no-manager>`
+    Otherwise, it is recommended to stick to this chapter.
 
 ===============
 First DNS query
