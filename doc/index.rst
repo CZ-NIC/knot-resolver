@@ -18,7 +18,6 @@ If you are a new user, please start with chapter for :ref:`getting started <gett
    gettingstarted-install
    gettingstarted-startup
    gettingstarted-config
-   examples
 
 .. toctree::
    :caption: Configuration
