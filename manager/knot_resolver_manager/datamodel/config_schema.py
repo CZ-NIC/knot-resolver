@@ -122,7 +122,7 @@ class KresConfig(ConfigSchema):
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
         static_hints: StaticHintsSchema = StaticHintsSchema()
-        views: Optional[Dict[str, ViewSchema]] = None
+        views: Optional[List[ViewSchema]] = None
         slices: Optional[List[SliceSchema]] = None
         policy: Optional[List[PolicySchema]] = None
         rpz: Optional[List[RPZSchema]] = None
@@ -147,7 +147,7 @@ class KresConfig(ConfigSchema):
     options: OptionsSchema
     network: NetworkSchema
     static_hints: StaticHintsSchema
-    views: Optional[Dict[str, ViewSchema]]
+    views: Optional[List[ViewSchema]]
     slices: Optional[List[SliceSchema]]
     policy: Optional[List[PolicySchema]]
     rpz: Optional[List[RPZSchema]]
