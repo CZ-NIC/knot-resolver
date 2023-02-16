@@ -1,9 +1,13 @@
 import ipaddress
 import re
-from typing import Any, Dict, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 
 from knot_resolver_manager.datamodel.types.base_types import IntRangeBase, PatternBase, StrBase, UnitBase
 from knot_resolver_manager.utils.modeling import BaseValueType
+
+_ElementType = TypeVar("_ElementType")
+
+ListOrSingle = Union[List[_ElementType], _ElementType]
 
 
 class IntNonNegative(IntRangeBase):
