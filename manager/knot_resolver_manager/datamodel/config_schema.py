@@ -11,7 +11,7 @@ from knot_resolver_manager.constants import MAX_WORKERS
 from knot_resolver_manager.datamodel.cache_schema import CacheSchema
 from knot_resolver_manager.datamodel.dns64_schema import Dns64Schema
 from knot_resolver_manager.datamodel.dnssec_schema import DnssecSchema
-from knot_resolver_manager.datamodel.forward_zone_schema import ForwardZoneSchema
+from knot_resolver_manager.datamodel.forward_schema import ForwardSchema
 from knot_resolver_manager.datamodel.logging_schema import LoggingSchema
 from knot_resolver_manager.datamodel.lua_schema import LuaSchema
 from knot_resolver_manager.datamodel.management_schema import ManagementSchema
@@ -102,7 +102,7 @@ class KresConfig(ConfigSchema):
         policy: List of policy rules and its configuration.
         rpz: List of Response Policy Zones and its configuration.
         stub_zones: List of Stub Zones and its configuration.
-        forward_zones: List of Forward Zones and its configuration.
+        forward: List of Forward Zones and its configuration.
         cache: DNS resolver cache configuration.
         dnssec: Disable DNSSEC, enable with defaults or set new configuration.
         dns64: Disable DNS64 (RFC 6147), enable with defaults or set new configuration.
@@ -127,7 +127,7 @@ class KresConfig(ConfigSchema):
         policy: Optional[List[PolicySchema]] = None
         rpz: Optional[List[RPZSchema]] = None
         stub_zones: Optional[List[StubZoneSchema]] = None
-        forward_zones: Optional[List[ForwardZoneSchema]] = None
+        forward: Optional[List[ForwardSchema]] = None
         cache: CacheSchema = CacheSchema()
         dnssec: Union[bool, DnssecSchema] = True
         dns64: Union[bool, Dns64Schema] = False
@@ -152,7 +152,7 @@ class KresConfig(ConfigSchema):
     policy: Optional[List[PolicySchema]]
     rpz: Optional[List[RPZSchema]]
     stub_zones: Optional[List[StubZoneSchema]]
-    forward_zones: Optional[List[ForwardZoneSchema]]
+    forward: Optional[List[ForwardSchema]]
     cache: CacheSchema
     dnssec: Union[Literal[False], DnssecSchema]
     dns64: Union[Literal[False], Dns64Schema]

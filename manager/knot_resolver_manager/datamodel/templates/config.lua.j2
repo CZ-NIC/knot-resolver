@@ -39,8 +39,8 @@ nsid.name('{{ cfg.nsid }}_' .. worker.id)
 -- STUB-ZONES section -------------------------------
 {% include "stub_zones.lua.j2" %}
 
--- FORWARD-ZONES section ----------------------------
-{% include "forward_zones.lua.j2" %}
+-- FORWARD section ----------------------------
+{% include "forward.lua.j2" %}
 
 -- CACHE section ------------------------------------
 {% include "cache.lua.j2" %}
