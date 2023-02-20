@@ -12,6 +12,7 @@ from knot_resolver_manager.datamodel.cache_schema import CacheSchema
 from knot_resolver_manager.datamodel.dns64_schema import Dns64Schema
 from knot_resolver_manager.datamodel.dnssec_schema import DnssecSchema
 from knot_resolver_manager.datamodel.forward_schema import ForwardSchema
+from knot_resolver_manager.datamodel.local_data_schema import LocalDataSchema
 from knot_resolver_manager.datamodel.logging_schema import LoggingSchema
 from knot_resolver_manager.datamodel.lua_schema import LuaSchema
 from knot_resolver_manager.datamodel.management_schema import ManagementSchema
@@ -21,7 +22,6 @@ from knot_resolver_manager.datamodel.options_schema import OptionsSchema
 from knot_resolver_manager.datamodel.policy_schema import PolicySchema
 from knot_resolver_manager.datamodel.rpz_schema import RPZSchema
 from knot_resolver_manager.datamodel.slice_schema import SliceSchema
-from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
 from knot_resolver_manager.datamodel.types import IntPositive
 from knot_resolver_manager.datamodel.types.files import UncheckedPath
@@ -96,8 +96,8 @@ class KresConfig(ConfigSchema):
         webmgmt: Configuration of legacy web management endpoint.
         options: Fine-tuning global parameters of DNS resolver operation.
         network: Network connections and protocols configuration.
-        static_hints: Static hints for forward records (A/AAAA) and reverse records (PTR)
         views: List of views and its configuration.
+        local_data: Local data for forward records (A/AAAA) and reverse records (PTR).
         slices: Split the entire DNS namespace into distinct slices.
         policy: List of policy rules and its configuration.
         rpz: List of Response Policy Zones and its configuration.
@@ -121,8 +121,8 @@ class KresConfig(ConfigSchema):
         webmgmt: Optional[WebmgmtSchema] = None
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
-        static_hints: StaticHintsSchema = StaticHintsSchema()
         views: Optional[List[ViewSchema]] = None
+        local_data: LocalDataSchema = LocalDataSchema()
         slices: Optional[List[SliceSchema]] = None
         policy: Optional[List[PolicySchema]] = None
         rpz: Optional[List[RPZSchema]] = None
@@ -146,8 +146,8 @@ class KresConfig(ConfigSchema):
     webmgmt: Optional[WebmgmtSchema]
     options: OptionsSchema
     network: NetworkSchema
-    static_hints: StaticHintsSchema
     views: Optional[List[ViewSchema]]
+    local_data: LocalDataSchema
     slices: Optional[List[SliceSchema]]
     policy: Optional[List[PolicySchema]]
     rpz: Optional[List[RPZSchema]]
