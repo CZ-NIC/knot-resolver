@@ -155,6 +155,9 @@ class UnitBase(IntBase):
                 self._value = int(val) * type(self)._units[unit]
             else:
                 raise ValueError(f"{type(self._value)} Failed to convert: {self}")
+        elif source_value in (0, "0"):
+            self._value_orig = source_value
+            self._value = int(source_value)
         elif isinstance(source_value, int):
             raise ValueError(
                 f"number without units, please convert to string and add unit  - {list(type(self)._units.keys())}",

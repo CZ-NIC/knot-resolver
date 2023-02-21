@@ -21,6 +21,7 @@ LogTargetEnum = Literal["syslog", "stderr", "stdout"]
 LogGroupsEnum: TypeAlias = Literal[
     "manager",
     "supervisord",
+    "cache-gc",
     "system",
     "cache",
     "io",

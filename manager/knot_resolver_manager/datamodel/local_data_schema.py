@@ -2,11 +2,12 @@ from typing import Dict, List, Optional, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.types import DomainName, IDPattern, IPAddress, TimeUnit, UncheckedPath
-from knot_resolver_manager.utils.modeling import BaseSchema
+from knot_resolver_manager.datamodel.types import DomainName, IDPattern, IPAddress, TimeUnit
+from knot_resolver_manager.datamodel.types.files import UncheckedPath
+from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
-class SubtreeSchema(BaseSchema):
+class SubtreeSchema(ConfigSchema):
     """
     Local data and configuration of subtree.
 
@@ -38,7 +39,7 @@ class SubtreeSchema(BaseSchema):
             raise ValueError("'refresh' can be only configured with 'roots-file' or 'roots-url'")
 
 
-class LocalDataSchema(BaseSchema):
+class LocalDataSchema(ConfigSchema):
     """
     Local data for forward records (A/AAAA) and reverse records (PTR).
 
