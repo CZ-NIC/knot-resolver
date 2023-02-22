@@ -26,7 +26,6 @@
 
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE (60*60*24*7)
 #define GNUTLS_PIN_MIN_VERSION  0x030400
-#define UNWRAP_BUF_SIZE 16384
 #define TLS_CHUNK_SIZE (16 * 1024)
 
 #define VERBOSE_MSG(cl_side, ...)\
@@ -956,7 +955,7 @@ static int pl_tls_sess_server_init(struct protolayer_manager *manager,
 	}
 
 	tls->client_side = false;
-	wire_buf_init(&tls->unwrap_buf, UNWRAP_BUF_SIZE);
+	wire_buf_init(&tls->unwrap_buf, manager->wire_buf.size);
 
 	gnutls_transport_set_pull_function(tls->tls_session, kres_gnutls_pull);
 	gnutls_transport_set_vec_push_function(tls->tls_session, kres_gnutls_vec_push);
@@ -1033,7 +1032,7 @@ static int pl_tls_sess_client_init(struct protolayer_manager *manager,
 	}
 
 	tls->client_side = true;
-	wire_buf_init(&tls->unwrap_buf, UNWRAP_BUF_SIZE);
+	wire_buf_init(&tls->unwrap_buf, manager->wire_buf.size);
 
 	gnutls_transport_set_pull_function(tls->tls_session, kres_gnutls_pull);
 	gnutls_transport_set_vec_push_function(tls->tls_session, kres_gnutls_vec_push);
@@ -1128,7 +1127,7 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 		}
 		DEBUG_MSG("[%s] received %zd data\n", tls->client_side ? "tls_client" : "tls", count);
 		wire_buf_consume(&tls->unwrap_buf, count);
-		if (wire_buf_free_space_length(&tls->unwrap_buf) == 0 && queue_len(tls->unwrap_queue) > 0) {
+		if (wire_buf_free_space_length(&tls->unwrap_buf) == 0 && protolayer_queue_has_payload(&tls->unwrap_queue) > 0) {
 			/* wire buffer is full but not all data was consumed */
 			brstatus = kr_error(ENOSPC);
 			goto exit_break;
