@@ -14,14 +14,14 @@
 # which may look something like this:
 #
 #   #!/bin/bash
-#   export KRDBG_SCRIPT_FILE="$(realpath "${BASH_SOURCE[0]}")"
+#   export KRDBG_WORKSPACE="/path/to/your/workspace"
 #   export KRDBG_WORKING_DIR="/tmp/krwd"
 #   export KRDBG_NINJA_PATH="/path/to/knot-resolver/build_dir"
-#   export KRDBG_PREFIX="/path/to/install/prefix"
 #   source "/path/to/this/script.sh"
 #
-# Note that KRDBG_PREFIX must match the one configured by Meson in
-# KRDBG_NINJA_PATH.
+# KRDBG_WORKSPACE is the directory where your workspace is located. Your
+# 'kresd.conf' file should be located there. The script will also put output
+# files from tools (like Massif, Callgrind, etc.) in this directory.
 #
 # KRDBG_WORKING_DIR is the working directory for kresd, where its cache and
 # potentially other data is stored. It is recommended for it to be in tmpfs.
@@ -33,7 +33,7 @@
 
 short_help_text=$(cat << EOF
 Debugging harness for Knot Resolver
-USAGE: $0 [options] -- [kresd args]
+USAGE: $0 [options] [-- [kresd args]]
 EOF
 )
 
@@ -118,9 +118,21 @@ fi
 build_path="$KRDBG_NINJA_PATH"
 
 if [ -z "$KRDBG_PREFIX" ]; then
-	# TODO - could potentially be automated
-	echo '$KRDBG_PREFIX missing - set it to the prefix where Ninja installs kresd' >&2
-	exit 1
+	if ! command -v jq &> /dev/null; then
+		echo '$KRDBG_PREFIX missing and jq is not installed:' >&2
+		echo '  set $KRDBG_PREFIX to the prefix where Ninja installs kresd' >&2
+		echo '  OR' >&2
+		echo '  install jq to autodetect the prefix' >&2
+		exit 1
+	fi
+
+	KRDBG_PREFIX="$(meson introspect --buildoptions "$build_path" | jq '.[] | select(.name == "prefix") | .value' --raw-output)"
+	if [ -z "$KRDBG_PREFIX" ]; then
+		echo '$KRDBG_PREFIX missing and could not be autodetected' >&2
+		exit 1
+	fi
+
+	echo "Auto-detected prefix as '$KRDBG_PREFIX'"
 fi
 kresd_path="$KRDBG_PREFIX/sbin/kresd"
 
@@ -130,12 +142,11 @@ if [ -z "$KRDBG_WORKING_DIR" ]; then
 fi
 wd_dir="$KRDBG_WORKING_DIR"
 
-if [ -z "$KRDBG_SCRIPT_FILE" ]; then
-	echo '$KRDBG_SCRIPT_FILE missing - set it to the path to the script that executes the harness' >&2
+if [ -z "$KRDBG_WORKSPACE" ]; then
+	echo '$KRDBG_WORKSPACE missing - set it to the path of your workspace' >&2
 	exit 1
 fi
-script_file=$(realpath "$KRDBG_SCRIPT_FILE")
-script_dir=$(cd -- "$(dirname -- "$script_file")" && pwd)
+script_dir=$(realpath "$KRDBG_WORKSPACE")
 
 if [ -z "$KRDBG_CONFIG" ]; then
 	config="$script_dir/kresd.conf"
