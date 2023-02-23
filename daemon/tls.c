@@ -34,13 +34,6 @@
 	else \
 		kr_log_debug(TLS, __VA_ARGS__);
 
-/** @internal Debugging facility. */
-#ifdef DEBUG
-#define DEBUG_MSG(...) kr_log_debug(TLS, __VA_ARGS__)
-#else
-#define DEBUG_MSG(...)
-#endif
-
 static const gnutls_datum_t tls_grp_alpn[PROTOLAYER_GRP_COUNT] = {
 	[PROTOLAYER_GRP_DOTLS] = { (uint8_t *)"dot", 3 },
 	[PROTOLAYER_GRP_DOHTTPS] = { (uint8_t *)"h2", 2 },
@@ -105,8 +98,7 @@ static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 	}
 
 	bool avail = protolayer_queue_has_payload(&tls->unwrap_queue);
-	DEBUG_MSG("[%s] pull wanted: %zu avail: %s\n",
-			tls->client_side ? "tls_client" : "tls",
+	VERBOSE_MSG(tls->client_side, "pull wanted: %zu avail: %s\n",
 			len, avail ? "yes" : "no");
 	if (!avail) {
 		errno = EAGAIN;
@@ -188,9 +180,7 @@ static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 		}
 	}
 
-	DEBUG_MSG("[%s] pull transfer: %zu\n",
-			tls->client_side ? "tls_client" : "tls",
-			transfer);
+	VERBOSE_MSG(tls->client_side, "pull transfer: %zu\n", transfer);
 	return transfer;
 }
 
@@ -583,7 +573,7 @@ void tls_client_param_unref(tls_client_param_t *entry)
 	--(entry->refs);
 	if (entry->refs) return;
 
-	DEBUG_MSG("freeing TLS parameters %p\n", (void *)entry);
+	VERBOSE_MSG(true, "freeing TLS parameters %p\n", (void *)entry);
 
 	for (int i = 0; i < entry->ca_files.len; ++i) {
 		free_const(entry->ca_files.at[i]);
@@ -740,9 +730,9 @@ static int client_verify_pin(const unsigned int cert_list_size,
 			 * Not very efficient, but that's OK for DEBUG. */
 			ret = get_oob_key_pin(cert, pin_base64, sizeof(pin_base64), false);
 			if (ret == GNUTLS_E_SUCCESS) {
-				DEBUG_MSG("[tls_client] received pin: %s\n", pin_base64);
+				VERBOSE_MSG(true, "received pin: %s\n", pin_base64);
 			} else {
-				DEBUG_MSG("[tls_client] failed to convert received pin\n");
+				VERBOSE_MSG(true, "failed to convert received pin\n");
 				/* Now we hope that `ret` below can't differ. */
 			}
 		}
@@ -758,10 +748,10 @@ static int client_verify_pin(const unsigned int cert_list_size,
 			const uint8_t *pin = params->pins.at[j];
 			if (memcmp(cert_pin, pin, TLS_SHA256_RAW_LEN) != 0)
 				continue; /* mismatch */
-			DEBUG_MSG("[tls_client] matched a configured pin no. %zd\n", j);
+			VERBOSE_MSG(true, "matched a configured pin no. %zd\n", j);
 			return GNUTLS_E_SUCCESS;
 		}
-		DEBUG_MSG("[tls_client] none of %zd configured pin(s) matched\n",
+		VERBOSE_MSG(true, "none of %zd configured pin(s) matched\n",
 				params->pins.len);
 	}
 
@@ -861,8 +851,7 @@ static int tls_pull_timeout_func(gnutls_transport_ptr_t h, unsigned int ms)
 	}
 
 	size_t avail = protolayer_queue_count_payload(&tls->unwrap_queue);
-	DEBUG_MSG("[%s] timeout check: available: %zu\n",
-		  tls->client_side ? "tls_client" : "tls", avail);
+	VERBOSE_MSG(tls->client_side, "timeout check: available: %zu\n", avail);
 	if (!avail) {
 		errno = EAGAIN;
 		return -1;
@@ -1125,7 +1114,7 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 		} else if (count == 0) {
 			break;
 		}
-		DEBUG_MSG("[%s] received %zd data\n", tls->client_side ? "tls_client" : "tls", count);
+		VERBOSE_MSG(tls->client_side, "received %zd data\n", count);
 		wire_buf_consume(&tls->unwrap_buf, count);
 		if (wire_buf_free_space_length(&tls->unwrap_buf) == 0 && protolayer_queue_has_payload(&tls->unwrap_queue) > 0) {
 			/* wire buffer is full but not all data was consumed */
@@ -1342,5 +1331,4 @@ void tls_protolayers_init(void)
 	};
 }
 
-#undef DEBUG_MSG
 #undef VERBOSE_MSG
