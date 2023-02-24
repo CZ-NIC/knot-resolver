@@ -805,12 +805,6 @@ static void on_connect(uv_connect_t *req, int status)
 
 	session2_event(session, PROTOLAYER_EVENT_CONNECT, NULL);
 	session2_start_read(session);
-
-	int ret = send_waiting(session);
-	if (ret != 0) {
-		return;
-	}
-
 	session2_timer_stop(session);
 	session2_timer_start(session, PROTOLAYER_EVENT_GENERAL_TIMEOUT,
 			MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
@@ -1909,6 +1903,8 @@ static enum protolayer_event_cb_result pl_dns_stream_connected(
 	}
 
 	worker_add_tcp_connected(peer, session);
+
+	send_waiting(session);
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
 

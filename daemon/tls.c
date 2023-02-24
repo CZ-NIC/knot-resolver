@@ -51,6 +51,7 @@ typedef enum tls_client_hs_state {
 struct pl_tls_sess_data {
 	PROTOLAYER_DATA_HEADER();
 	bool client_side;
+	bool first_handshake_done;
 	gnutls_session_t tls_session;
 	tls_hs_state_t handshake_state;
 	protolayer_iter_ctx_queue_t unwrap_queue;
@@ -256,7 +257,11 @@ static void tls_handshake_success(struct pl_tls_sess_data *tls,
 			}
 		}
 	}
-	session2_event_after(session, PROTOLAYER_TLS, PROTOLAYER_EVENT_CONNECT, NULL);
+	if (!tls->first_handshake_done) {
+		session2_event_after(session, PROTOLAYER_TLS,
+				PROTOLAYER_EVENT_CONNECT, NULL);
+		tls->first_handshake_done = true;
+	}
 }
 
 /** Perform TLS handshake and handle error codes according to the documentation.
