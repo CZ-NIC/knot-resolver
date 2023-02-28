@@ -1,0 +1,53 @@
+
+name: Cygwin
+
+on: push
+
+jobs:
+  build-test:
+    name: Build Knot Resolver (and Knot DNS libs, all Cygwin)
+    runs-on: windows-latest
+
+    steps:
+      - name: git - avoid converting EOL breaks (i.e. keep the UNIX style)
+        run: git config --global core.autocrlf input
+      - name: Cygwin - set up and pull dependencies
+        uses: cygwin/cygwin-install-action@master
+        with:
+            packages: \
+              bash autoconf automake m4 libtool pkg-config make gcc-core gnutls-devel liblmdb-devel \
+              meson gcc-g++ libuv-devel luajit-devel
+
+      - name: knot-dns - install libraries (also download sources and build)
+        shell: C:\cygwin\bin\bash.exe --login --norc -e -o igncr '{0}'
+        run: |
+          git clone -b 3.2-cygwin --depth 1 https://github.com/CZ-NIC/knot.git
+          cd knot
+          env SHELLOPTS=igncr ./autogen.sh
+          env SHELLOPTS=igncr ./configure --disable-static --disable-fastparser --disable-documentation --disable-daemon --disable-utilities || (cat config.log && exit 1)
+          make -j$(nproc) install
+          cd ..
+
+      - name: knot-resolver - get sources
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: knot-resolver - install from sources
+        shell: C:\cygwin\bin\bash.exe --login --norc -e -o igncr '{0}'
+        run: |
+          cd $GITHUB_WORKSPACE
+          export PKG_CONFIG_PATH+=:/usr/local/lib/pkgconfig # to find knot-dns libs
+          export CC=cc CXX=c++ # trying `ccache cc` otherwise which somehow doesn't work
+          meson setup build_dir --default-library=static --errorlogs || cat build_dir/meson-logs/meson-log.txt
+          ninja -C build_dir
+          ninja -C build_dir install
+
+      - name: Artifacts - remove unneeded files
+        shell: C:\cygwin\bin\bash.exe --login --norc -e -o igncr '{0}'
+        run: |
+          rm -r /usr/local/include/ /usr/local/lib/pkgconfig/
+          find /usr/local -name '*.a' -delete
+      - name: Artifacts - upload
+        uses: actions/upload-artifact@v3
+        with:
+          path: C:\cygwin\usr\local
