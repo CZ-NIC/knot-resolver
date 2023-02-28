@@ -348,13 +348,13 @@ static enum protolayer_event_cb_result pl_tcp_event_wrap(
 
 void io_protolayers_init(void)
 {
-	protolayer_globals[PROTOLAYER_UDP] = (struct protolayer_globals){
+	protolayer_globals[PROTOLAYER_PROTOCOL_UDP] = (struct protolayer_globals){
 		.iter_size = sizeof(struct pl_udp_iter_data),
 		.unwrap = pl_udp_unwrap,
 		.event_wrap = pl_udp_event_wrap,
 	};
 
-	protolayer_globals[PROTOLAYER_TCP] = (struct protolayer_globals){
+	protolayer_globals[PROTOLAYER_PROTOCOL_TCP] = (struct protolayer_globals){
 		.sess_size = sizeof(struct pl_tcp_sess_data),
 		.sess_init = pl_tcp_sess_init,
 		.sess_deinit = pl_tcp_sess_deinit,

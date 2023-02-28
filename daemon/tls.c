@@ -226,7 +226,7 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 	push_ctx->sess_data = tls;
 	memcpy(push_ctx->iov, iov, sizeof(struct iovec[iovcnt]));
 
-	session2_wrap_after(tls->session, PROTOLAYER_TLS,
+	session2_wrap_after(tls->session, PROTOLAYER_PROTOCOL_TLS,
 			protolayer_iovec(push_ctx->iov, iovcnt), NULL,
 			kres_gnutls_push_finished, push_ctx);
 
@@ -258,7 +258,7 @@ static void tls_handshake_success(struct pl_tls_sess_data *tls,
 		}
 	}
 	if (!tls->first_handshake_done) {
-		session2_event_after(session, PROTOLAYER_TLS,
+		session2_event_after(session, PROTOLAYER_PROTOCOL_TLS,
 				PROTOLAYER_EVENT_CONNECT, NULL);
 		tls->first_handshake_done = true;
 	}
@@ -1324,7 +1324,7 @@ static void pl_tls_request_init(struct protolayer_manager *manager,
 
 void tls_protolayers_init(void)
 {
-	protolayer_globals[PROTOLAYER_TLS] = (struct protolayer_globals){
+	protolayer_globals[PROTOLAYER_PROTOCOL_TLS] = (struct protolayer_globals){
 		.sess_size = sizeof(struct pl_tls_sess_data),
 		.sess_deinit = pl_tls_sess_deinit,
 		.wire_buf_overhead = TLS_CHUNK_SIZE,

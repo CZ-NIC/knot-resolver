@@ -389,7 +389,7 @@ static ssize_t send_callback(nghttp2_session *h2, const uint8_t *data, size_t le
 	memcpy(send_ctx->data, data, length);
 
 	kr_log_debug(DOH, "[%p] send_callback: %p\n", (void *)h2, (void *)send_ctx->data);
-	session2_wrap_after(http->session, PROTOLAYER_HTTP,
+	session2_wrap_after(http->session, PROTOLAYER_PROTOCOL_HTTP,
 			protolayer_buffer(send_ctx->data, length), NULL,
 			callback_finished_free_baton, send_ctx);
 
@@ -505,7 +505,7 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 		dest_iov[cur++] = (struct iovec){ (void *)padding, padlen - 1 };
 
 	kr_assert(cur == iovcnt);
-	int ret = session2_wrap_after(http->session, PROTOLAYER_HTTP,
+	int ret = session2_wrap_after(http->session, PROTOLAYER_PROTOCOL_HTTP,
 			protolayer_iovec(dest_iov, cur),
 			NULL, callback_finished_free_baton, sdctx);
 
@@ -732,7 +732,7 @@ static int submit_to_wirebuffer(struct pl_http_sess_data *ctx)
 	}
 
 	ret = 0;
-	session2_unwrap_after(ctx->session, PROTOLAYER_HTTP,
+	session2_unwrap_after(ctx->session, PROTOLAYER_PROTOCOL_HTTP,
 			protolayer_wire_buf(wb), NULL, NULL, NULL);
 cleanup:
 	http_cleanup_stream(ctx);
@@ -1032,7 +1032,7 @@ static void pl_http_request_init(struct protolayer_manager *manager,
 
 void http_protolayers_init(void)
 {
-	protolayer_globals[PROTOLAYER_HTTP] = (struct protolayer_globals) {
+	protolayer_globals[PROTOLAYER_PROTOCOL_HTTP] = (struct protolayer_globals) {
 		.sess_size = sizeof(struct pl_http_sess_data),
 		.sess_deinit = pl_http_sess_deinit,
 		.wire_buf_overhead = HTTP_MAX_FRAME_SIZE,

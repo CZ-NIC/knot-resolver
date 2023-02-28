@@ -33,39 +33,46 @@ static uint32_t next_log_id = 1;
 struct protolayer_globals protolayer_globals[PROTOLAYER_PROTOCOL_COUNT] = {{0}};
 
 static const enum protolayer_protocol protolayer_grp_doudp[] = {
-	PROTOLAYER_UDP,
-	PROTOLAYER_DNS_DGRAM,
-	PROTOLAYER_NULL
+	PROTOLAYER_PROTOCOL_UDP,
+	PROTOLAYER_PROTOCOL_DNS_DGRAM,
+	PROTOLAYER_PROTOCOL_NULL
 };
 
 static const enum protolayer_protocol protolayer_grp_dotcp[] = {
-	PROTOLAYER_TCP,
-	PROTOLAYER_DNS_MULTI_STREAM,
-	PROTOLAYER_NULL
+	PROTOLAYER_PROTOCOL_TCP,
+	PROTOLAYER_PROTOCOL_DNS_MULTI_STREAM,
+	PROTOLAYER_PROTOCOL_NULL
 };
 
 static const enum protolayer_protocol protolayer_grp_dot[] = {
-	PROTOLAYER_TCP,
-	PROTOLAYER_TLS,
-	PROTOLAYER_DNS_MULTI_STREAM,
-	PROTOLAYER_NULL
+	PROTOLAYER_PROTOCOL_TCP,
+	PROTOLAYER_PROTOCOL_TLS,
+	PROTOLAYER_PROTOCOL_DNS_MULTI_STREAM,
+	PROTOLAYER_PROTOCOL_NULL
 };
 
 static const enum protolayer_protocol protolayer_grp_doh[] = {
-	PROTOLAYER_TCP,
-	PROTOLAYER_TLS,
-	PROTOLAYER_HTTP,
-	PROTOLAYER_DNS_UNSIZED_STREAM,
-	PROTOLAYER_NULL
+	PROTOLAYER_PROTOCOL_TCP,
+	PROTOLAYER_PROTOCOL_TLS,
+	PROTOLAYER_PROTOCOL_HTTP,
+	PROTOLAYER_PROTOCOL_DNS_UNSIZED_STREAM,
+	PROTOLAYER_PROTOCOL_NULL
 };
 
 
-const char *protolayer_protocol_names[PROTOLAYER_PROTOCOL_COUNT] = {
-	[PROTOLAYER_NULL] = "(null)",
-#define XX(cid) [PROTOLAYER_##cid] = #cid,
+const char *protolayer_protocol_name(enum protolayer_protocol p)
+{
+	switch (p) {
+	case PROTOLAYER_PROTOCOL_NULL:
+		return "(null)";
+#define XX(cid) case PROTOLAYER_PROTOCOL_ ## cid: \
+			return #cid;
 	PROTOLAYER_PROTOCOL_MAP(XX)
 #undef XX
-};
+	default:
+		return "(invalid)";
+	}
+}
 
 /** Sequences of layers, mapped by `enum protolayer_grp`.
  *
@@ -76,34 +83,52 @@ const char *protolayer_protocol_names[PROTOLAYER_PROTOCOL_COUNT] = {
  * one defined as *Variable name* (2nd parameter) in the `PROTOLAYER_GRP_MAP`
  * macro. */
 static const enum protolayer_protocol *protolayer_grps[PROTOLAYER_GRP_COUNT] = {
-#define XX(cid, vid, name) [PROTOLAYER_GRP_##cid] = protolayer_grp_##vid,
+#define XX(cid, vid, name) [PROTOLAYER_GRP_ ## cid] = protolayer_grp_ ## vid,
 	PROTOLAYER_GRP_MAP(XX)
 #undef XX
 };
 
-/** Human-readable names for protocol layer groups. */
-const char *protolayer_grp_names[PROTOLAYER_GRP_COUNT] = {
-	[PROTOLAYER_GRP_NULL] = "(null)",
-#define XX(cid, vid, name) [PROTOLAYER_GRP_##cid] = (name),
+const char *protolayer_grp_name(enum protolayer_grp g)
+{
+	switch (g) {
+	case PROTOLAYER_GRP_NULL:
+		return "(null)";
+#define XX(cid, vid, name) case PROTOLAYER_GRP_ ## cid: \
+		return (name);
 	PROTOLAYER_GRP_MAP(XX)
 #undef XX
-};
+	default:
+		return "(invalid)";
+	}
+}
 
-/** Human-readable names for events. */
-const char *protolayer_event_names[PROTOLAYER_EVENT_COUNT] = {
-	[PROTOLAYER_EVENT_NULL] = "(null)",
-#define XX(cid) [PROTOLAYER_EVENT_##cid] = #cid,
+const char *protolayer_event_name(enum protolayer_event_type e)
+{
+	switch (e) {
+	case PROTOLAYER_EVENT_NULL:
+		return "(null)";
+#define XX(cid) case PROTOLAYER_EVENT_ ## cid: \
+		return #cid;
 	PROTOLAYER_EVENT_MAP(XX)
 #undef XX
-};
+	default:
+		return "(invalid)";
+	}
+}
 
-/** Human-readable names for payloads. */
-const char *protolayer_payload_names[PROTOLAYER_PAYLOAD_COUNT] = {
-	[PROTOLAYER_PAYLOAD_NULL] = "(null)",
-#define XX(cid, name) [PROTOLAYER_PAYLOAD_##cid] = (name),
+const char *protolayer_payload_name(enum protolayer_payload_type p)
+{
+	switch (p) {
+	case PROTOLAYER_PAYLOAD_NULL:
+		return "(null)";
+#define XX(cid, name) case PROTOLAYER_PAYLOAD_ ## cid: \
+		return (name);
 	PROTOLAYER_PAYLOAD_MAP(XX)
 #undef XX
-};
+	default:
+		return "(invalid)";
+	}
+}
 
 
 /* Forward decls. */
@@ -310,8 +335,10 @@ static inline void protolayer_iter_ctx_next(struct protolayer_iter_ctx *ctx)
 
 static inline const char *layer_name(enum protolayer_grp grp, ssize_t layer_ix)
 {
+	if (grp >= PROTOLAYER_GRP_COUNT)
+		return "(invalid)";
 	enum protolayer_protocol p = protolayer_grps[grp][layer_ix];
-	return protolayer_protocol_names[p];
+	return protolayer_protocol_name(p);
 }
 
 static inline const char *layer_name_ctx(struct protolayer_iter_ctx *ctx)
@@ -333,12 +360,12 @@ static int protolayer_iter_ctx_finish(struct protolayer_iter_ctx *ctx, int ret)
 
 	if (ret)
 		VERBOSE_LOG(session, "layer context of group '%s' (on %u: %s) ended with return code %d\n",
-				protolayer_grp_names[ctx->manager->grp],
+				protolayer_grp_name(ctx->manager->grp),
 				ctx->layer_ix, layer_name_ctx(ctx), ret);
 
 	if (ctx->status)
 		VERBOSE_LOG(session, "iteration of group '%s' (on %u: %s) ended with status %d\n",
-				protolayer_grp_names[ctx->manager->grp],
+				protolayer_grp_name(ctx->manager->grp),
 				ctx->layer_ix, layer_name_ctx(ctx), ctx->status);
 
 	if (ctx->finished_cb)
@@ -368,7 +395,7 @@ static int protolayer_push(struct protolayer_iter_ctx *ctx)
 
 	if (kr_log_is_debug(PROTOLAYER, NULL)) {
 		VERBOSE_LOG(session, "Pushing %s\n",
-				protolayer_payload_names[ctx->payload.type]);
+				protolayer_payload_name(ctx->payload.type));
 	}
 
 	if (ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
@@ -395,6 +422,9 @@ static int protolayer_push(struct protolayer_iter_ctx *ctx)
 static int protolayer_step(struct protolayer_iter_ctx *ctx)
 {
 	while (true) {
+		if (kr_fails_assert(ctx->manager->grp < PROTOLAYER_GRP_COUNT))
+			return kr_error(EFAULT);
+
 		enum protolayer_protocol protocol = protolayer_grps[ctx->manager->grp][ctx->layer_ix];
 		struct protolayer_globals *globals = &protolayer_globals[protocol];
 
@@ -473,8 +503,8 @@ static int protolayer_manager_submit(
 
 	VERBOSE_LOG(manager->session,
 			"%s submitted to grp '%s' in %s direction (%zu: %s)\n",
-			protolayer_payload_names[payload.type],
-			protolayer_grp_names[manager->grp],
+			protolayer_payload_name(payload.type),
+			protolayer_grp_name(manager->grp),
 			(direction == PROTOLAYER_UNWRAP) ? "unwrap" : "wrap",
 			layer_ix, layer_name(manager->grp, layer_ix));
 
@@ -489,6 +519,9 @@ static int protolayer_manager_submit(
 	};
 
 	for (size_t i = 0; i < manager->num_layers; i++) {
+		if (kr_fails_assert(ctx->manager->grp < PROTOLAYER_GRP_COUNT))
+			return kr_error(EFAULT);
+
 		enum protolayer_protocol p = protolayer_grps[manager->grp][i];
 		struct protolayer_globals *globals = &protolayer_globals[p];
 		struct protolayer_data *iter_data = protolayer_iter_data_get(ctx, i);

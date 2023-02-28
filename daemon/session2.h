@@ -102,7 +102,16 @@ struct comm_info {
 };
 
 
-/** A buffer, with indices marking the chunk containing valid data.
+/** A buffer, with indices marking the chunk containing as of yet unprocessed
+ * data - this chunk is called "valid". The contents may be manipulated using
+ * `wire_buf_` functions, which ensure the struct's validity.
+ *
+ * The struct may be used to retrieve data piecewise, e.g. from a stream-based
+ * transport like TCP, by writing data to the buffer's free space, then
+ * "consuming" that space with `wire_buf_consume`. It can also be handy for
+ * processing message headers, then trimming the beginning of the buffer (using
+ * `wire_buf_trim`) so that the next part of the data may be processed by a
+ * next part of a common pipeline.
  *
  * May be initialized in two possible ways:
  *  - via `wire_buf_init`
@@ -122,30 +131,30 @@ int wire_buf_init(struct wire_buf *wb, size_t initial_size);
  * intact). */
 void wire_buf_deinit(struct wire_buf *wb);
 
-/** Ensures that the wire buffer's size is at least `size`. `*wb` must be
- * initialized, either to zero or via `wire_buf_init`. */
+/** Ensures that the wire buffer's size is at least `size`. The memory at `wb`
+ * must be initialized, either to zero or via `wire_buf_init`. */
 int wire_buf_reserve(struct wire_buf *wb, size_t size);
 
 /** Adds `length` to the end index of the valid data, marking `length` more
  * bytes as valid.
  *
  * Returns 0 on success.
- * Returns `kr_error(EINVAL)` if the end index would exceed the
- * buffer size. */
+ * Assert-fails and/or returns `kr_error(EINVAL)` if the end index would exceed
+ * the buffer size. */
 int wire_buf_consume(struct wire_buf *wb, size_t length);
 
 /** Adds `length` to the start index of the valid data, marking `length` less
  * bytes as valid.
  *
  * Returns 0 on success.
- * Returns `kr_error(EINVAL)` if the start index would exceed
- * the end index. */
+ * Assert-fails and/or returns `kr_error(EINVAL)` if the start index would
+ * exceed the end index. */
 int wire_buf_trim(struct wire_buf *wb, size_t length);
 
 /** Moves the valid bytes of the buffer to the buffer's beginning. */
 int wire_buf_movestart(struct wire_buf *wb);
 
-/** Resets the valid bytes of the buffer to zero, as well as the error flag. */
+/** Resets the valid bytes of the buffer to zero. */
 int wire_buf_reset(struct wire_buf *wb);
 
 /** Gets a pointer to the data marked as valid in the wire buffer. */
@@ -210,16 +219,15 @@ static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 
 /** The identifiers of protocol layer types. */
 enum protolayer_protocol {
-	PROTOLAYER_NULL = 0,
-#define XX(cid) PROTOLAYER_##cid,
+	PROTOLAYER_PROTOCOL_NULL = 0,
+#define XX(cid) PROTOLAYER_PROTOCOL_ ## cid,
 	PROTOLAYER_PROTOCOL_MAP(XX)
 #undef XX
 	PROTOLAYER_PROTOCOL_COUNT /* must be the last! */
 };
 
-/** Maps protocol layer type IDs to string names.
- * E.g. PROTOLAYER_HTTP has name 'HTTP'. */
-extern const char *protolayer_protocol_names[];
+/** Gets the constant string name of the specified protocol. */
+const char *protolayer_protocol_name(enum protolayer_protocol p);
 
 /** Protocol layer group map
  *
@@ -247,15 +255,14 @@ extern const char *protolayer_protocol_names[];
 /** The identifiers of pre-defined protocol layer sequences. */
 enum protolayer_grp {
 	PROTOLAYER_GRP_NULL = 0,
-#define XX(cid, vid, name) PROTOLAYER_GRP_##cid,
+#define XX(cid, vid, name) PROTOLAYER_GRP_ ## cid,
 	PROTOLAYER_GRP_MAP(XX)
 #undef XX
 	PROTOLAYER_GRP_COUNT
 };
 
-/** Maps protocol layer group IDs to human-readable descriptions.
- * E.g. PROTOLAYER_GRP_DOH has description 'DNS-over-HTTPS'. */
-extern const char *protolayer_grp_names[];
+/** Gets the constant string name of the specified protocol layer group. */
+const char *protolayer_grp_name(enum protolayer_grp g);
 
 /** Flow control indicators for protocol layer `wrap` and `unwrap` callbacks.
  * Use via `protolayer_continue`, `protolayer_break`, and `protolayer_push`
@@ -339,14 +346,14 @@ typedef void (*protolayer_finished_cb)(int status, struct session2 *session,
 /** Event type, to be interpreted by a layer. */
 enum protolayer_event_type {
 	PROTOLAYER_EVENT_NULL = 0,
-#define XX(cid) PROTOLAYER_EVENT_##cid,
+#define XX(cid) PROTOLAYER_EVENT_ ## cid,
 	PROTOLAYER_EVENT_MAP(XX)
 #undef XX
 	PROTOLAYER_EVENT_COUNT
 };
 
-/** Maps event types to their names. */
-extern const char *protolayer_event_names[];
+/** Gets the constant string name of the specified event. */
+const char *protolayer_event_name(enum protolayer_event_type e);
 
 
 /** Payload types.
@@ -363,14 +370,14 @@ extern const char *protolayer_event_names[];
  * valid. */
 enum protolayer_payload_type {
 	PROTOLAYER_PAYLOAD_NULL = 0,
-#define XX(cid, name) PROTOLAYER_PAYLOAD_##cid,
+#define XX(cid, name) PROTOLAYER_PAYLOAD_ ## cid,
 	PROTOLAYER_PAYLOAD_MAP(XX)
 #undef XX
 	PROTOLAYER_PAYLOAD_COUNT
 };
 
-/** Maps payload type IDs to human-readable names. */
-extern const char *protolayer_payload_names[];
+/** Gets the constant string name of the specified payload type. */
+const char *protolayer_payload_name(enum protolayer_payload_type p);
 
 /** Data processed by the sequence of layers. All pointed-to memory is always
  * owned by its creator. It is also the layer (group) implementor's
