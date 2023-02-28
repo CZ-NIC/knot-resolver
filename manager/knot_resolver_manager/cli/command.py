@@ -27,22 +27,21 @@ def install_commands_parsers(parser: argparse.ArgumentParser) -> None:
     subparsers = parser.add_subparsers(help="command type")
     for command in _registered_commands:
         subparser, typ = command.register_args_subparser(subparsers)
-        subparser.set_defaults(command=typ)
+        subparser.set_defaults(command=typ, subparser=subparser)
 
 
 class CommandArgs:
     def __init__(self, namespace: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+        self.namespace = namespace
+        self.parser = parser
+        self.subparser: argparse.ArgumentParser = namespace.subparser
+        self.command: Type["Command"] = namespace.command
+
         self.socket: str = namespace.socket[0]
         if Path(self.socket).exists():
             self.socket = f'http+unix://{quote(self.socket, safe="")}/'
         if self.socket.endswith("/"):
             self.socket = self.socket[:-1]
-        if not hasattr(namespace, "command"):
-            setattr(namespace, "command", get_help_command())
-
-        self.command: Type["Command"] = namespace.command
-        self.parser = parser
-        self.namespace = namespace
 
 
 class Command(ABC):

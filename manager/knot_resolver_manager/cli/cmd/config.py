@@ -93,77 +93,110 @@ def reformat(data: str, req_format: Formats) -> str:
 class ConfigCommand(Command):
     def __init__(self, namespace: argparse.Namespace) -> None:
         super().__init__(namespace)
-        self.path: str = str(namespace.path)
-        self.value_or_file: Optional[str] = namespace.value_or_file
-        self.operation: Operations = namespace.operation
-        self.format: Formats = namespace.format
-        self.stdin: bool = namespace.stdin
+        self.path: str = str(namespace.path) if hasattr(namespace, "path") else ""
+        self.format: Formats = namespace.format if hasattr(namespace, "format") else Formats.JSON
+        self.operation: Optional[Operations] = namespace.operation if hasattr(namespace, "operation") else None
+        self.file: Optional[str] = namespace.file if hasattr(namespace, "file") else None
 
     @staticmethod
     def register_args_subparser(
         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
         config = subparser.add_parser("config", help="Performs operations on the running resolver's configuration.")
-        config.add_argument(
-            "path",
-            type=str,
-            help="Path (JSON pointer, RFC6901) to the configuration resources to work with.",
-        )
+        path_help = "Optional, path (JSON pointer, RFC6901) to the configuration resources. By default, the entire configuration is selected."
 
-        config.add_argument("--stdin", help="Read config values from stdin.", action="store_true", default=False)
-        config.add_argument(
-            "value_or_file",
+        config_subparsers = config.add_subparsers(help="operation type")
+
+        # GET operation
+        get = config_subparsers.add_parser("get", help="Get current configuration from the resolver.")
+        get.set_defaults(operation=Operations.GET)
+
+        get.add_argument(
+            "-p",
+            "--path",
+            help=path_help,
+            action="store",
+            type=str,
+            default="",
+        )
+        get.add_argument(
+            "file",
+            help="Optional, path to the file where to save exported configuration data. If not specified, data will be printed.",
             type=str,
             nargs="?",
-            help="Optional, new configuration value, path to file with new configuraion or path to file where to save exported configuration data."
-            "If not specified, the configuration is printed.",
-            default=None,
         )
 
-        op_dest = "operation"
-        operations = config.add_mutually_exclusive_group()
-        operations.add_argument(
-            "-s",
-            "--set",
-            help="Set new configuration for the resolver.",
-            action="store_const",
-            dest=op_dest,
-            const=Operations.SET,
-            default=Operations.SET,
-        )
-        operations.add_argument(
-            "-d",
-            "--delete",
-            help="Delete given configuration property or list item at the given index.",
-            action="store_const",
-            dest=op_dest,
-            const=Operations.DELETE,
-        )
-        operations.add_argument(
-            "-g",
-            "--get",
-            help="Get current configuration from the resolver.",
-            action="store_const",
-            dest=op_dest,
-            const=Operations.GET,
-        )
-
-        fm_dest = "format"
-        formats = config.add_mutually_exclusive_group()
-        formats.add_argument(
+        get_formats = get.add_mutually_exclusive_group()
+        get_formats.add_argument(
             "--json",
-            help="JSON format for input configuration or required format for exported configuration.",
-            action="store_const",
-            dest=fm_dest,
+            help="Get configuration data in JSON format, default.",
             const=Formats.JSON,
-            default=Formats.JSON,
-        )
-        formats.add_argument(
-            "--yaml",
-            help="YAML format for input configuration or required format for exported configuration.",
             action="store_const",
-            dest=fm_dest,
+            dest="format",
+        )
+        get_formats.add_argument(
+            "--yaml",
+            help="Get configuration data in YAML format.",
             const=Formats.YAML,
+            action="store_const",
+            dest="format",
+        )
+
+        # SET operation
+        set = config_subparsers.add_parser("set", help="Set new configuration for the resolver.")
+        set.set_defaults(operation=Operations.SET)
+
+        set.add_argument(
+            "-p",
+            "--path",
+            help=path_help,
+            action="store",
+            type=str,
+            default="",
+        )
+
+        value_or_file = set.add_mutually_exclusive_group()
+        value_or_file.add_argument(
+            "file",
+            help="Optional, path to file with new configuraion.",
+            type=str,
+            nargs="?",
+        )
+        value_or_file.add_argument(
+            "value",
+            help="Optional, new configuration value.",
+            type=str,
+            nargs="?",
+        )
+
+        set_formats = set.add_mutually_exclusive_group()
+        set_formats.add_argument(
+            "--json",
+            help="Set configuration data in JSON format, default.",
+            const=Formats.JSON,
+            action="store_const",
+            dest="format",
+        )
+        set_formats.add_argument(
+            "--yaml",
+            help="Set configuration data in YAML format.",
+            const=Formats.YAML,
+            action="store_const",
+            dest="format",
+        )
+
+        # DELETE operation
+        delete = config_subparsers.add_parser(
+            "delete", help="Delete given configuration property or list item at the given index."
+        )
+        delete.set_defaults(operation=Operations.DELETE)
+        delete.add_argument(
+            "-p",
+            "--path",
+            help=path_help,
+            action="store",
+            type=str,
+            default="",
         )
 
         return config, ConfigCommand
@@ -186,23 +219,24 @@ class ConfigCommand(Command):
         return {}
 
     def run(self, args: CommandArgs) -> None:
-        if not self.path.startswith("/"):
-            self.path = "/" + self.path
+        if not self.operation:
+            args.subparser.print_help()
+            sys.exit()
 
         new_config = None
         url = f"{args.socket}/v1/config{self.path}"
         method = operation_to_method(self.operation)
 
         if self.operation == Operations.SET:
-            # use STDIN also when value_or_file is not specified
-            if self.stdin or not self.value_or_file:
-                new_config = input("Type new configuration: ")
-            else:
+            if self.file:
                 try:
-                    with open(self.value_or_file, "r") as f:
+                    with open(self.file, "r") as f:
                         new_config = f.read()
                 except FileNotFoundError:
-                    new_config = self.value_or_file
+                    new_config = self.file
+            else:
+                # use STDIN also when file is not specified
+                new_config = input("Type new configuration: ")
 
         response = request(method, url, reformat(new_config, Formats.JSON) if new_config else None)
 
@@ -212,9 +246,9 @@ class ConfigCommand(Command):
 
         print(f"status: {response.status}")
 
-        if self.operation == Operations.GET and self.value_or_file:
-            with open(self.value_or_file, "w") as f:
+        if self.operation == Operations.GET and self.file:
+            with open(self.file, "w") as f:
                 f.write(reformat(response.body, self.format))
-            print(f"saved to: {self.value_or_file}")
+            print(f"saved to: {self.file}")
         else:
             print(reformat(response.body, self.format))
