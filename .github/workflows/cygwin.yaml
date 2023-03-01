@@ -1,25 +1,30 @@
 
-name: Cygwin
+name: MSYS2
 
 on: push
 
 jobs:
   build-test:
-    name: Build Knot Resolver (and Knot DNS libs, all Cygwin)
+    name: Build Knot Resolver (and Knot DNS libs, all MSYS2)
     runs-on: windows-latest
 
+    defaults:
+      run:
+        shell: msys2 {0}
+
     steps:
+      - name: MSYS2 - set up and pull dependencies
+        uses: msys2/setup-msys2@v2
+        with:
+          #update: true
+          install: |
+            bash autoconf automake m4 libtool pkg-config make gcc gnutls-devel mingw-w64-lmdb \
+            meson gcc libuv-devel luajit-devel
+
       - name: git - avoid converting EOL breaks (i.e. keep the UNIX style)
         run: git config --global core.autocrlf input
-      - name: Cygwin - set up and pull dependencies
-        uses: cygwin/cygwin-install-action@master
-        with:
-            packages: \
-              bash autoconf automake m4 libtool pkg-config make gcc-core gnutls-devel liblmdb-devel \
-              meson gcc-g++ libuv-devel luajit-devel
 
       - name: knot-dns - install libraries (also download sources and build)
-        shell: C:\cygwin\bin\bash.exe --login --norc -e -o igncr '{0}'
         run: |
           git clone -b 3.2 --depth 1 https://github.com/CZ-NIC/knot.git
           cd knot
