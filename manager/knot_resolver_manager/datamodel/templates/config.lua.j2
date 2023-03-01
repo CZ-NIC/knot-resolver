@@ -36,9 +36,6 @@ nsid.name('{{ cfg.nsid }}_' .. worker.id)
 -- RPZ section --------------------------------------
 {% include "rpz.lua.j2" %}
 
--- STUB-ZONES section -------------------------------
-{% include "stub_zones.lua.j2" %}
-
 -- FORWARD section ----------------------------
 {% include "forward.lua.j2" %}
 
