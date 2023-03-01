@@ -26,14 +26,29 @@ class ForwardServerSchema(ConfigSchema):
     ca_file: Optional[FilePath] = None
 
 
+class ForwardOptionsSchema(ConfigSchema):
+    """
+    Configuration options for forward subtree.
+
+    ---
+    authoritative: The forwarding target is an authoritative server.
+    dnssec: Enable/disable DNSSEC.
+    """
+
+    authoritative: bool = False
+    dnssec: bool = True
+
+
 class ForwardSchema(ConfigSchema):
     """
-    Configuration of Forward Zone.
+    Configuration of forward subtree.
 
     ---
     subtree: Subtree to forward.
     servers: Forward server configuration.
+    options: Configuration options for forward subtree.
     """
 
     subtree: DomainName
     servers: Union[List[IPAddressOptionalPort], List[ForwardServerSchema]]
+    options: ForwardOptionsSchema = ForwardOptionsSchema()
