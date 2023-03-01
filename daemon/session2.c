@@ -576,6 +576,7 @@ static struct protolayer_manager *protolayer_manager_new(
 		return NULL;
 
 	size_t wire_buf_length = 0;
+	size_t wire_buf_max_length = 0;
 	ssize_t offsets[2 * num_layers];
 	manager_size += sizeof(offsets);
 
@@ -594,7 +595,11 @@ static struct protolayer_manager *protolayer_manager_new(
 		iter_offsets[i] = g->iter_size ? total_iter_data_size : -1;
 		total_iter_data_size += ALIGN_TO(g->iter_size, CPU_STRUCT_ALIGN);
 
-		wire_buf_length += g->wire_buf_overhead;
+		size_t wire_buf_overhead = (g->wire_buf_overhead_cb)
+			? g->wire_buf_overhead_cb(s->outgoing)
+			: g->wire_buf_overhead;
+		wire_buf_length += wire_buf_overhead;
+		wire_buf_max_length += MAX(g->wire_buf_max_overhead, wire_buf_overhead);
 	}
 	manager_size += total_sess_data_size;
 	cb_ctx_size += total_iter_data_size;
@@ -608,6 +613,7 @@ static struct protolayer_manager *protolayer_manager_new(
 	m->cb_ctx_size = cb_ctx_size;
 	memcpy(m->data, offsets, sizeof(offsets));
 
+	m->wire_buf_max_length = wire_buf_max_length;
 	int ret = wire_buf_init(&m->wire_buf, wire_buf_length);
 	kr_require(!ret);
 

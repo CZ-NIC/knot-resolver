@@ -50,8 +50,10 @@ static void check_bufsize(uv_handle_t* handle)
 static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
 {
 	struct session2 *s = handle->data;
-	buf->base = wire_buf_free_space(&s->layers->wire_buf);
-	buf->len = wire_buf_free_space_length(&s->layers->wire_buf);
+	struct wire_buf *wb = &s->layers->wire_buf;
+
+	buf->base = wire_buf_free_space(wb);
+	buf->len = wire_buf_free_space_length(wb);
 }
 
 static void udp_on_unwrapped(int status, struct session2 *session,

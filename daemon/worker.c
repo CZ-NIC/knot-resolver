@@ -1737,6 +1737,18 @@ static enum protolayer_event_cb_result pl_dns_dgram_event_unwrap(
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
+static size_t pl_dns_dgram_wire_buf_overhead(bool outgoing)
+{
+	if (outgoing) {
+		if (the_resolver->upstream_opt_rr)
+			return knot_edns_get_payload(the_resolver->upstream_opt_rr);
+	} else {
+		if (the_resolver->downstream_opt_rr)
+			return knot_edns_get_payload(the_resolver->downstream_opt_rr);
+	}
+	return KNOT_WIRE_MAX_PKTSIZE;
+}
+
 static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
 {
@@ -2264,7 +2276,8 @@ int worker_init(void)
 
 	/* DNS protocol layers */
 	protolayer_globals[PROTOLAYER_PROTOCOL_DNS_DGRAM] = (struct protolayer_globals){
-		.wire_buf_overhead = KNOT_WIRE_MAX_PKTSIZE,
+		.wire_buf_overhead_cb = pl_dns_dgram_wire_buf_overhead,
+		.wire_buf_max_overhead = KNOT_WIRE_MAX_PKTSIZE,
 		.unwrap = pl_dns_dgram_unwrap,
 		.event_unwrap = pl_dns_dgram_event_unwrap
 	};

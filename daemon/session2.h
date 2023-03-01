@@ -172,13 +172,15 @@ static inline size_t wire_buf_data_length(const struct wire_buf *wb)
 /** Gets a pointer to the free space after the valid data of the wire buffer. */
 static inline void *wire_buf_free_space(const struct wire_buf *wb)
 {
-	return &wb->buf[wb->end];
+	return (wb->buf) ? &wb->buf[wb->end] : NULL;
 }
 
 /** Gets the length of the free space after the valid data of the wire buffer. */
 static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 {
-	return wb->size - wb->end;
+	if (kr_fails_assert(wb->end <= wb->size))
+		return 0;
+	return (wb->buf) ? wb->size - wb->end : 0;
 }
 
 
@@ -565,6 +567,9 @@ typedef int (*protolayer_data_sess_init_cb)(struct protolayer_manager *manager,
                                             void *data,
                                             void *param);
 
+/** Function type for determining the size of a layer's wire buffer overhead. */
+typedef size_t (*protolayer_wire_buf_overhead_cb)(bool outgoing);
+
 /** Function type for (de)initialization callback of layer iteration data.
  *
  * `ctx` points to the iteration context that `data` belongs to.
@@ -601,6 +606,7 @@ typedef void (*protolayer_request_cb)(struct protolayer_manager *manager,
 struct protolayer_manager {
 	enum protolayer_grp grp;
 	struct wire_buf wire_buf;
+	size_t wire_buf_max_length;
 	struct session2 *session;
 	size_t num_layers;
 	size_t cb_ctx_size; /**< Size of a single callback context, including
@@ -661,10 +667,27 @@ struct protolayer_globals {
 	 * no iteration struct is used by the layer, the value may be zero. */
 	size_t iter_size;
 
-	/** Number of bytes that this layer adds onto the session's wire
-	 * buffer. All overheads in a group are summed together to form the
-	 * resulting wire buffer length. */
+	/** Number of bytes that this layer adds onto the session's wire buffer
+	 * by default. All overheads in a group are summed together to form the
+	 * resulting default wire buffer length.
+	 *
+	 * Ignored when `wire_buf_overhead_cb` is non-NULL. */
 	size_t wire_buf_overhead;
+
+	/** Called during session initialization to determine the number of
+	 * bytes that this layer adds onto the session's wire buffer.
+	 *
+	 * It is the dynamic version of `wire_buf_overhead`, which is ignored
+	 * when this is non-NULL. */
+	protolayer_wire_buf_overhead_cb wire_buf_overhead_cb;
+
+	/** Number of bytes that this layer adds onto the session's wire buffer
+	 * at most. All overheads in a group are summed together to form the
+	 * resulting default wire buffer length.
+	 *
+	 * If this is less than the default overhead, the default is used
+	 * instead. */
+	size_t wire_buf_max_overhead;
 
 	/** Called during session creation to initialize
 	 * layer-specific session data. The data is always provided
