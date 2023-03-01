@@ -18,8 +18,8 @@ jobs:
         with:
           #update: true
           install: >-
-            bash autoconf automake m4 libtool pkg-config make gcc gnutls-devel mingw-w64-lmdb
-            meson gcc libuv-devel mingw-w64-luajit
+            bash autoconf automake m4 libtool pkg-config make gcc libgnutls-devel mingw-w64-x86_64-lmdb
+            meson gcc libuv-devel mingw-w64-x86_64-luajit
 
       - name: git - avoid converting EOL breaks (i.e. keep the UNIX style)
         run: git config --global core.autocrlf input
