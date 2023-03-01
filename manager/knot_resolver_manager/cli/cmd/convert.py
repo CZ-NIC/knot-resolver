@@ -26,7 +26,6 @@ class ConvertCommand(Command):
             help="File with configuration in YAML or JSON format.",
         )
 
-        convert.add_argument("--stdin", help="Read config values from stdin.", action="store_true", default=False)
         convert.add_argument(
             "output_file",
             type=str,
