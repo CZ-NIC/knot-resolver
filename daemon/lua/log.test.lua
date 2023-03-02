@@ -30,8 +30,8 @@ local function test_log_groups()
 	same(log_groups({'devel'}), {'devel'}, 'another call overrides previously set groups')
 	same(log_groups({'devel', 'system'}), {'system', 'devel'}, 'configure multiple groups')
 	same(log_groups({}), {}, 'clear groups with empty table')
+	same(log_groups({'nonexistent'}), {}, "nonexistent group is ignored")
 	boom(log_groups, { 'string' }, "group argument can't be string")
-	boom(log_groups, { {'nonexistent'} }, "nonexistent group can't be added")
 	boom(log_groups, { 1, 2 }, "group doesn't take multiple arguments")
 end
 
