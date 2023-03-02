@@ -29,9 +29,8 @@ class ReloadCommand(Command):
         return {}
 
     def run(self, args: CommandArgs) -> None:
-        url = f"{args.socket}/reload"
-        response = request("POST", url)
-        print(response)
+        response = request("POST", f"{args.socket}/reload")
 
         if response.status != 200:
+            print(response)
             sys.exit(1)

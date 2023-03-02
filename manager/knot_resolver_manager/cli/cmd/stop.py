@@ -11,18 +11,6 @@ class StopCommand(Command):
     def __init__(self, namespace: argparse.Namespace) -> None:
         super().__init__(namespace)
 
-    def run(self, args: CommandArgs) -> None:
-        url = f"{args.socket}/stop"
-        response = request("POST", url)
-        print(response)
-
-        if response.status != 200:
-            sys.exit(1)
-
-    @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return {}
-
     @staticmethod
     def register_args_subparser(
         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
@@ -31,3 +19,14 @@ class StopCommand(Command):
             "stop", help="Tells the resolver to shutdown everthing. No process will run after this command."
         )
         return stop, StopCommand
+
+    def run(self, args: CommandArgs) -> None:
+        response = request("POST", f"{args.socket}/stop")
+
+        if response.status != 200:
+            print(response)
+            sys.exit(1)
+
+    @staticmethod
+    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
+        return {}

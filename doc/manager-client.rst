@@ -51,54 +51,75 @@ Only one of these arguments can be selected during the execution of a single ``k
     Performs operations on the running resolver's configuration.
     Requires connection to the management API.
 
-    .. option:: <path>
-
-        Path (JSON pointer, RFC6901) to the configuration resources to work with.
-
-    .. option:: <value_or_file>
-
-        Optional, new configuration value, path to file with new configuraion or path to file where to save exported configuration data.
-        If not specified, the configuration is printed.
-
 
     **Operations:**
 
-        One of the following operations is always performed on the configuration.
-        Default operation is :option:`--get`.
+    Use one of the following operations to be performed on the configuration.
 
-        .. option:: -g, --get
 
-            Get current configuration from the resolver.
+    .. option:: get
 
-        .. option:: -s, --set
+        Get current configuration from the resolver.
 
-            Set new configuration for the resolver.
+        .. option:: -p <path>, --path <path>
 
-        .. option:: -d, --delete
+            Optional, path (JSON pointer, RFC6901) to the configuration resources.
+            By default, the entire configuration is selected.
 
-            Delete given configuration property or list item at the given index.
+        .. option:: --json, --yaml
 
-    .. option:: --json, --yaml
+            :default: :option:`--json`
 
-        :default: :option:`--json`
+            Get configuration data in JSON or YAML format.
 
-        Expected format for input configuration or required format for exported configuration.
+        .. option:: <file>
 
-    .. option:: --stdin
+            Optional, path to the file where to save exported configuration data.
+            If not specified, data will be printed.
 
-        Read config values from stdin.
 
-    This command reads current ``network`` configuration subtree from the resolver and exports it to file in YAML format
+    .. option:: set
+
+        Set new configuration for the resolver.
+
+        .. option:: -p <path>, --path <path>
+
+            Optional, path (JSON pointer, RFC6901) to the configuration resources.
+            By default, the entire configuration is selected.
+
+        .. option:: --json, --yaml
+
+            :default: :option:`--json`
+
+            Set configuration data in JSON or YAML format.
+
+        .. option:: [ <file> | <value> ]
+
+            Optional, path to file with new configuraion or new configuration value.
+            If not specified, value will be readed from stdin.
+
+
+    .. option:: delete
+
+        Delete given configuration property or list item at the given index.
+
+        .. option:: -p <path>, --path <path>
+
+            Optional, path (JSON pointer, RFC6901) to the configuration resources.
+            By default, the entire configuration is selected.
+
+
+    This command reads current ``network`` configuration subtree from the resolver and exports it to file in YAML format.
 
     .. code-block:: bash
 
-        $ kresctl config --yaml --get /network ./network-config.yaml
+        $ kresctl config get --yaml -p /network ./network-config.yaml
 
     Next command changes workers configuration to ``8``.
 
     .. code-block:: bash
 
-        $ kresctl config --set /workers 8
+        $ kresctl config set -p /workers 8
 
 .. option:: metrics
 
@@ -122,7 +143,7 @@ Only one of these arguments can be selected during the execution of a single ``k
 
     .. option:: -l, --live
 
-        Get current configuration JSON-schema directly from the running resolver.
+        Get configuration JSON-schema from the running resolver.
         Requires connection to the management API.
 
     .. option:: <file>
@@ -160,10 +181,6 @@ Only one of these arguments can be selected during the execution of a single ``k
 
         Optional, output file for converted configuration in Lua script.
         If not specified, converted configuration is printed.
-
-    .. option:: --stdin
-
-        Read config values from stdin.
 
     .. code-block:: bash
 

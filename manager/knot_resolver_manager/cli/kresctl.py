@@ -16,9 +16,12 @@ class Kresctl:
         self.parser = parser
 
     def execute(self):
-        cmd_args = CommandArgs(self.namespace, self.parser)
-        command = self.namespace.command(self.namespace)
-        command.run(cmd_args)
+        if hasattr(self.namespace, "command"):
+            args = CommandArgs(self.namespace, self.parser)
+            command = args.command(self.namespace)
+            command.run(args)
+        else:
+            self.parser.print_help()
 
     def _prompt_format(self) -> str:
         bolt = "\033[1m"

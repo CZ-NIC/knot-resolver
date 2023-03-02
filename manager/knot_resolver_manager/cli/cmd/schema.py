@@ -25,7 +25,7 @@ class SchemaCommand(Command):
         schema.add_argument(
             "-l",
             "--live",
-            help="Get current configuration JSON-schema directly from the running resolver. Requires connection to the management API.",
+            help="Get configuration JSON-schema from the running resolver. Requires connection to the management API.",
             action="store_true",
             default=False,
         )
@@ -41,11 +41,10 @@ class SchemaCommand(Command):
     def run(self, args: CommandArgs) -> None:
         if self.live:
             response = request("GET", f"{args.socket}/schema")
-            if response.status == 200:
-                schema = response.body
-            else:
+            if response.status != 200:
                 print(response)
                 sys.exit(1)
+            schema = response.body
         else:
             schema = json.dumps(KresConfig.json_schema(), indent=4)
 
