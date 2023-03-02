@@ -39,11 +39,10 @@ class ValidateCommand(Command):
             with open(self.input_file, "r") as f:
                 data = f.read()
         else:
-            data = input("Type new configuration: ")
+            data = input("Type configuration to validate: ")
 
         try:
             KresConfig(try_to_parse(data))
-            print("config is valid")
         except (DataParsingError, DataValidationError) as e:
             print(e)
             sys.exit(1)

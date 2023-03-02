@@ -244,8 +244,6 @@ class ConfigCommand(Command):
             print(response)
             sys.exit(1)
 
-        print(f"status: {response.status}")
-
         if self.operation == Operations.GET and self.file:
             with open(self.file, "w") as f:
                 f.write(reformat(response.body, self.format))

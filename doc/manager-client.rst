@@ -143,7 +143,7 @@ Only one of these arguments can be selected during the execution of a single ``k
 
     .. option:: -l, --live
 
-        Get current configuration JSON-schema directly from the running resolver.
+        Get configuration JSON-schema from the running resolver.
         Requires connection to the management API.
 
     .. option:: <file>
