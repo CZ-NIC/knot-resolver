@@ -2,15 +2,15 @@
 
 .. _usage-without-systemd:
 
-*********************
-Usage without systemd
-*********************
+*****************************************
+Usage without systemd and without systemd
+*****************************************
 
 .. tip:: Our upstream packages use systemd integration, which is the recommended
    way to run kresd. This section is only relevant if you choose to use kresd
    without systemd integration.
 
-Knot Resolver is designed to be a single process without the use of threads.
+``kresd`` is designed to be a single process without the use of threads.
 While the cache is shared, the individual processes are independent.  This
 approach has several benefits, but it also comes with a few downsides, in
 particular:
@@ -31,7 +31,7 @@ mind when configuring and running kresd without systemd integration.
 .. toctree::
    :maxdepth: 2
 
-   config-no-systemd-processes
-   config-no-systemd-privileges
+   deployment-no-systemd-processes
+   deployment-no-systemd-privileges
 
 .. _`#529`: https://gitlab.nic.cz/knot/knot-resolver/issues/529

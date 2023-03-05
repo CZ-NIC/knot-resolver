@@ -34,8 +34,9 @@ If you are a new user, please start with chapter for :ref:`getting started <gett
    :name: deployment-chapter
    :maxdepth: 1
 
-   config-no-systemd
+   deployment-systemd
    deployment-docker
+   deployment-manual
    deployment-advanced
 
 .. toctree::

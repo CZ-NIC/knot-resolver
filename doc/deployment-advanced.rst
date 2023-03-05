@@ -1,11 +1,9 @@
-*******************
-Advanced deployment
-*******************
-
-DO NOT DO THIS, YOU ARE ON YOUR OWN
-
+********
+Advanced
+********
 
 .. toctree::
    :maxdepth: 2
    
-   advanced-no-manager
+   deployment-advanced-no-manager
+   config-no-systemd

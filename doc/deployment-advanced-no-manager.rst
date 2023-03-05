@@ -2,17 +2,23 @@
 
 .. _advanced-no-manager:
 
-***********************************
-Advanced: Usage without the manager
-***********************************
+*************************
+Usage without the manager
+*************************
 
-If you want to continue using Knot Resolver as before version ``6.0.0`` this is chapter for you.
-For new and less experienced users, we recommend using the newer approach starting in :ref:`Getting Started <gettingstarted-intro>` chapter.
 
-There are a few downsides to using the legacy approach that need to be mentioned.
+.. warning::
 
-* configuration in Lua script
-* manual process management
+    This page is intended for experienced users only. If you follow these instructions, you are not protected from footguns elimited with the introduction of the manager. However, if you want to continue using Knot Resolver as before version ``6.0.0`` this is chapter for you.
+
+    For new and less experienced users, we recommend using the newer approach starting in :ref:`Getting Started <gettingstarted-intro>` chapter.
+
+
+There are a few downsides to using the Knot Resolver without the manager:.
+
+* Configuration is a imperative Lua script and can't be properly validated without actually running it.
+* ``kresd`` is single-threaded so you need to manage multiple processes manually.
+* Restarts without downtime after configuration change are only your responsibility.
 
 
 .. _advanced-no-manager-startup:
@@ -21,7 +27,7 @@ There are a few downsides to using the legacy approach that need to be mentioned
 Startup
 =======
 
-The legacy way to start Knot Resolver is to run single instance of its resolving daemon manualy using ``kresd@`` systemd integration.
+The older way to start Knot Resolver is to run single instance of its resolving daemon manualy using ``kresd@`` systemd integration.
 The daemon is single thread process.
 
 .. code-block:: bash
@@ -39,7 +45,7 @@ The daemon is single thread process.
 Configuration
 =============
 
-Legacy way to configure Knot Resolver is to paste your Lua code typically into ``/etc/knot-resolver/kresd.conf`` configuration script.
+You can configure ``kresd`` by pasting your Lua code into ``/etc/knot-resolver/kresd.conf`` configuration script.
 The resolver's daemon is preconfigure to load this script when using ``kresd@`` systemd integration.
 
 .. note::
