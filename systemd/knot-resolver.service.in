@@ -9,15 +9,14 @@ Wants=nss-lookup.target
 [Service]
 Type=notify
 TimeoutStartSec=10s
-ExecStart=/usr/bin/env python3 -m knot_resolver_manager --config=/etc/knot-resolver/config.yml
+ExecStart=/usr/bin/env knot-resolver --config=/etc/knot-resolver/config.yml
 KillSignal=SIGINT
 WorkingDirectory=/var/run/knot-resolver/
 User=@user@
 Group=@group@
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_SETPCAP
 AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_SETPCAP
-# See systemd.service(5) for explanation, why we should replace this with a blocking request
-# ExecReload=/usr/bin/env kill -HUP $MAINPID
+ExecReload=/usr/bin/env kresctl --socket /var/run/knot-resolver/manager.sock reload
 
 [Install]
 WantedBy=multi-user.target
