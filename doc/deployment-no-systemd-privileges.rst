@@ -1,5 +1,7 @@
 .. SPDX-License-Identifier: GPL-3.0-or-later
 
+.. include:: deployment-warning.rst
+
 Privileges and capabilities
 ===========================
 

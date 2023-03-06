@@ -35,8 +35,8 @@ If you are a new user, please start with chapter for :ref:`getting started <gett
    :maxdepth: 1
 
    deployment-systemd
-   deployment-docker
    deployment-manual
+   deployment-docker
    deployment-advanced
 
 .. toctree::

@@ -1,17 +1,13 @@
 .. SPDX-License-Identifier: GPL-3.0-or-later
 
+
+.. include:: deployment-warning.rst
+
 .. _advanced-no-manager:
 
 *************************
 Usage without the manager
 *************************
-
-
-.. warning::
-
-    This page is intended for experienced users only. If you follow these instructions, you are not protected from footguns elimited with the introduction of the manager. However, if you want to continue using Knot Resolver as before version ``6.0.0`` this is chapter for you.
-
-    For new and less experienced users, we recommend using the newer approach starting in :ref:`Getting Started <gettingstarted-intro>` chapter.
 
 
 There are a few downsides to using the Knot Resolver without the manager:.

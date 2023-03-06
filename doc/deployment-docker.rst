@@ -13,7 +13,7 @@ An official Docker image can be found on `Docker Hub <https://hub.docker.com/r/c
 
     docker run --rm -ti -P docker.io/cznic/knot-resolver
 
-The configuration file is located at ``/etc/knot-resolver/config.yml`` and the cache is at ``/var/cache/knot-resolver``. Having persistent cache in a mounted volume will help a lot with performance just after restart.
+The configuration file is located at ``/etc/knot-resolver/config.yml`` and the cache is at ``/var/cache/knot-resolver``. We recommend configuring a persistent cache across container restarts.
 
 .. warning::
     

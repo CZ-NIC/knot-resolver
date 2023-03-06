@@ -2,6 +2,8 @@
 
 .. _usage-without-systemd:
 
+.. include:: deployment-warning.rst
+
 *****************************************
 Usage without systemd and without manager
 *****************************************
