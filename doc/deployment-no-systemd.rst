@@ -3,7 +3,7 @@
 .. _usage-without-systemd:
 
 *****************************************
-Usage without systemd and without systemd
+Usage without systemd and without manager
 *****************************************
 
 .. tip:: Our upstream packages use systemd integration, which is the recommended
