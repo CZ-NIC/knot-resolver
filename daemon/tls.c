@@ -573,6 +573,7 @@ ssize_t tls_process_input_data(struct session *s, const uint8_t *buf, ssize_t nr
  * \return error code */
 static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar_len, bool raw)
 {
+	/* TODO: simplify this function by using gnutls_x509_crt_get_key_id() */
 	if (kr_fails_assert(!raw || outchar_len >= TLS_SHA256_RAW_LEN)) {
 		return kr_error(ENOSPC);
 		/* With !raw we have check inside kr_base64_encode. */
