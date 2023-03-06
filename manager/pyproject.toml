@@ -43,6 +43,7 @@ poetry = "^1.1.12"
 
 [tool.poetry.scripts]
 kresctl = 'knot_resolver_manager.cli.main:main'
+knot-resolver = 'knot_resolver_manager.__main__:run'
 
 [tool.poe.tasks]
 run = { cmd = "scripts/run", help = "Run the manager" }

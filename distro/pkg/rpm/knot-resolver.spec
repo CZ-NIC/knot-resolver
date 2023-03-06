@@ -386,6 +386,7 @@ fi
 %{_sysconfdir}/knot-resolver/config.yml
 %{_unitdir}/knot-resolver.service
 %{_bindir}/kresctl
+%{_bindir}/knot-resolver
 %{_datarootdir}/bash-completion/completions/kresctl
 %{_datarootdir}/fish/completions/kresctl.fish
 
