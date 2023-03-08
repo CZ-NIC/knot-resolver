@@ -2,9 +2,9 @@ from typing import List, Optional, Union
 
 from knot_resolver_manager.datamodel.network_schema import AddressRenumberingSchema
 from knot_resolver_manager.datamodel.types import (
-    CheckedPath,
     DNSRecordTypeEnum,
     DomainName,
+    File,
     IPAddressOptionalPort,
     PolicyActionEnum,
     PolicyFlagEnum,
@@ -59,7 +59,7 @@ class ForwardServerSchema(BaseSchema):
     address: IPAddressOptionalPort
     pin_sha256: Optional[Union[str, List[str]]] = None
     hostname: Optional[DomainName] = None
-    ca_file: Optional[CheckedPath] = None
+    ca_file: Optional[File] = None
 
 
 def _validate_policy_action(policy_action: Union["ActionSchema", "PolicySchema"]) -> None:

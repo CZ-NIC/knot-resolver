@@ -23,7 +23,7 @@ from knot_resolver_manager.datamodel.rpz_schema import RPZSchema
 from knot_resolver_manager.datamodel.slice_schema import SliceSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
-from knot_resolver_manager.datamodel.types.types import IntPositive, UncheckedPath
+from knot_resolver_manager.datamodel.types import AbsoluteDir, IntPositive
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
 from knot_resolver_manager.utils.modeling import BaseSchema
@@ -112,7 +112,7 @@ class KresConfig(BaseSchema):
         version: int = 1
         nsid: Optional[str] = None
         hostname: Optional[str] = None
-        rundir: UncheckedPath = UncheckedPath(".")
+        rundir: AbsoluteDir = AbsoluteDir("/var/run/knot-resolver")
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         max_workers: IntPositive = IntPositive(_default_max_worker_count())
         management: ManagementSchema = ManagementSchema({"unix-socket": "./manager.sock"})
@@ -137,7 +137,7 @@ class KresConfig(BaseSchema):
 
     nsid: Optional[str]
     hostname: str
-    rundir: UncheckedPath
+    rundir: AbsoluteDir
     workers: IntPositive
     max_workers: IntPositive
     management: ManagementSchema

@@ -3,7 +3,8 @@ from typing import List, Optional, Union
 from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import (
-    CheckedPath,
+    File,
+    FilePath,
     Int0_512,
     Int0_65535,
     InterfaceOptionalPort,
@@ -58,10 +59,10 @@ class TLSSchema(BaseSchema):
     padding: EDNS(0) padding of answers to queries that arrive over TLS transport.
     """
 
-    cert_file: Optional[CheckedPath] = None
-    key_file: Optional[CheckedPath] = None
+    cert_file: Optional[File] = None
+    key_file: Optional[File] = None
     sticket_secret: Optional[str] = None
-    sticket_secret_file: Optional[CheckedPath] = None
+    sticket_secret_file: Optional[File] = None
     auto_discovery: bool = False
     padding: Union[bool, Int0_512] = True
 
@@ -84,7 +85,7 @@ class ListenSchema(BaseSchema):
         """
 
         interface: Union[None, InterfaceOptionalPort, List[InterfaceOptionalPort]] = None
-        unix_socket: Union[None, CheckedPath, List[CheckedPath]] = None
+        unix_socket: Union[None, FilePath, List[FilePath]] = None
         port: Optional[PortNumber] = None
         kind: KindEnum = "dns"
         freebind: bool = False
@@ -92,7 +93,7 @@ class ListenSchema(BaseSchema):
     _LAYER = Raw
 
     interface: Union[None, InterfaceOptionalPort, List[InterfaceOptionalPort]]
-    unix_socket: Union[None, CheckedPath, List[CheckedPath]]
+    unix_socket: Union[None, FilePath, List[FilePath]]
     port: Optional[PortNumber]
     kind: KindEnum
     freebind: bool

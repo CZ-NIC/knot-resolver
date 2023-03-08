@@ -4,8 +4,7 @@ import pytest
 from pytest import raises
 
 from knot_resolver_manager.datamodel.network_schema import ListenSchema, NetworkSchema
-from knot_resolver_manager.datamodel.types import PortNumber
-from knot_resolver_manager.datamodel.types.types import InterfaceOptionalPort
+from knot_resolver_manager.datamodel.types import InterfaceOptionalPort, PortNumber
 from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
 
 

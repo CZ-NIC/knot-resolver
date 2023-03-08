@@ -3,7 +3,7 @@ from typing import Any, List, Optional, Set, Type, Union, cast
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.types import CheckedPath, TimeUnit
+from knot_resolver_manager.datamodel.types import FilePath, TimeUnit
 from knot_resolver_manager.utils.modeling import BaseSchema
 from knot_resolver_manager.utils.modeling.base_schema import is_obj_type_valid
 
@@ -80,7 +80,7 @@ class DnstapSchema(BaseSchema):
     log_tcp_rtt: Log TCP RTT (Round-trip time).
     """
 
-    unix_socket: CheckedPath
+    unix_socket: FilePath
     log_queries: bool = True
     log_responses: bool = True
     log_tcp_rtt: bool = True

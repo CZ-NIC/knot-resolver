@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from knot_resolver_manager.datamodel.types import CheckedPath, PolicyActionEnum, PolicyFlagEnum
+from knot_resolver_manager.datamodel.types import File, PolicyActionEnum, PolicyFlagEnum
 from knot_resolver_manager.utils.modeling import BaseSchema
 
 
@@ -18,7 +18,7 @@ class RPZSchema(BaseSchema):
     """
 
     action: PolicyActionEnum
-    file: CheckedPath
+    file: File
     watch: bool = True
     views: Optional[List[str]] = None
     options: Optional[List[PolicyFlagEnum]] = None

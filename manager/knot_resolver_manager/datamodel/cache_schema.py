@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from knot_resolver_manager.datamodel.types import CheckedPath, DomainName, SizeUnit, TimeUnit
+from knot_resolver_manager.datamodel.types import Dir, DomainName, File, SizeUnit, TimeUnit
 from knot_resolver_manager.utils.modeling import BaseSchema
 
 
@@ -18,7 +18,7 @@ class PrefillSchema(BaseSchema):
     origin: DomainName
     url: str
     refresh_interval: TimeUnit = TimeUnit("1d")
-    ca_file: Optional[CheckedPath] = None
+    ca_file: Optional[File] = None
 
     def _validate(self) -> None:
         if str(self.origin) != ".":
@@ -40,7 +40,7 @@ class CacheSchema(BaseSchema):
     """
 
     garbage_collector: bool = True
-    storage: CheckedPath = CheckedPath("/var/cache/knot-resolver")
+    storage: Dir = Dir("/var/cache/knot-resolver")
     size_max: SizeUnit = SizeUnit("100M")
     ttl_min: TimeUnit = TimeUnit("5s")
     ttl_max: TimeUnit = TimeUnit("6d")

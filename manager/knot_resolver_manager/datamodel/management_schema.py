@@ -1,6 +1,6 @@
 from typing import Optional
 
-from knot_resolver_manager.datamodel.types import CheckedPath, IPAddressPort
+from knot_resolver_manager.datamodel.types import FilePath, IPAddressPort
 from knot_resolver_manager.utils.modeling import BaseSchema
 
 
@@ -13,7 +13,7 @@ class ManagementSchema(BaseSchema):
     interface: IP address and port number to listen to.
     """
 
-    unix_socket: Optional[CheckedPath] = None
+    unix_socket: Optional[FilePath] = None
     interface: Optional[IPAddressPort] = None
 
     def _validate(self) -> None:

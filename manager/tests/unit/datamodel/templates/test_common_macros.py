@@ -49,7 +49,8 @@ def test_servers_table():
 
 def test_tls_servers_table():
     d = ForwardServerSchema(
-        {"address": "2001:DB8::d0c", "hostname": "res.example.com", "ca-file": "/etc/knot-resolver/tlsca.crt"}
+        # the ca-file is a dummy, because it's existence is checked
+        {"address": "2001:DB8::d0c", "hostname": "res.example.com", "ca-file": "/etc/passwd"}
     )
     t = [d, ForwardServerSchema({"address": "192.0.2.1", "pin-sha256": "YQ=="})]
     tmpl_str = """{% from 'macros/common_macros.lua.j2' import tls_servers_table %}

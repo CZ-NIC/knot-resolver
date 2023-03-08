@@ -1,6 +1,6 @@
 from typing import Optional
 
-from knot_resolver_manager.datamodel.types import CheckedPath, InterfacePort
+from knot_resolver_manager.datamodel.types import File, FilePath, InterfacePort
 from knot_resolver_manager.utils.modeling import BaseSchema
 
 
@@ -16,11 +16,11 @@ class WebmgmtSchema(BaseSchema):
     key_file: Path to certificate key.
     """
 
-    unix_socket: Optional[CheckedPath] = None
+    unix_socket: Optional[FilePath] = None
     interface: Optional[InterfacePort] = None
     tls: bool = False
-    cert_file: Optional[CheckedPath] = None
-    key_file: Optional[CheckedPath] = None
+    cert_file: Optional[File] = None
+    key_file: Optional[File] = None
 
     def _validate(self) -> None:
         if bool(self.unix_socket) == bool(self.interface):
