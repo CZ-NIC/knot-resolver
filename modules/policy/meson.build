@@ -41,10 +41,11 @@ lua_ac_lib = shared_module(
     '-fPIC',
   ],
   dependencies: [
-    luajit_inc,
+    luajit,
   ],
   include_directories: mod_inc_dir,
   name_prefix: '',
   install: true,
   install_dir: lib_dir,
+  link_with: kresd,
 )

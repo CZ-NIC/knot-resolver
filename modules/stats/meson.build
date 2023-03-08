@@ -16,10 +16,10 @@ stats_mod = shared_module(
   stats_src,
   dependencies: [
     libknot,
-    luajit_inc,
   ],
   include_directories: mod_inc_dir,
   name_prefix: '',
   install: true,
   install_dir: modules_dir,
+  link_with: kresd,
 )

@@ -11,12 +11,13 @@ hints_mod = shared_module(
   hints_src,
   dependencies: [
     libknot,
-    luajit_inc,
+    luajit,
   ],
   include_directories: mod_inc_dir,
   name_prefix: '',
   install: true,
   install_dir: modules_dir,
+  link_with: kresd,
 )
 
 config_tests += [

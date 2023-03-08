@@ -29,9 +29,6 @@ if not lmdb.found()  # darwin workaround: missing pkgconfig
 endif
 gnutls = dependency('gnutls')
 luajit = dependency('luajit')
-# NOTE avoid using link_args for luajit due to a macOS issue
-# https://github.com/Homebrew/homebrew-core/issues/37169
-luajit_inc = luajit.partial_dependency(compile_args: true, includes: true)
 message('------------------------------')
 
 
@@ -41,6 +38,8 @@ libkres_soversion = 9
 libext = '.so'
 if host_machine.system() == 'darwin'
   libext = '.dylib'
+elif host_machine.system() == 'cygwin'
+  libext = '.dll'
 endif
 
 ## Paths
@@ -59,7 +58,6 @@ systemd_cache_dir = prefix / get_option('localstatedir') / 'cache' / 'knot-resol
 systemd_unit_dir = prefix / 'lib' / 'systemd' / 'system'
 systemd_tmpfiles_dir = prefix / 'lib' / 'tmpfiles.d'
 systemd_sysusers_dir = prefix / 'lib' / 'sysusers.d'
-mod_inc_dir = include_directories('.', 'contrib/')
 
 ## Trust anchors
 managed_ta = get_option('managed_ta') == 'enabled'
