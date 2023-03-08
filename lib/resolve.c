@@ -611,6 +611,9 @@ static void answer_finalize(struct kr_request *request)
 static int query_finalize(struct kr_request *request, struct kr_query *qry, knot_pkt_t *pkt)
 {
 	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
+	if (qry->flags.STUB || qry->flags.FORWARD)
+		knot_wire_set_rd(pkt->wire);
+	// The rest of this function is all about EDNS.
 	if (qry->flags.NO_EDNS)
 		return kr_ok();
 	/* Remove any EDNS records from any previous iteration. */
@@ -620,7 +623,6 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 	if (ret) return ret;
 	if (qry->flags.STUB) {
 		/* Stub resolution */
-		knot_wire_set_rd(pkt->wire);
 		if (knot_wire_get_cd(request->qsource.packet->wire)) {
 			knot_wire_set_cd(pkt->wire);
 		}
@@ -628,9 +630,6 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 		/* Full resolution (ask for +cd and +do) */
 		knot_edns_set_do(pkt->opt_rr);
 		knot_wire_set_cd(pkt->wire);
-		if (qry->flags.FORWARD) {
-			knot_wire_set_rd(pkt->wire);
-		}
 	}
 	return kr_ok();
 }
