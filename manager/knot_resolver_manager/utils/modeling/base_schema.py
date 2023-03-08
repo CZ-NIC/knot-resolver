@@ -27,6 +27,9 @@ from .types import (
 )
 
 
+T = TypeVar("T")
+
+
 def is_obj_type(obj: Any, types: Union[type, Tuple[Any, ...], Tuple[type, ...]]) -> bool:
     # To check specific type we are using 'type()' instead of 'isinstance()'
     # because for example 'bool' is instance of 'int', 'isinstance(False, int)' returns True.
@@ -195,7 +198,7 @@ def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
     raise NotImplementedError(f"Trying to get JSON schema for type '{typ}', which is not implemented")
 
 
-TSource = Union[NoneType, "NoRenameBaseSchema", Dict[str, Any]]
+TSource = Union[None, "NoRenameBaseSchema", Dict[str, Any]]
 
 
 def _create_untouchable(name: str) -> object:
@@ -394,29 +397,11 @@ class Mapper:
 
         # BaseValueType subclasses
         elif inspect.isclass(tp) and issubclass(tp, BaseValueType):
-            if isinstance(obj, tp):
-                # if we already have a custom value type, just pass it through
-                return obj
-            else:
-                # no validation performed, the implementation does it in the constuctor
-                try:
-                    return tp(obj, object_path=object_path)
-                except ValueError as e:
-                    if len(e.args) > 0 and isinstance(e.args[0], str):
-                        msg = e.args[0]
-                    else:
-                        msg = f"Failed to validate value against {tp} type"
-                    raise DataValidationError(msg, object_path) from e
+            return self.construct_value_type(tp, obj, object_path)
 
         # nested BaseSchema subclasses
         elif inspect.isclass(tp) and issubclass(tp, NoRenameBaseSchema):
-            # we should return DataParser, we expect to be given a dict,
-            # because we can construct a DataParser from it
-            if isinstance(obj, (dict, NoRenameBaseSchema)):
-                return tp(obj, object_path=object_path)  # type: ignore
-            raise DataValidationError(
-                f"expected 'dict' or 'NoRenameBaseSchema' object, found '{type(obj)}'", object_path
-            )
+            return self.construct_base_schema(tp, obj, object_path)
 
         # if the object matches, just pass it through
         elif inspect.isclass(tp) and isinstance(obj, tp):
@@ -430,23 +415,163 @@ class Mapper:
                 object_path,
             )
 
-    T = TypeVar("T")
+    def construct_base_schema(self, tp: Type[Any], obj: Any, object_path: str) -> "NoRenameBaseSchema":
+        if isinstance(obj, (dict, NoRenameBaseSchema)):
+            return tp(obj, object_path=object_path)  # type: ignore
+        raise DataValidationError(
+            f"expected 'dict' or 'NoRenameBaseSchema' object, found '{type(obj)}'", object_path
+        )
 
-    @staticmethod
-    def load(clazz: Type[T], obj: Any, default: Any = ..., use_default: bool = False) -> T:
-        return Mapper().validated_object_type(clazz, obj, default, use_default)
+    def construct_value_type(self, tp: Type[Any], obj: Any, object_path: str) -> "BaseValueType":
+        if isinstance(obj, tp):
+            # if we already have a custom value type, just pass it through
+            return obj
+        else:
+            # no validation performed, the implementation does it in the constuctor
+            try:
+                return tp(obj, object_path=object_path)
+            except ValueError as e:
+                if len(e.args) > 0 and isinstance(e.args[0], str):
+                    msg = e.args[0]
+                else:
+                    msg = f"Failed to validate value against {tp} type"
+                raise DataValidationError(msg, object_path) from e
 
-    @staticmethod
-    def is_obj_type_valid(obj: Any, tp: Type[Any]) -> bool:
+    def load(self, clazz: Type[T], obj: Any, default: Any = ..., use_default: bool = False) -> T:
+        return self.validated_object_type(clazz, obj, default, use_default)
+
+    @classmethod
+    def is_obj_type_valid(cls, obj: Any, tp: Type[Any]) -> bool:
         """
         Runtime type checking. Validate, that a given object is of a given type.
         """
 
         try:
-            Mapper().validated_object_type(tp, obj)
+            cls().validated_object_type(tp, obj)
             return True
         except (DataValidationError, ValueError):
             return False
+
+    def _assign_default(self, obj: Any, name: str, python_type: Any, object_path: str) -> None:
+        cls = obj.__class__
+        default = getattr(cls, name, None)
+        value = self.validated_object_type(python_type, default, object_path=f"{object_path}/{name}")
+        setattr(obj, name, value)
+
+    def _assign_field(self, obj: Any, name: str, python_type: Any, value: Any, object_path: str) -> None:
+        value = self.validated_object_type(python_type, value, object_path=f"{object_path}/{name}")
+        setattr(obj, name, value)
+
+    def _assign_fields(self, obj: Any, source: Union[Dict[str, Any], "NoRenameBaseSchema", None], object_path: str) -> Set[str]:
+        """
+        Order of assignment:
+          1. all direct assignments
+          2. assignments with conversion method
+        """
+        cls = obj.__class__
+        annot = cls.__dict__.get("__annotations__", {})
+        errs: List[DataValidationError] = []
+
+        used_keys: Set[str] = set()
+        for name, python_type in annot.items():
+            try:
+                if is_internal_field_name(name):
+                    continue
+
+                # populate field
+                if source is None:
+                    self._assign_default(obj, name, python_type, object_path)
+
+                # check for invalid configuration with both transformation function and default value
+                elif hasattr(obj, f"_{name}") and hasattr(obj, name):
+                    raise RuntimeError(
+                        f"Field '{obj.__class__.__name__}.{name}' has default value and transformation function at"
+                        " the same time. That is now allowed. Store the default in the transformation function."
+                    )
+
+                # there is a transformation function to create the value
+                elif hasattr(obj, f"_{name}") and callable(getattr(obj, f"_{name}")):
+                    val = self._get_converted_value(obj, name, source, object_path)
+                    self._assign_field(obj, name, python_type, val, object_path)
+                    used_keys.add(name)
+
+                # source just contains the value
+                elif name in source:
+                    val = source[name]
+                    self._assign_field(obj, name, python_type, val, object_path)
+                    used_keys.add(name)
+
+                # there is a default value, or the type is optional => store the default or null
+                elif hasattr(obj, name) or is_optional(python_type):
+                    self._assign_default(obj, name, python_type, object_path)
+
+                # we expected a value but it was not there
+                else:
+                    errs.append(DataValidationError(f"missing attribute '{name}'.", object_path))
+            except DataValidationError as e:
+                errs.append(e)
+
+        if len(errs) == 1:
+            raise errs[0]
+        elif len(errs) > 1:
+            raise AggregateDataValidationError(object_path, errs)
+        return used_keys
+
+    def _get_converted_value(self, obj: Any, key: str, source: TSource, object_path: str) -> Any:
+        """
+        Get a value of a field by invoking appropriate transformation function.
+        """
+        try:
+            func = getattr(obj.__class__, f"_{key}")
+            argc = len(inspect.signature(func).parameters)
+            if argc == 1:
+                # it is a static method
+                return func(source)
+            elif argc == 2:
+                # it is a instance method
+                return func(_create_untouchable("obj"), source)
+            else:
+                raise RuntimeError("Transformation function has wrong number of arguments")
+        except ValueError as e:
+            if len(e.args) > 0 and isinstance(e.args[0], str):
+                msg = e.args[0]
+            else:
+                msg = "Failed to validate value type"
+            raise DataValidationError(msg, object_path) from e
+
+    def object_constructor(self, obj: Any, source: TSource, object_path: str) -> None:
+        # make sure that all raw data checks passed on the source object
+        if source is None:
+            source = {}
+
+        if not isinstance(source, (NoRenameBaseSchema, dict)):
+            raise DataValidationError(f"expected dict-like object, found '{type(source)}'", object_path)
+
+        # save source (2 underscores should invoke Python's build-in mangling and we wont hopefully have collistions with data fields)
+        obj.__source: Union[Dict[str, Any], NoRenameBaseSchema] = source  # type: ignore
+
+        # construct lower level schema first if configured to do so
+        if obj._LAYER is not None:
+            source = obj._LAYER(source, object_path=object_path)  # pylint: disable=not-callable
+
+        # assign fields
+        used_keys = self._assign_fields(obj, source, object_path)
+
+        # check for unused keys in the source object
+        if source and not isinstance(source, NoRenameBaseSchema):
+            unused = source.keys() - used_keys
+            if len(unused) > 0:
+                keys = ", ".join((f"'{u}'" for u in unused))
+                raise DataValidationError(
+                    f"unexpected extra key(s) {keys}",
+                    object_path,
+                )
+
+        # validate the constructed value
+        try:
+            obj._validate()
+        except ValueError as e:
+            raise DataValidationError(e.args[0] if len(e.args) > 0 else "Validation error", object_path) from e
 
 
 class NoRenameBaseSchema(Serializable):
@@ -515,134 +640,17 @@ class NoRenameBaseSchema(Serializable):
     _LAYER: Optional[Type["NoRenameBaseSchema"]] = None
     _MAPPER: Mapper = Mapper()
 
-    def _assign_default(self, name: str, python_type: Any, object_path: str) -> None:
-        cls = self.__class__
-        default = getattr(cls, name, None)
-        value = self._MAPPER.validated_object_type(python_type, default, object_path=f"{object_path}/{name}")
-        setattr(self, name, value)
-
-    def _assign_field(self, name: str, python_type: Any, value: Any, object_path: str) -> None:
-        value = self._MAPPER.validated_object_type(python_type, value, object_path=f"{object_path}/{name}")
-        setattr(self, name, value)
-
-    def _assign_fields(self, source: Union[Dict[str, Any], "NoRenameBaseSchema", None], object_path: str) -> Set[str]:
-        """
-        Order of assignment:
-          1. all direct assignments
-          2. assignments with conversion method
-        """
-        cls = self.__class__
-        annot = cls.__dict__.get("__annotations__", {})
-        errs: List[DataValidationError] = []
-
-        used_keys: Set[str] = set()
-        for name, python_type in annot.items():
-            try:
-                if is_internal_field_name(name):
-                    continue
-
-                # populate field
-                if source is None:
-                    self._assign_default(name, python_type, object_path)
-
-                # check for invalid configuration with both transformation function and default value
-                elif hasattr(self, f"_{name}") and hasattr(self, name):
-                    raise RuntimeError(
-                        f"Field '{self.__class__.__name__}.{name}' has default value and transformation function at"
-                        " the same time. That is now allowed. Store the default in the transformation function."
-                    )
-
-                # there is a transformation function to create the value
-                elif hasattr(self, f"_{name}") and callable(getattr(self, f"_{name}")):
-                    val = self._get_converted_value(name, source, object_path)
-                    self._assign_field(name, python_type, val, object_path)
-                    used_keys.add(name)
-
-                # source just contains the value
-                elif name in source:
-                    val = source[name]
-                    self._assign_field(name, python_type, val, object_path)
-                    used_keys.add(name)
-
-                # there is a default value, or the type is optional => store the default or null
-                elif hasattr(self, name) or is_optional(python_type):
-                    self._assign_default(name, python_type, object_path)
-
-                # we expected a value but it was not there
-                else:
-                    errs.append(DataValidationError(f"missing attribute '{name}'.", object_path))
-            except DataValidationError as e:
-                errs.append(e)
-
-        if len(errs) == 1:
-            raise errs[0]
-        elif len(errs) > 1:
-            raise AggregateDataValidationError(object_path, errs)
-        return used_keys
-
     def __init__(self, source: TSource = None, object_path: str = ""):
-        # make sure that all raw data checks passed on the source object
-        if source is None:
-            source = {}
-
-        if not isinstance(source, (NoRenameBaseSchema, dict)):
-            raise DataValidationError(f"expected dict-like object, found '{type(source)}'", object_path)
-
-        # save source (3 underscores to prevent collisions with any user defined conversion methods or system methods)
-        self.___source: Union[Dict[str, Any], NoRenameBaseSchema] = source
-
-        # construct lower level schema first if configured to do so
-        if self._LAYER is not None:
-            source = self._LAYER(source, object_path=object_path)  # pylint: disable=not-callable
-
-        # assign fields
-        used_keys = self._assign_fields(source, object_path)
-
-        # check for unused keys in the source object
-        if source and not isinstance(source, NoRenameBaseSchema):
-            unused = source.keys() - used_keys
-            if len(unused) > 0:
-                keys = ", ".join((f"'{u}'" for u in unused))
-                raise DataValidationError(
-                    f"unexpected extra key(s) {keys}",
-                    object_path,
-                )
-
-        # validate the constructed value
-        try:
-            self._validate()
-        except ValueError as e:
-            raise DataValidationError(e.args[0] if len(e.args) > 0 else "Validation error", object_path) from e
+        self._MAPPER.object_constructor(self, source, object_path)
+        self.__source: Union[Dict[str, Any], NoRenameBaseSchema]
 
     def get_unparsed_data(self) -> Dict[str, Any]:
-        if isinstance(self.___source, NoRenameBaseSchema):
-            return self.___source.get_unparsed_data()
-        elif isinstance(self.___source, Renamed):
-            return self.___source.original()
+        if isinstance(self.__source, NoRenameBaseSchema):
+            return self.__source.get_unparsed_data()
+        elif isinstance(self.__source, Renamed):
+            return self.__source.original()
         else:
-            return self.___source
-
-    def _get_converted_value(self, key: str, source: TSource, object_path: str) -> Any:
-        """
-        Get a value of a field by invoking appropriate transformation function.
-        """
-        try:
-            func = getattr(self.__class__, f"_{key}")
-            argc = len(inspect.signature(func).parameters)
-            if argc == 1:
-                # it is a static method
-                return func(source)
-            elif argc == 2:
-                # it is a instance method
-                return func(_create_untouchable("self"), source)
-            else:
-                raise RuntimeError("Transformation function has wrong number of arguments")
-        except ValueError as e:
-            if len(e.args) > 0 and isinstance(e.args[0], str):
-                msg = e.args[0]
-            else:
-                msg = "Failed to validate value type"
-            raise DataValidationError(msg, object_path) from e
+            return self.__source
 
     def __getitem__(self, key: str) -> Any:
         if not hasattr(self, key):
@@ -694,16 +702,26 @@ class NoRenameBaseSchema(Serializable):
         return res
 
 
-# export as a standalone functions for backwards compatibility
-load = Mapper.load
-is_obj_type_valid = Mapper.is_obj_type_valid
-
-
 class RenamedMapper(Mapper):
     def _validated_dict(self, tp: Type[Any], obj: Dict[Any, Any], object_path: str) -> Dict[Any, Any]:
         if isinstance(obj, Renamed):
             obj = obj.original()
         return super()._validated_dict(tp, obj, object_path)
+
+    def construct_base_schema(self, tp: Type[Any], obj: Any, object_path: str) -> "NoRenameBaseSchema":
+        if isinstance(obj, dict):
+            obj = renamed(obj)
+        return super().construct_base_schema(tp, obj, object_path)
+
+    def object_constructor(self, obj: Any, source: TSource, object_path: str) -> None:
+        if isinstance(source, dict):
+            source = renamed(source)
+        return super().object_constructor(obj, source, object_path)
+
+
+# export as a standalone functions for backwards compatibility
+load = RenamedMapper().load
+is_obj_type_valid = RenamedMapper.is_obj_type_valid
 
 
 class BaseSchema(NoRenameBaseSchema):
@@ -714,8 +732,3 @@ class BaseSchema(NoRenameBaseSchema):
     """
 
     _MAPPER: Mapper = RenamedMapper()
-
-    def __init__(self, source: TSource = None, object_path: str = ""):
-        if isinstance(source, dict):
-            source = renamed(source)
-        super().__init__(source, object_path)
