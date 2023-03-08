@@ -1,10 +1,7 @@
 from .enums import DNSRecordTypeEnum, PolicyActionEnum, PolicyFlagEnum
+from .files import AbsoluteDir, Dir, File, FilePath
 from .types import (
-    AbsoluteDir,
-    Dir,
     DomainName,
-    File,
-    FilePath,
     Int0_512,
     Int0_65535,
     InterfaceName,

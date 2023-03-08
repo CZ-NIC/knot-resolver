@@ -7,6 +7,7 @@ import pytest
 from pytest import raises
 
 from knot_resolver_manager.datamodel.types import (
+    Dir,
     DomainName,
     InterfaceName,
     InterfaceOptionalPort,
@@ -21,7 +22,6 @@ from knot_resolver_manager.datamodel.types import (
     SizeUnit,
     TimeUnit,
 )
-from knot_resolver_manager.datamodel.types import Dir
 from knot_resolver_manager.utils.modeling import BaseSchema
 
 
