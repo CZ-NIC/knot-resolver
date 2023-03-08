@@ -611,26 +611,42 @@ static void answer_finalize(struct kr_request *request)
 static int query_finalize(struct kr_request *request, struct kr_query *qry, knot_pkt_t *pkt)
 {
 	knot_pkt_begin(pkt, KNOT_ADDITIONAL);
-	if (qry->flags.STUB || qry->flags.FORWARD)
+	const bool is_iter = !(qry->flags.STUB || qry->flags.FORWARD);
+	if (!is_iter)
 		knot_wire_set_rd(pkt->wire);
 	// The rest of this function is all about EDNS.
 	if (qry->flags.NO_EDNS)
 		return kr_ok();
-	/* Remove any EDNS records from any previous iteration. */
+	// Replace any EDNS records from any previous iteration.
 	int ret = edns_erase_and_reserve(pkt);
+	if (ret == 0) ret = edns_create(pkt, request);
 	if (ret) return ret;
-	ret = edns_create(pkt, request);
-	if (ret) return ret;
-	if (qry->flags.STUB) {
-		/* Stub resolution */
-		if (knot_wire_get_cd(request->qsource.packet->wire)) {
-			knot_wire_set_cd(pkt->wire);
-		}
-	} else {
-		/* Full resolution (ask for +cd and +do) */
+
+	if (!qry->flags.STUB)
 		knot_edns_set_do(pkt->opt_rr);
+
+	// CD flag is a bit controversial for .FORWARD:
+	//  The original DNSSEC RFCs assume that if someone is validating,
+	//  they will use CD=1 in requests to upstream.  The intention was that
+	//  this way both sides could use independent sets of trust anchors.
+	//
+	//  However, in practice the trust anchor differences seem rather rare/small.
+	//  And some of the normal use cases get harmed.  With CD=1, the upstream
+	//  (e.g. 1.1.1.1) can keep returning a cached bogus answer, even though they could
+	//  instead retry with a different authoritative server and get a good one.
+	//
+	//  Therefore if we want validaton (CD from client, negative trust anchors),
+	//  we send CD=0 and then propagate returned SERVFAIL (but some retry logic remains).
+	//
+	//  Theoretically it might be best to use both CD=0 and CD=1, with either of them
+	//  in some kind of DNSSEC fallback, but I see bad complexity/improvement ratio.
+	if (is_iter) {
 		knot_wire_set_cd(pkt->wire);
+	} else {
+		if (knot_wire_get_cd(request->qsource.packet->wire) || !qry->flags.DNSSEC_WANT)
+			knot_wire_set_cd(pkt->wire);
 	}
+
 	return kr_ok();
 }
 
