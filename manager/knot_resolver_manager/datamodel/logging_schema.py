@@ -4,7 +4,7 @@ from typing import Any, List, Optional, Set, Type, Union, cast
 from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import FilePath, TimeUnit
-from knot_resolver_manager.utils.modeling import BaseSchema
+from knot_resolver_manager.utils.modeling import ConfigSchema
 from knot_resolver_manager.utils.modeling.base_schema import is_obj_type_valid
 
 try:
@@ -69,7 +69,7 @@ LogGroupsEnum: TypeAlias = Literal[
 ]
 
 
-class DnstapSchema(BaseSchema):
+class DnstapSchema(ConfigSchema):
     """
     Logging DNS queries and responses to a unix socket.
 
@@ -86,7 +86,7 @@ class DnstapSchema(BaseSchema):
     log_tcp_rtt: bool = True
 
 
-class DebuggingSchema(BaseSchema):
+class DebuggingSchema(ConfigSchema):
     """
     Advanced debugging parameters for kresd (Knot Resolver daemon).
 
@@ -99,8 +99,8 @@ class DebuggingSchema(BaseSchema):
     assertion_fork: TimeUnit = TimeUnit("5m")
 
 
-class LoggingSchema(BaseSchema):
-    class Raw(BaseSchema):
+class LoggingSchema(ConfigSchema):
+    class Raw(ConfigSchema):
         """
         Logging and debugging configuration.
 

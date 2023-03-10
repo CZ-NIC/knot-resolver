@@ -1,10 +1,10 @@
 from typing import Dict, List, Optional
 
 from knot_resolver_manager.datamodel.types import DomainName, File, IPAddress, TimeUnit
-from knot_resolver_manager.utils.modeling import BaseSchema
+from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
-class StaticHintsSchema(BaseSchema):
+class StaticHintsSchema(ConfigSchema):
     """
     Static hints for forward records (A/AAAA) and reverse records (PTR)
 

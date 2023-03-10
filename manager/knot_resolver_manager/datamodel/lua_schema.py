@@ -1,9 +1,9 @@
 from typing import Optional
 
-from knot_resolver_manager.utils.modeling import BaseSchema
+from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
-class LuaSchema(BaseSchema):
+class LuaSchema(ConfigSchema):
     """
     Custom Lua configuration.
 

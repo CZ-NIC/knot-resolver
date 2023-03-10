@@ -1,10 +1,10 @@
 from typing import Optional
 
 from knot_resolver_manager.datamodel.types import File, FilePath, InterfacePort
-from knot_resolver_manager.utils.modeling import BaseSchema
+from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
-class WebmgmtSchema(BaseSchema):
+class WebmgmtSchema(ConfigSchema):
     """
     Configuration of legacy web management endpoint.
 

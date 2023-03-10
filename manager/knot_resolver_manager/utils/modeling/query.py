@@ -4,7 +4,7 @@ from typing import Any, List, Optional, Tuple, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.utils.modeling.base_schema import NoRenameBaseSchema, load
+from knot_resolver_manager.utils.modeling.base_schema import BaseSchema, map_object
 from knot_resolver_manager.utils.modeling.json_pointer import json_ptr_resolve
 
 
@@ -12,7 +12,7 @@ class PatchError(Exception):
     pass
 
 
-class Op(NoRenameBaseSchema, ABC):
+class Op(BaseSchema, ABC):
     @abstractmethod
     def eval(self, fakeroot: Any) -> Any:
         """
@@ -169,7 +169,7 @@ def query(
 
     elif method == "patch":
         tp = List[Union[AddOp, RemoveOp, MoveOp, CopyOp, TestOp, ReplaceOp]]
-        transaction: tp = load(tp, payload)
+        transaction: tp = map_object(tp, payload)
 
         for i, op in enumerate(transaction):
             try:

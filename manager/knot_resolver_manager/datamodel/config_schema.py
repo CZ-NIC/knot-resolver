@@ -26,7 +26,7 @@ from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
 from knot_resolver_manager.datamodel.types import AbsoluteDir, IntPositive
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
-from knot_resolver_manager.utils.modeling import BaseSchema
+from knot_resolver_manager.utils.modeling import ConfigSchema
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +78,8 @@ def _default_max_worker_count() -> Optional[int]:
     return MAX_WORKERS
 
 
-class KresConfig(BaseSchema):
-    class Raw(BaseSchema):
+class KresConfig(ConfigSchema):
+    class Raw(ConfigSchema):
         """
         Knot Resolver declarative configuration.
 

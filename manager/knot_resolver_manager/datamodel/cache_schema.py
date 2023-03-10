@@ -1,10 +1,10 @@
 from typing import List, Optional
 
 from knot_resolver_manager.datamodel.types import Dir, DomainName, File, SizeUnit, TimeUnit
-from knot_resolver_manager.utils.modeling import BaseSchema
+from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
-class PrefillSchema(BaseSchema):
+class PrefillSchema(ConfigSchema):
     """
     Prefill the cache periodically by importing zone data obtained over HTTP.
 
@@ -25,7 +25,7 @@ class PrefillSchema(BaseSchema):
             raise ValueError("cache prefilling is not yet supported for non-root zones")
 
 
-class CacheSchema(BaseSchema):
+class CacheSchema(ConfigSchema):
     """
     DNS resolver cache configuration.
 

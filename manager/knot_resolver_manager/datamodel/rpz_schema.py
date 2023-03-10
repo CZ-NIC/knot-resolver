@@ -1,10 +1,10 @@
 from typing import List, Optional
 
 from knot_resolver_manager.datamodel.types import File, PolicyActionEnum, PolicyFlagEnum
-from knot_resolver_manager.utils.modeling import BaseSchema
+from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
-class RPZSchema(BaseSchema):
+class RPZSchema(ConfigSchema):
     """
     Configuration or Response Policy Zone (RPZ).
 

@@ -5,12 +5,12 @@ The utilities also take care of parsing, validating and creating JSON schemas an
 
 ## Creating schema
 
-Schema is created using `BaseSchema` class. Schema structure is specified using annotations.
+Schema is created using `ConfigSchema` class. Schema structure is specified using annotations.
 
 ```python
-from .modeling import BaseSchema
+from .modeling import ConfigSchema
 
-class SimpleSchema(BaseSchema):
+class SimpleSchema(ConfigSchema):
     integer: int = 5    # a default value can be specified
     string: str
     boolean: bool
@@ -21,7 +21,7 @@ Words in multi-word names are separated by underscore `_` (e.g. `simple_schema`)
 ```python
 from typing import Dict, List, Optional, Union
 
-class ComplexSchema(BaseSchema):
+class ComplexSchema(ConfigSchema):
     optional: Optional[str]     # this field is optional
     union: Union[int, str]      # integer and string are both valid
     list: List[int]             # list of integers
@@ -36,7 +36,7 @@ If a some additional validation needs to be done, there is `_validate()` method 
 `ValueError` exception should be raised in case of validation error.
 
 ```python
-class FieldsSchema(BaseSchema):
+class FieldsSchema(ConfigSchema):
     field1: int
     field2: int
 
@@ -53,8 +53,8 @@ Transformation method must be named based on field (`value` in this example) wit
 In this example, the `Layer2Schema` is structure for input data and `Layer1Schema` is for result data.
 
 ```python
-class Layer1Schema(BaseSchema):
-    class Layer2Schema(BaseSchema):
+class Layer1Schema(ConfigSchema):
+    class Layer2Schema(ConfigSchema):
         value: Union[str, int]
 
     _LAYER = Layer2Schema
@@ -72,7 +72,7 @@ class Layer1Schema(BaseSchema):
 Created schema can be documented using simple docstring. Json schema is created by calling `json_schema()` method on schema class. JSON schema includes description from docstring, defaults, etc.
 
 ```python
-SimpleSchema(BaseSchema):
+SimpleSchema(ConfigSchema):
     """
     This is description for SimpleSchema itself.
 
