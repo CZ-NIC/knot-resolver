@@ -69,8 +69,9 @@ local function evaluate(state, req)
 				if execute(state, req, match_cb) then return end
 			end
 		end
+	end
 	-- Finally try :addr by the destination.
-	elseif req.qsource.dst_addr ~= nil then
+	if req.qsource.dst_addr ~= nil then
 		for i = 1, #view.dst do
 			local pair = view.dst[i]
 			if match_subnet(pair[1], pair[2], pair[3], req.qsource.dst_addr) then
