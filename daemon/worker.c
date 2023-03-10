@@ -158,7 +158,7 @@ static struct session2 *ioreq_spawn(int socktype, sa_family_t family,
 	}
 	if (addr->ip.sa_family != AF_UNSPEC) {
 		if (kr_fails_assert(addr->ip.sa_family == family)) {
-			session2_event(s, PROTOLAYER_EVENT_FORCE_CLOSE, NULL);
+			session2_force_close(s);
 			return NULL;
 		}
 		if (socktype == SOCK_DGRAM) {
@@ -171,7 +171,7 @@ static struct session2 *ioreq_spawn(int socktype, sa_family_t family,
 	}
 
 	if (ret != 0) {
-		session2_event(s, PROTOLAYER_EVENT_FORCE_CLOSE, NULL);
+		session2_force_close(s);
 		return NULL;
 	}
 
@@ -717,7 +717,7 @@ static int send_waiting(struct session2 *session)
 			session2_waitinglist_finalize(session, KR_STATE_FAIL);
 			session2_tasklist_finalize(session, KR_STATE_FAIL);
 			worker_del_tcp_connected(peer);
-			session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
+			session2_close(session);
 			break;
 		}
 		session2_waitinglist_pop(session, true);
@@ -760,7 +760,7 @@ static void on_connect(uv_connect_t *req, int status)
 		}
 		kr_assert(session2_tasklist_is_empty(session));
 		session2_waitinglist_retry(session, false);
-		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
+		session2_close(session);
 		return;
 	}
 
@@ -777,7 +777,7 @@ static void on_connect(uv_connect_t *req, int status)
 		}
 		kr_assert(session2_tasklist_is_empty(session));
 		session2_waitinglist_retry(session, false);
-		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
+		session2_close(session);
 		return;
 	}
 
@@ -794,7 +794,7 @@ static void on_connect(uv_connect_t *req, int status)
 			session2_event(session, PROTOLAYER_EVENT_CONNECT_FAIL, NULL);
 		}
 		kr_assert(session2_tasklist_is_empty(session));
-		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
+		session2_close(session);
 		return;
 	}
 
@@ -844,7 +844,7 @@ static int transmit(struct qr_task *task)
 	};
 	ret = qr_task_send(task, session, &out_comm, task->pktbuf);
 	if (ret) {
-		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
+		session2_close(session);
 		return ret;
 	}
 
@@ -993,7 +993,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 			 * (ie. task->leading is true) */
 			worker_task_unref(t);
 		}
-		session2_event(source_session, PROTOLAYER_EVENT_CLOSE, NULL);
+		session2_close(source_session);
 	}
 
 	qr_task_unref(task);
@@ -1063,7 +1063,7 @@ static int tcp_task_existing_connection(struct session2 *session, struct qr_task
 		 * close connection to upstream. */
 		session2_tasklist_finalize(session, KR_STATE_FAIL);
 		worker_del_tcp_connected(session2_get_peer(session));
-		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
+		session2_close(session);
 		return kr_error(EINVAL);
 	}
 
@@ -1108,7 +1108,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	int ret = worker_add_tcp_waiting(addr, session);
 	if (ret < 0) {
 		free(conn);
-		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
+		session2_close(session);
 		return kr_error(EINVAL);
 	}
 
@@ -1123,7 +1123,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	if (ret != 0) {
 		worker_del_tcp_waiting(addr);
 		free(conn);
-		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
+		session2_close(session);
 		return kr_error(EINVAL);
 	}
 
@@ -1140,7 +1140,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 		session2_timer_stop(session);
 		worker_del_tcp_waiting(addr);
 		free(conn);
-		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
+		session2_close(session);
 		qry->server_selection.error(qry, task->transport, KR_SELECTION_TCP_CONNECT_FAILED);
 		return kr_error(EAGAIN);
 	}
@@ -1152,7 +1152,7 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 		session2_timer_stop(session);
 		worker_del_tcp_waiting(addr);
 		free(conn);
-		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
+		session2_close(session);
 		return kr_error(EINVAL);
 	}
 
@@ -1490,7 +1490,7 @@ int worker_end_tcp(struct session2 *session)
 		return kr_error(EINVAL);
 
 	session2_timer_stop(session);
-	session2_event(session, PROTOLAYER_EVENT_FORCE_CLOSE, NULL);
+	session2_force_close(session);
 	return kr_ok();
 }
 
@@ -1889,7 +1889,7 @@ static enum protolayer_event_cb_result pl_dns_stream_resolution_timeout(
 				worker_del_tcp_waiting(peer);
 				worker_del_tcp_connected(peer);
 			}
-			session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
+			session2_close(s);
 		}
 	}
 
@@ -1910,7 +1910,7 @@ static enum protolayer_event_cb_result pl_dns_stream_connected(
 		 * something gone wrong */
 		session2_waitinglist_finalize(session, KR_STATE_FAIL);
 		kr_assert(session2_tasklist_is_empty(session));
-		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
+		session2_close(session);
 		return PROTOLAYER_EVENT_CONSUME;
 	}
 

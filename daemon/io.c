@@ -309,7 +309,7 @@ static enum protolayer_iter_cb_result pl_tcp_unwrap(
 			worker_end_tcp(s);
 			return protolayer_break(ctx, kr_error(ECONNRESET));
 		} else if (trimmed == 0) {
-			session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
+			session2_close(s);
 			return protolayer_break(ctx, kr_error(ECONNRESET));
 		}
 
@@ -552,7 +552,7 @@ static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp
 	if (uv_accept(master, (uv_stream_t *)client) != 0) {
 		/* close session, close underlying uv handles and
 		 * deallocate (or return to memory pool) memory. */
-		session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
+		session2_close(s);
 		return;
 	}
 
@@ -562,14 +562,14 @@ static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp
 	int sa_len = sizeof(struct sockaddr_in6);
 	int ret = uv_tcp_getpeername(client, sa, &sa_len);
 	if (ret || sa->sa_family == AF_UNSPEC) {
-		session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
+		session2_close(s);
 		return;
 	}
 	sa = session2_get_sockname(s);
 	sa_len = sizeof(struct sockaddr_in6);
 	ret = uv_tcp_getsockname(client, sa, &sa_len);
 	if (ret || sa->sa_family == AF_UNSPEC) {
-		session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
+		session2_close(s);
 		return;
 	}
 

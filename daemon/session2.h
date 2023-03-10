@@ -326,13 +326,12 @@ typedef void (*protolayer_finished_cb)(int status, struct session2 *session,
  * Event types are used to distinguish different events that can be passed to
  * sessions using `session2_event()`. */
 #define PROTOLAYER_EVENT_MAP(XX) \
-	XX(CLOSE) /**< Signal to gracefully close the session -
+	XX(CLOSE) /**< Sending this event closes the session gracefully -
 	           * i.e. layers add their standard disconnection
 	           * ceremony (e.g. `gnutls_bye()`). */\
-	XX(FORCE_CLOSE) /**< Signal to forcefully close the
-	                 * session - i.e. layers SHOULD NOT add
-	                 * any disconnection ceremony, if
-	                 * avoidable. */\
+	XX(FORCE_CLOSE) /**< Sending this event closes the session forcefully -
+	                 * i.e. layers SHOULD NOT add any disconnection
+	                 * ceremony, if avoidable. */\
 	XX(CONNECT_TIMEOUT) /**< Signal that a connection could not be
 	                     * established due to a timeout. */\
 	XX(GENERAL_TIMEOUT) /**< Signal that a general application-defined
@@ -1065,6 +1064,24 @@ void session2_event(struct session2 *s, enum protolayer_event_type event, void *
  * `_UNWRAP` direction! */
 void session2_event_after(struct session2 *s, enum protolayer_protocol protocol,
                           enum protolayer_event_type event, void *baton);
+
+/** Sends a `PROTOLAYER_EVENT_CLOSE` event to be processed by the protocol
+ * layers of the specified session. This function exists for readability
+ * reasons, to signal the intent that sending this event is used to actually
+ * close the session. */
+static inline void session2_close(struct session2 *s)
+{
+	session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
+}
+
+/** Sends a `PROTOLAYER_EVENT_FORCE_CLOSE` event to be processed by the
+ * protocol layers of the specified session. This function exists for
+ * readability reasons, to signal the intent that sending this event is used to
+ * actually close the session. */
+static inline void session2_force_close(struct session2 *s)
+{
+	session2_event(s, PROTOLAYER_EVENT_FORCE_CLOSE, NULL);
+}
 
 /** Performs initial setup of the specified `req`, using the session's protocol
  * layers. Layers are processed in the `_UNWRAP` direction. */

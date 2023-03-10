@@ -234,11 +234,11 @@ static void endpoint_close(struct endpoint *ep, bool force)
 			ep->handle->loop = NULL;
 			struct session2 *s = ep->handle->data;
 			if (s)
-				session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
+				session2_close(s);
 		}
 	} else { /* Asynchronous close */
 		struct session2 *s = ep->handle->data;
-		session2_event(s, PROTOLAYER_EVENT_CLOSE, NULL);
+		session2_close(s);
 	}
 }
 

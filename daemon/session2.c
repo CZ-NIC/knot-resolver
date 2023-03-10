@@ -1537,5 +1537,5 @@ void session2_kill_ioreq(struct session2 *session, struct qr_task *task)
 		return;
 	session2_tasklist_del(session, task);
 	if (session->transport.io.handle->type == UV_UDP)
-		session2_event(session, PROTOLAYER_EVENT_CLOSE, NULL);
+		session2_close(session);
 }
