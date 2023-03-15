@@ -499,14 +499,10 @@ size_t protolayer_queue_count_payload(const protolayer_iter_ctx_queue_t *queue);
  * queue iterators, as it does not need to iterate through the whole queue. */
 bool protolayer_queue_has_payload(const protolayer_iter_ctx_queue_t *queue);
 
-/** Mandatory header members for any layer-specific data. */
-#define PROTOLAYER_DATA_HEADER() struct {\
-	struct session2 *session; /**< Pointer to the owner session. */\
-}
-
-/** Layer-specific data - the generic struct. */
+/** Layer-specific data - the generic struct. To be added as the first member of
+ * each specific struct. */
 struct protolayer_data {
-	PROTOLAYER_DATA_HEADER();
+	struct session2 *session; /**< Pointer to the owner session. */\
 };
 
 /** Return value of `protolayer_iter_cb` callbacks. To be returned by *layer
@@ -654,7 +650,7 @@ struct protolayer_data_param {
 struct protolayer_globals {
 	/** Size of the layer-specific data struct, valid per-session.
 	 *
-	 * The struct MUST begin with the `PROTOLAYER_DATA_HEADER()` macro. If
+	 * The struct MUST begin with a `struct protolayer_data` member. If
 	 * no session struct is used by the layer, the value may be zero. */
 	size_t sess_size;
 
@@ -662,7 +658,7 @@ struct protolayer_globals {
 	 * gets created and destroyed together with a `struct
 	 * protolayer_iter_ctx`.
 	 *
-	 * The struct MUST begin with the `PROTOLAYER_DATA_HEADER()` macro. If
+	 * The struct MUST begin with a `struct protolayer_data` member. If
 	 * no iteration struct is used by the layer, the value may be zero. */
 	size_t iter_size;
 

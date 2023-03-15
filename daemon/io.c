@@ -130,7 +130,7 @@ static int family_to_freebind_option(sa_family_t sa_family, int *level, int *nam
 
 
 struct pl_udp_iter_data {
-	PROTOLAYER_DATA_HEADER();
+	struct protolayer_data h;
 	struct proxy_result proxy;
 	bool has_proxy;
 };
@@ -212,7 +212,7 @@ static enum protolayer_event_cb_result pl_udp_event_wrap(
 
 
 struct pl_tcp_sess_data {
-	PROTOLAYER_DATA_HEADER();
+	struct protolayer_data h;
 	struct proxy_result proxy;
 	struct wire_buf wire_buf;
 	bool had_data : 1;

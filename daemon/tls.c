@@ -49,7 +49,7 @@ typedef enum tls_client_hs_state {
 } tls_hs_state_t;
 
 struct pl_tls_sess_data {
-	PROTOLAYER_DATA_HEADER();
+	struct protolayer_data h;
 	bool client_side;
 	bool first_handshake_done;
 	gnutls_session_t tls_session;
@@ -226,7 +226,7 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 	push_ctx->sess_data = tls;
 	memcpy(push_ctx->iov, iov, sizeof(struct iovec[iovcnt]));
 
-	session2_wrap_after(tls->session, PROTOLAYER_PROTOCOL_TLS,
+	session2_wrap_after(tls->h.session, PROTOLAYER_PROTOCOL_TLS,
 			protolayer_iovec(push_ctx->iov, iovcnt), NULL,
 			kres_gnutls_push_finished, push_ctx);
 

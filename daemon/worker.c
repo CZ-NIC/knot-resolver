@@ -1800,13 +1800,13 @@ static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 }
 
 struct pl_dns_stream_sess_data {
-	PROTOLAYER_DATA_HEADER();
+	struct protolayer_data h;
 	bool single : 1; /**< True: Stream only allows a single packet */
 	bool produced : 1; /**< True: At least one packet has been produced */
 };
 
 struct pl_dns_stream_iter_data {
-	PROTOLAYER_DATA_HEADER();
+	struct protolayer_data h;
 	struct {
 		knot_mm_t *pool;
 		void *mem;
