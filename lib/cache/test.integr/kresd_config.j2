@@ -28,6 +28,7 @@ _hint_root_file('hints')
 cache.size = 2*MB
 log_level('debug')
 policy.add(policy.all(policy.DEBUG_ALWAYS))
+net.bufsize(4096)
 {% endraw %}
 
 net = { '{{SELF_ADDR}}' }

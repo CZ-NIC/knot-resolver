@@ -39,6 +39,7 @@ end
 policy.add(policy.suffix(policy.PASS, {todname('test.')}))
 cache.size = 2*MB
 log_level('debug')
+net.bufsize(4096)
 {% endraw %}
 
 modules.load('hints')
