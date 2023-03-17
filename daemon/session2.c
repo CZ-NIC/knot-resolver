@@ -32,6 +32,7 @@ static uint32_t next_log_id = 1;
 
 struct protolayer_globals protolayer_globals[PROTOLAYER_PROTOCOL_COUNT] = {{0}};
 
+
 static const enum protolayer_protocol protolayer_grp_doudp[] = {
 	PROTOLAYER_PROTOCOL_UDP,
 	PROTOLAYER_PROTOCOL_DNS_DGRAM,
@@ -59,6 +60,20 @@ static const enum protolayer_protocol protolayer_grp_doh[] = {
 	PROTOLAYER_PROTOCOL_NULL
 };
 
+/** Sequences of layers, mapped by `enum protolayer_grp`.
+ *
+ * To define a new group, add a new entry in the `PROTOLAYER_GRP_MAP` macro and
+ * create a new static `protolayer_grp_*` array above, similarly to the already
+ * existing ones. Each array must end with `PROTOLAYER_GRP_NULL`, to indicate
+ * the end of the list of protocol layers. The array name's suffix must be the
+ * one defined as *Variable name* (2nd parameter) in the `PROTOLAYER_GRP_MAP`
+ * macro. */
+static const enum protolayer_protocol *protolayer_grps[PROTOLAYER_GRP_COUNT] = {
+#define XX(cid, vid, name) [PROTOLAYER_GRP_ ## cid] = protolayer_grp_ ## vid,
+	PROTOLAYER_GRP_MAP(XX)
+#undef XX
+};
+
 
 const char *protolayer_protocol_name(enum protolayer_protocol p)
 {
@@ -73,20 +88,6 @@ const char *protolayer_protocol_name(enum protolayer_protocol p)
 		return "(invalid)";
 	}
 }
-
-/** Sequences of layers, mapped by `enum protolayer_grp`.
- *
- * To define a new group, add a new entry in the `PROTOLAYER_GRP_MAP` macro and
- * create a new static `protolayer_grp_*` array above, similarly to the already
- * existing ones. Each array must end with `PROTOLAYER_GRP_NULL`, to indicate
- * the end of the list of protocol layers. The array name's suffix must be the
- * one defined as *Variable name* (2nd parameter) in the `PROTOLAYER_GRP_MAP`
- * macro. */
-static const enum protolayer_protocol *protolayer_grps[PROTOLAYER_GRP_COUNT] = {
-#define XX(cid, vid, name) [PROTOLAYER_GRP_ ## cid] = protolayer_grp_ ## vid,
-	PROTOLAYER_GRP_MAP(XX)
-#undef XX
-};
 
 const char *protolayer_grp_name(enum protolayer_grp g)
 {

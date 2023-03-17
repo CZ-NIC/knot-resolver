@@ -88,7 +88,8 @@ struct comm_info {
 	const struct sockaddr *dst_addr;
 
 	/** Data parsed from a PROXY header. May be `NULL` if the communication
-	 * did not come through a proxy, or if the PROXYv2 protocol was not used. */
+	 * did not come through a proxy, or if the PROXYv2 protocol was not
+	 * used. */
 	const struct proxy_result *proxy;
 
 	/** Pointer to protolayer-specific data, e.g. a key to decide, which
@@ -184,7 +185,6 @@ static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 }
 
 
-
 /** Protocol layer types map - an enumeration of individual protocol layer
  * implementations
  *
@@ -244,9 +244,10 @@ const char *protolayer_protocol_name(enum protolayer_protocol p);
  * For defining new groups, see the docs of `protolayer_grps[]` in
  * `daemon/session2.h`.
  *
- * Parameters are:
- *   1. Constant name (for e.g. PROTOLAYER_GRP_* enum values)
- *   2. Variable name (for e.g. protolayer_grp_* arrays - in `session2.c`)
+ * Parameters for XX are:
+ *   1. Constant name (for e.g. PROTOLAYER_GRP_* enum value identifiers)
+ *   2. Variable name (for e.g. protolayer_grp_* array identifiers - defined in
+ *      `session2.c`)
  *   3. Human-readable name for logging */
 #define PROTOLAYER_GRP_MAP(XX) \
 	XX(DOUDP, doudp, "DNS UDP") \
@@ -289,9 +290,11 @@ enum protolayer_direction {
 	PROTOLAYER_WRAP,
 };
 
+/** Returned by a successful call to `session2_wrap()` or `session2_unwrap()`
+ * functions. */
 enum protolayer_ret {
 	/** Returned when a protolayer context iteration has finished
-	 * processing, i.e. with _BREAK. */
+	 * processing, i.e. with `protolayer_break()`. */
 	PROTOLAYER_RET_NORMAL = 0,
 
 	/** Returned when a protolayer context iteration is waiting for an
@@ -299,10 +302,6 @@ enum protolayer_ret {
 	 * passed to `protolayer_finished_cb`, only returned by
 	 * `session2_unwrap` or `session2_wrap`. */
 	PROTOLAYER_RET_ASYNC,
-
-	/** Returned when a protolayer context iteration has ended on a layer
-	 * that needs more data from another buffer. */
-	PROTOLAYER_RET_WAITING,
 };
 
 /** Called when a payload iteration (started by `session2_unwrap` or
