@@ -209,11 +209,14 @@ static int l_log_groups(lua_State *L)
 			const char *grp_str = lua_tostring(L, -1);
 			if (!grp_str)
 				goto bad_call;
-			enum kr_log_group grp = kr_log_name2grp(grp_str);
-			if (grp < 0)
-				lua_error_p(L, "unknown log group '%s'", lua_tostring(L, -1));
 
-			kr_log_group_add(grp);
+			enum kr_log_group grp = kr_log_name2grp(grp_str);
+			if (grp >= 0) {
+				kr_log_group_add(grp);
+			} else {
+				kr_log_warning(SYSTEM, "WARNING: unknown log group '%s'\n", lua_tostring(L, -1));
+			}
+
 			++idx;
 			lua_pop(L, 1);
 		}

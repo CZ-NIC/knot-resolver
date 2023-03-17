@@ -44,8 +44,8 @@ install_subdir(
   install_dir: modules_dir / 'http',
 )
 
-# auxiliary debug library for HTTP module
-if openssl.found()
+# auxiliary debug library for HTTP module - doesn't compile on Cygwin
+if openssl.found() and host_machine.system() != 'cygwin'
   debug_opensslkeylog_mod = shared_module(
     'debug_opensslkeylog',
     ['debug_opensslkeylog.c'],

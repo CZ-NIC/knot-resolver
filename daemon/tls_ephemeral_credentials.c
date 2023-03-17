@@ -159,7 +159,7 @@ static gnutls_x509_crt_t get_ephemeral_cert(gnutls_x509_privkey_t privkey, const
 	uint8_t serial[16];
 	gnutls_rnd(GNUTLS_RND_NONCE, serial, sizeof(serial));
 	/* clear the left-most bit to avoid signedness confusion: */
-	serial[0] &= 0x8f;
+	serial[0] &= 0x7f;
 	size_t namelen = strlen(servicename);
 
 #define gtx(fn, ...)							\
