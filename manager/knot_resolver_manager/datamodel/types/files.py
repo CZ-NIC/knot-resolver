@@ -77,7 +77,7 @@ class Dir(UncheckedPath):
     ) -> None:
         super().__init__(source_value, parents=parents, object_path=object_path)
         if not self._value.is_dir():
-            raise ValueError("path does not point to an existing directory")
+            raise ValueError(f"path '{self._value}' does not point to an existing directory")
 
 
 class AbsoluteDir(Dir):
@@ -124,7 +124,7 @@ class FilePath(UncheckedPath):
         super().__init__(source_value, parents=parents, object_path=object_path)
         p = self._value.parent
         if not p.exists() or not p.is_dir():
-            raise ValueError("path does not point inside an existing directory")
+            raise ValueError(f"path '{self._value}' does not point inside an existing directory")
         if self._value.is_dir():
             raise ValueError("path points to a directory when we expected a file")
 

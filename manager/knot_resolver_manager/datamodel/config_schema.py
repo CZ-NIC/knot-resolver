@@ -23,7 +23,8 @@ from knot_resolver_manager.datamodel.rpz_schema import RPZSchema
 from knot_resolver_manager.datamodel.slice_schema import SliceSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
-from knot_resolver_manager.datamodel.types import AbsoluteDir, IntPositive
+from knot_resolver_manager.datamodel.types import IntPositive
+from knot_resolver_manager.datamodel.types.files import UncheckedPath
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
 from knot_resolver_manager.utils.modeling import ConfigSchema
@@ -112,7 +113,7 @@ class KresConfig(ConfigSchema):
         version: int = 1
         nsid: Optional[str] = None
         hostname: Optional[str] = None
-        rundir: AbsoluteDir = AbsoluteDir("/var/run/knot-resolver")
+        rundir: UncheckedPath = UncheckedPath("/var/run/knot-resolver")
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         max_workers: IntPositive = IntPositive(_default_max_worker_count())
         management: ManagementSchema = ManagementSchema({"unix-socket": "./manager.sock"})
@@ -137,7 +138,7 @@ class KresConfig(ConfigSchema):
 
     nsid: Optional[str]
     hostname: str
-    rundir: AbsoluteDir
+    rundir: UncheckedPath
     workers: IntPositive
     max_workers: IntPositive
     management: ManagementSchema
@@ -201,3 +202,20 @@ class KresConfig(ConfigSchema):
         # it should be removed and relative path used instead as soon as issue
         # https://gitlab.nic.cz/knot/knot-resolver/-/issues/720 is fixed
         return _MAIN_TEMPLATE.render(cfg=self, cwd=os.getcwd())  # pyright: reportUnknownMemberType=false
+
+
+def get_rundir_without_validation(data: Dict[str, Any]) -> UncheckedPath:
+    """
+    Without fully parsing, try to get a rundir from a raw config data. When it fails,
+    attempts a full validation to produce a good error message.
+
+    Used for initial manager startup.
+    """
+
+    if "rundir" in data:
+        rundir = data["rundir"]
+    else:
+        _ = KresConfig(data)  # this should throw a descriptive error
+        assert False
+
+    return UncheckedPath(rundir)

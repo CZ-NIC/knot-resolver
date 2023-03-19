@@ -23,7 +23,7 @@ from knot_resolver_manager import log, statistics
 from knot_resolver_manager.compat import asyncio as asyncio_compat
 from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, PID_FILE_NAME, init_user_constants
-from knot_resolver_manager.datamodel.config_schema import KresConfig
+from knot_resolver_manager.datamodel.config_schema import KresConfig, get_rundir_without_validation
 from knot_resolver_manager.datamodel.management_schema import ManagementSchema
 from knot_resolver_manager.exceptions import CancelStartupExecInsteadException, KresManagerException
 from knot_resolver_manager.kresd_controller import get_best_controller_implementation
@@ -389,12 +389,13 @@ async def _deny_working_directory_changes(config_old: KresConfig, config_new: Kr
 
 
 def _set_working_directory(config_raw: Dict[str, Any]) -> None:
-    config = KresConfig(config_raw)
+    rundir = get_rundir_without_validation(config_raw)
 
-    if not config.rundir.to_path().exists():
-        raise KresManagerException(f"`rundir` directory ({config.rundir}) does not exist!")
+    if not rundir.to_path().exists():
+        raise KresManagerException(f"`rundir` directory ({rundir}) does not exist!")
 
-    os.chdir(config.rundir.to_path())
+    logger.info("changing working directory to rundir at '%s'", rundir.to_path().absolute())
+    os.chdir(rundir.to_path())
 
 
 def _lock_working_directory(attempt: int = 0) -> None:
@@ -469,11 +470,9 @@ async def start_server(config: Union[Path, Dict[str, Any]] = DEFAULT_MANAGER_CON
         config_raw = await _load_raw_config(config)
 
         # We want to change cwd as soon as possible. Especially before any real config validation, because cwd
-        # is used for resolving relative paths. Thats also a reason, why in practice, we validate the config twice.
-        # Once when setting up the cwd just to read the `rundir` property. When cwd is set, we do it again to resolve
-        # all paths correctly.
-        # Note: the first config validation is done here - therefore all initial config validation errors will
-        # originate from here.
+        # is used for resolving relative paths. If we fail to read rundir from unparsed config, a full validation
+        # error will come from here. If we are successfull, full validation will be done further on when initializing
+        # the config store.
         _set_working_directory(config_raw)
 
         # We don't want more than one manager in a single working directory. So we lock it with a PID file.
