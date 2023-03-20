@@ -24,6 +24,7 @@ from knot_resolver_manager.compat import asyncio as asyncio_compat
 from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, PID_FILE_NAME, init_user_constants
 from knot_resolver_manager.datamodel.config_schema import KresConfig, get_rundir_without_validation
+from knot_resolver_manager.datamodel.globals import Context, set_global_validation_context
 from knot_resolver_manager.datamodel.management_schema import ManagementSchema
 from knot_resolver_manager.exceptions import CancelStartupExecInsteadException, KresManagerException
 from knot_resolver_manager.kresd_controller import get_best_controller_implementation
@@ -448,7 +449,7 @@ async def _sigterm_while_shutting_down():
     sys.exit(128 + signal.SIGTERM)
 
 
-async def start_server(config: Union[Path, Dict[str, Any]] = DEFAULT_MANAGER_CONFIG_FILE) -> int:
+async def start_server(config: Path = DEFAULT_MANAGER_CONFIG_FILE) -> int:
     # This function is quite long, but it describes how manager runs. So let's silence pylint
     # pylint: disable=too-many-statements
 
@@ -463,16 +464,19 @@ async def start_server(config: Union[Path, Dict[str, Any]] = DEFAULT_MANAGER_CON
     # are fatal
     try:
         # Make sure that the config path does not change meaning when we change working directory
-        if isinstance(config, Path):
-            config = config.absolute()
+        config = config.absolute()
+
+        # before processing any configuration, set validation context
+        #  - resolve_directory = root against which all relative paths will be resolved
+        set_global_validation_context(Context(resolve_directory=config.parent))
 
         # Preprocess config - load from file or in general take it to the last step before validation.
         config_raw = await _load_raw_config(config)
 
-        # We want to change cwd as soon as possible. Especially before any real config validation, because cwd
-        # is used for resolving relative paths. If we fail to read rundir from unparsed config, a full validation
-        # error will come from here. If we are successfull, full validation will be done further on when initializing
-        # the config store.
+        # We want to change cwd as soon as possible. Some parts of the codebase are using os.getcwd() to get the
+        # working directory.
+        #
+        # If we fail to read rundir from unparsed config, the first config validation error comes from here
         _set_working_directory(config_raw)
 
         # We don't want more than one manager in a single working directory. So we lock it with a PID file.
@@ -499,7 +503,7 @@ async def start_server(config: Union[Path, Dict[str, Any]] = DEFAULT_MANAGER_CON
         await statistics.init_monitoring(config_store)
 
         # prepare instance of the server (no side effects)
-        server = Server(config_store, config if isinstance(config, Path) else None)
+        server = Server(config_store, config)
 
         # After we have loaded the configuration, we can start worring about subprocess management.
         manager = await _init_manager(config_store, server)

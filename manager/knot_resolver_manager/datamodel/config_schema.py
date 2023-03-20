@@ -28,6 +28,7 @@ from knot_resolver_manager.datamodel.types.files import UncheckedPath
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
 from knot_resolver_manager.utils.modeling import ConfigSchema
+from knot_resolver_manager.utils.modeling.base_schema import lazy_default
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +117,7 @@ class KresConfig(ConfigSchema):
         rundir: UncheckedPath = UncheckedPath("/var/run/knot-resolver")
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         max_workers: IntPositive = IntPositive(_default_max_worker_count())
-        management: ManagementSchema = ManagementSchema({"unix-socket": "./manager.sock"})
+        management: ManagementSchema = lazy_default(ManagementSchema, {"unix-socket": "./manager.sock"})
         webmgmt: Optional[WebmgmtSchema] = None
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
@@ -218,4 +219,4 @@ def get_rundir_without_validation(data: Dict[str, Any]) -> UncheckedPath:
         _ = KresConfig(data)  # this should throw a descriptive error
         assert False
 
-    return UncheckedPath(rundir)
+    return UncheckedPath(rundir, object_path="/rundir")

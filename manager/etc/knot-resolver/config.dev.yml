@@ -1,9 +1,9 @@
-rundir: etc/knot-resolver/runtime
+rundir: ./runtime
 workers: 1
 management:
   interface: 127.0.0.1@5000
 cache:
-  storage: ../cache
+  storage: ./cache
 logging:
   level: notice
   groups:

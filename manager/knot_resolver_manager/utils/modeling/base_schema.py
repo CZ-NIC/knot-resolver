@@ -1,7 +1,7 @@
 import enum
 import inspect
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Set, Tuple, Type, TypeVar, Union, cast
+from typing import Any, Callable, Dict, Generic, List, Optional, Set, Tuple, Type, TypeVar, Union, cast
 
 import yaml
 
@@ -74,6 +74,29 @@ class Serializable(ABC):
             return res
 
         return obj
+
+
+class _lazy_default(Generic[T], Serializable):
+    """
+    Wrapper for default values BaseSchema classes which deffers their instantiation until the schema
+    itself is being instantiated
+    """
+
+    def __init__(self, constructor: Callable[..., T], *args: Any, **kwargs: Any) -> None:
+        self._func = constructor
+        self._args = args
+        self._kwargs = kwargs
+
+    def instantiate(self) -> T:
+        return self._func(*self._args, **self._kwargs)
+
+    def to_dict(self) -> Dict[Any, Any]:
+        return Serializable.serialize(self.instantiate())
+
+
+def lazy_default(constructor: Callable[..., T], *args: Any, **kwargs: Any) -> T:
+    """We use a factory function because you can't lie about the return type in `__new__`"""
+    return _lazy_default(constructor, *args, **kwargs)  # type: ignore
 
 
 def _split_docstring(docstring: str) -> Tuple[str, Optional[str]]:
@@ -340,6 +363,12 @@ class ObjectMapper:
                     msg = f"Failed to validate value against {tp} type"
                 raise DataValidationError(msg, object_path) from e
 
+    def _create_default(self, obj: Any) -> Any:
+        if isinstance(obj, _lazy_default):
+            return obj.instantiate()  # type: ignore
+        else:
+            return obj
+
     def map_object(
         self,
         tp: Type[Any],
@@ -359,7 +388,7 @@ class ObjectMapper:
 
         # default values
         if obj is None and use_default:
-            return default
+            return self._create_default(default)
 
         # NoneType
         elif is_none_type(tp):
@@ -464,7 +493,7 @@ class ObjectMapper:
 
     def _assign_default(self, obj: Any, name: str, python_type: Any, object_path: str) -> None:
         cls = obj.__class__
-        default = getattr(cls, name, None)
+        default = self._create_default(getattr(cls, name, None))
         value = self.map_object(python_type, default, object_path=f"{object_path}/{name}")
         setattr(obj, name, value)
 

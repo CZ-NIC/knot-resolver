@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any, Dict, Tuple, Type, TypeVar
 
+from knot_resolver_manager.datamodel.globals import get_global_validation_context
 from knot_resolver_manager.utils.modeling.base_value_type import BaseValueType
 
 
@@ -19,13 +20,22 @@ class UncheckedPath(BaseValueType):
         super().__init__(source_value, object_path=object_path)
         self._object_path: str = object_path
         self._parents: Tuple[UncheckedPath, ...] = parents
+
         if isinstance(source_value, str):
+
+            # we do not load global validation context if the path is absolute
+            # this prevents errors when constructing defaults in the schema
+            if source_value.startswith("/"):
+                resolve_root = Path("/")
+            else:
+                resolve_root = get_global_validation_context().resolve_directory
+
             self._raw_value: str = source_value
             if self._parents:
                 pp = map(lambda p: p.to_path(), self._parents)
-                self._value: Path = Path(*pp, source_value)
+                self._value: Path = Path(resolve_root, *pp, source_value)
             else:
-                self._value: Path = Path(source_value)
+                self._value: Path = Path(resolve_root, source_value)
         else:
             raise ValueError(f"expected file path in a string, got '{source_value}' with type '{type(source_value)}'.")
 
@@ -127,19 +137,3 @@ class FilePath(UncheckedPath):
             raise ValueError(f"path '{self._value}' does not point inside an existing directory")
         if self._value.is_dir():
             raise ValueError("path points to a directory when we expected a file")
-
-
-class CheckedPath(UncheckedPath):
-    """
-    Like UncheckedPath, but the file path is checked for being valid. So no non-existent directories in the middle,
-    no symlink loops. This however means, that resolving of relative path happens while validating.
-    """
-
-    def __init__(
-        self, source_value: Any, parents: Tuple["UncheckedPath", ...] = tuple(), object_path: str = "/"
-    ) -> None:
-        super().__init__(source_value, parents=parents, object_path=object_path)
-        try:
-            self._value = self._value.resolve(strict=False)
-        except RuntimeError as e:
-            raise ValueError("Failed to resolve given file path. Is there a symlink loop?") from e
