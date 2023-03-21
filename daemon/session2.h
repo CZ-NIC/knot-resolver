@@ -842,9 +842,10 @@ struct session2 {
 	 * Set during protocol layer initialization by the stream-based layer. */
 	bool stream : 1;
 
-	/** If true, the session contains a HTTP protocol layer.
-	 * Set during protocol layer initialization by the HTTP layer. */
-	bool http : 1;
+	/** If true, the session contains a protocol layer with custom handling
+	 * of malformed queries. This is used e.g. by the HTTP layer, which will
+	 * return a Bad Request status on a malformed query. */
+	bool custom_emalf_handling : 1;
 
 	/** If true, a connection is established. Only applicable to sessions
 	 * using connection-based protocols. One of the stream-based protocol

@@ -877,7 +877,7 @@ static int pl_http_sess_init(struct protolayer_manager *manager,
 	struct sockaddr *peer = session2_get_peer(manager->session);
 	kr_log_debug(DOH, "[%p] h2 session created for %s\n", (void *)http->h2, kr_straddr(peer));
 
-	manager->session->http = true;
+	manager->session->custom_emalf_handling = true;
 
 	ret = kr_ok();
 

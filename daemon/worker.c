@@ -1351,9 +1351,7 @@ static int worker_submit(struct session2 *session, struct comm_info *comm, knot_
 	}
 
 	/* Badly formed query when using DoH leads to a Bad Request */
-	/* TODO: Do not necessarily tie it to HTTP - it should probably be a
-	 * more generic flag */
-	if (session->http && !is_outgoing && ret) {
+	if (session->custom_emalf_handling && !is_outgoing && ret) {
 		session2_event(session, PROTOLAYER_EVENT_MALFORMED, NULL);
 		return ret;
 	}
