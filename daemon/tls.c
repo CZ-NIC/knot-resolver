@@ -286,7 +286,10 @@ static int tls_handshake(struct pl_tls_sess_data *tls, struct session2 *session)
 				gnutls_strerror_name(err), err);
 		/* Notify the peer about handshake failure via an alert. */
 		gnutls_alert_send_appropriate(tls->tls_session, err);
-		session2_event(session, PROTOLAYER_EVENT_CONNECT_FAIL,
+		enum protolayer_event_type etype = (tls->first_handshake_done)
+			? PROTOLAYER_EVENT_DISCONNECT
+			: PROTOLAYER_EVENT_CONNECT_FAIL;
+		session2_event(session, etype,
 				(void *)KR_SELECTION_TLS_HANDSHAKE_FAILED);
 		return kr_error(EIO);
 	} else if (err == GNUTLS_E_WARNING_ALERT_RECEIVED) {

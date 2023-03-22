@@ -1420,8 +1420,8 @@ static int trie_add_tcp_session(trie_t *trie, const struct sockaddr *addr,
 	if (keylen < 0)
 		return keylen;
 	trie_val_t *val = trie_get_ins(trie, key.bytes, keylen);
-	if (kr_fails_assert(*val == NULL))
-		return kr_error(EINVAL);
+	if (*val != NULL)
+		return kr_error(EEXIST);
 	*val = session;
 	return kr_ok();
 }
@@ -1883,10 +1883,8 @@ static enum protolayer_event_cb_result pl_dns_stream_resolution_timeout(
 			char *peer_str = kr_straddr(peer);
 			kr_log_debug(IO, "=> closing connection to '%s'\n",
 				       peer_str ? peer_str : "");
-			if (s->outgoing) {
-				worker_del_tcp_waiting(peer);
-				worker_del_tcp_connected(peer);
-			}
+			worker_del_tcp_waiting(peer);
+			worker_del_tcp_connected(peer);
 			session2_close(s);
 		}
 	}
@@ -1904,18 +1902,26 @@ static enum protolayer_event_cb_result pl_dns_stream_connected(
 
 	struct sockaddr *peer = session2_get_peer(session);
 	if (session->outgoing && worker_del_tcp_waiting(peer) != 0) {
-		/* session isn't in list of waiting queries, *
+		/* session isn't in list of waiting queries,
 		 * something gone wrong */
-		session2_waitinglist_finalize(session, KR_STATE_FAIL);
-		kr_assert(session2_tasklist_is_empty(session));
-		session2_close(session);
-		return PROTOLAYER_EVENT_CONSUME;
+		goto fail;
 	}
 
-	worker_add_tcp_connected(peer, session);
+	int err = worker_add_tcp_connected(peer, session);
+	if (err) {
+		/* Could not add session to the list of connected, something
+		 * went wrong. */
+		goto fail;
+	}
 
 	send_waiting(session);
 	return PROTOLAYER_EVENT_PROPAGATE;
+
+fail:
+	session2_waitinglist_finalize(session, KR_STATE_FAIL);
+	kr_assert(session2_tasklist_is_empty(session));
+	session2_close(session);
+	return PROTOLAYER_EVENT_CONSUME;
 }
 
 static enum protolayer_event_cb_result pl_dns_stream_connection_fail(
@@ -1967,12 +1973,13 @@ static enum protolayer_event_cb_result pl_dns_stream_connection_fail(
 static enum protolayer_event_cb_result pl_dns_stream_disconnected(
 		struct session2 *session)
 {
-	if (!session->connected)
-		return PROTOLAYER_EVENT_PROPAGATE;
-
 	struct sockaddr *peer = session2_get_peer(session);
 	worker_del_tcp_waiting(peer);
 	worker_del_tcp_connected(peer);
+
+	if (!session->connected)
+		return PROTOLAYER_EVENT_PROPAGATE;
+
 	session->connected = false;
 
 	while (!session2_waitinglist_is_empty(session)) {
@@ -2025,25 +2032,31 @@ static enum protolayer_event_cb_result pl_dns_stream_event_unwrap(
 	if (session->closing)
 		return PROTOLAYER_EVENT_PROPAGATE;
 
-	if (event == PROTOLAYER_EVENT_GENERAL_TIMEOUT) {
+	switch (event) {
+	case PROTOLAYER_EVENT_GENERAL_TIMEOUT:
 		return pl_dns_stream_resolution_timeout(manager->session);
-	} else if (event == PROTOLAYER_EVENT_CONNECT_TIMEOUT) {
+
+	case PROTOLAYER_EVENT_CONNECT_TIMEOUT:
 		return pl_dns_stream_connection_fail(manager->session,
 				KR_SELECTION_TCP_CONNECT_TIMEOUT);
-	} else if (event == PROTOLAYER_EVENT_CONNECT) {
+
+	case PROTOLAYER_EVENT_CONNECT:
 		return pl_dns_stream_connected(session);
-	} else if (event == PROTOLAYER_EVENT_DISCONNECT
-			|| event == PROTOLAYER_EVENT_CLOSE
-			|| event == PROTOLAYER_EVENT_FORCE_CLOSE) {
-		return pl_dns_stream_disconnected(session);
-	} else if (event == PROTOLAYER_EVENT_CONNECT_FAIL) {
+
+	case PROTOLAYER_EVENT_CONNECT_FAIL:;
 		enum kr_selection_error err = (*baton)
 			? *(enum kr_selection_error *)baton
 			: KR_SELECTION_TCP_CONNECT_FAILED;
 		return pl_dns_stream_connection_fail(manager->session, err);
-	}
 
-	return PROTOLAYER_EVENT_PROPAGATE;
+	case PROTOLAYER_EVENT_DISCONNECT:
+	case PROTOLAYER_EVENT_CLOSE:
+	case PROTOLAYER_EVENT_FORCE_CLOSE:
+		return pl_dns_stream_disconnected(session);
+
+	default:
+		return PROTOLAYER_EVENT_PROPAGATE;
+	}
 }
 
 static knot_pkt_t *stream_produce_packet(struct session2 *session,

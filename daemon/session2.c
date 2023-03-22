@@ -436,6 +436,11 @@ static int protolayer_step(struct protolayer_iter_ctx *ctx)
 		protolayer_iter_cb cb = (ctx->direction == PROTOLAYER_UNWRAP)
 			? globals->unwrap : globals->wrap;
 
+		if (ctx->manager->session->closing) {
+			return protolayer_iter_ctx_finish(
+					ctx, kr_error(ECANCELED));
+		}
+
 		if (cb) {
 			struct protolayer_data *sess_data = protolayer_sess_data_get(
 					ctx->manager, ctx->layer_ix);

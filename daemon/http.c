@@ -934,7 +934,7 @@ static enum protolayer_iter_cb_result pl_http_unwrap(
 	ssize_t ret = 0;
 
 	if (!http->h2)
-		return kr_error(ENOSYS);
+		return protolayer_break(ctx, kr_error(ENOSYS));
 
 	struct protolayer_payload pld = ctx->payload;
 	if (pld.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
