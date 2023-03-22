@@ -847,11 +847,6 @@ struct session2 {
 	 * return a Bad Request status on a malformed query. */
 	bool custom_emalf_handling : 1;
 
-	/** If true, a connection is established. Only applicable to sessions
-	 * using connection-based protocols. One of the stream-based protocol
-	 * layers is going to be the writer for this flag. */
-	bool connected : 1;
-
 	/** If true, session is being rate-limited. One of the protocol layers
 	 * is going to be the writer for this flag. */
 	bool throttled : 1;

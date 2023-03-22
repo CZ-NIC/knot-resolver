@@ -1801,6 +1801,7 @@ struct pl_dns_stream_sess_data {
 	struct protolayer_data h;
 	bool single : 1; /**< True: Stream only allows a single packet */
 	bool produced : 1; /**< True: At least one packet has been produced */
+	bool connected : 1; /**< True: The stream is connected */
 };
 
 struct pl_dns_stream_iter_data {
@@ -1893,12 +1894,12 @@ static enum protolayer_event_cb_result pl_dns_stream_resolution_timeout(
 }
 
 static enum protolayer_event_cb_result pl_dns_stream_connected(
-		struct session2 *session)
+		struct session2 *session, struct pl_dns_stream_sess_data *stream)
 {
-	if (kr_fails_assert(!session->connected))
+	if (kr_fails_assert(!stream->connected))
 		return PROTOLAYER_EVENT_PROPAGATE;
 
-	session->connected = true;
+	stream->connected = true;
 
 	struct sockaddr *peer = session2_get_peer(session);
 	if (session->outgoing && worker_del_tcp_waiting(peer) != 0) {
@@ -1971,16 +1972,16 @@ static enum protolayer_event_cb_result pl_dns_stream_connection_fail(
 }
 
 static enum protolayer_event_cb_result pl_dns_stream_disconnected(
-		struct session2 *session)
+		struct session2 *session, struct pl_dns_stream_sess_data *stream)
 {
 	struct sockaddr *peer = session2_get_peer(session);
 	worker_del_tcp_waiting(peer);
 	worker_del_tcp_connected(peer);
 
-	if (!session->connected)
+	if (!stream->connected)
 		return PROTOLAYER_EVENT_PROPAGATE;
 
-	session->connected = false;
+	stream->connected = false;
 
 	while (!session2_waitinglist_is_empty(session)) {
 		struct qr_task *task = session2_waitinglist_pop(session, false);
@@ -2032,6 +2033,8 @@ static enum protolayer_event_cb_result pl_dns_stream_event_unwrap(
 	if (session->closing)
 		return PROTOLAYER_EVENT_PROPAGATE;
 
+	struct pl_dns_stream_sess_data *stream = sess_data;
+
 	switch (event) {
 	case PROTOLAYER_EVENT_GENERAL_TIMEOUT:
 		return pl_dns_stream_resolution_timeout(manager->session);
@@ -2041,7 +2044,7 @@ static enum protolayer_event_cb_result pl_dns_stream_event_unwrap(
 				KR_SELECTION_TCP_CONNECT_TIMEOUT);
 
 	case PROTOLAYER_EVENT_CONNECT:
-		return pl_dns_stream_connected(session);
+		return pl_dns_stream_connected(session, stream);
 
 	case PROTOLAYER_EVENT_CONNECT_FAIL:;
 		enum kr_selection_error err = (*baton)
@@ -2052,7 +2055,7 @@ static enum protolayer_event_cb_result pl_dns_stream_event_unwrap(
 	case PROTOLAYER_EVENT_DISCONNECT:
 	case PROTOLAYER_EVENT_CLOSE:
 	case PROTOLAYER_EVENT_FORCE_CLOSE:
-		return pl_dns_stream_disconnected(session);
+		return pl_dns_stream_disconnected(session, stream);
 
 	default:
 		return PROTOLAYER_EVENT_PROPAGATE;
@@ -2293,6 +2296,7 @@ int worker_init(void)
 		.event_unwrap = pl_dns_dgram_event_unwrap
 	};
 	protolayer_globals[PROTOLAYER_PROTOCOL_DNS_UNSIZED_STREAM] = (struct protolayer_globals){
+		.sess_size = sizeof(struct pl_dns_stream_sess_data),
 		.wire_buf_overhead = KNOT_WIRE_MAX_PKTSIZE,
 		.sess_init = pl_dns_stream_sess_init,
 		.unwrap = pl_dns_dgram_unwrap,
