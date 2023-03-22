@@ -31,12 +31,15 @@ def operation_to_method(operation: Operations) -> Literal["PUT", "GET", "DELETE"
     return "GET"
 
 
-def reformat(data: str, req_format: Formats) -> str:
-    dict = try_to_parse(data)
-
+def reformat(json_str: str, req_format: Formats) -> str:
+    d = json.loads(json_str)
     if req_format == Formats.YAML:
-        return yaml.dump(dict, indent=4)
-    return json.dumps(dict, indent=4)
+        return yaml.dump(d, indent=4)
+    return json.dumps(d, indent=4)
+
+
+def json_dump(yaml_or_json_str: str) -> str:
+    return json.dumps(try_to_parse(yaml_or_json_str))
 
 
 # def _properties_words(props: Dict[str, Any]) -> CompWords:
@@ -238,7 +241,7 @@ class ConfigCommand(Command):
                 # use STDIN also when file is not specified
                 new_config = input("Type new configuration: ")
 
-        response = request(method, url, reformat(new_config, Formats.JSON) if new_config else None)
+        response = request(method, url, json_dump(new_config) if new_config else None)
 
         if response.status != 200:
             print(response)
@@ -248,5 +251,5 @@ class ConfigCommand(Command):
             with open(self.file, "w") as f:
                 f.write(reformat(response.body, self.format))
             print(f"saved to: {self.file}")
-        else:
+        elif response.body:
             print(reformat(response.body, self.format))
