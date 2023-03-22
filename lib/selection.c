@@ -686,6 +686,13 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		break;
 	case KR_SELECTION_REFUSED:
 	case KR_SELECTION_SERVFAIL:
+		if (qry->flags.FORWARD || qry->flags.STUB) {
+			/* The NS might not be broken, but this state is just for this query
+			 * and it doesn't make sense to retry on the same NS immediately. */
+			addr_state->broken = true;
+			break;
+		}
+		/* For authoritative servers we try some fallback workarounds. */
 		if (qry->flags.NO_MINIMIZE && qry->flags.NO_0X20 && qry->flags.TCP) {
 			addr_state->broken = true;
 		} else if (qry->flags.NO_MINIMIZE) {

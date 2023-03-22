@@ -66,7 +66,7 @@ void forward_choose_transport(struct kr_query *qry,
 
 		update_address_state(addr_state, address, addr_len, qry);
 
-		if (addr_state->generation == -1) {
+		if (addr_state->generation == -1 || addr_state->broken) {
 			continue;
 		}
 		addr_state->choice_array_index = i;
