@@ -38,7 +38,7 @@ modules.unload('refuse_nord')
 {% endif %}
 
 -- options.qname-minimisation
-option('NO_MINIMIZE', {{ 'false' if cfg.options.qname_minimisation else 'true' }})
+option('NO_MINIMIZE', {{ 'false' if cfg.options.minimize else 'true' }})
 
 -- options.query-loopback
 option('ALLOW_LOCAL', {{ 'true' if cfg.options.query_loopback else 'false' }})
