@@ -11,14 +11,14 @@ class ViewSchema(ConfigSchema):
     ---
     subnets: Identifies the client based on his subnet.
     tsig: Identifies the client based on a TSIG key name (for testing purposes, TSIG signature is not verified!).
-    tags: Tags to link with other policy rules.
     options: Configuration flags for clients identified by the view.
+    tags: Tags to link with other policy rules.
     """
 
     subnets: Optional[List[IPNetwork]] = None
     tsig: Optional[List[str]] = None
-    tags: List[IDPattern]
     options: Optional[List[PolicyFlagEnum]] = None
+    tags: Optional[List[IDPattern]] = None
 
     def _validate(self) -> None:
         if self.tsig is None and self.subnets is None:

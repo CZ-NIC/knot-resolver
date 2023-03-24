@@ -72,9 +72,9 @@ def _cpu_count() -> Optional[int]:
         return cpus
 
 
-def _default_max_worker_count() -> Optional[int]:
+def _default_max_worker_count() -> int:
     c = _cpu_count()
-    if c is not None:
+    if c:
         return c * 10
     return MAX_WORKERS
 

@@ -28,13 +28,13 @@ nsid.name('{{ cfg.nsid }}_' .. worker.id)
 {% include "local_data.lua.j2" %}
 
 -- SLICES section -----------------------------------
-{% include "slices.lua.j2" %}
+-- {% include "slices.lua.j2" %}
 
 -- POLICY section -----------------------------------
-{% include "policy.lua.j2" %}
+-- {% include "policy.lua.j2" %}
 
 -- RPZ section --------------------------------------
-{% include "rpz.lua.j2" %}
+-- {% include "rpz.lua.j2" %}
 
 -- FORWARD section ----------------------------
 {% include "forward.lua.j2" %}
