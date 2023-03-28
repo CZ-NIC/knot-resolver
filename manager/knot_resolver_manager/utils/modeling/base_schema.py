@@ -682,9 +682,6 @@ class BaseSchema(Serializable):
     _LAYER: Optional[Type["BaseSchema"]] = None
     _MAPPER: ObjectMapper = ObjectMapper()
 
-    def __init_subclass__(cls) -> None:
-        return super().__init_subclass__()
-
     def __init__(self, source: TSource = None, object_path: str = ""):
         # save source data (and drop information about nullness)
         source = source or {}
