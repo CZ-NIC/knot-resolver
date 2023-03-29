@@ -49,53 +49,35 @@ class _RaiseDuplicatesLoader(yaml.SafeLoader):
         return mapping
 
 
-class _Format(Enum):
+class DataFormat(Enum):
     YAML = auto()
     JSON = auto()
 
     def parse_to_dict(self, text: str) -> Any:
-        if self is _Format.YAML:
+        if self is DataFormat.YAML:
             # RaiseDuplicatesLoader extends yaml.SafeLoader, so this should be safe
             # https://python.land/data-processing/python-yaml#PyYAML_safe_load_vs_load
             return renamed(yaml.load(text, Loader=_RaiseDuplicatesLoader))  # type: ignore
-        elif self is _Format.JSON:
+        elif self is DataFormat.JSON:
             return renamed(json.loads(text, object_pairs_hook=_json_raise_duplicates))
         else:
             raise NotImplementedError(f"Parsing of format '{self}' is not implemented")
 
     def dict_dump(self, data: Dict[str, Any]) -> str:
-        if self is _Format.YAML:
+        if self is DataFormat.YAML:
             return yaml.safe_dump(data)  # type: ignore
-        elif self is _Format.JSON:
+        elif self is DataFormat.JSON:
             return json.dumps(data)
         else:
             raise NotImplementedError(f"Exporting to '{self}' format is not implemented")
 
-    @staticmethod
-    def from_mime_type(mime_type: str) -> "_Format":
-        formats = {
-            "application/json": _Format.JSON,
-            "application/yaml": _Format.YAML,
-            "application/octet-stream": _Format.JSON,  # default in aiohttp
-            "text/vnd.yaml": _Format.YAML,
-        }
-        if mime_type not in formats:
-            raise DataParsingError(
-                f"unsupported MIME type '{mime_type}', expected 'application/json' or 'application/yaml'"
-            )
-        return formats[mime_type]
-
-
-def parse(data: str, mime_type: str) -> Any:
-    return _Format.from_mime_type(mime_type).parse_to_dict(data)
-
 
 def parse_yaml(data: str) -> Any:
-    return _Format.YAML.parse_to_dict(data)
+    return DataFormat.YAML.parse_to_dict(data)
 
 
 def parse_json(data: str) -> Any:
-    return _Format.JSON.parse_to_dict(data)
+    return DataFormat.JSON.parse_to_dict(data)
 
 
 def try_to_parse(data: str) -> Any:

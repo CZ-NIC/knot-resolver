@@ -33,7 +33,7 @@ from knot_resolver_manager.utils.async_utils import readfile
 from knot_resolver_manager.utils.etag import structural_etag
 from knot_resolver_manager.utils.functional import Result
 from knot_resolver_manager.utils.modeling.exceptions import DataParsingError, DataValidationError
-from knot_resolver_manager.utils.modeling.parsing import parse, parse_yaml
+from knot_resolver_manager.utils.modeling.parsing import DataFormat, parse_yaml
 from knot_resolver_manager.utils.modeling.query import query
 from knot_resolver_manager.utils.modeling.types import NoneType
 from knot_resolver_manager.utils.systemd_notify import systemd_notify
@@ -60,6 +60,20 @@ async def error_handler(request: web.Request, handler: Any) -> web.Response:
         return web.Response(text=f"request processing error:\n{e}", status=HTTPStatus.BAD_REQUEST)
     except KresManagerException as e:
         return web.Response(text=f"request processing failed:\n{e}", status=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+
+def from_mime_type(mime_type: str) -> DataFormat:
+    formats = {
+        "application/json": DataFormat.JSON,
+        "application/octet-stream": DataFormat.JSON,  # default in aiohttp
+    }
+    if mime_type not in formats:
+        raise DataParsingError(f"unsupported MIME type '{mime_type}', expected: {str(formats)[1:-1]}")
+    return formats[mime_type]
+
+
+def parse_from_mime_type(data: str, mime_type: str) -> Any:
+    return from_mime_type(mime_type).parse_to_dict(data)
 
 
 class Server:
@@ -181,7 +195,7 @@ class Server:
         if request.method == "GET":
             update_with: Optional[Dict[str, Any]] = None
         else:
-            update_with = parse(await request.text(), request.content_type)
+            update_with = parse_from_mime_type(await request.text(), request.content_type)
         document_path = request.match_info["path"]
         getheaders = ignore_exceptions_optional(List[str], None, KeyError)(request.headers.getall)
         etags = getheaders("if-match")
