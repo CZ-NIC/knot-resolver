@@ -1,10 +1,10 @@
 from typing import List, Optional
 
 from knot_resolver_manager.datamodel.types import IPNetwork, PolicyFlagEnum
-from knot_resolver_manager.utils.modeling import BaseSchema
+from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
-class ViewSchema(BaseSchema):
+class ViewSchema(ConfigSchema):
     """
     Configuration parameters that allow you to create personalized policy rules and other.
 

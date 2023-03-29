@@ -3,7 +3,8 @@ from typing import List, Optional, Union
 from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import (
-    CheckedPath,
+    File,
+    FilePath,
     Int0_512,
     Int0_65535,
     InterfaceOptionalPort,
@@ -14,12 +15,12 @@ from knot_resolver_manager.datamodel.types import (
     PortNumber,
     SizeUnit,
 )
-from knot_resolver_manager.utils.modeling import BaseSchema
+from knot_resolver_manager.utils.modeling import ConfigSchema
 
 KindEnum = Literal["dns", "xdp", "dot", "doh-legacy", "doh2"]
 
 
-class EdnsBufferSizeSchema(BaseSchema):
+class EdnsBufferSizeSchema(ConfigSchema):
     """
     EDNS payload size advertised in DNS packets.
 
@@ -32,7 +33,7 @@ class EdnsBufferSizeSchema(BaseSchema):
     downstream: SizeUnit = SizeUnit("1232B")
 
 
-class AddressRenumberingSchema(BaseSchema):
+class AddressRenumberingSchema(ConfigSchema):
     """
     Renumbers addresses in answers to different address space.
 
@@ -45,7 +46,7 @@ class AddressRenumberingSchema(BaseSchema):
     destination: IPAddress
 
 
-class TLSSchema(BaseSchema):
+class TLSSchema(ConfigSchema):
     """
     TLS configuration, also affects DNS over TLS and DNS over HTTPS.
 
@@ -58,10 +59,10 @@ class TLSSchema(BaseSchema):
     padding: EDNS(0) padding of answers to queries that arrive over TLS transport.
     """
 
-    cert_file: Optional[CheckedPath] = None
-    key_file: Optional[CheckedPath] = None
+    cert_file: Optional[File] = None
+    key_file: Optional[File] = None
     sticket_secret: Optional[str] = None
-    sticket_secret_file: Optional[CheckedPath] = None
+    sticket_secret_file: Optional[File] = None
     auto_discovery: bool = False
     padding: Union[bool, Int0_512] = True
 
@@ -70,8 +71,8 @@ class TLSSchema(BaseSchema):
             raise ValueError("'sticket_secret' and 'sticket_secret_file' are both defined, only one can be used")
 
 
-class ListenSchema(BaseSchema):
-    class Raw(BaseSchema):
+class ListenSchema(ConfigSchema):
+    class Raw(ConfigSchema):
         """
         Configuration of listening interface.
 
@@ -84,7 +85,7 @@ class ListenSchema(BaseSchema):
         """
 
         interface: Union[None, InterfaceOptionalPort, List[InterfaceOptionalPort]] = None
-        unix_socket: Union[None, CheckedPath, List[CheckedPath]] = None
+        unix_socket: Union[None, FilePath, List[FilePath]] = None
         port: Optional[PortNumber] = None
         kind: KindEnum = "dns"
         freebind: bool = False
@@ -92,7 +93,7 @@ class ListenSchema(BaseSchema):
     _LAYER = Raw
 
     interface: Union[None, InterfaceOptionalPort, List[InterfaceOptionalPort]]
-    unix_socket: Union[None, CheckedPath, List[CheckedPath]]
+    unix_socket: Union[None, FilePath, List[FilePath]]
     port: Optional[PortNumber]
     kind: KindEnum
     freebind: bool
@@ -134,7 +135,7 @@ class ListenSchema(BaseSchema):
             )
 
 
-class ProxyProtocolSchema(BaseSchema):
+class ProxyProtocolSchema(ConfigSchema):
     """
     PROXYv2 protocol configuration.
 
@@ -145,7 +146,7 @@ class ProxyProtocolSchema(BaseSchema):
     allow: List[Union[IPAddress, IPNetwork]]
 
 
-class NetworkSchema(BaseSchema):
+class NetworkSchema(ConfigSchema):
     """
     Network connections and protocols configuration.
 

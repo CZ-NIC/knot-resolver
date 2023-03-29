@@ -7,7 +7,7 @@ import pytest
 from pytest import raises
 
 from knot_resolver_manager.datamodel.types import (
-    CheckedPath,
+    Dir,
     DomainName,
     InterfaceName,
     InterfaceOptionalPort,
@@ -85,7 +85,7 @@ def test_parsing_units():
 
 def test_checked_path():
     class TestSchema(BaseSchema):
-        p: CheckedPath
+        p: Dir
 
     assert str(TestSchema({"p": "/tmp"}).p) == "/tmp"
 

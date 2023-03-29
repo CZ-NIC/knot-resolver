@@ -1,8 +1,8 @@
 from knot_resolver_manager.datamodel.types import IPv6Network96
-from knot_resolver_manager.utils.modeling import BaseSchema
+from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
-class Dns64Schema(BaseSchema):
+class Dns64Schema(ConfigSchema):
     """
     DNS64 (RFC 6147) configuration.
 

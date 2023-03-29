@@ -1,10 +1,10 @@
 from typing import Dict, List, Optional
 
-from knot_resolver_manager.datamodel.types import CheckedPath, DomainName, IPAddress, TimeUnit
-from knot_resolver_manager.utils.modeling import BaseSchema
+from knot_resolver_manager.datamodel.types import DomainName, File, IPAddress, TimeUnit
+from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
-class StaticHintsSchema(BaseSchema):
+class StaticHintsSchema(ConfigSchema):
     """
     Static hints for forward records (A/AAAA) and reverse records (PTR)
 
@@ -22,6 +22,6 @@ class StaticHintsSchema(BaseSchema):
     nodata: bool = True
     etc_hosts: bool = False
     root_hints: Optional[Dict[DomainName, List[IPAddress]]] = None
-    root_hints_file: Optional[CheckedPath] = None
+    root_hints_file: Optional[File] = None
     hints: Optional[Dict[DomainName, List[IPAddress]]] = None
-    hints_files: Optional[List[CheckedPath]] = None
+    hints_files: Optional[List[File]] = None

@@ -1,6 +1,5 @@
 import ipaddress
 import re
-from pathlib import Path
 from typing import Any, Dict, Optional, Type, Union
 
 from knot_resolver_manager.datamodel.types.base_types import IntRangeBase, PatternBase, StrBase, UnitBase
@@ -399,58 +398,3 @@ class IPv6Network96(BaseValueType):
     @classmethod
     def json_schema(cls: Type["IPv6Network96"]) -> Dict[Any, Any]:
         return {"type": "string"}
-
-
-class UncheckedPath(BaseValueType):
-    """
-    Wrapper around pathlib.Path object. Can represent pretty much any Path. No checks are
-    performed on the value. The value is taken as is.
-    """
-
-    _value: Path
-
-    def __init__(self, source_value: Any, object_path: str = "/") -> None:
-        super().__init__(source_value, object_path=object_path)
-        if isinstance(source_value, str):
-            self._raw_value: str = source_value
-            self._value: Path = Path(source_value)
-        else:
-            raise ValueError(f"expected file path in a string, got '{source_value}' with type '{type(source_value)}'.")
-
-    def __str__(self) -> str:
-        return str(self._value)
-
-    def __eq__(self, o: object) -> bool:
-        if not isinstance(o, UncheckedPath):
-            return False
-
-        return o._value == self._value
-
-    def __int__(self) -> int:
-        raise RuntimeError("Path cannot be converted to type <int>")
-
-    def to_path(self) -> Path:
-        return self._value
-
-    def serialize(self) -> Any:
-        return self._raw_value
-
-    @classmethod
-    def json_schema(cls: Type["UncheckedPath"]) -> Dict[Any, Any]:
-        return {
-            "type": "string",
-        }
-
-
-class CheckedPath(UncheckedPath):
-    """
-    Like UncheckedPath, but the file path is checked for being valid. So no non-existent directories in the middle,
-    no symlink loops. This however means, that resolving of relative path happens while validating.
-    """
-
-    def __init__(self, source_value: Any, object_path: str = "/") -> None:
-        super().__init__(source_value, object_path=object_path)
-        try:
-            self._value = self._value.resolve(strict=False)
-        except RuntimeError as e:
-            raise ValueError("Failed to resolve given file path. Is there a symlink loop?") from e

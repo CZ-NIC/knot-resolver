@@ -1,6 +1,6 @@
 from .enums import DNSRecordTypeEnum, PolicyActionEnum, PolicyFlagEnum
+from .files import AbsoluteDir, Dir, File, FilePath
 from .types import (
-    CheckedPath,
     DomainName,
     Int0_512,
     Int0_65535,
@@ -19,14 +19,12 @@ from .types import (
     PortNumber,
     SizeUnit,
     TimeUnit,
-    UncheckedPath,
 )
 
 __all__ = [
     "PolicyActionEnum",
     "PolicyFlagEnum",
     "DNSRecordTypeEnum",
-    "CheckedPath",
     "DomainName",
     "Int0_512",
     "Int0_65535",
@@ -45,5 +43,8 @@ __all__ = [
     "PortNumber",
     "SizeUnit",
     "TimeUnit",
-    "UncheckedPath",
+    "AbsoluteDir",
+    "File",
+    "FilePath",
+    "Dir",
 ]

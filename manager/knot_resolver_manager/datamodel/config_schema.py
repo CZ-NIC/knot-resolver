@@ -23,10 +23,12 @@ from knot_resolver_manager.datamodel.rpz_schema import RPZSchema
 from knot_resolver_manager.datamodel.slice_schema import SliceSchema
 from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
 from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
-from knot_resolver_manager.datamodel.types.types import IntPositive, UncheckedPath
+from knot_resolver_manager.datamodel.types import IntPositive
+from knot_resolver_manager.datamodel.types.files import UncheckedPath
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
-from knot_resolver_manager.utils.modeling import BaseSchema
+from knot_resolver_manager.utils.modeling import ConfigSchema
+from knot_resolver_manager.utils.modeling.base_schema import lazy_default
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +80,8 @@ def _default_max_worker_count() -> Optional[int]:
     return MAX_WORKERS
 
 
-class KresConfig(BaseSchema):
-    class Raw(BaseSchema):
+class KresConfig(ConfigSchema):
+    class Raw(ConfigSchema):
         """
         Knot Resolver declarative configuration.
 
@@ -112,10 +114,10 @@ class KresConfig(BaseSchema):
         version: int = 1
         nsid: Optional[str] = None
         hostname: Optional[str] = None
-        rundir: UncheckedPath = UncheckedPath(".")
+        rundir: UncheckedPath = UncheckedPath("/var/run/knot-resolver")
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         max_workers: IntPositive = IntPositive(_default_max_worker_count())
-        management: ManagementSchema = ManagementSchema({"unix-socket": "./manager.sock"})
+        management: ManagementSchema = lazy_default(ManagementSchema, {"unix-socket": "./manager.sock"})
         webmgmt: Optional[WebmgmtSchema] = None
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
@@ -201,3 +203,20 @@ class KresConfig(BaseSchema):
         # it should be removed and relative path used instead as soon as issue
         # https://gitlab.nic.cz/knot/knot-resolver/-/issues/720 is fixed
         return _MAIN_TEMPLATE.render(cfg=self, cwd=os.getcwd())  # pyright: reportUnknownMemberType=false
+
+
+def get_rundir_without_validation(data: Dict[str, Any]) -> UncheckedPath:
+    """
+    Without fully parsing, try to get a rundir from a raw config data. When it fails,
+    attempts a full validation to produce a good error message.
+
+    Used for initial manager startup.
+    """
+
+    if "rundir" in data:
+        rundir = data["rundir"]
+    else:
+        _ = KresConfig(data)  # this should throw a descriptive error
+        assert False
+
+    return UncheckedPath(rundir, object_path="/rundir")

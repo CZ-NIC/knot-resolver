@@ -2,10 +2,10 @@ from typing import List, Optional, Union
 
 from knot_resolver_manager.datamodel.policy_schema import ForwardServerSchema
 from knot_resolver_manager.datamodel.types import DomainName, IPAddressOptionalPort, PolicyFlagEnum
-from knot_resolver_manager.utils.modeling import BaseSchema
+from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
-class ForwardZoneSchema(BaseSchema):
+class ForwardZoneSchema(ConfigSchema):
     """
     Configuration of Forward Zone.
 

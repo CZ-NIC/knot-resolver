@@ -3,12 +3,12 @@ from typing import Any, Union
 from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import IntNonNegative, TimeUnit
-from knot_resolver_manager.utils.modeling import BaseSchema
+from knot_resolver_manager.utils.modeling import ConfigSchema
 
 GlueCheckingEnum = Literal["normal", "strict", "permissive"]
 
 
-class PredictionSchema(BaseSchema):
+class PredictionSchema(ConfigSchema):
     """
     Helps keep the cache hot by prefetching expiring records and learning usage patterns and repetitive queries.
 
@@ -21,8 +21,8 @@ class PredictionSchema(BaseSchema):
     period: IntNonNegative = IntNonNegative(24)
 
 
-class OptionsSchema(BaseSchema):
-    class Raw(BaseSchema):
+class OptionsSchema(ConfigSchema):
+    class Raw(ConfigSchema):
         """
         Fine-tuning global parameters of DNS resolver operation.
 
