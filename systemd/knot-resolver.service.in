@@ -9,14 +9,14 @@ Wants=nss-lookup.target
 [Service]
 Type=notify
 TimeoutStartSec=10s
-ExecStart=/usr/bin/env knot-resolver --config=/etc/knot-resolver/config.yml
+ExecStart=@bin_dir@/knot-resolver --config=@etc_dir@/config.yml
+ExecReload=@bin_dir@/kresctl --socket @run_dir@/manager.sock reload
 KillSignal=SIGINT
-WorkingDirectory=/var/run/knot-resolver/
+WorkingDirectory=@systemd_work_dir@
 User=@user@
 Group=@group@
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_SETPCAP
 AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_SETPCAP
-ExecReload=/usr/bin/env kresctl --socket /var/run/knot-resolver/manager.sock reload
 
 [Install]
 WantedBy=multi-user.target
