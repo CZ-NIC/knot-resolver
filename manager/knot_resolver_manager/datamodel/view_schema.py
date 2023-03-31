@@ -24,11 +24,15 @@ class ViewSchema(ConfigSchema):
     ---
     subnets: Identifies the client based on his subnet.
     tags: Tags to link with other policy rules.
-    options: Configuration options for clients identified by the view.
     answer: Direct approach how to handle request from clients identified by the view.
+    options: Configuration options for clients identified by the view.
     """
 
-    subnets: Optional[Union[List[IPNetwork], IPNetwork]] = None
+    subnets: Optional[Union[List[IPNetwork], IPNetwork]]
     tags: Optional[List[IDPattern]] = None
+    answer: Optional[Literal["allow", "refused", "noanswer"]] = None
     options: ViewOptionsSchema = ViewOptionsSchema()
-    answer: Optional[Literal["allow", "refused"]] = None
+
+    def _validate(self) -> None:
+        if bool(self.tags) == bool(self.answer):
+            raise ValueError("only one of 'tags' and 'answer' options must be configured")

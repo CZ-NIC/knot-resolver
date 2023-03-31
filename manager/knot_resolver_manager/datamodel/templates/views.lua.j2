@@ -1,3 +1,18 @@
-{% if cfg.views %}
-modules.load('view')
-{% endif %}
+{% from 'macros/view_macros.lua.j2' import view_insert_action, view_options_flags, view_answer %}
+{% from 'macros/policy_macros.lua.j2' import policy_tags_assign %}
+
+local C = require('ffi').C
+
+{% for view in cfg.views %}
+{% for subnet in view.subnets %}
+
+{% if view.tags -%}
+{{ view_insert_action(subnet, policy_tags_assign(view.tags)) }}
+{% elif view.answer -%}
+{{ view_insert_action(subnet, view_answer(view.answer)) }}
+{%- endif %}
+
+{{ view_insert_action(subnet, view_options_flags(view.options)) }}
+
+{% endfor %}
+{% endfor %}
