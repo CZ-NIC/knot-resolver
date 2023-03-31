@@ -48,6 +48,13 @@ policy.FLAGS({
 {%- endmacro %}
 
 
+{# Tags assign #}
+
+{% macro policy_tags_assign(tags) -%}
+policy.TAGS_ASSIGN({{ string_table(tags) }})
+{%- endmacro %}
+
+
 {# Filters #}
 
 {% macro policy_all(action) -%}
