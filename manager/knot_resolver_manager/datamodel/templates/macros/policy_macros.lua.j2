@@ -54,6 +54,10 @@ policy.FLAGS({
 policy.TAGS_ASSIGN({{ string_table(tags) }})
 {%- endmacro %}
 
+{% macro policy_get_tagset(tags) -%}
+policy.get_tagset({{ string_table(tags) }})
+{%- endmacro %}
+
 
 {# Filters #}
 
