@@ -1,0 +1,7 @@
+{% macro local_data_emptyzone(dname, tags) -%}
+assert(C.kr_rule_local_data_emptyzone({{ dname }},{{ tags }})==0)
+{%- endmacro %}
+
+{% macro local_data_nxdomain(dname, tags) -%}
+assert(C.kr_rule_local_data_nxdomain({{ dname }},{{ tags }})==0)
+{%- endmacro %}

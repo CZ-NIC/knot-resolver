@@ -12,6 +12,9 @@ nsid.name('{{ cfg.nsid }}_' .. worker.id)
 -- LOGGING section ----------------------------------
 {% include "logging.lua.j2" %}
 
+-- MONITORING section -------------------------------
+{% include "monitoring.lua.j2" %}
+
 -- WEBMGMT section ----------------------------------
 {% include "webmgmt.lua.j2" %}
 
@@ -24,8 +27,8 @@ nsid.name('{{ cfg.nsid }}_' .. worker.id)
 -- VIEWS section ------------------------------------
 {# {% include "views.lua.j2" %} #}
 
--- LOCAL-DATA section -----------------------------
-{% include "local_data.lua.j2" %}
+-- LOCAL-DATA section -------------------------------
+{# {% include "local_data.lua.j2" %} #}
 
 -- SLICES section -----------------------------------
 {# {% include "slices.lua.j2" %} #}
@@ -36,7 +39,7 @@ nsid.name('{{ cfg.nsid }}_' .. worker.id)
 -- RPZ section --------------------------------------
 {# {% include "rpz.lua.j2" %} #}
 
--- FORWARD section ----------------------------
+-- FORWARD section ----------------------------------
 {% include "forward.lua.j2" %}
 
 -- CACHE section ------------------------------------
@@ -61,6 +64,3 @@ nsid.name('{{ cfg.nsid }}_' .. worker.id)
 {% if cfg.lua.script %}
 {{ cfg.lua.script }}
 {% endif %}
-
--- manager's monitoring configuration
-{% include "monitoring.lua.j2" %}
