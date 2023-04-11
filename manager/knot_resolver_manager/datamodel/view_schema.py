@@ -1,4 +1,5 @@
-from typing import List, Optional, Union
+from typing import List, Optional
+
 from typing_extensions import Literal
 from knot_resolver_manager.utils.modeling import ConfigSchema
 from knot_resolver_manager.datamodel.types import IDPattern, IPNetwork
@@ -28,7 +29,7 @@ class ViewSchema(ConfigSchema):
     options: Configuration options for clients identified by the view.
     """
 
-    subnets: Optional[Union[List[IPNetwork], IPNetwork]]
+    subnets: List[IPNetwork]
     tags: Optional[List[IDPattern]] = None
     answer: Optional[Literal["allow", "refused", "noanswer"]] = None
     options: ViewOptionsSchema = ViewOptionsSchema()

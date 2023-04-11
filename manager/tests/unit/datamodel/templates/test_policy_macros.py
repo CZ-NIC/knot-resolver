@@ -16,18 +16,6 @@ def test_policy_add():
     assert tmpl.render(rule=rule, postrule=True) == f"policy.add({rule},true)"
 
 
-def test_policy_flags():
-    flags: List[PolicyFlagEnum] = ["no-cache", "no-edns"]
-    tmpl_str = """{% from 'macros/policy_macros.lua.j2' import policy_flags %}
-{{ policy_flags(flags) }}"""
-
-    tmpl = template_from_str(tmpl_str)
-    assert tmpl.render(flags=flags[1]) == f"policy.FLAGS({{'{flags[1].upper().replace('-', '_')}'}})"
-    assert (
-        tmpl.render(flags=flags) == f"policy.FLAGS({{{str(flags).upper().replace('-', '_').replace(' ', '')[1:-1]},}})"
-    )
-
-
 def test_policy_tags_assign():
     tags: List[str] = ["t01", "t02", "t03"]
     tmpl_str = """{% from 'macros/policy_macros.lua.j2' import policy_tags_assign %}

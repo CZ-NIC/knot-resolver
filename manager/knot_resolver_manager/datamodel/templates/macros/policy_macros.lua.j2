@@ -37,13 +37,7 @@ policy.slice_randomize_psl()
 
 {% macro policy_flags(flags) -%}
 policy.FLAGS({
-{%- if flags is string -%}
-'{{ flags.upper().replace("-", "_")|string }}'
-{%- else -%}
-{%- for flag in flags|list -%}
-'{{ flag.upper().replace("-", "_") }}',
-{%- endfor -%}
-{%- endif -%}
+{{- flags -}}
 })
 {%- endmacro %}
 

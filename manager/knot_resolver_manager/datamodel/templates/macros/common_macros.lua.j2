@@ -1,3 +1,7 @@
+{% macro quotes(string) -%}
+'{{ string }}'
+{%- endmacro %}
+
 {# Return string or table of strings #}
 {% macro string_table(table) -%}
 {%- if table is string -%}

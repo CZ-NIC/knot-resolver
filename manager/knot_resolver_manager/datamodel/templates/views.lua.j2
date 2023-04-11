@@ -1,18 +1,22 @@
-{% from 'macros/view_macros.lua.j2' import view_insert_action, view_options_flags, view_answer %}
-{% from 'macros/policy_macros.lua.j2' import policy_tags_assign %}
+{% from 'macros/common_macros.lua.j2' import quotes %}
+{% from 'macros/view_macros.lua.j2' import view_insert_action, view_flags, view_answer %}
+{% from 'macros/policy_macros.lua.j2' import policy_flags, policy_tags_assign %}
 
-local C = require('ffi').C
-
+{% if cfg.views %}
 {% for view in cfg.views %}
 {% for subnet in view.subnets %}
 
 {% if view.tags -%}
 {{ view_insert_action(subnet, policy_tags_assign(view.tags)) }}
-{% elif view.answer -%}
+{% elif view.answer %}
 {{ view_insert_action(subnet, view_answer(view.answer)) }}
 {%- endif %}
 
-{{ view_insert_action(subnet, view_options_flags(view.options)) }}
+{%- set flags = view_flags(view.options) -%}
+{% if flags -%}
+{{ view_insert_action(subnet, quotes(policy_flags(flags))) }}
+{%- endif %}
 
 {% endfor %}
 {% endfor %}
+{% endif %}

@@ -1,5 +1,8 @@
 {% if not cfg.lua.script_only %}
 
+-- FFI library
+local C = require('ffi').C
+
 -- hostname
 hostname('{{ cfg.hostname }}')
 
@@ -25,7 +28,7 @@ nsid.name('{{ cfg.nsid }}_' .. worker.id)
 {% include "network.lua.j2" %}
 
 -- VIEWS section ------------------------------------
-{# {% include "views.lua.j2" %} #}
+{% include "views.lua.j2" %}
 
 -- LOCAL-DATA section -------------------------------
 {# {% include "local_data.lua.j2" %} #}

@@ -2,25 +2,21 @@
 assert(C.kr_view_insert_action('{{ subnet }}',{{ action }})==0)
 {%- endmacro %}
 
-
-{% macro view_options_flags(options) -%}
-policy.FLAGS({
-{%- if not options.minimize -%}
-'NO_MINIMIZE',
-{%- endif -%}
-{%- if not options.dns64 -%}
-'DNS64_DISABLE',
-{%- endif -%}
-})
+{% macro view_flags(options) -%}
+{% if not options.minimize -%}
+"NO_MINIMIZE",
+{%- endif %}
+{% if not options.dns64 -%}
+"DNS64_DISABLE",
+{%- endif %}
 {%- endmacro %}
-
 
 {% macro view_answer(answer) -%}
 {%- if answer == 'allow' -%}
 policy.TAGS_ASSIGN({})
 {%- elif answer == 'refused' -%}
-policy.REFUSE
+'policy.REFUSE'
 {%- elif answer == 'noanswer' -%}
-policy.NO_ANSWER
+'policy.NO_ANSWER'
 {%- endif -%}
 {%- endmacro %}
