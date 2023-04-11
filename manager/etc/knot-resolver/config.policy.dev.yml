@@ -1,0 +1,68 @@
+rundir: etc/knot-resolver/runtime
+workers: 1
+management:
+  interface: 127.0.0.1@5000
+cache:
+  storage: ../cache
+logging:
+  level: notice
+  groups:
+    - manager
+    - supervisord
+network:
+  listen:
+    - interface: 127.0.0.1@5353
+
+# views:
+#   - subnets: [ 0.0.0.0/0, "::/0" ]
+#     answer: refused
+  # - subnets: [ 0.0.0.0/0, "::/0" ]
+  #   tags: [t01, t02, t03]
+  #   options:
+  #     minimize: true  # default
+  #     dns64: true     # default
+  # - subnets: [10.0.10.0/24] # can be single value
+  #   answer: allow
+
+# local-data:
+#   ttl: 1d
+#   nodata: true
+#   addresses:
+#     foo.bar: [ 127.0.0.1, "::1" ]
+#     my.pc.corp: 192.168.12.95
+#   addresses-files:
+#     - /etc/hosts
+#   records: |
+#     example.net. TXT "foo bar"
+#      A 192.168.2.3
+#      A 192.168.2.4
+#     local.example.org AAAA ::1
+#   subtrees:
+#     - type: empty
+#       roots: [ sub2.example.org ]
+#       tags: [ t2 ]
+#     - type: nxdomain
+#       roots-file: /path/to/file.txt
+#     - type: empty
+#       roots-url: https://example.org/blocklist.txt
+#       refresh: 1d
+#     - type: redirect
+#       roots: [ sub4.example.org ]
+#       addresses: [ 127.0.0.1, "::1" ]
+
+# forward:
+#   - subtree: '.'
+#     servers:
+#       - address: [ 192.0.2.1, 192.0.2.2@5353 ]
+#         transport: tls
+#         pin-sha256: Wg==
+#       - address: 2001:DB8::d0c
+#         transport: tls
+#         hostname: res.example.com
+#         ca-file: /etc/knot-resolver/tlsca.crt
+#     options:
+#       dnssec: true  # default
+#   - subtree: 1.168.192.in-addr.arpa
+#     servers: [ 192.0.2.1@5353 ]
+#     options:
+#       dnssec: false # policy.STUB?
