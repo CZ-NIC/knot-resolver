@@ -31,7 +31,7 @@ nsid.name('{{ cfg.nsid }}_' .. worker.id)
 {% include "views.lua.j2" %}
 
 -- LOCAL-DATA section -------------------------------
-{# {% include "local_data.lua.j2" %} #}
+{% include "local_data.lua.j2" %}
 
 -- SLICES section -----------------------------------
 {# {% include "slices.lua.j2" %} #}

@@ -1,39 +1,18 @@
-{% from 'macros/common_macros.lua.j2' import string_table %}
-{% from 'macros/policy_macros.lua.j2' import policy_get_tagset, policy_todname %}
-{% from 'macros/local_data_macros.lua.j2' import local_data_emptyzone, local_data_nxdomain %}
-
-local C = require('ffi').C
-
+{% from 'macros/local_data_macros.lua.j2' import local_data_subtree_root %}
 
 {# TODO: implemented all other options/features from local_data_schema #}
+{% if cfg.local_data.subtrees -%}
+{% for subtree in cfg.local_data.subtrees %}
 
-
-{% for subtree in cfg.local_data.subnets %}
-
-{# IF subtree.roots is not None #}
 {% if subtree.roots -%}
-{%- for root in subtree.roots -%}
-
-
-{% if subtree.type == 'empty' -%}
-{{ local_data_emptyzone(policy_todname(root), policy_get_tagset(string_table(subtree.tags))) }}
-{%- elif subtree.type == 'nxdomain' -%}
-{{ view_insert_action(policy_todname(root), policy_get_tagset(string_table(subtree.tags))) }}
-{% else %}
-{# TODO: implement other possible types #}
-{%- endif %}
-
-{%- endfor -%}
-{%- endif %}
-
-{# IF subtree.roots_file is not None #}
-{% if subtree.roots_file -%}
+{% for root in subtree.roots %}
+{{ local_data_subtree_root(subtree.type, root, subtree.tags) }}
+{% endfor %}
+{%- elif subtree.roots_file -%}
 {# TODO: not implemented yet #}
-{%- endif %}
-
-{# IF subtree.roots_url is not None #}
-{% if subtree.roots_url -%}
+{%- elif subtree.roots_url -%}
 {# TODO: not implemented yet #}
 {%- endif %}
 
 {% endfor %}
+{%- endif %}

@@ -1,7 +1,25 @@
+{% from 'macros/common_macros.lua.j2' import string_table %}
+{% from 'macros/policy_macros.lua.j2' import policy_get_tagset, policy_todname %}
+
 {% macro local_data_emptyzone(dname, tags) -%}
 assert(C.kr_rule_local_data_emptyzone({{ dname }},{{ tags }})==0)
 {%- endmacro %}
 
 {% macro local_data_nxdomain(dname, tags) -%}
 assert(C.kr_rule_local_data_nxdomain({{ dname }},{{ tags }})==0)
+{%- endmacro %}
+
+{% macro local_data_subtree_root(type, root, tags) -%}
+{%- if tags -%}
+{%- set get_tags = policy_get_tagset(tags) -%}
+{%- else -%}
+{%- set get_tags = '0' -%}
+{%- endif -%}
+{%- if type == 'empty' -%}
+{{ local_data_emptyzone(policy_todname(root), get_tags) }}
+{%- elif type == 'nxdomain' -%}
+{{ local_data_nxdomain(policy_todname(root), get_tags) }}
+{%- else -%}
+{# TODO: implement other possible types #}
+{%- endif -%}
 {%- endmacro %}

@@ -23,7 +23,14 @@ views:
   - subnets: [10.0.10.0/24]
     answer: allow
 
-# local-data:
+local-data:
+  subtrees:
+    - type: empty
+      tags: [ t2 ]
+      roots: [ example1.org ]
+    - type: nxdomain
+      roots: [ sub4.example.org ]
+
 #   ttl: 1d
 #   nodata: true
 #   addresses:
@@ -36,18 +43,6 @@ views:
 #      A 192.168.2.3
 #      A 192.168.2.4
 #     local.example.org AAAA ::1
-#   subtrees:
-#     - type: empty
-#       roots: [ sub2.example.org ]
-#       tags: [ t2 ]
-#     - type: nxdomain
-#       roots-file: /path/to/file.txt
-#     - type: empty
-#       roots-url: https://example.org/blocklist.txt
-#       refresh: 1d
-#     - type: redirect
-#       roots: [ sub4.example.org ]
-#       addresses: [ 127.0.0.1, "::1" ]
 
 # forward:
 #   - subtree: '.'
