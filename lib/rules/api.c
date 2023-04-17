@@ -56,6 +56,8 @@ enum {
 	VAL_ZLAT_EMPTY = 1,
 	/** Forced NXDOMAIN. */
 	VAL_ZLAT_NXDOMAIN,
+	/** Forced NODATA.  Does not apply on exact name (e.g. it's similar to DNAME) */
+	VAL_ZLAT_NODATA,
 	/** Redirect: anything beneath has the same data as apex (except NS+SOA). */
 	VAL_ZLAT_REDIRECT,
 };
@@ -88,6 +90,7 @@ static int tag_names_default(void)
 
 int kr_rule_tag_add(const char *tag, kr_rule_tags_t *tagset)
 {
+	kr_require(the_rules);
 	// Construct the DB key.
 	const uint8_t key_prefix[] = "\0tag_";
 	knot_db_val_t key;
@@ -287,6 +290,7 @@ static size_t key_common_subtree(knot_db_val_t k1, knot_db_val_t k2, size_t lf_s
 
 int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 {
+	kr_require(the_rules);
 	// TODO: implement EDE codes somehow
 
 	const uint16_t rrtype = qry->stype;
@@ -402,7 +406,11 @@ int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 			switch (ztype) {
 			case VAL_ZLAT_EMPTY:
 			case VAL_ZLAT_NXDOMAIN:
-				return answer_zla_empty(ztype, qry, pkt, zla_lf, val);
+			case VAL_ZLAT_NODATA:
+				ret = answer_zla_empty(ztype, qry, pkt, zla_lf, val);
+				if (ret == kr_error(EAGAIN))
+					goto shorten;
+				return ret;
 			case VAL_ZLAT_REDIRECT:
 				return answer_zla_redirect(qry, pkt, ruleset_name, zla_lf, val);
 			default:
@@ -516,6 +524,7 @@ static knot_db_val_t local_data_key(const knot_rrset_t *rrs, uint8_t key_data[KE
 int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_rds,
 				kr_rule_tags_t tags)
 {
+	kr_require(the_rules);
 	// Construct the DB key.
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key = local_data_key(rrs, key_data, RULESET_DEFAULT);
@@ -541,6 +550,7 @@ int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_r
 }
 int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags)
 {
+	kr_require(the_rules);
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key = local_data_key(rrs, key_data, RULESET_DEFAULT);
 	int ret = ruledb_op(remove, &key, 1);
@@ -550,11 +560,12 @@ int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags)
 	return ret == 0 ? 1 : ret;
 }
 
-/** Empty or NXDOMAIN */
+/** Empty or NXDOMAIN or NODATA.  Returning kr_error(EAGAIN) means the rule didn't match. */
 static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_t *pkt,
 				const knot_db_val_t zla_lf, const knot_db_val_t val)
 {
-	if (kr_fails_assert(type == VAL_ZLAT_EMPTY || type == VAL_ZLAT_NXDOMAIN))
+	if (kr_fails_assert(type == VAL_ZLAT_EMPTY || type == VAL_ZLAT_NXDOMAIN
+				|| type == VAL_ZLAT_NODATA))
 		return kr_error(EINVAL);
 	if (kr_fails_assert(val.len == 0)) {
 		kr_log_error(RULES, "ERROR: unused bytes: %zu\n", val.len);
@@ -565,15 +576,18 @@ static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 	int ret = knot_dname_lf2wire(apex_name, zla_lf.len, zla_lf.data);
 	CHECK_RET(ret);
 
+	const bool hit_apex = knot_dname_is_equal(qry->sname, apex_name);
+	if (hit_apex && type == VAL_ZLAT_NODATA)
+		return kr_error(EAGAIN);
+
 	/* Start constructing the (pseudo-)packet. */
 	ret = pkt_renew(pkt, qry->sname, qry->stype);
 	CHECK_RET(ret);
 	struct answer_rrset arrset;
 	memset(&arrset, 0, sizeof(arrset));
 
-	/* Construct SOA or NS data (hardcoded content). */
-	const bool name_matches = type != VAL_ZLAT_NXDOMAIN && knot_dname_is_equal(qry->sname, apex_name);
-	const bool want_NS = name_matches && qry->stype == KNOT_RRTYPE_NS;
+	/* Construct SOA or NS data (hardcoded content).  _EMPTY has a proper zone apex. */
+	const bool want_NS = hit_apex && type == VAL_ZLAT_EMPTY && qry->stype == KNOT_RRTYPE_NS;
 	arrset.set.rr = knot_rrset_new(apex_name, want_NS ? KNOT_RRTYPE_NS : KNOT_RRTYPE_SOA,
 					KNOT_CLASS_IN, RULE_TTL_DEFAULT, &pkt->mm);
 	if (kr_fails_assert(arrset.set.rr))
@@ -591,12 +605,13 @@ static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 	arrset.set.expiring = false;
 
 	/* Small differences if we exactly hit the name or even type. */
-	if (name_matches) {
+	if (type == VAL_ZLAT_NODATA || (type == VAL_ZLAT_EMPTY && hit_apex)) {
 		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_NOERROR);
 	} else {
 		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_NXDOMAIN);
 	}
-	if (want_NS || (name_matches && qry->stype == KNOT_RRTYPE_SOA)) {
+	if (type == VAL_ZLAT_EMPTY && hit_apex
+			&& (qry->stype == KNOT_RRTYPE_SOA || qry->stype == KNOT_RRTYPE_NS)) {
 		ret = knot_pkt_begin(pkt, KNOT_ANSWER);
 	} else {
 		ret = knot_pkt_begin(pkt, KNOT_AUTHORITY);
@@ -688,6 +703,7 @@ nodata: // Want NODATA answer (or NOERROR if it hits apex SOA).
 static int insert_trivial_zone(val_zla_type_t ztype,
 			       const knot_dname_t *apex, kr_rule_tags_t tags)
 {
+	kr_require(the_rules);
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key;
 	key.data = key_dname_lf(apex, key_data);
@@ -721,6 +737,10 @@ int kr_rule_local_data_emptyzone(const knot_dname_t *apex, kr_rule_tags_t tags)
 int kr_rule_local_data_nxdomain(const knot_dname_t *apex, kr_rule_tags_t tags)
 {
 	return insert_trivial_zone(VAL_ZLAT_NXDOMAIN, apex, tags);
+}
+int kr_rule_local_data_nodata(const knot_dname_t *apex, kr_rule_tags_t tags)
+{
+	return insert_trivial_zone(VAL_ZLAT_NODATA, apex, tags);
 }
 int kr_rule_local_data_redirect(const knot_dname_t *apex, kr_rule_tags_t tags)
 {
@@ -788,6 +808,7 @@ bool subnet_is_prefix(uint8_t a, uint8_t b)
 
 int kr_view_insert_action(const char *subnet, const char *action)
 {
+	kr_require(the_rules);
 	// Parse the subnet string.
 	union kr_sockaddr saddr;
 	saddr.ip.sa_family = kr_straddr_family(subnet);
@@ -822,6 +843,7 @@ int kr_view_insert_action(const char *subnet, const char *action)
 
 int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)
 {
+	kr_require(the_rules);
 	const struct sockaddr * const addr = req->qsource.addr;
 	if (!addr) return kr_error(ENOENT); // internal request; LATER: act somehow?
 

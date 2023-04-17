@@ -73,6 +73,9 @@ int kr_rule_local_data_emptyzone(const knot_dname_t *apex, kr_rule_tags_t tags);
 /** Insert an "NXDOMAIN zone".  TODO: SOA owner is hard. */
 KR_EXPORT
 int kr_rule_local_data_nxdomain(const knot_dname_t *apex, kr_rule_tags_t tags);
+/** Insert a "NODATA zone".  These functions are all similar. */
+KR_EXPORT
+int kr_rule_local_data_nodata(const knot_dname_t *apex, kr_rule_tags_t tags);
 
 /** Insert a redirect zone.
  * Into the default rule-set ATM.  SOA for generated NODATA answers isn't overridable. */
