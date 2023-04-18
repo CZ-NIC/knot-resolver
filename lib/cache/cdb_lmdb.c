@@ -10,6 +10,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #ifdef __CYGWIN__
+#include <sys/cygwin.h>
 #include <w32api/fileapi.h>
 #include <w32api/handleapi.h>
 #include <w32api/error.h>
@@ -102,10 +103,20 @@ static int lmdb_error(int error)
 	case MDB_TXN_FULL:
 		return kr_error(ENOSPC);
 	default:
-		kr_log_error(CACHE, "LMDB error: %s\n", mdb_strerror(error));
+		kr_log_error(CACHE, "LMDB error: %d %s\n", error, mdb_strerror(error));
 		return kr_error(error);
 	}
 }
+
+#ifdef __CYGWIN__
+/** @brief Convert Win32 error code. */
+static int w32_error(int error)
+{
+	// use MDB's conversion code
+	kr_log_error(CACHE, "Win32 error: %d %s\n", error, mdb_strerror(error));
+	return kr_error(error);
+}
+#endif
 
 /** Conversion between knot and lmdb structs for values. */
 static inline knot_db_val_t val_mdb2knot(MDB_val v)
@@ -379,7 +390,7 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 #ifdef __CYGWIN__
 	BY_HANDLE_FILE_INFORMATION fi;
 	if (!GetFileInformationByHandle(fd, &fi)) {
-		goto error_mdb; // delegate to mdb windows error handling
+		goto error_w32;
 	}
 	env->vol_sno = fi.dwVolumeSerialNumber;
 	env->file_idx = ((uint64_t) fi.nFileIndexHigh) << 32 | fi.nFileIndexLow;
@@ -424,14 +435,14 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 			if (ret == NO_ERROR) {
 				ret = 0;
 			} else {
-				ret = lmdb_error(ret); // delegate to mdb windows error handling
+				ret = w32_error(ret);
 			}
 		} else {
 			ret = 0;
 		}
 
 		if (ret == 0 && !SetEndOfFile(fd)) {
-			ret = lmdb_error(GetLastError()); // delegate to mdb windows error handling
+			ret = w32_error(GetLastError());
 		}
 #else
 		ret = posix_fallocate(fd, 0, MAX(env->mapsize, env->st_size));
@@ -464,6 +475,11 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 
 error_mdb:
 	ret = lmdb_error(ret);
+#ifdef __CYGWIN__
+	goto error_sys;
+error_w32:
+	ret = w32_error(ret);
+#endif
 error_sys:
 	free_const(env->mdb_data_path);
 	stats->close++;
@@ -539,21 +555,30 @@ static int cdb_check_health(kr_cdb_pt db, struct kr_cdb_stats *stats)
 	struct lmdb_env *env = db2env(db);
 
 #ifdef __CYGWIN__
-	HANDLE fd = CreateFile(env->mdb_data_path, 0,
+	char *w32_path = cygwin_create_path(CCP_POSIX_TO_WIN_A, env->mdb_data_path);
+	if (w32_path == NULL) {
+		int ret = errno;
+		return w32_error(ret);
+	}
+
+	HANDLE fd = CreateFile(w32_path, 0,
 			FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING,
 			FILE_ATTRIBUTE_NORMAL, NULL);
 	if (fd == INVALID_HANDLE_VALUE) {
 		int ret = GetLastError();
-		return lmdb_error(ret); // delegate to mdb windows error handling
+		free(w32_path);
+		return w32_error(ret);
 	}
+	free(w32_path);
 
 	BY_HANDLE_FILE_INFORMATION fi;
 	bool success = GetFileInformationByHandle(fd, &fi);
-	CloseHandle(fd);
 	if (!success) {
 		int ret = GetLastError();
-		return lmdb_error(ret); // delegate to mdb windows error handling
+		CloseHandle(fd);
+		return w32_error(ret);
 	}
+	CloseHandle(fd);
 
 	uint64_t file_idx = ((uint64_t) fi.nFileIndexHigh) << 32 | fi.nFileIndexLow;
 
