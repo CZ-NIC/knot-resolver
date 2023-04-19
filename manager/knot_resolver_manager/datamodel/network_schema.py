@@ -84,21 +84,21 @@ class ListenSchema(ConfigSchema):
         freebind: Used for binding to non-local address.
         """
 
-        interface: Union[None, InterfaceOptionalPort, List[InterfaceOptionalPort]] = None
-        unix_socket: Union[None, FilePath, List[FilePath]] = None
+        interface: Optional[List[InterfaceOptionalPort]] = None
+        unix_socket: Optional[List[FilePath]] = None
         port: Optional[PortNumber] = None
         kind: KindEnum = "dns"
         freebind: bool = False
 
     _LAYER = Raw
 
-    interface: Union[None, InterfaceOptionalPort, List[InterfaceOptionalPort]]
-    unix_socket: Union[None, FilePath, List[FilePath]]
+    interface: Optional[List[InterfaceOptionalPort]]
+    unix_socket: Optional[List[FilePath]]
     port: Optional[PortNumber]
     kind: KindEnum
     freebind: bool
 
-    def _interface(self, origin: Raw) -> Union[None, InterfaceOptionalPort, List[InterfaceOptionalPort]]:
+    def _interface(self, origin: Raw) -> Optional[List[InterfaceOptionalPort]]:
         if isinstance(origin.interface, list):
             port_set: Optional[bool] = None
             for intrfc in origin.interface:
@@ -175,6 +175,6 @@ class NetworkSchema(ConfigSchema):
     tls: TLSSchema = TLSSchema()
     proxy_protocol: Union[Literal[False], ProxyProtocolSchema] = False
     listen: List[ListenSchema] = [
-        ListenSchema({"interface": "127.0.0.1"}),
-        ListenSchema({"interface": "::1", "freebind": True}),
+        ListenSchema({"interface": ["127.0.0.1"]}),
+        ListenSchema({"interface": ["::1"], "freebind": True}),
     ]

@@ -19,9 +19,9 @@ class ForwardServerSchema(ConfigSchema):
     ca_file: Path to CA certificate file.
     """
 
-    address: Union[IPAddressOptionalPort, List[IPAddressOptionalPort]]
+    address: List[IPAddressOptionalPort]
     transport: Optional[Literal["tls"]] = None
-    pin_sha256: Optional[Union[str, List[str]]] = None
+    pin_sha256: Optional[List[str]] = None
     hostname: Optional[DomainName] = None
     ca_file: Optional[FilePath] = None
 

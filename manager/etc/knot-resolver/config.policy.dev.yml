@@ -11,7 +11,7 @@ logging:
     - supervisord
 network:
   listen:
-    - interface: 127.0.0.1@5353
+    - interface: [127.0.0.1@5353]
 
 views:
   - subnets: [127.0.0.0/24]
