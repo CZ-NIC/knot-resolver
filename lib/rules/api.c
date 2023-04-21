@@ -40,27 +40,13 @@ struct kr_rules *the_rules = NULL;
 	-> action-rule string; see kr_view_insert_action()
  */
 
-#define KEY_RULESET_MAXLEN 16 /**< max. len of ruleset ID + 1(for kind) */
-static /*const*/ char RULESET_DEFAULT[] = "d";
+/*const*/ char RULESET_DEFAULT[] = "d";
 
 static const uint8_t KEY_EXACT_MATCH[1] = "e";
 static const uint8_t KEY_ZONELIKE_A [1] = "a";
 
 static const uint8_t KEY_VIEW_SRC4[1] = "4";
 static const uint8_t KEY_VIEW_SRC6[1] = "6";
-
-/** The first byte of zone-like apex value is its type. */
-typedef uint8_t val_zla_type_t;
-enum {
-	/** Empty zone. No data in DB value after this byte. */
-	VAL_ZLAT_EMPTY = 1,
-	/** Forced NXDOMAIN. */
-	VAL_ZLAT_NXDOMAIN,
-	/** Forced NODATA.  Does not apply on exact name (e.g. it's similar to DNAME) */
-	VAL_ZLAT_NODATA,
-	/** Redirect: anything beneath has the same data as apex (except NS+SOA). */
-	VAL_ZLAT_REDIRECT,
-};
 
 
 static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,
@@ -234,11 +220,6 @@ static bool kr_rule_consume_tags(knot_db_val_t *val, const struct kr_request *re
 
 
 
-
-/** When constructing a key, it's convenient that the dname_lf ends on a fixed offset.
- * Convention: the end here is before the final '\0' byte (if any). */
-#define KEY_DNAME_END_OFFSET (KEY_RULESET_MAXLEN + KNOT_DNAME_MAXLEN)
-#define KEY_MAXLEN (KEY_DNAME_END_OFFSET + 64) //TODO: most of 64 is unused ATM
 
 /** Add name lookup format on the fixed end-position inside key_data.
  *
@@ -502,7 +483,7 @@ static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t ty
 }
 
 
-static knot_db_val_t local_data_key(const knot_rrset_t *rrs, uint8_t key_data[KEY_MAXLEN],
+knot_db_val_t local_data_key(const knot_rrset_t *rrs, uint8_t key_data[KEY_MAXLEN],
 					const char *ruleset_name)
 {
 	knot_db_val_t key;
@@ -528,7 +509,11 @@ int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_r
 	// Construct the DB key.
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key = local_data_key(rrs, key_data, RULESET_DEFAULT);
-
+	return local_data_ins(key, rrs, sig_rds, tags);
+}
+int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs,
+			const knot_rdataset_t *sig_rds, kr_rule_tags_t tags)
+{
 	// Allocate the data in DB.
 	const int rr_ssize = rdataset_dematerialize_size(&rrs->rrs);
 	const int to_alloc = sizeof(tags) + sizeof(rrs->ttl) + rr_ssize
