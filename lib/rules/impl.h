@@ -34,7 +34,6 @@ enum {
 	/** Empty zone. No data in DB value after this byte.
 	 *
 	 * TODO: add
-	 *  - TTL (most likely, optional, 4B)
 	 *  - SOA rdata (maybe, optional, remainder of DB value)
 	 *  Same for _NXDOMAIN and _NODATA, too.
 	 */
@@ -46,6 +45,11 @@ enum {
 	/** Redirect: anything beneath has the same data as apex (except NS+SOA). */
 	VAL_ZLAT_REDIRECT,
 };
+/** For now see kr_rule_local_data_emptyzone() and friends.
+ *
+ * TODO: probably make something like this the preferred API. */
+int insert_trivial_zone(val_zla_type_t ztype, uint32_t ttl,
+			const knot_dname_t *apex, kr_rule_tags_t tags);
 
 extern /*const*/ char RULESET_DEFAULT[];
 

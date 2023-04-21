@@ -48,13 +48,28 @@ static const uint8_t KEY_ZONELIKE_A [1] = "a";
 static const uint8_t KEY_VIEW_SRC4[1] = "4";
 static const uint8_t KEY_VIEW_SRC6[1] = "6";
 
+/// Fill *variable_ptr from a knot_db_val_t and advance it (and kr_assert it fits).
+#define deserialize_fails_assert(val_ptr, variable_ptr) \
+	deserialize_fails_assert_f_(val_ptr, (variable_ptr), sizeof(*(variable_ptr)))
+static bool deserialize_fails_assert_f_(knot_db_val_t *val, void *var, size_t size)
+{
+	if (kr_fails_assert(val->len >= size))
+		return true;
+	memcpy(var, val->data, size);
+	val->len -= size;
+	// avoiding void* arithmetics complicates this
+	char *tmp = val->data;
+	tmp += size;
+	val->data = tmp;
+	return false;
+}
 
 static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,
 		const uint8_t *data, const uint8_t *data_bound);
 static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_t *pkt,
-		knot_db_val_t zla_lf, knot_db_val_t val);
+		knot_db_val_t zla_lf, uint32_t ttl);
 static int answer_zla_redirect(struct kr_query *qry, knot_pkt_t *pkt, const char *ruleset_name,
-				knot_db_val_t zla_lf, knot_db_val_t val);
+				knot_db_val_t zla_lf, uint32_t ttl);
 
 // LATER: doing tag_names_default() and kr_rule_tag_add() inside a RW transaction would be better.
 static int tag_names_default(void)
@@ -202,17 +217,13 @@ void kr_rules_deinit(void)
 
 static bool kr_rule_consume_tags(knot_db_val_t *val, const struct kr_request *req)
 {
-	const size_t tl = sizeof(kr_rule_tags_t);
-	if (kr_fails_assert(val->len >= tl)) {
+	kr_rule_tags_t tags;
+	if (deserialize_fails_assert(val, &tags)) {
 		val->len = 0;
 		/* We may not fail immediately, but further processing
 		 * will fail anyway due to zero remaining length. */
 		return false;
 	}
-	kr_rule_tags_t tags;
-	memcpy(&tags, val->data, tl);
-	val->data += tl;
-	val->len  -= tl;
 	return tags == KR_RULE_TAGS_ALL || (tags & req->rule_tags);
 }
 
@@ -378,22 +389,28 @@ int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 				while (key_leq.len > lf_start_i && data[--key_leq.len] != '\0') ;
 				continue;
 			}
-			// Tags OK; execute the rule.
+			// Tags OK; get ZLA type and TTL.
 			val_zla_type_t ztype;
-			if (val.len < sizeof(ztype))
+			if (deserialize_fails_assert(&val, &ztype))
 				return kr_error(EILSEQ);
-			memcpy(&ztype, val.data, sizeof(ztype));
-			++val.data; --val.len;
+			uint32_t ttl = RULE_TTL_DEFAULT;
+			if (val.len >= sizeof(ttl)) // allow omitting -> can't kr_assert
+				deserialize_fails_assert(&val, &ttl);
+			if (kr_fails_assert(val.len == 0)) {
+				kr_log_error(RULES, "ERROR: unused bytes: %zu\n", val.len);
+				return kr_error(EILSEQ);
+			}
+			// Finally execute the rule.
 			switch (ztype) {
 			case VAL_ZLAT_EMPTY:
 			case VAL_ZLAT_NXDOMAIN:
 			case VAL_ZLAT_NODATA:
-				ret = answer_zla_empty(ztype, qry, pkt, zla_lf, val);
+				ret = answer_zla_empty(ztype, qry, pkt, zla_lf, ttl);
 				if (ret == kr_error(EAGAIN))
 					goto shorten;
 				return ret;
 			case VAL_ZLAT_REDIRECT:
-				return answer_zla_redirect(qry, pkt, ruleset_name, zla_lf, val);
+				return answer_zla_redirect(qry, pkt, ruleset_name, zla_lf, ttl);
 			default:
 				return kr_error(EILSEQ);
 			}
@@ -547,15 +564,11 @@ int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags)
 
 /** Empty or NXDOMAIN or NODATA.  Returning kr_error(EAGAIN) means the rule didn't match. */
 static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_t *pkt,
-				const knot_db_val_t zla_lf, const knot_db_val_t val)
+				const knot_db_val_t zla_lf, uint32_t ttl)
 {
 	if (kr_fails_assert(type == VAL_ZLAT_EMPTY || type == VAL_ZLAT_NXDOMAIN
 				|| type == VAL_ZLAT_NODATA))
 		return kr_error(EINVAL);
-	if (kr_fails_assert(val.len == 0)) {
-		kr_log_error(RULES, "ERROR: unused bytes: %zu\n", val.len);
-		return kr_error(EILSEQ);
-	}
 
 	knot_dname_t apex_name[KNOT_DNAME_MAXLEN];
 	int ret = knot_dname_lf2wire(apex_name, zla_lf.len, zla_lf.data);
@@ -574,7 +587,7 @@ static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 	/* Construct SOA or NS data (hardcoded content).  _EMPTY has a proper zone apex. */
 	const bool want_NS = hit_apex && type == VAL_ZLAT_EMPTY && qry->stype == KNOT_RRTYPE_NS;
 	arrset.set.rr = knot_rrset_new(apex_name, want_NS ? KNOT_RRTYPE_NS : KNOT_RRTYPE_SOA,
-					KNOT_CLASS_IN, RULE_TTL_DEFAULT, &pkt->mm);
+					KNOT_CLASS_IN, ttl, &pkt->mm);
 	if (kr_fails_assert(arrset.set.rr))
 		return kr_error(ENOMEM);
 	if (want_NS) {
@@ -618,12 +631,8 @@ static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 }
 
 static int answer_zla_redirect(struct kr_query *qry, knot_pkt_t *pkt, const char *ruleset_name,
-				const knot_db_val_t zla_lf, const knot_db_val_t val_unused)
+				const knot_db_val_t zla_lf, uint32_t ttl)
 {
-	if (kr_fails_assert(val_unused.len == 0)) {
-		kr_log_error(RULES, "ERROR: unused bytes: %zu\n", val_unused.len);
-		return kr_error(EILSEQ);
-	}
 	VERBOSE_MSG(qry, "=> redirecting by local data\n"); // lazy to get the zone name
 
 	knot_dname_t apex_name[KNOT_DNAME_MAXLEN];
@@ -657,7 +666,7 @@ nodata: // Want NODATA answer (or NOERROR if it hits apex SOA).
 	struct answer_rrset arrset;
 	memset(&arrset, 0, sizeof(arrset));
 	arrset.set.rr = knot_rrset_new(apex_name, KNOT_RRTYPE_SOA,
-					KNOT_CLASS_IN, RULE_TTL_DEFAULT, &pkt->mm);
+					KNOT_CLASS_IN, ttl, &pkt->mm);
 	if (kr_fails_assert(arrset.set.rr))
 		return kr_error(ENOMEM);
 	ret = knot_rrset_add_rdata(arrset.set.rr, soa_rdata,
@@ -685,8 +694,8 @@ nodata: // Want NODATA answer (or NOERROR if it hits apex SOA).
 	return kr_ok();
 }
 
-static int insert_trivial_zone(val_zla_type_t ztype,
-			       const knot_dname_t *apex, kr_rule_tags_t tags)
+int insert_trivial_zone(val_zla_type_t ztype, uint32_t ttl,
+			const knot_dname_t *apex, kr_rule_tags_t tags)
 {
 	kr_require(the_rules);
 	uint8_t key_data[KEY_MAXLEN];
@@ -705,31 +714,38 @@ static int insert_trivial_zone(val_zla_type_t ztype,
 		.data = NULL,
 		.len = sizeof(tags) + sizeof(ztype),
 	};
+	const bool has_ttl = ttl != RULE_TTL_DEFAULT;
+	if (has_ttl)
+		val.len += sizeof(ttl);
 	int ret = ruledb_op(write, &key, &val, 1);
 	CHECK_RET(ret);
 	memcpy(val.data, &tags, sizeof(tags));
 	val.data += sizeof(tags);
 	memcpy(val.data, &ztype, sizeof(ztype));
 	val.data += sizeof(ztype);
+	if (has_ttl) {
+		memcpy(val.data, &ttl, sizeof(ttl));
+		val.data += sizeof(ttl);
+	}
 
 	return ruledb_op(commit);
 }
 
 int kr_rule_local_data_emptyzone(const knot_dname_t *apex, kr_rule_tags_t tags)
 {
-	return insert_trivial_zone(VAL_ZLAT_EMPTY, apex, tags);
+	return insert_trivial_zone(VAL_ZLAT_EMPTY, RULE_TTL_DEFAULT, apex, tags);
 }
 int kr_rule_local_data_nxdomain(const knot_dname_t *apex, kr_rule_tags_t tags)
 {
-	return insert_trivial_zone(VAL_ZLAT_NXDOMAIN, apex, tags);
+	return insert_trivial_zone(VAL_ZLAT_NXDOMAIN, RULE_TTL_DEFAULT, apex, tags);
 }
 int kr_rule_local_data_nodata(const knot_dname_t *apex, kr_rule_tags_t tags)
 {
-	return insert_trivial_zone(VAL_ZLAT_NODATA, apex, tags);
+	return insert_trivial_zone(VAL_ZLAT_NODATA, RULE_TTL_DEFAULT, apex, tags);
 }
 int kr_rule_local_data_redirect(const knot_dname_t *apex, kr_rule_tags_t tags)
 {
-	return insert_trivial_zone(VAL_ZLAT_REDIRECT, apex, tags);
+	return insert_trivial_zone(VAL_ZLAT_REDIRECT, RULE_TTL_DEFAULT, apex, tags);
 }
 
 

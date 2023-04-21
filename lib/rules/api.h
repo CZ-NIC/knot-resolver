@@ -66,7 +66,11 @@ int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags);
 // TODO: perhaps expose an enum to unify these simple subtree rules?
 
 /** Insert an empty zone.
- * Into the default rule-set ATM.  SOA and NS for generated answers aren't overridable. */
+ *
+ * - into the default rule-set
+ * - SOA and NS for generated answers aren't overridable.
+ * - TTL is RULE_TTL_DEFAULT
+ */
 KR_EXPORT
 int kr_rule_local_data_emptyzone(const knot_dname_t *apex, kr_rule_tags_t tags);
 
