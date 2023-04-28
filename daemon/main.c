@@ -58,6 +58,12 @@ KR_EXPORT void kr_jemalloc_unused(void)
 KR_EXPORT const char *malloc_conf = "narenas:1";
 #endif
 
+/** I don't know why linker is dropping this _zonefile function otherwise. TODO: revisit. */
+KR_EXPORT void kr_misc_unused(void)
+{
+	kr_rule_zonefile(NULL);
+}
+
 struct args the_args_value;  /** Static allocation for the_args singleton. */
 
 static void signal_handler(uv_signal_t *handle, int signum)

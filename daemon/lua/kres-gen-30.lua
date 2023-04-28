@@ -199,6 +199,16 @@ struct kr_request_qsource_flags {
 	_Bool xdp : 1;
 };
 typedef unsigned long kr_rule_tags_t;
+struct kr_rule_zonefile_config {
+	const char *filename;
+	const char *input_str;
+	size_t input_len;
+	_Bool is_rpz;
+	_Bool nodata;
+	kr_rule_tags_t tags;
+	const char *origin;
+	uint32_t ttl;
+};
 struct kr_extended_error {
 	int32_t info_code;
 	const char *extra_text;
@@ -470,6 +480,7 @@ int kr_view_select_action(const struct kr_request *, knot_db_val_t *);
 int kr_rule_tag_add(const char *, kr_rule_tags_t *);
 int kr_rule_local_data_emptyzone(const knot_dname_t *, kr_rule_tags_t);
 int kr_rule_local_data_nxdomain(const knot_dname_t *, kr_rule_tags_t);
+int kr_rule_zonefile(const struct kr_rule_zonefile_config *);
 typedef struct {
 	int sock_type;
 	_Bool tls;

@@ -127,6 +127,7 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_rplan
 	struct kr_request_qsource_flags
 	kr_rule_tags_t
+	struct kr_rule_zonefile_config
 	struct kr_extended_error
 	struct kr_request
 	enum kr_rank
@@ -290,6 +291,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_rule_tag_add
 	kr_rule_local_data_emptyzone
 	kr_rule_local_data_nxdomain
+	kr_rule_zonefile
 EOF
 
 

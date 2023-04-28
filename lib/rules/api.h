@@ -107,3 +107,19 @@ int kr_view_insert_action(const char *subnet, const char *action);
 KR_EXPORT
 int kr_rule_tag_add(const char *tag, kr_rule_tags_t *tagset);
 
+
+struct kr_rule_zonefile_config {
+	const char *filename; /// NULL if specifying input_str instead
+	const char *input_str; /// NULL if specifying filename instead
+	size_t input_len; /// 0 for strlen(input_str)
+
+	bool is_rpz; /// interpret either as RPZ or as plain RRsets
+	bool nodata; /// TODO: implement
+	kr_rule_tags_t tags; /// tag-set for the generated rule
+	const char *origin; /// NULL or zone origin if known
+	uint32_t ttl; /// default TTL
+};
+/** Load rules from some zonefile format, e.g. RPZ.  Code in ./zonefile.c */
+KR_EXPORT
+int kr_rule_zonefile(const struct kr_rule_zonefile_config *c);
+
