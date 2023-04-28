@@ -2,18 +2,7 @@ from abc import ABC, abstractmethod  # pylint: disable=[no-name-in-module]
 from typing import Any, Dict, Type
 
 
-class BaseValueType(ABC):
-    """
-    Subclasses of this class can be used as type annotations in 'DataParser'. When a value
-    is being parsed from a serialized format (e.g. JSON/YAML), an object will be created by
-    calling the constructor of the appropriate type on the field value. The only limitation
-    is that the value MUST NOT be `None`.
-
-    There is no validation done on the wrapped value. The only condition is that
-    it can't be `None`. If you want to perform any validation during creation,
-    raise a `ValueError` in case of errors.
-    """
-
+class BaseTypeABC(ABC):
     @abstractmethod
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         pass
@@ -36,6 +25,19 @@ class BaseValueType(ABC):
         to be the same semantically.
         """
         raise NotImplementedError(f"{type(self).__name__}'s' 'serialize()' not implemented.")
+
+
+class BaseValueType(BaseTypeABC):
+    """
+    Subclasses of this class can be used as type annotations in 'DataParser'. When a value
+    is being parsed from a serialized format (e.g. JSON/YAML), an object will be created by
+    calling the constructor of the appropriate type on the field value. The only limitation
+    is that the value MUST NOT be `None`.
+
+    There is no validation done on the wrapped value. The only condition is that
+    it can't be `None`. If you want to perform any validation during creation,
+    raise a `ValueError` in case of errors.
+    """
 
     @classmethod
     @abstractmethod

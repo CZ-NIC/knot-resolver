@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 from typing_extensions import Literal
 
+from .base_generic_type_wrapper import BaseGenericTypeWrapper
+
 NoneType = type(None)
 
 
@@ -46,6 +48,11 @@ def is_literal(tp: Any) -> bool:
         return getattr(tp, "__origin__", None) == Literal
 
 
+def is_generic_type_wrapper(tp: Any) -> bool:
+    orig = getattr(tp, "__origin__", None)
+    return inspect.isclass(orig) and issubclass(orig, BaseGenericTypeWrapper)
+
+
 def get_generic_type_arguments(tp: Any) -> List[Any]:
     default: List[Any] = []
     if sys.version_info.minor == 6 and is_literal(tp):
@@ -60,6 +67,17 @@ def get_generic_type_argument(tp: Any) -> Any:
     args = get_generic_type_arguments(tp)
     assert len(args) == 1
     return args[0]
+
+
+def get_generic_type_wrapper_argument(tp: Type["BaseGenericTypeWrapper[Any]"]) -> Any:
+    assert hasattr(tp, "__origin__")
+    origin = getattr(tp, "__origin__")
+
+    assert hasattr(origin, "__orig_bases__")
+    orig_base: List[Any] = getattr(origin, "__orig_bases__", [])[0]
+
+    arg = get_generic_type_argument(tp)
+    return get_generic_type_argument(orig_base[arg])
 
 
 def is_none_type(tp: Any) -> bool:
