@@ -2,7 +2,7 @@ from typing import List, Optional, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.types import DomainName, IPAddressOptionalPort
+from knot_resolver_manager.datamodel.types import DomainName, IPAddressOptionalPort, ListOrItem
 from knot_resolver_manager.datamodel.types.files import FilePath
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
@@ -19,9 +19,9 @@ class ForwardServerSchema(ConfigSchema):
     ca_file: Path to CA certificate file.
     """
 
-    address: List[IPAddressOptionalPort]
+    address: ListOrItem[IPAddressOptionalPort]
     transport: Optional[Literal["tls"]] = None
-    pin_sha256: Optional[List[str]] = None
+    pin_sha256: Optional[str] = None
     hostname: Optional[DomainName] = None
     ca_file: Optional[FilePath] = None
 

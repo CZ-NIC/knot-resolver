@@ -12,6 +12,7 @@ from knot_resolver_manager.datamodel.types import (
     IPNetwork,
     IPv4Address,
     IPv6Address,
+    ListOrItem,
     PortNumber,
     SizeUnit,
 )
@@ -84,24 +85,24 @@ class ListenSchema(ConfigSchema):
         freebind: Used for binding to non-local address.
         """
 
-        interface: Optional[List[InterfaceOptionalPort]] = None
-        unix_socket: Optional[List[FilePath]] = None
+        interface: Optional[ListOrItem[InterfaceOptionalPort]] = None
+        unix_socket: Optional[ListOrItem[FilePath]] = None
         port: Optional[PortNumber] = None
         kind: KindEnum = "dns"
         freebind: bool = False
 
     _LAYER = Raw
 
-    interface: Optional[List[InterfaceOptionalPort]]
-    unix_socket: Optional[List[FilePath]]
+    interface: Optional[ListOrItem[InterfaceOptionalPort]]
+    unix_socket: Optional[ListOrItem[FilePath]]
     port: Optional[PortNumber]
     kind: KindEnum
     freebind: bool
 
-    def _interface(self, origin: Raw) -> Optional[List[InterfaceOptionalPort]]:
-        if isinstance(origin.interface, list):
+    def _interface(self, origin: Raw) -> Optional[ListOrItem[InterfaceOptionalPort]]:
+        if origin.interface:
             port_set: Optional[bool] = None
-            for intrfc in origin.interface:
+            for intrfc in origin.interface:  # type: ignore[attr-defined]
                 if origin.port and intrfc.port:
                     raise ValueError("The port number is defined in two places ('port' option and '@<port>' syntax).")
                 if port_set is not None and (bool(intrfc.port) != port_set):
@@ -109,8 +110,6 @@ class ListenSchema(ConfigSchema):
                         "The '@<port>' syntax must be used either for all or none of the interface in the list."
                     )
                 port_set = bool(intrfc.port)
-        elif isinstance(origin.interface, InterfaceOptionalPort) and origin.interface.port and origin.port:
-            raise ValueError("The port number is defined in two places ('port' option and '@<port>' syntax).")
         return origin.interface
 
     def _port(self, origin: Raw) -> Optional[PortNumber]:
@@ -175,6 +174,6 @@ class NetworkSchema(ConfigSchema):
     tls: TLSSchema = TLSSchema()
     proxy_protocol: Union[Literal[False], ProxyProtocolSchema] = False
     listen: List[ListenSchema] = [
-        ListenSchema({"interface": ["127.0.0.1"]}),
-        ListenSchema({"interface": ["::1"], "freebind": True}),
+        ListenSchema({"interface": "127.0.0.1"}),
+        ListenSchema({"interface": "::1", "freebind": True}),
     ]

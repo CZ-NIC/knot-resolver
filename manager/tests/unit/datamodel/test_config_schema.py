@@ -49,6 +49,6 @@ def test_config_json_schema():
             try:
                 _ = json.dumps(obj)
             except BaseException as e:
-                raise Exception(f"failed to serialize '{path}'") from e
+                raise Exception(f"failed to serialize '{path}': {e}") from e
 
     recser(dct)

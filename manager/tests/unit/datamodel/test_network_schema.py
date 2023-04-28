@@ -13,12 +13,12 @@ def test_listen_defaults():
 
     assert len(o.listen) == 2
     # {"ip-address": "127.0.0.1"}
-    assert o.listen[0].interface == InterfaceOptionalPort("127.0.0.1")
+    assert o.listen[0].interface.to_std() == [InterfaceOptionalPort("127.0.0.1")]
     assert o.listen[0].port == PortNumber(53)
     assert o.listen[0].kind == "dns"
     assert o.listen[0].freebind == False
     # {"ip-address": "::1", "freebind": True}
-    assert o.listen[1].interface == InterfaceOptionalPort("::1")
+    assert o.listen[1].interface.to_std() == [InterfaceOptionalPort("::1")]
     assert o.listen[1].port == PortNumber(53)
     assert o.listen[1].kind == "dns"
     assert o.listen[1].freebind == True
@@ -27,11 +27,11 @@ def test_listen_defaults():
 @pytest.mark.parametrize(
     "listen,port",
     [
-        ({"unix-socket": "/tmp/kresd-socket"}, None),
-        ({"interface": "::1"}, 53),
-        ({"interface": "::1", "kind": "dot"}, 853),
-        ({"interface": "::1", "kind": "doh-legacy"}, 443),
-        ({"interface": "::1", "kind": "doh2"}, 443),
+        ({"unix-socket": ["/tmp/kresd-socket"]}, None),
+        ({"interface": ["::1"]}, 53),
+        ({"interface": ["::1"], "kind": "dot"}, 853),
+        ({"interface": ["::1"], "kind": "doh-legacy"}, 443),
+        ({"interface": ["::1"], "kind": "doh2"}, 443),
     ],
 )
 def test_listen_port_defaults(listen: Dict[str, Any], port: Optional[int]):
@@ -64,8 +64,8 @@ def test_listen_valid(listen: Dict[str, Any]):
 @pytest.mark.parametrize(
     "listen",
     [
-        {"unit-socket": "/tmp/kresd-socket", "port": "53"},
-        {"interface": "::1", "unit-socket": "/tmp/kresd-socket"},
+        {"unix-socket": "/tmp/kresd-socket", "port": "53"},
+        {"interface": "::1", "unix-socket": "/tmp/kresd-socket"},
         {"interface": "::1@5353", "port": 5353},
         {"interface": ["127.0.0.1", "::1@5353"]},
         {"interface": ["127.0.0.1@5353", "::1@5353"], "port": 5353},

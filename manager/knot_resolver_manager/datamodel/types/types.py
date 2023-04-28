@@ -1,12 +1,9 @@
 import ipaddress
 import re
-from typing import Any, Dict, List, Optional, Type, TypeVar, Union
+from typing import Any, Dict, Optional, Type, Union
 
 from knot_resolver_manager.datamodel.types.base_types import IntRangeBase, PatternBase, StrBase, UnitBase
 from knot_resolver_manager.utils.modeling import BaseValueType
-
-_InnerType = TypeVar("_InnerType")
-ListOrSingle = List[_InnerType]
 
 
 class IntNonNegative(IntRangeBase):
@@ -51,14 +48,14 @@ class SizeUnit(UnitBase):
         return self._value
 
     def mbytes(self) -> int:
-        return self._value // 1024 ** 2
+        return self._value // 1024**2
 
 
 class TimeUnit(UnitBase):
-    _units = {"us": 1, "ms": 10 ** 3, "s": 10 ** 6, "m": 60 * 10 ** 6, "h": 3600 * 10 ** 6, "d": 24 * 3600 * 10 ** 6}
+    _units = {"us": 1, "ms": 10**3, "s": 10**6, "m": 60 * 10**6, "h": 3600 * 10**6, "d": 24 * 3600 * 10**6}
 
     def seconds(self) -> int:
-        return self._value // 1000 ** 2
+        return self._value // 1000**2
 
     def millis(self) -> int:
         return self._value // 1000
