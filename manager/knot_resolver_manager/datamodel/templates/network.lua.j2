@@ -1,8 +1,9 @@
+{% from 'macros/common_macros.lua.j2' import boolean %}
 {% from 'macros/network_macros.lua.j2' import network_listen, http_config %}
 
 -- network.do-ipv4/6
-net.ipv4 = {{ 'true' if cfg.network.do_ipv4 else 'false' }}
-net.ipv6 = {{ 'true' if cfg.network.do_ipv6 else 'false' }}
+net.ipv4 = {{ boolean(cfg.network.do_ipv4) }}
+net.ipv6 = {{ boolean(cfg.network.do_ipv6) }}
 
 {% if cfg.network.out_interface_v4 %}
 -- network.out-interface-v4
