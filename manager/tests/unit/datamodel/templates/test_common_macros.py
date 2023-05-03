@@ -2,6 +2,24 @@ from knot_resolver_manager.datamodel.config_schema import template_from_str
 from knot_resolver_manager.datamodel.forward_schema import ForwardServerSchema
 
 
+def test_boolean():
+    tmpl_str = """{% from 'macros/common_macros.lua.j2' import boolean %}
+{{ boolean(x) }}"""
+
+    tmpl = template_from_str(tmpl_str)
+    assert tmpl.render(x=True) == "true"
+    assert tmpl.render(x=False) == "false"
+
+
+def test_boolean_neg():
+    tmpl_str = """{% from 'macros/common_macros.lua.j2' import boolean %}
+{{ boolean(x,true) }}"""
+
+    tmpl = template_from_str(tmpl_str)
+    assert tmpl.render(x=True) == "false"
+    assert tmpl.render(x=False) == "true"
+
+
 def test_string_table():
     s = "any string"
     t = [s, "other string"]
