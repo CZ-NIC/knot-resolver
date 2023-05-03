@@ -1,5 +1,22 @@
-{% from 'macros/common_macros.lua.j2' import string_table %}
+{% from 'macros/common_macros.lua.j2' import string_table, boolean %}
 {% from 'macros/policy_macros.lua.j2' import policy_get_tagset, policy_todname %}
+
+
+{% macro local_data_records(input_str, is_rpz, ttl, nodata) -%}
+rrs = ffi.new('struct kr_rule_zonefile_config')
+{% if ttl %}
+rrs.ttl = {{ ttl.millis() }}
+{% endif %}
+rrs.nodata = {{ boolean(nodata) }}
+rrs.is_rpz = {{ boolean(is_rpz) }}
+{% if is_rpz -%}
+rrs.filename = '{{ input_str }}'
+{% else %}
+rrs.input_str = [[
+{{ input_str }}]]
+{% endif %}
+assert(C.kr_rule_zonefile(rrs)==0)
+{%- endmacro %}
 
 {% macro local_data_emptyzone(dname, tags) -%}
 assert(C.kr_rule_local_data_emptyzone({{ dname }},{{ tags }})==0)

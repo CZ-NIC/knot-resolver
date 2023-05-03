@@ -1,7 +1,8 @@
 {% if not cfg.lua.script_only %}
 
 -- FFI library
-local C = require('ffi').C
+ffi = require('ffi')
+local C = ffi.C
 
 -- hostname
 hostname('{{ cfg.hostname }}')

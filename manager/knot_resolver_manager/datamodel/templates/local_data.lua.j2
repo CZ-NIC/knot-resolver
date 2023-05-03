@@ -1,6 +1,13 @@
-{% from 'macros/local_data_macros.lua.j2' import local_data_subtree_root %}
+{% from 'macros/local_data_macros.lua.j2' import local_data_subtree_root, local_data_records %}
 
 {# TODO: implemented all other options/features from local_data_schema #}
+
+{# records #}
+{% if cfg.local_data.records -%}
+{{ local_data_records(cfg.local_data.records, false, cfg.local_data.ttl, cfg.local_data.nodata) }}
+{%- endif %}
+
+{# subtrees #}
 {% if cfg.local_data.subtrees -%}
 {% for subtree in cfg.local_data.subtrees %}
 

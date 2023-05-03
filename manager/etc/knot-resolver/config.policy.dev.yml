@@ -24,6 +24,13 @@ views:
     answer: allow
 
 local-data:
+  ttl: 60m
+  nodata: false
+  records: |
+    example.net. TXT "foo bar"
+     A 192.168.2.3
+     A 192.168.2.4
+    local.example.org AAAA ::1
   subtrees:
     - type: empty
       tags: [ t2 ]
