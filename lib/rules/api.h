@@ -22,6 +22,8 @@ void kr_rules_deinit(void);
 
 /** Try answering the query from local data.
  *
+ * \return kr_error(): notably -ENOENT or 0
+ *
  * FIXME: we probably want to ensure AA flags in answer as appropriate.
  *   Perhaps approach it like AD?  Tweak flags in ranked_rr_array_entry
  *   and at the end decide whether to set AA=1?
