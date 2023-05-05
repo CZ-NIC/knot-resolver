@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import DomainName, IDPattern, IPAddress, TimeUnit
-from knot_resolver_manager.datamodel.types.files import UncheckedPath
+from knot_resolver_manager.datamodel.types.files import UncheckedPath, FilePath
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
@@ -43,6 +43,19 @@ class SubtreeSchema(ConfigSchema):
             raise ValueError("'refresh' can be only configured with 'roots-file' or 'roots-url'")
 
 
+class RPZSchema(ConfigSchema):
+    """
+    Configuration or Response Policy Zone (RPZ).
+
+    ---
+    file: Path to the RPZ zone file.
+    tags: Tags to link with other policy rules.
+    """
+
+    file: FilePath
+    tags: Optional[List[IDPattern]] = None
+
+
 class LocalDataSchema(ConfigSchema):
     """
     Local data for forward records (A/AAAA) and reverse records (PTR).
@@ -54,6 +67,7 @@ class LocalDataSchema(ConfigSchema):
     addresses_files: Direct addition of hostname and IP addresses pairs from files in '/etc/hosts' like format.
     records: Direct addition of records in DNS zone file format.
     subtrees: Direct addition of subtrees.
+    rpz: List of Response Policy Zones and its configuration.
     """
 
     ttl: Optional[TimeUnit] = None
@@ -62,3 +76,4 @@ class LocalDataSchema(ConfigSchema):
     addresses_files: Optional[List[UncheckedPath]] = None
     records: Optional[str] = None
     subtrees: Optional[List[SubtreeSchema]] = None
+    rpz: Optional[List[RPZSchema]] = None

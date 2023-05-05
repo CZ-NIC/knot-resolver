@@ -20,7 +20,6 @@ from knot_resolver_manager.datamodel.monitoring_schema import MonitoringSchema
 from knot_resolver_manager.datamodel.network_schema import NetworkSchema
 from knot_resolver_manager.datamodel.options_schema import OptionsSchema
 from knot_resolver_manager.datamodel.policy_schema import PolicySchema
-from knot_resolver_manager.datamodel.rpz_schema import RPZSchema
 from knot_resolver_manager.datamodel.slice_schema import SliceSchema
 from knot_resolver_manager.datamodel.types import IntPositive
 from knot_resolver_manager.datamodel.types.files import UncheckedPath
@@ -99,7 +98,6 @@ class KresConfig(ConfigSchema):
         local_data: Local data for forward records (A/AAAA) and reverse records (PTR).
         slices: Split the entire DNS namespace into distinct slices.
         policy: List of policy rules and its configuration.
-        rpz: List of Response Policy Zones and its configuration.
         forward: List of Forward Zones and its configuration.
         cache: DNS resolver cache configuration.
         dnssec: Disable DNSSEC, enable with defaults or set new configuration.
@@ -123,7 +121,6 @@ class KresConfig(ConfigSchema):
         local_data: LocalDataSchema = LocalDataSchema()
         slices: Optional[List[SliceSchema]] = None
         policy: Optional[List[PolicySchema]] = None
-        rpz: Optional[List[RPZSchema]] = None
         forward: Optional[List[ForwardSchema]] = None
         cache: CacheSchema = CacheSchema()
         dnssec: Union[bool, DnssecSchema] = True
@@ -147,7 +144,6 @@ class KresConfig(ConfigSchema):
     local_data: LocalDataSchema
     slices: Optional[List[SliceSchema]]
     policy: Optional[List[PolicySchema]]
-    rpz: Optional[List[RPZSchema]]
     forward: Optional[List[ForwardSchema]]
     cache: CacheSchema
     dnssec: Union[Literal[False], DnssecSchema]

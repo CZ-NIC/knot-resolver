@@ -37,6 +37,9 @@ local-data:
       roots: [ example1.org ]
     - type: nxdomain
       roots: [ sub4.example.org ]
+  rpz:
+    - file: blocklist.rpz
+      tags: [t01, t02]
 
 #   ttl: 1d
 #   nodata: true

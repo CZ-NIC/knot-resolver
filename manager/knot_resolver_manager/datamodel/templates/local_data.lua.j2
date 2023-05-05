@@ -10,7 +10,6 @@
 {# subtrees #}
 {% if cfg.local_data.subtrees -%}
 {% for subtree in cfg.local_data.subtrees %}
-
 {% if subtree.roots -%}
 {% for root in subtree.roots %}
 {{ local_data_subtree_root(subtree.type, root, subtree.tags) }}
@@ -20,6 +19,12 @@
 {%- elif subtree.roots_url -%}
 {# TODO: not implemented yet #}
 {%- endif %}
+{% endfor %}
+{%- endif %}
 
+{# rpz #}
+{% if cfg.local_data.rpz -%}
+{% for rpz in cfg.local_data.rpz %}
+{{ local_data_records(rpz.file, true, cfg.local_data.ttl, cfg.local_data.nodata, rpz.tags) }}
 {% endfor %}
 {%- endif %}
