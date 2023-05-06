@@ -350,8 +350,7 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
  *
  * @param  request request state (in PRODUCE state)
  * @param  src     address from which the query is going to be sent
- * @param  dst     address of the name server
- * @param  type    used socket type (SOCK_STREAM, SOCK_DGRAM)
+ * @param  transport  destination server's address and other properties
  * @param  packet  [in,out] query packet to be finalised
  * @return         kr_ok() or error code
  */

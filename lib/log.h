@@ -232,8 +232,8 @@ struct kr_query;
  * @param  grp GROUP_NAME (without the LOG_GRP_ prefix)
  * @param  fmt printf-like format string
  */
-#define kr_log_req(req, qry_id, indent, grp, fmt, ...) \
-       kr_log_req1(req, qry_id, indent, LOG_GRP_ ## grp, LOG_GRP_ ## grp ## _TAG, fmt, ## __VA_ARGS__)
+#define kr_log_req(req, qry_uid, indent, grp, fmt, ...) \
+       kr_log_req1(req, qry_uid, indent, LOG_GRP_ ## grp, LOG_GRP_ ## grp ## _TAG, fmt, ## __VA_ARGS__)
 KR_EXPORT KR_PRINTF(6)
 void kr_log_req1(const struct kr_request * const req, uint32_t qry_uid,
 		const unsigned int indent, enum kr_log_group group, const char *tag, const char *fmt, ...);
