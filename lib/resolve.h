@@ -334,6 +334,8 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
  * appropriate values and caller is responsible to send them and receive answer.
  * If it returns any other state, then content of the variables is undefined.
  *
+ * Implemented in its own file ./resolve-produce.c
+ *
  * @param  request request state (in PRODUCE state)
  * @param  dst     [out] possible address of the next nameserver
  * @param  type    [out] possible used socket type (SOCK_STREAM, SOCK_DGRAM)
