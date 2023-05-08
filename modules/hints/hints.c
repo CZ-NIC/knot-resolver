@@ -30,8 +30,6 @@
 #define ERR_MSG(...) kr_log_error(HINT, "[     ]" __VA_ARGS__)
 
 struct hints_data {
-	struct kr_zonecut hints;
-	struct kr_zonecut reverse_hints;
 	bool use_nodata; /**< See hint_use_nodata() description, exposed via lua. */
 	uint32_t ttl;    /**< TTL used for the hints, exposed via lua. */
 };
@@ -357,7 +355,6 @@ static JsonNode *pack_addrs(pack_t *pack)
 	return root;
 }
 
-static char* pack_hints(struct kr_zonecut *hints);
 /**
  * Retrieve address hints, either for given name or for all names.
  *
@@ -510,17 +507,9 @@ int hints_init(struct kr_module *module)
 	};
 	module->props = props;
 
-	knot_mm_t *pool = mm_ctx_mempool2(MM_DEFAULT_BLKSIZE);
-	if (!pool) {
+	struct hints_data *data = malloc(sizeof(*data));
+	if (!data)
 		return kr_error(ENOMEM);
-	}
-	struct hints_data *data = mm_alloc(pool, sizeof(struct hints_data));
-	if (!data) {
-		mp_delete(pool->ctx);
-		return kr_error(ENOMEM);
-	}
-	kr_zonecut_init(&data->hints, (const uint8_t *)(""), pool);
-	kr_zonecut_init(&data->reverse_hints, (const uint8_t *)(""), pool);
 	data->use_nodata = true;
 	data->ttl = HINTS_TTL_DEFAULT;
 	module->data = data;
@@ -532,13 +521,8 @@ int hints_init(struct kr_module *module)
 KR_EXPORT
 int hints_deinit(struct kr_module *module)
 {
-	struct hints_data *data = module->data;
-	if (data) {
-		kr_zonecut_deinit(&data->hints);
-		kr_zonecut_deinit(&data->reverse_hints);
-		mp_delete(data->hints.pool->ctx);
-		module->data = NULL;
-	}
+	free(module->data);
+	module->data = NULL;
 	return kr_ok();
 }
 
