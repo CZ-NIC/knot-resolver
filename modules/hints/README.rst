@@ -8,8 +8,7 @@ Static hints
 This is a module providing static hints for forward records (A/AAAA) and reverse records (PTR).
 The records can be loaded from ``/etc/hosts``-like files and/or added directly.
 
-You can also use the module to change the root hints; they are used as a safety belt or if the root NS
-drops out of cache.
+You can also use the module to change fallback addresses for the root servers.
 
 .. tip::
 
@@ -110,6 +109,9 @@ Properties
 
   Replace current root hints and return the current table of root hints.
 
+  These root hints are only used as fallback when addresses of ``NS .`` aren't available,
+  e.g. when cache is completely clear.
+
   .. tip:: If no parameters are passed, it only returns current root hints set without changing anything.
 
   Example:
@@ -126,8 +128,6 @@ Properties
     [m.root-servers.net.] => {
       [1] => 202.12.27.33
     }
-
-  .. tip:: A good rule of thumb is to select only a few fastest root hints. The server learns RTT and NS quality over time, and thus tries all servers available. You can help it by preselecting the candidates.
 
 .. function:: hints.use_nodata(toggle)
 
