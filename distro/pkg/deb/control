@@ -3,7 +3,7 @@ Section: net
 Priority: optional
 Maintainer: Knot Resolver <knot-resolver@labs.nic.cz>
 Build-Depends:
- debhelper (>= 9~),
+ debhelper (>= 12~),
  dh-python,
  libcmocka-dev (>= 1.0.0),
  libedit-dev,
@@ -28,7 +28,30 @@ Build-Depends:
  libssl-dev,
 Homepage: https://www.knot-resolver.cz/
 
-Package: knot-resolver
+Package: knot-resolver-manager
+Architecture: all
+Provides:
+ knot-resolver6,
+Depends:
+ knot-resolver-core (= ${binary:Version}),
+ python3-aiohttp,
+ python3-jinja2,
+ python3-yaml,
+ python3-prometheus-client,
+ supervisor,
+ ${misc:Depends},
+ ${python3:Depends},
+Section: python
+Description: caching, DNSSEC-validating DNS resolver - config manager
+ Knot Resolver is a caching full resolver implementation written in C and
+ LuaJIT, including both a resolver library and a daemon.
+ .
+ This package contains Knot Resolver Manager - a configuration tool for Knot
+ Resolver. The Manager hides the complexity of running several independent
+ resolver processes while ensuring zero-downtime reconfiguration with YAML/JSON
+ declarative configuration and an optional HTTP API for dynamic changes.
+
+Package: knot-resolver-core
 Architecture: any
 Depends:
  adduser,
@@ -36,10 +59,10 @@ Depends:
  systemd,
  ${misc:Depends},
  ${shlibs:Depends},
-Replaces:
-  libkres9 (<< 3.2.1-2),
 Breaks:
-  libkres9 (<< 3.2.1-2),
+ knot-resolver (<< 6),
+Replaces:
+ knot-resolver (<< 6),
 Recommends:
  lua-basexx,
  lua-cqueues,
@@ -47,8 +70,8 @@ Recommends:
  lua-psl,
 Suggests:
  knot-resolver-module-http,
-Description: caching, DNSSEC-validating DNS resolver
- The Knot Resolver is a caching full resolver implementation
+Description: caching, DNSSEC-validating DNS resolver - core binaries
+ Knot Resolver is a caching full resolver implementation
  written in C and LuaJIT, including both a resolver library and a
  daemon. Modular architecture of the library keeps the core tiny and
  efficient, and provides a state-machine like API for
@@ -63,14 +86,17 @@ Description: caching, DNSSEC-validating DNS resolver
  DNS recursors - no threading, shared-nothing architecture (except
  MVCC cache that may be shared). You can start and stop additional
  nodes depending on the contention without downtime.
+ .
+ This package contains the core resolver binaries.
 
-Package: knot-resolver-dbg
+Package: knot-resolver-core-dbg
 Architecture: any
-Depends: knot-resolver (= ${binary:Version}),
-         ${misc:Depends}
+Depends:
+ knot-resolver-core (= ${binary:Version}),
+ ${misc:Depends}
 Recommends: gdb
 Section: debug
-Priority: extra
+Priority: optional
 Description: Debug symbols for Knot Resolver
  This package provides the debug symbols for Knot Resolver needed
  for properly debugging errors in Knot Resolver with gdb.
@@ -79,7 +105,7 @@ Package: knot-resolver-module-dnstap
 Architecture: any
 Multi-Arch: same
 Depends:
- knot-resolver (= ${binary:Version}),
+ knot-resolver-core (= ${binary:Version}),
  libfstrm0,
  libprotobuf-c1,
  ${misc:Depends},
@@ -98,7 +124,7 @@ Description: dnstap module for Knot Resolver
 Package: knot-resolver-module-http
 Architecture: all
 Depends:
- knot-resolver (= ${binary:Version}),
+ knot-resolver-core (= ${binary:Version}),
  libjs-bootstrap,
  libjs-d3,
  libjs-jquery,
@@ -120,17 +146,3 @@ Description: HTTP module for Knot Resolver
  .
  This package contains HTTP/2 module for local visualization of the
  resolver cache and queries.
-
-Package: python3-knot-resolver-manager
-Architecture: all
-Provides: knot-resolver-manager
-Depends:
- knot-resolver (= ${binary:Version}),
- ${misc:Depends},
- ${python3:Depends},
-Section: python
-Description: Configuration tool for Knot Resolver
- Knot Resolver Manager is a configuration tool for Knot Resolver. The Manager
- hides the complexity of running several independent resolver processes while
- ensuring zero-downtime reconfiguration with YAML/JSON declarative
- configuration and an optional HTTP API for dynamic changes.
