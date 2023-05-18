@@ -239,7 +239,8 @@ static bool kr_rule_consume_tags(knot_db_val_t *val, const struct kr_request *re
 static inline uint8_t * key_dname_lf(const knot_dname_t *name, uint8_t key_data[KEY_MAXLEN])
 {
 	return knot_dname_lf(name, key_data + KEY_RULESET_MAXLEN + 1)
-		+ 1/*drop length*/;
+		// FIXME: recheck
+		+ (name[0] == '\0' ? 0 : 1);
 }
 
 /** Return length of the common prefix of two strings (knot_db_val_t). */
@@ -257,7 +258,9 @@ static size_t key_common_prefix(knot_db_val_t k1, knot_db_val_t k2)
 
 /** Find common "subtree" of two strings that both end in a dname_lf ('\0' terminator excluded).
  *
- * Note: return value < lf_start can happen - mismatch happened before LF.
+ * \return index pointing at the '\0' ending the last matching label
+ * 	(possibly the virtual '\0' just past the end of either string),
+ * 	or if no LF label matches, the first character that differs
  * Function reviewed thoroughly, including the dependency.
  */
 static size_t key_common_subtree(knot_db_val_t k1, knot_db_val_t k2, size_t lf_start_i)
@@ -265,7 +268,7 @@ static size_t key_common_subtree(knot_db_val_t k1, knot_db_val_t k2, size_t lf_s
 	ssize_t i = key_common_prefix(k1, k2);
 	const char *data1 = k1.data, *data2 = k2.data;
 	// beware: '\0' at the end is excluded, so we need to handle ends separately
-	if (i == 0
+	if (i <= lf_start_i
 		|| (i == k1.len && i == k2.len)
 		|| (i == k1.len && data2[i] == '\0')
 		|| (i == k2.len && data1[i] == '\0')) {
@@ -273,7 +276,7 @@ static size_t key_common_subtree(knot_db_val_t k1, knot_db_val_t k2, size_t lf_s
 		}
 	do {
 		--i;
-		if (i < lf_start_i)
+		if (i <= lf_start_i)
 			return i;
 		if (data2[i] == '\0')
 			return i;
