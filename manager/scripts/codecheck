@@ -14,14 +14,12 @@ function check_rv {
 	aggregate_rv=$(( $aggregate_rv + $1 ))
 }
 
-
 # stop failing early, because we wouldn't do anything else than fail
 set +e
 
-
 # check that all dependencies are installed correctly
 echo -e "${yellow}Checking that all dependencies are properly installed...${reset}"
-poetry install --dry-run | grep "0 install" > /dev/null
+poetry install --dry-run --only main,dev,lint | grep "0 install" > /dev/null
 check_rv $?
 echo
 
@@ -31,7 +29,6 @@ if test "$aggregate_rv" -ne "0"; then
 	echo -e "  ${red}poetry install${reset}"
 	exit 1
 fi
-
 
 # check formatting using black
 echo -e "${yellow}Checking formatting using black...${reset}"
@@ -57,7 +54,6 @@ mypy knot_resolver_manager
 check_rv $?
 echo
 
-
 # check that setup.py is not behind pyproject.toml
 echo -e "${yellow}Checking setup.py${reset}"
 python scripts/create_setup.py | diff - setup.py
@@ -68,7 +64,7 @@ echo
 
 # fancy messages at the end :)
 if test "$aggregate_rv" -eq "0"; then
-	echo -e "${green}Everything looks great!${reset} 🥳🎉🥰"
+	echo -e "${green}Everything looks great!${reset}"
 else
 	echo -e "${red}Failure.${reset}"
 	echo -e "${red}These commands might help you:${reset}"

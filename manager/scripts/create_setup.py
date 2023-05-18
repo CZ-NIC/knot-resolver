@@ -20,8 +20,8 @@
 import os
 import re
 import sys
-from distutils.version import StrictVersion
-from typing import List
+
+from packaging.version import Version
 
 # If there is a global installation of poetry, prefer that.
 lib = os.path.expanduser("~/.poetry/lib")
@@ -48,7 +48,7 @@ factory = Factory()
 poetry = factory.create_poetry(os.path.dirname(__file__))
 
 # Use the SdistBuilder to genrate a blob for setup.py
-if StrictVersion(__version__) >= StrictVersion("1.1.0b1"):
+if Version(__version__) >= Version("1.1.0b1"):
     sdist_builder = SdistBuilder(poetry, None)
 else:
     sdist_builder = SdistBuilder(poetry, None, None)
