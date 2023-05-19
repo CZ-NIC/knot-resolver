@@ -8,6 +8,7 @@
 #include <libknot/dname.h>
 #include <libknot/codes.h>
 
+#include "lib/rules/api.h"
 #include "lib/selection.h"
 #include "lib/zonecut.h"
 
@@ -36,7 +37,8 @@ struct kr_qflags {
 	bool DNSSEC_INSECURE : 1;/**< Query response is DNSSEC insecure. */
 	bool DNSSEC_CD : 1;      /**< Instruction to set CD bit in request. */
 	bool STUB : 1;           /**< Stub resolution, accept received answer as solved. */
-	bool ALWAYS_CUT : 1;     /**< Always recover zone cut (even if cached). */
+	bool ALWAYS_CUT : 1;     /**< Always recover zone cut (even if cached).
+				  *   This flag might be broken and/or not useful anymore. */
 	bool DNSSEC_WEXPAND : 1; /**< Query response has wildcard expansion. */
 	bool PERMISSIVE : 1;     /**< Permissive resolver mode. */
 	bool STRICT : 1;         /**< Strict resolver mode. */
@@ -74,8 +76,12 @@ void kr_qflags_clear(struct kr_qflags *fl1, struct kr_qflags fl2);
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
 				const struct kr_query *qry);
 
-/**
- * Single query representation.
+/** A part of kr_request's resolution when sname and stype don't change.
+ *
+ * A kr_request can contain multiple kr_query parts.  A new one is needed when:
+ *   - CNAME jump occurs (or DNAME and similar)
+ *   - some other records are needed to proceed, e.g. DS/DNSKEY for validation or NS addresses
+ *   - generally, see kr_rplan_push() calls
  */
 struct kr_query {
 	struct kr_query *parent;
@@ -96,6 +102,13 @@ struct kr_query {
 	struct timeval timestamp; /**< Real time for TTL+DNSSEC checks (.tv_sec only). */
 	struct kr_zonecut zone_cut;
 	struct kr_layer_pickle *deferred;
+	struct kr_query_data_src { // named struct to work around a bug in doc generator
+		bool initialized; /// !initialized -> all meaningless and zeroed
+		bool all_set;
+		uint8_t rule_depth; /// the number of labels for the apex
+		kr_rule_fwd_flags_t flags;
+		knot_db_val_t targets_ptr; /// pointer to targets inside rule DB
+	} data_src; /// information about "data source" for this sname+stype (+tags?)
 
 	/** Current xNAME depth, set by iterator.  0 = uninitialized, 1 = no CNAME, ...
 	 * See also KR_CNAME_CHAIN_LIMIT. */

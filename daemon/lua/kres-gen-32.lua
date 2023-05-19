@@ -210,6 +210,12 @@ struct kr_rule_zonefile_config {
 	const char *origin;
 	uint32_t ttl;
 };
+struct kr_rule_fwd_flags {
+	_Bool is_auth : 1;
+	_Bool is_tcp : 1;
+	_Bool is_nods : 1;
+};
+typedef struct kr_rule_fwd_flags kr_rule_fwd_flags_t;
 struct kr_extended_error {
 	int32_t info_code;
 	const char *extra_text;
@@ -334,6 +340,13 @@ struct kr_server_selection {
 };
 typedef int kr_log_level_t;
 enum kr_log_group {LOG_GRP_UNKNOWN = -1, LOG_GRP_SYSTEM = 1, LOG_GRP_CACHE, LOG_GRP_IO, LOG_GRP_NETWORK, LOG_GRP_TA, LOG_GRP_TLS, LOG_GRP_GNUTLS, LOG_GRP_TLSCLIENT, LOG_GRP_XDP, LOG_GRP_DOH, LOG_GRP_DNSSEC, LOG_GRP_HINT, LOG_GRP_PLAN, LOG_GRP_ITERATOR, LOG_GRP_VALIDATOR, LOG_GRP_RESOLVER, LOG_GRP_SELECTION, LOG_GRP_ZCUT, LOG_GRP_COOKIES, LOG_GRP_STATISTICS, LOG_GRP_REBIND, LOG_GRP_WORKER, LOG_GRP_POLICY, LOG_GRP_TASENTINEL, LOG_GRP_TASIGNALING, LOG_GRP_TAUPDATE, LOG_GRP_DAF, LOG_GRP_DETECTTIMEJUMP, LOG_GRP_DETECTTIMESKEW, LOG_GRP_GRAPHITE, LOG_GRP_PREFILL, LOG_GRP_PRIMING, LOG_GRP_SRVSTALE, LOG_GRP_WATCHDOG, LOG_GRP_NSID, LOG_GRP_DNSTAP, LOG_GRP_TESTS, LOG_GRP_DOTAUTH, LOG_GRP_HTTP, LOG_GRP_CONTROL, LOG_GRP_MODULE, LOG_GRP_DEVEL, LOG_GRP_RENUMBER, LOG_GRP_EDE, LOG_GRP_RULES, LOG_GRP_REQDBG};
+struct kr_query_data_src {
+	_Bool initialized;
+	_Bool all_set;
+	uint8_t rule_depth;
+	kr_rule_fwd_flags_t flags;
+	knot_db_val_t targets_ptr;
+};
 
 kr_layer_t kr_layer_t_static;
 _Bool kr_dbg_assertion_abort;
@@ -360,6 +373,7 @@ struct kr_query {
 	struct timeval timestamp;
 	struct kr_zonecut zone_cut;
 	struct kr_layer_pickle *deferred;
+	struct kr_query_data_src data_src;
 	int8_t cname_depth;
 	struct kr_query *cname_parent;
 	struct kr_request *request;
@@ -482,6 +496,7 @@ int kr_rule_tag_add(const char *, kr_rule_tags_t *);
 int kr_rule_local_data_emptyzone(const knot_dname_t *, kr_rule_tags_t);
 int kr_rule_local_data_nxdomain(const knot_dname_t *, kr_rule_tags_t);
 int kr_rule_zonefile(const struct kr_rule_zonefile_config *);
+int kr_rule_forward(const knot_dname_t *, kr_rule_fwd_flags_t, const struct sockaddr **);
 typedef struct {
 	int sock_type;
 	_Bool tls;

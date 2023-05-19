@@ -128,6 +128,8 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_request_qsource_flags
 	kr_rule_tags_t
 	struct kr_rule_zonefile_config
+	struct kr_rule_fwd_flags
+	typedef kr_rule_fwd_flags_t
 	struct kr_extended_error
 	struct kr_request
 	enum kr_rank
@@ -144,6 +146,7 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_server_selection
 	kr_log_level_t
 	enum kr_log_group
+	struct kr_query_data_src
 EOF
 
 # static variables; these lines might not be simple to generate
@@ -292,6 +295,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_rule_local_data_emptyzone
 	kr_rule_local_data_nxdomain
 	kr_rule_zonefile
+	kr_rule_forward
 EOF
 
 

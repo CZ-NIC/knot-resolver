@@ -315,6 +315,19 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
+
+	/* TODO: review when to run this?  We want to process rules here
+	 * even when some of the cache exit-conditions happen.  NO_CACHE in particular. */
+	if (!req->options.PASSTHRU_LEGACY && !qry->flags.CACHE_TRIED) {
+		int ret = kr_rule_local_data_answer(qry, pkt);
+		if (ret < 0)
+			ctx->state = KR_STATE_FAIL;
+		if (ret != 0) {
+			qry->flags.CACHE_TRIED = true;
+			return ctx->state;
+		}
+	}
+
 	/* We first check various exit-conditions and then call the _real function. */
 
 	if (!kr_cache_is_open(&req->ctx->cache)
@@ -336,15 +349,6 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	if (!check_dname_for_lf(qry->sname, qry)) {
 		return ctx->state;
-	}
-
-	/* TODO: we _might_ want to process rules here even when some of the cache
-	 * exit-conditions happen, though I don't expect these cases to be important. */
-	if (!req->options.PASSTHRU_LEGACY) {
-		int ret = kr_rule_local_data_answer(qry, pkt);
-		if (ret != -ENOENT) {
-			return ret;
-		}
 	}
 
 	int ret = peek_nosync(ctx, pkt);

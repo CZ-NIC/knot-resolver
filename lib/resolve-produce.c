@@ -461,10 +461,15 @@ static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 	return KR_STATE_PRODUCE;
 }
 
-/** @internal Check current zone cut status and credibility, spawn subrequests if needed. */
+/// Check current zone cut status and credibility, spawn subrequests if needed.
+/// \return KR_STATE_FAIL, KR_STATE_DONE, kr_ok()
+/// TODO: careful review might be nice
 static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot_pkt_t *packet)
-/* TODO: using cache on this point in this way just isn't nice; remove in time */
 {
+	// Set up nameserver+cut if overridden by policy.
+	int ret = kr_rule_data_src_check(qry, packet);
+	if (ret) return KR_STATE_FAIL;
+
 	/* Stub mode, just forward and do not solve cut. */
 	if (qry->flags.STUB) {
 		return KR_STATE_PRODUCE;
@@ -486,7 +491,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 	 * now it's the time to look up closest zone cut from cache. */
 	struct kr_cache *cache = &request->ctx->cache;
 	if (!kr_cache_is_open(cache)) {
-		int ret = kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);
+		ret = kr_zonecut_set_sbelt(request->ctx, &qry->zone_cut);
 		if (ret != 0) {
 			return KR_STATE_FAIL;
 		}
@@ -590,6 +595,7 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param, struc
 
 int kr_resolve_produce(struct kr_request *request, struct kr_transport **transport, knot_pkt_t *packet)
 {
+	kr_require(request && transport && packet);
 	struct kr_rplan *rplan = &request->rplan;
 
 	/* No query left for resolution */
@@ -598,11 +604,6 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 	}
 
 	struct kr_query *qry = array_tail(rplan->pending);
-
-	/* Initialize server selection */
-	if (!qry->server_selection.initialized) {
-		kr_server_selection_init(qry);
-	}
 
 	/* If we have deferred answers, resume them. */
 	if (qry->deferred != NULL) {
@@ -633,13 +634,11 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 	} else {
 		/* Caller is interested in always tracking a zone cut, even if the answer is cached
 		 * this is normally not required, and incurs another cache lookups for cached answer. */
-		if (qry->flags.ALWAYS_CUT) {
-			if (!(qry->flags.STUB)) {
-				switch(zone_cut_check(request, qry, packet)) {
-				case KR_STATE_FAIL: return KR_STATE_FAIL;
-				case KR_STATE_DONE: return KR_STATE_PRODUCE;
-				default: break;
-				}
+		if (qry->flags.ALWAYS_CUT) { // LATER: maybe the flag doesn't work well anymore
+			switch(zone_cut_check(request, qry, packet)) {
+			case KR_STATE_FAIL: return KR_STATE_FAIL;
+			case KR_STATE_DONE: return KR_STATE_PRODUCE;
+			default: break;
 			}
 		}
 		/* Resolve current query and produce dependent or finish */
@@ -663,7 +662,7 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 		ITERATE_LAYERS(request, qry, reset);
 		return kr_rplan_empty(rplan) ? KR_STATE_DONE : KR_STATE_PRODUCE;
 	}
-
+	/* At this point we need to send a query upstream to proceed towards success. */
 
 	/* This query has RD=0 or is ANY, stop here. */
 	if (qry->stype == KNOT_RRTYPE_ANY ||
@@ -673,15 +672,12 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 	}
 
 	/* Update zone cut, spawn new subrequests. */
-	if (!(qry->flags.STUB)) {
-		int state = zone_cut_check(request, qry, packet);
-		switch(state) {
-		case KR_STATE_FAIL: return KR_STATE_FAIL;
-		case KR_STATE_DONE: return KR_STATE_PRODUCE;
-		default: break;
-		}
+	int state = zone_cut_check(request, qry, packet);
+	switch(state) {
+	case KR_STATE_FAIL: return KR_STATE_FAIL;
+	case KR_STATE_DONE: return KR_STATE_PRODUCE;
+	default: break;
 	}
-
 
 	const struct kr_qflags qflg = qry->flags;
 	const bool retry = qflg.TCP || qflg.BADCOOKIE_AGAIN;

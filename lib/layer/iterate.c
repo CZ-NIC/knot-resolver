@@ -932,6 +932,7 @@ static int begin(kr_layer_t *ctx)
 	return reset(ctx);
 }
 
+/* LATER: make calls of this function more organized; spaghetti is though here. */
 int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 {
 	/* Minimize QNAME (if possible). */
@@ -977,6 +978,7 @@ static int prepare_query(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return KR_STATE_FAIL;
 	}
 
+	// TODO: this logging (and rplan's) is confusing, especially around `uid` values
 	WITH_VERBOSE(query) {
 		KR_DNAME_GET_STR(name_str, query->sname);
 		KR_RRTYPE_GET_STR(type_str, query->stype);
@@ -1083,7 +1085,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		VERBOSE_MSG("<= malformed response (parsed %d)\n", (int)pkt->parsed);
 		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_MALFORMED);
 		return KR_STATE_FAIL;
-	} else if (!is_paired_to_query(pkt, query)) {
+	} else if (!query->flags.CACHED && !is_paired_to_query(pkt, query)) {
 		WITH_VERBOSE(query) {
 			const char *ns_str =
 				req->upstream.transport ? kr_straddr(&req->upstream.transport->address.ip) : "(internal)";

@@ -35,6 +35,9 @@ int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs,
 /** Construct key for a zone-like-apex entry.  It's stored in `key_data`. */
 knot_db_val_t zla_key(const knot_dname_t *apex, uint8_t key_data[KEY_MAXLEN]);
 
+/** Almost the whole kr_rule_local_data_answer() */
+int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt);
+
 /** The first byte of zone-like apex value is its type. */
 typedef uint8_t val_zla_type_t;
 enum {
@@ -51,6 +54,8 @@ enum {
 	VAL_ZLAT_NODATA,
 	/** Redirect: anything beneath has the same data as apex (except NS+SOA). */
 	VAL_ZLAT_REDIRECT,
+	/** Forward, i.e. override upstream for this subtree (resolver or auth). */
+	VAL_ZLAT_FORWARD,
 };
 /** For now see kr_rule_local_data_emptyzone() and friends.
  *

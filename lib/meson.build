@@ -25,6 +25,7 @@ libkres_src = files([
   'log.c',
   'rules/api.c',
   'rules/defaults.c',
+  'rules/forward.c',
   'rules/zonefile.c',
   'module.c',
   'resolve.c',

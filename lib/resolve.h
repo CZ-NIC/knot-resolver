@@ -330,11 +330,12 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 /**
  * Produce either next additional query or finish.
  *
- * If the CONSUME is returned then dst, type and packet will be filled with
+ * If the CONSUME is returned then *transport and *packet will be filled with
  * appropriate values and caller is responsible to send them and receive answer.
  * If it returns any other state, then content of the variables is undefined.
  *
  * Implemented in its own file ./resolve-produce.c
+ * FIXME: more issues in this doc-comment
  *
  * @param  request request state (in PRODUCE state)
  * @param  dst     [out] possible address of the next nameserver

@@ -856,6 +856,58 @@ function policy.TAGS_ASSIGN(names)
 	return 'policy.tags_assign_bitmap(' .. tostring(bitmap) .. ')'
 end
 
+--[[ Insert a forwarding rule, i.e. override upstream for one DNS subtree.
+
+Throws lua exceptions when detecting something fishy.
+
+\param subtree plain string
+\param options
+  .auth targets are authoritative (false by default = resolver)
+  .tls use DoT (false by default, only for resolvers)
+  .dnssec if overridden to false, don't validate DNSSEC locally
+    - for resolvers we still do *not* send CD=1 upstream,
+      i.e. we trust their DNSSEC validation.
+    - for auths this inserts a negative trust anchor
+      Beware that setting .set_insecure() *later* would override that.
+\param targets same format as policy.TLS_FORWARD()
+--]]
+function policy.rule_forward_add(subtree, options, targets)
+	local port_default = 53
+	if options.tls or false then
+		port_default = 853
+		-- lots of code; easiest to just call it this way; checks and throws
+		policy.TLS_FORWARD(targets)
+	end
+
+	local targets_2 = {}
+	for _, target in ipairs(targets) do
+		-- this also throws on failure
+		local sock = addr2sock(target[1], port_default)
+		if options.auth then
+			local port = ffi.C.kr_inaddr_port(sock)
+			assert(not options.tls and port == port_default)
+		end
+		table.insert(targets_2, sock)
+	end
+	local targets_3 = ffi.new('const struct sockaddr * [?]', #targets_2 + 1, targets_2)
+	targets_3[#targets_2] = nil
+
+	local subtree_dname = todname(subtree)
+	assert(ffi.C.kr_rule_forward(subtree_dname,
+			{ is_tcp = options.tls
+			, is_nods = options.dnssec == false
+			, is_auth = options.auth
+			},
+			targets_3
+		) == 0)
+
+	-- Probably the best way to turn off DNSSEC validation for auth is negative TA.
+	if options.auth and options.dnssec == false then
+		local ntas = kres.context().negative_anchors
+		assert(ffi.C.kr_ta_add(ntas, subtree_dname, kres.type.DS, 0, nil, 0) == 0)
+	end
+end
+
 
 local view_action_buf = ffi.new('knot_db_val_t[1]')
 

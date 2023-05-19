@@ -251,10 +251,18 @@ static size_t key_common_subtree(knot_db_val_t k1, knot_db_val_t k2, size_t lf_s
 	} while (true);
 }
 
-int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
+int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 {
+	// return shorthands; see doc-comment for kr_rule_local_data_answer()
+	static const int RET_CONT_CACHE = 0;
+	static const int RET_ANSWERED = 1;
+
 	kr_require(the_rules);
 	// TODO: implement EDE codes somehow
+
+	//if (kr_fails_assert(!qry->data_src.initialized)) // low-severity assertion
+	if (qry->data_src.initialized) // TODO: why does it happen?
+		memset(&qry->data_src, 0, sizeof(qry->data_src));
 
 	const uint16_t rrtype = qry->stype;
 
@@ -276,7 +284,8 @@ int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 		knot_db_val_t key_rsk = { .data = key_rs, .len = sizeof(key_rs) };
 		ret = ruledb_op(read, &key_rsk, &rulesets, 1);
 	}
-	if (ret != 0) return ret; // including ENOENT: no rulesets -> no rule used
+	if (ret == kr_error(ENOENT)) return RET_CONT_CACHE; // no rulesets -> no rule used
+	if (ret != 0) return kr_error(ret);
 	const char *rulesets_str = rulesets.data;
 
 	// Iterate over all rulesets.
@@ -307,13 +316,14 @@ int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 			switch (ret) {
 				case -ENOENT: continue;
 				case 0: break;
-				default: return ret;
+				default: return kr_error(ret);
 			}
 			if (!kr_rule_consume_tags(&val, qry->request)) continue;
 
 			// We found a rule that applies to the dname+rrtype+req.
-			return answer_exact_match(qry, pkt, types[i],
-							val.data, val.data + val.len);
+			ret = answer_exact_match(qry, pkt, types[i],
+						 val.data, val.data + val.len);
+			return ret ? kr_error(ret) : RET_ANSWERED;
 		}
 
 		/* Find the closest zone-like apex that applies.
@@ -360,10 +370,25 @@ int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 				while (key_leq.len > lf_start_i && data[--key_leq.len] != '\0') ;
 				continue;
 			}
-			// Tags OK; get ZLA type and TTL.
+			// Tags OK; get ZLA type and deal with special _FORWARD case
 			val_zla_type_t ztype;
 			if (deserialize_fails_assert(&val, &ztype))
 				return kr_error(EILSEQ);
+			if (ztype == VAL_ZLAT_FORWARD) {
+				knot_dname_t apex_name[KNOT_DNAME_MAXLEN];
+				ret = knot_dname_lf2wire(apex_name, zla_lf.len, zla_lf.data);
+				if (kr_fails_assert(ret > 0)) return kr_error(ret);
+				if (val.len > 0 // zero len -> default flags
+				    && deserialize_fails_assert(&val, &qry->data_src.flags)) {
+					return kr_error(EILSEQ);
+				}
+
+				qry->data_src.initialized = true;
+				qry->data_src.targets_ptr = val;
+				qry->data_src.rule_depth = knot_dname_labels(apex_name, NULL);
+				return RET_CONT_CACHE;
+			}
+			// The other types optionally specify TTL.
 			uint32_t ttl = RULE_TTL_DEFAULT;
 			if (val.len >= sizeof(ttl)) // allow omitting -> can't kr_assert
 				deserialize_fails_assert(&val, &ttl);
@@ -381,14 +406,15 @@ int kr_rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 					goto shorten;
 				return ret;
 			case VAL_ZLAT_REDIRECT:
-				return answer_zla_redirect(qry, pkt, ruleset_name, zla_lf, ttl);
+				ret = answer_zla_redirect(qry, pkt, ruleset_name, zla_lf, ttl);
+				return ret ? kr_error(ret) : RET_ANSWERED;
 			default:
 				return kr_error(EILSEQ);
 			}
 		} while (true);
 	}
 
-	return kr_error(ENOENT);
+	return RET_CONT_CACHE;
 }
 
 /** SOA RDATA content, used as default in negative answers.

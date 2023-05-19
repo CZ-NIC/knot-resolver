@@ -7,6 +7,7 @@
 struct kr_query;
 struct kr_request;
 struct knot_pkt;
+struct sockaddr;
 #include <libknot/db/db.h>
 
 typedef uint64_t kr_rule_tags_t;
@@ -20,15 +21,18 @@ int kr_rules_init(void);
 KR_EXPORT
 void kr_rules_deinit(void);
 
-/** Try answering the query from local data.
+/** Try answering the query from local data; WIP: otherwise determine data source overrides.
  *
- * \return kr_error(): notably -ENOENT or 0
+ * \return kr_error() on errors, >0 if answered, 0 otherwise (also when forwarding)
  *
  * FIXME: we probably want to ensure AA flags in answer as appropriate.
  *   Perhaps approach it like AD?  Tweak flags in ranked_rr_array_entry
  *   and at the end decide whether to set AA=1?
  */
 int kr_rule_local_data_answer(struct kr_query *qry, struct knot_pkt *pkt);
+
+/** Set up nameserver+cut if overridden by policy.  \return kr_error() */
+int kr_rule_data_src_check(struct kr_query *qry, struct knot_pkt *pkt);
 
 /** Select the view action to perform.
  *
@@ -124,4 +128,21 @@ struct kr_rule_zonefile_config {
 /** Load rules from some zonefile format, e.g. RPZ.  Code in ./zonefile.c */
 KR_EXPORT
 int kr_rule_zonefile(const struct kr_rule_zonefile_config *c);
+
+
+struct kr_rule_fwd_flags {
+	/// Beware of ABI: this struct is memcpy'd to/from rule DB.
+	bool
+		is_auth : 1,
+		is_tcp  : 1, /// forced TCP (e.g. DoT)
+		is_nods : 1; /// disable local DNSSEC validation
+};
+typedef struct kr_rule_fwd_flags kr_rule_fwd_flags_t;
+/** Insert/overwrite a forwarding rule.
+ *
+ * Into the default rule-set ATM.
+ * \param targets NULL-terminated array. */
+KR_EXPORT
+int kr_rule_forward(const knot_dname_t *apex, kr_rule_fwd_flags_t flags,
+			const struct sockaddr * targets[]);
 
