@@ -16,13 +16,11 @@ class UncheckedPath(BaseValueType):
     def __init__(
         self, source_value: Any, parents: Tuple["UncheckedPath", ...] = tuple(), object_path: str = "/"
     ) -> None:
-
         super().__init__(source_value, object_path=object_path)
         self._object_path: str = object_path
         self._parents: Tuple[UncheckedPath, ...] = parents
 
         if isinstance(source_value, str):
-
             # we do not load global validation context if the path is absolute
             # this prevents errors when constructing defaults in the schema
             if source_value.startswith("/"):

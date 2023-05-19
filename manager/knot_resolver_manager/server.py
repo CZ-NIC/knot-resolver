@@ -109,7 +109,6 @@ class Server:
         return Result.ok(None)
 
     async def _reload_config(self) -> None:
-
         if self._config_path is None:
             logger.warning("The manager was started with inlined configuration - can't reload")
         else:

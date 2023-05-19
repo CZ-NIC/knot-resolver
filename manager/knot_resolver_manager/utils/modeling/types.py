@@ -35,7 +35,7 @@ def is_tuple(tp: Any) -> bool:
 
 
 def is_union(tp: Any) -> bool:
-    """ Returns true even for optional types, because they are just a Union[T, NoneType] """
+    """Returns true even for optional types, because they are just a Union[T, NoneType]"""
     return getattr(tp, "__origin__", None) == Union  # type: ignore
 
 
@@ -55,7 +55,7 @@ def get_generic_type_arguments(tp: Any) -> List[Any]:
 
 
 def get_generic_type_argument(tp: Any) -> Any:
-    """ same as function get_generic_type_arguments, but expects just one type argument"""
+    """same as function get_generic_type_arguments, but expects just one type argument"""
 
     args = get_generic_type_arguments(tp)
     assert len(args) == 1

@@ -1,5 +1,5 @@
 import logging
-from os import kill
+from os import kill  # pylint: disable=[no-name-in-module]
 from pathlib import Path
 from typing import Any, Dict, Iterable, NoReturn, Optional, Union, cast
 from xmlrpc.client import Fault, ServerProxy

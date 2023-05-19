@@ -41,7 +41,6 @@ class ConvertCommand(Command):
         return {}
 
     def run(self, args: CommandArgs) -> None:
-
         with open(self.input_file, "r") as f:
             data = f.read()
 
