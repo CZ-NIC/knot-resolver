@@ -4,6 +4,12 @@
 #pragma once
 
 #include "lib/rules/api.h"
+#include "lib/utils.h"
+#include <libknot/packet/pkt.h>
+
+#include "lib/cache/impl.h"
+#undef VERBOSE_MSG
+#define VERBOSE_MSG(qry, ...) kr_log_q((qry), RULES,  ## __VA_ARGS__)
 
 #define RULE_TTL_DEFAULT ((uint32_t)10800)
 
@@ -53,4 +59,31 @@ int insert_trivial_zone(val_zla_type_t ztype, uint32_t ttl,
 
 extern /*const*/ char RULESET_DEFAULT[];
 
+/// Fill *variable_ptr from a knot_db_val_t and advance it (and kr_assert it fits).
+#define deserialize_fails_assert(val_ptr, variable_ptr) \
+	deserialize_fails_assert_f_(val_ptr, (variable_ptr), sizeof(*(variable_ptr)))
+static inline bool deserialize_fails_assert_f_(knot_db_val_t *val, void *var, size_t size)
+{
+	if (kr_fails_assert(val->len >= size))
+		return true;
+	memcpy(var, val->data, size);
+	val->len -= size;
+	// avoiding void* arithmetics complicates this
+	char *tmp = val->data;
+	tmp += size;
+	val->data = tmp;
+	return false;
+}
+
+struct kr_rules {
+	/* Database for storing the rules (LMDB). */
+	kr_cdb_pt db;                 /**< Storage instance */
+	const struct kr_cdb_api *api; /**< Storage engine */
+	struct kr_cdb_stats stats;
+};
+#define ruledb_op(op, ...) \
+	the_rules->api->op(the_rules->db, &the_rules->stats, ## __VA_ARGS__)
+
+//TODO later, maybe.  ATM it would be cumbersome to avoid void* arithmetics.
+#pragma GCC diagnostic ignored "-Wpointer-arith"
 

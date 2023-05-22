@@ -9,20 +9,7 @@
 
 #include <stdlib.h>
 
-#include "lib/cache/impl.h"
-#undef VERBOSE_MSG
-#define VERBOSE_MSG(qry, ...) kr_log_q((qry), RULES,  ## __VA_ARGS__)
-
-struct kr_rules {
-	/* Database for storing the rules (LMDB). */
-	kr_cdb_pt db;                 /**< Storage instance */
-	const struct kr_cdb_api *api; /**< Storage engine */
-	struct kr_cdb_stats stats;
-};
-
 struct kr_rules *the_rules = NULL;
-#define ruledb_op(op, ...) \
-	the_rules->api->op(the_rules->db, &the_rules->stats, ## __VA_ARGS__)
 
 /* DB key-space summary
 
@@ -47,22 +34,6 @@ static const uint8_t KEY_ZONELIKE_A [1] = "a";
 
 static const uint8_t KEY_VIEW_SRC4[1] = "4";
 static const uint8_t KEY_VIEW_SRC6[1] = "6";
-
-/// Fill *variable_ptr from a knot_db_val_t and advance it (and kr_assert it fits).
-#define deserialize_fails_assert(val_ptr, variable_ptr) \
-	deserialize_fails_assert_f_(val_ptr, (variable_ptr), sizeof(*(variable_ptr)))
-static bool deserialize_fails_assert_f_(knot_db_val_t *val, void *var, size_t size)
-{
-	if (kr_fails_assert(val->len >= size))
-		return true;
-	memcpy(var, val->data, size);
-	val->len -= size;
-	// avoiding void* arithmetics complicates this
-	char *tmp = val->data;
-	tmp += size;
-	val->data = tmp;
-	return false;
-}
 
 static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,
 		const uint8_t *data, const uint8_t *data_bound);
@@ -156,9 +127,6 @@ int kr_rule_tag_add(const char *tag, kr_rule_tags_t *tagset)
 	return kr_ok();
 }
 
-
-//TODO later, maybe.  ATM it would be cumbersome to avoid void* arithmetics.
-#pragma GCC diagnostic ignored "-Wpointer-arith"
 
 int kr_rules_init(void)
 {
