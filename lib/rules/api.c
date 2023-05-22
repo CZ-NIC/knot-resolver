@@ -665,11 +665,9 @@ nodata: // Want NODATA answer (or NOERROR if it hits apex SOA).
 	return kr_ok();
 }
 
-int insert_trivial_zone(val_zla_type_t ztype, uint32_t ttl,
-			const knot_dname_t *apex, kr_rule_tags_t tags)
+knot_db_val_t zla_key(const knot_dname_t *apex, uint8_t key_data[KEY_MAXLEN])
 {
 	kr_require(the_rules);
-	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key;
 	key.data = key_dname_lf(apex, key_data);
 
@@ -680,6 +678,13 @@ int insert_trivial_zone(val_zla_type_t ztype, uint32_t ttl,
 	key.data -= rsp_len;
 	memcpy(key.data, RULESET_DEFAULT, rsp_len);
 	key.len = key_data + KEY_DNAME_END_OFFSET - (uint8_t *)key.data;
+	return key;
+}
+int insert_trivial_zone(val_zla_type_t ztype, uint32_t ttl,
+			const knot_dname_t *apex, kr_rule_tags_t tags)
+{
+	uint8_t key_data[KEY_MAXLEN];
+	knot_db_val_t key = zla_key(apex, key_data);
 
 	knot_db_val_t val = {
 		.data = NULL,
