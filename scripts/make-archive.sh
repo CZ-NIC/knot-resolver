@@ -33,6 +33,14 @@ rm -rf build_dist ||:
 meson build_dist
 ninja -C build_dist dist
 
-# print path to generated tarball
-set +o xtrace
-find "${PWD}/build_dist/meson-dist/" -name "knot-resolver-*.tar.xz"
+# copy tarball to apkg path
+DIST_ARCHIVE=$(find "build_dist/meson-dist/" -name "knot-resolver-*.tar.xz")
+APKG_ARCHIVE="pkg/archives/dev/$(basename $DIST_ARCHIVE)"
+mkdir -p pkg/archives/dev
+cp "$DIST_ARCHIVE" "$APKG_ARCHIVE"
+
+# remove build directory
+rm -rf build_dist ||:
+
+# print path to generated tarball as expected by apkg
+echo "$APKG_ARCHIVE"
