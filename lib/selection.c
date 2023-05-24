@@ -772,6 +772,15 @@ void kr_server_selection_init(struct kr_query *qry)
 			mempool, &qry->server_selection.local_state->private);
 	}
 }
+void kr_server_selection_cached(struct kr_query *qry)
+{
+	qry->server_selection = (struct kr_server_selection){
+		.initialized = false,
+		// we reuse iter_error, as it's no-op if (!initialized)
+		.error = iter_error,
+		// everything else is NULL
+	};
+}
 
 int kr_forward_add_target(struct kr_request *req, const struct sockaddr *sock)
 {

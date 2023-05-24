@@ -646,6 +646,7 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 		ITERATE_LAYERS(request, qry, produce, packet);
 		if (!(request->state & KR_STATE_FAIL) && knot_wire_get_qr(packet->wire)) {
 			/* Produced an answer from cache, consume it. */
+			kr_server_selection_cached(qry);
 			qry->secret = 0;
 			request->state = KR_STATE_CONSUME;
 			ITERATE_LAYERS(request, qry, consume, packet);
