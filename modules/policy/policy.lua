@@ -863,24 +863,25 @@ Throws lua exceptions when detecting something fishy.
 \param subtree plain string
 \param options
   .auth targets are authoritative (false by default = resolver)
-  .tls use DoT (false by default, only for resolvers)
   .dnssec if overridden to false, don't validate DNSSEC locally
     - for resolvers we still do *not* send CD=1 upstream,
       i.e. we trust their DNSSEC validation.
     - for auths this inserts a negative trust anchor
       Beware that setting .set_insecure() *later* would override that.
-\param targets same format as policy.TLS_FORWARD()
+\param targets same format as policy.TLS_FORWARD() except that `tls = true`
+               can be specified for each address (defaults to false)
 --]]
 function policy.rule_forward_add(subtree, options, targets)
-	local port_default = 53
-	if options.tls or false then
-		port_default = 853
-		-- lots of code; easiest to just call it this way; checks and throws
-		policy.TLS_FORWARD(targets)
-	end
-
 	local targets_2 = {}
 	for _, target in ipairs(targets) do
+		local port_default = 53
+		if target.tls or false then
+			port_default = 853
+			-- lots of code; easiest to just call it this way; checks and throws
+			-- The extra .tls field gets ignored.
+			policy.TLS_FORWARD({target})
+		end
+
 		-- this also throws on failure
 		local sock = addr2sock(target[1], port_default)
 		if options.auth then
@@ -894,9 +895,9 @@ function policy.rule_forward_add(subtree, options, targets)
 
 	local subtree_dname = todname(subtree)
 	assert(ffi.C.kr_rule_forward(subtree_dname,
-			{ is_tcp = options.tls
-			, is_nods = options.dnssec == false
-			, is_auth = options.auth
+			{
+				is_nods = options.dnssec == false,
+				is_auth = options.auth,
 			},
 			targets_3
 		) == 0)

@@ -134,7 +134,7 @@ struct kr_rule_fwd_flags {
 	/// Beware of ABI: this struct is memcpy'd to/from rule DB.
 	bool
 		is_auth : 1,
-		is_tcp  : 1, /// forced TCP (e.g. DoT)
+		is_tcp  : 1, /// forced TCP; unused, not needed for DoT
 		is_nods : 1; /// disable local DNSSEC validation
 };
 typedef struct kr_rule_fwd_flags kr_rule_fwd_flags_t;
