@@ -11,8 +11,8 @@
 
 int pkt_renew(knot_pkt_t *pkt, const knot_dname_t *name, uint16_t type)
 {
-	/* Update packet question if needed. */
-	if (!knot_dname_is_equal(knot_pkt_qname(pkt), name)
+	/* Clear the packet if needed. */
+	if (pkt->rrset_count != 0 || !knot_dname_is_equal(knot_pkt_qname(pkt), name)
 	    || knot_pkt_qtype(pkt) != type || knot_pkt_qclass(pkt) != KNOT_CLASS_IN) {
 		int ret = kr_pkt_recycle(pkt);
 		if (ret) return kr_error(ret);
