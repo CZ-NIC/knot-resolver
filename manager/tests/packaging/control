@@ -8,6 +8,11 @@ Tests: kresctl.sh
 Tests-Directory: manager/tests/packaging
 
 
+{# Test that knot-resolver command exists and is in $PATH #}
+Tests: knot-resolver.sh
+Tests-Directory: manager/tests/packaging
+
+
 {# Tests that manager can be started with default config and it resolves some domains #}
 Tests: systemd_service.sh
 Tests-Directory: manager/tests/packaging

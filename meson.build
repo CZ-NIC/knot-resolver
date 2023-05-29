@@ -53,6 +53,7 @@ etc_dir = prefix / get_option('sysconfdir') / 'knot-resolver'
 lib_dir = prefix / get_option('libdir') / 'knot-resolver'
 modules_dir = lib_dir / 'kres_modules'
 sbin_dir = prefix / get_option('sbindir')
+bin_dir = prefix / get_option('bindir')
 run_dir = '/run' / 'knot-resolver'
 systemd_work_dir = prefix / get_option('localstatedir') / 'lib' / 'knot-resolver'
 systemd_cache_dir = prefix / get_option('localstatedir') / 'cache' / 'knot-resolver'

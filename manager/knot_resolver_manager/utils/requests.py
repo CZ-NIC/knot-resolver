@@ -1,7 +1,8 @@
 import socket
 from http.client import HTTPConnection
+import sys
 from typing import Any, Optional, Union
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.request import AbstractHTTPHandler, Request, build_opener, install_opener, urlopen
 
 from typing_extensions import Literal
@@ -35,6 +36,16 @@ def request(
             return Response(response.status, response.read().decode("utf8"))
     except HTTPError as err:
         return Response(err.code, err.read().decode("utf8"))
+    except URLError as err:
+        if err.errno == 111 or isinstance(err.reason, ConnectionRefusedError):
+            print("Connection refused.")
+            print(f"\tURL: {url}")
+            print("Is the URL correct?")
+            print("\tUnix socket would start with http+unix:// and URL encoded path.")
+            print("\tInet sockets would start with http:// and domain or ip")
+        else:
+            print(f"{err}: url={url}", file=sys.stderr)
+        sys.exit(1)
 
 
 # Code heavily inspired by requests-unixsocket

@@ -6,6 +6,7 @@ file to allow us to exclude the __main__.py file from black's autoformatting
 import argparse
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 from knot_resolver_manager import compat
 from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE
@@ -27,7 +28,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> None:
+def main() -> NoReturn:
     # initial logging is to memory until we read the config
     logger_startup()
 

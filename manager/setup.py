@@ -27,7 +27,8 @@ install_requires = \
  'typing-extensions']
 
 entry_points = \
-{'console_scripts': ['kresctl = knot_resolver_manager.cli.main:main']}
+{'console_scripts': ['knot-resolver = knot_resolver_manager.__main__:run',
+                     'kresctl = knot_resolver_manager.cli.main:main']}
 
 setup_kwargs = {
     'name': 'knot-resolver-manager',
