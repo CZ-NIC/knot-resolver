@@ -19,10 +19,10 @@ package_data = \
  'knot_resolver_manager.datamodel': ['templates/*', 'templates/macros/*']}
 
 install_requires = \
-['Jinja2',
- 'PyYAML',
- 'aiohttp',
+['aiohttp',
+ 'jinja2',
  'prometheus-client',
+ 'pyyaml',
  'supervisor',
  'typing-extensions']
 
@@ -34,17 +34,17 @@ setup_kwargs = {
     'name': 'knot-resolver-manager',
     'version': '0.1.0',
     'description': 'A central management tool for multiple instances of Knot Resolver',
-    'long_description': None,
+    'long_description': 'None',
     'author': 'Václav Šraier',
     'author_email': 'vaclav.sraier@nic.cz',
-    'maintainer': None,
-    'maintainer_email': None,
-    'url': None,
+    'maintainer': 'None',
+    'maintainer_email': 'None',
+    'url': 'None',
     'packages': packages,
     'package_data': package_data,
     'install_requires': install_requires,
     'entry_points': entry_points,
-    'python_requires': '>=3.6.8,<4.0.0',
+    'python_requires': '>=3.7,<4.0',
 }
 from build import *
 build(setup_kwargs)

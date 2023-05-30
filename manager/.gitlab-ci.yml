@@ -2,27 +2,29 @@ stages:
   - check
 
 default:
-  image: registry.nic.cz/knot/knot-resolver/ci/manager:knot-$KNOT_VERSION
+  image: $CI_REGISTRY/knot/knot-resolver/ci/manager:knot-$KNOT_VERSION
   before_script:
     - cd manager
+    - poetry --version
     - poetry env use $PYTHON_INTERPRETER
-    - poetry install --no-root
   tags:
     - docker
     - linux
     - amd64
 
-lint:py3.10:
+lint:py3.11:
   stage: check
   script:
+    - poetry install --only main,dev,lint
     - poe check
   variables:
-    PYTHON_INTERPRETER: python3.10
+    PYTHON_INTERPRETER: python3.11
 
 
 .unit: &unit
   stage: check
   script:
+    - poetry install --only main,dev,test
     # create required directories that are in default config, otherwise unit tests fail
     - mkdir -p /var/cache/knot-resolver
     - poe test
@@ -36,11 +38,6 @@ lint:py3.10:
       junit: manager/unit.junit.xml
     paths:
       - manager/unit.junit.xml
-
-unit:py3.6:
-  <<: *unit
-  variables:
-    PYTHON_INTERPRETER: python3.6
 
 unit:py3.7:
   <<: *unit
@@ -61,3 +58,8 @@ unit:py3.10:
   <<: *unit
   variables:
     PYTHON_INTERPRETER: python3.10
+
+unit:py3.11:
+  <<: *unit
+  variables:
+    PYTHON_INTERPRETER: python3.11

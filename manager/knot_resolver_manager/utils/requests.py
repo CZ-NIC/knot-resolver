@@ -78,7 +78,7 @@ class UnixHTTPHandler(AbstractHTTPHandler):
         super().__init__()
 
         def open_(self: UnixHTTPHandler, req: Any) -> Any:
-            return self.do_open(UnixHTTPConnection, req)
+            return self.do_open(UnixHTTPConnection, req)  # type: ignore[arg-type]
 
         setattr(UnixHTTPHandler, "http+unix_open", open_)
         setattr(UnixHTTPHandler, "http+unix_request", AbstractHTTPHandler.do_request_)

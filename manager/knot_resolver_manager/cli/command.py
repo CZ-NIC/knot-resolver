@@ -1,5 +1,5 @@
 import argparse
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod  # pylint: disable=[no-name-in-module]
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Type, TypeVar
 from urllib.parse import quote
@@ -53,7 +53,7 @@ class Command(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def __init__(self, namespace: argparse.Namespace) -> None:
+    def __init__(self, namespace: argparse.Namespace) -> None:  # pylint: disable=[unused-argument]
         super().__init__()
 
     @abstractmethod

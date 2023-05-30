@@ -5,13 +5,8 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Generator, Lis
 
 from prometheus_client import Histogram, exposition  # type: ignore
 from prometheus_client.bridge.graphite import GraphiteBridge  # type: ignore
-from prometheus_client.core import (  # type: ignore
-    REGISTRY,
-    CounterMetricFamily,
-    GaugeMetricFamily,
-    HistogramMetricFamily,
-    Metric,
-)
+from prometheus_client.core import GaugeMetricFamily  # type: ignore
+from prometheus_client.core import REGISTRY, CounterMetricFamily, HistogramMetricFamily, Metric
 
 from knot_resolver_manager import compat
 from knot_resolver_manager.config_store import ConfigStore, only_on_real_changes

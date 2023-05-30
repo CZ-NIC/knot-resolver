@@ -37,7 +37,7 @@ class PortNumber(IntRangeBase):
 
 
 class SizeUnit(UnitBase):
-    _units = {"B": 1, "K": 1024, "M": 1024 ** 2, "G": 1024 ** 3}
+    _units = {"B": 1, "K": 1024, "M": 1024**2, "G": 1024**3}
 
     def bytes(self) -> int:
         return self._value

@@ -15,7 +15,7 @@ assert isinstance(rd, Renamed) == True
 assert l = rl.original()
 """
 
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod  # pylint: disable=[no-name-in-module]
 from typing import Any, Dict, List, TypeVar
 
 

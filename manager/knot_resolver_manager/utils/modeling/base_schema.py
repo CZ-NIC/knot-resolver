@@ -1,6 +1,6 @@
 import enum
 import inspect
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod  # pylint: disable=[no-name-in-module]
 from typing import Any, Callable, Dict, Generic, List, Optional, Set, Tuple, Type, TypeVar, Union, cast
 
 import yaml
@@ -83,6 +83,7 @@ class _lazy_default(Generic[T], Serializable):
     """
 
     def __init__(self, constructor: Callable[..., T], *args: Any, **kwargs: Any) -> None:
+        # pylint: disable=[super-init-not-called]
         self._func = constructor
         self._args = args
         self._kwargs = kwargs
@@ -682,7 +683,7 @@ class BaseSchema(Serializable):
     _LAYER: Optional[Type["BaseSchema"]] = None
     _MAPPER: ObjectMapper = ObjectMapper()
 
-    def __init__(self, source: TSource = None, object_path: str = ""):
+    def __init__(self, source: TSource = None, object_path: str = ""):  # pylint: disable=[super-init-not-called]
         # save source data (and drop information about nullness)
         source = source or {}
         self.__source: Union[Dict[str, Any], BaseSchema] = source

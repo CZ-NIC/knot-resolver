@@ -47,11 +47,11 @@ def create_task(coro: Awaitable[T], name: Optional[str] = None) -> "asyncio.Task
     # version 3.8 and higher, call directly
     if sys.version_info.major >= 3 and sys.version_info.minor >= 8:
         # pylint: disable=unexpected-keyword-arg
-        return asyncio.create_task(coro, name=name)  # type: ignore[attr-defined]
+        return asyncio.create_task(coro, name=name)  # type: ignore[attr-defined,arg-type,call-arg]
 
     # version 3.7 and higher, call directly without the name argument
     if sys.version_info.major >= 3 and sys.version_info.minor >= 8:
-        return asyncio.create_task(coro)  # type: ignore[attr-defined]
+        return asyncio.create_task(coro)  # type: ignore[attr-defined,arg-type]
 
     # earlier versions, use older function
     else:
@@ -70,7 +70,7 @@ def run(coro: Awaitable[T], debug: Optional[bool] = None) -> T:
     # version 3.7 and higher, call directly
     # disabled due to incompatibilities
     if sys.version_info.major >= 3 and sys.version_info.minor >= 7:
-        return asyncio.run(coro, debug=debug)  # type: ignore[attr-defined]
+        return asyncio.run(coro, debug=debug)  # type: ignore[attr-defined,arg-type]
 
     # earlier versions, use backported version of the function
     if events._get_running_loop() is not None:  # pylint: disable=protected-access

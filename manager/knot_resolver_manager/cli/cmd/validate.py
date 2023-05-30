@@ -34,7 +34,6 @@ class ValidateCommand(Command):
         return {}
 
     def run(self, args: CommandArgs) -> None:
-
         if self.input_file:
             with open(self.input_file, "r") as f:
                 data = f.read()
