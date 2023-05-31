@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import DomainName, IDPattern, IPAddress, TimeUnit
-from knot_resolver_manager.datamodel.types.files import UncheckedPath, FilePath
+from knot_resolver_manager.datamodel.types.files import FilePath, UncheckedPath
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 

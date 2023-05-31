@@ -1,6 +1,6 @@
 import socket
-from http.client import HTTPConnection
 import sys
+from http.client import HTTPConnection
 from typing import Any, Optional, Union
 from urllib.error import HTTPError, URLError
 from urllib.request import AbstractHTTPHandler, Request, build_opener, install_opener, urlopen
