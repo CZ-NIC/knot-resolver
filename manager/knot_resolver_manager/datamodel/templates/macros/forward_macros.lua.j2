@@ -1,4 +1,4 @@
-{% from 'macros/common_macros.lua.j2' import boolean %}
+{% from 'macros/common_macros.lua.j2' import boolean, string_table %}
 
 {% macro forward_options(options) -%}
 {dnssec={{ boolean(options.dnssec) }},auth={{ boolean(options.authoritative) }}}
@@ -15,6 +15,9 @@ tls=false,
 {%- endif -%}
 {%- if server.hostname -%}
 hostname='{{ server.hostname }}',
+{%- endif -%}
+{%- if server.pin_sha256 -%}
+pin_sha256={{ string_table(server.pin_sha256) }},
 {%- endif -%}
 {%- if server.ca_file -%}
 ca_file='{{ server.ca_file }}',

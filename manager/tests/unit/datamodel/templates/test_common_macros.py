@@ -78,5 +78,5 @@ def test_tls_servers_table():
     assert tmpl.render(x=[d.address, t[1].address]) == f"{{'{d.address}','{t[1].address}',}}"
     assert (
         tmpl.render(x=t)
-        == f"{{{{'{d.address}',hostname='{d.hostname}',ca_file='{d.ca_file}',}},{{'{t[1].address}',pin_sha256='{t[1].pin_sha256}',}},}}"
+        == f"{{{{'{d.address}',hostname='{d.hostname}',ca_file='{d.ca_file}',}},{{'{t[1].address}',pin_sha256={{'{t[1].pin_sha256}',}}}},}}"
     )
