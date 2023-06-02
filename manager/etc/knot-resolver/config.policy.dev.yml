@@ -1,9 +1,9 @@
-rundir: etc/knot-resolver/runtime
+rundir: runtime
 workers: 1
 management:
   interface: 127.0.0.1@5000
 cache:
-  storage: ../cache
+  storage: cache
 logging:
   level: notice
   groups:
@@ -38,7 +38,7 @@ local-data:
     - type: nxdomain
       roots: [ sub4.example.org ]
   rpz:
-    - file: blocklist.rpz
+    - file: runtime/blocklist.rpz
       tags: [t01, t02]
 
 #   ttl: 1d
@@ -54,19 +54,18 @@ local-data:
 #      A 192.168.2.4
 #     local.example.org AAAA ::1
 
-# forward:
-#   - subtree: '.'
-#     servers:
-#       - address: [ 192.0.2.1, 192.0.2.2@5353 ]
-#         transport: tls
-#         pin-sha256: Wg==
-#       - address: 2001:DB8::d0c
-#         transport: tls
-#         hostname: res.example.com
-#         ca-file: /etc/knot-resolver/tlsca.crt
-#     options:
-#       dnssec: true  # default
-#   - subtree: 1.168.192.in-addr.arpa
-#     servers: [ 192.0.2.1@5353 ]
-#     options:
-#       dnssec: false # policy.STUB?
+forward:
+  - subtree: '.'
+    options:
+      dnssec: true
+      authoritative: false
+    servers:
+      - address: [2001:148f:fffe::1, 185.43.135.1]
+        transport: tls
+        hostname: odvr.nic.cz
+      - address: [ 192.0.2.1, 192.0.2.2 ]
+        pin-sha256: ['YQ==', 'Wg==']
+  - subtree: 1.168.192.in-addr.arpa
+    options:
+      dnssec: false
+    servers: [ 192.0.2.1@5353 ]
