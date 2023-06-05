@@ -2,7 +2,7 @@ import asyncio
 import itertools
 import logging
 import sys
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod  # pylint: disable=no-name-in-module
 from enum import Enum, auto
 from typing import Dict, Iterable, Optional, Type, TypeVar
 from weakref import WeakValueDictionary
