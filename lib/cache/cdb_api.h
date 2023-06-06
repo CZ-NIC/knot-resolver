@@ -57,8 +57,11 @@ struct kr_cdb_api {
 	int (*count)(kr_cdb_pt db, struct kr_cdb_stats *stat);
 	int (*clear)(kr_cdb_pt db, struct kr_cdb_stats *stat);
 
-	/** Run after a row of operations to release transaction/lock if needed. */
-	int (*commit)(kr_cdb_pt db, struct kr_cdb_stats *stat);
+	/** Run after a row of operations to release transaction/lock if needed.
+	 * \param accept true=commit / false=abort
+	 * \return error code - accepting RW transactions can fail with LMDB.
+	 */
+	int (*commit)(kr_cdb_pt db, struct kr_cdb_stats *stat, bool accept);
 
 	/* Data access */
 

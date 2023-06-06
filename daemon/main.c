@@ -612,12 +612,16 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	/* Starting everything succeeded, so commit rule DB changes. */
+	kr_rules_commit(true);
+
 	/* Run the event loop */
 	ret = run_worker(loop, &engine, fork_id == 0, the_args);
 
 cleanup:/* Cleanup. */
 	engine_deinit(&engine);
 	worker_deinit();
+	kr_rules_commit(false);
 	kr_rules_deinit();
 	if (loop != NULL) {
 		uv_loop_close(loop);

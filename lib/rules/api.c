@@ -167,7 +167,6 @@ int kr_rules_init(void)
 	knot_db_val_t key = { .data = key_rs, .len = sizeof(key_rs) };
 	knot_db_val_t rulesets = { .data = &RULESET_DEFAULT, .len = strlen(RULESET_DEFAULT) + 1 };
 	ret = ruledb_op(write, &key, &rulesets, 1);
-	if (ret == 0) ret = ruledb_op(commit);
 	if (ret == 0) return kr_ok();
 failure:
 	free(the_rules);
@@ -181,6 +180,12 @@ void kr_rules_deinit(void)
 	ruledb_op(close);
 	free(the_rules);
 	the_rules = NULL;
+}
+
+int kr_rules_commit(bool accept)
+{
+	if (!the_rules) return kr_error(EINVAL);
+	return ruledb_op(commit, accept);
 }
 
 static bool kr_rule_consume_tags(knot_db_val_t *val, const struct kr_request *req)
@@ -534,7 +539,11 @@ int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs,
 			+ rdataset_dematerialize_size(sig_rds);
 	knot_db_val_t val = { .data = NULL, .len = to_alloc };
 	int ret = ruledb_op(write, &key, &val, 1);
-	CHECK_RET(ret);
+	if (ret) {
+		// ENOSPC seems to be the only expectable error.
+		kr_assert(ret == kr_error(ENOSPC));
+		return kr_error(ret);
+	}
 
 	// Write all the data.
 	memcpy(val.data, &tags, sizeof(tags));
@@ -544,19 +553,14 @@ int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs,
 	rdataset_dematerialize(&rrs->rrs, val.data);
 	val.data += rr_ssize;
 	rdataset_dematerialize(sig_rds, val.data);
-
-	return ruledb_op(commit);
+	return kr_ok();
 }
 int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags)
 {
 	kr_require(the_rules);
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key = local_data_key(rrs, key_data, RULESET_DEFAULT);
-	int ret = ruledb_op(remove, &key, 1);
-	if (ret != 1)
-		return ret;
-	ret = ruledb_op(commit);
-	return ret == 0 ? 1 : ret;
+	return ruledb_op(remove, &key, 1);
 }
 
 /** Empty or NXDOMAIN or NODATA.  Returning kr_error(EAGAIN) means the rule didn't match. */
@@ -720,7 +724,11 @@ int insert_trivial_zone(val_zla_type_t ztype, uint32_t ttl,
 	if (has_ttl)
 		val.len += sizeof(ttl);
 	int ret = ruledb_op(write, &key, &val, 1);
-	CHECK_RET(ret);
+	if (ret) {
+		// ENOSPC seems to be the only expectable error.
+		kr_assert(ret == kr_error(ENOSPC));
+		return kr_error(ret);
+	}
 	memcpy(val.data, &tags, sizeof(tags));
 	val.data += sizeof(tags);
 	memcpy(val.data, &ztype, sizeof(ztype));
@@ -729,8 +737,7 @@ int insert_trivial_zone(val_zla_type_t ztype, uint32_t ttl,
 		memcpy(val.data, &ttl, sizeof(ttl));
 		val.data += sizeof(ttl);
 	}
-
-	return ruledb_op(commit);
+	return kr_ok();
 }
 
 int kr_rule_local_data_emptyzone(const knot_dname_t *apex, kr_rule_tags_t tags)
@@ -840,8 +847,7 @@ int kr_view_insert_action(const char *subnet, const char *action)
 		.data = (void *)/*const-cast*/action,
 		.len = strlen(action),
 	};
-	int ret = ruledb_op(write, &key, &val, 1);
-	return ret < 0 ? ret : ruledb_op(commit);
+	return ruledb_op(write, &key, &val, 1);
 }
 
 int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)

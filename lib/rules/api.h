@@ -21,6 +21,10 @@ int kr_rules_init(void);
 KR_EXPORT
 void kr_rules_deinit(void);
 
+/** Commit or abort changes done to the rule DB so far. */
+KR_EXPORT
+int kr_rules_commit(bool accept);
+
 /** Try answering the query from local data; WIP: otherwise determine data source overrides.
  *
  * \return kr_error() on errors, >0 if answered, 0 otherwise (also when forwarding)
@@ -47,7 +51,6 @@ int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)
 /* APIs to modify the rule DB.
  *
  * FIXME:
- *  - what about transactions in this API?
  *  - a way to read/modify a rule?
  */
 

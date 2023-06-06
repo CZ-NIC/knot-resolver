@@ -173,7 +173,7 @@ int put_rtt_state(const uint8_t *ip, size_t len, struct rtt_state state,
 				.data = &state };
 
 	int ret = cache->api->write(db, stats, &key, &value, 1);
-	cache->api->commit(db, stats);
+	cache->api->commit(db, stats, true);
 
 	free(key.data);
 	return ret;

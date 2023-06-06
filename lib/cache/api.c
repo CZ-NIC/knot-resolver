@@ -175,7 +175,7 @@ int kr_cache_commit(struct kr_cache *cache)
 		return kr_error(EINVAL);
 	}
 	if (cache->api->commit) {
-		return cache_op(cache, commit);
+		return cache_op(cache, commit, true);
 	}
 	return kr_ok();
 }

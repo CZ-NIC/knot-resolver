@@ -163,6 +163,5 @@ int kr_rule_forward(const knot_dname_t *apex, kr_rule_fwd_flags_t flags,
 		memcpy(val.data, &a, sizeof(a));
 		val.data += sizeof(a);
 	}
-
-	return ruledb_op(commit);
+	return kr_ok();
 }
