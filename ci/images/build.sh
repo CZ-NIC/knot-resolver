@@ -9,5 +9,15 @@ if [ -n "$COVERITY_SCAN_TOKEN" ]; then
 	SECRETS="$SECRETS --secret id=coverity-token,env=COVERITY_SCAN_TOKEN"
 fi
 
+DOCKERFILE="$(realpath "${IMAGE}")/Dockerfile"
+
+cd "$CURRENT_DIR/../.."
 export DOCKER_BUILDKIT=1 # Enables using secrets in docker-build
-docker build --pull --no-cache -t "${FULL_NAME}" "${IMAGE}" --build-arg KNOT_BRANCH=${KNOT_BRANCH} $SECRETS
+docker build \
+	--pull \
+	--no-cache \
+	--tag "${FULL_NAME}" \
+	--file "${DOCKERFILE}" \
+	. \
+	--build-arg KNOT_BRANCH=${KNOT_BRANCH} \
+	$SECRETS

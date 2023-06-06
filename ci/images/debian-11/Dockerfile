@@ -21,10 +21,12 @@ RUN apt-get install -y -qqq git make cmake pkg-config meson \
 
 # Build and testing deps for Resolver's dnstap module (go stuff is just for testing)
 RUN apt-get install -y -qqq \
-	protobuf-c-compiler libprotobuf-c-dev libfstrm-dev
-# Maintaining the go stuff in CI really seems more trouble than worth.
-#	golang-any
-#RUN bash -c "go get github.com/{FiloSottile/gvt,cloudflare/dns,dnstap/golang-dnstap,golang/protobuf/proto}"
+	protobuf-c-compiler libprotobuf-c-dev libfstrm-dev \
+	golang-any
+COPY ./tests/dnstap /root/tests/dnstap
+WORKDIR /root/tests/dnstap/src/dnstap-test
+RUN go get .
+WORKDIR /root
 
 # documentation dependencies
 RUN apt-get install -y -qqq doxygen python3-sphinx python3-breathe python3-sphinx-rtd-theme

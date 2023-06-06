@@ -25,9 +25,10 @@ RUN apt-get install -y -qqq git make cmake pkg-config meson \
 RUN apt-get install -y -qqq \
 	protobuf-c-compiler libprotobuf-c-dev libfstrm-dev \
 	golang-any
-# Some stuff won't work on buster:
-# package crypto/ed25519: unrecognized import path "crypto/ed25519"
-#RUN bash -c "go get github.com/{FiloSottile/gvt,cloudflare/dns,dnstap/golang-dnstap}"
+COPY ./tests/dnstap /root/tests/dnstap
+WORKDIR /root/tests/dnstap/src/dnstap-test
+RUN go get .
+WORKDIR /root
 
 # documentation dependencies
 RUN apt-get install -y -qqq doxygen python3-sphinx python3-breathe python3-sphinx-rtd-theme
@@ -41,7 +42,7 @@ RUN pip3 install pylint
 RUN pip3 install pep8
 RUN pip3 install pytest-xdist
 # tests/pytest dependencies: skip over broken versions
-RUN pip3 install 'dnspython != 2.0.0' jinja2 'pytest != 6.0.0' pytest-html pytest-xdist
+RUN pip3 install 'dnspython != 2.0.0' 'jinja2 == 2.11.3' 'pytest != 6.0.0' pytest-html pytest-xdist
 
 # packet capture tools for Deckard
 RUN apt-get install --no-install-suggests --no-install-recommends -y -qqq tcpdump wireshark-common
