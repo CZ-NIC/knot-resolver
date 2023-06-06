@@ -2,6 +2,7 @@ import asyncio
 import itertools
 import logging
 import sys
+from abc import ABC, abstractmethod  # pylint: disable=no-name-in-module
 from enum import Enum, auto
 from typing import Dict, Iterable, Optional, Type, TypeVar
 from weakref import WeakValueDictionary
@@ -91,7 +92,7 @@ class KresID:
         return self._id
 
 
-class Subprocess:
+class Subprocess(ABC):
     """
     One SubprocessInstance corresponds to one manager's subprocess
     """
@@ -142,14 +143,17 @@ class Subprocess:
     def __hash__(self) -> int:
         return hash(type(self)) ^ hash(self.type) ^ hash(self.id)
 
+    @abstractmethod
     async def _start(self) -> None:
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     async def _stop(self) -> None:
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     async def _restart(self) -> None:
-        raise NotImplementedError()
+        pass
 
     @property
     def type(self) -> SubprocessType:
@@ -192,31 +196,32 @@ class SubprocessStatus(Enum):
     UNKNOWN = auto()
 
 
-class SubprocessController:
+class SubprocessController(ABC):
     """
     The common Subprocess Controller interface. This is what KresManager requires and what has to be implemented by all
     controllers.
     """
 
+    @abstractmethod
     async def is_controller_available(self, config: KresConfig) -> bool:
         """
         Returns bool, whether the controller is available with the given config
         """
-        raise NotImplementedError()
 
+    @abstractmethod
     async def initialize_controller(self, config: KresConfig) -> None:
         """
         Should be called when we want to really start using the controller with a specific configuration
         """
-        raise NotImplementedError()
 
+    @abstractmethod
     async def get_all_running_instances(self) -> Iterable[Subprocess]:
         """
 
         Must NOT be called before initialize_controller()
         """
-        raise NotImplementedError()
 
+    @abstractmethod
     async def shutdown_controller(self) -> None:
         """
         Called when the manager is gracefully shutting down. Allows us to stop
@@ -225,8 +230,8 @@ class SubprocessController:
 
         Must NOT be called before initialize_controller()
         """
-        raise NotImplementedError()
 
+    @abstractmethod
     async def create_subprocess(self, subprocess_config: KresConfig, subprocess_type: SubprocessType) -> Subprocess:
         """
         Return a Subprocess object which can be operated on. The subprocess is not
@@ -235,8 +240,8 @@ class SubprocessController:
 
         Must NOT be called before initialize_controller()
         """
-        raise NotImplementedError()
 
+    @abstractmethod
     async def get_subprocess_status(self) -> Dict[KresID, SubprocessStatus]:
         """
         Get a status of running subprocesses as seen by the controller. This method  actively polls
@@ -244,4 +249,3 @@ class SubprocessController:
 
         Must NOT be called before initialize_controller()
         """
-        raise NotImplementedError()

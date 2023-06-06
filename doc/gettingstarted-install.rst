@@ -37,3 +37,7 @@ distribution.
 **openSUSE Leap/Tumbleweed**
 
 Add the `OBS <https://en.opensuse.org/Portal:Build_Service>`_ package repository `home:CZ-NIC:knot-resolver-latest <https://software.opensuse.org/download.html?project=home%3ACZ-NIC%3Aknot-resolver-latest&package=knot-resolver>`_ to your system.
+
+.. note::
+
+    If for some reason you need to **install Knot Resolver from source**, check out :ref:`building from sources <build>` documentation for developers.

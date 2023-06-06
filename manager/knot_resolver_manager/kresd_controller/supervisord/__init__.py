@@ -217,7 +217,7 @@ class SupervisordSubprocess(Subprocess):
 
 
 class SupervisordSubprocessController(SubprocessController):
-    def __init__(self):
+    def __init__(self):  # pylint: disable=super-init-not-called
         self._controller_config: Optional[KresConfig] = None
 
     def __str__(self):

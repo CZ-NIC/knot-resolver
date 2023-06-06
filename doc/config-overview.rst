@@ -31,6 +31,12 @@ checks for conformance to our :ref:`configuration-schema`.
         ERROR:knot_resolver_manager.server:multiple configuration errors detected:
                 [/management/interface] invalid port number 66000
                 [/logging/level] 'noticed' does not match any of the expected values ('crit', 'err', 'warning', 'notice', 'info', 'debug')
-    
+
     If you happen to find a rejected configuration with unhelpful or confusing error message, please report it as a bug.
 
+
+.. tip::
+
+    An easy way to see the complete configuration structure is to look at the `JSON schema <https://json-schema.org/>`_ represention.
+    The raw JSON schema is available at `this link <_static/config.schema.json>`_ (valid only for the version of resolver this documentation was generated for).
+    For the schema readability, some graphical visualizer can be used, for example `this one <https://json-schema.app/>`_.
