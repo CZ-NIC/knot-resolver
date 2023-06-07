@@ -11,7 +11,6 @@ disable=
     line-too-long,  # checked by flake8
     invalid-name,
     broad-except,
-    bad-continuation,
     global-statement,
     no-else-return,
     redefined-outer-name,  # commonly used with pytest fixtures

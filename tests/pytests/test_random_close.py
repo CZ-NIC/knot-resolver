@@ -18,7 +18,7 @@ import utils
 QPS = 500
 
 
-def random_string(size=32, chars=(string.ascii_lowercase + string.digits)):
+def random_string(size=32, chars=string.ascii_lowercase + string.digits):
     return ''.join(random.choice(chars) for x in range(size))
 
 
