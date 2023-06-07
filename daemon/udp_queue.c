@@ -40,7 +40,7 @@ typedef struct {
 	} items[UDP_QUEUE_LEN];
 } udp_queue_t;
 
-static udp_queue_t * udp_queue_create()
+static udp_queue_t * udp_queue_create(void)
 {
 	udp_queue_t *q = calloc(1, sizeof(*q));
 	kr_require(q != NULL);

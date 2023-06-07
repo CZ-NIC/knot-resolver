@@ -86,7 +86,7 @@ static inline tls_client_param_t *
 }
 
 /** Allocate and initialize the structure (with ->ref = 1). */
-tls_client_param_t * tls_client_param_new();
+tls_client_param_t * tls_client_param_new(void);
 /** Reference-counted free(); any inside data is freed alongside. */
 void tls_client_param_unref(tls_client_param_t *entry);
 

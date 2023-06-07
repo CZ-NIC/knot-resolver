@@ -139,7 +139,7 @@ bool kr_log_group_is_set(enum kr_log_group group);
 KR_EXPORT
 void kr_log_group_add(enum kr_log_group group);
 KR_EXPORT
-void kr_log_group_reset();
+void kr_log_group_reset(void);
 KR_EXPORT
 const char *kr_log_grp2name(enum kr_log_group group);
 KR_EXPORT

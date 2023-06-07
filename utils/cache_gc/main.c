@@ -30,7 +30,7 @@ static void got_killed(int signum)
 	}
 }
 
-static void print_help()
+static void print_help(void)
 {
 	printf("Usage: kr_cache_gc -c <resolver_cache> [ optional params... ]\n");
 	printf("Optional params:\n");
@@ -45,7 +45,7 @@ static void print_help()
 	printf(" -n (= dry run)\n");
 }
 
-static long get_nonneg_optarg()
+static long get_nonneg_optarg(void)
 {
 	char *end;
 	const long result = strtol(optarg, &end, 10);
