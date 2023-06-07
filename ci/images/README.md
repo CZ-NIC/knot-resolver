@@ -39,3 +39,11 @@ $ ./push.sh debian-11     # pushes the local image into target registry
 $ ./update.sh debian-11   # utility wrapper that both builds and pushes the image
 $ ./update.sh */          # use shell expansion of dirnames to update all images
 ```
+
+By default, a branch of Knot DNS deemed to be stable is selected according to
+the `vars.sh` file. To build an image for a different Knot DNS branch, set the
+`KNOT_BRANCH` environment variable to the name of the branch, e.g.:
+
+```
+$ KNOT_BRANCH='3.2' ./update.sh debian-11
+```
