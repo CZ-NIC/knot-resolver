@@ -12,7 +12,7 @@
 #include "kresconfig.h"
 #include "kr_cache_gc.h"
 
-volatile static int killed = 0;
+static volatile int killed = 0;
 
 static void got_killed(int signum)
 {
