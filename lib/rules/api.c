@@ -171,6 +171,8 @@ int kr_rules_init(void)
 failure:
 	free(the_rules);
 	the_rules = NULL;
+	auto_free const char *path = kr_absolutize_path(".", opts.path);
+	kr_log_error(RULES, "failed while opening or initializing rule DB %s/\n", path);
 	return ret;
 }
 
