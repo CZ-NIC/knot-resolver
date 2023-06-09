@@ -129,6 +129,7 @@ fallback:
 int kr_rule_forward(const knot_dname_t *apex, kr_rule_fwd_flags_t flags,
 			const struct sockaddr * targets[])
 {
+	ENSURE_the_rules;
 	const kr_rule_tags_t tags = KR_RULE_TAGS_ALL;
 	const val_zla_type_t ztype = VAL_ZLAT_FORWARD;
 

@@ -20,6 +20,12 @@ int rules_defaults_insert(void);
 struct kr_rules;
 extern struct kr_rules *the_rules;
 
+#define ENSURE_the_rules \
+	if (!the_rules) { \
+		int ret = kr_rules_init(NULL, 0); \
+		if (ret) return ret; \
+	}
+
 #define KEY_RULESET_MAXLEN 16 /**< max. len of ruleset ID + 1(for kind) */
 /** When constructing a key, it's convenient that the dname_lf ends on a fixed offset.
  * Convention: the end here is before the final '\0' byte (if any). */

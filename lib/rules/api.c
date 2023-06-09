@@ -62,7 +62,7 @@ static int tag_names_default(void)
 
 int kr_rule_tag_add(const char *tag, kr_rule_tags_t *tagset)
 {
-	kr_require(the_rules);
+	ENSURE_the_rules;
 	// Construct the DB key.
 	const uint8_t key_prefix[] = "\0tag_";
 	knot_db_val_t key;
@@ -128,20 +128,27 @@ int kr_rule_tag_add(const char *tag, kr_rule_tags_t *tagset)
 }
 
 
-int kr_rules_init(void)
+int kr_rules_init_ensure(void)
 {
-	kr_require(!the_rules);
+	if (the_rules)
+		return kr_ok();
+	return kr_rules_init(NULL, 0);
+}
+int kr_rules_init(const char *path, size_t maxsize)
+{
+	if (the_rules)
+		return kr_error(EINVAL);
 	the_rules = calloc(1, sizeof(*the_rules));
 	kr_require(the_rules);
 	the_rules->api = kr_cdb_lmdb();
 
 	struct kr_cdb_opts opts = {
 		.is_cache = false,
-		.path = "ruledb", // under current workdir
+		.path = path ? path : "ruledb", // under current workdir
 		// FIXME: the file will be sparse, but we still need to choose its size somehow.
 		// Later we might improve it to auto-resize in case of running out of space.
 		// Caveat: mdb_env_set_mapsize() can only be called without transactions open.
-		.maxsize = 10 * 1024*(size_t)1024,
+		.maxsize = maxsize ? maxsize : 100 * 1024*(size_t)1024,
 	};
 	int ret = the_rules->api->open(&the_rules->db, &the_rules->stats, &opts, NULL);
 	/* No persistence - we always refill from config for now.
@@ -171,8 +178,8 @@ int kr_rules_init(void)
 failure:
 	free(the_rules);
 	the_rules = NULL;
-	auto_free const char *path = kr_absolutize_path(".", opts.path);
-	kr_log_error(RULES, "failed while opening or initializing rule DB %s/\n", path);
+	auto_free const char *path_abs = kr_absolutize_path(".", opts.path);
+	kr_log_error(RULES, "failed while opening or initializing rule DB %s/\n", path_abs);
 	return ret;
 }
 
@@ -503,7 +510,6 @@ static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t ty
 	return kr_ok();
 }
 
-
 knot_db_val_t local_data_key(const knot_rrset_t *rrs, uint8_t key_data[KEY_MAXLEN],
 					const char *ruleset_name)
 {
@@ -526,7 +532,7 @@ knot_db_val_t local_data_key(const knot_rrset_t *rrs, uint8_t key_data[KEY_MAXLE
 int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_rds,
 				kr_rule_tags_t tags)
 {
-	kr_require(the_rules);
+	ENSURE_the_rules;
 	// Construct the DB key.
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key = local_data_key(rrs, key_data, RULESET_DEFAULT);
@@ -559,7 +565,7 @@ int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs,
 }
 int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags)
 {
-	kr_require(the_rules);
+	ENSURE_the_rules;
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key = local_data_key(rrs, key_data, RULESET_DEFAULT);
 	return ruledb_op(remove, &key, 1);
@@ -715,6 +721,7 @@ knot_db_val_t zla_key(const knot_dname_t *apex, uint8_t key_data[KEY_MAXLEN])
 int insert_trivial_zone(val_zla_type_t ztype, uint32_t ttl,
 			const knot_dname_t *apex, kr_rule_tags_t tags)
 {
+	ENSURE_the_rules;
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key = zla_key(apex, key_data);
 
@@ -820,7 +827,7 @@ bool subnet_is_prefix(uint8_t a, uint8_t b)
 
 int kr_view_insert_action(const char *subnet, const char *action)
 {
-	kr_require(the_rules);
+	ENSURE_the_rules;
 	// Parse the subnet string.
 	union kr_sockaddr saddr;
 	saddr.ip.sa_family = kr_straddr_family(subnet);

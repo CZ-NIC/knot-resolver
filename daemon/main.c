@@ -583,14 +583,6 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	ret = kr_rules_init();
-	if (ret) {
-		kr_log_error(RULES, "failed to initialize policy rule engine: %s\n",
-				kr_strerror(ret));
-		ret = EXIT_FAILURE;
-		goto cleanup;
-	}
-
 	for (i = 0; i < the_args->config.len; ++i) {
 		const char *config = the_args->config.at[i];
 		if (engine_loadconf(&engine, config) != 0) {
@@ -598,6 +590,14 @@ int main(int argc, char **argv)
 			goto cleanup;
 		}
 		lua_settop(engine.L, 0);
+	}
+
+	ret = kr_rules_init_ensure();
+	if (ret) {
+		kr_log_error(RULES, "failed to initialize policy rule engine: %s\n",
+				kr_strerror(ret));
+		ret = EXIT_FAILURE;
+		goto cleanup;
 	}
 
 	drop_capabilities();

@@ -15,8 +15,16 @@ typedef uint64_t kr_rule_tags_t;
 /// Tags "capacity", i.e. numbered from 0 to _CAP - 1.
 #define KR_RULE_TAGS_CAP (sizeof(kr_rule_tags_t) * 8)
 
+/** Open the rule DB.
+ *
+ * You can call this to override the path or size (NULL/0 -> default).
+ * Not allowed if already open (EINVAL), so this optional call has to come
+ * before writing anything into the DB. */
 KR_EXPORT
-int kr_rules_init(void);
+int kr_rules_init(const char *path, size_t maxsize);
+/** kr_rules_init() but OK if already open, and not allowing to override defaults. */
+KR_EXPORT
+int kr_rules_init_ensure(void);
 
 KR_EXPORT
 void kr_rules_deinit(void);

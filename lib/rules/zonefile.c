@@ -210,7 +210,7 @@ static void process_record(zs_scanner_t *s)
 
 int kr_rule_zonefile(const struct kr_rule_zonefile_config *c)
 {
-	kr_require(c && the_rules);
+	ENSURE_the_rules;
 	zs_scanner_t s_storage, *s = &s_storage;
 	/* zs_init(), zs_set_input_file(), zs_set_processing() returns -1 in case of error,
 	 * so don't print error code as it meaningless. */

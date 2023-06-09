@@ -289,6 +289,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	# FIXME: perhaps rename this exported symbol
 	packet_ttl
 # New policy
+	kr_rules_init
 	kr_view_insert_action
 	kr_view_select_action
 	kr_rule_tag_add
