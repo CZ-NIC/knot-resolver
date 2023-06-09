@@ -30,7 +30,7 @@ another program, e.g. a maintenance script.
    :ref:`systemd-multiple-instances`.
 
 When Knot Resolver is started using Systemd (see section
-:ref:`quickstart-startup`) it creates a control socket in path
+:ref:`gettingstarted-startup`) it creates a control socket in path
 ``/run/knot-resolver/control/$ID``. Connection to the socket can
 be made from command line using e.g. ``socat``:
 

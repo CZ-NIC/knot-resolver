@@ -49,6 +49,7 @@ BuildRequires:  pkgconfig(libcap-ng)
 BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
 BuildRequires:  jemalloc-devel
+BuildRequires:  python3-devel
 
 Requires:       systemd
 Requires(post): systemd
@@ -71,7 +72,6 @@ Requires(pre):  shadow-utils
 %endif
 %if 0%{?fedora} || 0%{?rhel} > 7
 BuildRequires:  pkgconfig(lmdb)
-BuildRequires:  python3-sphinx
 Requires:       lua5.1-basexx
 Requires:       lua5.1-cqueues
 Requires:       lua5.1-http
@@ -87,19 +87,7 @@ BuildRequires:  openssl-devel
 %if 0%{?suse_version}
 %define NINJA ninja
 BuildRequires:  lmdb-devel
-BuildRequires:  python3-Sphinx
 Requires(pre):  shadow
-%endif
-
-%if "x%{?rhel}" == "x"
-# dependencies for doc package
-# NOTE: doc isn't possible to build on CentOS 7, 8
-#       python2-sphinx is too old and python36-breathe is broken on CentOS 7
-#       python3-breathe isn't available for CentOS 8 (yet? rhbz#1808766)
-BuildRequires:  doxygen
-BuildRequires:  python3-breathe
-BuildRequires:  python3-sphinx_rtd_theme
-BuildRequires:  texinfo
 %endif
 
 %description
@@ -118,16 +106,6 @@ Requires:       %{name}%{?_isa} = %{version}-%{release}
 
 %description devel
 The package contains development headers for Knot Resolver.
-
-%if "x%{?rhel}" == "x"
-%package doc
-Summary:        Documentation for Knot Resolver
-BuildArch:      noarch
-Requires:       %{name} = %{version}-%{release}
-
-%description doc
-Documentation for Knot Resolver
-%endif
 
 %if "x%{?suse_version}" == "x"
 %package module-dnstap
@@ -159,6 +137,32 @@ queries. It can also serve DNS-over-HTTPS, but it is deprecated in favor of
 native C implementation, which doesn't require this package.
 %endif
 
+%package -n python3-knot-resolver-manager
+Summary:        Configuration tool for Knot Resolver
+Requires:       %{name} = %{version}-%{release}
+%if 0%{?rhel} == 8
+Requires:       python3
+Requires:       python3-pyyaml
+Requires:       python3-aiohttp
+Requires:       python3-typing-extensions
+Requires:       python3-prometheus_client
+Requires:       supervisor
+%endif
+%if 0%{?suse_version}
+Requires:		python3
+Requires:		python3-PyYAML
+Requires:		python3-aiohttp
+Requires:		python3-typing_extensions
+Requires:		python3-prometheus_client
+Requires:		supervisor
+%endif
+
+%description -n python3-knot-resolver-manager
+Knot Resolver Manager is a configuration tool for Knot Resolver. The Manager
+hides the complexity of running several independent resolver processes while
+ensuring zero-downtime reconfiguration with YAML/JSON declarative
+configuration and an optional HTTP API for dynamic changes.
+
 %prep
 %if 0%{GPG_CHECK}
 export GNUPGHOME=./gpg-keyring
@@ -170,9 +174,6 @@ gpg2 --verify %{SOURCE1} %{SOURCE0}
 
 %build
 CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
-%if "x%{?rhel}" == "x"
-    -Ddoc=enabled \
-%endif
     -Dsystemd_files=enabled \
     -Dclient=enabled \
 %if "x%{?suse_version}" == "x"
@@ -192,9 +193,10 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
     --sysconfdir="%{_sysconfdir}" \
 
 %{NINJA} -v -C build_rpm
-%if "x%{?rhel}" == "x"
-%{NINJA} -v -C build_rpm doc
-%endif
+
+pushd manager
+%py3_build
+popd
 
 %check
 meson test -C build_rpm
@@ -224,6 +226,15 @@ rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/prometheus.lua
 install -m 755 -d %{buildroot}/%{_pkgdocdir}
 mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 %endif
+
+# install knot-resolver-manager
+pushd manager
+%py3_install
+install -m 644 -D etc/knot-resolver/config.yml %{buildroot}%{_sysconfdir}/knot-resolver/config.yml
+install -m 644 -D shell-completion/client.bash %{buildroot}%{_datarootdir}/bash-completion/completions/kresctl
+install -m 644 -D shell-completion/client.fish %{buildroot}%{_datarootdir}/fish/completions/kresctl.fish
+
+popd
 
 %pre
 getent group knot-resolver >/dev/null || groupadd -r knot-resolver
@@ -350,20 +361,12 @@ fi
 %{_libdir}/knot-resolver/kres_modules/watchdog.lua
 %{_libdir}/knot-resolver/kres_modules/workarounds.lua
 %{_mandir}/man8/kresd.8.gz
+%{_mandir}/man8/kresctl.8.gz
 
 %files devel
 %{_includedir}/libkres
 %{_libdir}/pkgconfig/libkres.pc
 %{_libdir}/libkres.so
-
-%if "x%{?rhel}" == "x"
-%files doc
-%dir %{_pkgdocdir}
-%doc %{_pkgdocdir}/html
-%doc %{_datadir}/info/knot-resolver.info*
-%dir %{_datadir}/info/knot-resolver-figures
-%doc %{_datadir}/info/knot-resolver-figures/*
-%endif
 
 %if "x%{?suse_version}" == "x"
 %files module-dnstap
@@ -377,6 +380,15 @@ fi
 %{_libdir}/knot-resolver/kres_modules/http*.lua
 %{_libdir}/knot-resolver/kres_modules/prometheus.lua
 %endif
+
+%files -n python3-knot-resolver-manager
+%{python3_sitearch}/knot_resolver_manager*
+%{_sysconfdir}/knot-resolver/config.yml
+%{_unitdir}/knot-resolver.service
+%{_bindir}/kresctl
+%{_bindir}/knot-resolver
+%{_datarootdir}/bash-completion/completions/kresctl
+%{_datarootdir}/fish/completions/kresctl.fish
 
 %changelog
 * {{ now }} Jakub Ružička <jakub.ruzicka@nic.cz> - {{ version }}-{{ release }}

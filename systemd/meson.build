@@ -8,6 +8,7 @@ systemd_config.set('group', group)
 systemd_config.set('systemd_work_dir', systemd_work_dir)
 systemd_config.set('systemd_cache_dir', systemd_cache_dir)
 systemd_config.set('sbin_dir', sbin_dir)
+systemd_config.set('bin_dir', bin_dir)
 systemd_config.set('etc_dir', etc_dir)
 systemd_config.set('run_dir', run_dir)
 systemd_config.set('lib_dir', lib_dir)
@@ -28,6 +29,12 @@ if systemd_files == 'enabled'
   )
   install_data(
     sources: 'kresd.target',
+    install_dir: systemd_unit_dir,
+  )
+  manager_service = configure_file(
+    input: 'knot-resolver.service.in',
+    output: 'knot-resolver.service',
+    configuration: systemd_config,
     install_dir: systemd_unit_dir,
   )
 

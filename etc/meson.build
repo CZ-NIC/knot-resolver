@@ -27,9 +27,7 @@ if install_root_keys
   )
 endif
 
-
 subdir('config')
-
 
 install_data(
   sources: etc_files,

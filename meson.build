@@ -4,7 +4,7 @@ project(
   'knot-resolver',
   ['c', 'cpp'],
   license: 'GPLv3+',
-  version: '5.6.0',
+  version: '6.0.0a1',
   default_options: ['c_std=gnu11', 'b_ndebug=true'],
   meson_version: '>=0.49',
 )
@@ -52,12 +52,14 @@ etc_dir = prefix / get_option('sysconfdir') / 'knot-resolver'
 lib_dir = prefix / get_option('libdir') / 'knot-resolver'
 modules_dir = lib_dir / 'kres_modules'
 sbin_dir = prefix / get_option('sbindir')
+bin_dir = prefix / get_option('bindir')
 run_dir = '/run' / 'knot-resolver'
 systemd_work_dir = prefix / get_option('localstatedir') / 'lib' / 'knot-resolver'
 systemd_cache_dir = prefix / get_option('localstatedir') / 'cache' / 'knot-resolver'
 systemd_unit_dir = prefix / 'lib' / 'systemd' / 'system'
 systemd_tmpfiles_dir = prefix / 'lib' / 'tmpfiles.d'
 systemd_sysusers_dir = prefix / 'lib' / 'sysusers.d'
+completion_dir = prefix / 'share'
 
 ## Trust anchors
 managed_ta = get_option('managed_ta') == 'enabled'
@@ -212,6 +214,7 @@ subdir('lib')
 ## Remaining code
 subdir('daemon')
 subdir('modules')
+subdir('manager')
 subdir('utils')
 if get_option('bench') == 'enabled'
   subdir('bench')
@@ -297,6 +300,7 @@ run_target(
 # https://github.com/mesonbuild/meson/issues/2404
 s_managed_ta = managed_ta ? 'enabled' : 'disabled'
 s_install_root_keys = install_root_keys ? 'enabled' : 'disabled'
+s_build_manager = build_manager ? 'enabled' : 'disabled'
 s_build_client = build_client ? 'enabled' : 'disabled'
 s_build_utils = build_utils ? 'enabled' : 'disabled'
 s_build_dnstap = build_dnstap ? 'enabled' : 'disabled'
@@ -332,6 +336,7 @@ message('''
     cache_dir:          @0@'''.format(systemd_cache_dir) + '''
 
   optional components
+    manager:            @0@'''.format(s_build_manager) + '''
     client:             @0@'''.format(s_build_client) + '''
     utils:              @0@'''.format(s_build_utils) + '''
     dnstap:             @0@'''.format(s_build_dnstap) + '''

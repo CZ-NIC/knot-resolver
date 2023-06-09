@@ -1,0 +1,89 @@
+"""
+Implements JSON pointer resolution based on RFC 6901:
+https://www.rfc-editor.org/rfc/rfc6901
+"""
+
+
+from typing import Any, Optional, Tuple, Union
+
+# JSONPtrAddressable = Optional[Union[Dict[str, "JSONPtrAddressable"], List["JSONPtrAddressable"], int, float, bool, str, None]]
+JSONPtrAddressable = Any  # the recursive definition above is not valid :(
+
+
+class _JSONPtr:
+    @staticmethod
+    def _decode_token(token: str) -> str:
+        """
+        Resolves escaped characters ~ and /
+        """
+
+        # the order of the replace statements is important, do not change without
+        # consulting the RFC
+        return token.replace("~1", "/").replace("~0", "~")
+
+    @staticmethod
+    def _encode_token(token: str) -> str:
+        return token.replace("~", "~0").replace("/", "~1")
+
+    def __init__(self, ptr: str):
+        if ptr == "":
+            # pointer to the root
+            self.tokens = []
+
+        else:
+            if ptr[0] != "/":
+                raise SyntaxError(
+                    f"JSON pointer '{ptr}' invalid: the first character MUST be '/' or the pointer must be empty"
+                )
+
+            ptr = ptr[1:]
+            self.tokens = [_JSONPtr._decode_token(tok) for tok in ptr.split("/")]
+
+    def resolve(
+        self, obj: JSONPtrAddressable
+    ) -> Tuple[Optional[JSONPtrAddressable], JSONPtrAddressable, Union[str, int, None]]:
+        """
+        Returns (Optional[parent], Optional[direct value], key of value in the parent object)
+        """
+
+        parent: Optional[JSONPtrAddressable] = None
+        current = obj
+        current_ptr = ""
+        token: Union[int, str, None] = None
+
+        for token in self.tokens:
+            if current is None:
+                raise ValueError(
+                    f"JSON pointer cannot reference nested non-existent object: object at ptr '{current_ptr}' already points to None, cannot nest deeper with token '{token}'"
+                )
+
+            elif isinstance(current, (bool, int, float, str)):
+                raise ValueError(f"object at '{current_ptr}' is a scalar, JSON pointer cannot point into it")
+
+            else:
+                parent = current
+                if isinstance(current, list):
+                    if token == "-":
+                        current = None
+                    else:
+                        try:
+                            token = int(token)
+                            current = current[token]
+                        except ValueError:
+                            raise ValueError(
+                                f"invalid JSON pointer: list '{current_ptr}' require numbers as keys, instead got '{token}'"
+                            )
+
+                elif isinstance(current, dict):
+                    current = current.get(token, None)
+
+            current_ptr += f"/{token}"
+
+        return parent, current, token
+
+
+def json_ptr_resolve(
+    obj: JSONPtrAddressable,
+    ptr: str,
+) -> Tuple[Optional[JSONPtrAddressable], Optional[JSONPtrAddressable], Union[str, int, None]]:
+    return _JSONPtr(ptr).resolve(obj)

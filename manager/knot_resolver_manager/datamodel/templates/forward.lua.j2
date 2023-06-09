@@ -1,0 +1,7 @@
+{% from 'macros/forward_macros.lua.j2' import policy_rule_forward_add %}
+
+{% if cfg.forward %}
+{% for fwd in cfg.forward %}
+{{ policy_rule_forward_add(fwd) }}
+{% endfor %}
+{% endif %}

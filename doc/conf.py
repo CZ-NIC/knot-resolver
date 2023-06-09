@@ -13,7 +13,13 @@ if os.environ.get('READTHEDOCS', None) == 'True':
     subprocess.call('doxygen')
 
 # Add any Sphinx extension module names here, as strings.
-extensions = ['sphinx.ext.todo', 'sphinx.ext.viewcode', 'breathe']
+extensions = [
+    'sphinx.ext.todo',
+    'sphinx.ext.viewcode',
+    'sphinx_tabs.tabs',
+    'breathe',
+    'sphinx_mdinclude',
+]
 
 # Breathe configuration
 breathe_projects = {"libkres": "doxyxml"}
@@ -93,3 +99,10 @@ texinfo_documents = [
     ('index', 'knot-resolver', u'Knot Resolver', u'CZ.NIC Labs',
      'Knot Resolver', 'Caching DNS resolver.', 'Network services'),
 ]
+
+# reStructuredText that will be included at the beginning of every source file that is read.
+# This is a possible place to add substitutions that should be available in every file.
+rst_prolog = """
+.. |yaml| replace:: YAML
+.. |lua| replace:: Lua
+"""

@@ -1,0 +1,2 @@
+{# This adds all tests for manager's packaging #}
+{% include 'manager/tests/packaging/control' %}

@@ -18,6 +18,12 @@ man_kresd = configure_file(
 )
 install_man(man_kresd)
 
+man_kresctl = configure_file(
+  input: 'kresctl.8.in',
+  output: 'kresctl.8',
+  configuration: man_config,
+)
+install_man(man_kresctl)
 
 # html and info documentation
 if get_option('doc') == 'enabled'
@@ -32,22 +38,35 @@ if get_option('doc') == 'enabled'
   # python dependencies: breathe, sphinx_rtd_theme
   python_breathe = run_command('python3', '-c', 'import breathe', check: false)
   if python_breathe.returncode() != 0
-    # some distros might use python2 sphinx
     python_breathe = run_command('python2', '-c', 'import breathe', check: false)
     if python_breathe.returncode() != 0
       error('missing doc dependency: python breathe')
-    else
-      python_sphinx_rtd_theme = run_command('python2', '-c', 'import sphinx_rtd_theme', check: false)
-      if python_sphinx_rtd_theme.returncode() != 0
-	error('missing doc dependency: python sphinx_rtd_theme')
-      endif
     endif
+    python = 'python2'
   else
-    python_sphinx_rtd_theme = run_command('python3', '-c', 'import sphinx_rtd_theme', check: false)
-    if python_sphinx_rtd_theme.returncode() != 0
-      error('missing doc dependency: python sphinx_rtd_theme')
-    endif
+    python = 'python3'
   endif
+
+  python_sphinx_rtd_theme = run_command(python, '-c', 'import sphinx_rtd_theme', check: false)
+  if python_sphinx_rtd_theme.returncode() != 0
+    error('missing doc dependency: python sphinx_rtd_theme')
+  endif
+
+  python_sphinx_tabs = run_command(python, '-c', 'import sphinx_tabs', check: false)
+  if python_sphinx_tabs.returncode() != 0
+    error('missing doc dependency: python python-sphinx-tabs')
+  endif
+
+  jsonschema2md = find_program('jsonschema2md')
+  if not jsonschema2md.found()
+    error('missing doc dependency: python jsonschema2md')
+  endif
+
+  jsonschemaforhumans = run_command(python, '-c', 'import json_schema_for_humans', check: false)
+  if jsonschemaforhumans.returncode() != 0
+    error('missing doc dependency: python json-schema-for-humans')
+  endif
+
   message('------------------------')
 
   # install html docs
@@ -66,14 +85,15 @@ if get_option('doc') == 'enabled'
   endif
 endif
 
+
 make_doc = find_program('../scripts/make-doc.sh')
 run_target(
   'doc',
-  command: make_doc,
+  command: make_doc
 )
 
 
 run_target(
   'doc-strict',
-  command: [make_doc, '-W'],
+  command: [make_doc, '-W']
 )

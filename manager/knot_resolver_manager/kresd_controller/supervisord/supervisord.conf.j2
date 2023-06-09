@@ -1,0 +1,80 @@
+[supervisord]
+pidfile = {{ config.pid_file }}
+directory = {{ config.workdir }}
+nodaemon = true
+
+{# disable initial logging until patch_logger.py takes over #}
+logfile = /dev/null
+logfile_maxbytes = 0
+silent = true
+
+{# config for patch_logger.py #}
+loglevel = {{ config.loglevel }}
+{# there are more options in the plugin section #}
+
+
+[unix_http_server]
+file = {{ config.unix_http_server }}
+
+[supervisorctl]
+serverurl = unix://{{ config.unix_http_server }}
+
+{# Extensions to changing the supervisord behavior #}
+[rpcinterface:patch_logger]
+supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.patch_logger:inject
+target = {{ config.target }}
+
+[rpcinterface:manager_integration]
+supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.manager_integration:inject
+
+[rpcinterface:sd_notify]
+supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.sd_notify:inject
+
+{# Extensions for actual API control #}
+[rpcinterface:supervisor]
+supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
+
+[rpcinterface:fast]
+supervisor.rpcinterface_factory = knot_resolver_manager.kresd_controller.supervisord.plugin.fast_rpcinterface:make_main_rpcinterface
+
+
+
+[program:manager]
+redirect_stderr=false
+directory={{ manager.workdir }}
+command={{ manager.command }}
+stopsignal=SIGINT
+killasgroup=true
+autorestart=true
+autostart=true
+startsecs=5
+environment={{ manager.environment }},KRES_SUPRESS_LOG_PREFIX=true
+stdout_logfile=NONE
+stderr_logfile=NONE
+
+[program:kresd]
+process_name=%(program_name)s%(process_num)d
+numprocs={{ kresd.max_procs }}
+directory={{ kresd.workdir }}
+command={{ kresd.command }}
+autostart=false
+autorestart=true
+stopsignal=TERM
+killasgroup=true
+startsecs=10
+environment={{ kresd.environment }}
+stdout_logfile=NONE
+stderr_logfile=NONE
+
+[program:cache-gc]
+redirect_stderr=false
+directory={{ gc.workdir }}
+command={{ gc.command }}
+autostart=false
+autorestart=true
+stopsignal=TERM
+killasgroup=true
+startsecs=0
+environment={{ gc.environment }}
+stdout_logfile=NONE
+stderr_logfile=NONE

@@ -1,0 +1,43 @@
+{% from 'macros/common_macros.lua.j2' import boolean %}
+
+-- logging.level
+log_level('{{ cfg.logging.level }}')
+
+{% if cfg.logging.target -%}
+-- logging.target
+log_target('{{ cfg.logging.target }}')
+{%- endif %}
+
+{% if cfg.logging.groups %}
+-- logging.groups
+log_groups({
+{% for g in cfg.logging.groups %}
+{% if g != "manager" and g != "supervisord" %}
+    '{{ g }}',
+{% endif %}
+{% endfor %}
+})
+{% endif %}
+
+{% if cfg.logging.dnssec_bogus %}
+modules.load('bogus_log')
+{% endif %}
+
+{% if cfg.logging.dnstap -%}
+-- logging.dnstap
+modules.load('dnstap')
+dnstap.config({
+    socket_path = '{{ cfg.logging.dnstap.unix_socket }}',
+    client = {
+        log_queries = {{ boolean(cfg.logging.dnstap.log_queries) }},
+        log_responses = {{ boolean(cfg.logging.dnstap.log_responses) }},
+        log_tcp_rtt = {{ boolean(cfg.logging.dnstap.log_tcp_rtt) }}
+    }
+})
+{%- endif %}
+
+-- logging.debugging.assertion-abort
+debugging.assertion_abort = {{ boolean(cfg.logging.debugging.assertion_abort) }}
+
+-- logging.debugging.assertion-fork
+debugging.assertion_fork = {{ cfg.logging.debugging.assertion_fork.millis() }}
