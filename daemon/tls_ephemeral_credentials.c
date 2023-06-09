@@ -51,7 +51,7 @@ static void _lock_unlock(lock_t *lock, const char *fname)
 	}
 }
 
-static gnutls_x509_privkey_t get_ephemeral_privkey ()
+static gnutls_x509_privkey_t get_ephemeral_privkey (void)
 {
 	gnutls_x509_privkey_t privkey = NULL;
 	int err;

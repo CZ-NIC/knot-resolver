@@ -203,7 +203,7 @@ enum kr_log_group kr_log_name2grp(const char *name)
 
 
 
-static void kr_gnutls_log_level_set()
+static void kr_gnutls_log_level_set(void)
 {
 	/* gnutls logs messages related to our TLS and also libdnssec,
 	 * and the logging is set up in a global way only */
@@ -238,7 +238,7 @@ void kr_log_group_add(enum kr_log_group group)
 		kr_gnutls_log_level_set();
 }
 
-void kr_log_group_reset()
+void kr_log_group_reset(void)
 {
 	bool had_gnutls = kr_log_group_is_set(LOG_GRP_GNUTLS);
 	kr_log_groups = 0;

@@ -434,7 +434,7 @@ void kr_qflags_clear(struct kr_qflags *, struct kr_qflags);
 int kr_zonecut_add(struct kr_zonecut *, const knot_dname_t *, const void *, int);
 _Bool kr_zonecut_is_empty(struct kr_zonecut *);
 void kr_zonecut_set(struct kr_zonecut *, const knot_dname_t *);
-uint64_t kr_now();
+uint64_t kr_now(void);
 const char *kr_strptime_diff(const char *, const char *, const char *, double *);
 time_t kr_file_mtime(const char *);
 long long kr_fssize(const char *);

@@ -1224,7 +1224,7 @@ char *kr_rrset_text(const knot_rrset_t *rr)
 	return buf;
 }
 
-uint64_t kr_now()
+uint64_t kr_now(void)
 {
 	return uv_now(uv_default_loop());
 }

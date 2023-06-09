@@ -834,7 +834,7 @@ void tls_client_params_free(tls_client_params_t *params)
 	trie_free(params);
 }
 
-tls_client_param_t * tls_client_param_new()
+tls_client_param_t * tls_client_param_new(void)
 {
 	tls_client_param_t *e = calloc(1, sizeof(*e));
 	if (kr_fails_assert(e))

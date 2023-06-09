@@ -893,7 +893,7 @@ void io_tty_alloc(uv_handle_t *handle, size_t suggested, uv_buf_t *buf)
 	buf->base = malloc(suggested);
 }
 
-struct io_stream_data *io_tty_alloc_data() {
+struct io_stream_data *io_tty_alloc_data(void) {
 	knot_mm_t *pool = mm_ctx_mempool2(MM_DEFAULT_BLKSIZE);
 	if (!pool) {
 		return NULL;

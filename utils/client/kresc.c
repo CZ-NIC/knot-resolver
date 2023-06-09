@@ -346,7 +346,7 @@ static char *run_cmd(const char *cmd, size_t * out_len)
 	return msg;
 }
 
-static int interact()
+static int interact(void)
 {
 	EditLine *el;
 	History *hist;

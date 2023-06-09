@@ -503,7 +503,7 @@ static inline uint16_t kr_rrset_type_maysig(const knot_rrset_t *rr)
  * \note it may be outdated in case of long callbacks; see uv_now().
  */
 KR_EXPORT
-uint64_t kr_now();
+uint64_t kr_now(void);
 
 /** Call free(handle->data); it's useful e.g. as a callback in uv_close(). */
 KR_EXPORT void kr_uv_free_cb(uv_handle_t* handle);
